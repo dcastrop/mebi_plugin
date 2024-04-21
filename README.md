@@ -22,3 +22,15 @@ is the current TODO list.
     sequences of Coq tactics.
   - Tau transitions/weak bisimilarity?
   - Open terms/use of existing lemmas?
+
+## Scratchpad
+
+### Command that declares a relation as a "LTS-generating relation": 
+
+```
+MeBi LTS <ident>.
+```
+
+* `<ident>` should be the identifier of a relation with type `Term -> Action ->
+  Term -> Prop`.
+
