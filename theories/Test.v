@@ -1,4 +1,4 @@
-From Tuto1 Require Import Loader.
+Require Import MEBI.loader.
 
 (*** Printing user inputs ***)
 

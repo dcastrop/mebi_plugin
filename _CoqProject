@@ -1,9 +1,9 @@
-src/META.coq-plugin-tutorial
--R theories Tuto1
+src/META.coq-mebi
+-R theories MEBI 
 -I src
 
-theories/Loader.v
-theories/Demo.v
+theories/loader.v
+theories/Test.v
 
 src/inspector.mli
 src/inspector.ml
@@ -13,5 +13,5 @@ src/simple_declare.mli
 src/simple_declare.ml
 src/simple_print.ml
 src/simple_print.mli
-src/g_tuto1.mlg
-src/tuto1_plugin.mlpack
+src/g_mebi.mlg
+src/mebi_plugin.mlpack
