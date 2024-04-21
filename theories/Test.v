@@ -1,5 +1,7 @@
 Require Import MEBI.loader.
 
+MeBi LTS i.
+
 (*** Printing user inputs ***)
 
 Definition definition := 5.

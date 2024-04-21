@@ -15,6 +15,14 @@ open Stdarg
 
 }
 
+(*
+ * TODO: so far, classified as query. What it should do: read proposition, check
+ * it has the corret type. Print proposition.
+ *)
+VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
+| [ "MeBi" "LTS" ident(r) ] -> { Command.lts r }
+END
+
 (*** Printing inputs ***)
 
 (*

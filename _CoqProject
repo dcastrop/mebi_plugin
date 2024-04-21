@@ -5,6 +5,8 @@ src/META.coq-mebi
 theories/loader.v
 theories/Test.v
 
+src/command.mli
+src/command.ml
 src/inspector.mli
 src/inspector.ml
 src/simple_check.mli
