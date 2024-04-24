@@ -1,3 +1,4 @@
+.merlin
 *.ml*.d
 *.cm[ixt]*
 Makefile.coq*

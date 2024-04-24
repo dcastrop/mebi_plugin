@@ -1,1 +1,1 @@
-val lts : Names.Id.t -> unit
+val lts : Names.GlobRef.t -> unit

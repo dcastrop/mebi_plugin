@@ -1,97 +1,114 @@
 Require Import MEBI.loader.
 
+Inductive i := C0 (i : nat) | C1 (b : bool) (j : nat) | C2 (x : nat).
+
 MeBi LTS i.
 
-(*** Printing user inputs ***)
+Fail MeBi LTS j.
 
-Definition definition := 5.
-What's definition.
-What kind of term is definition.
-What kind of identifier is definition.
+Definition k := 0.
+Fail MeBi LTS k.
 
-What is 1 2 3 a list of.
-What is a list of. (* no arguments = empty list *)
+MeBi LTS nat.
+Definition nnat := nat.
+Fail MeBi LTS nnat.
 
-Is 1 2 3 nonempty.
-(* Is nonempty *) (* does not parse *)
+MeBi LTS False.
 
-And is 1 provided.
-And is provided.
+Inductive test_lts A : nat -> nat -> nat -> Prop := | less_lt (x : A) (i : nat) : test_lts A (S i) 1 i.
 
-(*** Interning terms ***)
+MeBi LTS test_lts.
 
-Intern 3.
-Intern definition.
-Intern (fun (x : Prop) => x).
-Intern (fun (x : Type) => x).
-Intern (forall (T : Type), T).
-Intern (fun (T : Type) (t : T) => t).
-Intern _.
-Intern (Type : Type).
+(* (*** Printing user inputs ***) *)
 
-(*** Defining terms ***)
+(* Definition definition := 5. *)
+(* What's definition. *)
+(* What kind of term is definition. *)
+(* What kind of identifier is definition. *)
 
-MyDefine n := 1.
-Print n.
+(* What is 1 2 3 a list of. *)
+(* What is a list of. (* no arguments = empty list *) *)
 
-MyDefine f := (fun (x : Type) => x).
-Print f.
+(* Is 1 2 3 nonempty. *)
+(* (* Is nonempty *) (* does not parse *) *)
 
-(*** Printing terms ***)
+(* And is 1 provided. *)
+(* And is provided. *)
 
-MyPrint f.
-MyPrint n.
-Fail MyPrint nat.
+(* (*** Interning terms ***) *)
 
-DefineLookup n' := 1.
-DefineLookup f' := (fun (x : Type) => x).
+(* Intern 3. *)
+(* Intern definition. *)
+(* Intern (fun (x : Prop) => x). *)
+(* Intern (fun (x : Type) => x). *)
+(* Intern (forall (T : Type), T). *)
+(* Intern (fun (T : Type) (t : T) => t). *)
+(* Intern _. *)
+(* Intern (Type : Type). *)
 
-(*** Checking terms ***)
+(* (*** Defining terms ***) *)
 
-Check1 3.
-Check1 definition.
-Check1 (fun (x : Prop) => x).
-Check1 (fun (x : Type) => x).
-Check1 (forall (T : Type), T).
-Check1 (fun (T : Type) (t : T) => t).
-Check1 _.
-Check1 (Type : Type).
+(* MyDefine n := 1. *)
+(* Print n. *)
 
-Check2 3.
-Check2 definition.
-Check2 (fun (x : Prop) => x).
-Check2 (fun (x : Type) => x).
-Check2 (forall (T : Type), T).
-Check2 (fun (T : Type) (t : T) => t).
-Check2 _.
-Check2 (Type : Type).
+(* MyDefine f := (fun (x : Type) => x). *)
+(* Print f. *)
 
-(*** Convertibility ***)
+(* (*** Printing terms ***) *)
 
-Convertible 1 1.
-Convertible (fun (x : Type) => x) (fun (x : Type) => x).
-Convertible Type Type.
-Convertible 1 ((fun (x : nat) => x) 1).
+(* MyPrint f. *)
+(* MyPrint n. *)
+(* Fail MyPrint nat. *)
 
-Convertible 1 2.
-Convertible (fun (x : Type) => x) (fun (x : Prop) => x).
-Convertible Type Prop.
-Convertible 1 ((fun (x : nat) => x) 2).
+(* DefineLookup n' := 1. *)
+(* DefineLookup f' := (fun (x : Type) => x). *)
 
-(*** Introducing variables ***)
+(* (*** Checking terms ***) *)
 
-Theorem foo:
-  forall (T : Set) (t : T), T.
-Proof.
-  my_intro T. my_intro t. apply t.
-Qed.
+(* Check1 3. *)
+(* Check1 definition. *)
+(* Check1 (fun (x : Prop) => x). *)
+(* Check1 (fun (x : Type) => x). *)
+(* Check1 (forall (T : Type), T). *)
+(* Check1 (fun (T : Type) (t : T) => t). *)
+(* Check1 _. *)
+(* Check1 (Type : Type). *)
 
-(*** Exploring proof state ***)
+(* Check2 3. *)
+(* Check2 definition. *)
+(* Check2 (fun (x : Prop) => x). *)
+(* Check2 (fun (x : Type) => x). *)
+(* Check2 (forall (T : Type), T). *)
+(* Check2 (fun (T : Type) (t : T) => t). *)
+(* Check2 _. *)
+(* Check2 (Type : Type). *)
 
-Fail ExploreProof. (* not in a proof *)
+(* (*** Convertibility ***) *)
 
-Theorem bar:
-  forall (T : Set) (t : T), T.
-Proof.
-  ExploreProof. my_intro T. ExploreProof. my_intro t. ExploreProof. apply t.
-Qed.
+(* Convertible 1 1. *)
+(* Convertible (fun (x : Type) => x) (fun (x : Type) => x). *)
+(* Convertible Type Type. *)
+(* Convertible 1 ((fun (x : nat) => x) 1). *)
+
+(* Convertible 1 2. *)
+(* Convertible (fun (x : Type) => x) (fun (x : Prop) => x). *)
+(* Convertible Type Prop. *)
+(* Convertible 1 ((fun (x : nat) => x) 2). *)
+
+(* (*** Introducing variables ***) *)
+
+(* Theorem foo: *)
+(*   forall (T : Set) (t : T), T. *)
+(* Proof. *)
+(*   my_intro T. my_intro t. apply t. *)
+(* Qed. *)
+
+(* (*** Exploring proof state ***) *)
+
+(* Fail ExploreProof. (* not in a proof *) *)
+
+(* Theorem bar: *)
+(*   forall (T : Set) (t : T), T. *)
+(* Proof. *)
+(*   ExploreProof. my_intro T. ExploreProof. my_intro t. ExploreProof. apply t. *)
+(* Qed. *)
