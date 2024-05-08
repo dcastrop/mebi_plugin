@@ -6,7 +6,7 @@ let rec split_at i l acc =
     else
       match l with
       | [] -> (acc, [])
-      | h :: t -> split_at (i-1) (h :: acc) t;;
+      | h :: t -> split_at (i-1) t (h :: acc);;
 
 let test_constr_match t =
   let open Constr in
@@ -16,12 +16,20 @@ let test_constr_match t =
   | Sort _ -> Feedback.msg_notice (strbrk "A sort")
   | _ -> Feedback.msg_notice (strbrk "Not a var")
 
-let check_lts_idx = function
-  | [t1; a; t2; prop] ->
+let check_lts_idx env sigma = function
+  | [t1; a; t2] ->
     Feedback.msg_notice (strbrk "Correct shape")
-  | _ ->
+  | typs ->
     CErrors.user_err (str "Expecting LTS of the form '?Term -> ?Action -> ?Term \
-    -> Prop (FIXME: format error)")
+    -> Prop (FIXME: format error)" ++ int (List.length typs))
+
+let print_arity env sigma a =
+  let open Declarations in
+  match a with
+  | RegularArity ar -> Feedback.msg_notice
+                         (str "Arity: " ++
+                          Printer.pr_constr_env env sigma ar.mind_user_arity)
+  | _ -> CErrors.user_err (str "Expecting 'RegularArity'")
 
 
 (** Builds a LTS from a Term [t : T] and an LTS [P : forall Ts, T -> A -> T -> Prop]
@@ -35,8 +43,10 @@ let lts (gref : Names.GlobRef.t) : unit =
   | IndRef i ->
     let (mib, mip) = Inductive.lookup_mind_specif env i in
     let i_ctx = mip.mind_arity_ctxt in
+    let i_ar = mip.mind_arity in
+    print_arity env sigma i_ar;
     let i_parms, i_idx = split_at mip.mind_nrealdecls i_ctx [] in
-    check_lts_idx i_idx;
+    check_lts_idx env sigma i_idx;
     let i_types = List.map Context.Rel.Declaration.get_type i_idx in
     let _ = List.map test_constr_match i_types in
     Feedback.msg_notice

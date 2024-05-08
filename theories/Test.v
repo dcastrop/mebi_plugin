@@ -19,12 +19,16 @@ CoInductive co_nat := CoZ | CoS : co_nat -> co_nat.
 
 Inductive test_lts A : co_nat -> nat -> nat -> Prop := | less_lt (x : A) (i : co_nat) (j : nat) : test_lts A (CoS i) 1 j.
 
-Fail MeBi LTS test_lts.
+MeBi LTS test_lts.
 
 Inductive test_mut A : Prop := Mk1 (x : A) (y : test_mut2 A)
 with test_mut2 A : Prop := Mk2 (y : test_mut A).
 
 Fail MeBi LTS test_mut2.
+
+Inductive testLTS : nat -> bool -> nat -> Prop := test1 : testLTS (S 0) true 0.
+
+MeBi LTS testLTS.
 
 (* (*** Printing user inputs ***) *)
 
