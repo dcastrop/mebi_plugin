@@ -19,6 +19,11 @@ Inductive test_lts A : nat -> nat -> nat -> Prop := | less_lt (x : A) (i : nat) 
 
 MeBi LTS test_lts.
 
+Inductive test_mut A : Prop := Mk1 (x : A) (y : test_mut2 A)
+with test_mut2 A : Prop := Mk2 (y : test_mut A).
+
+MeBi LTS test_mut2.
+
 (* (*** Printing user inputs ***) *)
 
 (* Definition definition := 5. *)
