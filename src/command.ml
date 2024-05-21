@@ -16,18 +16,8 @@ let rec split_at i l acc =
 (*   | Sort _ -> Feedback.msg_notice (strbrk "A sort") *)
 (*   | _ -> Feedback.msg_notice (strbrk "Not a var") *)
 
-let check_lts_idx env sigma = function
-  | [t1; a; t2] ->
-    if Context.Rel.Declaration.equal Constr.equal t1 t2 then
-      Feedback.msg_notice (strbrk "Correct shape")
-    else
-      CErrors.user_err (str "Expecting LTS of the form '?Term -> ?Action -> ?Term \
-    -> Prop (FIXME: format error)")
-  | typs ->
-    CErrors.user_err (str "Expecting LTS of the form '?Term -> ?Action -> ?Term \
-    -> Prop (FIXME: format error)")
 
-let check_arity env sigma a =
+let arity_is_Prop env sigma a =
   let open Declarations in
   match a with
   | RegularArity ar ->
@@ -38,6 +28,16 @@ let check_arity env sigma a =
                         str "). Expecting Prop.")
   | TemplateArity _ ->
       CErrors.user_err (str "Expecting LTS in Prop.")
+
+let check_lts_labels_and_terms env sigma = function
+  | [t1; a; t2] ->
+    if Context.Rel.Declaration.equal Constr.equal t1 t2 then (a, t1)
+    else
+      CErrors.user_err (str "Expecting LTS of the form '?Term -> ?Action -> ?Term \
+    -> Prop (FIXME: format error)")
+  | typs ->
+    CErrors.user_err (str "Expecting LTS of the form '?Term -> ?Action -> ?Term \
+    -> Prop (FIXME: format error)")
 
 
 (** Builds a LTS from a Term [t : T] and an LTS [P : forall Ts, T -> A -> T -> Prop]
@@ -52,16 +52,18 @@ let lts (iref : Names.GlobRef.t) : unit =
     let (mib, mip) = Inductive.lookup_mind_specif env i in
     let i_ctx = mip.mind_arity_ctxt in
     let i_ar = mip.mind_arity in
-    check_arity env sigma i_ar;
+    arity_is_Prop env sigma i_ar;
     let i_parms, i_idx = split_at mip.mind_nrealdecls i_ctx [] in
-    check_lts_idx env sigma i_idx;
-    let i_types = List.map Context.Rel.Declaration.get_type i_idx in
+    let (lbls, terms) = check_lts_labels_and_terms env sigma i_idx in
 
-
+    (* let i_types = List.map Context.Rel.Declaration.get_type i_idx in *)
     (* let _ = List.map test_constr_match i_types in *)
+
     Feedback.msg_notice
-      (strbrk "Types of idxs: " ++
-       seq (List.map (Printer.pr_constr_env env sigma) i_types));
+      (str "Types of terms: " ++  Printer.pr_rel_decl env sigma terms ++ strbrk "");
+
+    Feedback.msg_notice
+      (str "Types of labels: " ++  Printer.pr_rel_decl env sigma lbls ++ strbrk "");
 
     Feedback.msg_notice (strbrk "Type " ++ Names.Id.print mip.mind_typename ++
                          strbrk " has " ++ int (Array.length mip.mind_consnames) ++
