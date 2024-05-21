@@ -60,7 +60,8 @@ let lts (iref : Names.GlobRef.t) : unit =
     (* let _ = List.map test_constr_match i_types in *)
 
     Feedback.msg_notice
-      (str "Types of terms: " ++  Printer.pr_rel_decl env sigma terms ++ strbrk "");
+      (str "Types of terms: " ++
+       Printer.pr_constr_env env sigma (Context.Rel.Declaration.get_type terms)++ strbrk "");
 
     Feedback.msg_notice
       (str "Types of labels: " ++  Printer.pr_rel_decl env sigma lbls ++ strbrk "");
