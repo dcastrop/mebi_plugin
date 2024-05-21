@@ -8,51 +8,60 @@ let rec split_at i l acc =
       | [] -> (acc, [])
       | h :: t -> split_at (i-1) t (h :: acc);;
 
-let test_constr_match t =
-  let open Constr in
-  match kind t with
-  | Var v -> Feedback.msg_notice (strbrk "Is a var")
-  | Ind (_, _) -> Feedback.msg_notice (strbrk "An inductive type")
-  | Sort _ -> Feedback.msg_notice (strbrk "A sort")
-  | _ -> Feedback.msg_notice (strbrk "Not a var")
+(* let test_constr_match t = *)
+(*   let open Constr in *)
+(*   match kind t with *)
+(*   | Var v -> Feedback.msg_notice (strbrk "Is a var") *)
+(*   | Ind (_, _) -> Feedback.msg_notice (strbrk "An inductive type") *)
+(*   | Sort _ -> Feedback.msg_notice (strbrk "A sort") *)
+(*   | _ -> Feedback.msg_notice (strbrk "Not a var") *)
 
 let check_lts_idx env sigma = function
   | [t1; a; t2] ->
-    Feedback.msg_notice (strbrk "Correct shape")
+    if Context.Rel.Declaration.equal Constr.equal t1 t2 then
+      Feedback.msg_notice (strbrk "Correct shape")
+    else
+      CErrors.user_err (str "Expecting LTS of the form '?Term -> ?Action -> ?Term \
+    -> Prop (FIXME: format error)")
   | typs ->
     CErrors.user_err (str "Expecting LTS of the form '?Term -> ?Action -> ?Term \
-    -> Prop (FIXME: format error)" ++ int (List.length typs))
+    -> Prop (FIXME: format error)")
 
-let print_arity env sigma a =
+let check_arity env sigma a =
   let open Declarations in
   match a with
-  | RegularArity ar -> Feedback.msg_notice
-                         (str "Arity: " ++
-                          Printer.pr_constr_env env sigma ar.mind_user_arity)
-  | _ -> CErrors.user_err (str "Expecting 'RegularArity'")
+  | RegularArity ar ->
+    if Sorts.is_prop ar.mind_sort then
+      ()
+    else
+      CErrors.user_err (str "Invalid sort (" ++ Printer.pr_sort sigma ar.mind_sort ++
+                        str "). Expecting Prop.")
+  | TemplateArity _ ->
+      CErrors.user_err (str "Expecting LTS in Prop.")
 
 
 (** Builds a LTS from a Term [t : T] and an LTS [P : forall Ts, T -> A -> T -> Prop]
  *  Constraints:
  *  - [T \& A \not\in Ts]
  *)
-let lts (gref : Names.GlobRef.t) : unit =
+let lts (iref : Names.GlobRef.t) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  match gref with
+  match iref with
   | IndRef i ->
     let (mib, mip) = Inductive.lookup_mind_specif env i in
     let i_ctx = mip.mind_arity_ctxt in
     let i_ar = mip.mind_arity in
-    print_arity env sigma i_ar;
+    check_arity env sigma i_ar;
     let i_parms, i_idx = split_at mip.mind_nrealdecls i_ctx [] in
     check_lts_idx env sigma i_idx;
     let i_types = List.map Context.Rel.Declaration.get_type i_idx in
-    let _ = List.map test_constr_match i_types in
+
+
+    (* let _ = List.map test_constr_match i_types in *)
     Feedback.msg_notice
       (strbrk "Types of idxs: " ++
        seq (List.map (Printer.pr_constr_env env sigma) i_types));
-
 
     Feedback.msg_notice (strbrk "Type " ++ Names.Id.print mip.mind_typename ++
                          strbrk " has " ++ int (Array.length mip.mind_consnames) ++
@@ -62,5 +71,5 @@ let lts (gref : Names.GlobRef.t) : unit =
                          int (List.length i_idx) ++
                          str " and nrealdecls = " ++
                          int (mip.mind_nrealdecls))
-  | _ -> CErrors.user_err (str "Reference '" ++ Printer.pr_global gref ++
+  | _ -> CErrors.user_err (str "Reference '" ++ Printer.pr_global iref ++
                            str "' does not define a LTS.")
