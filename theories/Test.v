@@ -2,33 +2,38 @@ Require Import MEBI.loader.
 
 Inductive i := C0 (i : nat) | C1 (b : bool) (j : nat) | C2 (x : nat).
 
-Fail MeBi LTS i.
+Fail MeBi LTS i 0.
 
-Fail MeBi LTS j.
+Fail MeBi LTS j 0.
 
 Definition k := 0.
-Fail MeBi LTS k.
+Fail MeBi LTS k 0.
 
-Fail MeBi LTS nat.
+Fail MeBi LTS nat 0.
 Definition nnat := nat.
-Fail MeBi LTS nnat.
+Fail MeBi LTS nnat 0.
 
-Fail MeBi LTS False.
+Fail MeBi LTS False 0.
 
 CoInductive co_nat := CoZ | CoS : co_nat -> co_nat.
 
 Inductive test_lts A : co_nat -> nat -> nat -> Prop := | less_lt (x : A) (i : co_nat) (j : nat) : test_lts A (CoS i) 1 j.
 
-Fail MeBi LTS test_lts.
+Fail MeBi LTS test_lts 0.
 
 Inductive test_mut A : Prop := Mk1 (x : A) (y : test_mut2 A)
 with test_mut2 A : Prop := Mk2 (y : test_mut A).
 
-Fail MeBi LTS test_mut2.
+Fail MeBi LTS test_mut2 0.
+
 
 Inductive testLTS : nat -> bool -> nat -> Prop := test1 : testLTS (S 0) true 0.
 
-MeBi LTS testLTS.
+Definition one := 2.
+
+MeBi LTS testLTS one.
+
+Fail MeBi LTS testLTS false.
 
 (* (*** Printing user inputs ***) *)
 
