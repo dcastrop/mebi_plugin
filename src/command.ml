@@ -32,13 +32,26 @@ let arity_is_Prop env sigma mip =
 
 let get_labels_and_terms env sigma = function
   | [t1; a; t2] ->
-    if Context.Rel.Declaration.equal Constr.equal t1 t2 then (a, t1)
+    let open Context.Rel in
+    if Declaration.equal Constr.equal t1 t2 then (a, t1)
     else
-      CErrors.user_err (str "Expecting LTS of the form '?Term -> ?Action -> ?Term \
-    -> Prop (FIXME: format error)")
-  | typs ->
-    CErrors.user_err (str "Expecting LTS of the form '?Term -> ?Action -> ?Term \
-    -> Prop (FIXME: format error)")
+      CErrors.user_err
+        (str "Expecting arity \"term -> label -> term -> Prop\". Type mismatch: " ++
+         Printer.pr_rel_decl env sigma t1 ++
+         str " <=> " ++
+         Printer.pr_rel_decl env sigma t2 ++
+         strbrk ".")
+  | _ ->
+    CErrors.user_err (str "Expecting arity \"term -> label -> term -> Prop\".")
+
+let _fresh_typed_name avoid env sigma =
+  let nn = Tactics.fresh_id_in_env avoid Namegen.default_type_ident env in
+  let nn = Context.nameR nn in
+
+  let sigma, s = Evd.new_sort_variable Evd.univ_rigid sigma in
+  let new_type = EConstr.mkSort s in
+  let sigma, arg_type = Evarutil.new_evar env sigma new_type in
+  sigma, (nn, arg_type)
 
 let get_lts_labels_and_terms env sigma mip =
     let open Declarations in
