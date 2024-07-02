@@ -76,17 +76,88 @@ let check_ref_lts env sigma gref =
       (str "Reference '" ++ Printer.pr_global gref ++ str "' does not define a LTS.")
 ;;
 
-(** Builds a LTS from a Term [t : T] and an LTS [P : forall Ts, T -> A -> T -> Prop]
-    *  Constraints:
-    *  - [T \& A \not\in Ts] *)
+let get_constructors env sigma gref =
+  let open Names.GlobRef in
+  match gref with
+  | IndRef i ->
+    let _, mip = Inductive.lookup_mind_specif env i in
+    mip.mind_consnames, mip.mind_nf_lc
+  | _ -> assert false
+;;
+
+(** Checks possible transitions for this term:
+    TODO: lots of doubts
+    - Conversion.CUMUL?
+    - Is [w_unify] the best way?
+    - ... *)
+let check_valid_constructor env sigma gref t term_ty lbl_ty transitions =
+  let open Names.GlobRef in
+  match gref with
+  | IndRef i ->
+    let mib, _ = Inductive.lookup_mind_specif env i in
+    let univ = mib.mind_univ_hyps in
+    Array.fold_left
+      (fun (sigma, acc) tm ->
+        try
+          let sigma, act = Evarutil.new_evar env sigma lbl_ty in
+          let sigma, term' = Evarutil.new_evar env sigma term_ty in
+          let to_unif =
+            EConstr.mkApp
+              (EConstr.mkIndU (i, EConstr.EInstance.make univ), [| t; act; term' |])
+          in
+          let sigma =
+            Unification.w_unify
+              env
+              sigma
+              Conversion.CUMUL
+              to_unif
+              (EConstr.of_constr (snd tm))
+          in
+          sigma, acc + 1
+        with
+        | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify _) -> sigma, acc)
+      (sigma, 0)
+      transitions
+  (* END FIXME *)
+  | _ -> assert false
+;;
+
+(* TODO: check which are all possible next transitions *)
+(* TODO: check following functions/modules: *)
+(* [ ] Unification *)
+(* [ ] Reductionops.infer_conv *)
+(*  *)
+
+(** Builds an LTS from a Term [t : T] and an LTS [P : forall Ts, T -> A -> T -> Prop]
+
+    Constraints:
+    - [ T \& A \not\in Ts ]
+
+    Notes:
+    - Constructors of [P] are the transitions
+    - States are the sets of possible transitions
+    - A term [t] is represented by the state of the transitions that can be taken *)
 let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let lbls, terms = check_ref_lts env sigma iref in
+  let lbls = EConstr.of_constr lbls in
+  let terms = EConstr.of_constr terms in
   let sigma, t = Constrintern.interp_constr_evars env sigma tref in
-  let sigma = Typing.check env sigma t (EConstr.of_constr terms) in
+  let sigma = Typing.check env sigma t terms in
+  let c_names, transitions = get_constructors env sigma iref in
+  let sigma, constrs = check_valid_constructor env sigma iref t terms lbls transitions in
   Feedback.msg_notice
-    (str "Types of terms: " ++ Printer.pr_constr_env env sigma terms ++ strbrk "");
+    (str "Types of terms: " ++ Printer.pr_econstr_env env sigma terms ++ strbrk "");
   Feedback.msg_notice
-    (str "Types of labels: " ++ Printer.pr_constr_env env sigma lbls ++ strbrk "")
+    (str "Types of labels: " ++ Printer.pr_econstr_env env sigma lbls ++ strbrk "");
+  Feedback.msg_notice
+    (str "Constructors: " ++ Pp.prvect_with_sep (fun _ -> str ", ") Names.Id.print c_names);
+  Feedback.msg_notice
+    (str "Transitions: "
+     ++ Pp.prvect_with_sep
+          (fun _ -> strbrk "\n")
+          (fun t -> Printer.pr_constr_env env sigma (snd t))
+          transitions);
+  Feedback.msg_notice (str "Target matches: " ++ Pp.int constrs)
 ;;
