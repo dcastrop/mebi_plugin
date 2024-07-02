@@ -112,7 +112,7 @@ let check_valid_constructor env sigma gref t term_ty lbl_ty transitions =
           EConstr.mkApp
             (EConstr.mkIndU (i, EConstr.EInstance.make univ), [| t; act; term' |])
         in
-        match m_unify env sigma t0 t1 with
+        match m_unify env sigma to_unif (EConstr.of_constr (snd tm)) with
         | Some sigma -> sigma, acc + 1
         | None -> sigma, acc)
       (sigma, 0)
