@@ -85,6 +85,11 @@ let get_constructors env sigma gref =
   | _ -> assert false
 ;;
 
+(** Checks if two terms unify
+    TODO: lots of doubts
+    - Conversion.CUMUL?
+    - Is [w_unify] the best way?
+    - ... *)
 let m_unify env sigma t0 t1 =
   try
     let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
@@ -93,25 +98,24 @@ let m_unify env sigma t0 t1 =
   | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify _) -> None
 ;;
 
-(** Checks possible transitions for this term:
-    TODO: lots of doubts
-    - Conversion.CUMUL?
-    - Is [w_unify] the best way?
-    - ... *)
+let mk_template env sigma lts termL lbl_ty term_ty =
+  let sigma, act = Evarutil.new_evar env sigma lbl_ty in
+  let sigma, termR = Evarutil.new_evar env sigma term_ty in
+  let template = EConstr.mkApp (lts, [| termL; act; termR |]) in
+  sigma, template
+;;
+
+(** Checks possible transitions for this term: *)
 let check_valid_constructor env sigma gref t term_ty lbl_ty transitions =
   let open Names.GlobRef in
   match gref with
   | IndRef i ->
     let mib, _ = Inductive.lookup_mind_specif env i in
     let univ = mib.mind_univ_hyps in
+    let lts = EConstr.mkIndU (i, EConstr.EInstance.make univ) in
     Array.fold_left
       (fun (sigma, acc) tm ->
-        let sigma, act = Evarutil.new_evar env sigma lbl_ty in
-        let sigma, term' = Evarutil.new_evar env sigma term_ty in
-        let to_unif =
-          EConstr.mkApp
-            (EConstr.mkIndU (i, EConstr.EInstance.make univ), [| t; act; term' |])
-        in
+        let sigma, to_unif = mk_template env sigma lts t lbl_ty term_ty in
         match m_unify env sigma to_unif (EConstr.of_constr (snd tm)) with
         | Some sigma -> sigma, acc + 1
         | None -> sigma, acc)
