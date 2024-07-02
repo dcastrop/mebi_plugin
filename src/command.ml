@@ -98,6 +98,7 @@ let m_unify env sigma t0 t1 =
   | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify _) -> None
 ;;
 
+(** Generates [LTS term ?act ?term2] for unification *)
 let mk_template env sigma lts termL lbl_ty term_ty =
   let sigma, act = Evarutil.new_evar env sigma lbl_ty in
   let sigma, termR = Evarutil.new_evar env sigma term_ty in
