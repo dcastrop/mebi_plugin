@@ -27,13 +27,17 @@ with test_mut2 A : Prop := Mk2 (y : test_mut A).
 Fail MeBi LTS test_mut2 0.
 
 
-Inductive testLTS : nat -> bool -> nat -> Prop := test1 : testLTS (S 0) true 0.
+Inductive testLTS : nat -> bool -> nat -> Prop :=
+  | test1 : testLTS (S 0) true 0
+  | test2 : testLTS (S 0) false (S 0).
 
-Definition one := 2.
-
-MeBi LTS testLTS one.
+Definition one := 1.
 
 Fail MeBi LTS testLTS false.
+
+MeBi LTS testLTS (S 0).
+MeBi LTS testLTS one.
+MeBi LTS testLTS (S one).
 
 (* (*** Printing user inputs ***) *)
 
