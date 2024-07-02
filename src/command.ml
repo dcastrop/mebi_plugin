@@ -85,6 +85,14 @@ let get_constructors env sigma gref =
   | _ -> assert false
 ;;
 
+let m_unify env sigma t0 t1 =
+  try
+    let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
+    Some sigma
+  with
+  | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify _) -> None
+;;
+
 (** Checks possible transitions for this term:
     TODO: lots of doubts
     - Conversion.CUMUL?
@@ -98,24 +106,15 @@ let check_valid_constructor env sigma gref t term_ty lbl_ty transitions =
     let univ = mib.mind_univ_hyps in
     Array.fold_left
       (fun (sigma, acc) tm ->
-        try
-          let sigma, act = Evarutil.new_evar env sigma lbl_ty in
-          let sigma, term' = Evarutil.new_evar env sigma term_ty in
-          let to_unif =
-            EConstr.mkApp
-              (EConstr.mkIndU (i, EConstr.EInstance.make univ), [| t; act; term' |])
-          in
-          let sigma =
-            Unification.w_unify
-              env
-              sigma
-              Conversion.CUMUL
-              to_unif
-              (EConstr.of_constr (snd tm))
-          in
-          sigma, acc + 1
-        with
-        | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify _) -> sigma, acc)
+        let sigma, act = Evarutil.new_evar env sigma lbl_ty in
+        let sigma, term' = Evarutil.new_evar env sigma term_ty in
+        let to_unif =
+          EConstr.mkApp
+            (EConstr.mkIndU (i, EConstr.EInstance.make univ), [| t; act; term' |])
+        in
+        match m_unify env sigma t0 t1 with
+        | Some sigma -> sigma, acc + 1
+        | None -> sigma, acc)
       (sigma, 0)
       transitions
   (* END FIXME *)
