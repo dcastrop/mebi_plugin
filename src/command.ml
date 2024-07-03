@@ -37,6 +37,13 @@ let check_ref_lts env sigma gref =
   | _ -> raise (Err.invalid_ref gref)
 ;;
 
+(* let rec instantiate_ctor_args env sigma t = *)
+(*   let open Constr in *)
+(*   match kind t with *)
+(*   (\* ∀ (a : b), c *\) *)
+(*   | Prod (a, b, c) ->  *)
+(*     let sigma, ea = Evarutil.new_evar env sigma b in *)
+
 let get_constructors env sigma gref =
   let open Names.GlobRef in
   match gref with
@@ -67,16 +74,31 @@ let mk_template env sigma lts termL lbl_ty term_ty =
   sigma, template
 ;;
 
+let rec instantiate_ctx env sigma (c : EConstr.t) = function
+  | [] -> sigma, c
+  | t :: ts ->
+    let sigma, vt = Evarutil.new_evar env sigma t in
+    instantiate_ctx env sigma (EConstr.Vars.subst1 vt c) ts
+;;
+
 (** Checks possible transitions for this term: *)
 let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
-  Array.fold_left
-    (fun (sigma, acc) tm ->
-      let sigma, to_unif = mk_template env sigma lts t lbl_ty term_ty in
-      match m_unify env sigma to_unif (EConstr.of_constr (snd tm)) with
-      | Some sigma -> sigma, acc + 1
-      | None -> sigma, acc)
-    (sigma, 0)
-    transitions
+  let (ctors : (Evd.evar_map * int list) ref) = { contents = sigma, [] } in
+  for i = 0 to Array.length transitions - 1 do
+    let sigma, ctor_vals = !ctors in
+    let ctx, tm = transitions.(i) in
+    let tm = EConstr.of_constr tm in
+    (* Feedback.msg_notice (str "num_ctx: " ++ Pp.int n_ctx); *)
+    let ctx_tys = List.map Context.Rel.Declaration.get_type ctx in
+    let sigma, tm =
+      instantiate_ctx env sigma tm (List.map EConstr.of_constr ctx_tys)
+    in
+    let sigma, to_unif = mk_template env sigma lts t lbl_ty term_ty in
+    match m_unify env sigma to_unif tm with
+    | Some sigma -> ctors := sigma, i :: ctor_vals
+    | None -> ()
+  done;
+  !ctors
 ;;
 
 (* END FIXME *)
@@ -121,8 +143,11 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
   Feedback.msg_notice
     (str "Transitions: "
      ++ Pp.prvect_with_sep
-          (fun _ -> strbrk "\n")
+          (fun _ -> str ", ")
           (fun t -> Printer.pr_constr_env env sigma (snd t))
           transitions);
-  Feedback.msg_notice (str "Target matches: " ++ Pp.int constrs)
+  Feedback.msg_notice
+    (str "Target matches constructors  ["
+     ++ Pp.prlist_with_sep (fun _ -> str ", ") Pp.int constrs
+     ++ strbrk "]\n")
 ;;
