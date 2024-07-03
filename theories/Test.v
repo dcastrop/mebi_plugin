@@ -17,7 +17,8 @@ Fail MeBi LTS False 0.
 
 CoInductive co_nat := CoZ | CoS : co_nat -> co_nat.
 
-Inductive test_lts A : co_nat -> nat -> nat -> Prop := | less_lt (x : A) (i : co_nat) (j : nat) : test_lts A (CoS i) 1 j.
+Inductive test_lts A : co_nat -> nat -> nat -> Prop :=
+| less_lt (x : A) (i : co_nat) (j : nat) : test_lts A (CoS i) 1 j.
 
 Fail MeBi LTS test_lts 0.
 
@@ -28,7 +29,7 @@ Fail MeBi LTS test_mut2 0.
 
 
 Inductive testLTS : nat -> bool -> nat -> Prop :=
-  | test1 : testLTS (S 0) true 0
+  | test1 n : testLTS (S n) true n
   | test2 : testLTS (S 0) false (S 0).
 
 Definition one := 1.
