@@ -5,17 +5,11 @@ src/META.coq-mebi
 theories/loader.v
 theories/Test.v
 
-src/utils.ml
-src/utils.mli
+src/mebi_errors.ml
+src/mebi_errors.mli
+src/mebi_utils.ml
+src/mebi_utils.mli
 src/command.mli
 src/command.ml
-src/inspector.mli
-src/inspector.ml
-src/simple_check.mli
-src/simple_check.ml
-src/simple_declare.mli
-src/simple_declare.ml
-src/simple_print.ml
-src/simple_print.mli
 src/g_mebi.mlg
 src/mebi_plugin.mlpack
