@@ -1,35 +1,14 @@
 open Pp
-
-let rec split_at i l acc =
-  if i <= 0
-  then l, acc
-  else (
-    match l with
-    | [] -> acc, []
-    | h :: t -> split_at (i - 1) t (h :: acc))
-;;
-
-(* let test_constr_match t = *)
-(*   let open Constr in *)
-(*   match kind t with *)
-(*   | Var v -> Feedback.msg_notice (strbrk "Is a var") *)
-(*   | Ind (_, _) -> Feedback.msg_notice (strbrk "An inductive type") *)
-(*   | Sort _ -> Feedback.msg_notice (strbrk "A sort") *)
-(*   | _ -> Feedback.msg_notice (strbrk "Not a var") *)
+open Utils
 
 let arity_is_Prop env sigma mip =
-  let open Declarations in
-  let a = mip.mind_arity in
-  match a with
-  | RegularArity ar ->
-    if Sorts.is_prop ar.mind_sort
-    then ()
-    else
-      CErrors.user_err
-        (str "Invalid sort ("
-         ++ Printer.pr_sort sigma ar.mind_sort
-         ++ str "). Expecting Prop.")
-  | TemplateArity _ -> CErrors.user_err (str "Expecting LTS in Prop.")
+  match Inductive.inductive_sort_family mip with
+  | Sorts.InProp -> ()
+  | family ->
+    CErrors.user_err
+      (str "Invalid sort ("
+       ++ Sorts.pr_sort_family family
+       ++ str "). Expecting Prop.")
 ;;
 
 let get_labels_and_terms env sigma = function
@@ -39,21 +18,14 @@ let get_labels_and_terms env sigma = function
     then a, t1
     else
       CErrors.user_err
-        (str "Expecting arity \"term -> label -> term -> Prop\". Type mismatch: "
+        (str
+           "Expecting arity \"term -> label -> term -> Prop\". Type mismatch: "
          ++ Printer.pr_rel_decl env sigma t1
          ++ str " <=> "
          ++ Printer.pr_rel_decl env sigma t2
          ++ strbrk ".")
-  | _ -> CErrors.user_err (str "Expecting arity \"term -> label -> term -> Prop\".")
-;;
-
-let _fresh_typed_name avoid env sigma =
-  let nn = Tactics.fresh_id_in_env avoid Namegen.default_type_ident env in
-  let nn = Context.nameR nn in
-  let sigma, s = Evd.new_sort_variable Evd.univ_rigid sigma in
-  let new_type = EConstr.mkSort s in
-  let sigma, arg_type = Evarutil.new_evar env sigma new_type in
-  sigma, (nn, arg_type)
+  | _ ->
+    CErrors.user_err (str "Expecting arity \"term -> label -> term -> Prop\".")
 ;;
 
 let get_lts_labels_and_terms env sigma mip =
@@ -73,7 +45,9 @@ let check_ref_lts env sigma gref =
     Context.Rel.Declaration.get_type lbl, Context.Rel.Declaration.get_type term
   | _ ->
     CErrors.user_err
-      (str "Reference '" ++ Printer.pr_global gref ++ str "' does not define a LTS.")
+      (str "Reference '"
+       ++ Printer.pr_global gref
+       ++ str "' does not define a LTS.")
 ;;
 
 let get_constructors env sigma gref =
@@ -141,7 +115,8 @@ let check_valid_constructor env sigma gref t term_ty lbl_ty transitions =
     - Constructors of [P] are the transitions
     - States are the sets of possible transitions
     - A term [t] is represented by the state of the transitions that can be taken *)
-let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit =
+let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
+  =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let lbls, terms = check_ref_lts env sigma iref in
@@ -150,13 +125,20 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
   let sigma, t = Constrintern.interp_constr_evars env sigma tref in
   let sigma = Typing.check env sigma t terms in
   let c_names, transitions = get_constructors env sigma iref in
-  let sigma, constrs = check_valid_constructor env sigma iref t terms lbls transitions in
+  let sigma, constrs =
+    check_valid_constructor env sigma iref t terms lbls transitions
+  in
   Feedback.msg_notice
-    (str "Types of terms: " ++ Printer.pr_econstr_env env sigma terms ++ strbrk "");
+    (str "Types of terms: "
+     ++ Printer.pr_econstr_env env sigma terms
+     ++ strbrk "");
   Feedback.msg_notice
-    (str "Types of labels: " ++ Printer.pr_econstr_env env sigma lbls ++ strbrk "");
+    (str "Types of labels: "
+     ++ Printer.pr_econstr_env env sigma lbls
+     ++ strbrk "");
   Feedback.msg_notice
-    (str "Constructors: " ++ Pp.prvect_with_sep (fun _ -> str ", ") Names.Id.print c_names);
+    (str "Constructors: "
+     ++ Pp.prvect_with_sep (fun _ -> str ", ") Names.Id.print c_names);
   Feedback.msg_notice
     (str "Transitions: "
      ++ Pp.prvect_with_sep
