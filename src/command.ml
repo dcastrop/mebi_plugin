@@ -74,6 +74,7 @@ let mk_template env sigma lts termL lbl_ty term_ty =
   sigma, template
 ;;
 
+(* Can I instantiate the bound variables with metavariables instead? *)
 let rec instantiate_ctx env sigma (c : EConstr.t) = function
   | [] -> sigma, c
   | t :: ts ->
