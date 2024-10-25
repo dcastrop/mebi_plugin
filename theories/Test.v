@@ -27,7 +27,6 @@ with test_mut2 A : Prop := Mk2 (y : test_mut A).
 
 Fail MeBi LTS test_mut2 0.
 
-
 Inductive testLTS : nat -> bool -> nat -> Prop :=
   | test1 n : testLTS (S n) true n
   | test2 : testLTS (S 0) false (S 0).
