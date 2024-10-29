@@ -71,6 +71,21 @@ E.g., to add this for a specific workspace in vscode it may look like this:
 }
 ```
 
+#### to build in vscode
+Run the following commands
+```
+make clean
+```
+```
+dune build
+```
+```
+coq_makefile -f _CoqProject -o CoqMakeFile
+```
+```
+make -f CoqMakeFile
+```
+
 ### ~~using `dune`~~  (*`dune` currently not supported*)
 *issue (in vscode) with `theories/loder.v` where `mebi_plugin.cmxs` appears inside `_build/default/src` instead of under `src/`.*
 ```
