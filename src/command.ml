@@ -30,6 +30,7 @@ let check_ref_lts env sigma gref =
     arity_is_Prop mip;
     let lbl, term = get_lts_labels_and_terms env sigma mib mip in
     let univ = mib.mind_univ_hyps in
+    (* lts of inductive type *)
     let lts = EConstr.mkIndU (i, EConstr.EInstance.make univ) in
     ( lts
     , EConstr.of_constr (Context.Rel.Declaration.get_type lbl)
@@ -105,6 +106,28 @@ let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
 
 (* END FIXME *)
 
+
+let rec print_outgoing_edges env sigma lts_ty constrs terms lbls transitions =
+    match constrs with
+    | [] -> strbrk ""
+    | (h_term,_)::t ->
+      let sigma, constrs' = 
+        check_valid_constructor env sigma lts_ty h_term terms lbls transitions
+      in
+        (* stringify current states outgoing edges *)
+        (str "\n\t" (* ++ (length t) *)
+        ++ (Pp.prlist_with_sep
+              (fun _ -> str ",\n\t")
+              (fun i -> 
+                (Printer.pr_econstr_env env sigma (fst i))
+                ++ (str " :: ")
+                ++ (Printer.pr_econstr_env env sigma (snd i))
+                ++ (str (Printf.sprintf "   (tail len : %d)" (List.length t))))
+              constrs')
+        (* call on tail *)
+        ++ print_outgoing_edges env sigma lts_ty t terms lbls transitions)
+  ;;
+
 (* TODO: check which are all possible next transitions *)
 (* TODO: check following functions/modules: *)
 (* [ ] Unification *)
@@ -136,6 +159,7 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
   let sigma, constrs' =
     match constrs with
     | [] -> sigma, []
+    (* get head of list *)
     | (hack_tm, hack_test) :: _ ->
       check_valid_constructor env sigma lts_ty hack_tm terms lbls transitions
   in
@@ -164,11 +188,23 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
           (fun i -> Printer.pr_econstr_env env sigma (snd i))
           constrs
      ++ strbrk "]\n");
-  Feedback.msg_notice
-    (str "Target matches constructors  ["
+  (* Feedback.msg_notice
+    (str "Target matches constructors'  ["
      ++ Pp.prlist_with_sep
           (fun _ -> str ", ")
           (fun i -> Printer.pr_econstr_env env sigma (snd i))
           constrs'
-     ++ strbrk "]\n")
+     ++ strbrk "]\n") *)
+     Feedback.msg_notice
+     (str "Target (outgoing) matches constructors  ["
+     ++ (print_outgoing_edges env sigma lts_ty constrs terms lbls transitions)
+     ++ strbrk "]\n");
 ;;
+
+        (* Feedback.msg_notice
+        (str "Target (outgoing) matches constructors:\n\t ["
+        ++ Pp.prlist_with_sep
+              (fun _ -> str ", ")
+              (fun i -> Printer.pr_econstr_env env sigma (snd i))
+              constrs'
+        ++ strbrk "]\n"); *)
