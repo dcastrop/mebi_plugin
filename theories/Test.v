@@ -32,8 +32,8 @@ Inductive testLTS : nat -> bool -> nat -> Prop :=
   | test2 : testLTS (S 0) false (S 0).
 
 Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
-  | test1 n :  testLTS n true (S n)
-  | test2 : testLTS (S 0) false (S 0).
+  | test1' n :  nonTerminatingTestLTS n true (S n)
+  | test2' : nonTerminatingTestLTS (S 0) false (S 0).
 
 Definition one := 1.
 

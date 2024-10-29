@@ -22,5 +22,5 @@ _build
 
 # ignore generated make files
 CoqMakeFile*
-.CoqMakefile.d
 
+.CoqMakeFile.d
