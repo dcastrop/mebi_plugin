@@ -71,7 +71,7 @@ let mk_template env sigma lts termL lbl_ty term_ty =
   let sigma, act = Evarutil.new_evar env sigma lbl_ty in
   let sigma, termR = Evarutil.new_evar env sigma term_ty in
   let template = EConstr.mkApp (lts, [| termL; act; termR |]) in
-  sigma, template
+  sigma, termR, template
 ;;
 
 (* Can I instantiate the bound variables with metavariables instead? *)
@@ -84,7 +84,8 @@ let rec instantiate_ctx env sigma (c : EConstr.t) = function
 
 (** Checks possible transitions for this term: *)
 let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
-  let (ctors : (Evd.evar_map * int list) ref) = { contents = sigma, [] } in
+  let (ctors : (Evd.evar_map * (EConstr.t * EConstr.t) list) ref) =
+    { contents = sigma, [] } in
   for i = 0 to Array.length transitions - 1 do
     let sigma, ctor_vals = !ctors in
     let ctx, tm = transitions.(i) in
@@ -94,9 +95,9 @@ let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
     let sigma, tm =
       instantiate_ctx env sigma tm (List.map EConstr.of_constr ctx_tys)
     in
-    let sigma, to_unif = mk_template env sigma lts t lbl_ty term_ty in
+    let sigma, tgt_term, to_unif = mk_template env sigma lts t lbl_ty term_ty in
     match m_unify env sigma to_unif tm with
-    | Some sigma -> ctors := sigma, i :: ctor_vals
+    | Some sigma -> ctors := sigma, (tgt_term, to_unif) :: ctor_vals
     | None -> ()
   done;
   !ctors
@@ -130,6 +131,15 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
   let sigma, constrs =
     check_valid_constructor env sigma lts_ty t terms lbls transitions
   in
+  (* THIS IS A HACK TO TEST STUFF! *)
+  (* We can now recursively apply check_valid_constructor to build an LTS *)
+  let sigma, constrs' =
+    match constrs with
+    | [] -> sigma, []
+    | (hack_tm, hack_test) :: _ ->
+      check_valid_constructor env sigma lts_ty hack_tm terms lbls transitions
+  in
+  (* END OF HACK TO TEST STUFF! *)
   Feedback.msg_notice
     (str "Types of terms: "
      ++ Printer.pr_econstr_env env sigma terms
@@ -149,6 +159,16 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
           transitions);
   Feedback.msg_notice
     (str "Target matches constructors  ["
-     ++ Pp.prlist_with_sep (fun _ -> str ", ") Pp.int constrs
+     ++ Pp.prlist_with_sep
+          (fun _ -> str ", ")
+          (fun i -> Printer.pr_econstr_env env sigma (snd i))
+          constrs
+     ++ strbrk "]\n");
+  Feedback.msg_notice
+    (str "Target matches constructors  ["
+     ++ Pp.prlist_with_sep
+          (fun _ -> str ", ")
+          (fun i -> Printer.pr_econstr_env env sigma (snd i))
+          constrs'
      ++ strbrk "]\n")
 ;;
