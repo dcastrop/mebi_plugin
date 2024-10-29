@@ -18,7 +18,9 @@ g_*.ml
 
 # ignore dune stuff
 _build
+*.opam
 
 # ignore generated make files
 CoqMakeFile*
+.CoqMakefile.d
 
