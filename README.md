@@ -65,8 +65,8 @@ Assuming you are using `vscoq` extension, you will not be able to use `MEBI.load
 E.g., to add this for a specific workspace in vscode it may look like this:
 ```json
 {
-	"settings": {
-		"vscoq.args": ["-R theories/ MEBI -w all -I src/ "]
+  "settings": {
+    "vscoq.args": ["-R theories/ MEBI -w all -I src/ "]
   }
 }
 ```
