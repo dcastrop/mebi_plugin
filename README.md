@@ -4,39 +4,30 @@ This repository contains a Coq plugin for automating bisimilarity proofs.
 
 **Work in progress**
 
-## Setup
-(currently using `coq 8.19.0` ?)
-### using `dune`
-```
-dune build
-```
-
-### using `make`
-```
-coq_makefile -f _CoqProject -o CoqMakeFile
-```
-```
-make -f CoqMakeFile
-```
-
 ## TODO
 
-So far, this is essentially `coq/doc/plugins_tutorial/tuto1` but renamed.  Here
-is the current TODO list.
+So far, this is essentially 
+[`coq/doc/plugins_tutorial/tuto1`](https://github.com/coq/coq/tree/master/doc/plugin_tutorial/tuto1) 
+but renamed. Here is the current TODO list.
 
-[] Reading `step` relation with type `Step : Term -> Label -> Term -> Prop'`
-   that captures state transitions in a LTS semantics.
-[] Reading terms `t : Term`. 
-[] Building a state machine using `Step` for term `t`
-[] Implementing one of the algoriths for deciding bisimilarity in Sangiorgi's
-   book.
+- [ ] Reading `step` relation with type 
+      `Step : Term -> Label -> Term -> Prop'` 
+      that captures state transitions in a LTS semantics.
+
+- [ ] Reading terms `t : Term`. 
+
+- [ ] Building a state machine using `Step` for term `t`
+
+- [ ] Implementing one of the algoriths for deciding 
+      bisimilarity in Sangiorgi's book.
+
 
 **Questions:**
-  - We need to build a proof in Coq that two terms are bisimilar. We need the
-    statement in terms of `Step`, and turn the result of our algorithm into
-    sequences of Coq tactics.
-  - Tau transitions/weak bisimilarity?
-  - Open terms/use of existing lemmas?
+- We need to build a proof in Coq that two terms are bisimilar. 
+  We need the statement in terms of `Step`, and turn the result 
+  of our algorithm into sequences of Coq tactics.
+- Tau transitions/weak bisimilarity?
+- Open terms/use of existing lemmas?
 
 ## Scratchpad
 
@@ -46,8 +37,48 @@ is the current TODO list.
 MeBi LTS <ident>.
 ```
 
-* `<ident>` should be the identifier of a relation with type `Term -> Action ->
-  Term -> Prop`.
+* `<ident>` should be the identifier of a relation with type 
+`Term -> Action -> Term -> Prop`.
+
+
+
+## Setup
+*using `coq 8.19.0`* (?)
+
+### using `make`
+Run the following commands
+```
+coq_makefile -f _CoqProject -o CoqMakeFile
+```
+```
+make -f CoqMakeFile
+```
+
+### using **vscode** (with `vscoq`)
+Use `make` method (above).
+Assuming you are using `vscoq` extension, you will not be able to use `MEBI.loader` unless you add the following line to your `settings.json`:
+```json
+"vscoq.args": ["-R theories/ MEBI -w all -I src/ "]
+```
+(access by `ctrl+,` and find the button in the top right for opening the settings as `json` file.)
+
+E.g., to add this for a specific workspace in vscode it may look like this:
+```json
+{
+	"settings": {
+		"vscoq.args": ["-R theories/ MEBI -w all -I src/ "]
+  }
+}
+```
+
+### ~~using `dune`~~  (*`dune` currently not supported*)
+*issue (in vscode) with `theories/loder.v` where `mebi_plugin.cmxs` appears inside `_build/default/src` instead of under `src/`.*
+```
+dune build
+```
+
+
+
 
 
 ## Other Resources
@@ -63,6 +94,8 @@ MeBi LTS <ident>.
 ### Other
 - [Coq Makefiles](https://coq.inria.fr/doc/V8.19.0/refman/practical-tools/utilities.html#coq-makefile)
 - [Writing Coq Plugins](https://coq.inria.fr/doc/v8.19/refman/using/libraries/writing.html)
+
+- [Dune Init](https://dune.readthedocs.io/en/stable/quick-start.html)
 - [Dune Coq Plugin Project](https://dune.readthedocs.io/en/stable/coq.html#coq-plugin-project)
 
 - [Ltac](https://coq.inria.fr/doc/V8.19.0/refman/proof-engine/ltac.html)
