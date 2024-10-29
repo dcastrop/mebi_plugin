@@ -1,15 +1,23 @@
 src/META.coq-mebi
--R theories MEBI 
--I src
+-R theories/ MEBI 
+-arg "-w all" 
 
-theories/loader.v
-theories/Test.v
+# include everything under "theories"
+theories
 
-src/mebi_errors.ml
-src/mebi_errors.mli
-src/mebi_utils.ml
-src/mebi_utils.mli
-src/command.mli
-src/command.ml
-src/g_mebi.mlg
-src/mebi_plugin.mlpack
+-I src/
+# include everything under "src"
+src
+
+
+# theories/loader.v
+# theories/Test.v
+
+# src/mebi_errors.ml
+# src/mebi_errors.mli
+# src/mebi_utils.ml
+# src/mebi_utils.mli
+# src/command.mli
+# src/command.ml
+# src/g_mebi.mlg
+# src/mebi_plugin.mlpack
