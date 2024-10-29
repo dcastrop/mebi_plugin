@@ -4,6 +4,21 @@ This repository contains a Coq plugin for automating bisimilarity proofs.
 
 **Work in progress**
 
+## Setup
+(currently using `coq 8.19.0` ?)
+### using `dune`
+```
+dune build
+```
+
+### using `make`
+```
+coq_makefile -f _CoqProject -o CoqMakeFile
+```
+```
+make -f CoqMakeFile
+```
+
 ## TODO
 
 So far, this is essentially `coq/doc/plugins_tutorial/tuto1` but renamed.  Here
@@ -33,4 +48,23 @@ MeBi LTS <ident>.
 
 * `<ident>` should be the identifier of a relation with type `Term -> Action ->
   Term -> Prop`.
+
+
+## Other Resources
+
+### Templates
+- [(Community) Coq Plugin Template](https://github.com/coq-community/coq-plugin-template)
+- [(Community) Coq Program Verification Template](https://github.com/coq-community/coq-program-verification-template)
+
+### Tutorials
+- [(Official) Coq Plugin Tutorial](https://github.com/coq/coq/tree/master/doc/plugin_tutorial)
+- [(tlringer) Coq Plugin Tutorial](https://github.com/tlringer/plugin-tutorial) [(see also)](https://dependenttyp.es/classes/artifacts/14-mixed.html)
+
+### Other
+- [Coq Makefiles](https://coq.inria.fr/doc/V8.19.0/refman/practical-tools/utilities.html#coq-makefile)
+- [Writing Coq Plugins](https://coq.inria.fr/doc/v8.19/refman/using/libraries/writing.html)
+- [Dune Coq Plugin Project](https://dune.readthedocs.io/en/stable/coq.html#coq-plugin-project)
+
+- [Ltac](https://coq.inria.fr/doc/V8.19.0/refman/proof-engine/ltac.html)
+- [Ltac2](https://coq.inria.fr/doc/V8.19.0/refman/proof-engine/ltac2.html)
 

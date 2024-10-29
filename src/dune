@@ -1,6 +1,31 @@
 (library
- (name mebi_plugin)
- (public_name coq-core.plugins.mebi.mebi)
- (libraries coq-core.plugins.ltac))
+ (name mebi_plugin)                 ; This is the name you will use in
+                                    ; Coq's `Declare ML Module`, and
+                                    ; the name of the main OCaml
+                                    ; module of your plugin.
 
+ (public_name coq-mebi.mebi)        ; This makes the plugin
+                                    ; installable; recommended, must
+                                    ; match opam package name.
+
+ (synopsis "MEBI Plugin (src)")     ; Synopsis, used in META generation.
+
+ (flags :standard -rectypes -w -27) ; Coq requires the `-rectypes`
+                                    ; flag; CoqPP generated code
+                                    ; requires to disable warning 27
+                                    ; often.
+
+ ; (foreign_stubs                     ; we link our plugin with a C
+ ;  (language c)                      ; library! Optional, of course.
+ ;  (names ce_get))
+
+ (libraries                         ; OCaml Libraries we want to link
+                                    ; with, your choice here.
+
+   ; coq-core.vernac                  ; Needed for vernac extend.
+   coq-core.plugins.ltac            ; Needed for tactic extend.
+ )
+)
+
+; This will let Dune know about Coq's .mlg grammar files.
 (coq.pp (modules g_mebi))

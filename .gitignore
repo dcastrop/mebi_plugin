@@ -15,3 +15,10 @@ Makefile.coq*
 
 # by convention g_foo.ml is generated
 g_*.ml
+
+# ignore dune stuff
+_build
+
+# ignore generated make files
+CoqMakeFile*
+
