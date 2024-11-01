@@ -106,27 +106,87 @@ let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
 
 (* END FIXME *)
 
+(* pp individual edges *)
+let pp_constr_edge env sigma term =
+  (Printer.pr_econstr_env env sigma (fst term))
+    ++ (str " :: ")
+    ++ (Printer.pr_econstr_env env sigma (snd term))
+;;
 
-let rec print_outgoing_edges env sigma lts_ty constrs terms lbls transitions =
-    match constrs with
-    | [] -> strbrk ""
-    | (h_term,_)::t ->
-      let sigma, constrs' = 
+(* pp list containing all edges of one constr *)
+let rec pp_constr_edges env sigma constrs = 
+  match constrs with
+  | [] -> []
+  | h::t_constrs ->
+    (pp_constr_edge env sigma h)
+    ::(pp_constr_edges env sigma t_constrs)
+;;
+
+(* pp list containing all edges of each constrs *)
+let rec pp_list_outgoing_edges env sigma lts_ty constrs terms lbls transitions =
+  match constrs with
+    | [] -> []
+    (* | (h_term,_)::t -> *)
+    | h_term::t ->
+      let sigma, h_constrs = 
         check_valid_constructor env sigma lts_ty h_term terms lbls transitions
-      in
-        (* stringify current states outgoing edges *)
-        (str "\n\t" (* ++ (length t) *)
-        ++ (Pp.prlist_with_sep
-              (fun _ -> str ",\n\t")
-              (fun i -> 
-                (Printer.pr_econstr_env env sigma (fst i))
-                ++ (str " :: ")
-                ++ (Printer.pr_econstr_env env sigma (snd i))
-                ++ (str (Printf.sprintf "   (tail len : %d)" (List.length t))))
-              constrs')
-        (* call on tail *)
-        ++ print_outgoing_edges env sigma lts_ty t terms lbls transitions)
-  ;;
+      in 
+        (* pp h_constrs *)
+        (pp_constr_edges env sigma h_constrs)
+        (* repeat on tail *)
+        ::(pp_list_outgoing_edges env sigma lts_ty t terms lbls transitions)
+;;
+
+(* pp str of all edges of each constrs *)
+(* 
+  TODO: what does strbrk even do? 
+
+  i've been trying to get things to print on separate lines, 
+  but the more \n i add the worse it looks -- the end half of
+  lines keep then appearing on the rhs side of the feedback.
+
+  i've then tried to use strbrk since the name suggests something
+  to do with "string break". maybe a signal of where it can 
+  insert a breakline? without any \n it prints perfectly, but i
+  would prefer to be able to list them vertically, all aligned.
+
+  --- oh i see
+  there are specific commands given for this stuff in pp.ml
+  -> fnl "force new line"
+  -> brk "print line break"
+
+  i think strbrk is just for "optional" breaking at the right point.
+*)
+let pp_edges env sigma lts_ty constrs terms lbls transitions =
+    (Pp.prlist_with_sep
+      (* sep  *) (fun _ -> str "," ++ fnl())
+      (* fun  *) (fun i -> str "  " ++ i)
+      (* list *) (List.concat (pp_list_outgoing_edges env sigma lts_ty constrs terms lbls transitions))
+      (* list constrs *)
+    )
+;;
+(* 
+(* gets outgoing edges from current constr *)
+let rec outgoing_edges env sigma lts_ty constrs terms lbls transitions =
+  match constrs with
+    | [] -> []
+    | (h_term,_)::t_constrs ->
+      let sigma, h_constrs = 
+        check_valid_constructor env sigma lts_ty h_term terms lbls transitions
+      in 
+        h_constrs
+        ::(outgoing_edges env sigma lts_ty t_constrs terms lbls transitions)
+;;
+  
+let pp_outgoing_edges env sigma lts_ty constrs terms lbls transitions =
+  (Pp.prlist_with_sep
+      (* sep  *) (fun _ -> str "," ++ fnl())
+      (* fun  *) (fun i -> str "  " ++ i)
+      (* list *) (pp_list_outgoing_edges env sigma lts_ty (List.concat (outgoing_edges env sigma lts_ty constrs terms lbls transitions)) terms lbls transitions)
+      
+      
+    )
+;; *)
 
 (* TODO: check which are all possible next transitions *)
 (* TODO: check following functions/modules: *)
@@ -154,6 +214,7 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
   let sigma, constrs =
     check_valid_constructor env sigma lts_ty t terms lbls transitions
   in
+(* 
   (* THIS IS A HACK TO TEST STUFF! *)
   (* We can now recursively apply check_valid_constructor to build an LTS *)
   let sigma, constrs' =
@@ -164,6 +225,7 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
       check_valid_constructor env sigma lts_ty hack_tm terms lbls transitions
   in
   (* END OF HACK TO TEST STUFF! *)
+   *)
   Feedback.msg_notice
     (str "Types of terms: "
      ++ Printer.pr_econstr_env env sigma terms
@@ -175,36 +237,25 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
   Feedback.msg_notice
     (str "Constructors: "
      ++ Pp.prvect_with_sep (fun _ -> str ", ") Names.Id.print c_names);
+
+  (* Q: what is different about these transitions and the constrs below? *)
   Feedback.msg_notice
     (str "Transitions: "
      ++ Pp.prvect_with_sep
           (fun _ -> str ", ")
           (fun t -> Printer.pr_constr_env env sigma (snd t))
           transitions);
-  Feedback.msg_notice
-    (str "Target matches constructors  ["
-     ++ Pp.prlist_with_sep
-          (fun _ -> str ", ")
-          (fun i -> Printer.pr_econstr_env env sigma (snd i))
-          constrs
-     ++ strbrk "]\n");
+
   (* Feedback.msg_notice
-    (str "Target matches constructors'  ["
-     ++ Pp.prlist_with_sep
-          (fun _ -> str ", ")
-          (fun i -> Printer.pr_econstr_env env sigma (snd i))
-          constrs'
-     ++ strbrk "]\n") *)
-     Feedback.msg_notice
-     (str "Target (outgoing) matches constructors  ["
-     ++ (print_outgoing_edges env sigma lts_ty constrs terms lbls transitions)
-     ++ strbrk "]\n");
+    (str "Target matches constructors  [\n"
+     ++ (pp_edges env sigma lts_ty constrs terms lbls transitions)
+     ++ strbrk "]\n"); *)
+
+  (* print all outgoing edges *)
+  Feedback.msg_notice
+     (str "Target (outgoing) matches constructors  [\n" 
+     ++ (pp_outgoing_edges env sigma lts_ty constrs terms lbls transitions)
+     ++ strbrk "\n]\n");
 ;;
 
-        (* Feedback.msg_notice
-        (str "Target (outgoing) matches constructors:\n\t ["
-        ++ Pp.prlist_with_sep
-              (fun _ -> str ", ")
-              (fun i -> Printer.pr_econstr_env env sigma (snd i))
-              constrs'
-        ++ strbrk "]\n"); *)
+
