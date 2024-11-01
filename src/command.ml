@@ -106,54 +106,76 @@ let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
 
 (* END FIXME *)
 
-(* 
-  TODO: what does strbrk even do? 
-
-  i've been trying to get things to print on separate lines, 
-  but the more \n i add the worse it looks -- the end half of
-  lines keep then appearing on the rhs side of the feedback.
-
-  i've then tried to use strbrk since the name suggests something
-  to do with "string break". maybe a signal of where it can 
-  insert a breakline? without any \n it prints perfectly, but i
-  would prefer to be able to list them vertically, all aligned.
-
-  --- oh i see
-  there are specific commands given for this stuff in pp.ml
-  -> fnl "force new line"
-  -> brk "print line break"
-
-  i think strbrk is just for "optional" breaking at the right point.
-*)
 
 
+
+
+(** [pp_list l] is a pretty printed list ([l]). *)
 let pp_list l = 
-  str "[\n" ++ Pp.prlist_with_sep 
-  (* sep  *) (fun _ -> str ", " ++ fnl())
-  (* fun  *) (fun i -> str "  " ++ i)
+  (* ! remember, [fnl()] should be used to force new lines. *)
+  str "[" ++ Pp.prlist_with_sep 
+  (* sep  *) (fun _ -> str ", ")
+  (* fun  *) (fun i -> fnl() ++ str "  " ++ i)
   (* list *) l
-  ++ str "\n]\n"
+  ++ fnl() ++ str "]\n"
 ;;
 
+(** [pp_edge env sigma edge] is a pretty printed [edge]. *)
 let pp_edge env sigma edge =
   (Printer.pr_econstr_env env sigma (fst edge))
   ++ (str " :: ")
   ++ (Printer.pr_econstr_env env sigma (snd edge))
 ;;
 
-let rec edges_to_list env sigma constrs = 
+(** [pp_edges_to_list env sigma constrs] is a pretty printed list of edges ([constrs]). *)
+let rec pp_edges_to_list env sigma constrs = 
   match constrs with
   | [] -> []
   | h_edge::t_edges ->
     pp_edge env sigma h_edge
-    ::(edges_to_list env sigma t_edges)
+    ::(pp_edges_to_list env sigma t_edges)
 ;;
 
+(** [pp_edges env sigma constrs] is a [t] (str) of pretty printed dges ([constrs]). *)
 let pp_edges env sigma constrs =
-  pp_list (edges_to_list env sigma constrs)
+  pp_list (pp_edges_to_list env sigma constrs)
 ;;
 
-let rec get_outgoing_edges env sigma lts_ty constrs terms lbls transitions = 
+
+
+
+(** [pp_transition env sigma transition] is a pretty printed [transition]. *)
+let pp_transition env sigma transition =
+  (Printer.pr_constr_env env sigma (snd transition))
+;;
+
+(** [pp_transitions_to_list env sigma constrs] is. *)
+let pp_transitions_to_list env sigma (transitions : 'a array) = 
+    let rec transitions_to_list i res =
+       if i < 0 then res
+       else transitions_to_list (i - 1) (pp_transition env sigma (Array.unsafe_get transitions i) :: res)
+    in
+    transitions_to_list (Array.length transitions - 1) []
+;;
+
+(** [pp_transitions env sigma transitions] is an [array] of [transitions] pretty printed as a [list]. *)
+let pp_transitions env sigma (transitions : 'a array) = 
+  pp_list (pp_transitions_to_list env sigma transitions)
+;;
+
+
+
+(** [get_next_edges ...] is a list of edges from the next constrs. 
+    
+    Unfolds each of the outgoing edges in constrs, and collects all
+    of the outgoing edges from there. 
+
+    In terms of fsm: from the current state [a], for each outgoing 
+    edge the resulting state [b] is checked for any outgoing edges. 
+    The returned list contains all outgoing edges from all possible 
+    next states [b] reachable within 1 step.
+ *)
+let rec get_next_edges env sigma lts_ty constrs terms lbls transitions = 
   let sigma, h_edges, t_edges = 
     match constrs with
     | [] -> sigma, [], []
@@ -167,17 +189,17 @@ let rec get_outgoing_edges env sigma lts_ty constrs terms lbls transitions =
   | [] -> sigma, h_edges
   | _::_ -> 
     let sigma, edges = 
-      get_outgoing_edges env sigma lts_ty t_edges terms lbls transitions 
+    get_next_edges env sigma lts_ty t_edges terms lbls transitions 
     in
     sigma, List.concat [ h_edges; edges ]
 ;;
 
-
-let pp_outgoing_edges env sigma lts_ty constrs terms lbls transitions =
+(** [pp_next_edges] is [pp_edges] on [get_next_edges edges]. *)
+let pp_next_edges env sigma lts_ty constrs terms lbls transitions =
   let sigma, edges = 
-    get_outgoing_edges env sigma lts_ty constrs terms lbls transitions
+  get_next_edges env sigma lts_ty constrs terms lbls transitions
   in
-    pp_list (edges_to_list env sigma edges)
+    pp_edges env sigma edges
 ;;
 
 
@@ -207,26 +229,17 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
   let sigma, constrs =
     check_valid_constructor env sigma lts_ty t terms lbls transitions
   in
-(* 
-  (* THIS IS A HACK TO TEST STUFF! *)
-  (* We can now recursively apply check_valid_constructor to build an LTS *)
-  let sigma, constrs' =
-    match constrs with
-    | [] -> sigma, []
-    (* get head of list *)
-    | (hack_tm, hack_test) :: _ ->
-      check_valid_constructor env sigma lts_ty hack_tm terms lbls transitions
-  in
-  (* END OF HACK TO TEST STUFF! *)
-   *)
+
   Feedback.msg_notice
     (str "Types of terms: "
      ++ Printer.pr_econstr_env env sigma terms
      ++ strbrk "");
+
   Feedback.msg_notice
     (str "Types of labels: "
      ++ Printer.pr_econstr_env env sigma lbls
      ++ strbrk "");
+
   Feedback.msg_notice
     (str "Constructors: "
      ++ Pp.prvect_with_sep (fun _ -> str ", ") Names.Id.print c_names);
@@ -234,10 +247,8 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
   (* Q: what is different about these transitions and the constrs below? *)
   Feedback.msg_notice
     (str "Transitions: "
-     ++ Pp.prvect_with_sep
-          (fun _ -> str ", ")
-          (fun t -> Printer.pr_constr_env env sigma (snd t))
-          transitions);
+        ++ (pp_transitions env sigma transitions)
+        ++ strbrk "\n");
 
   (* print all edges *)
   Feedback.msg_notice
@@ -245,10 +256,10 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
       ++ (pp_edges env sigma constrs)
       ++ strbrk "\n");
 
-  (* print all outgoing edges *)
+  (* print all next edges *)
   Feedback.msg_notice
-    (str "(outgoing) Target matches constructors  " 
-      ++ (pp_outgoing_edges env sigma lts_ty constrs terms lbls transitions)
+    (str "(next edges) Target matches constructors  " 
+      ++ (pp_next_edges env sigma lts_ty constrs terms lbls transitions)
       ++ strbrk "\n");
 
 ;;
