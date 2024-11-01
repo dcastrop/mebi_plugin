@@ -157,14 +157,16 @@ let pp_edge_label env sigma label =
   (* str ">-(" ++ label ++ str ")->" *)
 ;; *)
 
-
+exception Foo of string;;
 
 (** [pp_edge env sigma edge] is a pretty printed [edge]. *)
-let pp_edge env sigma edge =
+let pp_edge env sigma edge = 
+(* (edge : (Evd.econstr * Evd.econstr)) = *)
   let edge_econstr = snd edge in
   (* start state -> *)
 
-  let state_a = edge_econstr in
+  let state_a = 
+    edge_econstr in
 
   (* let state_a = (EConstr.kind sigma edge_econstr) in *)
   (* let state_a = 
@@ -181,6 +183,35 @@ let pp_edge env sigma edge =
       any of the contents of [edge_econstr] *)
 
 (* ! (EConstr.isApp edge_econstr) returned true *)
+(* ! Constr.App : 'constr * 'constr array *)
+(* 
+  match edge_econstr with
+  | Constr.App (h, t) as _k ->
+    h
+(* | Constr.Rel _ -> 
+  | (Constr.Var _
+     | (Constr.Meta _
+        | (Constr.Evar _
+           | (Constr.Sort _
+              | (Constr.Cast (_, _, _)
+                 | (Constr.Prod (_, _, _)
+                    | (Constr.Lambda (_, _, _)
+                       | (Constr.LetIn (_, _, _, _)
+                          | (Constr.Const _
+                             | (Constr.Ind _
+                                | (Constr.Construct _
+                                   | (Constr.Case (_, _, _, _, _, _, _)
+                                      | (Constr.Fix _
+                                         | (Constr.CoFix _
+                                            | (Constr.Proj (_, _, _)
+                                               | (Constr.Int _
+                                                  | (Constr.Float _
+                                                     | Constr.Array
+                                                     (_, _, _, _)))))))))))))))))) *)
+  | _ -> raise (Foo "edge_constr not handled correctly.")
+
+
+  in *)
 
   (* let open Names.GlobRef in
   match gref with
@@ -216,7 +247,7 @@ let pp_edge env sigma edge =
 
   ++ fnl() ++ str "  "
 
-
+(* 
   ++ str (
     Printf.sprintf "isEvar: %b" (
       EConstr.isEvar sigma 
@@ -321,7 +352,7 @@ let pp_edge env sigma edge =
       EConstr.isArity sigma 
       edge_econstr
     )
-  )
+  ) *)
 
 (* 
   ++ fnl() ++ str "  "
