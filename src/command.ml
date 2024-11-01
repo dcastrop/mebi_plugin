@@ -109,7 +109,6 @@ let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
 
 
 
-
 (** [pp_list l] is a pretty printed list ([l]). *)
 let pp_list l = 
   (* ! remember, [fnl()] should be used to force new lines. *)
@@ -118,27 +117,6 @@ let pp_list l =
   (* fun  *) (fun i -> fnl() ++ str "  " ++ i)
   (* list *) l
   ++ fnl() ++ str "]\n"
-;;
-
-(** [pp_edge env sigma edge] is a pretty printed [edge]. *)
-let pp_edge env sigma edge =
-  (Printer.pr_econstr_env env sigma (fst edge))
-  ++ (str " :: ")
-  ++ (Printer.pr_econstr_env env sigma (snd edge))
-;;
-
-(** [pp_edges_to_list env sigma constrs] is a pretty printed list of edges ([constrs]). *)
-let rec pp_edges_to_list env sigma constrs = 
-  match constrs with
-  | [] -> []
-  | h_edge::t_edges ->
-    pp_edge env sigma h_edge
-    ::(pp_edges_to_list env sigma t_edges)
-;;
-
-(** [pp_edges env sigma constrs] is a [t] (str) of pretty printed dges ([constrs]). *)
-let pp_edges env sigma constrs =
-  pp_list (pp_edges_to_list env sigma constrs)
 ;;
 
 
@@ -162,6 +140,31 @@ let pp_transitions_to_list env sigma (transitions : 'a array) =
 let pp_transitions env sigma (transitions : 'a array) = 
   pp_list (pp_transitions_to_list env sigma transitions)
 ;;
+
+
+
+
+(** [pp_edge env sigma edge] is a pretty printed [edge]. *)
+let pp_edge env sigma edge =
+  (Printer.pr_econstr_env env sigma (fst edge))
+  ++ (str " :: ")
+  ++ (Printer.pr_econstr_env env sigma (snd edge))
+;;
+
+(** [pp_edges_to_list env sigma constrs] is a pretty printed list of edges ([constrs]). *)
+let rec pp_edges_to_list env sigma constrs = 
+  match constrs with
+  | [] -> []
+  | h_edge::t_edges ->
+    pp_edge env sigma h_edge
+    ::(pp_edges_to_list env sigma t_edges)
+;;
+
+(** [pp_edges env sigma constrs] is a [t] (str) of pretty printed dges ([constrs]). *)
+let pp_edges env sigma constrs =
+  pp_list (pp_edges_to_list env sigma constrs)
+;;
+
 
 
 
@@ -201,6 +204,8 @@ let pp_next_edges env sigma lts_ty constrs terms lbls transitions =
   in
     pp_edges env sigma edges
 ;;
+
+
 
 
 (* TODO: check which are all possible next transitions *)
