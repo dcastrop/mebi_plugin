@@ -111,7 +111,7 @@ let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
 
 (** [pp_list l] is a pretty printed list ([l]). *)
 let pp_list l = 
-  (* ! remember, [fnl()] should be used to force new lines. *)
+  (* ! use [fnl()] for newlines (will only be used if necessary). *)
   str "[" ++ Pp.prlist_with_sep 
   (* sep  *) (fun _ -> str ", ")
   (* fun  *) (fun i -> fnl() ++ str "  " ++ i)
@@ -123,12 +123,16 @@ let pp_list l =
 
 
 (** [pp_transition env sigma transition] is a pretty printed [transition]. *)
-let pp_transition env sigma transition =
+let pp_transition env sigma (transition : (Constr.rel_context * Constr.t)) =
   (Printer.pr_constr_env env sigma (snd transition))
+  (* ++ str " " ++ str (
+  match (snd transition) with
+  | _ -> "(unknown)"
+  ) *)
 ;;
 
 (** [pp_transitions_to_list env sigma constrs] is. *)
-let pp_transitions_to_list env sigma (transitions : 'a array) = 
+let pp_transitions_to_list env sigma transitions = 
     let rec transitions_to_list i res =
        if i < 0 then res
        else transitions_to_list (i - 1) (pp_transition env sigma (Array.unsafe_get transitions i) :: res)
@@ -137,18 +141,208 @@ let pp_transitions_to_list env sigma (transitions : 'a array) =
 ;;
 
 (** [pp_transitions env sigma transitions] is an [array] of [transitions] pretty printed as a [list]. *)
-let pp_transitions env sigma (transitions : 'a array) = 
+let pp_transitions env sigma transitions = 
   pp_list (pp_transitions_to_list env sigma transitions)
 ;;
 
 
 
+let pp_state env sigma state = 
+  (str "[" ++ (Printer.pr_econstr_env env sigma state) ++ str "]")
+;;
+
+(* 
+let pp_edge_label env sigma label = 
+  (str ">-(" ++ (Printer.pr_econstr_env env sigma label) ++ str ")->")
+  (* str ">-(" ++ label ++ str ")->" *)
+;; *)
+
+
 
 (** [pp_edge env sigma edge] is a pretty printed [edge]. *)
 let pp_edge env sigma edge =
-  (Printer.pr_econstr_env env sigma (fst edge))
-  ++ (str " :: ")
-  ++ (Printer.pr_econstr_env env sigma (snd edge))
+  let edge_econstr = snd edge in
+  (* start state -> *)
+
+  let state_a = edge_econstr in
+
+  (* let state_a = (EConstr.kind sigma edge_econstr) in *)
+  (* let state_a = 
+    
+    
+      EConstr.isType sigma 
+      edge_econstr
+
+
+  in *)
+
+
+  (* ! using below as reference, trying to see how to access 
+      any of the contents of [edge_econstr] *)
+
+(* ! (EConstr.isApp edge_econstr) returned true *)
+
+  (* let open Names.GlobRef in
+  match gref with
+  | IndRef i ->
+    let mib, mip = Inductive.lookup_mind_specif env i in
+    arity_is_Prop mip;
+    let lbl, term = get_lts_labels_and_terms env sigma mib mip in
+    let univ = mib.mind_univ_hyps in
+    (* lts of inductive type *)
+    let lts = EConstr.mkIndU (i, EConstr.EInstance.make univ) in
+    ( lts
+    , EConstr.of_constr (Context.Rel.Declaration.get_type lbl)
+    , EConstr.of_constr (Context.Rel.Declaration.get_type term) )
+  | _ -> raise (Err.invalid_ref gref)
+   *)
+
+
+
+
+  (* edge label *)
+  (* let edge_label = (pp_edge_label env sigma "") in *)
+  (* let edge_label = edge_econstr.(3) in *)
+
+  (* -> result state *)
+  let state_b = (fst edge) in
+
+  (* ++ (str " :: ") *)
+  (* ++ (Printer.pr_econstr_env env sigma (snd edge)) *)
+
+  (pp_state env sigma state_a) 
+  (* ++ str " " ++ (pp_edge_label env sigma edge_label) *)
+  ++ str " " ++ (pp_state env sigma state_b) 
+
+  ++ fnl() ++ str "  "
+
+
+  ++ str (
+    Printf.sprintf "isEvar: %b" (
+      EConstr.isEvar sigma 
+      edge_econstr
+    )
+  )
+
+  ++ fnl() ++ str "  "
+
+  ++ str (
+    Printf.sprintf "isInd: %b" (
+      EConstr.isInd sigma 
+      edge_econstr
+    )
+  )
+
+  ++ fnl() ++ str "  "
+
+  ++ str (
+    Printf.sprintf "isType: %b" (
+      EConstr.isType sigma 
+      edge_econstr
+    )
+  )
+
+  ++ fnl() ++ str "  "
+
+  ++ str (
+    Printf.sprintf "isMeta: %b" (
+      EConstr.isMeta sigma 
+      edge_econstr
+    )
+  )
+  
+  ++ fnl() ++ str "  "
+
+  ++ str (
+    Printf.sprintf "isVar: %b" (
+      EConstr.isVar sigma 
+      edge_econstr
+    )
+  )
+
+  ++ fnl() ++ str "  "
+
+  ++ str (
+    Printf.sprintf "isProd: %b" (
+      EConstr.isProd sigma 
+      edge_econstr
+    )
+  )
+
+  ++ fnl() ++ str "  "
+
+  ++ str (
+    Printf.sprintf "isProj: %b" (
+      EConstr.isProj sigma 
+      edge_econstr
+    )
+  )
+
+  ++ fnl() ++ str "  "
+
+  ++ str (
+    Printf.sprintf "isSort: %b" (
+      EConstr.isSort sigma 
+      edge_econstr
+    )
+  )
+
+  ++ fnl() ++ str "  "
+
+  ++ str (
+    Printf.sprintf "isApp: %b" (
+      EConstr.isApp sigma 
+      edge_econstr
+    )
+  )
+
+  ++ fnl() ++ str "  "
+
+  ++ str (
+    Printf.sprintf "isRel: %b" (
+      EConstr.isRel sigma 
+      edge_econstr
+    )
+  )
+
+  ++ fnl() ++ str "  "
+
+  ++ str (
+    Printf.sprintf "isConstruct: %b" (
+      EConstr.isConstruct sigma 
+      edge_econstr
+    )
+  )
+
+  ++ fnl() ++ str "  "
+
+  ++ str (
+    Printf.sprintf "isArity: %b" (
+      EConstr.isArity sigma 
+      edge_econstr
+    )
+  )
+
+(* 
+  ++ fnl() ++ str "  "
+
+  ++ str (
+    Printf.sprintf "isType: %b" (
+      EConstr.isType sigma 
+      edge_econstr
+    )
+  )
+
+  ++ fnl() ++ str "  "
+
+  ++ str (
+    Printf.sprintf "isType: %b" (
+      EConstr.isType sigma 
+      edge_econstr
+    )
+  ) 
+    *)
+
 ;;
 
 (** [pp_edges_to_list env sigma constrs] is a pretty printed list of edges ([constrs]). *)
@@ -249,13 +443,16 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
     (str "Constructors: "
      ++ Pp.prvect_with_sep (fun _ -> str ", ") Names.Id.print c_names);
 
-  (* Q: what is different about these transitions and the constrs below? *)
+  (* prints all transitions -- the possible constructors
+      a term may take as part of its structure. 
+      these are dependant on the definition of a type *)
   Feedback.msg_notice
     (str "Transitions: "
         ++ (pp_transitions env sigma transitions)
         ++ strbrk "\n");
 
-  (* print all edges *)
+  (* print all edges -- describing the possible 
+      applications of a type on a given term *)
   Feedback.msg_notice
     (str "Target matches constructors "
       ++ (pp_edges env sigma constrs)
