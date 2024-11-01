@@ -106,38 +106,6 @@ let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
 
 (* END FIXME *)
 
-(* pp individual edges *)
-let pp_constr_edge env sigma term =
-  (Printer.pr_econstr_env env sigma (fst term))
-    ++ (str " :: ")
-    ++ (Printer.pr_econstr_env env sigma (snd term))
-;;
-
-(* pp list containing all edges of one constr *)
-let rec pp_constr_edges env sigma constrs = 
-  match constrs with
-  | [] -> []
-  | h::t_constrs ->
-    (pp_constr_edge env sigma h)
-    ::(pp_constr_edges env sigma t_constrs)
-;;
-
-(* pp list containing all edges of each constrs *)
-let rec pp_list_outgoing_edges env sigma lts_ty constrs terms lbls transitions =
-  match constrs with
-    | [] -> []
-    (* | (h_term,_)::t -> *)
-    | h_term::t ->
-      let sigma, h_constrs = 
-        check_valid_constructor env sigma lts_ty h_term terms lbls transitions
-      in 
-        (* pp h_constrs *)
-        (pp_constr_edges env sigma h_constrs)
-        (* repeat on tail *)
-        ::(pp_list_outgoing_edges env sigma lts_ty t terms lbls transitions)
-;;
-
-(* pp str of all edges of each constrs *)
 (* 
   TODO: what does strbrk even do? 
 
@@ -157,36 +125,61 @@ let rec pp_list_outgoing_edges env sigma lts_ty constrs terms lbls transitions =
 
   i think strbrk is just for "optional" breaking at the right point.
 *)
-let pp_edges env sigma lts_ty constrs terms lbls transitions =
-    (Pp.prlist_with_sep
-      (* sep  *) (fun _ -> str "," ++ fnl())
-      (* fun  *) (fun i -> str "  " ++ i)
-      (* list *) (List.concat (pp_list_outgoing_edges env sigma lts_ty constrs terms lbls transitions))
-      (* list constrs *)
-    )
+
+
+let pp_list l = 
+  str "[\n" ++ Pp.prlist_with_sep 
+  (* sep  *) (fun _ -> str ", " ++ fnl())
+  (* fun  *) (fun i -> str "  " ++ i)
+  (* list *) l
+  ++ str "\n]\n"
 ;;
-(* 
-(* gets outgoing edges from current constr *)
-let rec outgoing_edges env sigma lts_ty constrs terms lbls transitions =
+
+let pp_edge env sigma edge =
+  (Printer.pr_econstr_env env sigma (fst edge))
+  ++ (str " :: ")
+  ++ (Printer.pr_econstr_env env sigma (snd edge))
+;;
+
+let rec edges_to_list env sigma constrs = 
   match constrs with
-    | [] -> []
-    | (h_term,_)::t_constrs ->
-      let sigma, h_constrs = 
-        check_valid_constructor env sigma lts_ty h_term terms lbls transitions
-      in 
-        h_constrs
-        ::(outgoing_edges env sigma lts_ty t_constrs terms lbls transitions)
+  | [] -> []
+  | h_edge::t_edges ->
+    pp_edge env sigma h_edge
+    ::(edges_to_list env sigma t_edges)
 ;;
-  
+
+let pp_edges env sigma constrs =
+  pp_list (edges_to_list env sigma constrs)
+;;
+
+let rec get_outgoing_edges env sigma lts_ty constrs terms lbls transitions = 
+  let sigma, h_edges, t_edges = 
+    match constrs with
+    | [] -> sigma, [], []
+    | (h_edge,_)::t_edges ->
+        let sigma', constrs' = 
+          check_valid_constructor env sigma lts_ty h_edge terms lbls transitions
+        in
+        sigma', constrs', t_edges
+  in
+  match t_edges with 
+  | [] -> sigma, h_edges
+  | _::_ -> 
+    let sigma, edges = 
+      get_outgoing_edges env sigma lts_ty t_edges terms lbls transitions 
+    in
+    sigma, List.concat [ h_edges; edges ]
+;;
+
+
 let pp_outgoing_edges env sigma lts_ty constrs terms lbls transitions =
-  (Pp.prlist_with_sep
-      (* sep  *) (fun _ -> str "," ++ fnl())
-      (* fun  *) (fun i -> str "  " ++ i)
-      (* list *) (pp_list_outgoing_edges env sigma lts_ty (List.concat (outgoing_edges env sigma lts_ty constrs terms lbls transitions)) terms lbls transitions)
-      
-      
-    )
-;; *)
+  let sigma, edges = 
+    get_outgoing_edges env sigma lts_ty constrs terms lbls transitions
+  in
+    pp_list (edges_to_list env sigma edges)
+;;
+
 
 (* TODO: check which are all possible next transitions *)
 (* TODO: check following functions/modules: *)
@@ -246,16 +239,18 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
           (fun t -> Printer.pr_constr_env env sigma (snd t))
           transitions);
 
-  (* Feedback.msg_notice
-    (str "Target matches constructors  [\n"
-     ++ (pp_edges env sigma lts_ty constrs terms lbls transitions)
-     ++ strbrk "]\n"); *)
+  (* print all edges *)
+  Feedback.msg_notice
+    (str "Target matches constructors "
+      ++ (pp_edges env sigma constrs)
+      ++ strbrk "\n");
 
   (* print all outgoing edges *)
   Feedback.msg_notice
-     (str "Target (outgoing) matches constructors  [\n" 
-     ++ (pp_outgoing_edges env sigma lts_ty constrs terms lbls transitions)
-     ++ strbrk "\n]\n");
+    (str "(outgoing) Target matches constructors  " 
+      ++ (pp_outgoing_edges env sigma lts_ty constrs terms lbls transitions)
+      ++ strbrk "\n");
+
 ;;
 
 
