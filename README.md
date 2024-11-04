@@ -90,6 +90,7 @@ make -f CoqMakeFile
 ```
 make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile
 ```
+then afterwards, you have to reload vscode. [this extension is helpful for this](https://marketplace.visualstudio.com/items?itemName=natqe.reload)
 
 ### ~~using `dune`~~  (*`dune` currently not supported*)
 *issue (in vscode) with `theories/loder.v` where `mebi_plugin.cmxs` appears inside `_build/default/src` instead of under `src/`.*
@@ -120,4 +121,6 @@ dune build
 
 - [Ltac](https://coq.inria.fr/doc/V8.19.0/refman/proof-engine/ltac.html)
 - [Ltac2](https://coq.inria.fr/doc/V8.19.0/refman/proof-engine/ltac2.html)
+
+- [`evar-map` helper functions](https://github.com/uwplse/coq-plugin-lib/blob/master/src/coq/logicutils/contexts/stateutils.ml) in [coq-plugin-lib](https://github.com/uwplse/coq-plugin-lib) (recommended by [tlringer](https://github.com/tlringer/plugin-tutorial/blob/main/src/termutils.mli))
 
