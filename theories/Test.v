@@ -62,10 +62,26 @@ MeBi BoundedLTS testLTS 0.
 MeBi LTS testLTS (S 0).
 MeBi BoundedLTS testLTS (S 0).
 
+
+MeBi BoundedLTS testLTS 0.
+MeBi BoundedLTS testLTS (S 0).
+MeBi BoundedLTS testLTS (S (S 0)).
+MeBi BoundedLTS testLTS (S (S (S 0))).
+
+
 MeBi LTS nonTerminatingTestLTS 0.
 MeBi BoundedLTS nonTerminatingTestLTS 0.
 
+MeBi LTS nonTerminatingTestLTS (S 0).
+MeBi BoundedLTS nonTerminatingTestLTS (S 0).
 
+MeBi LTS nonTerminatingTestLTS (S (S 0)).
+MeBi BoundedLTS nonTerminatingTestLTS (S (S 0)).
+
+MeBi LTS nonTerminatingTestLTS (S (S (S 0))).
+MeBi BoundedLTS nonTerminatingTestLTS (S (S (S 0))).
+
+MeBi BoundedLTS nonTerminatingTestLTS 0.
 MeBi BoundedLTS nonTerminatingTestLTS (S 0).
 MeBi BoundedLTS nonTerminatingTestLTS (S (S 0)).
 MeBi BoundedLTS nonTerminatingTestLTS (S (S (S 0))).

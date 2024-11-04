@@ -116,7 +116,7 @@ let pp_list l =
   (* sep  *) (fun _ -> str ", " ++ fnl())
   (* fun  *) (fun i -> str "  " ++ i)
   (* list *) l
-  ++ fnl() ++ str "]\n"
+  ++ str "\n]\n"
 ;;
 
 
@@ -277,96 +277,139 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
 (* type fsm = (Evd.econstr * Evd.econstr) list;; *)
 
 
-(**
 
 
 
- *)
+(* [mem m l] is [true] if [m] is in [l]. *)
+let rec mem env sigma (m:Evd.econstr * Evd.econstr) (l:(Evd.econstr * Evd.econstr) list):bool
+  = 
+  match l with
+  | [] -> false
+  | h::t -> 
+    match 
+    (* (EConstr.ESorts.equal sigma' 
+      (EConstr.ESorts.kind sigma h) 
+      (* (EConstr.ESorts.kind sigma m) *)
+      (* Evd.ESorts.kind m *)
+      )  *)
+    (
+      EConstr.eq_constr sigma (snd h) (snd m)
+    )
+    with
+    | true -> 
+        (* Feedback.msg_info (str "[]" ++ (Printer.pr_econstr_env env sigma (snd h)) ++ str " == " ++ (Printer.pr_econstr_env env sigma (snd m))); *)
+        true
+    | _ -> 
+      (* Feedback.msg_info (str "[]" ++ (Printer.pr_econstr_env env sigma (snd h)) ++ str " != " ++ (Printer.pr_econstr_env env sigma (snd m))); *)
+      mem env sigma m t
+;;
+
+
+(** [cap_edges es to_check] is the list in of elements in [to_check] that do not appear in [es].*)
+let rec cap_edges env sigma (es:(Evd.econstr * Evd.econstr) list) (to_check:(Evd.econstr * Evd.econstr) list) 
+  :(Evd.econstr * Evd.econstr) list 
+  =
+  match to_check with
+  (* return [] *)
+  | [] -> []
+
+  (*  *)
+  | h::t ->
+    match (mem env sigma h es) with
+    | true ->
+      (* Feedback.msg_info (str " --: (" ++ (Printer.pr_econstr_env env sigma (snd h)) ++ str ")  already found, skipping.\n" ); *)
+      cap_edges env sigma es t;
+    | _ -> 
+      (* Feedback.msg_info (str " +-: (" ++ (Printer.pr_econstr_env env sigma (snd h)) ++ str ")  not found, adding.\n" ); *)
+      List.concat [(cap_edges env sigma es t); [h]]
+;;
+
+(** [merge env sigma l1 l2] is the combination of [l1] and [l2] with any duplicates removed. *)
+let rec merge env sigma l1 l2 
+  =
+  match l1 with
+  | [] -> l2
+  | h::t ->
+    match (mem env sigma h l2) with
+    | true -> merge env sigma t l2
+    | _ -> h::(merge env sigma t l2)
+;;
+
+
+(** [unique env sigma l] is list [l] with any duplicates removed. *)
+let rec unique env sigma l 
+  =
+  match l with
+  | [] -> []
+  | h::t ->
+    match (mem env sigma h t) with
+    (* if dupe, skip this one add the next *)
+    | true -> unique env sigma t
+    (* else keep *)
+    | _ -> h::(unique env sigma t)
+;;
+
+
+(** [explore_lts] is the list of [constrs] (edges) reachable, within [max] bounds.*)
 let rec explore_lts env sigma lts_ty constrs terms lbls transitions (fsm, bound, max)
   = 
   assert (bound>=0);
+  match constrs, fsm with 
+  (* error if both are empty *)
+  | [], [] -> 
+    Feedback.msg_info (str "both constrs and fsm empty, returning empty lts.");
+    sigma, []
 
-  Feedback.msg_info (str (Printf.sprintf "exploring (%d / %d) with (%d) edges." bound max (List.length fsm)));
+  (* first entering *)
+  | _, [] ->
+    Feedback.msg_info (str "fsm was empty, using constrs.");
+    explore_lts env sigma lts_ty constrs terms lbls transitions (constrs, bound, max)
 
-  match bound with
-  | 0 -> Feedback.msg_info (str (Printf.sprintf "Reached Bound (%d).\n" max)); sigma, fsm
-  | _ -> 
-    (* get constructors *)
-    let sigma', (edges:(Evd.econstr * Evd.econstr) list) = 
-      get_next_edges env sigma lts_ty constrs terms lbls transitions
-    in
+  (* no more edges *)
+  | [], _ ->
+    Feedback.msg_info (str "no more edges (constrs) to explore.");
+    sigma, (unique env sigma fsm)
 
-    (* get edges that are not in fsm already *)
-    (* let fsm' = List.filter (fun e f -> (Evd.Filter.equal e f)) edges fsm; *)
+  (* continue exploring *)
+  | _, _ ->
 
-    (* TODO: actually order them
-    let fsm' = List.merge 
-      (fun e f -> 1
-        (* match (Evd.Filter.equal e f) with
-        | true -> 0
-        | _ -> 1 *)
-        ) fsm edges 
-      in *)
+    (* Feedback.msg_info (str (Printf.sprintf "\nexploring (%d / %d) with (%d) edges." bound max (List.length fsm))); *)
 
-    (* ! find way of only passing the non-repeated edges to the next exploration. *)
-    (* [cap_edges es to_check] is the list in of elements in [to_check] that do not appear in [es].*)
-    let rec cap_edges (es:(Evd.econstr * Evd.econstr) list) (to_check:(Evd.econstr * Evd.econstr) list) :(Evd.econstr * Evd.econstr) list =
-      match to_check with
-      | [] -> es
-      | h::t ->
-        (* ! returns true if m is in l *)
-        let rec mem (m:Evd.econstr * Evd.econstr) (l:(Evd.econstr * Evd.econstr) list):bool
-          = 
-          match l with
-          | [] -> false
-          | h::t -> 
-            match 
-            (* (EConstr.ESorts.equal sigma' 
-              (EConstr.ESorts.kind sigma h) 
-              (* (EConstr.ESorts.kind sigma m) *)
-              (* Evd.ESorts.kind m *)
-              )  *)
-            (
-              EConstr.eq_constr sigma' (snd h) (snd m)
-            )
-            with
-            | true -> 
-                (* Feedback.msg_info (str "[]" ++ (Printer.pr_econstr_env env sigma' (snd h)) ++ str " == " ++ (Printer.pr_econstr_env env sigma' (snd m))); *)
-                true
-            | _ -> 
-              (* Feedback.msg_info (str "[]" ++ (Printer.pr_econstr_env env sigma' (snd h)) ++ str " != " ++ (Printer.pr_econstr_env env sigma' (snd m))); *)
-              mem m t
-        in 
-        
-        match (mem h es) with
-        | true ->
-          (* Feedback.msg_info (str " --: (" ++ (Printer.pr_econstr_env env sigma' (snd h)) ++ str ")  already found, skipping.\n" ); *)
-          cap_edges es t;
-        | _ -> 
-          (* Feedback.msg_info (str " +-: (" ++ (Printer.pr_econstr_env env sigma' (snd h)) ++ str ")  not found, adding.\n" ); *)
-          cap_edges (List.concat [es; [h]]) t
-    in
+    match bound with
+    (* stop -- bound exceeded *)
+    | 0 -> 
+      Feedback.msg_info (str (Printf.sprintf "Reached Bound (%d).\n" max)); 
+      sigma, (unique env sigma fsm)
 
-    let constrs' = cap_edges fsm edges in
+    (* continue -- within bounds *)
+    | _ -> 
+      (* get constructors *)
+      let sigma', (edges:(Evd.econstr * Evd.econstr) list) = 
+        get_next_edges env sigma lts_ty constrs terms lbls transitions
+      in
 
-    let fsm' = cap_edges constrs' fsm in
+      (* Feedback.msg_info (str "fsm: " ++ (pp_edges env sigma' fsm));
+      Feedback.msg_info (str "edges: " ++ (pp_edges env sigma' edges)); *)
 
+      (*** [constrs'] is the list of [edges] not contained within [fsm]. *)
+      let constrs' = cap_edges env sigma' fsm edges in
 
-    (* Feedback.msg_info (str (Printf.sprintf "entered with: (fsm: %d) and (edges: %d),\nleaving with: (fsm: %d) and (edges: %d).\n" (List.length fsm) (List.length constrs) (List.length fsm') (List.length constrs'))); *)
+      (* Feedback.msg_info (str "constrs': " ++ (pp_edges env sigma' constrs')); *)
 
+      (*** [fsm'] is the combination of [fsm] and [edges] with duplicates removed. *)
+      let fsm' = merge env sigma' fsm edges in
 
-
-    (* let fsm' = List.concat [fsm; edges] in *)
-    
-    match (List.is_empty constrs') with
-    | true -> 
+      (* Feedback.msg_info (str "fsm': " ++ (pp_edges env sigma' fsm')); *)
+      
+      match (List.is_empty constrs') with
       (* finished within bounds *)
-      Feedback.msg_notice (str (Printf.sprintf "Finished within ( %d / %d ) bounds.\n" bound max));
-      sigma', fsm'
+      | true -> 
+        Feedback.msg_notice (str (Printf.sprintf "Finished on bound ( %d / %d ).\n" (max-bound) max));
+        sigma', (unique env sigma' fsm')
 
-    | _ ->
       (* keep going *)
-      explore_lts env sigma' lts_ty constrs' terms lbls transitions (fsm', bound-1, max)
+      | _ ->
+        explore_lts env sigma' lts_ty constrs' terms lbls transitions (fsm', bound-1, max)
 ;;
 
 
