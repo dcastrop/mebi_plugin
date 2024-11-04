@@ -112,9 +112,9 @@ let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
 (** [pp_list l] is a pretty printed list ([l]). *)
 let pp_list l = 
   (* ! use [fnl()] for newlines (will only be used if necessary). *)
-  str "[" ++ Pp.prlist_with_sep 
-  (* sep  *) (fun _ -> str ", ")
-  (* fun  *) (fun i -> fnl() ++ str "  " ++ i)
+  str "[\n" ++ Pp.prlist_with_sep 
+  (* sep  *) (fun _ -> str ", " ++ fnl())
+  (* fun  *) (fun i -> str "  " ++ i)
   (* list *) l
   ++ fnl() ++ str "]\n"
 ;;
@@ -143,7 +143,7 @@ let pp_transitions env sigma transitions =
 
 
 (** [pp_edge env sigma edge] is a pretty printed [edge]. *)
-let pp_edge env sigma edge = Printer.pr_econstr_env env sigma (fst edge)
+let pp_edge env sigma edge = Printer.pr_econstr_env env sigma (snd edge)
 ;;
 
 (** [pp_edges_to_list env sigma constrs] is a pretty printed list of edges ([constrs]). *)
