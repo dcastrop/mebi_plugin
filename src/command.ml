@@ -145,26 +145,26 @@ let pp_transitions env sigma transitions =
   pp_list (pp_transitions_to_list env sigma transitions)
 ;;
 
-
+(* 
 
 let pp_state env sigma state = 
   (str "[" ++ (Printer.pr_econstr_env env sigma state) ++ str "]")
 ;;
 
-(* 
+(*  *)
 let pp_edge_label env sigma label = 
   (str ">-(" ++ (Printer.pr_econstr_env env sigma label) ++ str ")->")
   (* str ">-(" ++ label ++ str ")->" *)
 ;; *)
 
-exception Foo of string;;
+(* exception Foo of string;; *)
 
 (** [pp_edge env sigma edge] is a pretty printed [edge]. *)
-let pp_edge env sigma edge = 
+let pp_edge env sigma edge = Printer.pr_econstr_env env sigma (fst edge)
 (* (edge : (Evd.econstr * Evd.econstr)) = *)
-  let edge_econstr = snd edge in
+  (* let edge_econstr = snd edge in *)
   (* start state -> *)
-
+(* 
   let state_a = 
     edge_econstr in
 
@@ -245,7 +245,7 @@ let pp_edge env sigma edge =
   (* ++ str " " ++ (pp_edge_label env sigma edge_label) *)
   ++ str " " ++ (pp_state env sigma state_b) 
 
-  ++ fnl() ++ str "  "
+  ++ fnl() ++ str "  " *)
 
 (* 
   ++ str (
