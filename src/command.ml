@@ -174,6 +174,7 @@ let pp_edges env sigma constrs =
     next states [b] reachable within 1 step.
  *)
 let rec get_next_edges env sigma lts_ty constrs terms lbls transitions = 
+  (* update sigma with constructors *)
   let sigma, h_edges, t_edges = 
     match constrs with
     | [] -> sigma, [], []
@@ -183,19 +184,23 @@ let rec get_next_edges env sigma lts_ty constrs terms lbls transitions =
         in
         sigma', constrs', t_edges
   in
+  (* continue going through edges *)
   match t_edges with 
   | [] -> sigma, h_edges
   | _::_ -> 
     let sigma, edges = 
     get_next_edges env sigma lts_ty t_edges terms lbls transitions 
     in
+    (* return updated sigma and edges *)
     sigma, List.concat [ h_edges; edges ]
 ;;
 
 (** [pp_next_edges] is [pp_edges] on [get_next_edges edges]. *)
-let pp_next_edges env sigma lts_ty constrs terms lbls transitions =
+let pp_next_edges env sigma lts_ty constrs terms lbls transitions 
+  (* : Environ.env * Evd.evar_map * ((Evd.econstr * Evd.econstr) list) *)
+  =
   let sigma, edges = 
-  get_next_edges env sigma lts_ty constrs terms lbls transitions
+    get_next_edges env sigma lts_ty constrs terms lbls transitions
   in
     pp_edges env sigma edges
 ;;
@@ -268,3 +273,145 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
 ;;
 
 
+(* module FSM = Map.Make(Constr);; *)
+(* type fsm = (Evd.econstr * Evd.econstr) list;; *)
+
+
+(**
+
+
+
+ *)
+let rec explore_lts env sigma lts_ty constrs terms lbls transitions (fsm, bound, max)
+  = 
+  assert (bound>=0);
+
+  Feedback.msg_info (str (Printf.sprintf "exploring (%d / %d) with (%d) edges." bound max (List.length fsm)));
+
+  match bound with
+  | 0 -> Feedback.msg_info (str (Printf.sprintf "Reached Bound (%d).\n" max)); sigma, fsm
+  | _ -> 
+    (* get constructors *)
+    let sigma', (edges:(Evd.econstr * Evd.econstr) list) = 
+      get_next_edges env sigma lts_ty constrs terms lbls transitions
+    in
+
+    (* get edges that are not in fsm already *)
+    (* let fsm' = List.filter (fun e f -> (Evd.Filter.equal e f)) edges fsm; *)
+
+    (* TODO: actually order them
+    let fsm' = List.merge 
+      (fun e f -> 1
+        (* match (Evd.Filter.equal e f) with
+        | true -> 0
+        | _ -> 1 *)
+        ) fsm edges 
+      in *)
+
+    (* ! find way of only passing the non-repeated edges to the next exploration. *)
+    (* [cap_edges es to_check] is the list in of elements in [to_check] that do not appear in [es].*)
+    let rec cap_edges (es:(Evd.econstr * Evd.econstr) list) (to_check:(Evd.econstr * Evd.econstr) list) :(Evd.econstr * Evd.econstr) list =
+      match to_check with
+      | [] -> es
+      | h::t ->
+        (* ! returns true if m is in l *)
+        let rec mem (m:Evd.econstr * Evd.econstr) (l:(Evd.econstr * Evd.econstr) list):bool
+          = 
+          match l with
+          | [] -> false
+          | h::t -> 
+            match 
+            (* (EConstr.ESorts.equal sigma' 
+              (EConstr.ESorts.kind sigma h) 
+              (* (EConstr.ESorts.kind sigma m) *)
+              (* Evd.ESorts.kind m *)
+              )  *)
+            (
+              EConstr.eq_constr sigma' (snd h) (snd m)
+            )
+            with
+            | true -> 
+                (* Feedback.msg_info (str "[]" ++ (Printer.pr_econstr_env env sigma' (snd h)) ++ str " == " ++ (Printer.pr_econstr_env env sigma' (snd m))); *)
+                true
+            | _ -> 
+              (* Feedback.msg_info (str "[]" ++ (Printer.pr_econstr_env env sigma' (snd h)) ++ str " != " ++ (Printer.pr_econstr_env env sigma' (snd m))); *)
+              mem m t
+        in 
+        
+        match (mem h es) with
+        | true ->
+          (* Feedback.msg_info (str " --: (" ++ (Printer.pr_econstr_env env sigma' (snd h)) ++ str ")  already found, skipping.\n" ); *)
+          cap_edges es t;
+        | _ -> 
+          (* Feedback.msg_info (str " +-: (" ++ (Printer.pr_econstr_env env sigma' (snd h)) ++ str ")  not found, adding.\n" ); *)
+          cap_edges (List.concat [es; [h]]) t
+    in
+
+    let constrs' = cap_edges fsm edges in
+
+    let fsm' = cap_edges constrs' fsm in
+
+
+    (* Feedback.msg_info (str (Printf.sprintf "entered with: (fsm: %d) and (edges: %d),\nleaving with: (fsm: %d) and (edges: %d).\n" (List.length fsm) (List.length constrs) (List.length fsm') (List.length constrs'))); *)
+
+
+
+    (* let fsm' = List.concat [fsm; edges] in *)
+    
+    match (List.is_empty constrs') with
+    | true -> 
+      (* finished within bounds *)
+      Feedback.msg_notice (str (Printf.sprintf "Finished within ( %d / %d ) bounds.\n" bound max));
+      sigma', fsm'
+
+    | _ ->
+      (* keep going *)
+      explore_lts env sigma' lts_ty constrs' terms lbls transitions (fsm', bound-1, max)
+;;
+
+
+
+let bound :int = 3
+;;
+
+let bounded_lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
+  =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let lts_ty, lbls, terms = check_ref_lts env sigma iref in
+  let sigma, t = Constrintern.interp_constr_evars env sigma tref in
+  let sigma = Typing.check env sigma t terms in
+  let c_names, transitions = get_constructors env sigma iref in
+  let sigma, constrs =
+    check_valid_constructor env sigma lts_ty t terms lbls transitions
+  in
+
+  Feedback.msg_notice
+  (str "(b) Types of terms: "
+  ++ Printer.pr_econstr_env env sigma terms
+  ++ strbrk "");
+
+  Feedback.msg_notice
+  (str "(b) Types of labels: "
+    ++ Printer.pr_econstr_env env sigma lbls
+    ++ strbrk "");
+
+  Feedback.msg_notice
+  (str "(b) Constructors: "
+    ++ Pp.prvect_with_sep (fun _ -> str ", ") Names.Id.print c_names);
+
+  (* prints all transitions -- the possible constructors
+    a term may take as part of its structure. 
+    these are dependant on the definition of a type *)
+  Feedback.msg_notice
+  (str "Transitions: "
+      ++ (pp_transitions env sigma transitions)
+      ++ strbrk "\n");
+
+  let sigma, edges = 
+    explore_lts env sigma lts_ty constrs terms lbls transitions ([], bound, bound) 
+  in
+
+  Feedback.msg_notice
+    (str "(b) Edges: " ++ (pp_edges env sigma edges))
+;;

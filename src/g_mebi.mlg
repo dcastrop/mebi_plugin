@@ -21,4 +21,5 @@ open Stdarg
  *)
 VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | [ "MeBi" "LTS" reference(r) constr(t) ] -> { Command.lts (Nametab.global r) t }
+| [ "MeBi" "BoundedLTS" reference(r) constr(t) ] -> { Command.bounded_lts (Nametab.global r) t }
 END
