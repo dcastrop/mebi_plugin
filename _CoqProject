@@ -1,7 +1,7 @@
 src/META.coq-mebi
--R theories/ MEBI 
+-R theories/ MEBI
 -I src/
--arg "-w all" 
+-arg "-w all"
 
 theories/loader.v
 theories/Test.v
@@ -10,7 +10,11 @@ src/mebi_errors.ml
 src/mebi_errors.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
-src/command.mli
+src/fsm.ml
+src/fsm.mli
+src/translation_layer.ml
+src/translation_layer.mli
 src/command.ml
+src/command.mli
 src/g_mebi.mlg
 src/mebi_plugin.mlpack

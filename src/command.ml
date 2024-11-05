@@ -2,6 +2,8 @@ open Pp
 open Mebi_utils
 module Err = Mebi_errors
 
+(* open Fsm *)
+
 let arity_is_Prop mip =
   match Inductive.inductive_sort_family mip with
   | Sorts.InProp -> ()
