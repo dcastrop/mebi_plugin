@@ -41,7 +41,7 @@ type has_edge =
   | State of state
 
 (** [edge] is an [edge] type with a default [label] of [[lhs_id] -> [rhs_id]]. *)
-let edge ?label lhs rhs : edge =
+let edge ?label (lhs : has_edge) (rhs : has_edge) : edge =
   let lhs_id : id =
     match lhs with
     | ID id -> id
@@ -190,6 +190,39 @@ let rec find_state (id_to_find : id) (m : has_state) : state option =
      | { states; _ } -> find_state id_to_find (States states))
 ;;
 
+(** [has_lts] denotes the types the contain both [states] and [edges]. *)
+type has_lts = Fsm of fsm
+
+(** [get_edges id m] is the list of [edges] in [m] that are outgoing from some [state] of [id] in [m]. *)
+let get_edges (has_edge : has_edge) (m : has_lts) : edges option =
+  (* check what [has_edge] is *)
+  let id =
+    match has_edge with
+    | ID id -> id
+    | State state ->
+      (match state with
+       | { id; _ } -> id)
+  in
+  (* check what [m] is *)
+  match m with
+  (* [Fsm fsm] *)
+  | Fsm fsm ->
+    (match fsm with
+     | { states; edges; _ } ->
+       (*** [get_edges' id edges] is the list of [edges] with [[id]==[lhs]]. *)
+       let rec get_edges' (id : id) (edges : edges) : edges =
+         match edges with
+         | [] -> []
+         | h :: t ->
+           (match h with
+            | { lhs; _ } ->
+              if id == lhs then h :: get_edges' id t else get_edges' id t)
+       in
+       (match get_edges' id edges with
+        | [] -> None
+        | es -> Some es))
+;;
+
 (** [stringable] denotes the types supported by the [to_string] function. *)
 type stringable =
   | ID of id
@@ -307,7 +340,7 @@ let pp (str : string) : unit = Printf.printf "%s\n" str
 
 (** [pp_tests]. *)
 let pp_tests =
-  Printf.printf "\nFsm, begin.\n";
+  Printf.printf "\nFsm, begin.\n\n";
   (*  *)
   let s0 = state 0 ~name:"s0" in
   pp (to_string ~prefix:"state 0: " (State s0));
@@ -333,6 +366,13 @@ let pp_tests =
   (*  *)
   let fsm1 = fsm states1 edges1 in
   pp (to_string ~prefix:"fsm1: " (Fsm fsm1));
+  (*  *)
+  let edges_from_s2 = Option.get (get_edges (ID 2) (Fsm fsm1)) in
+  pp (to_string ~prefix:"edges from s2: " (Edges edges_from_s2));
+  (*  *)
+  let edges_from_s2' = Option.get (get_edges (State s2) (Fsm fsm1)) in
+  pp (to_string ~prefix:"edges from s2': " (Edges edges_from_s2'));
+  (*  *)
   Printf.printf "\nFsm, end.\n"
 ;;
 
