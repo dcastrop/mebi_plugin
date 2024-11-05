@@ -1,43 +1,43 @@
 # MEBI: Mechanised Bisimilarities
 
-This repository contains a Coq plugin for automating bisimilarity proofs. 
+This repository contains a Coq plugin for automating bisimilarity proofs.
 
 **Work in progress**
 
 ## TODO
 
-So far, this is essentially 
-[`coq/doc/plugins_tutorial/tuto1`](https://github.com/coq/coq/tree/master/doc/plugin_tutorial/tuto1) 
+So far, this is essentially
+[`coq/doc/plugins_tutorial/tuto1`](https://github.com/coq/coq/tree/master/doc/plugin_tutorial/tuto1)
 but renamed. Here is the current TODO list.
 
-- [ ] Reading `step` relation with type 
-      `Step : Term -> Label -> Term -> Prop'` 
+- [ ] Reading `step` relation with type
+      `Step : Term -> Label -> Term -> Prop'`
       that captures state transitions in a LTS semantics.
 
-- [ ] Reading terms `t : Term`. 
+- [ ] Reading terms `t : Term`.
 
 - [ ] Building a state machine using `Step` for term `t`
 
-- [ ] Implementing one of the algoriths for deciding 
+- [ ] Implementing one of the algoriths for deciding
       bisimilarity in Sangiorgi's book.
 
 
 **Questions:**
-- We need to build a proof in Coq that two terms are bisimilar. 
-  We need the statement in terms of `Step`, and turn the result 
+- We need to build a proof in Coq that two terms are bisimilar.
+  We need the statement in terms of `Step`, and turn the result
   of our algorithm into sequences of Coq tactics.
 - Tau transitions/weak bisimilarity?
 - Open terms/use of existing lemmas?
 
 ## Scratchpad
 
-### Command that declares a relation as a "LTS-generating relation": 
+### Command that declares a relation as a "LTS-generating relation":
 
 ```
 MeBi LTS <ident>.
 ```
 
-* `<ident>` should be the identifier of a relation with type 
+* `<ident>` should be the identifier of a relation with type
 `Term -> Action -> Term -> Prop`.
 
 
@@ -71,7 +71,7 @@ E.g., to add this for a specific workspace in vscode it may look like this:
 }
 ```
 
-#### to build in vscode
+#### to build in vscode (whole plugin)
 Run the following commands
 ```
 make .merlin clean
@@ -91,6 +91,17 @@ make -f CoqMakeFile
 make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile
 ```
 then afterwards, you have to reload vscode. [this extension is helpful for this](https://marketplace.visualstudio.com/items?itemName=natqe.reload)
+
+##### all-in-one (suppress warnings)
+```
+make .merlin clean; dune build --profile release; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile
+```
+
+#### build in vscode (ocaml tools only)
+
+```
+make .merlin clean; dune build
+```
 
 ### ~~using `dune`~~  (*`dune` currently not supported*)
 *issue (in vscode) with `theories/loder.v` where `mebi_plugin.cmxs` appears inside `_build/default/src` instead of under `src/`.*
