@@ -50,6 +50,10 @@ type has_state =
 
 val find_state : id -> has_state -> state option
 
+type has_lts = Fsm of fsm
+
+val get_edges : has_edge -> has_lts -> edges option
+
 type stringable =
   | ID of id
   | Label of label
