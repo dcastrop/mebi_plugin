@@ -269,7 +269,7 @@ let rec mem
   =
   match l with
   | [] -> false
-  | (h1, h2, h3) :: t ->
+  | h :: t ->
     (match
        (* (EConstr.ESorts.equal sigma'
           (EConstr.ESorts.kind sigma h)
