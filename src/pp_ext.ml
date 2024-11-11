@@ -52,6 +52,11 @@ let pp_edges env sigma (edges : Evd.econstr list) =
   pp_list (pp_edges_to_list env sigma edges)
 ;;
 
+(** [pp_edges env sigma edges] is a [t] (str) of pretty printed edges ([constrs]). *)
+let pp_edges' env sigma (edges : (Evd.econstr * Evd.econstr) list) =
+  pp_list (pp_edges_to_list env sigma (Mebi_utils.strip_snd edges))
+;;
+
 (** [pp_state env sigma state] is a pretty printed [state]. *)
 let pp_state env sigma (state : Evd.econstr) =
   Printer.pr_econstr_env env sigma state

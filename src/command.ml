@@ -121,7 +121,7 @@ let rec get_next_edges
   env
   sigma
   lts_ty
-  (edges : Evd.econstr list)
+  (edges : (Evd.econstr * Evd.econstr) list)
   terms
   lbls
   transitions
@@ -132,7 +132,14 @@ let rec get_next_edges
     | [] -> sigma, [], []
     | h_edge :: t_edges ->
       let sigma', constrs' =
-        check_valid_constructor env sigma lts_ty h_edge terms lbls transitions
+        check_valid_constructor
+          env
+          sigma
+          lts_ty
+          (fst h_edge)
+          terms
+          lbls
+          transitions
       in
       sigma', constrs', t_edges
   in
@@ -230,37 +237,77 @@ let rec mem env sigma m l : bool =
      | _ -> mem env sigma m t)
 ;;
 
+let rec mem' env sigma m (l : (Evd.econstr * Evd.econstr) list) : bool =
+  match l with
+  | [] -> false
+  | h :: t ->
+    (match EConstr.eq_constr sigma (snd h) (snd m) with
+     | true -> true
+     | _ -> mem' env sigma m t)
+;;
+
 (** [cap_edges es to_check] is the list in of elements in [to_check] that do not appear in [es].*)
-let rec cap_edges
+(* let rec cap_edges
+   env
+   sigma
+   (es : Evd.econstr list)
+   (to_check : Evd.econstr list)
+   : Evd.econstr list
+   =
+   match to_check with
+   (* return [] *)
+   | [] -> []
+   (*  *)
+   | h :: t ->
+   (match mem env sigma h es with
+   | true ->
+   (* Feedback.msg_info (str " --: (" ++ (Printer.pr_econstr_env env sigma (snd h)) ++ str ")  already found, skipping.\n" ); *)
+   cap_edges env sigma es t
+   | _ ->
+   (* Feedback.msg_info (str " +-: (" ++ (Printer.pr_econstr_env env sigma (snd h)) ++ str ")  not found, adding.\n" ); *)
+   List.concat [ cap_edges env sigma es t; [ h ] ])
+   ;; *)
+
+let rec cap_edges'
   env
   sigma
-  (es : Evd.econstr list)
-  (to_check : Evd.econstr list)
-  : Evd.econstr list
+  (es : (Evd.econstr * Evd.econstr) list)
+  (to_check : (Evd.econstr * Evd.econstr) list)
+  : (Evd.econstr * Evd.econstr) list
   =
   match to_check with
   (* return [] *)
   | [] -> []
   (*  *)
   | h :: t ->
-    (match mem env sigma h es with
+    (match mem' env sigma h es with
      | true ->
        (* Feedback.msg_info (str " --: (" ++ (Printer.pr_econstr_env env sigma (snd h)) ++ str ")  already found, skipping.\n" ); *)
-       cap_edges env sigma es t
+       cap_edges' env sigma es t
      | _ ->
        (* Feedback.msg_info (str " +-: (" ++ (Printer.pr_econstr_env env sigma (snd h)) ++ str ")  not found, adding.\n" ); *)
-       List.concat [ cap_edges env sigma es t; [ h ] ])
+       List.concat [ cap_edges' env sigma es t; [ h ] ])
 ;;
 
 (** [merge env sigma l1 l2] is the combination of [l1] and [l2] with any duplicates removed. *)
-let rec merge env sigma l1 l2 =
+(* let rec merge env sigma l1 l2 =
+   match l1 with
+   | [] -> l2
+   | h :: t ->
+   (match mem env sigma h l2 with
+   | true -> merge env sigma t l2
+   (* (EConstr_list t) (EConstr_list l2) *)
+   | _ -> h :: merge env sigma t l2)
+   ;; *)
+
+let rec merge' env sigma l1 l2 =
   match l1 with
   | [] -> l2
   | h :: t ->
-    (match mem env sigma h l2 with
-     | true -> merge env sigma t l2
+    (match mem' env sigma h l2 with
+     | true -> merge' env sigma t l2
      (* (EConstr_list t) (EConstr_list l2) *)
-     | _ -> h :: merge env sigma t l2)
+     | _ -> h :: merge' env sigma t l2)
 ;;
 
 (** [unique env sigma l] is list [l] with any duplicates removed. *)
@@ -286,11 +333,16 @@ let rec explore_lts
   (env : Environ.env)
   (sigma : Evd.evar_map)
   (lts_ty : Evd.econstr)
-  (constrs : Evd.econstr list)
-  (terms : Evd.econstr)
+  (constrs : (Evd.econstr * Evd.econstr) list)
+  (* (constrs : Evd.econstr list) *)
+    (terms : Evd.econstr)
   (lbls : Evd.econstr)
   transitions
-  (lts, states, bound, max)
+  ( (* (lts : Evd.econstr list) *)
+    (lts : (Evd.econstr * Evd.econstr) list)
+  , states
+  , bound
+  , max )
   : Evd.evar_map * coq_fsm
   =
   assert (bound >= 0);
@@ -320,7 +372,7 @@ let rec explore_lts
   (* no more edges *)
   | [], _ ->
     Feedback.msg_notice (str "ExploreLTS, no more edges (constrs) to explore.");
-    sigma, { states; edges = unique env sigma lts }
+    sigma, { states; edges = unique env sigma (Mebi_utils.strip_snd lts) }
   (* continue exploring *)
   | _, _ ->
     (match bound with
@@ -329,7 +381,7 @@ let rec explore_lts
        Feedback.msg_info
          (str
             (Printf.sprintf "ExploreLTS, stopping -- reached bound (%d).\n" max));
-       sigma, { states; edges = unique env sigma lts }
+       sigma, { states; edges = unique env sigma (Mebi_utils.strip_snd lts) }
      (* continue -- within bounds *)
      | _ ->
        (* get constructors *)
@@ -369,10 +421,20 @@ let rec explore_lts
        in
        (*** [states'] is the list of [states] encountered so far. *)
        let states' = extract_states env sigma edges states in
+       Feedback.msg_info (str "fsm: " ++ pp_edges' env sigma' lts);
+       Feedback.msg_info (str "edges: " ++ pp_edges' env sigma' edges);
        (*** [constrs'] is the list of [edges] not contained within [lts]. *)
-       let constrs' = cap_edges env sigma' lts (Mebi_utils.strip_snd edges) in
+       let constrs' =
+         cap_edges' env sigma' lts edges
+         (* (Mebi_utils.strip_snd lts)
+            (Mebi_utils.strip_snd edges) *)
+       in
        (*** [lts'] is the combination of [lts] and [edges] with duplicates removed. *)
-       let lts' = merge env sigma' lts (Mebi_utils.strip_snd edges) in
+       let lts' =
+         merge' env sigma' lts edges
+         (* (Mebi_utils.strip_snd lts)
+            (Mebi_utils.strip_snd edges) *)
+       in
        (match List.is_empty constrs' with
         (* finished within bounds *)
         | true ->
@@ -382,7 +444,10 @@ let rec explore_lts
                   "ExploreLTS, finished on bound ( %d / %d ).\n"
                   (max - bound)
                   max));
-          sigma', { states = states'; edges = unique env sigma' lts' }
+          ( sigma'
+          , { states = states'
+            ; edges = unique env sigma' (Mebi_utils.strip_snd lts')
+            } )
         (* keep going *)
         | _ ->
           explore_lts
@@ -433,7 +498,8 @@ let bounded_lts
       env
       sigma
       lts_ty
-      (Mebi_utils.strip_snd constrs)
+      constrs
+      (* (Mebi_utils.strip_snd constrs) *)
       terms
       lbls
       transitions
@@ -450,37 +516,38 @@ let bounded_lts
   Feedback.msg_notice (str "lts_ty: " ++ Printer.pr_econstr_env env sigma lts_ty);
   Feedback.msg_notice (str "t: " ++ Printer.pr_econstr_env env sigma t);
   (* tests on edges *)
-  (match coq_fsm.edges with
-   | [] -> ()
-   | h :: _t ->
-     Feedback.msg_notice
-       (str "h edge: "
-        ++ pp_edge env sigma h
-        ++ str "\n\ntests: \n"
-        ++ str (Printf.sprintf "isApp: %b" (EConstr.isApp sigma h))
-        ++ str "\nend of tests.\n"));
-  (* lts to fsm *)
-  let _tbl, _fsm =
-    lts_to_fsm
-      env
-      sigma
-      lts_ty
-      terms
-      lbls
-      t
-      transitions
-      coq_fsm.states
-      coq_fsm.edges
-  in
-  (* ( Hashtbl.iter (fun x y -> Printf.sprintf "tbl: %s -> %s\n" x y) _tbl.state_map;;); *)
-  (* Feedback.msg_notice
-     (str (Printf.sprintf "translated fsm: %s" ++
-     (let rec sprintf_tbl  = Printer.pr_econstr_env env sigma )
-     )); *)
-  Feedback.msg_notice
-    (str
-       (Printf.sprintf
-          "translated fsm: %s\n\n--------\n"
-          (to_string ~context:ShowIDs (Fsm _fsm))))
+  match coq_fsm.edges with
+  | [] -> ()
+  | h :: _t ->
+    Feedback.msg_notice
+      (str "h edge: "
+       ++ pp_edge env sigma h
+       ++ str "\n\ntests: \n"
+       ++ str (Printf.sprintf "isApp: %b" (EConstr.isApp sigma h))
+       ++ str "\nend of tests.\n");
+    (* lts to fsm *)
+    let _tbl, _fsm =
+      lts_to_fsm
+        env
+        sigma
+        lts_ty
+        terms
+        lbls
+        t
+        transitions
+        coq_fsm.states
+        coq_fsm.edges
+    in
+    (* ( Hashtbl.iter (fun x y -> Printf.sprintf "tbl: %s -> %s\n" x y) _tbl.state_map;;); *)
+    (* Feedback.msg_notice
+       (str (Printf.sprintf "translated fsm: %s" ++
+       (let rec sprintf_tbl  = Printer.pr_econstr_env env sigma )
+       )); *)
+    Feedback.msg_notice
+      (str
+         (Printf.sprintf
+            "translated fsm: %s\n\n--------\n"
+            (to_string ~context:ShowIDs (Fsm _fsm))))
 ;;
+
 (* Feedback.msg_notice (str "lts_ty: " ++ Printer.pr_econstr_env env sigma lts_ty); *)
