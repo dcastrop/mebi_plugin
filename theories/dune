@@ -1,22 +1,21 @@
 (coq.theory
- (name MEBI)   ; -R flag           ; This will determine the top-level Coq
-                                   ; module of your theory, modules will
-                                   ; be MyPlugin.A, etc., when seen from the
-                                   ; outside.
-
+ (name MEBI) ; -R flag           ; This will determine the top-level Coq
+             ; module of your theory, modules will
+             ; be MyPlugin.A, etc., when seen from the
+             ; outside.
  (synopsis "MEBI Plugin (theories)")
+ (package coq-mebi) ; Adding this line will make your
+                    ; library installable in the opam package
+ (plugins coq-mebi.mebi coq-core.plugins.ltac))
 
-
- (package coq-mebi)                ; Adding this line will make your
-                                   ; library installable in the opam package
-
- (plugins coq-mebi.mebi
-          coq-core.plugins.ltac))  ; Here you should declare all
-                                   ; OCaml plugin dependencies
-                                   ; for your Coq files.
+; Here you should declare all
+; OCaml plugin dependencies
+; for your Coq files.
 
 ; Other important fields are `modules` and `flags`, see Dune
 ; documentation for more details.
 
-(include_subdirs qualified) ; enable usual recursive organisation of files in project
-                            ; https://coq.inria.fr/doc/master/refman/practical-tools/utilities.html#building-dune
+(include_subdirs qualified)
+
+; enable usual recursive organisation of files in project
+; https://coq.inria.fr/doc/master/refman/practical-tools/utilities.html#building-dune
