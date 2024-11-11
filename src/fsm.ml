@@ -28,9 +28,13 @@ let state ?name (id : id) : state =
 (** [states] is a list of [state]s. *)
 type states = state list
 
+(** [seq_from_states states] is the sequence of [states]. *)
+let seq_from_states (states : states) : state Seq.t = List.to_seq states
+
 (** [edge] is a transition from [lhs] to [rhs] via [label]. *)
 type edge =
-  { lhs : id
+  { id : id
+  ; lhs : id
   ; rhs : id
   ; label : label
   }
@@ -41,7 +45,7 @@ type has_edge =
   | State of state
 
 (** [edge] is an [edge] type with a default [label] of [[lhs_id] -> [rhs_id]]. *)
-let edge ?label (lhs : has_edge) (rhs : has_edge) : edge =
+let edge ?label (id : id) (lhs : has_edge) (rhs : has_edge) : edge =
   let lhs_id : id =
     match lhs with
     | ID id -> id
@@ -56,7 +60,8 @@ let edge ?label (lhs : has_edge) (rhs : has_edge) : edge =
       (match state with
        | { id; _ } -> id)
   in
-  { lhs = lhs_id
+  { id
+  ; lhs = lhs_id
   ; rhs = rhs_id
   ; label =
       (match label with
@@ -354,11 +359,11 @@ let pp_tests =
   let states1 = [ s0; s1; s2; s3 ] in
   pp (to_string ~prefix:"states 0-3: " (States states1));
   (*  *)
-  let e1 = edge (State s0) (State s1) in
+  let e1 = edge 1 (State s0) (State s1) in
   pp (to_string ~prefix:"e1: " (Edge e1));
-  let e2 = edge (State s1) (State s2) in
+  let e2 = edge 2 (State s1) (State s2) in
   pp (to_string ~prefix:"e2: " (Edge e2));
-  let e3 = edge (State s2) (State s3) in
+  let e3 = edge 3 (State s2) (State s3) in
   pp (to_string ~prefix:"e3: " (Edge e2));
   (*  *)
   let edges1 : edges = [ e1; e2; e3 ] in

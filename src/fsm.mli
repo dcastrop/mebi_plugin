@@ -12,8 +12,11 @@ val state : ?name:label -> id -> state
 
 type states = state list
 
+val seq_from_states : states -> state Seq.t
+
 type edge =
-  { lhs : id
+  { id : id
+  ; lhs : id
   ; rhs : id
   ; label : label
   }
@@ -22,7 +25,7 @@ type has_edge =
   | ID of id
   | State of state
 
-val edge : ?label:label -> has_edge -> has_edge -> edge
+val edge : ?label:label -> id -> has_edge -> has_edge -> edge
 
 type edges = edge list
 

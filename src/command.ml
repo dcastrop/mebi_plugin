@@ -2,7 +2,7 @@ open Pp
 open Mebi_utils
 module Err = Mebi_errors
 open Pp_ext
-(* open Translation_layer *)
+open Translation_layer
 
 let arity_is_Prop mip =
   match Inductive.inductive_sort_family mip with
@@ -452,6 +452,30 @@ let bounded_lts
   Feedback.msg_notice (str "terms: " ++ Printer.pr_econstr_env env sigma terms);
   Feedback.msg_notice (str "lbls: " ++ Printer.pr_econstr_env env sigma lbls);
   Feedback.msg_notice (str "lts_ty: " ++ Printer.pr_econstr_env env sigma lts_ty);
-  Feedback.msg_notice (str "t: " ++ Printer.pr_econstr_env env sigma t)
+  Feedback.msg_notice (str "t: " ++ Printer.pr_econstr_env env sigma t);
+  (* tests on edges *)
+  (match coq_fsm.edges with
+   | [] -> ()
+   | h :: _t ->
+     Feedback.msg_notice
+       (str "h edge: "
+        ++ pp_edge env sigma h
+        ++ str "\n\ntests: \n"
+        ++ str (Printf.sprintf "isApp: %b" (EConstr.isApp sigma h))
+        ++ str "\nend of tests.\n"));
+  (* lts to fsm *)
+  let _ =
+    lts_to_fsm
+      env
+      sigma
+      lts_ty
+      terms
+      lbls
+      t
+      transitions
+      coq_fsm.states
+      coq_fsm.edges
+  in
+  ()
 ;;
 (* Feedback.msg_notice (str "lts_ty: " ++ Printer.pr_econstr_env env sigma lts_ty); *)
