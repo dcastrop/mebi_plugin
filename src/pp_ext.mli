@@ -27,6 +27,13 @@ val pp_edges_to_list
   -> Pp.t list
 
 val pp_edges : Environ.env -> Evd.evar_map -> Evd.econstr list -> Pp.t
+
+val pp_edges'
+  :  Environ.env
+  -> Evd.evar_map
+  -> (Evd.econstr * Evd.econstr) list
+  -> Pp.t
+
 val pp_state : Environ.env -> Evd.evar_map -> Evd.econstr -> Pp.t
 
 val pp_states_to_list
