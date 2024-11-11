@@ -2,6 +2,7 @@ src/META.coq-mebi
 -R theories/ MEBI
 -I src/
 -arg "-w all"
+# -arg -d -arg backtrace
 
 theories/loader.v
 theories/Test.v
@@ -10,6 +11,10 @@ src/mebi_errors.ml
 src/mebi_errors.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
+src/stringify.ml
+src/stringify.mli
+src/pp_ext.ml
+src/pp_ext.mli
 src/fsm.ml
 src/fsm.mli
 src/translation_layer.ml

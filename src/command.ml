@@ -108,7 +108,7 @@ let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
   !ctors
 ;;
 
-(** [get_next_edges ...] is a list of edges from the next constrs.
+(** [get_next_edges ...] is a list of edges from the next constrs (edges).
 
     Unfolds each of the outgoing edges in constrs, and collects all
     of the outgoing edges from there.
@@ -117,12 +117,20 @@ let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
     edge the resulting state [b] is checked for any outgoing edges.
     The returned list contains all outgoing edges from all possible
     next states [b] reachable within 1 step. *)
-let rec get_next_edges env sigma lts_ty constrs terms lbls transitions =
+let rec get_next_edges
+  env
+  sigma
+  lts_ty
+  (edges : Evd.econstr list)
+  terms
+  lbls
+  transitions
+  =
   (* update sigma with constructors *)
   let sigma, h_edges, t_edges =
-    match constrs with
+    match edges with
     | [] -> sigma, [], []
-    | (h_edge, _) :: t_edges ->
+    | h_edge :: t_edges ->
       let sigma', constrs' =
         check_valid_constructor env sigma lts_ty h_edge terms lbls transitions
       in
@@ -226,16 +234,16 @@ let rec mem env sigma m l : bool =
 let rec cap_edges
   env
   sigma
-  (es : (Evd.econstr * Evd.econstr) list)
-  (to_check : (Evd.econstr * Evd.econstr) list)
-  : (Evd.econstr * Evd.econstr) list
+  (es : Evd.econstr list)
+  (to_check : Evd.econstr list)
+  : Evd.econstr list
   =
   match to_check with
   (* return [] *)
   | [] -> []
   (*  *)
   | h :: t ->
-    (match mem env sigma (snd h) (Mebi_utils.strip_snd es) with
+    (match mem env sigma h es with
      | true ->
        (* Feedback.msg_info (str " --: (" ++ (Printer.pr_econstr_env env sigma (snd h)) ++ str ")  already found, skipping.\n" ); *)
        cap_edges env sigma es t
@@ -244,23 +252,8 @@ let rec cap_edges
        List.concat [ cap_edges env sigma es t; [ h ] ])
 ;;
 
-(*
-   (** [mergable_edges] is a type denoting the edges supported by the merge function. *)
-   type mergable_edges =
-   | EConstr_list of Evd.econstr list
-   | EConstr_tup_list of (Evd.econstr * Evd.econstr) list *)
-
 (** [merge env sigma l1 l2] is the combination of [l1] and [l2] with any duplicates removed. *)
 let rec merge env sigma l1 l2 =
-  (* let l1, l2 =
-     match l1, l2 with
-     | EConstr_list l1, EConstr_list l2 -> l1, l2
-     | EConstr_tup_list l1, EConstr_tup_list l2 ->
-     Mebi_utils.strip_snd l1, Mebi_utils.strip_snd l2
-     (* if different, demote both to snd (non tuple). *)
-     | EConstr_list l1, EConstr_tup_list l2 -> l1, Mebi_utils.strip_snd l2
-     | EConstr_tup_list l1, EConstr_list l2 -> Mebi_utils.strip_snd l1, l2
-     in *)
   match l1 with
   | [] -> l2
   | h :: t ->
@@ -268,18 +261,6 @@ let rec merge env sigma l1 l2 =
      | true -> merge env sigma t l2
      (* (EConstr_list t) (EConstr_list l2) *)
      | _ -> h :: merge env sigma t l2)
-;;
-
-(* (EConstr_list t) (EConstr_list l2)) *)
-
-(** [merge env sigma l1 l2] is the combination of [l1] and [l2] with any duplicates removed. *)
-let rec merge' env sigma l1 l2 =
-  match l1 with
-  | [] -> l2
-  | h :: t ->
-    (match mem env sigma (snd h) (Mebi_utils.strip_snd l2) with
-     | true -> merge' env sigma t l2
-     | _ -> h :: merge' env sigma t l2)
 ;;
 
 (** [unique env sigma l] is list [l] with any duplicates removed. *)
@@ -305,7 +286,7 @@ let rec explore_lts
   (env : Environ.env)
   (sigma : Evd.evar_map)
   (lts_ty : Evd.econstr)
-  (constrs : (Evd.econstr * Evd.econstr) list)
+  (constrs : Evd.econstr list)
   (terms : Evd.econstr)
   (lbls : Evd.econstr)
   transitions
@@ -316,14 +297,15 @@ let rec explore_lts
   match constrs, lts with
   (* error if both are empty *)
   | [], [] ->
-    Feedback.msg_info (str "both constrs and lts empty, returning empty lts.");
+    Feedback.msg_notice
+      (str "ExploreLTS, both constrs and lts empty, returning empty lts.");
     sigma, { states; edges = [] }
   (* first entering *)
   | _, [] ->
-    Feedback.msg_info
+    Feedback.msg_notice
       (str
          (Printf.sprintf
-            "bound ( %d / %d ), lts was empty, using constrs."
+            "ExploreLTS, bound ( %d / %d ), lts was empty, using constrs."
             (max - bound)
             max));
     explore_lts
@@ -337,15 +319,17 @@ let rec explore_lts
       (constrs, states, bound, max)
   (* no more edges *)
   | [], _ ->
-    Feedback.msg_info (str "no more edges (constrs) to explore.");
-    sigma, { states; edges = unique env sigma (Mebi_utils.strip_snd lts) }
+    Feedback.msg_notice (str "ExploreLTS, no more edges (constrs) to explore.");
+    sigma, { states; edges = unique env sigma lts }
   (* continue exploring *)
   | _, _ ->
     (match bound with
      (* stop -- bound exceeded *)
      | 0 ->
-       Feedback.msg_info (str (Printf.sprintf "Reached Bound (%d).\n" max));
-       sigma, { states; edges = unique env sigma (Mebi_utils.strip_snd lts) }
+       Feedback.msg_info
+         (str
+            (Printf.sprintf "ExploreLTS, stopping -- reached bound (%d).\n" max));
+       sigma, { states; edges = unique env sigma lts }
      (* continue -- within bounds *)
      | _ ->
        (* get constructors *)
@@ -386,23 +370,16 @@ let rec explore_lts
        (*** [states'] is the list of [states] encountered so far. *)
        let states' = extract_states env sigma edges states in
        (*** [constrs'] is the list of [edges] not contained within [lts]. *)
-       let constrs' = cap_edges env sigma' lts edges in
+       let constrs' = cap_edges env sigma' lts (Mebi_utils.strip_snd edges) in
        (*** [lts'] is the combination of [lts] and [edges] with duplicates removed. *)
-       let lts', lts_tup' =
-         ( merge
-             env
-             sigma'
-             (Mebi_utils.strip_snd lts)
-             (Mebi_utils.strip_snd edges)
-         , merge' env sigma' lts edges )
-       in
+       let lts' = merge env sigma' lts (Mebi_utils.strip_snd edges) in
        (match List.is_empty constrs' with
         (* finished within bounds *)
         | true ->
           Feedback.msg_notice
             (str
                (Printf.sprintf
-                  "Finished on bound ( %d / %d ).\n"
+                  "ExploreLTS, finished on bound ( %d / %d ).\n"
                   (max - bound)
                   max));
           sigma', { states = states'; edges = unique env sigma' lts' }
@@ -416,7 +393,7 @@ let rec explore_lts
             terms
             lbls
             transitions
-            (lts_tup', states', bound - 1, max)))
+            (lts', states', bound - 1, max)))
 ;;
 
 let bound : int = 3
@@ -456,7 +433,7 @@ let bounded_lts
       env
       sigma
       lts_ty
-      constrs
+      (Mebi_utils.strip_snd constrs)
       terms
       lbls
       transitions
@@ -504,7 +481,6 @@ let bounded_lts
     (str
        (Printf.sprintf
           "translated fsm: %s\n\n--------\n"
-          (to_string ~context:ShowIDs (Fsm _fsm))));
-  ()
+          (to_string ~context:ShowIDs (Fsm _fsm))))
 ;;
 (* Feedback.msg_notice (str "lts_ty: " ++ Printer.pr_econstr_env env sigma lts_ty); *)

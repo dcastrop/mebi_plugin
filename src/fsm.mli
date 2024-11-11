@@ -74,6 +74,11 @@ type stringable_context =
   | States of states
   | List of stringable_context list
 
+val add_to_stringable_context
+  :  stringable_context
+  -> stringable_context
+  -> stringable_context
+
 val to_string
   :  ?context:stringable_context
   -> ?indents:int
