@@ -18,17 +18,9 @@ val fsm_table
   -> string
   -> fsm_table
 
-type translate_from =
-  | States of Evd.econstr list
-  | Edges of (Evd.econstr * Evd.econstr) list
-
-type translate_to =
-  | State of Fsm.state
-  | States of Fsm.states
-  | Edge of Fsm.edge
-  | Edges of Fsm.edges
-
 type translate_map = (Evd.econstr * int) list
+
+val econstr_to_int : Environ.env -> Evd.evar_map -> Evd.econstr -> int
 
 val get_states
   :  Environ.env

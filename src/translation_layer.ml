@@ -1,4 +1,4 @@
-open Pp
+(* open Pp *)
 open Fsm
 open Stringify
 
@@ -27,55 +27,12 @@ let fsm_table
   { env; sigma; term_type; lbls_type; type_name; state_map }
 ;;
 
-type translate_from =
-  (* State of Evd.econstr *)
-  | States of Evd.econstr list
-  (* | Edge of Evd.econstr *)
-  | Edges of (Evd.econstr * Evd.econstr) list
-
-type translate_to =
-  | State of state
-  | States of states
-  | Edge of edge
-  | Edges of edges
-
 type translate_map = (Evd.econstr * id) list
-(*
-   let get_from_econstr
-   (env : Environ.env)
-   (sigma : Evd.evar_map)
-   (l : translate_from)
-   : translate_to * translate_map
-   =
-   (* determine acc and map *)
-   let acc, map =
-   match l with
-   | States _ -> States [], []
-   | Edges _ -> Edges [], []
-   in
-   (* recurse over l *)
-   let rec get_from
-   (l : translate_from)
-   (acc : translate_to)
-   (map : translate_map)
-   (index : int)
-   : translate_to * translate_map
-   =
-   match l with
-   | States s ->
-   (match s with
-   | [] -> acc, map
-   | h :: t -> get_from
-   (States t)
-   (States (List.concat [ [ state ~name:(econstr_to_string env sigma h) index ]; acc ]))
-   (List.concat [ [ h, index ]; map ])
-   (index + 1)
-   )
-   | Edges e ->
-   (match e with | [] -> acc, map | h::t -> get_from (Edges t) (Edges (List.concat [[edge ~]])) )
-   in
-   get_from' l acc map 0
-   ;; *)
+
+(** [econstr_to_int] is [e] converted to [int] (via [econstr_to_string] and [int_of_string]). *)
+let econstr_to_int env sigma e : int =
+  int_of_string (econstr_to_string env sigma e)
+;;
 
 (** [get_states env sigma s] is the list of [Fsm.state]s (i.e., [Fsm.states]) derived from a list [s] of [Evd.econstr]. *)
 let get_states (env : Environ.env) (sigma : Evd.evar_map) (s : Evd.econstr list)
@@ -118,42 +75,59 @@ let get_edges
     match es' with
     | [] -> acc, map
     | h :: t ->
-      (* let lhs_id,rhs_id = *)
-      (match EConstr.decompose_app sigma h with
-       | h' ->
-         (match h' with
-          | lhs', rhs' ->
-            Feedback.msg_info
-              (str (Printf.sprintf "edge #%d lhs': " i)
-               ++ Printer.pr_econstr_env env sigma lhs'
-               ++ str "\n  rhs': "
-               ++ str "[\n"
-               ++ Pp.prlist_with_sep
-                    (* sep *) (fun _ -> str ", " ++ fnl ())
-                    (* fun *) (fun i -> str "  " ++ i)
-                    (* list *)
-                    (let rec rhs_to_list i res =
-                       if i < 0
-                       then res
-                       else
-                         rhs_to_list
-                           (i - 1)
-                           (Printer.pr_econstr_env
-                              env
-                              sigma
-                              (Array.unsafe_get rhs' i)
-                            :: res)
-                     in
-                     rhs_to_list (Array.length rhs' - 1) [])
-               ++ str "\n]\n");
-            (* Hashtbl.find state_map lhs, Hashtbl.find state_map rhs
-               in
-               edges' t (List.concat [ [ edge i lhs_id rhs_id]; acc ]) (List.concat [ [ h, i ]; map ]) (i + 1) *)
-            edges'
-              t
-              acc (* (List.concat [ [ edge i - 1 - 1 ]; acc ]) *)
-              (List.concat [ [ h, i ]; map ])
-              (i + 1)))
+      let lhs_id, label, rhs_id =
+        match EConstr.decompose_app sigma h with
+        | h' ->
+          (match h' with
+           | _lhs, rhs ->
+             (* Feedback.msg_info
+                (str (Printf.sprintf "edge #%d lhs': " i)
+                ++ Printer.pr_econstr_env env sigma _lhs
+                ++ str "\n  rhs': "
+                ++ str "[\n"
+                ++ Pp.prlist_with_sep
+                     (* sep *) (fun _ -> str ", " ++ fnl ())
+                     (* fun *) (fun i -> str "  " ++ i)
+                     (* list *)
+                     (let rec rhs_to_list i res =
+                        if i < 0
+                        then res
+                        else
+                          rhs_to_list
+                            (i - 1)
+                            (Printer.pr_econstr_env
+                               env
+                               sigma
+                               (Array.unsafe_get rhs i)
+                             :: res)
+                      in
+                      rhs_to_list (Array.length rhs - 1) [])
+                ++ str "\n]\n"); *)
+             let rhs' = Array.to_list rhs in
+             List.nth rhs' 0, List.nth rhs' 1, List.nth rhs' 2)
+        (* Hashtbl.find
+           state_map
+           lhs
+           , Hashtbl.find state_map rhs *)
+      in
+      edges'
+        t
+        (List.concat
+           [ [ edge
+                 ~label:(econstr_to_string env sigma label)
+                 i
+                 (ID (econstr_to_int env sigma lhs_id))
+                 (ID (econstr_to_int env sigma rhs_id))
+             ]
+           ; acc
+           ])
+        (List.concat [ [ h, i ]; map ])
+        (i + 1)
+    (* edges'
+       t
+       acc (* (List.concat [ [ edge i - 1 - 1 ]; acc ]) *)
+       (List.concat [ [ h, i ]; map ])
+       (i + 1))) *)
   in
   edges' es [] [] 0
 ;;
