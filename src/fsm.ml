@@ -482,5 +482,7 @@ let pp_tests =
   Printf.printf "\nFsm, end.\n"
 ;;
 
+(* () *)
+
 (** [fsm.ml] entry point. *)
-let () = pp_tests
+(* let () = pp_tests *)
