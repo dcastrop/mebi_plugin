@@ -320,7 +320,12 @@ let rec explore_lts
     sigma, { states; edges = [] }
   (* first entering *)
   | _, [] ->
-    Feedback.msg_info (str "lts was empty, using constrs.");
+    Feedback.msg_info
+      (str
+         (Printf.sprintf
+            "bound ( %d / %d ), lts was empty, using constrs."
+            (max - bound)
+            max));
     explore_lts
       env
       sigma
@@ -333,7 +338,7 @@ let rec explore_lts
   (* no more edges *)
   | [], _ ->
     Feedback.msg_info (str "no more edges (constrs) to explore.");
-    sigma, { states = []; edges = unique env sigma (Mebi_utils.strip_snd lts) }
+    sigma, { states; edges = unique env sigma (Mebi_utils.strip_snd lts) }
   (* continue exploring *)
   | _, _ ->
     (match bound with
@@ -347,7 +352,7 @@ let rec explore_lts
        let sigma', (edges : (Evd.econstr * Evd.econstr) list) =
          get_next_edges env sigma lts_ty constrs terms lbls transitions
        in
-       (* get states *)
+       (* get states (terms) from each of the edges. *)
        let rec extract_states
          env
          sigma
@@ -362,8 +367,21 @@ let rec explore_lts
              env
              sigma
              t
-             (List.concat
-                [ (if mem env sigma' (fst h) acc then [] else [ fst h ]); acc ])
+             ((* extract the states from the edge *)
+              let lhs_id, rhs_id =
+                match EConstr.decompose_app sigma (snd h) with
+                | h' ->
+                  (match h' with
+                   | _lhs, rhs ->
+                     let rhs' = Array.to_list rhs in
+                     List.nth rhs' 0, List.nth rhs' 2)
+              in
+              (* only add the new states. *)
+              List.concat
+                [ (if mem env sigma' lhs_id acc then [] else [ lhs_id ])
+                ; (if mem env sigma' rhs_id acc then [] else [ rhs_id ])
+                ; acc
+                ])
        in
        (*** [states'] is the list of [states] encountered so far. *)
        let states' = extract_states env sigma edges states in
@@ -483,7 +501,10 @@ let bounded_lts
      (let rec sprintf_tbl  = Printer.pr_econstr_env env sigma )
      )); *)
   Feedback.msg_notice
-    (str (Printf.sprintf "translated fsm: %s" (to_string (Fsm _fsm))));
+    (str
+       (Printf.sprintf
+          "translated fsm: %s\n\n--------\n"
+          (to_string ~context:ShowIDs (Fsm _fsm))));
   ()
 ;;
 (* Feedback.msg_notice (str "lts_ty: " ++ Printer.pr_econstr_env env sigma lts_ty); *)

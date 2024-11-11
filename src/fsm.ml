@@ -228,17 +228,6 @@ let get_edges (has_edge : has_edge) (m : has_lts) : edges option =
         | es -> Some es))
 ;;
 
-(** [stringable] denotes the types supported by the [to_string] function. *)
-type stringable =
-  | ID of id
-  | Label of label
-  | State of state
-  | States of states
-  | Edge of edge
-  | Edges of edges
-  | Fsm of fsm
-(* | Trace of Trace.t *)
-
 (** [default_indent_val] is the default number of spaces to use perindent in [to_string]. *)
 let default_indent_val = 2
 
@@ -251,8 +240,43 @@ let rec tabs ?(size : int = default_indent_val) (n : int) : string =
   if n > 0 then Printf.sprintf "%s%s" (tab size) (tabs ~size (n - 1)) else ""
 ;;
 
+(** [stringable] denotes the types supported by the [to_string] function. *)
+type stringable =
+  | ID of id
+  | Label of label
+  | State of state
+  | States of states
+  | Edge of edge
+  | Edges of edges
+  | Fsm of fsm
+(* | Trace of Trace.t *)
+
+(** [stringable_context] denotes the types that may be provided to enable more detailed pretty-printed strings via the [to_string] function. E.g., providing [States] for [Edges] will allow the [State.name] to be used rather than the [id]s found in an [Edge]. *)
+type stringable_context =
+  | None
+  | ShowIDs
+  | States of states
+  | List of stringable_context list
+
+(** [add_to_stringable_context c1 c2] is the a [stringable_context.List] containing the concat of both [c1] and [c2]. *)
+let add_to_stringable_context
+  (c1 : stringable_context)
+  (c2 : stringable_context)
+  : stringable_context
+  =
+  match c1, c2 with
+  | List l1, List l2 -> List (List.concat [ l1; l2 ])
+  | List l1, _ -> List (List.concat [ l1; [ c2 ] ])
+  | _, List l2 -> List (List.concat [ [ c1 ]; l2 ])
+  | _, _ -> List [ c1; c2 ]
+;;
+
 (** [to_string ?indents ?prefix m] is the pretty-printed string of [m], with [?prefix] and [?indents]. If [?indents] is [-1] then everything will be pretty-printed inline. *)
-let rec to_string ?(indents : int = 0) ?(prefix : string = "") (m : stringable)
+let rec to_string
+  ?(context : stringable_context = None)
+  ?(indents : int = 0)
+  ?(prefix : string = "")
+  (m : stringable)
   : string
   =
   Printf.sprintf
@@ -261,19 +285,37 @@ let rec to_string ?(indents : int = 0) ?(prefix : string = "") (m : stringable)
     prefix
     (match m with
      (* [ID id] *)
-     | ID id -> Printf.sprintf "{|%d|}" id
+     | ID id -> Printf.sprintf "{%d}" id
      (* [Label label] *)
-     | Label label -> Printf.sprintf "[|%s|]" label
+     | Label label -> Printf.sprintf "[%s]" label
      (* [State state] *)
      | State state ->
        Printf.sprintf
-         "(%s)"
-         (match state with
-          | { name; _ } -> name)
+         "(%s%s)"
+         state.name
+         (* check if id should be printed too *)
+         (if let rec check_context (ctx : stringable_context) : bool =
+               match ctx with
+               | ShowIDs -> true
+               | List l' ->
+                 (match l' with
+                  | [] -> false
+                  | h :: t ->
+                    (match h with
+                     | ShowIDs -> true
+                     | _ -> check_context (List t)))
+               | _ -> false
+             in
+             check_context context
+          then Printf.sprintf " #%d" state.id
+          else "")
      (* [States states] *)
      | States states ->
        (*** [to_string ?indents' states] is the pretty-printed string of each [state] in [states]. *)
-       let rec to_string' ?(indents' : int = indents + 1) (states : states)
+       let rec to_string'
+         ?(context' : stringable_context = None)
+         ?(indents' : int = indents + 1)
+         (states : states)
          : string
          =
          match states with
@@ -281,29 +323,82 @@ let rec to_string ?(indents : int = 0) ?(prefix : string = "") (m : stringable)
          | h :: t ->
            Printf.sprintf
              "%s%s%s"
-             (to_string ~indents:indents' ~prefix (State h))
+             (to_string ~context:context' ~indents:indents' (State h))
              (if List.is_empty t
               then ""
               else Printf.sprintf ",%s" (if indents == -1 then "" else "\n"))
-             (to_string' ~indents' t)
+             (to_string' ~context' ~indents' t)
        in
        Printf.sprintf
          "[\n%s\n%s]"
-         (to_string' ~indents':(indents + 1) states)
+         (to_string' ~context':context ~indents':(indents + 1) states)
          (tabs indents)
      (* [Edge edge] *)
      | Edge edge ->
        (match edge with
-        | { lhs; rhs; label; _ } ->
+        | { id; lhs; rhs; label; _ } ->
+          (* check if states are provided by context. *)
+          let lhs', rhs' =
+            match context with
+            | States states ->
+              ( to_string
+                  ~context
+                  ~indents:(-1)
+                  (match find_state lhs (States states) with
+                   | Some s -> State s
+                   | None -> ID lhs)
+              , to_string
+                  ~context
+                  ~indents:(-1)
+                  (match find_state rhs (States states) with
+                   | Some s -> State s
+                   | None -> ID rhs) )
+            | List l ->
+              let rec check_context (ctx : stringable_context) : string * string
+                =
+                match ctx with
+                | List l' ->
+                  (match l' with
+                   | [] ->
+                     ( to_string ~context ~indents:(-1) (ID lhs)
+                     , to_string ~context ~indents:(-1) (ID rhs) )
+                   | h :: t ->
+                     (match h with
+                      | States states ->
+                        ( to_string
+                            ~context
+                            ~indents:(-1)
+                            (match find_state lhs (States states) with
+                             | Some s -> State s
+                             | None -> ID lhs)
+                        , to_string
+                            ~context
+                            ~indents:(-1)
+                            (match find_state rhs (States states) with
+                             | Some s -> State s
+                             | None -> ID rhs) )
+                      | _ -> check_context (List t)))
+                | _ ->
+                  ( to_string ~context ~indents:(-1) (ID lhs)
+                  , to_string ~context ~indents:(-1) (ID rhs) )
+              in
+              check_context (List l)
+            | _ ->
+              ( to_string ~context ~indents:(-1) (ID lhs)
+              , to_string ~context ~indents:(-1) (ID rhs) )
+          in
           Printf.sprintf
-            "%s to %s via %s"
-            (to_string ~indents:(-1) (ID lhs))
-            (to_string ~indents:(-1) (ID rhs))
-            (to_string ~indents:(-1) (Label label)))
+            "from %s to %s via label: %s"
+            lhs'
+            rhs'
+            (to_string ~context ~indents:(-1) (Label label)))
      (* [Edges edges] *)
      | Edges edges ->
        (*** [to_string ?indents' edges] is the pretty-printed string of each [edge] in [edges]. *)
-       let rec to_string' ?(indents' : int = indents + 1) (edges : edges)
+       let rec to_string'
+         ?(context' : stringable_context = None)
+         ?(indents' : int = indents + 1)
+         (edges : edges)
          : string
          =
          match edges with
@@ -311,15 +406,15 @@ let rec to_string ?(indents : int = 0) ?(prefix : string = "") (m : stringable)
          | h :: t ->
            Printf.sprintf
              "%s%s%s"
-             (to_string ~indents:indents' (Edge h))
+             (to_string ~context:context' ~indents:indents' (Edge h))
              (if List.is_empty t
               then ""
               else Printf.sprintf ",%s" (if indents == -1 then "" else "\n"))
-             (to_string' ~indents' t)
+             (to_string' ~context' ~indents' t)
        in
        Printf.sprintf
          "[\n%s\n%s]"
-         (to_string' ~indents':(indents + 1) edges)
+         (to_string' ~context':context ~indents':(indents + 1) edges)
          (tabs indents)
      (* [Fsm fsm] *)
      | Fsm fsm ->
@@ -328,14 +423,20 @@ let rec to_string ?(indents : int = 0) ?(prefix : string = "") (m : stringable)
           Printf.sprintf
             "{\n%s;\n%s;\n%s;\n}"
             (to_string
+               ~context
                ~indents:(indents + 1)
                ~prefix:"init: "
                (State (Option.get (find_state init (States states)))))
             (to_string
+               ~context
                ~indents:(indents + 1)
                ~prefix:"states: "
                (States states))
-            (to_string ~indents:(indents + 1) ~prefix:"edges: " (Edges edges)))
+            (to_string
+               ~context:(add_to_stringable_context context (States states))
+               ~indents:(indents + 1)
+               ~prefix:"edges: "
+               (Edges edges)))
        (* [Trace trace] *)
        (* | Trace trace -> to_string ~indents (Edges (Trace.elements trace)) *))
 ;;
