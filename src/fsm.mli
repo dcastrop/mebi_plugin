@@ -56,6 +56,8 @@ val find_state : id -> has_state -> state option
 type has_lts = Fsm of fsm
 
 val get_edges : has_edge -> has_lts -> edges option
+val default_indent_val : int
+val tabs : ?size:int -> int -> string
 
 type stringable =
   | ID of id
@@ -66,8 +68,18 @@ type stringable =
   | Edges of edges
   | Fsm of fsm
 
-val default_indent_val : int
-val tabs : ?size:int -> int -> string
-val to_string : ?indents:int -> ?prefix:string -> stringable -> string
+type stringable_context =
+  | None
+  | ShowIDs
+  | States of states
+  | List of stringable_context list
+
+val to_string
+  :  ?context:stringable_context
+  -> ?indents:int
+  -> ?prefix:string
+  -> stringable
+  -> string
+
 val pp : string -> unit
 val pp_tests : unit

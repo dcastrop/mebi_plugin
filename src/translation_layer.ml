@@ -50,7 +50,13 @@ let get_states (env : Environ.env) (sigma : Evd.evar_map) (s : Evd.econstr list)
     | h :: t ->
       states'
         t
-        (List.concat [ [ state ~name:(econstr_to_string env sigma h) i ]; acc ])
+        (List.concat
+           [ [ state
+                 ~name:(Printf.sprintf "s%s" (econstr_to_string env sigma h))
+                 i
+             ]
+           ; acc
+           ])
         (List.concat [ [ h, i ]; map ])
         (i + 1)
   in
@@ -166,7 +172,7 @@ let lts_to_fsm
   (* translate [lts] from coq api to ocaml [Fsm.edges]. *)
   let edges, edge_map = get_edges env sigma lts tbl.state_map in
   (* add meta data *)
-  tbl, fsm states edges
+  tbl, fsm ~init:(Hashtbl.find tbl.state_map start_term) states edges
 ;;
 
 (* let () =
