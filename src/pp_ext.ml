@@ -16,7 +16,7 @@ let pp_transition env sigma (transition : Constr.rel_context * Constr.t) =
   Printer.pr_constr_env env sigma (snd transition)
 ;;
 
-(** [pp_transitions_to_list env sigma constrs] is. *)
+(** [pp_transitions_to_list env sigma transitions] is an list of pretty-printed [transitions]. *)
 let pp_transitions_to_list env sigma transitions =
   let rec transitions_to_list i res =
     if i < 0
@@ -29,17 +29,17 @@ let pp_transitions_to_list env sigma transitions =
   transitions_to_list (Array.length transitions - 1) []
 ;;
 
-(** [pp_transitions env sigma transitions] is an [array] of [transitions] pretty printed as a [list]. *)
+(** [pp_transitions env sigma transitions] is an array of [transitions] pretty-printed as a list. *)
 let pp_transitions env sigma transitions =
   pp_list (pp_transitions_to_list env sigma transitions)
 ;;
 
-(** [pp_edge env sigma edge] is a pretty printed [edge]. *)
+(** [pp_edge env sigma edge] is a pretty-printed [edge]. *)
 let pp_edge env sigma (edge : Evd.econstr) =
   Printer.pr_econstr_env env sigma edge
 ;;
 
-(** [pp_edges_to_list env sigma constrs] is a pretty printed list of edges ([constrs]). *)
+(** [pp_edges_to_list env sigma edges] is a pretty-printed list of [edges] (i.e., [constrs]). *)
 let rec pp_edges_to_list env sigma (edges : Evd.econstr list) =
   match edges with
   | [] -> []
@@ -47,22 +47,22 @@ let rec pp_edges_to_list env sigma (edges : Evd.econstr list) =
     pp_edge env sigma h_edge :: pp_edges_to_list env sigma t_edges
 ;;
 
-(** [pp_edges env sigma edges] is a [t] (str) of pretty printed edges ([constrs]). *)
+(** [pp_edges env sigma edges] is a [t] (str) of pretty-printed [edges] (i.e., [constrs]). *)
 let pp_edges env sigma (edges : Evd.econstr list) =
   pp_list (pp_edges_to_list env sigma edges)
 ;;
 
-(** [pp_edges env sigma edges] is a [t] (str) of pretty printed edges ([constrs]). *)
+(** [pp_edges env sigma edges] is a [t] (str) of pretty-printed [edges] (i.e., [constrs]). *)
 let pp_edges' env sigma (edges : (Evd.econstr * Evd.econstr) list) =
   pp_list (pp_edges_to_list env sigma (Mebi_utils.strip_snd edges))
 ;;
 
-(** [pp_state env sigma state] is a pretty printed [state]. *)
+(** [pp_state env sigma state] is a pretty-printed [state]. *)
 let pp_state env sigma (state : Evd.econstr) =
   Printer.pr_econstr_env env sigma state
 ;;
 
-(** [pp_states_to_list env sigma constrs] is a pretty printed list of states. *)
+(** [pp_states_to_list env sigma constrs] is a pretty-printed list of [states]. *)
 let rec pp_states_to_list env sigma (states : Evd.econstr list) =
   match states with
   | [] -> []
@@ -70,7 +70,7 @@ let rec pp_states_to_list env sigma (states : Evd.econstr list) =
     pp_state env sigma h_state :: pp_states_to_list env sigma t_states
 ;;
 
-(** [pp_states env sigma states] is a [t] (str) of pretty printed states. *)
+(** [pp_states env sigma states] is a [t] (str) of pretty-printed states. *)
 let pp_states
   (env : Environ.env)
   (sigma : Evd.evar_map)
@@ -79,7 +79,7 @@ let pp_states
   pp_list (pp_states_to_list env sigma states)
 ;;
 
-(** [] *)
+(** [pp_coq_fsm env sigma fsm] is a [t] (str) of pretty-printed coq-based [fsm]. *)
 let pp_coq_fsm
   (env : Environ.env)
   (sigma : Evd.evar_map)
