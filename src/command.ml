@@ -467,8 +467,15 @@ let rec explore_lts
             (lts', states', bound - 1, max)))
 ;;
 
+(* TODO: finish [pp_fsm_table] *)
+(* let pp_fsm_table (tbl:fsm_table) : unit =
+   match fsm
+   ;; *)
+
+(** [bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
 let bound : int = 3
 
+(** [bounded_lts] . *)
 let bounded_lts
   (iref : Names.GlobRef.t)
   (tref : Constrexpr.constr_expr_r CAst.t)
