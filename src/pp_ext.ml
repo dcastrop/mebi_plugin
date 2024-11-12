@@ -88,8 +88,8 @@ let pp_coq_fsm
   =
   match fsm with
   | states, edges ->
-    str "states:\n"
+    str "states: "
     ++ pp_states env sigma states
-    ++ str "\n\nedges:\n"
+    ++ str "  edges: "
     ++ pp_edges env sigma edges
 ;;
