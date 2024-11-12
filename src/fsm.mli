@@ -87,4 +87,3 @@ val to_string
   -> string
 
 val pp : string -> unit
-val pp_tests : unit

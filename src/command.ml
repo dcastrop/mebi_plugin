@@ -516,38 +516,38 @@ let bounded_lts
   Feedback.msg_notice (str "lts_ty: " ++ Printer.pr_econstr_env env sigma lts_ty);
   Feedback.msg_notice (str "t: " ++ Printer.pr_econstr_env env sigma t);
   (* tests on edges *)
-  match coq_fsm.edges with
-  | [] -> ()
-  | h :: _t ->
-    Feedback.msg_notice
-      (str "h edge: "
-       ++ pp_edge env sigma h
-       ++ str "\n\ntests: \n"
-       ++ str (Printf.sprintf "isApp: %b" (EConstr.isApp sigma h))
-       ++ str "\nend of tests.\n");
-    (* lts to fsm *)
-    let _tbl, _fsm =
-      lts_to_fsm
-        env
-        sigma
-        lts_ty
-        terms
-        lbls
-        t
-        transitions
-        coq_fsm.states
-        coq_fsm.edges
-    in
-    (* ( Hashtbl.iter (fun x y -> Printf.sprintf "tbl: %s -> %s\n" x y) _tbl.state_map;;); *)
-    (* Feedback.msg_notice
-       (str (Printf.sprintf "translated fsm: %s" ++
-       (let rec sprintf_tbl  = Printer.pr_econstr_env env sigma )
-       )); *)
-    Feedback.msg_notice
-      (str
-         (Printf.sprintf
-            "translated fsm: %s\n\n--------\n"
-            (to_string ~context:ShowIDs (Fsm _fsm))))
+  (* match coq_fsm.edges with
+     | [] -> Feedback.msg_notice (str "coq_fsm.edges empty. cannot continue")
+     | h :: _t ->
+     Feedback.msg_notice
+     (str "h edge: "
+     ++ pp_edge env sigma h
+     ++ str "\n\ntests: \n"
+     ++ str (Printf.sprintf "isApp: %b" (EConstr.isApp sigma h))
+     ++ str "\nend of tests.\n"); *)
+  (* lts to fsm *)
+  let _tbl, _fsm =
+    lts_to_fsm
+      env
+      sigma
+      lts_ty
+      terms
+      lbls
+      t
+      transitions
+      coq_fsm.states
+      coq_fsm.edges
+  in
+  (* ( Hashtbl.iter (fun x y -> Printf.sprintf "tbl: %s -> %s\n" x y) _tbl.state_map;;); *)
+  (* Feedback.msg_notice
+     (str (Printf.sprintf "translated fsm: %s" ++
+     (let rec sprintf_tbl  = Printer.pr_econstr_env env sigma )
+     )); *)
+  Feedback.msg_notice
+    (str
+       (Printf.sprintf
+          "translated fsm: %s\n\n--------\n"
+          (to_string ~context:ShowIDs (Fsm _fsm))))
 ;;
 
 (* Feedback.msg_notice (str "lts_ty: " ++ Printer.pr_econstr_env env sigma lts_ty); *)
