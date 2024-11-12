@@ -413,16 +413,22 @@ let rec explore_lts
                      List.nth rhs' 0, List.nth rhs' 2)
               in
               (* only add the new states. *)
+              let acc' =
+                List.concat
+                  [ (if mem env sigma' lhs_id acc then [] else [ lhs_id ])
+                  ; acc
+                  ]
+              in
+              (* ensure self-ref transitions dont add same state twice. *)
               List.concat
-                [ (if mem env sigma' lhs_id acc then [] else [ lhs_id ])
-                ; (if mem env sigma' rhs_id acc then [] else [ rhs_id ])
-                ; acc
+                [ (if mem env sigma' rhs_id acc' then [] else [ rhs_id ])
+                ; acc'
                 ])
        in
        (*** [states'] is the list of [states] encountered so far. *)
        let states' = extract_states env sigma edges states in
-       (* Feedback.msg_debug (str "fsm: " ++ pp_edges' env sigma' lts);
-          Feedback.msg_debug (str "edges: " ++ pp_edges' env sigma' edges); *)
+       Feedback.msg_debug (str "fsm: " ++ pp_edges' env sigma' lts);
+       Feedback.msg_debug (str "edges: " ++ pp_edges' env sigma' edges);
        (*** [constrs'] is the list of [edges] not contained within [lts]. *)
        let constrs' =
          cap_edges' env sigma' lts edges
