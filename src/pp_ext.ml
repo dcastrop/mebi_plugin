@@ -1,14 +1,18 @@
 open Pp
+open Mebi_structs
 
 (** [pp_list l] is a pretty printed list ([l]). *)
-let pp_list l =
-  (* ! use [fnl()] for newlines (will only be used if necessary). *)
-  str "[\n"
-  ++ Pp.prlist_with_sep
-       (* sep *) (fun _ -> str ", " ++ fnl ())
-       (* fun *) (fun i -> str "  " ++ i)
-       (* list *) l
-  ++ str "\n]\n"
+let pp_list (l : 'a list) =
+  if List.is_empty l
+  then str "[] (empty)\n"
+  else
+    (* ! use [fnl()] for newlines (will only be used if necessary). *)
+    str "[\n"
+    ++ Pp.prlist_with_sep
+         (* sep *) (fun _ -> str ", " ++ fnl ())
+         (* fun *) (fun i -> str "  " ++ i)
+         (* list *) l
+    ++ str "\n]\n"
 ;;
 
 (** [pp_transition env sigma transition] is a pretty printed [transition]. *)
@@ -79,17 +83,59 @@ let pp_states
   pp_list (pp_states_to_list env sigma states)
 ;;
 
-(** [pp_coq_fsm env sigma fsm] is a [t] (str) of pretty-printed coq-based [fsm]. *)
-let pp_coq_fsm
-  (env : Environ.env)
-  (sigma : Evd.evar_map)
-  (fsm : Evd.econstr list * Evd.econstr list)
-  : Pp.t
-  =
-  match fsm with
-  | states, edges ->
-    str "states: "
-    ++ pp_states env sigma states
-    ++ str "  edges: "
-    ++ pp_edges env sigma edges
+(** [pp_coq_lts lts] is a [t] (str) of pretty-printed coq-based [lts]. *)
+let pp_coq_lts (lts : Mebi_structs.coq_lts) : Pp.t =
+  match lts with
+  | { env
+    ; sigma
+    ; lts_type
+    ; term_type
+    ; type_lbls
+    ; constr_names
+    ; constr_transitions
+    ; start_term
+    ; states
+    ; edges
+    ; _
+    } ->
+    let header_pp =
+      str "lts of type: \""
+      ++ Printer.pr_econstr_env env sigma lts_type
+      ++ str "\";\n"
+    in
+    let terms_pp =
+      str "has terms of: \""
+      ++ Printer.pr_econstr_env env sigma term_type
+      ++ str "\";\n"
+    in
+    let labels_pp =
+      str "has labels of: \""
+      ++ Printer.pr_econstr_env env sigma type_lbls
+      ++ str "\";\n"
+    in
+    let constrs_pp =
+      str "constructors: \""
+      ++ Pp.prvect_with_sep (fun _ -> str "\", \"") Names.Id.print constr_names
+      ++ str "\";\n"
+    in
+    let transitions_pp =
+      str "transitions: "
+      ++ pp_transitions env sigma constr_transitions
+      ++ strbrk ""
+      (* ++ strbrk "\n" *)
+    in
+    let states_pp = str "states: " ++ pp_states env sigma states in
+    let edges_pp = str "edges: " ++ pp_edges env sigma edges in
+    (* return all joined together *)
+    header_pp
+    ++ str "{\n  "
+    ++ terms_pp
+    ++ str "  "
+    ++ labels_pp
+    ++ str "  "
+    ++ constrs_pp
+    ++ str "}\n"
+    ++ transitions_pp
+    ++ states_pp
+    ++ edges_pp
 ;;

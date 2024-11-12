@@ -11,6 +11,8 @@ src/mebi_errors.ml
 src/mebi_errors.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
+src/mebi_structs.ml
+src/mebi_structs.mli
 src/stringify.ml
 src/stringify.mli
 src/pp_ext.ml

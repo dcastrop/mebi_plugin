@@ -1,7 +1,9 @@
 open Pp
 open Mebi_utils
 module Err = Mebi_errors
-open Pp_ext
+open Mebi_structs
+(* open Pp_ext *)
+(* open Stringify *)
 (* open Translation_layer *)
 (* open Fsm *)
 
@@ -86,8 +88,17 @@ let rec instantiate_ctx env sigma (c : EConstr.t) = function
     instantiate_ctx env sigma (EConstr.Vars.subst1 vt c) ts
 ;;
 
-(** Checks possible transitions for this term: *)
-let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
+(** [check_valid_constructor end sigma ... transitions to_check] is the tuple containing an updated [sigma] and the possible [transitions] for term [to_check]. *)
+let check_valid_constructor
+  (env : Environ.env)
+  (sigma : Evd.evar_map)
+  (lts : Evd.econstr)
+  (term_ty : Evd.econstr)
+  (lbl_ty : Evd.econstr)
+  (transitions : (Constr.rel_context * Constr.t) array)
+  (to_check : Evd.econstr)
+  : Evd.evar_map * (Evd.econstr * Evd.econstr) list
+  =
   let (ctors : (Evd.evar_map * (EConstr.t * EConstr.t) list) ref) =
     { contents = sigma, [] }
   in
@@ -100,7 +111,9 @@ let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
     let sigma, tm =
       instantiate_ctx env sigma tm (List.map EConstr.of_constr ctx_tys)
     in
-    let sigma, tgt_term, to_unif = mk_template env sigma lts t lbl_ty term_ty in
+    let sigma, tgt_term, to_unif =
+      mk_template env sigma lts to_check lbl_ty term_ty
+    in
     match m_unify env sigma to_unif tm with
     | Some sigma -> ctors := sigma, (tgt_term, to_unif) :: ctor_vals
     | None -> ()
@@ -108,68 +121,217 @@ let check_valid_constructor env sigma lts t term_ty lbl_ty transitions =
   !ctors
 ;;
 
-(** [get_next_edges ...] is a list of edges from the next constrs (edges).
+(** [bound] is the total number of states to be reached by [explore_lts]. *)
+let bound : int = 4
 
-    Unfolds each of the outgoing edges in constrs, and collects all
-    of the outgoing edges from there.
-
-    In terms of fsm: from the current state [a], for each outgoing
-    edge the resulting state [b] is checked for any outgoing edges.
-    The returned list contains all outgoing edges from all possible
-    next states [b] reachable within 1 step. *)
-let rec get_next_edges
-  env
-  sigma
-  lts_ty
-  (edges : (Evd.econstr * Evd.econstr) list)
-  terms
-  lbls
-  transitions
+let rec bound_search
+  ?(states_to_check : Evd.econstr list = [])
+  (lts : Mebi_structs.coq_lts)
+  : Mebi_structs.coq_lts
   =
-  (* update sigma with constructors *)
-  let sigma, h_edges, t_edges =
-    match edges with
-    | [] -> sigma, [], []
-    | h_edge :: t_edges ->
-      let sigma', constrs' =
-        check_valid_constructor
-          env
-          sigma
-          lts_ty
-          (fst h_edge)
-          terms
-          lbls
-          transitions
-      in
-      sigma', constrs', t_edges
-  in
-  (* continue going through edges *)
-  match t_edges with
-  | [] -> sigma, h_edges
-  | _ :: _ ->
-    let sigma, edges =
-      get_next_edges env sigma lts_ty t_edges terms lbls transitions
-    in
-    (* return updated sigma and edges *)
-    sigma, List.concat [ h_edges; edges ]
+  let num_states = List.length lts.states in
+  match bound <= num_states with
+  | true ->
+    (* stop, too many states. *)
+    Feedback.msg_debug
+      (str
+         (Printf.sprintf
+            "\n\n\
+             ===\n\
+             bound_search, Stopping: found reached (%d <= %d). Still had (%d) \
+             states to check."
+            bound
+            num_states
+            (List.length states_to_check)));
+    lts
+  | _ ->
+    (* within bounds, continue -> *)
+    (match states_to_check with
+     | [] ->
+       (* no states to check, is this the first time entering? *)
+       (match lts.states with
+        | [] ->
+          (* this is the first time entering, re-enter with [lts.start_term]. *)
+          bound_search ~states_to_check:[ lts.start_term ] lts
+        | _ ->
+          (* no more states to check, we must have finished. *)
+          Feedback.msg_debug
+            (str
+               (Printf.sprintf
+                  "\n\n\
+                   ===\n\
+                   bound_search, Finished: found (%d) states, (%d) edges."
+                  (List.length lts.states)
+                  (List.length lts.edges)));
+          lts)
+     | h_to_check :: t_to_check ->
+       (* explore more [states_to_check]. *)
+       (* update [lts.states] with [h_to_check]. *)
+       let lts =
+         Mebi_structs.coq_lts_update_states
+           lts
+           (List.concat [ lts.states; [ h_to_check ] ])
+       in
+       Feedback.msg_debug
+         (str
+            (Printf.sprintf
+               "\n\
+                --\n\
+                bound_search, checking state (%s): currently found (%d) \
+                states, (%d) edges.\n"
+               (Stringify.econstr_to_string lts.env lts.sigma h_to_check)
+               (List.length lts.states)
+               (List.length lts.edges)));
+       (* unpack [lts]. *)
+       (match lts with
+        | { env
+          ; sigma
+          ; lts_type
+          ; term_type
+          ; type_lbls
+          ; constr_names
+          ; constr_transitions
+          ; start_term
+          ; states
+          ; edges
+          ; _
+          } ->
+          (* get the outgoing edges ([contrs]) from state ([h_to_check]). *)
+          let sigma, constrs =
+            check_valid_constructor
+              env
+              sigma
+              lts_type
+              term_type
+              type_lbls
+              constr_transitions
+              h_to_check
+          in
+          (* update [sigma] of [lts]. *)
+          let lts = Mebi_structs.coq_lts_update_sigma lts sigma in
+          (* determine which edges ([constrs]) are new. *)
+          let new_edges =
+            (*** [new_edges' ?acc edges] is the sublist of [edges] that do
+              not appear already in [acc], which is initially [lts.edges].
+              (note, we also strip the tuple down to the [snd] item.
+              while we could instead keep them both as it would simplify [extract_new_states] (below), in the long run we would have
+              to strip them away anyway. so we do it now to make sure
+              that what we do in [extract_new_states] works. *)
+            let rec new_edges'
+              ?(acc : Evd.econstr list = lts.edges)
+              (edges : (Evd.econstr * Evd.econstr) list)
+              : Evd.econstr list
+              =
+              (* for each [h_edge], *)
+              match edges with
+              | [] -> []
+              | (_, h_edge) :: t_edges ->
+                (* continue with on [t_edges], return [h_edge] and add
+                   to [acc] if not already in [acc]
+                   (i.e., not already encountered). *)
+                let to_add =
+                  if econstr_mem env sigma h_edge acc
+                  then (
+                    Feedback.msg_debug
+                      (str
+                         (Printf.sprintf
+                            "edge (%s) already in acc."
+                            (Stringify.econstr_to_string env sigma h_edge)));
+                    [])
+                  else (
+                    Feedback.msg_debug
+                      (str
+                         (Printf.sprintf
+                            "edge (%s) is new!"
+                            (Stringify.econstr_to_string env sigma h_edge)));
+                    [ h_edge ])
+                in
+                List.concat
+                  [ to_add
+                  ; new_edges' ~acc:(List.concat [ acc; to_add ]) t_edges
+                  ]
+            in
+            (* get [new_edges]. *)
+            new_edges' ~acc:lts.edges constrs
+          in
+          (* check [new_edges] for any [new_states_to_check]. *)
+          let new_states_to_check =
+            (*** [extract_new_states edges acc] is a list of [states] that
+              do not appear already in [to_ignore] or [acc], extracted from
+              the destination of [edges]. *)
+            let rec extract_new_states
+              (edges : Evd.econstr list)
+              (acc : Evd.econstr list)
+              (to_ignore : Evd.econstr list)
+              : Evd.econstr list
+              =
+              match edges with
+              | [] ->
+                (* return [acc] *)
+                acc
+              | h_edge :: t_edges ->
+                (* extract from states and labels from [h_edge] *)
+                let _lhs, _label, rhs =
+                  match EConstr.decompose_app sigma h_edge with
+                  | h_edge' ->
+                    let h_edge'' = Array.to_list (snd h_edge') in
+                    (* get [lhs]. *)
+                    ( List.nth h_edge'' 0
+                    , (* get [label]. *)
+                      List.nth h_edge'' 1
+                    , (* get [rhs]. *)
+                      List.nth h_edge'' 2 )
+                in
+                (* Feedback.msg_debug
+                   (str
+                   (Printf.sprintf
+                   "bound_search.extract_new_states,\n\
+                   \  lhs: %s;\n\
+                   \  label: %s;\n\
+                   \  rhs: %s.\n"
+                   (Stringify.econstr_to_string env sigma _lhs)
+                   (Stringify.econstr_to_string env sigma _label)
+                   (Stringify.econstr_to_string env sigma rhs))); *)
+                (* update [acc] with [rhs] if not already in [acc]. *)
+                let acc' =
+                  List.concat
+                    [ acc
+                    ; (if econstr_mem
+                            env
+                            sigma
+                            rhs
+                            (List.concat [ acc; to_ignore ])
+                       then (
+                         Feedback.msg_debug
+                           (str
+                              (Printf.sprintf
+                                 "state (%s) already in acc."
+                                 (Stringify.econstr_to_string env sigma rhs)));
+                         [])
+                       else (
+                         Feedback.msg_debug
+                           (str
+                              (Printf.sprintf
+                                 "state (%s) is new!"
+                                 (Stringify.econstr_to_string env sigma rhs)));
+                         [ rhs ]))
+                    ]
+                in
+                (* continue checking [t_edges]. *)
+                extract_new_states t_edges acc' to_ignore
+            in
+            (* get [new_states_to_check]. *)
+            extract_new_states new_edges t_to_check lts.states
+          in
+          (* update [lts] with [new_edges]. *)
+          let lts =
+            Mebi_structs.coq_lts_update_edges
+              lts
+              (List.concat [ lts.edges; new_edges ])
+          in
+          (* continue exploring *)
+          bound_search ~states_to_check:new_states_to_check lts))
 ;;
-
-(* (** [pp_next_edges] is [pp_edges] on [get_next_edges edges]. *)
-   let pp_next_edges
-   env
-   sigma
-   lts_ty
-   constrs
-   terms
-   lbls
-   transitions
-   (* : Environ.env * Evd.evar_map * ((Evd.econstr * Evd.econstr) list) *)
-   =
-   let sigma, edges =
-   get_next_edges env sigma lts_ty constrs terms lbls transitions
-   in
-   pp_edges env sigma (Mebi_utils.strip_snd edges)
-   ;; *)
 
 (* TODO: check which are all possible next transitions *)
 (* TODO: check following functions/modules: *)
@@ -190,344 +352,66 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
   =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let lts_ty, lbls, terms = check_ref_lts env sigma iref in
+  (* using [iref], get the following from the relevant type definition in coq. *)
+  let lts_type, type_lbls, term_type = check_ref_lts env sigma iref in
+  (* fetch the specific valuation [t] of the term/type shown above. *)
   let sigma, t = Constrintern.interp_constr_evars env sigma tref in
-  let sigma = Typing.check env sigma t terms in
-  let c_names, transitions = get_constructors env sigma iref in
-  let sigma, constrs =
-    check_valid_constructor env sigma lts_ty t terms lbls transitions
-  in
-  Feedback.msg_notice
-    (str "Types of terms: "
-     ++ Printer.pr_econstr_env env sigma terms
-     ++ strbrk "");
-  Feedback.msg_notice
-    (str "Types of labels: "
-     ++ Printer.pr_econstr_env env sigma lbls
-     ++ strbrk "");
-  Feedback.msg_notice
-    (str "Constructors: "
-     ++ Pp.prvect_with_sep (fun _ -> str ", ") Names.Id.print c_names);
-  (* prints all transitions -- the possible constructors
-     a term may take as part of its structure.
-     these are dependant on the definition of a type *)
-  Feedback.msg_notice
-    (str "Transitions: " ++ pp_transitions env sigma transitions ++ strbrk "\n");
-  (* print all edges -- describing the possible
-     applications of a type on a given term *)
-  Feedback.msg_debug
-    (str "Target matches constructors "
-     ++ pp_edges env sigma (Mebi_utils.strip_snd constrs)
-     ++ strbrk "\n");
-  (* print all next edges *)
-  (* Feedback.msg_notice
-     (str "(next edges) Target matches constructors  "
-     ++ pp_next_edges env sigma lts_ty constrs terms lbls transitions
-     ++ strbrk "\n") *)
-  Feedback.msg_debug (str "done.")
-;;
-
-(* [mem m l] is [true] if [m] is in [l]. *)
-let rec mem env sigma m l : bool =
-  match l with
-  | [] -> false
-  | h :: t ->
-    (match EConstr.eq_constr sigma h m with
-     | true -> true
-     | _ -> mem env sigma m t)
-;;
-
-let rec mem' env sigma m (l : (Evd.econstr * Evd.econstr) list) : bool =
-  match l with
-  | [] -> false
-  | h :: t ->
-    (match EConstr.eq_constr sigma (snd h) (snd m) with
-     | true -> true
-     | _ -> mem' env sigma m t)
-;;
-
-(** [cap_edges es to_check] is the list in of elements in [to_check] that do not appear in [es].*)
-(* let rec cap_edges
-   env
-   sigma
-   (es : Evd.econstr list)
-   (to_check : Evd.econstr list)
-   : Evd.econstr list
-   =
-   match to_check with
-   (* return [] *)
-   | [] -> []
-   (*  *)
-   | h :: t ->
-   (match mem env sigma h es with
-   | true ->
-   (* Feedback.msg_info (str " --: (" ++ (Printer.pr_econstr_env env sigma (snd h)) ++ str ")  already found, skipping.\n" ); *)
-   cap_edges env sigma es t
-   | _ ->
-   (* Feedback.msg_info (str " +-: (" ++ (Printer.pr_econstr_env env sigma (snd h)) ++ str ")  not found, adding.\n" ); *)
-   List.concat [ cap_edges env sigma es t; [ h ] ])
-   ;; *)
-
-let rec cap_edges'
-  env
-  sigma
-  (es : (Evd.econstr * Evd.econstr) list)
-  (to_check : (Evd.econstr * Evd.econstr) list)
-  : (Evd.econstr * Evd.econstr) list
-  =
-  match to_check with
-  (* return [] *)
-  | [] -> []
-  (*  *)
-  | h :: t ->
-    (match mem' env sigma h es with
-     | true ->
-       (* Feedback.msg_info (str " --: (" ++ (Printer.pr_econstr_env env sigma (snd h)) ++ str ")  already found, skipping.\n" ); *)
-       cap_edges' env sigma es t
-     | _ ->
-       (* Feedback.msg_info (str " +-: (" ++ (Printer.pr_econstr_env env sigma (snd h)) ++ str ")  not found, adding.\n" ); *)
-       List.concat [ cap_edges' env sigma es t; [ h ] ])
-;;
-
-(** [merge env sigma l1 l2] is the combination of [l1] and [l2] with any duplicates removed. *)
-(* let rec merge env sigma l1 l2 =
-   match l1 with
-   | [] -> l2
-   | h :: t ->
-   (match mem env sigma h l2 with
-   | true -> merge env sigma t l2
-   (* (EConstr_list t) (EConstr_list l2) *)
-   | _ -> h :: merge env sigma t l2)
-   ;; *)
-
-let rec merge' env sigma l1 l2 =
-  match l1 with
-  | [] -> l2
-  | h :: t ->
-    (match mem' env sigma h l2 with
-     | true -> merge' env sigma t l2
-     (* (EConstr_list t) (EConstr_list l2) *)
-     | _ -> h :: merge' env sigma t l2)
-;;
-
-(** [unique env sigma l] is list [l] with any duplicates removed. *)
-let rec unique env sigma l =
-  match l with
-  | [] -> []
-  | h :: t ->
-    (match mem env sigma h t with
-     (* if dupe, skip this one add the next *)
-     | true -> unique env sigma t
-     (* else keep *)
-     | _ -> h :: unique env sigma t)
-;;
-
-(** [coq_fsm] is . *)
-type coq_fsm =
-  { states : Evd.econstr list
-  ; edges : Evd.econstr list
-  }
-
-(** [explore_lts] is the list of [constrs] (edges) reachable, within [max] bounds.*)
-let rec explore_lts
-  (env : Environ.env)
-  (sigma : Evd.evar_map)
-  (lts_ty : Evd.econstr)
-  (constrs : (Evd.econstr * Evd.econstr) list)
-  (* (constrs : Evd.econstr list) *)
-    (terms : Evd.econstr)
-  (lbls : Evd.econstr)
-  transitions
-  ( (* (lts : Evd.econstr list) *)
-    (lts : (Evd.econstr * Evd.econstr) list)
-  , states
-  , bound
-  , max )
-  : Evd.evar_map * coq_fsm
-  =
-  assert (bound >= 0);
-  match constrs, lts with
-  (* error if both are empty *)
-  | [], [] ->
-    Feedback.msg_debug
-      (str "ExploreLTS, both constrs and lts empty, returning empty lts.");
-    sigma, { states; edges = [] }
-  (* first entering *)
-  | _, [] ->
-    Feedback.msg_debug
-      (str
-         (Printf.sprintf
-            "ExploreLTS, bound ( %d / %d ), lts was empty, using constrs."
-            (max - bound)
-            max));
-    explore_lts
+  (* ? typing should always pass -- used to update [sigma]. *)
+  let sigma = Typing.check env sigma t term_type in
+  (* get each of the constructors of the relevant type definition, split across the names and transitions. *)
+  let constr_names, constr_transitions = get_constructors env sigma iref in
+  (* setup coq lts table containing all necessary meta-information or
+     contexts (e.g., env, sigma) which are also to be updated throughout. *)
+  let coq_lts =
+    Mebi_structs.coq_lts
       env
       sigma
-      lts_ty
-      constrs
-      terms
-      lbls
-      transitions
-      (constrs, states, bound, max)
-  (* no more edges *)
-  | [], _ ->
-    Feedback.msg_debug (str "ExploreLTS, no more edges (constrs) to explore.");
-    sigma, { states; edges = unique env sigma (Mebi_utils.strip_snd lts) }
-  (* continue exploring *)
-  | _, _ ->
-    (match bound with
-     (* stop -- bound exceeded *)
-     | 0 ->
-       Feedback.msg_debug
-         (str
-            (Printf.sprintf "ExploreLTS, stopping -- reached bound (%d).\n" max));
-       sigma, { states; edges = unique env sigma (Mebi_utils.strip_snd lts) }
-     (* continue -- within bounds *)
-     | _ ->
-       (* get constructors *)
-       let sigma', (edges : (Evd.econstr * Evd.econstr) list) =
-         get_next_edges env sigma lts_ty constrs terms lbls transitions
-       in
-       (* get states (terms) from each of the edges. *)
-       let rec extract_states
-         env
-         sigma
-         (edges : (Evd.econstr * Evd.econstr) list)
-         (acc : Evd.econstr list)
-         : Evd.econstr list
-         =
-         match edges with
-         | [] -> acc
-         | h :: t ->
-           extract_states
-             env
-             sigma
-             t
-             ((* extract the states from the edge *)
-              let lhs_id, rhs_id =
-                match EConstr.decompose_app sigma (snd h) with
-                | h' ->
-                  (match h' with
-                   | _lhs, rhs ->
-                     let rhs' = Array.to_list rhs in
-                     List.nth rhs' 0, List.nth rhs' 2)
-              in
-              (* only add the new states. *)
-              let acc' =
-                List.concat
-                  [ (if mem env sigma' lhs_id acc then [] else [ lhs_id ])
-                  ; acc
-                  ]
-              in
-              (* ensure self-ref transitions dont add same state twice. *)
-              List.concat
-                [ (if mem env sigma' rhs_id acc' then [] else [ rhs_id ])
-                ; acc'
-                ])
-       in
-       (*** [states'] is the list of [states] encountered so far. *)
-       let states' = extract_states env sigma edges states in
-       Feedback.msg_debug (str "fsm: " ++ pp_edges' env sigma' lts);
-       Feedback.msg_debug (str "edges: " ++ pp_edges' env sigma' edges);
-       (*** [constrs'] is the list of [edges] not contained within [lts]. *)
-       let constrs' =
-         cap_edges' env sigma' lts edges
-         (* (Mebi_utils.strip_snd lts)
-            (Mebi_utils.strip_snd edges) *)
-       in
-       (*** [lts'] is the combination of [lts] and [edges] with duplicates removed. *)
-       let lts' =
-         merge' env sigma' lts edges
-         (* (Mebi_utils.strip_snd lts)
-            (Mebi_utils.strip_snd edges) *)
-       in
-       (match List.is_empty constrs' with
-        (* finished within bounds *)
-        | true ->
-          Feedback.msg_debug
-            (str
-               (Printf.sprintf
-                  "ExploreLTS, finished on bound ( %d / %d ).\n"
-                  (max - bound)
-                  max));
-          ( sigma'
-          , { states = states'
-            ; edges = unique env sigma' (Mebi_utils.strip_snd lts')
-            } )
-        (* keep going *)
-        | _ ->
-          explore_lts
-            env
-            sigma'
-            lts_ty
-            constrs'
-            terms
-            lbls
-            transitions
-            (lts', states', bound - 1, max)))
-;;
-
-(* TODO: finish [pp_fsm_table] *)
-(* let pp_fsm_table (tbl:fsm_table) : unit =
-   match fsm
-   ;; *)
-
-(** [bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
-let bound : int = 3
-
-(** [bounded_lts] . *)
-let bounded_lts
-  (iref : Names.GlobRef.t)
-  (tref : Constrexpr.constr_expr_r CAst.t)
-  : unit
-  =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let lts_ty, lbls, terms = check_ref_lts env sigma iref in
-  let sigma, t = Constrintern.interp_constr_evars env sigma tref in
-  let sigma = Typing.check env sigma t terms in
-  let c_names, transitions = get_constructors env sigma iref in
-  let sigma, constrs =
-    check_valid_constructor env sigma lts_ty t terms lbls transitions
+      lts_type
+      term_type
+      type_lbls
+      constr_names
+      constr_transitions
+      t
   in
-  Feedback.msg_notice
-    (str "(b) Types of terms: "
-     ++ Printer.pr_econstr_env env sigma terms
-     ++ strbrk "");
-  Feedback.msg_notice
-    (str "(b) Types of labels: "
-     ++ Printer.pr_econstr_env env sigma lbls
-     ++ strbrk "");
-  Feedback.msg_notice
-    (str "(b) Constructors: "
-     ++ Pp.prvect_with_sep (fun _ -> str ", ") Names.Id.print c_names);
-  (* prints all transitions -- the possible constructors
-     a term may take as part of its structure.
-     these are dependant on the definition of a type *)
-  Feedback.msg_debug
-    (str "Transitions: " ++ pp_transitions env sigma transitions ++ strbrk "\n");
-  let sigma, coq_fsm =
-    explore_lts
-      env
-      sigma
-      lts_ty
-      constrs
-      (* (Mebi_utils.strip_snd constrs) *)
-      terms
-      lbls
-      transitions
-      ([], [ t ], bound, bound)
-  in
+  Feedback.msg_debug (str "init: " ++ Pp_ext.pp_coq_lts coq_lts ++ str "\n---\n");
+  (* explore using [coq_lts], up to [bound]-many states. *)
+  let coq_lts = bound_search coq_lts in
+  Feedback.msg_info (str "final: " ++ Pp_ext.pp_coq_lts coq_lts ++ str "\n---\n");
+  (* ! remove below
+     let sigma, constrs =
+     check_valid_constructor
+     env
+     sigma
+     lts_type
+     term_type
+     type_lbls
+     constr_transitions
+     t
+     in *)
+  (* let sigma, coq_fsm =
+     explore_lts'
+     env
+     sigma
+     lts_ty
+     constrs
+     (* (Mebi_utils.strip_snd constrs) *)
+     terms
+     lbls
+     transitions
+     ([], [ t ], bound, bound)
+     in *)
   (* match coq_fsm with
   | { states; edges; _ } ->
     Feedback.msg_notice (str "(b) Edges: " ++ pp_edges env sigma edges); *)
-  Feedback.msg_info
-    (str "(b) CoqFsm: " ++ pp_coq_fsm env sigma (coq_fsm.states, coq_fsm.edges));
+  (* Feedback.msg_info
+     (str "(b) CoqFsm: " ++ pp_coq_fsm env sigma (coq_fsm.states, coq_fsm.edges)); *)
   (* print out other information too *)
-  Feedback.msg_debug (str "terms: " ++ Printer.pr_econstr_env env sigma terms);
-  Feedback.msg_debug (str "lbls: " ++ Printer.pr_econstr_env env sigma lbls);
-  Feedback.msg_debug (str "lts_ty: " ++ Printer.pr_econstr_env env sigma lts_ty);
-  Feedback.msg_debug (str "t: " ++ Printer.pr_econstr_env env sigma t);
+  (* Feedback.msg_debug
+     (str "terms: " ++ Printer.pr_econstr_env env sigma term_type);
+     Feedback.msg_debug (str "lbls: " ++ Printer.pr_econstr_env env sigma type_lbls);
+     Feedback.msg_debug
+     (str "lts_ty: " ++ Printer.pr_econstr_env env sigma lts_type);
+     Feedback.msg_debug (str "t: " ++ Printer.pr_econstr_env env sigma t); *)
   (* tests on edges *)
   (* match coq_fsm.edges with
      | [] -> Feedback.msg_notice (str "coq_fsm.edges empty. cannot continue")
