@@ -73,6 +73,11 @@ let get_edges
   (state_map : (Evd.econstr, int) Hashtbl.t)
   : edges * translate_map
   =
+  Printf.printf "\n2 Printing state_map:\n";
+  Hashtbl.iter
+    (fun k v -> Printf.printf "2 %s -> %d\n" (econstr_to_string env sigma k) v)
+    state_map;
+  Printf.printf "2 Finished printing state_map.\n\n";
   let rec edges'
     (es' : Evd.econstr list)
     (acc : edges)
@@ -91,12 +96,33 @@ let get_edges
              let rhs' = Array.to_list rhs in
              List.nth rhs' 0, List.nth rhs' 1, List.nth rhs' 2)
       in
+      (*  *)
+      Printf.printf "\n3 Printing state_map:\n";
+      Hashtbl.iter
+        (fun k v ->
+          Printf.printf "3 %s -> %d\n" (econstr_to_string env sigma k) v)
+        state_map;
+      Printf.printf "3 Finished printing state_map.\n\n";
+      Printf.printf
+        "lhs: %s -> %s\n"
+        (econstr_to_string env sigma lhs_id)
+        (match Hashtbl.find_opt state_map lhs_id with
+         | None -> "None"
+         | Some v -> Printf.sprintf "%d" v)
+      (* (Hashtbl.find state_map lhs_id) *);
+      Printf.printf "rhs: %s -> \n" (econstr_to_string env sigma lhs_id)
+      (* (Hashtbl.find state_map lhs_id) *);
       edges'
         t
         (List.concat
            [ [ edge
                  ~label:(econstr_to_string env sigma label)
                  i
+                 (* TODO: make it take from the state_map.
+                    ! current issue: appears to not be in table.
+                    ? maybe need to put stringified econstr in table? *)
+                 (* (ID (Hashtbl.find state_map lhs_id))
+                    (ID (Hashtbl.find state_map rhs_id)) *)
                  (ID (econstr_to_int env sigma lhs_id))
                  (ID (econstr_to_int env sigma rhs_id))
              ]
@@ -131,10 +157,16 @@ let lts_to_fsm
       (econstr_to_string env sigma lts_type)
   in
   (* translate [raw_states] from coq api to ocaml [Fsm.states],
-     and get the [state_map] from [Evd.econstr] to [id]. *)
-  let states, state_map = get_states env sigma raw_states in
+     and get the [state_map_list] from [Evd.econstr] to [id]. *)
+  let states, state_map_list = get_states env sigma raw_states in
   (* update the [state_map] *)
-  Hashtbl.add_seq tbl.state_map (List.to_seq state_map);
+  Hashtbl.add_seq tbl.state_map (List.to_seq state_map_list);
+  (*  *)
+  Printf.printf "\nPrinting state_map:\n";
+  Hashtbl.iter
+    (fun k v -> Printf.printf "%s -> %d\n" (econstr_to_string env sigma k) v)
+    tbl.state_map;
+  Printf.printf "Finished printing state_map.\n\n";
   (* translate [lts] from coq api to ocaml [Fsm.edges]. *)
   let edges, edge_map = get_edges env sigma lts tbl.state_map in
   (* add meta data *)

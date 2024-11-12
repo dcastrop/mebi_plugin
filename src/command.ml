@@ -2,8 +2,8 @@ open Pp
 open Mebi_utils
 module Err = Mebi_errors
 open Pp_ext
-open Translation_layer
-open Fsm
+(* open Translation_layer *)
+(* open Fsm *)
 
 let arity_is_Prop mip =
   match Inductive.inductive_sort_family mip with
@@ -539,28 +539,29 @@ let bounded_lts
      ++ str (Printf.sprintf "isApp: %b" (EConstr.isApp sigma h))
      ++ str "\nend of tests.\n"); *)
   (* lts to fsm *)
-  let _tbl, _fsm =
-    lts_to_fsm
-      env
-      sigma
-      lts_ty
-      terms
-      lbls
-      t
-      transitions
-      coq_fsm.states
-      coq_fsm.edges
-  in
+  (* let _tbl, _fsm =
+     lts_to_fsm
+     env
+     sigma
+     lts_ty
+     terms
+     lbls
+     t
+     transitions
+     coq_fsm.states
+     coq_fsm.edges
+     in *)
   (* ( Hashtbl.iter (fun x y -> Printf.sprintf "tbl: %s -> %s\n" x y) _tbl.state_map;;); *)
   (* Feedback.msg_notice
      (str (Printf.sprintf "translated fsm: %s" ++
      (let rec sprintf_tbl  = Printer.pr_econstr_env env sigma )
      )); *)
-  Feedback.msg_notice
-    (str
-       (Printf.sprintf
-          "translated fsm: %s\n\n--------\n"
-          (to_string ~context:ShowIDs (Fsm _fsm))))
+  (* Feedback.msg_notice
+     (str
+     (Printf.sprintf
+     "translated fsm: %s\n"
+     (to_string ~context:ShowIDs (Fsm _fsm)))); *)
+  Feedback.msg_notice (str "\n--------\n")
 ;;
 
 (* Feedback.msg_notice (str "lts_ty: " ++ Printer.pr_econstr_env env sigma lts_ty); *)
