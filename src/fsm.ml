@@ -444,43 +444,45 @@ let rec to_string
 (** [pp str] is a shorthand for [Printf.printf "%s\n" str]. Useful for pretty-printed strings. *)
 let pp (str : string) : unit = Printf.printf "%s\n" str
 
+(* ! this must not be used since it causes vscoq to crash.
+   ! i think it is something to do with using Printf.printf ? *)
 (** [pp_tests]. *)
-let pp_tests =
-  Printf.printf "\nFsm, begin.\n\n";
-  (*  *)
-  let s0 = state 0 ~name:"s0" in
-  pp (to_string ~prefix:"state 0: " (State s0));
-  let s1 = state 1 in
-  pp (to_string ~prefix:"state 1: " (State s1));
-  let s2 = state 2 ~name:"S2" in
-  pp (to_string ~prefix:"state 2: " (State s2));
-  let s3 = state 3 in
-  pp (to_string ~prefix:"state 3: " (State s3));
-  (*  *)
-  let states1 = [ s0; s1; s2; s3 ] in
-  pp (to_string ~prefix:"states 0-3: " (States states1));
-  (*  *)
-  let e1 = edge 1 (State s0) (State s1) in
-  pp (to_string ~prefix:"e1: " (Edge e1));
-  let e2 = edge 2 (State s1) (State s2) in
-  pp (to_string ~prefix:"e2: " (Edge e2));
-  let e3 = edge 3 (State s2) (State s3) in
-  pp (to_string ~prefix:"e3: " (Edge e2));
-  (*  *)
-  let edges1 : edges = [ e1; e2; e3 ] in
-  pp (to_string ~prefix:"edges 1-3: " (Edges edges1));
-  (*  *)
-  let fsm1 = fsm states1 edges1 in
-  pp (to_string ~prefix:"fsm1: " (Fsm fsm1));
-  (*  *)
-  let edges_from_s2 = Option.get (get_edges (ID 2) (Fsm fsm1)) in
-  pp (to_string ~prefix:"edges from s2: " (Edges edges_from_s2));
-  (*  *)
-  let edges_from_s2' = Option.get (get_edges (State s2) (Fsm fsm1)) in
-  pp (to_string ~prefix:"edges from s2': " (Edges edges_from_s2'));
-  (*  *)
-  Printf.printf "\nFsm, end.\n"
-;;
+(* let pp_tests =
+   Printf.printf "\nFsm, begin.\n\n";
+   (*  *)
+   let s0 = state 0 ~name:"s0" in
+   pp (to_string ~prefix:"state 0: " (State s0));
+   let s1 = state 1 in
+   pp (to_string ~prefix:"state 1: " (State s1));
+   let s2 = state 2 ~name:"S2" in
+   pp (to_string ~prefix:"state 2: " (State s2));
+   let s3 = state 3 in
+   pp (to_string ~prefix:"state 3: " (State s3));
+   (*  *)
+   let states1 = [ s0; s1; s2; s3 ] in
+   pp (to_string ~prefix:"states 0-3: " (States states1));
+   (*  *)
+   let e1 = edge 1 (State s0) (State s1) in
+   pp (to_string ~prefix:"e1: " (Edge e1));
+   let e2 = edge 2 (State s1) (State s2) in
+   pp (to_string ~prefix:"e2: " (Edge e2));
+   let e3 = edge 3 (State s2) (State s3) in
+   pp (to_string ~prefix:"e3: " (Edge e2));
+   (*  *)
+   let edges1 : edges = [ e1; e2; e3 ] in
+   pp (to_string ~prefix:"edges 1-3: " (Edges edges1));
+   (*  *)
+   let fsm1 = fsm states1 edges1 in
+   pp (to_string ~prefix:"fsm1: " (Fsm fsm1));
+   (*  *)
+   let edges_from_s2 = Option.get (get_edges (ID 2) (Fsm fsm1)) in
+   pp (to_string ~prefix:"edges from s2: " (Edges edges_from_s2));
+   (*  *)
+   let edges_from_s2' = Option.get (get_edges (State s2) (Fsm fsm1)) in
+   pp (to_string ~prefix:"edges from s2': " (Edges edges_from_s2'));
+   (*  *)
+   Printf.printf "\nFsm, end.\n"
+   ;; *)
 
 (* () *)
 
