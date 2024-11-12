@@ -215,7 +215,7 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
     (str "Transitions: " ++ pp_transitions env sigma transitions ++ strbrk "\n");
   (* print all edges -- describing the possible
      applications of a type on a given term *)
-  Feedback.msg_notice
+  Feedback.msg_debug
     (str "Target matches constructors "
      ++ pp_edges env sigma (Mebi_utils.strip_snd constrs)
      ++ strbrk "\n");
@@ -224,7 +224,7 @@ let lts (iref : Names.GlobRef.t) (tref : Constrexpr.constr_expr_r CAst.t) : unit
      (str "(next edges) Target matches constructors  "
      ++ pp_next_edges env sigma lts_ty constrs terms lbls transitions
      ++ strbrk "\n") *)
-  Feedback.msg_notice (str "done.")
+  Feedback.msg_debug (str "done.")
 ;;
 
 (* [mem m l] is [true] if [m] is in [l]. *)
@@ -349,12 +349,12 @@ let rec explore_lts
   match constrs, lts with
   (* error if both are empty *)
   | [], [] ->
-    Feedback.msg_notice
+    Feedback.msg_debug
       (str "ExploreLTS, both constrs and lts empty, returning empty lts.");
     sigma, { states; edges = [] }
   (* first entering *)
   | _, [] ->
-    Feedback.msg_notice
+    Feedback.msg_debug
       (str
          (Printf.sprintf
             "ExploreLTS, bound ( %d / %d ), lts was empty, using constrs."
@@ -371,14 +371,14 @@ let rec explore_lts
       (constrs, states, bound, max)
   (* no more edges *)
   | [], _ ->
-    Feedback.msg_notice (str "ExploreLTS, no more edges (constrs) to explore.");
+    Feedback.msg_debug (str "ExploreLTS, no more edges (constrs) to explore.");
     sigma, { states; edges = unique env sigma (Mebi_utils.strip_snd lts) }
   (* continue exploring *)
   | _, _ ->
     (match bound with
      (* stop -- bound exceeded *)
      | 0 ->
-       Feedback.msg_info
+       Feedback.msg_debug
          (str
             (Printf.sprintf "ExploreLTS, stopping -- reached bound (%d).\n" max));
        sigma, { states; edges = unique env sigma (Mebi_utils.strip_snd lts) }
@@ -421,8 +421,8 @@ let rec explore_lts
        in
        (*** [states'] is the list of [states] encountered so far. *)
        let states' = extract_states env sigma edges states in
-       Feedback.msg_info (str "fsm: " ++ pp_edges' env sigma' lts);
-       Feedback.msg_info (str "edges: " ++ pp_edges' env sigma' edges);
+       (* Feedback.msg_debug (str "fsm: " ++ pp_edges' env sigma' lts);
+          Feedback.msg_debug (str "edges: " ++ pp_edges' env sigma' edges); *)
        (*** [constrs'] is the list of [edges] not contained within [lts]. *)
        let constrs' =
          cap_edges' env sigma' lts edges
@@ -438,7 +438,7 @@ let rec explore_lts
        (match List.is_empty constrs' with
         (* finished within bounds *)
         | true ->
-          Feedback.msg_notice
+          Feedback.msg_debug
             (str
                (Printf.sprintf
                   "ExploreLTS, finished on bound ( %d / %d ).\n"
@@ -491,7 +491,7 @@ let bounded_lts
   (* prints all transitions -- the possible constructors
      a term may take as part of its structure.
      these are dependant on the definition of a type *)
-  Feedback.msg_notice
+  Feedback.msg_debug
     (str "Transitions: " ++ pp_transitions env sigma transitions ++ strbrk "\n");
   let sigma, coq_fsm =
     explore_lts
@@ -508,13 +508,13 @@ let bounded_lts
   (* match coq_fsm with
   | { states; edges; _ } ->
     Feedback.msg_notice (str "(b) Edges: " ++ pp_edges env sigma edges); *)
-  Feedback.msg_notice
+  Feedback.msg_info
     (str "(b) CoqFsm: " ++ pp_coq_fsm env sigma (coq_fsm.states, coq_fsm.edges));
   (* print out other information too *)
-  Feedback.msg_notice (str "terms: " ++ Printer.pr_econstr_env env sigma terms);
-  Feedback.msg_notice (str "lbls: " ++ Printer.pr_econstr_env env sigma lbls);
-  Feedback.msg_notice (str "lts_ty: " ++ Printer.pr_econstr_env env sigma lts_ty);
-  Feedback.msg_notice (str "t: " ++ Printer.pr_econstr_env env sigma t);
+  Feedback.msg_debug (str "terms: " ++ Printer.pr_econstr_env env sigma terms);
+  Feedback.msg_debug (str "lbls: " ++ Printer.pr_econstr_env env sigma lbls);
+  Feedback.msg_debug (str "lts_ty: " ++ Printer.pr_econstr_env env sigma lts_ty);
+  Feedback.msg_debug (str "t: " ++ Printer.pr_econstr_env env sigma t);
   (* tests on edges *)
   (* match coq_fsm.edges with
      | [] -> Feedback.msg_notice (str "coq_fsm.edges empty. cannot continue")
