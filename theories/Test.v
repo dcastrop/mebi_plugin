@@ -86,6 +86,32 @@ MeBi BoundedLTS nonTerminatingTestLTS (S 0).
 MeBi BoundedLTS nonTerminatingTestLTS (S (S 0)).
 MeBi BoundedLTS nonTerminatingTestLTS (S (S (S 0))).
 
+Inductive action : Type := | TheAction.
+Inductive term : Type :=
+| trec : term
+| tend : term
+| tfix : term -> term
+| tact : action -> term -> term
+.
+
+Fixpoint subst (t1 : term) (t2 : term) :=
+  match t2 with
+  | trec => t1
+  | tend => tend
+  | tfix t => tfix t
+  | tact a t => tact a (subst t1 t)
+  end.
+
+Inductive termLTS : term -> action -> term -> Prop :=
+| do_act : forall a t, termLTS (tact a t) a t
+
+| do_fix : forall a t t',
+    termLTS (subst (tfix t) t) a t' ->
+    termLTS (tfix t) a t'.
+
+MeBi BoundedLTS termLTS (tfix (tact TheAction tend)).
+
+
 
 
 (* (*** Printing user inputs ***) *)
