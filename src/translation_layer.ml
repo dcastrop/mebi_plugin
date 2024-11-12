@@ -5,17 +5,17 @@ open Stringify
 (** [default_table_size] is the default size of the [translation_table]. *)
 let default_table_size = 10
 
-(** [] *)
+(** [fsm_table] is a type containing the coq-based information of an [lts] to be turned into an [Fsm.fsm] type. *)
 type fsm_table =
   { env : Environ.env
   ; sigma : Evd.evar_map
   ; term_type : string
   ; lbls_type : string
   ; type_name : string
-  ; state_map : (Evd.econstr, int) Hashtbl.t
+  ; state_map : (Evd.econstr, int) Hashtbl.t (* ; fsm : Fsm.fsm *)
   }
 
-(** [] *)
+(** [fsm_table ?state_map env sigma term_type lbls_type type_name] is a constructor for the [fsm_table] type. *)
 let fsm_table
   ?(state_map = Hashtbl.create default_table_size)
   (env : Environ.env)
@@ -27,6 +27,7 @@ let fsm_table
   { env; sigma; term_type; lbls_type; type_name; state_map }
 ;;
 
+(** [translate_map] is a type [(Evd.econstr * id) list], used to associate coq-based terms ([Evd.econstr]) to indices ([id]s) used in the translation tables (e.g., [fsm_table]). *)
 type translate_map = (Evd.econstr * id) list
 
 (** [econstr_to_int] is [e] converted to [int] (via [econstr_to_string] and [int_of_string]). *)
@@ -38,6 +39,7 @@ let econstr_to_int env sigma e : int =
 let get_states (env : Environ.env) (sigma : Evd.evar_map) (s : Evd.econstr list)
   : states * translate_map
   =
+  (*** [states'] is the list of tuples denoting the mapping of coq-based terms to indices used in the ocaml-based translation (e.g., in states/edges [id]s of [Fsm.fsm]). *)
   let rec states'
     (s' : Evd.econstr list)
     (acc : states)
@@ -63,7 +65,7 @@ let get_states (env : Environ.env) (sigma : Evd.evar_map) (s : Evd.econstr list)
   states' s [] [] 0
 ;;
 
-(** [] *)
+(** [get_edges env sigma es state_map] is the tuple containing the ocaml-based [Fsm.edge]s derived from the coq-based [es], along with the translation map. *)
 let get_edges
   (env : Environ.env)
   (sigma : Evd.evar_map)
@@ -86,35 +88,8 @@ let get_edges
         | h' ->
           (match h' with
            | _lhs, rhs ->
-             (* Feedback.msg_info
-                (str (Printf.sprintf "edge #%d lhs': " i)
-                ++ Printer.pr_econstr_env env sigma _lhs
-                ++ str "\n  rhs': "
-                ++ str "[\n"
-                ++ Pp.prlist_with_sep
-                     (* sep *) (fun _ -> str ", " ++ fnl ())
-                     (* fun *) (fun i -> str "  " ++ i)
-                     (* list *)
-                     (let rec rhs_to_list i res =
-                        if i < 0
-                        then res
-                        else
-                          rhs_to_list
-                            (i - 1)
-                            (Printer.pr_econstr_env
-                               env
-                               sigma
-                               (Array.unsafe_get rhs i)
-                             :: res)
-                      in
-                      rhs_to_list (Array.length rhs - 1) [])
-                ++ str "\n]\n"); *)
              let rhs' = Array.to_list rhs in
              List.nth rhs' 0, List.nth rhs' 1, List.nth rhs' 2)
-        (* Hashtbl.find
-           state_map
-           lhs
-           , Hashtbl.find state_map rhs *)
       in
       edges'
         t
@@ -129,21 +104,11 @@ let get_edges
            ])
         (List.concat [ [ h, i ]; map ])
         (i + 1)
-    (* edges'
-       t
-       acc (* (List.concat [ [ edge i - 1 - 1 ]; acc ]) *)
-       (List.concat [ [ h, i ]; map ])
-       (i + 1))) *)
   in
   edges' es [] [] 0
 ;;
 
-(* (** [] *)
-   let _ =
-
-   ;; *)
-
-(** [] *)
+(** [lts_to_fsm ...] is the translation from the coq-based [lts] and [raw_states] to the ocaml-based [Fsm.fsm] and [fsm_table] containing the meta-data. *)
 let lts_to_fsm
   (env : Environ.env)
   (sigma : Evd.evar_map)
@@ -165,7 +130,8 @@ let lts_to_fsm
       (econstr_to_string env sigma lbls_type)
       (econstr_to_string env sigma lts_type)
   in
-  (* translate [raw_states] from coq api to ocaml [Fsm.states], and get the [state_map] from [Evd.econstr] to [id]. *)
+  (* translate [raw_states] from coq api to ocaml [Fsm.states],
+     and get the [state_map] from [Evd.econstr] to [id]. *)
   let states, state_map = get_states env sigma raw_states in
   (* update the [state_map] *)
   Hashtbl.add_seq tbl.state_map (List.to_seq state_map);
@@ -174,7 +140,3 @@ let lts_to_fsm
   (* add meta data *)
   tbl, fsm ~init:(Hashtbl.find tbl.state_map start_term) states edges
 ;;
-
-(* let () =
-
-   ;; *)
