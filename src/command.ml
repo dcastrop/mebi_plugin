@@ -127,10 +127,10 @@ type graph_ctx =
   ; tmp_edges : (EConstr.constr, lts_transition) Hashtbl.t
   }
 
-(* FIXME: Should be user-configurable *)
+(* FIXME: Should be user-configurable, not hardcoded *)
 
 (** [bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
-let bound : int = 3
+let bound : int = 5
 
 let rec build_graph (the_lts : lts) (g : graph_ctx) : lts_graph mm =
   if Hashtbl.length g.tmp_edges >= bound
@@ -141,22 +141,16 @@ let rec build_graph (the_lts : lts) (g : graph_ctx) : lts_graph mm =
     let* sigma = get_sigma in
     let* t = return (Queue.pop g.to_visit) in
     let* constrs = check_valid_constructor the_lts t in
-    let* _ =
-      return
-        (List.iter
-           (fun (i, tgt, _) ->
-             Hashtbl.add g.tmp_edges t { edge_ctor = i; to_node = tgt })
-           constrs)
-    in
-    let* _ =
-      return
-        (List.iter
-           (fun (i, tgt, _) ->
-             if Hashtbl.mem g.tmp_edges tgt || EConstr.eq_constr sigma tgt t
-             then ()
-             else Queue.push tgt g.to_visit)
-           constrs)
-    in
+    List.iter
+      (fun (i, tgt, _) ->
+        Hashtbl.add g.tmp_edges t { edge_ctor = i; to_node = tgt })
+      constrs;
+    List.iter
+      (fun (i, tgt, _) ->
+        if Hashtbl.mem g.tmp_edges tgt || EConstr.eq_constr sigma tgt t
+        then ()
+        else Queue.push tgt g.to_visit)
+      constrs;
     build_graph the_lts g
 ;;
 
