@@ -6,9 +6,13 @@ open Pp_ext
 (* open Fsm *)
 
 let arity_is_Prop mip =
-  match Inductive.inductive_sort_family mip with
-  | Sorts.InProp -> ()
-  | family -> raise (Err.invalid_sort family)
+  let open Declarations in
+  match mip.mind_arity with
+  | RegularArity s ->
+    if not (Sorts.is_prop s.mind_sort)
+    then raise (Err.invalid_sort (Sorts.family s.mind_sort));
+    ()
+  | TemplateArity t -> raise (Err.invalid_sort (Sorts.family t.template_level))
 ;;
 
 let get_lts_labels_and_terms env sigma mib mip =
@@ -19,7 +23,7 @@ let get_lts_labels_and_terms env sigma mib mip =
   match i_idx with
   | [ t1; a; t2 ] ->
     let open Context.Rel in
-    if Declaration.equal Constr.equal t1 t2
+    if Declaration.equal Sorts.relevance_equal Constr.equal t1 t2
     then a, t1
     else raise (Err.invalid_arity env sigma typ)
   | _ -> raise (Err.invalid_arity env sigma typ)
