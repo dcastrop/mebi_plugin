@@ -20,6 +20,6 @@ open Stdarg
  * it has the corret type. Print proposition.
  *)
 VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
-| [ "MeBi" "LTS" reference(r) constr(t) ] -> { Command.lts (Nametab.global r) t }
-| [ "MeBi" "BoundedLTS" reference(r) constr(t) ] -> { Command.bounded_lts (Nametab.global r) t }
+| [ "MeBi" "LTS" reference(r) constr(t) ] ->
+  { Mebi_monad.run (Command.bounded_lts (Nametab.global r) t) }
 END
