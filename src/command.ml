@@ -111,6 +111,7 @@ let rec instantiate_ctx lts (c : EConstr.t) = function
 
 (** Checks possible transitions for this term: *)
 let check_valid_constructor lts t =
+  let$ t env sigma = Reductionops.nf_all env sigma t, sigma in
   let iter_body i ctor_vals =
     let ctx, tm = lts.transitions.(i) in
     let tm = EConstr.of_constr tm in
