@@ -56,35 +56,6 @@ MeBi LTS nonTerminatingTestLTS (S (S (S 0))).
 
 (* Definition boundedLTS (p:Prop) (n:nat) : Type := Prop * nat. *)
 
-MeBi LTS testLTS 0.
-
-MeBi LTS testLTS (S 0).
-MeBi LTS testLTS (S 0).
-
-
-MeBi LTS testLTS 0.
-MeBi LTS testLTS (S 0).
-MeBi LTS testLTS (S (S 0)).
-MeBi LTS testLTS (S (S (S 0))).
-
-
-MeBi LTS nonTerminatingTestLTS 0.
-MeBi LTS nonTerminatingTestLTS 0.
-
-MeBi LTS nonTerminatingTestLTS (S 0).
-MeBi LTS nonTerminatingTestLTS (S 0).
-
-MeBi LTS nonTerminatingTestLTS (S (S 0)).
-MeBi LTS nonTerminatingTestLTS (S (S 0)).
-
-MeBi LTS nonTerminatingTestLTS (S (S (S 0))).
-MeBi LTS nonTerminatingTestLTS (S (S (S 0))).
-
-MeBi LTS nonTerminatingTestLTS 0.
-MeBi LTS nonTerminatingTestLTS (S 0).
-MeBi LTS nonTerminatingTestLTS (S (S 0)).
-MeBi LTS nonTerminatingTestLTS (S (S (S 0))).
-
 Inductive action : Set := | TheAction.
 Inductive term : Set :=
 | trec : term
