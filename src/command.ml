@@ -88,12 +88,26 @@ let mk_template (lts : lts) (termL : EConstr.t) : (EConstr.t * EConstr.t) mm =
 ;;
 
 (* Can I instantiate the bound variables with metavariables instead? *)
-let rec instantiate_ctx (c : EConstr.t) = function
+let rec instantiate_ctx lts (c : EConstr.t) = function
   | [] -> return c
   | t :: ts ->
+    let* env = get_env in
+    let* sigma = get_sigma in
+    Feedback.msg_info
+      (str "CONSTRUCTOR: "
+       ++ int (List.length ts)
+       ++ str " "
+       ++ Printer.pr_econstr_env env sigma t
+       ++ str "  <======= "
+       ++ Printer.pr_econstr_env env sigma c);
     let$ vt env sigma = Evarutil.new_evar env sigma t in
-    instantiate_ctx (EConstr.Vars.subst1 vt c) ts
+    instantiate_ctx
+      lts
+      (EConstr.Vars.subst1 vt c)
+      (List.map (EConstr.Vars.subst1 vt) ts)
 ;;
+
+(* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
 (** Checks possible transitions for this term: *)
 let check_valid_constructor lts t =
@@ -101,10 +115,11 @@ let check_valid_constructor lts t =
     let ctx, tm = lts.transitions.(i) in
     let tm = EConstr.of_constr tm in
     let ctx_tys = List.map Context.Rel.Declaration.get_type ctx in
-    let* tm = instantiate_ctx tm (List.map EConstr.of_constr ctx_tys) in
+    let* tm = instantiate_ctx lts tm (List.map EConstr.of_constr ctx_tys) in
     let* tgt_term, to_unif = mk_template lts t in
     let* success = m_unify to_unif tm in
     let* sigma = get_sigma in
+    (* FIXME: do we need nf_evar here? *)
     let tgt_term = Evarutil.nf_evar sigma tgt_term in
     match success with
     | true -> return ((i, tgt_term, to_unif) :: ctor_vals)
@@ -138,13 +153,13 @@ let rec build_graph (the_lts : lts) (g : graph_ctx) : lts_graph mm =
   else if Queue.is_empty g.to_visit
   then return { edges = g.tmp_edges }
   else
-    let* sigma = get_sigma in
     let* t = return (Queue.pop g.to_visit) in
     let* constrs = check_valid_constructor the_lts t in
     List.iter
       (fun (i, tgt, _) ->
         Hashtbl.add g.tmp_edges t { edge_ctor = i; to_node = tgt })
       constrs;
+    let* sigma = get_sigma in
     List.iter
       (fun (i, tgt, _) ->
         if Hashtbl.mem g.tmp_edges tgt || EConstr.eq_constr sigma tgt t
