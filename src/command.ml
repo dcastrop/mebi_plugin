@@ -77,62 +77,95 @@ let m_unify t0 t1 =
       let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
       sigma, true
     with
-    | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify _) ->
+    | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify (m, n, e))
+      ->
+      Feedback.msg_info
+        (str "Could not unify:" ++ Printer.pr_econstr_env env sigma m);
+      Feedback.msg_info
+        (str "Could not unify:" ++ Printer.pr_econstr_env env sigma n);
       sigma, false)
 ;;
 
-(** Generates [LTS termL ?act ?term2] for unification *)
-let mk_template (lts : lts) (termL : EConstr.t) : (EConstr.t * EConstr.t) mm =
-  let$ act env sigma = Evarutil.new_evar env sigma lts.lbl_type in
-  let$ termR env sigma = Evarutil.new_evar env sigma lts.trm_type in
-  let template = EConstr.mkApp (lts.coq_lts, [| termL; act; termR |]) in
-  return (termR, template)
-;;
-
-(* Can I instantiate the bound variables with metavariables instead? *)
-let rec instantiate_ctx lts (c : EConstr.t) = function
-  | [] -> return c
+let rec mk_ctx_substl (substl : EConstr.t list) = function
+  | [] -> return substl
   | t :: ts ->
-    let* env = get_env in
-    let* sigma = get_sigma in
-    Feedback.msg_info
-      (str "CONSTRUCTOR: "
-       ++ int (List.length ts)
-       ++ str " "
-       ++ Printer.pr_econstr_env env sigma t
-       ++ str "  <======= "
-       ++ Printer.pr_econstr_env env sigma c);
-    let$ vt env sigma = Evarutil.new_evar env sigma t in
-    instantiate_ctx
-      lts
-      (EConstr.Vars.subst1 vt c)
-      (List.map (EConstr.Vars.subst1 vt) ts)
+    let ty = EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t) in
+    let$ vt env sigma = Evarutil.new_evar env sigma ty in
+    mk_ctx_substl (vt :: substl) ts
 ;;
 
+(** Extract args of a type [LTS termL act termR]
+    Prerequisite: input *must* be of this shape *)
+let extract_args substl tm =
+  match Constr.kind tm with
+  | App (_, args) ->
+    assert (Array.length args == 3);
+    let args = EConstr.of_constr_array args in
+    let args = Array.map (EConstr.Vars.substl substl) args in
+    args.(0), args.(1), args.(2)
+  | _ -> assert false
+;;
+
+let rec check_updated_ctx acc lts substl = function
+  | [] -> return acc
+  | t :: tl ->
+    let$+ upd_t env sigma =
+      EConstr.Vars.substl (List.tl substl) (Context.Rel.Declaration.get_type t)
+    in
+    let* sigma = get_sigma in
+    (match EConstr.kind sigma upd_t with
+     | App (fn, args) ->
+       if EConstr.eq_constr sigma fn lts.coq_lts
+       then
+         let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
+         let* ctors = check_valid_constructor lts nextT in
+         check_updated_ctx (ctors @ acc) lts (List.tl substl) tl
+       else check_updated_ctx acc lts (List.tl substl) tl
+     | _ -> check_updated_ctx acc lts (List.tl substl) tl)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
 (** Checks possible transitions for this term: *)
-let check_valid_constructor lts t =
+and check_valid_constructor lts t =
   let$+ t env sigma = Reductionops.nf_all env sigma t in
   let iter_body i ctor_vals =
-    let ctx, tm = lts.transitions.(i) in
-    let tm = EConstr.of_constr tm in
-    let ctx_tys = List.map Context.Rel.Declaration.get_type ctx in
-    let* tm = instantiate_ctx lts tm (List.map EConstr.of_constr ctx_tys) in
-    let* tgt_term, to_unif = mk_template lts t in
-    let* success = m_unify to_unif tm in
+    let* env = get_env in
     let* sigma = get_sigma in
-    (* FIXME: do we need nf_evar here? *)
-    let tgt_term = Evarutil.nf_evar sigma tgt_term in
+    Feedback.msg_info
+      (str "CHECKING CONSTRUCTOR "
+       ++ int i
+       ++ Printer.pr_econstr_env env sigma t);
+    let ctx, tm = lts.transitions.(i) in
+    let ctx_tys = List.map EConstr.of_rel_decl ctx in
+    let* substl = mk_ctx_substl [] (List.rev ctx_tys) in
+    let termL, act, termR = extract_args substl tm in
+    let* env = get_env in
+    let* sigma = get_sigma in
+    Feedback.msg_info
+      (str "Unifying "
+       ++ Printer.pr_econstr_env env sigma (EConstr.Vars.substl substl termL));
+    Feedback.msg_info
+      (str "Unifying "
+       ++ Printer.pr_econstr_env env sigma (EConstr.Vars.substl substl t));
+    let* success = m_unify t termL in
     match success with
-    | true -> return ((i, tgt_term, to_unif) :: ctor_vals)
+    | true ->
+      let* next_ctors = check_updated_ctx [] lts substl ctx_tys in
+      let tgt_term = EConstr.Vars.substl substl termR in
+      (*** HACK FOR TESTING PURPOSES!!! ***)
+      (match next_ctors with
+       | (_, termRR) :: _ ->
+         let* success = m_unify tgt_term termRR in
+         (match success with
+          | true -> return ((i, tgt_term) :: ctor_vals)
+          | false -> return ctor_vals)
+       | _ -> return ((i, tgt_term) :: ctor_vals))
     | false -> return ctor_vals
   in
   iterate 0 (Array.length lts.transitions - 1) [] iter_body
 ;;
 
 (** [bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
-let bound : int = 5
+let bound : int = 3
 
 (* FIXME: refactor the below somewhere else, self-contained, with standard *)
 (* OCaml naming (e.g. Graph.Make, Graph.S, etc) *)
@@ -170,11 +203,11 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) = struct
       let* t = return (Queue.pop g.to_visit) in
       let* constrs = check_valid_constructor the_lts t in
       List.iter
-        (fun (i, tgt, _) -> H.add g.edges t { edge_ctor = i; to_node = tgt })
+        (fun (i, tgt) -> H.add g.edges t { edge_ctor = i; to_node = tgt })
         constrs;
       let* sigma = get_sigma in
       List.iter
-        (fun (i, tgt, _) ->
+        (fun (i, tgt) ->
           if H.mem g.edges tgt || EConstr.eq_constr sigma tgt t
           then ()
           else Queue.push tgt g.to_visit)
@@ -267,10 +300,8 @@ let bounded_lts
     (str "(d) Transitions: "
      ++ pp_transitions env sigma the_lts.transitions
      ++ strbrk "\n");
-  Feedback.msg_debug
-    (str "(e) Starting term: " ++ Printer.pr_econstr_env env sigma t);
   Feedback.msg_notice (strbrk "(f) Graph Edges: \n");
-  Graph.pp_graph_edges env sigma graph;
+  G.pp_graph_edges env sigma graph;
   (* Feedback.msg_info *)
   (*   (str "(b) CoqFsm: " ++ pp_coq_fsm env sigma (coq_fsm.states, coq_fsm.edges)); *)
   (* match coq_fsm.edges with
