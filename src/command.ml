@@ -63,14 +63,16 @@ let check_ref_lts gref =
   | _ -> invalid_ref gref
 ;;
 
-(* FIXME: Weird interaction between exceptions and monadic code *)
+(* FIXME: Weird interaction between exceptions and monadic code. Try/cut *)
+(* CANNOT be wrapped around monadic code. Otherwise, the exception is *)
+(* *not* caught *)
 (** Checks if two terms unify
     TODO: lots of doubts
     - Conversion.CUMUL?
     - Is [w_unify] the best way?
     - ... *)
 let m_unify t0 t1 =
-  with_state (fun env sigma ->
+  state (fun env sigma ->
     try
       let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
       sigma, true
@@ -111,7 +113,7 @@ let rec instantiate_ctx lts (c : EConstr.t) = function
 
 (** Checks possible transitions for this term: *)
 let check_valid_constructor lts t =
-  let$ t env sigma = Reductionops.nf_all env sigma t, sigma in
+  let$+ t env sigma = Reductionops.nf_all env sigma t in
   let iter_body i ctor_vals =
     let ctx, tm = lts.transitions.(i) in
     let tm = EConstr.of_constr tm in
@@ -129,58 +131,77 @@ let check_valid_constructor lts t =
   iterate 0 (Array.length lts.transitions - 1) [] iter_body
 ;;
 
+(** [bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
+let bound : int = 5
+
+(* FIXME: refactor the below somewhere else, self-contained, with standard *)
+(* OCaml naming (e.g. Graph.Make, Graph.S, etc) *)
 type lts_transition =
   { edge_ctor : int (** Ctor number *)
   ; to_node : EConstr.constr
   }
 
-(* Cannot use OCaml Set library due to compare_constr *)
-(*  being dependent on evars *)
-type lts_graph = { edges : (EConstr.constr, lts_transition) Hashtbl.t }
+module type GraphB = sig
+  module H : Hashtbl.S with type key = EConstr.t
 
-type graph_ctx =
-  { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
-  ; tmp_edges : (EConstr.constr, lts_transition) Hashtbl.t
-  }
+  type lts_graph =
+    { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
+    ; edges : lts_transition H.t
+    }
+
+  val build_graph : lts -> lts_graph -> lts_graph mm
+  val pp_graph_edges : Environ.env -> Evd.evar_map -> lts_graph -> unit
+end
+
+module MkGraph (M : Hashtbl.S with type key = EConstr.t) = struct
+  module H = M
+
+  type lts_graph =
+    { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
+    ; edges : lts_transition H.t
+    }
+
+  let rec build_graph (the_lts : lts) (g : lts_graph) : lts_graph mm =
+    if H.length g.edges >= bound
+    then return g (* FIXME: raise error *)
+    else if Queue.is_empty g.to_visit
+    then return g
+    else
+      let* t = return (Queue.pop g.to_visit) in
+      let* constrs = check_valid_constructor the_lts t in
+      List.iter
+        (fun (i, tgt, _) -> H.add g.edges t { edge_ctor = i; to_node = tgt })
+        constrs;
+      let* sigma = get_sigma in
+      List.iter
+        (fun (i, tgt, _) ->
+          if H.mem g.edges tgt || EConstr.eq_constr sigma tgt t
+          then ()
+          else Queue.push tgt g.to_visit)
+        constrs;
+      build_graph the_lts g
+  ;;
+
+  let pp_graph_edges env sigma (g : lts_graph) =
+    H.iter
+      (fun f t ->
+        Feedback.msg_notice
+          (Printer.pr_econstr_env env sigma f
+           ++ Pp.str " ---{ "
+           ++ Pp.int t.edge_ctor
+           ++ Pp.str " }--> "
+           ++ Printer.pr_econstr_env env sigma t.to_node))
+      g.edges
+  ;;
+end
+
+let make_graph_builder =
+  let* m = make_constr_tbl in
+  let module G = MkGraph ((val m)) in
+  return (module G : GraphB)
+;;
 
 (* FIXME: Should be user-configurable, not hardcoded *)
-
-(** [bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
-let bound : int = 5
-
-let rec build_graph (the_lts : lts) (g : graph_ctx) : lts_graph mm =
-  if Hashtbl.length g.tmp_edges >= bound
-  then return { edges = g.tmp_edges } (* FIXME: raise error *)
-  else if Queue.is_empty g.to_visit
-  then return { edges = g.tmp_edges }
-  else
-    let* t = return (Queue.pop g.to_visit) in
-    let* constrs = check_valid_constructor the_lts t in
-    List.iter
-      (fun (i, tgt, _) ->
-        Hashtbl.add g.tmp_edges t { edge_ctor = i; to_node = tgt })
-      constrs;
-    let* sigma = get_sigma in
-    List.iter
-      (fun (i, tgt, _) ->
-        if Hashtbl.mem g.tmp_edges tgt || EConstr.eq_constr sigma tgt t
-        then ()
-        else Queue.push tgt g.to_visit)
-      constrs;
-    build_graph the_lts g
-;;
-
-let pp_graph_edges env sigma (g : lts_graph) =
-  Hashtbl.iter
-    (fun f t ->
-      Feedback.msg_notice
-        (Printer.pr_econstr_env env sigma f
-         ++ Pp.str " ---{ "
-         ++ Pp.int t.edge_ctor
-         ++ Pp.str " }--> "
-         ++ Printer.pr_econstr_env env sigma t.to_node))
-    g.edges
-;;
 
 (* (\** [coq_fsm] is . *\) *)
 (* type coq_fsm = *)
@@ -210,12 +231,14 @@ let bounded_lts
   =
   let* the_lts = check_ref_lts iref in
   let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
-  let$+ tt env sigma = Typing.check env sigma t the_lts.trm_type in
+  let$* u env sigma = Typing.check env sigma t the_lts.trm_type in
   let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
+  let* graph_Module = make_graph_builder in
+  let module Graph = (val graph_Module) in
   let q = Queue.create () in
   let* _ = return (Queue.push t q) in
   let* graph =
-    build_graph the_lts { to_visit = q; tmp_edges = Hashtbl.create bound }
+    Graph.build_graph the_lts { to_visit = q; edges = Graph.H.create bound }
   in
   let* env = get_env in
   let* sigma = get_sigma in
@@ -243,7 +266,7 @@ let bounded_lts
   Feedback.msg_debug
     (str "(e) Starting term: " ++ Printer.pr_econstr_env env sigma t);
   Feedback.msg_notice (strbrk "(f) Graph Edges: \n");
-  pp_graph_edges env sigma graph;
+  Graph.pp_graph_edges env sigma graph;
   (* Feedback.msg_info *)
   (*   (str "(b) CoqFsm: " ++ pp_coq_fsm env sigma (coq_fsm.states, coq_fsm.edges)); *)
   (* match coq_fsm.edges with

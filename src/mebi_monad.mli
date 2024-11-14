@@ -22,8 +22,12 @@ val invalid_ref : Names.GlobRef.t -> 'a t
 (********************************************)
 val get_env : Environ.env t
 val get_sigma : Evd.evar_map t
-val with_state : (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) -> 'a t
-val with_state' : (Environ.env -> Evd.evar_map -> Evd.evar_map) -> unit t
+val state : (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) -> 'a t
+
+(********************************************)
+(****** CTX-dependent wrappers **************)
+(********************************************)
+val make_constr_tbl : (module Hashtbl.S with type key = EConstr.t) t
 
 module type Monad = sig
   val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
@@ -34,11 +38,12 @@ module type Monad = sig
     -> ('a -> 'b t)
     -> 'b t
 
-  val ( let$+ )
+  val ( let$* )
     :  (Environ.env -> Evd.evar_map -> Evd.evar_map)
     -> (unit -> 'b t)
     -> 'b t
 
+  val ( let$+ ) : (Environ.env -> Evd.evar_map -> 'a) -> ('a -> 'b t) -> 'b t
   val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
 end
 
