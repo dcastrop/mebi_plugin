@@ -149,7 +149,7 @@ module type GraphB = sig
     ; edges : lts_transition H.t
     }
 
-  val build_graph : lts -> lts_graph -> lts_graph mm
+  val build_graph : lts -> Constrexpr.constr_expr_r CAst.t -> lts_graph mm
   val pp_graph_edges : Environ.env -> Evd.evar_map -> lts_graph -> unit
 end
 
@@ -161,7 +161,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) = struct
     ; edges : lts_transition H.t
     }
 
-  let rec build_graph (the_lts : lts) (g : lts_graph) : lts_graph mm =
+  let rec build_lts (the_lts : lts) (g : lts_graph) : lts_graph mm =
     if H.length g.edges >= bound
     then return g (* FIXME: raise error *)
     else if Queue.is_empty g.to_visit
@@ -179,7 +179,18 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) = struct
           then ()
           else Queue.push tgt g.to_visit)
         constrs;
-      build_graph the_lts g
+      build_lts the_lts g
+  ;;
+
+  let build_graph (the_lts : lts) (t : Constrexpr.constr_expr_r CAst.t)
+    : lts_graph mm
+    =
+    let$ t env sigma = Constrintern.interp_constr_evars env sigma t in
+    let$* u env sigma = Typing.check env sigma t the_lts.trm_type in
+    let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
+    let q = Queue.create () in
+    let* _ = return (Queue.push t q) in
+    build_lts the_lts { to_visit = q; edges = H.create bound }
   ;;
 
   let pp_graph_edges env sigma (g : lts_graph) =
@@ -230,16 +241,9 @@ let bounded_lts
   : unit mm
   =
   let* the_lts = check_ref_lts iref in
-  let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
-  let$* u env sigma = Typing.check env sigma t the_lts.trm_type in
-  let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
-  let* graph_Module = make_graph_builder in
-  let module Graph = (val graph_Module) in
-  let q = Queue.create () in
-  let* _ = return (Queue.push t q) in
-  let* graph =
-    Graph.build_graph the_lts { to_visit = q; edges = Graph.H.create bound }
-  in
+  let* graphM = make_graph_builder in
+  let module G = (val graphM) in
+  let* graph = G.build_graph the_lts tref in
   let* env = get_env in
   let* sigma = get_sigma in
   Feedback.msg_notice
