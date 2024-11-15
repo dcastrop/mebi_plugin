@@ -79,10 +79,7 @@ let m_unify t0 t1 =
     with
     | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify (m, n, e))
       ->
-      Feedback.msg_info
-        (str "Could not unify:" ++ Printer.pr_econstr_env env sigma m);
-      Feedback.msg_info
-        (str "Could not unify:" ++ Printer.pr_econstr_env env sigma n);
+      Feedback.msg_debug (str "Could not unify");
       sigma, false)
 ;;
 
@@ -106,11 +103,11 @@ let extract_args substl tm =
   | _ -> assert false
 ;;
 
-let rec check_updated_ctx acc lts substl = function
-  | [] -> return acc
-  | t :: tl ->
+let rec check_updated_ctx acc lts = function
+  | [], [] -> return acc
+  | _ :: substl, t :: tl ->
     let$+ upd_t env sigma =
-      EConstr.Vars.substl (List.tl substl) (Context.Rel.Declaration.get_type t)
+      EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
     in
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with
@@ -119,9 +116,11 @@ let rec check_updated_ctx acc lts substl = function
        then
          let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
          let* ctors = check_valid_constructor lts nextT in
-         check_updated_ctx (ctors @ acc) lts (List.tl substl) tl
-       else check_updated_ctx acc lts (List.tl substl) tl
-     | _ -> check_updated_ctx acc lts (List.tl substl) tl)
+         check_updated_ctx (ctors @ acc) lts (substl, tl)
+       else check_updated_ctx acc lts (substl, tl)
+     | _ -> check_updated_ctx acc lts (substl, tl))
+  | _, _ -> assert false
+(* Impossible! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
 (** Checks possible transitions for this term: *)
@@ -130,7 +129,7 @@ and check_valid_constructor lts t =
   let iter_body i ctor_vals =
     let* env = get_env in
     let* sigma = get_sigma in
-    Feedback.msg_info
+    Feedback.msg_debug
       (str "CHECKING CONSTRUCTOR "
        ++ int i
        ++ Printer.pr_econstr_env env sigma t);
@@ -140,18 +139,19 @@ and check_valid_constructor lts t =
     let termL, act, termR = extract_args substl tm in
     let* env = get_env in
     let* sigma = get_sigma in
-    Feedback.msg_info
+    Feedback.msg_debug
       (str "Unifying "
        ++ Printer.pr_econstr_env env sigma (EConstr.Vars.substl substl termL));
-    Feedback.msg_info
+    Feedback.msg_debug
       (str "Unifying "
        ++ Printer.pr_econstr_env env sigma (EConstr.Vars.substl substl t));
     let* success = m_unify t termL in
     match success with
     | true ->
-      let* next_ctors = check_updated_ctx [] lts substl ctx_tys in
+      let* next_ctors = check_updated_ctx [] lts (substl, ctx_tys) in
       let tgt_term = EConstr.Vars.substl substl termR in
       (*** HACK FOR TESTING PURPOSES!!! ***)
+      (*** TODO: can I "restore" sigma for every next_ctor in next_ctors?*)
       (match next_ctors with
        | (_, termRR) :: _ ->
          let* success = m_unify tgt_term termRR in
@@ -229,7 +229,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) = struct
   let pp_graph_edges env sigma (g : lts_graph) =
     H.iter
       (fun f t ->
-        Feedback.msg_notice
+        Feedback.msg_debug
           (Printer.pr_econstr_env env sigma f
            ++ Pp.str " ---{ "
            ++ Pp.int t.edge_ctor
@@ -279,15 +279,15 @@ let bounded_lts
   let* graph = G.build_graph the_lts tref in
   let* env = get_env in
   let* sigma = get_sigma in
-  Feedback.msg_notice
+  Feedback.msg_debug
     (str "(a) Types of terms: "
      ++ Printer.pr_econstr_env env sigma the_lts.trm_type
      ++ strbrk "");
-  Feedback.msg_notice
+  Feedback.msg_debug
     (str "(b) Types of labels: "
      ++ Printer.pr_econstr_env env sigma the_lts.lbl_type
      ++ strbrk "");
-  Feedback.msg_notice
+  Feedback.msg_debug
     (str "(c) Constructors: "
      ++ Pp.prvect_with_sep
           (fun _ -> str ", ")
@@ -300,14 +300,14 @@ let bounded_lts
     (str "(d) Transitions: "
      ++ pp_transitions env sigma the_lts.transitions
      ++ strbrk "\n");
-  Feedback.msg_notice (strbrk "(f) Graph Edges: \n");
+  Feedback.msg_debug (strbrk "(f) Graph Edges: \n");
   G.pp_graph_edges env sigma graph;
   (* Feedback.msg_info *)
   (*   (str "(b) CoqFsm: " ++ pp_coq_fsm env sigma (coq_fsm.states, coq_fsm.edges)); *)
   (* match coq_fsm.edges with
-     | [] -> Feedback.msg_notice (str "coq_fsm.edges empty. cannot continue")
+     | [] -> Feedback.msg_debug (str "coq_fsm.edges empty. cannot continue")
      | h :: _t ->
-     Feedback.msg_notice
+     Feedback.msg_debug
      (str "h edge: "
      ++ pp_edge env sigma h
      ++ str "\n\ntests: \n"
@@ -327,15 +327,15 @@ let bounded_lts
      coq_fsm.edges
      in *)
   (* ( Hashtbl.iter (fun x y -> Printf.sprintf "tbl: %s -> %s\n" x y) _tbl.state_map;;); *)
-  (* Feedback.msg_notice
+  (* Feedback.msg_debug
      (str (Printf.sprintf "translated fsm: %s" ++
      (let rec sprintf_tbl  = Printer.pr_econstr_env env sigma )
      )); *)
-  (* Feedback.msg_notice
+  (* Feedback.msg_debug
      (str
      (Printf.sprintf
      "translated fsm: %s\n"
      (to_string ~context:ShowIDs (Fsm _fsm)))); *)
-  Feedback.msg_notice (str "\n--------\n");
+  Feedback.msg_debug (str "\n--------\n");
   return ()
 ;;
