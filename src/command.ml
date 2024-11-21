@@ -123,6 +123,8 @@ let rec retrieve_tgt_nodes acc i tgt_term = function
       (str "Unifying " ++ Printer.pr_econstr_env env sigma tgt_term);
     Feedback.msg_debug
       (str "Unifying " ++ Printer.pr_econstr_env env sigma termRR);
+    (* FIXME: This is wrong! tgt_term and termRR should only unify in *)
+    (* our examples, but not in the general case! *)
     let* success = sandboxed_unify tgt_term termRR in
     (match success with
      | Some tgt -> retrieve_tgt_nodes ((i, tgt) :: acc) i tgt_term nctors
@@ -185,7 +187,7 @@ and check_valid_constructor lts t =
 ;;
 
 (** [bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
-let bound : int = 3
+let bound : int = 5
 
 (* FIXME: refactor the below somewhere else, self-contained, with standard *)
 (* OCaml naming (e.g. Graph.Make, Graph.S, etc) *)
@@ -222,15 +224,18 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) = struct
     else
       let* t = return (Queue.pop g.to_visit) in
       let* constrs = check_valid_constructor the_lts t in
-      List.iter
-        (fun (i, tgt) -> H.add g.edges t { edge_ctor = i; to_node = tgt })
-        constrs;
+      let* env = get_env in
       let* sigma = get_sigma in
       List.iter
         (fun (i, tgt) ->
+          Feedback.msg_debug
+            (str "Transition to" ++ Printer.pr_econstr_env env sigma tgt);
+          H.add g.edges t { edge_ctor = i; to_node = tgt };
           if H.mem g.edges tgt || EConstr.eq_constr sigma tgt t
           then ()
-          else Queue.push tgt g.to_visit)
+          else Queue.push tgt g.to_visit;
+          Feedback.msg_debug
+            (str "Visiting next: " ++ int (Queue.length g.to_visit)))
         constrs;
       build_lts the_lts g
   ;;
