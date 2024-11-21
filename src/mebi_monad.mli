@@ -23,6 +23,7 @@ val invalid_ref : Names.GlobRef.t -> 'a t
 val get_env : Environ.env t
 val get_sigma : Evd.evar_map t
 val state : (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) -> 'a t
+val sandbox : 'a t -> 'a t
 
 (********************************************)
 (****** CTX-dependent wrappers **************)
