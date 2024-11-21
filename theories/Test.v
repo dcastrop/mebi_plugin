@@ -116,6 +116,7 @@ Module Test2.
 
   MeBi LTS termLTS (tfix (tact TheAction1 tend)).
   MeBi LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
+
   MeBi LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
 End Test2.
 

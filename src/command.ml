@@ -103,6 +103,32 @@ let extract_args substl tm =
   | _ -> assert false
 ;;
 
+let sandboxed_unify tgt_term termRR =
+  sandbox
+    (let* success = m_unify tgt_term termRR in
+     match success with
+     | true ->
+       let$+ term env sigma = Reductionops.nf_all env sigma tgt_term in
+       return (Some term)
+     | false -> return None)
+;;
+
+let rec retrieve_tgt_nodes acc i tgt_term = function
+  | [] -> return acc
+  | (_, termRR) :: nctors ->
+    let* env = get_env in
+    let* sigma = get_sigma in
+    Feedback.msg_debug (str "SANDBOXED_UNIFY");
+    Feedback.msg_debug
+      (str "Unifying " ++ Printer.pr_econstr_env env sigma tgt_term);
+    Feedback.msg_debug
+      (str "Unifying " ++ Printer.pr_econstr_env env sigma termRR);
+    let* success = sandboxed_unify tgt_term termRR in
+    (match success with
+     | Some tgt -> retrieve_tgt_nodes ((i, tgt) :: acc) i tgt_term nctors
+     | None -> retrieve_tgt_nodes acc i tgt_term nctors)
+;;
+
 let rec check_updated_ctx acc lts = function
   | [], [] -> return acc
   | _ :: substl, t :: tl ->
@@ -150,15 +176,9 @@ and check_valid_constructor lts t =
     | true ->
       let* next_ctors = check_updated_ctx [] lts (substl, ctx_tys) in
       let tgt_term = EConstr.Vars.substl substl termR in
-      (*** HACK FOR TESTING PURPOSES!!! ***)
-      (*** TODO: can I "restore" sigma for every next_ctor in next_ctors?*)
       (match next_ctors with
-       | (_, termRR) :: _ ->
-         let* success = m_unify tgt_term termRR in
-         (match success with
-          | true -> return ((i, tgt_term) :: ctor_vals)
-          | false -> return ctor_vals)
-       | _ -> return ((i, tgt_term) :: ctor_vals))
+       | [] -> return ((i, tgt_term) :: ctor_vals)
+       | _ -> retrieve_tgt_nodes ctor_vals i tgt_term next_ctors)
     | false -> return ctor_vals
   in
   iterate 0 (Array.length lts.transitions - 1) [] iter_body

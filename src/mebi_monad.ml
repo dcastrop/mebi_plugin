@@ -88,8 +88,10 @@ let state f st =
 ;;
 
 let sandbox (m : 'a t) (st : coq_context ref) =
+  let st_contents = !st in
   let res = m st in
-  { res with state = st }
+  st := st_contents;
+  { state = st; value = res.value }
 ;;
 
 (** Error when input LTS has the wrong arity *)
