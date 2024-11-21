@@ -87,6 +87,11 @@ let state f st =
   { state = st; value = a }
 ;;
 
+let sandbox (m : 'a t) (st : coq_context ref) =
+  let res = m st in
+  { res with state = st }
+;;
+
 (** Error when input LTS has the wrong arity *)
 let invalid_arity (x : Constr.types) : 'a t =
   fun st -> raise (invalid_arity !st.coq_env !st.coq_ctx x)
