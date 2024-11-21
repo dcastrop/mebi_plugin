@@ -43,9 +43,4 @@ val pp_states_to_list
   -> Pp.t list
 
 val pp_states : Environ.env -> Evd.evar_map -> Evd.econstr list -> Pp.t
-
-val pp_coq_fsm
-  :  Environ.env
-  -> Evd.evar_map
-  -> Evd.econstr list * Evd.econstr list
-  -> Pp.t
+val pp_coq_lts : Mebi_structs.coq_lts -> Pp.t

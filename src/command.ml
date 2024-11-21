@@ -3,6 +3,10 @@ open Mebi_utils
 open Mebi_monad
 open Mebi_monad.Monad_syntax
 open Pp_ext
+(* module Err = Mebi_errors
+open Mebi_structs *)
+(* open Pp_ext *)
+(* open Stringify *)
 (* open Translation_layer *)
 (* open Fsm *)
 
@@ -91,6 +95,7 @@ let rec mk_ctx_substl (substl : EConstr.t list) = function
     mk_ctx_substl (vt :: substl) ts
 ;;
 
+
 (** Extract args of a type [LTS termL act termR]
     Prerequisite: input *must* be of this shape *)
 let extract_args substl tm =
@@ -174,6 +179,7 @@ type lts_transition =
   ; to_node : EConstr.constr
   }
 
+
 module type GraphB = sig
   module H : Hashtbl.S with type key = EConstr.t
 
@@ -181,6 +187,7 @@ module type GraphB = sig
     { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
     ; edges : lts_transition H.t
     }
+
 
   val build_graph : lts -> Constrexpr.constr_expr_r CAst.t -> lts_graph mm
   val pp_graph_edges : Environ.env -> Evd.evar_map -> lts_graph -> unit
