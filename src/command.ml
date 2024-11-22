@@ -63,6 +63,8 @@ let check_ref_lts gref =
   | _ -> invalid_ref gref
 ;;
 
+(* FIXME: All of the code below, up to [check_valid_constructor] needs
+   reworking *)
 (* FIXME: Weird interaction between exceptions and monadic code. Try/cut *)
 (* CANNOT be wrapped around monadic code. Otherwise, the exception is *)
 (* *not* caught *)
@@ -72,14 +74,23 @@ let check_ref_lts gref =
     - Is [w_unify] the best way?
     - ... *)
 let m_unify t0 t1 =
+  let* _ =
+    debug (fun env sigma ->
+      str "Unifying "
+      ++ Printer.pr_econstr_env env sigma t0
+      ++ strbrk "\n"
+      ++ str "Unifying "
+      ++ Printer.pr_econstr_env env sigma t1)
+  in
   state (fun env sigma ->
     try
       let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
+      Feedback.msg_debug (str "\t\tSuccess");
       sigma, true
     with
     | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify (m, n, e))
       ->
-      Feedback.msg_debug (str "Could not unify");
+      Feedback.msg_debug (str "\t\tCould not unify");
       sigma, false)
 ;;
 
@@ -103,9 +114,33 @@ let extract_args substl tm =
   | _ -> assert false
 ;;
 
-let sandboxed_unify tgt_term termRR =
+type unif_problem =
+  { termL : EConstr.t
+  ; termR : EConstr.t
+  }
+
+let rec unify_all (i : (int * unif_problem) list) : bool t =
+  match i with
+  | [] -> return true
+  | (_, u) :: t ->
+    let* _ =
+      debug (fun env sigma ->
+        str "UNIFYALL:::::::::: "
+        ++ Printer.pr_econstr_env env sigma u.termL
+        ++ strbrk "\n::::::::::"
+        ++ Printer.pr_econstr_env env sigma u.termR)
+    in
+    let* success = m_unify u.termL u.termR in
+    if success then unify_all t else return false
+;;
+
+let sandboxed_unify tgt_term u =
+  let* _ =
+    debug (fun env sigma ->
+      str "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term)
+  in
   sandbox
-    (let* success = m_unify tgt_term termRR in
+    (let* success = unify_all u in
      match success with
      | true ->
        let$+ term env sigma = Reductionops.nf_all env sigma tgt_term in
@@ -113,25 +148,22 @@ let sandboxed_unify tgt_term termRR =
      | false -> return None)
 ;;
 
-let rec retrieve_tgt_nodes acc i tgt_term = function
+let rec retrieve_tgt_nodes acc i tgt_term
+  : (int * unif_problem) list list -> (int * EConstr.t) list t
+  = function
   | [] -> return acc
-  | (_, termRR) :: nctors ->
-    let* env = get_env in
-    let* sigma = get_sigma in
-    Feedback.msg_debug (str "SANDBOXED_UNIFY");
-    Feedback.msg_debug
-      (str "Unifying " ++ Printer.pr_econstr_env env sigma tgt_term);
-    Feedback.msg_debug
-      (str "Unifying " ++ Printer.pr_econstr_env env sigma termRR);
-    (* FIXME: This is wrong! tgt_term and termRR should only unify in *)
-    (* our examples, but not in the general case! *)
-    let* success = sandboxed_unify tgt_term termRR in
+  | u1 :: nctors ->
+    let* success = sandbox (sandboxed_unify tgt_term u1) in
     (match success with
      | Some tgt -> retrieve_tgt_nodes ((i, tgt) :: acc) i tgt_term nctors
      | None -> retrieve_tgt_nodes acc i tgt_term nctors)
 ;;
 
-let rec check_updated_ctx acc lts = function
+(* Should return a list of unification problems *)
+let rec check_updated_ctx acc lts
+  :  EConstr.t list * EConstr.rel_declaration list
+  -> (int * unif_problem) list list t
+  = function
   | [], [] -> return acc
   | _ :: substl, t :: tl ->
     let$+ upd_t env sigma =
@@ -144,7 +176,18 @@ let rec check_updated_ctx acc lts = function
        then
          let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
          let* ctors = check_valid_constructor lts nextT in
-         check_updated_ctx (ctors @ acc) lts (substl, tl)
+         let ctors =
+           List.map (fun (i, tL) -> i, { termL = tL; termR = args.(2) }) ctors
+         in
+         (* We need to cross-product all possible unifications. This is in case
+            we have a constructor of the form LTS t11 a1 t12 -> LTS t21 a2
+            t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
+            unavoidable, but we should make sure we understand well the
+            problem before removing the source of repetition. *)
+         check_updated_ctx
+           (List.concat_map (fun x -> List.map (fun y -> y :: x) ctors) acc)
+           lts
+           (substl, tl)
        else check_updated_ctx acc lts (substl, tl)
      | _ -> check_updated_ctx acc lts (substl, tl))
   | _, _ -> assert false
@@ -152,31 +195,24 @@ let rec check_updated_ctx acc lts = function
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
 (** Checks possible transitions for this term: *)
-and check_valid_constructor lts t =
+and check_valid_constructor lts t : (int * EConstr.t) list t =
   let$+ t env sigma = Reductionops.nf_all env sigma t in
   let iter_body i ctor_vals =
-    let* env = get_env in
-    let* sigma = get_sigma in
-    Feedback.msg_debug
-      (str "CHECKING CONSTRUCTOR "
-       ++ int i
-       ++ Printer.pr_econstr_env env sigma t);
+    let* _ =
+      debug (fun env sigma ->
+        str "CHECKING CONSTRUCTOR "
+        ++ int i
+        ++ str ". Term: "
+        ++ Printer.pr_econstr_env env sigma t)
+    in
     let ctx, tm = lts.transitions.(i) in
     let ctx_tys = List.map EConstr.of_rel_decl ctx in
     let* substl = mk_ctx_substl [] (List.rev ctx_tys) in
     let termL, act, termR = extract_args substl tm in
-    let* env = get_env in
-    let* sigma = get_sigma in
-    Feedback.msg_debug
-      (str "Unifying "
-       ++ Printer.pr_econstr_env env sigma (EConstr.Vars.substl substl termL));
-    Feedback.msg_debug
-      (str "Unifying "
-       ++ Printer.pr_econstr_env env sigma (EConstr.Vars.substl substl t));
     let* success = m_unify t termL in
     match success with
     | true ->
-      let* next_ctors = check_updated_ctx [] lts (substl, ctx_tys) in
+      let* next_ctors = check_updated_ctx [ [] ] lts (substl, ctx_tys) in
       let tgt_term = EConstr.Vars.substl substl termR in
       (match next_ctors with
        | [] -> return ((i, tgt_term) :: ctor_vals)
@@ -229,13 +265,13 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) = struct
       List.iter
         (fun (i, tgt) ->
           Feedback.msg_debug
-            (str "Transition to" ++ Printer.pr_econstr_env env sigma tgt);
+            (str "\n\nTransition to" ++ Printer.pr_econstr_env env sigma tgt);
           H.add g.edges t { edge_ctor = i; to_node = tgt };
           if H.mem g.edges tgt || EConstr.eq_constr sigma tgt t
           then ()
           else Queue.push tgt g.to_visit;
           Feedback.msg_debug
-            (str "Visiting next: " ++ int (Queue.length g.to_visit)))
+            (str "\nVisiting next: " ++ int (Queue.length g.to_visit)))
         constrs;
       build_lts the_lts g
   ;;
