@@ -29,6 +29,7 @@ val sandbox : 'a t -> 'a t
 (****** CTX-dependent wrappers **************)
 (********************************************)
 val make_constr_tbl : (module Hashtbl.S with type key = EConstr.t) t
+val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit t
 
 module type Monad = sig
   val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t

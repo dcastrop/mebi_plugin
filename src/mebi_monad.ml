@@ -94,6 +94,12 @@ let sandbox (m : 'a t) (st : coq_context ref) =
   { state = st; value = res.value }
 ;;
 
+let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit t =
+  state (fun env sigma ->
+    Feedback.msg_debug (f env sigma);
+    sigma, ())
+;;
+
 (** Error when input LTS has the wrong arity *)
 let invalid_arity (x : Constr.types) : 'a t =
   fun st -> raise (invalid_arity !st.coq_env !st.coq_ctx x)
