@@ -144,7 +144,8 @@ let sandboxed_unify tgt_term u =
      match success with
      | true ->
        let$+ term env sigma = Reductionops.nf_all env sigma tgt_term in
-       return (Some term)
+       let$+ undefined _ sigma = EConstr.isEvar sigma term in
+       if undefined then return None else return (Some term)
      | false -> return None)
 ;;
 
@@ -162,9 +163,9 @@ let rec retrieve_tgt_nodes acc i tgt_term
 (* Should return a list of unification problems *)
 let rec check_updated_ctx acc lts
   :  EConstr.t list * EConstr.rel_declaration list
-  -> (int * unif_problem) list list t
+  -> (int * unif_problem) list list option t
   = function
-  | [], [] -> return acc
+  | [], [] -> return (Some acc)
   | _ :: substl, t :: tl ->
     let$+ upd_t env sigma =
       EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
@@ -176,18 +177,21 @@ let rec check_updated_ctx acc lts
        then
          let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
          let* ctors = check_valid_constructor lts nextT in
-         let ctors =
-           List.map (fun (i, tL) -> i, { termL = tL; termR = args.(2) }) ctors
-         in
-         (* We need to cross-product all possible unifications. This is in case
-            we have a constructor of the form LTS t11 a1 t12 -> LTS t21 a2
-            t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
-            unavoidable, but we should make sure we understand well the
-            problem before removing the source of repetition. *)
-         check_updated_ctx
-           (List.concat_map (fun x -> List.map (fun y -> y :: x) ctors) acc)
-           lts
-           (substl, tl)
+         if List.is_empty ctors
+         then return None
+         else (
+           let ctors =
+             List.map (fun (i, tL) -> i, { termL = tL; termR = args.(2) }) ctors
+           in
+           (* We need to cross-product all possible unifications. This is in case
+              we have a constructor of the form LTS t11 a1 t12 -> LTS t21 a2
+              t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
+              unavoidable, but we should make sure we understand well the
+              problem before removing the source of repetition. *)
+           check_updated_ctx
+             (List.concat_map (fun x -> List.map (fun y -> y :: x) ctors) acc)
+             lts
+             (substl, tl))
        else check_updated_ctx acc lts (substl, tl)
      | _ -> check_updated_ctx acc lts (substl, tl))
   | _, _ -> assert false
@@ -215,8 +219,13 @@ and check_valid_constructor lts t : (int * EConstr.t) list t =
       let* next_ctors = check_updated_ctx [ [] ] lts (substl, ctx_tys) in
       let tgt_term = EConstr.Vars.substl substl termR in
       (match next_ctors with
-       | [] -> return ((i, tgt_term) :: ctor_vals)
-       | _ -> retrieve_tgt_nodes ctor_vals i tgt_term next_ctors)
+       | None -> return ctor_vals
+       | Some [] ->
+         let* sg = get_sigma in
+         if EConstr.isEvar sg tgt_term
+         then return ctor_vals
+         else return ((i, tgt_term) :: ctor_vals)
+       | Some nctors -> retrieve_tgt_nodes ctor_vals i tgt_term nctors)
     | false -> return ctor_vals
   in
   iterate 0 (Array.length lts.transitions - 1) [] iter_body

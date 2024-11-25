@@ -121,6 +121,48 @@ Module Test2.
 End Test2.
 
 
+(* FIXME: The test below is wrong, because we do not check whether unification
+ for recursive occurrences in [do_fix] failed or not. If recursive occurrences
+ fail to unify, we should stop and fail the case, even if unification originally
+ succeeded. One (hacky) way of doing this is to check whether the resulting term
+ is a metavariable. If it is, we should remove the case. *)
+Module Test3.
+  Inductive action : Set := | TheAction1 | TheAction2 | Collapse.
+  Inductive term : Set :=
+  | trec : term
+  | tend : term
+  | tfix : term -> term
+  | tact : action -> term -> term
+  | tpar : action -> action -> term -> term
+  .
+
+  Fixpoint subst (t1 : term) (t2 : term) :=
+    match t2 with
+    | trec => t1
+    | tend => tend
+    | tfix t => tfix t
+    | tact a t => tact a (subst t1 t)
+    | tpar a b t => tpar a b (subst t1 t)
+    end.
+
+  Inductive termLTS : term -> action -> term -> Prop :=
+  | do_act : forall a t, termLTS (tact a t) a t
+
+  | do_par1 : forall a b t, termLTS (tpar a b t) a (tact b t)
+
+  | do_par2 : forall a b t, termLTS (tpar a b t) b (tact a t)
+
+  | do_fix : forall a t t',
+      termLTS (subst (tfix t) t) a t' ->
+      termLTS (tfix t) a (tfix t')
+  | do_collapse : forall t, termLTS (tfix (tfix t)) Collapse (tfix t).
+
+  MeBi LTS termLTS (tfix (tact TheAction1 tend)).
+  MeBi LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
+
+  MeBi LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
+End Test3.
+
 
 
 (* (*** Printing user inputs ***) *)
