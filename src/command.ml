@@ -21,13 +21,14 @@ let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
 ;;
 
 (** [get_lts_labels_and_terms mib mip] is the mapping of terms (states) and labels (outgoing edges) from [mip].
-    [mib] is only used to raise an error ([invalid_arity]) if these cannot be obtained from [mip]. *)
+    Raises error ([invalid_arity]) if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error. *)
 let get_lts_labels_and_terms
   (mib : Declarations.mutual_inductive_body)
   (mip : Declarations.one_inductive_body)
   : (Constr.rel_declaration * Constr.rel_declaration) mm
   =
   let open Declarations in
+  (* get the type of [mip] from [mib]. *)
   let typ = Inductive.type_of_inductive (UVars.in_punivs (mib, mip)) in
   let i_ctx = mip.mind_arity_ctxt in
   let _, i_idx = split_at mip.mind_nrealdecls i_ctx [] in
@@ -40,17 +41,23 @@ let get_lts_labels_and_terms
   | _ -> invalid_arity typ
 ;;
 
-(** Coq LTS *)
+(** [lts] is a type used to describe the Coq LTS of Coq-based terms.
+    [coq_lts] is the type constructor.
+    [trm_type] is the type of terms for the LTS.
+    [lbl_type] is the type of labels for the LTS.
+    [coq_ctor_names] is the array of names for each constructor of the Coq term.
+    [transitions] is the array of constructors of the Coq term (i.e., the transitions or outgoing edges). *)
 type lts =
-  { coq_lts : EConstr.constr (*** The Coq LTS type constructor. *)
-  ; trm_type : EConstr.types (*** The type of terms for the LTS. *)
-  ; lbl_type : EConstr.types (*** The type of labels for the LTS. *)
+  { coq_lts : EConstr.constr
+  ; trm_type : EConstr.types
+  ; lbl_type : EConstr.types
   ; coq_ctor_names : Names.Id.t array
   ; transitions : (Constr.rel_context * Constr.types) array
-  (*** Coq constructors (i.e. our transitions) *)
   }
 
-let check_ref_lts (gref : Names.GlobRef.t) =
+(** [check_ref_lts gref] is the [lts] of [gref].
+    Raises error ([invalid_ref]) if [gref] is not a reference to an inductive type. *)
+let check_ref_lts (gref : Names.GlobRef.t) : lts mm =
   let open Names.GlobRef in
   match gref with
   | IndRef i ->
@@ -68,6 +75,7 @@ let check_ref_lts (gref : Names.GlobRef.t) =
       ; coq_ctor_names = mip.mind_consnames
       ; transitions = mip.mind_nf_lc
       }
+  (* raise error if [gref] is not an inductive type *)
   | _ -> invalid_ref gref
 ;;
 
@@ -81,7 +89,7 @@ let check_ref_lts (gref : Names.GlobRef.t) =
     - Conversion.CUMUL?
     - Is [w_unify] the best way?
     - ... *)
-let m_unify (t0 : Evd.econstr) (t1 : Evd.econstr) =
+let m_unify (t0 : Evd.econstr) (t1 : Evd.econstr) : bool mm =
   let* _ =
     debug (fun (env : Environ.env) (sigma : Evd.evar_map) ->
       str "Unifying "
@@ -102,10 +110,15 @@ let m_unify (t0 : Evd.econstr) (t1 : Evd.econstr) =
       sigma, false)
 ;;
 
-let rec mk_ctx_substl (substl : EConstr.t list) = function
+(** [mk_ctx_substl] *)
+let rec mk_ctx_substl (substl : EConstr.t list)
+  : ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list -> Evd.econstr list mm
+  = function
   | [] -> return substl
   | t :: ts ->
+    (* get type of [t] *)
     let ty = EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t) in
+    (*  *)
     let$ vt env sigma = Evarutil.new_evar env sigma ty in
     mk_ctx_substl (vt :: substl) ts
 ;;
@@ -355,6 +368,7 @@ let bounded_lts
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
   let* graph = G.build_graph the_lts tref in
+  (* bind [env] and [sigma] to [get_env st] and [get_sigma st] in [mebi_monad], respectively. *)
   let* env = get_env in
   let* sigma = get_sigma in
   Feedback.msg_debug
