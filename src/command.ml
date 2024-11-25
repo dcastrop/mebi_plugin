@@ -6,9 +6,11 @@ open Pp_ext
 (* open Translation_layer *)
 (* open Fsm *)
 
+(** ['a mm] is a function type mapping from [coq_context ref] to ['a in_context]. *)
 type 'a mm = 'a Mebi_monad.t
 
-let arity_is_Prop (mip : Declarations.one_inductive_body) : unit mm =
+(** [arity_is_prop mip] raises an error if [mip.mind_arity] is not a [prop]. *)
+let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
   let open Declarations in
   match mip.mind_arity with
   | RegularArity s ->
@@ -18,7 +20,13 @@ let arity_is_Prop (mip : Declarations.one_inductive_body) : unit mm =
   | TemplateArity t -> invalid_sort (Sorts.family t.template_level)
 ;;
 
-let get_lts_labels_and_terms mib mip =
+(** [get_lts_labels_and_terms mib mip] is the mapping of terms (states) and labels (outgoing edges) from [mip].
+    [mib] is only used to raise an error ([invalid_arity]) if these cannot be obtained from [mip]. *)
+let get_lts_labels_and_terms
+  (mib : Declarations.mutual_inductive_body)
+  (mip : Declarations.one_inductive_body)
+  : (Constr.rel_declaration * Constr.rel_declaration) mm
+  =
   let open Declarations in
   let typ = Inductive.type_of_inductive (UVars.in_punivs (mib, mip)) in
   let i_ctx = mip.mind_arity_ctxt in
@@ -34,21 +42,21 @@ let get_lts_labels_and_terms mib mip =
 
 (** Coq LTS *)
 type lts =
-  { coq_lts : EConstr.constr (** The Coq LTS type constructor. *)
-  ; trm_type : EConstr.types (** The type of terms for the LTS. *)
-  ; lbl_type : EConstr.types (** The type of labels for the LTS. *)
+  { coq_lts : EConstr.constr (*** The Coq LTS type constructor. *)
+  ; trm_type : EConstr.types (*** The type of terms for the LTS. *)
+  ; lbl_type : EConstr.types (*** The type of labels for the LTS. *)
   ; coq_ctor_names : Names.Id.t array
   ; transitions : (Constr.rel_context * Constr.types) array
-  (** Coq constructors (i.e. our transitions) *)
+  (*** Coq constructors (i.e. our transitions) *)
   }
 
-let check_ref_lts gref =
+let check_ref_lts (gref : Names.GlobRef.t) =
   let open Names.GlobRef in
   match gref with
   | IndRef i ->
     let* env = get_env in
     let mib, mip = Inductive.lookup_mind_specif env i in
-    let* _ = arity_is_Prop mip in
+    let* _ = arity_is_prop mip in
     let* lbl, term = get_lts_labels_and_terms mib mip in
     let univ = mib.mind_univ_hyps in
     (* lts of inductive type *)
@@ -73,16 +81,16 @@ let check_ref_lts gref =
     - Conversion.CUMUL?
     - Is [w_unify] the best way?
     - ... *)
-let m_unify t0 t1 =
+let m_unify (t0 : Evd.econstr) (t1 : Evd.econstr) =
   let* _ =
-    debug (fun env sigma ->
+    debug (fun (env : Environ.env) (sigma : Evd.evar_map) ->
       str "Unifying "
       ++ Printer.pr_econstr_env env sigma t0
       ++ strbrk "\n"
       ++ str "Unifying "
       ++ Printer.pr_econstr_env env sigma t1)
   in
-  state (fun env sigma ->
+  state (fun (env : Environ.env) (sigma : Evd.evar_map) ->
     try
       let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
       Feedback.msg_debug (str "\t\tSuccess");
@@ -104,7 +112,7 @@ let rec mk_ctx_substl (substl : EConstr.t list) = function
 
 (** Extract args of a type [LTS termL act termR]
     Prerequisite: input *must* be of this shape *)
-let extract_args substl tm =
+let extract_args (substl : EConstr.Vars.substl) (tm : Constr.t) =
   match Constr.kind tm with
   | App (_, args) ->
     assert (Array.length args == 3);
