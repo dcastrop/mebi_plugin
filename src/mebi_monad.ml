@@ -50,6 +50,7 @@ let econstr_hash st () t =
     (EConstr.to_constr ?abort_on_undefined_evars:(Some false) !st.coq_ctx t)
 ;;
 
+(** [make_constr_tbl st] is ... *)
 let make_constr_tbl st =
   let cmp_eq = eq_constr st in
   let hashf = econstr_hash st in

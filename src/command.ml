@@ -262,6 +262,8 @@ type lts_transition =
   ; to_node : EConstr.constr
   }
 
+(** [GraphB] is ...
+    (Essentially acts as a `.mli` for the [MkGraph] module.) *)
 module type GraphB = sig
   module H : Hashtbl.S with type key = EConstr.t
 
@@ -274,14 +276,22 @@ module type GraphB = sig
   val pp_graph_edges : Environ.env -> Evd.evar_map -> lts_graph -> unit
 end
 
+(** [MkGraph M] is ...
+    [M] is a ... *)
 module MkGraph (M : Hashtbl.S with type key = EConstr.t) = struct
   module H = M
 
+  (** [lts_graph] is a type used when building an lts graph from Coq-based terms.
+      [to_visit] is a queue of coq terms to explore.
+      [edges] is a hashtable mapping integers (of hashed constructors) to Coq terms. *)
   type lts_graph =
     { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
     ; edges : lts_transition H.t
     }
 
+  (** [build_lts the_lts g] is an [lts_graph] [g] obtained by exploring [the_lts].
+      [the_lts] describes the Coq-based term.
+      [g] is an [lts_graph] accumulated while exploring [the_lts]. *)
   let rec build_lts (the_lts : lts) (g : lts_graph) : lts_graph mm =
     if H.length g.edges >= bound
     then return g (* FIXME: raise error *)
@@ -306,6 +316,9 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) = struct
       build_lts the_lts g
   ;;
 
+  (** [build_graph the_lts t] is ...
+      [the_lts] is ...
+      [t] is ... *)
   let build_graph (the_lts : lts) (t : Constrexpr.constr_expr_r CAst.t)
     : lts_graph mm
     =
@@ -317,7 +330,8 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) = struct
     build_lts the_lts { to_visit = q; edges = H.create bound }
   ;;
 
-  let pp_graph_edges env sigma (g : lts_graph) =
+  (** [pp_graph_edges env sigma g] is ... *)
+  let pp_graph_edges (env : Environ.env) (sigma : Evd.evar_map) (g : lts_graph) =
     H.iter
       (fun f t ->
         Feedback.msg_debug
@@ -330,6 +344,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) = struct
   ;;
 end
 
+(** [make_graph_builder] is ... *)
 let make_graph_builder =
   let* m = make_constr_tbl in
   let module G = MkGraph ((val m)) in
