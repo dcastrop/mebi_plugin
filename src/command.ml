@@ -278,7 +278,7 @@ end
 
 (** [MkGraph M] is ...
     [M] is a ... *)
-module MkGraph (M : Hashtbl.S with type key = EConstr.t) = struct
+module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   module H = M
 
   (** [lts_graph] is a type used when building an lts graph from Coq-based terms.
