@@ -73,14 +73,15 @@ let rec iterate
   (to_idx : int)
   (acc : 'a)
   (f : int -> 'a -> 'a t)
+  : 'a t
   =
   if from_idx > to_idx
   then return acc
   else bind (f from_idx acc) (fun acc' -> iterate (from_idx + 1) to_idx acc' f)
 ;;
 
-let get_env st = { state = st; value = !st.coq_env }
-let get_sigma st = { state = st; value = !st.coq_ctx }
+let get_env st : Environ.env in_context = { state = st; value = !st.coq_env }
+let get_sigma st : Evd.evar_map in_context = { state = st; value = !st.coq_ctx }
 
 let state f st =
   let sigma, a = f !st.coq_env !st.coq_ctx in
