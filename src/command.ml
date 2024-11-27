@@ -3,8 +3,6 @@ open Mebi_utils
 open Mebi_monad
 open Mebi_monad.Monad_syntax
 open Pp_ext
-(* open Translation_layer *)
-(* open Fsm *)
 
 (** ['a mm] is a function type mapping from [coq_context ref] to ['a in_context]. *)
 type 'a mm = 'a Mebi_monad.t
@@ -269,11 +267,11 @@ module type GraphB = sig
 
   type lts_graph =
     { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
-    ; edges : lts_transition H.t
+    ; transitions : lts_transition H.t
     }
 
   val build_graph : lts -> Constrexpr.constr_expr_r CAst.t -> lts_graph mm
-  val pp_graph_edges : Environ.env -> Evd.evar_map -> lts_graph -> unit
+  val pp_graph_transitions : Environ.env -> Evd.evar_map -> lts_graph -> unit
 end
 
 (** [MkGraph M] is ...
@@ -283,17 +281,17 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
 
   (** [lts_graph] is a type used when building an lts graph from Coq-based terms.
       [to_visit] is a queue of coq terms to explore.
-      [edges] is a hashtable mapping integers (of hashed constructors) to Coq terms. *)
+      [transitions] is a hashtable mapping integers (of hashed constructors) to Coq terms. *)
   type lts_graph =
     { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
-    ; edges : lts_transition H.t
+    ; transitions : lts_transition H.t
     }
 
   (** [build_lts the_lts g] is an [lts_graph] [g] obtained by exploring [the_lts].
       [the_lts] describes the Coq-based term.
       [g] is an [lts_graph] accumulated while exploring [the_lts]. *)
   let rec build_lts (the_lts : lts) (g : lts_graph) : lts_graph mm =
-    if H.length g.edges >= bound
+    if H.length g.transitions >= bound
     then return g (* FIXME: raise error *)
     else if Queue.is_empty g.to_visit
     then return g
@@ -306,8 +304,8 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
         (fun (i, tgt) ->
           Feedback.msg_debug
             (str "\n\nTransition to" ++ Printer.pr_econstr_env env sigma tgt);
-          H.add g.edges t { edge_ctor = i; to_node = tgt };
-          if H.mem g.edges tgt || EConstr.eq_constr sigma tgt t
+          H.add g.transitions t { edge_ctor = i; to_node = tgt };
+          if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
           then ()
           else Queue.push tgt g.to_visit;
           Feedback.msg_debug
@@ -327,11 +325,15 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
     let q = Queue.create () in
     let* _ = return (Queue.push t q) in
-    build_lts the_lts { to_visit = q; edges = H.create bound }
+    build_lts the_lts { to_visit = q; transitions = H.create bound }
   ;;
 
-  (** [pp_graph_edges env sigma g] is ... *)
-  let pp_graph_edges (env : Environ.env) (sigma : Evd.evar_map) (g : lts_graph) =
+  (** [pp_graph_transitions env sigma g] is ... *)
+  let pp_graph_transitions
+    (env : Environ.env)
+    (sigma : Evd.evar_map)
+    (g : lts_graph)
+    =
     H.iter
       (fun f t ->
         Feedback.msg_debug
@@ -340,7 +342,78 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
            ++ Pp.int t.edge_ctor
            ++ Pp.str " }--> "
            ++ Printer.pr_econstr_env env sigma t.to_node))
-      g.edges
+      g.transitions
+  ;;
+
+  (** [econstr_to_string env sigma target] is a [string] representing [target]. *)
+  let econstr_to_string
+    (env : Environ.env)
+    (sigma : Evd.evar_map)
+    (target : Evd.econstr)
+    : string
+    =
+    Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma target)
+  ;;
+
+  (** [econstr_to_int] is [e] converted to [int] (via [econstr_to_string] and [int_of_string]). *)
+  let econstr_to_int env sigma e : int =
+    int_of_string (econstr_to_string env sigma e)
+  ;;
+
+  (** Error when trying to translate unfinished LTS to FSM. *)
+  exception UnfinishedLTS of lts_graph
+
+  open Fsm
+
+  (** [translation_map] is ... *)
+  type translation_map = (Evd.econstr * int) list
+
+  (** [get_states transitions] is ... *)
+  let get_states (transitions : lts_transition M.t)
+    : (state list * translation_map) mm
+    =
+    let* env = get_env in
+    let* sigma = get_sigma in
+    let rec get_states'
+      (ts : (Evd.econstr * lts_transition) list)
+      (acc : state list)
+      (map : (Evd.econstr * int) list)
+      (id : int)
+      : state list * translation_map
+      =
+      match ts with
+      | [] -> acc, map
+      | (h_constr, _h_transition) :: t ->
+        get_states'
+          t
+          (List.concat
+             [ [ state
+                   ~name:
+                     (Printf.sprintf
+                        "s%s"
+                        (econstr_to_string env sigma h_constr))
+                   id
+               ]
+             ; acc
+             ])
+          (List.concat [ [ h_constr, id ]; map ])
+          (id + 1)
+    in
+    return (get_states' (List.of_seq (H.to_seq transitions)) [] [] 0)
+  ;;
+
+  (** [lts_to_fsm g] is ... *)
+  let lts_to_fsm (g : lts_graph) : fsm mm =
+    match g with
+    | { to_visit; transitions; _ } ->
+      if Queue.is_empty to_visit
+      then (
+        (* translate [raw_states] from coq api to ocaml [Fsm.states],
+           and get the [state_map_list] from [Evd.econstr] to [id]. *)
+        let states, state_map = get_states transitions in
+        (* temp... *)
+        return (fsm [] []))
+      else raise (UnfinishedLTS g)
   ;;
 end
 

@@ -12,7 +12,7 @@ val state : ?name:label -> id -> state
 
 type states = state list
 
-val seq_from_states : states -> state Seq.t
+(* val seq_from_states : states -> state Seq.t *)
 
 type edge =
   { id : id
