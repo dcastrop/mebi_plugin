@@ -333,6 +333,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     (env : Environ.env)
     (sigma : Evd.evar_map)
     (g : lts_graph)
+    : unit
     =
     H.iter
       (fun f t ->
@@ -366,7 +367,23 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   open Fsm
 
   (** [translation_map] is ... *)
-  type translation_map = (Evd.econstr * int) list
+  type translation_map = (Evd.econstr * id) list
+
+  (** [translation_table] is ... *)
+  type translation_table = (Evd.econstr, id) Hashtbl.t
+
+  (** [lts_fsm_translation] is ...
+      [ctor_id] is the hash of the Coq-based [Evd.econstr] corresponding to the state.
+      [state_id] is the (unique) [int] id of the corresponding Ocaml [fsm] state. *)
+  (* type lts_fsm_translation = {
+    coq_id : id; state_id : int
+  } *)
+
+  (** [fsm_translation] is... *)
+  type fsm_translation =
+    { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
+    ; transitions : lts_transition H.t
+    }
 
   (** [get_states transitions] is ... *)
   let get_states (transitions : lts_transition M.t)
@@ -378,12 +395,13 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       (ts : (Evd.econstr * lts_transition) list)
       (acc : state list)
       (map : (Evd.econstr * int) list)
-      (id : int)
+      (state_id : int)
       : state list * translation_map
       =
       match ts with
       | [] -> acc, map
-      | (h_constr, _h_transition) :: t ->
+      | (h_econstr, _h_transition) :: t ->
+        (* let hash = (Constr.hash (EConstr.to_constr sigma h_econstr)) in *)
         get_states'
           t
           (List.concat
@@ -391,15 +409,80 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
                    ~name:
                      (Printf.sprintf
                         "s%s"
-                        (econstr_to_string env sigma h_constr))
-                   id
+                        (econstr_to_string env sigma h_econstr))
+                   state_id
                ]
              ; acc
              ])
-          (List.concat [ [ h_constr, id ]; map ])
-          (id + 1)
+          (List.concat [ [ h_econstr, state_id ]; map ])
+          (state_id + 1)
     in
     return (get_states' (List.of_seq (H.to_seq transitions)) [] [] 0)
+  ;;
+
+  (** [pp_fsm_states env sigma states state_table] is ... *)
+  (* let pp_fsm_states
+    (env : Environ.env)
+    (sigma : Evd.evar_map)
+    (states : state list)
+    (state_table : (Evd.econstr, int) Hashtbl.t) : unit
+    =
+    H.iter
+      (fun f t ->
+        Feedback.msg_debug
+          (Printer.pr_econstr_env env sigma f
+           ++ Pp.str " ---{ "
+           ++ Pp.int t.edge_ctor
+           ++ Pp.str " }--> "
+           ++ Printer.pr_econstr_env env sigma t.to_node))
+      state_table
+  ;; *)
+
+  (** [get_edges transitions state_table] is ... *)
+  let get_edges
+    (transitions : lts_transition M.t)
+    (state_table : (Evd.econstr, int) Hashtbl.t)
+    : (edge list * translation_map) mm
+    =
+    let* env = get_env in
+    let* sigma = get_sigma in
+    let rec get_edges'
+      (ts : (Evd.econstr * lts_transition) list)
+      (acc : edge list)
+      (map : (Evd.econstr * int) list)
+      (edge_id : int)
+      : edge list * translation_map
+      =
+      match ts with
+      | [] -> acc, map
+      | (h_econstr, _h_transition) :: t ->
+        let lhs_econstr, label_ecosntr, rhs_econstr =
+          match EConstr.decompose_app sigma h_econstr with
+          | _, edge_econstr ->
+            let edge_econstr' = Array.to_list edge_econstr in
+            ( List.nth edge_econstr' 0
+            , List.nth edge_econstr' 1
+            , List.nth edge_econstr' 2 )
+        in
+        let _lhs_hash = Constr.hash (EConstr.to_constr sigma lhs_econstr) in
+        let lhs_id = Hashtbl.find state_table lhs_econstr in
+        let _rhs_hash = Constr.hash (EConstr.to_constr sigma rhs_econstr) in
+        let rhs_id = Hashtbl.find state_table rhs_econstr in
+        get_edges'
+          t
+          (List.concat
+             [ [ edge
+                   ~label:(econstr_to_string env sigma lhs_econstr)
+                   edge_id
+                   (ID lhs_id)
+                   (ID rhs_id)
+               ]
+             ; acc
+             ])
+          (List.concat [ [ h_econstr, edge_id ]; map ])
+          (edge_id + 1)
+    in
+    return (get_edges' (List.of_seq (H.to_seq transitions)) [] [] 0)
   ;;
 
   (** [lts_to_fsm g] is ... *)
@@ -408,9 +491,17 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     | { to_visit; transitions; _ } ->
       if Queue.is_empty to_visit
       then (
-        (* translate [raw_states] from coq api to ocaml [Fsm.states],
-           and get the [state_map_list] from [Evd.econstr] to [id]. *)
-        let states, state_map = get_states transitions in
+        (* [states] is a list of [fsm.state]. *)
+        (* [state_map] is a tuple list mapping Coq-based [Evd.econstr] to state id [int]. *)
+        let* states, state_map = get_states transitions in
+        (* convert [state_map] to a [Hashtbl]. *)
+        let (state_table : (Evd.econstr, int) Hashtbl.t) = Hashtbl.create 10 in
+        Hashtbl.add_seq state_table (List.to_seq state_map);
+        (* [edge_map] is a tuple list mapping Coq-based [Evd.econstr] to edge id [int]. *)
+        let* edges, edge_map = get_edges transitions state_table in
+        (* TODO: in the above, change the tables to use the hash of the Evd.econstr. *)
+        (* TODO: additionally, then update the [get_edges'] function to use the [_lhs_hash] to obtain the [lhs_id]. *)
+
         (* temp... *)
         return (fsm [] []))
       else raise (UnfinishedLTS g)
@@ -481,7 +572,7 @@ let bounded_lts
      ++ pp_transitions env sigma the_lts.transitions
      ++ strbrk "\n");
   Feedback.msg_debug (strbrk "(f) Graph Edges: \n");
-  G.pp_graph_edges env sigma graph;
+  G.pp_graph_transitions env sigma graph;
   (* Feedback.msg_info *)
   (*   (str "(b) CoqFsm: " ++ pp_coq_fsm env sigma (coq_fsm.states, coq_fsm.edges)); *)
   (* match coq_fsm.edges with
