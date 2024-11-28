@@ -272,6 +272,25 @@ module type GraphB = sig
 
   val build_graph : lts -> Constrexpr.constr_expr_r CAst.t -> lts_graph mm
   val pp_graph_transitions : Environ.env -> Evd.evar_map -> lts_graph -> unit
+
+  type translation =
+    { (* { state_table : lts_to_fsm_translation_table H.t
+    ; edge_table : lts_to_fsm_translation_table H.t
+    } *)
+      state_table : (Evd.econstr, int) Hashtbl.t
+    ; edge_table : (Evd.econstr, int) Hashtbl.t
+    }
+
+  val lts_to_fsm : lts_graph -> (Fsm.fsm * translation) mm
+
+  val pp_fsm_states
+    :  Environ.env
+    -> Evd.evar_map
+    -> Fsm.state list
+    -> (Evd.econstr, int) Hashtbl.t
+    -> unit
+
+  val pp_fsm_edges : Environ.env -> Evd.evar_map -> Fsm.edge list -> unit
 end
 
 (** [MkGraph M] is ...
@@ -336,13 +355,13 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     : unit
     =
     H.iter
-      (fun f t ->
+      (fun from transition ->
         Feedback.msg_debug
-          (Printer.pr_econstr_env env sigma f
+          (Printer.pr_econstr_env env sigma from
            ++ Pp.str " ---{ "
-           ++ Pp.int t.edge_ctor
+           ++ Pp.int transition.edge_ctor
            ++ Pp.str " }--> "
-           ++ Printer.pr_econstr_env env sigma t.to_node))
+           ++ Printer.pr_econstr_env env sigma transition.to_node))
       g.transitions
   ;;
 
@@ -357,9 +376,9 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   ;;
 
   (** [econstr_to_int] is [e] converted to [int] (via [econstr_to_string] and [int_of_string]). *)
-  let econstr_to_int env sigma e : int =
-    int_of_string (econstr_to_string env sigma e)
-  ;;
+  (* let econstr_to_int env sigma e : int =
+     int_of_string (econstr_to_string env sigma e)
+     ;; *)
 
   (** Error when trying to translate unfinished LTS to FSM. *)
   exception UnfinishedLTS of lts_graph
@@ -367,27 +386,68 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   open Fsm
 
   (** [translation_map] is ... *)
-  type translation_map = (Evd.econstr * id) list
+  type translation_map = (Evd.econstr * int) list
 
   (** [translation_table] is ... *)
-  type translation_table = (Evd.econstr, id) Hashtbl.t
+  (* type translation_table = (Evd.econstr, id) Hashtbl.t *)
 
-  (** [lts_fsm_translation] is ...
-      [ctor_id] is the hash of the Coq-based [Evd.econstr] corresponding to the state.
-      [state_id] is the (unique) [int] id of the corresponding Ocaml [fsm] state. *)
-  (* type lts_fsm_translation = {
-    coq_id : id; state_id : int
-  } *)
+  (** [] is ...
+      [constr_hash] is an [id] obtained by hashing the Coq-based [Evd.econstr] extracted from a transition, where a [state] corresponds to a [term] and an [edge] corresponds to a [ctor].
+      [id] is an [int] used to identify a [fsm] component (either acting as a [state.id] or [edge.id]). *)
+  (* type lts_to_fsm_translation_table =
+    { constr_hash : int
+    ; id : int
+    } *)
 
-  (** [fsm_translation] is... *)
+  (** [translation] is ...
+      [state_table] is a hashtable mapping hashed [Evd.econstr] of [term] to [state.id].
+      [edge_table] is a hashtable mapping hashed [Evd.econstr] of [ctor] (transitions) to [edge.id]. *)
+  type translation =
+    { (* { state_table : lts_to_fsm_translation_table H.t
+    ; edge_table : lts_to_fsm_translation_table H.t
+    } *)
+      state_table : (Evd.econstr, int) Hashtbl.t
+    ; edge_table : (Evd.econstr, int) Hashtbl.t
+    }
+  (*
+     (** [fsm_translation] is... *)
   type fsm_translation =
     { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
     ; transitions : lts_transition H.t
-    }
+    } *)
+
+  (* let get_state_translation_table
+    ?(tr : translation = { state_table = H.create 1; edge_table = H.create 1 })
+    (transitions : lts_transition H.t)
+    : translation mm
+    =
+    let* env = get_env in
+    let* sigma = get_sigma in
+    H.iter
+      (fun f t ->
+        H.add
+          tr.state_table
+          t
+          { constr_hash = Constr.hash (EConstr.to_constr sigma f)
+          ; id = 1
+          })
+      transitions;
+    return tr
+  ;; *)
+
+  (* let rec get_state_translation_table' (ts:lts_transition M.t) : lts_to_fsm_translation_table =
+
+     match ts with
+     | [] ->
+
+     in
+     get_state_translation_table' transitions *)
+  (* ;; *)
 
   (** [get_states transitions] is ... *)
   let get_states (transitions : lts_transition M.t)
-    : (state list * translation_map) mm
+    : (state list * (Evd.econstr * int) list) mm
+    (* : (state list * lts_to_fsm_translation_table) mm *)
     =
     let* env = get_env in
     let* sigma = get_sigma in
@@ -395,48 +455,34 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       (ts : (Evd.econstr * lts_transition) list)
       (acc : state list)
       (map : (Evd.econstr * int) list)
-      (state_id : int)
-      : state list * translation_map
+      (* (map: lts_to_fsm_translation_table) *)
+        (state_id : int)
+      : state list * (Evd.econstr * int) list
       =
+      (* : state list * lts_to_fsm_translation_table *)
       match ts with
       | [] -> acc, map
-      | (h_econstr, _h_transition) :: t ->
+      | (h_from, _h_transition) :: t ->
         (* let hash = (Constr.hash (EConstr.to_constr sigma h_econstr)) in *)
+        (* H.add map t {constr_hash = (Constr.hash (EConstr.to_constr sigma h_econstr)) ; id = state_id}; *)
         get_states'
           t
           (List.concat
              [ [ state
                    ~name:
                      (Printf.sprintf
-                        "s%s"
-                        (econstr_to_string env sigma h_econstr))
+                        "s:%s"
+                        (econstr_to_string env sigma h_from))
                    state_id
                ]
              ; acc
              ])
-          (List.concat [ [ h_econstr, state_id ]; map ])
+          map
+          (* (List.concat [ [ h_econstr, state_id ]; map ]) *)
           (state_id + 1)
     in
     return (get_states' (List.of_seq (H.to_seq transitions)) [] [] 0)
   ;;
-
-  (** [pp_fsm_states env sigma states state_table] is ... *)
-  (* let pp_fsm_states
-    (env : Environ.env)
-    (sigma : Evd.evar_map)
-    (states : state list)
-    (state_table : (Evd.econstr, int) Hashtbl.t) : unit
-    =
-    H.iter
-      (fun f t ->
-        Feedback.msg_debug
-          (Printer.pr_econstr_env env sigma f
-           ++ Pp.str " ---{ "
-           ++ Pp.int t.edge_ctor
-           ++ Pp.str " }--> "
-           ++ Printer.pr_econstr_env env sigma t.to_node))
-      state_table
-  ;; *)
 
   (** [get_edges transitions state_table] is ... *)
   let get_edges
@@ -444,8 +490,10 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     (state_table : (Evd.econstr, int) Hashtbl.t)
     : (edge list * translation_map) mm
     =
+    Feedback.msg_info (str "h (before *)");
     let* env = get_env in
     let* sigma = get_sigma in
+    Feedback.msg_info (str "i (after *)");
     let rec get_edges'
       (ts : (Evd.econstr * lts_transition) list)
       (acc : edge list)
@@ -453,21 +501,40 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       (edge_id : int)
       : edge list * translation_map
       =
+      Feedback.msg_info (str "k (inside ')");
       match ts with
-      | [] -> acc, map
-      | (h_econstr, _h_transition) :: t ->
-        let lhs_econstr, label_ecosntr, rhs_econstr =
-          match EConstr.decompose_app sigma h_econstr with
-          | _, edge_econstr ->
-            let edge_econstr' = Array.to_list edge_econstr in
-            ( List.nth edge_econstr' 0
-            , List.nth edge_econstr' 1
-            , List.nth edge_econstr' 2 )
+      | [] ->
+        Feedback.msg_info (str "l (returning from ')");
+        acc, map
+      | (h_from, h_transition) :: t ->
+        Feedback.msg_info (str "m (found h)");
+        let lhs_econstr, label_econstr, rhs_econstr =
+          h_from, h_transition.edge_ctor, h_transition.to_node
+          (* match EConstr.decompose_app sigma h_econstr with
+             | _, edge_econstr ->
+             let edge_econstr' = Array.to_list edge_econstr in
+             ( List.nth edge_econstr' 0
+             , List.nth edge_econstr' 1
+             , List.nth edge_econstr' 2 ) *)
         in
-        let _lhs_hash = Constr.hash (EConstr.to_constr sigma lhs_econstr) in
+        Feedback.msg_info
+          (str "lhs_ecosntr:" ++ Printer.pr_econstr_env env sigma lhs_econstr);
+        Feedback.msg_info (str "label_econstr:" ++ Pp.int label_econstr);
+        Feedback.msg_info
+          (str "rhs_ecosntr:" ++ Printer.pr_econstr_env env sigma rhs_econstr);
+        Feedback.msg_info (str "n (got lhs rhs label)");
+        (* let _lhs_hash = Constr.hash (EConstr.to_constr sigma lhs_econstr) in *)
         let lhs_id = Hashtbl.find state_table lhs_econstr in
-        let _rhs_hash = Constr.hash (EConstr.to_constr sigma rhs_econstr) in
+        (* let _rhs_hash = Constr.hash (EConstr.to_constr sigma rhs_econstr) in *)
         let rhs_id = Hashtbl.find state_table rhs_econstr in
+        Feedback.msg_info (str "o (after ids)");
+        Feedback.msg_info
+          (str
+             (Printf.sprintf
+                "lhs_id: %d\nrhs_id:%d\nlabel: %d."
+                lhs_id
+                rhs_id
+                label_econstr));
         get_edges'
           t
           (List.concat
@@ -479,14 +546,56 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
                ]
              ; acc
              ])
-          (List.concat [ [ h_econstr, edge_id ]; map ])
+          (List.concat [ [ h_from, edge_id ]; map ])
           (edge_id + 1)
     in
+    Feedback.msg_info (str "j (after def ')");
     return (get_edges' (List.of_seq (H.to_seq transitions)) [] [] 0)
   ;;
 
+  (** [pp_fsm_states env sigma states state_table] is ... *)
+  let pp_fsm_states
+    (env : Environ.env)
+    (sigma : Evd.evar_map)
+    (states : state list)
+    (state_table : (Evd.econstr, int) Hashtbl.t)
+    : unit
+    =
+    Hashtbl.iter
+      (fun f i ->
+        Feedback.msg_debug
+          (Printer.pr_econstr_env env sigma f
+           ++ Pp.str
+                (Printf.sprintf
+                   " => \"%s\" (state <%d>)"
+                   (match find_state i (States states) with
+                    | None -> "[Error, not found.]"
+                    | Some state -> state.name)
+                   i)))
+      state_table
+  ;;
+
+  (** [pp_fsm_edges env sigma edges edge_table] is ... *)
+  let pp_fsm_edges
+    (env : Environ.env)
+    (sigma : Evd.evar_map)
+    (edges : edge list)
+    : unit
+    =
+    (* (edge_table : (Evd.econstr, int) Hashtbl.t) *)
+
+    (* Hashtbl.iter *)
+    (* (fun f i -> *)
+    Feedback.msg_debug
+      (* (Printer.pr_econstr_env env sigma f *)
+      (* ++ *)
+      (Pp.str (Fsm.Stringify.to_string (Edges edges)))
+  ;;
+
   (** [lts_to_fsm g] is ... *)
-  let lts_to_fsm (g : lts_graph) : fsm mm =
+  let lts_to_fsm (g : lts_graph) : (fsm * translation) mm =
+    let* env = get_env in
+    let* sigma = get_sigma in
     match g with
     | { to_visit; transitions; _ } ->
       if Queue.is_empty to_visit
@@ -494,18 +603,68 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
         (* [states] is a list of [fsm.state]. *)
         (* [state_map] is a tuple list mapping Coq-based [Evd.econstr] to state id [int]. *)
         let* states, state_map = get_states transitions in
+        Feedback.msg_info
+          (str
+             (Printf.sprintf
+                "states: %s"
+                (Fsm.Stringify.to_string (States states))));
         (* convert [state_map] to a [Hashtbl]. *)
         let (state_table : (Evd.econstr, int) Hashtbl.t) = Hashtbl.create 10 in
         Hashtbl.add_seq state_table (List.to_seq state_map);
+        (*  *)
+        Feedback.msg_info (str "states_table: ");
+        Hashtbl.iter
+          (fun f i ->
+            Feedback.msg_info
+              (Printer.pr_econstr_env env sigma f
+               ++ Pp.str (Printf.sprintf " => (state <%d>)" i)))
+          state_table;
+        Feedback.msg_info (str "(finished printing states_table).\n");
+        (* pp_fsm_states env sigma states state_table; *)
         (* [edge_map] is a tuple list mapping Coq-based [Evd.econstr] to edge id [int]. *)
         let* edges, edge_map = get_edges transitions state_table in
+        Feedback.msg_info
+          (str
+             (Printf.sprintf
+                "edges: %s"
+                (Fsm.Stringify.to_string (Edges edges))));
+        (* convert [edge_map] to a [Hashtbl]. *)
+        let (edge_table : (Evd.econstr, int) Hashtbl.t) = Hashtbl.create 10 in
+        Hashtbl.add_seq edge_table (List.to_seq edge_map);
+        (*  *)
+        Feedback.msg_info (str "edges_table: ");
+        Hashtbl.iter
+          (fun f i ->
+            Feedback.msg_info
+              (Printer.pr_econstr_env env sigma f
+               ++ Pp.str (Printf.sprintf " => (edge <%d>)" i)))
+          edge_table;
+        Feedback.msg_info (str "(finished printing edges_table).\n");
         (* TODO: in the above, change the tables to use the hash of the Evd.econstr. *)
         (* TODO: additionally, then update the [get_edges'] function to use the [_lhs_hash] to obtain the [lhs_id]. *)
 
+        (* ! ! ! note to self: *)
+        (* TODO: the [lts_transition M.t] is itself the [lhs -(label)-> rhs]. *)
+        (* ? see [pp_graph_transitions] where [H.iter (fun from transition -> ... ] shows that the [key] [from] is the [lhs] state (coq-term) and then the [transition] itself has [transition.edge_ctor] for the label of the transition and [transition.to_node] for the [rhs] state (being a coq-term).*)
+        (* TODO: need to check where things are hashed, since i recall and can observe the functionality in [Mebi_monad]. I believe that this is happening later on in [make_graph_builder] when it calls [make_constr_tbl]. I think that I should be using the hashed versions of these [lhs] and [rhs] [Evd.econstr] terms, so that the ocaml side of things does not have to worry about these things, and so that the translation can actually be baked into the output [fsm], and we don't have to carry around a translation table with us. *)
+
+        (*  *)
+        let fsm_translation : translation = { state_table; edge_table } in
         (* temp... *)
-        return (fsm [] []))
-      else raise (UnfinishedLTS g)
+        return (fsm states edges, fsm_translation))
+      else (
+        Feedback.msg_warning
+          (str
+             (Printf.sprintf
+                "lts is not complete, still had at least (%d) terms to visit."
+                (Queue.length to_visit)));
+        raise (UnfinishedLTS g))
   ;;
+
+  (* ) *)
+
+  (* )
+     edge_table *)
 end
 
 (** [make_graph_builder] is ... *)
@@ -514,6 +673,8 @@ let make_graph_builder =
   let module G = MkGraph ((val m)) in
   return (module G : GraphB)
 ;;
+
+(**  *)
 
 (* FIXME: Should be user-configurable, not hardcoded *)
 
@@ -571,8 +732,16 @@ let bounded_lts
     (str "(d) Transitions: "
      ++ pp_transitions env sigma the_lts.transitions
      ++ strbrk "\n");
-  Feedback.msg_debug (strbrk "(f) Graph Edges: \n");
+  Feedback.msg_debug (strbrk "(e) Graph Edges: \n");
   G.pp_graph_transitions env sigma graph;
+  (* lts to fsm *)
+  let* the_fsm, translation = G.lts_to_fsm graph in
+  (* print states *)
+  Feedback.msg_info (str "(f) Fsm.states: \n");
+  G.pp_fsm_states env sigma the_fsm.states translation.state_table;
+  (* print edges *)
+  Feedback.msg_info (str "(g) Fsm.edges: \n");
+  G.pp_fsm_edges env sigma the_fsm.edges;
   (* Feedback.msg_info *)
   (*   (str "(b) CoqFsm: " ++ pp_coq_fsm env sigma (coq_fsm.states, coq_fsm.edges)); *)
   (* match coq_fsm.edges with
