@@ -1,4 +1,4 @@
-open Fsm
+(* open Fsm
 open Mebi_utils
 
 (** [default_table_size] is the default size of the [translation_table]. *)
@@ -165,4 +165,4 @@ let lts_to_fsm
   let edges, edge_map = get_edges env sigma lts tbl.state_map in
   (* add meta data *)
   tbl, fsm ~init:(Hashtbl.find tbl.state_map start_term) states edges
-;;
+;; *)
