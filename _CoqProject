@@ -13,8 +13,6 @@ src/mebi_monad.ml
 src/mebi_monad.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
-src/stringify.ml
-src/stringify.mli
 src/pp_ext.ml
 src/pp_ext.mli
 src/fsm.ml

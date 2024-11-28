@@ -1,3 +1,6 @@
+(* TODO: delete this file along with the [.mli]. *)
+(* ! keeping here for now while I work on the translation functionality in [command.ml]. *)
+
 (* open Fsm
 open Mebi_utils
 

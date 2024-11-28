@@ -1,205 +1,202 @@
-(** [Fsm] *)
-module Fsm = struct
-  (** [state] is a 2-tuple with a unique [id] and (non-unique) name (or [label]).
-      [id] is an integer.
-      [name] is a string. *)
-  type state =
-    { id : int
-    ; name : string
-    }
+(** [state] is a 2-tuple with a unique [id] and (non-unique) name (or [label]).
+    [id] is an integer.
+    [name] is a string. *)
+type state =
+  { id : int
+  ; name : string
+  }
 
-  (** [state] is a [state] type of [id] and [?name].
-      [?name] is an optional argument, which when omitted is replaced by ["s[id]"].
-      [id] is an integer. *)
-  let state ?name (id : int) : state =
-    match name with
-    | None -> { id; name = Printf.sprintf "s%d" id }
-    | Some name' -> { id; name = name' }
-  ;;
+(** [state] is a [state] type of [id] and [?name].
+    [?name] is an optional argument, which when omitted is replaced by ["s[id]"].
+    [id] is an integer. *)
+let state ?name (id : int) : state =
+  match name with
+  | None -> { id; name = Printf.sprintf "s%d" id }
+  | Some name' -> { id; name = name' }
+;;
 
-  (** [seq_from_states states] is the sequence of [states]. *)
-  (* let seq_from_states (states : state list) : state Seq.t = List.to_seq states *)
+(** [seq_from_states states] is the sequence of [states]. *)
+(* let seq_from_states (states : state list) : state Seq.t = List.to_seq states *)
 
-  (** [edge] is a transition from [lhs] to [rhs] via [label]. *)
-  type edge =
-    { id : int
-    ; lhs : int
-    ; rhs : int
-    ; label : string
-    }
+(** [edge] is a transition from [lhs] to [rhs] via [label]. *)
+type edge =
+  { id : int
+  ; lhs : int
+  ; rhs : int
+  ; label : string
+  }
 
-  (** [has_edge] denotes the types that can have an [edge].
-      [ID] corresponds to the [id] of a [state].
-      [State] corresponds to a [state]. *)
-  type has_edge =
-    | ID of int
-    | State of state
+(** [has_edge] denotes the types that can have an [edge].
+    [ID] corresponds to the [id] of a [state].
+    [State] corresponds to a [state]. *)
+type has_edge =
+  | ID of int
+  | State of state
 
-  (** [edge] is an [edge] type with a default [?label] of [[lhs_id] -> [rhs_id]].
-      [?label]
-      [id]
-      [lhs]
-      [rhs] *)
-  let edge ?label (id : int) (lhs : has_edge) (rhs : has_edge) : edge =
-    let lhs_id : int =
-      match lhs with
-      | ID id -> id
-      | State state ->
-        (match state with
-         | { id; _ } -> id)
-    in
-    let rhs_id : int =
-      match rhs with
-      | ID id -> id
-      | State state ->
-        (match state with
-         | { id; _ } -> id)
-    in
-    { id
-    ; lhs = lhs_id
-    ; rhs = rhs_id
-    ; label =
-        (match label with
-         | None -> Printf.sprintf "%d -> %d" lhs_id rhs_id
-         | Some label' -> label')
-    }
-  ;;
-
-  (** [fsm] is a 3-tuple of [init] states, and list of [states] and [edges].
-      [init] is the initial (starting) state of the [fsm].
-      [states] is the list of [state]s of the [fsm].
-      [edges] is the list of [edge]s of the [fsm].*)
-  type fsm =
-    { init : int
-    ; states : state list
-    ; edges : edge list
-    }
-
-  (** [fsm] is an [fsm] type with default [init] [id] of [0]. *)
-  let fsm ?(init : int = 0) (states : state list) (edges : edge list) : fsm =
-    { init; states; edges }
-  ;;
-
-  (** [has_state_id] denotes the types that can contain [id]s of [states]. *)
-  type has_state_id =
-    | States of state list
-    | State of state
-    | Edges of edge list
-    | Edge of edge
-    | Fsm of fsm
-
-  (** [has_state] is [true] if [m] contains either: a [state] with matching [id], or a matching [id]. *)
-  let rec has_state (id_to_find : int) (m : has_state_id) : bool =
-    match m with
-    (* [State state] *)
+(** [edge] is an [edge] type with a default [?label] of [[lhs_id] -> [rhs_id]].
+    [?label]
+    [id]
+    [lhs]
+    [rhs] *)
+let edge ?label (id : int) (lhs : has_edge) (rhs : has_edge) : edge =
+  let lhs_id : int =
+    match lhs with
+    | ID id -> id
     | State state ->
       (match state with
-       | { id; _ } -> id_to_find == id)
-    (* [States states] *)
-    | States states ->
-      let rec has_state' (id_to_find : int) (states : state list) : bool =
-        match states with
-        | [] -> false
-        | { id; _ } :: t ->
-          if id_to_find == id then true else has_state' id_to_find states
-      in
-      has_state' id_to_find states
-    (* [Edge edge] *)
-    | Edge edge ->
-      (match edge with
-       | { lhs; rhs; _ } -> id_to_find == lhs || id_to_find == rhs)
-    (* [Edges edges] *)
-    | Edges edges ->
-      let rec has_state' (id_to_find : int) (edges : edge list) : bool =
-        match edges with
-        | [] -> false
-        | { lhs; rhs; _ } :: t ->
-          if id_to_find == lhs || id_to_find == rhs
-          then true
-          else has_state' id_to_find t
-      in
-      has_state' id_to_find edges
-    (* [Trace trace] *)
-    (* | Trace trace ->
+       | { id; _ } -> id)
+  in
+  let rhs_id : int =
+    match rhs with
+    | ID id -> id
+    | State state ->
+      (match state with
+       | { id; _ } -> id)
+  in
+  { id
+  ; lhs = lhs_id
+  ; rhs = rhs_id
+  ; label =
+      (match label with
+       | None -> Printf.sprintf "%d -> %d" lhs_id rhs_id
+       | Some label' -> label')
+  }
+;;
+
+(** [fsm] is a 3-tuple of [init] states, and list of [states] and [edges].
+    [init] is the initial (starting) state of the [fsm].
+    [states] is the list of [state]s of the [fsm].
+    [edges] is the list of [edge]s of the [fsm].*)
+type fsm =
+  { init : int
+  ; states : state list
+  ; edges : edge list
+  }
+
+(** [fsm] is an [fsm] type with default [init] [id] of [0]. *)
+let fsm ?(init : int = 0) (states : state list) (edges : edge list) : fsm =
+  { init; states; edges }
+;;
+
+(** [has_state_id] denotes the types that can contain [id]s of [states]. *)
+type has_state_id =
+  | States of state list
+  | State of state
+  | Edges of edge list
+  | Edge of edge
+  | Fsm of fsm
+
+(** [has_state] is [true] if [m] contains either: a [state] with matching [id], or a matching [id]. *)
+let rec has_state (id_to_find : int) (m : has_state_id) : bool =
+  match m with
+  (* [State state] *)
+  | State state ->
+    (match state with
+     | { id; _ } -> id_to_find == id)
+  (* [States states] *)
+  | States states ->
+    let rec has_state' (id_to_find : int) (states : state list) : bool =
+      match states with
+      | [] -> false
+      | { id; _ } :: t ->
+        if id_to_find == id then true else has_state' id_to_find states
+    in
+    has_state' id_to_find states
+  (* [Edge edge] *)
+  | Edge edge ->
+    (match edge with
+     | { lhs; rhs; _ } -> id_to_find == lhs || id_to_find == rhs)
+  (* [Edges edges] *)
+  | Edges edges ->
+    let rec has_state' (id_to_find : int) (edges : edge list) : bool =
+      match edges with
+      | [] -> false
+      | { lhs; rhs; _ } :: t ->
+        if id_to_find == lhs || id_to_find == rhs
+        then true
+        else has_state' id_to_find t
+    in
+    has_state' id_to_find edges
+  (* [Trace trace] *)
+  (* | Trace trace ->
   Trace.exists
     (fun e ->
       match e with
       | { lhs; rhs; _ } -> id_to_find == lhs || id_to_find == rhs)
     trace *)
-    (* [Fsm fsm] *)
-    | Fsm fsm ->
-      (match fsm with
-       | { states; _ } -> has_state id_to_find (States states))
-  ;;
+  (* [Fsm fsm] *)
+  | Fsm fsm ->
+    (match fsm with
+     | { states; _ } -> has_state id_to_find (States states))
+;;
 
-  (** [has_state] denotes the types that can contain [states]. *)
-  type has_state =
-    | State of state
-    | States of state list
-    | Fsm of fsm
+(** [has_state] denotes the types that can contain [states]. *)
+type has_state =
+  | State of state
+  | States of state list
+  | Fsm of fsm
 
-  (** [find_state id m] is the [state] in [m] with matching [id_to_find].*)
-  let rec find_state (id_to_find : int) (m : has_state) : state option =
-    match m with
-    (* [State state] *)
-    | State state ->
-      if has_state id_to_find (State state) then Some state else None
-    (* [States states] *)
-    | States states ->
-      let rec find_state' (id_to_find : int) (states : state list)
-        : state option
-        =
-        match states with
-        | [] -> None
-        | h :: t ->
-          if has_state id_to_find (State h)
-          then Some h
-          else find_state' id_to_find t
-      in
-      find_state' id_to_find states
-    (* [Fsm fsm] *)
-    | Fsm fsm ->
-      (match fsm with
-       | { states; _ } -> find_state id_to_find (States states))
-  ;;
-
-  (** [has_lts] denotes the types the contain both [states] and [edges]. *)
-  type has_lts = Fsm of fsm
-
-  (** [get_edges id m] is the list of [edges] in [m] that are outgoing from some [state] of [id] in [m]. *)
-  let get_edges (has_edge : has_edge) (m : has_lts) : edge list option =
-    (* check what [has_edge] is *)
-    let id =
-      match has_edge with
-      | ID id -> id
-      | State state ->
-        (match state with
-         | { id; _ } -> id)
+(** [find_state id m] is the [state] in [m] with matching [id_to_find].*)
+let rec find_state (id_to_find : int) (m : has_state) : state option =
+  match m with
+  (* [State state] *)
+  | State state ->
+    if has_state id_to_find (State state) then Some state else None
+  (* [States states] *)
+  | States states ->
+    let rec find_state' (id_to_find : int) (states : state list) : state option =
+      match states with
+      | [] -> None
+      | h :: t ->
+        if has_state id_to_find (State h)
+        then Some h
+        else find_state' id_to_find t
     in
-    (* check what [m] is *)
-    match m with
-    (* [Fsm fsm] *)
-    | Fsm fsm ->
-      (match fsm with
-       | { states; edges; _ } ->
-         (*** [get_edges' id edges] is the list of [edges] with [[id]==[lhs]]. *)
-         let rec get_edges' (id : int) (edges : edge list) : edge list =
-           match edges with
-           | [] -> []
-           | h :: t ->
-             (match h with
-              | { lhs; _ } ->
-                if id == lhs then h :: get_edges' id t else get_edges' id t)
-         in
-         (match get_edges' id edges with
-          | [] -> None
-          | es -> Some es))
-  ;;
-end
+    find_state' id_to_find states
+  (* [Fsm fsm] *)
+  | Fsm fsm ->
+    (match fsm with
+     | { states; _ } -> find_state id_to_find (States states))
+;;
+
+(** [has_lts] denotes the types the contain both [states] and [edges]. *)
+type has_lts = Fsm of fsm
+
+(** [get_edges id m] is the list of [edges] in [m] that are outgoing from some [state] of [id] in [m]. *)
+let get_edges (has_edge : has_edge) (m : has_lts) : edge list option =
+  (* check what [has_edge] is *)
+  let id =
+    match has_edge with
+    | ID id -> id
+    | State state ->
+      (match state with
+       | { id; _ } -> id)
+  in
+  (* check what [m] is *)
+  match m with
+  (* [Fsm fsm] *)
+  | Fsm fsm ->
+    (match fsm with
+     | { states; edges; _ } ->
+       (*** [get_edges' id edges] is the list of [edges] with [[id]==[lhs]]. *)
+       let rec get_edges' (id : int) (edges : edge list) : edge list =
+         match edges with
+         | [] -> []
+         | h :: t ->
+           (match h with
+            | { lhs; _ } ->
+              if id == lhs then h :: get_edges' id t else get_edges' id t)
+       in
+       (match get_edges' id edges with
+        | [] -> None
+        | es -> Some es))
+;;
+
+(* end *)
 
 (** [Stringify] ... *)
 module Stringify = struct
-  open Fsm
+  (* open Fsm *)
 
   (** [default_indent_val] is the default number of spaces to use perindent in [to_string]. *)
   let default_indent_val = 2
