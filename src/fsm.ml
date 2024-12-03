@@ -2,8 +2,7 @@
     [id] is an integer for identifying the state.
     [pp] is a pretty-printed string of something corresponding to this state. *)
 type state =
-  { id : int
-  (* ; hash : int *)
+  { id : int (* ; hash : int *)
   ; pp : string
   }
 
@@ -21,10 +20,8 @@ type ('a, 'b) transition =
 (*  *)
 (* module Inttbl = Hashtbl.Make() *)
 type fsm_aux =
-  {
-    (* init : int *)
-init:state
-  (* ; states : *)
+  { (* init : int *)
+    init : state (* ; states : *)
   ; edges : (state, (label, state) transition) Hashtbl.t
   }
 
