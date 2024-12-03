@@ -1,13 +1,18 @@
 (** [state] is a 2-tuple with a unique [id] and (non-unique) name (or [label]).
-    [id] is an integer.
-    [name] is a string. *)
+    [id] is an integer for identifying the state.
+    [pp] is a pretty-printed string of something corresponding to this state. *)
 type state =
   { id : int
-  ; name : string
+  (* ; hash : int *)
+  ; pp : string
   }
 
+(** [label] is similar to [state]. *)
 type label = int
 
+(** [('a, 'b) transition] is a 2-tuple with a [label] and [to_state].
+    [label] is of type ['a].
+    [to_state] is of type ['b]. *)
 type ('a, 'b) transition =
   { label : 'a
   ; to_state : 'b
@@ -16,18 +21,21 @@ type ('a, 'b) transition =
 (*  *)
 (* module Inttbl = Hashtbl.Make() *)
 type fsm_aux =
-  { init : state
-  ; transitions : (state, (label, state) transition) Hashtbl.t
+  {
+    (* init : int *)
+init:state
+  (* ; states : *)
+  ; edges : (state, (label, state) transition) Hashtbl.t
   }
 
 (** [state] is a [state] type of [id] and [?name].
     [?name] is an optional argument, which when omitted is replaced by ["s[id]"].
     [id] is an integer. *)
-let state ?name (id : int) : state =
+(* let state ?name (id : int) : state =
   match name with
   | None -> { id; name = Printf.sprintf "s%d" id }
   | Some name' -> { id; name = name' }
-;;
+;; *)
 
 (** [seq_from_states states] is the sequence of [states]. *)
 (* let seq_from_states (states : state list) : state Seq.t = List.to_seq states *)
@@ -275,7 +283,7 @@ module Stringify = struct
        | State state ->
          Printf.sprintf
            "(%s%s)"
-           state.name
+           state.pp
            (* check if id should be printed too *)
            (if let rec check_context (ctx : stringable_context) : bool =
                  match ctx with
