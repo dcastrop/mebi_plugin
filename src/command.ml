@@ -278,24 +278,31 @@ module type GraphB = sig
   val pp_graph_transitions : Environ.env -> Evd.evar_map -> lts_graph -> unit
 
   type state_translation = (EConstr.t, Fsm.state) Hashtbl.t
-  type es = (Fsm.state,(Fsm.label,Fsm.state)Fsm.transition) Hashtbl.t
+  type ed = (Fsm.label, Fsm.state) Fsm.transition
+  type es = (Fsm.state, ed) Hashtbl.t
 
   val build_translation : lts_graph -> state_translation mm
   val build_edges : lts_graph -> state_translation -> es mm
 
+  val lts_to_fsm
+    :  lts_graph
+    -> (* EConstr.constr *)
+       Constrexpr.constr_expr_r CAst.t
+    -> EConstr.types
+    -> (Fsm.fsm_aux * state_translation) mm
 
-  val lts_to_fsm : lts_graph -> (Fsm.fsm_aux * state_translation) mm
-
-  val pp_fsm : Environ.env -> Evd.evar_map -> Fsm.fsm_aux -> unit
+  val pp_fsm : ?long:unit -> Environ.env -> Evd.evar_map -> Fsm.fsm_aux -> unit
+  val pstr_state : ?long:unit -> Fsm.state -> string
+  val pstr_edge : ?long:unit -> Fsm.state * ed -> string
 
   (* val pp_fsm_states
-    :  Environ.env
-    -> Evd.evar_map
-    -> Fsm.state list
-    -> (Evd.econstr, int) Hashtbl.t
-    -> unit
+     :  Environ.env
+     -> Evd.evar_map
+     -> Fsm.state list
+     -> (Evd.econstr, int) Hashtbl.t
+     -> unit
 
-  val pp_fsm_edges : Environ.env -> Evd.evar_map -> Fsm.edge list -> unit *)
+     val pp_fsm_edges : Environ.env -> Evd.evar_map -> Fsm.edge list -> unit *)
 end
 
 (** [MkGraph M] is ...
@@ -380,9 +387,6 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma target)
   ;;
 
-  (** Error when trying to translate unfinished LTS to FSM. *)
-  exception UnfinishedLTS of lts_graph
-
   open Fsm
 
   (** [translation_map] is ... *)
@@ -415,90 +419,248 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     let _ =
       Seq.iter
         (fun t ->
-          Hashtbl.add
-            tr_tbl
-            t
-            { id = hash t
-            ; pp = econstr_to_string env sigma t
-            })
+          (* check if [t] is already captured *)
+          if false == Hashtbl.mem tr_tbl t
+          then
+            Hashtbl.add
+              tr_tbl
+              t
+              { id = hash t; pp = econstr_to_string env sigma t };
+          (* check if [dest_state] is already captured *)
+          let dest_state = (H.find g.transitions t).to_node in
+          if false == Hashtbl.mem tr_tbl dest_state
+          then
+            Hashtbl.add
+              tr_tbl
+              dest_state
+              { id = hash dest_state
+              ; pp = econstr_to_string env sigma dest_state
+              })
         keys
     in
     return tr_tbl
   ;;
 
-  (**  *)
-  type es = (Fsm.state,(Fsm.label,Fsm.state)Fsm.transition) Hashtbl.t
+  type ed = (Fsm.label, Fsm.state) Fsm.transition
+
+  type es = (Fsm.state, ed) Hashtbl.t (**  *)
 
   (**  *)
-  let build_edges (g:lts_graph) (s:state_translation) : es mm =
+  let build_edges (g : lts_graph) (s : state_translation) : es mm =
     let* env = get_env in
     let* sigma = get_sigma in
     let keys = H.to_seq_keys g.transitions in
     let es_tbl = Seq.length keys |> Hashtbl.create in
-    let _ = Seq.iter
-    (fun t ->
-      let edge_from = (Hashtbl.find s t) in
-      let edge_label = (H.find g.transitions t).edge_ctor in
-      let edge_dest =  Hashtbl.find s (H.find g.transitions t).to_node in
-      Hashtbl.add es_tbl edge_from {label = edge_label; to_state = edge_dest})
-    keys
-  in
-    return (es_tbl)
+    (* H.iter
+      (fun from transition ->
+        Feedback.msg_debug
+          (Printer.pr_econstr_env env sigma from
+           ++ Pp.str " ---{ "
+           ++ Pp.int transition.edge_ctor
+           ++ Pp.str " }--> "
+           ++ Printer.pr_econstr_env env sigma transition.to_node))
+      g.transitions *)
+    H.iter
+      (fun from transition ->
+        let edge_from = Hashtbl.find s from in
+        let edge_label = transition.edge_ctor in
+        let edge_dest = Hashtbl.find s transition.to_node in
+        Hashtbl.add
+          es_tbl
+          edge_from
+          { label = edge_label; to_state = edge_dest })
+      g.transitions;
+    (* in *)
+    return es_tbl
   ;;
 
+  (* Feedback.msg_debug
+          (Printer.pr_econstr_env env sigma from
+           ++ Pp.str " ---{ "
+           ++ Pp.int transition.edge_ctor
+           ++ Pp.str " }--> "
+           ++ Printer.pr_econstr_env env sigma transition.to_node))
+      g.transitions;
 
-  let lts_to_fsm (g:lts_graph) : (Fsm.fsm_aux * state_translation) mm =
-    match g with
-    | { to_visit; transitions; _ } ->
-    if Queue.is_empty to_visit
-    then (
-    let* states = build_translation g in
-    let* edges = build_edges g states in
-    let init:Fsm.state =
-      {id = -1; pp="init"}
-      (* Hashtbl.find states ( List.nth (Hashtbl.to_seq_keys states |> List.of_seq) 0)  *)
+    let _ =
+      Seq.iter
+        (fun t ->
+          Feedback.msg_warning
+            (str (Printf.sprintf "edge_from: %b" (Hashtbl.mem s t)));
+          Feedback.msg_warning
+            (str
+               (Printf.sprintf "edge_label: %b (mem)" (H.mem g.transitions t)));
+          Feedback.msg_warning
+            (str
+               (Printf.sprintf
+                  "edge_label: %d"
+                  (H.find g.transitions t).edge_ctor));
+          Feedback.msg_warning
+            (str
+               (Printf.sprintf
+                  "edge_dest: %b (mem g) :: %s"
+                  (H.mem g.transitions t)
+                  (econstr_to_string env sigma (H.find g.transitions t).to_node)));
+          Feedback.msg_warning
+            (str
+               (Printf.sprintf
+                  "edge_dest: %b"
+                  (Hashtbl.mem s (H.find g.transitions t).to_node)));
+          let edge_from = Hashtbl.find s t in
+          let edge_label = (H.find g.transitions t).edge_ctor in
+          let edge_dest = Hashtbl.find s (H.find g.transitions t).to_node in
+          Hashtbl.add
+            es_tbl
+            edge_from
+            { label = edge_label; to_state = edge_dest })
+        (* keys *)
     in
-    return ({init = init; edges = edges},states))
-  else (
-    Feedback.msg_warning
-      (str
-         (Printf.sprintf
-            "lts is not complete, still had at least (%d) terms to visit."
-            (Queue.length to_visit)));
-    raise (UnfinishedLTS g))
+    return es_tbl
+  ;; *)
+
+  (** Error when trying to translate unfinished LTS to FSM. *)
+  exception UnfinishedLTS of lts_graph
+
+  exception NoStates of state_translation
+  (* exception NoEdges of es *)
+
+  let pstr_state ?(long : unit option) (state : Fsm.state) : string =
+    match long with
+    | None -> Printf.sprintf "(%d)" state.id
+    | Some () -> Printf.sprintf "(%s)" state.pp
   ;;
 
-  let pstr_state
-  (* (env : Environ.env)
-  (sigma : Evd.evar_map)
-  (the_fsm_aux:Fsm.fsm_aux) *)
-  (state:Fsm.state): string = state.pp
-  (* econstr_to_string env sigma (Printer.pr_econstr_env env sigma state) *)
-;;
-
+  let pstr_edge ?(long : unit option) ((from_state : Fsm.state), (edge : ed))
+    : string
+    =
+    let from_state_str, dest_state_str =
+      match long with
+      | None -> pstr_state from_state, pstr_state edge.to_state
+      | Some () ->
+        pstr_state ~long:() from_state, pstr_state ~long:() edge.to_state
+    in
+    let edge_label_str = Printf.sprintf "--{ %d }->" edge.label in
+    Printf.sprintf "{%s %s %s}" from_state_str edge_label_str dest_state_str
+  ;;
 
   let pp_fsm
-  (env : Environ.env)
-  (sigma : Evd.evar_map)
-  (the_fsm_aux:Fsm.fsm_aux): unit =
-  Feedback.msg_debug (str (Printf.sprintf "init state: %s"
-  (* (pstr_state env sigma the_fsm_aux.init) *)
-  (pstr_state the_fsm_aux.init))
-  );
-  Hashtbl.iter (fun (from_state:Fsm.state) (t: (Fsm.label, Fsm.state) Fsm.transition) ->
-    let edge_label = t.label in
-    let dest_state = t.to_state in
-    Feedback.msg_debug (str (Printf.sprintf "(from: %s)\n\t(label: %d)\n\t(dest: %s)." (pstr_state from_state) (edge_label) (pstr_state dest_state)
-    (* (e.label) (pstr_state e.to_state) *)
-    ))
-    )
-  the_fsm_aux.edges;
-  ()
-;;
+    ?(long : unit option)
+    (env : Environ.env)
+    (sigma : Evd.evar_map)
+    (the_fsm_aux : Fsm.fsm_aux)
+    : unit
+    =
+    Feedback.msg_debug
+      (str
+         (Printf.sprintf
+            "init state: %s"
+            (* (pstr_state env sigma the_fsm_aux.init) *)
+            (match long with
+             | None -> pstr_state the_fsm_aux.init
+             | Some () -> pstr_state ~long:() the_fsm_aux.init)));
+    Hashtbl.iter
+      (fun (from_state : Fsm.state)
+        (outgoing_transition : ed)
+          (* (t : (Fsm.label, Fsm.state) Fsm.transition) *) ->
+        (* let edge_label = t.label in
+           let dest_state = t.to_state in *)
+        Feedback.msg_debug
+          (str
+             (match long with
+              | None -> pstr_edge (from_state, outgoing_transition)
+              | Some () -> pstr_edge ~long:() (from_state, outgoing_transition))
+             (* (Printf.sprintf
+                "(from: %s)\n\t(label: %d)\n\t(dest: %s)."
+                (pstr_state from_state)
+                edge_label
+                (pstr_state dest_state) (* (e.label) (pstr_state e.to_state) *))
+             *)))
+      the_fsm_aux.edges;
+    ()
+  ;;
 
-(*
+  (*  *)
+  let lts_to_fsm
+    (g : lts_graph)
+    (* (initial_term : EConstr.constr) *)
+      (init_t : Constrexpr.constr_expr_r CAst.t)
+    (term_type : EConstr.types)
+    : (Fsm.fsm_aux * state_translation) mm
+    =
+    match g with
+    | { to_visit; transitions; _ } ->
+      if Queue.is_empty to_visit
+      then (
+        Feedback.msg_debug (str "queue not empty");
+        let* states = build_translation g in
+        if Hashtbl.to_seq_keys states |> Seq.is_empty
+        then raise (NoStates states)
+        else
+          let* env = get_env in
+          let* sigma = get_sigma in
+          let states_keys = Hashtbl.to_seq_keys states in
+          Feedback.msg_debug
+            (str
+               (Printf.sprintf
+                  "%s"
+                  (Seq.fold_left
+                     (fun acc x ->
+                       Printf.sprintf
+                         "%s%s;\n"
+                         acc
+                         (econstr_to_string env sigma x))
+                     ""
+                     states_keys)));
+          Feedback.msg_debug
+            (str (Printf.sprintf "after states (%d)." (Seq.length states_keys)));
+          let* edges = build_edges g states in
+          (* if Hashtbl.to_seq_keys edges |> Seq.is_empty
+             then raise (NoEdges edges)
+             else *)
+          let edges_keys = Hashtbl.to_seq_keys edges in
+          Feedback.msg_debug
+            (str
+               (Printf.sprintf
+                  "%s"
+                  (Seq.fold_left
+                     (fun acc x -> Printf.sprintf "%s%s;\n" acc (pstr_state x))
+                     ""
+                     edges_keys)));
+          Feedback.msg_debug (str "after edges.");
+          let$ t env sigma =
+            Constrintern.interp_constr_evars env sigma init_t
+          in
+          let$* u env sigma = Typing.check env sigma t term_type in
+          let$ init_t env sigma = sigma, Reductionops.nf_all env sigma t in
+          Feedback.msg_warning
+            (str
+               (Printf.sprintf
+                  "mem init: %b (%s)"
+                  (Hashtbl.mem states init_t)
+                  (econstr_to_string env sigma init_t)));
+          let init =
+            Hashtbl.find states init_t
+            (* (H.find lts_graph.transitions initial_term ) *)
+            (* { id = -1; pp = "init" } *)
+            (* Hashtbl.find states ( List.nth (Hashtbl.to_seq_keys states |> List.of_seq) 0) *)
+          in
+          Feedback.msg_warning
+            (str
+               (Printf.sprintf
+                  "init state: %s"
+                  (Fsm.Stringify.to_string (State init))));
+          return ({ init; edges }, states))
+      else (
+        Feedback.msg_warning
+          (str
+             (Printf.sprintf
+                "lts is not complete, still had at least (%d) terms to visit."
+                (Queue.length to_visit)));
+        raise (UnfinishedLTS g))
+  ;;
 
   (*
+     (*
      (** [fsm_translation] is... *)
   type fsm_translation =
     { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
@@ -643,49 +805,48 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   ;;
   *)
 
-(*
-  (** [pp_fsm_states env sigma states state_table] is ... *)
-  let pp_fsm_states
-    (env : Environ.env)
-    (sigma : Evd.evar_map)
-    (states : state list)
-    (state_table : (Evd.econstr, int) Hashtbl.t)
-    : unit
-    =
-    Hashtbl.iter
-      (fun f i ->
-        Feedback.msg_debug
-          (Printer.pr_econstr_env env sigma f
-           ++ Pp.str
-                (Printf.sprintf
-                   " => \"%s\" (state <%d>)"
-                   (match find_state i (States states) with
-                    | None -> "[Error, not found.]"
-                    | Some state -> state.name)
-                   i)))
-      state_table
-  ;;
+  (*
+     (** [pp_fsm_states env sigma states state_table] is ... *)
+     let pp_fsm_states
+     (env : Environ.env)
+     (sigma : Evd.evar_map)
+     (states : state list)
+     (state_table : (Evd.econstr, int) Hashtbl.t)
+     : unit
+     =
+     Hashtbl.iter
+     (fun f i ->
+     Feedback.msg_debug
+     (Printer.pr_econstr_env env sigma f
+     ++ Pp.str
+     (Printf.sprintf
+     " => \"%s\" (state <%d>)"
+     (match find_state i (States states) with
+     | None -> "[Error, not found.]"
+     | Some state -> state.name)
+     i)))
+     state_table
+     ;;
 
-  (** [pp_fsm_edges env sigma edges edge_table] is ... *)
-  let pp_fsm_edges
-    (env : Environ.env)
-    (sigma : Evd.evar_map)
-    (edges : edge list)
-    : unit
-    =
-    (* (edge_table : (Evd.econstr, int) Hashtbl.t) *)
+     (** [pp_fsm_edges env sigma edges edge_table] is ... *)
+     let pp_fsm_edges
+     (env : Environ.env)
+     (sigma : Evd.evar_map)
+     (edges : edge list)
+     : unit
+     =
+     (* (edge_table : (Evd.econstr, int) Hashtbl.t) *)
 
-    (* Hashtbl.iter *)
-    (* (fun f i -> *)
-    Feedback.msg_debug
-      (* (Printer.pr_econstr_env env sigma f *)
-      (* ++ *)
-      (Pp.str (Fsm.Stringify.to_string (Edges edges)))
-  ;; *)
+     (* Hashtbl.iter *)
+     (* (fun f i -> *)
+     Feedback.msg_debug
+     (* (Printer.pr_econstr_env env sigma f *)
+     (* ++ *)
+     (Pp.str (Fsm.Stringify.to_string (Edges edges)))
+     ;; *)
 
   (*
-
-  (** [lts_to_fsm g] is ... *)
+     (** [lts_to_fsm g] is ... *)
   let lts_to_fsm (g : lts_graph) : (fsm * translation) mm =
     let* env = get_env in
     let* sigma = get_sigma in
@@ -828,15 +989,18 @@ let bounded_lts
   Feedback.msg_debug (strbrk "(e) Graph Edges: \n");
   G.pp_graph_transitions env sigma graph;
   (* lts to fsm *)
-  let* the_fsm_aux, translation = G.lts_to_fsm graph in
+  let* the_fsm_aux, translation =
+    G.lts_to_fsm graph tref the_lts.trm_type
+    (* the_lts.coq_lts *)
+  in
   Feedback.msg_info (str "(f) Fsm: \n");
-  G.pp_fsm env sigma the_fsm_aux;
+  G.pp_fsm ~long:() env sigma the_fsm_aux;
   (* print states *)
   (* Feedback.msg_info (str "(f) Fsm.states: \n");
-  G.pp_fsm_states env sigma the_fsm.states translation.state_table;
-  (* print edges *)
-  Feedback.msg_info (str "(g) Fsm.edges: \n");
-  G.pp_fsm_edges env sigma the_fsm.edges; *)
+     G.pp_fsm_states env sigma the_fsm.states translation.state_table;
+     (* print edges *)
+     Feedback.msg_info (str "(g) Fsm.edges: \n");
+     G.pp_fsm_edges env sigma the_fsm.edges; *)
   (* Feedback.msg_info *)
   (*   (str "(b) CoqFsm: " ++ pp_coq_fsm env sigma (coq_fsm.states, coq_fsm.edges)); *)
   (* match coq_fsm.edges with
