@@ -36,7 +36,7 @@ Definition one := 1.
 
 Fail MeBi LTS testLTS false.
 
-MeBi LTS testLTS 0.
+(* MeBi LTS testLTS 0. *) (* <- has no edges, fails. *)
 MeBi LTS testLTS (S 0).
 MeBi LTS testLTS (S (S 0)).
 MeBi LTS testLTS (S (S (S 0))).

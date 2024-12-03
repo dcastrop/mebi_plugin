@@ -1,59 +1,71 @@
-(** [id] is an [int] used to uniquely index states. *)
-type id = int
-
-(** [label] is a [string] used in [fsm]s for [state] names and transition (or [edge]) [label]s. *)
-type label = string
-
-(** [labels] is a list of [label]s. *)
-type _labels = label list
-
-(** [state] is a 2-tuple with a unique [id] and (non-unique) name (or [label]). *)
+(** [state] is a 2-tuple with a unique [id] and (non-unique) name (or [label]).
+    [id] is an integer for identifying the state.
+    [pp] is a pretty-printed string of something corresponding to this state. *)
 type state =
-  { id : id
-  ; name : label
+  { id : int (* ; hash : int *)
+  ; pp : string
   }
 
-(** [default_name id] is [s[id]]. *)
-let default_name (id : id) : string = Printf.sprintf "s%d" id
+(** [label] is similar to [state]. *)
+type label = int
 
-(* let state (id : id) ?(name : label = default_name id) : state = { id; name } *)
+(** [('a, 'b) transition] is a 2-tuple with a [label] and [to_state].
+    [label] is of type ['a].
+    [to_state] is of type ['b]. *)
+type ('a, 'b) transition =
+  { label : 'a
+  ; to_state : 'b
+  }
 
-(** [state] is a [state] type with a default [name] of [default_name id]. *)
-let state ?name (id : id) : state =
+(*  *)
+(* module Inttbl = Hashtbl.Make() *)
+type fsm_aux =
+  { (* init : int *)
+    init : state (* ; states : *)
+  ; edges : (state, (label, state) transition) Hashtbl.t
+  }
+
+(** [state] is a [state] type of [id] and [?name].
+    [?name] is an optional argument, which when omitted is replaced by ["s[id]"].
+    [id] is an integer. *)
+(* let state ?name (id : int) : state =
   match name with
-  | None -> { id; name = default_name id }
+  | None -> { id; name = Printf.sprintf "s%d" id }
   | Some name' -> { id; name = name' }
-;;
-
-(** [states] is a list of [state]s. *)
-type states = state list
+;; *)
 
 (** [seq_from_states states] is the sequence of [states]. *)
-let seq_from_states (states : states) : state Seq.t = List.to_seq states
+(* let seq_from_states (states : state list) : state Seq.t = List.to_seq states *)
 
 (** [edge] is a transition from [lhs] to [rhs] via [label]. *)
 type edge =
-  { id : id
-  ; lhs : id
-  ; rhs : id
-  ; label : label
+  { id : int
+  ; lhs : int
+  ; rhs : int
+  ; label : string
   }
 
-(** [has_edge] denotes the types that can have an [edge] (i.e., a [state] or an [id] (of a [state])). *)
+(** [has_edge] denotes the types that can have an [edge].
+    [ID] corresponds to the [id] of a [state].
+    [State] corresponds to a [state]. *)
 type has_edge =
-  | ID of id
+  | ID of int
   | State of state
 
-(** [edge] is an [edge] type with a default [label] of [[lhs_id] -> [rhs_id]]. *)
-let edge ?label (id : id) (lhs : has_edge) (rhs : has_edge) : edge =
-  let lhs_id : id =
+(** [edge] is an [edge] type with a default [?label] of [[lhs_id] -> [rhs_id]].
+    [?label]
+    [id]
+    [lhs]
+    [rhs] *)
+let edge ?label (id : int) (lhs : has_edge) (rhs : has_edge) : edge =
+  let lhs_id : int =
     match lhs with
     | ID id -> id
     | State state ->
       (match state with
        | { id; _ } -> id)
   in
-  let rhs_id : id =
+  let rhs_id : int =
     match rhs with
     | ID id -> id
     | State state ->
@@ -70,60 +82,31 @@ let edge ?label (id : id) (lhs : has_edge) (rhs : has_edge) : edge =
   }
 ;;
 
-(** [edges] is a list of [edge]s. *)
-type edges = edge list
-
-(* ! removing traces for now
-   (** [Trace] is a set of [edge]s. *)
-module Trace = Set.Make (struct
-    type t = edge
-
-    (** [compare a b] is [0] if [a] and [b] are the same, and otherwise compares [id]s of each (returning either [1] for [a] first and [-1] for [b] first).
-        TODO: make this more useful. *)
-    let compare a b =
-      match a, b with
-      | ( { lhs = a_l_id; rhs = a_r_id; label = a_label; _ }
-        , { lhs = b_l_id; rhs = b_r_id; label = b_label; _ } ) ->
-        if a_l_id == b_l_id
-        then
-          if a_r_id == b_r_id
-          then if a_label == b_label then 0 else 0
-          else if a_r_id > b_r_id
-          then 1
-          else -1
-        else if a_l_id > b_l_id
-        then 1
-        else -1
-    ;;
-  end)
-
-(** [trace edges] is a [Trace] type ([Set]) from list [edges]. *)
-let trace (edges : edges) : Trace.t = edges |> Trace.of_list
-*)
-
-(** [fsm] is a 3-tuple of [init] states, and list of [states] and [edges]. *)
+(** [fsm] is a 3-tuple of [init] states, and list of [states] and [edges].
+    [init] is the initial (starting) state of the [fsm].
+    [states] is the list of [state]s of the [fsm].
+    [edges] is the list of [edge]s of the [fsm].*)
 type fsm =
-  { init : id (*** [init] is the initial (starting) state of the [fsm]. *)
-  ; states : states (*** [states] is the list of [state]s of the [fsm]. *)
-  ; edges : edges (*** [edges] is the list of [edge]s of the [fsm]. *)
+  { init : int
+  ; states : state list
+  ; edges : edge list
   }
 
 (** [fsm] is an [fsm] type with default [init] [id] of [0]. *)
-let fsm ?(init : id = 0) (states : states) (edges : edges) : fsm =
+let fsm ?(init : int = 0) (states : state list) (edges : edge list) : fsm =
   { init; states; edges }
 ;;
 
-(** [has_state_id] denotes the types that can contain [id]s of [state]s. *)
+(** [has_state_id] denotes the types that can contain [id]s of [states]. *)
 type has_state_id =
-  | States of states
+  | States of state list
   | State of state
-  | Edges of edges
+  | Edges of edge list
   | Edge of edge
-  (* | Trace of Trace.t *)
   | Fsm of fsm
 
 (** [has_state] is [true] if [m] contains either: a [state] with matching [id], or a matching [id]. *)
-let rec has_state (id_to_find : id) (m : has_state_id) : bool =
+let rec has_state (id_to_find : int) (m : has_state_id) : bool =
   match m with
   (* [State state] *)
   | State state ->
@@ -131,7 +114,7 @@ let rec has_state (id_to_find : id) (m : has_state_id) : bool =
      | { id; _ } -> id_to_find == id)
   (* [States states] *)
   | States states ->
-    let rec has_state' (id_to_find : id) (states : states) : bool =
+    let rec has_state' (id_to_find : int) (states : state list) : bool =
       match states with
       | [] -> false
       | { id; _ } :: t ->
@@ -144,7 +127,7 @@ let rec has_state (id_to_find : id) (m : has_state_id) : bool =
      | { lhs; rhs; _ } -> id_to_find == lhs || id_to_find == rhs)
   (* [Edges edges] *)
   | Edges edges ->
-    let rec has_state' (id_to_find : id) (edges : edges) : bool =
+    let rec has_state' (id_to_find : int) (edges : edge list) : bool =
       match edges with
       | [] -> false
       | { lhs; rhs; _ } :: t ->
@@ -155,32 +138,32 @@ let rec has_state (id_to_find : id) (m : has_state_id) : bool =
     has_state' id_to_find edges
   (* [Trace trace] *)
   (* | Trace trace ->
-    Trace.exists
-      (fun e ->
-        match e with
-        | { lhs; rhs; _ } -> id_to_find == lhs || id_to_find == rhs)
-      trace *)
+  Trace.exists
+    (fun e ->
+      match e with
+      | { lhs; rhs; _ } -> id_to_find == lhs || id_to_find == rhs)
+    trace *)
   (* [Fsm fsm] *)
   | Fsm fsm ->
     (match fsm with
      | { states; _ } -> has_state id_to_find (States states))
 ;;
 
-(** [has_state] denotes the types that can contain [state]s. *)
+(** [has_state] denotes the types that can contain [states]. *)
 type has_state =
   | State of state
-  | States of states
+  | States of state list
   | Fsm of fsm
 
 (** [find_state id m] is the [state] in [m] with matching [id_to_find].*)
-let rec find_state (id_to_find : id) (m : has_state) : state option =
+let rec find_state (id_to_find : int) (m : has_state) : state option =
   match m with
   (* [State state] *)
   | State state ->
     if has_state id_to_find (State state) then Some state else None
   (* [States states] *)
   | States states ->
-    let rec find_state' (id_to_find : id) (states : states) : state option =
+    let rec find_state' (id_to_find : int) (states : state list) : state option =
       match states with
       | [] -> None
       | h :: t ->
@@ -199,7 +182,7 @@ let rec find_state (id_to_find : id) (m : has_state) : state option =
 type has_lts = Fsm of fsm
 
 (** [get_edges id m] is the list of [edges] in [m] that are outgoing from some [state] of [id] in [m]. *)
-let get_edges (has_edge : has_edge) (m : has_lts) : edges option =
+let get_edges (has_edge : has_edge) (m : has_lts) : edge list option =
   (* check what [has_edge] is *)
   let id =
     match has_edge with
@@ -215,7 +198,7 @@ let get_edges (has_edge : has_edge) (m : has_lts) : edges option =
     (match fsm with
      | { states; edges; _ } ->
        (*** [get_edges' id edges] is the list of [edges] with [[id]==[lhs]]. *)
-       let rec get_edges' (id : id) (edges : edges) : edges =
+       let rec get_edges' (id : int) (edges : edge list) : edge list =
          match edges with
          | [] -> []
          | h :: t ->
@@ -228,224 +211,227 @@ let get_edges (has_edge : has_edge) (m : has_lts) : edges option =
         | es -> Some es))
 ;;
 
-(** [default_indent_val] is the default number of spaces to use perindent in [to_string]. *)
-let default_indent_val = 2
+(* end *)
 
-(** [tabs ?size n] is [n] number of [?size]d spaces. *)
-let rec tabs ?(size : int = default_indent_val) (n : int) : string =
-  (*** [tab num] is [n'] number of spaces. *)
-  let rec tab (n' : int) : string =
-    if n' > 0 then Printf.sprintf " %s" (tab (n' - 1)) else ""
-  in
-  if n > 0 then Printf.sprintf "%s%s" (tab size) (tabs ~size (n - 1)) else ""
-;;
+(** [Stringify] ... *)
+module Stringify = struct
+  (* open Fsm *)
 
-(** [stringable] denotes the types supported by the [to_string] function. *)
-type stringable =
-  | ID of id
-  | Label of label
-  | State of state
-  | States of states
-  | Edge of edge
-  | Edges of edges
-  | Fsm of fsm
-(* | Trace of Trace.t *)
+  (** [default_indent_val] is the default number of spaces to use perindent in [to_string]. *)
+  let default_indent_val = 2
 
-(** [stringable_context] denotes the types that may be provided to enable more detailed pretty-printed strings via the [to_string] function. E.g., providing [States] for [Edges] will allow the [State.name] to be used rather than the [id]s found in an [Edge]. *)
-type stringable_context =
-  | None
-  | ShowIDs
-  | States of states
-  | List of stringable_context list
+  (** [tabs ?size n] is [n] number of [?size]d spaces. *)
+  let rec tabs ?(size : int = default_indent_val) (n : int) : string =
+    (*** [tab num] is [n'] number of spaces. *)
+    let rec tab (n' : int) : string =
+      if n' > 0 then Printf.sprintf " %s" (tab (n' - 1)) else ""
+    in
+    if n > 0 then Printf.sprintf "%s%s" (tab size) (tabs ~size (n - 1)) else ""
+  ;;
 
-(** [add_to_stringable_context c1 c2] is the a [stringable_context.List] containing the concat of both [c1] and [c2]. *)
-let add_to_stringable_context
-  (c1 : stringable_context)
-  (c2 : stringable_context)
-  : stringable_context
-  =
-  match c1, c2 with
-  | List l1, List l2 -> List (List.concat [ l1; l2 ])
-  | List l1, _ -> List (List.concat [ l1; [ c2 ] ])
-  | _, List l2 -> List (List.concat [ [ c1 ]; l2 ])
-  | _, _ -> List [ c1; c2 ]
-;;
+  (** [stringable] denotes the types supported by the [to_string] function. *)
+  type stringable =
+    | ID of int
+    | Label of string
+    | State of state
+    | States of state list
+    | Edge of edge
+    | Edges of edge list
+    | Fsm of fsm
 
-(** [to_string ?indents ?prefix m] is the pretty-printed string of [m], with [?prefix] and [?indents]. If [?indents] is [-1] then everything will be pretty-printed inline. *)
-let rec to_string
-  ?(context : stringable_context = None)
-  ?(indents : int = 0)
-  ?(prefix : string = "")
-  (m : stringable)
-  : string
-  =
-  Printf.sprintf
-    "%s%s%s"
-    (tabs indents)
-    prefix
-    (match m with
-     (* [ID id] *)
-     | ID id -> Printf.sprintf "{%d}" id
-     (* [Label label] *)
-     | Label label -> Printf.sprintf "[%s]" label
-     (* [State state] *)
-     | State state ->
-       Printf.sprintf
-         "(%s%s)"
-         state.name
-         (* check if id should be printed too *)
-         (if let rec check_context (ctx : stringable_context) : bool =
-               match ctx with
-               | ShowIDs -> true
-               | List l' ->
-                 (match l' with
-                  | [] -> false
-                  | h :: t ->
-                    (match h with
-                     | ShowIDs -> true
-                     | _ -> check_context (List t)))
-               | _ -> false
-             in
-             check_context context
-          then Printf.sprintf " #%d" state.id
-          else "")
-     (* [States states] *)
-     | States states ->
-       (*** [to_string ?indents' states] is the pretty-printed string of each [state] in [states]. *)
-       let rec to_string'
-         ?(context' : stringable_context = None)
-         ?(indents' : int = indents + 1)
-         (states : states)
-         : string
-         =
-         match states with
-         | [] -> ""
-         | h :: t ->
-           Printf.sprintf
-             "%s%s%s"
-             (to_string ~context:context' ~indents:indents' (State h))
-             (if List.is_empty t
-              then ""
-              else Printf.sprintf ",%s" (if indents == -1 then "" else "\n"))
-             (to_string' ~context' ~indents' t)
-       in
-       Printf.sprintf
-         "[\n%s\n%s]"
-         (to_string' ~context':context ~indents':(indents + 1) states)
-         (tabs indents)
-     (* [Edge edge] *)
-     | Edge edge ->
-       (match edge with
-        | { id; lhs; rhs; label; _ } ->
-          (* check if states are provided by context. *)
-          let lhs', rhs' =
-            match context with
-            | States states ->
-              ( to_string
-                  ~context
-                  ~indents:(-1)
-                  (match find_state lhs (States states) with
-                   | Some s -> State s
-                   | None -> ID lhs)
-              , to_string
-                  ~context
-                  ~indents:(-1)
-                  (match find_state rhs (States states) with
-                   | Some s -> State s
-                   | None -> ID rhs) )
-            | List l ->
-              let rec check_context (ctx : stringable_context) : string * string
-                =
-                match ctx with
-                | List l' ->
-                  (match l' with
-                   | [] ->
-                     ( to_string ~context ~indents:(-1) (ID lhs)
-                     , to_string ~context ~indents:(-1) (ID rhs) )
-                   | h :: t ->
-                     (match h with
-                      | States states ->
-                        ( to_string
-                            ~context
-                            ~indents:(-1)
-                            (match find_state lhs (States states) with
-                             | Some s -> State s
-                             | None -> ID lhs)
-                        , to_string
-                            ~context
-                            ~indents:(-1)
-                            (match find_state rhs (States states) with
-                             | Some s -> State s
-                             | None -> ID rhs) )
-                      | _ -> check_context (List t)))
-                | _ ->
-                  ( to_string ~context ~indents:(-1) (ID lhs)
-                  , to_string ~context ~indents:(-1) (ID rhs) )
-              in
-              check_context (List l)
-            | _ ->
-              ( to_string ~context ~indents:(-1) (ID lhs)
-              , to_string ~context ~indents:(-1) (ID rhs) )
-          in
-          Printf.sprintf
-            "from %s to %s via label: %s"
-            lhs'
-            rhs'
-            (to_string ~context ~indents:(-1) (Label label)))
-     (* [Edges edges] *)
-     | Edges edges ->
-       (*** [to_string ?indents' edges] is the pretty-printed string of each [edge] in [edges]. *)
-       let rec to_string'
-         ?(context' : stringable_context = None)
-         ?(indents' : int = indents + 1)
-         (edges : edges)
-         : string
-         =
-         match edges with
-         | [] -> ""
-         | h :: t ->
-           Printf.sprintf
-             "%s%s%s"
-             (to_string ~context:context' ~indents:indents' (Edge h))
-             (if List.is_empty t
-              then ""
-              else Printf.sprintf ",%s" (if indents == -1 then "" else "\n"))
-             (to_string' ~context' ~indents' t)
-       in
-       Printf.sprintf
-         "[\n%s\n%s]"
-         (to_string' ~context':context ~indents':(indents + 1) edges)
-         (tabs indents)
-     (* [Fsm fsm] *)
-     | Fsm fsm ->
-       (match fsm with
-        | { init; states; edges; _ } ->
-          Printf.sprintf
-            "{\n%s;\n%s;\n%s;\n}"
-            (to_string
-               ~context
-               ~indents:(indents + 1)
-               ~prefix:"init: "
-               (State (Option.get (find_state init (States states)))))
-            (to_string
-               ~context
-               ~indents:(indents + 1)
-               ~prefix:"states: "
-               (States states))
-            (to_string
-               ~context:(add_to_stringable_context context (States states))
-               ~indents:(indents + 1)
-               ~prefix:"edges: "
-               (Edges edges)))
-       (* [Trace trace] *)
-       (* | Trace trace -> to_string ~indents (Edges (Trace.elements trace)) *))
-;;
+  (** [stringable_context] denotes the types that may be provided to enable more detailed pretty-printed strings via the [to_string] function. E.g., providing [States] for [Edges] will allow the [State.name] to be used rather than the [id]s found in an [Edge]. *)
+  type stringable_context =
+    | None
+    | ShowIDs
+    | States of state list
+    | List of stringable_context list
 
-(** [pp str] is a shorthand for [Printf.printf "%s\n" str]. Useful for pretty-printed strings. *)
-let pp (str : string) : unit = Printf.printf "%s\n" str
+  (** [add_to_stringable_context c1 c2] is the a [stringable_context.List] containing the concat of both [c1] and [c2]. *)
+  let add_to_stringable_context
+    (c1 : stringable_context)
+    (c2 : stringable_context)
+    : stringable_context
+    =
+    match c1, c2 with
+    | List l1, List l2 -> List (List.concat [ l1; l2 ])
+    | List l1, _ -> List (List.concat [ l1; [ c2 ] ])
+    | _, List l2 -> List (List.concat [ [ c1 ]; l2 ])
+    | _, _ -> List [ c1; c2 ]
+  ;;
 
-(* ! this must not be used since it causes vscoq to crash.
-   ! i think it is something to do with using Printf.printf ? *)
+  (** [to_string ?indents ?prefix m] is the pretty-printed string of [m], with [?prefix] and [?indents]. If [?indents] is [-1] then everything will be pretty-printed inline. *)
+  let rec to_string
+    ?(context : stringable_context = None)
+    ?(indents : int = 0)
+    ?(prefix : string = "")
+    (m : stringable)
+    : string
+    =
+    Printf.sprintf
+      "%s%s%s"
+      (tabs indents)
+      prefix
+      (match m with
+       (* [ID int] *)
+       | ID id -> Printf.sprintf "{%d}" id
+       (* [Label string] *)
+       | Label label -> Printf.sprintf "[%s]" label
+       (* [State state] *)
+       | State state ->
+         Printf.sprintf
+           "(%s%s)"
+           state.pp
+           (* check if id should be printed too *)
+           (if let rec check_context (ctx : stringable_context) : bool =
+                 match ctx with
+                 | ShowIDs -> true
+                 | List l' ->
+                   (match l' with
+                    | [] -> false
+                    | h :: t ->
+                      (match h with
+                       | ShowIDs -> true
+                       | _ -> check_context (List t)))
+                 | _ -> false
+               in
+               check_context context
+            then Printf.sprintf " #%d" state.id
+            else "")
+       (* [States states] *)
+       | States states ->
+         (*** [to_string ?indents' states] is the pretty-printed string of each [state] in [states]. *)
+         let rec to_string'
+           ?(context' : stringable_context = None)
+           ?(indents' : int = indents + 1)
+           (states : state list)
+           : string
+           =
+           match states with
+           | [] -> ""
+           | h :: t ->
+             Printf.sprintf
+               "%s%s%s"
+               (to_string ~context:context' ~indents:indents' (State h))
+               (if List.is_empty t
+                then ""
+                else Printf.sprintf ",%s" (if indents == -1 then "" else "\n"))
+               (to_string' ~context' ~indents' t)
+         in
+         Printf.sprintf
+           "[\n%s\n%s]"
+           (to_string' ~context':context ~indents':(indents + 1) states)
+           (tabs indents)
+       (* [Edge edge] *)
+       | Edge edge ->
+         (match edge with
+          | { id; lhs; rhs; label; _ } ->
+            (* check if states are provided by context. *)
+            let lhs', rhs' =
+              match context with
+              | States states ->
+                ( to_string
+                    ~context
+                    ~indents:(-1)
+                    (match find_state lhs (States states) with
+                     | Some s -> State s
+                     | None -> ID lhs)
+                , to_string
+                    ~context
+                    ~indents:(-1)
+                    (match find_state rhs (States states) with
+                     | Some s -> State s
+                     | None -> ID rhs) )
+              | List l ->
+                let rec check_context (ctx : stringable_context)
+                  : string * string
+                  =
+                  match ctx with
+                  | List l' ->
+                    (match l' with
+                     | [] ->
+                       ( to_string ~context ~indents:(-1) (ID lhs)
+                       , to_string ~context ~indents:(-1) (ID rhs) )
+                     | h :: t ->
+                       (match h with
+                        | States states ->
+                          ( to_string
+                              ~context
+                              ~indents:(-1)
+                              (match find_state lhs (States states) with
+                               | Some s -> State s
+                               | None -> ID lhs)
+                          , to_string
+                              ~context
+                              ~indents:(-1)
+                              (match find_state rhs (States states) with
+                               | Some s -> State s
+                               | None -> ID rhs) )
+                        | _ -> check_context (List t)))
+                  | _ ->
+                    ( to_string ~context ~indents:(-1) (ID lhs)
+                    , to_string ~context ~indents:(-1) (ID rhs) )
+                in
+                check_context (List l)
+              | _ ->
+                ( to_string ~context ~indents:(-1) (ID lhs)
+                , to_string ~context ~indents:(-1) (ID rhs) )
+            in
+            Printf.sprintf
+              "from %s to %s via label: %s"
+              lhs'
+              rhs'
+              (to_string ~context ~indents:(-1) (Label label)))
+       (* [Edges edges] *)
+       | Edges edges ->
+         (*** [to_string ?indents' edges] is the pretty-printed string of each [edge] in [edges]. *)
+         let rec to_string'
+           ?(context' : stringable_context = None)
+           ?(indents' : int = indents + 1)
+           (edges : edge list)
+           : string
+           =
+           match edges with
+           | [] -> ""
+           | h :: t ->
+             Printf.sprintf
+               "%s%s%s"
+               (to_string ~context:context' ~indents:indents' (Edge h))
+               (if List.is_empty t
+                then ""
+                else Printf.sprintf ",%s" (if indents == -1 then "" else "\n"))
+               (to_string' ~context' ~indents' t)
+         in
+         Printf.sprintf
+           "[\n%s\n%s]"
+           (to_string' ~context':context ~indents':(indents + 1) edges)
+           (tabs indents)
+       (* [Fsm fsm] *)
+       | Fsm fsm ->
+         (match fsm with
+          | { init; states; edges; _ } ->
+            Printf.sprintf
+              "{\n%s;\n%s;\n%s;\n}"
+              (to_string
+                 ~context
+                 ~indents:(indents + 1)
+                 ~prefix:"init: "
+                 (State (Option.get (find_state init (States states)))))
+              (to_string
+                 ~context
+                 ~indents:(indents + 1)
+                 ~prefix:"states: "
+                 (States states))
+              (to_string
+                 ~context:(add_to_stringable_context context (States states))
+                 ~indents:(indents + 1)
+                 ~prefix:"edges: "
+                 (Edges edges))))
+  ;;
+
+  (** [pp str] is a shorthand for [Printf.printf "%s\n" str]. Useful for pretty-printed strings. *)
+  let pp (str : string) : unit = Printf.printf "%s\n" str
+end
+
 (** [pp_tests]. *)
 (* let pp_tests =
    Printf.printf "\nFsm, begin.\n\n";
