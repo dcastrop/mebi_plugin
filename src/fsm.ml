@@ -6,6 +6,20 @@ type state =
   ; name : string
   }
 
+type label = int
+
+type ('a, 'b) transition =
+  { label : 'a
+  ; to_state : 'b
+  }
+
+(*  *)
+(* module Inttbl = Hashtbl.Make() *)
+type fsm_aux =
+  { init : state
+  ; transitions : (state, (label, state) transition) Hashtbl.t
+  }
+
 (** [state] is a [state] type of [id] and [?name].
     [?name] is an optional argument, which when omitted is replaced by ["s[id]"].
     [id] is an integer. *)

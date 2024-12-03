@@ -253,10 +253,14 @@ and check_valid_constructor lts t : (int * EConstr.t) list t =
 (** [bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
 let bound : int = 5
 
+(* type 'a tree = *)
+(*   | Node of 'a * 'a tree list *)
+
 (* FIXME: refactor the below somewhere else, self-contained, with standard *)
 (* OCaml naming (e.g. Graph.Make, Graph.S, etc) *)
 type lts_transition =
-  { edge_ctor : int (** Ctor number *)
+  { edge_ctor : int (* FIXME: [edge_ctor] should be a int tree *)
+  (** Ctor number *)
   ; to_node : EConstr.constr
   }
 
@@ -273,15 +277,9 @@ module type GraphB = sig
   val build_graph : lts -> Constrexpr.constr_expr_r CAst.t -> lts_graph mm
   val pp_graph_transitions : Environ.env -> Evd.evar_map -> lts_graph -> unit
 
-  type translation =
-    { (* { state_table : lts_to_fsm_translation_table H.t
-    ; edge_table : lts_to_fsm_translation_table H.t
-    } *)
-      state_table : (Evd.econstr, int) Hashtbl.t
-    ; edge_table : (Evd.econstr, int) Hashtbl.t
-    }
+  type translation = (EConstr.t, Fsm.state) Hashtbl.t
 
-  val lts_to_fsm : lts_graph -> (Fsm.fsm * translation) mm
+  val lts_to_fsm : lts_graph -> (Fsm.fsm_aux * translation) mm
 
   val pp_fsm_states
     :  Environ.env
@@ -402,13 +400,31 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   (** [translation] is ...
       [state_table] is a hashtable mapping hashed [Evd.econstr] of [term] to [state.id].
       [edge_table] is a hashtable mapping hashed [Evd.econstr] of [ctor] (transitions) to [edge.id]. *)
-  type translation =
-    { (* { state_table : lts_to_fsm_translation_table H.t
-    ; edge_table : lts_to_fsm_translation_table H.t
-    } *)
-      state_table : (Evd.econstr, int) Hashtbl.t
-    ; edge_table : (Evd.econstr, int) Hashtbl.t
-    }
+  type translation = (EConstr.t, Fsm.state) Hashtbl.t
+
+  let build_translation (x : lts_graph) : translation mm =
+    let* env = get_env in
+    let* sigma = get_sigma in
+    let hash t =
+      EConstr.to_constr ?abort_on_undefined_evars:(Some false) sigma t
+      |> Constr.hash
+    in
+    let keys = H.to_seq_keys x.transitions in
+    let tr_tbl = Seq.length keys |> Hashtbl.create in
+    let _ =
+      Seq.iter
+        (fun x ->
+          Hashtbl.add
+            tr_tbl
+            x
+            { id = hash x
+            ; name = Printer.pr_econstr_env env sigma x |> Pp.db_string_of_pp
+            })
+        keys
+    in
+    return tr_tbl
+  ;;
+
   (*
      (** [fsm_translation] is... *)
   type fsm_translation =
