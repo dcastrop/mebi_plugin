@@ -1,6 +1,8 @@
-(* open Pp *)
-open Fsm
-open Stringify
+(* TODO: delete this file along with the [.mli]. *)
+(* ! keeping here for now while I work on the translation functionality in [command.ml]. *)
+
+(* open Fsm
+open Mebi_utils
 
 (** [default_table_size] is the default size of the [translation_table]. *)
 let default_table_size = 10
@@ -29,11 +31,6 @@ let fsm_table
 
 (** [translate_map] is a type [(Evd.econstr * id) list], used to associate coq-based terms ([Evd.econstr]) to indices ([id]s) used in the translation tables (e.g., [fsm_table]). *)
 type translate_map = (Evd.econstr * id) list
-
-(** [econstr_to_int] is [e] converted to [int] (via [econstr_to_string] and [int_of_string]). *)
-let econstr_to_int env sigma e : int =
-  int_of_string (econstr_to_string env sigma e)
-;;
 
 (** [get_states env sigma s] is the list of [Fsm.state]s (i.e., [Fsm.states]) derived from a list [s] of [Evd.econstr]. *)
 let get_states (env : Environ.env) (sigma : Evd.evar_map) (s : Evd.econstr list)
@@ -171,4 +168,4 @@ let lts_to_fsm
   let edges, edge_map = get_edges env sigma lts tbl.state_map in
   (* add meta data *)
   tbl, fsm ~init:(Hashtbl.find tbl.state_map start_term) states edges
-;;
+;; *)

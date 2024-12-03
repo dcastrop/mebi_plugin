@@ -1,4 +1,4 @@
-val default_table_size : int
+(* val default_table_size : int
 
 type fsm_table =
   { env : Environ.env
@@ -45,4 +45,4 @@ val lts_to_fsm
   -> (Constr.rel_context * Constr.t) array
   -> Evd.econstr list
   -> Evd.econstr list
-  -> fsm_table * Fsm.fsm
+  -> fsm_table * Fsm.fsm *)

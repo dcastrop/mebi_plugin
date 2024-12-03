@@ -1,89 +1,81 @@
-type id = int
-type label = string
-type _labels = label list
+type state = { id : int; pp : string }
+type label = int
+type ('a, 'b) transition = { label : 'a; to_state : 'b }
 
-type state =
-  { id : id
-  ; name : label
-  }
+type fsm_aux = {
+  init : state;
+  edges : (state, (label, state) transition) Hashtbl.t;
+}
 
-val default_name : id -> string
-val state : ?name:label -> id -> state
+type edge = {
+  id : label;
+  lhs : label;
+  rhs : label;
+  label : string;
+}
 
-type states = state list
+type has_edge = ID of label | State of state
 
-val seq_from_states : states -> state Seq.t
+val edge : ?label:string -> int -> has_edge -> has_edge -> edge
 
-type edge =
-  { id : id
-  ; lhs : id
-  ; rhs : id
-  ; label : label
-  }
+type fsm = {
+  init : label;
+  states : state list;
+  edges : edge list;
+}
 
-type has_edge =
-  | ID of id
-  | State of state
-
-val edge : ?label:label -> id -> has_edge -> has_edge -> edge
-
-type edges = edge list
-
-type fsm =
-  { init : id
-  ; states : states
-  ; edges : edges
-  }
-
-val fsm : ?init:id -> states -> edges -> fsm
+val fsm : ?init:int -> state list -> edge list -> fsm
 
 type has_state_id =
-  | States of states
+  | States of state list
   | State of state
-  | Edges of edges
+  | Edges of edge list
   | Edge of edge
   | Fsm of fsm
 
-val has_state : id -> has_state_id -> bool
+val has_state : int -> has_state_id -> bool
 
 type has_state =
   | State of state
-  | States of states
+  | States of state list
   | Fsm of fsm
 
-val find_state : id -> has_state -> state option
+val find_state : int -> has_state -> state option
 
 type has_lts = Fsm of fsm
 
-val get_edges : has_edge -> has_lts -> edges option
-val default_indent_val : int
-val tabs : ?size:int -> int -> string
+val get_edges : has_edge -> has_lts -> edge list option
 
-type stringable =
-  | ID of id
-  | Label of label
-  | State of state
-  | States of states
-  | Edge of edge
-  | Edges of edges
-  | Fsm of fsm
+module Stringify : sig
+  val default_indent_val : label
+  val tabs : ?size:label -> label -> string
 
-type stringable_context =
-  | None
-  | ShowIDs
-  | States of states
-  | List of stringable_context list
+  type stringable =
+    | ID of label
+    | Label of string
+    | State of state
+    | States of state list
+    | Edge of edge
+    | Edges of edge list
+    | Fsm of fsm
 
-val add_to_stringable_context
-  :  stringable_context
-  -> stringable_context
-  -> stringable_context
+  type stringable_context =
+    | None
+    | ShowIDs
+    | States of state list
+    | List of stringable_context list
 
-val to_string
-  :  ?context:stringable_context
-  -> ?indents:int
-  -> ?prefix:string
-  -> stringable
-  -> string
+  val add_to_stringable_context :
+    stringable_context ->
+    stringable_context ->
+    stringable_context
 
-val pp : string -> unit
+  val to_string :
+    ?context:stringable_context ->
+    ?indents:label ->
+    ?prefix:string ->
+    stringable ->
+    string
+
+  val pp : string -> unit
+end

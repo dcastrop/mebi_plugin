@@ -50,6 +50,7 @@ let econstr_hash st () t =
     (EConstr.to_constr ?abort_on_undefined_evars:(Some false) !st.coq_ctx t)
 ;;
 
+(** [make_constr_tbl st] is ... *)
 let make_constr_tbl st =
   let cmp_eq = eq_constr st in
   let hashf = econstr_hash st in
@@ -72,14 +73,15 @@ let rec iterate
   (to_idx : int)
   (acc : 'a)
   (f : int -> 'a -> 'a t)
+  : 'a t
   =
   if from_idx > to_idx
   then return acc
   else bind (f from_idx acc) (fun acc' -> iterate (from_idx + 1) to_idx acc' f)
 ;;
 
-let get_env st = { state = st; value = !st.coq_env }
-let get_sigma st = { state = st; value = !st.coq_ctx }
+let get_env st : Environ.env in_context = { state = st; value = !st.coq_env }
+let get_sigma st : Evd.evar_map in_context = { state = st; value = !st.coq_ctx }
 
 let state f st =
   let sigma, a = f !st.coq_env !st.coq_ctx in
