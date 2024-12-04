@@ -39,13 +39,14 @@ let get_lts_labels_and_terms
   | _ -> invalid_arity typ
 ;;
 
-(** [lts] is a type used to describe the Coq LTS of Coq-based terms.
+(** [raw_lts] is an LTS type used to describe Coq-based terms.
     [coq_lts] is the type constructor.
     [trm_type] is the type of terms for the LTS.
     [lbl_type] is the type of labels for the LTS.
     [coq_ctor_names] is the array of names for each constructor of the Coq term.
-    [transitions] is the array of constructors of the Coq term (i.e., the transitions or outgoing edges). *)
-type lts =
+    [transitions] is the array of constructors of the Coq term
+    (i.e., the transitions or outgoing edges). *)
+type raw_lts =
   { coq_lts : EConstr.constr
   ; trm_type : EConstr.types
   ; lbl_type : EConstr.types
@@ -53,9 +54,9 @@ type lts =
   ; transitions : (Constr.rel_context * Constr.types) array
   }
 
-(** [check_ref_lts gref] is the [lts] of [gref].
+(** [check_ref_lts gref] is the [raw_lts] of [gref].
     Raises error ([invalid_ref]) if [gref] is not a reference to an inductive type. *)
-let check_ref_lts (gref : Names.GlobRef.t) : lts mm =
+let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
   let open Names.GlobRef in
   match gref with
   | IndRef i ->
@@ -274,35 +275,29 @@ module type GraphB = sig
     ; transitions : lts_transition H.t
     }
 
-  val build_graph : lts -> Constrexpr.constr_expr_r CAst.t -> lts_graph mm
-  val pp_graph_transitions : Environ.env -> Evd.evar_map -> lts_graph -> unit
+  val build_graph : raw_lts -> Constrexpr.constr_expr_r CAst.t -> lts_graph mm
 
   type state_translation = (EConstr.t, Fsm.state) Hashtbl.t
-  type ed = (Fsm.label, Fsm.state) Fsm.transition
-  type es = (Fsm.state, ed) Hashtbl.t
+  (* type ed = (Fsm.label, Fsm.state) Fsm.transition
+     type es = (Fsm.state, ed) Hashtbl.t *)
 
-  val build_translation : lts_graph -> state_translation mm
-  val build_edges : lts_graph -> state_translation -> es mm
+  val build_state_translation : lts_graph -> state_translation mm
+  val build_edges : lts_graph -> state_translation -> Fsm.es mm
 
   val lts_to_fsm
     :  lts_graph
-    -> (* EConstr.constr *)
-       Constrexpr.constr_expr_r CAst.t
-    -> EConstr.types
+    -> Constrexpr.constr_expr_r CAst.t
     -> (Fsm.fsm_aux * state_translation) mm
 
-  val pp_fsm : ?long:unit -> Environ.env -> Evd.evar_map -> Fsm.fsm_aux -> unit
+  val pstr_lts_transition : EConstr.constr * lts_transition -> string
+  val pstr_lts_transitions : ?indent:int -> lts_transition H.t -> string
+  val pstr_lts : lts_graph -> string
   val pstr_state : ?long:unit -> Fsm.state -> string
-  val pstr_edge : ?long:unit -> Fsm.state * ed -> string
-
-  (* val pp_fsm_states
-     :  Environ.env
-     -> Evd.evar_map
-     -> Fsm.state list
-     -> (Evd.econstr, int) Hashtbl.t
-     -> unit
-
-     val pp_fsm_edges : Environ.env -> Evd.evar_map -> Fsm.edge list -> unit *)
+  val pstr_states : ?long:unit -> ?indent:int -> Fsm.state list -> string
+  val pstr_edge : ?long:unit -> Fsm.state * Fsm.ed -> string
+  val pstr_edges : ?long:unit -> ?indent:int -> Fsm.es -> string
+  val pstr_fsm : ?long:unit -> Fsm.fsm_aux -> string
+  (* val pp_fsm : ?long:unit -> Fsm.fsm_aux -> unit *)
 end
 
 (** [MkGraph M] is ...
@@ -321,7 +316,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   (** [build_lts the_lts g] is an [lts_graph] [g] obtained by exploring [the_lts].
       [the_lts] describes the Coq-based term.
       [g] is an [lts_graph] accumulated while exploring [the_lts]. *)
-  let rec build_lts (the_lts : lts) (g : lts_graph) : lts_graph mm =
+  let rec build_lts (the_lts : raw_lts) (g : lts_graph) : lts_graph mm =
     if H.length g.transitions >= bound
     then return g (* FIXME: raise error *)
     else if Queue.is_empty g.to_visit
@@ -347,8 +342,8 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
 
   (** [build_graph the_lts t] is ...
       [the_lts] is ...
-      [t] is ... *)
-  let build_graph (the_lts : lts) (t : Constrexpr.constr_expr_r CAst.t)
+      [t] is the original Coq-term. *)
+  let build_graph (the_lts : raw_lts) (t : Constrexpr.constr_expr_r CAst.t)
     : lts_graph mm
     =
     let$ t env sigma = Constrintern.interp_constr_evars env sigma t in
@@ -359,56 +354,25 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     build_lts the_lts { to_visit = q; transitions = H.create bound }
   ;;
 
-  (** [pp_graph_transitions env sigma g] is ... *)
-  let pp_graph_transitions
-    (env : Environ.env)
-    (sigma : Evd.evar_map)
-    (g : lts_graph)
-    : unit
-    =
-    H.iter
-      (fun from transition ->
-        Feedback.msg_debug
-          (Printer.pr_econstr_env env sigma from
-           ++ Pp.str " ---{ "
-           ++ Pp.int transition.edge_ctor
-           ++ Pp.str " }--> "
-           ++ Printer.pr_econstr_env env sigma transition.to_node))
-      g.transitions
-  ;;
-
-  (** [econstr_to_string env sigma target] is a [string] representing [target]. *)
-  let econstr_to_string
-    (env : Environ.env)
-    (sigma : Evd.evar_map)
-    (target : Evd.econstr)
-    : string
-    =
-    Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma target)
+  (* TODO: should maybe be moved to [mebi_monad.ml]? *)
+  (** [econstr_to_string target] is a [string] representing [target]. *)
+  let econstr_to_string (target : EConstr.t) : string =
+    let econstr_to_string' (target : Evd.econstr) : string mm =
+      let* env = get_env in
+      let* sigma = get_sigma in
+      return (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma target))
+    in
+    run (econstr_to_string' target)
   ;;
 
   open Fsm
 
-  (** [translation_map] is ... *)
-  (* type translation_map = (Evd.econstr * int) list *)
-
-  (** [translation_table] is ... *)
-  (* type translation_table = (Evd.econstr, id) Hashtbl.t *)
-
-  (** [] is ...
-      [constr_hash] is an [id] obtained by hashing the Coq-based [Evd.econstr] extracted from a transition, where a [state] corresponds to a [term] and an [edge] corresponds to a [ctor].
-      [id] is an [int] used to identify a [fsm] component (either acting as a [state.id] or [edge.id]). *)
-  (* type lts_to_fsm_translation_table =
-    { constr_hash : int
-    ; id : int
-    } *)
-
   (** [state_translation] is is a hashtable mapping [EConstr.t] of terms to [Fsm.states]. *)
   type state_translation = (EConstr.t, Fsm.state) Hashtbl.t
 
-  (** [build_translation g] is the [state_translation] of [lts_graph] [g] of Coq-based terms to pure OCaml [Fsm]. *)
-  let build_translation (g : lts_graph) : state_translation mm =
-    let* env = get_env in
+  (** [build_state_translation g] is a hashtable mapping the Coq-based endpoints
+      of transitions of LTS [g] to pure OCaml FSM states. *)
+  let build_state_translation (g : lts_graph) : state_translation mm =
     let* sigma = get_sigma in
     let hash t =
       EConstr.to_constr ?abort_on_undefined_evars:(Some false) sigma t
@@ -421,11 +385,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
         (fun t ->
           (* check if [t] is already captured *)
           if false == Hashtbl.mem tr_tbl t
-          then
-            Hashtbl.add
-              tr_tbl
-              t
-              { id = hash t; pp = econstr_to_string env sigma t };
+          then Hashtbl.add tr_tbl t { id = hash t; pp = econstr_to_string t };
           (* check if [dest_state] is already captured *)
           let dest_state = (H.find g.transitions t).to_node in
           if false == Hashtbl.mem tr_tbl dest_state
@@ -433,19 +393,16 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
             Hashtbl.add
               tr_tbl
               dest_state
-              { id = hash dest_state
-              ; pp = econstr_to_string env sigma dest_state
-              })
+              { id = hash dest_state; pp = econstr_to_string dest_state })
         keys
     in
     return tr_tbl
   ;;
 
-  type ed = (Fsm.label, Fsm.state) Fsm.transition
-
-  type es = (Fsm.state, ed) Hashtbl.t (**  *)
-
-  (**  *)
+  (** [build_edges g s] is a hashtable mapping FSM states to
+      outgoing edges comprised of labels and destination states.
+      [g] is the LTS with transitions to build the FSM edges from.
+      [s] is the translation map from Coq-terms to FSM states. *)
   let build_edges (g : lts_graph) (s : state_translation) : es mm =
     let* env = get_env in
     let* sigma = get_sigma in
@@ -464,86 +421,214 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     return es_tbl
   ;;
 
-  (** Error when trying to translate unfinished LTS to FSM. *)
+  (** Error when trying to translate an unfinished LTS to FSM. *)
   exception UnfinishedLTS of lts_graph
 
+  (** Error when a translation from an [lts_graph] to an FSM yields no [states].*)
   exception NoStates of state_translation
 
+  (** [pstr_state ?long state] is a string of [state].
+      [?long] determines if [state.id] of [state.pp] is used.
+      [state] is the state to be printed. *)
   let pstr_state ?(long : unit option) (state : Fsm.state) : string =
     match long with
     | None -> Printf.sprintf "(%d)" state.id
     | Some () -> Printf.sprintf "(%s)" state.pp
   ;;
 
-  let pstr_edge ?(long : unit option) ((from_state : Fsm.state), (edge : ed))
+  (** [pstr_states ?long states] is a string of [states].
+      [?long] is used when printing individual [states].
+      [states] is the list of states to be printed. *)
+  let pstr_states
+    ?(long : unit option)
+    ?(indent : int = 1)
+    (states : Fsm.state list)
+    : string
+    =
+    let s =
+      Printf.sprintf
+        "[%s]"
+        (List.fold_left
+           (fun (acc : string) (s : Fsm.state) ->
+             Printf.sprintf
+               "%s%s%s\n"
+               acc
+               (Fsm.Stringify.tabs indent)
+               (pstr_state s))
+           "\n"
+           states)
+    in
+    if s == "[\n]" then "[ ] (empty)" else s
+  ;;
+
+  (** [pstr_edge ?long (from_state, outgoing_edge)] is a string of [edge].
+      [?long] is used when printing the corresponding states.
+      [from_state] is the starting state.
+      [outgoing_edge] denotes the edge label [outgoing_edge.label]
+      and the destination [outgoing_edge.to_state]. *)
+  let pstr_edge
+    ?(long : unit option)
+    ((from_state : Fsm.state), (outgoing_edge : ed))
     : string
     =
     let from_state_str, dest_state_str =
       match long with
-      | None -> pstr_state from_state, pstr_state edge.to_state
+      | None -> pstr_state from_state, pstr_state outgoing_edge.to_state
       | Some () ->
-        pstr_state ~long:() from_state, pstr_state ~long:() edge.to_state
+        ( pstr_state ~long:() from_state
+        , pstr_state ~long:() outgoing_edge.to_state )
     in
-    let edge_label_str = Printf.sprintf "--{ %d }->" edge.label in
-    Printf.sprintf "{%s %s %s}" from_state_str edge_label_str dest_state_str
+    let edge_label_str = Printf.sprintf "--{ %d }->" outgoing_edge.label in
+    Printf.sprintf "%s %s %s" from_state_str edge_label_str dest_state_str
   ;;
 
-  let pp_fsm
-    ?(long : unit option)
-    (env : Environ.env)
-    (sigma : Evd.evar_map)
-    (the_fsm_aux : Fsm.fsm_aux)
-    : unit
+  (** [pstr_edges ?long edges] is a string of [edges].
+      [?long] is used when printing individual edges.
+      [edges] is the list of edges to be printed. *)
+  let pstr_edges ?(long : unit option) ?(indent : int = 1) (edges : es) : string
     =
-    Feedback.msg_debug
-      (str
-         (Printf.sprintf
-            "init state: %s"
-            (match long with
-             | None -> pstr_state the_fsm_aux.init
-             | Some () -> pstr_state ~long:() the_fsm_aux.init)));
-    Hashtbl.iter
-      (fun (from_state : Fsm.state) (outgoing_transition : ed) ->
-        Feedback.msg_debug
-          (str
-             (match long with
-              | None -> pstr_edge (from_state, outgoing_transition)
-              | Some () -> pstr_edge ~long:() (from_state, outgoing_transition))))
-      the_fsm_aux.edges;
-    ()
+    let s =
+      Printf.sprintf
+        "[%s]"
+        (Hashtbl.fold
+           (fun (from_state : Fsm.state)
+             (outgoing_transition : ed)
+             (acc : string) ->
+             Printf.sprintf
+               "%s%s{ %s }\n"
+               acc
+               (Fsm.Stringify.tabs indent)
+               (match long with
+                | None -> pstr_edge (from_state, outgoing_transition)
+                | Some () -> pstr_edge ~long:() (from_state, outgoing_transition)))
+           edges
+           "\n")
+    in
+    if s == "[\n]" then "[ ] (empty)" else s
   ;;
 
-  (*  *)
-  let lts_to_fsm
-    (g : lts_graph)
-    (init_t : Constrexpr.constr_expr_r CAst.t)
-    (term_type : EConstr.types)
+  (** [pstr_fsm ?long the_fsm] is a string of [the_fsm].
+      [?long] is used when printing individual states and edges.
+      [the_fsm] is the fsm to be printed. *)
+  let pstr_fsm ?(long : unit option) (the_fsm_aux : Fsm.fsm_aux) : string =
+    Printf.sprintf
+      "%s\n%s"
+      (Printf.sprintf
+         "init state: %s"
+         (match long with
+          | None -> pstr_state the_fsm_aux.init
+          | Some () -> pstr_state ~long:() the_fsm_aux.init))
+      (Printf.sprintf
+         "edges: %s"
+         (match long with
+          | None -> pstr_edges the_fsm_aux.edges
+          | Some () -> pstr_edges ~long:() the_fsm_aux.edges))
+  ;;
+
+  (* let pp_fsm ?(long : unit option) (the_fsm_aux : Fsm.fsm_aux) : unit =
+     Feedback.msg_debug
+     (str
+     (match long with
+     | None -> pstr_fsm the_fsm_aux
+     | Some () -> pstr_fsm ~long:() the_fsm_aux))
+     ;; *)
+
+  (** [pstr_lts_transition (from, t)] is a string transition:
+      [(from) --(t.edge_ctor)--> (t.to_node)].
+      [from] is the starting node.
+      [t] is an (outgoing) [lts_transition] composed of a label [t.edge_ctor]
+      and a destination node [t.to_node]. *)
+  let pstr_lts_transition ((from : EConstr.constr), (t : lts_transition))
+    : string
+    =
+    match t with
+    | { edge_ctor; to_node } ->
+      Printf.sprintf
+        "%s ---{ %d }--> %s"
+        (econstr_to_string from)
+        t.edge_ctor
+        (econstr_to_string t.to_node)
+  ;;
+
+  (** [pstr_lts_transitions transitions] is a string of [transitions]. *)
+  let pstr_lts_transitions
+    ?(indent : int = 1)
+    (transitions : lts_transition H.t)
+    : string
+    =
+    let s =
+      Printf.sprintf
+        "[%s]"
+        (H.fold
+           (fun (from_node : EConstr.constr)
+             (outgoing_transition : lts_transition)
+             (acc : string) ->
+             Printf.sprintf
+               "%s%s{%s}\n"
+               acc
+               (Fsm.Stringify.tabs indent)
+               (pstr_lts_transition (from_node, outgoing_transition)))
+           transitions
+           "\n")
+    in
+    if s == "[\n]" then "[ ] (empty)" else s
+  ;;
+
+  let pstr_lts_to_visit
+    ?(indent : int = 1)
+    (nodes_to_visit : EConstr.constr Queue.t)
+    : string
+    =
+    let s =
+      Printf.sprintf
+        "[%s]"
+        (Queue.fold
+           (fun (acc : string) (node_to_visit : EConstr.constr) ->
+             Printf.sprintf "%s{%s}\n" acc (econstr_to_string node_to_visit))
+           "\n"
+           nodes_to_visit)
+    in
+    if s == "[\n]" then "[ ] (empty)" else s
+  ;;
+
+  (** [pstr_lts g] is a string of the LTS [g]. *)
+  let pstr_lts (g : lts_graph) : string =
+    Printf.sprintf
+      "%s\n%s"
+      (Printf.sprintf "to_visit: %s" (pstr_lts_to_visit g.to_visit))
+      (Printf.sprintf "transitions: %s" (pstr_lts_transitions g.transitions))
+  ;;
+
+  (** [lts_to_fsm g init_term term] translates LTS [g] to an FSM.
+      [g] is an [lts_graph] to be translated.
+      [init_term] is the original actual Coq-term used to build the LTS.
+      (Used to determine the initial state of the FSM). *)
+  let lts_to_fsm (g : lts_graph) (init_term : Constrexpr.constr_expr_r CAst.t)
     : (Fsm.fsm_aux * state_translation) mm
     =
     match g with
     | { to_visit; transitions; _ } ->
       if Queue.is_empty to_visit
-      then (
-        Feedback.msg_debug (str "queue not empty");
-        let* states = build_translation g in
+      then
+        let* states = build_state_translation g in
         if Hashtbl.to_seq_keys states |> Seq.is_empty
-        then raise (NoStates states)
-        else
-          let* env = get_env in
-          let* sigma = get_sigma in
-          let* edges = build_edges g states in
-          let$ t env sigma =
-            Constrintern.interp_constr_evars env sigma init_t
-          in
-          let$ init_t env sigma = sigma, Reductionops.nf_all env sigma t in
+        then (
           Feedback.msg_warning
             (str
                (Printf.sprintf
-                  "mem init: %b (%s)"
-                  (Hashtbl.mem states init_t)
-                  (econstr_to_string env sigma init_t)));
-          let init = Hashtbl.find states init_t in
-          return ({ init; edges }, states))
+                  "no states were extracted from lts: %s"
+                  (pstr_lts g)));
+          raise (NoStates states))
+        else
+          let* edges = build_edges g states in
+          (* need to get initial state. *)
+          (* copied from [build_graph]. *)
+          let$ t env sigma =
+            Constrintern.interp_constr_evars env sigma init_term
+          in
+          let$ init_term env sigma = sigma, Reductionops.nf_all env sigma t in
+          let init_state = Hashtbl.find states init_term in
+          return ({ init = init_state; edges }, states)
       else (
         Feedback.msg_warning
           (str
@@ -619,15 +704,18 @@ let bounded_lts
     (str "(d) Transitions: "
      ++ pp_transitions env sigma the_lts.transitions
      ++ strbrk "\n");
-  Feedback.msg_debug (strbrk "(e) Graph Edges: \n");
-  G.pp_graph_transitions env sigma graph;
+  Feedback.msg_debug
+    (str
+       (Printf.sprintf
+          "(e) Graph Edges: %s."
+          (G.pstr_lts_transitions graph.transitions)));
   (* lts to fsm *)
   let* the_fsm_aux, translation =
-    G.lts_to_fsm graph tref the_lts.trm_type
+    G.lts_to_fsm graph tref
     (* the_lts.coq_lts *)
   in
-  Feedback.msg_info (str "(f) Fsm: \n");
-  G.pp_fsm ~long:() env sigma the_fsm_aux;
+  Feedback.msg_info
+    (str (Printf.sprintf "(f) Fsm: %s." (G.pstr_fsm ~long:() the_fsm_aux)));
   (* print states *)
   (* Feedback.msg_info (str "(f) Fsm.states: \n");
      G.pp_fsm_states env sigma the_fsm.states translation.state_table;

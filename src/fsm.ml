@@ -17,6 +17,9 @@ type ('a, 'b) transition =
   ; to_state : 'b
   }
 
+type ed = (label, state) transition
+type es = (state, ed) Hashtbl.t
+
 (*  *)
 (* module Inttbl = Hashtbl.Make() *)
 type fsm_aux =
@@ -24,6 +27,9 @@ type fsm_aux =
     init : state (* ; states : *)
   ; edges : (state, (label, state) transition) Hashtbl.t
   }
+
+(** [fsm] is an [fsm] type with default [init] [id] of [0]. *)
+(* let fsm_aux ?(init : int = 0) (edges : es) : fsm = { init; edges } *)
 
 (** [state] is a [state] type of [id] and [?name].
     [?name] is an optional argument, which when omitted is replaced by ["s[id]"].
