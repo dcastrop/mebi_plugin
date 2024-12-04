@@ -7,6 +7,18 @@ open Pp_ext
 (** ['a mm] is a function type mapping from [coq_context ref] to ['a in_context]. *)
 type 'a mm = 'a Mebi_monad.t
 
+(* TODO: should maybe be moved to [mebi_monad.ml]? *)
+
+(** [econstr_to_string target] is a [string] representing [target]. *)
+let econstr_to_string (target : EConstr.t) : string =
+  let econstr_to_string' (target : Evd.econstr) : string mm =
+    let* env = get_env in
+    let* sigma = get_sigma in
+    return (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma target))
+  in
+  run (econstr_to_string' target)
+;;
+
 (** [arity_is_prop mip] raises an error if [mip.mind_arity] is not a [prop]. *)
 let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
   let open Declarations in
@@ -352,17 +364,6 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     build_lts the_lts { to_visit = q; transitions = H.create bound }
   ;;
 
-  (* TODO: should maybe be moved to [mebi_monad.ml]? *)
-  (** [econstr_to_string target] is a [string] representing [target]. *)
-  let econstr_to_string (target : EConstr.t) : string =
-    let econstr_to_string' (target : Evd.econstr) : string mm =
-      let* env = get_env in
-      let* sigma = get_sigma in
-      return (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma target))
-    in
-    run (econstr_to_string' target)
-  ;;
-
   open Fsm
 
   (** [state_translation] is is a hashtable mapping [EConstr.t] of terms to [Fsm.states]. *)
@@ -679,13 +680,15 @@ let bounded_lts
   let* env = get_env in
   let* sigma = get_sigma in
   Feedback.msg_debug
-    (str "(a) Types of terms: "
-     ++ Printer.pr_econstr_env env sigma the_lts.trm_type
-     ++ strbrk "");
+    (str
+       (Printf.sprintf
+          "(a) Types of terms: %s.\n"
+          (econstr_to_string the_lts.trm_type)));
   Feedback.msg_debug
-    (str "(b) Types of labels: "
-     ++ Printer.pr_econstr_env env sigma the_lts.lbl_type
-     ++ strbrk "");
+    (str
+       (Printf.sprintf
+          "(b) Types of labels: %s.\n"
+          (econstr_to_string the_lts.lbl_type)));
   Feedback.msg_debug
     (str "(c) Constructors: "
      ++ Pp.prvect_with_sep
@@ -695,6 +698,8 @@ let bounded_lts
   (* prints all transitions -- the possible constructors
      a term may take as part of its structure.
      these are dependant on the definition of a type *)
+  (* TODO: update to be consistent with above and use [econstr_to_string ...].
+     TODO: (requires changing [pp_transitions] (and alike) to print to string instead.) *)
   Feedback.msg_debug
     (str "(d) Transitions: "
      ++ pp_transitions env sigma the_lts.transitions
@@ -702,52 +707,13 @@ let bounded_lts
   Feedback.msg_debug
     (str
        (Printf.sprintf
-          "(e) Graph Edges: %s."
+          "(e) Graph Edges: %s.\n"
           (G.pstr_lts_transitions graph.transitions)));
   (* lts to fsm *)
-  let* the_fsm, translation = G.lts_to_fsm graph tref (* the_lts.coq_lts *) in
-  Feedback.msg_info
-    (str (Printf.sprintf "(f) Fsm: %s." (G.pstr_fsm ~long:() the_fsm)));
-  (* print states *)
-  (* Feedback.msg_info (str "(f) Fsm.states: \n");
-     G.pp_fsm_states env sigma the_fsm.states translation.state_table;
-     (* print edges *)
-     Feedback.msg_info (str "(g) Fsm.edges: \n");
-     G.pp_fsm_edges env sigma the_fsm.edges; *)
-  (* Feedback.msg_info *)
-  (*   (str "(b) CoqFsm: " ++ pp_coq_fsm env sigma (coq_fsm.states, coq_fsm.edges)); *)
-  (* match coq_fsm.edges with
-     | [] -> Feedback.msg_debug (str "coq_fsm.edges empty. cannot continue")
-     | h :: _t ->
-     Feedback.msg_debug
-     (str "h edge: "
-     ++ pp_edge env sigma h
-     ++ str "\n\ntests: \n"
-     ++ str (Printf.sprintf "isApp: %b" (EConstr.isApp sigma h))
-     ++ str "\nend of tests.\n"); *)
-  (* lts to fsm *)
-  (* let _tbl, _fsm =
-     lts_to_fsm
-     env
-     sigma
-     lts_ty
-     terms
-     lbls
-     t
-     transitions
-     coq_fsm.states
-     coq_fsm.edges
-     in *)
-  (* ( Hashtbl.iter (fun x y -> Printf.sprintf "tbl: %s -> %s\n" x y) _tbl.state_map;;); *)
-  (* Feedback.msg_debug
-     (str (Printf.sprintf "translated fsm: %s" ++
-     (let rec sprintf_tbl  = Printer.pr_econstr_env env sigma )
-     )); *)
-  (* Feedback.msg_debug
-     (str
-     (Printf.sprintf
-     "translated fsm: %s\n"
-     (to_string ~context:ShowIDs (Fsm _fsm)))); *)
+  let* the_fsm, translation = G.lts_to_fsm graph tref in
+  Feedback.msg_debug
+    (str (Printf.sprintf "(f) Fsm: %s.\n" (G.pstr_fsm ~long:() the_fsm)));
+  (*  *)
   Feedback.msg_debug (str "\n--------\n");
   return ()
 ;;
