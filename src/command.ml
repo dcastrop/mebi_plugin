@@ -278,26 +278,24 @@ module type GraphB = sig
   val build_graph : raw_lts -> Constrexpr.constr_expr_r CAst.t -> lts_graph mm
 
   type state_translation = (EConstr.t, Fsm.state) Hashtbl.t
-  (* type ed = (Fsm.label, Fsm.state) Fsm.transition
-     type es = (Fsm.state, ed) Hashtbl.t *)
 
   val build_state_translation : lts_graph -> state_translation mm
-  val build_edges : lts_graph -> state_translation -> Fsm.es mm
+  val build_edges : lts_graph -> state_translation -> Fsm.edges mm
 
   val lts_to_fsm
     :  lts_graph
     -> Constrexpr.constr_expr_r CAst.t
-    -> (Fsm.fsm_aux * state_translation) mm
+    -> (Fsm.fsm * state_translation) mm
 
   val pstr_lts_transition : EConstr.constr * lts_transition -> string
   val pstr_lts_transitions : ?indent:int -> lts_transition H.t -> string
   val pstr_lts : lts_graph -> string
   val pstr_state : ?long:unit -> Fsm.state -> string
   val pstr_states : ?long:unit -> ?indent:int -> Fsm.state list -> string
-  val pstr_edge : ?long:unit -> Fsm.state * Fsm.ed -> string
-  val pstr_edges : ?long:unit -> ?indent:int -> Fsm.es -> string
-  val pstr_fsm : ?long:unit -> Fsm.fsm_aux -> string
-  (* val pp_fsm : ?long:unit -> Fsm.fsm_aux -> unit *)
+  val pstr_edge : ?long:unit -> Fsm.state * Fsm.outgoing_edge -> string
+  val pstr_edges : ?long:unit -> ?indent:int -> Fsm.edges -> string
+  val pstr_fsm : ?long:unit -> Fsm.fsm -> string
+  (* val pp_fsm : ?long:unit -> Fsm.fsm -> unit *)
 end
 
 (** [MkGraph M] is ...
@@ -403,7 +401,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       outgoing edges comprised of labels and destination states.
       [g] is the LTS with transitions to build the FSM edges from.
       [s] is the translation map from Coq-terms to FSM states. *)
-  let build_edges (g : lts_graph) (s : state_translation) : es mm =
+  let build_edges (g : lts_graph) (s : state_translation) : Fsm.edges mm =
     let* env = get_env in
     let* sigma = get_sigma in
     let keys = H.to_seq_keys g.transitions in
@@ -450,11 +448,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
         "[%s]"
         (List.fold_left
            (fun (acc : string) (s : Fsm.state) ->
-             Printf.sprintf
-               "%s%s%s\n"
-               acc
-               (Fsm.Stringify.tabs indent)
-               (pstr_state s))
+             Printf.sprintf "%s%s%s\n" acc (str_tabs indent) (pstr_state s))
            "\n"
            states)
     in
@@ -468,7 +462,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       and the destination [outgoing_edge.to_state]. *)
   let pstr_edge
     ?(long : unit option)
-    ((from_state : Fsm.state), (outgoing_edge : ed))
+    ((from_state : Fsm.state), (outgoing_edge : Fsm.outgoing_edge))
     : string
     =
     let from_state_str, dest_state_str =
@@ -485,22 +479,23 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   (** [pstr_edges ?long edges] is a string of [edges].
       [?long] is used when printing individual edges.
       [edges] is the list of edges to be printed. *)
-  let pstr_edges ?(long : unit option) ?(indent : int = 1) (edges : es) : string
+  let pstr_edges ?(long : unit option) ?(indent : int = 1) (edges : Fsm.edges)
+    : string
     =
     let s =
       Printf.sprintf
         "[%s]"
         (Hashtbl.fold
            (fun (from_state : Fsm.state)
-             (outgoing_transition : ed)
+             (outgoing_edge : Fsm.outgoing_edge)
              (acc : string) ->
              Printf.sprintf
                "%s%s{ %s }\n"
                acc
-               (Fsm.Stringify.tabs indent)
+               (str_tabs indent)
                (match long with
-                | None -> pstr_edge (from_state, outgoing_transition)
-                | Some () -> pstr_edge ~long:() (from_state, outgoing_transition)))
+                | None -> pstr_edge (from_state, outgoing_edge)
+                | Some () -> pstr_edge ~long:() (from_state, outgoing_edge)))
            edges
            "\n")
     in
@@ -510,27 +505,27 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   (** [pstr_fsm ?long the_fsm] is a string of [the_fsm].
       [?long] is used when printing individual states and edges.
       [the_fsm] is the fsm to be printed. *)
-  let pstr_fsm ?(long : unit option) (the_fsm_aux : Fsm.fsm_aux) : string =
+  let pstr_fsm ?(long : unit option) (the_fsm : Fsm.fsm) : string =
     Printf.sprintf
       "%s\n%s"
       (Printf.sprintf
          "init state: %s"
          (match long with
-          | None -> pstr_state the_fsm_aux.init
-          | Some () -> pstr_state ~long:() the_fsm_aux.init))
+          | None -> pstr_state the_fsm.init
+          | Some () -> pstr_state ~long:() the_fsm.init))
       (Printf.sprintf
          "edges: %s"
          (match long with
-          | None -> pstr_edges the_fsm_aux.edges
-          | Some () -> pstr_edges ~long:() the_fsm_aux.edges))
+          | None -> pstr_edges the_fsm.edges
+          | Some () -> pstr_edges ~long:() the_fsm.edges))
   ;;
 
-  (* let pp_fsm ?(long : unit option) (the_fsm_aux : Fsm.fsm_aux) : unit =
+  (* let pp_fsm ?(long : unit option) (the_fsm : Fsm.fsm) : unit =
      Feedback.msg_debug
      (str
      (match long with
-     | None -> pstr_fsm the_fsm_aux
-     | Some () -> pstr_fsm ~long:() the_fsm_aux))
+     | None -> pstr_fsm the_fsm
+     | Some () -> pstr_fsm ~long:() the_fsm))
      ;; *)
 
   (** [pstr_lts_transition (from, t)] is a string transition:
@@ -566,7 +561,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
              Printf.sprintf
                "%s%s{%s}\n"
                acc
-               (Fsm.Stringify.tabs indent)
+               (str_tabs indent)
                (pstr_lts_transition (from_node, outgoing_transition)))
            transitions
            "\n")
@@ -604,7 +599,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       [init_term] is the original actual Coq-term used to build the LTS.
       (Used to determine the initial state of the FSM). *)
   let lts_to_fsm (g : lts_graph) (init_term : Constrexpr.constr_expr_r CAst.t)
-    : (Fsm.fsm_aux * state_translation) mm
+    : (Fsm.fsm * state_translation) mm
     =
     match g with
     | { to_visit; transitions; _ } ->
@@ -710,12 +705,9 @@ let bounded_lts
           "(e) Graph Edges: %s."
           (G.pstr_lts_transitions graph.transitions)));
   (* lts to fsm *)
-  let* the_fsm_aux, translation =
-    G.lts_to_fsm graph tref
-    (* the_lts.coq_lts *)
-  in
+  let* the_fsm, translation = G.lts_to_fsm graph tref (* the_lts.coq_lts *) in
   Feedback.msg_info
-    (str (Printf.sprintf "(f) Fsm: %s." (G.pstr_fsm ~long:() the_fsm_aux)));
+    (str (Printf.sprintf "(f) Fsm: %s." (G.pstr_fsm ~long:() the_fsm)));
   (* print states *)
   (* Feedback.msg_info (str "(f) Fsm.states: \n");
      G.pp_fsm_states env sigma the_fsm.states translation.state_table;
