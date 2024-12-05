@@ -30,7 +30,9 @@ let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
   | TemplateArity t -> invalid_sort (Sorts.family t.template_level)
 ;;
 
-(** [get_lts_labels_and_terms mib mip] is the mapping of terms (states) and labels (outgoing edges) from [mip].
+(** [get_lts_labels_and_terms mib mip] is the mapping of terms (states)
+    and labels (outgoing edges) from [mip].
+
     Raises error ([invalid_arity]) if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error. *)
 let get_lts_labels_and_terms
   (mib : Declarations.mutual_inductive_body)
@@ -67,6 +69,7 @@ type raw_lts =
   }
 
 (** [check_ref_lts gref] is the [raw_lts] of [gref].
+
     Raises error ([invalid_ref]) if [gref] is not a reference to an inductive type. *)
 let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
   let open Names.GlobRef in
@@ -265,22 +268,14 @@ and check_valid_constructor lts t : (int * EConstr.t) list t =
 
 (** [bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
 let bound : int = 5
-
-(* type 'a tree = *)
-(*   | Node of 'a * 'a tree list *)
-
-(* FIXME: refactor the below somewhere else, self-contained, with standard *)
-(* OCaml naming (e.g. Graph.Make, Graph.S, etc) *)
-type lts_transition =
-  { edge_ctor : int (* FIXME: [edge_ctor] should be a int tree *)
-  (** Ctor number *)
-  ; to_node : EConstr.constr
-  }
+(* TODO: get this as user input! *)
 
 (** [GraphB] is ...
     (Essentially acts as a `.mli` for the [MkGraph] module.) *)
 module type GraphB = sig
   module H : Hashtbl.S with type key = EConstr.t
+
+  type lts_transition = (int, EConstr.constr) Fsm.transition
 
   type lts_graph =
     { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
@@ -304,7 +299,7 @@ module type GraphB = sig
   val pstr_lts : lts_graph -> string
   val pstr_state : ?long:unit -> Fsm.state -> string
   val pstr_states : ?long:unit -> ?indent:int -> Fsm.state list -> string
-  val pstr_edge : ?long:unit -> Fsm.state * Fsm.outgoing_edge -> string
+  val pstr_edge : ?long:unit -> Fsm.state * Fsm.fsm_transition -> string
   val pstr_edges : ?long:unit -> ?indent:int -> Fsm.edges -> string
   val pstr_fsm : ?long:unit -> Fsm.fsm -> string
   (* val pp_fsm : ?long:unit -> Fsm.fsm -> unit *)
@@ -315,7 +310,12 @@ end
 module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   module H = M
 
-  (** [lts_graph] is a type used when building an lts graph from Coq-based terms.
+  (** [lts_transition] is a type for describing outgoing transitions of a Coq-based LTS.
+      [Fsm.label] is the constructor number.
+      [EConstr.constr] is the destination node. *)
+  type lts_transition = (Fsm.label, EConstr.constr) Fsm.transition
+
+  (** [lts_graph] is a type used when building an LTS (graph) from Coq-based terms.
       [to_visit] is a queue of coq terms to explore.
       [transitions] is a hashtable mapping integers (of hashed constructors) to Coq terms. *)
   type lts_graph =
@@ -340,7 +340,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
         (fun (i, tgt) ->
           Feedback.msg_debug
             (str "\n\nTransition to" ++ Printer.pr_econstr_env env sigma tgt);
-          H.add g.transitions t { edge_ctor = i; to_node = tgt };
+          H.add g.transitions t { label = i; to_state = tgt };
           if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
           then ()
           else Queue.push tgt g.to_visit;
@@ -386,7 +386,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
           if false == Hashtbl.mem tr_tbl t
           then Hashtbl.add tr_tbl t { id = hash t; pp = econstr_to_string t };
           (* check if [dest_state] is already captured *)
-          let dest_state = (H.find g.transitions t).to_node in
+          let dest_state = (H.find g.transitions t).to_state in
           if false == Hashtbl.mem tr_tbl dest_state
           then
             Hashtbl.add
@@ -410,8 +410,8 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     H.iter
       (fun from transition ->
         let edge_from = Hashtbl.find s from in
-        let edge_label = transition.edge_ctor in
-        let edge_dest = Hashtbl.find s transition.to_node in
+        let edge_label = transition.label in
+        let edge_dest = Hashtbl.find s transition.to_state in
         Hashtbl.add
           es_tbl
           edge_from
@@ -463,7 +463,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       and the destination [outgoing_edge.to_state]. *)
   let pstr_edge
     ?(long : unit option)
-    ((from_state : Fsm.state), (outgoing_edge : Fsm.outgoing_edge))
+    ((from_state : Fsm.state), (outgoing_edge : Fsm.fsm_transition))
     : string
     =
     let from_state_str, dest_state_str =
@@ -488,7 +488,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
         "[%s]"
         (Hashtbl.fold
            (fun (from_state : Fsm.state)
-             (outgoing_edge : Fsm.outgoing_edge)
+             (outgoing_edge : Fsm.fsm_transition)
              (acc : string) ->
              Printf.sprintf
                "%s%s{ %s }\n"
@@ -521,6 +521,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
           | Some () -> pstr_edges ~long:() the_fsm.edges))
   ;;
 
+  (* TODO: below is unused, delete? *)
   (* let pp_fsm ?(long : unit option) (the_fsm : Fsm.fsm) : unit =
      Feedback.msg_debug
      (str
@@ -538,12 +539,12 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     : string
     =
     match t with
-    | { edge_ctor; to_node } ->
+    | { label; to_state } ->
       Printf.sprintf
         "%s ---{ %d }--> %s"
         (econstr_to_string from)
-        t.edge_ctor
-        (econstr_to_string t.to_node)
+        label
+        (econstr_to_string to_state)
   ;;
 
   (** [pstr_lts_transitions transitions] is a string of [transitions]. *)
@@ -570,6 +571,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     if s == "[\n]" then "[ ] (empty)" else s
   ;;
 
+  (** [pstr_lts_to_visit ?indent nodes_to_visit] is a string of [nodes_to_visit]. *)
   let pstr_lts_to_visit
     ?(indent : int = 1)
     (nodes_to_visit : EConstr.constr Queue.t)
