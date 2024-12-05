@@ -60,7 +60,7 @@ module RCP : sig
     exception PartitionsNotDisjoint of Partition.t
 
     val reachable_blocks : Fsm.fsm_transition list -> Partition.t -> Block.t
-    val split : Block.t -> int -> Partition.t -> Fsm.fsm -> Partition.t
+    val split : Block.t -> Fsm.action -> Partition.t -> Fsm.fsm -> Partition.t
     val run : Fsm.fsm -> unit
   end
 

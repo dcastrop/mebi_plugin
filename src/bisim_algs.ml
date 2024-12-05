@@ -23,15 +23,23 @@ module RCP = struct
             List.to_seq
               [ (* s0 *)
                 ( { id = 0; pp = "s0" }
-                , { label = 1; to_state = { id = 1; pp = "s1" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 1; pp = "s1" }
+                  } )
               ; ( { id = 0; pp = "s0" }
-                , { label = 1; to_state = { id = 2; pp = "s2" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 2; pp = "s2" }
+                  } )
                 (* s1 *)
               ; ( { id = 1; pp = "s1" }
-                , { label = 2; to_state = { id = 2; pp = "s2" } } )
+                , { label = { id = 2; name = "b" }
+                  ; to_state = { id = 2; pp = "s2" }
+                  } )
                 (* s2 *)
               ; ( { id = 2; pp = "s2" }
-                , { label = 2; to_state = { id = 2; pp = "s2" } } )
+                , { label = { id = 2; name = "b" }
+                  ; to_state = { id = 2; pp = "s2" }
+                  } )
               ]
             |> Hashtbl.of_seq
         }
@@ -44,10 +52,14 @@ module RCP = struct
             List.to_seq
               [ (* t0 *)
                 ( { id = 0; pp = "t0" }
-                , { label = 1; to_state = { id = 1; pp = "t1" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 1; pp = "t1" }
+                  } )
                 (* t1 *)
               ; ( { id = 1; pp = "t1" }
-                , { label = 2; to_state = { id = 1; pp = "t1" } } )
+                , { label = { id = 2; name = "b" }
+                  ; to_state = { id = 1; pp = "t1" }
+                  } )
               ]
             |> Hashtbl.of_seq
         }
@@ -71,23 +83,37 @@ module RCP = struct
             List.to_seq
               [ (* s0 *)
                 ( { id = 0; pp = "s0" }
-                , { label = 1; to_state = { id = 1; pp = "s1" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 1; pp = "s1" }
+                  } )
               ; ( { id = 0; pp = "s0" }
-                , { label = 1; to_state = { id = 2; pp = "s2" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 2; pp = "s2" }
+                  } )
                 (* s1 *)
               ; ( { id = 1; pp = "s1" }
-                , { label = 1; to_state = { id = 3; pp = "s3" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 3; pp = "s3" }
+                  } )
               ; ( { id = 1; pp = "s1" }
-                , { label = 2; to_state = { id = 4; pp = "s4" } } )
+                , { label = { id = 2; name = "b" }
+                  ; to_state = { id = 4; pp = "s4" }
+                  } )
                 (* s2 *)
               ; ( { id = 2; pp = "s2" }
-                , { label = 1; to_state = { id = 4; pp = "s4" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 4; pp = "s4" }
+                  } )
                 (* s3 *)
               ; ( { id = 3; pp = "s3" }
-                , { label = 1; to_state = { id = 0; pp = "s0" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 0; pp = "s0" }
+                  } )
                 (* s4 *)
               ; ( { id = 4; pp = "s4" }
-                , { label = 1; to_state = { id = 0; pp = "s0" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 0; pp = "s0" }
+                  } )
               ]
             |> Hashtbl.of_seq
         }
@@ -107,30 +133,50 @@ module RCP = struct
             List.to_seq
               [ (* t0 *)
                 ( { id = 0; pp = "t0" }
-                , { label = 1; to_state = { id = 1; pp = "t1" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 1; pp = "t1" }
+                  } )
               ; ( { id = 0; pp = "t0" }
-                , { label = 1; to_state = { id = 3; pp = "t3" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 3; pp = "t3" }
+                  } )
                 (* t1 *)
               ; ( { id = 1; pp = "t1" }
-                , { label = 2; to_state = { id = 2; pp = "t2" } } )
+                , { label = { id = 2; name = "b" }
+                  ; to_state = { id = 2; pp = "t2" }
+                  } )
               ; ( { id = 1; pp = "t1" }
-                , { label = 1; to_state = { id = 5; pp = "t5" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 5; pp = "t5" }
+                  } )
               ; ( { id = 1; pp = "t1" }
-                , { label = 2; to_state = { id = 5; pp = "t5" } } )
+                , { label = { id = 2; name = "b" }
+                  ; to_state = { id = 5; pp = "t5" }
+                  } )
                 (* t2 *)
               ; ( { id = 2; pp = "t2" }
-                , { label = 1; to_state = { id = 0; pp = "t0" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 0; pp = "t0" }
+                  } )
                 (* t3 *)
               ; ( { id = 3; pp = "t3" }
-                , { label = 1; to_state = { id = 4; pp = "t4" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 4; pp = "t4" }
+                  } )
                 (* t4 *)
               ; ( { id = 4; pp = "t4" }
-                , { label = 1; to_state = { id = 0; pp = "t0" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 0; pp = "t0" }
+                  } )
                 (* t5 *)
               ; ( { id = 5; pp = "t5" }
-                , { label = 1; to_state = { id = 0; pp = "t0" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 0; pp = "t0" }
+                  } )
               ; ( { id = 5; pp = "t5" }
-                , { label = 1; to_state = { id = 4; pp = "t4" } } )
+                , { label = { id = 1; name = "a" }
+                  ; to_state = { id = 4; pp = "t4" }
+                  } )
               ]
             |> Hashtbl.of_seq
         }
@@ -184,7 +230,7 @@ module RCP = struct
         [action] is ...
         [pi] is ...
         [f] is the corresponding FSM (needed to obtain the edges). *)
-    let split (block : Block.t) (action : label) (pi : Partition.t) (f : fsm)
+    let split (block : Block.t) (a : action) (pi : Partition.t) (f : fsm)
       : Partition.t
       =
       (* choose some state [s] in [block] *)
@@ -194,7 +240,7 @@ module RCP = struct
         (* get edges corresponding to [action] *)
         let s_edges =
           List.filter
-            (fun (e : fsm_transition) -> e.label == action)
+            (fun (e : fsm_transition) -> e.label == a)
             (Hashtbl.find_all f.edges s)
         in
         (* cache which partitions in [pi] [s_edges] can reach *)
@@ -205,7 +251,7 @@ module RCP = struct
             (fun ((b1', b2') : Block.t * Block.t) t ->
               let t_edges =
                 List.filter
-                  (fun (e : fsm_transition) -> e.label == action)
+                  (fun (e : fsm_transition) -> e.label == a)
                   (Hashtbl.find_all f.edges t)
               in
               (* check if edges of s and t can reach the same blocks in [pi]. *)
@@ -245,4 +291,4 @@ module RCP = struct
   end
 end
 
-let bisim_foo : label = 0
+let bisim_foo : int = 0

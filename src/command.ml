@@ -276,7 +276,7 @@ let bound : int = 5
 module type GraphB = sig
   module H : Hashtbl.S with type key = EConstr.t
 
-  type lts_transition = (int, EConstr.constr) Fsm.transition
+  type lts_transition = (Fsm.action, EConstr.constr) Fsm.transition
 
   type lts_graph =
     { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
@@ -295,9 +295,18 @@ module type GraphB = sig
     -> Constrexpr.constr_expr_r CAst.t
     -> (Fsm.fsm * state_translation_table) mm
 
-  val pstr_lts_transition : EConstr.constr * lts_transition -> string
-  val pstr_lts_transitions : ?indent:int -> lts_transition H.t -> string
-  val pstr_lts : lts_graph -> string
+  val pstr_lts_transition
+    :  ?long:unit
+    -> EConstr.constr * lts_transition
+    -> string
+
+  val pstr_lts_transitions
+    :  ?long:unit
+    -> ?indent:int
+    -> lts_transition H.t
+    -> string
+
+  val pstr_lts : ?long:unit -> lts_graph -> string
   val pstr_state : ?long:unit -> Fsm.state -> string
   val pstr_states : ?long:unit -> ?indent:int -> Fsm.States.t -> string
   val pstr_edge : ?long:unit -> Fsm.state * Fsm.fsm_transition -> string
@@ -312,9 +321,9 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   module H = M
 
   (** [lts_transition] is a type for describing outgoing transitions of a Coq-based LTS.
-      [Fsm.label] is the constructor number.
+      [Fsm.action] is the constructor number.
       [EConstr.constr] is the destination node. *)
-  type lts_transition = (Fsm.label, EConstr.constr) Fsm.transition
+  type lts_transition = (Fsm.action, EConstr.constr) Fsm.transition
 
   (** [lts_graph] is a type used when building an LTS (graph) from Coq-based terms.
       [to_visit] is a queue of coq terms to explore.
@@ -341,7 +350,10 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
         (fun (i, tgt) ->
           Feedback.msg_debug
             (str "\n\nTransition to" ++ Printer.pr_econstr_env env sigma tgt);
-          H.add g.transitions t { label = i; to_state = tgt };
+          H.add
+            g.transitions
+            t
+            { label = { id = i; name = econstr_to_string tgt }; to_state = tgt };
           if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
           then ()
           else Queue.push tgt g.to_visit;
@@ -475,7 +487,11 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
         ( pstr_state ~long:() from_state
         , pstr_state ~long:() outgoing_edge.to_state )
     in
-    let edge_label_str = Printf.sprintf "--{ %d }->" outgoing_edge.label in
+    let edge_label_str =
+      match long with
+      | None -> Printf.sprintf "--{ %d }->" outgoing_edge.label.id
+      | Some () -> Printf.sprintf "--{ %s }->" outgoing_edge.label.name
+    in
     Printf.sprintf "%s %s %s" from_state_str edge_label_str dest_state_str
   ;;
 
@@ -542,20 +558,25 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       [from] is the starting node.
       [t] is an (outgoing) [lts_transition] composed of a label [t.edge_ctor]
       and a destination node [t.to_node]. *)
-  let pstr_lts_transition ((from : EConstr.constr), (t : lts_transition))
+  let pstr_lts_transition
+    ?(long : unit option)
+    ((from : EConstr.constr), (t : lts_transition))
     : string
     =
     match t with
     | { label; to_state } ->
       Printf.sprintf
-        "%s ---{ %d }--> %s"
+        "%s ---{ %s }--> %s"
         (econstr_to_string from)
-        label
+        (match long with
+         | None -> Printf.sprintf "%d" label.id
+         | Some () -> label.name)
         (econstr_to_string to_state)
   ;;
 
   (** [pstr_lts_transitions transitions] is a string of [transitions]. *)
   let pstr_lts_transitions
+    ?(long : unit option)
     ?(indent : int = 1)
     (transitions : lts_transition H.t)
     : string
@@ -597,7 +618,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   ;;
 
   (** [pstr_lts g] is a string of the LTS [g]. *)
-  let pstr_lts (g : lts_graph) : string =
+  let pstr_lts ?(long : unit option) (g : lts_graph) : string =
     Printf.sprintf
       "%s\n%s"
       (Printf.sprintf "to_visit: %s" (pstr_lts_to_visit g.to_visit))

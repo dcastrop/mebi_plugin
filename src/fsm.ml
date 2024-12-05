@@ -6,7 +6,7 @@ type state =
   ; pp : string
   }
 
-(** [States] is ... *)
+(** [States] is a set of [states]. *)
 module States = Set.Make (struct
     type t = state
 
@@ -14,9 +14,19 @@ module States = Set.Make (struct
   end)
 
 (** [label] is an alias for [int], corresponding to the index of a Coq-based constructor. *)
-type label = int
+(* type label = int *)
 
-(* module Actions = Set.Make( struct type t = );; *)
+type action =
+  { id : int
+  ; name : string
+  }
+
+(** [Actions] is a set of [actions]. *)
+module Actions = Set.Make (struct
+    type t = action
+
+    let compare a b = compare a.id b.id
+  end)
 
 (** [('a, 'b) transition] is a 2-tuple with a [label] and [to_state].
     [label] is of type ['a].
@@ -29,7 +39,7 @@ type ('a, 'b) transition =
 (** [fsm_transition] is a type describing outgoing edges of an OCaml FSM.
     [Fsm.label] is a label (corresponding to the Coq-based LTS constructor number).
     [Fsm.state] is thr destination state. *)
-type fsm_transition = (label, state) transition
+type fsm_transition = (action, state) transition
 
 (** [edges] is a hashtable mapping states to their outgoing-transitions. *)
 type edges = (state, fsm_transition) Hashtbl.t
