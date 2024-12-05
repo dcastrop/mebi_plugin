@@ -64,5 +64,6 @@ type edges = (state, fsm_transition) Hashtbl.t
 
 type fsm =
   { init : state
+  ; states : States.t
   ; edges : (state, fsm_transition) Hashtbl.t
   }

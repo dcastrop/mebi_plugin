@@ -5,11 +5,11 @@ module RCP : sig
   end
 
   module KS90 : sig
-    module Block = States
+    module Block = Fsm.States
 
     module Partition : sig
-      type elt
-      type t
+      type elt = Block.t
+      type t = Set.Make(Block).t
 
       val empty : t
       val add : elt -> t -> t
@@ -56,10 +56,11 @@ module RCP : sig
       val of_seq : elt Seq.t -> t
     end
 
+    exception EmptyBlock of Block.t
     exception PartitionsNotDisjoint of Partition.t
 
-    val reachable_blocks : Fsm.fsm_transition list -> Partition.t -> 'a
-    val split : 'a -> int -> Partition.t -> Fsm.fsm -> Partition.t
+    val reachable_blocks : Fsm.fsm_transition list -> Partition.t -> Block.t
+    val split : Block.t -> int -> Partition.t -> Fsm.fsm -> Partition.t
     val run : Fsm.fsm -> unit
   end
 
