@@ -6,6 +6,13 @@ type state =
   ; pp : string
   }
 
+(** [States] is ... *)
+module States = Set.Make (struct
+    type t = state
+
+    let compare a b = compare a.id b.id
+  end)
+
 (** [label] is an alias for [int], corresponding to the index of a Coq-based constructor. *)
 type label = int
 
@@ -29,7 +36,9 @@ type edges = (state, fsm_transition) Hashtbl.t
     [init] is the initial state.
     [edges] is a hashtable mapping states to outgoing edges. *)
 type fsm =
-  { init : state (* ; states : *)
+  { init : state
+      (* TODO: include set of states, below: *)
+      (* ; states : States.t *)
   ; edges : (state, fsm_transition) Hashtbl.t
   }
 (* TODO: Currently, there may be many copies of the same state in an [fsm] (i.e., in [init] and the [edges]). Maybe add list of states and change others to be an index referencing their position in the list. *)
