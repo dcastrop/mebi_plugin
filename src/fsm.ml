@@ -16,6 +16,8 @@ module States = Set.Make (struct
 (** [label] is an alias for [int], corresponding to the index of a Coq-based constructor. *)
 type label = int
 
+(* module Actions = Set.Make( struct type t = );; *)
+
 (** [('a, 'b) transition] is a 2-tuple with a [label] and [to_state].
     [label] is of type ['a].
     [to_state] is of type ['b]. *)
@@ -37,8 +39,7 @@ type edges = (state, fsm_transition) Hashtbl.t
     [edges] is a hashtable mapping states to outgoing edges. *)
 type fsm =
   { init : state
-      (* TODO: include set of states, below: *)
-      (* ; states : States.t *)
-  ; edges : (state, fsm_transition) Hashtbl.t
+  ; states : States.t
+  ; edges : (state, fsm_transition) Hashtbl.t (* ; actions : Actions.t *)
   }
 (* TODO: Currently, there may be many copies of the same state in an [fsm] (i.e., in [init] and the [edges]). Maybe add list of states and change others to be an index referencing their position in the list. *)

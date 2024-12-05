@@ -285,21 +285,21 @@ module type GraphB = sig
 
   val build_graph : raw_lts -> Constrexpr.constr_expr_r CAst.t -> lts_graph mm
 
-  type state_translation = (EConstr.t, Fsm.state) Hashtbl.t
+  type state_translation_table = (EConstr.t, Fsm.state) Hashtbl.t
 
-  val build_state_translation : lts_graph -> state_translation mm
-  val build_edges : lts_graph -> state_translation -> Fsm.edges mm
+  val build_state_translation_table : lts_graph -> state_translation_table mm
+  val build_edges : lts_graph -> state_translation_table -> Fsm.edges mm
 
   val lts_to_fsm
     :  lts_graph
     -> Constrexpr.constr_expr_r CAst.t
-    -> (Fsm.fsm * state_translation) mm
+    -> (Fsm.fsm * state_translation_table) mm
 
   val pstr_lts_transition : EConstr.constr * lts_transition -> string
   val pstr_lts_transitions : ?indent:int -> lts_transition H.t -> string
   val pstr_lts : lts_graph -> string
   val pstr_state : ?long:unit -> Fsm.state -> string
-  val pstr_states : ?long:unit -> ?indent:int -> Fsm.state list -> string
+  val pstr_states : ?long:unit -> ?indent:int -> Fsm.States.t -> string
   val pstr_edge : ?long:unit -> Fsm.state * Fsm.fsm_transition -> string
   val pstr_edges : ?long:unit -> ?indent:int -> Fsm.edges -> string
   val pstr_fsm : ?long:unit -> Fsm.fsm -> string
@@ -367,12 +367,13 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
 
   open Fsm
 
-  (** [state_translation] is is a hashtable mapping [EConstr.t] of terms to [Fsm.states]. *)
-  type state_translation = (EConstr.t, Fsm.state) Hashtbl.t
+  (** [state_translation_table] is is a hashtable mapping [EConstr.t] of terms to [Fsm.states]. *)
+  type state_translation_table = (EConstr.t, Fsm.state) Hashtbl.t
 
-  (** [build_state_translation g] is a hashtable mapping the Coq-based endpoints
+  (** [build_state_translation_table g] is a hashtable mapping the Coq-based endpoints
       of transitions of LTS [g] to pure OCaml FSM states. *)
-  let build_state_translation (g : lts_graph) : state_translation mm =
+  let build_state_translation_table (g : lts_graph) : state_translation_table mm
+    =
     let* sigma = get_sigma in
     let hash t =
       EConstr.to_constr ?abort_on_undefined_evars:(Some false) sigma t
@@ -403,7 +404,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       outgoing edges comprised of labels and destination states.
       [g] is the LTS with transitions to build the FSM edges from.
       [s] is the translation map from Coq-terms to FSM states. *)
-  let build_edges (g : lts_graph) (s : state_translation) : Fsm.edges mm =
+  let build_edges (g : lts_graph) (s : state_translation_table) : Fsm.edges mm =
     let* env = get_env in
     let* sigma = get_sigma in
     let keys = H.to_seq_keys g.transitions in
@@ -425,7 +426,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   exception UnfinishedLTS of lts_graph
 
   (** Error when a translation from an [lts_graph] to an FSM yields no [states].*)
-  exception NoStates of state_translation
+  exception NoStates of state_translation_table
 
   (** [pstr_state ?long state] is a string of [state].
       [?long] determines if [state.id] of [state.pp] is used.
@@ -438,23 +439,23 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
 
   (** [pstr_states ?long states] is a string of [states].
       [?long] is used when printing individual [states].
-      [states] is the list of states to be printed. *)
+      [states] is the set of states to be printed. *)
   let pstr_states
     ?(long : unit option)
     ?(indent : int = 1)
-    (states : Fsm.state list)
+    (states : Fsm.States.t)
     : string
     =
-    let s =
+    if States.is_empty states
+    then "[ ] (empty)"
+    else
       Printf.sprintf
         "[%s]"
-        (List.fold_left
-           (fun (acc : string) (s : Fsm.state) ->
+        (States.fold
+           (fun (s : Fsm.state) (acc : string) ->
              Printf.sprintf "%s%s%s\n" acc (str_tabs indent) (pstr_state s))
-           "\n"
-           states)
-    in
-    if s == "[\n]" then "[ ] (empty)" else s
+           states
+           "\n")
   ;;
 
   (** [pstr_edge ?long (from_state, outgoing_edge)] is a string of [edge].
@@ -484,7 +485,9 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
   let pstr_edges ?(long : unit option) ?(indent : int = 1) (edges : Fsm.edges)
     : string
     =
-    let s =
+    if Hashtbl.to_seq_keys edges |> Seq.is_empty
+    then "[ ] (empty)"
+    else
       Printf.sprintf
         "[%s]"
         (Hashtbl.fold
@@ -500,8 +503,6 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
                 | Some () -> pstr_edge ~long:() (from_state, outgoing_edge)))
            edges
            "\n")
-    in
-    if s == "[\n]" then "[ ] (empty)" else s
   ;;
 
   (** [pstr_fsm ?long the_fsm] is a string of [the_fsm].
@@ -509,12 +510,17 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       [the_fsm] is the fsm to be printed. *)
   let pstr_fsm ?(long : unit option) (the_fsm : Fsm.fsm) : string =
     Printf.sprintf
-      "%s\n%s"
+      "%s\n%s\n%s"
       (Printf.sprintf
          "init state: %s"
          (match long with
           | None -> pstr_state the_fsm.init
           | Some () -> pstr_state ~long:() the_fsm.init))
+      (Printf.sprintf
+         "states: %s"
+         (match long with
+          | None -> pstr_states the_fsm.states
+          | Some () -> pstr_states ~long:() the_fsm.states))
       (Printf.sprintf
          "edges: %s"
          (match long with
@@ -554,7 +560,9 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     (transitions : lts_transition H.t)
     : string
     =
-    let s =
+    if H.to_seq_keys transitions |> Seq.is_empty
+    then "[ ] (empty)"
+    else
       Printf.sprintf
         "[%s]"
         (H.fold
@@ -568,8 +576,6 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
                (pstr_lts_transition (from_node, outgoing_transition)))
            transitions
            "\n")
-    in
-    if s == "[\n]" then "[ ] (empty)" else s
   ;;
 
   (** [pstr_lts_to_visit ?indent nodes_to_visit] is a string of [nodes_to_visit]. *)
@@ -603,31 +609,40 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       [init_term] is the original actual Coq-term used to build the LTS.
       (Used to determine the initial state of the FSM). *)
   let lts_to_fsm (g : lts_graph) (init_term : Constrexpr.constr_expr_r CAst.t)
-    : (Fsm.fsm * state_translation) mm
+    : (Fsm.fsm * state_translation_table) mm
     =
     match g with
     | { to_visit; transitions; _ } ->
       if Queue.is_empty to_visit
       then
-        let* states = build_state_translation g in
-        if Hashtbl.to_seq_keys states |> Seq.is_empty
+        let* state_translation = build_state_translation_table g in
+        (* extract states *)
+        let states =
+          States.of_list
+            (Hashtbl.fold
+               (fun _ state acc -> List.concat [ acc; [ state ] ])
+               state_translation
+               [])
+        in
+        if Hashtbl.to_seq_keys state_translation |> Seq.is_empty
         then (
           Feedback.msg_warning
             (str
                (Printf.sprintf
                   "no states were extracted from lts: %s"
                   (pstr_lts g)));
-          raise (NoStates states))
+          raise (NoStates state_translation))
         else
-          let* edges = build_edges g states in
+          (* TODO: make [build_edges] use [States] rather than [state_translation]. *)
+          let* edges = build_edges g state_translation in
           (* need to get initial state. *)
           (* copied from [build_graph]. *)
           let$ t env sigma =
             Constrintern.interp_constr_evars env sigma init_term
           in
           let$ init_term env sigma = sigma, Reductionops.nf_all env sigma t in
-          let init_state = Hashtbl.find states init_term in
-          return ({ init = init_state; edges }, states)
+          let init_state = Hashtbl.find state_translation init_term in
+          return ({ init = init_state; states; edges }, state_translation)
       else (
         Feedback.msg_warning
           (str

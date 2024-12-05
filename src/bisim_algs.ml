@@ -13,6 +13,12 @@ module RCP = struct
     let exa_1 : fsm * fsm =
       let (s : fsm) =
         { init = { id = 0; pp = "s0" }
+        ; states =
+            States.of_list
+              [ { id = 0; pp = "s0" }
+              ; { id = 1; pp = "s1" }
+              ; { id = 2; pp = "s2" }
+              ]
         ; edges =
             List.to_seq
               [ (* s0 *)
@@ -32,6 +38,8 @@ module RCP = struct
       in
       let (t : fsm) =
         { init = { id = 0; pp = "t0" }
+        ; states =
+            States.of_list [ { id = 0; pp = "t0" }; { id = 1; pp = "t1" } ]
         ; edges =
             List.to_seq
               [ (* t0 *)
@@ -51,6 +59,14 @@ module RCP = struct
     let exa_2 : fsm * fsm =
       let (s : fsm) =
         { init = { id = 0; pp = "s0" }
+        ; states =
+            States.of_list
+              [ { id = 0; pp = "s0" }
+              ; { id = 1; pp = "s1" }
+              ; { id = 2; pp = "s2" }
+              ; { id = 3; pp = "s3" }
+              ; { id = 4; pp = "s4" }
+              ]
         ; edges =
             List.to_seq
               [ (* s0 *)
@@ -78,6 +94,15 @@ module RCP = struct
       in
       let (t : fsm) =
         { init = { id = 0; pp = "t0" }
+        ; states =
+            States.of_list
+              [ { id = 0; pp = "t0" }
+              ; { id = 1; pp = "t1" }
+              ; { id = 2; pp = "t2" }
+              ; { id = 3; pp = "t3" }
+              ; { id = 4; pp = "t4" }
+              ; { id = 5; pp = "t5" }
+              ]
         ; edges =
             List.to_seq
               [ (* t0 *)
@@ -198,9 +223,16 @@ module RCP = struct
 
     (*  *)
     let run (f : fsm) : unit =
-      (* TODO: change this to use [Fsm.States] *)
-      (* let pi = Partition.of_list  *)
+      (* initially [pi] is a partition with a single block containing all states. *)
+      let _pi =
+        Partition.of_list [ Block.of_list (States.elements f.states) ]
+      in
+      let _changed = true in
+      (* while changed do (
+         (* let changed = false in *)
+         (* for each block in [pi] *)
 
+         ); *)
       (* TODO: *)
       ()
     ;;
