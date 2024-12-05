@@ -674,6 +674,7 @@ let bounded_lts
   (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
+  (* TODO: how to get input from user also? *)
   let* raw_lts = check_ref_lts iref in
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
