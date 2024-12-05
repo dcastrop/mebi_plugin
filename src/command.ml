@@ -2,6 +2,7 @@ open Pp
 open Mebi_utils
 open Mebi_monad
 open Mebi_monad.Monad_syntax
+open Bisim_algs
 open Pp_ext
 
 (** ['a mm] is a function type mapping from [coq_context ref] to ['a in_context]. *)
@@ -716,6 +717,8 @@ let bounded_lts
   let* the_fsm, translation = G.lts_to_fsm graph_lts tref in
   Feedback.msg_debug
     (str (Printf.sprintf "(f) Fsm: %s.\n" (G.pstr_fsm ~long:() the_fsm)));
+  (* FIXME: below is useless, just to stop errors when recompiling about not using [Bisim_algs]. *)
+  let _ = bisim_foo in
   (*  *)
   Feedback.msg_debug (str "\n--------\n");
   return ()
