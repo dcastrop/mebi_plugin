@@ -10,10 +10,10 @@ type ('a, 'b) transition =
   ; to_state : 'b
   }
 
-type outgoing_edge = (label, state) transition
-type edges = (state, outgoing_edge) Hashtbl.t
+type fsm_transition = (label, state) transition
+type edges = (state, fsm_transition) Hashtbl.t
 
 type fsm =
   { init : state
-  ; edges : (state, (label, state) transition) Hashtbl.t
+  ; edges : (state, fsm_transition) Hashtbl.t
   }

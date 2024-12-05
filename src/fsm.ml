@@ -6,7 +6,7 @@ type state =
   ; pp : string
   }
 
-(** [label] is ... *)
+(** [label] is an alias for [int], corresponding to the index of a Coq-based constructor. *)
 type label = int
 
 (** [('a, 'b) transition] is a 2-tuple with a [label] and [to_state].
@@ -17,12 +17,19 @@ type ('a, 'b) transition =
   ; to_state : 'b
   }
 
-type outgoing_edge = (label, state) transition
-type edges = (state, outgoing_edge) Hashtbl.t
+(** [fsm_transition] is a type describing outgoing edges of an OCaml FSM.
+    [Fsm.label] is a label (corresponding to the Coq-based LTS constructor number).
+    [Fsm.state] is thr destination state. *)
+type fsm_transition = (label, state) transition
 
-(** [fsm] *)
+(** [edges] is a hashtable mapping states to their outgoing-transitions. *)
+type edges = (state, fsm_transition) Hashtbl.t
+
+(** [fsm] is a type used to describe an FSM in OCaml.
+    [init] is the initial state.
+    [edges] is a hashtable mapping states to outgoing edges. *)
 type fsm =
-  { (* init : int *)
-    init : state (* ; states : *)
-  ; edges : (state, (label, state) transition) Hashtbl.t
+  { init : state (* ; states : *)
+  ; edges : (state, fsm_transition) Hashtbl.t
   }
+(* TODO: Currently, there may be many copies of the same state in an [fsm] (i.e., in [init] and the [edges]). Maybe add list of states and change others to be an index referencing their position in the list. *)
