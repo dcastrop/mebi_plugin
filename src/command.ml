@@ -65,7 +65,7 @@ type raw_lts =
   ; trm_type : EConstr.types
   ; lbl_type : EConstr.types
   ; coq_ctor_names : Names.Id.t array
-  ; transitions : (Constr.rel_context * Constr.types) array
+  ; constructor_transitions : (Constr.rel_context * Constr.types) array
   }
 
 (** [check_ref_lts gref] is the [raw_lts] of [gref].
@@ -87,7 +87,7 @@ let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
       ; trm_type = EConstr.of_constr (Context.Rel.Declaration.get_type term)
       ; lbl_type = EConstr.of_constr (Context.Rel.Declaration.get_type lbl)
       ; coq_ctor_names = mip.mind_consnames
-      ; transitions = mip.mind_nf_lc
+      ; constructor_transitions = mip.mind_nf_lc
       }
   (* raise error if [gref] is not an inductive type *)
   | _ -> invalid_ref gref
@@ -244,7 +244,7 @@ and check_valid_constructor lts t : (int * EConstr.t) list t =
         ++ str ". Term: "
         ++ Printer.pr_econstr_env env sigma t)
     in
-    let ctx, tm = lts.transitions.(i) in
+    let ctx, tm = lts.constructor_transitions.(i) in
     let ctx_tys = List.map EConstr.of_rel_decl ctx in
     let* substl = mk_ctx_substl [] (List.rev ctx_tys) in
     let termL, act, termR = extract_args substl tm in
@@ -263,7 +263,7 @@ and check_valid_constructor lts t : (int * EConstr.t) list t =
        | Some nctors -> retrieve_tgt_nodes ctor_vals i tgt_term nctors)
     | false -> return ctor_vals
   in
-  iterate 0 (Array.length lts.transitions - 1) [] iter_body
+  iterate 0 (Array.length lts.constructor_transitions - 1) [] iter_body
 ;;
 
 (** [bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
@@ -674,10 +674,10 @@ let bounded_lts
   (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
-  let* the_lts = check_ref_lts iref in
+  let* raw_lts = check_ref_lts iref in
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
-  let* graph = G.build_graph the_lts tref in
+  let* graph_lts = G.build_graph raw_lts tref in
   (* bind [env] and [sigma] to [get_env st] and [get_sigma st] in [mebi_monad], respectively. *)
   let* env = get_env in
   let* sigma = get_sigma in
@@ -685,18 +685,18 @@ let bounded_lts
     (str
        (Printf.sprintf
           "(a) Types of terms: %s.\n"
-          (econstr_to_string the_lts.trm_type)));
+          (econstr_to_string raw_lts.trm_type)));
   Feedback.msg_debug
     (str
        (Printf.sprintf
           "(b) Types of labels: %s.\n"
-          (econstr_to_string the_lts.lbl_type)));
+          (econstr_to_string raw_lts.lbl_type)));
   Feedback.msg_debug
     (str "(c) Constructors: "
      ++ Pp.prvect_with_sep
           (fun _ -> str ", ")
           Names.Id.print
-          the_lts.coq_ctor_names);
+          raw_lts.coq_ctor_names);
   (* prints all transitions -- the possible constructors
      a term may take as part of its structure.
      these are dependant on the definition of a type *)
@@ -704,15 +704,15 @@ let bounded_lts
      TODO: (requires changing [pp_transitions] (and alike) to print to string instead.) *)
   Feedback.msg_debug
     (str "(d) Transitions: "
-     ++ pp_transitions env sigma the_lts.transitions
+     ++ pp_transitions env sigma raw_lts.constructor_transitions
      ++ strbrk "\n");
   Feedback.msg_debug
     (str
        (Printf.sprintf
           "(e) Graph Edges: %s.\n"
-          (G.pstr_lts_transitions graph.transitions)));
+          (G.pstr_lts_transitions graph_lts.transitions)));
   (* lts to fsm *)
-  let* the_fsm, translation = G.lts_to_fsm graph tref in
+  let* the_fsm, translation = G.lts_to_fsm graph_lts tref in
   Feedback.msg_debug
     (str (Printf.sprintf "(f) Fsm: %s.\n" (G.pstr_fsm ~long:() the_fsm)));
   (*  *)
