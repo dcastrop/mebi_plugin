@@ -33,7 +33,7 @@ module States = Set.Make (struct
 
 type action =
   { id : int
-  ; name : string
+  ; label : string
   }
 
 (** [Actions] is a set of [actions]. *)
@@ -41,13 +41,15 @@ module Actions = Set.Make (struct
     type t = action
 
     let compare a b = compare a.id b.id
+
+    (* let add_new (label:string) (actions:t) : t = add {id = actio; label }  *)
   end)
 
 (** [('a, 'b) transition] is a 2-tuple with a [label] and [to_state].
     [label] is of type ['a].
     [to_state] is of type ['b]. *)
 type ('a, 'b) transition =
-  { label : 'a
+  { action : 'a
   ; to_state : 'b
   }
 
@@ -65,7 +67,8 @@ type edges = (state, fsm_transition) Hashtbl.t
 type fsm =
   { init : state
   ; states : States.t
-  ; edges : (state, fsm_transition) Hashtbl.t (* ; actions : Actions.t *)
+  ; actions : Actions.t
+  ; edges : (state, fsm_transition) Hashtbl.t
   }
 (* TODO: Currently, there may be many copies of the same state in an [fsm] (i.e., in [init] and the [edges]). Maybe add list of states and change others to be an index referencing their position in the list. *)
 
@@ -152,6 +155,70 @@ let pstr_states
          "\n")
 ;;
 
+(** [pstr_action ?ids ?long action] is a string of [action].
+    [?ids] determines if [action.id] is shown.
+    [?long] determines if all fields are shown.
+    [action] is the action to show. *)
+let pstr_action ?(ids : unit option) ?(long : unit option) (action : action)
+  : string
+  =
+  match long with
+  | None ->
+    Printf.sprintf
+      "%s"
+      (Printf.sprintf
+         "%s%s"
+         action.label
+         (match ids with
+          | None -> ""
+          | Some () -> Printf.sprintf " <id: %d>" action.id))
+  (* show everything *)
+  | Some () -> Printf.sprintf "id: %d; label: %s" action.id action.label
+;;
+
+let handle_action_pstr
+  (ids : unit option)
+  (pp : unit option)
+  (long : unit option)
+  (a : action)
+  : string
+  =
+  match long with
+  | None ->
+    (match ids with
+     | None -> pstr_action a
+     | Some () -> pstr_action ~ids:() a)
+  | Some () -> pstr_action ~long:() a
+;;
+
+(** [pstr_action ?ids ?long action] is a string of [action].
+    [?ids] determines if [action.id] is shown.
+    [?long] determines if all fields are shown.
+    [action] is the action to show. *)
+let pstr_actions
+  ?(ids : unit option)
+  ?(long : unit option)
+  ?(indent : int = 1)
+  (actions : Actions.t)
+  : string
+  =
+  if Actions.is_empty actions
+  then "[ ] (empty)"
+  else
+    Printf.sprintf
+      "[%s]"
+      (Actions.fold
+         (fun (a : action) (acc : string) ->
+           Printf.sprintf
+             "%s%s%s\n"
+             acc
+             (Mebi_utils.str_tabs indent)
+             (* figure out which units to pass on (bit messy) *)
+             (handle_action_pstr ids None long a))
+         actions
+         "\n")
+;;
+
 (** [pstr_edge ?long (from_state, outgoing_edge)] is a string of [edge].
     [?ids], [?pp] and [?long] are used for corresponding states.
     [from_state] is the starting state.
@@ -164,18 +231,11 @@ let pstr_edge
   ((from_state : state), (outgoing_edge : fsm_transition))
   : string
   =
-  (* get state pstr *)
-  let from_state_pstr, dest_state_pstr =
-    ( handle_state_pstr ids pp long from_state
-    , handle_state_pstr ids pp long outgoing_edge.to_state )
-  in
-  (* TODO: when overhauling labels/actions, update this *)
-  let edge_label_pstr =
-    match long with
-    | None -> Printf.sprintf "--{ %d }->" outgoing_edge.label.id
-    | Some () -> Printf.sprintf "--{ %s }->" outgoing_edge.label.name
-  in
-  Printf.sprintf "%s %s %s" from_state_pstr edge_label_pstr dest_state_pstr
+  Printf.sprintf
+    "%s ---{ %s }--> %s"
+    (handle_state_pstr ids pp long from_state)
+    (handle_action_pstr ids pp long outgoing_edge.action)
+    (handle_state_pstr ids pp long outgoing_edge.to_state)
 ;;
 
 (* TODO: merge below with [handle_state_pstr] ? *)
@@ -274,6 +334,23 @@ let handle_states_pstr
   | Some () -> pstr_states ~long:() s
 ;;
 
+(** [handle_actions_pstr ids pp long a] is a wrapper for [pstr_states] which
+    makes it easier to pass the options from higher-level [pstr_] functions. *)
+let handle_actions_pstr
+  (ids : unit option)
+  (pp : unit option)
+  (long : unit option)
+  (a : Actions.t)
+  : string
+  =
+  match long with
+  | None ->
+    (match ids with
+     | None -> pstr_actions a
+     | Some () -> pstr_actions ~ids:() a)
+  | Some () -> pstr_actions ~long:() a
+;;
+
 (** [handle_edges_pstr ids pp long e] is a wrapper for [pstr_edges] which
     makes it easier to pass the options from higher-level [pstr_] functions. *)
 let handle_edges_pstr
@@ -305,12 +382,15 @@ let pstr_fsm
   : string
   =
   Printf.sprintf
-    "%s\n%s\n%s"
+    "%s\n%s\n%s\n%s"
     (Printf.sprintf
        "init state: %s"
        (handle_state_pstr ids pp long the_fsm.init))
     (Printf.sprintf
        "states: %s"
        (handle_states_pstr ids pp long the_fsm.states))
+    (Printf.sprintf
+       "actions: %s"
+       (handle_actions_pstr ids pp long the_fsm.actions))
     (Printf.sprintf "edges: %s" (handle_edges_pstr ids pp long the_fsm.edges))
 ;;

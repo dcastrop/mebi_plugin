@@ -19,25 +19,27 @@ module RCP = struct
               ; { id = 1; hash = -1; pp = "s1" }
               ; { id = 2; hash = -1; pp = "s2" }
               ]
+        ; actions =
+            Actions.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
         ; edges =
             List.to_seq
               [ (* s0 *)
                 ( { id = 0; hash = -1; pp = "s0" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 1; hash = -1; pp = "s1" }
                   } )
               ; ( { id = 0; hash = -1; pp = "s0" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 2; hash = -1; pp = "s2" }
                   } )
                 (* s1 *)
               ; ( { id = 1; hash = -1; pp = "s1" }
-                , { label = { id = 2; name = "b" }
+                , { action = { id = 2; label = "b" }
                   ; to_state = { id = 2; hash = -1; pp = "s2" }
                   } )
                 (* s2 *)
               ; ( { id = 2; hash = -1; pp = "s2" }
-                , { label = { id = 2; name = "b" }
+                , { action = { id = 2; label = "b" }
                   ; to_state = { id = 2; hash = -1; pp = "s2" }
                   } )
               ]
@@ -51,16 +53,18 @@ module RCP = struct
               [ { id = 0; hash = -1; pp = "t0" }
               ; { id = 1; hash = -1; pp = "t1" }
               ]
+        ; actions =
+            Actions.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
         ; edges =
             List.to_seq
               [ (* t0 *)
                 ( { id = 0; hash = -1; pp = "t0" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 1; hash = -1; pp = "t1" }
                   } )
                 (* t1 *)
               ; ( { id = 1; hash = -1; pp = "t1" }
-                , { label = { id = 2; name = "b" }
+                , { action = { id = 2; label = "b" }
                   ; to_state = { id = 1; hash = -1; pp = "t1" }
                   } )
               ]
@@ -82,39 +86,41 @@ module RCP = struct
               ; { id = 3; hash = -1; pp = "s3" }
               ; { id = 4; hash = -1; pp = "s4" }
               ]
+        ; actions =
+            Actions.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
         ; edges =
             List.to_seq
               [ (* s0 *)
                 ( { id = 0; hash = -1; pp = "s0" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 1; hash = -1; pp = "s1" }
                   } )
               ; ( { id = 0; hash = -1; pp = "s0" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 2; hash = -1; pp = "s2" }
                   } )
                 (* s1 *)
               ; ( { id = 1; hash = -1; pp = "s1" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 3; hash = -1; pp = "s3" }
                   } )
               ; ( { id = 1; hash = -1; pp = "s1" }
-                , { label = { id = 2; name = "b" }
+                , { action = { id = 2; label = "b" }
                   ; to_state = { id = 4; hash = -1; pp = "s4" }
                   } )
                 (* s2 *)
               ; ( { id = 2; hash = -1; pp = "s2" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 4; hash = -1; pp = "s4" }
                   } )
                 (* s3 *)
               ; ( { id = 3; hash = -1; pp = "s3" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 0; hash = -1; pp = "s0" }
                   } )
                 (* s4 *)
               ; ( { id = 4; hash = -1; pp = "s4" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 0; hash = -1; pp = "s0" }
                   } )
               ]
@@ -132,52 +138,54 @@ module RCP = struct
               ; { id = 4; hash = -1; pp = "t4" }
               ; { id = 5; hash = -1; pp = "t5" }
               ]
+        ; actions =
+            Actions.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
         ; edges =
             List.to_seq
               [ (* t0 *)
                 ( { id = 0; hash = -1; pp = "t0" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 1; hash = -1; pp = "t1" }
                   } )
               ; ( { id = 0; hash = -1; pp = "t0" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 3; hash = -1; pp = "t3" }
                   } )
                 (* t1 *)
               ; ( { id = 1; hash = -1; pp = "t1" }
-                , { label = { id = 2; name = "b" }
+                , { action = { id = 2; label = "b" }
                   ; to_state = { id = 2; hash = -1; pp = "t2" }
                   } )
               ; ( { id = 1; hash = -1; pp = "t1" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 5; hash = -1; pp = "t5" }
                   } )
               ; ( { id = 1; hash = -1; pp = "t1" }
-                , { label = { id = 2; name = "b" }
+                , { action = { id = 2; label = "b" }
                   ; to_state = { id = 5; hash = -1; pp = "t5" }
                   } )
                 (* t2 *)
               ; ( { id = 2; hash = -1; pp = "t2" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 0; hash = -1; pp = "t0" }
                   } )
                 (* t3 *)
               ; ( { id = 3; hash = -1; pp = "t3" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 4; hash = -1; pp = "t4" }
                   } )
                 (* t4 *)
               ; ( { id = 4; hash = -1; pp = "t4" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 0; hash = -1; pp = "t0" }
                   } )
                 (* t5 *)
               ; ( { id = 5; hash = -1; pp = "t5" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 0; hash = -1; pp = "t0" }
                   } )
               ; ( { id = 5; hash = -1; pp = "t5" }
-                , { label = { id = 1; name = "a" }
+                , { action = { id = 1; label = "a" }
                   ; to_state = { id = 4; hash = -1; pp = "t4" }
                   } )
               ]
@@ -243,7 +251,7 @@ module RCP = struct
         (* get edges corresponding to [action] *)
         let s_edges =
           List.filter
-            (fun (e : fsm_transition) -> e.label == a)
+            (fun (e : fsm_transition) -> e.action == a)
             (Hashtbl.find_all f.edges s)
         in
         (* cache which partitions in [pi] [s_edges] can reach *)
@@ -254,7 +262,7 @@ module RCP = struct
             (fun ((b1', b2') : Block.t * Block.t) t ->
               let t_edges =
                 List.filter
-                  (fun (e : fsm_transition) -> e.label == a)
+                  (fun (e : fsm_transition) -> e.action == a)
                   (Hashtbl.find_all f.edges t)
               in
               (* check if edges of s and t can reach the same blocks in [pi]. *)
