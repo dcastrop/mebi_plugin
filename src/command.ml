@@ -307,11 +307,6 @@ module type GraphB = sig
     -> string
 
   val pstr_lts : ?long:unit -> lts_graph -> string
-  val pstr_state : ?long:unit -> Fsm.state -> string
-  val pstr_states : ?long:unit -> ?indent:int -> Fsm.States.t -> string
-  val pstr_edge : ?long:unit -> Fsm.state * Fsm.fsm_transition -> string
-  val pstr_edges : ?long:unit -> ?indent:int -> Fsm.edges -> string
-  val pstr_fsm : ?long:unit -> Fsm.fsm -> string
   (* val pp_fsm : ?long:unit -> Fsm.fsm -> unit *)
 end
 
@@ -393,12 +388,24 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     in
     let keys = H.to_seq_keys g.transitions in
     let tr_tbl = Seq.length keys |> Hashtbl.create in
+    (* set up counter for state ids *)
+    let state_id_counter = ref 0 in
+    let get_state_id () : int =
+      let to_return = !state_id_counter in
+      state_id_counter := !state_id_counter + 1;
+      to_return
+    in
+    (* for each key, extract states from transitions. *)
     let _ =
       Seq.iter
         (fun t ->
           (* check if [t] is already captured *)
           if false == Hashtbl.mem tr_tbl t
-          then Hashtbl.add tr_tbl t { id = hash t; pp = econstr_to_string t };
+          then
+            Hashtbl.add
+              tr_tbl
+              t
+              { id = get_state_id (); hash = hash t; pp = econstr_to_string t };
           (* check if [dest_state] is already captured *)
           let dest_state = (H.find g.transitions t).to_state in
           if false == Hashtbl.mem tr_tbl dest_state
@@ -406,7 +413,10 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
             Hashtbl.add
               tr_tbl
               dest_state
-              { id = hash dest_state; pp = econstr_to_string dest_state })
+              { id = get_state_id ()
+              ; hash = hash dest_state
+              ; pp = econstr_to_string dest_state
+              })
         keys
     in
     return tr_tbl
@@ -439,110 +449,6 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
 
   (** Error when a translation from an [lts_graph] to an FSM yields no [states].*)
   exception NoStates of state_translation_table
-
-  (** [pstr_state ?long state] is a string of [state].
-      [?long] determines if [state.id] of [state.pp] is used.
-      [state] is the state to be printed. *)
-  let pstr_state ?(long : unit option) (state : Fsm.state) : string =
-    match long with
-    | None -> Printf.sprintf "(%d)" state.id
-    | Some () -> Printf.sprintf "(%s)" state.pp
-  ;;
-
-  (** [pstr_states ?long states] is a string of [states].
-      [?long] is used when printing individual [states].
-      [states] is the set of states to be printed. *)
-  let pstr_states
-    ?(long : unit option)
-    ?(indent : int = 1)
-    (states : Fsm.States.t)
-    : string
-    =
-    if States.is_empty states
-    then "[ ] (empty)"
-    else
-      Printf.sprintf
-        "[%s]"
-        (States.fold
-           (fun (s : Fsm.state) (acc : string) ->
-             Printf.sprintf "%s%s%s\n" acc (str_tabs indent) (pstr_state s))
-           states
-           "\n")
-  ;;
-
-  (** [pstr_edge ?long (from_state, outgoing_edge)] is a string of [edge].
-      [?long] is used when printing the corresponding states.
-      [from_state] is the starting state.
-      [outgoing_edge] denotes the edge label [outgoing_edge.label]
-      and the destination [outgoing_edge.to_state]. *)
-  let pstr_edge
-    ?(long : unit option)
-    ((from_state : Fsm.state), (outgoing_edge : Fsm.fsm_transition))
-    : string
-    =
-    let from_state_str, dest_state_str =
-      match long with
-      | None -> pstr_state from_state, pstr_state outgoing_edge.to_state
-      | Some () ->
-        ( pstr_state ~long:() from_state
-        , pstr_state ~long:() outgoing_edge.to_state )
-    in
-    let edge_label_str =
-      match long with
-      | None -> Printf.sprintf "--{ %d }->" outgoing_edge.label.id
-      | Some () -> Printf.sprintf "--{ %s }->" outgoing_edge.label.name
-    in
-    Printf.sprintf "%s %s %s" from_state_str edge_label_str dest_state_str
-  ;;
-
-  (** [pstr_edges ?long edges] is a string of [edges].
-      [?long] is used when printing individual edges.
-      [edges] is the list of edges to be printed. *)
-  let pstr_edges ?(long : unit option) ?(indent : int = 1) (edges : Fsm.edges)
-    : string
-    =
-    if Hashtbl.to_seq_keys edges |> Seq.is_empty
-    then "[ ] (empty)"
-    else
-      Printf.sprintf
-        "[%s]"
-        (Hashtbl.fold
-           (fun (from_state : Fsm.state)
-             (outgoing_edge : Fsm.fsm_transition)
-             (acc : string) ->
-             Printf.sprintf
-               "%s%s{ %s }\n"
-               acc
-               (str_tabs indent)
-               (match long with
-                | None -> pstr_edge (from_state, outgoing_edge)
-                | Some () -> pstr_edge ~long:() (from_state, outgoing_edge)))
-           edges
-           "\n")
-  ;;
-
-  (** [pstr_fsm ?long the_fsm] is a string of [the_fsm].
-      [?long] is used when printing individual states and edges.
-      [the_fsm] is the fsm to be printed. *)
-  let pstr_fsm ?(long : unit option) (the_fsm : Fsm.fsm) : string =
-    Printf.sprintf
-      "%s\n%s\n%s"
-      (Printf.sprintf
-         "init state: %s"
-         (match long with
-          | None -> pstr_state the_fsm.init
-          | Some () -> pstr_state ~long:() the_fsm.init))
-      (Printf.sprintf
-         "states: %s"
-         (match long with
-          | None -> pstr_states the_fsm.states
-          | Some () -> pstr_states ~long:() the_fsm.states))
-      (Printf.sprintf
-         "edges: %s"
-         (match long with
-          | None -> pstr_edges the_fsm.edges
-          | Some () -> pstr_edges ~long:() the_fsm.edges))
-  ;;
 
   (* TODO: below is unused, delete? *)
   (* let pp_fsm ?(long : unit option) (the_fsm : Fsm.fsm) : unit =
@@ -752,7 +658,8 @@ let bounded_lts
   (* lts to fsm *)
   let* the_fsm, translation = G.lts_to_fsm graph_lts tref in
   Feedback.msg_debug
-    (str (Printf.sprintf "(f) Fsm: %s.\n" (G.pstr_fsm ~long:() the_fsm)));
+    (str
+       (Printf.sprintf "(f) Fsm: %s.\n" (Fsm.pstr_fsm ~ids:() ~pp:() the_fsm)));
   (* FIXME: below is useless, just to stop errors when recompiling about not using [Bisim_algs]. *)
   let _ = bisim_foo in
   (*  *)
