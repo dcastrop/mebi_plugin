@@ -36,6 +36,16 @@ type action =
   ; label : string
   }
 
+(** [action] ... *)
+let action ?(label : string option) (id : int) : action =
+  { id
+  ; label =
+      (match label with
+       | None -> Printf.sprintf "l%d" id
+       | Some label' -> label')
+  }
+;;
+
 (** [Actions] is a set of [actions]. *)
 module Actions = Set.Make (struct
     type t = action
@@ -142,7 +152,7 @@ let pstr_states
   then "[ ] (empty)"
   else
     Printf.sprintf
-      "[%s]"
+      "[%s%s]"
       (States.fold
          (fun (s : state) (acc : string) ->
            Printf.sprintf
@@ -153,6 +163,7 @@ let pstr_states
              (handle_state_pstr ids pp long s))
          states
          "\n")
+      (Mebi_utils.str_tabs (indent - 1))
 ;;
 
 (** [pstr_action ?ids ?long action] is a string of [action].
@@ -206,7 +217,7 @@ let pstr_actions
   then "[ ] (empty)"
   else
     Printf.sprintf
-      "[%s]"
+      "[%s%s]"
       (Actions.fold
          (fun (a : action) (acc : string) ->
            Printf.sprintf
@@ -217,6 +228,7 @@ let pstr_actions
              (handle_action_pstr ids None long a))
          actions
          "\n")
+      (Mebi_utils.str_tabs (indent - 1))
 ;;
 
 (** [pstr_edge ?long (from_state, outgoing_edge)] is a string of [edge].
@@ -300,7 +312,7 @@ let pstr_edges
   then "[ ] (empty)"
   else
     Printf.sprintf
-      "[%s]"
+      "[%s%s]"
       (Hashtbl.fold
          (fun (from_state : state)
            (outgoing_edge : fsm_transition)
@@ -312,11 +324,13 @@ let pstr_edges
              (handle_edge_pstr ids pp long (from_state, outgoing_edge)))
          edges
          "\n")
+      (Mebi_utils.str_tabs (indent - 1))
 ;;
 
 (** [handle_states_pstr ids pp long e] is a wrapper for [pstr_states] which
     makes it easier to pass the options from higher-level [pstr_] functions. *)
 let handle_states_pstr
+  ?(indent : int = 1)
   (ids : unit option)
   (pp : unit option)
   (long : unit option)
@@ -326,12 +340,12 @@ let handle_states_pstr
   match long with
   | None ->
     (match pp with
-     | None -> pstr_states s
+     | None -> pstr_states ~indent s
      | Some () ->
        (match ids with
-        | None -> pstr_states ~pp:() s
-        | Some () -> pstr_states ~ids:() ~pp:() s))
-  | Some () -> pstr_states ~long:() s
+        | None -> pstr_states ~pp:() ~indent s
+        | Some () -> pstr_states ~ids:() ~pp:() ~indent s))
+  | Some () -> pstr_states ~long:() ~indent s
 ;;
 
 (** [handle_actions_pstr ids pp long a] is a wrapper for [pstr_states] which

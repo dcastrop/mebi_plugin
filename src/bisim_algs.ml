@@ -204,6 +204,31 @@ module RCP = struct
 
     module Partition = Set.Make (Block)
 
+    (**  *)
+    let pstr_partition
+      ?(ids : unit option)
+      ?(pp : unit option)
+      ?(indent : int = 1)
+      (p : Partition.t)
+      : string
+      =
+      if Partition.is_empty p
+      then "[ ] (empty)"
+      else
+        Printf.sprintf
+          "[%s]"
+          (Partition.fold
+             (fun (b : Block.t) (acc : string) ->
+               Printf.sprintf
+                 "%s%s%s\n"
+                 acc
+                 (Mebi_utils.str_tabs indent)
+                 (* figure out which units to pass on (bit messy) *)
+                 (handle_states_pstr ~indent:(indent + 1) ids pp None b))
+             p
+             "\n")
+    ;;
+
     (* Error when trying to split on empty block. *)
     exception EmptyBlock of Block.t
 
@@ -240,10 +265,22 @@ module RCP = struct
         [block] is ...
         [action] is ...
         [pi] is ...
-        [f] is the corresponding FSM (needed to obtain the edges). *)
-    let split (block : Block.t) (a : action) (pi : Partition.t) (f : fsm)
+        [edges] is the (sorted) list of outgoing edges. *)
+    let split
+      (block : Block.t)
+      (a : action)
+      (pi : Partition.t)
+      (edges : Fsm.edges)
       : Partition.t
       =
+      Feedback.msg_warning
+        (Pp.str
+           (Printf.sprintf
+              "#### split...\nblock: %s.\na: %s\npi: %s.\nedges: %s.\n"
+              (Fsm.pstr_states ~pp:() block)
+              (Fsm.pstr_action a)
+              (pstr_partition ~pp:() pi)
+              (Fsm.pstr_edges ~pp:() edges)));
       (* choose some state [s] in [block] *)
       match Block.to_list block with
       | [] -> raise (EmptyBlock block)
@@ -252,7 +289,7 @@ module RCP = struct
         let s_edges =
           List.filter
             (fun (e : fsm_transition) -> e.action == a)
-            (Hashtbl.find_all f.edges s)
+            (Hashtbl.find_all edges s)
         in
         (* cache which partitions in [pi] [s_edges] can reach *)
         let s_reachable = reachable_blocks s_edges pi in
@@ -263,35 +300,135 @@ module RCP = struct
               let t_edges =
                 List.filter
                   (fun (e : fsm_transition) -> e.action == a)
-                  (Hashtbl.find_all f.edges t)
+                  (Hashtbl.find_all edges t)
               in
               (* check if edges of s and t can reach the same blocks in [pi]. *)
               let t_reachable = reachable_blocks t_edges pi in
+              (* TODO: this seems to be broken
+
+                 !!! continue from here
+              *)
               if Block.is_empty (Block.inter s_reachable t_reachable)
-              then Block.union b1' (Block.of_list [ t ]), b2'
+              then (
+                Feedback.msg_warning
+                  (Pp.str
+                     (Printf.sprintf
+                        "s and t cannot reach the same block via label %s."
+                        (Fsm.pstr_action a)));
+                Block.union b1' (Block.of_list [ t ]), b2')
               else b1', Block.union b2' (Block.of_list [ t ]))
             (Block.empty, Block.empty)
             block'
         in
+        Feedback.msg_warning
+          (Pp.str
+             (Printf.sprintf
+                "\nb1: %s.\nb2: %s.\n#### split #### (end)\n"
+                (Fsm.pstr_states ~pp:() b1)
+                (Fsm.pstr_states ~pp:() b2)));
         if Block.is_empty b2
         then Partition.of_list [ b1 ]
         else Partition.of_list [ b1; b2 ]
     ;;
 
-    (*  *)
-    let run (f : fsm) : unit =
-      (* initially [pi] is a partition with a single block containing all states. *)
-      let _pi =
-        Partition.of_list [ Block.of_list (States.elements f.states) ]
-      in
-      let _changed = true in
-      (* while changed do (
-         (* let changed = false in *)
-         (* for each block in [pi] *)
+    (* let changed = ref true in
+       let rec loop (pi : Partition.t) : Partition.t =
+       if !changed
+       then (
+       changed := false;
+       Partition.fold (fun (b:Block.t) (acc:Partition.t) -> acc) pi Partition.empty *)
 
-         ); *)
-      (* TODO: *)
-      ()
+    exception SplitEmpty of Partition.t
+    exception SplitTooMany of Partition.t
+
+    (*  *)
+    let run (s : fsm) (t : fsm) : Partition.t =
+      (* initially [pi] is a partition with a single block containing all states. *)
+      let pi, map_t_states =
+        let init_block, map_t_states' =
+          (* cant just merge States.t since their ids would conflict *)
+          States.fold
+            (fun (state : Fsm.state)
+              ((acc, map) : Block.t * (Fsm.state, Fsm.state) Hashtbl.t) ->
+              let state' = Fsm.state (Block.cardinal acc) in
+              (* save mapping from old to new state *)
+              Hashtbl.add map state state';
+              Block.add state' acc, map)
+            s.states
+            (t.states, States.cardinal t.states |> Hashtbl.create)
+        in
+        ref (Partition.of_list [ init_block ]), map_t_states'
+      in
+      (* merge actions *)
+      let actions, map_t_actions =
+        Actions.fold
+          (fun (action : Fsm.action)
+            ((acc, map) : Fsm.Actions.t * (Fsm.action, Fsm.action) Hashtbl.t) ->
+            let action' =
+              Fsm.action ~label:action.label (Actions.cardinal acc)
+            in
+            (* save mapping from old to new action *)
+            Hashtbl.add map action action';
+            Actions.add action' acc, map)
+          s.actions
+          (t.actions, Actions.cardinal t.actions |> Hashtbl.create)
+      in
+      (* merge edge tables *)
+      let edges =
+        Hashtbl.fold
+          (fun (from_state : Fsm.state)
+            (outgoing_edge : Fsm.fsm_transition)
+            (acc : Fsm.edges) ->
+            (* need to update states in edge *)
+            Hashtbl.add
+              acc
+              (Hashtbl.find map_t_states from_state)
+              { action = Hashtbl.find map_t_actions outgoing_edge.action
+              ; to_state = Hashtbl.find map_t_states outgoing_edge.to_state
+              };
+            acc)
+          s.edges
+          t.edges
+        (* (Seq.append (Hashtbl.to_seq s.edges) (Hashtbl.to_seq t.edges)) *)
+      in
+      (* prepare main alg loop *)
+      let changed = ref true in
+      while !changed do
+        changed := false;
+        (* for each block in [pi] *)
+        Partition.iter
+          (fun (b : Block.t) ->
+            (* for each action *)
+            Fsm.Actions.iter
+              (fun (a : Fsm.action) ->
+                (* sort outgoing edges with [a.label] by  [b] by the states with outgoing edges with [a.label] *)
+                (* let edges = Hashtbl.length f.edges |> Hashtbl.create in *)
+                let edges_of_a = edges in
+                let pi' = split b a !pi edges_of_a in
+                (* check no greater than 2 blocks were returned *)
+                if Partition.cardinal pi' > 2
+                then raise (SplitTooMany pi')
+                else if Partition.cardinal pi' == 2
+                then
+                  (* if [pi'] has two blocks that are not just [b] again, *)
+                  if Bool.not
+                       (Block.equal
+                          b
+                          (Partition.fold
+                             (fun (b' : Block.t) (acc : Block.t) ->
+                               Block.add_seq (Block.to_seq b') acc)
+                             pi'
+                             Block.empty))
+                  then (
+                    (* refine further using [pi'] *)
+                    pi := pi';
+                    changed := true))
+              actions;
+            ())
+          !pi
+      done;
+      (* return partitions *)
+      !pi
     ;;
   end
 

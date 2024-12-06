@@ -22,4 +22,9 @@ open Stdarg
 VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | [ "MeBi" "LTS" reference(r) constr(t) ] ->
   { Mebi_monad.run (Command.bounded_lts (Nametab.global r) t) }
+(* for testing purposes *)
+| [ "MeBi" "Bisim_Exa1_KS90" ] ->
+  { Command.bisim_exa1_ks90 }
+| [ "MeBi" "Bisim_Exa2_KS90" ] ->
+  { Command.bisim_exa2_ks90 }
 END
