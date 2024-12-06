@@ -478,8 +478,6 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
           edge_from
           { action = edge_action; to_state = edge_dest })
       g.transitions;
-    Feedback.msg_warning
-      (str (Printf.sprintf "edges: %s" (Fsm.pstr_edges edges)));
     return (edges, actions)
   ;;
 
@@ -719,9 +717,64 @@ let bounded_lts
   Feedback.msg_debug
     (str
        (Printf.sprintf "(f) Fsm: %s.\n" (Fsm.pstr_fsm ~ids:() ~pp:() the_fsm)));
-  (* FIXME: below is useless, just to stop errors when recompiling about not using [Bisim_algs]. *)
-  let _ = bisim_foo in
   (*  *)
   Feedback.msg_debug (str "\n--------\n");
   return ()
+;;
+
+(** [bisim_exa1_ks90] *)
+let bisim_exa1_ks90 : unit =
+  let s, t = RCP.Examples.exa_1 in
+  Feedback.msg_warning
+    (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa1)\n"));
+  Feedback.msg_warning
+    (str (Printf.sprintf "exa1.s: %s" (Fsm.pstr_fsm ~pp:() s)));
+  Feedback.msg_warning
+    (str (Printf.sprintf "exa1.t: %s" (Fsm.pstr_fsm ~pp:() t)));
+  (* run algorithm *)
+  let pi = RCP.KS90.run s t in
+  (* print out results *)
+  Feedback.msg_warning
+    (str
+       (Printf.sprintf "\n--------\npi: %s" (RCP.KS90.pstr_partition ~pp:() pi)));
+  Feedback.msg_warning (str (Printf.sprintf "\n= = = = = = = = = =\n"));
+  ()
+;;
+
+(** [bisim_exa2_ks90] *)
+let bisim_exa2_ks90 : unit =
+  let s, t = RCP.Examples.exa_1 in
+  Feedback.msg_warning
+    (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa2)\n"));
+  Feedback.msg_warning
+    (str (Printf.sprintf "exa2.s: %s" (Fsm.pstr_fsm ~pp:() s)));
+  Feedback.msg_warning
+    (str (Printf.sprintf "exa2.t: %s" (Fsm.pstr_fsm ~pp:() t)));
+  (* run algorithm *)
+  let pi = RCP.KS90.run s t in
+  (* print out results *)
+  Feedback.msg_warning
+    (str
+       (Printf.sprintf "\n--------\npi: %s" (RCP.KS90.pstr_partition ~pp:() pi)));
+  (* let _ =
+     RCP.KS90.Partition.fold
+     (fun (states : Fsm.States.t) (acc : int) ->
+     Feedback.msg_warning
+     (str (Printf.sprintf "s_pi %d : %s" acc (Fsm.pstr_states states)));
+     acc + 1)
+     s_pi
+     0
+     in
+     Feedback.msg_warning (str (Printf.sprintf "\n--------\nt_pi:"));
+     let _ =
+     RCP.KS90.Partition.fold
+     (fun (states : Fsm.States.t) (acc : int) ->
+     Feedback.msg_warning
+     (str (Printf.sprintf "t_pi %d : %s" acc (Fsm.pstr_states states)));
+     acc + 1)
+     t_pi
+     0
+     in *)
+  Feedback.msg_warning (str (Printf.sprintf "\n= = = = = = = = = =\n"));
+  ()
 ;;

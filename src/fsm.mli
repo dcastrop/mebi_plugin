@@ -60,6 +60,8 @@ type action =
   ; label : string
   }
 
+val action : ?label:string -> int -> action
+
 module Actions : sig
   type elt = action
   type t
@@ -175,7 +177,8 @@ val pstr_edges
   -> string
 
 val handle_states_pstr
-  :  unit option
+  :  ?indent:int
+  -> unit option
   -> unit option
   -> unit option
   -> States.t
