@@ -57,7 +57,7 @@ end
 
 type action =
   { id : int
-  ; name : string
+  ; label : string
   }
 
 module Actions : sig
@@ -110,7 +110,7 @@ module Actions : sig
 end
 
 type ('a, 'b) transition =
-  { label : 'a
+  { action : 'a
   ; to_state : 'b
   }
 
@@ -120,6 +120,7 @@ type edges = (state, fsm_transition) Hashtbl.t
 type fsm =
   { init : state
   ; states : States.t
+  ; actions : Actions.t
   ; edges : (state, fsm_transition) Hashtbl.t
   }
 
@@ -139,6 +140,17 @@ val pstr_states
   -> ?indent:int
   -> States.t
   -> string
+
+val pstr_action : ?ids:unit -> ?long:unit -> action -> string
+
+val handle_action_pstr
+  :  unit option
+  -> unit option
+  -> unit option
+  -> action
+  -> string
+
+val pstr_actions : ?ids:unit -> ?long:unit -> ?indent:int -> Actions.t -> string
 
 val pstr_edge
   :  ?ids:unit
@@ -167,6 +179,13 @@ val handle_states_pstr
   -> unit option
   -> unit option
   -> States.t
+  -> string
+
+val handle_actions_pstr
+  :  unit option
+  -> unit option
+  -> unit option
+  -> Actions.t
   -> string
 
 val handle_edges_pstr

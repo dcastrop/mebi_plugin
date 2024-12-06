@@ -288,7 +288,11 @@ module type GraphB = sig
   type state_translation_table = (EConstr.t, Fsm.state) Hashtbl.t
 
   val build_state_translation_table : lts_graph -> state_translation_table mm
-  val build_edges : lts_graph -> state_translation_table -> Fsm.edges mm
+
+  val build_edges
+    :  lts_graph
+    -> state_translation_table
+    -> (Fsm.edges * Fsm.Actions.t) mm
 
   val lts_to_fsm
     :  lts_graph
@@ -348,7 +352,9 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
           H.add
             g.transitions
             t
-            { label = { id = i; name = econstr_to_string tgt }; to_state = tgt };
+            { action = { id = i; label = econstr_to_string tgt }
+            ; to_state = tgt
+            };
           if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
           then ()
           else Queue.push tgt g.to_visit;
@@ -426,22 +432,55 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       outgoing edges comprised of labels and destination states.
       [g] is the LTS with transitions to build the FSM edges from.
       [s] is the translation map from Coq-terms to FSM states. *)
-  let build_edges (g : lts_graph) (s : state_translation_table) : Fsm.edges mm =
+  let build_edges (g : lts_graph) (s : state_translation_table)
+    : (Fsm.edges * Fsm.Actions.t) mm
+    =
     let* env = get_env in
     let* sigma = get_sigma in
     let keys = H.to_seq_keys g.transitions in
-    let es_tbl = Seq.length keys |> Hashtbl.create in
+    let edges = Seq.length keys |> Hashtbl.create in
+    (* get actions first *)
+    let actions =
+      H.fold
+        (fun (from : EConstr.t)
+          (transition : (Fsm.action, EConstr.constr) Fsm.transition)
+          (acc : Fsm.Actions.t) ->
+          if Fsm.Actions.exists
+               (fun (a : Fsm.action) ->
+                 String.equal a.label transition.action.label)
+               acc
+          then acc
+          else
+            Fsm.Actions.add
+              { id = Fsm.Actions.cardinal acc; label = transition.action.label }
+              acc)
+        g.transitions
+        Fsm.Actions.empty
+    in
     H.iter
-      (fun from transition ->
+      (fun (from : EConstr.t)
+        (transition : (Fsm.action, EConstr.constr) Fsm.transition) ->
         let edge_from = Hashtbl.find s from in
-        let edge_label = transition.label in
         let edge_dest = Hashtbl.find s transition.to_state in
+        let edge_action =
+          List.nth
+            (let pstr_actions =
+               Fsm.Actions.filter
+                 (fun (a : action) ->
+                   String.equal a.label transition.action.label)
+                 actions
+             in
+             Fsm.Actions.to_list pstr_actions)
+            0
+        in
         Hashtbl.add
-          es_tbl
+          edges
           edge_from
-          { label = edge_label; to_state = edge_dest })
+          { action = edge_action; to_state = edge_dest })
       g.transitions;
-    return es_tbl
+    Feedback.msg_warning
+      (str (Printf.sprintf "edges: %s" (Fsm.pstr_edges edges)));
+    return (edges, actions)
   ;;
 
   (** Error when trying to translate an unfinished LTS to FSM. *)
@@ -449,6 +488,9 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
 
   (** Error when a translation from an [lts_graph] to an FSM yields no [states].*)
   exception NoStates of state_translation_table
+
+  (** Error when duplication actions found. *)
+  exception DuplicateActions of Actions.t
 
   (* TODO: below is unused, delete? *)
   (* let pp_fsm ?(long : unit option) (the_fsm : Fsm.fsm) : unit =
@@ -470,13 +512,13 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     : string
     =
     match t with
-    | { label; to_state } ->
+    | { action; to_state } ->
       Printf.sprintf
         "%s ---{ %s }--> %s"
         (econstr_to_string from)
         (match long with
-         | None -> Printf.sprintf "%d" label.id
-         | Some () -> label.name)
+         | None -> Printf.sprintf "%d" action.id
+         | Some () -> action.label)
         (econstr_to_string to_state)
   ;;
 
@@ -541,7 +583,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     match g with
     | { to_visit; transitions; _ } ->
       if Queue.is_empty to_visit
-      then
+      then (
         let* state_translation = build_state_translation_table g in
         (* extract states *)
         let states =
@@ -561,15 +603,32 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
           raise (NoStates state_translation))
         else
           (* TODO: make [build_edges] use [States] rather than [state_translation]. *)
-          let* edges = build_edges g state_translation in
-          (* need to get initial state. *)
-          (* copied from [build_graph]. *)
+          let* edges, actions = build_edges g state_translation in
+          (* check no duplicate actions *)
+          if Actions.for_all
+               (fun (a : action) ->
+                 Actions.exists
+                   (fun (b : action) ->
+                     Bool.not
+                       (Int.equal a.id b.id == String.equal a.label b.label))
+                   actions)
+               actions
+          then (
+            Feedback.msg_warning
+              (str
+                 (Printf.sprintf
+                    "duplicate actions found: %s"
+                    (Fsm.pstr_actions actions)));
+            raise (DuplicateActions actions));
+          (* need to get initial state.
+             ( copied from [build_graph].) *)
           let$ t env sigma =
             Constrintern.interp_constr_evars env sigma init_term
           in
           let$ init_term env sigma = sigma, Reductionops.nf_all env sigma t in
           let init_state = Hashtbl.find state_translation init_term in
-          return ({ init = init_state; states; edges }, state_translation)
+          return
+            ({ init = init_state; states; actions; edges }, state_translation))
       else (
         Feedback.msg_warning
           (str
