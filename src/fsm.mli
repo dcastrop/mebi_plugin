@@ -55,6 +55,14 @@ module States : sig
   val of_seq : elt Seq.t -> t
 end
 
+exception StateNotFoundWithID of (int * States.t)
+exception MultipleStatesFoundWithID of (int * States.t)
+exception StateNotFoundWithName of (string * States.t)
+exception MultipleStatesFoundWithName of (string * States.t)
+
+val get_state_by_id : States.t -> int -> state
+val get_state_by_name : States.t -> string -> state
+
 type action =
   { id : int
   ; label : string
