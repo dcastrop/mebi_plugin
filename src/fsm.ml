@@ -46,8 +46,8 @@ let action ?(label : string option) (id : int) : action =
   }
 ;;
 
-(** [Actions] is a set of [actions]. *)
-module Actions = Set.Make (struct
+(** [Alphabet] is a set of [actions]. *)
+module Alphabet = Set.Make (struct
     type t = action
 
     let compare a b = compare a.id b.id
@@ -55,21 +55,72 @@ module Actions = Set.Make (struct
     (* let add_new (label:string) (actions:t) : t = add {id = actio; label }  *)
   end)
 
-(** [('a, 'b) transition] is a 2-tuple with a [label] and [to_state].
+(** [('a, 'b) transition] is a 2-tuple with a [label] and [destination].
     [label] is of type ['a].
-    [to_state] is of type ['b]. *)
+    [go_to] is of type ['b]. *)
 type ('a, 'b) transition =
   { action : 'a
-  ; to_state : 'b
+  ; destination : 'b
   }
 
 (** [fsm_transition] is a type describing outgoing edges of an OCaml FSM.
     [label] is a label (corresponding to the Coq-based LTS constructor number).
     [state] is thr destination state. *)
-type fsm_transition = (action, state) transition
+(* type fsm_transition = (action, state) transition *)
+
+(** [outgoing_edges] is a hashtable mapping the actions of outgoing edges of states to their destination state. *)
+(* type outgoing_edges = (action, state) Hashtbl.t *)
 
 (** [edges] is a hashtable mapping states to their outgoing-transitions. *)
-type edges = (state, fsm_transition) Hashtbl.t
+(* type edges = (state, outgoing_edges) Hashtbl.t *)
+
+(* module Edges = Set.Make (struct type t = (state, outgoing_edges) Hashtbl.t let compare a b = compare a.) *)
+
+module Actions = Hashtbl.Make (struct
+    type t = action
+
+    let equal (t1 : action) (t2 : action) = String.equal t1.label t2.label
+    let hash (t : action) = Hashtbl.hash t
+  end)
+
+module Edges = Hashtbl.Make (struct
+    type t = state
+
+    let equal (t1 : state) (t2 : state) = Int.equal t1.id t2.id
+    let hash (t : state) = Hashtbl.hash t
+  end)
+
+let get_edges_with_action
+  (es : state Actions.t Edges.t)
+  (s : state)
+  (a : action)
+  : state Actions.t
+  =
+  Actions.of_seq
+    (List.to_seq
+       (Actions.fold
+          (fun (action : action)
+            (destination : state)
+            (acc : (action * state) list) ->
+            if action == a then List.append acc [ action, destination ] else acc)
+          (Edges.find es s)
+          []))
+;;
+
+let get_action_alphabet_from_edges (es : state Actions.t Edges.t) : Alphabet.t =
+  Alphabet.of_list
+    (Edges.fold
+       (fun (from_state : state) (actions : state Actions.t) (acc : action list) ->
+         List.append
+           acc
+           (Actions.fold
+              (fun (action : action) (destination : state) (acc' : action list) ->
+                List.append acc' [ action ])
+              actions
+              []))
+       es
+       [])
+;;
 
 (** [fsm] is a type used to describe an FSM in OCaml.
     [init] is the initial state.
@@ -77,8 +128,7 @@ type edges = (state, fsm_transition) Hashtbl.t
 type fsm =
   { init : state
   ; states : States.t
-  ; actions : Actions.t
-  ; edges : (state, fsm_transition) Hashtbl.t
+  ; edges : state Actions.t Edges.t
   }
 (* TODO: Currently, there may be many copies of the same state in an [fsm] (i.e., in [init] and the [edges]). Maybe add list of states and change others to be an index referencing their position in the list. *)
 
@@ -202,23 +252,23 @@ let handle_action_pstr
   | Some () -> pstr_action ~long:() a
 ;;
 
-(** [pstr_action ?ids ?long action] is a string of [action].
+(** [pstr_action_alphabet ?ids ?long action] is a string of [action].
     [?ids] determines if [action.id] is shown.
     [?long] determines if all fields are shown.
     [action] is the action to show. *)
-let pstr_actions
+let pstr_action_alphabet
   ?(ids : unit option)
   ?(long : unit option)
   ?(indent : int = 1)
-  (actions : Actions.t)
+  (actions : Alphabet.t)
   : string
   =
-  if Actions.is_empty actions
+  if Alphabet.is_empty actions
   then "[ ] (empty)"
   else
     Printf.sprintf
       "[%s%s]"
-      (Actions.fold
+      (Alphabet.fold
          (fun (a : action) (acc : string) ->
            Printf.sprintf
              "%s%s%s\n"
@@ -240,14 +290,14 @@ let pstr_edge
   ?(ids : unit option)
   ?(pp : unit option)
   ?(long : unit option)
-  ((from_state : state), (outgoing_edge : fsm_transition))
+  ((from_state : state), (action : action), (destination : state))
   : string
   =
   Printf.sprintf
     "%s ---{ %s }--> %s"
     (handle_state_pstr ids pp long from_state)
-    (handle_action_pstr ids pp long outgoing_edge.action)
-    (handle_state_pstr ids pp long outgoing_edge.to_state)
+    (handle_action_pstr ids pp long action)
+    (handle_state_pstr ids pp long destination)
 ;;
 
 (* TODO: merge below with [handle_state_pstr] ? *)
@@ -257,7 +307,7 @@ let handle_edge_pstr
   (ids : unit option)
   (pp : unit option)
   (long : unit option)
-  (e : state * fsm_transition)
+  (e : state * action * state)
   : string
   =
   match long with
@@ -305,23 +355,31 @@ let pstr_edges
   ?(pp : unit option)
   ?(long : unit option)
   ?(indent : int = 1)
-  (edges : edges)
+  (edges : state Actions.t Edges.t)
   : string
   =
-  if Hashtbl.to_seq_keys edges |> Seq.is_empty
+  if Edges.to_seq_keys edges |> Seq.is_empty
   then "[ ] (empty)"
   else
     Printf.sprintf
       "[%s%s]"
-      (Hashtbl.fold
+      (Edges.fold
          (fun (from_state : state)
-           (outgoing_edge : fsm_transition)
+           (outgoing_edges : state Actions.t)
            (acc : string) ->
-           Printf.sprintf
-             "%s%s{ %s }\n"
-             acc
-             (Mebi_utils.str_tabs indent)
-             (handle_edge_pstr ids pp long (from_state, outgoing_edge)))
+           Actions.fold
+             (fun (action : action) (destination : state) (acc' : string) ->
+               Printf.sprintf
+                 "%s%s{ %s }\n"
+                 acc
+                 (Mebi_utils.str_tabs indent)
+                 (handle_edge_pstr
+                    ids
+                    pp
+                    long
+                    (from_state, action, destination)))
+             outgoing_edges
+             "\n")
          edges
          "\n")
       (Mebi_utils.str_tabs (indent - 1))
@@ -348,21 +406,21 @@ let handle_states_pstr
   | Some () -> pstr_states ~long:() ~indent s
 ;;
 
-(** [handle_actions_pstr ids pp long a] is a wrapper for [pstr_states] which
+(** [handle_pstr_alphabet ids pp long a] is a wrapper for [pstr_states] which
     makes it easier to pass the options from higher-level [pstr_] functions. *)
-let handle_actions_pstr
+let handle_action_alphabet_pstr
   (ids : unit option)
   (pp : unit option)
   (long : unit option)
-  (a : Actions.t)
+  (a : Alphabet.t)
   : string
   =
   match long with
   | None ->
     (match ids with
-     | None -> pstr_actions a
-     | Some () -> pstr_actions ~ids:() a)
-  | Some () -> pstr_actions ~long:() a
+     | None -> pstr_action_alphabet a
+     | Some () -> pstr_action_alphabet ~ids:() a)
+  | Some () -> pstr_action_alphabet ~long:() a
 ;;
 
 (** [handle_edges_pstr ids pp long e] is a wrapper for [pstr_edges] which
@@ -371,7 +429,7 @@ let handle_edges_pstr
   (ids : unit option)
   (pp : unit option)
   (long : unit option)
-  (e : edges)
+  (e : state Actions.t Edges.t)
   : string
   =
   match long with
@@ -404,7 +462,11 @@ let pstr_fsm
        "states: %s"
        (handle_states_pstr ids pp long the_fsm.states))
     (Printf.sprintf
-       "actions: %s"
-       (handle_actions_pstr ids pp long the_fsm.actions))
+       "alphabet: %s"
+       (handle_action_alphabet_pstr
+          ids
+          pp
+          long
+          (get_action_alphabet_from_edges the_fsm.edges)))
     (Printf.sprintf "edges: %s" (handle_edges_pstr ids pp long the_fsm.edges))
 ;;

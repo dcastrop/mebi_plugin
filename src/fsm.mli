@@ -62,7 +62,7 @@ type action =
 
 val action : ?label:string -> int -> action
 
-module Actions : sig
+module Alphabet : sig
   type elt = action
   type t
 
@@ -113,17 +113,77 @@ end
 
 type ('a, 'b) transition =
   { action : 'a
-  ; to_state : 'b
+  ; destination : 'b
   }
 
-type fsm_transition = (action, state) transition
-type edges = (state, fsm_transition) Hashtbl.t
+module Actions : sig
+  type key = action
+  type !'a t
+
+  val create : int -> 'a t
+  val clear : 'a t -> unit
+  val reset : 'a t -> unit
+  val copy : 'a t -> 'a t
+  val add : 'a t -> key -> 'a -> unit
+  val remove : 'a t -> key -> unit
+  val find : 'a t -> key -> 'a
+  val find_opt : 'a t -> key -> 'a option
+  val find_all : 'a t -> key -> 'a list
+  val replace : 'a t -> key -> 'a -> unit
+  val mem : 'a t -> key -> bool
+  val iter : (key -> 'a -> unit) -> 'a t -> unit
+  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+  val length : 'a t -> int
+  val stats : 'a t -> Hashtbl.statistics
+  val to_seq : 'a t -> (key * 'a) Seq.t
+  val to_seq_keys : 'a t -> key Seq.t
+  val to_seq_values : 'a t -> 'a Seq.t
+  val add_seq : 'a t -> (key * 'a) Seq.t -> unit
+  val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
+  val of_seq : (key * 'a) Seq.t -> 'a t
+end
+
+module Edges : sig
+  type key = state
+  type !'a t
+
+  val create : int -> 'a t
+  val clear : 'a t -> unit
+  val reset : 'a t -> unit
+  val copy : 'a t -> 'a t
+  val add : 'a t -> key -> 'a -> unit
+  val remove : 'a t -> key -> unit
+  val find : 'a t -> key -> 'a
+  val find_opt : 'a t -> key -> 'a option
+  val find_all : 'a t -> key -> 'a list
+  val replace : 'a t -> key -> 'a -> unit
+  val mem : 'a t -> key -> bool
+  val iter : (key -> 'a -> unit) -> 'a t -> unit
+  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+  val length : 'a t -> int
+  val stats : 'a t -> Hashtbl.statistics
+  val to_seq : 'a t -> (key * 'a) Seq.t
+  val to_seq_keys : 'a t -> key Seq.t
+  val to_seq_values : 'a t -> 'a Seq.t
+  val add_seq : 'a t -> (key * 'a) Seq.t -> unit
+  val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
+  val of_seq : (key * 'a) Seq.t -> 'a t
+end
+
+val get_edges_with_action
+  :  state Actions.t Edges.t
+  -> state
+  -> action
+  -> state Actions.t
+
+val get_action_alphabet_from_edges : state Actions.t Edges.t -> Alphabet.t
 
 type fsm =
   { init : state
   ; states : States.t
-  ; actions : Actions.t
-  ; edges : (state, fsm_transition) Hashtbl.t
+  ; edges : state Actions.t Edges.t
   }
 
 val pstr_state : ?ids:unit -> ?pp:unit -> ?long:unit -> state -> string
@@ -152,20 +212,25 @@ val handle_action_pstr
   -> action
   -> string
 
-val pstr_actions : ?ids:unit -> ?long:unit -> ?indent:int -> Actions.t -> string
+val pstr_action_alphabet
+  :  ?ids:unit
+  -> ?long:unit
+  -> ?indent:int
+  -> Alphabet.t
+  -> string
 
 val pstr_edge
   :  ?ids:unit
   -> ?pp:unit
   -> ?long:unit
-  -> state * fsm_transition
+  -> state * action * state
   -> string
 
 val handle_edge_pstr
   :  unit option
   -> unit option
   -> unit option
-  -> state * fsm_transition
+  -> state * action * state
   -> string
 
 val pstr_edges
@@ -173,7 +238,7 @@ val pstr_edges
   -> ?pp:unit
   -> ?long:unit
   -> ?indent:int
-  -> edges
+  -> state Actions.t Edges.t
   -> string
 
 val handle_states_pstr
@@ -184,18 +249,18 @@ val handle_states_pstr
   -> States.t
   -> string
 
-val handle_actions_pstr
+val handle_action_alphabet_pstr
   :  unit option
   -> unit option
   -> unit option
-  -> Actions.t
+  -> Alphabet.t
   -> string
 
 val handle_edges_pstr
   :  unit option
   -> unit option
   -> unit option
-  -> edges
+  -> state Actions.t Edges.t
   -> string
 
 val pstr_fsm : ?ids:unit -> ?pp:unit -> ?long:unit -> fsm -> string

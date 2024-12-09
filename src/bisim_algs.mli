@@ -66,11 +66,18 @@ module RCP : sig
     exception EmptyBlock of Block.t
     exception PartitionsNotDisjoint of Partition.t
 
-    val reachable_blocks : Fsm.fsm_transition list -> Partition.t -> Block.t
-    val split : Block.t -> Fsm.action -> Partition.t -> Fsm.edges -> Partition.t
+    val reachable_blocks : Fsm.state Fsm.Actions.t -> Partition.t -> Block.t
+
+    val split
+      :  Block.t
+      -> Fsm.action
+      -> Partition.t
+      -> Fsm.state Fsm.Actions.t Fsm.Edges.t
+      -> Partition.t
 
     exception SplitEmpty of Partition.t
     exception SplitTooMany of Partition.t
+    exception MultipleActionsSameLabel of Fsm.state Fsm.Actions.t Fsm.Edges.t
 
     val run : Fsm.fsm -> Fsm.fsm -> Partition.t
   end

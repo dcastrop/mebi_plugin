@@ -11,6 +11,17 @@ module RCP = struct
   module Examples = struct
     (** [exa_1] is `Example 3.2.5` on page 106. *)
     let exa_1 : fsm * fsm =
+      let es = Edges.create 2 in
+      Edges.add_seq
+        es
+        (List.to_seq
+           [ ( { id = 0; hash = -1; pp = "s0" }
+             , Actions.of_seq
+                 (List.to_seq
+                    [ { id = 1; label = "a" }, { id = 1; hash = -1; pp = "s1" }
+                    ; { id = 1; label = "a" }, { id = 2; hash = -1; pp = "s2" }
+                    ]) )
+           ]);
       let (s : fsm) =
         { init = { id = 0; hash = -1; pp = "s0" }
         ; states =
@@ -19,31 +30,31 @@ module RCP = struct
               ; { id = 1; hash = -1; pp = "s1" }
               ; { id = 2; hash = -1; pp = "s2" }
               ]
-        ; actions =
-            Actions.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
         ; edges =
-            List.to_seq
-              [ (* s0 *)
-                ( { id = 0; hash = -1; pp = "s0" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 1; hash = -1; pp = "s1" }
-                  } )
-              ; ( { id = 0; hash = -1; pp = "s0" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 2; hash = -1; pp = "s2" }
-                  } )
-                (* s1 *)
-              ; ( { id = 1; hash = -1; pp = "s1" }
-                , { action = { id = 2; label = "b" }
-                  ; to_state = { id = 2; hash = -1; pp = "s2" }
-                  } )
-                (* s2 *)
-              ; ( { id = 2; hash = -1; pp = "s2" }
-                , { action = { id = 2; label = "b" }
-                  ; to_state = { id = 2; hash = -1; pp = "s2" }
-                  } )
-              ]
-            |> Hashtbl.of_seq
+            Edges.of_seq
+              (List.to_seq
+                 (List.fold_left
+                    (fun (acc : (state * state Actions.t) list)
+                      ((from, edges) : state * (action * state) list) ->
+                      List.append
+                        acc
+                        [ from, Actions.of_seq (List.to_seq edges) ])
+                    []
+                    [ ( { id = 0; hash = -1; pp = "s0" }
+                      , [ ( { id = 1; label = "a" }
+                          , { id = 1; hash = -1; pp = "s1" } )
+                        ; ( { id = 1; label = "a" }
+                          , { id = 2; hash = -1; pp = "s2" } )
+                        ] )
+                    ; ( { id = 1; hash = -1; pp = "s1" }
+                      , [ ( { id = 2; label = "b" }
+                          , { id = 1; hash = -1; pp = "s2" } )
+                        ] )
+                    ; ( { id = 2; hash = -1; pp = "s2" }
+                      , [ ( { id = 2; label = "b" }
+                          , { id = 2; hash = -1; pp = "s2" } )
+                        ] )
+                    ]))
         }
       in
       let (t : fsm) =
@@ -53,22 +64,25 @@ module RCP = struct
               [ { id = 0; hash = -1; pp = "t0" }
               ; { id = 1; hash = -1; pp = "t1" }
               ]
-        ; actions =
-            Actions.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
         ; edges =
-            List.to_seq
-              [ (* t0 *)
-                ( { id = 0; hash = -1; pp = "t0" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 1; hash = -1; pp = "t1" }
-                  } )
-                (* t1 *)
-              ; ( { id = 1; hash = -1; pp = "t1" }
-                , { action = { id = 2; label = "b" }
-                  ; to_state = { id = 1; hash = -1; pp = "t1" }
-                  } )
-              ]
-            |> Hashtbl.of_seq
+            Edges.of_seq
+              (List.to_seq
+                 (List.fold_left
+                    (fun (acc : (state * state Actions.t) list)
+                      ((from, edges) : state * (action * state) list) ->
+                      List.append
+                        acc
+                        [ from, Actions.of_seq (List.to_seq edges) ])
+                    []
+                    [ ( { id = 0; hash = -1; pp = "t0" }
+                      , [ ( { id = 1; label = "a" }
+                          , { id = 1; hash = -1; pp = "t1" } )
+                        ] )
+                    ; ( { id = 1; hash = -1; pp = "t1" }
+                      , [ ( { id = 2; label = "b" }
+                          , { id = 2; hash = -1; pp = "t2" } )
+                        ] )
+                    ]))
         }
       in
       s, t
@@ -86,45 +100,41 @@ module RCP = struct
               ; { id = 3; hash = -1; pp = "s3" }
               ; { id = 4; hash = -1; pp = "s4" }
               ]
-        ; actions =
-            Actions.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
         ; edges =
-            List.to_seq
-              [ (* s0 *)
-                ( { id = 0; hash = -1; pp = "s0" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 1; hash = -1; pp = "s1" }
-                  } )
-              ; ( { id = 0; hash = -1; pp = "s0" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 2; hash = -1; pp = "s2" }
-                  } )
-                (* s1 *)
-              ; ( { id = 1; hash = -1; pp = "s1" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 3; hash = -1; pp = "s3" }
-                  } )
-              ; ( { id = 1; hash = -1; pp = "s1" }
-                , { action = { id = 2; label = "b" }
-                  ; to_state = { id = 4; hash = -1; pp = "s4" }
-                  } )
-                (* s2 *)
-              ; ( { id = 2; hash = -1; pp = "s2" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 4; hash = -1; pp = "s4" }
-                  } )
-                (* s3 *)
-              ; ( { id = 3; hash = -1; pp = "s3" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 0; hash = -1; pp = "s0" }
-                  } )
-                (* s4 *)
-              ; ( { id = 4; hash = -1; pp = "s4" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 0; hash = -1; pp = "s0" }
-                  } )
-              ]
-            |> Hashtbl.of_seq
+            Edges.of_seq
+              (List.to_seq
+                 (List.fold_left
+                    (fun (acc : (state * state Actions.t) list)
+                      ((from, edges) : state * (action * state) list) ->
+                      List.append
+                        acc
+                        [ from, Actions.of_seq (List.to_seq edges) ])
+                    []
+                    [ ( { id = 0; hash = -1; pp = "s0" }
+                      , [ ( { id = 1; label = "a" }
+                          , { id = 1; hash = -1; pp = "s1" } )
+                        ; ( { id = 1; label = "a" }
+                          , { id = 2; hash = -1; pp = "s2" } )
+                        ] )
+                    ; ( { id = 1; hash = -1; pp = "s1" }
+                      , [ ( { id = 1; label = "a" }
+                          , { id = 3; hash = -1; pp = "s3" } )
+                        ; ( { id = 2; label = "b" }
+                          , { id = 4; hash = -1; pp = "s4" } )
+                        ] )
+                    ; ( { id = 2; hash = -1; pp = "s2" }
+                      , [ ( { id = 1; label = "a" }
+                          , { id = 4; hash = -1; pp = "s4" } )
+                        ] )
+                    ; ( { id = 3; hash = -1; pp = "s3" }
+                      , [ ( { id = 1; label = "a" }
+                          , { id = 0; hash = -1; pp = "s0" } )
+                        ] )
+                    ; ( { id = 4; hash = -1; pp = "s4" }
+                      , [ ( { id = 1; label = "a" }
+                          , { id = 0; hash = -1; pp = "s0" } )
+                        ] )
+                    ]))
         }
       in
       let (t : fsm) =
@@ -138,58 +148,61 @@ module RCP = struct
               ; { id = 4; hash = -1; pp = "t4" }
               ; { id = 5; hash = -1; pp = "t5" }
               ]
-        ; actions =
-            Actions.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
         ; edges =
-            List.to_seq
-              [ (* t0 *)
-                ( { id = 0; hash = -1; pp = "t0" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 1; hash = -1; pp = "t1" }
-                  } )
-              ; ( { id = 0; hash = -1; pp = "t0" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 3; hash = -1; pp = "t3" }
-                  } )
-                (* t1 *)
-              ; ( { id = 1; hash = -1; pp = "t1" }
-                , { action = { id = 2; label = "b" }
-                  ; to_state = { id = 2; hash = -1; pp = "t2" }
-                  } )
-              ; ( { id = 1; hash = -1; pp = "t1" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 5; hash = -1; pp = "t5" }
-                  } )
-              ; ( { id = 1; hash = -1; pp = "t1" }
-                , { action = { id = 2; label = "b" }
-                  ; to_state = { id = 5; hash = -1; pp = "t5" }
-                  } )
-                (* t2 *)
-              ; ( { id = 2; hash = -1; pp = "t2" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 0; hash = -1; pp = "t0" }
-                  } )
-                (* t3 *)
-              ; ( { id = 3; hash = -1; pp = "t3" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 4; hash = -1; pp = "t4" }
-                  } )
-                (* t4 *)
-              ; ( { id = 4; hash = -1; pp = "t4" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 0; hash = -1; pp = "t0" }
-                  } )
-                (* t5 *)
-              ; ( { id = 5; hash = -1; pp = "t5" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 0; hash = -1; pp = "t0" }
-                  } )
-              ; ( { id = 5; hash = -1; pp = "t5" }
-                , { action = { id = 1; label = "a" }
-                  ; to_state = { id = 4; hash = -1; pp = "t4" }
-                  } )
-              ]
-            |> Hashtbl.of_seq
+            Edges.of_seq
+              (List.to_seq
+                 (List.fold_left
+                    (fun (acc : (state * state Actions.t) list)
+                      ((from, edges) : state * (action * state) list) ->
+                      List.append
+                        acc
+                        [ from, Actions.of_seq (List.to_seq edges) ])
+                    []
+                    [ ( { id = 0; hash = -1; pp = "t0" }
+                      , [ ( { id = 1; label = "a" }
+                          , { id = 1; hash = -1; pp = "t1" } )
+                        ; ( { id = 1; label = "a" }
+                          , { id = 3; hash = -1; pp = "t3" } )
+                        ] )
+                    ; ( { id = 1; hash = -1; pp = "t1" }
+                      , [ ( { id = 2; label = "b" }
+                          , { id = 2; hash = -1; pp = "t2" } )
+                        ; ( { id = 1; label = "a" }
+                          , { id = 5; hash = -1; pp = "t5" } )
+                        ; ( { id = 2; label = "b" }
+                          , { id = 5; hash = -1; pp = "t5" } )
+                        ] )
+                    ; ( { id = 1; hash = -1; pp = "t1" }
+                      , [ ( { id = 2; label = "b" }
+                          , { id = 2; hash = -1; pp = "t2" } )
+                        ; ( { id = 1; label = "a" }
+                          , { id = 5; hash = -1; pp = "t5" } )
+                        ; ( { id = 2; label = "b" }
+                          , { id = 5; hash = -1; pp = "t5" } )
+                        ] )
+                    ; ( { id = 4; hash = -1; pp = "s4" }
+                      , [ ( { id = 1; label = "a" }
+                          , { id = 0; hash = -1; pp = "t0" } )
+                        ] )
+                    ; ( { id = 2; hash = -1; pp = "t2" }
+                      , [ ( { id = 1; label = "a" }
+                          , { id = 0; hash = -1; pp = "t0" } )
+                        ] )
+                    ; ( { id = 3; hash = -1; pp = "t3" }
+                      , [ ( { id = 1; label = "a" }
+                          , { id = 0; hash = -1; pp = "t4" } )
+                        ] )
+                    ; ( { id = 4; hash = -1; pp = "t4" }
+                      , [ ( { id = 1; label = "a" }
+                          , { id = 0; hash = -1; pp = "t0" } )
+                        ] )
+                    ; ( { id = 2; hash = -1; pp = "t5" }
+                      , [ ( { id = 1; label = "a" }
+                          , { id = 0; hash = -1; pp = "t0" } )
+                        ; ( { id = 1; label = "a" }
+                          , { id = 4; hash = -1; pp = "t4" } )
+                        ] )
+                    ]))
         }
       in
       s, t
@@ -236,16 +249,14 @@ module RCP = struct
     exception PartitionsNotDisjoint of Partition.t
 
     (** [reachable_blocks outgoing_edges pi] is the subset of states in [pi] reachable via [outgoing_edges]. *)
-    let reachable_blocks
-      (outgoing_edges : fsm_transition list)
-      (pi : Partition.t)
+    let reachable_blocks (outgoing_edges : state Actions.t) (pi : Partition.t)
       : Block.t
       =
-      List.fold_left
-        (fun (acc : Block.t) (edge : fsm_transition) ->
+      Actions.fold
+        (fun (action : action) (destination : state) (acc : Block.t) ->
           (* filter [pi] to find block containing destination state. *)
           let filtered_pi =
-            Partition.filter (fun (b : Block.t) -> Block.mem edge.to_state b) pi
+            Partition.filter (fun (b : Block.t) -> Block.mem destination b) pi
           in
           (* throw error if state found in more than one partition *)
           if Partition.cardinal filtered_pi > 1
@@ -256,8 +267,8 @@ module RCP = struct
             if Block.is_empty filtered'
             then acc
             else Block.add_seq (Block.to_seq filtered') acc))
-        Block.empty
         outgoing_edges
+        Block.empty
     ;;
 
     (** [split block action pi f] is ...
@@ -270,7 +281,7 @@ module RCP = struct
       (block : Block.t)
       (a : action)
       (pi : Partition.t)
-      (edges : Fsm.edges)
+      (edges : state Actions.t Edges.t)
       : Partition.t
       =
       Feedback.msg_warning
@@ -286,28 +297,33 @@ module RCP = struct
       | [] -> raise (EmptyBlock block)
       | s :: block' ->
         (* get edges corresponding to [action] *)
-        let s_edges =
-          List.filter
-            (fun (e : fsm_transition) -> e.action == a)
-            (Hashtbl.find_all edges s)
-        in
+        let s_edges = get_edges_with_action edges s a in
         (* cache which partitions in [pi] [s_edges] can reach *)
         let s_reachable = reachable_blocks s_edges pi in
         (* for each state in [block] *)
         let b1, b2 =
           List.fold_left
             (fun ((b1', b2') : Block.t * Block.t) t ->
-              let t_edges =
-                List.filter
-                  (fun (e : fsm_transition) -> e.action == a)
-                  (Hashtbl.find_all edges t)
-              in
+              let t_edges = get_edges_with_action edges t a in
               (* check if edges of s and t can reach the same blocks in [pi]. *)
               let t_reachable = reachable_blocks t_edges pi in
               (* TODO: this seems to be broken
 
                  !!! continue from here
+
+                 ! no, go back and filter block [b] to only contain those that can perform the action [a]
               *)
+              Feedback.msg_warning
+                (Pp.str
+                   (Printf.sprintf
+                      "via (%s)...\n\
+                       s [%s] reachable: %s.\n\
+                       t_reachable [%s]: %s."
+                      (Fsm.pstr_action a)
+                      (Fsm.pstr_state ~pp:() s)
+                      (Fsm.pstr_states ~pp:() s_reachable)
+                      (Fsm.pstr_state ~pp:() t)
+                      (Fsm.pstr_states ~pp:() t_reachable)));
               if Block.is_empty (Block.inter s_reachable t_reachable)
               then (
                 Feedback.msg_warning
@@ -341,6 +357,9 @@ module RCP = struct
     exception SplitEmpty of Partition.t
     exception SplitTooMany of Partition.t
 
+    (** Error when duplication actions found. *)
+    exception MultipleActionsSameLabel of state Actions.t Edges.t
+
     (*  *)
     let run (s : fsm) (t : fsm) : Partition.t =
       (* initially [pi] is a partition with a single block containing all states. *)
@@ -360,37 +379,73 @@ module RCP = struct
         ref (Partition.of_list [ init_block ]), map_t_states'
       in
       (* merge actions *)
-      let actions, map_t_actions =
-        Actions.fold
-          (fun (action : Fsm.action)
-            ((acc, map) : Fsm.Actions.t * (Fsm.action, Fsm.action) Hashtbl.t) ->
-            let action' =
-              Fsm.action ~label:action.label (Actions.cardinal acc)
+      let s_alphabet = get_action_alphabet_from_edges s.edges in
+      let t_alphabet = get_action_alphabet_from_edges t.edges in
+      let alphabet, map_t_alphabet =
+        Alphabet.fold
+          (fun (t_action : action)
+            ((alphabet, map) : Alphabet.t * (action, action) Hashtbl.t) ->
+            let s_alphas =
+              Alphabet.filter
+                (fun (s_action : action) -> s_action.label == t_action.label)
+                alphabet
             in
-            (* save mapping from old to new action *)
-            Hashtbl.add map action action';
-            Actions.add action' acc, map)
-          s.actions
-          (t.actions, Actions.cardinal t.actions |> Hashtbl.create)
+            if Alphabet.is_empty s_alphas
+            then (
+              (* create new action in alphabet and add to map *)
+              let new_action =
+                action ~label:t_action.label (Alphabet.cardinal alphabet)
+              in
+              let alphabet' = Alphabet.add new_action alphabet in
+              alphabet', map)
+            else (
+              (* double check there is only one with matching label *)
+              if Alphabet.cardinal s_alphas > 1
+              then raise (MultipleActionsSameLabel s.edges);
+              (* just update map to use existing in s *)
+              Hashtbl.add map t_action (List.nth (Alphabet.elements s_alphas) 0);
+              alphabet, map))
+          t_alphabet
+          (s_alphabet, Alphabet.cardinal t_alphabet |> Hashtbl.create)
       in
+      (* let actions, map_t_actions =
+         Actions.fold
+         (fun (action : Fsm.action)
+         ((acc, map) : Fsm.Actions.t * (Fsm.action, Fsm.action) Hashtbl.t) ->
+         let action' =
+         Fsm.action ~label:action.label (Actions.cardinal acc)
+         in
+         (* save mapping from old to new action *)
+         Hashtbl.add map action action';
+         Actions.add action' acc, map)
+         s.actions
+         (t.actions, Actions.cardinal t.actions |> Hashtbl.create)
+         in *)
       (* merge edge tables *)
-      let edges =
-        Hashtbl.fold
-          (fun (from_state : Fsm.state)
-            (outgoing_edge : Fsm.fsm_transition)
-            (acc : Fsm.edges) ->
-            (* need to update states in edge *)
-            Hashtbl.add
-              acc
-              (Hashtbl.find map_t_states from_state)
-              { action = Hashtbl.find map_t_actions outgoing_edge.action
-              ; to_state = Hashtbl.find map_t_states outgoing_edge.to_state
-              };
-            acc)
-          s.edges
-          t.edges
-        (* (Seq.append (Hashtbl.to_seq s.edges) (Hashtbl.to_seq t.edges)) *)
-      in
+      let edges = s.edges in
+      Edges.iter
+        (fun (from_state : state) (outgoing_edges : state Actions.t) ->
+          (* need to update states in edge *)
+          Edges.add
+            edges
+            (Hashtbl.find map_t_states from_state)
+            (Actions.of_seq
+               (List.to_seq
+                  (Actions.fold
+                     (fun (action : action)
+                       (destination : state)
+                       (acc : (action * state) list) ->
+                       List.append
+                         acc
+                         [ ( Hashtbl.find map_t_alphabet action
+                           , Hashtbl.find map_t_states destination )
+                           (* { action = Hashtbl.find map_t_actions outgoing_edge.action
+                 ; to_state = Hashtbl.find map_t_states outgoing_edge.to_state
+                 }; *)
+                         ])
+                     outgoing_edges
+                     []))))
+        t.edges;
       (* prepare main alg loop *)
       let changed = ref true in
       while !changed do
@@ -399,11 +454,35 @@ module RCP = struct
         Partition.iter
           (fun (b : Block.t) ->
             (* for each action *)
-            Fsm.Actions.iter
-              (fun (a : Fsm.action) ->
-                (* sort outgoing edges with [a.label] by  [b] by the states with outgoing edges with [a.label] *)
-                (* let edges = Hashtbl.length f.edges |> Hashtbl.create in *)
-                let edges_of_a = edges in
+            Alphabet.iter
+              (fun (a : action) ->
+                (* filter [edges] that are of [a]. *)
+                (* (start by assuming an equal number of each action.) *)
+                let edges_of_a =
+                  Edges.length edges
+                  / Alphabet.cardinal (get_action_alphabet_from_edges edges)
+                  |> Edges.create
+                in
+                Edges.iter
+                  (fun (from_state : state)
+                    (outgoing_edges : state Actions.t)
+                    : unit ->
+                    let relevant_edges =
+                      Actions.fold
+                        (fun (action : action)
+                          (destination : state)
+                          (acc : (action * state) list) ->
+                          if action.label == a.label
+                          then List.append acc [ action, destination ]
+                          else acc)
+                        outgoing_edges
+                        []
+                    in
+                    if List.is_empty relevant_edges
+                    then ()
+                    else Edges.add edges_of_a from_state outgoing_edges)
+                  edges;
+                (* List.filter (fun e -> e.action.label==a) edges in *)
                 let pi' = split b a !pi edges_of_a in
                 (* check no greater than 2 blocks were returned *)
                 if Partition.cardinal pi' > 2
@@ -423,7 +502,7 @@ module RCP = struct
                     (* refine further using [pi'] *)
                     pi := pi';
                     changed := true))
-              actions;
+              alphabet;
             ())
           !pi
       done;
