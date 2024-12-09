@@ -7,6 +7,13 @@ type state =
   ; pp : string
   }
 
+(*
+   !
+   !!!
+   ! continue changing edges to be States.t Actions.t Edges.t
+   !
+*)
+
 (** [state ?pp ?hash id] is a wrapper constructor for [state].
     [?pp] is a pretty-printed respresentation, which defaults to [s{id}].
     [?hash] is for storing the hash of Coq-based terms; defaults to -1.
@@ -27,6 +34,27 @@ module States = Set.Make (struct
 
     let compare a b = compare a.id b.id
   end)
+
+exception StateNotFoundWithID of (int * States.t)
+exception MultipleStatesFoundWithID of (int * States.t)
+exception StateNotFoundWithName of (string * States.t)
+exception MultipleStatesFoundWithName of (string * States.t)
+
+let get_state_by_id (states : States.t) (id : int) : state =
+  let filtered = States.filter (fun (s : state) -> s.id == id) states in
+  if States.is_empty filtered then raise (StateNotFoundWithID (id, states));
+  if States.cardinal filtered > 1
+  then raise (MultipleStatesFoundWithID (id, states));
+  List.nth (States.elements filtered) 0
+;;
+
+let get_state_by_name (states : States.t) (name : string) : state =
+  let filtered = States.filter (fun (s : state) -> s.pp == name) states in
+  if States.is_empty filtered then raise (StateNotFoundWithName (name, states));
+  if States.cardinal filtered > 1
+  then raise (MultipleStatesFoundWithName (name, states));
+  List.nth (States.elements filtered) 0
+;;
 
 (** [label] is an alias for [int], corresponding to the index of a Coq-based constructor. *)
 (* type label = int *)
@@ -108,14 +136,20 @@ let get_edges_with_action
 ;;
 
 let get_action_alphabet_from_edges (es : state Actions.t Edges.t) : Alphabet.t =
+  (* (es : States.t Actions.t Edges.t) *)
   Alphabet.of_list
     (Edges.fold
-       (fun (from_state : state) (actions : state Actions.t) (acc : action list) ->
+       (fun (from_state : state)
+         (actions : state Actions.t)
+         (* (actions : States.t Actions.t) *)
+           (acc : action list) ->
          List.append
            acc
            (Actions.fold
-              (fun (action : action) (destination : state) (acc' : action list) ->
-                List.append acc' [ action ])
+              (fun (action : action)
+                (destinations : state)
+                (* (destinations : States.t) *)
+                  (acc' : action list) -> List.append acc' [ action ])
               actions
               []))
        es
@@ -128,7 +162,7 @@ let get_action_alphabet_from_edges (es : state Actions.t Edges.t) : Alphabet.t =
 type fsm =
   { init : state
   ; states : States.t
-  ; edges : state Actions.t Edges.t
+  ; edges : state Actions.t Edges.t (* ; edges : States.t Actions.t Edges.t *)
   }
 (* TODO: Currently, there may be many copies of the same state in an [fsm] (i.e., in [init] and the [edges]). Maybe add list of states and change others to be an index referencing their position in the list. *)
 
@@ -367,19 +401,24 @@ let pstr_edges
          (fun (from_state : state)
            (outgoing_edges : state Actions.t)
            (acc : string) ->
-           Actions.fold
-             (fun (action : action) (destination : state) (acc' : string) ->
-               Printf.sprintf
-                 "%s%s{ %s }\n"
-                 acc
-                 (Mebi_utils.str_tabs indent)
-                 (handle_edge_pstr
-                    ids
-                    pp
-                    long
-                    (from_state, action, destination)))
-             outgoing_edges
-             "\n")
+           Printf.sprintf
+             "%s%s"
+             acc
+             (Actions.fold
+                (fun (action : action) (destinations : state) (acc' : string) ->
+                  (* (States.fold (fun (destination:state) (acc'':)) *)
+                  Printf.sprintf
+                    "%s%s{ %s }\n"
+                    acc'
+                    (Mebi_utils.str_tabs indent)
+                    (handle_edge_pstr
+                       ids
+                       pp
+                       long
+                       (from_state, action, destinations))
+                  (* ) *))
+                outgoing_edges
+                "\n"))
          edges
          "\n")
       (Mebi_utils.str_tabs (indent - 1))
@@ -432,6 +471,7 @@ let handle_edges_pstr
   (e : state Actions.t Edges.t)
   : string
   =
+  (* (e : States.t Actions.t Edges.t) *)
   match long with
   | None ->
     (match pp with

@@ -11,34 +11,55 @@ module RCP = struct
   module Examples = struct
     (** [exa_1] is `Example 3.2.5` on page 106. *)
     let exa_1 : fsm * fsm =
-      let es = Edges.create 2 in
-      Edges.add_seq
-        es
-        (List.to_seq
-           [ ( { id = 0; hash = -1; pp = "s0" }
-             , Actions.of_seq
-                 (List.to_seq
-                    [ { id = 1; label = "a" }, { id = 1; hash = -1; pp = "s1" }
-                    ; { id = 1; label = "a" }, { id = 2; hash = -1; pp = "s2" }
-                    ]) )
-           ]);
+      let init = { id = 0; hash = -1; pp = "s0" } in
+      let states =
+        States.of_list
+          [ { id = 0; hash = -1; pp = "s0" }
+          ; { id = 1; hash = -1; pp = "s1" }
+          ; { id = 2; hash = -1; pp = "s2" }
+          ]
+      in
+      (* let edges = Edges.create 4 in
+         Edges.add edges (get_state_by_id states 0) *)
       let (s : fsm) =
-        { init = { id = 0; hash = -1; pp = "s0" }
-        ; states =
-            States.of_list
-              [ { id = 0; hash = -1; pp = "s0" }
-              ; { id = 1; hash = -1; pp = "s1" }
-              ; { id = 2; hash = -1; pp = "s2" }
-              ]
+        { init
+        ; states
         ; edges =
             Edges.of_seq
               (List.to_seq
                  (List.fold_left
                     (fun (acc : (state * state Actions.t) list)
                       ((from, edges) : state * (action * state) list) ->
+                      Feedback.msg_warning
+                        (Pp.str
+                           (Printf.sprintf
+                              "from [%s] (%d) actions.of_seq: %s."
+                              (pstr_state from)
+                              (List.length edges)
+                              (pstr_edges
+                                 (Edges.of_seq
+                                    (List.to_seq
+                                       [ ( from
+                                         , Actions.of_seq (List.to_seq edges) )
+                                       ])))));
                       List.append
                         acc
-                        [ from, Actions.of_seq (List.to_seq edges) ])
+                        [ ( from
+                          , (Feedback.msg_info
+                               (Pp.str
+                                  (List.fold_left
+                                     (fun (acc : string)
+                                       ((e_a, e_d) : action * state) ->
+                                       Printf.sprintf
+                                         ">> from: [%s] label: [%s]; dest: \
+                                          [%s]."
+                                         (pstr_state from)
+                                         (pstr_action e_a)
+                                         (pstr_state e_d))
+                                     ""
+                                     edges));
+                             Actions.of_seq (List.to_seq edges)) )
+                        ])
                     []
                     [ ( { id = 0; hash = -1; pp = "s0" }
                       , [ ( { id = 1; label = "a" }
@@ -80,7 +101,7 @@ module RCP = struct
                         ] )
                     ; ( { id = 1; hash = -1; pp = "t1" }
                       , [ ( { id = 2; label = "b" }
-                          , { id = 2; hash = -1; pp = "t2" } )
+                          , { id = 1; hash = -1; pp = "t1" } )
                         ] )
                     ]))
         }
