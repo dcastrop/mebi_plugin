@@ -292,7 +292,7 @@ module type GraphB = sig
   val build_edges
     :  lts_graph
     -> state_translation_table
-    -> Fsm.state Fsm.Actions.t Fsm.Edges.t mm
+    -> Fsm.States.t Fsm.Actions.t Fsm.Edges.t mm
 
   val lts_to_fsm
     :  lts_graph
@@ -433,12 +433,14 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       [g] is the LTS with transitions to build the FSM edges from.
       [s] is the translation map from Coq-terms to FSM states. *)
   let build_edges (g : lts_graph) (s : state_translation_table)
-    : Fsm.state Fsm.Actions.t Fsm.Edges.t mm
+    : Fsm.States.t Fsm.Actions.t Fsm.Edges.t mm
     =
     let* env = get_env in
     let* sigma = get_sigma in
     let keys = H.to_seq_keys g.transitions in
-    let edges = Seq.length keys |> Fsm.Edges.create in
+    let (edges : States.t Actions.t Edges.t) =
+      Seq.length keys |> Fsm.Edges.create
+    in
     (* get actions first *)
     let alphabet =
       H.fold
@@ -459,6 +461,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
         g.transitions
         Fsm.Alphabet.empty
     in
+    (* build edges *)
     H.iter
       (fun (from : EConstr.t)
         (transition : (Fsm.action, EConstr.constr) Fsm.transition) ->
@@ -482,9 +485,10 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
           Edges.add
             edges
             edge_from
-            (Actions.of_seq (List.to_seq [ edge_action, edge_dest ]))
+            (Actions.of_seq
+               (List.to_seq [ edge_action, States.of_list [ edge_dest ] ]))
         | Some actions ->
-          (* get current *)
+          (* add to outgoing edges *)
           Edges.add
             edges
             edge_from
@@ -492,7 +496,14 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
                (List.to_seq
                   (List.append
                      (List.of_seq (Actions.to_seq actions))
-                     [ edge_action, edge_dest ]))))
+                     [ ( edge_action
+                       , match Actions.find_opt actions edge_action with
+                         (* add new *)
+                         | None -> States.of_list [ edge_dest ]
+                         (* add to actions of outgoing edges*)
+                         | Some destinations ->
+                           States.add edge_dest destinations )
+                     ]))))
       g.transitions;
     return edges
   ;;
