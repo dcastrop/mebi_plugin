@@ -181,17 +181,17 @@ module Edges : sig
 end
 
 val get_edges_with_action
-  :  state Actions.t Edges.t
+  :  States.t Actions.t Edges.t
   -> state
   -> action
-  -> state Actions.t
+  -> States.t Actions.t
 
-val get_action_alphabet_from_edges : state Actions.t Edges.t -> Alphabet.t
+val get_action_alphabet_from_edges : States.t Actions.t Edges.t -> Alphabet.t
 
 type fsm =
   { init : state
   ; states : States.t
-  ; edges : state Actions.t Edges.t
+  ; edges : States.t Actions.t Edges.t
   }
 
 val pstr_state : ?ids:unit -> ?pp:unit -> ?long:unit -> state -> string
@@ -246,7 +246,7 @@ val pstr_edges
   -> ?pp:unit
   -> ?long:unit
   -> ?indent:int
-  -> state Actions.t Edges.t
+  -> States.t Actions.t Edges.t
   -> string
 
 val handle_states_pstr
@@ -268,7 +268,7 @@ val handle_edges_pstr
   :  unit option
   -> unit option
   -> unit option
-  -> state Actions.t Edges.t
+  -> States.t Actions.t Edges.t
   -> string
 
 val pstr_fsm : ?ids:unit -> ?pp:unit -> ?long:unit -> fsm -> string

@@ -119,37 +119,38 @@ module Edges = Hashtbl.Make (struct
   end)
 
 let get_edges_with_action
-  (es : state Actions.t Edges.t)
+  (es : States.t Actions.t Edges.t)
   (s : state)
   (a : action)
-  : state Actions.t
+  : States.t Actions.t
   =
   Actions.of_seq
     (List.to_seq
        (Actions.fold
           (fun (action : action)
-            (destination : state)
-            (acc : (action * state) list) ->
-            if action == a then List.append acc [ action, destination ] else acc)
+            (destinations : States.t)
+            (acc : (action * States.t) list) ->
+            if action == a
+            then List.append acc [ action, destinations ]
+            else acc)
           (Edges.find es s)
           []))
 ;;
 
-let get_action_alphabet_from_edges (es : state Actions.t Edges.t) : Alphabet.t =
-  (* (es : States.t Actions.t Edges.t) *)
+let get_action_alphabet_from_edges (es : States.t Actions.t Edges.t)
+  : Alphabet.t
+  =
   Alphabet.of_list
     (Edges.fold
        (fun (from_state : state)
-         (actions : state Actions.t)
-         (* (actions : States.t Actions.t) *)
-           (acc : action list) ->
+         (actions : States.t Actions.t)
+         (acc : action list) ->
          List.append
            acc
            (Actions.fold
               (fun (action : action)
-                (destinations : state)
-                (* (destinations : States.t) *)
-                  (acc' : action list) -> List.append acc' [ action ])
+                (destinations : States.t)
+                (acc' : action list) -> List.append acc' [ action ])
               actions
               []))
        es
@@ -162,7 +163,7 @@ let get_action_alphabet_from_edges (es : state Actions.t Edges.t) : Alphabet.t =
 type fsm =
   { init : state
   ; states : States.t
-  ; edges : state Actions.t Edges.t (* ; edges : States.t Actions.t Edges.t *)
+  ; edges : States.t Actions.t Edges.t
   }
 (* TODO: Currently, there may be many copies of the same state in an [fsm] (i.e., in [init] and the [edges]). Maybe add list of states and change others to be an index referencing their position in the list. *)
 
@@ -389,7 +390,7 @@ let pstr_edges
   ?(pp : unit option)
   ?(long : unit option)
   ?(indent : int = 1)
-  (edges : state Actions.t Edges.t)
+  (edges : States.t Actions.t Edges.t)
   : string
   =
   if Edges.to_seq_keys edges |> Seq.is_empty
@@ -399,26 +400,31 @@ let pstr_edges
       "[%s%s]"
       (Edges.fold
          (fun (from_state : state)
-           (outgoing_edges : state Actions.t)
+           (outgoing_edges : States.t Actions.t)
            (acc : string) ->
            Printf.sprintf
              "%s%s"
              acc
              (Actions.fold
-                (fun (action : action) (destinations : state) (acc' : string) ->
-                  (* (States.fold (fun (destination:state) (acc'':)) *)
+                (fun (action : action) (destinations : States.t) (acc' : string) ->
                   Printf.sprintf
-                    "%s%s{ %s }\n"
+                    "%s%s"
                     acc'
-                    (Mebi_utils.str_tabs indent)
-                    (handle_edge_pstr
-                       ids
-                       pp
-                       long
-                       (from_state, action, destinations))
-                  (* ) *))
+                    (States.fold
+                       (fun (destination : state) (acc'' : string) ->
+                         Printf.sprintf
+                           "%s%s{ %s }\n"
+                           acc''
+                           (Mebi_utils.str_tabs indent)
+                           (handle_edge_pstr
+                              ids
+                              pp
+                              long
+                              (from_state, action, destination)))
+                       destinations
+                       ""))
                 outgoing_edges
-                "\n"))
+                ""))
          edges
          "\n")
       (Mebi_utils.str_tabs (indent - 1))
@@ -468,10 +474,9 @@ let handle_edges_pstr
   (ids : unit option)
   (pp : unit option)
   (long : unit option)
-  (e : state Actions.t Edges.t)
+  (e : States.t Actions.t Edges.t)
   : string
   =
-  (* (e : States.t Actions.t Edges.t) *)
   match long with
   | None ->
     (match pp with

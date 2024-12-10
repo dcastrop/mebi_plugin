@@ -11,220 +11,220 @@ module RCP = struct
   module Examples = struct
     (** [exa_1] is `Example 3.2.5` on page 106. *)
     let exa_1 : fsm * fsm =
-      let init = { id = 0; hash = -1; pp = "s0" } in
-      let states =
-        States.of_list
-          [ { id = 0; hash = -1; pp = "s0" }
-          ; { id = 1; hash = -1; pp = "s1" }
-          ; { id = 2; hash = -1; pp = "s2" }
-          ]
-      in
-      (* let edges = Edges.create 4 in
-         Edges.add edges (get_state_by_id states 0) *)
+      (* s *)
       let (s : fsm) =
-        { init
-        ; states
-        ; edges =
-            Edges.of_seq
-              (List.to_seq
-                 (List.fold_left
-                    (fun (acc : (state * state Actions.t) list)
-                      ((from, edges) : state * (action * state) list) ->
-                      Feedback.msg_warning
-                        (Pp.str
-                           (Printf.sprintf
-                              "from [%s] (%d) actions.of_seq: %s."
-                              (pstr_state from)
-                              (List.length edges)
-                              (pstr_edges
-                                 (Edges.of_seq
-                                    (List.to_seq
-                                       [ ( from
-                                         , Actions.of_seq (List.to_seq edges) )
-                                       ])))));
-                      List.append
-                        acc
-                        [ ( from
-                          , (Feedback.msg_info
-                               (Pp.str
-                                  (List.fold_left
-                                     (fun (acc : string)
-                                       ((e_a, e_d) : action * state) ->
-                                       Printf.sprintf
-                                         ">> from: [%s] label: [%s]; dest: \
-                                          [%s]."
-                                         (pstr_state from)
-                                         (pstr_action e_a)
-                                         (pstr_state e_d))
-                                     ""
-                                     edges));
-                             Actions.of_seq (List.to_seq edges)) )
-                        ])
-                    []
-                    [ ( { id = 0; hash = -1; pp = "s0" }
-                      , [ ( { id = 1; label = "a" }
-                          , { id = 1; hash = -1; pp = "s1" } )
-                        ; ( { id = 1; label = "a" }
-                          , { id = 2; hash = -1; pp = "s2" } )
-                        ] )
-                    ; ( { id = 1; hash = -1; pp = "s1" }
-                      , [ ( { id = 2; label = "b" }
-                          , { id = 1; hash = -1; pp = "s2" } )
-                        ] )
-                    ; ( { id = 2; hash = -1; pp = "s2" }
-                      , [ ( { id = 2; label = "b" }
-                          , { id = 2; hash = -1; pp = "s2" } )
-                        ] )
-                    ]))
-        }
+        let init = { id = 0; hash = -1; pp = "s0" } in
+        let states =
+          States.of_list
+            [ { id = 0; hash = -1; pp = "s0" }
+            ; { id = 1; hash = -1; pp = "s1" }
+            ; { id = 2; hash = -1; pp = "s2" }
+            ]
+        in
+        let edges = Edges.create 4 in
+        (* s0 *)
+        Edges.add
+          edges
+          (get_state_by_id states 0)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 1; label = "a" }
+                  , States.of_list
+                      [ get_state_by_id states 1; get_state_by_id states 2 ] )
+                ]));
+        (* s1 *)
+        Edges.add
+          edges
+          (get_state_by_id states 1)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 2; label = "b" }
+                  , States.of_list [ get_state_by_id states 2 ] )
+                ]));
+        (* s2 *)
+        Edges.add
+          edges
+          (get_state_by_id states 2)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 2; label = "b" }
+                  , States.of_list [ get_state_by_id states 2 ] )
+                ]));
+        { init; states; edges }
       in
+      (* t *)
       let (t : fsm) =
-        { init = { id = 0; hash = -1; pp = "t0" }
-        ; states =
-            States.of_list
-              [ { id = 0; hash = -1; pp = "t0" }
-              ; { id = 1; hash = -1; pp = "t1" }
-              ]
-        ; edges =
-            Edges.of_seq
-              (List.to_seq
-                 (List.fold_left
-                    (fun (acc : (state * state Actions.t) list)
-                      ((from, edges) : state * (action * state) list) ->
-                      List.append
-                        acc
-                        [ from, Actions.of_seq (List.to_seq edges) ])
-                    []
-                    [ ( { id = 0; hash = -1; pp = "t0" }
-                      , [ ( { id = 1; label = "a" }
-                          , { id = 1; hash = -1; pp = "t1" } )
-                        ] )
-                    ; ( { id = 1; hash = -1; pp = "t1" }
-                      , [ ( { id = 2; label = "b" }
-                          , { id = 1; hash = -1; pp = "t1" } )
-                        ] )
-                    ]))
-        }
+        let init = { id = 0; hash = -1; pp = "t0" } in
+        let states =
+          States.of_list
+            [ { id = 0; hash = -1; pp = "t0" }
+            ; { id = 1; hash = -1; pp = "t1" }
+            ]
+        in
+        let edges = Edges.create 4 in
+        (* t0 *)
+        Edges.add
+          edges
+          (get_state_by_id states 0)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 1; label = "a" }
+                  , States.of_list [ get_state_by_id states 1 ] )
+                ]));
+        (* t1 *)
+        Edges.add
+          edges
+          (get_state_by_id states 1)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 2; label = "b" }
+                  , States.of_list [ get_state_by_id states 1 ] )
+                ]));
+        { init; states; edges }
       in
       s, t
     ;;
 
     (** [exa_2] is `Example 3.2.6` on page 107. *)
     let exa_2 : fsm * fsm =
+      (* s *)
       let (s : fsm) =
-        { init = { id = 0; hash = -1; pp = "s0" }
-        ; states =
-            States.of_list
-              [ { id = 0; hash = -1; pp = "s0" }
-              ; { id = 1; hash = -1; pp = "s1" }
-              ; { id = 2; hash = -1; pp = "s2" }
-              ; { id = 3; hash = -1; pp = "s3" }
-              ; { id = 4; hash = -1; pp = "s4" }
-              ]
-        ; edges =
-            Edges.of_seq
-              (List.to_seq
-                 (List.fold_left
-                    (fun (acc : (state * state Actions.t) list)
-                      ((from, edges) : state * (action * state) list) ->
-                      List.append
-                        acc
-                        [ from, Actions.of_seq (List.to_seq edges) ])
-                    []
-                    [ ( { id = 0; hash = -1; pp = "s0" }
-                      , [ ( { id = 1; label = "a" }
-                          , { id = 1; hash = -1; pp = "s1" } )
-                        ; ( { id = 1; label = "a" }
-                          , { id = 2; hash = -1; pp = "s2" } )
-                        ] )
-                    ; ( { id = 1; hash = -1; pp = "s1" }
-                      , [ ( { id = 1; label = "a" }
-                          , { id = 3; hash = -1; pp = "s3" } )
-                        ; ( { id = 2; label = "b" }
-                          , { id = 4; hash = -1; pp = "s4" } )
-                        ] )
-                    ; ( { id = 2; hash = -1; pp = "s2" }
-                      , [ ( { id = 1; label = "a" }
-                          , { id = 4; hash = -1; pp = "s4" } )
-                        ] )
-                    ; ( { id = 3; hash = -1; pp = "s3" }
-                      , [ ( { id = 1; label = "a" }
-                          , { id = 0; hash = -1; pp = "s0" } )
-                        ] )
-                    ; ( { id = 4; hash = -1; pp = "s4" }
-                      , [ ( { id = 1; label = "a" }
-                          , { id = 0; hash = -1; pp = "s0" } )
-                        ] )
-                    ]))
-        }
+        let init = { id = 0; hash = -1; pp = "s0" } in
+        let states =
+          States.of_list
+            [ { id = 0; hash = -1; pp = "s0" }
+            ; { id = 1; hash = -1; pp = "s1" }
+            ; { id = 2; hash = -1; pp = "s2" }
+            ; { id = 3; hash = -1; pp = "s3" }
+            ; { id = 4; hash = -1; pp = "s4" }
+            ]
+        in
+        let edges = Edges.create 4 in
+        (* s0 *)
+        Edges.add
+          edges
+          (get_state_by_id states 0)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 1; label = "a" }
+                  , States.of_list
+                      [ get_state_by_id states 1; get_state_by_id states 2 ] )
+                ]));
+        (* s1 *)
+        Edges.add
+          edges
+          (get_state_by_id states 1)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 1; label = "a" }
+                  , States.of_list [ get_state_by_id states 3 ] )
+                ; ( { id = 2; label = "b" }
+                  , States.of_list [ get_state_by_id states 4 ] )
+                ]));
+        (* s2 *)
+        Edges.add
+          edges
+          (get_state_by_id states 2)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 1; label = "a" }
+                  , States.of_list [ get_state_by_id states 4 ] )
+                ]));
+        (* s3 *)
+        Edges.add
+          edges
+          (get_state_by_id states 3)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 1; label = "a" }
+                  , States.of_list [ get_state_by_id states 0 ] )
+                ]));
+        (* s4 *)
+        Edges.add
+          edges
+          (get_state_by_id states 4)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 1; label = "a" }
+                  , States.of_list [ get_state_by_id states 0 ] )
+                ]));
+        { init; states; edges }
       in
+      (* t *)
       let (t : fsm) =
-        { init = { id = 0; hash = -1; pp = "t0" }
-        ; states =
-            States.of_list
-              [ { id = 0; hash = -1; pp = "t0" }
-              ; { id = 1; hash = -1; pp = "t1" }
-              ; { id = 2; hash = -1; pp = "t2" }
-              ; { id = 3; hash = -1; pp = "t3" }
-              ; { id = 4; hash = -1; pp = "t4" }
-              ; { id = 5; hash = -1; pp = "t5" }
-              ]
-        ; edges =
-            Edges.of_seq
-              (List.to_seq
-                 (List.fold_left
-                    (fun (acc : (state * state Actions.t) list)
-                      ((from, edges) : state * (action * state) list) ->
-                      List.append
-                        acc
-                        [ from, Actions.of_seq (List.to_seq edges) ])
-                    []
-                    [ ( { id = 0; hash = -1; pp = "t0" }
-                      , [ ( { id = 1; label = "a" }
-                          , { id = 1; hash = -1; pp = "t1" } )
-                        ; ( { id = 1; label = "a" }
-                          , { id = 3; hash = -1; pp = "t3" } )
-                        ] )
-                    ; ( { id = 1; hash = -1; pp = "t1" }
-                      , [ ( { id = 2; label = "b" }
-                          , { id = 2; hash = -1; pp = "t2" } )
-                        ; ( { id = 1; label = "a" }
-                          , { id = 5; hash = -1; pp = "t5" } )
-                        ; ( { id = 2; label = "b" }
-                          , { id = 5; hash = -1; pp = "t5" } )
-                        ] )
-                    ; ( { id = 1; hash = -1; pp = "t1" }
-                      , [ ( { id = 2; label = "b" }
-                          , { id = 2; hash = -1; pp = "t2" } )
-                        ; ( { id = 1; label = "a" }
-                          , { id = 5; hash = -1; pp = "t5" } )
-                        ; ( { id = 2; label = "b" }
-                          , { id = 5; hash = -1; pp = "t5" } )
-                        ] )
-                    ; ( { id = 4; hash = -1; pp = "s4" }
-                      , [ ( { id = 1; label = "a" }
-                          , { id = 0; hash = -1; pp = "t0" } )
-                        ] )
-                    ; ( { id = 2; hash = -1; pp = "t2" }
-                      , [ ( { id = 1; label = "a" }
-                          , { id = 0; hash = -1; pp = "t0" } )
-                        ] )
-                    ; ( { id = 3; hash = -1; pp = "t3" }
-                      , [ ( { id = 1; label = "a" }
-                          , { id = 0; hash = -1; pp = "t4" } )
-                        ] )
-                    ; ( { id = 4; hash = -1; pp = "t4" }
-                      , [ ( { id = 1; label = "a" }
-                          , { id = 0; hash = -1; pp = "t0" } )
-                        ] )
-                    ; ( { id = 2; hash = -1; pp = "t5" }
-                      , [ ( { id = 1; label = "a" }
-                          , { id = 0; hash = -1; pp = "t0" } )
-                        ; ( { id = 1; label = "a" }
-                          , { id = 4; hash = -1; pp = "t4" } )
-                        ] )
-                    ]))
-        }
+        let init = { id = 0; hash = -1; pp = "t0" } in
+        let states =
+          States.of_list
+            [ { id = 0; hash = -1; pp = "t0" }
+            ; { id = 1; hash = -1; pp = "t1" }
+            ; { id = 2; hash = -1; pp = "t2" }
+            ; { id = 3; hash = -1; pp = "t3" }
+            ; { id = 4; hash = -1; pp = "t4" }
+            ; { id = 5; hash = -1; pp = "t5" }
+            ]
+        in
+        let edges = Edges.create 4 in
+        (* t0 *)
+        Edges.add
+          edges
+          (get_state_by_id states 0)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 1; label = "a" }
+                  , States.of_list
+                      [ get_state_by_id states 1; get_state_by_id states 3 ] )
+                ]));
+        (* t1 *)
+        Edges.add
+          edges
+          (get_state_by_id states 1)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 2; label = "b" }
+                  , States.of_list [ get_state_by_id states 2 ] )
+                ; ( { id = 1; label = "a" }
+                  , States.of_list [ get_state_by_id states 5 ] )
+                ; ( { id = 2; label = "b" }
+                  , States.of_list [ get_state_by_id states 5 ] )
+                ]));
+        (* t2 *)
+        Edges.add
+          edges
+          (get_state_by_id states 2)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 1; label = "a" }
+                  , States.of_list [ get_state_by_id states 0 ] )
+                ]));
+        (* t3 *)
+        Edges.add
+          edges
+          (get_state_by_id states 3)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 1; label = "a" }
+                  , States.of_list [ get_state_by_id states 4 ] )
+                ]));
+        (* t4 *)
+        Edges.add
+          edges
+          (get_state_by_id states 4)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 1; label = "a" }
+                  , States.of_list [ get_state_by_id states 0 ] )
+                ]));
+        (* t5 *)
+        Edges.add
+          edges
+          (get_state_by_id states 5)
+          (Actions.of_seq
+             (List.to_seq
+                [ ( { id = 1; label = "a" }
+                  , States.of_list
+                      [ get_state_by_id states 0; get_state_by_id states 4 ] )
+                ]));
+        { init; states; edges }
       in
       s, t
     ;;
@@ -270,14 +270,18 @@ module RCP = struct
     exception PartitionsNotDisjoint of Partition.t
 
     (** [reachable_blocks outgoing_edges pi] is the subset of states in [pi] reachable via [outgoing_edges]. *)
-    let reachable_blocks (outgoing_edges : state Actions.t) (pi : Partition.t)
+    let reachable_blocks
+      (outgoing_edges : States.t Actions.t)
+      (pi : Partition.t)
       : Block.t
       =
       Actions.fold
-        (fun (action : action) (destination : state) (acc : Block.t) ->
-          (* filter [pi] to find block containing destination state. *)
+        (fun (action : action) (destinations : States.t) (acc : Block.t) ->
+          (* filter [pi] to find block containing one of the destination states. *)
           let filtered_pi =
-            Partition.filter (fun (b : Block.t) -> Block.mem destination b) pi
+            Partition.filter
+              (fun (b : Block.t) -> Block.is_empty (Block.inter destinations b))
+              pi
           in
           (* throw error if state found in more than one partition *)
           if Partition.cardinal filtered_pi > 1
@@ -302,7 +306,7 @@ module RCP = struct
       (block : Block.t)
       (a : action)
       (pi : Partition.t)
-      (edges : state Actions.t Edges.t)
+      (edges : States.t Actions.t Edges.t)
       : Partition.t
       =
       Feedback.msg_warning
@@ -379,7 +383,7 @@ module RCP = struct
     exception SplitTooMany of Partition.t
 
     (** Error when duplication actions found. *)
-    exception MultipleActionsSameLabel of state Actions.t Edges.t
+    exception MultipleActionsSameLabel of States.t Actions.t Edges.t
 
     (*  *)
     let run (s : fsm) (t : fsm) : Partition.t =
@@ -392,7 +396,12 @@ module RCP = struct
               ((acc, map) : Block.t * (Fsm.state, Fsm.state) Hashtbl.t) ->
               let state' = Fsm.state (Block.cardinal acc) in
               (* save mapping from old to new state *)
+              (* (match Hashtbl.find_opt map state with
+                 | None -> Hashtbl.add map state (States.of_list [ state' ])
+                 | Some states -> *)
               Hashtbl.add map state state';
+              (* ); *)
+              (* continue *)
               Block.add state' acc, map)
             s.states
             (t.states, States.cardinal t.states |> Hashtbl.create)
@@ -445,7 +454,7 @@ module RCP = struct
       (* merge edge tables *)
       let edges = s.edges in
       Edges.iter
-        (fun (from_state : state) (outgoing_edges : state Actions.t) ->
+        (fun (from_state : state) (outgoing_edges : States.t Actions.t) ->
           (* need to update states in edge *)
           Edges.add
             edges
@@ -454,12 +463,15 @@ module RCP = struct
                (List.to_seq
                   (Actions.fold
                      (fun (action : action)
-                       (destination : state)
-                       (acc : (action * state) list) ->
+                       (destinations : States.t)
+                       (acc : (action * States.t) list) ->
                        List.append
                          acc
                          [ ( Hashtbl.find map_t_alphabet action
-                           , Hashtbl.find map_t_states destination )
+                           , States.map
+                               (fun (old_state : state) ->
+                                 Hashtbl.find map_t_states old_state)
+                               destinations )
                            (* { action = Hashtbl.find map_t_actions outgoing_edge.action
                  ; to_state = Hashtbl.find map_t_states outgoing_edge.to_state
                  }; *)
@@ -486,15 +498,15 @@ module RCP = struct
                 in
                 Edges.iter
                   (fun (from_state : state)
-                    (outgoing_edges : state Actions.t)
+                    (outgoing_edges : States.t Actions.t)
                     : unit ->
                     let relevant_edges =
                       Actions.fold
                         (fun (action : action)
-                          (destination : state)
-                          (acc : (action * state) list) ->
+                          (destinations : States.t)
+                          (acc : (action * States.t) list) ->
                           if action.label == a.label
-                          then List.append acc [ action, destination ]
+                          then List.append acc [ action, destinations ]
                           else acc)
                         outgoing_edges
                         []
