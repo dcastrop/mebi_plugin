@@ -275,18 +275,24 @@ module RCP = struct
       (pi : Partition.t)
       : Block.t
       =
+      (* !
+
+         error in here, somehow thinks partitions are not disjoint?
+
+         filter function must be wrong
+      *)
       Actions.fold
         (fun (action : action) (destinations : States.t) (acc : Block.t) ->
           (* filter [pi] to find block containing one of the destination states. *)
           let filtered_pi =
             Partition.filter
               (fun (b : Block.t) ->
-                (* Feedback.msg_warning
-                   (Pp.str
-                   (Printf.sprintf
-                   "b: %s.\ndestinations: %s."
-                   (pstr_states ~ids:() ~pp:() b)
-                   (pstr_states ~ids:() ~pp:() destinations))); *)
+                Feedback.msg_warning
+                  (Pp.str
+                     (Printf.sprintf
+                        "b: %s.\ndestinations: %s."
+                        (pstr_states ~pp:() b)
+                        (pstr_states ~pp:() destinations)));
                 Bool.not (Block.is_empty (Block.inter destinations b)))
               pi
           in
@@ -335,74 +341,75 @@ module RCP = struct
         let s_edges = get_edges_with_action edges s_state a in
         (* cache which partitions in [pi] [s_edges] can reach *)
         let s_reachable_blocks = reachable_blocks s_edges pi in
-        (* Feedback.msg_warning
-           (Pp.str
-           (Printf.sprintf
-           "via (%s) [%s] reachable_blocks: %s"
-           (Fsm.pstr_action a)
-           (Fsm.pstr_state ~pp:() s_state)
-           (Fsm.pstr_states ~pp:() s_reachable_blocks))); *)
+        Feedback.msg_info
+          (Pp.str
+             (Printf.sprintf
+                "\nvia (%s) [%s] reachable_blocks: %s.\n"
+                (Fsm.pstr_action a)
+                (Fsm.pstr_state ~pp:() s_state)
+                (Fsm.pstr_states ~pp:() s_reachable_blocks)));
         (* for each state in [block] *)
         let b1, b2 =
           List.fold_left
             (fun ((b1', b2') : Block.t * Block.t) (t_state : state) ->
               let t_edges = get_edges_with_action edges t_state a in
-              (* Feedback.msg_warning
-                 (Pp.str
-                 (Printf.sprintf
-                 "via (%s) %s has (%d) t_edges: [%s]."
-                 (Fsm.pstr_action a)
-                 (Fsm.pstr_state ~pp:() t_state)
-                 (Actions.length t_edges)
-                 (Actions.fold
-                 (fun (_a : action) (_dest : States.t) (_acc : string) ->
-                 Printf.sprintf
-                 "%s  (%s) --( %s )-> (%s)\n"
-                 _acc
-                 (pstr_state ~pp:() t_state)
-                 (pstr_action _a)
-                 (pstr_states ~pp:() _dest))
-                 t_edges
-                 "\n"))); *)
+              Feedback.msg_info
+                (Pp.str
+                   (Printf.sprintf
+                      "\nvia (%s) %s has (%d) t_edges: [%s].\n"
+                      (Fsm.pstr_action a)
+                      (Fsm.pstr_state ~pp:() t_state)
+                      (Actions.length t_edges)
+                      (Actions.fold
+                         (fun (_a : action) (_dest : States.t) (_acc : string) ->
+                           Printf.sprintf
+                             "%s  (%s) --( %s )-> (%s)\n"
+                             _acc
+                             (pstr_state ~pp:() t_state)
+                             (pstr_action _a)
+                             (pstr_states ~pp:() _dest))
+                         t_edges
+                         "\n")));
               if Actions.length t_edges > 0
               then (
                 (* check if edges of s and t can reach the same blocks in [pi]. *)
                 let t_reachable_blocks = reachable_blocks t_edges pi in
-                (* Feedback.msg_warning
-                   (Pp.str
-                   (Printf.sprintf
-                   "via (%s)...\n\
-                   s [%s] reachable: %s.\n\
-                   t_reachable [%s]: %s."
-                   (Fsm.pstr_action a)
-                   (Fsm.pstr_state ~pp:() s_state)
-                   (Fsm.pstr_states ~pp:() s_reachable_blocks)
-                   (Fsm.pstr_state ~pp:() t_state)
-                   (Fsm.pstr_states ~pp:() t_reachable_blocks))); *)
-                if Bool.not
-                     (Block.is_empty
-                        (Block.inter s_reachable_blocks t_reachable_blocks))
-                then
-                  ( (* Feedback.msg_warning
-                       (Pp.str
-                       (Printf.sprintf
-                       "%s and %s cannot reach the same block via label %s."
-                       (pstr_state ~pp:() s_state)
-                       (pstr_state ~pp:() t_state)
-                       (Fsm.pstr_action a))); *)
-                    Block.union b1' (Block.of_list [ t_state ])
-                  , b2' )
-                else b1', Block.union b2' (Block.of_list [ t_state ]))
-              else
-                ( (* no edges for [t_state] via [a] *)
-                  (* Feedback.msg_warning
-                     (Pp.str
+                Feedback.msg_warning
+                  (Pp.str
                      (Printf.sprintf
-                     "%s has no transitions via label %s."
-                     (pstr_state ~pp:() t_state)
-                     (Fsm.pstr_action a))); *)
-                  b1'
-                , Block.union b2' (Block.of_list [ t_state ]) ))
+                        "via (%s)...\n\
+                         s [%s] reachable: %s.\n\
+                         t_reachable [%s]: %s."
+                        (Fsm.pstr_action a)
+                        (Fsm.pstr_state ~pp:() s_state)
+                        (Fsm.pstr_states ~pp:() s_reachable_blocks)
+                        (Fsm.pstr_state ~pp:() t_state)
+                        (Fsm.pstr_states ~pp:() t_reachable_blocks)));
+                if Block.is_empty
+                     (Block.inter s_reachable_blocks t_reachable_blocks)
+                then (
+                  Feedback.msg_info
+                    (Pp.str
+                       (Printf.sprintf
+                          "\n\
+                           %s and %s cannot reach the same block via label %s.\n"
+                          (pstr_state ~pp:() s_state)
+                          (pstr_state ~pp:() t_state)
+                          (Fsm.pstr_action a)));
+                  b1', Block.add t_state b2')
+                else Block.add t_state b1', b2')
+              else (
+                (* no edges for [t_state] via [a] *)
+                Feedback.msg_info
+                  (Pp.str
+                     (Printf.sprintf
+                        "\n%s has no transitions via label %s.\n"
+                        (pstr_state ~pp:() t_state)
+                        (Fsm.pstr_action a)));
+                (* if [s_state] can use [a], then put [t] in [b2] *)
+                if Actions.length s_edges > 0
+                then b1', Block.add t_state b2'
+                else Block.add t_state b1', b2'))
             (Block.empty, Block.empty)
             block_list
         in
@@ -466,8 +473,8 @@ module RCP = struct
                    Printf.sprintf
                      "%s\n  (old: %s -> new: %s)"
                      acc
-                     (pstr_state ~ids:() ~pp:() old_state)
-                     (pstr_state ~ids:() ~pp:() new_state))
+                     (pstr_state ~pp:() old_state)
+                     (pstr_state ~pp:() new_state))
                  map_t_states
                  "")));
       (* merge actions *)
@@ -570,14 +577,16 @@ module RCP = struct
                      []))))
         t.edges;
       Feedback.msg_warning
-        (Pp.str (Printf.sprintf "(d) merged edges: %s" (pstr_edges edges)));
+        (Pp.str
+           (Printf.sprintf "(d) merged edges: %s" (pstr_edges ~pp:() edges)));
       (* prepare main alg loop *)
       let changed = ref true in
       while !changed do
         changed := false;
         (* for each block in [pi] *)
         Partition.iter
-          (fun (b : Block.t) ->
+          (fun (_b : Block.t) ->
+            let b = ref _b in
             (* for each action *)
             Alphabet.iter
               (fun (a : action) ->
@@ -592,41 +601,66 @@ module RCP = struct
                   (fun (from_state : state)
                     (outgoing_edges : States.t Actions.t)
                     : unit ->
-                    let relevant_edges =
-                      Actions.fold
-                        (fun (action : action)
-                          (destinations : States.t)
-                          (acc : (action * States.t) list) ->
-                          if action.label == a.label
-                          then List.append acc [ action, destinations ]
-                          else acc)
-                        outgoing_edges
-                        []
-                    in
-                    if List.is_empty relevant_edges
-                    then ()
-                    else Edges.add edges_of_a from_state outgoing_edges)
+                    match Actions.find_opt outgoing_edges a with
+                    | None -> ()
+                    | Some destinations ->
+                      Edges.add
+                        edges_of_a
+                        from_state
+                        (Actions.of_seq (List.to_seq [ a, destinations ]))
+                    (* Actions.fold
+                       (fun (action : action)
+                       (destinations : States.t)
+                       (acc : (action * States.t) list) ->
+                       if action.label == a.label
+                       then List.append acc [ action, destinations ]
+                       else acc)
+                       outgoing_edges
+                       [] *)
+                    (* if List.is_empty relevant_edges
+                       then () *)
+                    (* else Edges.add edges_of_a from_state outgoing_edges) *))
                   edges;
                 (* split *)
-                match Partition.elements (split b a !pi edges_of_a) with
+                match Partition.elements (split !b a !pi edges_of_a) with
                 | [] ->
                   Feedback.msg_warning
                     (Pp.str (Printf.sprintf "split returned empty list."))
                 | b1 :: [] ->
                   (* check if same as b *)
-                  if Bool.not (Block.equal b1 b)
+                  Feedback.msg_warning
+                    (Pp.str
+                       (Printf.sprintf
+                          "split returned only b1: %s."
+                          (pstr_states ~pp:() b1)));
+                  if Bool.not (Block.equal b1 !b)
                   then (
-                    pi := Partition.remove b !pi;
+                    pi := Partition.remove !b !pi;
                     pi := Partition.union !pi (Partition.of_list [ b1 ]);
+                    (* b := b1; *)
                     changed := true)
                 | [ b1; b2 ] ->
-                  pi := Partition.remove b !pi;
-                  pi
-                  := Partition.union
-                       !pi
-                       (Partition.of_list
-                          (if Block.is_empty b1 then [ b2 ] else [ b1; b2 ]));
-                  changed := true
+                  Feedback.msg_warning
+                    (Pp.str
+                       (Printf.sprintf
+                          "split returned b1: %s.\nand b2: %s"
+                          (pstr_states ~pp:() b1)
+                          (pstr_states ~pp:() b2)));
+                  (* check if union is not the same as b *)
+                  if Bool.not (Block.equal b1 !b)
+                     && Bool.not (Block.equal b2 !b)
+                  then (
+                    Feedback.msg_warning
+                      (Pp.str (Printf.sprintf "b1 and b2 are not equal to b"));
+                    pi := Partition.remove !b !pi;
+                    pi
+                    := Partition.union
+                         !pi
+                         (Partition.of_list
+                            (if Block.is_empty b1 then [ b2 ] else [ b1; b2 ]));
+                    (* FIXME: how could [b := b1 and b2] as the book suggests ? *)
+                    if Block.is_empty b1 then b := b2 else b := b1;
+                    changed := true)
                 | _pi ->
                   Feedback.msg_warning
                     (Pp.str
@@ -642,6 +676,15 @@ module RCP = struct
           !pi
       done;
       (* return partitions *)
+      Feedback.msg_warning
+        (Pp.str
+           (Printf.sprintf
+              "# # #\nreturning: %s.\n# # #"
+              (Partition.fold
+                 (fun (b : Block.t) (acc : string) ->
+                   Printf.sprintf "%s[%s]" acc (pstr_states ~pp:() b))
+                 !pi
+                 "\n")));
       !pi
     ;;
   end

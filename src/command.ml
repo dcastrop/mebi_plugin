@@ -771,18 +771,18 @@ let bisim_exa1_ks90 : unit =
   Feedback.msg_warning
     (str (Printf.sprintf "exa1.t: %s" (Fsm.pstr_fsm ~pp:() t)));
   (* run algorithm *)
-  let pi = RCP.KS90.run s t in
-  (* print out results *)
-  Feedback.msg_warning
-    (str
-       (Printf.sprintf "\n--------\npi: %s" (RCP.KS90.pstr_partition ~pp:() pi)));
+  (* let pi = RCP.KS90.run s t in
+     (* print out results *)
+     Feedback.msg_warning
+     (str
+     (Printf.sprintf "\n--------\npi: %s" (RCP.KS90.pstr_partition ~pp:() pi))); *)
   Feedback.msg_warning (str (Printf.sprintf "\n= = = = = = = = = =\n"));
   ()
 ;;
 
 (** [bisim_exa2_ks90] *)
 let bisim_exa2_ks90 : unit =
-  let s, t = RCP.Examples.exa_1 in
+  let s, t = RCP.Examples.exa_2 in
   Feedback.msg_warning
     (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa2)\n"));
   Feedback.msg_warning
