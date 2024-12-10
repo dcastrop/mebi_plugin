@@ -385,8 +385,11 @@ module RCP = struct
     (** Error when duplication actions found. *)
     exception MultipleActionsSameLabel of States.t Actions.t Edges.t
 
+    exception OldStateHasNoNewState of (state * (state, state) Hashtbl.t)
+
     (*  *)
     let run (s : fsm) (t : fsm) : Partition.t =
+      Feedback.msg_warning (Pp.str "(a) entered run");
       (* initially [pi] is a partition with a single block containing all states. *)
       let pi, map_t_states =
         let init_block, map_t_states' =
@@ -394,7 +397,7 @@ module RCP = struct
           States.fold
             (fun (state : Fsm.state)
               ((acc, map) : Block.t * (Fsm.state, Fsm.state) Hashtbl.t) ->
-              let state' = Fsm.state (Block.cardinal acc) in
+              let state' = Fsm.state ~pp:state.pp (Block.cardinal acc) in
               (* save mapping from old to new state *)
               (* (match Hashtbl.find_opt map state with
                  | None -> Hashtbl.add map state (States.of_list [ state' ])
@@ -408,6 +411,24 @@ module RCP = struct
         in
         ref (Partition.of_list [ init_block ]), map_t_states'
       in
+      Feedback.msg_warning
+        (Pp.str
+           (Printf.sprintf
+              "(b.1) initial pi: %s.\n(b.2) state map: [%s]."
+              (Partition.fold
+                 (fun (b : Block.t) (acc : string) ->
+                   Printf.sprintf "%s%s" acc (pstr_states ~long:() b))
+                 !pi
+                 "")
+              (Hashtbl.fold
+                 (fun (old_state : state) (new_state : state) (acc : string) ->
+                   Printf.sprintf
+                     "%s\n  (old: %s -> new: %s)"
+                     acc
+                     (pstr_state ~ids:() ~pp:() old_state)
+                     (pstr_state ~ids:() ~pp:() new_state))
+                 map_t_states
+                 "")));
       (* merge actions *)
       let s_alphabet = get_action_alphabet_from_edges s.edges in
       let t_alphabet = get_action_alphabet_from_edges t.edges in
@@ -438,19 +459,20 @@ module RCP = struct
           t_alphabet
           (s_alphabet, Alphabet.cardinal t_alphabet |> Hashtbl.create)
       in
-      (* let actions, map_t_actions =
-         Actions.fold
-         (fun (action : Fsm.action)
-         ((acc, map) : Fsm.Actions.t * (Fsm.action, Fsm.action) Hashtbl.t) ->
-         let action' =
-         Fsm.action ~label:action.label (Actions.cardinal acc)
-         in
-         (* save mapping from old to new action *)
-         Hashtbl.add map action action';
-         Actions.add action' acc, map)
-         s.actions
-         (t.actions, Actions.cardinal t.actions |> Hashtbl.create)
-         in *)
+      Feedback.msg_warning
+        (Pp.str
+           (Printf.sprintf
+              "(c.1) merged alphabet: %s.\n(c.2) alphabet map: [%s]."
+              (pstr_action_alphabet ~long:() alphabet)
+              (Hashtbl.fold
+                 (fun (old_alpha : action) (new_alpha : action) (acc : string) ->
+                   Printf.sprintf
+                     "%s\n  (old: (%s) -> new: (%s))"
+                     acc
+                     (pstr_action ~long:() old_alpha)
+                     (pstr_action ~long:() new_alpha))
+                 map_t_alphabet
+                 "")));
       (* merge edge tables *)
       let edges = s.edges in
       Edges.iter
@@ -470,15 +492,27 @@ module RCP = struct
                          [ ( Hashtbl.find map_t_alphabet action
                            , States.map
                                (fun (old_state : state) ->
-                                 Hashtbl.find map_t_states old_state)
+                                 match
+                                   Hashtbl.find_opt map_t_states old_state
+                                 with
+                                 | None ->
+                                   Feedback.msg_warning
+                                     (Pp.str
+                                        (Printf.sprintf
+                                           "old_state: %s is not in \
+                                            map_t_states"
+                                           (pstr_state ~ids:() ~pp:() old_state)));
+                                   raise
+                                     (OldStateHasNoNewState
+                                        (old_state, map_t_states))
+                                 | Some new_state -> new_state)
                                destinations )
-                           (* { action = Hashtbl.find map_t_actions outgoing_edge.action
-                 ; to_state = Hashtbl.find map_t_states outgoing_edge.to_state
-                 }; *)
                          ])
                      outgoing_edges
                      []))))
         t.edges;
+      Feedback.msg_warning
+        (Pp.str (Printf.sprintf "(d) merged edges: %s" (pstr_edges edges)));
       (* prepare main alg loop *)
       let changed = ref true in
       while !changed do
