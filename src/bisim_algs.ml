@@ -280,11 +280,20 @@ module RCP = struct
           (* filter [pi] to find block containing one of the destination states. *)
           let filtered_pi =
             Partition.filter
-              (fun (b : Block.t) -> Block.is_empty (Block.inter destinations b))
+              (fun (b : Block.t) ->
+                (* Feedback.msg_warning
+                   (Pp.str
+                   (Printf.sprintf
+                   "b: %s.\ndestinations: %s."
+                   (pstr_states ~ids:() ~pp:() b)
+                   (pstr_states ~ids:() ~pp:() destinations))); *)
+                Bool.not (Block.is_empty (Block.inter destinations b)))
               pi
           in
           (* throw error if state found in more than one partition *)
-          if Partition.cardinal filtered_pi > 1
+          if Partition.is_empty filtered_pi
+          then Block.empty
+          else if Partition.cardinal filtered_pi > 1
           then raise (PartitionsNotDisjoint pi)
           else (
             (* get single block in partition *)
@@ -318,48 +327,84 @@ module RCP = struct
               (pstr_partition ~pp:() pi)
               (Fsm.pstr_edges ~pp:() edges)));
       (* choose some state [s] in [block] *)
-      match Block.to_list block with
+      let block_list = Block.to_list block in
+      match block_list with
       | [] -> raise (EmptyBlock block)
-      | s :: block' ->
+      | s_state :: _block' ->
         (* get edges corresponding to [action] *)
-        let s_edges = get_edges_with_action edges s a in
+        let s_edges = get_edges_with_action edges s_state a in
         (* cache which partitions in [pi] [s_edges] can reach *)
-        let s_reachable = reachable_blocks s_edges pi in
+        let s_reachable_blocks = reachable_blocks s_edges pi in
+        (* Feedback.msg_warning
+           (Pp.str
+           (Printf.sprintf
+           "via (%s) [%s] reachable_blocks: %s"
+           (Fsm.pstr_action a)
+           (Fsm.pstr_state ~pp:() s_state)
+           (Fsm.pstr_states ~pp:() s_reachable_blocks))); *)
         (* for each state in [block] *)
         let b1, b2 =
           List.fold_left
-            (fun ((b1', b2') : Block.t * Block.t) t ->
-              let t_edges = get_edges_with_action edges t a in
-              (* check if edges of s and t can reach the same blocks in [pi]. *)
-              let t_reachable = reachable_blocks t_edges pi in
-              (* TODO: this seems to be broken
-
-                 !!! continue from here
-
-                 ! no, go back and filter block [b] to only contain those that can perform the action [a]
-              *)
-              Feedback.msg_warning
-                (Pp.str
-                   (Printf.sprintf
-                      "via (%s)...\n\
-                       s [%s] reachable: %s.\n\
-                       t_reachable [%s]: %s."
-                      (Fsm.pstr_action a)
-                      (Fsm.pstr_state ~pp:() s)
-                      (Fsm.pstr_states ~pp:() s_reachable)
-                      (Fsm.pstr_state ~pp:() t)
-                      (Fsm.pstr_states ~pp:() t_reachable)));
-              if Block.is_empty (Block.inter s_reachable t_reachable)
+            (fun ((b1', b2') : Block.t * Block.t) (t_state : state) ->
+              let t_edges = get_edges_with_action edges t_state a in
+              (* Feedback.msg_warning
+                 (Pp.str
+                 (Printf.sprintf
+                 "via (%s) %s has (%d) t_edges: [%s]."
+                 (Fsm.pstr_action a)
+                 (Fsm.pstr_state ~pp:() t_state)
+                 (Actions.length t_edges)
+                 (Actions.fold
+                 (fun (_a : action) (_dest : States.t) (_acc : string) ->
+                 Printf.sprintf
+                 "%s  (%s) --( %s )-> (%s)\n"
+                 _acc
+                 (pstr_state ~pp:() t_state)
+                 (pstr_action _a)
+                 (pstr_states ~pp:() _dest))
+                 t_edges
+                 "\n"))); *)
+              if Actions.length t_edges > 0
               then (
-                Feedback.msg_warning
-                  (Pp.str
+                (* check if edges of s and t can reach the same blocks in [pi]. *)
+                let t_reachable_blocks = reachable_blocks t_edges pi in
+                (* Feedback.msg_warning
+                   (Pp.str
+                   (Printf.sprintf
+                   "via (%s)...\n\
+                   s [%s] reachable: %s.\n\
+                   t_reachable [%s]: %s."
+                   (Fsm.pstr_action a)
+                   (Fsm.pstr_state ~pp:() s_state)
+                   (Fsm.pstr_states ~pp:() s_reachable_blocks)
+                   (Fsm.pstr_state ~pp:() t_state)
+                   (Fsm.pstr_states ~pp:() t_reachable_blocks))); *)
+                if Bool.not
+                     (Block.is_empty
+                        (Block.inter s_reachable_blocks t_reachable_blocks))
+                then
+                  ( (* Feedback.msg_warning
+                       (Pp.str
+                       (Printf.sprintf
+                       "%s and %s cannot reach the same block via label %s."
+                       (pstr_state ~pp:() s_state)
+                       (pstr_state ~pp:() t_state)
+                       (Fsm.pstr_action a))); *)
+                    Block.union b1' (Block.of_list [ t_state ])
+                  , b2' )
+                else b1', Block.union b2' (Block.of_list [ t_state ]))
+              else
+                ( (* no edges for [t_state] via [a] *)
+                  (* Feedback.msg_warning
+                     (Pp.str
                      (Printf.sprintf
-                        "s and t cannot reach the same block via label %s."
-                        (Fsm.pstr_action a)));
-                Block.union b1' (Block.of_list [ t ]), b2')
-              else b1', Block.union b2' (Block.of_list [ t ]))
+                     "%s has no transitions via label %s."
+                     (pstr_state ~pp:() t_state)
+                     (Fsm.pstr_action a))); *)
+                  b1'
+                , Block.union b2' (Block.of_list [ t_state ]) ))
             (Block.empty, Block.empty)
-            block'
+            block_list
         in
         Feedback.msg_warning
           (Pp.str
@@ -399,15 +444,11 @@ module RCP = struct
               ((acc, map) : Block.t * (Fsm.state, Fsm.state) Hashtbl.t) ->
               let state' = Fsm.state ~pp:state.pp (Block.cardinal acc) in
               (* save mapping from old to new state *)
-              (* (match Hashtbl.find_opt map state with
-                 | None -> Hashtbl.add map state (States.of_list [ state' ])
-                 | Some states -> *)
               Hashtbl.add map state state';
-              (* ); *)
               (* continue *)
               Block.add state' acc, map)
-            s.states
-            (t.states, States.cardinal t.states |> Hashtbl.create)
+            t.states
+            (s.states, States.cardinal t.states |> Hashtbl.create)
         in
         ref (Partition.of_list [ init_block ]), map_t_states'
       in
@@ -566,26 +607,36 @@ module RCP = struct
                     then ()
                     else Edges.add edges_of_a from_state outgoing_edges)
                   edges;
-                (* List.filter (fun e -> e.action.label==a) edges in *)
-                let pi' = split b a !pi edges_of_a in
-                (* check no greater than 2 blocks were returned *)
-                if Partition.cardinal pi' > 2
-                then raise (SplitTooMany pi')
-                else if Partition.cardinal pi' == 2
-                then
-                  (* if [pi'] has two blocks that are not just [b] again, *)
-                  if Bool.not
-                       (Block.equal
-                          b
-                          (Partition.fold
-                             (fun (b' : Block.t) (acc : Block.t) ->
-                               Block.add_seq (Block.to_seq b') acc)
-                             pi'
-                             Block.empty))
+                (* split *)
+                match Partition.elements (split b a !pi edges_of_a) with
+                | [] ->
+                  Feedback.msg_warning
+                    (Pp.str (Printf.sprintf "split returned empty list."))
+                | b1 :: [] ->
+                  (* check if same as b *)
+                  if Bool.not (Block.equal b1 b)
                   then (
-                    (* refine further using [pi'] *)
-                    pi := pi';
-                    changed := true))
+                    pi := Partition.remove b !pi;
+                    pi := Partition.union !pi (Partition.of_list [ b1 ]);
+                    changed := true)
+                | [ b1; b2 ] ->
+                  pi := Partition.remove b !pi;
+                  pi
+                  := Partition.union
+                       !pi
+                       (Partition.of_list
+                          (if Block.is_empty b1 then [ b2 ] else [ b1; b2 ]));
+                  changed := true
+                | _pi ->
+                  Feedback.msg_warning
+                    (Pp.str
+                       (Printf.sprintf
+                          "split returned more than 2 items: %s."
+                          (Partition.fold
+                             (fun (b' : Block.t) (_acc : string) ->
+                               Printf.sprintf "%s%s" _acc (pstr_states b'))
+                             (Partition.of_list _pi)
+                             "\n"))))
               alphabet;
             ())
           !pi
