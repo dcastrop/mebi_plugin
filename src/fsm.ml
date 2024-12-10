@@ -133,7 +133,9 @@ let get_edges_with_action
             if action == a
             then List.append acc [ action, destinations ]
             else acc)
-          (Edges.find es s)
+          (match Edges.find_opt es s with
+           | None -> Actions.of_seq (List.to_seq [])
+           | Some es' -> es')
           []))
 ;;
 
