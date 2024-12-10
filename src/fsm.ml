@@ -107,7 +107,7 @@ type ('a, 'b) transition =
 module Actions = Hashtbl.Make (struct
     type t = action
 
-    let equal (t1 : action) (t2 : action) = String.equal t1.label t2.label
+    let equal (t1 : action) (t2 : action) = Int.equal t1.id t2.id
     let hash (t : action) = Hashtbl.hash t
   end)
 
