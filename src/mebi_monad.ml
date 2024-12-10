@@ -67,6 +67,22 @@ let make_constr_tbl st =
   }
 ;;
 
+let compare_constr st () t1 t2 =
+  if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1
+;;
+
+let make_constr_set st =
+  let cmp = compare_constr st in
+  let module Constrset =
+    Set.Make (struct
+      type t = EConstr.t
+
+      let compare t1 t2 = cmp () t1 t2
+    end)
+  in
+  { state = st; value = (module Constrset : Set.S with type elt = EConstr.t) }
+;;
+
 (** Monadic for loop *)
 let rec iterate
   (from_idx : int)
