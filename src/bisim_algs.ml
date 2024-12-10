@@ -500,8 +500,25 @@ module RCP = struct
                                      (Pp.str
                                         (Printf.sprintf
                                            "old_state: %s is not in \
-                                            map_t_states"
-                                           (pstr_state ~ids:() ~pp:() old_state)));
+                                            map_t_states: [%s]"
+                                           (pstr_state ~ids:() ~pp:() old_state)
+                                           (Hashtbl.fold
+                                              (fun (old : state)
+                                                (_new : state)
+                                                (_acc : string) ->
+                                                Printf.sprintf
+                                                  "%s  (old: %s) -> (new: %s)\n"
+                                                  _acc
+                                                  (pstr_state
+                                                     ~ids:()
+                                                     ~pp:()
+                                                     old)
+                                                  (pstr_state
+                                                     ~ids:()
+                                                     ~pp:()
+                                                     _new))
+                                              map_t_states
+                                              "\n")));
                                    raise
                                      (OldStateHasNoNewState
                                         (old_state, map_t_states))
