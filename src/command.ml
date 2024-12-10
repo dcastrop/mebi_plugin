@@ -276,11 +276,13 @@ let bound : int = 5
     (Essentially acts as a `.mli` for the [MkGraph] module.) *)
 module type GraphB = sig
   module H : Hashtbl.S with type key = EConstr.t
+  module S : Set.S with type elt = EConstr.t
 
   type lts_transition = (Fsm.action, EConstr.constr) Fsm.transition
 
   type lts_graph =
     { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
+    ; states : S.t
     ; transitions : lts_transition H.t
     }
 
@@ -317,8 +319,11 @@ end
 
 (** [MkGraph M] is ...
     [M] is a ... *)
-module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
+module MkGraph
+    (M : Hashtbl.S with type key = EConstr.t)
+    (N : Set.S with type elt = EConstr.t) : GraphB = struct
   module H = M
+  module S = N
 
   (** [lts_transition] is a type for describing outgoing transitions of a Coq-based LTS.
       [Fsm.action] is the constructor number.
@@ -330,6 +335,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       [transitions] is a hashtable mapping integers (of hashed constructors) to Coq terms. *)
   type lts_graph =
     { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
+    ; states : S.t
     ; transitions : lts_transition H.t
     }
 
@@ -346,10 +352,12 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
       let* constrs = check_valid_constructor the_lts t in
       let* env = get_env in
       let* sigma = get_sigma in
+      let new_states = ref (S.singleton t) in
       List.iter
         (fun (i, tgt) ->
           Feedback.msg_debug
             (str "\n\nTransition to" ++ Printer.pr_econstr_env env sigma tgt);
+          new_states := S.add tgt !new_states;
           H.add
             g.transitions
             t
@@ -362,6 +370,7 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
           Feedback.msg_debug
             (str "\nVisiting next: " ++ int (Queue.length g.to_visit)))
         constrs;
+      let g = { g with states = S.union g.states !new_states } in
       build_lts the_lts g
   ;;
 
@@ -376,7 +385,9 @@ module MkGraph (M : Hashtbl.S with type key = EConstr.t) : GraphB = struct
     let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
     let q = Queue.create () in
     let* _ = return (Queue.push t q) in
-    build_lts the_lts { to_visit = q; transitions = H.create bound }
+    build_lts
+      the_lts
+      { to_visit = q; states = S.empty; transitions = H.create bound }
   ;;
 
   open Fsm
@@ -667,7 +678,8 @@ end
 (** [make_graph_builder] is ... *)
 let make_graph_builder =
   let* m = make_constr_tbl in
-  let module G = MkGraph ((val m)) in
+  let* s = make_constr_set in
+  let module G = MkGraph ((val m)) ((val s)) in
   return (module G : GraphB)
 ;;
 
