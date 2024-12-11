@@ -1,10 +1,9 @@
 type state =
   { id : int
-  ; hash : int
   ; pp : string
   }
 
-val state : ?pp:string -> ?hash:int -> int -> state
+val state : ?pp:string -> int -> state
 
 module States : sig
   type elt = state
@@ -186,6 +185,7 @@ val get_edges_with_action
   -> action
   -> States.t Actions.t
 
+val get_action_alphabet_from_actions : States.t Actions.t -> Alphabet.t
 val get_action_alphabet_from_edges : States.t Actions.t Edges.t -> Alphabet.t
 
 type fsm =
@@ -239,6 +239,24 @@ val handle_edge_pstr
   -> unit option
   -> unit option
   -> state * action * state
+  -> string
+
+val pstr_actions
+  :  ?ids:unit
+  -> ?pp:unit
+  -> ?long:unit
+  -> ?indent:int
+  -> ?from_state:state
+  -> States.t Actions.t
+  -> string
+
+val handle_actions_pstr
+  :  ?indent:int
+  -> ?from_state:state
+  -> unit option
+  -> unit option
+  -> unit option
+  -> States.t Actions.t
   -> string
 
 val pstr_edges

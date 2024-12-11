@@ -66,7 +66,10 @@ module RCP : sig
     exception EmptyBlock of Block.t
     exception PartitionsNotDisjoint of Partition.t
 
-    val reachable_blocks : Fsm.States.t Fsm.Actions.t -> Partition.t -> Block.t
+    val reachable_partition
+      :  Fsm.States.t Fsm.Actions.t
+      -> Partition.t
+      -> Partition.t
 
     val split
       :  Block.t
@@ -79,7 +82,10 @@ module RCP : sig
     exception SplitTooMany of Partition.t
     exception MultipleActionsSameLabel of Fsm.States.t Fsm.Actions.t Fsm.Edges.t
 
-    val run : Fsm.fsm -> Fsm.fsm -> Partition.t
+    exception
+      OldStateHasNoNewState of (Fsm.state * (Fsm.state, Fsm.state) Hashtbl.t)
+
+    val run : Fsm.fsm -> Fsm.fsm -> bool * Partition.t
   end
 
   module PT87 : sig end

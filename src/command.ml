@@ -400,10 +400,10 @@ module MkGraph
   let build_state_translation_table (g : lts_graph) : state_translation_table mm
     =
     let* sigma = get_sigma in
-    let hash t =
-      EConstr.to_constr ?abort_on_undefined_evars:(Some false) sigma t
-      |> Constr.hash
-    in
+    (* let hash t =
+       EConstr.to_constr ?abort_on_undefined_evars:(Some false) sigma t
+       |> Constr.hash
+       in *)
     let keys = H.to_seq_keys g.transitions in
     let tr_tbl = Seq.length keys |> Hashtbl.create in
     (* set up counter for state ids *)
@@ -423,7 +423,10 @@ module MkGraph
             Hashtbl.add
               tr_tbl
               t
-              { id = get_state_id (); hash = hash t; pp = econstr_to_string t };
+              { id = get_state_id ()
+              ; (* hash = hash t; *)
+                pp = econstr_to_string t
+              };
           (* check if [dest_state] is already captured *)
           let dest_state = (H.find g.transitions t).destination in
           if false == Hashtbl.mem tr_tbl dest_state
@@ -431,8 +434,7 @@ module MkGraph
             Hashtbl.add
               tr_tbl
               dest_state
-              { id = get_state_id ()
-              ; hash = hash dest_state
+              { id = get_state_id () (* ; hash = hash dest_state *)
               ; pp = econstr_to_string dest_state
               })
         keys
@@ -764,56 +766,67 @@ let bounded_lts
 (** [bisim_exa1_ks90] *)
 let bisim_exa1_ks90 : unit =
   let s, t = RCP.Examples.exa_1 in
-  Feedback.msg_warning
+  Feedback.msg_debug
     (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa1)\n"));
-  Feedback.msg_warning
-    (str (Printf.sprintf "exa1.s: %s" (Fsm.pstr_fsm ~pp:() s)));
-  Feedback.msg_warning
-    (str (Printf.sprintf "exa1.t: %s" (Fsm.pstr_fsm ~pp:() t)));
+  Feedback.msg_debug (str (Printf.sprintf "exa1.s: %s" (Fsm.pstr_fsm ~pp:() s)));
+  Feedback.msg_debug (str (Printf.sprintf "exa1.t: %s" (Fsm.pstr_fsm ~pp:() t)));
   (* run algorithm *)
-  (* let pi = RCP.KS90.run s t in
-     (* print out results *)
-     Feedback.msg_warning
-     (str
-     (Printf.sprintf "\n--------\npi: %s" (RCP.KS90.pstr_partition ~pp:() pi))); *)
-  Feedback.msg_warning (str (Printf.sprintf "\n= = = = = = = = = =\n"));
+  let are_bisimilar, pi = RCP.KS90.run s t in
+  (* print out results *)
+  Feedback.msg_notice
+    (str
+       (Printf.sprintf
+          "(s ~ t) = %b.%s"
+          are_bisimilar
+          (if Bool.not are_bisimilar
+           then
+             Printf.sprintf
+               "\nnon-bisimilar partition: %s"
+               (RCP.KS90.pstr_partition ~pp:() pi)
+           else "")));
+  Feedback.msg_info
+    (str
+       (Printf.sprintf
+          "where s = %s\nand t = %s."
+          (Fsm.pstr_fsm ~pp:() s)
+          (Fsm.pstr_fsm ~pp:() t)));
+  Feedback.msg_debug
+    (str
+       (Printf.sprintf "\n--------\npi: %s" (RCP.KS90.pstr_partition ~pp:() pi)));
+  Feedback.msg_debug (str (Printf.sprintf "\n= = = = = = = = = =\n"));
   ()
 ;;
 
 (** [bisim_exa2_ks90] *)
 let bisim_exa2_ks90 : unit =
   let s, t = RCP.Examples.exa_2 in
-  Feedback.msg_warning
+  Feedback.msg_debug
     (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa2)\n"));
-  Feedback.msg_warning
-    (str (Printf.sprintf "exa2.s: %s" (Fsm.pstr_fsm ~pp:() s)));
-  Feedback.msg_warning
-    (str (Printf.sprintf "exa2.t: %s" (Fsm.pstr_fsm ~pp:() t)));
+  Feedback.msg_debug (str (Printf.sprintf "exa2.s: %s" (Fsm.pstr_fsm ~pp:() s)));
+  Feedback.msg_debug (str (Printf.sprintf "exa2.t: %s" (Fsm.pstr_fsm ~pp:() t)));
   (* run algorithm *)
-  let pi = RCP.KS90.run s t in
+  let are_bisimilar, pi = RCP.KS90.run s t in
   (* print out results *)
-  Feedback.msg_warning
+  Feedback.msg_notice
+    (str
+       (Printf.sprintf
+          "(s ~ t) = %b.%s"
+          are_bisimilar
+          (if Bool.not are_bisimilar
+           then
+             Printf.sprintf
+               "\nnon-bisimilar partition: %s"
+               (RCP.KS90.pstr_partition ~pp:() pi)
+           else "")));
+  Feedback.msg_info
+    (str
+       (Printf.sprintf
+          "where s = %s\nand t = %s."
+          (Fsm.pstr_fsm ~pp:() s)
+          (Fsm.pstr_fsm ~pp:() t)));
+  Feedback.msg_debug
     (str
        (Printf.sprintf "\n--------\npi: %s" (RCP.KS90.pstr_partition ~pp:() pi)));
-  (* let _ =
-     RCP.KS90.Partition.fold
-     (fun (states : Fsm.States.t) (acc : int) ->
-     Feedback.msg_warning
-     (str (Printf.sprintf "s_pi %d : %s" acc (Fsm.pstr_states states)));
-     acc + 1)
-     s_pi
-     0
-     in
-     Feedback.msg_warning (str (Printf.sprintf "\n--------\nt_pi:"));
-     let _ =
-     RCP.KS90.Partition.fold
-     (fun (states : Fsm.States.t) (acc : int) ->
-     Feedback.msg_warning
-     (str (Printf.sprintf "t_pi %d : %s" acc (Fsm.pstr_states states)));
-     acc + 1)
-     t_pi
-     0
-     in *)
-  Feedback.msg_warning (str (Printf.sprintf "\n= = = = = = = = = =\n"));
+  Feedback.msg_debug (str (Printf.sprintf "\n= = = = = = = = = =\n"));
   ()
 ;;

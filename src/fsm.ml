@@ -2,8 +2,7 @@
     [id] is an integer for identifying the state.
     [pp] is a pretty-printed string of something corresponding to this state. *)
 type state =
-  { id : int
-  ; hash : int
+  { id : int (* ; hash : int *)
   ; pp : string
   }
 
@@ -18,9 +17,9 @@ type state =
     [?pp] is a pretty-printed respresentation, which defaults to [s{id}].
     [?hash] is for storing the hash of Coq-based terms; defaults to -1.
     [id] is the unique identifier for the state. *)
-let state ?(pp : string option) ?(hash : int = -1) (id : int) =
-  { id
-  ; hash
+let state ?(pp : string option) (* ?(hash : int = -1) *)
+                                  (id : int) =
+  { id (* ; hash *)
   ; pp =
       (match pp with
        | None -> Printf.sprintf "s%d" id
@@ -139,6 +138,11 @@ let get_edges_with_action
           []))
 ;;
 
+let get_action_alphabet_from_actions (actions : States.t Actions.t) : Alphabet.t
+  =
+  Alphabet.of_list (List.of_seq (Actions.to_seq_keys actions))
+;;
+
 let get_action_alphabet_from_edges (es : States.t Actions.t Edges.t)
   : Alphabet.t
   =
@@ -199,9 +203,10 @@ let pstr_state
             | None -> ""
             | Some () -> Printf.sprintf " <id: %d>" state.id))
   (* show everything *)
-  | Some () ->
-    Printf.sprintf "(id: %d; hash: %d; pp: %s)" state.id state.hash state.pp
+  | Some () -> Printf.sprintf "(id: %d; pp: %s)" state.id state.pp
 ;;
+
+(* Printf.sprintf "(id: %d; hash: %d; pp: %s)" state.id state.hash state.pp *)
 
 (** [handle_state_pstr ids pp long s] is a wrapper for [pstr_state] which
     makes it easier to pass the options from higher-level [pstr_] functions. *)
@@ -358,6 +363,66 @@ let handle_edge_pstr
   | Some () -> pstr_edge ~long:() e
 ;;
 
+let pstr_actions
+  ?(ids : unit option)
+  ?(pp : unit option)
+  ?(long : unit option)
+  ?(indent : int = 1)
+  ?(from_state : state = { id = -1; pp = ".." })
+  (actions : States.t Actions.t)
+  : string
+  =
+  if List.is_empty (List.of_seq (Actions.to_seq_keys actions))
+  then "[ ] (empty)"
+  else
+    Printf.sprintf
+      "[%s%s]"
+      (Actions.fold
+         (fun (action : action) (destinations : States.t) (acc : string) ->
+           Printf.sprintf
+             "%s%s"
+             acc
+             (States.fold
+                (fun (destination : state) (acc' : string) ->
+                  Printf.sprintf
+                    "%s%s{ %s }\n"
+                    acc'
+                    (Mebi_utils.str_tabs indent)
+                    (handle_edge_pstr
+                       ids
+                       pp
+                       long
+                       (from_state, action, destination)))
+                destinations
+                ""))
+         actions
+         "\n")
+      (Mebi_utils.str_tabs (indent - 1))
+;;
+
+let handle_actions_pstr
+  ?(indent : int = 1)
+  ?(from_state : state = { id = -1; pp = ".." })
+  (ids : unit option)
+  (pp : unit option)
+  (long : unit option)
+  (a : States.t Actions.t)
+  : string
+  =
+  match long with
+  | None ->
+    (match ids with
+     | None ->
+       (match pp with
+        | None -> pstr_actions ~indent ~from_state a
+        | Some () -> pstr_actions ~pp:() ~indent ~from_state a)
+     | Some () ->
+       (match pp with
+        | None -> pstr_actions ~ids:() ~indent ~from_state a
+        | Some () -> pstr_actions ~ids:() ~pp:() ~indent ~from_state a))
+  | Some () -> pstr_actions ~long:() ~indent ~from_state a
+;;
+
 (* TODO: trying to combine all of the [handle_state_pstr], [handle_edge_pstr], etc. *)
 (** [handle_units] denotes the types that [handle_units_pstr] supports. *)
 (* type handle_units =
@@ -405,28 +470,16 @@ let pstr_edges
            (outgoing_edges : States.t Actions.t)
            (acc : string) ->
            Printf.sprintf
-             "%s%s"
+             "%s%s%s\n"
              acc
-             (Actions.fold
-                (fun (action : action) (destinations : States.t) (acc' : string) ->
-                  Printf.sprintf
-                    "%s%s"
-                    acc'
-                    (States.fold
-                       (fun (destination : state) (acc'' : string) ->
-                         Printf.sprintf
-                           "%s%s{ %s }\n"
-                           acc''
-                           (Mebi_utils.str_tabs indent)
-                           (handle_edge_pstr
-                              ids
-                              pp
-                              long
-                              (from_state, action, destination)))
-                       destinations
-                       ""))
-                outgoing_edges
-                ""))
+             (Mebi_utils.str_tabs indent)
+             (handle_actions_pstr
+                ~indent:(indent + 1)
+                ~from_state
+                ids
+                pp
+                long
+                outgoing_edges))
          edges
          "\n")
       (Mebi_utils.str_tabs (indent - 1))
