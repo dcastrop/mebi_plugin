@@ -705,7 +705,11 @@ module RCP = struct
       done;
       (* [s] and [t] are bisimilar if there are no singleton blocks in [pi] *)
       let non_bisimilar_partition =
-        Partition.filter (fun (b : Block.t) -> Block.cardinal b == 1) !pi
+        Partition.filter
+          (fun (b : Block.t) ->
+            (* TODO: using the state maps defined at the beginning prior to merging [s] and [t], check that each non-singleton partition contains states from both [s] and [t]. *)
+            Block.cardinal b == 1)
+          !pi
       in
       if Partition.is_empty non_bisimilar_partition
       then (* bisimilar *)
