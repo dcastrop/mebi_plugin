@@ -21,6 +21,9 @@ module RCP = struct
             ; { id = 2; pp = "s2" }
             ]
         in
+        let alphabet =
+          Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
+        in
         let edges = Edges.create 4 in
         (* s0 *)
         Edges.add
@@ -28,7 +31,7 @@ module RCP = struct
           (get_state_by_id states 0)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 1; label = "a" }
+                [ ( get_action_by_label alphabet "a"
                   , States.of_list
                       [ get_state_by_id states 1; get_state_by_id states 2 ] )
                 ]));
@@ -38,7 +41,7 @@ module RCP = struct
           (get_state_by_id states 1)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 2; label = "b" }
+                [ ( get_action_by_label alphabet "b"
                   , States.of_list [ get_state_by_id states 2 ] )
                 ]));
         (* s2 *)
@@ -47,16 +50,19 @@ module RCP = struct
           (get_state_by_id states 2)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 2; label = "b" }
+                [ ( get_action_by_label alphabet "b"
                   , States.of_list [ get_state_by_id states 2 ] )
                 ]));
-        { init; states; edges }
+        { init; states; alphabet; edges }
       in
       (* t *)
       let (t : fsm) =
         let init = { id = 0; pp = "t0" } in
         let states =
           States.of_list [ { id = 0; pp = "t0" }; { id = 1; pp = "t1" } ]
+        in
+        let alphabet =
+          Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
         in
         let edges = Edges.create 4 in
         (* t0 *)
@@ -65,7 +71,7 @@ module RCP = struct
           (get_state_by_id states 0)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 1; label = "a" }
+                [ ( get_action_by_label alphabet "a"
                   , States.of_list [ get_state_by_id states 1 ] )
                 ]));
         (* t1 *)
@@ -74,10 +80,10 @@ module RCP = struct
           (get_state_by_id states 1)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 2; label = "b" }
+                [ ( get_action_by_label alphabet "b"
                   , States.of_list [ get_state_by_id states 1 ] )
                 ]));
-        { init; states; edges }
+        { init; states; alphabet; edges }
       in
       s, t
     ;;
@@ -96,6 +102,9 @@ module RCP = struct
             ; { id = 4; pp = "s4" }
             ]
         in
+        let alphabet =
+          Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
+        in
         let edges = Edges.create 4 in
         (* s0 *)
         Edges.add
@@ -103,7 +112,7 @@ module RCP = struct
           (get_state_by_id states 0)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 1; label = "a" }
+                [ ( get_action_by_label alphabet "a"
                   , States.of_list
                       [ get_state_by_id states 1; get_state_by_id states 2 ] )
                 ]));
@@ -113,9 +122,9 @@ module RCP = struct
           (get_state_by_id states 1)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 1; label = "a" }
+                [ ( get_action_by_label alphabet "a"
                   , States.of_list [ get_state_by_id states 3 ] )
-                ; ( { id = 2; label = "b" }
+                ; ( get_action_by_label alphabet "b"
                   , States.of_list [ get_state_by_id states 4 ] )
                 ]));
         (* s2 *)
@@ -124,7 +133,7 @@ module RCP = struct
           (get_state_by_id states 2)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 1; label = "a" }
+                [ ( get_action_by_label alphabet "a"
                   , States.of_list [ get_state_by_id states 4 ] )
                 ]));
         (* s3 *)
@@ -133,7 +142,7 @@ module RCP = struct
           (get_state_by_id states 3)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 1; label = "a" }
+                [ ( get_action_by_label alphabet "a"
                   , States.of_list [ get_state_by_id states 0 ] )
                 ]));
         (* s4 *)
@@ -142,10 +151,10 @@ module RCP = struct
           (get_state_by_id states 4)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 1; label = "a" }
+                [ ( get_action_by_label alphabet "a"
                   , States.of_list [ get_state_by_id states 0 ] )
                 ]));
-        { init; states; edges }
+        { init; states; alphabet; edges }
       in
       (* t *)
       let (t : fsm) =
@@ -160,6 +169,9 @@ module RCP = struct
             ; { id = 5; pp = "t5" }
             ]
         in
+        let alphabet =
+          Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
+        in
         let edges = Edges.create 4 in
         (* t0 *)
         Edges.add
@@ -167,7 +179,7 @@ module RCP = struct
           (get_state_by_id states 0)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 1; label = "a" }
+                [ ( get_action_by_label alphabet "a"
                   , States.of_list
                       [ get_state_by_id states 1; get_state_by_id states 3 ] )
                 ]));
@@ -177,11 +189,11 @@ module RCP = struct
           (get_state_by_id states 1)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 2; label = "b" }
+                [ ( get_action_by_label alphabet "b"
                   , States.of_list [ get_state_by_id states 2 ] )
-                ; ( { id = 1; label = "a" }
+                ; ( get_action_by_label alphabet "a"
                   , States.of_list [ get_state_by_id states 5 ] )
-                ; ( { id = 2; label = "b" }
+                ; ( get_action_by_label alphabet "b"
                   , States.of_list [ get_state_by_id states 5 ] )
                 ]));
         (* t2 *)
@@ -190,7 +202,7 @@ module RCP = struct
           (get_state_by_id states 2)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 1; label = "a" }
+                [ ( get_action_by_label alphabet "a"
                   , States.of_list [ get_state_by_id states 0 ] )
                 ]));
         (* t3 *)
@@ -199,7 +211,7 @@ module RCP = struct
           (get_state_by_id states 3)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 1; label = "a" }
+                [ ( get_action_by_label alphabet "a"
                   , States.of_list [ get_state_by_id states 4 ] )
                 ]));
         (* t4 *)
@@ -208,7 +220,7 @@ module RCP = struct
           (get_state_by_id states 4)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 1; label = "a" }
+                [ ( get_action_by_label alphabet "a"
                   , States.of_list [ get_state_by_id states 0 ] )
                 ]));
         (* t5 *)
@@ -217,11 +229,11 @@ module RCP = struct
           (get_state_by_id states 5)
           (Actions.of_seq
              (List.to_seq
-                [ ( { id = 1; label = "a" }
+                [ ( get_action_by_label alphabet "a"
                   , States.of_list
                       [ get_state_by_id states 0; get_state_by_id states 4 ] )
                 ]));
-        { init; states; edges }
+        { init; states; alphabet; edges }
       in
       s, t
     ;;
@@ -272,20 +284,6 @@ module RCP = struct
       (pi : Partition.t)
       : Partition.t
       =
-      (* !
-
-         error in here, somehow thinks partitions are not disjoint?
-
-         filter function must be wrong
-      *)
-      (* Feedback.msg_warning
-         (Pp.str
-         (Printf.sprintf
-         "checking for reachability of: %s;\nof states in: %s."
-         (pstr_action_alphabet
-         (get_action_alphabet_from_actions outgoing_edges))
-         (pstr_partition ~pp:() pi))); *)
-      (* get the destinations of all outgoing_edges *)
       let all_destinations =
         Actions.fold
           (fun (a : action) (destinations : States.t) (acc : States.t) ->
@@ -302,45 +300,6 @@ module RCP = struct
         pi
     ;;
 
-    (* Actions.fold
-       (fun (action : action) (destinations : States.t) (acc : Block.t) ->
-       (* filter [pi] to find block containing one of the destination states. *)
-       let filtered_pi =
-       Partition.filter
-       (fun (b : Block.t) ->
-       Feedback.msg_warning
-       (Pp.str
-       (Printf.sprintf
-       "b: %s.\n\
-       destinations: %s.\n\
-       is reachable: %b.\n\
-       intersection: %s."
-       (pstr_states ~pp:() b)
-       (pstr_states ~pp:() destinations)
-       (Bool.not (Block.is_empty (Block.inter destinations b)))
-       (pstr_states ~pp:() (Block.inter destinations b))));
-       Bool.not (Block.is_empty (Block.inter destinations b)))
-       pi
-       in
-       Feedback.msg_warning
-       (Pp.str
-       (Printf.sprintf
-       "filtered pi: %s."
-       (pstr_partition ~pp:() filtered_pi)));
-       (* throw error if state found in more than one partition *)
-       if Partition.is_empty filtered_pi
-       then Block.empty
-       else if Partition.cardinal filtered_pi > 1
-       then raise (PartitionsNotDisjoint pi)
-       else (
-       (* get single block in partition *)
-       let filtered' = List.nth (Partition.elements filtered_pi) 0 in
-       if Block.is_empty filtered'
-       then acc
-       else Block.add_seq (Block.to_seq filtered') acc))
-       outgoing_edges
-       Block.empty *)
-
     (** [split block action pi f] is ...
         (Definition follows `Fig. 3.1` on page 108.)
         [block] is ...
@@ -354,67 +313,24 @@ module RCP = struct
       (edges : States.t Actions.t Edges.t)
       : Partition.t
       =
-      (* Feedback.msg_warning
-         (Pp.str
-         (Printf.sprintf
-         "#### split...\nblock: %s.\na: %s\npi: %s.\nedges: %s.\n"
-         (Fsm.pstr_states ~pp:() block)
-         (Fsm.pstr_action a)
-         (pstr_partition ~pp:() pi)
-         (Fsm.pstr_edges ~pp:() edges))); *)
       (* choose some state [s] in [block] *)
       let block_list = Block.to_list block in
       match block_list with
       | [] -> raise (EmptyBlock block)
       | s_state :: _block' ->
         (* get edges corresponding to [action] *)
-        let s_edges = get_edges_with_action edges s_state a in
+        let s_edges = get_outgoing_actions edges s_state a in
         (* cache which partitions in [pi] [s_edges] can reach *)
         let s_reachable_partition = reachable_partition s_edges pi in
-        (* Feedback.msg_info
-           (Pp.str
-           (Printf.sprintf
-           "\nvia (%s) [%s] reachable_blocks: %s.\n"
-           (Fsm.pstr_action a)
-           (Fsm.pstr_state ~pp:() s_state)
-           (pstr_partition ~pp:() s_reachable_partition))); *)
         (* for each state in [block] *)
         let b1, b2 =
           List.fold_left
             (fun ((b1', b2') : Block.t * Block.t) (t_state : state) ->
-              let t_edges = get_edges_with_action edges t_state a in
-              (* Feedback.msg_info
-                 (Pp.str
-                 (Printf.sprintf
-                 "\nvia (%s) %s has (%d) t_edges: [%s].\n"
-                 (Fsm.pstr_action a)
-                 (Fsm.pstr_state ~pp:() t_state)
-                 (Actions.length t_edges)
-                 (Actions.fold
-                 (fun (_a : action) (_dest : States.t) (_acc : string) ->
-                 Printf.sprintf
-                 "%s  (%s) --( %s )-> (%s)\n"
-                 _acc
-                 (pstr_state ~pp:() t_state)
-                 (pstr_action _a)
-                 (pstr_states ~pp:() _dest))
-                 t_edges
-                 "\n"))); *)
+              let t_edges = get_outgoing_actions edges t_state a in
               if Actions.length t_edges > 0
               then (
                 (* check if edges of s and t can reach the same blocks in [pi]. *)
                 let t_reachable_partition = reachable_partition t_edges pi in
-                (* Feedback.msg_warning
-                   (Pp.str
-                   (Printf.sprintf
-                   "via (%s)...\n\
-                   s [%s] reachable: %s.\n\
-                   t_reachable [%s]: %s."
-                   (Fsm.pstr_action a)
-                   (Fsm.pstr_state ~pp:() s_state)
-                   (pstr_partition ~pp:() s_reachable_partition)
-                   (Fsm.pstr_state ~pp:() t_state)
-                   (pstr_partition ~pp:() t_reachable_partition))); *)
                 (* if s and t can reach the same blocks *)
                 if Partition.equal
                      (Partition.inter
@@ -424,48 +340,18 @@ module RCP = struct
                         s_reachable_partition
                         t_reachable_partition)
                 then Block.add t_state b1', b2'
-                else
-                  ( (* Feedback.msg_info
-                       (Pp.str
-                       (Printf.sprintf
-                       "\n\
-                       %s and %s cannot reach the same block via label %s.\n"
-                       (pstr_state ~pp:() s_state)
-                       (pstr_state ~pp:() t_state)
-                       (Fsm.pstr_action a))); *)
-                    b1'
-                  , Block.add t_state b2' ))
+                else b1', Block.add t_state b2')
               else if (* no edges for [t_state] via [a] *)
-                      (* Feedback.msg_info
-                         (Pp.str
-                         (Printf.sprintf
-                         "\n%s has no transitions via label %s.\n"
-                         (pstr_state ~pp:() t_state)
-                         (Fsm.pstr_action a))); *)
-                      (* if [s_state] can use [a], then put [t] in [b2] *)
                       Actions.length s_edges > 0
               then b1', Block.add t_state b2'
               else Block.add t_state b1', b2')
             (Block.empty, Block.empty)
             block_list
         in
-        (* Feedback.msg_warning
-           (Pp.str
-           (Printf.sprintf
-           "\nb1: %s.\nb2: %s.\n#### split #### (end)\n"
-           (Fsm.pstr_states ~pp:() b1)
-           (Fsm.pstr_states ~pp:() b2))); *)
         if Block.is_empty b2
         then Partition.of_list [ b1 ]
         else Partition.of_list [ b1; b2 ]
     ;;
-
-    (* let changed = ref true in
-       let rec loop (pi : Partition.t) : Partition.t =
-       if !changed
-       then (
-       changed := false;
-       Partition.fold (fun (b:Block.t) (acc:Partition.t) -> acc) pi Partition.empty *)
 
     exception SplitEmpty of Partition.t
     exception SplitTooMany of Partition.t
@@ -479,21 +365,29 @@ module RCP = struct
     let run (s : fsm) (t : fsm) : bool * Partition.t =
       Feedback.msg_debug (Pp.str "(a) entered run");
       (* initially [pi] is a partition with a single block containing all states. *)
-      let pi, map_t_states =
-        let init_block, map_t_states' =
+      let pi, map_of_states =
+        let init_block, map_of_states' =
           (* cant just merge States.t since their ids would conflict *)
           States.fold
-            (fun (state : Fsm.state)
-              ((acc, map) : Block.t * (Fsm.state, Fsm.state) Hashtbl.t) ->
-              let state' = Fsm.state ~pp:state.pp (Block.cardinal acc) in
+            (fun (state : state)
+              ((acc, map) : Block.t * (state, state) Hashtbl.t) ->
+              let state' = make_state ~pp:state.pp (Block.cardinal acc) in
               (* save mapping from old to new state *)
               Hashtbl.add map state state';
               (* continue *)
               Block.add state' acc, map)
             t.states
-            (s.states, States.cardinal t.states |> Hashtbl.create)
+            ( s.states
+            , (* map states of [s] to themselves *)
+              Hashtbl.of_seq
+                (List.to_seq
+                   (States.fold
+                      (fun (state : state) (acc : (state * state) list) ->
+                        List.append acc [ state, state ])
+                      s.states
+                      [])) )
         in
-        ref (Partition.of_list [ init_block ]), map_t_states'
+        ref (Partition.of_list [ init_block ]), map_of_states'
       in
       Feedback.msg_debug
         (Pp.str
@@ -507,11 +401,11 @@ module RCP = struct
                      acc
                      (pstr_state ~pp:() old_state)
                      (pstr_state ~pp:() new_state))
-                 map_t_states
+                 map_of_states
                  "")));
       (* merge actions *)
-      let s_alphabet = get_action_alphabet_from_edges s.edges in
-      let t_alphabet = get_action_alphabet_from_edges t.edges in
+      let s_alphabet = s.alphabet in
+      let t_alphabet = t.alphabet in
       let alphabet, map_t_alphabet =
         Alphabet.fold
           (fun (t_action : action)
@@ -525,7 +419,7 @@ module RCP = struct
             then (
               (* create new action in alphabet and add to map *)
               let new_action =
-                action ~label:t_action.label (Alphabet.cardinal alphabet)
+                make_action ~label:t_action.label (Alphabet.cardinal alphabet)
               in
               let alphabet' = Alphabet.add new_action alphabet in
               alphabet', map)
@@ -560,7 +454,7 @@ module RCP = struct
           (* need to update states in edge *)
           Edges.add
             edges
-            (Hashtbl.find map_t_states from_state)
+            (Hashtbl.find map_of_states from_state)
             (Actions.of_seq
                (List.to_seq
                   (Actions.fold
@@ -573,35 +467,12 @@ module RCP = struct
                            , States.map
                                (fun (old_state : state) ->
                                  match
-                                   Hashtbl.find_opt map_t_states old_state
+                                   Hashtbl.find_opt map_of_states old_state
                                  with
                                  | None ->
-                                   (* Feedback.msg_warning
-                                      (Pp.str
-                                      (Printf.sprintf
-                                      "old_state: %s is not in \
-                                      map_t_states: [%s]"
-                                      (pstr_state ~ids:() ~pp:() old_state)
-                                      (Hashtbl.fold
-                                      (fun (old : state)
-                                      (_new : state)
-                                      (_acc : string) ->
-                                      Printf.sprintf
-                                      "%s  (old: %s) -> (new: %s)\n"
-                                      _acc
-                                      (pstr_state
-                                      ~ids:()
-                                      ~pp:()
-                                      old)
-                                      (pstr_state
-                                      ~ids:()
-                                      ~pp:()
-                                      _new))
-                                      map_t_states
-                                      "\n"))); *)
                                    raise
                                      (OldStateHasNoNewState
-                                        (old_state, map_t_states))
+                                        (old_state, map_of_states))
                                  | Some new_state -> new_state)
                                destinations )
                          ])
@@ -639,19 +510,7 @@ module RCP = struct
                       Edges.add
                         edges_of_a
                         from_state
-                        (Actions.of_seq (List.to_seq [ a, destinations ]))
-                    (* Actions.fold
-                       (fun (action : action)
-                       (destinations : States.t)
-                       (acc : (action * States.t) list) ->
-                       if action.label == a.label
-                       then List.append acc [ action, destinations ]
-                       else acc)
-                       outgoing_edges
-                       [] *)
-                    (* if List.is_empty relevant_edges
-                       then () *)
-                    (* else Edges.add edges_of_a from_state outgoing_edges) *))
+                        (Actions.of_seq (List.to_seq [ a, destinations ])))
                   edges;
                 (* split *)
                 match Partition.elements (split !b a !pi edges_of_a) with
@@ -660,11 +519,6 @@ module RCP = struct
                     (Pp.str (Printf.sprintf "split returned empty list."))
                 | b1 :: [] ->
                   (* check if same as b *)
-                  Feedback.msg_debug
-                    (Pp.str
-                       (Printf.sprintf
-                          "split returned only b1: %s."
-                          "[...]" (* (pstr_states ~pp:() b1) *)));
                   if Bool.not (Block.equal b1 !b)
                   then (
                     pi := Partition.remove !b !pi;
@@ -672,12 +526,6 @@ module RCP = struct
                     (* b := b1; *)
                     changed := true)
                 | [ b1; b2 ] ->
-                  Feedback.msg_debug
-                    (Pp.str
-                       (Printf.sprintf
-                          "split returned b1: %s.\nand b2: %s"
-                          "[...]" (* (pstr_states ~pp:() b1) *)
-                          "[...]" (* (pstr_states ~pp:() b2) *)));
                   (* check if union is not the same as b *)
                   if Bool.not (Block.equal b1 !b)
                      && Bool.not (Block.equal b2 !b)
@@ -707,8 +555,36 @@ module RCP = struct
       let non_bisimilar_partition =
         Partition.filter
           (fun (b : Block.t) ->
-            (* TODO: using the state maps defined at the beginning prior to merging [s] and [t], check that each non-singleton partition contains states from both [s] and [t]. *)
-            Block.cardinal b == 1)
+            (* either is alone *)
+            let b_is_singleton = Block.cardinal b == 1 in
+            (* or does not have another state in block from the other fsm *)
+            let b_not_diverse =
+              Bool.not
+                (* i.e., for all states in block b *)
+                (Block.for_all
+                   (fun (state : state) ->
+                     (* there must exist another state *)
+                     Block.exists
+                       (fun (state' : state) ->
+                         (* that is different *)
+                         Bool.not (Int.equal state.id state'.id)
+                         &&
+                         (* and originates from different fsms *)
+                         let original_state =
+                           get_reverse_map_state map_of_states state
+                         in
+                         let original_state' =
+                           get_reverse_map_state map_of_states state'
+                         in
+                         (States.mem original_state s.states
+                          && States.mem original_state' t.states)
+                         || (States.mem original_state' s.states
+                             && States.mem original_state t.states))
+                       b)
+                   b)
+            in
+            (* return *)
+            b_is_singleton || b_not_diverse)
           !pi
       in
       if Partition.is_empty non_bisimilar_partition

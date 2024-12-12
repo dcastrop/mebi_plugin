@@ -1,4 +1,8 @@
-(** [state] is a 2-tuple with a unique [id] and (non-unique) name (or [label]).
+(*********************************************************************)
+(****** States *******************************************************)
+(*********************************************************************)
+
+(** [state] is a 2-tuple with a unique [id] and (non-unique) name ([pp]).
     [id] is an integer for identifying the state.
     [pp] is a pretty-printed string of something corresponding to this state. *)
 type state =
@@ -6,20 +10,11 @@ type state =
   ; pp : string
   }
 
-(*
-   !
-   !!!
-   ! continue changing edges to be States.t Actions.t Edges.t
-   !
-*)
-
-(** [state ?pp ?hash id] is a wrapper constructor for [state].
+(** [make_state ?pp id] is a wrapper constructor for [state].
     [?pp] is a pretty-printed respresentation, which defaults to [s{id}].
-    [?hash] is for storing the hash of Coq-based terms; defaults to -1.
     [id] is the unique identifier for the state. *)
-let state ?(pp : string option) (* ?(hash : int = -1) *)
-                                  (id : int) =
-  { id (* ; hash *)
+let make_state ?(pp : string option) (id : int) =
+  { id
   ; pp =
       (match pp with
        | None -> Printf.sprintf "s%d" id
@@ -34,37 +29,22 @@ module States = Set.Make (struct
     let compare a b = compare a.id b.id
   end)
 
-exception StateNotFoundWithID of (int * States.t)
-exception MultipleStatesFoundWithID of (int * States.t)
-exception StateNotFoundWithName of (string * States.t)
-exception MultipleStatesFoundWithName of (string * States.t)
+(*********************************************************************)
+(****** Action Labels & Alphabet *************************************)
+(*********************************************************************)
 
-let get_state_by_id (states : States.t) (id : int) : state =
-  let filtered = States.filter (fun (s : state) -> s.id == id) states in
-  if States.is_empty filtered then raise (StateNotFoundWithID (id, states));
-  if States.cardinal filtered > 1
-  then raise (MultipleStatesFoundWithID (id, states));
-  List.nth (States.elements filtered) 0
-;;
-
-let get_state_by_name (states : States.t) (name : string) : state =
-  let filtered = States.filter (fun (s : state) -> s.pp == name) states in
-  if States.is_empty filtered then raise (StateNotFoundWithName (name, states));
-  if States.cardinal filtered > 1
-  then raise (MultipleStatesFoundWithName (name, states));
-  List.nth (States.elements filtered) 0
-;;
-
-(** [label] is an alias for [int], corresponding to the index of a Coq-based constructor. *)
-(* type label = int *)
-
+(** [action] is a 2-tuple with a unique [id] and (non-unique) [label]).
+    [id] is an integer for identifying the action.
+    [label] is a (pretty-printed) string describing the action. *)
 type action =
   { id : int
   ; label : string
   }
 
-(** [action] ... *)
-let action ?(label : string option) (id : int) : action =
+(** [make_action ?label id] is a wrapper constructor for [action].
+    [?label] is a pretty-printed representation, which defaults to [s{id}].
+    [id] is the unique identifier for the state. *)
+let make_action ?(label : string option) (id : int) : action =
   { id
   ; label =
       (match label with
@@ -78,31 +58,13 @@ module Alphabet = Set.Make (struct
     type t = action
 
     let compare a b = compare a.id b.id
-
-    (* let add_new (label:string) (actions:t) : t = add {id = actio; label }  *)
   end)
 
-(** [('a, 'b) transition] is a 2-tuple with a [label] and [destination].
-    [label] is of type ['a].
-    [go_to] is of type ['b]. *)
-type ('a, 'b) transition =
-  { action : 'a
-  ; destination : 'b
-  }
+(*********************************************************************)
+(****** Actions & Edges ***********************************)
+(*********************************************************************)
 
-(** [fsm_transition] is a type describing outgoing edges of an OCaml FSM.
-    [label] is a label (corresponding to the Coq-based LTS constructor number).
-    [state] is thr destination state. *)
-(* type fsm_transition = (action, state) transition *)
-
-(** [outgoing_edges] is a hashtable mapping the actions of outgoing edges of states to their destination state. *)
-(* type outgoing_edges = (action, state) Hashtbl.t *)
-
-(** [edges] is a hashtable mapping states to their outgoing-transitions. *)
-(* type edges = (state, outgoing_edges) Hashtbl.t *)
-
-(* module Edges = Set.Make (struct type t = (state, outgoing_edges) Hashtbl.t let compare a b = compare a.) *)
-
+(** [Actions] map [actions] to sets of destination [states]. *)
 module Actions = Hashtbl.Make (struct
     type t = action
 
@@ -110,6 +72,10 @@ module Actions = Hashtbl.Make (struct
     let hash (t : action) = Hashtbl.hash t
   end)
 
+(** [make_actions ?size] is a wrapper constructor for [Actions]. *)
+let make_actions ?(size : int = 0) () : States.t Actions.t = Actions.create size
+
+(** [Edges] map [states] to outgoing actions, mapped to sets of destination [states]. *)
 module Edges = Hashtbl.Make (struct
     type t = state
 
@@ -117,61 +83,68 @@ module Edges = Hashtbl.Make (struct
     let hash (t : state) = Hashtbl.hash t
   end)
 
-let get_edges_with_action
-  (es : States.t Actions.t Edges.t)
-  (s : state)
-  (a : action)
-  : States.t Actions.t
-  =
-  Actions.of_seq
-    (List.to_seq
-       (Actions.fold
-          (fun (action : action)
-            (destinations : States.t)
-            (acc : (action * States.t) list) ->
-            if action == a
-            then List.append acc [ action, destinations ]
-            else acc)
-          (match Edges.find_opt es s with
-           | None -> Actions.of_seq (List.to_seq [])
-           | Some es' -> es')
-          []))
+(** [make_edges ?size] is a wrapper constructor for [Actions]. *)
+let make_edges ?(size : int = 0) () : States.t Actions.t Edges.t =
+  Edges.create size
 ;;
 
-let get_action_alphabet_from_actions (actions : States.t Actions.t) : Alphabet.t
-  =
-  Alphabet.of_list (List.of_seq (Actions.to_seq_keys actions))
-;;
-
-let get_action_alphabet_from_edges (es : States.t Actions.t Edges.t)
-  : Alphabet.t
-  =
-  Alphabet.of_list
-    (Edges.fold
-       (fun (from_state : state)
-         (actions : States.t Actions.t)
-         (acc : action list) ->
-         List.append
-           acc
-           (Actions.fold
-              (fun (action : action)
-                (destinations : States.t)
-                (acc' : action list) -> List.append acc' [ action ])
-              actions
-              []))
-       es
-       [])
-;;
+(*********************************************************************)
+(****** FSM **********************************************************)
+(*********************************************************************)
 
 (** [fsm] is a type used to describe an FSM in OCaml.
     [init] is the initial state.
-    [edges] is a hashtable mapping states to outgoing edges. *)
+    [alphabet] is the set of labels of actions of edges.
+    [states] is a set of states.
+    [edges] is a hashtable mapping states to outgoing actions and their detination states. *)
 type fsm =
   { init : state
+  ; alphabet : Alphabet.t
   ; states : States.t
   ; edges : States.t Actions.t Edges.t
   }
 (* TODO: Currently, there may be many copies of the same state in an [fsm] (i.e., in [init] and the [edges]). Maybe add list of states and change others to be an index referencing their position in the list. *)
+
+(** [make_fsm init alphabet states edges] is a wrapper constructor for [fsm]. *)
+let make_fsm
+  (init : state)
+  (alphabet : Alphabet.t)
+  (states : States.t)
+  (edges : States.t Actions.t Edges.t)
+  : fsm
+  =
+  { init; alphabet; states; edges }
+;;
+
+(*********************************************************************)
+(****** Pretty-Printing **********************************************)
+(*********************************************************************)
+
+(********************************************)
+(****** States ******************************)
+(********************************************)
+
+(** [pp_option] denotes the types that specifically support the [pp] flag. *)
+(* type pp_option = State of state | Action of action
+
+   type pp_list = States of States.t | Alphabet of Alphabet.t
+
+   type pp_map = Actions of States.t Actions.t | Edges of States.t Actions.t Edges.t
+
+   type pp_collection = List of pp_list | Map of pp_map
+
+   type pp_supported = PpOption of pp_option | PpList of pp_list | PpMap of pp_map
+
+   (** [pstr] *)
+   let pstr (to_str:pp_supported) : string
+
+   =
+   match to_str with
+   | PpOption to_str -> ""
+   | PpList to_str -> ""
+   | PpMap to_str -> ""
+
+   ;; *)
 
 (** [pstr_state ?long state] is a string of [state].
     [?ids] determines if [state.id] is shown.
@@ -567,6 +540,155 @@ let pstr_fsm
           ids
           pp
           long
-          (get_action_alphabet_from_edges the_fsm.edges)))
+          (* (get_action_alphabet_from_edges the_fsm.edges) *)
+          the_fsm.alphabet))
     (Printf.sprintf "edges: %s" (handle_edges_pstr ids pp long the_fsm.edges))
+;;
+
+(*********************************************************************)
+(****** Getter Functions *********************************************)
+(*********************************************************************)
+
+(********************************************)
+(****** States ******************************)
+(********************************************)
+
+exception StateNotFoundWithID of (int * States.t)
+exception MultipleStatesFoundWithID of (int * States.t)
+
+(** [] *)
+let get_state_by_id (states : States.t) (id : int) : state =
+  let filtered = States.filter (fun (s : state) -> s.id == id) states in
+  if States.is_empty filtered then raise (StateNotFoundWithID (id, states));
+  if States.cardinal filtered > 1
+  then raise (MultipleStatesFoundWithID (id, states));
+  List.nth (States.elements filtered) 0
+;;
+
+exception StateNotFoundWithName of (string * States.t)
+exception MultipleStatesFoundWithName of (string * States.t)
+
+(** [] *)
+let get_state_by_name (states : States.t) (name : string) : state =
+  let filtered = States.filter (fun (s : state) -> s.pp == name) states in
+  if States.is_empty filtered then raise (StateNotFoundWithName (name, states));
+  if States.cardinal filtered > 1
+  then raise (MultipleStatesFoundWithName (name, states));
+  List.nth (States.elements filtered) 0
+;;
+
+(********************************************)
+(****** Alphabet ****************************)
+(********************************************)
+
+let get_action_alphabet_from_actions (actions : States.t Actions.t) : Alphabet.t
+  =
+  Alphabet.of_list (List.of_seq (Actions.to_seq_keys actions))
+;;
+
+let get_action_alphabet_from_edges (es : States.t Actions.t Edges.t)
+  : Alphabet.t
+  =
+  Alphabet.of_list
+    (Edges.fold
+       (fun (from_state : state)
+         (actions : States.t Actions.t)
+         (acc : action list) ->
+         List.append
+           acc
+           (Actions.fold
+              (fun (action : action)
+                (destinations : States.t)
+                (acc' : action list) -> List.append acc' [ action ])
+              actions
+              []))
+       es
+       [])
+;;
+
+(********************************************)
+(****** Actions *****************************)
+(********************************************)
+
+exception ActionNotFoundWithID of (int * Alphabet.t)
+exception MultipleActionsFoundWithID of (int * Alphabet.t)
+
+(** [] *)
+let get_action_by_id (alphabet : Alphabet.t) (id : int) : action =
+  let filtered = Alphabet.filter (fun (a : action) -> a.id == id) alphabet in
+  if Alphabet.is_empty filtered then raise (ActionNotFoundWithID (id, alphabet));
+  if Alphabet.cardinal filtered > 1
+  then raise (MultipleActionsFoundWithID (id, alphabet));
+  List.nth (Alphabet.elements filtered) 0
+;;
+
+exception ActionNotFoundWithLabel of (string * Alphabet.t)
+exception MultipleActionsFoundWithLabel of (string * Alphabet.t)
+
+(** [] *)
+let get_action_by_label (alphabet : Alphabet.t) (label : string) : action =
+  let filtered =
+    Alphabet.filter (fun (a : action) -> a.label == label) alphabet
+  in
+  if Alphabet.is_empty filtered
+  then raise (ActionNotFoundWithLabel (label, alphabet));
+  if Alphabet.cardinal filtered > 1
+  then raise (MultipleActionsFoundWithLabel (label, alphabet));
+  List.nth (Alphabet.elements filtered) 0
+;;
+
+(********************************************)
+(****** Edges *******************************)
+(********************************************)
+
+(** [] *)
+let get_outgoing_actions
+  (edges : States.t Actions.t Edges.t)
+  (from : state)
+  (a : action)
+  : States.t Actions.t
+  =
+  match Edges.find_opt edges from with
+  | None -> make_actions ~size:0 ()
+  | Some actions -> actions
+;;
+
+(** [] *)
+let get_outgoing_actions_by_id
+  (edges : States.t Actions.t Edges.t)
+  (from : state)
+  (id : int)
+  : States.t Actions.t
+  =
+  get_outgoing_actions
+    edges
+    from
+    (get_action_by_id (get_action_alphabet_from_edges edges) id)
+;;
+
+(** [] *)
+let get_outgoing_actions_by_label
+  (edges : States.t Actions.t Edges.t)
+  (from : state)
+  (label : string)
+  : States.t Actions.t
+  =
+  get_outgoing_actions
+    edges
+    from
+    (get_action_by_label (get_action_alphabet_from_edges edges) label)
+;;
+
+(********************************************)
+(****** Other Functions *********************)
+(****** (e.g., translation map helpers) *****)
+(********************************************)
+
+exception ReverseStateHashtblLookupFailed of ((state, state) Hashtbl.t * state)
+
+(** [get_reverse_map_state tbl v] gets the key corresponding to [v] of translation map [tbl]. *)
+let get_reverse_map_state (tbl : (state, state) Hashtbl.t) (v : state) : state =
+  match Mebi_utils.get_key_of_val tbl v with
+  | None -> raise (ReverseStateHashtblLookupFailed (tbl, v))
+  | Some key -> key
 ;;

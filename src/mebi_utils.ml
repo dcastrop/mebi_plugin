@@ -28,3 +28,14 @@ let rec str_tabs ?(size : int = default_indent_val) (n : int) : string =
   then Printf.sprintf "%s%s" (tab size) (str_tabs ~size (n - 1))
   else ""
 ;;
+
+(** [get_key_of_val tbl v] is a reverse-lookup in [tbl] for the key of value [v]. *)
+let get_key_of_val (tbl : ('a, 'b) Hashtbl.t) (v : 'b) : 'a option =
+  match
+    List.find_opt
+      (fun ((key, value) : 'a * 'b) -> v == value)
+      (List.of_seq (Hashtbl.to_seq tbl))
+  with
+  | None -> None
+  | Some (key, value) -> Some key
+;;
