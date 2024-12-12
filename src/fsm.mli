@@ -3,7 +3,7 @@ type state =
   ; pp : string
   }
 
-val state : ?pp:string -> int -> state
+val make_state : ?pp:string -> int -> state
 
 module States : sig
   type elt = state
@@ -54,20 +54,12 @@ module States : sig
   val of_seq : elt Seq.t -> t
 end
 
-exception StateNotFoundWithID of (int * States.t)
-exception MultipleStatesFoundWithID of (int * States.t)
-exception StateNotFoundWithName of (string * States.t)
-exception MultipleStatesFoundWithName of (string * States.t)
-
-val get_state_by_id : States.t -> int -> state
-val get_state_by_name : States.t -> string -> state
-
 type action =
   { id : int
   ; label : string
   }
 
-val action : ?label:string -> int -> action
+val make_action : ?label:string -> int -> action
 
 module Alphabet : sig
   type elt = action
@@ -118,11 +110,6 @@ module Alphabet : sig
   val of_seq : elt Seq.t -> t
 end
 
-type ('a, 'b) transition =
-  { action : 'a
-  ; destination : 'b
-  }
-
 module Actions : sig
   type key = action
   type !'a t
@@ -150,6 +137,8 @@ module Actions : sig
   val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
   val of_seq : (key * 'a) Seq.t -> 'a t
 end
+
+val make_actions : ?size:int -> unit -> States.t Actions.t
 
 module Edges : sig
   type key = state
@@ -179,20 +168,21 @@ module Edges : sig
   val of_seq : (key * 'a) Seq.t -> 'a t
 end
 
-val get_edges_with_action
-  :  States.t Actions.t Edges.t
-  -> state
-  -> action
-  -> States.t Actions.t
-
-val get_action_alphabet_from_actions : States.t Actions.t -> Alphabet.t
-val get_action_alphabet_from_edges : States.t Actions.t Edges.t -> Alphabet.t
+val make_edges : ?size:int -> unit -> States.t Actions.t Edges.t
 
 type fsm =
   { init : state
+  ; alphabet : Alphabet.t
   ; states : States.t
   ; edges : States.t Actions.t Edges.t
   }
+
+val make_fsm
+  :  state
+  -> Alphabet.t
+  -> States.t
+  -> States.t Actions.t Edges.t
+  -> fsm
 
 val pstr_state : ?ids:unit -> ?pp:unit -> ?long:unit -> state -> string
 
@@ -290,3 +280,47 @@ val handle_edges_pstr
   -> string
 
 val pstr_fsm : ?ids:unit -> ?pp:unit -> ?long:unit -> fsm -> string
+
+exception StateNotFoundWithID of (int * States.t)
+exception MultipleStatesFoundWithID of (int * States.t)
+
+val get_state_by_id : States.t -> int -> state
+
+exception StateNotFoundWithName of (string * States.t)
+exception MultipleStatesFoundWithName of (string * States.t)
+
+val get_state_by_name : States.t -> string -> state
+val get_action_alphabet_from_actions : States.t Actions.t -> Alphabet.t
+val get_action_alphabet_from_edges : States.t Actions.t Edges.t -> Alphabet.t
+
+exception ActionNotFoundWithID of (int * Alphabet.t)
+exception MultipleActionsFoundWithID of (int * Alphabet.t)
+
+val get_action_by_id : Alphabet.t -> int -> action
+
+exception ActionNotFoundWithLabel of (string * Alphabet.t)
+exception MultipleActionsFoundWithLabel of (string * Alphabet.t)
+
+val get_action_by_label : Alphabet.t -> string -> action
+
+val get_outgoing_actions
+  :  States.t Actions.t Edges.t
+  -> state
+  -> action
+  -> States.t Actions.t
+
+val get_outgoing_actions_by_id
+  :  States.t Actions.t Edges.t
+  -> state
+  -> int
+  -> States.t Actions.t
+
+val get_outgoing_actions_by_label
+  :  States.t Actions.t Edges.t
+  -> state
+  -> string
+  -> States.t Actions.t
+
+exception ReverseStateHashtblLookupFailed of ((state, state) Hashtbl.t * state)
+
+val get_reverse_map_state : (state, state) Hashtbl.t -> state -> state

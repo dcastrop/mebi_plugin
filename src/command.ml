@@ -277,11 +277,19 @@ let bound : int = 5
 module type GraphB = sig
   module H : Hashtbl.S with type key = EConstr.t
   module S : Set.S with type elt = EConstr.t
+  (* module L : Set.S with type elt = EConstr.t *)
 
-  type lts_transition = (Fsm.action, EConstr.constr) Fsm.transition
+  type ('a, 'b) transition =
+    { action : 'a
+    ; destination : 'b
+    }
+
+  type lts_transition = (Fsm.action, EConstr.constr) transition
 
   type lts_graph =
-    { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
+    { to_visit : EConstr.constr Queue.t
+        (* Queue for BFS *)
+        (* ; labels : L.t *)
     ; states : S.t
     ; transitions : lts_transition H.t
     }
@@ -290,12 +298,12 @@ module type GraphB = sig
 
   type state_translation_table = (EConstr.t, Fsm.state) Hashtbl.t
 
-  val build_state_translation_table : lts_graph -> state_translation_table mm
+  val build_states : lts_graph -> (Fsm.States.t * state_translation_table) mm
 
   val build_edges
     :  lts_graph
     -> state_translation_table
-    -> Fsm.States.t Fsm.Actions.t Fsm.Edges.t mm
+    -> (Fsm.States.t Fsm.Actions.t Fsm.Edges.t * Fsm.Alphabet.t) mm
 
   val lts_to_fsm
     :  lts_graph
@@ -321,20 +329,31 @@ end
     [M] is a ... *)
 module MkGraph
     (M : Hashtbl.S with type key = EConstr.t)
-    (N : Set.S with type elt = EConstr.t) : GraphB = struct
+    (N : Set.S with type elt = EConstr.t) : GraphB =
+(* (O : Set.S with type elt = EConstr.t) *)
+struct
   module H = M
   module S = N
+  (* module L = O *)
+
+  (** [('a, 'b) transition] is a 2-tuple with a [label] and [destination].
+      [label] is of type ['a].
+      [go_to] is of type ['b]. *)
+  type ('a, 'b) transition =
+    { action : 'a
+    ; destination : 'b
+    }
 
   (** [lts_transition] is a type for describing outgoing transitions of a Coq-based LTS.
       [Fsm.action] is the constructor number.
       [EConstr.constr] is the destination node. *)
-  type lts_transition = (Fsm.action, EConstr.constr) Fsm.transition
+  type lts_transition = (Fsm.action, EConstr.constr) transition
 
   (** [lts_graph] is a type used when building an LTS (graph) from Coq-based terms.
-      [to_visit] is a queue of coq terms to explore.
+      [to_visit] is a queue of coq terms to explore in BFS.
       [transitions] is a hashtable mapping integers (of hashed constructors) to Coq terms. *)
   type lts_graph =
-    { to_visit : EConstr.constr Queue.t (* Queue for BFS *)
+    { to_visit : EConstr.constr Queue.t (* ; labels : L.t *)
     ; states : S.t
     ; transitions : lts_transition H.t
     }
@@ -387,7 +406,10 @@ module MkGraph
     let* _ = return (Queue.push t q) in
     build_lts
       the_lts
-      { to_visit = q; states = S.empty; transitions = H.create bound }
+      { to_visit = q (* ; labels = L.empty *)
+      ; states = S.empty
+      ; transitions = H.create bound
+      }
   ;;
 
   open Fsm
@@ -395,17 +417,10 @@ module MkGraph
   (** [state_translation_table] is is a hashtable mapping [EConstr.t] of terms to [Fsm.states]. *)
   type state_translation_table = (EConstr.t, Fsm.state) Hashtbl.t
 
-  (** [build_state_translation_table g] is a hashtable mapping the Coq-based endpoints
-      of transitions of LTS [g] to pure OCaml FSM states. *)
-  let build_state_translation_table (g : lts_graph) : state_translation_table mm
+  (** [build_states g] returns the set of Fsm.States and for each a mapping from EConstr.t. *)
+  let build_states (g : lts_graph) : (Fsm.States.t * state_translation_table) mm
     =
-    let* sigma = get_sigma in
-    (* let hash t =
-       EConstr.to_constr ?abort_on_undefined_evars:(Some false) sigma t
-       |> Constr.hash
-       in *)
-    let keys = H.to_seq_keys g.transitions in
-    let tr_tbl = Seq.length keys |> Hashtbl.create in
+    let map_of_states = S.cardinal g.states |> Hashtbl.create in
     (* set up counter for state ids *)
     let state_id_counter = ref 0 in
     let get_state_id () : int =
@@ -413,33 +428,20 @@ module MkGraph
       state_id_counter := !state_id_counter + 1;
       to_return
     in
-    (* for each key, extract states from transitions. *)
-    let _ =
-      Seq.iter
-        (fun t ->
-          (* check if [t] is already captured *)
-          if false == Hashtbl.mem tr_tbl t
-          then
-            Hashtbl.add
-              tr_tbl
-              t
-              { id = get_state_id ()
-              ; (* hash = hash t; *)
-                pp = econstr_to_string t
-              };
-          (* check if [dest_state] is already captured *)
-          let dest_state = (H.find g.transitions t).destination in
-          if false == Hashtbl.mem tr_tbl dest_state
-          then
-            Hashtbl.add
-              tr_tbl
-              dest_state
-              { id = get_state_id () (* ; hash = hash dest_state *)
-              ; pp = econstr_to_string dest_state
-              })
-        keys
+    (* extract all states *)
+    let states =
+      S.fold
+        (fun (s : EConstr.t) (acc : Fsm.States.t) ->
+          let new_state =
+            Fsm.make_state ~pp:(econstr_to_string s) (get_state_id ())
+          in
+          Hashtbl.add map_of_states s new_state;
+          States.add new_state acc)
+        g.states
+        Fsm.States.empty
     in
-    return tr_tbl
+    (*  *)
+    return (states, map_of_states)
   ;;
 
   (** [build_edges g s] is a hashtable mapping FSM states to
@@ -447,7 +449,7 @@ module MkGraph
       [g] is the LTS with transitions to build the FSM edges from.
       [s] is the translation map from Coq-terms to FSM states. *)
   let build_edges (g : lts_graph) (s : state_translation_table)
-    : Fsm.States.t Fsm.Actions.t Fsm.Edges.t mm
+    : (Fsm.States.t Fsm.Actions.t Fsm.Edges.t * Fsm.Alphabet.t) mm
     =
     let* env = get_env in
     let* sigma = get_sigma in
@@ -459,8 +461,9 @@ module MkGraph
     let alphabet =
       H.fold
         (fun (from : EConstr.t)
-          (transition : (Fsm.action, EConstr.constr) Fsm.transition)
+          (transition : (Fsm.action, EConstr.constr) transition)
           (acc : Fsm.Alphabet.t) ->
+          (* only add if action with same label doesnt exist *)
           if Fsm.Alphabet.exists
                (fun (a : Fsm.action) ->
                  String.equal a.label transition.action.label)
@@ -468,9 +471,9 @@ module MkGraph
           then acc
           else
             Fsm.Alphabet.add
-              { id = Fsm.Alphabet.cardinal acc
-              ; label = transition.action.label
-              }
+              (Fsm.make_action
+                 ~label:transition.action.label
+                 (Fsm.Alphabet.cardinal acc))
               acc)
         g.transitions
         Fsm.Alphabet.empty
@@ -478,7 +481,7 @@ module MkGraph
     (* build edges *)
     H.iter
       (fun (from : EConstr.t)
-        (transition : (Fsm.action, EConstr.constr) Fsm.transition) ->
+        (transition : (Fsm.action, EConstr.constr) transition) ->
         let edge_from = Hashtbl.find s from in
         let edge_dest = Hashtbl.find s transition.destination in
         let edge_action =
@@ -519,26 +522,11 @@ module MkGraph
                            States.add edge_dest destinations )
                      ]))))
       g.transitions;
-    return edges
+    return (edges, alphabet)
   ;;
 
   (** Error when trying to translate an unfinished LTS to FSM. *)
   exception UnfinishedLTS of lts_graph
-
-  (** Error when a translation from an [lts_graph] to an FSM yields no [states].*)
-  exception NoStates of state_translation_table
-
-  (** Error when duplication actions found. *)
-  (* exception DuplicateActions of state Actions.t *)
-
-  (* TODO: below is unused, delete? *)
-  (* let pp_fsm ?(long : unit option) (the_fsm : Fsm.fsm) : unit =
-     Feedback.msg_debug
-     (str
-     (match long with
-     | None -> pstr_fsm the_fsm
-     | Some () -> pstr_fsm ~long:() the_fsm))
-     ;; *)
 
   (** [pstr_lts_transition (from, t)] is a string transition:
       [(from) --(t.edge_ctor)--> (t.to_node)].
@@ -621,59 +609,30 @@ module MkGraph
     =
     match g with
     | { to_visit; transitions; _ } ->
-      if Queue.is_empty to_visit
-      then
-        let* state_translation = build_state_translation_table g in
-        (* extract states *)
-        let states =
-          States.of_list
-            (Hashtbl.fold
-               (fun _ state acc -> List.concat [ acc; [ state ] ])
-               state_translation
-               [])
-        in
-        if Hashtbl.to_seq_keys state_translation |> Seq.is_empty
-        then (
-          Feedback.msg_warning
-            (str
-               (Printf.sprintf
-                  "no states were extracted from lts: %s"
-                  (pstr_lts g)));
-          raise (NoStates state_translation))
-        else
-          (* TODO: make [build_edges] use [States] rather than [state_translation]. *)
-          let* edges = build_edges g state_translation in
-          (* check no duplicate actions *)
-          (* if Actions.for_all
-             (fun (a : action) ->
-             Actions.exists
-             (fun (b : action) ->
-             Bool.not
-             (Int.equal a.id b.id == String.equal a.label b.label))
-             actions)
-             actions
-             then (
-             Feedback.msg_warning
-             (str
-             (Printf.sprintf
-             "duplicate actions found: %s"
-             (Fsm.pstr_actions actions)));
-             raise (DuplicateActions actions)); *)
-          (* need to get initial state.
-             ( copied from [build_graph].) *)
-          let$ t env sigma =
-            Constrintern.interp_constr_evars env sigma init_term
-          in
-          let$ init_term env sigma = sigma, Reductionops.nf_all env sigma t in
-          let init_state = Hashtbl.find state_translation init_term in
-          return ({ init = init_state; states; edges }, state_translation)
-      else (
+      (* we require the lts to be complete *)
+      if Bool.not (Queue.is_empty to_visit)
+      then (
+        (* do not proceed *)
         Feedback.msg_warning
           (str
              (Printf.sprintf
                 "lts is not complete, still had at least (%d) terms to visit."
                 (Queue.length to_visit)));
         raise (UnfinishedLTS g))
+      else
+        (* extract states *)
+        let* states, state_translation_map = build_states g in
+        (* extract edges *)
+        let* edges, alphabet = build_edges g state_translation_map in
+        (* get initial state *)
+        let$ t env sigma =
+          Constrintern.interp_constr_evars env sigma init_term
+        in
+        let$ init_term env sigma = sigma, Reductionops.nf_all env sigma t in
+        let init_state = Hashtbl.find state_translation_map init_term in
+        (* return fsm and state_translation_map *)
+        return
+          ({ init = init_state; alphabet; states; edges }, state_translation_map)
   ;;
 end
 
@@ -681,7 +640,8 @@ end
 let make_graph_builder =
   let* m = make_constr_tbl in
   let* s = make_constr_set in
-  let module G = MkGraph ((val m)) ((val s)) in
+  (* let* l = make_constr_set in *)
+  let module G = MkGraph ((val m)) ((val s)) (* ((val l)) *) in
   return (module G : GraphB)
 ;;
 
@@ -739,11 +699,9 @@ let bounded_lts
           (fun _ -> str ", ")
           Names.Id.print
           raw_lts.coq_ctor_names);
-  (* prints all transitions -- the possible constructors
+  (* prints all transitions -- the possible constructors.
      a term may take as part of its structure.
-     these are dependant on the definition of a type *)
-  (* TODO: update to be consistent with above and use [econstr_to_string ...].
-     TODO: (requires changing [pp_transitions] (and alike) to print to string instead.) *)
+     these are dependant on the definition of a type. *)
   Feedback.msg_debug
     (str "(d) Transitions: "
      ++ pp_transitions env sigma raw_lts.constructor_transitions
