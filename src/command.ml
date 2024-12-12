@@ -728,6 +728,8 @@ let bisim_exa1_ks90 : unit =
     (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa1)\n"));
   Feedback.msg_debug (str (Printf.sprintf "exa1.s: %s" (Fsm.pstr_fsm ~pp:() s)));
   Feedback.msg_debug (str (Printf.sprintf "exa1.t: %s" (Fsm.pstr_fsm ~pp:() t)));
+  Feedback.msg_debug (str (Printf.sprintf "exa1.s: %s" (Fsm.pstr (Fsm s))));
+  Feedback.msg_debug (str (Printf.sprintf "exa1.t: %s" (Fsm.pstr_fsm ~pp:() t)));
   (* run algorithm *)
   let are_bisimilar, pi = RCP.KS90.run s t in
   (* print out results *)

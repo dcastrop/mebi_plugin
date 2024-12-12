@@ -184,6 +184,56 @@ val make_fsm
   -> States.t Actions.t Edges.t
   -> fsm
 
+type pp_axiom =
+  | State of state
+  | Action of action
+  | Edge of (state * action * state)
+  | OutgoingEdge of (action * state)
+
+type pp_list =
+  | States of States.t
+  | Alphabet of Alphabet.t
+
+type pp_map =
+  | Actions of States.t Actions.t
+  | Edges of States.t Actions.t Edges.t
+
+type pp_collection =
+  | List of pp_list
+  | Map of pp_map
+
+type pp_utils_fsm =
+  | Init of fsm
+  | Alphabet of fsm
+  | States of fsm
+  | Edges of fsm
+
+type pp_utils = Fsm of pp_utils_fsm
+
+type pp_supported =
+  | Axiom of pp_axiom
+  | Collection of pp_collection
+  | Utils of pp_utils
+  | Fsm of fsm
+
+type pp_wrappable =
+  | State of state
+  | Action of action
+  | Edge of (state * action * state)
+  | OutgoingEdge of (action * state)
+  | States of States.t
+  | Alphabet of Alphabet.t
+  | Actions of States.t Actions.t
+  | Edges of States.t Actions.t Edges.t
+  | Fsm of fsm
+
+type pp_options =
+  | None of unit
+  | Debug of unit
+
+val pp_collection_is_empty : pp_collection -> bool
+val pp_wrap_as_supported : pp_wrappable -> pp_supported
+val pstr : ?tabs:int -> ?options:pp_options -> pp_supported -> string
 val pstr_state : ?ids:unit -> ?pp:unit -> ?long:unit -> state -> string
 
 val handle_state_pstr

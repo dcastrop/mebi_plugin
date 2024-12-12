@@ -124,27 +124,235 @@ let make_fsm
 (****** States ******************************)
 (********************************************)
 
-(** [pp_option] denotes the types that specifically support the [pp] flag. *)
-(* type pp_option = State of state | Action of action
+(** [pp_axiom] denotes the finest granularity that [pp_str] applies to. *)
+type pp_axiom =
+  | State of state
+  | Action of action
+  | Edge of (state * action * state)
+  | OutgoingEdge of (action * state)
 
-   type pp_list = States of States.t | Alphabet of Alphabet.t
+type pp_list =
+  | States of States.t
+  | Alphabet of Alphabet.t
 
-   type pp_map = Actions of States.t Actions.t | Edges of States.t Actions.t Edges.t
+type pp_map =
+  | Actions of States.t Actions.t
+  | Edges of States.t Actions.t Edges.t
 
-   type pp_collection = List of pp_list | Map of pp_map
+type pp_collection =
+  | List of pp_list
+  | Map of pp_map
 
-   type pp_supported = PpOption of pp_option | PpList of pp_list | PpMap of pp_map
+type pp_utils_fsm =
+  | Init of fsm
+  | Alphabet of fsm
+  | States of fsm
+  | Edges of fsm
 
-   (** [pstr] *)
-   let pstr (to_str:pp_supported) : string
+type pp_utils = Fsm of pp_utils_fsm
 
-   =
-   match to_str with
-   | PpOption to_str -> ""
-   | PpList to_str -> ""
-   | PpMap to_str -> ""
+type pp_supported =
+  | Axiom of pp_axiom
+  | Collection of pp_collection
+  | Utils of pp_utils
+  | Fsm of fsm
 
-   ;; *)
+type pp_wrappable =
+  | State of state
+  | Action of action
+  | Edge of (state * action * state)
+  | OutgoingEdge of (action * state)
+  | States of States.t
+  | Alphabet of Alphabet.t
+  | Actions of States.t Actions.t
+  | Edges of States.t Actions.t Edges.t
+  | Fsm of fsm
+
+(** [pp_options] denotes the types that specifically support the [pp] flag. *)
+type pp_options =
+  | None of unit
+  | Debug of unit
+
+(** [pp_collection_is_empty c] returns true if [c] is empty. *)
+let pp_collection_is_empty (c : pp_collection) : bool =
+  match c with
+  | List l ->
+    (match l with
+     | States s -> States.is_empty s
+     | Alphabet a -> Alphabet.is_empty a)
+  | Map m ->
+    (match m with
+     | Actions a -> Actions.length a == 0
+     | Edges e -> Edges.length e == 0)
+;;
+
+(** [] helper wrapper function for [pp_supported]. *)
+let pp_wrap_as_supported (to_wrap : pp_wrappable) : pp_supported =
+  match to_wrap with
+  | State to_wrap -> Axiom (State to_wrap)
+  | Action to_wrap -> Axiom (Action to_wrap)
+  | Edge to_wrap -> Axiom (Edge to_wrap)
+  | OutgoingEdge to_wrap -> Axiom (OutgoingEdge to_wrap)
+  | States to_wrap -> Collection (List (States to_wrap))
+  | Alphabet to_wrap -> Collection (List (Alphabet to_wrap))
+  | Actions to_wrap -> Collection (Map (Actions to_wrap))
+  | Edges to_wrap -> Collection (Map (Edges to_wrap))
+  | Fsm to_wrap -> Fsm to_wrap
+;;
+
+(** [pstr] *)
+let rec pstr
+  ?(tabs : int = 0)
+  ?(options : pp_options = None ())
+  (to_str : pp_supported)
+  : string
+  =
+  let basedent = Mebi_utils.str_tabs (tabs - 1) in
+  let indent = Mebi_utils.str_tabs tabs in
+  (* build string *)
+  match to_str with
+  (*  *)
+  | Axiom to_str ->
+    (match to_str with
+     (* [state] *)
+     | State to_str ->
+       Printf.sprintf
+         "(%s)"
+         (match options with
+          | None () -> Printf.sprintf "%s" to_str.pp
+          | Debug () -> Printf.sprintf "%s <id: %d>" to_str.pp to_str.id)
+     (* [action] *)
+     | Action to_str ->
+       Printf.sprintf
+         "{| %s |}"
+         (match options with
+          | None () -> Printf.sprintf "%s" to_str.label
+          | Debug () -> Printf.sprintf "%s <id: %d>" to_str.label to_str.id)
+     (* edge of [state * action * state] *)
+     | OutgoingEdge to_str ->
+       (match to_str with
+        | a, destination ->
+          Printf.sprintf
+            "---%s--> %s"
+            (pstr ~options (pp_wrap_as_supported (Action a)))
+            (pstr ~options (pp_wrap_as_supported (State destination))))
+     (* edge of [state * action * state] *)
+     | Edge to_str ->
+       (match to_str with
+        | from, a, destination ->
+          Printf.sprintf
+            "{ %s %s }"
+            (pstr ~options (pp_wrap_as_supported (State from)))
+            (pstr
+               ~options
+               (pp_wrap_as_supported (OutgoingEdge (a, destination))))))
+  (*  *)
+  | Collection to_str ->
+    (match to_str with
+     (*  *)
+     | List to_str ->
+       if pp_collection_is_empty (List to_str)
+       then "[ ] (empty)"
+       else
+         Printf.sprintf
+           "[%s%s]"
+           (match to_str with
+            (* [States] *)
+            | States to_str ->
+              States.fold
+                (fun (s : state) (acc : string) ->
+                  Printf.sprintf
+                    "%s%s\n"
+                    acc
+                    (pstr ~tabs:(tabs + 1) (pp_wrap_as_supported (State s))))
+                to_str
+                "\n"
+            (* [Alphabet] *)
+            | Alphabet to_str ->
+              Alphabet.fold
+                (fun (a : action) (acc : string) ->
+                  Printf.sprintf
+                    "%s%s\n"
+                    acc
+                    (pstr ~tabs:(tabs + 1) (pp_wrap_as_supported (Action a))))
+                to_str
+                "\n")
+           basedent
+     (*  *)
+     | Map to_str ->
+       if pp_collection_is_empty (Map to_str)
+       then "{ } (empty)"
+       else
+         Printf.sprintf
+           "{%s%s}"
+           (match to_str with
+            (* [Actions] *)
+            | Actions to_str ->
+              Actions.fold
+                (fun (a : action) (destinations : States.t) (acc : string) ->
+                  (* for each destination *)
+                  Printf.sprintf
+                    "%s%s"
+                    acc
+                    (States.fold
+                       (fun (destination : state) (acc' : string) ->
+                         Printf.sprintf
+                           "%s%s%s"
+                           acc'
+                           indent
+                           (pstr
+                              ~options
+                              (pp_wrap_as_supported
+                                 (OutgoingEdge (a, destination)))))
+                       destinations
+                       ""))
+                to_str
+                "\n"
+            (* [Edges] *)
+            | Edges to_str ->
+              Edges.fold
+                (fun (from : state)
+                  (actions : States.t Actions.t)
+                  (acc : string) ->
+                  Printf.sprintf
+                    "%s%s"
+                    acc
+                    (Actions.fold
+                       (fun (a : action)
+                         (destinations : States.t)
+                         (acc : string) ->
+                         (* for each destination *)
+                         Printf.sprintf
+                           "%s%s"
+                           acc
+                           (States.fold
+                              (fun (destination : state) (acc' : string) ->
+                                Printf.sprintf
+                                  "%s%s%s"
+                                  acc'
+                                  indent
+                                  (pstr
+                                     ~options
+                                     (pp_wrap_as_supported
+                                        (Edge (from, a, destination)))))
+                              destinations
+                              ""))
+                       actions
+                       "\n"))
+                to_str
+                "\n")
+           basedent)
+  (*  *)
+  | Utils to_str -> ""
+  (*  *)
+  | Fsm to_str ->
+    Printf.sprintf
+      "{init state %s\nalphabet: %s\nstates: %s\nedges: %s}"
+      (pstr ~options (pp_wrap_as_supported (State to_str.init)))
+      (pstr ~options (pp_wrap_as_supported (Alphabet to_str.alphabet)))
+      (pstr ~options (pp_wrap_as_supported (States to_str.states)))
+      (pstr ~options (pp_wrap_as_supported (Edges to_str.edges)))
+;;
 
 (** [pstr_state ?long state] is a string of [state].
     [?ids] determines if [state.id] is shown.
@@ -536,12 +744,7 @@ let pstr_fsm
        (handle_states_pstr ids pp long the_fsm.states))
     (Printf.sprintf
        "alphabet: %s"
-       (handle_action_alphabet_pstr
-          ids
-          pp
-          long
-          (* (get_action_alphabet_from_edges the_fsm.edges) *)
-          the_fsm.alphabet))
+       (handle_action_alphabet_pstr ids pp long the_fsm.alphabet))
     (Printf.sprintf "edges: %s" (handle_edges_pstr ids pp long the_fsm.edges))
 ;;
 
