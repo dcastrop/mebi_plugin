@@ -728,8 +728,12 @@ let bisim_exa1_ks90 : unit =
     (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa1)\n"));
   Feedback.msg_debug (str (Printf.sprintf "exa1.s: %s" (Fsm.pstr_fsm ~pp:() s)));
   Feedback.msg_debug (str (Printf.sprintf "exa1.t: %s" (Fsm.pstr_fsm ~pp:() t)));
-  Feedback.msg_debug (str (Printf.sprintf "exa1.s: %s" (Fsm.pstr (Fsm s))));
-  Feedback.msg_debug (str (Printf.sprintf "exa1.t: %s" (Fsm.pstr_fsm ~pp:() t)));
+  Feedback.msg_warning (str (Printf.sprintf "exa1.s: %s" (Fsm.pstr (Fsm s))));
+  Feedback.msg_warning
+    (str (Printf.sprintf "exa1.s: %s" (Fsm.pstr ~options:(Debug ()) (Fsm s))));
+  Feedback.msg_warning (str (Printf.sprintf "exa1.t: %s" (Fsm.pstr (Fsm t))));
+  Feedback.msg_warning
+    (str (Printf.sprintf "exa1.t: %s" (Fsm.pstr ~options:(Debug ()) (Fsm t))));
   (* run algorithm *)
   let are_bisimilar, pi = RCP.KS90.run s t in
   (* print out results *)
@@ -764,6 +768,8 @@ let bisim_exa2_ks90 : unit =
     (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa2)\n"));
   Feedback.msg_debug (str (Printf.sprintf "exa2.s: %s" (Fsm.pstr_fsm ~pp:() s)));
   Feedback.msg_debug (str (Printf.sprintf "exa2.t: %s" (Fsm.pstr_fsm ~pp:() t)));
+  Feedback.msg_warning (str (Printf.sprintf "exa2.s: %s" (Fsm.pstr (Fsm s))));
+  Feedback.msg_warning (str (Printf.sprintf "exa2.t: %s" (Fsm.pstr (Fsm t))));
   (* run algorithm *)
   let are_bisimilar, pi = RCP.KS90.run s t in
   (* print out results *)

@@ -213,39 +213,44 @@ let rec pstr
   match to_str with
   (*  *)
   | Axiom to_str ->
-    (match to_str with
-     (* [state] *)
-     | State to_str ->
-       Printf.sprintf
-         "(%s)"
-         (match options with
-          | None () -> Printf.sprintf "%s" to_str.pp
-          | Debug () -> Printf.sprintf "%s <id: %d>" to_str.pp to_str.id)
-     (* [action] *)
-     | Action to_str ->
-       Printf.sprintf
-         "{| %s |}"
-         (match options with
-          | None () -> Printf.sprintf "%s" to_str.label
-          | Debug () -> Printf.sprintf "%s <id: %d>" to_str.label to_str.id)
-     (* edge of [state * action * state] *)
-     | OutgoingEdge to_str ->
-       (match to_str with
-        | a, destination ->
-          Printf.sprintf
-            "---%s--> %s"
-            (pstr ~options (pp_wrap_as_supported (Action a)))
-            (pstr ~options (pp_wrap_as_supported (State destination))))
-     (* edge of [state * action * state] *)
-     | Edge to_str ->
-       (match to_str with
-        | from, a, destination ->
-          Printf.sprintf
-            "{ %s %s }"
-            (pstr ~options (pp_wrap_as_supported (State from)))
-            (pstr
-               ~options
-               (pp_wrap_as_supported (OutgoingEdge (a, destination))))))
+    Printf.sprintf
+      "%s%s"
+      indent
+      (match to_str with
+       (* [state] *)
+       | State to_str ->
+         Printf.sprintf
+           "(%s%s)"
+           to_str.pp
+           (match options with
+            | None () -> ""
+            | Debug () -> Printf.sprintf " <id: %d>" to_str.id)
+       (* [action] *)
+       | Action to_str ->
+         Printf.sprintf
+           "{| %s%s |}"
+           to_str.label
+           (match options with
+            | None () -> ""
+            | Debug () -> Printf.sprintf " <id: %d>" to_str.id)
+       (* edge of [state * action * state] *)
+       | OutgoingEdge to_str ->
+         (match to_str with
+          | a, destination ->
+            Printf.sprintf
+              "---%s--> %s"
+              (pstr ~options (pp_wrap_as_supported (Action a)))
+              (pstr ~options (pp_wrap_as_supported (State destination))))
+       (* edge of [state * action * state] *)
+       | Edge to_str ->
+         (match to_str with
+          | from, a, destination ->
+            Printf.sprintf
+              "{ %s %s }"
+              (pstr ~options (pp_wrap_as_supported (State from)))
+              (pstr
+                 ~options
+                 (pp_wrap_as_supported (OutgoingEdge (a, destination))))))
   (*  *)
   | Collection to_str ->
     (match to_str with
@@ -264,7 +269,10 @@ let rec pstr
                   Printf.sprintf
                     "%s%s\n"
                     acc
-                    (pstr ~tabs:(tabs + 1) (pp_wrap_as_supported (State s))))
+                    (pstr
+                       ~tabs:(tabs + 1)
+                       ~options
+                       (pp_wrap_as_supported (State s))))
                 to_str
                 "\n"
             (* [Alphabet] *)
@@ -274,7 +282,10 @@ let rec pstr
                   Printf.sprintf
                     "%s%s\n"
                     acc
-                    (pstr ~tabs:(tabs + 1) (pp_wrap_as_supported (Action a))))
+                    (pstr
+                       ~tabs:(tabs + 1)
+                       ~options
+                       (pp_wrap_as_supported (Action a))))
                 to_str
                 "\n")
            basedent
@@ -310,48 +321,72 @@ let rec pstr
                 "\n"
             (* [Edges] *)
             | Edges to_str ->
-              Edges.fold
-                (fun (from : state)
-                  (actions : States.t Actions.t)
-                  (acc : string) ->
+              (* order by starting state *)
+              States.fold
+                (fun (from : state) (acc : string) ->
+                  let outgoing_actions = Edges.find to_str from in
                   Printf.sprintf
                     "%s%s"
                     acc
-                    (Actions.fold
-                       (fun (a : action)
-                         (destinations : States.t)
-                         (acc : string) ->
-                         (* for each destination *)
+                    (* order by action ids *)
+                    (Alphabet.fold
+                       (fun (a : action) (acc' : string) ->
                          Printf.sprintf
                            "%s%s"
-                           acc
+                           acc'
+                           (* order by destination state *)
                            (States.fold
-                              (fun (destination : state) (acc' : string) ->
+                              (fun (destination : state) (acc'' : string) ->
                                 Printf.sprintf
-                                  "%s%s%s"
-                                  acc'
+                                  "%s%s%s\n"
+                                  acc''
                                   indent
                                   (pstr
                                      ~options
                                      (pp_wrap_as_supported
                                         (Edge (from, a, destination)))))
-                              destinations
+                              (Actions.find outgoing_actions a)
                               ""))
-                       actions
-                       "\n"))
-                to_str
+                       (* get alphabet from actions *)
+                       (Alphabet.of_seq (Actions.to_seq_keys outgoing_actions))
+                       ""))
+                (* get states from edges *)
+                (States.of_seq (Edges.to_seq_keys to_str))
                 "\n")
            basedent)
   (*  *)
-  | Utils to_str -> ""
+  | Utils to_str -> "<<<<unimplemented>>>>"
   (*  *)
   | Fsm to_str ->
+    let indent = Mebi_utils.str_tabs (tabs + 1) in
     Printf.sprintf
-      "{init state %s\nalphabet: %s\nstates: %s\nedges: %s}"
-      (pstr ~options (pp_wrap_as_supported (State to_str.init)))
-      (pstr ~options (pp_wrap_as_supported (Alphabet to_str.alphabet)))
-      (pstr ~options (pp_wrap_as_supported (States to_str.states)))
-      (pstr ~options (pp_wrap_as_supported (Edges to_str.edges)))
+      "{ %s; %s; %s; %s; \n%s}"
+      (Printf.sprintf
+         "\n%sinitial state: %s"
+         indent
+         (pstr ~options (pp_wrap_as_supported (State to_str.init))))
+      (Printf.sprintf
+         "\n%salphabet: %s"
+         indent
+         (pstr
+            ~tabs:(tabs + 2)
+            ~options
+            (pp_wrap_as_supported (Alphabet to_str.alphabet))))
+      (Printf.sprintf
+         "\n%sstates: %s"
+         indent
+         (pstr
+            ~tabs:(tabs + 2)
+            ~options
+            (pp_wrap_as_supported (States to_str.states))))
+      (Printf.sprintf
+         "\n%sedges: %s"
+         indent
+         (pstr
+            ~tabs:(tabs + 2)
+            ~options
+            (pp_wrap_as_supported (Edges to_str.edges))))
+      basedent
 ;;
 
 (** [pstr_state ?long state] is a string of [state].
