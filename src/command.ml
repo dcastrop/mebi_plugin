@@ -2,7 +2,7 @@ open Pp
 open Mebi_utils
 open Mebi_monad
 open Mebi_monad.Monad_syntax
-open Bisim_algs
+open Bisimilarity
 open Pp_ext
 
 (** ['a mm] is a function type mapping from [coq_context ref] to ['a in_context]. *)
