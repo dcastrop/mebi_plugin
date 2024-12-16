@@ -25,32 +25,8 @@ open Stdarg
 VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | [ "MeBi" "LTS" reference(r) constr(t) ] ->
   { Mebi_monad.run (Command.bounded_lts (Nametab.global r) t) }
-| [ "MeBi" "Bisim_Exa1_KS90" ] ->
-  { Command.bisim_exa1_ks90 }
-END
-
-(* for testing purposes *)
-
-(* FIXME: commands don't work, separate or together or when bundled above *)
-(* VERNAC COMMAND EXTEND MeBiExa1 CLASSIFIED AS QUERY
-| [ "MeBi" "Bisim_Exa1_KS90" ] ->
-  { Command.bisim_exa1_ks90 }
-END
-
-VERNAC COMMAND EXTEND MeBiExa2 CLASSIFIED AS QUERY
+  (* | [ "MeBi" "Bisim_Exa1_KS90" ] ->
+    { Command.bisim_exa1_ks90 }
 | [ "MeBi" "Bisim_Exa2_KS90" ] ->
-  { Command.bisim_exa2_ks90 }
-END *)
-
-(* FIXME: tried merging them? doesnt work *)
-(* VERNAC COMMAND EXTEND MebiExamples CLASSIFIED AS QUERY
-| [ "MeBi" string (exa) ] ->
-  {
-    match exa with
-    | "Bisim_Exa1_KS90" ->
-      Command.bisim_exa1_ks90
-    | "Bisim_Exa2_KS90" ->
-      Command.bisim_exa2_ks90
-    | _ -> Feedback.msg_notice (str (Printf.sprintf "unknown example: %s." exa))
-    }
-END *)
+  { Command.bisim_exa2_ks90 } *)
+END

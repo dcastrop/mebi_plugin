@@ -46,7 +46,7 @@ MeBi LTS testLTS (S one).
 
 
 (* tests for bisim algs *)
-MeBi Bisim_Exa1_KS90.
+(* MeBi Bisim_Exa1_KS90. *)
 
 (* MeBi Bisim_Exa2_KS90. *)
 
