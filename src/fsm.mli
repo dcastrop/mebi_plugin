@@ -54,6 +54,57 @@ module States : sig
   val of_seq : elt Seq.t -> t
 end
 
+module Block = States
+
+module Partition : sig
+  type elt = Block.t
+  type t = Set.Make(Block).t
+
+  val empty : t
+  val add : elt -> t -> t
+  val singleton : elt -> t
+  val remove : elt -> t -> t
+  val union : t -> t -> t
+  val inter : t -> t -> t
+  val disjoint : t -> t -> bool
+  val diff : t -> t -> t
+  val cardinal : t -> int
+  val elements : t -> elt list
+  val min_elt : t -> elt
+  val min_elt_opt : t -> elt option
+  val max_elt : t -> elt
+  val max_elt_opt : t -> elt option
+  val choose : t -> elt
+  val choose_opt : t -> elt option
+  val find : elt -> t -> elt
+  val find_opt : elt -> t -> elt option
+  val find_first : (elt -> bool) -> t -> elt
+  val find_first_opt : (elt -> bool) -> t -> elt option
+  val find_last : (elt -> bool) -> t -> elt
+  val find_last_opt : (elt -> bool) -> t -> elt option
+  val iter : (elt -> unit) -> t -> unit
+  val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+  val map : (elt -> elt) -> t -> t
+  val filter : (elt -> bool) -> t -> t
+  val filter_map : (elt -> elt option) -> t -> t
+  val partition : (elt -> bool) -> t -> t * t
+  val split : elt -> t -> t * bool * t
+  val is_empty : t -> bool
+  val mem : elt -> t -> bool
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val subset : t -> t -> bool
+  val for_all : (elt -> bool) -> t -> bool
+  val exists : (elt -> bool) -> t -> bool
+  val to_list : t -> elt list
+  val of_list : elt list -> t
+  val to_seq_from : elt -> t -> elt Seq.t
+  val to_seq : t -> elt Seq.t
+  val to_rev_seq : t -> elt Seq.t
+  val add_seq : elt Seq.t -> t -> t
+  val of_seq : elt Seq.t -> t
+end
+
 type action =
   { id : int
   ; label : string
@@ -173,8 +224,8 @@ val make_edges : ?size:int -> unit -> States.t Actions.t Edges.t
 type fsm =
   { init : state
   ; alphabet : Alphabet.t
-  ; states : States.t
-  ; edges : States.t Actions.t Edges.t
+  ; states : Block.t
+  ; edges : Block.t Actions.t Edges.t
   }
 
 val make_fsm
@@ -191,12 +242,14 @@ type pp_axiom =
   | OutgoingEdge of (action * state)
 
 type pp_list =
-  | States of States.t
+  | States of Block.t
   | Alphabet of Alphabet.t
+  | Block of Block.t
+  | Partition of Partition.t
 
 type pp_map =
-  | Actions of States.t Actions.t
-  | Edges of States.t Actions.t Edges.t
+  | Actions of Block.t Actions.t
+  | Edges of Block.t Actions.t Edges.t
 
 type pp_collection =
   | List of pp_list
@@ -221,115 +274,21 @@ type pp_wrappable =
   | Action of action
   | Edge of (state * action * state)
   | OutgoingEdge of (action * state)
-  | States of States.t
+  | States of Block.t
+  | Block of Block.t
   | Alphabet of Alphabet.t
-  | Actions of States.t Actions.t
-  | Edges of States.t Actions.t Edges.t
+  | Actions of Block.t Actions.t
+  | Edges of Block.t Actions.t Edges.t
+  | Partition of Partition.t
   | Fsm of fsm
 
 type pp_options =
-  | None of unit
+  | Default of unit
   | Debug of unit
 
 val pp_collection_is_empty : pp_collection -> bool
 val pp_wrap_as_supported : pp_wrappable -> pp_supported
 val pstr : ?tabs:int -> ?options:pp_options -> pp_supported -> string
-val pstr_state : ?ids:unit -> ?pp:unit -> ?long:unit -> state -> string
-
-val handle_state_pstr
-  :  unit option
-  -> unit option
-  -> unit option
-  -> state
-  -> string
-
-val pstr_states
-  :  ?ids:unit
-  -> ?pp:unit
-  -> ?long:unit
-  -> ?indent:int
-  -> States.t
-  -> string
-
-val pstr_action : ?ids:unit -> ?long:unit -> action -> string
-
-val handle_action_pstr
-  :  unit option
-  -> unit option
-  -> unit option
-  -> action
-  -> string
-
-val pstr_action_alphabet
-  :  ?ids:unit
-  -> ?long:unit
-  -> ?indent:int
-  -> Alphabet.t
-  -> string
-
-val pstr_edge
-  :  ?ids:unit
-  -> ?pp:unit
-  -> ?long:unit
-  -> state * action * state
-  -> string
-
-val handle_edge_pstr
-  :  unit option
-  -> unit option
-  -> unit option
-  -> state * action * state
-  -> string
-
-val pstr_actions
-  :  ?ids:unit
-  -> ?pp:unit
-  -> ?long:unit
-  -> ?indent:int
-  -> ?from_state:state
-  -> States.t Actions.t
-  -> string
-
-val handle_actions_pstr
-  :  ?indent:int
-  -> ?from_state:state
-  -> unit option
-  -> unit option
-  -> unit option
-  -> States.t Actions.t
-  -> string
-
-val pstr_edges
-  :  ?ids:unit
-  -> ?pp:unit
-  -> ?long:unit
-  -> ?indent:int
-  -> States.t Actions.t Edges.t
-  -> string
-
-val handle_states_pstr
-  :  ?indent:int
-  -> unit option
-  -> unit option
-  -> unit option
-  -> States.t
-  -> string
-
-val handle_action_alphabet_pstr
-  :  unit option
-  -> unit option
-  -> unit option
-  -> Alphabet.t
-  -> string
-
-val handle_edges_pstr
-  :  unit option
-  -> unit option
-  -> unit option
-  -> States.t Actions.t Edges.t
-  -> string
-
-val pstr_fsm : ?ids:unit -> ?pp:unit -> ?long:unit -> fsm -> string
 
 exception StateNotFoundWithID of (int * States.t)
 exception MultipleStatesFoundWithID of (int * States.t)

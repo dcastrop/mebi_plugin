@@ -231,8 +231,8 @@ let rec pstr
   (to_str : pp_supported)
   : string
   =
-  let basedent = Utils.str_tabs (tabs - 1) in
-  let indent = Utils.str_tabs tabs in
+  let basedent = Mebi_utils.str_tabs (tabs - 1) in
+  let indent = Mebi_utils.str_tabs tabs in
   (* build string *)
   match to_str with
   (*  *)
@@ -398,7 +398,7 @@ let rec pstr
   | Utils _to_str -> "<<<<unimplemented>>>>"
   (*  *)
   | Fsm to_str ->
-    let indent = Utils.str_tabs (tabs + 1) in
+    let indent = Mebi_utils.str_tabs (tabs + 1) in
     Printf.sprintf
       "{ %s; %s; %s; %s; \n%s}"
       (Printf.sprintf
