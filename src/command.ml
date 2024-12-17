@@ -5,7 +5,6 @@ open Mebi_monad.Monad_syntax
 open Pp_ext
 
 (*  *)
-(* open Bisimilarity *)
 open Fsm
 
 (** ['a mm] is a function type mapping from [coq_context ref] to ['a in_context]. *)
@@ -415,6 +414,78 @@ struct
       }
   ;;
 
+  (** [pstr_lts_transition (from, t)] is a string transition:
+      [(from) --(t.edge_ctor)--> (t.to_node)].
+      [from] is the starting node.
+      [t] is an (outgoing) [lts_transition] composed of a label [t.edge_ctor]
+      and a destination node [t.to_node]. *)
+  let pstr_lts_transition
+    ?(long : unit option)
+    ((from : EConstr.constr), (t : lts_transition))
+    : string
+    =
+    match t with
+    | { action; destination } ->
+      Printf.sprintf
+        "%s ---{ %s }--> %s"
+        (econstr_to_string from)
+        (match long with
+         | None -> Printf.sprintf "%d" action.id
+         | Some () -> action.label)
+        (econstr_to_string destination)
+  ;;
+
+  (** [pstr_lts_transitions transitions] is a string of [transitions]. *)
+  let pstr_lts_transitions
+    ?(long : unit option)
+    ?(indent : int = 1)
+    (transitions : lts_transition H.t)
+    : string
+    =
+    if H.to_seq_keys transitions |> Seq.is_empty
+    then "[ ] (empty)"
+    else
+      Printf.sprintf
+        "[%s]"
+        (H.fold
+           (fun (from_node : EConstr.constr)
+             (outgoing_transition : lts_transition)
+             (acc : string) ->
+             Printf.sprintf
+               "%s%s{%s}\n"
+               acc
+               (str_tabs indent)
+               (pstr_lts_transition (from_node, outgoing_transition)))
+           transitions
+           "\n")
+  ;;
+
+  (** [pstr_lts_to_visit ?indent nodes_to_visit] is a string of [nodes_to_visit]. *)
+  let pstr_lts_to_visit
+    ?(indent : int = 1)
+    (nodes_to_visit : EConstr.constr Queue.t)
+    : string
+    =
+    let s =
+      Printf.sprintf
+        "[%s]"
+        (Queue.fold
+           (fun (acc : string) (node_to_visit : EConstr.constr) ->
+             Printf.sprintf "%s{%s}\n" acc (econstr_to_string node_to_visit))
+           "\n"
+           nodes_to_visit)
+    in
+    if s == "[\n]" then "[ ] (empty)" else s
+  ;;
+
+  (** [pstr_lts g] is a string of the LTS [g]. *)
+  let pstr_lts ?(long : unit option) (g : lts_graph) : string =
+    Printf.sprintf
+      "%s\n%s"
+      (Printf.sprintf "to_visit: %s" (pstr_lts_to_visit g.to_visit))
+      (Printf.sprintf "transitions: %s" (pstr_lts_transitions g.transitions))
+  ;;
+
   (** [state_translation_table] is is a hashtable mapping [EConstr.t] of terms to [states]. *)
   type state_translation_table = (EConstr.t, state) Hashtbl.t
 
@@ -432,11 +503,18 @@ struct
     let states =
       S.fold
         (fun (s : EConstr.t) (acc : States.t) ->
-          let new_state =
-            make_state ~pp:(econstr_to_string s) (get_state_id ())
-          in
-          Hashtbl.add map_of_states s new_state;
-          States.add new_state acc)
+          (* check if [map_of_states] has *)
+          match Hashtbl.find_opt map_of_states s with
+          | None ->
+            (* add as new state *)
+            let new_state =
+              make_state ~pp:(econstr_to_string s) (get_state_id ())
+            in
+            Hashtbl.add map_of_states s new_state;
+            States.add new_state acc
+          | Some existing_state ->
+            (* do not add new state, already translated *)
+            acc)
         g.states
         States.empty
     in
@@ -526,78 +604,6 @@ struct
 
   (** Error when trying to translate an unfinished LTS to FSM. *)
   exception UnfinishedLTS of lts_graph
-
-  (** [pstr_lts_transition (from, t)] is a string transition:
-      [(from) --(t.edge_ctor)--> (t.to_node)].
-      [from] is the starting node.
-      [t] is an (outgoing) [lts_transition] composed of a label [t.edge_ctor]
-      and a destination node [t.to_node]. *)
-  let pstr_lts_transition
-    ?(long : unit option)
-    ((from : EConstr.constr), (t : lts_transition))
-    : string
-    =
-    match t with
-    | { action; destination } ->
-      Printf.sprintf
-        "%s ---{ %s }--> %s"
-        (econstr_to_string from)
-        (match long with
-         | None -> Printf.sprintf "%d" action.id
-         | Some () -> action.label)
-        (econstr_to_string destination)
-  ;;
-
-  (** [pstr_lts_transitions transitions] is a string of [transitions]. *)
-  let pstr_lts_transitions
-    ?(long : unit option)
-    ?(indent : int = 1)
-    (transitions : lts_transition H.t)
-    : string
-    =
-    if H.to_seq_keys transitions |> Seq.is_empty
-    then "[ ] (empty)"
-    else
-      Printf.sprintf
-        "[%s]"
-        (H.fold
-           (fun (from_node : EConstr.constr)
-             (outgoing_transition : lts_transition)
-             (acc : string) ->
-             Printf.sprintf
-               "%s%s{%s}\n"
-               acc
-               (str_tabs indent)
-               (pstr_lts_transition (from_node, outgoing_transition)))
-           transitions
-           "\n")
-  ;;
-
-  (** [pstr_lts_to_visit ?indent nodes_to_visit] is a string of [nodes_to_visit]. *)
-  let pstr_lts_to_visit
-    ?(indent : int = 1)
-    (nodes_to_visit : EConstr.constr Queue.t)
-    : string
-    =
-    let s =
-      Printf.sprintf
-        "[%s]"
-        (Queue.fold
-           (fun (acc : string) (node_to_visit : EConstr.constr) ->
-             Printf.sprintf "%s{%s}\n" acc (econstr_to_string node_to_visit))
-           "\n"
-           nodes_to_visit)
-    in
-    if s == "[\n]" then "[ ] (empty)" else s
-  ;;
-
-  (** [pstr_lts g] is a string of the LTS [g]. *)
-  let pstr_lts ?(long : unit option) (g : lts_graph) : string =
-    Printf.sprintf
-      "%s\n%s"
-      (Printf.sprintf "to_visit: %s" (pstr_lts_to_visit g.to_visit))
-      (Printf.sprintf "transitions: %s" (pstr_lts_transitions g.transitions))
-  ;;
 
   (** [lts_to_fsm g init_term term] translates LTS [g] to an FSM.
       [g] is an [lts_graph] to be translated.
@@ -716,83 +722,90 @@ let bounded_lts
        (Printf.sprintf
           "(f) Fsm: %s.\n"
           (pstr (pp_wrap_as_supported (Fsm the_fsm)))));
+  Feedback.msg_debug
+    (str
+       (Printf.sprintf
+          "(g, with details) Fsm: %s.\n"
+          (pstr ~options:(Debug ()) (pp_wrap_as_supported (Fsm the_fsm)))));
   (*  *)
   Feedback.msg_debug (str "\n--------\n");
   return ()
 ;;
-(*
-   (** [bisim_exa1_ks90] *)
-   let bisim_exa1_ks90 : unit =
-   let s, t = RCP.Examples.exa_1 in
-   Feedback.msg_debug
-   (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa1)\n"));
-   Feedback.msg_debug (str (Printf.sprintf "exa1.s: %s" (pstr_fsm ~pp:() s)));
-   Feedback.msg_debug (str (Printf.sprintf "exa1.t: %s" (pstr_fsm ~pp:() t)));
-   Feedback.msg_warning (str (Printf.sprintf "exa1.s: %s" (pstr (Fsm s))));
-   Feedback.msg_warning
-   (str (Printf.sprintf "exa1.s: %s" (pstr ~options:(Debug ()) (Fsm s))));
-   Feedback.msg_warning (str (Printf.sprintf "exa1.t: %s" (pstr (Fsm t))));
-   Feedback.msg_warning
-   (str (Printf.sprintf "exa1.t: %s" (pstr ~options:(Debug ()) (Fsm t))));
-   (* run algorithm *)
-   let are_bisimilar, pi = RCP.KS90.run s t in
-   (* print out results *)
-   Feedback.msg_notice
-   (str
-   (Printf.sprintf
-   "(s ~ t) = %b.%s"
-   are_bisimilar
-   (if Bool.not are_bisimilar
-   then
-   Printf.sprintf
-   "\nnon-bisimilar partition: %s"
-   (RCP.KS90.pstr_partition ~pp:() pi)
-   else "")));
-   Feedback.msg_info
-   (str
-   (Printf.sprintf
-   "where s = %s\nand t = %s."
-   (pstr_fsm ~pp:() s)
-   (pstr_fsm ~pp:() t)));
-   Feedback.msg_debug
-   (str
-   (Printf.sprintf "\n--------\npi: %s" (RCP.KS90.pstr_partition ~pp:() pi)));
-   Feedback.msg_debug (str (Printf.sprintf "\n= = = = = = = = = =\n"));
-   ()
-   ;;
 
-   (** [bisim_exa2_ks90] *)
-   let bisim_exa2_ks90 : unit =
-   let s, t = RCP.Examples.exa_2 in
-   Feedback.msg_debug
-   (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa2)\n"));
-   Feedback.msg_debug (str (Printf.sprintf "exa2.s: %s" (pstr_fsm ~pp:() s)));
-   Feedback.msg_debug (str (Printf.sprintf "exa2.t: %s" (pstr_fsm ~pp:() t)));
-   Feedback.msg_warning (str (Printf.sprintf "exa2.s: %s" (pstr (Fsm s))));
-   Feedback.msg_warning (str (Printf.sprintf "exa2.t: %s" (pstr (Fsm t))));
-   (* run algorithm *)
-   let are_bisimilar, pi = RCP.KS90.run s t in
-   (* print out results *)
-   Feedback.msg_notice
-   (str
-   (Printf.sprintf
-   "(s ~ t) = %b.%s"
-   are_bisimilar
-   (if Bool.not are_bisimilar
-   then
-   Printf.sprintf
-   "\nnon-bisimilar partition: %s"
-   (RCP.KS90.pstr_partition ~pp:() pi)
-   else "")));
-   Feedback.msg_info
-   (str
-   (Printf.sprintf
-   "where s = %s\nand t = %s."
-   (pstr_fsm ~pp:() s)
-   (pstr_fsm ~pp:() t)));
-   Feedback.msg_debug
-   (str
-   (Printf.sprintf "\n--------\npi: %s" (RCP.KS90.pstr_partition ~pp:() pi)));
-   Feedback.msg_debug (str (Printf.sprintf "\n= = = = = = = = = =\n"));
-   ()
-   ;; *)
+(** [bisim_exa1_ks90] *)
+let bisim_exa1_ks90 : unit =
+  let open Bisimilarity in
+  let s, t = RCP.Examples.exa_1 in
+  Feedback.msg_debug
+    (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa1)\n"));
+  Feedback.msg_warning (str (Printf.sprintf "exa1.s: %s" (pstr (Fsm s))));
+  Feedback.msg_warning
+    (str (Printf.sprintf "exa1.s: %s" (pstr ~options:(Debug ()) (Fsm s))));
+  Feedback.msg_warning (str (Printf.sprintf "exa1.t: %s" (pstr (Fsm t))));
+  Feedback.msg_warning
+    (str (Printf.sprintf "exa1.t: %s" (pstr ~options:(Debug ()) (Fsm t))));
+  (* run algorithm *)
+  let are_bisimilar, pi = RCP.KS90.run s t in
+  (* print out results *)
+  Feedback.msg_notice
+    (str
+       (Printf.sprintf
+          "[KS90] (exa1) Results: (s ~ t) = %b.%s"
+          are_bisimilar
+          (if Bool.not are_bisimilar
+           then
+             Printf.sprintf
+               "\nnon-bisimilar partition: %s"
+               (pstr (pp_wrap_as_supported (Partition pi)))
+           else "")));
+  Feedback.msg_info
+    (str
+       (Printf.sprintf
+          "where s = %s\nand t = %s."
+          (pstr (pp_wrap_as_supported (Fsm s)))
+          (pstr (pp_wrap_as_supported (Fsm t)))));
+  Feedback.msg_debug
+    (str
+       (Printf.sprintf
+          "\n--------\npi: %s"
+          (pstr (pp_wrap_as_supported (Partition pi)))));
+  Feedback.msg_debug (str (Printf.sprintf "\n= = = = = = = = = =\n"));
+  ()
+;;
+
+(** [bisim_exa2_ks90] *)
+let bisim_exa2_ks90 : unit =
+  let open Bisimilarity in
+  let s, t = RCP.Examples.exa_2 in
+  Feedback.msg_debug
+    (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa2)\n"));
+  Feedback.msg_warning (str (Printf.sprintf "exa2.s: %s" (pstr (Fsm s))));
+  Feedback.msg_warning (str (Printf.sprintf "exa2.t: %s" (pstr (Fsm t))));
+  (* run algorithm *)
+  let are_bisimilar, pi = RCP.KS90.run s t in
+  (* print out results *)
+  Feedback.msg_notice
+    (str
+       (Printf.sprintf
+          "[KS90] (exa2) Results: (s ~ t) = %b.%s"
+          are_bisimilar
+          (if Bool.not are_bisimilar
+           then
+             Printf.sprintf
+               "\nnon-bisimilar partition: %s"
+               (pstr (pp_wrap_as_supported (Partition pi)))
+           else "")));
+  Feedback.msg_info
+    (str
+       (Printf.sprintf
+          "where s = %s\nand t = %s."
+          (pstr (pp_wrap_as_supported (Fsm s)))
+          (pstr (pp_wrap_as_supported (Fsm t)))));
+  Feedback.msg_debug
+    (str
+       (Printf.sprintf
+          "\n--------\npi: %s"
+          (pstr (pp_wrap_as_supported (Partition pi)))));
+  Feedback.msg_debug (str (Printf.sprintf "\n= = = = = = = = = =\n"));
+  ()
+;;

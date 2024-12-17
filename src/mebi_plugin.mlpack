@@ -4,6 +4,6 @@ Mebi_monad
 Pp_ext
 Stringify
 Fsm
-Bisim_algs
+Bisimilarity
 Command
 G_mebi
