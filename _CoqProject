@@ -17,8 +17,8 @@ src/pp_ext.ml
 src/pp_ext.mli
 src/fsm.ml
 src/fsm.mli
-src/bisim_algs.ml
-src/bisim_algs.mli
+src/bisimilarity.ml
+src/bisimilarity.mli
 src/command.ml
 src/command.mli
 src/g_mebi.mlg

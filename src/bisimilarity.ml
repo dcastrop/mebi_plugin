@@ -332,7 +332,7 @@ module RCP = struct
 
     (*  *)
     let run (s : fsm) (t : fsm) : bool * Partition.t =
-      Printf.printf "[DEBUG] (a) entered run";
+      (* Printf.printf "\n[DEBUG] (a) entered run\n"; *)
       (* initially [pi] is a partition with a single block containing all states. *)
       let pi, map_of_states =
         let init_block, map_of_states' =
@@ -358,18 +358,18 @@ module RCP = struct
         in
         ref (Partition.of_list [ init_block ]), map_of_states'
       in
-      Printf.printf
-        "[DEBUG] (b.1) initial pi: %s.\n(b.2) state map: [%s]."
-        (Fsm.pstr (pp_wrap_as_supported (Fsm.Partition !pi)))
-        (Hashtbl.fold
-           (fun (old_state : state) (new_state : state) (acc : string) ->
-             Printf.sprintf
-               "%s\n  (old: %s -> new: %s)"
-               acc
-               (pstr (pp_wrap_as_supported (State old_state)))
-               (pstr (pp_wrap_as_supported (State new_state))))
-           map_of_states
-           "");
+      (* Printf.printf
+         "\n[DEBUG] (b.1) initial pi: %s.\n(b.2) state map: [%s].\n"
+         (Fsm.pstr (pp_wrap_as_supported (Fsm.Partition !pi)))
+         (Hashtbl.fold
+         (fun (old_state : state) (new_state : state) (acc : string) ->
+         Printf.sprintf
+         "%s\n  (old: %s -> new: %s)"
+         acc
+         (pstr (pp_wrap_as_supported (State old_state)))
+         (pstr (pp_wrap_as_supported (State new_state))))
+         map_of_states
+         ""); *)
       (* merge actions *)
       let s_alphabet = s.alphabet in
       let t_alphabet = t.alphabet in
@@ -400,18 +400,18 @@ module RCP = struct
           t_alphabet
           (s_alphabet, Alphabet.cardinal t_alphabet |> Hashtbl.create)
       in
-      Printf.printf
-        "[DEBUG] (c.1) merged alphabet: %s.\n(c.2) alphabet map: [%s]."
-        (pstr (pp_wrap_as_supported (Alphabet alphabet)))
-        (Hashtbl.fold
-           (fun (old_alpha : action) (new_alpha : action) (acc : string) ->
-             Printf.sprintf
-               "%s\n  (old: (%s) -> new: (%s))"
-               acc
-               (pstr (pp_wrap_as_supported (Action old_alpha)))
-               (pstr (pp_wrap_as_supported (Action new_alpha))))
-           map_t_alphabet
-           "");
+      (* Printf.printf
+         "\n[DEBUG] (c.1) merged alphabet: %s.\n(c.2) alphabet map: [%s].\n"
+         (pstr (pp_wrap_as_supported (Alphabet alphabet)))
+         (Hashtbl.fold
+         (fun (old_alpha : action) (new_alpha : action) (acc : string) ->
+         Printf.sprintf
+         "%s\n  (old: (%s) -> new: (%s))"
+         acc
+         (pstr (pp_wrap_as_supported (Action old_alpha)))
+         (pstr (pp_wrap_as_supported (Action new_alpha))))
+         map_t_alphabet
+         ""); *)
       (* merge edge tables *)
       let edges = s.edges in
       Edges.iter
@@ -444,9 +444,9 @@ module RCP = struct
                      outgoing_edges
                      []))))
         t.edges;
-      Printf.printf
-        "[DEBUG] (d) merged edges: %s"
-        (pstr (pp_wrap_as_supported (Edges edges)));
+      (* Printf.printf
+         "\n[DEBUG] (d) merged edges: %s.\n"
+         (pstr (pp_wrap_as_supported (Edges edges))); *)
       (* prepare main alg loop *)
       let changed = ref true in
       while !changed do
@@ -479,7 +479,9 @@ module RCP = struct
                   edges;
                 (* split *)
                 match Partition.elements (split !b a !pi edges_of_a) with
-                | [] -> Printf.printf "[DEBUG] split returned empty list."
+                | [] ->
+                  (* Printf.printf "\n[DEBUG] split returned empty list.\n"; *)
+                  ()
                 | b1 :: [] ->
                   (* check if same as b *)
                   if Bool.not (Block.equal b1 !b)
@@ -493,7 +495,7 @@ module RCP = struct
                   if Bool.not (Block.equal b1 !b)
                      && Bool.not (Block.equal b2 !b)
                   then (
-                    Printf.printf "[DEBUG] b1 and b2 are not equal to b";
+                    (* Printf.printf "\n[DEBUG] b1 and b2 are not equal to b.\n"; *)
                     pi := Partition.remove !b !pi;
                     pi
                     := Partition.union
@@ -504,11 +506,12 @@ module RCP = struct
                     if Block.is_empty b1 then b := b2 else b := b1;
                     changed := true)
                 | _pi ->
-                  Printf.printf
-                    "Warning: split returned more than 2 items: %s."
-                    (pstr
-                       (pp_wrap_as_supported
-                          (Partition (Partition.of_list _pi)))))
+                  (* Printf.printf
+                     "\nWarning: split returned more than 2 items: %s.\n"
+                     (pstr
+                     (pp_wrap_as_supported
+                     (Partition (Partition.of_list _pi)))); *)
+                  ())
               alphabet;
             ())
           !pi
