@@ -51,8 +51,8 @@ MeBi Bisim_Exa1_KS90.
 MeBi Bisim_Exa2_KS90.
 
 (* ! commenting out below to make it easier for me to find the messages for testing the above, *)
-
 (*
+
 Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
   | test1' n : nonTerminatingTestLTS n true (S n)
   | test2' n : nonTerminatingTestLTS (S n) false n.
@@ -221,7 +221,9 @@ Module Test4.
 
   MeBi LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
 End Test4.
+
  *)
+ (* ! end of comment out *)
 
 
 (* (*** Printing user inputs ***) *)
