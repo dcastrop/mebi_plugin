@@ -51,16 +51,16 @@ MeBi Bisim_Exa1_KS90.
 MeBi Bisim_Exa2_KS90.
 
 (* ! commenting out below to make it easier for me to find the messages for testing the above, *)
-(*
+
 
 Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
   | test1' n : nonTerminatingTestLTS n true (S n)
   | test2' n : nonTerminatingTestLTS (S n) false n.
 
-MeBi LTS nonTerminatingTestLTS 0.
+(* MeBi LTS nonTerminatingTestLTS 0.
 MeBi LTS nonTerminatingTestLTS (S 0).
 MeBi LTS nonTerminatingTestLTS (S (S 0)).
-MeBi LTS nonTerminatingTestLTS (S (S (S 0))).
+MeBi LTS nonTerminatingTestLTS (S (S (S 0))). *)
 
 (* Definition boundedLTS (p:Prop) (n:nat) : Type := Prop * nat. *)
 
@@ -131,7 +131,7 @@ End Test2.
 
 (* Cannot capture things like below due to cases like [tfix t --> tfix (tfix
  t')] leading to infinite states *)
-Module Test3.
+(* Module Test3.
   Inductive action : Set := | TheAction1 | TheAction2 | Collapse.
   Inductive term : Set :=
   | trec : term
@@ -166,7 +166,7 @@ Module Test3.
   MeBi LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
 
   MeBi LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
-End Test3.
+End Test3. *)
 
 (* FIXME: The case below is hard to implement. *)
 (* Solution 1:
@@ -178,7 +178,7 @@ Any term that *depends* on parameters ("a", "t", "t'"), try to find all terms th
 try to find all possible ways that this constructor can be instantiated. If we can't figure out if it
 is inhabited, or we have no way to check if we exhaustively cover all possible cases, fail.
  *)
-Module Test4.
+(* Module Test4.
   Inductive action : Set := | TheAction1 | TheAction2 | Collapse.
   Inductive term : Set :=
   | trec : term
@@ -220,9 +220,9 @@ Module Test4.
   MeBi LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
 
   MeBi LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
-End Test4.
+End Test4. *)
 
- *)
+
  (* ! end of comment out *)
 
 
