@@ -157,42 +157,86 @@ type unif_problem =
   ; termR : EConstr.t
   }
 
+let rec pstr_unif_problem (t : unif_problem) : string =
+  match t with
+  | { termL; termR; _ } ->
+    Printf.sprintf
+      "{ L: %s;\n  R: %s; }"
+      (econstr_to_string termL)
+      (econstr_to_string termR)
+;;
+
 type 'a tree = Node of 'a * 'a tree list
+
+type unif_tree =
+  | Tree of int tree
+  | Start
+  | Fail
+
+let rec pstr_int_tree (t : int tree) : string =
+  match t with
+  | Node (lhs_int, rhs_int_tree_list) ->
+    Printf.sprintf
+      "(%d) [%s]"
+      lhs_int
+      (List.fold_left
+         (fun (acc : string) (rhs_int_tree : int tree) ->
+           pstr_int_tree rhs_int_tree)
+         ""
+         rhs_int_tree_list)
+;;
 
 (* change type to: *)
 (* (int tree * unif_problem) list -> int tree list option t *)
 (* *)
-let rec unify_all (i : (int tree * unif_problem) list) : int tree list option t =
+let rec unify_all (i : (int tree * unif_problem) list) : int tree option t =
   (* : int tree list option t = *)
-  match i with
-  | [] -> return (Some [])
-  | (ctor_tree, u) :: t ->
-    let* _ =
-      debug (fun env sigma ->
-        str "UNIFYALL:::::::::: "
-        ++ Printer.pr_econstr_env env sigma u.termL
-        ++ strbrk "\n::::::::::"
-        ++ Printer.pr_econstr_env env sigma u.termR)
-    in
-    let* success = m_unify u.termL u.termR in
-    if success
-    then
-      let* _unified = unify_all t in
-      match _unified with
-      | None ->
-        Feedback.msg_warning
-          (str
-             "unify_all returned None after success ? (or should we still \
-              return what we have; i.e., [ctor_tree])");
-        return None
-      | Some unified -> return (Some (List.append [ ctor_tree ] unified))
-    else return None
+  (* inner recursive function to handle [unif_tree] *)
+  let rec unify_all' (i' : (int tree * unif_problem) list) : unif_tree t =
+    match i' with
+    | [] -> return Start
+    | (ctor_tree, u) :: t ->
+      let* _ =
+        debug (fun env sigma ->
+          str "UNIFYALL:::::::::: "
+          ++ Printer.pr_econstr_env env sigma u.termL
+          ++ strbrk "\n::::::::::"
+          ++ Printer.pr_econstr_env env sigma u.termR)
+      in
+      let* success = m_unify u.termL u.termR in
+      if success
+      then
+        let* _unified = unify_all' t in
+        match _unified with
+        | Fail ->
+          Feedback.msg_warning
+            (str
+               "unify_all returned Fail after m_unify success.\n\
+                returning Fail (or should we still return what we have; i.e., \
+                [ctor_tree])");
+          return Fail
+        | Start -> return (Some ctor_tree)
+        | Tree unified -> return (Some (List.append [ ctor_tree ] unified))
+      else return Fail
+  in
+  let* unified = unify_all' i in
+  match unified with
+  | Start ->
+    Feedback.msg_warning
+      (str
+         (Printf.sprintf
+            "ERROR :: unify_all' returned Start to the outer scope, this \
+             should not happen. was 'i' an empty list? (length: %d).\n"
+            (List.length i)));
+    return None
+  | Fail -> return None
+  | Tree int_tree -> return (Some int_tree)
 ;;
 
 let sandboxed_unify (tgt_term : EConstr.t) (u : (int tree * unif_problem) list)
-  : (EConstr.t * int tree list) option mm
+  : (EConstr.t * int tree) option mm
   =
-  (* : (EConstr.t * int tree) option mm *)
+  (* : (EConstr.t * int tree list) option mm *)
   let* _ =
     debug (fun env sigma ->
       str "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term)
@@ -208,13 +252,14 @@ let sandboxed_unify (tgt_term : EConstr.t) (u : (int tree * unif_problem) list)
 ;;
 
 let rec retrieve_tgt_nodes
-  (* (acc : (EConstr.t * int tree) list) *)
-    (acc : (EConstr.t * int tree list) list)
+  (acc : (EConstr.t * int tree) list)
+    (* (acc : (EConstr.t * int tree list) list) *)
   (i : int)
   (tgt_term : EConstr.t)
-  :  (int tree * unif_problem) list list -> (EConstr.t * int tree list) list t
-  (* : (int tree * unif_problem) list list -> (EConstr.t * int tree) list t *)
-  = function
+  : (int tree * unif_problem) list list -> (EConstr.t * int tree) list t
+  =
+  (* :  (int tree * unif_problem) list list -> (EConstr.t * int tree list) list t *)
+  function
   | [] -> return acc
   | u1 :: nctors ->
     let* success = sandbox (sandboxed_unify tgt_term u1) in
@@ -272,7 +317,9 @@ let rec check_updated_ctx
 and check_valid_constructor (lts : raw_lts) (t : EConstr.t)
   : (EConstr.t * int tree) list t
   =
+  (* : (EConstr.t * int tree list) list t *)
   let$+ t env sigma = Reductionops.nf_all env sigma t in
+  (* let iter_body (i : int) (ctor_vals : (EConstr.t * int tree list) list) = *)
   let iter_body (i : int) (ctor_vals : (EConstr.t * int tree) list) =
     let* _ =
       debug (fun env sigma ->
@@ -299,16 +346,7 @@ and check_valid_constructor (lts : raw_lts) (t : EConstr.t)
          if EConstr.isEvar sg tgt_term
          then return ctor_vals
          else return ((tgt_term, Node (i, [])) :: ctor_vals)
-       | Some nctors ->
-         retrieve_tgt_nodes
-           (List.map
-              (fun ((_term, _int_tree) : EConstr.t * int tree)
-                : (EConstr.t * int tree list) -> _term, [ _int_tree ])
-              ctor_vals)
-           (* ctor_vals *)
-           i
-           tgt_term
-           nctors)
+       | Some nctors -> retrieve_tgt_nodes ctor_vals i tgt_term nctors)
     | false -> return ctor_vals
   in
   iterate 0 (Array.length lts.constructor_transitions - 1) [] iter_body
@@ -327,6 +365,7 @@ module type GraphB = sig
 
   type ('a, 'b) transition =
     { action : 'a
+    ; index_tree : int tree
     ; destination : 'b
     }
 
@@ -387,6 +426,7 @@ struct
       [go_to] is of type ['b]. *)
   type ('a, 'b) transition =
     { action : 'a
+    ; index_tree : int tree
     ; destination : 'b
     }
 
@@ -414,18 +454,20 @@ struct
     then return g
     else
       let* t = return (Queue.pop g.to_visit) in
-      let* constrs = check_valid_constructor the_lts t in
+      let* (constrs : (EConstr.t * int tree) list) =
+        check_valid_constructor the_lts t
+      in
       Feedback.msg_debug
         (str
            (Printf.sprintf
               "---- (returned from check_valid_constructor)\n\n\
                build_lts: constrs: [%s] (length %d).\n"
               (List.fold_left
-                 (fun (acc : string) ((_int, ctor) : int * EConstr.t) ->
+                 (fun (acc : string) ((ctor, int_tree) : EConstr.t * int tree) ->
                    Printf.sprintf
-                     "%s   (%d ::\n    %s)\n"
+                     "%s   (%s ::\n    %s)\n"
                      acc
-                     _int
+                     (pstr_int_tree int_tree)
                      (econstr_to_string ctor))
                  "\n"
                  constrs)
@@ -433,15 +475,24 @@ struct
       let* env = get_env in
       let* sigma = get_sigma in
       let new_states = ref (S.singleton t) in
+      (* set up counter for transition ids *)
+      let transition_id_counter = ref 0 in
+      let get_transition_id () : int =
+        let to_return = !transition_id_counter in
+        transition_id_counter := !transition_id_counter + 1;
+        to_return
+      in
       List.iter
-        (fun (i, tgt) ->
+        (fun ((tgt, int_tree) : EConstr.t * int tree) ->
           Feedback.msg_debug
             (str "\n\nTransition to" ++ Printer.pr_econstr_env env sigma tgt);
           new_states := S.add tgt !new_states;
           H.add
             g.transitions
             t
-            { action = { id = i; label = econstr_to_string tgt }
+            { action =
+                { id = get_transition_id (); label = econstr_to_string tgt }
+            ; index_tree = int_tree
             ; destination = tgt
             };
           if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
@@ -484,13 +535,17 @@ struct
     : string
     =
     match t with
-    | { action; destination } ->
+    | { action; index_tree; destination } ->
       Printf.sprintf
         "%s ---{ %s }--> %s"
         (econstr_to_string from)
         (match long with
          | None -> Printf.sprintf "%d" action.id
-         | Some () -> action.label)
+         | Some () ->
+           Printf.sprintf
+             "%s (index_tree: %s)"
+             action.label
+             (pstr_int_tree index_tree))
         (econstr_to_string destination)
   ;;
 
