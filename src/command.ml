@@ -157,21 +157,21 @@ type unif_problem =
   ; termR : EConstr.t
   }
 
-let rec pstr_unif_problem (t : unif_problem) : string =
+(* let rec pstr_unif_problem (t : unif_problem) : string =
   match t with
   | { termL; termR; _ } ->
     Printf.sprintf
       "{ L: %s;\n  R: %s; }"
       (econstr_to_string termL)
       (econstr_to_string termR)
-;;
+;; *)
 
 type 'a tree = Node of 'a * 'a tree list
 
-type unif_tree =
-  | Tree of int tree
-  | Start
-  | Fail
+(* type unif_tree =
+   | Tree of int tree
+   | Start
+   | Failed *)
 
 let rec pstr_int_tree (t : int tree) : string =
   match t with
@@ -189,52 +189,34 @@ let rec pstr_int_tree (t : int tree) : string =
 (* change type to: *)
 (* (int tree * unif_problem) list -> int tree list option t *)
 (* *)
-let rec unify_all (i : (int tree * unif_problem) list) : int tree option t =
-  (* : int tree list option t = *)
-  (* inner recursive function to handle [unif_tree] *)
-  let rec unify_all' (i' : (int tree * unif_problem) list) : unif_tree t =
-    match i' with
-    | [] -> return Start
-    | (ctor_tree, u) :: t ->
-      let* _ =
-        debug (fun env sigma ->
-          str "UNIFYALL:::::::::: "
-          ++ Printer.pr_econstr_env env sigma u.termL
-          ++ strbrk "\n::::::::::"
-          ++ Printer.pr_econstr_env env sigma u.termR)
-      in
-      let* success = m_unify u.termL u.termR in
-      if success
-      then
-        let* _unified = unify_all' t in
-        match _unified with
-        | Fail ->
-          Feedback.msg_warning
-            (str
-               "unify_all returned Fail after m_unify success.\n\
-                returning Fail (or should we still return what we have; i.e., \
-                [ctor_tree])");
-          return Fail
-        | Start -> return (Some ctor_tree)
-        | Tree unified -> return (Some (List.append [ ctor_tree ] unified))
-      else return Fail
-  in
-  let* unified = unify_all' i in
-  match unified with
-  | Start ->
-    Feedback.msg_warning
-      (str
-         (Printf.sprintf
-            "ERROR :: unify_all' returned Start to the outer scope, this \
-             should not happen. was 'i' an empty list? (length: %d).\n"
-            (List.length i)));
-    return None
-  | Fail -> return None
-  | Tree int_tree -> return (Some int_tree)
+let rec unify_all (i : (int tree * unif_problem) list) : int tree list option t =
+  match i with
+  | [] -> return (Some [])
+  | (ctor_tree, u) :: t ->
+    let* _ =
+      debug (fun env sigma ->
+        str "UNIFYALL:::::::::: "
+        ++ Printer.pr_econstr_env env sigma u.termL
+        ++ strbrk "\n::::::::::"
+        ++ Printer.pr_econstr_env env sigma u.termR)
+    in
+    let* success = m_unify u.termL u.termR in
+    if success
+    then
+      let* _unified = unify_all t in
+      match _unified with
+      | None ->
+        Feedback.msg_warning
+          (str
+             "unify_all returned None after success ? (or should we still \
+              return what we have; i.e., [ctor_tree])");
+        return None
+      | Some unified -> return (Some (List.append [ ctor_tree ] unified))
+    else return None
 ;;
 
 let sandboxed_unify (tgt_term : EConstr.t) (u : (int tree * unif_problem) list)
-  : (EConstr.t * int tree) option mm
+  : (EConstr.t * int tree list) option mm
   =
   (* : (EConstr.t * int tree list) option mm *)
   let* _ =
@@ -265,8 +247,8 @@ let rec retrieve_tgt_nodes
     let* success = sandbox (sandboxed_unify tgt_term u1) in
     (match success with
      | None -> retrieve_tgt_nodes acc i tgt_term nctors
-     | Some tgt_ctor_tree ->
-       retrieve_tgt_nodes (tgt_ctor_tree :: acc) i tgt_term nctors)
+     | Some (_tgt, ctor_tree) ->
+       retrieve_tgt_nodes ((_tgt, Node (i, ctor_tree)) :: acc) i tgt_term nctors)
 ;;
 
 (* Should return a list of unification problems *)
@@ -346,7 +328,9 @@ and check_valid_constructor (lts : raw_lts) (t : EConstr.t)
          if EConstr.isEvar sg tgt_term
          then return ctor_vals
          else return ((tgt_term, Node (i, [])) :: ctor_vals)
-       | Some nctors -> retrieve_tgt_nodes ctor_vals i tgt_term nctors)
+       | Some nctors ->
+         let tgt_nodes = retrieve_tgt_nodes ctor_vals i tgt_term nctors in
+         tgt_nodes)
     | false -> return ctor_vals
   in
   iterate 0 (Array.length lts.constructor_transitions - 1) [] iter_body
@@ -479,7 +463,7 @@ struct
       let transition_id_counter = ref 0 in
       let get_transition_id () : int =
         let to_return = !transition_id_counter in
-        transition_id_counter := !transition_id_counter + 1;
+        transition_id_counter := to_return + 1;
         to_return
       in
       List.iter
@@ -537,13 +521,14 @@ struct
     match t with
     | { action; index_tree; destination } ->
       Printf.sprintf
-        "%s ---{ %s }--> %s"
+        "%s\n\t---{ %s\n\t}--> %s"
         (econstr_to_string from)
         (match long with
          | None -> Printf.sprintf "%d" action.id
          | Some () ->
            Printf.sprintf
-             "%s (index_tree: %s)"
+             "\n\t\t(id: %d)\n\t\t(label: %s)\n\t\t(index_tree: %s)"
+             action.id
              action.label
              (pstr_int_tree index_tree))
         (econstr_to_string destination)
@@ -566,10 +551,16 @@ struct
              (outgoing_transition : lts_transition)
              (acc : string) ->
              Printf.sprintf
-               "%s%s{%s}\n"
+               "%s%s{%s}\n%s"
                acc
                (str_tabs indent)
-               (pstr_lts_transition (from_node, outgoing_transition)))
+               (match long with
+                | None -> pstr_lts_transition (from_node, outgoing_transition)
+                | Some () ->
+                  pstr_lts_transition ~long:() (from_node, outgoing_transition))
+               (match long with
+                | None -> ""
+                | Some () -> "\n"))
            transitions
            "\n")
   ;;
@@ -828,7 +819,7 @@ let bounded_lts
     (str
        (Printf.sprintf
           "(e) Graph Edges: %s.\n"
-          (G.pstr_lts_transitions graph_lts.transitions)));
+          (G.pstr_lts_transitions ~long:() graph_lts.transitions)));
   (* lts to fsm *)
   let* the_fsm, translation = G.lts_to_fsm graph_lts tref in
   Feedback.msg_debug
@@ -841,7 +832,7 @@ let bounded_lts
        (Printf.sprintf
           "(g, with details) Fsm: %s.\n"
           (pstr ~options:(Debug ()) (pp_wrap_as_supported (Fsm the_fsm)))));
-  (* *)
-  Feedback.msg_debug (str "\n--------\n");
+  (* using warning so it shows the line number in [Text.v] in the console for me (since vscoq isnt being very useful for debugging plugins) -- jonah *)
+  Feedback.msg_warning (str "\n--------\n");
   return ()
 ;;
