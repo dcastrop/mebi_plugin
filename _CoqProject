@@ -21,5 +21,7 @@ src/bisimilarity.ml
 src/bisimilarity.mli
 src/command.ml
 src/command.mli
+src/tests.ml
+src/tests.mli
 src/g_mebi.mlg
 src/mebi_plugin.mlpack
