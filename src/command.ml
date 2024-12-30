@@ -157,15 +157,16 @@ type unif_problem =
   ; termR : EConstr.t
   }
 
-(* type 'a tree = Node of 'a * 'a tree list *)
+type 'a tree = Node of 'a * 'a tree list
 
 (* change type to: *)
 (* (int tree * unif_problem) list -> int tree list option t *)
 (* *)
-let rec unify_all (i : (int * unif_problem) list) : bool t =
+let rec unify_all (i : (int tree * unif_problem) list) : int tree list option t =
+  (* : int tree list option t = *)
   match i with
-  | [] -> return true
-  | (_, u) :: t ->
+  | [] -> return (Some [])
+  | (ctor_tree, u) :: t ->
     let* _ =
       debug (fun env sigma ->
         str "UNIFYALL:::::::::: "
@@ -174,10 +175,24 @@ let rec unify_all (i : (int * unif_problem) list) : bool t =
         ++ Printer.pr_econstr_env env sigma u.termR)
     in
     let* success = m_unify u.termL u.termR in
-    if success then unify_all t else return false
+    if success
+    then
+      let* _unified = unify_all t in
+      match _unified with
+      | None ->
+        Feedback.msg_warning
+          (str
+             "unify_all returned None after success ? (or should we still \
+              return what we have; i.e., [ctor_tree])");
+        return None
+      | Some unified -> return (Some (List.append [ ctor_tree ] unified))
+    else return None
 ;;
 
-let sandboxed_unify tgt_term u =
+let sandboxed_unify (tgt_term : EConstr.t) (u : (int tree * unif_problem) list)
+  : (EConstr.t * int tree list) option mm
+  =
+  (* : (EConstr.t * int tree) option mm *)
   let* _ =
     debug (fun env sigma ->
       str "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term)
@@ -185,28 +200,36 @@ let sandboxed_unify tgt_term u =
   sandbox
     (let* success = unify_all u in
      match success with
-     | true ->
+     | None -> return None
+     | Some unified ->
        let$+ term env sigma = Reductionops.nf_all env sigma tgt_term in
-       let$+ undefined _ sigma = EConstr.isEvar sigma term in
-       if undefined then return None else return (Some term)
-     | false -> return None)
+       let$+ is_undefined _ sigma = EConstr.isEvar sigma term in
+       if is_undefined then return None else return (Some (term, unified)))
 ;;
 
-let rec retrieve_tgt_nodes acc i tgt_term
-  : (int * unif_problem) list list -> (int * EConstr.t) list t
+let rec retrieve_tgt_nodes
+  (* (acc : (EConstr.t * int tree) list) *)
+    (acc : (EConstr.t * int tree list) list)
+  (i : int)
+  (tgt_term : EConstr.t)
+  :  (int tree * unif_problem) list list -> (EConstr.t * int tree list) list t
+  (* : (int tree * unif_problem) list list -> (EConstr.t * int tree) list t *)
   = function
   | [] -> return acc
   | u1 :: nctors ->
     let* success = sandbox (sandboxed_unify tgt_term u1) in
     (match success with
-     | Some tgt -> retrieve_tgt_nodes ((i, tgt) :: acc) i tgt_term nctors
-     | None -> retrieve_tgt_nodes acc i tgt_term nctors)
+     | None -> retrieve_tgt_nodes acc i tgt_term nctors
+     | Some tgt_ctor_tree ->
+       retrieve_tgt_nodes (tgt_ctor_tree :: acc) i tgt_term nctors)
 ;;
 
 (* Should return a list of unification problems *)
-let rec check_updated_ctx acc lts
+let rec check_updated_ctx
+  (acc : (int tree * unif_problem) list list)
+  (lts : raw_lts)
   :  EConstr.t list * EConstr.rel_declaration list
-  -> (int * unif_problem) list list option t
+  -> (int tree * unif_problem) list list option t
   = function
   | [], [] -> return (Some acc)
   | _ :: substl, t :: tl ->
@@ -224,7 +247,10 @@ let rec check_updated_ctx acc lts
          then return None
          else (
            let ctors =
-             List.map (fun (i, tL) -> i, { termL = tL; termR = args.(2) }) ctors
+             List.map
+               (fun ((tL : EConstr.t), (i : int tree)) ->
+                 i, { termL = tL; termR = args.(2) })
+               ctors
            in
            (* We need to cross-product all possible unifications. This is in case
               we have a constructor of the form LTS t11 a1 t12 -> LTS t21 a2
@@ -243,9 +269,11 @@ let rec check_updated_ctx acc lts
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
 (** Checks possible transitions for this term: *)
-and check_valid_constructor lts t : (int * EConstr.t) list t =
+and check_valid_constructor (lts : raw_lts) (t : EConstr.t)
+  : (EConstr.t * int tree) list t
+  =
   let$+ t env sigma = Reductionops.nf_all env sigma t in
-  let iter_body i ctor_vals =
+  let iter_body (i : int) (ctor_vals : (EConstr.t * int tree) list) =
     let* _ =
       debug (fun env sigma ->
         str "CHECKING CONSTRUCTOR "
@@ -260,16 +288,27 @@ and check_valid_constructor lts t : (int * EConstr.t) list t =
     let* success = m_unify t termL in
     match success with
     | true ->
-      let* next_ctors = check_updated_ctx [ [] ] lts (substl, ctx_tys) in
-      let tgt_term = EConstr.Vars.substl substl termR in
+      let* (next_ctors : (int tree * unif_problem) list list option) =
+        check_updated_ctx [ [] ] lts (substl, ctx_tys)
+      in
+      let (tgt_term : EConstr.t) = EConstr.Vars.substl substl termR in
       (match next_ctors with
        | None -> return ctor_vals
        | Some [] ->
          let* sg = get_sigma in
          if EConstr.isEvar sg tgt_term
          then return ctor_vals
-         else return ((i, tgt_term) :: ctor_vals)
-       | Some nctors -> retrieve_tgt_nodes ctor_vals i tgt_term nctors)
+         else return ((tgt_term, Node (i, [])) :: ctor_vals)
+       | Some nctors ->
+         retrieve_tgt_nodes
+           (List.map
+              (fun ((_term, _int_tree) : EConstr.t * int tree)
+                : (EConstr.t * int tree list) -> _term, [ _int_tree ])
+              ctor_vals)
+           (* ctor_vals *)
+           i
+           tgt_term
+           nctors)
     | false -> return ctor_vals
   in
   iterate 0 (Array.length lts.constructor_transitions - 1) [] iter_body
