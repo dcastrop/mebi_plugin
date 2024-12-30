@@ -71,7 +71,9 @@ let compare_constr st () t1 t2 =
   if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1
 ;;
 
-let make_constr_set st =
+let make_constr_set (st : coq_context ref)
+  : (module Set.S with type elt = Evd.econstr) in_context
+  =
   let cmp = compare_constr st in
   let module Constrset =
     Set.Make (struct
@@ -96,16 +98,25 @@ let rec iterate
   else bind (f from_idx acc) (fun acc' -> iterate (from_idx + 1) to_idx acc' f)
 ;;
 
-let get_env st : Environ.env in_context = { state = st; value = !st.coq_env }
-let get_sigma st : Evd.evar_map in_context = { state = st; value = !st.coq_ctx }
+let get_env (st : coq_context ref) : Environ.env in_context =
+  { state = st; value = !st.coq_env }
+;;
 
-let state f st =
+let get_sigma (st : coq_context ref) : Evd.evar_map in_context =
+  { state = st; value = !st.coq_ctx }
+;;
+
+let state
+  (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+  (st : coq_context ref)
+  : 'a in_context
+  =
   let sigma, a = f !st.coq_env !st.coq_ctx in
   st := { !st with coq_ctx = sigma };
   { state = st; value = a }
 ;;
 
-let sandbox (m : 'a t) (st : coq_context ref) =
+let sandbox (m : 'a t) (st : coq_context ref) : 'a in_context =
   let st_contents = !st in
   let res = m st in
   st := st_contents;
