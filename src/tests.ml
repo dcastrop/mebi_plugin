@@ -1,79 +1,50 @@
-open Pp
 open Fsm
 open Bisimilarity
 
-(** [bisim_exa1_ks90] *)
-let bisim_exa1_ks90 : unit =
-  let s, t = RCP.Examples.exa_1 in
-  Feedback.msg_debug
-    (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa1)\n"));
-  Feedback.msg_warning (str (Printf.sprintf "exa1.s: %s" (pstr (Fsm s))));
-  Feedback.msg_warning
-    (str (Printf.sprintf "exa1.s: %s" (pstr ~options:(Debug ()) (Fsm s))));
-  Feedback.msg_warning (str (Printf.sprintf "exa1.t: %s" (pstr (Fsm t))));
-  Feedback.msg_warning
-    (str (Printf.sprintf "exa1.t: %s" (pstr ~options:(Debug ()) (Fsm t))));
-  (* run algorithm *)
-  let are_bisimilar, pi = RCP.KS90.run s t in
-  (* print out results *)
-  Feedback.msg_notice
-    (str
-       (Printf.sprintf
-          "[KS90] (exa1) Results: (s ~ t) = %b.%s"
-          are_bisimilar
-          (if Bool.not are_bisimilar
-           then
-             Printf.sprintf
-               "\nnon-bisimilar partition: %s"
-               (pstr (pp_wrap_as_supported (Partition pi)))
-           else "")));
-  Feedback.msg_info
-    (str
-       (Printf.sprintf
-          "where s = %s\nand t = %s."
-          (pstr (pp_wrap_as_supported (Fsm s)))
-          (pstr (pp_wrap_as_supported (Fsm t)))));
-  Feedback.msg_debug
-    (str
-       (Printf.sprintf
-          "\n--------\npi: %s"
-          (pstr (pp_wrap_as_supported (Partition pi)))));
-  Feedback.msg_debug (str (Printf.sprintf "\n= = = = = = = = = =\n"));
-  ()
+(** [ks90_exas] ... *)
+let rec ks90_exas (exas : RCP.Examples.example list) : unit =
+  match exas with
+  | [] -> ()
+  | exa :: exas' ->
+    (match exa with
+     | { name; s; t; _ } ->
+       Printf.printf "\n= = = = = = = = = =\nRCP.KS90 (Exa2)\n";
+       (* Printf.printf "%s.s: %s" name (pstr (Fsm s)); *)
+       Printf.printf "%s.s: %s" name (pstr ~options:(Debug ()) (Fsm s));
+       (* Printf.printf "%s.t: %s" name (pstr (Fsm t)); *)
+       Printf.printf "%s.t: %s" name (pstr ~options:(Debug ()) (Fsm t));
+       (* run algorithm *)
+       let are_bisimilar, pi = RCP.KS90.run s t in
+       (* print out results *)
+       Printf.printf
+         "[KS90] (%s) Results: (s ~ t) = %b.%s"
+         name
+         are_bisimilar
+         (if Bool.not are_bisimilar
+          then
+            Printf.sprintf
+              "\nnon-bisimilar partition: %s"
+              (pstr (pp_wrap_as_supported (Partition pi)))
+          else "");
+       Printf.printf
+         "where s = %s\nand t = %s."
+         (pstr (pp_wrap_as_supported (Fsm s)))
+         (pstr (pp_wrap_as_supported (Fsm t)));
+       Printf.printf
+         "\n--------\npi: %s"
+         (pstr (pp_wrap_as_supported (Partition pi)));
+       Printf.printf "\n= = = = = = = = = =\n";
+       ();
+       (* continue *)
+       ks90_exas exas')
 ;;
 
-(** [bisim_exa2_ks90] *)
-let bisim_exa2_ks90 : unit =
-  let s, t = RCP.Examples.exa_2 in
-  Feedback.msg_debug
-    (str (Printf.sprintf "\n= = = = = = = = = =\nRCP.KS90 (Exa2)\n"));
-  Feedback.msg_warning (str (Printf.sprintf "exa2.s: %s" (pstr (Fsm s))));
-  Feedback.msg_warning (str (Printf.sprintf "exa2.t: %s" (pstr (Fsm t))));
-  (* run algorithm *)
-  let are_bisimilar, pi = RCP.KS90.run s t in
-  (* print out results *)
-  Feedback.msg_notice
-    (str
-       (Printf.sprintf
-          "[KS90] (exa2) Results: (s ~ t) = %b.%s"
-          are_bisimilar
-          (if Bool.not are_bisimilar
-           then
-             Printf.sprintf
-               "\nnon-bisimilar partition: %s"
-               (pstr (pp_wrap_as_supported (Partition pi)))
-           else "")));
-  Feedback.msg_info
-    (str
-       (Printf.sprintf
-          "where s = %s\nand t = %s."
-          (pstr (pp_wrap_as_supported (Fsm s)))
-          (pstr (pp_wrap_as_supported (Fsm t)))));
-  Feedback.msg_debug
-    (str
-       (Printf.sprintf
-          "\n--------\npi: %s"
-          (pstr (pp_wrap_as_supported (Partition pi)))));
-  Feedback.msg_debug (str (Printf.sprintf "\n= = = = = = = = = =\n"));
-  ()
+let run_all_ks90 : unit = ks90_exas [ RCP.Examples.exa_1; RCP.Examples.exa_2 ]
+
+let run_all : unit =
+  Printf.printf "\nRunning Tests.ml:\n\n";
+  run_all_ks90;
+  Printf.printf "\n\nEnd of Tests.ml.\n"
 ;;
+
+let () = run_all

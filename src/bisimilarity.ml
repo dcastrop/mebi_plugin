@@ -9,8 +9,16 @@ open Fsm
 module RCP = struct
   (** [Examples] contains examples to be used by either [KS90] or [PT87]. *)
   module Examples = struct
+    type example =
+      { name : string
+      ; s : fsm
+      ; t : fsm
+      }
+
+    let exa (name : string) (s : fsm) (t : fsm) : example = { name; s; t }
+
     (** [exa_1] is `Example 3.2.5` on page 106. *)
-    let exa_1 : fsm * fsm =
+    let exa_1 : example =
       (* s *)
       let (s : fsm) =
         let init = { id = 0; pp = "s0" } in
@@ -85,11 +93,11 @@ module RCP = struct
                 ]));
         { init; states; alphabet; edges }
       in
-      s, t
+      exa "exa1" s t
     ;;
 
     (** [exa_2] is `Example 3.2.6` on page 107. *)
-    let exa_2 : fsm * fsm =
+    let exa_2 : example =
       (* s *)
       let (s : fsm) =
         let init = { id = 0; pp = "s0" } in
@@ -235,7 +243,7 @@ module RCP = struct
                 ]));
         { init; states; alphabet; edges }
       in
-      s, t
+      exa "exa2" s t
     ;;
   end
 
