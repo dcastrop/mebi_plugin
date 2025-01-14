@@ -27,15 +27,15 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   { Mebi_monad.run (Command.bounded_lts (Nametab.global r) t) }
   (* run all examples *)
   | [ "MeBi" "Bisim_All_Examples" ] ->
-    { Tests.run_all  }
+    { Tests.run_all ~pp:() () }
   (* run all ks90 examples *)
   | [ "MeBi" "Bisim_KS90_All_Examples" ] ->
-    { Tests.run_all_ks90 }
+    { Tests.run_all_ks90 ~pp:() () }
   (* example 1 *)
   | [ "MeBi" "Bisim_KS90_Exa1" ] ->
-    { Tests.ks90_exas [Bisimilarity.RCP.Examples.exa_1 ] }
+    { Tests.ks90_exas ~pp:() [Bisimilarity.RCP.Examples.exa_1 ] }
   (* example 2 *)
   | [ "MeBi" "Bisim_KS90_Exa2" ] ->
-    { Tests.ks90_exas [Bisimilarity.RCP.Examples.exa_2 ] }
+    { Tests.ks90_exas ~pp:() [Bisimilarity.RCP.Examples.exa_2 ] }
 END
 (* TODO: move the above examples to a separate test file. *)
