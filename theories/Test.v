@@ -46,9 +46,15 @@ MeBi LTS testLTS (S one).
 
 
 (* tests for bisim algs *)
-MeBi Bisim_Exa1_KS90.
+(* ! all of the below will not show prints to coq atm. *)
+MeBi Bisim_KS90_Exa1.
 
-MeBi Bisim_Exa2_KS90.
+MeBi Bisim_KS90_Exa2.
+
+MeBi Bisim_KS90_All_Examples.
+
+MeBi Bisim_All_Examples.
+
 
 (* ! commenting out below to make it easier for me to find the messages for testing the above, *)
 

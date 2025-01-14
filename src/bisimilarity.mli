@@ -1,7 +1,14 @@
 module RCP : sig
   module Examples : sig
-    val exa_1 : Fsm.fsm * Fsm.fsm
-    val exa_2 : Fsm.fsm * Fsm.fsm
+    type example =
+      { name : string
+      ; s : Fsm.fsm
+      ; t : Fsm.fsm
+      }
+
+    val exa : string -> Fsm.fsm -> Fsm.fsm -> example
+    val exa_1 : example
+    val exa_2 : example
   end
 
   module KS90 : sig
