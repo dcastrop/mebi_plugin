@@ -9,8 +9,8 @@ let rec ks90_exas (exas : RCP.Examples.example list) : unit =
     (match exa with
      | { name; s; t; _ } ->
        Printf.printf "\n= = = = = = = = = =\nRCP.KS90 (%s)\n\n" name;
-       Printf.printf "%s.s: %s.\n" name (pstr (Fsm s));
-       Printf.printf "%s.t: %s.\n" name (pstr (Fsm t));
+       Printf.printf "%s.s: %s.\n\n" name (pstr (Fsm s));
+       Printf.printf "%s.t: %s.\n\n" name (pstr (Fsm t));
        (* Printf.printf "%s.s: %s.\n" name (pstr ~options:(Debug ()) (Fsm s));
           Printf.printf "%s.t: %s.\n" name (pstr ~options:(Debug ()) (Fsm t)); *)
        (* run algorithm *)
@@ -20,12 +20,15 @@ let rec ks90_exas (exas : RCP.Examples.example list) : unit =
          "[KS90] (%s) Results: (s ~ t) = %b.%s\n"
          name
          are_bisimilar
-         (if Bool.not are_bisimilar
-          then
+         (match are_bisimilar with
+          | true ->
+            Printf.sprintf
+              "\nbisimilar states: %s."
+              (pstr (pp_wrap_as_supported (Partition pi)))
+          | _ ->
             Printf.sprintf
               "\nnon-bisimilar partition: %s."
-              (pstr (pp_wrap_as_supported (Partition pi)))
-          else "");
+              (pstr (pp_wrap_as_supported (Partition pi))));
        (* Printf.printf
           "where s = %s\nand t = %s.\n"
           (pstr (pp_wrap_as_supported (Fsm s)))
