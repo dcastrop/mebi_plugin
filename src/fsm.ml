@@ -46,16 +46,17 @@ module Partition = Set.Make (States)
 (*********************************************************************)
 
 (** [action] is a 2-tuple with a unique [id] and (non-unique) [label]).
-    [id] is an integer for identifying the action.
-    [label] is a (pretty-printed) string describing the action. *)
+    - [id] is an integer for identifying the action.
+    - [label] is a (pretty-printed) string describing the action. *)
 type action =
   { id : int
   ; label : string
   }
 
 (** [make_action ?label id] is a wrapper constructor for [action].
-    [?label] is a pretty-printed representation, which defaults to [s{id}].
-    [id] is the unique identifier for the state. *)
+    @param ?label is a pretty-printed representation, which defaults to [s{id}].
+    @param id is the unique identifier for the state.
+    @return an [action]. *)
 let make_action ?(label : string option) (id : int) : action =
   { id
   ; label =
@@ -105,10 +106,10 @@ let make_edges ?(size : int = 0) () : States.t Actions.t Edges.t =
 (*********************************************************************)
 
 (** [fsm] is a type used to describe an FSM in OCaml.
-    [init] is the initial state.
-    [alphabet] is the set of labels of actions of edges.
-    [states] is a set of states.
-    [edges] is a hashtable mapping states to outgoing actions and their detination states. *)
+    - [init] is the initial state.
+    - [alphabet] is the set of labels of actions of edges.
+    - [states] is a set of states.
+    - [edges] is a hashtable mapping states to outgoing actions and their detination states. *)
 type fsm =
   { init : state
   ; alphabet : Alphabet.t
@@ -119,10 +120,10 @@ type fsm =
 
 (** [make_fsm init alphabet states edges] is a wrapper constructor for [fsm]. *)
 let make_fsm
-  (init : state)
-  (alphabet : Alphabet.t)
-  (states : States.t)
-  (edges : States.t Actions.t Edges.t)
+      (init : state)
+      (alphabet : Alphabet.t)
+      (states : States.t)
+      (edges : States.t Actions.t Edges.t)
   : fsm
   =
   { init; alphabet; states; edges }
@@ -226,16 +227,16 @@ let pp_wrap_as_supported (to_wrap : pp_wrappable) : pp_supported =
 
 (** [pstr] *)
 let rec pstr
-  ?(tabs : int = 0)
-  ?(options : pp_options = Default ())
-  (to_str : pp_supported)
+          ?(tabs : int = 0)
+          ?(options : pp_options = Default ())
+          (to_str : pp_supported)
   : string
   =
   let basedent = Mebi_utils.str_tabs (tabs - 1) in
   let indent = Mebi_utils.str_tabs tabs in
   (* build string *)
   match to_str with
-  (*  *)
+  (* *)
   | Axiom to_str ->
     Printf.sprintf
       "%s%s"
@@ -275,10 +276,10 @@ let rec pstr
               (pstr
                  ~options
                  (pp_wrap_as_supported (OutgoingEdge (a, destination))))))
-  (*  *)
+  (* *)
   | Collection to_str ->
     (match to_str with
-     (*  *)
+     (* *)
      | List to_str ->
        if pp_collection_is_empty (List to_str)
        then "[ ] (empty)"
@@ -290,13 +291,13 @@ let rec pstr
             | States to_str ->
               States.fold
                 (fun (s : state) (acc : string) ->
-                  Printf.sprintf
-                    "%s%s\n"
-                    acc
-                    (pstr
-                       ~tabs:(tabs + 1)
-                       ~options
-                       (pp_wrap_as_supported (State s))))
+                   Printf.sprintf
+                     "%s%s\n"
+                     acc
+                     (pstr
+                        ~tabs:(tabs + 1)
+                        ~options
+                        (pp_wrap_as_supported (State s))))
                 to_str
                 "\n"
             (* [Block] *)
@@ -306,30 +307,30 @@ let rec pstr
             | Alphabet to_str ->
               Alphabet.fold
                 (fun (a : action) (acc : string) ->
-                  Printf.sprintf
-                    "%s%s\n"
-                    acc
-                    (pstr
-                       ~tabs:(tabs + 1)
-                       ~options
-                       (pp_wrap_as_supported (Action a))))
+                   Printf.sprintf
+                     "%s%s\n"
+                     acc
+                     (pstr
+                        ~tabs:(tabs + 1)
+                        ~options
+                        (pp_wrap_as_supported (Action a))))
                 to_str
                 "\n"
             (* [Partition] *)
             | Partition to_str ->
               Partition.fold
                 (fun (b : Block.t) (acc : string) ->
-                  Printf.sprintf
-                    "%s%s\n"
-                    acc
-                    (pstr
-                       ~tabs:(tabs + 1)
-                       ~options
-                       (pp_wrap_as_supported (Block b))))
+                   Printf.sprintf
+                     "%s%s\n"
+                     acc
+                     (pstr
+                        ~tabs:(tabs + 1)
+                        ~options
+                        (pp_wrap_as_supported (Block b))))
                 to_str
                 "\n")
            basedent
-     (*  *)
+     (* *)
      | Map to_str ->
        if pp_collection_is_empty (Map to_str)
        then "{ } (empty)"
@@ -341,22 +342,22 @@ let rec pstr
             | Actions to_str ->
               Actions.fold
                 (fun (a : action) (destinations : States.t) (acc : string) ->
-                  (* for each destination *)
-                  Printf.sprintf
-                    "%s%s"
-                    acc
-                    (States.fold
-                       (fun (destination : state) (acc' : string) ->
-                         Printf.sprintf
-                           "%s%s%s"
-                           acc'
-                           indent
-                           (pstr
-                              ~options
-                              (pp_wrap_as_supported
-                                 (OutgoingEdge (a, destination)))))
-                       destinations
-                       ""))
+                   (* for each destination *)
+                   Printf.sprintf
+                     "%s%s"
+                     acc
+                     (States.fold
+                        (fun (destination : state) (acc' : string) ->
+                           Printf.sprintf
+                             "%s%s%s"
+                             acc'
+                             indent
+                             (pstr
+                                ~options
+                                (pp_wrap_as_supported
+                                   (OutgoingEdge (a, destination)))))
+                        destinations
+                        ""))
                 to_str
                 "\n"
             (* [Edges] *)
@@ -364,39 +365,39 @@ let rec pstr
               (* order by starting state *)
               States.fold
                 (fun (from : state) (acc : string) ->
-                  let outgoing_actions = Edges.find to_str from in
-                  Printf.sprintf
-                    "%s%s"
-                    acc
-                    (* order by action ids *)
-                    (Alphabet.fold
-                       (fun (a : action) (acc' : string) ->
-                         Printf.sprintf
-                           "%s%s"
-                           acc'
-                           (* order by destination state *)
-                           (States.fold
-                              (fun (destination : state) (acc'' : string) ->
-                                Printf.sprintf
-                                  "%s%s%s\n"
-                                  acc''
-                                  indent
-                                  (pstr
-                                     ~options
-                                     (pp_wrap_as_supported
-                                        (Edge (from, a, destination)))))
-                              (Actions.find outgoing_actions a)
-                              ""))
-                       (* get alphabet from actions *)
-                       (Alphabet.of_seq (Actions.to_seq_keys outgoing_actions))
-                       ""))
+                   let outgoing_actions = Edges.find to_str from in
+                   Printf.sprintf
+                     "%s%s"
+                     acc
+                     (* order by action ids *)
+                     (Alphabet.fold
+                        (fun (a : action) (acc' : string) ->
+                           Printf.sprintf
+                             "%s%s"
+                             acc'
+                             (* order by destination state *)
+                             (States.fold
+                                (fun (destination : state) (acc'' : string) ->
+                                   Printf.sprintf
+                                     "%s%s%s\n"
+                                     acc''
+                                     indent
+                                     (pstr
+                                        ~options
+                                        (pp_wrap_as_supported
+                                           (Edge (from, a, destination)))))
+                                (Actions.find outgoing_actions a)
+                                ""))
+                        (* get alphabet from actions *)
+                        (Alphabet.of_seq (Actions.to_seq_keys outgoing_actions))
+                        ""))
                 (* get states from edges *)
                 (States.of_seq (Edges.to_seq_keys to_str))
                 "\n")
            basedent)
-  (*  *)
+  (* *)
   | Utils _to_str -> "<<<<unimplemented>>>>"
-  (*  *)
+  (* *)
   | Fsm to_str ->
     let indent = Mebi_utils.str_tabs (tabs + 1) in
     Printf.sprintf
@@ -478,14 +479,14 @@ let get_action_alphabet_from_edges (es : States.t Actions.t Edges.t)
        (fun (_from_state : state)
          (actions : States.t Actions.t)
          (acc : action list) ->
-         List.append
-           acc
-           (Actions.fold
-              (fun (action : action)
-                (_destinations : States.t)
-                (acc' : action list) -> List.append acc' [ action ])
-              actions
-              []))
+          List.append
+            acc
+            (Actions.fold
+               (fun (action : action)
+                 (_destinations : States.t)
+                 (acc' : action list) -> List.append acc' [ action ])
+               actions
+               []))
        es
        [])
 ;;
@@ -527,9 +528,9 @@ let get_action_by_label (alphabet : Alphabet.t) (label : string) : action =
 
 (** [] *)
 let get_outgoing_actions
-  (edges : States.t Actions.t Edges.t)
-  (from : state)
-  (_a : action)
+      (edges : States.t Actions.t Edges.t)
+      (from : state)
+      (_a : action)
   : States.t Actions.t
   =
   match Edges.find_opt edges from with
@@ -539,9 +540,9 @@ let get_outgoing_actions
 
 (** [] *)
 let get_outgoing_actions_by_id
-  (edges : States.t Actions.t Edges.t)
-  (from : state)
-  (id : int)
+      (edges : States.t Actions.t Edges.t)
+      (from : state)
+      (id : int)
   : States.t Actions.t
   =
   get_outgoing_actions
@@ -552,9 +553,9 @@ let get_outgoing_actions_by_id
 
 (** [] *)
 let get_outgoing_actions_by_label
-  (edges : States.t Actions.t Edges.t)
-  (from : state)
-  (label : string)
+      (edges : States.t Actions.t Edges.t)
+      (from : state)
+      (label : string)
   : States.t Actions.t
   =
   get_outgoing_actions
