@@ -4,6 +4,13 @@
 
 open Fsm
 
+(** [bisim_result] is returned by the algorithms that check for bisimilarity. *)
+type bisim_result =
+  { are_bisimilar : bool
+  ; bisimilar_states : Partition.t
+  ; non_bisimilar_states : Block.t
+  }
+
 (** [RCP] contains algorithms for solving the
     `Relational Coarsest Partitioning` problem. *)
 module RCP = struct
@@ -247,6 +254,49 @@ module RCP = struct
     ;;
   end
 
+  (** [KS90] implements the algorithm by Kanellakis and Smolka (1990).
+  *)
+  module KS90' = struct
+    exception EmptyBlock of Block.t
+    exception PartitionsNotDisjoint of Partition.t
+
+    (** [] *)
+    let _ = ()
+
+    (** [] *)
+    let _ = ()
+
+    (** [] *)
+    let _ = ()
+
+    (** [] *)
+    let _ = ()
+
+    (** [run ?pp s t] algorithmically checks if [s] and [t] are bisimilar, returning a [bisim_result] with further details.
+      @param ?pp determines whether [Pp.Feedback.msg_info] or [Printf.printf] is used for output.
+      @param s is an [fsm] to check.
+      @param t is an [fsm] to check. *)
+    let run ?(pp : unit option) (s : fsm) (t : fsm) : bisim_result =
+      (* get initial partition [pi] by merging states from [s] and [t] into single set. *)
+      let merged_fsm, map_of_alphabet, map_of_states = Fsm.merge_fsm s t in
+      match merged_fsm with
+      | { alphabet; states; edges; _ } ->
+        let pi (* working partition *) = ref (Partition.of_list [ states ]) in
+        (* *)
+        let changed = ref true in
+        while !changed do
+          changed := false
+        done;
+        (* split [!pi] based on whether if states are bisimilar or not *)
+        let (bisimilar_states, non_bisimilar_states) : Partition.t * States.t =
+          Partition.empty, States.empty
+          (* TODO: (bisimilar if block contains states from both) *)
+        in
+        let are_bisimilar = States.is_empty non_bisimilar_states in
+        { are_bisimilar; bisimilar_states; non_bisimilar_states }
+    ;;
+  end
+
   (** [KS90] follows algorithm by Kanellakis and Smolka. *)
   module KS90 = struct
     (* Error when trying to split on empty block. *)
@@ -257,23 +307,23 @@ module RCP = struct
 
     (** [reachable_partition outgoing_edges pi] is the subset of states in [pi] reachable via [outgoing_edges]. *)
     let reachable_partition
-      (outgoing_edges : States.t Actions.t)
-      (pi : Partition.t)
+          (outgoing_edges : States.t Actions.t)
+          (pi : Partition.t)
       : Partition.t
       =
       let all_destinations =
         Actions.fold
           (fun (_a : action) (destinations : States.t) (acc : States.t) ->
-            (* [a]'s should already be filtered to be all of the same kind. *)
-            States.union acc destinations)
+             (* [a]'s should already be filtered to be all of the same kind. *)
+             States.union acc destinations)
           outgoing_edges
           States.empty
       in
       (* return subset of [pi] that contains any of the destinations of [outgoing_edges] *)
       Partition.filter
         (fun (b : Block.t) ->
-          (* get *)
-          Bool.not (Block.is_empty (Block.inter b all_destinations)))
+           (* get *)
+           Bool.not (Block.is_empty (Block.inter b all_destinations)))
         pi
     ;;
 
@@ -284,10 +334,10 @@ module RCP = struct
         [pi] is ...
         [edges] is the (sorted) list of outgoing edges. *)
     let split
-      (block : Block.t)
-      (a : action)
-      (pi : Partition.t)
-      (edges : States.t Actions.t Edges.t)
+          (block : Block.t)
+          (a : action)
+          (pi : Partition.t)
+          (edges : States.t Actions.t Edges.t)
       : Partition.t
       =
       (* choose some state [s] in [block] *)
@@ -303,25 +353,27 @@ module RCP = struct
         let b1, b2 =
           List.fold_left
             (fun ((b1', b2') : Block.t * Block.t) (t_state : state) ->
-              let t_edges = get_outgoing_actions edges t_state a in
-              if Actions.length t_edges > 0
-              then (
-                (* check if edges of s and t can reach the same blocks in [pi]. *)
-                let t_reachable_partition = reachable_partition t_edges pi in
-                (* if s and t can reach the same blocks *)
-                if Partition.equal
+               let t_edges = get_outgoing_actions edges t_state a in
+               if Actions.length t_edges > 0
+               then (
+                 (* check if edges of s and t can reach the same blocks in [pi]. *)
+                 let t_reachable_partition = reachable_partition t_edges pi in
+                 (* if s and t can reach the same blocks *)
+                 if
+                   Partition.equal
                      (Partition.inter
                         s_reachable_partition
                         t_reachable_partition)
                      (Partition.union
                         s_reachable_partition
                         t_reachable_partition)
-                then Block.add t_state b1', b2'
-                else b1', Block.add t_state b2')
-              else if (* no edges for [t_state] via [a] *)
-                      Actions.length s_edges > 0
-              then b1', Block.add t_state b2'
-              else Block.add t_state b1', b2')
+                 then Block.add t_state b1', b2'
+                 else b1', Block.add t_state b2')
+               else if
+                 (* no edges for [t_state] via [a] *)
+                 Actions.length s_edges > 0
+               then b1', Block.add t_state b2'
+               else Block.add t_state b1', b2')
             (Block.empty, Block.empty)
             block_list
         in
@@ -338,7 +390,7 @@ module RCP = struct
 
     exception OldStateHasNoNewState of (state * (state, state) Hashtbl.t)
 
-    (*  *)
+    (* *)
     let run (s : fsm) (t : fsm) : bool * Partition.t =
       (* Printf.printf "\n[DEBUG] (a) entered run\n"; *)
       (* initially [pi] is a partition with a single block containing all states. *)
@@ -348,11 +400,11 @@ module RCP = struct
           States.fold
             (fun (state : state)
               ((acc, map) : Block.t * (state, state) Hashtbl.t) ->
-              let state' = make_state ~pp:state.pp (Block.cardinal acc) in
-              (* save mapping from old to new state *)
-              Hashtbl.add map state state';
-              (* continue *)
-              Block.add state' acc, map)
+               let state' = make_state ~pp:state.pp (Block.cardinal acc) in
+               (* save mapping from old to new state *)
+               Hashtbl.add map state state';
+               (* continue *)
+               Block.add state' acc, map)
             t.states
             ( s.states
             , (* map states of [s] to themselves *)
@@ -360,7 +412,7 @@ module RCP = struct
                 (List.to_seq
                    (States.fold
                       (fun (state : state) (acc : (state * state) list) ->
-                        List.append acc [ state, state ])
+                         List.append acc [ state, state ])
                       s.states
                       [])) )
         in
@@ -385,26 +437,29 @@ module RCP = struct
         Alphabet.fold
           (fun (t_action : action)
             ((alphabet, map) : Alphabet.t * (action, action) Hashtbl.t) ->
-            let s_alphas =
-              Alphabet.filter
-                (fun (s_action : action) -> s_action.label == t_action.label)
-                alphabet
-            in
-            if Alphabet.is_empty s_alphas
-            then (
-              (* create new action in alphabet and add to map *)
-              let new_action =
-                make_action ~label:t_action.label (Alphabet.cardinal alphabet)
-              in
-              let alphabet' = Alphabet.add new_action alphabet in
-              alphabet', map)
-            else (
-              (* double check there is only one with matching label *)
-              if Alphabet.cardinal s_alphas > 1
-              then raise (MultipleActionsSameLabel s.edges);
-              (* just update map to use existing in s *)
-              Hashtbl.add map t_action (List.nth (Alphabet.elements s_alphas) 0);
-              alphabet, map))
+             let s_alphas =
+               Alphabet.filter
+                 (fun (s_action : action) -> s_action.label == t_action.label)
+                 alphabet
+             in
+             if Alphabet.is_empty s_alphas
+             then (
+               (* create new action in alphabet and add to map *)
+               let new_action =
+                 make_action ~label:t_action.label (Alphabet.cardinal alphabet)
+               in
+               let alphabet' = Alphabet.add new_action alphabet in
+               alphabet', map)
+             else (
+               (* double check there is only one with matching label *)
+               if Alphabet.cardinal s_alphas > 1
+               then raise (MultipleActionsSameLabel s.edges);
+               (* just update map to use existing in s *)
+               Hashtbl.add
+                 map
+                 t_action
+                 (List.nth (Alphabet.elements s_alphas) 0);
+               alphabet, map))
           t_alphabet
           (s_alphabet, Alphabet.cardinal t_alphabet |> Hashtbl.create)
       in
@@ -424,33 +479,33 @@ module RCP = struct
       let edges = s.edges in
       Edges.iter
         (fun (from_state : state) (outgoing_edges : States.t Actions.t) ->
-          (* need to update states in edge *)
-          Edges.add
-            edges
-            (Hashtbl.find map_of_states from_state)
-            (Actions.of_seq
-               (List.to_seq
-                  (Actions.fold
-                     (fun (action : action)
-                       (destinations : States.t)
-                       (acc : (action * States.t) list) ->
-                       List.append
-                         acc
-                         [ ( Hashtbl.find map_t_alphabet action
-                           , States.map
-                               (fun (old_state : state) ->
-                                 match
-                                   Hashtbl.find_opt map_of_states old_state
-                                 with
-                                 | None ->
-                                   raise
-                                     (OldStateHasNoNewState
-                                        (old_state, map_of_states))
-                                 | Some new_state -> new_state)
-                               destinations )
-                         ])
-                     outgoing_edges
-                     []))))
+           (* need to update states in edge *)
+           Edges.add
+             edges
+             (Hashtbl.find map_of_states from_state)
+             (Actions.of_seq
+                (List.to_seq
+                   (Actions.fold
+                      (fun (action : action)
+                        (destinations : States.t)
+                        (acc : (action * States.t) list) ->
+                         List.append
+                           acc
+                           [ ( Hashtbl.find map_t_alphabet action
+                             , States.map
+                                 (fun (old_state : state) ->
+                                    match
+                                      Hashtbl.find_opt map_of_states old_state
+                                    with
+                                    | None ->
+                                      raise
+                                        (OldStateHasNoNewState
+                                           (old_state, map_of_states))
+                                    | Some new_state -> new_state)
+                                 destinations )
+                           ])
+                      outgoing_edges
+                      []))))
         t.edges;
       (* Printf.printf
          "\n[DEBUG] (d) merged edges: %s.\n"
@@ -462,102 +517,103 @@ module RCP = struct
         (* for each block in [pi] *)
         Partition.iter
           (fun (_b : Block.t) ->
-            let b = ref _b in
-            (* for each action *)
-            Alphabet.iter
-              (fun (a : action) ->
-                (* filter [edges] that are of [a]. *)
-                (* (start by assuming an equal number of each action.) *)
-                let edges_of_a =
-                  Edges.length edges
-                  / Alphabet.cardinal (get_action_alphabet_from_edges edges)
-                  |> Edges.create
-                in
-                Edges.iter
-                  (fun (from_state : state)
-                    (outgoing_edges : States.t Actions.t)
-                    : unit ->
-                    match Actions.find_opt outgoing_edges a with
-                    | None -> ()
-                    | Some destinations ->
-                      Edges.add
-                        edges_of_a
-                        from_state
-                        (Actions.of_seq (List.to_seq [ a, destinations ])))
-                  edges;
-                (* split *)
-                match Partition.elements (split !b a !pi edges_of_a) with
-                | [] ->
-                  (* Printf.printf "\n[DEBUG] split returned empty list.\n"; *)
-                  ()
-                | b1 :: [] ->
-                  (* check if same as b *)
-                  if Bool.not (Block.equal b1 !b)
-                  then (
-                    pi := Partition.remove !b !pi;
-                    pi := Partition.union !pi (Partition.of_list [ b1 ]);
-                    (* b := b1; *)
-                    changed := true)
-                | [ b1; b2 ] ->
-                  (* check if union is not the same as b *)
-                  if Bool.not (Block.equal b1 !b)
-                     && Bool.not (Block.equal b2 !b)
-                  then (
-                    (* Printf.printf "\n[DEBUG] b1 and b2 are not equal to b.\n"; *)
-                    pi := Partition.remove !b !pi;
-                    pi
-                    := Partition.union
-                         !pi
-                         (Partition.of_list
-                            (if Block.is_empty b1 then [ b2 ] else [ b1; b2 ]));
-                    (* FIXME: how could [b := b1 and b2] as the book suggests ? *)
-                    if Block.is_empty b1 then b := b2 else b := b1;
-                    changed := true)
-                | _pi ->
-                  (* Printf.printf
+             let b = ref _b in
+             (* for each action *)
+             Alphabet.iter
+               (fun (a : action) ->
+                  (* filter [edges] that are of [a]. *)
+                  (* (start by assuming an equal number of each action.) *)
+                  let edges_of_a =
+                    Edges.length edges
+                    / Alphabet.cardinal (get_action_alphabet_from_edges edges)
+                    |> Edges.create
+                  in
+                  Edges.iter
+                    (fun (from_state : state)
+                      (outgoing_edges : States.t Actions.t)
+                      : unit ->
+                       match Actions.find_opt outgoing_edges a with
+                       | None -> ()
+                       | Some destinations ->
+                         Edges.add
+                           edges_of_a
+                           from_state
+                           (Actions.of_seq (List.to_seq [ a, destinations ])))
+                    edges;
+                  (* split *)
+                  match Partition.elements (split !b a !pi edges_of_a) with
+                  | [] ->
+                    (* Printf.printf "\n[DEBUG] split returned empty list.\n"; *)
+                    ()
+                  | b1 :: [] ->
+                    (* check if same as b *)
+                    if Bool.not (Block.equal b1 !b)
+                    then (
+                      pi := Partition.remove !b !pi;
+                      pi := Partition.union !pi (Partition.of_list [ b1 ]);
+                      (* b := b1; *)
+                      changed := true)
+                  | [ b1; b2 ] ->
+                    (* check if union is not the same as b *)
+                    if
+                      Bool.not (Block.equal b1 !b)
+                      && Bool.not (Block.equal b2 !b)
+                    then (
+                      (* Printf.printf "\n[DEBUG] b1 and b2 are not equal to b.\n"; *)
+                      pi := Partition.remove !b !pi;
+                      pi
+                      := Partition.union
+                           !pi
+                           (Partition.of_list
+                              (if Block.is_empty b1 then [ b2 ] else [ b1; b2 ]));
+                      (* FIXME: how could [b := b1 and b2] as the book suggests ? *)
+                      if Block.is_empty b1 then b := b2 else b := b1;
+                      changed := true)
+                  | _pi ->
+                    (* Printf.printf
                      "\nWarning: split returned more than 2 items: %s.\n"
                      (pstr
                      (pp_wrap_as_supported
                      (Partition (Partition.of_list _pi)))); *)
-                  ())
-              alphabet;
-            ())
+                    ())
+               alphabet;
+             ())
           !pi
       done;
       (* [s] and [t] are bisimilar if there are no singleton blocks in [pi] *)
       let non_bisimilar_partition =
         Partition.filter
           (fun (b : Block.t) ->
-            (* either is alone *)
-            let b_is_singleton = Block.cardinal b == 1 in
-            (* or does not have another state in block from the other fsm *)
-            let b_not_diverse =
-              Bool.not
-                (* i.e., for all states in block b *)
-                (Block.for_all
-                   (fun (state : state) ->
-                     (* there must exist another state *)
-                     Block.exists
-                       (fun (state' : state) ->
-                         (* that is different *)
-                         Bool.not (Int.equal state.id state'.id)
-                         &&
-                         (* and originates from different fsms *)
-                         let original_state =
-                           get_reverse_map_state map_of_states state
-                         in
-                         let original_state' =
-                           get_reverse_map_state map_of_states state'
-                         in
-                         (States.mem original_state s.states
-                          && States.mem original_state' t.states)
-                         || (States.mem original_state' s.states
-                             && States.mem original_state t.states))
-                       b)
-                   b)
-            in
-            (* return *)
-            b_is_singleton || b_not_diverse)
+             (* either is alone *)
+             let b_is_singleton = Block.cardinal b == 1 in
+             (* or does not have another state in block from the other fsm *)
+             let b_not_diverse =
+               Bool.not
+                 (* i.e., for all states in block b *)
+                 (Block.for_all
+                    (fun (state : state) ->
+                       (* there must exist another state *)
+                       Block.exists
+                         (fun (state' : state) ->
+                            (* that is different *)
+                            Bool.not (Int.equal state.id state'.id)
+                            &&
+                            (* and originates from different fsms *)
+                            let original_state =
+                              get_reverse_map_state map_of_states state
+                            in
+                            let original_state' =
+                              get_reverse_map_state map_of_states state'
+                            in
+                            (States.mem original_state s.states
+                             && States.mem original_state' t.states)
+                            || (States.mem original_state' s.states
+                                && States.mem original_state t.states))
+                         b)
+                    b)
+             in
+             (* return *)
+             b_is_singleton || b_not_diverse)
           !pi
       in
       if Partition.is_empty non_bisimilar_partition
@@ -574,5 +630,3 @@ module RCP = struct
     (* TODO: *)
   end
 end
-
-let bisim_foo : int = 0
