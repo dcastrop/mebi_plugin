@@ -1,3 +1,3 @@
-val ks90_exas : Bisimilarity.RCP.Examples.example list -> unit
-val run_all_ks90 : unit
-val run_all : unit
+val ks90_exas : ?pp:unit -> Bisimilarity.RCP.Examples.example list -> unit
+val run_all_ks90 : ?pp:unit -> unit -> unit
+val run_all : ?pp:unit -> unit -> unit
