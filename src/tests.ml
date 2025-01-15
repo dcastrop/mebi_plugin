@@ -48,6 +48,7 @@ let rec ks90_exas ?(pp : unit option) (exas : RCP.Examples.example list) : unit 
        (match pp with
         | None -> Printf.printf "%s" print_str'
         | Some () -> Feedback.msg_info (str print_str'));
+
        (* continue *)
        (match pp with
         | None -> ks90_exas exas'
