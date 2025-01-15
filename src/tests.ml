@@ -72,4 +72,5 @@ let run_all ?(pp : unit option) () : unit =
     Feedback.msg_info (str (Printf.sprintf "\n\nEnd of Tests.ml.\n"))
 ;;
 
-let () = run_all ()
+(* ! vscoq language server breaks if this is uncommented. *)
+(* let () = run_all () *)
