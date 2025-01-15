@@ -39,6 +39,7 @@ module States = Set.Make (struct
     This is necessary since [KS90] requires the actions of states to be sortable. *)
 module Block = States
 
+(** [Partition] is a set of [Blocks]. (Required by [KS90].) *)
 module Partition = Set.Make (States)
 
 (*********************************************************************)
@@ -127,6 +128,107 @@ let make_fsm
   : fsm
   =
   { init; alphabet; states; edges }
+;;
+
+exception AlphabetContainsDuplicateLabels of Alphabet.t
+exception StateNotFoundInMergedStates of (state * (state, state) Hashtbl.t)
+
+(** [merge_fsm a b] ... *)
+let merge_fsm (a : fsm) (b : fsm)
+  : fsm * (action, action) Hashtbl.t * (state, state) Hashtbl.t
+  =
+  (* *)
+  let merged_alphabet, map_of_alphabet =
+    Alphabet.fold
+      (fun (b_action : action)
+        ((alphabet, map) : Alphabet.t * (action, action) Hashtbl.t) ->
+         let a_alphas =
+           Alphabet.filter
+             (fun (a_action : action) -> a_action.label == b_action.label)
+             alphabet
+         in
+         if Alphabet.is_empty a_alphas
+         then (
+           (* create new action in alphabet and add to map *)
+           let new_action =
+             make_action ~label:b_action.label (Alphabet.cardinal alphabet)
+           in
+           let alphabet' = Alphabet.add new_action alphabet in
+           alphabet', map)
+         else (
+           (* double check there is only one with matching label *)
+           if Alphabet.cardinal a_alphas > 1
+           then raise (AlphabetContainsDuplicateLabels a.alphabet);
+           (* just update map to use existing in s *)
+           Hashtbl.add map b_action (List.nth (Alphabet.elements a_alphas) 0);
+           alphabet, map))
+      b.alphabet
+      ( a.alphabet
+      , Hashtbl.of_seq
+          (List.to_seq
+             (Alphabet.fold
+                (fun (a_alpha : action) (acc : (action * action) list) ->
+                   List.append acc [ a_alpha, a_alpha ])
+                a.alphabet
+                [])) )
+  in
+  (* *)
+  let merged_states, map_of_states =
+    States.fold
+      (fun (s : state) ((acc, map) : States.t * (state, state) Hashtbl.t) ->
+         let s' = make_state ~pp:s.pp (States.cardinal acc) in
+         (* save mapping from old to new state. *)
+         Hashtbl.add map s s';
+         (* continue *)
+         States.add s' acc, map)
+      (* only need to add the states in [b]. *)
+      b.states
+      (* union is added to [a]. *)
+      ( a.states
+      , Hashtbl.of_seq
+          (List.to_seq
+             (States.fold
+                (fun (s : state) (acc : (state * state) list) ->
+                   List.append acc [ s, s ])
+                a.states
+                [])) )
+  in
+  (* *)
+  let merged_edges = a.edges in
+  Edges.iter
+    (fun (from_state : state) (outgoing_edges : States.t Actions.t) ->
+       (* need to update states in edge *)
+       Edges.add
+         merged_edges
+         (Hashtbl.find map_of_states from_state)
+         (Actions.of_seq
+            (List.to_seq
+               (Actions.fold
+                  (fun (action : action)
+                    (destinations : States.t)
+                    (acc : (action * States.t) list) ->
+                     List.append
+                       acc
+                       [ ( Hashtbl.find map_of_alphabet action
+                         , States.map
+                             (fun (old_state : state) ->
+                                match
+                                  Hashtbl.find_opt map_of_states old_state
+                                with
+                                | None ->
+                                  raise
+                                    (StateNotFoundInMergedStates
+                                       (old_state, map_of_states))
+                                | Some new_state -> new_state)
+                             destinations )
+                       ])
+                  outgoing_edges
+                  []))))
+    b.edges;
+  (* *)
+  ( make_fsm a.init merged_alphabet merged_states merged_edges
+  , map_of_alphabet
+  , map_of_states )
 ;;
 
 (*********************************************************************)

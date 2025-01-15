@@ -57,8 +57,8 @@ end
 module Block = States
 
 module Partition : sig
-  type elt = Block.t
-  type t = Set.Make(Block).t
+  type elt = States.t
+  type t = Set.Make(States).t
 
   val empty : t
   val add : elt -> t -> t
@@ -234,6 +234,14 @@ val make_fsm
   -> States.t
   -> States.t Actions.t Edges.t
   -> fsm
+
+exception AlphabetContainsDuplicateLabels of Alphabet.t
+exception StateNotFoundInMergedStates of (state * (state, state) Hashtbl.t)
+
+val merge_fsm
+  :  fsm
+  -> fsm
+  -> fsm * (action, action) Hashtbl.t * (state, state) Hashtbl.t
 
 type pp_axiom =
   | State of state

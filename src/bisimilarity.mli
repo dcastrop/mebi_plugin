@@ -1,3 +1,9 @@
+type bisim_result =
+  { are_bisimilar : bool
+  ; bisimilar_states : Fsm.Partition.t
+  ; non_bisimilar_states : Fsm.States.t
+  }
+
 module RCP : sig
   module Examples : sig
     type example =
@@ -9,6 +15,13 @@ module RCP : sig
     val exa : string -> Fsm.fsm -> Fsm.fsm -> example
     val exa_1 : example
     val exa_2 : example
+  end
+
+  module KS90' : sig
+    exception EmptyBlock of Fsm.States.t
+    exception PartitionsNotDisjoint of Fsm.Partition.t
+
+    val run : ?pp:unit -> Fsm.fsm -> Fsm.fsm -> bisim_result
   end
 
   module KS90 : sig
@@ -39,5 +52,3 @@ module RCP : sig
 
   module PT87 : sig end
 end
-
-val bisim_foo : int
