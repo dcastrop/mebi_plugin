@@ -88,5 +88,5 @@ let run_all
   handle_pp ~coq ~show:true ~debug:true "\n\nEnd of Tests.ml.\n"
 ;;
 
-(* ! vscoq language server breaks if this is uncommented. *)
+(* ! vscoq language server breaks if this function somehow causes [Printf.printf] to be called. *)
 let () = run_all ~coq:true ()
