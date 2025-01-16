@@ -1,7 +1,7 @@
 type bisim_result =
   { are_bisimilar : bool
   ; bisimilar_states : Fsm.Partition.t
-  ; non_bisimilar_states : Fsm.States.t
+  ; non_bisimilar_states : Fsm.Partition.t
   }
 
 module RCP : sig
@@ -21,7 +21,31 @@ module RCP : sig
     exception EmptyBlock of Fsm.States.t
     exception PartitionsNotDisjoint of Fsm.Partition.t
 
-    val run : ?pp:unit -> Fsm.fsm -> Fsm.fsm -> bisim_result
+    val reachable_partitions
+      :  ?coq:bool
+      -> ?show:bool
+      -> ?debug:bool
+      -> Fsm.States.t Fsm.Actions.t
+      -> Fsm.Partition.t
+      -> Fsm.Partition.t
+
+    val split
+      :  ?coq:bool
+      -> ?show:bool
+      -> ?debug:bool
+      -> Fsm.States.t
+      -> Fsm.action
+      -> Fsm.Partition.t
+      -> Fsm.States.t Fsm.Actions.t Fsm.Edges.t
+      -> Fsm.States.t * Fsm.States.t
+
+    val run
+      :  ?coq:bool
+      -> ?show:bool
+      -> ?debug:bool
+      -> Fsm.fsm
+      -> Fsm.fsm
+      -> bisim_result
   end
 
   module KS90 : sig

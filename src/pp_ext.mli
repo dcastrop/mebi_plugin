@@ -1,3 +1,4 @@
+val handle_pp : ?coq:bool -> ?show:bool -> ?debug:bool -> string -> unit
 val pp_list : Pp.t list -> Pp.t
 
 val pp_transition
