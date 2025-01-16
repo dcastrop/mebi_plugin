@@ -89,4 +89,4 @@ let run_all
 ;;
 
 (* ! vscoq language server breaks if this is uncommented. *)
-(* let () = run_all () *)
+let () = run_all ~coq:true ()
