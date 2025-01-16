@@ -122,19 +122,6 @@ End Test2.
 
 
 
-(** bisimilarity tests *)
-
-MeBi Bisim_KS90_Exa1.
-(* MeBi Bisim_KS90_Exa1 show_debug. *)
-
-MeBi Bisim_KS90_Exa2.
-(* MeBi Bisim_KS90_Exa2 show_debug. *)
-
-(* MeBi Bisim_KS90_All_Examples. *)
-
-(* MeBi Bisim_All_Examples. *)
-MeBi Bisim_All_Examples show_debug.
-
 
 
 
