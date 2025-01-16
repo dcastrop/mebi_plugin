@@ -45,26 +45,6 @@ MeBi LTS testLTS one.
 MeBi LTS testLTS (S one).
 
 
-(* tests for bisim algs *)
-(* ! all of the below will not show prints to coq atm. *)
-
-
-MeBi Bisim_KS90_Exa1.
-(* MeBi Bisim_KS90_Exa1 show_debug. *)
-
-MeBi Bisim_KS90_Exa2.
-(* MeBi Bisim_KS90_Exa2 show_debug. *)
-
-(* MeBi Bisim_KS90_All_Examples. *)
-
-(* MeBi Bisim_All_Examples. *)
-MeBi Bisim_All_Examples show_debug.
-
-
-
-(* ! commenting out below to make it easier for me to find the messages for testing the above, *)
-
-
 Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
   | test1' n : nonTerminatingTestLTS n true (S n)
   | test2' n : nonTerminatingTestLTS (S n) false n.
@@ -139,6 +119,23 @@ Module Test2.
 
   MeBi LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
 End Test2.
+
+
+
+(** bisimilarity tests *)
+
+MeBi Bisim_KS90_Exa1.
+(* MeBi Bisim_KS90_Exa1 show_debug. *)
+
+MeBi Bisim_KS90_Exa2.
+(* MeBi Bisim_KS90_Exa2 show_debug. *)
+
+(* MeBi Bisim_KS90_All_Examples. *)
+
+(* MeBi Bisim_All_Examples. *)
+MeBi Bisim_All_Examples show_debug.
+
+
 
 
 (* Cannot capture things like below due to cases like [tfix t --> tfix (tfix
@@ -235,7 +232,6 @@ is inhabited, or we have no way to check if we exhaustively cover all possible c
 End Test4. *)
 
 
- (* ! end of comment out *)
 
 
 (* (*** Printing user inputs ***) *)
