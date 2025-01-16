@@ -262,12 +262,6 @@ module RCP = struct
     exception PartitionsNotDisjoint of Partition.t
 
     (** [] *)
-    let _ = ()
-
-    (** [] *)
-    let _ = ()
-
-    (** [] *)
     let reachable_partitions
           ?(coq : bool = false)
           ?(show : bool = false)
@@ -305,7 +299,7 @@ module RCP = struct
       (* *)
       handle_pp
         ~coq
-        ~show
+        ~show:false
         ~debug:true
         (Printf.sprintf
            "%s\n\n\
@@ -423,7 +417,7 @@ module RCP = struct
                       (* both are empty, this is not supposed to happen *)
                       handle_pp
                         ~coq
-                        ~show
+                        ~show:false
                         ~debug:true
                         (Printf.sprintf "split returned two empty blocks.\n\n");
                       ()
@@ -432,7 +426,7 @@ module RCP = struct
                       assert (Block.equal b1 !b);
                       handle_pp
                         ~coq
-                        ~show
+                        ~show:false
                         ~debug:true
                         (Printf.sprintf
                            "split returned empty b2.\nb1: %s.\n\n"
@@ -443,7 +437,7 @@ module RCP = struct
                       assert (Bool.not (Block.is_empty b1));
                       handle_pp
                         ~coq
-                        ~show
+                        ~show:false
                         ~debug:true
                         (Printf.sprintf
                            "split returned two blocks.\nb1: %s.\nb2: %s.\n\n"
@@ -509,7 +503,7 @@ module RCP = struct
                              (* *)
                              handle_pp
                                ~coq
-                               ~show:true
+                               ~show:false
                                ~debug:true
                                (Printf.sprintf
                                   "%s\n%s\n"
@@ -539,7 +533,7 @@ module RCP = struct
                in
                handle_pp
                  ~coq
-                 ~show:true
+                 ~show:false
                  ~debug:true
                  (Printf.sprintf
                     "=/= KS90.run, block_contains_states_from_both: %b.\n\
