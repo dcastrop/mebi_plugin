@@ -392,7 +392,8 @@ let rec pstr
        then "[ ] (empty)"
        else
          Printf.sprintf
-           "[%s%s]"
+           "%s[%s%s]"
+           basedent
            (match to_str with
             (* [States] *)
             | States to_str ->
@@ -409,7 +410,17 @@ let rec pstr
                 "\n"
             (* [Block] *)
             | Block to_str ->
-              pstr ~tabs ~options (pp_wrap_as_supported (States to_str))
+              Block.fold
+                (fun (s : state) (acc : string) ->
+                   Printf.sprintf
+                     "%s%s\n"
+                     acc
+                     (pstr
+                        ~tabs:(tabs + 1)
+                        ~options
+                        (pp_wrap_as_supported (State s))))
+                to_str
+                "\n"
             (* [Alphabet] *)
             | Alphabet to_str ->
               Alphabet.fold
@@ -443,7 +454,8 @@ let rec pstr
        then "{ } (empty)"
        else
          Printf.sprintf
-           "{%s%s}"
+           "%s{%s%s}"
+           basedent
            (match to_str with
             (* [Actions] *)
             | Actions to_str ->
