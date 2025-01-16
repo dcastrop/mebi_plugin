@@ -1,5 +1,27 @@
 open Pp
 
+(** [] *)
+let handle_pp
+      ?(coq : bool = true)
+      ?(show : bool = false)
+      ?(debug : bool = false)
+      (to_print : string)
+  : unit
+  =
+  if show
+  then (
+    match coq with
+    | true ->
+      (match debug with
+       | true -> Feedback.msg_debug (str to_print)
+       | false -> Feedback.msg_info (str to_print))
+    | false -> Printf.printf "%s" to_print)
+;;
+
+(*********************)
+(*********************)
+(*********************)
+
 (** [pp_list l] is a pretty printed list ([l]). *)
 let pp_list l =
   (* ! use [fnl()] for newlines (will only be used if necessary). *)
@@ -72,18 +94,18 @@ let rec pp_states_to_list env sigma (states : Evd.econstr list) =
 
 (** [pp_states env sigma states] is a [t] (str) of pretty-printed states. *)
 let pp_states
-  (env : Environ.env)
-  (sigma : Evd.evar_map)
-  (states : Evd.econstr list)
+      (env : Environ.env)
+      (sigma : Evd.evar_map)
+      (states : Evd.econstr list)
   =
   pp_list (pp_states_to_list env sigma states)
 ;;
 
 (** [pp_coq_fsm env sigma fsm] is a [t] (str) of pretty-printed coq-based [fsm]. *)
 let pp_coq_fsm
-  (env : Environ.env)
-  (sigma : Evd.evar_map)
-  (fsm : Evd.econstr list * Evd.econstr list)
+      (env : Environ.env)
+      (sigma : Evd.evar_map)
+      (fsm : Evd.econstr list * Evd.econstr list)
   : Pp.t
   =
   match fsm with

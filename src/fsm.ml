@@ -26,7 +26,8 @@ let make_state ?(pp : string option) (id : int) =
 module States = Set.Make (struct
     type t = state
 
-    let compare a b = compare a.id b.id
+    (* let compare a b = compare a.id b.id *)
+    let compare a b = compare a.pp b.pp
   end)
 
 (*************************************************)
@@ -226,7 +227,11 @@ let merge_fsm (a : fsm) (b : fsm)
                   []))))
     b.edges;
   (* *)
-  ( make_fsm a.init merged_alphabet merged_states merged_edges
+  ( make_fsm
+      (make_state ~pp:"<merged>" (-1))
+      merged_alphabet
+      merged_states
+      merged_edges
   , map_of_alphabet
   , map_of_states )
 ;;
