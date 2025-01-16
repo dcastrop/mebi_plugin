@@ -32,7 +32,7 @@ let rec ks90_exas
                name
                (pstr ~options:(if debug then Debug () else Default ()) (Fsm t))));
        (* run algorithm *)
-       let result = RCP.KS90'.run ~coq ~show ~debug s t in
+       let result = RCP.KS90.run ~coq ~show ~debug s t in
        (match result with
         | { are_bisimilar; bisimilar_states; non_bisimilar_states; _ } ->
           (* print out results *)
