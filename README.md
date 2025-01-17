@@ -40,10 +40,22 @@ MeBi LTS <ident>.
 * `<ident>` should be the identifier of a relation with type
 `Term -> Action -> Term -> Prop`.
 
+## To run the test of bisimilarity
+> currently taken from "Advanced Topics in Bisimulation and Coinduction", Section 3.2.2.
+
+### First build the project:
+```shell
+make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile
+```
+
+### Next, run the tests:
+```shell
+_build/default/test/tests.exe
+```
 
 
 ## Setup
-*using `coq 8.19.0`* (?)
+*using `coq 8.20.0`*
 
 ### using `make`
 Run the following commands
