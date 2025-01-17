@@ -297,6 +297,11 @@ type pp_options =
   | Default of unit
   | Debug of unit
 
+(** [pstr_options debug] is the [pp_options] corresponding to [debug]. *)
+let pstr_options (debug : bool) : pp_options =
+  if debug then Debug () else Default ()
+;;
+
 (** [pp_collection_is_empty c] returns true if [c] is empty. *)
 let pp_collection_is_empty (c : pp_collection) : bool =
   match c with

@@ -118,9 +118,54 @@ Module Test2.
   MeBi LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
 
   MeBi LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
+
+
+
 End Test2.
 
 
+
+Module BisimTest1.
+  Inductive action : Set := | TheAction1 | TheAction2.
+  Inductive term : Set :=
+  | trec : term
+  | tend : term
+  | tfix : term -> term
+  | tact : action -> term -> term
+  | tpar : action -> action -> term -> term
+  .
+
+  Fixpoint subst (t1 : term) (t2 : term) :=
+    match t2 with
+    | trec => t1
+    | tend => tend
+    | tfix t => tfix t
+    | tact a t => tact a (subst t1 t)
+    | tpar a b t => tpar a b (subst t1 t)
+    end.
+
+  Inductive termLTS : term -> action -> term -> Prop :=
+  | do_act : forall a t, termLTS (tact a t) a t
+
+  | do_par1 : forall a b t, termLTS (tpar a b t) a (tact b t)
+
+  | do_par2 : forall a b t, termLTS (tpar a b t) b (tact a t)
+
+  | do_fix : forall a t t',
+      termLTS (subst (tfix t) t) a t' ->
+      termLTS (tfix t) a t'.
+
+
+  MeBi Bisim KS90
+    termLTS (tpar TheAction1 TheAction2 tend)
+    termLTS (tact TheAction1 (tact TheAction2 tend)).
+
+  (* ... this one maybe should be true.. ? *)
+  MeBi Bisim KS90
+    termLTS (tfix (tact TheAction1 (tact TheAction2 trec)))
+    termLTS (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
+
+End BisimTest1.
 
 
 
