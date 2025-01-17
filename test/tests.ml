@@ -1,6 +1,6 @@
-open Bisim.Fsm
-open Bisim.Bisimilarity
-open Bisim.Utils
+open Mebi_plugin.Fsm
+open Mebi_plugin.Bisimilarity
+open Mebi_plugin.Utils
 
 (** [ks90_exas] ... *)
 let rec ks90_exas
@@ -16,7 +16,7 @@ let rec ks90_exas
      | { name; s; t; _ } ->
        (* safely print depending on if coq or not *)
        print
-         ~show
+         ~show:true
          (Printf.sprintf
             "\n= = = = = = = = = =\nRCP.KS90 (%s)\n\n%s.s: %s.\n\n%s.t: %s.\n\n"
             name
@@ -30,12 +30,12 @@ let rec ks90_exas
         | { are_bisimilar; bisimilar_states; non_bisimilar_states; _ } ->
           (* print out results *)
           print
-            ~show
+            ~show:true
             (Printf.sprintf
                "[KS90] (%s) Results: (s ~ t) = %b.\n\n\
                 Bisimilar states: %s.\n\n\
                 Non-bisimilar states: %s.\n\n\
-                = = = = = = = = = =\n"
+                = = = = = = = = = =\n\n"
                name
                are_bisimilar
                (pstr
@@ -60,4 +60,15 @@ let run_all ?(show : bool = false) ?(debug : bool = false) () : unit =
   print ~show "\n\nEnd of Tests.ml.\n"
 ;;
 
+(** To run tests...
+
+    - First build the project:
+
+    make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile
+
+    - Next, run the tests:
+
+    _build/default/test/tests.exe
+
+    *)
 let () = run_all ()
