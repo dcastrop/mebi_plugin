@@ -1,6 +1,6 @@
-open Mebi_fsm.Fsm
-open Mebi_fsm.Bisimilarity
-open Mebi_fsm.Utils
+open Bisim.Fsm
+open Bisim.Bisimilarity
+open Bisim.Utils
 
 (** [ks90_exas] ... *)
 let rec ks90_exas
