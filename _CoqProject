@@ -6,13 +6,13 @@ src/META.coq-mebi
 theories/loader.v
 theories/Test.v
 
-src/bisim_lib/utils.ml
-src/bisim_lib/utils.mli
-src/bisim_lib/fsm.ml
-src/bisim_lib/fsm.mli
-src/bisim_lib/bisimilarity.ml
-src/bisim_lib/bisimilarity.mli
-src/bisim_lib/bisim.mlpack
+src/utils.ml
+src/utils.mli
+src/fsm.ml
+src/fsm.mli
+src/bisimilarity.ml
+src/bisimilarity.mli
+
 
 test/tests.ml
 test/tests.mli
@@ -23,8 +23,6 @@ src/mebi_monad.ml
 src/mebi_monad.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
-src/utils.ml
-src/utils.mli
 src/pp_ext.ml
 src/pp_ext.mli
 src/command.ml

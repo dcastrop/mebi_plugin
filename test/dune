@@ -1,4 +1,5 @@
 (executable
  (name tests)
  (public_name coq-mebi.tests)
- (libraries coq-mebi.bisim))
+ (flags :standard -rectypes -w -27)
+ (libraries coq-mebi.mebi))

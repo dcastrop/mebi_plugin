@@ -6,7 +6,7 @@
  (synopsis "MEBI Plugin (theories)")
  (package coq-mebi) ; Adding this line will make your
                     ; library installable in the opam package
- (plugins coq-mebi.mebi coq-mebi.bisim coq-core.plugins.ltac))
+ (plugins coq-mebi.mebi coq-core.plugins.ltac))
 
 ; Here you should declare all
 ; OCaml plugin dependencies
