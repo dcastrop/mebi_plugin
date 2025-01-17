@@ -1,9 +1,6 @@
 Mebi_errors
 Mebi_utils
 Mebi_monad
-Utils
 Pp_ext
-Fsm
-Bisimilarity
 Command
 G_mebi
