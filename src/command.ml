@@ -6,6 +6,7 @@ open Pp_ext
 
 (* *)
 open Fsm
+open Utils
 
 (** ['a mm] is a function type mapping from [coq_context ref] to ['a in_context]. *)
 type 'a mm = 'a Mebi_monad.t
@@ -761,6 +762,67 @@ let make_graph_builder =
 ;;
 
 (**  *)
+let build_fsm
+      ?(debug : bool = false)
+      (iref : Names.GlobRef.t)
+      (tref : Constrexpr.constr_expr_r CAst.t)
+  : fsm mm
+  =
+  let* raw_lts = check_ref_lts iref in
+  let* graphM = make_graph_builder in
+  let module G = (val graphM) in
+  let* graph_lts = G.build_graph raw_lts tref in
+  (* *)
+  let* env = get_env in
+  let* sigma = get_sigma in
+  (* *)
+  if debug
+  then (
+    Feedback.msg_debug
+      (str
+         (Printf.sprintf
+            "(a) Types of terms: %s.\n"
+            (econstr_to_string raw_lts.trm_type)));
+    Feedback.msg_debug
+      (str
+         (Printf.sprintf
+            "(b) Types of labels: %s.\n"
+            (econstr_to_string raw_lts.lbl_type)));
+    Feedback.msg_debug
+      (str "(c) Constructors: "
+       ++ Pp.prvect_with_sep
+            (fun _ -> str ", ")
+            Names.Id.print
+            raw_lts.coq_ctor_names);
+    (* prints all transitions -- the possible constructors.
+ a term may take as part of its structure.
+ these are dependant on the definition of a type. *)
+    Feedback.msg_debug
+      (str "(d) Transitions: "
+       ++ pp_transitions env sigma raw_lts.constructor_transitions
+       ++ strbrk "\n");
+    Feedback.msg_debug
+      (str
+         (Printf.sprintf
+            "(e) Graph Edges: %s.\n"
+            (G.pstr_lts_transitions ~long:() graph_lts.transitions))));
+  (* lts to fsm *)
+  let* the_fsm, translation = G.lts_to_fsm graph_lts tref in
+  if debug
+  then (
+    Feedback.msg_debug
+      (str
+         (Printf.sprintf
+            "(f) Fsm: %s.\n"
+            (pstr (pp_wrap_as_supported (Fsm the_fsm)))));
+    Feedback.msg_debug
+      (str
+         (Printf.sprintf
+            "(g, with details) Fsm: %s.\n"
+            (pstr ~options:(Debug ()) (pp_wrap_as_supported (Fsm the_fsm))))));
+  Feedback.msg_debug (str "\n= = = = = (end of bounded_lts) = = = = = =\n");
+  return the_fsm
+;;
 
 (* FIXME: Should be user-configurable, not hardcoded *)
 
@@ -786,59 +848,53 @@ let make_graph_builder =
     - States are the sets of possible transitions
     - A term [t] is represented by the state of the transitions that can be taken *)
 let bounded_lts
+      ?(debug : bool = true)
       (iref : Names.GlobRef.t)
       (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
-  (* TODO: how to get input from user also? *)
-  let* raw_lts = check_ref_lts iref in
-  let* graphM = make_graph_builder in
-  let module G = (val graphM) in
-  let* graph_lts = G.build_graph raw_lts tref in
-  (* bind [env] and [sigma] to [get_env st] and [get_sigma st] in [mebi_monad], respectively. *)
-  let* env = get_env in
-  let* sigma = get_sigma in
-  Feedback.msg_debug
-    (str
-       (Printf.sprintf
-          "(a) Types of terms: %s.\n"
-          (econstr_to_string raw_lts.trm_type)));
-  Feedback.msg_debug
-    (str
-       (Printf.sprintf
-          "(b) Types of labels: %s.\n"
-          (econstr_to_string raw_lts.lbl_type)));
-  Feedback.msg_debug
-    (str "(c) Constructors: "
-     ++ Pp.prvect_with_sep
-          (fun _ -> str ", ")
-          Names.Id.print
-          raw_lts.coq_ctor_names);
-  (* prints all transitions -- the possible constructors.
-     a term may take as part of its structure.
-     these are dependant on the definition of a type. *)
-  Feedback.msg_debug
-    (str "(d) Transitions: "
-     ++ pp_transitions env sigma raw_lts.constructor_transitions
-     ++ strbrk "\n");
-  Feedback.msg_debug
-    (str
-       (Printf.sprintf
-          "(e) Graph Edges: %s.\n"
-          (G.pstr_lts_transitions ~long:() graph_lts.transitions)));
-  (* lts to fsm *)
-  let* the_fsm, translation = G.lts_to_fsm graph_lts tref in
-  Feedback.msg_debug
-    (str
-       (Printf.sprintf
-          "(f) Fsm: %s.\n"
-          (pstr (pp_wrap_as_supported (Fsm the_fsm)))));
-  Feedback.msg_debug
-    (str
-       (Printf.sprintf
-          "(g, with details) Fsm: %s.\n"
-          (pstr ~options:(Debug ()) (pp_wrap_as_supported (Fsm the_fsm)))));
-  (* using warning so it shows the line number in [Text.v] in the console for me (since vscoq isnt being very useful for debugging plugins) -- jonah *)
-  Feedback.msg_warning (str "\n--------\n");
+  let* _ = build_fsm ~debug iref tref in
   return ()
+;;
+
+(* *)
+let bisim_ks90
+      ?(debug : bool = true)
+      ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+      ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  : unit mm
+  =
+  let* s : fsm = build_fsm ~debug s_iref s_tref in
+  let* t : fsm = build_fsm ~debug t_iref t_tref in
+  let open Bisimilarity in
+  (* *)
+  let result = RCP.KS90.run ~show:false ~debug s t in
+  match result with
+  | { are_bisimilar; bisimilar_states; non_bisimilar_states; _ } ->
+    Feedback.msg_info
+      (str
+         (Printf.sprintf
+            "[KS90] Results: (s ~ t) = %b.\n\n\
+             Bisimilar states: %s.\n\n\
+             Non-bisimilar states: %s.\n\n\
+             where s = %s\n\n\
+             and t = %s.\n"
+            are_bisimilar
+            (pstr
+               ~options:(pstr_options debug)
+               ~tabs:1
+               (pp_wrap_as_supported (Partition bisimilar_states)))
+            (pstr
+               ~options:(pstr_options debug)
+               ~tabs:1
+               (pp_wrap_as_supported (Partition non_bisimilar_states)))
+            (pstr
+               ~options:(pstr_options debug)
+               ~tabs:1
+               (pp_wrap_as_supported (Fsm s)))
+            (pstr
+               ~options:(pstr_options debug)
+               ~tabs:1
+               (pp_wrap_as_supported (Fsm t)))));
+    return ()
 ;;
