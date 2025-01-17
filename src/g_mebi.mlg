@@ -13,7 +13,6 @@ open Ltac_plugin
 
 open Stdarg
 
-
 (* open Pp *)
 
 }

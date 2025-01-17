@@ -269,13 +269,22 @@ module RCP = struct
           (pi : Partition.t)
       : Partition.t
       =
-      let destinations =
+      let destinations : States.t =
         Actions.fold
           (fun (_a : action) (destinations : States.t) (acc : States.t) ->
              States.union acc destinations)
           edges
           States.empty
       in
+      print
+        ~show
+        (Printf.sprintf
+           "/\\/\\/\\ KS90.reachable_partitions /\\/\\/\\\n\n\
+           \  destinations: %s.\n\
+            /\\/\\/\\/\\/\\/\\/\\/\\/\\\n\n"
+           (pstr
+              ~options:(pstr_options debug)
+              (pp_wrap_as_supported (States destinations))));
       Partition.filter
         (fun (block : Block.t) ->
            Bool.not (Block.is_empty (Block.inter block destinations)))
@@ -368,7 +377,7 @@ module RCP = struct
       (* *)
       print ~show "\n\n=/=/=/= KS90.run =/=/=/=\n\n";
       (* get initial partition [pi] by merging states from [s] and [t] into single set. *)
-      let merged_fsm, map_of_alphabet, map_of_states = Fsm.merge_fsm s t in
+      let merged_fsm, _map_of_alphabet, map_of_states = Fsm.merge_fsm s t in
       match merged_fsm with
       | { alphabet; states; edges; _ } ->
         let pi (* working partition *) = ref (Partition.of_list [ states ]) in

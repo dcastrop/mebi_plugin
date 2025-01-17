@@ -1,4 +1,9 @@
 (library
+ (name mebi_fsm)
+ (public_name coq-mebi.mebi_fsm)
+ (modules utils fsm bisimilarity))
+
+(library
  (name mebi_plugin) ; This is the name you will use in
                     ; Coq's `Declare ML Module`, and
                     ; the name of the main OCaml
@@ -18,12 +23,36 @@
             ; with, your choice here.
             ; coq-core.vernac                  ; Needed for vernac extend.
   coq-core.plugins.ltac ; Needed for tactic extend.
-  ))
+  mebi_fsm)
+ (modules mebi_errors mebi_utils mebi_monad pp_ext command g_mebi))
 
 ; This will let Dune know about Coq's .mlg grammar files.
 
 (coq.pp
  (modules g_mebi))
+
+(executable
+ (name tests)
+ (modules tests)
+ (libraries mebi_plugin mebi_fsm))
+
+; (executable
+;  (name mebi)
+;  (modules
+;   mebi_errors
+;   mebi_utils
+;   mebi_monad
+;   utils
+;   pp_ext
+;   fsm
+;   bisimilarity
+;   command
+;   g_mebi)
+;  (libraries mebi_plugin))
+
+; (test
+;  (name tests)
+;  (modules utils fsm bisimilarity))
 
 ; for testing, create executable of fsm
 ; (executable
