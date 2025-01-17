@@ -297,6 +297,11 @@ type pp_options =
   | Default of unit
   | Debug of unit
 
+(** [pstr_options debug] is the [pp_options] corresponding to [debug]. *)
+let pstr_options (debug : bool) : pp_options =
+  if debug then Debug () else Default ()
+;;
+
 (** [pp_collection_is_empty c] returns true if [c] is empty. *)
 let pp_collection_is_empty (c : pp_collection) : bool =
   match c with
@@ -339,8 +344,8 @@ let rec pstr
           (to_str : pp_supported)
   : string
   =
-  let basedent = Mebi_utils.str_tabs (tabs - 1) in
-  let indent = Mebi_utils.str_tabs tabs in
+  let basedent = Utils.str_tabs (tabs - 1) in
+  let indent = Utils.str_tabs tabs in
   (* build string *)
   match to_str with
   (* *)
@@ -518,7 +523,7 @@ let rec pstr
   | Utils _to_str -> "<<<<unimplemented>>>>"
   (* *)
   | Fsm to_str ->
-    let indent = Mebi_utils.str_tabs (tabs + 1) in
+    let indent = Utils.str_tabs (tabs + 1) in
     Printf.sprintf
       "{ %s; %s; %s; %s; \n%s}"
       (Printf.sprintf
@@ -692,7 +697,7 @@ exception ReverseStateHashtblLookupFailed of ((state, state) Hashtbl.t * state)
 
 (** [get_reverse_map_state tbl v] gets the key corresponding to [v] of translation map [tbl]. *)
 let get_reverse_map_state (tbl : (state, state) Hashtbl.t) (v : state) : state =
-  match Mebi_utils.get_key_of_val tbl v with
+  match Utils.get_key_of_val tbl v with
   | None -> raise (ReverseStateHashtblLookupFailed (tbl, v))
   | Some key -> key
 ;;

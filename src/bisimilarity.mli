@@ -22,16 +22,14 @@ module RCP : sig
     exception PartitionsNotDisjoint of Fsm.Partition.t
 
     val reachable_partitions
-      :  ?coq:bool
-      -> ?show:bool
+      :  ?show:bool
       -> ?debug:bool
       -> Fsm.States.t Fsm.Actions.t
       -> Fsm.Partition.t
       -> Fsm.Partition.t
 
     val split
-      :  ?coq:bool
-      -> ?show:bool
+      :  ?show:bool
       -> ?debug:bool
       -> Fsm.States.t
       -> Fsm.action
@@ -39,13 +37,7 @@ module RCP : sig
       -> Fsm.States.t Fsm.Actions.t Fsm.Edges.t
       -> Fsm.States.t * Fsm.States.t
 
-    val run
-      :  ?coq:bool
-      -> ?show:bool
-      -> ?debug:bool
-      -> Fsm.fsm
-      -> Fsm.fsm
-      -> bisim_result
+    val run : ?show:bool -> ?debug:bool -> Fsm.fsm -> Fsm.fsm -> bisim_result
   end
 
   module PT87 : sig end
