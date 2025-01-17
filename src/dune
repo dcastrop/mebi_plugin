@@ -18,16 +18,28 @@
             ; with, your choice here.
             ; coq-core.vernac                  ; Needed for vernac extend.
   coq-core.plugins.ltac ; Needed for tactic extend.
-  mebi_fsm)
+  coq-mebi.bisim)
  (modules mebi_errors mebi_utils mebi_monad pp_ext command g_mebi))
 
 (coq.pp ; This will let Dune know about Coq's .mlg grammar files.
  (modules g_mebi))
 
-(library
- (name mebi_fsm)
- (public_name coq-mebi.mebi_fsm)
- (modules utils fsm bisimilarity))
+; (include_subdirs qualified)
+
+; (library
+;  (name bisim)
+;  (public_name coq-mebi.bisim)
+;  (modules bisim_lib/utils fsm bisimilarity))
+
+; (executable
+;  (name bisim_exec)
+;  (public_name coq-mebi.bisim_exec)
+;  (libraries coq-mebi.bisim))
+
+; (library
+;  (name mebi_fsm)
+;  (public_name coq-mebi.mebi_fsm)
+;  (modules utils fsm bisimilarity))
 
 ; (executable
 ;  (name tests)

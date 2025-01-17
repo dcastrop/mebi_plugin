@@ -2,10 +2,20 @@ src/META.coq-mebi
 -R theories/ MEBI
 -I src/
 -arg "-w all"
-# -arg -d -arg backtrace
 
 theories/loader.v
 theories/Test.v
+
+src/bisim_lib/utils.ml
+src/bisim_lib/utils.mli
+src/bisim_lib/fsm.ml
+src/bisim_lib/fsm.mli
+src/bisim_lib/bisimilarity.ml
+src/bisim_lib/bisimilarity.mli
+src/bisim_lib/bisim.mlpack
+
+test/tests.ml
+test/tests.mli
 
 src/mebi_errors.ml
 src/mebi_errors.mli
@@ -13,17 +23,11 @@ src/mebi_monad.ml
 src/mebi_monad.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
-src/utils.ml
-src/utils.mli
 src/pp_ext.ml
 src/pp_ext.mli
-src/fsm.ml
-src/fsm.mli
-src/bisimilarity.ml
-src/bisimilarity.mli
 src/command.ml
 src/command.mli
-src/tests.ml
-src/tests.mli
 src/g_mebi.mlg
 src/mebi_plugin.mlpack
+
+

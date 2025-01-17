@@ -5,8 +5,8 @@ open Mebi_monad.Monad_syntax
 open Pp_ext
 
 (* *)
-open Mebi_fsm.Fsm
-open Mebi_fsm.Utils
+open Bisim.Fsm
+open Bisim.Utils
 
 (** ['a mm] is a function type mapping from [coq_context ref] to ['a in_context]. *)
 type 'a mm = 'a Mebi_monad.t
@@ -866,7 +866,7 @@ let bisim_ks90
   =
   let* s : fsm = build_fsm ~debug s_iref s_tref in
   let* t : fsm = build_fsm ~debug t_iref t_tref in
-  let open Mebi_fsm.Bisimilarity in
+  let open Bisim.Bisimilarity in
   (* *)
   let result = RCP.KS90.run ~show:false ~debug s t in
   match result with
