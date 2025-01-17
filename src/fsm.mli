@@ -57,7 +57,7 @@ end
 module Block = States
 
 module Partition : sig
-  type elt = States.t
+  type elt = Block.t
   type t = Set.Make(States).t
 
   val empty : t
@@ -294,6 +294,7 @@ type pp_options =
   | Default of unit
   | Debug of unit
 
+val pstr_options : bool -> pp_options
 val pp_collection_is_empty : pp_collection -> bool
 val pp_wrap_as_supported : pp_wrappable -> pp_supported
 val pstr : ?tabs:int -> ?options:pp_options -> pp_supported -> string
