@@ -1,0 +1,4 @@
+(library
+ (name bisim)
+ (public_name coq-mebi.bisim)
+ (modules utils fsm bisimilarity))

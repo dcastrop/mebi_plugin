@@ -1,0 +1,4 @@
+(executable
+ (name tests)
+ (public_name coq-mebi.tests)
+ (libraries coq-mebi.bisim))
