@@ -153,15 +153,25 @@ Module BisimTest1.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
+  (* should be true? *)
+  MeBi Bisim KS90
+    termLTS (tact TheAction1 (tact TheAction2 tend))
+    termLTS (tact TheAction1 (tact TheAction2 tend)).
 
+  (* should be true? *)
   MeBi Bisim KS90
     termLTS (tpar TheAction1 TheAction2 tend)
-    termLTS (tact TheAction1 (tact TheAction2 tend)).
+    termLTS (tpar TheAction1 TheAction2 tend).
 
   (* ... this one maybe should be true.. ? *)
   MeBi Bisim KS90
     termLTS (tfix (tact TheAction1 (tact TheAction2 trec)))
     termLTS (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
+
+  (* ... ? *)
+  MeBi Bisim KS90
+    termLTS (tpar TheAction1 TheAction2 tend)
+    termLTS (tact TheAction1 (tact TheAction2 tend)).
 
 End BisimTest1.
 
