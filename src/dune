@@ -27,6 +27,7 @@
   command
   utils
   fsm
+  examples
   bisimilarity
   g_mebi))
 

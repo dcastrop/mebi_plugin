@@ -1,12 +1,13 @@
 open Mebi_plugin.Fsm
 open Mebi_plugin.Bisimilarity
 open Mebi_plugin.Utils
+open Mebi_plugin.Examples
 
 (** [ks90_exas] ... *)
 let rec ks90_exas
-          ?(show : bool = false)
-          ?(debug : bool = false)
-          (exas : RCP.Examples.example list)
+  ?(show : bool = false)
+  ?(debug : bool = false)
+  (exas : example list)
   : unit
   =
   match exas with
@@ -51,7 +52,7 @@ let rec ks90_exas
 ;;
 
 let run_all_ks90 ?(show : bool = false) ?(debug : bool = false) () : unit =
-  ks90_exas ~show ~debug [ RCP.Examples.exa_1; RCP.Examples.exa_2 ]
+  ks90_exas ~show ~debug [ exa_1; exa_2 ]
 ;;
 
 let run_all ?(show : bool = false) ?(debug : bool = false) () : unit =
@@ -68,7 +69,5 @@ let run_all ?(show : bool = false) ?(debug : bool = false) () : unit =
 
     - Next, run the tests:
 
-    _build/default/test/tests.exe
-
-    *)
+    _build/default/test/tests.exe *)
 let () = run_all ()

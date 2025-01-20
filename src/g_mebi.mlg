@@ -26,16 +26,50 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   { Mebi_monad.run (Command.bounded_lts (Nametab.global r) t) }
 | [ "MeBi" "LTS" "show_debug" reference(r) constr(t) ] ->
   { Mebi_monad.run (Command.bounded_lts ~debug:true (Nametab.global r) t) }
+(* run bisim alg on two terms (first, builds fsm) *)
 | [ "MeBi" "Bisim" "KS90" reference(r) constr(t) reference(r') constr(t') ] ->
   { (Mebi_monad.run
-      (Command.bisim_ks90
+      (Command.lts_bisim_ks90
         ~debug:false
         ((Nametab.global r), t)
         ((Nametab.global r'), t'))) }
 | [ "MeBi" "Bisim" "KS90" "show_debug" reference(r) constr(t) reference(r') constr(t') ] ->
   { (Mebi_monad.run
-      (Command.bisim_ks90
+      (Command.lts_bisim_ks90
         ~debug:true
         ((Nametab.global r), t)
         ((Nametab.global r'), t'))) }
+(* examples *)
+(* | [ "MeBi" "Bisim" "KS90" "exa1" ] ->
+  match Examples.exa_1 with
+  | {s, t; _} -> (
+    { (Mebi_monad.run
+        (Command.fsm_bisim_ks90
+          ~debug:false
+          s
+          t)) })
+| [ "MeBi" "Bisim" "KS90" "exa1" "show_debug" ] ->
+  match Examples.exa_1 with
+  | {s, t; _} -> (
+    { (Mebi_monad.run
+        (Command.fsm_bisim_ks90
+          ~debug:true
+          s
+          t)) })
+| [ "MeBi" "Bisim" "KS90" "exa2" ] ->
+  match Examples.exa_2 with
+  | {s, t; _} -> (
+    { (Mebi_monad.run
+        (Command.fsm_bisim_ks90
+          ~debug:false
+          s
+          t)) })
+| [ "MeBi" "Bisim" "KS90" "exa2" "show_debug" ] ->
+  match Examples.exa_2 with
+  | {s, t; _} -> (
+    { (Mebi_monad.run
+        (Command.fsm_bisim_ks90
+          ~debug:true
+          s
+          t)) }) *)
 END

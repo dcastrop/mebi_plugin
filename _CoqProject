@@ -10,6 +10,8 @@ src/utils.ml
 src/utils.mli
 src/fsm.ml
 src/fsm.mli
+src/examples.ml
+src/examples.mli
 src/bisimilarity.ml
 src/bisimilarity.mli
 

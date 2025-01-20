@@ -4,6 +4,7 @@ Mebi_monad
 Pp_ext
 Utils
 Fsm
+Examples
 Bisimilarity
 Command
 G_mebi
