@@ -36,10 +36,11 @@ let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
 
 (** [get_lts_labels_and_terms mib mip] is the mapping of terms (states) and labels (outgoing edges) from [mip].
 
-    @raises invalid_arity if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error. *)
+    @raise invalid_arity
+      if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error. *)
 let get_lts_labels_and_terms
-      (mib : Declarations.mutual_inductive_body)
-      (mip : Declarations.one_inductive_body)
+  (mib : Declarations.mutual_inductive_body)
+  (mip : Declarations.one_inductive_body)
   : (Constr.rel_declaration * Constr.rel_declaration) mm
   =
   let open Declarations in
@@ -60,8 +61,10 @@ let get_lts_labels_and_terms
     @param [coq_lts] is the type constructor.
     @param [trm_type] is the type of terms for the LTS.
     @param [lbl_type] is the type of labels for the LTS.
-    @param [coq_ctor_names] is the array of names for each constructor of the Coq term.
-    @param [constructor_transitions] is the array of constructors of the Coq term (i.e., the transitions or outgoing edges). *)
+    @param [coq_ctor_names]
+      is the array of names for each constructor of the Coq term.
+    @param [constructor_transitions]
+      is the array of constructors of the Coq term (i.e., the transitions or outgoing edges). *)
 type raw_lts =
   { coq_lts : EConstr.constr
   ; trm_type : EConstr.types
@@ -180,7 +183,7 @@ let rec pstr_int_tree (t : int tree) : string =
       lhs_int
       (List.fold_left
          (fun (acc : string) (rhs_int_tree : int tree) ->
-            pstr_int_tree rhs_int_tree)
+           pstr_int_tree rhs_int_tree)
          ""
          rhs_int_tree_list)
 ;;
@@ -233,10 +236,10 @@ let sandboxed_unify (tgt_term : EConstr.t) (u : (int tree * unif_problem) list)
 ;;
 
 let rec retrieve_tgt_nodes
-          (acc : (EConstr.t * int tree) list)
-            (* (acc : (EConstr.t * int tree list) list) *)
-          (i : int)
-          (tgt_term : EConstr.t)
+  (acc : (EConstr.t * int tree) list)
+    (* (acc : (EConstr.t * int tree list) list) *)
+  (i : int)
+  (tgt_term : EConstr.t)
   : (int tree * unif_problem) list list -> (EConstr.t * int tree) list t
   =
   (* :  (int tree * unif_problem) list list -> (EConstr.t * int tree list) list t *)
@@ -252,8 +255,8 @@ let rec retrieve_tgt_nodes
 
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
-          (acc : (int tree * unif_problem) list list)
-          (lts : raw_lts)
+  (acc : (int tree * unif_problem) list list)
+  (lts : raw_lts)
   :  EConstr.t list * EConstr.rel_declaration list
   -> (int tree * unif_problem) list list option t
   = function
@@ -275,7 +278,7 @@ let rec check_updated_ctx
            let ctors =
              List.map
                (fun ((tL : EConstr.t), (i : int tree)) ->
-                  i, { termL = tL; termR = args.(2) })
+                 i, { termL = tL; termR = args.(2) })
                ctors
            in
            (* We need to cross-product all possible unifications. This is in case
@@ -356,8 +359,8 @@ module type GraphB = sig
 
   type lts_graph =
     { to_visit : EConstr.constr Queue.t
-      (* Queue for BFS *)
-      (* ; labels : L.t *)
+        (* Queue for BFS *)
+        (* ; labels : L.t *)
     ; states : S.t
     ; transitions : lts_transition H.t
     }
@@ -449,13 +452,12 @@ struct
               "---- (returned from check_valid_constructor)\n\n\
                build_lts: constrs: [%s] (length %d).\n"
               (List.fold_left
-                 (fun (acc : string)
-                   ((ctor, int_tree) : EConstr.t * int tree) ->
-                    Printf.sprintf
-                      "%s   (%s ::\n    %s)\n"
-                      acc
-                      (pstr_int_tree int_tree)
-                      (econstr_to_string ctor))
+                 (fun (acc : string) ((ctor, int_tree) : EConstr.t * int tree) ->
+                   Printf.sprintf
+                     "%s   (%s ::\n    %s)\n"
+                     acc
+                     (pstr_int_tree int_tree)
+                     (econstr_to_string ctor))
                  "\n"
                  constrs)
               (List.length constrs)));
@@ -471,22 +473,22 @@ struct
       in
       List.iter
         (fun ((tgt, int_tree) : EConstr.t * int tree) ->
-           Feedback.msg_debug
-             (str "\n\nTransition to" ++ Printer.pr_econstr_env env sigma tgt);
-           new_states := S.add tgt !new_states;
-           H.add
-             g.transitions
-             t
-             { action =
-                 { id = get_transition_id (); label = econstr_to_string tgt }
-             ; index_tree = int_tree
-             ; destination = tgt
-             };
-           if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
-           then ()
-           else Queue.push tgt g.to_visit;
-           Feedback.msg_debug
-             (str "\nVisiting next: " ++ int (Queue.length g.to_visit)))
+          Feedback.msg_debug
+            (str "\n\nTransition to" ++ Printer.pr_econstr_env env sigma tgt);
+          new_states := S.add tgt !new_states;
+          H.add
+            g.transitions
+            t
+            { action =
+                { id = get_transition_id (); label = econstr_to_string tgt }
+            ; index_tree = int_tree
+            ; destination = tgt
+            };
+          if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
+          then ()
+          else Queue.push tgt g.to_visit;
+          Feedback.msg_debug
+            (str "\nVisiting next: " ++ int (Queue.length g.to_visit)))
         constrs;
       let g = { g with states = S.union g.states !new_states } in
       build_lts the_lts g
@@ -517,8 +519,8 @@ struct
       [t] is an (outgoing) [lts_transition] composed of a label [t.edge_ctor]
       and a destination node [t.to_node]. *)
   let pstr_lts_transition
-        ?(long : unit option)
-        ((from : EConstr.constr), (t : lts_transition))
+    ?(long : unit option)
+    ((from : EConstr.constr), (t : lts_transition))
     : string
     =
     match t with
@@ -539,9 +541,9 @@ struct
 
   (** [pstr_lts_transitions transitions] is a string of [transitions]. *)
   let pstr_lts_transitions
-        ?(long : unit option)
-        ?(indent : int = 1)
-        (transitions : lts_transition H.t)
+    ?(long : unit option)
+    ?(indent : int = 1)
+    (transitions : lts_transition H.t)
     : string
     =
     if H.to_seq_keys transitions |> Seq.is_empty
@@ -553,25 +555,25 @@ struct
            (fun (from_node : EConstr.constr)
              (outgoing_transition : lts_transition)
              (acc : string) ->
-              Printf.sprintf
-                "%s%s{%s}\n%s"
-                acc
-                (str_tabs indent)
-                (match long with
-                 | None -> pstr_lts_transition (from_node, outgoing_transition)
-                 | Some () ->
-                   pstr_lts_transition ~long:() (from_node, outgoing_transition))
-                (match long with
-                 | None -> ""
-                 | Some () -> "\n"))
+             Printf.sprintf
+               "%s%s{%s}\n%s"
+               acc
+               (str_tabs indent)
+               (match long with
+                | None -> pstr_lts_transition (from_node, outgoing_transition)
+                | Some () ->
+                  pstr_lts_transition ~long:() (from_node, outgoing_transition))
+               (match long with
+                | None -> ""
+                | Some () -> "\n"))
            transitions
            "\n")
   ;;
 
   (** [pstr_lts_to_visit ?indent nodes_to_visit] is a string of [nodes_to_visit]. *)
   let pstr_lts_to_visit
-        ?(indent : int = 1)
-        (nodes_to_visit : EConstr.constr Queue.t)
+    ?(indent : int = 1)
+    (nodes_to_visit : EConstr.constr Queue.t)
     : string
     =
     let s =
@@ -579,7 +581,7 @@ struct
         "[%s]"
         (Queue.fold
            (fun (acc : string) (node_to_visit : EConstr.constr) ->
-              Printf.sprintf "%s{%s}\n" acc (econstr_to_string node_to_visit))
+             Printf.sprintf "%s{%s}\n" acc (econstr_to_string node_to_visit))
            "\n"
            nodes_to_visit)
     in
@@ -611,18 +613,18 @@ struct
     let states =
       S.fold
         (fun (s : EConstr.t) (acc : States.t) ->
-           (* check if [map_of_states] has *)
-           match Hashtbl.find_opt map_of_states s with
-           | None ->
-             (* add as new state *)
-             let new_state =
-               make_state ~pp:(econstr_to_string s) (get_state_id ())
-             in
-             Hashtbl.add map_of_states s new_state;
-             States.add new_state acc
-           | Some existing_state ->
-             (* do not add new state, already translated *)
-             acc)
+          (* check if [map_of_states] has *)
+          match Hashtbl.find_opt map_of_states s with
+          | None ->
+            (* add as new state *)
+            let new_state =
+              make_state ~pp:(econstr_to_string s) (get_state_id ())
+            in
+            Hashtbl.add map_of_states s new_state;
+            States.add new_state acc
+          | Some existing_state ->
+            (* do not add new state, already translated *)
+            acc)
         g.states
         States.empty
     in
@@ -634,7 +636,8 @@ struct
       outgoing edges comprised of labels and destination states.
       @param g is the LTS with transitions to build the FSM edges from.
       @param s is the translation map from Coq-terms to FSM states.
-      @return a tuple containing the {b edges} [States.t Actions.t Edges.t] and corresponding {b alphabet} of labels. *)
+      @return
+        a tuple containing the {b edges} [States.t Actions.t Edges.t] and corresponding {b alphabet} of labels. *)
   let build_edges (g : lts_graph) (s : state_translation_table)
     : (States.t Actions.t Edges.t * Alphabet.t) mm
     =
@@ -650,65 +653,63 @@ struct
         (fun (from : EConstr.t)
           (transition : (action, EConstr.constr) transition)
           (acc : Alphabet.t) ->
-           (* only add if action with same label doesnt exist *)
-           if
-             Alphabet.exists
+          (* only add if action with same label doesnt exist *)
+          if Alphabet.exists
                (fun (a : action) ->
-                  String.equal a.label transition.action.label)
+                 String.equal a.label transition.action.label)
                acc
-           then acc
-           else
-             Alphabet.add
-               (make_action
-                  ~label:transition.action.label
-                  (Alphabet.cardinal acc))
-               acc)
+          then acc
+          else
+            Alphabet.add
+              (make_action
+                 ~label:transition.action.label
+                 (Alphabet.cardinal acc))
+              acc)
         g.transitions
         Alphabet.empty
     in
     (* build edges *)
     H.iter
-      (fun (from : EConstr.t)
-        (transition : (action, EConstr.constr) transition) ->
-         let edge_from = Hashtbl.find s from in
-         let edge_dest = Hashtbl.find s transition.destination in
-         let edge_action =
-           List.nth
-             (let pstr_actions =
-                Alphabet.filter
-                  (fun (a : action) ->
-                     String.equal a.label transition.action.label)
-                  alphabet
-              in
-              Alphabet.to_list pstr_actions)
-             0
-         in
-         (* check state already has edges *)
-         match Edges.find_opt edges edge_from with
-         | None ->
-           (* add new *)
-           Edges.add
-             edges
-             edge_from
-             (Actions.of_seq
-                (List.to_seq [ edge_action, States.of_list [ edge_dest ] ]))
-         | Some actions ->
-           (* add to outgoing edges *)
-           Edges.add
-             edges
-             edge_from
-             (Actions.of_seq
-                (List.to_seq
-                   (List.append
-                      (List.of_seq (Actions.to_seq actions))
-                      [ ( edge_action
-                        , match Actions.find_opt actions edge_action with
-                          (* add new *)
-                          | None -> States.of_list [ edge_dest ]
-                          (* add to actions of outgoing edges*)
-                          | Some destinations ->
-                            States.add edge_dest destinations )
-                      ]))))
+      (fun (from : EConstr.t) (transition : (action, EConstr.constr) transition) ->
+        let edge_from = Hashtbl.find s from in
+        let edge_dest = Hashtbl.find s transition.destination in
+        let edge_action =
+          List.nth
+            (let pstr_actions =
+               Alphabet.filter
+                 (fun (a : action) ->
+                   String.equal a.label transition.action.label)
+                 alphabet
+             in
+             Alphabet.to_list pstr_actions)
+            0
+        in
+        (* check state already has edges *)
+        match Edges.find_opt edges edge_from with
+        | None ->
+          (* add new *)
+          Edges.add
+            edges
+            edge_from
+            (Actions.of_seq
+               (List.to_seq [ edge_action, States.of_list [ edge_dest ] ]))
+        | Some actions ->
+          (* add to outgoing edges *)
+          Edges.add
+            edges
+            edge_from
+            (Actions.of_seq
+               (List.to_seq
+                  (List.append
+                     (List.of_seq (Actions.to_seq actions))
+                     [ ( edge_action
+                       , match Actions.find_opt actions edge_action with
+                         (* add new *)
+                         | None -> States.of_list [ edge_dest ]
+                         (* add to actions of outgoing edges*)
+                         | Some destinations ->
+                           States.add edge_dest destinations )
+                     ]))))
       g.transitions;
     return (edges, alphabet)
   ;;
@@ -718,9 +719,11 @@ struct
 
   (** [lts_to_fsm g init_term term] translates LTS [g] to an FSM.
       @param g is an [lts_graph] to be translated.
-      @param init_term is the original actual Coq-term used to build the LTS.
-      (Used to determine the initial state of the FSM).
-      @return a tuple containing the ocaml-based [Fsm.fsm] and a table for translating ocaml-fsm states to coq-terms.*)
+      @param init_term
+        is the original actual Coq-term used to build the LTS.
+        (Used to determine the initial state of the FSM).
+      @return
+        a tuple containing the ocaml-based [Fsm.fsm] and a table for translating ocaml-fsm states to coq-terms.*)
   let lts_to_fsm (g : lts_graph) (init_term : Constrexpr.constr_expr_r CAst.t)
     : (fsm * state_translation_table) mm
     =
@@ -763,9 +766,9 @@ let make_graph_builder =
 
 (**  *)
 let build_fsm
-      ?(debug : bool = false)
-      (iref : Names.GlobRef.t)
-      (tref : Constrexpr.constr_expr_r CAst.t)
+  ?(debug : bool = false)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
   : fsm mm
   =
   let* raw_lts = check_ref_lts iref in
@@ -795,8 +798,8 @@ let build_fsm
             Names.Id.print
             raw_lts.coq_ctor_names);
     (* prints all transitions -- the possible constructors.
- a term may take as part of its structure.
- these are dependant on the definition of a type. *)
+       a term may take as part of its structure.
+       these are dependant on the definition of a type. *)
     Feedback.msg_debug
       (str "(d) Transitions: "
        ++ pp_transitions env sigma raw_lts.constructor_transitions
@@ -848,24 +851,17 @@ let build_fsm
     - States are the sets of possible transitions
     - A term [t] is represented by the state of the transitions that can be taken *)
 let bounded_lts
-      ?(debug : bool = true)
-      (iref : Names.GlobRef.t)
-      (tref : Constrexpr.constr_expr_r CAst.t)
+  ?(debug : bool = true)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   let* _ = build_fsm ~debug iref tref in
   return ()
 ;;
 
-(* *)
-let bisim_ks90
-      ?(debug : bool = true)
-      ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-      ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-  : unit mm
-  =
-  let* s : fsm = build_fsm ~debug s_iref s_tref in
-  let* t : fsm = build_fsm ~debug t_iref t_tref in
+(*  *)
+let fsm_bisim_ks90 ?(debug : bool = true) (s : fsm) (t : fsm) : unit mm =
   let open Bisimilarity in
   (* *)
   let result = RCP.KS90.run ~show:false ~debug s t in
@@ -897,4 +893,17 @@ let bisim_ks90
                ~tabs:1
                (pp_wrap_as_supported (Fsm t)))));
     return ()
+;;
+
+(* *)
+let lts_bisim_ks90
+  ?(debug : bool = true)
+  ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  : unit mm
+  =
+  let* (s : fsm) = build_fsm ~debug s_iref s_tref in
+  let* (t : fsm) = build_fsm ~debug t_iref t_tref in
+  (*  *)
+  fsm_bisim_ks90 s t
 ;;

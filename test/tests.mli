@@ -1,7 +1,7 @@
 val ks90_exas
   :  ?show:bool
   -> ?debug:bool
-  -> Mebi_plugin.Bisimilarity.RCP.Examples.example list
+  -> Mebi_plugin.Examples.example list
   -> unit
 
 val run_all_ks90 : ?show:bool -> ?debug:bool -> unit -> unit

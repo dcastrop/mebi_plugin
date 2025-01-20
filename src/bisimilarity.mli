@@ -5,18 +5,6 @@ type bisim_result =
   }
 
 module RCP : sig
-  module Examples : sig
-    type example =
-      { name : string
-      ; s : Fsm.fsm
-      ; t : Fsm.fsm
-      }
-
-    val exa : string -> Fsm.fsm -> Fsm.fsm -> example
-    val exa_1 : example
-    val exa_2 : example
-  end
-
   module KS90 : sig
     exception EmptyBlock of Fsm.States.t
     exception PartitionsNotDisjoint of Fsm.Partition.t
