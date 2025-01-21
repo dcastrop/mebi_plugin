@@ -30,6 +30,33 @@ module States = Set.Make (struct
     (* let compare a b = compare a.pp b.pp *)
   end)
 
+exception StateNotFoundInMergedStates of (state * States.t)
+
+(*  *)
+let map_merge_states (a : States.t) (b : States.t)
+  : States.t * (state, state) Hashtbl.t
+  =
+  let map_of_states : (state, state) Hashtbl.t =
+    States.cardinal a + States.cardinal b |> Hashtbl.create
+  in
+  let merged_states = States.union a b in
+  let add_to_state_map (some_states : States.t) : unit =
+    States.iter
+      (fun (s : state) ->
+        Hashtbl.add
+          map_of_states
+          s
+          (match States.find_opt s merged_states with
+           | None -> raise (StateNotFoundInMergedStates (s, some_states))
+           | Some s' -> s'))
+      some_states
+  in
+  add_to_state_map a;
+  add_to_state_map b;
+  (*  *)
+  merged_states, map_of_states
+;;
+
 (*************************************************)
 (****** Blocks & Partitions of States ************)
 (****** (Used by Bisimilarity algorithms.) *******)
@@ -74,6 +101,34 @@ module Alphabet = Set.Make (struct
 
     let compare a b = compare a.label b.label
   end)
+
+exception ActionNotFoundInMergedAlphabet of (action * Alphabet.t)
+
+(*  *)
+let map_merge_alphabet (a : Alphabet.t) (b : Alphabet.t)
+  : Alphabet.t * (action, action) Hashtbl.t
+  =
+  let map_of_alphabet : (action, action) Hashtbl.t =
+    Alphabet.cardinal a + Alphabet.cardinal b |> Hashtbl.create
+  in
+  let merged_alphabet = Alphabet.union a b in
+  let add_to_alphabet_map (some_alphabet : Alphabet.t) : unit =
+    Alphabet.iter
+      (fun (act : action) ->
+        Hashtbl.add
+          map_of_alphabet
+          act
+          (match Alphabet.find_opt act merged_alphabet with
+           | None ->
+             raise (ActionNotFoundInMergedAlphabet (act, merged_alphabet))
+           | Some act' -> act'))
+      some_alphabet
+  in
+  add_to_alphabet_map a;
+  add_to_alphabet_map b;
+  (*  *)
+  merged_alphabet, map_of_alphabet
+;;
 
 (*********************************************************************)
 (****** Actions & Edges ***********************************)
@@ -132,85 +187,17 @@ let make_fsm
 ;;
 
 exception AlphabetContainsDuplicateLabels of Alphabet.t
-exception StateNotFoundInMergedStates of (state * (state, state) Hashtbl.t)
-exception ActionNotFoundInMergedAlphabet of (action * Alphabet.t)
+exception StateNotFoundInMapOfStates of (state * (state, state) Hashtbl.t)
 exception ActionNotFoundInMapOfAlphabet of (action * (action, action) Hashtbl.t)
 
 (** [merge_fsm s t] ... *)
 let merge_fsm (s : fsm) (t : fsm) : fsm * (state, state) Hashtbl.t =
   (* *)
-  let map_of_alphabet : (action, action) Hashtbl.t =
-    Alphabet.cardinal s.alphabet + Alphabet.cardinal t.alphabet
-    |> Hashtbl.create
+  let merged_alphabet, map_of_alphabet =
+    map_merge_alphabet s.alphabet t.alphabet
   in
-  let merged_alphabet = Alphabet.union s.alphabet t.alphabet in
-  let add_to_alphabet_map (some_alphabet : Alphabet.t) : unit =
-    Alphabet.iter
-      (fun (a : action) ->
-        Hashtbl.add
-          map_of_alphabet
-          a
-          (match Alphabet.find_opt a merged_alphabet with
-           | None -> raise (ActionNotFoundInMergedAlphabet (a, merged_alphabet))
-           | Some a' -> a'))
-      some_alphabet
-  in
-  add_to_alphabet_map s.alphabet;
-  add_to_alphabet_map t.alphabet;
-  (* Alphabet.fold
-     (fun (b_action : action)
-     ((alphabet, map) : Alphabet.t * (action, action) Hashtbl.t) ->
-     let a_alphas =
-     Alphabet.filter
-     (fun (a_action : action) -> a_action.label == b_action.label)
-     alphabet
-     in
-     if Alphabet.is_empty a_alphas
-     then (
-     (* create new action in alphabet and add to map *)
-     let new_action =
-     make_action ~label:b_action.label (Alphabet.cardinal alphabet)
-     in
-     let alphabet' = Alphabet.add new_action alphabet in
-     alphabet', map)
-     else (
-     (* double check there is only one with matching label *)
-     if Alphabet.cardinal a_alphas > 1
-     then raise (AlphabetContainsDuplicateLabels s.alphabet);
-     (* just update map to use existing in s *)
-     Hashtbl.add map b_action (List.nth (Alphabet.elements a_alphas) 0);
-     alphabet, map))
-     t.alphabet
-     ( s.alphabet
-     , Hashtbl.of_seq
-     (List.to_seq
-     (Alphabet.fold
-     (fun (a_alpha : action) (acc : (action * action) list) ->
-     List.append acc [ a_alpha, a_alpha ])
-     s.alphabet
-     [])) )
-     in *)
   (* *)
-  let merged_states, map_of_states =
-    States.fold
-      (fun (s : state) ((acc, map) : States.t * (state, state) Hashtbl.t) ->
-        let s' = make_state ~pp:s.pp (States.cardinal acc) in
-        (* save mapping from old to new state. *)
-        Hashtbl.add map s s';
-        (* continue *)
-        States.add s' acc, map)
-      (* only need to add the states in [b]. *)
-      t.states
-      (* union is added to [a]. *)
-      ( s.states
-      , Hashtbl.of_seq
-          (List.to_seq
-             (States.fold
-                (fun (s : state) (acc : (state * state) list) ->
-                  List.append acc [ s, s ])
-                s.states
-                [])) )
-  in
+  let merged_states, map_of_states = map_merge_states s.states t.states in
   (* *)
   let merged_edges = s.edges in
   Edges.iter
@@ -218,7 +205,10 @@ let merge_fsm (s : fsm) (t : fsm) : fsm * (state, state) Hashtbl.t =
       (* need to update states in edge *)
       Edges.add
         merged_edges
-        (Hashtbl.find map_of_states from_state)
+        (match Hashtbl.find_opt map_of_states from_state with
+         | None ->
+           raise (StateNotFoundInMapOfStates (from_state, map_of_states))
+         | Some from_state' -> from_state')
         (Actions.of_seq
            (List.to_seq
               (Actions.fold
@@ -241,7 +231,7 @@ let merge_fsm (s : fsm) (t : fsm) : fsm * (state, state) Hashtbl.t =
                                 with
                                 | None ->
                                   raise
-                                    (StateNotFoundInMergedStates
+                                    (StateNotFoundInMapOfStates
                                        (old_state, map_of_states))
                                 | Some new_state -> new_state)
                               destinations ))

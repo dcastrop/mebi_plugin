@@ -54,6 +54,13 @@ module States : sig
   val of_seq : elt Seq.t -> t
 end
 
+exception StateNotFoundInMergedStates of (state * States.t)
+
+val map_merge_states
+  :  States.t
+  -> States.t
+  -> States.t * (state, state) Hashtbl.t
+
 module Block = States
 
 module Partition : sig
@@ -161,6 +168,13 @@ module Alphabet : sig
   val of_seq : elt Seq.t -> t
 end
 
+exception ActionNotFoundInMergedAlphabet of (action * Alphabet.t)
+
+val map_merge_alphabet
+  :  Alphabet.t
+  -> Alphabet.t
+  -> Alphabet.t * (action, action) Hashtbl.t
+
 module Actions : sig
   type key = action
   type !'a t
@@ -236,8 +250,7 @@ val make_fsm
   -> fsm
 
 exception AlphabetContainsDuplicateLabels of Alphabet.t
-exception StateNotFoundInMergedStates of (state * (state, state) Hashtbl.t)
-exception ActionNotFoundInMergedAlphabet of (action * Alphabet.t)
+exception StateNotFoundInMapOfStates of (state * (state, state) Hashtbl.t)
 exception ActionNotFoundInMapOfAlphabet of (action * (action, action) Hashtbl.t)
 
 val merge_fsm : fsm -> fsm -> fsm * (state, state) Hashtbl.t
