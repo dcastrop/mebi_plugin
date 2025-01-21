@@ -39,14 +39,28 @@ let map_merge_states (a : States.t) (b : States.t)
   let map_of_states : (state, state) Hashtbl.t =
     States.cardinal a + States.cardinal b |> Hashtbl.create
   in
-  let merged_states = States.union a b in
+  (* let merged_states = States.union a b in *)
+  let merge_states (states : States.t) (into : States.t) : States.t =
+    States.fold
+      (fun (s : state) (acc : States.t) ->
+        let s' = make_state ~pp:s.pp (States.cardinal into) in
+        States.add s' acc)
+      states
+      into
+  in
+  let merged_states = merge_states b (merge_states a States.empty) in
+  (*  *)
   let add_to_state_map (some_states : States.t) : unit =
     States.iter
       (fun (s : state) ->
         Hashtbl.add
           map_of_states
           s
-          (match States.find_opt s merged_states with
+          (match
+             States.find_first_opt
+               (fun (s' : state) -> s.pp == s'.pp)
+               merged_states
+           with
            | None -> raise (StateNotFoundInMergedStates (s, some_states))
            | Some s' -> s'))
       some_states

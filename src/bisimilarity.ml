@@ -75,6 +75,22 @@ module RCP = struct
                 (pp_wrap_as_supported (Partition pi))))
       ;;
 
+      let run_merged
+        ?(show : bool = false)
+        ?(details : bool = true)
+        ?(debug : bool = false)
+        (m : fsm)
+        : unit
+        =
+        print
+          ~show
+          (Printf.sprintf
+             "merged fsm: %s.\n"
+             (pstr
+                ~options:(pstr_options details)
+                (pp_wrap_as_supported (Fsm m))))
+      ;;
+
       let run_iter
         ?(show : bool = false)
         ?(details : bool = true)
@@ -279,6 +295,8 @@ module RCP = struct
       print ~show:(show && debug) "\n\n=/=/=/= KS90.run =/=/=/=\n\n";
       (* get initial partition [pi] by merging states from [s] and [t] into single set. *)
       let merged_fsm, map_of_states = merge_fsm s t in
+      DebugMessages.run_merged ~show ~details ~debug merged_fsm;
+      (*  *)
       match merged_fsm with
       | { alphabet; states; edges; _ } ->
         (* working partition is initially all the states *)
