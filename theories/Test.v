@@ -188,6 +188,26 @@ Module BisimTest1.
 
   (* ? should be true *)
   MeBi Bisim KS90
+    termLTS (tfix (tact TheAction1 trec))
+    termLTS (tfix (tact TheAction1 trec)).
+
+  (* FIXME: looks like merge can't deal with recursion. *)
+  MeBi FSM Merge
+    termLTS (tfix (tact TheAction1 trec))
+    termLTS (tfix (tact TheAction1 trec)).
+
+  (* ? should be true *)
+  MeBi Bisim KS90
+    termLTS (tfix (tact TheAction1 trec))
+    termLTS (tact TheAction1 (tfix (tact TheAction1 trec))).
+
+  (* FIXME: looks like merge can't deal with recursion. *)
+  MeBi FSM Merge
+    termLTS (tfix (tact TheAction1 trec))
+    termLTS (tact TheAction1 (tfix (tact TheAction1 trec))).
+
+  (* ? should be true *)
+  MeBi Bisim KS90
     termLTS (tfix (tact TheAction1 (tact TheAction2 trec)))
     termLTS (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
 
