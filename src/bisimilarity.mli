@@ -9,6 +9,55 @@ module RCP : sig
     exception EmptyBlock of Fsm.States.t
     exception PartitionsNotDisjoint of Fsm.Partition.t
 
+    module DebugMessages : sig
+      val reachable_partitions
+        :  ?show:bool
+        -> ?details:bool
+        -> ?debug:bool
+        -> Fsm.States.t
+        -> unit
+
+      val split
+        :  ?show:bool
+        -> ?details:bool
+        -> ?debug:bool
+        -> Fsm.States.t
+        -> Fsm.action
+        -> Fsm.Partition.t
+        -> Fsm.States.t Fsm.Actions.t Fsm.Edges.t
+        -> unit
+
+      val run_iter
+        :  ?show:bool
+        -> ?details:bool
+        -> ?debug:bool
+        -> Fsm.action
+        -> Fsm.States.t
+        -> Fsm.Partition.t
+        -> unit
+
+      val run_exit
+        :  ?show:bool
+        -> ?details:bool
+        -> ?debug:bool
+        -> (Fsm.state, Fsm.state) Hashtbl.t
+        -> Fsm.States.t
+        -> Fsm.States.t
+        -> unit
+
+      val run_check
+        :  ?show:bool
+        -> ?details:bool
+        -> ?debug:bool
+        -> Fsm.state
+        -> Fsm.state
+        -> Fsm.state
+        -> Fsm.state
+        -> Fsm.States.t
+        -> Fsm.States.t
+        -> unit
+    end
+
     val reachable_partitions
       :  ?show:bool
       -> ?details:bool
