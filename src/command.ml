@@ -108,7 +108,9 @@ let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
     - Conversion.CUMUL?
     - Is [w_unify] the best way?
     - ... *)
-let m_unify (t0 : Evd.econstr) (t1 : Evd.econstr) : bool mm =
+let m_unify ?(show_debug : bool = false) (t0 : Evd.econstr) (t1 : Evd.econstr)
+  : bool mm
+  =
   let* _ =
     debug (fun (env : Environ.env) (sigma : Evd.evar_map) ->
       str "Unifying "
@@ -120,12 +122,12 @@ let m_unify (t0 : Evd.econstr) (t1 : Evd.econstr) : bool mm =
   state (fun (env : Environ.env) (sigma : Evd.evar_map) ->
     try
       let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
-      Feedback.msg_debug (str "\t\tSuccess");
+      if show_debug then Feedback.msg_debug (str "\t\tSuccess");
       sigma, true
     with
     | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify (m, n, e))
       ->
-      Feedback.msg_debug (str "\t\tCould not unify");
+      if show_debug then Feedback.msg_debug (str "\t\tCould not unify");
       sigma, false)
 ;;
 
@@ -306,7 +308,10 @@ let rec check_updated_ctx
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
 (** Checks possible transitions for this term: *)
-and check_valid_constructor (lts : raw_lts) (t : EConstr.t)
+and check_valid_constructor
+  ?(show_debug : bool = false)
+  (lts : raw_lts)
+  (t : EConstr.t)
   : (EConstr.t * EConstr.t * int tree) list t
   =
   (* : (EConstr.t * int tree list) list t *)
@@ -314,7 +319,7 @@ and check_valid_constructor (lts : raw_lts) (t : EConstr.t)
   (* let iter_body (i : int) (ctor_vals : (EConstr.t * int tree list) list) = *)
   let iter_body (i : int) (ctor_vals : (EConstr.t * EConstr.t * int tree) list) =
     let* _ =
-      debug (fun env sigma ->
+      debug ~show_debug (fun env sigma ->
         str "CHECKING CONSTRUCTOR "
         ++ int i
         ++ str ". Term: "
@@ -375,19 +380,28 @@ module type GraphB = sig
     ; transitions : lts_transition H.t
     }
 
-  val build_graph : raw_lts -> Constrexpr.constr_expr_r CAst.t -> lts_graph mm
+  val build_graph
+    :  ?show_debug:bool
+    -> raw_lts
+    -> Constrexpr.constr_expr_r CAst.t
+    -> lts_graph mm
 
   type state_translation_table = (EConstr.t, state) Hashtbl.t
 
-  val build_states : lts_graph -> (States.t * state_translation_table) mm
+  val build_states
+    :  ?show_debug:bool
+    -> lts_graph
+    -> (States.t * state_translation_table) mm
 
   val build_edges
-    :  lts_graph
+    :  ?show_debug:bool
+    -> lts_graph
     -> state_translation_table
     -> (States.t Actions.t Edges.t * Alphabet.t) mm
 
   val lts_to_fsm
-    :  lts_graph
+    :  ?show_debug:bool
+    -> lts_graph
     -> Constrexpr.constr_expr_r CAst.t
     -> (fsm * state_translation_table) mm
 
@@ -446,7 +460,12 @@ struct
       @param the_lts describes the Coq-based term.
       @param g is an [lts_graph] accumulated while exploring [the_lts].
       @return an [lts_graph] constructed so long as the [bound] is not exceeded. *)
-  let rec build_lts (the_lts : raw_lts) (g : lts_graph) : lts_graph mm =
+  let rec build_lts
+    ?(show_debug : bool = false)
+    (the_lts : raw_lts)
+    (g : lts_graph)
+    : lts_graph mm
+    =
     if H.length g.transitions >= bound
     then return g (* FIXME: raise error *)
     else if Queue.is_empty g.to_visit
@@ -454,8 +473,9 @@ struct
     else
       let* t = return (Queue.pop g.to_visit) in
       let* (constrs : (EConstr.t * EConstr.t * int tree) list) =
-        check_valid_constructor the_lts t
+        check_valid_constructor ~show_debug the_lts t
       in
+      if show_debug then
       Feedback.msg_debug
         (str
            (Printf.sprintf
@@ -485,6 +505,8 @@ struct
       in
       List.iter
         (fun ((act, tgt, int_tree) : EConstr.t * EConstr.t * int tree) ->
+          if show_debug
+          then
            Feedback.msg_debug
              (str "\n\nTransition to" ++ Printer.pr_econstr_env env sigma tgt);
            new_states := S.add tgt !new_states;
@@ -499,17 +521,22 @@ struct
            if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
            then ()
            else Queue.push tgt g.to_visit;
+          if show_debug
+          then
            Feedback.msg_debug
              (str "\nVisiting next: " ++ int (Queue.length g.to_visit)))
         constrs;
       let g = { g with states = S.union g.states !new_states } in
-      build_lts the_lts g
+      build_lts ~show_debug the_lts g
   ;;
 
   (** [build_graph the_lts t] is ...
       @param the_lts is ...
       @param t is the original Coq-term. *)
-  let build_graph (the_lts : raw_lts) (t : Constrexpr.constr_expr_r CAst.t)
+  let build_graph
+    ?(show_debug : bool = false)
+    (the_lts : raw_lts)
+    (t : Constrexpr.constr_expr_r CAst.t)
     : lts_graph mm
     =
     let$ t env sigma = Constrintern.interp_constr_evars env sigma t in
@@ -518,6 +545,7 @@ struct
     let q = Queue.create () in
     let* _ = return (Queue.push t q) in
     build_lts
+      ~show_debug
       the_lts
       { to_visit = q (* ; labels = L.empty *)
       ; states = S.empty
@@ -612,7 +640,9 @@ struct
   type state_translation_table = (EConstr.t, state) Hashtbl.t
 
   (** [build_states g] returns the set of States and for each a mapping from EConstr.t. *)
-  let build_states (g : lts_graph) : (States.t * state_translation_table) mm =
+  let build_states ?(show_debug : bool = false) (g : lts_graph)
+    : (States.t * state_translation_table) mm
+    =
     let map_of_states = S.cardinal g.states |> Hashtbl.create in
     (* set up counter for state ids *)
     let state_id_counter = ref 0 in
@@ -650,7 +680,10 @@ struct
       @param s is the translation map from Coq-terms to FSM states.
       @return
         a tuple containing the {b edges} [States.t Actions.t Edges.t] and corresponding {b alphabet} of labels. *)
-  let build_edges (g : lts_graph) (s : state_translation_table)
+  let build_edges
+    ?(show_debug : bool = false)
+    (g : lts_graph)
+    (s : state_translation_table)
     : (States.t Actions.t Edges.t * Alphabet.t) mm
     =
     let* env = get_env in
@@ -738,7 +771,10 @@ struct
         (Used to determine the initial state of the FSM).
       @return
         a tuple containing the ocaml-based [Fsm.fsm] and a table for translating ocaml-fsm states to coq-terms.*)
-  let lts_to_fsm (g : lts_graph) (init_term : Constrexpr.constr_expr_r CAst.t)
+  let lts_to_fsm
+    ?(show_debug : bool = false)
+    (g : lts_graph)
+    (init_term : Constrexpr.constr_expr_r CAst.t)
     : (fsm * state_translation_table) mm
     =
     match g with
@@ -755,9 +791,11 @@ struct
         raise (UnfinishedLTS g))
       else
         (* extract states *)
-        let* states, state_translation_map = build_states g in
+        let* states, state_translation_map = build_states ~show_debug g in
         (* extract edges *)
-        let* edges, alphabet = build_edges g state_translation_map in
+        let* edges, alphabet =
+          build_edges ~show_debug g state_translation_map
+        in
         (* get initial state *)
         let$ t env sigma =
           Constrintern.interp_constr_evars env sigma init_term
@@ -778,22 +816,22 @@ let make_graph_builder =
   return (module G : GraphB)
 ;;
 
-(**  *)
-let build_fsm
-      ?(debug : bool = false)
-      (iref : Names.GlobRef.t)
-      (tref : Constrexpr.constr_expr_r CAst.t)
-  : fsm mm
+let build_lts
+  ?(show_details : bool = true)
+  ?(show_debug : bool = false)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
+  : raw_lts mm
   =
   let* raw_lts = check_ref_lts iref in
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
-  let* graph_lts = G.build_graph raw_lts tref in
+  let* graph_lts = G.build_graph ~show_debug raw_lts tref in
   (* *)
   let* env = get_env in
   let* sigma = get_sigma in
   (* *)
-  if debug
+  if show_debug
   then (
     Feedback.msg_debug
       (str
@@ -823,9 +861,58 @@ let build_fsm
          (Printf.sprintf
             "(e) Graph Edges: %s.\n"
             (G.pstr_lts_transitions ~long:() graph_lts.transitions))));
-  (* lts to fsm *)
-  let* the_fsm, translation = G.lts_to_fsm graph_lts tref in
-  if debug
+  return raw_lts
+;;
+
+(**  *)
+let build_fsm_from_lts
+  ?(show_details : bool = true)
+  ?(show_debug : bool = false)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
+  : fsm mm
+  =
+  let* raw_lts = check_ref_lts iref in
+  let* graphM = make_graph_builder in
+  let module G = (val graphM) in
+  let* graph_lts = G.build_graph ~show_debug raw_lts tref in
+  (* *)
+  let* env = get_env in
+  let* sigma = get_sigma in
+  (* *)
+  if show_debug
+  then (
+    Feedback.msg_debug
+      (str
+         (Printf.sprintf
+            "(a) Types of terms: %s.\n"
+            (econstr_to_string raw_lts.trm_type)));
+    Feedback.msg_debug
+      (str
+         (Printf.sprintf
+            "(b) Types of labels: %s.\n"
+            (econstr_to_string raw_lts.lbl_type)));
+    Feedback.msg_debug
+      (str "(c) Constructors: "
+       ++ Pp.prvect_with_sep
+            (fun _ -> str ", ")
+            Names.Id.print
+            raw_lts.coq_ctor_names);
+    (* prints all transitions -- the possible constructors.
+       a term may take as part of its structure.
+       these are dependant on the definition of a type. *)
+    Feedback.msg_debug
+      (str "(d) Transitions: "
+       ++ pp_transitions env sigma raw_lts.constructor_transitions
+       ++ strbrk "\n");
+    Feedback.msg_debug
+      (str
+         (Printf.sprintf
+            "(e) Graph Edges: %s.\n"
+            (G.pstr_lts_transitions ~long:() graph_lts.transitions))));
+  (* *)
+  let* the_fsm, translation = G.lts_to_fsm ~show_debug graph_lts tref in
+  if show_debug
   then (
     Feedback.msg_debug
       (str
@@ -837,7 +924,17 @@ let build_fsm
          (Printf.sprintf
             "(g, with details) Fsm: %s.\n"
             (pstr ~options:(Debug ()) (pp_wrap_as_supported (Fsm the_fsm))))));
-  Feedback.msg_debug (str "\n= = = = = (end of bounded_lts) = = = = = =\n");
+  (*  *)
+  Feedback.msg_info
+    (str
+       (Printf.sprintf
+          "generated fsm: %s.\n"
+          (pstr
+             ~options:(pstr_options show_details)
+             (pp_wrap_as_supported (Fsm the_fsm)))));
+  (*  *)
+  if show_debug
+  then Feedback.msg_debug (str "\n= = = = = (end of build_fsm) = = = = = =\n");
   return the_fsm
 ;;
 
@@ -864,21 +961,41 @@ let build_fsm
     - Constructors of [P] are the transitions
     - States are the sets of possible transitions
     - A term [t] is represented by the state of the transitions that can be taken *)
-let bounded_lts
-      ?(debug : bool = true)
-      (iref : Names.GlobRef.t)
-      (tref : Constrexpr.constr_expr_r CAst.t)
+let cmd_bounded_lts
+  ?(show_details : bool = true)
+  ?(show_debug : bool = false)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
-  let* _ = build_fsm ~debug iref tref in
+  let* _ = build_lts ~show_details ~show_debug iref tref in
   return ()
 ;;
 
-(* *)
-let fsm_bisim_ks90 ?(debug : bool = true) (s : fsm) (t : fsm) : unit mm =
+let cmd_bounded_lts_to_fsm
+  ?(show_details : bool = true)
+  ?(show_debug : bool = false)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
+  : unit mm
+  =
+  let* _ = build_fsm_from_lts ~show_details ~show_debug iref tref in
+  return ()
+;;
+
+(*  *)
+let cmd_bisim_ks90_using_fsm
+  ?(show_details : bool = true)
+  ?(show_debug : bool = false)
+  (s : fsm)
+  (t : fsm)
+  : unit mm
+  =
   let open Bisimilarity in
   (* *)
-  let result = RCP.KS90.run ~show:false ~debug s t in
+  let result =
+    RCP.KS90.run ~show:false ~details:show_details ~debug:show_debug s t
+  in
   match result with
   | { are_bisimilar; bisimilar_states; non_bisimilar_states; _ } ->
     Feedback.msg_info
@@ -891,33 +1008,34 @@ let fsm_bisim_ks90 ?(debug : bool = true) (s : fsm) (t : fsm) : unit mm =
              and t = %s.\n"
             are_bisimilar
             (pstr
-               ~options:(pstr_options debug)
+               ~options:(pstr_options show_details)
                ~tabs:1
                (pp_wrap_as_supported (Partition bisimilar_states)))
             (pstr
-               ~options:(pstr_options debug)
+               ~options:(pstr_options show_details)
                ~tabs:1
                (pp_wrap_as_supported (Partition non_bisimilar_states)))
             (pstr
-               ~options:(pstr_options debug)
+               ~options:(pstr_options show_details)
                ~tabs:1
                (pp_wrap_as_supported (Fsm s)))
             (pstr
-               ~options:(pstr_options debug)
+               ~options:(pstr_options show_details)
                ~tabs:1
                (pp_wrap_as_supported (Fsm t)))));
     return ()
 ;;
 
 (* *)
-let lts_bisim_ks90
-      ?(debug : bool = true)
-      ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-      ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+let cmd_bisim_ks90_using_lts_to_fsm
+  ?(show_details : bool = true)
+  ?(show_debug : bool = false)
+  ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
-  let* (s : fsm) = build_fsm ~debug s_iref s_tref in
-  let* (t : fsm) = build_fsm ~debug t_iref t_tref in
-  (* *)
-  fsm_bisim_ks90 s t
+  let* (s : fsm) = build_fsm_from_lts ~show_details ~show_debug s_iref s_tref in
+  let* (t : fsm) = build_fsm_from_lts ~show_details ~show_debug t_iref t_tref in
+  (*  *)
+  cmd_bisim_ks90_using_fsm ~show_details ~show_debug s t
 ;;
