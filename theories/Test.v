@@ -153,48 +153,55 @@ Module BisimTest1.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
-  (* FIXME: currently working on solution where in the below,
-            because the terms are IDENTICAL, when they are
-            merged, the algorithm is unable to correctly check
-            if each of the states in each fsm are bisimilar. *)
-
-  (* TODO: current plan is to add annotations to the states so
-           that we can determine where they originated from
-           originally. However, this created a new problem which
-           I am now trying to debug.    -- jonah *)
-
-  (* should be true? *)
+  (* true *)
   MeBi Bisim KS90
     termLTS (tact TheAction1 tend)
     termLTS (tact TheAction1 tend).
 
-  (* should be true? *)
+  MeBi FSM Merge
+    termLTS (tact TheAction1 tend)
+    termLTS (tact TheAction1 tend).
+
+  (* true *)
   MeBi Bisim KS90
     termLTS (tact TheAction2 tend)
     termLTS (tact TheAction2 tend).
 
-  (* ! should NOT be true *)
+  (* ! false *)
   MeBi Bisim KS90
     termLTS (tact TheAction1 tend)
     termLTS (tact TheAction2 tend).
 
-  (* should be true? *)
+  MeBi FSM Merge
+    termLTS (tact TheAction1 tend)
+    termLTS (tact TheAction2 tend).
+
+  (* true *)
   MeBi Bisim KS90
     termLTS (tact TheAction1 (tact TheAction2 tend))
     termLTS (tact TheAction1 (tact TheAction2 tend)).
 
-  (* should be true? *)
+  (* true *)
   MeBi Bisim KS90
     termLTS (tpar TheAction1 TheAction2 tend)
     termLTS (tpar TheAction1 TheAction2 tend).
 
-  (* ... this one maybe should be true.. ? *)
+  (* ? should be true *)
   MeBi Bisim KS90
     termLTS (tfix (tact TheAction1 (tact TheAction2 trec)))
     termLTS (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
 
-  (* ... ? *)
+  (* FIXME: looks like merge can't deal with recursion. *)
+  MeBi FSM Merge
+    termLTS (tfix (tact TheAction1 (tact TheAction2 trec)))
+    termLTS (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
+
+  (* ! false *)
   MeBi Bisim KS90
+    termLTS (tpar TheAction1 TheAction2 tend)
+    termLTS (tact TheAction1 (tact TheAction2 tend)).
+
+  MeBi FSM Merge
     termLTS (tpar TheAction1 TheAction2 tend)
     termLTS (tact TheAction1 (tact TheAction2 tend)).
 
