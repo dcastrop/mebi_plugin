@@ -11,6 +11,7 @@ module RCP : sig
 
     val reachable_partitions
       :  ?show:bool
+      -> ?details:bool
       -> ?debug:bool
       -> Fsm.States.t Fsm.Actions.t
       -> Fsm.Partition.t
@@ -18,6 +19,7 @@ module RCP : sig
 
     val split
       :  ?show:bool
+      -> ?details:bool
       -> ?debug:bool
       -> Fsm.States.t
       -> Fsm.action
@@ -25,7 +27,13 @@ module RCP : sig
       -> Fsm.States.t Fsm.Actions.t Fsm.Edges.t
       -> Fsm.States.t * Fsm.States.t
 
-    val run : ?show:bool -> ?debug:bool -> Fsm.fsm -> Fsm.fsm -> bisim_result
+    val run
+      :  ?show:bool
+      -> ?details:bool
+      -> ?debug:bool
+      -> Fsm.fsm
+      -> Fsm.fsm
+      -> bisim_result
   end
 
   module PT87 : sig end

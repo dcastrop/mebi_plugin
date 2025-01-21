@@ -23,6 +23,7 @@ module RCP = struct
     (** [] *)
     let reachable_partitions
       ?(show : bool = false)
+      ?(details : bool = true)
       ?(debug : bool = false)
       (edges : States.t Actions.t)
       (pi : Partition.t)
@@ -42,7 +43,7 @@ module RCP = struct
            \  destinations: %s.\n\
             /\\/\\/\\/\\/\\/\\/\\/\\/\\\n\n"
            (pstr
-              ~options:(pstr_options debug)
+              ~options:(pstr_options details)
               (pp_wrap_as_supported (States destinations))));
       Partition.filter
         (fun (block : Block.t) ->
@@ -55,6 +56,7 @@ module RCP = struct
         @raise EmptyBlock if [block] is empty. *)
     let split
       ?(show : bool = false)
+      ?(details : bool = true)
       ?(debug : bool = false)
       (block : Block.t)
       (a : action)
@@ -64,7 +66,7 @@ module RCP = struct
       =
       (* *)
       print
-        ~show:false
+        ~show:(show && debug)
         (Printf.sprintf
            "/\\/\\/\\ KS90.split /\\/\\/\\\n\n\
            \  action: %s.\n\
@@ -73,18 +75,18 @@ module RCP = struct
            \  pi: %s.\n\n\
             /\\/\\/\\/\\/\\/\\/\\/\\/\\\n\n"
            (pstr
-              ~options:(pstr_options debug)
+              ~options:(pstr_options details)
               (pp_wrap_as_supported (Action a)))
            (pstr
-              ~options:(pstr_options debug)
+              ~options:(pstr_options details)
               ~tabs:2
               (pp_wrap_as_supported (Edges edges)))
            (pstr
-              ~options:(pstr_options debug)
+              ~options:(pstr_options details)
               ~tabs:2
               (pp_wrap_as_supported (Block block)))
            (pstr
-              ~options:(pstr_options debug)
+              ~options:(pstr_options details)
               ~tabs:2
               (pp_wrap_as_supported (Partition pi))));
       (* *)
@@ -94,7 +96,7 @@ module RCP = struct
       | (s : state) :: _block' ->
         let s_edges = get_outgoing_actions edges s a in
         let s_reachable_partitions =
-          reachable_partitions ~show ~debug s_edges pi
+          reachable_partitions ~show ~details ~debug s_edges pi
         in
         (* *)
         List.fold_left
@@ -106,7 +108,7 @@ module RCP = struct
             | true, true ->
               (* both [s] and [t] have action [a] *)
               let t_reachable_partitions =
-                reachable_partitions ~show ~debug t_edges pi
+                reachable_partitions ~show ~details ~debug t_edges pi
               in
               let p_inter =
                 Partition.inter s_reachable_partitions t_reachable_partitions
@@ -131,7 +133,12 @@ module RCP = struct
           determines whether [Pp.Feedback.msg_info] or [Printf.printf] is used for output.
         @param s is an [fsm] to check.
         @param t is an [fsm] to check. *)
-    let run ?(show : bool = false) ?(debug : bool = true) (s : fsm) (t : fsm)
+    let run
+      ?(show : bool = false)
+      ?(details : bool = true)
+      ?(debug : bool = false)
+      (s : fsm)
+      (t : fsm)
       : bisim_result
       =
       (* *)
@@ -161,14 +168,14 @@ module RCP = struct
                        \  pi: %s.\n\n\
                         - - - - - - - - -\n\n"
                        (pstr
-                          ~options:(pstr_options debug)
+                          ~options:(pstr_options details)
                           (pp_wrap_as_supported (Action a)))
                        (pstr
-                          ~options:(pstr_options debug)
+                          ~options:(pstr_options details)
                           ~tabs:1
                           (pp_wrap_as_supported (Block _b)))
                        (pstr
-                          ~options:(pstr_options debug)
+                          ~options:(pstr_options details)
                           ~tabs:1
                           (pp_wrap_as_supported (Partition !pi))));
                   (* *)
@@ -201,7 +208,9 @@ module RCP = struct
                       ~show:false
                       (Printf.sprintf
                          "split returned empty b2.\nb1: %s.\n\n"
-                         (pstr (pp_wrap_as_supported (Block b1))));
+                         (pstr
+                            ~options:(pstr_options details)
+                            (pp_wrap_as_supported (Block b1))));
                     ()
                   | _, _ ->
                     (* split did occur, so replace [b] with [b1] and [b2] and refine *)
@@ -210,8 +219,12 @@ module RCP = struct
                       ~show:false
                       (Printf.sprintf
                          "split returned two blocks.\nb1: %s.\nb2: %s.\n\n"
-                         (pstr (pp_wrap_as_supported (Block b1)))
-                         (pstr (pp_wrap_as_supported (Block b2))));
+                         (pstr
+                            ~options:(pstr_options details)
+                            (pp_wrap_as_supported (Block b1)))
+                         (pstr
+                            ~options:(pstr_options details)
+                            (pp_wrap_as_supported (Block b2))));
                     pi := Partition.remove !b !pi;
                     pi := Partition.union !pi (Partition.of_list [ b1; b2 ]);
                     changed := true;
@@ -233,18 +246,18 @@ module RCP = struct
                     "%s  original:%s -> merged:%s\n"
                     acc
                     (pstr
-                       ~options:(pstr_options debug)
+                       ~options:(pstr_options details)
                        (pp_wrap_as_supported (State state)))
                     (pstr
-                       ~options:(pstr_options debug)
+                       ~options:(pstr_options details)
                        (pp_wrap_as_supported (State state'))))
                 map_of_states
                 "\n")
              (pstr
-                ~options:(pstr_options debug)
+                ~options:(pstr_options details)
                 (pp_wrap_as_supported (States s.states)))
              (pstr
-                ~options:(pstr_options debug)
+                ~options:(pstr_options details)
                 (pp_wrap_as_supported (States t.states))));
         (* split [!pi] based on whether if states are bisimilar or not *)
         let (bisimilar_states, non_bisimilar_states) : Partition.t * Partition.t
@@ -275,20 +288,20 @@ module RCP = struct
                                (Printf.sprintf
                                   "%s -> %s originates from s ?= %b."
                                   (pstr
-                                     ~options:(pstr_options debug)
+                                     ~options:(pstr_options details)
                                      (pp_wrap_as_supported (State state)))
                                   (pstr
-                                     ~options:(pstr_options debug)
+                                     ~options:(pstr_options details)
                                      (pp_wrap_as_supported
                                         (State original_state)))
                                   (States.mem original_state s.states))
                                (Printf.sprintf
                                   "%s -> %s originates from t ?= %b."
                                   (pstr
-                                     ~options:(pstr_options debug)
+                                     ~options:(pstr_options details)
                                      (pp_wrap_as_supported (State state')))
                                   (pstr
-                                     ~options:(pstr_options debug)
+                                     ~options:(pstr_options details)
                                      (pp_wrap_as_supported
                                         (State original_state)))
                                   (States.mem original_state t.states)));
@@ -308,7 +321,7 @@ module RCP = struct
                     block: %s.\n"
                    block_contains_states_from_both
                    (pstr
-                      ~options:(if debug then Debug () else Default ())
+                      ~options:(pstr_options details)
                       (pp_wrap_as_supported (Block block))));
               (* block is bisimilar if it contains states from both fsms. *)
               match block_contains_states_from_both with

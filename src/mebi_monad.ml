@@ -123,9 +123,11 @@ let sandbox (m : 'a t) (st : coq_context ref) : 'a in_context =
   { state = st; value = res.value }
 ;;
 
-let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit t =
+let debug ?(show_debug : bool = true) (f : Environ.env -> Evd.evar_map -> Pp.t)
+  : unit t
+  =
   state (fun env sigma ->
-    Feedback.msg_debug (f env sigma);
+    if show_debug then Feedback.msg_debug (f env sigma);
     sigma, ())
 ;;
 

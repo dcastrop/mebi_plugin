@@ -30,7 +30,7 @@ val sandbox : 'a t -> 'a t
 (********************************************)
 val make_constr_tbl : (module Hashtbl.S with type key = EConstr.t) t
 val make_constr_set : (module Set.S with type elt = EConstr.t) t
-val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit t
+val debug : ?show_debug:bool -> (Environ.env -> Evd.evar_map -> Pp.t) -> unit t
 
 module type Monad = sig
   val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
