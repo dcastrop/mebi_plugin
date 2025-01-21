@@ -160,10 +160,8 @@ Module BisimTest1.
 
   (* TODO: current plan is to add annotations to the states so
            that we can determine where they originated from
-           originally. However, this created a new problem with
-           the edge labels, since these are pretty-printed
-           strings using the original terms and therefore,
-            *)
+           originally. However, this created a new problem which
+           I am now trying to debug.    -- jonah *)
 
   (* should be true? *)
   MeBi Bisim KS90
