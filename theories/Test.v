@@ -153,6 +153,33 @@ Module BisimTest1.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
+  (* FIXME: currently working on solution where in the below,
+            because the terms are IDENTICAL, when they are
+            merged, the algorithm is unable to correctly check
+            if each of the states in each fsm are bisimilar. *)
+
+  (* TODO: current plan is to add annotations to the states so
+           that we can determine where they originated from
+           originally. However, this created a new problem with
+           the edge labels, since these are pretty-printed
+           strings using the original terms and therefore,
+            *)
+
+  (* should be true? *)
+  MeBi Bisim KS90
+    termLTS (tact TheAction1 tend)
+    termLTS (tact TheAction1 tend).
+
+  (* should be true? *)
+  MeBi Bisim KS90
+    termLTS (tact TheAction2 tend)
+    termLTS (tact TheAction2 tend).
+
+  (* ! should NOT be true *)
+  MeBi Bisim KS90
+    termLTS (tact TheAction1 tend)
+    termLTS (tact TheAction2 tend).
+
   (* should be true? *)
   MeBi Bisim KS90
     termLTS (tact TheAction1 (tact TheAction2 tend))
