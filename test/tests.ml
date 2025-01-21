@@ -27,7 +27,7 @@ let rec ks90_exas
             name
             (pstr ~options:(pstr_options details) (Fsm t)));
        (* run algorithm *)
-       let result = RCP.KS90.run ~show s t in
+       let result = RCP.KS90.run ~show ~details ~debug s t in
        (match result with
         | { are_bisimilar; bisimilar_states; non_bisimilar_states; _ } ->
           (* print out results *)

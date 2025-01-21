@@ -85,7 +85,7 @@ module RCP = struct
         : unit
         =
         print
-          ~show
+          ~show:(show && debug)
           (Printf.sprintf
              "- - - next iteration - - -\n\n\
              \  action: %s.\n\
