@@ -26,8 +26,8 @@ let make_state ?(pp : string option) (id : int) =
 module States = Set.Make (struct
     type t = state
 
-    (* let compare a b = compare a.id b.id *)
-    let compare a b = compare a.pp b.pp
+    let compare a b = compare a.id b.id
+    (* let compare a b = compare a.pp b.pp *)
   end)
 
 (*************************************************)
