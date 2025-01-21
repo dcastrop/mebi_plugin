@@ -306,7 +306,9 @@ module RCP = struct
                           (Actions.of_seq (List.to_seq [ a, destinations ])))
                     edges;
                   (* *)
-                  let b1, b2 = split ~show ~debug !b a !pi edges_of_a in
+                  let b1, b2 =
+                    split ~show ~details ~debug !b a !pi edges_of_a
+                  in
                   match Block.is_empty b1, Block.is_empty b2 with
                   | true, true ->
                     (* both are empty, this is not supposed to happen *)
