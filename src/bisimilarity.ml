@@ -196,12 +196,16 @@ module RCP = struct
           States.empty
       in
       (*  *)
-      DebugMessages.reachable_partitions ~show ~details ~debug destinations;
-      (*  *)
-      Partition.filter
-        (fun (block : Block.t) ->
-          Bool.not (Block.is_empty (Block.inter block destinations)))
-        pi
+      match States.is_empty destinations with
+      | true -> Partition.empty
+      | false ->
+        (*  *)
+        DebugMessages.reachable_partitions ~show ~details ~debug destinations;
+        (*  *)
+        Partition.filter
+          (fun (block : Block.t) ->
+            Bool.not (Block.is_empty (Block.inter block destinations)))
+          pi
     ;;
 
     (** []
@@ -274,7 +278,7 @@ module RCP = struct
       (* *)
       print ~show:(show && debug) "\n\n=/=/=/= KS90.run =/=/=/=\n\n";
       (* get initial partition [pi] by merging states from [s] and [t] into single set. *)
-      let merged_fsm, _map_of_alphabet, map_of_states = Fsm.merge_fsm s t in
+      let merged_fsm, map_of_states = merge_fsm s t in
       match merged_fsm with
       | { alphabet; states; edges; _ } ->
         (* working partition is initially all the states *)
