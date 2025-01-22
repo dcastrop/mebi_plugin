@@ -53,6 +53,10 @@ make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make
 _build/default/test/tests.exe
 ```
 
+### To build and run together:
+```shell
+make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile; _build/default/test/tests.exe
+```
 
 ## Setup
 *using `coq 8.20.0`*
