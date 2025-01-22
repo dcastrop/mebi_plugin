@@ -13,9 +13,11 @@ let pstr_results
   =
   Printf.sprintf
     "\n\n\
-     = = = Test.ml Results = = =\n\n\
-     %s\n\n\
-     = = = (end of Test.ml Results) = = =\n\n"
+     = = = Test.ml Results = = = = = = = =\n\n\
+     %s\n\
+     - - - - - - - - - - - - - - - - - - -\n\n\
+     Passed all tests: %b.\n\n\
+     = = = = = = = = = = = = = = = = = = =\n\n"
     (List.fold_left
        (fun (acc : string)
          ((suite_name, suite_results) : string * (string * bool * bool) list) ->
@@ -35,6 +37,14 @@ let pstr_results
                "\n  EXPECT | ACTUAL | EXAMPLE\n  ---------------------------\n"
                suite_results))
        "\n"
+       results)
+    (List.for_all
+       (fun ((_suite_name, suite_results) :
+              string * (string * bool * bool) list) ->
+          List.for_all
+            (fun ((_name, expected_result, actual_result) :
+                   string * bool * bool) -> expected_result == actual_result)
+            suite_results)
        results)
 ;;
 
@@ -56,7 +66,11 @@ let rec ks90_exas
        print
          ~show
          (Printf.sprintf
-            "\n= = = = = = = = = =\nRCP.KS90 (%s)\n\n%s.s: %s.\n\n%s.t: %s.\n\n"
+            "\n\
+             = = = = = = = = = = = = = = = = = = =\n\
+             RCP.KS90 (%s)\n\n\
+             %s.s: %s.\n\n\
+             %s.t: %s.\n\n"
             name
             name
             (pstr ~options:(pstr_options details) (Fsm s))
@@ -73,7 +87,7 @@ let rec ks90_exas
                "[KS90] (%s) Results: (s ~ t) = %b.\n\n\
                 Bisimilar states: %s.\n\n\
                 Non-bisimilar states: %s.\n\n\
-                = = = = = = = = = =\n\n"
+                = = = = = = = = = = = = = = = = = = =\n\n"
                name
                are_bisimilar
                (pstr
