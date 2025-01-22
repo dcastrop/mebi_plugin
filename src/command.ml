@@ -229,7 +229,6 @@ let sandboxed_unify
       (u : (int tree * unif_problem) list)
   : (EConstr.t * int tree list) option mm
   =
-  (* : (EConstr.t * int tree list) option mm *)
   let* _ =
     debug ~show_debug (fun env sigma ->
       str "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term)

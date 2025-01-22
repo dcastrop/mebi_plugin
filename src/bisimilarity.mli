@@ -10,7 +10,7 @@ module RCP : sig
     exception PartitionsNotDisjoint of Fsm.Partition.t
 
     module DebugMessages : sig
-      val reachable_partitions
+      val reachable_blocks
         :  ?show:bool
         -> ?details:bool
         -> ?debug:bool
@@ -25,6 +25,13 @@ module RCP : sig
         -> Fsm.action
         -> Fsm.Partition.t
         -> Fsm.States.t Fsm.Actions.t Fsm.Edges.t
+        -> unit
+
+      val run_merged
+        :  ?show:bool
+        -> ?details:bool
+        -> ?debug:bool
+        -> Fsm.fsm
         -> unit
 
       val run_iter
@@ -58,7 +65,7 @@ module RCP : sig
         -> unit
     end
 
-    val reachable_partitions
+    val reachable_blocks
       :  ?show:bool
       -> ?details:bool
       -> ?debug:bool
@@ -75,6 +82,24 @@ module RCP : sig
       -> Fsm.Partition.t
       -> Fsm.States.t Fsm.Actions.t Fsm.Edges.t
       -> Fsm.States.t * Fsm.States.t
+
+    val main_loop
+      :  ?show:bool
+      -> ?details:bool
+      -> ?debug:bool
+      -> Fsm.Alphabet.t * Fsm.States.t Fsm.Actions.t Fsm.Edges.t
+      -> Fsm.Partition.t ref
+      -> bool ref
+      -> unit
+
+    val split_bisimilar
+      :  ?show:bool
+      -> ?details:bool
+      -> ?debug:bool
+      -> Fsm.States.t * Fsm.States.t
+      -> (Fsm.state, Fsm.state) Hashtbl.t
+      -> Fsm.Partition.t
+      -> Fsm.Partition.t * Fsm.Partition.t
 
     val run
       :  ?show:bool

@@ -54,18 +54,11 @@ module States : sig
   val of_seq : elt Seq.t -> t
 end
 
-exception StateNotFoundInMergedStates of (state * States.t)
-
-val map_merge_states
-  :  States.t
-  -> States.t
-  -> States.t * (state, state) Hashtbl.t
-
 module Block = States
 
 module Partition : sig
   type elt = Block.t
-  type t = Set.Make(Block).t
+  type t = Set.Make(States).t
 
   val empty : t
   val add : elt -> t -> t
@@ -168,13 +161,6 @@ module Alphabet : sig
   val of_seq : elt Seq.t -> t
 end
 
-exception ActionNotFoundInMergedAlphabet of (action * Alphabet.t)
-
-val map_merge_alphabet
-  :  Alphabet.t
-  -> Alphabet.t
-  -> Alphabet.t * (action, action) Hashtbl.t
-
 module Actions : sig
   type key = action
   type !'a t
@@ -249,12 +235,6 @@ val make_fsm
   -> States.t Actions.t Edges.t
   -> fsm
 
-exception AlphabetContainsDuplicateLabels of Alphabet.t
-exception StateNotFoundInMapOfStates of (state * (state, state) Hashtbl.t)
-exception ActionNotFoundInMapOfAlphabet of (action * (action, action) Hashtbl.t)
-
-val merge_fsm : fsm -> fsm -> fsm * (state, state) Hashtbl.t
-
 type pp_axiom =
   | State of state
   | Action of action
@@ -319,9 +299,9 @@ val get_state_by_id : States.t -> int -> state
 exception StateNotFoundWithName of (string * States.t)
 exception MultipleStatesFoundWithName of (string * States.t)
 
-val get_state_by_name : States.t -> string -> state
-val get_action_alphabet_from_actions : States.t Actions.t -> Alphabet.t
-val get_action_alphabet_from_edges : States.t Actions.t Edges.t -> Alphabet.t
+val _get_state_by_name : States.t -> string -> state
+val _get_action_alphabet_from_actions : States.t Actions.t -> Alphabet.t
+val _get_action_alphabet_from_edges : States.t Actions.t Edges.t -> Alphabet.t
 
 exception ActionNotFoundWithID of (int * Alphabet.t)
 exception MultipleActionsFoundWithID of (int * Alphabet.t)
@@ -333,24 +313,45 @@ exception MultipleActionsFoundWithLabel of (string * Alphabet.t)
 
 val get_action_by_label : Alphabet.t -> string -> action
 
-val get_outgoing_actions
-  :  States.t Actions.t Edges.t
-  -> state
-  -> action
-  -> States.t Actions.t
+val get_edges_of
+  :  action
+  -> States.t Actions.t Edges.t
+  -> States.t Actions.t Edges.t
 
-val get_outgoing_actions_by_id
-  :  States.t Actions.t Edges.t
-  -> state
-  -> int
-  -> States.t Actions.t
+val get_actions_from : state -> States.t Actions.t Edges.t -> States.t Actions.t
 
-val get_outgoing_actions_by_label
-  :  States.t Actions.t Edges.t
-  -> state
-  -> string
-  -> States.t Actions.t
+type has_destinations =
+  | Actions of Block.t Actions.t
+  | Edges of Block.t Actions.t Edges.t
+
+val get_all_destinations : has_destinations -> States.t
 
 exception ReverseStateHashtblLookupFailed of ((state, state) Hashtbl.t * state)
 
 val get_reverse_map_state : (state, state) Hashtbl.t -> state -> state
+
+exception StateNotFoundInMergedStates of (state * States.t)
+
+val map_merge_states
+  :  States.t
+  -> States.t
+  -> States.t * (state, state) Hashtbl.t * (state, state) Hashtbl.t
+
+exception ActionNotFoundInMergedAlphabet of (action * Alphabet.t)
+
+val map_merge_alphabet
+  :  Alphabet.t
+  -> Alphabet.t
+  -> Alphabet.t * (action, action) Hashtbl.t
+
+exception StateNotFoundInMapOfStates of (state * (state, state) Hashtbl.t)
+exception ActionNotFoundInMapOfAlphabet of (action * (action, action) Hashtbl.t)
+
+val map_merge_edges
+  :  States.t Actions.t Edges.t
+  -> States.t Actions.t Edges.t
+  -> (action, action) Hashtbl.t
+  -> (state, state) Hashtbl.t
+  -> States.t Actions.t Edges.t
+
+val merge_fsm : fsm -> fsm -> fsm * (state, state) Hashtbl.t
