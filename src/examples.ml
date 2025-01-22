@@ -1,13 +1,17 @@
+(** [Examples] contains examples to be used by either [KS90] or [PT87]. *)
 open Fsm
 
-(** [Examples] contains examples to be used by either [KS90] or [PT87]. *)
+(** [example] is a type for denoting pairs of fsms that we check are bisimilar. *)
 type example =
   { name : string
   ; s : fsm
   ; t : fsm
+  ; are_bisimilar : bool
   }
 
-let exa (name : string) (s : fsm) (t : fsm) : example = { name; s; t }
+let exa (name : string) (s : fsm) (t : fsm) (are_bisimilar : bool) : example =
+  { name; s; t; are_bisimilar }
+;;
 
 (** [exa_1] is `Example 3.2.5` on page 106. *)
 let exa_1 : example =
@@ -82,7 +86,7 @@ let exa_1 : example =
             ]));
     { init; states; alphabet; edges }
   in
-  exa "exa1" s t
+  exa "exa1" s t true
 ;;
 
 (** [exa_2] is `Example 3.2.6` on page 107. *)
@@ -232,5 +236,5 @@ let exa_2 : example =
             ]));
     { init; states; alphabet; edges }
   in
-  exa "exa2" s t
+  exa "exa2" s t false
 ;;
