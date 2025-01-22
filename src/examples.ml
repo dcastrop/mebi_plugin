@@ -238,3 +238,122 @@ let exa_2 : example =
   in
   exa "exa2" s t false
 ;;
+
+(** [exa_mc] ...
+    I was wondering about how to encode mixed-states using either mixed-choice or silent transitions -- Jonah *)
+let exa_mc : example =
+  (* [s] has a mixed-choice *)
+  let s : fsm =
+    let init = { id = 0; pp = "s0" } in
+    let states =
+      States.of_list
+        [ { id = 0; pp = "s0" }
+        ; { id = 1; pp = "s1" }
+        ; { id = 2; pp = "s2" }
+        ; { id = 3; pp = "sEnd" }
+        ]
+    in
+    let alphabet =
+      Alphabet.of_list
+        [ { id = 0; label = "silent" }
+        ; { id = 1; label = "send" }
+        ; { id = 2; label = "recv" }
+        ]
+    in
+    let edges = Edges.create 4 in
+    (* s0 *)
+    Edges.add
+      edges
+      (get_state_by_id states 0)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "send"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ; ( get_action_by_label alphabet "recv"
+              , States.of_list [ get_state_by_id states 2 ] )
+            ; ( get_action_by_label alphabet "silent"
+              , States.of_list [ get_state_by_id states 0 ] )
+            ]));
+    (* s1 *)
+    Edges.add
+      edges
+      (get_state_by_id states 1)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "recv"
+              , States.of_list [ get_state_by_id states 3 ] )
+            ]));
+    (* s2 *)
+    Edges.add
+      edges
+      (get_state_by_id states 2)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "send"
+              , States.of_list [ get_state_by_id states 3 ] )
+            ]));
+    make_fsm init alphabet states edges
+  (* [t] has silent transitions *)
+  and t : fsm =
+    let init = { id = 0; pp = "t0" } in
+    let states =
+      States.of_list
+        [ { id = 0; pp = "t0" }
+        ; { id = 1; pp = "t1" }
+        ; { id = 2; pp = "t2" }
+        ; { id = 3; pp = "t3" }
+        ; { id = 4; pp = "tEnd" }
+        ]
+    in
+    let alphabet =
+      Alphabet.of_list
+        [ { id = 0; label = "silent" }
+        ; { id = 1; label = "send" }
+        ; { id = 2; label = "recv" }
+        ]
+    in
+    let edges = Edges.create 4 in
+    (* t0 *)
+    Edges.add
+      edges
+      (get_state_by_id states 0)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "send"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ; ( get_action_by_label alphabet "silent"
+              , States.of_list [ get_state_by_id states 2 ] )
+            ]));
+    (* t1 *)
+    Edges.add
+      edges
+      (get_state_by_id states 1)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "recv"
+              , States.of_list [ get_state_by_id states 4 ] )
+            ]));
+    (* t2 *)
+    Edges.add
+      edges
+      (get_state_by_id states 2)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "recv"
+              , States.of_list [ get_state_by_id states 3 ] )
+            ; ( get_action_by_label alphabet "silent"
+              , States.of_list [ get_state_by_id states 0 ] )
+            ]));
+    (* t3 *)
+    Edges.add
+      edges
+      (get_state_by_id states 3)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "send"
+              , States.of_list [ get_state_by_id states 4 ] )
+            ]));
+    make_fsm init alphabet states edges
+  in
+  exa "exa_mc" s t false
+;;

@@ -8,3 +8,4 @@ type example =
 val exa : string -> Fsm.fsm -> Fsm.fsm -> bool -> example
 val exa_1 : example
 val exa_2 : example
+val exa_mc : example
