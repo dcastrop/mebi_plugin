@@ -11,8 +11,8 @@ type state =
   }
 
 (** [make_state ?pp id] is a wrapper constructor for [state].
-    [?pp] is a pretty-printed respresentation, which defaults to [s{id}].
-    [id] is the unique identifier for the state. *)
+    @param ?pp is a pretty-printed respresentation, which defaults to [s{id}].
+    @param id is the unique identifier for the state. *)
 let make_state ?(pp : string option) (id : int) =
   { id
   ; pp =
@@ -57,8 +57,7 @@ type action =
 
 (** [make_action ?label id] is a wrapper constructor for [action].
     @param ?label is a pretty-printed representation, which defaults to [s{id}].
-    @param id is the unique identifier for the state.
-    @return an [action]. *)
+    @param id is the unique identifier for the state. *)
 let make_action ?(label : string option) (id : int) : action =
   { id
   ; label =
@@ -216,7 +215,7 @@ let pp_collection_is_empty (c : pp_collection) : bool =
      | Edges e -> Edges.length e == 0)
 ;;
 
-(** [] helper wrapper function for [pp_supported]. *)
+(** [pp_wrap_as_supported] is a helper wrapper function for [pp_supported]. *)
 let pp_wrap_as_supported (to_wrap : pp_wrappable) : pp_supported =
   match to_wrap with
   | State to_wrap -> Axiom (State to_wrap)
@@ -232,7 +231,11 @@ let pp_wrap_as_supported (to_wrap : pp_wrappable) : pp_supported =
   | Fsm to_wrap -> Fsm to_wrap
 ;;
 
-(** [pstr] *)
+(** [pstr] is a central function that handles the pretty-printing of all FSM types.
+    @return a pretty-printed string representation of an FSM type.
+    @param ?tabs is the amount of lhs tabs to include.
+    @param ?options denote the level of detail to be included in printed types.
+    @param to_str is the type to be pretty-printed. *)
 let rec pstr
           ?(tabs : int = 0)
           ?(options : pp_options = Default ())
@@ -460,7 +463,7 @@ let rec pstr
 exception StateNotFoundWithID of (int * States.t)
 exception MultipleStatesFoundWithID of (int * States.t)
 
-(** [] *)
+(** @see [get_action_by_id]. *)
 let get_state_by_id (states : States.t) (id : int) : state =
   let filtered = States.filter (fun (s : state) -> s.id == id) states in
   if States.is_empty filtered then raise (StateNotFoundWithID (id, states));
@@ -472,8 +475,8 @@ let get_state_by_id (states : States.t) (id : int) : state =
 exception StateNotFoundWithName of (string * States.t)
 exception MultipleStatesFoundWithName of (string * States.t)
 
-(** [] *)
-let get_state_by_name (states : States.t) (name : string) : state =
+(** @see [get_action_by_label]. *)
+let _get_state_by_name (states : States.t) (name : string) : state =
   let filtered = States.filter (fun (s : state) -> s.pp == name) states in
   if States.is_empty filtered then raise (StateNotFoundWithName (name, states));
   if States.cardinal filtered > 1
@@ -485,12 +488,13 @@ let get_state_by_name (states : States.t) (name : string) : state =
 (****** Alphabet ****************************)
 (********************************************)
 
-let get_action_alphabet_from_actions (actions : States.t Actions.t) : Alphabet.t
+let _get_action_alphabet_from_actions (actions : States.t Actions.t)
+  : Alphabet.t
   =
   Alphabet.of_list (List.of_seq (Actions.to_seq_keys actions))
 ;;
 
-let get_action_alphabet_from_edges (es : States.t Actions.t Edges.t)
+let _get_action_alphabet_from_edges (es : States.t Actions.t Edges.t)
   : Alphabet.t
   =
   Alphabet.of_list
@@ -517,7 +521,10 @@ let get_action_alphabet_from_edges (es : States.t Actions.t Edges.t)
 exception ActionNotFoundWithID of (int * Alphabet.t)
 exception MultipleActionsFoundWithID of (int * Alphabet.t)
 
-(** [] *)
+(** [get_action_by_id alphabet id] returns the action within [alphabet] with the matching [id].
+    @raise ActionNotFoundWithID if no action is found in [alphabet] matching [id].
+    @raise MultipleActionsFoundWithID if multiple actions are found in [alphabet] matching [id].
+    @see [get_action_by_label]. *)
 let get_action_by_id (alphabet : Alphabet.t) (id : int) : action =
   let filtered = Alphabet.filter (fun (a : action) -> a.id == id) alphabet in
   if Alphabet.is_empty filtered then raise (ActionNotFoundWithID (id, alphabet));
@@ -529,7 +536,10 @@ let get_action_by_id (alphabet : Alphabet.t) (id : int) : action =
 exception ActionNotFoundWithLabel of (string * Alphabet.t)
 exception MultipleActionsFoundWithLabel of (string * Alphabet.t)
 
-(** [] *)
+(** [get_action_by_label alphabet label] returns the action within [alphabet] with the matching [label].
+    @raise ActionNotFoundWithLabel if no action is found in [alphabet] matching [label].
+    @raise MultipleActionsFoundWithLabel if multiple actions are found in [alphabet] matching [label].
+    @see [get_action_by_id]. *)
 let get_action_by_label (alphabet : Alphabet.t) (label : string) : action =
   let filtered =
     Alphabet.filter (fun (a : action) -> a.label == label) alphabet
@@ -545,11 +555,28 @@ let get_action_by_label (alphabet : Alphabet.t) (label : string) : action =
 (****** Edges *******************************)
 (********************************************)
 
-(** [] *)
-let get_outgoing_actions
-      (edges : States.t Actions.t Edges.t)
-      (from : state)
-      (_a : action)
+(** [get_edges_of a edges] filters [edges] by action [a]. *)
+let get_edges_of (a : action) (edges : States.t Actions.t Edges.t)
+  : States.t Actions.t Edges.t
+  =
+  let edges_of = Edges.create 0 in
+  Edges.iter
+    (fun (from_state : state) (outgoing_edges : States.t Actions.t) : unit ->
+       match Actions.find_opt outgoing_edges a with
+       (* skip edge without action [a]. *)
+       | None -> ()
+       (* edge has an [a] aciton. *)
+       | Some destinations ->
+         Edges.add
+           edges_of
+           from_state
+           (Actions.of_seq (List.to_seq [ a, destinations ])))
+    edges;
+  edges_of
+;;
+
+(** [get_actions_from from edges] is a shorthand for [Edges.find_opt] and in the case of [None] returns an empty map of actions. *)
+let get_actions_from (from : state) (edges : States.t Actions.t Edges.t)
   : States.t Actions.t
   =
   match Edges.find_opt edges from with
@@ -557,30 +584,30 @@ let get_outgoing_actions
   | Some actions -> actions
 ;;
 
-(** [] *)
-let get_outgoing_actions_by_id
-      (edges : States.t Actions.t Edges.t)
-      (from : state)
-      (id : int)
-  : States.t Actions.t
-  =
-  get_outgoing_actions
-    edges
-    from
-    (get_action_by_id (get_action_alphabet_from_edges edges) id)
-;;
+(** [has_destinations] is a type denoting either maps of edges or actions, both of which have destination states. *)
+type has_destinations =
+  | Actions of States.t Actions.t
+  | Edges of States.t Actions.t Edges.t
 
-(** [] *)
-let get_outgoing_actions_by_label
-      (edges : States.t Actions.t Edges.t)
-      (from : state)
-      (label : string)
-  : States.t Actions.t
-  =
-  get_outgoing_actions
-    edges
-    from
-    (get_action_by_label (get_action_alphabet_from_edges edges) label)
+(** [get_all_destinations edgse] is the set of destination states at the end of each [edges].
+    @return the set of detination states of [edges].
+    @param edges is either a map of actions or edges. *)
+let rec get_all_destinations (edges : has_destinations) : States.t =
+  match edges with
+  | Actions es ->
+    Actions.fold
+      (fun (_a : action) (destinations : States.t) (acc : States.t) ->
+         States.union acc destinations)
+      es
+      States.empty
+  | Edges es ->
+    Edges.fold
+      (fun (_from_state : state)
+        (action : States.t Actions.t)
+        (acc : States.t) ->
+         States.union acc (get_all_destinations (Actions action)))
+      es
+      States.empty
 ;;
 
 (********************************************)
@@ -590,7 +617,9 @@ let get_outgoing_actions_by_label
 
 exception ReverseStateHashtblLookupFailed of ((state, state) Hashtbl.t * state)
 
-(** [get_reverse_map_state tbl v] gets the key corresponding to [v] of translation map [tbl]. *)
+(** [get_reverse_map_state tbl v] gets the key corresponding to [v] of translation map [tbl].
+    @return the key corresponding to value [v] in [tbl].
+    @raise ReverseStateHashtblLookupFailed if [v] is not a value in [tbl]. *)
 let get_reverse_map_state (tbl : (state, state) Hashtbl.t) (v : state) : state =
   match Utils.get_key_of_val tbl v with
   | None -> raise (ReverseStateHashtblLookupFailed (tbl, v))
@@ -603,19 +632,28 @@ let get_reverse_map_state (tbl : (state, state) Hashtbl.t) (v : state) : state =
 
 exception StateNotFoundInMergedStates of (state * States.t)
 
-(* *)
+(** [map_merge_states a b] merges sets of states in [a] and [b] by combining them and assigning them new [ids] where necessary.
+    Note: we do not use the [union] of the sets since this would cause states of one to be lost in the merger.
+    @return the merger of [a] and [b], along with a bidirectional mapping from original and merged states.
+    @param a is a set of states to be merged.
+    @param b is a set of states to be merged. *)
 let map_merge_states (a : States.t) (b : States.t)
-  : States.t * (state, state) Hashtbl.t
+  : States.t * (state, state) Hashtbl.t * (state, state) Hashtbl.t
   =
   let num_states : int = States.cardinal a + States.cardinal b in
-  let map_of_states : (state, state) Hashtbl.t = num_states |> Hashtbl.create in
+  let map_of_merged_states : (state, state) Hashtbl.t =
+    num_states |> Hashtbl.create
+  and map_of_original_states : (state, state) Hashtbl.t =
+    num_states |> Hashtbl.create
+  in
   (* let merged_states = States.union a b in *)
   let merge_states (states : States.t) (into : States.t) : States.t =
     States.fold
       (fun (s : state) (acc : States.t) ->
          let s' = make_state ~pp:s.pp (States.cardinal acc) in
          (* add to map *)
-         Hashtbl.add map_of_states s s';
+         Hashtbl.add map_of_merged_states s s';
+         Hashtbl.add map_of_original_states s' s;
          (* add to merged states *)
          States.add s' acc)
       states
@@ -625,12 +663,16 @@ let map_merge_states (a : States.t) (b : States.t)
   (* *)
   assert (States.cardinal merged_states == num_states);
   (* *)
-  merged_states, map_of_states
+  merged_states, map_of_merged_states, map_of_original_states
 ;;
 
 exception ActionNotFoundInMergedAlphabet of (action * Alphabet.t)
 
-(* *)
+(** [map_merge_alphabet a b] merges alphabets [a] and [b].
+    @return the union of [a] and [b], along with a mapping from the original to the merged actions.
+    @param a is an alphabet to merge.
+    @param b is an alphabet to merge.
+    @raise ActionNotFoundInMergedAlphabet if when creating the mapping between original and merged actions, a merged action cannot be found. *)
 let map_merge_alphabet (a : Alphabet.t) (b : Alphabet.t)
   : Alphabet.t * (action, action) Hashtbl.t
   =
@@ -656,65 +698,94 @@ let map_merge_alphabet (a : Alphabet.t) (b : Alphabet.t)
   merged_alphabet, map_of_alphabet
 ;;
 
-exception AlphabetContainsDuplicateLabels of Alphabet.t
 exception StateNotFoundInMapOfStates of (state * (state, state) Hashtbl.t)
 exception ActionNotFoundInMapOfAlphabet of (action * (action, action) Hashtbl.t)
 
-(** [merge_fsm s t] ... *)
+(** [map_merge_edges a b map_of_alphabet map_of_states] merges [a] and [b] and updates the relevant states and actions accordingly.
+    @return a merger of [a] and [b] with updated states and actions.
+    @param a is a map of edges to merge.
+    @param b is a map of edges to merge.
+    @param map_of_alphabet is a map from original actions to merged actions.
+    @param map_of_states is a map from original states to merged states.
+    @raise StateNotFoundInMapOfStates if when updating a state in an edge, it cannot be found in [map_of_states].
+    @raise ActionNotFoundInMapOfAlphabet if when updating a action in an edge, it cannot be found in [map_of_alphabet]. *)
+let map_merge_edges
+      (a : States.t Actions.t Edges.t)
+      (b : States.t Actions.t Edges.t)
+      (map_of_alphabet : (action, action) Hashtbl.t)
+      (map_of_states : (state, state) Hashtbl.t)
+  : States.t Actions.t Edges.t
+  =
+  let merged_edges = Edges.length a + Edges.length b |> Edges.create in
+  let add_to_merged_edges (edges : States.t Actions.t Edges.t) : unit =
+    Edges.iter
+      (fun (from_state : state) (outgoing_edges : States.t Actions.t) ->
+         (* need to update states in edge *)
+         Edges.add
+           merged_edges
+           (match Hashtbl.find_opt map_of_states from_state with
+            | None ->
+              raise (StateNotFoundInMapOfStates (from_state, map_of_states))
+            | Some from_state' -> from_state')
+           (Actions.of_seq
+              (List.to_seq
+                 (Actions.fold
+                    (fun (action : action)
+                      (destinations : States.t)
+                      (acc : (action * States.t) list) ->
+                       List.append
+                         acc
+                         [ (match Hashtbl.find_opt map_of_alphabet action with
+                            | None ->
+                              raise
+                                (ActionNotFoundInMapOfAlphabet
+                                   (action, map_of_alphabet))
+                            | Some new_action ->
+                              ( new_action
+                              , States.map
+                                  (fun (old_state : state) ->
+                                     match
+                                       Hashtbl.find_opt map_of_states old_state
+                                     with
+                                     | None ->
+                                       raise
+                                         (StateNotFoundInMapOfStates
+                                            (old_state, map_of_states))
+                                     | Some new_state -> new_state)
+                                  destinations ))
+                         ])
+                    outgoing_edges
+                    []))))
+      edges
+  in
+  add_to_merged_edges a;
+  add_to_merged_edges b;
+  (* return *)
+  merged_edges
+;;
+
+(** [merge_fsm s t] is the merger of two fsms [s] and [t].
+    Note: the states of each are disjointly unioned (by creating new states with new IDs).
+    @return the merged fsm and a hashtable mapping the new states to the original.
+    @param s is an fsm to merge.
+    @param t is an fsm to merge.
+    @raise StateNotFoundInMapOfStates if when updating the edges, the new state cannot be found (likely due to the sets of states not merging correctly). *)
 let merge_fsm (s : fsm) (t : fsm) : fsm * (state, state) Hashtbl.t =
   (* *)
   let merged_alphabet, map_of_alphabet =
     map_merge_alphabet s.alphabet t.alphabet
   in
-  (* *)
-  let merged_states, map_of_states = map_merge_states s.states t.states in
-  (* *)
-  let merged_edges = s.edges in
-  Edges.iter
-    (fun (from_state : state) (outgoing_edges : States.t Actions.t) ->
-       (* need to update states in edge *)
-       Edges.add
-         merged_edges
-         (match Hashtbl.find_opt map_of_states from_state with
-          | None ->
-            raise (StateNotFoundInMapOfStates (from_state, map_of_states))
-          | Some from_state' -> from_state')
-         (Actions.of_seq
-            (List.to_seq
-               (Actions.fold
-                  (fun (action : action)
-                    (destinations : States.t)
-                    (acc : (action * States.t) list) ->
-                     List.append
-                       acc
-                       [ (match Hashtbl.find_opt map_of_alphabet action with
-                          | None ->
-                            raise
-                              (ActionNotFoundInMapOfAlphabet
-                                 (action, map_of_alphabet))
-                          | Some new_action ->
-                            ( new_action
-                            , States.map
-                                (fun (old_state : state) ->
-                                   match
-                                     Hashtbl.find_opt map_of_states old_state
-                                   with
-                                   | None ->
-                                     raise
-                                       (StateNotFoundInMapOfStates
-                                          (old_state, map_of_states))
-                                   | Some new_state -> new_state)
-                                destinations ))
-                       ])
-                  outgoing_edges
-                  []))))
-    t.edges;
-  (* *)
+  let merged_states, map_of_merged_states, map_of_original_states =
+    map_merge_states s.states t.states
+  in
+  let merged_edges =
+    map_merge_edges s.edges t.edges map_of_alphabet map_of_merged_states
+  in
+  (* return a new fsm *)
   ( make_fsm
       (make_state ~pp:"<merged>" (-1))
       merged_alphabet
       merged_states
       merged_edges
-    (* , map_of_alphabet *)
-  , map_of_states )
+  , map_of_original_states )
 ;;
