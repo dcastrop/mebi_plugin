@@ -6,7 +6,7 @@ open Mebi_plugin.Examples
 (** [ks90_exas] ... *)
 let rec ks90_exas
   ?(show : bool = false)
-  ?(details : bool = false)
+  ?(details : bool = true)
   ?(debug : bool = false)
   (exas : example list)
   : unit
@@ -54,7 +54,7 @@ let rec ks90_exas
 
 let run_all_ks90
   ?(show : bool = false)
-  ?(details : bool = false)
+  ?(details : bool = true)
   ?(debug : bool = false)
   ()
   : unit
@@ -64,7 +64,7 @@ let run_all_ks90
 
 let run_all
   ?(show : bool = false)
-  ?(details : bool = false)
+  ?(details : bool = true)
   ?(debug : bool = false)
   ()
   : unit
