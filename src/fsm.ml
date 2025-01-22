@@ -30,47 +30,6 @@ module States = Set.Make (struct
     (* let compare a b = compare a.pp b.pp *)
   end)
 
-exception StateNotFoundInMergedStates of (state * States.t)
-
-(*  *)
-let map_merge_states (a : States.t) (b : States.t)
-  : States.t * (state, state) Hashtbl.t
-  =
-  let map_of_states : (state, state) Hashtbl.t =
-    States.cardinal a + States.cardinal b |> Hashtbl.create
-  in
-  (* let merged_states = States.union a b in *)
-  let merge_states (states : States.t) (into : States.t) : States.t =
-    States.fold
-      (fun (s : state) (acc : States.t) ->
-        let s' = make_state ~pp:s.pp (States.cardinal into) in
-        States.add s' acc)
-      states
-      into
-  in
-  let merged_states = merge_states b (merge_states a States.empty) in
-  (*  *)
-  let add_to_state_map (some_states : States.t) : unit =
-    States.iter
-      (fun (s : state) ->
-        Hashtbl.add
-          map_of_states
-          s
-          (match
-             States.find_first_opt
-               (fun (s' : state) -> s.pp == s'.pp)
-               merged_states
-           with
-           | None -> raise (StateNotFoundInMergedStates (s, some_states))
-           | Some s' -> s'))
-      some_states
-  in
-  add_to_state_map a;
-  add_to_state_map b;
-  (*  *)
-  merged_states, map_of_states
-;;
-
 (*************************************************)
 (****** Blocks & Partitions of States ************)
 (****** (Used by Bisimilarity algorithms.) *******)
@@ -115,34 +74,6 @@ module Alphabet = Set.Make (struct
 
     let compare a b = compare a.label b.label
   end)
-
-exception ActionNotFoundInMergedAlphabet of (action * Alphabet.t)
-
-(*  *)
-let map_merge_alphabet (a : Alphabet.t) (b : Alphabet.t)
-  : Alphabet.t * (action, action) Hashtbl.t
-  =
-  let map_of_alphabet : (action, action) Hashtbl.t =
-    Alphabet.cardinal a + Alphabet.cardinal b |> Hashtbl.create
-  in
-  let merged_alphabet = Alphabet.union a b in
-  let add_to_alphabet_map (some_alphabet : Alphabet.t) : unit =
-    Alphabet.iter
-      (fun (act : action) ->
-        Hashtbl.add
-          map_of_alphabet
-          act
-          (match Alphabet.find_opt act merged_alphabet with
-           | None ->
-             raise (ActionNotFoundInMergedAlphabet (act, merged_alphabet))
-           | Some act' -> act'))
-      some_alphabet
-  in
-  add_to_alphabet_map a;
-  add_to_alphabet_map b;
-  (*  *)
-  merged_alphabet, map_of_alphabet
-;;
 
 (*********************************************************************)
 (****** Actions & Edges ***********************************)
@@ -191,76 +122,13 @@ type fsm =
 
 (** [make_fsm init alphabet states edges] is a wrapper constructor for [fsm]. *)
 let make_fsm
-  (init : state)
-  (alphabet : Alphabet.t)
-  (states : States.t)
-  (edges : States.t Actions.t Edges.t)
+      (init : state)
+      (alphabet : Alphabet.t)
+      (states : States.t)
+      (edges : States.t Actions.t Edges.t)
   : fsm
   =
   { init; alphabet; states; edges }
-;;
-
-exception AlphabetContainsDuplicateLabels of Alphabet.t
-exception StateNotFoundInMapOfStates of (state * (state, state) Hashtbl.t)
-exception ActionNotFoundInMapOfAlphabet of (action * (action, action) Hashtbl.t)
-
-(** [merge_fsm s t] ... *)
-let merge_fsm (s : fsm) (t : fsm) : fsm * (state, state) Hashtbl.t =
-  (* *)
-  let merged_alphabet, map_of_alphabet =
-    map_merge_alphabet s.alphabet t.alphabet
-  in
-  (* *)
-  let merged_states, map_of_states = map_merge_states s.states t.states in
-  (* *)
-  let merged_edges = s.edges in
-  Edges.iter
-    (fun (from_state : state) (outgoing_edges : States.t Actions.t) ->
-      (* need to update states in edge *)
-      Edges.add
-        merged_edges
-        (match Hashtbl.find_opt map_of_states from_state with
-         | None ->
-           raise (StateNotFoundInMapOfStates (from_state, map_of_states))
-         | Some from_state' -> from_state')
-        (Actions.of_seq
-           (List.to_seq
-              (Actions.fold
-                 (fun (action : action)
-                   (destinations : States.t)
-                   (acc : (action * States.t) list) ->
-                   List.append
-                     acc
-                     [ (match Hashtbl.find_opt map_of_alphabet action with
-                        | None ->
-                          raise
-                            (ActionNotFoundInMapOfAlphabet
-                               (action, map_of_alphabet))
-                        | Some new_action ->
-                          ( new_action
-                          , States.map
-                              (fun (old_state : state) ->
-                                match
-                                  Hashtbl.find_opt map_of_states old_state
-                                with
-                                | None ->
-                                  raise
-                                    (StateNotFoundInMapOfStates
-                                       (old_state, map_of_states))
-                                | Some new_state -> new_state)
-                              destinations ))
-                     ])
-                 outgoing_edges
-                 []))))
-    t.edges;
-  (* *)
-  ( make_fsm
-      (make_state ~pp:"<merged>" (-1))
-      merged_alphabet
-      merged_states
-      merged_edges
-    (* , map_of_alphabet *)
-  , map_of_states )
 ;;
 
 (*********************************************************************)
@@ -366,9 +234,9 @@ let pp_wrap_as_supported (to_wrap : pp_wrappable) : pp_supported =
 
 (** [pstr] *)
 let rec pstr
-  ?(tabs : int = 0)
-  ?(options : pp_options = Default ())
-  (to_str : pp_supported)
+          ?(tabs : int = 0)
+          ?(options : pp_options = Default ())
+          (to_str : pp_supported)
   : string
   =
   let basedent = Utils.str_tabs (tabs - 1) in
@@ -431,52 +299,52 @@ let rec pstr
             | States to_str ->
               States.fold
                 (fun (s : state) (acc : string) ->
-                  Printf.sprintf
-                    "%s%s\n"
-                    acc
-                    (pstr
-                       ~tabs:(tabs + 1)
-                       ~options
-                       (pp_wrap_as_supported (State s))))
+                   Printf.sprintf
+                     "%s%s\n"
+                     acc
+                     (pstr
+                        ~tabs:(tabs + 1)
+                        ~options
+                        (pp_wrap_as_supported (State s))))
                 to_str
                 "\n"
             (* [Block] *)
             | Block to_str ->
               Block.fold
                 (fun (s : state) (acc : string) ->
-                  Printf.sprintf
-                    "%s%s\n"
-                    acc
-                    (pstr
-                       ~tabs:(tabs + 1)
-                       ~options
-                       (pp_wrap_as_supported (State s))))
+                   Printf.sprintf
+                     "%s%s\n"
+                     acc
+                     (pstr
+                        ~tabs:(tabs + 1)
+                        ~options
+                        (pp_wrap_as_supported (State s))))
                 to_str
                 "\n"
             (* [Alphabet] *)
             | Alphabet to_str ->
               Alphabet.fold
                 (fun (a : action) (acc : string) ->
-                  Printf.sprintf
-                    "%s%s\n"
-                    acc
-                    (pstr
-                       ~tabs:(tabs + 1)
-                       ~options
-                       (pp_wrap_as_supported (Action a))))
+                   Printf.sprintf
+                     "%s%s\n"
+                     acc
+                     (pstr
+                        ~tabs:(tabs + 1)
+                        ~options
+                        (pp_wrap_as_supported (Action a))))
                 to_str
                 "\n"
             (* [Partition] *)
             | Partition to_str ->
               Partition.fold
                 (fun (b : Block.t) (acc : string) ->
-                  Printf.sprintf
-                    "%s%s\n"
-                    acc
-                    (pstr
-                       ~tabs:(tabs + 1)
-                       ~options
-                       (pp_wrap_as_supported (Block b))))
+                   Printf.sprintf
+                     "%s%s\n"
+                     acc
+                     (pstr
+                        ~tabs:(tabs + 1)
+                        ~options
+                        (pp_wrap_as_supported (Block b))))
                 to_str
                 "\n")
            basedent
@@ -493,22 +361,22 @@ let rec pstr
             | Actions to_str ->
               Actions.fold
                 (fun (a : action) (destinations : States.t) (acc : string) ->
-                  (* for each destination *)
-                  Printf.sprintf
-                    "%s%s"
-                    acc
-                    (States.fold
-                       (fun (destination : state) (acc' : string) ->
-                         Printf.sprintf
-                           "%s%s%s"
-                           acc'
-                           indent
-                           (pstr
-                              ~options
-                              (pp_wrap_as_supported
-                                 (OutgoingEdge (a, destination)))))
-                       destinations
-                       ""))
+                   (* for each destination *)
+                   Printf.sprintf
+                     "%s%s"
+                     acc
+                     (States.fold
+                        (fun (destination : state) (acc' : string) ->
+                           Printf.sprintf
+                             "%s%s%s"
+                             acc'
+                             indent
+                             (pstr
+                                ~options
+                                (pp_wrap_as_supported
+                                   (OutgoingEdge (a, destination)))))
+                        destinations
+                        ""))
                 to_str
                 "\n"
             (* [Edges] *)
@@ -516,32 +384,32 @@ let rec pstr
               (* order by starting state *)
               States.fold
                 (fun (from : state) (acc : string) ->
-                  let outgoing_actions = Edges.find to_str from in
-                  Printf.sprintf
-                    "%s%s"
-                    acc
-                    (* order by action ids *)
-                    (Alphabet.fold
-                       (fun (a : action) (acc' : string) ->
-                         Printf.sprintf
-                           "%s%s"
-                           acc'
-                           (* order by destination state *)
-                           (States.fold
-                              (fun (destination : state) (acc'' : string) ->
-                                Printf.sprintf
-                                  "%s%s%s\n"
-                                  acc''
-                                  indent
-                                  (pstr
-                                     ~options
-                                     (pp_wrap_as_supported
-                                        (Edge (from, a, destination)))))
-                              (Actions.find outgoing_actions a)
-                              ""))
-                       (* get alphabet from actions *)
-                       (Alphabet.of_seq (Actions.to_seq_keys outgoing_actions))
-                       ""))
+                   let outgoing_actions = Edges.find to_str from in
+                   Printf.sprintf
+                     "%s%s"
+                     acc
+                     (* order by action ids *)
+                     (Alphabet.fold
+                        (fun (a : action) (acc' : string) ->
+                           Printf.sprintf
+                             "%s%s"
+                             acc'
+                             (* order by destination state *)
+                             (States.fold
+                                (fun (destination : state) (acc'' : string) ->
+                                   Printf.sprintf
+                                     "%s%s%s\n"
+                                     acc''
+                                     indent
+                                     (pstr
+                                        ~options
+                                        (pp_wrap_as_supported
+                                           (Edge (from, a, destination)))))
+                                (Actions.find outgoing_actions a)
+                                ""))
+                        (* get alphabet from actions *)
+                        (Alphabet.of_seq (Actions.to_seq_keys outgoing_actions))
+                        ""))
                 (* get states from edges *)
                 (States.of_seq (Edges.to_seq_keys to_str))
                 "\n")
@@ -630,14 +498,14 @@ let get_action_alphabet_from_edges (es : States.t Actions.t Edges.t)
        (fun (_from_state : state)
          (actions : States.t Actions.t)
          (acc : action list) ->
-         List.append
-           acc
-           (Actions.fold
-              (fun (action : action)
-                (_destinations : States.t)
-                (acc' : action list) -> List.append acc' [ action ])
-              actions
-              []))
+          List.append
+            acc
+            (Actions.fold
+               (fun (action : action)
+                 (_destinations : States.t)
+                 (acc' : action list) -> List.append acc' [ action ])
+               actions
+               []))
        es
        [])
 ;;
@@ -679,9 +547,9 @@ let get_action_by_label (alphabet : Alphabet.t) (label : string) : action =
 
 (** [] *)
 let get_outgoing_actions
-  (edges : States.t Actions.t Edges.t)
-  (from : state)
-  (_a : action)
+      (edges : States.t Actions.t Edges.t)
+      (from : state)
+      (_a : action)
   : States.t Actions.t
   =
   match Edges.find_opt edges from with
@@ -691,9 +559,9 @@ let get_outgoing_actions
 
 (** [] *)
 let get_outgoing_actions_by_id
-  (edges : States.t Actions.t Edges.t)
-  (from : state)
-  (id : int)
+      (edges : States.t Actions.t Edges.t)
+      (from : state)
+      (id : int)
   : States.t Actions.t
   =
   get_outgoing_actions
@@ -704,9 +572,9 @@ let get_outgoing_actions_by_id
 
 (** [] *)
 let get_outgoing_actions_by_label
-  (edges : States.t Actions.t Edges.t)
-  (from : state)
-  (label : string)
+      (edges : States.t Actions.t Edges.t)
+      (from : state)
+      (label : string)
   : States.t Actions.t
   =
   get_outgoing_actions
@@ -727,4 +595,126 @@ let get_reverse_map_state (tbl : (state, state) Hashtbl.t) (v : state) : state =
   match Utils.get_key_of_val tbl v with
   | None -> raise (ReverseStateHashtblLookupFailed (tbl, v))
   | Some key -> key
+;;
+
+(********************************************)
+(****** Merging *****************************)
+(********************************************)
+
+exception StateNotFoundInMergedStates of (state * States.t)
+
+(* *)
+let map_merge_states (a : States.t) (b : States.t)
+  : States.t * (state, state) Hashtbl.t
+  =
+  let num_states : int = States.cardinal a + States.cardinal b in
+  let map_of_states : (state, state) Hashtbl.t = num_states |> Hashtbl.create in
+  (* let merged_states = States.union a b in *)
+  let merge_states (states : States.t) (into : States.t) : States.t =
+    States.fold
+      (fun (s : state) (acc : States.t) ->
+         let s' = make_state ~pp:s.pp (States.cardinal acc) in
+         (* add to map *)
+         Hashtbl.add map_of_states s s';
+         (* add to merged states *)
+         States.add s' acc)
+      states
+      into
+  in
+  let merged_states = merge_states b (merge_states a States.empty) in
+  (* *)
+  assert (States.cardinal merged_states == num_states);
+  (* *)
+  merged_states, map_of_states
+;;
+
+exception ActionNotFoundInMergedAlphabet of (action * Alphabet.t)
+
+(* *)
+let map_merge_alphabet (a : Alphabet.t) (b : Alphabet.t)
+  : Alphabet.t * (action, action) Hashtbl.t
+  =
+  let map_of_alphabet : (action, action) Hashtbl.t =
+    Alphabet.cardinal a + Alphabet.cardinal b |> Hashtbl.create
+  in
+  let merged_alphabet = Alphabet.union a b in
+  let add_to_alphabet_map (some_alphabet : Alphabet.t) : unit =
+    Alphabet.iter
+      (fun (act : action) ->
+         Hashtbl.add
+           map_of_alphabet
+           act
+           (match Alphabet.find_opt act merged_alphabet with
+            | None ->
+              raise (ActionNotFoundInMergedAlphabet (act, merged_alphabet))
+            | Some act' -> act'))
+      some_alphabet
+  in
+  add_to_alphabet_map a;
+  add_to_alphabet_map b;
+  (* *)
+  merged_alphabet, map_of_alphabet
+;;
+
+exception AlphabetContainsDuplicateLabels of Alphabet.t
+exception StateNotFoundInMapOfStates of (state * (state, state) Hashtbl.t)
+exception ActionNotFoundInMapOfAlphabet of (action * (action, action) Hashtbl.t)
+
+(** [merge_fsm s t] ... *)
+let merge_fsm (s : fsm) (t : fsm) : fsm * (state, state) Hashtbl.t =
+  (* *)
+  let merged_alphabet, map_of_alphabet =
+    map_merge_alphabet s.alphabet t.alphabet
+  in
+  (* *)
+  let merged_states, map_of_states = map_merge_states s.states t.states in
+  (* *)
+  let merged_edges = s.edges in
+  Edges.iter
+    (fun (from_state : state) (outgoing_edges : States.t Actions.t) ->
+       (* need to update states in edge *)
+       Edges.add
+         merged_edges
+         (match Hashtbl.find_opt map_of_states from_state with
+          | None ->
+            raise (StateNotFoundInMapOfStates (from_state, map_of_states))
+          | Some from_state' -> from_state')
+         (Actions.of_seq
+            (List.to_seq
+               (Actions.fold
+                  (fun (action : action)
+                    (destinations : States.t)
+                    (acc : (action * States.t) list) ->
+                     List.append
+                       acc
+                       [ (match Hashtbl.find_opt map_of_alphabet action with
+                          | None ->
+                            raise
+                              (ActionNotFoundInMapOfAlphabet
+                                 (action, map_of_alphabet))
+                          | Some new_action ->
+                            ( new_action
+                            , States.map
+                                (fun (old_state : state) ->
+                                   match
+                                     Hashtbl.find_opt map_of_states old_state
+                                   with
+                                   | None ->
+                                     raise
+                                       (StateNotFoundInMapOfStates
+                                          (old_state, map_of_states))
+                                   | Some new_state -> new_state)
+                                destinations ))
+                       ])
+                  outgoing_edges
+                  []))))
+    t.edges;
+  (* *)
+  ( make_fsm
+      (make_state ~pp:"<merged>" (-1))
+      merged_alphabet
+      merged_states
+      merged_edges
+    (* , map_of_alphabet *)
+  , map_of_states )
 ;;
