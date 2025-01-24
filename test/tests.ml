@@ -5,10 +5,10 @@ open Mebi_plugin.Examples
 
 (**  *)
 let pstr_results
-      ?(show : bool = false)
-      ?(details : bool = true)
-      ?(debug : bool = false)
-      (results : (string * (string * bool * bool) list) list)
+  ?(show : bool = false)
+  ?(details : bool = true)
+  ?(debug : bool = false)
+  (results : (string * (string * bool * bool) list) list)
   : string
   =
   Printf.sprintf
@@ -21,39 +21,39 @@ let pstr_results
     (List.fold_left
        (fun (acc : string)
          ((suite_name, suite_results) : string * (string * bool * bool) list) ->
-          Printf.sprintf
-            "%s(=>) %s: [%s].\n\n"
-            acc
-            suite_name
-            (List.fold_left
-               (fun (acc' : string)
-                 ((name, expected_result, actual_result) : string * bool * bool) ->
-                  Printf.sprintf
-                    "%s  %s  | %s  | %s\n"
-                    acc'
-                    (if expected_result then "true " else "false")
-                    (if actual_result then "true " else "false")
-                    name)
-               "\n  EXPECT | ACTUAL | EXAMPLE\n  ---------------------------\n"
-               suite_results))
+         Printf.sprintf
+           "%s(=>) %s: [%s].\n\n"
+           acc
+           suite_name
+           (List.fold_left
+              (fun (acc' : string)
+                ((name, expected_result, actual_result) : string * bool * bool) ->
+                Printf.sprintf
+                  "%s  %s  | %s  | %s\n"
+                  acc'
+                  (if expected_result then "true " else "false")
+                  (if actual_result then "true " else "false")
+                  name)
+              "\n  EXPECT | ACTUAL | EXAMPLE\n  ---------------------------\n"
+              suite_results))
        "\n"
        results)
     (List.for_all
        (fun ((_suite_name, suite_results) :
               string * (string * bool * bool) list) ->
-          List.for_all
-            (fun ((_name, expected_result, actual_result) :
-                   string * bool * bool) -> expected_result == actual_result)
-            suite_results)
+         List.for_all
+           (fun ((_name, expected_result, actual_result) : string * bool * bool) ->
+             expected_result == actual_result)
+           suite_results)
        results)
 ;;
 
 (** [ks90_exas] ... *)
 let rec ks90_exas
-          ?(show : bool = false)
-          ?(details : bool = true)
-          ?(debug : bool = false)
-          (exas : example list)
+  ?(show : bool = false)
+  ?(details : bool = true)
+  ?(debug : bool = false)
+  (exas : example list)
   : (string * bool * bool) list
   =
   match exas with
@@ -103,20 +103,30 @@ let rec ks90_exas
 ;;
 
 let run_all_ks90
-      ?(show : bool = false)
-      ?(details : bool = true)
-      ?(debug : bool = false)
-      ()
+  ?(show : bool = false)
+  ?(details : bool = true)
+  ?(debug : bool = false)
+  ()
   : (string * bool * bool) list
   =
-  ks90_exas ~show ~details ~debug [ exa_1; exa_2 ]
+  ks90_exas
+    ~show
+    ~details
+    ~debug
+    [ exa_1
+    ; exa_2
+    ; exa_rec1_nondet
+    ; exa_rec1_nondet_inf
+    ; exa_rec1_det
+    ; exa_rec1_det_inf
+    ]
 ;;
 
 let run_all
-      ?(show : bool = false)
-      ?(details : bool = true)
-      ?(debug : bool = false)
-      ()
+  ?(show : bool = false)
+  ?(details : bool = true)
+  ?(debug : bool = false)
+  ()
   : unit
   =
   print ~show "\nRunning Tests.ml:\n\n";

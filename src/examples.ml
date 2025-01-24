@@ -357,3 +357,311 @@ let exa_mc : example =
   in
   exa "exa_mc" s t false
 ;;
+
+(** [exa_rec1_nondet] ... *)
+let exa_rec1_nondet : example =
+  (* s *)
+  let (s : fsm) =
+    let init = { id = 0; pp = "s0" } in
+    let states =
+      States.of_list
+        [ { id = 0; pp = "s0" }; { id = 1; pp = "s1" }; { id = 2; pp = "s2" } ]
+    in
+    let alphabet = Alphabet.of_list [ { id = 1; label = "a" } ] in
+    let edges = Edges.create 2 in
+    (* s0 *)
+    Edges.add
+      edges
+      (get_state_by_id states 0)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ]));
+    (* s1 *)
+    Edges.add
+      edges
+      (get_state_by_id states 1)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list
+                  [ get_state_by_id states 1; get_state_by_id states 2 ] )
+            ]));
+    { init; states; alphabet; edges }
+  in
+  (* t *)
+  let (t : fsm) =
+    let init = { id = 0; pp = "t0" } in
+    let states =
+      States.of_list
+        [ { id = 0; pp = "t0" }; { id = 1; pp = "t1" }; { id = 2; pp = "t2" } ]
+    in
+    let alphabet = Alphabet.of_list [ { id = 1; label = "a" } ] in
+    let edges = Edges.create 2 in
+    (* t0 *)
+    Edges.add
+      edges
+      (get_state_by_id states 0)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ]));
+    (* t1 *)
+    Edges.add
+      edges
+      (get_state_by_id states 1)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list
+                  [ get_state_by_id states 1; get_state_by_id states 2 ] )
+            ]));
+    { init; states; alphabet; edges }
+  in
+  exa "exa_rec1_nondet" s t true
+;;
+
+(** [exa_rec1_nondet_inf] ... *)
+let exa_rec1_nondet_inf : example =
+  (* s *)
+  let (s : fsm) =
+    let init = { id = 0; pp = "s0" } in
+    let states =
+      States.of_list
+        [ { id = 0; pp = "s0" }; { id = 1; pp = "s1" }; { id = 2; pp = "s2" } ]
+    in
+    let alphabet = Alphabet.of_list [ { id = 1; label = "a" } ] in
+    let edges = Edges.create 3 in
+    (* s0 *)
+    Edges.add
+      edges
+      (get_state_by_id states 0)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ]));
+    (* s1 *)
+    Edges.add
+      edges
+      (get_state_by_id states 1)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list
+                  [ get_state_by_id states 1; get_state_by_id states 2 ] )
+            ]));
+    (* s2 *)
+    Edges.add
+      edges
+      (get_state_by_id states 2)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 0 ] )
+            ]));
+    { init; states; alphabet; edges }
+  in
+  (* t *)
+  let (t : fsm) =
+    let init = { id = 0; pp = "t0" } in
+    let states =
+      States.of_list
+        [ { id = 0; pp = "t0" }; { id = 1; pp = "t1" }; { id = 2; pp = "t2" } ]
+    in
+    let alphabet = Alphabet.of_list [ { id = 1; label = "a" } ] in
+    let edges = Edges.create 3 in
+    (* t0 *)
+    Edges.add
+      edges
+      (get_state_by_id states 0)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ]));
+    (* t1 *)
+    Edges.add
+      edges
+      (get_state_by_id states 1)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list
+                  [ get_state_by_id states 1; get_state_by_id states 2 ] )
+            ]));
+    (* t2 *)
+    Edges.add
+      edges
+      (get_state_by_id states 2)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 0 ] )
+            ]));
+    { init; states; alphabet; edges }
+  in
+  exa "exa_rec1_nondet_inf" s t true
+;;
+
+(** [exa_rec1_det] ... *)
+let exa_rec1_det : example =
+  (* s *)
+  let (s : fsm) =
+    let init = { id = 0; pp = "s0" } in
+    let states =
+      States.of_list
+        [ { id = 0; pp = "s0" }; { id = 1; pp = "s1" }; { id = 2; pp = "s2" } ]
+    in
+    let alphabet =
+      Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
+    in
+    let edges = Edges.create 2 in
+    (* s0 *)
+    Edges.add
+      edges
+      (get_state_by_id states 0)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ]));
+    (* s1 *)
+    Edges.add
+      edges
+      (get_state_by_id states 1)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ; ( get_action_by_label alphabet "b"
+              , States.of_list [ get_state_by_id states 2 ] )
+            ]));
+    { init; states; alphabet; edges }
+  in
+  (* t *)
+  let (t : fsm) =
+    let init = { id = 0; pp = "t0" } in
+    let states =
+      States.of_list
+        [ { id = 0; pp = "t0" }; { id = 1; pp = "t1" }; { id = 2; pp = "t2" } ]
+    in
+    let alphabet =
+      Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
+    in
+    let edges = Edges.create 2 in
+    (* t0 *)
+    Edges.add
+      edges
+      (get_state_by_id states 0)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ]));
+    (* t1 *)
+    Edges.add
+      edges
+      (get_state_by_id states 1)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ; ( get_action_by_label alphabet "b"
+              , States.of_list [ get_state_by_id states 2 ] )
+            ]));
+    { init; states; alphabet; edges }
+  in
+  exa "exa_rec1_det" s t true
+;;
+
+(** [exa_rec1_det_inf] ... *)
+let exa_rec1_det_inf : example =
+  (* s *)
+  let (s : fsm) =
+    let init = { id = 0; pp = "s0" } in
+    let states =
+      States.of_list
+        [ { id = 0; pp = "s0" }; { id = 1; pp = "s1" }; { id = 2; pp = "s2" } ]
+    in
+    let alphabet =
+      Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
+    in
+    let edges = Edges.create 3 in
+    (* s0 *)
+    Edges.add
+      edges
+      (get_state_by_id states 0)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ]));
+    (* s1 *)
+    Edges.add
+      edges
+      (get_state_by_id states 1)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ; ( get_action_by_label alphabet "b"
+              , States.of_list [ get_state_by_id states 2 ] )
+            ]));
+    (* s2 *)
+    Edges.add
+      edges
+      (get_state_by_id states 2)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 2 ] )
+            ]));
+    { init; states; alphabet; edges }
+  in
+  (* t *)
+  let (t : fsm) =
+    let init = { id = 0; pp = "t0" } in
+    let states =
+      States.of_list
+        [ { id = 0; pp = "t0" }; { id = 1; pp = "t1" }; { id = 2; pp = "t2" } ]
+    in
+    let alphabet =
+      Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
+    in
+    let edges = Edges.create 3 in
+    (* t0 *)
+    Edges.add
+      edges
+      (get_state_by_id states 0)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ]));
+    (* t1 *)
+    Edges.add
+      edges
+      (get_state_by_id states 1)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 1 ] )
+            ; ( get_action_by_label alphabet "b"
+              , States.of_list [ get_state_by_id states 2 ] )
+            ]));
+    (* t2 *)
+    Edges.add
+      edges
+      (get_state_by_id states 2)
+      (Actions.of_seq
+         (List.to_seq
+            [ ( get_action_by_label alphabet "a"
+              , States.of_list [ get_state_by_id states 2 ] )
+            ]));
+    { init; states; alphabet; edges }
+  in
+  exa "exa_rec1_det_inf" s t true
+;;
