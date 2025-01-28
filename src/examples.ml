@@ -17,74 +17,15 @@ let exa (name : string) (s : fsm) (t : fsm) (are_bisimilar : bool) : example =
 let exa_1 : example =
   (* s *)
   let (s : fsm) =
-    let init = { id = 0; pp = "s0" } in
-    let states =
-      States.of_list
-        [ { id = 0; pp = "s0" }; { id = 1; pp = "s1" }; { id = 2; pp = "s2" } ]
-    in
-    let alphabet =
-      Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
-    in
-    let edges = Edges.create 4 in
-    (* s0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list
-                  [ get_state_by_id states 1; get_state_by_id states 2 ] )
-            ]));
-    (* s1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "b"
-              , States.of_list [ get_state_by_id states 2 ] )
-            ]));
-    (* s2 *)
-    Edges.add
-      edges
-      (get_state_by_id states 2)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "b"
-              , States.of_list [ get_state_by_id states 2 ] )
-            ]));
-    { init; states; alphabet; edges }
-  in
-  (* t *)
-  let (t : fsm) =
-    let init = { id = 0; pp = "t0" } in
-    let states =
-      States.of_list [ { id = 0; pp = "t0" }; { id = 1; pp = "t1" } ]
-    in
-    let alphabet =
-      Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
-    in
-    let edges = Edges.create 4 in
-    (* t0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ]));
-    (* t1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "b"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ]));
-    { init; states; alphabet; edges }
+    make_fsm_from_lts
+      "s0"
+      [ "s0", [ "a", [ "s1"; "s2" ] ]
+      ; "s1", [ "b", [ "s2" ] ]
+      ; "s2", [ "b", [ "s2" ] ]
+      ]
+  and (* t *)
+    (t : fsm) =
+    make_fsm_from_lts "t0" [ "t0", [ "a", [ "t1" ] ]; "t1", [ "b", [ "t1" ] ] ]
   in
   exa "exa1" s t true
 ;;
@@ -93,148 +34,25 @@ let exa_1 : example =
 let exa_2 : example =
   (* s *)
   let (s : fsm) =
-    let init = { id = 0; pp = "s0" } in
-    let states =
-      States.of_list
-        [ { id = 0; pp = "s0" }
-        ; { id = 1; pp = "s1" }
-        ; { id = 2; pp = "s2" }
-        ; { id = 3; pp = "s3" }
-        ; { id = 4; pp = "s4" }
-        ]
-    in
-    let alphabet =
-      Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
-    in
-    let edges = Edges.create 4 in
-    (* s0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list
-                  [ get_state_by_id states 1; get_state_by_id states 2 ] )
-            ]));
-    (* s1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 3 ] )
-            ; ( get_action_by_label alphabet "b"
-              , States.of_list [ get_state_by_id states 4 ] )
-            ]));
-    (* s2 *)
-    Edges.add
-      edges
-      (get_state_by_id states 2)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 4 ] )
-            ]));
-    (* s3 *)
-    Edges.add
-      edges
-      (get_state_by_id states 3)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 0 ] )
-            ]));
-    (* s4 *)
-    Edges.add
-      edges
-      (get_state_by_id states 4)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 0 ] )
-            ]));
-    { init; states; alphabet; edges }
-  in
-  (* t *)
-  let (t : fsm) =
-    let init = { id = 0; pp = "t0" } in
-    let states =
-      States.of_list
-        [ { id = 0; pp = "t0" }
-        ; { id = 1; pp = "t1" }
-        ; { id = 2; pp = "t2" }
-        ; { id = 3; pp = "t3" }
-        ; { id = 4; pp = "t4" }
-        ; { id = 5; pp = "t5" }
-        ]
-    in
-    let alphabet =
-      Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
-    in
-    let edges = Edges.create 4 in
-    (* t0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list
-                  [ get_state_by_id states 1; get_state_by_id states 3 ] )
-            ]));
-    (* t1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "b"
-              , States.of_list [ get_state_by_id states 2 ] )
-            ; ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 5 ] )
-            ; ( get_action_by_label alphabet "b"
-              , States.of_list [ get_state_by_id states 5 ] )
-            ]));
-    (* t2 *)
-    Edges.add
-      edges
-      (get_state_by_id states 2)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 0 ] )
-            ]));
-    (* t3 *)
-    Edges.add
-      edges
-      (get_state_by_id states 3)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 4 ] )
-            ]));
-    (* t4 *)
-    Edges.add
-      edges
-      (get_state_by_id states 4)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 0 ] )
-            ]));
-    (* t5 *)
-    Edges.add
-      edges
-      (get_state_by_id states 5)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list
-                  [ get_state_by_id states 0; get_state_by_id states 4 ] )
-            ]));
-    { init; states; alphabet; edges }
+    make_fsm_from_lts
+      "s0"
+      [ "s0", [ "a", [ "s1"; "s2" ] ]
+      ; "s1", [ "a", [ "s3" ]; "b", [ "s4" ] ]
+      ; "s2", [ "a", [ "s4" ] ]
+      ; "s3", [ "a", [ "s0" ] ]
+      ; "s4", [ "a", [ "s0" ] ]
+      ]
+  and (* t *)
+    (t : fsm) =
+    make_fsm_from_lts
+      "t0"
+      [ "t0", [ "a", [ "t1"; "t2" ] ]
+      ; "t1", [ "a", [ "t5" ]; "b", [ "t4"; "t5" ] ]
+      ; "t2", [ "a", [ "t0" ] ]
+      ; "t3", [ "a", [ "t4" ] ]
+      ; "t4", [ "a", [ "t0" ] ]
+      ; "t5", [ "a", [ "t0"; "t4" ] ]
+      ]
   in
   exa "exa2" s t false
 ;;
@@ -243,425 +61,154 @@ let exa_2 : example =
     I was wondering about how to encode mixed-states using either mixed-choice or silent transitions -- Jonah *)
 let exa_mc : example =
   (* [s] has a mixed-choice *)
-  let s : fsm =
-    let init = { id = 0; pp = "s0" } in
-    let states =
-      States.of_list
-        [ { id = 0; pp = "s0" }
-        ; { id = 1; pp = "s1" }
-        ; { id = 2; pp = "s2" }
-        ; { id = 3; pp = "sEnd" }
-        ]
-    in
-    let alphabet =
-      Alphabet.of_list
-        [ { id = 0; label = "silent" }
-        ; { id = 1; label = "send" }
-        ; { id = 2; label = "recv" }
-        ]
-    in
-    let edges = Edges.create 4 in
-    (* s0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "send"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ; ( get_action_by_label alphabet "recv"
-              , States.of_list [ get_state_by_id states 2 ] )
-            ; ( get_action_by_label alphabet "silent"
-              , States.of_list [ get_state_by_id states 0 ] )
-            ]));
-    (* s1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "recv"
-              , States.of_list [ get_state_by_id states 3 ] )
-            ]));
-    (* s2 *)
-    Edges.add
-      edges
-      (get_state_by_id states 2)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "send"
-              , States.of_list [ get_state_by_id states 3 ] )
-            ]));
-    make_fsm init alphabet states edges
-  (* [t] has silent transitions *)
-  and t : fsm =
-    let init = { id = 0; pp = "t0" } in
-    let states =
-      States.of_list
-        [ { id = 0; pp = "t0" }
-        ; { id = 1; pp = "t1" }
-        ; { id = 2; pp = "t2" }
-        ; { id = 3; pp = "t3" }
-        ; { id = 4; pp = "tEnd" }
-        ]
-    in
-    let alphabet =
-      Alphabet.of_list
-        [ { id = 0; label = "silent" }
-        ; { id = 1; label = "send" }
-        ; { id = 2; label = "recv" }
-        ]
-    in
-    let edges = Edges.create 4 in
-    (* t0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "send"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ; ( get_action_by_label alphabet "silent"
-              , States.of_list [ get_state_by_id states 2 ] )
-            ]));
-    (* t1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "recv"
-              , States.of_list [ get_state_by_id states 4 ] )
-            ]));
-    (* t2 *)
-    Edges.add
-      edges
-      (get_state_by_id states 2)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "recv"
-              , States.of_list [ get_state_by_id states 3 ] )
-            ; ( get_action_by_label alphabet "silent"
-              , States.of_list [ get_state_by_id states 0 ] )
-            ]));
-    (* t3 *)
-    Edges.add
-      edges
-      (get_state_by_id states 3)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "send"
-              , States.of_list [ get_state_by_id states 4 ] )
-            ]));
-    make_fsm init alphabet states edges
+  let (s : fsm) =
+    make_fsm_from_lts
+      "s0"
+      [ "s0", [ "send", [ "s1" ]; "recv", [ "s2" ]; "silent", [ "s0" ] ]
+      ; "s1", [ "recv", [ "s3" ] ]
+      ; "s2", [ "send", [ "s3" ] ]
+      ]
+  and (* [t] has silent transitions *)
+    (t : fsm) =
+    make_fsm_from_lts
+      "t0"
+      [ "t0", [ "send", [ "t1" ]; "silent", [ "t2" ] ]
+      ; "t1", [ "recv", [ "t4" ] ]
+      ; "t2", [ "recv", [ "t3" ]; "silent", [ "t0" ] ]
+      ; "t3", [ "send", [ "t4" ] ]
+      ]
   in
   exa "exa_mc" s t false
 ;;
 
-(** [exa_rec1_nondet] ... *)
-let exa_rec1_nondet : example =
+(** [exa_self_rec_nondet] ... *)
+let exa_self_rec_nondet : example =
   (* s *)
   let (s : fsm) =
-    let init = { id = 0; pp = "s0" } in
-    let states =
-      States.of_list
-        [ { id = 0; pp = "s0" }; { id = 1; pp = "s1" }; { id = 2; pp = "s2" } ]
-    in
-    let alphabet = Alphabet.of_list [ { id = 1; label = "a" } ] in
-    let edges = Edges.create 2 in
-    (* s0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ]));
-    (* s1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list
-                  [ get_state_by_id states 1; get_state_by_id states 2 ] )
-            ]));
-    { init; states; alphabet; edges }
+    make_fsm_from_lts
+      "s0"
+      [ "s0", [ "a", [ "s1" ] ]; "s1", [ "a", [ "s1"; "s2" ] ] ]
+  and (* t *)
+    (t : fsm) =
+    make_fsm_from_lts
+      "t0"
+      [ "t0", [ "a", [ "t1" ] ]; "t1", [ "a", [ "t1"; "t2" ] ] ]
   in
-  (* t *)
-  let (t : fsm) =
-    let init = { id = 0; pp = "t0" } in
-    let states =
-      States.of_list
-        [ { id = 0; pp = "t0" }; { id = 1; pp = "t1" }; { id = 2; pp = "t2" } ]
-    in
-    let alphabet = Alphabet.of_list [ { id = 1; label = "a" } ] in
-    let edges = Edges.create 2 in
-    (* t0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ]));
-    (* t1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list
-                  [ get_state_by_id states 1; get_state_by_id states 2 ] )
-            ]));
-    { init; states; alphabet; edges }
-  in
-  exa "exa_rec1_nondet" s t true
+  exa "exa_self_rec_nondet" s t true
 ;;
 
-(** [exa_rec1_nondet_inf] ... *)
-let exa_rec1_nondet_inf : example =
+(** [exa_self_rec_nondet_inf] ... *)
+let exa_self_rec_nondet_inf : example =
   (* s *)
   let (s : fsm) =
-    let init = { id = 0; pp = "s0" } in
-    let states =
-      States.of_list
-        [ { id = 0; pp = "s0" }; { id = 1; pp = "s1" }; { id = 2; pp = "s2" } ]
-    in
-    let alphabet = Alphabet.of_list [ { id = 1; label = "a" } ] in
-    let edges = Edges.create 3 in
-    (* s0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ]));
-    (* s1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list
-                  [ get_state_by_id states 1; get_state_by_id states 2 ] )
-            ]));
-    (* s2 *)
-    Edges.add
-      edges
-      (get_state_by_id states 2)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 0 ] )
-            ]));
-    { init; states; alphabet; edges }
+    make_fsm_from_lts
+      "s0"
+      [ "s0", [ "a", [ "s1" ] ]
+      ; "s1", [ "a", [ "s1"; "s2" ] ]
+      ; "s2", [ "a", [ "s0" ] ]
+      ]
+  and (* t *)
+    (t : fsm) =
+    make_fsm_from_lts
+      "t0"
+      [ "t0", [ "a", [ "t1" ] ]
+      ; "t1", [ "a", [ "t1"; "t2" ] ]
+      ; "t2", [ "a", [ "t0" ] ]
+      ]
   in
-  (* t *)
-  let (t : fsm) =
-    let init = { id = 0; pp = "t0" } in
-    let states =
-      States.of_list
-        [ { id = 0; pp = "t0" }; { id = 1; pp = "t1" }; { id = 2; pp = "t2" } ]
-    in
-    let alphabet = Alphabet.of_list [ { id = 1; label = "a" } ] in
-    let edges = Edges.create 3 in
-    (* t0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ]));
-    (* t1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list
-                  [ get_state_by_id states 1; get_state_by_id states 2 ] )
-            ]));
-    (* t2 *)
-    Edges.add
-      edges
-      (get_state_by_id states 2)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 0 ] )
-            ]));
-    { init; states; alphabet; edges }
-  in
-  exa "exa_rec1_nondet_inf" s t true
+  exa "exa_self_rec_nondet_inf" s t true
 ;;
 
-(** [exa_rec1_det] ... *)
-let exa_rec1_det : example =
+(** [exa_self_rec_det] ... *)
+let exa_self_rec_det : example =
   (* s *)
   let (s : fsm) =
-    let init = { id = 0; pp = "s0" } in
-    let states =
-      States.of_list
-        [ { id = 0; pp = "s0" }; { id = 1; pp = "s1" }; { id = 2; pp = "s2" } ]
-    in
-    let alphabet =
-      Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
-    in
-    let edges = Edges.create 2 in
-    (* s0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ]));
-    (* s1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ; ( get_action_by_label alphabet "b"
-              , States.of_list [ get_state_by_id states 2 ] )
-            ]));
-    { init; states; alphabet; edges }
+    make_fsm_from_lts
+      "s0"
+      [ "s0", [ "a", [ "s1" ] ]; "s1", [ "a", [ "s1" ]; "b", [ "s2" ] ] ]
+  and (* t *)
+    (t : fsm) =
+    make_fsm_from_lts
+      "t0"
+      [ "t0", [ "a", [ "t1" ] ]; "t1", [ "a", [ "t1" ]; "b", [ "t2" ] ] ]
   in
-  (* t *)
-  let (t : fsm) =
-    let init = { id = 0; pp = "t0" } in
-    let states =
-      States.of_list
-        [ { id = 0; pp = "t0" }; { id = 1; pp = "t1" }; { id = 2; pp = "t2" } ]
-    in
-    let alphabet =
-      Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
-    in
-    let edges = Edges.create 2 in
-    (* t0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ]));
-    (* t1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ; ( get_action_by_label alphabet "b"
-              , States.of_list [ get_state_by_id states 2 ] )
-            ]));
-    { init; states; alphabet; edges }
-  in
-  exa "exa_rec1_det" s t true
+  exa "exa_self_rec_det" s t true
 ;;
 
-(** [exa_rec1_det_inf] ... *)
-let exa_rec1_det_inf : example =
+(** [exa_self_rec_det_inf] ... *)
+let exa_self_rec_det_inf : example =
   (* s *)
   let (s : fsm) =
-    let init = { id = 0; pp = "s0" } in
-    let states =
-      States.of_list
-        [ { id = 0; pp = "s0" }; { id = 1; pp = "s1" }; { id = 2; pp = "s2" } ]
-    in
-    let alphabet =
-      Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
-    in
-    let edges = Edges.create 3 in
-    (* s0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ]));
-    (* s1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ; ( get_action_by_label alphabet "b"
-              , States.of_list [ get_state_by_id states 2 ] )
-            ]));
-    (* s2 *)
-    Edges.add
-      edges
-      (get_state_by_id states 2)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 2 ] )
-            ]));
-    { init; states; alphabet; edges }
+    make_fsm_from_lts
+      "s0"
+      [ "s0", [ "a", [ "s1" ] ]
+      ; "s1", [ "a", [ "s1"; "s2" ] ]
+      ; "s2", [ "a", [ "s2" ] ]
+      ]
+  and (* t *)
+    (t : fsm) =
+    make_fsm_from_lts
+      "t0"
+      [ "t0", [ "a", [ "t1" ] ]
+      ; "t1", [ "a", [ "t1"; "t2" ] ]
+      ; "t2", [ "a", [ "t2" ] ]
+      ]
   in
-  (* t *)
-  let (t : fsm) =
-    let init = { id = 0; pp = "t0" } in
-    let states =
-      States.of_list
-        [ { id = 0; pp = "t0" }; { id = 1; pp = "t1" }; { id = 2; pp = "t2" } ]
-    in
-    let alphabet =
-      Alphabet.of_list [ { id = 1; label = "a" }; { id = 2; label = "b" } ]
-    in
-    let edges = Edges.create 3 in
-    (* t0 *)
-    Edges.add
-      edges
-      (get_state_by_id states 0)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ]));
-    (* t1 *)
-    Edges.add
-      edges
-      (get_state_by_id states 1)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 1 ] )
-            ; ( get_action_by_label alphabet "b"
-              , States.of_list [ get_state_by_id states 2 ] )
-            ]));
-    (* t2 *)
-    Edges.add
-      edges
-      (get_state_by_id states 2)
-      (Actions.of_seq
-         (List.to_seq
-            [ ( get_action_by_label alphabet "a"
-              , States.of_list [ get_state_by_id states 2 ] )
-            ]));
-    { init; states; alphabet; edges }
+  exa "exa_self_rec_det_inf" s t true
+;;
+
+(** [exa_rec_1] ... *)
+let exa_rec_1 : example =
+  (* s *)
+  let (s : fsm) =
+    make_fsm_from_lts "s0" [ "s0", [ "a", [ "s1" ] ]; "s1", [ "b", [ "s0" ] ] ]
+  and (* t *)
+    (t : fsm) =
+    make_fsm_from_lts
+      "t0"
+      [ "t0", [ "a", [ "t1" ] ]
+      ; "t1", [ "b", [ "t2" ] ]
+      ; "t2", [ "a", [ "t3" ] ]
+      ; "t3", [ "b", [ "t0" ] ]
+      ]
   in
-  exa "exa_rec1_det_inf" s t true
+  exa "exa_rec_1" s t true
+;;
+
+(** [exa_rec_2] ... *)
+let exa_rec_2 : example =
+  (* s *)
+  let (s : fsm) =
+    make_fsm_from_lts "s0" [ "s0", [ "a", [ "s1" ] ]; "s1", [ "b", [ "s0" ] ] ]
+  and (* t *)
+    (t : fsm) =
+    make_fsm_from_lts
+      "t0"
+      [ "t0", [ "a", [ "t1" ] ]
+      ; "t1", [ "b", [ "t2" ] ]
+      ; "t2", [ "a", [ "t1" ] ]
+      ]
+  in
+  exa "exa_rec_2" s t true
+;;
+
+(** [exa_par_1] ... *)
+let exa_par_1 : example =
+  (* s *)
+  let (s : fsm) =
+    make_fsm_from_lts
+      "s0"
+      [ "s0", [ "a", [ "s1" ]; "b", [ "s2" ] ]
+      ; "s1", [ "b", [ "s3" ] ]
+      ; "s2", [ "a", [ "s3" ] ]
+      ]
+  and (* t *)
+    (t : fsm) =
+    make_fsm_from_lts
+      "t0"
+      [ "t0", [ "a", [ "t1" ]; "b", [ "t1" ] ]
+      ; "t1", [ "a", [ "t2" ]; "b", [ "t2" ] ]
+      ]
+  in
+  exa "exa_par_1" s t false
 ;;
