@@ -58,7 +58,7 @@ module Block = States
 
 module Partition : sig
   type elt = Block.t
-  type t = Set.Make(States).t
+  type t = Set.Make(Block).t
 
   val empty : t
   val add : elt -> t -> t
@@ -221,6 +221,13 @@ end
 
 val make_edges : ?size:int -> unit -> States.t Actions.t Edges.t
 
+val add_new_outgoing_edge
+  :  States.t Actions.t Edges.t
+  -> state
+  -> action
+  -> state
+  -> unit
+
 type fsm =
   { init : state
   ; alphabet : Alphabet.t
@@ -233,6 +240,11 @@ val make_fsm
   -> Alphabet.t
   -> States.t
   -> States.t Actions.t Edges.t
+  -> fsm
+
+val make_fsm_from_lts
+  :  string
+  -> (string * (string * string list) list) list
   -> fsm
 
 type pp_axiom =
