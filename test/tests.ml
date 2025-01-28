@@ -115,10 +115,13 @@ let run_all_ks90
     ~debug
     [ exa_1
     ; exa_2
-    ; exa_rec1_nondet
-    ; exa_rec1_nondet_inf
-    ; exa_rec1_det
-    ; exa_rec1_det_inf
+    ; exa_self_rec_nondet
+    ; exa_self_rec_nondet_inf
+    ; exa_self_rec_det
+    ; exa_self_rec_det_inf
+    ; exa_rec_1
+    ; exa_rec_2
+    ; exa_par_1
     ]
 ;;
 
