@@ -111,16 +111,20 @@ let add_new_outgoing_edge
   : unit
   =
   match Edges.find_opt edges from_state with
+  (* add new set of actions from state *)
   | None ->
     Edges.add
       edges
       from_state
       (Actions.of_seq
          (List.to_seq [ out_action, States.of_list [ dest_state ] ]))
+  (* actions already exist, update them *)
   | Some existing_actions ->
     (match Actions.find_opt existing_actions out_action with
+     (* this specific action does not exist, add *)
      | None ->
        Actions.add existing_actions out_action (States.of_list [ dest_state ])
+     (* update destination states of this action which already exists *)
      | Some existing_destinations ->
        Actions.replace
          existing_actions
@@ -157,7 +161,9 @@ let make_fsm
 ;;
 
 (** [make_fsm_from_lts] is a more user-friendly helper function for defining FSMs.
-    @param init_label is the *)
+    @param init_label is the string label of the initial state.
+    @param transitions
+      is the list of pairs of states and, their list pairs of actions, with their list of destination states. *)
 
 let make_fsm_from_lts
   (init_label : string)
@@ -193,7 +199,7 @@ let make_fsm_from_lts
                    States.t * Alphabet.t * States.t Actions.t Edges.t)
               ((label, rhs) : string * string list) ->
               (* unpack outgoing label *)
-              let alphabet', out_action =
+              let alphabet'', out_action =
                 let new_action : action =
                   make_action ~label (Alphabet.cardinal alphabet')
                 in
@@ -235,7 +241,7 @@ let make_fsm_from_lts
                   rhs
               in
               (* return. *)
-              states''', alphabet', edges'')
+              states''', alphabet'', edges'')
             (states', alphabet, edges)
             labels_rhs
         in
