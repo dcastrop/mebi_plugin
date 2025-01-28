@@ -225,9 +225,24 @@ Module BisimTest1.
     termLTS (tpar TheAction1 TheAction2 tend)
     termLTS (tact TheAction1 (tact TheAction2 tend)).
 
+
+
+
 End BisimTest1.
 
+Section BisimDef.
+  Context (Term1 Term2 : Set)  (Action1 Action2 : Set)
+    (LTS1 : Term1 -> Action1 -> Term1 -> Prop)
+    (LTS2 : Term2 -> Action2 -> Term2 -> Prop).
 
+  CoInductive sim (s : Term1) (t : Term2) : Prop :=
+  | Bisim :
+         (forall s' a1, LTS1 s a1 s'
+           -> exists t', exists a2, (LTS2 t a2 t') /\ (bisim s' t'))
+      -> (forall t' a2, LTS2 t a2 t'
+         -> exists s', exists a1, (LTS1 s a1 s') /\ (bisim s' t'))
+     -> bisim s t.
+End BisimDef.
 
 
 (* Cannot capture things like below due to cases like [tfix t --> tfix (tfix
