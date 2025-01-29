@@ -211,8 +211,8 @@ let rec unify_all
     let* success = m_unify ~show_debug u.termL u.termR in
     if success
     then
-      let* _unified = unify_all ~show_debug t in
-      match _unified with
+      let* unified = unify_all ~show_debug t in
+      match unified with
       | None ->
         Feedback.msg_warning
           (str
