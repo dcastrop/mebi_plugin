@@ -22,6 +22,7 @@ _build
 
 # ignore generated make files
 CoqMakeFile*
+CoqMakefile*
 .CoqMakeFile.d
 
 # ignore vscode settings
