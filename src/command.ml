@@ -213,12 +213,7 @@ let rec unify_all
     then
       let* unified = unify_all ~show_debug t in
       match unified with
-      | None ->
-        Feedback.msg_warning
-          (str
-             "unify_all returned None after success ? (or should we still \
-              return what we have; i.e., [ctor_tree])");
-        return None
+      | None -> return None
       | Some unified -> return (Some (List.append [ ctor_tree ] unified))
     else return None
 ;;
@@ -257,7 +252,7 @@ let rec retrieve_tgt_nodes
   function
   | [] -> return acc
   | u1 :: nctors ->
-    let* success = sandbox (sandboxed_unify ~show_debug tgt_term u1) in
+    let* success = sandboxed_unify ~show_debug tgt_term u1 in
     (match success with
      | None -> retrieve_tgt_nodes ~show_debug acc i act tgt_term nctors
      | Some (tgt, ctor_tree) ->
