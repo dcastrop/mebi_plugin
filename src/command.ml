@@ -284,7 +284,7 @@ let rec check_updated_ctx
        if EConstr.eq_constr sigma fn lts.coq_lts
        then
          let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
-         let* ctors = check_valid_constructor lts nextT in
+         let* ctors = check_valid_constructor lts nextT (Some args.(1)) in
          if List.is_empty ctors
          then return None
          else (
@@ -315,6 +315,7 @@ and check_valid_constructor
       ?(show_debug : bool = false)
       (lts : raw_lts)
       (t : EConstr.t)
+      (ma : EConstr.t option)
   : (EConstr.t * EConstr.t * int tree) list t
   =
   (* : (EConstr.t * int tree list) list t *)
@@ -333,27 +334,30 @@ and check_valid_constructor
     let* substl = mk_ctx_substl [] (List.rev ctx_tys) in
     let termL, act, termR = extract_args substl tm in
     let* success = m_unify t termL in
-    match success with
-    | true ->
-      let* (next_ctors : (int tree * unif_problem) list list option) =
-        check_updated_ctx [ [] ] lts (substl, ctx_tys)
-      in
-      let (tgt_term : EConstr.t) = EConstr.Vars.substl substl termR in
-      (match next_ctors with
-       | None -> return ctor_vals
-       | Some [] ->
-         let* sg = get_sigma in
-         if EConstr.isEvar sg tgt_term
-         then return ctor_vals
-         else
-           let$+ act env sigma = Reductionops.nf_all env sigma act in
-           return ((act, tgt_term, Node (i, [])) :: ctor_vals)
-       | Some nctors ->
-         let tgt_nodes =
-           retrieve_tgt_nodes ~show_debug ctor_vals i act tgt_term nctors
-         in
-         tgt_nodes)
-    | false -> return ctor_vals
+    if success
+    then
+      let* success = Option.cata (fun a -> m_unify a act) (return true) ma in
+      if success
+      then
+        let* (next_ctors : (int tree * unif_problem) list list option) =
+          check_updated_ctx [ [] ] lts (substl, ctx_tys)
+        in
+        let$+ act env sigma = Reductionops.nf_all env sigma act in
+        let (tgt_term : EConstr.t) = EConstr.Vars.substl substl termR in
+        match next_ctors with
+        | None -> return ctor_vals
+        | Some [] ->
+          let* sg = get_sigma in
+          if EConstr.isEvar sg tgt_term
+          then return ctor_vals
+          else return ((act, tgt_term, Node (i, [])) :: ctor_vals)
+        | Some nctors ->
+          let tgt_nodes =
+            retrieve_tgt_nodes ~show_debug ctor_vals i act tgt_term nctors
+          in
+          tgt_nodes
+      else return ctor_vals
+    else return ctor_vals
   in
   iterate 0 (Array.length lts.constructor_transitions - 1) [] iter_body
 ;;
@@ -478,7 +482,7 @@ struct
     else
       let* t = return (Queue.pop g.to_visit) in
       let* (constrs : (EConstr.t * EConstr.t * int tree) list) =
-        check_valid_constructor ~show_debug the_lts t
+        check_valid_constructor ~show_debug the_lts t None
       in
       if show_debug
       then
