@@ -1,15 +1,16 @@
+val pstr_results
+  :  ?params:Mebi_plugin.Utils.logging_params
+  -> (string * (string * bool * bool) list) list
+  -> string
+
 val ks90_exas
-  :  ?show:bool
-  -> ?details:bool
-  -> ?debug:bool
+  :  ?params:Mebi_plugin.Utils.logging_params
   -> Mebi_plugin.Examples.example list
   -> (string * bool * bool) list
 
 val run_all_ks90
-  :  ?show:bool
-  -> ?details:bool
-  -> ?debug:bool
+  :  ?params:Mebi_plugin.Utils.logging_params
   -> unit
   -> (string * bool * bool) list
 
-val run_all : ?show:bool -> ?details:bool -> ?debug:bool -> unit -> unit
+val run_all : ?params:Mebi_plugin.Utils.logging_params -> unit -> unit

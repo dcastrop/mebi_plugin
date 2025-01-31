@@ -264,6 +264,29 @@ let make_fsm_from_lts
 (****** States ******************************)
 (********************************************)
 
+module PStr = struct
+  open Utils
+
+  (* make new param that wraps around logging, stating the tab level and such *)
+
+  let state ?(params : logging_params = default_logging_params ()) (s : state)
+    : string
+    =
+    let normal_pstr : string = Printf.sprintf "(%s)" s.pp
+    and detail_pstr : string = Printf.sprintf "(%s | id:%d)" s.pp s.id in
+    match params.kind with
+    | Normal () -> normal_pstr
+    | Details () -> detail_pstr
+    | Debug () -> detail_pstr
+    | Warning () -> detail_pstr
+  ;;
+
+  (*
+     let pstr_states ?(params:logging_params=default_logging_params) (states:States.t) : string =
+
+     ;; *)
+end
+
 (** [pp_axiom] denotes the finest granularity that [pp_str] applies to. *)
 type pp_axiom =
   | State of state

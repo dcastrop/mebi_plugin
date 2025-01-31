@@ -247,6 +247,10 @@ val make_fsm_from_lts
   -> (string * (string * string list) list) list
   -> fsm
 
+module PStr : sig
+  val state : ?params:Utils.logging_params -> state -> string
+end
+
 type pp_axiom =
   | State of state
   | Action of action
