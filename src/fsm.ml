@@ -279,7 +279,7 @@ module PStr = struct
     ()
     : formatting_params
     =
-    { tabs = 0; no_leading_tab = false; (*non_repetative = true;*) params }
+    { tabs = 0; no_leading_tab = true; (*non_repetative = true;*) params }
   ;;
 
   let inc_tab ?(by : int = 1) (params : formatting_params) : formatting_params =
@@ -367,7 +367,10 @@ module PStr = struct
         (if _params.no_leading_tab then "" else tabs)
         (States.fold
            (fun (s : state) (acc : string) ->
-             Printf.sprintf "%s%s\n" acc (state ~params:(Formatting _params') s))
+             Printf.sprintf
+               "%s%s\n"
+               acc
+               (state ~params:(Formatting (no_leading_tab false _params')) s))
            states
            "\n")
         tabs)
@@ -393,7 +396,9 @@ module PStr = struct
              Printf.sprintf
                "%s%s\n"
                acc
-               (states ~params:(Formatting _params') states'))
+               (states
+                  ~params:(Formatting (no_leading_tab false _params'))
+                  states'))
            partition
            "\n")
         tabs)
@@ -433,9 +438,7 @@ module PStr = struct
       (* increment tab of inner elements of set *)
       let _params : formatting_params = handle_formatting_params params in
       let _params' : formatting_params = inc_tab _params
-      and tabs : string =
-        if _params.no_leading_tab then "" else str_tabs _params.tabs
-      in
+      and tabs : string = str_tabs _params.tabs in
       Printf.sprintf
         "%s[%s%s]"
         (if _params.no_leading_tab then "" else tabs)
@@ -444,7 +447,7 @@ module PStr = struct
              Printf.sprintf
                "%s%s\n"
                acc
-               (action ~params:(Formatting _params') a))
+               (action ~params:(Formatting (no_leading_tab false _params')) a))
            actions
            "\n")
         tabs)
@@ -477,50 +480,45 @@ module PStr = struct
     else (
       (* increment tab of inner elements of table *)
       let _params : formatting_params = handle_formatting_params params in
-      let _params' : formatting_params = inc_tab _params
-      and tabs : string = str_tabs _params.tabs in
+      let tabs : string = str_tabs _params.tabs in
       match from with
       (* if no from state, then this is a non-repetative representation *)
       | None ->
         (* should not be leading next *)
-        let _params'' : formatting_params = no_leading_tab true _params' in
+        let _params' : formatting_params =
+          no_leading_tab true (inc_tab _params)
+        in
         Printf.sprintf
-          "%s{[%s%s]}"
-          (if _params'.no_leading_tab then "" else tabs)
+          "%s{[%s]}"
+          (if _params.no_leading_tab then "" else tabs)
           (Actions.fold
              (fun (a : action) (destinations : States.t) (acc : string) ->
                Printf.sprintf
                  "%s{ --%s--> %s }\n"
                  acc
-                 (action ~params:(Formatting _params'') a)
-                 (states ~params:(Formatting _params'') destinations))
+                 (action ~params:(Formatting _params') a)
+                 (states ~params:(Formatting _params') destinations))
              actions'
              "\n")
-          tabs
       (* if some from state, then go and pstr individual edges *)
       | Some from_state ->
-        let _params' : formatting_params = inc_tab _params in
-        Printf.sprintf
-          "%s[%s%s]"
-          (if _params'.no_leading_tab then "" else tabs)
-          (Actions.fold
-             (fun (a : action) (destinations : States.t) (acc : string) ->
-               Printf.sprintf
-                 "%s%s\n"
-                 acc
-                 (States.fold
-                    (fun (destination : state) (acc : string) ->
-                      Printf.sprintf
-                        "%s%s\n"
-                        acc
-                        (edge
-                           ~params:(Formatting _params')
-                           (from_state, a, destination)))
-                    destinations
-                    "\n"))
-             actions'
-             "\n")
-          tabs)
+        Actions.fold
+          (fun (a : action) (destinations : States.t) (acc : string) ->
+            Printf.sprintf
+              "%s%s"
+              acc
+              (States.fold
+                 (fun (destination : state) (acc' : string) ->
+                   Printf.sprintf
+                     "%s%s\n"
+                     acc'
+                     (edge
+                        ~params:(Formatting (no_leading_tab false _params))
+                        (from_state, a, destination)))
+                 destinations
+                 ""))
+          actions'
+          "")
   ;;
 
   let edges
@@ -543,10 +541,10 @@ module PStr = struct
              (actions' : States.t Actions.t)
              (acc : string) ->
              Printf.sprintf
-               "%s%s\n"
+               "%s%s"
                acc
                (actions
-                  ~params:(Formatting _params')
+                  ~params:(Formatting (no_leading_tab false _params'))
                   ?from:(Some from_state)
                   actions'))
            edges'
@@ -575,7 +573,7 @@ module PStr = struct
          tabs'
          (alphabet ~params:(Formatting _params') fsm'.alphabet))
       (Printf.sprintf
-         "\n%states: %s"
+         "\n%sstates: %s"
          tabs'
          (states ~params:(Formatting _params') fsm'.states))
       (Printf.sprintf
@@ -585,320 +583,6 @@ module PStr = struct
       tabs
   ;;
 end
-
-(** [pp_axiom] denotes the finest granularity that [pp_str] applies to. *)
-type pp_axiom =
-  | State of state
-  | Action of action
-  | Edge of (state * action * state)
-  | OutgoingEdge of (action * state)
-
-type pp_list =
-  | States of States.t
-  | Alphabet of Alphabet.t
-  | Block of Block.t
-  | Partition of Partition.t
-
-type pp_map =
-  | Actions of States.t Actions.t
-  | Edges of States.t Actions.t Edges.t
-
-type pp_collection =
-  | List of pp_list
-  | Map of pp_map
-
-type pp_utils_fsm =
-  | Init of fsm
-  | Alphabet of fsm
-  | States of fsm
-  | Edges of fsm
-
-type pp_utils = Fsm of pp_utils_fsm
-
-type pp_supported =
-  | Axiom of pp_axiom
-  | Collection of pp_collection
-  | Utils of pp_utils
-  | Fsm of fsm
-
-type pp_wrappable =
-  | State of state
-  | Action of action
-  | Edge of (state * action * state)
-  | OutgoingEdge of (action * state)
-  | States of States.t
-  | Block of Block.t
-  | Alphabet of Alphabet.t
-  | Actions of States.t Actions.t
-  | Edges of States.t Actions.t Edges.t
-  | Partition of Partition.t
-  | Fsm of fsm
-
-(** [pp_options] denotes the types that specifically support the [pp] flag. *)
-type pp_options =
-  | Default of unit
-  | Debug of unit
-
-(** [pstr_options debug] is the [pp_options] corresponding to [debug]. *)
-let pstr_options (debug : bool) : pp_options =
-  if debug then Debug () else Default ()
-;;
-
-(** [pp_collection_is_empty c] returns true if [c] is empty. *)
-let pp_collection_is_empty (c : pp_collection) : bool =
-  match c with
-  | List l ->
-    (match l with
-     | States s -> States.is_empty s
-     | Alphabet a -> Alphabet.is_empty a
-     | Block b -> Block.is_empty b
-     | Partition p ->
-       (* check also that any blocks are empty too *)
-       if Partition.is_empty p
-       then true
-       else Partition.for_all (fun (b : Block.t) -> Block.is_empty b) p)
-  | Map m ->
-    (match m with
-     | Actions a -> Actions.length a == 0
-     | Edges e -> Edges.length e == 0)
-;;
-
-(** [pp_wrap_as_supported] is a helper wrapper function for [pp_supported]. *)
-let pp_wrap_as_supported (to_wrap : pp_wrappable) : pp_supported =
-  match to_wrap with
-  | State to_wrap -> Axiom (State to_wrap)
-  | Action to_wrap -> Axiom (Action to_wrap)
-  | Edge to_wrap -> Axiom (Edge to_wrap)
-  | OutgoingEdge to_wrap -> Axiom (OutgoingEdge to_wrap)
-  | States to_wrap -> Collection (List (States to_wrap))
-  | Block to_wrap -> Collection (List (Block to_wrap))
-  | Alphabet to_wrap -> Collection (List (Alphabet to_wrap))
-  | Actions to_wrap -> Collection (Map (Actions to_wrap))
-  | Edges to_wrap -> Collection (Map (Edges to_wrap))
-  | Partition to_wrap -> Collection (List (Partition to_wrap))
-  | Fsm to_wrap -> Fsm to_wrap
-;;
-
-(** [pstr] is a central function that handles the pretty-printing of all FSM types.
-    @return a pretty-printed string representation of an FSM type.
-    @param ?tabs is the amount of lhs tabs to include.
-    @param ?options denote the level of detail to be included in printed types.
-    @param to_str is the type to be pretty-printed. *)
-let rec pstr
-  ?(tabs : int = 0)
-  ?(options : pp_options = Default ())
-  (to_str : pp_supported)
-  : string
-  =
-  let basedent = Utils.str_tabs (tabs - 1) in
-  let indent = Utils.str_tabs tabs in
-  (* build string *)
-  match to_str with
-  (* *)
-  | Axiom to_str ->
-    Printf.sprintf
-      "%s%s"
-      indent
-      (match to_str with
-       (* [state] *)
-       | State to_str ->
-         Printf.sprintf
-           "(%s%s)"
-           to_str.pp
-           (match options with
-            | Default () -> ""
-            | Debug () -> Printf.sprintf " <id: %d>" to_str.id)
-       (* [action] *)
-       | Action to_str ->
-         Printf.sprintf
-           "{| %s%s |}"
-           to_str.label
-           (match options with
-            | Default () -> ""
-            | Debug () -> Printf.sprintf " <id: %d>" to_str.id)
-       (* edge of [state * action * state] *)
-       | OutgoingEdge to_str ->
-         (match to_str with
-          | a, destination ->
-            Printf.sprintf
-              "---%s--> %s"
-              (pstr ~options (pp_wrap_as_supported (Action a)))
-              (pstr ~options (pp_wrap_as_supported (State destination))))
-       (* edge of [state * action * state] *)
-       | Edge to_str ->
-         (match to_str with
-          | from, a, destination ->
-            Printf.sprintf
-              "{ %s %s }"
-              (pstr ~options (pp_wrap_as_supported (State from)))
-              (pstr
-                 ~options
-                 (pp_wrap_as_supported (OutgoingEdge (a, destination))))))
-  (* *)
-  | Collection to_str ->
-    (match to_str with
-     (* *)
-     | List to_str ->
-       if pp_collection_is_empty (List to_str)
-       then "[ ] (empty)"
-       else
-         Printf.sprintf
-           "%s[%s%s]"
-           basedent
-           (match to_str with
-            (* [States] *)
-            | States to_str ->
-              States.fold
-                (fun (s : state) (acc : string) ->
-                  Printf.sprintf
-                    "%s%s\n"
-                    acc
-                    (pstr
-                       ~tabs:(tabs + 1)
-                       ~options
-                       (pp_wrap_as_supported (State s))))
-                to_str
-                "\n"
-            (* [Block] *)
-            | Block to_str ->
-              Block.fold
-                (fun (s : state) (acc : string) ->
-                  Printf.sprintf
-                    "%s%s\n"
-                    acc
-                    (pstr
-                       ~tabs:(tabs + 1)
-                       ~options
-                       (pp_wrap_as_supported (State s))))
-                to_str
-                "\n"
-            (* [Alphabet] *)
-            | Alphabet to_str ->
-              Alphabet.fold
-                (fun (a : action) (acc : string) ->
-                  Printf.sprintf
-                    "%s%s\n"
-                    acc
-                    (pstr
-                       ~tabs:(tabs + 1)
-                       ~options
-                       (pp_wrap_as_supported (Action a))))
-                to_str
-                "\n"
-            (* [Partition] *)
-            | Partition to_str ->
-              Partition.fold
-                (fun (b : Block.t) (acc : string) ->
-                  Printf.sprintf
-                    "%s%s\n"
-                    acc
-                    (pstr
-                       ~tabs:(tabs + 1)
-                       ~options
-                       (pp_wrap_as_supported (Block b))))
-                to_str
-                "\n")
-           basedent
-     (* *)
-     | Map to_str ->
-       if pp_collection_is_empty (Map to_str)
-       then "{ } (empty)"
-       else
-         Printf.sprintf
-           "%s{%s%s}"
-           basedent
-           (match to_str with
-            (* [Actions] *)
-            | Actions to_str ->
-              Actions.fold
-                (fun (a : action) (destinations : States.t) (acc : string) ->
-                  (* for each destination *)
-                  Printf.sprintf
-                    "%s%s"
-                    acc
-                    (States.fold
-                       (fun (destination : state) (acc' : string) ->
-                         Printf.sprintf
-                           "%s%s%s"
-                           acc'
-                           indent
-                           (pstr
-                              ~options
-                              (pp_wrap_as_supported
-                                 (OutgoingEdge (a, destination)))))
-                       destinations
-                       ""))
-                to_str
-                "\n"
-            (* [Edges] *)
-            | Edges to_str ->
-              (* order by starting state *)
-              States.fold
-                (fun (from : state) (acc : string) ->
-                  let outgoing_actions = Edges.find to_str from in
-                  Printf.sprintf
-                    "%s%s"
-                    acc
-                    (* order by action ids *)
-                    (Alphabet.fold
-                       (fun (a : action) (acc' : string) ->
-                         Printf.sprintf
-                           "%s%s"
-                           acc'
-                           (* order by destination state *)
-                           (States.fold
-                              (fun (destination : state) (acc'' : string) ->
-                                Printf.sprintf
-                                  "%s%s%s\n"
-                                  acc''
-                                  indent
-                                  (pstr
-                                     ~options
-                                     (pp_wrap_as_supported
-                                        (Edge (from, a, destination)))))
-                              (Actions.find outgoing_actions a)
-                              ""))
-                       (* get alphabet from actions *)
-                       (Alphabet.of_seq (Actions.to_seq_keys outgoing_actions))
-                       ""))
-                (* get states from edges *)
-                (States.of_seq (Edges.to_seq_keys to_str))
-                "\n")
-           basedent)
-  (* *)
-  | Utils _to_str -> "<<<<unimplemented>>>>"
-  (* *)
-  | Fsm to_str ->
-    let indent = Utils.str_tabs (tabs + 1) in
-    Printf.sprintf
-      "{ %s; %s; %s; %s; \n%s}"
-      (Printf.sprintf
-         "\n%sinitial state: %s"
-         indent
-         (pstr ~options (pp_wrap_as_supported (State to_str.init))))
-      (Printf.sprintf
-         "\n%salphabet: %s"
-         indent
-         (pstr
-            ~tabs:(tabs + 2)
-            ~options
-            (pp_wrap_as_supported (Alphabet to_str.alphabet))))
-      (Printf.sprintf
-         "\n%sstates: %s"
-         indent
-         (pstr
-            ~tabs:(tabs + 2)
-            ~options
-            (pp_wrap_as_supported (States to_str.states))))
-      (Printf.sprintf
-         "\n%sedges: %s"
-         indent
-         (pstr
-            ~tabs:(tabs + 2)
-            ~options
-            (pp_wrap_as_supported (Edges to_str.edges))))
-      basedent
-;;
 
 (*********************************************************************)
 (****** Getter Functions *********************************************)

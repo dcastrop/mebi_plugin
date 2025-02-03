@@ -69,11 +69,11 @@ let rec ks90_exas
              %s.t: %s.\n\n"
             name
             name
-            (pstr ~options:(Debug ()) (Fsm s))
+            (PStr.fsm ~params:(Logging params) s)
             name
-            (pstr ~options:(Debug ()) (Fsm t)));
+            (PStr.fsm ~params:(Logging params) t));
        (* run algorithm *)
-       let result = RCP.KS90.run ~show:true ~details:false ~debug:false s t in
+       let result = RCP.KS90.run ~params s t in
        (match result with
         | { are_bisimilar; bisimilar_states; non_bisimilar_states; _ } ->
           (* print out results *)
@@ -86,14 +86,8 @@ let rec ks90_exas
                 = = = = = = = = = = = = = = = = = = =\n\n"
                name
                are_bisimilar
-               (pstr
-                  ~options:(Debug ())
-                  ~tabs:1
-                  (pp_wrap_as_supported (Partition bisimilar_states)))
-               (pstr
-                  ~options:(Debug ())
-                  ~tabs:1
-                  (pp_wrap_as_supported (Partition non_bisimilar_states))));
+               (PStr.partition ~params:(Logging params) bisimilar_states)
+               (PStr.partition ~params:(Logging params) non_bisimilar_states));
           (* continue *)
           (name, _are_bisimilar, are_bisimilar) :: ks90_exas ~params exas'))
 ;;
