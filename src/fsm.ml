@@ -268,23 +268,322 @@ module PStr = struct
   open Utils
 
   (* make new param that wraps around logging, stating the tab level and such *)
+  type formatting_params =
+    { tabs : int
+    ; no_leading_tab : bool (* ; non_repetative : bool *)
+    ; params : logging_params
+    }
 
-  let state ?(params : logging_params = default_logging_params ()) (s : state)
-    : string
+  let default_formatting_params
+    ?(params : logging_params = default_logging_params ())
+    ()
+    : formatting_params
     =
-    let normal_pstr : string = Printf.sprintf "(%s)" s.pp
-    and detail_pstr : string = Printf.sprintf "(%s | id:%d)" s.pp s.id in
-    match params.kind with
-    | Normal () -> normal_pstr
-    | Details () -> detail_pstr
-    | Debug () -> detail_pstr
-    | Warning () -> detail_pstr
+    { tabs = 0; no_leading_tab = false; (*non_repetative = true;*) params }
   ;;
 
-  (*
-     let pstr_states ?(params:logging_params=default_logging_params) (states:States.t) : string =
+  let inc_tab ?(by : int = 1) (params : formatting_params) : formatting_params =
+    { tabs = params.tabs + by
+    ; no_leading_tab =
+        params.no_leading_tab (* ; non_repetative = params.non_repetative *)
+    ; params = params.params
+    }
+  ;;
 
-     ;; *)
+  let dec_tab ?(by : int = 1) (params : formatting_params) : formatting_params =
+    { tabs = (if params.tabs - by < 0 then 0 else params.tabs + by)
+    ; no_leading_tab =
+        params.no_leading_tab (* ; non_repetative = params.non_repetative *)
+    ; params = params.params
+    }
+  ;;
+
+  let no_tab (params : formatting_params) : formatting_params =
+    { tabs = 0
+    ; no_leading_tab =
+        params.no_leading_tab (* ; non_repetative = params.non_repetative *)
+    ; params = params.params
+    }
+  ;;
+
+  let no_leading_tab (_no_leading_tab : bool) (params : formatting_params)
+    : formatting_params
+    =
+    { tabs = params.tabs
+    ; no_leading_tab =
+        _no_leading_tab (* ; non_repetative = params.non_repetative *)
+    ; params = params.params
+    }
+  ;;
+
+  type pstr_params =
+    | Logging of logging_params
+    | Formatting of formatting_params
+
+  let handle_formatting_params (params : pstr_params) : formatting_params =
+    match params with
+    | Formatting _formatting_params -> _formatting_params
+    | Logging _logging_params ->
+      default_formatting_params ~params:_logging_params ()
+  ;;
+
+  (********************************************)
+  (****** States ******************************)
+  (********************************************)
+
+  let state
+    ?(params : pstr_params = Formatting (default_formatting_params ()))
+    (s : state)
+    : string
+    =
+    let _params : formatting_params = handle_formatting_params params in
+    let tabs : string = str_tabs _params.tabs in
+    Printf.sprintf
+      "%s%s"
+      (if _params.no_leading_tab then "" else tabs)
+      (let normal_pstr : string = Printf.sprintf "(%s)" s.pp
+       and detail_pstr : string = Printf.sprintf "(%s | id:%d)" s.pp s.id in
+       match _params.params.kind with
+       | Normal () -> normal_pstr
+       | Details () -> detail_pstr
+       | Debug () -> detail_pstr
+       | Warning () -> detail_pstr)
+  ;;
+
+  let states
+    ?(params : pstr_params = Formatting (default_formatting_params ()))
+    (states : States.t)
+    : string
+    =
+    if States.is_empty states
+    then "[ ] (empty)"
+    else (
+      (* increment tab of inner elements of set *)
+      let _params : formatting_params = handle_formatting_params params in
+      let _params' : formatting_params = inc_tab _params
+      and tabs : string = str_tabs _params.tabs in
+      Printf.sprintf
+        "%s[%s%s]"
+        (if _params.no_leading_tab then "" else tabs)
+        (States.fold
+           (fun (s : state) (acc : string) ->
+             Printf.sprintf "%s%s\n" acc (state ~params:(Formatting _params') s))
+           states
+           "\n")
+        tabs)
+  ;;
+
+  let partition
+    ?(params : pstr_params = Formatting (default_formatting_params ()))
+    (partition : Partition.t)
+    : string
+    =
+    if Partition.is_empty partition
+    then "[ ] (empty)"
+    else (
+      (* increment tab of inner elements of set *)
+      let _params : formatting_params = handle_formatting_params params in
+      let _params' : formatting_params = inc_tab _params
+      and tabs : string = str_tabs _params.tabs in
+      Printf.sprintf
+        "%s[%s%s]"
+        (if _params.no_leading_tab then "" else tabs)
+        (Partition.fold
+           (fun (states' : States.t) (acc : string) ->
+             Printf.sprintf
+               "%s%s\n"
+               acc
+               (states ~params:(Formatting _params') states'))
+           partition
+           "\n")
+        tabs)
+  ;;
+
+  (********************************************)
+  (****** Alphabet, Actions & Edges ***********)
+  (********************************************)
+
+  let action
+    ?(params : pstr_params = Formatting (default_formatting_params ()))
+    (a : action)
+    : string
+    =
+    let _params : formatting_params = handle_formatting_params params in
+    let tabs : string = str_tabs _params.tabs in
+    Printf.sprintf
+      "%s%s"
+      (if _params.no_leading_tab then "" else tabs)
+      (let normal_pstr : string = Printf.sprintf "(%s)" a.label
+       and detail_pstr : string = Printf.sprintf "(%s | id:%d)" a.label a.id in
+       match _params.params.kind with
+       | Normal () -> normal_pstr
+       | Details () -> detail_pstr
+       | Debug () -> detail_pstr
+       | Warning () -> detail_pstr)
+  ;;
+
+  let alphabet
+    ?(params : pstr_params = Formatting (default_formatting_params ()))
+    (actions : Alphabet.t)
+    : string
+    =
+    if Alphabet.is_empty actions
+    then "[ ] (empty)"
+    else (
+      (* increment tab of inner elements of set *)
+      let _params : formatting_params = handle_formatting_params params in
+      let _params' : formatting_params = inc_tab _params
+      and tabs : string =
+        if _params.no_leading_tab then "" else str_tabs _params.tabs
+      in
+      Printf.sprintf
+        "%s[%s%s]"
+        (if _params.no_leading_tab then "" else tabs)
+        (Alphabet.fold
+           (fun (a : action) (acc : string) ->
+             Printf.sprintf
+               "%s%s\n"
+               acc
+               (action ~params:(Formatting _params') a))
+           actions
+           "\n")
+        tabs)
+  ;;
+
+  let edge
+    ?(params : pstr_params = Formatting (default_formatting_params ()))
+    ((from, a, destination) : state * action * state)
+    : string
+    =
+    let _params : formatting_params = handle_formatting_params params in
+    let _params' : formatting_params = no_tab _params
+    and tabs : string = str_tabs _params.tabs in
+    Printf.sprintf
+      "%s{ %s ---%s--> %s }"
+      (if _params.no_leading_tab then "" else tabs)
+      (state ~params:(Formatting _params') from)
+      (action ~params:(Formatting _params') a)
+      (state ~params:(Formatting _params') destination)
+  ;;
+
+  let actions
+    ?(params : pstr_params = Formatting (default_formatting_params ()))
+    ?(from : state option)
+    (actions' : States.t Actions.t)
+    : string
+    =
+    if Actions.length actions' == 0
+    then "{ } (empty)"
+    else (
+      (* increment tab of inner elements of table *)
+      let _params : formatting_params = handle_formatting_params params in
+      let _params' : formatting_params = inc_tab _params
+      and tabs : string = str_tabs _params.tabs in
+      match from with
+      (* if no from state, then this is a non-repetative representation *)
+      | None ->
+        (* should not be leading next *)
+        let _params'' : formatting_params = no_leading_tab true _params' in
+        Printf.sprintf
+          "%s{[%s%s]}"
+          (if _params'.no_leading_tab then "" else tabs)
+          (Actions.fold
+             (fun (a : action) (destinations : States.t) (acc : string) ->
+               Printf.sprintf
+                 "%s{ --%s--> %s }\n"
+                 acc
+                 (action ~params:(Formatting _params'') a)
+                 (states ~params:(Formatting _params'') destinations))
+             actions'
+             "\n")
+          tabs
+      (* if some from state, then go and pstr individual edges *)
+      | Some from_state ->
+        let _params' : formatting_params = inc_tab _params in
+        Printf.sprintf
+          "%s[%s%s]"
+          (if _params'.no_leading_tab then "" else tabs)
+          (Actions.fold
+             (fun (a : action) (destinations : States.t) (acc : string) ->
+               Printf.sprintf
+                 "%s%s\n"
+                 acc
+                 (States.fold
+                    (fun (destination : state) (acc : string) ->
+                      Printf.sprintf
+                        "%s%s\n"
+                        acc
+                        (edge
+                           ~params:(Formatting _params')
+                           (from_state, a, destination)))
+                    destinations
+                    "\n"))
+             actions'
+             "\n")
+          tabs)
+  ;;
+
+  let edges
+    ?(params : pstr_params = Formatting (default_formatting_params ()))
+    (edges' : States.t Actions.t Edges.t)
+    : string
+    =
+    if Edges.length edges' == 0
+    then "{ } (empty)"
+    else (
+      (* increment tab of inner elements of table *)
+      let _params : formatting_params = handle_formatting_params params in
+      let _params' : formatting_params = inc_tab _params
+      and tabs : string = str_tabs _params.tabs in
+      Printf.sprintf
+        "%s{[%s%s]}"
+        (if _params.no_leading_tab then "" else tabs)
+        (Edges.fold
+           (fun (from_state : state)
+             (actions' : States.t Actions.t)
+             (acc : string) ->
+             Printf.sprintf
+               "%s%s\n"
+               acc
+               (actions
+                  ~params:(Formatting _params')
+                  ?from:(Some from_state)
+                  actions'))
+           edges'
+           "\n")
+        tabs)
+  ;;
+
+  let fsm
+    ?(params : pstr_params = Formatting (default_formatting_params ()))
+    (fsm' : fsm)
+    : string
+    =
+    (* increment tab of inner elements of fsm *)
+    let _params : formatting_params = handle_formatting_params params in
+    let _params' : formatting_params = inc_tab ~by:2 _params
+    and tabs : string = str_tabs _params.tabs
+    and tabs' : string = str_tabs (_params.tabs + 1) in
+    Printf.sprintf
+      "{ %s; %s; %s; %s; \n%s}"
+      (Printf.sprintf
+         "\n%sinitial state: %s"
+         tabs'
+         (state ~params:(Formatting _params') fsm'.init))
+      (Printf.sprintf
+         "\n%salphabet: %s"
+         tabs'
+         (alphabet ~params:(Formatting _params') fsm'.alphabet))
+      (Printf.sprintf
+         "\n%states: %s"
+         tabs'
+         (states ~params:(Formatting _params') fsm'.states))
+      (Printf.sprintf
+         "\n%sedges: %s"
+         tabs'
+         (edges ~params:(Formatting _params') fsm'.edges))
+      tabs
+  ;;
 end
 
 (** [pp_axiom] denotes the finest granularity that [pp_str] applies to. *)
