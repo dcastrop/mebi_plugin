@@ -248,64 +248,43 @@ val make_fsm_from_lts
   -> fsm
 
 module PStr : sig
-  val state : ?params:Utils.logging_params -> state -> string
+  type formatting_params =
+    { tabs : int
+    ; no_leading_tab : bool
+    ; params : Utils.logging_params
+    }
+
+  val default_formatting_params
+    :  ?params:Utils.logging_params
+    -> unit
+    -> formatting_params
+
+  val inc_tab : ?by:int -> formatting_params -> formatting_params
+  val dec_tab : ?by:int -> formatting_params -> formatting_params
+  val no_tab : formatting_params -> formatting_params
+  val no_leading_tab : bool -> formatting_params -> formatting_params
+
+  type pstr_params =
+    | Logging of Utils.logging_params
+    | Formatting of formatting_params
+
+  val handle_formatting_params : pstr_params -> formatting_params
+  val state : ?params:pstr_params -> state -> string
+  val states : ?params:pstr_params -> Block.t -> string
+  val partition : ?params:pstr_params -> Partition.t -> string
+  val action : ?params:pstr_params -> action -> string
+  val alphabet : ?params:pstr_params -> Alphabet.t -> string
+  val edge : ?params:pstr_params -> state * action * state -> string
+
+  val actions
+    :  ?params:pstr_params
+    -> ?from:state
+    -> Block.t Actions.t
+    -> string
+
+  val edges : ?params:pstr_params -> Block.t Actions.t Edges.t -> string
+  val fsm : ?params:pstr_params -> fsm -> string
 end
-
-type pp_axiom =
-  | State of state
-  | Action of action
-  | Edge of (state * action * state)
-  | OutgoingEdge of (action * state)
-
-type pp_list =
-  | States of Block.t
-  | Alphabet of Alphabet.t
-  | Block of Block.t
-  | Partition of Partition.t
-
-type pp_map =
-  | Actions of Block.t Actions.t
-  | Edges of Block.t Actions.t Edges.t
-
-type pp_collection =
-  | List of pp_list
-  | Map of pp_map
-
-type pp_utils_fsm =
-  | Init of fsm
-  | Alphabet of fsm
-  | States of fsm
-  | Edges of fsm
-
-type pp_utils = Fsm of pp_utils_fsm
-
-type pp_supported =
-  | Axiom of pp_axiom
-  | Collection of pp_collection
-  | Utils of pp_utils
-  | Fsm of fsm
-
-type pp_wrappable =
-  | State of state
-  | Action of action
-  | Edge of (state * action * state)
-  | OutgoingEdge of (action * state)
-  | States of Block.t
-  | Block of Block.t
-  | Alphabet of Alphabet.t
-  | Actions of Block.t Actions.t
-  | Edges of Block.t Actions.t Edges.t
-  | Partition of Partition.t
-  | Fsm of fsm
-
-type pp_options =
-  | Default of unit
-  | Debug of unit
-
-val pstr_options : bool -> pp_options
-val pp_collection_is_empty : pp_collection -> bool
-val pp_wrap_as_supported : pp_wrappable -> pp_supported
-val pstr : ?tabs:int -> ?options:pp_options -> pp_supported -> string
 
 exception StateNotFoundWithID of (int * States.t)
 exception MultipleStatesFoundWithID of (int * States.t)
