@@ -57,6 +57,7 @@ type logging_params =
   ; override : unit option
   }
 
+
 (**  *)
 let default_logging_params ?(mode : output_modes = OCaml ()) () : logging_params
   =
@@ -71,6 +72,17 @@ let default_logging_params ?(mode : output_modes = OCaml ()) () : logging_params
   and scope : string Stack.t = Stack.create ()
   and override : unit option = None in
   { mode; kind; options; scope; override }
+;;
+
+let set_logging_options (options : output_options) (params : logging_params)
+  : logging_params
+  =
+  { mode = params.mode
+  ; kind = params.kind
+  ; options
+  ; scope = params.scope
+  ; override = params.override
+  }
 ;;
 
 let override (params : logging_params) : logging_params =
