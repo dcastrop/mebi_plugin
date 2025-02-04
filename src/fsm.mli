@@ -326,34 +326,6 @@ exception ReverseStateHashtblLookupFailed of ((state, state) Hashtbl.t * state)
 val get_reverse_map_state : (state, state) Hashtbl.t -> state -> state
 
 module Merge : sig
-  val map_merge_states
-    :  ?params:Utils.logging_params
-    -> Block.t
-    -> Block.t
-    -> Block.t * (state, state) Hashtbl.t * (state, state) Hashtbl.t
-
-  exception StateNotFoundInMergedStates of (state * Block.t)
-  exception ActionNotFoundInMergedAlphabet of (action * Alphabet.t)
-
-  val map_merge_alphabet
-    :  ?params:Utils.logging_params
-    -> Alphabet.t
-    -> Alphabet.t
-    -> Alphabet.t * (action, action) Hashtbl.t
-
-  exception StateNotFoundInMapOfStates of (state * (state, state) Hashtbl.t)
-
-  exception
-    ActionNotFoundInMapOfAlphabet of (action * (action, action) Hashtbl.t)
-
-  val map_merge_edges
-    :  ?params:Utils.logging_params
-    -> Block.t Actions.t Edges.t
-    -> Block.t Actions.t Edges.t
-    -> (action, action) Hashtbl.t
-    -> (state, state) Hashtbl.t
-    -> Block.t Actions.t Edges.t
-
   val fsm
     :  ?params:Utils.logging_params
     -> fsm

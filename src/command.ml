@@ -987,8 +987,34 @@ let cmd_merge_fsm_from_lts
   ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
-  let* (s : fsm) = build_fsm_from_lts ~params s_iref s_tref in
-  let* (t : fsm) = build_fsm_from_lts ~params t_iref t_tref in
+  let* (s : fsm) =
+    build_fsm_from_lts
+      ~params:
+        (set_logging_options
+           { output_enabled = true
+           ; show_normal_output = false
+           ; show_detailed_output = false
+           ; show_debug_output = false
+           ; show_warning_output = true
+           }
+           params)
+      s_iref
+      s_tref
+  in
+  let* (t : fsm) =
+    build_fsm_from_lts
+      ~params:
+        (set_logging_options
+           { output_enabled = true
+           ; show_normal_output = false
+           ; show_detailed_output = false
+           ; show_debug_output = false
+           ; show_warning_output = true
+           }
+           params)
+      t_iref
+      t_tref
+  in
   (* *)
   let merged_fsm, _ = Merge.fsm ~params s t in
   log
@@ -1013,7 +1039,20 @@ let cmd_bisim_ks90_using_fsm
   =
   let open Bisimilarity in
   (* *)
-  let result = RCP.KS90.run ~params s t in
+  let result =
+    RCP.KS90.run
+      ~params:
+        (set_logging_options
+           { output_enabled = true
+           ; show_normal_output = false
+           ; show_detailed_output = false
+           ; show_debug_output = false
+           ; show_warning_output = true
+           }
+           params)
+      s
+      t
+  in
   match result with
   | { are_bisimilar; merged_fsm; bisimilar_states; non_bisimilar_states; _ } ->
     log

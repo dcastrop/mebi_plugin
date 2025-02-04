@@ -377,16 +377,14 @@ module RCP = struct
                       let original_state =
                         match Hashtbl.find_opt map_of_states state with
                         | None ->
-                          raise
-                            (Merge.StateNotFoundInMapOfStates
-                               (state, map_of_states))
+                          (* then must be from original state *)
+                          state
                         | Some _state -> _state
                       and original_state' =
                         match Hashtbl.find_opt map_of_states state' with
                         | None ->
-                          raise
-                            (Merge.StateNotFoundInMapOfStates
-                               (state, map_of_states))
+                          (* then must be from original state *)
+                          state'
                         | Some _state' -> _state'
                       in
                       (* [state] and [state'] must originate from different fsm. *)
