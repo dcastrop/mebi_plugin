@@ -5,19 +5,23 @@ Section Definitions.
     {A : Set}
     (LTS1 : M -> A -> M -> Prop)
     {N : Set}
-    {B : Set}
-    (LTS2 : N -> B -> N -> Prop).
+    (LTS2 : N -> A -> N -> Prop).
+
+  Record bisim_concl (Bisim : M -> N -> Prop) (t t' : N) (a : A) (s' : M) : Prop :=
+    { next_tr : LTS2 t a t';
+      next_bi : Bisim s' t'
+    }.
 
   Record bisim_f (Bisim : M -> N -> Prop) (s : M) (t : N) : Prop :=
     { bisim_l :
         forall s' a,
           LTS1 s a s' ->
-          exists t' b,
-            LTS2 t b t' /\ Bisim s' t';
+          exists t',
+            bisim_concl Bisim t t' a s';
       bisim_r :
-        forall t' b,
-          LTS2 t b t' ->
-          exists s' a,
+        forall t' a,
+          LTS2 t a t' ->
+          exists s',
             LTS1 s a s' /\ Bisim s' t';
     }.
 

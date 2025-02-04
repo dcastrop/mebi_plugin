@@ -760,169 +760,247 @@ let get_reverse_map_state (tbl : (state, state) Hashtbl.t) (v : state) : state =
 (****** Merging *****************************)
 (********************************************)
 
-exception StateNotFoundInMergedStates of (state * States.t)
+module Merge = struct
+  open Utils
 
-(** [map_merge_states a b] merges sets of states in [a] and [b] by combining them and assigning them new [ids] where necessary.
-    Note: we do not use the [union] of the sets since this would cause states of one to be lost in the merger.
-    @return
-      the merger of [a] and [b], along with a bidirectional mapping from original and merged states.
-    @param a is a set of states to be merged.
-    @param b is a set of states to be merged. *)
-let map_merge_states (a : States.t) (b : States.t)
-  : States.t * (state, state) Hashtbl.t * (state, state) Hashtbl.t
-  =
-  let num_states : int = States.cardinal a + States.cardinal b in
-  let map_of_merged_states : (state, state) Hashtbl.t =
-    num_states |> Hashtbl.create
-  and map_of_original_states : (state, state) Hashtbl.t =
-    num_states |> Hashtbl.create
-  in
-  (* let merged_states = States.union a b in *)
-  let merge_states (states : States.t) (into : States.t) : States.t =
-    States.fold
-      (fun (s : state) (acc : States.t) ->
-        let s' = make_state ~pp:s.pp (States.cardinal acc) in
-        (* add to map *)
-        Hashtbl.add map_of_merged_states s s';
-        Hashtbl.add map_of_original_states s' s;
-        (* add to merged states *)
-        States.add s' acc)
-      states
-      into
-  in
-  let merged_states = merge_states b (merge_states a States.empty) in
-  (* *)
-  assert (States.cardinal merged_states == num_states);
-  (* *)
-  merged_states, map_of_merged_states, map_of_original_states
-;;
+  (** [map_merge_states a b] merges sets of states in [a] and [b] by combining them and assigning them new [ids] where necessary.
+      Note: we do not use the [union] of the sets since this would cause states of one to be lost in the merger.
+      @return
+        the merger of [a] and [b], along with a bidirectional mapping from original and merged states.
+      @param params specifies what (debug) feedback is given.
+      @param a is a set of states to be merged.
+      @param b is a set of states to be merged. *)
+  let map_merge_states
+    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+    (a : States.t)
+    (b : States.t)
+    : States.t * (state, state) Hashtbl.t * (state, state) Hashtbl.t
+    =
+    let num_states : int = States.cardinal a + States.cardinal b in
+    let map_of_merged_states : (state, state) Hashtbl.t =
+      num_states |> Hashtbl.create
+    and map_of_original_states : (state, state) Hashtbl.t =
+      num_states |> Hashtbl.create
+    in
+    (* let merged_states = States.union a b in *)
+    let merge_states (states : States.t) (into : States.t) (name : string)
+      : States.t
+      =
+      States.fold
+        (fun (s : state) (acc : States.t) ->
+          let s' =
+            make_state
+              ~pp:(Printf.sprintf "%s|%s" name s.pp)
+              (States.cardinal acc)
+          in
+          (* add to map *)
+          Hashtbl.add map_of_merged_states s s';
+          Hashtbl.add map_of_original_states s' s;
+          (* add to merged states *)
+          States.add s' acc)
+        states
+        into
+    in
+    let merged_states = merge_states b (merge_states a States.empty "s") "t" in
+    (* *)
+    assert (States.cardinal merged_states == num_states);
+    (* *)
+    merged_states, map_of_merged_states, map_of_original_states
+  ;;
 
-exception ActionNotFoundInMergedAlphabet of (action * Alphabet.t)
+  exception StateNotFoundInMergedStates of (state * States.t)
+  exception ActionNotFoundInMergedAlphabet of (action * Alphabet.t)
 
-(** [map_merge_alphabet a b] merges alphabets [a] and [b].
-    @return
-      the union of [a] and [b], along with a mapping from the original to the merged actions.
-    @param a is an alphabet to merge.
-    @param b is an alphabet to merge.
-    @raise ActionNotFoundInMergedAlphabet
-      if when creating the mapping between original and merged actions, a merged action cannot be found. *)
-let map_merge_alphabet (a : Alphabet.t) (b : Alphabet.t)
-  : Alphabet.t * (action, action) Hashtbl.t
-  =
-  let map_of_alphabet : (action, action) Hashtbl.t =
-    Alphabet.cardinal a + Alphabet.cardinal b |> Hashtbl.create
-  in
-  let merged_alphabet = Alphabet.union a b in
-  let add_to_alphabet_map (some_alphabet : Alphabet.t) : unit =
-    Alphabet.iter
-      (fun (act : action) ->
-        Hashtbl.add
-          map_of_alphabet
-          act
-          (match Alphabet.find_opt act merged_alphabet with
-           | None ->
-             raise (ActionNotFoundInMergedAlphabet (act, merged_alphabet))
-           | Some act' -> act'))
-      some_alphabet
-  in
-  add_to_alphabet_map a;
-  add_to_alphabet_map b;
-  (* *)
-  merged_alphabet, map_of_alphabet
-;;
+  (** [map_merge_alphabet a b] merges alphabets [a] and [b].
+      @return
+        the union of [a] and [b], along with a mapping from the original to the merged actions.
+      @param params specifies what (debug) feedback is given.
+      @param a is an alphabet to merge.
+      @param b is an alphabet to merge.
+      @raise ActionNotFoundInMergedAlphabet
+        if when creating the mapping between original and merged actions, a merged action cannot be found. *)
+  let map_merge_alphabet
+    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+    (a : Alphabet.t)
+    (b : Alphabet.t)
+    : Alphabet.t * (action, action) Hashtbl.t
+    =
+    let map_of_alphabet : (action, action) Hashtbl.t =
+      Alphabet.cardinal a + Alphabet.cardinal b |> Hashtbl.create
+    in
+    let merged_alphabet = Alphabet.union a b in
+    let add_to_alphabet_map (some_alphabet : Alphabet.t) : unit =
+      Alphabet.iter
+        (fun (act : action) ->
+          Hashtbl.add
+            map_of_alphabet
+            act
+            (match Alphabet.find_opt act merged_alphabet with
+             | None ->
+               raise (ActionNotFoundInMergedAlphabet (act, merged_alphabet))
+             | Some act' -> act'))
+        some_alphabet
+    in
+    add_to_alphabet_map a;
+    add_to_alphabet_map b;
+    (* *)
+    merged_alphabet, map_of_alphabet
+  ;;
 
-exception StateNotFoundInMapOfStates of (state * (state, state) Hashtbl.t)
-exception ActionNotFoundInMapOfAlphabet of (action * (action, action) Hashtbl.t)
+  exception StateNotFoundInMapOfStates of (state * (state, state) Hashtbl.t)
 
-(** [map_merge_edges a b map_of_alphabet map_of_states] merges [a] and [b] and updates the relevant states and actions accordingly.
-    @return a merger of [a] and [b] with updated states and actions.
-    @param a is a map of edges to merge.
-    @param b is a map of edges to merge.
-    @param map_of_alphabet is a map from original actions to merged actions.
-    @param map_of_states is a map from original states to merged states.
-    @raise StateNotFoundInMapOfStates
-      if when updating a state in an edge, it cannot be found in [map_of_states].
-    @raise ActionNotFoundInMapOfAlphabet
-      if when updating a action in an edge, it cannot be found in [map_of_alphabet]. *)
-let map_merge_edges
-  (a : States.t Actions.t Edges.t)
-  (b : States.t Actions.t Edges.t)
-  (map_of_alphabet : (action, action) Hashtbl.t)
-  (map_of_states : (state, state) Hashtbl.t)
-  : States.t Actions.t Edges.t
-  =
-  let merged_edges = Edges.length a + Edges.length b |> Edges.create in
-  let add_to_merged_edges (edges : States.t Actions.t Edges.t) : unit =
-    Edges.iter
-      (fun (from_state : state) (outgoing_edges : States.t Actions.t) ->
-        (* need to update states in edge *)
-        Edges.add
-          merged_edges
-          (match Hashtbl.find_opt map_of_states from_state with
-           | None ->
-             raise (StateNotFoundInMapOfStates (from_state, map_of_states))
-           | Some from_state' -> from_state')
-          (Actions.of_seq
-             (List.to_seq
-                (Actions.fold
-                   (fun (action : action)
-                     (destinations : States.t)
-                     (acc : (action * States.t) list) ->
-                     List.append
-                       acc
-                       [ (match Hashtbl.find_opt map_of_alphabet action with
-                          | None ->
-                            raise
-                              (ActionNotFoundInMapOfAlphabet
-                                 (action, map_of_alphabet))
-                          | Some new_action ->
-                            ( new_action
-                            , States.map
-                                (fun (old_state : state) ->
-                                  match
-                                    Hashtbl.find_opt map_of_states old_state
-                                  with
-                                  | None ->
-                                    raise
-                                      (StateNotFoundInMapOfStates
-                                         (old_state, map_of_states))
-                                  | Some new_state -> new_state)
-                                destinations ))
-                       ])
-                   outgoing_edges
-                   []))))
-      edges
-  in
-  add_to_merged_edges a;
-  add_to_merged_edges b;
-  (* return *)
-  merged_edges
-;;
+  exception
+    ActionNotFoundInMapOfAlphabet of (action * (action, action) Hashtbl.t)
 
-(** [merge_fsm s t] is the merger of two fsms [s] and [t].
-    Note: the states of each are disjointly unioned (by creating new states with new IDs).
-    @return
-      the merged fsm and a hashtable mapping the new states to the original.
-    @param s is an fsm to merge.
-    @param t is an fsm to merge.
-    @raise StateNotFoundInMapOfStates
-      if when updating the edges, the new state cannot be found (likely due to the sets of states not merging correctly). *)
-let merge_fsm (s : fsm) (t : fsm) : fsm * (state, state) Hashtbl.t =
-  (* *)
-  let merged_alphabet, map_of_alphabet =
-    map_merge_alphabet s.alphabet t.alphabet
-  in
-  let merged_states, map_of_merged_states, map_of_original_states =
-    map_merge_states s.states t.states
-  in
-  let merged_edges =
-    map_merge_edges s.edges t.edges map_of_alphabet map_of_merged_states
-  in
-  (* return a new fsm *)
-  ( make_fsm
-      (make_state ~pp:"<merged>" (-1))
-      merged_alphabet
-      merged_states
-      merged_edges
-  , map_of_original_states )
-;;
+  (** [map_merge_edges a b map_of_alphabet map_of_states] merges [a] and [b] and updates the relevant states and actions accordingly.
+      @return a merger of [a] and [b] with updated states and actions.
+      @param params specifies what (debug) feedback is given.
+      @param a is a map of edges to merge.
+      @param b is a map of edges to merge.
+      @param map_of_alphabet is a map from original actions to merged actions.
+      @param map_of_states is a map from original states to merged states.
+      @raise StateNotFoundInMapOfStates
+        if when updating a state in an edge, it cannot be found in [map_of_states].
+      @raise ActionNotFoundInMapOfAlphabet
+        if when updating a action in an edge, it cannot be found in [map_of_alphabet]. *)
+  let map_merge_edges
+    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+    (a : States.t Actions.t Edges.t)
+    (b : States.t Actions.t Edges.t)
+    (map_of_alphabet : (action, action) Hashtbl.t)
+    (map_of_states : (state, state) Hashtbl.t)
+    : States.t Actions.t Edges.t
+    =
+    let merged_edges = Edges.length a + Edges.length b |> Edges.create in
+    let add_to_merged_edges (edges : States.t Actions.t Edges.t) (name : string)
+      : unit
+      =
+      Edges.iter
+        (fun (from_state : state) (outgoing_edges : States.t Actions.t) ->
+          (* let from_state':state=make_state ~pp:(Printf.sprintf "%s|%s" name from_state.pp) from_state.id in *)
+          (* need to update states in edge *)
+          Edges.add
+            merged_edges
+            (match Hashtbl.find_opt map_of_states from_state with
+             | None ->
+               raise (StateNotFoundInMapOfStates (from_state, map_of_states))
+             | Some from_state' -> from_state')
+            (Actions.of_seq
+               (List.to_seq
+                  (Actions.fold
+                     (fun (action : action)
+                       (destinations : States.t)
+                       (acc : (action * States.t) list) ->
+                       List.append
+                         acc
+                         [ (match Hashtbl.find_opt map_of_alphabet action with
+                            | None ->
+                              raise
+                                (ActionNotFoundInMapOfAlphabet
+                                   (action, map_of_alphabet))
+                            | Some new_action ->
+                              ( new_action
+                              , States.map
+                                  (fun (old_state : state) ->
+                                    match
+                                      Hashtbl.find_opt map_of_states old_state
+                                    with
+                                    | None ->
+                                      raise
+                                        (StateNotFoundInMapOfStates
+                                           (old_state, map_of_states))
+                                    | Some new_state -> new_state)
+                                  destinations ))
+                         ])
+                     outgoing_edges
+                     []))))
+        edges
+    in
+    add_to_merged_edges a "s";
+    add_to_merged_edges b "t";
+    (* return *)
+    merged_edges
+  ;;
+
+  (** [merge_fsm s t] is the merger of two fsms [s] and [t].
+      Note: the states of each are disjointly unioned (by creating new states with new IDs).
+      @return
+        the merged fsm and a hashtable mapping the new states to the original.
+      @param params specifies what (debug) feedback is given.
+      @param s is an fsm to merge.
+      @param t is an fsm to merge.
+      @raise StateNotFoundInMapOfStates
+        if when updating the edges, the new state cannot be found (likely due to the sets of states not merging correctly). *)
+  let fsm
+    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+    (s : fsm)
+    (t : fsm)
+    : fsm * (state, state) Hashtbl.t
+    =
+    (* *)
+    let merged_alphabet, map_of_alphabet =
+      map_merge_alphabet ~params s.alphabet t.alphabet
+    in
+    log
+      ~params:(log_kind (Details ()) params)
+      (Printf.sprintf
+         "map of alphabet: {%s}."
+         (Hashtbl.fold
+            (fun (_k : action) (_v : action) (acc : string) ->
+              Printf.sprintf
+                "%s  (%s) => (%s)\n"
+                acc
+                (PStr.action
+                   ~params:(Logging (log_kind (Details ()) params))
+                   _k)
+                (PStr.action
+                   ~params:(Logging (log_kind (Details ()) params))
+                   _v))
+            map_of_alphabet
+            "\n"));
+    let merged_states, map_of_merged_states, map_of_original_states =
+      map_merge_states ~params s.states t.states
+    in
+    log
+      ~params:(log_kind (Details ()) params)
+      (Printf.sprintf
+         "map of merged states: {%s}."
+         (Hashtbl.fold
+            (fun (_k : state) (_v : state) (acc : string) ->
+              Printf.sprintf
+                "%s  (%s) => (%s)\n"
+                acc
+                (PStr.state ~params:(Logging (log_kind (Details ()) params)) _k)
+                (PStr.state ~params:(Logging (log_kind (Details ()) params)) _v))
+            map_of_merged_states
+            "\n"));
+    log
+      ~params:(log_kind (Details ()) params)
+      (Printf.sprintf
+         "map of original states: {%s}."
+         (Hashtbl.fold
+            (fun (_k : state) (_v : state) (acc : string) ->
+              Printf.sprintf
+                "%s  (%s) => (%s)\n"
+                acc
+                (PStr.state ~params:(Logging (log_kind (Details ()) params)) _k)
+                (PStr.state ~params:(Logging (log_kind (Details ()) params)) _v))
+            map_of_original_states
+            "\n"));
+    let merged_edges =
+      map_merge_edges
+        ~params
+        s.edges
+        t.edges
+        map_of_alphabet
+        map_of_merged_states
+    in
+    (* return a new fsm *)
+    ( make_fsm
+        (make_state ~pp:"<merged>" (-1))
+        merged_alphabet
+        merged_states
+        merged_edges
+    , map_of_original_states )
+  ;;
+end
