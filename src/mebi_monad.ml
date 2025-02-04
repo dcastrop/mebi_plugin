@@ -129,7 +129,10 @@ let feedback
   (f : Environ.env -> Evd.evar_map -> Pp.t)
   : unit t
   =
-  assert (params.mode == Coq ());
+  assert (
+    match params.mode with
+    | Coq () -> true
+    | _ -> false);
   state (fun env sigma ->
     (match params.kind with
      | Normal () -> Feedback.msg_notice (f env sigma)

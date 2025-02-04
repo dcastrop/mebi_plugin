@@ -2,7 +2,7 @@ open Pp
 open Mebi_utils
 open Mebi_monad
 open Mebi_monad.Monad_syntax
-(* open Pp_ext *)
+open Pp_ext
 
 (* *)
 open Fsm
@@ -519,10 +519,9 @@ struct
       in
       List.iter
         (fun ((act, tgt, int_tree) : EConstr.t * EConstr.t * int tree) ->
-          (* let* _ =
-             feedback ~params:(log_kind (Debug ()) params) (fun env sigma ->
-             str "\n\nTransition to" ++ Printer.pr_econstr_env env sigma tgt)
-             in *)
+          log
+            ~params:(log_kind (Debug ()) params)
+            (Printf.sprintf "\n\nTransition to: %s." (econstr_to_string tgt));
           new_states := S.add tgt !new_states;
           H.add
             g.transitions
@@ -534,9 +533,10 @@ struct
             };
           if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
           then ()
-          else
-            Queue.push tgt g.to_visit
-            (* log ~params:(log_kind (Debug ()) params) (Printf.sprintf "\nVisiting next: %i" ++ int (Queue.length g.to_visit)) *))
+          else Queue.push tgt g.to_visit;
+          log
+            ~params:(log_kind (Debug ()) params)
+            (Printf.sprintf "\nVisiting next: %i." (Queue.length g.to_visit)))
         constrs;
       let g = { g with states = S.union g.states !new_states } in
       build_lts ~params the_lts g
@@ -792,11 +792,11 @@ struct
       if Bool.not (Queue.is_empty to_visit)
       then (
         (* do not proceed *)
-        Feedback.msg_warning
-          (str
-             (Printf.sprintf
-                "lts is not complete, still had at least (%d) terms to visit."
-                (Queue.length to_visit)));
+        log
+          ~params:(log_kind (Warning ()) params)
+          (Printf.sprintf
+             "lts is not complete, still had at least (%d) terms to visit."
+             (Queue.length to_visit));
         raise (UnfinishedLTS g))
       else
         (* extract states *)
@@ -829,6 +829,8 @@ let build_lts
   (tref : Constrexpr.constr_expr_r CAst.t)
   : raw_lts mm
   =
+  let debug_params : logging_params = log_kind (Debug ()) params in
+  (* *)
   let* raw_lts = check_ref_lts iref in
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
@@ -837,36 +839,36 @@ let build_lts
   let* env = get_env in
   let* sigma = get_sigma in
   (* *)
-  (* if show_debug
-     then (
-     Feedback.msg_debug
-     (str
-     (Printf.sprintf
-     "(a) Types of terms: %s.\n"
-     (econstr_to_string raw_lts.trm_type)));
-     Feedback.msg_debug
-     (str
-     (Printf.sprintf
-     "(b) Types of labels: %s.\n"
-     (econstr_to_string raw_lts.lbl_type)));
-     Feedback.msg_debug
-     (str "(c) Constructors: "
-     ++ Pp.prvect_with_sep
-     (fun _ -> str ", ")
-     Names.Id.print
-     raw_lts.coq_ctor_names);
-     (* prints all transitions -- the possible constructors.
-     a term may take as part of its structure.
-     these are dependant on the definition of a type. *)
-     Feedback.msg_debug
-     (str "(d) Transitions: "
-     ++ pp_transitions env sigma raw_lts.constructor_transitions
-     ++ strbrk "\n");
-     Feedback.msg_debug
-     (str
-     (Printf.sprintf
-     "(e) Graph Edges: %s.\n"
-     (G.pstr_lts_transitions ~long:() graph_lts.transitions)))); *)
+  log
+    ~params:debug_params
+    (Printf.sprintf
+       "(a) Types of terms: %s.\n"
+       (econstr_to_string raw_lts.trm_type));
+  log
+    ~params:debug_params
+    (Printf.sprintf
+       "(b) Types of labels: %s.\n"
+       (econstr_to_string raw_lts.lbl_type));
+  log
+    ~params:debug_params
+    (Printf.sprintf
+       "(c) Constructors: %s.\n"
+       (Pp.string_of_ppcmds
+          (Pp.prvect_with_sep
+             (fun _ -> str ", ")
+             Names.Id.print
+             raw_lts.coq_ctor_names)));
+  log
+    ~params:debug_params
+    (Printf.sprintf
+       "(d) Transitions: %s.\n"
+       (Pp.string_of_ppcmds
+          (pp_transitions env sigma raw_lts.constructor_transitions)));
+  log
+    ~params:debug_params
+    (Printf.sprintf
+       "(e) Graph Edges: %s.\n"
+       (G.pstr_lts_transitions ~params:debug_params graph_lts.transitions));
   return raw_lts
 ;;
 
@@ -877,71 +879,62 @@ let build_fsm_from_lts
   (tref : Constrexpr.constr_expr_r CAst.t)
   : fsm mm
   =
+  let debug_params : logging_params = log_kind (Debug ()) params in
+  (* *)
   let* raw_lts = check_ref_lts iref in
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
-  let* graph_lts = G.build_graph ~params raw_lts tref in
+  let* graph_lts = G.build_graph ~params:debug_params raw_lts tref in
   (* *)
   let* env = get_env in
   let* sigma = get_sigma in
   (* *)
-  (* if show_debug
-     then (
-     Feedback.msg_debug
-     (str
-     (Printf.sprintf
-     "(a) Types of terms: %s.\n"
-     (econstr_to_string raw_lts.trm_type)));
-     Feedback.msg_debug
-     (str
-     (Printf.sprintf
-     "(b) Types of labels: %s.\n"
-     (econstr_to_string raw_lts.lbl_type)));
-     Feedback.msg_debug
-     (str "(c) Constructors: "
-     ++ Pp.prvect_with_sep
-     (fun _ -> str ", ")
-     Names.Id.print
-     raw_lts.coq_ctor_names);
-     (* prints all transitions -- the possible constructors.
-     a term may take as part of its structure.
-     these are dependant on the definition of a type. *)
-     Feedback.msg_debug
-     (str "(d) Transitions: "
-     ++ pp_transitions env sigma raw_lts.constructor_transitions
-     ++ strbrk "\n");
-     Feedback.msg_debug
-     (str
-     (Printf.sprintf
-     "(e) Graph Edges: %s.\n"
-     (G.pstr_lts_transitions ~long:() graph_lts.transitions)))); *)
+  log
+    ~params:debug_params
+    (Printf.sprintf
+       "(a) Types of terms: %s.\n"
+       (econstr_to_string raw_lts.trm_type));
+  log
+    ~params:debug_params
+    (Printf.sprintf
+       "(b) Types of labels: %s.\n"
+       (econstr_to_string raw_lts.lbl_type));
+  log
+    ~params:debug_params
+    (Printf.sprintf
+       "(c) Constructors: %s.\n"
+       (Pp.string_of_ppcmds
+          (Pp.prvect_with_sep
+             (fun _ -> str ", ")
+             Names.Id.print
+             raw_lts.coq_ctor_names)));
+  log
+    ~params:debug_params
+    (Printf.sprintf
+       "(d) Transitions: %s.\n"
+       (Pp.string_of_ppcmds
+          (pp_transitions env sigma raw_lts.constructor_transitions)));
+  log
+    ~params:debug_params
+    (Printf.sprintf
+       "(e) Graph Edges: %s.\n"
+       (G.pstr_lts_transitions ~params:debug_params graph_lts.transitions));
   (* *)
-  let* the_fsm, translation = G.lts_to_fsm ~params graph_lts tref in
-  (* if show_debug
-     then (
-     Feedback.msg_debug
-     (str
-     (Printf.sprintf
-     "(f) Fsm: %s.\n"
-     (pstr (pp_wrap_as_supported (Fsm the_fsm)))));
-     Feedback.msg_debug
-     (str
-     (Printf.sprintf
-     "(g, with details) Fsm: %s.\n"
-     (pstr ~options:(Debug ()) (pp_wrap_as_supported (Fsm the_fsm))))));
-     (* *)
-     if show_details
-     then
-     Feedback.msg_info
-     (str
-     (Printf.sprintf
-     "generated fsm: %s.\n"
-     (pstr
-     ~options:(pstr_options show_details)
-     (pp_wrap_as_supported (Fsm the_fsm)))));
-     (* *)
-     if show_debug
-     then Feedback.msg_debug (str "\n= = = = = (end of build_fsm) = = = = = =\n"); *)
+  let* the_fsm, translation =
+    G.lts_to_fsm ~params:debug_params graph_lts tref
+  in
+  log
+    ~params:debug_params
+    (Printf.sprintf
+       "(f) Fsm: %s.\n"
+       (PStr.fsm ~params:(Logging debug_params) the_fsm));
+  log
+    ~params
+    (Printf.sprintf
+       "Generated FSM: %s.\n"
+       (PStr.fsm ~params:(Logging (log_kind (Normal ()) params)) the_fsm));
+  log ~params "\n= = = = = (end of build_fsm) = = = = = =\n";
+  (* *)
   return the_fsm
 ;;
 
@@ -998,7 +991,6 @@ let cmd_merge_fsm_from_lts
   let* (t : fsm) = build_fsm_from_lts ~params t_iref t_tref in
   (* *)
   let merged_fsm, _ = merge_fsm s t in
-  let params : logging_params = default_logging_params ~mode:(Coq ()) () in
   log
     ~params:(log_kind (Details ()) params)
     (Printf.sprintf
@@ -1024,20 +1016,20 @@ let cmd_bisim_ks90_using_fsm
   let result = RCP.KS90.run ~params s t in
   match result with
   | { are_bisimilar; bisimilar_states; non_bisimilar_states; _ } ->
-    Feedback.msg_info
-      (str
-         (Printf.sprintf
-            "[KS90] Results: (s ~ t) = %b.\n\n\
-             Bisimilar states: %s.\n\n\
-             Non-bisimilar states: %s.\n\n\
-             where s = %s\n\n\
-             and t = %s.\n\n\
-             = = = (end of cmd_bisim_ks90_using_fsm) = = = = = =\n\n"
-            are_bisimilar
-            (PStr.partition ~params:(Logging params) bisimilar_states)
-            (PStr.partition ~params:(Logging params) non_bisimilar_states)
-            (PStr.fsm ~params:(Logging params) s)
-            (PStr.fsm ~params:(Logging params) t)));
+    log
+      ~params:(log_kind (Normal ()) params)
+      (Printf.sprintf
+         "[KS90] Results: (s ~ t) = %b.\n\n\
+          Bisimilar states: %s.\n\n\
+          Non-bisimilar states: %s.\n\n\
+          where s = %s\n\n\
+          and t = %s.\n\n\
+          = = = (end of cmd_bisim_ks90_using_fsm) = = = = = =\n\n"
+         are_bisimilar
+         (PStr.partition ~params:(Logging params) bisimilar_states)
+         (PStr.partition ~params:(Logging params) non_bisimilar_states)
+         (PStr.fsm ~params:(Logging params) s)
+         (PStr.fsm ~params:(Logging params) t));
     return ()
 ;;
 
