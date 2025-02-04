@@ -8,6 +8,7 @@ open Utils
 (** [bisim_result] is returned by the algorithms that check for bisimilarity. *)
 type bisim_result =
   { are_bisimilar : bool
+  ; merged_fsm : fsm
   ; bisimilar_states : Partition.t
   ; non_bisimilar_states : Partition.t
   }
@@ -377,13 +378,15 @@ module RCP = struct
                         match Hashtbl.find_opt map_of_states state with
                         | None ->
                           raise
-                            (StateNotFoundInMapOfStates (state, map_of_states))
+                            (Merge.StateNotFoundInMapOfStates
+                               (state, map_of_states))
                         | Some _state -> _state
                       and original_state' =
                         match Hashtbl.find_opt map_of_states state' with
                         | None ->
                           raise
-                            (StateNotFoundInMapOfStates (state, map_of_states))
+                            (Merge.StateNotFoundInMapOfStates
+                               (state, map_of_states))
                         | Some _state' -> _state'
                       in
                       (* [state] and [state'] must originate from different fsm. *)
@@ -426,11 +429,9 @@ module RCP = struct
       : bisim_result
       =
       (* *)
-      log
-        ~params:(log_kind (Details ()) params)
-        "\n\n=/=/=/= KS90.run =/=/=/=\n\n";
+      log ~params:(log_kind (Debug ()) params) "=/=/=/= KS90.run =/=/=/=\n\n";
       (* get initial partition [pi] by merging states from [s] and [t] into single set. *)
-      let merged_fsm, map_of_states = merge_fsm s t in
+      let merged_fsm, map_of_states = Merge.fsm s t in
       (* *)
       match merged_fsm with
       | { alphabet; states; edges; _ } ->
@@ -448,7 +449,7 @@ module RCP = struct
         done;
         (* *)
         log
-          ~params:(log_kind (Details ()) params)
+          ~params:(log_kind (Debug ()) params)
           "=/= KS90.run, exited main loop =/=\n\n";
         (* split [!pi] based on whether if states are bisimilar or not *)
         let (bisimilar_states, non_bisimilar_states) : Partition.t * Partition.t
@@ -457,11 +458,11 @@ module RCP = struct
         in
         let are_bisimilar = Partition.is_empty non_bisimilar_states in
         log
-          ~params:(log_kind (Details ()) params)
+          ~params:(log_kind (Debug ()) params)
           (Printf.sprintf
              "=/=/=/=/=/=/=\n\nKS90.run, are_bisimilar: %b\n\n=/=/=/=/=/=/=\n\n"
              are_bisimilar);
-        { are_bisimilar; bisimilar_states; non_bisimilar_states }
+        { are_bisimilar; merged_fsm; bisimilar_states; non_bisimilar_states }
     ;;
   end
 
