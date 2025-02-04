@@ -1,5 +1,6 @@
 type bisim_result =
   { are_bisimilar : bool
+  ; merged_fsm : Fsm.fsm
   ; bisimilar_states : Fsm.Partition.t
   ; non_bisimilar_states : Fsm.Partition.t
   }

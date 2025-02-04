@@ -57,7 +57,6 @@ type logging_params =
   ; override : unit option
   }
 
-
 (**  *)
 let default_logging_params ?(mode : output_modes = OCaml ()) () : logging_params
   =
@@ -65,7 +64,7 @@ let default_logging_params ?(mode : output_modes = OCaml ()) () : logging_params
   and options : output_options =
     { output_enabled = true
     ; show_normal_output = true
-    ; show_detailed_output = false
+    ; show_detailed_output = true
     ; show_debug_output = false
     ; show_warning_output = true
     }
@@ -159,6 +158,28 @@ let log ?(params : logging_params = default_logging_params ()) (to_log : string)
            else Printf.sprintf "%s :: \n" (pstr_scope scope))
           msg_to_log)
 ;;
+
+(* else (
+   let msg_to_log : string =
+   Printf.sprintf
+   "LOGGING DISABLED: %s\n%s\n"
+   (pstr_output_kind_head mode kind)
+   to_log
+   in
+   match mode with
+   | Coq () ->
+   (match kind with
+   | Normal () -> Feedback.msg_notice (Pp.str msg_to_log)
+   | Details () -> Feedback.msg_info (Pp.str msg_to_log)
+   | Debug () -> Feedback.msg_debug (Pp.str msg_to_log)
+   | Warning () -> Feedback.msg_warning (Pp.str msg_to_log))
+   | OCaml () ->
+   Printf.printf
+   "%s%s\n"
+   (if Stack.is_empty scope
+   then ""
+   else Printf.sprintf "%s :: \n" (pstr_scope scope))
+   msg_to_log) *)
 
 (** [print ?show to_print] is a wrapper for [Printf.printf].
     @param ?show determines if [to_print] is outputted. *)

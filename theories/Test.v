@@ -154,7 +154,7 @@ Module BisimTest1.
       termLTS (tfix t) a t'.
 
   (* true *)
-  MeBi Bisim KS90
+  MeBi Bisim KS90 show_debug
     termLTS (tact TheAction1 tend)
     termLTS (tact TheAction1 tend).
 

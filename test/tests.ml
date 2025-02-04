@@ -69,13 +69,18 @@ let rec ks90_exas
              %s.t: %s.\n\n"
             name
             name
-            (PStr.fsm ~params:(Logging params) s)
+            (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) s)
             name
-            (PStr.fsm ~params:(Logging params) t));
+            (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) t));
        (* run algorithm *)
        let result = RCP.KS90.run ~params s t in
        (match result with
-        | { are_bisimilar; bisimilar_states; non_bisimilar_states; _ } ->
+        | { are_bisimilar
+          ; merged_fsm
+          ; bisimilar_states
+          ; non_bisimilar_states
+          ; _
+          } ->
           (* print out results *)
           log
             ~params:(override params)
@@ -83,11 +88,19 @@ let rec ks90_exas
                "[KS90] (%s) Results: (s ~ t) = %b.\n\n\
                 Bisimilar states: %s.\n\n\
                 Non-bisimilar states: %s.\n\n\
+                Using merged FSM: %s.\n\n\
                 = = = = = = = = = = = = = = = = = = =\n\n"
                name
                are_bisimilar
-               (PStr.partition ~params:(Logging params) bisimilar_states)
-               (PStr.partition ~params:(Logging params) non_bisimilar_states));
+               (PStr.partition
+                  ~params:(Logging (log_kind (Details ()) params))
+                  bisimilar_states)
+               (PStr.partition
+                  ~params:(Logging (log_kind (Details ()) params))
+                  non_bisimilar_states)
+               (PStr.fsm
+                  ~params:(Logging (log_kind (Details ()) params))
+                  merged_fsm));
           (* continue *)
           (name, _are_bisimilar, are_bisimilar) :: ks90_exas ~params exas'))
 ;;
@@ -108,6 +121,7 @@ let run_all_ks90
     ; exa_rec_1
     ; exa_rec_2
     ; exa_par_1
+    ; exa_self_act1
     ]
 ;;
 
