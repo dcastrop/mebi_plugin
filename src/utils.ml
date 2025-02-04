@@ -1,3 +1,153 @@
+let is_unit_option (override : unit option) : bool =
+  match override with
+  | None -> false
+  | Some () -> true
+;;
+
+type output_modes =
+  | Coq of unit
+  | OCaml of unit
+
+type output_kind =
+  | Normal of unit
+  | Details of unit
+  | Debug of unit
+  | Warning of unit
+
+let pstr_output_kind_head (mode : output_modes) (kind : output_kind) : string =
+  match mode with
+  | Coq () ->
+    (match kind with
+     | Normal () -> ""
+     | Details () -> "( Details )"
+     | Debug () -> ""
+     | Warning () -> "")
+  | OCaml () ->
+    (match kind with
+     | Normal () -> ""
+     | Details () -> "( Details )"
+     | Debug () -> "( > Debug )"
+     | Warning () -> "( Warning )")
+;;
+
+type output_options =
+  { output_enabled : bool
+  ; show_normal_output : bool
+  ; show_detailed_output : bool
+  ; show_debug_output : bool
+  ; show_warning_output : bool
+  }
+(*
+   module DebugScope =Stack.Make (struct
+   type t = string
+
+   let equal (t1 : string) (t2 : string) = String.equal t1 t2
+   end) *)
+
+(** [logging_params]
+    - [mode] determines if the print occurs via [Printf.printf] for [OCaml] or for [Coq], via [Feedback.msg_info] or similar.
+    - [kind] specifies the nature of the message to be printed.
+    - [options] specifies how different kinds of messages should be shown, in general.
+    - [override] specifies that the output should be shown, regardless of [kind], ignoring [options]. *)
+type logging_params =
+  { mode : output_modes
+  ; kind : output_kind
+  ; options : output_options
+  ; scope : string Stack.t
+  ; override : unit option
+  }
+
+(**  *)
+let default_logging_params ?(mode : output_modes = OCaml ()) () : logging_params
+  =
+  let kind : output_kind = Normal ()
+  and options : output_options =
+    { output_enabled = true
+    ; show_normal_output = true
+    ; show_detailed_output = false
+    ; show_debug_output = false
+    ; show_warning_output = true
+    }
+  and scope : string Stack.t = Stack.create ()
+  and override : unit option = None in
+  { mode; kind; options; scope; override }
+;;
+
+let override (params : logging_params) : logging_params =
+  match params with
+  | { mode; kind; options; scope; override } ->
+    { mode; kind; options; scope; override = Some () }
+;;
+
+let log_kind (kind' : output_kind) (params : logging_params) : logging_params =
+  match params with
+  | { mode; kind; options; scope; override } ->
+    { mode; kind = kind'; options; scope; override }
+;;
+
+let push_scope (to_push : string) (params : logging_params) : unit =
+  Stack.push to_push params.scope
+;;
+
+let peek_scope (to_push : string) (params : logging_params) : string =
+  Stack.top params.scope
+;;
+
+let pop_scope (to_push : string) (params : logging_params) : string =
+  Stack.pop params.scope
+;;
+
+let pstr_scope (scope : string Stack.t) : string =
+  Stack.fold
+    (fun (acc : string) (level : string) -> Printf.sprintf "%s.%s" level acc)
+    ""
+    scope
+;;
+
+let is_output_kind_enabled
+  (kind : output_kind)
+  (options : output_options)
+  (override : unit option)
+  : bool
+  =
+  is_unit_option override
+  ||
+  if options.output_enabled
+  then (
+    match kind with
+    | Normal () -> options.show_normal_output
+    | Details () -> options.show_detailed_output
+    | Debug () -> options.show_debug_output
+    | Warning () -> options.show_warning_output)
+  else false
+;;
+
+let log ?(params : logging_params = default_logging_params ()) (to_log : string)
+  : unit
+  =
+  match params with
+  | { mode; kind; options; scope; override } ->
+    if is_output_kind_enabled kind options override
+    then (
+      let msg_to_log : string =
+        Printf.sprintf "%s\n%s\n" (pstr_output_kind_head mode kind) to_log
+      in
+      match mode with
+      | Coq () ->
+        (match kind with
+         | Normal () -> Feedback.msg_notice (Pp.str msg_to_log)
+         | Details () -> Feedback.msg_info (Pp.str msg_to_log)
+         | Debug () -> Feedback.msg_debug (Pp.str msg_to_log)
+         | Warning () -> Feedback.msg_warning (Pp.str msg_to_log))
+      | OCaml () ->
+        Printf.printf
+          "%s%s\n"
+          (if Stack.is_empty scope
+           then ""
+           else Printf.sprintf "%s :: \n" (pstr_scope scope))
+          msg_to_log)
+;;
+
 (** [print ?show to_print] is a wrapper for [Printf.printf].
     @param ?show determines if [to_print] is outputted. *)
 let print ?(show : bool = false) (to_print : string) : unit =

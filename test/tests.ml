@@ -5,9 +5,7 @@ open Mebi_plugin.Examples
 
 (**  *)
 let pstr_results
-  ?(show : bool = false)
-  ?(details : bool = true)
-  ?(debug : bool = false)
+  ?(params : logging_params = default_logging_params ~mode:(OCaml ()) ())
   (results : (string * (string * bool * bool) list) list)
   : string
   =
@@ -50,9 +48,7 @@ let pstr_results
 
 (** [ks90_exas] ... *)
 let rec ks90_exas
-  ?(show : bool = false)
-  ?(details : bool = true)
-  ?(debug : bool = false)
+  ?(params : logging_params = default_logging_params ~mode:(OCaml ()) ())
   (exas : example list)
   : (string * bool * bool) list
   =
@@ -63,8 +59,8 @@ let rec ks90_exas
      | { name; s; t; are_bisimilar; _ } ->
        let _are_bisimilar = are_bisimilar in
        (* safely print depending on if coq or not *)
-       print
-         ~show
+       log
+         ~params:(override params)
          (Printf.sprintf
             "\n\
              = = = = = = = = = = = = = = = = = = =\n\
@@ -73,16 +69,16 @@ let rec ks90_exas
              %s.t: %s.\n\n"
             name
             name
-            (pstr ~options:(pstr_options details) (Fsm s))
+            (PStr.fsm ~params:(Logging params) s)
             name
-            (pstr ~options:(pstr_options details) (Fsm t)));
+            (PStr.fsm ~params:(Logging params) t));
        (* run algorithm *)
-       let result = RCP.KS90.run ~show ~details ~debug s t in
+       let result = RCP.KS90.run ~params s t in
        (match result with
         | { are_bisimilar; bisimilar_states; non_bisimilar_states; _ } ->
           (* print out results *)
-          print
-            ~show
+          log
+            ~params:(override params)
             (Printf.sprintf
                "[KS90] (%s) Results: (s ~ t) = %b.\n\n\
                 Bisimilar states: %s.\n\n\
@@ -90,29 +86,19 @@ let rec ks90_exas
                 = = = = = = = = = = = = = = = = = = =\n\n"
                name
                are_bisimilar
-               (pstr
-                  ~options:(pstr_options details)
-                  ~tabs:1
-                  (pp_wrap_as_supported (Partition bisimilar_states)))
-               (pstr
-                  ~options:(pstr_options details)
-                  ~tabs:1
-                  (pp_wrap_as_supported (Partition non_bisimilar_states))));
+               (PStr.partition ~params:(Logging params) bisimilar_states)
+               (PStr.partition ~params:(Logging params) non_bisimilar_states));
           (* continue *)
-          (name, _are_bisimilar, are_bisimilar) :: ks90_exas ~show ~debug exas'))
+          (name, _are_bisimilar, are_bisimilar) :: ks90_exas ~params exas'))
 ;;
 
 let run_all_ks90
-  ?(show : bool = false)
-  ?(details : bool = true)
-  ?(debug : bool = false)
+  ?(params : logging_params = default_logging_params ~mode:(OCaml ()) ())
   ()
   : (string * bool * bool) list
   =
   ks90_exas
-    ~show
-    ~details
-    ~debug
+    ~params
     [ exa_1
     ; exa_2
     ; exa_self_rec_nondet
@@ -126,18 +112,14 @@ let run_all_ks90
 ;;
 
 let run_all
-  ?(show : bool = false)
-  ?(details : bool = true)
-  ?(debug : bool = false)
+  ?(params : logging_params = default_logging_params ~mode:(OCaml ()) ())
   ()
   : unit
   =
-  print ~show "\nRunning Tests.ml:\n\n";
-  let ks90_results : (string * bool * bool) list =
-    run_all_ks90 ~show ~details ~debug ()
-  in
-  print ~show (pstr_results [ "KS90", ks90_results ]);
-  print ~show "\n\nEnd of Tests.ml.\n"
+  log ~params "\nRunning Tests.ml:\n\n";
+  let ks90_results : (string * bool * bool) list = run_all_ks90 ~params () in
+  log ~params (pstr_results [ "KS90", ks90_results ]);
+  log ~params "\n\nEnd of Tests.ml.\n"
 ;;
 
 (** To run tests...
@@ -149,4 +131,4 @@ let run_all
     - Next, run the tests:
 
     _build/default/test/tests.exe *)
-let () = run_all ~show:true ~details:true ~debug:false ()
+let () = run_all ()
