@@ -28,11 +28,6 @@ type logging_params =
   ; override : unit option
   }
 
-val default_logging_option_output_enabled : bool
-val default_logging_option_show_normal_output : bool
-val default_logging_option_show_detailed_output : bool
-val default_logging_option_show_debug_output : bool
-val default_logging_option_show_warning_output : bool
 val default_logging_params : ?mode:output_modes -> unit -> logging_params
 val set_logging_options : output_options -> logging_params -> logging_params
 val override : logging_params -> logging_params

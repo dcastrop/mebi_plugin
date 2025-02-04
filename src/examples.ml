@@ -212,3 +212,12 @@ let exa_par_1 : example =
   in
   exa "exa_par_1" s t false
 ;;
+
+(** [exa_self_act1] ... *)
+let exa_self_act1 : example =
+  (* s *)
+  let (s : fsm) = make_fsm_from_lts "s0" [ "s0", [ "a", [ "s1" ] ] ]
+  and (* t *)
+    (t : fsm) = make_fsm_from_lts "t0" [ "t0", [ "a", [ "t1" ] ] ] in
+  exa "exa_self_act1" s t true
+;;

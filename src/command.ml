@@ -932,7 +932,7 @@ let build_fsm_from_lts
     ~params
     (Printf.sprintf
        "Generated FSM: %s.\n"
-       (PStr.fsm ~params:(Logging (log_kind (Normal ()) params)) the_fsm));
+       (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) the_fsm));
   log ~params "\n= = = = = (end of build_fsm) = = = = = =\n";
   (* *)
   return the_fsm
@@ -990,17 +990,17 @@ let cmd_merge_fsm_from_lts
   let* (s : fsm) = build_fsm_from_lts ~params s_iref s_tref in
   let* (t : fsm) = build_fsm_from_lts ~params t_iref t_tref in
   (* *)
-  let merged_fsm, _ = merge_fsm s t in
+  let merged_fsm, _ = Merge.fsm ~params s t in
   log
     ~params:(log_kind (Details ()) params)
     (Printf.sprintf
-       "merged fsm's 's' and 't' :: %s.\n\n\
-        where s = %s,\n\
+       "Merged FSMs 's' and 't' :: %s.\n\n\
+        where s = %s,\n\n\
         and t = %s.\n\n\
         = = = (end of cmd_merge_fsm_from_lts) = = = = = =\n\n"
-       (PStr.fsm ~params:(Logging params) merged_fsm)
-       (PStr.fsm ~params:(Logging params) s)
-       (PStr.fsm ~params:(Logging params) t));
+       (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) merged_fsm)
+       (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) s)
+       (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) t));
   return ()
 ;;
 
@@ -1015,7 +1015,7 @@ let cmd_bisim_ks90_using_fsm
   (* *)
   let result = RCP.KS90.run ~params s t in
   match result with
-  | { are_bisimilar; bisimilar_states; non_bisimilar_states; _ } ->
+  | { are_bisimilar; merged_fsm; bisimilar_states; non_bisimilar_states; _ } ->
     log
       ~params:(log_kind (Normal ()) params)
       (Printf.sprintf
@@ -1023,13 +1023,19 @@ let cmd_bisim_ks90_using_fsm
           Bisimilar states: %s.\n\n\
           Non-bisimilar states: %s.\n\n\
           where s = %s\n\n\
-          and t = %s.\n\n\
+          and t = %s\n\n\
+          were merged into: %s.\n\n\
           = = = (end of cmd_bisim_ks90_using_fsm) = = = = = =\n\n"
          are_bisimilar
-         (PStr.partition ~params:(Logging params) bisimilar_states)
-         (PStr.partition ~params:(Logging params) non_bisimilar_states)
-         (PStr.fsm ~params:(Logging params) s)
-         (PStr.fsm ~params:(Logging params) t));
+         (PStr.partition
+            ~params:(Logging (log_kind (Details ()) params))
+            bisimilar_states)
+         (PStr.partition
+            ~params:(Logging (log_kind (Details ()) params))
+            non_bisimilar_states)
+         (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) s)
+         (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) t)
+         (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) merged_fsm));
     return ()
 ;;
 
