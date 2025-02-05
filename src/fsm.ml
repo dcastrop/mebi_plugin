@@ -177,102 +177,36 @@ module Make = struct
     =
     { init; alphabet; states; edges }
   ;;
+end
 
-  (** [make_fsm_from_lts] is a more user-friendly helper function for defining FSMs.
-    @param init_label is the string label of the initial state.
-    @param transitions
-      is the list of pairs of states and, their list pairs of actions, with their list of destination states. *)
-
-  (* let fsm_from_lts
-        (init_label : string)
-        (transitions : (string * (string * string list) list) list)
-    : fsm
-    =
-    let init : state = state (Of (0, init_label)) in
-    (* traverse transitions and collect states, labels and edges *)
-    let states, alphabet, edges =
-      List.fold_left
-        (fun ((states, alphabet, edges) :
-               States.t * Alphabet.t * States.t Actions.t Edges.t)
-          ((lhs, labels_rhs) : string * (string * string list) list) ->
-           (* unpack outgoing state *)
-           let states', from_state =
-             let new_state : state = state (Of (States.cardinal states, lhs)) in
-             let existing_state : States.t =
-               States.filter
-                 (fun (existing_state : state) ->
-                    existing_state.name == new_state.name)
-                 states
-             in
-             match States.is_empty existing_state with
-             | true -> States.add new_state states, new_state
-             | false ->
-               assert (States.cardinal existing_state == 1);
-               states, List.hd (States.elements existing_state)
-           in
-           (* go through each outgoing edge *)
-           let states'', alphabet', edges' =
-             List.fold_left
-               (fun ((states'', alphabet', edges') :
-                      States.t * Alphabet.t * States.t Actions.t Edges.t)
-                 ((label, rhs) : string * string list) ->
-                  (* unpack outgoing label *)
-                  let alphabet'', out_action =
-                    let new_action : action =
-                      action ~label (Alphabet.cardinal alphabet')
-                    in
-                    match Alphabet.find_opt new_action alphabet' with
-                    | None -> Alphabet.add new_action alphabet', new_action
-                    | Some existing_action -> alphabet', existing_action
-                  in
-                  (* go through each destination state *)
-                  let states''', edges'' =
-                    List.fold_left
-                      (fun ((states''', edges'') :
-                             States.t * States.t Actions.t Edges.t)
-                        (destination : string) ->
-                         (* unpack destination state *)
-                         let states'''', dest_state =
-                           let dest_state : state =
-                             state (Of (States.cardinal states''', destination))
-                           in
-                           let existing_dest : States.t =
-                             States.filter
-                               (fun (existing_dest : state) ->
-                                  existing_dest.name == dest_state.name)
-                               states'''
-                           in
-                           match States.is_empty existing_dest with
-                           | true -> States.add dest_state states''', dest_state
-                           | false ->
-                             states''', List.hd (States.to_list existing_dest)
-                         in
-                         (* add to edges *)
-                         add_new_outgoing_edge
-                           edges''
-                           from_state
-                           out_action
-                           dest_state;
-                         states'''', edges'')
-                      (* return. *)
-                      (states'', edges')
-                      rhs
-                  in
-                  (* return. *)
-                  states''', alphabet'', edges'')
-               (states', alphabet, edges)
-               labels_rhs
-           in
-           (* return. *)
-           states'', alphabet', edges')
-        ( States.of_list [ init ]
-        , Alphabet.empty
-        , Edges.create (List.length transitions) )
-        transitions
+module New = struct
+  let state (name : string) (fsm : fsm) : state =
+    let filtered : States.t =
+      States.filter (fun (s : state) -> s.name == name) fsm.states
     in
-    (* make fsm. *)
-    { init = Some init; alphabet; states; edges }
-  ;; *)
+    match States.cardinal filtered with
+    | 0 ->
+      (* create new and add *)
+      let s : state = Make.state (Of (States.cardinal fsm.states, name)) in
+      fsm.states <- States.add s fsm.states;
+      s
+    | _ ->
+      (* return existing state *)
+      assert (States.cardinal filtered == 1);
+      List.nth (States.elements filtered) 0
+  ;;
+
+  let action (label : string) (fsm : fsm) : action =
+    match Alphabet.find_opt { id = -1; label } fsm.alphabet with
+    | None ->
+      (* create new and add *)
+      let a : action =
+        Make.action (Of (Alphabet.cardinal fsm.alphabet, label))
+      in
+      fsm.alphabet <- Alphabet.add a fsm.alphabet;
+      a
+    | Some a -> a (* return existing action *)
+  ;;
 end
 
 (*********************************************************************)
@@ -327,6 +261,72 @@ module Append = struct
     | Some actions' ->
       (* append to existing *)
       action actions' (a, destination)
+  ;;
+end
+
+(********************************************)
+(****** Merging *****************************)
+(********************************************)
+
+module Merge = struct
+  open Utils
+
+  let edges
+        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        ((state_id_offset, merged_alphabet) : int * Alphabet.t)
+        (base : States.t Actions.t Edges.t)
+        (to_merge : States.t Actions.t Edges.t)
+    : States.t Actions.t Edges.t
+    =
+    Edges.iter
+      (fun (from : state) (actions : States.t Actions.t) ->
+         let from' : state = Make.state (From (from, state_id_offset))
+         and actions' : States.t Actions.t =
+           Actions.length actions |> Actions.create
+         in
+         Actions.iter
+           (fun (a : action) (destinations : States.t) ->
+              Actions.add
+                actions'
+                (Alphabet.find a merged_alphabet)
+                (Make.states (From (destinations, state_id_offset))))
+           actions;
+         Edges.add base from' actions')
+      to_merge;
+    base
+  ;;
+
+  let fsms
+        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        (base : fsm)
+        (to_merge : fsm)
+    : fsm * (state, state) Hashtbl.t
+    =
+    (* merge into [base] the fsm [to_merge] *)
+    match base with
+    | { init; alphabet; states; edges = edges'; _ } ->
+      (* needed to keep track of [to_merge.states] new IDs *)
+      let state_id_offset : int = States.cardinal states
+      and to_merge_state_map : (state, state) Hashtbl.t =
+        States.cardinal to_merge.states |> Hashtbl.create
+      in
+      (* *)
+      let merged_alphabet : Alphabet.t =
+        Alphabet.union alphabet to_merge.alphabet
+      and merged_states : States.t =
+        States.fold
+          (fun (s : state) (acc : States.t) ->
+             let s' : state = Make.state (From (s, state_id_offset)) in
+             Hashtbl.add to_merge_state_map s' s;
+             States.add s' acc)
+          to_merge.states
+          states
+      in
+      let merged_edges : States.t Actions.t Edges.t =
+        edges ~params (state_id_offset, merged_alphabet) edges' to_merge.edges
+      in
+      ( Make.fsm None merged_alphabet merged_states merged_edges
+      , to_merge_state_map )
   ;;
 end
 
@@ -667,93 +667,14 @@ end
 (********************************************)
 (****** States ******************************)
 (********************************************)
-(*
-exception StateNotFoundWithID of (int * States.t)
-exception MultipleStatesFoundWithID of (int * States.t)
-
-(** @see [get_action_by_id]. *)
-let get_state_by_id (states : States.t) (id : int) : state =
-  let filtered = States.filter (fun (s : state) -> s.id == id) states in
-  match States.cardinal filtered with
-  | 0 -> raise (StateNotFoundWithID (id, states))
-  | 1 -> List.nth (States.elements filtered) 0
-  | _ -> raise (MultipleStatesFoundWithID (id, states))
-;;
-
-(** @see [get_action_by_label]. *)
-let _get_state_by_name (states : States.t) (name : string) : state =
-  let filtered = States.filter (fun (s : state) -> s.name == name) states in
-  match States.cardinal filtered with
-  | 0 -> raise (StateNotFoundWithName (name, states))
-  | 1 -> List.nth (States.elements filtered) 0
-  | _ -> raise (MultipleStatesFoundWithName (name, states))
-;; *)
 
 (********************************************)
 (****** Alphabet ****************************)
 (********************************************)
 
-let _get_action_alphabet_from_actions (actions : States.t Actions.t)
-  : Alphabet.t
-  =
-  Alphabet.of_list (List.of_seq (Actions.to_seq_keys actions))
-;;
-
-let _get_action_alphabet_from_edges (es : States.t Actions.t Edges.t)
-  : Alphabet.t
-  =
-  Alphabet.of_list
-    (Edges.fold
-       (fun (_from_state : state)
-         (actions : States.t Actions.t)
-         (acc : action list) ->
-          List.append
-            acc
-            (Actions.fold
-               (fun (action : action)
-                 (_destinations : States.t)
-                 (acc' : action list) -> List.append acc' [ action ])
-               actions
-               []))
-       es
-       [])
-;;
-
 (********************************************)
 (****** Actions *****************************)
 (********************************************)
-
-exception ActionNotFoundWithID of (int * Alphabet.t)
-exception MultipleActionsFoundWithID of (int * Alphabet.t)
-
-(** [get_action_by_id alphabet id] returns the action within [alphabet] with the matching [id].
-    @raise ActionNotFoundWithID if no action is found in [alphabet] matching [id].
-    @raise MultipleActionsFoundWithID if multiple actions are found in [alphabet] matching [id].
-    @see [get_action_by_label]. *)
-let get_action_by_id (alphabet : Alphabet.t) (id : int) : action =
-  let filtered = Alphabet.filter (fun (a : action) -> a.id == id) alphabet in
-  match Alphabet.cardinal filtered with
-  | 0 -> raise (ActionNotFoundWithID (id, alphabet))
-  | 1 -> List.nth (Alphabet.elements filtered) 0
-  | _ -> raise (MultipleActionsFoundWithID (id, alphabet))
-;;
-
-exception ActionNotFoundWithLabel of (string * Alphabet.t)
-exception MultipleActionsFoundWithLabel of (string * Alphabet.t)
-
-(** [get_action_by_label alphabet label] returns the action within [alphabet] with the matching [label].
-    @raise ActionNotFoundWithLabel if no action is found in [alphabet] matching [label].
-    @raise MultipleActionsFoundWithLabel if multiple actions are found in [alphabet] matching [label].
-    @see [get_action_by_id]. *)
-let get_action_by_label (alphabet : Alphabet.t) (label : string) : action =
-  let filtered =
-    Alphabet.filter (fun (a : action) -> a.label == label) alphabet
-  in
-  match Alphabet.cardinal filtered with
-  | 0 -> raise (ActionNotFoundWithLabel (label, alphabet))
-  | 1 -> List.nth (Alphabet.elements filtered) 0
-  | _ -> raise (MultipleActionsFoundWithLabel (label, alphabet))
-;;
 
 (********************************************)
 (****** Edges *******************************)
@@ -813,85 +734,3 @@ let rec get_all_destinations (edges : has_destinations) : States.t =
       es
       States.empty
 ;;
-
-(********************************************)
-(****** Other Functions *********************)
-(****** (e.g., translation map helpers) *****)
-(********************************************)
-
-exception ReverseStateHashtblLookupFailed of ((state, state) Hashtbl.t * state)
-
-(** [get_reverse_map_state tbl v] gets the key corresponding to [v] of translation map [tbl].
-    @return the key corresponding to value [v] in [tbl].
-    @raise ReverseStateHashtblLookupFailed if [v] is not a value in [tbl]. *)
-let get_reverse_map_state (tbl : (state, state) Hashtbl.t) (v : state) : state =
-  match Utils.get_key_of_val tbl v with
-  | None -> raise (ReverseStateHashtblLookupFailed (tbl, v))
-  | Some key -> key
-;;
-
-(********************************************)
-(****** Merging *****************************)
-(********************************************)
-
-module Merge = struct
-  open Utils
-
-  let edges
-        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-        ((state_id_offset, merged_alphabet) : int * Alphabet.t)
-        (base : States.t Actions.t Edges.t)
-        (to_merge : States.t Actions.t Edges.t)
-    : States.t Actions.t Edges.t
-    =
-    Edges.iter
-      (fun (from : state) (actions : States.t Actions.t) ->
-         let from' : state = Make.state (From (from, state_id_offset))
-         and actions' : States.t Actions.t =
-           Actions.length actions |> Actions.create
-         in
-         Actions.iter
-           (fun (a : action) (destinations : States.t) ->
-              Actions.add
-                actions'
-                (Alphabet.find a merged_alphabet)
-                (Make.states (From (destinations, state_id_offset))))
-           actions;
-         Edges.add base from' actions')
-      to_merge;
-    base
-  ;;
-
-  let fsms
-        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-        (base : fsm)
-        (to_merge : fsm)
-    : fsm * (state, state) Hashtbl.t
-    =
-    (* merge into [base] the fsm [to_merge] *)
-    match base with
-    | { init; alphabet; states; edges = edges'; _ } ->
-      (* needed to keep track of [to_merge.states] new IDs *)
-      let state_id_offset : int = States.cardinal states
-      and to_merge_state_map : (state, state) Hashtbl.t =
-        States.cardinal to_merge.states |> Hashtbl.create
-      in
-      (* *)
-      let merged_alphabet : Alphabet.t =
-        Alphabet.union alphabet to_merge.alphabet
-      and merged_states : States.t =
-        States.fold
-          (fun (s : state) (acc : States.t) ->
-             let s' : state = Make.state (From (s, state_id_offset)) in
-             Hashtbl.add to_merge_state_map s' s;
-             States.add s' acc)
-          to_merge.states
-          states
-      in
-      let merged_edges : States.t Actions.t Edges.t =
-        edges ~params (state_id_offset, merged_alphabet) edges' to_merge.edges
-      in
-      ( Make.fsm None merged_alphabet merged_states merged_edges
-      , to_merge_state_map )
-  ;;
-end

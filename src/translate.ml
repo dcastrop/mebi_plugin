@@ -17,12 +17,9 @@ let to_fsm (lts : Lts.lts) : fsm =
     in
     Lts.Transitions.fold
       (fun (t : Lts.transition) (acc : fsm) ->
-         let a : action =
-           Make.action (Of (Alphabet.cardinal fsm.alphabet, t.label))
-         and from : state = Make.state (Of (States.cardinal fsm.states, t.from))
-         and destination : state =
-           Make.state (Of (States.cardinal fsm.states, t.destination))
-         in
+         let a : action = New.action t.label fsm in
+         let from : state = New.state t.from fsm in
+         let destination : state = New.state t.destination fsm in
          Append.alphabet fsm a;
          Append.state fsm from;
          Append.state fsm destination;
