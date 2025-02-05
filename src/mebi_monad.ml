@@ -88,10 +88,10 @@ let make_constr_set (st : coq_context ref)
 
 (** Monadic for loop *)
 let rec iterate
-  (from_idx : int)
-  (to_idx : int)
-  (acc : 'a)
-  (f : int -> 'a -> 'a t)
+          (from_idx : int)
+          (to_idx : int)
+          (acc : 'a)
+          (f : int -> 'a -> 'a t)
   : 'a t
   =
   if from_idx > to_idx
@@ -108,8 +108,8 @@ let get_sigma (st : coq_context ref) : Evd.evar_map in_context =
 ;;
 
 let state
-  (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-  (st : coq_context ref)
+      (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+      (st : coq_context ref)
   : 'a in_context
   =
   let sigma, a = f !st.coq_env !st.coq_ctx in
@@ -125,8 +125,8 @@ let sandbox (m : 'a t) (st : coq_context ref) : 'a in_context =
 ;;
 
 let feedback
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  (f : Environ.env -> Evd.evar_map -> Pp.t)
+      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      (f : Environ.env -> Evd.evar_map -> Pp.t)
   : unit t
   =
   assert (

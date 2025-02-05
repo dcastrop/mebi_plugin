@@ -24,9 +24,11 @@
   mebi_utils
   mebi_monad
   pp_ext
+  lts
+  fsm
+  translate
   command
   utils
-  fsm
   examples
   bisimilarity
   g_mebi))
