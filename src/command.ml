@@ -664,6 +664,14 @@ struct
       (Printf.sprintf "transitions: %s" (pstr_lts_transitions g.transitions))
   ;;
 
+  (*
+     TODO: refactor the below, using the new [Fsm.Make] and [Fsm.New] functions
+    - this will ensure that there are no duplicate states or actions and such
+    - first, just translate this graph_lts to a [Lts.lts] (composed of just strings)
+    - maybe [MkGraph] provides a record for converting to [Lts.lts].
+      Then it is simple to use [Translate.to_fsm]
+  *)
+
   (** [state_translation_table] is is a hashtable mapping [EConstr.t] of terms to [states]. *)
   type state_translation_table = (EConstr.t, state) Hashtbl.t
 
