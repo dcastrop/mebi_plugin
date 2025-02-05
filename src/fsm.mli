@@ -256,12 +256,32 @@ module Make : sig
     -> fsm
 end
 
+module New : sig
+  val state : string -> fsm -> state
+  val action : string -> fsm -> action
+end
+
 module Append : sig
   val alphabet : fsm -> action -> unit
   val state : ?skip_duplicate_names:bool -> fsm -> state -> unit
   val states : ?skip_duplicate_names:bool -> fsm -> Block.t -> unit
   val action : Block.t Actions.t -> action * state -> unit
   val edge : fsm -> state * action * state -> unit
+end
+
+module Merge : sig
+  val edges
+    :  ?params:Utils.logging_params
+    -> int * Alphabet.t
+    -> Block.t Actions.t Edges.t
+    -> Block.t Actions.t Edges.t
+    -> Block.t Actions.t Edges.t
+
+  val fsms
+    :  ?params:Utils.logging_params
+    -> fsm
+    -> fsm
+    -> fsm * (state, state) Hashtbl.t
 end
 
 module PStr : sig
@@ -303,19 +323,6 @@ module PStr : sig
   val fsm : ?params:pstr_params -> fsm -> string
 end
 
-val _get_action_alphabet_from_actions : States.t Actions.t -> Alphabet.t
-val _get_action_alphabet_from_edges : States.t Actions.t Edges.t -> Alphabet.t
-
-exception ActionNotFoundWithID of (int * Alphabet.t)
-exception MultipleActionsFoundWithID of (int * Alphabet.t)
-
-val get_action_by_id : Alphabet.t -> int -> action
-
-exception ActionNotFoundWithLabel of (string * Alphabet.t)
-exception MultipleActionsFoundWithLabel of (string * Alphabet.t)
-
-val get_action_by_label : Alphabet.t -> string -> action
-
 val get_edges_of
   :  action
   -> States.t Actions.t Edges.t
@@ -328,22 +335,3 @@ type has_destinations =
   | Edges of Block.t Actions.t Edges.t
 
 val get_all_destinations : has_destinations -> States.t
-
-exception ReverseStateHashtblLookupFailed of ((state, state) Hashtbl.t * state)
-
-val get_reverse_map_state : (state, state) Hashtbl.t -> state -> state
-
-module Merge : sig
-  val edges
-    :  ?params:Utils.logging_params
-    -> int * Alphabet.t
-    -> Block.t Actions.t Edges.t
-    -> Block.t Actions.t Edges.t
-    -> Block.t Actions.t Edges.t
-
-  val fsms
-    :  ?params:Utils.logging_params
-    -> fsm
-    -> fsm
-    -> fsm * (state, state) Hashtbl.t
-end
