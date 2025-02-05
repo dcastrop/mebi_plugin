@@ -206,9 +206,9 @@ module RCP = struct
         @param pi
           is the partition of blocks from which we extract and return a subset from. *)
     let reachable_blocks
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-      (actions : States.t Actions.t)
-      (pi : Partition.t)
+          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+          (actions : States.t Actions.t)
+          (pi : Partition.t)
       : Partition.t
       =
       let destinations : States.t = get_all_destinations (Actions actions) in
@@ -218,7 +218,7 @@ module RCP = struct
         (* remove any empty blocks *)
         Partition.filter
           (fun (block : Block.t) ->
-            Bool.not (Block.is_empty (Block.inter block destinations)))
+             Bool.not (Block.is_empty (Block.inter block destinations)))
           pi
     ;;
 
@@ -234,11 +234,11 @@ module RCP = struct
         @param edges is the map from states to actions to destination states.
         @raise EmptyBlock if [block] is empty. *)
     let split
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-      (block : Block.t)
-      (a : action)
-      (pi : Partition.t)
-      (edges : States.t Actions.t Edges.t)
+          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+          (block : Block.t)
+          (a : action)
+          (pi : Partition.t)
+          (edges : States.t Actions.t Edges.t)
       : Block.t * Block.t
       =
       let _block (* list for pattern matching *) = Block.to_list block in
@@ -254,25 +254,25 @@ module RCP = struct
            - [b2] if they can reach other blocks to [s]. *)
         List.fold_left
           (fun ((b1, b2) : Block.t * Block.t) (t : state) ->
-            let t_edges = get_actions_from t edges in
-            (* check if to add to [b1] or [b2]. *)
-            match Actions.length s_edges > 0, Actions.length t_edges > 0 with
-            (* neither [s] or [t] have action [a]. *)
-            | false, false -> Block.add t b1, b2
-            (* both [s] and [t] have action [a]. *)
-            | true, true ->
-              let t_reachable_blocks = reachable_blocks ~params t_edges pi in
-              (match
-                 Partition.equal
-                   (Partition.inter s_reachable_blocks t_reachable_blocks)
-                   (Partition.union s_reachable_blocks t_reachable_blocks)
-               with
-               (* both [s] and [t] can reach the same blocks via action [a]. *)
-               | true -> Block.add t b1, b2
-               (* must split since [s] and [t] can reach different blocks via action [a]. *)
-               | false -> b1, Block.add t b2)
-            (* only one of [s] or [t] has action [a]. *)
-            | _, _ -> b1, Block.add t b2)
+             let t_edges = get_actions_from t edges in
+             (* check if to add to [b1] or [b2]. *)
+             match Actions.length s_edges > 0, Actions.length t_edges > 0 with
+             (* neither [s] or [t] have action [a]. *)
+             | false, false -> Block.add t b1, b2
+             (* both [s] and [t] have action [a]. *)
+             | true, true ->
+               let t_reachable_blocks = reachable_blocks ~params t_edges pi in
+               (match
+                  Partition.equal
+                    (Partition.inter s_reachable_blocks t_reachable_blocks)
+                    (Partition.union s_reachable_blocks t_reachable_blocks)
+                with
+                (* both [s] and [t] can reach the same blocks via action [a]. *)
+                | true -> Block.add t b1, b2
+                (* must split since [s] and [t] can reach different blocks via action [a]. *)
+                | false -> b1, Block.add t b2)
+             (* only one of [s] or [t] has action [a]. *)
+             | _, _ -> b1, Block.add t b2)
           (Block.empty, Block.empty)
           _block
     ;;
@@ -288,57 +288,49 @@ module RCP = struct
         @param changed
           is used to denote whether a refinement has occured at all in the current iteration. *)
     let main_loop
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-      ((alphabet, edges) : Alphabet.t * States.t Actions.t Edges.t)
-      (pi : Partition.t ref)
-      (changed : bool ref)
+          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+          ((alphabet, edges) : Alphabet.t * States.t Actions.t Edges.t)
+          (pi : Partition.t ref)
+          (changed : bool ref)
       : unit
       =
       Partition.iter
         (fun (_b : Block.t) : unit ->
-          let b = ref _b in
-          Alphabet.iter
-            (fun (a : action) : unit ->
-              (* *)
-              let edges_of_a = get_edges_of a edges in
-              (* *)
-              let b1, b2 = split ~params !b a !pi edges_of_a in
-              match Block.is_empty b1, Block.is_empty b2 with
-              | true, true ->
-                (* both are empty, this is not supposed to happen *)
-                log
-                  ~params:(log_kind (Debug ()) params)
-                  "split returned two empty blocks.\n\n";
-                ()
-              | false, true ->
-                (* empty [b2] means that split did not occur *)
-                assert (Block.equal b1 !b);
-                log
-                  ~params:(log_kind (Debug ()) params)
-                  (Printf.sprintf
-                     "split returned empty b2.\nb1: %s.\n\n"
-                     (PStr.states
-                        ~params:(Logging (log_kind (Debug ()) params))
-                        b1));
-                ()
-              | _, _ ->
-                (* split did occur, so replace [b] with [b1] and [b2] and refine *)
-                assert (Bool.not (Block.is_empty b1));
-                log
-                  ~params:(log_kind (Debug ()) params)
-                  (Printf.sprintf
-                     "split returned two blocks.\nb1: %s.\nb2: %s.\n\n"
-                     (PStr.states
-                        ~params:(Logging (log_kind (Debug ()) params))
-                        b1)
-                     (PStr.states
-                        ~params:(Logging (log_kind (Debug ()) params))
-                        b2));
-                pi := Partition.remove !b !pi;
-                pi := Partition.union !pi (Partition.of_list [ b1; b2 ]);
-                changed := true;
-                ())
-            alphabet)
+           let b = ref _b in
+           Alphabet.iter
+             (fun (a : action) : unit ->
+                (* *)
+                let edges_of_a = get_edges_of a edges in
+                (* *)
+                let b1, b2 = split ~params !b a !pi edges_of_a in
+                match Block.is_empty b1, Block.is_empty b2 with
+                | true, true ->
+                  (* both are empty, this is not supposed to happen *)
+                  log ~params "split returned two empty blocks.\n\n";
+                  ()
+                | false, true ->
+                  (* empty [b2] means that split did not occur *)
+                  assert (Block.equal b1 !b);
+                  log
+                    ~params
+                    (Printf.sprintf
+                       "split returned empty b2.\nb1: %s.\n\n"
+                       (PStr.states ~params:(Logging params) b1));
+                  ()
+                | _, _ ->
+                  (* split did occur, so replace [b] with [b1] and [b2] and refine *)
+                  assert (Bool.not (Block.is_empty b1));
+                  log
+                    ~params
+                    (Printf.sprintf
+                       "split returned two blocks.\nb1: %s.\nb2: %s.\n\n"
+                       (PStr.states ~params:(Logging params) b1)
+                       (PStr.states ~params:(Logging params) b2));
+                  pi := Partition.remove !b !pi;
+                  pi := Partition.union !pi (Partition.of_list [ b1; b2 ]);
+                  changed := true;
+                  ())
+             alphabet)
         !pi
     ;;
 
@@ -355,58 +347,57 @@ module RCP = struct
           maps the original (pre-merged) states to the post-merged states.
         @param pi is the partition containing all blocks of states. *)
     let split_bisimilar
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-      ((s_states, t_states) : States.t * States.t)
-      (map_of_states : (state, state) Hashtbl.t)
-      (pi : Partition.t)
+          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+          ((s_states, t_states) : States.t * States.t)
+          (map_of_states : (state, state) Hashtbl.t)
+          (pi : Partition.t)
       : Partition.t * Partition.t
       =
       Partition.fold
         (fun (block : Block.t)
           ((bisimilar_states', non_bisimilar_states') :
             Partition.t * Partition.t) ->
-          (* check that another state in block is from another fsm. *)
-          let block_contains_states_from_both : bool =
-            Block.for_all
-              (fun (state : state) ->
-                Block.exists
-                  (fun (state' : state) ->
-                    match Int.equal state.id state'.id with
-                    | true -> false
-                    | false ->
-                      let original_state =
-                        match Hashtbl.find_opt map_of_states state with
-                        | None ->
-                          (* then must be from original state *)
-                          state
-                        | Some _state -> _state
-                      and original_state' =
-                        match Hashtbl.find_opt map_of_states state' with
-                        | None ->
-                          (* then must be from original state *)
-                          state'
-                        | Some _state' -> _state'
-                      in
-                      (* [state] and [state'] must originate from different fsm. *)
-                      (States.mem original_state s_states
-                       && States.mem original_state' t_states)
-                      || (States.mem original_state' s_states
-                          && States.mem original_state t_states))
-                  block)
-              block
-          in
-          log
-            ~params:(log_kind (Debug ()) params)
-            (Printf.sprintf
-               "split returned two blocks.\nb1: %s.\n\n"
-               (PStr.states
-                  ~params:(Logging (log_kind (Debug ()) params))
-                  block));
-          (* block is bisimilar if it contains states from both fsms. *)
-          match block_contains_states_from_both with
-          | true -> Partition.add block bisimilar_states', non_bisimilar_states'
-          | false ->
-            bisimilar_states', Partition.add block non_bisimilar_states')
+           (* check that another state in block is from another fsm. *)
+           let block_contains_states_from_both : bool =
+             Block.for_all
+               (fun (state : state) ->
+                  Block.exists
+                    (fun (state' : state) ->
+                       match Int.equal state.id state'.id with
+                       | true -> false
+                       | false ->
+                         let original_state =
+                           match Hashtbl.find_opt map_of_states state with
+                           | None ->
+                             (* then must be from original state *)
+                             state
+                           | Some _state -> _state
+                         and original_state' =
+                           match Hashtbl.find_opt map_of_states state' with
+                           | None ->
+                             (* then must be from original state *)
+                             state'
+                           | Some _state' -> _state'
+                         in
+                         (* [state] and [state'] must originate from different fsm. *)
+                         (States.mem original_state s_states
+                          && States.mem original_state' t_states)
+                         || (States.mem original_state' s_states
+                             && States.mem original_state t_states))
+                    block)
+               block
+           in
+           log
+             ~params
+             (Printf.sprintf
+                "split returned two blocks.\nb1: %s.\n\n"
+                (PStr.states ~params:(Logging params) block));
+           (* block is bisimilar if it contains states from both fsms. *)
+           match block_contains_states_from_both with
+           | true ->
+             Partition.add block bisimilar_states', non_bisimilar_states'
+           | false ->
+             bisimilar_states', Partition.add block non_bisimilar_states')
         pi
         (Partition.empty, Partition.empty)
     ;;
@@ -421,15 +412,16 @@ module RCP = struct
         @param s is an [fsm] to check.
         @param t is an [fsm] to check. *)
     let run
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-      (s : fsm)
-      (t : fsm)
+          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+          (s : fsm)
+          (t : fsm)
       : bisim_result
       =
       (* *)
-      log ~params:(log_kind (Debug ()) params) "=/=/=/= KS90.run =/=/=/=\n\n";
+      params.kind <- Debug ();
+      log ~params "=/=/=/= KS90.run =/=/=/=\n\n";
       (* get initial partition [pi] by merging states from [s] and [t] into single set. *)
-      let merged_fsm, map_of_states = Merge.fsm s t in
+      let merged_fsm, map_of_states = Merge.fsms s t in
       (* *)
       match merged_fsm with
       | { alphabet; states; edges; _ } ->
@@ -446,9 +438,7 @@ module RCP = struct
           main_loop ~params (alphabet, edges) pi changed
         done;
         (* *)
-        log
-          ~params:(log_kind (Debug ()) params)
-          "=/= KS90.run, exited main loop =/=\n\n";
+        log ~params "=/= KS90.run, exited main loop =/=\n\n";
         (* split [!pi] based on whether if states are bisimilar or not *)
         let (bisimilar_states, non_bisimilar_states) : Partition.t * Partition.t
           =
@@ -456,7 +446,7 @@ module RCP = struct
         in
         let are_bisimilar = Partition.is_empty non_bisimilar_states in
         log
-          ~params:(log_kind (Debug ()) params)
+          ~params
           (Printf.sprintf
              "=/=/=/=/=/=/=\n\nKS90.run, are_bisimilar: %b\n\n=/=/=/=/=/=/=\n\n"
              are_bisimilar);

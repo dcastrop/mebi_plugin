@@ -39,8 +39,8 @@ let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
     @raise invalid_arity
       if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error. *)
 let get_lts_labels_and_terms
-  (mib : Declarations.mutual_inductive_body)
-  (mip : Declarations.one_inductive_body)
+      (mib : Declarations.mutual_inductive_body)
+      (mip : Declarations.one_inductive_body)
   : (Constr.rel_declaration * Constr.rel_declaration) mm
   =
   let open Declarations in
@@ -109,29 +109,31 @@ let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
     - Is [w_unify] the best way?
     - ... *)
 let m_unify
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  (t0 : Evd.econstr)
-  (t1 : Evd.econstr)
+      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      (t0 : Evd.econstr)
+      (t1 : Evd.econstr)
   : bool mm
   =
+  params.kind <- Debug ();
   let* _ =
-    feedback
-      ~params:(log_kind (Debug ()) params)
-      (fun (env : Environ.env) (sigma : Evd.evar_map) ->
-         str "Unifying (t0) :: "
-         ++ Printer.pr_econstr_env env sigma t0
-         ++ strbrk "\nUnifying (t1) :: "
-         ++ Printer.pr_econstr_env env sigma t1)
+    if is_output_kind_enabled params
+    then
+      feedback ~params (fun (env : Environ.env) (sigma : Evd.evar_map) ->
+        str "Unifying (t0) :: "
+        ++ Printer.pr_econstr_env env sigma t0
+        ++ strbrk "\nUnifying (t1) :: "
+        ++ Printer.pr_econstr_env env sigma t1)
+    else return ()
   in
   state (fun (env : Environ.env) (sigma : Evd.evar_map) ->
     try
       let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
-      log ~params:(log_kind (Debug ()) params) "\t\tSuccess";
+      log ~params "\t\tSuccess";
       sigma, true
     with
     | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify (m, n, e))
       ->
-      log ~params:(log_kind (Debug ()) params) "\t\tCould not unify";
+      log ~params "\t\tCould not unify";
       sigma, false)
 ;;
 
@@ -189,7 +191,7 @@ let rec pstr_int_tree (t : int tree) : string =
       lhs_int
       (List.fold_left
          (fun (acc : string) (rhs_int_tree : int tree) ->
-           pstr_int_tree rhs_int_tree)
+            pstr_int_tree rhs_int_tree)
          ""
          rhs_int_tree_list)
 ;;
@@ -198,19 +200,23 @@ let rec pstr_int_tree (t : int tree) : string =
 (* (int tree * unif_problem) list -> int tree list option t *)
 (* *)
 let rec unify_all
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  (i : (int tree * unif_problem) list)
+          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+          (i : (int tree * unif_problem) list)
   : int tree list option t
   =
+  params.kind <- Debug ();
   match i with
   | [] -> return (Some [])
   | (ctor_tree, u) :: t ->
     let* _ =
-      feedback ~params:(log_kind (Debug ()) params) (fun env sigma ->
-        str "UNIFYALL (termL) :::::::::: "
-        ++ Printer.pr_econstr_env env sigma u.termL
-        ++ strbrk "\nUNIFYALL (termR) :::::::::: "
-        ++ Printer.pr_econstr_env env sigma u.termR)
+      if is_output_kind_enabled params
+      then
+        feedback ~params (fun env sigma ->
+          str "UNIFYALL (termL) :::::::::: "
+          ++ Printer.pr_econstr_env env sigma u.termL
+          ++ strbrk "\nUNIFYALL (termR) :::::::::: "
+          ++ Printer.pr_econstr_env env sigma u.termR)
+      else return ()
     in
     let* success = m_unify ~params u.termL u.termR in
     if success
@@ -223,14 +229,18 @@ let rec unify_all
 ;;
 
 let sandboxed_unify
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  (tgt_term : EConstr.t)
-  (u : (int tree * unif_problem) list)
+      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      (tgt_term : EConstr.t)
+      (u : (int tree * unif_problem) list)
   : (EConstr.t * int tree list) option mm
   =
+  params.kind <- Debug ();
   let* _ =
-    feedback ~params:(log_kind (Debug ()) params) (fun env sigma ->
-      str "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term)
+    if is_output_kind_enabled params
+    then
+      feedback ~params (fun env sigma ->
+        str "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term)
+    else return ()
   in
   sandbox
     (let* success = unify_all ~params u in
@@ -244,11 +254,11 @@ let sandboxed_unify
 
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  (acc : (EConstr.t * EConstr.t * int tree) list)
-  (i : int)
-  (act : EConstr.t)
-  (tgt_term : EConstr.t)
+          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+          (acc : (EConstr.t * EConstr.t * int tree) list)
+          (i : int)
+          (act : EConstr.t)
+          (tgt_term : EConstr.t)
   :  (int tree * unif_problem) list list
   -> (EConstr.t * EConstr.t * int tree) list t
   =
@@ -272,8 +282,8 @@ let rec retrieve_tgt_nodes
 
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
-  (acc : (int tree * unif_problem) list list)
-  (lts : raw_lts)
+          (acc : (int tree * unif_problem) list list)
+          (lts : raw_lts)
   :  EConstr.t list * EConstr.rel_declaration list
   -> (int tree * unif_problem) list list option t
   = function
@@ -295,7 +305,7 @@ let rec check_updated_ctx
            let ctors =
              List.map
                (fun (_, (tL : EConstr.t), (i : int tree)) ->
-                 i, { termL = tL; termR = args.(2) })
+                  i, { termL = tL; termR = args.(2) })
                ctors
            in
            (* We need to cross-product all possible unifications. This is in case
@@ -316,22 +326,26 @@ let rec check_updated_ctx
 
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  (lts : raw_lts)
-  (t : EConstr.t)
-  (ma : EConstr.t option)
+      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      (lts : raw_lts)
+      (t : EConstr.t)
+      (ma : EConstr.t option)
   : (EConstr.t * EConstr.t * int tree) list t
   =
+  params.kind <- Debug ();
   (* : (EConstr.t * int tree list) list t *)
   let$+ t env sigma = Reductionops.nf_all env sigma t in
   (* let iter_body (i : int) (ctor_vals : (EConstr.t * int tree list) list) = *)
   let iter_body (i : int) (ctor_vals : (EConstr.t * EConstr.t * int tree) list) =
     let* _ =
-      feedback ~params:(log_kind (Debug ()) params) (fun env sigma ->
-        str "CHECKING CONSTRUCTOR "
-        ++ int i
-        ++ str ". Term: "
-        ++ Printer.pr_econstr_env env sigma t)
+      if is_output_kind_enabled params
+      then
+        feedback ~params (fun env sigma ->
+          str "CHECKING CONSTRUCTOR "
+          ++ int i
+          ++ str ". Term: "
+          ++ Printer.pr_econstr_env env sigma t)
+      else return ()
     in
     let ctx, tm = lts.constructor_transitions.(i) in
     let ctx_tys = List.map EConstr.of_rel_decl ctx in
@@ -387,8 +401,8 @@ module type GraphB = sig
 
   type lts_graph =
     { to_visit : EConstr.constr Queue.t
-        (* Queue for BFS *)
-        (* ; labels : L.t *)
+      (* Queue for BFS *)
+      (* ; labels : L.t *)
     ; states : S.t
     ; transitions : lts_transition H.t
     }
@@ -474,11 +488,13 @@ struct
       @param g is an [lts_graph] accumulated while exploring [the_lts].
       @return an [lts_graph] constructed so long as the [bound] is not exceeded. *)
   let rec build_lts
-    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-    (the_lts : raw_lts)
-    (g : lts_graph)
+            ?(params : logging_params =
+              default_logging_params ~mode:(Coq ()) ())
+            (the_lts : raw_lts)
+            (g : lts_graph)
     : lts_graph mm
     =
+    params.kind <- Debug ();
     if H.length g.transitions >= bound
     then return g (* FIXME: raise error *)
     else if Queue.is_empty g.to_visit
@@ -491,23 +507,26 @@ struct
       let* env = get_env in
       let* sigma = get_sigma in
       let* _ =
-        feedback ~params:(log_kind (Debug ()) params) (fun env sigma ->
-          str
-            (Printf.sprintf
-               "---- (returned from check_valid_constructor)\n\n\
-                build_lts: constrs: [%s] (length %d).\n"
-               (List.fold_left
-                  (fun (acc : string)
-                    ((act, ctor, int_tree) : EConstr.t * EConstr.t * int tree) ->
-                    Printf.sprintf
-                      "%s   (%s ::\n    %s[%s])\n"
-                      acc
-                      (pstr_int_tree int_tree)
-                      (econstr_to_string ctor)
-                      (econstr_to_string act))
-                  "\n"
-                  constrs)
-               (List.length constrs)))
+        if is_output_kind_enabled params
+        then
+          feedback ~params (fun env sigma ->
+            str
+              (Printf.sprintf
+                 "---- (returned from check_valid_constructor)\n\n\
+                  build_lts: constrs: [%s] (length %d).\n"
+                 (List.fold_left
+                    (fun (acc : string)
+                      ((act, ctor, int_tree) : EConstr.t * EConstr.t * int tree) ->
+                       Printf.sprintf
+                         "%s   (%s ::\n    %s[%s])\n"
+                         acc
+                         (pstr_int_tree int_tree)
+                         (econstr_to_string ctor)
+                         (econstr_to_string act))
+                    "\n"
+                    constrs)
+                 (List.length constrs)))
+        else return ()
       in
       let new_states = ref (S.singleton t) in
       (* set up counter for transition ids *)
@@ -519,24 +538,24 @@ struct
       in
       List.iter
         (fun ((act, tgt, int_tree) : EConstr.t * EConstr.t * int tree) ->
-          log
-            ~params:(log_kind (Debug ()) params)
-            (Printf.sprintf "\n\nTransition to: %s." (econstr_to_string tgt));
-          new_states := S.add tgt !new_states;
-          H.add
-            g.transitions
-            t
-            { action =
-                { id = get_transition_id (); label = econstr_to_string act }
-            ; index_tree = int_tree
-            ; destination = tgt
-            };
-          if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
-          then ()
-          else Queue.push tgt g.to_visit;
-          log
-            ~params:(log_kind (Debug ()) params)
-            (Printf.sprintf "\nVisiting next: %i." (Queue.length g.to_visit)))
+           log
+             ~params
+             (Printf.sprintf "\n\nTransition to: %s." (econstr_to_string tgt));
+           new_states := S.add tgt !new_states;
+           H.add
+             g.transitions
+             t
+             { action =
+                 { id = get_transition_id (); label = econstr_to_string act }
+             ; index_tree = int_tree
+             ; destination = tgt
+             };
+           if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
+           then ()
+           else Queue.push tgt g.to_visit;
+           log
+             ~params
+             (Printf.sprintf "\nVisiting next: %i." (Queue.length g.to_visit)))
         constrs;
       let g = { g with states = S.union g.states !new_states } in
       build_lts ~params the_lts g
@@ -546,9 +565,9 @@ struct
       @param the_lts is ...
       @param t is the original Coq-term. *)
   let build_graph
-    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-    (the_lts : raw_lts)
-    (t : Constrexpr.constr_expr_r CAst.t)
+        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        (the_lts : raw_lts)
+        (t : Constrexpr.constr_expr_r CAst.t)
     : lts_graph mm
     =
     let$ t env sigma = Constrintern.interp_constr_evars env sigma t in
@@ -571,8 +590,8 @@ struct
       [t] is an (outgoing) [lts_transition] composed of a label [t.edge_ctor]
       and a destination node [t.to_node]. *)
   let pstr_lts_transition
-    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-    ((from : EConstr.constr), (t : lts_transition))
+        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        ((from : EConstr.constr), (t : lts_transition))
     : string
     =
     match t with
@@ -590,9 +609,9 @@ struct
 
   (** [pstr_lts_transitions transitions] is a string of [transitions]. *)
   let pstr_lts_transitions
-    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-    ?(indent : int = 1)
-    (transitions : lts_transition H.t)
+        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        ?(indent : int = 1)
+        (transitions : lts_transition H.t)
     : string
     =
     if H.to_seq_keys transitions |> Seq.is_empty
@@ -604,20 +623,20 @@ struct
            (fun (from_node : EConstr.constr)
              (outgoing_transition : lts_transition)
              (acc : string) ->
-             Printf.sprintf
-               "%s%s{%s}\n"
-               acc
-               (str_tabs indent)
-               (pstr_lts_transition ~params (from_node, outgoing_transition)))
+              Printf.sprintf
+                "%s%s{%s}\n"
+                acc
+                (str_tabs indent)
+                (pstr_lts_transition ~params (from_node, outgoing_transition)))
            transitions
            "\n")
   ;;
 
   (** [pstr_lts_to_visit ?indent nodes_to_visit] is a string of [nodes_to_visit]. *)
   let pstr_lts_to_visit
-    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-    ?(indent : int = 1)
-    (nodes_to_visit : EConstr.constr Queue.t)
+        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        ?(indent : int = 1)
+        (nodes_to_visit : EConstr.constr Queue.t)
     : string
     =
     let s =
@@ -625,7 +644,7 @@ struct
         "[%s]"
         (Queue.fold
            (fun (acc : string) (node_to_visit : EConstr.constr) ->
-             Printf.sprintf "%s{%s}\n" acc (econstr_to_string node_to_visit))
+              Printf.sprintf "%s{%s}\n" acc (econstr_to_string node_to_visit))
            "\n"
            nodes_to_visit)
     in
@@ -634,9 +653,9 @@ struct
 
   (** [pstr_lts g] is a string of the LTS [g]. *)
   let pstr_lts
-    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-    ?(long : unit option)
-    (g : lts_graph)
+        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        ?(long : unit option)
+        (g : lts_graph)
     : string
     =
     Printf.sprintf
@@ -650,8 +669,8 @@ struct
 
   (** [build_states g] returns the set of States and for each a mapping from EConstr.t. *)
   let build_states
-    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-    (g : lts_graph)
+        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        (g : lts_graph)
     : (States.t * state_translation_table) mm
     =
     let map_of_states = S.cardinal g.states |> Hashtbl.create in
@@ -666,18 +685,18 @@ struct
     let states =
       S.fold
         (fun (s : EConstr.t) (acc : States.t) ->
-          (* check if [map_of_states] has *)
-          match Hashtbl.find_opt map_of_states s with
-          | None ->
-            (* add as new state *)
-            let new_state =
-              make_state ~pp:(econstr_to_string s) (get_state_id ())
-            in
-            Hashtbl.add map_of_states s new_state;
-            States.add new_state acc
-          | Some existing_state ->
-            (* do not add new state, already translated *)
-            acc)
+           (* check if [map_of_states] has *)
+           match Hashtbl.find_opt map_of_states s with
+           | None ->
+             (* add as new state *)
+             let new_state =
+               Make.state (Of (get_state_id (), econstr_to_string s))
+             in
+             Hashtbl.add map_of_states s new_state;
+             States.add new_state acc
+           | Some existing_state ->
+             (* do not add new state, already translated *)
+             acc)
         g.states
         States.empty
     in
@@ -692,9 +711,9 @@ struct
       @return
         a tuple containing the {b edges} [States.t Actions.t Edges.t] and corresponding {b alphabet} of labels. *)
   let build_edges
-    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-    (g : lts_graph)
-    (s : state_translation_table)
+        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        (g : lts_graph)
+        (s : state_translation_table)
     : (States.t Actions.t Edges.t * Alphabet.t) mm
     =
     let* env = get_env in
@@ -709,63 +728,64 @@ struct
         (fun (from : EConstr.t)
           (transition : (action, EConstr.constr) transition)
           (acc : Alphabet.t) ->
-          (* only add if action with same label doesnt exist *)
-          if Alphabet.exists
+           (* only add if action with same label doesnt exist *)
+           if
+             Alphabet.exists
                (fun (a : action) ->
-                 String.equal a.label transition.action.label)
+                  String.equal a.label transition.action.label)
                acc
-          then acc
-          else
-            Alphabet.add
-              (make_action
-                 ~label:transition.action.label
-                 (Alphabet.cardinal acc))
-              acc)
+           then acc
+           else
+             Alphabet.add
+               (Make.action
+                  (Of (Alphabet.cardinal acc, transition.action.label)))
+               acc)
         g.transitions
         Alphabet.empty
     in
     (* build edges *)
     H.iter
-      (fun (from : EConstr.t) (transition : (action, EConstr.constr) transition) ->
-        let edge_from = Hashtbl.find s from in
-        let edge_dest = Hashtbl.find s transition.destination in
-        let edge_action =
-          List.nth
-            (let pstr_actions =
-               Alphabet.filter
-                 (fun (a : action) ->
-                   String.equal a.label transition.action.label)
-                 alphabet
-             in
-             Alphabet.to_list pstr_actions)
-            0
-        in
-        (* check state already has edges *)
-        match Edges.find_opt edges edge_from with
-        | None ->
-          (* add new *)
-          Edges.add
-            edges
-            edge_from
-            (Actions.of_seq
-               (List.to_seq [ edge_action, States.of_list [ edge_dest ] ]))
-        | Some actions ->
-          (* add to outgoing edges *)
-          Edges.add
-            edges
-            edge_from
-            (Actions.of_seq
-               (List.to_seq
-                  (List.append
-                     (List.of_seq (Actions.to_seq actions))
-                     [ ( edge_action
-                       , match Actions.find_opt actions edge_action with
-                         (* add new *)
-                         | None -> States.of_list [ edge_dest ]
-                         (* add to actions of outgoing edges*)
-                         | Some destinations ->
-                           States.add edge_dest destinations )
-                     ]))))
+      (fun (from : EConstr.t)
+        (transition : (action, EConstr.constr) transition) ->
+         let edge_from = Hashtbl.find s from in
+         let edge_dest = Hashtbl.find s transition.destination in
+         let edge_action =
+           List.nth
+             (let pstr_actions =
+                Alphabet.filter
+                  (fun (a : action) ->
+                     String.equal a.label transition.action.label)
+                  alphabet
+              in
+              Alphabet.to_list pstr_actions)
+             0
+         in
+         (* check state already has edges *)
+         match Edges.find_opt edges edge_from with
+         | None ->
+           (* add new *)
+           Edges.add
+             edges
+             edge_from
+             (Actions.of_seq
+                (List.to_seq [ edge_action, States.of_list [ edge_dest ] ]))
+         | Some actions ->
+           (* add to outgoing edges *)
+           Edges.add
+             edges
+             edge_from
+             (Actions.of_seq
+                (List.to_seq
+                   (List.append
+                      (List.of_seq (Actions.to_seq actions))
+                      [ ( edge_action
+                        , match Actions.find_opt actions edge_action with
+                          (* add new *)
+                          | None -> States.of_list [ edge_dest ]
+                          (* add to actions of outgoing edges*)
+                          | Some destinations ->
+                            States.add edge_dest destinations )
+                      ]))))
       g.transitions;
     return (edges, alphabet)
   ;;
@@ -781,19 +801,21 @@ struct
       @return
         a tuple containing the ocaml-based [Fsm.fsm] and a table for translating ocaml-fsm states to coq-terms.*)
   let lts_to_fsm
-    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-    (g : lts_graph)
-    (init_term : Constrexpr.constr_expr_r CAst.t)
+        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        (g : lts_graph)
+        (init_term : Constrexpr.constr_expr_r CAst.t)
     : (fsm * state_translation_table) mm
     =
+    params.kind <- Debug ();
     match g with
     | { to_visit; transitions; _ } ->
       (* we require the lts to be complete *)
       if Bool.not (Queue.is_empty to_visit)
       then (
         (* do not proceed *)
+        params.kind <- Warning ();
         log
-          ~params:(log_kind (Warning ()) params)
+          ~params
           (Printf.sprintf
              "lts is not complete, still had at least (%d) terms to visit."
              (Queue.length to_visit));
@@ -810,7 +832,9 @@ struct
         let$ init_term env sigma = sigma, Reductionops.nf_all env sigma t in
         let init_state = Hashtbl.find state_translation_map init_term in
         (* return fsm and state_translation_map *)
-        return (make_fsm init_state alphabet states edges, state_translation_map)
+        return
+          ( Make.fsm (Some init_state) alphabet states edges
+          , state_translation_map )
   ;;
 end
 
@@ -824,12 +848,12 @@ let make_graph_builder =
 ;;
 
 let build_lts
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  (iref : Names.GlobRef.t)
-  (tref : Constrexpr.constr_expr_r CAst.t)
+      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      (iref : Names.GlobRef.t)
+      (tref : Constrexpr.constr_expr_r CAst.t)
   : raw_lts mm
   =
-  let debug_params : logging_params = log_kind (Debug ()) params in
+  params.kind <- Debug ();
   (* *)
   let* raw_lts = check_ref_lts iref in
   let* graphM = make_graph_builder in
@@ -840,17 +864,17 @@ let build_lts
   let* sigma = get_sigma in
   (* *)
   log
-    ~params:debug_params
+    ~params
     (Printf.sprintf
        "(a) Types of terms: %s.\n"
        (econstr_to_string raw_lts.trm_type));
   log
-    ~params:debug_params
+    ~params
     (Printf.sprintf
        "(b) Types of labels: %s.\n"
        (econstr_to_string raw_lts.lbl_type));
   log
-    ~params:debug_params
+    ~params
     (Printf.sprintf
        "(c) Constructors: %s.\n"
        (Pp.string_of_ppcmds
@@ -859,48 +883,48 @@ let build_lts
              Names.Id.print
              raw_lts.coq_ctor_names)));
   log
-    ~params:debug_params
+    ~params
     (Printf.sprintf
        "(d) Transitions: %s.\n"
        (Pp.string_of_ppcmds
           (pp_transitions env sigma raw_lts.constructor_transitions)));
   log
-    ~params:debug_params
+    ~params
     (Printf.sprintf
        "(e) Graph Edges: %s.\n"
-       (G.pstr_lts_transitions ~params:debug_params graph_lts.transitions));
+       (G.pstr_lts_transitions ~params graph_lts.transitions));
   return raw_lts
 ;;
 
 (**  *)
 let build_fsm_from_lts
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  (iref : Names.GlobRef.t)
-  (tref : Constrexpr.constr_expr_r CAst.t)
+      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      (iref : Names.GlobRef.t)
+      (tref : Constrexpr.constr_expr_r CAst.t)
   : fsm mm
   =
-  let debug_params : logging_params = log_kind (Debug ()) params in
+  params.kind <- Debug ();
   (* *)
   let* raw_lts = check_ref_lts iref in
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
-  let* graph_lts = G.build_graph ~params:debug_params raw_lts tref in
+  let* graph_lts = G.build_graph ~params raw_lts tref in
   (* *)
   let* env = get_env in
   let* sigma = get_sigma in
   (* *)
   log
-    ~params:debug_params
+    ~params
     (Printf.sprintf
        "(a) Types of terms: %s.\n"
        (econstr_to_string raw_lts.trm_type));
   log
-    ~params:debug_params
+    ~params
     (Printf.sprintf
        "(b) Types of labels: %s.\n"
        (econstr_to_string raw_lts.lbl_type));
   log
-    ~params:debug_params
+    ~params
     (Printf.sprintf
        "(c) Constructors: %s.\n"
        (Pp.string_of_ppcmds
@@ -909,30 +933,30 @@ let build_fsm_from_lts
              Names.Id.print
              raw_lts.coq_ctor_names)));
   log
-    ~params:debug_params
+    ~params
     (Printf.sprintf
        "(d) Transitions: %s.\n"
        (Pp.string_of_ppcmds
           (pp_transitions env sigma raw_lts.constructor_transitions)));
   log
-    ~params:debug_params
+    ~params
     (Printf.sprintf
        "(e) Graph Edges: %s.\n"
-       (G.pstr_lts_transitions ~params:debug_params graph_lts.transitions));
+       (G.pstr_lts_transitions ~params graph_lts.transitions));
   (* *)
-  let* the_fsm, translation =
-    G.lts_to_fsm ~params:debug_params graph_lts tref
-  in
+  let* the_fsm, translation = G.lts_to_fsm ~params graph_lts tref in
   log
-    ~params:debug_params
+    ~params
     (Printf.sprintf
        "(f) Fsm: %s.\n"
-       (PStr.fsm ~params:(Logging debug_params) the_fsm));
+       (PStr.fsm ~params:(Logging params) the_fsm));
+  params.kind <- Details ();
   log
     ~params
     (Printf.sprintf
        "Generated FSM: %s.\n"
-       (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) the_fsm));
+       (PStr.fsm ~params:(Logging params) the_fsm));
+  params.kind <- Debug ();
   log ~params "\n= = = = = (end of build_fsm) = = = = = =\n";
   (* *)
   return the_fsm
@@ -962,101 +986,71 @@ let build_fsm_from_lts
     - States are the sets of possible transitions
     - A term [t] is represented by the state of the transitions that can be taken *)
 let cmd_bounded_lts
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  (iref : Names.GlobRef.t)
-  (tref : Constrexpr.constr_expr_r CAst.t)
+      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      (iref : Names.GlobRef.t)
+      (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
+  params.kind <- Debug ();
   let* _ = build_lts ~params iref tref in
   return ()
 ;;
 
 let cmd_bounded_lts_to_fsm
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  (iref : Names.GlobRef.t)
-  (tref : Constrexpr.constr_expr_r CAst.t)
+      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      (iref : Names.GlobRef.t)
+      (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
+  params.kind <- Debug ();
   let* _ = build_fsm_from_lts ~params iref tref in
   return ()
 ;;
 
 let cmd_merge_fsm_from_lts
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-  ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+      ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
-  let* (s : fsm) =
-    build_fsm_from_lts
-      ~params:
-        (set_logging_options
-           { output_enabled = true
-           ; show_normal_output = false
-           ; show_detailed_output = false
-           ; show_debug_output = false
-           ; show_warning_output = true
-           }
-           params)
-      s_iref
-      s_tref
-  in
-  let* (t : fsm) =
-    build_fsm_from_lts
-      ~params:
-        (set_logging_options
-           { output_enabled = true
-           ; show_normal_output = false
-           ; show_detailed_output = false
-           ; show_debug_output = false
-           ; show_warning_output = true
-           }
-           params)
-      t_iref
-      t_tref
-  in
+  params.kind <- Debug ();
+  let* (s : fsm) = build_fsm_from_lts ~params s_iref s_tref in
+  let* (t : fsm) = build_fsm_from_lts ~params t_iref t_tref in
   (* *)
-  let merged_fsm, _ = Merge.fsm ~params s t in
+  let merged_fsm, _ = Merge.fsms ~params s t in
+  params.kind <- Details ();
   log
-    ~params:(log_kind (Details ()) params)
+    ~params
     (Printf.sprintf
        "Merged FSMs 's' and 't' :: %s.\n\n\
         where s = %s,\n\n\
         and t = %s.\n\n\
         = = = (end of cmd_merge_fsm_from_lts) = = = = = =\n\n"
-       (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) merged_fsm)
-       (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) s)
-       (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) t));
+       (PStr.fsm ~params:(Logging params) merged_fsm)
+       (PStr.fsm ~params:(Logging params) s)
+       (PStr.fsm ~params:(Logging params) t));
   return ()
 ;;
 
 (* *)
 let cmd_bisim_ks90_using_fsm
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  (s : fsm)
-  (t : fsm)
+      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      (s : fsm)
+      (t : fsm)
   : unit mm
   =
   let open Bisimilarity in
   (* *)
-  let result =
-    RCP.KS90.run
-      ~params:
-        (set_logging_options
-           { output_enabled = true
-           ; show_normal_output = false
-           ; show_detailed_output = false
-           ; show_debug_output = false
-           ; show_warning_output = true
-           }
-           params)
-      s
-      t
-  in
+  params.kind <- Debug ();
+  let result = RCP.KS90.run ~params s t in
   match result with
   | { are_bisimilar; merged_fsm; bisimilar_states; non_bisimilar_states; _ } ->
+    params.kind <- Details ();
+    params.options.show_normal_output <- true;
     log
-      ~params:(log_kind (Normal ()) params)
+      ~params:
+        (params.kind <- Normal ();
+         params)
       (Printf.sprintf
          "[KS90] Results: (s ~ t) = %b.\n\n\
           Bisimilar states: %s.\n\n\
@@ -1066,25 +1060,22 @@ let cmd_bisim_ks90_using_fsm
           were merged into: %s.\n\n\
           = = = (end of cmd_bisim_ks90_using_fsm) = = = = = =\n\n"
          are_bisimilar
-         (PStr.partition
-            ~params:(Logging (log_kind (Details ()) params))
-            bisimilar_states)
-         (PStr.partition
-            ~params:(Logging (log_kind (Details ()) params))
-            non_bisimilar_states)
-         (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) s)
-         (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) t)
-         (PStr.fsm ~params:(Logging (log_kind (Details ()) params)) merged_fsm));
+         (PStr.partition ~params:(Logging params) bisimilar_states)
+         (PStr.partition ~params:(Logging params) non_bisimilar_states)
+         (PStr.fsm ~params:(Logging params) s)
+         (PStr.fsm ~params:(Logging params) t)
+         (PStr.fsm ~params:(Logging params) merged_fsm));
     return ()
 ;;
 
 (* *)
 let cmd_bisim_ks90_using_lts_to_fsm
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-  ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+      ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
+  params.kind <- Debug ();
   let* (s : fsm) = build_fsm_from_lts ~params s_iref s_tref in
   let* (t : fsm) = build_fsm_from_lts ~params t_iref t_tref in
   (* *)

@@ -28,26 +28,32 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "LTS" reference(r) constr(t) ] ->
     { (Mebi_monad.run
         (Command.cmd_bounded_lts
-        ~params:(Utils.set_logging_options
-          { output_enabled=true;
-            show_normal_output=true;
-            show_detailed_output=true;
-            show_debug_output=false;
-            show_warning_output=true }
-          (Utils.default_logging_params ~mode:(Coq()) ()))
+          ~params:(
+            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            params.options <-
+            { output_enabled=true;
+              show_normal_output=true;
+              show_detailed_output=false;
+              show_debug_output=false;
+              show_warning_output=true };
+            params
+          )
           (* coq terms: *)
           (Nametab.global r) t)) }
   (*** debug mode ****)
   | [ "MeBi" "LTS" "show_debug" reference(r) constr(t) ] ->
     { (Mebi_monad.run
         (Command.cmd_bounded_lts
-          ~params:(Utils.set_logging_options
+          ~params:(
+            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            params.options <-
             { output_enabled=true;
               show_normal_output=true;
               show_detailed_output=true;
               show_debug_output=true;
-              show_warning_output=true }
-            (Utils.default_logging_params ~mode:(Coq()) ()))
+              show_warning_output=true };
+            params
+          )
           (* coq terms: *)
           (Nametab.global r) t)) }
   (***************************)
@@ -56,26 +62,32 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "FSM" reference(r) constr(t) ] ->
     { (Mebi_monad.run
         (Command.cmd_bounded_lts_to_fsm
-          ~params:(Utils.set_logging_options
+          ~params:(
+            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            params.options <-
             { output_enabled=true;
               show_normal_output=true;
-              show_detailed_output=true;
+              show_detailed_output=false;
               show_debug_output=false;
-              show_warning_output=true }
-            (Utils.default_logging_params ~mode:(Coq()) ()))
+              show_warning_output=true };
+            params
+          )
           (* coq terms: *)
           (Nametab.global r) t)) }
   (*** debug mode ****)
   | [ "MeBi" "FSM" "show_debug" reference(r) constr(t) ] ->
     { (Mebi_monad.run
         (Command.cmd_bounded_lts_to_fsm
-          ~params:(Utils.set_logging_options
+          ~params:(
+            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            params.options <-
             { output_enabled=true;
               show_normal_output=true;
               show_detailed_output=true;
               show_debug_output=true;
-              show_warning_output=true }
-            (Utils.default_logging_params ~mode:(Coq()) ()))
+              show_warning_output=true };
+            params
+          )
           (* coq terms: *)
           (Nametab.global r) t)) }
   (***************************)
@@ -84,27 +96,33 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "FSM" "Merge" reference(r) constr(t) reference(r') constr(t') ] ->
     { (Mebi_monad.run
         (Command.cmd_merge_fsm_from_lts
-          ~params:(Utils.set_logging_options
+          ~params:(
+            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            params.options <-
             { output_enabled=true;
               show_normal_output=true;
-              show_detailed_output=true;
+              show_detailed_output=false;
               show_debug_output=false;
-              show_warning_output=true }
-            (Utils.default_logging_params ~mode:(Coq()) ()))
+              show_warning_output=true };
+            params
+          )
           (* coq terms: *)
         ((Nametab.global r), t)
         ((Nametab.global r'), t'))) }
   (*** debug mode ****)
   | [ "MeBi" "FSM" "Merge" "show_debug" reference(r) constr(t) reference(r') constr(t') ] ->
     { (Mebi_monad.run
-      (Command.cmd_merge_fsm_from_lts
-        ~params:(Utils.set_logging_options
-          { output_enabled=true;
-            show_normal_output=true;
-            show_detailed_output=true;
-            show_debug_output=true;
-            show_warning_output=true }
-          (Utils.default_logging_params ~mode:(Coq()) ()))
+        (Command.cmd_merge_fsm_from_lts
+          ~params:(
+            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            params.options <-
+            { output_enabled=true;
+              show_normal_output=true;
+              show_detailed_output=true;
+              show_debug_output=true;
+              show_warning_output=true };
+            params
+          )
         (* coq terms: *)
       ((Nametab.global r), t)
       ((Nametab.global r'), t'))) }
@@ -114,28 +132,34 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   (* run bisim alg on two terms (first, builds fsm) *)
   | [ "MeBi" "Bisim" "KS90" reference(r) constr(t) reference(r') constr(t') ] ->
     { (Mebi_monad.run
-      (Command.cmd_bisim_ks90_using_lts_to_fsm
-        ~params:(Utils.set_logging_options
-          { output_enabled=true;
-            show_normal_output=true;
-            show_detailed_output=true;
-            show_debug_output=false;
-            show_warning_output=true }
-          (Utils.default_logging_params ~mode:(Coq()) ()))
+        (Command.cmd_bisim_ks90_using_lts_to_fsm
+          ~params:(
+            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            params.options <-
+            { output_enabled=true;
+              show_normal_output=true;
+              show_detailed_output=false;
+              show_debug_output=false;
+              show_warning_output=true };
+            params
+          )
         (* coq terms: *)
       ((Nametab.global r), t)
       ((Nametab.global r'), t'))) }
   (*** debug mode ****)
   | [ "MeBi" "Bisim" "KS90" "show_debug" reference(r) constr(t) reference(r') constr(t') ] ->
     { (Mebi_monad.run
-      (Command.cmd_bisim_ks90_using_lts_to_fsm
-        ~params:(Utils.set_logging_options
-          { output_enabled=true;
-            show_normal_output=true;
-            show_detailed_output=true;
-            show_debug_output=true;
-            show_warning_output=true }
-          (Utils.default_logging_params ~mode:(Coq()) ()))
+        (Command.cmd_bisim_ks90_using_lts_to_fsm
+          ~params:(
+            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            params.options <-
+            { output_enabled=true;
+              show_normal_output=true;
+              show_detailed_output=true;
+              show_debug_output=true;
+              show_warning_output=true };
+            params
+          )
         (* coq terms: *)
       ((Nametab.global r), t)
       ((Nametab.global r'), t'))) }

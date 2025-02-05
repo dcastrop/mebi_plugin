@@ -2,32 +2,19 @@
 (****** States *******************************************************)
 (*********************************************************************)
 
-(** [state] is a 2-tuple with a unique [id] and (non-unique) name ([pp]).
+(** [state] is a 2-tuple with a unique [id] and (non-unique) [name].
     [id] is an integer for identifying the state.
-    [pp] is a pretty-printed string of something corresponding to this state. *)
+    [name] is a pretty-printed string of something corresponding to this state. *)
 type state =
   { id : int (* ; hash : int *)
-  ; pp : string
+  ; name : string
   }
-
-(** [make_state ?pp id] is a wrapper constructor for [state].
-    @param ?pp is a pretty-printed respresentation, which defaults to [s{id}].
-    @param id is the unique identifier for the state. *)
-let make_state ?(pp : string option) (id : int) =
-  { id
-  ; pp =
-      (match pp with
-       | None -> Printf.sprintf "s%d" id
-       | Some pp' -> pp')
-  }
-;;
 
 (** [States] is a set of [states]. *)
 module States = Set.Make (struct
     type t = state
 
     let compare a b = compare a.id b.id
-    (* let compare a b = compare a.pp b.pp *)
   end)
 
 (*************************************************)
@@ -55,18 +42,6 @@ type action =
   ; label : string
   }
 
-(** [make_action ?label id] is a wrapper constructor for [action].
-    @param ?label is a pretty-printed representation, which defaults to [s{id}].
-    @param id is the unique identifier for the state. *)
-let make_action ?(label : string option) (id : int) : action =
-  { id
-  ; label =
-      (match label with
-       | None -> Printf.sprintf "l%d" id
-       | Some label' -> label')
-  }
-;;
-
 (** [Alphabet] is a set of [actions]. *)
 module Alphabet = Set.Make (struct
     type t = action
@@ -86,51 +61,17 @@ module Actions = Hashtbl.Make (struct
     let hash (t : action) = Hashtbl.hash t
   end)
 
-(** [make_actions ?size] is a wrapper constructor for [Actions]. *)
-let make_actions ?(size : int = 0) () : States.t Actions.t = Actions.create size
-
 (** [Edges] map [states] to outgoing actions, mapped to sets of destination [states]. *)
 module Edges = Hashtbl.Make (struct
     type t = state
 
     let equal (t1 : state) (t2 : state) = Int.equal t1.id t2.id
     let hash (t : state) = Hashtbl.hash t
+
+    (* let add (tbl) (k:t) (v:States.t Actions.t) :unit = match Hashtbl.find_opt tbl k with
+    | None -> Hashtbl.add tbl k v
+    | Some v' -> Hashtbl.replace tbl k (Actions.add v') *)
   end)
-
-(** [make_edges ?size] is a wrapper constructor for [Actions]. *)
-let make_edges ?(size : int = 0) () : States.t Actions.t Edges.t =
-  Edges.create size
-;;
-
-(**  *)
-let add_new_outgoing_edge
-  (edges : States.t Actions.t Edges.t)
-  (from_state : state)
-  (out_action : action)
-  (dest_state : state)
-  : unit
-  =
-  match Edges.find_opt edges from_state with
-  (* add new set of actions from state *)
-  | None ->
-    Edges.add
-      edges
-      from_state
-      (Actions.of_seq
-         (List.to_seq [ out_action, States.of_list [ dest_state ] ]))
-  (* actions already exist, update them *)
-  | Some existing_actions ->
-    (match Actions.find_opt existing_actions out_action with
-     (* this specific action does not exist, add *)
-     | None ->
-       Actions.add existing_actions out_action (States.of_list [ dest_state ])
-     (* update destination states of this action which already exists *)
-     | Some existing_destinations ->
-       Actions.replace
-         existing_actions
-         out_action
-         (States.add dest_state existing_destinations))
-;;
 
 (*********************************************************************)
 (****** FSM **********************************************************)
@@ -142,127 +83,256 @@ let add_new_outgoing_edge
     - [states] is a set of states.
     - [edges] is a hashtable mapping states to outgoing actions and their detination states. *)
 type fsm =
-  { init : state
-  ; alphabet : Alphabet.t
-  ; states : States.t
-  ; edges : States.t Actions.t Edges.t
+  { init : state option
+  ; mutable alphabet : Alphabet.t
+  ; mutable states : States.t
+  ; mutable edges : States.t Actions.t Edges.t
   }
 (* TODO: Currently, there may be many copies of the same state in an [fsm] (i.e., in [init] and the [edges]). Maybe add list of states and change others to be an index referencing their position in the list. *)
-
-(** [make_fsm init alphabet states edges] is a wrapper constructor for [fsm]. *)
-let make_fsm
-  (init : state)
-  (alphabet : Alphabet.t)
-  (states : States.t)
-  (edges : States.t Actions.t Edges.t)
-  : fsm
-  =
-  { init; alphabet; states; edges }
-;;
-
-(** [make_fsm_from_lts] is a more user-friendly helper function for defining FSMs.
-    @param init_label is the string label of the initial state.
-    @param transitions
-      is the list of pairs of states and, their list pairs of actions, with their list of destination states. *)
-
-let make_fsm_from_lts
-  (init_label : string)
-  (transitions : (string * (string * string list) list) list)
-  : fsm
-  =
-  let init : state = make_state ~pp:init_label 0 in
-  (* traverse transitions and collect states, labels and edges *)
-  let states, alphabet, edges =
-    List.fold_left
-      (fun ((states, alphabet, edges) :
-             States.t * Alphabet.t * States.t Actions.t Edges.t)
-        ((lhs, labels_rhs) : string * (string * string list) list) ->
-        (* unpack outgoing state *)
-        let states', from_state =
-          let new_state : state = make_state ~pp:lhs (States.cardinal states) in
-          let existing_state : States.t =
-            States.filter
-              (fun (existing_state : state) ->
-                existing_state.pp == new_state.pp)
-              states
-          in
-          match States.is_empty existing_state with
-          | true -> States.add new_state states, new_state
-          | false ->
-            assert (States.cardinal existing_state == 1);
-            states, List.hd (States.elements existing_state)
-        in
-        (* go through each outgoing edge *)
-        let states'', alphabet', edges' =
-          List.fold_left
-            (fun ((states'', alphabet', edges') :
-                   States.t * Alphabet.t * States.t Actions.t Edges.t)
-              ((label, rhs) : string * string list) ->
-              (* unpack outgoing label *)
-              let alphabet'', out_action =
-                let new_action : action =
-                  make_action ~label (Alphabet.cardinal alphabet')
-                in
-                match Alphabet.find_opt new_action alphabet' with
-                | None -> Alphabet.add new_action alphabet', new_action
-                | Some existing_action -> alphabet', existing_action
-              in
-              (* go through each destination state *)
-              let states''', edges'' =
-                List.fold_left
-                  (fun ((states''', edges'') :
-                         States.t * States.t Actions.t Edges.t)
-                    (destination : string) ->
-                    (* unpack destination state *)
-                    let states'''', dest_state =
-                      let dest_state : state =
-                        make_state ~pp:destination (States.cardinal states''')
-                      in
-                      let existing_dest : States.t =
-                        States.filter
-                          (fun (existing_dest : state) ->
-                            existing_dest.pp == dest_state.pp)
-                          states'''
-                      in
-                      match States.is_empty existing_dest with
-                      | true -> States.add dest_state states''', dest_state
-                      | false ->
-                        states''', List.hd (States.to_list existing_dest)
-                    in
-                    (* add to edges *)
-                    add_new_outgoing_edge
-                      edges''
-                      from_state
-                      out_action
-                      dest_state;
-                    states'''', edges'')
-                  (* return. *)
-                  (states'', edges')
-                  rhs
-              in
-              (* return. *)
-              states''', alphabet'', edges'')
-            (states', alphabet, edges)
-            labels_rhs
-        in
-        (* return. *)
-        states'', alphabet', edges')
-      ( States.of_list [ init ]
-      , Alphabet.empty
-      , Edges.create (List.length transitions) )
-      transitions
-  in
-  (* make fsm. *)
-  { init; alphabet; states; edges }
-;;
 
 (*********************************************************************)
 (****** Pretty-Printing **********************************************)
 (*********************************************************************)
 
-(********************************************)
-(****** States ******************************)
-(********************************************)
+module Make = struct
+  (********************************************)
+  (****** States ******************************)
+  (********************************************)
+
+  type state_params =
+    | From of (state * int)
+    | Of of (int * string)
+
+  (** [state ?pp id] is a wrapper constructor for [state].
+    @param ?pp is a pretty-printed respresentation, which defaults to [s{id}].
+    @param id is the unique identifier for the state. *)
+  let state (params : state_params) : state =
+    let id, name =
+      match params with
+      | From (s, offset) -> s.id + offset, s.name
+      | Of (id, name) -> id, name
+    in
+    { id; name }
+  ;;
+
+  type states_params =
+    | From of (States.t * int)
+    | ()
+
+  let states (params : states_params) : States.t =
+    match params with
+    | From (states, offset) ->
+      States.map (fun (s : state) -> state (From (s, offset))) states
+    | () -> States.empty
+  ;;
+
+  (********************************************)
+  (****** Alphabet, Actions & Edges ***********)
+  (********************************************)
+
+  let label (id : int) : string = Printf.sprintf "l%d" id
+
+  type action_param =
+    | Of of (int * string)
+    | From of int
+
+  (** [action ?label id] is a wrapper constructor for [action].
+    @param ?label is a pretty-printed representation, which defaults to [s{id}].
+    @param id is the unique identifier for the state. *)
+  let action (params : action_param) : action =
+    match params with
+    | Of (id, label) -> { id; label }
+    | From id -> { id; label = label id }
+  ;;
+
+  type actions_params =
+    | New of (action * States.t)
+    | Singleton of (action * state)
+    | ()
+
+  let actions (params : actions_params) : States.t Actions.t =
+    match params with
+    | New (a, destinations) -> Actions.of_seq (List.to_seq [ a, destinations ])
+    | Singleton (a, destination) ->
+      Actions.of_seq (List.to_seq [ a, States.singleton destination ])
+    | () -> Actions.create 0
+  ;;
+
+  (** [edges ?size] is a wrapper constructor for [Actions]. *)
+  let edges ?(size : int = 0) unit : States.t Actions.t Edges.t =
+    Edges.create size
+  ;;
+
+  (********************************************)
+  (****** FSM *********************************)
+  (********************************************)
+
+  (** [fsm init alphabet states edges] is a wrapper constructor for [fsm]. *)
+  let fsm
+        (init : state option)
+        (alphabet : Alphabet.t)
+        (states : States.t)
+        (edges : States.t Actions.t Edges.t)
+    : fsm
+    =
+    { init; alphabet; states; edges }
+  ;;
+
+  (** [make_fsm_from_lts] is a more user-friendly helper function for defining FSMs.
+    @param init_label is the string label of the initial state.
+    @param transitions
+      is the list of pairs of states and, their list pairs of actions, with their list of destination states. *)
+
+  (* let fsm_from_lts
+        (init_label : string)
+        (transitions : (string * (string * string list) list) list)
+    : fsm
+    =
+    let init : state = state (Of (0, init_label)) in
+    (* traverse transitions and collect states, labels and edges *)
+    let states, alphabet, edges =
+      List.fold_left
+        (fun ((states, alphabet, edges) :
+               States.t * Alphabet.t * States.t Actions.t Edges.t)
+          ((lhs, labels_rhs) : string * (string * string list) list) ->
+           (* unpack outgoing state *)
+           let states', from_state =
+             let new_state : state = state (Of (States.cardinal states, lhs)) in
+             let existing_state : States.t =
+               States.filter
+                 (fun (existing_state : state) ->
+                    existing_state.name == new_state.name)
+                 states
+             in
+             match States.is_empty existing_state with
+             | true -> States.add new_state states, new_state
+             | false ->
+               assert (States.cardinal existing_state == 1);
+               states, List.hd (States.elements existing_state)
+           in
+           (* go through each outgoing edge *)
+           let states'', alphabet', edges' =
+             List.fold_left
+               (fun ((states'', alphabet', edges') :
+                      States.t * Alphabet.t * States.t Actions.t Edges.t)
+                 ((label, rhs) : string * string list) ->
+                  (* unpack outgoing label *)
+                  let alphabet'', out_action =
+                    let new_action : action =
+                      action ~label (Alphabet.cardinal alphabet')
+                    in
+                    match Alphabet.find_opt new_action alphabet' with
+                    | None -> Alphabet.add new_action alphabet', new_action
+                    | Some existing_action -> alphabet', existing_action
+                  in
+                  (* go through each destination state *)
+                  let states''', edges'' =
+                    List.fold_left
+                      (fun ((states''', edges'') :
+                             States.t * States.t Actions.t Edges.t)
+                        (destination : string) ->
+                         (* unpack destination state *)
+                         let states'''', dest_state =
+                           let dest_state : state =
+                             state (Of (States.cardinal states''', destination))
+                           in
+                           let existing_dest : States.t =
+                             States.filter
+                               (fun (existing_dest : state) ->
+                                  existing_dest.name == dest_state.name)
+                               states'''
+                           in
+                           match States.is_empty existing_dest with
+                           | true -> States.add dest_state states''', dest_state
+                           | false ->
+                             states''', List.hd (States.to_list existing_dest)
+                         in
+                         (* add to edges *)
+                         add_new_outgoing_edge
+                           edges''
+                           from_state
+                           out_action
+                           dest_state;
+                         states'''', edges'')
+                      (* return. *)
+                      (states'', edges')
+                      rhs
+                  in
+                  (* return. *)
+                  states''', alphabet'', edges'')
+               (states', alphabet, edges)
+               labels_rhs
+           in
+           (* return. *)
+           states'', alphabet', edges')
+        ( States.of_list [ init ]
+        , Alphabet.empty
+        , Edges.create (List.length transitions) )
+        transitions
+    in
+    (* make fsm. *)
+    { init = Some init; alphabet; states; edges }
+  ;; *)
+end
+
+(*********************************************************************)
+(****** Append FSM ***************************************************)
+(*********************************************************************)
+
+module Append = struct
+  let alphabet (fsm : fsm) (a : action) : unit =
+    fsm.alphabet <- Alphabet.add a fsm.alphabet
+  ;;
+
+  let state ?(skip_duplicate_names : bool = true) (fsm : fsm) (s : state) : unit
+    =
+    fsm.states
+    <- (if skip_duplicate_names
+        then
+          if States.exists (fun (s' : state) -> s'.name == s.name) fsm.states
+          then fsm.states
+          else States.add s fsm.states
+        else States.add s fsm.states)
+  ;;
+
+  let states
+        ?(skip_duplicate_names : bool = true)
+        (fsm : fsm)
+        (states : States.t)
+    : unit
+    =
+    States.iter (fun (s : state) -> state ~skip_duplicate_names fsm s) states
+  ;;
+
+  let action (actions : States.t Actions.t) ((a, destination) : action * state)
+    : unit
+    =
+    match Actions.find_opt actions a with
+    | None ->
+      (* add as new *)
+      Actions.add actions a (States.singleton destination)
+    | Some destinations ->
+      (* append to existing destinations *)
+      Actions.replace actions a (States.add destination destinations)
+  ;;
+
+  let edge (fsm : fsm) ((from, a, destination) : state * action * state) : unit =
+    match Edges.find_opt fsm.edges from with
+    | None ->
+      (* add as new *)
+      let actions : States.t Actions.t =
+        Make.actions (Singleton (a, destination))
+      in
+      Edges.add fsm.edges from actions
+    | Some actions' ->
+      (* append to existing *)
+      action actions' (a, destination)
+  ;;
+end
+
+(*********************************************************************)
+(****** Pretty-Printing **********************************************)
+(*********************************************************************)
 
 module PStr = struct
   open Utils
@@ -275,8 +345,8 @@ module PStr = struct
     }
 
   let default_formatting_params
-    ?(params : logging_params = default_logging_params ())
-    ()
+        ?(params : logging_params = default_logging_params ())
+        ()
     : formatting_params
     =
     { tabs = 0; no_leading_tab = true; (*non_repetative = true;*) params }
@@ -332,8 +402,8 @@ module PStr = struct
   (********************************************)
 
   let state
-    ?(params : pstr_params = Formatting (default_formatting_params ()))
-    (s : state)
+        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        (s : state)
     : string
     =
     let _params : formatting_params = handle_formatting_params params in
@@ -341,8 +411,8 @@ module PStr = struct
     Printf.sprintf
       "%s%s"
       (if _params.no_leading_tab then "" else tabs)
-      (let normal_pstr : string = Printf.sprintf "(%s)" s.pp
-       and detail_pstr : string = Printf.sprintf "(%s | id:%d)" s.pp s.id in
+      (let normal_pstr : string = Printf.sprintf "(%s)" s.name
+       and detail_pstr : string = Printf.sprintf "(%s | id:%d)" s.name s.id in
        match _params.params.kind with
        | Normal () -> normal_pstr
        | Details () -> detail_pstr
@@ -351,8 +421,8 @@ module PStr = struct
   ;;
 
   let states
-    ?(params : pstr_params = Formatting (default_formatting_params ()))
-    (states : States.t)
+        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        (states : States.t)
     : string
     =
     if States.is_empty states
@@ -367,18 +437,18 @@ module PStr = struct
         (if _params.no_leading_tab then "" else tabs)
         (States.fold
            (fun (s : state) (acc : string) ->
-             Printf.sprintf
-               "%s%s\n"
-               acc
-               (state ~params:(Formatting (no_leading_tab false _params')) s))
+              Printf.sprintf
+                "%s%s\n"
+                acc
+                (state ~params:(Formatting (no_leading_tab false _params')) s))
            states
            "\n")
         tabs)
   ;;
 
   let partition
-    ?(params : pstr_params = Formatting (default_formatting_params ()))
-    (partition : Partition.t)
+        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        (partition : Partition.t)
     : string
     =
     if Partition.is_empty partition
@@ -393,12 +463,12 @@ module PStr = struct
         (if _params.no_leading_tab then "" else tabs)
         (Partition.fold
            (fun (states' : States.t) (acc : string) ->
-             Printf.sprintf
-               "%s%s\n"
-               acc
-               (states
-                  ~params:(Formatting (no_leading_tab false _params'))
-                  states'))
+              Printf.sprintf
+                "%s%s\n"
+                acc
+                (states
+                   ~params:(Formatting (no_leading_tab false _params'))
+                   states'))
            partition
            "\n")
         tabs)
@@ -409,8 +479,8 @@ module PStr = struct
   (********************************************)
 
   let action
-    ?(params : pstr_params = Formatting (default_formatting_params ()))
-    (a : action)
+        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        (a : action)
     : string
     =
     let _params : formatting_params = handle_formatting_params params in
@@ -428,8 +498,8 @@ module PStr = struct
   ;;
 
   let alphabet
-    ?(params : pstr_params = Formatting (default_formatting_params ()))
-    (actions : Alphabet.t)
+        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        (actions : Alphabet.t)
     : string
     =
     if Alphabet.is_empty actions
@@ -444,18 +514,18 @@ module PStr = struct
         (if _params.no_leading_tab then "" else tabs)
         (Alphabet.fold
            (fun (a : action) (acc : string) ->
-             Printf.sprintf
-               "%s%s\n"
-               acc
-               (action ~params:(Formatting (no_leading_tab false _params')) a))
+              Printf.sprintf
+                "%s%s\n"
+                acc
+                (action ~params:(Formatting (no_leading_tab false _params')) a))
            actions
            "\n")
         tabs)
   ;;
 
   let edge
-    ?(params : pstr_params = Formatting (default_formatting_params ()))
-    ((from, a, destination) : state * action * state)
+        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        ((from, a, destination) : state * action * state)
     : string
     =
     let _params : formatting_params = handle_formatting_params params in
@@ -470,9 +540,9 @@ module PStr = struct
   ;;
 
   let actions
-    ?(params : pstr_params = Formatting (default_formatting_params ()))
-    ?(from : state option)
-    (actions' : States.t Actions.t)
+        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        ?(from : state option)
+        (actions' : States.t Actions.t)
     : string
     =
     if Actions.length actions' == 0
@@ -493,37 +563,37 @@ module PStr = struct
           (if _params.no_leading_tab then "" else tabs)
           (Actions.fold
              (fun (a : action) (destinations : States.t) (acc : string) ->
-               Printf.sprintf
-                 "%s{ --%s--> %s }\n"
-                 acc
-                 (action ~params:(Formatting _params') a)
-                 (states ~params:(Formatting _params') destinations))
+                Printf.sprintf
+                  "%s{ --%s--> %s }\n"
+                  acc
+                  (action ~params:(Formatting _params') a)
+                  (states ~params:(Formatting _params') destinations))
              actions'
              "\n")
       (* if some from state, then go and pstr individual edges *)
       | Some from_state ->
         Actions.fold
           (fun (a : action) (destinations : States.t) (acc : string) ->
-            Printf.sprintf
-              "%s%s"
-              acc
-              (States.fold
-                 (fun (destination : state) (acc' : string) ->
-                   Printf.sprintf
-                     "%s%s\n"
-                     acc'
-                     (edge
-                        ~params:(Formatting (no_leading_tab false _params))
-                        (from_state, a, destination)))
-                 destinations
-                 ""))
+             Printf.sprintf
+               "%s%s"
+               acc
+               (States.fold
+                  (fun (destination : state) (acc' : string) ->
+                     Printf.sprintf
+                       "%s%s\n"
+                       acc'
+                       (edge
+                          ~params:(Formatting (no_leading_tab false _params))
+                          (from_state, a, destination)))
+                  destinations
+                  ""))
           actions'
           "")
   ;;
 
   let edges
-    ?(params : pstr_params = Formatting (default_formatting_params ()))
-    (edges' : States.t Actions.t Edges.t)
+        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        (edges' : States.t Actions.t Edges.t)
     : string
     =
     if Edges.length edges' == 0
@@ -540,21 +610,25 @@ module PStr = struct
            (fun (from_state : state)
              (actions' : States.t Actions.t)
              (acc : string) ->
-             Printf.sprintf
-               "%s%s"
-               acc
-               (actions
-                  ~params:(Formatting (no_leading_tab false _params'))
-                  ?from:(Some from_state)
-                  actions'))
+              Printf.sprintf
+                "%s%s"
+                acc
+                (actions
+                   ~params:(Formatting (no_leading_tab false _params'))
+                   ?from:(Some from_state)
+                   actions'))
            edges'
            "\n")
         tabs)
   ;;
 
+  (********************************************)
+  (****** FSM *********************************)
+  (********************************************)
+
   let fsm
-    ?(params : pstr_params = Formatting (default_formatting_params ()))
-    (fsm' : fsm)
+        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        (fsm' : fsm)
     : string
     =
     (* increment tab of inner elements of fsm *)
@@ -567,7 +641,9 @@ module PStr = struct
       (Printf.sprintf
          "\n%sinitial state: %s"
          tabs'
-         (state ~params:(Formatting _params') fsm'.init))
+         (match fsm'.init with
+          | None -> "None"
+          | Some init' -> state ~params:(Formatting _params') init'))
       (Printf.sprintf
          "\n%salphabet: %s"
          tabs'
@@ -591,30 +667,27 @@ end
 (********************************************)
 (****** States ******************************)
 (********************************************)
-
+(*
 exception StateNotFoundWithID of (int * States.t)
 exception MultipleStatesFoundWithID of (int * States.t)
 
 (** @see [get_action_by_id]. *)
 let get_state_by_id (states : States.t) (id : int) : state =
   let filtered = States.filter (fun (s : state) -> s.id == id) states in
-  if States.is_empty filtered then raise (StateNotFoundWithID (id, states));
-  if States.cardinal filtered > 1
-  then raise (MultipleStatesFoundWithID (id, states));
-  List.nth (States.elements filtered) 0
+  match States.cardinal filtered with
+  | 0 -> raise (StateNotFoundWithID (id, states))
+  | 1 -> List.nth (States.elements filtered) 0
+  | _ -> raise (MultipleStatesFoundWithID (id, states))
 ;;
-
-exception StateNotFoundWithName of (string * States.t)
-exception MultipleStatesFoundWithName of (string * States.t)
 
 (** @see [get_action_by_label]. *)
 let _get_state_by_name (states : States.t) (name : string) : state =
-  let filtered = States.filter (fun (s : state) -> s.pp == name) states in
-  if States.is_empty filtered then raise (StateNotFoundWithName (name, states));
-  if States.cardinal filtered > 1
-  then raise (MultipleStatesFoundWithName (name, states));
-  List.nth (States.elements filtered) 0
-;;
+  let filtered = States.filter (fun (s : state) -> s.name == name) states in
+  match States.cardinal filtered with
+  | 0 -> raise (StateNotFoundWithName (name, states))
+  | 1 -> List.nth (States.elements filtered) 0
+  | _ -> raise (MultipleStatesFoundWithName (name, states))
+;; *)
 
 (********************************************)
 (****** Alphabet ****************************)
@@ -634,14 +707,14 @@ let _get_action_alphabet_from_edges (es : States.t Actions.t Edges.t)
        (fun (_from_state : state)
          (actions : States.t Actions.t)
          (acc : action list) ->
-         List.append
-           acc
-           (Actions.fold
-              (fun (action : action)
-                (_destinations : States.t)
-                (acc' : action list) -> List.append acc' [ action ])
-              actions
-              []))
+          List.append
+            acc
+            (Actions.fold
+               (fun (action : action)
+                 (_destinations : States.t)
+                 (acc' : action list) -> List.append acc' [ action ])
+               actions
+               []))
        es
        [])
 ;;
@@ -659,10 +732,10 @@ exception MultipleActionsFoundWithID of (int * Alphabet.t)
     @see [get_action_by_label]. *)
 let get_action_by_id (alphabet : Alphabet.t) (id : int) : action =
   let filtered = Alphabet.filter (fun (a : action) -> a.id == id) alphabet in
-  if Alphabet.is_empty filtered then raise (ActionNotFoundWithID (id, alphabet));
-  if Alphabet.cardinal filtered > 1
-  then raise (MultipleActionsFoundWithID (id, alphabet));
-  List.nth (Alphabet.elements filtered) 0
+  match Alphabet.cardinal filtered with
+  | 0 -> raise (ActionNotFoundWithID (id, alphabet))
+  | 1 -> List.nth (Alphabet.elements filtered) 0
+  | _ -> raise (MultipleActionsFoundWithID (id, alphabet))
 ;;
 
 exception ActionNotFoundWithLabel of (string * Alphabet.t)
@@ -676,11 +749,10 @@ let get_action_by_label (alphabet : Alphabet.t) (label : string) : action =
   let filtered =
     Alphabet.filter (fun (a : action) -> a.label == label) alphabet
   in
-  if Alphabet.is_empty filtered
-  then raise (ActionNotFoundWithLabel (label, alphabet));
-  if Alphabet.cardinal filtered > 1
-  then raise (MultipleActionsFoundWithLabel (label, alphabet));
-  List.nth (Alphabet.elements filtered) 0
+  match Alphabet.cardinal filtered with
+  | 0 -> raise (ActionNotFoundWithLabel (label, alphabet))
+  | 1 -> List.nth (Alphabet.elements filtered) 0
+  | _ -> raise (MultipleActionsFoundWithLabel (label, alphabet))
 ;;
 
 (********************************************)
@@ -694,15 +766,15 @@ let get_edges_of (a : action) (edges : States.t Actions.t Edges.t)
   let edges_of = Edges.create 0 in
   Edges.iter
     (fun (from_state : state) (outgoing_edges : States.t Actions.t) : unit ->
-      match Actions.find_opt outgoing_edges a with
-      (* skip edge without action [a]. *)
-      | None -> ()
-      (* edge has an [a] aciton. *)
-      | Some destinations ->
-        Edges.add
-          edges_of
-          from_state
-          (Actions.of_seq (List.to_seq [ a, destinations ])))
+       match Actions.find_opt outgoing_edges a with
+       (* skip edge without action [a]. *)
+       | None -> ()
+       (* edge has an [a] aciton. *)
+       | Some destinations ->
+         Edges.add
+           edges_of
+           from_state
+           (Actions.of_seq (List.to_seq [ a, destinations ])))
     edges;
   edges_of
 ;;
@@ -712,7 +784,7 @@ let get_actions_from (from : state) (edges : States.t Actions.t Edges.t)
   : States.t Actions.t
   =
   match Edges.find_opt edges from with
-  | None -> make_actions ~size:0 ()
+  | None -> Make.actions ()
   | Some actions -> actions
 ;;
 
@@ -729,13 +801,15 @@ let rec get_all_destinations (edges : has_destinations) : States.t =
   | Actions es ->
     Actions.fold
       (fun (_a : action) (destinations : States.t) (acc : States.t) ->
-        States.union acc destinations)
+         States.union acc destinations)
       es
       States.empty
   | Edges es ->
     Edges.fold
-      (fun (_from_state : state) (action : States.t Actions.t) (acc : States.t) ->
-        States.union acc (get_all_destinations (Actions action)))
+      (fun (_from_state : state)
+        (action : States.t Actions.t)
+        (acc : States.t) ->
+         States.union acc (get_all_destinations (Actions action)))
       es
       States.empty
 ;;
@@ -763,65 +837,61 @@ let get_reverse_map_state (tbl : (state, state) Hashtbl.t) (v : state) : state =
 module Merge = struct
   open Utils
 
-  let fsm
-    ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-    (base : fsm)
-    (to_merge : fsm)
+  let edges
+        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        ((state_id_offset, merged_alphabet) : int * Alphabet.t)
+        (base : States.t Actions.t Edges.t)
+        (to_merge : States.t Actions.t Edges.t)
+    : States.t Actions.t Edges.t
+    =
+    Edges.iter
+      (fun (from : state) (actions : States.t Actions.t) ->
+         let from' : state = Make.state (From (from, state_id_offset))
+         and actions' : States.t Actions.t =
+           Actions.length actions |> Actions.create
+         in
+         Actions.iter
+           (fun (a : action) (destinations : States.t) ->
+              Actions.add
+                actions'
+                (Alphabet.find a merged_alphabet)
+                (Make.states (From (destinations, state_id_offset))))
+           actions;
+         Edges.add base from' actions')
+      to_merge;
+    base
+  ;;
+
+  let fsms
+        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        (base : fsm)
+        (to_merge : fsm)
     : fsm * (state, state) Hashtbl.t
     =
     (* merge into [base] the fsm [to_merge] *)
     match base with
-    | { init; alphabet; states; edges; _ } ->
+    | { init; alphabet; states; edges = edges'; _ } ->
       (* needed to keep track of [to_merge.states] new IDs *)
       let state_id_offset : int = States.cardinal states
       and to_merge_state_map : (state, state) Hashtbl.t =
         States.cardinal to_merge.states |> Hashtbl.create
       in
-      (*  *)
+      (* *)
       let merged_alphabet : Alphabet.t =
         Alphabet.union alphabet to_merge.alphabet
-      in
-      let merged_states : States.t =
+      and merged_states : States.t =
         States.fold
           (fun (s : state) (acc : States.t) ->
-            let s' : state = make_state ~pp:s.pp (s.id + state_id_offset) in
-            Hashtbl.add to_merge_state_map s' s;
-            States.add s' acc)
+             let s' : state = Make.state (From (s, state_id_offset)) in
+             Hashtbl.add to_merge_state_map s' s;
+             States.add s' acc)
           to_merge.states
           states
       in
-      Edges.iter
-        (fun (from : state) (actions : States.t Actions.t) ->
-          let from' : state =
-            make_state ~pp:from.pp (from.id + state_id_offset)
-          in
-          Edges.add
-            edges
-            from'
-            (Actions.of_seq
-               (List.to_seq
-                  (Actions.fold
-                     (fun (a : action)
-                       (destinations : States.t)
-                       (acc : (action * States.t) list) ->
-                       List.append
-                         acc
-                         [ ( Alphabet.find a merged_alphabet
-                           , States.map
-                               (fun (dest : state) ->
-                                 make_state
-                                   ~pp:dest.pp
-                                   (dest.id + state_id_offset))
-                               destinations )
-                         ])
-                     actions
-                     []))))
-        to_merge.edges;
-      ( make_fsm
-          (make_state ~pp:"<merged>" (-1))
-          merged_alphabet
-          merged_states
-          edges
+      let merged_edges : States.t Actions.t Edges.t =
+        edges ~params (state_id_offset, merged_alphabet) edges' to_merge.edges
+      in
+      ( Make.fsm None merged_alphabet merged_states merged_edges
       , to_merge_state_map )
   ;;
 end

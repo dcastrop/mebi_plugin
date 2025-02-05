@@ -31,11 +31,11 @@ let pstr_output_kind_head (mode : output_modes) (kind : output_kind) : string =
 ;;
 
 type output_options =
-  { output_enabled : bool
-  ; show_normal_output : bool
-  ; show_detailed_output : bool
-  ; show_debug_output : bool
-  ; show_warning_output : bool
+  { mutable output_enabled : bool
+  ; mutable show_normal_output : bool
+  ; mutable show_detailed_output : bool
+  ; mutable show_debug_output : bool
+  ; mutable show_warning_output : bool
   }
 (*
    module DebugScope =Stack.Make (struct
@@ -51,10 +51,10 @@ type output_options =
     - [override] specifies that the output should be shown, regardless of [kind], ignoring [options]. *)
 type logging_params =
   { mode : output_modes
-  ; kind : output_kind
-  ; options : output_options
-  ; scope : string Stack.t
-  ; override : unit option
+  ; mutable kind : output_kind
+  ; mutable options : output_options
+  ; mutable scope : string Stack.t
+  ; mutable override : unit option
   }
 
 (**  *)
@@ -73,27 +73,18 @@ let default_logging_params ?(mode : output_modes = OCaml ()) () : logging_params
   { mode; kind; options; scope; override }
 ;;
 
-let set_logging_options (options : output_options) (params : logging_params)
-  : logging_params
-  =
-  { mode = params.mode
-  ; kind = params.kind
-  ; options
-  ; scope = params.scope
-  ; override = params.override
-  }
+let log_options (options : output_options) (params : logging_params) : unit =
+  params.options <- options
+;;
+
+let log_kind (kind : output_kind) (params : logging_params) : unit =
+  params.kind <- kind
 ;;
 
 let override (params : logging_params) : logging_params =
   match params with
   | { mode; kind; options; scope; override } ->
     { mode; kind; options; scope; override = Some () }
-;;
-
-let log_kind (kind' : output_kind) (params : logging_params) : logging_params =
-  match params with
-  | { mode; kind; options; scope; override } ->
-    { mode; kind = kind'; options; scope; override }
 ;;
 
 let push_scope (to_push : string) (params : logging_params) : unit =
@@ -115,33 +106,34 @@ let pstr_scope (scope : string Stack.t) : string =
     scope
 ;;
 
-let is_output_kind_enabled
-  (kind : output_kind)
-  (options : output_options)
-  (override : unit option)
-  : bool
-  =
-  is_unit_option override
-  ||
-  if options.output_enabled
-  then (
-    match kind with
-    | Normal () -> options.show_normal_output
-    | Details () -> options.show_detailed_output
-    | Debug () -> options.show_debug_output
-    | Warning () -> options.show_warning_output)
-  else false
+let is_output_kind_enabled (params : logging_params) : bool =
+  match params with
+  | { kind; options; override; _ } ->
+    is_unit_option override
+    ||
+    if options.output_enabled
+    then (
+      match kind with
+      | Normal () -> options.show_normal_output
+      | Details () -> options.show_detailed_output
+      | Debug () -> options.show_debug_output
+      | Warning () -> options.show_warning_output)
+    else false
 ;;
 
 let log ?(params : logging_params = default_logging_params ()) (to_log : string)
   : unit
   =
   match params with
-  | { mode; kind; options; scope; override } ->
-    if is_output_kind_enabled kind options override
+  | { mode; kind; options; scope; override; _ } ->
+    if is_output_kind_enabled params
     then (
       let msg_to_log : string =
-        Printf.sprintf "%s\n%s\n" (pstr_output_kind_head mode kind) to_log
+        Printf.sprintf
+          "%s%s\n%s\n"
+          (if is_unit_option override then "!!!>>>" else "")
+          (pstr_output_kind_head mode kind)
+          to_log
       in
       match mode with
       | Coq () ->
