@@ -672,6 +672,10 @@ struct
       (Printf.sprintf "transitions: %s" (pstr_lts_transitions g.transitions))
   ;;
 
+  module PStr = struct
+    (* TODO: refactor pstr_lts and others *)
+  end
+
   (*
      TODO: refactor the above, using the new [Fsm.Make] and [Fsm.New] functions
     - this will ensure that there are no duplicate states or actions and such
