@@ -8,6 +8,8 @@ open Pp_ext
 open Fsm
 open Utils
 
+let default_params : logging_params = default_logging_params ~mode:(Coq ()) ()
+
 (** ['a mm] is a function type mapping from [coq_context ref] to ['a in_context]. *)
 type 'a mm = 'a Mebi_monad.t
 
@@ -109,7 +111,7 @@ let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
     - Is [w_unify] the best way?
     - ... *)
 let m_unify
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      ?(params : logging_params = default_params)
       (t0 : Evd.econstr)
       (t1 : Evd.econstr)
   : bool mm
@@ -200,7 +202,7 @@ let rec pstr_int_tree (t : int tree) : string =
 (* (int tree * unif_problem) list -> int tree list option t *)
 (* *)
 let rec unify_all
-          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+          ?(params : logging_params = default_params)
           (i : (int tree * unif_problem) list)
   : int tree list option t
   =
@@ -229,7 +231,7 @@ let rec unify_all
 ;;
 
 let sandboxed_unify
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      ?(params : logging_params = default_params)
       (tgt_term : EConstr.t)
       (u : (int tree * unif_problem) list)
   : (EConstr.t * int tree list) option mm
@@ -254,7 +256,7 @@ let sandboxed_unify
 
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
-          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+          ?(params : logging_params = default_params)
           (acc : (EConstr.t * EConstr.t * int tree) list)
           (i : int)
           (act : EConstr.t)
@@ -326,7 +328,7 @@ let rec check_updated_ctx
 
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      ?(params : logging_params = default_params)
       (lts : raw_lts)
       (t : EConstr.t)
       (ma : EConstr.t option)
@@ -413,25 +415,6 @@ module type GraphB = sig
     -> Constrexpr.constr_expr_r CAst.t
     -> lts_graph mm
 
-  type state_translation_table = (EConstr.t, state) Hashtbl.t
-
-  val build_states
-    :  ?params:logging_params
-    -> lts_graph
-    -> (States.t * state_translation_table) mm
-
-  val build_edges
-    :  ?params:logging_params
-    -> lts_graph
-    -> state_translation_table
-    -> (States.t Actions.t Edges.t * Alphabet.t) mm
-
-  val lts_to_fsm
-    :  ?params:logging_params
-    -> lts_graph
-    -> Constrexpr.constr_expr_r CAst.t
-    -> (fsm * state_translation_table) mm
-
   val pstr_lts_transition
     :  ?params:logging_params
     -> EConstr.constr * lts_transition
@@ -445,6 +428,32 @@ module type GraphB = sig
 
   val pstr_lts : ?params:logging_params -> ?long:unit -> lts_graph -> string
   (* val pp_fsm : ?long:unit -> fsm -> unit *)
+
+  module DeCoq : sig
+    type coq_translation =
+      { from_coq : (EConstr.t, string) Hashtbl.t
+      ; to_coq : (string, EConstr.t) Hashtbl.t
+      }
+
+    (* type coq_translation = coq_translation_record mm *)
+
+    val translate_coq_terms
+      :  ?params:logging_params
+      -> S.t
+      -> coq_translation mm
+
+    val translate_coq_lts
+      :  ?params:logging_params
+      -> lts_transition H.t
+      -> coq_translation
+      -> Lts.raw_flat_lts mm
+
+    val lts_graph_to_lts
+      :  ?params:logging_params
+      -> lts_graph
+      -> Constrexpr.constr_expr_r CAst.t
+      -> (Lts.lts * coq_translation) mm
+  end
 end
 
 (** [MkGraph M] is ...
@@ -483,13 +492,12 @@ struct
     ; transitions : lts_transition H.t
     }
 
-  (** [build_lts the_lts g] is an [lts_graph] [g] obtained by exploring [the_lts].
+  (** [build_lts_graph the_lts g] is an [lts_graph] [g] obtained by exploring [the_lts].
       @param the_lts describes the Coq-based term.
       @param g is an [lts_graph] accumulated while exploring [the_lts].
       @return an [lts_graph] constructed so long as the [bound] is not exceeded. *)
-  let rec build_lts
-            ?(params : logging_params =
-              default_logging_params ~mode:(Coq ()) ())
+  let rec build_lts_graph
+            ?(params : logging_params = default_params)
             (the_lts : raw_lts)
             (g : lts_graph)
     : lts_graph mm
@@ -513,7 +521,7 @@ struct
             str
               (Printf.sprintf
                  "---- (returned from check_valid_constructor)\n\n\
-                  build_lts: constrs: [%s] (length %d).\n"
+                  build_lts_graph: constrs: [%s] (length %d).\n"
                  (List.fold_left
                     (fun (acc : string)
                       ((act, ctor, int_tree) : EConstr.t * EConstr.t * int tree) ->
@@ -558,14 +566,14 @@ struct
              (Printf.sprintf "\nVisiting next: %i." (Queue.length g.to_visit)))
         constrs;
       let g = { g with states = S.union g.states !new_states } in
-      build_lts ~params the_lts g
+      build_lts_graph ~params the_lts g
   ;;
 
   (** [build_graph the_lts t] is ...
       @param the_lts is ...
       @param t is the original Coq-term. *)
   let build_graph
-        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        ?(params : logging_params = default_params)
         (the_lts : raw_lts)
         (t : Constrexpr.constr_expr_r CAst.t)
     : lts_graph mm
@@ -575,7 +583,7 @@ struct
     let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
     let q = Queue.create () in
     let* _ = return (Queue.push t q) in
-    build_lts
+    build_lts_graph
       ~params
       the_lts
       { to_visit = q (* ; labels = L.empty *)
@@ -590,7 +598,7 @@ struct
       [t] is an (outgoing) [lts_transition] composed of a label [t.edge_ctor]
       and a destination node [t.to_node]. *)
   let pstr_lts_transition
-        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        ?(params : logging_params = default_params)
         ((from : EConstr.constr), (t : lts_transition))
     : string
     =
@@ -609,7 +617,7 @@ struct
 
   (** [pstr_lts_transitions transitions] is a string of [transitions]. *)
   let pstr_lts_transitions
-        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        ?(params : logging_params = default_params)
         ?(indent : int = 1)
         (transitions : lts_transition H.t)
     : string
@@ -634,7 +642,7 @@ struct
 
   (** [pstr_lts_to_visit ?indent nodes_to_visit] is a string of [nodes_to_visit]. *)
   let pstr_lts_to_visit
-        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        ?(params : logging_params = default_params)
         ?(indent : int = 1)
         (nodes_to_visit : EConstr.constr Queue.t)
     : string
@@ -653,7 +661,7 @@ struct
 
   (** [pstr_lts g] is a string of the LTS [g]. *)
   let pstr_lts
-        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        ?(params : logging_params = default_params)
         ?(long : unit option)
         (g : lts_graph)
     : string
@@ -665,185 +673,116 @@ struct
   ;;
 
   (*
-     TODO: refactor the below, using the new [Fsm.Make] and [Fsm.New] functions
+     TODO: refactor the above, using the new [Fsm.Make] and [Fsm.New] functions
     - this will ensure that there are no duplicate states or actions and such
     - first, just translate this graph_lts to a [Lts.lts] (composed of just strings)
     - maybe [MkGraph] provides a record for converting to [Lts.lts].
       Then it is simple to use [Translate.to_fsm]
   *)
+  module DeCoq = struct
+    type coq_translation =
+      { from_coq : (EConstr.t, string) Hashtbl.t
+      ; to_coq : (string, EConstr.t) Hashtbl.t
+      }
 
-  (** [state_translation_table] is is a hashtable mapping [EConstr.t] of terms to [states]. *)
-  type state_translation_table = (EConstr.t, state) Hashtbl.t
+    let make_coq_translation : coq_translation =
+      { from_coq = Hashtbl.create 0; to_coq = Hashtbl.create 0 }
+    ;;
 
-  (** [build_states g] returns the set of States and for each a mapping from EConstr.t. *)
-  let build_states
-        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-        (g : lts_graph)
-    : (States.t * state_translation_table) mm
-    =
-    let map_of_states = S.cardinal g.states |> Hashtbl.create in
-    (* set up counter for state ids *)
-    let state_id_counter = ref 0 in
-    let get_state_id () : int =
-      let to_return = !state_id_counter in
-      state_id_counter := !state_id_counter + 1;
-      to_return
-    in
-    (* extract all states *)
-    let states =
-      S.fold
-        (fun (s : EConstr.t) (acc : States.t) ->
-           (* check if [map_of_states] has *)
-           match Hashtbl.find_opt map_of_states s with
+    (* ! ! ! ! ! !
+    "double wrapping" using the monad. => Is this a good idea?
+
+    My idea is that it would be good if the coq_translation is
+    all wrapped up in the environment/sigma that it was created
+    from. Though, I am wondering if this would make it easier
+    for us to translate back if needed.
+
+    But... maybe this just isnt necessary since we access all
+    of this from the [G] module anyway.
+    *)
+
+    (* type coq_translation = coq_translation_record mm *)
+
+    let translate_coq_terms
+          ?(params : logging_params = default_params)
+          (states : N.t)
+      : coq_translation mm
+      =
+      let tbl : coq_translation = make_coq_translation in
+      S.iter
+        (fun (s : EConstr.t) ->
+           match Hashtbl.find_opt tbl.from_coq s with
            | None ->
              (* add as new state *)
-             let new_state =
-               Make.state (Of (get_state_id (), econstr_to_string s))
-             in
-             Hashtbl.add map_of_states s new_state;
-             States.add new_state acc
-           | Some existing_state ->
-             (* do not add new state, already translated *)
-             acc)
-        g.states
-        States.empty
-    in
-    (* *)
-    return (states, map_of_states)
-  ;;
+             let str : string = econstr_to_string s in
+             Hashtbl.add tbl.from_coq s str;
+             Hashtbl.add tbl.to_coq str s
+           | Some _ -> (* ignore *) ())
+        states;
+      return tbl
+    ;;
 
-  (** [build_edges g s] is a hashtable mapping FSM states to
-      outgoing edges comprised of labels and destination states.
-      @param g is the LTS with transitions to build the FSM edges from.
-      @param s is the translation map from Coq-terms to FSM states.
-      @return
-        a tuple containing the {b edges} [States.t Actions.t Edges.t] and corresponding {b alphabet} of labels. *)
-  let build_edges
-        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-        (g : lts_graph)
-        (s : state_translation_table)
-    : (States.t Actions.t Edges.t * Alphabet.t) mm
-    =
-    let* env = get_env in
-    let* sigma = get_sigma in
-    let keys = H.to_seq_keys g.transitions in
-    let (edges : States.t Actions.t Edges.t) =
-      Seq.length keys |> Edges.create
-    in
-    (* get actions first *)
-    let alphabet =
-      H.fold
-        (fun (from : EConstr.t)
-          (transition : (action, EConstr.constr) transition)
-          (acc : Alphabet.t) ->
-           (* only add if action with same label doesnt exist *)
-           if
-             Alphabet.exists
-               (fun (a : action) ->
-                  String.equal a.label transition.action.label)
-               acc
-           then acc
-           else
-             Alphabet.add
-               (Make.action
-                  (Of (Alphabet.cardinal acc, transition.action.label)))
-               acc)
-        g.transitions
-        Alphabet.empty
-    in
-    (* build edges *)
-    H.iter
-      (fun (from : EConstr.t)
-        (transition : (action, EConstr.constr) transition) ->
-         let edge_from = Hashtbl.find s from in
-         let edge_dest = Hashtbl.find s transition.destination in
-         let edge_action =
-           List.nth
-             (let pstr_actions =
-                Alphabet.filter
-                  (fun (a : action) ->
-                     String.equal a.label transition.action.label)
-                  alphabet
-              in
-              Alphabet.to_list pstr_actions)
-             0
-         in
-         (* check state already has edges *)
-         match Edges.find_opt edges edge_from with
-         | None ->
-           (* add new *)
-           Edges.add
-             edges
-             edge_from
-             (Actions.of_seq
-                (List.to_seq [ edge_action, States.of_list [ edge_dest ] ]))
-         | Some actions ->
-           (* add to outgoing edges *)
-           Edges.add
-             edges
-             edge_from
-             (Actions.of_seq
-                (List.to_seq
-                   (List.append
-                      (List.of_seq (Actions.to_seq actions))
-                      [ ( edge_action
-                        , match Actions.find_opt actions edge_action with
-                          (* add new *)
-                          | None -> States.of_list [ edge_dest ]
-                          (* add to actions of outgoing edges*)
-                          | Some destinations ->
-                            States.add edge_dest destinations )
-                      ]))))
-      g.transitions;
-    return (edges, alphabet)
-  ;;
+    let translate_coq_lts
+          ?(params : logging_params = default_params)
+          (transitions : lts_transition H.t)
+          (tbl : coq_translation)
+      : Lts.raw_flat_lts mm
+      =
+      return
+        (H.fold
+           (fun (from : EConstr.t)
+             (transition : (action, EConstr.constr) transition)
+             (acc : Lts.raw_flat_lts) ->
+              List.append
+                acc
+                [ ( Hashtbl.find tbl.from_coq from
+                  , transition.action.label
+                  , Hashtbl.find tbl.from_coq transition.destination )
+                ])
+           transitions
+           [])
+    ;;
 
-  (** Error when trying to translate an unfinished LTS to FSM. *)
-  exception UnfinishedLTS of lts_graph
+    let translate_init_term
+          (init_term : Constrexpr.constr_expr_r CAst.t)
+          (tbl : coq_translation)
+      : string mm
+      =
+      let$ t env sigma = Constrintern.interp_constr_evars env sigma init_term in
+      let$ init_term env sigma = sigma, Reductionops.nf_all env sigma t in
+      let init_str : string = Hashtbl.find tbl.from_coq init_term in
+      return init_str
+    ;;
 
-  (** [lts_to_fsm g init_term term] translates LTS [g] to an FSM.
-      @param g is an [lts_graph] to be translated.
-      @param init_term
-        is the original actual Coq-term used to build the LTS.
-        (Used to determine the initial state of the FSM).
-      @return
-        a tuple containing the ocaml-based [Fsm.fsm] and a table for translating ocaml-fsm states to coq-terms.*)
-  let lts_to_fsm
-        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-        (g : lts_graph)
-        (init_term : Constrexpr.constr_expr_r CAst.t)
-    : (fsm * state_translation_table) mm
-    =
-    params.kind <- Debug ();
-    match g with
-    | { to_visit; transitions; _ } ->
-      (* we require the lts to be complete *)
-      if Bool.not (Queue.is_empty to_visit)
+    (** Error when trying to translate an unfinished LTS to FSM. *)
+    exception UnfinishedLTS of lts_graph
+
+    let lts_graph_to_lts
+          ?(params : logging_params = default_params)
+          (g : lts_graph)
+          (init_term : Constrexpr.constr_expr_r CAst.t)
+      : (Lts.lts * coq_translation) mm
+      =
+      params.kind <- Debug ();
+      params.options.show_debug_output <- true;
+      (* abort if lts not complete *)
+      if Bool.not (Queue.is_empty g.to_visit)
       then (
-        (* do not proceed *)
         params.kind <- Warning ();
         log
           ~params
           (Printf.sprintf
              "lts is not complete, still had at least (%d) terms to visit."
-             (Queue.length to_visit));
-        raise (UnfinishedLTS g))
-      else
-        (* extract states *)
-        let* states, state_translation_map = build_states ~params g in
-        (* extract edges *)
-        let* edges, alphabet = build_edges ~params g state_translation_map in
-        (* get initial state *)
-        let$ t env sigma =
-          Constrintern.interp_constr_evars env sigma init_term
-        in
-        let$ init_term env sigma = sigma, Reductionops.nf_all env sigma t in
-        let init_state = Hashtbl.find state_translation_map init_term in
-        (* return fsm and state_translation_map *)
-        return
-          ( Make.fsm (Some init_state) alphabet states edges
-          , state_translation_map )
-  ;;
+             (Queue.length g.to_visit));
+        raise (UnfinishedLTS g));
+      (* *)
+      let* tbl : coq_translation = translate_coq_terms g.states in
+      let* init : string = translate_init_term init_term tbl in
+      let* raw_lts : Lts.raw_flat_lts = translate_coq_lts g.transitions tbl in
+      let lts : Lts.lts = Lts.Make.lts ~init (Flat raw_lts) in
+      return (lts, tbl)
+    ;;
+  end
 end
 
 (** [make_graph_builder] is ... *)
@@ -855,8 +794,8 @@ let make_graph_builder =
   return (module G : GraphB)
 ;;
 
-let build_lts
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+let build_lts_graph
+      ?(params : logging_params = default_params)
       (iref : Names.GlobRef.t)
       (tref : Constrexpr.constr_expr_r CAst.t)
   : raw_lts mm
@@ -906,7 +845,7 @@ let build_lts
 
 (**  *)
 let build_fsm_from_lts
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      ?(params : logging_params = default_params)
       (iref : Names.GlobRef.t)
       (tref : Constrexpr.constr_expr_r CAst.t)
   : fsm mm
@@ -952,17 +891,14 @@ let build_fsm_from_lts
        "(e) Graph Edges: %s.\n"
        (G.pstr_lts_transitions ~params graph_lts.transitions));
   (* *)
-  let* the_fsm, translation = G.lts_to_fsm ~params graph_lts tref in
+  let* the_pure_lts, coq_translation =
+    G.DeCoq.lts_graph_to_lts ~params graph_lts tref
+  in
+  let the_fsm = Translate.to_fsm the_pure_lts in
   log
     ~params
     (Printf.sprintf
        "(f) Fsm: %s.\n"
-       (PStr.fsm ~params:(Logging params) the_fsm));
-  params.kind <- Details ();
-  log
-    ~params
-    (Printf.sprintf
-       "Generated FSM: %s.\n"
        (PStr.fsm ~params:(Logging params) the_fsm));
   params.kind <- Debug ();
   log ~params "\n= = = = = (end of build_fsm) = = = = = =\n";
@@ -994,18 +930,18 @@ let build_fsm_from_lts
     - States are the sets of possible transitions
     - A term [t] is represented by the state of the transitions that can be taken *)
 let cmd_bounded_lts
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      ?(params : logging_params = default_params)
       (iref : Names.GlobRef.t)
       (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   params.kind <- Debug ();
-  let* _ = build_lts ~params iref tref in
+  let* _ = build_lts_graph ~params iref tref in
   return ()
 ;;
 
 let cmd_bounded_lts_to_fsm
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      ?(params : logging_params = default_params)
       (iref : Names.GlobRef.t)
       (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
@@ -1016,7 +952,7 @@ let cmd_bounded_lts_to_fsm
 ;;
 
 let cmd_merge_fsm_from_lts
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      ?(params : logging_params = default_params)
       ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
       ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
@@ -1042,7 +978,7 @@ let cmd_merge_fsm_from_lts
 
 (* *)
 let cmd_bisim_ks90_using_fsm
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      ?(params : logging_params = default_params)
       (s : fsm)
       (t : fsm)
   : unit mm
@@ -1078,7 +1014,7 @@ let cmd_bisim_ks90_using_fsm
 
 (* *)
 let cmd_bisim_ks90_using_lts_to_fsm
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+      ?(params : logging_params = default_params)
       ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
       ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm

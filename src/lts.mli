@@ -1,6 +1,9 @@
+type raw_flat_lts = (string * string * string) list
+type raw_nested_lts = (string * (string * string list) list) list
+
 type raw_transitions =
-  | Flat of (string * string * string) list
-  | Nested of (string * (string * string list) list) list
+  | Flat of raw_flat_lts
+  | Nested of raw_nested_lts
 
 type transition =
   { id : int
