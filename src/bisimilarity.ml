@@ -3,6 +3,8 @@
    (See https://doi.org/10.1017/CBO9780511792588.) *)
 
 open Fsm
+open Utils.Logging
+open Utils.Formatting
 open Utils
 
 (** [bisim_result] is returned by the algorithms that check for bisimilarity. *)
@@ -13,6 +15,8 @@ type bisim_result =
   ; non_bisimilar_states : Partition.t
   }
 
+let default_params : Params.log = Params.Default.log ~mode:(Coq ()) ()
+
 (** [RCP] contains algorithms for solving the
     `Relational Coarsest Partitioning` problem. *)
 module RCP = struct
@@ -20,180 +24,6 @@ module RCP = struct
   module KS90 = struct
     exception EmptyBlock of Block.t
     exception PartitionsNotDisjoint of Partition.t
-    (*
-       module DebugMessages = struct
-      let reachable_blocks
-        ?(show : bool = false)
-        ?(details : bool = true)
-        ?(debug : bool = false)
-        (destinations : States.t)
-        : unit
-        =
-        print
-          ~show:(show && debug)
-          (Printf.sprintf
-             "/\\/\\/\\ KS90.reachable_blocks /\\/\\/\\\n\n\
-             \  destinations: %s.\n\
-              /\\/\\/\\/\\/\\/\\/\\/\\/\\\n\n"
-             (pstr
-                ~options:(pstr_options details)
-                (pp_wrap_as_supported (States destinations))))
-      ;;
-
-      let split
-        ?(show : bool = false)
-        ?(details : bool = true)
-        ?(debug : bool = false)
-        (block : Block.t)
-        (a : action)
-        (pi : Partition.t)
-        (edges : States.t Actions.t Edges.t)
-        : unit
-        =
-        print
-          ~show:(show && debug)
-          (Printf.sprintf
-             "/\\/\\/\\ KS90.split /\\/\\/\\\n\n\
-             \  action: %s.\n\
-             \  edges: %s.\n\n\
-             \  block: %s.\n\n\
-             \  pi: %s.\n\n\
-              /\\/\\/\\/\\/\\/\\/\\/\\/\\\n\n"
-             (pstr
-                ~options:(pstr_options details)
-                (pp_wrap_as_supported (Action a)))
-             (pstr
-                ~options:(pstr_options details)
-                ~tabs:2
-                (pp_wrap_as_supported (Edges edges)))
-             (pstr
-                ~options:(pstr_options details)
-                ~tabs:2
-                (pp_wrap_as_supported (Block block)))
-             (pstr
-                ~options:(pstr_options details)
-                ~tabs:2
-                (pp_wrap_as_supported (Partition pi))))
-      ;;
-
-      let run_merged
-        ?(show : bool = false)
-        ?(details : bool = true)
-        ?(debug : bool = false)
-        (m : fsm)
-        : unit
-        =
-        print
-          ~show
-          (Printf.sprintf
-             "merged fsm: %s.\n"
-             (pstr
-                ~options:(pstr_options details)
-                (pp_wrap_as_supported (Fsm m))))
-      ;;
-
-      let run_iter
-        ?(show : bool = false)
-        ?(details : bool = true)
-        ?(debug : bool = false)
-        (a : action)
-        (block : Block.t)
-        (pi : Partition.t)
-        : unit
-        =
-        print
-          ~show:(show && debug)
-          (Printf.sprintf
-             "- - - next iteration - - -\n\n\
-             \  action: %s.\n\
-             \  block: %s.\n\n\
-             \  pi: %s.\n\n\
-              - - - - - - - - -\n\n"
-             (pstr
-                ~options:(pstr_options details)
-                (pp_wrap_as_supported (Action a)))
-             (pstr
-                ~options:(pstr_options details)
-                ~tabs:1
-                (pp_wrap_as_supported (Block block)))
-             (pstr
-                ~options:(pstr_options details)
-                ~tabs:1
-                (pp_wrap_as_supported (Partition pi))))
-      ;;
-
-      let run_exit
-        ?(show : bool = false)
-        ?(details : bool = true)
-        ?(debug : bool = false)
-        (map_of_states : (state, state) Hashtbl.t)
-        (s_states : States.t)
-        (t_states : States.t)
-        : unit
-        =
-        print
-          ~show:(show && debug)
-          (Printf.sprintf
-             "=/= KS90.run, map_of_states: {%s}.\n\
-              s.states: %s.\n\
-              t.states: %s.\n"
-             (Hashtbl.fold
-                (fun (state : state) (state' : state) (acc : string) ->
-                  Printf.sprintf
-                    "%s  original:%s -> merged:%s\n"
-                    acc
-                    (pstr
-                       ~options:(pstr_options details)
-                       (pp_wrap_as_supported (State state)))
-                    (pstr
-                       ~options:(pstr_options details)
-                       (pp_wrap_as_supported (State state'))))
-                map_of_states
-                "\n")
-             (pstr
-                ~options:(pstr_options details)
-                (pp_wrap_as_supported (States s_states)))
-             (pstr
-                ~options:(pstr_options details)
-                (pp_wrap_as_supported (States t_states))))
-      ;;
-
-      let run_check
-        ?(show : bool = false)
-        ?(details : bool = true)
-        ?(debug : bool = false)
-        (state : state)
-        (original_state : state)
-        (state' : state)
-        (original_state' : state)
-        (s_states : States.t)
-        (t_states : States.t)
-        : unit
-        =
-        print
-          ~show:(show && debug)
-          (Printf.sprintf
-             "%s\n%s\n"
-             (Printf.sprintf
-                "%s -> %s originates from s ?= %b."
-                (pstr
-                   ~options:(pstr_options details)
-                   (pp_wrap_as_supported (State state)))
-                (pstr
-                   ~options:(pstr_options details)
-                   (pp_wrap_as_supported (State original_state)))
-                (States.mem original_state s_states))
-             (Printf.sprintf
-                "%s -> %s originates from t ?= %b."
-                (pstr
-                   ~options:(pstr_options details)
-                   (pp_wrap_as_supported (State state')))
-                (pstr
-                   ~options:(pstr_options details)
-                   (pp_wrap_as_supported (State original_state)))
-                (States.mem original_state t_states)))
-      ;;
-    end *)
 
     (** [reachable_blocks edges pi] is the subset of partition [pi] containing blocks that contain the destination states of the [actions].
         @return
@@ -206,7 +36,7 @@ module RCP = struct
         @param pi
           is the partition of blocks from which we extract and return a subset from. *)
     let reachable_blocks
-          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+          ?(params : Params.log = default_params)
           (actions : States.t Actions.t)
           (pi : Partition.t)
       : Partition.t
@@ -234,7 +64,7 @@ module RCP = struct
         @param edges is the map from states to actions to destination states.
         @raise EmptyBlock if [block] is empty. *)
     let split
-          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+          ?(params : Params.log = default_params)
           (block : Block.t)
           (a : action)
           (pi : Partition.t)
@@ -288,7 +118,7 @@ module RCP = struct
         @param changed
           is used to denote whether a refinement has occured at all in the current iteration. *)
     let main_loop
-          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+          ?(params : Params.log = default_params)
           ((alphabet, edges) : Alphabet.t * States.t Actions.t Edges.t)
           (pi : Partition.t ref)
           (changed : bool ref)
@@ -315,7 +145,7 @@ module RCP = struct
                     ~params
                     (Printf.sprintf
                        "split returned empty b2.\nb1: %s.\n\n"
-                       (PStr.states ~params:(Logging params) b1));
+                       (PStr.states ~params:(Log params) b1));
                   ()
                 | _, _ ->
                   (* split did occur, so replace [b] with [b1] and [b2] and refine *)
@@ -324,8 +154,8 @@ module RCP = struct
                     ~params
                     (Printf.sprintf
                        "split returned two blocks.\nb1: %s.\nb2: %s.\n\n"
-                       (PStr.states ~params:(Logging params) b1)
-                       (PStr.states ~params:(Logging params) b2));
+                       (PStr.states ~params:(Log params) b1)
+                       (PStr.states ~params:(Log params) b2));
                   pi := Partition.remove !b !pi;
                   pi := Partition.union !pi (Partition.of_list [ b1; b2 ]);
                   changed := true;
@@ -347,7 +177,7 @@ module RCP = struct
           maps the original (pre-merged) states to the post-merged states.
         @param pi is the partition containing all blocks of states. *)
     let split_bisimilar
-          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+          ?(params : Params.log = default_params)
           ((s_states, t_states) : States.t * States.t)
           (map_of_states : (state, state) Hashtbl.t)
           (pi : Partition.t)
@@ -391,7 +221,7 @@ module RCP = struct
              ~params
              (Printf.sprintf
                 "split returned two blocks.\nb1: %s.\n\n"
-                (PStr.states ~params:(Logging params) block));
+                (PStr.states ~params:(Log params) block));
            (* block is bisimilar if it contains states from both fsms. *)
            match block_contains_states_from_both with
            | true ->
@@ -411,10 +241,7 @@ module RCP = struct
         @param ?debug denotes if debug messages should be shown.
         @param s is an [fsm] to check.
         @param t is an [fsm] to check. *)
-    let run
-          ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-          (s : fsm)
-          (t : fsm)
+    let run ?(params : Params.log = default_params) (s : fsm) (t : fsm)
       : bisim_result
       =
       (* *)

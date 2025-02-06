@@ -1,5 +1,4 @@
 open Mebi_errors
-open Utils
 
 type coq_context =
   { coq_env : Environ.env
@@ -124,21 +123,9 @@ let sandbox (m : 'a t) (st : coq_context ref) : 'a in_context =
   { state = st; value = res.value }
 ;;
 
-let feedback
-      ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-      (f : Environ.env -> Evd.evar_map -> Pp.t)
-  : unit t
-  =
-  assert (
-    match params.mode with
-    | Coq () -> true
-    | _ -> false);
+let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit t =
   state (fun env sigma ->
-    (match params.kind with
-     | Normal () -> Feedback.msg_notice (f env sigma)
-     | Details () -> Feedback.msg_info (f env sigma)
-     | Debug () -> Feedback.msg_debug (f env sigma)
-     | Warning () -> Feedback.msg_warning (f env sigma));
+    Feedback.msg_debug (f env sigma);
     sigma, ())
 ;;
 
