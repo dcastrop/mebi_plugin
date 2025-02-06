@@ -271,56 +271,48 @@ end
 
 module Merge : sig
   val edges
-    :  ?params:Utils.logging_params
+    :  ?params:'a
     -> int * Alphabet.t
     -> Block.t Actions.t Edges.t
     -> Block.t Actions.t Edges.t
     -> Block.t Actions.t Edges.t
 
-  val fsms
-    :  ?params:Utils.logging_params
-    -> fsm
-    -> fsm
-    -> fsm * (state, state) Hashtbl.t
+  val fsms : ?params:'a -> fsm -> fsm -> fsm * (state, state) Hashtbl.t
 end
 
 module PStr : sig
-  type formatting_params =
-    { tabs : int
-    ; no_leading_tab : bool
-    ; params : Utils.logging_params
-    }
+  val inc_tab : ?by:int -> Utils.Formatting.params -> Utils.Formatting.params
+  val dec_tab : ?by:int -> Utils.Formatting.params -> Utils.Formatting.params
+  val no_tab : Utils.Formatting.params -> Utils.Formatting.params
 
-  val default_formatting_params
-    :  ?params:Utils.logging_params
-    -> unit
-    -> formatting_params
+  val no_leading_tab
+    :  bool
+    -> Utils.Formatting.params
+    -> Utils.Formatting.params
 
-  val inc_tab : ?by:int -> formatting_params -> formatting_params
-  val dec_tab : ?by:int -> formatting_params -> formatting_params
-  val no_tab : formatting_params -> formatting_params
-  val no_leading_tab : bool -> formatting_params -> formatting_params
+  val state : ?params:Utils.Formatting.pstr_params -> state -> string
+  val states : ?params:Utils.Formatting.pstr_params -> Block.t -> string
+  val partition : ?params:Utils.Formatting.pstr_params -> Partition.t -> string
+  val action : ?params:Utils.Formatting.pstr_params -> action -> string
+  val alphabet : ?params:Utils.Formatting.pstr_params -> Alphabet.t -> string
 
-  type pstr_params =
-    | Logging of Utils.logging_params
-    | Formatting of formatting_params
-
-  val handle_formatting_params : pstr_params -> formatting_params
-  val state : ?params:pstr_params -> state -> string
-  val states : ?params:pstr_params -> Block.t -> string
-  val partition : ?params:pstr_params -> Partition.t -> string
-  val action : ?params:pstr_params -> action -> string
-  val alphabet : ?params:pstr_params -> Alphabet.t -> string
-  val edge : ?params:pstr_params -> state * action * state -> string
+  val edge
+    :  ?params:Utils.Formatting.pstr_params
+    -> state * action * state
+    -> string
 
   val actions
-    :  ?params:pstr_params
+    :  ?params:Utils.Formatting.pstr_params
     -> ?from:state
     -> Block.t Actions.t
     -> string
 
-  val edges : ?params:pstr_params -> Block.t Actions.t Edges.t -> string
-  val fsm : ?params:pstr_params -> fsm -> string
+  val edges
+    :  ?params:Utils.Formatting.pstr_params
+    -> Block.t Actions.t Edges.t
+    -> string
+
+  val fsm : ?params:Utils.Formatting.pstr_params -> fsm -> string
 end
 
 val get_edges_of

@@ -6,9 +6,11 @@ open Pp_ext
 
 (* *)
 open Fsm
+open Utils.Logging
+open Utils.Formatting
 open Utils
 
-let default_params : logging_params = default_logging_params ~mode:(Coq ()) ()
+let default_params : Params.log = Params.Default.log ~mode:(Coq ()) ()
 
 (** ['a mm] is a function type mapping from [coq_context ref] to ['a in_context]. *)
 type 'a mm = 'a Mebi_monad.t
@@ -17,7 +19,7 @@ type 'a mm = 'a Mebi_monad.t
 
 (** [econstr_to_string target] is a [string] representing [target]. *)
 let econstr_to_string (target : EConstr.t) : string =
-  let econstr_to_string' (target : Evd.econstr) : string mm =
+  let econstr_to_string' (target : EConstr.t) : string mm =
     let* env = get_env in
     let* sigma = get_sigma in
     return (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma target))
@@ -111,7 +113,7 @@ let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
     - Is [w_unify] the best way?
     - ... *)
 let m_unify
-      ?(params : logging_params = default_params)
+      ?(params : Params.log = default_params)
       (t0 : Evd.econstr)
       (t1 : Evd.econstr)
   : bool mm
@@ -120,7 +122,7 @@ let m_unify
   let* _ =
     if is_output_kind_enabled params
     then
-      feedback ~params (fun (env : Environ.env) (sigma : Evd.evar_map) ->
+      debug (fun (env : Environ.env) (sigma : Evd.evar_map) ->
         str "Unifying (t0) :: "
         ++ Printer.pr_econstr_env env sigma t0
         ++ strbrk "\nUnifying (t1) :: "
@@ -202,7 +204,7 @@ let rec pstr_int_tree (t : int tree) : string =
 (* (int tree * unif_problem) list -> int tree list option t *)
 (* *)
 let rec unify_all
-          ?(params : logging_params = default_params)
+          ?(params : Params.log = default_params)
           (i : (int tree * unif_problem) list)
   : int tree list option t
   =
@@ -213,7 +215,7 @@ let rec unify_all
     let* _ =
       if is_output_kind_enabled params
       then
-        feedback ~params (fun env sigma ->
+        debug (fun env sigma ->
           str "UNIFYALL (termL) :::::::::: "
           ++ Printer.pr_econstr_env env sigma u.termL
           ++ strbrk "\nUNIFYALL (termR) :::::::::: "
@@ -231,7 +233,7 @@ let rec unify_all
 ;;
 
 let sandboxed_unify
-      ?(params : logging_params = default_params)
+      ?(params : Params.log = default_params)
       (tgt_term : EConstr.t)
       (u : (int tree * unif_problem) list)
   : (EConstr.t * int tree list) option mm
@@ -240,7 +242,7 @@ let sandboxed_unify
   let* _ =
     if is_output_kind_enabled params
     then
-      feedback ~params (fun env sigma ->
+      debug (fun env sigma ->
         str "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term)
     else return ()
   in
@@ -256,7 +258,7 @@ let sandboxed_unify
 
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
-          ?(params : logging_params = default_params)
+          ?(params : Params.log = default_params)
           (acc : (EConstr.t * EConstr.t * int tree) list)
           (i : int)
           (act : EConstr.t)
@@ -328,7 +330,7 @@ let rec check_updated_ctx
 
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
-      ?(params : logging_params = default_params)
+      ?(params : Params.log = default_params)
       (lts : raw_lts)
       (t : EConstr.t)
       (ma : EConstr.t option)
@@ -342,7 +344,7 @@ and check_valid_constructor
     let* _ =
       if is_output_kind_enabled params
       then
-        feedback ~params (fun env sigma ->
+        debug (fun env sigma ->
           str "CHECKING CONSTRUCTOR "
           ++ int i
           ++ str ". Term: "
@@ -410,23 +412,23 @@ module type GraphB = sig
     }
 
   val build_graph
-    :  ?params:logging_params
+    :  ?params:Params.log
     -> raw_lts
     -> Constrexpr.constr_expr_r CAst.t
     -> lts_graph mm
 
   val pstr_lts_transition
-    :  ?params:logging_params
+    :  ?params:Params.log
     -> EConstr.constr * lts_transition
     -> string
 
   val pstr_lts_transitions
-    :  ?params:logging_params
+    :  ?params:Params.log
     -> ?indent:int
     -> lts_transition H.t
     -> string
 
-  val pstr_lts : ?params:logging_params -> ?long:unit -> lts_graph -> string
+  val pstr_lts : ?params:Params.log -> ?long:unit -> lts_graph -> string
   (* val pp_fsm : ?long:unit -> fsm -> unit *)
 
   module DeCoq : sig
@@ -437,19 +439,16 @@ module type GraphB = sig
 
     (* type coq_translation = coq_translation_record mm *)
 
-    val translate_coq_terms
-      :  ?params:logging_params
-      -> S.t
-      -> coq_translation mm
+    val translate_coq_terms : ?params:Params.log -> S.t -> coq_translation mm
 
     val translate_coq_lts
-      :  ?params:logging_params
+      :  ?params:Params.log
       -> lts_transition H.t
       -> coq_translation
       -> Lts.raw_flat_lts mm
 
     val lts_graph_to_lts
-      :  ?params:logging_params
+      :  ?params:Params.log
       -> lts_graph
       -> Constrexpr.constr_expr_r CAst.t
       -> (Lts.lts * coq_translation) mm
@@ -497,7 +496,7 @@ struct
       @param g is an [lts_graph] accumulated while exploring [the_lts].
       @return an [lts_graph] constructed so long as the [bound] is not exceeded. *)
   let rec build_lts_graph
-            ?(params : logging_params = default_params)
+            ?(params : Params.log = default_params)
             (the_lts : raw_lts)
             (g : lts_graph)
     : lts_graph mm
@@ -517,7 +516,7 @@ struct
       let* _ =
         if is_output_kind_enabled params
         then
-          feedback ~params (fun env sigma ->
+          debug (fun env sigma ->
             str
               (Printf.sprintf
                  "---- (returned from check_valid_constructor)\n\n\
@@ -573,7 +572,7 @@ struct
       @param the_lts is ...
       @param t is the original Coq-term. *)
   let build_graph
-        ?(params : logging_params = default_params)
+        ?(params : Params.log = default_params)
         (the_lts : raw_lts)
         (t : Constrexpr.constr_expr_r CAst.t)
     : lts_graph mm
@@ -598,7 +597,7 @@ struct
       [t] is an (outgoing) [lts_transition] composed of a label [t.edge_ctor]
       and a destination node [t.to_node]. *)
   let pstr_lts_transition
-        ?(params : logging_params = default_params)
+        ?(params : Params.log = default_params)
         ((from : EConstr.constr), (t : lts_transition))
     : string
     =
@@ -617,7 +616,7 @@ struct
 
   (** [pstr_lts_transitions transitions] is a string of [transitions]. *)
   let pstr_lts_transitions
-        ?(params : logging_params = default_params)
+        ?(params : Params.log = default_params)
         ?(indent : int = 1)
         (transitions : lts_transition H.t)
     : string
@@ -642,7 +641,7 @@ struct
 
   (** [pstr_lts_to_visit ?indent nodes_to_visit] is a string of [nodes_to_visit]. *)
   let pstr_lts_to_visit
-        ?(params : logging_params = default_params)
+        ?(params : Params.log = default_params)
         ?(indent : int = 1)
         (nodes_to_visit : EConstr.constr Queue.t)
     : string
@@ -661,7 +660,7 @@ struct
 
   (** [pstr_lts g] is a string of the LTS [g]. *)
   let pstr_lts
-        ?(params : logging_params = default_params)
+        ?(params : Params.log = default_params)
         ?(long : unit option)
         (g : lts_graph)
     : string
@@ -673,7 +672,104 @@ struct
   ;;
 
   module PStr = struct
+    let econstr (t : EConstr.t) : string mm =
+      let* env = get_env in
+      let* sigma = get_sigma in
+      return (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma t))
+    ;;
+
     (* TODO: refactor pstr_lts and others *)
+
+    let constructor
+          ?(params : pstr_params = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+          (t : lts_transition)
+      : string mm
+      =
+      let _params : Params.fmt = Params.handle params in
+      let normal_pstr : string = Printf.sprintf "(%s)" t.action.label
+      and detail_pstr : string =
+        Printf.sprintf "(%s | id:%d)" t.action.label t.action.id
+      in
+      match _params.params.kind with
+      | Normal () -> return normal_pstr
+      | Details () -> return detail_pstr
+      | Debug () -> return detail_pstr
+      | Warning () -> return detail_pstr
+    ;;
+
+    let transition
+          ?(params : pstr_params = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+          ((from, transition) : EConstr.constr * lts_transition)
+      : string mm
+      =
+      return
+        (Printf.sprintf
+           "{ %s --%s--> %s }"
+           (run (econstr from))
+           (run (econstr from))
+           (run (econstr transition.destination)))
+    ;;
+
+    let transitions
+          ?(params : pstr_params = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+          (transitions : lts_transition H.t)
+      : string mm
+      =
+      return
+        (if H.length transitions < 1
+         then "{ } (empty)"
+         else
+           H.fold
+             (fun (from : EConstr.t)
+               (transition' : lts_transition)
+               (acc : string) ->
+                Printf.sprintf
+                  "%s%s\n"
+                  acc
+                  (run (transition (from, transition'))))
+             transitions
+             "\n")
+    ;;
+
+    let states
+          ?(params : pstr_params = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+          (states : N.t)
+      : string mm
+      =
+      return
+        (if N.is_empty states
+         then "[ ] (empty)"
+         else
+           N.fold
+             (fun (s : EConstr.t) (acc : string) ->
+                Printf.sprintf "%s%s\n" acc (run (econstr s)))
+             states
+             "\n")
+    ;;
+
+    let queue
+          ?(params : pstr_params = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+          (q : EConstr.t Queue.t)
+      : string mm
+      =
+      return
+        (if Queue.is_empty q
+         then "[ ] (empty"
+         else
+           Queue.fold
+             (fun (acc : string) (to_visit : EConstr.t) ->
+                Printf.sprintf "%s%s\n" acc (run (econstr to_visit)))
+             "\n"
+             q)
+    ;;
+
+    let lts
+          ?(params : pstr_params = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+          (g : lts_graph)
+      : string mm
+      =
+      return ""
+    ;;
   end
 
   (*
@@ -708,7 +804,7 @@ struct
     (* type coq_translation = coq_translation_record mm *)
 
     let translate_coq_terms
-          ?(params : logging_params = default_params)
+          ?(params : Params.log = default_params)
           (states : N.t)
       : coq_translation mm
       =
@@ -727,7 +823,7 @@ struct
     ;;
 
     let translate_coq_lts
-          ?(params : logging_params = default_params)
+          ?(params : Params.log = default_params)
           (transitions : lts_transition H.t)
           (tbl : coq_translation)
       : Lts.raw_flat_lts mm
@@ -762,7 +858,7 @@ struct
     exception UnfinishedLTS of lts_graph
 
     let lts_graph_to_lts
-          ?(params : logging_params = default_params)
+          ?(params : Params.log = default_params)
           (g : lts_graph)
           (init_term : Constrexpr.constr_expr_r CAst.t)
       : (Lts.lts * coq_translation) mm
@@ -799,7 +895,7 @@ let make_graph_builder =
 ;;
 
 let build_lts_graph
-      ?(params : logging_params = default_params)
+      ?(params : Params.log = default_params)
       (iref : Names.GlobRef.t)
       (tref : Constrexpr.constr_expr_r CAst.t)
   : raw_lts mm
@@ -849,7 +945,7 @@ let build_lts_graph
 
 (**  *)
 let build_fsm_from_lts
-      ?(params : logging_params = default_params)
+      ?(params : Params.log = default_params)
       (iref : Names.GlobRef.t)
       (tref : Constrexpr.constr_expr_r CAst.t)
   : fsm mm
@@ -901,9 +997,7 @@ let build_fsm_from_lts
   let the_fsm = Translate.to_fsm the_pure_lts in
   log
     ~params
-    (Printf.sprintf
-       "(f) Fsm: %s.\n"
-       (PStr.fsm ~params:(Logging params) the_fsm));
+    (Printf.sprintf "(f) Fsm: %s.\n" (PStr.fsm ~params:(Log params) the_fsm));
   params.kind <- Debug ();
   log ~params "\n= = = = = (end of build_fsm) = = = = = =\n";
   (* *)
@@ -934,7 +1028,7 @@ let build_fsm_from_lts
     - States are the sets of possible transitions
     - A term [t] is represented by the state of the transitions that can be taken *)
 let cmd_bounded_lts
-      ?(params : logging_params = default_params)
+      ?(params : Params.log = default_params)
       (iref : Names.GlobRef.t)
       (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
@@ -945,7 +1039,7 @@ let cmd_bounded_lts
 ;;
 
 let cmd_bounded_lts_to_fsm
-      ?(params : logging_params = default_params)
+      ?(params : Params.log = default_params)
       (iref : Names.GlobRef.t)
       (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
@@ -956,7 +1050,7 @@ let cmd_bounded_lts_to_fsm
 ;;
 
 let cmd_merge_fsm_from_lts
-      ?(params : logging_params = default_params)
+      ?(params : Params.log = default_params)
       ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
       ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
@@ -974,15 +1068,15 @@ let cmd_merge_fsm_from_lts
         where s = %s,\n\n\
         and t = %s.\n\n\
         = = = (end of cmd_merge_fsm_from_lts) = = = = = =\n\n"
-       (PStr.fsm ~params:(Logging params) merged_fsm)
-       (PStr.fsm ~params:(Logging params) s)
-       (PStr.fsm ~params:(Logging params) t));
+       (PStr.fsm ~params:(Log params) merged_fsm)
+       (PStr.fsm ~params:(Log params) s)
+       (PStr.fsm ~params:(Log params) t));
   return ()
 ;;
 
 (* *)
 let cmd_bisim_ks90_using_fsm
-      ?(params : logging_params = default_params)
+      ?(params : Params.log = default_params)
       (s : fsm)
       (t : fsm)
   : unit mm
@@ -1008,17 +1102,17 @@ let cmd_bisim_ks90_using_fsm
           were merged into: %s.\n\n\
           = = = (end of cmd_bisim_ks90_using_fsm) = = = = = =\n\n"
          are_bisimilar
-         (PStr.partition ~params:(Logging params) bisimilar_states)
-         (PStr.partition ~params:(Logging params) non_bisimilar_states)
-         (PStr.fsm ~params:(Logging params) s)
-         (PStr.fsm ~params:(Logging params) t)
-         (PStr.fsm ~params:(Logging params) merged_fsm));
+         (PStr.partition ~params:(Log params) bisimilar_states)
+         (PStr.partition ~params:(Log params) non_bisimilar_states)
+         (PStr.fsm ~params:(Log params) s)
+         (PStr.fsm ~params:(Log params) t)
+         (PStr.fsm ~params:(Log params) merged_fsm));
     return ()
 ;;
 
 (* *)
 let cmd_bisim_ks90_using_lts_to_fsm
-      ?(params : logging_params = default_params)
+      ?(params : Params.log = default_params)
       ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
       ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm

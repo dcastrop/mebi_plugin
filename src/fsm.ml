@@ -272,7 +272,7 @@ module Merge = struct
   open Utils
 
   let edges
-        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
         ((state_id_offset, merged_alphabet) : int * Alphabet.t)
         (base : States.t Actions.t Edges.t)
         (to_merge : States.t Actions.t Edges.t)
@@ -297,7 +297,7 @@ module Merge = struct
   ;;
 
   let fsms
-        ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
+        ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
         (base : fsm)
         (to_merge : fsm)
     : fsm * (state, state) Hashtbl.t
@@ -335,24 +335,11 @@ end
 (*********************************************************************)
 
 module PStr = struct
+  open Utils.Logging
+  open Utils.Formatting
   open Utils
 
-  (* make new param that wraps around logging, stating the tab level and such *)
-  type formatting_params =
-    { tabs : int
-    ; no_leading_tab : bool (* ; non_repetative : bool *)
-    ; params : logging_params
-    }
-
-  let default_formatting_params
-        ?(params : logging_params = default_logging_params ())
-        ()
-    : formatting_params
-    =
-    { tabs = 0; no_leading_tab = true; (*non_repetative = true;*) params }
-  ;;
-
-  let inc_tab ?(by : int = 1) (params : formatting_params) : formatting_params =
+  let inc_tab ?(by : int = 1) (params : Params.fmt) : Params.fmt =
     { tabs = params.tabs + by
     ; no_leading_tab =
         params.no_leading_tab (* ; non_repetative = params.non_repetative *)
@@ -360,7 +347,7 @@ module PStr = struct
     }
   ;;
 
-  let dec_tab ?(by : int = 1) (params : formatting_params) : formatting_params =
+  let dec_tab ?(by : int = 1) (params : Params.fmt) : Params.fmt =
     { tabs = (if params.tabs - by < 0 then 0 else params.tabs + by)
     ; no_leading_tab =
         params.no_leading_tab (* ; non_repetative = params.non_repetative *)
@@ -368,7 +355,7 @@ module PStr = struct
     }
   ;;
 
-  let no_tab (params : formatting_params) : formatting_params =
+  let no_tab (params : Params.fmt) : Params.fmt =
     { tabs = 0
     ; no_leading_tab =
         params.no_leading_tab (* ; non_repetative = params.non_repetative *)
@@ -376,8 +363,7 @@ module PStr = struct
     }
   ;;
 
-  let no_leading_tab (_no_leading_tab : bool) (params : formatting_params)
-    : formatting_params
+  let no_leading_tab (_no_leading_tab : bool) (params : Params.fmt) : Params.fmt
     =
     { tabs = params.tabs
     ; no_leading_tab =
@@ -386,27 +372,14 @@ module PStr = struct
     }
   ;;
 
-  type pstr_params =
-    | Logging of logging_params
-    | Formatting of formatting_params
-
-  let handle_formatting_params (params : pstr_params) : formatting_params =
-    match params with
-    | Formatting _formatting_params -> _formatting_params
-    | Logging _logging_params ->
-      default_formatting_params ~params:_logging_params ()
-  ;;
-
   (********************************************)
   (****** States ******************************)
   (********************************************)
 
-  let state
-        ?(params : pstr_params = Formatting (default_formatting_params ()))
-        (s : state)
+  let state ?(params : pstr_params = Fmt (Params.Default.fmt ())) (s : state)
     : string
     =
-    let _params : formatting_params = handle_formatting_params params in
+    let _params : Params.fmt = Params.handle params in
     let tabs : string = str_tabs _params.tabs in
     Printf.sprintf
       "%s%s"
@@ -421,7 +394,7 @@ module PStr = struct
   ;;
 
   let states
-        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        ?(params : pstr_params = Fmt (Params.Default.fmt ()))
         (states : States.t)
     : string
     =
@@ -429,8 +402,8 @@ module PStr = struct
     then "[ ] (empty)"
     else (
       (* increment tab of inner elements of set *)
-      let _params : formatting_params = handle_formatting_params params in
-      let _params' : formatting_params = inc_tab _params
+      let _params : Params.fmt = Params.handle params in
+      let _params' : Params.fmt = inc_tab _params
       and tabs : string = str_tabs _params.tabs in
       Printf.sprintf
         "%s[%s%s]"
@@ -440,14 +413,14 @@ module PStr = struct
               Printf.sprintf
                 "%s%s\n"
                 acc
-                (state ~params:(Formatting (no_leading_tab false _params')) s))
+                (state ~params:(Fmt (no_leading_tab false _params')) s))
            states
            "\n")
         tabs)
   ;;
 
   let partition
-        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        ?(params : pstr_params = Fmt (Params.Default.fmt ()))
         (partition : Partition.t)
     : string
     =
@@ -455,8 +428,8 @@ module PStr = struct
     then "[ ] (empty)"
     else (
       (* increment tab of inner elements of set *)
-      let _params : formatting_params = handle_formatting_params params in
-      let _params' : formatting_params = inc_tab _params
+      let _params : Params.fmt = Params.handle params in
+      let _params' : Params.fmt = inc_tab _params
       and tabs : string = str_tabs _params.tabs in
       Printf.sprintf
         "%s[%s%s]"
@@ -466,9 +439,7 @@ module PStr = struct
               Printf.sprintf
                 "%s%s\n"
                 acc
-                (states
-                   ~params:(Formatting (no_leading_tab false _params'))
-                   states'))
+                (states ~params:(Fmt (no_leading_tab false _params')) states'))
            partition
            "\n")
         tabs)
@@ -478,12 +449,10 @@ module PStr = struct
   (****** Alphabet, Actions & Edges ***********)
   (********************************************)
 
-  let action
-        ?(params : pstr_params = Formatting (default_formatting_params ()))
-        (a : action)
+  let action ?(params : pstr_params = Fmt (Params.Default.fmt ())) (a : action)
     : string
     =
-    let _params : formatting_params = handle_formatting_params params in
+    let _params : Params.fmt = Params.handle params in
     let tabs : string = str_tabs _params.tabs in
     Printf.sprintf
       "%s%s"
@@ -498,7 +467,7 @@ module PStr = struct
   ;;
 
   let alphabet
-        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        ?(params : pstr_params = Fmt (Params.Default.fmt ()))
         (actions : Alphabet.t)
     : string
     =
@@ -506,8 +475,8 @@ module PStr = struct
     then "[ ] (empty)"
     else (
       (* increment tab of inner elements of set *)
-      let _params : formatting_params = handle_formatting_params params in
-      let _params' : formatting_params = inc_tab _params
+      let _params : Params.fmt = Params.handle params in
+      let _params' : Params.fmt = inc_tab _params
       and tabs : string = str_tabs _params.tabs in
       Printf.sprintf
         "%s[%s%s]"
@@ -517,30 +486,30 @@ module PStr = struct
               Printf.sprintf
                 "%s%s\n"
                 acc
-                (action ~params:(Formatting (no_leading_tab false _params')) a))
+                (action ~params:(Fmt (no_leading_tab false _params')) a))
            actions
            "\n")
         tabs)
   ;;
 
   let edge
-        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        ?(params : pstr_params = Fmt (Params.Default.fmt ()))
         ((from, a, destination) : state * action * state)
     : string
     =
-    let _params : formatting_params = handle_formatting_params params in
-    let _params' : formatting_params = no_tab _params
+    let _params : Params.fmt = Params.handle params in
+    let _params' : Params.fmt = no_tab _params
     and tabs : string = str_tabs _params.tabs in
     Printf.sprintf
       "%s{ %s ---%s--> %s }"
       (if _params.no_leading_tab then "" else tabs)
-      (state ~params:(Formatting _params') from)
-      (action ~params:(Formatting _params') a)
-      (state ~params:(Formatting _params') destination)
+      (state ~params:(Fmt _params') from)
+      (action ~params:(Fmt _params') a)
+      (state ~params:(Fmt _params') destination)
   ;;
 
   let actions
-        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        ?(params : pstr_params = Fmt (Params.Default.fmt ()))
         ?(from : state option)
         (actions' : States.t Actions.t)
     : string
@@ -549,15 +518,13 @@ module PStr = struct
     then "{ } (empty)"
     else (
       (* increment tab of inner elements of table *)
-      let _params : formatting_params = handle_formatting_params params in
+      let _params : Params.fmt = Params.handle params in
       let tabs : string = str_tabs _params.tabs in
       match from with
       (* if no from state, then this is a non-repetative representation *)
       | None ->
         (* should not be leading next *)
-        let _params' : formatting_params =
-          no_leading_tab true (inc_tab _params)
-        in
+        let _params' : Params.fmt = no_leading_tab true (inc_tab _params) in
         Printf.sprintf
           "%s{[%s]}"
           (if _params.no_leading_tab then "" else tabs)
@@ -566,8 +533,8 @@ module PStr = struct
                 Printf.sprintf
                   "%s{ --%s--> %s }\n"
                   acc
-                  (action ~params:(Formatting _params') a)
-                  (states ~params:(Formatting _params') destinations))
+                  (action ~params:(Fmt _params') a)
+                  (states ~params:(Fmt _params') destinations))
              actions'
              "\n")
       (* if some from state, then go and pstr individual edges *)
@@ -583,7 +550,7 @@ module PStr = struct
                        "%s%s\n"
                        acc'
                        (edge
-                          ~params:(Formatting (no_leading_tab false _params))
+                          ~params:(Fmt (no_leading_tab false _params))
                           (from_state, a, destination)))
                   destinations
                   ""))
@@ -592,7 +559,7 @@ module PStr = struct
   ;;
 
   let edges
-        ?(params : pstr_params = Formatting (default_formatting_params ()))
+        ?(params : pstr_params = Fmt (Params.Default.fmt ()))
         (edges' : States.t Actions.t Edges.t)
     : string
     =
@@ -600,8 +567,8 @@ module PStr = struct
     then "{ } (empty)"
     else (
       (* increment tab of inner elements of table *)
-      let _params : formatting_params = handle_formatting_params params in
-      let _params' : formatting_params = inc_tab _params
+      let _params : Params.fmt = Params.handle params in
+      let _params' : Params.fmt = inc_tab _params
       and tabs : string = str_tabs _params.tabs in
       Printf.sprintf
         "%s{[%s%s]}"
@@ -614,7 +581,7 @@ module PStr = struct
                 "%s%s"
                 acc
                 (actions
-                   ~params:(Formatting (no_leading_tab false _params'))
+                   ~params:(Fmt (no_leading_tab false _params'))
                    ?from:(Some from_state)
                    actions'))
            edges'
@@ -626,14 +593,12 @@ module PStr = struct
   (****** FSM *********************************)
   (********************************************)
 
-  let fsm
-        ?(params : pstr_params = Formatting (default_formatting_params ()))
-        (fsm' : fsm)
+  let fsm ?(params : pstr_params = Fmt (Params.Default.fmt ())) (fsm' : fsm)
     : string
     =
     (* increment tab of inner elements of fsm *)
-    let _params : formatting_params = handle_formatting_params params in
-    let _params' : formatting_params = inc_tab ~by:2 _params
+    let _params : Params.fmt = Params.handle params in
+    let _params' : Params.fmt = inc_tab ~by:2 _params
     and tabs : string = str_tabs _params.tabs
     and tabs' : string = str_tabs (_params.tabs + 1) in
     Printf.sprintf
@@ -643,19 +608,19 @@ module PStr = struct
          tabs'
          (match fsm'.init with
           | None -> "None"
-          | Some init' -> state ~params:(Formatting _params') init'))
+          | Some init' -> state ~params:(Fmt _params') init'))
       (Printf.sprintf
          "\n%salphabet: %s"
          tabs'
-         (alphabet ~params:(Formatting _params') fsm'.alphabet))
+         (alphabet ~params:(Fmt _params') fsm'.alphabet))
       (Printf.sprintf
          "\n%sstates: %s"
          tabs'
-         (states ~params:(Formatting _params') fsm'.states))
+         (states ~params:(Fmt _params') fsm'.states))
       (Printf.sprintf
          "\n%sedges: %s"
          tabs'
-         (edges ~params:(Formatting _params') fsm'.edges))
+         (edges ~params:(Fmt _params') fsm'.edges))
       tabs
   ;;
 end
