@@ -1,11 +1,12 @@
 open Mebi_plugin.Fsm
 open Mebi_plugin.Bisimilarity
 open Mebi_plugin.Utils
+open Mebi_plugin.Utils.Logging
 open Mebi_plugin.Examples
 
 (**  *)
 let pstr_results
-      ?(params : logging_params = default_logging_params ~mode:(OCaml ()) ())
+      ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
       (results : (string * (string * bool * bool) list) list)
   : string
   =
@@ -48,8 +49,7 @@ let pstr_results
 
 (** [ks90_exas] ... *)
 let rec ks90_exas
-          ?(params : logging_params =
-            default_logging_params ~mode:(OCaml ()) ())
+          ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
           (exas : example list)
   : (string * bool * bool) list
   =
@@ -71,9 +71,9 @@ let rec ks90_exas
              %s.t: %s.\n\n"
             name
             name
-            (PStr.fsm ~params:(Logging params) s)
+            (PStr.fsm ~params:(Log params) s)
             name
-            (PStr.fsm ~params:(Logging params) t));
+            (PStr.fsm ~params:(Log params) t));
        (* run algorithm *)
        let result = RCP.KS90.run ~params s t in
        (match result with
@@ -94,15 +94,15 @@ let rec ks90_exas
                 = = = = = = = = = = = = = = = = = = =\n\n"
                name
                are_bisimilar
-               (PStr.partition ~params:(Logging params) bisimilar_states)
-               (PStr.partition ~params:(Logging params) non_bisimilar_states)
-               (PStr.fsm ~params:(Logging params) merged_fsm));
+               (PStr.partition ~params:(Log params) bisimilar_states)
+               (PStr.partition ~params:(Log params) non_bisimilar_states)
+               (PStr.fsm ~params:(Log params) merged_fsm));
           (* continue *)
           (name, _are_bisimilar, are_bisimilar) :: ks90_exas ~params exas'))
 ;;
 
 let run_all_ks90
-      ?(params : logging_params = default_logging_params ~mode:(OCaml ()) ())
+      ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
       ()
   : (string * bool * bool) list
   =
@@ -121,9 +121,7 @@ let run_all_ks90
     ]
 ;;
 
-let run_all
-      ?(params : logging_params = default_logging_params ~mode:(OCaml ()) ())
-      ()
+let run_all ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ()) ()
   : unit
   =
   log ~params "\nRunning Tests.ml:\n\n";

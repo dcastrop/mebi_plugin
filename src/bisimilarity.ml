@@ -136,11 +136,13 @@ module RCP = struct
                 match Block.is_empty b1, Block.is_empty b2 with
                 | true, true ->
                   (* both are empty, this is not supposed to happen *)
+                  params.kind <- Debug ();
                   log ~params "split returned two empty blocks.\n\n";
                   ()
                 | false, true ->
                   (* empty [b2] means that split did not occur *)
                   assert (Block.equal b1 !b);
+                  params.kind <- Debug ();
                   log
                     ~params
                     (Printf.sprintf
@@ -150,6 +152,7 @@ module RCP = struct
                 | _, _ ->
                   (* split did occur, so replace [b] with [b1] and [b2] and refine *)
                   assert (Bool.not (Block.is_empty b1));
+                  params.kind <- Debug ();
                   log
                     ~params
                     (Printf.sprintf
@@ -217,6 +220,7 @@ module RCP = struct
                     block)
                block
            in
+           params.kind <- Debug ();
            log
              ~params
              (Printf.sprintf

@@ -339,44 +339,11 @@ module PStr = struct
   open Utils.Formatting
   open Utils
 
-  let inc_tab ?(by : int = 1) (params : Params.fmt) : Params.fmt =
-    { tabs = params.tabs + by
-    ; no_leading_tab =
-        params.no_leading_tab (* ; non_repetative = params.non_repetative *)
-    ; params = params.params
-    }
-  ;;
-
-  let dec_tab ?(by : int = 1) (params : Params.fmt) : Params.fmt =
-    { tabs = (if params.tabs - by < 0 then 0 else params.tabs + by)
-    ; no_leading_tab =
-        params.no_leading_tab (* ; non_repetative = params.non_repetative *)
-    ; params = params.params
-    }
-  ;;
-
-  let no_tab (params : Params.fmt) : Params.fmt =
-    { tabs = 0
-    ; no_leading_tab =
-        params.no_leading_tab (* ; non_repetative = params.non_repetative *)
-    ; params = params.params
-    }
-  ;;
-
-  let no_leading_tab (_no_leading_tab : bool) (params : Params.fmt) : Params.fmt
-    =
-    { tabs = params.tabs
-    ; no_leading_tab =
-        _no_leading_tab (* ; non_repetative = params.non_repetative *)
-    ; params = params.params
-    }
-  ;;
-
   (********************************************)
   (****** States ******************************)
   (********************************************)
 
-  let state ?(params : pstr_params = Fmt (Params.Default.fmt ())) (s : state)
+  let state ?(params : Params.pstr = Fmt (Params.Default.fmt ())) (s : state)
     : string
     =
     let _params : Params.fmt = Params.handle params in
@@ -394,7 +361,7 @@ module PStr = struct
   ;;
 
   let states
-        ?(params : pstr_params = Fmt (Params.Default.fmt ()))
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
         (states : States.t)
     : string
     =
@@ -420,7 +387,7 @@ module PStr = struct
   ;;
 
   let partition
-        ?(params : pstr_params = Fmt (Params.Default.fmt ()))
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
         (partition : Partition.t)
     : string
     =
@@ -449,7 +416,7 @@ module PStr = struct
   (****** Alphabet, Actions & Edges ***********)
   (********************************************)
 
-  let action ?(params : pstr_params = Fmt (Params.Default.fmt ())) (a : action)
+  let action ?(params : Params.pstr = Fmt (Params.Default.fmt ())) (a : action)
     : string
     =
     let _params : Params.fmt = Params.handle params in
@@ -467,7 +434,7 @@ module PStr = struct
   ;;
 
   let alphabet
-        ?(params : pstr_params = Fmt (Params.Default.fmt ()))
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
         (actions : Alphabet.t)
     : string
     =
@@ -493,7 +460,7 @@ module PStr = struct
   ;;
 
   let edge
-        ?(params : pstr_params = Fmt (Params.Default.fmt ()))
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
         ((from, a, destination) : state * action * state)
     : string
     =
@@ -509,7 +476,7 @@ module PStr = struct
   ;;
 
   let actions
-        ?(params : pstr_params = Fmt (Params.Default.fmt ()))
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
         ?(from : state option)
         (actions' : States.t Actions.t)
     : string
@@ -559,7 +526,7 @@ module PStr = struct
   ;;
 
   let edges
-        ?(params : pstr_params = Fmt (Params.Default.fmt ()))
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
         (edges' : States.t Actions.t Edges.t)
     : string
     =
@@ -593,7 +560,7 @@ module PStr = struct
   (****** FSM *********************************)
   (********************************************)
 
-  let fsm ?(params : pstr_params = Fmt (Params.Default.fmt ())) (fsm' : fsm)
+  let fsm ?(params : Params.pstr = Fmt (Params.Default.fmt ())) (fsm' : fsm)
     : string
     =
     (* increment tab of inner elements of fsm *)
