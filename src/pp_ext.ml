@@ -57,12 +57,10 @@ let pp_transitions env sigma transitions =
 ;;
 
 (** [pp_edge env sigma edge] is a pretty-printed [edge]. *)
-let pp_edge env sigma (edge : Evd.econstr) =
-  Printer.pr_econstr_env env sigma edge
-;;
+let pp_edge env sigma (edge : EConstr.t) = Printer.pr_econstr_env env sigma edge
 
 (** [pp_edges_to_list env sigma edges] is a pretty-printed list of [edges] (i.e., [constrs]). *)
-let rec pp_edges_to_list env sigma (edges : Evd.econstr list) =
+let rec pp_edges_to_list env sigma (edges : EConstr.t list) =
   match edges with
   | [] -> []
   | h_edge :: t_edges ->
@@ -70,22 +68,22 @@ let rec pp_edges_to_list env sigma (edges : Evd.econstr list) =
 ;;
 
 (** [pp_edges env sigma edges] is a [t] (str) of pretty-printed [edges] (i.e., [constrs]). *)
-let pp_edges env sigma (edges : Evd.econstr list) =
+let pp_edges env sigma (edges : EConstr.t list) =
   pp_list (pp_edges_to_list env sigma edges)
 ;;
 
 (** [pp_edges env sigma edges] is a [t] (str) of pretty-printed [edges] (i.e., [constrs]). *)
-let pp_edges' env sigma (edges : (Evd.econstr * Evd.econstr) list) =
+let pp_edges' env sigma (edges : (EConstr.t * EConstr.t) list) =
   pp_list (pp_edges_to_list env sigma (Mebi_utils.strip_snd edges))
 ;;
 
 (** [pp_state env sigma state] is a pretty-printed [state]. *)
-let pp_state env sigma (state : Evd.econstr) =
+let pp_state env sigma (state : EConstr.t) =
   Printer.pr_econstr_env env sigma state
 ;;
 
 (** [pp_states_to_list env sigma constrs] is a pretty-printed list of [states]. *)
-let rec pp_states_to_list env sigma (states : Evd.econstr list) =
+let rec pp_states_to_list env sigma (states : EConstr.t list) =
   match states with
   | [] -> []
   | h_state :: t_states ->
@@ -96,7 +94,7 @@ let rec pp_states_to_list env sigma (states : Evd.econstr list) =
 let pp_states
       (env : Environ.env)
       (sigma : Evd.evar_map)
-      (states : Evd.econstr list)
+      (states : EConstr.t list)
   =
   pp_list (pp_states_to_list env sigma states)
 ;;
@@ -105,7 +103,7 @@ let pp_states
 let pp_coq_fsm
       (env : Environ.env)
       (sigma : Evd.evar_map)
-      (fsm : Evd.econstr list * Evd.econstr list)
+      (fsm : EConstr.t list * EConstr.t list)
   : Pp.t
   =
   match fsm with

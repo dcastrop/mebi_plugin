@@ -20,7 +20,7 @@ module Logging = struct
     | Coq () ->
       (match kind with
        | Normal () -> ""
-       | Details () -> "( Details )"
+       | Details () -> "" (*"( Details )"*)
        | Debug () -> ""
        | Warning () -> "")
     | OCaml () ->
@@ -164,7 +164,11 @@ module Formatting = struct
         ()
     : params
     =
-    let params' = Logging.default_params ~mode () in
+    let params' =
+      match params with
+      | None -> Logging.default_params ~mode ()
+      | Some params' -> params'
+    in
     { tabs = 0; no_leading_tab = true; params = params' }
   ;;
 
@@ -182,6 +186,7 @@ end
 module Params = struct
   type fmt = Formatting.params
   type log = Logging.params
+  type pstr = Formatting.pstr_params
 
   module Default = struct
     let fmt = Formatting.default_params
@@ -190,6 +195,38 @@ module Params = struct
 
   let handle = Formatting.handle_params
 end
+
+let inc_tab ?(by : int = 1) (params : Params.fmt) : Params.fmt =
+  { tabs = params.tabs + by
+  ; no_leading_tab =
+      params.no_leading_tab (* ; non_repetative = params.non_repetative *)
+  ; params = params.params
+  }
+;;
+
+let dec_tab ?(by : int = 1) (params : Params.fmt) : Params.fmt =
+  { tabs = (if params.tabs - by < 0 then 0 else params.tabs + by)
+  ; no_leading_tab =
+      params.no_leading_tab (* ; non_repetative = params.non_repetative *)
+  ; params = params.params
+  }
+;;
+
+let no_tab (params : Params.fmt) : Params.fmt =
+  { tabs = 0
+  ; no_leading_tab =
+      params.no_leading_tab (* ; non_repetative = params.non_repetative *)
+  ; params = params.params
+  }
+;;
+
+let no_leading_tab (_no_leading_tab : bool) (params : Params.fmt) : Params.fmt =
+  { tabs = params.tabs
+  ; no_leading_tab =
+      _no_leading_tab (* ; non_repetative = params.non_repetative *)
+  ; params = params.params
+  }
+;;
 
 (** [print ?show to_print] is a wrapper for [Printf.printf].
     @param ?show determines if [to_print] is outputted. *)

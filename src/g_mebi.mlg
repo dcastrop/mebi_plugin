@@ -29,11 +29,11 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
     { (Mebi_monad.run
         (Command.cmd_bounded_lts
           ~params:(
-            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
             params.options <-
             { output_enabled=true;
               show_normal_output=true;
-              show_detailed_output=false;
+              show_detailed_output=true;
               show_debug_output=false;
               show_warning_output=true };
             params
@@ -45,7 +45,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
     { (Mebi_monad.run
         (Command.cmd_bounded_lts
           ~params:(
-            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
             params.options <-
             { output_enabled=true;
               show_normal_output=true;
@@ -63,7 +63,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
     { (Mebi_monad.run
         (Command.cmd_bounded_lts_to_fsm
           ~params:(
-            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
             params.options <-
             { output_enabled=true;
               show_normal_output=true;
@@ -79,7 +79,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
     { (Mebi_monad.run
         (Command.cmd_bounded_lts_to_fsm
           ~params:(
-            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
             params.options <-
             { output_enabled=true;
               show_normal_output=true;
@@ -97,7 +97,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
     { (Mebi_monad.run
         (Command.cmd_merge_fsm_from_lts
           ~params:(
-            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
             params.options <-
             { output_enabled=true;
               show_normal_output=true;
@@ -114,7 +114,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
     { (Mebi_monad.run
         (Command.cmd_merge_fsm_from_lts
           ~params:(
-            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
             params.options <-
             { output_enabled=true;
               show_normal_output=true;
@@ -134,7 +134,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
     { (Mebi_monad.run
         (Command.cmd_bisim_ks90_using_lts_to_fsm
           ~params:(
-            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
             params.options <-
             { output_enabled=true;
               show_normal_output=true;
@@ -151,7 +151,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
     { (Mebi_monad.run
         (Command.cmd_bisim_ks90_using_lts_to_fsm
           ~params:(
-            let params = (Utils.default_logging_params ~mode:(Coq()) ()) in
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
             params.options <-
             { output_enabled=true;
               show_normal_output=true;

@@ -72,7 +72,7 @@ let compare_constr st () t1 t2 =
 ;;
 
 let make_constr_set (st : coq_context ref)
-  : (module Set.S with type elt = Evd.econstr) in_context
+  : (module Set.S with type elt = EConstr.t) in_context
   =
   let cmp = compare_constr st in
   let module Constrset =

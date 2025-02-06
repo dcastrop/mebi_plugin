@@ -19,34 +19,34 @@ val pp_transitions
   -> (Constr.rel_context * Constr.t) array
   -> Pp.t
 
-val pp_edge : Environ.env -> Evd.evar_map -> Evd.econstr -> Pp.t
+val pp_edge : Environ.env -> Evd.evar_map -> EConstr.t -> Pp.t
 
 val pp_edges_to_list
   :  Environ.env
   -> Evd.evar_map
-  -> Evd.econstr list
+  -> EConstr.t list
   -> Pp.t list
 
-val pp_edges : Environ.env -> Evd.evar_map -> Evd.econstr list -> Pp.t
+val pp_edges : Environ.env -> Evd.evar_map -> EConstr.t list -> Pp.t
 
 val pp_edges'
   :  Environ.env
   -> Evd.evar_map
-  -> (Evd.econstr * Evd.econstr) list
+  -> (EConstr.t * EConstr.t) list
   -> Pp.t
 
-val pp_state : Environ.env -> Evd.evar_map -> Evd.econstr -> Pp.t
+val pp_state : Environ.env -> Evd.evar_map -> EConstr.t -> Pp.t
 
 val pp_states_to_list
   :  Environ.env
   -> Evd.evar_map
-  -> Evd.econstr list
+  -> EConstr.t list
   -> Pp.t list
 
-val pp_states : Environ.env -> Evd.evar_map -> Evd.econstr list -> Pp.t
+val pp_states : Environ.env -> Evd.evar_map -> EConstr.t list -> Pp.t
 
 val pp_coq_fsm
   :  Environ.env
   -> Evd.evar_map
-  -> Evd.econstr list * Evd.econstr list
+  -> EConstr.t list * EConstr.t list
   -> Pp.t

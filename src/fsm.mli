@@ -271,25 +271,20 @@ end
 
 module Merge : sig
   val edges
-    :  ?params:'a
+    :  ?params:Utils.Logging.params
     -> int * Alphabet.t
     -> Block.t Actions.t Edges.t
     -> Block.t Actions.t Edges.t
     -> Block.t Actions.t Edges.t
 
-  val fsms : ?params:'a -> fsm -> fsm -> fsm * (state, state) Hashtbl.t
+  val fsms
+    :  ?params:Utils.Logging.params
+    -> fsm
+    -> fsm
+    -> fsm * (state, state) Hashtbl.t
 end
 
 module PStr : sig
-  val inc_tab : ?by:int -> Utils.Formatting.params -> Utils.Formatting.params
-  val dec_tab : ?by:int -> Utils.Formatting.params -> Utils.Formatting.params
-  val no_tab : Utils.Formatting.params -> Utils.Formatting.params
-
-  val no_leading_tab
-    :  bool
-    -> Utils.Formatting.params
-    -> Utils.Formatting.params
-
   val state : ?params:Utils.Formatting.pstr_params -> state -> string
   val states : ?params:Utils.Formatting.pstr_params -> Block.t -> string
   val partition : ?params:Utils.Formatting.pstr_params -> Partition.t -> string
