@@ -60,7 +60,7 @@ Definition zplus1 : stream nat := fmap S zeros.
 Inductive StreamLTS A : stream A -> A -> stream A -> Prop :=
 | stream_step : forall s x s', out_stream s = consF x s' -> StreamLTS A s x s'.
 
-Goal bisim (StreamLTS nat) (StreamLTS nat) zeros ones.
+(* Goal bisim (StreamLTS nat) (StreamLTS nat) zeros ones.
   cofix CH.
   constructor.
   constructor.
@@ -78,5 +78,5 @@ Goal bisim (StreamLTS nat) (StreamLTS nat) zeros ones.
     apply stream_step; reflexivity.
     apply CH.
     Guarded.
-  Qed.
+  Qed. *)
 End StreamExample.

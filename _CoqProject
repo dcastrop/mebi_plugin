@@ -8,12 +8,18 @@ theories/Test.v
 
 src/utils.ml
 src/utils.mli
+src/lts.ml
+src/lts.mli
 src/fsm.ml
 src/fsm.mli
+src/translate.ml
+src/translate.mli
 src/examples.ml
 src/examples.mli
 src/bisimilarity.ml
 src/bisimilarity.mli
+src/minimise.ml
+src/minimise.mli
 
 
 test/tests.ml

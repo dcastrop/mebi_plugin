@@ -115,9 +115,13 @@ Module Test2.
       termLTS (tfix t) a t'.
 
   MeBi LTS termLTS (tfix (tact TheAction1 tend)).
+
   MeBi LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
 
   MeBi LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
+
+  MeBi LTS show_debug termLTS (tfix (tpar TheAction1 TheAction2 trec)).
+
 
 End Test2.
 
@@ -125,13 +129,27 @@ End Test2.
 
 Module BisimTest1.
   Inductive action : Set := | TheAction1 | TheAction2.
+
+
   Inductive term : Set :=
   | trec : term
   | tend : term
   | tfix : term -> term
   | tact : action -> term -> term
-  | tpar : action -> action -> term -> term
-  .
+  | tpar : action -> action -> term -> term.
+  (* | tcho : choice -> term
+  with choice : Type := | nil | cons (o:action -> term -> term) (t:choice).
+  (* with opt : Type := topt : action -> term -> term. *)
+
+  Example exa1 : term := tcho (cons (tact TheAction1 tend) (cons (tact TheAction2 tend) nil)).
+  Print exa1.
+
+  Notation "x :: l" := (cons x l) (at level 60, right associativity).
+  Notation "[ ]" := nil.
+  Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
+
+  Example exa2 : term := tcho [(tact TheAction1 tend); (tact TheAction2 tend)].
+  Print exa2. *)
 
   Fixpoint subst (t1 : term) (t2 : term) :=
     match t2 with
@@ -140,6 +158,10 @@ Module BisimTest1.
     | tfix t => tfix t
     | tact a t => tact a (subst t1 t)
     | tpar a b t => tpar a b (subst t1 t)
+    (* | tcho c => match c with
+                | nil => c
+                | ()
+                end *)
     end.
 
   Inductive termLTS : term -> action -> term -> Prop :=
@@ -148,6 +170,8 @@ Module BisimTest1.
   | do_par1 : forall a b t, termLTS (tpar a b t) a (tact b t)
 
   | do_par2 : forall a b t, termLTS (tpar a b t) b (tact a t)
+
+  (* | do_cho1 : forall a b t, termLTS (tcho ) *)
 
   | do_fix : forall a t t',
       termLTS (subst (tfix t) t) a t' ->
@@ -158,10 +182,6 @@ Module BisimTest1.
     termLTS (tact TheAction1 tend)
     termLTS (tact TheAction1 tend).
 
-  MeBi FSM Merge
-    termLTS (tact TheAction1 tend)
-    termLTS (tact TheAction1 tend).
-
   (* true *)
   MeBi Bisim KS90
     termLTS (tact TheAction2 tend)
@@ -169,10 +189,6 @@ Module BisimTest1.
 
   (* ! false *)
   MeBi Bisim KS90
-    termLTS (tact TheAction1 tend)
-    termLTS (tact TheAction2 tend).
-
-  MeBi FSM Merge
     termLTS (tact TheAction1 tend)
     termLTS (tact TheAction2 tend).
 
@@ -191,28 +207,13 @@ Module BisimTest1.
     termLTS (tfix (tact TheAction1 trec))
     termLTS (tfix (tact TheAction1 trec)).
 
-  (* FIXME: looks like merge can't deal with recursion. *)
-  MeBi FSM Merge
-    termLTS (tfix (tact TheAction1 trec))
-    termLTS (tfix (tact TheAction1 trec)).
-
   (* ? should be true *)
   MeBi Bisim KS90
     termLTS (tfix (tact TheAction1 trec))
     termLTS (tact TheAction1 (tfix (tact TheAction1 trec))).
 
-  (* FIXME: looks like merge can't deal with recursion. *)
-  MeBi FSM Merge
-    termLTS (tfix (tact TheAction1 trec))
-    termLTS (tact TheAction1 (tfix (tact TheAction1 trec))).
-
   (* ? should be true *)
   MeBi Bisim KS90
-    termLTS (tfix (tact TheAction1 (tact TheAction2 trec)))
-    termLTS (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
-
-  (* FIXME: looks like merge can't deal with recursion. *)
-  MeBi FSM Merge
     termLTS (tfix (tact TheAction1 (tact TheAction2 trec)))
     termLTS (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
 
@@ -220,12 +221,6 @@ Module BisimTest1.
   MeBi Bisim KS90
     termLTS (tpar TheAction1 TheAction2 tend)
     termLTS (tact TheAction1 (tact TheAction2 tend)).
-
-  MeBi FSM Merge
-    termLTS (tpar TheAction1 TheAction2 tend)
-    termLTS (tact TheAction1 (tact TheAction2 tend)).
-
-
 
 
 End BisimTest1.

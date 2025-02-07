@@ -9,7 +9,7 @@ let rec split_at i l acc =
 ;;
 
 (** [strip_snd l] is the list of rhs elements in a list of tuples [l] (typically a [constr]). *)
-let rec strip_snd (l : (Evd.econstr * Evd.econstr) list) : Evd.econstr list =
+let rec strip_snd (l : (EConstr.t * EConstr.t) list) : EConstr.t list =
   match l with
   | [] -> []
   | h :: t -> snd h :: strip_snd t
