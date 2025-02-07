@@ -3,8 +3,11 @@ Mebi_utils
 Utils
 Mebi_monad
 Pp_ext
+Lts
 Fsm
+Translate
 Examples
 Bisimilarity
+Minimise
 Command
 G_mebi

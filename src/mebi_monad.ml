@@ -1,5 +1,4 @@
 open Mebi_errors
-open Utils
 
 type coq_context =
   { coq_env : Environ.env
@@ -73,7 +72,7 @@ let compare_constr st () t1 t2 =
 ;;
 
 let make_constr_set (st : coq_context ref)
-  : (module Set.S with type elt = Evd.econstr) in_context
+  : (module Set.S with type elt = EConstr.t) in_context
   =
   let cmp = compare_constr st in
   let module Constrset =
@@ -88,10 +87,10 @@ let make_constr_set (st : coq_context ref)
 
 (** Monadic for loop *)
 let rec iterate
-  (from_idx : int)
-  (to_idx : int)
-  (acc : 'a)
-  (f : int -> 'a -> 'a t)
+          (from_idx : int)
+          (to_idx : int)
+          (acc : 'a)
+          (f : int -> 'a -> 'a t)
   : 'a t
   =
   if from_idx > to_idx
@@ -108,8 +107,8 @@ let get_sigma (st : coq_context ref) : Evd.evar_map in_context =
 ;;
 
 let state
-  (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-  (st : coq_context ref)
+      (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+      (st : coq_context ref)
   : 'a in_context
   =
   let sigma, a = f !st.coq_env !st.coq_ctx in
@@ -124,21 +123,9 @@ let sandbox (m : 'a t) (st : coq_context ref) : 'a in_context =
   { state = st; value = res.value }
 ;;
 
-let feedback
-  ?(params : logging_params = default_logging_params ~mode:(Coq ()) ())
-  (f : Environ.env -> Evd.evar_map -> Pp.t)
-  : unit t
-  =
-  assert (
-    match params.mode with
-    | Coq () -> true
-    | _ -> false);
+let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit t =
   state (fun env sigma ->
-    (match params.kind with
-     | Normal () -> Feedback.msg_notice (f env sigma)
-     | Details () -> Feedback.msg_info (f env sigma)
-     | Debug () -> Feedback.msg_debug (f env sigma)
-     | Warning () -> Feedback.msg_warning (f env sigma));
+    Feedback.msg_debug (f env sigma);
     sigma, ())
 ;;
 

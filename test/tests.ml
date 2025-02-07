@@ -1,12 +1,13 @@
 open Mebi_plugin.Fsm
 open Mebi_plugin.Bisimilarity
 open Mebi_plugin.Utils
+open Mebi_plugin.Utils.Logging
 open Mebi_plugin.Examples
 
 (**  *)
 let pstr_results
-  ?(params : logging_params = default_logging_params ~mode:(OCaml ()) ())
-  (results : (string * (string * bool * bool) list) list)
+      ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
+      (results : (string * (string * bool * bool) list) list)
   : string
   =
   Printf.sprintf
@@ -19,39 +20,40 @@ let pstr_results
     (List.fold_left
        (fun (acc : string)
          ((suite_name, suite_results) : string * (string * bool * bool) list) ->
-         Printf.sprintf
-           "%s(=>) %s: [%s].\n\n"
-           acc
-           suite_name
-           (List.fold_left
-              (fun (acc' : string)
-                ((name, expected_result, actual_result) : string * bool * bool) ->
-                Printf.sprintf
-                  "%s  %s  | %s  | %s\n"
-                  acc'
-                  (if expected_result then "true " else "false")
-                  (if actual_result then "true " else "false")
-                  name)
-              "\n  EXPECT | ACTUAL | EXAMPLE\n  ---------------------------\n"
-              suite_results))
+          Printf.sprintf
+            "%s(=>) %s: [%s].\n\n"
+            acc
+            suite_name
+            (List.fold_left
+               (fun (acc' : string)
+                 ((name, expected_result, actual_result) : string * bool * bool) ->
+                  Printf.sprintf
+                    "%s  %s  | %s  | %s\n"
+                    acc'
+                    (if expected_result then "true " else "false")
+                    (if actual_result then "true " else "false")
+                    name)
+               "\n  EXPECT | ACTUAL | EXAMPLE\n  ---------------------------\n"
+               suite_results))
        "\n"
        results)
     (List.for_all
        (fun ((_suite_name, suite_results) :
               string * (string * bool * bool) list) ->
-         List.for_all
-           (fun ((_name, expected_result, actual_result) : string * bool * bool) ->
-             expected_result == actual_result)
-           suite_results)
+          List.for_all
+            (fun ((_name, expected_result, actual_result) :
+                   string * bool * bool) -> expected_result == actual_result)
+            suite_results)
        results)
 ;;
 
 (** [ks90_exas] ... *)
 let rec ks90_exas
-  ?(params : logging_params = default_logging_params ~mode:(OCaml ()) ())
-  (exas : example list)
+          ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
+          (exas : example list)
   : (string * bool * bool) list
   =
+  params.kind <- Details ();
   match exas with
   | [] -> []
   | exa :: exas' ->
@@ -69,13 +71,18 @@ let rec ks90_exas
              %s.t: %s.\n\n"
             name
             name
-            (PStr.fsm ~params:(Logging params) s)
+            (PStr.fsm ~params:(Log params) s)
             name
-            (PStr.fsm ~params:(Logging params) t));
+            (PStr.fsm ~params:(Log params) t));
        (* run algorithm *)
        let result = RCP.KS90.run ~params s t in
        (match result with
-        | { are_bisimilar; bisimilar_states; non_bisimilar_states; _ } ->
+        | { are_bisimilar
+          ; merged_fsm
+          ; bisimilar_states
+          ; non_bisimilar_states
+          ; _
+          } ->
           (* print out results *)
           log
             ~params:(override params)
@@ -83,18 +90,20 @@ let rec ks90_exas
                "[KS90] (%s) Results: (s ~ t) = %b.\n\n\
                 Bisimilar states: %s.\n\n\
                 Non-bisimilar states: %s.\n\n\
+                Using merged FSM: %s.\n\n\
                 = = = = = = = = = = = = = = = = = = =\n\n"
                name
                are_bisimilar
-               (PStr.partition ~params:(Logging params) bisimilar_states)
-               (PStr.partition ~params:(Logging params) non_bisimilar_states));
+               (PStr.partition ~params:(Log params) bisimilar_states)
+               (PStr.partition ~params:(Log params) non_bisimilar_states)
+               (PStr.fsm ~params:(Log params) merged_fsm));
           (* continue *)
           (name, _are_bisimilar, are_bisimilar) :: ks90_exas ~params exas'))
 ;;
 
 let run_all_ks90
-  ?(params : logging_params = default_logging_params ~mode:(OCaml ()) ())
-  ()
+      ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
+      ()
   : (string * bool * bool) list
   =
   ks90_exas
@@ -108,12 +117,11 @@ let run_all_ks90
     ; exa_rec_1
     ; exa_rec_2
     ; exa_par_1
+    ; exa_self_act1
     ]
 ;;
 
-let run_all
-  ?(params : logging_params = default_logging_params ~mode:(OCaml ()) ())
-  ()
+let run_all ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ()) ()
   : unit
   =
   log ~params "\nRunning Tests.ml:\n\n";
