@@ -18,6 +18,8 @@ src/examples.ml
 src/examples.mli
 src/bisimilarity.ml
 src/bisimilarity.mli
+src/minimise.ml
+src/minimise.mli
 
 
 test/tests.ml
