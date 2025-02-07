@@ -40,16 +40,16 @@ module Logging = struct
     }
   (*
      module DebugScope =Stack.Make (struct
- type t = string
+     type t = string
 
- let equal (t1 : string) (t2 : string) = String.equal t1 t2
- end) *)
+     let equal (t1 : string) (t2 : string) = String.equal t1 t2
+     end) *)
 
   (** [Logging.params]
-  - [mode] determines if the print occurs via [Printf.printf] for [OCaml] or for [Coq], via [Feedback.msg_info] or similar.
-  - [kind] specifies the nature of the message to be printed.
-  - [options] specifies how different kinds of messages should be shown, in general.
-  - [override] specifies that the output should be shown, regardless of [kind], ignoring [options]. *)
+      - [mode] determines if the print occurs via [Printf.printf] for [OCaml] or for [Coq], via [Feedback.msg_info] or similar.
+      - [kind] specifies the nature of the message to be printed.
+      - [options] specifies how different kinds of messages should be shown, in general.
+      - [override] specifies that the output should be shown, regardless of [kind], ignoring [options]. *)
   type params =
     { mode : output_modes
     ; mutable kind : output_kind
@@ -128,7 +128,7 @@ module Logging = struct
       then (
         let msg_to_log : string =
           Printf.sprintf
-            "%s%s\n%s\n"
+            "%s%s %s\n"
             (if is_unit_option override then "!!!>>>" else "")
             (pstr_output_kind_head mode kind)
             to_log
@@ -159,9 +159,9 @@ module Formatting = struct
     }
 
   let default_params
-        ?(params : Logging.params option)
-        ?(mode : Logging.output_modes = OCaml ())
-        ()
+    ?(params : Logging.params option)
+    ?(mode : Logging.output_modes = OCaml ())
+    ()
     : params
     =
     let params' =
