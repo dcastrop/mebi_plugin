@@ -157,8 +157,8 @@ Module BisimTest1.
     | tend => tend
     | tfix t => tfix t
     | tact a t => tact a (subst t1 t)
-    (* | tpar a b t => tpar a b (subst t1 t)
-    | tcho c => match c with
+    | tpar a b t => tpar a b (subst t1 t)
+    (* | tcho c => match c with
                 | nil => c
                 | ()
                 end *)
