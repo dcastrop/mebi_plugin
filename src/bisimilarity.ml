@@ -111,6 +111,47 @@ module RCP = struct
           (Block.empty, Block.empty))
     ;;
 
+    let inner_loop
+      ?(params : Params.log = default_params)
+      (b1 : Block.t)
+      (b2 : Block.t)
+      (b : Block.t ref)
+      (pi : Partition.t ref)
+      (changed : bool ref)
+      : unit
+      =
+      match Block.is_empty b1, Block.is_empty b2 with
+      | true, true ->
+        (* both are empty, this is not supposed to happen *)
+        params.kind <- Debug ();
+        log ~params "split returned two empty blocks.\n\n";
+        ()
+      | false, true ->
+        (* empty [b2] means that split did not occur *)
+        assert (Block.equal b1 !b);
+        params.kind <- Debug ();
+        log
+          ~params
+          (Printf.sprintf
+             "split returned empty b2.\nb1: %s.\n\n"
+             (PStr.states ~params:(Log params) b1));
+        ()
+      | _, _ ->
+        (* split did occur, so replace [b] with [b1] and [b2] and refine *)
+        assert (Bool.not (Block.is_empty b1));
+        params.kind <- Debug ();
+        log
+          ~params
+          (Printf.sprintf
+             "split returned two blocks.\nb1: %s.\nb2: %s.\n\n"
+             (PStr.states ~params:(Log params) b1)
+             (PStr.states ~params:(Log params) b2));
+        pi := Partition.remove !b !pi;
+        pi := Partition.union !pi (Partition.of_list [ b1; b2 ]);
+        changed := true;
+        ()
+    ;;
+
     (** [main_loop (alphabet,edges) pi changed] is the main loop of the [KS90] algorithm.
         @param ?params contains parameters for logging and formatting.
         @param (alphabet,edges)
@@ -130,40 +171,9 @@ module RCP = struct
           let b = ref _b in
           Alphabet.iter
             (fun (a : action) : unit ->
-              (* *)
               let edges_of_a = get_edges_of a edges in
-              (* *)
               let b1, b2 = split ~params !b a !pi edges_of_a in
-              match Block.is_empty b1, Block.is_empty b2 with
-              | true, true ->
-                (* both are empty, this is not supposed to happen *)
-                params.kind <- Debug ();
-                log ~params "split returned two empty blocks.\n\n";
-                ()
-              | false, true ->
-                (* empty [b2] means that split did not occur *)
-                assert (Block.equal b1 !b);
-                params.kind <- Debug ();
-                log
-                  ~params
-                  (Printf.sprintf
-                     "split returned empty b2.\nb1: %s.\n\n"
-                     (PStr.states ~params:(Log params) b1));
-                ()
-              | _, _ ->
-                (* split did occur, so replace [b] with [b1] and [b2] and refine *)
-                assert (Bool.not (Block.is_empty b1));
-                params.kind <- Debug ();
-                log
-                  ~params
-                  (Printf.sprintf
-                     "split returned two blocks.\nb1: %s.\nb2: %s.\n\n"
-                     (PStr.states ~params:(Log params) b1)
-                     (PStr.states ~params:(Log params) b2));
-                pi := Partition.remove !b !pi;
-                pi := Partition.union !pi (Partition.of_list [ b1; b2 ]);
-                changed := true;
-                ())
+              inner_loop b1 b2 b pi changed)
             alphabet)
         !pi
     ;;
@@ -233,7 +243,7 @@ module RCP = struct
       =
       (* *)
       params.kind <- Debug ();
-      params.options.show_debug_output <- true;
+      (* params.options.show_debug_output <- true; *)
       log ~params "=/=/=/= KS90.run =/=/=/=\n\n";
       (* get initial partition [pi] by merging states from [s] and [t] into single set. *)
       let merged_fsm, map_of_states = Merge.fsms s t in
