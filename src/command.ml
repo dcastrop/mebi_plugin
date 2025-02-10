@@ -1158,8 +1158,7 @@ let cmd_minim_ks90_using_lts_to_fsm
   if Bool.not params.options.show_debug_output
   then params.options.show_normal_output <- true;
   (* *)
-  let* _ = cmd_minim_ks90_using_fsm ~params s in
-  return ()
+  cmd_minim_ks90_using_fsm ~params s
 ;;
 
 (* *)
@@ -1174,7 +1173,7 @@ let cmd_minim_ks90_using_lts_to_fsm_to_lts
   if Bool.not params.options.show_debug_output
   then params.options.show_normal_output <- true;
   (* *)
-  let* _ = cmd_minim_ks90_using_fsm ~params s in
   (* TODO: go back to lts, using the conversion map *)
-  return ()
+  (* cmd_minim_ks90_using_fsm_to_lts ~params s *)
+  cmd_minim_ks90_using_fsm ~params s
 ;;
