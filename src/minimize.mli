@@ -1,3 +1,5 @@
 exception UnexpectedBisimResult of Bisimilarity.result
 
-val run : ?params:Utils.Logging.params -> Fsm.fsm -> Fsm.fsm
+type result = Fsm.fsm * (Fsm.state, Fsm.state) Hashtbl.t
+
+val run : ?params:Utils.Logging.params -> Fsm.fsm -> result

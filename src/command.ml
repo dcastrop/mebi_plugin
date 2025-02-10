@@ -936,6 +936,7 @@ let build_fsm_from_lts
   (tref : Constrexpr.constr_expr_r CAst.t)
   : fsm mm
   =
+  (* TODO: make this return the conversion stuff too *)
   params.kind <- Debug ();
   (* *)
   let* raw_lts = check_ref_lts iref in
@@ -1129,7 +1130,9 @@ let cmd_minim_ks90_using_fsm
   =
   (* *)
   params.kind <- Debug ();
-  let minimized_fsm : fsm = Minimize.run ~params the_fsm in
+  let (minimized_fsm, _map_of_states) : fsm * (state, state) Hashtbl.t =
+    Minimize.run ~params the_fsm
+  in
   log
     ~params:
       (params.kind <- Normal ();
@@ -1155,5 +1158,23 @@ let cmd_minim_ks90_using_lts_to_fsm
   if Bool.not params.options.show_debug_output
   then params.options.show_normal_output <- true;
   (* *)
-  cmd_minim_ks90_using_fsm ~params s
+  let* _ = cmd_minim_ks90_using_fsm ~params s in
+  return ()
+;;
+
+(* *)
+let cmd_minim_ks90_using_lts_to_fsm_to_lts
+  ?(params : Params.log = default_params)
+  ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  : unit mm
+  =
+  if Bool.not params.options.show_debug_output
+  then params.options.show_normal_output <- false;
+  let* (s : fsm) = build_fsm_from_lts ~params s_iref s_tref in
+  if Bool.not params.options.show_debug_output
+  then params.options.show_normal_output <- true;
+  (* *)
+  let* _ = cmd_minim_ks90_using_fsm ~params s in
+  (* TODO: go back to lts, using the conversion map *)
+  return ()
 ;;
