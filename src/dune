@@ -31,6 +31,7 @@
   utils
   examples
   bisimilarity
+  minimize
   g_mebi))
 
 (coq.pp ; This will let Dune know about Coq's .mlg grammar files.

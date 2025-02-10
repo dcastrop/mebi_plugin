@@ -4,10 +4,13 @@ open Mebi_plugin.Utils
 open Mebi_plugin.Utils.Logging
 open Mebi_plugin.Examples
 
+exception UnexpectedBisimResult of Mebi_plugin.Bisimilarity.result
+exception UnexpectedExampleKind of Mebi_plugin.Examples.exa_kind
+
 (**  *)
 let pstr_results
-      ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
-      (results : (string * (string * bool * bool) list) list)
+  ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
+  (results : (string * (string * bool * bool) list) list)
   : string
   =
   Printf.sprintf
@@ -20,37 +23,82 @@ let pstr_results
     (List.fold_left
        (fun (acc : string)
          ((suite_name, suite_results) : string * (string * bool * bool) list) ->
-          Printf.sprintf
-            "%s(=>) %s: [%s].\n\n"
-            acc
-            suite_name
-            (List.fold_left
-               (fun (acc' : string)
-                 ((name, expected_result, actual_result) : string * bool * bool) ->
-                  Printf.sprintf
-                    "%s  %s  | %s  | %s\n"
-                    acc'
-                    (if expected_result then "true " else "false")
-                    (if actual_result then "true " else "false")
-                    name)
-               "\n  EXPECT | ACTUAL | EXAMPLE\n  ---------------------------\n"
-               suite_results))
+         Printf.sprintf
+           "%s(=>) %s: [%s].\n\n"
+           acc
+           suite_name
+           (List.fold_left
+              (fun (acc' : string)
+                ((name, expected_result, actual_result) : string * bool * bool) ->
+                Printf.sprintf
+                  "%s  %s  | %s  | %s\n"
+                  acc'
+                  (if expected_result then "true " else "false")
+                  (if actual_result then "true " else "false")
+                  name)
+              "\n  EXPECT | ACTUAL | EXAMPLE\n  ---------------------------\n"
+              suite_results))
        "\n"
        results)
     (List.for_all
        (fun ((_suite_name, suite_results) :
               string * (string * bool * bool) list) ->
-          List.for_all
-            (fun ((_name, expected_result, actual_result) :
-                   string * bool * bool) -> expected_result == actual_result)
-            suite_results)
+         List.for_all
+           (fun ((_name, expected_result, actual_result) : string * bool * bool) ->
+             expected_result == actual_result)
+           suite_results)
        results)
+;;
+
+let pstr_exa_bisim
+  ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
+  (name : string)
+  (s : fsm)
+  (t : fsm)
+  : string
+  =
+  Printf.sprintf
+    "\n\
+     = = = = = = = = = = = = = = = = = = =\n\
+     RCP.KS90 (%s)\n\n\
+     %s.s: %s.\n\n\
+     %s.t: %s.\n\n"
+    name
+    name
+    (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) s)
+    name
+    (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) t)
+;;
+
+let pstr_exa_bisim_result
+  ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
+  (exa : example)
+  (result : bisim_result)
+  : string
+  =
+  match exa with
+  | { name; _ } ->
+    (match result with
+     | { are_bisimilar; merged_fsm; bisimilar_states; non_bisimilar_states } ->
+       Printf.sprintf
+         "[KS90] (%s) Results: (s ~ t) = %b.\n\n\
+          Bisimilar states: %s.\n\n\
+          Non-bisimilar states: %s.\n\n\
+          Using merged FSM: %s.\n\n\
+          = = = = = = = = = = = = = = = = = = =\n\n"
+         name
+         are_bisimilar
+         (Mebi_plugin.Fsm.PStr.partition ~params:(Log params) bisimilar_states)
+         (Mebi_plugin.Fsm.PStr.partition
+            ~params:(Log params)
+            non_bisimilar_states)
+         (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) merged_fsm))
 ;;
 
 (** [ks90_exas] ... *)
 let rec ks90_exas
-          ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
-          (exas : example list)
+  ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
+  (exas : example list)
   : (string * bool * bool) list
   =
   params.kind <- Details ();
@@ -58,52 +106,30 @@ let rec ks90_exas
   | [] -> []
   | exa :: exas' ->
     (match exa with
-     | { name; s; t; are_bisimilar; _ } ->
-       let _are_bisimilar = are_bisimilar in
-       (* safely print depending on if coq or not *)
-       log
-         ~params:(override params)
-         (Printf.sprintf
-            "\n\
-             = = = = = = = = = = = = = = = = = = =\n\
-             RCP.KS90 (%s)\n\n\
-             %s.s: %s.\n\n\
-             %s.t: %s.\n\n"
-            name
-            name
-            (PStr.fsm ~params:(Log params) s)
-            name
-            (PStr.fsm ~params:(Log params) t));
-       (* run algorithm *)
-       let result = RCP.KS90.run ~params s t in
-       (match result with
-        | { are_bisimilar
-          ; merged_fsm
-          ; bisimilar_states
-          ; non_bisimilar_states
-          ; _
-          } ->
-          (* print out results *)
-          log
-            ~params:(override params)
-            (Printf.sprintf
-               "[KS90] (%s) Results: (s ~ t) = %b.\n\n\
-                Bisimilar states: %s.\n\n\
-                Non-bisimilar states: %s.\n\n\
-                Using merged FSM: %s.\n\n\
-                = = = = = = = = = = = = = = = = = = =\n\n"
-               name
-               are_bisimilar
-               (PStr.partition ~params:(Log params) bisimilar_states)
-               (PStr.partition ~params:(Log params) non_bisimilar_states)
-               (PStr.fsm ~params:(Log params) merged_fsm));
-          (* continue *)
-          (name, _are_bisimilar, are_bisimilar) :: ks90_exas ~params exas'))
+     | { name; kind } ->
+       (match kind with
+        | Bisim { s; t; are_bisimilar } ->
+          let expected_result : bool = are_bisimilar in
+          (* safely print depending on if coq or not *)
+          log ~params (pstr_exa_bisim ~params name s t);
+          (* run algorithm *)
+          let raw_result : of_bisim_result =
+            RCP.KS90.run ~params (ToMerge (s, t))
+          in
+          let result : result = RCP.KS90.result ~params raw_result in
+          (match result with
+           | BisimResult result' ->
+             (* print out results *)
+             log ~params (pstr_exa_bisim_result ~params exa result');
+             (* continue *)
+             (name, expected_result, are_bisimilar) :: ks90_exas ~params exas'
+           | _ -> raise (UnexpectedBisimResult result))
+        | _ -> raise (UnexpectedExampleKind kind)))
 ;;
 
 let run_all_ks90
-      ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
-      ()
+  ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
+  ()
   : (string * bool * bool) list
   =
   ks90_exas

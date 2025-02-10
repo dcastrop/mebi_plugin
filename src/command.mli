@@ -27,3 +27,13 @@ val cmd_bisim_ks90_using_lts_to_fsm
   -> Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t
   -> Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t
   -> unit Mebi_monad.t
+
+val cmd_minim_ks90_using_fsm
+  :  ?params:Utils.Params.log
+  -> Fsm.fsm
+  -> unit Mebi_monad.t
+
+val cmd_minim_ks90_using_lts_to_fsm
+  :  ?params:Utils.Params.log
+  -> Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t
+  -> unit Mebi_monad.t

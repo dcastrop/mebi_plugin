@@ -15,7 +15,52 @@ type bisim_result =
   ; non_bisimilar_states : Partition.t
   }
 
+type minim_result = fsm * Partition.t
+
+type of_bisim_result =
+  | OfMerged of
+      ((fsm * fsm) * (fsm * (state, state) Hashtbl.t) * Partition.t ref)
+  | OfMinimized of (fsm * Partition.t ref)
+
+type result =
+  | BisimResult of bisim_result
+  | MinimResult of minim_result
+
 let default_params : Params.log = Params.Default.log ~mode:(Coq ()) ()
+
+module PStr = struct
+  let bisim_result
+    ?(params : Params.log = default_params)
+    ?(merged_from : (fsm * fsm) option)
+    (to_pstr : bisim_result)
+    : string
+    =
+    match to_pstr with
+    | { are_bisimilar; merged_fsm; bisimilar_states; non_bisimilar_states; _ }
+      ->
+      Printf.sprintf
+        "Are Bisimilar: %b.\n\n\
+         Bisimilar states: %s.\n\n\
+         Non-bisimilar states: %s.\n\n\
+         Using merged fsm: %s.\n\
+         %s\n"
+        are_bisimilar
+        (Fsm.PStr.partition ~params:(Log params) bisimilar_states)
+        (Fsm.PStr.partition ~params:(Log params) non_bisimilar_states)
+        (Fsm.PStr.fsm ~params:(Log params) merged_fsm)
+        (match merged_from with
+         | None -> ""
+         | Some (s, t) ->
+           Printf.sprintf
+             "\nObtained from FSM s: %s\n\nand FSM t: %s.\n"
+             (Fsm.PStr.fsm ~params:(Log params) s)
+             (Fsm.PStr.fsm ~params:(Log params) t))
+  ;;
+  (* let minim_result (to_pstr:minim_result) : string =
+     match to_pstr with
+     | (the_fsm,pi) ->
+     Printf.sprintf "Initial Minimization result: %s." *)
+end
 
 (** [RCP] contains algorithms for solving the
     `Relational Coarsest Partitioning` problem. *)
@@ -134,7 +179,7 @@ module RCP = struct
           ~params
           (Printf.sprintf
              "split returned empty b2.\nb1: %s.\n\n"
-             (PStr.states ~params:(Log params) b1));
+             (Fsm.PStr.states ~params:(Log params) b1));
         ()
       | _, _ ->
         (* split did occur, so replace [b] with [b1] and [b2] and refine *)
@@ -144,8 +189,8 @@ module RCP = struct
           ~params
           (Printf.sprintf
              "split returned two blocks.\nb1: %s.\nb2: %s.\n\n"
-             (PStr.states ~params:(Log params) b1)
-             (PStr.states ~params:(Log params) b2));
+             (Fsm.PStr.states ~params:(Log params) b1)
+             (Fsm.PStr.states ~params:(Log params) b2));
         pi := Partition.remove !b !pi;
         pi := Partition.union !pi (Partition.of_list [ b1; b2 ]);
         changed := true;
@@ -176,6 +221,62 @@ module RCP = struct
               inner_loop b1 b2 b pi changed)
             alphabet)
         !pi
+    ;;
+
+    let run_main_loop
+      ?(params : Params.log = default_params)
+      (alphabet : Alphabet.t)
+      (edges : States.t Actions.t Edges.t)
+      (pi : Partition.t ref)
+      : unit
+      =
+      let changed = ref true in
+      while !changed do
+        changed := false;
+        main_loop ~params (alphabet, edges) pi changed
+      done
+    ;;
+
+    type bisim_input =
+      | ToMerge of (fsm * fsm)
+      | Merged of (fsm * fsm * fsm * (state, state) Hashtbl.t)
+      | Minimize of fsm
+
+    exception RunInputNotExpected of bisim_input
+
+    (** [run ?coq s t] algorithmically checks if [s] and [t] are bisimilar, returning a [bisim_result] with further details.
+        @return
+          [bisim_result] containing the bisimilar and non-bisimilar states.
+        @param ?params contains parameters for logging and formatting.
+        @param s is an [fsm] to check.
+        @param t is an [fsm] to check. *)
+    let run ?(params : Params.log = default_params) (input : bisim_input)
+      : of_bisim_result
+      =
+      (* run the algorithm for different usecases *)
+      match input with
+      | Minimize the_fsm ->
+        (match the_fsm with
+         | { alphabet; states; edges; _ } ->
+           let pi = ref (Partition.of_list [ states ]) in
+           run_main_loop ~params alphabet edges pi;
+           OfMinimized (the_fsm, pi))
+      | _ ->
+        (* check for bisimilarity *)
+        let s, t, merged_fsm, map_of_states =
+          match input with
+          | ToMerge (s, t) ->
+            let merged_fsm, map_of_states = Merge.fsms s t in
+            s, t, merged_fsm, map_of_states
+          | Merged (s, t, merged_fsm, map_of_states) ->
+            s, t, merged_fsm, map_of_states
+          | _ -> raise (RunInputNotExpected input)
+        in
+        (match merged_fsm with
+         | { alphabet; states; edges; _ } ->
+           let pi = ref (Partition.of_list [ states ]) in
+           run_main_loop ~params alphabet edges pi;
+           OfMerged ((s, t), (merged_fsm, map_of_states), pi))
     ;;
 
     type state_origins =
@@ -213,7 +314,7 @@ module RCP = struct
       ?(params : Params.log = default_params)
       ((s_states, t_states) : States.t * States.t)
       (map_of_states : (state, state) Hashtbl.t)
-      (pi : Partition.t)
+      (pi : Partition.t ref)
       : Partition.t * Partition.t
       =
       Partition.fold
@@ -228,54 +329,23 @@ module RCP = struct
           if origins.s && origins.t
           then Partition.add block bisimilar_states', non_bisimilar_states'
           else bisimilar_states', Partition.add block non_bisimilar_states')
-        pi
+        !pi
         (Partition.empty, Partition.empty)
     ;;
 
-    (** [run ?coq s t] algorithmically checks if [s] and [t] are bisimilar, returning a [bisim_result] with further details.
-        @return
-          [bisim_result] containing the bisimilar and non-bisimilar states.
-        @param ?params contains parameters for logging and formatting.
-        @param s is an [fsm] to check.
-        @param t is an [fsm] to check. *)
-    let run ?(params : Params.log = default_params) (s : fsm) (t : fsm)
-      : bisim_result
+    let result ?(params : Params.log = default_params) (res : of_bisim_result)
+      : result
       =
-      (* *)
-      params.kind <- Debug ();
-      (* params.options.show_debug_output <- true; *)
-      log ~params "=/=/=/= KS90.run =/=/=/=\n\n";
-      (* get initial partition [pi] by merging states from [s] and [t] into single set. *)
-      let merged_fsm, map_of_states = Merge.fsms s t in
-      (* *)
-      match merged_fsm with
-      | { alphabet; states; edges; _ } ->
-        (* working partition is initially all the states *)
-        let pi = ref (Partition.of_list [ states ])
-        and changed = ref true in
-        while !changed do
-          changed := false;
-          (* [main_loop] checks whether each block in partition [pi] can be further refined,
-             depending on whether each state within the block can reach a different set of
-             other blocks within [pi] via any of the available actions in [alphabet].
-             [main_loop] continues so long as refinement occurs.
-             If there is no change then the loop ends. *)
-          main_loop ~params (alphabet, edges) pi changed
-        done;
-        (* *)
-        log ~params "=/= KS90.run, exited main loop =/=\n\n";
-        (* split [!pi] based on whether if states are bisimilar or not *)
+      match res with
+      | OfMerged ((s, t), (merged_fsm, map_of_states), pi) ->
         let (bisimilar_states, non_bisimilar_states) : Partition.t * Partition.t
           =
-          split_bisimilar ~params (s.states, t.states) map_of_states !pi
+          split_bisimilar ~params (s.states, t.states) map_of_states pi
         in
         let are_bisimilar = Partition.is_empty non_bisimilar_states in
-        log
-          ~params
-          (Printf.sprintf
-             "=/=/=/=/=/=/=\n\nKS90.run, are_bisimilar: %b\n\n=/=/=/=/=/=/=\n\n"
-             are_bisimilar);
-        { are_bisimilar; merged_fsm; bisimilar_states; non_bisimilar_states }
+        BisimResult
+          { are_bisimilar; merged_fsm; bisimilar_states; non_bisimilar_states }
+      | OfMinimized (the_fsm, pi) -> MinimResult (the_fsm, !pi)
     ;;
   end
 
