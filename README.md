@@ -1,8 +1,70 @@
 # MEBI: Mechanised Bisimilarities
 
-This repository contains a Coq plugin for automating bisimilarity proofs.
+This repository contains a Coq plugin for automating bisimilarity proofs (which are currently taken from the methods detailed in "Advanced Topics in Bisimulation and Coinduction", Section 3.2.2).
+
 
 **Work in progress**
+
+---
+
+
+
+## Building the Project
+Using **`coq 8.20.0`**, below is the "fool-poof" method:
+```shell
+make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile
+```
+
+### Running tests
+Compiling using the above will also generate a `tests.exe` which can be run:
+```shell
+_build/default/test/tests.exe
+```
+
+### Altogether
+```shell
+make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile; _build/default/test/tests.exe
+```
+
+
+
+### Using VSCode
+Use the **[`vscoq` extension](https://github.com/coq/vscoq)** and build as shown above. Afterwards, you have to reload vscode. (**[This extension is helpful for this](https://marketplace.visualstudio.com/items?itemName=natqe.reload).**)
+
+
+
+#### Issues with `vscoqtop`
+Try adding this to your workspace settings `.json` file, under the `"settings"` field:
+```json
+"vscoq.path": "/home/jonah/.opam/mebi/bin/vscoqtop"
+```
+E.g.:
+```json
+{ "settings": {
+    "vscoq.path": "/home/jonah/.opam/mebi/bin/vscoqtop"
+} }
+```
+
+> Access this file by pressing **`ctrl+,`** and then clicking the file icon button in the top right corner, which will open the settings as a `json` file.
+
+
+
+
+
+## Scratchpad
+
+### Command that declares a relation as a "LTS-generating relation":
+
+```
+MeBi LTS <ident>.
+```
+
+* `<ident>` should be the identifier of a relation with type
+`Term -> Action -> Term -> Prop`.
+
+
+
+
 
 ## TODO
 
@@ -28,104 +90,6 @@ but renamed. Here is the current TODO list.
   of our algorithm into sequences of Coq tactics.
 - Tau transitions/weak bisimilarity?
 - Open terms/use of existing lemmas?
-
-## Scratchpad
-
-### Command that declares a relation as a "LTS-generating relation":
-
-```
-MeBi LTS <ident>.
-```
-
-* `<ident>` should be the identifier of a relation with type
-`Term -> Action -> Term -> Prop`.
-
-## To run the test of bisimilarity
-> currently taken from "Advanced Topics in Bisimulation and Coinduction", Section 3.2.2.
-
-### First build the project:
-```shell
-make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile
-```
-
-### Next, run the tests:
-```shell
-_build/default/test/tests.exe
-```
-
-### To build and run together:
-```shell
-make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile; _build/default/test/tests.exe
-```
-
-## Setup
-*using `coq 8.20.0`*
-
-### using `make`
-Run the following commands
-```
-coq_makefile -f _CoqProject -o CoqMakeFile
-```
-```
-make -f CoqMakeFile
-```
-
-### using **vscode** (with `vscoq`)
-Use `make` method (above).
-Assuming you are using `vscoq` extension, you will not be able to use `MEBI.loader` unless you add the following line to your `settings.json`:
-```json
-"vscoq.args": ["-R theories/ MEBI -w all -I src/ "]
-```
-(access by `ctrl+,` and find the button in the top right for opening the settings as `json` file.)
-
-E.g., to add this for a specific workspace in vscode it may look like this:
-```json
-{
-  "settings": {
-    "vscoq.args": ["-R theories/ MEBI -w all -I src/ "]
-  }
-}
-```
-
-#### to build in vscode (whole plugin)
-Run the following commands
-```
-make .merlin clean
-```
-```
-dune build
-```
-```
-coq_makefile -f _CoqProject -o CoqMakeFile
-```
-```
-make -f CoqMakeFile
-```
-
-##### all-in-one:
-```
-make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile
-```
-then afterwards, you have to reload vscode. [this extension is helpful for this](https://marketplace.visualstudio.com/items?itemName=natqe.reload)
-
-##### all-in-one (suppress warnings)
-```
-make .merlin clean; dune build --profile release; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile
-```
-
-#### build in vscode (ocaml tools only)
-
-```
-make .merlin clean; dune build
-```
-
-### ~~using `dune`~~  (*`dune` currently not supported*)
-*issue (in vscode) with `theories/loder.v` where `mebi_plugin.cmxs` appears inside `_build/default/src` instead of under `src/`.*
-```
-dune build
-```
-
-
 
 
 
@@ -155,6 +119,8 @@ dune build
 - [Popescu, A., Gunter, E.L. (2010). Incremental Pattern-Based Coinduction for Process Algebra and Its Isabelle Formalization](https://doi.org/10.1007/978-3-642-12032-9_9)
 - [Rodrigues, N., Sebe, M.O., Chen, X., Roşu, G. (2024). A Logical Treatment of Finite Automata.](https://doi.org/10.1007/978-3-031-57246-3_20)
 - [Stefanescu, A., Ciobaca, S., Moore, B., Serbanuta, T.F., Rosu, G. (2013). Reachability Logic in K](http://hdl.handle.net/2142/46296)
+
+### Books
 - [Sangiorgi, D. (2011). Introduction to Bisimulation and Coinduction](https://doi.org/10.1017/CBO9780511777110)
 - [Sangiorgi, D., Rutten, J. (2011). Advanced Topics in Bisimulation and Coinduction](https://doi.org/10.1017/CBO9780511792588)
 <!-- - []()
