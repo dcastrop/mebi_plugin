@@ -1,11 +1,21 @@
-type example =
-  { name : string
-  ; s : Fsm.fsm
+type bisim_exa =
+  { s : Fsm.fsm
   ; t : Fsm.fsm
   ; are_bisimilar : bool
   }
 
-val exa : string -> Fsm.fsm -> Fsm.fsm -> bool -> example
+type minim_exa = { the_fsm : Fsm.fsm }
+
+type exa_kind =
+  | Bisim of bisim_exa
+  | Minim of minim_exa
+
+type example =
+  { name : string
+  ; kind : exa_kind
+  }
+
+val exa : string -> exa_kind -> example
 val exa_1 : example
 val exa_2 : example
 val exa_mc : example

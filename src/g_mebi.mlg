@@ -163,4 +163,39 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         (* coq terms: *)
       ((Nametab.global r), t)
       ((Nametab.global r'), t'))) }
+  (***************************)
+  (***************************)
+  (***************************)
+  (* run minimization alg on single term (first, builds fsm) *)
+  | [ "MeBi" "Minim" "KS90" reference(r) constr(t) ] ->
+    { (Mebi_monad.run
+        (Command.cmd_minim_ks90_using_lts_to_fsm
+          ~params:(
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+            params.options <-
+            { output_enabled=true;
+              show_normal_output=true;
+              show_detailed_output=false;
+              show_debug_output=false;
+              show_warning_output=true };
+            params
+          )
+        (* coq terms: *)
+      ((Nametab.global r), t))) }
+  (*** debug mode ****)
+  | [ "MeBi" "Minim" "KS90" "show_debug" reference(r) constr(t) ] ->
+    { (Mebi_monad.run
+        (Command.cmd_minim_ks90_using_lts_to_fsm
+          ~params:(
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+            params.options <-
+            { output_enabled=true;
+              show_normal_output=true;
+              show_detailed_output=true;
+              show_debug_output=true;
+              show_warning_output=true };
+            params
+          )
+        (* coq terms: *)
+      ((Nametab.global r), t))) }
 END

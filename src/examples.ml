@@ -1,17 +1,25 @@
 (** [Examples] contains examples to be used by either [KS90] or [PT87]. *)
 open Fsm
 
-(** [example] is a type for denoting pairs of fsms that we check are bisimilar. *)
-type example =
-  { name : string
-  ; s : fsm
+type bisim_exa =
+  { s : fsm
   ; t : fsm
   ; are_bisimilar : bool
   }
 
-let exa (name : string) (s : fsm) (t : fsm) (are_bisimilar : bool) : example =
-  { name; s; t; are_bisimilar }
-;;
+type minim_exa = { the_fsm : fsm }
+
+type exa_kind =
+  | Bisim of bisim_exa
+  | Minim of minim_exa
+
+(** [example] is a type for denoting pairs of fsms that we check are bisimilar. *)
+type example =
+  { name : string
+  ; kind : exa_kind
+  }
+
+let exa (name : string) (kind : exa_kind) : example = { name; kind }
 
 (** [exa_1] is `Example 3.2.5` on page 106. *)
 let exa_1 : example =
@@ -25,16 +33,14 @@ let exa_1 : example =
             ; "s1", [ "b", [ "s2" ] ]
             ; "s2", [ "b", [ "s2" ] ]
             ]))
-  and
-      (* t *)
-        (t : fsm)
-    =
+  and (* t *)
+    (t : fsm) =
     Translate.to_fsm
       (Lts.Make.lts
          ~init:"t0"
          (Nested [ "t0", [ "a", [ "t1" ] ]; "t1", [ "b", [ "t1" ] ] ]))
   in
-  exa "exa1" s t true
+  exa "exa1" (Bisim { s; t; are_bisimilar = true })
 ;;
 
 (** [exa_2] is `Example 3.2.6` on page 107. *)
@@ -51,10 +57,8 @@ let exa_2 : example =
             ; "s3", [ "a", [ "s0" ] ]
             ; "s4", [ "a", [ "s0" ] ]
             ]))
-  and
-      (* t *)
-        (t : fsm)
-    =
+  and (* t *)
+    (t : fsm) =
     Translate.to_fsm
       (Lts.Make.lts
          ~init:"t0"
@@ -67,7 +71,7 @@ let exa_2 : example =
             ; "t5", [ "a", [ "t0"; "t4" ] ]
             ]))
   in
-  exa "exa2" s t false
+  exa "exa2" (Bisim { s; t; are_bisimilar = false })
 ;;
 
 (** [exa_mc] ...
@@ -83,10 +87,8 @@ let exa_mc : example =
             ; "s1", [ "recv", [ "s3" ] ]
             ; "s2", [ "send", [ "s3" ] ]
             ]))
-  and
-      (* [t] has silent transitions *)
-        (t : fsm)
-    =
+  and (* [t] has silent transitions *)
+    (t : fsm) =
     Translate.to_fsm
       (Lts.Make.lts
          ~init:"t0"
@@ -97,7 +99,7 @@ let exa_mc : example =
             ; "t3", [ "send", [ "t4" ] ]
             ]))
   in
-  exa "exa_mc" s t false
+  exa "exa_mc" (Bisim { s; t; are_bisimilar = false })
 ;;
 
 (** [exa_self_rec_nondet] ... *)
@@ -108,16 +110,14 @@ let exa_self_rec_nondet : example =
       (Lts.Make.lts
          ~init:"s0"
          (Nested [ "s0", [ "a", [ "s1" ] ]; "s1", [ "a", [ "s1"; "s2" ] ] ]))
-  and
-      (* t *)
-        (t : fsm)
-    =
+  and (* t *)
+    (t : fsm) =
     Translate.to_fsm
       (Lts.Make.lts
          ~init:"t0"
          (Nested [ "t0", [ "a", [ "t1" ] ]; "t1", [ "a", [ "t1"; "t2" ] ] ]))
   in
-  exa "exa_self_rec_nondet" s t true
+  exa "exa_self_rec_nondet" (Bisim { s; t; are_bisimilar = true })
 ;;
 
 (** [exa_self_rec_nondet_inf] ... *)
@@ -132,10 +132,8 @@ let exa_self_rec_nondet_inf : example =
             ; "s1", [ "a", [ "s1"; "s2" ] ]
             ; "s2", [ "a", [ "s0" ] ]
             ]))
-  and
-      (* t *)
-        (t : fsm)
-    =
+  and (* t *)
+    (t : fsm) =
     Translate.to_fsm
       (Lts.Make.lts
          ~init:"t0"
@@ -145,7 +143,7 @@ let exa_self_rec_nondet_inf : example =
             ; "t2", [ "a", [ "t0" ] ]
             ]))
   in
-  exa "exa_self_rec_nondet_inf" s t true
+  exa "exa_self_rec_nondet_inf" (Bisim { s; t; are_bisimilar = true })
 ;;
 
 (** [exa_self_rec_det] ... *)
@@ -157,17 +155,15 @@ let exa_self_rec_det : example =
          ~init:"s0"
          (Nested
             [ "s0", [ "a", [ "s1" ] ]; "s1", [ "a", [ "s1" ]; "b", [ "s2" ] ] ]))
-  and
-      (* t *)
-        (t : fsm)
-    =
+  and (* t *)
+    (t : fsm) =
     Translate.to_fsm
       (Lts.Make.lts
          ~init:"t0"
          (Nested
             [ "t0", [ "a", [ "t1" ] ]; "t1", [ "a", [ "t1" ]; "b", [ "t2" ] ] ]))
   in
-  exa "exa_self_rec_det" s t true
+  exa "exa_self_rec_det" (Bisim { s; t; are_bisimilar = true })
 ;;
 
 (** [exa_self_rec_det_inf] ... *)
@@ -182,10 +178,8 @@ let exa_self_rec_det_inf : example =
             ; "s1", [ "a", [ "s1"; "s2" ] ]
             ; "s2", [ "a", [ "s2" ] ]
             ]))
-  and
-      (* t *)
-        (t : fsm)
-    =
+  and (* t *)
+    (t : fsm) =
     Translate.to_fsm
       (Lts.Make.lts
          ~init:"t0"
@@ -195,7 +189,7 @@ let exa_self_rec_det_inf : example =
             ; "t2", [ "a", [ "t2" ] ]
             ]))
   in
-  exa "exa_self_rec_det_inf" s t true
+  exa "exa_self_rec_det_inf" (Bisim { s; t; are_bisimilar = true })
 ;;
 
 (** [exa_rec_1] ... *)
@@ -206,10 +200,8 @@ let exa_rec_1 : example =
       (Lts.Make.lts
          ~init:"s0"
          (Nested [ "s0", [ "a", [ "s1" ] ]; "s1", [ "b", [ "s0" ] ] ]))
-  and
-      (* t *)
-        (t : fsm)
-    =
+  and (* t *)
+    (t : fsm) =
     Translate.to_fsm
       (Lts.Make.lts
          ~init:"t0"
@@ -220,7 +212,7 @@ let exa_rec_1 : example =
             ; "t3", [ "b", [ "t0" ] ]
             ]))
   in
-  exa "exa_rec_1" s t true
+  exa "exa_rec_1" (Bisim { s; t; are_bisimilar = true })
 ;;
 
 (** [exa_rec_2] ... *)
@@ -231,10 +223,8 @@ let exa_rec_2 : example =
       (Lts.Make.lts
          ~init:"s0"
          (Nested [ "s0", [ "a", [ "s1" ] ]; "s1", [ "b", [ "s0" ] ] ]))
-  and
-      (* t *)
-        (t : fsm)
-    =
+  and (* t *)
+    (t : fsm) =
     Translate.to_fsm
       (Lts.Make.lts
          ~init:"t0"
@@ -244,7 +234,7 @@ let exa_rec_2 : example =
             ; "t2", [ "a", [ "t1" ] ]
             ]))
   in
-  exa "exa_rec_2" s t true
+  exa "exa_rec_2" (Bisim { s; t; are_bisimilar = true })
 ;;
 
 (** [exa_par_1] ... *)
@@ -259,10 +249,8 @@ let exa_par_1 : example =
             ; "s1", [ "b", [ "s3" ] ]
             ; "s2", [ "a", [ "s3" ] ]
             ]))
-  and
-      (* t *)
-        (t : fsm)
-    =
+  and (* t *)
+    (t : fsm) =
     Translate.to_fsm
       (Lts.Make.lts
          ~init:"t0"
@@ -271,7 +259,7 @@ let exa_par_1 : example =
             ; "t1", [ "a", [ "t2" ]; "b", [ "t2" ] ]
             ]))
   in
-  exa "exa_par_1" s t false
+  exa "exa_par_1" (Bisim { s; t; are_bisimilar = false })
 ;;
 
 (** [exa_self_act1] ... *)
@@ -280,12 +268,10 @@ let exa_self_act1 : example =
   let (s : fsm) =
     Translate.to_fsm
       (Lts.Make.lts ~init:"s0" (Nested [ "s0", [ "a", [ "s1" ] ] ]))
-  and
-      (* t *)
-        (t : fsm)
-    =
+  and (* t *)
+    (t : fsm) =
     Translate.to_fsm
       (Lts.Make.lts ~init:"t0" (Nested [ "t0", [ "a", [ "t1" ] ] ]))
   in
-  exa "exa_self_act1" s t true
+  exa "exa_self_act1" (Bisim { s; t; are_bisimilar = true })
 ;;

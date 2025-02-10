@@ -223,6 +223,13 @@ Module BisimTest1.
     termLTS (tact TheAction1 (tact TheAction2 tend)).
 
 
+
+  (* minimize *)
+  MeBi Minim KS90
+    termLTS (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
+
+
+
 End BisimTest1.
 
 (* Section BisimDef.
