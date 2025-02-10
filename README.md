@@ -36,12 +36,12 @@ Use the **[`vscoq` extension](https://github.com/coq/vscoq)** and build as shown
 #### Issues with `vscoqtop`
 Try adding this to your workspace settings `.json` file, under the `"settings"` field:
 ```json
-"vscoq.path": "/home/jonah/.opam/mebi/bin/vscoqtop"
+"vscoq.path": "/home/user/.opam/mebi/bin/vscoqtop"
 ```
 E.g.:
 ```json
 { "settings": {
-    "vscoq.path": "/home/jonah/.opam/mebi/bin/vscoqtop"
+    "vscoq.path": "/home/user/.opam/mebi/bin/vscoqtop"
 } }
 ```
 
