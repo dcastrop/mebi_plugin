@@ -1,6 +1,9 @@
 # Bibliography
 See the DOI/cite information of the PDFs contained within this directory. These are works that we are interesting in building upon.
 
+## From generic partition refinement to weighted tree automata minimization
+> `Wissmann2021`; Full version DOI: https://doi.org/10.1007/s00165-020-00526-z
+
 ## Fast Coalgebraic Bisimilarity Minimization
 > `Jacobs2023a`; Link: https://arxiv.org/abs/2204.12368
 > `Jacobs2023b`; Full version DOI: https://doi.org/10.1145/3571245
