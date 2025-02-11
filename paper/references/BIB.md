@@ -21,6 +21,10 @@ See the DOI/cite information of the PDFs contained within this directory. These 
 
 Apparently, (according to `Jacobs2023`) the method presented here superceed those of `Valmari2009` and the `KS90` bisimilarity algorithm presented in the book, which is currently implemented.
 
+### Uses of Minimisation Algorithms
+
+> https://cadp.inria.fr/ftp/publications/cadp/Garavel-Lang-Mateescu-Serwe-13.pdf
+
 
 
 
