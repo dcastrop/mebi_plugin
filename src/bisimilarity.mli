@@ -5,14 +5,14 @@ type bisim_result =
   ; non_bisimilar_states : Fsm.Partition.t
   }
 
-type minim_result = Fsm.fsm * Fsm.Partition.t
+type minim_result = Fsm.Partition.t
 
 type of_bisim_result =
   | OfMerged of
       ((Fsm.fsm * Fsm.fsm)
       * (Fsm.fsm * (Fsm.state, Fsm.state) Hashtbl.t)
-      * Fsm.Partition.t ref)
-  | OfMinimized of (Fsm.fsm * Fsm.Partition.t ref)
+      * minim_result ref)
+  | OfMinimized of minim_result ref
 
 type result =
   | BisimResult of bisim_result
@@ -31,15 +31,15 @@ end
 module RCP : sig
   module KS90 : sig
     exception EmptyBlock of Fsm.States.t
-    exception PartitionsNotDisjoint of Fsm.Partition.t
+    exception PartitionsNotDisjoint of minim_result
 
     val reachable_blocks
       :  ?params:Utils.Logging.params
       -> Fsm.States.t Fsm.Actions.t
-      -> Fsm.Partition.t
-      -> Fsm.Partition.t
+      -> minim_result
+      -> minim_result
 
-    val reach_same_blocks : Fsm.Partition.t -> Fsm.Partition.t -> bool
+    val reach_same_blocks : minim_result -> minim_result -> bool
 
     val lengths_gtr_0
       :  Fsm.States.t Fsm.Actions.t
@@ -50,7 +50,7 @@ module RCP : sig
       :  ?params:Utils.Logging.params
       -> Fsm.States.t
       -> Fsm.action
-      -> Fsm.Partition.t
+      -> minim_result
       -> Fsm.States.t Fsm.Actions.t Fsm.Edges.t
       -> Fsm.States.t * Fsm.States.t
 
@@ -59,14 +59,14 @@ module RCP : sig
       -> Fsm.States.t
       -> Fsm.States.t
       -> Fsm.States.t ref
-      -> Fsm.Partition.t ref
+      -> minim_result ref
       -> bool ref
       -> unit
 
     val main_loop
       :  ?params:Utils.Logging.params
       -> Fsm.Alphabet.t * Fsm.States.t Fsm.Actions.t Fsm.Edges.t
-      -> Fsm.Partition.t ref
+      -> minim_result ref
       -> bool ref
       -> unit
 
@@ -74,7 +74,7 @@ module RCP : sig
       :  ?params:Utils.Logging.params
       -> Fsm.Alphabet.t
       -> Fsm.States.t Fsm.Actions.t Fsm.Edges.t
-      -> Fsm.Partition.t ref
+      -> minim_result ref
       -> unit
 
     type bisim_input =
@@ -103,8 +103,8 @@ module RCP : sig
       :  ?params:Utils.Logging.params
       -> Fsm.States.t * Fsm.States.t
       -> (Fsm.state, Fsm.state) Hashtbl.t
-      -> Fsm.Partition.t ref
-      -> Fsm.Partition.t * Fsm.Partition.t
+      -> minim_result ref
+      -> minim_result * minim_result
 
     val result : ?params:Utils.Logging.params -> of_bisim_result -> result
   end
