@@ -21,9 +21,17 @@ See the DOI/cite information of the PDFs contained within this directory. These 
 
 Apparently, (according to `Jacobs2023`) the method presented here superceed those of `Valmari2009` and the `KS90` bisimilarity algorithm presented in the book, which is currently implemented.
 
-### Uses of Minimisation Algorithms
+### CADP 2011: A Toolbox for the Construction and Analysis of Distributed Processes
+> `Garavel2013`; Link: https://www.researchgate.net/publication/268814117_CADP_2011_A_Toolbox_for_the_Construction_and_Analysis_of_Distributed_Processes
 
-> https://cadp.inria.fr/ftp/publications/cadp/Garavel-Lang-Mateescu-Serwe-13.pdf
+> Full version DOI: http://dx.doi.org/10.1007/s10009-012-0244-z
+
+https://cadp.inria.fr/ftp/publications/cadp/Garavel-Lang-Mateescu-Serwe-13.pdf
+
+### Using Bisimulation Proof Techniques for the Analysis of Distributed Algorithms
+> `Pous2007`; Link: https://ens-lyon.hal.science/ensl-00149964v3/file/LIP-RR2007-31.pdf
+
+> Full version DOI: https://dx.doi.org/10.1016/j.tcs.2008.04.035
 
 
 
