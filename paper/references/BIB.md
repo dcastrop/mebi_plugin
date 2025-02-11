@@ -29,10 +29,12 @@ Apparently, (according to `Jacobs2023`) the method presented here superceed thos
 https://cadp.inria.fr/ftp/publications/cadp/Garavel-Lang-Mateescu-Serwe-13.pdf
 
 ### Using Bisimulation Proof Techniques for the Analysis of Distributed Algorithms
-> `Pous2007`; Link: https://ens-lyon.hal.science/ensl-00149964v3/file/LIP-RR2007-31.pdf
+> `Pous2007a`; Link: https://ens-lyon.hal.science/ensl-00149964v3/file/LIP-RR2007-31.pdf
 
 > Full version DOI: https://dx.doi.org/10.1016/j.tcs.2008.04.035
 
+### Up-to Techniques for Weak Bisimulation
+> 'Pous2007b'; Full version DOI: https://doi.org/10.1007/11523468_59
 
 
 
