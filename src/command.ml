@@ -860,6 +860,11 @@ struct
       return (lts, tbl)
     ;;
   end
+
+  (* TODO: from [LTS.lts] and [coq_translation] create a coq term and save to file *)
+  module ReCoq = struct
+    (* let from_lts *)
+  end
 end
 
 (** [make_graph_builder] is ... *)
