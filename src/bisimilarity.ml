@@ -15,12 +15,12 @@ type bisim_result =
   ; non_bisimilar_states : Partition.t
   }
 
-type minim_result = fsm * Partition.t
+type minim_result = Partition.t
 
 type of_bisim_result =
   | OfMerged of
       ((fsm * fsm) * (fsm * (state, state) Hashtbl.t) * Partition.t ref)
-  | OfMinimized of (fsm * Partition.t ref)
+  | OfMinimized of minim_result ref
 
 type result =
   | BisimResult of bisim_result
@@ -260,7 +260,7 @@ module RCP = struct
          | { alphabet; states; edges; _ } ->
            let pi = ref (Partition.of_list [ states ]) in
            run_main_loop ~params alphabet edges pi;
-           OfMinimized (the_fsm, pi))
+           OfMinimized pi)
       | _ ->
         (* check for bisimilarity *)
         let s, t, merged_fsm, map_of_states =
@@ -345,7 +345,7 @@ module RCP = struct
         let are_bisimilar = Partition.is_empty non_bisimilar_states in
         BisimResult
           { are_bisimilar; merged_fsm; bisimilar_states; non_bisimilar_states }
-      | OfMinimized (the_fsm, pi) -> MinimResult (the_fsm, !pi)
+      | OfMinimized pi -> MinimResult !pi
     ;;
   end
 

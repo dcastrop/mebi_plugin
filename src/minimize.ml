@@ -11,7 +11,7 @@ let run ?(params : Params.log = Params.Default.log ()) (the_fsm : fsm) : result 
   in
   let res : Bisimilarity.result = Bisimilarity.RCP.KS90.result bisim_result in
   match res with
-  | MinimResult (the_fsm, pi) ->
+  | MinimResult pi ->
     let minim_fsm : fsm =
       (* TODO: minimize? *)
       the_fsm
