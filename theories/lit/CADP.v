@@ -343,10 +343,10 @@ Print MCS.
 
 
 
-(* following: https://softwarefoundations.cis.upenn.edu/plf-current/Typechecking.html *)
+(* following: https://softwarefoundations.cis.upenn.edu/plf-current/Types.html *)
 
 (* Inductive step : term -> term -> Prop :=
-  | ST_OK :  forall t1 t1,  *)
+  | ST_PAR :  forall t1 t1,  *)
 
 
 
