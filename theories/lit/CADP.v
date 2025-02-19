@@ -151,13 +151,12 @@ Inductive term : Type :=
   | DEF (def:var_def)
   | DEFS (defs:list var_def)
   (*  *)
-  | LOOP (body:term)
-  (* | LOOP_OVER (over:iterable) (body:term) *)
+  | LOOP      (body:term)
   | LOOP_OVER (over:of_kind) (body:term)
   | BREAK (loop:of_kind)
   (*  *)
-  | IF_THEN (condition:Prop) (do_then:term)
-  | IF_THEN_ELSE (condition:Prop) (do_then:term) (do_else:term)
+  | IFF (condition:Prop) (do_then:term)
+  | IF  (condition:Prop) (do_then:term) (do_else:term)
   (*  *)
   (* | SELECT () *)
   .
@@ -168,9 +167,9 @@ Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
 
 Declare Custom Entry term.
 Declare Scope term_scope.
-Notation "'if' c 'then' t" := (IF_THEN_ELSE c t)
+Notation "'if' c 'then' t" := (IF c t)
                   (in custom term at level 90, c custom term at level 80, t custom term at level 80): term_scope.
-Notation "'if' c 'then' t 'else' e" := (IF_THEN_ELSE c t e)
+Notation "'if' c 'then' t 'else' e" := (IF c t e)
                   (in custom term at level 90, c custom term at level 80, t custom term at level 80, e custom term at level 80): term_scope.
 
 
@@ -271,7 +270,7 @@ Example MCS : composition := COMP
                     ; AS   KIND_INDEX (OF KIND_PID "PID")
                     ; REF             (OF KIND_PID "PID") ])
 
-           ; IF_THEN
+           ; IFF
               (REF (OF KIND_INDEX "predecessor") = LIT (OF KIND_INDEX "Nil"))
               (SEQ [ ACT (OF KIND_MEM "M")
                       (ARGS [ OP  WRITE_LOCKED
@@ -292,8 +291,7 @@ Example MCS : composition := COMP
                                     ; BIND "locked"
                                     ; REF  (OF KIND_PID "PID") ])
 
-                           ; IF_THEN
-                              (REF (OF KIND_BOOL "locked") = LIT (OF KIND_BOOL "false"))
+                           ; IFF (REF (OF KIND_BOOL "locked") = LIT (OF KIND_BOOL "false"))
                               (BREAK (OF KIND_LOCK "L")) ]) ]) ]) )
   ; (PROCESS "release"
       (PARAMS [ VAR KIND_LOCK "L"
@@ -307,8 +305,7 @@ Example MCS : composition := COMP
                     ; REF  (OF KIND_PID   "PID")
                     ; BIND "next"
                     ; REF  (OF KIND_PID   "PID") ])
-           ; IF_THEN_ELSE
-              (REF (OF KIND_INDEX "next") = LIT (OF KIND_INDEX "Nil"))
+           ; IF (REF (OF KIND_INDEX "next") = LIT (OF KIND_INDEX "Nil"))
               (SEQ [ ACT (OF KIND_LOCK "L")
                       (ARGS [ OP   COMPARE_AND_SWAP
                             ; AS   KIND_INDEX (OF KIND_PID "PID")
@@ -316,7 +313,7 @@ Example MCS : composition := COMP
                             ; BIND "swap"
                             ; REF  (OF KIND_PID "PID") ])
 
-                   ; IF_THEN
+                   ; IFF
                       (REF (OF KIND_BOOL "swap") = LIT (OF KIND_BOOL "false"))
                       (LOOP_OVER (OF KIND_LOCK "L")
                         (SEQ [ ACT (OF KIND_MEM "M")
@@ -325,8 +322,7 @@ Example MCS : composition := COMP
                                       ; BIND "next"
                                       ; REF (OF KIND_PID "PID") ])
 
-                             ; IF_THEN
-                                (~(REF (OF KIND_INDEX "next") = LIT (OF KIND_INDEX "Nil")))
+                             ; IFF (~(REF (OF KIND_INDEX "next") = LIT (OF KIND_INDEX "Nil")))
                                 (BREAK (OF KIND_LOCK "L")) ])) ])
 
               (ACT (OF KIND_MEM "M")
@@ -345,9 +341,24 @@ Print MCS.
 
 (* following: https://softwarefoundations.cis.upenn.edu/plf-current/Types.html *)
 
-(* Inductive step : term -> term -> Prop :=
-  | ST_PAR :  forall t1 t1,  *)
+Inductive step : term -> term -> Prop :=
+  (*  *)
+  | ST_PAR_L : forall t1 t2 t3,  step (PAR t1 t2) (PAR t3 t2)
+  | ST_PAR_R : forall t1 t2 t3,  step (PAR t1 t2) (PAR t1 t3)
+  (*  *)
+  (* | ST_SEQ : forall h1 h2 t,
+    step (cons h1 (cons h2 t)) (cons h1 (cons h2 t)) -> step (cons h1 (cons h2 t)) (cons h2 t) *)
+  (*  *)
+  (* | ST_IFF_TRUE : forall t1,    step (IFF () t1) t1 *)
+  (*  *)
+  | ST_IF_TRUE : forall t1 t2,  step (IF true t1 t2) t1
+  | ST_IF_FALSE : forall t1 t2, step (IF false t1 t2) t2
+  .
 
+
+
+
+(* Hint Constructors step : core. *)
 
 
 
