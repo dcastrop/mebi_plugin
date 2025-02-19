@@ -133,7 +133,7 @@ Inductive mem_access_param :=
   | ITER_LOCK_ACCESS : lock_access -> iterable
   . *)
 
-Inductive term :=
+Inductive term : Type :=
   (*  *)
   | TERM
   | OK
@@ -337,11 +337,16 @@ Example MCS : composition := COMP
  ]) )
 ].
 
+Print term.
+
 Print MCS.
 
 
 
+(* following: https://softwarefoundations.cis.upenn.edu/plf-current/Typechecking.html *)
 
+(* Inductive step : term -> term -> Prop :=
+  | ST_OK :  forall t1 t1,  *)
 
 
 
