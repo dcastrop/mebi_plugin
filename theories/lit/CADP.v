@@ -133,6 +133,8 @@ Inductive mem_access_param :=
   | ITER_LOCK_ACCESS : lock_access -> iterable
   . *)
 
+  (* SEQ ((ACT a) :: rest) , state ->^{\tau} SEQ rest (do a state) -- if a is not visible *)
+  (* SEQ ((ACT a) :: rest) , state ->^{a} SEQ rest (do a state)  -- if a is visible *)
 Inductive term : Type :=
   (*  *)
   | TERM
@@ -181,6 +183,12 @@ Inductive process :=
 Inductive composition :=
   | COMP (processes:list process)
   .
+
+(* Definition state := nat * mem * ... -- i **)
+(* Definition Nil := None.  *)
+(* Initial_state : state = (Nil, ... ) *)
+(* Inductive LTS_proc : process * state -> action -> process * state -> Prop :=  *)
+(* Inductive LTS : list process * state -> action -> list process * state -> Prop := *)
 
 Print index.
 Print pid.
