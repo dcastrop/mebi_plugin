@@ -233,7 +233,8 @@ Example MCS : composition := COMP
               ; VAR KIND_CS   "ENTER"
               ; VAR KIND_CS   "LEAVE"
               ; VAR KIND_LOCK "L"
-              ; VAR KIND_MEM  "M" ])
+              ; VAR KIND_MEM  "M"
+              ; VAR KIND_PID  "PID" ])
       (SEQ [ LOOP (SEQ [ ACT (OF KIND_CS "NCS")
                            (ARG (REF (OF KIND_PID "PID")))
 
@@ -252,11 +253,9 @@ Example MCS : composition := COMP
                                  ; REF (OF KIND_MEM  "M")
                                  ; REF (OF KIND_PID  "PID") ]) ]) ]) )
   ; (PROCESS "acquire"
-      (PARAMS [ VAR KIND_CS   "NCS"
-              ; VAR KIND_CS   "ENTER"
-              ; VAR KIND_CS   "LEAVE"
-              ; VAR KIND_LOCK "L"
-              ; VAR KIND_MEM  "M" ])
+      (PARAMS [ VAR KIND_LOCK "L"
+              ; VAR KIND_MEM  "M"
+              ; VAR KIND_PID  "PID" ])
       (SEQ [ DEFS [ VAR KIND_INDEX "predecessor"
                   ; VAR KIND_BOOL  "locked" ]
 
@@ -270,32 +269,72 @@ Example MCS : composition := COMP
               (ARGS [ OP   FETCH_AND_STORE
                     ; BIND "predecessor"
                     ; AS   KIND_INDEX (OF KIND_PID "PID")
-                    ; REF  (OF KIND_PID "PID") ])
+                    ; REF             (OF KIND_PID "PID") ])
 
            ; IF_THEN
               (REF (OF KIND_INDEX "predecessor") = LIT (OF KIND_INDEX "Nil"))
               (SEQ [ ACT (OF KIND_MEM "M")
-                      (ARGS [ OP WRITE_LOCKED
+                      (ARGS [ OP  WRITE_LOCKED
                             ; REF (OF KIND_PID  "PID")
                             ; LIT (OF KIND_BOOL "true")
                             ; REF (OF KIND_PID  "PID") ])
 
                    ; ACT (OF KIND_MEM "M")
                       (ARGS [ OP  WRITE_NEXT
-                            ; AS  KIND_PID (OF KIND_INDEX "predecessor")
+                            ; AS  KIND_PID   (OF KIND_INDEX "predecessor")
                             ; AS  KIND_INDEX (OF KIND_PID "PID")
-                            ; REF (OF KIND_PID  "PID") ])
+                            ; REF            (OF KIND_PID  "PID") ])
 
                     ; LOOP_OVER (OF KIND_LOCK "L")
                       (SEQ [ ACT (OF KIND_MEM "M")
-                              (ARGS [ OP READ_LOCKED
-                                    ; REF (OF KIND_PID "PID")
+                              (ARGS [ OP   READ_LOCKED
+                                    ; REF  (OF KIND_PID "PID")
                                     ; BIND "locked"
-                                    ; REF (OF KIND_PID "PID") ])
+                                    ; REF  (OF KIND_PID "PID") ])
 
                            ; IF_THEN
                               (REF (OF KIND_BOOL "locked") = LIT (OF KIND_BOOL "false"))
                               (BREAK (OF KIND_LOCK "L")) ]) ]) ]) )
+  ; (PROCESS "release"
+      (PARAMS [ VAR KIND_LOCK "L"
+              ; VAR KIND_MEM  "M"
+              ; VAR KIND_PID  "PID" ])
+      (SEQ [ DEFS [ VAR KIND_INDEX "next"
+                  ; VAR KIND_BOOL  "swap" ]
+
+           ; ACT (OF KIND_MEM "M")
+              (ARGS [ OP   READ_NEXT
+                    ; REF  (OF KIND_PID   "PID")
+                    ; BIND "next"
+                    ; REF  (OF KIND_PID   "PID") ])
+           ; IF_THEN_ELSE
+              (REF (OF KIND_INDEX "next") = LIT (OF KIND_INDEX "Nil"))
+              (SEQ [ ACT (OF KIND_LOCK "L")
+                      (ARGS [ OP   COMPARE_AND_SWAP
+                            ; AS   KIND_INDEX (OF KIND_PID "PID")
+                            ; LIT  (OF KIND_INDEX "Nil")
+                            ; BIND "swap"
+                            ; REF  (OF KIND_PID "PID") ])
+
+                   ; IF_THEN
+                      (REF (OF KIND_BOOL "swap") = LIT (OF KIND_BOOL "false"))
+                      (LOOP_OVER (OF KIND_LOCK "L")
+                        (SEQ [ ACT (OF KIND_MEM "M")
+                                (ARGS [ OP   READ_NEXT
+                                      ; REF (OF KIND_PID "PID")
+                                      ; BIND "next"
+                                      ; REF (OF KIND_PID "PID") ])
+
+                             ; IF_THEN
+                                (~(REF (OF KIND_INDEX "next") = LIT (OF KIND_INDEX "Nil")))
+                                (BREAK (OF KIND_LOCK "L")) ])) ])
+
+              (ACT (OF KIND_MEM "M")
+                (ARGS [ OP  WRITE_LOCKED
+                      ; AS  KIND_PID (OF KIND_INDEX "next")
+                      ; LIT (OF KIND_BOOL "false")
+                      ; REF (OF KIND_PID "PID") ]))
+ ]) )
 ].
 
 Print MCS.
