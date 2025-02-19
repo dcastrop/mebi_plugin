@@ -49,6 +49,66 @@ Inductive lock_access :=
   | LOCKACC_LOCKED (op:operation) (p:pid) (is_locked:bool) (q:pid)
   .
 
+(* TODO: change this to just be kinds, and then type-check later? (or during semantics) *)
+(* Inductive typable :=
+  | TYPE_LOCK_ACCESS : lock_access -> typable
+  | TYPE_INDEX : index -> typable
+  | TYPE_BOOL : bool -> typable
+  .
+
+Inductive var_def :=
+  | VAR (name:string) (type:typable)
+  . *)
+
+Inductive ref_kinds :=
+  | KIND_CS | KIND_LOCK | KIND_MEM | KIND_INDEX | KIND_BOOL | KIND_PID.
+
+Inductive var_def :=
+  | VAR (kind:ref_kinds) (name:string)
+  .
+
+(* Inductive var_ref :=
+  | VAR_REF (kind:ref_kinds) (ref:string). *)
+
+Inductive val :=
+  | LIT (kind:ref_kinds) (val:string) | REF (kind:ref_kinds) (ref:string).
+
+
+(* the parameters declared in the scope of processes/functions *)
+Inductive params := | PARAMS (params:list var_def).
+(* Inductive params := | PARAMS (params:list (ref_kinds * string)). *)
+
+(* the arguments passed into processes/functions *)
+Inductive args := | ARGS (args:list val).
+
+
+
+(* Inductive cs_access_param :=
+  | PARAM_CS (name:string)
+  .
+
+Inductive lock_access_param :=
+  | PARAM_LOCK (name:string)
+  .
+
+Inductive mem_access_param :=
+  | PARAM_MEM (name:string)
+  . *)
+
+
+(* Inductive params :=
+  | PRO_PARAMS (ncs:cs_access_param) (enter:cs_access_param) (leave:cs_access_param) (l:lock_access_param) (m:mem_access_param)
+  | PRC_PARAMS (ncs:cs_access_param) (enter:cs_access_param) (leave:cs_access_param) (l:lock_access_param) (m:mem_access_param) (pid:pid)
+  | PARAMS (l:lock_access_param) (m:string) (pid:pid)
+  . *)
+
+(* the arguments passed into processes/functions *)
+(* Inductive args :=
+  | PRO_ARGS (ncs:string) (enter:string) (leave:string) (l:string) (m:string)
+  | PRC_ARGS (ncs:string) (enter:string) (leave:string) (l:string) (m:string) (pid:string)
+  | ARGS (l:string) (m:string) (pid:string)
+  . *)
+
 Inductive access_operation :=
   | MEMORY : memory_access -> access_operation
   | LOCK : lock_access -> access_operation
@@ -58,19 +118,12 @@ Inductive iterable :=
   | ITER_LOCK_ACCESS : lock_access -> iterable
   .
 
-Inductive typable :=
-  | TYPE_LOCK_ACCESS : lock_access -> typable
-  | TYPE_INDEX : index -> typable
-  | TYPE_BOOL : bool -> typable
-  .
-
-Inductive var_def :=
-  | VAR (name:string) (type:typable)
-  .
-
 Inductive term :=
   (*  *)
   | TERM
+  | SEQ (terms:list term)
+  (*  *)
+  | SPAWN (name:string) (args:args)
   (*  *)
   | OP (op:access_operation)
   (*  *)
@@ -89,6 +142,10 @@ Inductive term :=
   (* | SELECT () *)
   .
 
+Notation "x :: l" := (cons x l) (at level 60, right associativity).
+Notation "[ ]" := nil.
+Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
+
 Declare Custom Entry term.
 Declare Scope term_scope.
 Notation "'if' c 'then' t" := (IF_THEN_ELSE c t)
@@ -96,24 +153,13 @@ Notation "'if' c 'then' t" := (IF_THEN_ELSE c t)
 Notation "'if' c 'then' t 'else' e" := (IF_THEN_ELSE c t e)
                   (in custom term at level 90, c custom term at level 80, t custom term at level 80, e custom term at level 80): term_scope.
 
-Inductive sequence :=
-  | SEQ (terms:list term)
-  .
-
-Notation "x :: l" := (cons x l) (at level 60, right associativity).
-Notation "[ ]" := nil.
-Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
-
-Inductive process_params :=
-  | PARAMS (p_options:option cs_access) (l:lock_access) (m:memory_access)
-  .
-
-Inductive body :=
-  | BODY (body:sequence)
-  .
 
 Inductive process :=
-  | PROCESS (name:string) (pid:pid) (body:body)
+  | PROCESS (name:string) (params:params) (body:term)
+  .
+
+Inductive composition :=
+  | COMP (processes:list process)
   .
 
 Print index.
@@ -125,29 +171,78 @@ Check 2:pid.
 
 (* TODO: make sure to add checks that pid is not nil *)
 
+Example MCS : composition := COMP [
+  (PROCESS "Protocol"
+    (PARAMS [ VAR KIND_CS "NCS"
+            ; VAR KIND_CS "ENTER"
+            ; VAR KIND_CS "LEAVE"
+            ; VAR KIND_LOCK "L"
+            ; VAR KIND_MEM "M" ])
+    (SEQ [
+      (* PAR ( *)
+        PARS [ SPAWN "P" (ARGS [ REF KIND_CS   "NCS"
+                               ; REF KIND_CS   "ENTER"
+                               ; REF KIND_CS   "LEAVE"
+                               ; REF KIND_LOCK "L"
+                               ; REF KIND_MEM  "M"
+                               ; LIT KIND_PID  "1" ])
+             ; SPAWN "P" (ARGS [ REF KIND_CS   "NCS"
+                               ; REF KIND_CS   "ENTER"
+                               ; REF KIND_CS   "LEAVE"
+                               ; REF KIND_LOCK "L"
+                               ; REF KIND_MEM  "M"
+                               ; LIT KIND_PID  "2" ])
+             ; SPAWN "P" (ARGS [ REF KIND_CS   "NCS"
+                               ; REF KIND_CS   "ENTER"
+                               ; REF KIND_CS   "LEAVE"
+                               ; REF KIND_LOCK "L"
+                               ; REF KIND_MEM  "M"
+                               ; LIT KIND_PID  "3" ])
+             ; SPAWN "P" (ARGS [ REF KIND_CS   "NCS"
+                               ; REF KIND_CS   "ENTER"
+                               ; REF KIND_CS   "LEAVE"
+                               ; REF KIND_LOCK "L"
+                               ; REF KIND_MEM  "M"
+                               ; LIT KIND_PID  "4" ])
+             ; SPAWN "P" (ARGS [ REF KIND_CS   "NCS"
+                               ; REF KIND_CS   "ENTER"
+                               ; REF KIND_CS   "LEAVE"
+                               ; REF KIND_LOCK "L"
+                               ; REF KIND_MEM  "M"
+                               ; LIT KIND_PID  "5" ])
+        ]
+      (* TODO: don't actually spawn these, will handle them in semantics *)
+      (* ) (
+        PAR
+          (SPAWN "P" (PRC_ARGS "NCS", "ENTER", "LEAVE", "L", "M" 5))
+          (SPAWN "P" (PRC_ARGS "NCS", "ENTER", "LEAVE", "L", "M" 5))
+      ) *)
+    ])
+  (* );
+  (PROCESS "P"
+    (PRC_PARAMS "NCS" "ENTER" "LEAVE" "L" "M" ) *)
+  )
+  (* (PROCESS "P" (PARGS  1)
+    (SEQ [
+      (LOOP (SEQ [
 
-Example P := PROCESS "P" (1)
-(BODY (SEQ [
-  TERM
-])).
+      ])) ;
+      TERM
+    ])
+  );
+  (PROCESS "acquire" (2)
+    (SEQ [
+      TERM
+    ])
+  );
+  (PROCESS "release" (3)
+    (SEQ [
+      TERM
+    ])
+  ) *)
+].
 
-
-Print P.
-
-Example acquire := PROCESS "acquire" (2)
-(BODY (SEQ [
-  TERM
-])).
-
-Print acquire.
-
-Example release := PROCESS "release" (3)
-(BODY (SEQ [
-  TERM
-])).
-
-
-Print release.
+Print MCS.
 
 
 
