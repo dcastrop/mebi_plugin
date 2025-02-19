@@ -70,16 +70,31 @@ Inductive var_def :=
 (* Inductive var_ref :=
   | VAR_REF (kind:ref_kinds) (ref:string). *)
 
+Inductive of_kind :=
+  | OF (kind:ref_kinds) (ref:string).
+
 Inductive val :=
-  | LIT (kind:ref_kinds) (val:string) | REF (kind:ref_kinds) (ref:string).
+  (* | LIT (kind:ref_kinds) (val:string) | REF (of_kind:of_kind). *)
+  | BIND (to:string)
+  | LIT (of_kind:of_kind)
+  | REF (of_kind:of_kind)
+  | AS (to:ref_kinds) (from:of_kind)
+  | OP (op:operation)
+  .
 
 
 (* the parameters declared in the scope of processes/functions *)
-Inductive params := | PARAMS (params:list var_def).
+Inductive params :=
+  | PARAM (param:var_def)
+  | PARAMS (params:list var_def)
+  .
 (* Inductive params := | PARAMS (params:list (ref_kinds * string)). *)
 
 (* the arguments passed into processes/functions *)
-Inductive args := | ARGS (args:list val).
+Inductive args :=
+  | ARG (arg:val)
+  | ARGS (args:list val)
+  .
 
 
 
@@ -109,32 +124,37 @@ Inductive mem_access_param :=
   | ARGS (l:string) (m:string) (pid:string)
   . *)
 
-Inductive access_operation :=
+(* Inductive access_operation :=
   | MEMORY : memory_access -> access_operation
   | LOCK : lock_access -> access_operation
-  .
+  . *)
 
-Inductive iterable :=
+(* Inductive iterable :=
   | ITER_LOCK_ACCESS : lock_access -> iterable
-  .
+  . *)
 
 Inductive term :=
   (*  *)
   | TERM
+  | OK
   | SEQ (terms:list term)
+  (*  *)
+  | ACT (of_kind:of_kind) (args:args)
   (*  *)
   | SPAWN (name:string) (args:args)
   (*  *)
-  | OP (op:access_operation)
+  (* | OP (op:access_operation) *)
   (*  *)
   | PAR (lhs:term) (rhs:term)
   | PARS (bodies:list term)
   (*  *)
   | DEF (def:var_def)
-  | DEFs (defs:list var_def)
+  | DEFS (defs:list var_def)
   (*  *)
   | LOOP (body:term)
-  | LOOP_OVER (over:iterable) (body:term)
+  (* | LOOP_OVER (over:iterable) (body:term) *)
+  | LOOP_OVER (over:of_kind) (body:term)
+  | BREAK (loop:of_kind)
   (*  *)
   | IF_THEN (condition:Prop) (do_then:term)
   | IF_THEN_ELSE (condition:Prop) (do_then:term) (do_else:term)
@@ -171,75 +191,111 @@ Check 2:pid.
 
 (* TODO: make sure to add checks that pid is not nil *)
 
-Example MCS : composition := COMP [
-  (PROCESS "Protocol"
+Example MCS : composition := COMP
+[ (PROCESS "Protocol"
     (PARAMS [ VAR KIND_CS "NCS"
             ; VAR KIND_CS "ENTER"
             ; VAR KIND_CS "LEAVE"
             ; VAR KIND_LOCK "L"
             ; VAR KIND_MEM "M" ])
-    (SEQ [
-      (* PAR ( *)
-        PARS [ SPAWN "P" (ARGS [ REF KIND_CS   "NCS"
-                               ; REF KIND_CS   "ENTER"
-                               ; REF KIND_CS   "LEAVE"
-                               ; REF KIND_LOCK "L"
-                               ; REF KIND_MEM  "M"
-                               ; LIT KIND_PID  "1" ])
-             ; SPAWN "P" (ARGS [ REF KIND_CS   "NCS"
-                               ; REF KIND_CS   "ENTER"
-                               ; REF KIND_CS   "LEAVE"
-                               ; REF KIND_LOCK "L"
-                               ; REF KIND_MEM  "M"
-                               ; LIT KIND_PID  "2" ])
-             ; SPAWN "P" (ARGS [ REF KIND_CS   "NCS"
-                               ; REF KIND_CS   "ENTER"
-                               ; REF KIND_CS   "LEAVE"
-                               ; REF KIND_LOCK "L"
-                               ; REF KIND_MEM  "M"
-                               ; LIT KIND_PID  "3" ])
-             ; SPAWN "P" (ARGS [ REF KIND_CS   "NCS"
-                               ; REF KIND_CS   "ENTER"
-                               ; REF KIND_CS   "LEAVE"
-                               ; REF KIND_LOCK "L"
-                               ; REF KIND_MEM  "M"
-                               ; LIT KIND_PID  "4" ])
-             ; SPAWN "P" (ARGS [ REF KIND_CS   "NCS"
-                               ; REF KIND_CS   "ENTER"
-                               ; REF KIND_CS   "LEAVE"
-                               ; REF KIND_LOCK "L"
-                               ; REF KIND_MEM  "M"
-                               ; LIT KIND_PID  "5" ])
-        ]
-      (* TODO: don't actually spawn these, will handle them in semantics *)
-      (* ) (
-        PAR
-          (SPAWN "P" (PRC_ARGS "NCS", "ENTER", "LEAVE", "L", "M" 5))
-          (SPAWN "P" (PRC_ARGS "NCS", "ENTER", "LEAVE", "L", "M" 5))
-      ) *)
-    ])
-  (* );
-  (PROCESS "P"
-    (PRC_PARAMS "NCS" "ENTER" "LEAVE" "L" "M" ) *)
-  )
-  (* (PROCESS "P" (PARGS  1)
-    (SEQ [
-      (LOOP (SEQ [
+    (SEQ [ PARS [ SPAWN "P" (ARGS [ REF ((OF KIND_CS   "NCS"))
+                                  ; REF ((OF KIND_CS   "ENTER"))
+                                  ; REF (OF KIND_CS   "LEAVE")
+                                  ; REF (OF KIND_LOCK "L")
+                                  ; REF (OF KIND_MEM  "M")
+                                  ; LIT (OF KIND_PID  "1") ])
+                ; SPAWN "P" (ARGS [ REF (OF KIND_CS   "NCS")
+                                  ; REF (OF KIND_CS   "ENTER")
+                                  ; REF (OF KIND_CS   "LEAVE")
+                                  ; REF (OF KIND_LOCK "L")
+                                  ; REF (OF KIND_MEM  "M")
+                                  ; LIT (OF KIND_PID  "2") ])
+                ; SPAWN "P" (ARGS [ REF (OF KIND_CS   "NCS")
+                                  ; REF (OF KIND_CS   "ENTER")
+                                  ; REF (OF KIND_CS   "LEAVE")
+                                  ; REF (OF KIND_LOCK "L")
+                                  ; REF (OF KIND_MEM  "M")
+                                  ; LIT (OF KIND_PID  "3") ])
+                ; SPAWN "P" (ARGS [ REF (OF KIND_CS   "NCS")
+                                  ; REF (OF KIND_CS   "ENTER")
+                                  ; REF (OF KIND_CS   "LEAVE")
+                                  ; REF (OF KIND_LOCK "L")
+                                  ; REF (OF KIND_MEM  "M")
+                                  ; LIT (OF KIND_PID  "4") ])
+                ; SPAWN "P" (ARGS [ REF (OF KIND_CS   "NCS")
+                                  ; REF (OF KIND_CS   "ENTER")
+                                  ; REF (OF KIND_CS   "LEAVE")
+                                  ; REF (OF KIND_LOCK "L")
+                                  ; REF (OF KIND_MEM  "M")
+                                  ; LIT (OF KIND_PID  "5") ]) ] ]) )
+  ; (PROCESS "P"
+      (PARAMS [ VAR KIND_CS   "NCS"
+              ; VAR KIND_CS   "ENTER"
+              ; VAR KIND_CS   "LEAVE"
+              ; VAR KIND_LOCK "L"
+              ; VAR KIND_MEM  "M" ])
+      (SEQ [ LOOP (SEQ [ ACT (OF KIND_CS "NCS")
+                           (ARG (REF (OF KIND_PID "PID")))
 
-      ])) ;
-      TERM
-    ])
-  );
-  (PROCESS "acquire" (2)
-    (SEQ [
-      TERM
-    ])
-  );
-  (PROCESS "release" (3)
-    (SEQ [
-      TERM
-    ])
-  ) *)
+                       ; SPAWN "acquire"
+                           (ARGS [ REF (OF KIND_LOCK "L")
+                                 ; REF (OF KIND_MEM  "M")
+                                 ; REF (OF KIND_PID  "PID") ])
+                       ; ACT (OF KIND_CS "ENTER")
+                           (ARG (REF (OF KIND_PID "PID")))
+
+                       ; ACT (OF KIND_CS "LEAVE")
+                           (ARG (REF (OF KIND_PID "PID")))
+
+                       ; SPAWN "release"
+                           (ARGS [ REF (OF KIND_LOCK "L")
+                                 ; REF (OF KIND_MEM  "M")
+                                 ; REF (OF KIND_PID  "PID") ]) ]) ]) )
+  ; (PROCESS "acquire"
+      (PARAMS [ VAR KIND_CS   "NCS"
+              ; VAR KIND_CS   "ENTER"
+              ; VAR KIND_CS   "LEAVE"
+              ; VAR KIND_LOCK "L"
+              ; VAR KIND_MEM  "M" ])
+      (SEQ [ DEFS [ VAR KIND_INDEX "predecessor"
+                  ; VAR KIND_BOOL  "locked" ]
+
+           ; ACT (OF KIND_MEM "M")
+              (ARGS [ OP  WRITE_NEXT
+                    ; REF (OF KIND_PID   "PID")
+                    ; LIT (OF KIND_INDEX "Nil")
+                    ; REF (OF KIND_PID   "PID") ])
+
+           ; ACT (OF KIND_MEM "L")
+              (ARGS [ OP   FETCH_AND_STORE
+                    ; BIND "predecessor"
+                    ; AS   KIND_INDEX (OF KIND_PID "PID")
+                    ; REF  (OF KIND_PID "PID") ])
+
+           ; IF_THEN
+              (REF (OF KIND_INDEX "predecessor") = LIT (OF KIND_INDEX "Nil"))
+              (SEQ [ ACT (OF KIND_MEM "M")
+                      (ARGS [ OP WRITE_LOCKED
+                            ; REF (OF KIND_PID  "PID")
+                            ; LIT (OF KIND_BOOL "true")
+                            ; REF (OF KIND_PID  "PID") ])
+
+                   ; ACT (OF KIND_MEM "M")
+                      (ARGS [ OP  WRITE_NEXT
+                            ; AS  KIND_PID (OF KIND_INDEX "predecessor")
+                            ; AS  KIND_INDEX (OF KIND_PID "PID")
+                            ; REF (OF KIND_PID  "PID") ])
+
+                    ; LOOP_OVER (OF KIND_LOCK "L")
+                      (SEQ [ ACT (OF KIND_MEM "M")
+                              (ARGS [ OP READ_LOCKED
+                                    ; REF (OF KIND_PID "PID")
+                                    ; BIND "locked"
+                                    ; REF (OF KIND_PID "PID") ])
+
+                           ; IF_THEN
+                              (REF (OF KIND_BOOL "locked") = LIT (OF KIND_BOOL "false"))
+                              (BREAK (OF KIND_LOCK "L")) ]) ]) ]) )
 ].
 
 Print MCS.
