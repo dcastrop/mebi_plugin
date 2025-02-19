@@ -9,8 +9,10 @@ Definition index : Type := nat.
 Definition Nil : index := 0.
 
 (* predicate type *)
+Definition pid : Type := index.
 (* Definition pid : Type := {n:index | ~(Nil=n)}. *)
-Definition pid := {n:index | ~(Nil=n)}.
+(* Definition pid : Type := {n:nat | ~(Nil=n)}. *)
+(* Definition pid : Type := {n:index | ~(Nil=n)}. *)
 (* Inductive pid' (i:index) : index -> Prop := | pid : {n:index | ~(Nil=n)}.  *)
 
 Record qnode := {
@@ -58,6 +60,8 @@ Inductive iterable :=
 
 Inductive typable :=
   | TYPE_LOCK_ACCESS : lock_access -> typable
+  | TYPE_INDEX : index -> typable
+  | TYPE_BOOL : bool -> typable
   .
 
 Inductive var_def :=
@@ -85,9 +89,20 @@ Inductive term :=
   (* | SELECT () *)
   .
 
+Declare Custom Entry term.
+Declare Scope term_scope.
+Notation "'if' c 'then' t" := (IF_THEN_ELSE c t)
+                  (in custom term at level 90, c custom term at level 80, t custom term at level 80): term_scope.
+Notation "'if' c 'then' t 'else' e" := (IF_THEN_ELSE c t e)
+                  (in custom term at level 90, c custom term at level 80, t custom term at level 80, e custom term at level 80): term_scope.
+
 Inductive sequence :=
   | SEQ (terms:list term)
   .
+
+Notation "x :: l" := (cons x l) (at level 60, right associativity).
+Notation "[ ]" := nil.
+Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
 
 Inductive process_params :=
   | PARAMS (p_options:option cs_access) (l:lock_access) (m:memory_access)
@@ -101,7 +116,38 @@ Inductive process :=
   | PROCESS (name:string) (pid:pid) (body:body)
   .
 
-(* Example acquire := PROCESS "acquire" (2) (BODY (SEQ (TERM :: nil))). *)
+Print index.
+Print pid.
+
+Check 2:index.
+Check 2:pid.
+(* Check (2:index):pid. *)
+
+(* TODO: make sure to add checks that pid is not nil *)
+
+
+Example P := PROCESS "P" (1)
+(BODY (SEQ [
+  TERM
+])).
+
+
+Print P.
+
+Example acquire := PROCESS "acquire" (2)
+(BODY (SEQ [
+  TERM
+])).
+
+Print acquire.
+
+Example release := PROCESS "release" (3)
+(BODY (SEQ [
+  TERM
+])).
+
+
+Print release.
 
 
 
