@@ -21,20 +21,23 @@ Definition Pid (i:index) : pid :=
   | n => Some n
   end.
 
-Inductive action_detail : Type :=
-  | READ_NEXT
-  | READ_LOCKED
-  | WRITE_NEXT
-  | WRITE_LOCKED
-  | FETCH_AND_STORE
-  | COMPARE_AND_SWAP
+Inductive lck_op : Type :=
+  | READ_NEXT | READ_LOCKED | WRITE_NEXT | WRITE_LOCKED.
+
+Inductive mem_op : Type :=
+  | FETCH_AND_STORE | COMPARE_AND_SWAP.
+
+Inductive action : Type :=
+  | NCS   : pid -> action
+  | ENTER : pid -> action
+  | LEAVE : pid -> action
+  | L     : lck_op -> index -> index -> pid -> action
+  | M     : mem_op -> pid   -> index -> pid -> action
+  | TAU   : action
   .
 
-Inductive action_kind : Type :=
-  | NCS | ENTER | LEAVE | M | L | TAU.
+Definition silent : action := TAU.
 
-Definition action : Type := (action_kind * option action_detail).
-Definition silent : action := (TAU, None).
 
 Inductive tm : Type :=
   | TERM  : tm                            (* termination *)
@@ -89,8 +92,11 @@ Definition mem : Type := list mem_item.
 
 Definition Empty : mem := nil.
 
-Definition state : Type := pid * mem.
-Definition Initial_state : state := (Nil, Empty).
+Record state := { state_pid:pid
+                ; state_mem:mem }.
+
+Definition Initial_state : state := Build_state Nil Empty.
+
 
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
 
@@ -102,7 +108,9 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
                 (c1, s1) --<{silent}>--> (c2, s2) ->
                   (<{ if c1 then t1 else t2 }>, s1) --<{silent}>--> (<{ if c2 then t1 else t2 }>, s2)
 
+  | ST_NCS : forall a t s1 s2, (ACT a t, s1) --<{NCS (state_pid s1)}>--> (t, s2)
 
+  (* | ST_FETCH_AND_STORE : forall t1  *)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
