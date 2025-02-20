@@ -33,23 +33,23 @@ Definition Bool (i:ibool) : option bool :=
   end.
 
 (* used in steps, not syntax *)
-Inductive action_step : Type :=
-  | NCS   : pid -> action_step
-  | ENTER : pid -> action_step
-  | LEAVE : pid -> action_step
+Inductive action : Type :=
+  | NCS   : pid -> action
+  | ENTER : pid -> action
+  | LEAVE : pid -> action
 
-  | READ_NEXT    : pid -> action_step (* M, binds ?next:index *)
-  | READ_LOCKED  : pid -> action_step (* M, binds ?locked:bool *)
-  | WRITE_NEXT   : pid -> index -> action_step
-  | WRITE_LOCKED : pid -> ibool -> action_step
+  | READ_NEXT    : pid -> action (* M, binds ?next:index *)
+  | READ_LOCKED  : pid -> action (* M, binds ?locked:bool *)
+  | WRITE_NEXT   : pid -> index -> action
+  | WRITE_LOCKED : pid -> ibool -> action
 
-  | FETCH_AND_STORE  :        index -> action_step (* L, binds predecessor -> i *)
-  | COMPARE_AND_SWAP : pid -> index -> action_step (* L, binds: swap -> i==j *)
+  | FETCH_AND_STORE  :        index -> action (* L, binds predecessor -> i *)
+  | COMPARE_AND_SWAP : pid -> index -> action (* L, binds: swap -> i==j *)
 
-  | TAU   : action_step
+  | TAU   : action
   .
 
-Definition silent : action_step := TAU.
+Definition silent : action := TAU.
 
 
 Inductive tm : Type :=
@@ -62,7 +62,7 @@ Inductive tm : Type :=
   | ACT_ENTER : tm -> tm            (* *)
   | ACT_LEAVE : tm -> tm            (* *)
   | ACT_L     : tm -> tm            (* *)
-  | ACT_M     : pid -> tm -> tm     (* *)
+  | ACT_M     : tm -> tm     (* *)
 
   | LOOP  : option iloop -> tm -> tm -> tm  (* optional loop id -> body -> outer continuation -> ... *)
   | BREAK : iloop -> tm                     (* loop id -> ... *)
@@ -102,9 +102,11 @@ Definition value (t : tm) := bvalue t \/ nvalue t.
 Hint Constructors bvalue nvalue : core.
 Hint Unfold value : core. *)
 
-Inductive mem_item : Type :=
+(* Inductive mem_item : Type :=
   | PID (name:string) (val:pid)
-  .
+  . *)
+Record mem_item := { name:string
+                   ; val:index }.
 
 Definition mem : Type := list mem_item.
 
@@ -118,7 +120,12 @@ Definition Initial_state : state := Build_state Nil Empty.
 
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
 
-Inductive step : (tm * state) -> action_step -> (tm * state) -> Prop :=
+
+(* Inductive action_step : step -> action -> state -> Prop :=
+  |  *)
+
+
+Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
   | ST_IF_TT : forall t1 t2 s, (<{ if TRU then t1 else t2 }>, s) --<{silent}>--> (t1, s)
   | ST_IF_FF : forall t1 t2 s, (<{ if FLS then t1 else t2 }>, s) --<{silent}>--> (t2, s)
 
@@ -127,10 +134,14 @@ Inductive step : (tm * state) -> action_step -> (tm * state) -> Prop :=
                   (<{ if c1 then t1 else t2 }>, s1) --<{silent}>--> (<{ if c2 then t1 else t2 }>, s2)
 
   | ST_NCS   : forall t s1 s2, (ACT_NCS   t, s1) --<{NCS (state_pid s1)}>--> (t, s2)
-  | ST_ENTER : forall t s1 s2, (ACT_ENTER t, s1) --<{NCS (state_pid s1)}>--> (t, s2)
-  | ST_LEAVE : forall t s1 s2, (ACT_LEAVE t, s1) --<{NCS (state_pid s1)}>--> (t, s2)
+  | ST_ENTER : forall t s1 s2, (ACT_ENTER t, s1) --<{ENTER (state_pid s1)}>--> (t, s2)
+  | ST_LEAVE : forall t s1 s2, (ACT_LEAVE t, s1) --<{LEAVE (state_pid s1)}>--> (t, s2)
 
-  (* | ST_FETCH_AND_STORE : forall t1  *)
+
+  (* TODO: overhaul state with both mem and lock, and also track vars predecessor, locked, next, swap, i, new_i, j (and where m=mem). *)
+  | ST_FETCH_AND_STORE : forall t s,
+                (OK, s) --<{FETCH_AND_STORE (Index (state_pid s))}>--> (OK, Build_state (state_pid s) (cons (Build_mem_item "fixme" 0) (state_mem s))) ->
+                  (ACT_L t, s) --<{TAU}>--> (t, s)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
