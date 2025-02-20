@@ -102,28 +102,31 @@ Definition value (t : tm) := bvalue t \/ nvalue t.
 Hint Constructors bvalue nvalue : core.
 Hint Unfold value : core. *)
 
-(* Inductive mem_item : Type :=
-  | PID (name:string) (val:pid)
-  . *)
-Record mem_item := { name:string
-                   ; val:index }.
+Record state := { state_pid           : pid
+                ; acquire_predecessor : option index
+                ; acquire_locked      : option ibool
+                ; release_next        : option index
+                ; release_swap        : option ibool }.
 
-Definition mem : Type := list mem_item.
+Definition Initial_state : state := Build_state Nil None None None None.
 
-Definition Empty : mem := nil.
+Definition set_pid (p:pid) (s:state) : state :=
+  Build_state p (acquire_predecessor s) (acquire_locked s) (release_next s) (release_swap s).
 
-Record state := { state_pid:pid
-                ; state_mem:mem }.
+Definition bind_predecessor (p:index) (s:state) : state :=
+  Build_state (state_pid s) (Some p) (acquire_locked s) (release_next s) (release_swap s).
 
-Definition Initial_state : state := Build_state Nil Empty.
+Definition bind_locked (p:ibool) (s:state) : state :=
+  Build_state (state_pid s) (acquire_predecessor s) (Some p) (release_next s) (release_swap s).
+
+Definition bind_next (p:index) (s:state) : state :=
+  Build_state (state_pid s) (acquire_predecessor s) (acquire_locked s) (Some p) (release_swap s).
+
+Definition bind_swap (p:ibool) (s:state) : state :=
+  Build_state (state_pid s) (acquire_predecessor s) (acquire_locked s) (release_next s) (Some p).
 
 
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
-
-
-(* Inductive action_step : step -> action -> state -> Prop :=
-  |  *)
-
 
 Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
   | ST_IF_TT : forall t1 t2 s, (<{ if TRU then t1 else t2 }>, s) --<{silent}>--> (t1, s)
@@ -136,6 +139,11 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
   | ST_NCS   : forall t s1 s2, (ACT_NCS   t, s1) --<{NCS (state_pid s1)}>--> (t, s2)
   | ST_ENTER : forall t s1 s2, (ACT_ENTER t, s1) --<{ENTER (state_pid s1)}>--> (t, s2)
   | ST_LEAVE : forall t s1 s2, (ACT_LEAVE t, s1) --<{LEAVE (state_pid s1)}>--> (t, s2)
+
+  | ST_FETCH_AND_STORE : forall t s,
+
+    (OK, s) --<{FETCH_AND_STORE (Index (state_pid s))}>--> (OK, )
+
 
 
   (* TODO: overhaul state with both mem and lock, and also track vars predecessor, locked, next, swap, i, new_i, j (and where m=mem). *)
