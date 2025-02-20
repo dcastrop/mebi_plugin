@@ -10,8 +10,7 @@ Definition pid : Type := option index.
 Definition Nil : option index := None.
 
 Definition ibool : Type := index.
-
-Definition iloop : Type := option index.
+Definition iloop : Type := index.
 
 Definition Index (p:pid) : index :=
   match p with
@@ -25,7 +24,7 @@ Definition Pid (i:index) : pid :=
   | n => Some n
   end.
 
-Definition Bool (i:ibool) : option bool :=
+Definition Bool (i:index) : option bool :=
   match i with
   | 0 => Some false
   | 1 => Some true
@@ -34,18 +33,22 @@ Definition Bool (i:ibool) : option bool :=
 
 (* used in steps, not syntax *)
 Inductive action : Type :=
+  (* channel CS_Access *)
   | NCS   : pid -> action
   | ENTER : pid -> action
   | LEAVE : pid -> action
 
+  (* channel Memory_Access *)
   | READ_NEXT    : pid -> action (* M, binds ?next:index *)
   | READ_LOCKED  : pid -> action (* M, binds ?locked:bool *)
   | WRITE_NEXT   : pid -> index -> action
   | WRITE_LOCKED : pid -> ibool -> action
 
-  | FETCH_AND_STORE  :        index -> action (* L, binds predecessor -> i *)
-  | COMPARE_AND_SWAP : pid -> index -> action (* L, binds: swap -> i==j *)
+  (* channel Lock_Access *)
+  | FETCH_AND_STORE  : index -> action          (* L, binds predecessor -> i *)
+  | COMPARE_AND_SWAP : index -> index -> action (* L, binds: swap -> i==j *)
 
+  (* silent action *)
   | TAU   : action
   .
 
@@ -58,11 +61,20 @@ Inductive tm : Type :=
 
   | IF    : tm -> tm -> tm -> tm    (* condition -> if true -> if false -> ... *)
 
-  | ACT_NCS   : tm -> tm            (* *)
-  | ACT_ENTER : tm -> tm            (* *)
-  | ACT_LEAVE : tm -> tm            (* *)
-  | ACT_L     : tm -> tm            (* *)
-  | ACT_M     : tm -> tm     (* *)
+  (* CS_access *)
+  | ACT_NCS   : tm -> tm
+  | ACT_ENTER : tm -> tm
+  | ACT_LEAVE : tm -> tm
+
+  (* Lock_access *)
+  | ACT_FETCH_AND_STORE  : tm -> tm
+  | ACT_COMPARE_AND_SWAP : tm -> tm
+
+  (* Memory_access *)
+  | ACT_READ_NEXT    : tm -> tm
+  | ACT_READ_LOCKED  : tm -> tm
+  | ACT_WRITE_NEXT   : tm -> tm
+  | ACT_WRITE_LOCKED : tm -> tm
 
   | LOOP  : option iloop -> tm -> tm -> tm  (* optional loop id -> body -> outer continuation -> ... *)
   | BREAK : iloop -> tm                     (* loop id -> ... *)
@@ -89,6 +101,11 @@ Notation "'if' c 'then' t 'else' e" := (IF c t e)
                   t custom tm at level 80, e custom tm at level 80): tm_scope.
 Local Open Scope tm_scope.
 
+
+Notation "x :: l" := (cons x l) (at level 60, right associativity).
+Notation "[ ]" := nil.
+Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
+
 (* Inductive bvalue : tm -> Prop :=
   | bv_true : bvalue <{ TRU }>
   | bv_false : bvalue <{ FLS }>.
@@ -102,28 +119,71 @@ Definition value (t : tm) := bvalue t \/ nvalue t.
 Hint Constructors bvalue nvalue : core.
 Hint Unfold value : core. *)
 
-Record state := { state_pid           : pid
-                ; acquire_predecessor : option index
-                ; acquire_locked      : option ibool
-                ; release_next        : option index
-                ; release_swap        : option ibool }.
+Record qnode := { next   : index
+                ; locked : ibool }.
 
-Definition Initial_state : state := Build_state Nil None None None None.
+Definition mem : Type := list qnode.
 
-Definition set_pid (p:pid) (s:state) : state :=
-  Build_state p (acquire_predecessor s) (acquire_locked s) (release_next s) (release_swap s).
+Definition lock : Type := index * index * index. (* i, new_i, j *)
 
+Record vars := { acquire_predecessor : option index
+               ; acquire_locked      : option ibool
+               ; release_next        : option index
+               ; release_swap        : option ibool }.
+
+Definition state : Type := pid * vars * mem * lock.
+
+Definition get_pid  (s:state) : pid  := match s with | (pid', _vars, _mem, _lock) => pid'  end.
+Definition get_vars (s:state) : vars := match s with | (_pid, vars', _mem, _lock) => vars' end.
+Definition get_mem  (s:state) : mem  := match s with | (_pid, _vars, mem', _lock) => mem'  end.
+Definition get_lock (s:state) : lock := match s with | (_pid, _vars, _mem, lock') => lock' end.
+
+(* lock get/set *)
+Definition get_lock_i     (s:state) : index := match get_lock s with | (i, _new_i, _j) => i     end.
+Definition get_lock_new_i (s:state) : index := match get_lock s with | (_i, new_i, _j) => new_i end.
+Definition get_lock_j     (s:state) : index := match get_lock s with | (_i, _new_i, j) => j     end.
+
+Definition set_lock_i (i:index) (s:state) : state :=
+  match s with
+  | (_pid, _vars, _mem, lock') => match lock' with | (_i, new_i, j) => (_pid, _vars, _mem, (i, new_i, j))
+  end end.
+
+Definition set_lock_new_i (new_i:index) (s:state) : state :=
+  match s with
+  | (_pid, _vars, _mem, lock') => match lock' with | (i, _new_i, j) => (_pid, _vars, _mem, (i, new_i, j))
+  end end.
+
+Definition set_lock_j (j:index) (s:state) : state :=
+  match s with
+  | (_pid, _vars, _mem, lock') => match lock' with | (i, new_i, _j) => (_pid, _vars, _mem, (i, new_i, j))
+  end end.
+
+(* bind vars *)
 Definition bind_predecessor (p:index) (s:state) : state :=
-  Build_state (state_pid s) (Some p) (acquire_locked s) (release_next s) (release_swap s).
+  match s with
+  | (_pid, vars', _mem, _lock) => (_pid, Build_vars (Some p) (acquire_locked vars') (release_next vars') (release_swap vars'), _mem, _lock)
+  end.
 
-Definition bind_locked (p:ibool) (s:state) : state :=
-  Build_state (state_pid s) (acquire_predecessor s) (Some p) (release_next s) (release_swap s).
+Definition bind_locked (p:index) (s:state) : state :=
+  match s with
+  | (_pid, vars', _mem, _lock) => (_pid, Build_vars (acquire_predecessor vars') (Some p) (release_next vars') (release_swap vars'), _mem, _lock)
+  end.
 
 Definition bind_next (p:index) (s:state) : state :=
-  Build_state (state_pid s) (acquire_predecessor s) (acquire_locked s) (Some p) (release_swap s).
+  match s with
+  | (_pid, vars', _mem, _lock) => (_pid, Build_vars (acquire_predecessor vars') (acquire_locked vars') (Some p) (release_swap vars'), _mem, _lock)
+  end.
 
-Definition bind_swap (p:ibool) (s:state) : state :=
-  Build_state (state_pid s) (acquire_predecessor s) (acquire_locked s) (release_next s) (Some p).
+Definition bind_swap (p:index) (s:state) : state :=
+  match s with
+  | (_pid, vars', _mem, _lock) => (_pid, Build_vars (acquire_predecessor vars') (acquire_locked vars') (release_next vars') (Some p), _mem, _lock)
+  end.
+
+(* initial *)
+Definition Initial_mem : mem := [].
+Definition Initial_lock : lock := (0, 0, 0).
+Definition Initial_vars : vars := Build_vars None None None None.
+Definition Initial_state : state := (Nil, Initial_vars, Initial_mem, Initial_lock).
 
 
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
@@ -136,20 +196,14 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
                 (c1, s1) --<{silent}>--> (c2, s2) ->
                   (<{ if c1 then t1 else t2 }>, s1) --<{silent}>--> (<{ if c2 then t1 else t2 }>, s2)
 
-  | ST_NCS   : forall t s1 s2, (ACT_NCS   t, s1) --<{NCS (state_pid s1)}>--> (t, s2)
-  | ST_ENTER : forall t s1 s2, (ACT_ENTER t, s1) --<{ENTER (state_pid s1)}>--> (t, s2)
-  | ST_LEAVE : forall t s1 s2, (ACT_LEAVE t, s1) --<{LEAVE (state_pid s1)}>--> (t, s2)
+  | ST_NCS   : forall t s1 s2, (ACT_NCS   t, s1) --<{NCS   (get_pid s1)}>--> (t, s2)
+  | ST_ENTER : forall t s1 s2, (ACT_ENTER t, s1) --<{ENTER (get_pid s1)}>--> (t, s2)
+  | ST_LEAVE : forall t s1 s2, (ACT_LEAVE t, s1) --<{LEAVE (get_pid s1)}>--> (t, s2)
 
   | ST_FETCH_AND_STORE : forall t s,
+    (OK, s) --<{FETCH_AND_STORE (Index (get_pid s))}>--> (OK, set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s)) ->
+      (ACT_FETCH_AND_STORE t, s) --<{silent}>--> (t, set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s))
 
-    (OK, s) --<{FETCH_AND_STORE (Index (state_pid s))}>--> (OK, )
-
-
-
-  (* TODO: overhaul state with both mem and lock, and also track vars predecessor, locked, next, swap, i, new_i, j (and where m=mem). *)
-  | ST_FETCH_AND_STORE : forall t s,
-                (OK, s) --<{FETCH_AND_STORE (Index (state_pid s))}>--> (OK, Build_state (state_pid s) (cons (Build_mem_item "fixme" 0) (state_mem s))) ->
-                  (ACT_L t, s) --<{TAU}>--> (t, s)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
