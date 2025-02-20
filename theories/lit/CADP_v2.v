@@ -9,8 +9,15 @@ Definition pid : Type := option index.
 
 Definition Nil : option index := None.
 
-Definition ibool : Type := index.
 Definition iloop : Type := index.
+
+Definition ibool : Type := index.
+Fixpoint index_eq (t1 t2:index) : ibool :=
+  match t1, t2 with
+  | 0, 0 => 1
+  | S n1, S n2 => index_eq n1 n2
+  | _, _ => 0
+  end.
 
 Definition Index (p:pid) : index :=
   match p with
@@ -45,8 +52,8 @@ Inductive action : Type :=
   | WRITE_LOCKED : pid -> ibool -> action
 
   (* channel Lock_Access *)
-  | FETCH_AND_STORE  : index -> action          (* L, binds predecessor -> i *)
-  | COMPARE_AND_SWAP : index -> index -> action (* L, binds: swap -> i==j *)
+  | FETCH_AND_STORE  : index -> action (* L, binds predecessor -> i *)
+  | COMPARE_AND_SWAP : index -> action (* L, binds: swap -> i==j *)
 
   (* silent action *)
   | TAU   : action
@@ -138,6 +145,22 @@ Definition get_vars (s:state) : vars := match s with | (_pid, vars', _mem, _lock
 Definition get_mem  (s:state) : mem  := match s with | (_pid, _vars, mem', _lock) => mem'  end.
 Definition get_lock (s:state) : lock := match s with | (_pid, _vars, _mem, lock') => lock' end.
 
+(* mem get/set *)
+Fixpoint get_index_of (i:nat) (m:mem) : option qnode :=
+  match m with
+  | [] => None
+  | h :: t => match i with
+              | 0 => Some h
+              | S n => get_index_of n t
+              end end.
+
+(* TODO: find some way to resolve option type? then finish READ_NEXT *)
+
+(* Exception IsNone. *)
+
+(* Definition get_mem_qnode (i:nat) (s:state) : qnode := Option.get (get_index_of i (get_mem s)). *)
+
+
 (* lock get/set *)
 Definition get_lock_i     (s:state) : index := match get_lock s with | (i, _new_i, _j) => i     end.
 Definition get_lock_new_i (s:state) : index := match get_lock s with | (_i, new_i, _j) => new_i end.
@@ -204,6 +227,12 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
     (OK, s) --<{FETCH_AND_STORE (Index (get_pid s))}>--> (OK, set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s)) ->
       (ACT_FETCH_AND_STORE t, s) --<{silent}>--> (t, set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s))
 
+  | ST_COMPARE_AND_SWAP : forall t s,
+    (OK, s) --<{COMPARE_AND_SWAP (Index (get_pid s))}>--> (OK, bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s) ->
+      (ACT_COMPARE_AND_SWAP t, s) --<{silent}>--> (t, bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s)
+
+  | ST_READ_NEXT : forall t s, (* TODO: FINISH below *)
+    (OK, s) --<{READ_NEXT (get_pid s)}>--> (OK, bind_next (next (get_mem_qnode (Index (get_pid s)) s)) s)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
