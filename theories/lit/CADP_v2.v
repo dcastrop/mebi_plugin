@@ -208,6 +208,11 @@ Definition Initial_lock : lock := (0, 0, 0).
 Definition Initial_vars : vars := Build_vars None None None None.
 Definition Initial_state : state := (Nil, Initial_vars, Initial_mem, Initial_lock).
 
+Definition handle_fetch_and_store (s:state) : state := set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s).
+Definition handle_compare_and_swap (s:state) : state := bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s.
+
+(* TODO: check if [get_mem_qnode_next] should return 0 if pid of s not in mem yet. *)
+Definition handle_read_next (s:state) : state := bind_next (get_mem_qnode_next (Index (get_pid s)) s) s.
 
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
 
@@ -224,17 +229,16 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
   | ST_LEAVE : forall t s1 s2, (ACT_LEAVE t, s1) --<{LEAVE (get_pid s1)}>--> (t, s2)
 
   | ST_FETCH_AND_STORE : forall t s,
-    (OK, s) --<{FETCH_AND_STORE (Index (get_pid s))}>--> (OK, set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s)) ->
-      (ACT_FETCH_AND_STORE t, s) --<{silent}>--> (t, set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s))
+    (OK, s) --<{FETCH_AND_STORE (Index (get_pid s))}>--> (OK, handle_fetch_and_store s) ->
+      (ACT_FETCH_AND_STORE t, s) --<{silent}>--> (t, handle_fetch_and_store s)
 
   | ST_COMPARE_AND_SWAP : forall t s,
-    (OK, s) --<{COMPARE_AND_SWAP (Index (get_pid s))}>--> (OK, bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s) ->
-      (ACT_COMPARE_AND_SWAP t, s) --<{silent}>--> (t, bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s)
+    (OK, s) --<{COMPARE_AND_SWAP (Index (get_pid s))}>--> (OK, handle_compare_and_swap s) ->
+      (ACT_COMPARE_AND_SWAP t, s) --<{silent}>--> (t, handle_compare_and_swap s)
 
-  (* TODO: check if [get_mem_qnode_next] should return 0 if pid of s not in mem yet. *)
   | ST_READ_NEXT : forall t s,
-    (OK, s) --<{READ_NEXT (get_pid s)}>--> (OK, bind_next (get_mem_qnode_next (Index (get_pid s)) s) s) ->
-      (ACT_READ_NEXT t, s) --<{silent}>--> (t, bind_next (get_mem_qnode_next (Index (get_pid s)) s) s)
+    (OK, s) --<{READ_NEXT (get_pid s)}>--> (OK, handle_read_next s) ->
+      (ACT_READ_NEXT t, s) --<{silent}>--> (t, handle_read_next s)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
