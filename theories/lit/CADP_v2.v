@@ -213,14 +213,21 @@ Definition Initial_lock  : lock  := (0, 0, 0).
 Definition Initial_vars  : vars  := Build_vars None None None None.
 Definition Initial_state : state := (Nil, Initial_vars, Initial_mem, Initial_lock).
 
-Definition handle_fetch_and_store  (s:state) : state := set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s).
-Definition handle_compare_and_swap (s:state) : state := bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s.
+Definition res_fetch_and_store  (s:state) : state := set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s).
+Definition res_compare_and_swap (s:state) : state := bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s.
 
 (* TODO: check if [get_mem_qnode_next] should return 0 if pid of s not in mem yet. *)
-Definition handle_read_next              (s:state) : state := bind_next (get_mem_qnode_next (Index (get_pid s)) s) s.
-Definition handle_read_locked            (s:state) : state := s. (* TODO: *)
-Definition handle_write_next             (s:state) : state := s. (* TODO: *)
-Definition handle_write_locked (l:ibool) (s:state) : state := s. (* TODO: *)
+Definition res_read_next              (s:state) : state := bind_next (get_mem_qnode_next (Index (get_pid s)) s) s.
+Definition res_read_locked            (s:state) : state := s. (* TODO: *)
+Definition res_write_next             (s:state) : state := s. (* TODO: *)
+Definition res_write_locked (l:ibool) (s:state) : state := s. (* TODO: *)
+
+Definition act_fetch_and_store        (s:state) : action := FETCH_AND_STORE (Index (get_pid s)).
+Definition act_compare_and_swap       (s:state) : action := COMPARE_AND_SWAP (Index (get_pid s)).
+Definition act_read_next              (s:state) : action := READ_NEXT (get_pid s).
+Definition act_read_locked            (s:state) : action := READ_LOCKED (get_pid s).
+Definition act_write_next             (s:state) : action := WRITE_NEXT (get_acquire_predecessor s) (Index (get_pid s)).
+Definition act_write_locked (l:ibool) (s:state) : action := WRITE_LOCKED (get_pid s) l.
 
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
 
@@ -237,28 +244,28 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
   | ST_LEAVE : forall t s1 s2, (ACT_LEAVE t, s1) --<{LEAVE (get_pid s1)}>--> (t, s2)
 
   | ST_FETCH_AND_STORE : forall t s,
-    (OK, s) --<{FETCH_AND_STORE (Index (get_pid s))}>--> (OK, handle_fetch_and_store s) ->
-      (ACT_FETCH_AND_STORE t, s) --<{silent}>--> (t, handle_fetch_and_store s)
+    (OK, s) --<{act_fetch_and_store s}>--> (OK, res_fetch_and_store s) ->
+      (ACT_FETCH_AND_STORE t, s) --<{silent}>--> (t, res_fetch_and_store s)
 
   | ST_COMPARE_AND_SWAP : forall t s,
-    (OK, s) --<{COMPARE_AND_SWAP (Index (get_pid s))}>--> (OK, handle_compare_and_swap s) ->
-      (ACT_COMPARE_AND_SWAP t, s) --<{silent}>--> (t, handle_compare_and_swap s)
+    (OK, s) --<{act_compare_and_swap s}>--> (OK, res_compare_and_swap s) ->
+      (ACT_COMPARE_AND_SWAP t, s) --<{silent}>--> (t, res_compare_and_swap s)
 
   | ST_READ_NEXT : forall t s,
-    (OK, s) --<{READ_NEXT (get_pid s)}>--> (OK, handle_read_next s) ->
-      (ACT_READ_NEXT t, s) --<{silent}>--> (t, handle_read_next s)
+    (OK, s) --<{act_read_next s}>--> (OK, res_read_next s) ->
+      (ACT_READ_NEXT t, s) --<{silent}>--> (t, res_read_next s)
 
   | ST_READ_LOCKED : forall t s,
-    (OK, s) --<{READ_LOCKED (get_pid s)}>--> (OK, handle_read_locked s) ->
-      (ACT_READ_LOCKED t, s) --<{silent}>--> (t, handle_read_locked s)
+    (OK, s) --<{act_read_locked s}>--> (OK, res_read_locked s) ->
+      (ACT_READ_LOCKED t, s) --<{silent}>--> (t, res_read_locked s)
 
   | ST_WRITE_NEXT : forall t s,
-    (OK, s) --<{WRITE_NEXT (get_acquire_predecessor s) (Index (get_pid s))}>--> (OK, handle_write_next s) ->
-      (ACT_WRITE_NEXT t, s) --<{silent}>--> (t, handle_write_next s)
+    (OK, s) --<{act_write_next s}>--> (OK, res_write_next s) ->
+      (ACT_WRITE_NEXT t, s) --<{silent}>--> (t, res_write_next s)
 
   | ST_WRITE_LOCKED : forall l t s,
-    (OK, s) --<{WRITE_LOCKED (get_pid s) l}>--> (OK, handle_write_locked l s) ->
-      (ACT_WRITE_LOCKED t, s) --<{silent}>--> (t, handle_write_locked l s)
+    (OK, s) --<{act_write_locked l s}>--> (OK, res_write_locked l s) ->
+      (ACT_WRITE_LOCKED t, s) --<{silent}>--> (t, res_write_locked l s)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
