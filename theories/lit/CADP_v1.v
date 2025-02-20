@@ -205,8 +205,8 @@ Example MCS : composition := COMP
             ; VAR KIND_CS "LEAVE"
             ; VAR KIND_LOCK "L"
             ; VAR KIND_MEM "M" ])
-    (SEQ [ PARS [ SPAWN "P" (ARGS [ REF ((OF KIND_CS   "NCS"))
-                                  ; REF ((OF KIND_CS   "ENTER"))
+    (SEQ [ PARS [ SPAWN "P" (ARGS [ REF (OF KIND_CS   "NCS")
+                                  ; REF (OF KIND_CS   "ENTER")
                                   ; REF (OF KIND_CS   "LEAVE")
                                   ; REF (OF KIND_LOCK "L")
                                   ; REF (OF KIND_MEM  "M")
