@@ -154,11 +154,11 @@ Fixpoint get_index_of (i:nat) (m:mem) : option qnode :=
               | S n => get_index_of n t
               end end.
 
-(* TODO: find some way to resolve option type? then finish READ_NEXT *)
-
-(* Exception IsNone. *)
-
-(* Definition get_mem_qnode (i:nat) (s:state) : qnode := Option.get (get_index_of i (get_mem s)). *)
+Definition get_mem_qnode_next (i:index) (s:state) : index :=
+  match get_index_of i (get_mem s) with
+  | None => 0
+  | Some n => (next n)
+  end.
 
 
 (* lock get/set *)
@@ -231,8 +231,10 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
     (OK, s) --<{COMPARE_AND_SWAP (Index (get_pid s))}>--> (OK, bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s) ->
       (ACT_COMPARE_AND_SWAP t, s) --<{silent}>--> (t, bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s)
 
-  | ST_READ_NEXT : forall t s, (* TODO: FINISH below *)
-    (OK, s) --<{READ_NEXT (get_pid s)}>--> (OK, bind_next (next (get_mem_qnode (Index (get_pid s)) s)) s)
+  (* TODO: check if [get_mem_qnode_next] should return 0 if pid of s not in mem yet. *)
+  | ST_READ_NEXT : forall t s,
+    (OK, s) --<{READ_NEXT (get_pid s)}>--> (OK, bind_next (get_mem_qnode_next (Index (get_pid s)) s) s) ->
+      (ACT_READ_NEXT t, s) --<{silent}>--> (t, bind_next (get_mem_qnode_next (Index (get_pid s)) s) s)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
