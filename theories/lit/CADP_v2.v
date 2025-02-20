@@ -92,13 +92,18 @@ Definition Empty : mem := nil.
 Definition state : Type := pid * mem.
 Definition Initial_state : state := (Nil, Empty).
 
-Reserved Notation "t '-->' t'" (at level 40).
+Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
 
 Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
-  | ST_IF_TT : forall t1 t2 s, (<{ if TRU then t1 else t2 }>, s) --> silent --> (t1, s)
-  | ST_IF_FF : forall t1 t2 s, (<{ if FLS then t1 else t2 }>, s) --> (t2, s)
-  | ST_IF : forall c1 c2 t1 t2 s1 s2, (c1, s1) --> (c2, s2) -> (<{ if c1 then t1 else t2 }>, s1) --> (<{ if c2 then t1 else t2 }>, s2)
+  | ST_IF_TT : forall t1 t2 s, (<{ if TRU then t1 else t2 }>, s) --<{silent}>--> (t1, s)
+  | ST_IF_FF : forall t1 t2 s, (<{ if FLS then t1 else t2 }>, s) --<{silent}>--> (t2, s)
 
-  where "t '-->' t'" := (step t t').
+  | ST_IF    : forall c1 c2 t1 t2 s1 s2,
+                (c1, s1) --<{silent}>--> (c2, s2) ->
+                  (<{ if c1 then t1 else t2 }>, s1) --<{silent}>--> (<{ if c2 then t1 else t2 }>, s2)
 
-(* Print step. *)
+
+
+  where "t '--<{' a '}>-->' t'" := (step t a t').
+
+Print step.
