@@ -21,7 +21,7 @@ Definition Pid (i:index) : pid :=
   | n => Some n
   end.
 
-Inductive action : Type :=
+Inductive action_detail : Type :=
   | READ_NEXT
   | READ_LOCKED
   | WRITE_NEXT
@@ -30,14 +30,56 @@ Inductive action : Type :=
   | COMPARE_AND_SWAP
   .
 
+Inductive action_kind : Type :=
+  | NCS | ENTER | LEAVE | M | L | TAU.
+
+Definition action : Type := (action_kind * option action_detail).
+Definition silent : action := (TAU, None).
+
 Inductive tm : Type :=
-  | OK
-  | SEQ (terms:list tm)
-  | ACT (label:action)
-  | IF (condition:Prop) (pass:tm) (fail:tm)
-  | LOOP (name:option nat)
-  | BREAK (name:nat)
+  | TERM  : tm                            (* termination *)
+  | OK    : tm                            (* no-op *)
+
+  | ACT   : action -> tm -> tm            (* action -> continuation -> ... *)
+  | IF    : tm -> tm -> tm -> tm          (* condition -> if true -> if false -> ... *)
+
+  | LOOP  : option nat -> tm -> tm -> tm  (* optional loop id -> body -> outer continuation -> ... *)
+  | BREAK : nat -> tm                     (* loop id -> ... *)
+
+  | TRU   : tm                            (* true *)
+  | FLS   : tm                            (* false *)
+
+  | ZRO : tm
+  | SCC : tm -> tm
   .
+
+(* following: https://softwarefoundations.cis.upenn.edu/plf-current/Types.html *)
+
+Declare Custom Entry tm.
+Declare Scope tm_scope.
+Notation "<{ e }>" := e (e custom tm at level 99): tm_scope.
+Notation "( x )" := x (in custom tm, x at level 99): tm_scope.
+Notation "x" := x (in custom tm at level 0, x constr at level 0): tm_scope.
+Notation "'0'" := (ZRO) (in custom tm at level 0): tm_scope.
+Notation "'0'" := 0 (at level 1): tm_scope.
+Notation "'succ' x" := (SCC x) (in custom tm at level 90, x custom tm at level 80): tm_scope.
+Notation "'if' c 'then' t 'else' e" := (IF c t e)
+                 (in custom tm at level 90, c custom tm at level 80,
+                  t custom tm at level 80, e custom tm at level 80): tm_scope.
+Local Open Scope tm_scope.
+
+Inductive bvalue : tm -> Prop :=
+  | bv_true : bvalue <{ TRU }>
+  | bv_false : bvalue <{ FLS }>.
+
+Inductive nvalue : tm -> Prop :=
+  | nv_0 : nvalue <{ 0 }>
+  | nv_succ : forall t, nvalue t -> nvalue <{ succ t }>.
+
+Definition value (t : tm) := bvalue t \/ nvalue t.
+
+Hint Constructors bvalue nvalue : core.
+Hint Unfold value : core.
 
 Inductive mem_item : Type :=
   | PID (name:string) (val:pid)
@@ -50,11 +92,13 @@ Definition Empty : mem := nil.
 Definition state : Type := pid * mem.
 Definition Initial_state : state := (Nil, Empty).
 
-(* Inductive step : process * state -> action -> process * state -> Prop :=
-  | ST_IF_TT : forall t1 t2, <{ if tru then t1 else t2 }> --> t1
-  | ST_IF_FF : forall t1 t2, <{ if fls then t1 else t2 }> --> t2
-  | ST_IF : forall c1 c2 t1 t2, c1 --> c2 -> <{ if c1 then t1 else t2 }> --> <{ if c2 then t1 else t2 }>
+Reserved Notation "t '-->' t'" (at level 40).
 
-  where "t '-->' t'" := (step t t'). *)
+Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
+  | ST_IF_TT : forall t1 t2 s, (<{ if TRU then t1 else t2 }>, s) --> silent --> (t1, s)
+  | ST_IF_FF : forall t1 t2 s, (<{ if FLS then t1 else t2 }>, s) --> (t2, s)
+  | ST_IF : forall c1 c2 t1 t2 s1 s2, (c1, s1) --> (c2, s2) -> (<{ if c1 then t1 else t2 }>, s1) --> (<{ if c2 then t1 else t2 }>, s2)
 
-Print step.
+  where "t '-->' t'" := (step t t').
+
+(* Print step. *)
