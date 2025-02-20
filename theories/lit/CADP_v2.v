@@ -182,6 +182,11 @@ Definition set_lock_j (j:index) (s:state) : state :=
   end end.
 
 (* bind vars *)
+Definition get_acquire_predecessor (s:state) : option index := acquire_predecessor (get_vars s).
+Definition get_acquire_locked      (s:state) : option ibool := acquire_locked      (get_vars s).
+Definition get_release_next        (s:state) : option index := release_next        (get_vars s).
+Definition get_release_swap        (s:state) : option ibool := release_swap        (get_vars s).
+
 Definition bind_predecessor (p:index) (s:state) : state :=
   match s with
   | (_pid, vars', _mem, _lock) => (_pid, Build_vars (Some p) (acquire_locked vars') (release_next vars') (release_swap vars'), _mem, _lock)
@@ -203,16 +208,19 @@ Definition bind_swap (p:index) (s:state) : state :=
   end.
 
 (* initial *)
-Definition Initial_mem : mem := [].
-Definition Initial_lock : lock := (0, 0, 0).
-Definition Initial_vars : vars := Build_vars None None None None.
+Definition Initial_mem   : mem   := [].
+Definition Initial_lock  : lock  := (0, 0, 0).
+Definition Initial_vars  : vars  := Build_vars None None None None.
 Definition Initial_state : state := (Nil, Initial_vars, Initial_mem, Initial_lock).
 
-Definition handle_fetch_and_store (s:state) : state := set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s).
+Definition handle_fetch_and_store  (s:state) : state := set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s).
 Definition handle_compare_and_swap (s:state) : state := bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s.
 
 (* TODO: check if [get_mem_qnode_next] should return 0 if pid of s not in mem yet. *)
-Definition handle_read_next (s:state) : state := bind_next (get_mem_qnode_next (Index (get_pid s)) s) s.
+Definition handle_read_next              (s:state) : state := bind_next (get_mem_qnode_next (Index (get_pid s)) s) s.
+Definition handle_read_locked            (s:state) : state := s. (* TODO: *)
+Definition handle_write_next             (s:state) : state := s. (* TODO: *)
+Definition handle_write_locked (l:ibool) (s:state) : state := s. (* TODO: *)
 
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
 
@@ -239,6 +247,18 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
   | ST_READ_NEXT : forall t s,
     (OK, s) --<{READ_NEXT (get_pid s)}>--> (OK, handle_read_next s) ->
       (ACT_READ_NEXT t, s) --<{silent}>--> (t, handle_read_next s)
+
+  | ST_READ_LOCKED : forall t s,
+    (OK, s) --<{READ_LOCKED (get_pid s)}>--> (OK, handle_read_locked s) ->
+      (ACT_READ_LOCKED t, s) --<{silent}>--> (t, handle_read_locked s)
+
+  | ST_WRITE_NEXT : forall t s,
+    (OK, s) --<{WRITE_NEXT (get_acquire_predecessor s) (Index (get_pid s))}>--> (OK, handle_write_next s) ->
+      (ACT_WRITE_NEXT t, s) --<{silent}>--> (t, handle_write_next s)
+
+  | ST_WRITE_LOCKED : forall l t s,
+    (OK, s) --<{WRITE_LOCKED (get_pid s) l}>--> (OK, handle_write_locked l s) ->
+      (ACT_WRITE_LOCKED t, s) --<{silent}>--> (t, handle_write_locked l s)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
