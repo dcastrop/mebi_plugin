@@ -71,11 +71,32 @@ Inductive action : Type :=
 Definition silent : action := TAU.
 
 
+Inductive var : Type :=
+  | PREDECESSOR
+  | LOCKED
+  | NEXT
+  | SWAP
+  | NIL.
+
 Inductive tm : Type :=
   | TERM  : tm                      (* termination *)
   | OK    : tm                      (* no-op *)
 
   | IF    : tm -> tm -> tm -> tm    (* condition -> if true -> if false -> ... *)
+
+  | NOT    : tm   -> tm
+  | EQ_N   : nat  -> nat -> tm
+  | EQ_B   : bool -> bool -> tm
+  | IS_TRU : tm   -> tm
+  | IS_NIL : tm   -> tm
+  | VAR    : var  -> tm
+
+  | IBOOL : ibool -> tm
+
+  | TRU   : tm        (* true *)
+  | FLS   : tm        (* false *)
+
+  | CALL  : tm -> tm -> tm (* call-body -> continuation -> ... *)
 
   (* CS_access *)
   | ACT_NCS   : tm -> tm
@@ -97,17 +118,6 @@ Inductive tm : Type :=
 
   | LOOP_OVER : iloop -> tm -> tm -> tm (* loop id -> body -> outer continuation -> ... *)
   | BREAK     : iloop -> tm             (* loop id -> ... *)
-
-  | NAT_EQ : nat -> nat -> tm
-  | NAT_NEQ : nat -> nat -> tm
-
-  | IBOOL : ibool -> tm
-
-  | TRU   : tm        (* true *)
-  | FLS   : tm        (* false *)
-
-  (* | ZRO : tm
-  | SCC : tm -> tm *)
   .
 
 (* following: https://softwarefoundations.cis.upenn.edu/plf-current/Types.html *)
@@ -251,6 +261,40 @@ Definition get_acquire_locked      (s:state) : option ibool := acquire_locked   
 Definition get_release_next        (s:state) : option index := release_next        (get_vars s).
 Definition get_release_swap        (s:state) : option ibool := release_swap        (get_vars s).
 
+(* Definition IsBool (v:var) : tm :=
+  match v with
+  | LOCKED => TRU
+  | SWAP => TRU
+  | _ => FLS
+  end.
+
+Definition IsIndex (v:var) : bool :=
+  match v with
+  | PREDECESSOR => true
+  | NEXT => true
+  | _ => false
+  end.
+
+Definition IsIndex_tm (v:var) : tm := if IsIndex v then TRU else FLS.
+
+Definition IsSome (o:option nat) : bool :=
+  match o with
+  | None => false
+  | Some _ => true
+  end.
+
+Definition IsSome_tm (o:option nat) : tm := if IsSome o then TRU else FLS.
+Definition IsNone_tm (o:option nat) : tm := if IsSome o then FLS else TRU. *)
+
+Definition get_var (v:var) (s:state) : option nat :=
+  match v with
+  | PREDECESSOR => get_acquire_predecessor s
+  | LOCKED      => get_acquire_locked s
+  | NEXT        => get_release_next s
+  | SWAP        => get_release_swap s
+  | _           => None
+  end.
+
 Definition bind_predecessor (p:index) (s:state) : state :=
   match s with
   | (_pid, vars', _mem, _lock) => (_pid, Build_vars (Some p) (acquire_locked vars') (release_next vars') (release_swap vars'), _mem, _lock)
@@ -303,6 +347,26 @@ Fixpoint subst (new old:tm) (loops:bool) : tm :=
 
   | IF c t e => IF c (subst new t loops) (subst new e loops)
 
+  (* | VAL_PREDECESSOR => VAL_PREDECESSOR
+  | VAL_LOCKED      => VAL_LOCKED
+  | VAL_NEXT        => VAL_NEXT
+  | VAL_SWAP        => VAL_SWAP
+  | VAL_NIL         => VAL_NIL *)
+
+  | NOT t      => NOT t
+  | EQ_N a b   => EQ_N a b
+  | EQ_B a b   => EQ_B a b
+  | IS_TRU a   => IS_TRU a
+  | IS_NIL t   => IS_NIL t
+  | VAR v      => VAR v
+
+  | IBOOL t => IBOOL t
+
+  | TRU => TRU
+  | FLS => FLS
+
+  | CALL b c => CALL b (subst new c loops) (* do not substitute in other body *)
+
   | ACT_NCS t   => ACT_NCS (subst new t loops)
   | ACT_ENTER t => ACT_ENTER (subst new t loops)
   | ACT_LEAVE t => ACT_LEAVE (subst new t loops)
@@ -320,14 +384,6 @@ Fixpoint subst (new old:tm) (loops:bool) : tm :=
 
   | LOOP_OVER l b c => LOOP_OVER l (subst new b loops) (subst new c loops)
   | BREAK l         => BREAK l
-
-  | NAT_EQ a b => NAT_EQ a b
-  | NAT_NEQ a b => NAT_NEQ a b
-
-  | IBOOL t => IBOOL t
-
-  | TRU => TRU
-  | FLS => FLS
   end.
 
 (* handle resulting terms *)
@@ -336,6 +392,7 @@ Fixpoint subst (new old:tm) (loops:bool) : tm :=
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
 
 Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
+
   | ST_IF_TT : forall t1 t2 s, (<{ if TRU then t1 else t2 }>, s) --<{silent}>--> (t1, s)
   | ST_IF_FF : forall t1 t2 s, (<{ if FLS then t1 else t2 }>, s) --<{silent}>--> (t2, s)
 
@@ -354,14 +411,23 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
     (LOOP t1, s1) --<{a}>--> (LOOP t2, s2) ->
       (LOOP_OVER l t1 c, s1) --<{a}>--> (LOOP_OVER l t2 c, s2)
 
+  | ST_NOT_TRU : forall s, (NOT TRU, s) --<{silent}>--> (FLS, s)
+  | ST_NOT_FLS : forall s, (NOT FLS, s) --<{silent}>--> (TRU, s)
+
+  (* | ST_VAL_IS_NIL : forall v s,
+    (IsIndex v) -> (IS_NIL (VAR v), s) --<{silent}>--> (IsNone_tm (get_var v s), s) *)
+
+  (* | ST_VAL_PREDECESSOR :
+    (VAL_PREDECESSOR) *)
+
   | ST_IBOOL : forall a s,
     (IBOOL a, s) --<{silent}>--> (match a with | 0 => FLS | _ => TRU end, s)
 
-  | ST_NAT_EQ : forall a b s,
-    (NAT_EQ a b, s) --<{silent}>--> (IBOOL (IBool (Nat.eqb a b)), s)
+  | ST_EQ_N : forall a b s,
+    (EQ_N a b, s) --<{silent}>--> (IBOOL (IBool (Nat.eqb a b)), s)
 
-  | ST_NAT_NEQ : forall a b s,
-    (NAT_NEQ a b, s) --<{silent}>--> (IBOOL (IBool (negb (Nat.eqb a b))), s)
+  (* | ST_NAT_NEQ : forall a b s,
+    (NAT_NEQ a b, s) --<{silent}>--> (IBOOL (IBool (negb (Nat.eqb a b))), s) *)
 
   | ST_NCS   : forall t s1 s2, (ACT_NCS   t, s1) --<{NCS   (get_pid s1)}>--> (t, s2)
   | ST_ENTER : forall t s1 s2, (ACT_ENTER t, s1) --<{ENTER (get_pid s1)}>--> (t, s2)
@@ -395,13 +461,79 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
 
 Print step.
 
+Reserved Notation "t '==<{' a '}>==>' t'" (at level 40).
 
 (* all tm must share the state, pass upwards to step. *)
 Inductive LTS : (list tm) * state -> action -> (list tm) * state -> Prop :=
-  (* | LTS_PAR_L : forall t s,
-      () *)
 
-  where "t '--<{' a '}>-->' t'" := (step t a t').
+  | LTS_CALL : forall body cont t s,
+    ((CALL body cont) :: t, s) ==<{silent}>==> (cont :: (t ++ [body]), s)
+
+  | LTS_H_STEP : forall a h1 h2 t s1 s2,
+    (h1, s1) --<{a}>--> (h2, s2) ->
+      (h1 :: t, s1) ==<{a}>==> (h2 :: t, s2)
+
+  | LTS_T_STEP : forall a h t1 t2 s1 s2,
+    (t1, s1) ==<{a}>==> (t2, s2) ->
+      (h :: t1, s1) ==<{a}>==> (h :: t2, s2)
+
+  where "t '==<{' a '}>==>' t'" := (LTS t a t').
 
 Print LTS.
 
+Example Acquire : tm :=
+  ACT_WRITE_NEXT (
+    ACT_FETCH_AND_STORE (
+      IF (NOT (IS_NIL (VAR PREDECESSOR))) (
+        ACT_WRITE_LOCKED (
+          ACT_WRITE_NEXT (
+            LOOP_OVER 0 (*L*) (
+              ACT_READ_LOCKED (
+                IF (NOT (VAR LOCKED)) (
+                  BREAK 0 (*L*)
+                ) (OK)
+              )
+            ) (TERM)
+          )
+        )
+      ) (OK)
+    )
+  ).
+
+Example Release : tm :=
+  ACT_READ_NEXT (
+    IF (IS_NIL (VAR NEXT)) (
+      ACT_COMPARE_AND_SWAP (
+        IF (NOT (IS_TRU (VAR SWAP))) (
+          LOOP_OVER 0 (*L*) (
+            ACT_READ_NEXT (
+              IF (NOT (IS_NIL (VAR NEXT))) (
+                BREAK 0 (*L*)
+              ) (OK)
+            )
+          ) (
+            ACT_WRITE_LOCKED (TERM)
+          )
+        ) (OK)
+      )
+    ) (
+      ACT_WRITE_LOCKED (TERM)
+    )
+  ).
+
+Example P : tm :=
+  LOOP (
+    ACT_NCS (
+      CALL Acquire (
+        ACT_ENTER (
+          ACT_LEAVE (
+            CALL Release (
+              TERM
+            )
+          )
+        )
+      )
+    )
+  ).
+
+Print P.
