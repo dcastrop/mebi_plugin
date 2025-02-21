@@ -2,6 +2,7 @@
 Require Export String.
 Require Import PeanoNat.
 Require Import Notations.
+Require Export Bool.
 
 
 
@@ -43,6 +44,8 @@ Definition Bool (i:index) : option bool :=
   | 1 => Some true
   | _ => None
   end.
+
+Definition IBool (b:bool) : ibool := if b then 1 else 0.
 
 (* used in steps, not syntax *)
 Inductive action : Type :=
@@ -89,8 +92,16 @@ Inductive tm : Type :=
   | ACT_WRITE_NEXT   : tm -> tm
   | ACT_WRITE_LOCKED : tm -> tm
 
-  | LOOP  : option iloop -> tm -> tm -> tm  (* optional loop id -> body -> outer continuation -> ... *)
-  | BREAK : iloop -> tm                     (* loop id -> ... *)
+  | LOOP      : tm -> tm (* inner loop body -> *)
+  | LOOP_END  : tm
+
+  | LOOP_OVER : iloop -> tm -> tm -> tm (* loop id -> body -> outer continuation -> ... *)
+  | BREAK     : iloop -> tm             (* loop id -> ... *)
+
+  | NAT_EQ : nat -> nat -> tm
+  | NAT_NEQ : nat -> nat -> tm
+
+  | IBOOL : ibool -> tm
 
   | TRU   : tm        (* true *)
   | FLS   : tm        (* false *)
@@ -115,18 +126,6 @@ Notation "'if' c 'then' t 'else' e" := (IF c t e)
 Local Open Scope tm_scope.
 
 
-(* Inductive bvalue : tm -> Prop :=
-  | bv_true : bvalue <{ TRU }>
-  | bv_false : bvalue <{ FLS }>.
-
-Inductive nvalue : tm -> Prop :=
-  | nv_0 : nvalue <{ 0 }>
-  | nv_succ : forall t, nvalue t -> nvalue <{ succ t }>.
-
-Definition value (t : tm) := bvalue t \/ nvalue t.
-
-Hint Constructors bvalue nvalue : core.
-Hint Unfold value : core. *)
 
 Record qnode := { next   : index
                 ; locked : ibool }.
@@ -142,7 +141,7 @@ Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
 Fixpoint mem_app (l1 l2 : mem) : mem :=
   match l1 with
   | nil    => l2
-  | h :: t => h :: (app t l2)
+  | h :: t => h :: (mem_app t l2)
   end.
 
 Notation "x ++ y" := (app x y)
@@ -279,6 +278,7 @@ Definition Initial_lock          : lock  := (0, 0, 0).
 Definition Initial_vars          : vars  := Build_vars None None None None.
 Definition Initial_state (n:nat) : state := (Nil, Initial_vars, Initial_mem n, Initial_lock).
 
+(* resulting state *)
 Definition res_fetch_and_store  (s:state) : state := set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s).
 Definition res_compare_and_swap (s:state) : state := bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s.
 
@@ -287,6 +287,7 @@ Definition res_read_locked            (s:state) : state := bind_locked (get_mem_
 Definition res_write_next             (s:state) : state := set_mem_qnode_next (get_acquire_predecessor s) (Index (get_pid s)) s.
 Definition res_write_locked (l:ibool) (s:state) : state := set_mem_qnode_locked l (Index (get_pid s)) s.
 
+(* actions/transitions *)
 Definition act_fetch_and_store        (s:state) : action := FETCH_AND_STORE (Index (get_pid s)).
 Definition act_compare_and_swap       (s:state) : action := COMPARE_AND_SWAP (Index (get_pid s)).
 Definition act_read_next              (s:state) : action := READ_NEXT (get_pid s).
@@ -294,15 +295,73 @@ Definition act_read_locked            (s:state) : action := READ_LOCKED (get_pid
 Definition act_write_next             (s:state) : action := WRITE_NEXT (get_acquire_predecessor s) (Index (get_pid s)).
 Definition act_write_locked (l:ibool) (s:state) : action := WRITE_LOCKED (get_pid s) l.
 
+(* substitution *)
+Fixpoint subst (new old:tm) (loops:bool) : tm :=
+  match old with
+  | TERM => TERM
+  | OK   => OK
+
+  | IF c t e => IF c (subst new t loops) (subst new e loops)
+
+  | ACT_NCS t   => ACT_NCS (subst new t loops)
+  | ACT_ENTER t => ACT_ENTER (subst new t loops)
+  | ACT_LEAVE t => ACT_LEAVE (subst new t loops)
+
+  | ACT_FETCH_AND_STORE t  => ACT_FETCH_AND_STORE (subst new t loops)
+  | ACT_COMPARE_AND_SWAP t => ACT_COMPARE_AND_SWAP (subst new t loops)
+
+  | ACT_READ_NEXT t    => ACT_READ_NEXT (subst new t loops)
+  | ACT_READ_LOCKED t  => ACT_READ_LOCKED (subst new t loops)
+  | ACT_WRITE_NEXT t   => ACT_WRITE_NEXT (subst new t loops)
+  | ACT_WRITE_LOCKED t => ACT_WRITE_LOCKED (subst new t loops)
+
+  | LOOP b   => if loops then LOOP (subst new b loops) else LOOP b
+  | LOOP_END => new
+
+  | LOOP_OVER l b c => LOOP_OVER l (subst new b loops) (subst new c loops)
+  | BREAK l         => BREAK l
+
+  | NAT_EQ a b => NAT_EQ a b
+  | NAT_NEQ a b => NAT_NEQ a b
+
+  | IBOOL t => IBOOL t
+
+  | TRU => TRU
+  | FLS => FLS
+  end.
+
+(* handle resulting terms *)
+
+
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
 
 Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
   | ST_IF_TT : forall t1 t2 s, (<{ if TRU then t1 else t2 }>, s) --<{silent}>--> (t1, s)
   | ST_IF_FF : forall t1 t2 s, (<{ if FLS then t1 else t2 }>, s) --<{silent}>--> (t2, s)
 
-  | ST_IF    : forall c1 c2 t1 t2 s1 s2,
-    (c1, s1) --<{silent}>--> (c2, s2) ->
-      (<{ if c1 then t1 else t2 }>, s1) --<{silent}>--> (<{ if c2 then t1 else t2 }>, s2)
+  | ST_IF    : forall a c1 c2 t1 t2 s,
+    (c1, s) --<{a}>--> (c2, s) ->
+      (<{ if c1 then t1 else t2 }>, s) --<{silent}>--> (<{ if c2 then t1 else t2 }>, s)
+
+  | ST_LOOP  : forall t s,
+    (* (t1, s1) --<{a}>--> (t2, s2) -> (LOOP t1, s1) --<{a}>--> (LOOP t2, s2) *)
+    (LOOP t, s) --<{silent}>--> (subst t LOOP_END false, s)
+
+  | ST_LOOP_BREAK : forall l c s,
+    (LOOP_OVER l (BREAK l) c, s) --<{silent}>--> (c, s)
+
+  | ST_LOOP_OVER : forall a l t1 t2 c s1 s2,
+    (LOOP t1, s1) --<{a}>--> (LOOP t2, s2) ->
+      (LOOP_OVER l t1 c, s1) --<{a}>--> (LOOP_OVER l t2 c, s2)
+
+  | ST_IBOOL : forall a s,
+    (IBOOL a, s) --<{silent}>--> (match a with | 0 => FLS | _ => TRU end, s)
+
+  | ST_NAT_EQ : forall a b s,
+    (NAT_EQ a b, s) --<{silent}>--> (IBOOL (IBool (Nat.eqb a b)), s)
+
+  | ST_NAT_NEQ : forall a b s,
+    (NAT_NEQ a b, s) --<{silent}>--> (IBOOL (IBool (negb (Nat.eqb a b))), s)
 
   | ST_NCS   : forall t s1 s2, (ACT_NCS   t, s1) --<{NCS   (get_pid s1)}>--> (t, s2)
   | ST_ENTER : forall t s1 s2, (ACT_ENTER t, s1) --<{ENTER (get_pid s1)}>--> (t, s2)
