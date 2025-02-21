@@ -261,6 +261,8 @@ Definition get_acquire_locked      (s:state) : option ibool := acquire_locked   
 Definition get_release_next        (s:state) : option index := release_next        (get_vars s).
 Definition get_release_swap        (s:state) : option ibool := release_swap        (get_vars s).
 
+Definition tmBool (b:bool) : tm := if true then TRU else FLS.
+
 (* Definition IsBool (v:var) : tm :=
   match v with
   | LOCKED => TRU
@@ -275,7 +277,7 @@ Definition IsIndex (v:var) : bool :=
   | _ => false
   end.
 
-Definition IsIndex_tm (v:var) : tm := if IsIndex v then TRU else FLS.
+Definition IsIndex_tm (v:var) : tm := if IsIndex v then TRU else FLS. *)
 
 Definition IsSome (o:option nat) : bool :=
   match o with
@@ -283,8 +285,10 @@ Definition IsSome (o:option nat) : bool :=
   | Some _ => true
   end.
 
-Definition IsSome_tm (o:option nat) : tm := if IsSome o then TRU else FLS.
-Definition IsNone_tm (o:option nat) : tm := if IsSome o then FLS else TRU. *)
+(* Definition IsSome_tm (o:option nat) : tm := if IsSome o then TRU else FLS.
+Definition IsNone_tm (o:option nat) : tm := if IsSome o then FLS else TRU.  *)
+
+Definition tmIsNil (o:option nat) : tm := match o with | None => TRU | _ => FLS end.
 
 Definition get_var (v:var) (s:state) : option nat :=
   match v with
@@ -414,17 +418,23 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
   | ST_NOT_TRU : forall s, (NOT TRU, s) --<{silent}>--> (FLS, s)
   | ST_NOT_FLS : forall s, (NOT FLS, s) --<{silent}>--> (TRU, s)
 
+  | ST_IBOOL : forall a s,
+    (IBOOL a, s) --<{silent}>--> (match a with | 0 => FLS | _ => TRU end, s)
+
+  | ST_EQ_N : forall a b s, (EQ_N a b, s) --<{silent}>--> (tmBool (Nat.eqb a b), s)
+  | ST_EQ_B : forall a b s, (EQ_B a b, s) --<{silent}>--> (tmBool (eqb a b), s)
+
+  | ST_IS_NIL : forall v s,
+    (IS_NIL (VAR v), s) --<{silent}>--> (tmIsNil (get_var v s), s)
+
   (* | ST_VAL_IS_NIL : forall v s,
     (IsIndex v) -> (IS_NIL (VAR v), s) --<{silent}>--> (IsNone_tm (get_var v s), s) *)
 
   (* | ST_VAL_PREDECESSOR :
     (VAL_PREDECESSOR) *)
 
-  | ST_IBOOL : forall a s,
-    (IBOOL a, s) --<{silent}>--> (match a with | 0 => FLS | _ => TRU end, s)
-
-  | ST_EQ_N : forall a b s,
-    (EQ_N a b, s) --<{silent}>--> (IBOOL (IBool (Nat.eqb a b)), s)
+  (* | ST_EQ_N : forall a b s,
+    (EQ_N a b, s) --<{silent}>--> (IBOOL (IBool (Nat.eqb a b)), s) *)
 
   (* | ST_NAT_NEQ : forall a b s,
     (NAT_NEQ a b, s) --<{silent}>--> (IBOOL (IBool (negb (Nat.eqb a b))), s) *)
