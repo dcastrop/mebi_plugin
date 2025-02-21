@@ -1,17 +1,23 @@
 
-From Coq Require Export String.
+Require Export String.
+Require Import PeanoNat.
+Require Import Notations.
+
+
 
 (* following Figure 1: https://doi.org/10.1007/s10009-012-0244-z *)
 
 Definition index : Type := nat.
-
-Definition pid : Type := option index.
-
-Definition Nil : option index := None.
-
+Definition pid   : Type := option index.
+Definition ibool : Type := index.
 Definition iloop : Type := index.
 
-Definition ibool : Type := index.
+Definition Nil   : option index := None.
+
+Definition Initial_index : index := 0.
+Definition Initial_pid   : pid   := Nil.
+Definition Initial_ibool : ibool := 0.
+
 Fixpoint index_eq (t1 t2:index) : ibool :=
   match t1, t2 with
   | 0, 0 => 1
@@ -63,7 +69,7 @@ Definition silent : action := TAU.
 
 
 Inductive tm : Type :=
-  | TERM  : tm                       (* termination *)
+  | TERM  : tm                      (* termination *)
   | OK    : tm                      (* no-op *)
 
   | IF    : tm -> tm -> tm -> tm    (* condition -> if true -> if false -> ... *)
@@ -109,10 +115,6 @@ Notation "'if' c 'then' t 'else' e" := (IF c t e)
 Local Open Scope tm_scope.
 
 
-Notation "x :: l" := (cons x l) (at level 60, right associativity).
-Notation "[ ]" := nil.
-Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
-
 (* Inductive bvalue : tm -> Prop :=
   | bv_true : bvalue <{ TRU }>
   | bv_false : bvalue <{ FLS }>.
@@ -131,6 +133,27 @@ Record qnode := { next   : index
 
 Definition mem : Type := list qnode.
 
+
+(* cant seem to import the following on my pc (vscoq) *)
+Notation "x :: l" := (cons x l) (at level 60, right associativity).
+Notation "[ ]" := nil.
+Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
+
+Fixpoint mem_app (l1 l2 : mem) : mem :=
+  match l1 with
+  | nil    => l2
+  | h :: t => h :: (app t l2)
+  end.
+
+Notation "x ++ y" := (app x y)
+                     (right associativity, at level 60).
+
+Fixpoint build_mem (n:nat) : mem :=
+  match n with
+  | 0 => []
+  | S n' => mem_app (build_mem n') [(Build_qnode 0 0)]
+  end.
+
 Definition lock : Type := index * index * index. (* i, new_i, j *)
 
 Record vars := { acquire_predecessor : option index
@@ -146,12 +169,18 @@ Definition get_mem  (s:state) : mem  := match s with | (_pid, _vars, mem', _lock
 Definition get_lock (s:state) : lock := match s with | (_pid, _vars, _mem, lock') => lock' end.
 
 (* mem get/set *)
+Fixpoint length_of (m:mem) : nat :=
+  match m with
+  | [] => 0
+  | h :: t => S (length_of t)
+  end.
+
 Fixpoint get_index_of (i:nat) (m:mem) : option qnode :=
   match m with
   | [] => None
-  | h :: t => match i with
-              | 0 => Some h
-              | S n => get_index_of n t
+  | h :: t => match i, (length_of m) with
+              | _, 0 => None
+              | _, _ => if (Nat.eqb i (length_of m)) then Some h else get_index_of i t
               end end.
 
 Definition get_mem_qnode_next (i:index) (s:state) : index :=
@@ -159,6 +188,42 @@ Definition get_mem_qnode_next (i:index) (s:state) : index :=
   | None => 0
   | Some n => (next n)
   end.
+
+Definition get_mem_qnode_locked (i:index) (s:state) : ibool :=
+  match get_index_of i (get_mem s) with
+  | None => 0
+  | Some n => (locked n)
+  end.
+
+Fixpoint set_index_qnode_next_of (i:nat) (next:index) (m:mem) : mem :=
+  match m with
+  | [] => m (* shouldn't happen*)
+  | h :: t =>
+      if (Nat.eqb i (length_of m))
+      then Build_qnode next (locked h) :: t
+      else h :: set_index_qnode_next_of i next t
+  end.
+
+Definition set_mem_qnode_next (i:option nat) (next:index) (s:state) : state :=
+  match i with
+  | None => s (* will never happen, guarded by [predecessor!=nil] *)
+  | Some i' =>
+    match s with | (_pid, _vars, mem', _lock) => (_pid, _vars, set_index_qnode_next_of i' next mem', _lock) end
+  end.
+
+
+Fixpoint set_index_qnode_locked_of (i:nat) (locked:index) (m:mem) : mem :=
+  match m with
+  | [] => m (* shouldn't happen*)
+  | h :: t =>
+      if (Nat.eqb i (length_of m))
+      then Build_qnode (next h) locked :: t
+      else h :: set_index_qnode_locked_of i locked t
+  end.
+
+Definition set_mem_qnode_locked (i:nat) (locked:index) (s:state) : state :=
+  match s with | (_pid, _vars, mem', _lock) => (_pid, _vars, set_index_qnode_locked_of i locked mem', _lock) end.
+
 
 
 (* lock get/set *)
@@ -207,20 +272,20 @@ Definition bind_swap (p:index) (s:state) : state :=
   | (_pid, vars', _mem, _lock) => (_pid, Build_vars (acquire_predecessor vars') (acquire_locked vars') (release_next vars') (Some p), _mem, _lock)
   end.
 
+
 (* initial *)
-Definition Initial_mem   : mem   := [].
-Definition Initial_lock  : lock  := (0, 0, 0).
-Definition Initial_vars  : vars  := Build_vars None None None None.
-Definition Initial_state : state := (Nil, Initial_vars, Initial_mem, Initial_lock).
+Definition Initial_mem   (n:nat) : mem   := build_mem n.
+Definition Initial_lock          : lock  := (0, 0, 0).
+Definition Initial_vars          : vars  := Build_vars None None None None.
+Definition Initial_state (n:nat) : state := (Nil, Initial_vars, Initial_mem n, Initial_lock).
 
 Definition res_fetch_and_store  (s:state) : state := set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s).
 Definition res_compare_and_swap (s:state) : state := bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s.
 
-(* TODO: check if [get_mem_qnode_next] should return 0 if pid of s not in mem yet. *)
 Definition res_read_next              (s:state) : state := bind_next (get_mem_qnode_next (Index (get_pid s)) s) s.
-Definition res_read_locked            (s:state) : state := s. (* TODO: *)
-Definition res_write_next             (s:state) : state := s. (* TODO: *)
-Definition res_write_locked (l:ibool) (s:state) : state := s. (* TODO: *)
+Definition res_read_locked            (s:state) : state := bind_locked (get_mem_qnode_locked (Index (get_pid s)) s) s.
+Definition res_write_next             (s:state) : state := set_mem_qnode_next (get_acquire_predecessor s) (Index (get_pid s)) s.
+Definition res_write_locked (l:ibool) (s:state) : state := set_mem_qnode_locked l (Index (get_pid s)) s.
 
 Definition act_fetch_and_store        (s:state) : action := FETCH_AND_STORE (Index (get_pid s)).
 Definition act_compare_and_swap       (s:state) : action := COMPARE_AND_SWAP (Index (get_pid s)).
@@ -236,8 +301,8 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
   | ST_IF_FF : forall t1 t2 s, (<{ if FLS then t1 else t2 }>, s) --<{silent}>--> (t2, s)
 
   | ST_IF    : forall c1 c2 t1 t2 s1 s2,
-                (c1, s1) --<{silent}>--> (c2, s2) ->
-                  (<{ if c1 then t1 else t2 }>, s1) --<{silent}>--> (<{ if c2 then t1 else t2 }>, s2)
+    (c1, s1) --<{silent}>--> (c2, s2) ->
+      (<{ if c1 then t1 else t2 }>, s1) --<{silent}>--> (<{ if c2 then t1 else t2 }>, s2)
 
   | ST_NCS   : forall t s1 s2, (ACT_NCS   t, s1) --<{NCS   (get_pid s1)}>--> (t, s2)
   | ST_ENTER : forall t s1 s2, (ACT_ENTER t, s1) --<{ENTER (get_pid s1)}>--> (t, s2)
