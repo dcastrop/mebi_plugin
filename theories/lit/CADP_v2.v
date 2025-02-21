@@ -79,6 +79,7 @@ Inductive var : Type :=
   | NIL.
 
 Inductive tm : Type :=
+  | TYPE_ERR : tm
   | TERM  : tm                      (* termination *)
   | OK    : tm                      (* no-op *)
 
@@ -91,7 +92,7 @@ Inductive tm : Type :=
   | IS_NIL : tm   -> tm
   | VAR    : var  -> tm
 
-  | IBOOL : ibool -> tm
+  (* | IBOOL : ibool -> tm *)
 
   | TRU   : tm        (* true *)
   | FLS   : tm        (* false *)
@@ -262,12 +263,13 @@ Definition get_release_next        (s:state) : option index := release_next     
 Definition get_release_swap        (s:state) : option ibool := release_swap        (get_vars s).
 
 Definition tmBool (b:bool) : tm := if true then TRU else FLS.
+Definition tmIBool (b:ibool) : tm := match b with | 0 => FLS | 1 => TRU | _ => TYPE_ERR end.
 
-(* Definition IsBool (v:var) : tm :=
+Definition IsBool (v:var) : bool :=
   match v with
-  | LOCKED => TRU
-  | SWAP => TRU
-  | _ => FLS
+  | LOCKED => true
+  | SWAP => true
+  | _ => false
   end.
 
 Definition IsIndex (v:var) : bool :=
@@ -276,8 +278,6 @@ Definition IsIndex (v:var) : bool :=
   | NEXT => true
   | _ => false
   end.
-
-Definition IsIndex_tm (v:var) : tm := if IsIndex v then TRU else FLS. *)
 
 Definition IsSome (o:option nat) : bool :=
   match o with
@@ -289,6 +289,8 @@ Definition IsSome (o:option nat) : bool :=
 Definition IsNone_tm (o:option nat) : tm := if IsSome o then FLS else TRU.  *)
 
 Definition tmIsNil (o:option nat) : tm := match o with | None => TRU | _ => FLS end.
+
+Definition tmIsTru (o:option nat) : tm := match o with | None => TYPE_ERR | Some b => tmIBool b end.
 
 Definition get_var (v:var) (s:state) : option nat :=
   match v with
@@ -335,6 +337,13 @@ Definition res_read_locked            (s:state) : state := bind_locked (get_mem_
 Definition res_write_next             (s:state) : state := set_mem_qnode_next (get_acquire_predecessor s) (Index (get_pid s)) s.
 Definition res_write_locked (l:ibool) (s:state) : state := set_mem_qnode_locked l (Index (get_pid s)) s.
 
+(* resulting term *)
+Definition tm_is_nil (v:var) (s:state) : tm :=
+  if IsIndex v then tmIsNil (get_var v s) else TYPE_ERR.
+
+Definition tm_is_tru (v:var) (s:state) : tm :=
+  if IsBool v then tmIsTru (get_var v s) else TYPE_ERR.
+
 (* actions/transitions *)
 Definition act_fetch_and_store        (s:state) : action := FETCH_AND_STORE (Index (get_pid s)).
 Definition act_compare_and_swap       (s:state) : action := COMPARE_AND_SWAP (Index (get_pid s)).
@@ -346,16 +355,11 @@ Definition act_write_locked (l:ibool) (s:state) : action := WRITE_LOCKED (get_pi
 (* substitution *)
 Fixpoint subst (new old:tm) (loops:bool) : tm :=
   match old with
+  | TYPE_ERR => TYPE_ERR
   | TERM => TERM
   | OK   => OK
 
   | IF c t e => IF c (subst new t loops) (subst new e loops)
-
-  (* | VAL_PREDECESSOR => VAL_PREDECESSOR
-  | VAL_LOCKED      => VAL_LOCKED
-  | VAL_NEXT        => VAL_NEXT
-  | VAL_SWAP        => VAL_SWAP
-  | VAL_NIL         => VAL_NIL *)
 
   | NOT t      => NOT t
   | EQ_N a b   => EQ_N a b
@@ -364,7 +368,7 @@ Fixpoint subst (new old:tm) (loops:bool) : tm :=
   | IS_NIL t   => IS_NIL t
   | VAR v      => VAR v
 
-  | IBOOL t => IBOOL t
+  (* | IBOOL t => IBOOL t *)
 
   | TRU => TRU
   | FLS => FLS
@@ -404,40 +408,20 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
     (c1, s) --<{a}>--> (c2, s) ->
       (<{ if c1 then t1 else t2 }>, s) --<{silent}>--> (<{ if c2 then t1 else t2 }>, s)
 
-  | ST_LOOP  : forall t s,
-    (* (t1, s1) --<{a}>--> (t2, s2) -> (LOOP t1, s1) --<{a}>--> (LOOP t2, s2) *)
-    (LOOP t, s) --<{silent}>--> (subst t LOOP_END false, s)
-
-  | ST_LOOP_BREAK : forall l c s,
-    (LOOP_OVER l (BREAK l) c, s) --<{silent}>--> (c, s)
-
-  | ST_LOOP_OVER : forall a l t1 t2 c s1 s2,
-    (LOOP t1, s1) --<{a}>--> (LOOP t2, s2) ->
-      (LOOP_OVER l t1 c, s1) --<{a}>--> (LOOP_OVER l t2 c, s2)
-
   | ST_NOT_TRU : forall s, (NOT TRU, s) --<{silent}>--> (FLS, s)
   | ST_NOT_FLS : forall s, (NOT FLS, s) --<{silent}>--> (TRU, s)
 
-  | ST_IBOOL : forall a s,
-    (IBOOL a, s) --<{silent}>--> (match a with | 0 => FLS | _ => TRU end, s)
+  (* | ST_IBOOL : forall a s,
+    (IBOOL a, s) --<{silent}>--> (match a with | 0 => FLS | _ => TRU end, s) *)
 
   | ST_EQ_N : forall a b s, (EQ_N a b, s) --<{silent}>--> (tmBool (Nat.eqb a b), s)
   | ST_EQ_B : forall a b s, (EQ_B a b, s) --<{silent}>--> (tmBool (eqb a b), s)
 
   | ST_IS_NIL : forall v s,
-    (IS_NIL (VAR v), s) --<{silent}>--> (tmIsNil (get_var v s), s)
+    (IS_NIL (VAR v), s) --<{silent}>--> (tm_is_nil v s, s)
 
-  (* | ST_VAL_IS_NIL : forall v s,
-    (IsIndex v) -> (IS_NIL (VAR v), s) --<{silent}>--> (IsNone_tm (get_var v s), s) *)
-
-  (* | ST_VAL_PREDECESSOR :
-    (VAL_PREDECESSOR) *)
-
-  (* | ST_EQ_N : forall a b s,
-    (EQ_N a b, s) --<{silent}>--> (IBOOL (IBool (Nat.eqb a b)), s) *)
-
-  (* | ST_NAT_NEQ : forall a b s,
-    (NAT_NEQ a b, s) --<{silent}>--> (IBOOL (IBool (negb (Nat.eqb a b))), s) *)
+  | ST_IS_TRU : forall v s,
+    (IS_TRU (VAR v), s) --<{silent}>--> (tm_is_tru v s, s)
 
   | ST_NCS   : forall t s1 s2, (ACT_NCS   t, s1) --<{NCS   (get_pid s1)}>--> (t, s2)
   | ST_ENTER : forall t s1 s2, (ACT_ENTER t, s1) --<{ENTER (get_pid s1)}>--> (t, s2)
@@ -467,6 +451,17 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
     (OK, s) --<{act_write_locked l s}>--> (OK, res_write_locked l s) ->
       (ACT_WRITE_LOCKED t, s) --<{silent}>--> (t, res_write_locked l s)
 
+  | ST_LOOP  : forall t s,
+    (* (t1, s1) --<{a}>--> (t2, s2) -> (LOOP t1, s1) --<{a}>--> (LOOP t2, s2) *)
+    (LOOP t, s) --<{silent}>--> (subst t LOOP_END false, s)
+
+  | ST_LOOP_BREAK : forall l c s,
+    (LOOP_OVER l (BREAK l) c, s) --<{silent}>--> (c, s)
+
+  | ST_LOOP_OVER : forall a l t1 t2 c s1 s2,
+    (LOOP t1, s1) --<{a}>--> (LOOP t2, s2) ->
+      (LOOP_OVER l t1 c, s1) --<{a}>--> (LOOP_OVER l t2 c, s2)
+
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
 Print step.
@@ -475,6 +470,12 @@ Reserved Notation "t '==<{' a '}>==>' t'" (at level 40).
 
 (* all tm must share the state, pass upwards to step. *)
 Inductive LTS : (list tm) * state -> action -> (list tm) * state -> Prop :=
+
+  | LTS_TERM : forall t s,
+    (TERM :: t, s) ==<{silent}>==> (t, s)
+
+  | LTS_OK : forall t s,
+    (OK :: t, s) ==<{silent}>==> (t, s)
 
   | LTS_CALL : forall body cont t s,
     ((CALL body cont) :: t, s) ==<{silent}>==> (cont :: (t ++ [body]), s)
