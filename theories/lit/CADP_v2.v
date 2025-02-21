@@ -335,3 +335,14 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
 Print step.
+
+
+(* all tm must share the state, pass upwards to step. *)
+Inductive LTS : (list tm) * state -> action -> (list tm) * state -> Prop :=
+  (* | LTS_PAR_L : forall t s,
+      () *)
+
+  where "t '--<{' a '}>-->' t'" := (step t a t').
+
+Print LTS.
+
