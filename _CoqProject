@@ -6,6 +6,8 @@ src/META.coq-mebi
 theories/loader.v
 theories/Test.v
 
+theories/CADP.v
+
 src/utils.ml
 src/utils.mli
 src/lts.ml
