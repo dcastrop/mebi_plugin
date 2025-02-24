@@ -1,3 +1,4 @@
+Require Import MEBI.loader.
 
 Require Export String.
 Require Import PeanoNat.
@@ -179,18 +180,23 @@ Definition get_mem  (s:state) : mem  := match s with | (_pid, _vars, mem', _lock
 Definition get_lock (s:state) : lock := match s with | (_pid, _vars, _mem, lock') => lock' end.
 
 (* mem get/set *)
-Fixpoint length_of (m:mem) : nat :=
+(* Fixpoint resize_mem (s:state) : state :=
+  match s with
+  | (_pid, _vars, mem', _lock) =>
+  end. *)
+
+Fixpoint length_of_mem (m:mem) : nat :=
   match m with
   | [] => 0
-  | h :: t => S (length_of t)
+  | h :: t => S (length_of_mem t)
   end.
 
 Fixpoint get_index_of (i:nat) (m:mem) : option qnode :=
   match m with
   | [] => None
-  | h :: t => match i, (length_of m) with
+  | h :: t => match i, (length_of_mem m) with
               | _, 0 => None
-              | _, _ => if (Nat.eqb i (length_of m)) then Some h else get_index_of i t
+              | _, _ => if (Nat.eqb i (length_of_mem m)) then Some h else get_index_of i t
               end end.
 
 Definition get_mem_qnode_next (i:index) (s:state) : index :=
@@ -209,7 +215,7 @@ Fixpoint set_index_qnode_next_of (i:nat) (next:index) (m:mem) : mem :=
   match m with
   | [] => m (* shouldn't happen*)
   | h :: t =>
-      if (Nat.eqb i (length_of m))
+      if (Nat.eqb i (length_of_mem m))
       then Build_qnode next (locked h) :: t
       else h :: set_index_qnode_next_of i next t
   end.
@@ -226,7 +232,7 @@ Fixpoint set_index_qnode_locked_of (i:nat) (locked:index) (m:mem) : mem :=
   match m with
   | [] => m (* shouldn't happen*)
   | h :: t =>
-      if (Nat.eqb i (length_of m))
+      if (Nat.eqb i (length_of_mem m))
       then Build_qnode (next h) locked :: t
       else h :: set_index_qnode_locked_of i locked t
   end.
@@ -334,7 +340,8 @@ Definition res_compare_and_swap (s:state) : state := bind_swap (index_eq (get_lo
 
 Definition res_read_next              (s:state) : state := bind_next (get_mem_qnode_next (Index (get_pid s)) s) s.
 Definition res_read_locked            (s:state) : state := bind_locked (get_mem_qnode_locked (Index (get_pid s)) s) s.
-Definition res_write_next             (s:state) : state := set_mem_qnode_next (get_acquire_predecessor s) (Index (get_pid s)) s.
+
+Definition res_write_next             (s:state) : state := set_mem_qnode_next (get_acquire_predecessor s) (Index (get_pid s)) s. (* TODO: make sure mem in s is the right size of pid ? (might be predecessor, check) *)
 Definition res_write_locked (l:ibool) (s:state) : state := set_mem_qnode_locked l (Index (get_pid s)) s.
 
 (* resulting term *)
@@ -469,7 +476,7 @@ Print step.
 Reserved Notation "t '==<{' a '}>==>' t'" (at level 40).
 
 (* all tm must share the state, pass upwards to step. *)
-Inductive LTS : (list tm) * state -> action -> (list tm) * state -> Prop :=
+Inductive lts : (list tm) * state -> action -> (list tm) * state -> Prop :=
 
   | LTS_TERM : forall t s,
     (TERM :: t, s) ==<{silent}>==> (t, s)
@@ -477,6 +484,7 @@ Inductive LTS : (list tm) * state -> action -> (list tm) * state -> Prop :=
   | LTS_OK : forall t s,
     (OK :: t, s) ==<{silent}>==> (t, s)
 
+  (* call causes process body to be added to list of terms *)
   | LTS_CALL : forall body cont t s,
     ((CALL body cont) :: t, s) ==<{silent}>==> (cont :: (t ++ [body]), s)
 
@@ -488,9 +496,27 @@ Inductive LTS : (list tm) * state -> action -> (list tm) * state -> Prop :=
     (t1, s1) ==<{a}>==> (t2, s2) ->
       (h :: t1, s1) ==<{a}>==> (h :: t2, s2)
 
-  where "t '==<{' a '}>==>' t'" := (LTS t a t').
+  where "t '==<{' a '}>==>' t'" := (lts t a t').
 
-Print LTS.
+Print lts.
+
+(* configurations *)
+Fixpoint length_of_tms (tms:list tm) : nat :=
+  match tms with
+  | [] => 0
+  | h :: t => S (length_of_tms t)
+  end.
+
+Definition Config (tms:list tm) (s:option state) : (list tm) * state :=
+  match s with
+  | None => (tms, Initial_state (length_of_tms tms))
+  | Some s' => (tms, s')
+  end.
+
+
+(*******************)
+(**** Example ******)
+(*******************)
 
 Example Acquire : tm :=
   ACT_WRITE_NEXT (
@@ -548,3 +574,69 @@ Example P : tm :=
   ).
 
 Print P.
+
+Example system : (list tm) * state := Config [P] None.
+Print system.
+
+MeBi LTS lts system.
+
+(* MeBi Bisim KS90
+  lts LTS_P
+  lts LTS_P. *)
+
+
+(*
+MeBi LTS lts ([(
+  LOOP (
+    ACT_NCS (
+      CALL (
+        ACT_WRITE_NEXT (
+          ACT_FETCH_AND_STORE (
+            IF (NOT (IS_NIL (VAR PREDECESSOR))) (
+              ACT_WRITE_LOCKED (
+                ACT_WRITE_NEXT (
+                  LOOP_OVER 0 (*L*) (
+                    ACT_READ_LOCKED (
+                      IF (NOT (VAR LOCKED)) (
+                        BREAK 0 (*L*)
+                      ) (OK)
+                    )
+                  ) (TERM)
+                )
+              )
+            ) (OK)
+          )
+        )
+      ) (
+        ACT_ENTER (
+          ACT_LEAVE (
+            CALL (
+              ACT_READ_NEXT (
+                IF (IS_NIL (VAR NEXT)) (
+                  ACT_COMPARE_AND_SWAP (
+                    IF (NOT (IS_TRU (VAR SWAP))) (
+                      LOOP_OVER 0 (*L*) (
+                        ACT_READ_NEXT (
+                          IF (NOT (IS_NIL (VAR NEXT))) (
+                            BREAK 0 (*L*)
+                          ) (OK)
+                        )
+                      ) (
+                        ACT_WRITE_LOCKED (TERM)
+                      )
+                    ) (OK)
+                  )
+                ) (
+                  ACT_WRITE_LOCKED (TERM)
+                )
+              )
+            ) (
+              TERM
+            )
+          )
+        )
+      )
+    )
+  )
+)], Initial_state 0). *)
+
