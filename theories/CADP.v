@@ -144,6 +144,7 @@ Record qnode := { next   : index
 
 Definition mem : Type := list qnode.
 
+Definition InitialQnode : qnode := Build_qnode 0 0.
 
 (* cant seem to import the following on my pc (vscoq) *)
 Notation "x :: l" := (cons x l) (at level 60, right associativity).
@@ -162,7 +163,7 @@ Notation "x ++ y" := (app x y)
 Fixpoint build_mem (n:nat) : mem :=
   match n with
   | 0 => []
-  | S n' => mem_app (build_mem n') [(Build_qnode 0 0)]
+  | S n' => mem_app (build_mem n') [InitialQnode]
   end.
 
 Definition lock : Type := index * index * index. (* i, new_i, j *)
@@ -185,11 +186,24 @@ Definition get_lock (s:state) : lock := match s with | (_pid, _vars, _mem, lock'
   | (_pid, _vars, mem', _lock) =>
   end. *)
 
+
 Fixpoint length_of_mem (m:mem) : nat :=
   match m with
   | [] => 0
   | h :: t => S (length_of_mem t)
   end.
+
+Fixpoint repeat_qnode (n:nat) (m:mem) :=
+  match n with
+    | O  => m
+    | S n' => InitialQnode::(repeat_qnode n' m)
+  end.
+
+(* pads mem so that index i exists *)
+Definition mem_check (i:nat) (m:mem) : mem :=
+  if (Nat.ltb (length_of_mem m) i)
+  then (repeat_qnode i m)
+  else m.
 
 Fixpoint get_index_of (i:nat) (m:mem) : option qnode :=
   match m with
@@ -224,7 +238,7 @@ Definition set_mem_qnode_next (i:option nat) (next:index) (s:state) : state :=
   match i with
   | None => s (* will never happen, guarded by [predecessor!=nil] *)
   | Some i' =>
-    match s with | (_pid, _vars, mem', _lock) => (_pid, _vars, set_index_qnode_next_of i' next mem', _lock) end
+    match s with | (_pid, _vars, mem', _lock) => (_pid, _vars, set_index_qnode_next_of i' next (mem_check i' mem'), _lock) end
   end.
 
 
@@ -232,13 +246,14 @@ Fixpoint set_index_qnode_locked_of (i:nat) (locked:index) (m:mem) : mem :=
   match m with
   | [] => m (* shouldn't happen*)
   | h :: t =>
-      if (Nat.eqb i (length_of_mem m))
-      then Build_qnode (next h) locked :: t
-      else h :: set_index_qnode_locked_of i locked t
-  end.
+    if (Nat.eqb i (length_of_mem m))
+    then Build_qnode (next h) locked :: t
+    else (h :: set_index_qnode_locked_of i locked t)
+    end.
 
 Definition set_mem_qnode_locked (i:nat) (locked:index) (s:state) : state :=
-  match s with | (_pid, _vars, mem', _lock) => (_pid, _vars, set_index_qnode_locked_of i locked mem', _lock) end.
+  match s with | (_pid, _vars, mem', _lock) => (_pid, _vars, set_index_qnode_locked_of i locked (mem_check i mem'), _lock) end.
+
 
 
 
@@ -341,7 +356,7 @@ Definition res_compare_and_swap (s:state) : state := bind_swap (index_eq (get_lo
 Definition res_read_next              (s:state) : state := bind_next (get_mem_qnode_next (Index (get_pid s)) s) s.
 Definition res_read_locked            (s:state) : state := bind_locked (get_mem_qnode_locked (Index (get_pid s)) s) s.
 
-Definition res_write_next             (s:state) : state := set_mem_qnode_next (get_acquire_predecessor s) (Index (get_pid s)) s. (* TODO: make sure mem in s is the right size of pid ? (might be predecessor, check) *)
+Definition res_write_next             (s:state) : state := set_mem_qnode_next (get_acquire_predecessor s) (Index (get_pid s)) s.
 Definition res_write_locked (l:ibool) (s:state) : state := set_mem_qnode_locked l (Index (get_pid s)) s.
 
 (* resulting term *)
