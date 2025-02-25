@@ -77,12 +77,14 @@ Inductive var : Type :=
   | LOCKED
   | NEXT
   | SWAP
-  | NIL.
+  | NIL
+  .
 
 Inductive tm : Type :=
   | TYPE_ERR : tm
-  | TERM  : tm                      (* termination *)
   | OK    : tm                      (* no-op *)
+
+  | SEQ : tm -> tm -> tm
 
   | IF    : tm -> tm -> tm -> tm    (* condition -> if true -> if false -> ... *)
 
@@ -93,12 +95,12 @@ Inductive tm : Type :=
   | IS_NIL : tm   -> tm
   | VAR    : var  -> tm
 
-  (* | IBOOL : ibool -> tm *)
-
   | TRU   : tm        (* true *)
   | FLS   : tm        (* false *)
 
   | CALL  : tm -> tm -> tm (* call-body -> continuation -> ... *)
+
+  (* | ACT : action -> tm -> tm *)
 
   (* CS_access *)
   | ACT_NCS   : tm -> tm
@@ -378,7 +380,6 @@ Definition act_write_locked (l:ibool) (s:state) : action := WRITE_LOCKED (get_pi
 Fixpoint subst (new old:tm) (loops:bool) : tm :=
   match old with
   | TYPE_ERR => TYPE_ERR
-  | TERM => TERM
   | OK   => OK
 
   | IF c t e => IF c (subst new t loops) (subst new e loops)
@@ -396,6 +397,10 @@ Fixpoint subst (new old:tm) (loops:bool) : tm :=
   | FLS => FLS
 
   | CALL b c => CALL b (subst new c loops) (* do not substitute in other body *)
+
+  (* | ACT a t => ACT a (subst new t loops) *)
+
+  | SEQ l r => SEQ (subst new l loops) (subst new r loops)
 
   | ACT_NCS t   => ACT_NCS (subst new t loops)
   | ACT_ENTER t => ACT_ENTER (subst new t loops)
@@ -433,8 +438,12 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
   | ST_NOT_TRU : forall s, (NOT TRU, s) --<{silent}>--> (FLS, s)
   | ST_NOT_FLS : forall s, (NOT FLS, s) --<{silent}>--> (TRU, s)
 
-  (* | ST_IBOOL : forall a s,
-    (IBOOL a, s) --<{silent}>--> (match a with | 0 => FLS | _ => TRU end, s) *)
+  | ST_SEQ_END : forall r s, (SEQ OK r, s) --<{silent}>--> (r, s)
+  | ST_SEQ     : forall a l1 l2 r s1 s2,
+    (l1, s1) --<{a}>--> (l2, s2) ->
+      (SEQ l1 r, s1) --<{a}>--> (SEQ l2 r, s2)
+
+  | ST_CALL : forall b c s, (CALL b c, s) --<{silent}>--> (SEQ b c, s)
 
   | ST_EQ_N : forall a b s, (EQ_N a b, s) --<{silent}>--> (tmBool (Nat.eqb a b), s)
   | ST_EQ_B : forall a b s, (EQ_B a b, s) --<{silent}>--> (tmBool (eqb a b), s)
@@ -490,43 +499,46 @@ Print step.
 
 Reserved Notation "t '==<{' a '}>==>' t'" (at level 40).
 
+Inductive sys : Type :=
+  | PRC : tm -> sys
+  | PAR : sys -> sys -> sys
+  .
+
 (* all tm must share the state, pass upwards to step. *)
-Inductive lts : (list tm) * state -> action -> (list tm) * state -> Prop :=
+Inductive lts : sys * state -> action -> sys * state -> Prop :=
 
-  | LTS_TERM : forall t s,
-    (TERM :: t, s) ==<{silent}>==> (t, s)
+  | LTS_PRC : forall a t1 t2 s1 s2,
+    (t1, s1) --<{a}>--> (t2, s2) ->
+      (PRC t1, s1) ==<{a}>==> (PRC t2, s2)
 
-  | LTS_OK : forall t s,
-    (OK :: t, s) ==<{silent}>==> (t, s)
+  | LTS_TERM_L : forall a r s, (PAR (PRC OK) r, s) ==<{a}>==> (r, s)
+  | LTS_TERM_R : forall a l s, (PAR l (PRC OK), s) ==<{a}>==> (l, s)
 
-  (* call causes process body to be added to list of terms *)
-  | LTS_CALL : forall body cont t s,
-    ((CALL body cont) :: t, s) ==<{silent}>==> (cont :: (t ++ [body]), s)
+  | LTS_PAR_L : forall a l1 l2 r s1 s2,
+    (l1, s1) ==<{a}>==> (l2, s2) ->
+      (PAR l1 r, s1) ==<{a}>==> (PAR l2 r, s2)
 
-  | LTS_H_STEP : forall a h1 h2 t s1 s2,
-    (h1, s1) --<{a}>--> (h2, s2) ->
-      (h1 :: t, s1) ==<{a}>==> (h2 :: t, s2)
+  | LTS_PAR_R : forall a l r1 r2 s1 s2,
+    (r1, s1) ==<{a}>==> (r2, s2) ->
+      (PAR l r1, s1) ==<{a}>==> (PAR l r2, s2)
 
-  | LTS_T_STEP : forall a h t1 t2 s1 s2,
-    (t1, s1) ==<{a}>==> (t2, s2) ->
-      (h :: t1, s1) ==<{a}>==> (h :: t2, s2)
 
   where "t '==<{' a '}>==>' t'" := (lts t a t').
 
 Print lts.
 
 (* configurations *)
-Fixpoint length_of_tms (tms:list tm) : nat :=
+(* Fixpoint length_of_tms (tms:list tm) : nat :=
   match tms with
   | [] => 0
   | h :: t => S (length_of_tms t)
-  end.
+  end. *)
 
-Definition Config (tms:list tm) (s:option state) : (list tm) * state :=
+(* Definition Config (tms:list tm) (s:option state) : (list tm) * state :=
   match s with
   | None => (tms, Initial_state (length_of_tms tms))
   | Some s' => (tms, s')
-  end.
+  end. *)
 
 
 (*******************)
@@ -545,7 +557,7 @@ Example Acquire : tm :=
                   BREAK 0 (*L*)
                 ) (OK)
               )
-            ) (TERM)
+            ) (OK)
           )
         )
       ) (OK)
@@ -564,12 +576,12 @@ Example Release : tm :=
               ) (OK)
             )
           ) (
-            ACT_WRITE_LOCKED (TERM)
+            ACT_WRITE_LOCKED (OK)
           )
         ) (OK)
       )
     ) (
-      ACT_WRITE_LOCKED (TERM)
+      ACT_WRITE_LOCKED (OK)
     )
   ).
 
@@ -579,9 +591,7 @@ Example P : tm :=
       CALL Acquire (
         ACT_ENTER (
           ACT_LEAVE (
-            CALL Release (
-              TERM
-            )
+            CALL Release (OK)
           )
         )
       )
@@ -590,10 +600,14 @@ Example P : tm :=
 
 Print P.
 
-Example system : (list tm) * state := Config [P] None.
-Print system.
+Example config : tm * state := (P, Initial_state 1).
+Print config.
 
-MeBi LTS lts system.
+Example sys_config : sys * state := (PRC P, Initial_state 1).
+Print sys_config.
+
+MeBi LTS step config.
+MeBi LTS lts sys_config.
 
 (* MeBi Bisim KS90
   lts LTS_P
