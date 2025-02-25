@@ -79,40 +79,26 @@ Inductive act : Type :=
   | COMPARE_AND_SWAP : act
   .
 
-(* conditional statement *)
-(* Inductive cond : Type :=
-  | NOT    : cond -> cond
-  | IS_TRU : val  -> cond
-  | IS_NIL : val  -> cond
-  | EQ_N   : nat  -> nat  -> cond
-  | EQ_B   : bool -> bool -> cond
-  | PASS   : cond
-  | FAIL   : cond
-  . *)
-
 
 Inductive tm : Type :=
   | TYPE_ERR : tm
   | OK    : tm                      (* no-op *)
 
+  | ACT : act -> tm -> tm
+
   | SEQ : tm -> tm -> tm
 
   | IF    : tm -> tm -> tm -> tm    (* condition -> if true -> if false -> ... *)
-  (* | EVAL  : cond -> tm *)
-  | VAL   : val  -> tm
 
-
+  | VAL    : val  -> tm
   | NOT    : tm   -> tm
   | EQ_N   : nat  -> nat -> tm
   | EQ_B   : bool -> bool -> tm
   | IS_TRU : tm   -> tm
   | IS_NIL : tm   -> tm
-  (* | VAR    : var  -> tm *)
 
   | TT   : tm        (* true *)
   | FF   : tm        (* false *)
-
-  | ACT : act -> tm -> tm
 
   | LOOP      : tm -> tm (* inner loop body -> *)
   | LOOP_END  : tm
@@ -128,9 +114,6 @@ Declare Scope tm_scope.
 Notation "<{ e }>" := e (e custom tm at level 99): tm_scope.
 Notation "( x )" := x (in custom tm, x at level 99): tm_scope.
 Notation "x" := x (in custom tm at level 0, x constr at level 0): tm_scope.
-(* Notation "'0'" := (ZRO) (in custom tm at level 0): tm_scope.
-Notation "'0'" := 0 (at level 1): tm_scope. *)
-(* Notation "'succ' x" := (SCC x) (in custom tm at level 90, x custom tm at level 80): tm_scope. *)
 Notation "'if' c 'then' t 'else' e" := (IF c t e)
                  (in custom tm at level 90, c custom tm at level 80,
                   t custom tm at level 80, e custom tm at level 80): tm_scope.
@@ -165,7 +148,8 @@ Fixpoint build_mem (n:nat) : mem :=
   | S n' => mem_app (build_mem n') [InitialQnode]
   end.
 
-Definition lock : Type := index * index * index. (* i, new_i, j *)
+(* we dont need new_i, only i and j *)
+Definition lock : Type := index * index.
 
 Record vars := { acquire_predecessor : option index
                ; acquire_locked      : option ibool
@@ -262,24 +246,19 @@ Definition set_mem_qnode_locked (index_of_qnode:option index) (new_locked:ibool)
 
 
 (* lock get/set *)
-Definition get_lock_i     (s:state) : index := match get_lock s with | (i, _new_i, _j) => i     end.
-Definition get_lock_new_i (s:state) : index := match get_lock s with | (_i, new_i, _j) => new_i end.
-Definition get_lock_j     (s:state) : index := match get_lock s with | (_i, _new_i, j) => j     end.
+Definition get_lock_i     (s:state) : index := match get_lock s with | (i,  _j) => i     end.
+Definition get_lock_j     (s:state) : index := match get_lock s with | (_i,  j) => j     end.
 
 Definition set_lock_i (i:index) (s:state) : state :=
   match s with
-  | (_pid, _vars, _mem, lock') => match lock' with | (_i, new_i, j) => (_pid, _vars, _mem, (i, new_i, j))
-  end end.
-
-Definition set_lock_new_i (new_i:index) (s:state) : state :=
-  match s with
-  | (_pid, _vars, _mem, lock') => match lock' with | (i, _new_i, j) => (_pid, _vars, _mem, (i, new_i, j))
+  | (_pid, _vars, _mem, lock') => match lock' with | (_i, j) => (_pid, _vars, _mem, (i, j))
   end end.
 
 Definition set_lock_j (j:index) (s:state) : state :=
   match s with
-  | (_pid, _vars, _mem, lock') => match lock' with | (i, new_i, _j) => (_pid, _vars, _mem, (i, new_i, j))
+  | (_pid, _vars, _mem, lock') => match lock' with | (i, _j) => (_pid, _vars, _mem, (i, j))
   end end.
+
 
 (* bind vars *)
 Definition get_var (v:var) (s:state) : option index :=
@@ -298,12 +277,6 @@ Definition get_val (v:val) (s:state) : index :=
   | TRU   => 1
   | FLS   => 0
   end.
-
-
-(* Definition get_acquire_predecessor (s:state) : option index := acquire_predecessor (get_vars s).
-Definition get_acquire_locked      (s:state) : option ibool := acquire_locked      (get_vars s).
-Definition get_release_next        (s:state) : option index := release_next        (get_vars s).
-Definition get_release_swap        (s:state) : option ibool := release_swap        (get_vars s). *)
 
 
 
@@ -330,8 +303,7 @@ Definition IsSome (o:option nat) : bool :=
   | Some _ => true
   end.
 
-(* Definition IsSome_tm (o:option nat) : tm := if IsSome o then TRU else FLS.
-Definition IsNone_tm (o:option nat) : tm := if IsSome o then FLS else TRU.  *)
+
 
 Definition tmIsNil (o:option nat) : tm := match o with | None => VAL TRU | _ => VAL FLS end.
 
@@ -368,19 +340,11 @@ Definition bind_swap (p:index) (s:state) : state :=
 
 (* initial *)
 Definition Initial_mem   (n:nat) : mem   := build_mem n.
-Definition Initial_lock          : lock  := (0, 0, 0).
+Definition Initial_lock          : lock  := (0, 0).
 Definition Initial_vars          : vars  := Build_vars None None None None.
 Definition Initial_state (n:nat) : state := (Nil, Initial_vars, Initial_mem n, Initial_lock).
 
-(* resulting state *)
-(* Definition res_fetch_and_store  (s:state) : state := set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s).
-Definition res_compare_and_swap (s:state) : state := bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s.
 
-Definition res_read_next              (s:state) : state := bind_next (get_mem_qnode_next (Index (get_pid s)) s) s.
-Definition res_read_locked            (s:state) : state := bind_locked (get_mem_qnode_locked (Index (get_pid s)) s) s.
-
-Definition res_write_next             (s:state) : state := set_mem_qnode_next (get_acquire_predecessor s) (Index (get_pid s)) s.
-Definition res_write_locked (l:ibool) (s:state) : state := set_mem_qnode_locked l (Index (get_pid s)) s. *)
 
 (* resulting term *)
 Definition tm_is_nil (v:val) (s:state) : tm :=
@@ -401,13 +365,7 @@ Definition tm_is_tru (v:val) (s:state) : tm :=
   | FLS => FF
   end.
 
-(* actions/transitions *)
-(* Definition act_fetch_and_store        (s:state) : action := FETCH_AND_STORE (Index (get_pid s)).
-Definition act_compare_and_swap       (s:state) : action := COMPARE_AND_SWAP (Index (get_pid s)).
-Definition act_read_next              (s:state) : action := READ_NEXT (get_pid s).
-Definition act_read_locked            (s:state) : action := READ_LOCKED (get_pid s).
-Definition act_write_next             (s:state) : action := WRITE_NEXT (get_acquire_predecessor s) (Index (get_pid s)).
-Definition act_write_locked (l:ibool) (s:state) : action := WRITE_LOCKED (get_pid s) l. *)
+
 
 (* substitution *)
 Fixpoint subst (new old:tm) (loops:bool) : tm :=
@@ -545,19 +503,6 @@ Inductive lts : sys * state -> action -> sys * state -> Prop :=
 
 Print lts.
 
-(* configurations *)
-(* Fixpoint length_of_tms (tms:list tm) : nat :=
-  match tms with
-  | [] => 0
-  | h :: t => S (length_of_tms t)
-  end. *)
-
-(* Definition Config (tms:list tm) (s:option state) : (list tm) * state :=
-  match s with
-  | None => (tms, Initial_state (length_of_tms tms))
-  | Some s' => (tms, s')
-  end. *)
-
 
 (*******************)
 (**** Example ******)
@@ -626,64 +571,3 @@ Print sys_config.
 
 MeBi LTS step config.
 MeBi LTS lts sys_config.
-
-(* MeBi Bisim KS90
-  lts LTS_P
-  lts LTS_P. *)
-
-
-(*
-MeBi LTS lts ([(
-  LOOP (
-    ACT_NCS (
-      CALL (
-        ACT_WRITE_NEXT (
-          ACT_FETCH_AND_STORE (
-            IF (NOT (IS_NIL (VAR PREDECESSOR))) (
-              ACT_WRITE_LOCKED (
-                ACT_WRITE_NEXT (
-                  LOOP_OVER 0 (*L*) (
-                    ACT_READ_LOCKED (
-                      IF (NOT (VAR LOCKED)) (
-                        BREAK 0 (*L*)
-                      ) (OK)
-                    )
-                  ) (TERM)
-                )
-              )
-            ) (OK)
-          )
-        )
-      ) (
-        ACT_ENTER (
-          ACT_LEAVE (
-            CALL (
-              ACT_READ_NEXT (
-                IF (IS_NIL (VAR NEXT)) (
-                  ACT_COMPARE_AND_SWAP (
-                    IF (NOT (IS_TRU (VAR SWAP))) (
-                      LOOP_OVER 0 (*L*) (
-                        ACT_READ_NEXT (
-                          IF (NOT (IS_NIL (VAR NEXT))) (
-                            BREAK 0 (*L*)
-                          ) (OK)
-                        )
-                      ) (
-                        ACT_WRITE_LOCKED (TERM)
-                      )
-                    ) (OK)
-                  )
-                ) (
-                  ACT_WRITE_LOCKED (TERM)
-                )
-              )
-            ) (
-              TERM
-            )
-          )
-        )
-      )
-    )
-  )
-)], Initial_state 0). *)
-
