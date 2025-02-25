@@ -98,8 +98,6 @@ Inductive tm : Type :=
   | TRU   : tm        (* true *)
   | FLS   : tm        (* false *)
 
-  | CALL  : tm -> tm -> tm (* call-body -> continuation -> ... *)
-
   (* | ACT : action -> tm -> tm *)
 
   (* CS_access *)
@@ -391,16 +389,12 @@ Fixpoint subst (new old:tm) (loops:bool) : tm :=
   | IS_NIL t   => IS_NIL t
   | VAR v      => VAR v
 
-  (* | IBOOL t => IBOOL t *)
-
   | TRU => TRU
   | FLS => FLS
 
-  | CALL b c => CALL b (subst new c loops) (* do not substitute in other body *)
-
   (* | ACT a t => ACT a (subst new t loops) *)
 
-  | SEQ l r => SEQ (subst new l loops) (subst new r loops)
+  | SEQ l r => SEQ l (subst new r loops) (* do not substitute in other body *)
 
   | ACT_NCS t   => ACT_NCS (subst new t loops)
   | ACT_ENTER t => ACT_ENTER (subst new t loops)
@@ -442,8 +436,6 @@ Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
   | ST_SEQ     : forall a l1 l2 r s1 s2,
     (l1, s1) --<{a}>--> (l2, s2) ->
       (SEQ l1 r, s1) --<{a}>--> (SEQ l2 r, s2)
-
-  | ST_CALL : forall b c s, (CALL b c, s) --<{silent}>--> (SEQ b c, s)
 
   | ST_EQ_N : forall a b s, (EQ_N a b, s) --<{silent}>--> (tmBool (Nat.eqb a b), s)
   | ST_EQ_B : forall a b s, (EQ_B a b, s) --<{silent}>--> (tmBool (eqb a b), s)
@@ -588,10 +580,10 @@ Example Release : tm :=
 Example P : tm :=
   LOOP (
     ACT_NCS (
-      CALL Acquire (
+      SEQ Acquire (
         ACT_ENTER (
           ACT_LEAVE (
-            CALL Release (OK)
+            SEQ Release (OK)
           )
         )
       )
