@@ -49,28 +49,8 @@ Definition Bool (i:index) : option bool :=
 Definition IBool (b:bool) : ibool := if b then 1 else 0.
 
 (* used in steps, not syntax *)
-Inductive action : Type :=
-  (* channel CS_Access *)
-  | NCS   : pid -> action
-  | ENTER : pid -> action
-  | LEAVE : pid -> action
-
-  (* channel Memory_Access *)
-  | READ_NEXT    : pid -> action (* M, binds ?next:index *)
-  | READ_LOCKED  : pid -> action (* M, binds ?locked:bool *)
-  | WRITE_NEXT   : pid -> index -> action
-  | WRITE_LOCKED : pid -> ibool -> action
-
-  (* channel Lock_Access *)
-  | FETCH_AND_STORE  : index -> action (* L, binds predecessor -> i *)
-  | COMPARE_AND_SWAP : index -> action (* L, binds: swap -> i==j *)
-
-  (* silent action *)
-  | TAU   : action
-  .
-
-Definition silent : action := TAU.
-
+Inductive act : Type :=
+  NCS | ENTER | LEAVE | READ_NEXT | READ_LOCKED | WRITE_NEXT | WRITE_LOCKED | FETCH_AND_STORE | COMPARE_AND_SWAP.
 
 Inductive var : Type :=
   | PREDECESSOR
@@ -98,22 +78,7 @@ Inductive tm : Type :=
   | TRU   : tm        (* true *)
   | FLS   : tm        (* false *)
 
-  (* | ACT : action -> tm -> tm *)
-
-  (* CS_access *)
-  | ACT_NCS   : tm -> tm
-  | ACT_ENTER : tm -> tm
-  | ACT_LEAVE : tm -> tm
-
-  (* Lock_access *)
-  | ACT_FETCH_AND_STORE  : tm -> tm
-  | ACT_COMPARE_AND_SWAP : tm -> tm
-
-  (* Memory_access *)
-  | ACT_READ_NEXT    : tm -> tm
-  | ACT_READ_LOCKED  : tm -> tm
-  | ACT_WRITE_NEXT   : tm -> tm
-  | ACT_WRITE_LOCKED : tm -> tm
+  | ACT : act -> tm -> tm
 
   | LOOP      : tm -> tm (* inner loop body -> *)
   | LOOP_END  : tm
@@ -180,13 +145,8 @@ Definition get_vars (s:state) : vars := match s with | (_pid, vars', _mem, _lock
 Definition get_mem  (s:state) : mem  := match s with | (_pid, _vars, mem', _lock) => mem'  end.
 Definition get_lock (s:state) : lock := match s with | (_pid, _vars, _mem, lock') => lock' end.
 
+
 (* mem get/set *)
-(* Fixpoint resize_mem (s:state) : state :=
-  match s with
-  | (_pid, _vars, mem', _lock) =>
-  end. *)
-
-
 Fixpoint length_of_mem (m:mem) : nat :=
   match m with
   | [] => 0
@@ -225,34 +185,38 @@ Definition get_mem_qnode_locked (i:index) (s:state) : ibool :=
   | Some n => (locked n)
   end.
 
-Fixpoint set_index_qnode_next_of (i:nat) (next:index) (m:mem) : mem :=
+Fixpoint set_index_qnode_next_of (old_next:nat) (new_next:index) (m:mem) : mem :=
   match m with
   | [] => m (* shouldn't happen*)
   | h :: t =>
-      if (Nat.eqb i (length_of_mem m))
-      then Build_qnode next (locked h) :: t
-      else h :: set_index_qnode_next_of i next t
+      if (Nat.eqb old_next (length_of_mem m))
+      then Build_qnode new_next (locked h) :: t
+      else h :: set_index_qnode_next_of old_next new_next t
   end.
 
-Definition set_mem_qnode_next (i:option nat) (next:index) (s:state) : state :=
-  match i with
+Definition set_mem_qnode_next (old_next:option nat) (new_next:index) (s:state) : state :=
+  match old_next with
   | None => s (* will never happen, guarded by [predecessor!=nil] *)
-  | Some i' =>
-    match s with | (_pid, _vars, mem', _lock) => (_pid, _vars, set_index_qnode_next_of i' next (mem_check i' mem'), _lock) end
+  | Some old_next' =>
+    match s with | (_pid, _vars, mem', _lock) => (_pid, _vars, set_index_qnode_next_of old_next' new_next (mem_check old_next' mem'), _lock) end
   end.
 
 
-Fixpoint set_index_qnode_locked_of (i:nat) (locked:index) (m:mem) : mem :=
+Fixpoint set_index_qnode_locked_of (is_locked:ibool) (i:index) (m:mem) : mem :=
   match m with
   | [] => m (* shouldn't happen*)
   | h :: t =>
-    if (Nat.eqb i (length_of_mem m))
-    then Build_qnode (next h) locked :: t
-    else (h :: set_index_qnode_locked_of i locked t)
+    if (Nat.eqb is_locked (length_of_mem m))
+    then Build_qnode (next h) i :: t
+    else (h :: set_index_qnode_locked_of is_locked i t)
     end.
 
-Definition set_mem_qnode_locked (i:nat) (locked:index) (s:state) : state :=
-  match s with | (_pid, _vars, mem', _lock) => (_pid, _vars, set_index_qnode_locked_of i locked (mem_check i mem'), _lock) end.
+Definition set_mem_qnode_locked (is_locked:option ibool) (i:index) (s:state) : state :=
+  match is_locked with
+  | None => s (* should never happen *)
+  | Some is_locked' =>
+    match s with | (_pid, _vars, mem', _lock) => (_pid, _vars, set_index_qnode_locked_of is_locked' i (mem_check i mem'), _lock) end
+  end.
 
 
 
@@ -350,14 +314,14 @@ Definition Initial_vars          : vars  := Build_vars None None None None.
 Definition Initial_state (n:nat) : state := (Nil, Initial_vars, Initial_mem n, Initial_lock).
 
 (* resulting state *)
-Definition res_fetch_and_store  (s:state) : state := set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s).
+(* Definition res_fetch_and_store  (s:state) : state := set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s).
 Definition res_compare_and_swap (s:state) : state := bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s.
 
 Definition res_read_next              (s:state) : state := bind_next (get_mem_qnode_next (Index (get_pid s)) s) s.
 Definition res_read_locked            (s:state) : state := bind_locked (get_mem_qnode_locked (Index (get_pid s)) s) s.
 
 Definition res_write_next             (s:state) : state := set_mem_qnode_next (get_acquire_predecessor s) (Index (get_pid s)) s.
-Definition res_write_locked (l:ibool) (s:state) : state := set_mem_qnode_locked l (Index (get_pid s)) s.
+Definition res_write_locked (l:ibool) (s:state) : state := set_mem_qnode_locked l (Index (get_pid s)) s. *)
 
 (* resulting term *)
 Definition tm_is_nil (v:var) (s:state) : tm :=
@@ -367,12 +331,12 @@ Definition tm_is_tru (v:var) (s:state) : tm :=
   if IsBool v then tmIsTru (get_var v s) else TYPE_ERR.
 
 (* actions/transitions *)
-Definition act_fetch_and_store        (s:state) : action := FETCH_AND_STORE (Index (get_pid s)).
+(* Definition act_fetch_and_store        (s:state) : action := FETCH_AND_STORE (Index (get_pid s)).
 Definition act_compare_and_swap       (s:state) : action := COMPARE_AND_SWAP (Index (get_pid s)).
 Definition act_read_next              (s:state) : action := READ_NEXT (get_pid s).
 Definition act_read_locked            (s:state) : action := READ_LOCKED (get_pid s).
 Definition act_write_next             (s:state) : action := WRITE_NEXT (get_acquire_predecessor s) (Index (get_pid s)).
-Definition act_write_locked (l:ibool) (s:state) : action := WRITE_LOCKED (get_pid s) l.
+Definition act_write_locked (l:ibool) (s:state) : action := WRITE_LOCKED (get_pid s) l. *)
 
 (* substitution *)
 Fixpoint subst (new old:tm) (loops:bool) : tm :=
@@ -392,11 +356,11 @@ Fixpoint subst (new old:tm) (loops:bool) : tm :=
   | TRU => TRU
   | FLS => FLS
 
-  (* | ACT a t => ACT a (subst new t loops) *)
+  | ACT a t => ACT a (subst new t loops)
 
   | SEQ l r => SEQ l (subst new r loops) (* do not substitute in other body *)
 
-  | ACT_NCS t   => ACT_NCS (subst new t loops)
+  (* | ACT_NCS t   => ACT_NCS (subst new t loops)
   | ACT_ENTER t => ACT_ENTER (subst new t loops)
   | ACT_LEAVE t => ACT_LEAVE (subst new t loops)
 
@@ -406,7 +370,7 @@ Fixpoint subst (new old:tm) (loops:bool) : tm :=
   | ACT_READ_NEXT t    => ACT_READ_NEXT (subst new t loops)
   | ACT_READ_LOCKED t  => ACT_READ_LOCKED (subst new t loops)
   | ACT_WRITE_NEXT t   => ACT_WRITE_NEXT (subst new t loops)
-  | ACT_WRITE_LOCKED t => ACT_WRITE_LOCKED (subst new t loops)
+  | ACT_WRITE_LOCKED t => ACT_WRITE_LOCKED (subst new t loops) *)
 
   | LOOP b   => if loops then LOOP (subst new b loops) else LOOP b
   | LOOP_END => new
@@ -418,74 +382,67 @@ Fixpoint subst (new old:tm) (loops:bool) : tm :=
 (* handle resulting terms *)
 
 
+Inductive action : Type := | SILENT : action | LABEL : act -> pid -> action.
+
+Definition step_state (a:act) (s:state) : state :=
+  match a with
+  (* CS Access *)
+  | NCS   => s
+  | ENTER => s
+  | LEAVE => s
+
+  (* Memory Access *)
+  | READ_NEXT    => bind_next (get_mem_qnode_next (Index (get_pid s)) s) s
+  | READ_LOCKED  => bind_locked (get_mem_qnode_locked (Index (get_pid s)) s) s
+
+  | WRITE_NEXT   => set_mem_qnode_next (get_acquire_predecessor s) (Index (get_pid s)) s
+  | WRITE_LOCKED => set_mem_qnode_locked (get_acquire_locked s) (Index (get_pid s)) s
+
+  (* Lock Access *)
+  | FETCH_AND_STORE  => set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s)
+  | COMPARE_AND_SWAP => bind_swap (index_eq (get_lock_i s) (get_lock_j s)) s
+  end.
+
+
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
 
 Inductive step : (tm * state) -> action -> (tm * state) -> Prop :=
 
-  | ST_IF_TT : forall t1 t2 s, (<{ if TRU then t1 else t2 }>, s) --<{silent}>--> (t1, s)
-  | ST_IF_FF : forall t1 t2 s, (<{ if FLS then t1 else t2 }>, s) --<{silent}>--> (t2, s)
+  | ST_ACT : forall a t s, (ACT a t, s) --<{LABEL a (get_pid s)}>--> (t, step_state a s)
+
+  | ST_IF_TT : forall t1 t2 s, (<{ if TRU then t1 else t2 }>, s) --<{SILENT}>--> (t1, s)
+  | ST_IF_FF : forall t1 t2 s, (<{ if FLS then t1 else t2 }>, s) --<{SILENT}>--> (t2, s)
 
   | ST_IF    : forall a c1 c2 t1 t2 s,
     (c1, s) --<{a}>--> (c2, s) ->
-      (<{ if c1 then t1 else t2 }>, s) --<{silent}>--> (<{ if c2 then t1 else t2 }>, s)
+      (<{ if c1 then t1 else t2 }>, s) --<{SILENT}>--> (<{ if c2 then t1 else t2 }>, s)
 
-  | ST_NOT_TRU : forall s, (NOT TRU, s) --<{silent}>--> (FLS, s)
-  | ST_NOT_FLS : forall s, (NOT FLS, s) --<{silent}>--> (TRU, s)
+  | ST_NOT_TRU : forall s, (NOT TRU, s) --<{SILENT}>--> (FLS, s)
+  | ST_NOT_FLS : forall s, (NOT FLS, s) --<{SILENT}>--> (TRU, s)
 
-  | ST_SEQ_END : forall r s, (SEQ OK r, s) --<{silent}>--> (r, s)
+  | ST_SEQ_END : forall r s, (SEQ OK r, s) --<{SILENT}>--> (r, s)
   | ST_SEQ     : forall a l1 l2 r s1 s2,
     (l1, s1) --<{a}>--> (l2, s2) ->
       (SEQ l1 r, s1) --<{a}>--> (SEQ l2 r, s2)
 
-  | ST_EQ_N : forall a b s, (EQ_N a b, s) --<{silent}>--> (tmBool (Nat.eqb a b), s)
-  | ST_EQ_B : forall a b s, (EQ_B a b, s) --<{silent}>--> (tmBool (eqb a b), s)
+  | ST_EQ_N : forall a b s, (EQ_N a b, s) --<{SILENT}>--> (tmBool (Nat.eqb a b), s)
+  | ST_EQ_B : forall a b s, (EQ_B a b, s) --<{SILENT}>--> (tmBool (eqb a b), s)
 
   | ST_IS_NIL : forall v s,
-    (IS_NIL (VAR v), s) --<{silent}>--> (tm_is_nil v s, s)
+    (IS_NIL (VAR v), s) --<{SILENT}>--> (tm_is_nil v s, s)
 
   | ST_IS_TRU : forall v s,
-    (IS_TRU (VAR v), s) --<{silent}>--> (tm_is_tru v s, s)
+    (IS_TRU (VAR v), s) --<{SILENT}>--> (tm_is_tru v s, s)
 
-  | ST_NCS   : forall t s1 s2, (ACT_NCS   t, s1) --<{NCS   (get_pid s1)}>--> (t, s2)
-  | ST_ENTER : forall t s1 s2, (ACT_ENTER t, s1) --<{ENTER (get_pid s1)}>--> (t, s2)
-  | ST_LEAVE : forall t s1 s2, (ACT_LEAVE t, s1) --<{LEAVE (get_pid s1)}>--> (t, s2)
-
-  | ST_FETCH_AND_STORE : forall t s,
-    (OK, s) --<{act_fetch_and_store s}>--> (OK, res_fetch_and_store s) ->
-      (ACT_FETCH_AND_STORE t, s) --<{silent}>--> (t, res_fetch_and_store s)
-
-  | ST_COMPARE_AND_SWAP : forall t s,
-    (OK, s) --<{act_compare_and_swap s}>--> (OK, res_compare_and_swap s) ->
-      (ACT_COMPARE_AND_SWAP t, s) --<{silent}>--> (t, res_compare_and_swap s)
-
-  | ST_READ_NEXT : forall t s,
-    (OK, s) --<{act_read_next s}>--> (OK, res_read_next s) ->
-      (ACT_READ_NEXT t, s) --<{silent}>--> (t, res_read_next s)
-
-  | ST_READ_LOCKED : forall t s,
-    (OK, s) --<{act_read_locked s}>--> (OK, res_read_locked s) ->
-      (ACT_READ_LOCKED t, s) --<{silent}>--> (t, res_read_locked s)
-
-  | ST_WRITE_NEXT : forall t s,
-    (OK, s) --<{act_write_next s}>--> (OK, res_write_next s) ->
-      (ACT_WRITE_NEXT t, s) --<{silent}>--> (t, res_write_next s)
-
-  | ST_WRITE_LOCKED : forall l t s,
-    (OK, s) --<{act_write_locked l s}>--> (OK, res_write_locked l s) ->
-      (ACT_WRITE_LOCKED t, s) --<{silent}>--> (t, res_write_locked l s)
-
-  | ST_LOOP  : forall t s,
-    (* (t1, s1) --<{a}>--> (t2, s2) -> (LOOP t1, s1) --<{a}>--> (LOOP t2, s2) *)
-    (LOOP t, s) --<{silent}>--> (subst t LOOP_END false, s)
-
-  | ST_LOOP_BREAK : forall l c s,
-    (LOOP_OVER l (BREAK l) c, s) --<{silent}>--> (c, s)
+  | ST_LOOP  : forall t s, (LOOP t, s) --<{SILENT}>--> (subst t LOOP_END false, s)
+  | ST_BREAK : forall l c s, (LOOP_OVER l (BREAK l) c, s) --<{SILENT}>--> (c, s)
 
   | ST_LOOP_OVER : forall a l t1 t2 c s1 s2,
     (LOOP t1, s1) --<{a}>--> (LOOP t2, s2) ->
       (LOOP_OVER l t1 c, s1) --<{a}>--> (LOOP_OVER l t2 c, s2)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
+
 
 Print step.
 
@@ -538,13 +495,13 @@ Print lts.
 (*******************)
 
 Example Acquire : tm :=
-  ACT_WRITE_NEXT (
-    ACT_FETCH_AND_STORE (
+  ACT WRITE_NEXT (
+    ACT FETCH_AND_STORE (
       IF (NOT (IS_NIL (VAR PREDECESSOR))) (
-        ACT_WRITE_LOCKED (
-          ACT_WRITE_NEXT (
+        ACT WRITE_LOCKED (
+          ACT WRITE_NEXT (
             LOOP_OVER 0 (*L*) (
-              ACT_READ_LOCKED (
+              ACT READ_LOCKED (
                 IF (NOT (VAR LOCKED)) (
                   BREAK 0 (*L*)
                 ) (OK)
@@ -557,32 +514,32 @@ Example Acquire : tm :=
   ).
 
 Example Release : tm :=
-  ACT_READ_NEXT (
+  ACT READ_NEXT (
     IF (IS_NIL (VAR NEXT)) (
-      ACT_COMPARE_AND_SWAP (
+      ACT COMPARE_AND_SWAP (
         IF (NOT (IS_TRU (VAR SWAP))) (
           LOOP_OVER 0 (*L*) (
-            ACT_READ_NEXT (
+            ACT READ_NEXT (
               IF (NOT (IS_NIL (VAR NEXT))) (
                 BREAK 0 (*L*)
               ) (OK)
             )
           ) (
-            ACT_WRITE_LOCKED (OK)
+            ACT WRITE_LOCKED (OK)
           )
         ) (OK)
       )
     ) (
-      ACT_WRITE_LOCKED (OK)
+      ACT WRITE_LOCKED (OK)
     )
   ).
 
 Example P : tm :=
   LOOP (
-    ACT_NCS (
+    ACT NCS (
       SEQ Acquire (
-        ACT_ENTER (
-          ACT_LEAVE (
+        ACT ENTER (
+          ACT LEAVE (
             SEQ Release (OK)
           )
         )
