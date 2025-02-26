@@ -42,6 +42,9 @@ type action =
   ; label : string
   }
 
+let tau : action = { id = 0; label = "~tau~" }
+let is_tau_action (a : action) : bool = a.label == tau.label && a.id == tau.id
+
 (** [Alphabet] is a set of [actions]. *)
 module Alphabet = Set.Make (struct
     type t = action
@@ -145,6 +148,18 @@ module Create = struct
     | From id -> { id; label = label id }
   ;;
 
+  type alphabet_param =
+    | ()
+    | From of action list
+
+  (**  *)
+  let alphabet (params : alphabet_param) : Alphabet.t =
+    let init : Alphabet.t = Alphabet.singleton tau in
+    match params with
+    | () -> init
+    | From actions -> Alphabet.add_seq (List.to_seq actions) init
+  ;;
+
   type actions_params =
     | New of (action * States.t)
     | Singleton of (action * state)
@@ -175,6 +190,7 @@ module Create = struct
         (edges : States.t Actions.t Edges.t)
     : fsm
     =
+    assert (Alphabet.find_opt tau alphabet != None);
     { init; alphabet; states; edges }
   ;;
 end

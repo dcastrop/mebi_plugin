@@ -108,6 +108,9 @@ type action =
   ; label : string
   }
 
+val tau : action
+val is_tau_action : action -> bool
+
 module Alphabet : sig
   type elt = action
   type t
@@ -239,6 +242,12 @@ module Create : sig
     | From of int
 
   val action : action_param -> action
+
+  type alphabet_param =
+    | ()
+    | From of action list
+
+  val alphabet : alphabet_param -> Alphabet.t
 
   type actions_params =
     | New of (action * Block.t)
