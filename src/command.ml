@@ -550,14 +550,14 @@ struct
              ~params
              (Printf.sprintf "\n\nTransition to: %s." (econstr_to_string tgt));
            new_states := S.add tgt !new_states;
+           (* TODO: detect tau transitions and then defer to [Fsm.tau] instead. *)
+           let to_add : action =
+             { id = get_transition_id (); label = econstr_to_string act }
+           in
            H.add
              g.transitions
              t
-             { action =
-                 { id = get_transition_id (); label = econstr_to_string act }
-             ; index_tree = int_tree
-             ; destination = tgt
-             };
+             { action = to_add; index_tree = int_tree; destination = tgt };
            if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
            then ()
            else Queue.push tgt g.to_visit;
