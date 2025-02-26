@@ -4,7 +4,7 @@ let to_fsm (lts : Lts.lts) : fsm =
   match lts with
   | { init = _init; transitions; _ } ->
     let init : state =
-      Make.state
+      Create.state
         (Of
            ( 0
            , match _init with
@@ -13,7 +13,7 @@ let to_fsm (lts : Lts.lts) : fsm =
     in
     let states : States.t = States.singleton init in
     let fsm : fsm =
-      Make.fsm (Some init) Alphabet.empty states (Edges.create 0)
+      Create.fsm (Some init) Alphabet.empty states (Edges.create 0)
     in
     Lts.Transitions.fold
       (fun (t : Lts.transition) (acc : fsm) ->

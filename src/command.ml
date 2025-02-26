@@ -751,7 +751,7 @@ struct
   end
 
   (*
-     TODO: refactor the above, using the new [Fsm.Make] and [Fsm.New] functions
+     TODO: refactor the above, using the new [Fsm.Create] and [Fsm.New] functions
      - this will ensure that there are no duplicate states or actions and such
      - first, just translate this graph_lts to a [Lts.lts] (composed of just strings)
      - maybe [MkGraph] provides a record for converting to [Lts.lts].
@@ -856,7 +856,7 @@ struct
       let* (tbl : coq_translation) = translate_coq_terms g.states in
       let* (init : string) = translate_init_term init_term tbl in
       let* (raw_lts : Lts.raw_flat_lts) = translate_coq_lts g.transitions tbl in
-      let lts : Lts.lts = Lts.Make.lts ~init (Flat raw_lts) in
+      let lts : Lts.lts = Lts.Create.lts ~init (Flat raw_lts) in
       return (lts, tbl)
     ;;
   end

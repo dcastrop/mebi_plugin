@@ -66,7 +66,7 @@ type lts =
   ; transitions : Transitions.t
   }
 
-module Make : sig
+module Create : sig
   type transition_params = Of of (int * string * string * string)
 
   val transition : transition_params -> transition

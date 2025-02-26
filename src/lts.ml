@@ -23,7 +23,7 @@ type lts =
   ; transitions : Transitions.t
   }
 
-module Make = struct
+module Create = struct
   type transition_params = Of of (int * string * string * string)
 
   let transition (params : transition_params) : transition =

@@ -220,7 +220,7 @@ type fsm =
   ; mutable edges : Block.t Actions.t Edges.t
   }
 
-module Make : sig
+module Create : sig
   type state_params =
     | From of (state * int)
     | Of of (int * string)

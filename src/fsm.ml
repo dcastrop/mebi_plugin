@@ -91,10 +91,10 @@ type fsm =
 (* TODO: Currently, there may be many copies of the same state in an [fsm] (i.e., in [init] and the [edges]). Maybe add list of states and change others to be an index referencing their position in the list. *)
 
 (*********************************************************************)
-(****** Pretty-Printing **********************************************)
+(****** Create *******************************************************)
 (*********************************************************************)
 
-module Make = struct
+module Create = struct
   (********************************************)
   (****** States ******************************)
   (********************************************)
@@ -187,7 +187,7 @@ module New = struct
     match States.cardinal filtered with
     | 0 ->
       (* create new and add *)
-      let s : state = Make.state (Of (States.cardinal fsm.states, name)) in
+      let s : state = Create.state (Of (States.cardinal fsm.states, name)) in
       fsm.states <- States.add s fsm.states;
       s
     | _ ->
@@ -201,7 +201,7 @@ module New = struct
     | None ->
       (* create new and add *)
       let a : action =
-        Make.action (Of (Alphabet.cardinal fsm.alphabet, label))
+        Create.action (Of (Alphabet.cardinal fsm.alphabet, label))
       in
       fsm.alphabet <- Alphabet.add a fsm.alphabet;
       a
@@ -255,7 +255,7 @@ module Append = struct
     | None ->
       (* add as new *)
       let actions : States.t Actions.t =
-        Make.actions (Singleton (a, destination))
+        Create.actions (Singleton (a, destination))
       in
       Edges.add fsm.edges from actions
     | Some actions' ->
@@ -280,7 +280,7 @@ module Merge = struct
     =
     Edges.iter
       (fun (from : state) (actions : States.t Actions.t) ->
-         let from' : state = Make.state (From (from, state_id_offset))
+         let from' : state = Create.state (From (from, state_id_offset))
          and actions' : States.t Actions.t =
            Actions.length actions |> Actions.create
          in
@@ -289,7 +289,7 @@ module Merge = struct
               Actions.add
                 actions'
                 (Alphabet.find a merged_alphabet)
-                (Make.states (From (destinations, state_id_offset))))
+                (Create.states (From (destinations, state_id_offset))))
            actions;
          Edges.add base from' actions')
       to_merge;
@@ -316,7 +316,7 @@ module Merge = struct
       and merged_states : States.t =
         States.fold
           (fun (s : state) (acc : States.t) ->
-             let s' : state = Make.state (From (s, state_id_offset)) in
+             let s' : state = Create.state (From (s, state_id_offset)) in
              Hashtbl.add to_merge_state_map s' s;
              States.add s' acc)
           to_merge.states
@@ -325,7 +325,7 @@ module Merge = struct
       let merged_edges : States.t Actions.t Edges.t =
         edges ~params (state_id_offset, merged_alphabet) edges' to_merge.edges
       in
-      ( Make.fsm None merged_alphabet merged_states merged_edges
+      ( Create.fsm None merged_alphabet merged_states merged_edges
       , to_merge_state_map )
   ;;
 end
@@ -637,7 +637,7 @@ let get_actions_from (from : state) (edges : States.t Actions.t Edges.t)
   : States.t Actions.t
   =
   match Edges.find_opt edges from with
-  | None -> Make.actions ()
+  | None -> Create.actions ()
   | Some actions -> actions
 ;;
 
