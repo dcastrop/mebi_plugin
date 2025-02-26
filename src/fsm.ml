@@ -34,30 +34,52 @@ module Partition = Set.Make (States)
 (****** Action Labels & Alphabet *************************************)
 (*********************************************************************)
 
-(** [action] is a 2-tuple with a unique [id] and (non-unique) [label]).
+(** [external_action] is a 2-tuple with a unique [id] and (non-unique) [label]).
     - [id] is an integer for identifying the action.
     - [label] is a (pretty-printed) string describing the action. *)
-type action =
+type external_action =
   { id : int
   ; label : string
   }
 
+type silent_action =
+  { id : int
+  ; annotation : string
+  }
+
+type action =
+  | Silent of silent_action
+  | Action of external_action
+
 (** [Alphabet] is a set of [actions]. *)
 module Alphabet = Set.Make (struct
-    type t = action
+    type t = external_action
 
     let compare a b = compare a.label b.label
   end)
 
+(** [find_action_in_alphabet a alpha] handles both [Silent] or [Action] cases. *)
+let find_action_in_alphabet (a : action) (alpha : Alphabet.t) : action =
+  match a with
+  | Action a' -> Action (Alphabet.find a' alpha)
+  | Silent a' -> a
+;;
+
 (*********************************************************************)
-(****** Actions & Edges ***********************************)
+(****** Actions & Edges **********************************************)
 (*********************************************************************)
 
 (** [Actions] map [actions] to sets of destination [states]. *)
 module Actions = Hashtbl.Make (struct
     type t = action
 
-    let equal (t1 : action) (t2 : action) = Int.equal t1.id t2.id
+    let equal (t1 : action) (t2 : action) =
+      match t1, t2 with
+      | Silent t1', Silent t2' -> Int.equal t1'.id t2'.id
+      | Action t1', Action t2' -> Int.equal t1'.id t2'.id
+      | _, _ -> false
+    ;;
+
     let hash (t : action) = Hashtbl.hash t
   end)
 
@@ -139,7 +161,7 @@ module Make = struct
   (** [action ?label id] is a wrapper constructor for [action].
     @param ?label is a pretty-printed representation, which defaults to [s{id}].
     @param id is the unique identifier for the state. *)
-  let action (params : action_param) : action =
+  let action (params : action_param) : external_action =
     match params with
     | Of (id, label) -> { id; label }
     | From id -> { id; label = label id }
@@ -196,11 +218,11 @@ module New = struct
       List.nth (States.elements filtered) 0
   ;;
 
-  let action (label : string) (fsm : fsm) : action =
+  let action (label : string) (fsm : fsm) : external_action =
     match Alphabet.find_opt { id = -1; label } fsm.alphabet with
     | None ->
       (* create new and add *)
-      let a : action =
+      let a : external_action =
         Make.action (Of (Alphabet.cardinal fsm.alphabet, label))
       in
       fsm.alphabet <- Alphabet.add a fsm.alphabet;
@@ -214,7 +236,7 @@ end
 (*********************************************************************)
 
 module Append = struct
-  let alphabet (fsm : fsm) (a : action) : unit =
+  let alphabet (fsm : fsm) (a : external_action) : unit =
     fsm.alphabet <- Alphabet.add a fsm.alphabet
   ;;
 
@@ -288,7 +310,7 @@ module Merge = struct
            (fun (a : action) (destinations : States.t) ->
               Actions.add
                 actions'
-                (Alphabet.find a merged_alphabet)
+                (find_action_in_alphabet a merged_alphabet)
                 (Make.states (From (destinations, state_id_offset))))
            actions;
          Edges.add base from' actions')
@@ -416,7 +438,9 @@ module PStr = struct
   (****** Alphabet, Actions & Edges ***********)
   (********************************************)
 
-  let action ?(params : Params.pstr = Fmt (Params.Default.fmt ())) (a : action)
+  let external_action
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (a : external_action)
     : string
     =
     let _params : Params.fmt = Params.handle params in
@@ -431,6 +455,38 @@ module PStr = struct
        | Details () -> detail_pstr
        | Debug () -> detail_pstr
        | Warning () -> detail_pstr)
+  ;;
+
+  let silent_action
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (a : silent_action)
+    : string
+    =
+    let _params : Params.fmt = Params.handle params in
+    let tabs : string = str_tabs _params.tabs in
+    let anno : string =
+      if a.annotation == "" then "" else Printf.sprintf " %s" a.annotation
+    in
+    Printf.sprintf
+      "%s%s"
+      (if _params.no_leading_tab then "" else tabs)
+      (let normal_pstr : string = Printf.sprintf "(~silent~%s)" anno
+       and detail_pstr : string =
+         Printf.sprintf "(~silent~%s| id:%d)" anno a.id
+       in
+       match _params.params.kind with
+       | Normal () -> normal_pstr
+       | Details () -> detail_pstr
+       | Debug () -> detail_pstr
+       | Warning () -> detail_pstr)
+  ;;
+
+  let action ?(params : Params.pstr = Fmt (Params.Default.fmt ())) (a : action)
+    : string
+    =
+    match a with
+    | Action a' -> external_action ~params a'
+    | Silent a' -> silent_action ~params a'
   ;;
 
   let alphabet
@@ -449,11 +505,13 @@ module PStr = struct
         "%s[%s%s]"
         (if _params.no_leading_tab then "" else tabs)
         (Alphabet.fold
-           (fun (a : action) (acc : string) ->
+           (fun (a : external_action) (acc : string) ->
               Printf.sprintf
                 "%s%s\n"
                 acc
-                (action ~params:(Fmt (no_leading_tab false _params')) a))
+                (external_action
+                   ~params:(Fmt (no_leading_tab false _params'))
+                   a))
            actions
            "\n")
         tabs)

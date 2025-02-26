@@ -17,13 +17,13 @@ let to_fsm (lts : Lts.lts) : fsm =
     in
     Lts.Transitions.fold
       (fun (t : Lts.transition) (acc : fsm) ->
-         let a : action = New.action t.label fsm in
+         let a : external_action = New.action t.label fsm in
          let from : state = New.state t.from fsm in
          let destination : state = New.state t.destination fsm in
          Append.alphabet fsm a;
          Append.state fsm from;
          Append.state fsm destination;
-         Append.edge fsm (from, a, destination);
+         Append.edge fsm (from, Action a, destination);
          fsm)
       transitions
       fsm

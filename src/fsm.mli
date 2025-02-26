@@ -103,13 +103,22 @@ module Partition : sig
   val of_seq : elt Seq.t -> t
 end
 
-type action =
+type external_action =
   { id : int
   ; label : string
   }
 
+type silent_action =
+  { id : int
+  ; annotation : string
+  }
+
+type action =
+  | Silent of silent_action
+  | Action of external_action
+
 module Alphabet : sig
-  type elt = action
+  type elt = external_action
   type t
 
   val empty : t
@@ -156,6 +165,8 @@ module Alphabet : sig
   val add_seq : elt Seq.t -> t -> t
   val of_seq : elt Seq.t -> t
 end
+
+val find_action_in_alphabet : action -> Alphabet.t -> action
 
 module Actions : sig
   type key = action
@@ -238,7 +249,7 @@ module Make : sig
     | Of of (int * string)
     | From of int
 
-  val action : action_param -> action
+  val action : action_param -> external_action
 
   type actions_params =
     | New of (action * Block.t)
@@ -258,11 +269,11 @@ end
 
 module New : sig
   val state : string -> fsm -> state
-  val action : string -> fsm -> action
+  val action : string -> fsm -> external_action
 end
 
 module Append : sig
-  val alphabet : fsm -> action -> unit
+  val alphabet : fsm -> external_action -> unit
   val state : ?skip_duplicate_names:bool -> fsm -> state -> unit
   val states : ?skip_duplicate_names:bool -> fsm -> Block.t -> unit
   val action : Block.t Actions.t -> action * state -> unit
@@ -288,6 +299,17 @@ module PStr : sig
   val state : ?params:Utils.Formatting.pstr_params -> state -> string
   val states : ?params:Utils.Formatting.pstr_params -> Block.t -> string
   val partition : ?params:Utils.Formatting.pstr_params -> Partition.t -> string
+
+  val external_action
+    :  ?params:Utils.Formatting.pstr_params
+    -> external_action
+    -> string
+
+  val silent_action
+    :  ?params:Utils.Formatting.pstr_params
+    -> silent_action
+    -> string
+
   val action : ?params:Utils.Formatting.pstr_params -> action -> string
   val alphabet : ?params:Utils.Formatting.pstr_params -> Alphabet.t -> string
 
