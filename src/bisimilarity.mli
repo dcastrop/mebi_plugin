@@ -63,7 +63,7 @@ module RCP : sig
       -> bool ref
       -> unit
 
-    val main_loop
+    val main_loop_body
       :  ?params:Utils.Logging.params
       -> Fsm.Alphabet.t * Fsm.States.t Fsm.Actions.t Fsm.Edges.t
       -> minim_result ref
@@ -77,15 +77,15 @@ module RCP : sig
       -> minim_result ref
       -> unit
 
-    type bisim_input =
+    type of_bisim_input =
       | ToMerge of (Fsm.fsm * Fsm.fsm)
       | Merged of
           (Fsm.fsm * Fsm.fsm * Fsm.fsm * (Fsm.state, Fsm.state) Hashtbl.t)
       | Minimize of Fsm.fsm
 
-    exception RunInputNotExpected of bisim_input
+    exception RunInputNotExpected of of_bisim_input
 
-    val run : ?params:Utils.Logging.params -> bisim_input -> of_bisim_result
+    val run : ?params:Utils.Logging.params -> of_bisim_input -> of_bisim_result
 
     type state_origins =
       { s : bool
