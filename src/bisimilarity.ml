@@ -7,6 +7,21 @@ open Utils.Logging
 open Utils.Formatting
 open Utils
 
+(* TODO: weak bisimilarity.
+    NOTES on extending for weak bisimilarity:
+    - define [Fsm.Tau] as the silent transition
+    - redefine [Fsm.action] to be either a silent transition, or a labelled transition
+      - do not add [Fsm.Tau] to [Fsm.Alphabet]
+      - update [Fsm.Alphabet] to be of [Fsm.label] for labelled transitions
+    - extend [Fsm.get_edges_of] to ignore silent transitions (configurable)
+    - 'closure of tau actions'
+      - will be useful when proving in coq
+      - to be created during bisim
+      - 'if S does a then T does tau tau tau a'
+          - where we need to annotate the tau actions,
+            to keep track of the path through states
+*)
+
 (** [bisim_result] is returned by the algorithms that check for bisimilarity. *)
 type bisim_result =
   { are_bisimilar : bool
