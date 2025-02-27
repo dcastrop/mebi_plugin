@@ -120,7 +120,7 @@ Module Test2.
 
   MeBi LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
 
-  MeBi LTS show_debug termLTS (tfix (tpar TheAction1 TheAction2 trec)).
+  MeBi LTS (*show_debug*) termLTS (tfix (tpar TheAction1 TheAction2 trec)).
 
 
 End Test2.
