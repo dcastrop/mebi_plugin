@@ -78,6 +78,10 @@ end
 module RCP = struct
   (** [KS90] implements the algorithm by Kanellakis and Smolka (1990). *)
   module KS90 = struct
+    type check_weak_bisim =
+      | ()
+      | Weak
+
     exception EmptyBlock of Block.t
     exception PartitionsNotDisjoint of Partition.t
 
@@ -258,6 +262,7 @@ module RCP = struct
       (alphabet : Alphabet.t)
       (edges : States.t Actions.t Edges.t)
       (pi : Partition.t ref)
+      (weak : check_weak_bisim)
       : unit
       =
       let changed = ref true in
@@ -267,16 +272,13 @@ module RCP = struct
       done
     ;;
 
-    type of_weak_bisim_input =
-      | ()
-      | Weak
-
     type of_bisim_input =
       | ToMerge of (fsm * fsm)
       | Merged of (fsm * fsm * fsm * (state, state) Hashtbl.t)
       | Minimize of fsm
 
     exception RunInputNotExpected of of_bisim_input
+    exception MinimizeDoesNotExpectWeak of (of_bisim_input * check_weak_bisim)
 
     (** [run ?params input] handles running the alogrithm for either term Minimization or checking Bisimilarity.
         @param ?params contains parameters for logging and formatting.
@@ -287,36 +289,48 @@ module RCP = struct
     let run
       ?(params : Params.log = default_params)
       (input : of_bisim_input)
-      (weak : of_weak_bisim_input)
+      (weak : check_weak_bisim)
       : of_bisim_result
       =
       (* run the algorithm for different usecases *)
       match input with
       | Minimize the_fsm ->
+        if weak == Weak then raise (MinimizeDoesNotExpectWeak (input, weak));
         (match the_fsm with
          | { alphabet; states; edges; _ } ->
            let pi = ref (Partition.of_list [ states ]) in
-           run_main_loop ~params alphabet edges pi;
+           run_main_loop ~params alphabet edges pi ();
            OfMinimized pi)
       | _ ->
-        (* check for bisimilarity *)
+        (* check for (weak) bisimilarity *)
         let s, t, merged_fsm, map_of_states =
-          match input with
-          | ToMerge (s, t) ->
-            let merged_fsm, map_of_states = Merge.fsms s t in
-            s, t, merged_fsm, map_of_states
-          | Merged (s, t, merged_fsm, map_of_states) ->
-            s, t, merged_fsm, map_of_states
-          | _ -> raise (RunInputNotExpected input)
+          match weak with
+          | Weak ->
+            (* weak bisimilarity *)
+            let s, t =
+              match input with
+              | ToMerge (s, t) -> s, t
+              | Merged (s, t, _merged_fsm, _map_of_states) -> s, t
+              | _ -> raise (RunInputNotExpected input)
+            in
+            let sat_s : fsm = Saturate.fsm ~params s
+            and sat_t : fsm = Saturate.fsm ~params t in
+            let merged_fsm, map_of_states = Merge.fsms sat_s sat_t in
+            sat_s, sat_t, merged_fsm, map_of_states
+          | () ->
+            (* (strong) bisimilarity *)
+            (match input with
+             | ToMerge (s, t) ->
+               let merged_fsm, map_of_states = Merge.fsms s t in
+               s, t, merged_fsm, map_of_states
+             | Merged (s, t, merged_fsm, map_of_states) ->
+               s, t, merged_fsm, map_of_states
+             | _ -> raise (RunInputNotExpected input))
         in
-        (* check if weak-bisimilarity *)
-        (* (match input with
-           | _ _ Weak ->""
-           | _ _ () -> ""); *)
         (match merged_fsm with
          | { alphabet; states; edges; _ } ->
            let pi = ref (Partition.of_list [ states ]) in
-           run_main_loop ~params alphabet edges pi;
+           run_main_loop ~params alphabet edges pi weak;
            OfMerged ((s, t), (merged_fsm, map_of_states), pi))
     ;;
 

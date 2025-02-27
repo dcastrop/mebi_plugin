@@ -56,7 +56,7 @@ module Block = States
 
 module Partition : sig
   type elt = Block.t
-  type t = Set.Make(States).t
+  type t = Set.Make(Block).t
 
   val empty : t
   val add : elt -> t -> t
@@ -291,6 +291,10 @@ module Merge : sig
     -> fsm
     -> fsm
     -> fsm * (state, state) Hashtbl.t
+end
+
+module Saturate : sig
+  val fsm : ?params:Utils.Logging.params -> fsm -> fsm
 end
 
 module PStr : sig
