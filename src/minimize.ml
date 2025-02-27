@@ -7,7 +7,7 @@ type result = fsm * (state, state) Hashtbl.t
 
 let run ?(params : Params.log = Params.Default.log ()) (the_fsm : fsm) : result =
   let bisim_result : Bisimilarity.of_bisim_result =
-    Bisimilarity.RCP.KS90.run ~params (Minimize the_fsm)
+    Bisimilarity.RCP.KS90.run ~params (Minimize the_fsm) ()
   in
   let res : Bisimilarity.result = Bisimilarity.RCP.KS90.result bisim_result in
   match res with
