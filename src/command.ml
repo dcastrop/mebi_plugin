@@ -43,8 +43,8 @@ let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
     @raise invalid_arity
       if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error. *)
 let get_lts_labels_and_terms
-      (mib : Declarations.mutual_inductive_body)
-      (mip : Declarations.one_inductive_body)
+  (mib : Declarations.mutual_inductive_body)
+  (mip : Declarations.one_inductive_body)
   : (Constr.rel_declaration * Constr.rel_declaration) mm
   =
   let open Declarations in
@@ -113,9 +113,9 @@ let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
     - Is [w_unify] the best way?
     - ... *)
 let m_unify
-      ?(params : Params.log = default_params)
-      (t0 : EConstr.t)
-      (t1 : EConstr.t)
+  ?(params : Params.log = default_params)
+  (t0 : EConstr.t)
+  (t1 : EConstr.t)
   : bool mm
   =
   params.kind <- Debug ();
@@ -195,7 +195,7 @@ let rec pstr_int_tree (t : int tree) : string =
       lhs_int
       (List.fold_left
          (fun (acc : string) (rhs_int_tree : int tree) ->
-            pstr_int_tree rhs_int_tree)
+           pstr_int_tree rhs_int_tree)
          ""
          rhs_int_tree_list)
 ;;
@@ -204,8 +204,8 @@ let rec pstr_int_tree (t : int tree) : string =
 (* (int tree * unif_problem) list -> int tree list option t *)
 (* *)
 let rec unify_all
-          ?(params : Params.log = default_params)
-          (i : (int tree * unif_problem) list)
+  ?(params : Params.log = default_params)
+  (i : (int tree * unif_problem) list)
   : int tree list option t
   =
   params.kind <- Debug ();
@@ -233,9 +233,9 @@ let rec unify_all
 ;;
 
 let sandboxed_unify
-      ?(params : Params.log = default_params)
-      (tgt_term : EConstr.t)
-      (u : (int tree * unif_problem) list)
+  ?(params : Params.log = default_params)
+  (tgt_term : EConstr.t)
+  (u : (int tree * unif_problem) list)
   : (EConstr.t * int tree list) option mm
   =
   params.kind <- Debug ();
@@ -258,11 +258,11 @@ let sandboxed_unify
 
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
-          ?(params : Params.log = default_params)
-          (acc : (EConstr.t * EConstr.t * int tree) list)
-          (i : int)
-          (act : EConstr.t)
-          (tgt_term : EConstr.t)
+  ?(params : Params.log = default_params)
+  (acc : (EConstr.t * EConstr.t * int tree) list)
+  (i : int)
+  (act : EConstr.t)
+  (tgt_term : EConstr.t)
   :  (int tree * unif_problem) list list
   -> (EConstr.t * EConstr.t * int tree) list t
   =
@@ -286,8 +286,8 @@ let rec retrieve_tgt_nodes
 
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
-          (acc : (int tree * unif_problem) list list)
-          (lts : raw_lts)
+  (acc : (int tree * unif_problem) list list)
+  (lts : raw_lts)
   :  EConstr.t list * EConstr.rel_declaration list
   -> (int tree * unif_problem) list list option t
   = function
@@ -309,7 +309,7 @@ let rec check_updated_ctx
            let ctors =
              List.map
                (fun (_, (tL : EConstr.t), (i : int tree)) ->
-                  i, { termL = tL; termR = args.(2) })
+                 i, { termL = tL; termR = args.(2) })
                ctors
            in
            (* We need to cross-product all possible unifications. This is in case
@@ -330,10 +330,10 @@ let rec check_updated_ctx
 
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
-      ?(params : Params.log = default_params)
-      (lts : raw_lts)
-      (t : EConstr.t)
-      (ma : EConstr.t option)
+  ?(params : Params.log = default_params)
+  (lts : raw_lts)
+  (t : EConstr.t)
+  (ma : EConstr.t option)
   : (EConstr.t * EConstr.t * int tree) list t
   =
   params.kind <- Debug ();
@@ -405,8 +405,8 @@ module type GraphB = sig
 
   type lts_graph =
     { to_visit : EConstr.constr Queue.t
-      (* Queue for BFS *)
-      (* ; labels : L.t *)
+        (* Queue for BFS *)
+        (* ; labels : L.t *)
     ; states : S.t
     ; transitions : lts_transition H.t
     }
@@ -497,9 +497,9 @@ struct
       @param g is an [lts_graph] accumulated while exploring [the_lts].
       @return an [lts_graph] constructed so long as the [bound] is not exceeded. *)
   let rec build_lts_graph
-            ?(params : Params.log = default_params)
-            (the_lts : raw_lts)
-            (g : lts_graph)
+    ?(params : Params.log = default_params)
+    (the_lts : raw_lts)
+    (g : lts_graph)
     : lts_graph mm
     =
     params.kind <- Debug ();
@@ -525,12 +525,12 @@ struct
                  (List.fold_left
                     (fun (acc : string)
                       ((act, ctor, int_tree) : EConstr.t * EConstr.t * int tree) ->
-                       Printf.sprintf
-                         "%s   (%s ::\n    %s[%s])\n"
-                         acc
-                         (pstr_int_tree int_tree)
-                         (econstr_to_string ctor)
-                         (econstr_to_string act))
+                      Printf.sprintf
+                        "%s   (%s ::\n    %s[%s])\n"
+                        acc
+                        (pstr_int_tree int_tree)
+                        (econstr_to_string ctor)
+                        (econstr_to_string act))
                     "\n"
                     constrs)
                  (List.length constrs)))
@@ -546,24 +546,24 @@ struct
       in
       List.iter
         (fun ((act, tgt, int_tree) : EConstr.t * EConstr.t * int tree) ->
-           log
-             ~params
-             (Printf.sprintf "\n\nTransition to: %s." (econstr_to_string tgt));
-           new_states := S.add tgt !new_states;
-           (* TODO: detect tau transitions and then defer to [Fsm.tau] instead. *)
-           let to_add : action =
-             { id = get_transition_id (); label = econstr_to_string act }
-           in
-           H.add
-             g.transitions
-             t
-             { action = to_add; index_tree = int_tree; destination = tgt };
-           if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
-           then ()
-           else Queue.push tgt g.to_visit;
-           log
-             ~params
-             (Printf.sprintf "\nVisiting next: %i." (Queue.length g.to_visit)))
+          log
+            ~params
+            (Printf.sprintf "\n\nTransition to: %s." (econstr_to_string tgt));
+          new_states := S.add tgt !new_states;
+          (* TODO: detect tau transitions and then defer to [Fsm.tau] instead. *)
+          let to_add : action =
+            { id = get_transition_id (); label = econstr_to_string act }
+          in
+          H.add
+            g.transitions
+            t
+            { action = to_add; index_tree = int_tree; destination = tgt };
+          if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
+          then ()
+          else Queue.push tgt g.to_visit;
+          log
+            ~params
+            (Printf.sprintf "\nVisiting next: %i." (Queue.length g.to_visit)))
         constrs;
       let g = { g with states = S.union g.states !new_states } in
       build_lts_graph ~params the_lts g
@@ -573,9 +573,9 @@ struct
       @param the_lts is ...
       @param t is the original Coq-term. *)
   let build_graph
-        ?(params : Params.log = default_params)
-        (the_lts : raw_lts)
-        (t : Constrexpr.constr_expr_r CAst.t)
+    ?(params : Params.log = default_params)
+    (the_lts : raw_lts)
+    (t : Constrexpr.constr_expr_r CAst.t)
     : lts_graph mm
     =
     let$ t env sigma = Constrintern.interp_constr_evars env sigma t in
@@ -602,8 +602,8 @@ struct
     (* TODO: refactor pstr_lts and others *)
 
     let constructor
-          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-          (t : lts_transition)
+      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+      (t : lts_transition)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -619,8 +619,8 @@ struct
     ;;
 
     let transition
-          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-          ((from, transition) : EConstr.constr * lts_transition)
+      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+      ((from, transition) : EConstr.constr * lts_transition)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -647,8 +647,8 @@ struct
     ;;
 
     let transitions
-          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-          (transitions : lts_transition H.t)
+      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+      (transitions : lts_transition H.t)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -662,11 +662,11 @@ struct
             (fun (from : EConstr.t)
               (transition' : lts_transition)
               (acc : string) ->
-               Printf.sprintf
-                 "%s%s%s\n"
-                 acc
-                 tabs'
-                 (run (transition (from, transition'))))
+              Printf.sprintf
+                "%s%s%s\n"
+                acc
+                tabs'
+                (run (transition (from, transition'))))
             transitions
             "\n"
         in
@@ -674,8 +674,8 @@ struct
     ;;
 
     let states
-          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-          (states : N.t)
+      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+      (states : N.t)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -687,7 +687,7 @@ struct
         let pstr : string =
           N.fold
             (fun (s : EConstr.t) (acc : string) ->
-               Printf.sprintf "%s%s%s\n" acc tabs' (run (econstr s)))
+              Printf.sprintf "%s%s%s\n" acc tabs' (run (econstr s)))
             states
             "\n"
         in
@@ -695,8 +695,8 @@ struct
     ;;
 
     let queue
-          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-          (q : EConstr.t Queue.t)
+      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+      (q : EConstr.t Queue.t)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -708,7 +708,7 @@ struct
         let pstr : string =
           Queue.fold
             (fun (acc : string) (to_visit : EConstr.t) ->
-               Printf.sprintf "%s%s%s\n" acc tabs' (run (econstr to_visit)))
+              Printf.sprintf "%s%s%s\n" acc tabs' (run (econstr to_visit)))
             "\n"
             q
         in
@@ -716,8 +716,8 @@ struct
     ;;
 
     let lts
-          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-          (g : lts_graph)
+      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+      (g : lts_graph)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -782,28 +782,28 @@ struct
     (* type coq_translation = coq_translation_record mm *)
 
     let translate_coq_terms
-          ?(params : Params.log = default_params)
-          (states : N.t)
+      ?(params : Params.log = default_params)
+      (states : N.t)
       : coq_translation mm
       =
       let tbl : coq_translation = make_coq_translation in
       S.iter
         (fun (s : EConstr.t) ->
-           match Hashtbl.find_opt tbl.from_coq s with
-           | None ->
-             (* add as new state *)
-             let str : string = econstr_to_string s in
-             Hashtbl.add tbl.from_coq s str;
-             Hashtbl.add tbl.to_coq str s
-           | Some _ -> (* ignore *) ())
+          match Hashtbl.find_opt tbl.from_coq s with
+          | None ->
+            (* add as new state *)
+            let str : string = econstr_to_string s in
+            Hashtbl.add tbl.from_coq s str;
+            Hashtbl.add tbl.to_coq str s
+          | Some _ -> (* ignore *) ())
         states;
       return tbl
     ;;
 
     let translate_coq_lts
-          ?(params : Params.log = default_params)
-          (transitions : lts_transition H.t)
-          (tbl : coq_translation)
+      ?(params : Params.log = default_params)
+      (transitions : lts_transition H.t)
+      (tbl : coq_translation)
       : Lts.raw_flat_lts mm
       =
       return
@@ -811,19 +811,19 @@ struct
            (fun (from : EConstr.t)
              (transition : (action, EConstr.constr) transition)
              (acc : Lts.raw_flat_lts) ->
-              List.append
-                acc
-                [ ( Hashtbl.find tbl.from_coq from
-                  , transition.action.label
-                  , Hashtbl.find tbl.from_coq transition.destination )
-                ])
+             List.append
+               acc
+               [ ( Hashtbl.find tbl.from_coq from
+                 , transition.action.label
+                 , Hashtbl.find tbl.from_coq transition.destination )
+               ])
            transitions
            [])
     ;;
 
     let translate_init_term
-          (init_term : Constrexpr.constr_expr_r CAst.t)
-          (tbl : coq_translation)
+      (init_term : Constrexpr.constr_expr_r CAst.t)
+      (tbl : coq_translation)
       : string mm
       =
       let$ t env sigma = Constrintern.interp_constr_evars env sigma init_term in
@@ -836,9 +836,9 @@ struct
     exception UnfinishedLTS of lts_graph
 
     let lts_graph_to_lts
-          ?(params : Params.log = default_params)
-          (g : lts_graph)
-          (init_term : Constrexpr.constr_expr_r CAst.t)
+      ?(params : Params.log = default_params)
+      (g : lts_graph)
+      (init_term : Constrexpr.constr_expr_r CAst.t)
       : (Lts.lts * coq_translation) mm
       =
       params.kind <- Debug ();
@@ -863,8 +863,8 @@ struct
 
   (* TODO: from [LTS.lts] and [coq_translation] create a coq term and save to file *)
   (* module ReCoq = struct
-    (* let from_lts *)
-  end *)
+     (* let from_lts *)
+     end *)
 end
 
 (** [make_graph_builder] is ... *)
@@ -877,9 +877,9 @@ let make_graph_builder =
 ;;
 
 let build_lts_graph
-      ?(params : Params.log = default_params)
-      (iref : Names.GlobRef.t)
-      (tref : Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
   : raw_lts mm
   =
   params.kind <- Debug ();
@@ -936,9 +936,9 @@ let build_lts_graph
 
 (**  *)
 let build_fsm_from_lts
-      ?(params : Params.log = default_params)
-      (iref : Names.GlobRef.t)
-      (tref : Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
   : fsm mm
   =
   (* TODO: make this return the conversion stuff too *)
@@ -1036,9 +1036,9 @@ let build_fsm_from_lts
     - States are the sets of possible transitions
     - A term [t] is represented by the state of the transitions that can be taken *)
 let cmd_bounded_lts
-      ?(params : Params.log = default_params)
-      (iref : Names.GlobRef.t)
-      (tref : Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   params.kind <- Details ();
@@ -1048,9 +1048,9 @@ let cmd_bounded_lts
 ;;
 
 let cmd_bounded_lts_to_fsm
-      ?(params : Params.log = default_params)
-      (iref : Names.GlobRef.t)
-      (tref : Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   params.kind <- Debug ();
@@ -1059,9 +1059,9 @@ let cmd_bounded_lts_to_fsm
 ;;
 
 let cmd_merge_fsm_from_lts
-      ?(params : Params.log = default_params)
-      ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-      ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   params.kind <- Debug ();
@@ -1086,15 +1086,15 @@ exception UnexpectedResultKind of Bisimilarity.result
 
 (* *)
 let cmd_bisim_ks90_using_fsm
-      ?(params : Params.log = default_params)
-      (s : fsm)
-      (t : fsm)
+  ?(params : Params.log = default_params)
+  (s : fsm)
+  (t : fsm)
   : unit mm
   =
   let open Bisimilarity in
   (* *)
   params.kind <- Debug ();
-  let raw_result = RCP.KS90.run ~params (ToMerge (s, t)) in
+  let raw_result = RCP.KS90.run ~params (ToMerge (s, t)) () in
   let result = RCP.KS90.result ~params raw_result in
   match result with
   | BisimResult result' ->
@@ -1112,9 +1112,9 @@ let cmd_bisim_ks90_using_fsm
 
 (* *)
 let cmd_bisim_ks90_using_lts_to_fsm
-      ?(params : Params.log = default_params)
-      ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-      ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   if Bool.not params.options.show_debug_output
@@ -1129,8 +1129,8 @@ let cmd_bisim_ks90_using_lts_to_fsm
 
 (* *)
 let cmd_minim_ks90_using_fsm
-      ?(params : Params.log = default_params)
-      (the_fsm : fsm)
+  ?(params : Params.log = default_params)
+  (the_fsm : fsm)
   : unit mm
   =
   (* *)
@@ -1153,8 +1153,8 @@ let cmd_minim_ks90_using_fsm
 
 (* *)
 let cmd_minim_ks90_using_lts_to_fsm
-      ?(params : Params.log = default_params)
-      ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   if Bool.not params.options.show_debug_output
@@ -1168,8 +1168,8 @@ let cmd_minim_ks90_using_lts_to_fsm
 
 (* *)
 let cmd_minim_ks90_using_lts_to_fsm_to_lts
-      ?(params : Params.log = default_params)
-      ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   if Bool.not params.options.show_debug_output

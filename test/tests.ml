@@ -95,8 +95,23 @@ let pstr_exa_bisim_result
          (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) merged_fsm))
 ;;
 
+let rec ks90_run_bisim
+  ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
+  ((name, kind) : string * exa_kind)
+  ((s, t) : fsm * fsm)
+  (weak : RCP.KS90.of_weak_bisim_input)
+  : result
+  =
+  (* safely print depending on if coq or not *)
+  log ~params (pstr_exa_bisim ~params name s t);
+  (* run algorithm *)
+  let raw_result : of_bisim_result =
+    RCP.KS90.run ~params (ToMerge (s, t)) weak
+  in
+  RCP.KS90.result ~params raw_result
+
 (** [ks90_exas] ... *)
-let rec ks90_exas
+and ks90_exas
   ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
   (exas : example list)
   : (string * bool * bool) list
@@ -107,24 +122,22 @@ let rec ks90_exas
   | exa :: exas' ->
     (match exa with
      | { name; kind } ->
-       (match kind with
-        | Bisim { s; t; are_bisimilar } ->
-          let expected_result : bool = are_bisimilar in
-          (* safely print depending on if coq or not *)
-          log ~params (pstr_exa_bisim ~params name s t);
-          (* run algorithm *)
-          let raw_result : of_bisim_result =
-            RCP.KS90.run ~params (ToMerge (s, t))
-          in
-          let result : result = RCP.KS90.result ~params raw_result in
-          (match result with
-           | BisimResult result' ->
-             (* print out results *)
-             log ~params (pstr_exa_bisim_result ~params exa result');
-             (* continue *)
-             (name, expected_result, are_bisimilar) :: ks90_exas ~params exas'
-           | _ -> raise (UnexpectedBisimResult result))
-        | _ -> raise (UnexpectedExampleKind kind)))
+       let (result, expected_result) : result * bool =
+         match kind with
+         | Bisim { s; t; are_bisimilar } ->
+           ks90_run_bisim ~params (name, kind) (s, t) (), are_bisimilar
+         | Weak { s; t; are_bisimilar } ->
+           ks90_run_bisim ~params (name, kind) (s, t) Weak, are_bisimilar
+         | _ -> raise (UnexpectedExampleKind kind)
+       in
+       (match result with
+        | BisimResult result' ->
+          (* print out results *)
+          log ~params (pstr_exa_bisim_result ~params exa result');
+          (* continue *)
+          (name, expected_result, result'.are_bisimilar)
+          :: ks90_exas ~params exas'
+        | _ -> raise (UnexpectedBisimResult result)))
 ;;
 
 let run_all_ks90
@@ -144,6 +157,7 @@ let run_all_ks90
     ; exa_rec_2
     ; exa_par_1
     ; exa_self_act1
+    ; exa_weak1
     ]
 ;;
 

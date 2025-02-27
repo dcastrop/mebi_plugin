@@ -77,6 +77,10 @@ module RCP : sig
       -> minim_result ref
       -> unit
 
+    type of_weak_bisim_input =
+      | ()
+      | Weak
+
     type of_bisim_input =
       | ToMerge of (Fsm.fsm * Fsm.fsm)
       | Merged of
@@ -85,7 +89,11 @@ module RCP : sig
 
     exception RunInputNotExpected of of_bisim_input
 
-    val run : ?params:Utils.Logging.params -> of_bisim_input -> of_bisim_result
+    val run
+      :  ?params:Utils.Logging.params
+      -> of_bisim_input
+      -> of_weak_bisim_input
+      -> of_bisim_result
 
     type state_origins =
       { s : bool
