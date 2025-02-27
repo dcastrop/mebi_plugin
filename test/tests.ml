@@ -99,7 +99,7 @@ let rec ks90_run_bisim
   ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
   ((name, kind) : string * exa_kind)
   ((s, t) : fsm * fsm)
-  (weak : RCP.KS90.of_weak_bisim_input)
+  (weak : RCP.KS90.check_weak_bisim)
   : result
   =
   (* safely print depending on if coq or not *)
