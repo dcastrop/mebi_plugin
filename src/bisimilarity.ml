@@ -13,7 +13,7 @@ open Utils
    - redefine [Fsm.action] to be either a silent transition, or a labelled transition
    - do not add [Fsm.Tau] to [Fsm.Alphabet]
    - update [Fsm.Alphabet] to be of [Fsm.label] for labelled transitions
-   - extend [Fsm.get_edges_of] to ignore silent transitions (configurable)
+   - extend [Fsm.Get.edges_of] to ignore silent transitions (configurable)
    - 'closure of tau actions'
    - will be useful when proving in coq
    - to be created during bisim
@@ -98,7 +98,7 @@ module RCP = struct
       (pi : Partition.t)
       : Partition.t
       =
-      let destinations : States.t = get_all_destinations (Actions actions) in
+      let destinations : States.t = Fsm.Get.destinations (Actions actions) in
       match States.is_empty destinations with
       | true -> Partition.empty
       | false ->
@@ -150,13 +150,13 @@ module RCP = struct
       else (
         (* select some state [s] from block *)
         let s : state = Block.min_elt block in
-        let s_actions : States.t Actions.t = get_actions_from s edges in
+        let s_actions : States.t Actions.t = Fsm.Get.actions_from s edges in
         let s_reachable_blocks : Partition.t =
           reachable_blocks ~params s_actions pi
         in
         Block.fold
           (fun (t : state) ((b1, b2) : Block.t * Block.t) ->
-            let t_actions : States.t Actions.t = get_actions_from t edges in
+            let t_actions : States.t Actions.t = Fsm.Get.actions_from t edges in
             (* check if to add to [b1] or [b2]. *)
             match lengths_gtr_0 s_actions t_actions with
             (* neither [s] or [t] have action [a]. *)
@@ -244,7 +244,7 @@ module RCP = struct
           let b = ref _b in
           Alphabet.iter
             (fun (a : action) : unit ->
-              let edges_of_a = get_edges_of a edges in
+              let edges_of_a = Fsm.Get.edges_of a edges in
               let b1, b2 = split ~params !b a !pi edges_of_a in
               inner_loop b1 b2 b pi changed)
             alphabet)
@@ -313,8 +313,22 @@ module RCP = struct
               | Merged (s, t, _merged_fsm, _map_of_states) -> s, t
               | _ -> raise (RunInputNotExpected input)
             in
+            params.override <- Some ();
             let sat_s : fsm = Saturate.fsm ~params s
             and sat_t : fsm = Saturate.fsm ~params t in
+            log
+              ~params
+              (Printf.sprintf
+                 "\n\n(Weak, Saturation), S: %s,\n\nSaturated S: %s.\n\n"
+                 (Fsm.PStr.fsm ~params:(Log params) s)
+                 (Fsm.PStr.fsm ~params:(Log params) sat_s));
+            (* log
+               ~params
+               (Printf.sprintf
+               "\n\n(Weak, Saturation), T: %s,\n\nSaturated T: %s.\n\n"
+               (Fsm.PStr.fsm ~params:(Log params) t)
+               (Fsm.PStr.fsm ~params:(Log params) sat_t)); *)
+            params.override <- None;
             let merged_fsm, map_of_states = Merge.fsms sat_s sat_t in
             sat_s, sat_t, merged_fsm, map_of_states
           | () ->
