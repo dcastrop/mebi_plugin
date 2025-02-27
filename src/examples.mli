@@ -9,6 +9,7 @@ type minim_exa = { the_fsm : Fsm.fsm }
 type exa_kind =
   | Bisim of bisim_exa
   | Minim of minim_exa
+  | Weak of bisim_exa
 
 type example =
   { name : string
@@ -27,3 +28,4 @@ val exa_rec_1 : example
 val exa_rec_2 : example
 val exa_par_1 : example
 val exa_self_act1 : example
+val exa_weak1 : example
