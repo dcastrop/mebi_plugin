@@ -41,10 +41,10 @@ type action =
   { id : int
   ; label : string
   ; is_tau : bool
-  ; annotation : States.t option
+  ; mutable annotation : (state * action) list
   }
 
-let tau : action = { id = 0; label = "~"; is_tau = true; annotation = None }
+let tau : action = { id = 0; label = "~"; is_tau = true; annotation = [] }
 
 (** [Alphabet] is a set of [actions]. *)
 module Alphabet = Set.Make (struct
@@ -232,11 +232,31 @@ module PStr = struct
     let _params' : Params.fmt = no_tab _params
     and tabs : string = str_tabs _params.tabs in
     Printf.sprintf
-      "%s{ %s ---%s--> %s }"
+      "%s{ %s ---%s--> %s } %s"
       (if _params.no_leading_tab then "" else tabs)
       (state ~params:(Fmt _params') from)
       (action ~params:(Fmt _params') a)
       (state ~params:(Fmt _params') destination)
+      (if a.is_tau
+       then (
+         match a.annotation with
+         | [] -> "anno: [] (empty)"
+         | (h_s, h_a) :: annotation ->
+           Printf.sprintf
+             "anno: [%s]"
+             (List.fold_left
+                (fun (acc : string) ((t_s, t_a) : state * action) ->
+                  Printf.sprintf
+                    "%s; (%s, %s)"
+                    acc
+                    (state ~params:(Fmt _params') t_s)
+                    (action ~params:(Fmt _params') t_a))
+                (Printf.sprintf
+                   "%s, %s"
+                   (state ~params:(Fmt _params') h_s)
+                   (action ~params:(Fmt _params') h_a))
+                annotation))
+       else "")
   ;;
 
   let actions
@@ -408,7 +428,7 @@ module Create = struct
       @param id is the unique identifier for the state. *)
   let action
     ?(is_tau : bool option)
-    ?(annotation : States.t option)
+    ?(annotation : (state * action) list option)
     (params : action_param)
     : action
     =
@@ -416,6 +436,11 @@ module Create = struct
       match is_tau with
       | None -> false
       | Some t -> t
+    in
+    let annotation : (state * action) list =
+      match annotation with
+      | None -> []
+      | Some anno -> anno
     in
     match params with
     | Of (id, label) -> { id; label; is_tau; annotation }
@@ -471,6 +496,12 @@ end
 (****** Clone ********************************************************)
 (*********************************************************************)
 module Clone = struct
+  let action (a : action) : action =
+    match a with
+    | { id; label; is_tau; annotation } ->
+      Create.action ~is_tau ~annotation (Of (id, label))
+  ;;
+
   let fsm (m : fsm) : fsm =
     match m with
     | { init; alphabet; states; edges } -> Create.fsm init alphabet states edges
@@ -500,7 +531,7 @@ module New = struct
 
   let action
     ?(is_tau : bool option)
-    ?(annotation : States.t option)
+    ?(annotation : (state * action) list option)
     (label : string)
     (fsm : fsm)
     : action
@@ -509,6 +540,11 @@ module New = struct
       match is_tau with
       | None -> false
       | Some t -> t
+    in
+    let annotation : (state * action) list =
+      match annotation with
+      | None -> []
+      | Some anno -> anno
     in
     match
       Alphabet.find_opt { id = -1; label; is_tau; annotation } fsm.alphabet
@@ -855,46 +891,51 @@ end
 module Saturate = struct
   open Utils
 
-  let rec annotate_edges_from
-    (from : state)
-    (add_to : States.t Actions.t)
-    (prefix : States.t)
-    (skip_states : States.t)
+  (** [collected_annotated_actions ?params visited destinations m] ...
+      @param visited
+        is the trace of states reached via silent actions used for annotation. *)
+  let rec collect_annotated_actions
+    ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
+    (visited : States.t)
+    (annotation : (state * action) list)
+    (to_visit : States.t)
     (m : fsm)
-    : unit
+    : States.t Actions.t
     =
-    if States.mem from skip_states == false
-    then (
-      (* get destinations of silent actions *)
-      let silent_destinations : States.t =
-        Get.destinations (Actions (Edges.find m.edges from))
-      in
-      (* get actions of destinations *)
-      States.iter
-        (fun (destination : state) ->
-          let destination_actions : States.t Actions.t =
-            Edges.find m.edges destination
-          in
-          Actions.iter
-            (fun (a : action) (destinations : States.t) ->
-              if a.is_tau
-              then (
-                (* visit this destination with prefixed annotation *)
-                let prefix' : States.t = States.add destination prefix in
-                States.iter
-                  (fun (destination' : state) ->
-                    annotate_edges_from
-                      destination'
-                      add_to
-                      prefix'
-                      (States.add destination' skip_states)
-                      m)
-                  destinations)
-              else (* just add as normal *)
-                Actions.add add_to a destinations)
-            destination_actions;
-          ())
-        silent_destinations)
+    let collection : States.t Actions.t = Create.actions () in
+    States.iter
+      (fun (destination : state) ->
+        match Edges.find_opt m.edges destination with
+        | None -> ()
+        | Some destination_actions ->
+          if States.mem destination visited == false
+          then
+            Actions.iter
+              (fun (a : action) (destinations : States.t) ->
+                if a.is_tau
+                then (
+                  let annotated_actions : States.t Actions.t =
+                    collect_annotated_actions
+                      ~params
+                      (States.add destination visited)
+                      (List.append annotation [ destination, a ])
+                      (States.union to_visit destinations)
+                      m
+                  in
+                  Actions.add_seq collection (Actions.to_seq annotated_actions))
+                else (
+                  let a' : action =
+                    Create.action
+                      ?is_tau:(Some true)
+                      ?annotation:
+                        (Some (List.append annotation [ destination, a ]))
+                      (Of (Alphabet.cardinal m.alphabet, tau.label))
+                  in
+                  m.alphabet <- Alphabet.add a' m.alphabet;
+                  Actions.add collection a' destinations))
+              destination_actions)
+      to_visit;
+    collection
   ;;
 
   let fsm
@@ -903,36 +944,34 @@ module Saturate = struct
     : fsm
     =
     let m : fsm = Clone.fsm to_saturate in
-    let silent_states : States.t =
-      (* Get.silent_states (FSM m) *)
-      Get.from_states (Filter.edges (Edges m.edges) (Action IsSilent))
-    in
     Logging.log
       ~params
       (Printf.sprintf
          "Fsm.Saturate.fsm, silent states: %s."
-         (PStr.states ~params:(Log params) silent_states));
-    (* for each state with silent actions, accumulate:
-       visit: each destination reached via a silent action,
-       for each outgoing transition of destination:
-       - if non-silent, add to accumulate
-       - if silent, visit *)
-    States.iter
-      (fun (from : state) ->
-        let annotated_actions : States.t Actions.t = Create.actions () in
-        Logging.log
-          ~params
-          (Printf.sprintf
-             "Fsm.Saturate.fsm, (from:%s)"
-             (PStr.state ~params:(Log params) from));
-        annotate_edges_from
-          from
-          annotated_actions
-          States.empty
-          (States.singleton from)
-          m;
-        Edges.add m.edges from annotated_actions)
-      silent_states;
+         (PStr.states
+            ~params:(Log params)
+            (Get.from_states (Filter.edges (Edges m.edges) (Action IsSilent)))));
+    (* for each outgoing edge from a state *)
+    Edges.iter
+      (fun (from : state) (a's : States.t Actions.t) ->
+        Actions.iter
+          (fun (a : action) (destinations : States.t) ->
+            (* if it is silent,
+               - then collect all of the destination states transitions,
+               - and if those transitions are also silent, continue recursively *)
+            if a.is_tau
+            then (
+              let annotated_actions : States.t Actions.t =
+                collect_annotated_actions
+                  ~params
+                  (States.singleton from)
+                  [ from, a ]
+                  destinations
+                  m
+              in
+              Actions.add_seq a's (Actions.to_seq annotated_actions)))
+          a's)
+      m.edges;
     m
   ;;
 end

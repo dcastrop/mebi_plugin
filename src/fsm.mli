@@ -107,7 +107,7 @@ type action =
   { id : int
   ; label : string
   ; is_tau : bool
-  ; annotation : Block.t option
+  ; mutable annotation : (state * action) list
   }
 
 val tau : action
@@ -268,7 +268,11 @@ module Create : sig
     | Of of (int * string)
     | From of int
 
-  val action : ?is_tau:bool -> ?annotation:Block.t -> action_param -> action
+  val action
+    :  ?is_tau:bool
+    -> ?annotation:(state * action) list
+    -> action_param
+    -> action
 
   type alphabet_param =
     | ()
@@ -293,12 +297,19 @@ module Create : sig
 end
 
 module Clone : sig
+  val action : action -> action
   val fsm : fsm -> fsm
 end
 
 module New : sig
   val state : string -> fsm -> state
-  val action : ?is_tau:bool -> ?annotation:Block.t -> string -> fsm -> action
+
+  val action
+    :  ?is_tau:bool
+    -> ?annotation:(state * action) list
+    -> string
+    -> fsm
+    -> action
 end
 
 module Append : sig
@@ -394,13 +405,13 @@ module Merge : sig
 end
 
 module Saturate : sig
-  val annotate_edges_from
-    :  state
-    -> Block.t Actions.t
+  val collect_annotated_actions
+    :  ?params:Utils.Logging.params
     -> Block.t
+    -> (state * action) list
     -> Block.t
     -> fsm
-    -> unit
+    -> Block.t Actions.t
 
   val fsm : ?params:Utils.Logging.params -> fsm -> fsm
 end
