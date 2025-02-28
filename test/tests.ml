@@ -73,27 +73,23 @@ let pstr_exa_bisim
 
 let pstr_exa_bisim_result
   ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
-  (exa : example)
+  (name : string)
   (result : bisim_result)
   : string
   =
-  match exa with
-  | { name; _ } ->
-    (match result with
-     | { are_bisimilar; merged_fsm; bisimilar_states; non_bisimilar_states } ->
-       Printf.sprintf
-         "[KS90] (%s) Results: (s ~ t) = %b.\n\n\
-          Bisimilar states: %s.\n\n\
-          Non-bisimilar states: %s.\n\n\
-          Using merged FSM: %s.\n\n\
-          = = = = = = = = = = = = = = = = = = =\n\n"
-         name
-         are_bisimilar
-         (Mebi_plugin.Fsm.PStr.partition ~params:(Log params) bisimilar_states)
-         (Mebi_plugin.Fsm.PStr.partition
-            ~params:(Log params)
-            non_bisimilar_states)
-         (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) merged_fsm))
+  match result with
+  | { are_bisimilar; merged_fsm; bisimilar_states; non_bisimilar_states } ->
+    Printf.sprintf
+      "[KS90] (%s) Results: (s ~ t) = %b.\n\n\
+       Bisimilar states: %s.\n\n\
+       Non-bisimilar states: %s.\n\n\
+       Using merged FSM: %s.\n\n\
+       = = = = = = = = = = = = = = = = = = =\n\n"
+      name
+      are_bisimilar
+      (Mebi_plugin.Fsm.PStr.partition ~params:(Log params) bisimilar_states)
+      (Mebi_plugin.Fsm.PStr.partition ~params:(Log params) non_bisimilar_states)
+      (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) merged_fsm)
 ;;
 
 let rec ks90_run_bisim
@@ -134,7 +130,8 @@ and ks90_exas
        (match result with
         | BisimResult result' ->
           (* print out results *)
-          log ~params (pstr_exa_bisim_result ~params exa result');
+          params.kind <- Details ();
+          log ~params (pstr_exa_bisim_result ~params name result');
           (* continue *)
           (name, expected_result, result'.are_bisimilar)
           :: ks90_exas ~params exas'
@@ -159,6 +156,7 @@ let run_all_ks90
     ; exa_par_1
     ; exa_self_act1
     ; exa_weak1
+    ; exa_weak2
     ]
 ;;
 
@@ -214,6 +212,6 @@ let quick_test
     - Next, run the tests:
 
     _build/default/test/tests.exe *)
-let () = run_all ()
+(* let () = run_all () *)
 
-(* let () = quick_test () *)
+let () = quick_test ()

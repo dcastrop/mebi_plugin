@@ -32,3 +32,4 @@ val exa_self_act1 : example
 val exa_saturated1 : example
 val exa_saturated2 : example
 val exa_weak1 : example
+val exa_weak2 : example
