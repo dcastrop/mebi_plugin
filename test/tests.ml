@@ -212,6 +212,6 @@ let quick_test
     - Next, run the tests:
 
     _build/default/test/tests.exe *)
-(* let () = run_all () *)
+let () = run_all ()
 
-let () = quick_test ()
+(* let () = quick_test () *)
