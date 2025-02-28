@@ -177,8 +177,9 @@ let quick_test
   ()
   : unit
   =
-  params.kind <- Details ();
+  (* params.kind <- Details (); *)
   let example_to_test : Mebi_plugin.Examples.example =
+    (* Mebi_plugin.Examples.exa_saturated1 *)
     Mebi_plugin.Examples.exa_saturated2
   in
   log ~params (Printf.sprintf "\nQuickTest: %s." example_to_test.name);
