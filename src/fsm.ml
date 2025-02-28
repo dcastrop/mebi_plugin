@@ -929,7 +929,7 @@ module Saturate = struct
                       ?is_tau:(Some true)
                       ?annotation:
                         (Some (List.append annotation [ destination, a ]))
-                      (Of (Alphabet.cardinal m.alphabet, tau.label))
+                      (Of (Alphabet.cardinal m.alphabet, a.label))
                   in
                   m.alphabet <- Alphabet.add a' m.alphabet;
                   Actions.add collection a' destinations))
