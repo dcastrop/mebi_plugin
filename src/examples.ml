@@ -335,7 +335,7 @@ let exa_weak1 : example =
          (Nested
             [ "t0", [ "a", [ "t1" ]; "c", [ "t2" ] ]
             ; "t1", [ "b", [ "t3" ] ]
-            ; "t2", [ "d", [ "t3" ] ]
+            ; "t2", [ "d", [ "t4" ] ]
             ]))
   in
   exa "exa_weak1" (Weak { s; t; are_bisimilar = true })
