@@ -99,7 +99,7 @@ let rec ks90_run_bisim
   ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
   ((name, kind) : string * exa_kind)
   ((s, t) : fsm * fsm)
-  (weak : RCP.KS90.of_weak_bisim_input)
+  (weak : RCP.KS90.check_weak_bisim)
   : result
   =
   (* safely print depending on if coq or not *)
@@ -170,6 +170,39 @@ let run_all ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ()) ()
   log ~params "\n\nEnd of Tests.ml.\n"
 ;;
 
+exception QuickTestFiled of example
+
+let quick_test
+  ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
+  ()
+  : unit
+  =
+  params.kind <- Details ();
+  let example_to_test : Mebi_plugin.Examples.example =
+    Mebi_plugin.Examples.exa_saturated2
+  in
+  log ~params (Printf.sprintf "\nQuickTest: %s." example_to_test.name);
+  let to_test : Mebi_plugin.Fsm.fsm =
+    match example_to_test.kind with
+    | Saturate s -> s
+    | _ -> raise (QuickTestFiled example_to_test)
+  in
+  log
+    ~params
+    (Printf.sprintf
+       "\nUnsaturated: %s."
+       (Mebi_plugin.Fsm.PStr.edges ~params:(Log params) to_test.edges));
+  let saturated : Mebi_plugin.Fsm.fsm =
+    Mebi_plugin.Fsm.Saturate.fsm ~params to_test
+  in
+  log
+    ~params
+    (Printf.sprintf
+       "\nSaturated: %s."
+       (Mebi_plugin.Fsm.PStr.edges ~params:(Log params) saturated.edges));
+  log ~params (Printf.sprintf "\nEnd of Tests.ml (%s)" example_to_test.name)
+;;
+
 (** To run tests...
 
     - First build the project:
@@ -179,4 +212,7 @@ let run_all ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ()) ()
     - Next, run the tests:
 
     _build/default/test/tests.exe *)
-let () = run_all ()
+let () =
+  (* run_all () *)
+  quick_test ()
+;;

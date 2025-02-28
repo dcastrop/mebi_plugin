@@ -30,6 +30,10 @@ end
 
 module RCP : sig
   module KS90 : sig
+    type check_weak_bisim =
+      | ()
+      | Weak
+
     exception EmptyBlock of Fsm.States.t
     exception PartitionsNotDisjoint of minim_result
 
@@ -75,11 +79,8 @@ module RCP : sig
       -> Fsm.Alphabet.t
       -> Fsm.States.t Fsm.Actions.t Fsm.Edges.t
       -> minim_result ref
+      -> check_weak_bisim
       -> unit
-
-    type of_weak_bisim_input =
-      | ()
-      | Weak
 
     type of_bisim_input =
       | ToMerge of (Fsm.fsm * Fsm.fsm)
@@ -88,11 +89,12 @@ module RCP : sig
       | Minimize of Fsm.fsm
 
     exception RunInputNotExpected of of_bisim_input
+    exception MinimizeDoesNotExpectWeak of (of_bisim_input * check_weak_bisim)
 
     val run
       :  ?params:Utils.Logging.params
       -> of_bisim_input
-      -> of_weak_bisim_input
+      -> check_weak_bisim
       -> of_bisim_result
 
     type state_origins =
