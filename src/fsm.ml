@@ -247,7 +247,7 @@ module PStr = struct
              (List.fold_left
                 (fun (acc : string) ((t_s, t_a) : state * action) ->
                   Printf.sprintf
-                    "%s; (%s, %s)"
+                    "%s; %s, %s"
                     acc
                     (state ~params:(Fmt _params') t_s)
                     (action ~params:(Fmt _params') t_a))
