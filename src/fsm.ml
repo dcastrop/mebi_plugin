@@ -949,10 +949,10 @@ module Saturate = struct
     (visited : States.t)
     (annotation : (state * action) list)
     (to_visit : States.t)
+    (saturated_actions : States.t Actions.t)
     (m : fsm)
     : States.t Actions.t
     =
-    let collection : States.t Actions.t = Create.actions () in
     States.iter
       (fun (destination : state) ->
         match Edges.find_opt m.edges destination with
@@ -970,9 +970,12 @@ module Saturate = struct
                       (States.add destination visited)
                       (List.append annotation [ destination, a ])
                       (States.union to_visit destinations)
+                      saturated_actions
                       m
                   in
-                  Actions.add_seq collection (Actions.to_seq annotated_actions))
+                  Actions.add_seq
+                    saturated_actions
+                    (Actions.to_seq annotated_actions))
                 else (
                   let a' : action =
                     Create.action
@@ -982,10 +985,10 @@ module Saturate = struct
                       (Of (Alphabet.cardinal m.alphabet, a.label))
                   in
                   m.alphabet <- Alphabet.add a' m.alphabet;
-                  Actions.add collection a' destinations))
+                  Actions.add saturated_actions a' destinations))
               destination_actions)
       to_visit;
-    collection
+    saturated_actions
   ;;
 
   let fsm
@@ -994,16 +997,11 @@ module Saturate = struct
     : fsm
     =
     let m : fsm = Clone.fsm to_saturate in
-    (* Logging.log
-       ~params
-       (Printf.sprintf
-       "Fsm.Saturate.fsm, silent states: %s."
-       (PStr.states
-       ~params:(Log params)
-       (Get.from_states (Filter.edges (Edges m.edges) (Action IsSilent))))); *)
+    let saturated_edges : States.t Actions.t Edges.t = Create.edges () in
     (* for each outgoing edge from a state *)
     Edges.iter
       (fun (from : state) (a's : States.t Actions.t) ->
+        let saturated_actions : States.t Actions.t = Create.actions () in
         Actions.iter
           (fun (a : action) (destinations : States.t) ->
             (* if it is silent,
@@ -1017,11 +1015,17 @@ module Saturate = struct
                   (States.singleton from)
                   [ from, a ]
                   destinations
+                  saturated_actions
                   m
               in
-              Actions.add_seq a's (Actions.to_seq annotated_actions)))
-          a's)
+              Actions.add_seq
+                saturated_actions
+                (Actions.to_seq annotated_actions))
+            else Actions.add saturated_actions a destinations)
+          a's;
+        Edges.add saturated_edges from saturated_actions)
       m.edges;
+    m.edges <- saturated_edges;
     m
   ;;
 end
