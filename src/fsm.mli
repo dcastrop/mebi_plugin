@@ -297,7 +297,13 @@ module Create : sig
 end
 
 module Clone : sig
+  val state : state -> state
+  val states : Block.t -> Block.t
+  val init_state : state option -> state option
+  val alphabet : Alphabet.t -> Alphabet.t
   val action : action -> action
+  val actions : Block.t Actions.t -> Block.t Actions.t
+  val edges : Block.t Actions.t Edges.t -> Block.t Actions.t Edges.t
   val fsm : fsm -> fsm
 end
 
@@ -410,6 +416,7 @@ module Saturate : sig
     -> Block.t
     -> (state * action) list
     -> Block.t
+    -> Block.t Actions.t
     -> fsm
     -> Block.t Actions.t
 
