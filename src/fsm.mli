@@ -418,7 +418,7 @@ module Saturate : sig
     -> Block.t
     -> Block.t Actions.t
     -> fsm
-    -> Block.t Actions.t
+    -> unit
 
   val fsm : ?params:Utils.Logging.params -> fsm -> fsm
 end
