@@ -307,6 +307,10 @@ module Clone : sig
   val fsm : fsm -> fsm
 end
 
+module IsMatch : sig
+  val action : ?weak:bool -> action -> action -> bool
+end
+
 module New : sig
   val state : string -> fsm -> state
 
@@ -356,17 +360,25 @@ module Filter : sig
   val filter_states : Block.t -> kind_state_filter -> Block.t
 
   val filter_actions
-    :  Block.t Actions.t
+    :  ?weak:bool
+    -> Block.t Actions.t
     -> kind_action_filter
     -> Block.t Actions.t
 
   val filter_edges
-    :  Block.t Actions.t Edges.t
+    :  ?weak:bool
+    -> Block.t Actions.t Edges.t
     -> kind_edge_filter
     -> Block.t Actions.t Edges.t
 
   val actions : Block.t Actions.t -> kind_action_filter -> Block.t Actions.t
-  val edges : has_edges -> kind_edge_filter -> Block.t Actions.t Edges.t
+
+  val edges
+    :  ?weak:bool
+    -> has_edges
+    -> kind_edge_filter
+    -> Block.t Actions.t Edges.t
+
   val states : has_states -> kind_state_filter -> Block.t
 end
 
@@ -376,7 +388,8 @@ module Get : sig
   val silent_edges : Block.t Actions.t Edges.t -> Block.t Actions.t Edges.t
 
   val edges_of
-    :  action
+    :  ?weak:bool
+    -> action
     -> Block.t Actions.t Edges.t
     -> Block.t Actions.t Edges.t
 
@@ -411,12 +424,20 @@ module Merge : sig
 end
 
 module Saturate : sig
+  val saturated_action
+    :  action
+    -> action option
+    -> state
+    -> (state * action) list
+    -> action
+
   val collect_annotated_actions
     :  ?params:Utils.Logging.params
     -> Block.t
     -> (state * action) list
     -> Block.t
     -> Block.t Actions.t
+    -> action option
     -> fsm
     -> unit
 

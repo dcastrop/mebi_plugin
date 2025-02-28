@@ -63,6 +63,7 @@ module RCP : sig
       -> Fsm.States.t
       -> Fsm.States.t
       -> Fsm.States.t ref
+      -> Fsm.action
       -> minim_result ref
       -> bool ref
       -> unit
@@ -72,6 +73,7 @@ module RCP : sig
       -> Fsm.Alphabet.t * Fsm.States.t Fsm.Actions.t Fsm.Edges.t
       -> minim_result ref
       -> bool ref
+      -> check_weak_bisim
       -> unit
 
     val run_main_loop
