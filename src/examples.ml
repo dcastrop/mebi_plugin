@@ -284,14 +284,12 @@ let exa_saturated1 : example =
   let (s : fsm) =
     Translate.to_fsm
       (Lts.Create.lts
-         ~init:"1"
+         ~init:"0"
          (Nested
-            [ "1", [ "a", [ "2" ]; "b", [ "3" ]; "~", [ "4" ] ]
-            ; "2", [ "e", [ "6" ] ]
-            ; "3", [ "~", [ "2" ]; "~", [ "4" ]; "d", [ "5" ] ]
-            ; "4", [ "c", [ "5" ]; "~", [ "2" ] ]
-            ; "5", [ "g", [ "7" ] ]
-            ; "6", [ "~", [ "2" ]; "f", [ "7" ] ]
+            [ "0", [ "a", [ "1" ]; "~", [ "2" ] ]
+            ; "1", [ "b", [ "3" ] ]
+            ; "2", [ "c", [ "4" ]; "~", [ "0" ] ]
+            ; "4", [ "d", [ "5" ] ]
             ]))
   in
   exa "exa_saturated1" (Saturate s)
@@ -303,12 +301,14 @@ let exa_saturated2 : example =
   let (s : fsm) =
     Translate.to_fsm
       (Lts.Create.lts
-         ~init:"0"
+         ~init:"1"
          (Nested
-            [ "0", [ "a", [ "1" ]; "~", [ "2" ] ]
-            ; "1", [ "b", [ "3" ] ]
-            ; "2", [ "c", [ "4" ]; "~", [ "0" ] ]
-            ; "4", [ "d", [ "5" ] ]
+            [ "1", [ "a", [ "2" ]; "b", [ "3" ]; "~", [ "4" ] ]
+            ; "2", [ "e", [ "6" ] ]
+            ; "3", [ "~", [ "2" ]; "~", [ "4" ]; "d", [ "5" ] ]
+            ; "4", [ "c", [ "5" ]; "~", [ "2" ] ]
+            ; "5", [ "g", [ "7" ] ]
+            ; "6", [ "~", [ "2" ]; "f", [ "7" ] ]
             ]))
   in
   exa "exa_saturated2" (Saturate s)
@@ -339,4 +339,40 @@ let exa_weak1 : example =
             ]))
   in
   exa "exa_weak1" (Weak { s; t; are_bisimilar = true })
+;;
+
+(** [exa_weak2] ... *)
+let exa_weak2 : example =
+  (* s *)
+  let (s : fsm) =
+    Translate.to_fsm
+      (Lts.Create.lts
+         ~init:"s1"
+         (Nested
+            [ "s1", [ "a", [ "s2" ]; "b", [ "s3" ]; "~", [ "s4" ] ]
+            ; "s2", [ "e", [ "s6" ] ]
+            ; "s3", [ "~", [ "s2" ]; "~", [ "s4" ]; "d", [ "s5" ] ]
+            ; "s4", [ "c", [ "s5" ]; "~", [ "s2" ] ]
+            ; "s5", [ "g", [ "s7" ] ]
+            ; "s6", [ "~", [ "s2" ]; "f", [ "s7" ] ]
+            ]))
+  and (* t *)
+    (t : fsm) =
+    Translate.to_fsm
+      (Lts.Create.lts
+         ~init:"t1"
+         (Nested
+            [ ( "t1"
+              , [ "a", [ "t2" ]
+                ; "b", [ "t3" ]
+                ; "c", [ "t5" ]
+                ; "e", [ "t2"; "t6" ]
+                ] )
+            ; "t2", [ "e", [ "t2"; "t6" ] ]
+            ; "t3", [ "d", [ "t5" ]; "e", [ "t2"; "t6" ]; "c", [ "t5" ] ]
+            ; "t5", [ "g", [ "t7" ] ]
+            ; "t6", [ "f", [ "t7" ]; "e", [ "t6" ] ]
+            ]))
+  in
+  exa "exa_weak2" (Weak { s; t; are_bisimilar = true })
 ;;
