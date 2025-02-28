@@ -951,8 +951,9 @@ module Saturate = struct
     (to_visit : States.t)
     (saturated_actions : States.t Actions.t)
     (m : fsm)
-    : States.t Actions.t
+    : unit
     =
+    (* let collection : States.t Actions.t = Create.actions () in *)
     States.iter
       (fun (destination : state) ->
         match Edges.find_opt m.edges destination with
@@ -963,19 +964,19 @@ module Saturate = struct
             Actions.iter
               (fun (a : action) (destinations : States.t) ->
                 if a.is_tau
-                then (
-                  let annotated_actions : States.t Actions.t =
-                    collect_annotated_actions
-                      ~params
-                      (States.add destination visited)
-                      (List.append annotation [ destination, a ])
-                      (States.union to_visit destinations)
-                      saturated_actions
-                      m
-                  in
-                  Actions.add_seq
+                then
+                  (* let annotated_actions : States.t Actions.t = *)
+                  collect_annotated_actions
+                    ~params
+                    (States.add destination visited)
+                    (List.append annotation [ destination, a ])
+                    (States.union to_visit destinations)
                     saturated_actions
-                    (Actions.to_seq annotated_actions))
+                    m
+                  (* in
+                     Actions.add_seq
+                     saturated_actions
+                     (Actions.to_seq annotated_actions) *)
                 else (
                   let a' : action =
                     Create.action
@@ -987,9 +988,10 @@ module Saturate = struct
                   m.alphabet <- Alphabet.add a' m.alphabet;
                   Actions.add saturated_actions a' destinations))
               destination_actions)
-      to_visit;
-    saturated_actions
+      to_visit
   ;;
+
+  (* saturated_actions *)
 
   let fsm
     ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
@@ -997,6 +999,13 @@ module Saturate = struct
     : fsm
     =
     let m : fsm = Clone.fsm to_saturate in
+    (* Logging.log
+       ~params
+       (Printf.sprintf
+       "Fsm.Saturate.fsm, silent states: %s."
+       (PStr.states
+       ~params:(Log params)
+       (Get.from_states (Filter.edges (Edges m.edges) (Action IsSilent))))); *)
     let saturated_edges : States.t Actions.t Edges.t = Create.edges () in
     (* for each outgoing edge from a state *)
     Edges.iter
@@ -1009,18 +1018,40 @@ module Saturate = struct
                - and if those transitions are also silent, continue recursively *)
             if a.is_tau
             then (
-              let annotated_actions : States.t Actions.t =
-                collect_annotated_actions
-                  ~params
-                  (States.singleton from)
-                  [ from, a ]
-                  destinations
-                  saturated_actions
-                  m
-              in
-              Actions.add_seq
+              Logging.log
+                ~params
+                (Printf.sprintf
+                   "Fsm.Saturate.fsm, (%s) (%s) saturated actions: %s."
+                   (PStr.state ~params:(Log params) from)
+                   (PStr.action ~params:(Log params) a)
+                   (PStr.actions ~params:(Log params) saturated_actions));
+              (* let annotated_actions : States.t Actions.t = *)
+              collect_annotated_actions
+                ~params
+                (States.singleton from)
+                [ from, a ]
+                destinations
                 saturated_actions
-                (Actions.to_seq annotated_actions))
+                m;
+              (* in *)
+              Logging.log
+                ~params
+                (Printf.sprintf
+                   "Fsm.Saturate.fsm, (%s) (%s) saturated actions: %s."
+                   (PStr.state ~params:(Log params) from)
+                   (PStr.action ~params:(Log params) a)
+                   (PStr.actions ~params:(Log params) saturated_actions))
+              (* Logging.log
+                 ~params
+                 (Printf.sprintf
+                 "Fsm.Saturate.fsm, (%s) (%s) annotated actions: %s."
+                 (PStr.state ~params:(Log params) from)
+                 (PStr.action ~params:(Log params) a)
+                 (PStr.actions ~params:(Log params) annotated_actions)
+                 ); *)
+              (* Actions.add_seq
+                 saturated_actions
+                 (Actions.to_seq annotated_actions) *))
             else Actions.add saturated_actions a destinations)
           a's;
         Edges.add saturated_edges from saturated_actions)
