@@ -24,19 +24,20 @@ let pstr_results
        (fun (acc : string)
          ((suite_name, suite_results) : string * (string * bool * bool) list) ->
          Printf.sprintf
-           "%s(=>) %s: [%s].\n\n"
+           "%s(=>) %s: [%s-----------------------------\n].\n\n"
            acc
            suite_name
            (List.fold_left
               (fun (acc' : string)
                 ((name, expected_result, actual_result) : string * bool * bool) ->
                 Printf.sprintf
-                  "%s  %s  | %s  | %s\n"
+                  "%s%s | %s  | %s  | %s\n"
                   acc'
+                  (if expected_result == actual_result then " " else "X")
                   (if expected_result then "true " else "false")
                   (if actual_result then "true " else "false")
                   name)
-              "\n  EXPECT | ACTUAL | EXAMPLE\n  ---------------------------\n"
+              "\n? | EXPECT | ACTUAL | EXAMPLE\n-----------------------------\n"
               suite_results))
        "\n"
        results)
@@ -213,7 +214,5 @@ let quick_test
     - Next, run the tests:
 
     _build/default/test/tests.exe *)
-let () =
-  (* run_all () *)
-  quick_test ()
-;;
+let () = run_all ()
+(* quick_test () *)

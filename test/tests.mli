@@ -13,4 +13,7 @@ val run_all_ks90
   -> unit
   -> (string * bool * bool) list
 
+exception QuickTestFiled of Mebi_plugin.Examples.example
+
+val quick_test : ?params:Mebi_plugin.Utils.Logging.params -> unit -> unit
 val run_all : ?params:Mebi_plugin.Utils.Logging.params -> unit -> unit
