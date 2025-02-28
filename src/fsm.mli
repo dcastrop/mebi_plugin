@@ -423,6 +423,11 @@ module Merge : sig
     -> fsm * (state, state) Hashtbl.t
 end
 
+module Organize : sig
+  val edges : Block.t Actions.t Edges.t -> Block.t Actions.t Edges.t
+  val fsm : fsm -> fsm
+end
+
 module Saturate : sig
   val saturated_action
     :  action
@@ -442,8 +447,4 @@ module Saturate : sig
     -> unit
 
   val fsm : ?params:Utils.Logging.params -> fsm -> fsm
-end
-
-module Organize : sig
-  val fsm : fsm -> fsm
 end
