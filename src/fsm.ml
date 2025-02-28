@@ -496,15 +496,65 @@ end
 (****** Clone ********************************************************)
 (*********************************************************************)
 module Clone = struct
+  let state (s : state) : state =
+    match s with
+    | { id; name } -> Create.state (Of (id, name))
+  ;;
+
+  let states (states : States.t) : States.t =
+    States.fold
+      (fun (s : state) (acc : States.t) -> States.add s acc)
+      states
+      States.empty
+  ;;
+
+  let init_state (s : state option) : state option =
+    match s with
+    | None -> None
+    | Some t -> Some (state t)
+  ;;
+
+  let alphabet (alpha : Alphabet.t) : Alphabet.t =
+    Alphabet.fold
+      (fun (a : action) (acc : Alphabet.t) -> Alphabet.add a acc)
+      alpha
+      Alphabet.empty
+  ;;
+
   let action (a : action) : action =
     match a with
     | { id; label; is_tau; annotation } ->
       Create.action ~is_tau ~annotation (Of (id, label))
   ;;
 
+  let actions (a's : States.t Actions.t) : States.t Actions.t =
+    Actions.fold
+      (fun (a : action) (destinations : States.t) (acc : States.t Actions.t) ->
+        Actions.add acc (action a) (states destinations);
+        acc)
+      a's
+      (Create.actions ())
+  ;;
+
+  let edges (es : States.t Actions.t Edges.t) : States.t Actions.t Edges.t =
+    Edges.fold
+      (fun (from : state)
+        (a's : States.t Actions.t)
+        (acc : States.t Actions.t Edges.t) ->
+        Edges.add acc (state from) (actions a's);
+        acc)
+      es
+      (Create.edges ())
+  ;;
+
   let fsm (m : fsm) : fsm =
     match m with
-    | { init; alphabet; states; edges } -> Create.fsm init alphabet states edges
+    | { init; alphabet = m_alphabet; states = m_states; edges = m_edges } ->
+      Create.fsm
+        (init_state init)
+        (alphabet m_alphabet)
+        (states m_states)
+        (edges m_edges)
   ;;
 end
 
@@ -944,13 +994,13 @@ module Saturate = struct
     : fsm
     =
     let m : fsm = Clone.fsm to_saturate in
-    Logging.log
-      ~params
-      (Printf.sprintf
-         "Fsm.Saturate.fsm, silent states: %s."
-         (PStr.states
-            ~params:(Log params)
-            (Get.from_states (Filter.edges (Edges m.edges) (Action IsSilent)))));
+    (* Logging.log
+       ~params
+       (Printf.sprintf
+       "Fsm.Saturate.fsm, silent states: %s."
+       (PStr.states
+       ~params:(Log params)
+       (Get.from_states (Filter.edges (Edges m.edges) (Action IsSilent))))); *)
     (* for each outgoing edge from a state *)
     Edges.iter
       (fun (from : state) (a's : States.t Actions.t) ->
