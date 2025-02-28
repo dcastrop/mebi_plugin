@@ -303,12 +303,12 @@ let exa_saturated2 : example =
   let (s : fsm) =
     Translate.to_fsm
       (Lts.Create.lts
-         ~init:"s0"
+         ~init:"0"
          (Nested
-            [ "s0", [ "a", [ "s1" ]; "~", [ "s2" ] ]
-            ; "s1", [ "b", [ "s3" ] ]
-            ; "s2", [ "c", [ "s4" ]; "~", [ "s0" ] ]
-            ; "s4", [ "d", [ "s5" ] ]
+            [ "0", [ "a", [ "1" ]; "~", [ "2" ] ]
+            ; "1", [ "b", [ "3" ] ]
+            ; "2", [ "c", [ "4" ]; "~", [ "0" ] ]
+            ; "4", [ "d", [ "5" ] ]
             ]))
   in
   exa "exa_saturated2" (Saturate s)
@@ -322,9 +322,9 @@ let exa_weak1 : example =
       (Lts.Create.lts
          ~init:"s0"
          (Nested
-            [ "s0", [ "a", [ "s1" ]; "~tau~", [ "s2" ] ]
+            [ "s0", [ "a", [ "s1" ]; "~", [ "s2" ] ]
             ; "s1", [ "b", [ "s3" ] ]
-            ; "s2", [ "c", [ "s4" ]; "~tau~", [ "s0" ] ]
+            ; "s2", [ "c", [ "s4" ]; "~", [ "s0" ] ]
             ; "s4", [ "d", [ "s5" ] ]
             ]))
   and (* t *)
