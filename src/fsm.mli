@@ -422,3 +422,7 @@ module Saturate : sig
 
   val fsm : ?params:Utils.Logging.params -> fsm -> fsm
 end
+
+module Organize : sig
+  val fsm : fsm -> fsm
+end
