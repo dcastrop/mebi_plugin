@@ -1100,7 +1100,9 @@ module Saturate = struct
           (fun (a : action) (destinations : States.t) ->
             (* if it is silent,
                - then collect all of the destination states transitions,
-               - and if those transitions are also silent, continue recursively *)
+               - and if those transitions are also silent, continue recursively
+                 else,
+               - check for immediate silent actions and annotate those *)
             if a.is_tau
             then
               collect_annotated_actions
@@ -1111,7 +1113,16 @@ module Saturate = struct
                 saturated_actions
                 None
                 m
-            else Actions.add saturated_actions a destinations)
+            else (
+              collect_annotated_actions
+                ~params
+                (States.singleton from)
+                [ from, a ]
+                destinations
+                saturated_actions
+                (Some a)
+                m;
+              Actions.add saturated_actions a destinations))
           a's;
         Edges.add saturated_edges from saturated_actions)
       m.edges;
