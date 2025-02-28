@@ -215,4 +215,5 @@ let quick_test
 
     _build/default/test/tests.exe *)
 let () = run_all ()
-(* quick_test () *)
+
+(* let () = quick_test () *)
