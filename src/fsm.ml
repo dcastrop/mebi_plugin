@@ -559,6 +559,21 @@ module Clone = struct
 end
 
 (*********************************************************************)
+(****** IsMatch (comparison) *****************************************)
+(*********************************************************************)
+
+module IsMatch = struct
+  let action ?(weak : bool option) (a : action) (b : action) : bool =
+    let weak : bool =
+      match weak with
+      | None -> false
+      | Some w -> w
+    in
+    a == b || (weak && a.label == b.label && a.id == b.id)
+  ;;
+end
+
+(*********************************************************************)
 (****** New (state/action) in FSM ************************************)
 (*********************************************************************)
 
@@ -712,15 +727,24 @@ module Filter = struct
         states
   ;;
 
-  let filter_actions (actions : States.t Actions.t) (kind : kind_action_filter)
+  let filter_actions
+    ?(weak : bool option)
+    (actions : States.t Actions.t)
+    (kind : kind_action_filter)
     : States.t Actions.t
     =
+    let weak : bool =
+      match weak with
+      | None -> false
+      | Some w -> w
+    in
     let res : States.t Actions.t = Create.actions () in
     Actions.iter
       (fun (a : action) (destinations : States.t) ->
         match kind with
         | Label l -> if l == a.label then Actions.add res a destinations
-        | Matches b -> if b == a then Actions.add res a destinations
+        | Matches b ->
+          if IsMatch.action ~weak a b then Actions.add res a destinations
         | IsSilent -> if a.is_tau then Actions.add res a destinations
         | To s ->
           let res' : States.t = filter_states destinations (State s) in
@@ -730,10 +754,16 @@ module Filter = struct
   ;;
 
   let filter_edges
+    ?(weak : bool option)
     (edges : States.t Actions.t Edges.t)
     (kind : kind_edge_filter)
     : States.t Actions.t Edges.t
     =
+    let weak : bool =
+      match weak with
+      | None -> false
+      | Some w -> w
+    in
     let res : States.t Actions.t Edges.t = Create.edges 0 in
     Edges.iter
       (fun (from : state) (a's : States.t Actions.t) ->
@@ -744,7 +774,9 @@ module Filter = struct
             (fun (s : state) -> if from == s then Edges.add res s a's)
             states
         | Action kind' ->
-          let res_actions : States.t Actions.t = filter_actions a's kind' in
+          let res_actions : States.t Actions.t =
+            filter_actions ~weak a's kind'
+          in
           if Actions.length res_actions > 0 then Edges.add res from res_actions)
       edges;
     res
@@ -758,12 +790,20 @@ module Filter = struct
     filter_actions actions_to_filter kind
   ;;
 
-  let edges (edges_to_filter : has_edges) (kind : kind_edge_filter)
+  let edges
+    ?(weak : bool option)
+    (edges_to_filter : has_edges)
+    (kind : kind_edge_filter)
     : States.t Actions.t Edges.t
     =
+    let weak : bool =
+      match weak with
+      | None -> false
+      | Some w -> w
+    in
     match edges_to_filter with
-    | FSM m -> filter_edges m.edges kind
-    | Edges e -> filter_edges e kind
+    | FSM m -> filter_edges ~weak m.edges kind
+    | Edges e -> filter_edges ~weak e kind
   ;;
 
   let states (states_to_filter : has_states) (kind : kind_state_filter)
@@ -797,7 +837,10 @@ module Get = struct
   (********************************************)
 
   (** [actions_from from edges] is a shorthand for [Edges.find_opt] and in the case of [None] returns an empty map of actions. *)
-  let actions_from (from : state) (edges : States.t Actions.t Edges.t)
+  let actions_from
+    (* ?(weak : bool option) *)
+      (from : state)
+    (edges : States.t Actions.t Edges.t)
     : States.t Actions.t
     =
     match Edges.find_opt edges from with
@@ -822,10 +865,18 @@ module Get = struct
   ;;
 
   (** [edges_of a edges] filters [edges] by action [a]. *)
-  let edges_of (a : action) (edges : States.t Actions.t Edges.t)
+  let edges_of
+    ?(weak : bool option)
+    (a : action)
+    (edges : States.t Actions.t Edges.t)
     : States.t Actions.t Edges.t
     =
-    Filter.edges (Edges edges) (Action (Matches a))
+    let weak : bool =
+      match weak with
+      | None -> false
+      | Some w -> w
+    in
+    Filter.edges ~weak (Edges edges) (Action (Matches a))
   ;;
 
   let from_states (edges : States.t Actions.t Edges.t) : States.t =
@@ -941,6 +992,32 @@ end
 module Saturate = struct
   open Utils
 
+  let saturated_action
+    (a : action) (* last action taken *)
+    (b : action option) (* if rhs, the named action *)
+    (destination : state)
+    (annotation : (state * action) list)
+    : action
+    =
+    let b : action =
+      match b with
+      | None ->
+        (* find the non-tau action in annotation *)
+        let (_s, b) : state * action =
+          List.find
+            (fun ((_state, b) : state * action) ->
+              (b.id == tau.id && b.label == tau.label) == false)
+            annotation
+        in
+        b
+      | Some b -> b
+    in
+    Create.action
+      ?is_tau:(Some true)
+      ?annotation:(Some (List.append annotation [ destination, a ]))
+      (Of (b.id, b.label))
+  ;;
+
   (** [collected_annotated_actions ?params visited destinations m] ...
       @param visited
         is the trace of states reached via silent actions used for annotation. *)
@@ -950,9 +1027,15 @@ module Saturate = struct
     (annotation : (state * action) list)
     (to_visit : States.t)
     (saturated_actions : States.t Actions.t)
+    (named_action : action option)
     (m : fsm)
     : unit
     =
+    let is_lhs_of_named_action : bool =
+      match named_action with
+      | None -> true
+      | Some _ -> false
+    in
     States.iter
       (fun (destination : state) ->
         match Edges.find_opt m.edges destination with
@@ -963,29 +1046,44 @@ module Saturate = struct
             Actions.iter
               (fun (a : action) (destinations : States.t) ->
                 if a.is_tau
-                then
+                then (
+                  if is_lhs_of_named_action == false
+                  then (
+                    (* also add *)
+                    let a' : action =
+                      saturated_action a named_action destination annotation
+                    in
+                    Actions.add saturated_actions a' destinations);
                   collect_annotated_actions
                     ~params
                     (States.add destination visited)
                     (List.append annotation [ destination, a ])
                     (States.union to_visit destinations)
                     saturated_actions
-                    m
-                else (
+                    named_action
+                    m)
+                else if is_lhs_of_named_action
+                then (
                   let a' : action =
-                    Create.action
-                      ?is_tau:(Some true)
-                      ?annotation:
-                        (Some (List.append annotation [ destination, a ]))
-                      (Of (Alphabet.cardinal m.alphabet, a.label))
+                    saturated_action a (Some a) destination annotation
                   in
-                  m.alphabet <- Alphabet.add a' m.alphabet;
-                  Actions.add saturated_actions a' destinations))
+                  (* let annotation : (state * action) list =
+                     List.append annotation [ destination, a ]
+                     in *)
+                  Actions.add saturated_actions a' destinations;
+                  (* need to continue annotating outward silent actions *)
+                  collect_annotated_actions
+                    ~params
+                    (States.add destination visited)
+                    (List.append annotation [ destination, a ])
+                    (* annotation *)
+                    (States.union to_visit destinations)
+                    saturated_actions
+                    (Some a)
+                    m))
               destination_actions)
       to_visit
   ;;
-
-  (* saturated_actions *)
 
   let fsm
     ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
@@ -1011,6 +1109,7 @@ module Saturate = struct
                 [ from, a ]
                 destinations
                 saturated_actions
+                None
                 m
             else Actions.add saturated_actions a destinations)
           a's;

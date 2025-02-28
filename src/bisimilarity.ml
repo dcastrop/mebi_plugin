@@ -187,6 +187,7 @@ module RCP = struct
       (b1 : Block.t)
       (b2 : Block.t)
       (b : Block.t ref)
+      (a : action)
       (pi : Partition.t ref)
       (changed : bool ref)
       : unit
@@ -195,7 +196,11 @@ module RCP = struct
       | true, true ->
         (* both are empty, this is not supposed to happen *)
         params.kind <- Debug ();
-        log ~params "split returned two empty blocks.\n\n";
+        log
+          ~params
+          (Printf.sprintf
+             "split (%s) returned two empty blocks.\n\n"
+             (Fsm.PStr.action ~params:(Log params) a));
         ()
       | false, true ->
         (* empty [b2] means that split did not occur *)
@@ -204,7 +209,8 @@ module RCP = struct
         log
           ~params
           (Printf.sprintf
-             "split returned empty b2.\nb1: %s.\n\n"
+             "split (%s) returned empty b2.\nb1: %s.\n\n"
+             (Fsm.PStr.action ~params:(Log params) a)
              (Fsm.PStr.states ~params:(Log params) b1));
         ()
       | _, _ ->
@@ -214,11 +220,14 @@ module RCP = struct
         log
           ~params
           (Printf.sprintf
-             "split returned two blocks.\nb1: %s.\nb2: %s.\n\n"
+             "split (%s) returned two blocks.\nb1: %s.\nb2: %s.\n\n"
+             (Fsm.PStr.action ~params:(Log params) a)
              (Fsm.PStr.states ~params:(Log params) b1)
              (Fsm.PStr.states ~params:(Log params) b2));
         pi := Partition.remove !b !pi;
-        pi := Partition.union !pi (Partition.of_list [ b1; b2 ]);
+        pi := Partition.add b2 (Partition.add b1 !pi);
+        (* update [b] to point to the newly split b1 in pi *)
+        b := Partition.find b1 !pi;
         changed := true;
         ()
     ;;
@@ -237,16 +246,25 @@ module RCP = struct
       ((alphabet, edges) : Alphabet.t * States.t Actions.t Edges.t)
       (pi : Partition.t ref)
       (changed : bool ref)
+      (weak : check_weak_bisim)
       : unit
       =
+      let weak : bool =
+        match weak with
+        | () -> false
+        | Weak -> true
+      in
       Partition.iter
         (fun (_b : Block.t) : unit ->
           let b = ref _b in
           Alphabet.iter
             (fun (a : action) : unit ->
-              let edges_of_a = Fsm.Get.edges_of a edges in
-              let b1, b2 = split ~params !b a !pi edges_of_a in
-              inner_loop b1 b2 b pi changed)
+              let edges_of_a = Fsm.Get.edges_of ~weak a edges in
+              (* TODO: [Fsm.Saturate.fsm] doesn't clean up unreachable states/edges yet. *)
+              if Edges.length edges_of_a > 0
+              then (
+                let b1, b2 = split ~params !b a !pi edges_of_a in
+                inner_loop ~params b1 b2 b a pi changed))
             alphabet)
         !pi
     ;;
@@ -268,7 +286,7 @@ module RCP = struct
       let changed = ref true in
       while !changed do
         changed := false;
-        main_loop_body ~params (alphabet, edges) pi changed
+        main_loop_body ~params (alphabet, edges) pi changed weak
       done
     ;;
 
@@ -313,22 +331,10 @@ module RCP = struct
               | Merged (s, t, _merged_fsm, _map_of_states) -> s, t
               | _ -> raise (RunInputNotExpected input)
             in
-            params.override <- Some ();
+            (* params.override <- Some (); *)
             let sat_s : fsm = Saturate.fsm ~params s
             and sat_t : fsm = Saturate.fsm ~params t in
-            log
-              ~params
-              (Printf.sprintf
-                 "\n\n(Weak, Saturation), S: %s,\n\nSaturated S: %s.\n\n"
-                 (Fsm.PStr.fsm ~params:(Log params) s)
-                 (Fsm.PStr.fsm ~params:(Log params) sat_s));
-            (* log
-               ~params
-               (Printf.sprintf
-               "\n\n(Weak, Saturation), T: %s,\n\nSaturated T: %s.\n\n"
-               (Fsm.PStr.fsm ~params:(Log params) t)
-               (Fsm.PStr.fsm ~params:(Log params) sat_t)); *)
-            params.override <- None;
+            (* params.override <- None; *)
             let merged_fsm, map_of_states = Merge.fsms sat_s sat_t in
             sat_s, sat_t, merged_fsm, map_of_states
           | () ->
