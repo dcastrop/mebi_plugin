@@ -1020,3 +1020,16 @@ module Saturate = struct
     m
   ;;
 end
+
+(*********************************************************************)
+(****** Organize / Cleanup *******************************************)
+(*********************************************************************)
+
+(** [Organize] aims to re-organize an FSM to be more human-readable. E.g.:
+    - make sure there is only one termination state.
+    - order edges by the index of their [from] state.
+    - order actions by their index (or, reassign indices by position in alphabet and propagate) *)
+module Organize = struct
+  (* TODO: *)
+  let fsm (m : fsm) : fsm = m
+end
