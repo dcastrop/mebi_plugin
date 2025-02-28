@@ -552,7 +552,9 @@ struct
           new_states := S.add tgt !new_states;
           (* TODO: detect tau transitions and then defer to [Fsm.tau] instead. *)
           let to_add : action =
-            { id = get_transition_id (); label = econstr_to_string act }
+            Fsm.Create.action
+              ~is_tau:false
+              (Of (get_transition_id (), econstr_to_string act))
           in
           H.add
             g.transitions

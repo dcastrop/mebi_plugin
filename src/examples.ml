@@ -13,6 +13,7 @@ type exa_kind =
   | Bisim of bisim_exa
   | Minim of minim_exa
   | Weak of bisim_exa
+  | Saturate of fsm
 
 (** [example] is a type for denoting pairs of fsms that we check are bisimilar. *)
 type example =
@@ -275,6 +276,42 @@ let exa_self_act1 : example =
       (Lts.Create.lts ~init:"t0" (Nested [ "t0", [ "a", [ "t1" ] ] ]))
   in
   exa "exa_self_act1" (Bisim { s; t; are_bisimilar = true })
+;;
+
+(** [exa_saturated1] ... *)
+let exa_saturated1 : example =
+  (* s *)
+  let (s : fsm) =
+    Translate.to_fsm
+      (Lts.Create.lts
+         ~init:"1"
+         (Nested
+            [ "1", [ "a", [ "2" ]; "b", [ "3" ]; "~", [ "4" ] ]
+            ; "2", [ "e", [ "6" ] ]
+            ; "3", [ "~", [ "2" ]; "~", [ "4" ]; "d", [ "5" ] ]
+            ; "4", [ "c", [ "5" ]; "~", [ "2" ] ]
+            ; "5", [ "g", [ "7" ] ]
+            ; "6", [ "~", [ "2" ]; "d", [ "7" ] ]
+            ]))
+  in
+  exa "exa_saturated1" (Saturate s)
+;;
+
+(** [exa_saturated2] ... *)
+let exa_saturated2 : example =
+  (* s *)
+  let (s : fsm) =
+    Translate.to_fsm
+      (Lts.Create.lts
+         ~init:"s0"
+         (Nested
+            [ "s0", [ "a", [ "s1" ]; "~", [ "s2" ] ]
+            ; "s1", [ "b", [ "s3" ] ]
+            ; "s2", [ "c", [ "s4" ]; "~", [ "s0" ] ]
+            ; "s4", [ "d", [ "s5" ] ]
+            ]))
+  in
+  exa "exa_saturated2" (Saturate s)
 ;;
 
 (** [exa_weak1] ... *)

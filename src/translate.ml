@@ -17,18 +17,20 @@ let to_fsm (lts : Lts.lts) : fsm =
     in
     Lts.Transitions.fold
       (fun (t : Lts.transition) (acc : fsm) ->
-         let a : action = New.action t.label fsm in
-         let from : state = New.state t.from fsm in
-         let destination : state = New.state t.destination fsm in
-         Append.alphabet fsm a;
-         Append.state fsm from;
-         Append.state fsm destination;
-         Append.edge fsm (from, a, destination);
-         fsm)
+        let a : action =
+          New.action ~is_tau:(String.equal t.label Fsm.tau.label) t.label fsm
+        in
+        let from : state = New.state t.from fsm in
+        let destination : state = New.state t.destination fsm in
+        Append.alphabet fsm a;
+        Append.state fsm from;
+        Append.state fsm destination;
+        Append.edge fsm (from, a, destination);
+        fsm)
       transitions
       fsm
 ;;
 
 (* let to_lts (fsm:fsm) : lts =
 
-;; *)
+   ;; *)

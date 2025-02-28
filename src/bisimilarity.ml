@@ -13,7 +13,7 @@ open Utils
    - redefine [Fsm.action] to be either a silent transition, or a labelled transition
    - do not add [Fsm.Tau] to [Fsm.Alphabet]
    - update [Fsm.Alphabet] to be of [Fsm.label] for labelled transitions
-   - extend [Fsm.get_edges_of] to ignore silent transitions (configurable)
+   - extend [Fsm.Get.edges_of] to ignore silent transitions (configurable)
    - 'closure of tau actions'
    - will be useful when proving in coq
    - to be created during bisim
@@ -78,6 +78,10 @@ end
 module RCP = struct
   (** [KS90] implements the algorithm by Kanellakis and Smolka (1990). *)
   module KS90 = struct
+    type check_weak_bisim =
+      | ()
+      | Weak
+
     exception EmptyBlock of Block.t
     exception PartitionsNotDisjoint of Partition.t
 
@@ -94,7 +98,7 @@ module RCP = struct
       (pi : Partition.t)
       : Partition.t
       =
-      let destinations : States.t = get_all_destinations (Actions actions) in
+      let destinations : States.t = Fsm.Get.destinations (Actions actions) in
       match States.is_empty destinations with
       | true -> Partition.empty
       | false ->
@@ -146,13 +150,13 @@ module RCP = struct
       else (
         (* select some state [s] from block *)
         let s : state = Block.min_elt block in
-        let s_actions : States.t Actions.t = get_actions_from s edges in
+        let s_actions : States.t Actions.t = Fsm.Get.actions_from s edges in
         let s_reachable_blocks : Partition.t =
           reachable_blocks ~params s_actions pi
         in
         Block.fold
           (fun (t : state) ((b1, b2) : Block.t * Block.t) ->
-            let t_actions : States.t Actions.t = get_actions_from t edges in
+            let t_actions : States.t Actions.t = Fsm.Get.actions_from t edges in
             (* check if to add to [b1] or [b2]. *)
             match lengths_gtr_0 s_actions t_actions with
             (* neither [s] or [t] have action [a]. *)
@@ -240,7 +244,7 @@ module RCP = struct
           let b = ref _b in
           Alphabet.iter
             (fun (a : action) : unit ->
-              let edges_of_a = get_edges_of a edges in
+              let edges_of_a = Fsm.Get.edges_of a edges in
               let b1, b2 = split ~params !b a !pi edges_of_a in
               inner_loop b1 b2 b pi changed)
             alphabet)
@@ -258,6 +262,7 @@ module RCP = struct
       (alphabet : Alphabet.t)
       (edges : States.t Actions.t Edges.t)
       (pi : Partition.t ref)
+      (weak : check_weak_bisim)
       : unit
       =
       let changed = ref true in
@@ -267,16 +272,13 @@ module RCP = struct
       done
     ;;
 
-    type of_weak_bisim_input =
-      | ()
-      | Weak
-
     type of_bisim_input =
       | ToMerge of (fsm * fsm)
       | Merged of (fsm * fsm * fsm * (state, state) Hashtbl.t)
       | Minimize of fsm
 
     exception RunInputNotExpected of of_bisim_input
+    exception MinimizeDoesNotExpectWeak of (of_bisim_input * check_weak_bisim)
 
     (** [run ?params input] handles running the alogrithm for either term Minimization or checking Bisimilarity.
         @param ?params contains parameters for logging and formatting.
@@ -287,36 +289,62 @@ module RCP = struct
     let run
       ?(params : Params.log = default_params)
       (input : of_bisim_input)
-      (weak : of_weak_bisim_input)
+      (weak : check_weak_bisim)
       : of_bisim_result
       =
       (* run the algorithm for different usecases *)
       match input with
       | Minimize the_fsm ->
+        if weak == Weak then raise (MinimizeDoesNotExpectWeak (input, weak));
         (match the_fsm with
          | { alphabet; states; edges; _ } ->
            let pi = ref (Partition.of_list [ states ]) in
-           run_main_loop ~params alphabet edges pi;
+           run_main_loop ~params alphabet edges pi ();
            OfMinimized pi)
       | _ ->
-        (* check for bisimilarity *)
+        (* check for (weak) bisimilarity *)
         let s, t, merged_fsm, map_of_states =
-          match input with
-          | ToMerge (s, t) ->
-            let merged_fsm, map_of_states = Merge.fsms s t in
-            s, t, merged_fsm, map_of_states
-          | Merged (s, t, merged_fsm, map_of_states) ->
-            s, t, merged_fsm, map_of_states
-          | _ -> raise (RunInputNotExpected input)
+          match weak with
+          | Weak ->
+            (* weak bisimilarity *)
+            let s, t =
+              match input with
+              | ToMerge (s, t) -> s, t
+              | Merged (s, t, _merged_fsm, _map_of_states) -> s, t
+              | _ -> raise (RunInputNotExpected input)
+            in
+            params.override <- Some ();
+            let sat_s : fsm = Saturate.fsm ~params s
+            and sat_t : fsm = Saturate.fsm ~params t in
+            log
+              ~params
+              (Printf.sprintf
+                 "\n\n(Weak, Saturation), S: %s,\n\nSaturated S: %s.\n\n"
+                 (Fsm.PStr.fsm ~params:(Log params) s)
+                 (Fsm.PStr.fsm ~params:(Log params) sat_s));
+            (* log
+               ~params
+               (Printf.sprintf
+               "\n\n(Weak, Saturation), T: %s,\n\nSaturated T: %s.\n\n"
+               (Fsm.PStr.fsm ~params:(Log params) t)
+               (Fsm.PStr.fsm ~params:(Log params) sat_t)); *)
+            params.override <- None;
+            let merged_fsm, map_of_states = Merge.fsms sat_s sat_t in
+            sat_s, sat_t, merged_fsm, map_of_states
+          | () ->
+            (* (strong) bisimilarity *)
+            (match input with
+             | ToMerge (s, t) ->
+               let merged_fsm, map_of_states = Merge.fsms s t in
+               s, t, merged_fsm, map_of_states
+             | Merged (s, t, merged_fsm, map_of_states) ->
+               s, t, merged_fsm, map_of_states
+             | _ -> raise (RunInputNotExpected input))
         in
-        (* check if weak-bisimilarity *)
-        (* (match input with
-           | _ _ Weak ->""
-           | _ _ () -> ""); *)
         (match merged_fsm with
          | { alphabet; states; edges; _ } ->
            let pi = ref (Partition.of_list [ states ]) in
-           run_main_loop ~params alphabet edges pi;
+           run_main_loop ~params alphabet edges pi weak;
            OfMerged ((s, t), (merged_fsm, map_of_states), pi))
     ;;
 
