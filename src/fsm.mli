@@ -107,8 +107,11 @@ type action =
   { id : int
   ; label : string
   ; is_tau : bool
-  ; mutable annotation : (state * action) list
+  ; mutable annotation : annotations
   }
+
+and annotation = (state * action) list
+and annotations = annotation list
 
 val tau : action
 
@@ -230,6 +233,12 @@ module PStr : sig
   val partition : ?params:Utils.Formatting.pstr_params -> Partition.t -> string
   val action : ?params:Utils.Formatting.pstr_params -> action -> string
   val alphabet : ?params:Utils.Formatting.pstr_params -> Alphabet.t -> string
+  val annotation : ?params:Utils.Formatting.pstr_params -> annotation -> string
+
+  val annotations
+    :  ?params:Utils.Formatting.pstr_params
+    -> annotations
+    -> string
 
   val edge
     :  ?params:Utils.Formatting.pstr_params
@@ -268,11 +277,7 @@ module Create : sig
     | Of of (int * string)
     | From of int
 
-  val action
-    :  ?is_tau:bool
-    -> ?annotation:(state * action) list
-    -> action_param
-    -> action
+  val action : ?is_tau:bool -> ?annotation:annotations -> action_param -> action
 
   type alphabet_param =
     | ()
@@ -316,13 +321,15 @@ module New : sig
 
   val action
     :  ?is_tau:bool
-    -> ?annotation:(state * action) list
+    -> ?annotation:annotations
     -> string
     -> fsm
     -> action
 end
 
 module Append : sig
+  val annotation : state * action -> annotation -> annotation
+  val annotations : annotation -> annotations -> annotations
   val alphabet : fsm -> action -> unit
   val state : ?skip_duplicate_names:bool -> fsm -> state -> unit
   val states : ?skip_duplicate_names:bool -> fsm -> Block.t -> unit
@@ -429,18 +436,14 @@ module Organize : sig
 end
 
 module Saturate : sig
-  val saturated_action
-    :  action
-    -> action option
-    -> state
-    -> (state * action) list
-    -> action
+  val saturated_action : action option -> state -> annotation -> action
 
   val collect_annotated_actions
     :  ?params:Utils.Logging.params
     -> Block.t
-    -> (state * action) list
+    -> annotation
     -> Block.t
+    -> (state, bool) Hashtbl.t
     -> Block.t Actions.t
     -> action option
     -> fsm

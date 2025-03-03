@@ -191,7 +191,7 @@ let quick_test
     ~params
     (Printf.sprintf
        "\nUnsaturated: %s."
-       (Mebi_plugin.Fsm.PStr.edges ~params:(Log params) to_test.edges));
+       (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) to_test));
   let saturated : Mebi_plugin.Fsm.fsm =
     Mebi_plugin.Fsm.Saturate.fsm ~params to_test
   in
@@ -199,7 +199,7 @@ let quick_test
     ~params
     (Printf.sprintf
        "\nSaturated: %s."
-       (Mebi_plugin.Fsm.PStr.edges ~params:(Log params) saturated.edges));
+       (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) saturated));
   log ~params (Printf.sprintf "\nEnd of Tests.ml (%s)" example_to_test.name)
 ;;
 
@@ -212,6 +212,6 @@ let quick_test
     - Next, run the tests:
 
     _build/default/test/tests.exe *)
-let () = run_all ()
+(* let () = run_all () *)
 
-(* let () = quick_test () *)
+let () = quick_test ()
