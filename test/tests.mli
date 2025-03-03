@@ -15,5 +15,10 @@ val run_all_ks90
 
 exception QuickTestFiled of Mebi_plugin.Examples.example
 
-val quick_test : ?params:Mebi_plugin.Utils.Logging.params -> unit -> unit
+val quick_test
+  :  ?params:Mebi_plugin.Utils.Logging.params
+  -> Mebi_plugin.Examples.example
+  -> unit
+  -> unit
+
 val run_all : ?params:Mebi_plugin.Utils.Logging.params -> unit -> unit

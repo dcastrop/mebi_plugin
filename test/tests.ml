@@ -173,14 +173,11 @@ exception QuickTestFiled of example
 
 let quick_test
   ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
+  (example_to_test : Mebi_plugin.Examples.example)
   ()
   : unit
   =
   (* params.kind <- Details (); *)
-  let example_to_test : Mebi_plugin.Examples.example =
-    (* Mebi_plugin.Examples.exa_saturated1 *)
-    Mebi_plugin.Examples.exa_saturated2
-  in
   log ~params (Printf.sprintf "\nQuickTest: %s." example_to_test.name);
   let to_test : Mebi_plugin.Fsm.fsm =
     match example_to_test.kind with
@@ -214,4 +211,8 @@ let quick_test
     _build/default/test/tests.exe *)
 (* let () = run_all () *)
 
-let () = quick_test ()
+let () =
+  quick_test Mebi_plugin.Examples.exa_saturated1 ();
+  quick_test Mebi_plugin.Examples.exa_saturated2 ();
+  ()
+;;

@@ -314,6 +314,12 @@ end
 
 module IsMatch : sig
   val action : ?weak:bool -> action -> action -> bool
+
+  val edge
+    :  ?weak:bool
+    -> state * action * state
+    -> state * action * state
+    -> bool
 end
 
 module New : sig
@@ -431,7 +437,14 @@ module Merge : sig
 end
 
 module Saturate : sig
-  val saturated_action : action option -> state -> annotation -> action
+  val saturated_action : action -> state -> annotation -> action
+
+  val saturated_action'
+    :  action
+    -> action option
+    -> state
+    -> annotation
+    -> action
 
   val handle_saturated_action
     :  state
@@ -442,8 +455,34 @@ module Saturate : sig
     -> unit
 
   val check_revisitable : (state, bool) Hashtbl.t -> state -> bool * bool
+  val visited_state : (state, int) Hashtbl.t -> state -> unit
+  val max_revisit_num : int
+  val is_state_revisitable : (state, int) Hashtbl.t -> state -> bool
+
+  val get_next_to_visit
+    :  state
+    -> action
+    -> action
+    -> Block.t
+    -> Block.t Actions.t
+    -> annotation
+    -> fsm
+    -> Block.t
+
+  exception SaturatingActionRhsHasNoNamedAction of annotation
+  exception SaturatingActionAlreadyHasNamedAction of (annotation * action)
 
   val collect_annotated_actions
+    :  ?params:Utils.Logging.params
+    -> (state, int) Hashtbl.t
+    -> annotation
+    -> Block.t
+    -> Block.t Actions.t
+    -> action option
+    -> fsm
+    -> unit
+
+  val collect_annotated_actions'
     :  ?params:Utils.Logging.params
     -> Block.t
     -> annotation
