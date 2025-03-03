@@ -430,13 +430,18 @@ module Merge : sig
     -> fsm * (state, state) Hashtbl.t
 end
 
-module Organize : sig
-  val edges : Block.t Actions.t Edges.t -> Block.t Actions.t Edges.t
-  val fsm : fsm -> fsm
-end
-
 module Saturate : sig
   val saturated_action : action option -> state -> annotation -> action
+
+  val handle_saturated_action
+    :  state
+    -> annotation
+    -> action
+    -> Block.t
+    -> Block.t Actions.t
+    -> unit
+
+  val check_revisitable : (state, bool) Hashtbl.t -> state -> bool * bool
 
   val collect_annotated_actions
     :  ?params:Utils.Logging.params
