@@ -1166,6 +1166,7 @@ module Saturate = struct
       m.edges;
     m.edges <- saturated_edges;
     (* make sure all unreachable states/edges are pruned *)
-    Organize.fsm m
+    (* Organize.fsm m *)
+    m
   ;;
 end
