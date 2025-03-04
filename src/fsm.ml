@@ -41,8 +41,11 @@ type action =
   { id : int
   ; label : string
   ; is_tau : bool
-  ; mutable annotation : (state * action) list
+  ; mutable annotation : annotations
   }
+
+and annotation = (state * action) list
+and annotations = annotation list
 
 let tau : action = { id = 0; label = "~"; is_tau = true; annotation = [] }
 
@@ -223,6 +226,54 @@ module PStr = struct
         tabs)
   ;;
 
+  let annotation
+    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+    (anno : annotation)
+    : string
+    =
+    let _params : Params.fmt = Params.handle params in
+    let _params' : Params.fmt = no_tab _params in
+    match anno with
+    | [] -> "[] (empty)"
+    | (h_s, h_a) :: anno' ->
+      Printf.sprintf
+        "[%s]"
+        (List.fold_left
+           (fun (acc : string) ((t_s, t_a) : state * action) ->
+             Printf.sprintf
+               "%s; %s,%s"
+               acc
+               (state ~params:(Fmt _params') t_s)
+               (action ~params:(Fmt _params') t_a))
+           (Printf.sprintf
+              "%s,%s"
+              (state ~params:(Fmt _params') h_s)
+              (action ~params:(Fmt _params') h_a))
+           anno')
+  ;;
+
+  let annotations
+    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+    (anno : annotations)
+    : string
+    =
+    let _params : Params.fmt = Params.handle params in
+    let _params' : Params.fmt = no_tab _params in
+    match anno with
+    | [] -> "[] (empty)"
+    | h :: t ->
+      Printf.sprintf
+        "anno: %s"
+        (List.fold_left
+           (fun (acc : string) (s_a : (state * action) list) ->
+             Printf.sprintf
+               "%s;   %s"
+               acc
+               (annotation ~params:(Fmt _params') s_a))
+           (annotation ~params:(Fmt _params') h)
+           t)
+  ;;
+
   let edge
     ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
     ((from, a, destination) : state * action * state)
@@ -237,26 +288,7 @@ module PStr = struct
       (state ~params:(Fmt _params') from)
       (action ~params:(Fmt _params') a)
       (state ~params:(Fmt _params') destination)
-      (if a.is_tau
-       then (
-         match a.annotation with
-         | [] -> "anno: [] (empty)"
-         | (h_s, h_a) :: annotation ->
-           Printf.sprintf
-             "anno: [%s]"
-             (List.fold_left
-                (fun (acc : string) ((t_s, t_a) : state * action) ->
-                  Printf.sprintf
-                    "%s; %s, %s"
-                    acc
-                    (state ~params:(Fmt _params') t_s)
-                    (action ~params:(Fmt _params') t_a))
-                (Printf.sprintf
-                   "%s, %s"
-                   (state ~params:(Fmt _params') h_s)
-                   (action ~params:(Fmt _params') h_a))
-                annotation))
-       else "")
+      (if a.is_tau then annotations ~params:(Fmt _params') a.annotation else "")
   ;;
 
   let actions
@@ -428,7 +460,7 @@ module Create = struct
       @param id is the unique identifier for the state. *)
   let action
     ?(is_tau : bool option)
-    ?(annotation : (state * action) list option)
+    ?(annotation : annotations option)
     (params : action_param)
     : action
     =
@@ -437,7 +469,7 @@ module Create = struct
       | None -> false
       | Some t -> t
     in
-    let annotation : (state * action) list =
+    let annotation : annotations =
       match annotation with
       | None -> []
       | Some anno -> anno
@@ -571,6 +603,20 @@ module IsMatch = struct
     in
     a == b || (weak && a.label == b.label && a.id == b.id)
   ;;
+
+  let edge
+    ?(weak : bool option)
+    ((a_f, a_a, a_d) : state * action * state)
+    ((b_f, b_a, b_d) : state * action * state)
+    : bool
+    =
+    let weak : bool =
+      match weak with
+      | None -> false
+      | Some w -> w
+    in
+    a_f == b_f && action ~weak a_a b_a && a_d == b_d
+  ;;
 end
 
 (*********************************************************************)
@@ -596,7 +642,7 @@ module New = struct
 
   let action
     ?(is_tau : bool option)
-    ?(annotation : (state * action) list option)
+    ?(annotation : annotations option)
     (label : string)
     (fsm : fsm)
     : action
@@ -606,7 +652,7 @@ module New = struct
       | None -> false
       | Some t -> t
     in
-    let annotation : (state * action) list =
+    let annotation : annotations =
       match annotation with
       | None -> []
       | Some anno -> anno
@@ -630,6 +676,14 @@ end
 (*********************************************************************)
 
 module Append = struct
+  let annotation (an : state * action) (anno : annotation) : annotation =
+    if List.mem an anno then anno else List.append anno [ an ]
+  ;;
+
+  let annotations (anno : annotation) (annos : annotations) : annotations =
+    if List.mem anno annos then annos else List.append [ anno ] annos
+  ;;
+
   let alphabet (fsm : fsm) (a : action) : unit =
     fsm.alphabet <- Alphabet.add a fsm.alphabet
   ;;
@@ -1034,7 +1088,7 @@ module Saturate = struct
     (a : action) (* last action taken *)
     (b : action option) (* if rhs, the named action *)
     (destination : state)
-    (annotation : (state * action) list)
+    (annotation : annotation)
     : action
     =
     let b : action =
@@ -1052,7 +1106,11 @@ module Saturate = struct
     in
     Create.action
       ?is_tau:(Some true)
-      ?annotation:(Some (List.append annotation [ destination, a ]))
+      ?annotation:
+        (Some
+           (Append.annotations
+              (Append.annotation (destination, a) annotation)
+              b.annotation))
       (Of (b.id, b.label))
   ;;
 
@@ -1096,7 +1154,7 @@ module Saturate = struct
                     ~params
                     (States.add destination visited)
                     (List.append annotation [ destination, a ])
-                    (States.union to_visit destinations)
+                    destinations
                     saturated_actions
                     named_action
                     m)
@@ -1115,7 +1173,7 @@ module Saturate = struct
                     (States.add destination visited)
                     (List.append annotation [ destination, a ])
                     (* annotation *)
-                    (States.union to_visit destinations)
+                    destinations
                     saturated_actions
                     (Some a)
                     m))
