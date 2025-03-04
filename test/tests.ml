@@ -169,29 +169,26 @@ let run_all ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ()) ()
   log ~params "\n\nEnd of Tests.ml.\n"
 ;;
 
-exception QuickTestFiled of example
+exception QuickTestFailed of example
 
 let quick_test
   ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
+  (example_to_test : Mebi_plugin.Examples.example)
   ()
   : unit
   =
   (* params.kind <- Details (); *)
-  let example_to_test : Mebi_plugin.Examples.example =
-    (* Mebi_plugin.Examples.exa_saturated1 *)
-    Mebi_plugin.Examples.exa_saturated2
-  in
   log ~params (Printf.sprintf "\nQuickTest: %s." example_to_test.name);
   let to_test : Mebi_plugin.Fsm.fsm =
     match example_to_test.kind with
     | Saturate s -> s
-    | _ -> raise (QuickTestFiled example_to_test)
+    | _ -> raise (QuickTestFailed example_to_test)
   in
   log
     ~params
     (Printf.sprintf
        "\nUnsaturated: %s."
-       (Mebi_plugin.Fsm.PStr.edges ~params:(Log params) to_test.edges));
+       (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) to_test));
   let saturated : Mebi_plugin.Fsm.fsm =
     Mebi_plugin.Fsm.Saturate.fsm ~params to_test
   in
@@ -199,7 +196,7 @@ let quick_test
     ~params
     (Printf.sprintf
        "\nSaturated: %s."
-       (Mebi_plugin.Fsm.PStr.edges ~params:(Log params) saturated.edges));
+       (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) saturated));
   log ~params (Printf.sprintf "\nEnd of Tests.ml (%s)" example_to_test.name)
 ;;
 
@@ -214,4 +211,8 @@ let quick_test
     _build/default/test/tests.exe *)
 (* let () = run_all () *)
 
-let () = quick_test ()
+let () =
+  (* quick_test Mebi_plugin.Examples.exa_saturated1 (); *)
+  quick_test Mebi_plugin.Examples.exa_saturated2 ();
+  ()
+;;
