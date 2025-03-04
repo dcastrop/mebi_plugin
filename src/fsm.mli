@@ -436,6 +436,11 @@ module Merge : sig
     -> fsm * (state, state) Hashtbl.t
 end
 
+module Organize : sig
+  val edges : Block.t Actions.t Edges.t -> Block.t Actions.t Edges.t
+  val fsm : fsm -> fsm
+end
+
 module Saturate : sig
   val visited_state : (state, int) Hashtbl.t -> state -> unit
   val max_revisit_num : int
