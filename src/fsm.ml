@@ -41,8 +41,11 @@ type action =
   { id : int
   ; label : string
   ; is_tau : bool
-  ; mutable annotation : (state * action) list
+  ; mutable annotation : annotations
   }
+
+and annotation = (state * action) list
+and annotations = annotation list
 
 let tau : action = { id = 0; label = "~"; is_tau = true; annotation = [] }
 
@@ -223,6 +226,54 @@ module PStr = struct
         tabs)
   ;;
 
+  let annotation
+    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+    (anno : annotation)
+    : string
+    =
+    let _params : Params.fmt = Params.handle params in
+    let _params' : Params.fmt = no_tab _params in
+    match anno with
+    | [] -> "[] (empty)"
+    | (h_s, h_a) :: anno' ->
+      Printf.sprintf
+        "[%s]"
+        (List.fold_left
+           (fun (acc : string) ((t_s, t_a) : state * action) ->
+             Printf.sprintf
+               "%s; %s,%s"
+               acc
+               (state ~params:(Fmt _params') t_s)
+               (action ~params:(Fmt _params') t_a))
+           (Printf.sprintf
+              "%s,%s"
+              (state ~params:(Fmt _params') h_s)
+              (action ~params:(Fmt _params') h_a))
+           anno')
+  ;;
+
+  let annotations
+    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+    (anno : annotations)
+    : string
+    =
+    let _params : Params.fmt = Params.handle params in
+    let _params' : Params.fmt = no_tab _params in
+    match anno with
+    | [] -> "[] (empty)"
+    | h :: t ->
+      Printf.sprintf
+        "anno: [ %s ]"
+        (List.fold_left
+           (fun (acc : string) (s_a : (state * action) list) ->
+             Printf.sprintf
+               "%s;   %s"
+               acc
+               (annotation ~params:(Fmt _params') s_a))
+           (annotation ~params:(Fmt _params') h)
+           t)
+  ;;
+
   let edge
     ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
     ((from, a, destination) : state * action * state)
@@ -237,26 +288,7 @@ module PStr = struct
       (state ~params:(Fmt _params') from)
       (action ~params:(Fmt _params') a)
       (state ~params:(Fmt _params') destination)
-      (if a.is_tau
-       then (
-         match a.annotation with
-         | [] -> "anno: [] (empty)"
-         | (h_s, h_a) :: annotation ->
-           Printf.sprintf
-             "anno: [%s]"
-             (List.fold_left
-                (fun (acc : string) ((t_s, t_a) : state * action) ->
-                  Printf.sprintf
-                    "%s; %s, %s"
-                    acc
-                    (state ~params:(Fmt _params') t_s)
-                    (action ~params:(Fmt _params') t_a))
-                (Printf.sprintf
-                   "%s, %s"
-                   (state ~params:(Fmt _params') h_s)
-                   (action ~params:(Fmt _params') h_a))
-                annotation))
-       else "")
+      (if a.is_tau then annotations ~params:(Fmt _params') a.annotation else "")
   ;;
 
   let actions
@@ -428,7 +460,7 @@ module Create = struct
       @param id is the unique identifier for the state. *)
   let action
     ?(is_tau : bool option)
-    ?(annotation : (state * action) list option)
+    ?(annotation : annotations option)
     (params : action_param)
     : action
     =
@@ -437,7 +469,7 @@ module Create = struct
       | None -> false
       | Some t -> t
     in
-    let annotation : (state * action) list =
+    let annotation : annotations =
       match annotation with
       | None -> []
       | Some anno -> anno
@@ -596,7 +628,7 @@ module New = struct
 
   let action
     ?(is_tau : bool option)
-    ?(annotation : (state * action) list option)
+    ?(annotation : annotations option)
     (label : string)
     (fsm : fsm)
     : action
@@ -606,7 +638,7 @@ module New = struct
       | None -> false
       | Some t -> t
     in
-    let annotation : (state * action) list =
+    let annotation : annotations =
       match annotation with
       | None -> []
       | Some anno -> anno
@@ -630,6 +662,14 @@ end
 (*********************************************************************)
 
 module Append = struct
+  let annotation (an : state * action) (anno : annotation) : annotation =
+    if List.mem an anno then anno else List.append [ an ] anno
+  ;;
+
+  let annotations (anno : annotation) (annos : annotations) : annotations =
+    if List.mem anno annos then annos else List.append [ anno ] annos
+  ;;
+
   let alphabet (fsm : fsm) (a : action) : unit =
     fsm.alphabet <- Alphabet.add a fsm.alphabet
   ;;
@@ -986,44 +1026,6 @@ module Merge = struct
 end
 
 (*********************************************************************)
-(****** Organize / Cleanup *******************************************)
-(*********************************************************************)
-
-(** [Organize] aims to re-organize an FSM to be more human-readable. E.g.:
-    - make sure there is only one termination state.
-    - order edges by the index of their [from] state.
-    - order actions by their index (or, reassign indices by position in alphabet and propagate).
-    - prune unreachable states and edges. *)
-module Organize = struct
-  (* TODO: *)
-
-  let edges (es : States.t Actions.t Edges.t) : States.t Actions.t Edges.t = es
-
-  let fsm (m : fsm) : fsm =
-    (* prune unreachable states *)
-    let reachable_states : States.t =
-      States.union
-        (Get.destinations (Edges m.edges))
-        (match m.init with
-         | None -> States.empty
-         | Some init -> States.singleton init)
-    in
-    let unreachable_states : States.t =
-      States.filter
-        (fun (s : state) ->
-          States.mem s reachable_states == false || true
-          (* add condition for pruning if all incoming actions are silent *))
-        m.states
-    in
-    m.states
-    <- States.filter (fun (s : state) -> States.mem s reachable_states) m.states;
-    (* prune unused edges *)
-    States.iter (fun (s : state) -> Edges.remove m.edges s) unreachable_states;
-    m
-  ;;
-end
-
-(*********************************************************************)
 (****** Saturate *****************************************************)
 (*********************************************************************)
 
@@ -1031,10 +1033,10 @@ module Saturate = struct
   open Utils
 
   let saturated_action
-    (a : action) (* last action taken *)
-    (b : action option) (* if rhs, the named action *)
+    (* (a : action) *)
+      (b : action option) (* if rhs, the named action *)
     (destination : state)
-    (annotation : (state * action) list)
+    (anno : annotation)
     : action
     =
     let b : action =
@@ -1042,28 +1044,82 @@ module Saturate = struct
       | None ->
         (* find the non-tau action in annotation *)
         let (_s, b) : state * action =
+          (* check the first one *)
           List.find
             (fun ((_state, b) : state * action) ->
               (b.id == tau.id && b.label == tau.label) == false)
-            annotation
+            anno
         in
         b
       | Some b -> b
     in
+    (* check if *)
     Create.action
       ?is_tau:(Some true)
-      ?annotation:(Some (List.append annotation [ destination, a ]))
+      ?annotation:
+        (Some
+           (Append.annotations
+              (Append.annotation (destination, b) anno)
+              b.annotation))
       (Of (b.id, b.label))
+  ;;
+
+  let handle_saturated_action
+    (destination : state)
+    (anno : annotation)
+    (a : action)
+    (next_destinations : States.t)
+    (saturated_actions : States.t Actions.t)
+    : unit
+    =
+    let a' : action = saturated_action (Some a) destination anno in
+    match
+      Actions.fold
+        (fun (b : action) (_next_destinations' : States.t) (b' : action option) ->
+          match b' with
+          | None -> if IsMatch.action ~weak:true a' b then Some b else b'
+          | Some b' -> Some b')
+        saturated_actions
+        None
+    with
+    | None ->
+      (* add to saturated actions *)
+      Actions.add saturated_actions a' next_destinations
+    | Some b ->
+      (* already exists, append annotations *)
+      b.annotation <- Append.annotations anno b.annotation
+  ;;
+
+  let check_revisitable
+    (may_revisit : (state, bool) Hashtbl.t)
+    (destination : state)
+    : bool * bool
+    =
+    match Hashtbl.find_opt may_revisit destination with
+    | None -> false, true
+    | Some b ->
+      if b
+      then
+        ( b
+        , (Hashtbl.add may_revisit destination false;
+           false) )
+      else b, true
   ;;
 
   (** [collected_annotated_actions ?params visited destinations m] ...
       @param visited
-        is the trace of states reached via silent actions used for annotation. *)
+        is the trace of states reached via silent actions used for annotation.
+      @param annotation
+      @param to_visit
+      @param may_revisit
+      @param saturated_actions is the map of actions to add to.
+      @param named_action *)
   let rec collect_annotated_actions
     ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
     (visited : States.t)
-    (annotation : (state * action) list)
+    (anno : annotation)
     (to_visit : States.t)
+    (may_revisit : (state, bool) Hashtbl.t)
     (saturated_actions : States.t Actions.t)
     (named_action : action option)
     (m : fsm)
@@ -1079,46 +1135,72 @@ module Saturate = struct
         match Edges.find_opt m.edges destination with
         | None -> ()
         | Some destination_actions ->
-          if States.mem destination visited == false
+          let (is_revisitable, can_set_revisitable) : bool * bool =
+            check_revisitable may_revisit destination
+          in
+          if States.mem destination visited == false || is_revisitable
           then
+            (*  *)
             Actions.iter
-              (fun (a : action) (destinations : States.t) ->
-                if a.is_tau
-                then (
-                  if is_lhs_of_named_action == false
-                  then (
-                    (* also add *)
-                    let a' : action =
-                      saturated_action a named_action destination annotation
-                    in
-                    Actions.add saturated_actions a' destinations);
+              (fun (a : action) (next_destinations : States.t) ->
+                match a.is_tau, is_lhs_of_named_action with
+                | true, true ->
+                  if can_set_revisitable
+                  then Hashtbl.add may_revisit destination true;
+                  (* not reached named action yet, keep going *)
                   collect_annotated_actions
                     ~params
                     (States.add destination visited)
-                    (List.append annotation [ destination, a ])
-                    (States.union to_visit destinations)
+                    (Append.annotation (destination, a) anno)
+                    (States.union to_visit next_destinations) (* to_visit *)
+                    may_revisit
                     saturated_actions
                     named_action
-                    m)
-                else if is_lhs_of_named_action
-                then (
-                  let a' : action =
-                    saturated_action a (Some a) destination annotation
-                  in
-                  (* let annotation : (state * action) list =
-                     List.append annotation [ destination, a ]
-                     in *)
-                  Actions.add saturated_actions a' destinations;
+                    m;
+                  ()
+                | true, false ->
+                  (* propagate forward named action to rest of tau chain *)
+                  handle_saturated_action
+                    destination
+                    anno
+                    (saturated_action named_action destination anno)
+                    next_destinations
+                    saturated_actions;
+                  collect_annotated_actions
+                    ~params
+                    (States.add destination visited)
+                    (Append.annotation (destination, a) anno)
+                    (States.union to_visit next_destinations)
+                    may_revisit
+                    saturated_actions
+                    named_action
+                    m;
+                  ()
+                | false, true ->
+                  if can_set_revisitable
+                  then Hashtbl.add may_revisit destination true;
+                  (* found named action to saturate *)
+                  handle_saturated_action
+                    destination
+                    anno
+                    a
+                    next_destinations
+                    saturated_actions;
                   (* need to continue annotating outward silent actions *)
                   collect_annotated_actions
                     ~params
                     (States.add destination visited)
-                    (List.append annotation [ destination, a ])
+                    anno (* (Append.annotation (destination, a) annos) *)
                     (* annotation *)
-                    (States.union to_visit destinations)
+                    (States.union to_visit next_destinations)
+                    may_revisit
                     saturated_actions
                     (Some a)
-                    m))
+                    m;
+                  ()
+                | false, false ->
+                  (* ignore, cannot propagate named action on named action *)
+                  ())
               destination_actions)
       to_visit
   ;;
@@ -1141,31 +1223,24 @@ module Saturate = struct
                - and if those transitions are also silent, continue recursively
                  else,
                - check for immediate silent actions and annotate those *)
-            if a.is_tau
-            then
-              collect_annotated_actions
-                ~params
-                (States.singleton from)
-                [ from, a ]
-                destinations
-                saturated_actions
-                None
-                m
-            else (
-              collect_annotated_actions
-                ~params
-                (States.singleton from)
-                [ from, a ]
-                destinations
-                saturated_actions
-                (Some a)
-                m;
-              Actions.add saturated_actions a destinations))
+            collect_annotated_actions
+              ~params
+              (States.singleton from)
+              [ from, a ]
+              destinations
+              (Hashtbl.of_seq (List.to_seq [ from, true ]))
+              saturated_actions
+              (if a.is_tau then None else Some a)
+              m;
+            if a.is_tau == false
+            then Actions.add saturated_actions a destinations)
           a's;
         Edges.add saturated_edges from saturated_actions)
       m.edges;
     m.edges <- saturated_edges;
     (* make sure all unreachable states/edges are pruned *)
-    Organize.fsm m
+    (* Organize.fsm m *)
+    (* TODO: determine how to merge/resolve actions from the same state that have identical annotations. Probaby need to check if the outgoing edges from one of them can be achieved by the origin state, and then remove the one that has all its actions already handled *)
+    m
   ;;
 end
