@@ -1136,7 +1136,7 @@ module Saturate = struct
     | Some n -> Hashtbl.replace visited_states s (n + 1)
   ;;
 
-  let max_revisit_num : int = 5
+  let max_revisit_num : int = 50
 
   let is_state_revisitable (visited_states : (state, int) Hashtbl.t) (s : state)
     : bool
@@ -1317,30 +1317,34 @@ module Saturate = struct
                       named_action
                       m
                   | false, false ->
-                    (* may be first named action of tau chain *)
-                    let named_action : action option = Some a in
-                    (* only visit destinations with silent actions *)
-                    let to_visit_next : States.t =
-                      get_next_to_visit
-                        s
-                        a
-                        a
-                        destinations
-                        (* outgoing_states_actions *)
-                        saturated_actions
-                        working_anno
-                        m
-                    in
-                    (* continue exploring *)
-                    collect_annotated_actions
-                      ~params
-                      visited_states
-                      (* outgoing_states_actions *)
-                      (Append.annotation (s, a) working_anno)
-                      to_visit_next
-                      saturated_actions
-                      named_action
-                      m))
+                    (* only proceed if named_action not yet found *)
+                    (match named_action with
+                     | Some _ -> ()
+                     | None ->
+                       (* may be first named action of tau chain *)
+                       let named_action : action option = Some a in
+                       (* only visit destinations with silent actions *)
+                       let to_visit_next : States.t =
+                         get_next_to_visit
+                           s
+                           a
+                           a
+                           destinations
+                           (* outgoing_states_actions *)
+                           saturated_actions
+                           working_anno
+                           m
+                       in
+                       (* continue exploring *)
+                       collect_annotated_actions
+                         ~params
+                         visited_states
+                         (* outgoing_states_actions *)
+                         (Append.annotation (s, a) working_anno)
+                         to_visit_next
+                         saturated_actions
+                         named_action
+                         m)))
               s_actions))
       to_visit
   ;;
