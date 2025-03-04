@@ -1091,7 +1091,7 @@ module Saturate = struct
     | Some n -> Hashtbl.replace visited_states s (n + 1)
   ;;
 
-  let max_revisit_num : int = 50
+  let max_revisit_num : int = 2
 
   let is_state_revisitable (visited_states : (state, int) Hashtbl.t) (s : state)
     : bool
@@ -1138,7 +1138,8 @@ module Saturate = struct
         is the trace of states reached via silent actions used for annotation. *)
   let rec collect_annotated_actions
     ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
-    (visited_states : (state, int) Hashtbl.t)
+    (* (visited : States.t) *)
+      (visited_states : (state, int) Hashtbl.t)
     (annotation : annotation)
     (to_visit : States.t)
     (saturated_actions : States.t Actions.t)
