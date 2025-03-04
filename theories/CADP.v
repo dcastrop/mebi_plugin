@@ -6,277 +6,764 @@ Require Import Notations.
 Require Export Bool.
 
 
+Definition index : Type := option nat.
+Definition pid   : Type := nat.
 
-(* following Figure 1: https://doi.org/10.1007/s10009-012-0244-z *)
+Definition ibool : Type := nat.
+Definition iloop : Type := nat.
 
-Definition index : Type := nat.
-Definition pid   : Type := option index.
-Definition ibool : Type := index.
-Definition iloop : Type := index.
+Definition Nil   : index := None.
 
-Definition Nil   : option index := None.
-
-Definition Initial_index : index := 0.
-Definition Initial_pid   : pid   := Nil.
-Definition Initial_ibool : ibool := 0.
-
-Fixpoint index_eq (t1 t2:index) : ibool :=
-  match t1, t2 with
-  | 0, 0 => 1
-  | S n1, S n2 => index_eq n1 n2
-  | _, _ => 0
-  end.
-
-Definition Index (p:pid) : index :=
-  match p with
-  | None => 0
-  | Some n => n
-  end.
-
-Definition Pid (i:index) : pid :=
-  match i with
-  | 0 => None
-  | n => Some n
-  end.
-
-Definition Bool (i:index) : option bool :=
-  match i with
-  | 0 => Some false
-  | 1 => Some true
-  | _ => None
-  end.
-
-Definition IBool (b:bool) : ibool := if b then 1 else 0.
-
-Inductive var : Type :=
-  | PREDECESSOR
-  | LOCKED
-  | NEXT
-  | SWAP
-  | PID
-  | NIL
-  .
-
-Inductive val : Type :=
-  | VAR : var -> val
-  | TRU : val
-  | FLS : val
-  .
-
-(* used in steps, not syntax *)
-Inductive act : Type :=
-  | NCS   : act
-  | ENTER : act
-  | LEAVE : act
-
-  | READ_NEXT   : act
-  | READ_LOCKED : act
-
-  | WRITE_NEXT   : var -> val -> act
-  | WRITE_LOCKED : var -> val -> act
-
-  | FETCH_AND_STORE  : act
-  | COMPARE_AND_SWAP : act
-  .
-
-
-Inductive tm : Type :=
-  | TYPE_ERR : tm
-  | OK    : tm                      (* no-op *)
-
-  | ACT : act -> tm -> tm
-
-  | SEQ : tm -> tm -> tm
-
-  | IF    : tm -> tm -> tm -> tm    (* condition -> if true -> if false -> ... *)
-
-  | VAL    : val  -> tm
-  | NOT    : tm   -> tm
-  | EQ_N   : nat  -> nat -> tm
-  | EQ_B   : bool -> bool -> tm
-  | IS_TRU : tm   -> tm
-  | IS_NIL : tm   -> tm
-
-  | TT   : tm        (* true *)
-  | FF   : tm        (* false *)
-
-  | LOOP      : tm -> tm (* inner loop body -> *)
-  | LOOP_END  : tm
-
-  | LOOP_OVER : iloop -> tm -> tm -> tm (* loop id -> body -> outer continuation -> ... *)
-  | BREAK     : iloop -> tm             (* loop id -> ... *)
-  .
-
-(* following: https://softwarefoundations.cis.upenn.edu/plf-current/Types.html *)
-
-Declare Custom Entry tm.
-Declare Scope tm_scope.
-Notation "<{ e }>" := e (e custom tm at level 99): tm_scope.
-Notation "( x )" := x (in custom tm, x at level 99): tm_scope.
-Notation "x" := x (in custom tm at level 0, x constr at level 0): tm_scope.
-Notation "'if' c 'then' t 'else' e" := (IF c t e)
-                 (in custom tm at level 90, c custom tm at level 80,
-                  t custom tm at level 80, e custom tm at level 80): tm_scope.
-Local Open Scope tm_scope.
-
-
-
-Record qnode := { next   : index
-                ; locked : ibool }.
-
-Definition mem : Type := list qnode.
-
-Definition InitialQnode : qnode := Build_qnode 0 0.
-
-(* cant seem to import the following on my pc (vscoq) *)
-Notation "x :: l" := (cons x l) (at level 60, right associativity).
-Notation "[ ]" := nil.
-Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
-
-Fixpoint mem_app (l1 l2 : mem) : mem :=
-  match l1 with
-  | nil    => l2
-  | h :: t => h :: (mem_app t l2)
-  end.
-
-Notation "x ++ y" := (app x y)
-                     (right associativity, at level 60).
-
-Fixpoint build_mem (n:nat) : mem :=
-  match n with
-  | 0 => []
-  | S n' => mem_app (build_mem n') [InitialQnode]
-  end.
 
 (* we dont need new_i, only i and j *)
 Definition lock : Type := index * index.
 
-Record vars := { acquire_predecessor : option index
-               ; acquire_locked      : option ibool
-               ; release_next        : option index
-               ; release_swap        : option ibool }.
+Module Index.
 
-Definition state : Type := pid * vars * mem * lock.
+  Definition Initial : index := Nil.
 
-Definition get_pid  (s:state) : pid  := match s with | (pid', _vars, _mem, _lock) => pid'  end.
-Definition get_vars (s:state) : vars := match s with | (_pid, vars', _mem, _lock) => vars' end.
-Definition get_mem  (s:state) : mem  := match s with | (_pid, _vars, mem', _lock) => mem'  end.
-Definition get_lock (s:state) : lock := match s with | (_pid, _vars, _mem, lock') => lock' end.
+  Definition of_pid (i : pid) : index := Some i.
 
 
-(* mem get/set *)
-Fixpoint length_of_mem (m:mem) : nat :=
-  match m with
-  | [] => 0
-  | h :: t => S (length_of_mem t)
-  end.
+End Index.
 
-Fixpoint repeat_qnode (n:nat) (m:mem) :=
-  match n with
-    | O  => m
-    | S n' => InitialQnode::(repeat_qnode n' m)
-  end.
 
-(* pads mem so that index i exists *)
-Definition mem_check (i:nat) (m:mem) : mem :=
-  if (Nat.ltb (length_of_mem m) i)
-  then (repeat_qnode i m)
-  else m.
 
-Fixpoint get_index_of (i:nat) (m:mem) : option qnode :=
-  match m with
-  | [] => None
-  | h :: t => match i, (length_of_mem m) with
-              | _, 0 => None
-              | _, _ => if (Nat.eqb i (length_of_mem m)) then Some h else get_index_of i t
-              end end.
+Module IBool.
 
-Definition get_mem_qnode_next (i:index) (s:state) : index :=
-  match get_index_of i (get_mem s) with
-  | None => 0
-  | Some n => (next n)
-  end.
-
-Definition get_mem_qnode_locked (i:index) (s:state) : ibool :=
-  match get_index_of i (get_mem s) with
-  | None => 0
-  | Some n => (locked n)
-  end.
-
-Fixpoint set_index_qnode_next_of (qnode_index:index) (new_next:index) (m:mem) : mem :=
-  match m with
-  | [] => m (* shouldn't happen*)
-  | h :: t =>
-      if (Nat.eqb qnode_index (length_of_mem m))
-      then Build_qnode new_next (locked h) :: t
-      else h :: set_index_qnode_next_of qnode_index new_next t
-  end.
-
-Definition set_mem_qnode_next (index_of_qnode:option index) (new_next:index) (s:state) : state :=
-  match index_of_qnode with
-  | None => s (* will never happen, guarded by [predecessor!=nil] *)
-  | Some qnode_index =>
-    match s with
-    | (_pid, _vars, mem', _lock) =>
-      (_pid, _vars, set_index_qnode_next_of qnode_index new_next (mem_check qnode_index mem'), _lock)
+  Definition of_index (i:index) : option bool :=
+  match i with
+  | None => None
+  | Some n =>
+    match n with
+    | 0 => Some false
+    | 1 => Some true
+    | _ => None
     end
   end.
 
+  Definition of_bool (b:bool) : ibool := if b then 1 else 0.
 
-Fixpoint set_index_qnode_locked_of (qnode_index:index) (new_locked:ibool) (m:mem) : mem :=
-  match m with
-  | [] => m (* shouldn't happen*)
-  | h :: t =>
-    if (Nat.eqb qnode_index (length_of_mem m))
-    then Build_qnode (next h) new_locked :: t
-    else (h :: set_index_qnode_locked_of qnode_index new_locked t)
+  Definition is_some (b:option ibool) : bool :=
+    match b with
+    | None => false
+    | _    => true
     end.
 
-Definition set_mem_qnode_locked (index_of_qnode:option index) (new_locked:ibool) (s:state) : state :=
-  match index_of_qnode with
-  | None => s (* should never happen *)
-  | Some qnode_index =>
-    match s with
-    | (_pid, _vars, mem', _lock) =>
-        (_pid, _vars, set_index_qnode_locked_of qnode_index new_locked (mem_check qnode_index mem'), _lock)
-    end
-  end.
+End IBool.
 
 
 
 
-(* lock get/set *)
-Definition get_lock_i     (s:state) : index := match get_lock s with | (i,  _j) => i     end.
-Definition get_lock_j     (s:state) : index := match get_lock s with | (_i,  j) => j     end.
-
-Definition set_lock_i (i:index) (s:state) : state :=
-  match s with
-  | (_pid, _vars, _mem, lock') => match lock' with | (_i, j) => (_pid, _vars, _mem, (i, j))
-  end end.
-
-Definition set_lock_j (j:index) (s:state) : state :=
-  match s with
-  | (_pid, _vars, _mem, lock') => match lock' with | (i, _j) => (_pid, _vars, _mem, (i, j))
-  end end.
+Module Memory.
 
 
-(* bind vars *)
-Definition get_var (v:var) (s:state) : option index :=
-  match v with
-  | PREDECESSOR => acquire_predecessor (get_vars s)
-  | LOCKED      => acquire_locked      (get_vars s)
-  | NEXT        => release_next        (get_vars s)
-  | SWAP        => release_swap        (get_vars s)
-  | PID         => Some (Index (get_pid s))
-  | NIL         => None
-  end.
+  (**********************************)
+  (**** Qnode ***********************)
+  (**********************************)
 
-Definition get_val (v:val) (s:state) : index :=
-  match v with
-  | VAR r => Index (get_var r s)
-  | TRU   => 1
-  | FLS   => 0
-  end.
+  Record qnode :=
+    { next   : index
+    ; locked : ibool }.
+
+  Module Qnode.
+
+    Definition initial : qnode := Build_qnode None 0.
+
+    (* redundant ? *)
+    Module _Get.
+
+      Definition next   (q:qnode) : index := (next q).
+      Definition locked (q:qnode) : ibool := (locked q).
+
+    End _Get.
+
+
+    Module _Set.
+
+      Definition next   (i:index) (q:qnode) : qnode := Build_qnode i (_Get.locked q).
+      Definition locked (b:ibool) (q:qnode) : qnode := Build_qnode (_Get.next q) b.
+
+    End _Set.
+
+
+  End Qnode.
+
+
+  (**********************************)
+  (**** mem Type, notation & app ****)
+  (**********************************)
+
+  Definition mem : Type := list qnode.
+
+  Notation "x :: l" := (cons x l) (at level 60, right associativity).
+  Notation "[ ]" := nil.
+  Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
+
+  Fixpoint app (l1 l2 : mem) : mem :=
+    match l1 with
+    | nil    => l2
+    | h :: t => h :: (app t l2)
+    end.
+
+  (**********************************)
+  (**** Creating & Initializing *****)
+  (**********************************)
+
+  Fixpoint create (n:nat) : mem :=
+    match n with
+    | 0    => []
+    | S n' => app (create n') [Qnode.initial]
+    end.
+
+  Definition initial (n:nat) : mem := create n.
+
+  (**********************************)
+  (**** helpful funs/definitions ****)
+  (**********************************)
+
+  Fixpoint length_of (m:mem) : nat :=
+    match m with
+    | [] => 0
+    | h :: t => S (length_of t)
+    end.
+
+  Fixpoint add_n_qnodes (n:nat) (m:mem) :=
+    match n with
+      | O  => m
+      | S n' => Qnode.initial::(add_n_qnodes n' m)
+    end.
+
+  (* pads mem so that index i exists *)
+  Definition pad (i:nat) (m:mem) : mem :=
+    let length_of_m:nat := length_of m in
+    if (Nat.ltb length_of_m i)
+    then (add_n_qnodes (i - length_of_m) m)
+    else m.
+
+
+  Module _Get.
+
+    Fixpoint index_of (i:nat) (m:mem) : option qnode :=
+      match m with
+      | []     => None
+      | h :: t =>
+        let length_of_m:nat := length_of m in
+        match i, length_of_m with
+        | _, 0 => None
+        | _, _ => if (Nat.eqb i length_of_m)
+                  then Some h
+                  else index_of i t
+        end
+      end.
+
+    Definition locked_of (i:index) (m:mem) : option ibool :=
+      match i with
+      | None => None
+      | Some n =>
+        match (index_of n m) with
+        | None => None
+        | Some b => Some (locked b)
+        end
+      end.
+
+    Definition next_of (i:index) (m:mem) : index :=
+      match i with
+        | None => None
+        | Some n =>
+        match (index_of n m) with
+        | None => None
+        | Some b => (next b)
+        end
+      end.
+
+  End _Get.
+
+
+  Module _Set.
+
+    Fixpoint index_of (i:nat) (q:qnode) (m:mem) : option mem :=
+      match m with
+      | []     => None
+      | h :: t =>
+        let length_of_m:nat := length_of m in
+        match i, length_of_m with
+        | _, 0 => None
+        | _, _ =>
+          if (Nat.eqb i length_of_m) then Some (q :: t)
+          else match (index_of i q t) with
+               | None   => None
+               | Some l => Some (h :: l)
+               end
+        end
+      end.
+
+    Definition locked_of (i:index) (l:ibool) (m:mem) : option mem :=
+      match i with
+        | None => None
+        | Some n =>
+        match _Get.index_of n m with
+        | None       => None
+        | Some qnode => index_of n (Qnode._Set.locked l qnode) m
+        end
+      end.
+
+    Definition next_of (i:index) (n:index) (m:mem) : option mem :=
+      match i with
+      | None => None
+      | Some j =>
+        match _Get.index_of j m with
+        | None       => None
+        | Some qnode => index_of j (Qnode._Set.next n qnode) m
+        end
+      end.
+
+  End _Set.
+
+
+End Memory.
+
+
+
+Module Vars.
+
+  Record vars :=
+  { var_predecessor : index        (* acquire *)
+  ; var_locked      : option ibool (* acquire *)
+  ; var_next        : index        (* release *)
+  ; var_swap        : option ibool (* release *) }.
+
+  Inductive var : Type :=
+    | PREDECESSOR
+    | LOCKED
+    | NEXT
+    | SWAP
+    (* | PID *)
+    (* | NIL *)
+    .
+
+  Inductive val : Type :=
+  | INDEX : index        -> val (* not yet used *)
+  | IBOOL : option ibool -> val (* not yet used *)
+  | VAR : var -> val
+  | TRU : val
+  | FLS : val
+  | NIL : val
+  .
+
+
+  Module _Get.
+
+    Definition predecessor (v:vars) : index := var_predecessor v.
+
+    Definition locked (v:vars) : option ibool := var_locked v.
+
+    Definition next (v:vars) : index := var_next v.
+
+    Definition swap (v:vars) : option ibool := var_swap v.
+
+  End _Get.
+
+
+  Module _Set.
+
+    Definition predecessor (i:index) (v:vars) : vars :=
+      Build_vars i (_Get.locked v) (_Get.next v) (_Get.swap v).
+
+    Definition locked (b:ibool) (v:vars) : vars :=
+      Build_vars (_Get.predecessor v) (Some b) (_Get.next v) (_Get.swap v).
+
+    Definition next (i:index) (v:vars) : vars :=
+      Build_vars (_Get.predecessor v) (_Get.locked v) i (_Get.swap v).
+
+    Definition swap (b:ibool) (v:vars) : vars :=
+      Build_vars (_Get.predecessor v) (_Get.locked v) (_Get.next v) (Some b).
+
+  End _Set.
+
+End Vars.
+
+
+
+Module State.
+
+  Definition local : Type := pid * Vars.vars.
+
+  Definition resource : Type := Memory.mem * lock.
+
+  Definition global : Type := (list local) * resource.
+
+
+  Module _Local.
+
+    Module _Get.
+
+      Definition pid (s:local) : pid :=
+        match s with
+        | (pid, vars) => pid
+        end.
+
+      Definition vars (s:local) : Vars.vars :=
+        match s with
+        | (pid, vars) => vars
+        end.
+
+
+      Module Var.
+
+        Definition predecessor (s:local) : index := Vars._Get.predecessor (vars s).
+
+        Definition locked (s:local) : option ibool := Vars._Get.locked (vars s).
+
+        Definition next (s:local) : index := Vars._Get.next (vars s).
+
+        Definition swap (s:local) : option ibool := Vars._Get.swap (vars s).
+
+      End Var.
+
+      Definition var (v:Vars.var) (s:local) : option nat :=
+        match v with
+        | Vars.PREDECESSOR => Var.predecessor s
+        | Vars.LOCKED      => Var.locked s
+        | Vars.NEXT        => Var.next s
+        | Vars.SWAP        => Var.swap s
+        (* | PID         => Some (pid s) *)
+        (* | NIL         => None *)
+        end.
+
+      Definition val (v:Vars.val) (s:local) : option nat :=
+        match v with
+        | Vars.INDEX i => i
+        | Vars.IBOOL b => b
+        | Vars.VAR v   => var v s
+        | Vars.TRU     => Some 1
+        | Vars.FLS     => Some 0
+        | Vars.NIL     => Nil
+        end.
+
+    End _Get.
+
+
+    Module _Set.
+
+
+      Module Var.
+
+        Definition predecessor (i:index) (s:local) : local :=
+          match s with
+          | (pid, vars) => (pid, Vars._Set.predecessor i vars)
+          end.
+
+        Definition locked (b:ibool) (s:local) : local :=
+        match s with
+        | (pid, vars) => (pid, Vars._Set.locked b vars)
+        end.
+
+        Definition next (i:index) (s:local) : local :=
+          match s with
+          | (pid, vars) => (pid, Vars._Set.next i vars)
+          end.
+
+        Definition swap (b:ibool) (s:local) : local :=
+        match s with
+        | (pid, vars) => (pid, Vars._Set.swap b vars)
+        end.
+
+      End Var.
+
+    End _Set.
+
+  End _Local.
+
+
+  Module _Resource.
+
+
+    Module _Get.
+
+      Definition mem (s:resource) : Memory.mem :=
+        match s with
+        | (mem, lock) => mem
+        end.
+
+      Definition lock (s:resource) : lock :=
+        match s with
+        | (mem, lock) => lock
+        end.
+
+
+      Module Lock.
+
+        Definition i (s:resource) : index :=
+          match (lock s) with
+          | (i, j) => i
+          end.
+
+        Definition j (s:resource) : index :=
+          match (lock s) with
+          | (i, j) => j
+          end.
+
+      End Lock.
+
+    End _Get.
+
+
+    Module _Set.
+
+
+      Module Lock.
+
+        Definition i (new_i:index) (s:resource) : resource :=
+          match (_Get.lock s) with
+          | (i, j) => (_Get.mem s, (new_i, j))
+          end.
+
+        Definition j (new_j:index) (s:resource) : resource :=
+          match (_Get.lock s) with
+          | (i, j) => (_Get.mem s, (i, new_j))
+          end.
+
+      End Lock.
+
+    End _Set.
+
+  End _Resource.
+
+
+  Module _Global.
+
+
+    Module _Get.
+
+      Definition mem (s:global) : Memory.mem :=
+        match s with
+        | (pids, resource) =>
+          match resource with
+          | (mem, lock) => mem
+          end
+        end.
+
+      Definition lock (s:global) : lock :=
+        match s with
+        | (pids, resource) =>
+          match resource with
+          | (mem, lock) => lock
+          end
+        end.
+
+      End _Get.
+
+  End _Global.
+
+  Inductive state : Type :=
+  | LOCAL  : local  -> state
+  | GLOBAL : global -> state
+  .
+
+End State.
+
+
+Module Process.
+
+  Definition env : Type := State.local * State.resource.
+
+  Module Env.
+
+    Module _Get.
+
+      Definition local (e:env) : State.local :=
+        match e with
+        | (l, r) => l
+        end.
+
+      Definition pid (e:env) : pid := State._Local._Get.pid (local e).
+      Definition vars (e:env) : Vars.vars := State._Local._Get.vars (local e).
+
+      Definition resource (e:env) : State.resource :=
+        match e with
+        | (l, r) => r
+        end.
+
+      Definition mem (e:env) : Memory.mem := State._Resource._Get.mem (resource e).
+      Definition lock (e:env) : lock := State._Resource._Get.lock (resource e).
+
+    End _Get.
+
+
+    Module _Set.
+
+      Module Var.
+
+        Definition predecessor (i:index) (e:env) : env :=
+          match e with
+          | (l, r) => ((State._Local._Set.Var.predecessor i l), r)
+          end.
+
+        Definition locked (b:ibool) (e:env) : env :=
+          match e with
+          | (l, r) => ((State._Local._Set.Var.locked b l), r)
+          end.
+
+        Definition next (i:index) (e:env) : env :=
+          match e with
+          | (l, r) => ((State._Local._Set.Var.next i l), r)
+          end.
+
+        Definition swap (b:ibool) (e:env) : env :=
+          match e with
+          | (l, r) => ((State._Local._Set.Var.swap b l), r)
+          end.
+
+      End Var.
+
+    End _Set.
+
+  End Env.
+
+
+  Module Expr.
+
+    Inductive expr : Type :=
+      | NOT : expr -> expr
+      | VAR : Vars.var -> expr
+      | NAT : nat -> expr
+      | IBOOL : nat -> expr
+      | EQ  : nat -> nat -> expr
+      | TT  : expr
+      | FF  : expr
+      .
+
+    Inductive ibool_guard : option ibool -> Prop :=
+      | SOME_IBOOL : forall (b:ibool), ibool_guard (Some b)
+      .
+
+    Inductive eval : (expr * env) -> (expr * env) -> Prop :=
+
+      | IBOOL_TT : forall e, eval (IBOOL 1, e) (TT, e)
+      | IBOOL_FF : forall e, eval (IBOOL 0, e) (FF, e)
+
+      | NOT_TT : forall e, eval (NOT TT, e) (FF, e)
+      | NOT_FF : forall e, eval (NOT FF, e) (TT, e)
+
+      | EQ_NAT : forall n e,
+        eval (EQ n n) (TT)
+
+      .
+
+  End Expr.
+
+
+  Module Operation.
+
+    (* used in steps, not syntax *)
+    Inductive act : Type :=
+      | NCS   : act
+      | ENTER : act
+      | LEAVE : act
+
+      | READ_NEXT   : act
+      | READ_LOCKED : act
+
+      | WRITE_NEXT   : Vars.var -> Vars.val -> act
+      | WRITE_LOCKED : Vars.var -> Vars.val -> act
+
+      | FETCH_AND_STORE  : act
+      | COMPARE_AND_SWAP : act
+      .
+
+      Module Handle.
+
+        (** [read_next e] will set var [next] to be the value
+            currently of the [qnode.next] corresponding to the
+            [pid] of the process in the state. *)
+        Definition read_next (e:env) : env :=
+          let m : Memory.mem := Env._Get.mem e in
+          let p : pid        := Env._Get.pid e in
+          let new_next:index := Memory._Get.next_of (Index.of_pid p) m in
+          Env._Set.Var.next new_next e.
+
+        (** [read_locked e] will set var [locked] to be
+            the value of the [qnode.locked] corresponding
+            to the [pid] of the process in the state.
+            ! ! ! it requires that [qnode.locked] is not None. *)
+        Definition read_locked (e:env) : env :=
+        let m : Memory.mem := Env._Get.mem e in
+        let p : pid        := Env._Get.pid e in
+        match (Memory._Get.locked_of (Index.of_pid p) m) with
+        | None => e (* should not happen, semantics guard this from happening *)
+        | Some new_locked =>
+          Env._Set.Var.locked new_locked e
+        end.
+
+
+      End Handle.
+
+      Inductive guard : (act * env) -> Prop :=
+
+        | G_READ_NEXT : forall (e:env),
+          guard (READ_NEXT, e)
+
+        | G_READ_LOCKED : forall (e:env) (p:pid) (m:Memory.mem) (l:ibool),
+          Expr.ibool_guard (Memory._Get.next_of (Index.of_pid p) m) ->
+          guard (READ_LOCKED, e)
+
+        | G_WRITE_NEXT : forall vr vl (e:env),
+          guard (WRITE_NEXT vr vl, e)
+
+        | G_WRITE_LOCKED : forall vr vl (e:env) (p:pid) (m:Memory.mem) (l:ibool),
+          guard (WRITE_LOCKED vr vl, e)
+
+        .
+
+      Definition update_env (a:act) (e:env) : env :=
+        match a with
+        (* CS Access *)
+        | NCS   => e
+        | ENTER => e
+        | LEAVE => e
+
+        (* Memory Access *)
+        | READ_NEXT    => Handle.read_next e
+        | READ_LOCKED  => Handle.read_locked e
+        (* bind_locked (get_mem_qnode_locked (Index (get_pid s)) s) s *)
+
+        | WRITE_NEXT   pid_to_write next_pid  => e
+                          (* set_mem_qnode_next   (get_var pid_to_write s) (get_val next_pid  s) s *)
+
+        | WRITE_LOCKED pid_to_write is_locked => e
+                          (* set_mem_qnode_locked (get_var pid_to_write s) (get_val is_locked s) s *)
+
+        (* Lock Access *)
+        | FETCH_AND_STORE  => e
+        (* set_lock_i (Index (get_pid s)) (bind_predecessor (get_lock_i s) s) *)
+        | COMPARE_AND_SWAP => e
+        (* let s1 := set_lock_j (Index (get_pid s)) s in
+                              let s2 := bind_swap (index_eq (get_lock_i s1) (get_lock_j s1)) s1 in
+                              let s3 := set_lock_i 0 s2 in s3 *)
+        end.
+
+  End Operation.
+
+  Inductive tm : Type :=
+    | TYPE_ERR : tm
+    | OK    : tm                      (* no-op *)
+
+    | ACT : Operation.act -> tm
+
+    | SEQ : tm -> tm -> tm
+
+    | IF    : Expr.expr -> tm -> tm -> tm    (* condition -> if true -> if false -> ... *)
+
+    (* | VAL    : Vars.val  -> tm
+    | NOT    : tm   -> tm
+    | EQ_N   : nat  -> nat -> tm
+    | EQ_B   : bool -> bool -> tm
+    | IS_TRU : tm   -> tm
+    | IS_NIL : tm   -> tm
+
+    | TT   : tm        (* true *)
+    | FF   : tm        (* false *)
+ *)
+    | LOOP      : tm -> tm (* inner loop body -> *)
+    | LOOP_END  : tm
+
+    | LOOP_OVER : iloop -> tm -> tm -> tm (* loop id -> body -> outer continuation -> ... *)
+    | BREAK     : iloop -> tm             (* loop id -> ... *)
+    .
+
+  (* following: https://softwarefoundations.cis.upenn.edu/plf-current/Types.html *)
+
+  Declare Custom Entry tm.
+  Declare Scope tm_scope.
+  Notation "<{ e }>" := e (e custom tm at level 99): tm_scope.
+  Notation "( x )" := x (in custom tm, x at level 99): tm_scope.
+  Notation "x" := x (in custom tm at level 0, x constr at level 0): tm_scope.
+  Notation "'if' c 'then' t 'else' e" := (IF c t e)
+                  (in custom tm at level 90, c custom tm at level 80,
+                    t custom tm at level 80, e custom tm at level 80): tm_scope.
+  Local Open Scope tm_scope.
+
+  Fixpoint subst (new old:tm) (loops:bool) : tm :=
+    match old with
+    | TYPE_ERR => TYPE_ERR
+    | OK   => OK
+
+    | IF c t e => IF c (subst new t loops) (subst new e loops)
+
+
+    | VAL t => VAL t
+    | NOT t      => NOT t
+    | EQ_N a b   => EQ_N a b
+    | EQ_B a b   => EQ_B a b
+    | IS_TRU a   => IS_TRU a
+    | IS_NIL t   => IS_NIL t
+    (* | VAR v      => VAR v *)
+
+    | TT => TT
+    | FF => FF
+
+    | ACT a => ACT a
+
+    | SEQ l r => SEQ l (subst new r loops) (* do not substitute in other body *)
+
+    | LOOP b   => if loops then LOOP (subst new b loops) else LOOP b
+    | LOOP_END => new
+
+    | LOOP_OVER l b c => LOOP_OVER l (subst new b loops) (subst new c loops)
+    | BREAK l         => BREAK l
+    end.
+
+    Module Semantics.
+
+      Inductive action : Type :=
+      | SILENT : action
+      | LABEL  : Operation.act -> pid -> action.
+
+      Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
+
+      Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
+
+        | ACT : forall a (e:env),
+          (Operation.guard (a, e)) ->
+          (ACT a, e) --<{LABEL a (Env._Get.pid e)}>--> (OK, Operation.update_env a e)
+
+        | SEQ : forall a l1 l2 r e1 e2,
+          (l1, e1) --<{a}>--> (l2, e2) ->
+          (SEQ l1 r, e1) --<{a}>--> (SEQ l2 r, e2)
+
+        | SEQ_END : forall r e,
+          (SEQ OK r, e) --<{SILENT}>--> (r, e)
+
+        | LOOP  : forall t e,
+          (LOOP t, e) --<{SILENT}>--> (subst t LOOP_END false, e)
+
+        | BREAK : forall l c e,
+          (LOOP_OVER l (BREAK l) c, e) --<{SILENT}>--> (c, e)
+
+        | LOOP_OVER : forall a l t1 t2 c e1 e2,
+          (LOOP t1, e1) --<{a}>--> (LOOP t2, e2) ->
+            (LOOP_OVER l t1 c, e1) --<{a}>--> (LOOP_OVER l t2 c, e2)
+
+        | IF_TT : forall t1 t2 e,
+          (<{ if TT then t1 else t2 }>, e) --<{SILENT}>--> (t1, e)
+
+        | IF_FF : forall t1 t2 e,
+          (<{ if FF then t1 else t2 }>, e) --<{SILENT}>--> (t2, e)
+
+        | IF : forall c1 c2 t1 t2 e1,
+          (Expr.eval (c1, e1) (c2, e2)) ->
+          (<{ if c1 then t1 else t2 }>, e1) --<{SILENT}>--> (<{ if c2 then t1 else t2 }>, e2)
+
+      where "t '--<{' a '}>-->' t'" := (step t a t').
+
+
+
+    End Semantics.
+
+End Process.
+
+
 
 
 
@@ -368,36 +855,6 @@ Definition tm_is_tru (v:val) (s:state) : tm :=
 
 
 (* substitution *)
-Fixpoint subst (new old:tm) (loops:bool) : tm :=
-  match old with
-  | TYPE_ERR => TYPE_ERR
-  | OK   => OK
-
-  | IF c t e => IF c (subst new t loops) (subst new e loops)
-
-
-  | VAL t => VAL t
-  | NOT t      => NOT t
-  | EQ_N a b   => EQ_N a b
-  | EQ_B a b   => EQ_B a b
-  | IS_TRU a   => IS_TRU a
-  | IS_NIL t   => IS_NIL t
-  (* | VAR v      => VAR v *)
-
-  | TT => TT
-  | FF => FF
-
-  | ACT a t => ACT a (subst new t loops)
-
-  | SEQ l r => SEQ l (subst new r loops) (* do not substitute in other body *)
-
-  | LOOP b   => if loops then LOOP (subst new b loops) else LOOP b
-  | LOOP_END => new
-
-  | LOOP_OVER l b c => LOOP_OVER l (subst new b loops) (subst new c loops)
-  | BREAK l         => BREAK l
-  end.
-
 (* handle resulting terms *)
 
 
