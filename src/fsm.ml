@@ -1040,6 +1040,44 @@ module Merge = struct
 end
 
 (*********************************************************************)
+(****** Organize / Cleanup *******************************************)
+(*********************************************************************)
+
+(** [Organize] aims to re-organize an FSM to be more human-readable. E.g.:
+    - make sure there is only one termination state.
+    - order edges by the index of their [from] state.
+    - order actions by their index (or, reassign indices by position in alphabet and propagate).
+    - prune unreachable states and edges. *)
+module Organize = struct
+  (* TODO: *)
+
+  let edges (es : States.t Actions.t Edges.t) : States.t Actions.t Edges.t = es
+
+  let fsm (m : fsm) : fsm =
+    (* prune unreachable states *)
+    let reachable_states : States.t =
+      States.union
+        (Get.destinations (Edges m.edges))
+        (match m.init with
+         | None -> States.empty
+         | Some init -> States.singleton init)
+    in
+    let unreachable_states : States.t =
+      States.filter
+        (fun (s : state) ->
+          States.mem s reachable_states == false || true
+          (* add condition for pruning if all incoming actions are silent *))
+        m.states
+    in
+    m.states
+    <- States.filter (fun (s : state) -> States.mem s reachable_states) m.states;
+    (* prune unused edges *)
+    States.iter (fun (s : state) -> Edges.remove m.edges s) unreachable_states;
+    m
+  ;;
+end
+
+(*********************************************************************)
 (****** Saturate *****************************************************)
 (*********************************************************************)
 
@@ -1136,31 +1174,27 @@ module Saturate = struct
                 collect_annotated_actions
                   ~params
                   visited_states
-                  (Append.annotation (destination, a) annotation)
+                  (List.append annotation [ destination, a ])
                   destinations
                   saturated_actions
                   named_action
                   m)
-              else (
-                if is_lhs_of_named_action
-                then
-                  (* a is a named-action, add and continue *)
-                  Actions.add
-                    saturated_actions
-                    (saturated_action a (Some a) destination annotation)
-                    destinations;
-                let named_action : action option =
-                  if is_lhs_of_named_action then Some a else named_action
-                in
+              else if is_lhs_of_named_action
+              then (
+                (* a is a named-action, add and continue *)
+                Actions.add
+                  saturated_actions
+                  (saturated_action a (Some a) destination annotation)
+                  destinations;
                 (* need to continue annotating outward silent actions *)
                 collect_annotated_actions
                   ~params
                   visited_states
-                  (Append.annotation (destination, a) annotation)
+                  (List.append annotation [ destination, a ])
                   (* annotation *)
                   destinations
                   saturated_actions
-                  named_action
+                  (Some a)
                   m))
             destination_actions)
       to_visit
@@ -1198,6 +1232,8 @@ module Saturate = struct
         Edges.add saturated_edges from saturated_actions)
       m.edges;
     m.edges <- saturated_edges;
+    (* make sure all unreachable states/edges are pruned *)
+    (* Organize.fsm m *)
     m
   ;;
 end
