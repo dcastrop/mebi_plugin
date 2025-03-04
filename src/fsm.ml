@@ -1168,7 +1168,11 @@ module Saturate = struct
                 if is_lhs_of_named_action == false
                 then (
                   let a' : action =
-                    saturated_action a named_action destination annotation
+                    saturated_action
+                      a
+                      named_action
+                      destination
+                      (List.append annotation [ destination, a ])
                   in
                   Actions.add saturated_actions a' destinations);
                 (* continue *)
