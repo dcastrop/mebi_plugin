@@ -25,7 +25,7 @@ let to_fsm (lts : Lts.lts) : fsm =
         Append.alphabet fsm a;
         Append.state fsm from;
         Append.state fsm destination;
-        Append.edge fsm (from, a, destination);
+        Append.edge (FSM fsm) (from, a, Singleton destination);
         fsm)
       transitions
       fsm

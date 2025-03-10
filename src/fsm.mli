@@ -288,6 +288,7 @@ module Create : sig
   type actions_params =
     | New of (action * Block.t)
     | Singleton of (action * state)
+    | Destinations of (action * Block.t)
     | ()
 
   val actions : actions_params -> Block.t Actions.t
@@ -334,13 +335,31 @@ module New : sig
 end
 
 module Append : sig
-  val annotation : state * action -> annotation -> annotation
-  val annotations : annotation -> annotations -> annotations
+  val annotation' : state * action -> annotation -> annotation
+  val annotation : state * action -> annotation -> annotation option
+
+  type of_annotation =
+    | Anno of annotation
+    | Annos of annotations
+
+  val annotations' : of_annotation -> annotations -> annotations
+  val annotations : of_annotation -> annotations -> annotations option
   val alphabet : fsm -> action -> unit
   val state : ?skip_duplicate_names:bool -> fsm -> state -> unit
   val states : ?skip_duplicate_names:bool -> fsm -> Block.t -> unit
-  val action : Block.t Actions.t -> action * state -> unit
-  val edge : fsm -> state * action * state -> unit
+
+  type of_destination =
+    | Singleton of state
+    | Destinations of Block.t
+
+  val action : Block.t Actions.t -> action * of_destination -> unit
+
+  type has_edges =
+    | FSM of fsm
+    | Edges of Block.t Actions.t Edges.t
+
+  val edge : has_edges -> state * action * of_destination -> unit
+  val edges : has_edges -> state * Block.t Actions.t -> unit
 end
 
 module Filter : sig
@@ -384,7 +403,11 @@ module Filter : sig
     -> kind_edge_filter
     -> Block.t Actions.t Edges.t
 
-  val actions : Block.t Actions.t -> kind_action_filter -> Block.t Actions.t
+  val actions
+    :  ?weak:bool
+    -> Block.t Actions.t
+    -> kind_action_filter
+    -> Block.t Actions.t
 
   val edges
     :  ?weak:bool
@@ -396,7 +419,20 @@ module Filter : sig
 end
 
 module Get : sig
+  type has_states =
+    | FSM of fsm
+    | Anno of annotation
+    | Annos of annotations
+
+  val states : has_states -> Block.t
   val actions_from : state -> Block.t Actions.t Edges.t -> Block.t Actions.t
+
+  val actions_of
+    :  ?weak:bool
+    -> action
+    -> Block.t Actions.t
+    -> Block.t Actions.t option
+
   val silent_actions : Block.t Actions.t -> Block.t Actions.t
   val silent_edges : Block.t Actions.t Edges.t -> Block.t Actions.t Edges.t
 
@@ -464,4 +500,25 @@ module Saturate : sig
     -> unit
 
   val fsm : ?params:Utils.Logging.params -> fsm -> fsm
+
+  exception AppendAnnotationIsNone of ((state * action) * annotation)
+  exception AppendAnnotationsIsNone of (Append.of_annotation * annotations)
+
+  val append_annotation : state * action -> annotation -> annotation
+  val append_annotations : Append.of_annotation -> annotations -> annotations
+
+  val explore_from
+    :  state
+    -> annotation
+    -> Block.t Actions.t Edges.t
+    -> annotations
+
+  val annotated
+    :  action
+    -> state
+    -> annotation
+    -> Block.t Actions.t option
+    -> action option
+
+  val fsm_states : ?params:Utils.Logging.params -> fsm -> fsm
 end

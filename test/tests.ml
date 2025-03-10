@@ -171,7 +171,7 @@ let run_all ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ()) ()
 
 exception QuickTestFailed of example
 
-let quick_test
+let quick_test_saturate_fsm
   ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
   (example_to_test : Mebi_plugin.Examples.example)
   ()
@@ -200,6 +200,35 @@ let quick_test
   log ~params (Printf.sprintf "\nEnd of Tests.ml (%s)" example_to_test.name)
 ;;
 
+let quick_test_saturate_fsm_states
+  ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
+  (example_to_test : Mebi_plugin.Examples.example)
+  ()
+  : unit
+  =
+  (* params.kind <- Details (); *)
+  log ~params (Printf.sprintf "\nQuickTest: %s." example_to_test.name);
+  let to_test : Mebi_plugin.Fsm.fsm =
+    match example_to_test.kind with
+    | Saturate s -> s
+    | _ -> raise (QuickTestFailed example_to_test)
+  in
+  log
+    ~params
+    (Printf.sprintf
+       "\nUnsaturated: %s."
+       (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) to_test));
+  let saturated : Mebi_plugin.Fsm.fsm =
+    Mebi_plugin.Fsm.Saturate.fsm_states ~params to_test
+  in
+  log
+    ~params
+    (Printf.sprintf
+       "\nSaturated: %s."
+       (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) saturated));
+  log ~params (Printf.sprintf "\nEnd of Tests.ml (%s)" example_to_test.name)
+;;
+
 (** To run tests...
 
     - First build the project:
@@ -212,7 +241,10 @@ let quick_test
 (* let () = run_all () *)
 
 let () =
-  (* quick_test Mebi_plugin.Examples.exa_saturated1 (); *)
-  quick_test Mebi_plugin.Examples.exa_saturated2 ();
+  (* quick_test_saturate_fsm Mebi_plugin.Examples.exa_saturated1 (); *)
+  quick_test_saturate_fsm_states Mebi_plugin.Examples.exa_saturated1 ();
+  (*  *)
+  (* quick_test_saturate_fsm Mebi_plugin.Examples.exa_saturated2 (); *)
+  quick_test_saturate_fsm_states Mebi_plugin.Examples.exa_saturated2 ();
   ()
 ;;
