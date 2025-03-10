@@ -15,7 +15,13 @@ val run_all_ks90
 
 exception QuickTestFailed of Mebi_plugin.Examples.example
 
-val quick_test
+val quick_test_saturate_fsm
+  :  ?params:Mebi_plugin.Utils.Logging.params
+  -> Mebi_plugin.Examples.example
+  -> unit
+  -> unit
+
+val quick_test_saturate_fsm_states
   :  ?params:Mebi_plugin.Utils.Logging.params
   -> Mebi_plugin.Examples.example
   -> unit
