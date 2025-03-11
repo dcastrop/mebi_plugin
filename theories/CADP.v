@@ -77,17 +77,6 @@ End PID.
 
 Module IBool.
 
-  Definition of_index (i:index) : option bool :=
-    match i with
-    | None => None
-    | Some n =>
-      match n with
-      | 0 => Some false
-      | 1 => Some true
-      | _ => None
-      end
-    end.
-
   Definition of_bool (b:bool) : ibool := if b then 1 else 0.
 
   Definition to_nat (b:ibool) : nat := b.
@@ -124,7 +113,7 @@ Module Memory.
     ; locked : ibool }.
 
   Module Qnode.
-    Definition initial : qnode := Build_qnode None 0.
+    Definition initial : qnode := Build_qnode Nil 0.
 
     Module _Get.
       Definition next   (q:qnode) : index := (next q).
@@ -186,18 +175,8 @@ Module Memory.
 
   Module _Get.
 
-    Fixpoint index_of (i:nat) (m:mem) : option qnode :=
-      match m with
-      | []     => None
-      | h :: t =>
-        let length_of_m:nat := length_of m in
-        match i, length_of_m with
-        | _, 0 => None
-        | _, _ => if (Nat.eqb i length_of_m)
-                  then Some h
-                  else index_of i t
-        end
-      end.
+
+    Definition index_of (i:nat) (m:mem) := nth_error m i.
 
     Definition locked_of (i:index) (m:mem) : option ibool :=
       match i with
@@ -215,7 +194,7 @@ Module Memory.
         | Some n =>
         match (index_of n m) with
         | None => None
-        | Some b => (next b)
+        | Some b => next b
         end
       end.
 
@@ -683,9 +662,9 @@ End Env.
 (*************************************************************************)
 Module Process.
 
-
-
   Module Expr.
+
+    Inductive value : Set :=. (*TODO Move values from [expr] to [value]*)
 
     Inductive expr : Type :=
       | NOT : expr -> expr
@@ -709,9 +688,10 @@ Module Process.
       | NOT_TT : forall e, eval (NOT TT, e) (FF, e)
       | NOT_FF : forall e, eval (NOT FF, e) (TT, e)
 
-      | VAR_PREDECESSOR : forall v e,
-        (Env._Get.Var.predecessor e)=v ->
-        eval (VAR Vars.PREDECESSOR, e) (INDEX v, e)
+      | VAR_PREDECESSOR : forall e,
+        eval
+          (VAR Vars.PREDECESSOR, e)
+          (INDEX (Env._Get.Var.predecessor e), e)
 
       | VAR_LOCKED : forall v b e,
         (Env._Get.Var.locked e)=v /\ v=(Some b) ->
@@ -944,7 +924,7 @@ Module Process.
     Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
 
       | ACT : forall a (e:env),
-        (Operation.guard (a, e)) ->
+        Operation.guard (a, e) ->
         (ACT a, e) --<{LABEL a (Env._Get.pid e)}>--> (OK, Operation.update_env a e)
 
       | SEQ : forall a l1 l2 r e1 e2,
