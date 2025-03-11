@@ -1443,64 +1443,102 @@ module Saturate = struct
       []
   ;;
 
+  exception
+    MoreThanOneAnnotatedActionFoundForSameStartEndAction of
+      (action * States.t Actions.t)
+
   (** return None if the specific annotation already exists for this action & destination *)
   let annotated
     (a : action)
     (destination : state)
     (anno : annotation)
     (a's : States.t Actions.t option)
-    : action option
+    : action option * action option
     =
     match a's with
     | None ->
-      Some
-        (Create.action ~is_tau:false ~annotation:[ anno ] (Of (a.id, a.label)))
+      ( Some
+          (Create.action
+             ~is_tau:false
+             ~annotation:[ anno ]
+             (Of (a.id, a.label)))
+      , None )
     | Some a's ->
       (* match Actions.find_opt a's a with *)
       (* check if annotations for [a] already exist *)
       (match Get.actions_of ~weak:true a a's with
        | None ->
-         Some
-           (Create.action
-              ~is_tau:false
-              ~annotation:[ anno ]
-              (Of (a.id, a.label)))
-       | Some actions ->
-         let (annos', annotated_a, destinations)
-           : annotations * action option * States.t
-           =
-           Actions.fold
-             (fun (b : action)
-               (ds : States.t)
-               ((annos', annotated_a, destinations) :
-                 annotations * action option * States.t) ->
-               ( append_annotations (Annos b.annotation) annos'
-               , (if List.is_empty b.annotation then None else Some b)
-               , States.union ds destinations ))
-             actions
-             ([], None, States.empty)
-         in
-         if States.mem destination destinations
-         then (
-           match Append.annotations (Anno anno) annos' with
-           | None -> None
-           | Some annos ->
-             (match annotated_a with
-              | None ->
-                Some
-                  (Create.action
-                     ~is_tau:false
-                     ~annotation:annos
-                     (Of (a.id, a.label)))
-              | Some annotated_a ->
-                annotated_a.annotation <- annos;
-                None))
-         else
-           Some
+         ( Some
              (Create.action
                 ~is_tau:false
-                ~annotation:[ anno ]
-                (Of (a.id, a.label))))
+                ~annotation:
+                  [ anno
+                    (* ; [ ( Create.state (Of (99, "tt"))
+                    , Create.action ~is_tau:true (Of (99, "aa")) )
+                  ] *)
+                  ]
+                (Of (a.id, a.label)))
+         , None )
+       | Some actions ->
+         if Actions.length actions > 1
+         then
+           raise (MoreThanOneAnnotatedActionFoundForSameStartEndAction (a, a's));
+         let (b, destinations) : action * States.t =
+           List.hd (List.of_seq (Actions.to_seq actions))
+         in
+         let annos : annotations =
+           append_annotations
+             (Annos
+                [ anno
+                  (* ; [ ( Create.state (Of (99, "dd"))
+                    , Create.action ~is_tau:true (Of (99, "cc")) )
+                  ] *)
+                ])
+             b.annotation
+         in
+         (* let (annos', annotated_a, destinations)
+            : annotations * action option * States.t
+            =
+            Actions.fold
+            (fun (b : action)
+            (ds : States.t)
+            ((annos', annotated_a, destinations) :
+            annotations * action option * States.t) ->
+            ( append_annotations (Annos b.annotation) annos'
+            , (if List.is_empty b.annotation then None else Some b)
+            , States.union ds destinations ))
+            actions
+            ([], None, States.empty)
+            in *)
+         if States.mem destination destinations
+         then (
+           b.annotation <- annos;
+           None, Some b
+           (* match Append.annotations (Anno anno) annos with
+              | None -> None
+              | Some annos ->
+              (match annotated_a with
+              | None ->
+              Some
+              (Create.action
+              ~is_tau:false
+              ~annotation:annos
+              (Of (a.id, a.label)))
+              | Some annotated_a ->
+              annotated_a.annotation <- annos;
+              None)) *))
+         else
+           ( Some
+               (Create.action
+                  ~is_tau:false
+                  ~annotation:
+                    [ anno
+                      (* ; [ ( Create.state (Of (99, "ff"))
+                      , Create.action ~is_tau:true (Of (99, "bb")) )
+                    ] *)
+                    ]
+                  (Of (a.id, a.label)))
+           , None ))
   ;;
 
   (* append_annotations (Anno anno) annos in *)
@@ -1576,14 +1614,15 @@ module Saturate = struct
                     (match
                        annotated a destination anno (Edges.find_opt new_edges s)
                      with
-                     | None -> new_states''
-                     | Some anno_a ->
+                     | None, Some anno_b -> new_states''
+                     | Some anno_a, None ->
                        (* append edges to new state *)
                        Append.edge
                          (Edges new_edges)
                          (s, anno_a, Singleton destination);
                        (* add new destination to states *)
-                       States.add destination new_states''))
+                       States.add destination new_states''
+                     | _, _ -> new_states'' (* should not happen *)))
                 new_states'
                 annos
             in

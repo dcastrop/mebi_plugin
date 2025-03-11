@@ -513,12 +513,16 @@ module Saturate : sig
     -> Block.t Actions.t Edges.t
     -> annotations
 
+  exception
+    MoreThanOneAnnotatedActionFoundForSameStartEndAction of
+      (action * Block.t Actions.t)
+
   val annotated
     :  action
     -> state
     -> annotation
     -> Block.t Actions.t option
-    -> action option
+    -> action option * action option
 
   val fsm_states : ?params:Utils.Logging.params -> fsm -> fsm
 end
