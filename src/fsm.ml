@@ -1542,29 +1542,29 @@ module Saturate = struct
               new_states')
           else (
             (* first, add all non silent actions *)
-            let new_states'' : States.t =
-              Actions.fold
-                (fun (a : action)
-                  (destinations : States.t)
-                  (new_states'' : States.t) ->
-                  if a.is_tau == false
-                  then (
-                    (* add with no change *)
-                    Append.edge
-                      (Edges new_edges)
-                      (s, a, Destinations destinations);
-                    (* add all destinations (unchanged) *)
-                    States.union new_states'' destinations)
-                  else new_states'')
-                s_actions
-                new_states'
-            in
+            (* let new_states'' : States.t =
+               Actions.fold
+               (fun (a : action)
+               (destinations : States.t)
+               (new_states'' : States.t) ->
+               if a.is_tau == false
+               then (
+               (* add with no change *)
+               Append.edge
+               (Edges new_edges)
+               (s, a, Destinations destinations);
+               (* add all destinations (unchanged) *)
+               States.union new_states'' destinations)
+               else new_states'')
+               s_actions
+               new_states'
+               in *)
             (* new_states'') *)
             (* iterate through, create copies of all states reachable via any named action (after sequence of tau's) *)
             let annos : annotations = explore_from s [] old_edges in
-            let new_states''' : States.t =
+            let new_states'' : States.t =
               List.fold_left
-                (fun (new_states''' : States.t) (anno : annotation) ->
+                (fun (new_states'' : States.t) (anno : annotation) ->
                   match List.hd anno with
                   | destination, a ->
                     (* create copy of destination *)
@@ -1576,18 +1576,18 @@ module Saturate = struct
                     (match
                        annotated a destination anno (Edges.find_opt new_edges s)
                      with
-                     | None -> new_states'''
+                     | None -> new_states''
                      | Some anno_a ->
                        (* append edges to new state *)
                        Append.edge
                          (Edges new_edges)
                          (s, anno_a, Singleton destination);
                        (* add new destination to states *)
-                       States.add destination new_states'''))
-                new_states''
+                       States.add destination new_states''))
+                new_states'
                 annos
             in
-            new_states'''))
+            new_states''))
         old_states
         States.empty
     in
