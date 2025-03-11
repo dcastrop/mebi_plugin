@@ -595,6 +595,7 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
   | STEP_BREAK : forall l c e,
     (LOOP_OVER l (BREAK l) c, e) --<{SILENT}>--> (c, e)
 
+  (* TODO: this currently only breaks the immediate outer loop if id's match *)
   | STEP_LOOP_OVER : forall a l t1 t2 c e1 e2,
     (LOOP t1, e1) --<{a}>--> (LOOP t2, e2) ->
       (LOOP_OVER l t1 c, e1) --<{a}>--> (LOOP_OVER l t2 c, e2)
