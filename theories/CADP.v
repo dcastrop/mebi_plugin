@@ -443,6 +443,7 @@ Definition read_locked (e:env) : option env :=
     Some (Env.set_state (State.set_vars (set_locked qnode_locked v) s) e)
   end.
 
+(*DC: slight simplification: instead of taking an expr, it needs to take a val*)
 (** [write_next to_write next e] will set the
     field [qnode.next] of the [qnode] of the
     index [to_write] to the value of [next]. *)
@@ -584,6 +585,8 @@ Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
 
 Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
 
+  (*DC: the below is wrong: some actions need to be silent. Unless you propose
+   to filter later the actions that are silent?*)
   | STEP_ACT : forall a e,
     (ACT a, e) --<{LABEL a (State.get_pid (Env.get_state e))}>--> (do_act a e)
 
@@ -600,6 +603,13 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
   (* TODO: this currently only breaks the immediate outer loop if id's match *)
   (* FIXME: some kind of context hold needed? I.e.: A.B.C =~ A.[[C]] *)
   (* E.g.: LOOP_OVER l [[ BREAK l ]] *)
+
+(* DC: Yes, the definition is broken. Similarly with [BREAK_OVER]. A separate definition is needed: *)
+(* There are two approaches:
+(1) substituting a label by a sequence of statements (i.e. something similar to the standard rule : unfold (mu X. P) = [\mu X. P / X] P
+(2) keeping a context of labels and the loop that they associate to. Then "break" would just jump to the associated loop by
+inserting its associated sequence of instructions
+*)
   | STEP_BREAK : forall l c e,
     (LOOP_OVER l (BREAK l) c, e) --<{SILENT}>--> (c, e)
 
@@ -607,6 +617,9 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
   | STEP_BREAK_OTHER : forall l1 l2 c e,
     (LOOP_OVER l1 (BREAK l2) c, e) --<{SILENT}>--> (BREAK l2, e)
 
+(* DC: I do not understand this rule; why are we ignoring the label? *)
+(* What if t1 is already a [BREAK]?
+ *)
   | STEP_LOOP_OVER : forall a l t1 t2 c e1 e2,
     (LOOP t1, e1) --<{a}>--> (LOOP t2, e2) ->
     (LOOP_OVER l t1 c, e1) --<{a}>--> (LOOP_OVER l t2 c, e2)
@@ -617,6 +630,8 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
   | STEP_IF_FF : forall t1 t2 e,
     (<{ if FLS then t1 else t2 }>, e) --<{SILENT}>--> (t2, e)
 
+  (* I would merge the rule below with the two above, with condition [eval c e =
+  TRU] or [eval c e = FALSE] *)
   | STEP_IF : forall c t1 t2 e,
     (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (eval_or_err c t1 t2 e)
 
@@ -648,6 +663,7 @@ Inductive lts : sys * resource -> action -> sys * resource -> Prop :=
     (r1, gr1) ==<{a}>==> (r2, gr2) ->
     (PAR l r1, gr1) ==<{a}>==> (PAR l r2, gr2)
 
+(* DC: Where does [a] come from? What does [a] mean in this transition? *)
   | LTS_END_L : forall a ls r gr,
     (PAR (PRC END ls) r, gr) ==<{a}>==> (r, gr)
 
