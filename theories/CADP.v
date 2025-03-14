@@ -548,7 +548,7 @@ Definition compare_and_swap (e:env) : option env :=
   end.
 
 
-Definition do_act (a:act) (e:env) : (tm*env) :=
+Definition do_act (a:act) (e:env) : (tm * env) :=
   match a with
   | NCS   => (OK, e)
   | ENTER => (OK, e)
@@ -597,10 +597,16 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
   | STEP_LOOP  : forall t e,
     (LOOP t, e) --<{SILENT}>--> (subst t LOOP_END false, e)
 
+  (* TODO: this currently only breaks the immediate outer loop if id's match *)
+  (* FIXME: some kind of context hold needed? I.e.: A.B.C =~ A.[[C]] *)
+  (* E.g.: LOOP_OVER l [[ BREAK l ]] *)
   | STEP_BREAK : forall l c e,
     (LOOP_OVER l (BREAK l) c, e) --<{SILENT}>--> (c, e)
 
-  (* TODO: this currently only breaks the immediate outer loop if id's match *)
+  (* Or, maybe we can just pass the BREAK outwards to find the correct LOOP: *)
+  | STEP_BREAK_OTHER : forall l1 l2 c e,
+    (LOOP_OVER l1 (BREAK l2) c, e) --<{SILENT}>--> ((BREAK l2), e)
+
   | STEP_LOOP_OVER : forall a l t1 t2 c e1 e2,
     (LOOP t1, e1) --<{a}>--> (LOOP t2, e2) ->
     (LOOP_OVER l t1 c, e1) --<{a}>--> (LOOP_OVER l t2 c, e2)
