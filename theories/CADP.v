@@ -41,12 +41,6 @@ Module Index.
 
   Definition of_pid (i : pid) : index := Some i.
 
-  Definition is_nil (i : index) : bool :=
-    match i with
-    | None => true
-    | _ => false
-    end.
-
   Definition eqb (i:index) (j:index) : bool :=
     match i, j with
     | None, None => true
@@ -281,41 +275,6 @@ Module Expr.
   Definition of_bool (b:bool) : expr := if b then TRU else FLS.
 End Expr.
 
-Fixpoint eval (e:expr) (s:state) : option expr :=
-  match e with
-
-  | NOT b =>
-    match eval b s with
-    | Some TRU => Some FLS
-    | Some FLS => Some TRU
-    | _ => None
-    end
-
-  | EQ a b =>
-    match eval a s, eval b s with
-    | Some (VAL (NAT a)),
-      Some (VAL (NAT b))   => Some (Expr.of_bool (Nat.eqb a b))
-
-    | Some (VAL (INDEX a)),
-      Some (VAL (INDEX b)) => Some (Expr.of_bool (Index.eqb a b))
-
-    | Some (VAL (PID a)),
-      Some (VAL (PID b))   => Some (Expr.of_bool (Nat.eqb a b))
-
-    | Some (VAL (BOOL a)),
-      Some (VAL (BOOL b))  => Some (Expr.of_bool (eqb a b))
-
-    | _, _ => None
-    end
-
-  | VAR v => Some (VAL (State.get_local_var_value v s))
-
-  | VAL v => Some (VAL v)
-
-  | TRU => Some TRU
-  | FLS => Some FLS
-  end.
-
 
 (*************************************************************************)
 (**** Actions ************************************************************)
@@ -389,6 +348,52 @@ Fixpoint subst (new old:tm) (loops:bool) : tm :=
 
   | LOOP_OVER l b c => LOOP_OVER l (subst new b loops) (subst new c loops)
   | BREAK l         => BREAK l
+  end.
+
+
+(*************************************************************************)
+(**** Evaluate Expressions  **********************************************)
+(*************************************************************************)
+
+Fixpoint eval (e:expr) (s:state) : option expr :=
+  match e with
+
+  | NOT b =>
+    match eval b s with
+    | Some TRU => Some FLS
+    | Some FLS => Some TRU
+    | _ => None
+    end
+
+  | EQ a b =>
+    match eval a s, eval b s with
+    | Some (VAL (NAT a)),
+      Some (VAL (NAT b))   => Some (Expr.of_bool (Nat.eqb a b))
+
+    | Some (VAL (INDEX a)),
+      Some (VAL (INDEX b)) => Some (Expr.of_bool (Index.eqb a b))
+
+    | Some (VAL (PID a)),
+      Some (VAL (PID b))   => Some (Expr.of_bool (Nat.eqb a b))
+
+    | Some (VAL (BOOL a)),
+      Some (VAL (BOOL b))  => Some (Expr.of_bool (eqb a b))
+
+    | _, _ => None
+    end
+
+  | VAR v => Some (VAL (State.get_local_var_value v s))
+
+  | VAL v => Some (VAL v)
+
+  | TRU => Some TRU
+  | FLS => Some FLS
+  end.
+
+Definition eval_or_err (e:expr) (t1 t2:tm) (s:state) (r:resource) : tm * env :=
+  match eval e s with
+  | None => (ERR, (s, r))
+  | Some t => (<{ if t then t1 else t2 }>, (s, r))
   end.
 
 
@@ -606,8 +611,9 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
   | STEP_IF_FF : forall t1 t2 e,
     (<{ if FLS then t1 else t2 }>, e) --<{SILENT}>--> (t2, e)
 
-  | STEP_IF : forall c t1 t2 s r,
-    (<{ if c then t1 else t2 }>, (s, r)) --<{SILENT}>--> (<{ if c (*(eval c s)*) then t1 else t2 }>, (s, r))
+  | STEP_IF : forall (e:expr) t1 t2 s r,
+    (<{ if e then t1 else t2 }>, (s, r)) --<{SILENT}>-->
+      (eval_or_err e t1 t2 s r)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
