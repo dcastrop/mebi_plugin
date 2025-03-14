@@ -598,7 +598,7 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
     (SEQ OK r, e) --<{SILENT}>--> (r, e)
 
   | STEP_LOOP  : forall t e,
-    (LOOP t, e) --<{SILENT}>--> (subst t LOOP_END false, e)
+    (LOOP t, e) --<{SILENT}>--> (SEQ t (LOOP t), e)
 
   (* TODO: this currently only breaks the immediate outer loop if id's match *)
   (* FIXME: some kind of context hold needed? I.e.: A.B.C =~ A.[[C]] *)
@@ -625,6 +625,7 @@ inserting its associated sequence of instructions
     (LOOP_OVER l t1 c, e1) --<{a}>--> (LOOP_OVER l t2 c, e2)
 
   | STEP_IF_TT : forall t1 t2 e,
+    (*  eval c e = TRU -> ...*)
     (<{ if TRU then t1 else t2 }>, e) --<{SILENT}>--> (t1, e)
 
   | STEP_IF_FF : forall t1 t2 e,
@@ -725,6 +726,10 @@ Example P : tm :=
       )
     )
   ).
+
+(*************************************************************************)
+(**** TODO: LTS equiv temp. logic prop. **********************************)
+(*************************************************************************)
 
 
 
