@@ -333,8 +333,8 @@ Local Open Scope tm_scope.
 Fixpoint subst (new old:tm) (loops:bool) : tm :=
   match old with
   | ERR => ERR
-  | OK   => OK
-  | END   => END
+  | OK  => OK
+  | END => END
 
   | IF c t e => IF c (subst new t loops) (subst new e loops)
 
