@@ -390,10 +390,10 @@ Fixpoint eval (e:expr) (s:state) : option expr :=
   | FLS => Some FLS
   end.
 
-Definition eval_or_err (e:expr) (t1 t2:tm) (s:state) (r:resource) : tm * env :=
-  match eval e s with
-  | None => (ERR, (s, r))
-  | Some t => (<{ if t then t1 else t2 }>, (s, r))
+Definition eval_or_err (c:expr) (t1 t2:tm) (e:env) : tm * env :=
+  match eval c (Env.get_state e) with
+  | None => (ERR, e)
+  | Some t => (<{ if t then t1 else t2 }>, e)
   end.
 
 
@@ -603,7 +603,7 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
   (* TODO: this currently only breaks the immediate outer loop if id's match *)
   | STEP_LOOP_OVER : forall a l t1 t2 c e1 e2,
     (LOOP t1, e1) --<{a}>--> (LOOP t2, e2) ->
-      (LOOP_OVER l t1 c, e1) --<{a}>--> (LOOP_OVER l t2 c, e2)
+    (LOOP_OVER l t1 c, e1) --<{a}>--> (LOOP_OVER l t2 c, e2)
 
   | STEP_IF_TT : forall t1 t2 e,
     (<{ if TRU then t1 else t2 }>, e) --<{SILENT}>--> (t1, e)
@@ -611,9 +611,8 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
   | STEP_IF_FF : forall t1 t2 e,
     (<{ if FLS then t1 else t2 }>, e) --<{SILENT}>--> (t2, e)
 
-  | STEP_IF : forall (e:expr) t1 t2 s r,
-    (<{ if e then t1 else t2 }>, (s, r)) --<{SILENT}>-->
-      (eval_or_err e t1 t2 s r)
+  | STEP_IF : forall c t1 t2 e,
+    (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (eval_or_err c t1 t2 e)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
