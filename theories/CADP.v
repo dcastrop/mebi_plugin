@@ -605,7 +605,7 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
 
   (* Or, maybe we can just pass the BREAK outwards to find the correct LOOP: *)
   | STEP_BREAK_OTHER : forall l1 l2 c e,
-    (LOOP_OVER l1 (BREAK l2) c, e) --<{SILENT}>--> ((BREAK l2), e)
+    (LOOP_OVER l1 (BREAK l2) c, e) --<{SILENT}>--> (BREAK l2, e)
 
   | STEP_LOOP_OVER : forall a l t1 t2 c e1 e2,
     (LOOP t1, e1) --<{a}>--> (LOOP t2, e2) ->
