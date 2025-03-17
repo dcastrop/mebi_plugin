@@ -813,13 +813,33 @@ MeBi LTS lts ncs.
 
 Definition trace : Type := list action.
 
-(** [prune t] removes all [SILENT] actions from [t]. *)
-Fixpoint prune (t:trace) : trace :=
-  match t with
-  | [] => []
-  | SILENT :: t => (prune t)
-  | h :: t => h :: (prune t)
-  end.
+
+(* TODO: unsure if [Trace.prune] (below) is needed. *)
+(* intention here is if we some how obtain arbitrary traces *)
+
+Module Trace.
+  (** [prune t] removes all [SILENT] actions from [t]. *)
+  Fixpoint prune (t:trace) : trace :=
+    match t with
+    | [] => []
+    | SILENT :: t => (prune t)
+    | h :: t => h :: (prune t)
+    end.
+
+  (** [is_named_only t] returns [true] if no [SILENT] actions. *)
+  Fixpoint is_named_only (t:trace): bool :=
+    match t with
+    | [] => true
+    | SILENT :: t => false
+    | _ :: t => is_named_only t
+    end.
+End Trace.
+
+Example trace_1 : trace := [LABEL ENTER 0; LABEL LEAVE 0].
+
+
+
+
 
 (*
 Module LTL.
