@@ -838,7 +838,10 @@ End Trace.
 Example trace_1 : trace := [LABEL ENTER 0; LABEL LEAVE 0].
 
 
-
+(* ! remember: just encode the LTL examples into an LTS.
+  - that means two separate LTS, one of each.
+  - each action in the trace is used to navigate the LTS.
+    i.e., if a transition is not possible, then the property does not hold *)
 
 
 (*
