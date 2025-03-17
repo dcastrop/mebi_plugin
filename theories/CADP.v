@@ -237,26 +237,6 @@ Module State.
 End State.
 
 
-(*************************************************************************)
-(**** Environment (local) ************************************************)
-(*************************************************************************)
-Definition env : Type := state * resource.
-
-Module Env.
-
-  Definition get_state (e:env) : state := match e with | (s, _) => s end.
-
-  Definition get_resource (e:env) : resource := match e with | (_, r) => r end.
-
-  Definition set_state (s:state) (e:env) : env :=
-    match e with | (_, r) => (s, r) end.
-
-  Definition set_resource (r:resource) (e:env) : env :=
-    match e with | (s, _) => (s, r) end.
-
-End Env.
-
-
 
 (*************************************************************************)
 (**** (Conditional) Expressions ******************************************)
@@ -304,7 +284,6 @@ Inductive act : Type :=
 Inductive tm : Type :=
   | ERR : tm (* error *)
   | OK  : tm (* no-op *)
-  | END : tm (* termination *)
 
   | IF  : expr -> tm -> tm -> tm
 
@@ -334,7 +313,6 @@ Fixpoint subst (new old:tm) (loops:bool) : tm :=
   match old with
   | ERR => ERR
   | OK  => OK
-  | END => END
 
   | IF c t e => IF c (subst new t loops) (subst new e loops)
 
@@ -390,11 +368,55 @@ Fixpoint eval (e:expr) (s:state) : option expr :=
   | FLS => Some FLS
   end.
 
-Definition eval_or_err (c:expr) (t1 t2:tm) (e:env) : tm * env :=
+(* UNUSED: used by old STEP_IF in [step] semantics. *)
+(* Definition eval_or_err (c:expr) (t1 t2:tm) (e:env) : tm * env :=
   match eval c (Env.get_state e) with
   | None => (ERR, e)
   | Some t => (<{ if t then t1 else t2 }>, e)
+  end. *)
+
+(*************************************************************************)
+(**** Recursive Variables ************************************************)
+(*************************************************************************)
+Definition rec_def : Type := iloop * tm.
+Definition rec_defs : Type := list rec_def.
+
+Definition get_rec_def (i:iloop) (d:rec_defs) : option rec_def := nth_error d i.
+
+Definition get_rec_var (i:iloop) (d:rec_defs) : option tm :=
+  match get_rec_def i d with
+  | None => None
+  | Some (_, v) => Some v
   end.
+
+
+
+(*************************************************************************)
+(**** Environment (local) ************************************************)
+(*************************************************************************)
+
+Definition env : Type := state * resource * rec_defs.
+
+Module Env.
+
+  Definition get_state (e:env) : state := match e with | (s, _, _) => s end.
+
+  Definition get_resource (e:env) : resource :=
+    match e with | (_, r, _) => r end.
+
+  Definition get_rec_defs (e:env) : rec_defs :=
+    match e with | (_, _, d) => d end.
+
+  Definition set_state (s:state) (e:env) : env :=
+    match e with | (_, r, d) => (s, r, d) end.
+
+  Definition set_resource (r:resource) (e:env) : env :=
+    match e with | (s, _, d) => (s, r, d) end.
+
+  Definition set_rec_defs (d:rec_defs) (e:env) : env :=
+    match e with | (s, r, _) => (s, r, d) end.
+
+End Env.
 
 
 (*************************************************************************)
@@ -418,8 +440,7 @@ Definition read_next (e:env) : option env :=
     (* get local vars *)
     let v:local_vars := State.get_vars s in
     (* update env *)
-    let e:env := Env.set_state (State.set_vars (set_next qnode_next v) s) e in
-    Some e
+    Some (State.set_vars (set_next qnode_next v) s, r, Env.get_rec_defs e)
   end.
 
 (** [read_locked e] will set var [locked] to be
@@ -440,7 +461,7 @@ Definition read_locked (e:env) : option env :=
     (* get local vars *)
     let v:local_vars := State.get_vars s in
     (* update env *)
-    Some (Env.set_state (State.set_vars (set_locked qnode_locked v) s) e)
+    Some (State.set_vars (set_locked qnode_locked v) s, r, Env.get_rec_defs e)
   end.
 
 (*DC: slight simplification: instead of taking an expr, it needs to take a val*)
@@ -468,7 +489,7 @@ Definition write_next (to_write:local_var) (next:expr) (e:env) : option env :=
         | (true, Some n) =>
           match Memory.nth_replace (Qnode.set_next (Some n) q) p m with
           | None => None
-          | Some m => Some (Env.set_resource (Resource.set_mem m r) e)
+          | Some m => Some (s, Resource.set_mem m r, Env.get_rec_defs e)
           end
         end
       | _ => None (* [next] must be an [VAL] *)
@@ -496,7 +517,7 @@ Definition write_locked (to_write:local_var) (locked:expr) (e:env) : option env 
       | Some (VAL (BOOL b)) =>
         match Memory.nth_replace (Qnode.set_locked b q) p m with
         | None => None
-        | Some m => Some (Env.set_resource (Resource.set_mem m r) e)
+        | Some m => Some (s, (Resource.set_mem m r), Env.get_rec_defs e)
         end
       | _ => None (* [locked] must be an [VAL] of [BOOL] *)
       end
@@ -517,7 +538,7 @@ Definition fetch_and_store (e:env) : option env :=
   let p:pid := State.get_pid s in
   let r:resource := Resource.set_lock_i (Index.of_pid p) r in
   (* update env *)
-  Some (s, r).
+  Some (s, r, Env.get_rec_defs e).
 
 
 Definition compare_and_swap (e:env) : option env :=
@@ -539,13 +560,13 @@ Definition compare_and_swap (e:env) : option env :=
     (* set [i] to [Nil] *)
     let r:resource := Resource.set_lock_i Nil r in
     (* update env *)
-    Some (s, r)
+    Some (s, r, Env.get_rec_defs e)
   | false =>
     (* set [swap] false *)
     let v:local_vars := set_swap false v in
     let s:state := State.set_vars v s in
     (* update env *)
-    Some (s, r)
+    Some (s, r, Env.get_rec_defs e)
   end.
 
 
@@ -576,26 +597,44 @@ Definition do_act (a:act) (e:env) : (tm * env) :=
     end
   end.
 
-
 Inductive action : Type :=
   | SILENT : action
   | LABEL  : act -> pid -> action.
+
+Definition visible_action (a:act) (e:env) : action :=
+  LABEL a (State.get_pid (Env.get_state e)).
+
+Definition get_action (a:act) (e:env) : action :=
+  match a with
+  | NCS => visible_action a e
+  | ENTER => visible_action a e
+  | LEAVE => visible_action a e
+  | _ => SILENT
+  end.
 
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
 
 Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
 
-  (*DC: the below is wrong: some actions need to be silent. Unless you propose
-   to filter later the actions that are silent?*)
-  | STEP_ACT : forall a e,
-    (ACT a, e) --<{LABEL a (State.get_pid (Env.get_state e))}>--> (do_act a e)
+  | STEP_ACT : forall a e, (ACT a, e) --<{get_action a e}>--> (do_act a e)
+
+  | STEP_SEQ_END : forall r e, (SEQ OK r, e) --<{SILENT}>--> (r, e)
 
   | STEP_SEQ : forall a l1 l2 r e1 e2,
     (l1, e1) --<{a}>--> (l2, e2) ->
     (SEQ l1 r, e1) --<{a}>--> (SEQ l2 r, e2)
 
-  | STEP_SEQ_END : forall r e,
-    (SEQ OK r, e) --<{SILENT}>--> (r, e)
+  | STEP_IF_TRU : forall c t1 t2 e,
+    eval c (Env.get_state e) = Some TRU ->
+    (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (t1, e)
+
+  | STEP_IF_FLS : forall c t1 t2 e,
+    eval c (Env.get_state e) = Some FLS ->
+    (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (t2, e)
+
+  (* INFO: below is alternative to the above, which allows [ERR] if expr cannot be evaluated *)
+  (* | STEP_IF : forall c t1 t2 e,
+    (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> eval_or_err c t1 t2 e *)
 
   | STEP_LOOP  : forall t e,
     (LOOP t, e) --<{SILENT}>--> (SEQ t (LOOP t), e)
@@ -624,18 +663,6 @@ inserting its associated sequence of instructions
     (LOOP t1, e1) --<{a}>--> (LOOP t2, e2) ->
     (LOOP_OVER l t1 c, e1) --<{a}>--> (LOOP_OVER l t2 c, e2)
 
-  | STEP_IF_TT : forall t1 t2 e,
-    (*  eval c e = TRU -> ...*)
-    (<{ if TRU then t1 else t2 }>, e) --<{SILENT}>--> (t1, e)
-
-  | STEP_IF_FF : forall t1 t2 e,
-    (<{ if FLS then t1 else t2 }>, e) --<{SILENT}>--> (t2, e)
-
-  (* I would merge the rule below with the two above, with condition [eval c e =
-  TRU] or [eval c e = FALSE] *)
-  | STEP_IF : forall c t1 t2 e,
-    (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (eval_or_err c t1 t2 e)
-
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
 
@@ -643,7 +670,7 @@ inserting its associated sequence of instructions
 
 
 Inductive sys : Type :=
-  | PRC : tm -> state -> sys
+  | PRC : tm -> state -> rec_defs -> sys
   | PAR : sys -> sys -> sys
   | TERM : sys
   .
@@ -652,9 +679,9 @@ Reserved Notation "t '==<{' a '}>==>' t'" (at level 40).
 
 Inductive lts : sys * resource -> action -> sys * resource -> Prop :=
 
-  | LTS_PRC : forall a t1 t2 s1 s2 r1 r2,
-    (t1, (s1, r1)) --<{a}>--> (t2, (s2, r2)) ->
-    (PRC t1 s1, r1) ==<{a}>==> (PRC t2 s2, r2)
+  | LTS_PRC : forall a t1 t2 s1 s2 d1 d2 r1 r2,
+    (t1, (s1, r1, d1)) --<{a}>--> (t2, (s2, r2, d2)) ->
+    (PRC t1 s1 d1, r1) ==<{a}>==> (PRC t2 s2 d2, r2)
 
   | LTS_PAR_L : forall a l1 l2 r gr1 gr2,
     (l1, gr1) ==<{a}>==> (l2, gr2) ->
@@ -664,12 +691,9 @@ Inductive lts : sys * resource -> action -> sys * resource -> Prop :=
     (r1, gr1) ==<{a}>==> (r2, gr2) ->
     (PAR l r1, gr1) ==<{a}>==> (PAR l r2, gr2)
 
-(* DC: Where does [a] come from? What does [a] mean in this transition? *)
-  | LTS_END_L : forall a ls r gr,
-    (PAR (PRC END ls) r, gr) ==<{a}>==> (r, gr)
+  | LTS_OK_L : forall s d r g, (PAR (PRC OK s d) r, g) ==<{SILENT}>==> (r, g)
 
-  | LTS_END_R : forall a l rs gr,
-    (PAR l (PRC END rs), gr) ==<{a}>==> (l, gr)
+  | LTS_OK_R : forall l s d g, (PAR l (PRC OK s d), g) ==<{SILENT}>==> (l, g)
 
   where "t '==<{' a '}>==>' t'" := (lts t a t')
   and "t '--<{' a '}>-->' t'" := (step t a t').
