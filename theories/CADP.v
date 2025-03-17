@@ -759,11 +759,6 @@ Example P : tm :=
     )
   ) (OK).
 
-(*************************************************************************)
-(**** TODO: LTS equiv temp. logic prop. **********************************)
-(*************************************************************************)
-
-
 
 (**********************************)
 (**** Single process **************)
@@ -811,3 +806,154 @@ Definition compose (s:system) : composition :=
 Example ncs : composition := compose (create 5 P).
 MeBi LTS lts ncs.
 
+
+(*************************************************************************)
+(**** TODO: LTS equiv temp. logic prop. **********************************)
+(*************************************************************************)
+
+Definition trace : Type := list action.
+
+(** [prune t] removes all [SILENT] actions from [t]. *)
+Fixpoint prune (t:trace) : trace :=
+  match t with
+  | [] => []
+  | SILENT :: t => (prune t)
+  | h :: t => h :: (prune t)
+  end.
+
+(*
+Module LTL.
+
+  Inductive prop_const  : Type :=
+    | VAL : string -> prop_const (* !i *)
+    | VAR : string -> Type -> prop_const (* ?j:nat *)
+
+    | WHERE : prop_const -> prop_const
+    .
+
+  Definition prop_consts : Type := list prop_const.
+
+  Inductive formula : Type :=
+
+    (* logical constants *)
+    | TRUE | FALSE
+
+    (* propositional constants *)
+    (* | PROP  : prop_const -> formula *)
+
+    | ENTER : prop_const -> formula
+    | LEAVE : prop_const -> formula
+    | NCS   : prop_const -> formula
+    | LABEL : prop_const -> prop_const -> formula
+
+    | FORALL : prop_const -> nat -> formula
+    | EXISTS : prop_const -> nat -> formula
+
+    | FOR : prop_const -> nat -> nat -> formula
+
+    (* operators *)
+    | NOT      : formula -> formula
+
+    | CONCAT   : formula -> formula -> formula
+
+    | AND      : formula -> formula -> formula
+    | OR       : formula -> formula -> formula
+    | IMPLIES  : formula -> formula -> formula
+    | BIMPLIES : formula -> formula -> formula
+
+    | EQ       : formula -> formula -> formula
+
+    (* symbols *)
+    | NEXTTIME   : formula -> formula -> formula (* (F) G *)
+    | HENCEFORTH : formula -> formula -> formula (* [F] G *)
+    | EVENTUALLY : formula -> formula -> formula (* <F> G *)
+
+    (* saturation operator, forbids infinite repetition *)
+    | SATURATION : fomrula -> formula (* [F]-| *)
+    .
+
+(** [mutual_exclusion]
+    [ true*.
+      { ENTER ?i:nat }.
+      (not { LEAVE !i })*.
+      { ENTER ?j:nat where j<>i }
+    ] false *)
+
+Definition mutual_exclusion : formula :=
+  HENCEFORTH (
+    CONCAT (ENTER (VAR "i" nat)) (
+      CONCAT (NOT (LEAVE (VAL "i"))) (
+        ENTER (
+          WHERE (VAR "j" nat)
+          (NOT (EQ "j" "j"))
+        )
+      )
+    )
+  ) FALSE.
+
+
+(** [no_starvation]
+    [ true* ] forall i:nat among {1..N}.
+    [ for j:nat from 1 to N do
+        (not { ENTER ...!i })*.
+        { ?G:string ...!j where (j=i) -> (G<>"ENTER") }
+      end for
+    ]-| *)
+Definition no_starvation (n:nat) : formula :=
+  HENCEFORTH ( TRUE ) (
+    CONCAT (FORALL (VAR "i" nat) n) (
+      SATURATION (FOR (VAR "j" nat) 1 n (
+        CONCAT (NOT (ENTER (VAL "i"))) (
+          LABEL (VAR "g" string) (VAL "j")
+        )
+      ))
+    )
+  ).
+
+
+  (* Fixpoint eval (f:formula) : option bool :=
+    match f with
+    | TRUE => Some true
+    | FALSE => Some false
+
+    | NOT g =>
+      match eval g with
+      | None => None
+      | Some g => Some (negb g)
+      end
+
+    | AND a b =>
+      match eval a, eval b with
+      | Some a, Some b => Some (andb a b)
+      | _, _ => None
+      end
+
+    | OR a b =>
+      match eval a, eval b with
+      | Some a, Some b => Some (orb a b)
+      | _, _ => None
+      end
+
+    | IMPLIES a b =>
+      match eval a, eval b with
+      | Some false, Some false => Some true
+      | Some false, Some true  => Some true
+      | Some true,  Some false => Some false
+      | Some true,  Some true  => Some true
+      | _, _ => None
+      end
+
+    | BIMPLIES a b =>
+      match eval a, eval b with
+      | Some true,  Some true  => Some true
+      | Some false, Some false => Some true
+      | Some _,     Some _     => Some false
+      | _, _ => None
+      end
+
+    end. *)
+
+
+
+End LTL.
+ *)
