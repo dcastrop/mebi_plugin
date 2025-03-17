@@ -129,11 +129,11 @@ Module Vars.
 End Vars.
 
 Inductive local_var : Type :=
-  | VAR_PREDECESSOR
-  | VAR_LOCKED
-  | VAR_NEXT
-  | VAR_SWAP
-  | VAR_PID
+  | PREDECESSOR
+  | LOCKED
+  | NEXT
+  | SWAP
+  | THE_PID
   .
 
 Definition set_predecessor (i:index) (v:local_vars) : local_vars :=
@@ -163,6 +163,7 @@ Inductive value : Type (*Set*) :=
   | INDEX : index -> value
   | BOOL : bool -> value
   | NIL : value
+  | GET : local_var -> value
   .
 
 
@@ -224,11 +225,11 @@ Module State.
 
   Definition get_local_var_value (v:local_var) (s:state) : value :=
     match v with
-    | VAR_PREDECESSOR => INDEX (get_predecessor s)
-    | VAR_LOCKED      => BOOL  (get_locked s)
-    | VAR_NEXT        => INDEX (get_next s)
-    | VAR_SWAP        => BOOL  (get_swap s)
-    | VAR_PID         => PID   (get_pid s)
+    | PREDECESSOR => INDEX (get_predecessor s)
+    | LOCKED      => BOOL  (get_locked s)
+    | NEXT        => INDEX (get_next s)
+    | SWAP        => BOOL  (get_swap s)
+    | THE_PID     => PID   (get_pid s)
     end.
 
   Definition set_vars (v:local_vars) (s:state) : state :=
@@ -269,8 +270,8 @@ Inductive act : Type :=
   | READ_LOCKED : act
 
   (* below: [expr] as may be value or var *)
-  | WRITE_NEXT   : local_var -> expr -> act
-  | WRITE_LOCKED : local_var -> expr -> act
+  | WRITE_NEXT   : local_var -> value -> act
+  | WRITE_LOCKED : local_var -> value -> act
 
   | FETCH_AND_STORE  : act
   | COMPARE_AND_SWAP : act
@@ -291,12 +292,9 @@ Inductive tm : Type :=
 
   | SEQ : tm -> tm -> tm
 
-  | LOOP      : tm -> tm (* inner loop body -> *)
-  | LOOP_END  : tm
-
   (* loop id -> body -> outer continuation -> ... *)
   | LOOP_OVER : iloop -> tm -> tm -> tm
-  | BREAK     : iloop -> tm
+  | BREAK : iloop -> tm
   .
 
 Declare Custom Entry tm.
@@ -309,86 +307,95 @@ Notation "'if' c 'then' t 'else' e" := (IF c t e)
                   t custom tm at level 80, e custom tm at level 80): tm_scope.
 Local Open Scope tm_scope.
 
-Fixpoint subst (new old:tm) (loops:bool) : tm :=
-  match old with
-  | ERR => ERR
-  | OK  => OK
-
-  | IF c t e => IF c (subst new t loops) (subst new e loops)
-
-  | ACT a => ACT a
-
-  (* do not substitute in other body *)
-  | SEQ l r => SEQ l (subst new r loops)
-
-  | LOOP b   => if loops then LOOP (subst new b loops) else LOOP b
-  | LOOP_END => new
-
-  | LOOP_OVER l b c => LOOP_OVER l (subst new b loops) (subst new c loops)
-  | BREAK l         => BREAK l
-  end.
-
 
 (*************************************************************************)
 (**** Evaluate Expressions  **********************************************)
 (*************************************************************************)
 
-Fixpoint eval (e:expr) (s:state) : option expr :=
+Fixpoint eval (e:expr) (s:state) : option value :=
   match e with
+
+  | VAL v => Some v
+
+  | TRU => Some (BOOL true)
+  | FLS => Some (BOOL false)
+
+  | VAR v => Some (State.get_local_var_value v s)
 
   | NOT b =>
     match eval b s with
-    | Some TRU => Some FLS
-    | Some FLS => Some TRU
+    | Some (BOOL b) => Some (BOOL (negb b))
     | _ => None
     end
 
   | EQ a b =>
     match eval a s, eval b s with
-    | Some (VAL (NAT a)),
-      Some (VAL (NAT b))   => Some (Expr.of_bool (Nat.eqb a b))
+    | Some (NAT a),
+      Some (NAT b)   => Some (BOOL (Nat.eqb a b))
 
-    | Some (VAL (INDEX a)),
-      Some (VAL (INDEX b)) => Some (Expr.of_bool (Index.eqb a b))
+    | Some (INDEX a),
+      Some (INDEX b) => Some (BOOL (Index.eqb a b))
 
-    | Some (VAL (PID a)),
-      Some (VAL (PID b))   => Some (Expr.of_bool (Nat.eqb a b))
+    | Some (PID a),
+      Some (PID b)   => Some (BOOL (Nat.eqb a b))
 
-    | Some (VAL (BOOL a)),
-      Some (VAL (BOOL b))  => Some (Expr.of_bool (eqb a b))
+    | Some (BOOL a),
+      Some (BOOL b)  => Some (BOOL (eqb a b))
 
     | _, _ => None
     end
 
-  | VAR v => Some (VAL (State.get_local_var_value v s))
-
-  | VAL v => Some (VAL v)
-
-  | TRU => Some TRU
-  | FLS => Some FLS
   end.
 
-(* UNUSED: used by old STEP_IF in [step] semantics. *)
-(* Definition eval_or_err (c:expr) (t1 t2:tm) (e:env) : tm * env :=
-  match eval c (Env.get_state e) with
-  | None => (ERR, e)
-  | Some t => (<{ if t then t1 else t2 }>, e)
-  end. *)
+Definition handle_value (v:value) (s:state) : option value :=
+  match v with
+  | GET n => eval (VAR n) s
+  | _ => Some v
+  end.
 
 (*************************************************************************)
 (**** Recursive Variables ************************************************)
 (*************************************************************************)
-Definition rec_def : Type := iloop * tm.
+Record rec_def := { loop_id : iloop
+                  ; body    : tm
+                  ; cont    : tm }.
+
 Definition rec_defs : Type := list rec_def.
 
-Definition get_rec_def (i:iloop) (d:rec_defs) : option rec_def := nth_error d i.
-
-Definition get_rec_var (i:iloop) (d:rec_defs) : option tm :=
-  match get_rec_def i d with
-  | None => None
-  | Some (_, v) => Some v
+Fixpoint get_rec_def (i:iloop) (d:rec_defs) : option rec_def :=
+  match d with
+  | [] => None
+  | h :: t => if Nat.eqb i (loop_id h) then Some h else get_rec_def i t
   end.
 
+Definition rec_def_to_tm (d:rec_def) : tm :=
+  LOOP_OVER (loop_id d) (body d) (cont d).
+
+
+(*************************************************************************)
+(**** Unfolding **********************************************************)
+(*************************************************************************)
+
+Fixpoint unfold (new:rec_def) (old:tm) : tm :=
+  match old with
+  | ERR => ERR
+  | IF c t1 t2 => IF c (unfold new t1) (unfold new t2)
+  | ACT a => ACT a
+
+  | SEQ l r => SEQ l (unfold new r)
+
+  | LOOP_OVER l b c =>
+    if Nat.eqb l (loop_id new)
+    then ERR
+    else LOOP_OVER l (unfold new b) (unfold new c)
+
+  | BREAK l =>
+    if Nat.eqb l (loop_id new)
+    then (cont new)
+    else BREAK l
+
+  | OK  => OK
+  end.
 
 
 (*************************************************************************)
@@ -398,6 +405,7 @@ Definition get_rec_var (i:iloop) (d:rec_defs) : option tm :=
 Definition env : Type := state * resource * rec_defs.
 
 Module Env.
+  Definition initial (n:nat) : env := (State.initial, Resource.initial n, []).
 
   Definition get_state (e:env) : state := match e with | (s, _, _) => s end.
 
@@ -417,6 +425,25 @@ Module Env.
     match e with | (s, r, _) => (s, r, d) end.
 
 End Env.
+
+
+Definition do_unfold (l:iloop) (b:tm) (c:tm) (e:env) : option (tm * env) :=
+  let d:rec_defs := Env.get_rec_defs e in
+  match get_rec_def l d with
+  | None => (* [l] is not yet defined (good) *)
+    let new:rec_def := Build_rec_def l b c in
+    let e:env := Env.set_rec_defs (new :: d) e in
+    Some (unfold new (rec_def_to_tm new), e)
+
+  | Some _ => None (* [l] is already defined *)
+  end.
+
+Definition do_break (l:iloop) (e:env) : option tm :=
+  let d:rec_defs := Env.get_rec_defs e in
+  match get_rec_def l d with
+  | None => None (* [l] is not defined *)
+  | Some r => Some (cont r) (* return cont *)
+  end.
 
 
 (*************************************************************************)
@@ -468,22 +495,23 @@ Definition read_locked (e:env) : option env :=
 (** [write_next to_write next e] will set the
     field [qnode.next] of the [qnode] of the
     index [to_write] to the value of [next]. *)
-Definition write_next (to_write:local_var) (next:expr) (e:env) : option env :=
-  (* get pid from [to_write] *)
+Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
   let s:state := Env.get_state e in
-  match State.get_local_var_value to_write s with
-  | PID p => (* should be pid *)
-    (* get qnode *)
-    let r:resource := Env.get_resource e in
-    let m:mem := Resource.get_mem r in
-    match Memory.nth_error p m with
-    | None => None (* [qnode] must exist *)
-    | Some q =>
-      (* make sure [next] is a [VAL] *)
-      match eval next s with
-      | Some (VAL v) =>
-        (* check that this is some kind of nat *)
-        match valid_cast_to_nat v with
+  (* get value of [next] *)
+  match handle_value next s with
+  | None => None (* [next=GET v] and [v] could not be resolved *)
+  | Some next =>
+    (* get pid from [to_write] *)
+    match State.get_local_var_value to_write s with
+    | PID p => (* should be pid *)
+      (* get qnode *)
+      let r:resource := Env.get_resource e in
+      let m:mem := Resource.get_mem r in
+      match Memory.nth_error p m with
+      | None => None (* [qnode] must exist *)
+      | Some q =>
+        (* check [next] is some kind of nat *)
+        match valid_cast_to_nat next with
         | (false, _) => None (* i.e., BOOL, NIL *)
         | (true, None) => None (* i.e., INDEX NONE *)
         | (true, Some n) =>
@@ -492,16 +520,15 @@ Definition write_next (to_write:local_var) (next:expr) (e:env) : option env :=
           | Some m => Some (s, Resource.set_mem m r, Env.get_rec_defs e)
           end
         end
-      | _ => None (* [next] must be an [VAL] *)
       end
+    | _ => None (* [to_write] must be a [pid] *)
     end
-  | _ => None (* [to_write] must be a [pid] *)
   end.
 
 (** [write_locked to_write locked e] will set the
     field [qnode.locked] of the [qnode] of the
     index [to_write] to the value of [locked]. *)
-Definition write_locked (to_write:local_var) (locked:expr) (e:env) : option env :=
+Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env :=
   (* get pid from [to_write] *)
   let s:state := Env.get_state e in
   match State.get_local_var_value to_write s with
@@ -512,14 +539,14 @@ Definition write_locked (to_write:local_var) (locked:expr) (e:env) : option env 
     match Memory.nth_error p m with
     | None => None (* [qnode] must exist *)
     | Some q =>
-      (* make sure [locked] is a [VAL] of [BOOL] *)
-      match eval locked s with
-      | Some (VAL (BOOL b)) =>
+      (* make sure [locked] is a [BOOL] *)
+      match locked with
+      | BOOL b =>
         match Memory.nth_replace (Qnode.set_locked b q) p m with
         | None => None
         | Some m => Some (s, (Resource.set_mem m r), Env.get_rec_defs e)
         end
-      | _ => None (* [locked] must be an [VAL] of [BOOL] *)
+      | _ => None (* [locked] must be a [BOOL] *)
       end
     end
   | _ => None (* [to_write] must be a [pid] *)
@@ -625,43 +652,21 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
     (SEQ l1 r, e1) --<{a}>--> (SEQ l2 r, e2)
 
   | STEP_IF_TRU : forall c t1 t2 e,
-    eval c (Env.get_state e) = Some TRU ->
+    eval c (Env.get_state e) = Some (BOOL true) ->
     (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (t1, e)
 
   | STEP_IF_FLS : forall c t1 t2 e,
-    eval c (Env.get_state e) = Some FLS ->
+    eval c (Env.get_state e) = Some (BOOL false) ->
     (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (t2, e)
 
-  (* INFO: below is alternative to the above, which allows [ERR] if expr cannot be evaluated *)
-  (* | STEP_IF : forall c t1 t2 e,
-    (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> eval_or_err c t1 t2 e *)
+  | STEP_LOOP_OVER : forall l b c t e1 e2,
+    do_unfold l b c e1 = Some (t, e2) -> (* unfolded t, stores def in [e2] *)
+    (LOOP_OVER l b c, e1) --<{SILENT}>--> (t, e2)
 
-  | STEP_LOOP  : forall t e,
-    (LOOP t, e) --<{SILENT}>--> (SEQ t (LOOP t), e)
-
-  (* TODO: this currently only breaks the immediate outer loop if id's match *)
-  (* FIXME: some kind of context hold needed? I.e.: A.B.C =~ A.[[C]] *)
-  (* E.g.: LOOP_OVER l [[ BREAK l ]] *)
-
-(* DC: Yes, the definition is broken. Similarly with [BREAK_OVER]. A separate definition is needed: *)
-(* There are two approaches:
-(1) substituting a label by a sequence of statements (i.e. something similar to the standard rule : unfold (mu X. P) = [\mu X. P / X] P
-(2) keeping a context of labels and the loop that they associate to. Then "break" would just jump to the associated loop by
-inserting its associated sequence of instructions
-*)
-  | STEP_BREAK : forall l c e,
-    (LOOP_OVER l (BREAK l) c, e) --<{SILENT}>--> (c, e)
-
-  (* Or, maybe we can just pass the BREAK outwards to find the correct LOOP: *)
-  | STEP_BREAK_OTHER : forall l1 l2 c e,
-    (LOOP_OVER l1 (BREAK l2) c, e) --<{SILENT}>--> (BREAK l2, e)
-
-(* DC: I do not understand this rule; why are we ignoring the label? *)
-(* What if t1 is already a [BREAK]?
- *)
-  | STEP_LOOP_OVER : forall a l t1 t2 c e1 e2,
-    (LOOP t1, e1) --<{a}>--> (LOOP t2, e2) ->
-    (LOOP_OVER l t1 c, e1) --<{a}>--> (LOOP_OVER l t2 c, e2)
+  (* UNUSED: would cause [BREAK l] to act like [REC_CALL l] *)
+  (* | STEP_BREAK : forall l e t,
+    do_break l e = Some t ->
+    (BREAK l, e) --<{SILENT}>--> (t, e) *)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
@@ -707,49 +712,52 @@ Inductive lts : sys * resource -> action -> sys * resource -> Prop :=
 Import Expr.
 
 Example Acquire : tm :=
-  SEQ (ACT (WRITE_NEXT VAR_PID (VAL NIL))) (
+  SEQ (ACT (WRITE_NEXT THE_PID NIL)) (
     SEQ (ACT FETCH_AND_STORE) (
-      IF (NOT (EQ (VAR VAR_PREDECESSOR) (VAL NIL))) (
-        SEQ (ACT (WRITE_LOCKED VAR_PREDECESSOR (VAR VAR_PID))) (
-          LOOP_OVER 0 (
-            SEQ (ACT READ_LOCKED) (
-              IF (NOT (VAR VAR_LOCKED)) (BREAK 0) (OK)
-            )
-          ) (END)
+      IF (NOT (EQ (VAR PREDECESSOR) (VAL NIL))) (
+        SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (
+          SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (
+            LOOP_OVER 2 (*L*) (
+              SEQ (ACT READ_LOCKED) (
+                IF (NOT (VAR LOCKED)) (BREAK 2 (*L*)) (OK)
+              )
+            ) (OK)
+          )
         )
-      ) (END)
+      ) (OK)
     )
   ).
 
 
 Example Release : tm :=
   SEQ (ACT READ_NEXT) (
-    IF (EQ (VAL NIL) (VAR VAR_NEXT)) (
+    IF (EQ (VAL NIL) (VAR NEXT)) (
       SEQ (ACT COMPARE_AND_SWAP) (
-        IF (EQ FLS (VAR VAR_SWAP)) (
-          LOOP_OVER 0 (*L*) (
+        IF (EQ FLS (VAR SWAP)) (
+          LOOP_OVER 1 (*L*) (
             SEQ (ACT READ_NEXT) (
-              IF (NOT (EQ (VAL NIL) (VAR VAR_NEXT))) (BREAK 0 (*L*)) (OK)
+              IF (NOT (EQ (VAL NIL) (VAR NEXT))) (BREAK 1 (*L*)) (OK)
             )
-          ) (ACT (WRITE_LOCKED VAR_NEXT TRU))
-        ) (END)
+          ) (ACT (WRITE_LOCKED NEXT (BOOL true)))
+        ) (OK)
       )
-    ) (ACT (WRITE_LOCKED VAR_NEXT FLS))
+    ) (ACT (WRITE_LOCKED NEXT (BOOL false)))
   ).
 
 
+
 Example P : tm :=
-  LOOP (
+  LOOP_OVER 0 (
     SEQ (ACT NCS) (
       SEQ Acquire (
         SEQ (ACT ENTER) (
           SEQ (ACT LEAVE) (
-            SEQ Release END
+            SEQ Release OK
           )
         )
       )
     )
-  ).
+  ) (OK).
 
 (*************************************************************************)
 (**** TODO: LTS equiv temp. logic prop. **********************************)
@@ -761,8 +769,9 @@ Example P : tm :=
 (**** Single process **************)
 (**********************************)
 
-Example p0 : tm * env := (P, (State.initial, Resource.initial 0)).
-MeBi LTS step p0.
+(* Example p0 : tm * env := (P, Env.initial 0). *)
+Example p0 : tm * env := (P, (State.initial, Resource.initial 0, [])).
+(* MeBi LTS step p0. *) (* FIXME: calling mebi appears to cause exception *)
 
 
 
@@ -770,9 +779,9 @@ MeBi LTS step p0.
 (**** System **********************)
 (**********************************)
 
-Definition process : Type := tm * state.
+Definition process : Type := tm * state * rec_defs.
 
-Definition spawn (p:pid) (b:tm) : process := (b, State.create p).
+Definition spawn (p:pid) (b:tm) : process := (b, State.create p, []).
 
 Fixpoint populate (n:nat) (b:tm) : list process :=
   match n with
@@ -789,7 +798,7 @@ Fixpoint load (ps:list process) : sys :=
   | [] => TERM
   | h :: t =>
     match h with
-    | (p, s) => PAR (PRC p s) (load t)
+    | (p, s, d) => PAR (PRC p s d) (load t)
     end
   end.
 
