@@ -845,7 +845,7 @@ Example trace_1 : trace := [(ENTER, 0); (LEAVE, 0)]. *)
   - each action in the trace is used to navigate the LTS.
     i.e., if a transition is not possible, then the property does not hold *)
 
-Definition trace : Type := list action.
+(* Definition trace : Type := list action. *)
 
 Definition prc_trace : Type := list act.
 
@@ -915,6 +915,16 @@ Fixpoint exist_last_act (a:act) (s:sys_trace) : bool :=
     end
   end.
 
+Fixpoint all_last_act (a:act) (s:sys_trace) : bool :=
+  match s with
+  | [] => true
+  | (_, l) :: t =>
+    match l with
+    | [] => false
+    | b :: _ => if Act.eq a b then all_last_act a t else false
+    end
+  end.
+
 Fixpoint append_act_hd (p:pid) (a:act) (s:sys_trace) : option sys_trace :=
   match s with
   | [] => None
@@ -926,7 +936,19 @@ Fixpoint append_act_hd (p:pid) (a:act) (s:sys_trace) : option sys_trace :=
     end
   end.
 
+Definition can_do_act (p:pid) (a:act) (s:sys_trace) : option bool :=
+  match last_act_of p s with
+  | (false, _) => None (* [p] not in [s] *)
 
+  | (true, None) => (* [p] in [s], but empty trace*)
+    match a with
+    | ENTER => Some true
+    | LEAVE => Some false
+    | _ => None
+    end
+
+  | (true, Some b) => Act.are_dual a b (* [p] last act [b] in [s]*)
+  end.
 
 
 (** [mutual_exclusion]
@@ -940,21 +962,10 @@ Module MutualExclusion.
 
   (** [can_enter p a s] checks that the last act of [p] is LEAVE or nothing. *)
   Definition can_enter (p:pid) (s:sys_trace) : option bool :=
-    match last_act_of p s with
-    | (false, _) => (* [p] not in [s], but we may add *)
-      (* (s ++ [(p,[])], Some true) *)
-      Some true
-
-    | (true, None) => (* [p] in [s], but empty trace*)
-      (* (s, Some true) *)
-      Some true
-
-    | (true, Some b) => (* [p] in [s] with last act [b] *)
-      match Act.are_dual ENTER b with
-      | Some true => Some (negb (exist_last_act ENTER (get_other_traces p s)))
-      | _ => Some false
-      end
-
+    match can_do_act p ENTER s with
+    | None => None
+    | Some false => Some false
+    | Some true => Some (negb (exist_last_act ENTER (get_other_traces p s)))
     end.
 
   (** [do_enter p s] returns [Some s] updated with [p] last act ENTER, if [can_enter] is true. *)
@@ -967,16 +978,7 @@ Module MutualExclusion.
 
   (** [can_leave p a s] checks that the last act of [p] is ENTER. *)
   Definition can_leave (p:pid) (s:sys_trace) : option bool :=
-    match last_act_of p s with
-    | (false, _) => (* [p] not in [s] *)
-      Some false
-
-    | (true, None) => (* [p] in [s], but empty trace*)
-      Some false
-
-    | (true, Some b) => (* [p] in [s] with last act [b] *)
-      Act.are_dual LEAVE b
-    end.
+    can_do_act p LEAVE s.
 
   (** [do_leave p s] returns [Some s] updated with [p] last act LEAVE, if [can_leave] is true. *)
   Definition do_leave (p:pid) (s:sys_trace) : option sys_trace :=
@@ -1009,17 +1011,85 @@ End MutualExclusion.
     end for
   ]-|
 *)
-(* Module NoStarvation.
+Module NoStarvation.
 
-  (** [NoStarvation.lts] holds *)
-  Inductive lts :
-    (trace * sys_trace) -> action -> (trace * sys_trace) -> Prop :=
+  Definition do_act (p:pid) (a:act) (s:sys_trace) : option sys_trace :=
+    match can_do_act p a s with
+    | Some true => append_act_hd p a s
+    | _ => None
+    end.
 
-    |
+  (* Definition is_starving (p:pid) (s:sys_trace) : bool := false. *)
+    (* forall_last_act ENTER *)
 
+
+  (* Fixpoint has_starvation (s:sys_trace) : bool :=
+    match s with
+    | [] => false
+    | (p, l) :: t =>
+      match l with
+      | [] => (* [p] has not acted => is a candidate for starvation *)
+        if is_starving p s then false else has_starvation t
+
+      | LEAVE :: _ => (* [p] is waiting to act *)
+        if is_starving p s then false else has_starvation t
+
+      | ENTER :: _ => has_starvation t (* [p] has acted => pass *)
+
+      | _ => has_starvation t (* ignore any others *)
+      end
+    end. *)
+
+  (* Fixpoint no_starvation (l:list sys_trace) : bool :=
+    match l with
+    | [] => true
+    | h :: t => if has_starvation h then false else no_starvation t
+    end. *)
+
+  Definition prc_history : Type := pid * (list prc_trace).
+
+  Fixpoint get_prc_trace (z:prc_history) : prc_trace :=
+    match z with
+    | (_, l) =>
+      match l with
+      | [] => []
+      | h :: _ => h
+      end
+    end.
+
+
+  Definition sys_history : Type := list prc_history.
+
+  Fixpoint get_sys_trace (s:sys_history) : sys_trace :=
+    match s with
+    | [] => []
+    | h :: t =>
+      match h with
+      | (p, _) => (p, get_prc_trace h) :: get_sys_trace t
+      end
+    end.
+
+  (** [no_starvation l] is [true] if each process in [l] is not repeatidly forced to wait until every other process has done some action, for itself to do an [ENTER] action. *)
+  Fixpoint no_starvation (l:sys_history) : bool :=
+    (* TODO: *)false.
+
+  Definition do_action (a:action) (l:sys_history) : option sys_history :=
+    match a with
+    | SILENT => Some l (* skip *)
+    | LABEL (a, p) =>
+      match do_act p a (get_sys_trace l) with
+      | None => None
+      | Some s => (* then check if any process starves *)
+        if no_starvation l then Some (s :: l) else None
+      end
+    end.
+
+  (** [NoStarvation.lts] is defined so long as after each action, [no_starvation s] holds. I.e.,  *)
+  Inductive lts : sys_history -> action -> sys_history -> Prop :=
+    | ACT : forall t1 t2 a, do_action a t1 = Some t2 -> lts t1 a t2
     .
 
-End NoStarvation. *)
+End NoStarvation.
 
 (* Module NoStarvation.
   Inductive lts : automata -> action -> automata -> Prop :=
