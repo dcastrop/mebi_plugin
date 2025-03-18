@@ -985,20 +985,16 @@ Module MutualExclusion.
     | _ => None
     end.
 
-  (** [MutualExclusion.lts] holds for a given input trace [i] and output trace [o] if, the order of the items in [i] are such that no two processes are inside their critical section at once. I.e., if a process does ENTER, then all other processes must not have done ENTER last (e.g., done LEAVE or never done ENTER). *)
-  Inductive lts :
-    (trace * sys_trace) -> action -> (trace * sys_trace) -> Prop :=
+  (** [MutualExclusion.lts] is defined so long as when a process [p] does an [ENTER] action, there are no other processes whose last action was [ENTER], rather their last action should either be LEAVE or nothing. *)
+  Inductive lts : sys_trace -> action -> sys_trace -> Prop :=
 
-    | ENTER : forall i o1 o2 p,
-      do_enter p o1 = Some o2 ->
-      lts (LABEL (ENTER, p) :: i, o1) (LABEL (ENTER, p)) (i, o2)
+    | ENTER : forall t1 t2 p,
+      do_enter p t1 = Some t2 -> lts t1 (LABEL (ENTER, p)) t2
 
-    | LEAVE : forall i o1 o2 p,
-      do_leave p o1 = Some o2 ->
-      lts (LABEL (LEAVE, p) :: i, o1) (LABEL (LEAVE, p)) (i, o2)
+    | LEAVE : forall t1 t2 p,
+      do_leave p t1 = Some t2 -> lts t1 (LABEL (LEAVE, p)) t2
 
-    | SILENT : forall i o,
-      lts (SILENT :: i, o) SILENT (i, o)
+    | SILENT : forall t, lts t SILENT t
     .
 
 End MutualExclusion.
