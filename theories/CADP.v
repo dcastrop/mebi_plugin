@@ -851,50 +851,6 @@ Definition prc_trace : Type := list act.
 
 Definition sys_trace : Type := list (pid * prc_trace).
 
-Definition named_action_of (a:action) : option named_action :=
-  match a with
-  | SILENT => None
-  | LABEL n => Some n
-  end.
-
-(* Definition named_action_eq (a:named_action) (b:named_action) : bool :=
-  match a, b with
-  | (ENTER, _), (ENTER, _) => true
-  | (LEAVE, _), (LEAVE, _) => true
-  | _, _ => false
-  end. *)
-
-(* Definition is_named_action_enter (a:named_action) : bool :=
-  match a with
-  | (ENTER, _) => true
-  | _ => false
-  end. *)
-
-(* Definition is_named_action_leave (a:named_action) : bool :=
-  match a with
-  | (LEAVE, _) => true
-  | _ => false
-  end. *)
-
-Fixpoint get_prc_trace (p:pid) (s:sys_trace) : option prc_trace :=
-  match s with
-  | [] => None
-  | (q, l) :: t => if Nat.eqb p q then Some l else get_prc_trace p t
-  end.
-
-Fixpoint get_other_traces (p:pid) (s:sys_trace) : sys_trace :=
-  match s with
-  | [] => []
-  | (q, l) :: t =>
-    (if Nat.eqb p q then [] else [(q, l)]) ++ get_other_traces p t
-  end.
-
-(* Definition is_act_enter (a:act) : option bool :=
-  match a with
-  | ENTER => Some true
-  | LEAVE => Some false
-  | _ => None
-  end. *)
 
 Module Act.
   Definition eq (a:act) (b:act) : bool :=
@@ -926,6 +882,19 @@ Module Act.
     end.
 End Act.
 
+Fixpoint get_prc_trace (p:pid) (s:sys_trace) : option prc_trace :=
+  match s with
+  | [] => None
+  | (q, l) :: t => if Nat.eqb p q then Some l else get_prc_trace p t
+  end.
+
+Fixpoint get_other_traces (p:pid) (s:sys_trace) : sys_trace :=
+  match s with
+  | [] => []
+  | (q, l) :: t =>
+    (if Nat.eqb p q then [] else [(q, l)]) ++ get_other_traces p t
+  end.
+
 (** [last_act_of p s] returns the last act of [p] (if [p] not in [s], then [None]). *)
 Definition last_act_of (p:pid) (s:sys_trace) : bool * option act :=
   match get_prc_trace p s with
@@ -933,14 +902,6 @@ Definition last_act_of (p:pid) (s:sys_trace) : bool * option act :=
   | Some [] => (true, None)
   | Some (h :: _) => (true, Some h)
   end.
-
-(** [last_act_is_dual p a s] checks if the last act of [p] is dual to [a]. *)
-(* Definition last_act_is_dual (p:pid) (a:act) (s:sys_trace) : option bool :=
-  match get_prc_trace p s with
-  | None => Some false
-  | Some [] => Some false
-  | Some (h :: _) => Act.are_dual a h
-  end. *)
 
 
 (** [exist_last_act a s] returns [true] if the head of any of the [prc_trace] in [s] matches [a]. *)
@@ -954,93 +915,77 @@ Fixpoint exist_last_act (a:act) (s:sys_trace) : bool :=
     end
   end.
 
-(** [can_enter p a s] checks that the last act of [p] is LEAVE or nothing. *)
-Definition can_enter (p:pid) (s:sys_trace) : option bool :=
-  match last_act_of p s with
-  | (false, _) => (* [p] not in [s], but we may add *)
-    (* (s ++ [(p,[])], Some true) *)
-    Some true
-
-  | (true, None) => (* [p] in [s], but empty trace*)
-    (* (s, Some true) *)
-    Some true
-
-  | (true, Some b) => (* [p] in [s] with last act [b] *)
-    match Act.are_dual ENTER b with
-    | Some true => Some (negb (exist_last_act ENTER (get_other_traces p s)))
-    | _ => Some false
-    end
-
-  end.
-
-(** [can_leave p a s] checks that the last act of [p] is ENTER. *)
-Definition can_leave (p:pid) (s:sys_trace) : option bool :=
-  match last_act_of p s with
-  | (false, _) => (* [p] not in [s] *)
-    Some false
-
-  | (true, None) => (* [p] in [s], but empty trace*)
-    Some false
-
-  | (true, Some b) => (* [p] in [s] with last act [b] *)
-    Act.are_dual LEAVE b
-  end.
-
-Fixpoint update_prc_trace (p:pid) (a:act) (s:sys_trace) : option sys_trace :=
+Fixpoint append_act_hd (p:pid) (a:act) (s:sys_trace) : option sys_trace :=
   match s with
   | [] => None
   | (q, l) :: t =>
     if Nat.eqb p q then Some ((p, a :: l) :: t) else
-    match update_prc_trace p a t with
+    match append_act_hd p a t with
     | None => None
     | Some c => Some ((q,l) :: c)
     end
   end.
 
 
-Definition do_enter (p:pid) (s:sys_trace) : option sys_trace :=
-  match can_enter p s with
-  | Some true => update_prc_trace p ENTER s
-  | _ => None
-  end.
 
 
-Definition do_leave (p:pid) (s:sys_trace) : option sys_trace :=
-  match can_leave p s with
-  | Some true => update_prc_trace p LEAVE s
-  | _ => None
-  end.
-
-(** [p_can_act p a s] is [Some true] if last action of [p] is dual to [a], and if [a] is ENTER then all others do not have last action ENTER. *)
-(* Definition p_can_act (p:pid) (a:act) (s:sys_trace) : sys_trace * option bool :=
-  match a with
-  | ENTER => can_do_enter p s
-  | LEAVE => can_do_leave p s
-  | _ => None
-  end. *)
-
-
-    (* match h with
-    | ENTER =>
-    match h, a with
-    | ENTER, LEAVE => Some true
-    | LEAVE, ENTER => Some true
-    | ENTER, ENTER => Some false
-    | LEAVE, LEAVE => Some false
-    | _, _ => None
-    end
-  end. *)
-
-
-
+(** [mutual_exclusion]
+  [ true*.
+    { ENTER ?i:nat }.
+    (not { LEAVE !i })*.
+    { ENTER ?j:nat where j<>i }
+  ] false
+*)
 Module MutualExclusion.
-  (** [mutual_exclusion]
-    [ true*.
-      { ENTER ?i:nat }.
-      (not { LEAVE !i })*.
-      { ENTER ?j:nat where j<>i }
-    ] false *)
 
+  (** [can_enter p a s] checks that the last act of [p] is LEAVE or nothing. *)
+  Definition can_enter (p:pid) (s:sys_trace) : option bool :=
+    match last_act_of p s with
+    | (false, _) => (* [p] not in [s], but we may add *)
+      (* (s ++ [(p,[])], Some true) *)
+      Some true
+
+    | (true, None) => (* [p] in [s], but empty trace*)
+      (* (s, Some true) *)
+      Some true
+
+    | (true, Some b) => (* [p] in [s] with last act [b] *)
+      match Act.are_dual ENTER b with
+      | Some true => Some (negb (exist_last_act ENTER (get_other_traces p s)))
+      | _ => Some false
+      end
+
+    end.
+
+  (** [do_enter p s] returns [Some s] updated with [p] last act ENTER, if [can_enter] is true. *)
+  Definition do_enter (p:pid) (s:sys_trace) : option sys_trace :=
+    match can_enter p s with
+    | Some true => append_act_hd p ENTER s
+    | _ => None
+    end.
+
+
+  (** [can_leave p a s] checks that the last act of [p] is ENTER. *)
+  Definition can_leave (p:pid) (s:sys_trace) : option bool :=
+    match last_act_of p s with
+    | (false, _) => (* [p] not in [s] *)
+      Some false
+
+    | (true, None) => (* [p] in [s], but empty trace*)
+      Some false
+
+    | (true, Some b) => (* [p] in [s] with last act [b] *)
+      Act.are_dual LEAVE b
+    end.
+
+  (** [do_leave p s] returns [Some s] updated with [p] last act LEAVE, if [can_leave] is true. *)
+  Definition do_leave (p:pid) (s:sys_trace) : option sys_trace :=
+    match can_leave p s with
+    | Some true => append_act_hd p LEAVE s
+    | _ => None
+    end.
+
+  (** [MutualExclusion.lts] holds for a given input trace [i] and output trace [o] if, the order of the items in [i] are such that no two processes are inside their critical section at once. I.e., if a process does ENTER, then all other processes must not have done ENTER last (e.g., done LEAVE or never done ENTER). *)
   Inductive lts :
     (trace * sys_trace) -> action -> (trace * sys_trace) -> Prop :=
 
@@ -1058,39 +1003,27 @@ Module MutualExclusion.
 
 End MutualExclusion.
 
-(* Definition automata : Type := sys_trace. *)
-(* Inductive  *)
-
-(* Reserved Notation "t '-{' a '}->' t'" (at level 40). *)
-
-(* Module MutualExclusion.
-
-
-
-
-  (* Inductive lts : sys_trace -> action -> sys_trace -> Prop :=
-    (* | SILENT : forall  *)
-
-    | ENTER : forall s a p h t,
-      (* sanity check: [h] not already ENTER *)
-      get_prc_trace p s = Some (h :: t)   /\ negb (is_named_action_enter a) /\
-
-      get_other_traces p s                ->
-      s -{LABEL (ENTER, p)}-> s
-
-
-    where "t '-{' a '}->' t'" := (lts t a t'). *)
-End MutualExclusion. *)
-
 
 
 (** [no_starvation]
-    [ true* ] forall i:nat among {1..N}.
-    [ for j:nat from 1 to N do
-        (not { ENTER ...!i })*.
-        { ?G:string ...!j where (j=i) -> (G<>"ENTER") }
-      end for
-    ]-| *)
+  [ true* ] forall i:nat among {1..N}.
+  [ for j:nat from 1 to N do
+      (not { ENTER ...!i })*.
+      { ?G:string ...!j where (j=i) -> (G<>"ENTER") }
+    end for
+  ]-|
+*)
+(* Module NoStarvation.
+
+  (** [NoStarvation.lts] holds *)
+  Inductive lts :
+    (trace * sys_trace) -> action -> (trace * sys_trace) -> Prop :=
+
+    |
+
+    .
+
+End NoStarvation. *)
 
 (* Module NoStarvation.
   Inductive lts : automata -> action -> automata -> Prop :=
