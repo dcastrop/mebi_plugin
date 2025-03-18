@@ -624,16 +624,19 @@ Definition do_act (a:act) (e:env) : (tm * env) :=
     end
   end.
 
+Definition named_action : Type := act * pid.
+
 Inductive action : Type :=
   | SILENT : action
-  | LABEL  : act -> pid -> action.
+  | LABEL  : named_action -> action.
 
 Definition visible_action (a:act) (e:env) : action :=
-  LABEL a (State.get_pid (Env.get_state e)).
+  LABEL (a, (State.get_pid (Env.get_state e))).
 
 Definition get_action (a:act) (e:env) : action :=
   match a with
-  | NCS => visible_action a e
+  (* | NCS   => visible_action a e *)
+  | NCS   => SILENT
   | ENTER => visible_action a e
   | LEAVE => visible_action a e
   | _ => SILENT
@@ -811,37 +814,125 @@ MeBi LTS lts ncs.
 (**** TODO: LTS equiv temp. logic prop. **********************************)
 (*************************************************************************)
 
-Definition trace : Type := list action.
+
+(* Module NamedAction.
+  Definition to_action (v:named_action) : action :=
+    match v with
+    | (a, p) => LABEL (a, p)
+    end.
+End NamedAction. *)
 
 
-(* TODO: unsure if [Trace.prune] (below) is needed. *)
-(* intention here is if we some how obtain arbitrary traces *)
+(* Definition trace : Type := list named_action. *)
 
-Module Trace.
+(* Module Trace.
   (** [prune t] removes all [SILENT] actions from [t]. *)
-  Fixpoint prune (t:trace) : trace :=
+  Fixpoint prune (t:list action) : trace :=
     match t with
     | [] => []
     | SILENT :: t => (prune t)
-    | h :: t => h :: (prune t)
+    | LABEL h :: t => h :: (prune t)
     end.
 
-  (** [is_named_only t] returns [true] if no [SILENT] actions. *)
-  Fixpoint is_named_only (t:trace): bool :=
-    match t with
-    | [] => true
-    | SILENT :: t => false
-    | _ :: t => is_named_only t
-    end.
+  Definition of_action_list (l:list action) : trace := prune l.
 End Trace.
 
-Example trace_1 : trace := [LABEL ENTER 0; LABEL LEAVE 0].
+Example trace_1 : trace := [(ENTER, 0); (LEAVE, 0)]. *)
 
 
 (* ! remember: just encode the LTL examples into an LTS.
   - that means two separate LTS, one of each.
   - each action in the trace is used to navigate the LTS.
     i.e., if a transition is not possible, then the property does not hold *)
+
+Definition trace : Type := list action.
+
+Definition prc_trace : Type := list named_action.
+
+Definition sys_trace : Type := list (pid * prc_trace).
+
+Definition named_action_of (a:action) : option named_action :=
+  match a with
+  | SILENT => None
+  | LABEL n => Some n
+  end.
+
+(* Definition named_action_eq (a:named_action) (b:named_action) : bool :=
+  match a, b with
+  | (ENTER, _), (ENTER, _) => true
+  | (LEAVE, _), (LEAVE, _) => true
+  | _, _ => false
+  end. *)
+
+Definition is_named_action_enter (a:named_action) : bool :=
+  match a with
+  | (ENTER, _) => true
+  | _ => false
+  end.
+
+Definition is_named_action_leave (a:named_action) : bool :=
+  match a with
+  | (LEAVE, _) => true
+  | _ => false
+  end.
+
+Fixpoint get_prc_trace (p:pid) (s:sys_trace) : option prc_trace :=
+  match s with
+  | [] => None
+  | (q, l) :: t => if Nat.eqb p q then Some l else get_prc_trace p t
+  end.
+
+Fixpoint get_other_traces (p:pid) (s:sys_trace) : sys_trace :=
+  match s with
+  | [] => []
+  | (q, l) :: t =>
+    (if Nat.eqb p q then [] else [(q, l)]) ++ get_other_traces p t
+  end.
+
+
+
+(* Definition automata : Type := sys_trace. *)
+(* Inductive  *)
+
+Reserved Notation "t '-{' a '}->' t'" (at level 40).
+
+(** [mutual_exclusion]
+    [ true*.
+      { ENTER ?i:nat }.
+      (not { LEAVE !i })*.
+      { ENTER ?j:nat where j<>i }
+    ] false *)
+
+Module MutualExclusion.
+  Inductive lts : sys_trace -> action -> sys_trace -> Prop :=
+    (* | SILENT : forall  *)
+
+    | ENTER : forall s a p h t,
+      (* sanity check: [h] not already ENTER *)
+      get_prc_trace p s = Some (h :: t)   /\ negb (is_named_action_enter a) /\
+      named_action_of a = Some (ENTER, p) /\
+      get_other_traces p s                ->
+      s -{LABEL (ENTER, p)}-> s
+
+
+    where "t '-{' a '}->' t'" := (lts t a t').
+End MutualExclusion.
+
+
+
+(** [no_starvation]
+    [ true* ] forall i:nat among {1..N}.
+    [ for j:nat from 1 to N do
+        (not { ENTER ...!i })*.
+        { ?G:string ...!j where (j=i) -> (G<>"ENTER") }
+      end for
+    ]-| *)
+
+Module NoStarvation.
+  Inductive lts : automata -> action -> automata -> Prop :=
+    | SILENT :
+    .
+End NoStarvation.
 
 
 (*
@@ -894,13 +985,6 @@ Module LTL.
     (* saturation operator, forbids infinite repetition *)
     | SATURATION : fomrula -> formula (* [F]-| *)
     .
-
-(** [mutual_exclusion]
-    [ true*.
-      { ENTER ?i:nat }.
-      (not { LEAVE !i })*.
-      { ENTER ?j:nat where j<>i }
-    ] false *)
 
 Definition mutual_exclusion : formula :=
   HENCEFORTH (
