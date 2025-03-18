@@ -815,38 +815,6 @@ MeBi LTS lts ncs.
 (*************************************************************************)
 
 
-(* Module NamedAction.
-  Definition to_action (v:named_action) : action :=
-    match v with
-    | (a, p) => LABEL (a, p)
-    end.
-End NamedAction. *)
-
-
-(* Definition trace : Type := list named_action. *)
-
-(* Module Trace.
-  (** [prune t] removes all [SILENT] actions from [t]. *)
-  Fixpoint prune (t:list action) : trace :=
-    match t with
-    | [] => []
-    | SILENT :: t => (prune t)
-    | LABEL h :: t => h :: (prune t)
-    end.
-
-  Definition of_action_list (l:list action) : trace := prune l.
-End Trace.
-
-Example trace_1 : trace := [(ENTER, 0); (LEAVE, 0)]. *)
-
-
-(* ! remember: just encode the LTL examples into an LTS.
-  - that means two separate LTS, one of each.
-  - each action in the trace is used to navigate the LTS.
-    i.e., if a transition is not possible, then the property does not hold *)
-
-(* Definition trace : Type := list action. *)
-
 Definition prc_trace : Type := list act.
 
 Definition sys_trace : Type := list (pid * prc_trace).
