@@ -706,8 +706,6 @@ Inductive lts : sys * resource -> action -> sys * resource -> Prop :=
   where "t '==<{' a '}>==>' t'" := (lts t a t')
   and "t '--<{' a '}>-->' t'" := (step t a t').
 
-
-
 (*************************************************************************)
 (**** Example ************************************************************)
 (*************************************************************************)
@@ -730,6 +728,27 @@ Example Acquire : tm :=
       ) (OK)
     )
   ).
+
+
+Goal exists tm , (Acquire, (State.initial, Resource.initial 1, [])) --<{ SILENT }>--> tm.
+  do 1 eexists.
+  eapply STEP_SEQ.
+  assert (EQ : SILENT = get_action  (WRITE_NEXT THE_PID NIL) (State.initial, Resource.initial 1, []))
+    by reflexivity.
+
+  assert (EQ2 : (ERR, (State.initial, Resource.initial 1, []))
+               = do_act (WRITE_NEXT THE_PID NIL) (State.initial, Resource.initial 1, []))
+    by reflexivity.
+
+  pose proof
+    (eq_refl (write_next THE_PID NIL (State.initial, Resource.initial 1, []))).
+  unfold write_next in H.
+  unfold handle_value in H.
+  simpl in H.
+
+
+
+  constructor.
 
 
 Example Release : tm :=
@@ -762,7 +781,6 @@ Example P : tm :=
     )
   ) (OK).
 
-
 (**********************************)
 (**** Single process **************)
 (**********************************)
@@ -770,9 +788,7 @@ Example P : tm :=
 (* Example p0 : tm * env := (P, Env.initial 0). *)
 Example p0 : tm * env := (P, (State.initial, Resource.initial 0, [])).
 (* FIXME: calling mebi appears to cause exception *)
-(* MeBi LTS step p0.  *)
-
-
+(* MeBi LTS step p0. *)
 
 (**********************************)
 (**** System **********************)
