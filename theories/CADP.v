@@ -981,12 +981,135 @@ End MutualExclusion.
 *)
 Module NoStarvation.
 
-  Definition do_act (p:pid) (a:act) (s:sys_trace) : option sys_trace :=
+  (* Definition do_act (p:pid) (a:act) (s:sys_trace) : option sys_trace :=
     match can_do_act p a s with
     | Some true => append_act_hd p a s
     | _ => None
+    end. *)
+
+
+  Definition sys_history : Type := list (pid * list (option act)).
+
+  (** creates new point in history, where only [p] acts, and all others do [None] *)
+  Fixpoint append_sys_history (p:pid) (a:act) (z:sys_history) : sys_history :=
+    match z with
+    | [] => []
+    | (q, y) :: t => (q, if Nat.eqb p q
+                         then Some a :: y
+                         else None :: y) :: append_sys_history p a t
     end.
 
+  (** only returns None when [prc_trace] would return empty list *)
+  Fixpoint get_last_act (y:list (option act)) : option act :=
+    match y with
+    | [] => None
+    | Some a :: _ => Some a
+    | None :: t => get_last_act t
+    end.
+
+  (** converts sys_history to [sys_trace], by recursively fetching the last non-None option action for each process *)
+  Fixpoint get_sys_trace (z:sys_history) : sys_trace :=
+    match z with
+    | [] => []
+    | (p, y) :: t =>
+      match get_last_act y with
+      | None => (p, []) :: get_sys_trace t
+      | Some a => (p, [a]) :: get_sys_trace t
+      end
+    end.
+
+  Definition history_slice : Type := list (pid * option act).
+
+  (** returns a tuple containing: (1) a list of all the processes and their last historical event (None or Some act), (2) the prior history of the system prior to the most recent slice removed. *)
+  Fixpoint slice_of_history (z:sys_history) : history_slice * sys_history :=
+    match z with
+    | [] => ([], [])
+    | (p, y) :: t =>
+      match slice_of_history t with
+      | (s, h) =>
+        match y with
+        | [] => ((p, None) :: s, (p, []) :: h)
+        | a :: y => ((p, a) :: s, (p, y) :: h)
+        end
+      end
+    end.
+
+  Example slice_of_history_test : bool :=
+    match slice_of_history [ (1, [None; None; Some ENTER])
+                           ; (2, [None; Some ENTER; None])
+                           ; (3, [Some ENTER; None; None])
+                           ; (4, [None; Some LEAVE; Some ENTER]) ] with
+    |([ (1, None); (2, None); (3, Some ENTER); (4, None) ],
+      [ (1, [None; Some ENTER])
+      ; (2, [Some ENTER; None])
+      ; (3, [None; None])
+      ; (4, [Some LEAVE; Some ENTER]) ]) => true
+    | _ => false
+    end.
+
+  Compute slice_of_history_test.
+
+  (* Fixpoint slice_history (z:sys_history) : list history_slice :=
+    match z with
+    | [] => []
+    | (p, y) :: t =>
+      match slice_of_history t with
+      | (s, h) =>
+        match y with
+        | [] => ((p, None) :: s, (p, []) :: h)
+        | a :: y => ((p, a) :: s, (p, y) :: h)
+        end
+      end
+    end. *)
+    (* match z with
+    | [] => []
+    | _ =>
+      match slice_of_history z with
+      | ([], []) => []
+      | (s, r) => s :: slice_history r
+      end
+    end. *)
+
+  (* * splits [z] into small histories that lie between two actions performed by [p]. If actions are [None, act] then this is the first action done by [p]. If actions are [act, None] then this is the latest action done by [p]. Otherwise, this is some other historic action done by [p].
+  Fixpoint split_history (p:pid) (z:sys_history) : list (option act * option act * sys_history) :=
+    match z with
+    | [] => []
+    | (q, y) :: t =>
+      if Nat.eqb p q then
+
+
+  (** *)
+  Fixpoint no_starvation (z:sys_history) : bool :=
+    match z with
+    | [] => true
+    | (p, y) :: t =>
+
+    end.
+
+
+  Definition do_action (a:action) (z:sys_history) : option sys_history :=
+    match a with
+    | SILENT => Some z (* skip *)
+    | LABEL (a, p) =>
+      match can_do_act p a (get_sys_trace z) with
+      | None => None
+      | Some false => None
+      | Some true =>
+        if no_starvation z then Some (append_sys_history p a z) else None
+      end
+      (* match do_act p a (get_sys_trace z) with
+      | None => None
+      | Some s => (* then check if any process starves *)
+        if no_starvation z then Some (s :: z) else None
+      end *)
+    end.
+
+  (** [NoStarvation.lts] is defined so long as after each action, [no_starvation s] holds. I.e.,  *)
+  Inductive lts : sys_history -> action -> sys_history -> Prop :=
+    | ACT : forall t1 t2 a, do_action a t1 = Some t2 -> lts t1 a t2
+    . *)
+
+End NoStarvation.
   (* Definition is_starving (p:pid) (s:sys_trace) : bool := false. *)
     (* forall_last_act ENTER *)
 
@@ -1014,32 +1137,55 @@ Module NoStarvation.
     | h :: t => if has_starvation h then false else no_starvation t
     end. *)
 
-  Definition prc_history : Type := pid * (list prc_trace).
+  (* Definition prc_history : Type := pid * (list prc_trace). *)
+  (* Definition prc_history : Type := list prc_trace.
 
-  Fixpoint get_prc_trace (z:prc_history) : prc_trace :=
-    match z with
+  (** [get_prc_trace y] returns the head trace in [y] *)
+  Definition get_prc_trace (y:option prc_history) : option prc_trace :=
+    match y with
+    | None => None
+    | Some [] => Some []
+    | Some (h :: t) => Some h
+    end.
+    (* match y with
     | (_, l) =>
       match l with
       | [] => []
       | h :: _ => h
       end
+    end. *)
+
+
+  Definition sys_history : Type := list (pid * option prc_history).
+
+  (** [get_sys_trace z] converts [sys_history] to [sys_trace] by converting the head of each [prc_history] in [z] into [prc_trace]. *)
+  Fixpoint get_sys_trace (z:sys_history) : list (pid * option prc_trace) :=
+    match z with
+    | [] => []
+    | (p, y) :: t => (p, get_prc_trace y) :: get_sys_trace t
     end.
-
-
-  Definition sys_history : Type := list prc_history.
-
-  Fixpoint get_sys_trace (s:sys_history) : sys_trace :=
-    match s with
+    (* match s with
     | [] => []
     | h :: t =>
       match h with
       | (p, _) => (p, get_prc_trace h) :: get_sys_trace t
       end
-    end.
+    end. *)
+
+  (** returns a subset of [z] containing all the periods inbetween [p] performing an action (in [y]). *)
+  Fixpoint traces_between_p_act (y:prc_history) (z:sys_history) : list sys_history :=
+    match
+    match z with
+    | [] => []
+    | (q, y) :: t => (* pid, prc_history *)
+      match y with
+      | [] => [] (* nothing more to check for [q] *)
+
 
   (** [no_starvation l] is [true] if each process in [l] is not repeatidly forced to wait until every other process has done some action, for itself to do an [ENTER] action. *)
   Fixpoint no_starvation (l:sys_history) : bool :=
-    (* TODO: *)false.
+    (* TODO: *)
+    false.
 
   Definition do_action (a:action) (l:sys_history) : option sys_history :=
     match a with
@@ -1057,7 +1203,7 @@ Module NoStarvation.
     | ACT : forall t1 t2 a, do_action a t1 = Some t2 -> lts t1 a t2
     .
 
-End NoStarvation.
+End NoStarvation. *)
 
 (* Module NoStarvation.
   Inductive lts : automata -> action -> automata -> Prop :=
