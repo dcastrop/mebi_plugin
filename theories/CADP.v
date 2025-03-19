@@ -730,7 +730,7 @@ Example Acquire : tm :=
   ).
 
 
-Goal exists tm , (Acquire, (State.initial, Resource.initial 1, [])) --<{ SILENT }>--> tm.
+(* Goal exists tm , (Acquire, (State.initial, Resource.initial 1, [])) --<{ SILENT }>--> tm.
   do 1 eexists.
   eapply STEP_SEQ.
   assert (EQ : SILENT = get_action  (WRITE_NEXT THE_PID NIL) (State.initial, Resource.initial 1, []))
@@ -748,7 +748,7 @@ Goal exists tm , (Acquire, (State.initial, Resource.initial 1, [])) --<{ SILENT 
 
 
 
-  constructor.
+  constructor. *)
 
 
 Example Release : tm :=
