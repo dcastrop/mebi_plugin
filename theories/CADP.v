@@ -50,13 +50,9 @@ Module Index.
 
 End Index.
 
-
-
-
 (*************************************************************************)
 (**** Memory *************************************************************)
 (*************************************************************************)
-
 
 (**********************************)
 (**** Qnode ***********************)
@@ -72,12 +68,13 @@ Module Qnode.
   Definition get_next   (q:qnode) : index := next q.
   Definition get_locked (q:qnode) : bool  := locked q.
 
-  Definition set_next   (i:index) (q:qnode) : qnode := Build_qnode
-                                                        i (Qnode.get_locked q).
-  Definition set_locked (b:bool)  (q:qnode) : qnode := Build_qnode
-                                                        (Qnode.get_next q) b.
-End Qnode.
+  Definition set_next   (i:index) (q:qnode) : qnode :=
+    Build_qnode i (Qnode.get_locked q).
 
+  Definition set_locked (b:bool)  (q:qnode) : qnode :=
+    Build_qnode (Qnode.get_next q) b.
+
+End Qnode.
 
 (**********************************)
 (**** mem (Memory) Type ***********)
@@ -111,8 +108,6 @@ Module Memory.
     end.
 
 End Memory.
-
-
 
 (*************************************************************************)
 (**** Vars (Local to process ) *******************************************)
@@ -148,9 +143,6 @@ Definition set_next (i:index) (v:local_vars) : local_vars :=
 Definition set_swap (b:bool) (v:local_vars) : local_vars :=
   Build_local_vars (var_predecessor v) (var_locked v) (var_next v) b.
 
-
-
-
 (*************************************************************************)
 (**** Value **************************************************************)
 (*************************************************************************)
@@ -167,13 +159,13 @@ Inductive value : Type (*Set*) :=
   .
 
 
-Definition valid_cast_to_nat (v:value) : bool * option nat :=
+Definition valid_cast_to_index (v:value) : bool * index :=
   match v with
   | NAT n => (true, Some n)
-  | PID p => (true, Some p)
+  | PID p => (true, Index.of_pid p)
   | INDEX i => (true, i)
   | NIL => (true, None)
-  | _ => (false, None) (* i.e., BOOL, NIL *)
+  | _ => (false, None) (* i.e., BOOL *)
   end.
 
 (*************************************************************************)
@@ -183,25 +175,25 @@ Definition resource : Type := mem * lock.
 
 Module Resource.
   Definition initial (n:nat) : resource := (Memory.initial n, Lock.initial).
-
-  Definition get_mem (r:resource) : mem :=
-    match r with | (m, _) => m end.
-
-  Definition get_lock_i (r:resource) : index :=
-    match r with | (_, (i, _)) => i end.
-
-  Definition get_lock_j (r:resource) : index :=
-    match r with | (_, (_, j)) => j end.
-
-  Definition set_mem (new_m:mem) (r:resource) : resource :=
-    match r with | (_, l) => (new_m, l) end.
-
-  Definition set_lock_i (new_i:index) (r:resource) : resource :=
-    match r with | (m, (_, j)) => (m, (new_i, j)) end.
-
-  Definition set_lock_j (new_j:index) (r:resource) : resource :=
-    match r with | (m, (i, _)) => (m, (i, new_j)) end.
 End Resource.
+
+Definition get_mem (r:resource) : mem :=
+  match r with | (m, _) => m end.
+
+Definition get_lock_i (r:resource) : index :=
+  match r with | (_, (i, _)) => i end.
+
+Definition get_lock_j (r:resource) : index :=
+  match r with | (_, (_, j)) => j end.
+
+Definition set_mem (new_m:mem) (r:resource) : resource :=
+  match r with | (_, l) => (new_m, l) end.
+
+Definition set_lock_i (new_i:index) (r:resource) : resource :=
+  match r with | (m, (_, j)) => (m, (new_i, j)) end.
+
+Definition set_lock_j (new_j:index) (r:resource) : resource :=
+  match r with | (m, (i, _)) => (m, (i, new_j)) end.
 
 
 (*************************************************************************)
@@ -212,32 +204,30 @@ Definition state : Type := pid * local_vars.
 Module State.
   Definition create (p:pid) : state := (p, Vars.initial).
   Definition initial : state := State.create 0.
-
-  Definition get_pid (s:state) : pid :=
-    match s with | (p, _) => p end.
-
-  Definition get_vars (s:state) : local_vars :=
-    match s with | (_, v) => v end.
-
-  Definition get_predecessor (s:state) : index := var_predecessor (get_vars s).
-  Definition get_locked      (s:state) : bool  := var_locked (get_vars s).
-  Definition get_next        (s:state) : index := var_next (get_vars s).
-  Definition get_swap        (s:state) : bool  := var_swap (get_vars s).
-
-  Definition get_local_var_value (v:local_var) (s:state) : value :=
-    match v with
-    | PREDECESSOR => INDEX (get_predecessor s)
-    | LOCKED      => BOOL  (get_locked s)
-    | NEXT        => INDEX (get_next s)
-    | SWAP        => BOOL  (get_swap s)
-    | THE_PID     => PID   (get_pid s)
-    end.
-
-  Definition set_vars (v:local_vars) (s:state) : state :=
-    match s with | (p, _) => (p, v) end.
-
 End State.
 
+Definition get_pid (s:state) : pid :=
+  match s with | (p, _) => p end.
+
+Definition get_vars (s:state) : local_vars :=
+  match s with | (_, v) => v end.
+
+Definition get_predecessor (s:state) : index := var_predecessor (get_vars s).
+Definition get_locked      (s:state) : bool  := var_locked (get_vars s).
+Definition get_next        (s:state) : index := var_next (get_vars s).
+Definition get_swap        (s:state) : bool  := var_swap (get_vars s).
+
+Definition get_local_var_value (v:local_var) (s:state) : value :=
+  match v with
+  | PREDECESSOR => INDEX (get_predecessor s)
+  | LOCKED      => BOOL  (get_locked s)
+  | NEXT        => INDEX (get_next s)
+  | SWAP        => BOOL  (get_swap s)
+  | THE_PID     => PID   (get_pid s)
+  end.
+
+Definition set_vars (v:local_vars) (s:state) : state :=
+  match s with | (p, _) => (p, v) end.
 
 
 (*************************************************************************)
@@ -321,7 +311,7 @@ Fixpoint eval (e:expr) (s:state) : option value :=
   | TRU => Some (BOOL true)
   | FLS => Some (BOOL false)
 
-  | VAR v => Some (State.get_local_var_value v s)
+  | VAR v => Some (get_local_var_value v s)
 
   | NOT b =>
     match eval b s with
@@ -352,6 +342,226 @@ Definition handle_value (v:value) (s:state) : option value :=
   match v with
   | GET n => eval (VAR n) s
   | _ => Some v
+  end.
+
+(*************************************************************************)
+(**** Environment (local) ************************************************)
+(*************************************************************************)
+
+Definition env : Type := state * resource.
+
+Module Env.
+  Definition initial (n:nat) : env := (State.initial, Resource.initial n).
+End Env.
+
+Definition get_state (e:env) : state := match e with | (s, _) => s end.
+
+Definition get_resource (e:env) : resource :=
+  match e with | (_, r) => r end.
+
+(* Definition set_state (s:state) (e:env) : env :=
+  match e with | (_, r) => (s, r) end. *)
+
+(* Definition set_resource (r:resource) (e:env) : env :=
+  match e with | (s, _) => (s, r) end. *)
+
+
+(*************************************************************************)
+(**** (Local) Semantics of Processes *************************************)
+(*************************************************************************)
+
+(** [read_next e] will set var [next] to be the value
+    currently of the [qnode.next] corresponding to the
+    [pid] of the process in the state. *)
+Definition read_next (e:env) : option env :=
+  (* get pid *)
+  let s:state := get_state e in
+  let p:pid := get_pid s in
+  (* get qnode *)
+  let r:resource := get_resource e in
+  let m:mem := get_mem r in
+  match Memory.nth_error p m with
+  | None => None (* tried to access out of bounds *)
+  | Some q => (* get next of qnode *)
+    let qnode_next:index := Qnode.get_next q in
+    (* get local vars *)
+    let v:local_vars := get_vars s in
+    (* update env *)
+    Some (set_vars (set_next qnode_next v) s, r)
+  end.
+
+(** [read_locked e] will set var [locked] to be
+    the value of the [qnode.locked] corresponding
+    to the [pid] of the process in the state.
+    ! ! ! it requires that [qnode.locked] is not None. *)
+Definition read_locked (e:env) : option env :=
+  (* get pid *)
+  let s:state := get_state e in
+  let p:pid := get_pid s in
+  (* get qnode *)
+  let r:resource := get_resource e in
+  let m:mem := get_mem r in
+  match Memory.nth_error p m with
+  | None => None (* tried to access out of bounds *)
+  | Some q => (* get locked of qnode *)
+    let qnode_locked:bool := Qnode.get_locked q in
+    (* get local vars *)
+    let v:local_vars := get_vars s in
+    (* update env *)
+    Some (set_vars (set_locked qnode_locked v) s, r)
+  end.
+
+(*DC: slight simplification: instead of taking an expr, it needs to take a val*)
+(** [write_next to_write next e] will set the
+    field [qnode.next] of the [qnode] of the
+    index [to_write] to the value of [next]. *)
+Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
+  let s:state := get_state e in
+  (* get value of [next] *)
+  match handle_value next s with
+  | None => None (* [next=GET v] and [v] could not be resolved *)
+  | Some next =>
+    (* get pid from [to_write] *)
+    match get_local_var_value to_write s with
+    | PID p => (* should be pid *)
+      (* get qnode *)
+      let r:resource := get_resource e in
+      let m:mem := get_mem r in
+      match Memory.nth_error p m with
+      | None => None (* [qnode] must exist *)
+      | Some q =>
+        (* check [next] is some kind of nat *)
+        match valid_cast_to_index next with
+        | (false, _) => None (* i.e., BOOL, NIL *)
+        | (true, n) => (* i.e., PID n, INDEX n, NIL, NAT n *)
+          match Memory.nth_replace (Qnode.set_next n q) p m with
+          | None => None
+          | Some m => Some (s, set_mem m r)
+          end
+        end
+      end
+    | _ => None (* [to_write] must be a [pid] *)
+    end
+  end.
+
+(** [write_locked to_write locked e] will set the
+    field [qnode.locked] of the [qnode] of the
+    index [to_write] to the value of [locked]. *)
+Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env :=
+  (* get pid from [to_write] *)
+  let s:state := get_state e in
+  match get_local_var_value to_write s with
+  | PID p => (* should be pid *)
+    (* get qnode *)
+    let r:resource := get_resource e in
+    let m:mem := get_mem r in
+    match Memory.nth_error p m with
+    | None => None (* [qnode] must exist *)
+    | Some q =>
+      (* make sure [locked] is a [BOOL] *)
+      match locked with
+      | BOOL b =>
+        match Memory.nth_replace (Qnode.set_locked b q) p m with
+        | None => None
+        | Some m => Some (s, (set_mem m r))
+        end
+      | _ => None (* [locked] must be a [BOOL] *)
+      end
+    end
+  | _ => None (* [to_write] must be a [pid] *)
+  end.
+
+Definition fetch_and_store (e:env) : option env :=
+  (* get [i] *)
+  let r:resource := get_resource e in
+  let i:index := get_lock_i r in
+  (* store [i] in [predecessor] *)
+  let s:state := get_state e in
+  let v:local_vars := get_vars s in
+  let v:local_vars := set_predecessor i v in
+  let s:state := set_vars v s in
+  (* set [i] to [pid] *)
+  let p:pid := get_pid s in
+  let r:resource := set_lock_i (Index.of_pid p) r in
+  (* update env *)
+  Some (s, r).
+
+
+Definition compare_and_swap (e:env) : option env :=
+  (* set [j] to [pid] *)
+  let s:state := get_state e in
+  let p:pid := get_pid s in
+  let r:resource := get_resource e in
+  let r:resource := set_lock_j (Index.of_pid p) r in
+  (* get [i] and [j] *)
+  let i:index := get_lock_i r in
+  let j:index := get_lock_j r in
+  (* if the same, then set [swap] to true and set [i] to [Nil], else false *)
+  let v:local_vars := get_vars s in
+  match Index.eqb i j with
+  | true =>
+    (* set [swap] true *)
+    let v:local_vars := set_swap true v in
+    let s:state := set_vars v s in
+    (* set [i] to [Nil] *)
+    let r:resource := set_lock_i Nil r in
+    (* update env *)
+    Some (s, r)
+  | false =>
+    (* set [swap] false *)
+    let v:local_vars := set_swap false v in
+    let s:state := set_vars v s in
+    (* update env *)
+    Some (s, r)
+  end.
+
+(*************************************************************************)
+(**** Actions ************************************************************)
+(*************************************************************************)
+
+Definition do_act (a:act) (e:env) : (tm * env) :=
+  match a with
+  | NCS   => (OK, e)
+  | ENTER => (OK, e)
+  | LEAVE => (OK, e)
+
+  | _ =>
+    let res : option env :=
+      match a with
+      | READ_NEXT   => read_next e
+      | READ_LOCKED => read_locked e
+
+      | WRITE_NEXT to_write next   => write_next to_write next e
+      | WRITE_LOCKED to_write next => write_locked to_write next e
+
+      | FETCH_AND_STORE => fetch_and_store e
+      | COMPARE_AND_SWAP => compare_and_swap e
+
+      | _ => None (* shouldn't happen, outer match catches these *)
+      end
+    in
+    match res with
+    | None => (ERR, e)
+    | Some e => (OK, e)
+    end
+  end.
+
+Definition named_action : Type := act * pid.
+
+Inductive action : Type :=
+  | SILENT : action
+  | LABEL  : named_action -> action.
+
+Definition visible_action (a:act) (e:env) : action :=
+  LABEL (a, (get_pid (get_state e))).
+
+Definition get_action (a:act) (e:env) : action :=
+  match a with
+  (* | NCS   => visible_action a e *)
+  | NCS   => SILENT
+  | ENTER => visible_action a e
+  | LEAVE => visible_action a e
+  | _ => SILENT
   end.
 
 (*************************************************************************)
@@ -386,227 +596,12 @@ Fixpoint unfold (new:rec_def) (old:tm) : tm :=
 
   end.
 
-
-(*************************************************************************)
-(**** Environment (local) ************************************************)
-(*************************************************************************)
-
-Definition env : Type := state * resource.
-
-Module Env.
-  Definition initial (n:nat) : env := (State.initial, Resource.initial n).
-
-  Definition get_state (e:env) : state := match e with | (s, _) => s end.
-
-  Definition get_resource (e:env) : resource :=
-    match e with | (_, r) => r end.
-
-  Definition set_state (s:state) (e:env) : env :=
-    match e with | (_, r) => (s, r) end.
-
-  Definition set_resource (r:resource) (e:env) : env :=
-    match e with | (s, _) => (s, r) end.
-
-End Env.
-
-(*************************************************************************)
-(**** (Local) Semantics of Processes *************************************)
-(*************************************************************************)
-
-(** [read_next e] will set var [next] to be the value
-    currently of the [qnode.next] corresponding to the
-    [pid] of the process in the state. *)
-Definition read_next (e:env) : option env :=
-  (* get pid *)
-  let s:state := Env.get_state e in
-  let p:pid := State.get_pid s in
-  (* get qnode *)
-  let r:resource := Env.get_resource e in
-  let m:mem := Resource.get_mem r in
-  match Memory.nth_error p m with
-  | None => None (* tried to access out of bounds *)
-  | Some q => (* get next of qnode *)
-    let qnode_next:index := Qnode.get_next q in
-    (* get local vars *)
-    let v:local_vars := State.get_vars s in
-    (* update env *)
-    Some (State.set_vars (set_next qnode_next v) s, r)
-  end.
-
-(** [read_locked e] will set var [locked] to be
-    the value of the [qnode.locked] corresponding
-    to the [pid] of the process in the state.
-    ! ! ! it requires that [qnode.locked] is not None. *)
-Definition read_locked (e:env) : option env :=
-  (* get pid *)
-  let s:state := Env.get_state e in
-  let p:pid := State.get_pid s in
-  (* get qnode *)
-  let r:resource := Env.get_resource e in
-  let m:mem := Resource.get_mem r in
-  match Memory.nth_error p m with
-  | None => None (* tried to access out of bounds *)
-  | Some q => (* get locked of qnode *)
-    let qnode_locked:bool := Qnode.get_locked q in
-    (* get local vars *)
-    let v:local_vars := State.get_vars s in
-    (* update env *)
-    Some (State.set_vars (set_locked qnode_locked v) s, r)
-  end.
-
-(*DC: slight simplification: instead of taking an expr, it needs to take a val*)
-(** [write_next to_write next e] will set the
-    field [qnode.next] of the [qnode] of the
-    index [to_write] to the value of [next]. *)
-Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
-  let s:state := Env.get_state e in
-  (* get value of [next] *)
-  match handle_value next s with
-  | None => None (* [next=GET v] and [v] could not be resolved *)
-  | Some next =>
-    (* get pid from [to_write] *)
-    match State.get_local_var_value to_write s with
-    | PID p => (* should be pid *)
-      (* get qnode *)
-      let r:resource := Env.get_resource e in
-      let m:mem := Resource.get_mem r in
-      match Memory.nth_error p m with
-      | None => None (* [qnode] must exist *)
-      | Some q =>
-        (* check [next] is some kind of nat *)
-        match valid_cast_to_nat next with
-        | (false, _) => None (* i.e., BOOL, NIL *)
-        (* | (true, None) => None  *)
-        | (true, n) => (* i.e., PID n, INDEX n, NIL, NAT n *)
-          match Memory.nth_replace (Qnode.set_next n q) p m with
-          | None => None
-          | Some m => Some (s, Resource.set_mem m r)
-          end
-        end
-      end
-    | _ => None (* [to_write] must be a [pid] *)
-    end
-  end.
-
-(** [write_locked to_write locked e] will set the
-    field [qnode.locked] of the [qnode] of the
-    index [to_write] to the value of [locked]. *)
-Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env :=
-  (* get pid from [to_write] *)
-  let s:state := Env.get_state e in
-  match State.get_local_var_value to_write s with
-  | PID p => (* should be pid *)
-    (* get qnode *)
-    let r:resource := Env.get_resource e in
-    let m:mem := Resource.get_mem r in
-    match Memory.nth_error p m with
-    | None => None (* [qnode] must exist *)
-    | Some q =>
-      (* make sure [locked] is a [BOOL] *)
-      match locked with
-      | BOOL b =>
-        match Memory.nth_replace (Qnode.set_locked b q) p m with
-        | None => None
-        | Some m => Some (s, (Resource.set_mem m r))
-        end
-      | _ => None (* [locked] must be a [BOOL] *)
-      end
-    end
-  | _ => None (* [to_write] must be a [pid] *)
-  end.
-
-Definition fetch_and_store (e:env) : option env :=
-  (* get [i] *)
-  let r:resource := Env.get_resource e in
-  let i:index := Resource.get_lock_i r in
-  (* store [i] in [predecessor] *)
-  let s:state := Env.get_state e in
-  let v:local_vars := State.get_vars s in
-  let v:local_vars := set_predecessor i v in
-  let s:state := State.set_vars v s in
-  (* set [i] to [pid] *)
-  let p:pid := State.get_pid s in
-  let r:resource := Resource.set_lock_i (Index.of_pid p) r in
-  (* update env *)
-  Some (s, r).
-
-
-Definition compare_and_swap (e:env) : option env :=
-  (* set [j] to [pid] *)
-  let s:state := Env.get_state e in
-  let p:pid := State.get_pid s in
-  let r:resource := Env.get_resource e in
-  let r:resource := Resource.set_lock_j (Index.of_pid p) r in
-  (* get [i] and [j] *)
-  let i:index := Resource.get_lock_i r in
-  let j:index := Resource.get_lock_j r in
-  (* if the same, then set [swap] to true and set [i] to [Nil], else false *)
-  let v:local_vars := State.get_vars s in
-  match Index.eqb i j with
-  | true =>
-    (* set [swap] true *)
-    let v:local_vars := set_swap true v in
-    let s:state := State.set_vars v s in
-    (* set [i] to [Nil] *)
-    let r:resource := Resource.set_lock_i Nil r in
-    (* update env *)
-    Some (s, r)
-  | false =>
-    (* set [swap] false *)
-    let v:local_vars := set_swap false v in
-    let s:state := State.set_vars v s in
-    (* update env *)
-    Some (s, r)
-  end.
-
-
-Definition do_act (a:act) (e:env) : (tm * env) :=
-  match a with
-  | NCS   => (OK, e)
-  | ENTER => (OK, e)
-  | LEAVE => (OK, e)
-
-  | _ =>
-    let res : option env :=
-      match a with
-      | READ_NEXT   => read_next e
-      | READ_LOCKED => read_locked e
-
-      | WRITE_NEXT to_write next   => write_next to_write next e
-      | WRITE_LOCKED to_write next => write_locked to_write next e
-
-      | FETCH_AND_STORE => fetch_and_store e
-      | COMPARE_AND_SWAP => compare_and_swap e
-
-      | _ => None (* shouldn't happen, outer match catches these *)
-      end
-    in
-    match res with
-    | None => (ERR, e)
-    | Some e => (OK, e)
-    end
-  end.
-
 Definition do_unfold (i:idef) (b:tm) (c:tm) : tm :=
   (unfold (i, (unfold (i, REC_DEF i b c) b)) c).
 
-Definition named_action : Type := act * pid.
-
-Inductive action : Type :=
-  | SILENT : action
-  | LABEL  : named_action -> action.
-
-Definition visible_action (a:act) (e:env) : action :=
-  LABEL (a, (State.get_pid (Env.get_state e))).
-
-Definition get_action (a:act) (e:env) : action :=
-  match a with
-  (* | NCS   => visible_action a e *)
-  | NCS   => SILENT
-  | ENTER => visible_action a e
-  | LEAVE => visible_action a e
-  | _ => SILENT
-  end.
+(*************************************************************************)
+(**** Semantics **********************************************************)
+(*************************************************************************)
 
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
 
@@ -621,11 +616,11 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
     (SEQ l1 r, e1) --<{a}>--> (SEQ l2 r, e2)
 
   | STEP_IF_TRU : forall c t1 t2 e,
-    eval c (Env.get_state e) = Some (BOOL true) ->
+    eval c (get_state e) = Some (BOOL true) ->
     (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (t1, e)
 
   | STEP_IF_FLS : forall c t1 t2 e,
-    eval c (Env.get_state e) = Some (BOOL false) ->
+    eval c (get_state e) = Some (BOOL false) ->
     (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (t2, e)
 
   | STEP_REC_DEF : forall i b c e,
@@ -1139,16 +1134,13 @@ Definition compose (s:system) : composition :=
 Example ncs : composition := compose (create 5 P).
 MeBi LTS lts ncs.
 
-
 (*************************************************************************)
 (**** TODO: LTS equiv temp. logic prop. **********************************)
 (*************************************************************************)
 
-
 Definition prc_trace : Type := list act.
 
 Definition sys_trace : Type := list (pid * prc_trace).
-
 
 Module Act.
   Definition eq (a:act) (b:act) : bool :=
