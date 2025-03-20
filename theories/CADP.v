@@ -754,11 +754,6 @@ Example Acquire : tm :=
                 IF (VAR LOCKED) (REC_CALL 2) (OK)
               )
             ) (REC_CALL 2)
-            (* LOOP_OVER 2 (*L*) (
-              SEQ (ACT READ_LOCKED) (
-                IF (NOT (VAR LOCKED)) (BREAK 2 (*L*)) (OK)
-              )
-            ) (OK) *)
           )
         )
       ) (OK)
@@ -806,11 +801,6 @@ Example Release : tm :=
                 (ACT (WRITE_LOCKED NEXT (BOOL true)))
             )
           ) (REC_CALL 1)
-          (* LOOP_OVER 1 (*L*) (
-            SEQ (ACT READ_NEXT) (
-              IF (NOT (EQ (VAL NIL) (VAR NEXT))) (BREAK 1 (*L*)) (OK)
-            )
-          ) (ACT (WRITE_LOCKED NEXT (BOOL true))) *)
         ) (OK)
       )
     ) (ACT (WRITE_LOCKED NEXT (BOOL false)))
@@ -830,17 +820,6 @@ Example P : tm :=
       )
     )
   ) (REC_CALL 0).
-  (* LOOP_OVER 0 (
-    SEQ (ACT NCS) (
-      SEQ Acquire (
-        SEQ (ACT ENTER) (
-          SEQ (ACT LEAVE) (
-            SEQ Release OK
-          )
-        )
-      )
-    )
-  ) (OK). *)
 
 (**********************************)
 (**** Single process **************)
