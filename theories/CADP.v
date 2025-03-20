@@ -24,9 +24,6 @@ Definition pid   : Type  := nat.
 Definition index : Type  := option pid.
 Definition Nil   : index := None.
 
-(* loop identifier *)
-(* Definition iloop : Type := nat. *)
-
 (* recursive definition identifier *)
 Definition idef : Type := nat.
 
@@ -295,10 +292,6 @@ Inductive tm : Type :=
 
   | SEQ : tm -> tm -> tm
 
-  (* loop id -> body -> outer continuation -> ... *)
-  (* | LOOP_OVER : iloop -> tm -> tm -> tm
-  | BREAK : iloop -> tm *)
-
   (* def id -> def body -> continue in *)
   | REC_DEF : idef -> tm -> tm -> tm
   | REC_CALL : idef -> tm
@@ -361,25 +354,6 @@ Definition handle_value (v:value) (s:state) : option value :=
   end.
 
 (*************************************************************************)
-(**** Recursive Variables ************************************************)
-(*************************************************************************)
-(* Record rec_def := { loop_id : iloop
-                  ; body    : tm
-                  ; cont    : tm }.
-
-Definition rec_defs : Type := list rec_def.
-
-Fixpoint get_rec_def (i:iloop) (d:rec_defs) : option rec_def :=
-  match d with
-  | [] => None
-  | h :: t => if Nat.eqb i (loop_id h) then Some h else get_rec_def i t
-  end.
-
-Definition rec_def_to_tm (d:rec_def) : tm :=
-  LOOP_OVER (loop_id d) (body d) (cont d). *)
-
-
-(*************************************************************************)
 (**** Unfolding **********************************************************)
 (*************************************************************************)
 
@@ -409,17 +383,6 @@ Fixpoint unfold (new:rec_def) (old:tm) : tm :=
     | (j, b) => if Nat.eqb i j then b else REC_CALL i
     end
 
-
-  (* | LOOP_OVER l b c =>
-    if Nat.eqb l (loop_id new)
-    then ERR
-    else LOOP_OVER l (unfold new b) (unfold new c) *)
-
-  (* | BREAK l =>
-    if Nat.eqb l (loop_id new)
-    then (cont new)
-    else BREAK l *)
-
   end.
 
 
@@ -437,39 +400,13 @@ Module Env.
   Definition get_resource (e:env) : resource :=
     match e with | (_, r) => r end.
 
-  (* Definition get_rec_defs (e:env) : rec_defs := *)
-    (* match e with | (_, _, d) => d end. *)
-
   Definition set_state (s:state) (e:env) : env :=
     match e with | (_, r) => (s, r) end.
 
   Definition set_resource (r:resource) (e:env) : env :=
     match e with | (s, _) => (s, r) end.
 
-  (* Definition set_rec_defs (d:rec_defs) (e:env) : env := *)
-    (* match e with | (s, r, _) => (s, r, d) end. *)
-
 End Env.
-
-
-(* Definition do_unfold (l:iloop) (b:tm) (c:tm) (e:env) : option (tm * env) :=
-  let d:rec_defs := Env.get_rec_defs e in
-  match get_rec_def l d with
-  | None => (* [l] is not yet defined (good) *)
-    let new:rec_def := Build_rec_def l b c in
-    let e:env := Env.set_rec_defs (new :: d) e in
-    Some (unfold new (rec_def_to_tm new), e)
-
-  | Some _ => None (* [l] is already defined *)
-  end. *)
-
-(* Definition do_break (l:iloop) (e:env) : option tm :=
-  let d:rec_defs := Env.get_rec_defs e in
-  match get_rec_def l d with
-  | None => None (* [l] is not defined *)
-  | Some r => Some (cont r) (* return cont *)
-  end. *)
-
 
 (*************************************************************************)
 (**** (Local) Semantics of Processes *************************************)
@@ -692,15 +629,6 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
 
   | STEP_REC_DEF : forall i b c e,
     (REC_DEF i b c, e) --<{SILENT}>--> (do_unfold i b c e)
-
-  (* | STEP_LOOP_OVER : forall l b c t e1 e2,
-    do_unfold l b c e1 = Some (t, e2) -> (* unfolded t, stores def in [e2] *)
-    (LOOP_OVER l b c, e1) --<{SILENT}>--> (t, e2) *)
-
-  (* UNUSED: would cause [BREAK l] to act like [REC_CALL l] *)
-  (* | STEP_BREAK : forall l e t,
-    do_break l e = Some t ->
-    (BREAK l, e) --<{SILENT}>--> (t, e) *)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
