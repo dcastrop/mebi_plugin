@@ -847,9 +847,8 @@ Example P : tm :=
 (**********************************)
 
 (* Example p0 : tm * env := (P, Env.initial 0). *)
-Example p0 : tm * env := (P, (State.initial, Resource.initial 0)).
-(* FIXME: calling mebi appears to cause exception *)
-(* MeBi LTS step p0. *)
+Example p0 : tm * env := (P, (State.initial, Resource.initial 1)).
+MeBi LTS step p0.
 
 (**********************************)
 (**** System **********************)
