@@ -25,7 +25,10 @@ Definition index : Type  := option pid.
 Definition Nil   : index := None.
 
 (* loop identifier *)
-Definition iloop : Type := nat.
+(* Definition iloop : Type := nat. *)
+
+(* recursive definition identifier *)
+Definition idef : Type := nat.
 
 (* we dont need new_i, only i and j *)
 Definition lock : Type := index * index.
@@ -293,8 +296,12 @@ Inductive tm : Type :=
   | SEQ : tm -> tm -> tm
 
   (* loop id -> body -> outer continuation -> ... *)
-  | LOOP_OVER : iloop -> tm -> tm -> tm
-  | BREAK : iloop -> tm
+  (* | LOOP_OVER : iloop -> tm -> tm -> tm
+  | BREAK : iloop -> tm *)
+
+  (* def id -> def body -> continue in *)
+  | REC_DEF : idef -> tm -> tm -> tm
+  | REC_CALL : idef -> tm
   .
 
 Declare Custom Entry tm.
@@ -356,7 +363,7 @@ Definition handle_value (v:value) (s:state) : option value :=
 (*************************************************************************)
 (**** Recursive Variables ************************************************)
 (*************************************************************************)
-Record rec_def := { loop_id : iloop
+(* Record rec_def := { loop_id : iloop
                   ; body    : tm
                   ; cont    : tm }.
 
@@ -369,32 +376,50 @@ Fixpoint get_rec_def (i:iloop) (d:rec_defs) : option rec_def :=
   end.
 
 Definition rec_def_to_tm (d:rec_def) : tm :=
-  LOOP_OVER (loop_id d) (body d) (cont d).
+  LOOP_OVER (loop_id d) (body d) (cont d). *)
 
 
 (*************************************************************************)
 (**** Unfolding **********************************************************)
 (*************************************************************************)
 
+Definition rec_def : Type := idef * tm.
+
 Fixpoint unfold (new:rec_def) (old:tm) : tm :=
   match old with
   | ERR => ERR
-  | IF c t1 t2 => IF c (unfold new t1) (unfold new t2)
+  | OK  => OK
+
   | ACT a => ACT a
+
+  | IF c t1 t2 => IF c (unfold new t1) (unfold new t2)
 
   | SEQ l r => SEQ l (unfold new r)
 
-  | LOOP_OVER l b c =>
+  | REC_DEF i b c =>
+    match new with
+    | (j, b') =>
+      if Nat.eqb i j
+      then unfold (i, (unfold (i, REC_DEF i b c) b)) c
+      else REC_DEF i (unfold new b) (unfold new c)
+    end
+
+  | REC_CALL i =>
+    match new with
+    | (j, b) => if Nat.eqb i j then b else REC_CALL i
+    end
+
+
+  (* | LOOP_OVER l b c =>
     if Nat.eqb l (loop_id new)
     then ERR
-    else LOOP_OVER l (unfold new b) (unfold new c)
+    else LOOP_OVER l (unfold new b) (unfold new c) *)
 
-  | BREAK l =>
+  (* | BREAK l =>
     if Nat.eqb l (loop_id new)
     then (cont new)
-    else BREAK l
+    else BREAK l *)
 
-  | OK  => OK
   end.
 
 
@@ -402,32 +427,32 @@ Fixpoint unfold (new:rec_def) (old:tm) : tm :=
 (**** Environment (local) ************************************************)
 (*************************************************************************)
 
-Definition env : Type := state * resource * rec_defs.
+Definition env : Type := state * resource.
 
 Module Env.
-  Definition initial (n:nat) : env := (State.initial, Resource.initial n, []).
+  Definition initial (n:nat) : env := (State.initial, Resource.initial n).
 
-  Definition get_state (e:env) : state := match e with | (s, _, _) => s end.
+  Definition get_state (e:env) : state := match e with | (s, _) => s end.
 
   Definition get_resource (e:env) : resource :=
-    match e with | (_, r, _) => r end.
+    match e with | (_, r) => r end.
 
-  Definition get_rec_defs (e:env) : rec_defs :=
-    match e with | (_, _, d) => d end.
+  (* Definition get_rec_defs (e:env) : rec_defs := *)
+    (* match e with | (_, _, d) => d end. *)
 
   Definition set_state (s:state) (e:env) : env :=
-    match e with | (_, r, d) => (s, r, d) end.
+    match e with | (_, r) => (s, r) end.
 
   Definition set_resource (r:resource) (e:env) : env :=
-    match e with | (s, _, d) => (s, r, d) end.
+    match e with | (s, _) => (s, r) end.
 
-  Definition set_rec_defs (d:rec_defs) (e:env) : env :=
-    match e with | (s, r, _) => (s, r, d) end.
+  (* Definition set_rec_defs (d:rec_defs) (e:env) : env := *)
+    (* match e with | (s, r, _) => (s, r, d) end. *)
 
 End Env.
 
 
-Definition do_unfold (l:iloop) (b:tm) (c:tm) (e:env) : option (tm * env) :=
+(* Definition do_unfold (l:iloop) (b:tm) (c:tm) (e:env) : option (tm * env) :=
   let d:rec_defs := Env.get_rec_defs e in
   match get_rec_def l d with
   | None => (* [l] is not yet defined (good) *)
@@ -436,14 +461,14 @@ Definition do_unfold (l:iloop) (b:tm) (c:tm) (e:env) : option (tm * env) :=
     Some (unfold new (rec_def_to_tm new), e)
 
   | Some _ => None (* [l] is already defined *)
-  end.
+  end. *)
 
-Definition do_break (l:iloop) (e:env) : option tm :=
+(* Definition do_break (l:iloop) (e:env) : option tm :=
   let d:rec_defs := Env.get_rec_defs e in
   match get_rec_def l d with
   | None => None (* [l] is not defined *)
   | Some r => Some (cont r) (* return cont *)
-  end.
+  end. *)
 
 
 (*************************************************************************)
@@ -467,7 +492,7 @@ Definition read_next (e:env) : option env :=
     (* get local vars *)
     let v:local_vars := State.get_vars s in
     (* update env *)
-    Some (State.set_vars (set_next qnode_next v) s, r, Env.get_rec_defs e)
+    Some (State.set_vars (set_next qnode_next v) s, r)
   end.
 
 (** [read_locked e] will set var [locked] to be
@@ -488,7 +513,7 @@ Definition read_locked (e:env) : option env :=
     (* get local vars *)
     let v:local_vars := State.get_vars s in
     (* update env *)
-    Some (State.set_vars (set_locked qnode_locked v) s, r, Env.get_rec_defs e)
+    Some (State.set_vars (set_locked qnode_locked v) s, r)
   end.
 
 (*DC: slight simplification: instead of taking an expr, it needs to take a val*)
@@ -517,7 +542,7 @@ Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
         | (true, Some n) =>
           match Memory.nth_replace (Qnode.set_next (Some n) q) p m with
           | None => None
-          | Some m => Some (s, Resource.set_mem m r, Env.get_rec_defs e)
+          | Some m => Some (s, Resource.set_mem m r)
           end
         end
       end
@@ -544,7 +569,7 @@ Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env
       | BOOL b =>
         match Memory.nth_replace (Qnode.set_locked b q) p m with
         | None => None
-        | Some m => Some (s, (Resource.set_mem m r), Env.get_rec_defs e)
+        | Some m => Some (s, (Resource.set_mem m r))
         end
       | _ => None (* [locked] must be a [BOOL] *)
       end
@@ -565,7 +590,7 @@ Definition fetch_and_store (e:env) : option env :=
   let p:pid := State.get_pid s in
   let r:resource := Resource.set_lock_i (Index.of_pid p) r in
   (* update env *)
-  Some (s, r, Env.get_rec_defs e).
+  Some (s, r).
 
 
 Definition compare_and_swap (e:env) : option env :=
@@ -587,13 +612,13 @@ Definition compare_and_swap (e:env) : option env :=
     (* set [i] to [Nil] *)
     let r:resource := Resource.set_lock_i Nil r in
     (* update env *)
-    Some (s, r, Env.get_rec_defs e)
+    Some (s, r)
   | false =>
     (* set [swap] false *)
     let v:local_vars := set_swap false v in
     let s:state := State.set_vars v s in
     (* update env *)
-    Some (s, r, Env.get_rec_defs e)
+    Some (s, r)
   end.
 
 
@@ -623,6 +648,9 @@ Definition do_act (a:act) (e:env) : (tm * env) :=
     | Some e => (OK, e)
     end
   end.
+
+Definition do_unfold (i:idef) (b:tm) (c:tm) (e:env) : (tm * env) :=
+  (unfold (i, (unfold (i, REC_DEF i b c) b)) c, e).
 
 Definition named_action : Type := act * pid.
 
@@ -662,9 +690,12 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
     eval c (Env.get_state e) = Some (BOOL false) ->
     (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (t2, e)
 
-  | STEP_LOOP_OVER : forall l b c t e1 e2,
+  | STEP_REC_DEF : forall i b c e,
+    (REC_DEF i b c, e) --<{SILENT}>--> (do_unfold i b c e)
+
+  (* | STEP_LOOP_OVER : forall l b c t e1 e2,
     do_unfold l b c e1 = Some (t, e2) -> (* unfolded t, stores def in [e2] *)
-    (LOOP_OVER l b c, e1) --<{SILENT}>--> (t, e2)
+    (LOOP_OVER l b c, e1) --<{SILENT}>--> (t, e2) *)
 
   (* UNUSED: would cause [BREAK l] to act like [REC_CALL l] *)
   (* | STEP_BREAK : forall l e t,
@@ -678,7 +709,7 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
 
 
 Inductive sys : Type :=
-  | PRC : tm -> state -> rec_defs -> sys
+  | PRC : tm -> state -> sys
   | PAR : sys -> sys -> sys
   | TERM : sys
   .
@@ -687,9 +718,9 @@ Reserved Notation "t '==<{' a '}>==>' t'" (at level 40).
 
 Inductive lts : sys * resource -> action -> sys * resource -> Prop :=
 
-  | LTS_PRC : forall a t1 t2 s1 s2 d1 d2 r1 r2,
-    (t1, (s1, r1, d1)) --<{a}>--> (t2, (s2, r2, d2)) ->
-    (PRC t1 s1 d1, r1) ==<{a}>==> (PRC t2 s2 d2, r2)
+  | LTS_PRC : forall a t1 t2 s1 s2 r1 r2,
+    (t1, (s1, r1)) --<{a}>--> (t2, (s2, r2)) ->
+    (PRC t1 s1, r1) ==<{a}>==> (PRC t2 s2, r2)
 
   | LTS_PAR_L : forall a l1 l2 r gr1 gr2,
     (l1, gr1) ==<{a}>==> (l2, gr2) ->
@@ -699,9 +730,9 @@ Inductive lts : sys * resource -> action -> sys * resource -> Prop :=
     (r1, gr1) ==<{a}>==> (r2, gr2) ->
     (PAR l r1, gr1) ==<{a}>==> (PAR l r2, gr2)
 
-  | LTS_OK_L : forall s d r g, (PAR (PRC OK s d) r, g) ==<{SILENT}>==> (r, g)
+  | LTS_OK_L : forall s r g, (PAR (PRC OK s) r, g) ==<{SILENT}>==> (r, g)
 
-  | LTS_OK_R : forall l s d g, (PAR l (PRC OK s d), g) ==<{SILENT}>==> (l, g)
+  | LTS_OK_R : forall l s g, (PAR l (PRC OK s), g) ==<{SILENT}>==> (l, g)
 
   where "t '==<{' a '}>==>' t'" := (lts t a t')
   and "t '--<{' a '}>-->' t'" := (step t a t').
@@ -718,16 +749,28 @@ Example Acquire : tm :=
       IF (NOT (EQ (VAR PREDECESSOR) (VAL NIL))) (
         SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (
           SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (
-            LOOP_OVER 2 (*L*) (
+            REC_DEF 2 (
+              SEQ (ACT READ_LOCKED) (
+                IF (VAR LOCKED) (REC_CALL 2) (OK)
+              )
+            ) (REC_CALL 2)
+            (* LOOP_OVER 2 (*L*) (
               SEQ (ACT READ_LOCKED) (
                 IF (NOT (VAR LOCKED)) (BREAK 2 (*L*)) (OK)
               )
-            ) (OK)
+            ) (OK) *)
           )
         )
       ) (OK)
     )
   ).
+
+
+(* Example exa_seq_end :=
+  Goal exists tm,
+    (SEQ OK OK, ) *)
+
+
 
 
 (* Goal exists tm , (Acquire, (State.initial, Resource.initial 1, [])) --<{ SILENT }>--> tm.
@@ -756,11 +799,18 @@ Example Release : tm :=
     IF (EQ (VAL NIL) (VAR NEXT)) (
       SEQ (ACT COMPARE_AND_SWAP) (
         IF (EQ FLS (VAR SWAP)) (
-          LOOP_OVER 1 (*L*) (
+          REC_DEF 1 (
+            SEQ (ACT READ_NEXT) (
+              IF (EQ (VAL NIL) (VAR NEXT))
+                (REC_CALL 1)
+                (ACT (WRITE_LOCKED NEXT (BOOL true)))
+            )
+          ) (REC_CALL 1)
+          (* LOOP_OVER 1 (*L*) (
             SEQ (ACT READ_NEXT) (
               IF (NOT (EQ (VAL NIL) (VAR NEXT))) (BREAK 1 (*L*)) (OK)
             )
-          ) (ACT (WRITE_LOCKED NEXT (BOOL true)))
+          ) (ACT (WRITE_LOCKED NEXT (BOOL true))) *)
         ) (OK)
       )
     ) (ACT (WRITE_LOCKED NEXT (BOOL false)))
@@ -769,7 +819,18 @@ Example Release : tm :=
 
 
 Example P : tm :=
-  LOOP_OVER 0 (
+  REC_DEF 0 (
+    SEQ (ACT NCS) (
+      SEQ Acquire (
+        SEQ (ACT ENTER) (
+          SEQ (ACT LEAVE) (
+            SEQ Release (REC_CALL 0)
+          )
+        )
+      )
+    )
+  ) (REC_CALL 0).
+  (* LOOP_OVER 0 (
     SEQ (ACT NCS) (
       SEQ Acquire (
         SEQ (ACT ENTER) (
@@ -779,14 +840,14 @@ Example P : tm :=
         )
       )
     )
-  ) (OK).
+  ) (OK). *)
 
 (**********************************)
 (**** Single process **************)
 (**********************************)
 
 (* Example p0 : tm * env := (P, Env.initial 0). *)
-Example p0 : tm * env := (P, (State.initial, Resource.initial 0, [])).
+Example p0 : tm * env := (P, (State.initial, Resource.initial 0)).
 (* FIXME: calling mebi appears to cause exception *)
 (* MeBi LTS step p0. *)
 
@@ -794,9 +855,9 @@ Example p0 : tm * env := (P, (State.initial, Resource.initial 0, [])).
 (**** System **********************)
 (**********************************)
 
-Definition process : Type := tm * state * rec_defs.
+Definition process : Type := tm * state.
 
-Definition spawn (p:pid) (b:tm) : process := (b, State.create p, []).
+Definition spawn (p:pid) (b:tm) : process := (b, State.create p).
 
 Fixpoint populate (n:nat) (b:tm) : list process :=
   match n with
@@ -813,7 +874,7 @@ Fixpoint load (ps:list process) : sys :=
   | [] => TERM
   | h :: t =>
     match h with
-    | (p, s, d) => PAR (PRC p s d) (load t)
+    | (p, s) => PAR (PRC p s) (load t)
     end
   end.
 
