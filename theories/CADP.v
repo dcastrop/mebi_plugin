@@ -8,10 +8,10 @@ Require Import List.
 Import ListNotations.
 
 Fixpoint app {X:Type} (l1 l2 : list X) : list X :=
-match l1 with
-| nil    => l2
-| h :: t => h :: (app t l2)
-end.
+  match l1 with
+  | nil    => l2
+  | h :: t => h :: (app t l2)
+  end.
 
 
 (*************************************************************************)
@@ -172,6 +172,7 @@ Definition valid_cast_to_nat (v:value) : bool * option nat :=
   | NAT n => (true, Some n)
   | PID p => (true, Some p)
   | INDEX i => (true, i)
+  | NIL => (true, None)
   | _ => (false, None) (* i.e., BOOL, NIL *)
   end.
 
@@ -475,9 +476,9 @@ Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
         (* check [next] is some kind of nat *)
         match valid_cast_to_nat next with
         | (false, _) => None (* i.e., BOOL, NIL *)
-        | (true, None) => None (* i.e., INDEX NONE *)
-        | (true, Some n) =>
-          match Memory.nth_replace (Qnode.set_next (Some n) q) p m with
+        (* | (true, None) => None  *)
+        | (true, n) => (* i.e., PID n, INDEX n, NIL, NAT n *)
+          match Memory.nth_replace (Qnode.set_next n q) p m with
           | None => None
           | Some m => Some (s, Resource.set_mem m r)
           end
@@ -577,7 +578,7 @@ Definition do_act (a:act) (e:env) : (tm * env) :=
       | FETCH_AND_STORE => fetch_and_store e
       | COMPARE_AND_SWAP => compare_and_swap e
 
-      | _ => None (* shouldn't happen, outer match catches these*)
+      | _ => None (* shouldn't happen, outer match catches these *)
       end
     in
     match res with
@@ -586,8 +587,8 @@ Definition do_act (a:act) (e:env) : (tm * env) :=
     end
   end.
 
-Definition do_unfold (i:idef) (b:tm) (c:tm) (e:env) : (tm * env) :=
-  (unfold (i, (unfold (i, REC_DEF i b c) b)) c, e).
+Definition do_unfold (i:idef) (b:tm) (c:tm) : tm :=
+  (unfold (i, (unfold (i, REC_DEF i b c) b)) c).
 
 Definition named_action : Type := act * pid.
 
@@ -628,7 +629,7 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
     (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (t2, e)
 
   | STEP_REC_DEF : forall i b c e,
-    (REC_DEF i b c, e) --<{SILENT}>--> (do_unfold i b c e)
+    (REC_DEF i b c, e) --<{SILENT}>--> (do_unfold i b c, e)
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
@@ -689,32 +690,377 @@ Example Acquire : tm :=
   ).
 
 
-(* Example exa_seq_end :=
-  Goal exists tm,
-    (SEQ OK OK, ) *)
+Goal exists a e,
+  (Acquire, Env.initial 1) --<{a}>-->
+  (SEQ (ACT FETCH_AND_STORE) (
+    IF (NOT (EQ (VAR PREDECESSOR) (VAL NIL))) (
+      SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (
+        SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (
+          REC_DEF 2 (
+            SEQ (ACT READ_LOCKED) (
+              IF (VAR LOCKED) (REC_CALL 2) (OK)
+            )
+          ) (REC_CALL 2)
+        )
+      )
+    ) (OK)
+  ), e).
+  do 2 eexists.
+
+  unfold Acquire.
+
+  assert ( A : SILENT = get_action (WRITE_NEXT THE_PID NIL) (Env.initial 1) )
+  by reflexivity.
+
+  assert (R :
+    do_unfold 2 (
+      SEQ (ACT READ_LOCKED) (
+        IF (VAR LOCKED) (REC_CALL 2) (OK)
+      )
+    ) (REC_CALL 2)
+    =
+    SEQ (ACT READ_LOCKED) (
+      IF (VAR LOCKED) (REC_DEF 2 (
+        SEQ (ACT READ_LOCKED) (
+          IF (VAR LOCKED) (REC_CALL 2) (OK)
+        )
+      ) (REC_CALL 2)) (OK)
+    )
+  ) by reflexivity.
+
+Abort.
 
 
+  (* rewrite <- R. *)
+
+  (* assumption. *)
+  (* eassumption. *)
+
+  (* assumption. *)
+
+  (* ecase STEP_SEQ. *)
+  (* ecase STEP_SEQ. *)
+
+  (* einduction STEP_SEQ. *)
+
+  (* constructor.
 
 
-(* Goal exists tm , (Acquire, (State.initial, Resource.initial 1, [])) --<{ SILENT }>--> tm.
-  do 1 eexists.
+  assert (R :
+    do_unfold 2 (
+      SEQ (ACT READ_LOCKED) (
+        IF (VAR LOCKED) (REC_CALL 2) (OK)
+      )
+    ) (REC_CALL 2)
+    =
+    SEQ (ACT READ_LOCKED) (
+      IF (VAR LOCKED) (REC_DEF 2 (
+        SEQ (ACT READ_LOCKED) (
+          IF (VAR LOCKED) (REC_CALL 2) (OK)
+        )
+      ) (REC_CALL 2)) (OK)
+    )
+  ) by reflexivity.
+
   eapply STEP_SEQ.
-  assert (EQ : SILENT = get_action  (WRITE_NEXT THE_PID NIL) (State.initial, Resource.initial 1, []))
+
+  apply R.
+
+
+  eapply STEP_REC_DEF. *)
+
+
+
+  Example exa_do_unfold_1 :=
+  (do_unfold 0 (IF (VAL (BOOL true)) (REC_CALL 0) (OK)) (REC_CALL 0))
+  =
+  IF (VAL (BOOL true)) (REC_DEF 0 (IF (VAL (BOOL true)) (REC_CALL 0) (OK)) (REC_CALL 0)) (OK).
+
+Compute exa_do_unfold_1.
+
+
+Example exa_do_unfold_2 :=
+  (do_unfold
+    0
+    (REC_DEF 1 (IF (VAL (BOOL true)) (REC_CALL 0) (REC_CALL 1)) (REC_CALL 1))
+    (REC_CALL 0)
+  )
+  =
+  (REC_DEF 1 (IF (VAL (BOOL true)) (REC_DEF 0 (REC_DEF 1 (IF (VAL (BOOL true)) (REC_CALL 0) (REC_CALL 1)) (REC_CALL 1))
+  (REC_CALL 0)) (REC_CALL 1)) (REC_CALL 1)).
+
+Compute exa_do_unfold_2.
+
+Goal exists t,
+  (REC_DEF 0
+    (REC_DEF 1
+      (IF (VAL (BOOL true)) (REC_CALL 0) (REC_CALL 1))
+      (REC_CALL 1))
+    (REC_CALL 0),
+  ((0, Vars.initial), (Memory.initial 1, Lock.initial)))
+  --<{SILENT}>-->
+  (t, ((0, Vars.initial), (Memory.initial 1, Lock.initial))).
+
+  eexists.
+  eapply STEP_REC_DEF.
+Qed.
+
+Example exa_do_unfold_acquire :=
+  do_unfold 2 (
+              SEQ (ACT READ_LOCKED) (
+                IF (VAR LOCKED) (REC_CALL 2) (OK)
+              )
+            ) (REC_CALL 2).
+
+Compute exa_do_unfold_acquire.
+
+Goal exists t,
+  (REC_DEF 0
+    (REC_DEF 1
+      (IF (VAL (BOOL true)) (REC_CALL 0) (REC_CALL 1))
+      (REC_CALL 1))
+    (REC_CALL 0),
+  ((0, Vars.initial), (Memory.initial 1, Lock.initial)))
+  --<{SILENT}>-->
+  (t, ((0, Vars.initial), (Memory.initial 1, Lock.initial))).
+
+  eexists.
+  eapply STEP_REC_DEF.
+Qed.
+
+
+
+
+Example exa_do_unfold_3 :=
+  (do_unfold 0 (IF (VAL (BOOL true)) (REC_CALL 0) (OK)) (REC_CALL 0))
+  =
+  IF (VAL (BOOL true)) (REC_DEF 0 (IF (VAL (BOOL true)) (REC_CALL 0) (OK)) (REC_CALL 0)) (OK).
+
+Compute exa_do_unfold_3.
+
+
+Compute (do_unfold 0 (IF (VAL (BOOL true)) (REC_CALL 0) (OK)) (REC_CALL 0)).
+
+Compute (do_unfold 0 (
+  IF (EQ (VAR LOCKED) (VAL (BOOL false))) (
+    SEQ ((ACT (WRITE_LOCKED THE_PID (BOOL true)))) (
+      SEQ ((ACT (READ_LOCKED))) (REC_CALL 0)
+    )
+  ) (OK)
+) (REC_CALL 0)).
+
+
+(** rec def test *)
+Goal exists t e a,
+  (SEQ (REC_DEF 0 (
+    IF (EQ (VAR LOCKED) (VAL (BOOL false))) (
+      SEQ ((ACT (WRITE_LOCKED THE_PID (BOOL true)))) (
+        SEQ ((ACT (READ_LOCKED))) (REC_CALL 0)
+      )
+    ) (OK)
+  ) (REC_CALL 0)) (OK), ((0, Vars.initial), (*state*)
+                   (Memory.initial 1, Lock.initial) (*resource*) ))
+  --<{a}>-->
+  (t, e).
+  do 3 eexists.
+  eapply STEP_SEQ.
+  eapply STEP_REC_DEF.
+Qed.
+
+
+
+
+
+
+(** basic SEQ test *)
+Goal exists a,
+  (SEQ OK OK, ((0, Vars.initial), (*state*)
+               (Memory.initial 1, Lock.initial) (*resource*) ))
+  --<{a}>-->
+  (OK, ((0, Vars.initial), (*state*)
+        (Memory.initial 1, Lock.initial) (*resource*) )).
+  do 1 eexists.
+  constructor.
+Qed.
+
+Goal exists a t,
+  (SEQ OK OK, ((0, Vars.initial), (*state*)
+               (Memory.initial 1, Lock.initial) (*resource*) ))
+  --<{a}>-->
+  (t, ((0, Vars.initial), (*state*)
+        (Memory.initial 1, Lock.initial) (*resource*) )).
+  do 2 eexists.
+  constructor.
+Qed.
+
+(* Compute step (SEQ OK OK, ((0, Vars.initial), (*state*)
+                          (Memory.initial 1, Lock.initial) (*resource*) )).
+
+Compute step (SEQ OK OK, ((0, Vars.initial), (*state*)
+                          (Memory.initial 1, Lock.initial) (*resource*) )) SILENT. *)
+
+Goal exists a t e,
+  (SEQ OK OK, ((0, Vars.initial), (*state*)
+               (Memory.initial 1, Lock.initial) (*resource*) ))
+  --<{a}>-->
+  (t, e).
+  do 3 eexists.
+  constructor.
+Qed.
+
+Goal exists a p,
+  (SEQ OK OK, ((0, Vars.initial), (*state*)
+               (Memory.initial 1, Lock.initial) (*resource*) ))
+  --<{a}>-->
+  p.
+  do 2 eexists.
+  constructor.
+Qed.
+
+(** rec def test *)
+Goal exists t a,
+  (REC_DEF 0 (
+    IF (EQ (VAR LOCKED) (VAL (BOOL false)))
+      (SEQ ((ACT (WRITE_LOCKED NEXT (BOOL true)))) (REC_CALL 0))
+      (OK)
+  ) (REC_CALL 0), ((0, Vars.initial), (*state*)
+                   (Memory.initial 1, Lock.initial) (*resource*) ))
+  --<{a}>-->
+  (t, ((0, Vars.initial), (*state*)
+        (Memory.initial 1, Lock.initial) (*resource*) )).
+  do 2 eexists.
+  eapply STEP_REC_DEF.
+Qed.
+
+
+(* Goal exists a t e,
+  (REC_DEF 0 (
+    IF (EQ (VAR LOCKED) (VAL (BOOL false)))
+      (SEQ ((ACT (WRITE_LOCKED NEXT (BOOL true)))) (REC_CALL 0))
+      (OK)
+  ) (REC_CALL 0), ((0, Vars.initial), (*state*)
+                   (Memory.initial 1, Lock.initial) (*resource*) ))
+  --<{a}>-->
+  (t, e).
+  do 3 eexists.
+  eapply STEP_REC_DEF.
+Qed. *)
+
+
+Compute do_act (WRITE_NEXT THE_PID NIL)
+((0, Vars.initial), (*state*)
+ (Memory.initial 1, Lock.initial) (*resource*) ).
+
+
+Goal exists t e,
+  (Acquire, ((0, Vars.initial), (*state*)
+             (Memory.initial 1, Lock.initial) (*resource*) ))
+  --<{SILENT}>-->
+  (t, e).
+  assert (A : SILENT = get_action (WRITE_NEXT THE_PID NIL)
+                              ((0, Vars.initial), (*state*)
+                               (Memory.initial 1, Lock.initial) (*resource*) ))
+  by reflexivity.
+  assert (D : (OK, ((0, Vars.initial), (*state*)
+                    ([Build_qnode Nil false], Lock.initial) (*resource*) ))
+                = do_act (WRITE_NEXT THE_PID NIL)
+                            ((0, Vars.initial), (*state*)
+                             (Memory.initial 1, Lock.initial) (*resource*) ) )
+  by reflexivity.
+  assert (W : write_next THE_PID NIL
+              ((0, Vars.initial),(Memory.initial 1, Lock.initial))
+              = Some ((0, Vars.initial), (*state*)
+              ([Build_qnode Nil false], Lock.initial) (*resource*) ))
+  by reflexivity.
+  do 2 eexists.
+  eapply STEP_SEQ.
+  (* constructor. *)
+  (* eapply STEP_ACT. *)
+
+  (* econstructor. *)
+
+Abort.
+
+  (* refine . *)
+
+  (* reflexivity. *)
+
+  (* erewrite D. *)
+
+  (* constructor. *)
+
+
+  (* pose proof (eq_refl (write_next THE_PID NIL ((0, Vars.initial), (Memory.initial 1, Lock.initial)))). *)
+
+  (* unfold write_next in H. *)
+  (* unfold handle_value in H. *)
+  (* simpl in H. *)
+
+  (* refine . *)
+
+  (* rewrite (lts (ACT (WRITE_NEXT THE_PID NIL), (0, Vars.initial, (Memory.initial 1, Lock.initial))) --<{ A }>--> (R)). *)
+
+
+
+  (* Unshelve. 2:{ltac:(exact A)}.
+
+  pattern a.
+  set *)
+
+  (* pose proof (eq_refl a A). *)
+
+
+  (* Unshelve.
+  3:{
+    apply R.
+    (* constructor. *)
+  } *)
+
+
+
+  (* 2:{ *)
+    (* rewrite A.
+      (* }. *)
+
+  (* simpl. *)
+  apply R.
+  eapply STEP_ACT.
+  constructor.
+
+  rewrite A.
+
+  eapply STEP_ACT.
+  simpl.
+  (* eapply STEP_REC_DEF. *)
+Qed. *)
+
+
+
+
+Goal exists tm , (Acquire, (State.initial, Resource.initial 1)) --<{ SILENT }>--> tm.
+  do 1 eexists.
+  (* constructor.
+Qed. *)
+  eapply STEP_SEQ.
+  assert (EQ : SILENT = get_action  (WRITE_NEXT THE_PID NIL) (State.initial, Resource.initial 1))
     by reflexivity.
 
-  assert (EQ2 : (ERR, (State.initial, Resource.initial 1, []))
-               = do_act (WRITE_NEXT THE_PID NIL) (State.initial, Resource.initial 1, []))
+  (* assert (EQ2 : (ERR, (State.initial, Resource.initial 1)) *)
+  assert (EQ2 : (OK, (State.initial, Resource.initial 1))
+               = do_act (WRITE_NEXT THE_PID NIL) (State.initial, Resource.initial 1))
     by reflexivity.
 
   pose proof
-    (eq_refl (write_next THE_PID NIL (State.initial, Resource.initial 1, []))).
+    (eq_refl (write_next THE_PID NIL (State.initial, Resource.initial 1))).
   unfold write_next in H.
   unfold handle_value in H.
   simpl in H.
+  simpl.
+  (* apply H. *)
 
+Abort.
 
-
-  constructor. *)
+  (* constructor. *)
 
 
 Example Release : tm :=
