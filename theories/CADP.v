@@ -392,8 +392,7 @@ Definition read_next (e:env) : option env :=
 
 (** [read_locked e] will set var [locked] to be
     the value of the [qnode.locked] corresponding
-    to the [pid] of the process in the state.
-    ! ! ! it requires that [qnode.locked] is not None. *)
+    to the [pid] of the process in the state. *)
 Definition read_locked (e:env) : option env :=
   (* get pid *)
   let s:state := get_state e in
@@ -428,9 +427,8 @@ Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
       let r:resource := get_resource e in
       let m:mem := get_mem r in
       match Memory.nth_error p m with
-      | None => None (* [qnode] must exist *)
-      | Some q =>
-        (* check [next] is some kind of nat *)
+      | None => None (* tried to access out of bounds *)
+      | Some q => (* check [next] of [qnode] is some kind of nat *)
         match valid_cast_to_index next with
         | (false, _) => None (* i.e., BOOL, NIL *)
         | (true, n) => (* i.e., PID n, INDEX n, NIL, NAT n *)
@@ -457,8 +455,7 @@ Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env
     let m:mem := get_mem r in
     match Memory.nth_error p m with
     | None => None (* [qnode] must exist *)
-    | Some q =>
-      (* make sure [locked] is a [BOOL] *)
+    | Some q => (* check [locked] of [qnode] is a [BOOL] *)
       match locked with
       | BOOL b =>
         match Memory.nth_replace (Qnode.set_locked b q) p m with
@@ -570,6 +567,8 @@ Definition get_action (a:act) (e:env) : action :=
 
 Definition rec_def : Type := idef * tm.
 
+(* TODO: fix recursion. what happens when a call is not made? it should somehow lead to an outer [r] of SEQ. *)
+
 Fixpoint unfold (new:rec_def) (old:tm) : tm :=
   match old with
   | ERR => ERR
@@ -585,7 +584,7 @@ Fixpoint unfold (new:rec_def) (old:tm) : tm :=
     match new with
     | (j, b') =>
       if Nat.eqb i j
-      then unfold (i, (unfold (i, REC_DEF i b c) b)) c
+      then unfold (i, unfold (i, REC_DEF i b c) b) c
       else REC_DEF i (unfold new b) (unfold new c)
     end
 
@@ -597,7 +596,8 @@ Fixpoint unfold (new:rec_def) (old:tm) : tm :=
   end.
 
 Definition do_unfold (i:idef) (b:tm) (c:tm) : tm :=
-  (unfold (i, (unfold (i, REC_DEF i b c) b)) c).
+  (* unfold (i, unfold (i, REC_DEF i b c) b) c. *)
+  unfold (i, b, c) c.
 
 (*************************************************************************)
 (**** Semantics **********************************************************)
