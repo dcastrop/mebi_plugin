@@ -569,16 +569,6 @@ Definition get_action (a:act) (e:env) : action :=
 
 Definition rec_def : Type := idef * tm.
 
-(* TODO: fix recursion. what happens when a call is not made? it should somehow lead to an outer [r] of SEQ. *)
-
-(* Example exa_pre_def :=
-  REC_DEF 0 (
-    IF (VAL (BOOL TRU)) (OK) (REC_CALL 0)
-  ) (REC_CALL 0). *)
-
-(* Example exa_post_def :=
-  IF (VAL (BOOL TRU)) (OK) () *)
-
 Fixpoint unfold (new:rec_def) (old:tm) : tm :=
   match old with
   | ERR => ERR
@@ -606,12 +596,8 @@ Fixpoint unfold (new:rec_def) (old:tm) : tm :=
 
   end.
 
-(* Definition do_unfold (i:idef) (b:tm) : tm :=
-  (* unfold (i, unfold (i, REC_DEF i b c) b) c. *)
-  unfold (i, b). *)
-
 (*************************************************************************)
-(**** Semantics **********************************************************)
+(**** Semantics (Local step) *********************************************)
 (*************************************************************************)
 
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
@@ -639,9 +625,9 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
 
   where "t '--<{' a '}>-->' t'" := (step t a t').
 
-
-
-
+(*************************************************************************)
+(**** Semantics (System lts) *********************************************)
+(*************************************************************************)
 
 Inductive sys : Type :=
   | PRC : tm -> state -> sys
@@ -712,8 +698,6 @@ Example Release : tm :=
     ) (ACT (WRITE_LOCKED NEXT (BOOL false)))
   ).
 
-
-
 Example P : tm :=
   REC_DEF 0 (
     SEQ (ACT NCS) (
@@ -755,50 +739,16 @@ Goal exists a t e, (Release, Env.initial 1) --<{ a }>--> (t, e).
   eapply STEP_ACT_helper; reflexivity.
 Qed.
 
+(*************************************************************************)
+(**** Single process *****************************************************)
+(*************************************************************************)
 
-
-Definition is_action_ENTER (a:action) : bool :=
-  match a with
-  | LABEL (ENTER, _) => true
-  | _ => false
-  end.
-
-Definition is_action_LEAVE (a:action) : bool :=
-  match a with
-  | LABEL (LEAVE, _) => true
-  | _ => false
-  end.
-
-Definition is_term_not_ERR (t:tm) : bool :=
-  match t with
-  | ERR => false
-  | _ => true
-  end.
-
-
-(* Fixpoint next_visible_action (t1:tm)  (e1:env)
-
-
-
-Fixpoint will_ENTER (t1:tm) (e1:env) : Prop :=
-  exists a t2 e2,
-  (t1, e1) --<{ a }>--> (t2, e2) ->
-  (is_ENTER a=true) \/ (t2=OK) \/ (t2=ERR) \/ (will_ENTER t2 e2). *)
-
-
-
-
-(**********************************)
-(**** Single process **************)
-(**********************************)
-
-(* Example p0 : tm * env := (P, Env.initial 0). *)
-Example p0 : tm * env := (P, (State.initial, Resource.initial 1)).
+Example p0 : tm * env := (P, Env.initial 0).
 MeBi LTS step p0.
 
-(**********************************)
-(**** System **********************)
-(**********************************)
+(*************************************************************************)
+(**** System *************************************************************)
+(*************************************************************************)
 
 Definition process : Type := tm * state.
 
@@ -831,6 +781,47 @@ Definition compose (s:system) : composition :=
 
 Example ncs : composition := compose (create 5 P).
 MeBi LTS lts ncs.
+
+Compute ncs.
+
+(* Goal exists a t1 t2 s1 s2 r1 r2,
+  (t1, (s1, r1)) --<{ a }>--> (t2, (s2, r2)) ->
+  (PRC t1 s1, r1) ==<{ a }>==> (PRC t2 s2, r2).
+Proof.
+  do 7 eexists.
+  eapply LTS_PRC. *)
+
+Definition can_STEP (t1:tm) (e1:env) : Prop :=
+  exists a t2 e2, (t1, e1) --<{a}>--> (t2, e2).
+
+Definition can_LTS (s1:sys) (r1:resource) : Prop :=
+  exists a s2 r2, (s1, r1) ==<{a}>==> (s2, r2).
+
+(* Lemma env_helper :
+  forall s
+
+Lemma do_act_helper :
+  forall (e:env), exists (s:state) (r:resource), e=(s,r).
+Proof.
+  intros. do 2 eexists.
+  apply env.
+  eauto. *)
+
+
+
+(* Goal exists a l t s r,
+  (ACT a, Env.initial 1) --<{l}>--> (t, (s, r)) ->
+  (PRC (ACT a) State.initial, Resource.initial 1) ==<{l}>==> (PRC t s, r).
+Proof.
+  do 5 eexists.
+  intros.
+  eapply LTS_PRC.
+  eapply STEP_ACT_helper.
+  - reflexivity.
+  - reflexivity.
+  - unfold do_act. . *)
+
+
 
 (*************************************************************************)
 (**** TODO: LTS equiv temp. logic prop. **********************************)
