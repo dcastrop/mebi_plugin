@@ -632,7 +632,6 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
 Inductive sys : Type :=
   | PRC : tm -> state -> sys
   | PAR : sys -> sys -> sys
-  | TERM : sys
   .
 
 Reserved Notation "t '==<{' a '}>==>' t'" (at level 40).
@@ -744,6 +743,7 @@ Qed.
 (*************************************************************************)
 
 Example p0 : tm * env := (P, Env.initial 0).
+(* MeBi LTS show_debug step p0. *)
 MeBi LTS step p0.
 
 (*************************************************************************)
@@ -766,10 +766,14 @@ Definition create (n:nat) (b:tm) : system := (populate n b, Resource.initial n).
 
 Fixpoint load (ps:list process) : sys :=
   match ps with
-  | [] => TERM
+  | [] => PRC OK State.initial (* shouldn't happen *)
   | h :: t =>
     match h with
-    | (p, s) => PAR (PRC p s) (load t)
+    | (p, s) =>
+      match t with (* to avoid having a spare empty state at the end *)
+      | [] => PRC p s
+      | _  => PAR (PRC p s) (load t)
+      end
     end
   end.
 
@@ -779,10 +783,21 @@ Definition compose (s:system) : composition :=
   | (ps, r) => (load ps, r)
   end.
 
-Example ncs : composition := compose (create 5 P).
-MeBi LTS lts ncs.
+Example ncs1 : composition := compose (create 1 P).
+Compute ncs1.
 
-Compute ncs.
+MeBi LTS show_debug lts ncs1.
+
+(* Example ncs2 : composition := compose (create 2 P).
+Compute ncs2.
+MeBi LTS show_debug lts ncs2. *)
+
+(* Example ncs5 : composition := compose (create 5 P).
+Compute ncs5.
+MeBi LTS show_debug lts ncs5. *)
+
+(* MeBi LTS lts ncs. *)
+
 
 (* Goal exists a t1 t2 s1 s2 r1 r2,
   (t1, (s1, r1)) --<{ a }>--> (t2, (s2, r2)) ->

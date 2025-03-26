@@ -365,6 +365,17 @@ and check_valid_constructor
           check_updated_ctx [ [] ] lts (substl, ctx_tys)
         in
         let$+ act env sigma = Reductionops.nf_all env sigma act in
+        (* let* _ =
+          if is_output_kind_enabled params
+          then
+            debug (fun env sigma ->
+              str "(CONSTRUCTOR "
+              ++ int i
+              ++ str " is: "
+              ++ Printer.pr_econstr_env env sigma act
+              ++ str ")")
+          else return ()
+        in *)
         let (tgt_term : EConstr.t) = EConstr.Vars.substl substl termR in
         match next_ctors with
         | None -> return ctor_vals
@@ -385,7 +396,7 @@ and check_valid_constructor
 ;;
 
 (** [bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
-let bound : int = 5
+let bound : int = 100
 (* TODO: get this as user input! *)
 
 (** [GraphB] is ...
@@ -512,8 +523,6 @@ struct
       let* (constrs : (EConstr.t * EConstr.t * int tree) list) =
         check_valid_constructor ~params the_lts t None
       in
-      let* env = get_env in
-      let* sigma = get_sigma in
       let* _ =
         if is_output_kind_enabled params
         then
@@ -544,6 +553,7 @@ struct
         transition_id_counter := to_return + 1;
         to_return
       in
+      let* sigma = get_sigma in
       List.iter
         (fun ((act, tgt, int_tree) : EConstr.t * EConstr.t * int tree) ->
            log
@@ -895,6 +905,15 @@ let build_lts_graph
   let* env = get_env in
   let* sigma = get_sigma in
   (* *)
+  log ~params (Printf.sprintf "= = = = = = = = =\n");
+  if G.H.length graph_lts.transitions >= bound
+  then
+    log
+      ~params
+      (Printf.sprintf
+         "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
+         bound);
+  (* *)
   log
     ~params
     (Printf.sprintf
@@ -954,6 +973,15 @@ let build_fsm_from_lts
   (* *)
   let* env = get_env in
   let* sigma = get_sigma in
+  (* *)
+  log ~params (Printf.sprintf "= = = = = = = = =\n");
+  if G.H.length graph_lts.transitions >= bound
+  then
+    log
+      ~params
+      (Printf.sprintf
+         "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
+         bound);
   (* *)
   log
     ~params
