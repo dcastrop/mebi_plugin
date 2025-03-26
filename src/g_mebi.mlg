@@ -59,6 +59,40 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   (***************************)
   (***************************)
   (***************************)
+  (* | [ "MeBi" "LTS2" reference(r) constr(t) reference(s) ] ->
+    { (Mebi_monad.run
+        (Command.cmd_bounded_lts2
+          ~params:(
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+            params.options <-
+            { output_enabled=true;
+              show_normal_output=true;
+              show_detailed_output=true;
+              show_debug_output=false;
+              show_warning_output=true };
+            params
+          )
+          (* coq terms: *)
+          (Nametab.global r) t (Nametab.global s))) }
+  (*** debug mode ****)
+  | [ "MeBi" "LTS2" "show_debug" reference(r) constr(t) reference(s) ] ->
+    { (Mebi_monad.run
+        (Command.cmd_bounded_lts2
+          ~params:(
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+            params.options <-
+            { output_enabled=true;
+              show_normal_output=true;
+              show_detailed_output=true;
+              show_debug_output=true;
+              show_warning_output=true };
+            params
+          )
+          (* coq terms: *)
+          (Nametab.global r) t (Nametab.global s))) } *)
+  (***************************)
+  (***************************)
+  (***************************)
   | [ "MeBi" "FSM" reference(r) constr(t) ] ->
     { (Mebi_monad.run
         (Command.cmd_bounded_lts_to_fsm
