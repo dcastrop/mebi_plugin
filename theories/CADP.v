@@ -655,7 +655,7 @@ Inductive lts : sys * resource -> action -> sys * resource -> Prop :=
   | LTS_OK_R : forall l s g, (PAR l (PRC OK s), g) ==<{SILENT}>==> (l, g)
 
   where "t '==<{' a '}>==>' t'" := (lts t a t')
-  and "t '--<{' a '}>-->' t'" := (step t a t').
+  and "y '--<{' a '}>-->' y'" := (step y a y').
 
 (*************************************************************************)
 (**** Example ************************************************************)
