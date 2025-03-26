@@ -61,7 +61,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   (***************************)
   (* | [ "MeBi" "LTS2" reference(r) constr(t) reference(s) ] ->
     { (Mebi_monad.run
-        (Command.cmd_bounded_lts2
+        (Command.cmd_bounded_layered_lts
           ~params:(
             let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
             params.options <-
@@ -73,11 +73,11 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
             params
           )
           (* coq terms: *)
-          (Nametab.global r) t (Nametab.global s))) }
+          [(Nametab.global s); (Nametab.global r)] t )) }
   (*** debug mode ****)
   | [ "MeBi" "LTS2" "show_debug" reference(r) constr(t) reference(s) ] ->
     { (Mebi_monad.run
-        (Command.cmd_bounded_lts2
+        (Command.cmd_bounded_layered_lts
           ~params:(
             let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
             params.options <-
@@ -89,7 +89,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
             params
           )
           (* coq terms: *)
-          (Nametab.global r) t (Nametab.global s))) } *)
+          [(Nametab.global s); (Nametab.global r)] t )) } *)
   (***************************)
   (***************************)
   (***************************)

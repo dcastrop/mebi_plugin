@@ -396,7 +396,7 @@ and check_valid_constructor
 ;;
 
 (** [bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
-let bound : int = 100
+let bound : int = 10
 (* TODO: get this as user input! *)
 
 (** [GraphB] is ...
@@ -889,6 +889,38 @@ let make_graph_builder =
   return (module G : GraphB)
 ;;
 
+(* let rec build_layered_raw_lts
+?(params : Params.log = default_params)
+(grefs : Names.GlobRef.t list)
+: (raw_lts option) mm =
+  (* params.kind <- Debug (); *)
+  params.kind <- Normal ();
+  match grefs with
+  | [] -> return None
+  | h :: t ->
+    let* h_raw_lts : raw_lts = check_ref_lts h in
+    match build_layered_raw_lts t with
+    | None -> return (Some h)
+    | Some t ->
+    end
+  end *)
+(* let cmd_bounded_layered_lts
+      ?(params : Params.log = default_params)
+      (grefs : Names.GlobRef.t list)
+      (tref : Constrexpr.constr_expr_r CAst.t)
+  : unit mm
+  =
+  params.kind <- Details ();
+  params.options.show_detailed_output <- true;
+  (* let* (_graph_lts : raw_lts) = build_lts_graph ~params iref tref in *)
+  return ()
+;; *)
+
+(****************************************************************)
+(***** (above is the new stuff) *********************************)
+(***** (allowing layered lts using list of gref) ****************)
+(****************************************************************)
+
 let build_lts_graph
       ?(params : Params.log = default_params)
       (iref : Names.GlobRef.t)
@@ -898,21 +930,6 @@ let build_lts_graph
   params.kind <- Debug ();
   (* *)
   let* raw_lts = check_ref_lts iref in
-  let* graphM = make_graph_builder in
-  let module G = (val graphM) in
-  let* graph_lts = G.build_graph ~params raw_lts tref in
-  (* *)
-  let* env = get_env in
-  let* sigma = get_sigma in
-  (* *)
-  log ~params (Printf.sprintf "= = = = = = = = =\n");
-  if G.H.length graph_lts.transitions >= bound
-  then
-    log
-      ~params
-      (Printf.sprintf
-         "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
-         bound);
   (* *)
   log
     ~params
@@ -933,12 +950,28 @@ let build_lts_graph
              (fun _ -> str ", ")
              Names.Id.print
              raw_lts.coq_ctor_names)));
+  (* *)
+  let* env = get_env in
+  let* sigma = get_sigma in
   log
     ~params
     (Printf.sprintf
        "(d) Transitions: %s.\n"
        (Pp.string_of_ppcmds
           (pp_transitions env sigma raw_lts.constructor_transitions)));
+  (* *)
+  let* graphM = make_graph_builder in
+  let module G = (val graphM) in
+  let* graph_lts = G.build_graph ~params raw_lts tref in
+  (* *)
+  log ~params (Printf.sprintf "= = = = = = = = =\n");
+  if G.H.length graph_lts.transitions >= bound
+  then
+    log
+      ~params
+      (Printf.sprintf
+         "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
+         bound);
   log
     ~params
     (Printf.sprintf
