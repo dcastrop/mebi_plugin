@@ -788,53 +788,53 @@ Compute ncs1.
 
 MeBi LTS show_debug lts ncs1.
 
-(* Example ncs2 : composition := compose (create 2 P).
-Compute ncs2.
-MeBi LTS show_debug lts ncs2. *)
 
-(* Example ncs5 : composition := compose (create 5 P).
-Compute ncs5.
-MeBi LTS show_debug lts ncs5. *)
-
-(* MeBi LTS lts ncs. *)
-
-
-(* Goal exists a t1 t2 s1 s2 r1 r2,
-  (t1, (s1, r1)) --<{ a }>--> (t2, (s2, r2)) ->
-  (PRC t1 s1, r1) ==<{ a }>==> (PRC t2 s2, r2).
+Goal exists a t s r, (ncs1) ==<{a}>==> (PRC t s, r).
 Proof.
-  do 7 eexists.
-  eapply LTS_PRC. *)
-
-Definition can_STEP (t1:tm) (e1:env) : Prop :=
-  exists a t2 e2, (t1, e1) --<{a}>--> (t2, e2).
-
-Definition can_LTS (s1:sys) (r1:resource) : Prop :=
-  exists a s2 r2, (s1, r1) ==<{a}>==> (s2, r2).
-
-(* Lemma env_helper :
-  forall s
-
-Lemma do_act_helper :
-  forall (e:env), exists (s:state) (r:resource), e=(s,r).
-Proof.
-  intros. do 2 eexists.
-  apply env.
-  eauto. *)
-
-
-
-(* Goal exists a l t s r,
-  (ACT a, Env.initial 1) --<{l}>--> (t, (s, r)) ->
-  (PRC (ACT a) State.initial, Resource.initial 1) ==<{l}>==> (PRC t s, r).
-Proof.
-  do 5 eexists.
-  intros.
+  do 4 eexists.
+  unfold ncs1.
+  simpl.
+  unfold P.
   eapply LTS_PRC.
-  eapply STEP_ACT_helper.
-  - reflexivity.
-  - reflexivity.
-  - unfold do_act. . *)
+  constructor.
+Qed.
+
+
+(** Following the same stratefy as [STEP_ACT_helper] (above) *)
+(** Note: below ends up not being necessary. *)
+(* Lemma LTS_PRC_helper :
+  forall a t1 t2 s1 s2 r1 r2 x1 x2,
+  x1 = (PRC t1 s1, r1) ->
+  (t1, (s1, r1)) --<{ a }>--> (t2, (s2, r2)) ->
+  x2 = (PRC t2 s2, r2) ->
+  x1 ==<{ a }>==> x2.
+Proof.
+  intros; subst.
+  constructor.
+  apply H0.
+Qed. *)
+
+(** this time testing the ACT *)
+Example ncs1b : composition := compose (create 1 Acquire).
+Compute ncs1b.
+
+Goal exists a t s r, (ncs1b) ==<{a}>==> (PRC t s, r).
+Proof.
+  do 4 eexists.
+  unfold ncs1b.
+  simpl.
+  unfold Acquire.
+  constructor.
+  eapply STEP_SEQ.
+  eapply STEP_ACT_helper; reflexivity.
+Qed.
+
+
+(* Definition can_STEP (t1:tm) (e1:env) : Prop :=
+  exists a t2 e2, (t1, e1) --<{a}>--> (t2, e2). *)
+
+(* Definition can_LTS (s1:sys) (r1:resource) : Prop :=
+  exists a s2 r2, (s1, r1) ==<{a}>==> (s2, r2). *)
 
 
 
