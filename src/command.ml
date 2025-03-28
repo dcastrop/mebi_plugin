@@ -77,6 +77,42 @@ type raw_lts =
   ; constructor_transitions : (Constr.rel_context * Constr.types) array
   }
 
+(** [log_raw_lts] *)
+let log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
+  : unit mm
+  =
+  (* *)
+  log
+    ~params
+    (Printf.sprintf
+       "(a) Types of terms: %s.\n"
+       (econstr_to_string rlts.trm_type));
+  log
+    ~params
+    (Printf.sprintf
+       "(b) Types of labels: %s.\n"
+       (econstr_to_string rlts.lbl_type));
+  log
+    ~params
+    (Printf.sprintf
+       "(c) Constructors: %s.\n"
+       (Pp.string_of_ppcmds
+          (Pp.prvect_with_sep
+             (fun _ -> str ", ")
+             Names.Id.print
+             rlts.coq_ctor_names)));
+  (* *)
+  let* env = get_env in
+  let* sigma = get_sigma in
+  log
+    ~params
+    (Printf.sprintf
+       "(d) Transitions: %s.\n"
+       (Pp.string_of_ppcmds
+          (pp_transitions env sigma rlts.constructor_transitions)));
+  return ()
+;;
+
 (** essentially a list of [raw_lts], to allow the plugin to be provided (manually) the relevant inductive defeinitions. Useful in the case of a layered LTS. *)
 type rlts_list = raw_lts list
 
@@ -977,17 +1013,57 @@ let make_graph_builder =
    | Some t ->
    end
    end *)
-(* let cmd_bounded_layered_lts
-   ?(params : Params.log = default_params)
-   (grefs : Names.GlobRef.t list)
-   (tref : Constrexpr.constr_expr_r CAst.t)
-   : unit mm
-   =
-   params.kind <- Details ();
-   params.options.show_detailed_output <- true;
-   (* let* (_graph_lts : raw_lts) = build_lts_graph ~params iref tref in *)
-   return ()
-   ;; *)
+
+let cmd_bounded_layered_lts
+  ?(params : Params.log = default_params)
+  (grefs : Names.GlobRef.t list)
+  (tref : Constrexpr.constr_expr_r CAst.t)
+  : rlts_list mm
+  =
+  params.kind <- Details ();
+  params.options.show_detailed_output <- true;
+  (*  *)
+  let rlts_ctx : rlts_list =
+    List.fold_left
+      (fun (acc : rlts_list) (gref : Names.GlobRef.t) ->
+        let rlts : raw_lts = run (check_ref_lts gref) in
+        log
+          ~params
+          (Printf.sprintf "= = = = = = = = =\n\trlts (#%d):" (List.length acc));
+        let _ = log_raw_lts ~params rlts in
+        List.append acc [ rlts ])
+      []
+      grefs
+  in
+  (* *)
+  let* graphM = make_graph_builder in
+  let module G = (val graphM) in
+  let* graph_lts = G.build_graph ~params rlts_ctx tref in
+  (* *)
+  log ~params (Printf.sprintf "= = = = = = = = =\n");
+  if G.H.length graph_lts.transitions >= bound
+  then
+    log
+      ~params
+      (Printf.sprintf
+         "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
+         bound);
+  log
+    ~params
+    (Printf.sprintf
+       "(e) Graph Edges: %s.\n"
+       (run (G.PStr.transitions ~params:(Log params) graph_lts.transitions)));
+  (* show if normal output allowed from outside call *)
+  if params.options.show_debug_output
+  then params.kind <- Details ()
+  else params.kind <- Normal ();
+  log
+    ~params
+    (Printf.sprintf
+       "Constructed LTS: %s.\n"
+       (run (G.PStr.lts ~params:(Log params) graph_lts)));
+  return rlts_ctx
+;;
 
 (****************************************************************)
 (***** (above is the new stuff) *********************************)
@@ -1003,35 +1079,7 @@ let build_lts_graph
   params.kind <- Debug ();
   (* *)
   let* rlts = check_ref_lts iref in
-  (* *)
-  log
-    ~params
-    (Printf.sprintf
-       "(a) Types of terms: %s.\n"
-       (econstr_to_string rlts.trm_type));
-  log
-    ~params
-    (Printf.sprintf
-       "(b) Types of labels: %s.\n"
-       (econstr_to_string rlts.lbl_type));
-  log
-    ~params
-    (Printf.sprintf
-       "(c) Constructors: %s.\n"
-       (Pp.string_of_ppcmds
-          (Pp.prvect_with_sep
-             (fun _ -> str ", ")
-             Names.Id.print
-             rlts.coq_ctor_names)));
-  (* *)
-  let* env = get_env in
-  let* sigma = get_sigma in
-  log
-    ~params
-    (Printf.sprintf
-       "(d) Transitions: %s.\n"
-       (Pp.string_of_ppcmds
-          (pp_transitions env sigma rlts.constructor_transitions)));
+  let* _ = log_raw_lts ~params rlts in
   (* *)
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
@@ -1073,6 +1121,7 @@ let build_fsm_from_lts
   params.kind <- Debug ();
   (* *)
   let* rlts = check_ref_lts iref in
+  let* _ = log_raw_lts ~params rlts in
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
   let* graph_lts = G.build_graph ~params [ rlts ] tref in
@@ -1089,31 +1138,6 @@ let build_fsm_from_lts
          "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
          bound);
   (* *)
-  log
-    ~params
-    (Printf.sprintf
-       "(a) Types of terms: %s.\n"
-       (econstr_to_string rlts.trm_type));
-  log
-    ~params
-    (Printf.sprintf
-       "(b) Types of labels: %s.\n"
-       (econstr_to_string rlts.lbl_type));
-  log
-    ~params
-    (Printf.sprintf
-       "(c) Constructors: %s.\n"
-       (Pp.string_of_ppcmds
-          (Pp.prvect_with_sep
-             (fun _ -> str ", ")
-             Names.Id.print
-             rlts.coq_ctor_names)));
-  log
-    ~params
-    (Printf.sprintf
-       "(d) Transitions: %s.\n"
-       (Pp.string_of_ppcmds
-          (pp_transitions env sigma rlts.constructor_transitions)));
   log
     ~params
     (Printf.sprintf
@@ -1181,6 +1205,18 @@ let cmd_bounded_lts
   params.kind <- Details ();
   params.options.show_detailed_output <- true;
   let* (_rlts : raw_lts) = build_lts_graph ~params iref tref in
+  return ()
+;;
+
+let cmd_bounded_layered_lts
+  ?(params : Params.log = default_params)
+  (gref : Names.GlobRef.t list)
+  (tref : Constrexpr.constr_expr_r CAst.t)
+  : unit mm
+  =
+  params.kind <- Details ();
+  params.options.show_detailed_output <- true;
+  let* (_rlts_ctx : rlts_list) = cmd_bounded_layered_lts ~params gref tref in
   return ()
 ;;
 
