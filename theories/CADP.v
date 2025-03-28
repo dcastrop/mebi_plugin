@@ -726,11 +726,42 @@ Proof.
   constructor.
 Qed.
 
-Goal exists a t e, (Acquire, Env.initial 1) --<{ a }>--> (t, e).
+Inductive n_steps : tm * env -> Prop :=
+   | no_step : forall t e, n_steps (t, e)
+   | trans_step : forall t a t' e' e, (t, e) --<{ a }>--> (t', e') -> n_steps (t', e')
+        -> n_steps (t, e).
+
+
+Goal n_steps (P, Env.initial 1).
+   eapply trans_step.
+   unfold P.
+   eapply STEP_REC_DEF.
+   simpl.
+   eapply trans_step.
+
+   eapply STEP_SEQ.
+
+   eapply STEP_ACT_helper;  reflexivity.
+   eapply trans_step.
+   constructor.
+   eapply trans_step.
+   eapply STEP_SEQ.
+   constructor.
+   eapply STEP_ACT_helper;  reflexivity.
+   eapply trans_step.
+   simpl.
+   eapply STEP_SEQ.
+
+Abort.
+
+
+(* Goal exists a t e, (Acquire, Env.initial 1) --<{ a }>--> (t, e).
   do 3 eexists.
   eapply STEP_SEQ.
-  eapply STEP_ACT_helper; reflexivity.
-Qed.
+  (* eapply STEP_ACT. *)
+  eapply STEP_ACT_helper. reflexivity. simpl.
+  (* ; reflexivity. *)
+Qed. *)
 
 Goal exists a t e, (Release, Env.initial 1) --<{ a }>--> (t, e).
   do 3 eexists.
@@ -841,7 +872,15 @@ Proof.
   eapply STEP_ACT_helper; reflexivity.
 Qed.
 
+(*************************************************************************)
+(**** TESTING: Coq-type for mebi input. **********************************)
+(*************************************************************************)
 
+(* Definition lts_type_of {A:Type} {B:Type} (kind:A->B->A->Prop): Type := kind. *)
+
+(* Record mebi_input {A:Type} {B:Type} :=
+  { lts  : A -> B -> A -> Prop
+  ; term : A }. *)
 
 (*************************************************************************)
 (**** TODO: LTS equiv temp. logic prop. **********************************)
