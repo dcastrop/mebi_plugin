@@ -388,30 +388,7 @@ and check_valid_constructor
   : (EConstr.t * EConstr.t * int tree) list t
   =
   params.kind <- Debug ();
-  (* : (EConstr.t * int tree list) list t *)
   let$+ t env sigma = Reductionops.nf_all env sigma t in
-  (* let iter_body (i : int) (ctor_vals : (EConstr.t * int tree list) list) = *)
-  (* get relevant rlts *)
-  (* match rlts with
-  | None -> (* check for all rtls *)
-    (let ctors = List.fold_left (fun (acc_ctors:((EConstr.t * EConstr.t * int tree) list t)) (rlts:raw_lts) ->
-      let* ctors = check_valid_constructor ~params (Some rlts) rlts_ctx t ma in
-      if List.is_empty ctors then acc_ctors else (
-        (* let ctors =
-          List.map
-            (fun (_, (tL : EConstr.t), (i : int tree)) ->
-              i, { termL = tL; termR = args.(2) })
-            ctors *)
-        (* merge the two list of ctors *)
-        List.fold_left (fun (acc_ctors':((EConstr.t * EConstr.t * int tree) list t)) (rlts':raw_lts) ->
-
-          ) acc_ctors ctors
-      )
-
-      ) [] rlts_ctx in ctors)
-  | Some rlts_index ->
-    let rlts : raw_lts = List.nth rlts_ctx rlts_index in *)
-  (* *)
   let iter_body (i : int) (ctor_vals : (EConstr.t * EConstr.t * int tree) list) =
     let* _ =
       if is_output_kind_enabled params
@@ -437,17 +414,6 @@ and check_valid_constructor
           check_updated_ctx ~params [ [] ] rlts_ctx (substl, ctx_tys)
         in
         let$+ act env sigma = Reductionops.nf_all env sigma act in
-        (* let* _ =
-           if is_output_kind_enabled params
-           then
-           debug (fun env sigma ->
-           str "(CONSTRUCTOR "
-           ++ int i
-           ++ str " is: "
-           ++ Printer.pr_econstr_env env sigma act
-           ++ str ")")
-           else return ()
-           in *)
         let (tgt_term : EConstr.t) = EConstr.Vars.substl substl termR in
         match next_ctors with
         | None -> return ctor_vals
