@@ -786,7 +786,19 @@ Definition compose (s:system) : composition :=
 Example ncs1 : composition := compose (create 1 P).
 Compute ncs1.
 
-MeBi LTS show_debug lts ncs1.
+(* original: *) MeBi LTS  show_debug lts ncs1.
+(* updated:  *) MeBi LTS2 show_debug lts ncs1 step.
+
+Example ncs2 : composition := compose (create 2 P).
+Compute ncs2.
+MeBi LTS show_debug lts ncs2.
+MeBi LTS2 show_debug lts ncs2 step.
+
+Example ncs5 : composition := compose (create 5 P).
+Compute ncs5.
+MeBi LTS show_debug lts ncs5.
+MeBi LTS2 show_debug lts ncs5 step.
+
 
 
 Goal exists a t s r, (ncs1) ==<{a}>==> (PRC t s, r).
@@ -828,13 +840,6 @@ Proof.
   eapply STEP_SEQ.
   eapply STEP_ACT_helper; reflexivity.
 Qed.
-
-
-(* Definition can_STEP (t1:tm) (e1:env) : Prop :=
-  exists a t2 e2, (t1, e1) --<{a}>--> (t2, e2). *)
-
-(* Definition can_LTS (s1:sys) (r1:resource) : Prop :=
-  exists a s2 r2, (s1, r1) ==<{a}>==> (s2, r2). *)
 
 
 
