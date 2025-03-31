@@ -27,6 +27,77 @@ open Stdarg
  *)
 VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   (***************************)
+  (**** Coq -> LTS  **********)
+  (***************************)
+  (* build lts for [t] using [r] (default bounds) *)
+  | [ "MeBi"
+      "Show"
+      "LTS" "Of" constr(t)
+      "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.cmd_bounded_lts
+        (List.fold_left
+          (fun (acc: Names.GlobRef.t list ) (s:Libnames.qualid) ->
+            List.append acc [Nametab.global s]) [] r)
+        t
+      ) }
+  (* build lts for [t] using [r], within bound [i] *)
+  | [ "MeBi"
+      "Show"
+      "LTS" "Of" constr(t)
+      "With" "Bound" int(i)
+      "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.cmd_bounded_lts
+        ~bound:i
+        (List.fold_left
+          (fun (acc: Names.GlobRef.t list ) (s:Libnames.qualid) ->
+            List.append acc [Nametab.global s]) [] r)
+        t
+      ) }
+  (***************************)
+  (**** Coq -> LTS -> FSM ****)
+  (***************************)
+  (* build fsm from lts for [t] using [r] (default bounds) *)
+  | [ "MeBi"
+      "Show"
+      "FSM" "Of" constr(t)
+      "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.cmd_bounded_lts_to_fsm
+        (List.fold_left
+          (fun (acc: Names.GlobRef.t list ) (s:Libnames.qualid) ->
+            List.append acc [Nametab.global s]) [] r)
+        t
+      ) }
+  (* build fsm from lts for [t] using [r], within bound [i] *)
+  | [ "MeBi"
+      "Show"
+      "FSM" "Of" constr(t)
+      "With" "Bound" int(i)
+      "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.cmd_bounded_lts_to_fsm
+        ~bound:i
+        (List.fold_left
+          (fun (acc: Names.GlobRef.t list ) (s:Libnames.qualid) ->
+            List.append acc [Nametab.global s]) [] r)
+        t
+      ) }
+  (****************************************************)
+  (**** Coq A B -> LTS A B -> FSM A B -> Merge A B ****)
+  (****************************************************)
+  | [ "MeBi"
+      "Show"
+      "FSM" "Merger"
+      "Of" constr(tA)
+      "Using" reference_list(rA)
+      "With"
+      "Of" constr(tB)
+      "Using" reference_list(rB)
+      ] ->
+    { }
+  (***************************)
   (***************************)
   (***************************)
   | [ "MeBi" "LTS" reference(r) constr(t) ] ->
