@@ -726,13 +726,19 @@ Proof.
   constructor.
 Qed.
 
-Inductive n_steps : tm * env -> Prop :=
-   | no_step : forall t e, n_steps (t, e)
-   | trans_step : forall t a t' e' e, (t, e) --<{ a }>--> (t', e') -> n_steps (t', e')
-        -> n_steps (t, e).
+(** *)
+Inductive step_transitive_closure : tm * env -> Prop :=
+
+  | trans_step : forall t a t' e' e,
+      (t, e) --<{ a }>--> (t', e') ->
+      step_transitive_closure (t', e') ->
+      step_transitive_closure (t, e)
+
+  | no_step : forall t e, step_transitive_closure (t, e)
+  .
 
 
-Goal n_steps (P, Env.initial 1).
+(* Goal step_transitive_closure (P, Env.initial 1).
    eapply trans_step.
    unfold P.
    eapply STEP_REC_DEF.
@@ -752,7 +758,7 @@ Goal n_steps (P, Env.initial 1).
    simpl.
    eapply STEP_SEQ.
 
-Abort.
+Abort. *)
 
 
 (* Goal exists a t e, (Acquire, Env.initial 1) --<{ a }>--> (t, e).
