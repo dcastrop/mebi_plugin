@@ -43,8 +43,8 @@ let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
     @raise invalid_arity
       if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error. *)
 let get_lts_labels_and_terms
-      (mib : Declarations.mutual_inductive_body)
-      (mip : Declarations.one_inductive_body)
+  (mib : Declarations.mutual_inductive_body)
+  (mip : Declarations.one_inductive_body)
   : (Constr.rel_declaration * Constr.rel_declaration) mm
   =
   let open Declarations in
@@ -76,6 +76,45 @@ type raw_lts =
   ; coq_ctor_names : Names.Id.t array
   ; constructor_transitions : (Constr.rel_context * Constr.types) array
   }
+
+(** [log_raw_lts] *)
+let log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
+  : unit mm
+  =
+  (* *)
+  log
+    ~params
+    (Printf.sprintf
+       "(a) Types of terms: %s.\n"
+       (econstr_to_string rlts.trm_type));
+  log
+    ~params
+    (Printf.sprintf
+       "(b) Types of labels: %s.\n"
+       (econstr_to_string rlts.lbl_type));
+  log
+    ~params
+    (Printf.sprintf
+       "(c) Constructors: %s.\n"
+       (Pp.string_of_ppcmds
+          (Pp.prvect_with_sep
+             (fun _ -> str ", ")
+             Names.Id.print
+             rlts.coq_ctor_names)));
+  (* *)
+  let* env = get_env in
+  let* sigma = get_sigma in
+  log
+    ~params
+    (Printf.sprintf
+       "(d) Transitions: %s.\n"
+       (Pp.string_of_ppcmds
+          (pp_transitions env sigma rlts.constructor_transitions)));
+  return ()
+;;
+
+(** essentially a list of [raw_lts], to allow the plugin to be provided (manually) the relevant inductive defeinitions. Useful in the case of a layered LTS. *)
+type rlts_list = raw_lts list
 
 (** [check_ref_lts gref] is the [raw_lts] of [gref].
 
@@ -113,9 +152,9 @@ let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
     - Is [w_unify] the best way?
     - ... *)
 let m_unify
-      ?(params : Params.log = default_params)
-      (t0 : EConstr.t)
-      (t1 : EConstr.t)
+  ?(params : Params.log = default_params)
+  (t0 : EConstr.t)
+  (t1 : EConstr.t)
   : bool mm
   =
   params.kind <- Debug ();
@@ -195,7 +234,7 @@ let rec pstr_int_tree (t : int tree) : string =
       lhs_int
       (List.fold_left
          (fun (acc : string) (rhs_int_tree : int tree) ->
-            pstr_int_tree rhs_int_tree)
+           pstr_int_tree rhs_int_tree)
          ""
          rhs_int_tree_list)
 ;;
@@ -204,8 +243,8 @@ let rec pstr_int_tree (t : int tree) : string =
 (* (int tree * unif_problem) list -> int tree list option t *)
 (* *)
 let rec unify_all
-          ?(params : Params.log = default_params)
-          (i : (int tree * unif_problem) list)
+  ?(params : Params.log = default_params)
+  (i : (int tree * unif_problem) list)
   : int tree list option t
   =
   params.kind <- Debug ();
@@ -233,9 +272,9 @@ let rec unify_all
 ;;
 
 let sandboxed_unify
-      ?(params : Params.log = default_params)
-      (tgt_term : EConstr.t)
-      (u : (int tree * unif_problem) list)
+  ?(params : Params.log = default_params)
+  (tgt_term : EConstr.t)
+  (u : (int tree * unif_problem) list)
   : (EConstr.t * int tree list) option mm
   =
   params.kind <- Debug ();
@@ -258,11 +297,11 @@ let sandboxed_unify
 
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
-          ?(params : Params.log = default_params)
-          (acc : (EConstr.t * EConstr.t * int tree) list)
-          (i : int)
-          (act : EConstr.t)
-          (tgt_term : EConstr.t)
+  ?(params : Params.log = default_params)
+  (acc : (EConstr.t * EConstr.t * int tree) list)
+  (i : int)
+  (act : EConstr.t)
+  (tgt_term : EConstr.t)
   :  (int tree * unif_problem) list list
   -> (EConstr.t * EConstr.t * int tree) list t
   =
@@ -286,8 +325,9 @@ let rec retrieve_tgt_nodes
 
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
-          (acc : (int tree * unif_problem) list list)
-          (lts : raw_lts)
+  ?(params : Params.log = default_params)
+  (acc : (int tree * unif_problem) list list)
+  (rlts_ctx : rlts_list)
   :  EConstr.t list * EConstr.rel_declaration list
   -> (int tree * unif_problem) list list option t
   = function
@@ -299,47 +339,56 @@ let rec check_updated_ctx
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with
      | App (fn, args) ->
-       if EConstr.eq_constr sigma fn lts.coq_lts
-       then
-         let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
-         let* ctors = check_valid_constructor lts nextT (Some args.(1)) in
-         if List.is_empty ctors
-         then return None
-         else (
-           let ctors =
-             List.map
-               (fun (_, (tL : EConstr.t), (i : int tree)) ->
+       (match
+          List.find_opt
+            (fun (rlts : raw_lts) -> EConstr.eq_constr sigma fn rlts.coq_lts)
+            rlts_ctx
+        with
+        | None -> check_updated_ctx acc rlts_ctx (substl, tl)
+        | Some rlts ->
+          let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
+          let* ctors =
+            check_valid_constructor ~params rlts rlts_ctx nextT (Some args.(1))
+          in
+          if List.is_empty ctors
+          then return None
+          else (
+            let ctors =
+              List.map
+                (fun (_, (tL : EConstr.t), (i : int tree)) ->
                   i, { termL = tL; termR = args.(2) })
-               ctors
-           in
-           (* We need to cross-product all possible unifications. This is in case
-              we have a constructor of the form LTS t11 a1 t12 -> LTS t21 a2
-              t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
-              unavoidable, but we should make sure we understand well the
-              problem before removing the source of repetition. *)
-           (* FIXME: Test this *)
-           check_updated_ctx
-             (List.concat_map (fun x -> List.map (fun y -> y :: x) ctors) acc)
-             lts
-             (substl, tl))
-       else check_updated_ctx acc lts (substl, tl)
-     | _ -> check_updated_ctx acc lts (substl, tl))
+                ctors
+            in
+            (* We need to cross-product all possible unifications. This is in case
+               we have a constructor of the form LTS t11 a1 t12 -> LTS t21 a2
+               t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
+               unavoidable, but we should make sure we understand well the
+               problem before removing the source of repetition. *)
+            (* FIXME: Test this *)
+            (* replace [rtls] in [rtls_ctx] *)
+            (* let rtls_ctx':rlts_list =
+               List.append [  ]
+               in *)
+            check_updated_ctx
+              (List.concat_map (fun x -> List.map (fun y -> y :: x) ctors) acc)
+              rlts_ctx
+              (substl, tl)))
+     | _ -> check_updated_ctx acc rlts_ctx (substl, tl))
   | _, _ -> assert false
 (* Impossible! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
-      ?(params : Params.log = default_params)
-      (lts : raw_lts)
-      (t : EConstr.t)
-      (ma : EConstr.t option)
+  ?(params : Params.log = default_params)
+  (rlts : raw_lts)
+  (rlts_ctx : rlts_list)
+  (t : EConstr.t)
+  (ma : EConstr.t option)
   : (EConstr.t * EConstr.t * int tree) list t
   =
   params.kind <- Debug ();
-  (* : (EConstr.t * int tree list) list t *)
   let$+ t env sigma = Reductionops.nf_all env sigma t in
-  (* let iter_body (i : int) (ctor_vals : (EConstr.t * int tree list) list) = *)
   let iter_body (i : int) (ctor_vals : (EConstr.t * EConstr.t * int tree) list) =
     let* _ =
       if is_output_kind_enabled params
@@ -351,7 +400,7 @@ and check_valid_constructor
           ++ Printer.pr_econstr_env env sigma t)
       else return ()
     in
-    let ctx, tm = lts.constructor_transitions.(i) in
+    let ctx, tm = rlts.constructor_transitions.(i) in
     let ctx_tys = List.map EConstr.of_rel_decl ctx in
     let* substl = mk_ctx_substl [] (List.rev ctx_tys) in
     let termL, act, termR = extract_args substl tm in
@@ -362,20 +411,9 @@ and check_valid_constructor
       if success
       then
         let* (next_ctors : (int tree * unif_problem) list list option) =
-          check_updated_ctx [ [] ] lts (substl, ctx_tys)
+          check_updated_ctx ~params [ [] ] rlts_ctx (substl, ctx_tys)
         in
         let$+ act env sigma = Reductionops.nf_all env sigma act in
-        (* let* _ =
-          if is_output_kind_enabled params
-          then
-            debug (fun env sigma ->
-              str "(CONSTRUCTOR "
-              ++ int i
-              ++ str " is: "
-              ++ Printer.pr_econstr_env env sigma act
-              ++ str ")")
-          else return ()
-        in *)
         let (tgt_term : EConstr.t) = EConstr.Vars.substl substl termR in
         match next_ctors with
         | None -> return ctor_vals
@@ -392,11 +430,11 @@ and check_valid_constructor
       else return ctor_vals
     else return ctor_vals
   in
-  iterate 0 (Array.length lts.constructor_transitions - 1) [] iter_body
+  iterate 0 (Array.length rlts.constructor_transitions - 1) [] iter_body
 ;;
 
 (** [bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
-let bound : int = 100
+let bound : int = 10
 (* TODO: get this as user input! *)
 
 (** [GraphB] is ...
@@ -416,15 +454,15 @@ module type GraphB = sig
 
   type lts_graph =
     { to_visit : EConstr.constr Queue.t
-      (* Queue for BFS *)
-      (* ; labels : L.t *)
+        (* Queue for BFS *)
+        (* ; labels : L.t *)
     ; states : S.t
     ; transitions : lts_transition H.t
     }
 
   val build_graph
     :  ?params:Params.log
-    -> raw_lts
+    -> rlts_list
     -> Constrexpr.constr_expr_r CAst.t
     -> lts_graph mm
 
@@ -503,14 +541,14 @@ struct
     ; transitions : lts_transition H.t
     }
 
-  (** [build_lts_graph the_lts g] is an [lts_graph] [g] obtained by exploring [the_lts].
-      @param the_lts describes the Coq-based term.
-      @param g is an [lts_graph] accumulated while exploring [the_lts].
+  (** [build_lts_graph rlts g] is an [lts_graph] [g] obtained by exploring [rlts].
+      @param rlts describes the Coq-based term.
+      @param g is an [lts_graph] accumulated while exploring [rlts].
       @return an [lts_graph] constructed so long as the [bound] is not exceeded. *)
   let rec build_lts_graph
-            ?(params : Params.log = default_params)
-            (the_lts : raw_lts)
-            (g : lts_graph)
+    ?(params : Params.log = default_params)
+    (rlts_ctx : rlts_list)
+    (g : lts_graph)
     : lts_graph mm
     =
     params.kind <- Debug ();
@@ -521,7 +559,24 @@ struct
     else
       let* t = return (Queue.pop g.to_visit) in
       let* (constrs : (EConstr.t * EConstr.t * int tree) list) =
-        check_valid_constructor ~params the_lts t None
+        (* return *)
+        List.fold_left
+          (fun (acc : (EConstr.t * EConstr.t * int tree) list t)
+            (rlts : raw_lts) ->
+            let* ctors = check_valid_constructor ~params rlts rlts_ctx t None in
+            if List.is_empty ctors
+            then acc
+            else
+              return
+                (List.fold_left
+                   (fun (acc' : (EConstr.t * EConstr.t * int tree) list)
+                     (ctor : EConstr.t * EConstr.t * int tree) ->
+                     (* TODO: figure out how to  merge *)
+                     List.append acc' [ ctor ])
+                   (run acc)
+                   ctors))
+          (return [])
+          rlts_ctx
       in
       let* _ =
         if is_output_kind_enabled params
@@ -534,12 +589,12 @@ struct
                  (List.fold_left
                     (fun (acc : string)
                       ((act, ctor, int_tree) : EConstr.t * EConstr.t * int tree) ->
-                       Printf.sprintf
-                         "%s   (%s ::\n    %s[%s])\n"
-                         acc
-                         (pstr_int_tree int_tree)
-                         (econstr_to_string ctor)
-                         (econstr_to_string act))
+                      Printf.sprintf
+                        "%s   (%s ::\n    %s[%s])\n"
+                        acc
+                        (pstr_int_tree int_tree)
+                        (econstr_to_string ctor)
+                        (econstr_to_string act))
                     "\n"
                     constrs)
                  (List.length constrs)))
@@ -556,49 +611,67 @@ struct
       let* sigma = get_sigma in
       List.iter
         (fun ((act, tgt, int_tree) : EConstr.t * EConstr.t * int tree) ->
-           log
-             ~params
-             (Printf.sprintf "\n\nTransition to: %s." (econstr_to_string tgt));
-           new_states := S.add tgt !new_states;
-           (* TODO: detect tau transitions and then defer to [Fsm.tau] instead. *)
-           let to_add : action =
-             Fsm.Create.action
-               ~is_tau:false
-               ~annotation:[]
-               (Of (get_transition_id (), econstr_to_string act))
-           in
-           H.add
-             g.transitions
-             t
-             { action = to_add; index_tree = int_tree; destination = tgt };
-           if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
-           then ()
-           else Queue.push tgt g.to_visit;
-           log
-             ~params
-             (Printf.sprintf "\nVisiting next: %i." (Queue.length g.to_visit)))
+          log
+            ~params
+            (Printf.sprintf "\n\nTransition to: %s." (econstr_to_string tgt));
+          new_states := S.add tgt !new_states;
+          (* TODO: detect tau transitions and then defer to [Fsm.tau] instead. *)
+          let to_add : action =
+            Fsm.Create.action
+              ~is_tau:false
+              ~annotation:[]
+              (Of (get_transition_id (), econstr_to_string act))
+          in
+          H.add
+            g.transitions
+            t
+            { action = to_add; index_tree = int_tree; destination = tgt };
+          if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
+          then ()
+          else Queue.push tgt g.to_visit;
+          log
+            ~params
+            (Printf.sprintf "\nVisiting next: %i." (Queue.length g.to_visit)))
         constrs;
       let g = { g with states = S.union g.states !new_states } in
-      build_lts_graph ~params the_lts g
+      build_lts_graph ~params rlts_ctx g
   ;;
 
-  (** [build_graph the_lts t] is ...
-      @param the_lts is ...
+  (* let type_check_all_rlts_ctx
+     (rlts_ctx : rlts_list)
+     (t : Constrexpr.constr_expr_r CAst.t)
+     :(Environ.env*Evd.evar_map) =
+     let env sigma = List.fold_left (
+     fun ((env, sigma):(Environ.env*Evd.evar_map)) (rlts:raw_lts) ->
+     let$* _ env sigma = Typing.check env sigma t rlts.trm_type in
+     env,sigma
+     ) (env,sigma) rlts_ctx in (env, sigma);; *)
+
+  (** [build_graph rlts t] is ...
+      @param rlts is the raw_lts of the inductively defined coq term.
       @param t is the original Coq-term. *)
   let build_graph
-        ?(params : Params.log = default_params)
-        (the_lts : raw_lts)
-        (t : Constrexpr.constr_expr_r CAst.t)
+    ?(params : Params.log = default_params)
+    (rlts_ctx : rlts_list)
+    (t : Constrexpr.constr_expr_r CAst.t)
     : lts_graph mm
     =
     let$ t env sigma = Constrintern.interp_constr_evars env sigma t in
-    let$* u env sigma = Typing.check env sigma t the_lts.trm_type in
+    (* FIXME: we assume the head of rlts_ctx is the outermost rlts  *)
+    (* let iter_body (i : int) ((env,sigma):(Environ.env*Evd.evar_map)) = *)
+    let rlts = List.hd rlts_ctx in
+    let$* u env sigma = Typing.check env sigma t rlts.trm_type in
     let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
+    (* return (env, sigma) *)
+    (* in *)
+    (* let* env = get_env in
+       let* sigma = get_sigma in
+       let$* env sigma = iterate 0 (List.length rlts_ctx) (env,sigma) iter_body in *)
     let q = Queue.create () in
     let* _ = return (Queue.push t q) in
     build_lts_graph
       ~params
-      the_lts
+      rlts_ctx
       { to_visit = q (* ; labels = L.empty *)
       ; states = S.empty
       ; transitions = H.create bound
@@ -615,8 +688,8 @@ struct
     (* TODO: refactor pstr_lts and others *)
 
     let constructor
-          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-          (t : lts_transition)
+      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+      (t : lts_transition)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -632,8 +705,8 @@ struct
     ;;
 
     let transition
-          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-          ((from, transition) : EConstr.constr * lts_transition)
+      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+      ((from, transition) : EConstr.constr * lts_transition)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -660,8 +733,8 @@ struct
     ;;
 
     let transitions
-          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-          (transitions : lts_transition H.t)
+      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+      (transitions : lts_transition H.t)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -675,11 +748,11 @@ struct
             (fun (from : EConstr.t)
               (transition' : lts_transition)
               (acc : string) ->
-               Printf.sprintf
-                 "%s%s%s\n"
-                 acc
-                 tabs'
-                 (run (transition (from, transition'))))
+              Printf.sprintf
+                "%s%s%s\n"
+                acc
+                tabs'
+                (run (transition (from, transition'))))
             transitions
             "\n"
         in
@@ -687,8 +760,8 @@ struct
     ;;
 
     let states
-          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-          (states : N.t)
+      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+      (states : N.t)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -700,7 +773,7 @@ struct
         let pstr : string =
           N.fold
             (fun (s : EConstr.t) (acc : string) ->
-               Printf.sprintf "%s%s%s\n" acc tabs' (run (econstr s)))
+              Printf.sprintf "%s%s%s\n" acc tabs' (run (econstr s)))
             states
             "\n"
         in
@@ -708,8 +781,8 @@ struct
     ;;
 
     let queue
-          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-          (q : EConstr.t Queue.t)
+      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+      (q : EConstr.t Queue.t)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -721,7 +794,7 @@ struct
         let pstr : string =
           Queue.fold
             (fun (acc : string) (to_visit : EConstr.t) ->
-               Printf.sprintf "%s%s%s\n" acc tabs' (run (econstr to_visit)))
+              Printf.sprintf "%s%s%s\n" acc tabs' (run (econstr to_visit)))
             "\n"
             q
         in
@@ -729,8 +802,8 @@ struct
     ;;
 
     let lts
-          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-          (g : lts_graph)
+      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+      (g : lts_graph)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -795,28 +868,28 @@ struct
     (* type coq_translation = coq_translation_record mm *)
 
     let translate_coq_terms
-          ?(params : Params.log = default_params)
-          (states : N.t)
+      ?(params : Params.log = default_params)
+      (states : N.t)
       : coq_translation mm
       =
       let tbl : coq_translation = make_coq_translation in
       S.iter
         (fun (s : EConstr.t) ->
-           match Hashtbl.find_opt tbl.from_coq s with
-           | None ->
-             (* add as new state *)
-             let str : string = econstr_to_string s in
-             Hashtbl.add tbl.from_coq s str;
-             Hashtbl.add tbl.to_coq str s
-           | Some _ -> (* ignore *) ())
+          match Hashtbl.find_opt tbl.from_coq s with
+          | None ->
+            (* add as new state *)
+            let str : string = econstr_to_string s in
+            Hashtbl.add tbl.from_coq s str;
+            Hashtbl.add tbl.to_coq str s
+          | Some _ -> (* ignore *) ())
         states;
       return tbl
     ;;
 
     let translate_coq_lts
-          ?(params : Params.log = default_params)
-          (transitions : lts_transition H.t)
-          (tbl : coq_translation)
+      ?(params : Params.log = default_params)
+      (transitions : lts_transition H.t)
+      (tbl : coq_translation)
       : Lts.raw_flat_lts mm
       =
       return
@@ -824,19 +897,19 @@ struct
            (fun (from : EConstr.t)
              (transition : (action, EConstr.constr) transition)
              (acc : Lts.raw_flat_lts) ->
-              List.append
-                acc
-                [ ( Hashtbl.find tbl.from_coq from
-                  , transition.action.label
-                  , Hashtbl.find tbl.from_coq transition.destination )
-                ])
+             List.append
+               acc
+               [ ( Hashtbl.find tbl.from_coq from
+                 , transition.action.label
+                 , Hashtbl.find tbl.from_coq transition.destination )
+               ])
            transitions
            [])
     ;;
 
     let translate_init_term
-          (init_term : Constrexpr.constr_expr_r CAst.t)
-          (tbl : coq_translation)
+      (init_term : Constrexpr.constr_expr_r CAst.t)
+      (tbl : coq_translation)
       : string mm
       =
       let$ t env sigma = Constrintern.interp_constr_evars env sigma init_term in
@@ -849,9 +922,9 @@ struct
     exception UnfinishedLTS of lts_graph
 
     let lts_graph_to_lts
-          ?(params : Params.log = default_params)
-          (g : lts_graph)
-          (init_term : Constrexpr.constr_expr_r CAst.t)
+      ?(params : Params.log = default_params)
+      (g : lts_graph)
+      (init_term : Constrexpr.constr_expr_r CAst.t)
       : (Lts.lts * coq_translation) mm
       =
       params.kind <- Debug ();
@@ -868,8 +941,10 @@ struct
       (* *)
       let* (tbl : coq_translation) = translate_coq_terms g.states in
       let* (init : string) = translate_init_term init_term tbl in
-      let* (raw_lts : Lts.raw_flat_lts) = translate_coq_lts g.transitions tbl in
-      let lts : Lts.lts = Lts.Create.lts ~init (Flat raw_lts) in
+      let* (flat_rlts : Lts.raw_flat_lts) =
+        translate_coq_lts g.transitions tbl
+      in
+      let lts : Lts.lts = Lts.Create.lts ~init (Flat flat_rlts) in
       return (lts, tbl)
     ;;
   end
@@ -889,21 +964,47 @@ let make_graph_builder =
   return (module G : GraphB)
 ;;
 
-let build_lts_graph
-      ?(params : Params.log = default_params)
-      (iref : Names.GlobRef.t)
-      (tref : Constrexpr.constr_expr_r CAst.t)
-  : raw_lts mm
+(* let rec build_layered_raw_lts
+   ?(params : Params.log = default_params)
+   (grefs : Names.GlobRef.t list)
+   : (raw_lts option) mm =
+   (* params.kind <- Debug (); *)
+   params.kind <- Normal ();
+   match grefs with
+   | [] -> return None
+   | h :: t ->
+   let* h_raw_lts : raw_lts = check_ref_lts h in
+   match build_layered_raw_lts t with
+   | None -> return (Some h)
+   | Some t ->
+   end
+   end *)
+
+let cmd_bounded_layered_lts
+  ?(params : Params.log = default_params)
+  (grefs : Names.GlobRef.t list)
+  (tref : Constrexpr.constr_expr_r CAst.t)
+  : rlts_list mm
   =
-  params.kind <- Debug ();
+  params.kind <- Details ();
+  params.options.show_detailed_output <- true;
+  (*  *)
+  let rlts_ctx : rlts_list =
+    List.fold_left
+      (fun (acc : rlts_list) (gref : Names.GlobRef.t) ->
+        let rlts : raw_lts = run (check_ref_lts gref) in
+        log
+          ~params
+          (Printf.sprintf "= = = = = = = = =\n\trlts (#%d):" (List.length acc));
+        let _ = log_raw_lts ~params rlts in
+        List.append acc [ rlts ])
+      []
+      grefs
+  in
   (* *)
-  let* raw_lts = check_ref_lts iref in
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
-  let* graph_lts = G.build_graph ~params raw_lts tref in
-  (* *)
-  let* env = get_env in
-  let* sigma = get_sigma in
+  let* graph_lts = G.build_graph ~params rlts_ctx tref in
   (* *)
   log ~params (Printf.sprintf "= = = = = = = = =\n");
   if G.H.length graph_lts.transitions >= bound
@@ -913,32 +1014,6 @@ let build_lts_graph
       (Printf.sprintf
          "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
          bound);
-  (* *)
-  log
-    ~params
-    (Printf.sprintf
-       "(a) Types of terms: %s.\n"
-       (econstr_to_string raw_lts.trm_type));
-  log
-    ~params
-    (Printf.sprintf
-       "(b) Types of labels: %s.\n"
-       (econstr_to_string raw_lts.lbl_type));
-  log
-    ~params
-    (Printf.sprintf
-       "(c) Constructors: %s.\n"
-       (Pp.string_of_ppcmds
-          (Pp.prvect_with_sep
-             (fun _ -> str ", ")
-             Names.Id.print
-             raw_lts.coq_ctor_names)));
-  log
-    ~params
-    (Printf.sprintf
-       "(d) Transitions: %s.\n"
-       (Pp.string_of_ppcmds
-          (pp_transitions env sigma raw_lts.constructor_transitions)));
   log
     ~params
     (Printf.sprintf
@@ -953,23 +1028,69 @@ let build_lts_graph
     (Printf.sprintf
        "Constructed LTS: %s.\n"
        (run (G.PStr.lts ~params:(Log params) graph_lts)));
-  return raw_lts
+  return rlts_ctx
+;;
+
+(****************************************************************)
+(***** (above is the new stuff) *********************************)
+(***** (allowing layered lts using list of gref) ****************)
+(****************************************************************)
+
+let build_lts_graph
+  ?(params : Params.log = default_params)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
+  : raw_lts mm
+  =
+  params.kind <- Debug ();
+  (* *)
+  let* rlts = check_ref_lts iref in
+  let* _ = log_raw_lts ~params rlts in
+  (* *)
+  let* graphM = make_graph_builder in
+  let module G = (val graphM) in
+  let* graph_lts = G.build_graph ~params [ rlts ] tref in
+  (* *)
+  log ~params (Printf.sprintf "= = = = = = = = =\n");
+  if G.H.length graph_lts.transitions >= bound
+  then
+    log
+      ~params
+      (Printf.sprintf
+         "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
+         bound);
+  log
+    ~params
+    (Printf.sprintf
+       "(e) Graph Edges: %s.\n"
+       (run (G.PStr.transitions ~params:(Log params) graph_lts.transitions)));
+  (* show if normal output allowed from outside call *)
+  if params.options.show_debug_output
+  then params.kind <- Details ()
+  else params.kind <- Normal ();
+  log
+    ~params
+    (Printf.sprintf
+       "Constructed LTS: %s.\n"
+       (run (G.PStr.lts ~params:(Log params) graph_lts)));
+  return rlts
 ;;
 
 (**  *)
 let build_fsm_from_lts
-      ?(params : Params.log = default_params)
-      (iref : Names.GlobRef.t)
-      (tref : Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
   : fsm mm
   =
   (* TODO: make this return the conversion stuff too *)
   params.kind <- Debug ();
   (* *)
-  let* raw_lts = check_ref_lts iref in
+  let* rlts = check_ref_lts iref in
+  let* _ = log_raw_lts ~params rlts in
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
-  let* graph_lts = G.build_graph ~params raw_lts tref in
+  let* graph_lts = G.build_graph ~params [ rlts ] tref in
   (* *)
   let* env = get_env in
   let* sigma = get_sigma in
@@ -983,31 +1104,6 @@ let build_fsm_from_lts
          "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
          bound);
   (* *)
-  log
-    ~params
-    (Printf.sprintf
-       "(a) Types of terms: %s.\n"
-       (econstr_to_string raw_lts.trm_type));
-  log
-    ~params
-    (Printf.sprintf
-       "(b) Types of labels: %s.\n"
-       (econstr_to_string raw_lts.lbl_type));
-  log
-    ~params
-    (Printf.sprintf
-       "(c) Constructors: %s.\n"
-       (Pp.string_of_ppcmds
-          (Pp.prvect_with_sep
-             (fun _ -> str ", ")
-             Names.Id.print
-             raw_lts.coq_ctor_names)));
-  log
-    ~params
-    (Printf.sprintf
-       "(d) Transitions: %s.\n"
-       (Pp.string_of_ppcmds
-          (pp_transitions env sigma raw_lts.constructor_transitions)));
   log
     ~params
     (Printf.sprintf
@@ -1067,21 +1163,33 @@ let build_fsm_from_lts
     - States are the sets of possible transitions
     - A term [t] is represented by the state of the transitions that can be taken *)
 let cmd_bounded_lts
-      ?(params : Params.log = default_params)
-      (iref : Names.GlobRef.t)
-      (tref : Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   params.kind <- Details ();
   params.options.show_detailed_output <- true;
-  let* (_graph_lts : raw_lts) = build_lts_graph ~params iref tref in
+  let* (_rlts : raw_lts) = build_lts_graph ~params iref tref in
+  return ()
+;;
+
+let cmd_bounded_layered_lts
+  ?(params : Params.log = default_params)
+  (gref : Names.GlobRef.t list)
+  (tref : Constrexpr.constr_expr_r CAst.t)
+  : unit mm
+  =
+  params.kind <- Details ();
+  params.options.show_detailed_output <- true;
+  let* (_rlts_ctx : rlts_list) = cmd_bounded_layered_lts ~params gref tref in
   return ()
 ;;
 
 let cmd_bounded_lts_to_fsm
-      ?(params : Params.log = default_params)
-      (iref : Names.GlobRef.t)
-      (tref : Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  (iref : Names.GlobRef.t)
+  (tref : Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   params.kind <- Debug ();
@@ -1090,9 +1198,9 @@ let cmd_bounded_lts_to_fsm
 ;;
 
 let cmd_merge_fsm_from_lts
-      ?(params : Params.log = default_params)
-      ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-      ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   params.kind <- Debug ();
@@ -1117,9 +1225,9 @@ exception UnexpectedResultKind of Bisimilarity.result
 
 (* *)
 let cmd_bisim_ks90_using_fsm
-      ?(params : Params.log = default_params)
-      (s : fsm)
-      (t : fsm)
+  ?(params : Params.log = default_params)
+  (s : fsm)
+  (t : fsm)
   : unit mm
   =
   let open Bisimilarity in
@@ -1143,9 +1251,9 @@ let cmd_bisim_ks90_using_fsm
 
 (* *)
 let cmd_bisim_ks90_using_lts_to_fsm
-      ?(params : Params.log = default_params)
-      ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-      ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   if Bool.not params.options.show_debug_output
@@ -1160,8 +1268,8 @@ let cmd_bisim_ks90_using_lts_to_fsm
 
 (* *)
 let cmd_minim_ks90_using_fsm
-      ?(params : Params.log = default_params)
-      (the_fsm : fsm)
+  ?(params : Params.log = default_params)
+  (the_fsm : fsm)
   : unit mm
   =
   (* *)
@@ -1184,8 +1292,8 @@ let cmd_minim_ks90_using_fsm
 
 (* *)
 let cmd_minim_ks90_using_lts_to_fsm
-      ?(params : Params.log = default_params)
-      ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   if Bool.not params.options.show_debug_output
@@ -1199,8 +1307,8 @@ let cmd_minim_ks90_using_lts_to_fsm
 
 (* *)
 let cmd_minim_ks90_using_lts_to_fsm_to_lts
-      ?(params : Params.log = default_params)
-      ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
+  ?(params : Params.log = default_params)
+  ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
   : unit mm
   =
   if Bool.not params.options.show_debug_output

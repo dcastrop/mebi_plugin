@@ -17,6 +17,10 @@ open Stdarg
 
 }
 
+(* https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto0/src/g_tuto0.mlg *)
+(* https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto1/src/g_tuto1.mlg *)
+(* https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto2/src/g_tuto2.mlg *)
+
 (*
  * TODO: so far, classified as query. What it should do: read proposition, check
  * it has the corret type. Print proposition.
@@ -59,9 +63,9 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   (***************************)
   (***************************)
   (***************************)
-  (* | [ "MeBi" "LTS2" reference(r) constr(t) reference(s) ] ->
+  | [ "MeBi" "LTS2" reference(r) constr(t) reference(s) ] ->
     { (Mebi_monad.run
-        (Command.cmd_bounded_lts2
+        (Command.cmd_bounded_layered_lts
           ~params:(
             let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
             params.options <-
@@ -73,11 +77,11 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
             params
           )
           (* coq terms: *)
-          (Nametab.global r) t (Nametab.global s))) }
+          [(Nametab.global r); (Nametab.global s)] t )) }
   (*** debug mode ****)
   | [ "MeBi" "LTS2" "show_debug" reference(r) constr(t) reference(s) ] ->
     { (Mebi_monad.run
-        (Command.cmd_bounded_lts2
+        (Command.cmd_bounded_layered_lts
           ~params:(
             let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
             params.options <-
@@ -89,7 +93,46 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
             params
           )
           (* coq terms: *)
-          (Nametab.global r) t (Nametab.global s))) } *)
+          [(Nametab.global r); (Nametab.global s)] t )) }
+  (***************************)
+  (***************************)
+  (***************************)
+  | [ "MeBi" "Layered" "LTS" constr(t) "Using" reference_list(r) ] ->
+    { (Mebi_monad.run
+        (Command.cmd_bounded_layered_lts
+          ~params:(
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+            params.options <-
+            { output_enabled=true;
+              show_normal_output=true;
+              show_detailed_output=true;
+              show_debug_output=false;
+              show_warning_output=true };
+            params
+          )
+          (* coq terms: *)
+          (List.fold_left (fun (acc: Names.GlobRef.t list ) (s:Libnames.qualid) -> List.append acc [Nametab.global s]) [] r) t )) }
+  (*** debug mode ****)
+  | [ "MeBi" "Layered" "LTS" "show_debug" constr(t) "Using" reference_list(r) ] ->
+    { (Mebi_monad.run
+        (Command.cmd_bounded_layered_lts
+          ~params:(
+            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+            params.options <-
+            { output_enabled=true;
+              show_normal_output=true;
+              show_detailed_output=true;
+              show_debug_output=true;
+              show_warning_output=true };
+            params
+          )
+          (* coq terms: *)
+          (List.fold_left
+            (fun (acc: Names.GlobRef.t list ) (s:Libnames.qualid) ->
+              List.append acc [Nametab.global s]
+            ) [] r)
+          t
+          )) }
   (***************************)
   (***************************)
   (***************************)
@@ -109,7 +152,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
           (* coq terms: *)
           (Nametab.global r) t)) }
   (*** debug mode ****)
-  | [ "MeBi" "FSM" "show_debug" reference(r) constr(t) ] ->
+  (* | [ "MeBi" "FSM" "show_debug" reference(r) constr(t) ] ->
     { (Mebi_monad.run
         (Command.cmd_bounded_lts_to_fsm
           ~params:(
@@ -142,7 +185,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
           )
           (* coq terms: *)
         ((Nametab.global r), t)
-        ((Nametab.global r'), t'))) }
+        ((Nametab.global r'), t'))) } *)
   (*** debug mode ****)
   | [ "MeBi" "FSM" "Merge" "show_debug" reference(r) constr(t) reference(r') constr(t') ] ->
     { (Mebi_monad.run
@@ -232,4 +275,14 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
           )
         (* coq terms: *)
       ((Nametab.global r), t))) }
+      (*  *)
+      (* line 36: https://github.com/rocq-prover/rocq/blob/master/coqpp/coqpp_parse.mly *)
+  | [ "AcceptTestInt" int(l) ] -> { () }
+  | [ "AcceptTestInts" int_list(l) ] -> { () }
+  | [ "AcceptTestRef" reference(l) ] -> { () }
+  | [ "AcceptTestRefs" reference_list(l) ] -> { () }
+  | [ "AcceptTestRefsConstrA" reference_list(l) constr(t) ] -> { () }
+  | [ "AcceptTestRefsConstrB" constr(t) reference_list(l) ] -> { () }
+  | [ "AcceptTestRefsConstrA2" reference_list(l) "On" constr(t) ] -> { () }
+  | [ "AcceptTestRefsConstrB2" constr(t) "Using" reference_list(l) ] -> { () }
 END

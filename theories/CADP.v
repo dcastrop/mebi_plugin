@@ -655,7 +655,7 @@ Inductive lts : sys * resource -> action -> sys * resource -> Prop :=
   | LTS_OK_R : forall l s g, (PAR l (PRC OK s), g) ==<{SILENT}>==> (l, g)
 
   where "t '==<{' a '}>==>' t'" := (lts t a t')
-  and "t '--<{' a '}>-->' t'" := (step t a t').
+  and "y '--<{' a '}>-->' y'" := (step y a y').
 
 (*************************************************************************)
 (**** Example ************************************************************)
@@ -726,11 +726,48 @@ Proof.
   constructor.
 Qed.
 
-Goal exists a t e, (Acquire, Env.initial 1) --<{ a }>--> (t, e).
+(** *)
+Inductive step_transitive_closure : tm * env -> Prop :=
+
+  | trans_step : forall t a t' e' e,
+      (t, e) --<{ a }>--> (t', e') ->
+      step_transitive_closure (t', e') ->
+      step_transitive_closure (t, e)
+
+  | no_step : forall t e, step_transitive_closure (t, e)
+  .
+
+
+(* Goal step_transitive_closure (P, Env.initial 1).
+   eapply trans_step.
+   unfold P.
+   eapply STEP_REC_DEF.
+   simpl.
+   eapply trans_step.
+
+   eapply STEP_SEQ.
+
+   eapply STEP_ACT_helper;  reflexivity.
+   eapply trans_step.
+   constructor.
+   eapply trans_step.
+   eapply STEP_SEQ.
+   constructor.
+   eapply STEP_ACT_helper;  reflexivity.
+   eapply trans_step.
+   simpl.
+   eapply STEP_SEQ.
+
+Abort. *)
+
+
+(* Goal exists a t e, (Acquire, Env.initial 1) --<{ a }>--> (t, e).
   do 3 eexists.
   eapply STEP_SEQ.
-  eapply STEP_ACT_helper; reflexivity.
-Qed.
+  (* eapply STEP_ACT. *)
+  eapply STEP_ACT_helper. reflexivity. simpl.
+  (* ; reflexivity. *)
+Qed. *)
 
 Goal exists a t e, (Release, Env.initial 1) --<{ a }>--> (t, e).
   do 3 eexists.
@@ -745,6 +782,43 @@ Qed.
 Example p0 : tm * env := (P, Env.initial 0).
 (* MeBi LTS show_debug step p0. *)
 MeBi LTS step p0.
+
+AcceptTestInt 1.
+
+AcceptTestInts 1.
+AcceptTestInts 1 3.
+AcceptTestInts.
+
+AcceptTestRef step.
+
+AcceptTestRefs step.
+AcceptTestRefs step lts.
+
+
+(* AcceptTestRefsConstrA p0. *) (* ! <- invalid *)
+(* AcceptTestRefsConstrA step p0. *) (* ! <- invalid *)
+(* AcceptTestRefsConstrA step lts p1. *)
+
+
+AcceptTestRefsConstrB p0.
+AcceptTestRefsConstrB p0 step.
+AcceptTestRefsConstrB p0 step lts.
+
+
+
+(* AcceptTestRefsConstrA2 On p0. *)
+(* AcceptTestRefsConstrA2 step On p0. *)
+(* AcceptTestRefsConstrA2 step lts On p1. *)
+
+
+AcceptTestRefsConstrB2 p0 Using.
+AcceptTestRefsConstrB2 p0 Using step.
+AcceptTestRefsConstrB2 p0 Using step lts.
+
+
+MeBi Layered LTS show_debug p0 Using step.
+
+
 
 (*************************************************************************)
 (**** System *************************************************************)
@@ -786,57 +860,74 @@ Definition compose (s:system) : composition :=
 Example ncs1 : composition := compose (create 1 P).
 Compute ncs1.
 
-MeBi LTS show_debug lts ncs1.
+(* original: *) MeBi LTS  show_debug lts ncs1.
+(* updated:  *) MeBi LTS2 show_debug lts ncs1 step.
 
-(* Example ncs2 : composition := compose (create 2 P).
+MeBi Layered LTS show_debug ncs1 Using lts step.
+
+
+(* MeBi Layered_LTS show_debug [lts ; step] ncs1. *)
+(* MeBi Layered_LTS show_debug [lts] ncs1. *)
+
+Example ncs2 : composition := compose (create 2 P).
 Compute ncs2.
-MeBi LTS show_debug lts ncs2. *)
+(* MeBi LTS show_debug lts ncs2.
+MeBi LTS2 show_debug lts ncs2 step. *)
 
-(* Example ncs5 : composition := compose (create 5 P).
+Example ncs5 : composition := compose (create 5 P).
 Compute ncs5.
-MeBi LTS show_debug lts ncs5. *)
+(* MeBi LTS show_debug lts ncs5.
+MeBi LTS2 show_debug lts ncs5 step. *)
 
-(* MeBi LTS lts ncs. *)
 
 
-(* Goal exists a t1 t2 s1 s2 r1 r2,
-  (t1, (s1, r1)) --<{ a }>--> (t2, (s2, r2)) ->
-  (PRC t1 s1, r1) ==<{ a }>==> (PRC t2 s2, r2).
+Goal exists a t s r, (ncs1) ==<{a}>==> (PRC t s, r).
 Proof.
-  do 7 eexists.
-  eapply LTS_PRC. *)
-
-Definition can_STEP (t1:tm) (e1:env) : Prop :=
-  exists a t2 e2, (t1, e1) --<{a}>--> (t2, e2).
-
-Definition can_LTS (s1:sys) (r1:resource) : Prop :=
-  exists a s2 r2, (s1, r1) ==<{a}>==> (s2, r2).
-
-(* Lemma env_helper :
-  forall s
-
-Lemma do_act_helper :
-  forall (e:env), exists (s:state) (r:resource), e=(s,r).
-Proof.
-  intros. do 2 eexists.
-  apply env.
-  eauto. *)
-
-
-
-(* Goal exists a l t s r,
-  (ACT a, Env.initial 1) --<{l}>--> (t, (s, r)) ->
-  (PRC (ACT a) State.initial, Resource.initial 1) ==<{l}>==> (PRC t s, r).
-Proof.
-  do 5 eexists.
-  intros.
+  do 4 eexists.
+  unfold ncs1.
+  simpl.
+  unfold P.
   eapply LTS_PRC.
-  eapply STEP_ACT_helper.
-  - reflexivity.
-  - reflexivity.
-  - unfold do_act. . *)
+  constructor.
+Qed.
 
 
+(** Following the same stratefy as [STEP_ACT_helper] (above) *)
+(** Note: below ends up not being necessary. *)
+(* Lemma LTS_PRC_helper :
+  forall a t1 t2 s1 s2 r1 r2 x1 x2,
+  x1 = (PRC t1 s1, r1) ->
+  (t1, (s1, r1)) --<{ a }>--> (t2, (s2, r2)) ->
+  x2 = (PRC t2 s2, r2) ->
+  x1 ==<{ a }>==> x2.
+Proof.
+  intros; subst.
+  constructor.
+  apply H0.
+Qed. *)
+
+(** this time testing the ACT *)
+Example ncs1b : composition := compose (create 1 Acquire).
+Compute ncs1b.
+
+Goal exists a t s r, (ncs1b) ==<{a}>==> (PRC t s, r).
+Proof.
+  do 4 eexists.
+  unfold ncs1b.
+  simpl.
+  unfold Acquire.
+  constructor.
+  eapply STEP_SEQ.
+  eapply STEP_ACT_helper; reflexivity.
+Qed.
+
+(*************************************************************************)
+(**** TESTING: Coq-type for mebi input. **********************************)
+(*************************************************************************)
+
+(* Record mebi_input {A:Type} {B:Type} :=
+  { input_lts  : A -> B -> A -> Prop
+  ; input_term : A }. *)
 
 (*************************************************************************)
 (**** TODO: LTS equiv temp. logic prop. **********************************)
