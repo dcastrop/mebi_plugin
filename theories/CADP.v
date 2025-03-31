@@ -783,6 +783,43 @@ Example p0 : tm * env := (P, Env.initial 0).
 (* MeBi LTS show_debug step p0. *)
 MeBi LTS step p0.
 
+AcceptTestInt 1.
+
+AcceptTestInts 1.
+AcceptTestInts 1 3.
+AcceptTestInts.
+
+AcceptTestRef step.
+
+AcceptTestRefs step.
+AcceptTestRefs step lts.
+
+
+(* AcceptTestRefsConstrA p0. *) (* ! <- invalid *)
+(* AcceptTestRefsConstrA step p0. *) (* ! <- invalid *)
+(* AcceptTestRefsConstrA step lts p1. *)
+
+
+AcceptTestRefsConstrB p0.
+AcceptTestRefsConstrB p0 step.
+AcceptTestRefsConstrB p0 step lts.
+
+
+
+(* AcceptTestRefsConstrA2 On p0. *)
+(* AcceptTestRefsConstrA2 step On p0. *)
+(* AcceptTestRefsConstrA2 step lts On p1. *)
+
+
+AcceptTestRefsConstrB2 p0 Using.
+AcceptTestRefsConstrB2 p0 Using step.
+AcceptTestRefsConstrB2 p0 Using step lts.
+
+
+MeBi Layered LTS show_debug p0 Using step.
+
+
+
 (*************************************************************************)
 (**** System *************************************************************)
 (*************************************************************************)
@@ -826,15 +863,21 @@ Compute ncs1.
 (* original: *) MeBi LTS  show_debug lts ncs1.
 (* updated:  *) MeBi LTS2 show_debug lts ncs1 step.
 
+MeBi Layered LTS show_debug ncs1 Using lts step.
+
+
+(* MeBi Layered_LTS show_debug [lts ; step] ncs1. *)
+(* MeBi Layered_LTS show_debug [lts] ncs1. *)
+
 Example ncs2 : composition := compose (create 2 P).
 Compute ncs2.
-MeBi LTS show_debug lts ncs2.
-MeBi LTS2 show_debug lts ncs2 step.
+(* MeBi LTS show_debug lts ncs2.
+MeBi LTS2 show_debug lts ncs2 step. *)
 
 Example ncs5 : composition := compose (create 5 P).
 Compute ncs5.
-MeBi LTS show_debug lts ncs5.
-MeBi LTS2 show_debug lts ncs5 step.
+(* MeBi LTS show_debug lts ncs5.
+MeBi LTS2 show_debug lts ncs5 step. *)
 
 
 
@@ -882,11 +925,9 @@ Qed.
 (**** TESTING: Coq-type for mebi input. **********************************)
 (*************************************************************************)
 
-(* Definition lts_type_of {A:Type} {B:Type} (kind:A->B->A->Prop): Type := kind. *)
-
 (* Record mebi_input {A:Type} {B:Type} :=
-  { lts  : A -> B -> A -> Prop
-  ; term : A }. *)
+  { input_lts  : A -> B -> A -> Prop
+  ; input_term : A }. *)
 
 (*************************************************************************)
 (**** TODO: LTS equiv temp. logic prop. **********************************)
