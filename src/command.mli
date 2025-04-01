@@ -24,7 +24,6 @@ module Vernac : sig
     :  ?params:Utils.Logging.params
     -> ?bound:int
     -> Constrexpr.constr_expr_r CAst.t
-    -> Names.GlobRef.t list
     -> Constrexpr.constr_expr_r CAst.t
     -> Names.GlobRef.t list
     -> unit Mebi_monad.t
@@ -33,7 +32,6 @@ module Vernac : sig
     :  ?params:Utils.Logging.params
     -> ?bound:int
     -> Constrexpr.constr_expr_r CAst.t
-    -> Names.GlobRef.t list
     -> Constrexpr.constr_expr_r CAst.t
     -> Names.GlobRef.t list
     -> unit Mebi_monad.t

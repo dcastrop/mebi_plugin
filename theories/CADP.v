@@ -849,7 +849,7 @@ Example ncs2 : composition := compose (create 2 P).
 Compute ncs2.
 
 (* ! lts incomplete even after 5000 bound *)
-MeBi Show  LTS Bounded 5000 Of ncs2 Using lts step.
+(* MeBi Show  LTS Bounded 5000 Of ncs2 Using lts step. *)
 (* MeBi Debug LTS Of ncs2 Using lts step. *)
 
 (* MeBi Show  FSM Of ncs2 Using lts step. *)
