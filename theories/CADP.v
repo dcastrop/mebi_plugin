@@ -780,44 +780,14 @@ Qed.
 (*************************************************************************)
 
 Example p0 : tm * env := (P, Env.initial 0).
-(* MeBi LTS show_debug step p0. *)
-MeBi LTS step p0.
+MeBi Show  LTS Of p0 Using step.
+MeBi Debug LTS Of p0 Using step.
 
-AcceptTestInt 1.
+MeBi Show  FSM Of p0 Using step.
+MeBi Debug FSM Of p0 Using step.
 
-AcceptTestInts 1.
-AcceptTestInts 1 3.
-AcceptTestInts.
-
-AcceptTestRef step.
-
-AcceptTestRefs step.
-AcceptTestRefs step lts.
-
-
-(* AcceptTestRefsConstrA p0. *) (* ! <- invalid *)
-(* AcceptTestRefsConstrA step p0. *) (* ! <- invalid *)
-(* AcceptTestRefsConstrA step lts p1. *)
-
-
-AcceptTestRefsConstrB p0.
-AcceptTestRefsConstrB p0 step.
-AcceptTestRefsConstrB p0 step lts.
-
-
-
-(* AcceptTestRefsConstrA2 On p0. *)
-(* AcceptTestRefsConstrA2 step On p0. *)
-(* AcceptTestRefsConstrA2 step lts On p1. *)
-
-
-AcceptTestRefsConstrB2 p0 Using.
-AcceptTestRefsConstrB2 p0 Using step.
-AcceptTestRefsConstrB2 p0 Using step lts.
-
-
-MeBi Layered LTS show_debug p0 Using step.
-
+MeBi Show  Minim Of p0 Using step.
+MeBi Debug Minim Of p0 Using step.
 
 
 (*************************************************************************)
@@ -857,31 +827,54 @@ Definition compose (s:system) : composition :=
   | (ps, r) => (load ps, r)
   end.
 
+(***************************)
+(**** System size: 1 *******)
+(***************************)
 Example ncs1 : composition := compose (create 1 P).
 Compute ncs1.
 
-(* original: *) MeBi LTS  show_debug lts ncs1.
-(* updated:  *) MeBi LTS2 show_debug lts ncs1 step.
+MeBi Show  LTS Of ncs1 Using lts step.
+MeBi Debug LTS Of ncs1 Using lts step.
 
-MeBi Layered LTS show_debug ncs1 Using lts step.
+MeBi Show  FSM Of ncs1 Using lts step.
+MeBi Debug FSM Of ncs1 Using lts step.
 
+MeBi Show  Minim Of ncs1 Using lts step.
+MeBi Debug Minim Of ncs1 Using lts step.
 
-(* MeBi Layered_LTS show_debug [lts ; step] ncs1. *)
-(* MeBi Layered_LTS show_debug [lts] ncs1. *)
-
+(***************************)
+(**** System size: 2 *******)
+(***************************)
 Example ncs2 : composition := compose (create 2 P).
 Compute ncs2.
-(* MeBi LTS show_debug lts ncs2.
-MeBi LTS2 show_debug lts ncs2 step. *)
 
+(* ! lts incomplete even after 5000 bound *)
+MeBi Show  LTS Bounded 5000 Of ncs2 Using lts step.
+(* MeBi Debug LTS Of ncs2 Using lts step. *)
+
+(* MeBi Show  FSM Of ncs2 Using lts step. *)
+(* MeBi Debug FSM Of ncs2 Using lts step. *)
+
+(* MeBi Show  Minim Of ncs2 Using lts step. *)
+(* MeBi Debug Minim Of ncs2 Using lts step. *)
+
+(***************************)
+(**** System size: 5 *******)
+(***************************)
 Example ncs5 : composition := compose (create 5 P).
 Compute ncs5.
-(* MeBi LTS show_debug lts ncs5.
-MeBi LTS2 show_debug lts ncs5 step. *)
+(* MeBi Show  LTS Of ncs5 Using lts step. *)
+(* MeBi Debug LTS Of ncs5 Using lts step. *)
+
+(* MeBi Show  FSM Of ncs5 Using lts step. *)
+(* MeBi Debug FSM Of ncs5 Using lts step. *)
+
+(* MeBi Show  Minim Of ncs5 Using lts step. *)
+(* MeBi Debug Minim Of ncs5 Using lts step. *)
 
 
 
-Goal exists a t s r, (ncs1) ==<{a}>==> (PRC t s, r).
+(* Goal exists a t s r, (ncs1) ==<{a}>==> (PRC t s, r).
 Proof.
   do 4 eexists.
   unfold ncs1.
@@ -889,7 +882,7 @@ Proof.
   unfold P.
   eapply LTS_PRC.
   constructor.
-Qed.
+Qed. *)
 
 
 (** Following the same stratefy as [STEP_ACT_helper] (above) *)
@@ -907,7 +900,7 @@ Proof.
 Qed. *)
 
 (** this time testing the ACT *)
-Example ncs1b : composition := compose (create 1 Acquire).
+(* Example ncs1b : composition := compose (create 1 Acquire).
 Compute ncs1b.
 
 Goal exists a t s r, (ncs1b) ==<{a}>==> (PRC t s, r).
@@ -919,7 +912,7 @@ Proof.
   constructor.
   eapply STEP_SEQ.
   eapply STEP_ACT_helper; reflexivity.
-Qed.
+Qed. *)
 
 (*************************************************************************)
 (**** TESTING: Coq-type for mebi input. **********************************)

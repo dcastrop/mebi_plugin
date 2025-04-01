@@ -66,6 +66,12 @@ type lts =
   ; transitions : Transitions.t
   }
 
+module PStr : sig
+  val transition : ?params:Utils.Params.pstr -> transition -> string
+  val transitions : ?params:Utils.Params.pstr -> Transitions.t -> string
+  val lts : ?params:Utils.Params.pstr -> lts -> string
+end
+
 module Create : sig
   type transition_params = Of of (int * string * string * string)
 

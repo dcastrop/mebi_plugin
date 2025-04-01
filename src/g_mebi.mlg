@@ -30,330 +30,326 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   (**** Coq -> LTS  **********)
   (***************************)
   (* build lts for [t] using [r] (default bounds) *)
-  | [ "MeBi"
-      "Show"
-      "LTS" "Of" constr(t)
-      "Using" reference_list(r) ] ->
+  | [ "MeBi" "Show" "LTS"
+      "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
-      Command.cmd_bounded_lts
-        (List.fold_left
-          (fun (acc: Names.GlobRef.t list ) (s:Libnames.qualid) ->
-            List.append acc [Nametab.global s]) [] r)
+      Command.Vernac.show_lts
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  | [ "MeBi" "Debug" "LTS"
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_lts
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
       ) }
   (* build lts for [t] using [r], within bound [i] *)
-  | [ "MeBi"
-      "Show"
-      "LTS" "Of" constr(t)
-      "With" "Bound" int(i)
-      "Using" reference_list(r) ] ->
+  | [ "MeBi" "Show" "LTS" "Bounded" int(i)
+      "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
-      Command.cmd_bounded_lts
+      Command.Vernac.show_lts
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
-        (List.fold_left
-          (fun (acc: Names.GlobRef.t list ) (s:Libnames.qualid) ->
-            List.append acc [Nametab.global s]) [] r)
         t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  | [ "MeBi" "Debug" "LTS"
+      "Of" constr(t) "Using" reference_list(r)
+      "Within" "Bound" int(i) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_lts
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        ~bound:i
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
       ) }
   (***************************)
   (**** Coq -> LTS -> FSM ****)
   (***************************)
   (* build fsm from lts for [t] using [r] (default bounds) *)
-  | [ "MeBi"
-      "Show"
-      "FSM" "Of" constr(t)
-      "Using" reference_list(r) ] ->
+  | [ "MeBi" "Show" "FSM"
+      "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
-      Command.cmd_bounded_lts_to_fsm
-        (List.fold_left
-          (fun (acc: Names.GlobRef.t list ) (s:Libnames.qualid) ->
-            List.append acc [Nametab.global s]) [] r)
+      Command.Vernac.show_fsm
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  | [ "MeBi" "Debug" "FSM"
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_fsm
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
       ) }
   (* build fsm from lts for [t] using [r], within bound [i] *)
-  | [ "MeBi"
-      "Show"
-      "FSM" "Of" constr(t)
-      "With" "Bound" int(i)
-      "Using" reference_list(r) ] ->
+  | [ "MeBi" "Show" "FSM"
+      "Of" constr(t) "Using" reference_list(r)
+      "Within" "Bound" int(i) ] ->
     { Mebi_monad.run (
-      Command.cmd_bounded_lts_to_fsm
+      Command.Vernac.show_fsm
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
-        (List.fold_left
-          (fun (acc: Names.GlobRef.t list ) (s:Libnames.qualid) ->
-            List.append acc [Nametab.global s]) [] r)
         t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  | [ "MeBi" "Debug" "FSM"
+      "Of" constr(t) "Using" reference_list(r)
+      "Within" "Bound" int(i) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_fsm
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        ~bound:i
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  (****************************************************)
+  (**** Coq A -> LTS A -> FSM A -> Minim A ************)
+  (****************************************************)
+  (* build fsm from lts for [t] using [r] (default bounds), and run minum *)
+  | [ "MeBi" "Show" "Minim"
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_minim
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  | [ "MeBi" "Debug" "Minim"
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_minim
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  (* build fsm from lts for [t] using [r], within bound [i], and run minum *)
+  | [ "MeBi" "Show" "Minim"
+      "Of" constr(t) "Using" reference_list(r)
+      "Within" "Bound" int(i) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_minim
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~bound:i
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  | [ "MeBi" "Debug" "Minim"
+      "Of" constr(t) "Using" reference_list(r)
+      "Within" "Bound" int(i) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_minim
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        ~bound:i
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
       ) }
   (****************************************************)
   (**** Coq A B -> LTS A B -> FSM A B -> Merge A B ****)
   (****************************************************)
-  | [ "MeBi"
-      "Show"
-      "FSM" "Merger"
-      "Of" constr(tA)
-      "Using" reference_list(rA)
+  (* build two fsms from two different lts and merge them *)
+  | [ "MeBi" "Show" "FSM" "Merge"
+      "Of" constr(tA) "Using" reference_list(rA)
       "With"
-      "Of" constr(tB)
-      "Using" reference_list(rB)
-      ] ->
-    { }
-  (***************************)
-  (***************************)
-  (***************************)
-  | [ "MeBi" "LTS" reference(r) constr(t) ] ->
-    { (Mebi_monad.run
-        (Command.cmd_bounded_lts
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=true;
-              show_debug_output=false;
-              show_warning_output=true };
-            params
-          )
-          (* coq terms: *)
-          (Nametab.global r) t)) }
-  (*** debug mode ****)
-  | [ "MeBi" "LTS" "show_debug" reference(r) constr(t) ] ->
-    { (Mebi_monad.run
-        (Command.cmd_bounded_lts
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=true;
-              show_debug_output=true;
-              show_warning_output=true };
-            params
-          )
-          (* coq terms: *)
-          (Nametab.global r) t)) }
-  (***************************)
-  (***************************)
-  (***************************)
-  | [ "MeBi" "LTS2" reference(r) constr(t) reference(s) ] ->
-    { (Mebi_monad.run
-        (Command.cmd_bounded_layered_lts
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=true;
-              show_debug_output=false;
-              show_warning_output=true };
-            params
-          )
-          (* coq terms: *)
-          [(Nametab.global r); (Nametab.global s)] t )) }
-  (*** debug mode ****)
-  | [ "MeBi" "LTS2" "show_debug" reference(r) constr(t) reference(s) ] ->
-    { (Mebi_monad.run
-        (Command.cmd_bounded_layered_lts
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=true;
-              show_debug_output=true;
-              show_warning_output=true };
-            params
-          )
-          (* coq terms: *)
-          [(Nametab.global r); (Nametab.global s)] t )) }
-  (***************************)
-  (***************************)
-  (***************************)
-  | [ "MeBi" "Layered" "LTS" constr(t) "Using" reference_list(r) ] ->
-    { (Mebi_monad.run
-        (Command.cmd_bounded_layered_lts
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=true;
-              show_debug_output=false;
-              show_warning_output=true };
-            params
-          )
-          (* coq terms: *)
-          (List.fold_left (fun (acc: Names.GlobRef.t list ) (s:Libnames.qualid) -> List.append acc [Nametab.global s]) [] r) t )) }
-  (*** debug mode ****)
-  | [ "MeBi" "Layered" "LTS" "show_debug" constr(t) "Using" reference_list(r) ] ->
-    { (Mebi_monad.run
-        (Command.cmd_bounded_layered_lts
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=true;
-              show_debug_output=true;
-              show_warning_output=true };
-            params
-          )
-          (* coq terms: *)
-          (List.fold_left
-            (fun (acc: Names.GlobRef.t list ) (s:Libnames.qualid) ->
-              List.append acc [Nametab.global s]
-            ) [] r)
-          t
-          )) }
-  (***************************)
-  (***************************)
-  (***************************)
-  | [ "MeBi" "FSM" reference(r) constr(t) ] ->
-    { (Mebi_monad.run
-        (Command.cmd_bounded_lts_to_fsm
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=false;
-              show_debug_output=false;
-              show_warning_output=true };
-            params
-          )
-          (* coq terms: *)
-          (Nametab.global r) t)) }
-  (*** debug mode ****)
-  (* | [ "MeBi" "FSM" "show_debug" reference(r) constr(t) ] ->
-    { (Mebi_monad.run
-        (Command.cmd_bounded_lts_to_fsm
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=true;
-              show_debug_output=true;
-              show_warning_output=true };
-            params
-          )
-          (* coq terms: *)
-          (Nametab.global r) t)) }
-  (***************************)
-  (***************************)
-  (***************************)
-  | [ "MeBi" "FSM" "Merge" reference(r) constr(t) reference(r') constr(t') ] ->
-    { (Mebi_monad.run
-        (Command.cmd_merge_fsm_from_lts
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=false;
-              show_debug_output=false;
-              show_warning_output=true };
-            params
-          )
-          (* coq terms: *)
-        ((Nametab.global r), t)
-        ((Nametab.global r'), t'))) } *)
-  (*** debug mode ****)
-  | [ "MeBi" "FSM" "Merge" "show_debug" reference(r) constr(t) reference(r') constr(t') ] ->
-    { (Mebi_monad.run
-        (Command.cmd_merge_fsm_from_lts
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=true;
-              show_debug_output=true;
-              show_warning_output=true };
-            params
-          )
-        (* coq terms: *)
-      ((Nametab.global r), t)
-      ((Nametab.global r'), t'))) }
-  (***************************)
-  (***************************)
-  (***************************)
-  (* run bisim alg on two terms (first, builds fsm) *)
-  | [ "MeBi" "Bisim" "KS90" reference(r) constr(t) reference(r') constr(t') ] ->
-    { (Mebi_monad.run
-        (Command.cmd_bisim_ks90_using_lts_to_fsm
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=false;
-              show_debug_output=false;
-              show_warning_output=true };
-            params
-          )
-        (* coq terms: *)
-      ((Nametab.global r), t)
-      ((Nametab.global r'), t'))) }
-  (*** debug mode ****)
-  | [ "MeBi" "Bisim" "KS90" "show_debug" reference(r) constr(t) reference(r') constr(t') ] ->
-    { (Mebi_monad.run
-        (Command.cmd_bisim_ks90_using_lts_to_fsm
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=true;
-              show_debug_output=true;
-              show_warning_output=true };
-            params
-          )
-        (* coq terms: *)
-      ((Nametab.global r), t)
-      ((Nametab.global r'), t'))) }
-  (***************************)
-  (***************************)
-  (***************************)
-  (* run minimization alg on single term (first, builds fsm) *)
-  | [ "MeBi" "Minim" "KS90" reference(r) constr(t) ] ->
-    { (Mebi_monad.run
-        (Command.cmd_minim_ks90_using_lts_to_fsm
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=false;
-              show_debug_output=false;
-              show_warning_output=true };
-            params
-          )
-        (* coq terms: *)
-      ((Nametab.global r), t))) }
-  (*** debug mode ****)
-  | [ "MeBi" "Minim" "KS90" "show_debug" reference(r) constr(t) ] ->
-    { (Mebi_monad.run
-        (Command.cmd_minim_ks90_using_lts_to_fsm
-          ~params:(
-            let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
-            params.options <-
-            { output_enabled=true;
-              show_normal_output=true;
-              show_detailed_output=true;
-              show_debug_output=true;
-              show_warning_output=true };
-            params
-          )
-        (* coq terms: *)
-      ((Nametab.global r), t))) }
-      (*  *)
-      (* line 36: https://github.com/rocq-prover/rocq/blob/master/coqpp/coqpp_parse.mly *)
-  | [ "AcceptTestInt" int(l) ] -> { () }
-  | [ "AcceptTestInts" int_list(l) ] -> { () }
-  | [ "AcceptTestRef" reference(l) ] -> { () }
-  | [ "AcceptTestRefs" reference_list(l) ] -> { () }
-  | [ "AcceptTestRefsConstrA" reference_list(l) constr(t) ] -> { () }
-  | [ "AcceptTestRefsConstrB" constr(t) reference_list(l) ] -> { () }
-  | [ "AcceptTestRefsConstrA2" reference_list(l) "On" constr(t) ] -> { () }
-  | [ "AcceptTestRefsConstrB2" constr(t) "Using" reference_list(l) ] -> { () }
+      "Of" constr(tB) "Using" reference_list(rB) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_merged_fsm
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        tA
+        (Mebi_utils.ref_list_to_glob_list rA)
+        tB
+        (Mebi_utils.ref_list_to_glob_list rB)
+      ) }
+  | [ "MeBi" "Debug" "FSM" "Merge"
+      "Of" constr(tA) "Using" reference_list(rA)
+      "With"
+      "Of" constr(tB) "Using" reference_list(rB) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_merged_fsm
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        tA
+        (Mebi_utils.ref_list_to_glob_list rA)
+        tB
+        (Mebi_utils.ref_list_to_glob_list rB)
+      ) }
+  (* build two fsms from two different lts and merge them, within bound [i] *)
+  | [ "MeBi" "Show" "FSM" "Merge"
+      "Of" constr(tA) "Using" reference_list(rA)
+      "With"
+      "Of" constr(tB) "Using" reference_list(rB)
+      "Within" "Bound" int(i) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_merged_fsm
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~bound:i
+        tA
+        (Mebi_utils.ref_list_to_glob_list rA)
+        tB
+        (Mebi_utils.ref_list_to_glob_list rB)
+      ) }
+  | [ "MeBi" "Debug" "FSM" "Merge"
+      "Of" constr(tA) "Using" reference_list(rA)
+      "With"
+      "Of" constr(tB) "Using" reference_list(rB)
+      "Within" "Bound" int(i) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_merged_fsm
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        ~bound:i
+        tA
+        (Mebi_utils.ref_list_to_glob_list rA)
+        tB
+        (Mebi_utils.ref_list_to_glob_list rB)
+      ) }
+  (****************************************************)
+  (**** Coq A B -> LTS A B -> FSM A B -> Bisim A M ****)
+  (****************************************************)
+  (* check if two fsms built from lts are bisimiular *)
+  | [ "MeBi" "Show" "Bisim"
+      "Of" constr(tA) "Using" reference_list(rA)
+      "With"
+      "Of" constr(tB) "Using" reference_list(rB) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_bisim
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        tA
+        (Mebi_utils.ref_list_to_glob_list rA)
+        tB
+        (Mebi_utils.ref_list_to_glob_list rB)
+      ) }
+  | [ "MeBi" "Debug" "Bisim"
+      "Of" constr(tA) "Using" reference_list(rA)
+      "With"
+      "Of" constr(tB) "Using" reference_list(rB) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_bisim
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        tA
+        (Mebi_utils.ref_list_to_glob_list rA)
+        tB
+        (Mebi_utils.ref_list_to_glob_list rB)
+      ) }
+  (* check if two fsms built from lts within bound [i] are bisimiular *)
+  | [ "MeBi" "Show" "Bisim"
+      "Of" constr(tA) "Using" reference_list(rA)
+      "With"
+      "Of" constr(tB) "Using" reference_list(rB)
+      "Within" "Bound" int(i) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_bisim
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~bound:i
+        tA
+        (Mebi_utils.ref_list_to_glob_list rA)
+        tB
+        (Mebi_utils.ref_list_to_glob_list rB)
+      ) }
+  | [ "MeBi" "Debug" "Bisim"
+      "Of" constr(tA) "Using" reference_list(rA)
+      "With"
+      "Of" constr(tB) "Using" reference_list(rB)
+      "Within" "Bound" int(i) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.show_bisim
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        ~bound:i
+        tA
+        (Mebi_utils.ref_list_to_glob_list rA)
+        tB
+        (Mebi_utils.ref_list_to_glob_list rB)
+      ) }
 END

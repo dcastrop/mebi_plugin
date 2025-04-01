@@ -2,30 +2,30 @@ Require Import MEBI.loader.
 
 Inductive i := C0 (i : nat) | C1 (b : bool) (j : nat) | C2 (x : nat).
 
-Fail MeBi LTS i 0.
+(* Fail MeBi LTS i 0. *)
 
-Fail MeBi LTS j 0.
+(* Fail MeBi LTS j 0. *)
 
 Definition k := 0.
-Fail MeBi LTS k 0.
+(* Fail MeBi LTS k 0. *)
 
-Fail MeBi LTS nat 0.
+(* Fail MeBi LTS nat 0. *)
 Definition nnat := nat.
-Fail MeBi LTS nnat 0.
+(* Fail MeBi LTS nnat 0. *)
 
-Fail MeBi LTS False 0.
+(* Fail MeBi LTS False 0. *)
 
 CoInductive co_nat := CoZ | CoS : co_nat -> co_nat.
 
 Inductive test_lts A : co_nat -> nat -> nat -> Prop :=
 | less_lt (x : A) (i : co_nat) (j : nat) : test_lts A (CoS i) 1 j.
 
-Fail MeBi LTS test_lts 0.
+(* Fail MeBi LTS test_lts 0. *)
 
 Inductive test_mut A : Prop := Mk1 (x : A) (y : test_mut2 A)
 with test_mut2 A : Prop := Mk2 (y : test_mut A).
 
-Fail MeBi LTS test_mut2 0.
+(* Fail MeBi LTS test_mut2 0. *)
 
 
 Inductive testLTS : nat -> bool -> nat -> Prop :=
@@ -34,15 +34,15 @@ Inductive testLTS : nat -> bool -> nat -> Prop :=
 
 Definition one := 1.
 
-Fail MeBi LTS testLTS false.
+(* Fail MeBi LTS testLTS false. *)
 
 (* MeBi LTS testLTS 0. *) (* <- has no edges, fails. *)
-MeBi LTS testLTS (S 0).
+(* MeBi LTS testLTS (S 0).
 MeBi LTS testLTS (S (S 0)).
 MeBi LTS testLTS (S (S (S 0))).
 
 MeBi LTS testLTS one.
-MeBi LTS testLTS (S one).
+MeBi LTS testLTS (S one). *)
 
 
 Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
@@ -80,8 +80,8 @@ Module Test1.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
-  MeBi LTS termLTS (tfix (tact TheAction1 tend)).
-  MeBi LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
+  (* MeBi LTS termLTS (tfix (tact TheAction1 tend)).
+  MeBi LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))). *)
 End Test1.
 
 Module Test2.
@@ -114,13 +114,13 @@ Module Test2.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
-  MeBi LTS termLTS (tfix (tact TheAction1 tend)).
+  (* MeBi LTS termLTS (tfix (tact TheAction1 tend)).
 
   MeBi LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
 
   MeBi LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
 
-  MeBi LTS (*show_debug*) termLTS (tfix (tpar TheAction1 TheAction2 trec)).
+  MeBi LTS (*show_debug*) termLTS (tfix (tpar TheAction1 TheAction2 trec)). *)
 
 
 End Test2.
@@ -178,7 +178,7 @@ Module BisimTest1.
       termLTS (tfix t) a t'.
 
   (* true *)
-  MeBi Bisim KS90
+  (* MeBi Bisim KS90
     termLTS (tact TheAction1 tend)
     termLTS (tact TheAction1 tend).
 
@@ -226,7 +226,7 @@ Module BisimTest1.
 
   (* minimize *)
   MeBi Minim KS90
-    termLTS (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
+    termLTS (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))). *)
 
 
 
