@@ -1033,6 +1033,8 @@ let build_fsm_from_bounded_lts
       (grefs : Names.GlobRef.t list)
   : Fsm.fsm mm
   =
+  (* disable detailed printouts *)
+  params.options.show_normal_output <- false;
   (* list of raw coq lts *)
   let rlts_ctx : rlts_list = build_rlts_ctx ~params grefs in
   (* graph module *)
@@ -1043,6 +1045,7 @@ let build_fsm_from_bounded_lts
     build_bounded_lts ~params bound rlts_ctx tref (module G)
   in
   (* translate to fsm *)
+  params.options.show_normal_output <- true;
   return (Translate.to_fsm the_lts)
 ;;
 
