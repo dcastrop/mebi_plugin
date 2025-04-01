@@ -1122,14 +1122,14 @@ module Vernac = struct
         ?(params : Params.log = default_params)
         ?(bound : int = default_bound)
         (trefA : Constrexpr.constr_expr_r CAst.t)
-        (grefsA : Names.GlobRef.t list)
-        (trefB : Constrexpr.constr_expr_r CAst.t)
-        (grefsB : Names.GlobRef.t list)
+        (* (grefsA : Names.GlobRef.t list) (* <- VERNAC requires only one list per command, since it must be the last argument*) *)
+          (trefB : Constrexpr.constr_expr_r CAst.t)
+        (grefs : Names.GlobRef.t list)
     : unit mm
     =
     (* get translated fsm *)
-    let* fsm_A = build_fsm_from_bounded_lts ~params bound trefA grefsA in
-    let* fsm_B = build_fsm_from_bounded_lts ~params bound trefB grefsB in
+    let* fsm_A = build_fsm_from_bounded_lts ~params bound trefA grefs in
+    let* fsm_B = build_fsm_from_bounded_lts ~params bound trefB grefs in
     (* merge fsm *)
     let (merged_fsm, translation_table) : Fsm.fsm * (state, state) Hashtbl.t =
       Fsm.Merge.fsms ~params fsm_A fsm_B
@@ -1155,14 +1155,14 @@ module Vernac = struct
         ?(params : Params.log = default_params)
         ?(bound : int = default_bound)
         (trefA : Constrexpr.constr_expr_r CAst.t)
-        (grefsA : Names.GlobRef.t list)
-        (trefB : Constrexpr.constr_expr_r CAst.t)
-        (grefsB : Names.GlobRef.t list)
+        (* (grefsA : Names.GlobRef.t list) (* <- VERNAC requires only one list per command, since it must be the last argument*) *)
+          (trefB : Constrexpr.constr_expr_r CAst.t)
+        (grefs : Names.GlobRef.t list)
     : unit mm
     =
     (* get translated fsm *)
-    let* fsm_A = build_fsm_from_bounded_lts ~params bound trefA grefsA in
-    let* fsm_B = build_fsm_from_bounded_lts ~params bound trefB grefsB in
+    let* fsm_A = build_fsm_from_bounded_lts ~params bound trefA grefs in
+    let* fsm_B = build_fsm_from_bounded_lts ~params bound trefB grefs in
     (* run bisimilarity algorithm *)
     let open Bisimilarity in
     let raw_result = RCP.KS90.run ~params (ToMerge (fsm_A, fsm_B)) () in

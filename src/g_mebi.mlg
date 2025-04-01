@@ -65,9 +65,8 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Debug" "LTS"
-      "Of" constr(t) "Using" reference_list(r)
-      "Within" "Bound" int(i) ] ->
+  | [ "MeBi" "Debug" "LTS" "Bounded" int(i)
+      "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.show_lts
         ~params:(
@@ -114,9 +113,8 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
   (* build fsm from lts for [t] using [r], within bound [i] *)
-  | [ "MeBi" "Show" "FSM"
-      "Of" constr(t) "Using" reference_list(r)
-      "Within" "Bound" int(i) ] ->
+  | [ "MeBi" "Show" "FSM" "Bounded" int(i)
+      "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.show_fsm
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
@@ -124,9 +122,8 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Debug" "FSM"
-      "Of" constr(t) "Using" reference_list(r)
-      "Within" "Bound" int(i) ] ->
+  | [ "MeBi" "Debug" "FSM" "Bounded" int(i)
+      "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.show_fsm
         ~params:(
@@ -173,9 +170,8 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
   (* build fsm from lts for [t] using [r], within bound [i], and run minum *)
-  | [ "MeBi" "Show" "Minim"
-      "Of" constr(t) "Using" reference_list(r)
-      "Within" "Bound" int(i) ] ->
+  | [ "MeBi" "Show" "Minim" "Bounded" int(i)
+      "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.show_minim
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
@@ -183,9 +179,8 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Debug" "Minim"
-      "Of" constr(t) "Using" reference_list(r)
-      "Within" "Bound" int(i) ] ->
+  | [ "MeBi" "Debug" "Minim" "Bounded" int(i)
+      "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.show_minim
         ~params:(
@@ -207,21 +202,20 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   (****************************************************)
   (* build two fsms from two different lts and merge them *)
   | [ "MeBi" "Show" "FSM" "Merge"
-      "Of" constr(tA) "Using" reference_list(rA)
-      "With"
-      "Of" constr(tB) "Using" reference_list(rB) ] ->
+      "Of" constr(tA)
+      "With" constr(tB)
+      "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.show_merged_fsm
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         tA
-        (Mebi_utils.ref_list_to_glob_list rA)
         tB
-        (Mebi_utils.ref_list_to_glob_list rB)
+        (Mebi_utils.ref_list_to_glob_list r)
       ) }
   | [ "MeBi" "Debug" "FSM" "Merge"
-      "Of" constr(tA) "Using" reference_list(rA)
-      "With"
-      "Of" constr(tB) "Using" reference_list(rB) ] ->
+      "Of" constr(tA)
+      "With" constr(tB)
+      "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.show_merged_fsm
         ~params:(
@@ -235,30 +229,26 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
           params
         )
         tA
-        (Mebi_utils.ref_list_to_glob_list rA)
         tB
-        (Mebi_utils.ref_list_to_glob_list rB)
+        (Mebi_utils.ref_list_to_glob_list r)
       ) }
   (* build two fsms from two different lts and merge them, within bound [i] *)
-  | [ "MeBi" "Show" "FSM" "Merge"
-      "Of" constr(tA) "Using" reference_list(rA)
-      "With"
-      "Of" constr(tB) "Using" reference_list(rB)
-      "Within" "Bound" int(i) ] ->
+  | [ "MeBi" "Show" "FSM" "Merge" "Bounded" int(i)
+      "Of" constr(tA)
+      "With" constr(tB)
+      "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.show_merged_fsm
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         tA
-        (Mebi_utils.ref_list_to_glob_list rA)
         tB
-        (Mebi_utils.ref_list_to_glob_list rB)
+        (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Debug" "FSM" "Merge"
-      "Of" constr(tA) "Using" reference_list(rA)
-      "With"
-      "Of" constr(tB) "Using" reference_list(rB)
-      "Within" "Bound" int(i) ] ->
+  | [ "MeBi" "Debug" "FSM" "Merge" "Bounded" int(i)
+      "Of" constr(tA)
+      "With" constr(tB)
+      "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.show_merged_fsm
         ~params:(
@@ -273,30 +263,28 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         )
         ~bound:i
         tA
-        (Mebi_utils.ref_list_to_glob_list rA)
         tB
-        (Mebi_utils.ref_list_to_glob_list rB)
+        (Mebi_utils.ref_list_to_glob_list r)
       ) }
   (****************************************************)
   (**** Coq A B -> LTS A B -> FSM A B -> Bisim A M ****)
   (****************************************************)
   (* check if two fsms built from lts are bisimiular *)
   | [ "MeBi" "Show" "Bisim"
-      "Of" constr(tA) "Using" reference_list(rA)
-      "With"
-      "Of" constr(tB) "Using" reference_list(rB) ] ->
+      "Of" constr(tA)
+      "With" constr(tB)
+      "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.show_bisim
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         tA
-        (Mebi_utils.ref_list_to_glob_list rA)
         tB
-        (Mebi_utils.ref_list_to_glob_list rB)
+        (Mebi_utils.ref_list_to_glob_list r)
       ) }
   | [ "MeBi" "Debug" "Bisim"
-      "Of" constr(tA) "Using" reference_list(rA)
-      "With"
-      "Of" constr(tB) "Using" reference_list(rB) ] ->
+      "Of" constr(tA)
+      "With" constr(tB)
+      "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.show_bisim
         ~params:(
@@ -310,30 +298,26 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
           params
         )
         tA
-        (Mebi_utils.ref_list_to_glob_list rA)
         tB
-        (Mebi_utils.ref_list_to_glob_list rB)
+        (Mebi_utils.ref_list_to_glob_list r)
       ) }
   (* check if two fsms built from lts within bound [i] are bisimiular *)
-  | [ "MeBi" "Show" "Bisim"
-      "Of" constr(tA) "Using" reference_list(rA)
-      "With"
-      "Of" constr(tB) "Using" reference_list(rB)
-      "Within" "Bound" int(i) ] ->
+  | [ "MeBi" "Show" "Bisim" "Bounded" int(i)
+      "Of" constr(tA)
+      "With" constr(tB)
+      "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.show_bisim
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         tA
-        (Mebi_utils.ref_list_to_glob_list rA)
         tB
-        (Mebi_utils.ref_list_to_glob_list rB)
+        (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Debug" "Bisim"
-      "Of" constr(tA) "Using" reference_list(rA)
-      "With"
-      "Of" constr(tB) "Using" reference_list(rB)
-      "Within" "Bound" int(i) ] ->
+  | [ "MeBi" "Debug" "Bisim" "Bounded" int(i)
+      "Of" constr(tA)
+      "With" constr(tB)
+      "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.show_bisim
         ~params:(
@@ -348,8 +332,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         )
         ~bound:i
         tA
-        (Mebi_utils.ref_list_to_glob_list rA)
         tB
-        (Mebi_utils.ref_list_to_glob_list rB)
+        (Mebi_utils.ref_list_to_glob_list r)
       ) }
 END

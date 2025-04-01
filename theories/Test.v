@@ -2,30 +2,31 @@ Require Import MEBI.loader.
 
 Inductive i := C0 (i : nat) | C1 (b : bool) (j : nat) | C2 (x : nat).
 
-(* Fail MeBi LTS i 0. *)
+Fail MeBi Show LTS Of 0 Using i.
 
-(* Fail MeBi LTS j 0. *)
+Fail MeBi Show LTS Of 0 Using j.
 
 Definition k := 0.
-(* Fail MeBi LTS k 0. *)
+Fail MeBi Show LTS Of 0 Using k.
 
-(* Fail MeBi LTS nat 0. *)
+Fail MeBi Show LTS Of 0 Using nat.
+
 Definition nnat := nat.
-(* Fail MeBi LTS nnat 0. *)
+Fail MeBi Show LTS Of 0 Using nnat.
 
-(* Fail MeBi LTS False 0. *)
+Fail MeBi Show LTS Of 0 Using False.
 
 CoInductive co_nat := CoZ | CoS : co_nat -> co_nat.
 
 Inductive test_lts A : co_nat -> nat -> nat -> Prop :=
 | less_lt (x : A) (i : co_nat) (j : nat) : test_lts A (CoS i) 1 j.
 
-(* Fail MeBi LTS test_lts 0. *)
+Fail MeBi Show LTS Of 0 Using test_lts.
 
 Inductive test_mut A : Prop := Mk1 (x : A) (y : test_mut2 A)
 with test_mut2 A : Prop := Mk2 (y : test_mut A).
 
-(* Fail MeBi LTS test_mut2 0. *)
+Fail MeBi Show LTS Of 0 Using test_mut2.
 
 
 Inductive testLTS : nat -> bool -> nat -> Prop :=
@@ -34,25 +35,29 @@ Inductive testLTS : nat -> bool -> nat -> Prop :=
 
 Definition one := 1.
 
-(* Fail MeBi LTS testLTS false. *)
+Fail MeBi Show LTS Of false Using testLTS.
 
-(* MeBi LTS testLTS 0. *) (* <- has no edges, fails. *)
-(* MeBi LTS testLTS (S 0).
-MeBi LTS testLTS (S (S 0)).
-MeBi LTS testLTS (S (S (S 0))).
+MeBi Show LTS Of 0 Using testLTS.
+MeBi Show LTS Of (S 0) Using testLTS.
+MeBi Show LTS Of (S (S 0)) Using testLTS.
+MeBi Show LTS Of (S (S (S 0))) Using testLTS.
 
-MeBi LTS testLTS one.
-MeBi LTS testLTS (S one). *)
+MeBi Show LTS Of one Using testLTS.
+MeBi Show LTS Of (S one) Using testLTS.
+
+MeBi Show LTS Bounded 30 Of (S one) Using testLTS.
 
 
 Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
   | test1' n : nonTerminatingTestLTS n true (S n)
-  | test2' n : nonTerminatingTestLTS (S n) false n.
+  | test2' n : nonTerminatingTestLTS (S n) false n
+  .
 
-(* MeBi LTS nonTerminatingTestLTS 0.
-MeBi LTS nonTerminatingTestLTS (S 0).
-MeBi LTS nonTerminatingTestLTS (S (S 0)).
-MeBi LTS nonTerminatingTestLTS (S (S (S 0))). *)
+(* below cannot be finitely represented  *)
+(* MeBi Show LTS Bounded 50 Of 0 Using nonTerminatingTestLTS. *)
+(* MeBi Show LTS Of (S 0) Using nonTerminatingTestLTS. *)
+(* MeBi Show LTS Of (S (S 0)) Using nonTerminatingTestLTS. *)
+(* MeBi Show LTS Of (S (S (S 0))) Using nonTerminatingTestLTS. *)
 
 (* Definition boundedLTS (p:Prop) (n:nat) : Type := Prop * nat. *)
 
@@ -80,8 +85,12 @@ Module Test1.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
-  (* MeBi LTS termLTS (tfix (tact TheAction1 tend)).
-  MeBi LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))). *)
+  MeBi Show LTS Of (tfix (tact TheAction1 tend)) Using termLTS.
+
+  MeBi Show LTS
+    Of (tfix (tact TheAction1 (tact TheAction2 trec)))
+    Using termLTS.
+
 End Test1.
 
 Module Test2.
@@ -114,14 +123,21 @@ Module Test2.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
-  (* MeBi LTS termLTS (tfix (tact TheAction1 tend)).
+  MeBi Show LTS
+    Of (tfix (tact TheAction1 tend))
+    Using termLTS.
 
-  MeBi LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
+  MeBi Show LTS
+    Of (tfix (tact TheAction1 (tact TheAction2 trec)))
+    Using termLTS.
 
-  MeBi LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
+  MeBi Show LTS
+    Of (tfix (tpar TheAction1 TheAction2 trec))
+    Using termLTS.
 
-  MeBi LTS (*show_debug*) termLTS (tfix (tpar TheAction1 TheAction2 trec)). *)
-
+  MeBi Show LTS
+    Of (tfix (tpar TheAction1 TheAction2 trec))
+    Using termLTS.
 
 End Test2.
 
@@ -178,57 +194,105 @@ Module BisimTest1.
       termLTS (tfix t) a t'.
 
   (* true *)
-  (* MeBi Bisim KS90
-    termLTS (tact TheAction1 tend)
-    termLTS (tact TheAction1 tend).
+  MeBi Show Bisim
+    Of (tact TheAction1 tend)
+    With (tact TheAction1 tend)
+    Using termLTS.
 
   (* true *)
-  MeBi Bisim KS90
-    termLTS (tact TheAction2 tend)
-    termLTS (tact TheAction2 tend).
+  MeBi Show Bisim
+    Of (tact TheAction2 tend)
+    With (tact TheAction2 tend)
+    Using termLTS.
 
-  (* ! false *)
-  MeBi Bisim KS90
-    termLTS (tact TheAction1 tend)
-    termLTS (tact TheAction2 tend).
-
-  (* true *)
-  MeBi Bisim KS90
-    termLTS (tact TheAction1 (tact TheAction2 tend))
-    termLTS (tact TheAction1 (tact TheAction2 tend)).
+  (* false *)
+  MeBi Show Bisim
+    Of (tact TheAction1 tend)
+    With (tact TheAction2 tend)
+    Using termLTS.
 
   (* true *)
-  MeBi Bisim KS90
-    termLTS (tpar TheAction1 TheAction2 tend)
-    termLTS (tpar TheAction1 TheAction2 tend).
+  MeBi Show Bisim
+    Of (tact TheAction1 (tact TheAction2 tend))
+    With (tact TheAction1 (tact TheAction2 tend))
+    Using termLTS.
 
-  (* ? should be true *)
-  MeBi Bisim KS90
-    termLTS (tfix (tact TheAction1 trec))
-    termLTS (tfix (tact TheAction1 trec)).
+  (* true *)
+  MeBi Show Bisim
+    Of (tact TheAction2 (tact TheAction1 tend))
+    With (tact TheAction2 (tact TheAction1 tend))
+    Using termLTS.
 
-  (* ? should be true *)
-  MeBi Bisim KS90
-    termLTS (tfix (tact TheAction1 trec))
-    termLTS (tact TheAction1 (tfix (tact TheAction1 trec))).
+  (* false *) (* TODO: check this *)
+  MeBi Show Bisim
+    Of (tact TheAction2 (tact TheAction1 tend))
+    With (tact TheAction1 (tact TheAction2 tend))
+    Using termLTS.
 
-  (* ? should be true *)
-  MeBi Bisim KS90
-    termLTS (tfix (tact TheAction1 (tact TheAction2 trec)))
-    termLTS (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
+  (* true *)
+  MeBi Show Bisim
+    Of (tpar TheAction1 TheAction2 tend)
+    With (tpar TheAction1 TheAction2 tend)
+    Using termLTS.
 
-  (* ! false *)
-  MeBi Bisim KS90
-    termLTS (tpar TheAction1 TheAction2 tend)
-    termLTS (tact TheAction1 (tact TheAction2 tend)).
+  (* true *)
+  MeBi Show Bisim
+    Of (tpar TheAction2 TheAction1 tend)
+    With (tpar TheAction2 TheAction1 tend)
+    Using termLTS.
 
+  (* true *)
+  MeBi Show Bisim
+    Of (tpar TheAction1 TheAction2 tend)
+    With (tpar TheAction2 TheAction1 tend)
+    Using termLTS.
 
+  (* true *)
+  MeBi Show Bisim
+    Of (tpar TheAction2 TheAction1 tend)
+    With (tpar TheAction1 TheAction2 tend)
+    Using termLTS.
+
+  (* true *)
+  MeBi Show Bisim
+    Of (tpar TheAction1 TheAction1 tend)
+    With (tact TheAction1 tend)
+    Using termLTS.
+
+  (* false *)
+  MeBi Show Bisim
+    Of (tpar TheAction1 TheAction2 tend)
+    With (tact TheAction1 (tact TheAction2 tend))
+    Using termLTS.
+
+  (* true *)
+  MeBi Show Bisim
+    Of (tfix (tact TheAction1 trec))
+    With (tfix (tact TheAction1 trec))
+    Using termLTS.
+
+  (* true *)
+  MeBi Show Bisim
+    Of (tfix (tact TheAction1 trec))
+    With (tfix (tact TheAction1 (tfix (tact TheAction1 trec))))
+    Using termLTS.
+
+  (* true *)
+  MeBi Show Bisim
+    Of (tfix (tact TheAction1 (tact TheAction2 trec)))
+    With (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec)))))
+    Using termLTS.
+
+  (* true *)
+  MeBi Show Bisim
+    Of (tfix (tact TheAction1 (tact TheAction2 trec)))
+    With (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec)))))
+    Using termLTS.
 
   (* minimize *)
-  MeBi Minim KS90
-    termLTS (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))). *)
-
-
+  MeBi Show Minim
+    Of (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec)))))
+    Using termLTS.
 
 End BisimTest1.
 
