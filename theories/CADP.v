@@ -838,6 +838,7 @@ Example ncs1 : composition := compose (create 1 P).
 Compute ncs1.
 
 (* MeBi Show  LTS Of ncs1 Using lts step. *)
+MeBi Dump  LTS Of ncs1 Using lts step.
 (* MeBi Debug LTS Of ncs1 Using lts step. *)
 
 (* MeBi Show  FSM Of ncs1 Using lts step. *)
@@ -854,10 +855,11 @@ Compute ncs2.
 
 (* ! lts incomplete even after 5000 bound *)
 (* MeBi Show  LTS Bounded 5000 Of ncs2 Using lts step. *)
-(* MeBi Show  LTS Of ncs2 Using lts step. *)
+MeBi Dump  LTS Of ncs2 Using lts step.
 (* MeBi Debug LTS Of ncs2 Using lts step. *)
 
 (* MeBi Show  FSM Of ncs2 Using lts step. *)
+MeBi Dump  FSM Of ncs2 Using lts step.
 (* MeBi Debug FSM Of ncs2 Using lts step. *)
 
 (* MeBi Show  Minim Of ncs2 Using lts step. *)
