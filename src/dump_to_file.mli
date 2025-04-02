@@ -39,7 +39,15 @@ module JSON : sig
     val lts : string -> Lts.lts -> string
   end
 
-  val of_fsm : Fsm.fsm -> string
+  module FSM : sig
+    val action : Fsm.action -> string
+    val alphabet : Fsm.Alphabet.t -> string
+    val state : Fsm.state -> string
+    val states : Fsm.States.t -> string
+    val edges : Fsm.States.t Fsm.Actions.t Fsm.Edges.t -> string
+    val initial : Fsm.state option -> string
+    val fsm : string -> Fsm.fsm -> string
+  end
 end
 
 type dumpable_kind =
