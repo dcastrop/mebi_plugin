@@ -174,7 +174,71 @@ module JSON = struct
     ;;
   end
 
-  let of_fsm (the_fsm : fsm) : string = "todo"
+  module FSM = struct
+    let action (a : action) : string =
+      key_val
+        (Printf.sprintf "%i" a.id)
+        (col
+           (Dict
+              [ key_val "label" (quoted (clean a.label))
+              ; key_val "is_tau" (quoted (clean (Printf.sprintf "%b" a.is_tau)))
+                (* ; key_val "annotations" (quoted (clean a.annotation)) *)
+              ]))
+    ;;
+
+    let alphabet (alphas : Alphabet.t) : string =
+      key_val
+        "alphabet"
+        (col
+           (Dict
+              (Fsm.Alphabet.fold
+                 (fun (a : action) (acc : string list) ->
+                   List.append acc [ action a ])
+                 alphas
+                 [])))
+    ;;
+
+    let state (s : state) : string =
+      col
+        (Dict
+           [ key_val "id" (quoted (clean (Printf.sprintf "%d" s.id)))
+           ; key_val "name" (quoted (clean s.name))
+           ])
+    ;;
+
+    let states (states : States.t) : string =
+      key_val
+        "states"
+        (col
+           (List
+              (Fsm.States.fold
+                 (fun (s : state) (acc : string list) ->
+                   List.append acc [ state s ])
+                 states
+                 [])))
+    ;;
+
+    let edges (s : States.t Actions.t Edges.t) : string =
+      key_val "edges" (quoted "todo")
+    ;;
+
+    let initial (s : state option) : string =
+      match s with
+      | None -> key_val "initial" (quoted "None")
+      | Some s -> key_val "initial" (state s)
+    ;;
+
+    let fsm (name : string) (m : fsm) : string =
+      Printf.sprintf
+        "{\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s\n}"
+        (key_val "name" (quoted name))
+        (key_val "kind" (quoted "fsm"))
+        (initial m.init)
+        (alphabet m.alphabet)
+        (states m.states)
+        (edges m.edges)
+    ;;
+  end
 end
 
 type dumpable_kind =
@@ -189,7 +253,7 @@ let handle_filecontents
   =
   match to_dump, filetype with
   | LTS s, JSON () -> JSON.LTS.lts filename s
-  | FSM s, JSON () -> JSON.of_fsm s
+  | FSM s, JSON () -> JSON.FSM.fsm filename s
 ;;
 
 let write_to_file
