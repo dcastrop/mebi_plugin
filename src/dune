@@ -27,6 +27,7 @@
   lts
   fsm
   translate
+  dump_to_file
   command
   utils
   examples
