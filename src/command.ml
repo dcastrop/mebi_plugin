@@ -916,7 +916,7 @@ struct
     ;;
 
     (** Error when trying to translate an unfinished LTS to FSM. *)
-    exception UnfinishedLTS of lts_graph
+    (* exception UnfinishedLTS of lts_graph *)
 
     let lts_graph_to_lts
       ?(params : Params.log = default_params)
@@ -966,8 +966,8 @@ struct
         in
         log
           ~params
-          (Printf.sprintf "saved incomplete LTS to: %s\n" dump_filepath);
-        raise (UnfinishedLTS g));
+          (Printf.sprintf "saved incomplete LTS to: %s\n" dump_filepath)
+        (* raise (UnfinishedLTS g) *));
       return (lts, tbl)
     ;;
   end
