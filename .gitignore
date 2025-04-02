@@ -28,6 +28,5 @@ CoqMakefile*
 # ignore vscode settings
 .vscode
 
-# ignore wip files
-src/fsm_old.ml
-src/fsm_old.mli
+# ignore dumps
+_dumps/*
