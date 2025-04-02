@@ -35,6 +35,8 @@ src/mebi_utils.ml
 src/mebi_utils.mli
 src/pp_ext.ml
 src/pp_ext.mli
+src/dump_to_file.ml
+src/dump_to_file.mli
 src/command.ml
 src/command.mli
 src/g_mebi.mlg
