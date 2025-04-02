@@ -780,14 +780,18 @@ Qed.
 (*************************************************************************)
 
 Example p0 : tm * env := (P, Env.initial 0).
-MeBi Show  LTS Of p0 Using step.
-MeBi Debug LTS Of p0 Using step.
+(* MeBi Show  LTS Of p0 Using step. *)
+(* MeBi Debug LTS Of p0 Using step. *)
 
-MeBi Show  FSM Of p0 Using step.
-MeBi Debug FSM Of p0 Using step.
+(* MeBi Show  FSM Of p0 Using step. *)
+(* MeBi Debug FSM Of p0 Using step. *)
 
-MeBi Show  Minim Of p0 Using step.
-MeBi Debug Minim Of p0 Using step.
+(* MeBi Show  Minim Of p0 Using step. *)
+(* MeBi Debug Minim Of p0 Using step. *)
+
+MeBi Dump LTS Of p0 Using step.
+(* MeBi Dump FSM Of p0 Using step. *)
+(* MeBi Dump Minim Of p0 Using step. *)
 
 
 (*************************************************************************)
@@ -833,14 +837,14 @@ Definition compose (s:system) : composition :=
 Example ncs1 : composition := compose (create 1 P).
 Compute ncs1.
 
-MeBi Show  LTS Of ncs1 Using lts step.
-MeBi Debug LTS Of ncs1 Using lts step.
+(* MeBi Show  LTS Of ncs1 Using lts step. *)
+(* MeBi Debug LTS Of ncs1 Using lts step. *)
 
-MeBi Show  FSM Of ncs1 Using lts step.
-MeBi Debug FSM Of ncs1 Using lts step.
+(* MeBi Show  FSM Of ncs1 Using lts step. *)
+(* MeBi Debug FSM Of ncs1 Using lts step. *)
 
-MeBi Show  Minim Of ncs1 Using lts step.
-MeBi Debug Minim Of ncs1 Using lts step.
+(* MeBi Show  Minim Of ncs1 Using lts step. *)
+(* MeBi Debug Minim Of ncs1 Using lts step. *)
 
 (***************************)
 (**** System size: 2 *******)
@@ -850,6 +854,7 @@ Compute ncs2.
 
 (* ! lts incomplete even after 5000 bound *)
 (* MeBi Show  LTS Bounded 5000 Of ncs2 Using lts step. *)
+(* MeBi Show  LTS Of ncs2 Using lts step. *)
 (* MeBi Debug LTS Of ncs2 Using lts step. *)
 
 (* MeBi Show  FSM Of ncs2 Using lts step. *)
