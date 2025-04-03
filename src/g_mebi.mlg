@@ -38,11 +38,12 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Dump" "LTS"
+  | [ "MeBi" "Dump" string(name) "LTS"
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.LTS.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~name
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
@@ -73,12 +74,13 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Dump" "LTS" "Bounded" int(i)
+  | [ "MeBi" "Dump" string(name) "LTS" "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.LTS.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
+        ~name
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
@@ -112,11 +114,12 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Dump" "FSM"
+  | [ "MeBi" "Dump" string(name) "FSM"
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.FSM.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~name
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
@@ -147,12 +150,13 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Dump" "FSM" "Bounded" int(i)
+  | [ "MeBi" "Dump" string(name) "FSM" "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.FSM.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
+        ~name
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
@@ -186,11 +190,12 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Dump" "Minim"
+  | [ "MeBi" "Dump" string(name) "Minim"
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.Minim.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~name
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
@@ -221,12 +226,13 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Dump" "Minim" "Bounded" int(i)
+  | [ "MeBi" "Dump" string(name) "Minim" "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.Minim.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
+        ~name
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
@@ -263,13 +269,14 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         tB
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Dump" "FSM" "Merge"
+  | [ "MeBi" "Dump" string(name) "FSM" "Merge"
       "Of" constr(tA)
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.Merged.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~name
         tA
         tB
         (Mebi_utils.ref_list_to_glob_list r)
@@ -307,7 +314,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         tB
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Dump" "FSM" "Merge" "Bounded" int(i)
+  | [ "MeBi" "Dump" string(name) "FSM" "Merge" "Bounded" int(i)
       "Of" constr(tA)
       "With" constr(tB)
       "Using" reference_list(r) ] ->
@@ -315,6 +322,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       Command.Vernac.Merged.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
+        ~name
         tA
         tB
         (Mebi_utils.ref_list_to_glob_list r)
@@ -355,13 +363,14 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         tB
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Dump" "Bisim"
+  | [ "MeBi" "Dump" string(name) "Bisim"
       "Of" constr(tA)
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_monad.run (
       Command.Vernac.Bisim.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~name
         tA
         tB
         (Mebi_utils.ref_list_to_glob_list r)
@@ -399,7 +408,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         tB
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
-  | [ "MeBi" "Dump" "Bisim" "Bounded" int(i)
+  | [ "MeBi" "Dump" string(name) "Bisim" "Bounded" int(i)
       "Of" constr(tA)
       "With" constr(tB)
       "Using" reference_list(r) ] ->
@@ -407,6 +416,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       Command.Vernac.Bisim.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
+        ~name
         tA
         tB
         (Mebi_utils.ref_list_to_glob_list r)

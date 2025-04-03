@@ -3,6 +3,7 @@ module Vernac : sig
     val build
       :  ?params:Utils.Logging.params
       -> ?bound:int
+      -> ?name:string
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
       -> Lts.lts Mebi_monad.t
@@ -17,6 +18,7 @@ module Vernac : sig
     val dump
       :  ?params:Utils.Logging.params
       -> ?bound:int
+      -> ?name:string
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
       -> unit Mebi_monad.t
@@ -26,6 +28,7 @@ module Vernac : sig
     val build
       :  ?params:Utils.Logging.params
       -> ?bound:int
+      -> ?name:string
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
       -> Fsm.fsm Mebi_monad.t
@@ -40,6 +43,7 @@ module Vernac : sig
     val dump
       :  ?params:Utils.Logging.params
       -> ?bound:int
+      -> ?name:string
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
       -> unit Mebi_monad.t
@@ -49,6 +53,7 @@ module Vernac : sig
     val build
       :  ?params:Utils.Logging.params
       -> ?bound:int
+      -> ?name:string
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
       -> (Fsm.fsm * Fsm.fsm) Mebi_monad.t
@@ -63,6 +68,7 @@ module Vernac : sig
     val dump
       :  ?params:Utils.Logging.params
       -> ?bound:int
+      -> ?name:string
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
       -> unit Mebi_monad.t
@@ -72,6 +78,7 @@ module Vernac : sig
     val build
       :  ?params:Utils.Logging.params
       -> ?bound:int
+      -> ?name:string
       -> Constrexpr.constr_expr_r CAst.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
@@ -88,6 +95,7 @@ module Vernac : sig
     val dump
       :  ?params:Utils.Logging.params
       -> ?bound:int
+      -> ?name:string
       -> Constrexpr.constr_expr_r CAst.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
@@ -100,6 +108,7 @@ module Vernac : sig
     val build
       :  ?params:Utils.Logging.params
       -> ?bound:int
+      -> ?name:string
       -> Constrexpr.constr_expr_r CAst.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
@@ -116,6 +125,7 @@ module Vernac : sig
     val dump
       :  ?params:Utils.Logging.params
       -> ?bound:int
+      -> ?name:string
       -> Constrexpr.constr_expr_r CAst.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
