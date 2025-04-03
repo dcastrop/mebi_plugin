@@ -950,6 +950,7 @@ struct
       let lts : Lts.lts = Lts.Create.lts ~init (Flat flat_rlts) in
       if Bool.not (Queue.is_empty g.to_visit)
       then (
+        let to_visit : int = Queue.length g.to_visit in
         params.kind <- Warning ();
         log
           ~params
@@ -957,12 +958,17 @@ struct
              "lts is not complete using bound (%d), still had at least (%d) \
               terms to visit."
              bound
-             (Queue.length g.to_visit));
+             to_visit);
         (* dump lts to *)
         let dump_filepath : string =
           Dump_to_file.write_to_file
             (Default ())
-            (LTS "incomplete")
+            (LTS
+               (Printf.sprintf
+                  "%s incomplete with (%d) after (%d)"
+                  name
+                  to_visit
+                  bound))
             (JSON ())
             (LTS lts)
         in
@@ -1118,7 +1124,7 @@ module Vernac = struct
       : unit mm
       =
       params.options.output_enabled <- false;
-      let* (the_lts : Lts.lts) = build ~params ~bound tref grefs in
+      let* (the_lts : Lts.lts) = build ~params ~bound ~name tref grefs in
       let dump_filepath : string =
         Dump_to_file.write_to_file
           (Default ())
@@ -1175,7 +1181,7 @@ module Vernac = struct
       : unit mm
       =
       (* get translated fsm *)
-      let* the_fsm = build ~params ~bound tref grefs in
+      let* the_fsm = build ~params ~bound ~name tref grefs in
       let dump_filepath : string =
         Dump_to_file.write_to_file
           (Default ())
@@ -1238,7 +1244,7 @@ module Vernac = struct
       : unit mm
       =
       (* get translated fsm *)
-      let* the_fsm, minimized_fsm = build ~params ~bound tref grefs in
+      let* the_fsm, minimized_fsm = build ~params ~bound ~name tref grefs in
       let fsm_dump_filepath : string =
         Dump_to_file.write_to_file
           (Default ())
