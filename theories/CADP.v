@@ -781,17 +781,17 @@ Qed.
 
 Example p0 : tm * env := (P, Env.initial 0).
 (* MeBi Show  LTS Of p0 Using step. *)
+MeBi Dump "p0" LTS Of p0 Using step.
 (* MeBi Debug LTS Of p0 Using step. *)
 
 (* MeBi Show  FSM Of p0 Using step. *)
+MeBi Dump "p0" FSM Of p0 Using step.
 (* MeBi Debug FSM Of p0 Using step. *)
 
 (* MeBi Show  Minim Of p0 Using step. *)
+MeBi Dump "p0" Minim Of p0 Using step.
 (* MeBi Debug Minim Of p0 Using step. *)
 
-MeBi Dump "p0" LTS Of p0 Using step.
-(* MeBi Dump FSM Of p0 Using step. *)
-(* MeBi Dump Minim Of p0 Using step. *)
 
 
 (*************************************************************************)
@@ -863,6 +863,11 @@ MeBi Dump "NCS2" LTS Of ncs2 Using lts step.
 (* MeBi Show  FSM Of ncs2 Using lts step. *)
 MeBi Dump  "NCS2" FSM Of ncs2 Using lts step.
 (* MeBi Debug FSM Of ncs2 Using lts step. *)
+
+(* MeBi Dump "NCS2" LTS Bounded 5000 Of ncs2 Using lts step. *)
+
+(* MeBi Dump  "NCS2" FSM Bounded 5000 Of ncs2 Using lts step. *)
+
 
 (* MeBi Show  Minim Of ncs2 Using lts step. *)
 (* MeBi Debug Minim Of ncs2 Using lts step. *)

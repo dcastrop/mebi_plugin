@@ -31,8 +31,8 @@ let get_filename (f : filename_kind) : string =
   match f with
   | Auto () -> get_local_timestamp
   | Just s -> s
-  | LTS s -> Printf.sprintf "LTS %s %s" s get_local_timestamp
-  | FSM s -> Printf.sprintf "FSM %s %s" s get_local_timestamp
+  | LTS s -> Printf.sprintf "LTS | %s | %s" s get_local_timestamp
+  | FSM s -> Printf.sprintf "FSM | %s | %s" s get_local_timestamp
 ;;
 
 type filetype_kind = JSON of unit
