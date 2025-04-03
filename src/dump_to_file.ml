@@ -42,9 +42,15 @@ let get_filename (f : filename_kind) (is_complete : bool) : string =
   match f with
   | Auto () -> get_local_timestamp
   | Just s -> s
-  | _ ->
+  | LTS _ ->
     Printf.sprintf
-      "%s | %s%s"
+      "%s | LTS | %s%s"
+      get_local_timestamp
+      (get_name f)
+      (if is_complete then " | incomplete" else "")
+  | FSM _ ->
+    Printf.sprintf
+      "%s | FSM | %s%s"
       get_local_timestamp
       (get_name f)
       (if is_complete then " | incomplete" else "")
