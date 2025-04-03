@@ -12,11 +12,14 @@ let get_local_timestamp : string =
   match Unix.localtime (Unix.time ()) with
   | { tm_sec; tm_min; tm_hour; tm_mday; tm_mon; tm_year; _ } ->
     Printf.sprintf
-      "%d %d %d - %d:%d:%d"
+      "%d %s%d %s%d - %d:%s%d:%d"
       (tm_year + 1900)
+      (if tm_mon < 10 then "0" else "")
       tm_mon
+      (if tm_mday < 10 then "0" else "")
       tm_mday
       tm_hour
+      (if tm_min < 10 then "0" else "")
       tm_min
       tm_sec
 ;;
