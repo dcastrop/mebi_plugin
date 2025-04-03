@@ -21,6 +21,7 @@ module Transitions = Set.Make (struct
 type lts =
   { init : string option
   ; transitions : Transitions.t
+  ; is_complete : bool
   }
 
 module PStr = struct
@@ -29,8 +30,8 @@ module PStr = struct
   open Utils
 
   let transition
-        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-        (t : transition)
+    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+    (t : transition)
     : string
     =
     let _params : Params.fmt = Params.handle params in
@@ -56,8 +57,8 @@ module PStr = struct
   ;;
 
   let transitions
-        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-        (ts : Transitions.t)
+    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+    (ts : Transitions.t)
     : string
     =
     if Transitions.is_empty ts
@@ -72,10 +73,10 @@ module PStr = struct
         (if _params.no_leading_tab then "" else tabs)
         (Transitions.fold
            (fun (t : transition) (acc : string) ->
-              Printf.sprintf
-                "%s%s\n"
-                acc
-                (transition ~params:(Fmt (no_leading_tab false _params')) t))
+             Printf.sprintf
+               "%s%s\n"
+               acc
+               (transition ~params:(Fmt (no_leading_tab false _params')) t))
            ts
            "\n")
         tabs)
@@ -90,13 +91,14 @@ module PStr = struct
     and tabs : string = str_tabs _params.tabs
     and tabs' : string = str_tabs (_params.tabs + 1) in
     Printf.sprintf
-      "{ %s; %s\n%s}"
+      "{ %s; %s; %s\n%s}"
       (Printf.sprintf
          "\n%sinitial state: %s"
          tabs'
          (match the_lts.init with
           | None -> "None"
           | Some init' -> init'))
+      (Printf.sprintf "\n%sis complete: %b" tabs' the_lts.is_complete)
       (Printf.sprintf
          "\n%stransitions: %s"
          tabs'
@@ -113,43 +115,48 @@ module Create = struct
     | Of (id, from, label, destination) -> { id; from; label; destination }
   ;;
 
-  let lts ?(init : string option) (raw : raw_transitions) : lts =
+  let lts
+    ?(init : string option)
+    ?(is_complete : bool = true)
+    (raw : raw_transitions)
+    : lts
+    =
     let transitions : Transitions.t =
       match raw with
       | Flat raw' ->
         List.fold_left
           (fun (acc : Transitions.t)
             ((from, label, destination) : string * string * string) ->
-             Transitions.add
-               (transition
-                  (Of (Transitions.cardinal acc, from, label, destination)))
-               acc)
+            Transitions.add
+              (transition
+                 (Of (Transitions.cardinal acc, from, label, destination)))
+              acc)
           Transitions.empty
           raw'
       | Nested raw' ->
         List.fold_left
           (fun (acc : Transitions.t)
             ((from, actions) : string * (string * string list) list) ->
-             List.fold_left
-               (fun (acc' : Transitions.t)
-                 ((label, destinations) : string * string list) ->
-                  List.fold_left
-                    (fun (acc'' : Transitions.t) (destination : string) ->
-                       Transitions.add
-                         (transition
-                            (Of
-                               ( Transitions.cardinal acc''
-                               , from
-                               , label
-                               , destination )))
-                         acc'')
-                    acc'
-                    destinations)
-               acc
-               actions)
+            List.fold_left
+              (fun (acc' : Transitions.t)
+                ((label, destinations) : string * string list) ->
+                List.fold_left
+                  (fun (acc'' : Transitions.t) (destination : string) ->
+                    Transitions.add
+                      (transition
+                         (Of
+                            ( Transitions.cardinal acc''
+                            , from
+                            , label
+                            , destination )))
+                      acc'')
+                  acc'
+                  destinations)
+              acc
+              actions)
           Transitions.empty
           raw'
     in
-    { init; transitions }
+    { init; transitions; is_complete }
   ;;
 end
