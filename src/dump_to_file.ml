@@ -13,7 +13,7 @@ let get_local_timestamp : string =
   | { tm_sec; tm_min; tm_hour; tm_mday; tm_mon; tm_year; _ } ->
     Printf.sprintf
       "%d %d %d - %d:%d:%d"
-      tm_year
+      (tm_year + 1900)
       tm_mon
       tm_mday
       tm_hour
@@ -31,8 +31,8 @@ let get_filename (f : filename_kind) : string =
   match f with
   | Auto () -> get_local_timestamp
   | Just s -> s
-  | LTS s -> Printf.sprintf "LTS | %s | %s" s get_local_timestamp
-  | FSM s -> Printf.sprintf "FSM | %s | %s" s get_local_timestamp
+  | LTS s -> Printf.sprintf "%s | LTS | %s" get_local_timestamp s
+  | FSM s -> Printf.sprintf "%s | FSM | %s" get_local_timestamp s
 ;;
 
 type filetype_kind = JSON of unit
