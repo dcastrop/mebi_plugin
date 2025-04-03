@@ -43,7 +43,8 @@ module JSON : sig
     val action : Fsm.action -> string
     val alphabet : Fsm.Alphabet.t -> string
     val state : Fsm.state -> string
-    val states : Fsm.States.t -> string
+    val states : ?key:string -> Fsm.States.t -> string
+    val edge : Fsm.state -> Fsm.action -> Fsm.States.t -> string
     val edges : Fsm.States.t Fsm.Actions.t Fsm.Edges.t -> string
     val initial : Fsm.state option -> string
     val fsm : string -> Fsm.fsm -> string

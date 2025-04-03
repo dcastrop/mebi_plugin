@@ -176,21 +176,20 @@ module JSON = struct
 
   module FSM = struct
     let action (a : action) : string =
-      key_val
-        (Printf.sprintf "%i" a.id)
-        (col
-           (Dict
-              [ key_val "label" (quoted (clean a.label))
-              ; key_val "is_tau" (quoted (clean (Printf.sprintf "%b" a.is_tau)))
-                (* ; key_val "annotations" (quoted (clean a.annotation)) *)
-              ]))
+      col
+        (Dict
+           [ key_val "id" (quoted (clean (Printf.sprintf "%i" a.id)))
+           ; key_val "label" (quoted (clean a.label))
+           ; key_val "is_tau" (quoted (clean (Printf.sprintf "%b" a.is_tau)))
+             (* ; key_val "annotations" (quoted (clean a.annotation)) *)
+           ])
     ;;
 
     let alphabet (alphas : Alphabet.t) : string =
       key_val
         "alphabet"
         (col
-           (Dict
+           (List
               (Fsm.Alphabet.fold
                  (fun (a : action) (acc : string list) ->
                    List.append acc [ action a ])
@@ -206,9 +205,9 @@ module JSON = struct
            ])
     ;;
 
-    let states (states : States.t) : string =
+    let states ?(key : string = "states") (states : States.t) : string =
       key_val
-        "states"
+        key
         (col
            (List
               (Fsm.States.fold
@@ -218,8 +217,46 @@ module JSON = struct
                  [])))
     ;;
 
-    let edges (s : States.t Actions.t Edges.t) : string =
-      key_val "edges" (quoted "todo")
+    let edge (from : state) (a : action) (destinations : States.t) : string =
+      col
+        (Dict
+           [ key_val "from" (state from)
+           ; key_val "label" (action a)
+           ; states ~key:"destinations" destinations
+           ])
+    ;;
+
+    let edges (edges : States.t Actions.t Edges.t) : string =
+      key_val
+        "edges"
+        (col
+           (List
+              (let from_states : States.t =
+                 States.of_seq (Edges.to_seq_keys edges)
+               in
+               States.fold
+                 (fun (from_state : state) (from_acc : string list) ->
+                   let outgoing_actions : States.t Actions.t =
+                     Edges.find edges from_state
+                   in
+                   let actions : Alphabet.t =
+                     Alphabet.of_seq (Actions.to_seq_keys outgoing_actions)
+                   in
+                   let action_acc : string list =
+                     Alphabet.fold
+                       (fun (a : action) (action_acc : string list) ->
+                         let destination_states : States.t =
+                           Actions.find outgoing_actions a
+                         in
+                         List.append
+                           action_acc
+                           [ edge from_state a destination_states ])
+                       actions
+                       []
+                   in
+                   List.append from_acc action_acc)
+                 from_states
+                 [])))
     ;;
 
     let initial (s : state option) : string =
