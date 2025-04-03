@@ -864,9 +864,9 @@ MeBi Dump "NCS2" LTS Of ncs2 Using lts step.
 MeBi Dump  "NCS2" FSM Of ncs2 Using lts step.
 (* MeBi Debug FSM Of ncs2 Using lts step. *)
 
-(* MeBi Dump "NCS2" LTS Bounded 5000 Of ncs2 Using lts step. *)
+MeBi Dump "NCS2" LTS Bounded 500 Of ncs2 Using lts step.
 
-(* MeBi Dump  "NCS2" FSM Bounded 5000 Of ncs2 Using lts step. *)
+MeBi Dump  "NCS2" FSM Bounded 500 Of ncs2 Using lts step.
 
 
 (* MeBi Show  Minim Of ncs2 Using lts step. *)

@@ -947,8 +947,9 @@ struct
       let* (flat_rlts : Lts.raw_flat_lts) =
         translate_coq_lts g.transitions tbl
       in
-      let lts : Lts.lts = Lts.Create.lts ~init (Flat flat_rlts) in
-      if Bool.not (Queue.is_empty g.to_visit)
+      let is_complete : bool = Queue.is_empty g.to_visit in
+      let lts : Lts.lts = Lts.Create.lts ~init ~is_complete (Flat flat_rlts) in
+      if Bool.not is_complete
       then (
         let to_visit : int = Queue.length g.to_visit in
         params.kind <- Warning ();
@@ -1125,17 +1126,20 @@ module Vernac = struct
       =
       params.options.output_enabled <- false;
       let* (the_lts : Lts.lts) = build ~params ~bound ~name tref grefs in
-      let dump_filepath : string =
-        Dump_to_file.write_to_file
-          (Default ())
-          (LTS name)
-          (JSON ())
-          (LTS the_lts)
-      in
-      params.options.output_enabled <- true;
-      params.kind <- Normal ();
-      params.override <- Some ();
-      log ~params (Printf.sprintf "Dumped LTS into: %s.\n" dump_filepath);
+      if the_lts.is_complete
+      then (
+        let dump_filepath : string =
+          Dump_to_file.write_to_file
+            (Default ())
+            (LTS name)
+            (JSON ())
+            (LTS the_lts)
+        in
+        params.options.output_enabled <- true;
+        params.kind <- Normal ();
+        params.override <- Some ();
+        log ~params (Printf.sprintf "Dumped LTS into: %s.\n" dump_filepath))
+      else log ~params "Incomplete, LTS should already be dumped.\n";
       return ()
     ;;
   end
