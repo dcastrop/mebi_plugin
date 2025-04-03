@@ -2,7 +2,7 @@ open Fsm
 
 let to_fsm (lts : Lts.lts) : fsm =
   match lts with
-  | { init = _init; transitions; _ } ->
+  | { init = _init; transitions; is_complete } ->
     let init : state =
       Create.state
         (Of
@@ -13,7 +13,12 @@ let to_fsm (lts : Lts.lts) : fsm =
     in
     let states : States.t = States.singleton init in
     let fsm : fsm =
-      Create.fsm (Some init) (Create.alphabet ()) states (Edges.create 0)
+      Create.fsm
+        ~is_complete
+        (Some init)
+        (Create.alphabet ())
+        states
+        (Edges.create 0)
     in
     Lts.Transitions.fold
       (fun (t : Lts.transition) (acc : fsm) ->

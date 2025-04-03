@@ -225,6 +225,7 @@ type fsm =
   ; mutable alphabet : Alphabet.t
   ; mutable states : Block.t
   ; mutable edges : Block.t Actions.t Edges.t
+  ; is_complete : bool
   }
 
 module PStr : sig
@@ -295,7 +296,8 @@ module Create : sig
   val edges : ?size:int -> 'a -> Block.t Actions.t Edges.t
 
   val fsm
-    :  state option
+    :  ?is_complete:bool
+    -> state option
     -> Alphabet.t
     -> Block.t
     -> Block.t Actions.t Edges.t
