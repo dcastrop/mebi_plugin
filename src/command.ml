@@ -477,7 +477,8 @@ module type GraphB = sig
 
     val lts_graph_to_lts
       :  ?params:Params.log
-      -> int
+      -> ?bound:int
+      -> ?name:string
       -> lts_graph
       -> Constrexpr.constr_expr_r CAst.t
       -> (Lts.lts * coq_translation) mm
@@ -920,7 +921,8 @@ struct
 
     let lts_graph_to_lts
       ?(params : Params.log = default_params)
-      (bound : int)
+      ?(bound : int = default_bound)
+      ?(name : string = "unknown")
       (g : lts_graph)
       (init_term : Constrexpr.constr_expr_r CAst.t)
       : (Lts.lts * coq_translation) mm
@@ -1008,7 +1010,8 @@ let build_rlts_ctx
 (** *)
 let build_bounded_lts
   ?(params : Params.log = default_params)
-  (bound : int)
+  ?(bound : int = default_bound)
+  ?(name : string = "unknown")
   (rlts_ctx : raw_lts list)
   (tref : Constrexpr.constr_expr_r CAst.t)
   (module G : GraphB)
@@ -1041,7 +1044,7 @@ let build_bounded_lts
        (run (G.PStr.lts ~params:(Log params) graph_lts)));
   (* pure lts *)
   let* the_pure_lts, coq_translation =
-    G.DeCoq.lts_graph_to_lts ~params bound graph_lts tref
+    G.DeCoq.lts_graph_to_lts ~params ~bound ~name graph_lts tref
   in
   return the_pure_lts
 ;;
@@ -1049,7 +1052,8 @@ let build_bounded_lts
 (** *)
 let build_fsm_from_bounded_lts
   ?(params : Params.log = default_params)
-  (bound : int)
+  ?(bound : int = default_bound)
+  ?(name : string = "unknown")
   (tref : Constrexpr.constr_expr_r CAst.t)
   (grefs : Names.GlobRef.t list)
   : Fsm.fsm mm
@@ -1063,7 +1067,7 @@ let build_fsm_from_bounded_lts
   let module G = (val graphM) in
   (* get pure lts *)
   let* (the_lts : Lts.lts) =
-    build_bounded_lts ~params bound rlts_ctx tref (module G)
+    build_bounded_lts ~params ~bound ~name rlts_ctx tref (module G)
   in
   (* translate to fsm *)
   params.options.show_normal_output <- true;
@@ -1075,6 +1079,7 @@ module Vernac = struct
     let build
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
+      ?(name : string = "unknown")
       (tref : Constrexpr.constr_expr_r CAst.t)
       (grefs : Names.GlobRef.t list)
       : Lts.lts mm
@@ -1085,7 +1090,7 @@ module Vernac = struct
       let* graphM = make_graph_builder in
       let module G = (val graphM) in
       (* get pure lts *)
-      build_bounded_lts ~params bound rlts_ctx tref (module G)
+      build_bounded_lts ~params ~bound ~name rlts_ctx tref (module G)
     ;;
 
     let show
@@ -1107,6 +1112,7 @@ module Vernac = struct
     let dump
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
+      ?(name : string = "dump")
       (tref : Constrexpr.constr_expr_r CAst.t)
       (grefs : Names.GlobRef.t list)
       : unit mm
@@ -1116,7 +1122,7 @@ module Vernac = struct
       let dump_filepath : string =
         Dump_to_file.write_to_file
           (Default ())
-          (LTS "dump")
+          (LTS name)
           (JSON ())
           (LTS the_lts)
       in
@@ -1133,11 +1139,12 @@ module Vernac = struct
     let build
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
+      ?(name : string = "unknown")
       (tref : Constrexpr.constr_expr_r CAst.t)
       (grefs : Names.GlobRef.t list)
       : Fsm.fsm mm
       =
-      build_fsm_from_bounded_lts ~params bound tref grefs
+      build_fsm_from_bounded_lts ~params ~bound ~name tref grefs
     ;;
 
     let show
@@ -1162,6 +1169,7 @@ module Vernac = struct
     let dump
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
+      ?(name : string = "dump")
       (tref : Constrexpr.constr_expr_r CAst.t)
       (grefs : Names.GlobRef.t list)
       : unit mm
@@ -1171,7 +1179,7 @@ module Vernac = struct
       let dump_filepath : string =
         Dump_to_file.write_to_file
           (Default ())
-          (FSM "dump")
+          (FSM name)
           (JSON ())
           (FSM the_fsm)
       in
@@ -1185,12 +1193,13 @@ module Vernac = struct
     let build
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
+      ?(name : string = "unknown")
       (tref : Constrexpr.constr_expr_r CAst.t)
       (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm) mm
       =
       (* get translated fsm *)
-      let* the_fsm = FSM.build ~params ~bound tref grefs in
+      let* the_fsm = FSM.build ~params ~bound ~name tref grefs in
       let (minimized_fsm, _map_of_states) : fsm * (state, state) Hashtbl.t =
         Minimize.run ~params the_fsm
       in
@@ -1223,6 +1232,7 @@ module Vernac = struct
     let dump
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
+      ?(name : string = "dump")
       (tref : Constrexpr.constr_expr_r CAst.t)
       (grefs : Names.GlobRef.t list)
       : unit mm
@@ -1232,13 +1242,13 @@ module Vernac = struct
       let fsm_dump_filepath : string =
         Dump_to_file.write_to_file
           (Default ())
-          (FSM "tobe minim")
+          (FSM (Printf.sprintf "%s tobe minim" name))
           (JSON ())
           (FSM the_fsm)
       and minim_dump_filepath : string =
         Dump_to_file.write_to_file
           (Default ())
-          (FSM "post minim")
+          (FSM (Printf.sprintf "%s post minim" name))
           (JSON ())
           (FSM minimized_fsm)
       in
@@ -1257,14 +1267,19 @@ module Vernac = struct
     let build
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
+      ?(name : string = "unknown")
       (trefA : Constrexpr.constr_expr_r CAst.t)
       (trefB : Constrexpr.constr_expr_r CAst.t)
       (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm * Fsm.fsm) mm
       =
       (* get translated fsm *)
-      let* fsm_A = FSM.build ~params ~bound trefA grefs in
-      let* fsm_B = FSM.build ~params ~bound trefB grefs in
+      let* fsm_A =
+        FSM.build ~params ~bound ~name:(Printf.sprintf "%s A" name) trefA grefs
+      in
+      let* fsm_B =
+        FSM.build ~params ~bound ~name:(Printf.sprintf "%s B" name) trefB grefs
+      in
       (* merge fsm *)
       let (merged_fsm, _translation_table) : Fsm.fsm * (state, state) Hashtbl.t =
         Fsm.Merge.fsms ~params fsm_A fsm_B
@@ -1300,29 +1315,32 @@ module Vernac = struct
     let dump
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
+      ?(name : string = "dump")
       (trefA : Constrexpr.constr_expr_r CAst.t)
       (trefB : Constrexpr.constr_expr_r CAst.t)
       (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get merged fsm *)
-      let* merged_fsm, fsm_A, fsm_B = build ~params ~bound trefA trefB grefs in
+      let* merged_fsm, fsm_A, fsm_B =
+        build ~params ~bound ~name trefA trefB grefs
+      in
       let merged_dump_filepath : string =
         Dump_to_file.write_to_file
           (Default ())
-          (FSM "merged fsm")
+          (FSM (Printf.sprintf "%s merged fsm" name))
           (JSON ())
           (FSM merged_fsm)
       and fsm_a_dump_filepath : string =
         Dump_to_file.write_to_file
           (Default ())
-          (FSM "to merge A")
+          (FSM (Printf.sprintf "%s to merge A" name))
           (JSON ())
           (FSM fsm_A)
       and fsm_b_dump_filepath : string =
         Dump_to_file.write_to_file
           (Default ())
-          (FSM "to merge B")
+          (FSM (Printf.sprintf "%s to merge B" name))
           (JSON ())
           (FSM fsm_B)
       in
@@ -1346,14 +1364,19 @@ module Vernac = struct
     let build
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
+      ?(name : string = "unknown")
       (trefA : Constrexpr.constr_expr_r CAst.t)
       (trefB : Constrexpr.constr_expr_r CAst.t)
       (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm * Bisimilarity.result) mm
       =
       (* get translated fsm *)
-      let* fsm_A = FSM.build ~params ~bound trefA grefs in
-      let* fsm_B = FSM.build ~params ~bound trefB grefs in
+      let* fsm_A =
+        FSM.build ~params ~bound ~name:(Printf.sprintf "%s A" name) trefA grefs
+      in
+      let* fsm_B =
+        FSM.build ~params ~bound ~name:(Printf.sprintf "%s B" name) trefB grefs
+      in
       (* run bisimilarity algorithm *)
       let raw_result = RCP.KS90.run ~params (ToMerge (fsm_A, fsm_B)) () in
       let result = RCP.KS90.result ~params raw_result in
@@ -1389,30 +1412,33 @@ module Vernac = struct
     let dump
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
+      ?(name : string = "dump")
       (trefA : Constrexpr.constr_expr_r CAst.t)
       (trefB : Constrexpr.constr_expr_r CAst.t)
       (grefs : Names.GlobRef.t list)
       : unit mm
       =
-      let* fsm_A, fsm_B, result = build ~params ~bound trefA trefB grefs in
+      let* fsm_A, fsm_B, result =
+        build ~params ~bound ~name trefA trefB grefs
+      in
       match result with
       | BisimResult result ->
         let merged_dump_filepath : string =
           Dump_to_file.write_to_file
             (Default ())
-            (FSM "bisim merged fsm")
+            (FSM (Printf.sprintf "%s bisim merged fsm" name))
             (JSON ())
             (FSM result.merged_fsm)
         and fsm_a_dump_filepath : string =
           Dump_to_file.write_to_file
             (Default ())
-            (FSM "bisim to merge A")
+            (FSM (Printf.sprintf "%s bisim to merge A" name))
             (JSON ())
             (FSM fsm_A)
         and fsm_b_dump_filepath : string =
           Dump_to_file.write_to_file
             (Default ())
-            (FSM "bisim to merge B")
+            (FSM (Printf.sprintf "%s bisim to merge B" name))
             (JSON ())
             (FSM fsm_B)
         in
