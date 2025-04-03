@@ -30,36 +30,53 @@ type filename_kind =
   | LTS of string
   | FSM of string
 
-let get_filename (f : filename_kind) : string =
+let get_name (f : filename_kind) : string =
+  match f with
+  | Auto () -> "unknown"
+  | Just s -> s
+  | LTS s -> s
+  | FSM s -> s
+;;
+
+let get_filename (f : filename_kind) (is_complete : bool) : string =
   match f with
   | Auto () -> get_local_timestamp
   | Just s -> s
-  | LTS s -> Printf.sprintf "%s | LTS | %s" get_local_timestamp s
-  | FSM s -> Printf.sprintf "%s | FSM | %s" get_local_timestamp s
+  | _ ->
+    Printf.sprintf
+      "%s | %s%s"
+      get_local_timestamp
+      (get_name f)
+      (if is_complete then " | incomplete" else "")
 ;;
 
 type filetype_kind = JSON of unit
 
-let build_filename (filename : filename_kind) (filetype : filetype_kind)
+let build_filename
+  (filename : filename_kind)
+  (filetype : filetype_kind)
+  (is_complete : bool)
   : string
   =
   match filetype with
-  | JSON () -> Printf.sprintf "%s.json" (get_filename filename)
+  | JSON () -> Printf.sprintf "%s.json" (get_filename filename is_complete)
 ;;
 
 let build_filepath
   (output_dir : output_dir_kind)
   (filename : filename_kind)
   (filetype : filetype_kind)
+  (is_complete : bool)
   : string
   =
   match output_dir, filetype with
   | Default (), JSON () ->
     Filename.concat
       (Printf.sprintf "%sjson/" default_output_dir)
-      (build_filename filename filetype)
+      (build_filename filename filetype is_complete)
   (* | Default (), _ ->  Filename.concat default_output_dir (build_filename filename filetype) *)
-  | Exact s, _ -> Filename.concat s (build_filename filename filetype)
+  | Exact s, _ ->
+    Filename.concat s (build_filename filename filetype is_complete)
 ;;
 
 (** https://discuss.ocaml.org/t/how-to-create-a-new-file-while-automatically-creating-any-intermediate-directories/14837/5 *)
@@ -289,11 +306,11 @@ let handle_filecontents
   (filename : string)
   (filetype : filetype_kind)
   (to_dump : dumpable_kind)
-  : string
+  : string * bool
   =
   match to_dump, filetype with
-  | LTS s, JSON () -> JSON.LTS.lts filename s
-  | FSM s, JSON () -> JSON.FSM.fsm filename s
+  | LTS s, JSON () -> JSON.LTS.lts filename s, s.is_complete
+  | FSM s, JSON () -> JSON.FSM.fsm filename s, s.is_complete
 ;;
 
 let write_to_file
@@ -303,14 +320,16 @@ let write_to_file
   (to_dump : dumpable_kind)
   : string
   =
+  (* get content to output *)
+  let (content, is_complete) : string * bool =
+    handle_filecontents (get_name filename) filetype to_dump
+  in
   (* build filepath *)
-  let filepath : string = build_filepath output_dir filename filetype in
+  let filepath : string =
+    build_filepath output_dir filename filetype is_complete
+  in
   (* check parent directory exists *)
   create_parent_dir filepath;
-  (* get content to output *)
-  let content : string =
-    handle_filecontents (get_filename filename) filetype to_dump
-  in
   (* write to file *)
   (* Out_channel.with_open_gen
      [ Out_channel.Open_creat; Out_channel.Open_excl ]

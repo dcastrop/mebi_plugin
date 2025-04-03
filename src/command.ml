@@ -964,12 +964,7 @@ struct
         let dump_filepath : string =
           Dump_to_file.write_to_file
             (Default ())
-            (LTS
-               (Printf.sprintf
-                  "%s incomplete with (%d) after (%d)"
-                  name
-                  to_visit
-                  bound))
+            (LTS (Printf.sprintf "%s (%d > %d)" name to_visit bound))
             (JSON ())
             (LTS lts)
         in

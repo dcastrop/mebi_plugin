@@ -13,12 +13,20 @@ type filename_kind =
   | LTS of string
   | FSM of string
 
-val get_filename : filename_kind -> string
+val get_name : filename_kind -> string
+val get_filename : filename_kind -> bool -> string
 
 type filetype_kind = JSON of unit
 
-val build_filename : filename_kind -> filetype_kind -> string
-val build_filepath : output_dir_kind -> filename_kind -> filetype_kind -> string
+val build_filename : filename_kind -> filetype_kind -> bool -> string
+
+val build_filepath
+  :  output_dir_kind
+  -> filename_kind
+  -> filetype_kind
+  -> bool
+  -> string
+
 val create_parent_dir : string -> unit
 
 module JSON : sig
@@ -55,7 +63,11 @@ type dumpable_kind =
   | LTS of Lts.lts
   | FSM of Fsm.fsm
 
-val handle_filecontents : string -> filetype_kind -> dumpable_kind -> string
+val handle_filecontents
+  :  string
+  -> filetype_kind
+  -> dumpable_kind
+  -> string * bool
 
 val write_to_file
   :  output_dir_kind
