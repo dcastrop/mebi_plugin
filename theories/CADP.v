@@ -857,16 +857,19 @@ Compute ncs2.
 (* ! lts incomplete even after 5000 bound *)
 (* MeBi Show  LTS Bounded 5000 Of ncs2 Using lts step. *)
 (* MeBi Show  LTS Of ncs2 Using lts step. *)
-(* MeBi Dump "NCS2" LTS Of ncs2 Using lts step.
+(* MeBi Dump "NCS2" LTS Of ncs2 Using lts step. *)
 (* MeBi Debug LTS Of ncs2 Using lts step. *)
 
 (* MeBi Show  FSM Of ncs2 Using lts step. *)
-MeBi Dump  "NCS2" FSM Of ncs2 Using lts step.
+(* MeBi Dump  "NCS2" FSM Of ncs2 Using lts step. *)
 (* MeBi Debug FSM Of ncs2 Using lts step. *)
-
+(*
 MeBi Dump "NCS2" LTS Bounded 500 Of ncs2 Using lts step.
 
 MeBi Dump  "NCS2" FSM Bounded 500 Of ncs2 Using lts step. *)
+
+(* MeBi Dump  "NCS2" FSM Bounded 4000 Of ncs2 Using lts step. *)
+
 
 
 (* MeBi Show  Minim Of ncs2 Using lts step. *)
