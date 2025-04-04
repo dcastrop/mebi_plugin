@@ -146,14 +146,18 @@ module JSON = struct
       | List ss -> ss, "[", "]", " "
       | Dict ss -> ss, "{", "}", "\n"
     in
-    Printf.sprintf
-      "%s %s %s"
-      lhs
-      (List.fold_left
-         (fun (acc : string) (s : string) -> Printf.sprintf "%s,%s%s" acc sep s)
-         (List.hd ss)
-         (List.tl ss))
-      rhs
+    match ss with
+    | [] -> Printf.sprintf "%s %s" lhs rhs
+    | h :: t ->
+      Printf.sprintf
+        "%s %s %s"
+        lhs
+        (List.fold_left
+           (fun (acc : string) (s : string) ->
+             Printf.sprintf "%s,%s%s" acc sep s)
+           h
+           t)
+        rhs
   ;;
 
   let key_val (k : string) (v : string) : string =
@@ -201,13 +205,48 @@ module JSON = struct
   end
 
   module FSM = struct
+    let state (s : state) : string =
+      col
+        (Dict
+           [ key_val "id" (quoted (clean (Printf.sprintf "%d" s.id)))
+           ; key_val "name" (quoted (clean s.name))
+           ])
+    ;;
+
+    let annotation (anno : annotation) : string =
+      col
+        (List
+           (List.fold_left
+              (fun (acc : string list) ((s, a) : state * action) ->
+                List.append
+                  acc
+                  [ col
+                      (Dict
+                         [ key_val "state" (state s); key_val "action" a.label ])
+                  ])
+              []
+              anno))
+    ;;
+
+    let annotations (annos : annotations) : string =
+      key_val
+        "annotations"
+        (col
+           (List
+              (List.fold_left
+                 (fun (acc : string list) (anno : annotation) ->
+                   List.append acc [ annotation anno ])
+                 []
+                 annos)))
+    ;;
+
     let action (a : action) : string =
       col
         (Dict
            [ key_val "id" (quoted (clean (Printf.sprintf "%i" a.id)))
            ; key_val "label" (quoted (clean a.label))
            ; key_val "is_tau" (quoted (clean (Printf.sprintf "%b" a.is_tau)))
-             (* ; key_val "annotations" (quoted (clean a.annotation)) *)
+           ; annotations a.annotation
            ])
     ;;
 
@@ -221,14 +260,6 @@ module JSON = struct
                    List.append acc [ action a ])
                  alphas
                  [])))
-    ;;
-
-    let state (s : state) : string =
-      col
-        (Dict
-           [ key_val "id" (quoted (clean (Printf.sprintf "%d" s.id)))
-           ; key_val "name" (quoted (clean s.name))
-           ])
     ;;
 
     let states ?(key : string = "states") (states : States.t) : string =
