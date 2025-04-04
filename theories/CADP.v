@@ -686,6 +686,7 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
   | STEP_IF : forall c t1 t2 e,
     (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (take_branch c t1 t2 e)
 
+    (* usin the below somehow caused both branches to be taken in the FSM *)
 (*
   | STEP_IF_TRU : forall c t1 t2 e,
     eval c (get_state e) = Some (BOOL true) ->
@@ -978,13 +979,14 @@ Compute ncs2.
 
 (* MeBi Dump "NCS2" LTS Bounded 500 Of ncs2 Using lts step. *)
 
-MeBi Dump  "NCS2" FSM Bounded 500 Of ncs2 Using lts step.
+(* MeBi Dump  "NCS2" FSM Bounded 500 Of ncs2 Using lts step. *)
 
 (* MeBi Dump  "NCS2" FSM Bounded 1000 Of ncs2 Using lts step. *)
 (* MeBi Dump  "NCS2" FSM Bounded 2000 Of ncs2 Using lts step. *)
 (* MeBi Dump  "NCS2" FSM Bounded 3000 Of ncs2 Using lts step. *)
 (* MeBi Dump  "NCS2" FSM Bounded 4000 Of ncs2 Using lts step. *)
 
+(* MeBi Dump  "NCS2" FSM Bounded 4000 Of ncs2 Using lts step. *)
 
 
 (* MeBi Show  Minim Of ncs2 Using lts step. *)
