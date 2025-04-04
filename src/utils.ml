@@ -4,6 +4,27 @@ let is_unit_option (override : unit option) : bool =
   | Some () -> true
 ;;
 
+(** used to store info on if a model is complete or the number of bounds required *)
+type model_info =
+  { is_complete : bool
+  ; bound : int
+  }
+
+let is_complete (m : model_info option) : bool option =
+  match m with
+  | None -> None
+  | Some i -> Some i.is_complete
+;;
+
+module PStr = struct
+  let model_info (m : model_info option) : string =
+    match m with
+    | None -> "None"
+    | Some i ->
+      Printf.sprintf "{| is complete: %b; bound: %i |}" i.is_complete i.bound
+  ;;
+end
+
 module Logging = struct
   type output_modes =
     | Coq of unit

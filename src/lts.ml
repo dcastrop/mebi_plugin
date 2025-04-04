@@ -21,7 +21,7 @@ module Transitions = Set.Make (struct
 type lts =
   { init : string option
   ; transitions : Transitions.t
-  ; is_complete : bool
+  ; info : Utils.model_info option
   }
 
 module PStr = struct
@@ -98,7 +98,10 @@ module PStr = struct
          (match the_lts.init with
           | None -> "None"
           | Some init' -> init'))
-      (Printf.sprintf "\n%sis complete: %b" tabs' the_lts.is_complete)
+      (Printf.sprintf
+         "\n%smeta info: %s"
+         tabs'
+         (Utils.PStr.model_info the_lts.info))
       (Printf.sprintf
          "\n%stransitions: %s"
          tabs'
@@ -117,7 +120,7 @@ module Create = struct
 
   let lts
     ?(init : string option)
-    ?(is_complete : bool = true)
+    ?(info : Utils.model_info option)
     (raw : raw_transitions)
     : lts
     =
@@ -157,6 +160,6 @@ module Create = struct
           Transitions.empty
           raw'
     in
-    { init; transitions; is_complete }
+    { init; transitions; info }
   ;;
 end

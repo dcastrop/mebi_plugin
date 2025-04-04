@@ -948,7 +948,8 @@ struct
         translate_coq_lts g.transitions tbl
       in
       let is_complete : bool = Queue.is_empty g.to_visit in
-      let lts : Lts.lts = Lts.Create.lts ~init ~is_complete (Flat flat_rlts) in
+      let info : Utils.model_info = { is_complete; bound } in
+      let lts : Lts.lts = Lts.Create.lts ~init ~info (Flat flat_rlts) in
       if Bool.not is_complete
       then (
         let to_visit : int = Queue.length g.to_visit in
@@ -1121,7 +1122,12 @@ module Vernac = struct
       =
       params.options.output_enabled <- false;
       let* (the_lts : Lts.lts) = build ~params ~bound ~name tref grefs in
-      if the_lts.is_complete
+      let make_dump : bool =
+        match the_lts.info with
+        | None -> true
+        | Some i -> i.is_complete
+      in
+      if make_dump
       then (
         let dump_filepath : string =
           Dump_to_file.write_to_file

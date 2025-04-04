@@ -94,7 +94,7 @@ type fsm =
   ; mutable alphabet : Alphabet.t
   ; mutable states : States.t
   ; mutable edges : States.t Actions.t Edges.t
-  ; is_complete : bool
+  ; info : Utils.model_info option
   }
 (* TODO: Currently, there may be many copies of the same state in an [fsm] (i.e., in [init] and the [edges]). Maybe add list of states and change others to be an index referencing their position in the list. *)
 
@@ -409,7 +409,7 @@ module PStr = struct
          (match fsm'.init with
           | None -> "None"
           | Some init' -> state ~params:(Fmt _params') init'))
-      (Printf.sprintf "\n%sis complete: %b" tabs' fsm'.is_complete)
+      (Printf.sprintf "\n%sinfo: %s" tabs' (Utils.PStr.model_info fsm'.info))
       (Printf.sprintf
          "\n%salphabet: %s"
          tabs'
@@ -535,14 +535,14 @@ module Create = struct
 
   (** [fsm init alphabet states edges] is a wrapper constructor for [fsm]. *)
   let fsm
-    ?(is_complete : bool = true)
+    ?(info : Utils.model_info option = None)
     (init : state option)
     (alphabet : Alphabet.t)
     (states : States.t)
     (edges : States.t Actions.t Edges.t)
     : fsm
     =
-    { init; alphabet; states; edges; is_complete }
+    { init; alphabet; states; edges; info }
   ;;
 end
 
@@ -603,14 +603,10 @@ module Clone = struct
 
   let fsm (m : fsm) : fsm =
     match m with
-    | { init
-      ; alphabet = m_alphabet
-      ; states = m_states
-      ; edges = m_edges
-      ; is_complete
-      } ->
+    | { init; alphabet = m_alphabet; states = m_states; edges = m_edges; info }
+      ->
       Create.fsm
-        ~is_complete
+        ~info
         (init_state init)
         (alphabet m_alphabet)
         (states m_states)

@@ -12,15 +12,17 @@ let get_local_timestamp : string =
   match Unix.localtime (Unix.time ()) with
   | { tm_sec; tm_min; tm_hour; tm_mday; tm_mon; tm_year; _ } ->
     Printf.sprintf
-      "%d %s%d %s%d - %d:%s%d:%d"
+      "%d %s%d %s%d - %s%d:%s%d:%s%d"
       (tm_year + 1900)
       (if tm_mon < 10 then "0" else "")
       tm_mon
       (if tm_mday < 10 then "0" else "")
       tm_mday
+      (if tm_hour < 10 then "0" else "")
       tm_hour
       (if tm_min < 10 then "0" else "")
       tm_min
+      (if tm_sec < 10 then "0" else "")
       tm_sec
 ;;
 
@@ -38,7 +40,7 @@ let get_name (f : filename_kind) : string =
   | FSM s -> s
 ;;
 
-let get_filename (f : filename_kind) (is_complete : bool) : string =
+let get_filename (f : filename_kind) (is_complete : bool option) : string =
   match f with
   | Auto () -> get_local_timestamp
   | Just s -> s
@@ -47,13 +49,17 @@ let get_filename (f : filename_kind) (is_complete : bool) : string =
       "%s | LTS | %s%s"
       get_local_timestamp
       (get_name f)
-      (if is_complete then "" else " | incomplete")
+      (match is_complete with
+       | None -> " | unknown if complete"
+       | Some b -> if b then " | complete" else " | incomplete")
   | FSM _ ->
     Printf.sprintf
       "%s | FSM | %s%s"
       get_local_timestamp
       (get_name f)
-      (if is_complete then "" else " | incomplete")
+      (match is_complete with
+       | None -> " | unknown if complete"
+       | Some b -> if b then " | complete" else " | incomplete")
 ;;
 
 type filetype_kind = JSON of unit
@@ -61,7 +67,7 @@ type filetype_kind = JSON of unit
 let build_filename
   (filename : filename_kind)
   (filetype : filetype_kind)
-  (is_complete : bool)
+  (is_complete : bool option)
   : string
   =
   match filetype with
@@ -72,7 +78,7 @@ let build_filepath
   (output_dir : output_dir_kind)
   (filename : filename_kind)
   (filetype : filetype_kind)
-  (is_complete : bool)
+  (is_complete : bool option)
   : string
   =
   match output_dir, filetype with
@@ -103,7 +109,7 @@ module JSON = struct
     Str.global_replace (Str.regexp {|\(\r\n|\n|\r\)|}) " " s
   ;; *)
 
-  (** removes all newlines, excess spaces from string *)
+  (** removes all newlines, excess spaces from string, and makes " " safe *)
   let clean (s : string) : string =
     let writing_space : bool ref = ref true in
     String.fold_left
@@ -120,15 +126,18 @@ module JSON = struct
                " ")
            else (
              let c_str : string = String.make 1 c in
-             match String.equal " " c_str, !writing_space with
-             | true, true -> ""
-             | true, false ->
-               writing_space := true;
-               c_str
-             | false, true ->
-               writing_space := false;
-               c_str
-             | false, false -> c_str)))
+             if String.contains "\"" c
+             then "\\\""
+             else (
+               match String.equal " " c_str, !writing_space with
+               | true, true -> ""
+               | true, false ->
+                 writing_space := true;
+                 c_str
+               | false, true ->
+                 writing_space := false;
+                 c_str
+               | false, false -> c_str))))
       ""
       s
   ;;
@@ -164,6 +173,17 @@ module JSON = struct
     Printf.sprintf "%s: %s" (quoted k) v
   ;;
 
+  let model_info (m : Utils.model_info option) : string =
+    match m with
+    | None -> "None"
+    | Some i ->
+      col
+        (Dict
+           [ key_val "is_complete" (quoted (Printf.sprintf "%b" i.is_complete))
+           ; key_val "bound" (quoted (Printf.sprintf "%i" i.bound))
+           ])
+  ;;
+
   module LTS = struct
     let initial (init : string option) : string =
       match init with
@@ -172,21 +192,20 @@ module JSON = struct
     ;;
 
     let transition (t : Lts.transition) : string =
-      key_val
-        (Printf.sprintf "%i" t.id)
-        (col
-           (Dict
-              [ key_val "from" (quoted (clean t.from))
-              ; key_val "label" (quoted (clean t.label))
-              ; key_val "destination" (quoted (clean t.destination))
-              ]))
+      col
+        (Dict
+           [ key_val "id" (quoted (clean (Printf.sprintf "%i" t.id)))
+           ; key_val "from" (quoted (clean t.from))
+           ; key_val "label" (quoted (clean t.label))
+           ; key_val "destination" (quoted (clean t.destination))
+           ])
     ;;
 
     let transitions (ts : Lts.Transitions.t) : string =
       key_val
         "transitions"
         (col
-           (Dict
+           (List
               (Lts.Transitions.fold
                  (fun (t : Lts.transition) (acc : string list) ->
                    List.append acc [ transition t ])
@@ -196,9 +215,10 @@ module JSON = struct
 
     let lts (name : string) (m : lts) : string =
       Printf.sprintf
-        "{\n\t%s,\n\t%s,\n\t%s,\n\t%s\n}"
+        "{\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s\n}"
         (key_val "name" (quoted name))
         (key_val "kind" (quoted "lts"))
+        (key_val "info" (model_info m.info))
         (initial m.init)
         (transitions m.transitions)
     ;;
@@ -324,9 +344,10 @@ module JSON = struct
 
     let fsm (name : string) (m : fsm) : string =
       Printf.sprintf
-        "{\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s\n}"
+        "{\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s\n}"
         (key_val "name" (quoted name))
         (key_val "kind" (quoted "fsm"))
+        (key_val "info" (model_info m.info))
         (initial m.init)
         (alphabet m.alphabet)
         (states m.states)
@@ -343,11 +364,11 @@ let handle_filecontents
   (filename : string)
   (filetype : filetype_kind)
   (to_dump : dumpable_kind)
-  : string * bool
+  : string * bool option
   =
   match to_dump, filetype with
-  | LTS s, JSON () -> JSON.LTS.lts filename s, s.is_complete
-  | FSM s, JSON () -> JSON.FSM.fsm filename s, s.is_complete
+  | LTS s, JSON () -> JSON.LTS.lts filename s, Utils.is_complete s.info
+  | FSM s, JSON () -> JSON.FSM.fsm filename s, Utils.is_complete s.info
 ;;
 
 let write_to_file
@@ -358,7 +379,7 @@ let write_to_file
   : string
   =
   (* get content to output *)
-  let (content, is_complete) : string * bool =
+  let (content, is_complete) : string * bool option =
     handle_filecontents (get_name filename) filetype to_dump
   in
   (* build filepath *)

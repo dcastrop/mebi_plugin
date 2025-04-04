@@ -64,7 +64,7 @@ end
 type lts =
   { init : string option
   ; transitions : Transitions.t
-  ; is_complete : bool
+  ; info : Utils.model_info option
   }
 
 module PStr : sig
@@ -82,5 +82,5 @@ module Create : sig
   type transition_params = Of of (int * string * string * string)
 
   val transition : transition_params -> transition
-  val lts : ?init:string -> ?is_complete:bool -> raw_transitions -> lts
+  val lts : ?init:string -> ?info:Utils.model_info -> raw_transitions -> lts
 end

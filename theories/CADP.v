@@ -13,6 +13,11 @@ Fixpoint app {X:Type} (l1 l2 : list X) : list X :=
   | h :: t => h :: (app t l2)
   end.
 
+(*************************************************************************)
+(**** Debugging **********************************************************)
+(*************************************************************************)
+
+Record error := { code: nat ; msg : string }.
 
 (*************************************************************************)
 (**** Basic defs *********************************************************)
@@ -120,7 +125,7 @@ Record local_vars :=
   ; var_swap        : bool  (* release *) }.
 
 Module Vars.
-  Definition initial : local_vars := Build_local_vars None false None false.
+  Definition initial : local_vars := Build_local_vars Nil false Nil false.
 End Vars.
 
 Inductive local_var : Type :=
@@ -199,36 +204,59 @@ Definition set_lock_j (new_j:index) (r:resource) : resource :=
 (*************************************************************************)
 (**** (Local) State ******************************************************)
 (*************************************************************************)
-Definition state : Type := pid * local_vars.
+Definition state : Type := pid * local_vars * (option (list error)).
 
 Module State.
-  Definition create (p:pid) : state := (p, Vars.initial).
+  Definition create (p:pid) : state := (p, Vars.initial, None).
   Definition initial : state := State.create 0.
 End State.
 
 Definition get_pid (s:state) : pid :=
-  match s with | (p, _) => p end.
+  match s with | (p, _, _) => p end.
 
 Definition get_vars (s:state) : local_vars :=
-  match s with | (_, v) => v end.
+  match s with | (_, v, _) => v end.
+
+Definition get_errors (s:state) : option (list error) :=
+  match s with | (_, _, e) => e end.
 
 Definition get_predecessor (s:state) : index := var_predecessor (get_vars s).
 Definition get_locked      (s:state) : bool  := var_locked (get_vars s).
 Definition get_next        (s:state) : index := var_next (get_vars s).
 Definition get_swap        (s:state) : bool  := var_swap (get_vars s).
 
+Definition handle_index_value (i:index) : value :=
+  match i with
+  | None => NIL
+  | _ => INDEX i
+  end.
+
 Definition get_local_var_value (v:local_var) (s:state) : value :=
   match v with
-  | PREDECESSOR => INDEX (get_predecessor s)
   | LOCKED      => BOOL  (get_locked s)
-  | NEXT        => INDEX (get_next s)
   | SWAP        => BOOL  (get_swap s)
+  | PREDECESSOR => handle_index_value (get_predecessor s)
+  | NEXT        => handle_index_value (get_next s)
   | THE_PID     => PID   (get_pid s)
   end.
 
 Definition set_vars (v:local_vars) (s:state) : state :=
-  match s with | (p, _) => (p, v) end.
+  match s with | (p, _, e) => (p, v, e) end.
 
+Definition has_error_occurred (s:state) : bool :=
+  match get_errors s with
+  | None => false
+  | _ => true
+  end.
+
+Definition add_error (e:error) (s:state) : state :=
+  match s with
+  | (p, v, es) =>
+    match es with
+    | None => (p, v, Some [e])
+    | Some es => (p, v, Some (es ++ [e]))
+    end
+  end.
 
 (*************************************************************************)
 (**** (Conditional) Expressions ******************************************)
@@ -333,10 +361,19 @@ Fixpoint eval (e:expr) (s:state) : option value :=
     | Some (BOOL a),
       Some (BOOL b)  => Some (BOOL (eqb a b))
 
+    | Some NIL, Some NIL => Some (BOOL true)
+
     | _, _ => None
     end
 
   end.
+
+Compute (eval (VAL (BOOL true)) State.initial).
+Compute (eval (VAL (BOOL false)) State.initial).
+
+Compute (eval (VAL NIL) State.initial).
+Compute (eval (VAR PREDECESSOR) State.initial).
+
 
 Definition handle_value (v:value) (s:state) : option value :=
   match v with
@@ -423,9 +460,16 @@ Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
   | None => None (* [next=GET v] and [v] could not be resolved *)
   | Some next =>
     (* get pid from [to_write] *)
+    let p:option pid := (* should be index of pid, not None *)
     match get_local_var_value to_write s with
-    | PID p => (* should be pid *)
-      (* get qnode *)
+    | INDEX i => i
+    | PID p => Some p
+    | _ => None (* [to_write] must be a [pid] *)
+    end
+    in
+    match p with
+    | None => None
+    | Some p => (* get qnode *)
       let r:resource := get_resource e in
       let m:mem := get_mem r in
       match Memory.nth_error p m with
@@ -440,7 +484,6 @@ Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
           end
         end
       end
-    | _ => None (* [to_write] must be a [pid] *)
     end
   end.
 
@@ -450,24 +493,39 @@ Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
 Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env :=
   (* get pid from [to_write] *)
   let s:state := get_state e in
-  match get_local_var_value to_write s with
-  | PID p => (* should be pid *)
-    (* get qnode *)
+  let p:option pid := (* should be index of pid, not None *)
+    match get_local_var_value to_write s with
+    | INDEX i => i
+    | PID p => Some p
+    | _ => None (* [to_write] must be a [pid] *)
+    end
+  in
+  match p with
+  | None =>
+      (* Some (State.create 99, get_resource e) *)
+      match get_local_var_value to_write s with
+      | INDEX None => Some (add_error (Build_error 91 "write_locked, to_write yielded INDEX None") s, get_resource e)
+      | INDEX _ => Some (add_error (Build_error 92 "write_locked, to_write yielded INDEX _") s, get_resource e)
+      | NIL => Some (add_error (Build_error 93 "write_locked, to_write yielded NIL") s, get_resource e)
+      | PID _ => Some (add_error (Build_error 94 "write_locked, to_write yielded PID _") s, get_resource e)
+      | BOOL _ => Some (add_error (Build_error 95 "write_locked, to_write yielded BOOL _") s, get_resource e)
+      | _ => None (* [to_write] must be a [pid] *)
+      end
+  | Some p => (* get qnode *)
     let r:resource := get_resource e in
     let m:mem := get_mem r in
     match Memory.nth_error p m with
-    | None => None (* [qnode] must exist *)
+    | None => Some (add_error (Build_error 71 "write_locked, qnode does not exist") s, get_resource e) (* [qnode] must exist *)
     | Some q => (* check [locked] of [qnode] is a [BOOL] *)
       match locked with
       | BOOL b =>
         match Memory.nth_replace (Qnode.set_locked b q) p m with
-        | None => None
+        | None => Some (add_error (Build_error 71 "write_locked, nth_replace failed") s, get_resource e)
         | Some m => Some (s, (set_mem m r))
         end
-      | _ => None (* [locked] must be a [BOOL] *)
+      | _ => Some (add_error (Build_error 61 "write_locked, locked value not bool") s, get_resource e) (* [locked] must be a [BOOL] *)
       end
     end
-  | _ => None (* [to_write] must be a [pid] *)
   end.
 
 Definition fetch_and_store (e:env) : option env :=
@@ -541,7 +599,7 @@ Definition do_act (a:act) (e:env) : (tm * env) :=
     in
     match res with
     | None => (ERR, e)
-    | Some e => (OK, e)
+    | Some e => (if has_error_occurred (get_state e) then ERR else OK, e)
     end
   end.
 
@@ -597,6 +655,19 @@ Fixpoint unfold (new:rec_def) (old:tm) : tm :=
   end.
 
 (*************************************************************************)
+(**** Conditional branching **********************************************)
+(*************************************************************************)
+
+Definition take_branch (c:expr) (t1:tm) (t2:tm) (e:env) : tm * env :=
+  match eval c (get_state e) with
+  | Some (BOOL true) => (t1, e)
+  | Some (BOOL false) => (t2, e)
+  | _ => (ERR, ((add_error (Build_error 41 "conditional statement did not evaluate correctly") (get_state e)), get_resource e))
+  end.
+
+
+
+(*************************************************************************)
 (**** Semantics (Local step) *********************************************)
 (*************************************************************************)
 
@@ -612,13 +683,17 @@ Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
     (l1, e1) --<{a}>--> (l2, e2) ->
     (SEQ l1 r, e1) --<{a}>--> (SEQ l2 r, e2)
 
+  | STEP_IF : forall c t1 t2 e,
+    (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (take_branch c t1 t2 e)
+
+(*
   | STEP_IF_TRU : forall c t1 t2 e,
     eval c (get_state e) = Some (BOOL true) ->
     (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (t1, e)
 
   | STEP_IF_FLS : forall c t1 t2 e,
     eval c (get_state e) = Some (BOOL false) ->
-    (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (t2, e)
+    (<{ if c then t1 else t2 }>, e) --<{SILENT}>--> (t2, e) *)
 
   | STEP_REC_DEF : forall i b e,
     (REC_DEF i b, e) --<{SILENT}>--> (unfold (i, b) b, e)
@@ -663,7 +738,7 @@ Inductive lts : sys * resource -> action -> sys * resource -> Prop :=
 
 Import Expr.
 
-Example Acquire : tm :=
+(* Example Acquire : tm :=
   SEQ (ACT (WRITE_NEXT THE_PID NIL)) (
     SEQ (ACT FETCH_AND_STORE) (
       IF (NOT (EQ (VAR PREDECESSOR) (VAL NIL))) (
@@ -677,6 +752,23 @@ Example Acquire : tm :=
           )
         )
       ) (OK)
+    )
+  ). *)
+
+Example Acquire : tm :=
+  SEQ (ACT (WRITE_NEXT THE_PID NIL)) (
+    SEQ (ACT FETCH_AND_STORE) (
+      IF (EQ (VAR PREDECESSOR) (VAL NIL)) (OK) (
+        SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (
+          SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (
+            REC_DEF 2 (
+              SEQ (ACT READ_LOCKED) (
+                IF (VAR LOCKED) (REC_CALL 2) (OK)
+              )
+            )
+          )
+        )
+      )
     )
   ).
 
@@ -710,7 +802,20 @@ Example P : tm :=
     )
   ).
 
+Compute (eval (NOT (EQ (VAR PREDECESSOR) (VAL NIL))) (get_state (Env.initial 1))).
+
 Compute (write_next THE_PID NIL (Env.initial 1)).
+
+Compute get_local_var_value PREDECESSOR (get_state (Env.initial 1)).
+Compute get_local_var_value NEXT (get_state (Env.initial 1)).
+
+(* Compute (write_locked PREDECESSOR (BOOL true) (Env.initial 1)).
+
+Compute (write_locked PREDECESSOR (BOOL false) (Env.initial 1)).
+
+Compute (write_locked NEXT (BOOL true) (Env.initial 1)).
+
+Compute (write_locked NEXT (BOOL false) (Env.initial 1)). *)
 
 (** Thank you paulo for the tip! -- (see below, reworded by Jonah)
       A lemma/property can be used to help tell
@@ -738,27 +843,32 @@ Inductive step_transitive_closure : tm * env -> Prop :=
   .
 
 
-(* Goal step_transitive_closure (P, Env.initial 1).
-   eapply trans_step.
-   unfold P.
-   eapply STEP_REC_DEF.
-   simpl.
-   eapply trans_step.
+Goal step_transitive_closure (P, Env.initial 1).
+  eapply trans_step.
+  unfold P.
+  eapply STEP_REC_DEF.
+  simpl.
+  eapply trans_step.
 
-   eapply STEP_SEQ.
+  eapply STEP_SEQ.
 
-   eapply STEP_ACT_helper;  reflexivity.
-   eapply trans_step.
-   constructor.
-   eapply trans_step.
-   eapply STEP_SEQ.
-   constructor.
-   eapply STEP_ACT_helper;  reflexivity.
-   eapply trans_step.
-   simpl.
-   eapply STEP_SEQ.
+  eapply STEP_ACT_helper;  reflexivity.
+  eapply trans_step.
+  constructor.
+  eapply trans_step.
+  constructor.
+  eapply STEP_SEQ.
+  eapply STEP_ACT_helper;  reflexivity.
+  eapply trans_step.
+  simpl.
+  eapply STEP_SEQ.
+  constructor.
+  eapply trans_step.
+  eapply STEP_SEQ.
+  eapply STEP_SEQ.
+  eapply STEP_ACT_helper;  reflexivity.
 
-Abort. *)
+Abort.
 
 
 (* Goal exists a t e, (Acquire, Env.initial 1) --<{ a }>--> (t, e).
@@ -779,17 +889,19 @@ Qed.
 (**** Single process *****************************************************)
 (*************************************************************************)
 
-Example p0 : tm * env := (P, Env.initial 0).
+Example p0 : tm * env := (P, Env.initial 1).
+Compute p0.
+
 (* MeBi Show  LTS Of p0 Using step. *)
-MeBi Dump "p0" LTS Of p0 Using step.
+MeBi Dump "p0" LTS Bounded 150 Of p0 Using step.
 (* MeBi Debug LTS Of p0 Using step. *)
 
 (* MeBi Show  FSM Of p0 Using step. *)
-MeBi Dump "p0" FSM Of p0 Using step.
+MeBi Dump "p0" FSM Bounded 150 Of p0 Using step.
 (* MeBi Debug FSM Of p0 Using step. *)
 
 (* MeBi Show  Minim Of p0 Using step. *)
-MeBi Dump "p0" Minim Of p0 Using step.
+(* MeBi Dump "p0" Minim Bounded 150 Of p0 Using step. *)
 (* MeBi Debug Minim Of p0 Using step. *)
 
 
@@ -805,7 +917,7 @@ Definition spawn (p:pid) (b:tm) : process := (b, State.create p).
 Fixpoint populate (n:nat) (b:tm) : list process :=
   match n with
   | 0 => []
-  | S m => app (populate m b) [spawn n b]
+  | S m => app (populate m b) [spawn m b]
   end.
 
 Definition system : Type := list process * resource.
@@ -814,7 +926,7 @@ Definition create (n:nat) (b:tm) : system := (populate n b, Resource.initial n).
 
 Fixpoint load (ps:list process) : sys :=
   match ps with
-  | [] => PRC OK State.initial (* shouldn't happen *)
+  | [] => PRC ERR State.initial (* shouldn't happen *)
   | h :: t =>
     match h with
     | (p, s) =>
@@ -838,11 +950,11 @@ Example ncs1 : composition := compose (create 1 P).
 Compute ncs1.
 
 (* MeBi Show  LTS Of ncs1 Using lts step. *)
-MeBi Dump "NCS1" LTS Of ncs1 Using lts step.
+MeBi Dump "NCS1" LTS Bounded 150 Of ncs1 Using lts step.
 (* MeBi Debug LTS Of ncs1 Using lts step. *)
 
 (* MeBi Show  FSM Of ncs1 Using lts step. *)
-MeBi Dump "NCS1"  FSM Of ncs1 Using lts step.
+MeBi Dump "NCS1"  FSM Bounded 150 Of ncs1 Using lts step.
 (* MeBi Debug FSM Of ncs1 Using lts step. *)
 
 (* MeBi Show  Minim Of ncs1 Using lts step. *)
@@ -866,7 +978,7 @@ Compute ncs2.
 
 (* MeBi Dump "NCS2" LTS Bounded 500 Of ncs2 Using lts step. *)
 
-(* MeBi Dump  "NCS2" FSM Bounded 500 Of ncs2 Using lts step. *)
+MeBi Dump  "NCS2" FSM Bounded 500 Of ncs2 Using lts step.
 
 (* MeBi Dump  "NCS2" FSM Bounded 1000 Of ncs2 Using lts step. *)
 (* MeBi Dump  "NCS2" FSM Bounded 2000 Of ncs2 Using lts step. *)
