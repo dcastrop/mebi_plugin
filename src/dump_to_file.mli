@@ -14,17 +14,17 @@ type filename_kind =
   | FSM of string
 
 val get_name : filename_kind -> string
-val get_filename : filename_kind -> bool -> string
+val get_filename : filename_kind -> bool option -> string
 
 type filetype_kind = JSON of unit
 
-val build_filename : filename_kind -> filetype_kind -> bool -> string
+val build_filename : filename_kind -> filetype_kind -> bool option -> string
 
 val build_filepath
   :  output_dir_kind
   -> filename_kind
   -> filetype_kind
-  -> bool
+  -> bool option
   -> string
 
 val create_parent_dir : string -> unit
@@ -39,6 +39,7 @@ module JSON : sig
 
   val col : col_kind -> string
   val key_val : string -> string -> string
+  val model_info : Utils.model_info option -> string
 
   module LTS : sig
     val initial : string option -> string
@@ -48,9 +49,11 @@ module JSON : sig
   end
 
   module FSM : sig
+    val state : Fsm.state -> string
+    val annotation : Fsm.annotation -> string
+    val annotations : Fsm.annotations -> string
     val action : Fsm.action -> string
     val alphabet : Fsm.Alphabet.t -> string
-    val state : Fsm.state -> string
     val states : ?key:string -> Fsm.States.t -> string
     val edge : Fsm.state -> Fsm.action -> Fsm.States.t -> string
     val edges : Fsm.States.t Fsm.Actions.t Fsm.Edges.t -> string
@@ -67,7 +70,7 @@ val handle_filecontents
   :  string
   -> filetype_kind
   -> dumpable_kind
-  -> string * bool
+  -> string * bool option
 
 val write_to_file
   :  output_dir_kind

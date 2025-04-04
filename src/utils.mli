@@ -1,5 +1,16 @@
 val is_unit_option : unit option -> bool
 
+type model_info =
+  { is_complete : bool
+  ; bound : int
+  }
+
+val is_complete : model_info option -> bool option
+
+module PStr : sig
+  val model_info : model_info option -> string
+end
+
 module Logging : sig
   type output_modes =
     | Coq of unit
@@ -78,7 +89,6 @@ val inc_tab : ?by:int -> Params.fmt -> Params.fmt
 val dec_tab : ?by:int -> Params.fmt -> Params.fmt
 val no_tab : Params.fmt -> Params.fmt
 val no_leading_tab : bool -> Params.fmt -> Params.fmt
-
 val print : ?show:bool -> string -> unit
 val default_indent_val : int
 val str_tabs : ?size:int -> int -> string
