@@ -1,12 +1,16 @@
 src/META.coq-mebi
 -R theories/ MEBI
+-R examples/ MEBI.Examples
+-R examples/properties/ MEBI.Examples.Properties
 -I src/
 -arg "-w all"
 
 theories/loader.v
 theories/Test.v
 
-theories/CADP.v
+examples/CADP.v
+examples/properties/mutual_exclusion.v
+examples/properties/no_starvation.v
 
 src/utils.ml
 src/utils.mli
