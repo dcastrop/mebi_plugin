@@ -18,33 +18,27 @@ Fixpoint app {X:Type} (l1 l2 : list X) : list X :=
 (**** Layer 1 ************************************************************)
 (*************************************************************************)
 
-(** [tm1] is a [nat] that can change before it terminates. *)
+(** [tm1] is a [nat] that can change via increments and decrements. *)
 Inductive tm1 : Type :=
   | END : tm1               (* termination         *)
   | NUM : nat -> tm1        (* any nat             *)
-  | INC : tm1 -> tm1        (* increment the state *)
-  | DEC : tm1 -> tm1        (* decrement the state *)
   | ADD : tm1 -> tm1        (* add the increment   *)
   | SUB : tm1 -> tm1        (* sub the decrement   *)
-  | SEQ : tm1 -> tm1 -> tm1 (* sequence            *)
   | DEF : nat -> tm1 -> tm1 (* recursive def       *)
   | REC : nat -> tm1        (* recursive call      *)
   | PTY : tm1 -> tm1 -> tm1 -> tm1 (* parity (even l, odd r) *)
   .
 
-(** [unfold (i, b) t] unfolds all recursive calls within [t] corresponding to [i] with [b]. Note: if another recursive definition is encountered corresponding to [i], then that body is skipped. *)
-Fixpoint unfold (i:nat) (b:tm1) (t:tm1) : tm1 :=
+(** [unfold1 (i, b) t] unfolds all recursive calls within [t] corresponding to [i] with [b]. Note: if another recursive definition is encountered corresponding to [i], then that body is skipped. *)
+Fixpoint unfold1 (i:nat) (b:tm1) (t:tm1) : tm1 :=
   match t with
   | END => END
   | NUM n => NUM n
-  | INC t => unfold i b t
-  | DEC t => unfold i b t
-  | ADD t => unfold i b t
-  | SUB t => unfold i b t
-  | SEQ l r => SEQ l (unfold i b r)
-  | DEF j d => if Nat.eqb i j then DEF j d else DEF j (unfold i b d)
+  | ADD t => unfold1 i b t
+  | SUB t => unfold1 i b t
+  | DEF j d => if Nat.eqb i j then DEF j d else DEF j (unfold1 i b d)
   | REC j => if Nat.eqb i j then DEF i b else REC j
-  | PTY n l r => PTY n (unfold i b l) (unfold i b r)
+  | PTY n l r => PTY n (unfold1 i b l) (unfold1 i b r)
   end.
 
 (** [parity n l r] returns [l] if [n] is even, else [r]. *)
@@ -119,6 +113,28 @@ Inductive lts1_tc : cfg1 -> Prop :=
 
 
 
+
+(*************************************************************************)
+(**** Layer 2 ************************************************************)
+(*************************************************************************)
+
+(** [tm2] controls the values of increment and decrement in the state. *)
+Inductive tm2 : Type :=
+  | TERM : tm1               (* termination         *)
+  | INCR : tm2 -> tm2        (* increment the state *)
+  | DECR : tm2 -> tm2        (* decrement the state *)
+  | SEQ  : tm1 -> tm1 -> tm1 (* sequence            *)
+  .
+
+(** [unfold2 (i, b) t] unfolds all recursive calls within [t] corresponding to [i] with [b]. Note: if another recursive definition is encountered corresponding to [i], then that body is skipped. *)
+(* Fixpoint unfold2 (i:nat) (b:tm2) (t:tm2) : tm2 :=
+  match t with
+  | TERM => TERM
+  | NUM n => NUM n
+  | INCR t => unfold2 i b t
+  | DECR t => unfold2 i b t
+  | SEQ l r => SEQ l (unfold2 i b r)
+  end. *)
 
 
 
