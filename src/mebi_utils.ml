@@ -19,7 +19,7 @@ let rec strip_snd (l : (EConstr.t * EConstr.t) list) : EConstr.t list =
 let ref_list_to_glob_list (l : Libnames.qualid list) : Names.GlobRef.t list =
   List.fold_left
     (fun (acc : Names.GlobRef.t list) (s : Libnames.qualid) ->
-       List.append acc [ Nametab.global s ])
+      List.append acc [ Nametab.global s ])
     []
     l
 ;;
@@ -39,4 +39,16 @@ let econstr_to_string (target : EConstr.t) : string =
     return (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma target))
   in
   run (econstr_to_string' target)
+;;
+
+(** [constr_to_string target] is a [string] representing [target]. *)
+let constr_to_string (target : Constr.t) : string =
+  let open Mebi_monad in
+  let open Mebi_monad.Monad_syntax in
+  let constr_to_string' (target : Constr.t) : string mm =
+    let* env = get_env in
+    let* sigma = get_sigma in
+    return (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma target))
+  in
+  run (constr_to_string' target)
 ;;
