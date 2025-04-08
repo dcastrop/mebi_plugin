@@ -2,7 +2,7 @@ open Pp
 open Mebi_utils
 open Mebi_monad
 open Mebi_monad.Monad_syntax
-open Pp_ext
+(* open Pp_ext *)
 
 (* *)
 open Fsm
@@ -62,11 +62,17 @@ type raw_lts =
   ; constructor_transitions : (Constr.rel_context * Constr.types) array
   }
 
+type term_type_map =
+  (* (EConstr.types, (Constr.rel_context * Constr.types) array) Hashtbl.t *)
+  (EConstr.types, raw_lts) Hashtbl.t
+
+(** essentially a list of [raw_lts], to allow the plugin to be provided (manually) the relevant inductive defeinitions. Useful in the case of a layered LTS. *)
+type rlts_list = raw_lts list
+
 (** [log_raw_lts] *)
 let log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
   : unit mm
   =
-  (* *)
   log
     ~params
     (Printf.sprintf
@@ -86,20 +92,27 @@ let log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
              (fun _ -> str ", ")
              Names.Id.print
              rlts.coq_ctor_names)));
-  (* *)
-  let* env = get_env in
-  let* sigma = get_sigma in
   log
     ~params
     (Printf.sprintf
-       "(d) Transitions: %s.\n"
-       (Pp.string_of_ppcmds
-          (pp_transitions env sigma rlts.constructor_transitions)));
+       "(d) Types of coq_lts: %s.\n"
+       (econstr_to_string rlts.coq_lts));
+  log
+    ~params
+    (Printf.sprintf
+       "(f) Transitions (do not be alarmed by any _UNBOUND_ below): %s.\n"
+       (if Array.length rlts.constructor_transitions < 1
+        then "[] (empty)"
+        else
+          Printf.sprintf
+            "[%s]"
+            (Array.fold_left
+               (fun (acc : string) (tr : Constr.rel_context * Constr.t) ->
+                 Printf.sprintf "%s   %s\n" acc (constr_to_string (snd tr)))
+               "\n"
+               rlts.constructor_transitions)));
   return ()
 ;;
-
-(** essentially a list of [raw_lts], to allow the plugin to be provided (manually) the relevant inductive defeinitions. Useful in the case of a layered LTS. *)
-type rlts_list = raw_lts list
 
 (** [check_ref_lts gref] is the [raw_lts] of [gref].
 
@@ -312,7 +325,8 @@ let rec retrieve_tgt_nodes
 let rec check_updated_ctx
   ?(params : Params.log = default_params)
   (acc : (int tree * unif_problem) list list)
-  (rlts_ctx : rlts_list)
+  (* (rlts_map : term_type_map) *)
+    (rlts_ctx : rlts_list)
   :  EConstr.t list * EConstr.rel_declaration list
   -> (int tree * unif_problem) list list option t
   = function
@@ -325,15 +339,24 @@ let rec check_updated_ctx
     (match EConstr.kind sigma upd_t with
      | App (fn, args) ->
        (match
+          (* Hashtbl.find
+             rlts_map *)
           List.find_opt
             (fun (rlts : raw_lts) -> EConstr.eq_constr sigma fn rlts.coq_lts)
             rlts_ctx
         with
         | None -> check_updated_ctx acc rlts_ctx (substl, tl)
+        (* | None -> check_updated_ctx acc rlts_map (substl, tl) *)
         | Some rlts ->
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
           let* ctors =
-            check_valid_constructor ~params rlts rlts_ctx nextT (Some args.(1))
+            check_valid_constructor
+              ~params
+              rlts.constructor_transitions
+              rlts_ctx
+              (* rlts_map *)
+              nextT
+              (Some args.(1))
           in
           if List.is_empty ctors
           then return None
@@ -356,9 +379,9 @@ let rec check_updated_ctx
                in *)
             check_updated_ctx
               (List.concat_map (fun x -> List.map (fun y -> y :: x) ctors) acc)
-              rlts_ctx
+              rlts_ctx (* rlts_map *)
               (substl, tl)))
-     | _ -> check_updated_ctx acc rlts_ctx (substl, tl))
+     | _ -> check_updated_ctx acc rlts_ctx (* rlts_map *) (substl, tl))
   | _, _ -> assert false
 (* Impossible! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
@@ -366,8 +389,8 @@ let rec check_updated_ctx
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
   ?(params : Params.log = default_params)
-  (rlts : raw_lts)
-  (rlts_ctx : rlts_list)
+  (ctor_transitions : (Constr.rel_context * Constr.types) array)
+  (rlts_ctx : rlts_list) (* (rlts_map : term_type_map) *)
   (t : EConstr.t)
   (ma : EConstr.t option)
   : (EConstr.t * EConstr.t * int tree) list t
@@ -385,7 +408,7 @@ and check_valid_constructor
           ++ Printer.pr_econstr_env env sigma t)
       else return ()
     in
-    let ctx, tm = rlts.constructor_transitions.(i) in
+    let ctx, tm = ctor_transitions.(i) in
     let ctx_tys = List.map EConstr.of_rel_decl ctx in
     let* substl = mk_ctx_substl [] (List.rev ctx_tys) in
     let termL, act, termR = extract_args substl tm in
@@ -396,7 +419,11 @@ and check_valid_constructor
       if success
       then
         let* (next_ctors : (int tree * unif_problem) list list option) =
-          check_updated_ctx ~params [ [] ] rlts_ctx (substl, ctx_tys)
+          check_updated_ctx
+            ~params
+            [ [] ]
+            rlts_ctx (* rlts_map *)
+            (substl, ctx_tys)
         in
         let$+ act env sigma = Reductionops.nf_all env sigma act in
         let (tgt_term : EConstr.t) = EConstr.Vars.substl substl termR in
@@ -415,7 +442,7 @@ and check_valid_constructor
       else return ctor_vals
     else return ctor_vals
   in
-  iterate 0 (Array.length rlts.constructor_transitions - 1) [] iter_body
+  iterate 0 (Array.length ctor_transitions - 1) [] iter_body
 ;;
 
 (** [default_bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
@@ -446,14 +473,14 @@ module type GraphB = sig
     }
 
   val build_lts_graph
-    :  ?params:Params.log
+    :  ?params:Params.log (* -> term_type_map *)
     -> rlts_list
     -> lts_graph
     -> int
     -> lts_graph mm
 
   val build_graph
-    :  ?params:Params.log
+    :  ?params:Params.log (* -> term_type_map *)
     -> rlts_list
     -> Constrexpr.constr_expr_r CAst.t
     -> int
@@ -542,7 +569,7 @@ struct
       @return an [lts_graph] constructed so long as the [bound] is not exceeded. *)
   let rec build_lts_graph
     ?(params : Params.log = default_params)
-    (rlts_ctx : rlts_list)
+    (rlts_ctx : rlts_list) (* (rlts_map : term_type_map) *)
     (g : lts_graph)
     (bound : int)
     : lts_graph mm
@@ -559,7 +586,14 @@ struct
         List.fold_left
           (fun (acc : (EConstr.t * EConstr.t * int tree) list t)
             (rlts : raw_lts) ->
-            let* ctors = check_valid_constructor ~params rlts rlts_ctx t None in
+            let* ctors =
+              check_valid_constructor
+                ~params
+                rlts.constructor_transitions
+                rlts_ctx (* rlts_map *)
+                t
+                None
+            in
             if List.is_empty ctors
             then acc
             else
@@ -572,7 +606,7 @@ struct
                    (run acc)
                    ctors))
           (return [])
-          rlts_ctx
+          rlts_ctx (* rlts_map *)
       in
       let* _ =
         if is_output_kind_enabled params
@@ -630,7 +664,7 @@ struct
             (Printf.sprintf "\nVisiting next: %i." (Queue.length g.to_visit)))
         constrs;
       let g = { g with states = S.union g.states !new_states } in
-      build_lts_graph ~params rlts_ctx g bound
+      build_lts_graph ~params rlts_ctx (* rlts_map *) g bound
   ;;
 
   (* let type_check_all_rlts_ctx
@@ -648,7 +682,8 @@ struct
       @param t is the original Coq-term. *)
   let build_graph
     ?(params : Params.log = default_params)
-    (rlts_ctx : rlts_list)
+    (* (rlts_map : term_type_map) *)
+      (rlts_ctx : rlts_list)
     (t : Constrexpr.constr_expr_r CAst.t)
     (bound : int)
     : lts_graph mm
@@ -657,6 +692,7 @@ struct
     (* FIXME: we assume the head of rlts_ctx is the outermost rlts  *)
     (* let iter_body (i : int) ((env,sigma):(Environ.env*Evd.evar_map)) = *)
     let rlts = List.hd rlts_ctx in
+    (* update environment by typechecking *)
     let$* u env sigma = Typing.check env sigma t rlts.trm_type in
     let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
     (* return (env, sigma) *)
@@ -668,7 +704,7 @@ struct
     let* _ = return (Queue.push t q) in
     build_lts_graph
       ~params
-      rlts_ctx
+      rlts_ctx (* rlts_map *)
       { to_visit = q (* ; labels = L.empty *)
       ; states = S.empty
       ; transitions = H.create bound
@@ -990,6 +1026,26 @@ let make_graph_builder =
   return (module G : GraphB)
 ;;
 
+let build_rlts_map
+  ?(params : Params.log = default_params)
+  (grefs : Names.GlobRef.t list)
+  : term_type_map
+  =
+  let tmap : term_type_map = Hashtbl.create (List.length grefs)
+  and i : int ref = ref 0 in
+  params.override <- Some ();
+  List.iter
+    (fun (gref : Names.GlobRef.t) ->
+      let rlts : raw_lts = run (check_ref_lts gref) in
+      log ~params (Printf.sprintf "MAP = = = = = = = = =\n\trlts (#%d):" !i);
+      let _ = log_raw_lts ~params rlts in
+      Hashtbl.add tmap rlts.trm_type rlts;
+      i := !i + 1)
+    grefs;
+  params.override <- None;
+  tmap
+;;
+
 (** *)
 let build_rlts_ctx
   ?(params : Params.log = default_params)
@@ -1062,7 +1118,8 @@ let build_fsm_from_bounded_lts
   (* disable detailed printouts *)
   params.options.show_normal_output <- false;
   (* list of raw coq lts *)
-  let rlts_ctx : rlts_list = build_rlts_ctx ~params grefs in
+  let rlts_ctx : rlts_list = build_rlts_ctx ~params grefs
+  and _rlts_map : term_type_map = build_rlts_map ~params grefs in
   (* graph module *)
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
