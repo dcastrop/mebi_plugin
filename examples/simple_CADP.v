@@ -24,11 +24,29 @@ Inductive act : Type :=
   | DEC_V : act
   .
 
+Definition act_equiv (t1:act) (t2:act) : Prop :=
+  match t1, t2 with
+  | ENTER, ENTER => True
+  | LEAVE, LEAVE => True
+  | INC_N, INC_N => True
+  | DEC_N, DEC_N => True
+  | SET_V i, SET_V j => if Nat.eqb i j then True else False
+  | DEC_V, DEC_V => True
+  | _, _ => False
+  end.
+
 
 Inductive ntm : Type :=
   | N_IS_ZERO : ntm
   | V_IS_ZERO : ntm
   .
+
+Definition ntm_equiv (t1:ntm) (t2:ntm) : Prop :=
+  match t1, t2 with
+  | N_IS_ZERO, N_IS_ZERO => True
+  | V_IS_ZERO, V_IS_ZERO => True
+  | _, _ => False
+  end.
 
 
 Inductive tm : Type :=
@@ -41,6 +59,29 @@ Inductive tm : Type :=
   | DEF : nat -> tm -> tm
   | REC : nat -> tm
   .
+
+Fixpoint tm_equiv (t1:tm) (t2:tm) : Prop :=
+  match t1, t2 with
+  | OK, OK => True
+
+  | ACT a,
+    ACT b => act_equiv a b
+
+  | SEQ l1 r1,
+    SEQ l2 r2 => tm_equiv l1 l2 /\ tm_equiv r1 r2
+
+  | IF c1 a1 b1,
+    IF c2 a2 b2 => ntm_equiv c1 c2 /\ tm_equiv a1 a2 /\ tm_equiv b1 b2
+
+  | DEF i b1,
+    DEF j b2 => if Nat.eqb i j then tm_equiv b1 b2 else False
+
+  | REC i, REC j => if Nat.eqb i j then True else False
+
+  | _, _ => False
+
+  end.
+
 
 Fixpoint unfold (i:nat) (b:tm) (t:tm) : tm :=
   match t with
@@ -131,16 +172,36 @@ Example e1 : tm * nat * nat := (tm1, 0, 0).
 MeBi Dump "e1" FSM Bounded 150 Of e1 Using step.
 
 Inductive sys : Type :=
-  | PRC : tm -> nat -> nat -> sys
+  | PRC : (tm * nat * nat) -> sys
   | PAR : sys -> sys -> sys
   .
 
+Fixpoint sys_equiv (t1:sys) (t2:sys) : Prop :=
+  match t1, t2 with
+
+  | PAR t1a t1b,
+    PAR t2a t2b => (sys_equiv t1a t2a /\ sys_equiv t1b t2b) \/
+                   (sys_equiv t1a t2b /\ sys_equiv t1b t2a)
+
+  | PRC t1, PRC t2 =>
+    match t1, t2 with
+    | (t1, n1, v1),
+      (t2, n2, v2) =>
+      match Nat.eqb n1 n2, Nat.eqb v1 v2 with
+      | true, true => tm_equiv t1 t2
+      | _, _ => False
+      end
+    end
+
+  | _, _ => False
+
+  end.
 
 Inductive lts : sys -> label -> sys -> Prop :=
 
   | LTS_PRC : forall a t1 t2 n1 n2 v1 v2,
     step (t1, n1, v1) a (t2, n2, v2) ->
-    lts (PRC t1 n1 v1) a (PRC t2 n2 v2)
+    lts (PRC (t1, n1, v1)) a (PRC (t2, n2, v2))
 
   | LTS_PAR_L : forall a l1 l2 r,
     lts l1 a l2 ->
@@ -150,15 +211,20 @@ Inductive lts : sys -> label -> sys -> Prop :=
     lts r1 a r2 ->
     lts (PAR l r1) a (PAR l r2)
 
-  | LTS_OK_L : forall r n v, lts (PAR (PRC OK n v) r) SILENT (r)
+  | LTS_OK_L : forall r n v, lts (PAR (PRC (OK, n, v)) r) SILENT (r)
 
-  | LTS_OK_R : forall l n v, lts (PAR l (PRC OK n v)) SILENT (l)
+  | LTS_OK_R : forall l n v, lts (PAR l (PRC (OK, n, v))) SILENT (l)
   .
 
 Example e2 : sys :=
-  PAR (PRC tm1 0 0) (
-    (* (PRC tm1 0 0) *)
-    PRC OK 0 0
+  PAR (PRC (tm1, 0, 0)) (
+    (* (PRC (tm1, 0, 0)) *)
+    PRC (OK, 0, 0)
   ).
 
 MeBi Dump "e2" FSM Bounded 350 Of e2 Using lts step.
+
+MeBi Dump "e2" FSM sys_equiv Bounded 350 Of e2 Using lts step.
+
+(** concept for how we will pass in the structural equivalence to the plugin *)
+(* MeBi Dump "e2" FSM Bounded 350 Of e2 Using (lts, lts_equiv) (step, step_equiv). *)

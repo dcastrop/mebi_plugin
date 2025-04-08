@@ -102,6 +102,88 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
+  (******************************)
+  (**** Coq -> LTS (with equiv) *)
+  (******************************)
+  (* build lts for [t] using [r] (default bounds) *)
+  | [ "MeBi" "Show" "LTS" reference(e)
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.LTS.show
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+        ~equiv:(Nametab.global e)
+        ) }
+  | [ "MeBi" "Dump" string(name) "LTS" reference(e)
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.LTS.dump
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~name
+        ~equiv:(Nametab.global e)
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  | [ "MeBi" "Debug" "LTS" reference(e)
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.LTS.show
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        ~equiv:(Nametab.global e)
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  (* build lts for [t] using [r], within bound [i] *)
+  | [ "MeBi" "Show" "LTS" reference(e) "Bounded" int(i)
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.LTS.show
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~bound:i
+        ~equiv:(Nametab.global e)
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  | [ "MeBi" "Dump" string(name) "LTS" reference(e) "Bounded" int(i)
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.LTS.dump
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~bound:i
+        ~name
+        ~equiv:(Nametab.global e)
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  | [ "MeBi" "Debug" "LTS" reference(e) "Bounded" int(i)
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.LTS.show
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        ~bound:i
+        ~equiv:(Nametab.global e)
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
   (***************************)
   (**** Coq -> LTS -> FSM ****)
   (***************************)
@@ -175,6 +257,88 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
           params
         )
         ~bound:i
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  (*************************************)
+  (**** Coq -> LTS (with equiv) -> FSM *)
+  (*************************************)
+  (* build fsm from lts for [t] using [r] (default bounds) *)
+  | [ "MeBi" "Show" "FSM" reference(e)
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.FSM.show
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~equiv:(Nametab.global e)
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  | [ "MeBi" "Dump" string(name) "FSM" reference(e)
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.FSM.dump
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~name
+        ~equiv:(Nametab.global e)
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  | [ "MeBi" "Debug" "FSM" reference(e)
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.FSM.show
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        ~equiv:(Nametab.global e)
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  (* build fsm from lts for [t] using [r], within bound [i] *)
+  | [ "MeBi" "Show" "FSM" reference(e) "Bounded" int(i)
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.FSM.show
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~bound:i
+        ~equiv:(Nametab.global e)
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  | [ "MeBi" "Dump" string(name) "FSM" reference(e) "Bounded" int(i)
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.FSM.dump
+        ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
+        ~bound:i
+        ~name
+        ~equiv:(Nametab.global e)
+        t
+        (Mebi_utils.ref_list_to_glob_list r)
+      ) }
+  | [ "MeBi" "Debug" "FSM" reference(e) "Bounded" int(i)
+      "Of" constr(t) "Using" reference_list(r) ] ->
+    { Mebi_monad.run (
+      Command.Vernac.FSM.show
+        ~params:(
+          let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
+          params.options <-
+          { output_enabled=true;
+            show_normal_output=true;
+            show_detailed_output=true;
+            show_debug_output=true;
+            show_warning_output=true };
+          params
+        )
+        ~bound:i
+        ~equiv:(Nametab.global e)
         t
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
