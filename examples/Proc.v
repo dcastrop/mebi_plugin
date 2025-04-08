@@ -51,3 +51,4 @@ Example proc1 := tpar (tfix (tact ASend trec)) (tfix (tact ARecv trec)).
  many bisimilar states here, where the order (or assoc) of the processes is
  completely irrelevant *)
 MeBi Dump "proc0" LTS Bounded 150 Of proc1 Using termLTS.
+MeBi Dump "proc0" FSM Bounded 150 Of proc1 Using termLTS.
