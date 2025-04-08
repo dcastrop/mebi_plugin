@@ -1105,12 +1105,57 @@ let build_bounded_lts
   return the_pure_lts
 ;;
 
+let get_type_of_tref (tref : Constrexpr.constr_expr) : string =
+  let open Constrexpr in
+  match tref with
+  | { v; _ } ->
+    (match v with
+     | CRef (q, i) ->
+       Printf.sprintf
+         "%s, %s"
+         (Libnames.string_of_qualid q)
+         (match i with
+          | None -> "None"
+          | Some instance_expr ->
+            (match instance_expr with
+             | quality_expr_list, univ_level_expr_list -> "Some ..."))
+       (* (match v with
+        | { v; _ } ->
+          (match v with
+           | CRef _ -> "CRef"
+           | CFix _ -> "CFix"
+           | CCoFix _ -> "CCoFix"
+           | CProdN _ -> "CProdN"
+           | CLambdaN _ -> "CLambdaN"
+           | CAppExpl _ -> "CAppExpl"
+           | CApp _ -> "CApp"
+           | CProj _ -> "CProj"
+           | CRecord _ -> "CRecord"
+           | CCases _ -> "CCases"
+           | CLetTuple _ -> "CLetTuple"
+           | CIf _ -> "CIf"
+           | CHole _ -> "CHole"
+           | CGenarg _ -> "CGenarg"
+           | CGenargGlob _ -> "CGenargGlob"
+           | CPatVar _ -> "CPatVar"
+           | CEvar _ -> "CEvar"
+           | CSort _ -> "CSort"
+           | CCast _ -> "CCast"
+           | CNotation _ -> "CNotation"
+           | CGeneralization _ -> "CGeneralization"
+           | CPrim _ -> "CPrim"
+           | CDelimiters _ -> "CDelimiters"
+           | CArray _ -> "CArray"
+           | _ -> "unknown B")) *)
+     | _ -> "unknown A")
+;;
+
 (** *)
 let build_fsm_from_bounded_lts
   ?(params : Params.log = default_params)
   ?(bound : int = default_bound)
   ?(name : string = "unknown")
-  (tref : Constrexpr.constr_expr_r CAst.t)
+  (tref : Constrexpr.constr_expr)
   (grefs : Names.GlobRef.t list)
   : Fsm.fsm mm
   =
@@ -1119,6 +1164,21 @@ let build_fsm_from_bounded_lts
   (* list of raw coq lts *)
   let rlts_ctx : rlts_list = build_rlts_ctx ~params grefs
   and _rlts_map : term_type_map = build_rlts_map ~params grefs in
+  (* print out the type of the term *)
+  params.override <- Some ();
+  (* let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in *)
+  (* let$ t = Constrintern.interp_constr env sigma tref in *)
+  let* (env : Environ.env) = get_env in
+  let* (sigma : Evd.evar_map) = get_sigma in
+  (* let t = Constrintern.interp_constr env sigma tref in *)
+  (* let t = Constrintern.interp_type env sigma tref in *)
+  log
+    ~params
+    (Printf.sprintf
+       "type of tref: %s"
+       (* (econstr_to_string t) *)
+       (get_type_of_tref tref));
+  params.override <- None;
   (* graph module *)
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
@@ -1143,7 +1203,19 @@ module Vernac = struct
       : Lts.lts mm
       =
       (* list of raw coq lts *)
-      let rlts_ctx : rlts_list = build_rlts_ctx ~params grefs in
+      let rlts_ctx : rlts_list = build_rlts_ctx ~params grefs
+      and _rlts_map : term_type_map = build_rlts_map ~params grefs in
+      (* print out the type of the term *)
+      params.override <- Some ();
+      let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
+      (* log ~params (Printf.sprintf "type of tref: %s" (econstr_to_string t)); *)
+      log
+        ~params
+        (Printf.sprintf
+           "type of tref: %s"
+           (* (econstr_to_string t) *)
+           (get_type_of_tref tref));
+      params.override <- None;
       (* graph module *)
       let* graphM = make_graph_builder in
       let module G = (val graphM) in
