@@ -9,8 +9,9 @@ theories/loader.v
 theories/Test.v
 
 examples/CADP.v
-examples/properties/mutual_exclusion.v
-examples/properties/no_starvation.v
+examples/Proc.v
+# examples/properties/mutual_exclusion.v
+# examples/properties/no_starvation.v
 
 src/utils.ml
 src/utils.mli
