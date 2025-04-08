@@ -9,6 +9,7 @@ theories/loader.v
 theories/Test.v
 
 examples/CADP.v
+examples/simple_CADP.v
 examples/Proc.v
 # examples/properties/mutual_exclusion.v
 # examples/properties/no_starvation.v
