@@ -23,7 +23,6 @@
   mebi_errors
   mebi_utils
   mebi_monad
-  pp_ext
   lts
   fsm
   translate
