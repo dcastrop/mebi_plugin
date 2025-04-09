@@ -1,8 +1,14 @@
 # todo
 
-## Layered Semantics Handling in `command.ml`
-Currently is rather "hacky" -- tries each coq-lts in a list, one by one until the correct constructor is found in one of them.
--[x] Change this to use a map since we should already have access to the type of the term anyway.
+## Refactor `Command.ml`
+- [ ] `check_updated_ctx`
+- [ ] `check_valid_constructor`
+- [ ] `build_lts_graph`
+- [ ] `build_graph`
+- [ ] `lts_graph_to_lts`
+
+## Add Plugin Support Structural Equivalence
+If provided, when building the LTS of a coq-term the plugin should only consider exploring new states that are not structurally equivalent to an already-explored state.
 
 
 ## Overaul `Utils.params`
