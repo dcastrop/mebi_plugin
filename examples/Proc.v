@@ -48,12 +48,12 @@ Inductive termLTS : term -> bool -> term -> Prop :=
 
 Example proc0 := tfix trec.
 
-MeBi Show LTS Bounded 150 Of proc0 Using termLTS.
+(* MeBi Show LTS Bounded 150 Of proc0 Using termLTS. *)
 
 Example proc1 := tpar (tfix (tact ASend trec)) (tfix (tact ARecv trec)).
 
 (* TODO: would be cool to do first a "FSM minimisation". I believe there are
  many bisimilar states here, where the order (or assoc) of the processes is
  completely irrelevant *)
-MeBi Show LTS Bounded 150 Of proc1 Using termLTS.
+(* MeBi Show LTS Bounded 150 Of proc1 Using termLTS. *)
 (* MeBi Dump "proc0" FSM Bounded 150 Of proc1 Using termLTS. *)
