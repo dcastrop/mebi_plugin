@@ -96,7 +96,7 @@ let log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
     (Printf.sprintf
        "(d) Types of coq_lts: %s.\n"
        (econstr_to_string rlts.coq_lts));
-  log
+  (* log
     ~params
     (Printf.sprintf
        "(f) Transitions (do not be alarmed by any _UNBOUND_ below): %s.\n"
@@ -109,7 +109,7 @@ let log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
                (fun (acc : string) (tr : Constr.rel_context * Constr.t) ->
                   Printf.sprintf "%s   %s\n" acc (constr_to_string (snd tr)))
                "\n"
-               rlts.constructor_transitions)));
+               rlts.constructor_transitions))); *)
   return ()
 ;;
 
