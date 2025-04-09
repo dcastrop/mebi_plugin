@@ -96,7 +96,7 @@ let log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
     (Printf.sprintf
        "(d) Types of coq_lts: %s.\n"
        (econstr_to_string rlts.coq_lts));
-  log
+  (* log
     ~params
     (Printf.sprintf
        "(f) Transitions (do not be alarmed by any _UNBOUND_ below): %s.\n"
@@ -109,7 +109,7 @@ let log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
                (fun (acc : string) (tr : Constr.rel_context * Constr.t) ->
                   Printf.sprintf "%s   %s\n" acc (constr_to_string (snd tr)))
                "\n"
-               rlts.constructor_transitions)));
+               rlts.constructor_transitions))); *)
   return ()
 ;;
 
@@ -683,11 +683,11 @@ struct
         ?(params : Params.log = default_params)
         (* (rlts_map : term_type_map) *)
           (rlts_ctx : rlts_list)
-        (t : Constrexpr.constr_expr_r CAst.t)
+        (tref : Constrexpr.constr_expr_r CAst.t)
         (bound : int)
     : lts_graph mm
     =
-    let$ t env sigma = Constrintern.interp_constr_evars env sigma t in
+    let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
     (* FIXME: we assume the head of rlts_ctx is the outermost rlts  *)
     (* let iter_body (i : int) ((env,sigma):(Environ.env*Evd.evar_map)) = *)
     let rlts = List.hd rlts_ctx in
@@ -1110,7 +1110,7 @@ let build_fsm_from_bounded_lts
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
       ?(name : string = "unknown")
-      (tref : Constrexpr.constr_expr_r CAst.t)
+      (tref : Constrexpr.constr_expr)
       (grefs : Names.GlobRef.t list)
   : Fsm.fsm mm
   =
@@ -1119,6 +1119,14 @@ let build_fsm_from_bounded_lts
   (* list of raw coq lts *)
   let rlts_ctx : rlts_list = build_rlts_ctx ~params grefs
   and _rlts_map : term_type_map = build_rlts_map ~params grefs in
+  (* print out the type of the term *)
+  params.override <- Some ();
+  log
+    ~params
+    (Printf.sprintf
+       "type of tref: %s"
+       (econstr_to_string (run (Mebi_utils.type_of_tref tref))));
+  params.override <- None;
   (* graph module *)
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
@@ -1143,7 +1151,16 @@ module Vernac = struct
       : Lts.lts mm
       =
       (* list of raw coq lts *)
-      let rlts_ctx : rlts_list = build_rlts_ctx ~params grefs in
+      let rlts_ctx : rlts_list = build_rlts_ctx ~params grefs
+      and _rlts_map : term_type_map = build_rlts_map ~params grefs in
+      (* print out the type of the term *)
+      params.override <- Some ();
+      log
+        ~params
+        (Printf.sprintf
+           "type of tref: %s"
+           (econstr_to_string (run (Mebi_utils.type_of_tref tref))));
+      params.override <- None;
       (* graph module *)
       let* graphM = make_graph_builder in
       let module G = (val graphM) in
@@ -1526,188 +1543,6 @@ module Vernac = struct
   end
 end
 
-(* let rec build_layered_raw_lts
-   ?(params : Params.log = default_params)
-   (grefs : Names.GlobRef.t list)
-   : (raw_lts option) mm =
-   (* params.kind <- Debug (); *)
-   params.kind <- Normal ();
-   match grefs with
-   | [] -> return None
-   | h :: t ->
-   let* h_raw_lts : raw_lts = check_ref_lts h in
-   match build_layered_raw_lts t with
-   | None -> return (Some h)
-   | Some t ->
-   end
-   end *)
-
-(* let cmd_bounded_layered_lts
-   ?(params : Params.log = default_params)
-   (grefs : Names.GlobRef.t list)
-   (tref : Constrexpr.constr_expr_r CAst.t)
-   : rlts_list mm
-   =
-   params.kind <- Details ();
-   params.options.show_detailed_output <- true;
-   (* *)
-   let rlts_ctx : rlts_list =
-   List.fold_left
-   (fun (acc : rlts_list) (gref : Names.GlobRef.t) ->
-   let rlts : raw_lts = run (check_ref_lts gref) in
-   log
-   ~params
-   (Printf.sprintf "= = = = = = = = =\n\trlts (#%d):" (List.length acc));
-   let _ = log_raw_lts ~params rlts in
-   List.append acc [ rlts ])
-   []
-   grefs
-   in
-   (* *)
-   let* graphM = make_graph_builder in
-   let module G = (val graphM) in
-   let* graph_lts = G.build_graph ~params rlts_ctx tref in
-   (* *)
-   log ~params (Printf.sprintf "= = = = = = = = =\n");
-   if G.H.length graph_lts.transitions >= bound
-   then
-   log
-   ~params
-   (Printf.sprintf
-   "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
-   bound);
-   log
-   ~params
-   (Printf.sprintf
-   "(e) Graph Edges: %s.\n"
-   (run (G.PStr.transitions ~params:(Log params) graph_lts.transitions)));
-   (* show if normal output allowed from outside call *)
-   if params.options.show_debug_output
-   then params.kind <- Details ()
-   else params.kind <- Normal ();
-   log
-   ~params
-   (Printf.sprintf
-   "Constructed LTS: %s.\n"
-   (run (G.PStr.lts ~params:(Log params) graph_lts)));
-   return rlts_ctx
-   ;;
-
-   (****************************************************************)
-   (***** (above is the new stuff) *********************************)
-   (***** (allowing layered lts using list of gref) ****************)
-   (****************************************************************)
-
-   let build_lts_graph
-   ?(params : Params.log = default_params)
-   (iref : Names.GlobRef.t)
-   (tref : Constrexpr.constr_expr_r CAst.t)
-   : raw_lts mm
-   =
-   params.kind <- Debug ();
-   (* *)
-   let* rlts = check_ref_lts iref in
-   let* _ = log_raw_lts ~params rlts in
-   (* *)
-   let* graphM = make_graph_builder in
-   let module G = (val graphM) in
-   let* graph_lts = G.build_graph ~params [ rlts ] tref in
-   (* *)
-   log ~params (Printf.sprintf "= = = = = = = = =\n");
-   if G.H.length graph_lts.transitions >= bound
-   then
-   log
-   ~params
-   (Printf.sprintf
-   "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
-   bound);
-   log
-   ~params
-   (Printf.sprintf
-   "(e) Graph Edges: %s.\n"
-   (run (G.PStr.transitions ~params:(Log params) graph_lts.transitions)));
-   (* show if normal output allowed from outside call *)
-   if params.options.show_debug_output
-   then params.kind <- Details ()
-   else params.kind <- Normal ();
-   log
-   ~params
-   (Printf.sprintf
-   "Constructed LTS: %s.\n"
-   (run (G.PStr.lts ~params:(Log params) graph_lts)));
-   return rlts
-   ;;
-*)
-(* let build_fsm_from_lts
-   ?(params : Params.log = default_params)
-   (iref : Names.GlobRef.t)
-   (tref : Constrexpr.constr_expr_r CAst.t)
-   : fsm mm
-   =
-   (* TODO: make this return the conversion stuff too *)
-   params.kind <- Debug ();
-   (* *)
-   let* rlts = check_ref_lts iref in
-   let* _ = log_raw_lts ~params rlts in
-   let* graphM = make_graph_builder in
-   let module G = (val graphM) in
-   let* graph_lts = G.build_graph ~params [ rlts ] tref in
-   (* *)
-   let* env = get_env in
-   let* sigma = get_sigma in
-   (* *)
-   log ~params (Printf.sprintf "= = = = = = = = =\n");
-   if G.H.length graph_lts.transitions >= bound
-   then
-   log
-   ~params
-   (Printf.sprintf
-   "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
-   bound);
-   (* *)
-   log
-   ~params
-   (Printf.sprintf
-   "(e) Graph Edges: %s.\n"
-   (run (G.PStr.transitions ~params:(Log params) graph_lts.transitions)));
-   (* show if normal output allowed from outside call *)
-   if params.options.show_debug_output
-   then params.kind <- Details ()
-   else params.kind <- Normal ();
-   log
-   ~params
-   (Printf.sprintf
-   "Constructed LTS: %s.\n"
-   (run (G.PStr.lts ~params:(Log params) graph_lts)));
-   (* stop normal output *)
-   params.options.show_normal_output <- false;
-   let* the_pure_lts, coq_translation =
-   G.DeCoq.lts_graph_to_lts ~params graph_lts tref
-   in
-   let the_fsm = Translate.to_fsm the_pure_lts in
-   (* show if normal output allowed from outside call *)
-   if params.options.show_debug_output
-   then params.kind <- Details ()
-   else params.kind <- Normal ();
-   log
-   ~params
-   (Printf.sprintf
-   "Translated FSM: %s.\n"
-   (PStr.fsm ~params:(Log params) the_fsm));
-   params.kind <- Debug ();
-   log ~params "\n= = = = = (end of build_fsm) = = = = = =\n";
-   (* *)
-   return the_fsm
-   ;; *)
-
-(* FIXME: Should be user-configurable, not hardcoded *)
-
-(* (\** [coq_fsm] is . *\) *)
-(* type coq_fsm = *)
-(*   { states : EConstr.t list *)
-(*   ; edges : EConstr.t list *)
-(*   } *)
-
 (* (\* TODO: check which are all possible next transitions *\) *)
 (* (\* TODO: check following functions/modules: *\) *)
 (* (\* [ ] Unification *\) *)
@@ -1723,162 +1558,3 @@ end
     - Constructors of [P] are the transitions
     - States are the sets of possible transitions
     - A term [t] is represented by the state of the transitions that can be taken *)
-(* let cmd_bounded_lts
-   ?(params : Params.log = default_params)
-   (iref : Names.GlobRef.t)
-   (tref : Constrexpr.constr_expr_r CAst.t)
-   : unit mm
-   =
-   params.kind <- Details ();
-   params.options.show_detailed_output <- true;
-   let* (_rlts : raw_lts) = build_lts_graph ~params iref tref in
-   return ()
-   ;;
-
-   let cmd_bounded_layered_lts
-   ?(params : Params.log = default_params)
-   (gref : Names.GlobRef.t list)
-   (tref : Constrexpr.constr_expr_r CAst.t)
-   : unit mm
-   =
-   params.kind <- Details ();
-   params.options.show_detailed_output <- true;
-   let* (_rlts_ctx : rlts_list) = cmd_bounded_layered_lts ~params gref tref in
-   return ()
-   ;;
-
-   let cmd_bounded_lts_to_fsm
-   ?(params : Params.log = default_params)
-   (iref : Names.GlobRef.t)
-   (tref : Constrexpr.constr_expr_r CAst.t)
-   : unit mm
-   =
-   params.kind <- Debug ();
-   let* _ = build_fsm_from_lts ~params iref tref in
-   return ()
-   ;;
-
-   let cmd_merge_fsm_from_lts
-   ?(params : Params.log = default_params)
-   ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-   ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-   : unit mm
-   =
-   params.kind <- Debug ();
-   let* (s : fsm) = build_fsm_from_lts ~params s_iref s_tref in
-   let* (t : fsm) = build_fsm_from_lts ~params t_iref t_tref in
-   (* *)
-   let merged_fsm, _ = Merge.fsms ~params s t in
-   params.kind <- Details ();
-   log
-   ~params
-   (Printf.sprintf
-   "Merged FSMs 's' and 't' :: %s.\n\nwhere s = %s,\n\nand t = %s.\n"
-   (PStr.fsm ~params:(Log params) merged_fsm)
-   (PStr.fsm ~params:(Log params) s)
-   (PStr.fsm ~params:(Log params) t));
-   params.kind <- Debug ();
-   log ~params "\n= = = (end of cmd_merge_fsm_from_lts) = = = = = =\n";
-   return ()
-   ;;
-
-   exception UnexpectedResultKind of Bisimilarity.result
-
-   (* *)
-   let cmd_bisim_ks90_using_fsm
-   ?(params : Params.log = default_params)
-   (s : fsm)
-   (t : fsm)
-   : unit mm
-   =
-   let open Bisimilarity in
-   (* *)
-   params.kind <- Debug ();
-   let raw_result = RCP.KS90.run ~params (ToMerge (s, t)) () in
-   let result = RCP.KS90.result ~params raw_result in
-   match result with
-   | BisimResult result' ->
-   params.kind <- Details ();
-   log
-   ~params:
-   (params.kind <- Normal ();
-   params)
-   (Bisimilarity.PStr.bisim_result ~params ~merged_from:(s, t) result');
-   params.kind <- Debug ();
-   log ~params "\n= = = (end of cmd_bisim_ks90_using_fsm) = = = = = =\n";
-   return ()
-   | _ -> raise (UnexpectedResultKind result)
-   ;;
-
-   (* *)
-   let cmd_bisim_ks90_using_lts_to_fsm
-   ?(params : Params.log = default_params)
-   ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-   ((t_iref, t_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-   : unit mm
-   =
-   if Bool.not params.options.show_debug_output
-   then params.options.show_normal_output <- false;
-   let* (s : fsm) = build_fsm_from_lts ~params s_iref s_tref in
-   let* (t : fsm) = build_fsm_from_lts ~params t_iref t_tref in
-   if Bool.not params.options.show_debug_output
-   then params.options.show_normal_output <- true;
-   (* *)
-   cmd_bisim_ks90_using_fsm ~params s t
-   ;;
-
-   (* *)
-   let cmd_minim_ks90_using_fsm
-   ?(params : Params.log = default_params)
-   (the_fsm : fsm)
-   : unit mm
-   =
-   (* *)
-   params.kind <- Debug ();
-   let (minimized_fsm, _map_of_states) : fsm * (state, state) Hashtbl.t =
-   Minimize.run ~params the_fsm
-   in
-   log
-   ~params:
-   (params.kind <- Normal ();
-   params)
-   (Printf.sprintf
-   "Minimized FSM: %s."
-   (Fsm.PStr.fsm ~params:(Log params) minimized_fsm));
-   (* (Bisimilarity.PStr.minim_result result'); *)
-   params.kind <- Debug ();
-   log ~params "\n= = = (end of cmd_minim_ks90_using_fsm) = = = = = =\n";
-   return ()
-   ;;
-
-   (* *)
-   let cmd_minim_ks90_using_lts_to_fsm
-   ?(params : Params.log = default_params)
-   ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-   : unit mm
-   =
-   if Bool.not params.options.show_debug_output
-   then params.options.show_normal_output <- false;
-   let* (s : fsm) = build_fsm_from_lts ~params s_iref s_tref in
-   if Bool.not params.options.show_debug_output
-   then params.options.show_normal_output <- true;
-   (* *)
-   cmd_minim_ks90_using_fsm ~params s
-   ;;
-
-   (* *)
-   let cmd_minim_ks90_using_lts_to_fsm_to_lts
-   ?(params : Params.log = default_params)
-   ((s_iref, s_tref) : Names.GlobRef.t * Constrexpr.constr_expr_r CAst.t)
-   : unit mm
-   =
-   if Bool.not params.options.show_debug_output
-   then params.options.show_normal_output <- false;
-   let* (s : fsm) = build_fsm_from_lts ~params s_iref s_tref in
-   if Bool.not params.options.show_debug_output
-   then params.options.show_normal_output <- true;
-   (* *)
-   (* TODO: go back to lts, using the conversion map *)
-   (* cmd_minim_ks90_using_fsm_to_lts ~params s *)
-   cmd_minim_ks90_using_fsm ~params s
-   ;; *)
