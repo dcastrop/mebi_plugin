@@ -938,9 +938,8 @@ Fixpoint load (ps:list process) : sys :=
     end
   end.
 
-(* Definition composition : Type := sys * resource. *)
-(* FIXME: plugin breaks when using aliases/wrappers for lts, such as [composition] above. *)
-Definition compose (s:system) : sys * resource (*composition*) :=
+Definition composition : Type := sys * resource.
+Definition compose (s:system) : composition :=
   match s with
   | (ps, r) => (load ps, r)
   end.
@@ -952,11 +951,11 @@ Example ncs1 : sys * resource := compose (create 1 P).
 Compute ncs1.
 
 (* MeBi Show  LTS Of ncs1 Using lts step. *)
-(* MeBi Dump "NCS1" LTS Bounded 150 Of ncs1 Using lts step. *)
+MeBi Dump "NCS1" LTS Bounded 150 Of ncs1 Using lts step.
 (* MeBi Debug LTS Of ncs1 Using lts step. *)
 
 (* MeBi Show  FSM Of ncs1 Using lts step. *)
-(* MeBi Dump "NCS1"  FSM Bounded 150 Of ncs1 Using lts step. *)
+MeBi Dump "NCS1"  FSM Bounded 150 Of ncs1 Using lts step.
 (* MeBi Debug FSM Of ncs1 Using lts step. *)
 
 (* MeBi Show  Minim Of ncs1 Using lts step. *)
