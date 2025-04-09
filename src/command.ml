@@ -721,7 +721,7 @@ struct
             (Hashtbl.to_seq_keys fn_rlts_map)));
     let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
     log ~params (Printf.sprintf "build_graph, t: %s." (econstr_to_string t));
-    let rlts = Hashtbl.find fn_rlts_map (run (Mebi_utils.type_of_tref tref)) in
+    let rlts = Hashtbl.find tr_rlts_map (run (Mebi_utils.type_of_tref tref)) in
     (* update environment by typechecking *)
     let$* u env sigma = Typing.check env sigma t rlts.trm_type in
     let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
@@ -1074,11 +1074,11 @@ let build_rlts_map
        (* FIXME: avoid two keys mapping to same rlts *)
        (* - [build_graph] requires [tref -> raw_lts] *)
        (* - [check_updated_ctx] requires [fn -> raw_lts] *)
-       Hashtbl.add trmap rlts.coq_lts rlts;
-       Hashtbl.add fnmap rlts.trm_type rlts;
+       Hashtbl.add trmap rlts.trm_type rlts;
+       Hashtbl.add fnmap rlts.coq_lts rlts;
        i := !i + 1)
     grefs;
-  (* params.override <- None; *)
+  params.override <- None;
   trmap, fnmap
 ;;
 

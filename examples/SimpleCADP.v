@@ -224,9 +224,9 @@ Example e2 : sys :=
   ).
 
 MeBi Dump "e2" LTS Bounded 350 Of e2 Using lts step.
-MeBi Dump "e2" FSM Bounded 350 Of e2 Using lts step.
+(* MeBi Dump "e2" FSM Bounded 350 Of e2 Using lts step.
 
-MeBi Dump "e2" FSM sys_equiv Bounded 350 Of e2 Using lts step.
+MeBi Dump "e2" FSM sys_equiv Bounded 350 Of e2 Using lts step. *)
 
 (** concept for how we will pass in the structural equivalence to the plugin *)
 (* MeBi Dump "e2" FSM Bounded 350 Of e2 Using (lts, lts_equiv) (step, step_equiv). *)
