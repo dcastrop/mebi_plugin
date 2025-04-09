@@ -7,6 +7,10 @@
 - [ ] `build_graph`
 - [ ] `lts_graph_to_lts`
 
+### Optimizations
+- [ ] Add configuration option to use hashes of coq-terms rather than strings. (E.g., only use strings in `debug` mode.)
+- [ ] Streamline the pure-LTS (of non-coq terms) by building the coq-translation to a pure-LTS on-the-fly.
+
 ## Add Plugin Support Structural Equivalence
 If provided, when building the LTS of a coq-term the plugin should only consider exploring new states that are not structurally equivalent to an already-explored state.
 
