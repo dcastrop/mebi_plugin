@@ -324,7 +324,7 @@ let rec retrieve_tgt_nodes
 let rec check_updated_ctx
           ?(params : Params.log = default_params)
           (acc : (int tree * unif_problem) list list)
-          (rlts_map : term_type_map)
+          (fn_rlts_map : term_type_map)
   :  EConstr.t list * EConstr.rel_declaration list
   -> (int tree * unif_problem) list list option t
   = function
@@ -336,15 +336,25 @@ let rec check_updated_ctx
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with
      | App (fn, args) ->
-       (match Hashtbl.find_opt rlts_map fn with
-        | None -> check_updated_ctx acc rlts_map (substl, tl)
+       log
+         ~params
+         (Printf.sprintf
+            "check_updated_ctx, App.\n\tfn: %s\n\trlts keys: %s"
+            (econstr_to_string fn)
+            (Seq.fold_left
+               (fun (acc : string) (e : EConstr.t) ->
+                  Printf.sprintf "%s, %s" acc (econstr_to_string e))
+               ""
+               (Hashtbl.to_seq_keys fn_rlts_map)));
+       (match Hashtbl.find_opt fn_rlts_map fn with
+        | None -> check_updated_ctx acc fn_rlts_map (substl, tl)
         | Some rlts ->
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
           let* ctors =
             check_valid_constructor
               ~params
               rlts.constructor_transitions
-              rlts_map
+              fn_rlts_map
               nextT
               (Some args.(1))
           in
@@ -369,9 +379,9 @@ let rec check_updated_ctx
                in *)
             check_updated_ctx
               (List.concat_map (fun x -> List.map (fun y -> y :: x) ctors) acc)
-              rlts_map
+              fn_rlts_map
               (substl, tl)))
-     | _ -> check_updated_ctx acc rlts_map (substl, tl))
+     | _ -> check_updated_ctx acc fn_rlts_map (substl, tl))
   | _, _ -> assert false
 (* Impossible! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
@@ -380,13 +390,24 @@ let rec check_updated_ctx
 and check_valid_constructor
       ?(params : Params.log = default_params)
       (ctor_transitions : (Constr.rel_context * Constr.types) array)
-      (rlts_map : term_type_map)
-      (t : EConstr.t)
+      (fn_rlts_map : term_type_map)
+      (t' : EConstr.t)
       (ma : EConstr.t option)
   : (EConstr.t * EConstr.t * int tree) list t
   =
   params.kind <- Debug ();
-  let$+ t env sigma = Reductionops.nf_all env sigma t in
+  let$+ t env sigma = Reductionops.nf_all env sigma t' in
+  log
+    ~params
+    (Printf.sprintf
+       "check_valid_constructor, t': %s\n\tt: %s\n\trlts keys: %s"
+       (econstr_to_string t')
+       (econstr_to_string t)
+       (Seq.fold_left
+          (fun (acc : string) (e : EConstr.t) ->
+             Printf.sprintf "%s, %s" acc (econstr_to_string e))
+          ""
+          (Hashtbl.to_seq_keys fn_rlts_map)));
   let iter_body (i : int) (ctor_vals : (EConstr.t * EConstr.t * int tree) list) =
     let* _ =
       if is_output_kind_enabled params
@@ -409,7 +430,7 @@ and check_valid_constructor
       if success
       then
         let* (next_ctors : (int tree * unif_problem) list list option) =
-          check_updated_ctx ~params [ [] ] rlts_map (substl, ctx_tys)
+          check_updated_ctx ~params [ [] ] fn_rlts_map (substl, ctx_tys)
         in
         let$+ act env sigma = Reductionops.nf_all env sigma act in
         let (tgt_term : EConstr.t) = EConstr.Vars.substl substl termR in
@@ -461,12 +482,14 @@ module type GraphB = sig
   val build_lts_graph
     :  ?params:Params.log
     -> term_type_map
+    -> term_type_map
     -> lts_graph
     -> int
     -> lts_graph mm
 
   val build_graph
     :  ?params:Params.log
+    -> term_type_map
     -> term_type_map
     -> Constrexpr.constr_expr
     -> int
@@ -575,18 +598,18 @@ struct
   let build_constrs_tree_list
         ?(params : Params.log = default_params)
         (t : EConstr.t)
-        (rlts_map : term_type_map)
+        (fn_rlts_map : term_type_map)
     : (EConstr.t * EConstr.t * int tree) list mm
     =
     Hashtbl.fold
-      (fun (k : EConstr.t)
+      (fun (_k : EConstr.t)
         (v : raw_lts)
         (acc : (EConstr.t * EConstr.t * int tree) list mm) ->
          let* ctors =
            check_valid_constructor
              ~params
              v.constructor_transitions
-             rlts_map
+             fn_rlts_map
              t
              None
          in
@@ -602,7 +625,7 @@ struct
                    ctor :: acc')
                 (run acc)
                 ctors))
-      rlts_map
+      fn_rlts_map
       (return [])
   ;;
 
@@ -612,7 +635,8 @@ struct
       @return an [lts_graph] constructed so long as the [bound] is not exceeded. *)
   let rec build_lts_graph
             ?(params : Params.log = default_params)
-            (rlts_map : term_type_map)
+            (tr_rlts_map : term_type_map)
+            (fn_rlts_map : term_type_map)
             (g : lts_graph)
             (bound : int)
     : lts_graph mm
@@ -625,7 +649,7 @@ struct
     else
       let* t = return (Queue.pop g.to_visit) in
       let* (constrs : (EConstr.t * EConstr.t * int tree) list) =
-        build_constrs_tree_list ~params t rlts_map
+        build_constrs_tree_list ~params t fn_rlts_map
       in
       let* _ =
         if is_output_kind_enabled params
@@ -666,7 +690,7 @@ struct
              (Printf.sprintf "\nVisiting next: %i." (Queue.length g.to_visit)))
         constrs;
       let g = { g with states = S.union g.states !new_states } in
-      build_lts_graph ~params rlts_map g bound
+      build_lts_graph ~params tr_rlts_map fn_rlts_map g bound
   ;;
 
   (** [build_graph rlts t] is ...
@@ -674,13 +698,30 @@ struct
       @param t is the original Coq-term. *)
   let build_graph
         ?(params : Params.log = default_params)
-        (rlts_map : term_type_map)
+        (tr_rlts_map : term_type_map)
+        (fn_rlts_map : term_type_map)
         (tref : Constrexpr.constr_expr)
         (bound : int)
     : lts_graph mm
     =
+    log
+      ~params
+      (Printf.sprintf
+         "build_graph, tref: %s\n\ttr keys: %s\n\tfn keys: %s"
+         (econstr_to_string (run (Mebi_utils.type_of_tref tref)))
+         (Seq.fold_left
+            (fun (acc : string) (e : EConstr.t) ->
+               Printf.sprintf "%s, %s" acc (econstr_to_string e))
+            ""
+            (Hashtbl.to_seq_keys tr_rlts_map))
+         (Seq.fold_left
+            (fun (acc : string) (e : EConstr.t) ->
+               Printf.sprintf "%s, %s" acc (econstr_to_string e))
+            ""
+            (Hashtbl.to_seq_keys fn_rlts_map)));
     let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
-    let rlts = Hashtbl.find rlts_map (run (Mebi_utils.type_of_tref tref)) in
+    log ~params (Printf.sprintf "build_graph, t: %s." (econstr_to_string t));
+    let rlts = Hashtbl.find fn_rlts_map (run (Mebi_utils.type_of_tref tref)) in
     (* update environment by typechecking *)
     let$* u env sigma = Typing.check env sigma t rlts.trm_type in
     let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
@@ -693,7 +734,8 @@ struct
     let* _ = return (Queue.push t q) in
     build_lts_graph
       ~params
-      rlts_map
+      tr_rlts_map
+      fn_rlts_map
       { to_visit = q (* ; labels = L.empty *)
       ; states = S.empty
       ; transitions = H.create bound
@@ -1018,9 +1060,10 @@ let make_graph_builder =
 let build_rlts_map
       ?(params : Params.log = default_params)
       (grefs : Names.GlobRef.t list)
-  : term_type_map
+  : term_type_map * term_type_map
   =
-  let tmap : term_type_map = Hashtbl.create (List.length grefs)
+  let trmap : term_type_map = Hashtbl.create (List.length grefs)
+  and fnmap : term_type_map = Hashtbl.create (List.length grefs)
   and i : int ref = ref 0 in
   params.override <- Some ();
   List.iter
@@ -1028,11 +1071,15 @@ let build_rlts_map
        let rlts : raw_lts = run (check_ref_lts gref) in
        log ~params (Printf.sprintf "MAP = = = = = = = = =\n\trlts (#%d):" !i);
        let _ = log_raw_lts ~params rlts in
-       Hashtbl.add tmap rlts.trm_type rlts;
+       (* FIXME: avoid two keys mapping to same rlts *)
+       (* - [build_graph] requires [tref -> raw_lts] *)
+       (* - [check_updated_ctx] requires [fn -> raw_lts] *)
+       Hashtbl.add trmap rlts.coq_lts rlts;
+       Hashtbl.add fnmap rlts.trm_type rlts;
        i := !i + 1)
     grefs;
   (* params.override <- None; *)
-  tmap
+  trmap, fnmap
 ;;
 
 (** *)
@@ -1058,13 +1105,14 @@ let build_bounded_lts
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
       ?(name : string = "unknown")
-      (rlts_map : term_type_map)
+      (tr_rlts_map : term_type_map)
+      (fn_rlts_map : term_type_map)
       (tref : Constrexpr.constr_expr)
       (module G : GraphB)
   : Lts.lts mm
   =
   (* graph lts *)
-  let* graph_lts = G.build_graph ~params rlts_map tref bound in
+  let* graph_lts = G.build_graph ~params tr_rlts_map fn_rlts_map tref bound in
   log ~params (Printf.sprintf "= = = = = = = = =\n");
   if G.H.length graph_lts.transitions >= bound
   then
@@ -1107,21 +1155,30 @@ let build_fsm_from_bounded_lts
   (* disable detailed printouts *)
   params.options.show_normal_output <- false;
   (* list of raw coq lts *)
-  let rlts_map : term_type_map = build_rlts_map ~params grefs in
+  let (tr_rlts_map, fn_rlts_map) : term_type_map * term_type_map =
+    build_rlts_map ~params grefs
+  in
   (* print out the type of the term *)
   params.override <- Some ();
   log
     ~params
     (Printf.sprintf
-       "type of tref: %s"
+       "(A) type of tref: %s"
        (econstr_to_string (run (Mebi_utils.type_of_tref tref))));
-  (* params.override <- None; *)
+  params.override <- None;
   (* graph module *)
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
   (* get pure lts *)
   let* (the_lts : Lts.lts) =
-    build_bounded_lts ~params ~bound ~name rlts_map tref (module G)
+    build_bounded_lts
+      ~params
+      ~bound
+      ~name
+      tr_rlts_map
+      fn_rlts_map
+      tref
+      (module G)
   in
   (* translate to fsm *)
   params.options.show_normal_output <- true;
@@ -1140,20 +1197,29 @@ module Vernac = struct
       : Lts.lts mm
       =
       (* list of raw coq lts *)
-      let rlts_map : term_type_map = build_rlts_map ~params grefs in
+      let (tr_rlts_map, fn_rlts_map) : term_type_map * term_type_map =
+        build_rlts_map ~params grefs
+      in
       (* print out the type of the term *)
       params.override <- Some ();
       log
         ~params
         (Printf.sprintf
-           "type of tref: %s"
+           "(B) type of tref: %s"
            (econstr_to_string (run (Mebi_utils.type_of_tref tref))));
       (* params.override <- None; *)
       (* graph module *)
       let* graphM = make_graph_builder in
       let module G = (val graphM) in
       (* get pure lts *)
-      build_bounded_lts ~params ~bound ~name rlts_map tref (module G)
+      build_bounded_lts
+        ~params
+        ~bound
+        ~name
+        tr_rlts_map
+        fn_rlts_map
+        tref
+        (module G)
     ;;
 
     let show

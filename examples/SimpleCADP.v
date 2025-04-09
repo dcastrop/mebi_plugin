@@ -169,7 +169,8 @@ Example tm1 : tm :=
 
 Example e1 : tm * nat * nat := (tm1, 0, 0).
 
-MeBi Dump "e1" FSM Bounded 150 Of e1 Using step.
+MeBi Dump "e1" LTS Bounded 150 Of e1 Using step.
+(* MeBi Dump "e1" FSM Bounded 150 Of e1 Using step. *)
 
 Inductive sys : Type :=
   | PRC : (tm * nat * nat) -> sys
@@ -222,6 +223,7 @@ Example e2 : sys :=
     PRC (OK, 0, 0)
   ).
 
+MeBi Dump "e2" LTS Bounded 350 Of e2 Using lts step.
 MeBi Dump "e2" FSM Bounded 350 Of e2 Using lts step.
 
 MeBi Dump "e2" FSM sys_equiv Bounded 350 Of e2 Using lts step.
