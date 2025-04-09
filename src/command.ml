@@ -1207,7 +1207,7 @@ module Vernac = struct
         (Printf.sprintf
            "(B) type of tref: %s"
            (econstr_to_string (run (Mebi_utils.type_of_tref tref))));
-      (* params.override <- None; *)
+      params.override <- None;
       (* graph module *)
       let* graphM = make_graph_builder in
       let module G = (val graphM) in

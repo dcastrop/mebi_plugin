@@ -2,7 +2,7 @@
 
 ## Layered Semantics Handling in `command.ml`
 Currently is rather "hacky" -- tries each coq-lts in a list, one by one until the correct constructor is found in one of them.
-- Change this to use a map since we should already have access to the type of the term anyway.
+-[x] Change this to use a map since we should already have access to the type of the term anyway.
 
 
 ## Overaul `Utils.params`
