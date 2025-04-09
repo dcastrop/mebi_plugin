@@ -938,8 +938,9 @@ Fixpoint load (ps:list process) : sys :=
     end
   end.
 
-Definition composition : Type := sys * resource.
-Definition compose (s:system) : composition :=
+(* Definition composition : Type := sys * resource. *)
+(* FIXME: plugin breaks when using aliases/wrappers for lts, such as [composition] above. *)
+Definition compose (s:system) : sys * resource (*composition*) :=
   match s with
   | (ps, r) => (load ps, r)
   end.
@@ -947,7 +948,7 @@ Definition compose (s:system) : composition :=
 (***************************)
 (**** System size: 1 *******)
 (***************************)
-Example ncs1 : composition := compose (create 1 P).
+Example ncs1 : sys * resource := compose (create 1 P).
 Compute ncs1.
 
 (* MeBi Show  LTS Of ncs1 Using lts step. *)
