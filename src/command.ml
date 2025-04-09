@@ -745,16 +745,16 @@ struct
       let _params : Params.fmt = Params.handle params in
       let normal_pstr : string =
         Printf.sprintf
-          "{ %s --%s--> %s }"
+          "{ %s --<%s>--> %s }"
           (run (econstr from))
-          (run (econstr from))
+          transition.action.label
           (run (econstr transition.destination))
       and detail_pstr : string =
         Printf.sprintf
           "{ %s :: %s --<%s | id:%d>--> %s }"
           (pstr_int_tree transition.index_tree)
           (run (econstr from))
-          (run (econstr from))
+          transition.action.label
           transition.action.id
           (run (econstr transition.destination))
       in
