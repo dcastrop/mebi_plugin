@@ -947,7 +947,7 @@ Definition compose (s:system) : composition :=
 (***************************)
 (**** System size: 1 *******)
 (***************************)
-Example ncs1 : composition := compose (create 1 P).
+Example ncs1 : sys * resource := compose (create 1 P).
 Compute ncs1.
 
 (* MeBi Show  LTS Of ncs1 Using lts step. *)
@@ -964,7 +964,7 @@ MeBi Dump "NCS1"  FSM Bounded 150 Of ncs1 Using lts step.
 (***************************)
 (**** System size: 2 *******)
 (***************************)
-Example ncs2 : composition := compose (create 2 P).
+Example ncs2 : sys * resource := compose (create 2 P).
 Compute ncs2.
 
 (* ! lts incomplete even after 5000 bound *)
@@ -995,7 +995,7 @@ Compute ncs2.
 (***************************)
 (**** System size: 5 *******)
 (***************************)
-Example ncs5 : composition := compose (create 5 P).
+Example ncs5 : sys * resource := compose (create 5 P).
 Compute ncs5.
 (* MeBi Show  LTS Of ncs5 Using lts step. *)
 (* MeBi Debug LTS Of ncs5 Using lts step. *)

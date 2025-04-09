@@ -66,7 +66,7 @@ type term_type_map =
   (EConstr.types, raw_lts) Hashtbl.t
 
 (** essentially a list of [raw_lts], to allow the plugin to be provided (manually) the relevant inductive defeinitions. Useful in the case of a layered LTS. *)
-type rlts_list = raw_lts list
+(* type rlts_list = raw_lts list *)
 
 (** [log_raw_lts] *)
 let log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
@@ -324,8 +324,7 @@ let rec retrieve_tgt_nodes
 let rec check_updated_ctx
           ?(params : Params.log = default_params)
           (acc : (int tree * unif_problem) list list)
-          (* (rlts_map : term_type_map) *)
-            (rlts_ctx : rlts_list)
+          (fn_rlts_map : term_type_map)
   :  EConstr.t list * EConstr.rel_declaration list
   -> (int tree * unif_problem) list list option t
   = function
@@ -337,23 +336,25 @@ let rec check_updated_ctx
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with
      | App (fn, args) ->
-       (match
-          (* Hashtbl.find
-             rlts_map *)
-          List.find_opt
-            (fun (rlts : raw_lts) -> EConstr.eq_constr sigma fn rlts.coq_lts)
-            rlts_ctx
-        with
-        | None -> check_updated_ctx acc rlts_ctx (substl, tl)
-        (* | None -> check_updated_ctx acc rlts_map (substl, tl) *)
+       log
+         ~params
+         (Printf.sprintf
+            "check_updated_ctx, App.\n\tfn: %s\n\trlts keys: %s"
+            (econstr_to_string fn)
+            (Seq.fold_left
+               (fun (acc : string) (e : EConstr.t) ->
+                  Printf.sprintf "%s, %s" acc (econstr_to_string e))
+               ""
+               (Hashtbl.to_seq_keys fn_rlts_map)));
+       (match Hashtbl.find_opt fn_rlts_map fn with
+        | None -> check_updated_ctx acc fn_rlts_map (substl, tl)
         | Some rlts ->
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
           let* ctors =
             check_valid_constructor
               ~params
               rlts.constructor_transitions
-              rlts_ctx
-              (* rlts_map *)
+              fn_rlts_map
               nextT
               (Some args.(1))
           in
@@ -378,9 +379,9 @@ let rec check_updated_ctx
                in *)
             check_updated_ctx
               (List.concat_map (fun x -> List.map (fun y -> y :: x) ctors) acc)
-              rlts_ctx (* rlts_map *)
+              fn_rlts_map
               (substl, tl)))
-     | _ -> check_updated_ctx acc rlts_ctx (* rlts_map *) (substl, tl))
+     | _ -> check_updated_ctx acc fn_rlts_map (substl, tl))
   | _, _ -> assert false
 (* Impossible! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
@@ -389,13 +390,24 @@ let rec check_updated_ctx
 and check_valid_constructor
       ?(params : Params.log = default_params)
       (ctor_transitions : (Constr.rel_context * Constr.types) array)
-      (rlts_ctx : rlts_list) (* (rlts_map : term_type_map) *)
-      (t : EConstr.t)
+      (fn_rlts_map : term_type_map)
+      (t' : EConstr.t)
       (ma : EConstr.t option)
   : (EConstr.t * EConstr.t * int tree) list t
   =
   params.kind <- Debug ();
-  let$+ t env sigma = Reductionops.nf_all env sigma t in
+  let$+ t env sigma = Reductionops.nf_all env sigma t' in
+  log
+    ~params
+    (Printf.sprintf
+       "check_valid_constructor, t': %s\n\tt: %s\n\trlts keys: %s"
+       (econstr_to_string t')
+       (econstr_to_string t)
+       (Seq.fold_left
+          (fun (acc : string) (e : EConstr.t) ->
+             Printf.sprintf "%s, %s" acc (econstr_to_string e))
+          ""
+          (Hashtbl.to_seq_keys fn_rlts_map)));
   let iter_body (i : int) (ctor_vals : (EConstr.t * EConstr.t * int tree) list) =
     let* _ =
       if is_output_kind_enabled params
@@ -418,11 +430,7 @@ and check_valid_constructor
       if success
       then
         let* (next_ctors : (int tree * unif_problem) list list option) =
-          check_updated_ctx
-            ~params
-            [ [] ]
-            rlts_ctx (* rlts_map *)
-            (substl, ctx_tys)
+          check_updated_ctx ~params [ [] ] fn_rlts_map (substl, ctx_tys)
         in
         let$+ act env sigma = Reductionops.nf_all env sigma act in
         let (tgt_term : EConstr.t) = EConstr.Vars.substl substl termR in
@@ -472,16 +480,18 @@ module type GraphB = sig
     }
 
   val build_lts_graph
-    :  ?params:Params.log (* -> term_type_map *)
-    -> rlts_list
+    :  ?params:Params.log
+    -> term_type_map
+    -> term_type_map
     -> lts_graph
     -> int
     -> lts_graph mm
 
   val build_graph
-    :  ?params:Params.log (* -> term_type_map *)
-    -> rlts_list
-    -> Constrexpr.constr_expr_r CAst.t
+    :  ?params:Params.log
+    -> term_type_map
+    -> term_type_map
+    -> Constrexpr.constr_expr
     -> int
     -> lts_graph mm
 
@@ -506,7 +516,7 @@ module type GraphB = sig
       -> ?bound:int
       -> ?name:string
       -> lts_graph
-      -> Constrexpr.constr_expr_r CAst.t
+      -> Constrexpr.constr_expr
       -> (Lts.lts * coq_translation) mm
   end
 
@@ -562,71 +572,88 @@ struct
     ; transitions : lts_transition H.t
     }
 
+  let debug_output_constrs (constrs : (EConstr.t * EConstr.t * int tree) list)
+    : unit mm
+    =
+    debug (fun env sigma ->
+      str
+        (Printf.sprintf
+           "---- (returned from check_valid_constructor)\n\n\
+            build_lts_graph: constrs: [%s] (length %d).\n"
+           (List.fold_left
+              (fun (acc : string)
+                ((act, ctor, int_tree) : EConstr.t * EConstr.t * int tree) ->
+                 Printf.sprintf
+                   "%s   (%s ::\n    %s[%s])\n"
+                   acc
+                   (pstr_int_tree int_tree)
+                   (econstr_to_string ctor)
+                   (econstr_to_string act))
+              "\n"
+              constrs)
+           (List.length constrs)))
+  ;;
+
+  (** *)
+  let build_constrs_tree_list
+        ?(params : Params.log = default_params)
+        (t : EConstr.t)
+        (fn_rlts_map : term_type_map)
+    : (EConstr.t * EConstr.t * int tree) list mm
+    =
+    Hashtbl.fold
+      (fun (_k : EConstr.t)
+        (v : raw_lts)
+        (acc : (EConstr.t * EConstr.t * int tree) list mm) ->
+         let* ctors =
+           check_valid_constructor
+             ~params
+             v.constructor_transitions
+             fn_rlts_map
+             t
+             None
+         in
+         if List.is_empty ctors
+         then acc
+         else
+           (* TODO: change the below *)
+           return
+             (List.fold_left
+                (fun (acc' : (EConstr.t * EConstr.t * int tree) list)
+                  (ctor : EConstr.t * EConstr.t * int tree) ->
+                   (* TODO: figure out how to  merge *)
+                   ctor :: acc')
+                (run acc)
+                ctors))
+      fn_rlts_map
+      (return [])
+  ;;
+
   (** [build_lts_graph rlts g] is an [lts_graph] [g] obtained by exploring [rlts].
       @param rlts describes the Coq-based term.
       @param g is an [lts_graph] accumulated while exploring [rlts].
       @return an [lts_graph] constructed so long as the [bound] is not exceeded. *)
   let rec build_lts_graph
             ?(params : Params.log = default_params)
-            (rlts_ctx : rlts_list) (* (rlts_map : term_type_map) *)
+            (tr_rlts_map : term_type_map)
+            (fn_rlts_map : term_type_map)
             (g : lts_graph)
             (bound : int)
     : lts_graph mm
     =
     params.kind <- Debug ();
-    if H.length g.transitions >= bound
-    then return g (* FIXME: raise error *)
-    else if Queue.is_empty g.to_visit
-    then return g
+    if Queue.is_empty g.to_visit
+    then return g (* finished if no more to visit*)
+    else if S.cardinal g.states >= bound
+    then return g (* exit if bound reached *)
     else
       let* t = return (Queue.pop g.to_visit) in
       let* (constrs : (EConstr.t * EConstr.t * int tree) list) =
-        (* return *)
-        List.fold_left
-          (fun (acc : (EConstr.t * EConstr.t * int tree) list t)
-            (rlts : raw_lts) ->
-             let* ctors =
-               check_valid_constructor
-                 ~params
-                 rlts.constructor_transitions
-                 rlts_ctx (* rlts_map *)
-                 t
-                 None
-             in
-             if List.is_empty ctors
-             then acc
-             else
-               return
-                 (List.fold_left
-                    (fun (acc' : (EConstr.t * EConstr.t * int tree) list)
-                      (ctor : EConstr.t * EConstr.t * int tree) ->
-                       (* TODO: figure out how to  merge *)
-                       ctor :: acc')
-                    (run acc)
-                    ctors))
-          (return [])
-          rlts_ctx (* rlts_map *)
+        build_constrs_tree_list ~params t fn_rlts_map
       in
       let* _ =
         if is_output_kind_enabled params
-        then
-          debug (fun env sigma ->
-            str
-              (Printf.sprintf
-                 "---- (returned from check_valid_constructor)\n\n\
-                  build_lts_graph: constrs: [%s] (length %d).\n"
-                 (List.fold_left
-                    (fun (acc : string)
-                      ((act, ctor, int_tree) : EConstr.t * EConstr.t * int tree) ->
-                       Printf.sprintf
-                         "%s   (%s ::\n    %s[%s])\n"
-                         acc
-                         (pstr_int_tree int_tree)
-                         (econstr_to_string ctor)
-                         (econstr_to_string act))
-                    "\n"
-                    constrs)
-                 (List.length constrs)))
+        then debug_output_constrs constrs
         else return ()
       in
       let new_states = ref (S.singleton t) in
@@ -663,34 +690,38 @@ struct
              (Printf.sprintf "\nVisiting next: %i." (Queue.length g.to_visit)))
         constrs;
       let g = { g with states = S.union g.states !new_states } in
-      build_lts_graph ~params rlts_ctx (* rlts_map *) g bound
+      build_lts_graph ~params tr_rlts_map fn_rlts_map g bound
   ;;
-
-  (* let type_check_all_rlts_ctx
-     (rlts_ctx : rlts_list)
-     (t : Constrexpr.constr_expr_r CAst.t)
-     :(Environ.env*Evd.evar_map) =
-     let env sigma = List.fold_left (
-     fun ((env, sigma):(Environ.env*Evd.evar_map)) (rlts:raw_lts) ->
-     let$* _ env sigma = Typing.check env sigma t rlts.trm_type in
-     env,sigma
-     ) (env,sigma) rlts_ctx in (env, sigma);; *)
 
   (** [build_graph rlts t] is ...
       @param rlts is the raw_lts of the inductively defined coq term.
       @param t is the original Coq-term. *)
   let build_graph
         ?(params : Params.log = default_params)
-        (* (rlts_map : term_type_map) *)
-          (rlts_ctx : rlts_list)
-        (tref : Constrexpr.constr_expr_r CAst.t)
+        (tr_rlts_map : term_type_map)
+        (fn_rlts_map : term_type_map)
+        (tref : Constrexpr.constr_expr)
         (bound : int)
     : lts_graph mm
     =
+    log
+      ~params
+      (Printf.sprintf
+         "build_graph, tref: %s\n\ttr keys: %s\n\tfn keys: %s"
+         (econstr_to_string (run (Mebi_utils.type_of_tref tref)))
+         (Seq.fold_left
+            (fun (acc : string) (e : EConstr.t) ->
+               Printf.sprintf "%s, %s" acc (econstr_to_string e))
+            ""
+            (Hashtbl.to_seq_keys tr_rlts_map))
+         (Seq.fold_left
+            (fun (acc : string) (e : EConstr.t) ->
+               Printf.sprintf "%s, %s" acc (econstr_to_string e))
+            ""
+            (Hashtbl.to_seq_keys fn_rlts_map)));
     let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
-    (* FIXME: we assume the head of rlts_ctx is the outermost rlts  *)
-    (* let iter_body (i : int) ((env,sigma):(Environ.env*Evd.evar_map)) = *)
-    let rlts = List.hd rlts_ctx in
+    log ~params (Printf.sprintf "build_graph, t: %s." (econstr_to_string t));
+    let rlts = Hashtbl.find tr_rlts_map (run (Mebi_utils.type_of_tref tref)) in
     (* update environment by typechecking *)
     let$* u env sigma = Typing.check env sigma t rlts.trm_type in
     let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
@@ -703,7 +734,8 @@ struct
     let* _ = return (Queue.push t q) in
     build_lts_graph
       ~params
-      rlts_ctx (* rlts_map *)
+      tr_rlts_map
+      fn_rlts_map
       { to_visit = q (* ; labels = L.empty *)
       ; states = S.empty
       ; transitions = H.create bound
@@ -939,7 +971,7 @@ struct
     ;;
 
     let translate_init_term
-          (init_term : Constrexpr.constr_expr_r CAst.t)
+          (init_term : Constrexpr.constr_expr)
           (tbl : coq_translation)
       : string mm
       =
@@ -957,7 +989,7 @@ struct
           ?(bound : int = default_bound)
           ?(name : string = "unknown")
           (g : lts_graph)
-          (init_term : Constrexpr.constr_expr_r CAst.t)
+          (init_term : Constrexpr.constr_expr)
       : (Lts.lts * coq_translation) mm
       =
       params.kind <- Debug ();
@@ -1028,9 +1060,10 @@ let make_graph_builder =
 let build_rlts_map
       ?(params : Params.log = default_params)
       (grefs : Names.GlobRef.t list)
-  : term_type_map
+  : term_type_map * term_type_map
   =
-  let tmap : term_type_map = Hashtbl.create (List.length grefs)
+  let trmap : term_type_map = Hashtbl.create (List.length grefs)
+  and fnmap : term_type_map = Hashtbl.create (List.length grefs)
   and i : int ref = ref 0 in
   params.override <- Some ();
   List.iter
@@ -1038,15 +1071,19 @@ let build_rlts_map
        let rlts : raw_lts = run (check_ref_lts gref) in
        log ~params (Printf.sprintf "MAP = = = = = = = = =\n\trlts (#%d):" !i);
        let _ = log_raw_lts ~params rlts in
-       Hashtbl.add tmap rlts.trm_type rlts;
+       (* FIXME: avoid two keys mapping to same rlts *)
+       (* - [build_graph] requires [tref -> raw_lts] *)
+       (* - [check_updated_ctx] requires [fn -> raw_lts] *)
+       Hashtbl.add trmap rlts.trm_type rlts;
+       Hashtbl.add fnmap rlts.coq_lts rlts;
        i := !i + 1)
     grefs;
   params.override <- None;
-  tmap
+  trmap, fnmap
 ;;
 
 (** *)
-let build_rlts_ctx
+(* let build_rlts_ctx
       ?(params : Params.log = default_params)
       (grefs : Names.GlobRef.t list)
   : rlts_list
@@ -1061,20 +1098,21 @@ let build_rlts_ctx
        List.append acc [ rlts ])
     []
     grefs
-;;
+;; *)
 
 (** *)
 let build_bounded_lts
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
       ?(name : string = "unknown")
-      (rlts_ctx : raw_lts list)
-      (tref : Constrexpr.constr_expr_r CAst.t)
+      (tr_rlts_map : term_type_map)
+      (fn_rlts_map : term_type_map)
+      (tref : Constrexpr.constr_expr)
       (module G : GraphB)
   : Lts.lts mm
   =
   (* graph lts *)
-  let* graph_lts = G.build_graph ~params rlts_ctx tref bound in
+  let* graph_lts = G.build_graph ~params tr_rlts_map fn_rlts_map tref bound in
   log ~params (Printf.sprintf "= = = = = = = = =\n");
   if G.H.length graph_lts.transitions >= bound
   then
@@ -1117,14 +1155,15 @@ let build_fsm_from_bounded_lts
   (* disable detailed printouts *)
   params.options.show_normal_output <- false;
   (* list of raw coq lts *)
-  let rlts_ctx : rlts_list = build_rlts_ctx ~params grefs
-  and _rlts_map : term_type_map = build_rlts_map ~params grefs in
+  let (tr_rlts_map, fn_rlts_map) : term_type_map * term_type_map =
+    build_rlts_map ~params grefs
+  in
   (* print out the type of the term *)
   params.override <- Some ();
   log
     ~params
     (Printf.sprintf
-       "type of tref: %s"
+       "(A) type of tref: %s"
        (econstr_to_string (run (Mebi_utils.type_of_tref tref))));
   params.override <- None;
   (* graph module *)
@@ -1132,7 +1171,14 @@ let build_fsm_from_bounded_lts
   let module G = (val graphM) in
   (* get pure lts *)
   let* (the_lts : Lts.lts) =
-    build_bounded_lts ~params ~bound ~name rlts_ctx tref (module G)
+    build_bounded_lts
+      ~params
+      ~bound
+      ~name
+      tr_rlts_map
+      fn_rlts_map
+      tref
+      (module G)
   in
   (* translate to fsm *)
   params.options.show_normal_output <- true;
@@ -1146,33 +1192,41 @@ module Vernac = struct
           ?(bound : int = default_bound)
           ?(name : string = "unknown")
           ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr_r CAst.t)
+          (tref : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : Lts.lts mm
       =
       (* list of raw coq lts *)
-      let rlts_ctx : rlts_list = build_rlts_ctx ~params grefs
-      and _rlts_map : term_type_map = build_rlts_map ~params grefs in
+      let (tr_rlts_map, fn_rlts_map) : term_type_map * term_type_map =
+        build_rlts_map ~params grefs
+      in
       (* print out the type of the term *)
       params.override <- Some ();
       log
         ~params
         (Printf.sprintf
-           "type of tref: %s"
+           "(B) type of tref: %s"
            (econstr_to_string (run (Mebi_utils.type_of_tref tref))));
-      params.override <- None;
+      (* params.override <- None; *)
       (* graph module *)
       let* graphM = make_graph_builder in
       let module G = (val graphM) in
       (* get pure lts *)
-      build_bounded_lts ~params ~bound ~name rlts_ctx tref (module G)
+      build_bounded_lts
+        ~params
+        ~bound
+        ~name
+        tr_rlts_map
+        fn_rlts_map
+        tref
+        (module G)
     ;;
 
     let show
           ?(params : Params.log = default_params)
           ?(bound : int = default_bound)
           ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr_r CAst.t)
+          (tref : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : unit mm
       =
@@ -1190,7 +1244,7 @@ module Vernac = struct
           ?(bound : int = default_bound)
           ?(name : string = "dump")
           ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr_r CAst.t)
+          (tref : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : unit mm
       =
@@ -1226,7 +1280,7 @@ module Vernac = struct
           ?(bound : int = default_bound)
           ?(name : string = "unknown")
           ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr_r CAst.t)
+          (tref : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : Fsm.fsm mm
       =
@@ -1237,7 +1291,7 @@ module Vernac = struct
           ?(params : Params.log = default_params)
           ?(bound : int = default_bound)
           ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr_r CAst.t)
+          (tref : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : unit mm
       =
@@ -1258,7 +1312,7 @@ module Vernac = struct
           ?(bound : int = default_bound)
           ?(name : string = "dump")
           ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr_r CAst.t)
+          (tref : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : unit mm
       =
@@ -1282,7 +1336,7 @@ module Vernac = struct
           ?(params : Params.log = default_params)
           ?(bound : int = default_bound)
           ?(name : string = "unknown")
-          (tref : Constrexpr.constr_expr_r CAst.t)
+          (tref : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm) mm
       =
@@ -1298,7 +1352,7 @@ module Vernac = struct
     let show
           ?(params : Params.log = default_params)
           ?(bound : int = default_bound)
-          (tref : Constrexpr.constr_expr_r CAst.t)
+          (tref : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : unit mm
       =
@@ -1321,7 +1375,7 @@ module Vernac = struct
           ?(params : Params.log = default_params)
           ?(bound : int = default_bound)
           ?(name : string = "dump")
-          (tref : Constrexpr.constr_expr_r CAst.t)
+          (tref : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : unit mm
       =
@@ -1356,8 +1410,8 @@ module Vernac = struct
           ?(params : Params.log = default_params)
           ?(bound : int = default_bound)
           ?(name : string = "unknown")
-          (trefA : Constrexpr.constr_expr_r CAst.t)
-          (trefB : Constrexpr.constr_expr_r CAst.t)
+          (trefA : Constrexpr.constr_expr)
+          (trefB : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm * Fsm.fsm) mm
       =
@@ -1379,8 +1433,8 @@ module Vernac = struct
     let show
           ?(params : Params.log = default_params)
           ?(bound : int = default_bound)
-          (trefA : Constrexpr.constr_expr_r CAst.t)
-          (trefB : Constrexpr.constr_expr_r CAst.t)
+          (trefA : Constrexpr.constr_expr)
+          (trefB : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : unit mm
       =
@@ -1404,8 +1458,8 @@ module Vernac = struct
           ?(params : Params.log = default_params)
           ?(bound : int = default_bound)
           ?(name : string = "dump")
-          (trefA : Constrexpr.constr_expr_r CAst.t)
-          (trefB : Constrexpr.constr_expr_r CAst.t)
+          (trefA : Constrexpr.constr_expr)
+          (trefB : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : unit mm
       =
@@ -1453,8 +1507,8 @@ module Vernac = struct
           ?(params : Params.log = default_params)
           ?(bound : int = default_bound)
           ?(name : string = "unknown")
-          (trefA : Constrexpr.constr_expr_r CAst.t)
-          (trefB : Constrexpr.constr_expr_r CAst.t)
+          (trefA : Constrexpr.constr_expr)
+          (trefB : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm * Bisimilarity.result) mm
       =
@@ -1475,8 +1529,8 @@ module Vernac = struct
     let show
           ?(params : Params.log = default_params)
           ?(bound : int = default_bound)
-          (trefA : Constrexpr.constr_expr_r CAst.t)
-          (trefB : Constrexpr.constr_expr_r CAst.t)
+          (trefA : Constrexpr.constr_expr)
+          (trefB : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : unit mm
       =
@@ -1501,8 +1555,8 @@ module Vernac = struct
           ?(params : Params.log = default_params)
           ?(bound : int = default_bound)
           ?(name : string = "dump")
-          (trefA : Constrexpr.constr_expr_r CAst.t)
-          (trefB : Constrexpr.constr_expr_r CAst.t)
+          (trefA : Constrexpr.constr_expr)
+          (trefB : Constrexpr.constr_expr)
           (grefs : Names.GlobRef.t list)
       : unit mm
       =
