@@ -417,12 +417,12 @@ and check_valid_constructor
           check_updated_ctx ~params [ [] ] fn_rlts (substl, ctx_tys)
         in
         let$+ act env sigma = Reductionops.nf_all env sigma act in
-        let (tgt_term : EConstr.t) = EConstr.Vars.substl substl termR in
+        let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in
         match next_ctors with
         | None -> return ctor_vals
         | Some [] ->
-          let* sg = get_sigma in
-          if EConstr.isEvar sg tgt_term
+          let* sigma = get_sigma in
+          if EConstr.isEvar sigma tgt_term
           then return ctor_vals
           else return ((act, tgt_term, Node (i, [])) :: ctor_vals)
         | Some nctors ->
@@ -568,7 +568,7 @@ struct
                   acc
                   (pstr_int_tree int_tree)
                   (econstr_to_string ctor)
-                  (econstr_to_string act))
+                  "..." (* (econstr_to_string act) *))
               "\n"
               constrs)
            (List.length constrs)))
@@ -600,7 +600,9 @@ struct
                (fun (acc' : coq_ctor list) (ctor : coq_ctor) ->
                  (* only add if not already in acc' *)
                  (* TODO: check about merging int trees? *)
-                 if List.mem ctor acc' then acc' else ctor :: acc')
+                 if List.mem ctor acc'
+                 then acc'
+                 else ctor :: acc' (* List.append acc' [ ctor ] *))
                (run acc)
                ctors))
       fn_rlts
@@ -628,10 +630,14 @@ struct
             ~annotation:[]
             (Of (get_transition_id (), econstr_to_string act))
         in
-        H.add
-          g.transitions
-          t
-          { action = to_add; index_tree = int_tree; destination = tgt };
+        (* if new transition, add to [g] *)
+        if Bool.not (H.mem g.transitions t)
+        then
+          H.add
+            g.transitions
+            t
+            { action = to_add; index_tree = int_tree; destination = tgt };
+        (* if [tgt] is new state, add to [new_states] *)
         if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
         then ()
         else Queue.push tgt g.to_visit)
@@ -661,11 +667,13 @@ struct
       let* (constrs : coq_ctor list) =
         build_constrs_tree_list ~params t fn_rlts
       in
+      (* params.override <- Some (); *)
       let* _ =
         if is_output_kind_enabled params
         then debug_output_constrs constrs
         else return ()
       in
+      (* params.override <- None; *)
       let* (g, new_states) : lts_graph * S.t =
         get_new_states ~params g t constrs
       in
