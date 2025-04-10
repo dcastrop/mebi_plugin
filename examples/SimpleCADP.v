@@ -148,18 +148,16 @@ Example tm1 : tm :=
       IF N_IS_ZERO (
         ACT INC_N (* inc n by one, continue to enter *)
       ) (
-        DEF 1 (
-          IF N_IS_ZERO OK (REC 1)
-        )
+        REC 0 (* go back to beginning, wait until can enter *)
       )
     ) (
       SEQ (ACT ENTER) (
         SEQ (ACT (SET_V 5)) (
-          DEF 2 (
+          DEF 1 (
             IF V_IS_ZERO (
-              SEQ (ACT LEAVE) (SEQ (ACT DEC_N) OK)
+              SEQ (ACT LEAVE) (ACT DEC_N) (* leave and dec n by one *)
             ) (
-              SEQ (ACT DEC_V) (REC 2)
+              SEQ (ACT DEC_V) (REC 1) (* dec v by one, loop *)
             )
           )
         )
@@ -169,6 +167,7 @@ Example tm1 : tm :=
 
 Example e1 : tm * nat * nat := (tm1, 0, 0).
 
+MeBi Show LTS Bounded 150 Of e1 Using step.
 MeBi Dump "e1" LTS Bounded 150 Of e1 Using step.
 (* MeBi Dump "e1" FSM Bounded 150 Of e1 Using step. *)
 
@@ -223,8 +222,9 @@ Example e2 : sys :=
     PRC (OK, 0, 0)
   ).
 
+MeBi Show LTS Bounded 350 Of e2 Using lts step.
 MeBi Dump "e2" LTS Bounded 350 Of e2 Using lts step.
-MeBi Dump "e2" FSM Bounded 350 Of e2 Using lts step.
+(* MeBi Dump "e2" FSM Bounded 350 Of e2 Using lts step. *)
 
-MeBi Dump "e2" LTS sys_equiv Bounded 350 Of e2 Using lts step.
-MeBi Dump "e2" FSM sys_equiv Bounded 350 Of e2 Using lts step.
+(* MeBi Dump "e2" LTS sys_equiv Bounded 350 Of e2 Using lts step. *)
+(* MeBi Dump "e2" FSM sys_equiv Bounded 350 Of e2 Using lts step. *)
