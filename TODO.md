@@ -14,9 +14,18 @@
 ## Add Plugin Support Structural Equivalence
 If provided, when building the LTS of a coq-term the plugin should only consider exploring new states that are not structurally equivalent to an already-explored state.
 
-
 ## Overaul `Utils.params`
 Overhaul the `params` used to determine the level-of-detail for logging and formatting. The current approach ended up being rather combersome and, unfortunately difficult to extend and use.
 - Function `Utils.log` handles all printing and ensures the correct output is used (i.e., if in Coq then using `Feedback`).
 - However, there is currently some overlap with the idea of "show details": some messages are classified as a "detail", whilst others will provide "further details" (e.g., `Fsm.PStr` will include additional meta-info).
 
+## Bugs
+- [ ] The plugin will crash if provided a term with a type that does not *exactly* match the type expected by the semantics. E.g.:
+```coq
+Inductive lts : tm * state -> action -> tm * state -> Prop := ...
+
+Definition process : type := tm * state.
+Example p1 : process := ...
+
+MeBi Show LTS Of p1 Using lts. (* <- error not found *)
+```
