@@ -660,7 +660,7 @@ struct
     params.kind <- Debug ();
     if Queue.is_empty g.to_visit
     then return g (* finished if no more to visit*)
-    else if S.cardinal g.states >= bound
+    else if S.cardinal g.states > bound
     then return g (* exit if bound reached *)
     else
       let* (t : EConstr.t) = return (Queue.pop g.to_visit) in
@@ -1029,19 +1029,20 @@ let build_rlts_map
   =
   let trmap : term_type_map = Hashtbl.create (List.length grefs)
   and fnmap : term_type_map = Hashtbl.create (List.length grefs)
-  and i : int ref = ref 0 in
+  and map_id : unit -> int = new_int_counter () in
   params.override <- Some ();
   List.iter
     (fun (gref : Names.GlobRef.t) ->
       let rlts : raw_lts = run (check_ref_lts gref) in
-      log ~params (Printf.sprintf "MAP = = = = = = = = =\n\trlts (#%d):" !i);
+      log
+        ~params
+        (Printf.sprintf "= = = = = = = = =\n\trlts (#%d):" (map_id ()));
       let _ = log_raw_lts ~params rlts in
       (* FIXME: avoid two keys mapping to same rlts *)
       (* - [build_graph] requires [tref -> raw_lts] *)
       (* - [check_updated_ctx] requires [fn -> raw_lts] *)
       Hashtbl.add trmap rlts.trm_type rlts;
-      Hashtbl.add fnmap rlts.coq_lts rlts;
-      i := !i + 1)
+      Hashtbl.add fnmap rlts.coq_lts rlts)
     grefs;
   params.override <- None;
   trmap, fnmap
@@ -1061,7 +1062,7 @@ let build_bounded_lts
   (* graph lts *)
   let* graph_lts = G.build_graph ~params tr_rlts fn_rlts tref bound in
   log ~params (Printf.sprintf "= = = = = = = = =\n");
-  if G.H.length graph_lts.transitions >= bound
+  if G.S.cardinal graph_lts.states > bound
   then
     log
       ~params
