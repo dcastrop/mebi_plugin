@@ -218,6 +218,11 @@ type unif_problem =
 
 type 'a tree = Node of 'a * 'a tree list
 
+let merge_tree (t1 : 'a tree) (t2 : 'a tree) : 'a tree =
+  match t1 with
+  | Node (a1, b1) -> Node (a1, t1 :: b1)
+;;
+
 (* type unif_tree =
    | Tree of int tree
    | Start
@@ -293,9 +298,9 @@ let sandboxed_unify
 ;;
 
 (** [coq_ctor]
-    - [EConstr.t]
-    - [EConstr.t]
-    - [int tree] *)
+    - [EConstr.t] action
+    - [EConstr.t] destination
+    - [int tree] coq-constructor index *)
 type coq_ctor = EConstr.t * EConstr.t * int tree
 
 (* [act] should probably come from the unification problems? *)
@@ -555,160 +560,6 @@ struct
     ; transitions : lts_transition H.t
     }
 
-  let debug_output_constrs (constrs : coq_ctor list) : unit mm =
-    debug (fun env sigma ->
-      str
-        (Printf.sprintf
-           "---- (returned from check_valid_constructor)\n\n\
-            build_lts_graph: constrs: [%s] (length %d).\n"
-           (List.fold_left
-              (fun (acc : string) ((act, ctor, int_tree) : coq_ctor) ->
-                Printf.sprintf
-                  "%s   (%s ::\n    %s[%s])\n"
-                  acc
-                  (pstr_int_tree int_tree)
-                  (econstr_to_string ctor)
-                  "..." (* (econstr_to_string act) *))
-              "\n"
-              constrs)
-           (List.length constrs)))
-  ;;
-
-  (** *)
-  let build_constrs_tree_list
-    ?(params : Params.log = default_params)
-    (t : EConstr.t)
-    (fn_rlts : term_type_map)
-    : coq_ctor list mm
-    =
-    Hashtbl.fold
-      (fun (_k : EConstr.t) (v : raw_lts) (acc : coq_ctor list mm) ->
-        let* ctors =
-          check_valid_constructor
-            ~params
-            v.constructor_transitions
-            fn_rlts
-            t
-            None
-        in
-        if List.is_empty ctors
-        then acc
-        else
-          (* TODO: change the below *)
-          return
-            (List.fold_left
-               (fun (acc' : coq_ctor list) (ctor : coq_ctor) ->
-                 (* only add if not already in acc' *)
-                 (* TODO: check about merging int trees? *)
-                 if List.mem ctor acc'
-                 then acc'
-                 else ctor :: acc' (* List.append acc' [ ctor ] *))
-               (run acc)
-               ctors))
-      fn_rlts
-      (return [])
-  ;;
-
-  (** [get_new_states g t constrs] is the new set of states to explore (that are not already explored). *)
-  let get_new_states
-    ?(params : Params.log = default_params)
-    (g : lts_graph)
-    (t : EConstr.t)
-    (constrs : coq_ctor list)
-    : (lts_graph * S.t) mm
-    =
-    let new_states : S.t ref = ref (S.singleton t) in
-    let get_transition_id : unit -> int = new_int_counter () in
-    let* sigma = get_sigma in
-    List.iter
-      (fun ((act, tgt, int_tree) : coq_ctor) ->
-        new_states := S.add tgt !new_states;
-        (* TODO: detect tau transitions and then defer to [Fsm.tau] instead. *)
-        let to_add : action =
-          Fsm.Create.action
-            ~is_tau:false
-            ~annotation:[]
-            (Of (get_transition_id (), econstr_to_string act))
-        in
-        (* if new transition, add to [g] *)
-        if Bool.not (H.mem g.transitions t)
-        then
-          H.add
-            g.transitions
-            t
-            { action = to_add; index_tree = int_tree; destination = tgt };
-        (* if [tgt] is new state, add to [new_states] *)
-        if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
-        then ()
-        else Queue.push tgt g.to_visit)
-      constrs;
-    return (g, !new_states)
-  ;;
-
-  (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
-      @param fn_rlts maps coq-term names to [raw_lts].
-      @param g is an [lts_graph] accumulated while exploring [rlts].
-      @param bound is the number of states to explore until.
-      @return an [lts_graph] with a maximum of [bound] many states. *)
-  let rec build_lts_graph
-    ?(params : Params.log = default_params)
-    (fn_rlts : term_type_map)
-    (g : lts_graph)
-    (bound : int)
-    : lts_graph mm
-    =
-    params.kind <- Debug ();
-    if Queue.is_empty g.to_visit
-    then return g (* finished if no more to visit*)
-    else if S.cardinal g.states > bound
-    then return g (* exit if bound reached *)
-    else
-      let* (t : EConstr.t) = return (Queue.pop g.to_visit) in
-      let* (constrs : coq_ctor list) =
-        build_constrs_tree_list ~params t fn_rlts
-      in
-      (* params.override <- Some (); *)
-      let* _ =
-        if is_output_kind_enabled params
-        then debug_output_constrs constrs
-        else return ()
-      in
-      (* params.override <- None; *)
-      let* (g, new_states) : lts_graph * S.t =
-        get_new_states ~params g t constrs
-      in
-      let g = { g with states = S.union g.states new_states } in
-      build_lts_graph ~params fn_rlts g bound
-  ;;
-
-  (** [build_graph tr_rlts fn_rlts tref bound] is the entry point for [build_lts_graph].
-      @param tr_rlts maps coq-term types to [raw_lts].
-      @param fn_rlts
-        is passed to [build_lts_graph] and maps coq-term names to [raw_lts].
-      @param tref is the original coq-term.
-      @param bound is the number of states to explore until. *)
-  let build_graph
-    ?(params : Params.log = default_params)
-    (tr_rlts : term_type_map)
-    (fn_rlts : term_type_map)
-    (tref : Constrexpr.constr_expr)
-    (bound : int)
-    : lts_graph mm
-    =
-    let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
-    let rlts = Hashtbl.find tr_rlts (run (Mebi_utils.type_of_tref tref)) in
-    (* update environment by typechecking *)
-    let$* u env sigma = Typing.check env sigma t rlts.trm_type in
-    let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
-    let q = Queue.create () in
-    let* _ = return (Queue.push t q) in
-    build_lts_graph
-      ~params
-      fn_rlts
-      { to_visit = q; states = S.empty; transitions = H.create bound }
-      bound
-  ;;
-
   module PStr = struct
     let econstr (t : EConstr.t) : string mm =
       let* env = get_env in
@@ -866,6 +717,277 @@ struct
            tabs)
     ;;
   end
+
+  (** handles adding new transition to [lts_graph] *)
+  (* let _handle_new_lts_graph_transition
+    (g : lts_graph ref)
+    (t : EConstr.t)
+    (to_add : action)
+    (int_tree : int tree)
+    (tgt : EConstr.t)
+    : lts_graph mm
+    =
+    let* sigma = get_sigma in
+    (match H.find_opt !g.transitions t with
+     | None ->
+       H.add
+         !g.transitions
+         t
+         { action = to_add; index_tree = int_tree; destination = tgt }
+     | Some lt ->
+       (match lt with
+        | { action; destination; index_tree } ->
+          if EConstr.eq_constr sigma tgt destination
+          then
+            H.replace
+              !g.transitions
+              t
+              { action
+              ; index_tree = merge_tree index_tree int_tree
+              ; destination
+              }
+          else
+            H.add
+              !g.transitions
+              t
+              { action = to_add; index_tree = int_tree; destination = tgt }));
+    return !g
+  ;; *)
+
+  let debug_output_constrs (constrs : coq_ctor list) : unit mm =
+    debug (fun env sigma ->
+      str
+        (Printf.sprintf
+           "---- (returned from check_valid_constructor)\n\n\
+            build_lts_graph: constrs: [%s] (length %d).\n"
+           (List.fold_left
+              (fun (acc : string) ((act, ctor, int_tree) : coq_ctor) ->
+                Printf.sprintf
+                  "%s   (%s ::\n    %s[%s])\n"
+                  acc
+                  (pstr_int_tree int_tree)
+                  (econstr_to_string ctor)
+                  "..." (* (econstr_to_string act) *))
+              "\n"
+              constrs)
+           (List.length constrs)))
+  ;;
+
+  (** returns [None] if [ctor] is not in [ctors], by matching only on the first two fields (i.e, [act] and [tgt] -- ignoring [int tree]). *)
+  let find_opt_ctor (ctor : coq_ctor) (ctors : coq_ctor list)
+    : coq_ctor option mm
+    =
+    let* sigma = get_sigma in
+    match ctor with
+    | act, tgt, int_tree ->
+      (match
+         List.find_opt
+           (fun (ctor' : coq_ctor) ->
+             match ctor' with
+             | act', tgt', int_tree' ->
+               EConstr.eq_constr sigma act act'
+               && EConstr.eq_constr sigma tgt tgt')
+           ctors
+       with
+       | None -> return None
+       | Some ctor -> return (Some ctor))
+  ;;
+
+  (** merges [ctors] into [acc] by:
+      - if already in [acc], then skip.
+      - if another in [acc] has matching [act] and [tgt] fields, then merge [int tree].
+      - else just add to [acc]. *)
+  (* let merge_constrs_tree_lists (acc : coq_ctor list) (ctors : coq_ctor list)
+     : coq_ctor list
+     =
+     List.fold_left
+     (fun (acc' : coq_ctor list) (ctor : coq_ctor) ->
+     (* skip if already in [acc'] *)
+     if List.mem ctor acc'
+     then acc'
+     else (
+     let (opt_ctor : coq_ctor option) = run (find_opt_ctor ctor acc') in
+     match opt_ctor with
+     (* merge [int tree] if already exists *)
+     | Some ctor' ->
+     (match ctor, ctor' with
+     | (act, tgt, int_tree), (_act', _tgt', int_tree') ->
+     (act, tgt, merge_tree int_tree int_tree') :: acc')
+     (* add if new *)
+     | None -> ctor :: acc'))
+     acc
+     ctors
+     ;; *)
+
+  (** *)
+  let build_constrs_tree_list
+    ?(params : Params.log = default_params)
+    (t : EConstr.t)
+    (fn_rlts : term_type_map)
+    : coq_ctor list mm
+    =
+    Hashtbl.fold
+      (fun (_k : EConstr.t) (v : raw_lts) (acc : coq_ctor list mm) ->
+        let* (ctors : coq_ctor list) =
+          check_valid_constructor
+            ~params
+            v.constructor_transitions
+            fn_rlts
+            t
+            None
+        in
+        if List.is_empty ctors
+        then acc (* else return (merge_constrs_tree_lists (run acc) ctors) *)
+        else
+          return
+            (List.fold_left
+               (fun (acc' : coq_ctor list) (ctor : coq_ctor) ->
+                 (* skip if already in [acc'] *)
+                 if List.mem ctor acc'
+                 then acc'
+                 else (
+                   let (opt_ctor : coq_ctor option) =
+                     run (find_opt_ctor ctor acc')
+                   in
+                   match opt_ctor with
+                   (* merge [int tree] if already exists *)
+                   | Some ctor' ->
+                     (match ctor, ctor' with
+                      | (act, tgt, int_tree), (_act', _tgt', int_tree') ->
+                        (act, tgt, merge_tree int_tree int_tree') :: acc')
+                     (* add if new *)
+                   | None -> ctor :: acc'))
+               (run acc)
+               ctors))
+      fn_rlts
+      (return [])
+  ;;
+
+  (** [get_new_states g t constrs] is the new set of states to explore (that are not already explored). *)
+  let get_new_states
+    ?(params : Params.log = default_params)
+    (g : lts_graph)
+    (t : EConstr.t)
+    (constrs : coq_ctor list)
+    : (lts_graph * S.t) mm
+    =
+    let new_states : S.t ref = ref (S.singleton t) in
+    let get_transition_id : unit -> int = new_int_counter () in
+    let* sigma = get_sigma in
+    (* TODO: change the below to use the iterate from mebi. (see check_valid_constructor) *)
+    List.iter
+      (fun ((act, tgt, int_tree) : coq_ctor) ->
+        new_states := S.add tgt !new_states;
+        (* TODO: detect tau transitions and then defer to [Fsm.tau] instead. *)
+        let to_add : action =
+          Fsm.Create.action
+            ~is_tau:false
+            ~annotation:[]
+            (Of (get_transition_id (), econstr_to_string act))
+        in
+        (* if new transition, add to [g] *)
+        (* if Bool.not (H.mem g.transitions t)
+        then
+          H.add
+            g.transitions
+            t
+            { action = to_add; index_tree = int_tree; destination = tgt }; *)
+        (* TODO: bottom appears to cause stall on complicated terms *)
+        (match H.find_opt g.transitions t with
+         | None ->
+           H.add
+             g.transitions
+             t
+             { action = to_add; index_tree = int_tree; destination = tgt }
+         | Some lt ->
+           (match lt with
+            | { action; destination; index_tree } ->
+              if EConstr.eq_constr sigma tgt destination
+              then
+                ()
+                (* H.replace
+                  g.transitions
+                  t
+                  { action
+                  ; index_tree = merge_tree index_tree int_tree
+                  ; destination
+                  } *)
+              else
+                H.add
+                  g.transitions
+                  t
+                  { action = to_add; index_tree = int_tree; destination = tgt }));
+        (* if [tgt] is new state, add to [new_states] *)
+        if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
+        then ()
+        else Queue.push tgt g.to_visit)
+      constrs;
+    return (g, !new_states)
+  ;;
+
+  (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
+      @param fn_rlts maps coq-term names to [raw_lts].
+      @param g is an [lts_graph] accumulated while exploring [rlts].
+      @param bound is the number of states to explore until.
+      @return an [lts_graph] with a maximum of [bound] many states. *)
+  let rec build_lts_graph
+    ?(params : Params.log = default_params)
+    (fn_rlts : term_type_map)
+    (g : lts_graph)
+    (bound : int)
+    : lts_graph mm
+    =
+    params.kind <- Debug ();
+    if Queue.is_empty g.to_visit
+    then return g (* finished if no more to visit*)
+    else if S.cardinal g.states > bound
+    then return g (* exit if bound reached *)
+    else
+      let* (t : EConstr.t) = return (Queue.pop g.to_visit) in
+      let* (constrs : coq_ctor list) =
+        build_constrs_tree_list ~params t fn_rlts
+      in
+      (* params.override <- Some (); *)
+      let* _ =
+        if is_output_kind_enabled params
+        then debug_output_constrs constrs
+        else return ()
+      in
+      (* params.override <- None; *)
+      let* (g, new_states) : lts_graph * S.t =
+        get_new_states ~params g t constrs
+      in
+      let g = { g with states = S.union g.states new_states } in
+      build_lts_graph ~params fn_rlts g bound
+  ;;
+
+  (** [build_graph tr_rlts fn_rlts tref bound] is the entry point for [build_lts_graph].
+      @param tr_rlts maps coq-term types to [raw_lts].
+      @param fn_rlts
+        is passed to [build_lts_graph] and maps coq-term names to [raw_lts].
+      @param tref is the original coq-term.
+      @param bound is the number of states to explore until. *)
+  let build_graph
+    ?(params : Params.log = default_params)
+    (tr_rlts : term_type_map)
+    (fn_rlts : term_type_map)
+    (tref : Constrexpr.constr_expr)
+    (bound : int)
+    : lts_graph mm
+    =
+    let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
+    let rlts = Hashtbl.find tr_rlts (run (Mebi_utils.type_of_tref tref)) in
+    (* update environment by typechecking *)
+    let$* u env sigma = Typing.check env sigma t rlts.trm_type in
+    let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
+    let q = Queue.create () in
+    let* _ = return (Queue.push t q) in
+    build_lts_graph
+      ~params
+      fn_rlts
+      { to_visit = q; states = S.empty; transitions = H.create bound }
+      bound
+  ;;
 
   (*
      TODO: refactor the above, using the new [Fsm.Create] and [Fsm.New] functions

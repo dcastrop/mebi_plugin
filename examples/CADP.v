@@ -970,7 +970,9 @@ Compute ncs2.
 (* ! lts incomplete even after 5000 bound *)
 (* MeBi Show  LTS Bounded 5000 Of ncs2 Using lts step. *)
 (* MeBi Show  LTS Of ncs2 Using lts step. *)
-MeBi Dump "NCS2" LTS Bounded 150 Of ncs2 Using lts step.
+
+(* MeBi Dump "NCS2" LTS Bounded 1000 Of ncs2 Using lts step. *)
+
 (* MeBi Dump "NCS2" FSM Bounded 150 Of ncs2 Using lts step. *)
 (* MeBi Debug LTS Of ncs2 Using lts step. *)
 
