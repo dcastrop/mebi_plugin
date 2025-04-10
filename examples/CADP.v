@@ -955,7 +955,7 @@ MeBi Dump "NCS1" LTS Bounded 150 Of ncs1 Using lts step.
 (* MeBi Debug LTS Of ncs1 Using lts step. *)
 
 (* MeBi Show  FSM Of ncs1 Using lts step. *)
-MeBi Dump "NCS1"  FSM Bounded 150 Of ncs1 Using lts step.
+(* MeBi Dump "NCS1"  FSM Bounded 150 Of ncs1 Using lts step. *)
 (* MeBi Debug FSM Of ncs1 Using lts step. *)
 
 (* MeBi Show  Minim Of ncs1 Using lts step. *)
@@ -999,7 +999,7 @@ MeBi Dump "NCS2" LTS Bounded 150 Of ncs2 Using lts step.
 Example ncs5 : sys * resource := compose (create 5 P).
 Compute ncs5.
 
-MeBi Dump "NCS5" LTS Bounded 150 Of ncs5 Using lts step.
+(* MeBi Dump "NCS5" LTS Bounded 150 Of ncs5 Using lts step. *)
 
 
 
