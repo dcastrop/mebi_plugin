@@ -216,15 +216,61 @@ Inductive lts : sys -> label -> sys -> Prop :=
   | LTS_OK_R : forall l n v, lts (PAR l (PRC (OK, n, v))) SILENT (l)
   .
 
+(*  *)
 Example e2 : sys :=
   PAR (PRC (tm1, 0, 0)) (
-    (* (PRC (tm1, 0, 0)) *)
     PRC (OK, 0, 0)
   ).
 
-MeBi Show LTS Bounded 350 Of e2 Using lts step.
 MeBi Dump "e2" LTS Bounded 350 Of e2 Using lts step.
-(* MeBi Dump "e2" FSM Bounded 350 Of e2 Using lts step. *)
+
+(*  *)
+Example e3 : sys :=
+  PAR (PRC (tm1, 0, 0)) (
+    (PRC (tm1, 0, 0))
+  ).
+
+MeBi Dump "e3" LTS Bounded 350 Of e3 Using lts step.
+
+(*  *)
+Example e4 : sys :=
+  PAR (PRC (tm1, 0, 0)) (
+    PAR (PRC (tm1, 0, 0)) (
+      (PRC (OK, 0, 0))
+    )
+  ).
+
+MeBi Dump "e4" LTS Bounded 500 Of e4 Using lts step.
+
+(*  *)
+Example e5 : sys :=
+  PAR (PRC (tm1, 0, 0)) (
+    PAR (PRC (tm1, 0, 0)) (
+      (PRC (tm1, 0, 0))
+    )
+  ).
+
+(* MeBi Dump "e5" LTS Bounded 2000 Of e5 Using lts step. *)
+
+(*  *)
+Example e6 : sys :=
+  PAR
+    (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))
+    (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0)).
+
+MeBi Dump "e6" LTS Bounded 500 Of e6 Using lts step.
+
+
+(*  *)
+Example e7 : sys :=
+  PAR
+    (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))
+    (PAR
+      (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))
+      (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))).
+
+MeBi Dump "e7" LTS Bounded 500 Of e7 Using lts step.
+
 
 (* MeBi Dump "e2" LTS sys_equiv Bounded 350 Of e2 Using lts step. *)
 (* MeBi Dump "e2" FSM sys_equiv Bounded 350 Of e2 Using lts step. *)
