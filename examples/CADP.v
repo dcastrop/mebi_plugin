@@ -970,6 +970,7 @@ Compute ncs2.
 (* ! lts incomplete even after 5000 bound *)
 (* MeBi Show  LTS Bounded 5000 Of ncs2 Using lts step. *)
 (* MeBi Show  LTS Of ncs2 Using lts step. *)
+MeBi Dump "NCS2" LTS Bounded 150 Of ncs2 Using lts step.
 (* MeBi Dump "NCS2" FSM Bounded 150 Of ncs2 Using lts step. *)
 (* MeBi Debug LTS Of ncs2 Using lts step. *)
 
@@ -997,14 +998,8 @@ Compute ncs2.
 (***************************)
 Example ncs5 : sys * resource := compose (create 5 P).
 Compute ncs5.
-(* MeBi Show  LTS Of ncs5 Using lts step. *)
-(* MeBi Debug LTS Of ncs5 Using lts step. *)
 
-(* MeBi Show  FSM Of ncs5 Using lts step. *)
-(* MeBi Debug FSM Of ncs5 Using lts step. *)
-
-(* MeBi Show  Minim Of ncs5 Using lts step. *)
-(* MeBi Debug Minim Of ncs5 Using lts step. *)
+MeBi Dump "NCS5" LTS Bounded 150 Of ncs5 Using lts step.
 
 
 
