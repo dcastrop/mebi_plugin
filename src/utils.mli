@@ -94,3 +94,7 @@ val default_indent_val : int
 val str_tabs : ?size:int -> int -> string
 val get_key_of_val : ('a, 'b) Hashtbl.t -> 'b -> 'a option
 val new_int_counter : unit -> unit -> int
+
+type keys_kind = OfEConstr of Evd.econstr Seq.t
+
+val pstr_keys : keys_kind -> string

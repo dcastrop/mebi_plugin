@@ -292,3 +292,16 @@ let new_int_counter () : unit -> int =
   in
   get_and_incr_counter
 ;;
+
+type keys_kind = OfEConstr of EConstr.t Seq.t
+
+(** pstr a seq of keys *)
+let pstr_keys (keys : keys_kind) : string =
+  match keys with
+  | OfEConstr keys ->
+    Seq.fold_left
+      (fun (acc : string) (k : EConstr.t) ->
+        Printf.sprintf "%s, %s" acc (Mebi_utils.econstr_to_string k))
+      ""
+      keys
+;;
