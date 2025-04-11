@@ -216,17 +216,111 @@ type unif_problem =
       (econstr_to_string termR)
 ;; *)
 
+(* type leaf_kind = Int of int
+
+   let leaf_eq (l1 : leaf_kind) (l2 : leaf_kind) : bool =
+   match l1, l2 with
+   | Int i1, Int i2 -> i1 == i2
+   | _, _ -> false
+   ;; *)
+
 type 'a tree = Node of 'a * 'a tree list
 
-let merge_tree (t1 : 'a tree) (t2 : 'a tree) : 'a tree =
-  match t1 with
-  | Node (a1, b1) -> Node (a1, t1 :: b1)
+let rec tree_eq (t1 : int tree) (t2 : int tree) : bool =
+  match t1, t2 with
+  | Node (a1, b1), Node (a2, b2) -> a1 == a2 && tree_list_eq b1 b2
+
+and tree_list_eq (l1 : int tree list) (l2 : int tree list) : bool =
+  match l1, l2 with
+  | [], [] -> true
+  | h1 :: t1, h2 :: t2 -> tree_eq h1 h2 && tree_list_eq t1 t2
+  | _, _ -> false
 ;;
 
-(* type unif_tree =
-   | Tree of int tree
-   | Start
-   | Failed *)
+(* TODO: finish *)
+let add_to_tree (to_add : int tree) (t : int tree) : int tree = t
+
+(* let rec balance_tree (t:int tree) : int tree =
+   match t with
+   | Node (leaf, stem) ->
+   match stem with
+   | [] -> t
+   | h::[] -> t
+   | h::tl -> Node (leaf, balance_tree  )
+
+   and add_to_tree (to_add : int tree) (t : int tree) : int tree =
+   match t, to_add with
+   | Node (base_leaf, base_stem), Node (leaf_to_add, stem_to_add) ->
+   if base_leaf == leaf_to_add
+   then (
+   match base_stem, list_to_add with
+   | [], [] -> t
+   | _::_, [] -> t
+   | [], _::_ -> t
+   | h_to_add :: [] -> Node ()
+
+   ) else (
+
+   )
+   ;; *)
+(* if a1 == a2
+   then
+   Node
+   ( a1
+   , List.fold_left
+   (fun (acc : int tree list) (t : int tree) ->
+   match t with
+   | Node (leaf, l) ->
+   if leaf==a1
+   )
+   b1
+   b2 )
+   else Node (a1, add_to_tree_list to_add b1) *)
+
+(* and add_to_tree_list (to_add : int tree) (l : int tree list) : int tree list =
+   match l with
+   | [] -> [ to_add ]
+   | h :: t -> add_to_tree to_add h :: t
+   ;; *)
+
+(* let rec tree_contains_node (n : 'a tree) (t : 'a tree) : bool =
+   tree_eq n t
+   ||
+   match t with
+   | Node (a, b) -> tree_eq n a || tree_list_contains_node n b
+
+   and tree_list_contains_node (n : 'a tree) (l : 'a tree list) : bool =
+   match l with
+   | [] -> false
+   | h :: t -> tree_contains_node n h || tree_list_contains_node n t
+   ;; *)
+
+(* let rec merge_tree: 'a tree -> 'a tree -> 'a tree =
+   fun t1 t2 -> *)
+
+(* let rec add_to_tree (i : int) (t : int tree) : int tree =
+   match t with
+   | Node (a, b) -> if i == a then t else Node (a, add_to_tree_list i b)
+
+   and add_to_tree_list (i : int) (l : int tree list) : int tree list =
+   match l with
+   | [] -> [ Node (i, []) ]
+   | h :: t -> add_to_tree i h :: t
+   ;;
+
+   let rec merge_tree (t1 : int tree) (t2 : int tree) : int tree =
+   match t2 with
+   | Node (a, b) -> add_to_tree a t1
+
+   (* and merge_tree_list : 'a tree list -> 'a tree list -> 'a tree list =
+   fun l1 l2 -> *)
+   and merge_tree_list (l1 : int tree list) (l2 : int tree list) : int tree list =
+   match l1, l2 with
+   | [], [] -> []
+   | _ :: _, [] -> l1
+   | [], _ :: _ -> l2
+   | h1 :: t1, h2 :: t2 -> merge_tree h1 h2 :: merge_tree_list t1 t2
+   ;; *)
 
 let rec pstr_int_tree (t : int tree) : string =
   match t with
@@ -854,7 +948,25 @@ struct
                    | Some ctor' ->
                      (match ctor, ctor' with
                       | (act, tgt, int_tree), (_act', _tgt', int_tree') ->
-                        (act, tgt, merge_tree int_tree int_tree') :: acc')
+                        let merged_tree : int tree =
+                          add_to_tree int_tree int_tree'
+                        in
+                        if Bool.not (tree_eq int_tree int_tree')
+                        then (
+                          params.override <- Some ();
+                          log
+                            ~params
+                            (Printf.sprintf
+                               "build_constrs_tree_list, different int tree \
+                                found:\n\
+                                existing: %s\n\
+                                new: %s\n\
+                                merged: %s"
+                               (pstr_int_tree int_tree)
+                               (pstr_int_tree int_tree')
+                               (pstr_int_tree merged_tree));
+                          params.override <- None);
+                        (act, tgt, merged_tree) :: acc')
                      (* add if new *)
                    | None -> ctor :: acc'))
                (run acc)
@@ -864,17 +976,93 @@ struct
   ;;
 
   (** [get_new_states g t constrs] is the new set of states to explore (that are not already explored). *)
+  (* let _get_new_states_and_transitions
+    ?(params : Params.log = default_params)
+    (t : EConstr.t)
+    (g : lts_graph)
+    (* (transitions : lts_transition H.t) *)
+      (ctors : coq_ctor list)
+    : (lts_transition H.t * S.t) mm
+    =
+    (* let new_states : S.t ref = ref (S.singleton t) in *)
+    let get_transition_id : unit -> int = new_int_counter () in
+    (* let* sigma = get_sigma in *)
+    (* TODO: change the below to use the iterate from mebi. (see check_valid_constructor) *)
+    let iter_body'
+      (i : int)
+      ((transitions, acc_states) : lts_transition H.t * S.t)
+      =
+      let* sigma = get_sigma in
+      match List.nth_opt ctors i with
+      | None ->
+        log
+          ~params
+          (Printf.sprintf
+             "get_new_states, iter body None for (%d) out of (%d) ctors."
+             i
+             (List.length ctors));
+        return (transitions, acc_states)
+      | Some (act, tgt, int_tree) ->
+        log
+          ~params
+          (Printf.sprintf
+             "get_new_states, iter body Some (%s, %s, %s) for (%d) out of (%d) \
+              ctors."
+             (econstr_to_string act)
+             (econstr_to_string tgt)
+             (pstr_int_tree int_tree)
+             i
+             (List.length ctors));
+        let new_states : S.t = S.add tgt acc_states in
+        let to_add : action =
+          Fsm.Create.action
+            ~is_tau:false
+            ~annotation:[]
+            (Of (get_transition_id (), econstr_to_string act))
+        in
+        (match H.find_opt transitions t with
+         | None ->
+           H.add
+             transitions
+             t
+             { action = to_add; index_tree = int_tree; destination = tgt }
+         | Some lt ->
+           (match lt with
+            | { action; destination; index_tree } ->
+              if EConstr.eq_constr sigma tgt destination
+              then
+                (* () *)
+                H.replace
+                  g.transitions
+                  t
+                  { action
+                  ; index_tree = merge_tree index_tree int_tree
+                  ; destination
+                  }
+              else
+                H.add
+                  transitions
+                  t
+                  { action = to_add; index_tree = int_tree; destination = tgt }));
+        (* if [tgt] is new state, add to [new_states] *)
+        if H.mem transitions tgt || EConstr.eq_constr sigma tgt t
+        then ()
+        else Queue.push tgt g.to_visit;
+        return (transitions, new_states)
+    in
+    iterate 0 (List.length ctors - 1) (g.transitions, S.empty) iter_body'
+  ;; *)
+
   let get_new_states
     ?(params : Params.log = default_params)
-    (g : lts_graph)
     (t : EConstr.t)
-    (constrs : coq_ctor list)
-    : (lts_graph * S.t) mm
+    (g : lts_graph)
+    (ctors : coq_ctor list)
+    : S.t mm
     =
     let new_states : S.t ref = ref (S.singleton t) in
     let get_transition_id : unit -> int = new_int_counter () in
     let* sigma = get_sigma in
-    (* TODO: change the below to use the iterate from mebi. (see check_valid_constructor) *)
     List.iter
       (fun ((act, tgt, int_tree) : coq_ctor) ->
         new_states := S.add tgt !new_states;
@@ -903,15 +1091,66 @@ struct
            (match lt with
             | { action; destination; index_tree } ->
               if EConstr.eq_constr sigma tgt destination
-              then
-                ()
-                (* H.replace
+              then (
+                params.override <- Some ();
+                log
+                  ~params
+                  (Printf.sprintf
+                     "get_new_states, found match for t in g.transitions, \n\
+                      where t: %s\n\
+                      and the new transition is:\n\
+                      act: %s\n\
+                      tgt: %s\n\
+                      int_tree: %s\n\n\
+                      and the existing transition is:\n\
+                      action: %s\n\
+                      destination: %s\n\
+                      index_tree: %s\n\n\n\
+                      ============"
+                     (econstr_to_string t)
+                     (econstr_to_string act)
+                     (econstr_to_string destination)
+                     (pstr_int_tree int_tree)
+                     action.label
+                     (econstr_to_string destination)
+                     (pstr_int_tree index_tree));
+                if Bool.not (tree_eq index_tree int_tree)
+                then
+                  if Bool.not (tree_eq int_tree index_tree)
+                  then (
+                    let merged_tree : int tree =
+                      add_to_tree index_tree int_tree
+                    in
+                    params.override <- Some ();
+                    log
+                      ~params
+                      (Printf.sprintf
+                         "build_constrs_tree_list, different int tree found:\n\
+                          existing: %s\n\
+                          new: %s\n\
+                          merged: %s"
+                         (pstr_int_tree index_tree)
+                         (pstr_int_tree int_tree)
+                         (pstr_int_tree merged_tree));
+                    params.override <- None
+                    (* log
+                       ~params
+                       (Printf.sprintf
+                       "int trees are different, merging into: %s."
+                       (pstr_int_tree merged_tree)) *)
+                    (* (Printf.sprintf "int trees are different, could merge.") *)
+                    (* H.replace
+                    g.transitions
+                    t
+                    { action; index_tree = merged_tree; destination } *)
+                    (* H.replace
                   g.transitions
                   t
                   { action
                   ; index_tree = merge_tree index_tree int_tree
                   ; destination
-                  } *)
+                  } *));
+                params.override <- None)
               else
                 H.add
                   g.transitions
@@ -921,8 +1160,8 @@ struct
         if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
         then ()
         else Queue.push tgt g.to_visit)
-      constrs;
-    return (g, !new_states)
+      ctors;
+    return !new_states
   ;;
 
   (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
@@ -938,12 +1177,16 @@ struct
     : lts_graph mm
     =
     params.kind <- Debug ();
+    (* params.override <- Some (); *)
+    log ~params "build_lts_graph A";
     if Queue.is_empty g.to_visit
     then return g (* finished if no more to visit*)
     else if S.cardinal g.states > bound
     then return g (* exit if bound reached *)
     else
       let* (t : EConstr.t) = return (Queue.pop g.to_visit) in
+      (* params.override <- Some (); *)
+      log ~params "build_lts_graph B";
       let* (constrs : coq_ctor list) =
         build_constrs_tree_list ~params t fn_rlts
       in
@@ -953,13 +1196,24 @@ struct
         then debug_output_constrs constrs
         else return ()
       in
+      log ~params "build_lts_graph C";
       (* params.override <- None; *)
-      let* (g, new_states) : lts_graph * S.t =
-        get_new_states ~params g t constrs
+      (* let* (new_transitions, new_states) : lts_transition H.t * S.t =
+         get_new_states_and_transitions ~params t g constrs
+         in *)
+      let* (new_states : S.t) = get_new_states ~params t g constrs in
+      let g =
+        { g with
+          states =
+            S.union g.states new_states (* ; transitions = new_transitions *)
+        }
       in
-      let g = { g with states = S.union g.states new_states } in
       build_lts_graph ~params fn_rlts g bound
   ;;
+
+  exception
+    CoqTermDoesNotMatchSemantics of
+      (Constrexpr.constr_expr * EConstr.t * term_type_map * term_type_map)
 
   (** [build_graph tr_rlts fn_rlts tref bound] is the entry point for [build_lts_graph].
       @param tr_rlts maps coq-term types to [raw_lts].
@@ -976,17 +1230,30 @@ struct
     : lts_graph mm
     =
     let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
-    let rlts = Hashtbl.find tr_rlts (run (Mebi_utils.type_of_tref tref)) in
-    (* update environment by typechecking *)
-    let$* u env sigma = Typing.check env sigma t rlts.trm_type in
-    let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
-    let q = Queue.create () in
-    let* _ = return (Queue.push t q) in
-    build_lts_graph
-      ~params
-      fn_rlts
-      { to_visit = q; states = S.empty; transitions = H.create bound }
-      bound
+    match Hashtbl.find_opt tr_rlts (run (Mebi_utils.type_of_tref tref)) with
+    | None ->
+      log
+        ~params
+        (Printf.sprintf
+           "build_graph, ERROR: could not find rlts matching:\n\
+            \tt of tref: %s\n\
+            where tr_lts (keys): %s\n\
+            and fn_rlts (keys): %s."
+           (econstr_to_string t)
+           (Utils.pstr_keys (Utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts)))
+           (Utils.pstr_keys (Utils.OfEConstr (Hashtbl.to_seq_keys fn_rlts))));
+      raise (CoqTermDoesNotMatchSemantics (tref, t, tr_rlts, fn_rlts))
+    | Some rlts ->
+      (* update environment by typechecking *)
+      let$* u env sigma = Typing.check env sigma t rlts.trm_type in
+      let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
+      let q = Queue.create () in
+      let* _ = return (Queue.push t q) in
+      build_lts_graph
+        ~params
+        fn_rlts
+        { to_visit = q; states = S.empty; transitions = H.create bound }
+        bound
   ;;
 
   (*
