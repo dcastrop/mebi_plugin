@@ -143,22 +143,22 @@ Inductive step :
 
 (** [tm1] will keep waiting until [n] in state is 0, *)
 Example tm1 : tm :=
-  DEF 0 (
-    SEQ (
+  SEQ (
+    DEF 0 (
       IF N_IS_ZERO (
         ACT INC_N (* inc n by one, continue to enter *)
       ) (
         REC 0 (* go back to beginning, wait until can enter *)
       )
-    ) (
-      SEQ (ACT ENTER) (
-        SEQ (ACT (SET_V 5)) (
-          DEF 1 (
-            IF V_IS_ZERO (
-              SEQ (ACT LEAVE) (ACT DEC_N) (* leave and dec n by one *)
-            ) (
-              SEQ (ACT DEC_V) (REC 1) (* dec v by one, loop *)
-            )
+    )
+  ) (
+    SEQ (ACT ENTER) (
+      SEQ (ACT (SET_V 5)) (
+        DEF 1 (
+          IF V_IS_ZERO (
+            SEQ (ACT LEAVE) (ACT DEC_N) (* leave and dec n by one *)
+          ) (
+            SEQ (ACT DEC_V) (REC 1) (* dec v by one, loop *)
           )
         )
       )
@@ -230,7 +230,7 @@ Example e3 : sys :=
     (PRC (tm1, 0, 0))
   ).
 
-MeBi Dump "e3" LTS Bounded 350 Of e3 Using lts step.
+MeBi Dump "e3" LTS Bounded 500 Of e3 Using lts step.
 
 (*  *)
 Example e4 : sys :=
@@ -240,7 +240,7 @@ Example e4 : sys :=
     )
   ).
 
-MeBi Dump "e4" LTS Bounded 500 Of e4 Using lts step.
+(* MeBi Dump "e4" LTS Bounded 500 Of e4 Using lts step. *)
 
 (*  *)
 Example e5 : sys :=
@@ -250,7 +250,7 @@ Example e5 : sys :=
     )
   ).
 
-MeBi Dump "e5" LTS Bounded 2000 Of e5 Using lts step.
+(* MeBi Dump "e5" LTS Bounded 2000 Of e5 Using lts step. *)
 
 (*  *)
 Example e6 : sys :=
@@ -258,7 +258,7 @@ Example e6 : sys :=
     (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))
     (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0)).
 
-MeBi Dump "e6" LTS Bounded 500 Of e6 Using lts step.
+(* MeBi Dump "e6" LTS Bounded 500 Of e6 Using lts step. *)
 
 
 (*  *)
@@ -269,7 +269,7 @@ Example e7 : sys :=
       (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))
       (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))).
 
-MeBi Dump "e7" LTS Bounded 500 Of e7 Using lts step.
+(* MeBi Dump "e7" LTS Bounded 500 Of e7 Using lts step. *)
 
 
 (* MeBi Dump "e2" LTS sys_equiv Bounded 350 Of e2 Using lts step. *)
