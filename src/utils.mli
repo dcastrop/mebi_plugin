@@ -52,6 +52,7 @@ module Logging : sig
   val log : ?params:params -> string -> unit
 
   module Log : sig
+    val normal : ?params:params -> string -> unit
     val warning : ?params:params -> string -> unit
     val debug : ?params:params -> string -> unit
     val details : ?params:params -> string -> unit
