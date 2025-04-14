@@ -171,28 +171,44 @@ module Logging = struct
   ;;
 
   module Log = struct
+    let normal ?(params : params = default_params ()) (to_log : string) : unit =
+      let stashed_kind = params.kind in
+      log
+        ~params:
+          (params.kind <- Normal ();
+           params)
+        to_log;
+      params.kind <- stashed_kind
+    ;;
+
     let warning ?(params : params = default_params ()) (to_log : string) : unit =
+      let stashed_kind = params.kind in
       log
         ~params:
           (params.kind <- Warning ();
            params)
-        to_log
+        to_log;
+      params.kind <- stashed_kind
     ;;
 
     let debug ?(params : params = default_params ()) (to_log : string) : unit =
+      let stashed_kind = params.kind in
       log
         ~params:
           (params.kind <- Debug ();
            params)
-        to_log
+        to_log;
+      params.kind <- stashed_kind
     ;;
 
     let details ?(params : params = default_params ()) (to_log : string) : unit =
+      let stashed_kind = params.kind in
       log
         ~params:
           (params.kind <- Details ();
            params)
-        to_log
+        to_log;
+      params.kind <- stashed_kind
     ;;
   end
 end

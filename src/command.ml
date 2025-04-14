@@ -155,20 +155,20 @@ let m_unify
   : bool mm
   =
   params.kind <- Debug ();
-  let* _ =
-    if is_output_kind_enabled params
-    then
-      debug (fun (env : Environ.env) (sigma : Evd.evar_map) ->
-        str "Unifying (t0) :: "
-        ++ Printer.pr_econstr_env env sigma t0
-        ++ strbrk "\nUnifying (t1) :: "
-        ++ Printer.pr_econstr_env env sigma t1)
-    else return ()
-  in
+  (* let* _ =
+     if is_output_kind_enabled params
+     then
+     debug (fun (env : Environ.env) (sigma : Evd.evar_map) ->
+     str "Unifying (t0) :: "
+     ++ Printer.pr_econstr_env env sigma t0
+     ++ strbrk "\nUnifying (t1) :: "
+     ++ Printer.pr_econstr_env env sigma t1)
+     else return ()
+     in *)
   state (fun (env : Environ.env) (sigma : Evd.evar_map) ->
     try
       let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
-      log ~params "\t\tSuccess";
+      (* log ~params "\t\tSuccess"; *)
       sigma, true
     with
     | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify (m, n, e))
@@ -265,16 +265,16 @@ let rec unify_all
   match i with
   | [] -> return (Some [])
   | (ctor_tree, u) :: t ->
-    let* _ =
-      if is_output_kind_enabled params
-      then
-        debug (fun env sigma ->
-          str "UNIFYALL (termL) :::::::::: "
-          ++ Printer.pr_econstr_env env sigma u.termL
-          ++ strbrk "\nUNIFYALL (termR) :::::::::: "
-          ++ Printer.pr_econstr_env env sigma u.termR)
-      else return ()
-    in
+    (* let* _ =
+       if is_output_kind_enabled params
+       then
+       debug (fun env sigma ->
+       str "UNIFYALL (termL) :::::::::: "
+       ++ Printer.pr_econstr_env env sigma u.termL
+       ++ strbrk "\nUNIFYALL (termR) :::::::::: "
+       ++ Printer.pr_econstr_env env sigma u.termR)
+       else return ()
+       in *)
     let* success = m_unify ~params u.termL u.termR in
     if success
     then
@@ -291,14 +291,13 @@ let sandboxed_unify
   (u : (int tree * unif_problem) list)
   : (EConstr.t * int tree list) option mm
   =
-  params.kind <- Debug ();
-  let* _ =
-    if is_output_kind_enabled params
-    then
-      debug (fun env sigma ->
-        str "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term)
-    else return ()
-  in
+  (* let* _ =
+     if is_output_kind_enabled params
+     then
+     debug (fun env sigma ->
+     str "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term)
+     else return ()
+     in *)
   sandbox
     (let* success = unify_all ~params u in
      match success with
@@ -410,16 +409,16 @@ and check_valid_constructor
   params.kind <- Debug ();
   let$+ t env sigma = Reductionops.nf_all env sigma t' in
   let iter_body (i : int) (ctor_vals : coq_ctor list) =
-    let* _ =
-      if is_output_kind_enabled params
-      then
-        debug (fun env sigma ->
-          str "CHECKING CONSTRUCTOR "
-          ++ int i
-          ++ str ". Term: "
-          ++ Printer.pr_econstr_env env sigma t)
-      else return ()
-    in
+    (* let* _ =
+       if is_output_kind_enabled params
+       then
+       debug (fun env sigma ->
+       str "CHECKING CONSTRUCTOR "
+       ++ int i
+       ++ str ". Term: "
+       ++ Printer.pr_econstr_env env sigma t)
+       else return ()
+       in *)
     let ctx, tm = ctor_transitions.(i) in
     let ctx_tys = List.map EConstr.of_rel_decl ctx in
     let* substl = mk_ctx_substl [] (List.rev ctx_tys) in
@@ -766,21 +765,24 @@ struct
     return !g
   ;; *)
 
-  let debug_output_constrs (constrs : coq_ctor list) : unit mm =
+  let _debug_output_constrs (t : EConstr.t) (constrs : coq_ctor list) : unit mm =
     debug (fun env sigma ->
       str
         (Printf.sprintf
-           "---- (returned from check_valid_constructor)\n\n\
-            build_lts_graph: constrs: [%s] (length %d).\n"
+           "---- (returned from check_valid_constructor)\n\
+            build_lts_graph, t: %s\n\
+            constrs of t: [%s\n\
+            ] (length %d).\n"
+           (econstr_to_string t)
            (List.fold_left
               (fun (acc : string) ((act, ctor, int_tree) : coq_ctor) ->
                 Printf.sprintf
-                  "%s   (%s ::\n    %s[%s])\n"
+                  "%s\n- ctor_index_tree: %s\n  act:%s\n  ctors: %s\n"
                   acc
                   (pstr_int_tree int_tree)
-                  (econstr_to_string ctor)
-                  "..." (* (econstr_to_string act) *))
-              "\n"
+                  (econstr_to_string act)
+                  (econstr_to_string ctor))
+              ""
               constrs)
            (List.length constrs)))
   ;;
@@ -881,12 +883,72 @@ struct
     (ctors : coq_ctor list)
     : S.t mm
     =
+    let get_transition_id : unit -> int = new_int_counter () in
+    let iter_body (i : int) (new_states : S.t) =
+      let (act, tgt, int_tree) : coq_ctor = List.nth ctors i in
+      let new_states : S.t = S.add tgt new_states in
+      let* sigma = get_sigma in
+      (* TODO: detect tau transitions and then defer to [Fsm.tau] instead. *)
+      let to_add : action =
+        Fsm.Create.action
+          ~is_tau:false
+          ~annotation:[]
+          (Of (get_transition_id (), econstr_to_string act))
+      in
+      (match H.find_opt g.transitions t with
+       | None ->
+         H.add
+           g.transitions
+           t
+           { action = to_add; index_tree = int_tree; destination = tgt };
+         (* if [tgt] is new state, add to [new_states] *)
+         if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
+         then ()
+         else Queue.push tgt g.to_visit
+       | Some lt ->
+         (* () *)
+         (match lt with
+          | { action; destination; index_tree } ->
+            if Bool.not (tree_eq int_tree index_tree)
+            then (
+              (* if [tgt] is new state, add to [new_states] *)
+              if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
+              then ()
+              else Queue.push tgt g.to_visit;
+              H.add
+                g.transitions
+                t
+                { action = to_add; index_tree = int_tree; destination = tgt })));
+      return new_states
+    in
+    (* ) *)
+    (* ctors; *)
+    (* return !new_states *)
+    (* let new_states : S.t ref = ref (S.singleton t) in *)
+    iterate 0 (List.length ctors - 1) (S.singleton t) iter_body
+  ;;
+
+  let _get_new_states
+    ?(params : Params.log = default_params)
+    (t : EConstr.t)
+    (g : lts_graph)
+    (ctors : coq_ctor list)
+    : S.t mm
+    =
     let new_states : S.t ref = ref (S.singleton t) in
     let get_transition_id : unit -> int = new_int_counter () in
     let* sigma = get_sigma in
     List.iter
       (fun ((act, tgt, int_tree) : coq_ctor) ->
+        (* let old_states = !new_states in *)
         new_states := S.add tgt !new_states;
+        (* log
+           ~params
+           (Printf.sprintf
+           "get_new_states, t: %s\nold new states: %s\nnew new states: %s"
+           (econstr_to_string t)
+           (run (PStr.states ~params:(Log params) old_states))
+           (run (PStr.states ~params:(Log params) old_states))); *)
         (* TODO: detect tau transitions and then defer to [Fsm.tau] instead. *)
         let to_add : action =
           Fsm.Create.action
@@ -894,25 +956,37 @@ struct
             ~annotation:[]
             (Of (get_transition_id (), econstr_to_string act))
         in
-        (match H.find_opt g.transitions t with
-         | None ->
-           H.add
-             g.transitions
-             t
-             { action = to_add; index_tree = int_tree; destination = tgt }
-         | Some lt ->
-           (match lt with
-            | { action; destination; index_tree } ->
-              if Bool.not (EConstr.eq_constr sigma tgt destination)
+        match H.find_opt g.transitions t with
+        | None ->
+          H.add
+            g.transitions
+            t
+            { action = to_add; index_tree = int_tree; destination = tgt };
+          (* if [tgt] is new state, add to [new_states] *)
+          if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
+          then ()
+          else Queue.push tgt g.to_visit
+        | Some lt ->
+          (* () *)
+          (match lt with
+           | { action; destination; index_tree } ->
+             if Bool.not (tree_eq int_tree index_tree)
+             then (
+               (* if [tgt] is new state, add to [new_states] *)
+               if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
+               then ()
+               else Queue.push tgt g.to_visit;
+               H.add
+                 g.transitions
+                 t
+                 { action = to_add; index_tree = int_tree; destination = tgt }))
+        (*
+           if Bool.not (EConstr.eq_constr sigma tgt destination)
               then
                 H.add
                   g.transitions
                   t
-                  { action = to_add; index_tree = int_tree; destination = tgt }));
-        (* if [tgt] is new state, add to [new_states] *)
-        if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
-        then ()
-        else Queue.push tgt g.to_visit)
+                  { action = to_add; index_tree = int_tree; destination = tgt }) *))
       ctors;
     return !new_states
   ;;
@@ -939,11 +1013,11 @@ struct
       let* (constrs : coq_ctor list) =
         build_constrs_tree_list ~params t fn_rlts
       in
-      let* _ =
-        if is_output_kind_enabled params
-        then debug_output_constrs constrs
-        else return ()
-      in
+      (* let* _ =
+         if is_output_kind_enabled params
+         then debug_output_constrs t constrs
+         else return ()
+         in *)
       let* (new_states : S.t) = get_new_states ~params t g constrs in
       let g = { g with states = S.union g.states new_states } in
       build_lts_graph ~params fn_rlts g bound
@@ -1068,6 +1142,9 @@ struct
       : (Lts.lts * coq_translation) mm
       =
       params.kind <- Debug ();
+      if List.mem name [ "e3"; "e4" ]
+      then params.override <- Some ()
+      else params.override <- None;
       (* abort if lts not complete *)
       (* if Bool.not (Queue.is_empty g.to_visit)
          then (
@@ -1096,8 +1173,9 @@ struct
         Log.warning
           ~params
           (Printf.sprintf
-             "lts is not complete using bound (%d), still had at least (%d) \
-              terms to visit."
+             "LTS (%s) is not complete using bound (%d), still had at least \
+              (%d) terms to visit."
+             name
              bound
              to_visit);
         (* dump lts to *)
@@ -1179,20 +1257,20 @@ let build_bounded_lts
          "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
          bound);
   (* show edges *)
-  log
-    ~params
-    (Printf.sprintf
-       "(e) Graph Edges: %s.\n"
-       (run (G.PStr.transitions ~params:(Log params) graph_lts.transitions)));
+  (* log
+     ~params
+     (Printf.sprintf
+     "(e) Graph Edges: %s.\n"
+     (run (G.PStr.transitions ~params:(Log params) graph_lts.transitions))); *)
   (* show if normal output allowed from outside call *)
   if params.options.show_debug_output
   then params.kind <- Details ()
   else params.kind <- Normal ();
-  log
-    ~params
-    (Printf.sprintf
-       "Constructed LTS: %s.\n"
-       (run (G.PStr.lts ~params:(Log params) graph_lts)));
+  (* log
+     ~params
+     (Printf.sprintf
+     "Constructed LTS: %s.\n"
+     (run (G.PStr.lts ~params:(Log params) graph_lts))); *)
   (* pure lts *)
   let* the_pure_lts, coq_translation =
     G.DeCoq.lts_graph_to_lts ~params ~bound ~name graph_lts tref
@@ -1257,7 +1335,7 @@ module Vernac = struct
         (Printf.sprintf
            "(B) type of tref: %s"
            (econstr_to_string (run (Mebi_utils.type_of_tref tref))));
-      params.override <- None;
+      if Bool.not (List.mem name [ "e3"; "e4" ]) then params.override <- None;
       (* graph module *)
       let* graphM = make_graph_builder in
       let module G = (val graphM) in
@@ -1310,8 +1388,15 @@ module Vernac = struct
         params.options.output_enabled <- true;
         params.kind <- Normal ();
         params.override <- Some ();
-        log ~params (Printf.sprintf "Dumped LTS into: %s.\n" dump_filepath))
-      else log ~params "Incomplete, LTS should already be dumped.\n";
+        Log.normal
+          ~params
+          (Printf.sprintf "Dumped LTS into: %s.\n" dump_filepath))
+      else
+        Log.normal
+          ~params
+          (Printf.sprintf
+             "Incomplete, LTS (%s) should already be dumped.\n"
+             name);
       return ()
     ;;
   end

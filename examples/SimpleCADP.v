@@ -167,7 +167,7 @@ Example tm1 : tm :=
 
 Example e1 : tm * nat * nat := (tm1, 0, 0).
 
-MeBi Show LTS Bounded 150 Of e1 Using step.
+(* MeBi Show LTS Bounded 150 Of e1 Using step. *)
 MeBi Dump "e1" LTS Bounded 150 Of e1 Using step.
 (* MeBi Dump "e1" FSM Bounded 150 Of e1 Using step. *)
 
@@ -250,7 +250,7 @@ Example e5 : sys :=
     )
   ).
 
-(* MeBi Dump "e5" LTS Bounded 2000 Of e5 Using lts step. *)
+MeBi Dump "e5" LTS Bounded 2000 Of e5 Using lts step.
 
 (*  *)
 Example e6 : sys :=
