@@ -169,6 +169,32 @@ module Logging = struct
              else Printf.sprintf "%s :: \n" (pstr_scope scope))
             msg_to_log)
   ;;
+
+  module Log = struct
+    let warning ?(params : params = default_params ()) (to_log : string) : unit =
+      log
+        ~params:
+          (params.kind <- Warning ();
+           params)
+        to_log
+    ;;
+
+    let debug ?(params : params = default_params ()) (to_log : string) : unit =
+      log
+        ~params:
+          (params.kind <- Debug ();
+           params)
+        to_log
+    ;;
+
+    let details ?(params : params = default_params ()) (to_log : string) : unit =
+      log
+        ~params:
+          (params.kind <- Details ();
+           params)
+        to_log
+    ;;
+  end
 end
 
 module Formatting = struct
@@ -291,4 +317,17 @@ let new_int_counter () : unit -> int =
     to_return
   in
   get_and_incr_counter
+;;
+
+type keys_kind = OfEConstr of EConstr.t Seq.t
+
+(** pstr a seq of keys *)
+let pstr_keys (keys : keys_kind) : string =
+  match keys with
+  | OfEConstr keys ->
+    Seq.fold_left
+      (fun (acc : string) (k : EConstr.t) ->
+        Printf.sprintf "%s, %s" acc (Mebi_utils.econstr_to_string k))
+      ""
+      keys
 ;;

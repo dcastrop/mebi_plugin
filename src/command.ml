@@ -207,26 +207,38 @@ type unif_problem =
   ; termR : EConstr.t
   }
 
-(* let rec pstr_unif_problem (t : unif_problem) : string =
+let _pstr_unif_problem (t : unif_problem) : string =
   match t with
   | { termL; termR; _ } ->
     Printf.sprintf
       "{ L: %s;\n  R: %s; }"
       (econstr_to_string termL)
       (econstr_to_string termR)
-;; *)
+;;
 
 type 'a tree = Node of 'a * 'a tree list
 
-let merge_tree (t1 : 'a tree) (t2 : 'a tree) : 'a tree =
-  match t1 with
-  | Node (a1, b1) -> Node (a1, t1 :: b1)
+let rec tree_eq (t1 : int tree) (t2 : int tree) : bool =
+  match t1, t2 with
+  | Node (a1, b1), Node (a2, b2) -> a1 == a2 && tree_list_eq b1 b2
+
+and tree_list_eq (l1 : int tree list) (l2 : int tree list) : bool =
+  match l1, l2 with
+  | [], [] -> true
+  | h1 :: t1, h2 :: t2 -> tree_eq h1 h2 && tree_list_eq t1 t2
+  | _, _ -> false
 ;;
 
-(* type unif_tree =
-   | Tree of int tree
-   | Start
-   | Failed *)
+let rec _tree_contains (i : int) (t : int tree) : bool =
+  match t with
+  | Node (j, l) ->
+    if i == j
+    then true
+    else (
+      match l with
+      | [] -> false
+      | l -> List.for_all (fun (s : int tree) -> _tree_contains i s) l)
+;;
 
 let rec pstr_int_tree (t : int tree) : string =
   match t with
@@ -797,27 +809,46 @@ struct
       - if already in [acc], then skip.
       - if another in [acc] has matching [act] and [tgt] fields, then merge [int tree].
       - else just add to [acc]. *)
-  (* let merge_constrs_tree_lists (acc : coq_ctor list) (ctors : coq_ctor list)
-     : coq_ctor list
-     =
-     List.fold_left
-     (fun (acc' : coq_ctor list) (ctor : coq_ctor) ->
-     (* skip if already in [acc'] *)
-     if List.mem ctor acc'
-     then acc'
-     else (
-     let (opt_ctor : coq_ctor option) = run (find_opt_ctor ctor acc') in
-     match opt_ctor with
-     (* merge [int tree] if already exists *)
-     | Some ctor' ->
-     (match ctor, ctor' with
-     | (act, tgt, int_tree), (_act', _tgt', int_tree') ->
-     (act, tgt, merge_tree int_tree int_tree') :: acc')
-     (* add if new *)
-     | None -> ctor :: acc'))
-     acc
-     ctors
-     ;; *)
+  let merge_constrs_tree_lists
+    ?(params : Params.log = default_params)
+    (t : EConstr.t)
+    (acc : coq_ctor list)
+    (ctors : coq_ctor list)
+    : coq_ctor list
+    =
+    List.fold_left
+      (fun (acc' : coq_ctor list) (ctor : coq_ctor) ->
+        (* skip if already in [acc'] *)
+        if List.mem ctor acc'
+        then acc'
+        else (
+          let (opt_ctor : coq_ctor option) = run (find_opt_ctor ctor acc') in
+          match opt_ctor with
+          (* merge [int tree] if already exists *)
+          | Some ctor' ->
+            (match ctor, ctor' with
+             | (act, tgt, int_tree), (_act', _tgt', int_tree') ->
+               if Bool.not (tree_eq int_tree int_tree')
+               then (
+                 Log.warning
+                   ~params
+                   (Printf.sprintf
+                      "merge_constrs_tree_lists, different int tree found for \
+                       t: %s\n\
+                       existing: %s\n\
+                       new: %s.\n\
+                       kept the original (i.e., %s)"
+                      (econstr_to_string t)
+                      (pstr_int_tree int_tree)
+                      (pstr_int_tree int_tree')
+                      (pstr_int_tree int_tree));
+                 params.kind <- Normal ());
+               (act, tgt, int_tree) :: acc')
+            (* add if new *)
+          | None -> ctor :: acc'))
+      acc
+      ctors
+  ;;
 
   (** *)
   let build_constrs_tree_list
@@ -837,44 +868,22 @@ struct
             None
         in
         if List.is_empty ctors
-        then acc (* else return (merge_constrs_tree_lists (run acc) ctors) *)
-        else
-          return
-            (List.fold_left
-               (fun (acc' : coq_ctor list) (ctor : coq_ctor) ->
-                 (* skip if already in [acc'] *)
-                 if List.mem ctor acc'
-                 then acc'
-                 else (
-                   let (opt_ctor : coq_ctor option) =
-                     run (find_opt_ctor ctor acc')
-                   in
-                   match opt_ctor with
-                   (* merge [int tree] if already exists *)
-                   | Some ctor' ->
-                     (match ctor, ctor' with
-                      | (act, tgt, int_tree), (_act', _tgt', int_tree') ->
-                        (act, tgt, merge_tree int_tree int_tree') :: acc')
-                     (* add if new *)
-                   | None -> ctor :: acc'))
-               (run acc)
-               ctors))
+        then acc
+        else return (merge_constrs_tree_lists t (run acc) ctors))
       fn_rlts
       (return [])
   ;;
 
-  (** [get_new_states g t constrs] is the new set of states to explore (that are not already explored). *)
   let get_new_states
     ?(params : Params.log = default_params)
-    (g : lts_graph)
     (t : EConstr.t)
-    (constrs : coq_ctor list)
-    : (lts_graph * S.t) mm
+    (g : lts_graph)
+    (ctors : coq_ctor list)
+    : S.t mm
     =
     let new_states : S.t ref = ref (S.singleton t) in
     let get_transition_id : unit -> int = new_int_counter () in
     let* sigma = get_sigma in
-    (* TODO: change the below to use the iterate from mebi. (see check_valid_constructor) *)
     List.iter
       (fun ((act, tgt, int_tree) : coq_ctor) ->
         new_states := S.add tgt !new_states;
@@ -885,14 +894,6 @@ struct
             ~annotation:[]
             (Of (get_transition_id (), econstr_to_string act))
         in
-        (* if new transition, add to [g] *)
-        (* if Bool.not (H.mem g.transitions t)
-        then
-          H.add
-            g.transitions
-            t
-            { action = to_add; index_tree = int_tree; destination = tgt }; *)
-        (* TODO: bottom appears to cause stall on complicated terms *)
         (match H.find_opt g.transitions t with
          | None ->
            H.add
@@ -902,17 +903,8 @@ struct
          | Some lt ->
            (match lt with
             | { action; destination; index_tree } ->
-              if EConstr.eq_constr sigma tgt destination
+              if Bool.not (EConstr.eq_constr sigma tgt destination)
               then
-                ()
-                (* H.replace
-                  g.transitions
-                  t
-                  { action
-                  ; index_tree = merge_tree index_tree int_tree
-                  ; destination
-                  } *)
-              else
                 H.add
                   g.transitions
                   t
@@ -921,8 +913,8 @@ struct
         if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
         then ()
         else Queue.push tgt g.to_visit)
-      constrs;
-    return (g, !new_states)
+      ctors;
+    return !new_states
   ;;
 
   (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
@@ -947,19 +939,19 @@ struct
       let* (constrs : coq_ctor list) =
         build_constrs_tree_list ~params t fn_rlts
       in
-      (* params.override <- Some (); *)
       let* _ =
         if is_output_kind_enabled params
         then debug_output_constrs constrs
         else return ()
       in
-      (* params.override <- None; *)
-      let* (g, new_states) : lts_graph * S.t =
-        get_new_states ~params g t constrs
-      in
+      let* (new_states : S.t) = get_new_states ~params t g constrs in
       let g = { g with states = S.union g.states new_states } in
       build_lts_graph ~params fn_rlts g bound
   ;;
+
+  exception
+    CoqTermDoesNotMatchSemantics of
+      (Constrexpr.constr_expr * EConstr.t * term_type_map * term_type_map)
 
   (** [build_graph tr_rlts fn_rlts tref bound] is the entry point for [build_lts_graph].
       @param tr_rlts maps coq-term types to [raw_lts].
@@ -976,26 +968,32 @@ struct
     : lts_graph mm
     =
     let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
-    let rlts = Hashtbl.find tr_rlts (run (Mebi_utils.type_of_tref tref)) in
-    (* update environment by typechecking *)
-    let$* u env sigma = Typing.check env sigma t rlts.trm_type in
-    let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
-    let q = Queue.create () in
-    let* _ = return (Queue.push t q) in
-    build_lts_graph
-      ~params
-      fn_rlts
-      { to_visit = q; states = S.empty; transitions = H.create bound }
-      bound
+    match Hashtbl.find_opt tr_rlts (run (Mebi_utils.type_of_tref tref)) with
+    | None ->
+      Log.warning
+        ~params
+        (Printf.sprintf
+           "build_graph, ERROR: could not find rlts matching:\n\
+            \tt of tref: %s\n\
+            where tr_lts (keys): %s\n\
+            and fn_rlts (keys): %s."
+           (econstr_to_string t)
+           (Utils.pstr_keys (Utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts)))
+           (Utils.pstr_keys (Utils.OfEConstr (Hashtbl.to_seq_keys fn_rlts))));
+      raise (CoqTermDoesNotMatchSemantics (tref, t, tr_rlts, fn_rlts))
+    | Some rlts ->
+      (* update environment by typechecking *)
+      let$* u env sigma = Typing.check env sigma t rlts.trm_type in
+      let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
+      let q = Queue.create () in
+      let* _ = return (Queue.push t q) in
+      build_lts_graph
+        ~params
+        fn_rlts
+        { to_visit = q; states = S.empty; transitions = H.create bound }
+        bound
   ;;
 
-  (*
-     TODO: refactor the above, using the new [Fsm.Create] and [Fsm.New] functions
-     - this will ensure that there are no duplicate states or actions and such
-     - first, just translate this graph_lts to a [Lts.lts] (composed of just strings)
-     - maybe [MkGraph] provides a record for converting to [Lts.lts].
-       Then it is simple to use [Translate.to_fsm]
-  *)
   module DeCoq = struct
     type coq_translation =
       { from_coq : (EConstr.t, string) Hashtbl.t
@@ -1005,18 +1003,6 @@ struct
     let make_coq_translation : coq_translation =
       { from_coq = Hashtbl.create 0; to_coq = Hashtbl.create 0 }
     ;;
-
-    (* ! ! ! ! ! !
-       "double wrapping" using the monad. => Is this a good idea?
-
-       My idea is that it would be good if the coq_translation is
-       all wrapped up in the environment/sigma that it was created
-       from. Though, I am wondering if this would make it easier
-       for us to translate back if needed.
-
-       But... maybe this just isnt necessary since we access all
-       of this from the [G] module anyway.
-    *)
 
     (* type coq_translation = coq_translation_record mm *)
 
@@ -1052,7 +1038,8 @@ struct
              (acc : Lts.raw_flat_lts) ->
              ( Hashtbl.find tbl.from_coq from
              , transition.action.label
-             , Hashtbl.find tbl.from_coq transition.destination )
+             , Hashtbl.find tbl.from_coq transition.destination
+             , Some (pstr_int_tree transition.index_tree) )
              :: acc)
            transitions
            [])
@@ -1106,7 +1093,7 @@ struct
       then (
         let to_visit : int = Queue.length g.to_visit in
         params.kind <- Warning ();
-        log
+        Log.warning
           ~params
           (Printf.sprintf
              "lts is not complete using bound (%d), still had at least (%d) \
@@ -1121,7 +1108,7 @@ struct
             (JSON ())
             (LTS lts)
         in
-        log
+        Log.warning
           ~params
           (Printf.sprintf "saved incomplete LTS to: %s\n" dump_filepath)
         (* raise (UnfinishedLTS g) *));
