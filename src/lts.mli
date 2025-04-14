@@ -1,4 +1,4 @@
-type raw_flat_lts = (string * string * string) list
+type raw_flat_lts = (string * string * string * string option) list
 type raw_nested_lts = (string * (string * string list) list) list
 
 type raw_transitions =
@@ -10,6 +10,7 @@ type transition =
   ; from : string
   ; label : string
   ; destination : string
+  ; info : string option
   }
 
 module Transitions : sig
@@ -79,7 +80,8 @@ module PStr : sig
 end
 
 module Create : sig
-  type transition_params = Of of (int * string * string * string)
+  type transition_params =
+    | Of of (int * string * string * string * string option)
 
   val transition : transition_params -> transition
   val lts : ?init:string -> ?info:Utils.model_info -> raw_transitions -> lts

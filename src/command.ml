@@ -237,90 +237,19 @@ and tree_list_eq (l1 : int tree list) (l2 : int tree list) : bool =
   | _, _ -> false
 ;;
 
+let rec _tree_contains (i : int) (t : int tree) : bool =
+  match t with
+  | Node (j, l) ->
+    if i == j
+    then true
+    else (
+      match l with
+      | [] -> false
+      | l -> List.for_all (fun (s : int tree) -> _tree_contains i s) l)
+;;
+
 (* TODO: finish *)
 let add_to_tree (to_add : int tree) (t : int tree) : int tree = t
-
-(* let rec balance_tree (t:int tree) : int tree =
-   match t with
-   | Node (leaf, stem) ->
-   match stem with
-   | [] -> t
-   | h::[] -> t
-   | h::tl -> Node (leaf, balance_tree  )
-
-   and add_to_tree (to_add : int tree) (t : int tree) : int tree =
-   match t, to_add with
-   | Node (base_leaf, base_stem), Node (leaf_to_add, stem_to_add) ->
-   if base_leaf == leaf_to_add
-   then (
-   match base_stem, list_to_add with
-   | [], [] -> t
-   | _::_, [] -> t
-   | [], _::_ -> t
-   | h_to_add :: [] -> Node ()
-
-   ) else (
-
-   )
-   ;; *)
-(* if a1 == a2
-   then
-   Node
-   ( a1
-   , List.fold_left
-   (fun (acc : int tree list) (t : int tree) ->
-   match t with
-   | Node (leaf, l) ->
-   if leaf==a1
-   )
-   b1
-   b2 )
-   else Node (a1, add_to_tree_list to_add b1) *)
-
-(* and add_to_tree_list (to_add : int tree) (l : int tree list) : int tree list =
-   match l with
-   | [] -> [ to_add ]
-   | h :: t -> add_to_tree to_add h :: t
-   ;; *)
-
-(* let rec tree_contains_node (n : 'a tree) (t : 'a tree) : bool =
-   tree_eq n t
-   ||
-   match t with
-   | Node (a, b) -> tree_eq n a || tree_list_contains_node n b
-
-   and tree_list_contains_node (n : 'a tree) (l : 'a tree list) : bool =
-   match l with
-   | [] -> false
-   | h :: t -> tree_contains_node n h || tree_list_contains_node n t
-   ;; *)
-
-(* let rec merge_tree: 'a tree -> 'a tree -> 'a tree =
-   fun t1 t2 -> *)
-
-(* let rec add_to_tree (i : int) (t : int tree) : int tree =
-   match t with
-   | Node (a, b) -> if i == a then t else Node (a, add_to_tree_list i b)
-
-   and add_to_tree_list (i : int) (l : int tree list) : int tree list =
-   match l with
-   | [] -> [ Node (i, []) ]
-   | h :: t -> add_to_tree i h :: t
-   ;;
-
-   let rec merge_tree (t1 : int tree) (t2 : int tree) : int tree =
-   match t2 with
-   | Node (a, b) -> add_to_tree a t1
-
-   (* and merge_tree_list : 'a tree list -> 'a tree list -> 'a tree list =
-   fun l1 l2 -> *)
-   and merge_tree_list (l1 : int tree list) (l2 : int tree list) : int tree list =
-   match l1, l2 with
-   | [], [] -> []
-   | _ :: _, [] -> l1
-   | [], _ :: _ -> l2
-   | h1 :: t1, h2 :: t2 -> merge_tree h1 h2 :: merge_tree_list t1 t2
-   ;; *)
 
 let rec pstr_int_tree (t : int tree) : string =
   match t with
@@ -958,10 +887,11 @@ struct
                             ~params
                             (Printf.sprintf
                                "build_constrs_tree_list, different int tree \
-                                found:\n\
+                                found for t: %s\n\
                                 existing: %s\n\
                                 new: %s\n\
                                 merged: %s"
+                               (econstr_to_string t)
                                (pstr_int_tree int_tree)
                                (pstr_int_tree int_tree')
                                (pstr_int_tree merged_tree));
@@ -1115,35 +1045,33 @@ struct
                      (econstr_to_string destination)
                      (pstr_int_tree index_tree));
                 if Bool.not (tree_eq index_tree int_tree)
-                then
-                  if Bool.not (tree_eq int_tree index_tree)
-                  then (
-                    let merged_tree : int tree =
-                      add_to_tree index_tree int_tree
-                    in
-                    params.override <- Some ();
-                    log
-                      ~params
-                      (Printf.sprintf
-                         "build_constrs_tree_list, different int tree found:\n\
-                          existing: %s\n\
-                          new: %s\n\
-                          merged: %s"
-                         (pstr_int_tree index_tree)
-                         (pstr_int_tree int_tree)
-                         (pstr_int_tree merged_tree));
-                    params.override <- None
-                    (* log
-                       ~params
-                       (Printf.sprintf
-                       "int trees are different, merging into: %s."
-                       (pstr_int_tree merged_tree)) *)
-                    (* (Printf.sprintf "int trees are different, could merge.") *)
-                    (* H.replace
+                then (
+                  let merged_tree : int tree =
+                    add_to_tree index_tree int_tree
+                  in
+                  params.override <- Some ();
+                  log
+                    ~params
+                    (Printf.sprintf
+                       "build_constrs_tree_list, different int tree found:\n\
+                        existing: %s\n\
+                        new: %s\n\
+                        merged: %s"
+                       (pstr_int_tree index_tree)
+                       (pstr_int_tree int_tree)
+                       (pstr_int_tree merged_tree));
+                  params.override <- None
+                  (* log
+                     ~params
+                     (Printf.sprintf
+                     "int trees are different, merging into: %s."
+                     (pstr_int_tree merged_tree)) *)
+                  (* (Printf.sprintf "int trees are different, could merge.") *)
+                  (* H.replace
                     g.transitions
                     t
                     { action; index_tree = merged_tree; destination } *)
-                    (* H.replace
+                  (* H.replace
                   g.transitions
                   t
                   { action
@@ -1319,7 +1247,8 @@ struct
              (acc : Lts.raw_flat_lts) ->
              ( Hashtbl.find tbl.from_coq from
              , transition.action.label
-             , Hashtbl.find tbl.from_coq transition.destination )
+             , Hashtbl.find tbl.from_coq transition.destination
+             , Some (pstr_int_tree transition.index_tree) )
              :: acc)
            transitions
            [])
