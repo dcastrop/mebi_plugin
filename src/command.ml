@@ -207,22 +207,14 @@ type unif_problem =
   ; termR : EConstr.t
   }
 
-(* let rec pstr_unif_problem (t : unif_problem) : string =
+let _pstr_unif_problem (t : unif_problem) : string =
   match t with
   | { termL; termR; _ } ->
     Printf.sprintf
       "{ L: %s;\n  R: %s; }"
       (econstr_to_string termL)
       (econstr_to_string termR)
-;; *)
-
-(* type leaf_kind = Int of int
-
-   let leaf_eq (l1 : leaf_kind) (l2 : leaf_kind) : bool =
-   match l1, l2 with
-   | Int i1, Int i2 -> i1 == i2
-   | _, _ -> false
-   ;; *)
+;;
 
 type 'a tree = Node of 'a * 'a tree list
 
@@ -247,9 +239,6 @@ let rec _tree_contains (i : int) (t : int tree) : bool =
       | [] -> false
       | l -> List.for_all (fun (s : int tree) -> _tree_contains i s) l)
 ;;
-
-(* TODO: finish *)
-let add_to_tree (to_add : int tree) (t : int tree) : int tree = t
 
 let rec pstr_int_tree (t : int tree) : string =
   match t with
@@ -820,27 +809,46 @@ struct
       - if already in [acc], then skip.
       - if another in [acc] has matching [act] and [tgt] fields, then merge [int tree].
       - else just add to [acc]. *)
-  (* let merge_constrs_tree_lists (acc : coq_ctor list) (ctors : coq_ctor list)
-     : coq_ctor list
-     =
-     List.fold_left
-     (fun (acc' : coq_ctor list) (ctor : coq_ctor) ->
-     (* skip if already in [acc'] *)
-     if List.mem ctor acc'
-     then acc'
-     else (
-     let (opt_ctor : coq_ctor option) = run (find_opt_ctor ctor acc') in
-     match opt_ctor with
-     (* merge [int tree] if already exists *)
-     | Some ctor' ->
-     (match ctor, ctor' with
-     | (act, tgt, int_tree), (_act', _tgt', int_tree') ->
-     (act, tgt, merge_tree int_tree int_tree') :: acc')
-     (* add if new *)
-     | None -> ctor :: acc'))
-     acc
-     ctors
-     ;; *)
+  let merge_constrs_tree_lists
+    ?(params : Params.log = default_params)
+    (t : EConstr.t)
+    (acc : coq_ctor list)
+    (ctors : coq_ctor list)
+    : coq_ctor list
+    =
+    List.fold_left
+      (fun (acc' : coq_ctor list) (ctor : coq_ctor) ->
+        (* skip if already in [acc'] *)
+        if List.mem ctor acc'
+        then acc'
+        else (
+          let (opt_ctor : coq_ctor option) = run (find_opt_ctor ctor acc') in
+          match opt_ctor with
+          (* merge [int tree] if already exists *)
+          | Some ctor' ->
+            (match ctor, ctor' with
+             | (act, tgt, int_tree), (_act', _tgt', int_tree') ->
+               if Bool.not (tree_eq int_tree int_tree')
+               then (
+                 Log.warning
+                   ~params
+                   (Printf.sprintf
+                      "merge_constrs_tree_lists, different int tree found for \
+                       t: %s\n\
+                       existing: %s\n\
+                       new: %s.\n\
+                       kept the original (i.e., %s)"
+                      (econstr_to_string t)
+                      (pstr_int_tree int_tree)
+                      (pstr_int_tree int_tree')
+                      (pstr_int_tree int_tree));
+                 params.kind <- Normal ());
+               (act, tgt, int_tree) :: acc')
+            (* add if new *)
+          | None -> ctor :: acc'))
+      acc
+      ctors
+  ;;
 
   (** *)
   let build_constrs_tree_list
@@ -860,128 +868,11 @@ struct
             None
         in
         if List.is_empty ctors
-        then acc (* else return (merge_constrs_tree_lists (run acc) ctors) *)
-        else
-          return
-            (List.fold_left
-               (fun (acc' : coq_ctor list) (ctor : coq_ctor) ->
-                 (* skip if already in [acc'] *)
-                 if List.mem ctor acc'
-                 then acc'
-                 else (
-                   let (opt_ctor : coq_ctor option) =
-                     run (find_opt_ctor ctor acc')
-                   in
-                   match opt_ctor with
-                   (* merge [int tree] if already exists *)
-                   | Some ctor' ->
-                     (match ctor, ctor' with
-                      | (act, tgt, int_tree), (_act', _tgt', int_tree') ->
-                        let merged_tree : int tree =
-                          add_to_tree int_tree int_tree'
-                        in
-                        if Bool.not (tree_eq int_tree int_tree')
-                        then (
-                          params.override <- Some ();
-                          log
-                            ~params
-                            (Printf.sprintf
-                               "build_constrs_tree_list, different int tree \
-                                found for t: %s\n\
-                                existing: %s\n\
-                                new: %s\n\
-                                merged: %s"
-                               (econstr_to_string t)
-                               (pstr_int_tree int_tree)
-                               (pstr_int_tree int_tree')
-                               (pstr_int_tree merged_tree));
-                          params.override <- None);
-                        (act, tgt, merged_tree) :: acc')
-                     (* add if new *)
-                   | None -> ctor :: acc'))
-               (run acc)
-               ctors))
+        then acc
+        else return (merge_constrs_tree_lists t (run acc) ctors))
       fn_rlts
       (return [])
   ;;
-
-  (** [get_new_states g t constrs] is the new set of states to explore (that are not already explored). *)
-  (* let _get_new_states_and_transitions
-    ?(params : Params.log = default_params)
-    (t : EConstr.t)
-    (g : lts_graph)
-    (* (transitions : lts_transition H.t) *)
-      (ctors : coq_ctor list)
-    : (lts_transition H.t * S.t) mm
-    =
-    (* let new_states : S.t ref = ref (S.singleton t) in *)
-    let get_transition_id : unit -> int = new_int_counter () in
-    (* let* sigma = get_sigma in *)
-    (* TODO: change the below to use the iterate from mebi. (see check_valid_constructor) *)
-    let iter_body'
-      (i : int)
-      ((transitions, acc_states) : lts_transition H.t * S.t)
-      =
-      let* sigma = get_sigma in
-      match List.nth_opt ctors i with
-      | None ->
-        log
-          ~params
-          (Printf.sprintf
-             "get_new_states, iter body None for (%d) out of (%d) ctors."
-             i
-             (List.length ctors));
-        return (transitions, acc_states)
-      | Some (act, tgt, int_tree) ->
-        log
-          ~params
-          (Printf.sprintf
-             "get_new_states, iter body Some (%s, %s, %s) for (%d) out of (%d) \
-              ctors."
-             (econstr_to_string act)
-             (econstr_to_string tgt)
-             (pstr_int_tree int_tree)
-             i
-             (List.length ctors));
-        let new_states : S.t = S.add tgt acc_states in
-        let to_add : action =
-          Fsm.Create.action
-            ~is_tau:false
-            ~annotation:[]
-            (Of (get_transition_id (), econstr_to_string act))
-        in
-        (match H.find_opt transitions t with
-         | None ->
-           H.add
-             transitions
-             t
-             { action = to_add; index_tree = int_tree; destination = tgt }
-         | Some lt ->
-           (match lt with
-            | { action; destination; index_tree } ->
-              if EConstr.eq_constr sigma tgt destination
-              then
-                (* () *)
-                H.replace
-                  g.transitions
-                  t
-                  { action
-                  ; index_tree = merge_tree index_tree int_tree
-                  ; destination
-                  }
-              else
-                H.add
-                  transitions
-                  t
-                  { action = to_add; index_tree = int_tree; destination = tgt }));
-        (* if [tgt] is new state, add to [new_states] *)
-        if H.mem transitions tgt || EConstr.eq_constr sigma tgt t
-        then ()
-        else Queue.push tgt g.to_visit;
-        return (transitions, new_states)
-    in
-    iterate 0 (List.length ctors - 1) (g.transitions, S.empty) iter_body'
-  ;; *)
 
   let get_new_states
     ?(params : Params.log = default_params)
@@ -1003,14 +894,6 @@ struct
             ~annotation:[]
             (Of (get_transition_id (), econstr_to_string act))
         in
-        (* if new transition, add to [g] *)
-        (* if Bool.not (H.mem g.transitions t)
-        then
-          H.add
-            g.transitions
-            t
-            { action = to_add; index_tree = int_tree; destination = tgt }; *)
-        (* TODO: bottom appears to cause stall on complicated terms *)
         (match H.find_opt g.transitions t with
          | None ->
            H.add
@@ -1020,66 +903,8 @@ struct
          | Some lt ->
            (match lt with
             | { action; destination; index_tree } ->
-              if EConstr.eq_constr sigma tgt destination
-              then (
-                params.override <- Some ();
-                log
-                  ~params
-                  (Printf.sprintf
-                     "get_new_states, found match for t in g.transitions, \n\
-                      where t: %s\n\
-                      and the new transition is:\n\
-                      act: %s\n\
-                      tgt: %s\n\
-                      int_tree: %s\n\n\
-                      and the existing transition is:\n\
-                      action: %s\n\
-                      destination: %s\n\
-                      index_tree: %s\n\n\n\
-                      ============"
-                     (econstr_to_string t)
-                     (econstr_to_string act)
-                     (econstr_to_string destination)
-                     (pstr_int_tree int_tree)
-                     action.label
-                     (econstr_to_string destination)
-                     (pstr_int_tree index_tree));
-                if Bool.not (tree_eq index_tree int_tree)
-                then (
-                  let merged_tree : int tree =
-                    add_to_tree index_tree int_tree
-                  in
-                  params.override <- Some ();
-                  log
-                    ~params
-                    (Printf.sprintf
-                       "build_constrs_tree_list, different int tree found:\n\
-                        existing: %s\n\
-                        new: %s\n\
-                        merged: %s"
-                       (pstr_int_tree index_tree)
-                       (pstr_int_tree int_tree)
-                       (pstr_int_tree merged_tree));
-                  params.override <- None
-                  (* log
-                     ~params
-                     (Printf.sprintf
-                     "int trees are different, merging into: %s."
-                     (pstr_int_tree merged_tree)) *)
-                  (* (Printf.sprintf "int trees are different, could merge.") *)
-                  (* H.replace
-                    g.transitions
-                    t
-                    { action; index_tree = merged_tree; destination } *)
-                  (* H.replace
-                  g.transitions
-                  t
-                  { action
-                  ; index_tree = merge_tree index_tree int_tree
-                  ; destination
-                  } *));
-                params.override <- None)
-              else
+              if Bool.not (EConstr.eq_constr sigma tgt destination)
+              then
                 H.add
                   g.transitions
                   t
@@ -1105,37 +930,22 @@ struct
     : lts_graph mm
     =
     params.kind <- Debug ();
-    (* params.override <- Some (); *)
-    log ~params "build_lts_graph A";
     if Queue.is_empty g.to_visit
     then return g (* finished if no more to visit*)
     else if S.cardinal g.states > bound
     then return g (* exit if bound reached *)
     else
       let* (t : EConstr.t) = return (Queue.pop g.to_visit) in
-      (* params.override <- Some (); *)
-      log ~params "build_lts_graph B";
       let* (constrs : coq_ctor list) =
         build_constrs_tree_list ~params t fn_rlts
       in
-      (* params.override <- Some (); *)
       let* _ =
         if is_output_kind_enabled params
         then debug_output_constrs constrs
         else return ()
       in
-      log ~params "build_lts_graph C";
-      (* params.override <- None; *)
-      (* let* (new_transitions, new_states) : lts_transition H.t * S.t =
-         get_new_states_and_transitions ~params t g constrs
-         in *)
       let* (new_states : S.t) = get_new_states ~params t g constrs in
-      let g =
-        { g with
-          states =
-            S.union g.states new_states (* ; transitions = new_transitions *)
-        }
-      in
+      let g = { g with states = S.union g.states new_states } in
       build_lts_graph ~params fn_rlts g bound
   ;;
 
@@ -1160,7 +970,7 @@ struct
     let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
     match Hashtbl.find_opt tr_rlts (run (Mebi_utils.type_of_tref tref)) with
     | None ->
-      log
+      Log.warning
         ~params
         (Printf.sprintf
            "build_graph, ERROR: could not find rlts matching:\n\
@@ -1184,13 +994,6 @@ struct
         bound
   ;;
 
-  (*
-     TODO: refactor the above, using the new [Fsm.Create] and [Fsm.New] functions
-     - this will ensure that there are no duplicate states or actions and such
-     - first, just translate this graph_lts to a [Lts.lts] (composed of just strings)
-     - maybe [MkGraph] provides a record for converting to [Lts.lts].
-       Then it is simple to use [Translate.to_fsm]
-  *)
   module DeCoq = struct
     type coq_translation =
       { from_coq : (EConstr.t, string) Hashtbl.t
@@ -1200,18 +1003,6 @@ struct
     let make_coq_translation : coq_translation =
       { from_coq = Hashtbl.create 0; to_coq = Hashtbl.create 0 }
     ;;
-
-    (* ! ! ! ! ! !
-       "double wrapping" using the monad. => Is this a good idea?
-
-       My idea is that it would be good if the coq_translation is
-       all wrapped up in the environment/sigma that it was created
-       from. Though, I am wondering if this would make it easier
-       for us to translate back if needed.
-
-       But... maybe this just isnt necessary since we access all
-       of this from the [G] module anyway.
-    *)
 
     (* type coq_translation = coq_translation_record mm *)
 
@@ -1302,7 +1093,7 @@ struct
       then (
         let to_visit : int = Queue.length g.to_visit in
         params.kind <- Warning ();
-        log
+        Log.warning
           ~params
           (Printf.sprintf
              "lts is not complete using bound (%d), still had at least (%d) \
@@ -1317,7 +1108,7 @@ struct
             (JSON ())
             (LTS lts)
         in
-        log
+        Log.warning
           ~params
           (Printf.sprintf "saved incomplete LTS to: %s\n" dump_filepath)
         (* raise (UnfinishedLTS g) *));

@@ -50,6 +50,12 @@ module Logging : sig
   val pstr_scope : string Stack.t -> string
   val is_output_kind_enabled : params -> bool
   val log : ?params:params -> string -> unit
+
+  module Log : sig
+    val warning : ?params:params -> string -> unit
+    val debug : ?params:params -> string -> unit
+    val details : ?params:params -> string -> unit
+  end
 end
 
 module Formatting : sig

@@ -169,6 +169,32 @@ module Logging = struct
              else Printf.sprintf "%s :: \n" (pstr_scope scope))
             msg_to_log)
   ;;
+
+  module Log = struct
+    let warning ?(params : params = default_params ()) (to_log : string) : unit =
+      log
+        ~params:
+          (params.kind <- Warning ();
+           params)
+        to_log
+    ;;
+
+    let debug ?(params : params = default_params ()) (to_log : string) : unit =
+      log
+        ~params:
+          (params.kind <- Debug ();
+           params)
+        to_log
+    ;;
+
+    let details ?(params : params = default_params ()) (to_log : string) : unit =
+      log
+        ~params:
+          (params.kind <- Details ();
+           params)
+        to_log
+    ;;
+  end
 end
 
 module Formatting = struct
