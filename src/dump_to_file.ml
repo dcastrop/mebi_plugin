@@ -198,6 +198,13 @@ module JSON = struct
            ; key_val "from" (quoted (clean t.from))
            ; key_val "label" (quoted (clean t.label))
            ; key_val "destination" (quoted (clean t.destination))
+           ; key_val
+               "info"
+               (quoted
+                  (clean
+                     (match t.info with
+                      | None -> "None"
+                      | Some index_tree -> index_tree)))
            ])
     ;;
 

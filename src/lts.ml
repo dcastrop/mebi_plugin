@@ -1,4 +1,4 @@
-type raw_flat_lts = (string * string * string) list
+type raw_flat_lts = (string * string * string * string option) list
 type raw_nested_lts = (string * (string * string list) list) list
 
 type raw_transitions =
@@ -10,6 +10,7 @@ type transition =
   ; from : string
   ; label : string
   ; destination : string
+  ; info : string option
   }
 
 module Transitions = Set.Make (struct
@@ -111,11 +112,13 @@ module PStr = struct
 end
 
 module Create = struct
-  type transition_params = Of of (int * string * string * string)
+  type transition_params =
+    | Of of (int * string * string * string * string option)
 
   let transition (params : transition_params) : transition =
     match params with
-    | Of (id, from, label, destination) -> { id; from; label; destination }
+    | Of (id, from, label, destination, info) ->
+      { id; from; label; destination; info }
   ;;
 
   let lts
@@ -129,10 +132,11 @@ module Create = struct
       | Flat raw' ->
         List.fold_left
           (fun (acc : Transitions.t)
-            ((from, label, destination) : string * string * string) ->
+            ((from, label, destination, info) :
+              string * string * string * string option) ->
             Transitions.add
               (transition
-                 (Of (Transitions.cardinal acc, from, label, destination)))
+                 (Of (Transitions.cardinal acc, from, label, destination, info)))
               acc)
           Transitions.empty
           raw'
@@ -151,7 +155,8 @@ module Create = struct
                             ( Transitions.cardinal acc''
                             , from
                             , label
-                            , destination )))
+                            , destination
+                            , None )))
                       acc'')
                   acc'
                   destinations)
