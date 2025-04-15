@@ -21,6 +21,7 @@
   )
  (modules
   mebi_errors
+  mebi_action
   mebi_utils
   mebi_monad
   lts

@@ -34,9 +34,6 @@ module Partition = Set.Make (States)
 (****** Action Labels & Alphabet *************************************)
 (*********************************************************************)
 
-(** [action] is a 2-tuple with a unique [id] and (non-unique) [label]).
-    - [id] is an integer for identifying the action.
-    - [label] is a (pretty-printed) string describing the action. *)
 type action =
   { id : int
   ; label : string
@@ -48,6 +45,16 @@ and annotation = (state * action) list
 and annotations = annotation list
 
 let tau : action = { id = 0; label = "~"; is_tau = true; annotation = [] }
+
+let of_mebi_action (a : Mebi_action.action) : action =
+  match a with
+  | { id; label; is_tau } -> { id; label; is_tau; annotation = [] }
+;;
+
+let to_mebi_action (a : action) : Mebi_action.action =
+  match a with
+  | { id; label; is_tau; _ } -> { id; label; is_tau }
+;;
 
 (** [Alphabet] is a set of [actions]. *)
 module Alphabet = Set.Make (struct

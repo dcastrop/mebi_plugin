@@ -67,6 +67,52 @@ let make_constr_tbl st =
   }
 ;;
 
+let eq_lts_transitions_action st () = Mebi_action.eq
+
+type 'a tree = Node of 'a * 'a tree list
+
+let eq_lts_transitions_tree st () =
+  let rec tree_eq (t1 : 'a tree) (t2 : 'a tree) : bool =
+    match t1, t2 with
+    | Node (a1, b1), Node (a2, b2) -> a1 == a2 && tree_list_eq b1 b2
+  and tree_list_eq (l1 : 'a tree list) (l2 : 'a tree list) : bool =
+    match l1, l2 with
+    | [], [] -> true
+    | h1 :: t1, h2 :: t2 -> tree_eq h1 h2 && tree_list_eq t1 t2
+    | [], _ :: _ -> false
+    | _ :: _, [] -> false
+  in
+  tree_eq
+;;
+
+let lts_transitions_hash st () t = Hashtbl.hash t
+
+(** [make_transition_tbl st] is ... *)
+let make_lts_transitions_tbl st =
+  let cmp_eq1 = eq_lts_transitions_action st in
+  let cmp_eq2 = eq_lts_transitions_tree st in
+  let hashf = lts_transitions_hash st in
+  let module LtsTransitionsTbl =
+    Hashtbl.Make (struct
+      type t = Mebi_action.action * int tree
+
+      let equal
+        ((a1, t1) : Mebi_action.action * int tree)
+        ((a2, t2) : Mebi_action.action * int tree)
+        =
+        cmp_eq1 () a1 a2 && cmp_eq2 () t1 t2
+      ;;
+
+      let hash t = hashf () t
+    end)
+  in
+  { state = st
+  ; value =
+      (module LtsTransitionsTbl : Hashtbl.S
+        with type key = Mebi_action.action * int tree)
+  }
+;;
+
 let compare_constr st () t1 t2 =
   if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1
 ;;
@@ -87,10 +133,10 @@ let make_constr_set (st : coq_context ref)
 
 (** Monadic for loop *)
 let rec iterate
-          (from_idx : int)
-          (to_idx : int)
-          (acc : 'a)
-          (f : int -> 'a -> 'a t)
+  (from_idx : int)
+  (to_idx : int)
+  (acc : 'a)
+  (f : int -> 'a -> 'a t)
   : 'a t
   =
   if from_idx > to_idx
@@ -107,8 +153,8 @@ let get_sigma (st : coq_context ref) : Evd.evar_map in_context =
 ;;
 
 let state
-      (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-      (st : coq_context ref)
+  (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+  (st : coq_context ref)
   : 'a in_context
   =
   let sigma, a = f !st.coq_env !st.coq_ctx in

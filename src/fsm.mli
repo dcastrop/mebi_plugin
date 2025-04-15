@@ -114,6 +114,8 @@ and annotation = (state * action) list
 and annotations = annotation list
 
 val tau : action
+val of_mebi_action : Mebi_action.action -> action
+val to_mebi_action : action -> Mebi_action.action
 
 module Alphabet : sig
   type elt = action
