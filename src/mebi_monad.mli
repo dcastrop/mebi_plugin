@@ -31,6 +31,11 @@ val sandbox : 'a t -> 'a t
 val make_constr_tbl : (module Hashtbl.S with type key = EConstr.t) t
 val make_constr_set : (module Set.S with type elt = EConstr.t) t
 
+type 'a tree = Node of 'a * 'a tree list
+
+val make_lts_transitions_tbl
+  : (module Hashtbl.S with type key = Mebi_action.action * int tree) t
+
 (* val debug : ?params:logging_params -> (Environ.env -> Evd.evar_map -> Pp.t) -> unit t *)
 val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit t
 

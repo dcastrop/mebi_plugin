@@ -171,6 +171,17 @@ module Logging = struct
   ;;
 
   module Log = struct
+    let override ?(params : params = default_params ()) (to_log : string) : unit
+      =
+      let stashed_override = params.override in
+      log
+        ~params:
+          (params.override <- Some ();
+           params)
+        to_log;
+      params.override <- stashed_override
+    ;;
+
     let normal ?(params : params = default_params ()) (to_log : string) : unit =
       let stashed_kind = params.kind in
       log
@@ -333,17 +344,4 @@ let new_int_counter () : unit -> int =
     to_return
   in
   get_and_incr_counter
-;;
-
-type keys_kind = OfEConstr of EConstr.t Seq.t
-
-(** pstr a seq of keys *)
-let pstr_keys (keys : keys_kind) : string =
-  match keys with
-  | OfEConstr keys ->
-    Seq.fold_left
-      (fun (acc : string) (k : EConstr.t) ->
-        Printf.sprintf "%s, %s" acc (Mebi_utils.econstr_to_string k))
-      ""
-      keys
 ;;

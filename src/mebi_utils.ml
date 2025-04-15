@@ -19,7 +19,7 @@ let rec strip_snd (l : (EConstr.t * EConstr.t) list) : EConstr.t list =
 let ref_list_to_glob_list (l : Libnames.qualid list) : Names.GlobRef.t list =
   List.fold_left
     (fun (acc : Names.GlobRef.t list) (s : Libnames.qualid) ->
-       List.append acc [ Nametab.global s ])
+      List.append acc [ Nametab.global s ])
     []
     l
 ;;
@@ -60,4 +60,17 @@ let type_of_tref (tref : Constrexpr.constr_expr) : EConstr.t mm =
   let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
   let$ u env sigma = Typing.type_of env sigma t in
   return u
+;;
+
+type keys_kind = OfEConstr of EConstr.t Seq.t
+
+(** pstr a seq of keys *)
+let pstr_keys (keys : keys_kind) : string =
+  match keys with
+  | OfEConstr keys ->
+    Seq.fold_left
+      (fun (acc : string) (k : EConstr.t) ->
+        Printf.sprintf "%s, %s" acc (econstr_to_string k))
+      ""
+      keys
 ;;
