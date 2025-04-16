@@ -233,9 +233,9 @@ module Formatting = struct
     }
 
   let default_params
-    ?(params : Logging.params option)
-    ?(mode : Logging.output_modes = OCaml ())
-    ()
+        ?(params : Logging.params option)
+        ?(mode : Logging.output_modes = OCaml ())
+        ()
     : params
     =
     let params' =
@@ -336,8 +336,8 @@ let get_key_of_val (tbl : ('a, 'b) Hashtbl.t) (v : 'b) : 'a option =
 ;;
 
 (** [new_int_counter] returns a function that when called, will return the value of a counter and then increment it by 1, starting from 0. *)
-let new_int_counter () : unit -> int =
-  let id_counter : int ref = ref 0 in
+let new_int_counter ?(start : int = 0) () : unit -> int =
+  let id_counter : int ref = ref start in
   let get_and_incr_counter () : int =
     let to_return = !id_counter in
     id_counter := to_return + 1;
