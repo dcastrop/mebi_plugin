@@ -201,12 +201,15 @@ module Logging = struct
 
     let warning ?(params : params = default_params ()) (to_log : string) : unit =
       let stashed_kind = params.kind in
+      let stashed_override = params.override in
       log
         ~params:
           (params.kind <- Warning ();
+           params.override <- Some ();
            params)
         to_log;
-      params.kind <- stashed_kind
+      params.kind <- stashed_kind;
+      params.override <- stashed_override
     ;;
 
     let debug ?(params : params = default_params ()) (to_log : string) : unit =
