@@ -1,7 +1,4 @@
-type state =
-  { id : int
-  ; name : string
-  }
+type state = { id : int; name : string }
 
 module States : sig
   type elt = state
@@ -56,7 +53,7 @@ module Block = States
 
 module Partition : sig
   type elt = Block.t
-  type t = Set.Make(Block).t
+  type t = Set.Make(States).t
 
   val empty : t
   val add : elt -> t -> t
@@ -103,12 +100,12 @@ module Partition : sig
   val of_seq : elt Seq.t -> t
 end
 
-type action =
-  { id : int
-  ; label : string
-  ; is_tau : bool
-  ; mutable annotation : annotations
-  }
+type action = {
+  id : int;
+  label : string;
+  is_tau : bool;
+  mutable annotation : annotations;
+}
 
 and annotation = (state * action) list
 and annotations = annotation list
@@ -180,8 +177,13 @@ module Actions : sig
   val replace : 'a t -> key -> 'a -> unit
   val mem : 'a t -> key -> bool
   val iter : (key -> 'a -> unit) -> 'a t -> unit
-  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+  val filter_map_inplace :
+    (key -> 'a -> 'a option) -> 'a t -> unit
+
+  val fold :
+    (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
   val length : 'a t -> int
   val stats : 'a t -> Hashtbl.statistics
   val to_seq : 'a t -> (key * 'a) Seq.t
@@ -208,8 +210,13 @@ module Edges : sig
   val replace : 'a t -> key -> 'a -> unit
   val mem : 'a t -> key -> bool
   val iter : (key -> 'a -> unit) -> 'a t -> unit
-  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+  val filter_map_inplace :
+    (key -> 'a -> 'a option) -> 'a t -> unit
+
+  val fold :
+    (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
   val length : 'a t -> int
   val stats : 'a t -> Hashtbl.statistics
   val to_seq : 'a t -> (key * 'a) Seq.t
@@ -220,44 +227,62 @@ module Edges : sig
   val of_seq : (key * 'a) Seq.t -> 'a t
 end
 
-type fsm =
-  { init : state option
-  ; mutable alphabet : Alphabet.t
-  ; mutable states : Block.t
-  ; mutable edges : Block.t Actions.t Edges.t
-  ; info : Utils.model_info option
-  }
+type fsm = {
+  init : state option;
+  mutable alphabet : Alphabet.t;
+  mutable states : Block.t;
+  mutable edges : Block.t Actions.t Edges.t;
+  info : Utils.model_info option;
+}
 
 module PStr : sig
-  val state : ?params:Utils.Formatting.pstr_params -> state -> string
-  val states : ?params:Utils.Formatting.pstr_params -> Block.t -> string
-  val partition : ?params:Utils.Formatting.pstr_params -> Partition.t -> string
-  val action : ?params:Utils.Formatting.pstr_params -> action -> string
-  val alphabet : ?params:Utils.Formatting.pstr_params -> Alphabet.t -> string
-  val annotation : ?params:Utils.Formatting.pstr_params -> annotation -> string
+  val state :
+    ?params:Utils.Formatting.pstr_params -> state -> string
 
-  val annotations
-    :  ?params:Utils.Formatting.pstr_params
-    -> annotations
-    -> string
+  val states :
+    ?params:Utils.Formatting.pstr_params -> Block.t -> string
 
-  val edge
-    :  ?params:Utils.Formatting.pstr_params
-    -> state * action * state
-    -> string
+  val partition :
+    ?params:Utils.Formatting.pstr_params ->
+    Partition.t ->
+    string
 
-  val actions
-    :  ?params:Utils.Formatting.pstr_params
-    -> ?from:state
-    -> Block.t Actions.t
-    -> string
+  val action :
+    ?params:Utils.Formatting.pstr_params -> action -> string
 
-  val edges
-    :  ?params:Utils.Formatting.pstr_params
-    -> Block.t Actions.t Edges.t
-    -> string
+  val alphabet :
+    ?params:Utils.Formatting.pstr_params ->
+    Alphabet.t ->
+    string
 
-  val fsm : ?params:Utils.Formatting.pstr_params -> fsm -> string
+  val annotation :
+    ?params:Utils.Formatting.pstr_params ->
+    annotation ->
+    string
+
+  val annotations :
+    ?params:Utils.Formatting.pstr_params ->
+    annotations ->
+    string
+
+  val edge :
+    ?params:Utils.Formatting.pstr_params ->
+    state * action * state ->
+    string
+
+  val actions :
+    ?params:Utils.Formatting.pstr_params ->
+    ?from:state ->
+    Block.t Actions.t ->
+    string
+
+  val edges :
+    ?params:Utils.Formatting.pstr_params ->
+    Block.t Actions.t Edges.t ->
+    string
+
+  val fsm :
+    ?params:Utils.Formatting.pstr_params -> fsm -> string
 end
 
 module Create : sig
@@ -267,22 +292,20 @@ module Create : sig
 
   val state : state_params -> state
 
-  type states_params =
-    | From of (Block.t * int)
-    | ()
+  type states_params = From of (Block.t * int) | ()
 
   val states : states_params -> Block.t
   val label : int -> string
 
-  type action_param =
-    | Of of (int * string)
-    | From of int
+  type action_param = Of of (int * string) | From of int
 
-  val action : ?is_tau:bool -> ?annotation:annotations -> action_param -> action
+  val action :
+    ?is_tau:bool ->
+    ?annotation:annotations ->
+    action_param ->
+    action
 
-  type alphabet_param =
-    | ()
-    | From of action list
+  type alphabet_param = () | From of action list
 
   val alphabet : alphabet_param -> Alphabet.t
 
@@ -295,13 +318,13 @@ module Create : sig
   val actions : actions_params -> Block.t Actions.t
   val edges : ?size:int -> 'a -> Block.t Actions.t Edges.t
 
-  val fsm
-    :  ?info:Utils.model_info option
-    -> state option
-    -> Alphabet.t
-    -> Block.t
-    -> Block.t Actions.t Edges.t
-    -> fsm
+  val fsm :
+    ?info:Utils.model_info option ->
+    state option ->
+    Alphabet.t ->
+    Block.t ->
+    Block.t Actions.t Edges.t ->
+    fsm
 end
 
 module Clone : sig
@@ -311,56 +334,72 @@ module Clone : sig
   val alphabet : Alphabet.t -> Alphabet.t
   val action : action -> action
   val actions : Block.t Actions.t -> Block.t Actions.t
-  val edges : Block.t Actions.t Edges.t -> Block.t Actions.t Edges.t
+
+  val edges :
+    Block.t Actions.t Edges.t -> Block.t Actions.t Edges.t
+
   val fsm : fsm -> fsm
 end
 
 module IsMatch : sig
   val action : ?weak:bool -> action -> action -> bool
 
-  val edge
-    :  ?weak:bool
-    -> state * action * state
-    -> state * action * state
-    -> bool
+  val edge :
+    ?weak:bool ->
+    state * action * state ->
+    state * action * state ->
+    bool
 end
 
 module New : sig
   val state : string -> fsm -> state
 
-  val action
-    :  ?is_tau:bool
-    -> ?annotation:annotations
-    -> string
-    -> fsm
-    -> action
+  val action :
+    ?is_tau:bool ->
+    ?annotation:annotations ->
+    string ->
+    fsm ->
+    action
 end
 
 module Append : sig
   val annotation' : state * action -> annotation -> annotation
-  val annotation : state * action -> annotation -> annotation option
+
+  val annotation :
+    state * action -> annotation -> annotation option
 
   type of_annotation =
     | Anno of annotation
     | Annos of annotations
 
-  val annotations' : of_annotation -> annotations -> annotations
-  val annotations : of_annotation -> annotations -> annotations option
+  val annotations' :
+    of_annotation -> annotations -> annotations
+
+  val annotations :
+    of_annotation -> annotations -> annotations option
+
   val alphabet : fsm -> action -> unit
-  val state : ?skip_duplicate_names:bool -> fsm -> state -> unit
-  val states : ?skip_duplicate_names:bool -> fsm -> Block.t -> unit
+
+  val state :
+    ?skip_duplicate_names:bool -> fsm -> state -> unit
+
+  val states :
+    ?skip_duplicate_names:bool -> fsm -> Block.t -> unit
 
   type of_destination =
     | Singleton of state
     | Destinations of Block.t
 
-  val action : Block.t Actions.t -> action * of_destination -> unit
+  val action :
+    Block.t Actions.t -> action * of_destination -> unit
 
   type has_edges =
     | FSM of fsm
     | Edges of Block.t Actions.t Edges.t
 
-  val edge : has_edges -> state * action * of_destination -> unit
+  val edge :
+    has_edges -> state * action * of_destination -> unit
+
   val edges : has_edges -> state * Block.t Actions.t -> unit
 end
 
@@ -380,42 +419,41 @@ module Filter : sig
     | FromAny of Block.t
     | Action of kind_action_filter
 
-  type has_states =
-    | FSM of fsm
-    | States of Block.t
+  type has_states = FSM of fsm | States of Block.t
 
   type has_edges =
     | FSM of fsm
     | Edges of Block.t Actions.t Edges.t
 
   exception
-    CannotFilterStatesUsingActionWithoutFSM of (Block.t * kind_action_filter)
+    CannotFilterStatesUsingActionWithoutFSM of
+      (Block.t * kind_action_filter)
 
   val filter_states : Block.t -> kind_state_filter -> Block.t
 
-  val filter_actions
-    :  ?weak:bool
-    -> Block.t Actions.t
-    -> kind_action_filter
-    -> Block.t Actions.t
+  val filter_actions :
+    ?weak:bool ->
+    Block.t Actions.t ->
+    kind_action_filter ->
+    Block.t Actions.t
 
-  val filter_edges
-    :  ?weak:bool
-    -> Block.t Actions.t Edges.t
-    -> kind_edge_filter
-    -> Block.t Actions.t Edges.t
+  val filter_edges :
+    ?weak:bool ->
+    Block.t Actions.t Edges.t ->
+    kind_edge_filter ->
+    Block.t Actions.t Edges.t
 
-  val actions
-    :  ?weak:bool
-    -> Block.t Actions.t
-    -> kind_action_filter
-    -> Block.t Actions.t
+  val actions :
+    ?weak:bool ->
+    Block.t Actions.t ->
+    kind_action_filter ->
+    Block.t Actions.t
 
-  val edges
-    :  ?weak:bool
-    -> has_edges
-    -> kind_edge_filter
-    -> Block.t Actions.t Edges.t
+  val edges :
+    ?weak:bool ->
+    has_edges ->
+    kind_edge_filter ->
+    Block.t Actions.t Edges.t
 
   val states : has_states -> kind_state_filter -> Block.t
 end
@@ -427,22 +465,26 @@ module Get : sig
     | Annos of annotations
 
   val states : has_states -> Block.t
-  val actions_from : state -> Block.t Actions.t Edges.t -> Block.t Actions.t
 
-  val actions_of
-    :  ?weak:bool
-    -> action
-    -> Block.t Actions.t
-    -> Block.t Actions.t option
+  val actions_from :
+    state -> Block.t Actions.t Edges.t -> Block.t Actions.t
+
+  val actions_of :
+    ?weak:bool ->
+    action ->
+    Block.t Actions.t ->
+    Block.t Actions.t option
 
   val silent_actions : Block.t Actions.t -> Block.t Actions.t
-  val silent_edges : Block.t Actions.t Edges.t -> Block.t Actions.t Edges.t
 
-  val edges_of
-    :  ?weak:bool
-    -> action
-    -> Block.t Actions.t Edges.t
-    -> Block.t Actions.t Edges.t
+  val silent_edges :
+    Block.t Actions.t Edges.t -> Block.t Actions.t Edges.t
+
+  val edges_of :
+    ?weak:bool ->
+    action ->
+    Block.t Actions.t Edges.t ->
+    Block.t Actions.t Edges.t
 
   val from_states : Block.t Actions.t Edges.t -> Block.t
 
@@ -460,67 +502,74 @@ module Get : sig
 end
 
 module Merge : sig
-  val edges
-    :  ?params:Utils.Logging.params
-    -> int * Alphabet.t
-    -> Block.t Actions.t Edges.t
-    -> Block.t Actions.t Edges.t
-    -> Block.t Actions.t Edges.t
+  val edges :
+    ?params:Utils.Logging.params ->
+    int * Alphabet.t ->
+    Block.t Actions.t Edges.t ->
+    Block.t Actions.t Edges.t ->
+    Block.t Actions.t Edges.t
 
-  val fsms
-    :  ?params:Utils.Logging.params
-    -> fsm
-    -> fsm
-    -> fsm * (state, state) Hashtbl.t
+  val fsms :
+    ?params:Utils.Logging.params ->
+    fsm ->
+    fsm ->
+    fsm * (state, state) Hashtbl.t
 end
 
 module Organize : sig
-  val edges : Block.t Actions.t Edges.t -> Block.t Actions.t Edges.t
+  val edges :
+    Block.t Actions.t Edges.t -> Block.t Actions.t Edges.t
+
   val fsm : fsm -> fsm
 end
 
 module Saturate : sig
   val visited_state : (state, int) Hashtbl.t -> state -> unit
   val max_revisit_num : int
-  val is_state_revisitable : (state, int) Hashtbl.t -> state -> bool
 
-  val saturated_action
-    :  action
-    -> action option
-    -> state
-    -> annotation
-    -> action
+  val is_state_revisitable :
+    (state, int) Hashtbl.t -> state -> bool
 
-  val collect_annotated_actions
-    :  ?params:Utils.Logging.params
-    -> (state, int) Hashtbl.t
-    -> annotation
-    -> Block.t
-    -> Block.t Actions.t
-    -> action option
-    -> fsm
-    -> unit
+  val saturated_action :
+    action -> action option -> state -> annotation -> action
+
+  val collect_annotated_actions :
+    ?params:Utils.Logging.params ->
+    (state, int) Hashtbl.t ->
+    annotation ->
+    Block.t ->
+    Block.t Actions.t ->
+    action option ->
+    fsm ->
+    unit
 
   val fsm : ?params:Utils.Logging.params -> fsm -> fsm
 
-  exception AppendAnnotationIsNone of ((state * action) * annotation)
-  exception AppendAnnotationsIsNone of (Append.of_annotation * annotations)
+  exception
+    AppendAnnotationIsNone of ((state * action) * annotation)
 
-  val append_annotation : state * action -> annotation -> annotation
-  val append_annotations : Append.of_annotation -> annotations -> annotations
+  exception
+    AppendAnnotationsIsNone of
+      (Append.of_annotation * annotations)
 
-  val explore_from
-    :  state
-    -> annotation
-    -> Block.t Actions.t Edges.t
-    -> annotations
+  val append_annotation :
+    state * action -> annotation -> annotation
 
-  val annotated
-    :  action
-    -> state
-    -> annotation
-    -> Block.t Actions.t option
-    -> action option
+  val append_annotations :
+    Append.of_annotation -> annotations -> annotations
+
+  val explore_from :
+    state ->
+    annotation ->
+    Block.t Actions.t Edges.t ->
+    annotations
+
+  val annotated :
+    action ->
+    state ->
+    annotation ->
+    Block.t Actions.t option ->
+    action option
 
   val fsm_states : ?params:Utils.Logging.params -> fsm -> fsm
 end

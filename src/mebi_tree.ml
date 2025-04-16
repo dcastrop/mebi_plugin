@@ -1,0 +1,36 @@
+type 'a tree = Node of 'a * 'a tree list
+
+module ConstrTree = struct
+  type t = int tree
+
+  let eq (t1 : t) (t2 : t) : bool =
+    let rec tree_eq (t1 : t) (t2 : t) : bool =
+      match t1, t2 with
+      | Node (a1, b1), Node (a2, b2) -> a1 == a2 && tree_list_eq b1 b2
+    and tree_list_eq (l1 : t list) (l2 : t list) : bool =
+      match l1, l2 with
+      | [], [] -> true
+      | h1 :: t1, h2 :: t2 -> tree_eq h1 h2 && tree_list_eq t1 t2
+      | [], _ :: _ -> false
+      | _ :: _, [] -> false
+    in
+    tree_eq t1 t2
+  ;;
+
+  let rec pstr (t1 : t) : string =
+    match t1 with
+    | Node (lhs_int, rhs_int_tree_list) ->
+      Printf.sprintf
+        "(%d) [%s]"
+        lhs_int
+        (match List.length rhs_int_tree_list with
+         | 0 -> ""
+         | 1 -> pstr (List.hd rhs_int_tree_list)
+         | _ ->
+           List.fold_left
+             (fun (acc : string) (rhs_int_tree : t) ->
+                Printf.sprintf "%s, %s" acc (pstr rhs_int_tree))
+             (pstr (List.hd rhs_int_tree_list))
+             (List.tl rhs_int_tree_list))
+  ;;
+end

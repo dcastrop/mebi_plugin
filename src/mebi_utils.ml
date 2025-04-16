@@ -61,3 +61,26 @@ let type_of_tref (tref : Constrexpr.constr_expr) : EConstr.t mm =
   let$ u env sigma = Typing.type_of env sigma t in
   return u
 ;;
+
+let type_of_econstr (t : EConstr.t) : EConstr.t mm =
+  let open Mebi_monad in
+  let open Mebi_monad.Monad_syntax in
+  let$ ty env sigma = Typing.type_of env sigma t in
+  return ty
+;;
+
+type keys_kind = OfEConstr of EConstr.t Seq.t
+
+(** pstr a seq of keys *)
+let pstr_keys (keys : keys_kind) : string =
+  match keys with
+  | OfEConstr keys ->
+    let keys = List.of_seq keys in
+    Printf.sprintf
+      "[%s]"
+      (List.fold_left
+         (fun (acc : string) (k : EConstr.t) ->
+            Printf.sprintf "%s, %s" acc (econstr_to_string k))
+         (econstr_to_string (List.hd keys))
+         (List.tl keys))
+;;

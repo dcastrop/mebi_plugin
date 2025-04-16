@@ -53,6 +53,7 @@ module Logging : sig
   val log : ?params:params -> string -> unit
 
   module Log : sig
+    val override : ?params:params -> string -> unit
     val normal : ?params:params -> string -> unit
     val warning : ?params:params -> string -> unit
     val debug : ?params:params -> string -> unit
@@ -101,8 +102,4 @@ val print : ?show:bool -> string -> unit
 val default_indent_val : int
 val str_tabs : ?size:int -> int -> string
 val get_key_of_val : ('a, 'b) Hashtbl.t -> 'b -> 'a option
-val new_int_counter : unit -> unit -> int
-
-type keys_kind = OfEConstr of Evd.econstr Seq.t
-
-val pstr_keys : keys_kind -> string
+val new_int_counter : ?start:int -> unit -> unit -> int

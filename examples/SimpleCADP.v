@@ -143,22 +143,22 @@ Inductive step :
 
 (** [tm1] will keep waiting until [n] in state is 0, *)
 Example tm1 : tm :=
-  DEF 0 (
-    SEQ (
+  SEQ (
+    DEF 0 (
       IF N_IS_ZERO (
         ACT INC_N (* inc n by one, continue to enter *)
       ) (
         REC 0 (* go back to beginning, wait until can enter *)
       )
-    ) (
-      SEQ (ACT ENTER) (
-        SEQ (ACT (SET_V 5)) (
-          DEF 1 (
-            IF V_IS_ZERO (
-              SEQ (ACT LEAVE) (ACT DEC_N) (* leave and dec n by one *)
-            ) (
-              SEQ (ACT DEC_V) (REC 1) (* dec v by one, loop *)
-            )
+    )
+  ) (
+    SEQ (ACT ENTER) (
+      SEQ (ACT (SET_V 5)) (
+        DEF 1 (
+          IF V_IS_ZERO (
+            SEQ (ACT LEAVE) (ACT DEC_N) (* leave and dec n by one *)
+          ) (
+            SEQ (ACT DEC_V) (REC 1) (* dec v by one, loop *)
           )
         )
       )
@@ -222,7 +222,7 @@ Example e2 : sys :=
     PRC (OK, 0, 0)
   ).
 
-MeBi Dump "e2" LTS Bounded 350 Of e2 Using lts step.
+(* MeBi Dump "e2" LTS Bounded 350 Of e2 Using lts step. *)
 
 (*  *)
 Example e3 : sys :=
@@ -230,7 +230,7 @@ Example e3 : sys :=
     (PRC (tm1, 0, 0))
   ).
 
-MeBi Dump "e3" LTS Bounded 350 Of e3 Using lts step.
+MeBi Dump "e3" LTS Bounded 500 Of e3 Using lts step.
 
 (*  *)
 Example e4 : sys :=
