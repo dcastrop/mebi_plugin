@@ -1,6 +1,11 @@
 val is_unit_option : unit option -> bool
 
-type model_info = { is_complete : bool; bound : int }
+type model_info = {
+  is_complete : bool;
+  bound : int;
+  num_states : int;
+  num_edges : int;
+}
 
 val is_complete : model_info option -> bool option
 

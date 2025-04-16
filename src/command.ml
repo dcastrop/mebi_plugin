@@ -705,8 +705,8 @@ module MkGraph
     (* TODO: refactor pstr_lts and others *)
 
     let constructor
-      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-      (t : lts_transition)
+          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+          (t : lts_transition)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -750,8 +750,8 @@ module MkGraph
     ;;
 
     let transitions
-      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-      (transitions : lts_transition H.t)
+          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+          (transitions : lts_transition H.t)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -765,11 +765,11 @@ module MkGraph
             (fun (from : EConstr.t)
               (transition' : lts_transition)
               (acc : string) ->
-              Printf.sprintf
-                "%s%s%s\n"
-                acc
-                tabs'
-                (run (transition (from, transition'))))
+               Printf.sprintf
+                 "%s%s%s\n"
+                 acc
+                 tabs'
+                 (run (transition (from, transition'))))
             transitions
             "\n"
         in
@@ -777,8 +777,8 @@ module MkGraph
     ;;
 
     let states
-      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-      (states : N.t)
+          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+          (states : N.t)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -790,7 +790,7 @@ module MkGraph
         let pstr : string =
           N.fold
             (fun (s : EConstr.t) (acc : string) ->
-              Printf.sprintf "%s%s%s\n" acc tabs' (run (econstr s)))
+               Printf.sprintf "%s%s%s\n" acc tabs' (run (econstr s)))
             states
             "\n"
         in
@@ -798,8 +798,8 @@ module MkGraph
     ;;
 
     let queue
-      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-      (q : EConstr.t Queue.t)
+          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+          (q : EConstr.t Queue.t)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -811,7 +811,7 @@ module MkGraph
         let pstr : string =
           Queue.fold
             (fun (acc : string) (to_visit : EConstr.t) ->
-              Printf.sprintf "%s%s%s\n" acc tabs' (run (econstr to_visit)))
+               Printf.sprintf "%s%s%s\n" acc tabs' (run (econstr to_visit)))
             "\n"
             q
         in
@@ -819,8 +819,8 @@ module MkGraph
     ;;
 
     let lts
-      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-      (g : lts_graph)
+          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+          (g : lts_graph)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -1112,7 +1112,11 @@ module MkGraph
         translate_coq_lts g.transitions tbl
       in
       let is_complete : bool = Queue.is_empty g.to_visit in
-      let info : Utils.model_info = { is_complete; bound } in
+      let num_states : int = S.cardinal g.states in
+      let num_edges : int = H.length g.transitions in
+      let info : Utils.model_info =
+        { is_complete; bound; num_states; num_edges }
+      in
       let lts : Lts.lts = Lts.Create.lts ~init ~info (Flat flat_rlts) in
       if Bool.not is_complete
       then (

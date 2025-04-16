@@ -52,8 +52,48 @@ Example proc0 := tfix trec.
 
 Example proc1 := tpar (tfix (tact ASend trec)) (tfix (tact ARecv trec)).
 
+MeBi Show LTS Bounded 150 Of proc1 Using termLTS.
+MeBi Dump "proc1" LTS Bounded 150 Of proc1 Using termLTS.
+
+
+(* Example proc1 := tpar (tfix (tact ASend trec)) (tfix (tact ARecv trec)).
+
+MeBi Show LTS Bounded 150 Of proc0 Using termLTS. *)
+
+
 (* TODO: would be cool to do first a "FSM minimisation". I believe there are
  many bisimilar states here, where the order (or assoc) of the processes is
  completely irrelevant *)
 (* MeBi Show LTS Bounded 150 Of proc1 Using termLTS. *)
 (* MeBi Dump "proc0" FSM Bounded 150 Of proc1 Using termLTS. *)
+
+
+Inductive comp : Set :=
+| cterm : term -> comp
+| cpar : comp -> comp -> comp
+.
+
+(* second layer *)
+Inductive compLTS : comp -> bool -> comp -> Prop :=
+| do_t : forall a t t', termLTS t a t' -> compLTS (cterm t) a (cterm t')
+
+| do_l : forall a l l' r, compLTS l a l' -> compLTS (cpar l r) a (cpar l' r)
+| do_r : forall a l r r', compLTS r a r' -> compLTS (cpar l r) a (cpar l r')
+
+| do_l_end : forall a r, compLTS (cpar (cterm tend) r) a r
+| do_r_end : forall a l, compLTS (cpar l (cterm tend)) a l
+.
+
+Example comp0 := cpar (cterm proc0) (cterm proc0).
+
+MeBi Show LTS Bounded 150 Of comp0 Using termLTS compLTS.
+
+Example comp1a := cpar (cterm proc1) (cterm tend).
+
+MeBi Show LTS Bounded 150 Of comp1a Using termLTS compLTS.
+MeBi Dump "comp1a" LTS Bounded 150 Of comp1a Using termLTS compLTS.
+
+Example comp1b := cpar (cterm proc1) (cterm proc1).
+
+(* MeBi Show LTS Bounded 150 Of comp1b Using termLTS compLTS. *)
+MeBi Dump "comp1b" LTS Bounded 150 Of comp1b Using termLTS compLTS.

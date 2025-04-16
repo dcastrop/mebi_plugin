@@ -8,6 +8,8 @@ let is_unit_option (override : unit option) : bool =
 type model_info =
   { is_complete : bool
   ; bound : int
+  ; num_states : int
+  ; num_edges : int
   }
 
 let is_complete (m : model_info option) : bool option =
@@ -21,7 +23,12 @@ module PStr = struct
     match m with
     | None -> "None"
     | Some i ->
-      Printf.sprintf "{| is complete: %b; bound: %i |}" i.is_complete i.bound
+      Printf.sprintf
+        "{| is complete: %b; bound: %i; num states: %i; num edges: %i |}"
+        i.is_complete
+        i.bound
+        i.num_states
+        i.num_edges
   ;;
 end
 
@@ -344,4 +351,17 @@ let new_int_counter ?(start : int = 0) () : unit -> int =
     to_return
   in
   get_and_incr_counter
+;;
+
+type keys_kind = OfEConstr of EConstr.t Seq.t
+
+(** pstr a seq of keys *)
+let pstr_keys (keys : keys_kind) : string =
+  match keys with
+  | OfEConstr keys ->
+    Seq.fold_left
+      (fun (acc : string) (k : EConstr.t) ->
+         Printf.sprintf "%s, %s" acc (Mebi_utils.econstr_to_string k))
+      ""
+      keys
 ;;
