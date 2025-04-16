@@ -1121,7 +1121,6 @@ module MkGraph
       if Bool.not is_complete
       then (
         let to_visit : int = Queue.length g.to_visit in
-        params.kind <- Warning ();
         Log.warning
           ~params
           (Printf.sprintf
@@ -1140,7 +1139,10 @@ module MkGraph
         in
         Log.warning
           ~params
-          (Printf.sprintf "saved incomplete LTS to: %s\n" dump_filepath));
+          (Printf.sprintf "saved incomplete LTS to: %s\n" dump_filepath))
+      else Log.override (Printf.sprintf "Finished translating LTS: %s" name);
+      (* Log.override
+        (Printf.sprintf "leaving lts_graph_to_lts: %s, %b" name is_complete); *)
       return (lts, tbl)
     ;;
   end
@@ -1199,14 +1201,12 @@ let build_bounded_lts
   =
   (* graph lts *)
   let* graph_lts = G.build_graph ~params tr_rlts fn_rlts tref bound in
-  log ~params (Printf.sprintf "= = = = = = = = =\n");
+  Log.override ~params (Printf.sprintf "- - - - -");
   if G.S.cardinal graph_lts.states > bound
   then
-    log
+    Log.warning
       ~params
-      (Printf.sprintf
-         "Warning: LTS graph is incomplete, exceeded bound: %i.\n"
-         bound);
+      (Printf.sprintf "LTS graph is incomplete, exceeded bound: %i.\n" bound);
   (* show edges *)
   (* log
      ~params
@@ -1214,9 +1214,9 @@ let build_bounded_lts
      "(e) Graph Edges: %s.\n"
      (run (G.PStr.transitions ~params:(Log params) graph_lts.transitions))); *)
   (* show if normal output allowed from outside call *)
-  if params.options.show_debug_output
+  (* if params.options.show_debug_output
   then params.kind <- Details ()
-  else params.kind <- Normal ();
+  else params.kind <- Normal (); *)
   (* log
      ~params
      (Printf.sprintf
@@ -1245,13 +1245,11 @@ let build_fsm_from_bounded_lts
     build_rlts_map ~params grefs
   in
   (* print out the type of the term *)
-  params.override <- Some ();
-  log
+  Log.override
     ~params
     (Printf.sprintf
        "(A) type of tref: %s"
        (econstr_to_string (run (Mebi_utils.type_of_tref tref))));
-  params.override <- None;
   (* graph module *)
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
@@ -1281,13 +1279,11 @@ module Vernac = struct
         build_rlts_map ~params grefs
       in
       (* print out the type of the term *)
-      params.override <- Some ();
-      log
+      Log.override
         ~params
         (Printf.sprintf
            "(B) type of tref: %s"
            (econstr_to_string (run (Mebi_utils.type_of_tref tref))));
-      if Bool.not (List.mem name [ "e3"; "e4" ]) then params.override <- None;
       (* graph module *)
       let* graphM = make_graph_builder in
       let module G = (val graphM) in
@@ -1304,9 +1300,7 @@ module Vernac = struct
       : unit mm
       =
       let* (the_lts : Lts.lts) = build ~params ~bound tref grefs in
-      params.kind <- Normal ();
-      params.override <- Some ();
-      log
+      Log.normal
         ~params
         (Printf.sprintf "LTS: %s" (Lts.PStr.lts ~params:(Log params) the_lts));
       return ()
@@ -1337,9 +1331,6 @@ module Vernac = struct
             (JSON ())
             (LTS the_lts)
         in
-        params.options.output_enabled <- true;
-        params.kind <- Normal ();
-        params.override <- Some ();
         Log.normal
           ~params
           (Printf.sprintf "Dumped LTS into: %s.\n" dump_filepath))
