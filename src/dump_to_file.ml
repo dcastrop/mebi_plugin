@@ -65,9 +65,9 @@ let get_filename (f : filename_kind) (is_complete : bool option) : string =
 type filetype_kind = JSON of unit
 
 let build_filename
-  (filename : filename_kind)
-  (filetype : filetype_kind)
-  (is_complete : bool option)
+      (filename : filename_kind)
+      (filetype : filetype_kind)
+      (is_complete : bool option)
   : string
   =
   match filetype with
@@ -75,10 +75,10 @@ let build_filename
 ;;
 
 let build_filepath
-  (output_dir : output_dir_kind)
-  (filename : filename_kind)
-  (filetype : filetype_kind)
-  (is_complete : bool option)
+      (output_dir : output_dir_kind)
+      (filename : filename_kind)
+      (filetype : filetype_kind)
+      (is_complete : bool option)
   : string
   =
   match output_dir, filetype with
@@ -114,30 +114,30 @@ module JSON = struct
     let writing_space : bool ref = ref true in
     String.fold_left
       (fun (acc : string) (c : char) ->
-        Printf.sprintf
-          "%s%s"
-          acc
-          (if String.contains "\n\r\t" c
-           then
-             if !writing_space
-             then ""
-             else (
-               writing_space := true;
-               " ")
-           else (
-             let c_str : string = String.make 1 c in
-             if String.contains "\"" c
-             then "\\\""
-             else (
-               match String.equal " " c_str, !writing_space with
-               | true, true -> ""
-               | true, false ->
-                 writing_space := true;
-                 c_str
-               | false, true ->
-                 writing_space := false;
-                 c_str
-               | false, false -> c_str))))
+         Printf.sprintf
+           "%s%s"
+           acc
+           (if String.contains "\n\r\t" c
+            then
+              if !writing_space
+              then ""
+              else (
+                writing_space := true;
+                " ")
+            else (
+              let c_str : string = String.make 1 c in
+              if String.contains "\"" c
+              then "\\\""
+              else (
+                match String.equal " " c_str, !writing_space with
+                | true, true -> ""
+                | true, false ->
+                  writing_space := true;
+                  c_str
+                | false, true ->
+                  writing_space := false;
+                  c_str
+                | false, false -> c_str))))
       ""
       s
   ;;
@@ -163,7 +163,7 @@ module JSON = struct
         lhs
         (List.fold_left
            (fun (acc : string) (s : string) ->
-             Printf.sprintf "%s,%s%s" acc sep s)
+              Printf.sprintf "%s,%s%s" acc sep s)
            h
            t)
         rhs
@@ -181,6 +181,8 @@ module JSON = struct
         (Dict
            [ key_val "is_complete" (quoted (Printf.sprintf "%b" i.is_complete))
            ; key_val "bound" (quoted (Printf.sprintf "%i" i.bound))
+           ; key_val "num_states" (quoted (Printf.sprintf "%i" i.num_states))
+           ; key_val "num_edges" (quoted (Printf.sprintf "%i" i.num_edges))
            ])
   ;;
 
@@ -215,7 +217,7 @@ module JSON = struct
            (List
               (Lts.Transitions.fold
                  (fun (t : Lts.transition) (acc : string list) ->
-                   List.append acc [ transition t ])
+                    List.append acc [ transition t ])
                  ts
                  [])))
     ;;
@@ -245,12 +247,14 @@ module JSON = struct
         (List
            (List.fold_left
               (fun (acc : string list) ((s, a) : state * action) ->
-                List.append
-                  acc
-                  [ col
-                      (Dict
-                         [ key_val "state" (state s); key_val "action" a.label ])
-                  ])
+                 List.append
+                   acc
+                   [ col
+                       (Dict
+                          [ key_val "state" (state s)
+                          ; key_val "action" a.label
+                          ])
+                   ])
               []
               anno))
     ;;
@@ -262,7 +266,7 @@ module JSON = struct
            (List
               (List.fold_left
                  (fun (acc : string list) (anno : annotation) ->
-                   List.append acc [ annotation anno ])
+                    List.append acc [ annotation anno ])
                  []
                  annos)))
     ;;
@@ -284,7 +288,7 @@ module JSON = struct
            (List
               (Fsm.Alphabet.fold
                  (fun (a : action) (acc : string list) ->
-                   List.append acc [ action a ])
+                    List.append acc [ action a ])
                  alphas
                  [])))
     ;;
@@ -296,7 +300,7 @@ module JSON = struct
            (List
               (Fsm.States.fold
                  (fun (s : state) (acc : string list) ->
-                   List.append acc [ state s ])
+                    List.append acc [ state s ])
                  states
                  [])))
     ;;
@@ -320,25 +324,25 @@ module JSON = struct
                in
                States.fold
                  (fun (from_state : state) (from_acc : string list) ->
-                   let outgoing_actions : States.t Actions.t =
-                     Edges.find edges from_state
-                   in
-                   let actions : Alphabet.t =
-                     Alphabet.of_seq (Actions.to_seq_keys outgoing_actions)
-                   in
-                   let action_acc : string list =
-                     Alphabet.fold
-                       (fun (a : action) (action_acc : string list) ->
-                         let destination_states : States.t =
-                           Actions.find outgoing_actions a
-                         in
-                         List.append
-                           action_acc
-                           [ edge from_state a destination_states ])
-                       actions
-                       []
-                   in
-                   List.append from_acc action_acc)
+                    let outgoing_actions : States.t Actions.t =
+                      Edges.find edges from_state
+                    in
+                    let actions : Alphabet.t =
+                      Alphabet.of_seq (Actions.to_seq_keys outgoing_actions)
+                    in
+                    let action_acc : string list =
+                      Alphabet.fold
+                        (fun (a : action) (action_acc : string list) ->
+                           let destination_states : States.t =
+                             Actions.find outgoing_actions a
+                           in
+                           List.append
+                             action_acc
+                             [ edge from_state a destination_states ])
+                        actions
+                        []
+                    in
+                    List.append from_acc action_acc)
                  from_states
                  [])))
     ;;
@@ -368,9 +372,9 @@ type dumpable_kind =
   | FSM of Fsm.fsm
 
 let handle_filecontents
-  (filename : string)
-  (filetype : filetype_kind)
-  (to_dump : dumpable_kind)
+      (filename : string)
+      (filetype : filetype_kind)
+      (to_dump : dumpable_kind)
   : string * bool option
   =
   match to_dump, filetype with
@@ -379,10 +383,10 @@ let handle_filecontents
 ;;
 
 let write_to_file
-  (output_dir : output_dir_kind)
-  (filename : filename_kind)
-  (filetype : filetype_kind)
-  (to_dump : dumpable_kind)
+      (output_dir : output_dir_kind)
+      (filename : filename_kind)
+      (filetype : filetype_kind)
+      (to_dump : dumpable_kind)
   : string
   =
   (* get content to output *)
