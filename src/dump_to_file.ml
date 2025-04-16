@@ -148,24 +148,36 @@ module JSON = struct
     | List of string list
     | Dict of string list
 
+  let handle_list_sep sep : string =
+    match sep with
+    | None -> " "
+    | Some sep -> sep
+  ;;
+
+  let handle_dict_sep sep : string =
+    match sep with
+    | None -> "\n"
+    | Some sep -> sep
+  ;;
+
   (** assumes elements of [ss] are already stringified. *)
   let col
         ?(prefix : string = "")
+        ?(sep : string option)
         ?(tlindent : string = "")
-        ?(suffix : string = "")
         (ss : col_kind)
     : string
     =
     let ss, lhs, rhs, sep =
       match ss with
-      | List ss -> ss, "[", "]", " "
-      | Dict ss -> ss, "{", "}", "\n"
+      | List ss -> ss, "[", "]", handle_list_sep sep
+      | Dict ss -> ss, "{", "}", handle_dict_sep sep
     in
     match ss with
     | [] -> Printf.sprintf "%s %s" lhs rhs
     | h :: t ->
       Printf.sprintf
-        "%s%s\n%s\n%s%s%s"
+        "%s%s\n%s\n%s%s"
         prefix
         lhs
         (List.fold_left
@@ -175,7 +187,6 @@ module JSON = struct
            t)
         tlindent
         rhs
-        suffix
   ;;
 
   let key_val ?(prefix : string = "") (k : string) (v : string) : string =
@@ -237,7 +248,8 @@ module JSON = struct
       key_val
         "transitions"
         (col
-           ~suffix:"\n"
+           ~sep:"\n"
+           ~tlindent:"\t"
            (List
               (Lts.Transitions.fold
                  (fun (t : Lts.transition) (acc : string list) ->
@@ -430,7 +442,7 @@ let write_to_file
      filepath *)
   (* (fun oc -> Out_channel.output_string oc content); *)
   let oc = open_out filepath in
-  Printf.fprintf oc "%s\n" content;
+  Printf.fprintf oc "%s" content;
   close_out oc;
   (* return filepath *)
   filepath
