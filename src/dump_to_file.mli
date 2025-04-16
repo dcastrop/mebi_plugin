@@ -34,10 +34,13 @@ module JSON : sig
 
   type col_kind = List of string list | Dict of string list
 
+  val handle_list_sep : string option -> string
+  val handle_dict_sep : string option -> string
+
   val col :
     ?prefix:string ->
+    ?sep:string ->
     ?tlindent:string ->
-    ?suffix:string ->
     col_kind ->
     string
 
