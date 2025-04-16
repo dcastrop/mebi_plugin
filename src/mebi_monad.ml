@@ -67,6 +67,30 @@ let make_constr_tbl st =
   }
 ;;
 
+let eq_action st () = Mebi_action.eq
+let lts_actions_hash st () t = Hashtbl.hash t
+
+(** [make_transition_tbl st] is ... *)
+let make_lts_actions_tbl st =
+  let cmp_eq = eq_action st in
+  let hashf = lts_actions_hash st in
+  let module LtsTransitionsTbl =
+    Hashtbl.Make (struct
+      type t = Mebi_action.action
+
+      let equal (a1 : Mebi_action.action) (a2 : Mebi_action.action) =
+        cmp_eq () a1 a2
+      ;;
+
+      let hash t = hashf () t
+    end)
+  in
+  { state = st
+  ; value =
+      (module LtsTransitionsTbl : Hashtbl.S with type key = Mebi_action.action)
+  }
+;;
+
 let compare_constr st () t1 t2 =
   if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1
 ;;
@@ -83,6 +107,37 @@ let make_constr_set (st : coq_context ref)
     end)
   in
   { state = st; value = (module Constrset : Set.S with type elt = EConstr.t) }
+;;
+
+let compare_constr_tree
+      st
+      ()
+      (t1 : EConstr.t * Mebi_tree.ConstrTree.t)
+      (t2 : EConstr.t * Mebi_tree.ConstrTree.t)
+  =
+  if
+    EConstr.eq_constr !st.coq_ctx (fst t1) (fst t2)
+    && Mebi_tree.ConstrTree.eq (snd t1) (snd t2)
+  then 0
+  else 1
+;;
+
+let make_constr_tree_set (st : coq_context ref)
+  : (module Set.S with type elt = EConstr.t * Mebi_tree.ConstrTree.t) in_context
+  =
+  let cmp = compare_constr_tree st in
+  let module Constrset =
+    Set.Make (struct
+      type t = EConstr.t * Mebi_tree.ConstrTree.t
+
+      let compare t1 t2 = cmp () t1 t2
+    end)
+  in
+  { state = st
+  ; value =
+      (module Constrset : Set.S
+        with type elt = EConstr.t * Mebi_tree.ConstrTree.t)
+  }
 ;;
 
 (** Monadic for loop *)

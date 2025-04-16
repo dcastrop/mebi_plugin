@@ -35,6 +35,10 @@ test/tests.mli
 
 src/mebi_errors.ml
 src/mebi_errors.mli
+src/mebi_action.ml
+src/mebi_action.mli
+src/mebi_tree.ml
+src/mebi_tree.mli
 src/mebi_monad.ml
 src/mebi_monad.mli
 src/mebi_utils.ml

@@ -1,13 +1,14 @@
 open Pp
+open Mebi_tree
 open Mebi_utils
 open Mebi_monad
 open Mebi_monad.Monad_syntax
 
 (* *)
-open Fsm
 open Utils.Logging
 open Utils.Formatting
 open Utils
+open Fsm
 
 let default_params : Params.log = Params.Default.log ~mode:(Coq ()) ()
 
@@ -54,7 +55,7 @@ let get_lts_labels_and_terms
     @param [constructor_transitions]
       is the array of constructors of the Coq term (i.e., the transitions or outgoing edges). *)
 type raw_lts =
-  { coq_lts : EConstr.constr
+  { coq_lts : EConstr.t
   ; trm_type : EConstr.types
   ; lbl_type : EConstr.types
   ; coq_ctor_names : Names.Id.t array
@@ -216,50 +217,10 @@ let _pstr_unif_problem (t : unif_problem) : string =
       (econstr_to_string termR)
 ;;
 
-type 'a tree = Node of 'a * 'a tree list
-
-let rec tree_eq (t1 : int tree) (t2 : int tree) : bool =
-  match t1, t2 with
-  | Node (a1, b1), Node (a2, b2) -> a1 == a2 && tree_list_eq b1 b2
-
-and tree_list_eq (l1 : int tree list) (l2 : int tree list) : bool =
-  match l1, l2 with
-  | [], [] -> true
-  | h1 :: t1, h2 :: t2 -> tree_eq h1 h2 && tree_list_eq t1 t2
-  | _, _ -> false
-;;
-
-let rec _tree_contains (i : int) (t : int tree) : bool =
-  match t with
-  | Node (j, l) ->
-    if i == j
-    then true
-    else (
-      match l with
-      | [] -> false
-      | l -> List.for_all (fun (s : int tree) -> _tree_contains i s) l)
-;;
-
-let rec pstr_int_tree (t : int tree) : string =
-  match t with
-  | Node (lhs_int, rhs_int_tree_list) ->
-    Printf.sprintf
-      "(%d) [%s]"
-      lhs_int
-      (List.fold_left
-         (fun (acc : string) (rhs_int_tree : int tree) ->
-            pstr_int_tree rhs_int_tree)
-         ""
-         rhs_int_tree_list)
-;;
-
-(* change type to: *)
-(* (int tree * unif_problem) list -> int tree list option t *)
-(* *)
 let rec unify_all
           ?(params : Params.log = default_params)
-          (i : (int tree * unif_problem) list)
-  : int tree list option t
+          (i : (ConstrTree.t * unif_problem) list)
+  : ConstrTree.t list option t
   =
   params.kind <- Debug ();
   match i with
@@ -288,8 +249,8 @@ let rec unify_all
 let sandboxed_unify
       ?(params : Params.log = default_params)
       (tgt_term : EConstr.t)
-      (u : (int tree * unif_problem) list)
-  : (EConstr.t * int tree list) option mm
+      (u : (ConstrTree.t * unif_problem) list)
+  : (EConstr.t * ConstrTree.t list) option mm
   =
   (* let* _ =
      if is_output_kind_enabled params
@@ -311,8 +272,8 @@ let sandboxed_unify
 (** [coq_ctor]
     - [EConstr.t] action
     - [EConstr.t] destination
-    - [int tree] coq-constructor index *)
-type coq_ctor = EConstr.t * EConstr.t * int tree
+    - [ConstrTree.t] coq-constructor index *)
+type coq_ctor = EConstr.t * EConstr.t * ConstrTree.t
 
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
@@ -321,7 +282,7 @@ let rec retrieve_tgt_nodes
           (i : int)
           (act : EConstr.t)
           (tgt_term : EConstr.t)
-  : (int tree * unif_problem) list list -> coq_ctor list t
+  : (ConstrTree.t * unif_problem) list list -> coq_ctor list t
   =
   (* :  (int tree * unif_problem) list list -> (EConstr.t * int tree list) list t *)
   function
@@ -344,10 +305,10 @@ let rec retrieve_tgt_nodes
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
           ?(params : Params.log = default_params)
-          (acc : (int tree * unif_problem) list list)
+          (acc : (ConstrTree.t * unif_problem) list list)
           (fn_rlts : term_type_map)
   :  EConstr.t list * EConstr.rel_declaration list
-  -> (int tree * unif_problem) list list option t
+  -> (ConstrTree.t * unif_problem) list list option t
   = function
   | [], [] -> return (Some acc)
   | _ :: substl, t :: tl ->
@@ -358,7 +319,13 @@ let rec check_updated_ctx
     (match EConstr.kind sigma upd_t with
      | App (fn, args) ->
        (match Hashtbl.find_opt fn_rlts fn with
-        | None -> check_updated_ctx acc fn_rlts (substl, tl)
+        | None ->
+          Log.warning
+            ~params
+            (Printf.sprintf
+               "check_updated_ctx, fn_rlts does not have corresponding fn: %s."
+               (econstr_to_string fn));
+          check_updated_ctx acc fn_rlts (substl, tl)
         | Some rlts ->
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
           let* ctors =
@@ -374,7 +341,7 @@ let rec check_updated_ctx
           else (
             let ctors =
               List.map
-                (fun (_, (tL : EConstr.t), (i : int tree)) ->
+                (fun (_, (tL : EConstr.t), (i : ConstrTree.t)) ->
                    i, { termL = tL; termR = args.(2) })
                 ctors
             in
@@ -429,7 +396,7 @@ and check_valid_constructor
       let* success = Option.cata (fun a -> m_unify a act) (return true) ma in
       if success
       then
-        let* (next_ctors : (int tree * unif_problem) list list option) =
+        let* (next_ctors : (ConstrTree.t * unif_problem) list list option) =
           check_updated_ctx ~params [ [] ] fn_rlts (substl, ctx_tys)
         in
         let$+ act env sigma = Reductionops.nf_all env sigma act in
@@ -461,26 +428,29 @@ let default_bound : int = 10
 module type GraphB = sig
   module H : Hashtbl.S with type key = EConstr.t
   module S : Set.S with type elt = EConstr.t
-  (* module L : Set.S with type elt = EConstr.t *)
+  module C : Hashtbl.S with type key = Mebi_action.action
+  module D : Set.S with type elt = EConstr.t * ConstrTree.t
 
-  type ('a, 'b) transition =
-    { action : 'a
-    ; destination : 'b
-    ; index_tree : int tree
-    }
-
-  type lts_transition = (action, EConstr.constr) transition
+  type term = EConstr.t
+  type action = Mebi_action.action
+  type constr_transitions = D.t C.t
 
   type lts_graph =
-    { to_visit : EConstr.constr Queue.t
-      (* Queue for BFS *)
-      (* ; labels : L.t *)
+    { to_visit : term Queue.t
     ; states : S.t
-    ; transitions : lts_transition H.t
+    ; transitions : constr_transitions H.t
     }
+
+  val insert_constr_transition
+    :  constr_transitions
+    -> action
+    -> term
+    -> ConstrTree.t
+    -> unit
 
   val build_lts_graph
     :  ?params:Params.log
+    -> term_type_map
     -> term_type_map
     -> lts_graph
     -> int
@@ -506,7 +476,7 @@ module type GraphB = sig
 
     val translate_coq_lts
       :  ?params:Params.log
-      -> lts_transition H.t
+      -> constr_transitions H.t
       -> coq_translation
       -> Lts.raw_flat_lts mm
 
@@ -519,59 +489,213 @@ module type GraphB = sig
       -> (Lts.lts * coq_translation) mm
   end
 
-  module PStr : sig
-    val econstr : EConstr.t -> string mm
-    val constructor : ?params:Params.pstr -> lts_transition -> string mm
+  (* module PStr : sig
+     val econstr : EConstr.t -> string mm
+     val constructor : ?params:Params.pstr -> lts_transitions -> string mm
 
-    val transition
-      :  ?params:Params.pstr
-      -> EConstr.constr * lts_transition
-      -> string mm
+     val transition
+     :  ?params:Params.pstr
+     -> EConstr.t * lts_transitions
+     -> string mm
 
-    val transitions : ?params:Params.pstr -> lts_transition H.t -> string mm
-    val states : ?params:Params.pstr -> S.t -> string mm
-    val queue : ?params:Params.pstr -> EConstr.t Queue.t -> string mm
-    val lts : ?params:Params.pstr -> lts_graph -> string mm
-  end
+     val transitions : ?params:Params.pstr -> lts_transitions H.t -> string mm
+     val states : ?params:Params.pstr -> S.t -> string mm
+     val queue : ?params:Params.pstr -> EConstr.t Queue.t -> string mm
+     val lts : ?params:Params.pstr -> lts_graph -> string mm
+     end *)
 end
 
 (** [MkGraph M] is ...
     [M] is a ... *)
 module MkGraph
     (M : Hashtbl.S with type key = EConstr.t)
-    (N : Set.S with type elt = EConstr.t) : GraphB =
-(* (O : Set.S with type elt = EConstr.t) *)
-struct
+    (N : Set.S with type elt = EConstr.t)
+    (O : Hashtbl.S with type key = Mebi_action.action)
+    (P : Set.S with type elt = EConstr.t * ConstrTree.t) : GraphB = struct
+  (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t]. *)
   module H = M
+
+  (* [S] is the set of states, of [EConstr.t]. *)
   module S = N
-  (* module L = O *)
 
-  (** [('a, 'b) transition] is a 3-tuple comprised of:
-      - [action] which is typically of type [Fsm.action].
-      - [destination] of type ['b].
-      - [index_tree] of type [int tree], which helps us handle recursion. *)
-  type ('a, 'b) transition =
-    { action : 'a
-    ; destination : 'b
-    ; index_tree : int tree
-    }
+  (* [T] is the hashtbl of mapping actions to destination states, which is obtained by [H] from a corresponding start state. *)
+  module C = O
 
-  (** [lts_transition] is a type for describing outgoing transitions of a Coq-based LTS.
-      - [action] is the constructor number.
-      - [EConstr.constr] is the destination node. *)
-  type lts_transition = (action, EConstr.constr) transition
+  (* [D] is the set of destination tuples, each comprised of a [term] and the corresponding [ConstrTree.t]. *)
+  module D = P
 
-  (** [lts_graph] is a type used when building an LTS (graph) from Coq-based terms.
-      - [to_visit] is a queue of coq terms to explore in BFS.
-      - [states] is the set of coq terms visited so far.
-      - [transitions] is a hashtable mapping integers (of hashed constructors) to Coq terms. *)
+  (** [term] is a coq-term (i.e., [EConstr.t]) *)
+  type term = EConstr.t
+
+  (** [action] corresponds to a coq-constructor that applies to a [term]. *)
+  type action = Mebi_action.action
+
+  (** [constr_transitions] is a hashtbl mapping [action]s to [terms] and [ConstrTree.t]. *)
+  type constr_transitions = D.t C.t
+
+  (** [lts_graph] is a record containing a queue of [term]s [to_visit], a set of states visited (i.e., [term]s), and a hashtbl mapping [terms] to a map of [constr_transitions], which maps [action]s to [term]s and their [ConstrTree.t]. *)
   type lts_graph =
-    { to_visit : EConstr.constr Queue.t (* ; labels : L.t *)
+    { to_visit : term Queue.t
     ; states : S.t
-    ; transitions : lts_transition H.t
+    ; transitions : constr_transitions H.t
     }
 
-  module PStr = struct
+  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * ConstrTree.t)] in a given [constr_transitions]. *)
+  let insert_constr_transition
+        (constrs : constr_transitions)
+        (a : action)
+        (d : term)
+        (c : ConstrTree.t)
+    : unit
+    =
+    (* Log.override
+      (Printf.sprintf
+         "E, a:(label:%s, is_tau:%b)\n  constrs keys: [%s]"
+         a.label
+         a.is_tau
+         (C.fold
+            (fun (k : action) _ (acc : string) ->
+               Printf.sprintf
+                 "%s\n\
+                 \    (label:%s, is_tau:%b | eq %b, label eq %b, is_tau eq %b) "
+                 acc
+                 k.label
+                 k.is_tau
+                 (Mebi_action.eq a k)
+                 (a.label == k.label)
+                 (a.is_tau == k.is_tau))
+            constrs
+            "")); *)
+    match C.find_opt constrs a with
+    | None ->
+      (* Log.override (Printf.sprintf "F, action: %s" a.label); *)
+      C.add constrs a (D.singleton (d, c))
+    | Some ds ->
+      (* Log.override (Printf.sprintf "G, action: %s" a.label); *)
+      C.replace constrs a (D.add (d, c) ds)
+  ;;
+
+  let add_new_term_constr_transition
+        (g : lts_graph)
+        (t : term)
+        (a : action)
+        (d : term)
+        (c : ConstrTree.t)
+    : unit
+    =
+    H.add g.transitions t (C.of_seq (List.to_seq [ a, D.singleton (d, c) ]))
+  ;;
+
+  let _pstr_constr_transition
+        (f : term)
+        (a : action)
+        ((d, c) : term * ConstrTree.t)
+    : string
+    =
+    Printf.sprintf
+      "{|from: %s; label: %s; dest: %s; tree: %s|}"
+      (econstr_to_string f)
+      a.label
+      (econstr_to_string d)
+      (ConstrTree.pstr c)
+  ;;
+
+  let _pstr_list_constr_transitions (f : term) (a : action) (ds : D.t)
+    : string list
+    =
+    let l = D.to_list ds in
+    let hd = List.hd l
+    and tl = List.tl l in
+    List.fold_left
+      (fun (acc : string list) d -> _pstr_constr_transition f a d :: acc)
+      [ _pstr_constr_transition f a hd ]
+      tl
+  ;;
+
+  let _pstr_list_term_transitions (f : term) (cs : constr_transitions)
+    : string list
+    =
+    let keys = List.of_seq (C.to_seq_keys cs) in
+    let hd = List.hd keys
+    and tl = List.tl keys in
+    let hd_ds = C.find cs hd in
+    List.fold_left
+      (fun (acc : string list) (a : action) ->
+         List.append (_pstr_list_constr_transitions f a (C.find cs a)) acc)
+      (_pstr_list_constr_transitions f hd hd_ds)
+      tl
+  ;;
+
+  let _pstr_list_transitions (ts : constr_transitions H.t) : string list list =
+    let keys = List.of_seq (H.to_seq_keys ts) in
+    let hd = List.hd keys
+    and tl = List.tl keys in
+    let hd_ts = H.find ts hd in
+    List.fold_left
+      (fun (acc : string list list) (f : term) ->
+         _pstr_list_term_transitions f (H.find ts f) :: acc)
+      [ _pstr_list_term_transitions hd hd_ts ]
+      tl
+  ;;
+
+  let _check_for_duplicate_transitions
+        ?(prefix : string = "")
+        ?(none : string option)
+        (g : lts_graph)
+    : unit
+    =
+    if H.length g.transitions > 1
+    then (
+      let pstr_list_list : string list list =
+        _pstr_list_transitions g.transitions
+      in
+      let dupes : (string, int) Hashtbl.t = Hashtbl.create 0 in
+      let without_dupes : string list =
+        List.fold_left
+          (fun (acc : string list) (ts : string list) ->
+             List.fold_left
+               (fun (acc' : string list) (t : string) ->
+                  if List.mem t acc'
+                  then (
+                    (match Hashtbl.find_opt dupes t with
+                     | None -> Hashtbl.add dupes t 1
+                     | Some i -> Hashtbl.replace dupes t (i + 1));
+                    acc')
+                  else t :: acc')
+               acc
+               ts)
+          []
+          pstr_list_list
+      in
+      let num_dupes = Hashtbl.length dupes in
+      let num_nondupes = List.length without_dupes in
+      let dupe_id = new_int_counter () in
+      if num_dupes > 0
+      then
+        Log.warning
+          (Printf.sprintf
+             "%s (%d/%d) duplicate transitions found: [%s\n]"
+             prefix
+             num_dupes
+             num_nondupes
+             (Hashtbl.fold
+                (fun (s : string) (i : int) (acc : string) ->
+                   Printf.sprintf
+                     "%s\n- #%d, had %d dupes:\n  %s\n"
+                     acc
+                     (dupe_id ())
+                     i
+                     s)
+                dupes
+                ""))
+      else (
+        match none with
+        | None -> ()
+        | Some s -> Log.override (Printf.sprintf "%s%s" prefix s));
+      ())
+  ;;
+
+  (* module PStr = struct
     let econstr (t : EConstr.t) : string mm =
       let* env = get_env in
       let* sigma = get_sigma in
@@ -598,8 +722,8 @@ struct
     ;;
 
     let transition
-          ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
-          ((from, transition) : EConstr.constr * lts_transition)
+      ?(params : Params.pstr = Fmt (Params.Default.fmt ~mode:(Coq ()) ()))
+      ((from, transition) : EConstr.t * lts_transition)
       : string mm
       =
       let _params : Params.fmt = Params.handle params in
@@ -607,15 +731,15 @@ struct
         Printf.sprintf
           "{ %s --<%s>--> %s }"
           (run (econstr from))
-          transition.action.label
+          (fst transition).label
           (run (econstr transition.destination))
       and detail_pstr : string =
         Printf.sprintf
           "{ %s :: %s --<%s | id:%d>--> %s }"
-          (pstr_int_tree transition.index_tree)
+          (pstr_int_tree (snd transition))
           (run (econstr from))
-          transition.action.label
-          transition.action.id
+          (fst transition).label
+          (fst transition).id
           (run (econstr transition.destination))
       in
       match _params.params.kind with
@@ -727,154 +851,7 @@ struct
            pstr_transitions
            tabs)
     ;;
-  end
-
-  (** handles adding new transition to [lts_graph] *)
-  (* let _handle_new_lts_graph_transition
-    (g : lts_graph ref)
-    (t : EConstr.t)
-    (to_add : action)
-    (int_tree : int tree)
-    (tgt : EConstr.t)
-    : lts_graph mm
-    =
-    let* sigma = get_sigma in
-    (match H.find_opt !g.transitions t with
-     | None ->
-       H.add
-         !g.transitions
-         t
-         { action = to_add; index_tree = int_tree; destination = tgt }
-     | Some lt ->
-       (match lt with
-        | { action; destination; index_tree } ->
-          if EConstr.eq_constr sigma tgt destination
-          then
-            H.replace
-              !g.transitions
-              t
-              { action
-              ; index_tree = merge_tree index_tree int_tree
-              ; destination
-              }
-          else
-            H.add
-              !g.transitions
-              t
-              { action = to_add; index_tree = int_tree; destination = tgt }));
-    return !g
-  ;; *)
-
-  let _debug_output_constrs (t : EConstr.t) (constrs : coq_ctor list) : unit mm =
-    debug (fun env sigma ->
-      str
-        (Printf.sprintf
-           "---- (returned from check_valid_constructor)\n\
-            build_lts_graph, t: %s\n\
-            constrs of t: [%s\n\
-            ] (length %d).\n"
-           (econstr_to_string t)
-           (List.fold_left
-              (fun (acc : string) ((act, ctor, int_tree) : coq_ctor) ->
-                 Printf.sprintf
-                   "%s\n- ctor_index_tree: %s\n  act:%s\n  ctors: %s\n"
-                   acc
-                   (pstr_int_tree int_tree)
-                   (econstr_to_string act)
-                   (econstr_to_string ctor))
-              ""
-              constrs)
-           (List.length constrs)))
-  ;;
-
-  (** returns [None] if [ctor] is not in [ctors], by matching only on the first two fields (i.e, [act] and [tgt] -- ignoring [int tree]). *)
-  let find_opt_ctor (ctor : coq_ctor) (ctors : coq_ctor list)
-    : coq_ctor option mm
-    =
-    let* sigma = get_sigma in
-    match ctor with
-    | act, tgt, int_tree ->
-      (match
-         List.find_opt
-           (fun (ctor' : coq_ctor) ->
-              match ctor' with
-              | act', tgt', int_tree' ->
-                EConstr.eq_constr sigma act act'
-                && EConstr.eq_constr sigma tgt tgt')
-           ctors
-       with
-       | None -> return None
-       | Some ctor -> return (Some ctor))
-  ;;
-
-  (** merges [ctors] into [acc] by:
-      - if already in [acc], then skip.
-      - if another in [acc] has matching [act] and [tgt] fields, then merge [int tree].
-      - else just add to [acc]. *)
-  let merge_constrs_tree_lists
-        ?(params : Params.log = default_params)
-        (t : EConstr.t)
-        (acc : coq_ctor list)
-        (ctors : coq_ctor list)
-    : coq_ctor list
-    =
-    List.fold_left
-      (fun (acc' : coq_ctor list) (ctor : coq_ctor) ->
-         (* skip if already in [acc'] *)
-         if List.mem ctor acc'
-         then acc'
-         else (
-           let (opt_ctor : coq_ctor option) = run (find_opt_ctor ctor acc') in
-           match opt_ctor with
-           (* merge [int tree] if already exists *)
-           | Some ctor' ->
-             (match ctor, ctor' with
-              | (act, tgt, int_tree), (_act', _tgt', int_tree') ->
-                if Bool.not (tree_eq int_tree int_tree')
-                then (
-                  Log.warning
-                    ~params
-                    (Printf.sprintf
-                       "merge_constrs_tree_lists, different int tree found for \
-                        t: %s\n\
-                        existing: %s\n\
-                        new: %s.\n\
-                        kept the original (i.e., %s)"
-                       (econstr_to_string t)
-                       (pstr_int_tree int_tree)
-                       (pstr_int_tree int_tree')
-                       (pstr_int_tree int_tree));
-                  params.kind <- Normal ());
-                (act, tgt, int_tree) :: acc')
-             (* add if new *)
-           | None -> ctor :: acc'))
-      acc
-      ctors
-  ;;
-
-  (** *)
-  let build_constrs_tree_list
-        ?(params : Params.log = default_params)
-        (t : EConstr.t)
-        (fn_rlts : term_type_map)
-    : coq_ctor list mm
-    =
-    Hashtbl.fold
-      (fun (_k : EConstr.t) (v : raw_lts) (acc : coq_ctor list mm) ->
-         let* (ctors : coq_ctor list) =
-           check_valid_constructor
-             ~params
-             v.constructor_transitions
-             fn_rlts
-             t
-             None
-         in
-         if List.is_empty ctors
-         then acc
-         else return (merge_constrs_tree_lists t (run acc) ctors))
-      fn_rlts
-      (return [])
-  ;;
+  end *)
 
   let get_new_states
         ?(params : Params.log = default_params)
@@ -883,113 +860,42 @@ struct
         (ctors : coq_ctor list)
     : S.t mm
     =
-    let get_transition_id : unit -> int = new_int_counter () in
     let iter_body (i : int) (new_states : S.t) =
       let (act, tgt, int_tree) : coq_ctor = List.nth ctors i in
-      let new_states : S.t = S.add tgt new_states in
       let* sigma = get_sigma in
       (* TODO: detect tau transitions and then defer to [Fsm.tau] instead. *)
-      let to_add : action =
-        Fsm.Create.action
-          ~is_tau:false
-          ~annotation:[]
-          (Of (get_transition_id (), econstr_to_string act))
+      let is_tau : bool = false in
+      let to_add : Mebi_action.action =
+        { label = econstr_to_string act; is_tau }
       in
+      (* _check_for_duplicate_transitions
+        ~prefix:(Printf.sprintf "A, t: %s\n  " (econstr_to_string t))
+        g; *)
       (match H.find_opt g.transitions t with
        | None ->
-         H.add
-           g.transitions
-           t
-           { action = to_add; index_tree = int_tree; destination = tgt };
-         (* if [tgt] is new state, add to [new_states] *)
-         if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
-         then ()
-         else Queue.push tgt g.to_visit
-       | Some lt ->
-         (* () *)
-         (match lt with
-          | { action; destination; index_tree } ->
-            if Bool.not (tree_eq int_tree index_tree)
-            then (
-              (* if [tgt] is new state, add to [new_states] *)
-              if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
-              then ()
-              else Queue.push tgt g.to_visit;
-              H.add
-                g.transitions
-                t
-                { action = to_add; index_tree = int_tree; destination = tgt })));
-      return new_states
+         (* Log.override "C"; *)
+         add_new_term_constr_transition g t to_add tgt int_tree
+       | Some actions ->
+         (* Log.override "D"; *)
+         insert_constr_transition actions to_add tgt int_tree);
+      (* if [tgt] has not been explored then add [to_visit] *)
+      (* _check_for_duplicate_transitions
+        ~prefix:(Printf.sprintf "B, t: %s\n  " (econstr_to_string t))
+        g; *)
+      if
+        H.mem g.transitions tgt
+        || EConstr.eq_constr sigma tgt t
+        || S.mem tgt g.states
+      then ()
+      else Queue.push tgt g.to_visit;
+      (* add [tgt] to [new_states] *)
+      return (S.add tgt new_states)
     in
-    (* ) *)
-    (* ctors; *)
-    (* return !new_states *)
-    (* let new_states : S.t ref = ref (S.singleton t) in *)
     iterate 0 (List.length ctors - 1) (S.singleton t) iter_body
   ;;
 
-  let _get_new_states
-        ?(params : Params.log = default_params)
-        (t : EConstr.t)
-        (g : lts_graph)
-        (ctors : coq_ctor list)
-    : S.t mm
-    =
-    let new_states : S.t ref = ref (S.singleton t) in
-    let get_transition_id : unit -> int = new_int_counter () in
-    let* sigma = get_sigma in
-    List.iter
-      (fun ((act, tgt, int_tree) : coq_ctor) ->
-         (* let old_states = !new_states in *)
-         new_states := S.add tgt !new_states;
-         (* log
-           ~params
-           (Printf.sprintf
-           "get_new_states, t: %s\nold new states: %s\nnew new states: %s"
-           (econstr_to_string t)
-           (run (PStr.states ~params:(Log params) old_states))
-           (run (PStr.states ~params:(Log params) old_states))); *)
-         (* TODO: detect tau transitions and then defer to [Fsm.tau] instead. *)
-         let to_add : action =
-           Fsm.Create.action
-             ~is_tau:false
-             ~annotation:[]
-             (Of (get_transition_id (), econstr_to_string act))
-         in
-         match H.find_opt g.transitions t with
-         | None ->
-           H.add
-             g.transitions
-             t
-             { action = to_add; index_tree = int_tree; destination = tgt };
-           (* if [tgt] is new state, add to [new_states] *)
-           if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
-           then ()
-           else Queue.push tgt g.to_visit
-         | Some lt ->
-           (* () *)
-           (match lt with
-            | { action; destination; index_tree } ->
-              if Bool.not (tree_eq int_tree index_tree)
-              then (
-                (* if [tgt] is new state, add to [new_states] *)
-                if H.mem g.transitions tgt || EConstr.eq_constr sigma tgt t
-                then ()
-                else Queue.push tgt g.to_visit;
-                H.add
-                  g.transitions
-                  t
-                  { action = to_add; index_tree = int_tree; destination = tgt }))
-         (*
-            if Bool.not (EConstr.eq_constr sigma tgt destination)
-              then
-                H.add
-                  g.transitions
-                  t
-                  { action = to_add; index_tree = int_tree; destination = tgt }) *))
-      ctors;
-    return !new_states
-  ;;
+  exception
+    CannotFindTypeOfTermToVisit of (EConstr.t * EConstr.t * term_type_map)
 
   (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
       @param fn_rlts maps coq-term names to [raw_lts].
@@ -998,6 +904,7 @@ struct
       @return an [lts_graph] with a maximum of [bound] many states. *)
   let rec build_lts_graph
             ?(params : Params.log = default_params)
+            (tr_rlts : term_type_map)
             (fn_rlts : term_type_map)
             (g : lts_graph)
             (bound : int)
@@ -1010,17 +917,36 @@ struct
     then return g (* exit if bound reached *)
     else
       let* (t : EConstr.t) = return (Queue.pop g.to_visit) in
-      let* (constrs : coq_ctor list) =
-        build_constrs_tree_list ~params t fn_rlts
-      in
-      (* let* _ =
-         if is_output_kind_enabled params
-         then debug_output_constrs t constrs
-         else return ()
-         in *)
-      let* (new_states : S.t) = get_new_states ~params t g constrs in
-      let g = { g with states = S.union g.states new_states } in
-      build_lts_graph ~params fn_rlts g bound
+      let* ty = Mebi_utils.type_of_econstr t in
+      match Hashtbl.find_opt tr_rlts ty with
+      | None ->
+        Log.warning
+          ~params
+          (Printf.sprintf
+             "build_lts_graph, cannot find type of term to visit.\n\
+              - term: %s,\n\
+              - type: %s,\n\
+              - types provided: %s\n\
+              - types provided: %s"
+             (econstr_to_string t)
+             (econstr_to_string ty)
+             (Mebi_utils.pstr_keys
+                (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys fn_rlts)))
+             (Mebi_utils.pstr_keys
+                (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts))));
+        raise (CannotFindTypeOfTermToVisit (t, ty, fn_rlts))
+      | Some rlts ->
+        let* constrs : coq_ctor list =
+          check_valid_constructor
+            ~params
+            rlts.constructor_transitions
+            fn_rlts
+            t
+            None
+        in
+        let* (new_states : S.t) = get_new_states ~params t g constrs in
+        let g = { g with states = S.union g.states new_states } in
+        build_lts_graph ~params tr_rlts fn_rlts g bound
   ;;
 
   exception
@@ -1052,8 +978,10 @@ struct
             where tr_lts (keys): %s\n\
             and fn_rlts (keys): %s."
            (econstr_to_string t)
-           (Utils.pstr_keys (Utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts)))
-           (Utils.pstr_keys (Utils.OfEConstr (Hashtbl.to_seq_keys fn_rlts))));
+           (Mebi_utils.pstr_keys
+              (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts)))
+           (Mebi_utils.pstr_keys
+              (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys fn_rlts))));
       raise (CoqTermDoesNotMatchSemantics (tref, t, tr_rlts, fn_rlts))
     | Some rlts ->
       (* update environment by typechecking *)
@@ -1061,11 +989,19 @@ struct
       let$ t env sigma = sigma, Reductionops.nf_all env sigma t in
       let q = Queue.create () in
       let* _ = return (Queue.push t q) in
-      build_lts_graph
-        ~params
-        fn_rlts
-        { to_visit = q; states = S.empty; transitions = H.create bound }
-        bound
+      let* g =
+        build_lts_graph
+          ~params
+          tr_rlts
+          fn_rlts
+          { to_visit = q; states = S.empty; transitions = H.create bound }
+          bound
+      in
+      _check_for_duplicate_transitions
+        ~prefix:"build_graph, "
+        ~none:"No duplicates found"
+        g;
+      return g
   ;;
 
   module DeCoq = struct
@@ -1101,20 +1037,35 @@ struct
 
     let translate_coq_lts
           ?(params : Params.log = default_params)
-          (transitions : lts_transition H.t)
+          (transitions : constr_transitions H.t)
           (tbl : coq_translation)
       : Lts.raw_flat_lts mm
       =
       return
         (H.fold
            (fun (from : EConstr.t)
-             (transition : (action, EConstr.constr) transition)
+             (actions : constr_transitions)
              (acc : Lts.raw_flat_lts) ->
-              ( Hashtbl.find tbl.from_coq from
-              , transition.action.label
-              , Hashtbl.find tbl.from_coq transition.destination
-              , Some (pstr_int_tree transition.index_tree) )
-              :: acc)
+              C.fold
+                (fun (action : Mebi_action.action)
+                  (destinations : D.t)
+                  (acc' : Lts.raw_flat_lts) ->
+                   D.fold
+                     (fun ((destination, constr_tree) : D.elt)
+                       (acc'' : Lts.raw_flat_lts) ->
+                        ( (match Hashtbl.find_opt tbl.from_coq from with
+                           | None -> "UNKNOWN"
+                           | Some s -> s)
+                        , action.label
+                        , (match Hashtbl.find_opt tbl.from_coq destination with
+                           | None -> "UNKNOWN"
+                           | Some s -> s)
+                        , Some (ConstrTree.pstr constr_tree) )
+                        :: acc'')
+                     destinations
+                     acc')
+                actions
+                acc)
            transitions
            [])
     ;;
@@ -1142,9 +1093,6 @@ struct
       : (Lts.lts * coq_translation) mm
       =
       params.kind <- Debug ();
-      if List.mem name [ "e3"; "e4" ]
-      then params.override <- Some ()
-      else params.override <- None;
       (* abort if lts not complete *)
       (* if Bool.not (Queue.is_empty g.to_visit)
          then (
@@ -1192,8 +1140,7 @@ struct
         in
         Log.warning
           ~params
-          (Printf.sprintf "saved incomplete LTS to: %s\n" dump_filepath)
-        (* raise (UnfinishedLTS g) *));
+          (Printf.sprintf "saved incomplete LTS to: %s\n" dump_filepath));
       return (lts, tbl)
     ;;
   end
@@ -1206,10 +1153,12 @@ end
 
 (** [make_graph_builder] is ... *)
 let make_graph_builder =
-  let* m = make_constr_tbl in
+  let* h = make_constr_tbl in
   let* s = make_constr_set in
+  let* c = make_lts_actions_tbl in
+  let* d = make_constr_tree_set in
   (* let* l = make_constr_set in *)
-  let module G = MkGraph ((val m)) ((val s)) (* ((val l)) *) in
+  let module G = MkGraph ((val h)) ((val s)) ((val c)) ((val d)) in
   return (module G : GraphB)
 ;;
 
@@ -1221,11 +1170,10 @@ let build_rlts_map
   let trmap : term_type_map = Hashtbl.create (List.length grefs)
   and fnmap : term_type_map = Hashtbl.create (List.length grefs)
   and map_id : unit -> int = new_int_counter () in
-  params.override <- Some ();
   List.iter
     (fun (gref : Names.GlobRef.t) ->
        let rlts : raw_lts = run (check_ref_lts gref) in
-       log
+       Log.override
          ~params
          (Printf.sprintf "= = = = = = = = =\n\trlts (#%d):" (map_id ()));
        let _ = log_raw_lts ~params rlts in
@@ -1235,7 +1183,6 @@ let build_rlts_map
        Hashtbl.add trmap rlts.trm_type rlts;
        Hashtbl.add fnmap rlts.coq_lts rlts)
     grefs;
-  params.override <- None;
   trmap, fnmap
 ;;
 
@@ -1309,6 +1256,7 @@ let build_fsm_from_bounded_lts
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
   (* get pure lts *)
+  (* Utils.Logging.Log.override "D"; *)
   let* (the_lts : Lts.lts) =
     build_bounded_lts ~params ~bound ~name tr_rlts fn_rlts tref (module G)
   in

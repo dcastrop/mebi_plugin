@@ -34,9 +34,6 @@ module Partition = Set.Make (States)
 (****** Action Labels & Alphabet *************************************)
 (*********************************************************************)
 
-(** [action] is a 2-tuple with a unique [id] and (non-unique) [label]).
-    - [id] is an integer for identifying the action.
-    - [label] is a (pretty-printed) string describing the action. *)
 type action =
   { id : int
   ; label : string
@@ -48,6 +45,16 @@ and annotation = (state * action) list
 and annotations = annotation list
 
 let tau : action = { id = 0; label = "~"; is_tau = true; annotation = [] }
+
+(* let of_mebi_action (a : Mebi_action.action) : action =
+  match a with
+  | {label; is_tau } -> { id; label; is_tau; annotation = [] }
+;;
+
+let to_mebi_action (a : action) : Mebi_action.action =
+  match a with
+  | { label; is_tau; _ } -> { label; is_tau }
+;; *)
 
 (** [Alphabet] is a set of [actions]. *)
 module Alphabet = Set.Make (struct
@@ -129,8 +136,8 @@ module PStr = struct
   ;;
 
   let states
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (states : States.t)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (states : States.t)
     : string
     =
     if States.is_empty states
@@ -145,18 +152,18 @@ module PStr = struct
         (if _params.no_leading_tab then "" else tabs)
         (States.fold
            (fun (s : state) (acc : string) ->
-             Printf.sprintf
-               "%s%s\n"
-               acc
-               (state ~params:(Fmt (no_leading_tab false _params')) s))
+              Printf.sprintf
+                "%s%s\n"
+                acc
+                (state ~params:(Fmt (no_leading_tab false _params')) s))
            states
            "\n")
         tabs)
   ;;
 
   let partition
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (partition : Partition.t)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (partition : Partition.t)
     : string
     =
     if Partition.is_empty partition
@@ -171,10 +178,10 @@ module PStr = struct
         (if _params.no_leading_tab then "" else tabs)
         (Partition.fold
            (fun (states' : States.t) (acc : string) ->
-             Printf.sprintf
-               "%s%s\n"
-               acc
-               (states ~params:(Fmt (no_leading_tab false _params')) states'))
+              Printf.sprintf
+                "%s%s\n"
+                acc
+                (states ~params:(Fmt (no_leading_tab false _params')) states'))
            partition
            "\n")
         tabs)
@@ -202,8 +209,8 @@ module PStr = struct
   ;;
 
   let alphabet
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (actions : Alphabet.t)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (actions : Alphabet.t)
     : string
     =
     if Alphabet.is_empty actions
@@ -218,18 +225,18 @@ module PStr = struct
         (if _params.no_leading_tab then "" else tabs)
         (Alphabet.fold
            (fun (a : action) (acc : string) ->
-             Printf.sprintf
-               "%s%s\n"
-               acc
-               (action ~params:(Fmt (no_leading_tab false _params')) a))
+              Printf.sprintf
+                "%s%s\n"
+                acc
+                (action ~params:(Fmt (no_leading_tab false _params')) a))
            actions
            "\n")
         tabs)
   ;;
 
   let annotation
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (anno : annotation)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (anno : annotation)
     : string
     =
     let _params : Params.fmt = Params.handle params in
@@ -241,11 +248,11 @@ module PStr = struct
         "[%s]"
         (List.fold_left
            (fun (acc : string) ((t_s, t_a) : state * action) ->
-             Printf.sprintf
-               "%s; %s,%s"
-               acc
-               (state ~params:(Fmt _params') t_s)
-               (action ~params:(Fmt _params') t_a))
+              Printf.sprintf
+                "%s; %s,%s"
+                acc
+                (state ~params:(Fmt _params') t_s)
+                (action ~params:(Fmt _params') t_a))
            (Printf.sprintf
               "%s,%s"
               (state ~params:(Fmt _params') h_s)
@@ -254,8 +261,8 @@ module PStr = struct
   ;;
 
   let annotations
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (anno : annotations)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (anno : annotations)
     : string
     =
     let _params : Params.fmt = Params.handle params in
@@ -267,17 +274,17 @@ module PStr = struct
         "anno: %s"
         (List.fold_left
            (fun (acc : string) (s_a : (state * action) list) ->
-             Printf.sprintf
-               "%s;   %s"
-               acc
-               (annotation ~params:(Fmt _params') s_a))
+              Printf.sprintf
+                "%s;   %s"
+                acc
+                (annotation ~params:(Fmt _params') s_a))
            (annotation ~params:(Fmt _params') h)
            t)
   ;;
 
   let edge
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    ((from, a, destination) : state * action * state)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        ((from, a, destination) : state * action * state)
     : string
     =
     let _params : Params.fmt = Params.handle params in
@@ -295,9 +302,9 @@ module PStr = struct
   ;;
 
   let actions
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    ?(from : state option)
-    (actions' : States.t Actions.t)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        ?(from : state option)
+        (actions' : States.t Actions.t)
     : string
     =
     (* increment tab of inner elements of table *)
@@ -323,11 +330,11 @@ module PStr = struct
         (if _params.no_leading_tab then "" else tabs)
         (Actions.fold
            (fun (a : action) (destinations : States.t) (acc : string) ->
-             Printf.sprintf
-               "%s{ --%s--> %s }\n"
-               acc
-               (action ~params:(Fmt _params') a)
-               (states ~params:(Fmt _params') destinations))
+              Printf.sprintf
+                "%s{ --%s--> %s }\n"
+                acc
+                (action ~params:(Fmt _params') a)
+                (states ~params:(Fmt _params') destinations))
            actions'
            "\n")
     (* if some from state, then go and pstr individual edges *)
@@ -341,26 +348,26 @@ module PStr = struct
       else
         Actions.fold
           (fun (a : action) (destinations : States.t) (acc : string) ->
-            Printf.sprintf
-              "%s%s"
-              acc
-              (States.fold
-                 (fun (destination : state) (acc' : string) ->
-                   Printf.sprintf
-                     "%s%s\n"
-                     acc'
-                     (edge
-                        ~params:(Fmt (no_leading_tab false _params))
-                        (from_state, a, destination)))
-                 destinations
-                 ""))
+             Printf.sprintf
+               "%s%s"
+               acc
+               (States.fold
+                  (fun (destination : state) (acc' : string) ->
+                     Printf.sprintf
+                       "%s%s\n"
+                       acc'
+                       (edge
+                          ~params:(Fmt (no_leading_tab false _params))
+                          (from_state, a, destination)))
+                  destinations
+                  ""))
           actions'
           ""
   ;;
 
   let edges
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (edges' : States.t Actions.t Edges.t)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (edges' : States.t Actions.t Edges.t)
     : string
     =
     if Edges.length edges' == 0
@@ -377,13 +384,13 @@ module PStr = struct
            (fun (from_state : state)
              (actions' : States.t Actions.t)
              (acc : string) ->
-             Printf.sprintf
-               "%s%s"
-               acc
-               (actions
-                  ~params:(Fmt (no_leading_tab false _params'))
-                  ?from:(Some from_state)
-                  actions'))
+              Printf.sprintf
+                "%s%s"
+                acc
+                (actions
+                   ~params:(Fmt (no_leading_tab false _params'))
+                   ?from:(Some from_state)
+                   actions'))
            edges'
            "\n")
         tabs)
@@ -477,9 +484,9 @@ module Create = struct
         is a pretty-printed representation, which defaults to [s{id}].
       @param id is the unique identifier for the state. *)
   let action
-    ?(is_tau : bool option)
-    ?(annotation : annotations option)
-    (params : action_param)
+        ?(is_tau : bool option)
+        ?(annotation : annotations option)
+        (params : action_param)
     : action
     =
     let is_tau : bool =
@@ -535,11 +542,11 @@ module Create = struct
 
   (** [fsm init alphabet states edges] is a wrapper constructor for [fsm]. *)
   let fsm
-    ?(info : Utils.model_info option = None)
-    (init : state option)
-    (alphabet : Alphabet.t)
-    (states : States.t)
-    (edges : States.t Actions.t Edges.t)
+        ?(info : Utils.model_info option = None)
+        (init : state option)
+        (alphabet : Alphabet.t)
+        (states : States.t)
+        (edges : States.t Actions.t Edges.t)
     : fsm
     =
     { init; alphabet; states; edges; info }
@@ -584,8 +591,8 @@ module Clone = struct
   let actions (a's : States.t Actions.t) : States.t Actions.t =
     Actions.fold
       (fun (a : action) (destinations : States.t) (acc : States.t Actions.t) ->
-        Actions.add acc (action a) (states destinations);
-        acc)
+         Actions.add acc (action a) (states destinations);
+         acc)
       a's
       (Create.actions ())
   ;;
@@ -595,8 +602,8 @@ module Clone = struct
       (fun (from : state)
         (a's : States.t Actions.t)
         (acc : States.t Actions.t Edges.t) ->
-        Edges.add acc (state from) (actions a's);
-        acc)
+         Edges.add acc (state from) (actions a's);
+         acc)
       es
       (Create.edges ())
   ;;
@@ -629,9 +636,9 @@ module IsMatch = struct
   ;;
 
   let edge
-    ?(weak : bool option)
-    ((a_f, a_a, a_d) : state * action * state)
-    ((b_f, b_a, b_d) : state * action * state)
+        ?(weak : bool option)
+        ((a_f, a_a, a_d) : state * action * state)
+        ((b_f, b_a, b_d) : state * action * state)
     : bool
     =
     let weak : bool =
@@ -665,10 +672,10 @@ module New = struct
   ;;
 
   let action
-    ?(is_tau : bool option)
-    ?(annotation : annotations option)
-    (label : string)
-    (fsm : fsm)
+        ?(is_tau : bool option)
+        ?(annotation : annotations option)
+        (label : string)
+        (fsm : fsm)
     : action
     =
     let is_tau : bool =
@@ -724,7 +731,7 @@ module Append = struct
     | Annos annos ->
       List.fold_left
         (fun (acc : annotations) (anno : annotation) ->
-          annotations' (Anno anno) acc)
+           annotations' (Anno anno) acc)
         append_to
         annos
   ;;
@@ -740,12 +747,12 @@ module Append = struct
     | Annos annos ->
       List.fold_left
         (fun (acc : annotations option) (anno : annotation) ->
-          match acc with
-          | None -> None
-          | Some acc ->
-            (match annotations (Anno anno) acc with
-             | None -> None
-             | Some a -> Some a))
+           match acc with
+           | None -> None
+           | Some acc ->
+             (match annotations (Anno anno) acc with
+              | None -> None
+              | Some a -> Some a))
         (Some append_to)
         annos
   ;;
@@ -766,9 +773,9 @@ module Append = struct
   ;;
 
   let states
-    ?(skip_duplicate_names : bool = true)
-    (fsm : fsm)
-    (states : States.t)
+        ?(skip_duplicate_names : bool = true)
+        (fsm : fsm)
+        (states : States.t)
     : unit
     =
     States.iter (fun (s : state) -> state ~skip_duplicate_names fsm s) states
@@ -875,15 +882,15 @@ module Filter = struct
     | State to_match ->
       States.filter
         (fun (s : state) ->
-          (* will always use the same compare as [States.t] *)
-          States.equal (States.singleton s) (States.singleton to_match))
+           (* will always use the same compare as [States.t] *)
+           States.equal (States.singleton s) (States.singleton to_match))
         states
   ;;
 
   let filter_actions
-    ?(weak : bool option)
-    (actions : States.t Actions.t)
-    (kind : kind_action_filter)
+        ?(weak : bool option)
+        (actions : States.t Actions.t)
+        (kind : kind_action_filter)
     : States.t Actions.t
     =
     let weak : bool =
@@ -894,22 +901,22 @@ module Filter = struct
     let res : States.t Actions.t = Create.actions () in
     Actions.iter
       (fun (a : action) (destinations : States.t) ->
-        match kind with
-        | Label l -> if l == a.label then Actions.add res a destinations
-        | Matches b ->
-          if IsMatch.action ~weak a b then Actions.add res a destinations
-        | IsSilent -> if a.is_tau then Actions.add res a destinations
-        | To s ->
-          let res' : States.t = filter_states destinations (State s) in
-          if States.is_empty res' == false then Actions.add res a res')
+         match kind with
+         | Label l -> if l == a.label then Actions.add res a destinations
+         | Matches b ->
+           if IsMatch.action ~weak a b then Actions.add res a destinations
+         | IsSilent -> if a.is_tau then Actions.add res a destinations
+         | To s ->
+           let res' : States.t = filter_states destinations (State s) in
+           if States.is_empty res' == false then Actions.add res a res')
       actions;
     res
   ;;
 
   let filter_edges
-    ?(weak : bool option)
-    (edges : States.t Actions.t Edges.t)
-    (kind : kind_edge_filter)
+        ?(weak : bool option)
+        (edges : States.t Actions.t Edges.t)
+        (kind : kind_edge_filter)
     : States.t Actions.t Edges.t
     =
     let weak : bool =
@@ -920,25 +927,25 @@ module Filter = struct
     let res : States.t Actions.t Edges.t = Create.edges 0 in
     Edges.iter
       (fun (from : state) (a's : States.t Actions.t) ->
-        match kind with
-        | From s -> if from == s then Edges.add res s a's
-        | FromAny states ->
-          States.iter
-            (fun (s : state) -> if from == s then Edges.add res s a's)
-            states
-        | Action kind' ->
-          let res_actions : States.t Actions.t =
-            filter_actions ~weak a's kind'
-          in
-          if Actions.length res_actions > 0 then Edges.add res from res_actions)
+         match kind with
+         | From s -> if from == s then Edges.add res s a's
+         | FromAny states ->
+           States.iter
+             (fun (s : state) -> if from == s then Edges.add res s a's)
+             states
+         | Action kind' ->
+           let res_actions : States.t Actions.t =
+             filter_actions ~weak a's kind'
+           in
+           if Actions.length res_actions > 0 then Edges.add res from res_actions)
       edges;
     res
   ;;
 
   let actions
-    ?(weak : bool option)
-    (actions_to_filter : States.t Actions.t)
-    (kind : kind_action_filter)
+        ?(weak : bool option)
+        (actions_to_filter : States.t Actions.t)
+        (kind : kind_action_filter)
     : States.t Actions.t
     =
     let weak : bool =
@@ -950,9 +957,9 @@ module Filter = struct
   ;;
 
   let edges
-    ?(weak : bool option)
-    (edges_to_filter : has_edges)
-    (kind : kind_edge_filter)
+        ?(weak : bool option)
+        (edges_to_filter : has_edges)
+        (kind : kind_edge_filter)
     : States.t Actions.t Edges.t
     =
     let weak : bool =
@@ -1004,7 +1011,7 @@ module Get = struct
     | Annos annos ->
       List.fold_left
         (fun (acc : States.t) (anno : annotation) ->
-          States.union acc (states (Anno anno)))
+           States.union acc (states (Anno anno)))
         States.empty
         annos
   ;;
@@ -1019,9 +1026,9 @@ module Get = struct
 
   (** [actions_from from edges] is a shorthand for [Edges.find_opt] and in the case of [None] returns an empty map of actions. *)
   let actions_from
-    (* ?(weak : bool option) *)
-      (from : state)
-    (edges : States.t Actions.t Edges.t)
+        (* ?(weak : bool option) *)
+          (from : state)
+        (edges : States.t Actions.t Edges.t)
     : States.t Actions.t
     =
     match Edges.find_opt edges from with
@@ -1031,9 +1038,9 @@ module Get = struct
 
   (** [actions_of a edges] filters [actions] by action [a]. *)
   let actions_of
-    ?(weak : bool option)
-    (a : action)
-    (actions : States.t Actions.t)
+        ?(weak : bool option)
+        (a : action)
+        (actions : States.t Actions.t)
     : States.t Actions.t option
     =
     let weak : bool =
@@ -1063,9 +1070,9 @@ module Get = struct
 
   (** [edges_of a edges] filters [edges] by action [a]. *)
   let edges_of
-    ?(weak : bool option)
-    (a : action)
-    (edges : States.t Actions.t Edges.t)
+        ?(weak : bool option)
+        (a : action)
+        (edges : States.t Actions.t Edges.t)
     : States.t Actions.t Edges.t
     =
     let weak : bool =
@@ -1103,7 +1110,7 @@ module Get = struct
     | Actions es ->
       Actions.fold
         (fun (_a : action) (dests : States.t) (acc : States.t) ->
-          States.union acc dests)
+           States.union acc dests)
         es
         States.empty
     | Edges es ->
@@ -1124,34 +1131,34 @@ module Merge = struct
   open Utils
 
   let edges
-    ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
-    ((state_id_offset, merged_alphabet) : int * Alphabet.t)
-    (base : States.t Actions.t Edges.t)
-    (to_merge : States.t Actions.t Edges.t)
+        ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
+        ((state_id_offset, merged_alphabet) : int * Alphabet.t)
+        (base : States.t Actions.t Edges.t)
+        (to_merge : States.t Actions.t Edges.t)
     : States.t Actions.t Edges.t
     =
     Edges.iter
       (fun (from : state) (actions : States.t Actions.t) ->
-        let from' : state = Create.state (From (from, state_id_offset))
-        and actions' : States.t Actions.t =
-          Actions.length actions |> Actions.create
-        in
-        Actions.iter
-          (fun (a : action) (destinations : States.t) ->
-            Actions.add
-              actions'
-              (Alphabet.find a merged_alphabet)
-              (Create.states (From (destinations, state_id_offset))))
-          actions;
-        Edges.add base from' actions')
+         let from' : state = Create.state (From (from, state_id_offset))
+         and actions' : States.t Actions.t =
+           Actions.length actions |> Actions.create
+         in
+         Actions.iter
+           (fun (a : action) (destinations : States.t) ->
+              Actions.add
+                actions'
+                (Alphabet.find a merged_alphabet)
+                (Create.states (From (destinations, state_id_offset))))
+           actions;
+         Edges.add base from' actions')
       to_merge;
     base
   ;;
 
   let fsms
-    ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
-    (base : fsm)
-    (to_merge : fsm)
+        ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
+        (base : fsm)
+        (to_merge : fsm)
     : fsm * (state, state) Hashtbl.t
     =
     (* merge into [base] the fsm [to_merge] *)
@@ -1168,9 +1175,9 @@ module Merge = struct
       and merged_states : States.t =
         States.fold
           (fun (s : state) (acc : States.t) ->
-            let s' : state = Create.state (From (s, state_id_offset)) in
-            Hashtbl.add to_merge_state_map s' s;
-            States.add s' acc)
+             let s' : state = Create.state (From (s, state_id_offset)) in
+             Hashtbl.add to_merge_state_map s' s;
+             States.add s' acc)
           to_merge.states
           states
       in
@@ -1208,8 +1215,8 @@ module Organize = struct
     let unreachable_states : States.t =
       States.filter
         (fun (s : state) ->
-          States.mem s reachable_states == false || true
-          (* add condition for pruning if all incoming actions are silent *))
+           States.mem s reachable_states == false || true
+           (* add condition for pruning if all incoming actions are silent *))
         m.states
     in
     m.states
@@ -1247,10 +1254,10 @@ module Saturate = struct
   ;;
 
   let saturated_action
-    (a : action) (* last action taken *)
-    (b : action option) (* if rhs, the named action *)
-    (destination : state)
-    (annotation : annotation)
+        (a : action) (* last action taken *)
+        (b : action option) (* if rhs, the named action *)
+        (destination : state)
+        (annotation : annotation)
     : action
     =
     let b : action =
@@ -1260,7 +1267,7 @@ module Saturate = struct
         let (_s, b) : state * action =
           List.find
             (fun ((_state, b) : state * action) ->
-              (b.id == tau.id && b.label == tau.label) == false)
+               (b.id == tau.id && b.label == tau.label) == false)
             annotation
         in
         b
@@ -1280,14 +1287,14 @@ module Saturate = struct
       @param visited
         is the trace of states reached via silent actions used for annotation. *)
   let rec collect_annotated_actions
-    ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
-    (* (visited : States.t) *)
-      (visited_states : (state, int) Hashtbl.t)
-    (annotation : annotation)
-    (to_visit : States.t)
-    (saturated_actions : States.t Actions.t)
-    (named_action : action option)
-    (m : fsm)
+            ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
+            (* (visited : States.t) *)
+              (visited_states : (state, int) Hashtbl.t)
+            (annotation : annotation)
+            (to_visit : States.t)
+            (saturated_actions : States.t Actions.t)
+            (named_action : action option)
+            (m : fsm)
     : unit
     =
     let is_lhs_of_named_action : bool =
@@ -1297,60 +1304,60 @@ module Saturate = struct
     in
     States.iter
       (fun (destination : state) ->
-        match Edges.find_opt m.edges destination with
-        | None -> ()
-        | Some destination_actions ->
-          if is_state_revisitable visited_states destination
-          then visited_state visited_states destination;
-          Actions.iter
-            (fun (a : action) (destinations : States.t) ->
-              if a.is_tau
-              then (
-                (* also add if we already have the named action *)
-                (* TODO: restrict this feature to only destination has non-silent actions *)
-                if is_lhs_of_named_action == false
+         match Edges.find_opt m.edges destination with
+         | None -> ()
+         | Some destination_actions ->
+           if is_state_revisitable visited_states destination
+           then visited_state visited_states destination;
+           Actions.iter
+             (fun (a : action) (destinations : States.t) ->
+                if a.is_tau
                 then (
-                  let a' : action =
-                    saturated_action
-                      a
-                      named_action
-                      destination
-                      (List.append annotation [ destination, a ])
-                  in
-                  Actions.add saturated_actions a' destinations);
-                (* continue *)
-                collect_annotated_actions
-                  ~params
-                  visited_states
-                  (List.append annotation [ destination, a ])
-                  destinations
-                  saturated_actions
-                  named_action
-                  m)
-              else if is_lhs_of_named_action
-              then (
-                (* a is a named-action, add and continue *)
-                Actions.add
-                  saturated_actions
-                  (saturated_action a (Some a) destination annotation)
-                  destinations;
-                (* need to continue annotating outward silent actions *)
-                collect_annotated_actions
-                  ~params
-                  visited_states
-                  (List.append annotation [ destination, a ])
-                  (* annotation *)
-                  destinations
-                  saturated_actions
-                  (Some a)
-                  m))
-            destination_actions)
+                  (* also add if we already have the named action *)
+                  (* TODO: restrict this feature to only destination has non-silent actions *)
+                  if is_lhs_of_named_action == false
+                  then (
+                    let a' : action =
+                      saturated_action
+                        a
+                        named_action
+                        destination
+                        (List.append annotation [ destination, a ])
+                    in
+                    Actions.add saturated_actions a' destinations);
+                  (* continue *)
+                  collect_annotated_actions
+                    ~params
+                    visited_states
+                    (List.append annotation [ destination, a ])
+                    destinations
+                    saturated_actions
+                    named_action
+                    m)
+                else if is_lhs_of_named_action
+                then (
+                  (* a is a named-action, add and continue *)
+                  Actions.add
+                    saturated_actions
+                    (saturated_action a (Some a) destination annotation)
+                    destinations;
+                  (* need to continue annotating outward silent actions *)
+                  collect_annotated_actions
+                    ~params
+                    visited_states
+                    (List.append annotation [ destination, a ])
+                    (* annotation *)
+                    destinations
+                    saturated_actions
+                    (Some a)
+                    m))
+             destination_actions)
       to_visit
   ;;
 
   let fsm
-    ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
-    (to_saturate : fsm)
+        ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
+        (to_saturate : fsm)
     : fsm
     =
     let m : fsm = Clone.fsm to_saturate in
@@ -1358,26 +1365,26 @@ module Saturate = struct
     (* for each outgoing edge from a state *)
     Edges.iter
       (fun (from : state) (a's : States.t Actions.t) ->
-        let saturated_actions : States.t Actions.t = Create.actions () in
-        Actions.iter
-          (fun (a : action) (destinations : States.t) ->
-            (* if it is silent,
+         let saturated_actions : States.t Actions.t = Create.actions () in
+         Actions.iter
+           (fun (a : action) (destinations : States.t) ->
+              (* if it is silent,
                - then collect all of the destination states transitions,
                - and if those transitions are also silent, continue recursively
                  else,
                - check for immediate silent actions and annotate those *)
-            collect_annotated_actions
-              ~params
-              (Hashtbl.create (States.cardinal m.states))
-              [ from, a ]
-              destinations
-              saturated_actions
-              (if a.is_tau then None else Some a)
-              m;
-            if a.is_tau == false
-            then Actions.add saturated_actions a destinations)
-          a's;
-        Edges.add saturated_edges from saturated_actions)
+              collect_annotated_actions
+                ~params
+                (Hashtbl.create (States.cardinal m.states))
+                [ from, a ]
+                destinations
+                saturated_actions
+                (if a.is_tau then None else Some a)
+                m;
+              if a.is_tau == false
+              then Actions.add saturated_actions a destinations)
+           a's;
+         Edges.add saturated_edges from saturated_actions)
       m.edges;
     m.edges <- saturated_edges;
     (* make sure all unreachable states/edges are pruned *)
@@ -1405,55 +1412,55 @@ module Saturate = struct
   ;;
 
   let rec explore_from
-    (from : state)
-    (anno : annotation)
-    (es : States.t Actions.t Edges.t)
+            (from : state)
+            (anno : annotation)
+            (es : States.t Actions.t Edges.t)
     : annotations
     =
     let actions : States.t Actions.t = Get.actions_from from es in
     Actions.fold
       (fun (a : action) (destinations : States.t) (annos : annotations) ->
-        if a.is_tau
-        then
-          (* explore from all destinations *)
-          States.fold
-            (fun (destination : state) (annos' : annotations) ->
-              (* check if already visited *)
-              if States.mem destination (Get.states (Anno anno))
-              then annos'
-              else (
-                let anno' : annotation =
-                  append_annotation (destination, a) anno
-                in
-                append_annotations
-                  (Annos (explore_from destination anno' es))
-                  annos'))
-            destinations
-            annos
-          (* else if found, save annotation if not already annotated (i.e., from self)
+         if a.is_tau
+         then
+           (* explore from all destinations *)
+           States.fold
+             (fun (destination : state) (annos' : annotations) ->
+                (* check if already visited *)
+                if States.mem destination (Get.states (Anno anno))
+                then annos'
+                else (
+                  let anno' : annotation =
+                    append_annotation (destination, a) anno
+                  in
+                  append_annotations
+                    (Annos (explore_from destination anno' es))
+                    annos'))
+             destinations
+             annos
+           (* else if found, save annotation if not already annotated (i.e., from self)
              States.mem from (Get.states (Annos annos))
              then annos
              else append_annotations (Anno (append_annotation (from, a) anno)) annos) *)
-        else
-          (* found, save annotation for all destinations reached *)
-          States.fold
-            (fun (destination : state) (annos' : annotations) ->
-              let anno' : annotation =
-                append_annotation (destination, a) anno
-              in
-              append_annotations (Anno anno') annos')
-            destinations
-            annos)
+         else
+           (* found, save annotation for all destinations reached *)
+           States.fold
+             (fun (destination : state) (annos' : annotations) ->
+                let anno' : annotation =
+                  append_annotation (destination, a) anno
+                in
+                append_annotations (Anno anno') annos')
+             destinations
+             annos)
       actions
       []
   ;;
 
   (** return None if the specific annotation already exists for this action & destination *)
   let annotated
-    (a : action)
-    (destination : state)
-    (anno : annotation)
-    (a's : States.t Actions.t option)
+        (a : action)
+        (destination : state)
+        (anno : annotation)
+        (a's : States.t Actions.t option)
     : action option
     =
     match a's with
@@ -1479,9 +1486,9 @@ module Saturate = struct
                (ds : States.t)
                ((annos', annotated_a, destinations) :
                  annotations * action option * States.t) ->
-               ( append_annotations (Annos b.annotation) annos'
-               , (if List.is_empty b.annotation then None else Some b)
-               , States.union ds destinations ))
+                ( append_annotations (Annos b.annotation) annos'
+                , (if List.is_empty b.annotation then None else Some b)
+                , States.union ds destinations ))
              actions
              ([], None, States.empty)
          in
@@ -1512,8 +1519,8 @@ module Saturate = struct
 
   (** [fsm_states] is an alternative algorithm to [Saturate.fsm] *)
   let fsm_states
-    ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
-    (to_saturate : fsm)
+        ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
+        (to_saturate : fsm)
     : fsm
     =
     let m : fsm = Clone.fsm to_saturate in
@@ -1525,29 +1532,29 @@ module Saturate = struct
     let new_states : States.t =
       States.fold
         (fun (s : state) (new_states : States.t) ->
-          let s_actions : States.t Actions.t = Get.actions_from s old_edges in
-          let s_tau_actions : States.t Actions.t =
-            Get.silent_actions s_actions
-          in
-          (* add state to new states if some named actions exist *)
-          let new_states' : States.t =
-            if Actions.length s_actions > Actions.length s_tau_actions
-            then States.add s new_states
-            else new_states
-          in
-          (* handle states with no silent actions *)
-          if Actions.length s_tau_actions == 0
-          then (
-            (* add with no change *)
-            Append.edges (Edges new_edges) (s, s_actions);
-            (* add all destinations (unchanged) *)
-            States.fold
-              (fun (d : state) (new_states' : States.t) -> new_states')
-              (Get.destinations (Actions s_actions))
-              new_states')
-          else (
-            (* first, add all non silent actions *)
-            (* let new_states'' : States.t =
+           let s_actions : States.t Actions.t = Get.actions_from s old_edges in
+           let s_tau_actions : States.t Actions.t =
+             Get.silent_actions s_actions
+           in
+           (* add state to new states if some named actions exist *)
+           let new_states' : States.t =
+             if Actions.length s_actions > Actions.length s_tau_actions
+             then States.add s new_states
+             else new_states
+           in
+           (* handle states with no silent actions *)
+           if Actions.length s_tau_actions == 0
+           then (
+             (* add with no change *)
+             Append.edges (Edges new_edges) (s, s_actions);
+             (* add all destinations (unchanged) *)
+             States.fold
+               (fun (d : state) (new_states' : States.t) -> new_states')
+               (Get.destinations (Actions s_actions))
+               new_states')
+           else (
+             (* first, add all non silent actions *)
+             (* let new_states'' : States.t =
                Actions.fold
                (fun (a : action)
                (destinations : States.t)
@@ -1564,35 +1571,39 @@ module Saturate = struct
                s_actions
                new_states'
                in *)
-            (* new_states'') *)
-            (* iterate through, create copies of all states reachable via any named action (after sequence of tau's) *)
-            let annos : annotations = explore_from s [] old_edges in
-            let new_states'' : States.t =
-              List.fold_left
-                (fun (new_states'' : States.t) (anno : annotation) ->
-                  match List.hd anno with
-                  | destination, a ->
-                    (* create copy of destination *)
-                    (* let dest_copy : state =
+             (* new_states'') *)
+             (* iterate through, create copies of all states reachable via any named action (after sequence of tau's) *)
+             let annos : annotations = explore_from s [] old_edges in
+             let new_states'' : States.t =
+               List.fold_left
+                 (fun (new_states'' : States.t) (anno : annotation) ->
+                    match List.hd anno with
+                    | destination, a ->
+                      (* create copy of destination *)
+                      (* let dest_copy : state =
                        Create.state
                        (Of (States.cardinal new_states''', destination.name))
                        in *)
-                    (* create annotated action *)
-                    (match
-                       annotated a destination anno (Edges.find_opt new_edges s)
-                     with
-                     | None -> new_states''
-                     | Some anno_a ->
-                       (* append edges to new state *)
-                       Append.edge
-                         (Edges new_edges)
-                         (s, anno_a, Singleton destination);
-                       (* add new destination to states *)
-                       States.add destination new_states''))
-                new_states'
-                annos
-            in
-            new_states''))
+                      (* create annotated action *)
+                      (match
+                         annotated
+                           a
+                           destination
+                           anno
+                           (Edges.find_opt new_edges s)
+                       with
+                       | None -> new_states''
+                       | Some anno_a ->
+                         (* append edges to new state *)
+                         Append.edge
+                           (Edges new_edges)
+                           (s, anno_a, Singleton destination);
+                         (* add new destination to states *)
+                         States.add destination new_states''))
+                 new_states'
+                 annos
+             in
+             new_states''))
         old_states
         States.empty
     in

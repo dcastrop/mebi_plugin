@@ -148,29 +148,49 @@ module JSON = struct
     | List of string list
     | Dict of string list
 
+  let handle_list_sep sep : string =
+    match sep with
+    | None -> " "
+    | Some sep -> sep
+  ;;
+
+  let handle_dict_sep sep : string =
+    match sep with
+    | None -> "\n"
+    | Some sep -> sep
+  ;;
+
   (** assumes elements of [ss] are already stringified. *)
-  let col (ss : col_kind) : string =
+  let col
+        ?(prefix : string = "")
+        ?(sep : string option)
+        ?(tlindent : string = "")
+        (ss : col_kind)
+    : string
+    =
     let ss, lhs, rhs, sep =
       match ss with
-      | List ss -> ss, "[", "]", " "
-      | Dict ss -> ss, "{", "}", "\n"
+      | List ss -> ss, "[", "]", handle_list_sep sep
+      | Dict ss -> ss, "{", "}", handle_dict_sep sep
     in
     match ss with
     | [] -> Printf.sprintf "%s %s" lhs rhs
     | h :: t ->
       Printf.sprintf
-        "%s %s %s"
+        "%s%s\n%s\n%s%s"
+        prefix
         lhs
         (List.fold_left
            (fun (acc : string) (s : string) ->
               Printf.sprintf "%s,%s%s" acc sep s)
            h
            t)
+        tlindent
         rhs
   ;;
 
-  let key_val (k : string) (v : string) : string =
-    Printf.sprintf "%s: %s" (quoted k) v
+  let key_val ?(prefix : string = "") (k : string) (v : string) : string =
+    Printf.sprintf "%s%s: %s" prefix (quoted k) v
   ;;
 
   let model_info (m : Utils.model_info option) : string =
@@ -178,11 +198,24 @@ module JSON = struct
     | None -> "None"
     | Some i ->
       col
+        ~tlindent:"\t"
         (Dict
-           [ key_val "is_complete" (quoted (Printf.sprintf "%b" i.is_complete))
-           ; key_val "bound" (quoted (Printf.sprintf "%i" i.bound))
-           ; key_val "num_states" (quoted (Printf.sprintf "%i" i.num_states))
-           ; key_val "num_edges" (quoted (Printf.sprintf "%i" i.num_edges))
+           [ key_val
+               ~prefix:"\t\t"
+               "is_complete"
+               (quoted (Printf.sprintf "%b" i.is_complete))
+           ; key_val
+               ~prefix:"\t\t"
+               "bound"
+               (quoted (Printf.sprintf "%i" i.bound))
+           ; key_val
+               ~prefix:"\t\t"
+               "num_states"
+               (quoted (Printf.sprintf "%i" i.num_states))
+           ; key_val
+               ~prefix:"\t\t"
+               "num_edges"
+               (quoted (Printf.sprintf "%i" i.num_edges))
            ])
   ;;
 
@@ -195,12 +228,21 @@ module JSON = struct
 
     let transition (t : Lts.transition) : string =
       col
+        ~prefix:"\t\t"
+        ~tlindent:"\t\t"
         (Dict
-           [ key_val "id" (quoted (clean (Printf.sprintf "%i" t.id)))
-           ; key_val "from" (quoted (clean t.from))
-           ; key_val "label" (quoted (clean t.label))
-           ; key_val "destination" (quoted (clean t.destination))
+           [ key_val
+               ~prefix:"\t\t\t"
+               "id"
+               (quoted (clean (Printf.sprintf "%i" t.id)))
+           ; key_val ~prefix:"\t\t\t" "from" (quoted (clean t.from))
+           ; key_val ~prefix:"\t\t\t" "label" (quoted (clean t.label))
            ; key_val
+               ~prefix:"\t\t\t"
+               "destination"
+               (quoted (clean t.destination))
+           ; key_val
+               ~prefix:"\t\t\t"
                "info"
                (quoted
                   (clean
@@ -214,6 +256,8 @@ module JSON = struct
       key_val
         "transitions"
         (col
+           ~sep:"\n"
+           ~tlindent:"\t"
            (List
               (Lts.Transitions.fold
                  (fun (t : Lts.transition) (acc : string list) ->
@@ -406,7 +450,7 @@ let write_to_file
      filepath *)
   (* (fun oc -> Out_channel.output_string oc content); *)
   let oc = open_out filepath in
-  Printf.fprintf oc "%s\n" content;
+  Printf.fprintf oc "%s" content;
   close_out oc;
   (* return filepath *)
   filepath
