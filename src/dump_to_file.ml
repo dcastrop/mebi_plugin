@@ -208,6 +208,14 @@ module JSON = struct
                ~prefix:"\t\t"
                "bound"
                (quoted (Printf.sprintf "%i" i.bound))
+           ; key_val
+               ~prefix:"\t\t"
+               "num_states"
+               (quoted (Printf.sprintf "%i" i.num_states))
+           ; key_val
+               ~prefix:"\t\t"
+               "num_edges"
+               (quoted (Printf.sprintf "%i" i.num_edges))
            ])
   ;;
 
