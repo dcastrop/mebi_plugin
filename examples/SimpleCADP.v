@@ -230,7 +230,7 @@ Example e3 : sys :=
     (PRC (tm1, 0, 0))
   ).
 
-MeBi Dump "e3" LTS Bounded 500 Of e3 Using lts step.
+(* MeBi Dump "e3" LTS Bounded 500 Of e3 Using lts step. *)
 
 (*  *)
 Example e4 : sys :=
