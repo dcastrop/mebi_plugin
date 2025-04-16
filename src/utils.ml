@@ -8,6 +8,8 @@ let is_unit_option (override : unit option) : bool =
 type model_info =
   { is_complete : bool
   ; bound : int
+  ; num_states : int
+  ; num_edges : int
   }
 
 let is_complete (m : model_info option) : bool option =
@@ -21,7 +23,12 @@ module PStr = struct
     match m with
     | None -> "None"
     | Some i ->
-      Printf.sprintf "{| is complete: %b; bound: %i |}" i.is_complete i.bound
+      Printf.sprintf
+        "{| is complete: %b; bound: %i; num states: %i; num edges: %i |}"
+        i.is_complete
+        i.bound
+        i.num_states
+        i.num_edges
   ;;
 end
 
@@ -222,9 +229,9 @@ module Formatting = struct
     }
 
   let default_params
-    ?(params : Logging.params option)
-    ?(mode : Logging.output_modes = OCaml ())
-    ()
+        ?(params : Logging.params option)
+        ?(mode : Logging.output_modes = OCaml ())
+        ()
     : params
     =
     let params' =
@@ -343,7 +350,7 @@ let pstr_keys (keys : keys_kind) : string =
   | OfEConstr keys ->
     Seq.fold_left
       (fun (acc : string) (k : EConstr.t) ->
-        Printf.sprintf "%s, %s" acc (Mebi_utils.econstr_to_string k))
+         Printf.sprintf "%s, %s" acc (Mebi_utils.econstr_to_string k))
       ""
       keys
 ;;
