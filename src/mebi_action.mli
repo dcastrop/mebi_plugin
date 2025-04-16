@@ -1,6 +1,6 @@
 type action =
-  { id : int
-  ; label : string
+  { 
+   label : string
   ; is_tau : bool
   }
 
