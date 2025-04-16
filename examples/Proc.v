@@ -56,9 +56,9 @@ MeBi Show LTS Bounded 150 Of proc1 Using termLTS.
 MeBi Dump "proc1" LTS Bounded 150 Of proc1 Using termLTS.
 
 
-Example proc1 := tpar (tfix (tact ASend trec)) (tfix (tact ARecv trec)).
+(* Example proc1 := tpar (tfix (tact ASend trec)) (tfix (tact ARecv trec)).
 
-MeBi Show LTS Bounded 150 Of proc0 Using termLTS.
+MeBi Show LTS Bounded 150 Of proc0 Using termLTS. *)
 
 
 (* TODO: would be cool to do first a "FSM minimisation". I believe there are
