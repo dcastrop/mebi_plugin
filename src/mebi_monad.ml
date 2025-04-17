@@ -67,7 +67,7 @@ let make_constr_tbl st =
   }
 ;;
 
-let eq_action st () = Mebi_action.eq
+(* let eq_action st () = Mebi_action.eq
 let lts_actions_hash st () t = Hashtbl.hash t
 
 (** [make_transition_tbl st] is ... *)
@@ -89,7 +89,7 @@ let make_lts_actions_tbl st =
   ; value =
       (module LtsTransitionsTbl : Hashtbl.S with type key = Mebi_action.action)
   }
-;;
+;; *)
 
 let compare_constr st () t1 t2 =
   if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1
@@ -110,14 +110,13 @@ let make_constr_set (st : coq_context ref)
 ;;
 
 let compare_constr_tree
-      st
-      ()
-      (t1 : EConstr.t * Mebi_tree.ConstrTree.t)
-      (t2 : EConstr.t * Mebi_tree.ConstrTree.t)
+  st
+  ()
+  (t1 : EConstr.t * Mebi_tree.ConstrTree.t)
+  (t2 : EConstr.t * Mebi_tree.ConstrTree.t)
   =
-  if
-    EConstr.eq_constr !st.coq_ctx (fst t1) (fst t2)
-    && Mebi_tree.ConstrTree.eq (snd t1) (snd t2)
+  if EConstr.eq_constr !st.coq_ctx (fst t1) (fst t2)
+     && Mebi_tree.ConstrTree.eq (snd t1) (snd t2)
   then 0
   else 1
 ;;
@@ -142,10 +141,10 @@ let make_constr_tree_set (st : coq_context ref)
 
 (** Monadic for loop *)
 let rec iterate
-          (from_idx : int)
-          (to_idx : int)
-          (acc : 'a)
-          (f : int -> 'a -> 'a t)
+  (from_idx : int)
+  (to_idx : int)
+  (acc : 'a)
+  (f : int -> 'a -> 'a t)
   : 'a t
   =
   if from_idx > to_idx
@@ -162,8 +161,8 @@ let get_sigma (st : coq_context ref) : Evd.evar_map in_context =
 ;;
 
 let state
-      (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-      (st : coq_context ref)
+  (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+  (st : coq_context ref)
   : 'a in_context
   =
   let sigma, a = f !st.coq_env !st.coq_ctx in
