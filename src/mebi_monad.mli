@@ -30,9 +30,11 @@ val sandbox : 'a t -> 'a t
 (********************************************)
 val make_constr_tbl : (module Hashtbl.S with type key = EConstr.t) t
 val make_constr_set : (module Set.S with type elt = EConstr.t) t
-val make_lts_actions_tbl
-  : (module Hashtbl.S with type key = Mebi_action.action) t
-val make_constr_tree_set : (module Set.S with type elt = (EConstr.t * Mebi_tree.ConstrTree.t)) t
+
+(* val make_lts_actions_tbl
+   : (module Hashtbl.S with type key = Mebi_action.action) t *)
+val make_constr_tree_set
+  : (module Set.S with type elt = EConstr.t * Mebi_tree.ConstrTree.t) t
 
 (* val debug : ?params:logging_params -> (Environ.env -> Evd.evar_map -> Pp.t) -> unit t *)
 val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit t

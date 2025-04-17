@@ -425,12 +425,13 @@ let default_bound : int = 10
 module type GraphB = sig
   module H : Hashtbl.S with type key = EConstr.t
   module S : Set.S with type elt = EConstr.t
-  module C : Hashtbl.S with type key = Mebi_action.action
+
+  (* module C : Hashtbl.S with type key = Mebi_action.action *)
   module D : Set.S with type elt = EConstr.t * ConstrTree.t
 
   type term = EConstr.t
   type action = Mebi_action.action
-  type constr_transitions = D.t C.t
+  type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
 
   type lts_graph =
     { to_visit : term Queue.t
@@ -440,6 +441,14 @@ module type GraphB = sig
 
   val insert_constr_transition
     :  constr_transitions
+    -> action
+    -> term
+    -> ConstrTree.t
+    -> unit mm
+
+  val add_new_term_constr_transition
+    :  lts_graph
+    -> term
     -> action
     -> term
     -> ConstrTree.t
@@ -492,8 +501,8 @@ end
 module MkGraph
     (M : Hashtbl.S with type key = EConstr.t)
     (N : Set.S with type elt = EConstr.t)
-    (O : Hashtbl.S with type key = Mebi_action.action)
-    (P : Set.S with type elt = EConstr.t * ConstrTree.t) : GraphB = struct
+    (* (O : Hashtbl.S with type key = Mebi_action.action) *)
+     (P : Set.S with type elt = EConstr.t * ConstrTree.t) : GraphB = struct
   (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t]. *)
   module H = M
 
@@ -501,7 +510,7 @@ module MkGraph
   module S = N
 
   (* [T] is the hashtbl of mapping actions to destination states, which is obtained by [H] from a corresponding start state. *)
-  module C = O
+  (* module C = *)
 
   (* [D] is the set of destination tuples, each comprised of a [term] and the corresponding [ConstrTree.t]. *)
   module D = P
@@ -513,7 +522,7 @@ module MkGraph
   type action = Mebi_action.action
 
   (** [constr_transitions] is a hashtbl mapping [action]s to [terms] and [ConstrTree.t]. *)
-  type constr_transitions = D.t C.t
+  type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
 
   (** [lts_graph] is a record containing a queue of [term]s [to_visit], a set of states visited (i.e., [term]s), and a hashtbl mapping [terms] to a map of [constr_transitions], which maps [action]s to [term]s and their [ConstrTree.t]. *)
   type lts_graph =
@@ -531,9 +540,9 @@ module MkGraph
     : unit mm
     =
     let* sigma = get_sigma in
-    (match C.find_opt constrs a with
-     | None -> C.add constrs a (D.singleton (d, c))
-     | Some ds -> C.replace constrs a (D.add (d, c) ds));
+    (match Hashtbl.find_opt constrs a with
+     | None -> Hashtbl.add constrs a (D.singleton (d, c))
+     | Some ds -> Hashtbl.replace constrs a (D.add (d, c) ds));
     return ()
   ;;
 
@@ -543,9 +552,13 @@ module MkGraph
     (a : action)
     (d : term)
     (c : ConstrTree.t)
-    : unit
+    : unit mm
     =
-    H.add g.transitions t (C.of_seq (List.to_seq [ a, D.singleton (d, c) ]))
+    H.add
+      g.transitions
+      t
+      (Hashtbl.of_seq (List.to_seq [ a, D.singleton (d, c) ]));
+    return ()
   ;;
 
   let _pstr_constr_transition
@@ -577,13 +590,13 @@ module MkGraph
   let _pstr_list_term_transitions (f : term) (cs : constr_transitions)
     : string list
     =
-    let keys = List.of_seq (C.to_seq_keys cs) in
+    let keys = List.of_seq (Hashtbl.to_seq_keys cs) in
     let hd = List.hd keys
     and tl = List.tl keys in
-    let hd_ds = C.find cs hd in
+    let hd_ds = Hashtbl.find cs hd in
     List.fold_left
       (fun (acc : string list) (a : action) ->
-        List.append (_pstr_list_constr_transitions f a (C.find cs a)) acc)
+        List.append (_pstr_list_constr_transitions f a (Hashtbl.find cs a)) acc)
       (_pstr_list_constr_transitions f hd hd_ds)
       tl
   ;;
@@ -676,7 +689,9 @@ module MkGraph
          ~prefix:(Printf.sprintf "A, t: %s\n  " (econstr_to_string t))
          g; *)
       (match H.find_opt g.transitions t with
-       | None -> add_new_term_constr_transition g t to_add tgt int_tree
+       | None ->
+         let _ = add_new_term_constr_transition g t to_add tgt int_tree in
+         ()
        | Some actions ->
          let _ = insert_constr_transition actions to_add tgt int_tree in
          ());
@@ -908,7 +923,7 @@ module MkGraph
            (fun (from : EConstr.t)
              (actions : constr_transitions)
              (acc : Lts.raw_flat_lts) ->
-             C.fold
+             Hashtbl.fold
                (fun (action : Mebi_action.action)
                  (destinations : D.t)
                  (acc' : Lts.raw_flat_lts) ->
@@ -1019,10 +1034,9 @@ end
 let make_graph_builder =
   let* h = make_constr_tbl in
   let* s = make_constr_set in
-  let* c = make_lts_actions_tbl in
   let* d = make_constr_tree_set in
   (* let* l = make_constr_set in *)
-  let module G = MkGraph ((val h)) ((val s)) ((val c)) ((val d)) in
+  let module G = MkGraph ((val h)) ((val s)) ((val d)) in
   return (module G : GraphB)
 ;;
 
