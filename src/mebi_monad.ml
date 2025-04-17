@@ -67,30 +67,6 @@ let make_constr_tbl st =
   }
 ;;
 
-(* let eq_action st () = Mebi_action.eq
-let lts_actions_hash st () t = Hashtbl.hash t
-
-(** [make_transition_tbl st] is ... *)
-let make_lts_actions_tbl st =
-  let cmp_eq = eq_action st in
-  let hashf = lts_actions_hash st in
-  let module LtsTransitionsTbl =
-    Hashtbl.Make (struct
-      type t = Mebi_action.action
-
-      let equal (a1 : Mebi_action.action) (a2 : Mebi_action.action) =
-        cmp_eq () a1 a2
-      ;;
-
-      let hash t = hashf () t
-    end)
-  in
-  { state = st
-  ; value =
-      (module LtsTransitionsTbl : Hashtbl.S with type key = Mebi_action.action)
-  }
-;; *)
-
 let compare_constr st () t1 t2 =
   if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1
 ;;
