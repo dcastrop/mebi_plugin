@@ -427,8 +427,13 @@ let get_new_constrs
   (fn_rlts : term_type_map)
   : coq_ctor list mm
   =
+  (* let$+ t env sigma = Reductionops.nf_all env sigma t in *)
   let* ty = Mebi_utils.type_of_econstr t in
-  let$ ty env sigma = sigma, Reductionops.nf_all env sigma ty in
+  (* let$+ ty env sigma = Reductionops.nf_all env sigma ty in *)
+  (* let$+ upd_t env sigma =
+     EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
+     in *)
+  (* let$ ty env sigma = sigma, Reductionops.nf_all env sigma ty in *)
   match Hashtbl.find_opt tr_rlts ty with
   | None ->
     unknown_term_type (t, ty)
