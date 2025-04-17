@@ -282,9 +282,7 @@ let rec retrieve_tgt_nodes
   (act : EConstr.t)
   (tgt_term : EConstr.t)
   : (Constr_tree.t * unif_problem) list list -> coq_ctor list t
-  =
-  (* :  (int tree * unif_problem) list list -> (EConstr.t * int tree list) list t *)
-  function
+  = function
   | [] -> return acc
   | u1 :: nctors ->
     let* success = sandboxed_unify ~params tgt_term u1 in
@@ -418,6 +416,86 @@ and check_valid_constructor
   iterate 0 (Array.length ctor_transitions - 1) [] iter_body
 ;;
 
+(** [get_new_constrs t tr_rlts fn_rlts] returns the list of constructors applicable to term [t], using those provided in [tr_rlts] (and [fn_rlts]).
+    If no immediate constructor is found matching [t] in [tr_rlts] (likely due to unification problems), then each constructor in [tr_rlts] is tried sequentially, until one of them returns some valid constructors.
+    @raise CannotFindTypeOfTermToVisit
+      if none of the constructors provided in [tr_rlts] yield constructors from [check_valid_constructors]. *)
+let get_new_constrs
+  ?(params : Params.log = default_params)
+  (t : EConstr.t)
+  (tr_rlts : term_type_map)
+  (fn_rlts : term_type_map)
+  : coq_ctor list mm
+  =
+  let* ty = Mebi_utils.type_of_econstr t in
+  match Hashtbl.find_opt tr_rlts ty with
+  | None ->
+    (* Log.warning
+       ~params
+       (Printf.sprintf
+       "get_new_constrs, could not find immediate constructor matching \
+       type of term to visit.\n\
+       - term%s,\n\
+       - type: %s.\n\
+         => proceeding to try one by one."
+         (econstr_to_string t)
+         (econstr_to_string ty)); *)
+    (* try one by one until something returns something *)
+    let rlts_key_val_list : (EConstr.t * raw_lts) list =
+      List.of_seq (Hashtbl.to_seq tr_rlts)
+    in
+    let iter_body (i : int) ((acc, j) : coq_ctor list * EConstr.t option) =
+      if List.is_empty acc
+      then (
+        let nth_rlts = List.nth rlts_key_val_list i in
+        let rlts : raw_lts = snd nth_rlts in
+        let* constrs =
+          check_valid_constructor
+            ~params
+            rlts.constructor_transitions
+            fn_rlts
+            t
+            None
+        in
+        return (constrs, Some (fst nth_rlts)))
+      else return (acc, j)
+    in
+    let* (constrs, i) : coq_ctor list * EConstr.t option =
+      iterate 0 (List.length rlts_key_val_list - 1) ([], None) iter_body
+    in
+    if List.is_empty constrs
+    then (
+      Log.warning
+        ~params
+        (Printf.sprintf
+           "get_new_constrs, could not find constructor matching type of term \
+            to visit.\n\
+            - term: %s,\n\
+            - type: %s,\n\
+            - types provided: %s."
+           (econstr_to_string t)
+           (econstr_to_string ty)
+           (Mebi_utils.pstr_keys
+              (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts))));
+      unknown_term_type (t, ty))
+    else
+      (* Log.override
+         ~params
+         (Printf.sprintf
+         "get_new_constrs, found matching type of term to visit.\n\
+         - term: %s,\n\
+         - type: %s,\n\
+         - matching term: %s."
+           (econstr_to_string t)
+           (econstr_to_string ty)
+           (match i with
+           | None -> "..."
+           | Some i -> econstr_to_string i)); *)
+      return constrs
+  | Some rlts ->
+    check_valid_constructor ~params rlts.constructor_transitions fn_rlts t None
+;;
+
 (** [GraphB] is ...
     (Essentially acts as a `.mli` for the [MkGraph] module.) *)
 module type GraphB = sig
@@ -427,28 +505,26 @@ module type GraphB = sig
   (* module C : Hashtbl.S with type key = Mebi_action.action *)
   module D : Set.S with type elt = EConstr.t * Constr_tree.t
 
-  type term = EConstr.t
-  type action = Mebi_action.action
   type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
 
   type lts_graph =
-    { to_visit : term Queue.t
+    { to_visit : EConstr.t Queue.t
     ; states : S.t
     ; transitions : constr_transitions H.t
     }
 
   val insert_constr_transition
     :  constr_transitions
-    -> action
-    -> term
+    -> Mebi_action.action
+    -> EConstr.t
     -> Constr_tree.t
     -> unit mm
 
   val add_new_term_constr_transition
     :  lts_graph
-    -> term
-    -> action
-    -> term
+    -> EConstr.t
+    -> Mebi_action.action
+    -> EConstr.t
     -> Constr_tree.t
     -> unit mm
 
@@ -474,8 +550,6 @@ module type GraphB = sig
       ; to_coq : (string, EConstr.t) Hashtbl.t
       }
 
-    (* type coq_translation = coq_translation_record mm *)
-
     val translate_coq_terms : ?params:Params.log -> S.t -> coq_translation mm
 
     val translate_coq_lts
@@ -499,32 +573,22 @@ end
 module MkGraph
     (M : Hashtbl.S with type key = EConstr.t)
     (N : Set.S with type elt = EConstr.t)
-    (* (O : Hashtbl.S with type key = Mebi_action.action) *)
-     (P : Set.S with type elt = EConstr.t * Constr_tree.t) : GraphB = struct
+    (P : Set.S with type elt = EConstr.t * Constr_tree.t) : GraphB = struct
   (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t]. *)
   module H = M
 
   (* [S] is the set of states, of [EConstr.t]. *)
   module S = N
 
-  (* [T] is the hashtbl of mapping actions to destination states, which is obtained by [H] from a corresponding start state. *)
-  (* module C = *)
-
-  (* [D] is the set of destination tuples, each comprised of a [term] and the corresponding [Constr_tree.t]. *)
+  (* [D] is the set of destination tuples, each comprised of a term [EConstr.t] and the corresponding [Constr_tree.t]. *)
   module D = P
 
-  (** [term] is a coq-term (i.e., [EConstr.t]) *)
-  type term = EConstr.t
-
-  (** [action] corresponds to a coq-constructor that applies to a [term]. *)
-  type action = Mebi_action.action
-
-  (** [constr_transitions] is a hashtbl mapping [action]s to [terms] and [Constr_tree.t]. *)
+  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t]. *)
   type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
 
-  (** [lts_graph] is a record containing a queue of [term]s [to_visit], a set of states visited (i.e., [term]s), and a hashtbl mapping [terms] to a map of [constr_transitions], which maps [action]s to [term]s and their [Constr_tree.t]. *)
+  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t]. *)
   type lts_graph =
-    { to_visit : term Queue.t
+    { to_visit : EConstr.t Queue.t
     ; states : S.t
     ; transitions : constr_transitions H.t
     }
@@ -654,8 +718,8 @@ module MkGraph
   (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions]. *)
   let insert_constr_transition
     (constrs : constr_transitions)
-    (a : action)
-    (d : term)
+    (a : Mebi_action.action)
+    (d : EConstr.t)
     (c : Constr_tree.t)
     : unit mm
     =
@@ -668,9 +732,9 @@ module MkGraph
 
   let add_new_term_constr_transition
     (g : lts_graph)
-    (t : term)
-    (a : action)
-    (d : term)
+    (t : EConstr.t)
+    (a : Mebi_action.action)
+    (d : EConstr.t)
     (c : Constr_tree.t)
     : unit mm
     =
@@ -719,91 +783,6 @@ module MkGraph
       return (S.add tgt new_states)
     in
     iterate 0 (List.length ctors - 1) (S.singleton t) iter_body
-  ;;
-
-  (** [get_new_constrs t tr_rlts fn_rlts] returns the list of constructors applicable to term [t], using those provided in [tr_rlts] (and [fn_rlts]).
-      If no immediate constructor is found matching [t] in [tr_rlts] (likely due to unification problems), then each constructor in [tr_rlts] is tried sequentially, until one of them returns some valid constructors.
-      @raise CannotFindTypeOfTermToVisit
-        if none of the constructors provided in [tr_rlts] yield constructors from [check_valid_constructors]. *)
-  let get_new_constrs
-    ?(params : Params.log = default_params)
-    (t : EConstr.t)
-    (tr_rlts : term_type_map)
-    (fn_rlts : term_type_map)
-    : coq_ctor list mm
-    =
-    let* ty = Mebi_utils.type_of_econstr t in
-    match Hashtbl.find_opt tr_rlts ty with
-    | None ->
-      (* Log.warning
-         ~params
-         (Printf.sprintf
-         "get_new_constrs, could not find immediate constructor matching \
-         type of term to visit.\n\
-         - term%s,\n\
-         - type: %s.\n\
-           => proceeding to try one by one."
-           (econstr_to_string t)
-           (econstr_to_string ty)); *)
-      (* try one by one until something returns something *)
-      let rlts_key_val_list : (term * raw_lts) list =
-        List.of_seq (Hashtbl.to_seq tr_rlts)
-      in
-      let iter_body (i : int) ((acc, j) : coq_ctor list * term option) =
-        if List.is_empty acc
-        then (
-          let nth_rlts = List.nth rlts_key_val_list i in
-          let rlts : raw_lts = snd nth_rlts in
-          let* constrs =
-            check_valid_constructor
-              ~params
-              rlts.constructor_transitions
-              fn_rlts
-              t
-              None
-          in
-          return (constrs, Some (fst nth_rlts)))
-        else return (acc, j)
-      in
-      let* (constrs, i) : coq_ctor list * term option =
-        iterate 0 (List.length rlts_key_val_list - 1) ([], None) iter_body
-      in
-      if List.is_empty constrs
-      then (
-        Log.warning
-          ~params
-          (Printf.sprintf
-             "get_new_constrs, could not find constructor matching type of \
-              term to visit.\n\
-              - term: %s,\n\
-              - type: %s,\n\
-              - types provided: %s."
-             (econstr_to_string t)
-             (econstr_to_string ty)
-             (Mebi_utils.pstr_keys
-                (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts))));
-        unknown_term_type (t, ty))
-      else
-        (* Log.override
-           ~params
-           (Printf.sprintf
-           "get_new_constrs, found matching type of term to visit.\n\
-           - term: %s,\n\
-           - type: %s,\n\
-           - matching term: %s."
-             (econstr_to_string t)
-             (econstr_to_string ty)
-             (match i with
-             | None -> "..."
-             | Some i -> econstr_to_string i)); *)
-        return constrs
-    | Some rlts ->
-      check_valid_constructor
-        ~params
-        rlts.constructor_transitions
-        fn_rlts
-        t
-        None
   ;;
 
   (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
