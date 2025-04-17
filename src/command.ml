@@ -712,16 +712,16 @@ module MkGraph
     let* ty = Mebi_utils.type_of_econstr t in
     match Hashtbl.find_opt tr_rlts ty with
     | None ->
-      Log.warning
-        ~params
-        (Printf.sprintf
-           "get_new_constrs, could not find immediate constructor matching \
-            type of term to visit.\n\
-            - term%s,\n\
-            - type: %s.\n\
-            => proceeding to try one by one."
+      (* Log.warning
+         ~params
+         (Printf.sprintf
+         "get_new_constrs, could not find immediate constructor matching \
+         type of term to visit.\n\
+         - term%s,\n\
+         - type: %s.\n\
+           => proceeding to try one by one."
            (econstr_to_string t)
-           (econstr_to_string ty));
+           (econstr_to_string ty)); *)
       (* try one by one until something returns something *)
       let rlts_key_val_list : (term * raw_lts) list =
         List.of_seq (Hashtbl.to_seq tr_rlts)
@@ -1002,7 +1002,7 @@ module MkGraph
         Log.warning
           ~params
           (Printf.sprintf "saved incomplete LTS to: %s\n" dump_filepath))
-      else Log.override (Printf.sprintf "Finished translating LTS: %s" name);
+      else Log.normal (Printf.sprintf "Finished translating LTS: %s" name);
       (* Log.override
          (Printf.sprintf "leaving lts_graph_to_lts: %s, %b" name is_complete); *)
       return (lts, tbl)
