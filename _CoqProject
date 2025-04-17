@@ -14,39 +14,45 @@ examples/Proc.v
 # examples/properties/mutual_exclusion.v
 # examples/properties/no_starvation.v
 
+test/tests.ml
+test/tests.mli
+
+src/mebi_errors.ml
+src/mebi_errors.mli
+
+src/mebi_action.ml
+src/mebi_action.mli
+src/constr_tree.ml
+src/constr_tree.mli
+
+src/mebi_utils.ml
+src/mebi_utils.mli
+src/mebi_monad.ml
+src/mebi_monad.mli
+
 src/utils.ml
 src/utils.mli
+
 src/lts.ml
 src/lts.mli
 src/fsm.ml
 src/fsm.mli
 src/translate.ml
 src/translate.mli
-src/examples.ml
-src/examples.mli
+src/dump_to_file.ml
+src/dump_to_file.mli
+
 src/bisimilarity.ml
 src/bisimilarity.mli
 src/minimize.ml
 src/minimize.mli
 
-
-test/tests.ml
-test/tests.mli
-
-src/mebi_errors.ml
-src/mebi_errors.mli
-src/mebi_action.ml
-src/mebi_action.mli
-src/mebi_tree.ml
-src/mebi_tree.mli
-src/mebi_monad.ml
-src/mebi_monad.mli
-src/mebi_utils.ml
-src/mebi_utils.mli
-src/dump_to_file.ml
-src/dump_to_file.mli
 src/command.ml
 src/command.mli
+
+src/examples.ml
+src/examples.mli
+
 src/g_mebi.mlg
 src/mebi_plugin.mlpack
 

@@ -112,30 +112,28 @@ let make_constr_set (st : coq_context ref)
 let compare_constr_tree
   st
   ()
-  (t1 : EConstr.t * Mebi_tree.ConstrTree.t)
-  (t2 : EConstr.t * Mebi_tree.ConstrTree.t)
+  (t1 : EConstr.t * Constr_tree.t)
+  (t2 : EConstr.t * Constr_tree.t)
   =
   if EConstr.eq_constr !st.coq_ctx (fst t1) (fst t2)
-     && Mebi_tree.ConstrTree.eq (snd t1) (snd t2)
+     && Constr_tree.eq (snd t1) (snd t2)
   then 0
   else 1
 ;;
 
 let make_constr_tree_set (st : coq_context ref)
-  : (module Set.S with type elt = EConstr.t * Mebi_tree.ConstrTree.t) in_context
+  : (module Set.S with type elt = EConstr.t * Constr_tree.t) in_context
   =
   let cmp = compare_constr_tree st in
   let module Constrset =
     Set.Make (struct
-      type t = EConstr.t * Mebi_tree.ConstrTree.t
+      type t = EConstr.t * Constr_tree.t
 
       let compare t1 t2 = cmp () t1 t2
     end)
   in
   { state = st
-  ; value =
-      (module Constrset : Set.S
-        with type elt = EConstr.t * Mebi_tree.ConstrTree.t)
+  ; value = (module Constrset : Set.S with type elt = EConstr.t * Constr_tree.t)
   }
 ;;
 

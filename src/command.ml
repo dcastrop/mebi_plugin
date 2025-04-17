@@ -1,5 +1,4 @@
 open Pp
-open Mebi_tree
 open Mebi_utils
 open Mebi_monad
 open Mebi_monad.Monad_syntax
@@ -11,6 +10,9 @@ open Utils
 open Fsm
 
 let default_params : Params.log = Params.Default.log ~mode:(Coq ()) ()
+
+(** [default_bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
+let default_bound : int = 10
 
 (** [arity_is_prop mip] raises an error if [mip.mind_arity] is not a [prop]. *)
 let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
@@ -70,17 +72,17 @@ type term_type_map =
 let log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
   : unit mm
   =
-  log
+  Log.override
     ~params
     (Printf.sprintf
        "(a) Types of terms: %s.\n"
        (econstr_to_string rlts.trm_type));
-  log
+  Log.override
     ~params
     (Printf.sprintf
        "(b) Types of labels: %s.\n"
        (econstr_to_string rlts.lbl_type));
-  log
+  Log.override
     ~params
     (Printf.sprintf
        "(c) Constructors: %s.\n"
@@ -89,7 +91,7 @@ let log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
              (fun _ -> str ", ")
              Names.Id.print
              rlts.coq_ctor_names)));
-  log
+  Log.override
     ~params
     (Printf.sprintf
        "(d) Types of coq_lts: %s.\n"
@@ -216,8 +218,8 @@ let _pstr_unif_problem (t : unif_problem) : string =
 
 let rec unify_all
   ?(params : Params.log = default_params)
-  (i : (ConstrTree.t * unif_problem) list)
-  : ConstrTree.t list option t
+  (i : (Constr_tree.t * unif_problem) list)
+  : Constr_tree.t list option t
   =
   params.kind <- Debug ();
   match i with
@@ -246,8 +248,8 @@ let rec unify_all
 let sandboxed_unify
   ?(params : Params.log = default_params)
   (tgt_term : EConstr.t)
-  (u : (ConstrTree.t * unif_problem) list)
-  : (EConstr.t * ConstrTree.t list) option mm
+  (u : (Constr_tree.t * unif_problem) list)
+  : (EConstr.t * Constr_tree.t list) option mm
   =
   (* let* _ =
      if is_output_kind_enabled params
@@ -269,8 +271,8 @@ let sandboxed_unify
 (** [coq_ctor]
     - [EConstr.t] action
     - [EConstr.t] destination
-    - [ConstrTree.t] coq-constructor index *)
-type coq_ctor = EConstr.t * EConstr.t * ConstrTree.t
+    - [Constr_tree.t] coq-constructor index *)
+type coq_ctor = EConstr.t * EConstr.t * Constr_tree.t
 
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
@@ -279,7 +281,7 @@ let rec retrieve_tgt_nodes
   (i : int)
   (act : EConstr.t)
   (tgt_term : EConstr.t)
-  : (ConstrTree.t * unif_problem) list list -> coq_ctor list t
+  : (Constr_tree.t * unif_problem) list list -> coq_ctor list t
   =
   (* :  (int tree * unif_problem) list list -> (EConstr.t * int tree list) list t *)
   function
@@ -302,10 +304,10 @@ let rec retrieve_tgt_nodes
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
   ?(params : Params.log = default_params)
-  (acc : (ConstrTree.t * unif_problem) list list)
+  (acc : (Constr_tree.t * unif_problem) list list)
   (fn_rlts : term_type_map)
   :  EConstr.t list * EConstr.rel_declaration list
-  -> (ConstrTree.t * unif_problem) list list option t
+  -> (Constr_tree.t * unif_problem) list list option t
   = function
   | [], [] -> return (Some acc)
   | _ :: substl, t :: tl ->
@@ -338,7 +340,7 @@ let rec check_updated_ctx
           else (
             let ctors =
               List.map
-                (fun (_, (tL : EConstr.t), (i : ConstrTree.t)) ->
+                (fun (_, (tL : EConstr.t), (i : Constr_tree.t)) ->
                   i, { termL = tL; termR = args.(2) })
                 ctors
             in
@@ -393,7 +395,7 @@ and check_valid_constructor
       let* success = Option.cata (fun a -> m_unify a act) (return true) ma in
       if success
       then
-        let* (next_ctors : (ConstrTree.t * unif_problem) list list option) =
+        let* (next_ctors : (Constr_tree.t * unif_problem) list list option) =
           check_updated_ctx ~params [ [] ] fn_rlts (substl, ctx_tys)
         in
         let$+ act env sigma = Reductionops.nf_all env sigma act in
@@ -404,7 +406,7 @@ and check_valid_constructor
           let* sigma = get_sigma in
           if EConstr.isEvar sigma tgt_term
           then return ctor_vals
-          else return ((act, tgt_term, Node (i, [])) :: ctor_vals)
+          else return ((act, tgt_term, Constr_tree.Node (i, [])) :: ctor_vals)
         | Some nctors ->
           let tgt_nodes =
             retrieve_tgt_nodes ~params ctor_vals i act tgt_term nctors
@@ -416,10 +418,6 @@ and check_valid_constructor
   iterate 0 (Array.length ctor_transitions - 1) [] iter_body
 ;;
 
-(** [default_bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
-let default_bound : int = 10
-(* TODO: get this as user input! *)
-
 (** [GraphB] is ...
     (Essentially acts as a `.mli` for the [MkGraph] module.) *)
 module type GraphB = sig
@@ -427,7 +425,7 @@ module type GraphB = sig
   module S : Set.S with type elt = EConstr.t
 
   (* module C : Hashtbl.S with type key = Mebi_action.action *)
-  module D : Set.S with type elt = EConstr.t * ConstrTree.t
+  module D : Set.S with type elt = EConstr.t * Constr_tree.t
 
   type term = EConstr.t
   type action = Mebi_action.action
@@ -443,7 +441,7 @@ module type GraphB = sig
     :  constr_transitions
     -> action
     -> term
-    -> ConstrTree.t
+    -> Constr_tree.t
     -> unit mm
 
   val add_new_term_constr_transition
@@ -451,7 +449,7 @@ module type GraphB = sig
     -> term
     -> action
     -> term
-    -> ConstrTree.t
+    -> Constr_tree.t
     -> unit mm
 
   val build_lts_graph
@@ -502,7 +500,7 @@ module MkGraph
     (M : Hashtbl.S with type key = EConstr.t)
     (N : Set.S with type elt = EConstr.t)
     (* (O : Hashtbl.S with type key = Mebi_action.action) *)
-     (P : Set.S with type elt = EConstr.t * ConstrTree.t) : GraphB = struct
+     (P : Set.S with type elt = EConstr.t * Constr_tree.t) : GraphB = struct
   (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t]. *)
   module H = M
 
@@ -512,7 +510,7 @@ module MkGraph
   (* [T] is the hashtbl of mapping actions to destination states, which is obtained by [H] from a corresponding start state. *)
   (* module C = *)
 
-  (* [D] is the set of destination tuples, each comprised of a [term] and the corresponding [ConstrTree.t]. *)
+  (* [D] is the set of destination tuples, each comprised of a [term] and the corresponding [Constr_tree.t]. *)
   module D = P
 
   (** [term] is a coq-term (i.e., [EConstr.t]) *)
@@ -521,50 +519,26 @@ module MkGraph
   (** [action] corresponds to a coq-constructor that applies to a [term]. *)
   type action = Mebi_action.action
 
-  (** [constr_transitions] is a hashtbl mapping [action]s to [terms] and [ConstrTree.t]. *)
+  (** [constr_transitions] is a hashtbl mapping [action]s to [terms] and [Constr_tree.t]. *)
   type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
 
-  (** [lts_graph] is a record containing a queue of [term]s [to_visit], a set of states visited (i.e., [term]s), and a hashtbl mapping [terms] to a map of [constr_transitions], which maps [action]s to [term]s and their [ConstrTree.t]. *)
+  (** [lts_graph] is a record containing a queue of [term]s [to_visit], a set of states visited (i.e., [term]s), and a hashtbl mapping [terms] to a map of [constr_transitions], which maps [action]s to [term]s and their [Constr_tree.t]. *)
   type lts_graph =
     { to_visit : term Queue.t
     ; states : S.t
     ; transitions : constr_transitions H.t
     }
 
-  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * ConstrTree.t)] in a given [constr_transitions]. *)
-  let insert_constr_transition
-    (constrs : constr_transitions)
-    (a : action)
-    (d : term)
-    (c : ConstrTree.t)
-    : unit mm
-    =
-    let* sigma = get_sigma in
-    (match Hashtbl.find_opt constrs a with
-     | None -> Hashtbl.add constrs a (D.singleton (d, c))
-     | Some ds -> Hashtbl.replace constrs a (D.add (d, c) ds));
-    return ()
-  ;;
-
-  let add_new_term_constr_transition
-    (g : lts_graph)
-    (t : term)
-    (a : action)
-    (d : term)
-    (c : ConstrTree.t)
-    : unit mm
-    =
-    H.add
-      g.transitions
-      t
-      (Hashtbl.of_seq (List.to_seq [ a, D.singleton (d, c) ]));
-    return ()
-  ;;
+  (**********************************************************************)
+  (******** below is a sanity check *************************************)
+  (******** cannot be moved since it depends on this module *************)
+  (******** (i.e., H, D ) ***********************************************)
+  (**********************************************************************)
 
   let _pstr_constr_transition
-    (f : term)
-    (a : action)
-    ((d, c) : term * ConstrTree.t)
+    (f : EConstr.t)
+    (a : Mebi_action.action)
+    ((d, c) : EConstr.t * Constr_tree.t)
     : string
     =
     Printf.sprintf
@@ -572,10 +546,13 @@ module MkGraph
       (econstr_to_string f)
       a.label
       (econstr_to_string d)
-      (ConstrTree.pstr c)
+      (Constr_tree.pstr c)
   ;;
 
-  let _pstr_list_constr_transitions (f : term) (a : action) (ds : D.t)
+  let _pstr_list_constr_transitions
+    (f : EConstr.t)
+    (a : Mebi_action.action)
+    (ds : D.t)
     : string list
     =
     let l = D.to_list ds in
@@ -587,7 +564,7 @@ module MkGraph
       tl
   ;;
 
-  let _pstr_list_term_transitions (f : term) (cs : constr_transitions)
+  let _pstr_list_term_transitions (f : EConstr.t) (cs : constr_transitions)
     : string list
     =
     let keys = List.of_seq (Hashtbl.to_seq_keys cs) in
@@ -595,7 +572,7 @@ module MkGraph
     and tl = List.tl keys in
     let hd_ds = Hashtbl.find cs hd in
     List.fold_left
-      (fun (acc : string list) (a : action) ->
+      (fun (acc : string list) (a : Mebi_action.action) ->
         List.append (_pstr_list_constr_transitions f a (Hashtbl.find cs a)) acc)
       (_pstr_list_constr_transitions f hd hd_ds)
       tl
@@ -607,7 +584,7 @@ module MkGraph
     and tl = List.tl keys in
     let hd_ts = H.find ts hd in
     List.fold_left
-      (fun (acc : string list list) (f : term) ->
+      (fun (acc : string list list) (f : EConstr.t) ->
         _pstr_list_term_transitions f (H.find ts f) :: acc)
       [ _pstr_list_term_transitions hd hd_ts ]
       tl
@@ -668,6 +645,40 @@ module MkGraph
         | None -> ()
         | Some s -> Log.override (Printf.sprintf "%s%s" prefix s));
       ())
+  ;;
+
+  (**********************************************************************)
+  (******** above is a sanity check *************************************)
+  (**********************************************************************)
+
+  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions]. *)
+  let insert_constr_transition
+    (constrs : constr_transitions)
+    (a : action)
+    (d : term)
+    (c : Constr_tree.t)
+    : unit mm
+    =
+    let* sigma = get_sigma in
+    (match Hashtbl.find_opt constrs a with
+     | None -> Hashtbl.add constrs a (D.singleton (d, c))
+     | Some ds -> Hashtbl.replace constrs a (D.add (d, c) ds));
+    return ()
+  ;;
+
+  let add_new_term_constr_transition
+    (g : lts_graph)
+    (t : term)
+    (a : action)
+    (d : term)
+    (c : Constr_tree.t)
+    : unit mm
+    =
+    H.add
+      g.transitions
+      t
+      (Hashtbl.of_seq (List.to_seq [ a, D.singleton (d, c) ]));
+    return ()
   ;;
 
   let get_new_states
@@ -930,7 +941,7 @@ module MkGraph
                      , (match Hashtbl.find_opt tbl.from_coq destination with
                         | None -> "UNKNOWN"
                         | Some s -> s)
-                     , Some (ConstrTree.pstr constr_tree) )
+                     , Some (Constr_tree.pstr constr_tree) )
                      :: acc'')
                    destinations
                    acc')
