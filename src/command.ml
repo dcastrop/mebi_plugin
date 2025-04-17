@@ -28,8 +28,8 @@ let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
     @raise invalid_arity
       if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error. *)
 let get_lts_labels_and_terms
-      (mib : Declarations.mutual_inductive_body)
-      (mip : Declarations.one_inductive_body)
+  (mib : Declarations.mutual_inductive_body)
+  (mip : Declarations.one_inductive_body)
   : (Constr.rel_declaration * Constr.rel_declaration) mm
   =
   let open Declarations in
@@ -147,9 +147,9 @@ let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
     - Is [w_unify] the best way?
     - ... *)
 let m_unify
-      ?(params : Params.log = default_params)
-      (t0 : EConstr.t)
-      (t1 : EConstr.t)
+  ?(params : Params.log = default_params)
+  (t0 : EConstr.t)
+  (t1 : EConstr.t)
   : bool mm
   =
   params.kind <- Debug ();
@@ -215,8 +215,8 @@ let _pstr_unif_problem (t : unif_problem) : string =
 ;;
 
 let rec unify_all
-          ?(params : Params.log = default_params)
-          (i : (ConstrTree.t * unif_problem) list)
+  ?(params : Params.log = default_params)
+  (i : (ConstrTree.t * unif_problem) list)
   : ConstrTree.t list option t
   =
   params.kind <- Debug ();
@@ -244,9 +244,9 @@ let rec unify_all
 ;;
 
 let sandboxed_unify
-      ?(params : Params.log = default_params)
-      (tgt_term : EConstr.t)
-      (u : (ConstrTree.t * unif_problem) list)
+  ?(params : Params.log = default_params)
+  (tgt_term : EConstr.t)
+  (u : (ConstrTree.t * unif_problem) list)
   : (EConstr.t * ConstrTree.t list) option mm
   =
   (* let* _ =
@@ -274,11 +274,11 @@ type coq_ctor = EConstr.t * EConstr.t * ConstrTree.t
 
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
-          ?(params : Params.log = default_params)
-          (acc : coq_ctor list)
-          (i : int)
-          (act : EConstr.t)
-          (tgt_term : EConstr.t)
+  ?(params : Params.log = default_params)
+  (acc : coq_ctor list)
+  (i : int)
+  (act : EConstr.t)
+  (tgt_term : EConstr.t)
   : (ConstrTree.t * unif_problem) list list -> coq_ctor list t
   =
   (* :  (int tree * unif_problem) list list -> (EConstr.t * int tree list) list t *)
@@ -301,9 +301,9 @@ let rec retrieve_tgt_nodes
 
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
-          ?(params : Params.log = default_params)
-          (acc : (ConstrTree.t * unif_problem) list list)
-          (fn_rlts : term_type_map)
+  ?(params : Params.log = default_params)
+  (acc : (ConstrTree.t * unif_problem) list list)
+  (fn_rlts : term_type_map)
   :  EConstr.t list * EConstr.rel_declaration list
   -> (ConstrTree.t * unif_problem) list list option t
   = function
@@ -339,7 +339,7 @@ let rec check_updated_ctx
             let ctors =
               List.map
                 (fun (_, (tL : EConstr.t), (i : ConstrTree.t)) ->
-                   i, { termL = tL; termR = args.(2) })
+                  i, { termL = tL; termR = args.(2) })
                 ctors
             in
             (* We need to cross-product all possible unifications. This is in case
@@ -363,11 +363,11 @@ let rec check_updated_ctx
 
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
-      ?(params : Params.log = default_params)
-      (ctor_transitions : (Constr.rel_context * Constr.types) array)
-      (fn_rlts : term_type_map)
-      (t' : EConstr.t)
-      (ma : EConstr.t option)
+  ?(params : Params.log = default_params)
+  (ctor_transitions : (Constr.rel_context * Constr.types) array)
+  (fn_rlts : term_type_map)
+  (t' : EConstr.t)
+  (ma : EConstr.t option)
   : coq_ctor list t
   =
   params.kind <- Debug ();
@@ -524,30 +524,30 @@ module MkGraph
 
   (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * ConstrTree.t)] in a given [constr_transitions]. *)
   let insert_constr_transition
-        (constrs : constr_transitions)
-        (a : action)
-        (d : term)
-        (c : ConstrTree.t)
+    (constrs : constr_transitions)
+    (a : action)
+    (d : term)
+    (c : ConstrTree.t)
     : unit
     =
     (* Log.override
-      (Printf.sprintf
-         "E, a:(label:%s, is_tau:%b)\n  constrs keys: [%s]"
-         a.label
-         a.is_tau
-         (C.fold
-            (fun (k : action) _ (acc : string) ->
-               Printf.sprintf
-                 "%s\n\
-                 \    (label:%s, is_tau:%b | eq %b, label eq %b, is_tau eq %b) "
-                 acc
-                 k.label
-                 k.is_tau
-                 (Mebi_action.eq a k)
-                 (a.label == k.label)
-                 (a.is_tau == k.is_tau))
-            constrs
-            "")); *)
+       (Printf.sprintf
+       "E, a:(label:%s, is_tau:%b)\n  constrs keys: [%s]"
+       a.label
+       a.is_tau
+       (C.fold
+       (fun (k : action) _ (acc : string) ->
+       Printf.sprintf
+       "%s\n\
+       \    (label:%s, is_tau:%b | eq %b, label eq %b, is_tau eq %b) "
+       acc
+       k.label
+       k.is_tau
+       (Mebi_action.eq a k)
+       (a.label == k.label)
+       (a.is_tau == k.is_tau))
+       constrs
+       "")); *)
     match C.find_opt constrs a with
     | None ->
       (* Log.override (Printf.sprintf "F, action: %s" a.label); *)
@@ -558,20 +558,20 @@ module MkGraph
   ;;
 
   let add_new_term_constr_transition
-        (g : lts_graph)
-        (t : term)
-        (a : action)
-        (d : term)
-        (c : ConstrTree.t)
+    (g : lts_graph)
+    (t : term)
+    (a : action)
+    (d : term)
+    (c : ConstrTree.t)
     : unit
     =
     H.add g.transitions t (C.of_seq (List.to_seq [ a, D.singleton (d, c) ]))
   ;;
 
   let _pstr_constr_transition
-        (f : term)
-        (a : action)
-        ((d, c) : term * ConstrTree.t)
+    (f : term)
+    (a : action)
+    ((d, c) : term * ConstrTree.t)
     : string
     =
     Printf.sprintf
@@ -603,7 +603,7 @@ module MkGraph
     let hd_ds = C.find cs hd in
     List.fold_left
       (fun (acc : string list) (a : action) ->
-         List.append (_pstr_list_constr_transitions f a (C.find cs a)) acc)
+        List.append (_pstr_list_constr_transitions f a (C.find cs a)) acc)
       (_pstr_list_constr_transitions f hd hd_ds)
       tl
   ;;
@@ -615,15 +615,15 @@ module MkGraph
     let hd_ts = H.find ts hd in
     List.fold_left
       (fun (acc : string list list) (f : term) ->
-         _pstr_list_term_transitions f (H.find ts f) :: acc)
+        _pstr_list_term_transitions f (H.find ts f) :: acc)
       [ _pstr_list_term_transitions hd hd_ts ]
       tl
   ;;
 
   let _check_for_duplicate_transitions
-        ?(prefix : string = "")
-        ?(none : string option)
-        (g : lts_graph)
+    ?(prefix : string = "")
+    ?(none : string option)
+    (g : lts_graph)
     : unit
     =
     if H.length g.transitions > 1
@@ -635,17 +635,17 @@ module MkGraph
       let without_dupes : string list =
         List.fold_left
           (fun (acc : string list) (ts : string list) ->
-             List.fold_left
-               (fun (acc' : string list) (t : string) ->
-                  if List.mem t acc'
-                  then (
-                    (match Hashtbl.find_opt dupes t with
-                     | None -> Hashtbl.add dupes t 1
-                     | Some i -> Hashtbl.replace dupes t (i + 1));
-                    acc')
-                  else t :: acc')
-               acc
-               ts)
+            List.fold_left
+              (fun (acc' : string list) (t : string) ->
+                if List.mem t acc'
+                then (
+                  (match Hashtbl.find_opt dupes t with
+                   | None -> Hashtbl.add dupes t 1
+                   | Some i -> Hashtbl.replace dupes t (i + 1));
+                  acc')
+                else t :: acc')
+              acc
+              ts)
           []
           pstr_list_list
       in
@@ -662,12 +662,12 @@ module MkGraph
              num_nondupes
              (Hashtbl.fold
                 (fun (s : string) (i : int) (acc : string) ->
-                   Printf.sprintf
-                     "%s\n- #%d, had %d dupes:\n  %s\n"
-                     acc
-                     (dupe_id ())
-                     i
-                     s)
+                  Printf.sprintf
+                    "%s\n- #%d, had %d dupes:\n  %s\n"
+                    acc
+                    (dupe_id ())
+                    i
+                    s)
                 dupes
                 ""))
       else (
@@ -678,10 +678,10 @@ module MkGraph
   ;;
 
   let get_new_states
-        ?(params : Params.log = default_params)
-        (t : EConstr.t)
-        (g : lts_graph)
-        (ctors : coq_ctor list)
+    ?(params : Params.log = default_params)
+    (t : EConstr.t)
+    (g : lts_graph)
+    (ctors : coq_ctor list)
     : S.t mm
     =
     let iter_body (i : int) (new_states : S.t) =
@@ -693,8 +693,8 @@ module MkGraph
         { label = econstr_to_string act; is_tau }
       in
       (* _check_for_duplicate_transitions
-        ~prefix:(Printf.sprintf "A, t: %s\n  " (econstr_to_string t))
-        g; *)
+         ~prefix:(Printf.sprintf "A, t: %s\n  " (econstr_to_string t))
+         g; *)
       (match H.find_opt g.transitions t with
        | None ->
          (* Log.override "C"; *)
@@ -704,12 +704,11 @@ module MkGraph
          insert_constr_transition actions to_add tgt int_tree);
       (* if [tgt] has not been explored then add [to_visit] *)
       (* _check_for_duplicate_transitions
-        ~prefix:(Printf.sprintf "B, t: %s\n  " (econstr_to_string t))
-        g; *)
-      if
-        H.mem g.transitions tgt
-        || EConstr.eq_constr sigma tgt t
-        || S.mem tgt g.states
+         ~prefix:(Printf.sprintf "B, t: %s\n  " (econstr_to_string t))
+         g; *)
+      if H.mem g.transitions tgt
+         || EConstr.eq_constr sigma tgt t
+         || S.mem tgt g.states
       then ()
       else Queue.push tgt g.to_visit;
       (* add [tgt] to [new_states] *)
@@ -721,17 +720,102 @@ module MkGraph
   exception
     CannotFindTypeOfTermToVisit of (EConstr.t * EConstr.t * term_type_map)
 
+  (** [get_new_constrs t tr_rlts fn_rlts] returns the list of constructors applicable to term [t], using those provided in [tr_rlts] (and [fn_rlts]).
+      If no immediate constructor is found matching [t] in [tr_rlts] (likely due to unification problems), then each constructor in [tr_rlts] is tried sequentially, until one of them returns some valid constructors.
+      @raise CannotFindTypeOfTermToVisit
+        if none of the constructors provided in [tr_rlts] yield constructors from [check_valid_constructors]. *)
+  let get_new_constrs
+    ?(params : Params.log = default_params)
+    (t : EConstr.t)
+    (tr_rlts : term_type_map)
+    (fn_rlts : term_type_map)
+    : coq_ctor list mm
+    =
+    let* ty = Mebi_utils.type_of_econstr t in
+    match Hashtbl.find_opt tr_rlts ty with
+    | None ->
+      Log.warning
+        ~params
+        (Printf.sprintf
+           "get_new_constrs, could not find immediate constructor matching \
+            type of term to visit.\n\
+            - term%s,\n\
+            - type: %s.\n\
+            => proceeding to try one by one."
+           (econstr_to_string t)
+           (econstr_to_string ty));
+      (* try one by one until something returns something *)
+      let rlts_key_val_list : (term * raw_lts) list =
+        List.of_seq (Hashtbl.to_seq tr_rlts)
+      in
+      let iter_body (i : int) ((acc, j) : coq_ctor list * term option) =
+        if List.is_empty acc
+        then (
+          let nth_rlts = List.nth rlts_key_val_list i in
+          let rlts : raw_lts = snd nth_rlts in
+          let* constrs =
+            check_valid_constructor
+              ~params
+              rlts.constructor_transitions
+              fn_rlts
+              t
+              None
+          in
+          return (constrs, Some (fst nth_rlts)))
+        else return (acc, j)
+      in
+      let* (constrs, i) : coq_ctor list * term option =
+        iterate 0 (List.length rlts_key_val_list - 1) ([], None) iter_body
+      in
+      if List.is_empty constrs
+      then (
+        Log.warning
+          ~params
+          (Printf.sprintf
+             "get_new_constrs, could not find constructor matching type of \
+              term to visit.\n\
+              - term: %s,\n\
+              - type: %s,\n\
+              - types provided: %s."
+             (econstr_to_string t)
+             (econstr_to_string ty)
+             (Mebi_utils.pstr_keys
+                (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts))));
+        raise (CannotFindTypeOfTermToVisit (t, ty, tr_rlts)))
+      else (
+        Log.override
+          ~params
+          (Printf.sprintf
+             "get_new_constrs, found matching type of term to visit.\n\
+              - term: %s,\n\
+              - type: %s,\n\
+              - matching term: %s."
+             (econstr_to_string t)
+             (econstr_to_string ty)
+             (match i with
+              | None -> "..."
+              | Some i -> econstr_to_string i));
+        return constrs)
+    | Some rlts ->
+      check_valid_constructor
+        ~params
+        rlts.constructor_transitions
+        fn_rlts
+        t
+        None
+  ;;
+
   (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
       @param fn_rlts maps coq-term names to [raw_lts].
       @param g is an [lts_graph] accumulated while exploring [rlts].
       @param bound is the number of states to explore until.
       @return an [lts_graph] with a maximum of [bound] many states. *)
   let rec build_lts_graph
-            ?(params : Params.log = default_params)
-            (tr_rlts : term_type_map)
-            (fn_rlts : term_type_map)
-            (g : lts_graph)
-            (bound : int)
+    ?(params : Params.log = default_params)
+    (tr_rlts : term_type_map)
+    (fn_rlts : term_type_map)
+    (g : lts_graph)
+    (bound : int)
     : lts_graph mm
     =
     params.kind <- Debug ();
@@ -739,38 +823,14 @@ module MkGraph
     then return g (* finished if no more to visit*)
     else if S.cardinal g.states > bound
     then return g (* exit if bound reached *)
-    else
-      let* (t : EConstr.t) = return (Queue.pop g.to_visit) in
-      let* ty = Mebi_utils.type_of_econstr t in
-      match Hashtbl.find_opt tr_rlts ty with
-      | None ->
-        Log.warning
-          ~params
-          (Printf.sprintf
-             "build_lts_graph, cannot find type of term to visit.\n\
-              - term: %s,\n\
-              - type: %s,\n\
-              - types provided: %s\n\
-              - types provided: %s"
-             (econstr_to_string t)
-             (econstr_to_string ty)
-             (Mebi_utils.pstr_keys
-                (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys fn_rlts)))
-             (Mebi_utils.pstr_keys
-                (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts))));
-        raise (CannotFindTypeOfTermToVisit (t, ty, fn_rlts))
-      | Some rlts ->
-        let* constrs : coq_ctor list =
-          check_valid_constructor
-            ~params
-            rlts.constructor_transitions
-            fn_rlts
-            t
-            None
-        in
-        let* (new_states : S.t) = get_new_states ~params t g constrs in
-        let g = { g with states = S.union g.states new_states } in
-        build_lts_graph ~params tr_rlts fn_rlts g bound
+    else (
+      let t : EConstr.t = Queue.pop g.to_visit in
+      let* (constrs : coq_ctor list) =
+        get_new_constrs ~params t tr_rlts fn_rlts
+      in
+      let* (new_states : S.t) = get_new_states ~params t g constrs in
+      let g = { g with states = S.union g.states new_states } in
+      build_lts_graph ~params tr_rlts fn_rlts g bound)
   ;;
 
   exception
@@ -784,28 +844,28 @@ module MkGraph
       @param tref is the original coq-term.
       @param bound is the number of states to explore until. *)
   let build_graph
-        ?(params : Params.log = default_params)
-        (tr_rlts : term_type_map)
-        (fn_rlts : term_type_map)
-        (tref : Constrexpr.constr_expr)
-        (bound : int)
+    ?(params : Params.log = default_params)
+    (tr_rlts : term_type_map)
+    (fn_rlts : term_type_map)
+    (tref : Constrexpr.constr_expr)
+    (bound : int)
     : lts_graph mm
     =
     let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
-    match Hashtbl.find_opt tr_rlts (run (Mebi_utils.type_of_tref tref)) with
+    let* ty = Mebi_utils.type_of_econstr t in
+    match Hashtbl.find_opt tr_rlts ty with
     | None ->
       Log.warning
         ~params
         (Printf.sprintf
-           "build_graph, ERROR: could not find rlts matching:\n\
-            \tt of tref: %s\n\
-            where tr_lts (keys): %s\n\
-            and fn_rlts (keys): %s."
+           "build_graph, could not find type of term to visit.\n\
+            - tref: %s\n\
+            - type: %s\n\
+            - types provided: %s."
            (econstr_to_string t)
+           (econstr_to_string ty)
            (Mebi_utils.pstr_keys
-              (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts)))
-           (Mebi_utils.pstr_keys
-              (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys fn_rlts))));
+              (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts))));
       raise (CoqTermDoesNotMatchSemantics (tref, t, tr_rlts, fn_rlts))
     | Some rlts ->
       (* update environment by typechecking *)
@@ -841,28 +901,28 @@ module MkGraph
     (* type coq_translation = coq_translation_record mm *)
 
     let translate_coq_terms
-          ?(params : Params.log = default_params)
-          (states : N.t)
+      ?(params : Params.log = default_params)
+      (states : N.t)
       : coq_translation mm
       =
       let tbl : coq_translation = make_coq_translation in
       S.iter
         (fun (s : EConstr.t) ->
-           match Hashtbl.find_opt tbl.from_coq s with
-           | None ->
-             (* add as new state *)
-             let str : string = econstr_to_string s in
-             Hashtbl.add tbl.from_coq s str;
-             Hashtbl.add tbl.to_coq str s
-           | Some _ -> (* ignore *) ())
+          match Hashtbl.find_opt tbl.from_coq s with
+          | None ->
+            (* add as new state *)
+            let str : string = econstr_to_string s in
+            Hashtbl.add tbl.from_coq s str;
+            Hashtbl.add tbl.to_coq str s
+          | Some _ -> (* ignore *) ())
         states;
       return tbl
     ;;
 
     let translate_coq_lts
-          ?(params : Params.log = default_params)
-          (transitions : constr_transitions H.t)
-          (tbl : coq_translation)
+      ?(params : Params.log = default_params)
+      (transitions : constr_transitions H.t)
+      (tbl : coq_translation)
       : Lts.raw_flat_lts mm
       =
       return
@@ -870,33 +930,33 @@ module MkGraph
            (fun (from : EConstr.t)
              (actions : constr_transitions)
              (acc : Lts.raw_flat_lts) ->
-              C.fold
-                (fun (action : Mebi_action.action)
-                  (destinations : D.t)
-                  (acc' : Lts.raw_flat_lts) ->
-                   D.fold
-                     (fun ((destination, constr_tree) : D.elt)
-                       (acc'' : Lts.raw_flat_lts) ->
-                        ( (match Hashtbl.find_opt tbl.from_coq from with
-                           | None -> "UNKNOWN"
-                           | Some s -> s)
-                        , action.label
-                        , (match Hashtbl.find_opt tbl.from_coq destination with
-                           | None -> "UNKNOWN"
-                           | Some s -> s)
-                        , Some (ConstrTree.pstr constr_tree) )
-                        :: acc'')
-                     destinations
-                     acc')
-                actions
-                acc)
+             C.fold
+               (fun (action : Mebi_action.action)
+                 (destinations : D.t)
+                 (acc' : Lts.raw_flat_lts) ->
+                 D.fold
+                   (fun ((destination, constr_tree) : D.elt)
+                     (acc'' : Lts.raw_flat_lts) ->
+                     ( (match Hashtbl.find_opt tbl.from_coq from with
+                        | None -> "UNKNOWN"
+                        | Some s -> s)
+                     , action.label
+                     , (match Hashtbl.find_opt tbl.from_coq destination with
+                        | None -> "UNKNOWN"
+                        | Some s -> s)
+                     , Some (ConstrTree.pstr constr_tree) )
+                     :: acc'')
+                   destinations
+                   acc')
+               actions
+               acc)
            transitions
            [])
     ;;
 
     let translate_init_term
-          (init_term : Constrexpr.constr_expr)
-          (tbl : coq_translation)
+      (init_term : Constrexpr.constr_expr)
+      (tbl : coq_translation)
       : string mm
       =
       let$ t env sigma = Constrintern.interp_constr_evars env sigma init_term in
@@ -909,11 +969,11 @@ module MkGraph
     (* exception UnfinishedLTS of lts_graph *)
 
     let lts_graph_to_lts
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unknown")
-          (g : lts_graph)
-          (init_term : Constrexpr.constr_expr)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unknown")
+      (g : lts_graph)
+      (init_term : Constrexpr.constr_expr)
       : (Lts.lts * coq_translation) mm
       =
       params.kind <- Debug ();
@@ -966,7 +1026,7 @@ module MkGraph
           (Printf.sprintf "saved incomplete LTS to: %s\n" dump_filepath))
       else Log.override (Printf.sprintf "Finished translating LTS: %s" name);
       (* Log.override
-        (Printf.sprintf "leaving lts_graph_to_lts: %s, %b" name is_complete); *)
+         (Printf.sprintf "leaving lts_graph_to_lts: %s, %b" name is_complete); *)
       return (lts, tbl)
     ;;
   end
@@ -989,8 +1049,8 @@ let make_graph_builder =
 ;;
 
 let build_rlts_map
-      ?(params : Params.log = default_params)
-      (grefs : Names.GlobRef.t list)
+  ?(params : Params.log = default_params)
+  (grefs : Names.GlobRef.t list)
   : term_type_map * term_type_map
   =
   let trmap : term_type_map = Hashtbl.create (List.length grefs)
@@ -998,29 +1058,29 @@ let build_rlts_map
   and map_id : unit -> int = new_int_counter () in
   List.iter
     (fun (gref : Names.GlobRef.t) ->
-       let rlts : raw_lts = run (check_ref_lts gref) in
-       Log.override
-         ~params
-         (Printf.sprintf "= = = = = = = = =\n\trlts (#%d):" (map_id ()));
-       let _ = log_raw_lts ~params rlts in
-       (* FIXME: avoid two keys mapping to same rlts *)
-       (* - [build_graph] requires [tref -> raw_lts] *)
-       (* - [check_updated_ctx] requires [fn -> raw_lts] *)
-       Hashtbl.add trmap rlts.trm_type rlts;
-       Hashtbl.add fnmap rlts.coq_lts rlts)
+      let rlts : raw_lts = run (check_ref_lts gref) in
+      Log.override
+        ~params
+        (Printf.sprintf "= = = = = = = = =\n\trlts (#%d):" (map_id ()));
+      let _ = log_raw_lts ~params rlts in
+      (* FIXME: avoid two keys mapping to same rlts *)
+      (* - [build_graph] requires [tref -> raw_lts] *)
+      (* - [check_updated_ctx] requires [fn -> raw_lts] *)
+      Hashtbl.add trmap rlts.trm_type rlts;
+      Hashtbl.add fnmap rlts.coq_lts rlts)
     grefs;
   trmap, fnmap
 ;;
 
 (** *)
 let build_bounded_lts
-      ?(params : Params.log = default_params)
-      ?(bound : int = default_bound)
-      ?(name : string = "unknown")
-      (tr_rlts : term_type_map)
-      (fn_rlts : term_type_map)
-      (tref : Constrexpr.constr_expr)
-      (module G : GraphB)
+  ?(params : Params.log = default_params)
+  ?(bound : int = default_bound)
+  ?(name : string = "unknown")
+  (tr_rlts : term_type_map)
+  (fn_rlts : term_type_map)
+  (tref : Constrexpr.constr_expr)
+  (module G : GraphB)
   : Lts.lts mm
   =
   (* graph lts *)
@@ -1039,8 +1099,8 @@ let build_bounded_lts
      (run (G.PStr.transitions ~params:(Log params) graph_lts.transitions))); *)
   (* show if normal output allowed from outside call *)
   (* if params.options.show_debug_output
-  then params.kind <- Details ()
-  else params.kind <- Normal (); *)
+     then params.kind <- Details ()
+     else params.kind <- Normal (); *)
   (* log
      ~params
      (Printf.sprintf
@@ -1055,11 +1115,11 @@ let build_bounded_lts
 
 (** *)
 let build_fsm_from_bounded_lts
-      ?(params : Params.log = default_params)
-      ?(bound : int = default_bound)
-      ?(name : string = "unknown")
-      (tref : Constrexpr.constr_expr)
-      (grefs : Names.GlobRef.t list)
+  ?(params : Params.log = default_params)
+  ?(bound : int = default_bound)
+  ?(name : string = "unknown")
+  (tref : Constrexpr.constr_expr)
+  (grefs : Names.GlobRef.t list)
   : Fsm.fsm mm
   =
   (* disable detailed printouts *)
@@ -1090,12 +1150,12 @@ let build_fsm_from_bounded_lts
 module Vernac = struct
   module LTS = struct
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unknown")
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unknown")
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : Lts.lts mm
       =
       (* list of raw coq lts *)
@@ -1116,11 +1176,11 @@ module Vernac = struct
     ;;
 
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       let* (the_lts : Lts.lts) = build ~params ~bound tref grefs in
@@ -1131,12 +1191,12 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       params.options.output_enabled <- false;
@@ -1171,23 +1231,23 @@ module Vernac = struct
   module FSM = struct
     (** *)
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unknown")
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unknown")
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : Fsm.fsm mm
       =
       build_fsm_from_bounded_lts ~params ~bound ~name tref grefs
     ;;
 
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get translated fsm *)
@@ -1203,12 +1263,12 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get translated fsm *)
@@ -1228,11 +1288,11 @@ module Vernac = struct
   module Minim = struct
     (** *)
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unknown")
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unknown")
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm) mm
       =
       (* get translated fsm *)
@@ -1245,10 +1305,10 @@ module Vernac = struct
 
     (** *)
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get translated fsm *)
@@ -1267,11 +1327,11 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get translated fsm *)
@@ -1302,12 +1362,12 @@ module Vernac = struct
   module Merged = struct
     (** *)
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unknown")
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unknown")
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm * Fsm.fsm) mm
       =
       (* get translated fsm *)
@@ -1326,11 +1386,11 @@ module Vernac = struct
 
     (** *)
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get merged fsm *)
@@ -1350,12 +1410,12 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get merged fsm *)
@@ -1399,12 +1459,12 @@ module Vernac = struct
 
     (** *)
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unknown")
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unknown")
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm * Bisimilarity.result) mm
       =
       (* get translated fsm *)
@@ -1422,11 +1482,11 @@ module Vernac = struct
 
     (** *)
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       let* fsm_A, fsm_B, result = build ~params ~bound trefA trefB grefs in
@@ -1447,12 +1507,12 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       let* fsm_A, fsm_B, result =
