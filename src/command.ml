@@ -428,8 +428,16 @@ let get_new_constrs
   : coq_ctor list mm
   =
   let* ty = Mebi_utils.type_of_econstr t in
+  let$ ty env sigma = sigma, Reductionops.nf_all env sigma ty in
   match Hashtbl.find_opt tr_rlts ty with
   | None ->
+    unknown_term_type (t, ty)
+    (****************************************************************)
+    (****************************************************************)
+    (* below is old, which worked but we want to get the type first time. *)
+    (* crashes with CADP.v, p0 *)
+    (****************************************************************)
+    (****************************************************************)
     (* Log.warning
        ~params
        (Printf.sprintf
@@ -439,59 +447,47 @@ let get_new_constrs
        - type: %s.\n\
          => proceeding to try one by one."
          (econstr_to_string t)
-         (econstr_to_string ty)); *)
-    (* try one by one until something returns something *)
-    let rlts_key_val_list : (EConstr.t * raw_lts) list =
-      List.of_seq (Hashtbl.to_seq tr_rlts)
-    in
-    let iter_body (i : int) ((acc, j) : coq_ctor list * EConstr.t option) =
-      if List.is_empty acc
-      then (
-        let nth_rlts = List.nth rlts_key_val_list i in
-        let rlts : raw_lts = snd nth_rlts in
-        let* constrs =
-          check_valid_constructor
-            ~params
-            rlts.constructor_transitions
-            fn_rlts
-            t
-            None
-        in
-        return (constrs, Some (fst nth_rlts)))
-      else return (acc, j)
-    in
-    let* (constrs, i) : coq_ctor list * EConstr.t option =
-      iterate 0 (List.length rlts_key_val_list - 1) ([], None) iter_body
-    in
-    if List.is_empty constrs
-    then (
-      Log.warning
-        ~params
-        (Printf.sprintf
-           "get_new_constrs, could not find constructor matching type of term \
-            to visit.\n\
-            - term: %s,\n\
-            - type: %s,\n\
-            - types provided: %s."
-           (econstr_to_string t)
-           (econstr_to_string ty)
-           (Mebi_utils.pstr_keys
-              (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts))));
-      unknown_term_type (t, ty))
-    else
-      (* Log.override
+         (econstr_to_string ty));
+         (* try one by one until something returns something *)
+         let rlts_key_val_list : (EConstr.t * raw_lts) list =
+         List.of_seq (Hashtbl.to_seq tr_rlts)
+         in
+         let iter_body (i : int) ((acc, j) : coq_ctor list * EConstr.t option) =
+         if List.is_empty acc
+         then (
+         let nth_rlts = List.nth rlts_key_val_list i in
+         let rlts : raw_lts = snd nth_rlts in
+         let* constrs =
+         check_valid_constructor
+         ~params
+         rlts.constructor_transitions
+         fn_rlts
+         t
+         None
+         in
+         return (constrs, Some (fst nth_rlts)))
+         else return (acc, j)
+         in
+         let* (constrs, i) : coq_ctor list * EConstr.t option =
+         iterate 0 (List.length rlts_key_val_list - 1) ([], None) iter_body
+         in
+         if List.is_empty constrs
+         then (
+         unknown_term_type (t, ty))
+         else
+         (* Log.override
          ~params
          (Printf.sprintf
          "get_new_constrs, found matching type of term to visit.\n\
-         - term: %s,\n\
-         - type: %s,\n\
-         - matching term: %s."
-           (econstr_to_string t)
-           (econstr_to_string ty)
-           (match i with
-           | None -> "..."
-           | Some i -> econstr_to_string i)); *)
-      return constrs
+       - term: %s,\n\
+       - type: %s,\n\
+       - matching term: %s."
+         (econstr_to_string t)
+         (econstr_to_string ty)
+         (match i with
+         | None -> "..."
+         | Some i -> econstr_to_string i)); *)
+         return constrs*)
   | Some rlts ->
     check_valid_constructor ~params rlts.constructor_transitions fn_rlts t None
 ;;
@@ -828,21 +824,21 @@ module MkGraph
     : lts_graph mm
     =
     let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
+    (* "show" types expected by constructors to monad *)
+    (* let constr_tys = List.of_seq (Hashtbl.to_seq_keys tr_rlts) in
+       let iter_body (i : int) () =
+       (* let* env = get_env in
+       let* sigma = get_sigma in
+       let _ = Reductionops.nf_all env sigma (List.nth constr_tys i) in
+       return () *)
+       let _ = Mebi_utils.type_of_econstr (List.nth constr_tys i) in
+       return ()
+       in
+       let _ = iterate 0 (List.length constr_tys - 1) () iter_body in *)
+    (* should be able to get the type now -- fail otherwise *)
     let* ty = Mebi_utils.type_of_econstr t in
     match Hashtbl.find_opt tr_rlts ty with
-    | None ->
-      Log.warning
-        ~params
-        (Printf.sprintf
-           "build_graph, could not find type of term to visit.\n\
-            - tref: %s\n\
-            - type: %s\n\
-            - types provided: %s."
-           (econstr_to_string t)
-           (econstr_to_string ty)
-           (Mebi_utils.pstr_keys
-              (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts))));
-      unknown_tref_type (t, ty)
+    | None -> unknown_tref_type (t, ty)
     | Some rlts ->
       (* update environment by typechecking *)
       let$* u env sigma = Typing.check env sigma t rlts.trm_type in
