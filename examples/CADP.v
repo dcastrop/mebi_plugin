@@ -894,7 +894,7 @@ Example p0 : tm * env := (P, Env.initial 1).
 Compute p0.
 
 (* MeBi Show  LTS Of p0 Using step. *)
-(* MeBi Dump "p0" LTS Bounded 150 Of p0 Using step. *)
+MeBi Dump "p0" LTS Bounded 150 Of p0 Using step.
 (* MeBi Debug LTS Of p0 Using step. *)
 
 (* MeBi Show  FSM Of p0 Using step. *)
