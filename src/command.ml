@@ -443,7 +443,7 @@ module type GraphB = sig
     -> action
     -> term
     -> ConstrTree.t
-    -> unit
+    -> unit mm
 
   val build_lts_graph
     :  ?params:Params.log
@@ -528,33 +528,13 @@ module MkGraph
     (a : action)
     (d : term)
     (c : ConstrTree.t)
-    : unit
+    : unit mm
     =
-    (* Log.override
-       (Printf.sprintf
-       "E, a:(label:%s, is_tau:%b)\n  constrs keys: [%s]"
-       a.label
-       a.is_tau
-       (C.fold
-       (fun (k : action) _ (acc : string) ->
-       Printf.sprintf
-       "%s\n\
-       \    (label:%s, is_tau:%b | eq %b, label eq %b, is_tau eq %b) "
-       acc
-       k.label
-       k.is_tau
-       (Mebi_action.eq a k)
-       (a.label == k.label)
-       (a.is_tau == k.is_tau))
-       constrs
-       "")); *)
-    match C.find_opt constrs a with
-    | None ->
-      (* Log.override (Printf.sprintf "F, action: %s" a.label); *)
-      C.add constrs a (D.singleton (d, c))
-    | Some ds ->
-      (* Log.override (Printf.sprintf "G, action: %s" a.label); *)
-      C.replace constrs a (D.add (d, c) ds)
+    let* sigma = get_sigma in
+    (match C.find_opt constrs a with
+     | None -> C.add constrs a (D.singleton (d, c))
+     | Some ds -> C.replace constrs a (D.add (d, c) ds));
+    return ()
   ;;
 
   let add_new_term_constr_transition
@@ -696,16 +676,14 @@ module MkGraph
          ~prefix:(Printf.sprintf "A, t: %s\n  " (econstr_to_string t))
          g; *)
       (match H.find_opt g.transitions t with
-       | None ->
-         (* Log.override "C"; *)
-         add_new_term_constr_transition g t to_add tgt int_tree
+       | None -> add_new_term_constr_transition g t to_add tgt int_tree
        | Some actions ->
-         (* Log.override "D"; *)
-         insert_constr_transition actions to_add tgt int_tree);
-      (* if [tgt] has not been explored then add [to_visit] *)
+         let _ = insert_constr_transition actions to_add tgt int_tree in
+         ());
       (* _check_for_duplicate_transitions
          ~prefix:(Printf.sprintf "B, t: %s\n  " (econstr_to_string t))
          g; *)
+      (* if [tgt] has not been explored then add [to_visit] *)
       if H.mem g.transitions tgt
          || EConstr.eq_constr sigma tgt t
          || S.mem tgt g.states
@@ -782,20 +760,20 @@ module MkGraph
              (Mebi_utils.pstr_keys
                 (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts))));
         raise (CannotFindTypeOfTermToVisit (t, ty, tr_rlts)))
-      else (
-        Log.override
-          ~params
-          (Printf.sprintf
-             "get_new_constrs, found matching type of term to visit.\n\
-              - term: %s,\n\
-              - type: %s,\n\
-              - matching term: %s."
+      else
+        (* Log.override
+           ~params
+           (Printf.sprintf
+           "get_new_constrs, found matching type of term to visit.\n\
+           - term: %s,\n\
+           - type: %s,\n\
+           - matching term: %s."
              (econstr_to_string t)
              (econstr_to_string ty)
              (match i with
-              | None -> "..."
-              | Some i -> econstr_to_string i));
-        return constrs)
+             | None -> "..."
+             | Some i -> econstr_to_string i)); *)
+        return constrs
     | Some rlts ->
       check_valid_constructor
         ~params
