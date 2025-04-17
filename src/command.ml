@@ -710,9 +710,6 @@ module MkGraph
     iterate 0 (List.length ctors - 1) (S.singleton t) iter_body
   ;;
 
-  exception
-    CannotFindTypeOfTermToVisit of (EConstr.t * EConstr.t * term_type_map)
-
   (** [get_new_constrs t tr_rlts fn_rlts] returns the list of constructors applicable to term [t], using those provided in [tr_rlts] (and [fn_rlts]).
       If no immediate constructor is found matching [t] in [tr_rlts] (likely due to unification problems), then each constructor in [tr_rlts] is tried sequentially, until one of them returns some valid constructors.
       @raise CannotFindTypeOfTermToVisit
@@ -774,7 +771,7 @@ module MkGraph
              (econstr_to_string ty)
              (Mebi_utils.pstr_keys
                 (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts))));
-        raise (CannotFindTypeOfTermToVisit (t, ty, tr_rlts)))
+        unknown_term_type (t, ty))
       else
         (* Log.override
            ~params
@@ -826,10 +823,6 @@ module MkGraph
       build_lts_graph ~params tr_rlts fn_rlts g bound)
   ;;
 
-  exception
-    CoqTermDoesNotMatchSemantics of
-      (Constrexpr.constr_expr * EConstr.t * term_type_map * term_type_map)
-
   (** [build_graph tr_rlts fn_rlts tref bound] is the entry point for [build_lts_graph].
       @param tr_rlts maps coq-term types to [raw_lts].
       @param fn_rlts
@@ -859,7 +852,7 @@ module MkGraph
            (econstr_to_string ty)
            (Mebi_utils.pstr_keys
               (Mebi_utils.OfEConstr (Hashtbl.to_seq_keys tr_rlts))));
-      raise (CoqTermDoesNotMatchSemantics (tref, t, tr_rlts, fn_rlts))
+      unknown_tref_type (t, ty)
     | Some rlts ->
       (* update environment by typechecking *)
       let$* u env sigma = Typing.check env sigma t rlts.trm_type in
