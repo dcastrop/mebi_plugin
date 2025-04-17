@@ -19,7 +19,7 @@ let rec strip_snd (l : (EConstr.t * EConstr.t) list) : EConstr.t list =
 let ref_list_to_glob_list (l : Libnames.qualid list) : Names.GlobRef.t list =
   List.fold_left
     (fun (acc : Names.GlobRef.t list) (s : Libnames.qualid) ->
-       List.append acc [ Nametab.global s ])
+      List.append acc [ Nametab.global s ])
     []
     l
 ;;
@@ -80,7 +80,7 @@ let pstr_keys (keys : keys_kind) : string =
       "[%s]"
       (List.fold_left
          (fun (acc : string) (k : EConstr.t) ->
-            Printf.sprintf "%s, %s" acc (econstr_to_string k))
+           Printf.sprintf "%s, %s" acc (econstr_to_string k))
          (econstr_to_string (List.hd keys))
          (List.tl keys))
 ;;
