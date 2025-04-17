@@ -180,13 +180,16 @@ module Logging = struct
   module Log = struct
     let override ?(params : params = default_params ()) (to_log : string) : unit
       =
+      let stashed_kind = params.kind in
       let stashed_override = params.override in
       log
         ~params:
-          (params.override <- Some ();
+          (params.kind <- Normal ();
+           params.override <- Some ();
            params)
         to_log;
-      params.override <- stashed_override
+      params.override <- stashed_override;
+      params.kind <- stashed_kind
     ;;
 
     let normal ?(params : params = default_params ()) (to_log : string) : unit =
@@ -243,9 +246,9 @@ module Formatting = struct
     }
 
   let default_params
-        ?(params : Logging.params option)
-        ?(mode : Logging.output_modes = OCaml ())
-        ()
+    ?(params : Logging.params option)
+    ?(mode : Logging.output_modes = OCaml ())
+    ()
     : params
     =
     let params' =
