@@ -76,8 +76,7 @@ MeBi Show LTS Bounded 150 Of proc0_send0 Using termLTS.
 
 Example proc0_send1a := tpar (tact ASend tend)
                              (tact ARecv tend).
-MeBi Debug LTS Bounded 150 Of proc0_send1a Using termLTS.
-(* MeBi Dump "proc0_send1a" LTS Bounded 150 Of proc0_send1a Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc0_send1a Using termLTS.
 
 Goal termLTS proc0_send1a true (tpar tend tend).
   unfold proc0_send1a. eapply do_senda. Qed.
@@ -90,12 +89,11 @@ Qed.
 
 Example proc0_send1b := tpar (tact ARecv tend)
                              (tact ASend tend).
-MeBi Debug LTS Bounded 150 Of proc0_send1a Using termLTS.
-(* MeBi Dump "proc0_send1a" LTS Bounded 150 Of proc0_send1a Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc0_send1a Using termLTS.
 
 Example proc0_send2 := tpar (tact ASend (tact ARecv tend))
                             (tact ARecv (tact ASend tend)).
-(* MeBi Show LTS Bounded 150 Of proc0_send2 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc0_send2 Using termLTS.
 
 Goal transitive_closure proc0_send2.
   unfold proc0_send2.
@@ -107,33 +105,32 @@ Qed.
 
 Example proc0_send3 := tpar (tact ASend (tact BSend tend))
                             (tact ARecv (tact BRecv tend)).
-(* MeBi Show LTS Bounded 150 Of proc0_send3 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc0_send3 Using termLTS.
 
 Example proc0_send4 := tpar (tact BSend (tact ARecv tend))
                             (tact BRecv (tact ASend tend)).
-(* MeBi Show LTS Bounded 150 Of proc0_send4 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc0_send4 Using termLTS.
 
 
-(*
 
 (*************************************)
 (** Simple Recursion, no Branching ***)
 (*************************************)
 
 Example proc1_rec1 := tfix trec.
-(* MeBi Show LTS Bounded 150 Of proc1_rec1 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc1_rec1 Using termLTS.
 
 Example proc1_rec2 := tpar (tfix (tact ASend trec))
                            (tfix (tact ARecv trec)).
-(* MeBi Show LTS Bounded 150 Of proc1_rec2 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc1_rec2 Using termLTS.
 
 Example proc1_rec3 := tpar (tfix (tact ASend (tact BSend trec)))
                            (tfix (tact ARecv (tact BRecv trec))).
-(* MeBi Show LTS Bounded 150 Of proc1_rec3 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc1_rec3 Using termLTS.
 
 Example proc1_rec4 := tpar (tact ASend (tfix (tact BSend trec)))
                            (tact ARecv (tfix (tact BRecv trec))).
-(* MeBi Show LTS Bounded 150 Of proc1_rec4 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc1_rec4 Using termLTS.
 
 
 (*************************************)
@@ -158,8 +155,8 @@ MeBi Show LTS Bounded 150 Of proc1 Using termLTS.
 (* MeBi Dump "proc1" LTS Bounded 1000 Of proc1 Using termLTS. *)
 
 Example proc2 := tpar proc1 proc1.
-(* MeBi Show LTS Bounded 150 Of proc2 Using termLTS. *)
-MeBi Dump "proc2" LTS Bounded 20000 Of proc2 Using termLTS.
+MeBi Show LTS Bounded 500 Of proc2 Using termLTS.
+(* MeBi Dump "proc2" LTS Bounded 500 Of proc2 Using termLTS. *)
 
 
 (* TODO: would be cool to do first a "FSM minimisation". I believe there are
@@ -185,17 +182,15 @@ Inductive compLTS : comp -> bool -> comp -> Prop :=
 | do_r_end : forall a l, compLTS (cpar l (cterm tend)) a l
 .
 
-Example comp0 := cpar (cterm proc0) (cterm proc0).
-(* MeBi Show LTS Bounded 150 Of comp0 Using termLTS compLTS. *)
+Example comp0 := cpar (cterm proc1_rec1) (cterm proc1_rec1).
+MeBi Show LTS Bounded 150 Of comp0 Using termLTS compLTS.
 (* MeBi Dump "comp0" LTS Bounded 350 Of comp0 Using termLTS compLTS. *)
 
 Example comp1a := cpar (cterm proc1) (cterm tend).
-(* MeBi Show LTS Bounded 150 Of comp1a Using termLTS compLTS. *)
+MeBi Show LTS Bounded 150 Of comp1a Using termLTS compLTS.
 (* MeBi Dump "comp1a" LTS Bounded 350 Of comp1a Using termLTS compLTS. *)
 
 Example comp1b := cpar (cterm proc1) (cterm proc1).
-(* MeBi Show LTS Bounded 150 Of comp1b Using termLTS compLTS. *)
+MeBi Show LTS Bounded 150 Of comp1b Using termLTS compLTS.
 (* MeBi Dump "comp1b" LTS Bounded 5000 Of comp1b Using termLTS compLTS. *)
 
-
-*)
