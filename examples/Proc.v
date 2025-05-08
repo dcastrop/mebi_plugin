@@ -67,7 +67,7 @@ MeBi Show LTS Bounded 150 Of proc0_send0 Using termLTS.
 
 Example proc0_send1 := tpar (tact ASend tend)
                             (tact ARecv tend).
-MeBi Show LTS Bounded 150 Of proc0_send1 Using termLTS.
+MeBi Debug LTS Bounded 150 Of proc0_send1 Using termLTS.
 (* MeBi Dump "proc0_send1" LTS Bounded 150 Of proc0_send1 Using termLTS. *)
 
 Example proc0_send2 := tpar (tact ASend (tact ASend tend))
