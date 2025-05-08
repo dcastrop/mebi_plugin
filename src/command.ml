@@ -690,6 +690,7 @@ module MkGraph
       if num_dupes > 0
       then
         Log.warning
+          ~params:default_params
           (Printf.sprintf
              "%s (%d/%d) duplicate transitions found: [%s\n]"
              prefix
@@ -708,7 +709,8 @@ module MkGraph
       else (
         match none with
         | None -> ()
-        | Some s -> Log.override (Printf.sprintf "%s%s" prefix s));
+        | Some s ->
+          Log.override ~params:default_params (Printf.sprintf "%s%s" prefix s));
       ())
   ;;
 
@@ -1001,7 +1003,8 @@ module MkGraph
         Log.warning
           ~params
           (Printf.sprintf "saved incomplete LTS to: %s\n" dump_filepath))
-      else Log.normal (Printf.sprintf "Finished translating LTS: %s" name);
+      else
+        Log.normal ~params (Printf.sprintf "Finished translating LTS: %s" name);
       (* Log.override
          (Printf.sprintf "leaving lts_graph_to_lts: %s, %b" name is_complete); *)
       return (lts, tbl)
