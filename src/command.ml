@@ -971,7 +971,11 @@ module MkGraph
       return
         (S.fold
            (fun (state : S.elt) (acc : string list) ->
-             econstr_to_string state :: acc)
+             (* econstr_to_string state :: acc *)
+             (match Hashtbl.find_opt tbl.from_coq state with
+              | None -> "UNKNOWN"
+              | Some s -> s)
+             :: acc)
            states
            [])
     ;;
@@ -1009,6 +1013,16 @@ module MkGraph
       let* (string_states : string list) = translate_coq_states g.states tbl in
       let is_complete : bool = Queue.is_empty g.to_visit in
       let num_states : int = S.cardinal g.states in
+      (* let num_states : int = List.length string_states in *)
+      Log.override
+        (Printf.sprintf
+           "lts_graph_to_lts, num states (%i) but states: [%s\n]\n"
+           num_states
+           (List.fold_left
+              (fun (acc : string) (s : string) ->
+                Printf.sprintf "%s\n\t\t%s" acc s)
+              ""
+              string_states));
       let num_edges : int = H.length g.transitions in
       let info : Utils.model_info =
         { is_complete; bound; num_states; num_edges }

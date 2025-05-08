@@ -182,11 +182,16 @@ module Create = struct
         in
         ( List.fold_left
             (fun (acc : Transitions.t)
-              ((from, label, destination, info) :
+              ((from, label, destination, constr_info) :
                 string * string * string * string option) ->
               Transitions.add
                 (transition
-                   (Of (Transitions.cardinal acc, from, label, destination, info)))
+                   (Of
+                      ( Transitions.cardinal acc
+                      , from
+                      , label
+                      , destination
+                      , constr_info )))
                 acc)
             Transitions.empty
             raw'
