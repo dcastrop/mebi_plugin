@@ -597,8 +597,21 @@ module MkGraph
   (**********************************************************************)
   (******** below is a sanity check *************************************)
   (******** cannot be moved since it depends on this module *************)
-  (******** (i.e., H, D ) ***********************************************)
+  (******** (i.e., H, D, S )*********************************************)
   (**********************************************************************)
+
+  let _pstr_econstr_states (states : S.t) : string =
+    if S.is_empty states
+    then "[ ] (empty)"
+    else
+      Printf.sprintf
+        "[%s\n]"
+        (S.fold
+           (fun (s : S.elt) (acc : string) ->
+             Printf.sprintf "%s\n\t%s" acc (econstr_to_string s))
+           states
+           "")
+  ;;
 
   let _pstr_constr_transition
     (f : EConstr.t)
@@ -812,6 +825,11 @@ module MkGraph
         get_new_constrs ~params t tr_rlts fn_rlts
       in
       let* (new_states : S.t) = get_new_states ~params t g constrs in
+      (* Log.override
+         ~params
+         (Printf.sprintf
+         "build_lts_graph, new states: %s"
+         (_pstr_econstr_states new_states)); *)
       let g = { g with states = S.union g.states new_states } in
       build_lts_graph ~params tr_rlts fn_rlts g bound)
   ;;
@@ -944,6 +962,20 @@ module MkGraph
       return init_str
     ;;
 
+    let translate_coq_states
+      ?(params : Params.log = default_params)
+      (states : S.t)
+      (tbl : coq_translation)
+      : string list mm
+      =
+      return
+        (S.fold
+           (fun (state : S.elt) (acc : string list) ->
+             econstr_to_string state :: acc)
+           states
+           [])
+    ;;
+
     (** Error when trying to translate an unfinished LTS to FSM. *)
     (* exception UnfinishedLTS of lts_graph *)
 
@@ -974,13 +1006,16 @@ module MkGraph
       let* (flat_rlts : Lts.raw_flat_lts) =
         translate_coq_lts g.transitions tbl
       in
+      let* (string_states : string list) = translate_coq_states g.states tbl in
       let is_complete : bool = Queue.is_empty g.to_visit in
       let num_states : int = S.cardinal g.states in
       let num_edges : int = H.length g.transitions in
       let info : Utils.model_info =
         { is_complete; bound; num_states; num_edges }
       in
-      let lts : Lts.lts = Lts.Create.lts ~init ~info (Flat flat_rlts) in
+      let lts : Lts.lts =
+        Lts.Create.lts ~init ~info (Flat (flat_rlts, Some string_states))
+      in
       if Bool.not is_complete
       then (
         let to_visit : int = Queue.length g.to_visit in

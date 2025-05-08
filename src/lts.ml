@@ -2,8 +2,8 @@ type raw_flat_lts = (string * string * string * string option) list
 type raw_nested_lts = (string * (string * string list) list) list
 
 type raw_transitions =
-  | Flat of raw_flat_lts
-  | Nested of raw_nested_lts
+  | Flat of (raw_flat_lts * string list option)
+  | Nested of (raw_nested_lts * string list option)
 
 type transition =
   { id : int
@@ -19,9 +19,16 @@ module Transitions = Set.Make (struct
     let compare a b = compare a.id b.id
   end)
 
+module States = Set.Make (struct
+    type t = string
+
+    let compare a b = String.compare a b
+  end)
+
 type lts =
   { init : string option
   ; transitions : Transitions.t
+  ; states : States.t
   ; info : Utils.model_info option
   }
 
@@ -36,18 +43,28 @@ module PStr = struct
     : string
     =
     let _params : Params.fmt = Params.handle params in
-    let tabs : string = str_tabs _params.tabs in
+    let tabs : string = str_tabs _params.tabs
+    and tabs' : string = str_tabs (_params.tabs + 2) in
     Printf.sprintf
       "%s%s"
       (if _params.no_leading_tab then "" else tabs)
       (let normal_pstr : string =
-         Printf.sprintf "(%s --<%s>--> %s)" t.from t.label t.destination
+         (* Printf.sprintf "(%s --<%s>--> %s)" t.from t.label t.destination *)
+         Printf.sprintf
+           "%s\n%s--<%s>-->\n%s%s\n"
+           t.from
+           tabs'
+           t.label
+           tabs'
+           t.destination
        and detail_pstr : string =
          Printf.sprintf
-           "#%d (%s --<%s>--> %s)"
+           "#%d %s\n%s--<%s>-->\n%s%s\n"
            t.id
            t.from
+           tabs'
            t.label
+           tabs'
            t.destination
        in
        match _params.params.kind with
@@ -83,6 +100,30 @@ module PStr = struct
         tabs)
   ;;
 
+  let states
+    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+    (ss : States.t)
+    : string
+    =
+    if States.is_empty ss
+    then "[ ] (empty)"
+    else (
+      (* increment tab of inner elements of set *)
+      let _params : Params.fmt = Params.handle params in
+      let _params' : Params.fmt = inc_tab _params
+      and tabs : string = str_tabs _params.tabs in
+      let tabs' : string = str_tabs _params'.tabs in
+      Printf.sprintf
+        "%s[%s%s]"
+        (if _params.no_leading_tab then "" else tabs)
+        (States.fold
+           (fun (s : string) (acc : string) ->
+             Printf.sprintf "%s%s%s\n" acc tabs' s)
+           ss
+           "\n")
+        tabs)
+  ;;
+
   let lts ?(params : Params.pstr = Fmt (Params.Default.fmt ())) (the_lts : lts)
     : string
     =
@@ -92,7 +133,7 @@ module PStr = struct
     and tabs : string = str_tabs _params.tabs
     and tabs' : string = str_tabs (_params.tabs + 1) in
     Printf.sprintf
-      "{ %s; %s; %s\n%s}"
+      "{ %s; %s; %s; %s\n%s}"
       (Printf.sprintf
          "\n%sinitial state: %s"
          tabs'
@@ -103,6 +144,10 @@ module PStr = struct
          "\n%smeta info: %s"
          tabs'
          (Utils.PStr.model_info the_lts.info))
+      (Printf.sprintf
+         "\n%sstates: %s"
+         tabs'
+         (states ~params:(Fmt _params') the_lts.states))
       (Printf.sprintf
          "\n%stransitions: %s"
          tabs'
@@ -127,44 +172,56 @@ module Create = struct
     (raw : raw_transitions)
     : lts
     =
-    let transitions : Transitions.t =
+    let (transitions, states) : Transitions.t * States.t =
       match raw with
-      | Flat raw' ->
-        List.fold_left
-          (fun (acc : Transitions.t)
-            ((from, label, destination, info) :
-              string * string * string * string option) ->
-            Transitions.add
-              (transition
-                 (Of (Transitions.cardinal acc, from, label, destination, info)))
-              acc)
-          Transitions.empty
-          raw'
-      | Nested raw' ->
-        List.fold_left
-          (fun (acc : Transitions.t)
-            ((from, actions) : string * (string * string list) list) ->
-            List.fold_left
-              (fun (acc' : Transitions.t)
-                ((label, destinations) : string * string list) ->
-                List.fold_left
-                  (fun (acc'' : Transitions.t) (destination : string) ->
-                    Transitions.add
-                      (transition
-                         (Of
-                            ( Transitions.cardinal acc''
-                            , from
-                            , label
-                            , destination
-                            , None )))
-                      acc'')
-                  acc'
-                  destinations)
-              acc
-              actions)
-          Transitions.empty
-          raw'
+      | Flat (raw', states) ->
+        let states' : States.t =
+          match states with
+          | None -> States.empty
+          | Some states' -> States.of_list states'
+        in
+        ( List.fold_left
+            (fun (acc : Transitions.t)
+              ((from, label, destination, info) :
+                string * string * string * string option) ->
+              Transitions.add
+                (transition
+                   (Of (Transitions.cardinal acc, from, label, destination, info)))
+                acc)
+            Transitions.empty
+            raw'
+        , states' )
+      | Nested (raw', states) ->
+        let states' : States.t =
+          match states with
+          | None -> States.empty
+          | Some states' -> States.of_list states'
+        in
+        ( List.fold_left
+            (fun (acc : Transitions.t)
+              ((from, actions) : string * (string * string list) list) ->
+              List.fold_left
+                (fun (acc' : Transitions.t)
+                  ((label, destinations) : string * string list) ->
+                  List.fold_left
+                    (fun (acc'' : Transitions.t) (destination : string) ->
+                      Transitions.add
+                        (transition
+                           (Of
+                              ( Transitions.cardinal acc''
+                              , from
+                              , label
+                              , destination
+                              , None )))
+                        acc'')
+                    acc'
+                    destinations)
+                acc
+                actions)
+            Transitions.empty
+            raw'
+        , states' )
     in
-    { init; transitions; info }
+    { init; transitions; states; info }
   ;;
 end

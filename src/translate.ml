@@ -2,7 +2,7 @@ open Fsm
 
 let to_fsm (lts : Lts.lts) : fsm =
   match lts with
-  | { init = _init; transitions; info } ->
+  | { init = _init; transitions; states = _states; info } ->
     let init : state =
       Create.state
         (Of
