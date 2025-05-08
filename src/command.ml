@@ -739,7 +739,6 @@ module MkGraph
     (c : Constr_tree.t)
     : unit mm
     =
-    let* sigma = get_sigma in
     (match Hashtbl.find_opt constrs a with
      | None -> Hashtbl.add constrs a (D.singleton (d, c))
      | Some ds -> Hashtbl.replace constrs a (D.add (d, c) ds));
@@ -781,9 +780,31 @@ module MkGraph
          g; *)
       (match H.find_opt g.transitions t with
        | None ->
+         (* Log.override
+            (Printf.sprintf
+            "add_new_term_constr_transition\n\
+            from: %s\n\
+            to_add: %s\n\
+            tgt: %s\n\
+            int_tree: %s"
+            (econstr_to_string t)
+            to_add.label
+            (econstr_to_string tgt)
+            (Constr_tree.pstr int_tree)); *)
          let _ = add_new_term_constr_transition g t to_add tgt int_tree in
          ()
        | Some actions ->
+         (* Log.override
+            (Printf.sprintf
+            "insert_constr_transition\n\
+            from: %s\n\
+            to_add: %s\n\
+            tgt: %s\n\
+            int_tree: %s"
+            (econstr_to_string t)
+            to_add.label
+            (econstr_to_string tgt)
+            (Constr_tree.pstr int_tree)); *)
          let _ = insert_constr_transition actions to_add tgt int_tree in
          ());
       (* _check_for_duplicate_transitions
@@ -821,16 +842,50 @@ module MkGraph
     then return g (* exit if bound reached *)
     else (
       let t : EConstr.t = Queue.pop g.to_visit in
-      let* (constrs : coq_ctor list) =
+      let* (new_constrs : coq_ctor list) =
         get_new_constrs ~params t tr_rlts fn_rlts
       in
-      let* (new_states : S.t) = get_new_states ~params t g constrs in
+      let old_to_visit = List.of_seq (Queue.to_seq g.to_visit) in
+      (* [get_new_states] also updates [g.to_visit] *)
+      let* (new_states : S.t) = get_new_states ~params t g new_constrs in
+      (* TEMPORARY: for investigating bug of no `true` transition *)
+      let new_to_visit = List.of_seq (Queue.to_seq g.to_visit) in
+      let newly_added =
+        List.filter
+          (fun (s : EConstr.t) -> Bool.not (List.mem s old_to_visit))
+          new_to_visit
+      in
+      Log.override
+        ~params
+        (Printf.sprintf
+           "build_lts_graph, to visit\nfrom: %s\nall: %s\nadded: %s"
+           (econstr_to_string t)
+           (if List.is_empty new_to_visit
+            then "[ ] (empty)"
+            else
+              Printf.sprintf
+                "[%s\n]"
+                (List.fold_left
+                   (fun (acc : string) (s : EConstr.t) ->
+                     Printf.sprintf "%s\n\t%s" acc (econstr_to_string s))
+                   ""
+                   new_to_visit))
+           (if List.is_empty newly_added
+            then "[ ] (empty)"
+            else
+              Printf.sprintf
+                "[%s\n]"
+                (List.fold_left
+                   (fun (acc : string) (s : EConstr.t) ->
+                     Printf.sprintf "%s\n\t%s" acc (econstr_to_string s))
+                   ""
+                   newly_added)));
       (* Log.override
          ~params
          (Printf.sprintf
          "build_lts_graph, new states: %s"
          (_pstr_econstr_states new_states)); *)
-      let g = { g with states = S.union g.states new_states } in
+      let g : lts_graph = { g with states = S.union g.states new_states } in
       build_lts_graph ~params tr_rlts fn_rlts g bound)
   ;;
 
