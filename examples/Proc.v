@@ -58,6 +58,15 @@ Inductive termLTS : term -> bool -> term -> Prop :=
     termLTS (tpar (tpar t1 t2) t3) false (tpar t1 (tpar t2 t3))
 .
 
+
+Inductive transitive_closure : term -> Prop :=
+| trans_step : forall t a t', termLTS t a t' ->
+                              transitive_closure t' ->
+                              transitive_closure t
+
+| no_step : forall t, transitive_closure t
+.
+
 (*************************************)
 (** Basic: No recursion or branches **)
 (*************************************)
@@ -65,21 +74,43 @@ Inductive termLTS : term -> bool -> term -> Prop :=
 Example proc0_send0 := tact ASend tend. (* empty lts *)
 MeBi Show LTS Bounded 150 Of proc0_send0 Using termLTS.
 
-Example proc0_send1 := tpar (tact ASend tend)
-                            (tact ARecv tend).
-MeBi Debug LTS Bounded 150 Of proc0_send1 Using termLTS.
-(* MeBi Dump "proc0_send1" LTS Bounded 150 Of proc0_send1 Using termLTS. *)
+Example proc0_send1a := tpar (tact ASend tend)
+                             (tact ARecv tend).
+MeBi Debug LTS Bounded 150 Of proc0_send1a Using termLTS.
+(* MeBi Dump "proc0_send1a" LTS Bounded 150 Of proc0_send1a Using termLTS. *)
 
-Example proc0_send2 := tpar (tact ASend (tact ASend tend))
-                            (tact ARecv (tact ARecv tend)).
+Goal termLTS proc0_send1a true (tpar tend tend).
+  unfold proc0_send1a. eapply do_senda. Qed.
+
+Goal transitive_closure proc0_send1a.
+  unfold proc0_send1a.
+  eapply trans_step. eapply do_senda.
+  constructor.
+Qed.
+
+Example proc0_send1b := tpar (tact ARecv tend)
+                             (tact ASend tend).
+MeBi Debug LTS Bounded 150 Of proc0_send1a Using termLTS.
+(* MeBi Dump "proc0_send1a" LTS Bounded 150 Of proc0_send1a Using termLTS. *)
+
+Example proc0_send2 := tpar (tact ASend (tact ARecv tend))
+                            (tact ARecv (tact ASend tend)).
 (* MeBi Show LTS Bounded 150 Of proc0_send2 Using termLTS. *)
+
+Goal transitive_closure proc0_send2.
+  unfold proc0_send2.
+  eapply trans_step. apply do_senda.
+  eapply trans_step. apply do_comm.
+  eapply trans_step. apply do_senda.
+  constructor.
+Qed.
 
 Example proc0_send3 := tpar (tact ASend (tact BSend tend))
                             (tact ARecv (tact BRecv tend)).
 (* MeBi Show LTS Bounded 150 Of proc0_send3 Using termLTS. *)
 
-Example proc0_send4 := tpar (tact BSend (tact ASend tend))
-                            (tact BRecv (tact ARecv tend)).
+Example proc0_send4 := tpar (tact BSend (tact ARecv tend))
+                            (tact BRecv (tact ASend tend)).
 (* MeBi Show LTS Bounded 150 Of proc0_send4 Using termLTS. *)
 
 

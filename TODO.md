@@ -22,6 +22,7 @@
   Int.compare (econstr_hash st () t1) (econstr_hash st () t2)
   ```
 
+  Now the issue still remains that the LTS is missing any `true` transitions.
 
 
 
