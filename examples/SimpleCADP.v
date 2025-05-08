@@ -166,10 +166,7 @@ Example tm1 : tm :=
   ).
 
 Example e1 : tm * nat * nat := (tm1, 0, 0).
-
 (* MeBi Show LTS Bounded 150 Of e1 Using step. *)
-(* MeBi Dump "e1" LTS Bounded 150 Of e1 Using step. *)
-(* MeBi Dump "e1" FSM Bounded 150 Of e1 Using step. *)
 
 Inductive sys : Type :=
   | PRC : (tm * nat * nat) -> sys
@@ -221,16 +218,14 @@ Example e2 : sys :=
   PAR (PRC (tm1, 0, 0)) (
     PRC (OK, 0, 0)
   ).
-
-(* MeBi Dump "e2" LTS Bounded 350 Of e2 Using lts step. *)
+(* MeBi Show LTS Bounded 350 Of e2 Using lts step. *)
 
 (*  *)
 Example e3 : sys :=
   PAR (PRC (tm1, 0, 0)) (
     (PRC (tm1, 0, 0))
   ).
-
-(* MeBi Dump "e3" LTS Bounded 500 Of e3 Using lts step. *)
+(* MeBi Show LTS Bounded 2000 Of e3 Using lts step. *)
 
 (*  *)
 Example e4 : sys :=
@@ -239,8 +234,7 @@ Example e4 : sys :=
       (PRC (OK, 0, 0))
     )
   ).
-
-(* MeBi Dump "e4" LTS Bounded 500 Of e4 Using lts step. *)
+(* MeBi Show LTS Bounded 2500 Of e4 Using lts step. *)
 
 (*  *)
 Example e5 : sys :=
@@ -249,7 +243,7 @@ Example e5 : sys :=
       (PRC (tm1, 0, 0))
     )
   ).
-
+(* MeBi Show LTS Bounded 5000 Of e5 Using lts step. *)
 (* MeBi Dump "e5" LTS Bounded 2000 Of e5 Using lts step. *)
 
 (*  *)
@@ -257,8 +251,7 @@ Example e6 : sys :=
   PAR
     (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))
     (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0)).
-
-(* MeBi Dump "e6" LTS Bounded 500 Of e6 Using lts step. *)
+(* MeBi Show LTS Bounded 5 Of e6 Using lts step. *)
 
 
 (*  *)
@@ -268,8 +261,7 @@ Example e7 : sys :=
     (PAR
       (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))
       (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))).
-
-(* MeBi Dump "e7" LTS Bounded 500 Of e7 Using lts step. *)
+(* MeBi Show LTS Bounded 10 Of e7 Using lts step. *)
 
 
 (* MeBi Dump "e2" LTS sys_equiv Bounded 350 Of e2 Using lts step. *)
