@@ -1,5 +1,16 @@
 # todo
 
+## bug list
+- `Proc.v, Example proc0_send1` is missing `true` transitions.
+  LTS shows that the actions occur since `tpar (tend tend)` is present, but
+  the transitions themselves do not occur. Additionally, the number of states
+  reported is consistent with the states being reached, but for some reason the
+  transitions are not added.
+
+
+
+---
+
 ## Refactor `Command.ml`
 - [ ] `check_updated_ctx`
 - [ ] `check_valid_constructor`
