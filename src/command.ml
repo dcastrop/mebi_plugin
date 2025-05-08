@@ -950,7 +950,7 @@ module MkGraph
     let lts_graph_to_lts
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
-      ?(name : string = "unknown")
+      ?(name : string = "unnamed")
       (g : lts_graph)
       (init_term : Constrexpr.constr_expr)
       : (Lts.lts * coq_translation) mm
@@ -1055,7 +1055,7 @@ let build_rlts_map
 let build_bounded_lts
   ?(params : Params.log = default_params)
   ?(bound : int = default_bound)
-  ?(name : string = "unknown")
+  ?(name : string = "unnamed")
   (tr_rlts : term_type_map)
   (fn_rlts : term_type_map)
   (tref : Constrexpr.constr_expr)
@@ -1096,7 +1096,7 @@ let build_bounded_lts
 let build_fsm_from_bounded_lts
   ?(params : Params.log = default_params)
   ?(bound : int = default_bound)
-  ?(name : string = "unknown")
+  ?(name : string = "unnamed")
   (tref : Constrexpr.constr_expr)
   (grefs : Names.GlobRef.t list)
   : Fsm.fsm mm
@@ -1131,7 +1131,7 @@ module Vernac = struct
     let build
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
-      ?(name : string = "unknown")
+      ?(name : string = "unnamed")
       ?(equiv : Names.GlobRef.t option)
       (tref : Constrexpr.constr_expr)
       (grefs : Names.GlobRef.t list)
@@ -1212,7 +1212,7 @@ module Vernac = struct
     let build
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
-      ?(name : string = "unknown")
+      ?(name : string = "unnamed")
       ?(equiv : Names.GlobRef.t option)
       (tref : Constrexpr.constr_expr)
       (grefs : Names.GlobRef.t list)
@@ -1269,7 +1269,7 @@ module Vernac = struct
     let build
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
-      ?(name : string = "unknown")
+      ?(name : string = "unnamed")
       (tref : Constrexpr.constr_expr)
       (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm) mm
@@ -1343,7 +1343,7 @@ module Vernac = struct
     let build
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
-      ?(name : string = "unknown")
+      ?(name : string = "unnamed")
       (trefA : Constrexpr.constr_expr)
       (trefB : Constrexpr.constr_expr)
       (grefs : Names.GlobRef.t list)
@@ -1440,7 +1440,7 @@ module Vernac = struct
     let build
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
-      ?(name : string = "unknown")
+      ?(name : string = "unnamed")
       (trefA : Constrexpr.constr_expr)
       (trefB : Constrexpr.constr_expr)
       (grefs : Names.GlobRef.t list)
