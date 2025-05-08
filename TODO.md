@@ -1,11 +1,27 @@
 # todo
 
 ## bug list
+
 - `Proc.v, Example proc0_send1` is missing `true` transitions.
   LTS shows that the actions occur since `tpar (tend tend)` is present, but
   the transitions themselves do not occur. Additionally, the number of states
   reported is consistent with the states being reached, but for some reason the
   transitions are not added.
+
+  Appears that the same state is somehow able to be added to set of states S,
+  i.e., two states that produce the same string. Issue may lie in the comparison
+  function in `mebi_monad`:
+  ```ocaml
+  let compare_constr st () t1 t2 =
+    if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1
+  ;;
+  ```
+
+  Changing it to the below appears to have fixed the issue.
+  ```ocaml
+  Int.compare (econstr_hash st () t1) (econstr_hash st () t2)
+  ```
+
 
 
 

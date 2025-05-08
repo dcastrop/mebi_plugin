@@ -68,7 +68,8 @@ let make_constr_tbl st =
 ;;
 
 let compare_constr st () t1 t2 =
-  if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1
+  (* if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1 *)
+  Int.compare (econstr_hash st () t1) (econstr_hash st () t2)
 ;;
 
 let make_constr_set (st : coq_context ref)
