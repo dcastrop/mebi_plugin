@@ -587,6 +587,18 @@ module MkGraph
   (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t]. *)
   type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
 
+  let num_transitions (ts : constr_transitions H.t) : int =
+    H.fold
+      (fun (_from : EConstr.t) (transitions : constr_transitions) (acc : int) ->
+        Hashtbl.fold
+          (fun (_a : Mebi_action.action) (destinations : D.t) (acc' : int) ->
+            acc' + D.cardinal destinations)
+          transitions
+          acc)
+      ts
+      0
+  ;;
+
   (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t]. *)
   type lts_graph =
     { to_visit : EConstr.t Queue.t
@@ -845,41 +857,41 @@ module MkGraph
       let* (new_constrs : coq_ctor list) =
         get_new_constrs ~params t tr_rlts fn_rlts
       in
-      let old_to_visit = List.of_seq (Queue.to_seq g.to_visit) in
+      (* let old_to_visit = List.of_seq (Queue.to_seq g.to_visit) in *)
       (* [get_new_states] also updates [g.to_visit] *)
       let* (new_states : S.t) = get_new_states ~params t g new_constrs in
       (* TEMPORARY: for investigating bug of no `true` transition *)
-      let new_to_visit = List.of_seq (Queue.to_seq g.to_visit) in
-      let newly_added =
-        List.filter
-          (fun (s : EConstr.t) -> Bool.not (List.mem s old_to_visit))
-          new_to_visit
-      in
-      Log.override
-        ~params
-        (Printf.sprintf
-           "build_lts_graph, to visit\nfrom: %s\nall: %s\nadded: %s"
-           (econstr_to_string t)
-           (if List.is_empty new_to_visit
-            then "[ ] (empty)"
-            else
-              Printf.sprintf
-                "[%s\n]"
-                (List.fold_left
-                   (fun (acc : string) (s : EConstr.t) ->
-                     Printf.sprintf "%s\n\t%s" acc (econstr_to_string s))
-                   ""
-                   new_to_visit))
-           (if List.is_empty newly_added
-            then "[ ] (empty)"
-            else
-              Printf.sprintf
-                "[%s\n]"
-                (List.fold_left
-                   (fun (acc : string) (s : EConstr.t) ->
-                     Printf.sprintf "%s\n\t%s" acc (econstr_to_string s))
-                   ""
-                   newly_added)));
+      (* let new_to_visit = List.of_seq (Queue.to_seq g.to_visit) in *)
+      (* let newly_added =
+         List.filter
+         (fun (s : EConstr.t) -> Bool.not (List.mem s old_to_visit))
+         new_to_visit
+         in *)
+      (* Log.override
+         ~params
+         (Printf.sprintf
+         "build_lts_graph, to visit\nfrom: %s\nall: %s\nadded: %s"
+         (econstr_to_string t)
+         (if List.is_empty new_to_visit
+         then "[ ] (empty)"
+         else
+         Printf.sprintf
+         "[%s\n]"
+         (List.fold_left
+         (fun (acc : string) (s : EConstr.t) ->
+         Printf.sprintf "%s\n\t%s" acc (econstr_to_string s))
+         ""
+         new_to_visit))
+         (if List.is_empty newly_added
+         then "[ ] (empty)"
+         else
+         Printf.sprintf
+         "[%s\n]"
+         (List.fold_left
+         (fun (acc : string) (s : EConstr.t) ->
+         Printf.sprintf "%s\n\t%s" acc (econstr_to_string s))
+         ""
+         newly_added))); *)
       (* Log.override
          ~params
          (Printf.sprintf
@@ -1069,16 +1081,16 @@ module MkGraph
       let is_complete : bool = Queue.is_empty g.to_visit in
       let num_states : int = S.cardinal g.states in
       (* let num_states : int = List.length string_states in *)
-      Log.override
-        (Printf.sprintf
-           "lts_graph_to_lts, num states (%i) but states: [%s\n]\n"
-           num_states
-           (List.fold_left
-              (fun (acc : string) (s : string) ->
-                Printf.sprintf "%s\n\t\t%s" acc s)
-              ""
-              string_states));
-      let num_edges : int = H.length g.transitions in
+      (* Log.override
+         (Printf.sprintf
+         "lts_graph_to_lts, num states (%i) but states: [%s\n]\n"
+         num_states
+         (List.fold_left
+         (fun (acc : string) (s : string) ->
+         Printf.sprintf "%s\n\t\t%s" acc s)
+         ""
+         string_states)); *)
+      let num_edges : int = num_transitions g.transitions in
       let info : Utils.model_info =
         { is_complete; bound; num_states; num_edges }
       in

@@ -24,6 +24,14 @@
 
   Now the issue still remains that the LTS is missing any `true` transitions.
 
+  After investigating the contents of `g.to_visit` it appears that the issue may
+  occur at the beginning of each iteration, when exploring the constructors from the current state.
+
+  This has now been fixed by removing the following, which was misplaced and unused in `insert_constr_transition`:
+  ```ocaml
+  let* sigma = get_sigma in
+  ```
+
 
 
 ---
