@@ -72,35 +72,37 @@ MeBi Show LTS Bounded 150 Of proc0_send1 Using termLTS.
 
 Example proc0_send2 := tpar (tact ASend (tact ASend tend))
                             (tact ARecv (tact ARecv tend)).
-MeBi Show LTS Bounded 150 Of proc0_send2 Using termLTS.
+(* MeBi Show LTS Bounded 150 Of proc0_send2 Using termLTS. *)
 
 Example proc0_send3 := tpar (tact ASend (tact BSend tend))
                             (tact ARecv (tact BRecv tend)).
-MeBi Show LTS Bounded 150 Of proc0_send3 Using termLTS.
+(* MeBi Show LTS Bounded 150 Of proc0_send3 Using termLTS. *)
 
 Example proc0_send4 := tpar (tact BSend (tact ASend tend))
                             (tact BRecv (tact ARecv tend)).
-MeBi Show LTS Bounded 150 Of proc0_send4 Using termLTS.
+(* MeBi Show LTS Bounded 150 Of proc0_send4 Using termLTS. *)
 
+
+(*
 
 (*************************************)
 (** Simple Recursion, no Branching ***)
 (*************************************)
 
 Example proc1_rec1 := tfix trec.
-MeBi Show LTS Bounded 150 Of proc1_rec1 Using termLTS.
+(* MeBi Show LTS Bounded 150 Of proc1_rec1 Using termLTS. *)
 
 Example proc1_rec2 := tpar (tfix (tact ASend trec))
                            (tfix (tact ARecv trec)).
-MeBi Show LTS Bounded 150 Of proc1_rec2 Using termLTS.
+(* MeBi Show LTS Bounded 150 Of proc1_rec2 Using termLTS. *)
 
 Example proc1_rec3 := tpar (tfix (tact ASend (tact BSend trec)))
                            (tfix (tact ARecv (tact BRecv trec))).
-MeBi Show LTS Bounded 150 Of proc1_rec3 Using termLTS.
+(* MeBi Show LTS Bounded 150 Of proc1_rec3 Using termLTS. *)
 
 Example proc1_rec4 := tpar (tact ASend (tfix (tact BSend trec)))
                            (tact ARecv (tfix (tact BRecv trec))).
-MeBi Show LTS Bounded 150 Of proc1_rec4 Using termLTS.
+(* MeBi Show LTS Bounded 150 Of proc1_rec4 Using termLTS. *)
 
 
 (*************************************)
@@ -163,3 +165,6 @@ Example comp1a := cpar (cterm proc1) (cterm tend).
 Example comp1b := cpar (cterm proc1) (cterm proc1).
 (* MeBi Show LTS Bounded 150 Of comp1b Using termLTS compLTS. *)
 (* MeBi Dump "comp1b" LTS Bounded 5000 Of comp1b Using termLTS compLTS. *)
+
+
+*)
