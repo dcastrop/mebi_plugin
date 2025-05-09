@@ -5,9 +5,9 @@ type mebi_error =
   | InvalidArity of Environ.env * Evd.evar_map * Constr.types
   | InvalidLTSRef of Names.GlobRef.t
   | CoqTermDoesNotMatchSemantics of
-      (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t))
+      (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t * EConstr.t list))
   | CannotFindTypeOfTermToVisit of
-      (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t))
+      (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t * EConstr.t list))
 
 exception MEBI_exn of mebi_error
 
@@ -34,22 +34,98 @@ let mebi_handler = function
     ++ strbrk "\n"
     ++ str "Expecting: forall params, ?terms -> ?labels -> ?terms -> Prop"
   | InvalidLTSRef r -> str "Invalid LTS ref: " ++ Printer.pr_global r
-  | CannotFindTypeOfTermToVisit (ev, sg, (tm, ty)) ->
-    str "None of the constructors provided matched type of term to visit. "
+  | CannotFindTypeOfTermToVisit (ev, sg, (tm, ty, trkeys)) ->
+    str
+      "None of the constructors provided matched type of term to visit. \
+       (unknown_term_type) "
     ++ strbrk "\n"
     ++ str "Term: "
     ++ Printer.pr_econstr_env ev sg tm
     ++ strbrk "\n"
     ++ str "Type: "
     ++ Printer.pr_econstr_env ev sg ty
-  | CoqTermDoesNotMatchSemantics (ev, sg, (tr, ty)) ->
-    str "None of the constructors provided matched type of term to visit. "
+    ++ strbrk "\n"
+    ++ str
+         (Printf.sprintf
+            "Keys: %s"
+            (if List.is_empty trkeys
+             then "[ ] (empty)"
+             else
+               Printf.sprintf
+                 "[%s ]"
+                 (List.fold_left
+                    (fun (acc : string) (k : EConstr.t) ->
+                      Printf.sprintf
+                        "%s '%s'"
+                        acc
+                        (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg ty)))
+                    ""
+                    trkeys)))
+    ++ strbrk "\n"
+    ++ str
+         (Printf.sprintf
+            "Does Type match EConstr of any Key? = %b"
+            (List.exists
+               (fun (k : EConstr.t) -> EConstr.eq_constr sg ty k)
+               trkeys))
+    ++ strbrk "\n"
+    ++ str
+         (let tystr = Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg ty) in
+          Printf.sprintf
+            "Does Type match String of any Key? = %b"
+            (List.exists
+               (fun (k : EConstr.t) ->
+                 String.equal
+                   tystr
+                   (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg k)))
+               trkeys))
+  | CoqTermDoesNotMatchSemantics (ev, sg, (tr, ty, trkeys)) ->
+    str
+      "None of the constructors provided matched type of term to visit. \
+       (unknown_tref_type) "
     ++ strbrk "\n"
     ++ str "Tref: "
     ++ Printer.pr_econstr_env ev sg tr
     ++ strbrk "\n"
     ++ str "Type: "
     ++ Printer.pr_econstr_env ev sg ty
+    ++ strbrk "\n"
+    ++ str
+         (Printf.sprintf
+            "Keys: %s"
+            (if List.is_empty trkeys
+             then "[ ] (empty)"
+             else
+               Printf.sprintf
+                 "[%s ]"
+                 (List.fold_left
+                    (fun (acc : string) (k : EConstr.t) ->
+                      Printf.sprintf
+                        "%s '%s'"
+                        acc
+                        (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg ty)))
+                    ""
+                    trkeys)))
+    ++ strbrk "\n"
+    ++ str
+         (Printf.sprintf
+            "Does Type match EConstr of any Key? = %b"
+            (List.exists
+               (fun (k : EConstr.t) -> EConstr.eq_constr sg ty k)
+               trkeys))
+    ++ strbrk "\n"
+    ++ str
+         (Printf.sprintf
+            "Does Type match String of any Key? = %b"
+            (let tystr =
+               Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg ty)
+             in
+             List.exists
+               (fun (k : EConstr.t) ->
+                 String.equal
+                   tystr
+                   (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg k)))
+               trkeys))
 ;;
 
 let _ =

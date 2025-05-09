@@ -170,12 +170,12 @@ let invalid_sort (x : Sorts.family) : 'a t = fun st -> raise (invalid_sort x)
 let invalid_ref (x : Names.GlobRef.t) : 'a t = fun st -> raise (invalid_ref x)
 
 (** Error when first term (tref) is of unknown type *)
-let unknown_tref_type (trty : EConstr.t * EConstr.t) : 'a t =
+let unknown_tref_type (trty : EConstr.t * EConstr.t * EConstr.t list) : 'a t =
   fun st -> raise (unknown_tref_type !st.coq_env !st.coq_ctx trty)
 ;;
 
 (** Error when term is of unknown type *)
-let unknown_term_type (tmty : EConstr.t * EConstr.t) : 'a t =
+let unknown_term_type (tmty : EConstr.t * EConstr.t * EConstr.t list) : 'a t =
   fun st -> raise (unknown_term_type !st.coq_env !st.coq_ctx tmty)
 ;;
 
