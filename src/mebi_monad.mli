@@ -16,8 +16,8 @@ val iterate : int -> int -> 'a -> (int -> 'a -> 'a t) -> 'a t
 val invalid_arity : Constr.types -> 'a t
 val invalid_sort : Sorts.family -> 'a t
 val invalid_ref : Names.GlobRef.t -> 'a t
-val unknown_tref_type : EConstr.t * EConstr.t -> 'a t
-val unknown_term_type : EConstr.t * EConstr.t -> 'a t
+val unknown_tref_type : EConstr.t * EConstr.t * EConstr.t list -> 'a t
+val unknown_term_type : EConstr.t * EConstr.t * EConstr.t list -> 'a t
 
 (********************************************)
 (****** GET & PUT STATE *********************)
