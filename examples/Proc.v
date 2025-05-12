@@ -156,7 +156,7 @@ MeBi Show LTS Bounded 150 Of proc1 Using termLTS.
 
 Example proc2 := tpar proc1 proc1.
 MeBi Show LTS Bounded 500 Of proc2 Using termLTS.
-(* MeBi Dump "proc2" LTS Bounded 500 Of proc2 Using termLTS. *)
+MeBi Dump "proc2" LTS Bounded 500 Of proc2 Using termLTS.
 
 
 (* TODO: would be cool to do first a "FSM minimisation". I believe there are
@@ -183,14 +183,14 @@ Inductive compLTS : comp -> bool -> comp -> Prop :=
 .
 
 Example comp0 := cpar (cterm proc1_rec1) (cterm proc1_rec1).
-MeBi Show LTS Bounded 150 Of comp0 Using termLTS compLTS.
+(* MeBi Show LTS Bounded 150 Of comp0 Using termLTS compLTS. *)
 (* MeBi Dump "comp0" LTS Bounded 350 Of comp0 Using termLTS compLTS. *)
 
 Example comp1a := cpar (cterm proc1) (cterm tend).
-MeBi Show LTS Bounded 150 Of comp1a Using termLTS compLTS.
+(* MeBi Show LTS Bounded 150 Of comp1a Using termLTS compLTS. *)
 (* MeBi Dump "comp1a" LTS Bounded 350 Of comp1a Using termLTS compLTS. *)
 
 Example comp1b := cpar (cterm proc1) (cterm proc1).
-MeBi Show LTS Bounded 150 Of comp1b Using termLTS compLTS.
+(* MeBi Show LTS Bounded 150 Of comp1b Using termLTS compLTS. *)
 (* MeBi Dump "comp1b" LTS Bounded 5000 Of comp1b Using termLTS compLTS. *)
 

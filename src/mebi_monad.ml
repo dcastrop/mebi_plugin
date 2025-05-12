@@ -50,7 +50,7 @@ let econstr_hash st () t =
     (EConstr.to_constr ?abort_on_undefined_evars:(Some false) !st.coq_ctx t)
 ;;
 
-(** [make_constr_tbl st] is ... *)
+(** [make_constr_tbl st] is used to create Hashtbl that map from [EConstr.t] *)
 let make_constr_tbl st =
   let cmp_eq = eq_constr st in
   let hashf = econstr_hash st in
@@ -72,6 +72,7 @@ let compare_constr st () t1 t2 =
   Int.compare (econstr_hash st () t1) (econstr_hash st () t2)
 ;;
 
+(** [make_constr_set st] is used to create Set of [EConstr.t] *)
 let make_constr_set (st : coq_context ref)
   : (module Set.S with type elt = EConstr.t) in_context
   =
@@ -98,6 +99,7 @@ let compare_constr_tree
   else 1
 ;;
 
+(** [make_constr_set st] is used to create Set of [EConstr.t * Constr_tree.t] *)
 let make_constr_tree_set (st : coq_context ref)
   : (module Set.S with type elt = EConstr.t * Constr_tree.t) in_context
   =

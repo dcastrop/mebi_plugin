@@ -156,6 +156,150 @@
       }
     ```
 
+  ***This bug is still open***
+- Following explorations with the previous bug, I have encountered instances
+  where the `coq_translation` yields `UNKNOWN_DEST_STATE` when convertin from
+  `raw_lts` to `Lts.lts`. So far this is only occuring in `proc2` of `Proc.v`:
+  ```coq
+  tpar (tpar (tfix (tact ASend trec)) (tfix (tact ARecv trec)))
+       (tpar (tfix (tact ASend trec)) (tfix (tact ARecv trec))).
+  ```
+
+  Upon closer inspection of the `_dumps`, it does indeed appear that certain
+  states in particular are consistently yielding this issue. E.g.:
+  ```json
+  {
+    "id": "1",
+    "from": "(tpar (tfix (tact ASend trec))
+                   (tpar (tpar (tact ARecv (tfix (tact ARecv trec)))
+                               (tact ASend (tfix (tact ASend trec))))
+                         (tfix (tact ARecv trec))))",
+    "label": "false",
+    "destination": "UNKNOWN_DEST_STATE:
+             (tpar (tfix (tact ASend trec))
+                   (tpar (tact ARecv (tfix (tact ARecv trec)))
+                         (tpar (tact ASend (tfix (tact ASend trec)))
+                               (tfix (tact ARecv trec)))))",
+    "info": "(5) [(9) []]"
+  }, ...,
+  {
+    "id": "248",
+    "from": "(tpar (tfix (tact ASend trec))
+                   (tpar (tfix (tact ARecv trec))
+                         (tpar (tact ASend (tfix (tact ASend trec)))
+                         (tfix (tact ARecv trec)))))",
+    "label": "false",
+    "destination": "UNKNOWN_DEST_STATE:
+             (tpar (tfix (tact ASend trec))
+                   (tpar (tact ARecv (tfix (tact ARecv trec)))
+                         (tpar (tact ASend (tfix (tact ASend trec)))
+                               (tfix (tact ARecv trec)))))",
+    "info": "(5) [(4) [(6) []]]"
+  }, ...,
+  {
+    "id": "829",
+    "from": "(tpar (tpar (tfix (tact ASend trec))
+                         (tact ARecv (tfix (tact ARecv trec))))
+                   (tpar (tact ASend (tfix (tact ASend trec)))
+                         (tfix (tact ARecv trec))))",
+    "label": "false",
+    "destination": "UNKNOWN_DEST_STATE:
+             (tpar (tfix (tact ASend trec))
+                   (tpar (tact ARecv (tfix (tact ARecv trec)))
+                         (tpar (tact ASend (tfix (tact ASend trec)))
+                               (tfix (tact ARecv trec)))))",
+    "info": "(9) []"
+  }, ...,
+  {
+    "id": "856",
+    "from": "(tpar (tfix (tact ASend trec))
+                   (tpar (tact ARecv (tfix (tact ARecv trec)))
+                         (tpar (tfix (tact ASend trec))
+                               (tfix (tact ARecv trec)))))",
+    "label": "false",
+    "destination": "UNKNOWN_DEST_STATE:
+             (tpar (tfix (tact ASend trec))
+                   (tpar (tact ARecv (tfix (tact ARecv trec)))
+                         (tpar (tact ASend (tfix (tact ASend trec)))
+                               (tfix (tact ARecv trec)))))",
+    "info": "(5) [(5) [(4) [(6) []]]]"
+  }, ...,
+  {
+    "id": "924",
+    "from": "(tpar (tpar (tact ARecv (tfix (tact ARecv trec)))
+                         (tpar (tact ASend (tfix (tact ASend trec)))
+                               (tfix (tact ARecv trec))))
+                   (tfix (tact ASend trec)))",
+    "label": "false",
+    "destination": "UNKNOWN_DEST_STATE:
+             (tpar (tfix (tact ASend trec))
+                   (tpar (tact ARecv (tfix (tact ARecv trec)))
+                         (tpar (tact ASend (tfix (tact ASend trec)))
+                               (tfix (tact ARecv trec)))))",
+    "info": "(7) []"
+  }, ...,
+  {
+    "id": "1004",
+    "from": "(tpar (tfix (tact ASend trec))
+                   (tpar (tpar (tact ASend (tfix (tact ASend trec)))
+                               (tfix (tact ARecv trec)))
+                         (tact ARecv (tfix (tact ARecv trec)))))",
+    "label": "false",
+    "destination": "UNKNOWN_DEST_STATE:
+             (tpar (tfix (tact ASend trec))
+                   (tpar (tact ARecv (tfix (tact ARecv trec)))
+                         (tpar (tact ASend (tfix (tact ASend trec)))
+                               (tfix (tact ARecv trec)))))",
+    "info": "(5) [(7) []]"
+  }, ...,
+  {
+    "id": "1292",
+    "from": "(tpar (tfix (tact ASend trec))
+                   (tpar (tact ARecv (tfix (tact ARecv trec)))
+                         (tpar (tfix (tact ARecv trec))
+                               (tact ASend (tfix (tact ASend trec))))))",
+    "label": "false",
+    "destination": "UNKNOWN_DEST_STATE:
+             (tpar (tfix (tact ASend trec))
+                   (tpar (tact ARecv (tfix (tact ARecv trec)))
+                         (tpar (tact ASend (tfix (tact ASend trec)))
+                               (tfix (tact ARecv trec)))))",
+    "info": "(5) [(5) [(7) []]]"
+  },
+  ```
+
+  After adding a `_check_states` that checks that each state in the transitions
+  is present in the set of states, it appears this this is not the source of the
+  issue. (I.e., the error must occur after `lts_graph` has been constructed.)
+
+  I have been trying to remove any margin for error when interacting with
+  `EConstr.t` terms, as I believe that some of the issues may arise from the
+  monad somehow, e.g., if it is not correctly used, then the comparison of two
+  coq terms may not behave correctly. This has led me to try and
+  replace/refactor many of the loops to use the `Mebi_monad.iterate` function.
+  (This is underway.)
+
+  Most of the refactoring for this was inside `DeCoq` and appears to have paid
+  off. Now, instead of there being 7 issues, there is only 1 instance (in the
+  same example). See below:
+  ```json
+  {
+    "id": "5",
+    "from": "(tpar (tfix (tact ASend trec))
+                   (tpar (tpar (tact ARecv (tfix (tact ARecv trec)))
+                               (tact ASend (tfix (tact ASend trec))))
+                         (tfix (tact ARecv trec))))",
+    "label": "false",
+    "destination": "UNKNOWN_DEST_STATE: (tpar (tfix (tact ASend trec)) (tpar (tact ARecv (tfix (tact ARecv trec))) (tpar (tact ASend (tfix (tact ASend trec))) (tfix (tact ARecv trec)))))",
+    "info": "(5) [(9) []]"
+  },
+  ```
+
+  The above appears to correspond to `id: 5` from the previous block of
+  examples. (Notably, now this is the only instance of `UNKNOWN_`, while in the
+  previous examples there were a total of `506` instances of `UNKNOWN_`, both
+  for `DEST` and `FROM` states.)
+
 
 ---
 
