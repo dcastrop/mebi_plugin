@@ -226,6 +226,22 @@ module JSON = struct
       | Some s -> key_val "initial" (quoted (clean s))
     ;;
 
+    let states (ss : Lts.States.t) : string =
+      key_val
+        "states"
+        (col
+           ~sep:"\n"
+           ~tlindent:"\t"
+           (List
+              (Lts.States.fold
+                 (fun (state : string) (acc : string list) ->
+                   List.append
+                     acc
+                     [ Printf.sprintf "\t\t%s" (quoted (clean state)) ])
+                 ss
+                 [])))
+    ;;
+
     let transition (t : Lts.transition) : string =
       col
         ~prefix:"\t\t"
@@ -268,12 +284,13 @@ module JSON = struct
 
     let lts (name : string) (m : lts) : string =
       Printf.sprintf
-        "{\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s\n}"
+        "{\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s\n}"
         (key_val "name" (quoted name))
         (key_val "kind" (quoted "lts"))
         (key_val "info" (model_info m.info))
         (initial m.init)
         (transitions m.transitions)
+        (states m.states)
     ;;
   end
 
