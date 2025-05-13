@@ -5,9 +5,13 @@ type mebi_error =
   | InvalidArity of Environ.env * Evd.evar_map * Constr.types
   | InvalidLTSRef of Names.GlobRef.t
   | CoqTermDoesNotMatchSemantics of
-      (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t * EConstr.t list))
+      (Environ.env
+      * Evd.evar_map
+      * (string option * EConstr.t * EConstr.t * EConstr.t list))
   | CannotFindTypeOfTermToVisit of
-      (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t * EConstr.t list))
+      (Environ.env
+      * Evd.evar_map
+      * (string option * EConstr.t * EConstr.t * EConstr.t list))
 
 exception MEBI_exn of mebi_error
 
@@ -34,17 +38,20 @@ let mebi_handler = function
     ++ strbrk "\n"
     ++ str "Expecting: forall params, ?terms -> ?labels -> ?terms -> Prop"
   | InvalidLTSRef r -> str "Invalid LTS ref: " ++ Printer.pr_global r
-  | CannotFindTypeOfTermToVisit (ev, sg, (tm, ty, trkeys)) ->
-    str
-      "None of the constructors provided matched type of term to visit. \
-       (unknown_term_type) "
-    ++ strbrk "\n"
+  | CannotFindTypeOfTermToVisit (ev, sg, (prefix, tm, ty, trkeys)) ->
+    (match prefix with
+     | None -> str ""
+     | Some s -> str s ++ strbrk "\n")
+    ++ str
+         "None of the constructors provided matched type of term to visit. \
+          (unknown_term_type) "
+    ++ strbrk "\n\n"
     ++ str "Term: "
     ++ Printer.pr_econstr_env ev sg tm
-    ++ strbrk "\n"
+    ++ strbrk "\n\n"
     ++ str "Type: "
     ++ Printer.pr_econstr_env ev sg ty
-    ++ strbrk "\n"
+    ++ strbrk "\n\n"
     ++ str
          (Printf.sprintf
             "Keys: %s"
@@ -58,10 +65,10 @@ let mebi_handler = function
                       Printf.sprintf
                         "%s '%s'"
                         acc
-                        (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg ty)))
+                        (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg k)))
                     ""
                     trkeys)))
-    ++ strbrk "\n"
+    ++ strbrk "\n\n"
     ++ str
          (Printf.sprintf
             "Does Type match EConstr of any Key? = %b"
@@ -79,17 +86,20 @@ let mebi_handler = function
                    tystr
                    (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg k)))
                trkeys))
-  | CoqTermDoesNotMatchSemantics (ev, sg, (tr, ty, trkeys)) ->
-    str
-      "None of the constructors provided matched type of term to visit. \
-       (unknown_tref_type) "
-    ++ strbrk "\n"
+  | CoqTermDoesNotMatchSemantics (ev, sg, (prefix, tr, ty, trkeys)) ->
+    (match prefix with
+     | None -> str ""
+     | Some s -> str s ++ strbrk "\n")
+    ++ str
+         "None of the constructors provided matched type of term to visit. \
+          (unknown_tref_type) "
+    ++ strbrk "\n\b"
     ++ str "Tref: "
     ++ Printer.pr_econstr_env ev sg tr
-    ++ strbrk "\n"
+    ++ strbrk "\n\b"
     ++ str "Type: "
     ++ Printer.pr_econstr_env ev sg ty
-    ++ strbrk "\n"
+    ++ strbrk "\n\b"
     ++ str
          (Printf.sprintf
             "Keys: %s"
@@ -103,10 +113,10 @@ let mebi_handler = function
                       Printf.sprintf
                         "%s '%s'"
                         acc
-                        (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg ty)))
+                        (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg k)))
                     ""
                     trkeys)))
-    ++ strbrk "\n"
+    ++ strbrk "\n\n"
     ++ str
          (Printf.sprintf
             "Does Type match EConstr of any Key? = %b"

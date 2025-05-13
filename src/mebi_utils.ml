@@ -57,16 +57,12 @@ let constr_to_string (target : Constr.t) : string =
 
 (** *)
 let type_of_tref (tref : Constrexpr.constr_expr) : EConstr.t mm =
-  let open Mebi_monad in
-  let open Mebi_monad.Monad_syntax in
   let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
   let$ u env sigma = Typing.type_of env sigma t in
   return u
 ;;
 
 let type_of_econstr (t : EConstr.t) : EConstr.t mm =
-  let open Mebi_monad in
-  let open Mebi_monad.Monad_syntax in
   let$ ty env sigma = Typing.type_of env sigma t in
   return ty
 ;;

@@ -2,7 +2,7 @@
 
 ## bug list
 
-- `Proc.v, Example proc0_send1` is missing `true` transitions.
+- [x] `Proc.v, Example proc0_send1` is missing `true` transitions.
   LTS shows that the actions occur since `tpar (tend tend)` is present, but
   the transitions themselves do not occur. Additionally, the number of states
   reported is consistent with the states being reached, but for some reason the
@@ -33,9 +33,12 @@
   ```ocaml
   let* sigma = get_sigma in
   ```
-- Investigating the `mebi_errors` of `unknown_term_type` and `unknown_tref_type`
-  which appear to be occurring for even the most simple examples in `CADP.v`.
-  Below is the current output message: (reformatted for legibility)
+
+
+- [ ] Investigating the `mebi_errors` of `unknown_term_type` and
+  `unknown_tref_type` which appear to be occurring for even the most simple
+  examples in `CADP.v`. Below is the current output message:
+  (reformatted for legibility)
   ```
     None of the constructors provided matched type of term to visit.
 
@@ -157,7 +160,103 @@
     ```
 
   ***This bug is still open***
-- Following explorations with the previous bug, I have encountered instances
+
+  ---
+
+  Returning to this bug. So far, this only occurs in `CADP.v` in examples with
+  multiple layers, specifically where the semantics are over tuples. After
+  fixing the error message printout, it is given below (reformatted for
+  legibility):
+  ```
+  Type: (tm * ( nat * local_vars * option (list error) *
+                (list qnode * (option nat * option nat)) ) )
+
+  Keys: [ 'step' '(tm * env)' ]
+  ```
+
+  The initiala idea is that perhaps the plugin is unable to recognise that the
+  lhs is actually `env`, which is defined as:
+  ```coq
+  Definition env : Type := state * resource.
+  ```
+
+  where:
+  ```coq
+  Definition state : Type := pid * local_vars * (option (list error)).
+
+  Record local_vars :=
+    { var_predecessor : index
+    ; var_locked      : bool
+    ; var_next        : index
+    ; var_swap        : bool  }.
+  ```
+
+  and:
+  ```coq
+
+  Definition resource : Type := mem * lock.
+
+  Definition mem : Type := list qnode.
+
+  Record qnode := { next : index; locked : bool }.
+
+  Definition lock : Type := index * index.
+  ```
+
+  in total:
+  ```coq
+  Definition env : Type :=
+    (pid * local_vars * (option (list error))) * (* state *)
+    (list qnode * (index * index)).              (* resource *)
+  ```
+
+  which compared to the type of the term provided (ignoring `tm`):
+  ```coq
+    nat * local_vars * option (list error) *  (* state* )
+    (list qnode * (option nat * option nat)). (* resource *)
+  ```
+
+  does appear to be correct. (The only differences appear to be the names of,
+  e.g., `index` and `pid`, and the parentheses used.)
+
+  Notably, it gets stuck on the very first term, which `coq` successfully checks
+  to be the correct type (i.e., `tm * env`). Additionally, this did work in the
+  past when each of the constructors was applied exhaustatively.
+
+  - Could it be that since it is the first term, then both
+    `check_valid_constructor` and `check_updated_ctx` have not yet been called,
+    meaning that we haven't started to build/update the context/universe of
+    coq terms in the monad and therefore, are unable to unify the original term
+    with anything?
+
+    > The first idea from this would be to try to allow the "exhaustative"
+      checking for only the first initial term. However, after inspecting the
+      code, I see in `build_graph` that we do in fact update the environment
+      for the initial state, and the error does not occur there. Therefore,
+      it may be that the monad is somehow not staying updated, and I can see
+      that we use a standard `Queue` for our terms `to_visit`, and I wonder if
+      because this does not interact with the monad, that somehow the
+      information that we have already typed this (successfully) is lost.
+
+    I am going to now try to add a `Queue` to the monad.
+
+
+
+
+
+  <!-- I think it is worth looking further "downstream" to check what is actually
+  needed by `check_valid_constructor` and `check_updated_ctx`, and see if this
+  can be optimized. (If this is not possible, then we may have to consider
+  moving these functions inside of `MkGraph`, but I am hoping that this is not
+  going to be necessary, and that we can just pass what is needed to the
+  outside.) -->
+
+
+
+
+
+
+- [x] Following explorations with the previous bug, I have encountered instances
   where the `coq_translation` yields `UNKNOWN_DEST_STATE` when convertin from
   `raw_lts` to `Lts.lts`. So far this is only occuring in `proc2` of `Proc.v`:
   ```coq
@@ -309,6 +408,11 @@
 
   does appear to have fixed the issued of `UNKNOWN` terms in the translation.
 
+  Additionally, whilst debugging this issue I extended `lts_graph` to also
+  contain the `init` state. This is because the original state is actually a
+  `Constrexpr.constr_expr` rather than an `EConstr.t`, and we already do this
+  convertion in `build_graph` when we begin exploring. Therefore, it felt
+  appropriate to just store this state for later.
 
 ---
 

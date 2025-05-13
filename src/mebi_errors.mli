@@ -5,11 +5,11 @@ val invalid_ref : Names.GlobRef.t -> exn
 val unknown_tref_type
   :  Environ.env
   -> Evd.evar_map
-  -> EConstr.t * EConstr.t * EConstr.t list
+  -> string option * EConstr.t * EConstr.t * EConstr.t list
   -> exn
 
 val unknown_term_type
   :  Environ.env
   -> Evd.evar_map
-  -> EConstr.t * EConstr.t * EConstr.t list
+  -> string option * EConstr.t * EConstr.t * EConstr.t list
   -> exn
