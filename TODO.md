@@ -279,6 +279,7 @@
   replace/refactor many of the loops to use the `Mebi_monad.iterate` function.
   (This is underway.)
 
+  <!--
   Most of the refactoring for this was inside `DeCoq` and appears to have paid
   off. Now, instead of there being 7 issues, there is only 1 instance (in the
   same example). See below:
@@ -290,7 +291,11 @@
                                (tact ASend (tfix (tact ASend trec))))
                          (tfix (tact ARecv trec))))",
     "label": "false",
-    "destination": "UNKNOWN_DEST_STATE: (tpar (tfix (tact ASend trec)) (tpar (tact ARecv (tfix (tact ARecv trec))) (tpar (tact ASend (tfix (tact ASend trec))) (tfix (tact ARecv trec)))))",
+    "destination": "UNKNOWN_DEST_STATE:
+             (tpar (tfix (tact ASend trec))
+                   (tpar (tact ARecv (tfix (tact ARecv trec)))
+                         (tpar (tact ASend (tfix (tact ASend trec)))
+                               (tfix (tact ARecv trec)))))",
     "info": "(5) [(9) []]"
   },
   ```
@@ -299,6 +304,44 @@
   examples. (Notably, now this is the only instance of `UNKNOWN_`, while in the
   previous examples there were a total of `506` instances of `UNKNOWN_`, both
   for `DEST` and `FROM` states.)
+
+  ***However*** it is crucial to note that I have just realised there are far
+  fewer transitions in this new output. Now investigating this.
+  -->
+
+  Refactoring parts of `DeCoq` to better utilize the `Mebi_monad.iterate` have
+  not fixed the issue. Following this, the dumps produced have not been updated
+  so that the LTS also include a list of states. From this, it is clear that
+  the states that are `UNKNOWN` so not appear to be in the list of states, which
+  is odd since I have added checks whenever an `UNKNOWN` is encountered that
+  confirm that the `EConstr.t` term of the state is within `g.states`.
+  I will now investigate the translation of states.
+
+  After some tests, I can confirm that all the terms in `g.states` are indeed
+  present in the translation table. Therefore, there must be some disparity
+  between the terms stored in the transitions (i.e., `from` and `destination`)
+  and those that were translated. Puzzlingly, checks reveal that such terms are
+  in fact present in `g.states`. My thought at this stage is to check the
+  comparison function defined in `Mebi_monad` that would be used to fetch values
+  from the table `H`. Clearly, the one for set `S` is performing more desirably.
+
+  Indeed, changing the comparison function from:
+  ```ocaml
+  let eq_constr st () = EConstr.eq_constr !st.coq_ctx
+  ```
+
+  to:
+  ```ocaml
+  let compare_constr st () t1 t2 =
+    Int.compare (econstr_hash st () t1) (econstr_hash st () t2)
+  ;;
+
+  let eq_constr st () t1 t2 =
+    if Int.equal (compare_constr st () t1 t2) 0 then true else false
+  ;;
+  ```
+
+  does appear to have fixed the issued of `UNKNOWN` terms in the translation.
 
 
 ---

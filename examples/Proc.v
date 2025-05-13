@@ -155,7 +155,7 @@ MeBi Show LTS Bounded 150 Of proc1 Using termLTS.
 (* MeBi Dump "proc1" LTS Bounded 1000 Of proc1 Using termLTS. *)
 
 Example proc2 := tpar proc1 proc1.
-MeBi Show LTS Bounded 500 Of proc2 Using termLTS.
+(* MeBi Show LTS Bounded 500 Of proc2 Using termLTS. *)
 MeBi Dump "proc2" LTS Bounded 500 Of proc2 Using termLTS.
 
 

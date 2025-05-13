@@ -43,11 +43,20 @@ let product (x : 'a t) (y : 'b t) : ('a * 'b) t =
 [@@inline always]
 ;;
 
-let eq_constr st () = EConstr.eq_constr !st.coq_ctx
+(* let eq_constr st () = EConstr.eq_constr !st.coq_ctx *)
 
 let econstr_hash st () t =
   Constr.hash
     (EConstr.to_constr ?abort_on_undefined_evars:(Some false) !st.coq_ctx t)
+;;
+
+let compare_constr st () t1 t2 =
+  (* if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1 *)
+  Int.compare (econstr_hash st () t1) (econstr_hash st () t2)
+;;
+
+let eq_constr st () t1 t2 =
+  if Int.equal (compare_constr st () t1 t2) 0 then true else false
 ;;
 
 (** [make_constr_tbl st] is used to create Hashtbl that map from [EConstr.t] *)
@@ -65,11 +74,6 @@ let make_constr_tbl st =
   { state = st
   ; value = (module Constrtbl : Hashtbl.S with type key = EConstr.t)
   }
-;;
-
-let compare_constr st () t1 t2 =
-  (* if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1 *)
-  Int.compare (econstr_hash st () t1) (econstr_hash st () t2)
 ;;
 
 (** [make_constr_set st] is used to create Set of [EConstr.t] *)
