@@ -279,36 +279,6 @@
   replace/refactor many of the loops to use the `Mebi_monad.iterate` function.
   (This is underway.)
 
-  <!--
-  Most of the refactoring for this was inside `DeCoq` and appears to have paid
-  off. Now, instead of there being 7 issues, there is only 1 instance (in the
-  same example). See below:
-  ```json
-  {
-    "id": "5",
-    "from": "(tpar (tfix (tact ASend trec))
-                   (tpar (tpar (tact ARecv (tfix (tact ARecv trec)))
-                               (tact ASend (tfix (tact ASend trec))))
-                         (tfix (tact ARecv trec))))",
-    "label": "false",
-    "destination": "UNKNOWN_DEST_STATE:
-             (tpar (tfix (tact ASend trec))
-                   (tpar (tact ARecv (tfix (tact ARecv trec)))
-                         (tpar (tact ASend (tfix (tact ASend trec)))
-                               (tfix (tact ARecv trec)))))",
-    "info": "(5) [(9) []]"
-  },
-  ```
-
-  The above appears to correspond to `id: 5` from the previous block of
-  examples. (Notably, now this is the only instance of `UNKNOWN_`, while in the
-  previous examples there were a total of `506` instances of `UNKNOWN_`, both
-  for `DEST` and `FROM` states.)
-
-  ***However*** it is crucial to note that I have just realised there are far
-  fewer transitions in this new output. Now investigating this.
-  -->
-
   Refactoring parts of `DeCoq` to better utilize the `Mebi_monad.iterate` have
   not fixed the issue. Following this, the dumps produced have not been updated
   so that the LTS also include a list of states. From this, it is clear that
