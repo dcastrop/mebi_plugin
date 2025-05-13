@@ -437,6 +437,7 @@ module type GraphB = sig
   module H : Hashtbl.S with type key = EConstr.t
   module S : Set.S with type elt = EConstr.t
   module D : Set.S with type elt = EConstr.t * Constr_tree.t
+  (* module Q : Queue_intf.S with type t = EConstr.t *)
 
   type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
 
@@ -464,15 +465,18 @@ module type GraphB = sig
 
   val build_lts_graph
     :  ?params:Params.log
-    -> term_type_map (* -> raw_lts H.t -> raw_lts H.t *)
+    -> raw_lts H.t (* -> raw_lts H.t -> raw_lts H.t *)
     -> lts_graph
     -> int
     -> lts_graph mm
 
   val build_graph
-    :  ?params:Params.log
-    -> term_type_map (*  -> term_type_map *)
-    -> Constrexpr.constr_expr (* -> Names.GlobRef.t list *)
+    :  ?params:
+         Params.log
+         (* -> term_type_map  *)
+         (*  -> term_type_map *)
+    -> Constrexpr.constr_expr
+    -> Names.GlobRef.t list
     -> int
     -> lts_graph mm
 
@@ -504,7 +508,9 @@ end
 module MkGraph
     (M : Hashtbl.S with type key = EConstr.t)
     (N : Set.S with type elt = EConstr.t)
-    (P : Set.S with type elt = EConstr.t * Constr_tree.t) : GraphB = struct
+    (P : Set.S with type elt = EConstr.t * Constr_tree.t) : GraphB =
+(* (O : Queue_intf.S with type t = EConstr.t) *)
+struct
   (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t] and also is used for mapping term types to [raw_lts]. *)
   module H = M
 
@@ -513,6 +519,9 @@ module MkGraph
 
   (* [D] is the set of destination tuples, each comprised of a term [EConstr.t] and the corresponding [Constr_tree.t]. *)
   module D = P
+
+  (* [Q] is the queue of [EConstr.t] *)
+  (* module Q = O *)
 
   (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t]. *)
   type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
@@ -777,18 +786,22 @@ module MkGraph
   let get_new_constrs
     ?(params : Params.log = default_params)
     (t : EConstr.t)
-    (tr_rlts : term_type_map)
+    (tr_rlts : raw_lts H.t)
     : coq_ctor list mm
     =
-    let* ty = Mebi_utils.type_of_econstr t in
-    match Hashtbl.find_opt tr_rlts ty with
+    (* let* ty = Mebi_utils.type_of_econstr t in *)
+    let$ ty env sigma = Typing.type_of env sigma t in
+    match H.find_opt tr_rlts ty with
     | None ->
-      unknown_term_type (t, ty, List.of_seq (Hashtbl.to_seq_keys tr_rlts))
+      unknown_term_type
+        (Some "get_new_constrs", t, ty, List.of_seq (H.to_seq_keys tr_rlts))
     | Some rlts ->
+      let temp_map = Hashtbl.of_seq (H.to_seq tr_rlts) in
       check_valid_constructor
         ~params
         rlts.constructor_transitions
-        tr_rlts
+        (* tr_rlts *)
+        temp_map
         t
         None
   ;;
@@ -800,7 +813,7 @@ module MkGraph
       @return an [lts_graph] with a maximum of [bound] many states. *)
   let rec build_lts_graph
     ?(params : Params.log = default_params)
-    (tr_rlts : term_type_map)
+    (tr_rlts : raw_lts H.t)
     (g : lts_graph)
     (bound : int)
     : lts_graph mm
@@ -819,6 +832,37 @@ module MkGraph
       build_lts_graph ~params tr_rlts (* fn_rlts *) g bound)
   ;;
 
+  let build_rlts_map
+    ?(params : Params.log = default_params)
+    (grefs : Names.GlobRef.t list)
+    : raw_lts H.t mm
+    =
+    let num_grefs : int = List.length grefs in
+    let trmap : raw_lts H.t = H.create num_grefs in
+    let iter_body (i : int) (acc : raw_lts H.t) =
+      let gref : Names.GlobRef.t = List.nth grefs i in
+      (* let rlts : raw_lts = run (check_ref_lts gref) in *)
+      let* (rlts : raw_lts) = check_ref_lts gref in
+      (* sanity check *)
+      if H.mem acc rlts.trm_type
+      then
+        Log.warning
+          (Printf.sprintf
+             "build_rlts_map, trm_type already accounted for?\ntrm_type: %s"
+             (econstr_to_string rlts.trm_type));
+      H.add acc rlts.trm_type rlts;
+      if H.mem acc rlts.coq_lts
+      then
+        Log.warning
+          (Printf.sprintf
+             "build_rlts_map, coq_lts already accounted for?\ncoq_lts: %s"
+             (econstr_to_string rlts.coq_lts));
+      H.add acc rlts.coq_lts rlts;
+      return acc
+    in
+    iterate 0 (num_grefs - 1) trmap iter_body
+  ;;
+
   (** [build_graph tr_rlts fn_rlts tref bound] is the entry point for [build_lts_graph].
       @param tr_rlts maps coq-term types to [raw_lts].
       @param fn_rlts
@@ -827,17 +871,21 @@ module MkGraph
       @param bound is the number of states to explore until. *)
   let build_graph
     ?(params : Params.log = default_params)
-    (tr_rlts : term_type_map)
-    (tref : Constrexpr.constr_expr)
+    (* (tr_rlts : term_type_map) *)
+      (tref : Constrexpr.constr_expr)
+    (grefs : Names.GlobRef.t list)
     (bound : int)
     : lts_graph mm
     =
+    (* make map of term types *)
+    let* (tr_rlts : raw_lts H.t) = build_rlts_map ~params grefs in
     let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
     (* should be able to get the type now -- fail otherwise *)
     let* ty = Mebi_utils.type_of_econstr t in
-    match Hashtbl.find_opt tr_rlts ty with
+    match H.find_opt tr_rlts ty with
     | None ->
-      unknown_tref_type (t, ty, List.of_seq (Hashtbl.to_seq_keys tr_rlts))
+      unknown_tref_type
+        (Some "build_graph", t, ty, List.of_seq (H.to_seq_keys tr_rlts))
     | Some rlts ->
       (* update environment by typechecking *)
       let$* u env sigma = Typing.check env sigma t rlts.trm_type in
@@ -1099,37 +1147,39 @@ let make_graph_builder =
   return (module G : GraphB)
 ;;
 
-let build_rlts_map
-  ?(params : Params.log = default_params)
-  (grefs : Names.GlobRef.t list)
-  : term_type_map mm
-  =
-  let num_grefs : int = List.length grefs in
-  let trmap : term_type_map = Hashtbl.create num_grefs in
-  let iter_body (i : int) (acc : term_type_map) =
-    let gref : Names.GlobRef.t = List.nth grefs i in
-    (* let rlts : raw_lts = run (check_ref_lts gref) in *)
-    let* (rlts : raw_lts) = check_ref_lts gref in
-    Hashtbl.add acc rlts.trm_type rlts;
-    Hashtbl.add acc rlts.coq_lts rlts;
-    return acc
-  in
-  iterate 0 (num_grefs - 1) trmap iter_body
-;;
+(* let build_rlts_map
+   ?(params : Params.log = default_params)
+   (grefs : Names.GlobRef.t list)
+   : term_type_map mm
+   =
+   let num_grefs : int = List.length grefs in
+   let trmap : term_type_map = Hashtbl.create num_grefs in
+   let iter_body (i : int) (acc : term_type_map) =
+   let gref : Names.GlobRef.t = List.nth grefs i in
+   (* let rlts : raw_lts = run (check_ref_lts gref) in *)
+   let* (rlts : raw_lts) = check_ref_lts gref in
+   Hashtbl.add acc rlts.trm_type rlts;
+   Hashtbl.add acc rlts.coq_lts rlts;
+   return acc
+   in
+   iterate 0 (num_grefs - 1) trmap iter_body
+   ;; *)
 
 (** *)
 let build_bounded_lts
   ?(params : Params.log = default_params)
   ?(bound : int = default_bound)
   ?(name : string = "unnamed")
-  (tr_rlts : term_type_map) (* (fn_rlts : term_type_map) *)
-  (tref : Constrexpr.constr_expr)
-  (* (grefs : Names.GlobRef.t list) *)
-    (module G : GraphB)
+  (* (tr_rlts : term_type_map) *)
+  (* (fn_rlts : term_type_map) *)
+    (tref : Constrexpr.constr_expr)
+  (grefs : Names.GlobRef.t list)
+  (module G : GraphB)
   : Lts.lts mm
   =
   (* graph lts *)
-  let* graph_lts = G.build_graph ~params tr_rlts tref bound in
+  (* let* graph_lts = G.build_graph ~params tr_rlts tref bound in *)
+  let* graph_lts = G.build_graph ~params tref grefs bound in
   Log.override ~params (Printf.sprintf "- - - - -");
   if G.S.cardinal graph_lts.states > bound
   then
@@ -1156,7 +1206,7 @@ let build_fsm_from_bounded_lts
   params.options.show_normal_output <- false;
   (* list of raw coq lts *)
   (* let* (tr_rlts, fn_rlts) : term_type_map * term_type_map = *)
-  let* (tr_rlts : term_type_map) = build_rlts_map ~params grefs in
+  (* let* (tr_rlts : term_type_map) = build_rlts_map ~params grefs in *)
   (* print out the type of the term *)
   Log.override
     ~params
@@ -1170,7 +1220,8 @@ let build_fsm_from_bounded_lts
   (* Utils.Logging.Log.override "D"; *)
   let* (the_lts : Lts.lts) =
     (* build_bounded_lts ~params ~bound ~name tref grefs (module G) *)
-    build_bounded_lts ~params ~bound ~name tr_rlts tref (module G)
+    (* build_bounded_lts ~params ~bound ~name tr_rlts tref (module G) *)
+    build_bounded_lts ~params ~bound ~name tref grefs (module G)
     (* build_bounded_lts ~params ~bound ~name tr_rlts fn_rlts tref (module G) *)
   in
   (* translate to fsm *)
@@ -1191,7 +1242,7 @@ module Vernac = struct
       =
       (* list of raw coq lts *)
       (* let* (tr_rlts, fn_rlts) : term_type_map * term_type_map = *)
-      let* (tr_rlts : term_type_map) = build_rlts_map ~params grefs in
+      (* let* (tr_rlts : term_type_map) = build_rlts_map ~params grefs in *)
       (* print out the type of the term *)
       Log.override
         ~params
@@ -1202,7 +1253,8 @@ module Vernac = struct
       let* graphM = make_graph_builder in
       let module G = (val graphM) in
       (* get pure lts *)
-      build_bounded_lts ~params ~bound ~name tr_rlts tref (module G)
+      (* build_bounded_lts ~params ~bound ~name tr_rlts tref (module G) *)
+      build_bounded_lts ~params ~bound ~name tref grefs (module G)
     ;;
 
     (* build_bounded_lts ~params ~bound ~name tref grefs (module G) *)

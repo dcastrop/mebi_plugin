@@ -118,6 +118,25 @@ let make_constr_tree_set (st : coq_context ref)
   }
 ;;
 
+(** [make_constr_set st] is used to create Set of [EConstr.t] *)
+(* let make_econstr_queue (st : coq_context ref)
+   (* : (module Queue_intf.S with type t = EConstr.t) in_context  *)
+   =
+   let module EConstrQueue = Queue_intf.Make *)
+(* let make_econstr_queue (st : coq_context ref)
+  : (module Queue_intf.S with type t = EConstr.t) in_context
+  =
+  let cmp = compare_constr st in
+  let module EConstrQueue = Queue
+    (* Queue..Make (struct
+      type t = EConstr.t
+
+      let compare t1 t2 = cmp () t1 t2
+    end) *)
+  in
+  { state = st; value = (module EConstrQueue : Queue_intf.S ) }
+;; *)
+
 (** Monadic for loop *)
 let rec iterate
   (from_idx : int)
@@ -174,12 +193,18 @@ let invalid_sort (x : Sorts.family) : 'a t = fun st -> raise (invalid_sort x)
 let invalid_ref (x : Names.GlobRef.t) : 'a t = fun st -> raise (invalid_ref x)
 
 (** Error when first term (tref) is of unknown type *)
-let unknown_tref_type (trty : EConstr.t * EConstr.t * EConstr.t list) : 'a t =
+let unknown_tref_type
+  (trty : string option * EConstr.t * EConstr.t * EConstr.t list)
+  : 'a t
+  =
   fun st -> raise (unknown_tref_type !st.coq_env !st.coq_ctx trty)
 ;;
 
 (** Error when term is of unknown type *)
-let unknown_term_type (tmty : EConstr.t * EConstr.t * EConstr.t list) : 'a t =
+let unknown_term_type
+  (tmty : string option * EConstr.t * EConstr.t * EConstr.t list)
+  : 'a t
+  =
   fun st -> raise (unknown_term_type !st.coq_env !st.coq_ctx tmty)
 ;;
 

@@ -21,7 +21,7 @@
  (name coq-mebi)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml coq-core bisim)
+ (depends ocaml base coq-core bisim)
  (tags
   (topics "to describe" your project)))
 

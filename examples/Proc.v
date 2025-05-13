@@ -1,6 +1,6 @@
 Require Import MEBI.loader.
 
-Inductive action : Set := | ASend | ARecv | BSend | BRecv.
+Inductive action : Set := | ASend | ARecv | BSend | BRecv | CSend | CRecv.
 
 Inductive term : Set :=
 | trec : term
@@ -8,7 +8,7 @@ Inductive term : Set :=
 | tfix : term -> term
 | tact : action -> term -> term
 | tpar : term -> term -> term (* parallel *)
-| topt : term -> term -> term (* choice between options *)
+| tbra : term -> term -> term (* branching *)
 .
 
 Fixpoint tsubst (t1 : term) (t2 : term) :=
@@ -18,7 +18,7 @@ Fixpoint tsubst (t1 : term) (t2 : term) :=
   | tfix t => tfix t
   | tact a t => tact a (tsubst t1 t)
   | tpar tl tr => tpar (tsubst t1 tl) (tsubst t1 tr)
-  | topt tl tr => topt (tsubst t1 tl) (tsubst t1 tr)
+  | tbra tl tr => tbra (tsubst t1 tl) (tsubst t1 tr)
   end.
 
 (* true: "comm", false: "silent" *)
@@ -30,12 +30,15 @@ Inductive termLTS : term -> bool -> term -> Prop :=
 | do_sendb : forall tl tr, termLTS (tpar (tact BSend tl) (tact BRecv tr))
                              true  (tpar tl tr)
 
-(* non-deterministic choice between tl and tr *)
-| do_optl : forall a tl tr tl', termLTS tl a tl' ->
-                                termLTS (topt tl tr) a tl'
+| do_sendc : forall tl tr, termLTS (tpar (tact CSend tl) (tact CRecv tr))
+                             true  (tpar tl tr)
 
-| do_optr : forall a tl tr tr', termLTS tr a tr' ->
-                                termLTS (topt tl tr) a tr'
+(* non-deterministic choice between tl and tr *)
+| do_bral : forall a tl tr tl', termLTS tl a tl' ->
+                                termLTS (tbra tl tr) a tl'
+
+| do_brar : forall a tl tr tr', termLTS tr a tr' ->
+                                termLTS (tbra tl tr) a tr'
 
 (* non-deterministic parallel step *)
 | do_parl : forall a tl tl' tr, termLTS tl a tl' ->
@@ -137,11 +140,55 @@ MeBi Show LTS Bounded 150 Of proc1_rec4 Using termLTS.
 (** Branching, no Recursion **********)
 (*************************************)
 
+(** the example below does nothing since neither branch can occur *)
+(* Example proc2_bra1 := tpar (tbra (tact ASend tend)
+                                 (tact BSend tend))
+                           (tbra (tact ARecv tend)
+                                 (tact BRecv tend)).
+(* MeBi Show LTS Bounded 150 Of proc2_bra1 Using termLTS. *)
+MeBi Dump "proc2_bra1" LTS Bounded 150 Of proc2_bra1 Using termLTS. *)
+
+Example proc2_bra2 := tbra (tpar (tact ASend tend)
+                                 (tact ARecv tend))
+                           (tpar (tact BSend tend)
+                                 (tact BRecv tend)).
+(* MeBi Show LTS Bounded 150 Of proc2_bra2 Using termLTS. *)
+MeBi Dump "proc2_bra2" LTS Bounded 150 Of proc2_bra2 Using termLTS.
+
+Example proc2_bra3 := tbra (tpar (tact ASend (tact BSend tend))
+                                 (tact ARecv (tact BRecv tend)))
+                           (tpar (tact BSend (tact ASend tend))
+                                 (tact BRecv (tact ARecv tend))).
+(* MeBi Show LTS Bounded 150 Of proc2_bra3 Using termLTS. *)
+MeBi Dump "proc2_bra3" LTS Bounded 150 Of proc2_bra3 Using termLTS.
+
+Example proc2_bra4 := tbra (tpar (tact ASend (tact BSend tend))
+                                 (tact ARecv (tact BRecv tend)))
+                           (tbra (tpar (tact BSend (tact CSend tend))
+                                       (tact BRecv (tact CRecv tend)))
+                                 (tpar (tact CSend (tact ASend tend))
+                                       (tact CRecv (tact ARecv tend)))).
+(* MeBi Show LTS Bounded 150 Of proc2_bra4 Using termLTS. *)
+MeBi Dump "proc2_bra4" LTS Bounded 150 Of proc2_bra4 Using termLTS.
+
+(** the example below does nothing since neither branch can occur *)
+(* Example proc2_bra5 := tpar (tact ARecv (tact BRecv tend))
+                           (tbra (tact ASend (tact BSend tend))
+                                 (tact BSend (tact ASend tend))).
+(* MeBi Show LTS Bounded 150 Of proc2_bra5 Using termLTS. *)
+MeBi Dump "proc2_bra5" LTS Bounded 150 Of proc2_bra5 Using termLTS. *)
+
 
 (*************************************)
 (** Simple Branching and Recursion ***)
 (*************************************)
 
+(* Example proc3_recbra1 := tbra (tpar (tact ASend tend)
+                                    (tact ARecv tend))
+                              (tpar (tact BSend tend)
+                                    (tact BRecv tend)).
+(* MeBi Show LTS Bounded 150 Of proc2_bra2 Using termLTS. *)
+MeBi Dump "proc2_bra2" LTS Bounded 150 Of proc2_bra2 Using termLTS. *)
 
 (*************************************)
 (** Nested Branching and Recursion ***)
@@ -151,12 +198,12 @@ MeBi Show LTS Bounded 150 Of proc1_rec4 Using termLTS.
 
 
 Example proc1 := tpar (tfix (tact ASend trec)) (tfix (tact ARecv trec)).
-MeBi Show LTS Bounded 150 Of proc1 Using termLTS.
+(* MeBi Show LTS Bounded 150 Of proc1 Using termLTS. *)
 (* MeBi Dump "proc1" LTS Bounded 1000 Of proc1 Using termLTS. *)
 
 Example proc2 := tpar proc1 proc1.
 (* MeBi Show LTS Bounded 500 Of proc2 Using termLTS. *)
-MeBi Dump "proc2" LTS Bounded 500 Of proc2 Using termLTS.
+(* MeBi Dump "proc2" LTS Bounded 500 Of proc2 Using termLTS. *)
 
 
 (* TODO: would be cool to do first a "FSM minimisation". I believe there are
