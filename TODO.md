@@ -302,13 +302,9 @@
 
   to:
   ```ocaml
-  let compare_constr st () t1 t2 =
-    Int.compare (econstr_hash st () t1) (econstr_hash st () t2)
-  ;;
+  let compare_constr st () t1 t2 = Int.compare (econstr_hash st () t1) (econstr_hash st () t2)
 
-  let eq_constr st () t1 t2 =
-    if Int.equal (compare_constr st () t1 t2) 0 then true else false
-  ;;
+  let eq_constr st () t1 t2 = Int.equal (compare_constr st () t1 t2) 0
   ```
 
   does appear to have fixed the issued of `UNKNOWN` terms in the translation.
