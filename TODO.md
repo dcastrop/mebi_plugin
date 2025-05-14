@@ -2,6 +2,14 @@
 
 ## bug list
 
+- [x] Issue of retriving correct `raw_lts` from hashtbl using term.
+
+      Fixed this issue by normalizing the term before adding it to the hashtbl, 
+      rather than trying to normalise either the term before obtaining the type,
+      or the type when fetching from the hastabl.
+
+### archive
+
 - [x] `Proc.v, Example proc0_send1` is missing `true` transitions.
   LTS shows that the actions occur since `tpar (tend tend)` is present, but
   the transitions themselves do not occur. Additionally, the number of states

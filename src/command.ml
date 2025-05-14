@@ -318,17 +318,6 @@ let rec check_updated_ctx
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with
      | App (fn, args) ->
-       (* Log.override
-          ~params
-          (Printf.sprintf
-          (* "check_updated_ctx,\nApp fn: %s\nApp args: %s" *)
-          "check_updated_ctx,\nApp fn: %s"
-          (econstr_to_string fn)
-          (* (List.fold_left
-          (fun (pacc : string) (arg : EConstr.t) ->
-          Printf.sprintf "%s '%s'" pacc (econstr_to_string arg))
-          ""
-          (Array.to_list args)) *)); *)
        (match Hashtbl.find_opt fn_rlts fn with
         | None ->
           Log.warning
@@ -713,34 +702,58 @@ struct
   (* Log.override "_check_for_duplicate_transitions, begin." *)
 
   let _check_states ?(prefix : string = "") (g : lts_graph) : unit =
-    Log.override (Printf.sprintf "%s_check_states, begin." prefix);
+    Log.override
+      ~params:default_params
+      (Printf.sprintf "%s_check_states, begin." prefix);
     H.iter
       (fun (from : EConstr.t) (actions : constr_transitions) ->
         (* check [from] is in [g.states] *)
-        if Bool.not (S.mem from g.states)
-        then
-          Log.warning
-            ~params:default_params
-            (Printf.sprintf
-               "%s_check_states, from state not found: %s"
-               prefix
-               (econstr_to_string from));
         Hashtbl.iter
           (fun (a : Mebi_action.action) (destinations : D.t) ->
             D.iter
               (fun ((destination, _constr_tree) : D.elt) ->
-                if Bool.not (S.mem destination g.states)
+                if
+                  Bool.( || )
+                    (Bool.not (S.mem from g.states))
+                    (Bool.not (S.mem destination g.states))
                 then
                   Log.warning
                     ~params:default_params
                     (Printf.sprintf
-                       "%s_check_states, destination state not found: %s"
+                       "%s_check_states, in transition:\n\
+                        %s\n\n\
+                        did not find states: %s%s\n\
+                        in states: %s"
                        prefix
-                       (econstr_to_string destination)))
+                       (Printf.sprintf
+                          "from: %s\nlabel: %s\ndest: %s\nctor_tree: %s"
+                          (econstr_to_string from)
+                          a.label
+                          (econstr_to_string destination)
+                          (Constr_tree.pstr _constr_tree))
+                       (if Bool.not (S.mem from g.states)
+                        then Printf.sprintf "'from'"
+                        else "")
+                       (if Bool.not (S.mem destination g.states)
+                        then Printf.sprintf "'dest'"
+                        else "")
+                       (if S.is_empty g.states
+                        then "[ ] (empty)"
+                        else
+                          Printf.sprintf
+                            "[%s]"
+                            (S.fold
+                               (fun (s : S.elt) (acc : string) ->
+                                 Printf.sprintf
+                                   "%s\n  %s\n"
+                                   acc
+                                   (econstr_to_string s))
+                               g.states
+                               ""))))
               destinations)
           actions)
       g.transitions;
-    Log.override "_check_states, end."
+    Log.override ~params:default_params "_check_states, end."
   ;;
 
   (**********************************************************************)
@@ -827,27 +840,10 @@ struct
     check_valid_constructor
       ~params
       the_rlts.constructor_transitions
-      (* tr_rlts *)
       temp_map
       t
       None
   ;;
-
-  (* let* ty = Mebi_utils.type_of_econstr t' in *)
-  (* let* ty : EConstr.t = type_of_econstr t in
-    match H.find_opt tr_rlts ty with
-    | None ->
-      unknown_term_type
-        (Some "get_new_constrs", t, ty, List.of_seq (H.to_seq_keys tr_rlts))
-    | Some rlts ->
-      let temp_map = Hashtbl.of_seq (H.to_seq tr_rlts) in
-      check_valid_constructor
-        ~params
-        rlts.constructor_transitions
-        (* tr_rlts *)
-        temp_map
-        t
-        None *)
 
   (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
       @param fn_rlts maps coq-term names to [raw_lts].
@@ -893,13 +889,6 @@ struct
     (* should be able to get the type now -- fail otherwise *)
     let* t : EConstr.t = tref_to_econstr tref in
     let* the_lts : raw_lts = get_rlts t tr_rlts in
-    (* let* ty : EConstr.t = type_of_econstr t in
-       (* let* ty = Mebi_utils.type_of_tref tref in *)
-       match H.find_opt tr_rlts ty with
-       | None ->
-       unknown_tref_type
-       (Some "build_graph", t, ty, List.of_seq (H.to_seq_keys tr_rlts))
-       | Some rlts -> *)
     (* update environment by typechecking *)
     let$* u env sigma = Typing.check env sigma t the_lts.trm_type in
     let$ init env sigma = sigma, Reductionops.nf_all env sigma t in
@@ -909,7 +898,6 @@ struct
       build_lts_graph
         ~params
         tr_rlts
-        (* fn_rlts *)
         { to_visit = q; states = S.empty; init; transitions = H.create bound }
         bound
     in
@@ -933,13 +921,6 @@ struct
       : coq_translation mm
       =
       let list_states : EConstr.t list = S.elements states in
-      if Bool.not (Int.equal (S.cardinal states) (List.length list_states))
-      then
-        Log.warning
-          (Printf.sprintf
-             "create_translation_tbl, different sizes: (set: %i) (list: %i)"
-             (S.cardinal states)
-             (List.length list_states));
       let iter_body
             (i : int)
             ((from_coq_list, to_coq_list) :
@@ -953,17 +934,6 @@ struct
       let* from_coq_list, to_coq_list =
         iterate 0 (List.length list_states - 1) ([], []) iter_body
       in
-      if
-        Bool.not
-          (Int.equal (List.length from_coq_list) (List.length list_states))
-      then
-        Log.warning
-          (Printf.sprintf
-             "create_translation_tbl, different sizes: (from_coq: %i) (list: \
-              %i)"
-             (List.length from_coq_list)
-             (List.length list_states));
-      (* iterate 0 (List.length list_states - 1) make_coq_translation iter_body *)
       let from_coq : string H.t = H.of_seq (List.to_seq from_coq_list) in
       let to_coq : (string, EConstr.t) Hashtbl.t =
         Hashtbl.of_seq (List.to_seq to_coq_list)
@@ -1025,6 +995,80 @@ struct
       iterate 0 (List.length raw_list - 1) [] from_body
     ;;
 
+    let _check_all_states_translated
+          (translation_tbl : coq_translation)
+          (g : lts_graph)
+      : unit mm
+      =
+      S.iter
+        (fun (s : EConstr.t) ->
+          match H.find_opt translation_tbl.from_coq s with
+          | None ->
+            let (s_str : string) = econstr_to_string s in
+            Log.warning
+              ~params:default_params
+              (Printf.sprintf
+                 "translate_transitions, state not translated: %s"
+                 s_str)
+          | Some _ -> ())
+        g.states;
+      return ()
+    ;;
+
+    let get_state_translation
+          ?(prefix : string = "?")
+          (state : EConstr.t)
+          (translation_tbl : coq_translation)
+          (g : lts_graph)
+      : string mm
+      =
+      let* (_str : string) = econstr_to_string_mm state in
+      match H.find_opt translation_tbl.from_coq state with
+      | None ->
+        let missing_state : string =
+          Printf.sprintf "UNKNOWN_%s_STATE:\n%s" prefix _str
+        in
+        Log.warning
+          ~params:default_params
+          (Printf.sprintf
+             "%s\n\
+              is in states: %s\n\n\
+              is term in tbl: %b %b\n\
+              is str in tbl: %b %b"
+             missing_state
+             (if S.mem state g.states
+              then (
+                let matches : S.t =
+                  S.filter
+                    (fun (s : S.elt) -> S.mem state (S.singleton s))
+                    g.states
+                in
+                Printf.sprintf
+                  "true\nmatches (%i): %s\n"
+                  (S.cardinal matches)
+                  (if S.is_empty matches
+                   then "[ ] (empty)"
+                   else
+                     Printf.sprintf
+                       "[%s]"
+                       (S.fold
+                          (fun (s : S.elt) (acc : string) ->
+                            Printf.sprintf "%s\n%s\n" acc (econstr_to_string s))
+                          matches
+                          "")))
+              else "false")
+             (H.mem translation_tbl.from_coq state)
+             (List.mem
+                state
+                (List.of_seq (Hashtbl.to_seq_values translation_tbl.to_coq)))
+             (Hashtbl.mem translation_tbl.to_coq _str)
+             (List.mem
+                _str
+                (List.of_seq (H.to_seq_values translation_tbl.from_coq))));
+        return missing_state
+      | Some s -> return s
+    ;;
+
     let translate_transitions
           (transitions_list :
             (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
@@ -1033,76 +1077,19 @@ struct
       : Lts.raw_flat_lts mm
       =
       (* sanity check: all states should be translated *)
-      S.iter
-        (fun (s : EConstr.t) ->
-          match H.find_opt translation_tbl.from_coq s with
-          | None ->
-            let (s_str : string) = econstr_to_string s in
-            Log.warning
-              (Printf.sprintf
-                 "translate_transitions, state not translated: %s"
-                 s_str)
-          | Some _ -> ())
-        g.states;
-      (* *)
+      let* _ = _check_all_states_translated translation_tbl g in
       let iter_body (i : int) (acc : Lts.raw_flat_lts) =
         let (from, a, destination, constr_tree)
           : S.elt * Mebi_action.action * S.elt * Constr_tree.t
           =
           List.nth transitions_list i
         in
-        let* (_from_str : string) = econstr_to_string_mm from in
-        let from_str : string =
-          match H.find_opt translation_tbl.from_coq from with
-          | None ->
-            let missing_state : string =
-              Printf.sprintf "UNKNOWN_FROM_STATE: %s" _from_str
-            in
-            Log.warning
-              (Printf.sprintf
-                 "%s\n\
-                  is in states: %b\n\
-                  is term in tbl: %b %b\n\
-                  is str in tbl: %b %b"
-                 missing_state
-                 (S.mem from g.states)
-                 (H.mem translation_tbl.from_coq from)
-                 (List.mem
-                    from
-                    (List.of_seq (Hashtbl.to_seq_values translation_tbl.to_coq)))
-                 (Hashtbl.mem translation_tbl.to_coq _from_str)
-                 (List.mem
-                    _from_str
-                    (List.of_seq (H.to_seq_values translation_tbl.from_coq))));
-            missing_state
-          | Some s -> s
+        let* from_str : string =
+          get_state_translation ~prefix:"FROM" from translation_tbl g
         in
         let a_str : string = a.label in
-        let* (_dest_str : string) = econstr_to_string_mm destination in
-        let dest_str : string =
-          match H.find_opt translation_tbl.from_coq destination with
-          | None ->
-            let missing_state : string =
-              Printf.sprintf "UNKNOWN_DEST_STATE: %s" _dest_str
-            in
-            Log.warning
-              (Printf.sprintf
-                 "%s\n\
-                  is in states: %b\n\
-                  is term in tbl: %b %b\n\
-                  is str in tbl: %b %b"
-                 missing_state
-                 (S.mem destination g.states)
-                 (H.mem translation_tbl.from_coq destination)
-                 (List.mem
-                    destination
-                    (List.of_seq (Hashtbl.to_seq_values translation_tbl.to_coq)))
-                 (Hashtbl.mem translation_tbl.to_coq _dest_str)
-                 (List.mem
-                    _dest_str
-                    (List.of_seq (H.to_seq_values translation_tbl.from_coq))));
-            missing_state
-          | Some s -> s
+        let* dest_str : string =
+          get_state_translation ~prefix:"DEST" destination translation_tbl g
         in
         let constr_tree_str : string = Constr_tree.pstr constr_tree in
         return ((from_str, a_str, dest_str, Some constr_tree_str) :: acc)
@@ -1161,38 +1148,17 @@ let make_graph_builder =
   return (module G : GraphB)
 ;;
 
-(* let build_rlts_map
-   ?(params : Params.log = default_params)
-   (grefs : Names.GlobRef.t list)
-   : term_type_map mm
-   =
-   let num_grefs : int = List.length grefs in
-   let trmap : term_type_map = Hashtbl.create num_grefs in
-   let iter_body (i : int) (acc : term_type_map) =
-   let gref : Names.GlobRef.t = List.nth grefs i in
-   (* let rlts : raw_lts = run (check_ref_lts gref) in *)
-   let* (rlts : raw_lts) = check_ref_lts gref in
-   Hashtbl.add acc rlts.trm_type rlts;
-   Hashtbl.add acc rlts.coq_lts rlts;
-   return acc
-   in
-   iterate 0 (num_grefs - 1) trmap iter_body
-   ;; *)
-
 (** *)
 let build_bounded_lts
       ?(params : Params.log = default_params)
       ?(bound : int = default_bound)
       ?(name : string = "unnamed")
-      (* (tr_rlts : term_type_map) *)
-      (* (fn_rlts : term_type_map) *)
-        (tref : Constrexpr.constr_expr)
+      (tref : Constrexpr.constr_expr)
       (grefs : Names.GlobRef.t list)
       (module G : GraphB)
   : Lts.lts mm
   =
   (* graph lts *)
-  (* let* graph_lts = G.build_graph ~params tr_rlts tref bound in *)
   let* graph_lts = G.build_graph ~params tref grefs bound in
   Log.override ~params (Printf.sprintf "- - - - -");
   if G.S.cardinal graph_lts.states > bound
@@ -1218,10 +1184,6 @@ let build_fsm_from_bounded_lts
   =
   (* disable detailed printouts *)
   params.options.show_normal_output <- false;
-  (* list of raw coq lts *)
-  (* let* (tr_rlts, fn_rlts) : term_type_map * term_type_map = *)
-  (* let* (tr_rlts : term_type_map) = build_rlts_map ~params grefs in *)
-  (* print out the type of the term *)
   (* Log.override
     ~params
     (Printf.sprintf
@@ -1231,12 +1193,8 @@ let build_fsm_from_bounded_lts
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
   (* get pure lts *)
-  (* Utils.Logging.Log.override "D"; *)
   let* (the_lts : Lts.lts) =
-    (* build_bounded_lts ~params ~bound ~name tref grefs (module G) *)
-    (* build_bounded_lts ~params ~bound ~name tr_rlts tref (module G) *)
     build_bounded_lts ~params ~bound ~name tref grefs (module G)
-    (* build_bounded_lts ~params ~bound ~name tr_rlts fn_rlts tref (module G) *)
   in
   (* translate to fsm *)
   params.options.show_normal_output <- true;
@@ -1254,10 +1212,6 @@ module Vernac = struct
           (grefs : Names.GlobRef.t list)
       : Lts.lts mm
       =
-      (* list of raw coq lts *)
-      (* let* (tr_rlts, fn_rlts) : term_type_map * term_type_map = *)
-      (* let* (tr_rlts : term_type_map) = build_rlts_map ~params grefs in *)
-      (* print out the type of the term *)
       (* Log.override
         ~params
         (Printf.sprintf
@@ -1267,13 +1221,8 @@ module Vernac = struct
       let* graphM = make_graph_builder in
       let module G = (val graphM) in
       (* get pure lts *)
-      (* build_bounded_lts ~params ~bound ~name tr_rlts tref (module G) *)
       build_bounded_lts ~params ~bound ~name tref grefs (module G)
     ;;
-
-    (* build_bounded_lts ~params ~bound ~name tref grefs (module G) *)
-
-    (* build_bounded_lts ~params ~bound ~name tr_rlts fn_rlts tref (module G) *)
 
     let show
           ?(params : Params.log = default_params)
