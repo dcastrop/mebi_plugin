@@ -1,3 +1,11 @@
 profile = janestreet
 margin=80
-# parse-docstrings
+max-indent = 2
+break-cases = fit
+parse-docstrings = true
+wrap-comments = true
+# wrap-fun-args = false
+# break-fun-decl = fit-or-vertical
+# break-fun-sig = fit-or-vertical
+
+# the issue with over-indenting is here: https://github.com/ocaml-ppx/ocamlformat/issues/1116
