@@ -43,19 +43,32 @@ let product (x : 'a t) (y : 'b t) : ('a * 'b) t =
 [@@inline always]
 ;;
 
-(* let eq_constr st () = EConstr.eq_constr !st.coq_ctx *)
-
 let econstr_hash st () t =
   Constr.hash
     (EConstr.to_constr ?abort_on_undefined_evars:(Some false) !st.coq_ctx t)
 ;;
 
 let compare_constr st () t1 t2 =
-  (* if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1 *)
-  Int.compare (econstr_hash st () t1) (econstr_hash st () t2)
+  (* Int.compare (econstr_hash st () t1) (econstr_hash st () t2) *)
+  if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1
 ;;
 
-let eq_constr st () t1 t2 = Int.equal (compare_constr st () t1 t2) 0
+(* let compare_constr st () t1' t2' =
+   let t1 = Reductionops.nf_all !st.coq_env !st.coq_ctx t1' in
+   let t2 = Reductionops.nf_all !st.coq_env !st.coq_ctx t2' in
+   (* Int.compare (econstr_hash st () t1) (econstr_hash st () t2) *)
+   if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1
+   ;; *)
+
+let eq_constr st () = EConstr.eq_constr !st.coq_ctx
+
+(* let eq_constr st () t1' t2' =
+   let t1 = Reductionops.nf_all !st.coq_env !st.coq_ctx t1' in
+   let t2 = Reductionops.nf_all !st.coq_env !st.coq_ctx t2' in
+   EConstr.eq_constr !st.coq_ctx t1 t2
+   ;; *)
+
+(* let eq_constr st () t1 t2 = Int.equal (compare_constr st () t1 t2) 0 *)
 
 (** [make_constr_tbl st] is used to create Hashtbl that map from [EConstr.t] *)
 let make_constr_tbl st =
@@ -118,25 +131,6 @@ let make_constr_tree_set (st : coq_context ref)
   ; value = (module Constrset : Set.S with type elt = EConstr.t * Constr_tree.t)
   }
 ;;
-
-(** [make_constr_set st] is used to create Set of [EConstr.t] *)
-(* let make_econstr_queue (st : coq_context ref)
-   (* : (module Queue_intf.S with type t = EConstr.t) in_context  *)
-   =
-   let module EConstrQueue = Queue_intf.Make *)
-(* let make_econstr_queue (st : coq_context ref)
-  : (module Queue_intf.S with type t = EConstr.t) in_context
-  =
-  let cmp = compare_constr st in
-  let module EConstrQueue = Queue
-    (* Queue..Make (struct
-      type t = EConstr.t
-
-      let compare t1 t2 = cmp () t1 t2
-    end) *)
-  in
-  { state = st; value = (module EConstrQueue : Queue_intf.S ) }
-;; *)
 
 (** Monadic for loop *)
 let rec iterate

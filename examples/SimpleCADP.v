@@ -167,7 +167,7 @@ Example tm1 : tm :=
 
 Example e1 : tm * nat * nat := (tm1, 0, 0).
 (* MeBi Show LTS Bounded 150 Of e1 Using step. *)
-MeBi Dump "e1" LTS Bounded 150 Of e1 Using step.
+(* MeBi Dump "e1" LTS Bounded 150 Of e1 Using step. *)
 
 Inductive sys : Type :=
   | PRC : (tm * nat * nat) -> sys
