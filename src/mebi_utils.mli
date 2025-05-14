@@ -8,8 +8,10 @@ val econstr_to_string_mm : Evd.econstr -> string mm
 val econstr_to_string : Evd.econstr -> string
 val constr_to_string_mm : Constr.t -> string mm
 val constr_to_string : Constr.t -> string
-val type_of_tref : Constrexpr.constr_expr -> Evd.econstr mm
+val tref_to_econstr : Constrexpr.constr_expr -> Evd.econstr mm
+val normalize_econstr : Evd.econstr -> Evd.econstr mm
 val type_of_econstr : Evd.econstr -> Evd.econstr mm
+val type_of_tref : Constrexpr.constr_expr -> Evd.econstr mm
 
 type keys_kind = OfEConstr of Evd.econstr Seq.t
 

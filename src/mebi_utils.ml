@@ -1,18 +1,15 @@
-(** [split_at i l acc] is a tuple containing two lists [(l', acc)] split from list [l] at index [i]. *)
+(** [split_at i l acc] is a tuple containing two lists [(l', acc)] split from list [l] at index [i].
+*)
 let rec split_at i l acc =
   if i <= 0
   then l, acc
-  else (
-    match l with
-    | [] -> acc, []
-    | h :: t -> split_at (i - 1) t (h :: acc))
+  else (match l with [] -> acc, [] | h :: t -> split_at (i - 1) t (h :: acc))
 ;;
 
-(** [strip_snd l] is the list of rhs elements in a list of tuples [l] (typically a [constr]). *)
+(** [strip_snd l] is the list of rhs elements in a list of tuples [l] (typically a [constr]).
+*)
 let rec strip_snd (l : (EConstr.t * EConstr.t) list) : EConstr.t list =
-  match l with
-  | [] -> []
-  | h :: t -> snd h :: strip_snd t
+  match l with [] -> [] | h :: t -> snd h :: strip_snd t
 ;;
 
 (** used by [g_mebi.mlg]*)
@@ -24,7 +21,8 @@ let ref_list_to_glob_list (l : Libnames.qualid list) : Names.GlobRef.t list =
     l
 ;;
 
-(** ['a mm] is a function type mapping from [coq_context ref] to ['a in_context]. *)
+(** ['a mm] is a function type mapping from [coq_context ref] to ['a in_context].
+*)
 type 'a mm = 'a Mebi_monad.t
 
 (* TODO: should maybe be moved to [mebi_monad.ml]? *)
@@ -55,16 +53,26 @@ let constr_to_string (target : Constr.t) : string =
   run (constr_to_string_mm target)
 ;;
 
-(** *)
-let type_of_tref (tref : Constrexpr.constr_expr) : EConstr.t mm =
+let tref_to_econstr (tref : Constrexpr.constr_expr) : EConstr.t mm =
   let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
-  let$ u env sigma = Typing.type_of env sigma t in
-  return u
+  return t
 ;;
 
-let type_of_econstr (t : EConstr.t) : EConstr.t mm =
+let normalize_econstr (t' : EConstr.t) : EConstr.t mm =
+  let$+ t env sigma = Reductionops.nf_all env sigma t' in
+  return t
+;;
+
+let type_of_econstr (t' : EConstr.t) : EConstr.t mm =
+  let* t : EConstr.t = normalize_econstr t' in
   let$ ty env sigma = Typing.type_of env sigma t in
   return ty
+;;
+
+(** *)
+let type_of_tref (tref : Constrexpr.constr_expr) : EConstr.t mm =
+  let* t : EConstr.t = tref_to_econstr tref in
+  type_of_econstr t
 ;;
 
 type keys_kind = OfEConstr of EConstr.t Seq.t
