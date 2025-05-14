@@ -90,13 +90,14 @@ let make_constr_set (st : coq_context ref)
 ;;
 
 let compare_constr_tree
-  st
-  ()
-  (t1 : EConstr.t * Constr_tree.t)
-  (t2 : EConstr.t * Constr_tree.t)
+      st
+      ()
+      (t1 : EConstr.t * Constr_tree.t)
+      (t2 : EConstr.t * Constr_tree.t)
   =
-  if EConstr.eq_constr !st.coq_ctx (fst t1) (fst t2)
-     && Constr_tree.eq (snd t1) (snd t2)
+  if
+    EConstr.eq_constr !st.coq_ctx (fst t1) (fst t2)
+    && Constr_tree.eq (snd t1) (snd t2)
   then 0
   else 1
 ;;
@@ -139,10 +140,10 @@ let make_constr_tree_set (st : coq_context ref)
 
 (** Monadic for loop *)
 let rec iterate
-  (from_idx : int)
-  (to_idx : int)
-  (acc : 'a)
-  (f : int -> 'a -> 'a t)
+          (from_idx : int)
+          (to_idx : int)
+          (acc : 'a)
+          (f : int -> 'a -> 'a t)
   : 'a t
   =
   if from_idx > to_idx
@@ -159,8 +160,8 @@ let get_sigma (st : coq_context ref) : Evd.evar_map in_context =
 ;;
 
 let state
-  (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-  (st : coq_context ref)
+      (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+      (st : coq_context ref)
   : 'a in_context
   =
   let sigma, a = f !st.coq_env !st.coq_ctx in
@@ -192,19 +193,8 @@ let invalid_sort (x : Sorts.family) : 'a t = fun st -> raise (invalid_sort x)
 (** Error when input LTS reference is invalid (e.g. non existing) *)
 let invalid_ref (x : Names.GlobRef.t) : 'a t = fun st -> raise (invalid_ref x)
 
-(** Error when first term (tref) is of unknown type *)
-let unknown_tref_type
-  (trty : string option * EConstr.t * EConstr.t * EConstr.t list)
-  : 'a t
-  =
-  fun st -> raise (unknown_tref_type !st.coq_env !st.coq_ctx trty)
-;;
-
 (** Error when term is of unknown type *)
-let unknown_term_type
-  (tmty : string option * EConstr.t * EConstr.t * EConstr.t list)
-  : 'a t
-  =
+let unknown_term_type (tmty : EConstr.t * EConstr.t * EConstr.t list) : 'a t =
   fun st -> raise (unknown_term_type !st.coq_env !st.coq_ctx tmty)
 ;;
 

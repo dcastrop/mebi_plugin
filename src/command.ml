@@ -11,7 +11,8 @@ open Fsm
 
 let default_params : Params.log = Params.Default.log ~mode:(Coq ()) ()
 
-(** [default_bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
+(** [default_bound] is the total depth that will be explored of a given lts by [explore_lts].
+*)
 let default_bound : int = 10
 
 (** [arity_is_prop mip] raises an error if [mip.mind_arity] is not a [prop]. *)
@@ -28,7 +29,8 @@ let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
 (** [get_lts_labels_and_terms mib mip] is the mapping of terms (states) and labels (outgoing edges) from [mip].
 
     @raise invalid_arity
-      if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error. *)
+      if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error.
+*)
 let get_lts_labels_and_terms
       (mib : Declarations.mutual_inductive_body)
       (mip : Declarations.one_inductive_body)
@@ -55,7 +57,8 @@ let get_lts_labels_and_terms
     @param [coq_ctor_names]
       is the array of names for each constructor of the Coq term.
     @param [constructor_transitions]
-      is the array of constructors of the Coq term (i.e., the transitions or outgoing edges). *)
+      is the array of constructors of the Coq term (i.e., the transitions or outgoing edges).
+*)
 type raw_lts =
   { coq_lts : EConstr.t
   ; trm_type : EConstr.types
@@ -382,7 +385,8 @@ and check_valid_constructor
   : coq_ctor list mm
   =
   params.kind <- Debug ();
-  let$+ t env sigma = Reductionops.nf_all env sigma t' in
+  (* let$+ t env sigma = Reductionops.nf_all env sigma t' in *)
+  let* t : EConstr.t = normalize_econstr t' in
   let iter_body (i : int) (ctor_vals : coq_ctor list) =
     (* let* _ =
        if is_output_kind_enabled params
@@ -523,7 +527,8 @@ struct
   (* [Q] is the queue of [EConstr.t] *)
   (* module Q = O *)
 
-  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t]. *)
+  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t].
+  *)
   type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
 
   let num_transitions (ts : constr_transitions H.t) : int =
@@ -538,13 +543,38 @@ struct
       0
   ;;
 
-  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t]. *)
+  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t].
+  *)
   type lts_graph =
     { to_visit : EConstr.t Queue.t
     ; init : EConstr.t
     ; states : S.t
     ; transitions : constr_transitions H.t
     }
+
+  let build_rlts_map (grefs : Names.GlobRef.t list) : raw_lts H.t mm =
+    let num_grefs : int = List.length grefs in
+    let trmap : raw_lts H.t = H.create num_grefs in
+    let iter_body (i : int) (acc : raw_lts H.t) =
+      let gref : Names.GlobRef.t = List.nth grefs i in
+      let* (rlts : raw_lts) = check_ref_lts gref in
+      (* normalize term type before adding to map *)
+      let* ty : EConstr.t = normalize_econstr rlts.trm_type in
+      H.add acc ty rlts;
+      (* add name of inductive prop *)
+      H.add acc rlts.coq_lts rlts;
+      return acc
+    in
+    iterate 0 (num_grefs - 1) trmap iter_body
+  ;;
+
+  let get_rlts (t' : EConstr.t) (rlts_map : raw_lts H.t) : raw_lts mm =
+    let* t : EConstr.t = normalize_econstr t' in
+    let* ty : EConstr.t = type_of_econstr t in
+    match H.find_opt rlts_map ty with
+    | None -> unknown_term_type (t, ty, List.of_seq (H.to_seq_keys rlts_map))
+    | Some rlts -> return rlts
+  ;;
 
   (**********************************************************************)
   (******** below is a sanity check *************************************)
@@ -717,7 +747,8 @@ struct
   (******** above is a sanity check *************************************)
   (**********************************************************************)
 
-  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions]. *)
+  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions].
+  *)
   let insert_constr_transition
         (constrs : constr_transitions)
         (a : Mebi_action.action)
@@ -783,15 +814,27 @@ struct
   (** [get_new_constrs t tr_rlts fn_rlts] returns the list of constructors applicable to term [t], using those provided in [tr_rlts] (and [fn_rlts]).
       If no immediate constructor is found matching [t] in [tr_rlts] (likely due to unification problems), then each constructor in [tr_rlts] is tried sequentially, until one of them returns some valid constructors.
       @raise CannotFindTypeOfTermToVisit
-        if none of the constructors provided in [tr_rlts] yield constructors from [check_valid_constructors]. *)
+        if none of the constructors provided in [tr_rlts] yield constructors from [check_valid_constructors].
+  *)
   let get_new_constrs
         ?(params : Params.log = default_params)
         (t : EConstr.t)
         (tr_rlts : raw_lts H.t)
     : coq_ctor list mm
     =
-    (* let* ty = Mebi_utils.type_of_econstr t in *)
-    let$ ty env sigma = Typing.type_of env sigma t in
+    let* the_rlts : raw_lts = get_rlts t tr_rlts in
+    let temp_map = Hashtbl.of_seq (H.to_seq tr_rlts) in
+    check_valid_constructor
+      ~params
+      the_rlts.constructor_transitions
+      (* tr_rlts *)
+      temp_map
+      t
+      None
+  ;;
+
+  (* let* ty = Mebi_utils.type_of_econstr t' in *)
+  (* let* ty : EConstr.t = type_of_econstr t in
     match H.find_opt tr_rlts ty with
     | None ->
       unknown_term_type
@@ -804,8 +847,7 @@ struct
         (* tr_rlts *)
         temp_map
         t
-        None
-  ;;
+        None *)
 
   (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
       @param fn_rlts maps coq-term names to [raw_lts].
@@ -833,37 +875,6 @@ struct
       build_lts_graph ~params tr_rlts (* fn_rlts *) g bound)
   ;;
 
-  let build_rlts_map
-        ?(params : Params.log = default_params)
-        (grefs : Names.GlobRef.t list)
-    : raw_lts H.t mm
-    =
-    let num_grefs : int = List.length grefs in
-    let trmap : raw_lts H.t = H.create num_grefs in
-    let iter_body (i : int) (acc : raw_lts H.t) =
-      let gref : Names.GlobRef.t = List.nth grefs i in
-      (* let rlts : raw_lts = run (check_ref_lts gref) in *)
-      let* (rlts : raw_lts) = check_ref_lts gref in
-      (* sanity check *)
-      if H.mem acc rlts.trm_type
-      then
-        Log.warning
-          (Printf.sprintf
-             "build_rlts_map, trm_type already accounted for?\ntrm_type: %s"
-             (econstr_to_string rlts.trm_type));
-      H.add acc rlts.trm_type rlts;
-      if H.mem acc rlts.coq_lts
-      then
-        Log.warning
-          (Printf.sprintf
-             "build_rlts_map, coq_lts already accounted for?\ncoq_lts: %s"
-             (econstr_to_string rlts.coq_lts));
-      H.add acc rlts.coq_lts rlts;
-      return acc
-    in
-    iterate 0 (num_grefs - 1) trmap iter_body
-  ;;
-
   (** [build_graph tr_rlts fn_rlts tref bound] is the entry point for [build_lts_graph].
       @param tr_rlts maps coq-term types to [raw_lts].
       @param fn_rlts
@@ -872,41 +883,42 @@ struct
       @param bound is the number of states to explore until. *)
   let build_graph
         ?(params : Params.log = default_params)
-        (* (tr_rlts : term_type_map) *)
-          (tref : Constrexpr.constr_expr)
+        (tref : Constrexpr.constr_expr)
         (grefs : Names.GlobRef.t list)
         (bound : int)
     : lts_graph mm
     =
     (* make map of term types *)
-    let* (tr_rlts : raw_lts H.t) = build_rlts_map ~params grefs in
-    let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
+    let* (tr_rlts : raw_lts H.t) = build_rlts_map grefs in
     (* should be able to get the type now -- fail otherwise *)
-    let* ty = Mebi_utils.type_of_econstr t in
-    match H.find_opt tr_rlts ty with
-    | None ->
-      unknown_tref_type
-        (Some "build_graph", t, ty, List.of_seq (H.to_seq_keys tr_rlts))
-    | Some rlts ->
-      (* update environment by typechecking *)
-      let$* u env sigma = Typing.check env sigma t rlts.trm_type in
-      let$ init env sigma = sigma, Reductionops.nf_all env sigma t in
-      let q = Queue.create () in
-      let* _ = return (Queue.push init q) in
-      let* g =
-        build_lts_graph
-          ~params
-          tr_rlts
-          (* fn_rlts *)
-          { to_visit = q; states = S.empty; init; transitions = H.create bound }
-          bound
-      in
-      _check_for_duplicate_transitions
-        ~prefix:"build_graph, "
-        ~none:"No duplicates found"
-        g;
-      _check_states ~prefix:"build_graph, " g;
-      return g
+    let* t : EConstr.t = tref_to_econstr tref in
+    let* the_lts : raw_lts = get_rlts t tr_rlts in
+    (* let* ty : EConstr.t = type_of_econstr t in
+       (* let* ty = Mebi_utils.type_of_tref tref in *)
+       match H.find_opt tr_rlts ty with
+       | None ->
+       unknown_tref_type
+       (Some "build_graph", t, ty, List.of_seq (H.to_seq_keys tr_rlts))
+       | Some rlts -> *)
+    (* update environment by typechecking *)
+    let$* u env sigma = Typing.check env sigma t the_lts.trm_type in
+    let$ init env sigma = sigma, Reductionops.nf_all env sigma t in
+    let q = Queue.create () in
+    let* _ = return (Queue.push init q) in
+    let* g =
+      build_lts_graph
+        ~params
+        tr_rlts
+        (* fn_rlts *)
+        { to_visit = q; states = S.empty; init; transitions = H.create bound }
+        bound
+    in
+    _check_for_duplicate_transitions
+      ~prefix:"build_graph, "
+      ~none:"No duplicates found"
+      g;
+    _check_states ~prefix:"build_graph, " g;
+    return g
   ;;
 
   module DeCoq = struct
@@ -1210,11 +1222,11 @@ let build_fsm_from_bounded_lts
   (* let* (tr_rlts, fn_rlts) : term_type_map * term_type_map = *)
   (* let* (tr_rlts : term_type_map) = build_rlts_map ~params grefs in *)
   (* print out the type of the term *)
-  Log.override
+  (* Log.override
     ~params
     (Printf.sprintf
        "(A) type of tref: %s"
-       (econstr_to_string (run (Mebi_utils.type_of_tref tref))));
+       (econstr_to_string (run (Mebi_utils.type_of_tref tref)))); *)
   (* graph module *)
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
@@ -1246,11 +1258,11 @@ module Vernac = struct
       (* let* (tr_rlts, fn_rlts) : term_type_map * term_type_map = *)
       (* let* (tr_rlts : term_type_map) = build_rlts_map ~params grefs in *)
       (* print out the type of the term *)
-      Log.override
+      (* Log.override
         ~params
         (Printf.sprintf
            "(B) type of tref: %s"
-           (econstr_to_string (run (Mebi_utils.type_of_tref tref))));
+           (econstr_to_string (run (Mebi_utils.type_of_tref tref)))); *)
       (* graph module *)
       let* graphM = make_graph_builder in
       let module G = (val graphM) in
@@ -1290,9 +1302,7 @@ module Vernac = struct
       params.options.output_enabled <- false;
       let* (the_lts : Lts.lts) = build ~params ~bound ~name tref grefs in
       let make_dump : bool =
-        match the_lts.info with
-        | None -> true
-        | Some i -> i.is_complete
+        match the_lts.info with None -> true | Some i -> i.is_complete
       in
       if make_dump
       then (
@@ -1654,4 +1664,5 @@ end
     Notes:
     - Constructors of [P] are the transitions
     - States are the sets of possible transitions
-    - A term [t] is represented by the state of the transitions that can be taken *)
+    - A term [t] is represented by the state of the transitions that can be taken
+*)
