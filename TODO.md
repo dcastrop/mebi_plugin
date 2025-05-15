@@ -4,9 +4,20 @@
 
 - [x] Issue of retriving correct `raw_lts` from hashtbl using term.
 
-      Fixed this issue by normalizing the term before adding it to the hashtbl, 
+      Fixed this issue by normalizing the term before adding it to the hashtbl,
       rather than trying to normalise either the term before obtaining the type,
-      or the type when fetching from the hastabl.
+      or the type when fetching from the hashtbl.
+
+- [ ] Issue where terms are not found in the hashtbl when they should be.
+
+      This issue appeared to be (at least partially) resolved when using the
+      `hash` of the terms to compare equality -- however, upon closer inspection
+      I do believe I observed some collisions (false positive matches), even
+      though this did also successfully match terms.
+
+      Need to investigate the behaviour of `EConstr.eq_constr` to see why this
+      does not appear to work in certain cases. (Specifically, it does not match
+      some terms that do match when turned into strings.)
 
 ### archive
 

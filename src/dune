@@ -20,12 +20,12 @@
   coq-core.plugins.ltac ; Needed for tactic extend.
   )
  (modules
+  utils
   mebi_errors
   mebi_action
   constr_tree
   mebi_utils
   mebi_monad
-  utils
   lts
   fsm
   translate

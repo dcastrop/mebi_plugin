@@ -11,8 +11,7 @@ open Fsm
 
 let default_params : Params.log = Params.Default.log ~mode:(Coq ()) ()
 
-(** [default_bound] is the total depth that will be explored of a given lts by [explore_lts].
-*)
+(** [default_bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
 let default_bound : int = 10
 
 (** [arity_is_prop mip] raises an error if [mip.mind_arity] is not a [prop]. *)
@@ -29,11 +28,10 @@ let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
 (** [get_lts_labels_and_terms mib mip] is the mapping of terms (states) and labels (outgoing edges) from [mip].
 
     @raise invalid_arity
-      if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error.
-*)
+      if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error. *)
 let get_lts_labels_and_terms
-      (mib : Declarations.mutual_inductive_body)
-      (mip : Declarations.one_inductive_body)
+  (mib : Declarations.mutual_inductive_body)
+  (mip : Declarations.one_inductive_body)
   : (Constr.rel_declaration * Constr.rel_declaration) mm
   =
   let open Declarations in
@@ -57,8 +55,7 @@ let get_lts_labels_and_terms
     @param [coq_ctor_names]
       is the array of names for each constructor of the Coq term.
     @param [constructor_transitions]
-      is the array of constructors of the Coq term (i.e., the transitions or outgoing edges).
-*)
+      is the array of constructors of the Coq term (i.e., the transitions or outgoing edges). *)
 type raw_lts =
   { coq_lts : EConstr.t
   ; trm_type : EConstr.types
@@ -99,20 +96,11 @@ let _log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
     (Printf.sprintf
        "(d) Types of coq_lts: %s.\n"
        (econstr_to_string rlts.coq_lts));
-  (* log
-     ~params
-     (Printf.sprintf
-     "(f) Transitions (do not be alarmed by any _UNBOUND_ below): %s.\n"
-     (if Array.length rlts.constructor_transitions < 1
-     then "[] (empty)"
-     else
-     Printf.sprintf
-     "[%s]"
-     (Array.fold_left
-     (fun (acc : string) (tr : Constr.rel_context * Constr.t) ->
-     Printf.sprintf "%s   %s\n" acc (constr_to_string (snd tr)))
-     "\n"
-     rlts.constructor_transitions))); *)
+  (* log ~params (Printf.sprintf "(f) Transitions (do not be alarmed by any
+     _UNBOUND_ below): %s.\n" (if Array.length rlts.constructor_transitions < 1
+     then "[] (empty)" else Printf.sprintf "[%s]" (Array.fold_left (fun (acc :
+     string) (tr : Constr.rel_context * Constr.t) -> Printf.sprintf "%s %s\n"
+     acc (constr_to_string (snd tr))) "\n" rlts.constructor_transitions))); *)
   return ()
 ;;
 
@@ -152,22 +140,16 @@ let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
     - Is [w_unify] the best way?
     - ... *)
 let m_unify
-      ?(params : Params.log = default_params)
-      (t0 : EConstr.t)
-      (t1 : EConstr.t)
+  ?(params : Params.log = default_params)
+  (t0 : EConstr.t)
+  (t1 : EConstr.t)
   : bool mm
   =
   params.kind <- Debug ();
-  (* let* _ =
-     if is_output_kind_enabled params
-     then
-     debug (fun (env : Environ.env) (sigma : Evd.evar_map) ->
-     str "Unifying (t0) :: "
-     ++ Printer.pr_econstr_env env sigma t0
-     ++ strbrk "\nUnifying (t1) :: "
-     ++ Printer.pr_econstr_env env sigma t1)
-     else return ()
-     in *)
+  (* let* _ = if is_output_kind_enabled params then debug (fun (env :
+     Environ.env) (sigma : Evd.evar_map) -> str "Unifying (t0) :: " ++
+     Printer.pr_econstr_env env sigma t0 ++ strbrk "\nUnifying (t1) :: " ++
+     Printer.pr_econstr_env env sigma t1) else return () in *)
   state (fun (env : Environ.env) (sigma : Evd.evar_map) ->
     try
       let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
@@ -220,24 +202,18 @@ let _pstr_unif_problem (t : unif_problem) : string =
 ;;
 
 let rec unify_all
-          ?(params : Params.log = default_params)
-          (i : (Constr_tree.t * unif_problem) list)
+  ?(params : Params.log = default_params)
+  (i : (Constr_tree.t * unif_problem) list)
   : Constr_tree.t list option t
   =
   params.kind <- Debug ();
   match i with
   | [] -> return (Some [])
   | (ctor_tree, u) :: t ->
-    (* let* _ =
-       if is_output_kind_enabled params
-       then
-       debug (fun env sigma ->
-       str "UNIFYALL (termL) :::::::::: "
-       ++ Printer.pr_econstr_env env sigma u.termL
-       ++ strbrk "\nUNIFYALL (termR) :::::::::: "
-       ++ Printer.pr_econstr_env env sigma u.termR)
-       else return ()
-       in *)
+    (* let* _ = if is_output_kind_enabled params then debug (fun env sigma ->
+       str "UNIFYALL (termL) :::::::::: " ++ Printer.pr_econstr_env env sigma
+       u.termL ++ strbrk "\nUNIFYALL (termR) :::::::::: " ++
+       Printer.pr_econstr_env env sigma u.termR) else return () in *)
     let* success = m_unify ~params u.termL u.termR in
     if success
     then
@@ -249,17 +225,13 @@ let rec unify_all
 ;;
 
 let sandboxed_unify
-      ?(params : Params.log = default_params)
-      (tgt_term : EConstr.t)
-      (u : (Constr_tree.t * unif_problem) list)
+  ?(params : Params.log = default_params)
+  (tgt_term : EConstr.t)
+  (u : (Constr_tree.t * unif_problem) list)
   : (EConstr.t * Constr_tree.t list) option mm
   =
-  (* let* _ =
-     if is_output_kind_enabled params
-     then
-     debug (fun env sigma ->
-     str "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term)
-     else return ()
+  (* let* _ = if is_output_kind_enabled params then debug (fun env sigma -> str
+     "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term) else return ()
      in *)
   sandbox
     (let* success = unify_all ~params u in
@@ -279,11 +251,11 @@ type coq_ctor = EConstr.t * EConstr.t * Constr_tree.t
 
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
-          ?(params : Params.log = default_params)
-          (acc : coq_ctor list)
-          (i : int)
-          (act : EConstr.t)
-          (tgt_term : EConstr.t)
+  ?(params : Params.log = default_params)
+  (acc : coq_ctor list)
+  (i : int)
+  (act : EConstr.t)
+  (tgt_term : EConstr.t)
   : (Constr_tree.t * unif_problem) list list -> coq_ctor list mm
   = function
   | [] -> return acc
@@ -304,9 +276,9 @@ let rec retrieve_tgt_nodes
 
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
-          ?(params : Params.log = default_params)
-          (acc : (Constr_tree.t * unif_problem) list list)
-          (fn_rlts : term_type_map)
+  ?(params : Params.log = default_params)
+  (acc : (Constr_tree.t * unif_problem) list list)
+  (fn_rlts : term_type_map)
   :  EConstr.t list * EConstr.rel_declaration list
   -> (Constr_tree.t * unif_problem) list list option mm
   = function
@@ -345,16 +317,14 @@ let rec check_updated_ctx
                   i, { termL = tL; termR = args.(2) })
                 ctors
             in
-            (* We need to cross-product all possible unifications. This is in case
-               we have a constructor of the form LTS t11 a1 t12 -> LTS t21 a2
-               t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
+            (* We need to cross-product all possible unifications. This is in
+               case we have a constructor of the form LTS t11 a1 t12 -> LTS t21
+               a2 t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
                unavoidable, but we should make sure we understand well the
                problem before removing the source of repetition. *)
             (* FIXME: Test this *)
             (* replace [rtls] in [rtls_ctx] *)
-            (* let rtls_ctx':rlts_list =
-               List.append [  ]
-               in *)
+            (* let rtls_ctx':rlts_list = List.append [ ] in *)
             check_updated_ctx
               (List.concat_map (fun x -> List.map (fun y -> y :: x) ctors) acc)
               fn_rlts
@@ -366,27 +336,20 @@ let rec check_updated_ctx
 
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
-      ?(params : Params.log = default_params)
-      (ctor_transitions : (Constr.rel_context * Constr.types) array)
-      (fn_rlts : term_type_map)
-      (t' : EConstr.t)
-      (ma : EConstr.t option)
+  ?(params : Params.log = default_params)
+  (ctor_transitions : (Constr.rel_context * Constr.types) array)
+  (fn_rlts : term_type_map)
+  (t' : EConstr.t)
+  (ma : EConstr.t option)
   : coq_ctor list mm
   =
   params.kind <- Debug ();
   (* let$+ t env sigma = Reductionops.nf_all env sigma t' in *)
-  let* t : EConstr.t = normalize_econstr t' in
+  let* (t : EConstr.t) = normalize_econstr t' in
   let iter_body (i : int) (ctor_vals : coq_ctor list) =
-    (* let* _ =
-       if is_output_kind_enabled params
-       then
-       debug (fun env sigma ->
-       str "CHECKING CONSTRUCTOR "
-       ++ int i
-       ++ str ". Term: "
-       ++ Printer.pr_econstr_env env sigma t)
-       else return ()
-       in *)
+    (* let* _ = if is_output_kind_enabled params then debug (fun env sigma ->
+       str "CHECKING CONSTRUCTOR " ++ int i ++ str ". Term: " ++
+       Printer.pr_econstr_env env sigma t) else return () in *)
     let (ctx, tm) : Constr.rel_context * Constr.t = ctor_transitions.(i) in
     let ctx_tys : EConstr.rel_declaration list =
       List.map EConstr.of_rel_decl ctx
@@ -481,11 +444,8 @@ module type GraphB = sig
 
     (* val translate_coq_terms : ?params:Params.log -> S.t -> coq_translation mm
 
-       val translate_coq_lts
-       :  ?params:Params.log
-       -> constr_transitions H.t
-       -> coq_translation (* -> string list *)
-       -> Lts.raw_flat_lts mm *)
+       val translate_coq_lts : ?params:Params.log -> constr_transitions H.t ->
+       coq_translation (* -> string list *) -> Lts.raw_flat_lts mm *)
 
     val lts_graph_to_lts
       :  ?params:Params.log
@@ -504,20 +464,21 @@ module MkGraph
     (P : Set.S with type elt = EConstr.t * Constr_tree.t) : GraphB =
 (* (O : Queue_intf.S with type t = EConstr.t) *)
 struct
-  (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t] and also is used for mapping term types to [raw_lts]. *)
+  (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t] and also
+     is used for mapping term types to [raw_lts]. *)
   module H = M
 
   (* [S] is the set of states, of [EConstr.t]. *)
   module S = N
 
-  (* [D] is the set of destination tuples, each comprised of a term [EConstr.t] and the corresponding [Constr_tree.t]. *)
+  (* [D] is the set of destination tuples, each comprised of a term [EConstr.t]
+     and the corresponding [Constr_tree.t]. *)
   module D = P
 
   (* [Q] is the queue of [EConstr.t] *)
   (* module Q = O *)
 
-  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t].
-  *)
+  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t]. *)
   type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
 
   let num_transitions (ts : constr_transitions H.t) : int =
@@ -532,8 +493,7 @@ struct
       0
   ;;
 
-  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t].
-  *)
+  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t]. *)
   type lts_graph =
     { to_visit : EConstr.t Queue.t
     ; init : EConstr.t
@@ -548,7 +508,7 @@ struct
       let gref : Names.GlobRef.t = List.nth grefs i in
       let* (rlts : raw_lts) = check_ref_lts gref in
       (* normalize term type before adding to map *)
-      let* ty : EConstr.t = normalize_econstr rlts.trm_type in
+      let* (ty : EConstr.t) = normalize_econstr rlts.trm_type in
       H.add acc ty rlts;
       (* add name of inductive prop *)
       H.add acc rlts.coq_lts rlts;
@@ -558,8 +518,8 @@ struct
   ;;
 
   let get_rlts (t' : EConstr.t) (rlts_map : raw_lts H.t) : raw_lts mm =
-    let* t : EConstr.t = normalize_econstr t' in
-    let* ty : EConstr.t = type_of_econstr t in
+    let* (t : EConstr.t) = normalize_econstr t' in
+    let* (ty : EConstr.t) = type_of_econstr t in
     match H.find_opt rlts_map ty with
     | None -> unknown_term_type (t, ty, List.of_seq (H.to_seq_keys rlts_map))
     | Some rlts -> return rlts
@@ -571,7 +531,7 @@ struct
   (******** (i.e., H, D, S )*********************************************)
   (**********************************************************************)
 
-  let _pstr_econstr_states (states : S.t) : string =
+  let pstr_econstr_set (states : S.t) : string =
     if S.is_empty states
     then "[ ] (empty)"
     else
@@ -579,15 +539,15 @@ struct
         "[%s\n]"
         (S.fold
            (fun (s : S.elt) (acc : string) ->
-             Printf.sprintf "%s\n\t%s" acc (econstr_to_string s))
+             Printf.sprintf "%s\n  %s\n" acc (econstr_to_string s))
            states
            "")
   ;;
 
   let _pstr_constr_transition
-        (f : EConstr.t)
-        (a : Mebi_action.action)
-        ((d, c) : EConstr.t * Constr_tree.t)
+    (f : EConstr.t)
+    (a : Mebi_action.action)
+    ((d, c) : EConstr.t * Constr_tree.t)
     : string
     =
     Printf.sprintf
@@ -598,113 +558,172 @@ struct
       (Constr_tree.pstr c)
   ;;
 
-  let _pstr_list_constr_transitions
-        (f : EConstr.t)
-        (a : Mebi_action.action)
-        (ds : D.t)
-    : string list
-    =
-    let l = D.to_list ds in
-    let hd = List.hd l
-    and tl = List.tl l in
-    List.fold_left
-      (fun (acc : string list) d -> _pstr_constr_transition f a d :: acc)
-      [ _pstr_constr_transition f a hd ]
-      tl
-  ;;
+  (* let _pstr_list_constr_transitions (f : EConstr.t) (a : Mebi_action.action)
+     (ds : D.t) : string list = let l = D.to_list ds in let hd = List.hd l and
+     tl = List.tl l in List.fold_left (fun (acc : string list) d ->
+     _pstr_constr_transition f a d :: acc) [ _pstr_constr_transition f a hd ] tl
+     ;;
 
-  let _pstr_list_term_transitions (f : EConstr.t) (cs : constr_transitions)
-    : string list
-    =
-    let keys = List.of_seq (Hashtbl.to_seq_keys cs) in
-    let hd = List.hd keys
-    and tl = List.tl keys in
-    let hd_ds = Hashtbl.find cs hd in
-    List.fold_left
-      (fun (acc : string list) (a : Mebi_action.action) ->
-        List.append (_pstr_list_constr_transitions f a (Hashtbl.find cs a)) acc)
-      (_pstr_list_constr_transitions f hd hd_ds)
-      tl
-  ;;
+     let _pstr_list_term_transitions (f : EConstr.t) (cs : constr_transitions) :
+     string list = let keys = List.of_seq (Hashtbl.to_seq_keys cs) in let hd =
+     List.hd keys and tl = List.tl keys in let hd_ds = Hashtbl.find cs hd in
+     List.fold_left (fun (acc : string list) (a : Mebi_action.action) ->
+     List.append (_pstr_list_constr_transitions f a (Hashtbl.find cs a)) acc)
+     (_pstr_list_constr_transitions f hd hd_ds) tl ;;
 
-  let _pstr_list_transitions (ts : constr_transitions H.t) : string list list =
-    let keys = List.of_seq (H.to_seq_keys ts) in
-    let hd = List.hd keys
-    and tl = List.tl keys in
-    let hd_ts = H.find ts hd in
-    List.fold_left
-      (fun (acc : string list list) (f : EConstr.t) ->
-        _pstr_list_term_transitions f (H.find ts f) :: acc)
-      [ _pstr_list_term_transitions hd hd_ts ]
-      tl
-  ;;
+     let _pstr_list_transitions (ts : constr_transitions H.t) : string list list
+     mm = let keys = List.of_seq (H.to_seq_keys ts) in let hd = List.hd keys and
+     tl = List.tl keys in let hd_ts = H.find ts hd in return (List.fold_left
+     (fun (acc : string list list) (f : EConstr.t) ->
+     _pstr_list_term_transitions f (H.find ts f) :: acc) [
+     _pstr_list_term_transitions hd hd_ts ] tl) ;; *)
 
   let _check_for_duplicate_transitions
-        ?(prefix : string = "")
-        ?(none : string option)
-        (g : lts_graph)
-    : unit
+    ?(prefix : string = "")
+    ?(none : string option)
+    (g : lts_graph)
+    : unit mm
     =
     (* Log.override "_check_for_duplicate_transitions, begin."; *)
-    if H.length g.transitions > 1
-    then (
-      let pstr_list_list : string list list =
-        _pstr_list_transitions g.transitions
+    if Bool.not (H.length g.transitions > 1)
+    then return ()
+    else (
+      let raw_list : (EConstr.t * constr_transitions) list =
+        List.of_seq (H.to_seq g.transitions)
       in
-      let dupes : (string, int) Hashtbl.t = Hashtbl.create 0 in
-      let without_dupes : string list =
-        List.fold_left
-          (fun (acc : string list) (ts : string list) ->
-            List.fold_left
-              (fun (acc' : string list) (t : string) ->
-                if List.mem t acc'
-                then (
-                  (match Hashtbl.find_opt dupes t with
-                   | None -> Hashtbl.add dupes t 1
-                   | Some i -> Hashtbl.replace dupes t (i + 1));
-                  acc')
-                else t :: acc')
-              acc
-              ts)
-          []
-          pstr_list_list
+      let from_body
+        (i : int)
+        (new_transitions :
+          (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+        =
+        let (from, actions) : EConstr.t * constr_transitions =
+          List.nth raw_list i
+        in
+        let raw_actions : (Mebi_action.action * D.t) list =
+          List.of_seq (Hashtbl.to_seq actions)
+        in
+        let action_body
+          (j : int)
+          (new_transitions :
+            (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+          =
+          let (a, destinations) : Mebi_action.action * D.t =
+            List.nth raw_actions j
+          in
+          let raw_destinations : (EConstr.t * Constr_tree.t) list =
+            D.elements destinations
+          in
+          let destination_body
+            (k : int)
+            (new_transitions :
+              (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+            =
+            let (destination, constr_tree) : EConstr.t * Constr_tree.t =
+              List.nth raw_destinations k
+            in
+            return ((from, a, destination, constr_tree) :: new_transitions)
+          in
+          let* new_transitions' =
+            iterate 0 (List.length raw_destinations - 1) [] destination_body
+          in
+          return (List.append new_transitions' new_transitions)
+        in
+        let* new_transitions' =
+          iterate 0 (List.length raw_actions - 1) [] action_body
+        in
+        return (List.append new_transitions' new_transitions)
       in
-      let num_dupes = Hashtbl.length dupes in
-      let num_nondupes = List.length without_dupes in
-      let dupe_id = new_int_counter () in
-      if num_dupes > 0
-      then
-        Log.warning
-          ~params:default_params
-          (Printf.sprintf
-             "%s (%d/%d) duplicate transitions found: [%s\n]"
-             prefix
-             num_dupes
-             num_nondupes
-             (Hashtbl.fold
-                (fun (s : string) (i : int) (acc : string) ->
-                  Printf.sprintf
-                    "%s\n- #%d, had %d dupes:\n  %s\n"
-                    acc
-                    (dupe_id ())
-                    i
-                    s)
-                dupes
-                ""))
-      else (
+      let* flattened_transitions =
+        iterate 0 (List.length raw_list - 1) [] from_body
+      in
+      let iter_dupe
+        (i : int)
+        ((acc, cache) :
+          string list
+          * (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+        =
+        let t1 = List.nth flattened_transitions i in
+        let from1, a1, dest1, tree1 = t1 in
+        let pstr_from1 = econstr_to_string from1 in
+        let pstr_dest1 = econstr_to_string dest1 in
+        let iter_dupe2 (j : int) dupe_list =
+          if Int.equal i j
+          then return dupe_list
+          else (
+            let t2 = List.nth flattened_transitions j in
+            let from2, a2, dest2, tree2 = t2 in
+            let pstr_from2 = econstr_to_string from2 in
+            let pstr_dest2 = econstr_to_string dest2 in
+            let from_eq = String.equal pstr_from1 pstr_from2 in
+            let dest_eq = String.equal pstr_dest1 pstr_dest2 in
+            let a_eq = String.equal a1.label a2.label in
+            let tree_eq = Constr_tree.eq tree1 tree2 in
+            if from_eq && dest_eq && a_eq && tree_eq
+            then
+              return
+                (Printf.sprintf
+                   "from: %s\nact:  %s\ndest: %s\ntree: %s"
+                   pstr_from2
+                   a2.label
+                   pstr_dest2
+                   (Constr_tree.pstr tree2)
+                 :: dupe_list)
+            else return dupe_list)
+        in
+        let* dupe_list =
+          iterate 0 (List.length flattened_transitions - 1) [] iter_dupe2
+        in
+        if List.is_empty dupe_list
+        then return (acc, t1 :: cache)
+        else (
+          let dupe_str =
+            Printf.sprintf
+              "for transition:\n\
+               from: %s\n\
+               act:  %s\n\
+               dest: %s\n\
+               tree: %s\n\n\
+               found duplicates: [%s]"
+              pstr_from1
+              a1.label
+              pstr_dest1
+              (Constr_tree.pstr tree1)
+              (List.fold_left
+                 (fun (acc : string) (d : string) ->
+                   Printf.sprintf "%s\n%s\n" acc d)
+                 ""
+                 dupe_list)
+          in
+          return (dupe_str :: acc, cache))
+      in
+      let* pstr_dupes, _ =
+        iterate 0 (List.length flattened_transitions - 1) ([], []) iter_dupe
+      in
+      if List.is_empty pstr_dupes
+      then (
         match none with
         | None -> ()
         | Some s ->
-          Log.override ~params:default_params (Printf.sprintf "%s%s" prefix s));
-      ())
+          Log.override ~params:default_params (Printf.sprintf "%s%s" prefix s))
+      else
+        Log.warning
+          ~params:default_params
+          (Printf.sprintf
+             "%sduplicates found: [%s]"
+             prefix
+             (List.fold_left
+                (fun (acc : string) (d : string) ->
+                  Printf.sprintf "%s\n  %s\n" acc d)
+                ""
+                pstr_dupes));
+      return ())
   ;;
 
-  (* Log.override "_check_for_duplicate_transitions, begin." *)
-
-  let _check_states ?(prefix : string = "") (g : lts_graph) : unit =
+  let _check_transition_states ?(prefix : string = "") (g : lts_graph) : unit mm
+    =
     Log.override
       ~params:default_params
-      (Printf.sprintf "%s_check_states, begin." prefix);
+      (Printf.sprintf "%s_check_transition_states, begin." prefix);
     H.iter
       (fun (from : EConstr.t) (actions : constr_transitions) ->
         (* check [from] is in [g.states] *)
@@ -712,18 +731,20 @@ struct
           (fun (a : Mebi_action.action) (destinations : D.t) ->
             D.iter
               (fun ((destination, _constr_tree) : D.elt) ->
-                if
-                  Bool.( || )
-                    (Bool.not (S.mem from g.states))
-                    (Bool.not (S.mem destination g.states))
+                let is_from_missing : bool = Bool.not (S.mem from g.states) in
+                let is_dest_missing : bool =
+                  Bool.not (S.mem destination g.states)
+                in
+                if Bool.( || ) is_from_missing is_dest_missing
                 then
                   Log.warning
                     ~params:default_params
                     (Printf.sprintf
-                       "%s_check_states, in transition:\n\
+                       "%s_check_transition_states, in transition:\n\
                         %s\n\n\
                         did not find states: %s%s\n\
-                        in states: %s"
+                        in states: %s\n\n\
+                        %s"
                        prefix
                        (Printf.sprintf
                           "from: %s\nlabel: %s\ndest: %s\nctor_tree: %s"
@@ -731,42 +752,39 @@ struct
                           a.label
                           (econstr_to_string destination)
                           (Constr_tree.pstr _constr_tree))
-                       (if Bool.not (S.mem from g.states)
-                        then Printf.sprintf "'from'"
-                        else "")
-                       (if Bool.not (S.mem destination g.states)
-                        then Printf.sprintf "'dest'"
-                        else "")
-                       (if S.is_empty g.states
-                        then "[ ] (empty)"
-                        else
-                          Printf.sprintf
-                            "[%s]"
-                            (S.fold
-                               (fun (s : S.elt) (acc : string) ->
-                                 Printf.sprintf
-                                   "%s\n  %s\n"
-                                   acc
-                                   (econstr_to_string s))
-                               g.states
-                               ""))))
+                       (if is_from_missing then Printf.sprintf "'from'" else "")
+                       (if is_dest_missing then Printf.sprintf "'dest'" else "")
+                       (pstr_econstr_set g.states)
+                       (let singleton_matches : S.t =
+                          S.filter
+                            (fun (s : S.elt) ->
+                              Bool.( || )
+                                (is_from_missing && S.mem from (S.singleton s))
+                                (is_dest_missing
+                                 && S.mem destination (S.singleton s)))
+                            g.states
+                        in
+                        Printf.sprintf
+                          "found matches (%i) : %s\n"
+                          (S.cardinal singleton_matches)
+                          (pstr_econstr_set singleton_matches))))
               destinations)
           actions)
       g.transitions;
-    Log.override ~params:default_params "_check_states, end."
+    Log.override ~params:default_params "_check_transition_states, end.";
+    return ()
   ;;
 
   (**********************************************************************)
   (******** above is a sanity check *************************************)
   (**********************************************************************)
 
-  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions].
-  *)
+  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions]. *)
   let insert_constr_transition
-        (constrs : constr_transitions)
-        (a : Mebi_action.action)
-        (d : EConstr.t)
-        (c : Constr_tree.t)
+    (constrs : constr_transitions)
+    (a : Mebi_action.action)
+    (d : EConstr.t)
+    (c : Constr_tree.t)
     : unit mm
     =
     (match Hashtbl.find_opt constrs a with
@@ -776,11 +794,11 @@ struct
   ;;
 
   let add_new_term_constr_transition
-        (g : lts_graph)
-        (t : EConstr.t)
-        (a : Mebi_action.action)
-        (d : EConstr.t)
-        (c : Constr_tree.t)
+    (g : lts_graph)
+    (t : EConstr.t)
+    (a : Mebi_action.action)
+    (d : EConstr.t)
+    (c : Constr_tree.t)
     : unit mm
     =
     H.add
@@ -791,10 +809,10 @@ struct
   ;;
 
   let get_new_states
-        ?(params : Params.log = default_params)
-        (t : EConstr.t)
-        (g : lts_graph)
-        (ctors : coq_ctor list)
+    ?(params : Params.log = default_params)
+    (t : EConstr.t)
+    (g : lts_graph)
+    (ctors : coq_ctor list)
     : S.t mm
     =
     let iter_body (i : int) (new_states : S.t) =
@@ -812,14 +830,15 @@ struct
          let _ = insert_constr_transition actions to_add tgt int_tree in
          ());
       (* if [tgt] has not been explored then add [to_visit] *)
-      if
-        H.mem g.transitions tgt
-        || EConstr.eq_constr sigma tgt t
-        || S.mem tgt g.states
+      if H.mem g.transitions tgt
+         || EConstr.eq_constr sigma tgt t
+         || S.mem tgt g.states
       then ()
       else Queue.push tgt g.to_visit;
       (* add [tgt] to [new_states] *)
-      return (S.add tgt new_states)
+      if S.mem tgt new_states
+      then return new_states
+      else return (S.add tgt new_states)
     in
     iterate 0 (List.length ctors - 1) (S.singleton t) iter_body
   ;;
@@ -827,15 +846,14 @@ struct
   (** [get_new_constrs t tr_rlts fn_rlts] returns the list of constructors applicable to term [t], using those provided in [tr_rlts] (and [fn_rlts]).
       If no immediate constructor is found matching [t] in [tr_rlts] (likely due to unification problems), then each constructor in [tr_rlts] is tried sequentially, until one of them returns some valid constructors.
       @raise CannotFindTypeOfTermToVisit
-        if none of the constructors provided in [tr_rlts] yield constructors from [check_valid_constructors].
-  *)
+        if none of the constructors provided in [tr_rlts] yield constructors from [check_valid_constructors]. *)
   let get_new_constrs
-        ?(params : Params.log = default_params)
-        (t : EConstr.t)
-        (tr_rlts : raw_lts H.t)
+    ?(params : Params.log = default_params)
+    (t : EConstr.t)
+    (tr_rlts : raw_lts H.t)
     : coq_ctor list mm
     =
-    let* the_rlts : raw_lts = get_rlts t tr_rlts in
+    let* (the_rlts : raw_lts) = get_rlts t tr_rlts in
     let temp_map = Hashtbl.of_seq (H.to_seq tr_rlts) in
     check_valid_constructor
       ~params
@@ -851,10 +869,10 @@ struct
       @param bound is the number of states to explore until.
       @return an [lts_graph] with a maximum of [bound] many states. *)
   let rec build_lts_graph
-            ?(params : Params.log = default_params)
-            (tr_rlts : raw_lts H.t)
-            (g : lts_graph)
-            (bound : int)
+    ?(params : Params.log = default_params)
+    (tr_rlts : raw_lts H.t)
+    (g : lts_graph)
+    (bound : int)
     : lts_graph mm
     =
     params.kind <- Debug ();
@@ -878,17 +896,17 @@ struct
       @param tref is the original coq-term.
       @param bound is the number of states to explore until. *)
   let build_graph
-        ?(params : Params.log = default_params)
-        (tref : Constrexpr.constr_expr)
-        (grefs : Names.GlobRef.t list)
-        (bound : int)
+    ?(params : Params.log = default_params)
+    (tref : Constrexpr.constr_expr)
+    (grefs : Names.GlobRef.t list)
+    (bound : int)
     : lts_graph mm
     =
     (* make map of term types *)
     let* (tr_rlts : raw_lts H.t) = build_rlts_map grefs in
     (* should be able to get the type now -- fail otherwise *)
-    let* t : EConstr.t = tref_to_econstr tref in
-    let* the_lts : raw_lts = get_rlts t tr_rlts in
+    let* (t : EConstr.t) = tref_to_econstr tref in
+    let* (the_lts : raw_lts) = get_rlts t tr_rlts in
     (* update environment by typechecking *)
     let$* u env sigma = Typing.check env sigma t the_lts.trm_type in
     let$ init env sigma = sigma, Reductionops.nf_all env sigma t in
@@ -901,11 +919,13 @@ struct
         { to_visit = q; states = S.empty; init; transitions = H.create bound }
         bound
     in
-    _check_for_duplicate_transitions
-      ~prefix:"build_graph, "
-      ~none:"No duplicates found"
-      g;
-    _check_states ~prefix:"build_graph, " g;
+    let* _ =
+      _check_for_duplicate_transitions
+        ~prefix:"build_graph, "
+        ~none:"No duplicates found"
+        g
+    in
+    let* _ = _check_transition_states ~prefix:"build_graph, " g in
     return g
   ;;
 
@@ -916,15 +936,15 @@ struct
       }
 
     let create_translation_tbl
-          ?(params : Params.log = default_params)
-          (states : S.t)
+      ?(params : Params.log = default_params)
+      (states : S.t)
       : coq_translation mm
       =
       let list_states : EConstr.t list = S.elements states in
       let iter_body
-            (i : int)
-            ((from_coq_list, to_coq_list) :
-              (EConstr.t * string) list * (string * EConstr.t) list)
+        (i : int)
+        ((from_coq_list, to_coq_list) :
+          (EConstr.t * string) list * (string * EConstr.t) list)
         =
         let s : EConstr.t = List.nth list_states i in
         let* (str : string) = econstr_to_string_mm s in
@@ -943,17 +963,17 @@ struct
     ;;
 
     let create_transitions_list
-          ?(params : Params.log = default_params)
-          (transitions : constr_transitions H.t)
+      ?(params : Params.log = default_params)
+      (transitions : constr_transitions H.t)
       : (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list mm
       =
       let raw_list : (EConstr.t * constr_transitions) list =
         List.of_seq (H.to_seq transitions)
       in
       let from_body
-            (i : int)
-            (new_transitions :
-              (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+        (i : int)
+        (new_transitions :
+          (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
         =
         let (from, actions) : EConstr.t * constr_transitions =
           List.nth raw_list i
@@ -962,9 +982,9 @@ struct
           List.of_seq (Hashtbl.to_seq actions)
         in
         let action_body
-              (j : int)
-              (new_transitions :
-                (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+          (j : int)
+          (new_transitions :
+            (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
           =
           let (a, destinations) : Mebi_action.action * D.t =
             List.nth raw_actions j
@@ -973,9 +993,9 @@ struct
             D.elements destinations
           in
           let destination_body
-                (k : int)
-                (new_transitions :
-                  (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+            (k : int)
+            (new_transitions :
+              (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
             =
             let (destination, constr_tree) : EConstr.t * Constr_tree.t =
               List.nth raw_destinations k
@@ -996,8 +1016,8 @@ struct
     ;;
 
     let _check_all_states_translated
-          (translation_tbl : coq_translation)
-          (g : lts_graph)
+      (translation_tbl : coq_translation)
+      (g : lts_graph)
       : unit mm
       =
       S.iter
@@ -1016,10 +1036,10 @@ struct
     ;;
 
     let get_state_translation
-          ?(prefix : string = "?")
-          (state : EConstr.t)
-          (translation_tbl : coq_translation)
-          (g : lts_graph)
+      ?(prefix : string = "?")
+      (state : EConstr.t)
+      (translation_tbl : coq_translation)
+      (g : lts_graph)
       : string mm
       =
       let* (_str : string) = econstr_to_string_mm state in
@@ -1046,16 +1066,7 @@ struct
                 Printf.sprintf
                   "true\nmatches (%i): %s\n"
                   (S.cardinal matches)
-                  (if S.is_empty matches
-                   then "[ ] (empty)"
-                   else
-                     Printf.sprintf
-                       "[%s]"
-                       (S.fold
-                          (fun (s : S.elt) (acc : string) ->
-                            Printf.sprintf "%s\n%s\n" acc (econstr_to_string s))
-                          matches
-                          "")))
+                  (pstr_econstr_set matches))
               else "false")
              (H.mem translation_tbl.from_coq state)
              (List.mem
@@ -1070,10 +1081,10 @@ struct
     ;;
 
     let translate_transitions
-          (transitions_list :
-            (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
-          (translation_tbl : coq_translation)
-          (g : lts_graph)
+      (transitions_list :
+        (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+      (translation_tbl : coq_translation)
+      (g : lts_graph)
       : Lts.raw_flat_lts mm
       =
       (* sanity check: all states should be translated *)
@@ -1084,11 +1095,11 @@ struct
           =
           List.nth transitions_list i
         in
-        let* from_str : string =
+        let* (from_str : string) =
           get_state_translation ~prefix:"FROM" from translation_tbl g
         in
         let a_str : string = a.label in
-        let* dest_str : string =
+        let* (dest_str : string) =
           get_state_translation ~prefix:"DEST" destination translation_tbl g
         in
         let constr_tree_str : string = Constr_tree.pstr constr_tree in
@@ -1098,10 +1109,10 @@ struct
     ;;
 
     let lts_graph_to_lts
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unnamed")
-          (g : lts_graph)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unnamed")
+      (g : lts_graph)
       : (Lts.lts * coq_translation) mm
       =
       let* (transitions_list :
@@ -1130,10 +1141,9 @@ struct
       return (lts, translation_tbl)
     ;;
   end
-  (* TODO: from [LTS.lts] and [coq_translation] create a coq term and save to file *)
-  (* module ReCoq = struct
-     (* let from_lts *)
-     end *)
+  (* TODO: from [LTS.lts] and [coq_translation] create a coq term and save to
+     file *)
+  (* module ReCoq = struct (* let from_lts *) end *)
 end
 
 (** [make_graph_builder] is ... *)
@@ -1150,12 +1160,12 @@ let make_graph_builder =
 
 (** *)
 let build_bounded_lts
-      ?(params : Params.log = default_params)
-      ?(bound : int = default_bound)
-      ?(name : string = "unnamed")
-      (tref : Constrexpr.constr_expr)
-      (grefs : Names.GlobRef.t list)
-      (module G : GraphB)
+  ?(params : Params.log = default_params)
+  ?(bound : int = default_bound)
+  ?(name : string = "unnamed")
+  (tref : Constrexpr.constr_expr)
+  (grefs : Names.GlobRef.t list)
+  (module G : GraphB)
   : Lts.lts mm
   =
   (* graph lts *)
@@ -1175,20 +1185,17 @@ let build_bounded_lts
 
 (** *)
 let build_fsm_from_bounded_lts
-      ?(params : Params.log = default_params)
-      ?(bound : int = default_bound)
-      ?(name : string = "unnamed")
-      (tref : Constrexpr.constr_expr)
-      (grefs : Names.GlobRef.t list)
+  ?(params : Params.log = default_params)
+  ?(bound : int = default_bound)
+  ?(name : string = "unnamed")
+  (tref : Constrexpr.constr_expr)
+  (grefs : Names.GlobRef.t list)
   : Fsm.fsm mm
   =
   (* disable detailed printouts *)
   params.options.show_normal_output <- false;
-  (* Log.override
-    ~params
-    (Printf.sprintf
-       "(A) type of tref: %s"
-       (econstr_to_string (run (Mebi_utils.type_of_tref tref)))); *)
+  (* Log.override ~params (Printf.sprintf "(A) type of tref: %s"
+     (econstr_to_string (run (Mebi_utils.type_of_tref tref)))); *)
   (* graph module *)
   let* graphM = make_graph_builder in
   let module G = (val graphM) in
@@ -1204,19 +1211,16 @@ let build_fsm_from_bounded_lts
 module Vernac = struct
   module LTS = struct
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unnamed")
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unnamed")
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : Lts.lts mm
       =
-      (* Log.override
-        ~params
-        (Printf.sprintf
-           "(B) type of tref: %s"
-           (econstr_to_string (run (Mebi_utils.type_of_tref tref)))); *)
+      (* Log.override ~params (Printf.sprintf "(B) type of tref: %s"
+         (econstr_to_string (run (Mebi_utils.type_of_tref tref)))); *)
       (* graph module *)
       let* graphM = make_graph_builder in
       let module G = (val graphM) in
@@ -1225,11 +1229,11 @@ module Vernac = struct
     ;;
 
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       let* (the_lts : Lts.lts) = build ~params ~bound tref grefs in
@@ -1240,12 +1244,12 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       params.options.output_enabled <- false;
@@ -1278,23 +1282,23 @@ module Vernac = struct
   module FSM = struct
     (** *)
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unnamed")
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unnamed")
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : Fsm.fsm mm
       =
       build_fsm_from_bounded_lts ~params ~bound ~name tref grefs
     ;;
 
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get translated fsm *)
@@ -1310,12 +1314,12 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get translated fsm *)
@@ -1335,11 +1339,11 @@ module Vernac = struct
   module Minim = struct
     (** *)
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unnamed")
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unnamed")
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm) mm
       =
       (* get translated fsm *)
@@ -1352,10 +1356,10 @@ module Vernac = struct
 
     (** *)
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get translated fsm *)
@@ -1374,11 +1378,11 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get translated fsm *)
@@ -1409,12 +1413,12 @@ module Vernac = struct
   module Merged = struct
     (** *)
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unnamed")
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unnamed")
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm * Fsm.fsm) mm
       =
       (* get translated fsm *)
@@ -1433,11 +1437,11 @@ module Vernac = struct
 
     (** *)
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get merged fsm *)
@@ -1457,12 +1461,12 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get merged fsm *)
@@ -1506,12 +1510,12 @@ module Vernac = struct
 
     (** *)
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unnamed")
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unnamed")
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm * Bisimilarity.result) mm
       =
       (* get translated fsm *)
@@ -1529,11 +1533,11 @@ module Vernac = struct
 
     (** *)
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       let* fsm_A, fsm_B, result = build ~params ~bound trefA trefB grefs in
@@ -1554,12 +1558,12 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       let* fsm_A, fsm_B, result =
@@ -1613,5 +1617,4 @@ end
     Notes:
     - Constructors of [P] are the transitions
     - States are the sets of possible transitions
-    - A term [t] is represented by the state of the transitions that can be taken
-*)
+    - A term [t] is represented by the state of the transitions that can be taken *)
