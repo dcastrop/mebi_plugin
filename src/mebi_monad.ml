@@ -48,25 +48,51 @@ let econstr_hash st () t =
     (EConstr.to_constr ?abort_on_undefined_evars:(Some false) !st.coq_ctx t)
 ;;
 
-let compare_constr st () t1 t2 =
-  (* Int.compare (econstr_hash st () t1) (econstr_hash st () t2) *)
-  if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1
+let _econstr_to_string st () (target : EConstr.t) : string =
+  Pp.string_of_ppcmds (Printer.pr_econstr_env !st.coq_env !st.coq_ctx target)
 ;;
 
-(* let compare_constr st () t1' t2' =
-   let t1 = Reductionops.nf_all !st.coq_env !st.coq_ctx t1' in
-   let t2 = Reductionops.nf_all !st.coq_env !st.coq_ctx t2' in
-   (* Int.compare (econstr_hash st () t1) (econstr_hash st () t2) *)
-   if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1
-   ;; *)
+(* let eq_constr st () = EConstr.eq_constr !st.coq_ctx *)
+(** [] used to determine a match in a [Hashtbl] with [EConstr.t] keys. *)
+let eq_constr ?(prefix : string = "eq_constr") st () t1 t2 : bool =
+  let is_eq_constr : bool = EConstr.eq_constr !st.coq_ctx t1 t2 in
+  let t1_str : string = _econstr_to_string st () t1 in
+  let t2_str : string = _econstr_to_string st () t2 in
+  let is_eq_str : bool = String.equal t1_str t2_str in
+  (match is_eq_constr, is_eq_str with
+   | false, true ->
+     Utils.Logging.Log.warning
+       ~params:(Utils.Params.Default.log ~mode:(Coq ()) ())
+       (Printf.sprintf
+          "%s,\n\
+           EConstr.eq_constr t1 t2: %b\n\
+           String.equal t1 t2:      %b\n\
+           t1: %s\n\
+           t2: %s"
+          prefix
+          is_eq_constr
+          is_eq_str
+          t1_str
+          t2_str)
+   | _, _ -> ());
+  is_eq_constr
+;;
 
-let eq_constr st () = EConstr.eq_constr !st.coq_ctx
+(** [] used for comparing [EConstr.t] in a set. *)
+let compare_constr st () t1 t2 =
+  (* Int.compare (econstr_hash st () t1) (econstr_hash st () t2) *)
+  (* if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1 *)
+  if eq_constr ~prefix:"compare_constr" st () t1 t2 then 0 else 1
+;;
 
-(* let eq_constr st () t1' t2' =
-   let t1 = Reductionops.nf_all !st.coq_env !st.coq_ctx t1' in
-   let t2 = Reductionops.nf_all !st.coq_env !st.coq_ctx t2' in
-   EConstr.eq_constr !st.coq_ctx t1 t2
-   ;; *)
+(* let compare_constr st () t1' t2' = let t1 = Reductionops.nf_all !st.coq_env
+   !st.coq_ctx t1' in let t2 = Reductionops.nf_all !st.coq_env !st.coq_ctx t2'
+   in (* Int.compare (econstr_hash st () t1) (econstr_hash st () t2) *) if
+   EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1 ;; *)
+
+(* let eq_constr st () t1' t2' = let t1 = Reductionops.nf_all !st.coq_env
+   !st.coq_ctx t1' in let t2 = Reductionops.nf_all !st.coq_env !st.coq_ctx t2'
+   in EConstr.eq_constr !st.coq_ctx t1 t2 ;; *)
 
 (* let eq_constr st () t1 t2 = Int.equal (compare_constr st () t1 t2) 0 *)
 
@@ -102,15 +128,15 @@ let make_constr_set (st : coq_context ref)
   { state = st; value = (module Constrset : Set.S with type elt = EConstr.t) }
 ;;
 
+
 let compare_constr_tree
-      st
-      ()
-      (t1 : EConstr.t * Constr_tree.t)
-      (t2 : EConstr.t * Constr_tree.t)
+  st
+  ()
+  (t1 : EConstr.t * Constr_tree.t)
+  (t2 : EConstr.t * Constr_tree.t)
   =
-  if
-    EConstr.eq_constr !st.coq_ctx (fst t1) (fst t2)
-    && Constr_tree.eq (snd t1) (snd t2)
+  if EConstr.eq_constr !st.coq_ctx (fst t1) (fst t2)
+     && Constr_tree.eq (snd t1) (snd t2)
   then 0
   else 1
 ;;
@@ -134,10 +160,10 @@ let make_constr_tree_set (st : coq_context ref)
 
 (** Monadic for loop *)
 let rec iterate
-          (from_idx : int)
-          (to_idx : int)
-          (acc : 'a)
-          (f : int -> 'a -> 'a t)
+  (from_idx : int)
+  (to_idx : int)
+  (acc : 'a)
+  (f : int -> 'a -> 'a t)
   : 'a t
   =
   if from_idx > to_idx
@@ -154,8 +180,8 @@ let get_sigma (st : coq_context ref) : Evd.evar_map in_context =
 ;;
 
 let state
-      (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-      (st : coq_context ref)
+  (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+  (st : coq_context ref)
   : 'a in_context
   =
   let sigma, a = f !st.coq_env !st.coq_ctx in

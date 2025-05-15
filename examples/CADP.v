@@ -368,11 +368,11 @@ Fixpoint eval (e:expr) (s:state) : option value :=
 
   end.
 
-Compute (eval (VAL (BOOL true)) State.initial).
-Compute (eval (VAL (BOOL false)) State.initial).
+(* Compute (eval (VAL (BOOL true)) State.initial). *)
+(* Compute (eval (VAL (BOOL false)) State.initial). *)
 
-Compute (eval (VAL NIL) State.initial).
-Compute (eval (VAR PREDECESSOR) State.initial).
+(* Compute (eval (VAL NIL) State.initial). *)
+(* Compute (eval (VAR PREDECESSOR) State.initial). *)
 
 
 Definition handle_value (v:value) (s:state) : option value :=
@@ -803,12 +803,12 @@ Example P : tm :=
     )
   ).
 
-Compute (eval (NOT (EQ (VAR PREDECESSOR) (VAL NIL))) (get_state (Env.initial 1))).
+(* Compute (eval (NOT (EQ (VAR PREDECESSOR) (VAL NIL))) (get_state (Env.initial 1))). *)
 
-Compute (write_next THE_PID NIL (Env.initial 1)).
+(* Compute (write_next THE_PID NIL (Env.initial 1)). *)
 
-Compute get_local_var_value PREDECESSOR (get_state (Env.initial 1)).
-Compute get_local_var_value NEXT (get_state (Env.initial 1)).
+(* Compute get_local_var_value PREDECESSOR (get_state (Env.initial 1)). *)
+(* Compute get_local_var_value NEXT (get_state (Env.initial 1)). *)
 
 (* Compute (write_locked PREDECESSOR (BOOL true) (Env.initial 1)).
 
@@ -891,7 +891,7 @@ Qed.
 (*************************************************************************)
 
 Example p0 : tm * env := (P, Env.initial 1).
-Compute p0.
+(* Compute p0. *)
 (* MeBi Show LTS Bounded 1000 Of p0 Using step. *)
 (* MeBi Dump "p0" LTS Bounded 1000 Of p0 Using step. *)
 
@@ -944,7 +944,7 @@ Definition compose (s:system) : composition :=
 (**** System size: 1 *******)
 (***************************)
 Example ncs1 : sys * resource := compose (create 1 P).
-Compute ncs1.
+(* Compute ncs1. *)
 (* MeBi Show LTS Bounded 1000 Of ncs1 Using lts step. *)
 (* MeBi Dump "NCS1" LTS Bounded 1000 Of ncs1 Using lts step. *)
 
@@ -958,7 +958,7 @@ Compute ncs1.
 (**** System size: 2 *******)
 (***************************)
 Example ncs2 : sys * resource := compose (create 2 P).
-Compute ncs2.
+(* Compute ncs2. *)
 
 (* ! lts incomplete even after 5000 bound *)
 (* MeBi Show  LTS Bounded 5000 Of ncs2 Using lts step. *)
@@ -992,7 +992,7 @@ Compute ncs2.
 (**** System size: 5 *******)
 (***************************)
 Example ncs5 : sys * resource := compose (create 5 P).
-Compute ncs5.
+(* Compute ncs5. *)
 
 (* MeBi Dump "NCS5" LTS Bounded 150 Of ncs5 Using lts step. *)
 
