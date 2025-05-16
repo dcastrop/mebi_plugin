@@ -40,6 +40,28 @@
 
       Could we somehow encode the terms as unique integers?
 
+      I have now tried several different ways of encoding them as integers.
+      From tests, these are equivalent and provide the same output and
+      crucially, they do appear to have additional states that were missing, and
+      appear to be without duplicates.
+      These two attempts extend the monad with some collection we use to
+      determine the terms encoding, either:
+      - A `(EConstr.t * int) Hashtbl.t` that simply maps a term to an integer.
+        The integer is simply the length of the tbl when it is added. However,
+        out of concerns that this hashtbl would potentially encounter the issue
+        of hash collisions, I also tried a more rudimentary approach:
+      - A `EConstr.t list` containing each term in the order it is added to the
+        set. Terms are prepended to the list if they are not already present. To
+        retrieve the encoding of a term, find its position in the list and minus
+        from the total length of the list -- this yields the same as just taking
+        the index if they were *appended* to the list.
+
+      The main notable thing here is that the "sanity check" functions now take
+      a very long time on the more complicated examples, and therefore I have
+      currently commented them out. (This is due to the currently inefficient
+      methods that they iterate repeatidly over the same structures, and do lots
+      of string comparisons.)
+
 ### archive
 
 - [x] `Proc.v, Example proc0_send1` is missing `true` transitions.
