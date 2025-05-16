@@ -219,8 +219,8 @@ Example e2 : sys :=
   PAR (PRC (tm1, 0, 0)) (
     PRC (OK, 0, 0)
   ).
-(* MeBi Show LTS Bounded 350 Of e2 Using lts step. *)
-(* MeBi Dump "e2" LTS Bounded 350 Of e2 Using lts step. *)
+(* MeBi Show LTS Bounded 70 Of e2 Using lts step. *)
+(* MeBi Dump "e2" LTS Bounded 70 Of e2 Using lts step. *)
 
 (*  *)
 Example e3 : sys :=
