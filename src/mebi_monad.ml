@@ -3,6 +3,7 @@ open Mebi_errors
 type coq_context =
   { coq_env : Environ.env
   ; coq_ctx : Evd.evar_map
+  ; coq_enc : EConstr.t list (* ; coq_enc : (EConstr.t, int) Hashtbl.t *)
   }
 
 (* Essentially, a state monad *)
@@ -16,7 +17,10 @@ type 'a t = coq_context ref -> 'a in_context
 let run (x : 'a t) : 'a =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let a = x (ref { coq_env = env; coq_ctx = sigma }) in
+  (* let a = x (ref { coq_env = env; coq_ctx = sigma }) in *)
+  let a = x (ref { coq_env = env; coq_ctx = sigma; coq_enc = [] }) in
+  (* let a = x (ref { coq_env = env; coq_ctx = sigma; coq_enc = Hashtbl.create 0
+     }) in *)
   a.value
 ;;
 
@@ -54,7 +58,10 @@ let _econstr_to_string st () (target : EConstr.t) : string =
 
 (* let eq_constr st () = EConstr.eq_constr !st.coq_ctx *)
 (** [] used to determine a match in a [Hashtbl] with [EConstr.t] keys. *)
-let eq_constr ?(prefix : string = "eq_constr") st () t1 t2 : bool =
+let eq_constr st () t1 t2 : bool = EConstr.eq_constr !st.coq_ctx t1 t2
+
+(** same as above, but with sanity checks *)
+let _eq_constr ?(prefix : string = "eq_constr") st () t1 t2 : bool =
   let is_eq_constr : bool = EConstr.eq_constr !st.coq_ctx t1 t2 in
   let t1_str : string = _econstr_to_string st () t1 in
   let t2_str : string = _econstr_to_string st () t2 in
@@ -65,10 +72,10 @@ let eq_constr ?(prefix : string = "eq_constr") st () t1 t2 : bool =
        ~params:(Utils.Params.Default.log ~mode:(Coq ()) ())
        (Printf.sprintf
           "%s,\n\
-           EConstr.eq_constr t1 t2: %b\n\
-           String.equal t1 t2:      %b\n\
-           t1: %s\n\
-           t2: %s"
+          \ EConstr.eq_constr t1 t2: %b\n\
+          \ String.equal t1 t2     : %b\n\
+          \ t1: %s\n\
+          \ t2: %s"
           prefix
           is_eq_constr
           is_eq_str
@@ -79,25 +86,73 @@ let eq_constr ?(prefix : string = "eq_constr") st () t1 t2 : bool =
 ;;
 
 (** [] used for comparing [EConstr.t] in a set. *)
-let compare_constr st () t1 t2 =
-  (* Int.compare (econstr_hash st () t1) (econstr_hash st () t2) *)
-  (* if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1 *)
+let _compare_constr_using_eq st () t1 t2 =
   (* if eq_constr ~prefix:"compare_constr" st () t1 t2 then 0 else 1 *)
+  if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1
+;;
+
+let _compare_constr_using_int st () t1 t2 =
+  Int.compare (econstr_hash st () t1) (econstr_hash st () t2)
+;;
+
+let _compare_constr_using_str st () t1 t2 =
   let t1_str : string = _econstr_to_string st () t1 in
   let t2_str : string = _econstr_to_string st () t2 in
   String.compare t1_str t2_str
 ;;
 
-(* let compare_constr st () t1' t2' = let t1 = Reductionops.nf_all !st.coq_env
-   !st.coq_ctx t1' in let t2 = Reductionops.nf_all !st.coq_env !st.coq_ctx t2'
-   in (* Int.compare (econstr_hash st () t1) (econstr_hash st () t2) *) if
-   EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1 ;; *)
+let _compare_constr_using_enc_list st () t1 t2 =
+  let (t1_enc, offset2) : int * int =
+    let offset1 : int = List.length !st.coq_enc - 1 in
+    match
+      List.find_index
+        (fun (t : EConstr.t) -> EConstr.eq_constr !st.coq_ctx t1 t)
+        !st.coq_enc
+    with
+    | None ->
+      st := { !st with coq_enc = t1 :: !st.coq_enc };
+      offset1 + 1, offset1 + 1
+    | Some enc -> offset1 - enc, offset1
+  in
+  let t2_enc : int =
+    match
+      List.find_index
+        (fun (t : EConstr.t) -> EConstr.eq_constr !st.coq_ctx t2 t)
+        !st.coq_enc
+    with
+    | None ->
+      st := { !st with coq_enc = t2 :: !st.coq_enc };
+      offset2 + 1
+    | Some enc -> offset2 - enc
+  in
+  (* sanity check *)
+  (* let comp = Int.compare t1_enc t2_enc in if Int.equal comp 0 then ( let
+     t1_str : string = _econstr_to_string st () t1 in let t2_str : string =
+     _econstr_to_string st () t2 in if Bool.not (String.equal t1_str t2_str)
+     then Utils.Logging.Log.warning ~params:(Utils.Params.Default.log ~mode:(Coq
+     ()) ()) (Printf.sprintf "_compare_constr_using_enc_list, equal but str not
+     equal:\n\ \ t1: %s\n\n\ \ t2:\n\ \ %s\n" t1_str t2_str)); comp *)
+  Int.compare t1_enc t2_enc
+;;
 
-(* let eq_constr st () t1' t2' = let t1 = Reductionops.nf_all !st.coq_env
-   !st.coq_ctx t1' in let t2 = Reductionops.nf_all !st.coq_env !st.coq_ctx t2'
-   in EConstr.eq_constr !st.coq_ctx t1 t2 ;; *)
+(* let _compare_constr_using_enc_tbl st () t1 t2 = let t1_enc : int = match
+   Hashtbl.find_opt !st.coq_enc t1 with | None -> let enc : int = Hashtbl.length
+   !st.coq_enc in Hashtbl.add !st.coq_enc t1 enc; enc | Some enc -> enc in let
+   t2_enc : int = match Hashtbl.find_opt !st.coq_enc t2 with | None -> let enc :
+   int = Hashtbl.length !st.coq_enc in Hashtbl.add !st.coq_enc t2 enc; enc |
+   Some enc -> enc in (* sanity check *) (* let comp = Int.compare t1_enc t2_enc
+   in if Int.equal comp 0 then ( let t1_str : string = _econstr_to_string st ()
+   t1 in let t2_str : string = _econstr_to_string st () t2 in if Bool.not
+   (String.equal t1_str t2_str) then Utils.Logging.Log.warning
+   ~params:(Utils.Params.Default.log ~mode:(Coq ()) ()) (Printf.sprintf
+   "_compare_constr_using_enc_tbl, equal but str\n\ \ not equal:\n\ \ t1:
+   %s\n\n\ \ t2: %s\n" t1_str t2_str)); comp *) Int.compare t1_enc t2_enc ;; *)
 
-(* let eq_constr st () t1 t2 = Int.equal (compare_constr st () t1 t2) 0 *)
+(* temporary *)
+(* let compare_constr st () t1 t2 = _compare_constr_using_eq st () t1 t2 *)
+(* let compare_constr st () t1 t2 = _compare_constr_using_str st () t1 t2 *)
+let compare_constr st () t1 t2 = _compare_constr_using_enc_list st () t1 t2
+(* let compare_constr st () t1 t2 = _compare_constr_using_enc_tbl st () t1 t2 *)
 
 (** [make_constr_tbl st] is used to create Hashtbl that map from [EConstr.t] *)
 let make_constr_tbl st =

@@ -34,6 +34,12 @@
       We need a way or ordering the set of terms
       (states, which are currently `EConstr.t`).
 
+      For now I have ***temporarily*** changed the comparison function to use
+      the comparison of the string representations. This is definitely slower,
+      with some of the more complicated examples taking far too long to finish.
+
+      Could we somehow encode the terms as unique integers?
+
 ### archive
 
 - [x] `Proc.v, Example proc0_send1` is missing `true` transitions.
