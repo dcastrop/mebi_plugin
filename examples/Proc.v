@@ -122,18 +122,22 @@ MeBi Show LTS Bounded 150 Of proc0_send4 Using termLTS.
 
 Example proc1_rec1 := tfix trec.
 MeBi Show LTS Bounded 150 Of proc1_rec1 Using termLTS.
+(* MeBi Dump "proc1_rec1" LTS Bounded 150 Of proc1_rec1 Using termLTS. *)
 
 Example proc1_rec2 := tpar (tfix (tact ASend trec))
                            (tfix (tact ARecv trec)).
 MeBi Show LTS Bounded 150 Of proc1_rec2 Using termLTS.
+(* MeBi Dump "proc1_rec2" LTS Bounded 150 Of proc1_rec2 Using termLTS. *)
 
 Example proc1_rec3 := tpar (tfix (tact ASend (tact BSend trec)))
                            (tfix (tact ARecv (tact BRecv trec))).
 MeBi Show LTS Bounded 150 Of proc1_rec3 Using termLTS.
+(* MeBi Dump "proc1_rec3" LTS Bounded 150 Of proc1_rec3 Using termLTS. *)
 
 Example proc1_rec4 := tpar (tact ASend (tfix (tact BSend trec)))
                            (tact ARecv (tfix (tact BRecv trec))).
 MeBi Show LTS Bounded 150 Of proc1_rec4 Using termLTS.
+(* MeBi Dump "proc1_rec4" LTS Bounded 150 Of proc1_rec4 Using termLTS. *)
 
 
 (*************************************)

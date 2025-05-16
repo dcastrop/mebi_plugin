@@ -393,7 +393,6 @@ module type GraphB = sig
   module H : Hashtbl.S with type key = EConstr.t
   module S : Set.S with type elt = EConstr.t
   module D : Set.S with type elt = EConstr.t * Constr_tree.t
-  (* module Q : Queue_intf.S with type t = EConstr.t *)
 
   type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
 
@@ -421,16 +420,13 @@ module type GraphB = sig
 
   val build_lts_graph
     :  ?params:Params.log
-    -> raw_lts H.t (* -> raw_lts H.t -> raw_lts H.t *)
+    -> raw_lts H.t
     -> lts_graph
     -> int
     -> lts_graph mm
 
   val build_graph
-    :  ?params:
-         Params.log
-         (* -> term_type_map  *)
-         (*  -> term_type_map *)
+    :  ?params:Params.log
     -> Constrexpr.constr_expr
     -> Names.GlobRef.t list
     -> int
@@ -441,11 +437,6 @@ module type GraphB = sig
       { from_coq : string H.t
       ; to_coq : (string, EConstr.t) Hashtbl.t
       }
-
-    (* val translate_coq_terms : ?params:Params.log -> S.t -> coq_translation mm
-
-       val translate_coq_lts : ?params:Params.log -> constr_transitions H.t ->
-       coq_translation (* -> string list *) -> Lts.raw_flat_lts mm *)
 
     val lts_graph_to_lts
       :  ?params:Params.log
@@ -461,9 +452,7 @@ end
 module MkGraph
     (M : Hashtbl.S with type key = EConstr.t)
     (N : Set.S with type elt = EConstr.t)
-    (P : Set.S with type elt = EConstr.t * Constr_tree.t) : GraphB =
-(* (O : Queue_intf.S with type t = EConstr.t) *)
-struct
+    (P : Set.S with type elt = EConstr.t * Constr_tree.t) : GraphB = struct
   (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t] and also
      is used for mapping term types to [raw_lts]. *)
   module H = M
@@ -474,9 +463,6 @@ struct
   (* [D] is the set of destination tuples, each comprised of a term [EConstr.t]
      and the corresponding [Constr_tree.t]. *)
   module D = P
-
-  (* [Q] is the queue of [EConstr.t] *)
-  (* module Q = O *)
 
   (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t]. *)
   type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
@@ -557,26 +543,6 @@ struct
       (econstr_to_string d)
       (Constr_tree.pstr c)
   ;;
-
-  (* let _pstr_list_constr_transitions (f : EConstr.t) (a : Mebi_action.action)
-     (ds : D.t) : string list = let l = D.to_list ds in let hd = List.hd l and
-     tl = List.tl l in List.fold_left (fun (acc : string list) d ->
-     _pstr_constr_transition f a d :: acc) [ _pstr_constr_transition f a hd ] tl
-     ;;
-
-     let _pstr_list_term_transitions (f : EConstr.t) (cs : constr_transitions) :
-     string list = let keys = List.of_seq (Hashtbl.to_seq_keys cs) in let hd =
-     List.hd keys and tl = List.tl keys in let hd_ds = Hashtbl.find cs hd in
-     List.fold_left (fun (acc : string list) (a : Mebi_action.action) ->
-     List.append (_pstr_list_constr_transitions f a (Hashtbl.find cs a)) acc)
-     (_pstr_list_constr_transitions f hd hd_ds) tl ;;
-
-     let _pstr_list_transitions (ts : constr_transitions H.t) : string list list
-     mm = let keys = List.of_seq (H.to_seq_keys ts) in let hd = List.hd keys and
-     tl = List.tl keys in let hd_ts = H.find ts hd in return (List.fold_left
-     (fun (acc : string list list) (f : EConstr.t) ->
-     _pstr_list_term_transitions f (H.find ts f) :: acc) [
-     _pstr_list_term_transitions hd hd_ts ] tl) ;; *)
 
   let _check_for_duplicate_states ?(prefix : string = "") (g : lts_graph)
     : unit mm
@@ -886,25 +852,23 @@ struct
       then ()
       else Queue.push tgt g.to_visit;
       (* add [tgt] to [new_states] *)
-      (* if Bool.( || ) (S.mem tgt new_states) (S.mem tgt g.states) then return
-         new_states else return (S.add tgt new_states) *)
       return (S.add tgt new_states)
     in
     iterate 0 (List.length ctors - 1) (S.singleton t) iter_body
   ;;
 
-  (** [get_new_constrs t tr_rlts fn_rlts] returns the list of constructors applicable to term [t], using those provided in [tr_rlts] (and [fn_rlts]).
-      If no immediate constructor is found matching [t] in [tr_rlts] (likely due to unification problems), then each constructor in [tr_rlts] is tried sequentially, until one of them returns some valid constructors.
+  (** [get_new_constrs t rlts_map] returns the list of constructors applicable to term [t], using those provided in [rlts_map].
+      If no immediate constructor is found matching [t] in [rlts_map] (likely due to unification problems), then each constructor in [rlts_map] is tried sequentially, until one of them returns some valid constructors.
       @raise CannotFindTypeOfTermToVisit
-        if none of the constructors provided in [tr_rlts] yield constructors from [check_valid_constructors]. *)
+        if none of the constructors provided in [rlts_map] yield constructors from [check_valid_constructors]. *)
   let get_new_constrs
     ?(params : Params.log = default_params)
     (t : EConstr.t)
-    (tr_rlts : raw_lts H.t)
+    (rlts_map : raw_lts H.t)
     : coq_ctor list mm
     =
-    let* (the_rlts : raw_lts) = get_rlts t tr_rlts in
-    let temp_map = Hashtbl.of_seq (H.to_seq tr_rlts) in
+    let* (the_rlts : raw_lts) = get_rlts t rlts_map in
+    let temp_map = Hashtbl.of_seq (H.to_seq rlts_map) in
     check_valid_constructor
       ~params
       the_rlts.constructor_transitions
@@ -920,7 +884,7 @@ struct
       @return an [lts_graph] with a maximum of [bound] many states. *)
   let rec build_lts_graph
     ?(params : Params.log = default_params)
-    (tr_rlts : raw_lts H.t)
+    (rlts_map : raw_lts H.t)
     (g : lts_graph)
     (bound : int)
     : lts_graph mm
@@ -931,10 +895,13 @@ struct
     else if S.cardinal g.states > bound
     then return g (* exit if bound reached *)
     else (
+      (* Log.override ~params "build_lts_graph A"; *)
       let t : EConstr.t = Queue.pop g.to_visit in
-      let* (new_constrs : coq_ctor list) = get_new_constrs ~params t tr_rlts in
+      let* (new_constrs : coq_ctor list) = get_new_constrs ~params t rlts_map in
       (* [get_new_states] also updates [g.to_visit] *)
+      (* Log.override ~params "build_lts_graph B"; *)
       let* (new_states : S.t) = get_new_states ~params t g new_constrs in
+      (* Log.override ~params "build_lts_graph C"; *)
       (* let* _ = _check_for_duplicate_states ~prefix:"A build_lts_graph, " g in
          Log.override ~params (Printf.sprintf "old states: %s\n\nnew states:
          %s\n\nunion: %s" (pstr_econstr_set g.states) (pstr_econstr_set
@@ -942,17 +909,16 @@ struct
       (* let g : lts_graph = { g with states = S.union g.states new_states }
          in *)
       let g : lts_graph = { g with states = S.union g.states new_states } in
+      (* Log.override ~params "build_lts_graph D"; *)
       (* let* _ = _check_for_duplicate_transitions ~prefix:"build_lts_graph, "
          ~none:"No duplicates found" g in let* _ = _check_for_duplicate_states
          ~prefix:"build_lts_graph, " g in let* _ = _check_transition_states
          ~prefix:"build_lts_graph, " g in *)
-      build_lts_graph ~params tr_rlts (* fn_rlts *) g bound)
+      build_lts_graph ~params rlts_map g bound)
   ;;
 
-  (** [build_graph tr_rlts fn_rlts tref bound] is the entry point for [build_lts_graph].
-      @param tr_rlts maps coq-term types to [raw_lts].
-      @param fn_rlts
-        is passed to [build_lts_graph] and maps coq-term names to [raw_lts].
+  (** [build_graph rlts_map fn_rlts tref bound] is the entry point for [build_lts_graph].
+      @param rlts_map maps coq-term types to [raw_lts].
       @param tref is the original coq-term.
       @param bound is the number of states to explore until. *)
   let build_graph
@@ -963,10 +929,10 @@ struct
     : lts_graph mm
     =
     (* make map of term types *)
-    let* (tr_rlts : raw_lts H.t) = build_rlts_map grefs in
+    let* (rlts_map : raw_lts H.t) = build_rlts_map grefs in
     (* should be able to get the type now -- fail otherwise *)
     let* (t : EConstr.t) = tref_to_econstr tref in
-    let* (the_lts : raw_lts) = get_rlts t tr_rlts in
+    let* (the_lts : raw_lts) = get_rlts t rlts_map in
     (* update environment by typechecking *)
     let$* u env sigma = Typing.check env sigma t the_lts.trm_type in
     let$ init env sigma = sigma, Reductionops.nf_all env sigma t in
@@ -975,18 +941,16 @@ struct
     let* g =
       build_lts_graph
         ~params
-        tr_rlts
-        { to_visit = q; states = S.empty; init; transitions = H.create bound }
+        rlts_map
+        { to_visit = q; states = S.empty; init; transitions = H.create 0 }
         bound
     in
-    let* _ =
-      _check_for_duplicate_transitions
-        ~prefix:"build_graph, "
-        ~none:"No duplicates found"
-        g
-    in
-    let* _ = _check_for_duplicate_states ~prefix:"build_graph, " g in
-    let* _ = _check_transition_states ~prefix:"build_graph, " g in
+    (* Log.override ~params "build_graph AA"; let* _ =
+       _check_for_duplicate_transitions ~prefix:"build_graph, " ~none:"No
+       duplicates found" g in Log.override ~params "build_graph BB"; let* _ =
+       _check_for_duplicate_states ~prefix:"build_graph, " g in Log.override
+       ~params "build_graph CC"; let* _ = _check_transition_states
+       ~prefix:"build_graph, " g in Log.override ~params "build_graph DD"; *)
     return g
   ;;
 
