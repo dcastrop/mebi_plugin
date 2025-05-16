@@ -108,11 +108,11 @@ Qed.
 
 Example proc0_send3 := tpar (tact ASend (tact BSend tend))
                             (tact ARecv (tact BRecv tend)).
-(* MeBi Show LTS Bounded 150 Of proc0_send3 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc0_send3 Using termLTS.
 
 Example proc0_send4 := tpar (tact BSend (tact ARecv tend))
                             (tact BRecv (tact ASend tend)).
-(* MeBi Show LTS Bounded 150 Of proc0_send4 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc0_send4 Using termLTS.
 
 
 
@@ -121,19 +121,19 @@ Example proc0_send4 := tpar (tact BSend (tact ARecv tend))
 (*************************************)
 
 Example proc1_rec1 := tfix trec.
-(* MeBi Show LTS Bounded 150 Of proc1_rec1 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc1_rec1 Using termLTS.
 
 Example proc1_rec2 := tpar (tfix (tact ASend trec))
                            (tfix (tact ARecv trec)).
-(* MeBi Show LTS Bounded 150 Of proc1_rec2 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc1_rec2 Using termLTS.
 
 Example proc1_rec3 := tpar (tfix (tact ASend (tact BSend trec)))
                            (tfix (tact ARecv (tact BRecv trec))).
-(* MeBi Show LTS Bounded 150 Of proc1_rec3 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc1_rec3 Using termLTS.
 
 Example proc1_rec4 := tpar (tact ASend (tfix (tact BSend trec)))
                            (tact ARecv (tfix (tact BRecv trec))).
-(* MeBi Show LTS Bounded 150 Of proc1_rec4 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc1_rec4 Using termLTS.
 
 
 (*************************************)
@@ -152,14 +152,14 @@ Example proc2_bra2 := tbra (tpar (tact ASend tend)
                                  (tact ARecv tend))
                            (tpar (tact BSend tend)
                                  (tact BRecv tend)).
-(* MeBi Show LTS Bounded 150 Of proc2_bra2 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc2_bra2 Using termLTS.
 (* MeBi Dump "proc2_bra2" LTS Bounded 150 Of proc2_bra2 Using termLTS. *)
 
 Example proc2_bra3 := tbra (tpar (tact ASend (tact BSend tend))
                                  (tact ARecv (tact BRecv tend)))
                            (tpar (tact BSend (tact ASend tend))
                                  (tact BRecv (tact ARecv tend))).
-(* MeBi Show LTS Bounded 150 Of proc2_bra3 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc2_bra3 Using termLTS.
 (* MeBi Dump "proc2_bra3" LTS Bounded 150 Of proc2_bra3 Using termLTS. *)
 
 Example proc2_bra4 := tbra (tpar (tact ASend (tact BSend tend))
@@ -168,7 +168,7 @@ Example proc2_bra4 := tbra (tpar (tact ASend (tact BSend tend))
                                        (tact BRecv (tact CRecv tend)))
                                  (tpar (tact CSend (tact ASend tend))
                                        (tact CRecv (tact ARecv tend)))).
-(* MeBi Show LTS Bounded 150 Of proc2_bra4 Using termLTS. *)
+MeBi Show LTS Bounded 150 Of proc2_bra4 Using termLTS.
 (* MeBi Dump "proc2_bra4" LTS Bounded 150 Of proc2_bra4 Using termLTS. *)
 
 (** the example below does nothing since neither branch can occur *)

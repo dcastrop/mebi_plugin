@@ -578,6 +578,56 @@ struct
      _pstr_list_term_transitions f (H.find ts f) :: acc) [
      _pstr_list_term_transitions hd hd_ts ] tl) ;; *)
 
+  let _check_for_duplicate_states ?(prefix : string = "") (g : lts_graph)
+    : unit mm
+    =
+    let state_list : EConstr.t list = S.to_list g.states in
+    let iter_body (i : int) (dupes1 : (string, int * int) Hashtbl.t) =
+      let s1 : EConstr.t = List.nth state_list i in
+      let pstr1 : string = econstr_to_string s1 in
+      let iter_inner (j : int) (dupes2 : (string, int * int) Hashtbl.t) =
+        if Int.equal i j
+        then return dupes2
+        else (
+          let s2 : EConstr.t = List.nth state_list j in
+          let pstr2 : string = econstr_to_string s2 in
+          let* sigma = get_sigma in
+          let are_eq : bool = EConstr.eq_constr sigma s1 s2 in
+          let b_val : int = if are_eq then 1 else 0 in
+          if String.equal pstr1 pstr2
+          then (
+            match Hashtbl.find_opt dupes2 pstr1 with
+            | None -> Hashtbl.add dupes2 pstr1 (1, b_val)
+            | Some (sum, b) -> Hashtbl.replace dupes2 pstr1 (sum + 1, b + b_val));
+          return dupes2)
+      in
+      iterate 0 (List.length state_list - 1) dupes1 iter_inner
+    in
+    let* dupes =
+      iterate 0 (List.length state_list - 1) (Hashtbl.create 0) iter_body
+    in
+    let num_dupes = Hashtbl.length dupes in
+    if num_dupes > 0
+    then
+      Log.warning
+        ~params:default_params
+        (Printf.sprintf
+           "%sfound (%i) duplicate states: [%s]"
+           prefix
+           num_dupes
+           (Hashtbl.fold
+              (fun (k : string) ((v, b) : int * int) (acc : string) ->
+                Printf.sprintf
+                  "%s\nduplicates (%i), eq_constr (%i):\n  %s\n"
+                  acc
+                  v
+                  b
+                  k)
+              dupes
+              ""));
+    return ()
+  ;;
+
   let _check_for_duplicate_transitions
     ?(prefix : string = "")
     ?(none : string option)
@@ -836,9 +886,9 @@ struct
       then ()
       else Queue.push tgt g.to_visit;
       (* add [tgt] to [new_states] *)
-      if S.mem tgt new_states
-      then return new_states
-      else return (S.add tgt new_states)
+      (* if Bool.( || ) (S.mem tgt new_states) (S.mem tgt g.states) then return
+         new_states else return (S.add tgt new_states) *)
+      return (S.add tgt new_states)
     in
     iterate 0 (List.length ctors - 1) (S.singleton t) iter_body
   ;;
@@ -885,7 +935,17 @@ struct
       let* (new_constrs : coq_ctor list) = get_new_constrs ~params t tr_rlts in
       (* [get_new_states] also updates [g.to_visit] *)
       let* (new_states : S.t) = get_new_states ~params t g new_constrs in
+      (* let* _ = _check_for_duplicate_states ~prefix:"A build_lts_graph, " g in
+         Log.override ~params (Printf.sprintf "old states: %s\n\nnew states:
+         %s\n\nunion: %s" (pstr_econstr_set g.states) (pstr_econstr_set
+         new_states) (pstr_econstr_set (S.union g.states new_states))); *)
+      (* let g : lts_graph = { g with states = S.union g.states new_states }
+         in *)
       let g : lts_graph = { g with states = S.union g.states new_states } in
+      (* let* _ = _check_for_duplicate_transitions ~prefix:"build_lts_graph, "
+         ~none:"No duplicates found" g in let* _ = _check_for_duplicate_states
+         ~prefix:"build_lts_graph, " g in let* _ = _check_transition_states
+         ~prefix:"build_lts_graph, " g in *)
       build_lts_graph ~params tr_rlts (* fn_rlts *) g bound)
   ;;
 
@@ -925,6 +985,7 @@ struct
         ~none:"No duplicates found"
         g
     in
+    let* _ = _check_for_duplicate_states ~prefix:"build_graph, " g in
     let* _ = _check_transition_states ~prefix:"build_graph, " g in
     return g
   ;;

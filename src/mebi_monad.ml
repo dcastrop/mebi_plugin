@@ -82,7 +82,10 @@ let eq_constr ?(prefix : string = "eq_constr") st () t1 t2 : bool =
 let compare_constr st () t1 t2 =
   (* Int.compare (econstr_hash st () t1) (econstr_hash st () t2) *)
   (* if EConstr.eq_constr !st.coq_ctx t1 t2 then 0 else 1 *)
-  if eq_constr ~prefix:"compare_constr" st () t1 t2 then 0 else 1
+  (* if eq_constr ~prefix:"compare_constr" st () t1 t2 then 0 else 1 *)
+  let t1_str : string = _econstr_to_string st () t1 in
+  let t2_str : string = _econstr_to_string st () t2 in
+  String.compare t1_str t2_str
 ;;
 
 (* let compare_constr st () t1' t2' = let t1 = Reductionops.nf_all !st.coq_env
@@ -127,7 +130,6 @@ let make_constr_set (st : coq_context ref)
   in
   { state = st; value = (module Constrset : Set.S with type elt = EConstr.t) }
 ;;
-
 
 let compare_constr_tree
   st

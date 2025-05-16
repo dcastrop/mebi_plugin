@@ -19,6 +19,14 @@
       does not appear to work in certain cases. (Specifically, it does not match
       some terms that do match when turned into strings.)
 
+      > Lifting this restriction has caused duplicate states to be added.
+
+- [ ] Investigating why duplicate states appear in set.
+
+      After some printouts, it appears that `S.union` is the culprit (in this particular case). After looking into the definition, I wonder if the comparison function defined in `Mebi_monad` is causing the issue, as since we only return `0` or `1` the set is not actually ordered and therefore, the balancing of the tree that prepresents the set could cause arbitrary pockets of terms to not be found when perfoming the union. The crux of this seems to be the ordering of the elements in the set.
+
+      We need a way or ordering the set of terms (states, which are currently `EConstr.t`).
+
 ### archive
 
 - [x] `Proc.v, Example proc0_send1` is missing `true` transitions.
