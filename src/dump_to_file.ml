@@ -33,11 +33,7 @@ type filename_kind =
   | FSM of string
 
 let get_name (f : filename_kind) : string =
-  match f with
-  | Auto () -> "unknown"
-  | Just s -> s
-  | LTS s -> s
-  | FSM s -> s
+  match f with Auto () -> "unknown" | Just s -> s | LTS s -> s | FSM s -> s
 ;;
 
 let get_filename (f : filename_kind) (is_complete : bool option) : string =
@@ -86,7 +82,8 @@ let build_filepath
     Filename.concat
       (Printf.sprintf "%sjson/" default_output_dir)
       (build_filename filename filetype is_complete)
-  (* | Default (), _ ->  Filename.concat default_output_dir (build_filename filename filetype) *)
+  (* | Default (), _ -> Filename.concat default_output_dir (build_filename
+     filename filetype) *)
   | Exact s, _ ->
     Filename.concat s (build_filename filename filetype is_complete)
 ;;
@@ -101,13 +98,11 @@ let rec create_parent_dir (fn : string) =
 ;;
 
 module JSON = struct
-  (* let remove_double_spaces (s : string) : string =
-    Str.global_replace (Str.regexp {| + |\t+\t|}) " " s
-  ;; *)
+  (* let remove_double_spaces (s : string) : string = Str.global_replace
+     (Str.regexp {| + |\t+\t|}) " " s ;; *)
 
-  (* let remove_linebreaks (s : string) : string =
-    Str.global_replace (Str.regexp {|\(\r\n|\n|\r\)|}) " " s
-  ;; *)
+  (* let remove_linebreaks (s : string) : string = Str.global_replace
+     (Str.regexp {|\(\r\n|\n|\r\)|}) " " s ;; *)
 
   (** removes all newlines, excess spaces from string, and makes " " safe *)
   let clean (s : string) : string =
@@ -149,15 +144,11 @@ module JSON = struct
     | Dict of string list
 
   let handle_list_sep sep : string =
-    match sep with
-    | None -> " "
-    | Some sep -> sep
+    match sep with None -> " " | Some sep -> sep
   ;;
 
   let handle_dict_sep sep : string =
-    match sep with
-    | None -> "\n"
-    | Some sep -> sep
+    match sep with None -> "\n" | Some sep -> sep
   ;;
 
   (** assumes elements of [ss] are already stringified. *)
@@ -253,10 +244,7 @@ module JSON = struct
                (quoted (clean (Printf.sprintf "%i" t.id)))
            ; key_val ~prefix:"\t\t\t" "from" (quoted (clean t.from))
            ; key_val ~prefix:"\t\t\t" "label" (quoted (clean t.label))
-           ; key_val
-               ~prefix:"\t\t\t"
-               "destination"
-               (quoted (clean t.destination))
+           ; key_val ~prefix:"\t\t\t" "dest" (quoted (clean t.destination))
            ; key_val
                ~prefix:"\t\t\t"
                "info"
@@ -459,10 +447,8 @@ let write_to_file
   (* check parent directory exists *)
   create_parent_dir filepath;
   (* write to file *)
-  (* Out_channel.with_open_gen
-     [ Out_channel.Open_creat; Out_channel.Open_excl ]
-     perm
-     filepath *)
+  (* Out_channel.with_open_gen [ Out_channel.Open_creat; Out_channel.Open_excl ]
+     perm filepath *)
   (* (fun oc -> Out_channel.output_string oc content); *)
   let oc = open_out filepath in
   Printf.fprintf oc "%s" content;

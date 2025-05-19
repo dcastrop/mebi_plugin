@@ -192,11 +192,16 @@ let compare_constr_tree
   (t1 : EConstr.t * Constr_tree.t)
   (t2 : EConstr.t * Constr_tree.t)
   =
-  if EConstr.eq_constr !st.coq_ctx (fst t1) (fst t2)
-     && Constr_tree.eq (snd t1) (snd t2)
-  then 0
-  else 1
+  match compare_constr st () (fst t1) (fst t2) with
+  | 0 ->
+    if Constr_tree.eq (snd t1) (snd t2)
+    then 0
+    else Constr_tree.compare (snd t1) (snd t2)
+  | n -> n
 ;;
+
+(* if EConstr.eq_constr !st.coq_ctx (fst t1) (fst t2) && Constr_tree.eq (snd t1)
+   (snd t2) then 0 else 1 *)
 
 (** [make_constr_set st] is used to create Set of [EConstr.t * Constr_tree.t] *)
 let make_constr_tree_set (st : coq_context ref)
