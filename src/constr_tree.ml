@@ -15,6 +15,9 @@ let eq (t1 : t) (t2 : t) : bool =
   tree_eq t1 t2
 ;;
 
+(* TODO: *)
+let compare (t1 : t) (t2 : t) : int = 0
+
 let rec pstr (t1 : t) : string =
   match t1 with
   | Node (lhs_int, rhs_int_tree_list) ->

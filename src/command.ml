@@ -600,7 +600,9 @@ module MkGraph
     (g : lts_graph)
     : unit mm
     =
-    (* Log.override "_check_for_duplicate_transitions, begin."; *)
+    Log.override
+      ~params:default_params
+      "_check_for_duplicate_transitions, begin.";
     if Bool.not (H.length g.transitions > 1)
     then return ()
     else (
@@ -652,42 +654,45 @@ module MkGraph
       let* flattened_transitions =
         iterate 0 (List.length raw_list - 1) [] from_body
       in
+      (* let _num_transitions = List.length flattened_transitions in *)
+      (* Log.override ~params:default_params "_check_for_duplicate_transitions,
+         post iterate."; *)
       let iter_dupe
         (i : int)
         ((acc, cache) :
           string list
           * (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
         =
+        (* Log.override ~params:default_params (Printf.sprintf
+           "_check_for_duplicate_transitions, checking i: %i / %i." i
+           _num_transitions); *)
         let t1 = List.nth flattened_transitions i in
         let from1, a1, dest1, tree1 = t1 in
         let pstr_from1 = econstr_to_string from1 in
         let pstr_dest1 = econstr_to_string dest1 in
-        let iter_dupe2 (j : int) dupe_list =
-          if Int.equal i j
-          then return dupe_list
-          else (
-            let t2 = List.nth flattened_transitions j in
-            let from2, a2, dest2, tree2 = t2 in
-            let pstr_from2 = econstr_to_string from2 in
-            let pstr_dest2 = econstr_to_string dest2 in
-            let from_eq = String.equal pstr_from1 pstr_from2 in
-            let dest_eq = String.equal pstr_dest1 pstr_dest2 in
-            let a_eq = String.equal a1.label a2.label in
-            let tree_eq = Constr_tree.eq tree1 tree2 in
-            if from_eq && dest_eq && a_eq && tree_eq
-            then
-              return
-                (Printf.sprintf
-                   "from: %s\nact:  %s\ndest: %s\ntree: %s"
-                   pstr_from2
-                   a2.label
-                   pstr_dest2
-                   (Constr_tree.pstr tree2)
-                 :: dupe_list)
-            else return dupe_list)
+        let iter_dupe2 (j : int) (dupe_list : string list) =
+          let t2 = List.nth flattened_transitions j in
+          let from2, a2, dest2, tree2 = t2 in
+          let pstr_from2 = econstr_to_string from2 in
+          let pstr_dest2 = econstr_to_string dest2 in
+          let from_eq = String.equal pstr_from1 pstr_from2 in
+          let dest_eq = String.equal pstr_dest1 pstr_dest2 in
+          let a_eq = String.equal a1.label a2.label in
+          let tree_eq = Constr_tree.eq tree1 tree2 in
+          if from_eq && dest_eq && a_eq && tree_eq
+          then
+            return
+              (Printf.sprintf
+                 "from: %s\nact:  %s\ndest: %s\ntree: %s"
+                 pstr_from2
+                 a2.label
+                 pstr_dest2
+                 (Constr_tree.pstr tree2)
+               :: dupe_list)
+          else return dupe_list
         in
         let* dupe_list =
-          iterate 0 (List.length flattened_transitions - 1) [] iter_dupe2
+          iterate (i + 1) (List.length flattened_transitions - 1) [] iter_dupe2
         in
         if List.is_empty dupe_list
         then return (acc, t1 :: cache)
@@ -695,15 +700,19 @@ module MkGraph
           let dupe_str =
             Printf.sprintf
               "for transition:\n\
-               from: %s\n\
-               act:  %s\n\
-               dest: %s\n\
+               from:\n\
+               %s\n\
+               act:\n\
+               %s\n\
+               dest:\n\
+               %s\n\
                tree: %s\n\n\
-               found duplicates: [%s]"
+               found (%i) duplicates: [%s]"
               pstr_from1
               a1.label
               pstr_dest1
               (Constr_tree.pstr tree1)
+              (List.length dupe_list)
               (List.fold_left
                  (fun (acc : string) (d : string) ->
                    Printf.sprintf "%s\n%s\n" acc d)
@@ -715,6 +724,8 @@ module MkGraph
       let* pstr_dupes, _ =
         iterate 0 (List.length flattened_transitions - 1) ([], []) iter_dupe
       in
+      (* Log.override ~params:default_params "_check_for_duplicate_transitions,
+         post dupes."; *)
       if List.is_empty pstr_dupes
       then (
         match none with
@@ -838,13 +849,50 @@ module MkGraph
       let is_tau : bool = false in
       let* (label : string) = econstr_to_string_mm act in
       let to_add : Mebi_action.action = { label; is_tau } in
-      (match H.find_opt g.transitions t with
-       | None ->
-         let _ = add_new_term_constr_transition g t to_add tgt int_tree in
-         ()
-       | Some actions ->
-         let _ = insert_constr_transition actions to_add tgt int_tree in
-         ());
+      let* _ =
+        match H.find_opt g.transitions t with
+        | None ->
+          if S.cardinal g.states > 134
+          then
+            Log.override
+              ~params
+              (Printf.sprintf
+                 "get_new_states, no existing transitions.\nterm:\n%s\n"
+                 (econstr_to_string t));
+          add_new_term_constr_transition g t to_add tgt int_tree
+        | Some actions ->
+          if S.cardinal g.states > 134
+          then
+            Log.override
+              ~params
+              (Printf.sprintf
+                 "get_new_states, adding to existing.\n\
+                  term:\n\
+                  %s\n\n\
+                  action label match: %s"
+                 (econstr_to_string t)
+                 (if Hashtbl.mem actions to_add
+                  then
+                    Printf.sprintf
+                      "true\n\
+                       matching destination:\n\
+                      \  using eq_constr: %b\n\
+                      \  using str:       %b"
+                      (D.exists
+                         (fun ((d, _t) : EConstr.t * Constr_tree.t) ->
+                           EConstr.eq_constr sigma tgt t
+                           && Constr_tree.eq int_tree _t)
+                         (Hashtbl.find actions to_add))
+                      (D.exists
+                         (fun ((d, _t) : EConstr.t * Constr_tree.t) ->
+                           let str_d : string = econstr_to_string d in
+                           let str_tgt : string = econstr_to_string tgt in
+                           String.equal str_d str_tgt
+                           && Constr_tree.eq int_tree _t)
+                         (Hashtbl.find actions to_add))
+                  else "false"));
+          insert_constr_transition actions to_add tgt int_tree
+      in
       (* if [tgt] has not been explored then add [to_visit] *)
       if H.mem g.transitions tgt
          || EConstr.eq_constr sigma tgt t
@@ -910,10 +958,21 @@ module MkGraph
          in *)
       let g : lts_graph = { g with states = S.union g.states new_states } in
       (* Log.override ~params "build_lts_graph D"; *)
-      (* let* _ = _check_for_duplicate_transitions ~prefix:"build_lts_graph, "
-         ~none:"No duplicates found" g in let* _ = _check_for_duplicate_states
-         ~prefix:"build_lts_graph, " g in let* _ = _check_transition_states
-         ~prefix:"build_lts_graph, " g in *)
+      let* _ =
+        if S.cardinal g.states > 134
+        then
+          _check_for_duplicate_transitions
+            ~prefix:
+              (Printf.sprintf
+                 "(%i) build_lts_graph, term:\n%s\n\n"
+                 (S.cardinal g.states)
+                 (econstr_to_string t))
+            ~none:"No duplicates found"
+            g
+        else return ()
+      in
+      (* let* _ = _check_for_duplicate_states ~prefix:"build_lts_graph, " g in *)
+      (* let* _ = _check_transition_states ~prefix:"build_lts_graph, " g in *)
       build_lts_graph ~params rlts_map g bound)
   ;;
 
@@ -945,12 +1004,18 @@ module MkGraph
         { to_visit = q; states = S.empty; init; transitions = H.create 0 }
         bound
     in
-    (* Log.override ~params "build_graph AA"; let* _ =
-       _check_for_duplicate_transitions ~prefix:"build_graph, " ~none:"No
-       duplicates found" g in Log.override ~params "build_graph BB"; let* _ =
-       _check_for_duplicate_states ~prefix:"build_graph, " g in Log.override
-       ~params "build_graph CC"; let* _ = _check_transition_states
-       ~prefix:"build_graph, " g in Log.override ~params "build_graph DD"; *)
+    Log.override ~params "build_graph AA";
+    let* _ =
+      _check_for_duplicate_transitions
+        ~prefix:"build_graph, "
+        ~none:"No duplicates found"
+        g
+    in
+    Log.override ~params "build_graph BB";
+    let* _ = _check_for_duplicate_states ~prefix:"build_graph, " g in
+    Log.override ~params "build_graph CC";
+    let* _ = _check_transition_states ~prefix:"build_graph, " g in
+    Log.override ~params "build_graph DD";
     return g
   ;;
 
@@ -1279,27 +1344,14 @@ module Vernac = struct
       =
       params.options.output_enabled <- false;
       let* (the_lts : Lts.lts) = build ~params ~bound ~name tref grefs in
-      let make_dump : bool =
-        match the_lts.info with None -> true | Some i -> i.is_complete
+      let dump_filepath : string =
+        Dump_to_file.write_to_file
+          (Default ())
+          (LTS name)
+          (JSON ())
+          (LTS the_lts)
       in
-      if make_dump
-      then (
-        let dump_filepath : string =
-          Dump_to_file.write_to_file
-            (Default ())
-            (LTS name)
-            (JSON ())
-            (LTS the_lts)
-        in
-        Log.normal
-          ~params
-          (Printf.sprintf "Dumped LTS into: %s.\n" dump_filepath))
-      else
-        Log.normal
-          ~params
-          (Printf.sprintf
-             "Incomplete, LTS (%s) should already be dumped.\n"
-             name);
+      Log.normal ~params (Printf.sprintf "Dumped LTS into: %s.\n" dump_filepath);
       return ()
     ;;
   end

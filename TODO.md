@@ -62,6 +62,135 @@
       methods that they iterate repeatidly over the same structures, and do lots
       of string comparisons.)
 
+- [ ] Duplicates appear in `proc3_recbra1` in `Proc.v`.
+
+      Realised this was caused by the comparison function for destination pairs
+      not being updated in a similar way.
+
+      ***Need to finish implementing `Constr_tree.compare`***
+      <!-- Specifically, this starts occuring from exactly bound `135`, for
+      transitions from:
+      ```
+      (tpar (tfix (tbra (tpar (tact ASend trec)
+                              (tact ARecv trec))
+                        (tpar (tact BSend tend)
+                              (tact BRecv tend))))
+            (tpar (tfix (tbra (tpar (tact ASend trec)
+                                    (tact ARecv trec))
+                              (tpar (tact BSend tend)
+                                    (tact BRecv tend))))
+                  (tpar (tfix (tbra (tpar (tact ASend trec)
+                                          (tact ARecv trec))
+                                    (tpar (tact BSend tend)
+                                          (tact BRecv tend))))
+                        (tfix (tbra (tpar (tact ASend trec)
+                                          (tact ARecv trec))
+                                    (tpar (tact BSend tend)
+                                          (tact BRecv tend)))))))
+      ```
+
+      Which itself is reached from one of the following:
+      ```
+      (tpar (tfix (tbra (tpar (tact ASend trec)
+                              (tact ARecv trec))
+                        (tpar (tact BSend tend)
+                              (tact BRecv tend))))
+            (tpar (tfix (tbra (tpar (tact ASend trec)
+                                    (tact ARecv trec))
+                              (tpar (tact BSend tend)
+                                    (tact BRecv tend))))
+                  (tpar (tfix (tbra (tpar (tact ASend trec)
+                                          (tact ARecv trec))
+                                    (tpar (tact BSend tend)
+                                          (tact BRecv tend))))
+                        (tfix (tbra (tpar (tact ASend trec)
+                                          (tact ARecv trec))
+                                    (tpar (tact BSend tend)
+                                          (tact BRecv tend)))))))
+
+      (6) [(6) [(8) []]]
+      ```
+
+      ```
+      (tpar (tpar (tfix (tbra (tpar (tact ASend trec)
+                                    (tact ARecv trec))
+                              (tpar (tact BSend tend)
+                                    (tact BRecv tend))))
+                  (tpar (tfix (tbra (tpar (tact ASend trec)
+                                          (tact ARecv trec))
+                                    (tpar (tact BSend tend)
+                                          (tact BRecv tend))))
+                        (tfix (tbra (tpar (tact ASend trec)
+                                          (tact ARecv trec))
+                                    (tpar (tact BSend tend)
+                                          (tact BRecv tend))))))
+            (tfix (tbra (tpar (tact ASend trec)
+                              (tact ARecv trec))
+                        (tpar (tact BSend tend)
+                              (tact BRecv tend)))))
+
+      (8) []
+      ```
+
+      ```
+      (tpar (tpar (tfix (tbra (tpar (tact ASend trec)
+                                    (tact ARecv trec))
+                              (tpar (tact BSend tend)
+                                    (tact BRecv tend))))
+                  (tfix (tbra (tpar (tact ASend trec)
+                                    (tact ARecv trec))
+                              (tpar (tact BSend tend)
+                                    (tact BRecv tend)))))
+            (tpar (tfix (tbra (tpar (tact ASend trec)
+                                    (tact ARecv trec))
+                              (tpar (tact BSend tend)
+                                    (tact BRecv tend))))
+                  (tfix (tbra (tpar (tact ASend trec)
+                                    (tact ARecv trec))
+                              (tpar (tact BSend tend)
+                                    (tact BRecv tend))))))
+
+      (10) []
+      ```
+
+      ```
+      (tpar (tfix (tbra (tpar (tact ASend trec)
+                              (tact ARecv trec))
+                        (tpar (tact BSend tend)
+                              (tact BRecv tend))))
+            (tpar (tpar (tfix (tbra (tpar (tact ASend trec)
+                                          (tact ARecv trec))
+                                    (tpar (tact BSend tend)
+                                          (tact BRecv tend))))
+                        (tfix (tbra (tpar (tact ASend trec)
+                                          (tact ARecv trec))
+                                    (tpar (tact BSend tend)
+                                          (tact BRecv tend)))))
+                  (tfix (tbra (tpar (tact ASend trec)
+                                    (tact ARecv trec))
+                              (tpar (tact BSend tend)
+                                    (tact BRecv tend))))))
+
+      (6) [(8) []]
+      (6) [(10) []]
+      ```
+
+      ---
+
+      Or, with the addition of the `do_clean` group of rules, the duplicates
+      begin upwards and including a bound of exactly `125`, from:
+      ```
+      (tpar (tfix (tbra (tpar (tact ASend trec)
+                              (tact ARecv trec))
+                        (tpar (tact BSend tend)
+                              (tact BRecv tend))))
+            (tpar tend
+                  (tfix (tbra (tpar (tact ASend trec)
+                                    (tact ARecv trec))
+                              (tpar (tact BSend tend)
+                                    (tact BRecv tend))))))
+      ``` -->
+
 ### archive
 
 - [x] `Proc.v, Example proc0_send1` is missing `true` transitions.
