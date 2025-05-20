@@ -479,6 +479,57 @@ module MkGraph
       0
   ;;
 
+  let flatten_transitions (ts : constr_transitions H.t)
+    : (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list mm
+    =
+    let raw_list : (EConstr.t * constr_transitions) list =
+      List.of_seq (H.to_seq ts)
+    in
+    let from_body
+      (i : int)
+      (new_transitions :
+        (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+      =
+      let (from, actions) : EConstr.t * constr_transitions =
+        List.nth raw_list i
+      in
+      let raw_actions : (Mebi_action.action * D.t) list =
+        List.of_seq (Hashtbl.to_seq actions)
+      in
+      let action_body
+        (j : int)
+        (new_transitions :
+          (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+        =
+        let (a, destinations) : Mebi_action.action * D.t =
+          List.nth raw_actions j
+        in
+        let raw_destinations : (EConstr.t * Constr_tree.t) list =
+          D.elements destinations
+        in
+        let destination_body
+          (k : int)
+          (new_transitions :
+            (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+          =
+          let (destination, constr_tree) : EConstr.t * Constr_tree.t =
+            List.nth raw_destinations k
+          in
+          return ((from, a, destination, constr_tree) :: new_transitions)
+        in
+        let* new_transitions' =
+          iterate 0 (List.length raw_destinations - 1) [] destination_body
+        in
+        return (List.append new_transitions' new_transitions)
+      in
+      let* new_transitions' =
+        iterate 0 (List.length raw_actions - 1) [] action_body
+      in
+      return (List.append new_transitions' new_transitions)
+    in
+    iterate 0 (List.length raw_list - 1) [] from_body
+  ;;
+
   (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t]. *)
   type lts_graph =
     { to_visit : EConstr.t Queue.t
@@ -605,58 +656,14 @@ module MkGraph
       "_check_for_duplicate_transitions, begin.";
     if Bool.not (H.length g.transitions > 1)
     then return ()
-    else (
-      let raw_list : (EConstr.t * constr_transitions) list =
-        List.of_seq (H.to_seq g.transitions)
-      in
-      let from_body
-        (i : int)
-        (new_transitions :
-          (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
-        =
-        let (from, actions) : EConstr.t * constr_transitions =
-          List.nth raw_list i
-        in
-        let raw_actions : (Mebi_action.action * D.t) list =
-          List.of_seq (Hashtbl.to_seq actions)
-        in
-        let action_body
-          (j : int)
-          (new_transitions :
-            (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
-          =
-          let (a, destinations) : Mebi_action.action * D.t =
-            List.nth raw_actions j
-          in
-          let raw_destinations : (EConstr.t * Constr_tree.t) list =
-            D.elements destinations
-          in
-          let destination_body
-            (k : int)
-            (new_transitions :
-              (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
-            =
-            let (destination, constr_tree) : EConstr.t * Constr_tree.t =
-              List.nth raw_destinations k
-            in
-            return ((from, a, destination, constr_tree) :: new_transitions)
-          in
-          let* new_transitions' =
-            iterate 0 (List.length raw_destinations - 1) [] destination_body
-          in
-          return (List.append new_transitions' new_transitions)
-        in
-        let* new_transitions' =
-          iterate 0 (List.length raw_actions - 1) [] action_body
-        in
-        return (List.append new_transitions' new_transitions)
-      in
-      let* flattened_transitions =
-        iterate 0 (List.length raw_list - 1) [] from_body
-      in
+    else
+      let* flattened_transitions = flatten_transitions g.transitions in
       (* let _num_transitions = List.length flattened_transitions in *)
-      (* Log.override ~params:default_params "_check_for_duplicate_transitions,
-         post iterate."; *)
+      Log.override
+        ~params:default_params
+        (Printf.sprintf
+           "_check_for_duplicate_transitions, found (%i) to check."
+           (List.length flattened_transitions));
       let iter_dupe
         (i : int)
         ((acc, cache) :
@@ -743,7 +750,7 @@ module MkGraph
                   Printf.sprintf "%s\n  %s\n" acc d)
                 ""
                 pstr_dupes));
-      return ())
+      return ()
   ;;
 
   let _check_transition_states ?(prefix : string = "") (g : lts_graph) : unit mm
@@ -852,45 +859,23 @@ module MkGraph
       let* _ =
         match H.find_opt g.transitions t with
         | None ->
-          if S.cardinal g.states > 134
-          then
-            Log.override
-              ~params
-              (Printf.sprintf
-                 "get_new_states, no existing transitions.\nterm:\n%s\n"
-                 (econstr_to_string t));
+          (* if S.cardinal g.states > 134 then Log.override ~params
+             (Printf.sprintf "get_new_states, no existing
+             transitions.\nterm:\n%s\n" (econstr_to_string t)); *)
           add_new_term_constr_transition g t to_add tgt int_tree
         | Some actions ->
-          if S.cardinal g.states > 134
-          then
-            Log.override
-              ~params
-              (Printf.sprintf
-                 "get_new_states, adding to existing.\n\
-                  term:\n\
-                  %s\n\n\
-                  action label match: %s"
-                 (econstr_to_string t)
-                 (if Hashtbl.mem actions to_add
-                  then
-                    Printf.sprintf
-                      "true\n\
-                       matching destination:\n\
-                      \  using eq_constr: %b\n\
-                      \  using str:       %b"
-                      (D.exists
-                         (fun ((d, _t) : EConstr.t * Constr_tree.t) ->
-                           EConstr.eq_constr sigma tgt t
-                           && Constr_tree.eq int_tree _t)
-                         (Hashtbl.find actions to_add))
-                      (D.exists
-                         (fun ((d, _t) : EConstr.t * Constr_tree.t) ->
-                           let str_d : string = econstr_to_string d in
-                           let str_tgt : string = econstr_to_string tgt in
-                           String.equal str_d str_tgt
-                           && Constr_tree.eq int_tree _t)
-                         (Hashtbl.find actions to_add))
-                  else "false"));
+          (* if S.cardinal g.states > 134 then Log.override ~params
+             (Printf.sprintf "get_new_states, adding to existing.\n\ term:\n\
+             %s\n\n\ action label match: %s" (econstr_to_string t) (if
+             Hashtbl.mem actions to_add then Printf.sprintf "true\n\ matching
+             destination:\n\ \ using eq_constr: %b\n\ \ using str: %b" (D.exists
+             (fun ((d, _t) : EConstr.t * Constr_tree.t) -> EConstr.eq_constr
+             sigma tgt t && Constr_tree.eq int_tree _t) (Hashtbl.find actions
+             to_add)) (D.exists (fun ((d, _t) : EConstr.t * Constr_tree.t) ->
+             let str_d : string = econstr_to_string d in let str_tgt : string =
+             econstr_to_string tgt in String.equal str_d str_tgt &&
+             Constr_tree.eq int_tree _t) (Hashtbl.find actions to_add)) else
+             "false")); *)
           insert_constr_transition actions to_add tgt int_tree
       in
       (* if [tgt] has not been explored then add [to_visit] *)
@@ -958,19 +943,11 @@ module MkGraph
          in *)
       let g : lts_graph = { g with states = S.union g.states new_states } in
       (* Log.override ~params "build_lts_graph D"; *)
-      let* _ =
-        if S.cardinal g.states > 134
-        then
-          _check_for_duplicate_transitions
-            ~prefix:
-              (Printf.sprintf
-                 "(%i) build_lts_graph, term:\n%s\n\n"
-                 (S.cardinal g.states)
-                 (econstr_to_string t))
-            ~none:"No duplicates found"
-            g
-        else return ()
-      in
+      (* let* _ = if S.cardinal g.states > 134 then
+         _check_for_duplicate_transitions ~prefix: (Printf.sprintf "(%i)
+         build_lts_graph, term:\n%s\n\n" (S.cardinal g.states)
+         (econstr_to_string t)) ~none:"No duplicates found" g else return ()
+         in *)
       (* let* _ = _check_for_duplicate_states ~prefix:"build_lts_graph, " g in *)
       (* let* _ = _check_transition_states ~prefix:"build_lts_graph, " g in *)
       build_lts_graph ~params rlts_map g bound)
@@ -1052,58 +1029,27 @@ module MkGraph
       return translation_tbl
     ;;
 
-    let create_transitions_list
-      ?(params : Params.log = default_params)
-      (transitions : constr_transitions H.t)
-      : (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list mm
-      =
-      let raw_list : (EConstr.t * constr_transitions) list =
-        List.of_seq (H.to_seq transitions)
-      in
-      let from_body
-        (i : int)
-        (new_transitions :
-          (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
-        =
-        let (from, actions) : EConstr.t * constr_transitions =
-          List.nth raw_list i
-        in
-        let raw_actions : (Mebi_action.action * D.t) list =
-          List.of_seq (Hashtbl.to_seq actions)
-        in
-        let action_body
-          (j : int)
-          (new_transitions :
-            (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
-          =
-          let (a, destinations) : Mebi_action.action * D.t =
-            List.nth raw_actions j
-          in
-          let raw_destinations : (EConstr.t * Constr_tree.t) list =
-            D.elements destinations
-          in
-          let destination_body
-            (k : int)
-            (new_transitions :
-              (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
-            =
-            let (destination, constr_tree) : EConstr.t * Constr_tree.t =
-              List.nth raw_destinations k
-            in
-            return ((from, a, destination, constr_tree) :: new_transitions)
-          in
-          let* new_transitions' =
-            iterate 0 (List.length raw_destinations - 1) [] destination_body
-          in
-          return (List.append new_transitions' new_transitions)
-        in
-        let* new_transitions' =
-          iterate 0 (List.length raw_actions - 1) [] action_body
-        in
-        return (List.append new_transitions' new_transitions)
-      in
-      iterate 0 (List.length raw_list - 1) [] from_body
-    ;;
+    (* let create_transitions_list ?(params : Params.log = default_params)
+       (transitions : constr_transitions H.t) : (S.elt * Mebi_action.action *
+       S.elt * Constr_tree.t) list mm = let raw_list : (EConstr.t *
+       constr_transitions) list = List.of_seq (H.to_seq transitions) in let
+       from_body (i : int) (new_transitions : (S.elt * Mebi_action.action *
+       S.elt * Constr_tree.t) list) = let (from, actions) : EConstr.t *
+       constr_transitions = List.nth raw_list i in let raw_actions :
+       (Mebi_action.action * D.t) list = List.of_seq (Hashtbl.to_seq actions) in
+       let action_body (j : int) (new_transitions : (S.elt * Mebi_action.action
+       * S.elt * Constr_tree.t) list) = let (a, destinations) :
+       Mebi_action.action * D.t = List.nth raw_actions j in let raw_destinations
+       : (EConstr.t * Constr_tree.t) list = D.elements destinations in let
+       destination_body (k : int) (new_transitions : (S.elt * Mebi_action.action
+       * S.elt * Constr_tree.t) list) = let (destination, constr_tree) :
+       EConstr.t * Constr_tree.t = List.nth raw_destinations k in return ((from,
+       a, destination, constr_tree) :: new_transitions) in let* new_transitions'
+       = iterate 0 (List.length raw_destinations - 1) [] destination_body in
+       return (List.append new_transitions' new_transitions) in let*
+       new_transitions' = iterate 0 (List.length raw_actions - 1) [] action_body
+       in return (List.append new_transitions' new_transitions) in iterate 0
+       (List.length raw_list - 1) [] from_body ;; *)
 
     let _check_all_states_translated
       (translation_tbl : coq_translation)
@@ -1208,7 +1154,7 @@ module MkGraph
       let* (transitions_list :
              (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
         =
-        create_transitions_list ~params g.transitions
+        flatten_transitions g.transitions
       in
       (* bidirectional mapping between [EConstr.t] and [string] *)
       let* translation_tbl = create_translation_tbl g.states in

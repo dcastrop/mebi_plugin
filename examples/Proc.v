@@ -214,9 +214,10 @@ Example proc3_recbra1 := tfix (tbra (tpar (tact ASend trec)
                                     (tpar (tact BSend tend)
                                           (tact BRecv tend))).
 (* MeBi Show LTS Bounded 1000 Of proc3_recbra1 Using termLTS. *)
+MeBi Dump "proc3_recbra1" LTS Bounded 1000 Of proc3_recbra1 Using termLTS.
 
 (* NOTE: duplicates start appearing at exactly 135 and onwards. *)
-MeBi Dump "proc3_recbra1" LTS Bounded 135 Of proc3_recbra1 Using termLTS.
+(* MeBi Dump "proc3_recbra1" LTS Bounded 135 Of proc3_recbra1 Using termLTS. *)
 
 
 (* NOTE: with the [do_clean] additions to the semantics, duplicates start appearing at exactly 120 and onwards. *)
