@@ -165,10 +165,6 @@ Example tm1 : tm :=
     )
   ).
 
-Example e1 : tm * nat * nat := (tm1, 0, 0).
-(* MeBi Show LTS Bounded 150 Of e1 Using step. *)
-(* MeBi Dump "e1" LTS Bounded 150 Of e1 Using step. *)
-
 Inductive sys : Type :=
   | PRC : (tm * nat * nat) -> sys
   | PAR : sys -> sys -> sys
@@ -209,12 +205,17 @@ Inductive lts : sys -> label -> sys -> Prop :=
     lts r1 a r2 ->
     lts (PAR l r1) a (PAR l r2)
 
-  | LTS_OK_L : forall r n v, lts (PAR (PRC (OK, n, v)) r) SILENT (r)
+  (* | LTS_OK_L : forall r n v, lts (PAR (PRC (OK, n, v)) r) SILENT (r)
 
-  | LTS_OK_R : forall l n v, lts (PAR l (PRC (OK, n, v))) SILENT (l)
+  | LTS_OK_R : forall l n v, lts (PAR l (PRC (OK, n, v))) SILENT (l) *)
   .
 
-(*  *)
+
+Example e1 : tm * nat * nat := (tm1, 0, 0).
+(* MeBi Show LTS Bounded 150 Of e1 Using step. *)
+(* MeBi Dump "e1" LTS Bounded 150 Of e1 Using step. *)
+
+
 Example e2 : sys :=
   PAR (PRC (tm1, 0, 0)) (
     PRC (OK, 0, 0)
@@ -222,7 +223,7 @@ Example e2 : sys :=
 (* MeBi Show LTS Bounded 70 Of e2 Using lts step. *)
 (* MeBi Dump "e2" LTS Bounded 70 Of e2 Using lts step. *)
 
-(*  *)
+
 Example e3 : sys :=
   PAR (PRC (tm1, 0, 0)) (
     (PRC (tm1, 0, 0))
@@ -230,7 +231,7 @@ Example e3 : sys :=
 (* MeBi Show LTS Bounded 1200 Of e3 Using lts step. *)
 (* MeBi Dump "e3" LTS Bounded 1200 Of e3 Using lts step. *)
 
-(*  *)
+
 Example e4 : sys :=
   PAR (PRC (tm1, 0, 0)) (
     PAR (PRC (tm1, 0, 0)) (
@@ -238,9 +239,9 @@ Example e4 : sys :=
     )
   ).
 (* MeBi Show LTS Bounded 2040 Of e4 Using lts step. *)
-(* MeBi Dump "e4" LTS Bounded 2040 Of e4 Using lts step. *)
+(* MeBi Dump "e4" LTS Bounded 3000 Of e4 Using lts step. *)
 
-(*  *)
+
 Example e5 : sys :=
   PAR (PRC (tm1, 0, 0)) (
     PAR (PRC (tm1, 0, 0)) (
@@ -250,7 +251,7 @@ Example e5 : sys :=
 (* MeBi Show LTS Bounded 5000 Of e5 Using lts step. *)
 (* MeBi Dump "e5" LTS Bounded 5000 Of e5 Using lts step. *)
 
-(*  *)
+
 Example e6 : sys :=
   PAR
     (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))
@@ -259,7 +260,6 @@ Example e6 : sys :=
 (* MeBi Dump "e6" LTS Bounded 5 Of e6 Using lts step. *)
 
 
-(*  *)
 Example e7 : sys :=
   PAR
     (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))

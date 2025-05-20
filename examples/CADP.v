@@ -893,7 +893,7 @@ Qed.
 Example p0 : tm * env := (P, Env.initial 1).
 (* Compute p0. *)
 (* MeBi Show LTS Bounded 37 Of p0 Using step. *)
-(* MeBi Dump "p0" LTS Bounded 1000 Of p0 Using step. *)
+(* MeBi Dump "p0" LTS Bounded 37 Of p0 Using step. *)
 
 (* MeBi Show  FSM Of p0 Using step. *)
 (* MeBi Dump "p0" FSM Bounded 150 Of p0 Using step. *)
@@ -960,11 +960,37 @@ Example ncs1 : sys * resource := compose (create 1 P).
 Example ncs2 : sys * resource := compose (create 2 P).
 (* Compute ncs2. *)
 
-(* ! lts incomplete even after 5000 bound *)
+(* FIXME: in [ncs2] the condition [(EQ (VAR PREDECESSOR) (VAL NIL))] is not
+          correctly evaluated, leading to an error 41. *)
+(* MeBi Dump "NCS2" LTS Bounded 1000 Of ncs2 Using lts step. *)
+
+Example ncs2_error41 : sys * resource :=
+(PAR (PRC (SEQ (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_DEF 0 (SEQ (ACT NCS) (SEQ (SEQ (ACT (WRITE_NEXT THE_PID NIL)) (SEQ (ACT FETCH_AND_STORE) (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ))) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_CALL 0))))))))))) (0, {| var_predecessor := Some 1; var_locked := false; var_next := None; var_swap := true |}, None)) (PRC (SEQ (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_DEF 0 (SEQ (ACT NCS) (SEQ (SEQ (ACT (WRITE_NEXT THE_PID NIL)) (SEQ (ACT FETCH_AND_STORE) (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ))) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_CALL 0))))))))))) (1, {| var_predecessor := None; var_locked := false; var_next := None; var_swap := false |}, None)), ([{| next := None; locked := false |}; {| next := None; locked := false |}; {| next := None; locked := false |}], (Some 0, Some 0))).
+
+
+(** *)
+Inductive lts_transitive_closure : sys * resource -> Prop :=
+
+  | trans_lts : forall t a t' e' e,
+      (t, e) ==<{ a }>==> (t', e') ->
+      lts_transitive_closure (t', e') ->
+      lts_transitive_closure (t, e)
+
+  | no_lts : forall t e, lts_transitive_closure (t, e)
+  .
+
+(* Goal lts_transitive_closure ncs2_error41.
+  unfold ncs2_error41.
+  eapply trans_lts. eapply LTS_PAR_L.
+                    eapply LTS_PRC.
+                    eapply STEP_SEQ.
+                    (* eapply trans_step. *)
+                    (* eapply trans_lts. *)
+                    eapply STEP_IF. *)
+
 (* MeBi Show  LTS Bounded 5000 Of ncs2 Using lts step. *)
 (* MeBi Show  LTS Of ncs2 Using lts step. *)
 
-(* MeBi Dump "NCS2" LTS Bounded 1000 Of ncs2 Using lts step. *)
 
 (* MeBi Dump "NCS2" FSM Bounded 150 Of ncs2 Using lts step. *)
 (* MeBi Debug LTS Of ncs2 Using lts step. *)

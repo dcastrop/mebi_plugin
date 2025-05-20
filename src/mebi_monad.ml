@@ -101,6 +101,15 @@ let _compare_constr_using_str st () t1 t2 =
   String.compare t1_str t2_str
 ;;
 
+(** _compare_constr_using_enc_list st () t1 t2 compares the encodings of t1, t2.
+    Terms are stored in a list in the order they are encountered, with new terms
+    being added to the front of the list. If a term is not found in the list,
+    then its encoding must be the length of the list. When a term is found in
+    the list, since we add terms to front, the [int] index does not represent
+    its encoding and we must minus this from the total length of the list.
+    (E.g., for term [b] in list [e, d, c, b, a] which has length [5], the index
+    of [b] is [3], in order to obtain the encoding of [b] we must [(5-1)-3]
+    which yields an encoding of [1].) *)
 let _compare_constr_using_enc_list st () t1 t2 =
   let (t1_enc, offset2) : int * int =
     let offset1 : int = List.length !st.coq_enc - 1 in
@@ -110,7 +119,9 @@ let _compare_constr_using_enc_list st () t1 t2 =
         !st.coq_enc
     with
     | None ->
+      (* add to cache *)
       st := { !st with coq_enc = t1 :: !st.coq_enc };
+      (* t1 is at the head of the queue*)
       offset1 + 1, offset1 + 1
     | Some enc -> offset1 - enc, offset1
   in
@@ -121,6 +132,7 @@ let _compare_constr_using_enc_list st () t1 t2 =
         !st.coq_enc
     with
     | None ->
+      (* add to cache *)
       st := { !st with coq_enc = t2 :: !st.coq_enc };
       offset2 + 1
     | Some enc -> offset2 - enc
@@ -135,6 +147,9 @@ let _compare_constr_using_enc_list st () t1 t2 =
   Int.compare t1_enc t2_enc
 ;;
 
+(** let _compare_constr_using_enc_tbl st () t1 t2 compares encodings of t1 t2.
+    The [(EConstr.t, int) Hashtbl.t] maps terms to integers. When a new term is
+    encountered, it is mapped to the current length of the table. *)
 (* let _compare_constr_using_enc_tbl st () t1 t2 = let t1_enc : int = match
    Hashtbl.find_opt !st.coq_enc t1 with | None -> let enc : int = Hashtbl.length
    !st.coq_enc in Hashtbl.add !st.coq_enc t1 enc; enc | Some enc -> enc in let
@@ -186,6 +201,9 @@ let make_constr_set (st : coq_context ref)
   { state = st; value = (module Constrset : Set.S with type elt = EConstr.t) }
 ;;
 
+(** compare_constr_tree st () t1 t2 compares destination pairs t1 and t2.
+    Prioritises the comparison of terms over trees. Only if terms look identical
+    do we then compare the trees. (See [Constr_tree.compare].)*)
 let compare_constr_tree
   st
   ()
@@ -193,10 +211,7 @@ let compare_constr_tree
   (t2 : EConstr.t * Constr_tree.t)
   =
   match compare_constr st () (fst t1) (fst t2) with
-  | 0 ->
-    if Constr_tree.eq (snd t1) (snd t2)
-    then 0
-    else Constr_tree.compare (snd t1) (snd t2)
+  | 0 -> Constr_tree.compare (snd t1) (snd t2)
   | n -> n
 ;;
 
