@@ -15,8 +15,23 @@ let eq (t1 : t) (t2 : t) : bool =
   tree_eq t1 t2
 ;;
 
-(* TODO: *)
-let compare (t1 : t) (t2 : t) : int = 0
+let compare (t1 : t) (t2 : t) : int =
+  let rec tree_compare (t1 : t) (t2 : t) : int =
+    match t1, t2 with
+    | Node (i1, l1), Node (i2, l2) ->
+      (match Int.compare i1 i2 with 0 -> tree_list_compare l1 l2 | n -> n)
+  and tree_list_compare (l1 : t list) (l2 : t list) : int =
+    match l1, l2 with
+    | [], [] -> 0
+    | h1 :: t1, h2 :: t2 ->
+      (match tree_compare h1 h2 with
+       | 0 -> tree_list_compare t1 t2 (* these should always be empty *)
+       | n -> n (* prioritise the main node when comparing *))
+    | [], _ :: _ -> -1
+    | _ :: _, [] -> 1
+  in
+  tree_compare t1 t2
+;;
 
 let rec pstr (t1 : t) : string =
   match t1 with
