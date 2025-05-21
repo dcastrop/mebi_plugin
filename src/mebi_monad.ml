@@ -205,10 +205,10 @@ let make_constr_set (st : coq_context ref)
     Prioritises the comparison of terms over trees. Only if terms look identical
     do we then compare the trees. (See [Constr_tree.compare].)*)
 let compare_constr_tree
-  st
-  ()
-  (t1 : EConstr.t * Constr_tree.t)
-  (t2 : EConstr.t * Constr_tree.t)
+      st
+      ()
+      (t1 : EConstr.t * Constr_tree.t)
+      (t2 : EConstr.t * Constr_tree.t)
   =
   match compare_constr st () (fst t1) (fst t2) with
   | 0 -> Constr_tree.compare (snd t1) (snd t2)
@@ -237,10 +237,10 @@ let make_constr_tree_set (st : coq_context ref)
 
 (** Monadic for loop *)
 let rec iterate
-  (from_idx : int)
-  (to_idx : int)
-  (acc : 'a)
-  (f : int -> 'a -> 'a t)
+          (from_idx : int)
+          (to_idx : int)
+          (acc : 'a)
+          (f : int -> 'a -> 'a t)
   : 'a t
   =
   if from_idx > to_idx
@@ -257,8 +257,8 @@ let get_sigma (st : coq_context ref) : Evd.evar_map in_context =
 ;;
 
 let state
-  (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-  (st : coq_context ref)
+      (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+      (st : coq_context ref)
   : 'a in_context
   =
   let sigma, a = f !st.coq_env !st.coq_ctx in
@@ -293,6 +293,10 @@ let invalid_ref (x : Names.GlobRef.t) : 'a t = fun st -> raise (invalid_ref x)
 (** Error when term is of unknown type *)
 let unknown_term_type (tmty : EConstr.t * EConstr.t * EConstr.t list) : 'a t =
   fun st -> raise (unknown_term_type !st.coq_env !st.coq_ctx tmty)
+;;
+
+let primary_lts_not_found ((t, names) : EConstr.t * EConstr.t list) : 'a t =
+  fun st -> raise (primary_lts_not_found !st.coq_env !st.coq_ctx t names)
 ;;
 
 module type Monad = sig

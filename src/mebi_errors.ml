@@ -6,6 +6,8 @@ type mebi_error =
   | InvalidLTSRef of Names.GlobRef.t
   | CannotFindTypeOfTermToVisit of
       (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t * EConstr.t list))
+  | CannotFindMatchingInductiveDefinition of
+      (Environ.env * Evd.evar_map * EConstr.t * EConstr.t list)
 
 exception MEBI_exn of mebi_error
 
@@ -16,6 +18,11 @@ let invalid_ref r = MEBI_exn (InvalidLTSRef r)
 (** for any terms encountered when exploring/building the lts *)
 let unknown_term_type ev sg tmty =
   MEBI_exn (CannotFindTypeOfTermToVisit (ev, sg, tmty))
+;;
+
+(** *)
+let primary_lts_not_found ev sg t names =
+  MEBI_exn (CannotFindMatchingInductiveDefinition (ev, sg, t, names))
 ;;
 
 let mebi_handler = function
@@ -72,6 +79,7 @@ let mebi_handler = function
                    tystr
                    (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg k)))
                trkeys))
+  | CannotFindMatchingInductiveDefinition (ev, sg, t, names) -> str "..."
 ;;
 
 let _ =

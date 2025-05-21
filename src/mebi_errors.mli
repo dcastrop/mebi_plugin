@@ -7,3 +7,10 @@ val unknown_term_type
   -> Evd.evar_map
   -> EConstr.t * EConstr.t * EConstr.t list
   -> exn
+
+val primary_lts_not_found
+  :  Environ.env
+  -> Evd.evar_map
+  -> Evd.econstr
+  -> Evd.econstr list
+  -> exn
