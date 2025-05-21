@@ -21,10 +21,6 @@ let ref_list_to_glob_list (l : Libnames.qualid list) : Names.GlobRef.t list =
     l
 ;;
 
-(** ['a mm] is a function type mapping from [coq_context ref] to ['a in_context].
-*)
-type 'a mm = 'a Mebi_monad.t
-
 (* TODO: should maybe be moved to [mebi_monad.ml]? *)
 open Mebi_monad
 open Mebi_monad.Monad_syntax

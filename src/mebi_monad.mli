@@ -1,59 +1,65 @@
-type 'a t
+type 'a mm
+
+type coq_context =
+  { coq_env : Environ.env
+  ; coq_ctx : Evd.evar_map
+  ; coq_enc : EConstr.t list (* ; coq_enc : (EConstr.t, int) Hashtbl.t *)
+  }
 
 (********************************************)
 (****** CORE DEFINITIONS ********************)
 (********************************************)
-val run : 'a t -> 'a
-val return : 'a -> 'a t
-val bind : 'a t -> ('a -> 'b t) -> 'b t
-val map : ('a -> 'b) -> 'a t -> 'b t
-val product : 'a t -> 'b t -> ('a * 'b) t
-val iterate : int -> int -> 'a -> (int -> 'a -> 'a t) -> 'a t
+val run : 'a mm -> 'a
+val return : 'a -> 'a mm
+val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
+val map : ('a -> 'b) -> 'a mm -> 'b mm
+val product : 'a mm -> 'b mm -> ('a * 'b) mm
+val iterate : int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
 
 (********************************************)
 (****** ERRORS ******************************)
 (********************************************)
-val invalid_arity : Constr.types -> 'a t
-val invalid_sort : Sorts.family -> 'a t
-val invalid_ref : Names.GlobRef.t -> 'a t
-val unknown_term_type : EConstr.t * EConstr.t * EConstr.t list -> 'a t
-val primary_lts_not_found : EConstr.t * EConstr.t list -> 'a t
+val invalid_arity : Constr.types -> 'a mm
+val invalid_sort : Sorts.family -> 'a mm
+val invalid_ref : Names.GlobRef.t -> 'a mm
+val unknown_term_type : EConstr.t * EConstr.t * EConstr.t list -> 'a mm
+val primary_lts_not_found : EConstr.t * EConstr.t list -> 'a mm
 
 (********************************************)
 (****** GET & PUT STATE *********************)
 (********************************************)
-val get_env : Environ.env t
-val get_sigma : Evd.evar_map t
-val state : (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) -> 'a t
-val sandbox : 'a t -> 'a t
+val get_env : Environ.env mm
+val get_sigma : Evd.evar_map mm
+val state : (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) -> 'a mm
+val sandbox : 'a mm -> 'a mm
 
 (********************************************)
 (****** CTX-dependent wrappers **************)
 (********************************************)
-val make_constr_tbl : (module Hashtbl.S with type key = EConstr.t) t
-val make_constr_set : (module Set.S with type elt = EConstr.t) t
+val make_constr_tbl : (module Hashtbl.S with type key = EConstr.t) mm
+val make_constr_set : (module Set.S with type elt = EConstr.t) mm
 
 val make_constr_tree_set
-  : (module Set.S with type elt = EConstr.t * Constr_tree.t) t
+  : (module Set.S with type elt = EConstr.t * Constr_tree.t) mm
 
-val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit t
+val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit mm
 
 module type Monad = sig
-  val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
-  val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+  val ( let+ ) : 'a mm -> ('a -> 'b) -> 'b mm
+  val ( let* ) : 'a mm -> ('a -> 'b mm) -> 'b mm
 
   val ( let$ )
     :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-    -> ('a -> 'b t)
-    -> 'b t
+    -> ('a -> 'b mm)
+    -> 'b mm
 
   val ( let$* )
     :  (Environ.env -> Evd.evar_map -> Evd.evar_map)
-    -> (unit -> 'b t)
-    -> 'b t
+    -> (unit -> 'b mm)
+    -> 'b mm
 
-  val ( let$+ ) : (Environ.env -> Evd.evar_map -> 'a) -> ('a -> 'b t) -> 'b t
-  val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
+  val ( let$+ ) : (Environ.env -> Evd.evar_map -> 'a) -> ('a -> 'b mm) -> 'b mm
+  val ( and+ ) : 'a mm -> 'b mm -> ('a * 'b) mm
 end
 
 module Monad_syntax : Monad

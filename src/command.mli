@@ -7,7 +7,7 @@ module Vernac : sig
       -> ?equiv:Names.GlobRef.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> Lts.lts Mebi_monad.t
+      -> Lts.lts Mebi_monad.mm
 
     val show
       :  ?params:Utils.Logging.params
@@ -15,7 +15,7 @@ module Vernac : sig
       -> ?equiv:Names.GlobRef.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> unit Mebi_monad.t
+      -> unit Mebi_monad.mm
 
     val dump
       :  ?params:Utils.Logging.params
@@ -24,7 +24,7 @@ module Vernac : sig
       -> ?equiv:Names.GlobRef.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> unit Mebi_monad.t
+      -> unit Mebi_monad.mm
   end
 
   module FSM : sig
@@ -35,7 +35,7 @@ module Vernac : sig
       -> ?equiv:Names.GlobRef.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> Fsm.fsm Mebi_monad.t
+      -> Fsm.fsm Mebi_monad.mm
 
     val show
       :  ?params:Utils.Logging.params
@@ -43,7 +43,7 @@ module Vernac : sig
       -> ?equiv:Names.GlobRef.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> unit Mebi_monad.t
+      -> unit Mebi_monad.mm
 
     val dump
       :  ?params:Utils.Logging.params
@@ -52,7 +52,7 @@ module Vernac : sig
       -> ?equiv:Names.GlobRef.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> unit Mebi_monad.t
+      -> unit Mebi_monad.mm
   end
 
   module Minim : sig
@@ -62,14 +62,14 @@ module Vernac : sig
       -> ?name:string
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> (Fsm.fsm * Fsm.fsm) Mebi_monad.t
+      -> (Fsm.fsm * Fsm.fsm) Mebi_monad.mm
 
     val show
       :  ?params:Utils.Logging.params
       -> ?bound:int
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> unit Mebi_monad.t
+      -> unit Mebi_monad.mm
 
     val dump
       :  ?params:Utils.Logging.params
@@ -77,7 +77,7 @@ module Vernac : sig
       -> ?name:string
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> unit Mebi_monad.t
+      -> unit Mebi_monad.mm
   end
 
   module Merged : sig
@@ -88,7 +88,7 @@ module Vernac : sig
       -> Constrexpr.constr_expr_r CAst.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> (Fsm.fsm * Fsm.fsm * Fsm.fsm) Mebi_monad.t
+      -> (Fsm.fsm * Fsm.fsm * Fsm.fsm) Mebi_monad.mm
 
     val show
       :  ?params:Utils.Logging.params
@@ -96,7 +96,7 @@ module Vernac : sig
       -> Constrexpr.constr_expr_r CAst.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> unit Mebi_monad.t
+      -> unit Mebi_monad.mm
 
     val dump
       :  ?params:Utils.Logging.params
@@ -105,7 +105,7 @@ module Vernac : sig
       -> Constrexpr.constr_expr_r CAst.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> unit Mebi_monad.t
+      -> unit Mebi_monad.mm
   end
 
   module Bisim : sig
@@ -118,7 +118,7 @@ module Vernac : sig
       -> Constrexpr.constr_expr_r CAst.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> (Fsm.fsm * Fsm.fsm * Bisimilarity.result) Mebi_monad.t
+      -> (Fsm.fsm * Fsm.fsm * Bisimilarity.result) Mebi_monad.mm
 
     val show
       :  ?params:Utils.Logging.params
@@ -126,7 +126,7 @@ module Vernac : sig
       -> Constrexpr.constr_expr_r CAst.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> unit Mebi_monad.t
+      -> unit Mebi_monad.mm
 
     val dump
       :  ?params:Utils.Logging.params
@@ -135,6 +135,6 @@ module Vernac : sig
       -> Constrexpr.constr_expr_r CAst.t
       -> Constrexpr.constr_expr_r CAst.t
       -> Names.GlobRef.t list
-      -> unit Mebi_monad.t
+      -> unit Mebi_monad.mm
   end
 end
