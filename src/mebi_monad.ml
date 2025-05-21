@@ -15,7 +15,7 @@ open Mebi_errors
   (* exception Not_found *)
 end *)
 
-module type INTERNAL_PAIR = sig
+(* module type INTERNAL_PAIR = sig
   type fwd
   type bck
 end
@@ -23,7 +23,9 @@ end
 module IntEncoding : INTERNAL_PAIR = struct
   type fwd = EConstr.t
   type bck = int
-end
+end *)
+
+(* 
 
 module Internal =
 functor
@@ -47,7 +49,112 @@ functor
     ;;
   end
 
-module Internalize = Internal (IntEncoding)
+module Internalize = Internal (IntEncoding) *)
+
+module type INTERNAL_ENCODING = sig
+  type origin_type
+  type encode_type
+
+  val origin_eq : origin_type -> origin_type -> bool
+  val origin_hash : origin_type -> int
+  val origin_compare : origin_type -> origin_type -> int
+
+  val encode_eq : encode_type -> encode_type -> bool
+  val encode_hash : encode_type -> int
+  val encode_compare : encode_type -> encode_type -> int
+
+  val next_encoding : encode_type -> encode_type
+   
+end
+
+module IntEncoding : INTERNAL_ENCODING = struct
+  type origin_type = EConstr.t
+  type encode_type = int
+
+  let origin_eq t1 t2 = false 
+  let origin_hash t = 0
+  let origin_compare t1 t2 = 0
+
+  let encode_eq t1 t2 = false 
+  let encode_hash t = 0
+  let encode_compare t1 t2 = 0
+
+  let next_encoding n = n+1
+end
+
+
+
+module type INTERNAL_FUNCTOR = 
+  (Pair : INTERNAL_ENCODING) ->
+    sig
+      type origin_type = Pair.origin_type
+      type encode_type = Pair.encode_type
+
+      module FwdEncoding : Hashtbl.S with type key = origin_type
+      module BckEncoding : Hashtbl.S with type key = encode_type
+
+      val next_encoding : encode_type -> encode_type
+
+    end
+
+
+module Internal =
+  functor (Pair : INTERNAL_ENCODING) ->
+    struct
+      type origin_type = Pair.origin_type
+      type encode_type = Pair.encode_type
+
+      module FwdEncoding = Hashtbl.Make (struct
+        type key = origin_type
+
+        type equal t1 t2 = Pair.origin_eq t1 t2
+        type hash t = Pair.origin_hash t
+      end) 
+
+      module BckEncoding = Hashtbl.Make (struct
+        type key = encode_type
+
+        type equal t1 t2 = Pair.encode_eq t1 t2
+        type hash t = Pair.encode_hash t
+      end)
+
+      let next_encoding n = Pair.next_encoding n
+
+      type wrapper =
+        { fwd_enc : (origin_type, encode_type) Hashtbl.t
+        ; bck_enc : (encode_type, origin_type) Hashtbl.t
+        }
+
+      let encode (w : wrapper) (k : origin_type) : encode_type =
+        Hashtbl.find w.fwd_enc k
+      ;;
+
+      let decode (w : wrapper) (k : encode_type) : origin_type =
+        Hashtbl.find w.bck_enc k
+      ;;
+    end
+
+
+
+
+
+module IntEncoding : INTERNAL_ENCODING = struct
+  (* type origin_type = EConstr.t
+  type encode_type = int *)
+
+  type pair = (EConstr.t, int) INTERNAL_ENCODING.pair
+
+  let origin_type p = fst p
+  
+  let encode_type p = snd p
+
+  let next_encoding n = n+1
+end
+
+
+module InternalEncoding = (Internal:INTERNAL_FUNCTOR) -> (INTERNALIZED with type pair = Internal.origin_type and type )
+
+module Internals = InternalEncoding(IntEncoding)
 
 (* module Internals = Internalize(Internalized) *)
 
