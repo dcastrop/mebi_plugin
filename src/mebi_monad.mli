@@ -17,6 +17,7 @@ val invalid_arity : Constr.types -> 'a t
 val invalid_sort : Sorts.family -> 'a t
 val invalid_ref : Names.GlobRef.t -> 'a t
 val unknown_term_type : EConstr.t * EConstr.t * EConstr.t list -> 'a t
+val primary_lts_not_found : EConstr.t * EConstr.t list -> 'a t
 
 (********************************************)
 (****** GET & PUT STATE *********************)

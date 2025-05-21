@@ -221,7 +221,7 @@ Example e2 : sys :=
     PRC (OK, 0, 0)
   ).
 (* MeBi Show LTS Bounded 70 Of e2 Using lts step. *)
-(* MeBi Dump "e2" LTS Bounded 70 Of e2 Using lts step. *)
+MeBi Dump "e2" LTS Bounded 70 Of e2 Using lts step.
 
 
 Example e3 : sys :=
