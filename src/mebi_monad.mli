@@ -1,5 +1,6 @@
 type 'a mm
 
+(* needs to be exposed for [mebi_internalize.ml] *)
 type coq_context =
   { coq_env : Environ.env
   ; coq_ctx : Evd.evar_map
