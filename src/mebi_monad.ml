@@ -1,9 +1,97 @@
 open Mebi_errors
 
+(* module type InternalB = sig
+  type ('a, 'b) wrapper =
+    { fwd_enc : ('a, 'b) Hashtbl.t
+    ; bck_enc : ('b, 'a) Hashtbl.t
+    ; counter : 'b ref
+    }
+
+  (* val step_counter : ('a, 'b) wrapper -> ('a, 'b) wrapper *)
+
+  val encode : ('a, 'b) wrapper -> 'a -> 'b
+  val decode : ('a, 'b) wrapper -> 'b -> 'a
+
+  (* exception Not_found *)
+end *)
+
+module type INTERNAL_PAIR = sig
+  type fwd
+  type bck
+end
+
+module IntEncoding : INTERNAL_PAIR = struct
+  type fwd = EConstr.t
+  type bck = int
+end
+
+module Internal =
+functor
+  (Pair : INTERNAL_PAIR)
+  ->
+  struct
+    (* type fwd_enc = (Pair.fwd, Pair.bck) Hashtbl.t
+       type bck_enc = (Pair.bck, Pair.fwd) Hashtbl.t *)
+
+    type wrapper =
+      { fwd_enc : (Pair.fwd, Pair.bck) Hashtbl.t
+      ; bck_enc : (Pair.bck, Pair.fwd) Hashtbl.t
+      }
+
+    let encode (w : wrapper) (k : Pair.fwd) : Pair.bck =
+      Hashtbl.find w.fwd_enc k
+    ;;
+
+    let decode (w : wrapper) (k : Pair.bck) : Pair.fwd =
+      Hashtbl.find w.bck_enc k
+    ;;
+  end
+
+module Internalize = Internal (IntEncoding)
+
+(* module Internals = Internalize(Internalized) *)
+
+(* let _test : unit =
+   let module Internals = Internal (IntEncoding) in
+   Internals.wrapper;
+   ()
+   ;; *)
+
+(* module type INTERNAL_FUNCTOR = functor (Pair:INTERNAL_PAIR) -> struct
+   type wrapper = I.wrapper
+   end *)
+
+(* module Internalize = Internal(IntEncoding) *)
+
+(* module Internals = Internalize(Internalized) *)
+
+(* module Internalized = struct
+   type wrapper = (EConstr.t, int) Internalize.wrapper
+   end *)
+
+(* module Internals : Internalize = struct
+  type ('a, 'b) wrapper =
+    { fwd_enc : ('a, 'b) Hashtbl.t
+    ; bck_enc : ('b, 'a) Hashtbl.t
+    ; counter : 'b ref
+    }
+
+  (* let step_counter(w:('a, 'b) wrapper) : ('a, 'b) wrapper = *)
+
+  let encode (w : ('a, 'b) wrapper) (k : 'a) : 'b =
+    (* match Hashtbl.find_opt w.fwd_enc k with
+       | None -> add to encoding *)
+    Hashtbl.find w.fwd_enc k
+  ;;
+
+  let decode (w : ('a, 'b) wrapper) (k : 'b) : 'a = Hashtbl.find w.bck_enc k
+end *)
+
 type coq_context =
   { coq_env : Environ.env
   ; coq_ctx : Evd.evar_map
-  ; coq_enc : EConstr.t list (* ; coq_enc : (EConstr.t, int) Hashtbl.t *)
+  ; wrapper : (EConstr.t, int) Internals.wrapper
+    (* ; coq_enc : (EConstr.t, int) Hashtbl.t *)
   }
 
 (* Essentially, a state monad *)
@@ -14,11 +102,13 @@ type 'a in_context =
 
 type 'a mm = coq_context ref -> 'a in_context
 
+(********************************************)
+(****** CORE DEFINITIONS ********************)
+(********************************************)
 let run (x : 'a mm) : 'a =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  (* let a = x (ref { coq_env = env; coq_ctx = sigma }) in *)
-  let a = x (ref { coq_env = env; coq_ctx = sigma; coq_enc = [] }) in
+  let a = x (ref { coq_env = env; coq_ctx = sigma }) in
   (* let a = x (ref { coq_env = env; coq_ctx = sigma; coq_enc = Hashtbl.create 0
      }) in *)
   a.value
@@ -47,6 +137,75 @@ let product (x : 'a mm) (y : 'b mm) : ('a * 'b) mm =
 [@@inline always]
 ;;
 
+(** Monadic for loop *)
+let rec iterate
+          (from_idx : int)
+          (to_idx : int)
+          (acc : 'a)
+          (f : int -> 'a -> 'a mm)
+  : 'a mm
+  =
+  if from_idx > to_idx
+  then return acc
+  else bind (f from_idx acc) (fun acc' -> iterate (from_idx + 1) to_idx acc' f)
+;;
+
+(********************************************)
+(****** ERRORS ******************************)
+(********************************************)
+
+(** Error when input LTS has the wrong arity *)
+let invalid_arity (x : Constr.types) : 'a mm =
+  fun st -> raise (invalid_arity !st.coq_env !st.coq_ctx x)
+;;
+
+(** Error when input LTS has the wrong Sort *)
+let invalid_sort (x : Sorts.family) : 'a mm = fun st -> raise (invalid_sort x)
+
+(** Error when input LTS reference is invalid (e.g. non existing) *)
+let invalid_ref (x : Names.GlobRef.t) : 'a mm = fun st -> raise (invalid_ref x)
+
+(** Error when term is of unknown type *)
+let unknown_term_type (tmty : EConstr.t * EConstr.t * EConstr.t list) : 'a mm =
+  fun st -> raise (unknown_term_type !st.coq_env !st.coq_ctx tmty)
+;;
+
+let primary_lts_not_found ((t, names) : EConstr.t * EConstr.t list) : 'a mm =
+  fun st -> raise (primary_lts_not_found !st.coq_env !st.coq_ctx t names)
+;;
+
+(********************************************)
+(****** GET & PUT STATE *********************)
+(********************************************)
+
+let get_env (st : coq_context ref) : Environ.env in_context =
+  { state = st; value = !st.coq_env }
+;;
+
+let get_sigma (st : coq_context ref) : Evd.evar_map in_context =
+  { state = st; value = !st.coq_ctx }
+;;
+
+let state
+      (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+      (st : coq_context ref)
+  : 'a in_context
+  =
+  let sigma, a = f !st.coq_env !st.coq_ctx in
+  st := { !st with coq_ctx = sigma };
+  { state = st; value = a }
+;;
+
+let sandbox (m : 'a mm) (st : coq_context ref) : 'a in_context =
+  let st_contents = !st in
+  let res = m st in
+  st := st_contents;
+  { state = st; value = res.value }
+;;
+
+(********************************************)
+(****** CTX-dependent wrappers **************)
+(********************************************)
 let econstr_hash st () t =
   Constr.hash
     (EConstr.to_constr ?abort_on_undefined_evars:(Some false) !st.coq_ctx t)
@@ -110,7 +269,7 @@ let _compare_constr_using_str st () t1 t2 =
     (E.g., for term [b] in list [e, d, c, b, a] which has length [5], the index
     of [b] is [3], in order to obtain the encoding of [b] we must [(5-1)-3]
     which yields an encoding of [1].) *)
-let _compare_constr_using_enc_list st () t1 t2 =
+(* let _compare_constr_using_enc_list st () t1 t2 =
   let (t1_enc, offset2) : int * int =
     let offset1 : int = List.length !st.coq_enc - 1 in
     match
@@ -145,7 +304,7 @@ let _compare_constr_using_enc_list st () t1 t2 =
      ()) ()) (Printf.sprintf "_compare_constr_using_enc_list, equal but str not
      equal:\n\ \ t1: %s\n\n\ \ t2:\n\ \ %s\n" t1_str t2_str)); comp *)
   Int.compare t1_enc t2_enc
-;;
+;; *)
 
 (** let _compare_constr_using_enc_tbl st () t1 t2 compares encodings of t1 t2.
     The [(EConstr.t, int) Hashtbl.t] maps terms to integers. When a new term is
@@ -164,9 +323,9 @@ let _compare_constr_using_enc_list st () t1 t2 =
    %s\n\n\ \ t2: %s\n" t1_str t2_str)); comp *) Int.compare t1_enc t2_enc ;; *)
 
 (* temporary *)
-(* let compare_constr st () t1 t2 = _compare_constr_using_eq st () t1 t2 *)
+let compare_constr st () t1 t2 = _compare_constr_using_eq st () t1 t2
 (* let compare_constr st () t1 t2 = _compare_constr_using_str st () t1 t2 *)
-let compare_constr st () t1 t2 = _compare_constr_using_enc_list st () t1 t2
+(* let compare_constr st () t1 t2 = _compare_constr_using_enc_list st () t1 t2 *)
 (* let compare_constr st () t1 t2 = _compare_constr_using_enc_tbl st () t1 t2 *)
 
 (** [make_constr_tbl st] is used to create Hashtbl that map from [EConstr.t] *)
@@ -235,68 +394,10 @@ let make_constr_tree_set (st : coq_context ref)
   }
 ;;
 
-(** Monadic for loop *)
-let rec iterate
-          (from_idx : int)
-          (to_idx : int)
-          (acc : 'a)
-          (f : int -> 'a -> 'a mm)
-  : 'a mm
-  =
-  if from_idx > to_idx
-  then return acc
-  else bind (f from_idx acc) (fun acc' -> iterate (from_idx + 1) to_idx acc' f)
-;;
-
-let get_env (st : coq_context ref) : Environ.env in_context =
-  { state = st; value = !st.coq_env }
-;;
-
-let get_sigma (st : coq_context ref) : Evd.evar_map in_context =
-  { state = st; value = !st.coq_ctx }
-;;
-
-let state
-      (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-      (st : coq_context ref)
-  : 'a in_context
-  =
-  let sigma, a = f !st.coq_env !st.coq_ctx in
-  st := { !st with coq_ctx = sigma };
-  { state = st; value = a }
-;;
-
-let sandbox (m : 'a mm) (st : coq_context ref) : 'a in_context =
-  let st_contents = !st in
-  let res = m st in
-  st := st_contents;
-  { state = st; value = res.value }
-;;
-
 let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
   state (fun env sigma ->
     Feedback.msg_debug (f env sigma);
     sigma, ())
-;;
-
-(** Error when input LTS has the wrong arity *)
-let invalid_arity (x : Constr.types) : 'a mm =
-  fun st -> raise (invalid_arity !st.coq_env !st.coq_ctx x)
-;;
-
-(** Error when input LTS has the wrong Sort *)
-let invalid_sort (x : Sorts.family) : 'a mm = fun st -> raise (invalid_sort x)
-
-(** Error when input LTS reference is invalid (e.g. non existing) *)
-let invalid_ref (x : Names.GlobRef.t) : 'a mm = fun st -> raise (invalid_ref x)
-
-(** Error when term is of unknown type *)
-let unknown_term_type (tmty : EConstr.t * EConstr.t * EConstr.t list) : 'a mm =
-  fun st -> raise (unknown_term_type !st.coq_env !st.coq_ctx tmty)
-;;
-
-let primary_lts_not_found ((t, names) : EConstr.t * EConstr.t list) : 'a mm =
-  fun st -> raise (primary_lts_not_found !st.coq_env !st.coq_ctx t names)
 ;;
 
 module type Monad = sig
