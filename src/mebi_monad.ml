@@ -12,9 +12,9 @@ type 'a in_context =
   ; value : 'a
   }
 
-type 'a t = coq_context ref -> 'a in_context
+type 'a mm = coq_context ref -> 'a in_context
 
-let run (x : 'a t) : 'a =
+let run (x : 'a mm) : 'a =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   (* let a = x (ref { coq_env = env; coq_ctx = sigma }) in *)
@@ -24,25 +24,25 @@ let run (x : 'a t) : 'a =
   a.value
 ;;
 
-let return (x : 'a) : 'a t = fun st -> { state = st; value = x }
+let return (x : 'a) : 'a mm = fun st -> { state = st; value = x }
 [@@inline always]
 ;;
 
-let bind (x : 'a t) (f : 'a -> 'b t) : 'b t =
+let bind (x : 'a mm) (f : 'a -> 'b mm) : 'b mm =
   fun st ->
   let a = x st in
   f a.value a.state
 [@@inline always]
 ;;
 
-let map (f : 'a -> 'b) (x : 'a t) : 'b t =
+let map (f : 'a -> 'b) (x : 'a mm) : 'b mm =
   fun st ->
   let x_st = x st in
   { x_st with value = f x_st.value }
 [@@inline always]
 ;;
 
-let product (x : 'a t) (y : 'b t) : ('a * 'b) t =
+let product (x : 'a mm) (y : 'b mm) : ('a * 'b) mm =
   bind x (fun a -> bind y (fun b -> return (a, b)))
 [@@inline always]
 ;;
@@ -240,8 +240,8 @@ let rec iterate
           (from_idx : int)
           (to_idx : int)
           (acc : 'a)
-          (f : int -> 'a -> 'a t)
-  : 'a t
+          (f : int -> 'a -> 'a mm)
+  : 'a mm
   =
   if from_idx > to_idx
   then return acc
@@ -266,55 +266,55 @@ let state
   { state = st; value = a }
 ;;
 
-let sandbox (m : 'a t) (st : coq_context ref) : 'a in_context =
+let sandbox (m : 'a mm) (st : coq_context ref) : 'a in_context =
   let st_contents = !st in
   let res = m st in
   st := st_contents;
   { state = st; value = res.value }
 ;;
 
-let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit t =
+let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
   state (fun env sigma ->
     Feedback.msg_debug (f env sigma);
     sigma, ())
 ;;
 
 (** Error when input LTS has the wrong arity *)
-let invalid_arity (x : Constr.types) : 'a t =
+let invalid_arity (x : Constr.types) : 'a mm =
   fun st -> raise (invalid_arity !st.coq_env !st.coq_ctx x)
 ;;
 
 (** Error when input LTS has the wrong Sort *)
-let invalid_sort (x : Sorts.family) : 'a t = fun st -> raise (invalid_sort x)
+let invalid_sort (x : Sorts.family) : 'a mm = fun st -> raise (invalid_sort x)
 
 (** Error when input LTS reference is invalid (e.g. non existing) *)
-let invalid_ref (x : Names.GlobRef.t) : 'a t = fun st -> raise (invalid_ref x)
+let invalid_ref (x : Names.GlobRef.t) : 'a mm = fun st -> raise (invalid_ref x)
 
 (** Error when term is of unknown type *)
-let unknown_term_type (tmty : EConstr.t * EConstr.t * EConstr.t list) : 'a t =
+let unknown_term_type (tmty : EConstr.t * EConstr.t * EConstr.t list) : 'a mm =
   fun st -> raise (unknown_term_type !st.coq_env !st.coq_ctx tmty)
 ;;
 
-let primary_lts_not_found ((t, names) : EConstr.t * EConstr.t list) : 'a t =
+let primary_lts_not_found ((t, names) : EConstr.t * EConstr.t list) : 'a mm =
   fun st -> raise (primary_lts_not_found !st.coq_env !st.coq_ctx t names)
 ;;
 
 module type Monad = sig
-  val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
-  val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+  val ( let+ ) : 'a mm -> ('a -> 'b) -> 'b mm
+  val ( let* ) : 'a mm -> ('a -> 'b mm) -> 'b mm
 
   val ( let$ )
     :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-    -> ('a -> 'b t)
-    -> 'b t
+    -> ('a -> 'b mm)
+    -> 'b mm
 
   val ( let$* )
     :  (Environ.env -> Evd.evar_map -> Evd.evar_map)
-    -> (unit -> 'b t)
-    -> 'b t
+    -> (unit -> 'b mm)
+    -> 'b mm
 
-  val ( let$+ ) : (Environ.env -> Evd.evar_map -> 'a) -> ('a -> 'b t) -> 'b t
-  val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
+  val ( let$+ ) : (Environ.env -> Evd.evar_map -> 'a) -> ('a -> 'b mm) -> 'b mm
+  val ( and+ ) : 'a mm -> 'b mm -> ('a * 'b) mm
 end
 
 module Monad_syntax : Monad = struct
