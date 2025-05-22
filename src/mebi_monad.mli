@@ -4,7 +4,8 @@ type 'a mm
 type coq_context =
   { coq_env : Environ.env
   ; coq_ctx : Evd.evar_map
-  ; coq_enc : EConstr.t list (* ; coq_enc : (EConstr.t, int) Hashtbl.t *)
+  (* ; coq_enc : EConstr.t list *)
+  (* ; coq_enc : (EConstr.t, int) Hashtbl.t *)
   }
 
 (********************************************)

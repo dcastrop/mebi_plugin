@@ -1,204 +1,10 @@
 open Mebi_errors
 
-(* module type InternalB = sig
-  type ('a, 'b) wrapper =
-    { fwd_enc : ('a, 'b) Hashtbl.t
-    ; bck_enc : ('b, 'a) Hashtbl.t
-    ; counter : 'b ref
-    }
-
-  (* val step_counter : ('a, 'b) wrapper -> ('a, 'b) wrapper *)
-
-  val encode : ('a, 'b) wrapper -> 'a -> 'b
-  val decode : ('a, 'b) wrapper -> 'b -> 'a
-
-  (* exception Not_found *)
-end *)
-
-(* module type INTERNAL_PAIR = sig
-  type fwd
-  type bck
-end
-
-module IntEncoding : INTERNAL_PAIR = struct
-  type fwd = EConstr.t
-  type bck = int
-end *)
-
-(* 
-
-module Internal =
-functor
-  (Pair : INTERNAL_PAIR)
-  ->
-  struct
-    (* type fwd_enc = (Pair.fwd, Pair.bck) Hashtbl.t
-       type bck_enc = (Pair.bck, Pair.fwd) Hashtbl.t *)
-
-    type wrapper =
-      { fwd_enc : (Pair.fwd, Pair.bck) Hashtbl.t
-      ; bck_enc : (Pair.bck, Pair.fwd) Hashtbl.t
-      }
-
-    let encode (w : wrapper) (k : Pair.fwd) : Pair.bck =
-      Hashtbl.find w.fwd_enc k
-    ;;
-
-    let decode (w : wrapper) (k : Pair.bck) : Pair.fwd =
-      Hashtbl.find w.bck_enc k
-    ;;
-  end
-
-module Internalize = Internal (IntEncoding) *)
-
-module type INTERNAL_ENCODING = sig
-  type origin_type
-  type encode_type
-
-  val origin_eq : origin_type -> origin_type -> bool
-  val origin_hash : origin_type -> int
-  val origin_compare : origin_type -> origin_type -> int
-
-  val encode_eq : encode_type -> encode_type -> bool
-  val encode_hash : encode_type -> int
-  val encode_compare : encode_type -> encode_type -> int
-
-  val next_encoding : encode_type -> encode_type
-   
-end
-
-module IntEncoding : INTERNAL_ENCODING = struct
-  type origin_type = EConstr.t
-  type encode_type = int
-
-  let origin_eq t1 t2 = false 
-  let origin_hash t = 0
-  let origin_compare t1 t2 = 0
-
-  let encode_eq t1 t2 = false 
-  let encode_hash t = 0
-  let encode_compare t1 t2 = 0
-
-  let next_encoding n = n+1
-end
-
-
-
-module type INTERNAL_FUNCTOR = 
-  (Pair : INTERNAL_ENCODING) ->
-    sig
-      type origin_type = Pair.origin_type
-      type encode_type = Pair.encode_type
-
-      module FwdEncoding : Hashtbl.S with type key = origin_type
-      module BckEncoding : Hashtbl.S with type key = encode_type
-
-      val next_encoding : encode_type -> encode_type
-
-    end
-
-
-module Internal =
-  functor (Pair : INTERNAL_ENCODING) ->
-    struct
-      type origin_type = Pair.origin_type
-      type encode_type = Pair.encode_type
-
-      module FwdEncoding = Hashtbl.Make (struct
-        type key = origin_type
-
-        type equal t1 t2 = Pair.origin_eq t1 t2
-        type hash t = Pair.origin_hash t
-      end) 
-
-      module BckEncoding = Hashtbl.Make (struct
-        type key = encode_type
-
-        type equal t1 t2 = Pair.encode_eq t1 t2
-        type hash t = Pair.encode_hash t
-      end)
-
-      let next_encoding n = Pair.next_encoding n
-
-      type wrapper =
-        { fwd_enc : (origin_type, encode_type) Hashtbl.t
-        ; bck_enc : (encode_type, origin_type) Hashtbl.t
-        }
-
-      let encode (w : wrapper) (k : origin_type) : encode_type =
-        Hashtbl.find w.fwd_enc k
-      ;;
-
-      let decode (w : wrapper) (k : encode_type) : origin_type =
-        Hashtbl.find w.bck_enc k
-      ;;
-    end
-
-
-
-
-
-module IntEncoding : INTERNAL_ENCODING = struct
-  (* type origin_type = EConstr.t
-  type encode_type = int *)
-
-  type pair = (EConstr.t, int) INTERNAL_ENCODING.pair
-
-  let origin_type p = fst p
-  
-  let encode_type p = snd p
-
-  let next_encoding n = n+1
-end
-
-
-module InternalEncoding = (Internal:INTERNAL_FUNCTOR) -> (INTERNALIZED with type pair = Internal.origin_type and type )
-
-module Internals = InternalEncoding(IntEncoding)
-
-(* module Internals = Internalize(Internalized) *)
-
-(* let _test : unit =
-   let module Internals = Internal (IntEncoding) in
-   Internals.wrapper;
-   ()
-   ;; *)
-
-(* module type INTERNAL_FUNCTOR = functor (Pair:INTERNAL_PAIR) -> struct
-   type wrapper = I.wrapper
-   end *)
-
-(* module Internalize = Internal(IntEncoding) *)
-
-(* module Internals = Internalize(Internalized) *)
-
-(* module Internalized = struct
-   type wrapper = (EConstr.t, int) Internalize.wrapper
-   end *)
-
-(* module Internals : Internalize = struct
-  type ('a, 'b) wrapper =
-    { fwd_enc : ('a, 'b) Hashtbl.t
-    ; bck_enc : ('b, 'a) Hashtbl.t
-    ; counter : 'b ref
-    }
-
-  (* let step_counter(w:('a, 'b) wrapper) : ('a, 'b) wrapper = *)
-
-  let encode (w : ('a, 'b) wrapper) (k : 'a) : 'b =
-    (* match Hashtbl.find_opt w.fwd_enc k with
-       | None -> add to encoding *)
-    Hashtbl.find w.fwd_enc k
-  ;;
-
-  let decode (w : ('a, 'b) wrapper) (k : 'b) : 'a = Hashtbl.find w.bck_enc k
-end *)
-
 type coq_context =
   { coq_env : Environ.env
   ; coq_ctx : Evd.evar_map
-  ; wrapper : (EConstr.t, int) Internals.wrapper
-    (* ; coq_enc : (EConstr.t, int) Hashtbl.t *)
+  (* ; wrapper : (EConstr.t, int) Internals.wrapper *)
+  (* ; coq_enc : (EConstr.t, int) Hashtbl.t *)
   }
 
 (* Essentially, a state monad *)
@@ -246,10 +52,10 @@ let product (x : 'a mm) (y : 'b mm) : ('a * 'b) mm =
 
 (** Monadic for loop *)
 let rec iterate
-          (from_idx : int)
-          (to_idx : int)
-          (acc : 'a)
-          (f : int -> 'a -> 'a mm)
+  (from_idx : int)
+  (to_idx : int)
+  (acc : 'a)
+  (f : int -> 'a -> 'a mm)
   : 'a mm
   =
   if from_idx > to_idx
@@ -294,8 +100,8 @@ let get_sigma (st : coq_context ref) : Evd.evar_map in_context =
 ;;
 
 let state
-      (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-      (st : coq_context ref)
+  (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+  (st : coq_context ref)
   : 'a in_context
   =
   let sigma, a = f !st.coq_env !st.coq_ctx in
@@ -376,42 +182,22 @@ let _compare_constr_using_str st () t1 t2 =
     (E.g., for term [b] in list [e, d, c, b, a] which has length [5], the index
     of [b] is [3], in order to obtain the encoding of [b] we must [(5-1)-3]
     which yields an encoding of [1].) *)
-(* let _compare_constr_using_enc_list st () t1 t2 =
-  let (t1_enc, offset2) : int * int =
-    let offset1 : int = List.length !st.coq_enc - 1 in
-    match
-      List.find_index
-        (fun (t : EConstr.t) -> EConstr.eq_constr !st.coq_ctx t1 t)
-        !st.coq_enc
-    with
-    | None ->
-      (* add to cache *)
-      st := { !st with coq_enc = t1 :: !st.coq_enc };
-      (* t1 is at the head of the queue*)
-      offset1 + 1, offset1 + 1
-    | Some enc -> offset1 - enc, offset1
-  in
-  let t2_enc : int =
-    match
-      List.find_index
-        (fun (t : EConstr.t) -> EConstr.eq_constr !st.coq_ctx t2 t)
-        !st.coq_enc
-    with
-    | None ->
-      (* add to cache *)
-      st := { !st with coq_enc = t2 :: !st.coq_enc };
-      offset2 + 1
-    | Some enc -> offset2 - enc
-  in
-  (* sanity check *)
-  (* let comp = Int.compare t1_enc t2_enc in if Int.equal comp 0 then ( let
-     t1_str : string = _econstr_to_string st () t1 in let t2_str : string =
-     _econstr_to_string st () t2 in if Bool.not (String.equal t1_str t2_str)
-     then Utils.Logging.Log.warning ~params:(Utils.Params.Default.log ~mode:(Coq
-     ()) ()) (Printf.sprintf "_compare_constr_using_enc_list, equal but str not
-     equal:\n\ \ t1: %s\n\n\ \ t2:\n\ \ %s\n" t1_str t2_str)); comp *)
-  Int.compare t1_enc t2_enc
-;; *)
+(* let _compare_constr_using_enc_list st () t1 t2 = let (t1_enc, offset2) : int
+   * int = let offset1 : int = List.length !st.coq_enc - 1 in match
+   List.find_index (fun (t : EConstr.t) -> EConstr.eq_constr !st.coq_ctx t1 t)
+   !st.coq_enc with | None -> (* add to cache *) st := { !st with coq_enc = t1
+   :: !st.coq_enc }; (* t1 is at the head of the queue*) offset1 + 1, offset1 +
+   1 | Some enc -> offset1 - enc, offset1 in let t2_enc : int = match
+   List.find_index (fun (t : EConstr.t) -> EConstr.eq_constr !st.coq_ctx t2 t)
+   !st.coq_enc with | None -> (* add to cache *) st := { !st with coq_enc = t2
+   :: !st.coq_enc }; offset2 + 1 | Some enc -> offset2 - enc in (* sanity check
+   *) (* let comp = Int.compare t1_enc t2_enc in if Int.equal comp 0 then ( let
+   t1_str : string = _econstr_to_string st () t1 in let t2_str : string =
+   _econstr_to_string st () t2 in if Bool.not (String.equal t1_str t2_str) then
+   Utils.Logging.Log.warning ~params:(Utils.Params.Default.log ~mode:(Coq ())
+   ()) (Printf.sprintf "_compare_constr_using_enc_list, equal but str not
+   equal:\n\ \ t1: %s\n\n\ \ t2:\n\ \ %s\n" t1_str t2_str)); comp *) Int.compare
+   t1_enc t2_enc ;; *)
 
 (** let _compare_constr_using_enc_tbl st () t1 t2 compares encodings of t1 t2.
     The [(EConstr.t, int) Hashtbl.t] maps terms to integers. When a new term is
@@ -471,10 +257,10 @@ let make_constr_set (st : coq_context ref)
     Prioritises the comparison of terms over trees. Only if terms look identical
     do we then compare the trees. (See [Constr_tree.compare].)*)
 let compare_constr_tree
-      st
-      ()
-      (t1 : EConstr.t * Constr_tree.t)
-      (t2 : EConstr.t * Constr_tree.t)
+  st
+  ()
+  (t1 : EConstr.t * Constr_tree.t)
+  (t2 : EConstr.t * Constr_tree.t)
   =
   match compare_constr st () (fst t1) (fst t2) with
   | 0 -> Constr_tree.compare (snd t1) (snd t2)
