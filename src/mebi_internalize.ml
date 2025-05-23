@@ -44,20 +44,39 @@ module type MEBI_MONAD = sig
   type coq_context =
     { coq_env : Environ.env
     ; coq_ctx : Evd.evar_map
+    (* ; fwd_enc : (term, E.t) F.t *)
+    (* ; bck_enc : term B.t *)
+    (* ; counter : E.t ref *)
+    }
+
+  type 'a in_coq_context =
+    { state : coq_context ref
+    ; value : 'a
+    }
+
+  type 'a cm = coq_context ref -> 'a in_coq_context
+
+  val make_constr_tbl
+    :  coq_context ref
+    -> (module Hashtbl.S with type key = EConstr.t) in_coq_context
+
+  type wrapper =
+    { coq_ref : coq_context ref
     ; fwd_enc : (term, E.t) Hashtbl.t
     ; bck_enc : term E.Tbl.t
     ; counter : E.t ref
     }
 
   type 'a in_context =
-    { state : coq_context ref
+    { state : wrapper ref (* state : coq_context ref *)
     ; value : 'a
     }
 
-  type 'a mm = coq_context ref -> 'a in_context
+  (* type 'a mm = coq_context ref -> 'a in_context *)
+  type 'a mm = wrapper ref -> 'a in_context
 
   (* core definitions *)
-  val run : 'a mm -> 'a
+  (* val run : 'a mm -> 'a *)
   val return : 'a -> 'a mm
   val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
   val map : ('a -> 'b) -> 'a mm -> 'b mm
@@ -65,18 +84,18 @@ module type MEBI_MONAD = sig
   val iterate : int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
 
   (* get and put state *)
-  val get_env : coq_context ref -> Environ.env in_context
-  val get_sigma : coq_context ref -> Evd.evar_map in_context
-  val get_fwd_enc : coq_context ref -> (term, E.t) Hashtbl.t in_context
-  val get_bck_enc : coq_context ref -> term E.Tbl.t in_context
-  val get_counter : coq_context ref -> E.t ref in_context
+  val get_env : wrapper ref -> Environ.env in_context
+  val get_sigma : wrapper ref -> Evd.evar_map in_context
+  val get_fwd_enc : wrapper ref -> (term, E.t) Hashtbl.t in_context
+  val get_bck_enc : wrapper ref -> term E.Tbl.t in_context
+  val get_counter : wrapper ref -> E.t ref in_context
 
   val state
     :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-    -> coq_context ref
+    -> wrapper ref
     -> 'a in_context
 
-  val sandbox : 'a mm -> coq_context ref -> 'a in_context
+  val sandbox : 'a mm -> wrapper ref -> 'a in_context
   val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit mm
 
   (* syntax *)
@@ -104,9 +123,9 @@ module type MEBI_MONAD = sig
 
   module Syntax : MEBI_MONAD_SYNTAX
 
-  val next : coq_context ref -> E.t mm
-  val encode : coq_context ref -> term -> E.t mm
-  val decode : coq_context ref -> E.t -> term mm
+  val next : wrapper ref -> E.t mm
+  val encode : wrapper ref -> term -> E.t mm
+  val decode : wrapper ref -> E.t -> term mm
 end
 
 module MebiMonad (Enc : ENCODING_TYPE) : MEBI_MONAD = struct
@@ -121,37 +140,78 @@ module MebiMonad (Enc : ENCODING_TYPE) : MEBI_MONAD = struct
   type coq_context =
     { coq_env : Environ.env
     ; coq_ctx : Evd.evar_map
-    ; fwd_enc : (term, E.t) F.t
+    (* ; fwd_enc : (term, E.t) F.t *)
+    (* ; bck_enc : term B.t *)
+    (* ; counter : E.t ref *)
+    }
+
+  type 'a in_coq_context =
+    { state : coq_context ref
+    ; value : 'a
+    }
+
+  type 'a cm = coq_context ref -> 'a in_coq_context
+
+  let make_constr_tbl (st : coq_context ref)
+    : (module Hashtbl.S with type key = term) in_coq_context
+    =
+    let module Constrtbl =
+      Hashtbl.Make (struct
+        type t = term
+
+        let equal t1 t2 = EConstr.eq_constr !st.coq_ctx t1 t2
+
+        let hash t =
+          Constr.hash
+            (EConstr.to_constr
+               ?abort_on_undefined_evars:(Some false)
+               !st.coq_ctx
+               t)
+        ;;
+      end)
+    in
+    { state = st; value = (module Constrtbl : Hashtbl.S with type key = term) }
+  ;;
+
+  let coq_bind (x : 'a cm) (f : 'a -> 'b cm) : 'b cm =
+    fun st ->
+    let a = x st in
+    f a.value a.state
+  [@@inline always]
+  ;;
+
+  let ( let|* ) = coq_bind
+
+  type wrapper =
+    { coq_ref : coq_context ref
+    ; fwd_enc : (term, E.t) Hashtbl.t
     ; bck_enc : term B.t
     ; counter : E.t ref
     }
 
   type 'a in_context =
-    { state : coq_context ref
+    { (* { state : coq_context ref *)
+      state : wrapper ref
     ; value : 'a
     }
 
-  (* let make_constr_tbl (st : coq_context ref) : (module Hashtbl.S with type
-     key = EConstr.t) in_context = let module Constrtbl = Hashtbl.Make (struct
-     type t = EConstr.t
-
-     let equal t1 t2 = EConstr.eq_constr !st.coq_ctx t1 t2
-
-     let hash t = Constr.hash (EConstr.to_constr ?abort_on_undefined_evars:(Some
-     false) !st.coq_ctx t) ;; end) in { state = st ; value = (module Constrtbl :
-     Hashtbl.S with type key = EConstr.t) } ;; *)
-
-  type 'a mm = coq_context ref -> 'a in_context
+  (* type 'a mm = coq_context ref -> 'a in_context *)
+  type 'a mm = wrapper ref -> 'a in_context
 
   (** [run x] initializes the monad, and runs [x]. *)
   let run (x : 'a mm) : 'a =
     let env = Global.env () in
     let sigma = Evd.from_env env in
-    let fwd_enc = F.create 0 in
+    let coq_ref : coq_context ref = ref { coq_env = env; coq_ctx = sigma } in
+    let|* f = make_constr_tbl in
+    let module F = (val f) in
+    let fwd_enc : E.t F.t = F.create 0 in
     let bck_enc = B.create 0 in
     let counter : E.t ref = ref E.init in
     let a =
-      x (ref { coq_env = env; coq_ctx = sigma; fwd_enc; bck_enc; counter })
+      (* x (ref { coq_env = env; coq_ctx = sigma; fwd_enc; bck_enc; counter
+         }) *)
+      x (ref { coq_ref; fwd_enc; bck_enc; counter })
     in
     a.value
   ;;
@@ -193,37 +253,40 @@ module MebiMonad (Enc : ENCODING_TYPE) : MEBI_MONAD = struct
       bind (f from_idx acc) (fun acc' -> iterate (from_idx + 1) to_idx acc' f)
   ;;
 
-  let get_env (st : coq_context ref) : Environ.env in_context =
-    { state = st; value = !st.coq_env }
+  let get_env (st : wrapper ref) : Environ.env in_context =
+    let coq_st = !st.coq_ref in
+    { state = st; value = !coq_st.coq_env }
   ;;
 
-  let get_sigma (st : coq_context ref) : Evd.evar_map in_context =
-    { state = st; value = !st.coq_ctx }
+  let get_sigma (st : wrapper ref) : Evd.evar_map in_context =
+    let coq_st = !st.coq_ref in
+    { state = st; value = !coq_st.coq_ctx }
   ;;
 
-  let get_fwd_enc (st : coq_context ref) : (term, E.t) Hashtbl.t in_context =
+  let get_fwd_enc (st : wrapper ref) : (term, E.t) Hashtbl.t in_context =
     { state = st; value = !st.fwd_enc }
   ;;
 
-  let get_bck_enc (st : coq_context ref) : term B.t in_context =
+  let get_bck_enc (st : wrapper ref) : term B.t in_context =
     { state = st; value = !st.bck_enc }
   ;;
 
-  let get_counter (st : coq_context ref) : E.t ref in_context =
+  let get_counter (st : wrapper ref) : E.t ref in_context =
     { state = st; value = !st.counter }
   ;;
 
   let state
     (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-    (st : coq_context ref)
+    (st : wrapper ref)
     : 'a in_context
     =
-    let sigma, a = f !st.coq_env !st.coq_ctx in
-    st := { !st with coq_ctx = sigma };
+    let coq_st = !st.coq_ref in
+    let sigma, a = f !coq_st.coq_env !coq_st.coq_ctx in
+    coq_st := { !coq_st with coq_ctx = sigma };
     { state = st; value = a }
   ;;
 
-  let sandbox (m : 'a mm) (st : coq_context ref) : 'a in_context =
+  let sandbox (m : 'a mm) (st : wrapper ref) : 'a in_context =
     let st_contents = !st in
     let res = m st in
     st := st_contents;
@@ -269,14 +332,14 @@ module MebiMonad (Enc : ENCODING_TYPE) : MEBI_MONAD = struct
   end
 
   (** increments and returns counter *)
-  let next (st : coq_context ref) : E.t mm =
+  let next (st : wrapper ref) : E.t mm =
     let c : E.t ref = !st.counter in
     let new_val : E.t = E.next !c in
     !st.counter := new_val;
     return new_val
   ;;
 
-  let encode (st : coq_context ref) (k : term) : E.t mm =
+  let encode (st : wrapper ref) (k : term) : E.t mm =
     match F.find_opt !st.fwd_enc k with
     | None ->
       (* map to next encoding and return *)
@@ -292,7 +355,7 @@ module MebiMonad (Enc : ENCODING_TYPE) : MEBI_MONAD = struct
   exception InvalidDecodeKey of E.t
 
   (** dual to [encode] except we cannot handle new values *)
-  let decode (st : coq_context ref) (k : E.t) : term mm =
+  let decode (st : wrapper ref) (k : E.t) : term mm =
     match B.find_opt !st.bck_enc k with
     (* FIXME: need to parameterize this error too *)
     | None -> raise (InvalidDecodeKey k)
