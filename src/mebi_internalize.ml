@@ -2,51 +2,16 @@
 (*** Internals *******************************************************)
 (*********************************************************************)
 
-module type ENCODING_TYPE = sig
-  type t
-
-  val init : t
-  val eq : t -> t -> bool
-  val compare : t -> t -> int
-  val hash : t -> int
-  val next : t -> t
-  (* val make_hashtbl : (module Hashtbl.S with type key = t) *)
-
-  module Tbl : Hashtbl.S with type key = t
-end
-
-module IntEncoding : ENCODING_TYPE = struct
-  type t = int
-
-  let init = 0
-  let eq t1 t2 = Int.equal t1 t2
-  let compare t1 t2 = Int.compare t1 t2
-  let hash t = Int.hash t
-  let next t = t + 1
-
-  module Tbl = Hashtbl.Make (struct
-      type t = int
-
-      let equal t1 t2 = eq t1 t2
-      let hash t = hash t
-    end)
-end
+type term = EConstr.t
 
 (*********************************************************************)
 (*** Mebi Monad ******************************************************)
 (*********************************************************************)
 
 module type MEBI_MONAD = sig
-  module E : ENCODING_TYPE
-
-  type term = EConstr.t
-
   type coq_context =
     { coq_env : Environ.env
     ; coq_ctx : Evd.evar_map
-    (* ; fwd_enc : (term, E.t) F.t *)
-    (* ; bck_enc : term B.t *)
-    (* ; counter : E.t ref *)
     }
 
   type 'a in_coq_context =
@@ -56,46 +21,80 @@ module type MEBI_MONAD = sig
 
   type 'a cm = coq_context ref -> 'a in_coq_context
 
+  val coq_run : 'a cm -> 'a
   val coq_return : 'a -> 'a cm
+  val coq_bind : 'a cm -> ('a -> 'b cm) -> 'b cm
+  val ( let|* ) : 'a cm -> ('a -> 'b cm) -> 'b cm
+  val get_env : Environ.env cm
+  val get_sigma : Evd.evar_map cm
 
   val make_constr_tbl
     :  coq_context ref
     -> (module Hashtbl.S with type key = EConstr.t) cm
 
-  val coq_bind : 'a cm -> ('a -> 'b cm) -> 'b cm
-  val ( let|* ) : 'a cm -> ('a -> 'b cm) -> 'b cm
+  (* module type COQ_SYNTAX_TYPE = sig val ( let+ ) : 'a cm -> ('a -> 'b) -> 'b
+     cm val ( let* ) : 'a cm -> ('a -> 'b cm) -> 'b cm
+
+     val ( let$ ) : (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) -> ('a ->
+     'b cm) -> 'b cm
+
+     val ( let$* ) : (Environ.env -> Evd.evar_map -> Evd.evar_map) -> (unit ->
+     'b cm) -> 'b cm
+
+     val ( let$+ ) : (Environ.env -> Evd.evar_map -> 'a) -> ('a -> 'b cm) -> 'b
+     cm
+
+     val ( and+ ) : 'a cm -> 'b cm -> ('a * 'b) cm end *)
+
+  (* module CoqSyntax : COQ_SYNTAX_TYPE *)
+
   val init : coq_context ref
-  val coq_run : 'a cm -> 'a
-  (* val coq_run_with : coq_context ref -> (coq_context ref -> 'a cm) -> 'a *)
 end
 
 module type MEBI_WRAPPER = sig
   module M : MEBI_MONAD
-
-  (* val init : M.coq_context ref *)
-  (* val f : (module Hashtbl.S with type key = M.term) *)
-
-  module MkF : Hashtbl.S with type key = M.term
+  module MkF : Hashtbl.S with type key = term
 end
 
 module type WRAPPER = sig
-  module W : MEBI_WRAPPER
+  module MW : MEBI_WRAPPER
   module M : MEBI_MONAD
-  module F : Hashtbl.S with type key = M.term
+  module F : Hashtbl.S with type key = term
+
+  module type ENCODING_TYPE = sig
+    type t
+
+    val init : t
+    val eq : t -> t -> bool
+    val compare : t -> t -> int
+    val hash : t -> int
+
+    module type ENC_TBL = Hashtbl.S with type key = t
+
+    module Tbl : ENC_TBL
+
+    val encode : t F.t -> term Tbl.t -> term -> t
+
+    exception InvalidDecodeKey of (t * term Tbl.t)
+
+    val decode : term Tbl.t -> t -> term
+  end
+
+  module E : ENCODING_TYPE
+  module B : Hashtbl.S with type key = E.t
 
   type wrapper =
     { coq_ref : M.coq_context ref
-    ; fwd_enc : M.E.t F.t
-    ; bck_enc : M.term M.E.Tbl.t
-    ; counter : M.E.t ref
+    ; fwd_enc : E.t F.t
+    ; bck_enc : term E.Tbl.t
+    ; counter : E.t ref
     }
 
   type 'a in_context =
-    { state : wrapper ref (* state : coq_context ref *)
+    { state : wrapper ref
     ; value : 'a
     }
 
-  (* type 'a mm = coq_context ref -> 'a in_context *)
   type 'a mm = wrapper ref -> 'a in_context
 
   (* core definitions *)
@@ -109,9 +108,9 @@ module type WRAPPER = sig
   (* get and put state *)
   val get_env : wrapper ref -> Environ.env in_context
   val get_sigma : wrapper ref -> Evd.evar_map in_context
-  val get_fwd_enc : wrapper ref -> M.E.t W.MkF.t in_context
-  val get_bck_enc : wrapper ref -> M.term M.E.Tbl.t in_context
-  val get_counter : wrapper ref -> M.E.t ref in_context
+  val get_fwd_enc : wrapper ref -> E.t MW.MkF.t in_context
+  val get_bck_enc : wrapper ref -> term E.Tbl.t in_context
+  val get_counter : wrapper ref -> E.t ref in_context
 
   val state
     :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
@@ -146,26 +145,14 @@ module type WRAPPER = sig
 
   module Syntax : MEBI_MONAD_SYNTAX
 
-  val next : wrapper ref -> M.E.t mm
-  val encode : wrapper ref -> M.term -> M.E.t mm
-  val decode : wrapper ref -> M.E.t -> M.term mm
+  val encode : wrapper ref -> term -> E.t mm
+  val decode : wrapper ref -> E.t -> term mm
 end
 
-module MebiMonad (Enc : ENCODING_TYPE) : MEBI_MONAD = struct
-  module E = Enc
-
-  (* FIXME: must be custom module that uses state *)
-  (* module F = Hashtbl *)
-  module B = E.Tbl
-
-  type term = EConstr.t
-
+module MebiMonad : MEBI_MONAD = struct
   type coq_context =
     { coq_env : Environ.env
     ; coq_ctx : Evd.evar_map
-    (* ; fwd_enc : (term, E.t) F.t *)
-    (* ; bck_enc : term B.t *)
-    (* ; counter : E.t ref *)
     }
 
   type 'a in_coq_context =
@@ -175,8 +162,48 @@ module MebiMonad (Enc : ENCODING_TYPE) : MEBI_MONAD = struct
 
   type 'a cm = coq_context ref -> 'a in_coq_context
 
+  let coq_run (x : 'a cm) : 'a =
+    let env = Global.env () in
+    let sigma = Evd.from_env env in
+    let a = x (ref { coq_env = env; coq_ctx = sigma }) in
+    a.value
+  ;;
+
   let coq_return (x : 'a) : 'a cm = fun st -> { state = st; value = x }
   [@@inline always]
+  ;;
+
+  let coq_bind (x : 'a cm) (f : 'a -> 'b cm) : 'b cm =
+    fun st ->
+    let a = x st in
+    f a.value a.state
+  [@@inline always]
+  ;;
+
+  let ( let|* ) = coq_bind
+
+  (* let coq_map (f : 'a -> 'b) (x : 'a cm) : 'b cm = fun st -> let x_st = x st
+     in { x_st with value = f x_st.value } [@@inline always] ;; *)
+
+  (* let coq_product (x : 'a cm) (y : 'b cm) : ('a * 'b) cm = coq_bind x (fun a
+     -> coq_bind y (fun b -> coq_return (a, b))) [@@inline always] ;; *)
+
+  let get_env (st : coq_context ref) : Environ.env in_coq_context =
+    { state = st; value = !st.coq_env }
+  ;;
+
+  let get_sigma (st : coq_context ref) : Evd.evar_map in_coq_context =
+    { state = st; value = !st.coq_ctx }
+  ;;
+
+  let coq_state
+    (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+    (st : coq_context ref)
+    : 'a in_coq_context
+    =
+    let sigma, a = f !st.coq_env !st.coq_ctx in
+    st := { !st with coq_ctx = sigma };
+    { state = st; value = a }
   ;;
 
   let make_constr_tbl (st : coq_context ref)
@@ -200,15 +227,6 @@ module MebiMonad (Enc : ENCODING_TYPE) : MEBI_MONAD = struct
     coq_return (module Constrtbl : Hashtbl.S with type key = term)
   ;;
 
-  let coq_bind (x : 'a cm) (f : 'a -> 'b cm) : 'b cm =
-    fun st ->
-    let a = x st in
-    f a.value a.state
-  [@@inline always]
-  ;;
-
-  let ( let|* ) = coq_bind
-
   let init : coq_context ref =
     let env = Global.env () in
     let sigma = Evd.from_env env in
@@ -216,32 +234,33 @@ module MebiMonad (Enc : ENCODING_TYPE) : MEBI_MONAD = struct
     coq_ref
   ;;
 
-  (* let|* f = make_constr_tbl in coq_return (coq_ref, f) *)
+  (* module type COQ_SYNTAX_TYPE = sig val ( let+ ) : 'a cm -> ('a -> 'b) -> 'b
+     cm val ( let* ) : 'a cm -> ('a -> 'b cm) -> 'b cm
 
-  let coq_run (x : 'a cm) : 'a =
-    let env = Global.env () in
-    let sigma = Evd.from_env env in
-    let a = x (ref { coq_env = env; coq_ctx = sigma }) in
-    a.value
-  ;;
+     val ( let$ ) : (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) -> ('a ->
+     'b cm) -> 'b cm
 
-  (* let coq_run_with (st : coq_context ref) (x : 'a cm) : 'a = let a = x !st in
-     a.value ;; *)
+     val ( let$* ) : (Environ.env -> Evd.evar_map -> Evd.evar_map) -> (unit ->
+     'b cm) -> 'b cm
+
+     val ( let$+ ) : (Environ.env -> Evd.evar_map -> 'a) -> ('a -> 'b cm) -> 'b
+     cm
+
+     val ( and+ ) : 'a cm -> 'b cm -> ('a * 'b) cm end *)
+
+  (* module CoqSyntax : COQ_SYNTAX_TYPE = struct let ( let+ ) x f = coq_map f x
+     let ( let* ) = coq_bind let ( let$ ) f g = coq_bind (coq_state f) g let (
+     let$* ) f g = coq_bind (coq_state (fun e s -> f e s, ())) g let ( let$+ ) f
+     g = coq_bind (coq_state (fun e s -> s, f e s)) g let ( and+ ) x y =
+     coq_product x y end *)
 end
 
 (** initializes the monad and produces the module [F] *)
 module MebiWrapper (Mebi : MEBI_MONAD) : MEBI_WRAPPER = struct
-  (* (FwdMap:(Hashtbl.S with type key = Mebi.term)) : MEBI_WRAPPER = struct *)
   module M = Mebi
 
-  (* let init = M.init *)
-  (* let f = M.coq_run_with M.init M.make_constr_tbl *)
-
-  (* module F = M.coq_run (M.make_constr_tbl (init) )  *)
-  (* module F = ((val f)) *)
-
   module MkF = Hashtbl.Make (struct
-      type t = M.term
+      type t = term
 
       let equal t1 t2 = EConstr.eq_constr !M.init.coq_ctx t1 t2
 
@@ -255,29 +274,86 @@ module MebiWrapper (Mebi : MEBI_MONAD) : MEBI_WRAPPER = struct
     end)
 end
 
-module Wrapper (Mebi : MEBI_WRAPPER) : WRAPPER = struct
-  module W = Mebi
-  module M = W.M
-  module F = W.MkF
-  module E = M.E
-  module B = E.Tbl
+module Wrapper (MebiWrapper : MEBI_WRAPPER) : WRAPPER = struct
+  module MW = MebiWrapper
+  module M = MW.M
+  module F = MW.MkF
 
-  (* let init = M.init *)
+  module type ENCODING_TYPE = sig
+    type t
+
+    val init : t
+    val eq : t -> t -> bool
+    val compare : t -> t -> int
+    val hash : t -> int
+
+    module type ENC_TBL = Hashtbl.S with type key = t
+
+    module Tbl : ENC_TBL
+
+    val encode : t F.t -> term Tbl.t -> term -> t
+
+    exception InvalidDecodeKey of (t * term Tbl.t)
+
+    val decode : term Tbl.t -> t -> term
+  end
+
+  module IntEncoding : ENCODING_TYPE = struct
+    type t = int
+
+    let init = 0
+    let counter : t ref = ref init
+    let eq t1 t2 = Int.equal t1 t2
+    let compare t1 t2 = Int.compare t1 t2
+    let hash t = Int.hash t
+
+    module type ENC_TBL = Hashtbl.S with type key = t
+
+    module Tbl : ENC_TBL = Hashtbl.Make (struct
+        type t = int
+
+        let equal t1 t2 = eq t1 t2
+        let hash t = hash t
+      end)
+
+    let encode (fwd : t F.t) (bck : term Tbl.t) (k : term) : t =
+      match F.find_opt fwd k with
+      | None ->
+        (* map to next encoding and return *)
+        let next_enc : t = !counter in
+        counter := !counter + 1;
+        F.add fwd k next_enc;
+        Tbl.add bck next_enc k;
+        next_enc
+      | Some enc -> enc
+    ;;
+
+    (* FIXME: need to parameterize this error too *)
+    exception InvalidDecodeKey of (t * term Tbl.t)
+
+    let decode (bck : term Tbl.t) (k : t) : term =
+      match Tbl.find_opt bck k with
+      (* FIXME: need to parameterize this error too *)
+      | None -> raise (InvalidDecodeKey (k, bck))
+      | Some enc -> enc
+    ;;
+  end
+
+  module E = IntEncoding
+  module B = E.Tbl
 
   type wrapper =
     { coq_ref : M.coq_context ref
     ; fwd_enc : E.t F.t
-    ; bck_enc : M.term B.t
+    ; bck_enc : term B.t
     ; counter : E.t ref
     }
 
   type 'a in_context =
-    { (* { state : coq_context ref *)
-      state : wrapper ref
+    { state : wrapper ref
     ; value : 'a
     }
 
-  (* type 'a mm = coq_context ref -> 'a in_context *)
   type 'a mm = wrapper ref -> 'a in_context
 
   (** [run x] initializes the monad, and runs [x]. *)
@@ -341,7 +417,7 @@ module Wrapper (Mebi : MEBI_WRAPPER) : WRAPPER = struct
     { state = st; value = !st.fwd_enc }
   ;;
 
-  let get_bck_enc (st : wrapper ref) : M.term B.t in_context =
+  let get_bck_enc (st : wrapper ref) : term B.t in_context =
     { state = st; value = !st.bck_enc }
   ;;
 
@@ -405,41 +481,18 @@ module Wrapper (Mebi : MEBI_WRAPPER) : WRAPPER = struct
     let ( and+ ) x y = product x y
   end
 
-  (** increments and returns counter *)
-  let next (st : wrapper ref) : E.t mm =
-    let c : E.t ref = !st.counter in
-    let new_val : E.t = E.next !c in
-    !st.counter := new_val;
-    return new_val
+  let encode (st : wrapper ref) (k : term) : E.t mm =
+    return (E.encode !st.fwd_enc !st.bck_enc k)
   ;;
-
-  let encode (st : wrapper ref) (k : M.term) : E.t mm =
-    match F.find_opt !st.fwd_enc k with
-    | None ->
-      (* map to next encoding and return *)
-      let open Syntax in
-      let* (next_enc : E.t) = next st in
-      F.add !st.fwd_enc k next_enc;
-      B.add !st.bck_enc next_enc k;
-      return next_enc
-    | Some enc -> return enc
-  ;;
-
-  (* FIXME: need to parameterize this error too *)
-  exception InvalidDecodeKey of E.t
 
   (** dual to [encode] except we cannot handle new values *)
-  let decode (st : wrapper ref) (k : E.t) : M.term mm =
-    match B.find_opt !st.bck_enc k with
-    (* FIXME: need to parameterize this error too *)
-    | None -> raise (InvalidDecodeKey k)
-    | Some enc -> return enc
+  let decode (st : wrapper ref) (k : E.t) : term mm =
+    return (E.decode !st.bck_enc k)
   ;;
 end
 
-module MM = MebiMonad (IntEncoding)
-module MW = MebiWrapper (MM)
-module W = Wrapper (MW)
+(* module MM = MebiMonad *)
+(* module W = Wrapper (MebiWrapper (MM)) *)
 
 (* let make_wrapper : MebiMonad.MkWrapper.wrapper MebiMonad.in_context = *)
 
