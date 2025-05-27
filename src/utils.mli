@@ -1,11 +1,13 @@
+val split_at : int -> 'a list -> 'a list -> 'a list * 'a list
+val strip_snd : ('a * 'a) list -> 'a list
 val is_unit_option : unit option -> bool
 
-type model_info = {
-  is_complete : bool;
-  bound : int;
-  num_states : int;
-  num_edges : int;
-}
+type model_info =
+  { is_complete : bool
+  ; bound : int
+  ; num_states : int
+  ; num_edges : int
+  }
 
 val is_complete : model_info option -> bool option
 
@@ -14,7 +16,9 @@ module PStr : sig
 end
 
 module Logging : sig
-  type output_modes = Coq of unit | OCaml of unit
+  type output_modes =
+    | Coq of unit
+    | OCaml of unit
 
   type output_kind =
     | Normal of unit
@@ -22,24 +26,23 @@ module Logging : sig
     | Debug of unit
     | Warning of unit
 
-  val pstr_output_kind_head :
-    output_modes -> output_kind -> string
+  val pstr_output_kind_head : output_modes -> output_kind -> string
 
-  type output_options = {
-    mutable output_enabled : bool;
-    mutable show_normal_output : bool;
-    mutable show_detailed_output : bool;
-    mutable show_debug_output : bool;
-    mutable show_warning_output : bool;
-  }
+  type output_options =
+    { mutable output_enabled : bool
+    ; mutable show_normal_output : bool
+    ; mutable show_detailed_output : bool
+    ; mutable show_debug_output : bool
+    ; mutable show_warning_output : bool
+    }
 
-  type params = {
-    mode : output_modes;
-    mutable kind : output_kind;
-    mutable options : output_options;
-    mutable scope : string Stack.t;
-    mutable override : unit option;
-  }
+  type params =
+    { mode : output_modes
+    ; mutable kind : output_kind
+    ; mutable options : output_options
+    ; mutable scope : string Stack.t
+    ; mutable override : unit option
+    }
 
   val default_params : ?mode:output_modes -> unit -> params
   val log_options : output_options -> params -> unit
@@ -62,19 +65,21 @@ module Logging : sig
 end
 
 module Formatting : sig
-  type params = {
-    tabs : int;
-    no_leading_tab : bool;
-    params : Logging.params;
-  }
+  type params =
+    { tabs : int
+    ; no_leading_tab : bool
+    ; params : Logging.params
+    }
 
-  val default_params :
-    ?params:Logging.params ->
-    ?mode:Logging.output_modes ->
-    unit ->
-    params
+  val default_params
+    :  ?params:Logging.params
+    -> ?mode:Logging.output_modes
+    -> unit
+    -> params
 
-  type pstr_params = Log of Logging.params | Fmt of params
+  type pstr_params =
+    | Log of Logging.params
+    | Fmt of params
 
   val handle_params : pstr_params -> params
 end
@@ -85,9 +90,7 @@ module Params : sig
   type pstr = Formatting.pstr_params
 
   module Default : sig
-    val fmt :
-      ?params:log -> ?mode:Logging.output_modes -> unit -> fmt
-
+    val fmt : ?params:log -> ?mode:Logging.output_modes -> unit -> fmt
     val log : ?mode:Logging.output_modes -> unit -> log
   end
 

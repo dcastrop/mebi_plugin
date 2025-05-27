@@ -4,25 +4,35 @@ type mebi_error =
   | InvalidLTSSort of Sorts.family
   | InvalidArity of Environ.env * Evd.evar_map * Constr.types
   | InvalidLTSRef of Names.GlobRef.t
-  | CannotFindTypeOfTermToVisit of
+  | UnknownTermType of
       (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t * EConstr.t list))
-  | CannotFindMatchingInductiveDefinition of
+  | PrimaryLTSNotFound of
       (Environ.env * Evd.evar_map * EConstr.t * EConstr.t list)
+  | UnknownDecodeKey of
+      (Environ.env * Evd.evar_map * 'a * EConstr.t list)
 
 exception MEBI_exn of mebi_error
 
+(** Error when input LTS has the wrong arity *)
 let invalid_sort f = MEBI_exn (InvalidLTSSort f)
+(** Error when input LTS has the wrong Sort *)
 let invalid_arity ev sg t = MEBI_exn (InvalidArity (ev, sg, t))
+(** Error when input LTS reference is invalid (e.g. non existing) *)
 let invalid_ref r = MEBI_exn (InvalidLTSRef r)
 
-(** for any terms encountered when exploring/building the lts *)
+(** Error when term is of unknown type *)
 let unknown_term_type ev sg tmty =
-  MEBI_exn (CannotFindTypeOfTermToVisit (ev, sg, tmty))
+  MEBI_exn (UnknownTermType (ev, sg, tmty))
 ;;
 
-(** *)
+(** Error when multiple coq-LTS provided, but none of them match term. *)
 let primary_lts_not_found ev sg t names =
-  MEBI_exn (CannotFindMatchingInductiveDefinition (ev, sg, t, names))
+  MEBI_exn (PrimaryLTSNotFound (ev, sg, t, names))
+;;
+
+(** Error when multiple coq-LTS provided, but none of them match term. *)
+let unknown_decode_key ev sg t names =
+  MEBI_exn (UnknownDecodeKey (ev, sg, t, names))
 ;;
 
 let mebi_handler = function
@@ -34,7 +44,7 @@ let mebi_handler = function
     ++ strbrk "\n"
     ++ str "Expecting: forall params, ?terms -> ?labels -> ?terms -> Prop"
   | InvalidLTSRef r -> str "Invalid LTS ref: " ++ Printer.pr_global r
-  | CannotFindTypeOfTermToVisit (ev, sg, (tm, ty, trkeys)) ->
+  | UnknownTermType (ev, sg, (tm, ty, trkeys)) ->
     str
       "None of the constructors provided matched type of term to visit. \
        (unknown_term_type) "
@@ -79,7 +89,7 @@ let mebi_handler = function
                    tystr
                    (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg k)))
                trkeys))
-  | CannotFindMatchingInductiveDefinition (ev, sg, t, names) -> str "..."
+  | PrimaryLTSNotFound (ev, sg, t, names) -> str "..."
 ;;
 
 let _ =
