@@ -5,7 +5,7 @@
 type term = EConstr.t
 
 (*********************************************************************)
-(*** Mebi Monad ******************************************************)
+(*** Coq-Mebi Monad **************************************************)
 (*********************************************************************)
 
 module type MEBI_MONAD = sig
@@ -21,41 +21,61 @@ module type MEBI_MONAD = sig
 
   type 'a cm = coq_context ref -> 'a in_coq_context
 
-  val coq_run : 'a cm -> 'a
-  val coq_return : 'a -> 'a cm
-  val coq_bind : 'a cm -> ('a -> 'b cm) -> 'b cm
-  val ( let|* ) : 'a cm -> ('a -> 'b cm) -> 'b cm
-  val get_env : Environ.env cm
-  val get_sigma : Evd.evar_map cm
-
-  (* val state : (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) -> 'a cm *)
-
-  (* val make_constr_tbl : coq_context ref -> (module Hashtbl.S with type key =
-     term) cm *)
-
-  (* module type COQ_SYNTAX_TYPE = sig val ( let+ ) : 'a cm -> ('a -> 'b) -> 'b
-     cm val ( let* ) : 'a cm -> ('a -> 'b cm) -> 'b cm
-
-     val ( let$ ) : (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) -> ('a ->
-     'b cm) -> 'b cm
-
-     val ( let$* ) : (Environ.env -> Evd.evar_map -> Evd.evar_map) -> (unit ->
-     'b cm) -> 'b cm
-
-     val ( let$+ ) : (Environ.env -> Evd.evar_map -> 'a) -> ('a -> 'b cm) -> 'b
-     cm
-
-     val ( and+ ) : 'a cm -> 'b cm -> ('a * 'b) cm end *)
-
-  (* module CoqSyntax : COQ_SYNTAX_TYPE *)
-
   val init : coq_context ref
 end
+
+module MebiMonad : MEBI_MONAD = struct
+  type coq_context =
+    { coq_env : Environ.env
+    ; coq_ctx : Evd.evar_map
+    }
+
+  type 'a in_coq_context =
+    { state : coq_context ref
+    ; value : 'a
+    }
+
+  type 'a cm = coq_context ref -> 'a in_coq_context
+
+  let init : coq_context ref =
+    let env = Global.env () in
+    let sigma = Evd.from_env env in
+    let coq_ref : coq_context ref = ref { coq_env = env; coq_ctx = sigma } in
+    coq_ref
+  ;;
+end
+
+(*********************************************************************)
+(*** Coq-Mebi Wrapper ************************************************)
+(*********************************************************************)
 
 module type MEBI_WRAPPER = sig
   module M : MEBI_MONAD
   module MkF : Hashtbl.S with type key = term
 end
+
+(** initializes the monad and produces the module [F] *)
+module MebiWrapper : MEBI_WRAPPER = struct
+  module M = MebiMonad
+
+  module MkF = Hashtbl.Make (struct
+      type t = term
+
+      let equal t1 t2 = EConstr.eq_constr !M.init.coq_ctx t1 t2
+
+      let hash t =
+        Constr.hash
+          (EConstr.to_constr
+             ?abort_on_undefined_evars:(Some false)
+             !M.init.coq_ctx
+             t)
+      ;;
+    end)
+end
+
+(*********************************************************************)
+(*** Wrappper ********************************************************)
+(*********************************************************************)
 
 module type WRAPPER = sig
   module MW : MEBI_WRAPPER
@@ -215,115 +235,7 @@ module type WRAPPER = sig
     : (module Set.S with type elt = E.t * Constr_tree.t) mm
 end
 
-module MebiMonad : MEBI_MONAD = struct
-  type coq_context =
-    { coq_env : Environ.env
-    ; coq_ctx : Evd.evar_map
-    }
-
-  type 'a in_coq_context =
-    { state : coq_context ref
-    ; value : 'a
-    }
-
-  type 'a cm = coq_context ref -> 'a in_coq_context
-
-  let coq_run (x : 'a cm) : 'a =
-    let env = Global.env () in
-    let sigma = Evd.from_env env in
-    let a = x (ref { coq_env = env; coq_ctx = sigma }) in
-    a.value
-  ;;
-
-  let coq_return (x : 'a) : 'a cm = fun st -> { state = st; value = x }
-  [@@inline always]
-  ;;
-
-  let coq_bind (x : 'a cm) (f : 'a -> 'b cm) : 'b cm =
-    fun st ->
-    let a = x st in
-    f a.value a.state
-  [@@inline always]
-  ;;
-
-  let ( let|* ) = coq_bind
-
-  (* let coq_map (f : 'a -> 'b) (x : 'a cm) : 'b cm = fun st -> let x_st = x st
-     in { x_st with value = f x_st.value } [@@inline always] ;; *)
-
-  (* let coq_product (x : 'a cm) (y : 'b cm) : ('a * 'b) cm = coq_bind x (fun a
-     -> coq_bind y (fun b -> coq_return (a, b))) [@@inline always] ;; *)
-
-  let get_env (st : coq_context ref) : Environ.env in_coq_context =
-    { state = st; value = !st.coq_env }
-  ;;
-
-  let get_sigma (st : coq_context ref) : Evd.evar_map in_coq_context =
-    { state = st; value = !st.coq_ctx }
-  ;;
-
-  (* let coq_state (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) (st :
-     coq_context ref) : 'a in_coq_context = let sigma, a = f !st.coq_env
-     !st.coq_ctx in st := { !st with coq_ctx = sigma }; { state = st; value = a
-     } ;; *)
-
-  (* let make_constr_tbl (st : coq_context ref) : (module Hashtbl.S with type
-     key = term) cm = let module Constrtbl = Hashtbl.Make (struct type t = term
-
-     let equal t1 t2 = EConstr.eq_constr !st.coq_ctx t1 t2
-
-     let hash t = Constr.hash (EConstr.to_constr ?abort_on_undefined_evars:(Some
-     false) !st.coq_ctx t) ;; end) in coq_return (module Constrtbl : Hashtbl.S
-     with type key = term) ;; *)
-
-  let init : coq_context ref =
-    let env = Global.env () in
-    let sigma = Evd.from_env env in
-    let coq_ref : coq_context ref = ref { coq_env = env; coq_ctx = sigma } in
-    coq_ref
-  ;;
-
-  (* module type COQ_SYNTAX_TYPE = sig val ( let+ ) : 'a cm -> ('a -> 'b) -> 'b
-     cm val ( let* ) : 'a cm -> ('a -> 'b cm) -> 'b cm
-
-     val ( let$ ) : (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) -> ('a ->
-     'b cm) -> 'b cm
-
-     val ( let$* ) : (Environ.env -> Evd.evar_map -> Evd.evar_map) -> (unit ->
-     'b cm) -> 'b cm
-
-     val ( let$+ ) : (Environ.env -> Evd.evar_map -> 'a) -> ('a -> 'b cm) -> 'b
-     cm
-
-     val ( and+ ) : 'a cm -> 'b cm -> ('a * 'b) cm end *)
-
-  (* module CoqSyntax : COQ_SYNTAX_TYPE = struct let ( let+ ) x f = coq_map f x
-     let ( let* ) = coq_bind let ( let$ ) f g = coq_bind (coq_state f) g let (
-     let$* ) f g = coq_bind (coq_state (fun e s -> f e s, ())) g let ( let$+ ) f
-     g = coq_bind (coq_state (fun e s -> s, f e s)) g let ( and+ ) x y =
-     coq_product x y end *)
-end
-
-(** initializes the monad and produces the module [F] *)
-module MebiWrapper (Mebi : MEBI_MONAD) : MEBI_WRAPPER = struct
-  module M = Mebi
-
-  module MkF = Hashtbl.Make (struct
-      type t = term
-
-      let equal t1 t2 = EConstr.eq_constr !M.init.coq_ctx t1 t2
-
-      let hash t =
-        Constr.hash
-          (EConstr.to_constr
-             ?abort_on_undefined_evars:(Some false)
-             !M.init.coq_ctx
-             t)
-      ;;
-    end)
-end
-
-module Wrapper (MebiWrapper : MEBI_WRAPPER) : WRAPPER = struct
+module Wrapper : WRAPPER = struct
   module MW = MebiWrapper
   module M = MW.M
   module F = MW.MkF
@@ -865,37 +777,3 @@ module Wrapper (MebiWrapper : MEBI_WRAPPER) : WRAPPER = struct
     }
   ;;
 end
-
-module MM = MebiMonad
-module W = Wrapper (MebiWrapper (MM))
-
-(* let make_wrapper : MebiMonad.MkWrapper.wrapper MebiMonad.in_context = *)
-
-(*********************************************************************)
-(*** Wrappper ********************************************************)
-(*********************************************************************)
-
-(* module type S = sig module MM : MEBI_MONAD
-
-   (* val fwd_map : (module Hashtbl.S with type key = term) *)
-
-   type wrapper = { fwd_enc : (module Hashtbl.S with type key = term) ; bck_enc
-   : (module Hashtbl.S with type key = MM.E.t) }
-
-   type 'a in_wrapper = { state : wrapper ref ; value : 'a }
-
-   type 'a ii = wrapper ref -> 'a in_wrapper end
-
-   module Wrapper (Mebi : MEBI_MONAD) : S = struct module MM = Mebi
-
-   (* let fwd_map = let f = MM.make_constr_tbl in f MM.in_context *)
-
-   type wrapper = { fwd_enc : (module Hashtbl.S with type key = term) ; bck_enc
-   : (module Hashtbl.S with type key = MM.E.t) }
-
-   type 'a in_wrapper = { state : wrapper ref ; value : 'a }
-
-   type 'a ii = wrapper ref -> 'a in_wrapper
-
-   (** [run] initializes the wrapper and is called at the beginning. *) (* let
-   run (x : 'a ii) : 'a = let fwd_enc = MM.make_constr_tbl in *) end *)
