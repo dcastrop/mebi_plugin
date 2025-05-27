@@ -1,4 +1,4 @@
-open Pp
+(* open Pp *)
 
 (* open Mebi_utils *)
 (* open Mebi_monad *)
@@ -62,23 +62,43 @@ type raw_lts =
   ; constructor_transitions : (Constr.rel_context * Constr.types) array
   }
 
-type term_type_map = (EConstr.types, raw_lts) Hashtbl.t
+(* type term_type_map = (EConstr.types, raw_lts) Hashtbl.t *)
 
 (** [_log_raw_lts] *)
-(* let _log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts) :
-   unit mm = Log.override ~params (Printf.sprintf "(a) Types of terms: %s.\n"
-   (econstr_to_string rlts.trm_type)); Log.override ~params (Printf.sprintf "(b)
-   Types of labels: %s.\n" (econstr_to_string rlts.lbl_type)); Log.override
-   ~params (Printf.sprintf "(c) Constructors: %s.\n" (Pp.string_of_ppcmds
-   (Pp.prvect_with_sep (fun _ -> str ", ") Names.Id.print
-   rlts.coq_ctor_names))); Log.override ~params (Printf.sprintf "(d) Types of
-   coq_lts: %s.\n" (econstr_to_string rlts.coq_lts)); (* log ~params
-   (Printf.sprintf "(f) Transitions (do not be alarmed by any _UNBOUND_ below):
-   %s.\n" (if Array.length rlts.constructor_transitions < 1 then "[] (empty)"
-   else Printf.sprintf "[%s]" (Array.fold_left (fun (acc : string) (tr :
-   Constr.rel_context * Constr.t) -> Printf.sprintf "%s %s\n" acc
-   (constr_to_string (snd tr))) "\n" rlts.constructor_transitions))); *) return
-   () ;; *)
+let _log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
+  : unit mm
+  =
+  Log.override
+    ~params
+    (Printf.sprintf
+       "(a) Types of terms: %s.\n"
+       (econstr_to_string rlts.trm_type));
+  Log.override
+    ~params
+    (Printf.sprintf
+       "(b)\n   Types of labels: %s.\n"
+       (econstr_to_string rlts.lbl_type));
+  Log.override
+    ~params
+    (Printf.sprintf
+       "(c) Constructors: %s.\n"
+       (Pp.string_of_ppcmds
+          (Pp.prvect_with_sep
+             (fun _ -> Pp.str ", ")
+             Names.Id.print
+             rlts.coq_ctor_names)));
+  Log.override
+    ~params
+    (Printf.sprintf
+       "(d) Types of\n   coq_lts: %s.\n"
+       (econstr_to_string rlts.coq_lts));
+  (* log ~params (Printf.sprintf "(f) Transitions (do not be alarmed by any
+     _UNBOUND_ below): %s.\n" (if Array.length rlts.constructor_transitions < 1
+     then "[] (empty)" else Printf.sprintf "[%s]" (Array.fold_left (fun (acc :
+     string) (tr : Constr.rel_context * Constr.t) -> Printf.sprintf "%s %s\n"
+     acc (constr_to_string (snd tr))) "\n" rlts.constructor_transitions))); *)
+  return ()
+;;
 
 (** [check_ref_lts gref] is the [raw_lts] of [gref].
 
@@ -254,7 +274,7 @@ let rec retrieve_tgt_nodes
 let rec check_updated_ctx
   ?(params : Params.log = default_params)
   (acc : (Constr_tree.t * unif_problem) list list)
-  (fn_rlts : term_type_map)
+  (fn_rlts : raw_lts F.t)
   :  EConstr.t list * EConstr.rel_declaration list
   -> (Constr_tree.t * unif_problem) list list option mm
   = function
@@ -266,7 +286,7 @@ let rec check_updated_ctx
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with
      | App (fn, args) ->
-       (match Hashtbl.find_opt fn_rlts fn with
+       (match F.find_opt fn_rlts fn with
         | None ->
           Log.warning
             ~params
@@ -314,7 +334,7 @@ let rec check_updated_ctx
 and check_valid_constructor
   ?(params : Params.log = default_params)
   (ctor_transitions : (Constr.rel_context * Constr.types) array)
-  (fn_rlts : term_type_map)
+  (fn_rlts : raw_lts F.t)
   (t' : EConstr.t)
   (ma : EConstr.t option)
   : coq_ctor list mm
@@ -397,7 +417,7 @@ module type GraphB = sig
   val build_lts_graph
     :  ?params:Params.log
     -> raw_lts
-    -> raw_lts H.t
+    -> raw_lts B.t
     -> lts_graph
     -> int
     -> lts_graph mm
@@ -411,8 +431,8 @@ module type GraphB = sig
 
   module DeCoq : sig
     type coq_translation =
-      { from_coq : string H.t
-      ; to_coq : (string, EConstr.t) Hashtbl.t
+      { from_coq : string B.t
+      ; to_coq : (string, E.t) Hashtbl.t
       }
 
     val lts_graph_to_lts
@@ -557,9 +577,18 @@ module MkGraph
   (******** (i.e., H, D, S )*********************************************)
   (**********************************************************************)
 
-  (* let _pstr_econstr_set (states : S.t) : string = if S.is_empty states then
-     "[ ] (empty)" else Printf.sprintf "[%s\n]" (S.fold (fun (s : S.elt) (acc :
-     string) -> Printf.sprintf "%s\n %s\n" acc (E.to_string s)) states "") ;; *)
+  let _pstr_econstr_set (states : S.t) : string =
+    if S.is_empty states
+    then "[ ] (empty)"
+    else
+      Printf.sprintf
+        "[%s\n]"
+        (S.fold
+           (fun (s : S.elt) (acc : string) ->
+             Printf.sprintf "%s\n %s\n" acc (E.to_string s))
+           states
+           "")
+  ;;
 
   (* let _pstr_constr_transition (f : EConstr.t) (a : Mebi_action.action) ((d,
      c) : EConstr.t * Constr_tree.t) : string = Printf.sprintf "{|from: %s;
@@ -727,27 +756,17 @@ module MkGraph
         if none of the constructors provided in [rlts_map] yield constructors from [check_valid_constructors]. *)
   let get_new_constrs
     ?(params : Params.log = default_params)
-    (t : EConstr.t)
+    (encoded_t : E.t)
     (primary : raw_lts)
-    (rlts_map : raw_lts H.t)
+    (rlts_map : raw_lts B.t)
     : coq_ctor list mm
     =
-    (* let* (the_rlts : raw_lts) = get_rlts t rlts_map in *)
-    (* let temp_map = Hashtbl.of_seq (H.to_seq rlts_map) in *)
-    let temp_map =
-      Hashtbl.of_seq
-        (List.to_seq
-           (List.fold_left
-              (fun (acc : (EConstr.t * raw_lts) list) (k, v) ->
-                let* (decoded : EConstr.t) = decode k in
-                (decoded, v) :: acc)
-              []
-              (List.of_seq (H.to_seq rlts_map))))
-    in
+    let* (t : EConstr.t) = decode encoded_t in
+    let* (decoded_map : raw_lts F.t) = decode_map rlts_map in
     check_valid_constructor
       ~params
       primary.constructor_transitions
-      temp_map
+      decoded_map
       t
       None
   ;;
@@ -760,7 +779,7 @@ module MkGraph
   let rec build_lts_graph
     ?(params : Params.log = default_params)
     (primary : raw_lts)
-    (rlts_map : raw_lts H.t)
+    (rlts_map : raw_lts B.t)
     (g : lts_graph)
     (bound : int)
     : lts_graph mm
@@ -772,12 +791,14 @@ module MkGraph
     then return g (* exit if bound reached *)
     else (
       let encoded_t : E.t = Queue.pop g.to_visit in
-      let* (t : EConstr.t) = decode encoded_t in
+      (* let* (t : EConstr.t) = decode encoded_t in *)
       let* (new_constrs : coq_ctor list) =
-        get_new_constrs ~params t primary rlts_map
+        get_new_constrs ~params encoded_t primary rlts_map
       in
       (* [get_new_states] also updates [g.to_visit] *)
-      let* (new_states : S.t) = get_new_states ~params t g new_constrs in
+      let* (new_states : S.t) =
+        get_new_states ~params encoded_t g new_constrs
+      in
       let g : lts_graph = { g with states = S.union g.states new_states } in
       (* let* _ = _run_all_checks ~prefix:"build_graph, " g in *)
       build_lts_graph ~params primary rlts_map g bound)
@@ -786,25 +807,27 @@ module MkGraph
   (** @return
         the key for the primary lts and hashtable mapping the name of the coq definition to the rlts. *)
   let build_rlts_map (t' : EConstr.t) (grefs : Names.GlobRef.t list)
-    : (EConstr.t * raw_lts H.t) mm
+    : (E.t * raw_lts B.t) mm
     =
     (* normalize the initial term *)
     let* (t : EConstr.t) = normalize_econstr t' in
     let* (ty : EConstr.t) = type_of_econstr t in
     (* prepare for iterating through [grefs] *)
     let num_grefs : int = List.length grefs in
-    let trmap : raw_lts H.t = H.create num_grefs in
-    let iter_body (i : int) ((fn_opt, acc_map) : EConstr.t option * raw_lts H.t)
-      =
+    let trmap : raw_lts B.t = B.create num_grefs in
+    let iter_body (i : int) ((fn_opt, acc_map) : E.t option * raw_lts B.t) =
       let gref : Names.GlobRef.t = List.nth grefs i in
       let* (rlts : raw_lts) = check_ref_lts gref in
       (* add name of inductive prop *)
-      H.add acc_map rlts.coq_lts rlts;
+      let* (encoding : E.t) = encode rlts.coq_lts in
+      B.add acc_map encoding rlts;
       (* normalize term type and check if primary *)
       let* (trmty : EConstr.t) = normalize_econstr rlts.trm_type in
       let* sigma = get_sigma in
       match fn_opt, EConstr.eq_constr sigma ty trmty with
-      | None, true -> return (Some rlts.coq_lts, acc_map)
+      | None, true ->
+        let* (encoding : E.t) = encode rlts.coq_lts in
+        return (Some encoding, acc_map)
       | Some _, true ->
         Log.warning
           ~params:default_params
@@ -820,7 +843,9 @@ module MkGraph
       iterate 0 (num_grefs - 1) (None, trmap) iter_body
     in
     match primary with
-    | None -> primary_lts_not_found (ty, List.of_seq (H.to_seq_keys rlts_map))
+    | None ->
+      let* decoded_map = decode_map rlts_map in
+      primary_lts_not_found (ty, List.of_seq (F.to_seq_keys decoded_map))
     | Some p -> return (p, rlts_map)
   ;;
 
@@ -838,22 +863,25 @@ module MkGraph
     (* should be able to get the type now -- fail otherwise *)
     let* (t : EConstr.t) = tref_to_econstr tref in
     (* make map of term types *)
-    let* (primary, rlts_map) : EConstr.t * raw_lts H.t =
-      build_rlts_map t grefs
-    in
-    let (the_lts : raw_lts) = H.find rlts_map primary in
-    let* _ = _print_constr_names rlts_map in
+    let* (primary, rlts_map) : E.t * raw_lts B.t = build_rlts_map t grefs in
+    let (the_lts : raw_lts) = B.find rlts_map primary in
+    (* let* _ = _print_constr_names rlts_map in *)
     (* update environment by typechecking *)
     let$* u env sigma = Typing.check env sigma t the_lts.trm_type in
     let$ init env sigma = sigma, Reductionops.nf_all env sigma t in
+    let* encoded_init = encode init in
     let q = Queue.create () in
-    let* _ = return (Queue.push init q) in
+    let* _ = return (Queue.push encoded_init q) in
     let* g =
       build_lts_graph
         ~params
         the_lts
         rlts_map
-        { to_visit = q; states = S.empty; init; transitions = H.create 0 }
+        { to_visit = q
+        ; states = S.empty
+        ; init = encoded_init
+        ; transitions = H.create 0
+        }
         bound
     in
     let* _ = _print_finished_build_graph ~params g in
@@ -863,8 +891,8 @@ module MkGraph
 
   module DeCoq = struct
     type coq_translation =
-      { from_coq : string H.t
-      ; to_coq : (string, EConstr.t) Hashtbl.t
+      { from_coq : string B.t
+      ; to_coq : (string, E.t) Hashtbl.t
       }
 
     let create_translation_tbl
@@ -872,22 +900,23 @@ module MkGraph
       (states : S.t)
       : coq_translation mm
       =
-      let list_states : EConstr.t list = S.elements states in
+      let list_states : E.t list = S.elements states in
       let iter_body
         (i : int)
         ((from_coq_list, to_coq_list) :
-          (EConstr.t * string) list * (string * EConstr.t) list)
+          (E.t * string) list * (string * E.t) list)
         =
-        let s : EConstr.t = List.nth list_states i in
-        let (str : string) = econstr_to_string s in
+        let s : E.t = List.nth list_states i in
+        (* let (str : string) = econstr_to_string s in *)
+        let str : string = E.to_string s in
         (* since [list_states] is from a set, we assume no duplicates. *)
         return ((s, str) :: from_coq_list, (str, s) :: to_coq_list)
       in
       let* from_coq_list, to_coq_list =
         iterate 0 (List.length list_states - 1) ([], []) iter_body
       in
-      let from_coq : string H.t = H.of_seq (List.to_seq from_coq_list) in
-      let to_coq : (string, EConstr.t) Hashtbl.t =
+      let from_coq : string B.t = B.of_seq (List.to_seq from_coq_list) in
+      let to_coq : (string, E.t) Hashtbl.t =
         Hashtbl.of_seq (List.to_seq to_coq_list)
       in
       let translation_tbl : coq_translation = { from_coq; to_coq } in
@@ -922,10 +951,11 @@ module MkGraph
       : unit mm
       =
       S.iter
-        (fun (s : EConstr.t) ->
-          match H.find_opt translation_tbl.from_coq s with
+        (fun (s : E.t) ->
+          match B.find_opt translation_tbl.from_coq s with
           | None ->
-            let (s_str : string) = econstr_to_string s in
+            (* let (s_str : string) = econstr_to_string s in *)
+            let (s_str : string) = E.to_string s in
             Log.warning
               ~params:default_params
               (Printf.sprintf
@@ -938,13 +968,14 @@ module MkGraph
 
     let get_state_translation
       ?(prefix : string = "?")
-      (state : EConstr.t)
+      (state : E.t)
       (translation_tbl : coq_translation)
       (g : lts_graph)
       : string mm
       =
-      let (_str : string) = econstr_to_string state in
-      match H.find_opt translation_tbl.from_coq state with
+      (* let (_str : string) = econstr_to_string state in *)
+      let (_str : string) = E.to_string state in
+      match B.find_opt translation_tbl.from_coq state with
       | None ->
         let missing_state : string =
           Printf.sprintf "UNKNOWN_%s_STATE:\n%s" prefix _str
@@ -969,14 +1000,14 @@ module MkGraph
                   (S.cardinal matches)
                   (_pstr_econstr_set matches))
               else "false")
-             (H.mem translation_tbl.from_coq state)
+             (B.mem translation_tbl.from_coq state)
              (List.mem
                 state
                 (List.of_seq (Hashtbl.to_seq_values translation_tbl.to_coq)))
              (Hashtbl.mem translation_tbl.to_coq _str)
              (List.mem
                 _str
-                (List.of_seq (H.to_seq_values translation_tbl.from_coq))));
+                (List.of_seq (B.to_seq_values translation_tbl.from_coq))));
         return missing_state
       | Some s -> return s
     ;;
@@ -1026,7 +1057,7 @@ module MkGraph
       let* (flat_rlts : Lts.raw_flat_lts) =
         translate_transitions transitions_list translation_tbl g
       in
-      let init : string = H.find translation_tbl.from_coq g.init in
+      let init : string = B.find translation_tbl.from_coq g.init in
       let is_complete : bool = Queue.is_empty g.to_visit in
       let num_states : int = S.cardinal g.states in
       let num_edges : int = num_transitions g.transitions in
@@ -1034,7 +1065,7 @@ module MkGraph
         { is_complete; bound; num_states; num_edges }
       in
       let (string_states : string list) =
-        List.of_seq (H.to_seq_values translation_tbl.from_coq)
+        List.of_seq (B.to_seq_values translation_tbl.from_coq)
       in
       let lts : Lts.lts =
         Lts.Create.lts ~init ~info (Flat (flat_rlts, Some string_states))

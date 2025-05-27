@@ -263,8 +263,10 @@ module type WRAPPER = sig
   val unknown_term_type : term * term * term list -> 'a mm
   val primary_lts_not_found : term * term list -> 'a mm
   val unknown_decode_key : E.t * term B.t -> 'a mm
-  val encode : wrapper ref -> term -> E.t mm
-  val decode : wrapper ref -> E.t -> term mm
+  val encode : term -> E.t mm
+  val decode : E.t -> term mm
+  val encode_map : 'a F.t -> 'a B.t mm
+  val decode_map : 'a B.t -> 'a F.t mm
   val constr_to_string : Constr.t -> string
   val econstr_to_string : term -> string
   val tref_to_econstr : Constrexpr.constr_expr -> term mm
@@ -688,8 +690,10 @@ module W : sig
   val unknown_term_type : term * term * term list -> 'a mm
   val primary_lts_not_found : term * term list -> 'a mm
   val unknown_decode_key : E.t * term B.t -> 'a mm
-  val encode : wrapper ref -> term -> E.t mm
-  val decode : wrapper ref -> E.t -> term mm
+  val encode : term -> E.t mm
+  val decode : E.t -> term mm
+  val encode_map : 'a F.t -> 'a B.t mm
+  val decode_map : 'a B.t -> 'a F.t mm
   val constr_to_string : Constr.t -> string
   val econstr_to_string : term -> string
   val tref_to_econstr : Constrexpr.constr_expr -> term mm
