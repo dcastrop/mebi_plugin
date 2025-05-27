@@ -194,10 +194,12 @@ module type WRAPPER = sig
   val unknown_decode_key : E.t * term B.t -> 'a mm
 
   (* functionality *)
-  val encode : wrapper ref -> term -> E.t mm
-  val decode : wrapper ref -> E.t -> term mm
+  val encode : term -> E.t mm
+  val decode : E.t -> term mm
 
   (* utils *)
+  val encode_map : 'a F.t -> 'a B.t mm
+  val decode_map : 'a B.t -> 'a F.t mm
   val constr_to_string : Constr.t -> string
   val econstr_to_string : EConstr.t -> string
   val tref_to_econstr : Constrexpr.constr_expr -> term mm
@@ -721,22 +723,45 @@ module Wrapper (MebiWrapper : MEBI_WRAPPER) : WRAPPER = struct
   (****** ENCODE/DECODE ***********************)
   (********************************************)
 
-  let encode (st : wrapper ref) (k : term) : E.t mm =
+  let encode (k : term) : E.t mm =
+    fun (st : wrapper ref) ->
     let encoding : E.t = E.encode !st.fwd_enc !st.bck_enc k in
-    (* { state = st; value = encoding } *)
-    return encoding
+    { state = st; value = encoding }
   ;;
 
   (** dual to [encode] except we cannot handle new values *)
-  let decode (st : wrapper ref) (k : E.t) : term mm =
+  let decode (k : E.t) : term mm =
+    fun (st : wrapper ref) ->
     let decoding : term = E.decode !st.bck_enc k in
-    (* { state = st; value = decoding } *)
-    return decoding
+    { state = st; value = decoding }
   ;;
 
   (********************************************)
   (****** UTILS *******************************)
   (********************************************)
+
+  let encode_map (m : 'a F.t) : 'a B.t mm =
+    fun (st : wrapper ref) ->
+    let encoded_map : 'a B.t = B.create (F.length m) in
+    F.iter
+      (fun (k : term) (v : 'a) ->
+        let encoding : E.t = E.encode !st.fwd_enc !st.bck_enc k in
+        B.add encoded_map encoding v)
+      m;
+    { state = st; value = encoded_map }
+  ;;
+
+  (** *)
+  let decode_map (m : 'a B.t) : 'a F.t mm =
+    fun (st : wrapper ref) ->
+    let decoded_map : 'a F.t = F.create (B.length m) in
+    B.iter
+      (fun (k : E.t) (v : 'a) ->
+        let decoding : term = E.decode !st.bck_enc k in
+        F.add decoded_map decoding v)
+      m;
+    { state = st; value = decoded_map }
+  ;;
 
   (** *)
   let constr_to_string (x : Constr.t) : string =
