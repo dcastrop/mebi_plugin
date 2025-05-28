@@ -23,7 +23,16 @@ let the_coq_env () : Environ.env ref =
   | Some env -> env
 ;;
 
-let the_coq_ctx () : Evd.evar_map ref = ref (Evd.from_env !(the_coq_env ()))
+let coq_ctx_wrapper () : Evd.evar_map ref option ref = ref None
+
+let the_coq_ctx () : Evd.evar_map ref =
+  match !(coq_ctx_wrapper ()) with
+  | None ->
+    let ctx = ref (Evd.from_env !(the_coq_env ())) in
+    coq_ctx_wrapper () := Some ctx;
+    ctx
+  | Some ctx -> ctx
+;;
 
 (********************************************)
 (****** FORWARD ENCODING MAP ****************)
