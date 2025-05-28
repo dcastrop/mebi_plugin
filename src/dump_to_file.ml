@@ -61,9 +61,9 @@ let get_filename (f : filename_kind) (is_complete : bool option) : string =
 type filetype_kind = JSON of unit
 
 let build_filename
-  (filename : filename_kind)
-  (filetype : filetype_kind)
-  (is_complete : bool option)
+      (filename : filename_kind)
+      (filetype : filetype_kind)
+      (is_complete : bool option)
   : string
   =
   match filetype with
@@ -71,10 +71,10 @@ let build_filename
 ;;
 
 let build_filepath
-  (output_dir : output_dir_kind)
-  (filename : filename_kind)
-  (filetype : filetype_kind)
-  (is_complete : bool option)
+      (output_dir : output_dir_kind)
+      (filename : filename_kind)
+      (filetype : filetype_kind)
+      (is_complete : bool option)
   : string
   =
   match output_dir, filetype with
@@ -88,7 +88,8 @@ let build_filepath
     Filename.concat s (build_filename filename filetype is_complete)
 ;;
 
-(** https://discuss.ocaml.org/t/how-to-create-a-new-file-while-automatically-creating-any-intermediate-directories/14837/5 *)
+(** https://discuss.ocaml.org/t/how-to-create-a-new-file-while-automatically-creating-any-intermediate-directories/14837/5
+*)
 let rec create_parent_dir (fn : string) =
   let parent_dir = Filename.dirname fn in
   if not (Sys.file_exists parent_dir)
@@ -153,10 +154,10 @@ module JSON = struct
 
   (** assumes elements of [ss] are already stringified. *)
   let col
-    ?(prefix : string = "")
-    ?(sep : string option)
-    ?(tlindent : string = "")
-    (ss : col_kind)
+        ?(prefix : string = "")
+        ?(sep : string option)
+        ?(tlindent : string = "")
+        (ss : col_kind)
     : string
     =
     let ss, lhs, rhs, sep =
@@ -238,11 +239,12 @@ module JSON = struct
         ~prefix:"\t\t"
         ~tlindent:"\t\t"
         (Dict
-           [ key_val
+           [ (*key_val
                ~prefix:"\t\t\t"
                "id"
                (quoted (clean (Printf.sprintf "%i" t.id)))
-           ; key_val ~prefix:"\t\t\t" "from" (quoted (clean t.from))
+               ; *)
+             key_val ~prefix:"\t\t\t" "from" (quoted (clean t.from))
            ; key_val ~prefix:"\t\t\t" "label" (quoted (clean t.label))
            ; key_val ~prefix:"\t\t\t" "dest" (quoted (clean t.destination))
            ; key_val
@@ -419,9 +421,9 @@ type dumpable_kind =
   | FSM of Fsm.fsm
 
 let handle_filecontents
-  (filename : string)
-  (filetype : filetype_kind)
-  (to_dump : dumpable_kind)
+      (filename : string)
+      (filetype : filetype_kind)
+      (to_dump : dumpable_kind)
   : string * bool option
   =
   match to_dump, filetype with
@@ -430,10 +432,10 @@ let handle_filecontents
 ;;
 
 let write_to_file
-  (output_dir : output_dir_kind)
-  (filename : filename_kind)
-  (filetype : filetype_kind)
-  (to_dump : dumpable_kind)
+      (output_dir : output_dir_kind)
+      (filename : filename_kind)
+      (filetype : filetype_kind)
+      (to_dump : dumpable_kind)
   : string
   =
   (* get content to output *)
