@@ -1,5 +1,47 @@
-module M = Mebi_monad
-module F = Mebi_wrapper.MkF
+(* module M = Mebi_monad *)
+(* module F = Mebi_wrapper.MkF *)
+
+type term = EConstr.t
+
+(********************************************)
+(****** COQ ENVIRONMENT *********************)
+(********************************************)
+
+type coq_context =
+  { coq_env : Environ.env
+  ; coq_ctx : Evd.evar_map
+  }
+
+let coq_env_wrapper : Environ.env ref option ref = ref None
+
+let the_coq_env : Environ.env ref =
+  match !coq_env_wrapper with
+  | None ->
+    let env = Global.env () in
+    coq_env_wrapper := Some (ref env);
+    ref env
+  | Some env -> env
+;;
+
+let the_coq_ctx : Evd.evar_map ref = ref (Evd.from_env !the_coq_env)
+
+(********************************************)
+(****** FORWARD ENCODING MAP ****************)
+(********************************************)
+
+module F : Hashtbl.S with type key = term = Hashtbl.Make (struct
+    type t = term
+
+    let equal t1 t2 = EConstr.eq_constr !the_coq_ctx t1 t2
+
+    let hash t =
+      Constr.hash
+        (EConstr.to_constr
+           ?abort_on_undefined_evars:(Some false)
+           !the_coq_ctx
+           t)
+    ;;
+  end)
 
 (********************************************)
 (****** ENCODINGS ***************************)
@@ -18,11 +60,11 @@ module type ENCODING_TYPE = sig
 
   module Tbl : ENC_TBL
 
-  val encode : t F.t -> M.term Tbl.t -> M.term -> t
+  val encode : t F.t -> term Tbl.t -> term -> t
 
-  exception InvalidDecodeKey of (t * M.term Tbl.t)
+  exception InvalidDecodeKey of (t * term Tbl.t)
 
-  val decode : M.term Tbl.t -> t -> M.term
+  val decode : term Tbl.t -> t -> term
 end
 
 (**********************************)
@@ -48,7 +90,7 @@ module IntEncoding : ENCODING_TYPE = struct
       let hash t = hash t
     end)
 
-  let encode (fwd : t F.t) (bck : M.term Tbl.t) (k : M.term) : t =
+  let encode (fwd : t F.t) (bck : term Tbl.t) (k : term) : t =
     match F.find_opt fwd k with
     | None ->
       (* map to next encoding and return *)
@@ -60,9 +102,9 @@ module IntEncoding : ENCODING_TYPE = struct
     | Some enc -> enc
   ;;
 
-  exception InvalidDecodeKey of (t * M.term Tbl.t)
+  exception InvalidDecodeKey of (t * term Tbl.t)
 
-  let decode (bck : M.term Tbl.t) (k : t) : M.term =
+  let decode (bck : term Tbl.t) (k : t) : term =
     match Tbl.find_opt bck k with
     | None -> raise (InvalidDecodeKey (k, bck))
     | Some enc -> enc
@@ -77,9 +119,9 @@ module B = E.Tbl
 (********************************************)
 
 type wrapper =
-  { coq_ref : M.coq_context ref
+  { coq_ref : coq_context ref
   ; fwd_enc : E.t F.t
-  ; bck_enc : M.term B.t
+  ; bck_enc : term B.t
   }
 
 type 'a in_context =
@@ -91,7 +133,12 @@ type 'a mm = wrapper ref -> 'a in_context
 
 (** [run x] initializes the monad, and runs [x]. *)
 let run (x : 'a mm) : 'a =
-  let coq_ref = M.init in
+  let env = !the_coq_env in
+  let sigma = !the_coq_ctx in
+  (* let env = Global.env () in *)
+  (* let sigma = Evd.from_env env in *)
+  let coq_ref : coq_context ref = ref { coq_env = env; coq_ctx = sigma } in
+  (* let coq_ref : coq_context ref = M.init in *)
   let fwd_enc : E.t F.t = F.create 0 in
   let bck_enc = B.create 0 in
   let a = x (ref { coq_ref; fwd_enc; bck_enc }) in
@@ -144,9 +191,9 @@ module type ERROR_TYPE = sig
     | InvalidArity of Environ.env * Evd.evar_map * Constr.types
     | InvalidLTSRef of Names.GlobRef.t
     | UnknownTermType of
-        (Environ.env * Evd.evar_map * (M.term * M.term * M.term list))
-    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * M.term * M.term list)
-    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * M.term B.t)
+        (Environ.env * Evd.evar_map * (term * term * term list))
+    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
+    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
 
   exception MEBI_exn of mebi_error
 
@@ -157,22 +204,17 @@ module type ERROR_TYPE = sig
   val unknown_term_type
     :  Environ.env
     -> Evd.evar_map
-    -> M.term * M.term * M.term list
+    -> term * term * term list
     -> exn
 
   val primary_lts_not_found
     :  Environ.env
     -> Evd.evar_map
-    -> M.term
-    -> M.term list
+    -> term
+    -> term list
     -> exn
 
-  val unknown_decode_key
-    :  Environ.env
-    -> Evd.evar_map
-    -> E.t
-    -> M.term B.t
-    -> exn
+  val unknown_decode_key : Environ.env -> Evd.evar_map -> E.t -> term B.t -> exn
 end
 
 module Error : ERROR_TYPE = struct
@@ -181,9 +223,9 @@ module Error : ERROR_TYPE = struct
     | InvalidArity of Environ.env * Evd.evar_map * Constr.types
     | InvalidLTSRef of Names.GlobRef.t
     | UnknownTermType of
-        (Environ.env * Evd.evar_map * (M.term * M.term * M.term list))
-    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * M.term * M.term list)
-    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * M.term B.t)
+        (Environ.env * Evd.evar_map * (term * term * term list))
+    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
+    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
 
   exception MEBI_exn of mebi_error
 
@@ -196,7 +238,7 @@ module Error : ERROR_TYPE = struct
   (** Error when input LTS reference is invalid (e.g. non existing) *)
   let invalid_ref r = MEBI_exn (InvalidLTSRef r)
 
-  (** Error when M.term is of unknown type *)
+  (** Error when term is of unknown type *)
   let unknown_term_type ev sg tmty = MEBI_exn (UnknownTermType (ev, sg, tmty))
 
   (** Error when multiple coq-LTS provided, but none of them match term. *)
@@ -222,7 +264,7 @@ module Error : ERROR_TYPE = struct
     | InvalidLTSRef r -> str "Invalid LTS ref: " ++ Printer.pr_global r
     | UnknownTermType (ev, sg, (tm, ty, trkeys)) ->
       str
-        "None of the constructors provided matched type of M.term to visit. \
+        "None of the constructors provided matched type of term to visit. \
          (unknown_term_type) "
       ++ strbrk "\n\n"
       ++ str "Term: "
@@ -240,7 +282,7 @@ module Error : ERROR_TYPE = struct
                  Printf.sprintf
                    "[%s ]"
                    (List.fold_left
-                      (fun (acc : string) (k : M.term) ->
+                      (fun (acc : string) (k : term) ->
                         Printf.sprintf
                           "%s '%s'"
                           acc
@@ -251,16 +293,14 @@ module Error : ERROR_TYPE = struct
       ++ str
            (Printf.sprintf
               "Does Type match EConstr of any Key? = %b"
-              (List.exists
-                 (fun (k : M.term) -> EConstr.eq_constr sg ty k)
-                 trkeys))
+              (List.exists (fun (k : term) -> EConstr.eq_constr sg ty k) trkeys))
       ++ strbrk "\n"
       ++ str
            (let tystr = Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg ty) in
             Printf.sprintf
               "Does Type match String of any Key? = %b"
               (List.exists
-                 (fun (k : M.term) ->
+                 (fun (k : term) ->
                    String.equal
                      tystr
                      (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg k)))
@@ -298,22 +338,22 @@ let invalid_ref (x : Names.GlobRef.t) : 'a mm =
   fun st -> raise (Error.invalid_ref x)
 ;;
 
-(** Error when M.term is of unknown type *)
-let unknown_term_type (tmty : M.term * M.term * M.term list) : 'a mm =
+(** Error when term is of unknown type *)
+let unknown_term_type (tmty : term * term * term list) : 'a mm =
   fun st ->
   let coq_st = !st.coq_ref in
   raise (Error.unknown_term_type !coq_st.coq_env !coq_st.coq_ctx tmty)
 ;;
 
 (** Error when multiple coq-LTS provided, but none of them match term. *)
-let primary_lts_not_found ((t, names) : M.term * M.term list) : 'a mm =
+let primary_lts_not_found ((t, names) : term * term list) : 'a mm =
   fun st ->
   let coq_st = !st.coq_ref in
   raise (Error.primary_lts_not_found !coq_st.coq_env !coq_st.coq_ctx t names)
 ;;
 
 (** Error when try to decode key that does not exist in decode map. *)
-let unknown_decode_key ((k, bckmap) : E.t * M.term B.t) : 'a mm =
+let unknown_decode_key ((k, bckmap) : E.t * term B.t) : 'a mm =
   fun st ->
   let coq_st = !st.coq_ref in
   raise (Error.unknown_decode_key !coq_st.coq_env !coq_st.coq_ctx k bckmap)
@@ -337,7 +377,7 @@ let get_fwd_enc (st : wrapper ref) : E.t F.t in_context =
   { state = st; value = !st.fwd_enc }
 ;;
 
-let get_bck_enc (st : wrapper ref) : M.term B.t in_context =
+let get_bck_enc (st : wrapper ref) : term B.t in_context =
   { state = st; value = !st.bck_enc }
 ;;
 
@@ -400,16 +440,16 @@ end
 (****** ENCODE/DECODE ***********************)
 (********************************************)
 
-let encode (k : M.term) : E.t mm =
+let encode (k : term) : E.t mm =
   fun (st : wrapper ref) ->
   let encoding : E.t = E.encode !st.fwd_enc !st.bck_enc k in
   { state = st; value = encoding }
 ;;
 
 (** dual to [encode] except we cannot handle new values *)
-let decode (k : E.t) : M.term mm =
+let decode (k : E.t) : term mm =
   fun (st : wrapper ref) ->
-  let decoding : M.term = E.decode !st.bck_enc k in
+  let decoding : term = E.decode !st.bck_enc k in
   { state = st; value = decoding }
 ;;
 
@@ -421,7 +461,7 @@ let encode_map (m : 'a F.t) : 'a B.t mm =
   fun (st : wrapper ref) ->
   let encoded_map : 'a B.t = B.create (F.length m) in
   F.iter
-    (fun (k : M.term) (v : 'a) ->
+    (fun (k : term) (v : 'a) ->
       let encoding : E.t = E.encode !st.fwd_enc !st.bck_enc k in
       B.add encoded_map encoding v)
     m;
@@ -434,7 +474,7 @@ let decode_map (m : 'a B.t) : 'a F.t mm =
   let decoded_map : 'a F.t = F.create (B.length m) in
   B.iter
     (fun (k : E.t) (v : 'a) ->
-      let decoding : M.term = E.decode !st.bck_enc k in
+      let decoding : term = E.decode !st.bck_enc k in
       F.add decoded_map decoding v)
     m;
   { state = st; value = decoded_map }
@@ -473,29 +513,29 @@ let econstr_to_string (x : EConstr.t) : string =
 (****** COQ TERMS *****************)
 (**********************************)
 
-let tref_to_econstr (tref : Constrexpr.constr_expr) : M.term mm =
+let tref_to_econstr (tref : Constrexpr.constr_expr) : term mm =
   let open Syntax in
   let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
   return t
 ;;
 
-let normalize_econstr (t' : M.term) : M.term mm =
+let normalize_econstr (t' : term) : term mm =
   let open Syntax in
   let$+ t env sigma = Reductionops.nf_all env sigma t' in
   return t
 ;;
 
-let type_of_econstr (t' : M.term) : M.term mm =
+let type_of_econstr (t' : term) : term mm =
   let open Syntax in
-  let* (t : M.term) = normalize_econstr t' in
+  let* (t : term) = normalize_econstr t' in
   let$ ty env sigma = Typing.type_of env sigma t in
   return ty
 ;;
 
 (** *)
-let type_of_tref (tref : Constrexpr.constr_expr) : M.term mm =
+let type_of_tref (tref : Constrexpr.constr_expr) : term mm =
   let open Syntax in
-  let* (t : M.term) = tref_to_econstr tref in
+  let* (t : term) = tref_to_econstr tref in
   type_of_econstr t
 ;;
 
