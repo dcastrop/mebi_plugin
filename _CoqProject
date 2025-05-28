@@ -5,12 +5,12 @@ src/META.coq-mebi
 -I src/
 -arg "-w all"
 
-theories/loader.v
-theories/Test.v
+# theories/loader.v
+# theories/Test.v
 
-examples/CADP.v
-examples/SimpleCADP.v
-examples/Proc.v
+# examples/CADP.v
+# examples/SimpleCADP.v
+# examples/Proc.v
 # examples/properties/mutual_exclusion.v
 # examples/properties/no_starvation.v
 

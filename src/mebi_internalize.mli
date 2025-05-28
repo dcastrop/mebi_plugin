@@ -1,5 +1,41 @@
-module M = Mebi_monad
-module F = Mebi_wrapper.MkF
+type term = EConstr.t
+
+type coq_context =
+  { coq_env : Environ.env
+  ; coq_ctx : Evd.evar_map
+  }
+
+val coq_env_wrapper : Environ.env ref option ref
+val the_coq_env : Environ.env ref
+val the_coq_ctx : Evd.evar_map ref
+
+module F : sig
+  type key = term
+  type !'a t
+
+  val create : int -> 'a t
+  val clear : 'a t -> unit
+  val reset : 'a t -> unit
+  val copy : 'a t -> 'a t
+  val add : 'a t -> key -> 'a -> unit
+  val remove : 'a t -> key -> unit
+  val find : 'a t -> key -> 'a
+  val find_opt : 'a t -> key -> 'a option
+  val find_all : 'a t -> key -> 'a list
+  val replace : 'a t -> key -> 'a -> unit
+  val mem : 'a t -> key -> bool
+  val iter : (key -> 'a -> unit) -> 'a t -> unit
+  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+  val length : 'a t -> int
+  val stats : 'a t -> Hashtbl.statistics
+  val to_seq : 'a t -> (key * 'a) Seq.t
+  val to_seq_keys : 'a t -> key Seq.t
+  val to_seq_values : 'a t -> 'a Seq.t
+  val add_seq : 'a t -> (key * 'a) Seq.t -> unit
+  val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
+  val of_seq : (key * 'a) Seq.t -> 'a t
+end
 
 module type ENCODING_TYPE = sig
   type t
@@ -40,11 +76,11 @@ module type ENCODING_TYPE = sig
 
   module Tbl : ENC_TBL
 
-  val encode : t F.t -> EConstr.t Tbl.t -> EConstr.t -> t
+  val encode : t F.t -> term Tbl.t -> term -> t
 
-  exception InvalidDecodeKey of (t * EConstr.t Tbl.t)
+  exception InvalidDecodeKey of (t * term Tbl.t)
 
-  val decode : EConstr.t Tbl.t -> t -> EConstr.t
+  val decode : term Tbl.t -> t -> term
 end
 
 module IntEncoding : ENCODING_TYPE
@@ -52,9 +88,9 @@ module E = IntEncoding
 module B = E.Tbl
 
 type wrapper =
-  { coq_ref : M.coq_context ref
+  { coq_ref : coq_context ref
   ; fwd_enc : E.t F.t
-  ; bck_enc : EConstr.t B.t
+  ; bck_enc : term B.t
   }
 
 type 'a in_context =
@@ -77,10 +113,9 @@ module type ERROR_TYPE = sig
     | InvalidArity of Environ.env * Evd.evar_map * Constr.t
     | InvalidLTSRef of Names.GlobRef.t
     | UnknownTermType of
-        (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t * EConstr.t list))
-    | PrimaryLTSNotFound of
-        (Environ.env * Evd.evar_map * EConstr.t * EConstr.t list)
-    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * EConstr.t B.t)
+        (Environ.env * Evd.evar_map * (term * term * term list))
+    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
+    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
 
   exception MEBI_exn of mebi_error
 
@@ -91,22 +126,17 @@ module type ERROR_TYPE = sig
   val unknown_term_type
     :  Environ.env
     -> Evd.evar_map
-    -> EConstr.t * EConstr.t * EConstr.t list
+    -> term * term * term list
     -> exn
 
   val primary_lts_not_found
     :  Environ.env
     -> Evd.evar_map
-    -> EConstr.t
-    -> EConstr.t list
+    -> term
+    -> term list
     -> exn
 
-  val unknown_decode_key
-    :  Environ.env
-    -> Evd.evar_map
-    -> E.t
-    -> EConstr.t B.t
-    -> exn
+  val unknown_decode_key : Environ.env -> Evd.evar_map -> E.t -> term B.t -> exn
 end
 
 module Error : ERROR_TYPE
@@ -114,13 +144,13 @@ module Error : ERROR_TYPE
 val invalid_arity : Constr.t -> 'a mm
 val invalid_sort : Sorts.family -> 'a mm
 val invalid_ref : Names.GlobRef.t -> 'a mm
-val unknown_term_type : M.term * M.term * M.term list -> 'a mm
-val primary_lts_not_found : M.term * M.term list -> 'a mm
-val unknown_decode_key : E.t * M.term B.t -> 'a mm
+val unknown_term_type : term * term * term list -> 'a mm
+val primary_lts_not_found : term * term list -> 'a mm
+val unknown_decode_key : E.t * term B.t -> 'a mm
 val get_env : wrapper ref -> Environ.env in_context
 val get_sigma : wrapper ref -> Evd.evar_map in_context
 val get_fwd_enc : wrapper ref -> E.t F.t in_context
-val get_bck_enc : wrapper ref -> M.term B.t in_context
+val get_bck_enc : wrapper ref -> term B.t in_context
 
 val state
   :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
@@ -150,16 +180,16 @@ end
 
 module Syntax : MEBI_MONAD_SYNTAX
 
-val encode : M.term -> E.t mm
-val decode : E.t -> M.term mm
+val encode : term -> E.t mm
+val decode : E.t -> term mm
 val encode_map : 'a F.t -> 'a B.t mm
 val decode_map : 'a B.t -> 'a F.t mm
 val constr_to_string : Constr.t -> string
 val econstr_to_string : EConstr.t -> string
-val tref_to_econstr : Constrexpr.constr_expr -> M.term mm
-val normalize_econstr : M.term -> M.term mm
-val type_of_econstr : M.term -> M.term mm
-val type_of_tref : Constrexpr.constr_expr -> M.term mm
+val tref_to_econstr : Constrexpr.constr_expr -> term mm
+val normalize_econstr : term -> term mm
+val type_of_econstr : term -> term mm
+val type_of_tref : Constrexpr.constr_expr -> term mm
 
 val make_transition_tbl
   :  wrapper ref

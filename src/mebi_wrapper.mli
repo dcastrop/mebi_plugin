@@ -1,1 +1,1 @@
-module MkF : Hashtbl.S with type key = EConstr.t
+(* module MkF : Hashtbl.S with type key = EConstr.t *)
