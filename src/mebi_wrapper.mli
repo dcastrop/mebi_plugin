@@ -5,10 +5,6 @@ type coq_context =
   ; coq_ctx : Evd.evar_map
   }
 
-val coq_env_wrapper : unit -> Environ.env ref option ref
-val the_coq_env : unit -> Environ.env ref
-val the_coq_ctx : unit -> Evd.evar_map ref
-
 module F : sig
   type key = term
   type !'a t
