@@ -1,13 +1,13 @@
-type term = EConstr.t
+type term = Evd.econstr
 
 type coq_context =
   { coq_env : Environ.env
   ; coq_ctx : Evd.evar_map
   }
 
-val coq_env_wrapper : Environ.env ref option ref
-val the_coq_env : Environ.env ref
-val the_coq_ctx : Evd.evar_map ref
+val coq_env_wrapper : unit -> Environ.env ref option ref
+val the_coq_env : unit -> Environ.env ref
+val the_coq_ctx : unit -> Evd.evar_map ref
 
 module F : sig
   type key = term
@@ -185,7 +185,7 @@ val decode : E.t -> term mm
 val encode_map : 'a F.t -> 'a B.t mm
 val decode_map : 'a B.t -> 'a F.t mm
 val constr_to_string : Constr.t -> string
-val econstr_to_string : EConstr.t -> string
+val econstr_to_string : Evd.econstr -> string
 val tref_to_econstr : Constrexpr.constr_expr -> term mm
 val normalize_econstr : term -> term mm
 val type_of_econstr : term -> term mm

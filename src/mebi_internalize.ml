@@ -12,18 +12,18 @@ type coq_context =
   ; coq_ctx : Evd.evar_map
   }
 
-let coq_env_wrapper : Environ.env ref option ref = ref None
+let coq_env_wrapper () : Environ.env ref option ref = ref None
 
-let the_coq_env : Environ.env ref =
-  match !coq_env_wrapper with
+let the_coq_env () : Environ.env ref =
+  match !(coq_env_wrapper ()) with
   | None ->
     let env = Global.env () in
-    coq_env_wrapper := Some (ref env);
+    coq_env_wrapper () := Some (ref env);
     ref env
   | Some env -> env
 ;;
 
-let the_coq_ctx : Evd.evar_map ref = ref (Evd.from_env !the_coq_env)
+let the_coq_ctx () : Evd.evar_map ref = ref (Evd.from_env !(the_coq_env ()))
 
 (********************************************)
 (****** FORWARD ENCODING MAP ****************)
@@ -32,13 +32,13 @@ let the_coq_ctx : Evd.evar_map ref = ref (Evd.from_env !the_coq_env)
 module F : Hashtbl.S with type key = term = Hashtbl.Make (struct
     type t = term
 
-    let equal t1 t2 = EConstr.eq_constr !the_coq_ctx t1 t2
+    let equal t1 t2 = EConstr.eq_constr !(the_coq_ctx ()) t1 t2
 
     let hash t =
       Constr.hash
         (EConstr.to_constr
            ?abort_on_undefined_evars:(Some false)
-           !the_coq_ctx
+           !(the_coq_ctx ())
            t)
     ;;
   end)
@@ -133,8 +133,8 @@ type 'a mm = wrapper ref -> 'a in_context
 
 (** [run x] initializes the monad, and runs [x]. *)
 let run (x : 'a mm) : 'a =
-  let env = !the_coq_env in
-  let sigma = !the_coq_ctx in
+  let env = !(the_coq_env ()) in
+  let sigma = !(the_coq_ctx ()) in
   (* let env = Global.env () in *)
   (* let sigma = Evd.from_env env in *)
   let coq_ref : coq_context ref = ref { coq_env = env; coq_ctx = sigma } in
