@@ -28,8 +28,10 @@ src/mebi_action.mli
 src/constr_tree.ml
 src/constr_tree.mli
 
-# src/mebi_monad.ml
-# src/mebi_monad.mli
+src/mebi_monad.ml
+src/mebi_monad.mli
+src/mebi_wrapper.ml
+src/mebi_wrapper.mli
 src/mebi_internalize.ml
 src/mebi_internalize.mli
 src/mebi_utils.ml
