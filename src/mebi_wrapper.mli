@@ -37,6 +37,8 @@ module type ENCODING_TYPE = sig
   type t
 
   val init : t
+  val cache : t ref
+  val reset : unit -> unit
   val eq : t -> t -> bool
   val compare : t -> t -> int
   val hash : t -> int
@@ -96,7 +98,7 @@ type 'a in_context =
 
 type 'a mm = wrapper ref -> 'a in_context
 
-val run : 'a mm -> 'a
+val run : ?keep_encoding:bool -> 'a mm -> 'a
 val return : 'a -> 'a mm
 val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
 val map : ('a -> 'b) -> 'a mm -> 'b mm
