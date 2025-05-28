@@ -5,8 +5,8 @@
 (* open Mebi_monad.Monad_syntax *)
 
 (* open the wrapper *)
-open Mebi_internalize
-open Mebi_internalize.Syntax
+open Mebi_wrapper
+open Mebi_wrapper.Syntax
 
 (* *)
 open Utils.Logging

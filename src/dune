@@ -24,7 +24,7 @@
   ; mebi_errors
   mebi_action
   constr_tree
-  mebi_internalize
+  mebi_wrapper
   mebi_utils
   lts
   fsm
