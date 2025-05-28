@@ -1,7 +1,17 @@
+(** [split_at i l acc] is a tuple containing two lists [(l', acc)] split from list [l] at index [i]. *)
+let rec split_at i l acc =
+  if i <= 0
+  then l, acc
+  else (match l with [] -> acc, [] | h :: t -> split_at (i - 1) t (h :: acc))
+;;
+
+(** [strip_snd l] is the list of rhs elements in a list of tuples [l] (typically a [constr]). *)
+let rec strip_snd (l : ('a * 'a) list) : 'a list =
+  match l with [] -> [] | h :: t -> snd h :: strip_snd t
+;;
+
 let is_unit_option (override : unit option) : bool =
-  match override with
-  | None -> false
-  | Some () -> true
+  match override with None -> false | Some () -> true
 ;;
 
 (** used to store info on if a model is complete or the number of bounds required *)
@@ -13,9 +23,7 @@ type model_info =
   }
 
 let is_complete (m : model_info option) : bool option =
-  match m with
-  | None -> None
-  | Some i -> Some i.is_complete
+  match m with None -> None | Some i -> Some i.is_complete
 ;;
 
 module PStr = struct
@@ -66,12 +74,9 @@ module Logging = struct
     ; mutable show_debug_output : bool
     ; mutable show_warning_output : bool
     }
-  (*
-     module DebugScope =Stack.Make (struct
-     type t = string
+  (* module DebugScope =Stack.Make (struct type t = string
 
-     let equal (t1 : string) (t2 : string) = String.equal t1 t2
-     end) *)
+     let equal (t1 : string) (t2 : string) = String.equal t1 t2 end) *)
 
   (** [Logging.params]
       - [mode] determines if the print occurs via [Printf.printf] for [OCaml] or for [Coq], via [Feedback.msg_info] or similar.
@@ -318,9 +323,7 @@ let no_leading_tab (_no_leading_tab : bool) (params : Params.fmt) : Params.fmt =
 (** [print ?show to_print] is a wrapper for [Printf.printf].
     @param ?show determines if [to_print] is outputted. *)
 let print ?(show : bool = false) (to_print : string) : unit =
-  match show with
-  | true -> Printf.printf "%s" to_print
-  | false -> ()
+  match show with true -> Printf.printf "%s" to_print | false -> ()
 ;;
 
 (** [default_indent_val] is the default number of spaces to use perindent in [to_string]. *)
