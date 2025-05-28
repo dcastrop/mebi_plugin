@@ -1,7 +1,10 @@
-(* module M = Mebi_monad *)
-(* module F = Mebi_wrapper.MkF *)
-
 type term = EConstr.t
+
+let default_params () : Utils.Params.log =
+  Utils.Params.Default.log ~mode:(Coq ()) ()
+;;
+
+let enable_logging : bool ref = ref true
 
 (********************************************)
 (****** COQ ENVIRONMENT *********************)
@@ -12,26 +15,42 @@ type coq_context =
   ; coq_ctx : Evd.evar_map
   }
 
-let coq_env_wrapper () : Environ.env ref option ref = ref None
+let coq_env_wrapper : Environ.env ref option ref = ref None
 
-let the_coq_env () : Environ.env ref =
-  match !(coq_env_wrapper ()) with
-  | None ->
-    let env = Global.env () in
-    coq_env_wrapper () := Some (ref env);
-    ref env
-  | Some env -> env
+let new_coq_env () : Environ.env ref =
+  if !enable_logging
+  then
+    Utils.Logging.Log.override
+      ~params:(default_params ())
+      "Created new coq env.";
+  let env = ref (Global.env ()) in
+  coq_env_wrapper := Some env;
+  env
 ;;
 
-let coq_ctx_wrapper () : Evd.evar_map ref option ref = ref None
+let the_coq_env ?(fresh : bool = false) () : Environ.env ref =
+  match !coq_env_wrapper with
+  | None -> new_coq_env ()
+  | Some env -> if fresh then new_coq_env () else env
+;;
 
-let the_coq_ctx () : Evd.evar_map ref =
-  match !(coq_ctx_wrapper ()) with
-  | None ->
-    let ctx = ref (Evd.from_env !(the_coq_env ())) in
-    coq_ctx_wrapper () := Some ctx;
-    ctx
-  | Some ctx -> ctx
+let coq_ctx_wrapper : Evd.evar_map ref option ref = ref None
+
+let new_coq_ctx ?(fresh : bool = false) () : Evd.evar_map ref =
+  if !enable_logging
+  then
+    Utils.Logging.Log.override
+      ~params:(default_params ())
+      "Created new coq ctx.";
+  let ctx = ref (Evd.from_env !(the_coq_env ~fresh ())) in
+  coq_ctx_wrapper := Some ctx;
+  ctx
+;;
+
+let the_coq_ctx ?(fresh : bool = false) () : Evd.evar_map ref =
+  match !coq_ctx_wrapper with
+  | None -> new_coq_ctx ()
+  | Some ctx -> if fresh then new_coq_ctx ~fresh () else ctx
 ;;
 
 (********************************************)
@@ -60,6 +79,8 @@ module type ENCODING_TYPE = sig
   type t
 
   val init : t
+  val cache : t ref
+  val reset : unit -> unit
   val eq : t -> t -> bool
   val compare : t -> t -> int
   val hash : t -> int
@@ -83,8 +104,15 @@ end
 module IntEncoding : ENCODING_TYPE = struct
   type t = int
 
-  let init = 0
-  let counter : t ref = ref init
+  let init : t = 0
+  let cache : t ref = ref init
+  let counter = cache
+
+  let reset () =
+    cache := init;
+    ()
+  ;;
+
   let eq t1 t2 = Int.equal t1 t2
   let compare t1 t2 = Int.compare t1 t2
   let hash t = Int.hash t
@@ -140,17 +168,20 @@ type 'a in_context =
 
 type 'a mm = wrapper ref -> 'a in_context
 
-(** [run x] initializes the monad, and runs [x]. *)
-let run (x : 'a mm) : 'a =
-  let env = !(the_coq_env ()) in
+(** [run x] initializes the monad, and runs [x].
+    @param ?keep_encoding
+      is [true] when this is called mid-run.
+      E.g., via [econstr_to_string]
+    @param x is the command to run inside the [wrapper] state monad. *)
+let run ?(keep_encoding : bool = false) (x : 'a mm) : 'a =
+  let env = !(the_coq_env ~fresh:true ()) in
   let sigma = !(the_coq_ctx ()) in
-  (* let env = Global.env () in *)
-  (* let sigma = Evd.from_env env in *)
   let coq_ref : coq_context ref = ref { coq_env = env; coq_ctx = sigma } in
-  (* let coq_ref : coq_context ref = M.init in *)
+  if keep_encoding then () else E.reset ();
   let fwd_enc : E.t F.t = F.create 0 in
   let bck_enc = B.create 0 in
   let a = x (ref { coq_ref; fwd_enc; bck_enc }) in
+  enable_logging := false;
   a.value
 ;;
 
@@ -505,7 +536,7 @@ let constr_to_string (x : Constr.t) : string =
     let* sigma = get_sigma in
     return (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma x))
   in
-  run s_mm
+  run ~keep_encoding:true s_mm
 ;;
 
 let econstr_to_string (x : EConstr.t) : string =
@@ -515,7 +546,7 @@ let econstr_to_string (x : EConstr.t) : string =
     let* sigma = get_sigma in
     return (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma x))
   in
-  run s_mm
+  run ~keep_encoding:true s_mm
 ;;
 
 (**********************************)
