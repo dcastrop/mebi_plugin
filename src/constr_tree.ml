@@ -1,10 +1,11 @@
 type 'a tree = Node of 'a * 'a tree list
-type t = int tree
+type t = (int * int) tree
 
 let eq (t1 : t) (t2 : t) : bool =
   let rec tree_eq (t1 : t) (t2 : t) : bool =
     match t1, t2 with
-    | Node (a1, b1), Node (a2, b2) -> a1 == a2 && tree_list_eq b1 b2
+    | Node (a1, b1), Node (a2, b2) ->
+      fst a1 == fst a2 && snd a1 == snd a2 && tree_list_eq b1 b2
   and tree_list_eq (l1 : t list) (l2 : t list) : bool =
     match l1, l2 with
     | [], [] -> true
@@ -19,7 +20,12 @@ let compare (t1 : t) (t2 : t) : int =
   let rec tree_compare (t1 : t) (t2 : t) : int =
     match t1, t2 with
     | Node (i1, l1), Node (i2, l2) ->
-      (match Int.compare i1 i2 with 0 -> tree_list_compare l1 l2 | n -> n)
+      (match Int.compare (fst i1) (fst i2) with
+       | 0 ->
+         (match Int.compare (snd i1) (snd i2) with
+          | 0 -> tree_list_compare l1 l2
+          | n -> n)
+       | n -> n)
   and tree_list_compare (l1 : t list) (l2 : t list) : int =
     match l1, l2 with
     | [], [] -> 0
@@ -37,8 +43,9 @@ let rec pstr (t1 : t) : string =
   match t1 with
   | Node (lhs_int, rhs_int_tree_list) ->
     Printf.sprintf
-      "(%d) [%s]"
-      lhs_int
+      "(%i:%i) [%s]"
+      (fst lhs_int)
+      (snd lhs_int)
       (match List.length rhs_int_tree_list with
        | 0 -> ""
        | 1 -> pstr (List.hd rhs_int_tree_list)

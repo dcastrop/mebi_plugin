@@ -55,7 +55,8 @@ let get_lts_labels_and_terms
 
 (** *)
 type raw_lts =
-  { coq_lts : EConstr.t
+  { index : int
+  ; coq_lts : EConstr.t
   ; trm_type : EConstr.types
   ; lbl_type : EConstr.types
   ; coq_ctor_names : Names.Id.t array
@@ -103,7 +104,7 @@ let _log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
 (** [check_ref_lts gref] is the [raw_lts] of [gref].
 
     @raise invalid_ref if [gref] is not a reference to an inductive type. *)
-let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
+let check_ref_lts (index : int) (gref : Names.GlobRef.t) : raw_lts mm =
   let open Names.GlobRef in
   match gref with
   | IndRef i ->
@@ -115,7 +116,8 @@ let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
     (* lts of inductive type *)
     let lts = EConstr.mkIndU (i, EConstr.EInstance.make univ) in
     return
-      { coq_lts = lts
+      { index
+      ; coq_lts = lts
       ; trm_type = EConstr.of_constr (Context.Rel.Declaration.get_type term)
       ; lbl_type = EConstr.of_constr (Context.Rel.Declaration.get_type lbl)
       ; coq_ctor_names = mip.mind_consnames
@@ -252,31 +254,31 @@ let rec retrieve_tgt_nodes
   (i : int)
   (act : EConstr.t)
   (tgt_term : EConstr.t)
-  : (Constr_tree.t * unif_problem) list list -> coq_ctor list mm
+  : int * (Constr_tree.t * unif_problem) list list -> coq_ctor list mm
   = function
-  | [] -> return acc
-  | u1 :: nctors ->
+  | _, [] -> return acc
+  | lts_index, u1 :: nctors ->
     let* success = sandboxed_unify ~params tgt_term u1 in
     (match success with
-     | None -> retrieve_tgt_nodes ~params acc i act tgt_term nctors
+     | None -> retrieve_tgt_nodes ~params acc i act tgt_term (lts_index, nctors)
      | Some (tgt, ctor_tree) ->
        let$+ act env sigma = Reductionops.nf_all env sigma act in
        retrieve_tgt_nodes
          ~params
-         ((act, tgt, Node (i, ctor_tree)) :: acc)
+         ((act, tgt, Node ((lts_index, i), ctor_tree)) :: acc)
          i
          act
          tgt_term
-         nctors)
+         (lts_index, nctors))
 ;;
 
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
   ?(params : Params.log = default_params)
-  (acc : (Constr_tree.t * unif_problem) list list)
+  (acc : int * (Constr_tree.t * unif_problem) list list)
   (fn_rlts : raw_lts F.t)
   :  EConstr.t list * EConstr.rel_declaration list
-  -> (Constr_tree.t * unif_problem) list list option mm
+  -> (int * (Constr_tree.t * unif_problem) list list) option mm
   = function
   | [], [] -> return (Some acc)
   | _ :: substl, t :: tl ->
@@ -303,6 +305,7 @@ let rec check_updated_ctx
               fn_rlts
               nextT
               (Some args.(1))
+              rlts.index
           in
           if List.is_empty ctors
           then return None
@@ -322,7 +325,10 @@ let rec check_updated_ctx
             (* replace [rtls] in [rtls_ctx] *)
             (* let rtls_ctx':rlts_list = List.append [ ] in *)
             check_updated_ctx
-              (List.concat_map (fun x -> List.map (fun y -> y :: x) ctors) acc)
+              ( fst acc
+              , List.concat_map
+                  (fun x -> List.map (fun y -> y :: x) ctors)
+                  (snd acc) )
               fn_rlts
               (substl, tl)))
      | _ -> check_updated_ctx acc fn_rlts (substl, tl))
@@ -337,6 +343,7 @@ and check_valid_constructor
   (fn_rlts : raw_lts F.t)
   (t' : EConstr.t)
   (ma : EConstr.t option)
+  (lts_index : int)
   : coq_ctor list mm
   =
   params.kind <- Debug ();
@@ -360,23 +367,38 @@ and check_valid_constructor
       let* success = Option.cata (fun a -> m_unify a act) (return true) ma in
       if success
       then
-        let* (next_ctors : (Constr_tree.t * unif_problem) list list option) =
-          check_updated_ctx ~params [ [] ] fn_rlts (substl, ctx_tys)
+        let* (next_ctors :
+               (int * (Constr_tree.t * unif_problem) list list) option)
+          =
+          check_updated_ctx ~params (lts_index, [ [] ]) fn_rlts (substl, ctx_tys)
         in
         let$+ act env sigma = Reductionops.nf_all env sigma act in
         let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in
         match next_ctors with
         | None -> return ctor_vals
-        | Some [] ->
-          let* sigma = get_sigma in
-          if EConstr.isEvar sigma tgt_term
-          then return ctor_vals
-          else return ((act, tgt_term, Constr_tree.Node (i, [])) :: ctor_vals)
-        | Some nctors ->
-          let tgt_nodes =
-            retrieve_tgt_nodes ~params ctor_vals i act tgt_term nctors
-          in
-          tgt_nodes
+        | Some index_ctor_pair ->
+          (match snd index_ctor_pair with
+           | [] ->
+             let* sigma = get_sigma in
+             if EConstr.isEvar sigma tgt_term
+             then return ctor_vals
+             else
+               return
+                 (( act
+                  , tgt_term
+                  , Constr_tree.Node ((fst index_ctor_pair, i), []) )
+                  :: ctor_vals)
+           | nctors ->
+             let tgt_nodes =
+               retrieve_tgt_nodes
+                 ~params
+                 ctor_vals
+                 i
+                 act
+                 tgt_term
+                 index_ctor_pair
+             in
+             tgt_nodes)
       else return ctor_vals
     else return ctor_vals
   in
@@ -769,6 +791,7 @@ module MkGraph
       decoded_map
       t
       None
+      primary.index
   ;;
 
   (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
@@ -791,7 +814,6 @@ module MkGraph
     then return g (* exit if bound reached *)
     else (
       let encoded_t : E.t = Queue.pop g.to_visit in
-      (* let* (t : EConstr.t) = decode encoded_t in *)
       let* (new_constrs : coq_ctor list) =
         get_new_constrs ~params encoded_t primary rlts_map
       in
@@ -817,7 +839,7 @@ module MkGraph
     let trmap : raw_lts B.t = B.create num_grefs in
     let iter_body (i : int) ((fn_opt, acc_map) : E.t option * raw_lts B.t) =
       let gref : Names.GlobRef.t = List.nth grefs i in
-      let* (rlts : raw_lts) = check_ref_lts gref in
+      let* (rlts : raw_lts) = check_ref_lts i gref in
       (* add name of inductive prop *)
       let* (encoding : E.t) = encode rlts.coq_lts in
       B.add acc_map encoding rlts;
@@ -864,9 +886,8 @@ module MkGraph
     let* (t : EConstr.t) = tref_to_econstr tref in
     (* make map of term types *)
     let* (primary, rlts_map) : E.t * raw_lts B.t = build_rlts_map t grefs in
-    let (the_lts : raw_lts) = B.find rlts_map primary in
-    (* let* _ = _print_constr_names rlts_map in *)
     (* update environment by typechecking *)
+    let (the_lts : raw_lts) = B.find rlts_map primary in
     let$* u env sigma = Typing.check env sigma t the_lts.trm_type in
     let$ init env sigma = sigma, Reductionops.nf_all env sigma t in
     let* encoded_init = encode init in
