@@ -1,9 +1,13 @@
 type raw_flat_lts = (string * string * string * string option) list
 type raw_nested_lts = (string * (string * string list) list) list
 
+type raw_states =
+  | JustName of string list
+  | WithInfo of (string * string) list
+
 type raw_transitions =
-  | Flat of (raw_flat_lts * string list option)
-  | Nested of (raw_nested_lts * string list option)
+  | Flat of (raw_flat_lts * raw_states option)
+  | Nested of (raw_nested_lts * raw_states option)
 
 type transition =
   { id : int
@@ -19,10 +23,24 @@ module Transitions = Set.Make (struct
     let compare a b = compare a.id b.id
   end)
 
-module States = Set.Make (struct
-    type t = string
+type state =
+  { name : string
+  ; info : string option
+  }
 
-    let compare a b = String.compare a b
+module States = Set.Make (struct
+    type t = state
+
+    let compare a b =
+      match String.compare a.name b.name with
+      | 0 ->
+        (match a.info, b.info with
+         | None, None -> 0
+         | Some ai, Some bi -> String.compare ai bi
+         | Some _, None -> 1
+         | None, Some _ -> -1)
+      | x -> x
+    ;;
   end)
 
 type lts =
@@ -100,6 +118,18 @@ module PStr = struct
         tabs)
   ;;
 
+  let state ?(params : Params.pstr = Fmt (Params.Default.fmt ())) (s : state)
+    : string
+    =
+    let info_str : string =
+      (* FIXME: need to overhaul params *)
+      match s.info, true (* params.params.options.show_detailed_output*) with
+      | Some i, true -> Printf.sprintf " (%s)" i
+      | _, _ -> ""
+    in
+    Printf.sprintf "%s%s" s.name info_str
+  ;;
+
   let states
     ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
     (ss : States.t)
@@ -117,8 +147,8 @@ module PStr = struct
         "%s[%s%s]"
         (if _params.no_leading_tab then "" else tabs)
         (States.fold
-           (fun (s : string) (acc : string) ->
-             Printf.sprintf "%s%s%s\n" acc tabs' s)
+           (fun (s : state) (acc : string) ->
+             Printf.sprintf "%s%s%s\n" acc tabs' (state ~params s))
            ss
            "\n")
         tabs)
@@ -137,9 +167,7 @@ module PStr = struct
       (Printf.sprintf
          "\n%sinitial state: %s"
          tabs'
-         (match the_lts.init with
-          | None -> "None"
-          | Some init' -> init'))
+         (match the_lts.init with None -> "None" | Some init' -> init'))
       (Printf.sprintf
          "\n%smeta info: %s"
          tabs'
@@ -178,7 +206,21 @@ module Create = struct
         let states' : States.t =
           match states with
           | None -> States.empty
-          | Some states' -> States.of_list states'
+          | Some states' ->
+            States.of_list
+              (match states' with
+               | JustName states'' ->
+                 List.fold_left
+                   (fun (acc : state list) (name : string) ->
+                     { name; info = None } :: acc)
+                   []
+                   states''
+               | WithInfo states'' ->
+                 List.fold_left
+                   (fun (acc : state list) ((name, info) : string * string) ->
+                     { name; info = Some info } :: acc)
+                   []
+                   states'')
         in
         ( List.fold_left
             (fun (acc : Transitions.t)
@@ -200,7 +242,21 @@ module Create = struct
         let states' : States.t =
           match states with
           | None -> States.empty
-          | Some states' -> States.of_list states'
+          | Some states' ->
+            States.of_list
+              (match states' with
+               | JustName states'' ->
+                 List.fold_left
+                   (fun (acc : state list) (name : string) ->
+                     { name; info = None } :: acc)
+                   []
+                   states''
+               | WithInfo states'' ->
+                 List.fold_left
+                   (fun (acc : state list) ((name, info) : string * string) ->
+                     { name; info = Some info } :: acc)
+                   []
+                   states'')
         in
         ( List.fold_left
             (fun (acc : Transitions.t)

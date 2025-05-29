@@ -1,9 +1,13 @@
 type raw_flat_lts = (string * string * string * string option) list
 type raw_nested_lts = (string * (string * string list) list) list
 
+type raw_states =
+  | JustName of string list
+  | WithInfo of (string * string) list
+
 type raw_transitions =
-  | Flat of (raw_flat_lts * string list option)
-  | Nested of (raw_nested_lts * string list option)
+  | Flat of (raw_flat_lts * raw_states option)
+  | Nested of (raw_nested_lts * raw_states option)
 
 type transition =
   { id : int
@@ -62,8 +66,13 @@ module Transitions : sig
   val of_seq : elt Seq.t -> t
 end
 
+type state =
+  { name : string
+  ; info : string option
+  }
+
 module States : sig
-  type elt = string
+  type elt = state
   type t
 
   val empty : t
@@ -126,6 +135,7 @@ module PStr : sig
     -> Transitions.t
     -> string
 
+  val state : ?params:Utils.Formatting.pstr_params -> state -> string
   val states : ?params:Utils.Formatting.pstr_params -> States.t -> string
   val lts : ?params:Utils.Formatting.pstr_params -> lts -> string
 end

@@ -16,8 +16,7 @@ open Fsm
 
 let default_params : Params.log = Params.Default.log ~mode:(Coq ()) ()
 
-(** [default_bound] is the total depth that will be explored of a given lts by [explore_lts].
-*)
+(** [default_bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
 let default_bound : int = 10
 
 (** [arity_is_prop mip] raises an error if [mip.mind_arity] is not a [prop]. *)
@@ -34,11 +33,10 @@ let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
 (** [get_lts_labels_and_terms mib mip] is the mapping of terms (states) and labels (outgoing edges) from [mip].
 
     @raise invalid_arity
-      if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error.
-*)
+      if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error. *)
 let get_lts_labels_and_terms
-      (mib : Declarations.mutual_inductive_body)
-      (mip : Declarations.one_inductive_body)
+  (mib : Declarations.mutual_inductive_body)
+  (mip : Declarations.one_inductive_body)
   : (Constr.rel_declaration * Constr.rel_declaration) mm
   =
   let open Declarations in
@@ -138,9 +136,9 @@ let check_ref_lts (gref : Names.GlobRef.t) : raw_lts mm =
     - Is [w_unify] the best way?
     - ... *)
 let m_unify
-      ?(params : Params.log = default_params)
-      (t0 : EConstr.t)
-      (t1 : EConstr.t)
+  ?(params : Params.log = default_params)
+  (t0 : EConstr.t)
+  (t1 : EConstr.t)
   : bool mm
   =
   params.kind <- Debug ();
@@ -200,8 +198,8 @@ let _pstr_unif_problem (t : unif_problem) : string =
 ;;
 
 let rec unify_all
-          ?(params : Params.log = default_params)
-          (i : (Constr_tree.t * unif_problem) list)
+  ?(params : Params.log = default_params)
+  (i : (Constr_tree.t * unif_problem) list)
   : Constr_tree.t list option mm
   =
   params.kind <- Debug ();
@@ -223,9 +221,9 @@ let rec unify_all
 ;;
 
 let sandboxed_unify
-      ?(params : Params.log = default_params)
-      (tgt_term : EConstr.t)
-      (u : (Constr_tree.t * unif_problem) list)
+  ?(params : Params.log = default_params)
+  (tgt_term : EConstr.t)
+  (u : (Constr_tree.t * unif_problem) list)
   : (EConstr.t * Constr_tree.t list) option mm
   =
   (* let* _ = if is_output_kind_enabled params then debug (fun env sigma -> str
@@ -249,11 +247,11 @@ type coq_ctor = EConstr.t * EConstr.t * Constr_tree.t
 
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
-          ?(params : Params.log = default_params)
-          (acc : coq_ctor list)
-          (i : int)
-          (act : EConstr.t)
-          (tgt_term : EConstr.t)
+  ?(params : Params.log = default_params)
+  (acc : coq_ctor list)
+  (i : int)
+  (act : EConstr.t)
+  (tgt_term : EConstr.t)
   : (Constr_tree.t * unif_problem) list list -> coq_ctor list mm
   = function
   | [] -> return acc
@@ -274,9 +272,9 @@ let rec retrieve_tgt_nodes
 
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
-          ?(params : Params.log = default_params)
-          (acc : (Constr_tree.t * unif_problem) list list)
-          (fn_rlts : raw_lts F.t)
+  ?(params : Params.log = default_params)
+  (acc : (Constr_tree.t * unif_problem) list list)
+  (fn_rlts : raw_lts F.t)
   :  EConstr.t list * EConstr.rel_declaration list
   -> (Constr_tree.t * unif_problem) list list option mm
   = function
@@ -334,11 +332,11 @@ let rec check_updated_ctx
 
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
-      ?(params : Params.log = default_params)
-      (ctor_transitions : (Constr.rel_context * Constr.types) array)
-      (fn_rlts : raw_lts F.t)
-      (t' : EConstr.t)
-      (ma : EConstr.t option)
+  ?(params : Params.log = default_params)
+  (ctor_transitions : (Constr.rel_context * Constr.types) array)
+  (fn_rlts : raw_lts F.t)
+  (t' : EConstr.t)
+  (ma : EConstr.t option)
   : coq_ctor list mm
   =
   params.kind <- Debug ();
@@ -463,8 +461,7 @@ module MkGraph
      and the corresponding [Constr_tree.t]. *)
   module D = P
 
-  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t].
-  *)
+  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t]. *)
   type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
 
   let num_transitions (ts : constr_transitions H.t) : int =
@@ -486,18 +483,18 @@ module MkGraph
       List.of_seq (H.to_seq ts)
     in
     let from_body
-          (i : int)
-          (new_transitions :
-            (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+      (i : int)
+      (new_transitions :
+        (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
       =
       let (from, actions) : E.t * constr_transitions = List.nth raw_list i in
       let raw_actions : (Mebi_action.action * D.t) list =
         List.of_seq (Hashtbl.to_seq actions)
       in
       let action_body
-            (j : int)
-            (new_transitions :
-              (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+        (j : int)
+        (new_transitions :
+          (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
         =
         let (a, destinations) : Mebi_action.action * D.t =
           List.nth raw_actions j
@@ -506,9 +503,9 @@ module MkGraph
           D.elements destinations
         in
         let destination_body
-              (k : int)
-              (new_transitions :
-                (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+          (k : int)
+          (new_transitions :
+            (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
           =
           let (destination, constr_tree) : E.t * Constr_tree.t =
             List.nth raw_destinations k
@@ -528,8 +525,7 @@ module MkGraph
     iterate 0 (List.length raw_list - 1) [] from_body
   ;;
 
-  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t].
-  *)
+  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t]. *)
   type lts_graph =
     { to_visit : E.t Queue.t
     ; init : E.t
@@ -559,8 +555,8 @@ module MkGraph
   ;;
 
   let _print_finished_build_graph
-        ?(params : Params.log = default_params)
-        (g : lts_graph)
+    ?(params : Params.log = default_params)
+    (g : lts_graph)
     : unit mm
     =
     Log.override
@@ -692,13 +688,12 @@ module MkGraph
   (******** above is a sanity check *************************************)
   (**********************************************************************)
 
-  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions].
-  *)
+  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions]. *)
   let insert_constr_transition
-        (constrs : constr_transitions)
-        (a : Mebi_action.action)
-        (d : E.t)
-        (c : Constr_tree.t)
+    (constrs : constr_transitions)
+    (a : Mebi_action.action)
+    (d : E.t)
+    (c : Constr_tree.t)
     : unit mm
     =
     (match Hashtbl.find_opt constrs a with
@@ -708,11 +703,11 @@ module MkGraph
   ;;
 
   let add_new_term_constr_transition
-        (g : lts_graph)
-        (t : E.t)
-        (a : Mebi_action.action)
-        (d : E.t)
-        (c : Constr_tree.t)
+    (g : lts_graph)
+    (t : E.t)
+    (a : Mebi_action.action)
+    (d : E.t)
+    (c : Constr_tree.t)
     : unit mm
     =
     H.add
@@ -723,10 +718,10 @@ module MkGraph
   ;;
 
   let get_new_states
-        ?(params : Params.log = default_params)
-        (t : E.t)
-        (g : lts_graph)
-        (ctors : coq_ctor list)
+    ?(params : Params.log = default_params)
+    (t : E.t)
+    (g : lts_graph)
+    (ctors : coq_ctor list)
     : S.t mm
     =
     let iter_body (i : int) (new_states : S.t) =
@@ -744,10 +739,9 @@ module MkGraph
           insert_constr_transition actions to_add encoding int_tree
       in
       (* if [tgt] has not been explored then add [to_visit] *)
-      if
-        H.mem g.transitions encoding
-        (* || EConstr.eq_constr sigma tgt t *)
-        || S.mem encoding g.states
+      if H.mem g.transitions encoding
+         (* || EConstr.eq_constr sigma tgt t *)
+         || S.mem encoding g.states
       then ()
       else Queue.push encoding g.to_visit;
       (* add [tgt] to [new_states] *)
@@ -759,13 +753,12 @@ module MkGraph
   (** [get_new_constrs t rlts_map] returns the list of constructors applicable to term [t], using those provided in [rlts_map].
       If no immediate constructor is found matching [t] in [rlts_map] (likely due to unification problems), then each constructor in [rlts_map] is tried sequentially, until one of them returns some valid constructors.
       @raise CannotFindTypeOfTermToVisit
-        if none of the constructors provided in [rlts_map] yield constructors from [check_valid_constructors].
-  *)
+        if none of the constructors provided in [rlts_map] yield constructors from [check_valid_constructors]. *)
   let get_new_constrs
-        ?(params : Params.log = default_params)
-        (encoded_t : E.t)
-        (primary : raw_lts)
-        (rlts_map : raw_lts B.t)
+    ?(params : Params.log = default_params)
+    (encoded_t : E.t)
+    (primary : raw_lts)
+    (rlts_map : raw_lts B.t)
     : coq_ctor list mm
     =
     let* (t : EConstr.t) = decode encoded_t in
@@ -784,11 +777,11 @@ module MkGraph
       @param bound is the number of states to explore until.
       @return an [lts_graph] with a maximum of [bound] many states. *)
   let rec build_lts_graph
-            ?(params : Params.log = default_params)
-            (primary : raw_lts)
-            (rlts_map : raw_lts B.t)
-            (g : lts_graph)
-            (bound : int)
+    ?(params : Params.log = default_params)
+    (primary : raw_lts)
+    (rlts_map : raw_lts B.t)
+    (g : lts_graph)
+    (bound : int)
     : lts_graph mm
     =
     params.kind <- Debug ();
@@ -812,8 +805,7 @@ module MkGraph
   ;;
 
   (** @return
-        the key for the primary lts and hashtable mapping the name of the coq definition to the rlts.
-  *)
+        the key for the primary lts and hashtable mapping the name of the coq definition to the rlts. *)
   let build_rlts_map (t' : EConstr.t) (grefs : Names.GlobRef.t list)
     : (E.t * raw_lts B.t) mm
     =
@@ -862,10 +854,10 @@ module MkGraph
       @param tref is the original coq-term.
       @param bound is the number of states to explore until. *)
   let build_graph
-        ?(params : Params.log = default_params)
-        (tref : Constrexpr.constr_expr)
-        (grefs : Names.GlobRef.t list)
-        (bound : int)
+    ?(params : Params.log = default_params)
+    (tref : Constrexpr.constr_expr)
+    (grefs : Names.GlobRef.t list)
+    (bound : int)
     : lts_graph mm
     =
     (* should be able to get the type now -- fail otherwise *)
@@ -904,15 +896,15 @@ module MkGraph
       }
 
     let create_translation_tbl
-          ?(params : Params.log = default_params)
-          (states : S.t)
+      ?(params : Params.log = default_params)
+      (states : S.t)
       : coq_translation mm
       =
       let list_states : E.t list = S.elements states in
       let iter_body
-            (i : int)
-            ((from_coq_list, to_coq_list) :
-              (E.t * string) list * (string * E.t) list)
+        (i : int)
+        ((from_coq_list, to_coq_list) :
+          (E.t * string) list * (string * E.t) list)
         =
         let s : E.t = List.nth list_states i in
         (* let (str : string) = econstr_to_string s in *)
@@ -954,8 +946,8 @@ module MkGraph
        (List.length raw_list - 1) [] from_body ;; *)
 
     let _check_all_states_translated
-          (translation_tbl : coq_translation)
-          (g : lts_graph)
+      (translation_tbl : coq_translation)
+      (g : lts_graph)
       : unit mm
       =
       S.iter
@@ -975,10 +967,10 @@ module MkGraph
     ;;
 
     let get_state_translation
-          ?(prefix : string = "?")
-          (state : E.t)
-          (translation_tbl : coq_translation)
-          (g : lts_graph)
+      ?(prefix : string = "?")
+      (state : E.t)
+      (translation_tbl : coq_translation)
+      (g : lts_graph)
       : string mm
       =
       (* let (_str : string) = econstr_to_string state in *)
@@ -1021,14 +1013,14 @@ module MkGraph
     ;;
 
     let translate_transitions
-          (transitions_list :
-            (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
-          (translation_tbl : coq_translation)
-          (g : lts_graph)
+      (transitions_list :
+        (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+      (translation_tbl : coq_translation)
+      (g : lts_graph)
       : Lts.raw_flat_lts mm
       =
       (* sanity check: all states should be translated *)
-      let* _ = _check_all_states_translated translation_tbl g in
+      (* let* _ = _check_all_states_translated translation_tbl g in *)
       let iter_body (i : int) (acc : Lts.raw_flat_lts) =
         let (from, a, destination, constr_tree)
           : S.elt * Mebi_action.action * S.elt * Constr_tree.t
@@ -1048,11 +1040,31 @@ module MkGraph
       iterate 0 (List.length transitions_list - 1) [] iter_body
     ;;
 
+    (** [create_state_list from_coq]
+        @param from_coq
+          is the translation table mapping the encoded coq terms to the stringified decoq'd translation.
+        @return tuple list containing [(encoded_term, term_string)] *)
+    let create_state_list (from_coq : string B.t) : (string * string) list mm =
+      let raw_translation_tbl_from_coq = List.of_seq (B.to_seq from_coq) in
+      let iter_state_body (i : int) (acc : (string * string) list) =
+        let translation_pair = List.nth raw_translation_tbl_from_coq i in
+        let k, v = translation_pair in
+        let* (decoding : EConstr.t) = decode k in
+        let decoded_str : string = econstr_to_string decoding in
+        return ((v, decoded_str) :: acc)
+      in
+      iterate
+        0
+        (List.length raw_translation_tbl_from_coq - 1)
+        []
+        iter_state_body
+    ;;
+
     let lts_graph_to_lts
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unnamed")
-          (g : lts_graph)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unnamed")
+      (g : lts_graph)
       : (Lts.lts * coq_translation) mm
       =
       let* (transitions_list :
@@ -1062,21 +1074,23 @@ module MkGraph
       in
       (* bidirectional mapping between [EConstr.t] and [string] *)
       let* translation_tbl = create_translation_tbl g.states in
-      let* (flat_rlts : Lts.raw_flat_lts) =
+      let* flat_rlts =
         translate_transitions transitions_list translation_tbl g
       in
       let init : string = B.find translation_tbl.from_coq g.init in
-      let is_complete : bool = Queue.is_empty g.to_visit in
-      let num_states : int = S.cardinal g.states in
-      let num_edges : int = num_transitions g.transitions in
       let info : Utils.model_info =
-        { is_complete; bound; num_states; num_edges }
+        { is_complete = Queue.is_empty g.to_visit
+        ; bound
+        ; num_states = S.cardinal g.states
+        ; num_edges = num_transitions g.transitions
+        }
       in
-      let (string_states : string list) =
-        List.of_seq (B.to_seq_values translation_tbl.from_coq)
-      in
+      let* state_string_pairs = create_state_list translation_tbl.from_coq in
       let lts : Lts.lts =
-        Lts.Create.lts ~init ~info (Flat (flat_rlts, Some string_states))
+        Lts.Create.lts
+          ~init
+          ~info
+          (Flat (flat_rlts, Some (Lts.WithInfo state_string_pairs)))
       in
       return (lts, translation_tbl)
     ;;
@@ -1099,9 +1113,9 @@ let make_graph_builder =
 ;;
 
 let _print_incomplete_lts_warning
-      ?(params : Params.log = default_params)
-      (name : string)
-      (bound : int)
+  ?(params : Params.log = default_params)
+  (name : string)
+  (bound : int)
   : unit
   =
   Log.warning
@@ -1113,8 +1127,8 @@ let _print_incomplete_lts_warning
 ;;
 
 let _print_complete_lts_notice
-      ?(params : Params.log = default_params)
-      (name : string)
+  ?(params : Params.log = default_params)
+  (name : string)
   : unit
   =
   Log.override
@@ -1124,12 +1138,12 @@ let _print_complete_lts_notice
 
 (** *)
 let build_bounded_lts
-      ?(params : Params.log = default_params)
-      ?(bound : int = default_bound)
-      ?(name : string = "unnamed")
-      (tref : Constrexpr.constr_expr)
-      (grefs : Names.GlobRef.t list)
-      (module G : GraphB)
+  ?(params : Params.log = default_params)
+  ?(bound : int = default_bound)
+  ?(name : string = "unnamed")
+  (tref : Constrexpr.constr_expr)
+  (grefs : Names.GlobRef.t list)
+  (module G : GraphB)
   : Lts.lts mm
   =
   Log.override ~params (Printf.sprintf "=-=-=-=-= (building lts of: %s)" name);
@@ -1149,11 +1163,11 @@ let build_bounded_lts
 
 (** *)
 let build_fsm_from_bounded_lts
-      ?(params : Params.log = default_params)
-      ?(bound : int = default_bound)
-      ?(name : string = "unnamed")
-      (tref : Constrexpr.constr_expr)
-      (grefs : Names.GlobRef.t list)
+  ?(params : Params.log = default_params)
+  ?(bound : int = default_bound)
+  ?(name : string = "unnamed")
+  (tref : Constrexpr.constr_expr)
+  (grefs : Names.GlobRef.t list)
   : Fsm.fsm mm
   =
   (* disable detailed printouts *)
@@ -1173,12 +1187,12 @@ let build_fsm_from_bounded_lts
 module Vernac = struct
   module LTS = struct
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unnamed")
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unnamed")
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : Lts.lts mm
       =
       (* graph module *)
@@ -1189,11 +1203,11 @@ module Vernac = struct
     ;;
 
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       let* (the_lts : Lts.lts) = build ~params ~bound tref grefs in
@@ -1204,12 +1218,12 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       params.options.output_enabled <- false;
@@ -1229,23 +1243,23 @@ module Vernac = struct
   module FSM = struct
     (** *)
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unnamed")
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unnamed")
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : Fsm.fsm mm
       =
       build_fsm_from_bounded_lts ~params ~bound ~name tref grefs
     ;;
 
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get translated fsm *)
@@ -1261,12 +1275,12 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          ?(equiv : Names.GlobRef.t option)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      ?(equiv : Names.GlobRef.t option)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get translated fsm *)
@@ -1286,11 +1300,11 @@ module Vernac = struct
   module Minim = struct
     (** *)
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unnamed")
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unnamed")
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm) mm
       =
       (* get translated fsm *)
@@ -1303,10 +1317,10 @@ module Vernac = struct
 
     (** *)
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get translated fsm *)
@@ -1325,11 +1339,11 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          (tref : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      (tref : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get translated fsm *)
@@ -1360,12 +1374,12 @@ module Vernac = struct
   module Merged = struct
     (** *)
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unnamed")
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unnamed")
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm * Fsm.fsm) mm
       =
       (* get translated fsm *)
@@ -1384,11 +1398,11 @@ module Vernac = struct
 
     (** *)
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get merged fsm *)
@@ -1408,12 +1422,12 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       (* get merged fsm *)
@@ -1457,12 +1471,12 @@ module Vernac = struct
 
     (** *)
     let build
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "unnamed")
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "unnamed")
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : (Fsm.fsm * Fsm.fsm * Bisimilarity.result) mm
       =
       (* get translated fsm *)
@@ -1480,11 +1494,11 @@ module Vernac = struct
 
     (** *)
     let show
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       let* fsm_A, fsm_B, result = build ~params ~bound trefA trefB grefs in
@@ -1505,12 +1519,12 @@ module Vernac = struct
     ;;
 
     let dump
-          ?(params : Params.log = default_params)
-          ?(bound : int = default_bound)
-          ?(name : string = "dump")
-          (trefA : Constrexpr.constr_expr)
-          (trefB : Constrexpr.constr_expr)
-          (grefs : Names.GlobRef.t list)
+      ?(params : Params.log = default_params)
+      ?(bound : int = default_bound)
+      ?(name : string = "dump")
+      (trefA : Constrexpr.constr_expr)
+      (trefB : Constrexpr.constr_expr)
+      (grefs : Names.GlobRef.t list)
       : unit mm
       =
       let* fsm_A, fsm_B, result =
@@ -1564,5 +1578,4 @@ end
     Notes:
     - Constructors of [P] are the transitions
     - States are the sets of possible transitions
-    - A term [t] is represented by the state of the transitions that can be taken
-*)
+    - A term [t] is represented by the state of the transitions that can be taken *)
