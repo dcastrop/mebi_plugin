@@ -112,11 +112,13 @@ Inductive transitive_closure : term -> Prop :=
 
 Example proc0_send0 := tact ASend tend. (* empty lts *)
 (* MeBi Show LTS Bounded 150 Of proc0_send0 Using termLTS. *)
+MeBi Dump "proc0_send0" LTS Bounded 150 Of proc0_send0 Using termLTS.
 
 
 Example proc0_send1a := tpar (tact ASend tend)
                              (tact ARecv tend).
 (* MeBi Show LTS Bounded 150 Of proc0_send1a Using termLTS. *)
+MeBi Dump "proc0_send1a" LTS Bounded 150 Of proc0_send1a Using termLTS.
 
 Goal termLTS proc0_send1a true (tpar tend tend).
   unfold proc0_send1a. eapply do_senda. Qed.
@@ -131,11 +133,13 @@ Qed.
 Example proc0_send1b := tpar (tact ARecv tend)
                              (tact ASend tend).
 (* MeBi Show LTS Bounded 150 Of proc0_send1a Using termLTS. *)
+MeBi Dump "proc0_send1b" LTS Bounded 150 Of proc0_send1b Using termLTS.
 
 
 Example proc0_send2 := tpar (tact ASend (tact ARecv tend))
                             (tact ARecv (tact ASend tend)).
 (* MeBi Show LTS Bounded 150 Of proc0_send2 Using termLTS. *)
+MeBi Dump "proc0_send2" LTS Bounded 150 Of proc0_send2 Using termLTS.
 
 (* Goal transitive_closure proc0_send2.
   unfold proc0_send2.
@@ -149,11 +153,13 @@ Qed. *)
 Example proc0_send3 := tpar (tact ASend (tact BSend tend))
                             (tact ARecv (tact BRecv tend)).
 (* MeBi Show LTS Bounded 150 Of proc0_send3 Using termLTS. *)
+MeBi Dump "proc0_send3" LTS Bounded 150 Of proc0_send3 Using termLTS.
 
 
 Example proc0_send4 := tpar (tact BSend (tact ARecv tend))
                             (tact BRecv (tact ASend tend)).
 (* MeBi Show LTS Bounded 150 Of proc0_send4 Using termLTS. *)
+MeBi Dump "proc0_send4" LTS Bounded 150 Of proc0_send4 Using termLTS.
 
 
 
@@ -163,25 +169,25 @@ Example proc0_send4 := tpar (tact BSend (tact ARecv tend))
 
 Example proc1_rec1 := tfix trec.
 (* MeBi Show LTS Bounded 150 Of proc1_rec1 Using termLTS. *)
-(* MeBi Dump "proc1_rec1" LTS Bounded 150 Of proc1_rec1 Using termLTS. *)
+MeBi Dump "proc1_rec1" LTS Bounded 150 Of proc1_rec1 Using termLTS.
 
 
 Example proc1_rec2 := tpar (tfix (tact ASend trec))
                            (tfix (tact ARecv trec)).
 (* MeBi Show LTS Bounded 150 Of proc1_rec2 Using termLTS. *)
-(* MeBi Dump "proc1_rec2" LTS Bounded 150 Of proc1_rec2 Using termLTS. *)
+MeBi Dump "proc1_rec2" LTS Bounded 150 Of proc1_rec2 Using termLTS.
 
 
 Example proc1_rec3 := tpar (tfix (tact ASend (tact BSend trec)))
                            (tfix (tact ARecv (tact BRecv trec))).
 (* MeBi Show LTS Bounded 150 Of proc1_rec3 Using termLTS. *)
-(* MeBi Dump "proc1_rec3" LTS Bounded 150 Of proc1_rec3 Using termLTS. *)
+MeBi Dump "proc1_rec3" LTS Bounded 150 Of proc1_rec3 Using termLTS.
 
 
 Example proc1_rec4 := tpar (tact ASend (tfix (tact BSend trec)))
                            (tact ARecv (tfix (tact BRecv trec))).
 (* MeBi Show LTS Bounded 150 Of proc1_rec4 Using termLTS. *)
-(* MeBi Dump "proc1_rec4" LTS Bounded 150 Of proc1_rec4 Using termLTS. *)
+MeBi Dump "proc1_rec4" LTS Bounded 150 Of proc1_rec4 Using termLTS.
 
 
 Example proc1_rec5 := tpar (tfix (tact ASend (tact ASend trec)))
@@ -201,7 +207,7 @@ MeBi Dump "proc1_rec6" LTS Bounded 150 Of proc1_rec6 Using termLTS.
 Example proc1_rec7 := tfix (tpar (tact ASend (tact BSend trec))
                                  (tact ARecv (tact BRecv tend))).
 (* MeBi Show LTS Bounded 150 Of proc1_rec7 Using termLTS. *)
-MeBi Dump "proc1_rec7" LTS Bounded 150 Of proc1_rec7 Using termLTS.
+(* MeBi Dump "proc1_rec7" LTS Bounded 150 Of proc1_rec7 Using termLTS. *)
 
 
 
@@ -265,6 +271,7 @@ MeBi Dump "comp0_send1" LTS Bounded 350 Of comp0_send1 Using termLTS compLTS.
 (** Issues arise with branching AND recursion *******************************)
 (****************************************************************************)
 
+(* FIXME: these examples grow infinitely without some structural congruence. *)
 
 Inductive bad_term : Set :=
 | bad_trec : bad_term
@@ -366,69 +373,69 @@ Inductive bad_termLTS : bad_term -> bool -> bad_term -> Prop :=
 (** Branching, no Recursion **********)
 (*************************************)
 
-Example proc2_bra1 := bad_tbra (bad_tpar (bad_tact ASend bad_tend)
+Example bad_proc2_bra1 := bad_tbra (bad_tpar (bad_tact ASend bad_tend)
                                          (bad_tact ARecv bad_tend))
                                (bad_tpar (bad_tact BSend bad_tend)
                                          (bad_tact BRecv bad_tend)).
-(* MeBi Show LTS Bounded 150 Of proc2_bra1 Using bad_termLTS. *)
-MeBi Dump "proc2_bra1" LTS Bounded 150 Of proc2_bra1 Using bad_termLTS.
+(* MeBi Show LTS Bounded 150 Of bad_proc2_bra1 Using bad_termLTS. *)
+(* MeBi Dump "bad_proc2_bra1" LTS Bounded 150 Of bad_proc2_bra1 Using bad_termLTS. *)
 
-Example proc2_bra2 :=
+Example bad_proc2_bra2 :=
     bad_tbra (bad_tpar (bad_tact ASend (bad_tact BSend bad_tend))
                        (bad_tact ARecv (bad_tact BRecv bad_tend)))
              (bad_tpar (bad_tact BSend (bad_tact ASend bad_tend))
                        (bad_tact BRecv (bad_tact ARecv bad_tend))).
-(* MeBi Show LTS Bounded 150 Of proc2_bra2 Using bad_termLTS. *)
-MeBi Dump "proc2_bra2" LTS Bounded 150 Of proc2_bra2 Using bad_termLTS.
+(* MeBi Show LTS Bounded 150 Of bad_proc2_bra2 Using bad_termLTS. *)
+(* MeBi Dump "bad_bad_proc2_bra2" LTS Bounded 150 Of bad_proc2_bra2 Using bad_termLTS. *)
 
-Example proc2_bra3 :=
+Example bad_proc2_bra3 :=
     bad_tbra (bad_tpar (bad_tact ASend (bad_tact BSend bad_tend))
                        (bad_tact ARecv (bad_tact BRecv bad_tend)))
              (bad_tbra (bad_tpar (bad_tact BSend (bad_tact CSend bad_tend))
                                  (bad_tact BRecv (bad_tact CRecv bad_tend)))
                        (bad_tpar (bad_tact CSend (bad_tact ASend bad_tend))
                                  (bad_tact CRecv (bad_tact ARecv bad_tend)))).
-(* MeBi Show LTS Bounded 150 Of proc2_bra3 Using bad_termLTS. *)
-MeBi Dump "proc2_bra3" LTS Bounded 150 Of proc2_bra3 Using bad_termLTS.
+(* MeBi Show LTS Bounded 150 Of bad_proc2_bra3 Using bad_termLTS. *)
+(* MeBi Dump "bad_bad_proc2_bra3" LTS Bounded 150 Of bad_proc2_bra3 Using bad_termLTS. *)
 
 
 (*************************************)
 (** Simple Branching and Recursion ***)
 (*************************************)
 
-Example proc3_recbra1 :=
+Example bad_proc3_recbra1 :=
     bad_tbra (bad_tfix (bad_tpar (bad_tact ASend bad_trec)
                                  (bad_tact ARecv bad_trec)))
              (bad_tpar (bad_tact BSend bad_tend)
                        (bad_tact BRecv bad_tend)).
-(* MeBi Show LTS Bounded 1000 Of proc3_recbra1 Using bad_termLTS. *)
-MeBi Dump "proc3_recbra1" LTS Bounded 50 Of proc3_recbra1 Using bad_termLTS.
+(* MeBi Show LTS Bounded 1000 Of bad_proc3_recbra1 Using bad_termLTS. *)
+(* MeBi Dump "bad_proc3_recbra1" LTS Bounded 50 Of bad_proc3_recbra1 Using bad_termLTS. *)
 
 
-Example proc3_recbra2 :=
+Example bad_proc3_recbra2 :=
     bad_tfix (bad_tbra (bad_tpar (bad_tact ASend bad_trec)
                                  (bad_tact ARecv bad_trec))
                        (bad_tpar (bad_tact BSend bad_tend)
                                  (bad_tact BRecv bad_tend))).
-(* MeBi Show LTS Bounded 1000 Of proc3_recbra2 Using bad_termLTS. *)
-(* MeBi Dump "proc3_recbra2" LTS Bounded 5000 Of proc3_recbra2 Using bad_termLTS. *)
+(* MeBi Show LTS Bounded 1000 Of bad_proc3_recbra2 Using bad_termLTS. *)
+(* MeBi Dump "bad_proc3_recbra2" LTS Bounded 5000 Of bad_proc3_recbra2 Using bad_termLTS. *)
 
 
-Example proc3_recbra3 :=
+Example bad_proc3_recbra3 :=
     bad_tfix (bad_tbra (bad_tpar (bad_tact ASend bad_trec)
                                  (bad_tact ARecv bad_trec))
                        (bad_tpar (bad_tact BSend bad_trec)
                                  (bad_tact BRecv bad_trec))).
-(* MeBi Show LTS Bounded 1000 Of proc3_recbra3 Using bad_termLTS. *)
-(* MeBi Dump "proc3_recbra3" LTS Bounded 2000 Of proc3_recbra3 Using bad_termLTS. *)
+(* MeBi Show LTS Bounded 1000 Of bad_proc3_recbra3 Using bad_termLTS. *)
+(* MeBi Dump "bad_proc3_recbra3" LTS Bounded 2000 Of bad_proc3_recbra3 Using bad_termLTS. *)
 
-Example proc3_recbra4 :=
+Example bad_proc3_recbra4 :=
     bad_tbra (bad_tfix (bad_tpar (bad_tact ASend bad_trec)
                                  (bad_tact ARecv bad_trec)))
              (bad_tfix (bad_tpar (bad_tact BSend bad_trec)
                                  (bad_tact BRecv bad_trec))).
-(* MeBi Show LTS Bounded 1000 Of proc3_recbra4 Using bad_termLTS. *)
-(* MeBi Dump "proc3_recbra4" LTS Bounded 2000 Of proc3_recbra4 Using bad_termLTS. *)
+(* MeBi Show LTS Bounded 1000 Of bad_proc3_recbra4 Using bad_termLTS. *)
+(* MeBi Dump "bad_proc3_recbra4" LTS Bounded 2000 Of bad_proc3_recbra4 Using bad_termLTS. *)
 
 (*************************************)
 (** Nested Branching and Recursion ***)
@@ -436,13 +443,13 @@ Example proc3_recbra4 :=
 
 
 (* the below example sends [ASend] and then [BSend]. *)
-Example proc1_nestedrec1 :=
+Example bad_proc1_nestedrec1 :=
     bad_tfix (bad_tpar ((bad_tact ASend (bad_tact BSend bad_trec)))
                        (bad_tfix (bad_topt (bad_tact ARecv bad_trec)
                                            (bad_tact BRecv bad_tend)))).
 
-(* Goal transitive_closure proc1_nestedrec1.
-  unfold proc1_nestedrec1.
+(* Goal transitive_closure bad_proc1_nestedrec1.
+  unfold bad_proc1_nestedrec1.
   eapply trans_step. eapply do_fix. simpl.
   eapply trans_step. eapply do_parr. eapply do_fix. simpl.
   eapply trans_step. eapply do_optl. eapply do_senda.
@@ -452,8 +459,8 @@ Example proc1_nestedrec1 :=
   constructor.
 Qed. *)
 
-(* MeBi Show LTS Bounded 150 Of proc1_nestedrec1 Using bad_termLTS. *)
-MeBi Dump "proc1_nestedrec1" LTS Bounded 50 Of proc1_nestedrec1 Using bad_termLTS.
+(* MeBi Show LTS Bounded 150 Of bad_proc1_nestedrec1 Using bad_termLTS. *)
+(* MeBi Dump "bad_proc1_nestedrec1" LTS Bounded 50 Of bad_proc1_nestedrec1 Using bad_termLTS. *)
 
 
 

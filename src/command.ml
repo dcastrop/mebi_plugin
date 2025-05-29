@@ -923,28 +923,6 @@ module MkGraph
       return translation_tbl
     ;;
 
-    (* let create_transitions_list ?(params : Params.log = default_params)
-       (transitions : constr_transitions H.t) : (S.elt * Mebi_action.action *
-       S.elt * Constr_tree.t) list mm = let raw_list : (EConstr.t *
-       constr_transitions) list = List.of_seq (H.to_seq transitions) in let
-       from_body (i : int) (new_transitions : (S.elt * Mebi_action.action *
-       S.elt * Constr_tree.t) list) = let (from, actions) : EConstr.t *
-       constr_transitions = List.nth raw_list i in let raw_actions :
-       (Mebi_action.action * D.t) list = List.of_seq (Hashtbl.to_seq actions) in
-       let action_body (j : int) (new_transitions : (S.elt * Mebi_action.action
-       * S.elt * Constr_tree.t) list) = let (a, destinations) :
-       Mebi_action.action * D.t = List.nth raw_actions j in let raw_destinations
-       : (EConstr.t * Constr_tree.t) list = D.elements destinations in let
-       destination_body (k : int) (new_transitions : (S.elt * Mebi_action.action
-       * S.elt * Constr_tree.t) list) = let (destination, constr_tree) :
-       EConstr.t * Constr_tree.t = List.nth raw_destinations k in return ((from,
-       a, destination, constr_tree) :: new_transitions) in let* new_transitions'
-       = iterate 0 (List.length raw_destinations - 1) [] destination_body in
-       return (List.append new_transitions' new_transitions) in let*
-       new_transitions' = iterate 0 (List.length raw_actions - 1) [] action_body
-       in return (List.append new_transitions' new_transitions) in iterate 0
-       (List.length raw_list - 1) [] from_body ;; *)
-
     let _check_all_states_translated
       (translation_tbl : coq_translation)
       (g : lts_graph)

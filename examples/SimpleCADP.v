@@ -212,16 +212,16 @@ Inductive lts : sys -> label -> sys -> Prop :=
 
 
 Example e1 : tm * nat * nat := (tm1, 0, 0).
-(* MeBi Show LTS Bounded 150 Of e1 Using step. *)
-(* MeBi Dump "e1" LTS Bounded 150 Of e1 Using step. *)
+(* MeBi Show LTS Bounded 35 Of e1 Using step. *)
+(* MeBi Dump "e1" LTS Bounded 35 Of e1 Using step. *)
 
 
 Example e2 : sys :=
   PAR (PRC (tm1, 0, 0)) (
     PRC (OK, 0, 0)
   ).
-(* MeBi Show LTS Bounded 70 Of e2 Using lts step. *)
-MeBi Dump "e2" LTS Bounded 70 Of e2 Using lts step.
+(* MeBi Show LTS Bounded 35 Of e2 Using lts step. *)
+(* MeBi Dump "e2" LTS Bounded 35 Of e2 Using lts step. *)
 
 
 Example e3 : sys :=
@@ -229,7 +229,7 @@ Example e3 : sys :=
     (PRC (tm1, 0, 0))
   ).
 (* MeBi Show LTS Bounded 1200 Of e3 Using lts step. *)
-(* MeBi Dump "e3" LTS Bounded 1200 Of e3 Using lts step. *)
+MeBi Dump "e3" LTS Bounded 1156 Of e3 Using lts step.
 
 
 Example e4 : sys :=
@@ -239,7 +239,7 @@ Example e4 : sys :=
     )
   ).
 (* MeBi Show LTS Bounded 2040 Of e4 Using lts step. *)
-(* MeBi Dump "e4" LTS Bounded 3000 Of e4 Using lts step. *)
+MeBi Dump "e4" LTS Bounded 1156 Of e4 Using lts step.
 
 
 Example e5 : sys :=
@@ -249,7 +249,7 @@ Example e5 : sys :=
     )
   ).
 (* MeBi Show LTS Bounded 5000 Of e5 Using lts step. *)
-(* MeBi Dump "e5" LTS Bounded 5000 Of e5 Using lts step. *)
+MeBi Dump "e5" LTS Bounded 2278 Of e5 Using lts step.
 
 
 Example e6 : sys :=
@@ -257,7 +257,7 @@ Example e6 : sys :=
     (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))
     (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0)).
 (* MeBi Show LTS Bounded 5 Of e6 Using lts step. *)
-(* MeBi Dump "e6" LTS Bounded 5 Of e6 Using lts step. *)
+MeBi Dump "e6" LTS Bounded 5 Of e6 Using lts step.
 
 
 Example e7 : sys :=
@@ -267,7 +267,7 @@ Example e7 : sys :=
       (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))
       (PRC (DEF 0 (SEQ (OK) (REC 0)), 0, 0))).
 (* MeBi Show LTS Bounded 10 Of e7 Using lts step. *)
-(* MeBi Dump "e7" LTS Bounded 10 Of e7 Using lts step. *)
+MeBi Dump "e7" LTS Bounded 10 Of e7 Using lts step.
 
 
 (* MeBi Dump "e2" LTS sys_equiv Bounded 350 Of e2 Using lts step. *)
