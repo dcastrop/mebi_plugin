@@ -1,5 +1,14 @@
 # todo
 
+- [x] overhaul mebi monad into a wrapper that allows us to seamlessly just work
+      with the encodings
+- [x] since we support multi-layered lts, change `Constr_tree.t` from `int` to
+      `(int * int)` since we need to know which layer the constructor index
+      applies to. I.e, indexing from `0` the coq-lts in the order provided in
+      the command.
+
+---
+
 ## bug list
 
 - [x] Issue of retriving correct `raw_lts` from hashtbl using term.
