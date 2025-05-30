@@ -14,12 +14,6 @@ Fixpoint app {X:Type} (l1 l2 : list X) : list X :=
   end.
 
 (*************************************************************************)
-(**** Debugging **********************************************************)
-(*************************************************************************)
-
-Record error := { code: nat ; msg : string }.
-
-(*************************************************************************)
 (**** Basic defs *********************************************************)
 (*************************************************************************)
 
@@ -174,6 +168,32 @@ Definition valid_cast_to_index (v:value) : bool * index :=
   end.
 
 (*************************************************************************)
+(**** (Conditional) Expressions ******************************************)
+(*************************************************************************)
+
+Inductive expr : Type :=
+  | NOT : expr -> expr
+  | EQ : expr -> expr -> expr
+  | VAR : local_var -> expr
+  | VAL : value -> expr
+  | TRU : expr
+  | FLS : expr
+  .
+
+Module Expr.
+  Definition of_bool (b:bool) : expr := if b then TRU else FLS.
+End Expr.
+
+(*************************************************************************)
+(**** Debugging **********************************************************)
+(*************************************************************************)
+
+Record error := { error_code : nat
+                ; error_msg  : string
+                ; info       : option (expr * option value)
+                }.
+
+(*************************************************************************)
 (**** (Global) Resource **************************************************)
 (*************************************************************************)
 Definition resource : Type := mem * lock.
@@ -257,23 +277,6 @@ Definition add_error (e:error) (s:state) : state :=
     | Some es => (p, v, Some (es ++ [e]))
     end
   end.
-
-(*************************************************************************)
-(**** (Conditional) Expressions ******************************************)
-(*************************************************************************)
-
-Inductive expr : Type :=
-  | NOT : expr -> expr
-  | EQ : expr -> expr -> expr
-  | VAR : local_var -> expr
-  | VAL : value -> expr
-  | TRU : expr
-  | FLS : expr
-  .
-
-Module Expr.
-  Definition of_bool (b:bool) : expr := if b then TRU else FLS.
-End Expr.
 
 
 (*************************************************************************)
@@ -363,6 +366,16 @@ Fixpoint eval (e:expr) (s:state) : option value :=
 
     | Some NIL, Some NIL => Some (BOOL true)
 
+    (* always propagate a None (i.e., an error) *)
+    | Some NIL, None => None
+    | None, Some NIL => None
+
+    (* NOT NIL if other side isn't NIL and isn't None *)
+    | Some NIL, _ => Some (BOOL true)
+    | _, Some NIL => Some (BOOL true)
+
+
+    (* error has occurred *)
     | _, _ => None
     end
 
@@ -504,26 +517,26 @@ Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env
   | None =>
       (* Some (State.create 99, get_resource e) *)
       match get_local_var_value to_write s with
-      | INDEX None => Some (add_error (Build_error 91 "write_locked, to_write yielded INDEX None") s, get_resource e)
-      | INDEX _ => Some (add_error (Build_error 92 "write_locked, to_write yielded INDEX _") s, get_resource e)
-      | NIL => Some (add_error (Build_error 93 "write_locked, to_write yielded NIL") s, get_resource e)
-      | PID _ => Some (add_error (Build_error 94 "write_locked, to_write yielded PID _") s, get_resource e)
-      | BOOL _ => Some (add_error (Build_error 95 "write_locked, to_write yielded BOOL _") s, get_resource e)
+      | INDEX None => Some (add_error (Build_error 91 "write_locked, to_write yielded INDEX None" None) s, get_resource e)
+      | INDEX _ => Some (add_error (Build_error 92 "write_locked, to_write yielded INDEX _" None) s, get_resource e)
+      | NIL => Some (add_error (Build_error 93 "write_locked, to_write yielded NIL" None) s, get_resource e)
+      | PID _ => Some (add_error (Build_error 94 "write_locked, to_write yielded PID _" None) s, get_resource e)
+      | BOOL _ => Some (add_error (Build_error 95 "write_locked, to_write yielded BOOL _" None) s, get_resource e)
       | _ => None (* [to_write] must be a [pid] *)
       end
   | Some p => (* get qnode *)
     let r:resource := get_resource e in
     let m:mem := get_mem r in
     match Memory.nth_error p m with
-    | None => Some (add_error (Build_error 71 "write_locked, qnode does not exist") s, get_resource e) (* [qnode] must exist *)
+    | None => Some (add_error (Build_error 71 "write_locked, qnode does not exist" None) s, get_resource e) (* [qnode] must exist *)
     | Some q => (* check [locked] of [qnode] is a [BOOL] *)
       match locked with
       | BOOL b =>
         match Memory.nth_replace (Qnode.set_locked b q) p m with
-        | None => Some (add_error (Build_error 71 "write_locked, nth_replace failed") s, get_resource e)
+        | None => Some (add_error (Build_error 71 "write_locked, nth_replace failed" None) s, get_resource e)
         | Some m => Some (s, (set_mem m r))
         end
-      | _ => Some (add_error (Build_error 61 "write_locked, locked value not bool") s, get_resource e) (* [locked] must be a [BOOL] *)
+      | _ => Some (add_error (Build_error 61 "write_locked, locked value not bool" None) s, get_resource e) (* [locked] must be a [BOOL] *)
       end
     end
   end.
@@ -662,7 +675,7 @@ Definition take_branch (c:expr) (t1:tm) (t2:tm) (e:env) : tm * env :=
   match eval c (get_state e) with
   | Some (BOOL true) => (t1, e)
   | Some (BOOL false) => (t2, e)
-  | _ => (ERR, ((add_error (Build_error 41 "conditional statement did not evaluate correctly") (get_state e)), get_resource e))
+  | err_val => (ERR, ((add_error (Build_error 41 "conditional statement did not evaluate correctly" (Some (c, err_val))) (get_state e)), get_resource e))
   end.
 
 
@@ -893,7 +906,7 @@ Qed.
 Example p0 : tm * env := (P, Env.initial 1).
 (* Compute p0. *)
 (* MeBi Show LTS Bounded 37 Of p0 Using step. *)
-(* MeBi Dump "p0" LTS Bounded 37 Of p0 Using step. *)
+MeBi Dump "p0" LTS Bounded 37 Of p0 Using step.
 
 (* MeBi Show  FSM Of p0 Using step. *)
 (* MeBi Dump "p0" FSM Bounded 150 Of p0 Using step. *)
@@ -962,10 +975,62 @@ Example ncs2 : sys * resource := compose (create 2 P).
 
 (* FIXME: in [ncs2] the condition [(EQ (VAR PREDECESSOR) (VAL NIL))] is not
           correctly evaluated, leading to an error 41. *)
-MeBi Dump "NCS2" LTS Bounded 1000 Of ncs2 Using lts step.
+MeBi Dump "NCS2" LTS Bounded 5000 Of ncs2 Using lts step.
 
-Example ncs2_error41 : sys * resource :=
-(PAR (PRC (SEQ (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_DEF 0 (SEQ (ACT NCS) (SEQ (SEQ (ACT (WRITE_NEXT THE_PID NIL)) (SEQ (ACT FETCH_AND_STORE) (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ))) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_CALL 0))))))))))) (0, {| var_predecessor := Some 1; var_locked := false; var_next := None; var_swap := true |}, None)) (PRC (SEQ (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_DEF 0 (SEQ (ACT NCS) (SEQ (SEQ (ACT (WRITE_NEXT THE_PID NIL)) (SEQ (ACT FETCH_AND_STORE) (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ))) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_CALL 0))))))))))) (1, {| var_predecessor := None; var_locked := false; var_next := None; var_swap := false |}, None)), ([{| next := None; locked := false |}; {| next := None; locked := false |}; {| next := None; locked := false |}], (Some 0, Some 0))).
+Example ncs2_error41_from : sys * resource :=
+(PAR (
+  PRC (SEQ (
+    IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK ( (* <- this fails to evaluate *)
+    (* since [var_predecessor = Some 1], should be [FLS]. *)
+      SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_DEF 0 (SEQ (ACT NCS) (SEQ (SEQ (ACT (WRITE_NEXT THE_PID NIL)) (SEQ (ACT FETCH_AND_STORE) (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ))) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_CALL 0)))))))))))
+      (0,
+        {| var_predecessor := Some 1
+         ; var_locked := false
+         ; var_next := None
+         ; var_swap := true
+        |},
+        None)
+    ) (
+      PRC (SEQ (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_DEF 0 (SEQ (ACT NCS) (SEQ (SEQ (ACT (WRITE_NEXT THE_PID NIL)) (SEQ (ACT FETCH_AND_STORE) (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ))) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_CALL 0)))))))))))
+      (1,
+        {| var_predecessor := None
+         ; var_locked := false
+         ; var_next := None
+         ; var_swap := false |}, None)
+    ), (
+    (* global state *)
+      [ {| next := None; locked := false |}
+      ; {| next := None; locked := false |}
+      ; {| next := None; locked := false |}], (Some 0, Some 0))).
+
+Example ncs2_error41_dest : sys * resource :=
+(PAR (
+  PRC (SEQ ERR (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_DEF 0 (SEQ (ACT NCS) (SEQ (SEQ (ACT (WRITE_NEXT THE_PID NIL)) (SEQ (ACT FETCH_AND_STORE) (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ))) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_CALL 0)))))))))))
+  (* local state of pid=0 *)
+  (0,
+  {| var_predecessor := Some 1
+   ; var_locked := false
+   ; var_next := None
+   ; var_swap := false
+  |}, (* below is the resulting error *)
+    Some [{| error_code := 41
+           ; error_msg := "conditional statement did not evaluate correctly"
+           ; info := Some (EQ (VAR PREDECESSOR) (VAL NIL), None)
+          |}]
+    )
+  )
+  (
+    PRC (SEQ (SEQ OK (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) )) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_DEF 0 (SEQ (ACT NCS) (SEQ (SEQ (ACT (WRITE_NEXT THE_PID NIL)) (SEQ (ACT FETCH_AND_STORE) (IF (EQ (VAR PREDECESSOR) (VAL NIL)) OK (SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (REC_DEF 2 (SEQ (ACT READ_LOCKED) (IF (VAR LOCKED) (REC_CALL 2) OK ))))) ))) (SEQ (ACT ENTER) (SEQ (ACT LEAVE) (SEQ (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (SEQ (ACT COMPARE_AND_SWAP) (IF (EQ FLS (VAR SWAP)) (REC_DEF 1 (SEQ (ACT READ_NEXT) (IF (EQ (VAL NIL) (VAR NEXT)) (REC_CALL 1) (ACT (WRITE_LOCKED NEXT (BOOL true))) ))) OK )) (ACT (WRITE_LOCKED NEXT (BOOL false))) )) (REC_CALL 0)))))))))))
+    (1,
+      {| var_predecessor := None
+      ; var_locked := false
+      ; var_next := None
+      ; var_swap := false |}, None)
+  ), (
+    (* global state *)
+    [ {| next := None; locked := false |}
+    ; {| next := None; locked := false |}
+    ; {| next := None; locked := false |}], (Some 0, None))).
 
 
 (** *)
@@ -979,14 +1044,14 @@ Inductive lts_transitive_closure : sys * resource -> Prop :=
   | no_lts : forall t e, lts_transitive_closure (t, e)
   .
 
-(* Goal lts_transitive_closure ncs2_error41.
-  unfold ncs2_error41.
+(* Goal lts_transitive_closure ncs2_error41_from.
+  unfold ncs2_error41_from.
   eapply trans_lts. eapply LTS_PAR_L.
                     eapply LTS_PRC.
-                    eapply STEP_SEQ.
+                    eapply STEP_SEQ. *)
+                    (* eapply STEP_IF. *)
                     (* eapply trans_step. *)
                     (* eapply trans_lts. *)
-                    eapply STEP_IF. *)
 
 (* MeBi Show  LTS Bounded 5000 Of ncs2 Using lts step. *)
 (* MeBi Show  LTS Of ncs2 Using lts step. *)
