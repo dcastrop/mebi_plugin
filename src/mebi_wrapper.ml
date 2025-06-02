@@ -85,6 +85,7 @@ module type ENCODING_TYPE = sig
   val compare : t -> t -> int
   val hash : t -> int
   val to_string : t -> string
+  val of_int : int -> t
 
   module type ENC_TBL = Hashtbl.S with type key = t
 
@@ -117,6 +118,7 @@ module IntEncoding : ENCODING_TYPE = struct
   let compare t1 t2 = Int.compare t1 t2
   let hash t = Int.hash t
   let to_string t : string = Printf.sprintf "%i" t
+  let of_int (i : int) : t = i
 
   module type ENC_TBL = Hashtbl.S with type key = t
 
@@ -547,6 +549,119 @@ let econstr_to_string (x : EConstr.t) : string =
     return (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma x))
   in
   run ~keep_encoding:true s_mm
+;;
+
+(********************************************)
+(****** COQ CONSTR TREE *********************)
+(********************************************)
+
+(* TODO: generalize this, and use a functor to map from E.g., [E.t*int tree] to
+   [string*int tree]. *)
+
+module Constr_tree = struct
+  type 'a tree = Node of 'a * 'a tree list
+  type t = (E.t * int) tree
+
+  let eq (t1 : t) (t2 : t) : bool =
+    let rec tree_eq (t1 : t) (t2 : t) : bool =
+      match t1, t2 with
+      | Node (a1, b1), Node (a2, b2) ->
+        fst a1 == fst a2 && snd a1 == snd a2 && tree_list_eq b1 b2
+    and tree_list_eq (l1 : t list) (l2 : t list) : bool =
+      match l1, l2 with
+      | [], [] -> true
+      | h1 :: t1, h2 :: t2 -> tree_eq h1 h2 && tree_list_eq t1 t2
+      | [], _ :: _ -> false
+      | _ :: _, [] -> false
+    in
+    tree_eq t1 t2
+  ;;
+
+  let compare (t1 : t) (t2 : t) : int =
+    let rec tree_compare (t1 : t) (t2 : t) : int =
+      match t1, t2 with
+      | Node (i1, l1), Node (i2, l2) ->
+        (match E.compare (fst i1) (fst i2) with
+         | 0 ->
+           (match Int.compare (snd i1) (snd i2) with
+            | 0 -> tree_list_compare l1 l2
+            | n -> n)
+         | n -> n)
+    and tree_list_compare (l1 : t list) (l2 : t list) : int =
+      match l1, l2 with
+      | [], [] -> 0
+      | h1 :: t1, h2 :: t2 ->
+        (match tree_compare h1 h2 with
+         | 0 -> tree_list_compare t1 t2 (* these should always be empty *)
+         | n -> n (* prioritise the main node when comparing *))
+      | [], _ :: _ -> -1
+      | _ :: _, [] -> 1
+    in
+    tree_compare t1 t2
+  ;;
+
+  let rec pstr (t1 : t) : string =
+    match t1 with
+    | Node (lhs_int, rhs_int_tree_list) ->
+      Printf.sprintf
+        "(%s:%i) [%s]"
+        (E.to_string (fst lhs_int))
+        (snd lhs_int)
+        (match List.length rhs_int_tree_list with
+         | 0 -> ""
+         | 1 -> pstr (List.hd rhs_int_tree_list)
+         | _ ->
+           List.fold_left
+             (fun (acc : string) (rhs_int_tree : t) ->
+               Printf.sprintf "%s, %s" acc (pstr rhs_int_tree))
+             (pstr (List.hd rhs_int_tree_list))
+             (List.tl rhs_int_tree_list))
+  ;;
+end
+
+(**********************************)
+(****** DECODE CONSTR TREE ********)
+(**********************************)
+
+type decoded_tree = (string * int) Constr_tree.tree
+
+(** decodes the parts of the tree corresponding to the LTS into string form. *)
+let decode_constr_tree_lts (tree : Constr_tree.t) : decoded_tree mm =
+  let open Syntax in
+  let rec decode_tree (t : Constr_tree.t) : decoded_tree mm =
+    match t with
+    | Node (leaf, stem) ->
+      let* (decoded_leaf_lts : term) = decode (fst leaf) in
+      let decoded_leaf = econstr_to_string decoded_leaf_lts, snd leaf in
+      let* decoded_stem = decode_tree_list stem in
+      return (Constr_tree.Node (decoded_leaf, decoded_stem))
+  and decode_tree_list (l : Constr_tree.t list) : decoded_tree list mm =
+    match l with
+    | [] -> return []
+    | h :: t ->
+      let* decoded_h = decode_tree h in
+      let* decoded_l = decode_tree_list t in
+      return (decoded_h :: decoded_l)
+  in
+  decode_tree tree
+;;
+
+let rec pstr_decoded_tree (t1 : decoded_tree) : string =
+  match t1 with
+  | Node (lhs_int, rhs_int_tree_list) ->
+    Printf.sprintf
+      "(%s:%i) [%s]"
+      (fst lhs_int)
+      (snd lhs_int)
+      (match List.length rhs_int_tree_list with
+       | 0 -> ""
+       | 1 -> pstr_decoded_tree (List.hd rhs_int_tree_list)
+       | _ ->
+         List.fold_left
+           (fun (acc : string) (rhs_int_tree : decoded_tree) ->
+             Printf.sprintf "%s, %s" acc (pstr_decoded_tree rhs_int_tree))
+           (pstr_decoded_tree (List.hd rhs_int_tree_list))
+           (List.tl rhs_int_tree_list))
 ;;
 
 (**********************************)

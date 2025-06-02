@@ -23,7 +23,7 @@
   utils
   ; mebi_errors
   mebi_action
-  constr_tree
+  ; constr_tree
   mebi_wrapper
   mebi_utils
   lts
