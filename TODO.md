@@ -1,5 +1,21 @@
 # todo
 
+- [ ] fix the printouts/dumps for FSMs, generalize the dumps using a functor to handle either LTS or FSM
+- [ ] overhaul utils.params and utils.logging
+
+
+- [ ] "glue" the `CADP.v` example (`p0`) together so that only the *external*
+      (non `SILENT`) actions are performed, and the "internal" ones are all
+      performed as one *big step*.
+- [ ] test the performance of the plugin to build LTS for this glued version.
+      (The current version would require `2^37 = 137438953472` states which is
+      infeasible.)
+- [ ] Check if this "glued" version is *bisimilar* to the original protocol.
+- [ ] Check how this glued version compares to the minimized version too.
+
+
+---
+
 - [x] overhaul mebi monad into a wrapper that allows us to seamlessly just work
       with the encodings
 - [x] since we support multi-layered lts, change `Constr_tree.t` from `int` to
