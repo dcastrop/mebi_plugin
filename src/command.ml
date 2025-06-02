@@ -265,7 +265,7 @@ let rec retrieve_tgt_nodes
        let$+ act env sigma = Reductionops.nf_all env sigma act in
        retrieve_tgt_nodes
          ~params
-         ((act, tgt, Node ((lts_index, i), ctor_tree)) :: acc)
+         ((act, tgt, Node ((E.of_int lts_index, i), ctor_tree)) :: acc)
          i
          act
          tgt_term
@@ -386,7 +386,8 @@ and check_valid_constructor
                return
                  (( act
                   , tgt_term
-                  , Constr_tree.Node ((fst index_ctor_pair, i), []) )
+                  , Constr_tree.Node ((E.of_int (fst index_ctor_pair), i), [])
+                  )
                   :: ctor_vals)
            | nctors ->
              let tgt_nodes =
@@ -1033,7 +1034,11 @@ module MkGraph
         let* (dest_str : string) =
           get_state_translation ~prefix:"DEST" destination translation_tbl g
         in
-        let constr_tree_str : string = Constr_tree.pstr constr_tree in
+        (* let constr_tree_str : string = Constr_tree.pstr constr_tree in *)
+        let* (decoded_constr_tree : (string * int) Constr_tree.tree) =
+          decode_constr_tree_lts constr_tree
+        in
+        let constr_tree_str : string = pstr_decoded_tree decoded_constr_tree in
         return ((from_str, a_str, dest_str, Some constr_tree_str) :: acc)
       in
       iterate 0 (List.length transitions_list - 1) [] iter_body

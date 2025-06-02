@@ -43,6 +43,7 @@ module type ENCODING_TYPE = sig
   val compare : t -> t -> int
   val hash : t -> int
   val to_string : t -> string
+  val of_int : int -> t
 
   module type ENC_TBL = sig
     type key = t
@@ -184,6 +185,20 @@ val encode_map : 'a F.t -> 'a B.t mm
 val decode_map : 'a B.t -> 'a F.t mm
 val constr_to_string : Constr.t -> string
 val econstr_to_string : Evd.econstr -> string
+
+module Constr_tree : sig
+  type 'a tree = Node of 'a * 'a tree list
+  type t = (E.t * int) tree
+
+  val eq : t -> t -> bool
+  val compare : t -> t -> int
+  val pstr : t -> string
+end
+
+type decoded_tree = (string * int) Constr_tree.tree
+
+val decode_constr_tree_lts : Constr_tree.t -> decoded_tree mm
+val pstr_decoded_tree : decoded_tree -> string
 val tref_to_econstr : Constrexpr.constr_expr -> term mm
 val normalize_econstr : term -> term mm
 val type_of_econstr : term -> term mm

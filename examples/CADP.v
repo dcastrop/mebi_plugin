@@ -923,7 +923,7 @@ MeBi Dump "p0" LTS Bounded 37 Of p0 Using step.
 (* MeBi Dump "p0" FSM Bounded 150 Of p0 Using step. *)
 
 (* MeBi Show  Minim Of p0 Using step. *)
-(* MeBi Dump "p0" Minim Bounded 150 Of p0 Using step. *)
+MeBi Dump "p0" Minim Bounded 37 Of p0 Using step.
 
 
 
@@ -984,7 +984,7 @@ Example ncs1 : sys * resource := compose (create 1 P).
 Example ncs2 : sys * resource := compose (create 2 P).
 (* Compute ncs2. *)
 
-MeBi Dump "NCS2" LTS Bounded 5000 Of ncs2 Using lts step.
+(* MeBi Dump "NCS2" LTS Bounded 5000 Of ncs2 Using lts step. *)
 
 
 (* MeBi Show  LTS Bounded 5000 Of ncs2 Using lts step. *)
