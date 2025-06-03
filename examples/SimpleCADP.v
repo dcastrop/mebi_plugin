@@ -123,7 +123,6 @@ Definition do_if (c:ntm) (t1:tm) (t2:tm) (n:nat) (v:nat) : tm * nat * nat :=
   | V_IS_ZERO => (if Nat.eqb v 0 then t1 else t2, n, v)
   end.
 
-
 Inductive step :
   tm * nat * nat -> label -> tm * nat * nat -> Prop
   :=
@@ -139,6 +138,30 @@ Inductive step :
   | STEP_SEQ : forall a r l1 l2 n1 n2 v1 v2,
     step (l1, n1, v1) a (l2, n2, v2) ->
     step (SEQ l1 r, n1, v1) a (SEQ l2 r, n2, v2)
+  .
+
+Inductive sys : Type :=
+  | PRC : (tm * nat * nat) -> sys
+  | PAR : sys -> sys -> sys
+  .
+
+Inductive lts : sys -> label -> sys -> Prop :=
+
+  | LTS_PRC : forall a t1 t2 n1 n2 v1 v2,
+    step (t1, n1, v1) a (t2, n2, v2) ->
+    lts (PRC (t1, n1, v1)) a (PRC (t2, n2, v2))
+
+  | LTS_PAR_L : forall a l1 l2 r,
+    lts l1 a l2 ->
+    lts (PAR l1 r) a (PAR l2 r)
+
+  | LTS_PAR_R : forall a l r1 r2,
+    lts r1 a r2 ->
+    lts (PAR l r1) a (PAR l r2)
+
+  (* | LTS_OK_L : forall r n v, lts (PAR (PRC (OK, n, v)) r) SILENT (r)
+
+  | LTS_OK_R : forall l n v, lts (PAR l (PRC (OK, n, v))) SILENT (l) *)
   .
 
 (** [tm1] will keep waiting until [n] in state is 0, *)
@@ -165,55 +188,9 @@ Example tm1 : tm :=
     )
   ).
 
-Inductive sys : Type :=
-  | PRC : (tm * nat * nat) -> sys
-  | PAR : sys -> sys -> sys
-  .
-
-Fixpoint sys_equiv (t1:sys) (t2:sys) : Prop :=
-  match t1, t2 with
-
-  | PAR t1a t1b,
-    PAR t2a t2b => (sys_equiv t1a t2a /\ sys_equiv t1b t2b) \/
-                   (sys_equiv t1a t2b /\ sys_equiv t1b t2a)
-
-  | PRC t1, PRC t2 =>
-    match t1, t2 with
-    | (t1, n1, v1),
-      (t2, n2, v2) =>
-      match Nat.eqb n1 n2, Nat.eqb v1 v2 with
-      | true, true => tm_equiv t1 t2
-      | _, _ => False
-      end
-    end
-
-  | _, _ => False
-
-  end.
-
-Inductive lts : sys -> label -> sys -> Prop :=
-
-  | LTS_PRC : forall a t1 t2 n1 n2 v1 v2,
-    step (t1, n1, v1) a (t2, n2, v2) ->
-    lts (PRC (t1, n1, v1)) a (PRC (t2, n2, v2))
-
-  | LTS_PAR_L : forall a l1 l2 r,
-    lts l1 a l2 ->
-    lts (PAR l1 r) a (PAR l2 r)
-
-  | LTS_PAR_R : forall a l r1 r2,
-    lts r1 a r2 ->
-    lts (PAR l r1) a (PAR l r2)
-
-  (* | LTS_OK_L : forall r n v, lts (PAR (PRC (OK, n, v)) r) SILENT (r)
-
-  | LTS_OK_R : forall l n v, lts (PAR l (PRC (OK, n, v))) SILENT (l) *)
-  .
-
-
 Example e1 : tm * nat * nat := (tm1, 0, 0).
-(* MeBi Show LTS Bounded 35 Of e1 Using step. *)
-(* MeBi Dump "e1" LTS Bounded 35 Of e1 Using step. *)
+(* MeBi Show LTS Bounded 34 Of e1 Using step. *)
+(* MeBi Dump "e1" LTS Bounded 34 Of e1 Using step. *)
 
 
 Example e2 : sys :=
@@ -269,6 +246,27 @@ Example e7 : sys :=
 (* MeBi Show LTS Bounded 10 Of e7 Using lts step. *)
 (* MeBi Dump "e7" LTS Bounded 10 Of e7 Using lts step. *)
 
+
+Fixpoint sys_equiv (t1:sys) (t2:sys) : Prop :=
+  match t1, t2 with
+
+  | PAR t1a t1b,
+    PAR t2a t2b => (sys_equiv t1a t2a /\ sys_equiv t1b t2b) \/
+                   (sys_equiv t1a t2b /\ sys_equiv t1b t2a)
+
+  | PRC t1, PRC t2 =>
+    match t1, t2 with
+    | (t1, n1, v1),
+      (t2, n2, v2) =>
+      match Nat.eqb n1 n2, Nat.eqb v1 v2 with
+      | true, true => tm_equiv t1 t2
+      | _, _ => False
+      end
+    end
+
+  | _, _ => False
+
+  end.
 
 (* MeBi Dump "e2" LTS sys_equiv Bounded 350 Of e2 Using lts step. *)
 (* MeBi Dump "e2" FSM sys_equiv Bounded 350 Of e2 Using lts step. *)

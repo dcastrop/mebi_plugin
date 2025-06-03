@@ -10,7 +10,6 @@ theories/Test.v
 
 examples/CADP.v
 examples/SimpleCADP.v
-examples/GluedCADP.v
 
 examples/Proc.v
 
