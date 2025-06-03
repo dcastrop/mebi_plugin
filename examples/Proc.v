@@ -249,7 +249,7 @@ Inductive compLTS : comp -> bool -> comp -> Prop :=
 
 Example comp1_rec1 := cpar (cterm proc1_rec1) (cterm proc1_rec1).
 (* MeBi Show LTS Bounded 150 Of comp0_send1 Using termLTS compLTS. *)
-MeBi Dump "comp1_rec1" LTS Bounded 350 Of comp1_rec1 Using termLTS compLTS.
+(* MeBi Dump "comp1_rec1" LTS Bounded 350 Of comp1_rec1 Using termLTS compLTS. *)
 
 (*************************************)
 (** Recursion ************************)
@@ -257,7 +257,7 @@ MeBi Dump "comp1_rec1" LTS Bounded 350 Of comp1_rec1 Using termLTS compLTS.
 
 Example comp0_send1 := cpar (cterm proc0_send1a) (cterm proc0_send1b).
 (* MeBi Show LTS Bounded 150 Of comp1_rec1 Using termLTS compLTS. *)
-MeBi Dump "comp0_send1" LTS Bounded 350 Of comp0_send1 Using termLTS compLTS.
+(* MeBi Dump "comp0_send1" LTS Bounded 350 Of comp0_send1 Using termLTS compLTS. *)
 
 
 
