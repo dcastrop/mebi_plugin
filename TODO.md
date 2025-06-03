@@ -2,6 +2,7 @@
 
 - [ ] fix the printouts/dumps for FSMs, generalize the dumps using a functor to handle either LTS or FSM
 - [ ] overhaul utils.params and utils.logging
+- [ ] sometimes when writing to a file [dump_to_file.ml] appears to just crash without any kind of warning (only tested using COQ examples during compilation)
 
 
 - [ ] "glue" the `CADP.v` example (`p0`) together so that only the *external*
