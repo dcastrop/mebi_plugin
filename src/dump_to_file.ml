@@ -455,7 +455,8 @@ let write_to_file
      perm filepath *)
   (* (fun oc -> Out_channel.output_string oc content); *)
   let oc = open_out filepath in
-  Printf.fprintf oc "%s" content;
+  (* Printf.fprintf oc "%s" content; *)
+  String.iter (fun (c : char) -> Printf.fprintf oc "%c" c) content;
   close_out oc;
   (* return filepath *)
   filepath
