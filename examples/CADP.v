@@ -1100,8 +1100,8 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
   bigstep (PRC (SEQ OK y) s, r) a (PRC y s, r)
 
 (*  7 *)
-| DO_MAIN_LOOP : forall b a s r,
-  bigstep (PRC (REC_DEF PMainLoopDef b) s, r) a (do_main_loop b s r)
+| DO_MAIN_LOOP : forall b s r,
+  bigstep (PRC (REC_DEF PMainLoopDef b) s, r) SILENT (do_main_loop b s r)
 
 (* | DO_REC_DEF : forall x b a u s1 r1 s2 r2,
   lts (PRC (REC_DEF x b) s1, r1) a (PRC u s2, r2) ->
@@ -1128,14 +1128,14 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 .
 
 MeBi Dump "g1" LTS Bounded 16384 Of g1 Using bigstep lts step.
-(* MeBi Dump "g2" LTS Bounded 16384 Of g2 Using bigstep lts step. *)
+MeBi Dump "g2" LTS Bounded 16384 Of g2 Using bigstep lts step.
 
 Example gTest1 : sys * resource :=
   (
     (PRC P (State.create 0))
   , Resource.initial 1
   ).
-MeBi Dump "gTest1" LTS Bounded 16384 Of gTest1 Using bigstep lts step.
+(* MeBi Dump "gTest1" LTS Bounded 16384 Of gTest1 Using bigstep lts step. *)
 
 Example gTest2 : sys * resource :=
   (
@@ -1143,7 +1143,7 @@ Example gTest2 : sys * resource :=
         (PRC OK (State.create 1))
   , Resource.initial 2
   ).
-MeBi Dump "gTest2" LTS Bounded 16384 Of gTest2 Using bigstep lts step.
+(* MeBi Dump "gTest2" LTS Bounded 16384 Of gTest2 Using bigstep lts step. *)
 
 Example gTest2b : sys * resource :=
   (
@@ -1151,7 +1151,7 @@ Example gTest2b : sys * resource :=
         (PRC (SEQ OK OK) (State.create 1))
   , Resource.initial 2
   ).
-MeBi Dump "gTest2b" LTS Bounded 16384 Of gTest2b Using bigstep lts step.
+(* MeBi Dump "gTest2b" LTS Bounded 16384 Of gTest2b Using bigstep lts step. *)
 
 Example gTest3 : sys * resource :=
   (
