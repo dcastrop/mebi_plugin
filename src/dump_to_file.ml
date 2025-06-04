@@ -1,8 +1,41 @@
-open Fsm
+(* open Fsm *)
 open Lts
 
 let perm : int = 0o777
 let default_output_dir : string = "./_dumps/"
+
+(** removes all newlines, excess spaces from string, and makes " " safe *)
+let clean (s : string) : string =
+  let writing_space : bool ref = ref true in
+  String.fold_left
+    (fun (acc : string) (c : char) ->
+      Printf.sprintf
+        "%s%s"
+        acc
+        (if String.contains "\n\r\t" c
+         then
+           if !writing_space
+           then ""
+           else (
+             writing_space := true;
+             " ")
+         else (
+           let c_str : string = String.make 1 c in
+           (* if String.contains "\"" c
+              then "\\\""
+              else *)
+           match String.equal " " c_str, !writing_space with
+           | true, true -> ""
+           | true, false ->
+             writing_space := true;
+             c_str
+           | false, true ->
+             writing_space := false;
+             c_str
+           | false, false -> c_str)))
+    ""
+    s
+;;
 
 type output_dir_kind =
   | Default of unit
@@ -61,9 +94,9 @@ let get_filename (f : filename_kind) (is_complete : bool option) : string =
 type filetype_kind = JSON of unit
 
 let build_filename
-  (filename : filename_kind)
-  (filetype : filetype_kind)
-  (is_complete : bool option)
+      (filename : filename_kind)
+      (filetype : filetype_kind)
+      (is_complete : bool option)
   : string
   =
   match filetype with
@@ -71,10 +104,10 @@ let build_filename
 ;;
 
 let build_filepath
-  (output_dir : output_dir_kind)
-  (filename : filename_kind)
-  (filetype : filetype_kind)
-  (is_complete : bool option)
+      (output_dir : output_dir_kind)
+      (filename : filename_kind)
+      (filetype : filetype_kind)
+      (is_complete : bool option)
   : string
   =
   match output_dir, filetype with
@@ -88,7 +121,8 @@ let build_filepath
     Filename.concat s (build_filename filename filetype is_complete)
 ;;
 
-(** https://discuss.ocaml.org/t/how-to-create-a-new-file-while-automatically-creating-any-intermediate-directories/14837/5 *)
+(** https://discuss.ocaml.org/t/how-to-create-a-new-file-while-automatically-creating-any-intermediate-directories/14837/5
+*)
 let rec create_parent_dir (fn : string) =
   let parent_dir = Filename.dirname fn in
   if not (Sys.file_exists parent_dir)
@@ -97,366 +131,245 @@ let rec create_parent_dir (fn : string) =
     Sys.mkdir parent_dir perm)
 ;;
 
-module JSON = struct
-  (* let remove_double_spaces (s : string) : string = Str.global_replace
-     (Str.regexp {| + |\t+\t|}) " " s ;; *)
+type dumpable_kind = LTS of Lts.lts
+(* | FSM of Fsm.fsm *)
 
-  (* let remove_linebreaks (s : string) : string = Str.global_replace
-     (Str.regexp {|\(\r\n|\n|\r\)|}) " " s ;; *)
+(* let handle_filecontents
+   (filename : string)
+   (filetype : filetype_kind)
+   (to_dump : dumpable_kind)
+   : string * bool option
+   =
+   match to_dump, filetype with
+   | LTS s, JSON () -> JSON.LTS.lts filename s, Utils.is_complete s.info
+   ;; *)
 
-  (** removes all newlines, excess spaces from string, and makes " " safe *)
-  let clean (s : string) : string =
-    let writing_space : bool ref = ref true in
-    String.fold_left
-      (fun (acc : string) (c : char) ->
-        Printf.sprintf
-          "%s%s"
-          acc
-          (if String.contains "\n\r\t" c
-           then
-             if !writing_space
-             then ""
-             else (
-               writing_space := true;
-               " ")
-           else (
-             let c_str : string = String.make 1 c in
-             if String.contains "\"" c
-             then "\\\""
-             else (
-               match String.equal " " c_str, !writing_space with
-               | true, true -> ""
-               | true, false ->
-                 writing_space := true;
-                 c_str
-               | false, true ->
-                 writing_space := false;
-                 c_str
-               | false, false -> c_str))))
-      ""
-      s
-  ;;
+type json_action_name = string
+type json_action_silent = bool
+type json_action_annotations = string list
 
-  let quoted (s : string) : string = Printf.sprintf "\"%s\"" s
+module JSON_Alphabet = Set.Make (struct
+    type t = json_action_name * (json_action_silent * json_action_annotations)
 
-  type col_kind =
-    | List of string list
-    | Dict of string list
+    let compare a b =
+      match String.compare (fst a) (fst b) with
+      | 0 ->
+        (match
+           ( Bool.compare (fst (snd a)) (fst (snd b))
+           , List.compare
+               (fun a' b' -> String.compare a' b')
+               (snd (snd a))
+               (snd (snd b)) )
+         with
+         | 0, 0 -> 0
+         | 0, n -> n
+         | n, _ -> n)
+      | n -> n
+    ;;
+  end)
 
-  let handle_list_sep sep : string =
-    match sep with None -> " " | Some sep -> sep
-  ;;
+type json_state_name = string
+type json_state_info = string
 
-  let handle_dict_sep sep : string =
-    match sep with None -> "\n" | Some sep -> sep
-  ;;
+module JSON_States = Set.Make (struct
+    type t = json_state_name * json_state_info
 
-  (** assumes elements of [ss] are already stringified. *)
-  let col
-    ?(prefix : string = "")
-    ?(sep : string option)
-    ?(tlindent : string = "")
-    (ss : col_kind)
-    : string
-    =
-    let ss, lhs, rhs, sep =
-      match ss with
-      | List ss -> ss, "[", "]", handle_list_sep sep
-      | Dict ss -> ss, "{", "}", handle_dict_sep sep
+    let compare a b =
+      match String.compare (fst a) (fst b) with
+      | 0 -> String.compare (snd a) (snd b)
+      | n -> n
+    ;;
+  end)
+
+module JSON_Edges = Set.Make (struct
+    type t = (json_state_name * json_state_name) * (string * string)
+
+    let compare a b =
+      let c1 = String.compare (fst (fst a)) (fst (fst b)) in
+      let c2 = String.compare (snd (fst a)) (snd (fst b)) in
+      let c3 = String.compare (fst (snd a)) (fst (snd b)) in
+      let c4 = String.compare (snd (snd a)) (snd (snd b)) in
+      match c1, c2, c3, c4 with
+      | 0, 0, 0, 0 -> 0
+      | 0, 0, 0, n -> n
+      | 0, 0, n, _ -> n
+      | 0, n, _, _ -> n
+      | n, _, _, _ -> n
+    ;;
+  end)
+
+type model_info =
+  { name : string
+  ; kind : string
+  ; extra : Utils.model_info option
+  }
+
+type json_model =
+  { info : model_info
+  ; alphabet : JSON_Alphabet.t
+  ; initial_state : json_state_name
+  ; state_list : JSON_States.t
+  ; edge_list : JSON_Edges.t
+  }
+
+let string_opt (s : string option) : string =
+  match s with None -> "null" | Some s -> Printf.sprintf "\"%s\"" s
+;;
+
+let is_model_complete (m : json_model) : bool option =
+  match m.info.extra with None -> None | Some e -> Some e.is_complete
+;;
+
+let to_json_model (filename : string) (model : dumpable_kind) : json_model =
+  match model with
+  | LTS s ->
+    let extra = s.info in
+    let info = { name = filename; kind = "lts"; extra } in
+    let alphabet = JSON_Alphabet.empty in
+    let initial_state = string_opt s.init in
+    let state_list =
+      Lts.States.fold
+        (fun (state : Lts.state) (acc : JSON_States.t) ->
+          JSON_States.add (state.name, string_opt state.info) acc)
+        s.states
+        JSON_States.empty
     in
-    match ss with
-    | [] -> Printf.sprintf "%s %s" lhs rhs
-    | h :: t ->
-      Printf.sprintf
-        "%s%s\n%s\n%s%s"
-        prefix
-        lhs
-        (List.fold_left
-           (fun (acc : string) (s : string) ->
-             Printf.sprintf "%s,%s%s" acc sep s)
-           h
-           t)
-        tlindent
-        rhs
-  ;;
+    let edge_list =
+      Lts.Transitions.fold
+        (fun (edge : Lts.transition) (acc : JSON_Edges.t) ->
+          JSON_Edges.add
+            ((edge.from, edge.destination), (edge.label, string_opt edge.info))
+            acc)
+        s.transitions
+        JSON_Edges.empty
+    in
+    { info; alphabet; initial_state; state_list; edge_list }
+;;
 
-  let key_val ?(prefix : string = "") (k : string) (v : string) : string =
-    Printf.sprintf "%s%s: %s" prefix (quoted k) v
-  ;;
+(* | FSM s, JSON () -> JSON.FSM.fsm filename s, Utils.is_complete s.info *)
 
-  let model_info (m : Utils.model_info option) : string =
-    match m with
-    | None -> "None"
-    | Some i ->
-      col
-        ~tlindent:"\t"
-        (Dict
-           [ key_val
-               ~prefix:"\t\t"
-               "is_complete"
-               (quoted (Printf.sprintf "%b" i.is_complete))
-           ; key_val
-               ~prefix:"\t\t"
-               "bound"
-               (quoted (Printf.sprintf "%i" i.bound))
-           ; key_val
-               ~prefix:"\t\t"
-               "num_states"
-               (quoted (Printf.sprintf "%i" i.num_states))
-           ; key_val
-               ~prefix:"\t\t"
-               "num_edges"
-               (quoted (Printf.sprintf "%i" i.num_edges))
-           ])
-  ;;
+let handle_if_first (b : bool ref) : string =
+  if !b
+  then (
+    b := false;
+    "\n")
+  else ",\n"
+;;
 
-  module LTS = struct
-    let initial (init : string option) : string =
-      match init with
-      | None -> key_val "initial" (quoted "None")
-      | Some s -> key_val "initial" (quoted (clean s))
-    ;;
-
-    let states (ss : Lts.States.t) : string =
-      key_val
-        "states"
-        (col
-           ~sep:"\n"
-           ~tlindent:"\t"
-           (List
-              (Lts.States.fold
-                 (fun (s : Lts.state) (acc : string list) ->
-                   (match s.info with
-                    | None -> Printf.sprintf "\t\t%s" (quoted (clean s.name))
-                    | Some i ->
-                      col
-                        ~prefix:"\t\t"
-                        ~tlindent:"\t\t"
-                        (Dict
-                           [ key_val
-                               ~prefix:"\t\t\t"
-                               "name"
-                               (quoted (clean s.name))
-                           ; key_val ~prefix:"\t\t\t" "info" (quoted (clean i))
-                           ]))
-                   :: acc)
-                 ss
-                 [])))
-    ;;
-
-    let transition (t : Lts.transition) : string =
-      col
-        ~prefix:"\t\t"
-        ~tlindent:"\t\t"
-        (Dict
-           [ (*key_val ~prefix:"\t\t\t" "id" (quoted (clean (Printf.sprintf "%i"
-               t.id))) ; *)
-             key_val ~prefix:"\t\t\t" "from" (quoted (clean t.from))
-           ; key_val ~prefix:"\t\t\t" "label" (quoted (clean t.label))
-           ; key_val ~prefix:"\t\t\t" "dest" (quoted (clean t.destination))
-           ; key_val
-               ~prefix:"\t\t\t"
-               "info"
-               (quoted
-                  (clean
-                     (match t.info with
-                      | None -> "None"
-                      | Some index_tree -> index_tree)))
-           ])
-    ;;
-
-    let transitions (ts : Lts.Transitions.t) : string =
-      key_val
-        "transitions"
-        (col
-           ~sep:"\n"
-           ~tlindent:"\t"
-           (List
-              (Lts.Transitions.fold
-                 (fun (t : Lts.transition) (acc : string list) ->
-                   transition t :: acc)
-                 ts
-                 [])))
-    ;;
-
-    let lts (name : string) (m : lts) : string =
-      Printf.sprintf
-        "{\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s\n}"
-        (key_val "name" (quoted name))
-        (key_val "kind" (quoted "lts"))
-        (key_val "info" (model_info m.info))
-        (initial m.init)
-        (transitions m.transitions)
-        (states m.states)
-    ;;
-  end
-
-  module FSM = struct
-    let state (s : Fsm.state) : string =
-      col
-        (Dict
-           [ key_val "id" (quoted (clean (Printf.sprintf "%d" s.id)))
-           ; key_val "name" (quoted (clean s.name))
-           ])
-    ;;
-
-    let annotation (anno : annotation) : string =
-      col
-        (List
-           (List.fold_left
-              (fun (acc : string list) ((s, a) : Fsm.state * action) ->
-                col
-                  (Dict [ key_val "state" (state s); key_val "action" a.label ])
-                :: acc)
-              []
-              anno))
-    ;;
-
-    let annotations (annos : annotations) : string =
-      key_val
-        "annotations"
-        (col
-           (List
-              (List.fold_left
-                 (fun (acc : string list) (anno : annotation) ->
-                   annotation anno :: acc)
-                 []
-                 annos)))
-    ;;
-
-    let action (a : action) : string =
-      col
-        (Dict
-           [ key_val "id" (quoted (clean (Printf.sprintf "%i" a.id)))
-           ; key_val "label" (quoted (clean a.label))
-           ; key_val "is_tau" (quoted (clean (Printf.sprintf "%b" a.is_tau)))
-           ; annotations a.annotation
-           ])
-    ;;
-
-    let alphabet (alphas : Alphabet.t) : string =
-      key_val
-        "alphabet"
-        (col
-           (List
-              (Fsm.Alphabet.fold
-                 (fun (a : action) (acc : string list) -> action a :: acc)
-                 alphas
-                 [])))
-    ;;
-
-    let states ?(key : string = "states") (states : Fsm.States.t) : string =
-      key_val
-        key
-        (col
-           (List
-              (Fsm.States.fold
-                 (fun (s : Fsm.state) (acc : string list) -> state s :: acc)
-                 states
-                 [])))
-    ;;
-
-    let edge (from : Fsm.state) (a : action) (destinations : Fsm.States.t)
-      : string
-      =
-      col
-        (Dict
-           [ key_val "from" (state from)
-           ; key_val "label" (action a)
-           ; states ~key:"destinations" destinations
-           ])
-    ;;
-
-    let edges (edges : Fsm.States.t Actions.t Edges.t) : string =
-      key_val
-        "edges"
-        (col
-           (List
-              (let from_states : Fsm.States.t =
-                 Fsm.States.of_seq (Edges.to_seq_keys edges)
-               in
-               Fsm.States.fold
-                 (fun (from_state : Fsm.state) (from_acc : string list) ->
-                   let outgoing_actions : Fsm.States.t Actions.t =
-                     Edges.find edges from_state
-                   in
-                   let actions : Alphabet.t =
-                     Alphabet.of_seq (Actions.to_seq_keys outgoing_actions)
-                   in
-                   let action_acc : string list =
-                     Alphabet.fold
-                       (fun (a : action) (action_acc : string list) ->
-                         let destination_states : Fsm.States.t =
-                           Actions.find outgoing_actions a
-                         in
-                         edge from_state a destination_states :: action_acc)
-                       actions
-                       []
-                   in
-                   List.append from_acc action_acc)
-                 from_states
-                 [])))
-    ;;
-
-    let initial (s : Fsm.state option) : string =
-      match s with
-      | None -> key_val "initial" (quoted "None")
-      | Some s -> key_val "initial" (state s)
-    ;;
-
-    let fsm (name : string) (m : fsm) : string =
-      Printf.sprintf
-        "{\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s,\n\t%s\n}"
-        (key_val "name" (quoted name))
-        (key_val "kind" (quoted "fsm"))
-        (key_val "info" (model_info m.info))
-        (initial m.init)
-        (alphabet m.alphabet)
-        (states m.states)
-        (edges m.edges)
-    ;;
-  end
-end
-
-type dumpable_kind =
-  | LTS of Lts.lts
-  | FSM of Fsm.fsm
-
-let handle_filecontents
-  (filename : string)
-  (filetype : filetype_kind)
-  (to_dump : dumpable_kind)
-  : string * bool option
+let write_json_extra_to_file (oc : out_channel) (i : Utils.model_info option)
+  : unit
   =
-  match to_dump, filetype with
-  | LTS s, JSON () -> JSON.LTS.lts filename s, Utils.is_complete s.info
-  | FSM s, JSON () -> JSON.FSM.fsm filename s, Utils.is_complete s.info
+  match i with
+  | None -> Printf.fprintf oc "\t\t\"extra\": null\n"
+  | Some i ->
+    Printf.fprintf oc "\t\t\"extra\": {\n";
+    Printf.fprintf oc "\t\t\t\"is_complete\": %b,\n" i.is_complete;
+    Printf.fprintf oc "\t\t\t\"bound\": %i,\n" i.bound;
+    Printf.fprintf oc "\t\t\t\"num_states\": %i,\n" i.num_states;
+    Printf.fprintf oc "\t\t\t\"num_edges\": %i\n" i.num_edges;
+    Printf.fprintf oc "\t\t}\n"
+;;
+
+let write_json_info_to_file (oc : out_channel) (i : model_info) : unit =
+  Printf.fprintf oc (* open  info *) "\t\"info\": {\n";
+  Printf.fprintf oc "\t\t\"name\": \"%s\",\n" i.name;
+  Printf.fprintf oc "\t\t\"kind\": \"%s\",\n" i.kind;
+  write_json_extra_to_file oc i.extra;
+  Printf.fprintf oc (* close info *) "\t},\n"
+;;
+
+let write_json_alphabet_to_file (oc : out_channel) (i : JSON_Alphabet.t) : unit =
+  if JSON_Alphabet.is_empty i
+  then Printf.fprintf oc "\t\"alphabet\": [],\n"
+  else (
+    let is_first = ref true in
+    Printf.fprintf oc "\t\"alphabet\": [";
+    JSON_Alphabet.iter
+      (fun (action_name, (action_silent, action_annotations)) ->
+        Printf.fprintf oc "%s" (handle_if_first is_first);
+        Printf.fprintf oc "\t\t{\n";
+        Printf.fprintf oc "\t\t\t\"action\": \"%s\",\n" action_name;
+        Printf.fprintf oc "\t\t\t\"is_silent\": %b,\n" action_silent;
+        if List.is_empty action_annotations
+        then Printf.fprintf oc "\t\t\t\"annotations\": [],\n"
+        else (
+          let is_first' = ref true in
+          Printf.fprintf oc "\t\t\t\"annotations\": [\n";
+          List.iter
+            (fun action_annotation ->
+              Printf.fprintf oc "%s" (handle_if_first is_first');
+              Printf.fprintf oc "\t\t\t\t\"%s\"" action_annotation)
+            action_annotations;
+          Printf.fprintf oc "\t\t\t],\n");
+        Printf.fprintf oc "\t\t}")
+      i;
+    Printf.fprintf oc "\n\t],\n")
+;;
+
+let write_json_states_to_file (oc : out_channel) (i : JSON_States.t) : unit =
+  if JSON_States.is_empty i
+  then Printf.fprintf oc "\t\"states\": [],\n"
+  else (
+    let is_first = ref true in
+    Printf.fprintf oc "\t\"states\": [";
+    JSON_States.iter
+      (fun (state_name, state_info) ->
+        Printf.fprintf oc "%s" (handle_if_first is_first);
+        Printf.fprintf oc "\t\t{\n";
+        Printf.fprintf oc "\t\t\t\"name\": \"%s\",\n" state_name;
+        Printf.fprintf oc "\t\t\t\"info\": %s\n" (clean state_info);
+        Printf.fprintf oc "\t\t}")
+      i;
+    Printf.fprintf oc "\n\t]\n")
+;;
+
+let write_json_edges_to_file (oc : out_channel) (i : JSON_Edges.t) : unit =
+  if JSON_Edges.is_empty i
+  then Printf.fprintf oc "\t\"edges\": [],\n"
+  else (
+    let is_first = ref true in
+    Printf.fprintf oc "\t\"edges\": [";
+    JSON_Edges.iter
+      (fun ((from_state, dest_state), (action_label, action_info)) ->
+        Printf.fprintf oc "%s" (handle_if_first is_first);
+        Printf.fprintf oc "\t\t{\n";
+        Printf.fprintf oc "\t\t\t\"from\": \"%s\",\n" from_state;
+        Printf.fprintf oc "\t\t\t\"dest\": \"%s\",\n" dest_state;
+        Printf.fprintf oc "\t\t\t\"labl\": \"%s\",\n" action_label;
+        Printf.fprintf oc "\t\t\t\"info\": %s\n" action_info;
+        Printf.fprintf oc "\t\t}")
+      i;
+    Printf.fprintf oc "\n\t],\n")
+;;
+
+let write_json_to_file (oc : out_channel) (m : json_model) : unit =
+  Printf.fprintf (* open  json *) oc "{\n";
+  write_json_info_to_file oc m.info;
+  write_json_alphabet_to_file oc m.alphabet;
+  Printf.fprintf oc "\t\"initial_state\": %s\n," m.initial_state;
+  write_json_edges_to_file oc m.edge_list;
+  write_json_states_to_file oc m.state_list;
+  Printf.fprintf (* close json *) oc "}\n"
 ;;
 
 let write_to_file
-  (output_dir : output_dir_kind)
-  (filename : filename_kind)
-  (filetype : filetype_kind)
-  (to_dump : dumpable_kind)
+      (output_dir : output_dir_kind)
+      (filename : filename_kind)
+      (filetype : filetype_kind)
+      (model : dumpable_kind)
   : string
   =
-  (* get content to output *)
-  let (content, is_complete) : string * bool option =
-    handle_filecontents (get_name filename) filetype to_dump
-  in
+  (* convert model to json *)
+  let json = to_json_model (get_name filename) model in
+  let is_complete = is_model_complete json in
   (* build filepath *)
-  let filepath : string =
-    build_filepath output_dir filename filetype is_complete
-  in
+  let filepath = build_filepath output_dir filename filetype is_complete in
   (* check parent directory exists *)
   create_parent_dir filepath;
   (* write to file *)
-  (* Out_channel.with_open_gen [ Out_channel.Open_creat; Out_channel.Open_excl ]
-     perm filepath *)
-  (* (fun oc -> Out_channel.output_string oc content); *)
   let oc = open_out filepath in
-  Printf.fprintf oc "%s" content;
-  (* String.iter (fun (c : char) -> Printf.fprintf oc "%c" c) content; *)
+  (* List.iter (fun (line : string) -> Printf.fprintf oc "%s" line) lines; *)
+  write_json_to_file oc json;
   close_out oc;
   (* return filepath *)
   filepath

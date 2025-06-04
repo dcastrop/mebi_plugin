@@ -23,8 +23,9 @@ Definition pid   : Type  := nat.
 Definition index : Type  := option pid.
 Definition Nil   : index := None.
 
-(* recursive definition identifier *)
-Definition idef : Type := nat.
+(* recursive definition identifier and optional iteration limit *)
+Definition irec : Type := nat.
+Definition idef : Type := irec * option nat.
 
 (* we dont need new_i, only i and j *)
 Definition lock : Type := index * index.
@@ -316,7 +317,7 @@ Inductive tm : Type :=
 
   (* def id -> def body -> *)
   | REC_DEF : idef -> tm -> tm
-  | REC_CALL : idef -> tm
+  | REC_CALL : irec -> tm
   .
 
 Declare Custom Entry tm.
@@ -650,18 +651,26 @@ Fixpoint unfold (new:rec_def) (old:tm) : tm :=
 
   | SEQ l r => SEQ l (unfold new r)
 
-  | REC_DEF i b =>
+  | REC_DEF other_idef b =>
     match new with
-    | (j, b') => if Nat.eqb i j
-                 then unfold (i, b) b
-                 else REC_DEF i (unfold new b)
+    | (new_idef, b') => 
+      if Nat.eqb (fst new_idef) (fst other_idef)
+        then unfold (new_idef, b) b (* overwrite and continue *)
+        else REC_DEF new_idef (unfold new b)
     end
 
   | REC_CALL i =>
     match new with
-    | (j, b) => if Nat.eqb i j
-                then REC_DEF j b
-                else REC_CALL i
+    | (new_idef, b) => 
+      if Nat.eqb (fst new_idef) i
+        then (* unfold *)
+          match (snd new_idef) with 
+          | None => REC_DEF new_idef b (* forever *)
+          | Some 0 => OK               (* stop unfolding *)
+          | Some counter =>            (* unfold, dec counter *)
+            REC_DEF (fst new_idef, Some (counter - 1)) b 
+          end
+        else REC_CALL i  (* ignore, for some other def *)
     end
 
   end.
@@ -812,76 +821,52 @@ Inductive lts_transitive_closure : sys * resource -> Prop :=
 
 Import Expr.
 
-Example AcquireInner : tm :=
+Example AcquireInnerBody : tm :=
   SEQ (ACT READ_LOCKED) (
     IF (VAR LOCKED) (REC_CALL 2) (OK)
   ).
+
+Example AcquireInnerDef : idef := (2, None).
+Example AcquireInnerLoop : tm := REC_DEF (AcquireInnerDef) (AcquireInnerBody).
 
 Example Acquire : tm :=
   SEQ (ACT (WRITE_NEXT THE_PID NIL)) (
     SEQ (ACT FETCH_AND_STORE) (
       IF (EQ (VAR PREDECESSOR) (VAL NIL)) (OK) (
         SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (
-          SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (
-            REC_DEF 2 (AcquireInner)
-          )
+          SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (AcquireInnerLoop)
         )
       )
     )
   ).
 
-Example ReleaseInner : tm :=
+Example ReleaseInnerBody : tm :=
   SEQ (ACT READ_NEXT) (
     IF (EQ (VAL NIL) (VAR NEXT))
       (REC_CALL 1)
       (ACT (WRITE_LOCKED NEXT (BOOL true)))
   ).
 
+Example ReleaseInnerDef : idef := (1, None).
+Example ReleaseInnerLoop : tm := REC_DEF (ReleaseInnerDef) (ReleaseInnerBody).
+
 Example Release : tm :=
   SEQ (ACT READ_NEXT) (
     IF (EQ (VAL NIL) (VAR NEXT)) (
       SEQ (ACT COMPARE_AND_SWAP) (
-        IF (EQ FLS (VAR SWAP)) (
-            REC_DEF 1 (ReleaseInner)
-        ) (OK)
+        IF (EQ FLS (VAR SWAP)) (ReleaseInnerLoop) (OK)
       )
     ) (ACT (WRITE_LOCKED NEXT (BOOL false)))
   ).
 
+Example PMainLoopDef : idef := (0, None).
 Example P : tm :=
-  REC_DEF 0 (
+  REC_DEF (PMainLoopDef) (
     (* SEQ (ACT NCS) ( *)
       SEQ Acquire (
         SEQ (ACT ENTER) (
           SEQ (ACT LEAVE) (
             SEQ Release (REC_CALL 0)
-            (* SEQ Release (OK) *)
-            (* SEQ Release (
-              SEQ Acquire (
-                SEQ (ACT ENTER) (
-                  SEQ (ACT LEAVE) (
-                    SEQ Release (
-                      SEQ Acquire (
-                        SEQ (ACT ENTER) (
-                          SEQ (ACT LEAVE) (
-                            (* SEQ Release (OK) *)
-                            SEQ Release (
-                              SEQ Acquire (
-                                SEQ (ACT ENTER) (
-                                  SEQ (ACT LEAVE) (
-                                    SEQ Release (OK)
-                                  )
-                                )
-                              )
-                            )
-                          )
-                        )
-                      )
-                    )
-                  )
-                )
-              )
-            ) *)
           )
         )
       )
@@ -923,12 +908,12 @@ Example g2 : sys * resource := compose (create 2 P).
 (**** Example: Glued CADP ************************************************)
 (*************************************************************************)
 
-Definition do_acquire_inner (i:idef) (c:tm) (s:state) (r:resource)
+Definition do_acquire_inner (c:tm) (s:state) (r:resource)
   : sys * resource
   :=
   let e : env := (s, r) in
   (* REC_DEF 2 *)
-  let t : tm := unfold (i, AcquireInner) AcquireInner in
+  let t : tm := unfold (AcquireInnerDef, AcquireInnerBody) AcquireInnerBody in
   (* ACT READ_LOCKED *)
   match read_locked e with
   | None => (PRC ERR
@@ -985,7 +970,7 @@ Definition do_acquire (c:tm) (s:state) (r:resource)
                           "do_acquire, write_next PREDECESSOR (GET THE_PID) failed" None) (get_state e)),
                     (get_resource e))
           | Some e =>
-            (PRC (SEQ (REC_DEF 2 (AcquireInner)) c) (get_state e)
+            (PRC (SEQ (AcquireInnerLoop) c) (get_state e)
             , get_resource e
             )
           end
@@ -995,12 +980,12 @@ Definition do_acquire (c:tm) (s:state) (r:resource)
   end
   .
 
-Definition do_release_inner (i:idef) (c:tm) (s:state) (r:resource)
+Definition do_release_inner (c:tm) (s:state) (r:resource)
   : sys * resource
   :=
   let e : env := (s, r) in
   (* REC_DEF 1 *)
-  let t : tm := unfold (i, ReleaseInner) ReleaseInner in
+  let t : tm := unfold (ReleaseInnerDef, ReleaseInnerBody) ReleaseInnerBody in
   (* ACT READ_NEXT *)
   match read_next e with
   | None => (PRC ERR
@@ -1049,7 +1034,7 @@ Definition do_release (c:tm) (s:state) (r:resource)
         (* IF (EQ FLS (VAR SWAP)) *)
         match (get_local_var_value SWAP (get_state e)) with
         | BOOL false =>
-          (PRC (SEQ (REC_DEF 1 (ReleaseInner)) c) (get_state e)
+          (PRC (SEQ (ReleaseInnerLoop) c) (get_state e)
           , get_resource e)
         | _ => (* OK *) (PRC c (get_state e), get_resource e)
         end
@@ -1069,6 +1054,13 @@ Definition do_release (c:tm) (s:state) (r:resource)
   end
   .
 
+Definition do_main_loop (b:tm) (s:state) (r:resource)
+  : sys * resource
+  :=
+  (* REC_DEF 0 *)
+  (PRC (unfold (PMainLoopDef, b) b) s, r)
+  .
+
 Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 (*  0 *)
 | DO_ACQUIRE : forall c s r,
@@ -1083,16 +1075,16 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
           (do_release c s r)
 
 (*  2 *)
-| DO_ACQUIRE_INNER : forall i c s r,
-  bigstep (PRC (SEQ (REC_DEF i AcquireInner) c) s, r)
+| DO_ACQUIRE_INNER : forall c s r,
+  bigstep (PRC (SEQ (AcquireInnerLoop) c) s, r)
           SILENT
-          (do_acquire_inner i c s r)
+          (do_acquire_inner c s r)
 
 (*  3 *)
-| DO_RELEASE_INNER : forall i c s r,
-  bigstep (PRC (SEQ (REC_DEF i ReleaseInner) c) s, r)
+| DO_RELEASE_INNER : forall c s r,
+  bigstep (PRC (SEQ (ReleaseInnerLoop) c) s, r)
           SILENT
-          (do_release_inner i c s r)
+          (do_release_inner c s r)
 
 (*  4 *)
 | DO_SEQ_ACT_ENTER : forall y s r,
@@ -1108,9 +1100,12 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
   bigstep (PRC (SEQ OK y) s, r) a (PRC y s, r)
 
 (*  7 *)
-| DO_REC_DEF : forall x b a u s1 r1 s2 r2,
+| DO_MAIN_LOOP : forall b a s r,
+  bigstep (PRC (REC_DEF PMainLoopDef b) s, r) a (do_main_loop b s r)
+
+(* | DO_REC_DEF : forall x b a u s1 r1 s2 r2,
   lts (PRC (REC_DEF x b) s1, r1) a (PRC u s2, r2) ->
-  bigstep (PRC (REC_DEF x b) s1, r1) a (PRC u s2, r2)
+  bigstep (PRC (REC_DEF x b) s1, r1) a (PRC u s2, r2) *)
 
 (*  8 *)
 | DO_PAR_L : forall a l1 l2 r gr1 gr2,
@@ -1133,6 +1128,7 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 .
 
 MeBi Dump "g1" LTS Bounded 16384 Of g1 Using bigstep lts step.
+(* MeBi Dump "g2" LTS Bounded 16384 Of g2 Using bigstep lts step. *)
 
 Example gTest1 : sys * resource :=
   (
@@ -1166,7 +1162,6 @@ Example gTest3 : sys * resource :=
 (* MeBi Dump "gTest3" LTS Bounded 16384 Of gTest3 Using bigstep lts step. *)
 
 
-(* MeBi Dump "g2" LTS Bounded 16384 Of g2 Using bigstep lts step. *)
 (* MeBi Show LTS Bounded 16384 Of g2 Using bigstep lts step. *)
 
 (*

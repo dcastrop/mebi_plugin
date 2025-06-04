@@ -1,6 +1,7 @@
 val split_at : int -> 'a list -> 'a list -> 'a list * 'a list
 val strip_snd : ('a * 'a) list -> 'a list
 val is_unit_option : unit option -> bool
+val default_opt : 'a -> 'a option -> 'a
 
 type model_info =
   { is_complete : bool

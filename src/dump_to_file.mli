@@ -29,58 +29,186 @@ val build_filepath
 
 val create_parent_dir : string -> unit
 
-module JSON : sig
-  val clean : string -> string
-  val quoted : string -> string
+type dumpable_kind = LTS of Lts.lts
+type json_action_name = string
+type json_action_silent = bool
+type json_action_annotations = json_action_name list
 
-  type col_kind =
-    | List of string list
-    | Dict of string list
+module JSON_Alphabet : sig
+  type elt = json_action_name * (json_action_silent * json_action_annotations)
+  type t
 
-  val handle_list_sep : string option -> string
-  val handle_dict_sep : string option -> string
-
-  val col
-    :  ?prefix:string
-    -> ?sep:string
-    -> ?tlindent:string
-    -> col_kind
-    -> string
-
-  val key_val : ?prefix:string -> string -> string -> string
-  val model_info : Utils.model_info option -> string
-
-  module LTS : sig
-    val initial : string option -> string
-    val states : Lts.States.t -> string
-    val transition : Lts.transition -> string
-    val transitions : Lts.Transitions.t -> string
-    val lts : string -> Lts.lts -> string
-  end
-
-  module FSM : sig
-    val state : Fsm.state -> string
-    val annotation : Fsm.annotation -> string
-    val annotations : Fsm.annotations -> string
-    val action : Fsm.action -> string
-    val alphabet : Fsm.Alphabet.t -> string
-    val states : ?key:string -> Fsm.States.t -> string
-    val edge : Fsm.state -> Fsm.action -> Fsm.States.t -> string
-    val edges : Fsm.States.t Fsm.Actions.t Fsm.Edges.t -> string
-    val initial : Fsm.state option -> string
-    val fsm : string -> Fsm.fsm -> string
-  end
+  val empty : t
+  val add : elt -> t -> t
+  val singleton : elt -> t
+  val remove : elt -> t -> t
+  val union : t -> t -> t
+  val inter : t -> t -> t
+  val disjoint : t -> t -> json_action_silent
+  val diff : t -> t -> t
+  val cardinal : t -> int
+  val elements : t -> elt list
+  val min_elt : t -> elt
+  val min_elt_opt : t -> elt option
+  val max_elt : t -> elt
+  val max_elt_opt : t -> elt option
+  val choose : t -> elt
+  val choose_opt : t -> elt option
+  val find : elt -> t -> elt
+  val find_opt : elt -> t -> elt option
+  val find_first : (elt -> json_action_silent) -> t -> elt
+  val find_first_opt : (elt -> json_action_silent) -> t -> elt option
+  val find_last : (elt -> json_action_silent) -> t -> elt
+  val find_last_opt : (elt -> json_action_silent) -> t -> elt option
+  val iter : (elt -> unit) -> t -> unit
+  val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+  val map : (elt -> elt) -> t -> t
+  val filter : (elt -> json_action_silent) -> t -> t
+  val filter_map : (elt -> elt option) -> t -> t
+  val partition : (elt -> json_action_silent) -> t -> t * t
+  val split : elt -> t -> t * json_action_silent * t
+  val is_empty : t -> json_action_silent
+  val mem : elt -> t -> json_action_silent
+  val equal : t -> t -> json_action_silent
+  val compare : t -> t -> int
+  val subset : t -> t -> json_action_silent
+  val for_all : (elt -> json_action_silent) -> t -> json_action_silent
+  val exists : (elt -> json_action_silent) -> t -> json_action_silent
+  val to_list : t -> elt list
+  val of_list : elt list -> t
+  val to_seq_from : elt -> t -> elt Seq.t
+  val to_seq : t -> elt Seq.t
+  val to_rev_seq : t -> elt Seq.t
+  val add_seq : elt Seq.t -> t -> t
+  val of_seq : elt Seq.t -> t
 end
 
-type dumpable_kind =
-  | LTS of Lts.lts
-  | FSM of Fsm.fsm
+type json_state_name = json_action_name
+type json_state_info = json_state_name
 
-val handle_filecontents
-  :  string
-  -> filetype_kind
-  -> dumpable_kind
-  -> string * bool option
+module JSON_States : sig
+  type elt = json_state_info * json_state_info
+  type t
+
+  val empty : t
+  val add : elt -> t -> t
+  val singleton : elt -> t
+  val remove : elt -> t -> t
+  val union : t -> t -> t
+  val inter : t -> t -> t
+  val disjoint : t -> t -> json_action_silent
+  val diff : t -> t -> t
+  val cardinal : t -> int
+  val elements : t -> elt list
+  val min_elt : t -> elt
+  val min_elt_opt : t -> elt option
+  val max_elt : t -> elt
+  val max_elt_opt : t -> elt option
+  val choose : t -> elt
+  val choose_opt : t -> elt option
+  val find : elt -> t -> elt
+  val find_opt : elt -> t -> elt option
+  val find_first : (elt -> json_action_silent) -> t -> elt
+  val find_first_opt : (elt -> json_action_silent) -> t -> elt option
+  val find_last : (elt -> json_action_silent) -> t -> elt
+  val find_last_opt : (elt -> json_action_silent) -> t -> elt option
+  val iter : (elt -> unit) -> t -> unit
+  val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+  val map : (elt -> elt) -> t -> t
+  val filter : (elt -> json_action_silent) -> t -> t
+  val filter_map : (elt -> elt option) -> t -> t
+  val partition : (elt -> json_action_silent) -> t -> t * t
+  val split : elt -> t -> t * json_action_silent * t
+  val is_empty : t -> json_action_silent
+  val mem : elt -> t -> json_action_silent
+  val equal : t -> t -> json_action_silent
+  val compare : t -> t -> int
+  val subset : t -> t -> json_action_silent
+  val for_all : (elt -> json_action_silent) -> t -> json_action_silent
+  val exists : (elt -> json_action_silent) -> t -> json_action_silent
+  val to_list : t -> elt list
+  val of_list : elt list -> t
+  val to_seq_from : elt -> t -> elt Seq.t
+  val to_seq : t -> elt Seq.t
+  val to_rev_seq : t -> elt Seq.t
+  val add_seq : elt Seq.t -> t -> t
+  val of_seq : elt Seq.t -> t
+end
+
+module JSON_Edges : sig
+  type elt =
+    (json_state_info * json_state_info) * (json_state_info * json_state_info)
+
+  type t
+
+  val empty : t
+  val add : elt -> t -> t
+  val singleton : elt -> t
+  val remove : elt -> t -> t
+  val union : t -> t -> t
+  val inter : t -> t -> t
+  val disjoint : t -> t -> json_action_silent
+  val diff : t -> t -> t
+  val cardinal : t -> int
+  val elements : t -> elt list
+  val min_elt : t -> elt
+  val min_elt_opt : t -> elt option
+  val max_elt : t -> elt
+  val max_elt_opt : t -> elt option
+  val choose : t -> elt
+  val choose_opt : t -> elt option
+  val find : elt -> t -> elt
+  val find_opt : elt -> t -> elt option
+  val find_first : (elt -> json_action_silent) -> t -> elt
+  val find_first_opt : (elt -> json_action_silent) -> t -> elt option
+  val find_last : (elt -> json_action_silent) -> t -> elt
+  val find_last_opt : (elt -> json_action_silent) -> t -> elt option
+  val iter : (elt -> unit) -> t -> unit
+  val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+  val map : (elt -> elt) -> t -> t
+  val filter : (elt -> json_action_silent) -> t -> t
+  val filter_map : (elt -> elt option) -> t -> t
+  val partition : (elt -> json_action_silent) -> t -> t * t
+  val split : elt -> t -> t * json_action_silent * t
+  val is_empty : t -> json_action_silent
+  val mem : elt -> t -> json_action_silent
+  val equal : t -> t -> json_action_silent
+  val compare : t -> t -> int
+  val subset : t -> t -> json_action_silent
+  val for_all : (elt -> json_action_silent) -> t -> json_action_silent
+  val exists : (elt -> json_action_silent) -> t -> json_action_silent
+  val to_list : t -> elt list
+  val of_list : elt list -> t
+  val to_seq_from : elt -> t -> elt Seq.t
+  val to_seq : t -> elt Seq.t
+  val to_rev_seq : t -> elt Seq.t
+  val add_seq : elt Seq.t -> t -> t
+  val of_seq : elt Seq.t -> t
+end
+
+type model_info =
+  { name : json_state_info
+  ; kind : json_state_info
+  ; extra : Utils.model_info option
+  }
+
+type json_model =
+  { info : model_info
+  ; alphabet : JSON_Alphabet.t
+  ; initial_state : json_state_info
+  ; state_list : JSON_States.t
+  ; edge_list : JSON_Edges.t
+  }
+
+val string_opt : string option -> string
+val is_model_complete : json_model -> bool option
+val to_json_model : string -> dumpable_kind -> json_model
+val write_json_extra_to_file : out_channel -> Utils.model_info option -> unit
+val write_json_info_to_file : out_channel -> model_info -> unit
+val write_json_alphabet_to_file : out_channel -> JSON_Alphabet.t -> unit
+val write_json_states_to_file : out_channel -> JSON_States.t -> unit
+val write_json_edges_to_file : out_channel -> JSON_Edges.t -> unit
+val write_json_to_file : out_channel -> json_model -> unit
 
 val write_to_file
   :  output_dir_kind
