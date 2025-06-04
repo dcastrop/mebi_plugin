@@ -213,7 +213,7 @@ type json_model =
   }
 
 let string_opt (s : string option) : string =
-  match s with None -> "null" | Some s -> Printf.sprintf "\"%s\"" s
+  match s with None -> "null" | Some s -> Printf.sprintf "\"%s\"" (clean s)
 ;;
 
 let is_model_complete (m : json_model) : bool option =
@@ -317,7 +317,7 @@ let write_json_states_to_file (oc : out_channel) (i : JSON_States.t) : unit =
         Printf.fprintf oc "%s" (handle_if_first is_first);
         Printf.fprintf oc "\t\t{\n";
         Printf.fprintf oc "\t\t\t\"name\": \"%s\",\n" state_name;
-        Printf.fprintf oc "\t\t\t\"info\": %s\n" (clean state_info);
+        Printf.fprintf oc "\t\t\t\"info\": %s\n" state_info;
         Printf.fprintf oc "\t\t}")
       i;
     Printf.fprintf oc "\n\t]\n")

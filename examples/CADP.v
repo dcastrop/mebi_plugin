@@ -189,9 +189,12 @@ End Expr.
 (**** Debugging **********************************************************)
 (*************************************************************************)
 
+Record error_info := { expr_info : option (expr * option value)
+                     ; local_var_info : option (local_var * option value) }.
+
 Record error := { error_code : nat
                 ; error_msg  : string
-                ; info       : option (expr * option value)
+                ; info       : error_info
                 }.
 
 (*************************************************************************)
@@ -517,26 +520,26 @@ Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env
   | None =>
       (* Some (State.create 99, get_resource e) *)
       match get_local_var_value to_write s with
-      | INDEX None => Some (add_error (Build_error 91 "write_locked, to_write yielded INDEX None" None) s, get_resource e)
-      | INDEX _ => Some (add_error (Build_error 92 "write_locked, to_write yielded INDEX _" None) s, get_resource e)
-      | NIL => Some (add_error (Build_error 93 "write_locked, to_write yielded NIL" None) s, get_resource e)
-      | PID _ => Some (add_error (Build_error 94 "write_locked, to_write yielded PID _" None) s, get_resource e)
-      | BOOL _ => Some (add_error (Build_error 95 "write_locked, to_write yielded BOOL _" None) s, get_resource e)
+      | INDEX None => Some (add_error (Build_error 91 "write_locked, to_write yielded INDEX None" (Build_error_info None (Some (to_write, Some locked)))) s, get_resource e)
+      | INDEX _ => Some (add_error (Build_error 92 "write_locked, to_write yielded INDEX _" (Build_error_info None (Some (to_write, Some locked)))) s, get_resource e)
+      | NIL => Some (add_error (Build_error 93 "write_locked, to_write yielded NIL" (Build_error_info None (Some (to_write, Some locked)))) s, get_resource e)
+      | PID _ => Some (add_error (Build_error 94 "write_locked, to_write yielded PID _" (Build_error_info None (Some (to_write, Some locked)))) s, get_resource e)
+      | BOOL _ => Some (add_error (Build_error 95 "write_locked, to_write yielded BOOL _" (Build_error_info None (Some (to_write, Some locked)))) s, get_resource e)
       | _ => None (* [to_write] must be a [pid] *)
       end
   | Some p => (* get qnode *)
     let r:resource := get_resource e in
     let m:mem := get_mem r in
     match Memory.nth_error p m with
-    | None => Some (add_error (Build_error 96 "write_locked, qnode does not exist" None) s, get_resource e) (* [qnode] must exist *)
+    | None => Some (add_error (Build_error 96 "write_locked, qnode does not exist" (Build_error_info None (Some (to_write, Some locked)))) s, get_resource e) (* [qnode] must exist *)
     | Some q => (* check [locked] of [qnode] is a [BOOL] *)
       match locked with
       | BOOL b =>
         match Memory.nth_replace (Qnode.set_locked b q) p m with
-        | None => Some (add_error (Build_error 97 "write_locked, nth_replace failed" None) s, get_resource e)
+        | None => Some (add_error (Build_error 97 "write_locked, nth_replace failed" (Build_error_info None (Some (to_write, Some locked)))) s, get_resource e)
         | Some m => Some (s, (set_mem m r))
         end
-      | _ => Some (add_error (Build_error 98 "write_locked, locked value not bool" None) s, get_resource e) (* [locked] must be a [BOOL] *)
+      | _ => Some (add_error (Build_error 98 "write_locked, locked value not bool" (Build_error_info None (Some (to_write, Some locked)))) s, get_resource e) (* [locked] must be a [BOOL] *)
       end
     end
   end.
@@ -683,7 +686,7 @@ Definition take_branch (c:expr) (t1:tm) (t2:tm) (e:env) : tm * env :=
   match eval c (get_state e) with
   | Some (BOOL true) => (t1, e)
   | Some (BOOL false) => (t2, e)
-  | err_val => (ERR, ((add_error (Build_error 1 "conditional statement did not evaluate correctly" (Some (c, err_val))) (get_state e)), get_resource e))
+  | err_val => (ERR, ((add_error (Build_error 1 "conditional statement did not evaluate correctly" (Build_error_info (Some (c, err_val)) None)) (get_state e)), get_resource e))
   end.
 
 
@@ -918,7 +921,7 @@ Definition do_acquire_inner (c:tm) (s:state) (r:resource)
   match read_locked e with
   | None => (PRC ERR
                 (add_error (Build_error 40
-                  "do_acquire_inner, read_locked e failed" None) s),
+                  "do_acquire_inner, read_locked e failed" (Build_error_info None None)) s),
                 r)
   | Some e =>
     (* IF (VAR LOCKED) *)
@@ -927,7 +930,7 @@ Definition do_acquire_inner (c:tm) (s:state) (r:resource)
     | BOOL false => (PRC c (get_state e), get_resource e)
     | _ => (PRC ERR
                 (add_error (Build_error 41
-                  "do_acquire_inner, var locked not bool" None) (get_state e)),
+                  "do_acquire_inner, var locked not bool" (Build_error_info None None)) (get_state e)),
                 get_resource e)
     end
   end
@@ -942,14 +945,14 @@ Definition do_acquire (c:tm) (s:state) (r:resource)
   match write_next THE_PID NIL e with
   | None => (PRC ERR
                 (add_error (Build_error 50
-                  "do_acquire, write_next THE_PID NIL failed" None) s),
+                  "do_acquire, write_next THE_PID NIL failed" (Build_error_info None None)) s),
                 r)
   | Some e =>
     (* ACT FETCH_AND_STORE *)
     match fetch_and_store e with
     | None => (PRC ERR
                   (add_error (Build_error 51
-                    "do_acquire, fetch_and_store failed" None) (get_state e)),
+                    "do_acquire, fetch_and_store failed" (Build_error_info None None)) (get_state e)),
                   (get_resource e))
     | Some e =>
       (* IF (EQ (VAR PREDECESSOR) (VAL NIL)) *)
@@ -960,14 +963,14 @@ Definition do_acquire (c:tm) (s:state) (r:resource)
         match write_locked PREDECESSOR (BOOL true) e with
         | None => (PRC ERR
                       (add_error (Build_error 52
-                        "do_acquire, write_locked PREDECESSOR (BOOL true) failed" None) (get_state e)),
+                        "do_acquire, write_locked PREDECESSOR (BOOL true) failed" (Build_error_info None None)) (get_state e)),
                   (get_resource e))
         | Some e =>
           (* ACT (WRITE_NEXT PREDECESSOR (GET THE_PID)) *)
           match write_next PREDECESSOR (GET THE_PID) e with
           | None => (PRC ERR
                         (add_error (Build_error 53
-                          "do_acquire, write_next PREDECESSOR (GET THE_PID) failed" None) (get_state e)),
+                          "do_acquire, write_next PREDECESSOR (GET THE_PID) failed" (Build_error_info None None)) (get_state e)),
                     (get_resource e))
           | Some e =>
             (PRC (SEQ (AcquireInnerLoop) c) (get_state e)
@@ -990,18 +993,18 @@ Definition do_release_inner (c:tm) (s:state) (r:resource)
   match read_next e with
   | None => (PRC ERR
                 (add_error (Build_error 45
-                  "do_release_inner, read_next e failed" None) s),
+                  "do_release_inner, read_next e failed" (Build_error_info None None)) s),
                 r)
   | Some e =>
     (* IF (EQ (VAL NIL) (VAR NEXT)) *)
     match (get_local_var_value NEXT (get_state e)) with
     | NIL => (* REC_CALL 1 *) (PRC (SEQ t c) (get_state e), get_resource e)
     | _ =>
-      (* ACT (WRITE_LOCKED NEXT (BOOL false)) *)
+      (* ACT (WRITE_LOCKED NEXT (BOOL true)) *)
       match write_locked PREDECESSOR (BOOL true) e with
       | None => (PRC ERR
                     (add_error (Build_error 46
-                      "do_release_inner, write_locked PREDECESSOR (BOOL false) failed" None) (get_state e)),
+                      "do_release_inner, write_locked PREDECESSOR (BOOL false) failed" (Build_error_info None None)) (get_state e)),
                     (get_resource e))
       | Some e =>
         (PRC c (get_state e), get_resource e)
@@ -1018,7 +1021,7 @@ Definition do_release (c:tm) (s:state) (r:resource)
   match read_next e with
   | None => (PRC ERR
                 (add_error (Build_error 60
-                  "do_release, read_next e failed" None) s),
+                  "do_release, read_next e failed" (Build_error_info None None)) s),
                 r)
   | Some e =>
     (* IF (EQ (VAL NIL) (VAR NEXT)) *)
@@ -1028,7 +1031,7 @@ Definition do_release (c:tm) (s:state) (r:resource)
       match compare_and_swap e with
       | None => (PRC ERR
                     (add_error (Build_error 61
-                      "do_acquire, compare_and_swap failed" None) (get_state e)),
+                      "do_acquire, compare_and_swap failed" (Build_error_info None None)) (get_state e)),
                     (get_resource e))
       | Some e =>
         (* IF (EQ FLS (VAR SWAP)) *)
@@ -1042,10 +1045,10 @@ Definition do_release (c:tm) (s:state) (r:resource)
 
     | _ =>
       (* ACT (WRITE_LOCKED NEXT (BOOL false)) *)
-      match write_locked PREDECESSOR (BOOL true) e with
+      match write_locked PREDECESSOR (BOOL false) e with
       | None => (PRC ERR
                     (add_error (Build_error 61
-                      "do_release, write_locked PREDECESSOR (BOOL true) failed" None) (get_state e)),
+                      "do_release, write_locked PREDECESSOR (BOOL true) failed" (Build_error_info None None)) (get_state e)),
                     (get_resource e))
       | Some e =>
         (PRC c (get_state e), get_resource e)
@@ -1127,7 +1130,7 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 
 .
 
-MeBi Dump "g1" LTS Bounded 16384 Of g1 Using bigstep lts step.
+MeBi Dump "g1" LTS Bounded 10 Of g1 Using bigstep lts step.
 MeBi Dump "g2" LTS Bounded 16384 Of g2 Using bigstep lts step.
 
 Example gTest1 : sys * resource :=
