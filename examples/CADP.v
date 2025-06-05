@@ -1227,9 +1227,9 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
   bigstep (PRC (SEQ (ACT LEAVE) y) s, r) (LABEL (LEAVE, (get_pid s))) (PRC y s, r)
 
 (*  6 *)
-| DO_SEQ_OK : forall y a s r,
+(* | DO_SEQ_OK : forall y a s r,
   lts (PRC (SEQ OK y) s, r) a (PRC y s, r) ->
-  bigstep (PRC (SEQ OK y) s, r) a (PRC y s, r)
+  bigstep (PRC (SEQ OK y) s, r) a (PRC y s, r) *)
 
 (*  7 *)
 | DO_MAIN_LOOP : forall b s r,
@@ -1250,10 +1250,10 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
   bigstep (PAR l r1, gr1) a (PAR l r2, gr2)
 
 (* 10 *)
-| DO_OK_L : forall s r g, bigstep (PAR (PRC OK s) r, g) SILENT (r, g)
+(* | DO_OK_L : forall s r g, bigstep (PAR (PRC OK s) r, g) SILENT (r, g) *)
 
 (* 11 *)
-| DO_OK_R : forall s l g, bigstep (PAR l (PRC OK s), g) SILENT (l, g)
+(* | DO_OK_R : forall s l g, bigstep (PAR l (PRC OK s), g) SILENT (l, g) *)
 
 (* 12 *)
 
@@ -1320,6 +1320,7 @@ Example g2 : sys * resource := compose (create 2 P).
 (* MeBi Dump "g2" LTS Bounded 24000 Of g2 Using bigstep lts step. *)
 (* MeBi Dump "g2" LTS Bounded 32768 Of g2 Using bigstep lts step. *)
 (* MeBi Dump "g2" LTS Bounded 65538 Of g2 Using bigstep lts step. *)
+(* MeBi Dump "g2" LTS Bounded 100000 Of g2 Using bigstep lts step. *)
 
 
 
