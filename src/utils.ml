@@ -1,11 +1,13 @@
-(** [split_at i l acc] is a tuple containing two lists [(l', acc)] split from list [l] at index [i]. *)
+(** [split_at i l acc] is a tuple containing two lists [(l', acc)] split from list [l] at index [i].
+*)
 let rec split_at i l acc =
   if i <= 0
   then l, acc
   else (match l with [] -> acc, [] | h :: t -> split_at (i - 1) t (h :: acc))
 ;;
 
-(** [strip_snd l] is the list of rhs elements in a list of tuples [l] (typically a [constr]). *)
+(** [strip_snd l] is the list of rhs elements in a list of tuples [l] (typically a [constr]).
+*)
 let rec strip_snd (l : ('a * 'a) list) : 'a list =
   match l with [] -> [] | h :: t -> snd h :: strip_snd t
 ;;
@@ -14,7 +16,12 @@ let is_unit_option (override : unit option) : bool =
   match override with None -> false | Some () -> true
 ;;
 
-(** used to store info on if a model is complete or the number of bounds required *)
+let default_opt (default : 'a) (opt : 'a option) : 'a =
+  match opt with None -> default | Some o -> o
+;;
+
+(** used to store info on if a model is complete or the number of bounds required
+*)
 type model_info =
   { is_complete : bool
   ; bound : int
@@ -82,7 +89,8 @@ module Logging = struct
       - [mode] determines if the print occurs via [Printf.printf] for [OCaml] or for [Coq], via [Feedback.msg_info] or similar.
       - [kind] specifies the nature of the message to be printed.
       - [options] specifies how different kinds of messages should be shown, in general.
-      - [override] specifies that the output should be shown, regardless of [kind], ignoring [options]. *)
+      - [override] specifies that the output should be shown, regardless of [kind], ignoring [options].
+  *)
   type params =
     { mode : output_modes
     ; mutable kind : output_kind
@@ -251,9 +259,9 @@ module Formatting = struct
     }
 
   let default_params
-    ?(params : Logging.params option)
-    ?(mode : Logging.output_modes = OCaml ())
-    ()
+        ?(params : Logging.params option)
+        ?(mode : Logging.output_modes = OCaml ())
+        ()
     : params
     =
     let params' =
@@ -326,7 +334,8 @@ let print ?(show : bool = false) (to_print : string) : unit =
   match show with true -> Printf.printf "%s" to_print | false -> ()
 ;;
 
-(** [default_indent_val] is the default number of spaces to use perindent in [to_string]. *)
+(** [default_indent_val] is the default number of spaces to use perindent in [to_string].
+*)
 let default_indent_val = 2
 
 (** [str_tabs ?size n] is [n] number of [?size]d spaces. *)
@@ -340,7 +349,8 @@ let rec str_tabs ?(size : int = default_indent_val) (n : int) : string =
   else ""
 ;;
 
-(** [get_key_of_val tbl v] is a reverse-lookup in [tbl] for the key of value [v]. *)
+(** [get_key_of_val tbl v] is a reverse-lookup in [tbl] for the key of value [v].
+*)
 let get_key_of_val (tbl : ('a, 'b) Hashtbl.t) (v : 'b) : 'a option =
   match
     List.find_opt
@@ -351,7 +361,8 @@ let get_key_of_val (tbl : ('a, 'b) Hashtbl.t) (v : 'b) : 'a option =
   | Some (key, _value) -> Some key
 ;;
 
-(** [new_int_counter] returns a function that when called, will return the value of a counter and then increment it by 1, starting from 0. *)
+(** [new_int_counter] returns a function that when called, will return the value of a counter and then increment it by 1, starting from 0.
+*)
 let new_int_counter ?(start : int = 0) () : unit -> int =
   let id_counter : int ref = ref start in
   let get_and_incr_counter () : int =

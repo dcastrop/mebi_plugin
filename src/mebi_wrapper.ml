@@ -212,10 +212,10 @@ let product (x : 'a mm) (y : 'b mm) : ('a * 'b) mm =
 
 (** Monadic for loop *)
 let rec iterate
-  (from_idx : int)
-  (to_idx : int)
-  (acc : 'a)
-  (f : int -> 'a -> 'a mm)
+          (from_idx : int)
+          (to_idx : int)
+          (acc : 'a)
+          (f : int -> 'a -> 'a mm)
   : 'a mm
   =
   if from_idx > to_idx
@@ -424,8 +424,8 @@ let get_bck_enc (st : wrapper ref) : term B.t in_context =
 ;;
 
 let state
-  (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-  (st : wrapper ref)
+      (f : Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+      (st : wrapper ref)
   : 'a in_context
   =
   let coq_st = !st.coq_ref in
