@@ -1186,6 +1186,7 @@ Definition do_release (c:tm) (s:state) (r:resource)
   end
   .
 
+  (* TODO: merge main_loop with acquire *)
 Definition do_main_loop (b:tm) (s:state) (r:resource)
   : sys * resource
   :=
@@ -1233,7 +1234,7 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 
 (*  7 *)
 | DO_MAIN_LOOP : forall b s r,
-  bigstep (PRC (REC_DEF PMainLoopDef b) s, r) SILENT (do_main_loop b s r)
+  bigstep (PRC (REC_DEF PMainLoopDef (SEQ Acquire b)) s, r) SILENT (do_main_loop b s r)
 
 (* | DO_REC_DEF : forall x b a u s1 r1 s2 r2,
   lts (PRC (REC_DEF x b) s1, r1) a (PRC u s2, r2) ->
