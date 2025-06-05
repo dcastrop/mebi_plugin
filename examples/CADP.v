@@ -23,8 +23,10 @@ Definition pid   : Type  := nat.
 Definition index : Type  := option pid.
 Definition Nil   : index := None.
 
-(* recursive definition identifier *)
+(* recursive definition identifier and optional iteration limit *)
 Definition idef : Type := nat.
+(* Definition irec : Type := nat. *)
+(* Definition idef : Type := irec * option nat. *)
 
 (* we dont need new_i, only i and j *)
 Definition lock : Type := index * index.
@@ -64,6 +66,12 @@ Record qnode :=
 Module Qnode.
   Definition initial : qnode := Build_qnode Nil false.
 
+  Fixpoint create (n:nat) : list qnode :=
+    match n with
+    | 0    => []
+    | S m => app (create m) [Qnode.initial]
+    end.
+
   Definition get_next   (q:qnode) : index := next q.
   Definition get_locked (q:qnode) : bool  := locked q.
 
@@ -79,31 +87,48 @@ End Qnode.
 (**** mem (Memory) Type ***********)
 (**********************************)
 
-Definition mem : Type := list qnode.
-
-Fixpoint mem_create (n:nat) : mem :=
-  match n with
-  | 0    => []
-  | S n' => app (mem_create n') [Qnode.initial]
-  end.
+Record mem :=
+  { mem_next : index
+  ; mem_locked : bool
+  ; qnodes : list qnode
+  }.
 
 Module Memory.
-  Definition initial  (n:nat) : mem := mem_create n.
+  Definition create (n:nat) : mem := Build_mem Nil false (Qnode.create n).
 
-  Definition nth_error (i:nat) (m:mem) : option qnode := nth_error m i.
+  Definition get_mem_next   (m:mem) : index := mem_next m.
+  Definition get_mem_locked (m:mem) : bool  := mem_locked m.
+  Definition get_mem_qnodes (m:mem) : list qnode  := qnodes m.
 
-  Definition nth_default (d:qnode) (i:nat) (m:mem) : qnode := nth_default d m i.
+  Definition set_mem_next   (i:index) (m:mem) : mem :=
+    Build_mem i (get_mem_locked m) (get_mem_qnodes m).
 
-  Fixpoint nth_replace (r:qnode) (i:nat) (m:mem) : option mem :=
-    match i, m with
+  Definition set_mem_locked (b:bool)  (m:mem) : mem :=
+    Build_mem (get_mem_next m) b (get_mem_qnodes m).
+
+  Definition nth_error (i:nat) (m:mem)
+  : option qnode := nth_error (qnodes m) i.
+
+  Definition nth_default (d:qnode) (i:nat) (m:mem)
+  : qnode := nth_default d (qnodes m) i.
+
+  Fixpoint qnodes_nth_replace (r:qnode) (i:nat) (qs:list qnode)
+  : option (list qnode) :=
+    match i, qs with
     | 0, [] => None
     | 0, h :: t => Some (r :: t)
     | S n, [] => None
     | S n, h :: t =>
-      match nth_replace r n m with
+      match qnodes_nth_replace r n qs with
       | None => None
       | Some t' => Some (h :: t')
       end
+    end.
+
+  Definition nth_replace (r:qnode) (i:nat) (m:mem) : option mem :=
+    match (qnodes_nth_replace r i (qnodes m)) with
+    | None => None
+    | Some qs => Some (Build_mem (mem_next m) (mem_locked m) qs)
     end.
 
 End Memory.
@@ -188,9 +213,12 @@ End Expr.
 (**** Debugging **********************************************************)
 (*************************************************************************)
 
+Record error_info := { expr_info : option (expr * option (list value))
+                     ; local_var_info : (option local_var * option value) }.
+
 Record error := { error_code : nat
                 ; error_msg  : string
-                ; info       : option (expr * option value)
+                ; info       : error_info
                 }.
 
 (*************************************************************************)
@@ -199,7 +227,7 @@ Record error := { error_code : nat
 Definition resource : Type := mem * lock.
 
 Module Resource.
-  Definition initial (n:nat) : resource := (Memory.initial n, Lock.initial).
+  Definition initial (n:nat) : resource := (Memory.create n, Lock.initial).
 End Resource.
 
 Definition get_mem (r:resource) : mem :=
@@ -334,52 +362,79 @@ Local Open Scope tm_scope.
 (**** Evaluate Expressions  **********************************************)
 (*************************************************************************)
 
-Fixpoint eval (e:expr) (s:state) : option value :=
+Fixpoint eval (e:expr) (s:state) : (option value) * (option (list value)) :=
   match e with
 
-  | VAL v => Some v
+  | VAL (GET THE_PID) => (Some (PID (get_pid s)), None)
+  | VAL v => (Some v, None)
 
-  | TRU => Some (BOOL true)
-  | FLS => Some (BOOL false)
+  | TRU => (Some (BOOL true), None)
+  | FLS => (Some (BOOL false), None)
 
-  | VAR v => Some (get_local_var_value v s)
+  | VAR v => (Some (get_local_var_value v s), None)
 
   | NOT b =>
     match eval b s with
-    | Some (BOOL b) => Some (BOOL (negb b))
-    | _ => None
+    | (Some (BOOL b), errs) => (Some (BOOL (negb b)), errs)
+    | (_, errs) => (None, errs)
     end
 
   | EQ a b =>
     match eval a s, eval b s with
-    | Some (NAT a),
-      Some (NAT b)   => Some (BOOL (Nat.eqb a b))
+    | (Some (NAT a), None),
+      (Some (NAT b), None)   => (Some (BOOL (Nat.eqb a b)), None)
 
-    | Some (INDEX a),
-      Some (INDEX b) => Some (BOOL (Index.eqb a b))
+    | (Some (INDEX a), None),
+      (Some (INDEX b), None) => (Some (BOOL (Index.eqb a b)), None)
 
-    | Some (PID a),
-      Some (PID b)   => Some (BOOL (Nat.eqb a b))
+    | (Some (PID a), None),
+      (Some (PID b), None)   => (Some (BOOL (Nat.eqb a b)), None)
 
-    | Some (BOOL a),
-      Some (BOOL b)  => Some (BOOL (eqb a b))
+    | (Some (BOOL a), None),
+      (Some (BOOL b), None)  => (Some (BOOL (eqb a b)), None)
 
-    | Some NIL, Some NIL => Some (BOOL true)
+    | (Some NIL, None), (Some NIL, None) => (Some (BOOL true), None)
 
     (* always propagate a None (i.e., an error) *)
-    | Some NIL, None => None
-    | None, Some NIL => None
+    | (Some NIL, None), (None, None) => (None, None)
+    | (None, None), (Some NIL, None) => (None, None)
 
     (* NOT NIL if other side isn't NIL and isn't None *)
-    | Some NIL, _ => Some (BOOL true)
-    | _, Some NIL => Some (BOOL true)
+    | (Some NIL, None), (_, None) => (Some (BOOL false), None)
+    | (_, None), (Some NIL, None) => (Some (BOOL false), None)
 
+    (* if PID vs INDEX *)
+    | (Some (PID a), None),
+      (Some (INDEX b), None) =>
+                              (Some (BOOL (Index.eqb (Index.of_pid a) b)), None)
+
+    | (Some (INDEX a), None),
+      (Some (PID b), None) =>
+                              (Some (BOOL (Index.eqb a (Index.of_pid b))), None)
 
     (* error has occurred *)
-    | _, _ => None
+    | a, b =>
+      let errs1:list value :=
+        match a with
+        | (Some a, Some errs) => a :: errs
+        | (Some a, None) => [a]
+        | (None, Some errs) => errs
+        | (None, None) => []
+        end in
+      let errs2:list value :=
+        match b with
+        | (Some b, Some errs) => b :: errs
+        | (Some b, None) => [b]
+        | (None, Some errs) => errs
+        | (None, None) => []
+        end in
+      (None, Some (app errs1 errs2))
     end
 
   end.
+
+(* Compute (eval (EQ (VAR PREDECESSOR) (VAL (GET THE_PID))) ((0, {| var_predecessor := Some 1; var_locked := false; var_next := None; var_swap := false |}, None))). *)
+
 
 (* Compute (eval (VAL (BOOL true)) State.initial). *)
 (* Compute (eval (VAL (BOOL false)) State.initial). *)
@@ -388,10 +443,10 @@ Fixpoint eval (e:expr) (s:state) : option value :=
 (* Compute (eval (VAR PREDECESSOR) State.initial). *)
 
 
-Definition handle_value (v:value) (s:state) : option value :=
+Definition handle_value (v:value) (s:state) : option value * option (list value) :=
   match v with
   | GET n => eval (VAR n) s
-  | _ => Some v
+  | _ => (Some v, None)
   end.
 
 (*************************************************************************)
@@ -422,9 +477,9 @@ Definition set_resource (r:resource) (e:env) : env :=
 (**** (Local) Semantics of Processes *************************************)
 (*************************************************************************)
 
-(** [read_next e] will set var [next] to be the value
-    currently of the [qnode.next] corresponding to the
-    [pid] of the process in the state. *)
+(** [read_next e] will set [mem_next] and local var [next] to be the value
+    currently of the [qnode.next] corresponding to the [pid] of the process
+    in the state *)
 Definition read_next (e:env) : option env :=
   (* get pid *)
   let s:state := get_state e in
@@ -436,15 +491,17 @@ Definition read_next (e:env) : option env :=
   | None => None (* tried to access out of bounds *)
   | Some q => (* get next of qnode *)
     let qnode_next:index := Qnode.get_next q in
-    (* get local vars *)
-    let v:local_vars := get_vars s in
+    (* update local vars *)
+    let v:local_vars := set_next qnode_next (get_vars s) in
+    (* update mem_next *)
+    let m:mem := Memory.set_mem_next qnode_next m in
     (* update env *)
-    Some (set_vars (set_next qnode_next v) s, r)
+    Some (set_vars v s, set_mem m r)
   end.
 
-(** [read_locked e] will set var [locked] to be
-    the value of the [qnode.locked] corresponding
-    to the [pid] of the process in the state. *)
+(** [read_locked e] will set [mem_locked] and local var [locked] to be the value
+    currently of the [qnode.locked] corresponding to the [pid] of the process
+    in the state *)
 Definition read_locked (e:env) : option env :=
   (* get pid *)
   let s:state := get_state e in
@@ -456,10 +513,12 @@ Definition read_locked (e:env) : option env :=
   | None => None (* tried to access out of bounds *)
   | Some q => (* get locked of qnode *)
     let qnode_locked:bool := Qnode.get_locked q in
-    (* get local vars *)
-    let v:local_vars := get_vars s in
+    (* update local vars *)
+    let v:local_vars := set_locked qnode_locked (get_vars s) in
+    (* update mem_locked *)
+    let m:mem := Memory.set_mem_locked qnode_locked m in
     (* update env *)
-    Some (set_vars (set_locked qnode_locked v) s, r)
+    Some (set_vars v s, set_mem m r)
   end.
 
 (** [write_next to_write next e] will set the
@@ -469,8 +528,9 @@ Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
   let s:state := get_state e in
   (* get value of [next] *)
   match handle_value next s with
-  | None => None (* [next=GET v] and [v] could not be resolved *)
-  | Some next =>
+  | (_, Some errs) => Some (add_error (Build_error 89 "write_next, value of NEXT failed" (Build_error_info None (None, Some next))) s, get_resource e)
+  | (None, None) => None (* [next=GET v] and [v] could not be resolved *)
+  | (Some next, None) =>
     (* get pid from [to_write] *)
     let p:option pid := (* should be index of pid, not None *)
     match get_local_var_value to_write s with
@@ -516,26 +576,26 @@ Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env
   | None =>
       (* Some (State.create 99, get_resource e) *)
       match get_local_var_value to_write s with
-      | INDEX None => Some (add_error (Build_error 91 "write_locked, to_write yielded INDEX None" None) s, get_resource e)
-      | INDEX _ => Some (add_error (Build_error 92 "write_locked, to_write yielded INDEX _" None) s, get_resource e)
-      | NIL => Some (add_error (Build_error 93 "write_locked, to_write yielded NIL" None) s, get_resource e)
-      | PID _ => Some (add_error (Build_error 94 "write_locked, to_write yielded PID _" None) s, get_resource e)
-      | BOOL _ => Some (add_error (Build_error 95 "write_locked, to_write yielded BOOL _" None) s, get_resource e)
+      | INDEX None => Some (add_error (Build_error 91 "write_locked, to_write yielded INDEX None" (Build_error_info None (Some to_write, Some locked))) s, get_resource e)
+      | INDEX _ => Some (add_error (Build_error 92 "write_locked, to_write yielded INDEX _" (Build_error_info None (Some to_write, Some locked))) s, get_resource e)
+      | NIL => Some (add_error (Build_error 93 "write_locked, to_write yielded NIL" (Build_error_info None (Some to_write, Some locked))) s, get_resource e)
+      | PID _ => Some (add_error (Build_error 94 "write_locked, to_write yielded PID _" (Build_error_info None (Some to_write, Some locked))) s, get_resource e)
+      | BOOL _ => Some (add_error (Build_error 95 "write_locked, to_write yielded BOOL _" (Build_error_info None (Some to_write, Some locked))) s, get_resource e)
       | _ => None (* [to_write] must be a [pid] *)
       end
   | Some p => (* get qnode *)
     let r:resource := get_resource e in
     let m:mem := get_mem r in
     match Memory.nth_error p m with
-    | None => Some (add_error (Build_error 96 "write_locked, qnode does not exist" None) s, get_resource e) (* [qnode] must exist *)
+    | None => Some (add_error (Build_error 96 "write_locked, qnode does not exist" (Build_error_info None (Some to_write, Some locked))) s, get_resource e) (* [qnode] must exist *)
     | Some q => (* check [locked] of [qnode] is a [BOOL] *)
       match locked with
       | BOOL b =>
         match Memory.nth_replace (Qnode.set_locked b q) p m with
-        | None => Some (add_error (Build_error 97 "write_locked, nth_replace failed" None) s, get_resource e)
+        | None => Some (add_error (Build_error 97 "write_locked, nth_replace failed" (Build_error_info None (Some to_write, Some locked))) s, get_resource e)
         | Some m => Some (s, (set_mem m r))
         end
-      | _ => Some (add_error (Build_error 98 "write_locked, locked value not bool" None) s, get_resource e) (* [locked] must be a [BOOL] *)
+      | _ => Some (add_error (Build_error 98 "write_locked, locked value not bool" (Build_error_info None (Some to_write, Some locked))) s, get_resource e) (* [locked] must be a [BOOL] *)
       end
     end
   end.
@@ -650,18 +710,20 @@ Fixpoint unfold (new:rec_def) (old:tm) : tm :=
 
   | SEQ l r => SEQ l (unfold new r)
 
-  | REC_DEF i b =>
+  | REC_DEF other_idef b =>
     match new with
-    | (j, b') => if Nat.eqb i j
-                 then unfold (i, b) b
-                 else REC_DEF i (unfold new b)
+    | (new_idef, b') =>
+      if Nat.eqb new_idef other_idef
+        then unfold (new_idef, b) b (* overwrite and continue *)
+        else REC_DEF new_idef (unfold new b)
     end
 
   | REC_CALL i =>
     match new with
-    | (j, b) => if Nat.eqb i j
-                then REC_DEF j b
-                else REC_CALL i
+    | (new_idef, b) =>
+      if Nat.eqb new_idef i
+        then (* unfold *) REC_DEF new_idef b
+        else REC_CALL i  (* ignore, for some other def *)
     end
 
   end.
@@ -672,9 +734,16 @@ Fixpoint unfold (new:rec_def) (old:tm) : tm :=
 
 Definition take_branch (c:expr) (t1:tm) (t2:tm) (e:env) : tm * env :=
   match eval c (get_state e) with
-  | Some (BOOL true) => (t1, e)
-  | Some (BOOL false) => (t2, e)
-  | err_val => (ERR, ((add_error (Build_error 1 "conditional statement did not evaluate correctly" (Some (c, err_val))) (get_state e)), get_resource e))
+  | (Some (BOOL true), None) => (t1, e)
+  | (Some (BOOL false), None) => (t2, e)
+  (* error occurred *)
+  | (Some other, None) => (ERR, ((add_error (Build_error 1 "conditional statement evaluated to non-bool type" (Build_error_info (Some (c, Some [other])) (None, None))) (get_state e)), get_resource e))
+
+  | (Some other, Some errs) => (ERR, ((add_error (Build_error 2 "conditional statement evaluated to non-bool type with caused error" (Build_error_info (Some (c, Some (other :: errs))) (None, None))) (get_state e)), get_resource e))
+
+  | (None, None) => (ERR, ((add_error (Build_error 3 "conditional statement could not be evaluated" (Build_error_info (Some (c, None)) (None, None))) (get_state e)), get_resource e))
+
+  | (None, Some errs) => (ERR, ((add_error (Build_error 4 "conditional statement could not be evaluated with error" (Build_error_info (Some (c, Some (errs))) (None, None))) (get_state e)), get_resource e))
   end.
 
 
@@ -726,9 +795,9 @@ Inductive lts : sys * resource -> action -> sys * resource -> Prop :=
   (r1, gr1) ==<{a}>==> (r2, gr2) ->
   (PAR l r1, gr1) ==<{a}>==> (PAR l r2, gr2)
 
-| LTS_OK_L : forall s r g, (PAR (PRC OK s) r, g) ==<{SILENT}>==> (r, g)
+(* | LTS_OK_L : forall s r g, (PAR (PRC OK s) r, g) ==<{SILENT}>==> (r, g) *)
 
-| LTS_OK_R : forall l s g, (PAR l (PRC OK s), g) ==<{SILENT}>==> (l, g)
+(* | LTS_OK_R : forall l s g, (PAR l (PRC OK s), g) ==<{SILENT}>==> (l, g) *)
 
 where "t '==<{' a '}>==>' t'" := (lts t a t')
 and "y '--<{' a '}>-->' y'" := (step y a y').
@@ -807,81 +876,143 @@ Inductive lts_transitive_closure : sys * resource -> Prop :=
 .
 
 (*************************************************************************)
+(**** Tests: Lock ********************************************************)
+(*************************************************************************)
+
+(*************************)
+(**** FETCH_AND_STORE ****)
+(*************************)
+
+Example Lock_FaS_1 : sys * resource :=
+  compose (create 2 (
+      REC_DEF 0 (
+        SEQ (ACT FETCH_AND_STORE) (
+          (* end when value in fetch-and-store is our own PID *)
+          IF (EQ (VAR PREDECESSOR) (VAL (GET THE_PID))) (OK) (REC_CALL 0)
+        )
+      )
+  )).
+(* MeBi Dump "Lock_FaS_1" LTS Bounded 16384 Of Lock_FaS_1 Using lts step. *)
+
+Example Lock_FaS_2 : sys * resource :=
+  compose (create 2 (
+      REC_DEF 0 (
+        SEQ (ACT FETCH_AND_STORE) (
+          (* only fetch-and-store once PID has stopped being your own PID *)
+          IF (EQ (VAR PREDECESSOR) (VAL (GET THE_PID))) (
+            (* busy wait for fetch-and-store to not be your own PID*)
+            REC_DEF 1 (
+              SEQ (ACT FETCH_AND_STORE) (
+                IF (EQ (VAR PREDECESSOR) (VAL (GET THE_PID)))
+                  (REC_CALL 1)
+                  (REC_CALL 0)
+              )
+            )
+          ) (REC_CALL 0)
+        )
+      )
+  )).
+(* MeBi Dump "Lock_FaS_2" LTS Bounded 16384 Of Lock_FaS_2 Using lts step. *)
+
+(*******************************************)
+(**** FETCH_AND_STORE & COMPARE_AND_SWAP ***)
+(*******************************************)
+
+Example Lock_CaS_1 : sys * resource :=
+  compose (create 2 (
+      REC_DEF 0 (
+        SEQ (ACT COMPARE_AND_SWAP) (
+          (* end if value already in fetch-and-store is our own PID *)
+          IF (EQ (VAR PREDECESSOR) (VAL (GET THE_PID))) (OK) (
+            SEQ (ACT FETCH_AND_STORE) (
+              (* if swap then lock [i] contained our own PID, end *)
+              IF (VAR SWAP) (OK) (REC_CALL 0)
+            )
+          )
+        )
+      )
+  )).
+(* MeBi Dump "Lock_CaS_1" LTS Bounded 16384 Of Lock_CaS_1 Using lts step. *)
+
+(* Example Lock_CaS_2 : sys * resource :=
+  compose (create 2 (
+      REC_DEF 0 (
+        SEQ (ACT COMPARE_AND_SWAP) (
+          (* end if value already in fetch-and-store is our own PID *)
+          IF (EQ (VAR PREDECESSOR) (VAL (GET THE_PID))) (OK) (
+            SEQ (ACT FETCH_AND_STORE) (
+              (* if swap then lock [i] contained our own PID, end *)
+              IF (VAR SWAP) (OK) (REC_CALL 0)
+            )
+          )
+        )
+      )
+  )).
+MeBi Dump "Lock_CaS_2" LTS Bounded 16384 Of Lock_CaS_2 Using lts step. *)
+
+(*************************************************************************)
+(**** Tests: Memory ******************************************************)
+(*************************************************************************)
+
+(* Example Mem_Rn_a : tm := *)
+
+
+(* Example Mem_Rn_a1 : sys * resource := compose (create 1 Mem_Rn_a).
+MeBi Dump "Mem_Rn_a1" LTS Bounded 16384 Of Mem_Rn_a1 Using lts step. *)
+
+
+(*************************************************************************)
 (**** Example: Full CADP *************************************************)
 (*************************************************************************)
 
 Import Expr.
 
-Example AcquireInner : tm :=
+Example AcquireInnerDef : idef := 2.
+Example AcquireInnerBody : tm :=
   SEQ (ACT READ_LOCKED) (
-    IF (VAR LOCKED) (REC_CALL 2) (OK)
+    IF (VAR LOCKED) (REC_CALL (AcquireInnerDef)) (OK)
   ).
+
+Example AcquireInnerLoop : tm := REC_DEF (AcquireInnerDef) (AcquireInnerBody).
 
 Example Acquire : tm :=
   SEQ (ACT (WRITE_NEXT THE_PID NIL)) (
     SEQ (ACT FETCH_AND_STORE) (
       IF (EQ (VAR PREDECESSOR) (VAL NIL)) (OK) (
-        SEQ (ACT (WRITE_LOCKED PREDECESSOR (BOOL true))) (
-          SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (
-            REC_DEF 2 (AcquireInner)
-          )
+        SEQ (ACT (WRITE_LOCKED THE_PID (BOOL true))) (
+          SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (AcquireInnerLoop)
         )
       )
     )
   ).
 
-Example ReleaseInner : tm :=
+Example ReleaseInnerDef : idef := 1.
+Example ReleaseInnerBody : tm :=
   SEQ (ACT READ_NEXT) (
     IF (EQ (VAL NIL) (VAR NEXT))
-      (REC_CALL 1)
-      (ACT (WRITE_LOCKED NEXT (BOOL true)))
+      (REC_CALL (ReleaseInnerDef))
+      (ACT (WRITE_LOCKED NEXT (BOOL false)))
   ).
+
+Example ReleaseInnerLoop : tm := REC_DEF (ReleaseInnerDef) (ReleaseInnerBody).
 
 Example Release : tm :=
   SEQ (ACT READ_NEXT) (
     IF (EQ (VAL NIL) (VAR NEXT)) (
       SEQ (ACT COMPARE_AND_SWAP) (
-        IF (EQ FLS (VAR SWAP)) (
-            REC_DEF 1 (ReleaseInner)
-        ) (OK)
+        IF (EQ FLS (VAR SWAP)) (ReleaseInnerLoop) (OK)
       )
     ) (ACT (WRITE_LOCKED NEXT (BOOL false)))
   ).
 
+Example PMainLoopDef : idef := 0.
 Example P : tm :=
-  REC_DEF 0 (
+  REC_DEF (PMainLoopDef) (
     (* SEQ (ACT NCS) ( *)
       SEQ Acquire (
         SEQ (ACT ENTER) (
           SEQ (ACT LEAVE) (
-            SEQ Release (REC_CALL 0)
-            (* SEQ Release (OK) *)
-            (* SEQ Release (
-              SEQ Acquire (
-                SEQ (ACT ENTER) (
-                  SEQ (ACT LEAVE) (
-                    SEQ Release (
-                      SEQ Acquire (
-                        SEQ (ACT ENTER) (
-                          SEQ (ACT LEAVE) (
-                            (* SEQ Release (OK) *)
-                            SEQ Release (
-                              SEQ Acquire (
-                                SEQ (ACT ENTER) (
-                                  SEQ (ACT LEAVE) (
-                                    SEQ Release (OK)
-                                  )
-                                )
-                              )
-                            )
-                          )
-                        )
-                      )
-                    )
-                  )
-                )
-              )
-            ) *)
+            SEQ Release (REC_CALL (PMainLoopDef))
           )
         )
       )
@@ -890,7 +1021,7 @@ Example P : tm :=
   .
 
 (*************************************************************************)
-(**** Instances of P *****************************************************)
+(**** Instance of P ******************************************************)
 (*************************************************************************)
 
 (***************************)
@@ -904,36 +1035,22 @@ MeBi Dump "p0" LTS Bounded 37 Of p0 Using step.
 (* MeBi Dump "p0" Minim Bounded 37 Of p0 Using step. *)
 
 
-(***************************)
-(**** System size: 1 *******)
-(***************************)
-Example g1 : sys * resource := compose (create 1 P).
-(* MeBi Show LTS Bounded 37 Of g1 Using lts step. *)
-(* MeBi Dump "g1" LTS Bounded 37 Of g1 Using lts step. *)
-
-(***************************)
-(**** System size: 2 *******)
-(***************************)
-Example g2 : sys * resource := compose (create 2 P).
-(* Compute g2. *)
-(* MeBi Dump "g2" LTS Bounded 5000 Of g2 Using lts step. *)
-
 
 (*************************************************************************)
 (**** Example: Glued CADP ************************************************)
 (*************************************************************************)
 
-Definition do_acquire_inner (i:idef) (c:tm) (s:state) (r:resource)
+Definition do_acquire_inner (c:tm) (s:state) (r:resource)
   : sys * resource
   :=
   let e : env := (s, r) in
   (* REC_DEF 2 *)
-  let t : tm := unfold (i, AcquireInner) AcquireInner in
+  let t : tm := unfold (AcquireInnerDef, AcquireInnerBody) AcquireInnerBody in
   (* ACT READ_LOCKED *)
   match read_locked e with
   | None => (PRC ERR
                 (add_error (Build_error 40
-                  "do_acquire_inner, read_locked e failed" None) s),
+                  "do_acquire_inner, read_locked e failed" (Build_error_info None (None, None))) s),
                 r)
   | Some e =>
     (* IF (VAR LOCKED) *)
@@ -942,7 +1059,7 @@ Definition do_acquire_inner (i:idef) (c:tm) (s:state) (r:resource)
     | BOOL false => (PRC c (get_state e), get_resource e)
     | _ => (PRC ERR
                 (add_error (Build_error 41
-                  "do_acquire_inner, var locked not bool" None) (get_state e)),
+                  "do_acquire_inner, var locked not bool" (Build_error_info None (None, None))) (get_state e)),
                 get_resource e)
     end
   end
@@ -957,35 +1074,35 @@ Definition do_acquire (c:tm) (s:state) (r:resource)
   match write_next THE_PID NIL e with
   | None => (PRC ERR
                 (add_error (Build_error 50
-                  "do_acquire, write_next THE_PID NIL failed" None) s),
+                  "do_acquire, write_next THE_PID NIL failed" (Build_error_info None (None, None))) s),
                 r)
   | Some e =>
     (* ACT FETCH_AND_STORE *)
     match fetch_and_store e with
     | None => (PRC ERR
                   (add_error (Build_error 51
-                    "do_acquire, fetch_and_store failed" None) (get_state e)),
+                    "do_acquire, fetch_and_store failed" (Build_error_info None (None, None))) (get_state e)),
                   (get_resource e))
     | Some e =>
       (* IF (EQ (VAR PREDECESSOR) (VAL NIL)) *)
       match (get_local_var_value PREDECESSOR (get_state e)) with
       | NIL => (* OK *) (PRC c (get_state e), get_resource e)
       | _ =>
-        (* ACT (WRITE_LOCKED PREDECESSOR (BOOL true)) *)
-        match write_locked PREDECESSOR (BOOL true) e with
+        (* ACT (WRITE_LOCKED THE_PID (BOOL true)) *)
+        match write_locked THE_PID (BOOL true) e with
         | None => (PRC ERR
                       (add_error (Build_error 52
-                        "do_acquire, write_locked PREDECESSOR (BOOL true) failed" None) (get_state e)),
+                        "do_acquire, write_locked THE_PID (BOOL true) failed" (Build_error_info None (None, None))) (get_state e)),
                   (get_resource e))
         | Some e =>
           (* ACT (WRITE_NEXT PREDECESSOR (GET THE_PID)) *)
           match write_next PREDECESSOR (GET THE_PID) e with
           | None => (PRC ERR
                         (add_error (Build_error 53
-                          "do_acquire, write_next PREDECESSOR (GET THE_PID) failed" None) (get_state e)),
+                          "do_acquire, write_next PREDECESSOR (GET THE_PID) failed" (Build_error_info None (None, None))) (get_state e)),
                     (get_resource e))
           | Some e =>
-            (PRC (SEQ (REC_DEF 2 (AcquireInner)) c) (get_state e)
+            (PRC (SEQ (AcquireInnerLoop) c) (get_state e)
             , get_resource e
             )
           end
@@ -995,17 +1112,17 @@ Definition do_acquire (c:tm) (s:state) (r:resource)
   end
   .
 
-Definition do_release_inner (i:idef) (c:tm) (s:state) (r:resource)
+Definition do_release_inner (c:tm) (s:state) (r:resource)
   : sys * resource
   :=
   let e : env := (s, r) in
   (* REC_DEF 1 *)
-  let t : tm := unfold (i, ReleaseInner) ReleaseInner in
+  let t : tm := unfold (ReleaseInnerDef, ReleaseInnerBody) ReleaseInnerBody in
   (* ACT READ_NEXT *)
   match read_next e with
   | None => (PRC ERR
                 (add_error (Build_error 45
-                  "do_release_inner, read_next e failed" None) s),
+                  "do_release_inner, read_next e failed" (Build_error_info None (None, None))) s),
                 r)
   | Some e =>
     (* IF (EQ (VAL NIL) (VAR NEXT)) *)
@@ -1013,10 +1130,10 @@ Definition do_release_inner (i:idef) (c:tm) (s:state) (r:resource)
     | NIL => (* REC_CALL 1 *) (PRC (SEQ t c) (get_state e), get_resource e)
     | _ =>
       (* ACT (WRITE_LOCKED NEXT (BOOL false)) *)
-      match write_locked PREDECESSOR (BOOL true) e with
+      match write_locked NEXT (BOOL false) e with
       | None => (PRC ERR
                     (add_error (Build_error 46
-                      "do_release_inner, write_locked PREDECESSOR (BOOL false) failed" None) (get_state e)),
+                      "do_release_inner, write_locked NEXT (BOOL false) failed" (Build_error_info None (None, None))) (get_state e)),
                     (get_resource e))
       | Some e =>
         (PRC c (get_state e), get_resource e)
@@ -1033,7 +1150,7 @@ Definition do_release (c:tm) (s:state) (r:resource)
   match read_next e with
   | None => (PRC ERR
                 (add_error (Build_error 60
-                  "do_release, read_next e failed" None) s),
+                  "do_release, read_next e failed" (Build_error_info None (None, None))) s),
                 r)
   | Some e =>
     (* IF (EQ (VAL NIL) (VAR NEXT)) *)
@@ -1043,13 +1160,13 @@ Definition do_release (c:tm) (s:state) (r:resource)
       match compare_and_swap e with
       | None => (PRC ERR
                     (add_error (Build_error 61
-                      "do_acquire, compare_and_swap failed" None) (get_state e)),
+                      "do_acquire, compare_and_swap failed" (Build_error_info None (None, None))) (get_state e)),
                     (get_resource e))
       | Some e =>
         (* IF (EQ FLS (VAR SWAP)) *)
         match (get_local_var_value SWAP (get_state e)) with
         | BOOL false =>
-          (PRC (SEQ (REC_DEF 1 (ReleaseInner)) c) (get_state e)
+          (PRC (SEQ (ReleaseInnerLoop) c) (get_state e)
           , get_resource e)
         | _ => (* OK *) (PRC c (get_state e), get_resource e)
         end
@@ -1057,16 +1174,23 @@ Definition do_release (c:tm) (s:state) (r:resource)
 
     | _ =>
       (* ACT (WRITE_LOCKED NEXT (BOOL false)) *)
-      match write_locked PREDECESSOR (BOOL true) e with
+      match write_locked NEXT (BOOL false) e with
       | None => (PRC ERR
                     (add_error (Build_error 61
-                      "do_release, write_locked PREDECESSOR (BOOL true) failed" None) (get_state e)),
+                      "do_release, write_locked NEXT (BOOL false) failed" (Build_error_info None (None, None))) (get_state e)),
                     (get_resource e))
       | Some e =>
         (PRC c (get_state e), get_resource e)
       end
     end
   end
+  .
+
+Definition do_main_loop (b:tm) (s:state) (r:resource)
+  : sys * resource
+  :=
+  (* REC_DEF 0 *)
+  (PRC (unfold (PMainLoopDef, b) b) s, r)
   .
 
 Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
@@ -1083,16 +1207,16 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
           (do_release c s r)
 
 (*  2 *)
-| DO_ACQUIRE_INNER : forall i c s r,
-  bigstep (PRC (SEQ (REC_DEF i AcquireInner) c) s, r)
+| DO_ACQUIRE_INNER : forall c s r,
+  bigstep (PRC (SEQ (AcquireInnerLoop) c) s, r)
           SILENT
-          (do_acquire_inner i c s r)
+          (do_acquire_inner c s r)
 
 (*  3 *)
-| DO_RELEASE_INNER : forall i c s r,
-  bigstep (PRC (SEQ (REC_DEF i ReleaseInner) c) s, r)
+| DO_RELEASE_INNER : forall c s r,
+  bigstep (PRC (SEQ (ReleaseInnerLoop) c) s, r)
           SILENT
-          (do_release_inner i c s r)
+          (do_release_inner c s r)
 
 (*  4 *)
 | DO_SEQ_ACT_ENTER : forall y s r,
@@ -1108,9 +1232,12 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
   bigstep (PRC (SEQ OK y) s, r) a (PRC y s, r)
 
 (*  7 *)
-| DO_REC_DEF : forall x b a u s1 r1 s2 r2,
+| DO_MAIN_LOOP : forall b s r,
+  bigstep (PRC (REC_DEF PMainLoopDef b) s, r) SILENT (do_main_loop b s r)
+
+(* | DO_REC_DEF : forall x b a u s1 r1 s2 r2,
   lts (PRC (REC_DEF x b) s1, r1) a (PRC u s2, r2) ->
-  bigstep (PRC (REC_DEF x b) s1, r1) a (PRC u s2, r2)
+  bigstep (PRC (REC_DEF x b) s1, r1) a (PRC u s2, r2) *)
 
 (*  8 *)
 | DO_PAR_L : forall a l1 l2 r gr1 gr2,
@@ -1132,14 +1259,84 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 
 .
 
-MeBi Dump "g1" LTS Bounded 16384 Of g1 Using bigstep lts step.
+
+(***************************)
+(**** System size: 1 *******)
+(***************************)
+Example g1 : sys * resource := compose (create 1 P).
+(* MeBi Dump "g1" LTS Bounded 37 Of g1 Using lts step. *)
+
+MeBi Dump "g1" LTS Bounded 10 Of g1 Using bigstep lts step.
+
+Example g1b : sys * resource :=
+  (PAR (PRC P (State.create 0)) (PRC OK (State.create 1))
+  , Resource.initial 2).
+(* MeBi Dump "g1b" LTS Bounded 16384 Of g1b Using bigstep lts step. *)
+
+Example g1c : sys * resource :=
+  (PAR (PRC P (State.create 0)) (PRC (SEQ OK OK) (State.create 1))
+  , Resource.initial 2).
+(* MeBi Dump "g1c" LTS Bounded 16384 Of g1c Using bigstep lts step. *)
+
+(**********************************)
+(**** System size: 2 (simplified) *)
+(**********************************)
+(* Example Q : tm :=
+  SEQ (
+    REC_DEF 3 (
+      SEQ (ACT READ_LOCKED) (
+        IF (VAR LOCKED) (REC_CALL 3) (ACT WRITE_LOCKED)
+      )
+    )
+  ) (
+
+  )
+  ). *)
+
+(* Example g2b : sys * resource :=
+  (PAR (PRC Q (State.create 0))
+       (PRC Q (State.create 1))
+  , Resource.initial 2). *)
+(* MeBi Dump "g2b" LTS Bounded 24000 Of g2b Using bigstep lts step. *)
+
+
+(* Example g2c : sys * resource :=
+  (PAR (PRC P (State.create 0))
+       (PRC Q (State.create 1))
+  , Resource.initial 2). *)
+(* MeBi Dump "g2c" LTS Bounded 24000 Of g2c Using bigstep lts step. *)
+
+
+
+(**********************************)
+(**** System size: 2 (identical) **)
+(**********************************)
+Example g2 : sys * resource := compose (create 2 P).
+(* MeBi Dump "g2" LTS Bounded 5000 Of g2 Using lts step. *)
+
+(* MeBi Dump "g2" LTS Bounded 1024 Of g2 Using bigstep lts step. *)
+(* MeBi Dump "g2" LTS Bounded 8192 Of g2 Using bigstep lts step. *)
+(* MeBi Dump "g2" LTS Bounded 16384 Of g2 Using bigstep lts step. *)
+(* MeBi Dump "g2" LTS Bounded 24000 Of g2 Using bigstep lts step. *)
+(* MeBi Dump "g2" LTS Bounded 32768 Of g2 Using bigstep lts step. *)
+(* MeBi Dump "g2" LTS Bounded 65538 Of g2 Using bigstep lts step. *)
+
+
+
+
+
+(***************************)
+(***************************)
+(***************************)
+(***************************)
+(***************************)
 
 Example gTest1 : sys * resource :=
   (
     (PRC P (State.create 0))
   , Resource.initial 1
   ).
-MeBi Dump "gTest1" LTS Bounded 16384 Of gTest1 Using bigstep lts step.
+(* MeBi Dump "gTest1" LTS Bounded 16384 Of gTest1 Using bigstep lts step. *)
 
 Example gTest2 : sys * resource :=
   (
@@ -1147,7 +1344,7 @@ Example gTest2 : sys * resource :=
         (PRC OK (State.create 1))
   , Resource.initial 2
   ).
-MeBi Dump "gTest2" LTS Bounded 16384 Of gTest2 Using bigstep lts step.
+(* MeBi Dump "gTest2" LTS Bounded 16384 Of gTest2 Using bigstep lts step. *)
 
 Example gTest2b : sys * resource :=
   (
@@ -1155,7 +1352,7 @@ Example gTest2b : sys * resource :=
         (PRC (SEQ OK OK) (State.create 1))
   , Resource.initial 2
   ).
-MeBi Dump "gTest2b" LTS Bounded 16384 Of gTest2b Using bigstep lts step.
+(* MeBi Dump "gTest2b" LTS Bounded 16384 Of gTest2b Using bigstep lts step. *)
 
 Example gTest3 : sys * resource :=
   (
@@ -1166,7 +1363,6 @@ Example gTest3 : sys * resource :=
 (* MeBi Dump "gTest3" LTS Bounded 16384 Of gTest3 Using bigstep lts step. *)
 
 
-(* MeBi Dump "g2" LTS Bounded 16384 Of g2 Using bigstep lts step. *)
 (* MeBi Show LTS Bounded 16384 Of g2 Using bigstep lts step. *)
 
 (*

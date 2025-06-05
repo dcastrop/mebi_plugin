@@ -1,5 +1,6 @@
 val perm : int
 val default_output_dir : string
+val clean : string -> string
 
 type output_dir_kind =
   | Default of unit
@@ -29,58 +30,47 @@ val build_filepath
 
 val create_parent_dir : string -> unit
 
-module JSON : sig
-  val clean : string -> string
-  val quoted : string -> string
+type dumpable_kind = LTS of Lts.lts
+type json_action_name = string
+type json_action_silent = bool
+type json_action_annotations = json_action_name list
 
-  type col_kind =
-    | List of string list
-    | Dict of string list
+type json_action =
+  json_action_name * (json_action_silent * json_action_annotations)
 
-  val handle_list_sep : string option -> string
-  val handle_dict_sep : string option -> string
+type json_state_name = json_action_name
+type json_state_info = json_state_name
+type json_state = json_state_info * json_state_info
+type json_edge_info = json_state_info
 
-  val col
-    :  ?prefix:string
-    -> ?sep:string
-    -> ?tlindent:string
-    -> col_kind
-    -> string
+type json_edge =
+  (json_edge_info * json_edge_info) * (json_edge_info * json_edge_info)
 
-  val key_val : ?prefix:string -> string -> string -> string
-  val model_info : Utils.model_info option -> string
+type model_info =
+  { name : json_edge_info
+  ; kind : json_edge_info
+  ; extra : Utils.model_info option
+  }
 
-  module LTS : sig
-    val initial : string option -> string
-    val states : Lts.States.t -> string
-    val transition : Lts.transition -> string
-    val transitions : Lts.Transitions.t -> string
-    val lts : string -> Lts.lts -> string
-  end
+type json_model =
+  { info : model_info
+  ; alphabet : json_action Queue.t
+  ; initial_state : json_action_name
+  ; state_list : json_state Queue.t
+  ; edge_list : json_edge Queue.t
+  }
 
-  module FSM : sig
-    val state : Fsm.state -> string
-    val annotation : Fsm.annotation -> string
-    val annotations : Fsm.annotations -> string
-    val action : Fsm.action -> string
-    val alphabet : Fsm.Alphabet.t -> string
-    val states : ?key:string -> Fsm.States.t -> string
-    val edge : Fsm.state -> Fsm.action -> Fsm.States.t -> string
-    val edges : Fsm.States.t Fsm.Actions.t Fsm.Edges.t -> string
-    val initial : Fsm.state option -> string
-    val fsm : string -> Fsm.fsm -> string
-  end
-end
-
-type dumpable_kind =
-  | LTS of Lts.lts
-  | FSM of Fsm.fsm
-
-val handle_filecontents
-  :  string
-  -> filetype_kind
-  -> dumpable_kind
-  -> string * bool option
+val string_opt : string option -> string
+val is_model_complete : json_model -> bool option
+val to_json_model : string -> dumpable_kind -> json_model
+val handle_if_first : bool ref -> string
+val write_json_extra_to_file : out_channel -> Utils.model_info option -> unit
+val write_json_info_to_file : out_channel -> model_info -> unit
+val write_json_alphabet_to_file : out_channel -> json_action Queue.t -> unit
+val write_xl_string_to_file : out_channel -> string -> unit
+val write_json_states_to_file : out_channel -> json_state Queue.t -> unit
+val write_json_edges_to_file : out_channel -> json_edge Queue.t -> unit
+val write_json_to_file : json_model -> string -> unit
 
 val write_to_file
   :  output_dir_kind
