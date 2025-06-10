@@ -1020,7 +1020,7 @@ Example P : tm :=
 (**** Single process *******)
 (***************************)
 Example p0 : tm * env := (P, Env.initial 1).
-(* MeBi Show LTS Bounded 33 Of p0 Using step. *)
+
 MeBi Dump "p0" LTS Bounded 33 Of p0 Using step.
 
 (* MeBi Dump "p0" FSM Bounded 150 Of p0 Using step. *)
@@ -1230,9 +1230,13 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 (**** System size: 1 *******)
 (***************************)
 Example g1 : sys * resource := compose (create 1 P).
-(* MeBi Dump "g1" LTS Bounded 37 Of g1 Using lts step. *)
+MeBi Dump "g1_noglue" LTS Bounded 37 Of g1 Using lts step.
 
 MeBi Dump "g1" LTS Bounded 5 Of g1 Using bigstep lts step.
+
+MeBi Dump "g1_LTS" LTS Bounded 5 Of g1 Using bigstep lts step.
+(* MeBi Dump "g1_FSM" FSM Bounded 5 Of g1 Using bigstep lts step. *)
+MeBi Show FSM Bounded 5 Of g1 Using bigstep lts step.
 
 
 (***************************)
@@ -1256,21 +1260,21 @@ MeBi Dump "g2" LTS Bounded 8192 Of g2 Using bigstep lts step.
 (* MeBi Dump "g2" LTS Bounded 100000 Of g2 Using bigstep lts step. *)
 
 Example g3 : sys * resource := compose (create 3 P).
-MeBi Dump "g3" LTS Bounded 8192 Of g3 Using bigstep lts step.
+(* MeBi Dump "g3" LTS Bounded 8192 Of g3 Using bigstep lts step. *)
 
 Example g4 : sys * resource := compose (create 4 P).
-MeBi Dump "g4" LTS Bounded 8192 Of g4 Using bigstep lts step.
+(* MeBi Dump "g4" LTS Bounded 8192 Of g4 Using bigstep lts step. *)
 
 Example g5 : sys * resource := compose (create 5 P).
-MeBi Dump "g5" LTS Bounded 8192 Of g5 Using bigstep lts step.
+(* MeBi Dump "g5" LTS Bounded 8192 Of g5 Using bigstep lts step. *)
 
 Example g6 : sys * resource := compose (create 6 P).
-MeBi Dump "g6" LTS Bounded 8192 Of g6 Using bigstep lts step.
+(* MeBi Dump "g6" LTS Bounded 8192 Of g6 Using bigstep lts step. *)
 
 
 
-Example g16 : sys * resource := compose (create 6 P).
-MeBi Dump "g16" LTS Bounded 8192 Of g16 Using bigstep lts step.
+Example g16 : sys * resource := compose (create 16 P).
+(* MeBi Dump "g16" LTS Bounded 8192 Of g16 Using bigstep lts step. *)
 
 
 (***************************)
