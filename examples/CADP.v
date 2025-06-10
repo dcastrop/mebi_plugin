@@ -115,11 +115,10 @@ Module Memory.
   Fixpoint qnodes_nth_replace (r:qnode) (i:nat) (qs:list qnode)
   : option (list qnode) :=
     match i, qs with
-    | 0, [] => None
+    | _, [] => None
     | 0, h :: t => Some (r :: t)
-    | S n, [] => None
     | S n, h :: t =>
-      match qnodes_nth_replace r n qs with
+      match qnodes_nth_replace r n t with
       | None => None
       | Some t' => Some (h :: t')
       end
@@ -1235,51 +1234,18 @@ Example g1 : sys * resource := compose (create 1 P).
 
 MeBi Dump "g1" LTS Bounded 5 Of g1 Using bigstep lts step.
 
-(* Example g1b : sys * resource :=
-  (PAR (PRC P (State.create 0)) (PRC OK (State.create 1))
-  , Resource.initial 2).
-MeBi Dump "g1b" LTS Bounded 16384 Of g1b Using bigstep lts step. *)
 
-(* Example g1c : sys * resource :=
-  (PAR (PRC P (State.create 0)) (PRC (SEQ OK OK) (State.create 1))
-  , Resource.initial 2).
-MeBi Dump "g1c" LTS Bounded 16384 Of g1c Using bigstep lts step. *)
+(***************************)
+(**** Bisimilar ? **********)
+(***************************)
 
-(**********************************)
-(**** System size: 2 (simplified) *)
-(**********************************)
-(* Example Q : tm :=
-  SEQ (
-    REC_DEF 3 (
-      SEQ (ACT READ_LOCKED) (
-        IF (VAR LOCKED) (REC_CALL 3) (ACT WRITE_LOCKED)
-      )
-    )
-  ) (
-
-  )
-  ). *)
-
-(* Example g2b : sys * resource :=
-  (PAR (PRC Q (State.create 0))
-       (PRC Q (State.create 1))
-  , Resource.initial 2). *)
-(* MeBi Dump "g2b" LTS Bounded 24000 Of g2b Using bigstep lts step. *)
-
-
-(* Example g2c : sys * resource :=
-  (PAR (PRC P (State.create 0))
-       (PRC Q (State.create 1))
-  , Resource.initial 2). *)
-(* MeBi Dump "g2c" LTS Bounded 24000 Of g2c Using bigstep lts step. *)
-
-
+(* MeBi Show Bisim Bounded 33 Of g1 *)
 
 (**********************************)
 (**** System size: 2 (identical) **)
 (**********************************)
 Example g2 : sys * resource := compose (create 2 P).
-(* MeBi Dump "g2" LTS Bounded 5000 Of g2 Using lts step. *)
+(* MeBi Dump "g2_noglue" LTS Bounded 5000 Of g2 Using lts step. *)
 
 (* MeBi Dump "g2" LTS Bounded 1024 Of g2 Using bigstep lts step. *)
 MeBi Dump "g2" LTS Bounded 8192 Of g2 Using bigstep lts step.
@@ -1302,6 +1268,9 @@ Example g6 : sys * resource := compose (create 6 P).
 MeBi Dump "g6" LTS Bounded 8192 Of g6 Using bigstep lts step.
 
 
+
+Example g16 : sys * resource := compose (create 6 P).
+MeBi Dump "g16" LTS Bounded 8192 Of g16 Using bigstep lts step.
 
 
 (***************************)
