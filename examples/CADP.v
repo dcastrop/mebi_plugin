@@ -28,13 +28,6 @@ Definition idef : Type := nat.
 (* Definition irec : Type := nat. *)
 (* Definition idef : Type := irec * option nat. *)
 
-(* we dont need new_i, only i and j *)
-Definition lock : Type := index * index.
-
-Module Lock.
-  Definition initial : lock := (None, None).
-End Lock.
-
 
 Module Index.
 
@@ -50,6 +43,13 @@ Module Index.
     end.
 
 End Index.
+
+(* we dont need new_i or j, only i*)
+Definition lock : Type := index.
+
+Module Lock.
+  Definition initial : lock := Index.initial.
+End Lock.
 
 (*************************************************************************)
 (**** Memory *************************************************************)
@@ -234,19 +234,13 @@ Definition get_mem (r:resource) : mem :=
   match r with | (m, _) => m end.
 
 Definition get_lock_i (r:resource) : index :=
-  match r with | (_, (i, _)) => i end.
-
-Definition get_lock_j (r:resource) : index :=
-  match r with | (_, (_, j)) => j end.
+  match r with | (_, i) => i end.
 
 Definition set_mem (new_m:mem) (r:resource) : resource :=
   match r with | (_, l) => (new_m, l) end.
 
 Definition set_lock_i (new_i:index) (r:resource) : resource :=
-  match r with | (m, (_, j)) => (m, (new_i, j)) end.
-
-Definition set_lock_j (new_j:index) (r:resource) : resource :=
-  match r with | (m, (i, _)) => (m, (i, new_j)) end.
+  match r with | (m, _) => (m, new_i) end.
 
 
 (*************************************************************************)
@@ -617,18 +611,17 @@ Definition fetch_and_store (e:env) : option env :=
   Some (s, r).
 
 (** if [i] and [j] of the lock of the global resource [e] are the same then sets local var [swap] to [true] and sets [i] to [NIL]. otherwise, sets local var [swap] to [false] and [i] and [j] are unchanged. *)
+(* if [i] of the global resource lock is the same as [pid], then set [i] to [NIL] and set [swap] to [true]. Otherwise, set [swap] to [false] and leave [i] unchanged. *)
 Definition compare_and_swap (e:env) : option env :=
   (* set [j] of lock (in global resource [e]) to [pid] *)
   let s:state := get_state e in
   let p:pid := get_pid s in
+  (* get [i] of lock in global resource [e] *)
   let r:resource := get_resource e in
-  let r:resource := set_lock_j (Index.of_pid p) r in
-  (* get [i] and [j] of lock in global resource [e] *)
   let i:index := get_lock_i r in
-  let j:index := get_lock_j r in
   (* if the same, then set [swap] to true and set [i] to [Nil], else false *)
   let v:local_vars := get_vars s in
-  match Index.eqb i j with
+  match Index.eqb i (Index.of_pid p) with
   | true =>
     (* set [swap] true *)
     let v:local_vars := set_swap true v in
@@ -1028,11 +1021,11 @@ Example P : tm :=
 (**** Single process *******)
 (***************************)
 Example p0 : tm * env := (P, Env.initial 1).
-(* MeBi Show LTS Bounded 37 Of p0 Using step. *)
-MeBi Dump "p0" LTS Bounded 37 Of p0 Using step.
+(* MeBi Show LTS Bounded 33 Of p0 Using step. *)
+MeBi Dump "p0" LTS Bounded 33 Of p0 Using step.
 
 (* MeBi Dump "p0" FSM Bounded 150 Of p0 Using step. *)
-(* MeBi Dump "p0" Minim Bounded 37 Of p0 Using step. *)
+(* MeBi Dump "p0" Minim Bounded 33 Of p0 Using step. *)
 
 
 
@@ -1070,6 +1063,8 @@ Definition do_acquire (c:tm) (s:state) (r:resource)
   : sys * resource
   :=
   let e : env := (s, r) in
+  (* REC_DEF 0 *)
+  let c:tm := unfold (PMainLoopDef, c) c in
   (* ACT (WRITE_NEXT THE_PID NIL) *)
   match write_next THE_PID NIL e with
   | None => (PRC ERR
@@ -1186,18 +1181,10 @@ Definition do_release (c:tm) (s:state) (r:resource)
   end
   .
 
-  (* TODO: merge main_loop with acquire *)
-Definition do_main_loop (b:tm) (s:state) (r:resource)
-  : sys * resource
-  :=
-  (* REC_DEF 0 *)
-  (PRC (unfold (PMainLoopDef, b) b) s, r)
-  .
-
 Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 (*  0 *)
 | DO_ACQUIRE : forall c s r,
-  bigstep (PRC (SEQ (Acquire) (c)) s, r)
+  bigstep (PRC (REC_DEF PMainLoopDef (SEQ Acquire c)) s, r)
           SILENT
           (do_acquire c s r)
 
@@ -1228,35 +1215,14 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
   bigstep (PRC (SEQ (ACT LEAVE) y) s, r) (LABEL (LEAVE, (get_pid s))) (PRC y s, r)
 
 (*  6 *)
-(* | DO_SEQ_OK : forall y a s r,
-  lts (PRC (SEQ OK y) s, r) a (PRC y s, r) ->
-  bigstep (PRC (SEQ OK y) s, r) a (PRC y s, r) *)
-
-(*  7 *)
-| DO_MAIN_LOOP : forall b s r,
-  bigstep (PRC (REC_DEF PMainLoopDef (SEQ Acquire b)) s, r) SILENT (do_main_loop b s r)
-
-(* | DO_REC_DEF : forall x b a u s1 r1 s2 r2,
-  lts (PRC (REC_DEF x b) s1, r1) a (PRC u s2, r2) ->
-  bigstep (PRC (REC_DEF x b) s1, r1) a (PRC u s2, r2) *)
-
-(*  8 *)
 | DO_PAR_L : forall a l1 l2 r gr1 gr2,
   bigstep (l1, gr1) a (l2, gr2) ->
   bigstep (PAR l1 r, gr1) a (PAR l2 r, gr2)
 
-(*  9 *)
+(*  7 *)
 | DO_PAR_R : forall a l r1 r2 gr1 gr2,
   bigstep (r1, gr1) a (r2, gr2) ->
   bigstep (PAR l r1, gr1) a (PAR l r2, gr2)
-
-(* 10 *)
-(* | DO_OK_L : forall s r g, bigstep (PAR (PRC OK s) r, g) SILENT (r, g) *)
-
-(* 11 *)
-(* | DO_OK_R : forall s l g, bigstep (PAR l (PRC OK s), g) SILENT (l, g) *)
-
-(* 12 *)
 
 .
 
@@ -1267,17 +1233,17 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 Example g1 : sys * resource := compose (create 1 P).
 (* MeBi Dump "g1" LTS Bounded 37 Of g1 Using lts step. *)
 
-MeBi Dump "g1" LTS Bounded 10 Of g1 Using bigstep lts step.
+MeBi Dump "g1" LTS Bounded 5 Of g1 Using bigstep lts step.
 
-Example g1b : sys * resource :=
+(* Example g1b : sys * resource :=
   (PAR (PRC P (State.create 0)) (PRC OK (State.create 1))
   , Resource.initial 2).
-(* MeBi Dump "g1b" LTS Bounded 16384 Of g1b Using bigstep lts step. *)
+MeBi Dump "g1b" LTS Bounded 16384 Of g1b Using bigstep lts step. *)
 
-Example g1c : sys * resource :=
+(* Example g1c : sys * resource :=
   (PAR (PRC P (State.create 0)) (PRC (SEQ OK OK) (State.create 1))
   , Resource.initial 2).
-(* MeBi Dump "g1c" LTS Bounded 16384 Of g1c Using bigstep lts step. *)
+MeBi Dump "g1c" LTS Bounded 16384 Of g1c Using bigstep lts step. *)
 
 (**********************************)
 (**** System size: 2 (simplified) *)
@@ -1316,13 +1282,24 @@ Example g2 : sys * resource := compose (create 2 P).
 (* MeBi Dump "g2" LTS Bounded 5000 Of g2 Using lts step. *)
 
 (* MeBi Dump "g2" LTS Bounded 1024 Of g2 Using bigstep lts step. *)
-(* MeBi Dump "g2" LTS Bounded 8192 Of g2 Using bigstep lts step. *)
+MeBi Dump "g2" LTS Bounded 8192 Of g2 Using bigstep lts step.
 (* MeBi Dump "g2" LTS Bounded 16384 Of g2 Using bigstep lts step. *)
 (* MeBi Dump "g2" LTS Bounded 24000 Of g2 Using bigstep lts step. *)
 (* MeBi Dump "g2" LTS Bounded 32768 Of g2 Using bigstep lts step. *)
 (* MeBi Dump "g2" LTS Bounded 65538 Of g2 Using bigstep lts step. *)
 (* MeBi Dump "g2" LTS Bounded 100000 Of g2 Using bigstep lts step. *)
 
+Example g3 : sys * resource := compose (create 3 P).
+MeBi Dump "g3" LTS Bounded 8192 Of g3 Using bigstep lts step.
+
+Example g4 : sys * resource := compose (create 4 P).
+MeBi Dump "g4" LTS Bounded 8192 Of g4 Using bigstep lts step.
+
+Example g5 : sys * resource := compose (create 5 P).
+MeBi Dump "g5" LTS Bounded 8192 Of g5 Using bigstep lts step.
+
+Example g6 : sys * resource := compose (create 6 P).
+MeBi Dump "g6" LTS Bounded 8192 Of g6 Using bigstep lts step.
 
 
 
