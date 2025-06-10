@@ -1,8 +1,14 @@
 (* open Fsm *)
 open Lts
 
-let perm : int = 0o777
+let dir_perm : int = 0o777
+let out_perm : int = 0o666
 let default_output_dir : string = "./_dumps/"
+
+let open_out_channel () = function
+  | filepath ->
+    open_out_gen [ Open_creat; Open_text; Open_append ] out_perm filepath
+;;
 
 (** removes all newlines, excess spaces from string, and makes " " safe *)
 let clean (s : string) : string =
@@ -127,7 +133,7 @@ let rec create_parent_dir (fn : string) =
   if not (Sys.file_exists parent_dir)
   then (
     create_parent_dir parent_dir;
-    Sys.mkdir parent_dir perm)
+    Sys.mkdir parent_dir dir_perm)
 ;;
 
 type dumpable_kind = LTS of Lts.lts
@@ -295,17 +301,18 @@ let write_json_alphabet_to_file (oc : out_channel) (i : json_action Queue.t)
 let write_xl_string_to_file (oc : out_channel) (xlstr : string) : unit =
   if String.length xlstr > 80
   then (
-    let _, smaller_strings =
+    let rem, smaller_strings =
       String.fold_left
         (fun (build_str, acc) s ->
           if List.length build_str > 80
           then (
-            Queue.push (String.of_seq (List.to_seq build_str)) acc;
+            Queue.push (String.of_seq (List.to_seq (List.rev build_str))) acc;
             [ s ], acc)
           else s :: build_str, acc)
         ([], Queue.create ())
         xlstr
     in
+    Queue.push (String.of_seq (List.to_seq (List.rev rem))) smaller_strings;
     let rec iterate (n : int) () : unit =
       match n with
       | 0 -> ()
@@ -371,18 +378,21 @@ let write_json_edges_to_file (oc : out_channel) (i : json_edge Queue.t) : unit =
 ;;
 
 let write_json_to_file (m : json_model) (filepath : string) : unit =
-  let oc = open_out filepath in
+  let oc = open_out_channel () filepath in
   Printf.fprintf (* open json *) oc "{\n";
   write_json_info_to_file oc m.info;
   close_out oc;
-  let oc = open_out filepath in
+  let oc = open_out_channel () filepath in
   write_json_alphabet_to_file oc m.alphabet;
   close_out oc;
-  let oc = open_out filepath in
+  let oc = open_out_channel () filepath in
   Printf.fprintf oc "\t\"initial_state\": %s,\n" m.initial_state;
   write_json_edges_to_file oc m.edge_list;
+  close_out oc;
+  let oc = open_out_channel () filepath in
   write_json_states_to_file oc m.state_list;
-  let oc = open_out filepath in
+  close_out oc;
+  let oc = open_out_channel () filepath in
   Printf.fprintf (* close json *) oc "}\n";
   close_out oc
 ;;
