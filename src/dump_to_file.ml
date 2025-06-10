@@ -68,50 +68,41 @@ let get_local_timestamp : string =
 type filename_kind =
   | Auto of unit
   | Just of string
-  | LTS of string
-  | FSM of string
 
 let get_name (f : filename_kind) : string =
-  match f with Auto () -> "unknown" | Just s -> s | LTS s -> s | FSM s -> s
+  match f with Auto () -> "unknown" | Just s -> s
 ;;
 
-let get_filename (f : filename_kind) (is_complete : bool option) : string =
+let get_filename ((n, f) : string * filename_kind) (is_complete_str : string)
+  : string
+  =
   match f with
-  | Auto () -> get_local_timestamp
+  | Auto () ->
+    Printf.sprintf "%s | %s | %s" get_local_timestamp n is_complete_str
   | Just s -> s
-  | LTS _ ->
-    Printf.sprintf
-      "%s | LTS | %s%s"
-      get_local_timestamp
-      (get_name f)
-      (match is_complete with
-       | None -> " | unknown if complete"
-       | Some b -> if b then " | complete" else " | incomplete")
-  | FSM _ ->
-    Printf.sprintf
-      "%s | FSM | %s%s"
-      get_local_timestamp
-      (get_name f)
-      (match is_complete with
-       | None -> " | unknown if complete"
-       | Some b -> if b then " | complete" else " | incomplete")
 ;;
 
 type filetype_kind = JSON of unit
 
 let build_filename
-  (filename : filename_kind)
+  (fnk : string * filename_kind)
   (filetype : filetype_kind)
   (is_complete : bool option)
   : string
   =
+  let is_complete_str =
+    match is_complete with
+    | None -> "unknown completeness"
+    | Some true -> "complete"
+    | Some false -> "incomplete"
+  in
   match filetype with
-  | JSON () -> Printf.sprintf "%s.json" (get_filename filename is_complete)
+  | JSON () -> Printf.sprintf "%s.json" (get_filename fnk is_complete_str)
 ;;
 
 let build_filepath
   (output_dir : output_dir_kind)
-  (filename : filename_kind)
+  (fnk : string * filename_kind)
   (filetype : filetype_kind)
   (is_complete : bool option)
   : string
@@ -120,11 +111,8 @@ let build_filepath
   | Default (), JSON () ->
     Filename.concat
       (Printf.sprintf "%sjson/" default_output_dir)
-      (build_filename filename filetype is_complete)
-  (* | Default (), _ -> Filename.concat default_output_dir (build_filename
-     filename filetype) *)
-  | Exact s, _ ->
-    Filename.concat s (build_filename filename filetype is_complete)
+      (build_filename fnk filetype is_complete)
+  | Exact s, _ -> Filename.concat s (build_filename fnk filetype is_complete)
 ;;
 
 (** https://discuss.ocaml.org/t/how-to-create-a-new-file-while-automatically-creating-any-intermediate-directories/14837/5 *)
@@ -136,7 +124,7 @@ let rec create_parent_dir (fn : string) =
     Sys.mkdir parent_dir dir_perm)
 ;;
 
-type dumpable_kind = LTS of Lts.lts
+(* type dumpable_kind = LTS of Lts.lts *)
 (* | FSM of Fsm.fsm *)
 
 (* let handle_filecontents (filename : string) (filetype : filetype_kind)
@@ -203,7 +191,9 @@ let is_model_complete (m : json_model) : bool option =
   match m.info.extra with None -> None | Some e -> Some e.is_complete
 ;;
 
-let to_json_model (filename : string) (model : dumpable_kind) : json_model =
+exception ResultKindNotImplemented of Vernac.result_kind
+
+let to_json_model (filename : string) (model : Vernac.result_kind) : json_model =
   match model with
   | LTS s ->
     let extra = s.info in
@@ -229,6 +219,7 @@ let to_json_model (filename : string) (model : dumpable_kind) : json_model =
         (Queue.create ())
     in
     { info; alphabet; initial_state; state_list; edge_list }
+  | _ -> raise (ResultKindNotImplemented model)
 ;;
 
 (* | FSM s, JSON () -> JSON.FSM.fsm filename s, Utils.is_complete s.info *)
@@ -399,16 +390,19 @@ let write_json_to_file (m : json_model) (filepath : string) : unit =
 
 let write_to_file
   (output_dir : output_dir_kind)
-  (filename : filename_kind)
+  (fnk : string option * filename_kind)
   (filetype : filetype_kind)
-  (model : dumpable_kind)
+  (result : Vernac.result_kind)
   : string
   =
+  let filename = match fst fnk with None -> "unknown" | Some n -> n in
   (* convert model to json *)
-  let json = to_json_model (get_name filename) model in
+  let json = to_json_model filename result in
   let is_complete = is_model_complete json in
   (* build filepath *)
-  let filepath = build_filepath output_dir filename filetype is_complete in
+  let filepath =
+    build_filepath output_dir (filename, snd fnk) filetype is_complete
+  in
   (* check parent directory exists *)
   create_parent_dir filepath;
   (* write to file *)

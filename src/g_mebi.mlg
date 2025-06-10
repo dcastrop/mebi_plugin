@@ -21,6 +21,109 @@ open Stdarg
 (* https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto1/src/g_tuto1.mlg *)
 (* https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto2/src/g_tuto2.mlg *)
 
+(* https://github.com/rocq-prover/rocq/blob/master/dev/doc/parsing.md *)
+
+VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
+
+(*
+
+  # Syntax of MeBi commands
+
+  {C} ::= MeBi                            : syntax of commands {C}
+          [ Show | Dump | Dump <name> ]   : feedback/output mode
+          [ {L} | {F} | {A} ]             : kind of command to run
+                                              {L} => build LTS
+                                              {F} => build FSM
+                                              {A} => run algorithm
+          Using <lts_list>                : list of lts/constructors (outermost-first)
+
+  {L} ::= LTS                             : syntax of LTS model (term + lts)
+          [ Bounded <num> |   ]           : (optional) upper-bound
+          Of <term>                       : initial term
+
+  {F} ::= FSM From {L}                    : build ocaml FSM from extracted LTS
+
+  {A} ::= [ {B} | {M} | {G} ]             : kinds of algorithms to run
+                                              {G} => Merge
+                                              {B} => Bisimilarity
+                                              {M} => Minimization
+
+  {G} ::= Merge {L} {L}                   : run merge algorithm
+
+  {B} ::= Bisim {L} {L}                   : run bisimilarity algorithm
+
+  {M} ::= Minim {L}                       : run minimization algorithm
+
+  ---------------------------------------
+
+  # Examples
+
+  - [MeBi Show LTS Of p Using a b c.]
+    Builds an lts of term [p] using coq-lts [a], [b] and [c]
+    (using a default bound), and displays in feedback window.
+
+  - [MeBi Show LTS Bounded 5 Of p Using a b c.]
+    Builds an lts of term [p] using coq-lts [a], [b] and [c]
+    until 5 states are reached, and displays in feedback window.
+
+  - [MeBi Dump LTS Of p Using a b c.]
+    Builds an lts of term [p] using coq-lts [a], [b] and [c]
+    and then dumps to (json) file.
+
+  - [MeBi Dump n LTS Of p Using a b c.]
+    Builds an lts of term [p] using coq-lts [a], [b] and [c]
+    and then dumps to (json) file with name [n].
+
+  *)
+
+(******************************)
+(** Build LTS from coq term ***)
+(******************************)
+| [ "MeBi" "Show" "LTS" "Of" constr(t) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (Command.default_bound, t), r))}
+
+| [ "MeBi" "Show" "LTS" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (i, t), r))}
+
+| [ "MeBi" "Dump" "LTS" "Of" constr(t) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (Command.default_bound, t), r))}
+
+| [ "MeBi" "Dump" "LTS" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (i, t), r))}
+
+| [ "MeBi" "Dump" string(n) "LTS" "Of" constr(t) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (Command.default_bound, t), r))}
+
+| [ "MeBi" "Dump" string(n) "LTS" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (i, t), r))}
+
+(******************************)
+(** Build FSM from coq term ***) (* same as the above but with [Vernac.FSM] *)
+(******************************)
+| [ "MeBi" "Show" "FSM" "Of" constr(t) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (Command.default_bound, t), r))}
+
+| [ "MeBi" "Show" "FSM" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (i, t), r))}
+
+| [ "MeBi" "Dump" "FSM" "Of" constr(t) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (Command.default_bound, t), r))}
+
+| [ "MeBi" "Dump" "FSM" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (i, t), r))}
+
+| [ "MeBi" "Dump" string(n) "FSM" "Of" constr(t) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (Command.default_bound, t), r))}
+
+| [ "MeBi" "Dump" string(n) "FSM" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (i, t), r))}
+
+END
+
+
+(*
+
+
 (*
  * TODO: so far, classified as query. What it should do: read proposition, check
  * it has the corret type. Print proposition.
@@ -33,7 +136,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Show" "LTS"
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.LTS.show
+      Vernac.Vernac.LTS.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         t
         (Mebi_utils.ref_list_to_glob_list r)
@@ -41,7 +144,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Dump" string(name) "LTS"
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.LTS.dump
+      Vernac.Vernac.LTS.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~name
         t
@@ -50,7 +153,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Debug" "LTS"
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.LTS.show
+      Vernac.Vernac.LTS.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -68,7 +171,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Show" "LTS" "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.LTS.show
+      Vernac.Vernac.LTS.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         t
@@ -77,7 +180,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Dump" string(name) "LTS" "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.LTS.dump
+      Vernac.Vernac.LTS.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         ~name
@@ -87,7 +190,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Debug" "LTS" "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.LTS.show
+      Vernac.Vernac.LTS.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -109,7 +212,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Show" "LTS" reference(e)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.LTS.show
+      Vernac.Vernac.LTS.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         t
         (Mebi_utils.ref_list_to_glob_list r)
@@ -118,7 +221,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Dump" string(name) "LTS" reference(e)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.LTS.dump
+      Vernac.Vernac.LTS.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~name
         ~equiv:(Nametab.global e)
@@ -128,7 +231,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Debug" "LTS" reference(e)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.LTS.show
+      Vernac.Vernac.LTS.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -147,7 +250,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Show" "LTS" reference(e) "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.LTS.show
+      Vernac.Vernac.LTS.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         ~equiv:(Nametab.global e)
@@ -157,7 +260,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Dump" string(name) "LTS" reference(e) "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.LTS.dump
+      Vernac.Vernac.LTS.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         ~name
@@ -168,7 +271,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Debug" "LTS" reference(e) "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.LTS.show
+      Vernac.Vernac.LTS.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -191,7 +294,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Show" "FSM"
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.FSM.show
+      Vernac.Vernac.FSM.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         t
         (Mebi_utils.ref_list_to_glob_list r)
@@ -199,7 +302,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Dump" string(name) "FSM"
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.FSM.dump
+      Vernac.Vernac.FSM.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~name
         t
@@ -208,7 +311,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Debug" "FSM"
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.FSM.show
+      Vernac.Vernac.FSM.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -226,7 +329,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Show" "FSM" "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.FSM.show
+      Vernac.Vernac.FSM.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         t
@@ -235,7 +338,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Dump" string(name) "FSM" "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.FSM.dump
+      Vernac.Vernac.FSM.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         ~name
@@ -245,7 +348,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Debug" "FSM" "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.FSM.show
+      Vernac.Vernac.FSM.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -267,7 +370,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Show" "FSM" reference(e)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.FSM.show
+      Vernac.Vernac.FSM.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~equiv:(Nametab.global e)
         t
@@ -276,7 +379,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Dump" string(name) "FSM" reference(e)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.FSM.dump
+      Vernac.Vernac.FSM.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~name
         ~equiv:(Nametab.global e)
@@ -286,7 +389,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Debug" "FSM" reference(e)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.FSM.show
+      Vernac.Vernac.FSM.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -305,7 +408,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Show" "FSM" reference(e) "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.FSM.show
+      Vernac.Vernac.FSM.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         ~equiv:(Nametab.global e)
@@ -315,7 +418,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Dump" string(name) "FSM" reference(e) "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.FSM.dump
+      Vernac.Vernac.FSM.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         ~name
@@ -326,7 +429,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Debug" "FSM" reference(e) "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.FSM.show
+      Vernac.Vernac.FSM.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -349,7 +452,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Show" "Minim"
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Minim.show
+      Vernac.Vernac.Minim.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         t
         (Mebi_utils.ref_list_to_glob_list r)
@@ -357,7 +460,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Dump" string(name) "Minim"
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Minim.dump
+      Vernac.Vernac.Minim.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~name
         t
@@ -366,7 +469,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Debug" "Minim"
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Minim.show
+      Vernac.Vernac.Minim.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -384,7 +487,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Show" "Minim" "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Minim.show
+      Vernac.Vernac.Minim.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         t
@@ -393,7 +496,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Dump" string(name) "Minim" "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Minim.dump
+      Vernac.Vernac.Minim.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         ~name
@@ -403,7 +506,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
   | [ "MeBi" "Debug" "Minim" "Bounded" int(i)
       "Of" constr(t) "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Minim.show
+      Vernac.Vernac.Minim.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -427,7 +530,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Merged.show
+      Vernac.Vernac.Merged.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         tA
         tB
@@ -438,7 +541,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Merged.dump
+      Vernac.Vernac.Merged.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~name
         tA
@@ -450,7 +553,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Merged.show
+      Vernac.Vernac.Merged.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -471,7 +574,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Merged.show
+      Vernac.Vernac.Merged.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         tA
@@ -483,7 +586,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Merged.dump
+      Vernac.Vernac.Merged.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         ~name
@@ -496,7 +599,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Merged.show
+      Vernac.Vernac.Merged.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -521,7 +624,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Bisim.show
+      Vernac.Vernac.Bisim.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         tA
         tB
@@ -532,7 +635,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Bisim.dump
+      Vernac.Vernac.Bisim.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~name
         tA
@@ -544,7 +647,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Bisim.show
+      Vernac.Vernac.Bisim.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -565,7 +668,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Bisim.show
+      Vernac.Vernac.Bisim.show
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         tA
@@ -577,7 +680,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Bisim.dump
+      Vernac.Vernac.Bisim.dump
         ~params:(Utils.Params.Default.log ~mode:(Coq()) ())
         ~bound:i
         ~name
@@ -590,7 +693,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
       "With" constr(tB)
       "Using" reference_list(r) ] ->
     { Mebi_wrapper.run (
-      Command.Vernac.Bisim.show
+      Vernac.Vernac.Bisim.show
         ~params:(
           let params = (Utils.Params.Default.log ~mode:(Coq()) ()) in
           params.options <-
@@ -607,3 +710,4 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
         (Mebi_utils.ref_list_to_glob_list r)
       ) }
 END
+*)

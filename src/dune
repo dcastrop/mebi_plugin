@@ -29,6 +29,7 @@
   lts
   fsm
   translate
+  vernac
   dump_to_file
   bisimilarity
   minimize
