@@ -47,7 +47,8 @@ open Stdarg
           And {L}                         : initial term of second lts
           With <lts>                      : primary lts layer for second lts
 
-  {B} ::= Bisim {L}                       : run bisimilarity algorithm, first initial term
+  {B} ::= [ Weak <constr> |  ]            : (optional) check weak bisimilarity, using constructor for silent transitions
+          Bisim {L}                       : run bisimilarity algorithm, first initial term
           With <lts>                      : the primary lts layer of first lts
           And {L}                         : initial term of second lts
           With <lts>                      : primary lts layer for second lts
