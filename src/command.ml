@@ -17,7 +17,8 @@ open Utils
 
 let default_params : Params.log = Params.Default.log ~mode:(Coq ()) ()
 
-(** [default_bound] is the total depth that will be explored of a given lts by [explore_lts]. *)
+(** [default_bound] is the total depth that will be explored of a given lts by [explore_lts].
+*)
 let default_bound : int = 10
 
 (** [arity_is_prop mip] raises an error if [mip.mind_arity] is not a [prop]. *)
@@ -34,10 +35,11 @@ let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
 (** [get_lts_labels_and_terms mib mip] is the mapping of terms (states) and labels (outgoing edges) from [mip].
 
     @raise invalid_arity
-      if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error. *)
+      if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error.
+*)
 let get_lts_labels_and_terms
-  (mib : Declarations.mutual_inductive_body)
-  (mip : Declarations.one_inductive_body)
+      (mib : Declarations.mutual_inductive_body)
+      (mip : Declarations.one_inductive_body)
   : (Constr.rel_declaration * Constr.rel_declaration) mm
   =
   let open Declarations in
@@ -139,9 +141,9 @@ let check_ref_lts (index : int) (gref : Names.GlobRef.t) : raw_lts mm =
     - Is [w_unify] the best way?
     - ... *)
 let m_unify
-  ?(params : Params.log = default_params)
-  (t0 : EConstr.t)
-  (t1 : EConstr.t)
+      ?(params : Params.log = default_params)
+      (t0 : EConstr.t)
+      (t1 : EConstr.t)
   : bool mm
   =
   params.kind <- Debug ();
@@ -201,8 +203,8 @@ let _pstr_unif_problem (t : unif_problem) : string =
 ;;
 
 let rec unify_all
-  ?(params : Params.log = default_params)
-  (i : (Constr_tree.t * unif_problem) list)
+          ?(params : Params.log = default_params)
+          (i : (Constr_tree.t * unif_problem) list)
   : Constr_tree.t list option mm
   =
   params.kind <- Debug ();
@@ -224,9 +226,9 @@ let rec unify_all
 ;;
 
 let sandboxed_unify
-  ?(params : Params.log = default_params)
-  (tgt_term : EConstr.t)
-  (u : (Constr_tree.t * unif_problem) list)
+      ?(params : Params.log = default_params)
+      (tgt_term : EConstr.t)
+      (u : (Constr_tree.t * unif_problem) list)
   : (EConstr.t * Constr_tree.t list) option mm
   =
   (* let* _ = if is_output_kind_enabled params then debug (fun env sigma -> str
@@ -250,11 +252,11 @@ type coq_ctor = EConstr.t * EConstr.t * Constr_tree.t
 
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
-  ?(params : Params.log = default_params)
-  (acc : coq_ctor list)
-  (i : int)
-  (act : EConstr.t)
-  (tgt_term : EConstr.t)
+          ?(params : Params.log = default_params)
+          (acc : coq_ctor list)
+          (i : int)
+          (act : EConstr.t)
+          (tgt_term : EConstr.t)
   : int * (Constr_tree.t * unif_problem) list list -> coq_ctor list mm
   = function
   | _, [] -> return acc
@@ -275,9 +277,9 @@ let rec retrieve_tgt_nodes
 
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
-  ?(params : Params.log = default_params)
-  (acc : int * (Constr_tree.t * unif_problem) list list)
-  (fn_rlts : raw_lts F.t)
+          ?(params : Params.log = default_params)
+          (acc : int * (Constr_tree.t * unif_problem) list list)
+          (fn_rlts : raw_lts F.t)
   :  EConstr.t list * EConstr.rel_declaration list
   -> (int * (Constr_tree.t * unif_problem) list list) option mm
   = function
@@ -339,12 +341,12 @@ let rec check_updated_ctx
 
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
-  ?(params : Params.log = default_params)
-  (ctor_transitions : (Constr.rel_context * Constr.types) array)
-  (fn_rlts : raw_lts F.t)
-  (t' : EConstr.t)
-  (ma : EConstr.t option)
-  (lts_index : int)
+      ?(params : Params.log = default_params)
+      (ctor_transitions : (Constr.rel_context * Constr.types) array)
+      (fn_rlts : raw_lts F.t)
+      (t' : EConstr.t)
+      (ma : EConstr.t option)
+      (lts_index : int)
   : coq_ctor list mm
   =
   params.kind <- Debug ();
@@ -448,6 +450,7 @@ module type GraphB = sig
 
   val build_graph
     :  ?params:Params.log
+    -> ?primary_lts:Libnames.qualid option
     -> int
     -> Constrexpr.constr_expr
     -> Names.GlobRef.t list
@@ -485,7 +488,8 @@ module MkGraph
      and the corresponding [Constr_tree.t]. *)
   module D = P
 
-  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t]. *)
+  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t].
+  *)
   type constr_transitions = (Mebi_action.action, D.t) Hashtbl.t
 
   let num_transitions (ts : constr_transitions H.t) : int =
@@ -507,18 +511,18 @@ module MkGraph
       List.of_seq (H.to_seq ts)
     in
     let from_body
-      (i : int)
-      (new_transitions :
-        (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+          (i : int)
+          (new_transitions :
+            (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
       =
       let (from, actions) : E.t * constr_transitions = List.nth raw_list i in
       let raw_actions : (Mebi_action.action * D.t) list =
         List.of_seq (Hashtbl.to_seq actions)
       in
       let action_body
-        (j : int)
-        (new_transitions :
-          (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+            (j : int)
+            (new_transitions :
+              (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
         =
         let (a, destinations) : Mebi_action.action * D.t =
           List.nth raw_actions j
@@ -527,9 +531,9 @@ module MkGraph
           D.elements destinations
         in
         let destination_body
-          (k : int)
-          (new_transitions :
-            (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+              (k : int)
+              (new_transitions :
+                (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
           =
           let (destination, constr_tree) : E.t * Constr_tree.t =
             List.nth raw_destinations k
@@ -549,7 +553,8 @@ module MkGraph
     iterate 0 (List.length raw_list - 1) [] from_body
   ;;
 
-  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t]. *)
+  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t].
+  *)
   type lts_graph =
     { to_visit : E.t Queue.t
     ; init : E.t
@@ -579,19 +584,26 @@ module MkGraph
   ;;
 
   let _print_finished_build_graph
-    ?(params : Params.log = default_params)
-    (g : lts_graph)
+        ?(params : Params.log = default_params)
+        (g : lts_graph)
+        (primary_enc:E.t)
     : unit mm
     =
-    Log.override
-      ~params
-      (Printf.sprintf
-         "build_graph, finished, is complete: %b\n\
-          num states: %i\n\
-          num transitions: %i"
-         (Queue.is_empty g.to_visit)
-         (S.cardinal g.states)
-         (num_transitions g.transitions));
+    let is_complete = Queue.is_empty g.to_visit in
+    let* primary_decoding = decode primary_enc in
+    let primary_lts = econstr_to_string primary_decoding in
+    if Bool.not is_complete
+    then(
+      Log.override
+        ~params
+        (Printf.sprintf
+           "build_graph, finished (%s) -- %s\n\
+            num states: %i\n\
+            num transitions: %i"
+           (if is_complete then "complete" else "incomplete")
+           primary_lts
+           (S.cardinal g.states)
+           (num_transitions g.transitions)));
     return ()
   ;;
 
@@ -712,12 +724,13 @@ module MkGraph
   (******** above is a sanity check *************************************)
   (**********************************************************************)
 
-  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions]. *)
+  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions].
+  *)
   let insert_constr_transition
-    (constrs : constr_transitions)
-    (a : Mebi_action.action)
-    (d : E.t)
-    (c : Constr_tree.t)
+        (constrs : constr_transitions)
+        (a : Mebi_action.action)
+        (d : E.t)
+        (c : Constr_tree.t)
     : unit mm
     =
     (match Hashtbl.find_opt constrs a with
@@ -727,11 +740,11 @@ module MkGraph
   ;;
 
   let add_new_term_constr_transition
-    (g : lts_graph)
-    (t : E.t)
-    (a : Mebi_action.action)
-    (d : E.t)
-    (c : Constr_tree.t)
+        (g : lts_graph)
+        (t : E.t)
+        (a : Mebi_action.action)
+        (d : E.t)
+        (c : Constr_tree.t)
     : unit mm
     =
     H.add
@@ -742,10 +755,10 @@ module MkGraph
   ;;
 
   let get_new_states
-    ?(params : Params.log = default_params)
-    (t : E.t)
-    (g : lts_graph)
-    (ctors : coq_ctor list)
+        ?(params : Params.log = default_params)
+        (t : E.t)
+        (g : lts_graph)
+        (ctors : coq_ctor list)
     : S.t mm
     =
     let iter_body (i : int) (new_states : S.t) =
@@ -763,9 +776,10 @@ module MkGraph
           insert_constr_transition actions to_add encoding int_tree
       in
       (* if [tgt] has not been explored then add [to_visit] *)
-      if H.mem g.transitions encoding
-         (* || EConstr.eq_constr sigma tgt t *)
-         || S.mem encoding g.states
+      if
+        H.mem g.transitions encoding
+        (* || EConstr.eq_constr sigma tgt t *)
+        || S.mem encoding g.states
       then ()
       else Queue.push encoding g.to_visit;
       (* add [tgt] to [new_states] *)
@@ -777,12 +791,13 @@ module MkGraph
   (** [get_new_constrs t rlts_map] returns the list of constructors applicable to term [t], using those provided in [rlts_map].
       If no immediate constructor is found matching [t] in [rlts_map] (likely due to unification problems), then each constructor in [rlts_map] is tried sequentially, until one of them returns some valid constructors.
       @raise CannotFindTypeOfTermToVisit
-        if none of the constructors provided in [rlts_map] yield constructors from [check_valid_constructors]. *)
+        if none of the constructors provided in [rlts_map] yield constructors from [check_valid_constructors].
+  *)
   let get_new_constrs
-    ?(params : Params.log = default_params)
-    (encoded_t : E.t)
-    (primary : raw_lts)
-    (rlts_map : raw_lts B.t)
+        ?(params : Params.log = default_params)
+        (encoded_t : E.t)
+        (primary : raw_lts)
+        (rlts_map : raw_lts B.t)
     : coq_ctor list mm
     =
     let* (t : EConstr.t) = decode encoded_t in
@@ -802,11 +817,11 @@ module MkGraph
       @param bound is the number of states to explore until.
       @return an [lts_graph] with a maximum of [bound] many states. *)
   let rec build_lts_graph
-    ?(params : Params.log = default_params)
-    (primary : raw_lts)
-    (rlts_map : raw_lts B.t)
-    (g : lts_graph)
-    (bound : int)
+            ?(params : Params.log = default_params)
+            (primary : raw_lts)
+            (rlts_map : raw_lts B.t)
+            (g : lts_graph)
+            (bound : int)
     : lts_graph mm
     =
     params.kind <- Debug ();
@@ -829,8 +844,12 @@ module MkGraph
   ;;
 
   (** @return
-        the key for the primary lts and hashtable mapping the name of the coq definition to the rlts. *)
-  let build_rlts_map (t' : EConstr.t) (grefs : Names.GlobRef.t list)
+        the key for the primary lts and hashtable mapping the name of the coq definition to the rlts.
+  *)
+  let build_rlts_map
+        ?(disable_warning : bool = false)
+        (t' : EConstr.t)
+        (grefs : Names.GlobRef.t list)
     : (E.t * raw_lts B.t) mm
     =
     (* normalize the initial term *)
@@ -853,13 +872,15 @@ module MkGraph
         let* (encoding : E.t) = encode rlts.coq_lts in
         return (Some encoding, acc_map)
       | Some _, true ->
-        Log.warning
-          ~params:default_params
-          (Printf.sprintf
-             "Found inductive definition that could be primary, when primary \
-              has already been selected.\n\
-              Please make sure that the primary LTS is provided first when \
-              using the command.");
+        if Bool.not disable_warning
+        then
+          Log.warning
+            ~params:default_params
+            (Printf.sprintf
+               "Found inductive definition that could be primary, when primary \
+                has already been selected.\n\
+                Please make sure that the primary LTS is provided first when \
+                using the command.");
         return (fn_opt, acc_map)
       | _, false -> return (fn_opt, acc_map)
     in
@@ -873,23 +894,41 @@ module MkGraph
     | Some p -> return (p, rlts_map)
   ;;
 
+  let resolve_primary_lts (explicit : Libnames.qualid option) (obtained : E.t)
+    : E.t mm
+    =
+    match explicit with
+    | None -> return obtained
+    | Some explicit ->
+      let* (rlts : raw_lts) =
+        check_ref_lts 0 (Mebi_utils.ref_to_glob explicit)
+      in
+      let* (encoding : E.t) = encode rlts.coq_lts in
+      return encoding
+  ;;
+
   (** [build_graph rlts_map fn_rlts tref bound] is the entry point for [build_lts_graph].
       @param rlts_map maps coq-term types to [raw_lts].
       @param tref is the original coq-term.
       @param bound is the number of states to explore until. *)
   let build_graph
-    ?(params : Params.log = default_params)
-    (bound : int)
-    (tref : Constrexpr.constr_expr)
-    (grefs : Names.GlobRef.t list)
+        ?(params : Params.log = default_params)
+        ?(primary_lts : Libnames.qualid option = None)
+        (bound : int)
+        (tref : Constrexpr.constr_expr)
+        (grefs : Names.GlobRef.t list)
     : lts_graph mm
     =
     (* should be able to get the type now -- fail otherwise *)
     let* (t : EConstr.t) = tref_to_econstr tref in
     (* make map of term types *)
-    let* (primary, rlts_map) : E.t * raw_lts B.t = build_rlts_map t grefs in
+    let* (primary, rlts_map) : E.t * raw_lts B.t =
+      build_rlts_map ~disable_warning:(Option.has_some primary_lts) t grefs
+    in
+    (* resolve the primary lts *)
+    let* the_primary_lts = resolve_primary_lts primary_lts primary in
     (* update environment by typechecking *)
-    let (the_lts : raw_lts) = B.find rlts_map primary in
+    let (the_lts : raw_lts) = B.find rlts_map the_primary_lts in
     let$* u env sigma = Typing.check env sigma t the_lts.trm_type in
     let$ init env sigma = sigma, Reductionops.nf_all env sigma t in
     let* encoded_init = encode init in
@@ -907,7 +946,7 @@ module MkGraph
         }
         bound
     in
-    let* _ = _print_finished_build_graph ~params g in
+    let* _ = _print_finished_build_graph ~params g the_primary_lts in
     (* let* _ = _run_all_checks ~prefix:"build_graph, " g in *)
     return g
   ;;
@@ -919,15 +958,15 @@ module MkGraph
       }
 
     let create_translation_tbl
-      ?(params : Params.log = default_params)
-      (states : S.t)
+          ?(params : Params.log = default_params)
+          (states : S.t)
       : coq_translation mm
       =
       let list_states : E.t list = S.elements states in
       let iter_body
-        (i : int)
-        ((from_coq_list, to_coq_list) :
-          (E.t * string) list * (string * E.t) list)
+            (i : int)
+            ((from_coq_list, to_coq_list) :
+              (E.t * string) list * (string * E.t) list)
         =
         let s : E.t = List.nth list_states i in
         (* let (str : string) = econstr_to_string s in *)
@@ -947,8 +986,8 @@ module MkGraph
     ;;
 
     let _check_all_states_translated
-      (translation_tbl : coq_translation)
-      (g : lts_graph)
+          (translation_tbl : coq_translation)
+          (g : lts_graph)
       : unit mm
       =
       S.iter
@@ -968,10 +1007,10 @@ module MkGraph
     ;;
 
     let get_state_translation
-      ?(prefix : string = "?")
-      (state : E.t)
-      (translation_tbl : coq_translation)
-      (g : lts_graph)
+          ?(prefix : string = "?")
+          (state : E.t)
+          (translation_tbl : coq_translation)
+          (g : lts_graph)
       : string mm
       =
       (* let (_str : string) = econstr_to_string state in *)
@@ -1014,10 +1053,10 @@ module MkGraph
     ;;
 
     let translate_transitions
-      (transitions_list :
-        (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
-      (translation_tbl : coq_translation)
-      (g : lts_graph)
+          (transitions_list :
+            (S.elt * Mebi_action.action * S.elt * Constr_tree.t) list)
+          (translation_tbl : coq_translation)
+          (g : lts_graph)
       : Lts.raw_flat_lts mm
       =
       (* sanity check: all states should be translated *)
@@ -1066,10 +1105,10 @@ module MkGraph
     ;;
 
     let lts_graph
-      ?(params : Params.log = default_params)
-      ?(name : string = "unnamed")
-      (bound : int)
-      (g : lts_graph)
+          ?(params : Params.log = default_params)
+          ?(name : string = "unnamed")
+          (bound : int)
+          (g : lts_graph)
       : (Lts.lts * coq_translation) mm
       =
       let* (transitions_list :
@@ -1118,9 +1157,9 @@ let make_graph_builder =
 ;;
 
 let _print_incomplete_lts_warning
-  ?(params : Params.log = default_params)
-  (name : string)
-  (bound : int)
+      ?(params : Params.log = default_params)
+      (name : string)
+      (bound : int)
   : unit
   =
   Log.warning
@@ -1132,8 +1171,8 @@ let _print_incomplete_lts_warning
 ;;
 
 let _print_complete_lts_notice
-  ?(params : Params.log = default_params)
-  (name : string)
+      ?(params : Params.log = default_params)
+      (name : string)
   : unit
   =
   Log.override
@@ -1153,6 +1192,25 @@ let result_to_string (r : result_kind) : string =
     Printf.sprintf "LTS: %s" (Lts.PStr.lts ~params:(Log default_params) the_lts)
   | FSM the_fsm ->
     Printf.sprintf "FSM: %s" (Fsm.PStr.fsm ~params:(Log default_params) the_fsm)
+  | Bisim
+      ( (the_fsm_1, the_fsm_2)
+      , (the_merged_fsm, _)
+      , (bisim_states, non_bisim_states) ) ->
+    Printf.sprintf
+      "Bisimilar: %b\n\n\
+       Bisimilar States (%i): %s\n\
+       Non-Bisimilar States (%i): %s\n\n\
+       FSM merged: %s\n\n\
+       FSM A: %s\n\n\
+       FSM B: %s"
+      (Fsm.Partition.is_empty non_bisim_states)
+      (Fsm.Partition.cardinal bisim_states)
+      (Fsm.PStr.partition ~params:(Log default_params) bisim_states)
+      (Fsm.Partition.cardinal non_bisim_states)
+      (Fsm.PStr.partition ~params:(Log default_params) non_bisim_states)
+      (Fsm.PStr.fsm ~params:(Log default_params) the_merged_fsm)
+      (Fsm.PStr.fsm ~params:(Log default_params) the_fsm_1)
+      (Fsm.PStr.fsm ~params:(Log default_params) the_fsm_2)
   | _ -> "TODO: finish handle output"
 ;;
 
@@ -1173,22 +1231,25 @@ let handle_output (o : output_kind) (r : result_kind) : unit mm =
     return ()
 ;;
 
-exception ExceededBoundBeforeLTSCompleted of (int)
+exception ExceededBoundBeforeLTSCompleted of int
 
 let vernac (o : output_kind) (r : run_params) : unit mm =
   let* (graphM : (module GraphB)) = make_graph_builder in
   let module G = (val graphM) in
   let build_lts_graph
-    (fail_if_incomplete:bool)
-    (bound : int)
-    (t : Constrexpr.constr_expr)
-    (l : Libnames.qualid list)
+        ?(primary_lts : Libnames.qualid option = None)
+        (fail_if_incomplete : bool)
+        (bound : int)
+        (t : Constrexpr.constr_expr)
+        (l : Libnames.qualid list)
     : (Lts.lts * G.DeCoq.coq_translation) mm
     =
     let lts_grefs : Names.GlobRef.t list = Mebi_utils.ref_list_to_glob_list l in
-    let* graph_lts = G.build_graph bound t lts_grefs in
+    let* graph_lts = G.build_graph ~primary_lts bound t lts_grefs in
     let* the_lts_translation = G.DeCoq.lts_graph bound graph_lts in
-    match fail_if_incomplete, Utils.is_complete (fst the_lts_translation).info with
+    match
+      fail_if_incomplete, Utils.is_complete (fst the_lts_translation).info
+    with
     | true, Some false -> raise (ExceededBoundBeforeLTSCompleted bound)
     | _, _ -> return the_lts_translation
   in
@@ -1201,6 +1262,18 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
     let the_fsm = Translate.to_fsm the_lts in
     handle_output o (FSM the_fsm)
   | Minim (f, b, t), l -> return ()
-  | Merge (x, y), l -> return ()
-  | Bisim (x, y), l -> return ()
+  | Merge (((f1, b1, t1), p1), ((f2, b2, t2), p2)), l ->
+    let* the_lts_1, _ = build_lts_graph ~primary_lts:(Some p1) f1 b1 t1 l in
+    let the_fsm_1 = Translate.to_fsm the_lts_1 in
+    let* the_lts_2, _ = build_lts_graph ~primary_lts:(Some p2) f2 b2 t2 l in
+    let the_fsm_2 = Translate.to_fsm the_lts_2 in
+    let the_merged_fsm, _ = Fsm.Merge.fsms the_fsm_1 the_fsm_2 in
+    handle_output o (Merge (the_fsm_1, the_fsm_2, the_merged_fsm))
+  | Bisim (((f1, b1, t1), p1), ((f2, b2, t2), p2)), l ->
+    let* the_lts_1, _ = build_lts_graph ~primary_lts:(Some p1) f1 b1 t1 l in
+    let the_fsm_1 = Translate.to_fsm the_lts_1 in
+    let* the_lts_2, _ = build_lts_graph ~primary_lts:(Some p2) f2 b2 t2 l in
+    let the_fsm_2 = Translate.to_fsm the_lts_2 in
+    let the_bisim_result = Bisimilarity.run ((the_fsm_1, the_fsm_2), None) in
+    handle_output o (Bisim the_bisim_result)
 ;;

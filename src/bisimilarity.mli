@@ -1,125 +1,60 @@
-type bisim_result =
-  { are_bisimilar : bool
-  ; merged_fsm : Fsm.fsm
-  ; bisimilar_states : Fsm.Partition.t
-  ; non_bisimilar_states : Fsm.Partition.t
-  }
+type fsm_pair = Fsm.fsm * Fsm.fsm
 
-type minim_result = Fsm.Partition.t
+type run_params =
+  fsm_pair * Fsm.Merge.merged_fsm_result_kind option
 
-type of_bisim_result =
-  | OfMerged of
-      ((Fsm.fsm * Fsm.fsm)
-      * (Fsm.fsm * (Fsm.state, Fsm.state) Hashtbl.t)
-      * minim_result ref)
-  | OfMinimized of minim_result ref
+type result_kind =
+  fsm_pair
+  * Fsm.Merge.merged_fsm_result_kind
+  * (Fsm.Partition.t * Fsm.Partition.t)
 
-type result =
-  | BisimResult of bisim_result
-  | MinimResult of minim_result
+val get_pair_from_result : fsm_pair * 'a * 'b -> fsm_pair
+val resolve : result_kind -> bool
 
-val default_params : Utils.Logging.params
+exception CouldNotFindOriginOfState of Fsm.state
 
-module PStr : sig
-  val bisim_result
-    :  ?params:Utils.Logging.params
-    -> ?merged_from:Fsm.fsm * Fsm.fsm
-    -> bisim_result
-    -> string
-end
+val block_has_shared_origin :
+  Fsm.States.t ->
+  Fsm.States.t ->
+  Fsm.States.t ->
+  Fsm.Merge.merged_state_map ->
+  bool
 
-module RCP : sig
-  module KS90 : sig
-    type check_weak_bisim =
-      | ()
-      | Weak
+val split_bisimilar :
+  Fsm.Partition.t ->
+  Fsm.States.t ->
+  Fsm.States.t ->
+  Fsm.Merge.merged_state_map ->
+  Fsm.Partition.t * Fsm.Partition.t
 
-    exception EmptyBlock of Fsm.States.t
-    exception PartitionsNotDisjoint of minim_result
+val saturate_fsms : Fsm.fsm -> Fsm.fsm -> fsm_pair
 
-    val reachable_blocks
-      :  ?params:Utils.Logging.params
-      -> Fsm.States.t Fsm.Actions.t
-      -> minim_result
-      -> minim_result
+val handle_run_params :
+  run_params -> bool -> Fsm.Merge.merged_fsm_result_kind
 
-    val reach_same_blocks : minim_result -> minim_result -> bool
+val reachable_blocks :
+  Fsm.States.t Fsm.Actions.t ->
+  Fsm.Partition.t ->
+  Fsm.Partition.t option
 
-    val lengths_gtr_0
-      :  Fsm.States.t Fsm.Actions.t
-      -> Fsm.States.t Fsm.Actions.t
-      -> bool * bool
+val add_to_block_option :
+  Fsm.state -> Fsm.States.t option -> Fsm.States.t option
 
-    val split
-      :  ?params:Utils.Logging.params
-      -> Fsm.States.t
-      -> Fsm.action
-      -> minim_result
-      -> Fsm.States.t Fsm.Actions.t Fsm.Edges.t
-      -> Fsm.States.t * Fsm.States.t
+val split_block :
+  Fsm.States.t ->
+  Fsm.action ->
+  Fsm.States.t Fsm.Actions.t Fsm.Edges.t ->
+  Fsm.Partition.t ->
+  Fsm.States.t * Fsm.States.t option
 
-    val inner_loop
-      :  ?params:Utils.Logging.params
-      -> Fsm.States.t
-      -> Fsm.States.t
-      -> Fsm.States.t ref
-      -> Fsm.action
-      -> minim_result ref
-      -> bool ref
-      -> unit
+val update_if_changed : unit
 
-    val main_loop_body
-      :  ?params:Utils.Logging.params
-      -> Fsm.Alphabet.t * Fsm.States.t Fsm.Actions.t Fsm.Edges.t
-      -> minim_result ref
-      -> bool ref
-      -> check_weak_bisim
-      -> unit
+val iterate :
+  Fsm.Alphabet.t ->
+  Fsm.States.t Fsm.Actions.t Fsm.Edges.t ->
+  Fsm.Partition.t ref ->
+  bool ref ->
+  bool ->
+  unit
 
-    val run_main_loop
-      :  ?params:Utils.Logging.params
-      -> Fsm.Alphabet.t
-      -> Fsm.States.t Fsm.Actions.t Fsm.Edges.t
-      -> minim_result ref
-      -> check_weak_bisim
-      -> unit
-
-    type of_bisim_input =
-      | ToMerge of (Fsm.fsm * Fsm.fsm)
-      | Merged of
-          (Fsm.fsm * Fsm.fsm * Fsm.fsm * (Fsm.state, Fsm.state) Hashtbl.t)
-      | Minimize of Fsm.fsm
-
-    exception RunInputNotExpected of of_bisim_input
-    exception MinimizeDoesNotExpectWeak of (of_bisim_input * check_weak_bisim)
-
-    val run
-      :  ?params:Utils.Logging.params
-      -> of_bisim_input
-      -> check_weak_bisim
-      -> of_bisim_result
-
-    type state_origins =
-      { s : bool
-      ; t : bool
-      }
-
-    val origins_of
-      :  ?params:Utils.Logging.params
-      -> Fsm.States.t
-      -> Fsm.States.t * Fsm.States.t
-      -> (Fsm.state, Fsm.state) Hashtbl.t
-      -> state_origins
-
-    val split_bisimilar
-      :  ?params:Utils.Logging.params
-      -> Fsm.States.t * Fsm.States.t
-      -> (Fsm.state, Fsm.state) Hashtbl.t
-      -> minim_result ref
-      -> minim_result * minim_result
-
-    val result : ?params:Utils.Logging.params -> of_bisim_result -> result
-  end
-
-  module PT87 : sig end
-end
+val run : ?weak:bool -> run_params -> result_kind

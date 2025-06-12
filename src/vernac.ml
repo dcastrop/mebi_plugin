@@ -8,7 +8,7 @@ type result_kind =
   | FSM of Fsm.fsm
   | Minim of (Fsm.fsm * Fsm.fsm)
   | Merge of (Fsm.fsm * Fsm.fsm * Fsm.fsm)
-  | Bisim of Bisimilarity.result
+  | Bisim of Bisimilarity.result_kind
 
 (** [fail_if_incomplete * bounds * initial_term] *)
 type term_params = bool * int * Constrexpr.constr_expr

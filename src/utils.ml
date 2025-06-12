@@ -69,9 +69,9 @@ module Logging = struct
     | OCaml () ->
       (match kind with
        | Normal () -> ""
-       | Details () -> "( Details )"
-       | Debug () -> "( > Debug )"
-       | Warning () -> "( Warning )")
+       | Details () -> "( Details ) "
+       | Debug () -> "( > Debug ) "
+       | Warning () -> "( Warning ) ")
   ;;
 
   type output_options =
@@ -169,8 +169,8 @@ module Logging = struct
       then (
         let msg_to_log : string =
           Printf.sprintf
-            "%s%s %s\n"
-            (if is_unit_option override then "!!!>>>" else "")
+            "%s%s%s\n"
+            (if is_unit_option override then "!!!>>> " else "")
             (pstr_output_kind_head mode kind)
             to_log
         in

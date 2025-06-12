@@ -4,7 +4,8 @@
 
 (** [state] is a 2-tuple with a unique [id] and (non-unique) [name].
     [id] is an integer for identifying the state.
-    [name] is a pretty-printed string of something corresponding to this state. *)
+    [name] is a pretty-printed string of something corresponding to this state.
+*)
 type state =
   { id : int (* ; hash : int *)
   ; name : string
@@ -18,16 +19,12 @@ module States = Set.Make (struct
   end)
 
 (*************************************************)
-(****** Blocks & Partitions of States ************)
+(****** Partitions of States *********************)
 (****** (Used by Bisimilarity algorithms.) *******)
 (****** (Featured here for more seemless pstr.) **)
 (*************************************************)
 
-(** [Block] is a set of states.
-    This is necessary since [KS90] requires the actions of states to be sortable. *)
-module Block = States
-
-(** [Partition] is a set of [Blocks]. (Required by [KS90].) *)
+(** [Partition] is a set of [States]. (Required by [KS90].) *)
 module Partition = Set.Make (States)
 
 (*********************************************************************)
@@ -75,7 +72,8 @@ module Actions = Hashtbl.Make (struct
     let hash (t : action) = Hashtbl.hash t
   end)
 
-(** [Edges] map [states] to outgoing actions, mapped to sets of destination [states]. *)
+(** [Edges] map [states] to outgoing actions, mapped to sets of destination [states].
+*)
 module Edges = Hashtbl.Make (struct
     type t = state
 
@@ -95,7 +93,8 @@ module Edges = Hashtbl.Make (struct
     - [init] is the initial state.
     - [alphabet] is the set of labels of actions of edges.
     - [states] is a set of states.
-    - [edges] is a hashtable mapping states to outgoing actions and their detination states. *)
+    - [edges] is a hashtable mapping states to outgoing actions and their detination states.
+*)
 type fsm =
   { init : state option
   ; mutable alphabet : Alphabet.t
@@ -136,8 +135,8 @@ module PStr = struct
   ;;
 
   let states
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (states : States.t)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (states : States.t)
     : string
     =
     if States.is_empty states
@@ -162,8 +161,8 @@ module PStr = struct
   ;;
 
   let partition
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (partition : Partition.t)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (partition : Partition.t)
     : string
     =
     if Partition.is_empty partition
@@ -209,8 +208,8 @@ module PStr = struct
   ;;
 
   let alphabet
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (actions : Alphabet.t)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (actions : Alphabet.t)
     : string
     =
     if Alphabet.is_empty actions
@@ -235,8 +234,8 @@ module PStr = struct
   ;;
 
   let annotation
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (anno : annotation)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (anno : annotation)
     : string
     =
     let _params : Params.fmt = Params.handle params in
@@ -261,8 +260,8 @@ module PStr = struct
   ;;
 
   let annotations
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (anno : annotations)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (anno : annotations)
     : string
     =
     let _params : Params.fmt = Params.handle params in
@@ -283,8 +282,8 @@ module PStr = struct
   ;;
 
   let edge
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    ((from, a, destination) : state * action * state)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        ((from, a, destination) : state * action * state)
     : string
     =
     let _params : Params.fmt = Params.handle params in
@@ -302,9 +301,9 @@ module PStr = struct
   ;;
 
   let actions
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    ?(from : state option)
-    (actions' : States.t Actions.t)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        ?(from : state option)
+        (actions' : States.t Actions.t)
     : string
     =
     (* increment tab of inner elements of table *)
@@ -366,8 +365,8 @@ module PStr = struct
   ;;
 
   let edges
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (edges' : States.t Actions.t Edges.t)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (edges' : States.t Actions.t Edges.t)
     : string
     =
     if Edges.length edges' == 0
@@ -484,20 +483,14 @@ module Create = struct
         is a pretty-printed representation, which defaults to [s{id}].
       @param id is the unique identifier for the state. *)
   let action
-    ?(is_tau : bool option)
-    ?(annotation : annotations option)
-    (params : action_param)
+        ?(is_tau : bool option)
+        ?(annotation : annotations option)
+        (params : action_param)
     : action
     =
-    let is_tau : bool =
-      match is_tau with
-      | None -> false
-      | Some t -> t
-    in
+    let is_tau : bool = match is_tau with None -> false | Some t -> t in
     let annotation : annotations =
-      match annotation with
-      | None -> []
-      | Some anno -> anno
+      match annotation with None -> [] | Some anno -> anno
     in
     match params with
     | Of (id, label) -> { id; label; is_tau; annotation }
@@ -542,11 +535,11 @@ module Create = struct
 
   (** [fsm init alphabet states edges] is a wrapper constructor for [fsm]. *)
   let fsm
-    ?(info : Utils.model_info option = None)
-    (init : state option)
-    (alphabet : Alphabet.t)
-    (states : States.t)
-    (edges : States.t Actions.t Edges.t)
+        ?(info : Utils.model_info option = None)
+        (init : state option)
+        (alphabet : Alphabet.t)
+        (states : States.t)
+        (edges : States.t Actions.t Edges.t)
     : fsm
     =
     { init; alphabet; states; edges; info }
@@ -558,8 +551,7 @@ end
 (*********************************************************************)
 module Clone = struct
   let state (s : state) : state =
-    match s with
-    | { id; name } -> Create.state (Of (id, name))
+    match s with { id; name } -> Create.state (Of (id, name))
   ;;
 
   let states (states : States.t) : States.t =
@@ -570,9 +562,7 @@ module Clone = struct
   ;;
 
   let init_state (s : state option) : state option =
-    match s with
-    | None -> None
-    | Some t -> Some (state t)
+    match s with None -> None | Some t -> Some (state t)
   ;;
 
   let alphabet (alpha : Alphabet.t) : Alphabet.t =
@@ -627,25 +617,17 @@ end
 
 module IsMatch = struct
   let action ?(weak : bool option) (a : action) (b : action) : bool =
-    let weak : bool =
-      match weak with
-      | None -> false
-      | Some w -> w
-    in
+    let weak : bool = match weak with None -> false | Some w -> w in
     a == b || (weak && String.equal a.label b.label && a.id == b.id)
   ;;
 
   let edge
-    ?(weak : bool option)
-    ((a_f, a_a, a_d) : state * action * state)
-    ((b_f, b_a, b_d) : state * action * state)
+        ?(weak : bool option)
+        ((a_f, a_a, a_d) : state * action * state)
+        ((b_f, b_a, b_d) : state * action * state)
     : bool
     =
-    let weak : bool =
-      match weak with
-      | None -> false
-      | Some w -> w
-    in
+    let weak : bool = match weak with None -> false | Some w -> w in
     a_f == b_f && action ~weak a_a b_a && a_d == b_d
   ;;
 end
@@ -672,21 +654,15 @@ module New = struct
   ;;
 
   let action
-    ?(is_tau : bool option)
-    ?(annotation : annotations option)
-    (label : string)
-    (fsm : fsm)
+        ?(is_tau : bool option)
+        ?(annotation : annotations option)
+        (label : string)
+        (fsm : fsm)
     : action
     =
-    let is_tau : bool =
-      match is_tau with
-      | None -> false
-      | Some t -> t
-    in
+    let is_tau : bool = match is_tau with None -> false | Some t -> t in
     let annotation : annotations =
-      match annotation with
-      | None -> []
-      | Some anno -> anno
+      match annotation with None -> [] | Some anno -> anno
     in
     match
       Alphabet.find_opt { id = -1; label; is_tau; annotation } fsm.alphabet
@@ -707,7 +683,8 @@ end
 (*********************************************************************)
 
 module Append = struct
-  (** [annotation an anno] appends [an] to the front of [anno] if it does not already exisit within [anno]. *)
+  (** [annotation an anno] appends [an] to the front of [anno] if it does not already exisit within [anno].
+  *)
   let annotation' (an : state * action) (anno : annotation) : annotation =
     if List.mem an anno then anno else List.append [ an ] anno
   ;;
@@ -773,9 +750,9 @@ module Append = struct
   ;;
 
   let states
-    ?(skip_duplicate_names : bool = true)
-    (fsm : fsm)
-    (states : States.t)
+        ?(skip_duplicate_names : bool = true)
+        (fsm : fsm)
+        (states : States.t)
     : unit
     =
     States.iter (fun (s : state) -> state ~skip_duplicate_names fsm s) states
@@ -789,9 +766,7 @@ module Append = struct
     : unit
     =
     let destinations : States.t =
-      match d with
-      | Singleton s -> States.singleton s
-      | Destinations d -> d
+      match d with Singleton s -> States.singleton s | Destinations d -> d
     in
     match Actions.find_opt actions a with
     | None ->
@@ -810,13 +785,9 @@ module Append = struct
     : unit
     =
     let es : States.t Actions.t Edges.t =
-      match m with
-      | FSM fsm -> fsm.edges
-      | Edges es -> es
+      match m with FSM fsm -> fsm.edges | Edges es -> es
     and destinations : States.t =
-      match d with
-      | Singleton s -> States.singleton s
-      | Destinations d -> d
+      match d with Singleton s -> States.singleton s | Destinations d -> d
     in
     match Edges.find_opt es from with
     | None ->
@@ -832,9 +803,7 @@ module Append = struct
 
   let edges (m : has_edges) ((from, a's) : state * States.t Actions.t) : unit =
     let es : States.t Actions.t Edges.t =
-      match m with
-      | FSM fsm -> fsm.edges
-      | Edges es -> es
+      match m with FSM fsm -> fsm.edges | Edges es -> es
     in
     Edges.add es from a's
   ;;
@@ -888,16 +857,12 @@ module Filter = struct
   ;;
 
   let filter_actions
-    ?(weak : bool option)
-    (actions : States.t Actions.t)
-    (kind : kind_action_filter)
+        ?(weak : bool option)
+        (actions : States.t Actions.t)
+        (kind : kind_action_filter)
     : States.t Actions.t
     =
-    let weak : bool =
-      match weak with
-      | None -> false
-      | Some w -> w
-    in
+    let weak : bool = match weak with None -> false | Some w -> w in
     let res : States.t Actions.t = Create.actions () in
     Actions.iter
       (fun (a : action) (destinations : States.t) ->
@@ -914,16 +879,12 @@ module Filter = struct
   ;;
 
   let filter_edges
-    ?(weak : bool option)
-    (edges : States.t Actions.t Edges.t)
-    (kind : kind_edge_filter)
+        ?(weak : bool option)
+        (edges : States.t Actions.t Edges.t)
+        (kind : kind_edge_filter)
     : States.t Actions.t Edges.t
     =
-    let weak : bool =
-      match weak with
-      | None -> false
-      | Some w -> w
-    in
+    let weak : bool = match weak with None -> false | Some w -> w in
     let res : States.t Actions.t Edges.t = Create.edges 0 in
     Edges.iter
       (fun (from : state) (a's : States.t Actions.t) ->
@@ -943,30 +904,22 @@ module Filter = struct
   ;;
 
   let actions
-    ?(weak : bool option)
-    (actions_to_filter : States.t Actions.t)
-    (kind : kind_action_filter)
+        ?(weak : bool option)
+        (actions_to_filter : States.t Actions.t)
+        (kind : kind_action_filter)
     : States.t Actions.t
     =
-    let weak : bool =
-      match weak with
-      | None -> false
-      | Some w -> w
-    in
+    let weak : bool = match weak with None -> false | Some w -> w in
     filter_actions ~weak actions_to_filter kind
   ;;
 
   let edges
-    ?(weak : bool option)
-    (edges_to_filter : has_edges)
-    (kind : kind_edge_filter)
+        ?(weak : bool option)
+        (edges_to_filter : has_edges)
+        (kind : kind_edge_filter)
     : States.t Actions.t Edges.t
     =
-    let weak : bool =
-      match weak with
-      | None -> false
-      | Some w -> w
-    in
+    let weak : bool = match weak with None -> false | Some w -> w in
     match edges_to_filter with
     | FSM m -> filter_edges ~weak m.edges kind
     | Edges e -> filter_edges ~weak e kind
@@ -1024,11 +977,12 @@ module Get = struct
   (****** Actions *****************************)
   (********************************************)
 
-  (** [actions_from from edges] is a shorthand for [Edges.find_opt] and in the case of [None] returns an empty map of actions. *)
+  (** [actions_from from edges] is a shorthand for [Edges.find_opt] and in the case of [None] returns an empty map of actions.
+  *)
   let actions_from
-    (* ?(weak : bool option) *)
-      (from : state)
-    (edges : States.t Actions.t Edges.t)
+        (* ?(weak : bool option) *)
+          (from : state)
+        (edges : States.t Actions.t Edges.t)
     : States.t Actions.t
     =
     match Edges.find_opt edges from with
@@ -1038,16 +992,12 @@ module Get = struct
 
   (** [actions_of a edges] filters [actions] by action [a]. *)
   let actions_of
-    ?(weak : bool option)
-    (a : action)
-    (actions : States.t Actions.t)
+        ?(weak : bool option)
+        (a : action)
+        (actions : States.t Actions.t)
     : States.t Actions.t option
     =
-    let weak : bool =
-      match weak with
-      | None -> false
-      | Some w -> w
-    in
+    let weak : bool = match weak with None -> false | Some w -> w in
     let a's : States.t Actions.t = Filter.actions ~weak actions (Matches a) in
     if Actions.length a's > 1 then Some a's else None
   ;;
@@ -1070,16 +1020,12 @@ module Get = struct
 
   (** [edges_of a edges] filters [edges] by action [a]. *)
   let edges_of
-    ?(weak : bool option)
-    (a : action)
-    (edges : States.t Actions.t Edges.t)
+        ?(weak : bool option)
+        (a : action)
+        (edges : States.t Actions.t Edges.t)
     : States.t Actions.t Edges.t
     =
-    let weak : bool =
-      match weak with
-      | None -> false
-      | Some w -> w
-    in
+    let weak : bool = match weak with None -> false | Some w -> w in
     Filter.edges ~weak (Edges edges) (Action (Matches a))
   ;;
 
@@ -1097,7 +1043,8 @@ module Get = struct
     | Edges e -> from_states (Filter.edges (Edges e) (Action IsSilent))
   ;;
 
-  (** [has_destinations] is a type denoting either maps of edges or actions, both of which have destination states. *)
+  (** [has_destinations] is a type denoting either maps of edges or actions, both of which have destination states.
+  *)
   type has_destinations =
     | Actions of States.t Actions.t
     | Edges of States.t Actions.t Edges.t
@@ -1131,12 +1078,13 @@ module Merge = struct
   open Utils
 
   let edges
-    ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
-    ((state_id_offset, merged_alphabet) : int * Alphabet.t)
-    (base : States.t Actions.t Edges.t)
-    (to_merge : States.t Actions.t Edges.t)
+        ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
+        ((state_id_offset, merged_alphabet) : int * Alphabet.t)
+        (base : States.t Actions.t Edges.t)
+        (to_merge : States.t Actions.t Edges.t)
     : States.t Actions.t Edges.t
     =
+    let merged = Edges.copy base in
     Edges.iter
       (fun (from : state) (actions : States.t Actions.t) ->
         let from' : state = Create.state (From (from, state_id_offset))
@@ -1150,39 +1098,51 @@ module Merge = struct
               (Alphabet.find a merged_alphabet)
               (Create.states (From (destinations, state_id_offset))))
           actions;
-        Edges.add base from' actions')
+        Edges.add merged from' actions')
       to_merge;
-    base
+    merged
   ;;
 
+  type merged_state_map = (state, state) Hashtbl.t
+  type merged_fsm_result_kind = fsm * merged_state_map
+
   let fsms
-    ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
-    (base : fsm)
-    (to_merge : fsm)
-    : fsm * (state, state) Hashtbl.t
+        ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
+        (base : fsm)
+        (to_merge : fsm)
+    : merged_fsm_result_kind
     =
     (* merge into [base] the fsm [to_merge] *)
-    match base with
-    | { init; alphabet; states; edges = edges'; _ } ->
+    match base, to_merge with
+    | ( { alphabet = base_alphabet; states = base_states; edges = base_edges; _ }
+      , { alphabet = alphabet_to_merge
+        ; states = states_to_merge
+        ; edges = edges_to_merge
+        ; _
+        } ) ->
       (* needed to keep track of [to_merge.states] new IDs *)
-      let state_id_offset : int = States.cardinal states
-      and to_merge_state_map : (state, state) Hashtbl.t =
-        States.cardinal to_merge.states |> Hashtbl.create
+      let state_id_offset : int = States.cardinal base_states
+      and to_merge_state_map : merged_state_map =
+        States.cardinal states_to_merge |> Hashtbl.create
       in
       (* *)
       let merged_alphabet : Alphabet.t =
-        Alphabet.union alphabet to_merge.alphabet
+        Alphabet.union base_alphabet alphabet_to_merge
       and merged_states : States.t =
         States.fold
           (fun (s : state) (acc : States.t) ->
             let s' : state = Create.state (From (s, state_id_offset)) in
             Hashtbl.add to_merge_state_map s' s;
             States.add s' acc)
-          to_merge.states
-          states
+          states_to_merge
+          base_states
       in
       let merged_edges : States.t Actions.t Edges.t =
-        edges ~params (state_id_offset, merged_alphabet) edges' to_merge.edges
+        edges
+          ~params
+          (state_id_offset, merged_alphabet)
+          base_edges
+          edges_to_merge
       in
       ( Create.fsm None merged_alphabet merged_states merged_edges
       , to_merge_state_map )
@@ -1254,10 +1214,10 @@ module Saturate = struct
   ;;
 
   let saturated_action
-    (a : action) (* last action taken *)
-    (b : action option) (* if rhs, the named action *)
-    (destination : state)
-    (annotation : annotation)
+        (a : action) (* last action taken *)
+        (b : action option) (* if rhs, the named action *)
+        (destination : state)
+        (annotation : annotation)
     : action
     =
     let b : action =
@@ -1285,22 +1245,21 @@ module Saturate = struct
 
   (** [collected_annotated_actions ?params visited destinations m] ...
       @param visited
-        is the trace of states reached via silent actions used for annotation. *)
+        is the trace of states reached via silent actions used for annotation.
+  *)
   let rec collect_annotated_actions
-    ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
-    (* (visited : States.t) *)
-      (visited_states : (state, int) Hashtbl.t)
-    (annotation : annotation)
-    (to_visit : States.t)
-    (saturated_actions : States.t Actions.t)
-    (named_action : action option)
-    (m : fsm)
+            ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
+            (* (visited : States.t) *)
+              (visited_states : (state, int) Hashtbl.t)
+            (annotation : annotation)
+            (to_visit : States.t)
+            (saturated_actions : States.t Actions.t)
+            (named_action : action option)
+            (m : fsm)
     : unit
     =
     let is_lhs_of_named_action : bool =
-      match named_action with
-      | None -> true
-      | Some _ -> false
+      match named_action with None -> true | Some _ -> false
     in
     States.iter
       (fun (destination : state) ->
@@ -1356,8 +1315,8 @@ module Saturate = struct
   ;;
 
   let fsm
-    ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
-    (to_saturate : fsm)
+        ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
+        (to_saturate : fsm)
     : fsm
     =
     let m : fsm = Clone.fsm to_saturate in
@@ -1412,9 +1371,9 @@ module Saturate = struct
   ;;
 
   let rec explore_from
-    (from : state)
-    (anno : annotation)
-    (es : States.t Actions.t Edges.t)
+            (from : state)
+            (anno : annotation)
+            (es : States.t Actions.t Edges.t)
     : annotations
     =
     let actions : States.t Actions.t = Get.actions_from from es in
@@ -1455,12 +1414,13 @@ module Saturate = struct
       []
   ;;
 
-  (** return None if the specific annotation already exists for this action & destination *)
+  (** return None if the specific annotation already exists for this action & destination
+  *)
   let annotated
-    (a : action)
-    (destination : state)
-    (anno : annotation)
-    (a's : States.t Actions.t option)
+        (a : action)
+        (destination : state)
+        (anno : annotation)
+        (a's : States.t Actions.t option)
     : action option
     =
     match a's with
@@ -1519,8 +1479,8 @@ module Saturate = struct
 
   (** [fsm_states] is an alternative algorithm to [Saturate.fsm] *)
   let fsm_states
-    ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
-    (to_saturate : fsm)
+        ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
+        (to_saturate : fsm)
     : fsm
     =
     let m : fsm = Clone.fsm to_saturate in
