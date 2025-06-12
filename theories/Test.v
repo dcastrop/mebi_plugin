@@ -170,100 +170,84 @@ Module BisimTest1.
       termLTS (tfix t) a t'.
 
   (* true *)
-  (* MeBi Show Bisim
-    Of (tact TheAction1 tend)
-    With (tact TheAction1 tend)
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tact TheAction1 tend) With termLTS
+              And LTS Of (tact TheAction1 tend) With termLTS
+              Using termLTS.
 
   (* true *)
-  (* MeBi Show Bisim
-    Of (tact TheAction2 tend)
-    With (tact TheAction2 tend)
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tact TheAction2 tend) With termLTS
+              And LTS Of (tact TheAction2 tend) With termLTS
+              Using termLTS.
 
   (* false *)
-  (* MeBi Show Bisim
-    Of (tact TheAction1 tend)
-    With (tact TheAction2 tend)
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tact TheAction1 tend) With termLTS
+              And LTS Of (tact TheAction2 tend) With termLTS
+              Using termLTS.
 
   (* true *)
-  (* MeBi Show Bisim
-    Of (tact TheAction1 (tact TheAction2 tend))
-    With (tact TheAction1 (tact TheAction2 tend))
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tact TheAction1 (tact TheAction2 tend)) With termLTS
+              And LTS Of (tact TheAction1 (tact TheAction2 tend)) With termLTS
+              Using termLTS.
 
   (* true *)
-  (* MeBi Show Bisim
-    Of (tact TheAction2 (tact TheAction1 tend))
-    With (tact TheAction2 (tact TheAction1 tend))
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tact TheAction2 (tact TheAction1 tend)) With termLTS
+              And LTS Of (tact TheAction2 (tact TheAction1 tend)) With termLTS
+              Using termLTS.
 
-  (* false *) (* TODO: check this *)
-  (* MeBi Show Bisim
-    Of (tact TheAction2 (tact TheAction1 tend))
-    With (tact TheAction1 (tact TheAction2 tend))
-    Using termLTS. *)
+  (* false *) 
+  MeBi Check Bisim LTS Of (tact TheAction2 (tact TheAction1 tend)) With termLTS
+              And LTS Of (tact TheAction1 (tact TheAction2 tend)) With termLTS
+              Using termLTS.
 
   (* true *)
-  (* MeBi Show Bisim
-    Of (tpar TheAction1 TheAction2 tend)
-    With (tpar TheAction1 TheAction2 tend)
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tpar TheAction1 TheAction2 tend) With termLTS
+              And LTS Of (tpar TheAction1 TheAction2 tend) With termLTS
+              Using termLTS.
 
   (* true *)
-  (* MeBi Show Bisim
-    Of (tpar TheAction2 TheAction1 tend)
-    With (tpar TheAction2 TheAction1 tend)
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tpar TheAction2 TheAction1 tend) With termLTS
+              And LTS Of (tpar TheAction2 TheAction1 tend) With termLTS
+              Using termLTS.
 
   (* true *)
-  (* MeBi Show Bisim
-    Of (tpar TheAction1 TheAction2 tend)
-    With (tpar TheAction2 TheAction1 tend)
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tpar TheAction1 TheAction2 tend) With termLTS
+              And LTS Of (tpar TheAction2 TheAction1 tend) With termLTS
+              Using termLTS.
 
   (* true *)
-  (* MeBi Show Bisim
-    Of (tpar TheAction2 TheAction1 tend)
-    With (tpar TheAction1 TheAction2 tend)
-    Using termLTS. *)
-
-  (* true *)
-  (* MeBi Show Bisim
-    Of (tpar TheAction1 TheAction1 tend)
-    With (tact TheAction1 tend)
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tpar TheAction2 TheAction1 tend) With termLTS
+              And LTS Of (tpar TheAction1 TheAction2 tend) With termLTS
+              Using termLTS.
 
   (* false *)
-  (* MeBi Show Bisim
-    Of (tpar TheAction1 TheAction2 tend)
-    With (tact TheAction1 (tact TheAction2 tend))
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tpar TheAction1 TheAction1 tend) With termLTS
+              And LTS Of (tact TheAction1 tend) With termLTS
+              Using termLTS.
+
+  (* false *)
+  MeBi Check Bisim LTS Of (tpar TheAction1 TheAction2 tend) With termLTS
+              And LTS Of (tact TheAction1 (tact TheAction2 tend)) With termLTS
+              Using termLTS.
 
   (* true *)
-  (* MeBi Show Bisim
-    Of (tfix (tact TheAction1 trec))
-    With (tfix (tact TheAction1 trec))
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tfix (tact TheAction1 trec)) With termLTS
+              And LTS Of (tfix (tact TheAction1 trec)) With termLTS
+              Using termLTS.
 
   (* true *)
-  (* MeBi Show Bisim
-    Of (tfix (tact TheAction1 trec))
-    With (tfix (tact TheAction1 (tfix (tact TheAction1 trec))))
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tfix (tact TheAction1 trec)) With termLTS
+              And LTS Of (tfix (tact TheAction1 (tfix (tact TheAction1 trec)))) With termLTS
+              Using termLTS.
 
   (* true *)
-  (* MeBi Show Bisim
-    Of (tfix (tact TheAction1 (tact TheAction2 trec)))
-    With (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec)))))
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tfix (tact TheAction1 (tact TheAction2 trec))) With termLTS
+              And LTS Of (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))) With termLTS
+              Using termLTS.
 
   (* true *)
-  (* MeBi Show Bisim
-    Of (tfix (tact TheAction1 (tact TheAction2 trec)))
-    With (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec)))))
-    Using termLTS. *)
+  MeBi Check Bisim LTS Of (tfix (tact TheAction1 (tact TheAction2 trec))) With termLTS
+              And LTS Of (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))) With termLTS
+              Using termLTS. 
 
   (* minimize *)
   (* MeBi Show Minim
