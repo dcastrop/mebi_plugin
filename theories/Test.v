@@ -174,6 +174,9 @@ Module BisimTest1.
     Of (tact TheAction1 tend)
     With (tact TheAction1 tend)
     Using termLTS. *)
+  MeBi Show Bisim LTS Of (tact TheAction1 tend) With termLTS
+              And LTS Of (tact TheAction1 tend) With termLTS
+              Using termLTS.
 
   (* true *)
   (* MeBi Show Bisim

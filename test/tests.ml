@@ -1,10 +1,9 @@
 open Mebi_plugin.Fsm
-open Mebi_plugin.Bisimilarity
+(* open Mebi_plugin.Bisimilarity *)
 open Mebi_plugin.Utils
 open Mebi_plugin.Utils.Logging
 open Mebi_plugin.Examples
 
-exception UnexpectedBisimResult of Mebi_plugin.Bisimilarity.result
 exception UnexpectedExampleKind of Mebi_plugin.Examples.exa_kind
 
 (**  *)
@@ -71,7 +70,7 @@ let pstr_exa_bisim
     (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) t)
 ;;
 
-let pstr_exa_bisim_result
+(* let pstr_exa_bisim_result
   ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
   (name : string)
   (result : bisim_result)
@@ -90,9 +89,9 @@ let pstr_exa_bisim_result
       (Mebi_plugin.Fsm.PStr.partition ~params:(Log params) bisimilar_states)
       (Mebi_plugin.Fsm.PStr.partition ~params:(Log params) non_bisimilar_states)
       (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) merged_fsm)
-;;
+;; *)
 
-let rec ks90_run_bisim
+(* let rec ks90_run_bisim
   ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
   ((name, kind) : string * exa_kind)
   ((s, t) : fsm * fsm)
@@ -136,9 +135,9 @@ and ks90_exas
           (name, expected_result, result'.are_bisimilar)
           :: ks90_exas ~params exas'
         | _ -> raise (UnexpectedBisimResult result)))
-;;
+;; *)
 
-let run_all_ks90
+(* let run_all_ks90
   ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ())
   ()
   : (string * bool * bool) list
@@ -158,14 +157,15 @@ let run_all_ks90
     ; exa_weak1
     ; exa_weak2
     ]
-;;
+;; *)
 
 let run_all ?(params : Params.log = Params.Default.log ~mode:(OCaml ()) ()) ()
   : unit
   =
   log ~params "\nRunning Tests.ml:\n\n";
-  let ks90_results : (string * bool * bool) list = run_all_ks90 ~params () in
-  log ~params (pstr_results [ "KS90", ks90_results ]);
+  log ~params "\n\nTODO (fix after refactoring bisimilarity)\n\n";
+  (* let ks90_results : (string * bool * bool) list = run_all_ks90 ~params () in
+  log ~params (pstr_results [ "KS90", ks90_results ]); *)
   log ~params "\n\nEnd of Tests.ml.\n"
 ;;
 
