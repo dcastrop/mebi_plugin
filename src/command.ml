@@ -1179,6 +1179,7 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
   let* (graphM : (module GraphB)) = make_graph_builder in
   let module G = (val graphM) in
   let build_lts_graph
+    ?(primary_lts:Libnames.qualid option = None)
     (fail_if_incomplete:bool)
     (bound : int)
     (t : Constrexpr.constr_expr)
@@ -1201,6 +1202,18 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
     let the_fsm = Translate.to_fsm the_lts in
     handle_output o (FSM the_fsm)
   | Minim (f, b, t), l -> return ()
-  | Merge (x, y), l -> return ()
-  | Bisim (x, y), l -> return ()
+  | Merge (((f1, b1, t1), p1), ((f2, b2, t2), p2)), l -> (
+      let* the_lts_1, _ = build_lts_graph ~primary_lts:(Some p1) f1 b1 t1 l in
+      let the_fsm_1 = Translate.to_fsm (the_lts_1) in
+      let* the_lts_2, _ = build_lts_graph ~primary_lts:(Some p2) f2 b2 t2 l in
+      let the_fsm_2 = Translate.to_fsm (the_lts_2) in
+      let the_merged_fsm, _ = Fsm.Merge.fsms (the_fsm_1) the_fsm_2 in
+      handle_output o (Merge (the_fsm_1, the_fsm_2, the_merged_fsm)))
+  | Bisim (((f1, b1, t1), p1), ((f2, b2, t2), p2)), l -> (
+      let* the_lts_1, _ = build_lts_graph ~primary_lts:(Some p1) f1 b1 t1 l in
+      let the_fsm_1 = Translate.to_fsm (the_lts_1) in
+      let* the_lts_2, _ = build_lts_graph ~primary_lts:(Some p2) f2 b2 t2 l in
+      let the_fsm_2 = Translate.to_fsm (the_lts_2) in
+      let the_bisim_result = Bisimilarity.run ((the_fsm_1, the_fsm_2), None) in
+      handle_output o (Bisim the_bisim_result))
 ;;

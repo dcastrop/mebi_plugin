@@ -1155,18 +1155,21 @@ module Merge = struct
     base
   ;;
 
+  type merged_state_map = (state, state) Hashtbl.t
+  type merged_fsm_result_kind = fsm * merged_state_map
+
   let fsms
     ?(params : Params.log = Params.Default.log ~mode:(Coq ()) ())
     (base : fsm)
     (to_merge : fsm)
-    : fsm * (state, state) Hashtbl.t
+    : merged_fsm_result_kind
     =
     (* merge into [base] the fsm [to_merge] *)
     match base with
     | { init; alphabet; states; edges = edges'; _ } ->
       (* needed to keep track of [to_merge.states] new IDs *)
       let state_id_offset : int = States.cardinal states
-      and to_merge_state_map : (state, state) Hashtbl.t =
+      and to_merge_state_map : merged_state_map =
         States.cardinal to_merge.states |> Hashtbl.create
       in
       (* *)

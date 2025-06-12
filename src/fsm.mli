@@ -509,11 +509,14 @@ module Merge : sig
     Block.t Actions.t Edges.t ->
     Block.t Actions.t Edges.t
 
+  type merged_state_map = (state, state) Hashtbl.t
+  type merged_fsm_result_kind = fsm * merged_state_map
+
   val fsms :
     ?params:Utils.Logging.params ->
     fsm ->
     fsm ->
-    fsm * (state, state) Hashtbl.t
+    merged_fsm_result_kind
 end
 
 module Organize : sig
