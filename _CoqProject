@@ -6,7 +6,7 @@ src/META.coq-mebi
 -arg "-w all"
 
 theories/loader.v
-# theories/Test.v
+theories/Test.v
 
 examples/CADP.v
 examples/SimpleCADP.v

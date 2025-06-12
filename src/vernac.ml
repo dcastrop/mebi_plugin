@@ -1,4 +1,5 @@
 type output_kind =
+  | Check of unit
   | Show of unit
   | Dump of string option
 
@@ -9,7 +10,7 @@ type result_kind =
   | Merge of (Fsm.fsm * Fsm.fsm * Fsm.fsm)
   | Bisim of Bisimilarity.result
 
-type term_params = int * Constrexpr.constr_expr
+type term_params = bool * int * Constrexpr.constr_expr
 
 type run_kind =
   | LTS of term_params
