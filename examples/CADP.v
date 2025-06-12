@@ -1021,7 +1021,7 @@ Example P : tm :=
 (***************************)
 Example p0 : tm * env := (P, Env.initial 1).
 
-MeBi Dump "p0" LTS Bounded 33 Of p0 Using step.
+(* MeBi Dump "p0" LTS Bounded 33 Of p0 Using step. *)
 
 (* MeBi Dump "p0" FSM Bounded 150 Of p0 Using step. *)
 (* MeBi Dump "p0" Minim Bounded 33 Of p0 Using step. *)
@@ -1230,20 +1230,24 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 (**** System size: 1 *******)
 (***************************)
 Example g1 : sys * resource := compose (create 1 P).
-MeBi Dump "g1_noglue" LTS Bounded 37 Of g1 Using lts step.
+(* MeBi Dump "g1_noglue" LTS Bounded 37 Of g1 Using lts step. *)
 
-MeBi Dump "g1" LTS Bounded 5 Of g1 Using bigstep lts step.
+(* MeBi Dump "g1" LTS Bounded 5 Of g1 Using bigstep lts step. *)
 
-MeBi Dump "g1_LTS" LTS Bounded 5 Of g1 Using bigstep lts step.
+(* MeBi Dump "g1_LTS" LTS Bounded 5 Of g1 Using bigstep lts step. *)
 (* MeBi Dump "g1_FSM" FSM Bounded 5 Of g1 Using bigstep lts step. *)
-MeBi Show FSM Bounded 5 Of g1 Using bigstep lts step.
+(* MeBi Show FSM Bounded 5 Of g1 Using bigstep lts step. *)
+
+
 
 
 (***************************)
 (**** Bisimilar ? **********)
 (***************************)
 
-(* MeBi Show Bisim Bounded 33 Of g1 *)
+MeBi Show Bisim LTS Bounded 50 Of g1 With bigstep
+            And LTS Bounded 50 Of g1 With lts
+            Using bigstep lts step.
 
 (**********************************)
 (**** System size: 2 (identical) **)
@@ -1252,7 +1256,7 @@ Example g2 : sys * resource := compose (create 2 P).
 (* MeBi Dump "g2_noglue" LTS Bounded 5000 Of g2 Using lts step. *)
 
 (* MeBi Dump "g2" LTS Bounded 1024 Of g2 Using bigstep lts step. *)
-MeBi Dump "g2" LTS Bounded 8192 Of g2 Using bigstep lts step.
+(* MeBi Dump "g2" LTS Bounded 8192 Of g2 Using bigstep lts step. *)
 (* MeBi Dump "g2" LTS Bounded 16384 Of g2 Using bigstep lts step. *)
 (* MeBi Dump "g2" LTS Bounded 24000 Of g2 Using bigstep lts step. *)
 (* MeBi Dump "g2" LTS Bounded 32768 Of g2 Using bigstep lts step. *)
