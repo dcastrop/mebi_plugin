@@ -1238,6 +1238,7 @@ Example g1 : sys * resource := compose (create 1 P).
 (* MeBi Dump "g1_FSM" FSM Bounded 5 Of g1 Using bigstep lts step. *)
 (* MeBi Show FSM Bounded 5 Of g1 Using bigstep lts step. *)
 
+MeBi Show LTS Bounded 5 Of g1 Using bigstep lts step.
 
 
 

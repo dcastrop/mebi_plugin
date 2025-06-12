@@ -13,11 +13,14 @@ type result_kind =
 type term_params = bool * int * Constrexpr.constr_expr
 type term_lts_params = term_params * Libnames.qualid
 
+type bisim_lts_params =
+  term_lts_params * Libnames.qualid option
+
 type run_kind =
   | LTS of term_params
   | FSM of term_params
   | Minim of term_params
   | Merge of (term_lts_params * term_lts_params)
-  | Bisim of (term_lts_params * term_lts_params)
+  | Bisim of (bisim_lts_params * bisim_lts_params)
 
 type run_params = run_kind * Libnames.qualid list
