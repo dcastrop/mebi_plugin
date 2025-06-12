@@ -220,109 +220,109 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 (* check *)
 | [ "MeBi" "Check" "Merge" "LTS" "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Merge (((false, Command.default_bound, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Check" "Merge" "LTS" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Merge (((false, i1, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Check" "Merge" "LTS" "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Merge (((false, Command.default_bound, t1), l1), ((false, i2, t2), l2)), r))}
 
 | [ "MeBi" "Check" "Merge" "LTS" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Merge (((false, i1, t1), l1), ((false, i2, t2), l2)), r))}
 
 | [ "MeBi" "Check" "Merge" "LTS" "Is" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Merge (((true, i1, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Check" "Merge" "LTS" "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Is" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Merge (((false, Command.default_bound, t1), l1), ((true, i2, t2), l2)), r))}
 
 | [ "MeBi" "Check" "Merge" "LTS" "Is" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Is" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Merge (((true, i1, t1), l1), ((true, i2, t2), l2)), r))}
 
 (* show *)
 | [ "MeBi" "Show" "Merge" "LTS" "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Merge (((false, Command.default_bound, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Show" "Merge" "LTS" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Merge (((false, i1, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Show" "Merge" "LTS" "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Merge (((false, Command.default_bound, t1), l1), ((false, i2, t2), l2)), r))}
 
 | [ "MeBi" "Show" "Merge" "LTS" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Merge (((false, i1, t1), l1), ((false, i2, t2), l2)), r))}
 
 | [ "MeBi" "Show" "Merge" "LTS" "Is" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Merge (((true, i1, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Show" "Merge" "LTS" "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Is" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Merge (((false, Command.default_bound, t1), l1), ((true, i2, t2), l2)), r))}
 
 | [ "MeBi" "Show" "Merge" "LTS" "Is" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Is" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Merge (((true, i1, t1), l1), ((true, i2, t2), l2)), r))}
 
 (* dump -- unnamed *)
 | [ "MeBi" "Dump" "Merge" "LTS" "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Merge (((false, Command.default_bound, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Dump" "Merge" "LTS" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Merge (((false, i1, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Dump" "Merge" "LTS" "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Merge (((false, Command.default_bound, t1), l1), ((false, i2, t2), l2)), r))}
 
 | [ "MeBi" "Dump" "Merge" "LTS" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Merge (((false, i1, t1), l1), ((false, i2, t2), l2)), r))}
 
 | [ "MeBi" "Dump" "Merge" "LTS" "Is" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Merge (((true, i1, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Dump" "Merge" "LTS" "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Is" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Merge (((false, Command.default_bound, t1), l1), ((true, i2, t2), l2)), r))}
 
 | [ "MeBi" "Dump" "Merge" "LTS" "Is" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Is" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Merge (((true, i1, t1), l1), ((true, i2, t2), l2)), r))}
 
 (* dump -- named *)
@@ -372,109 +372,109 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 (* check *)
 | [ "MeBi" "Check" "Bisim" "LTS" "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Bisim (((false, Command.default_bound, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Check" "Bisim" "LTS" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Bisim (((false, i1, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Check" "Bisim" "LTS" "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Bisim (((false, Command.default_bound, t1), l1), ((false, i2, t2), l2)), r))}
 
 | [ "MeBi" "Check" "Bisim" "LTS" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Bisim (((false, i1, t1), l1), ((false, i2, t2), l2)), r))}
 
 | [ "MeBi" "Check" "Bisim" "LTS" "Is" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Bisim (((true, i1, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Check" "Bisim" "LTS" "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Is" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Bisim (((false, Command.default_bound, t1), l1), ((true, i2, t2), l2)), r))}
 
 | [ "MeBi" "Check" "Bisim" "LTS" "Is" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                      "And" "LTS" "Is" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                     "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.Bisim (((true, i1, t1), l1), ((true, i2, t2), l2)), r))}
 
 (* show *)
 | [ "MeBi" "Show" "Bisim" "LTS" "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Bisim (((false, Command.default_bound, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Show" "Bisim" "LTS" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Bisim (((false, i1, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Show" "Bisim" "LTS" "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Bisim (((false, Command.default_bound, t1), l1), ((false, i2, t2), l2)), r))}
 
 | [ "MeBi" "Show" "Bisim" "LTS" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Bisim (((false, i1, t1), l1), ((false, i2, t2), l2)), r))}
 
 | [ "MeBi" "Show" "Bisim" "LTS" "Is" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Bisim (((true, i1, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Show" "Bisim" "LTS" "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Is" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Bisim (((false, Command.default_bound, t1), l1), ((true, i2, t2), l2)), r))}
 
 | [ "MeBi" "Show" "Bisim" "LTS" "Is" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Is" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.Bisim (((true, i1, t1), l1), ((true, i2, t2), l2)), r))}
 
 (* dump -- unnamed *)
 | [ "MeBi" "Dump" "Bisim" "LTS" "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Bisim (((false, Command.default_bound, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Dump" "Bisim" "LTS" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Bisim (((false, i1, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Dump" "Bisim" "LTS" "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Bisim (((false, Command.default_bound, t1), l1), ((false, i2, t2), l2)), r))}
 
 | [ "MeBi" "Dump" "Bisim" "LTS" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Bisim (((false, i1, t1), l1), ((false, i2, t2), l2)), r))}
 
 | [ "MeBi" "Dump" "Bisim" "LTS" "Is" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Bisim (((true, i1, t1), l1), ((false, Command.default_bound, t2), l2)), r))}
 
 | [ "MeBi" "Dump" "Bisim" "LTS" "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Is" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Bisim (((false, Command.default_bound, t1), l1), ((true, i2, t2), l2)), r))}
 
 | [ "MeBi" "Dump" "Bisim" "LTS" "Is" "Bounded" int(i1) "Of" constr(t1) "With" reference(l1) 
                     "And" "LTS" "Is" "Bounded" int(i2) "Of" constr(t2) "With" reference(l2) 
-                           "Using" reference_list(r) ] ->
+                    "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.Bisim (((true, i1, t1), l1), ((true, i2, t2), l2)), r))}
 
 (* dump -- named *)
