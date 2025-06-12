@@ -451,6 +451,7 @@ module type GraphB = sig
   val build_graph
     :  ?params:Params.log
     -> ?primary_lts:Libnames.qualid option
+    -> ?weak:Libnames.qualid option
     -> int
     -> Constrexpr.constr_expr
     -> Names.GlobRef.t list
@@ -586,14 +587,14 @@ module MkGraph
   let _print_finished_build_graph
         ?(params : Params.log = default_params)
         (g : lts_graph)
-        (primary_enc:E.t)
+        (primary_enc : E.t)
     : unit mm
     =
     let is_complete = Queue.is_empty g.to_visit in
     let* primary_decoding = decode primary_enc in
     let primary_lts = econstr_to_string primary_decoding in
     if Bool.not is_complete
-    then(
+    then
       Log.override
         ~params
         (Printf.sprintf
@@ -603,7 +604,7 @@ module MkGraph
            (if is_complete then "complete" else "incomplete")
            primary_lts
            (S.cardinal g.states)
-           (num_transitions g.transitions)));
+           (num_transitions g.transitions));
     return ()
   ;;
 
@@ -914,6 +915,7 @@ module MkGraph
   let build_graph
         ?(params : Params.log = default_params)
         ?(primary_lts : Libnames.qualid option = None)
+        ?(weak : Libnames.qualid option = None)
         (bound : int)
         (tref : Constrexpr.constr_expr)
         (grefs : Names.GlobRef.t list)
@@ -1232,12 +1234,14 @@ let handle_output (o : output_kind) (r : result_kind) : unit mm =
 ;;
 
 exception ExceededBoundBeforeLTSCompleted of int
+exception WeakBisimilarityRequiresSilentConstrForEachTerm of unit
 
 let vernac (o : output_kind) (r : run_params) : unit mm =
   let* (graphM : (module GraphB)) = make_graph_builder in
   let module G = (val graphM) in
   let build_lts_graph
         ?(primary_lts : Libnames.qualid option = None)
+        ?(weak : Libnames.qualid option = None)
         (fail_if_incomplete : bool)
         (bound : int)
         (t : Constrexpr.constr_expr)
@@ -1245,7 +1249,7 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
     : (Lts.lts * G.DeCoq.coq_translation) mm
     =
     let lts_grefs : Names.GlobRef.t list = Mebi_utils.ref_list_to_glob_list l in
-    let* graph_lts = G.build_graph ~primary_lts bound t lts_grefs in
+    let* graph_lts = G.build_graph ~primary_lts ~weak bound t lts_grefs in
     let* the_lts_translation = G.DeCoq.lts_graph bound graph_lts in
     match
       fail_if_incomplete, Utils.is_complete (fst the_lts_translation).info
@@ -1269,11 +1273,23 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
     let the_fsm_2 = Translate.to_fsm the_lts_2 in
     let the_merged_fsm, _ = Fsm.Merge.fsms the_fsm_1 the_fsm_2 in
     handle_output o (Merge (the_fsm_1, the_fsm_2, the_merged_fsm))
-  | Bisim (((f1, b1, t1), p1), ((f2, b2, t2), p2)), l ->
-    let* the_lts_1, _ = build_lts_graph ~primary_lts:(Some p1) f1 b1 t1 l in
+  | Bisim ((((f1, b1, t1), p1), w1), (((f2, b2, t2), p2), w2)), l ->
+    let weak =
+      match w1, w2 with
+      | None, None -> false
+      | Some _, Some _ -> true
+      | _, _ -> raise (WeakBisimilarityRequiresSilentConstrForEachTerm ())
+    in
+    let* the_lts_1, _ =
+      build_lts_graph ~primary_lts:(Some p1) ~weak:w1 f1 b1 t1 l
+    in
     let the_fsm_1 = Translate.to_fsm the_lts_1 in
-    let* the_lts_2, _ = build_lts_graph ~primary_lts:(Some p2) f2 b2 t2 l in
+    let* the_lts_2, _ =
+      build_lts_graph ~primary_lts:(Some p2) ~weak:w2 f2 b2 t2 l
+    in
     let the_fsm_2 = Translate.to_fsm the_lts_2 in
-    let the_bisim_result = Bisimilarity.run ((the_fsm_1, the_fsm_2), None) in
+    let the_bisim_result =
+      Bisimilarity.run ~weak ((the_fsm_1, the_fsm_2), None)
+    in
     handle_output o (Bisim the_bisim_result)
 ;;
