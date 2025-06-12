@@ -2,31 +2,28 @@ Require Import MEBI.loader.
 
 Inductive i := C0 (i : nat) | C1 (b : bool) (j : nat) | C2 (x : nat).
 
-Fail MeBi Show LTS Of 0 Using i.
-
-Fail MeBi Show LTS Of 0 Using j.
+Fail MeBi Check LTS Of 0 Using i.
+Fail MeBi Check LTS Of 0 Using j.
 
 Definition k := 0.
-Fail MeBi Show LTS Of 0 Using k.
-
-Fail MeBi Show LTS Of 0 Using nat.
+Fail MeBi Check LTS Of 0 Using k.
+Fail MeBi Check LTS Of 0 Using nat.
 
 Definition nnat := nat.
-Fail MeBi Show LTS Of 0 Using nnat.
-
-Fail MeBi Show LTS Of 0 Using False.
+Fail MeBi Check LTS Of 0 Using nnat.
+Fail MeBi Check LTS Of 0 Using False.
 
 CoInductive co_nat := CoZ | CoS : co_nat -> co_nat.
 
 Inductive test_lts A : co_nat -> nat -> nat -> Prop :=
 | less_lt (x : A) (i : co_nat) (j : nat) : test_lts A (CoS i) 1 j.
 
-Fail MeBi Show LTS Of 0 Using test_lts.
+Fail MeBi Check LTS Of 0 Using test_lts.
 
 Inductive test_mut A : Prop := Mk1 (x : A) (y : test_mut2 A)
 with test_mut2 A : Prop := Mk2 (y : test_mut A).
 
-Fail MeBi Show LTS Of 0 Using test_mut2.
+Fail MeBi Check LTS Of 0 Using test_mut2.
 
 
 Inductive testLTS : nat -> bool -> nat -> Prop :=
@@ -35,18 +32,17 @@ Inductive testLTS : nat -> bool -> nat -> Prop :=
 
 Definition one := 1.
 
-(* FIXME: since [rlts_map] to be low crashes compilation, since [false] is [bool], and not found in [rlts_map] corresponding to [testLTS]. *)
-(* Fail MeBi Show LTS Of false Using testLTS. *)
+Fail MeBi Check LTS Of false Using testLTS.
 
-(* MeBi Show LTS Of 0 Using testLTS.
-MeBi Show LTS Of (S 0) Using testLTS.
-MeBi Show LTS Of (S (S 0)) Using testLTS.
-MeBi Show LTS Of (S (S (S 0))) Using testLTS.
+MeBi Check LTS Of 0 Using testLTS.
+MeBi Check LTS Of (S 0) Using testLTS.
+MeBi Check LTS Of (S (S 0)) Using testLTS.
+MeBi Check LTS Of (S (S (S 0))) Using testLTS.
 
-MeBi Show LTS Of one Using testLTS.
-MeBi Show LTS Of (S one) Using testLTS.
+MeBi Check LTS Of one Using testLTS.
+MeBi Check LTS Of (S one) Using testLTS.
 
-MeBi Show LTS Bounded 30 Of (S one) Using testLTS. *)
+MeBi Check LTS Bounded 30 Of (S one) Using testLTS.
 
 
 Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
@@ -55,12 +51,10 @@ Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
   .
 
 (* below cannot be finitely represented  *)
-(* MeBi Show LTS Bounded 50 Of 0 Using nonTerminatingTestLTS. *)
-(* MeBi Show LTS Of (S 0) Using nonTerminatingTestLTS. *)
-(* MeBi Show LTS Of (S (S 0)) Using nonTerminatingTestLTS. *)
-(* MeBi Show LTS Of (S (S (S 0))) Using nonTerminatingTestLTS. *)
-
-(* Definition boundedLTS (p:Prop) (n:nat) : Type := Prop * nat. *)
+MeBi Check LTS Bounded 50 Of 0 Using nonTerminatingTestLTS.
+MeBi Check LTS Of (S 0) Using nonTerminatingTestLTS.
+MeBi Check LTS Of (S (S 0)) Using nonTerminatingTestLTS.
+MeBi Check LTS Of (S (S (S 0))) Using nonTerminatingTestLTS.
 
 Module Test1.
   Inductive action : Set := | TheAction1 | TheAction2.
@@ -86,11 +80,11 @@ Module Test1.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
-  (* MeBi Show LTS Of (tfix (tact TheAction1 tend)) Using termLTS. *)
+  MeBi Check LTS Is Bounded 2 Of (tfix (tact TheAction1 tend)) Using termLTS.
 
-  (* MeBi Show LTS
+  MeBi Check LTS Is Bounded 2 
     Of (tfix (tact TheAction1 (tact TheAction2 trec)))
-    Using termLTS. *)
+    Using termLTS.
 
 End Test1.
 
@@ -124,21 +118,21 @@ Module Test2.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
-  (* MeBi Show LTS
+  MeBi Check LTS Is Bounded 2 
     Of (tfix (tact TheAction1 tend))
-    Using termLTS. *)
+    Using termLTS.
 
-  (* MeBi Show LTS
+  MeBi Check LTS Is Bounded 2 
     Of (tfix (tact TheAction1 (tact TheAction2 trec)))
-    Using termLTS. *)
+    Using termLTS.
 
-  (* MeBi Show LTS
+  MeBi Check LTS Is Bounded 2 
     Of (tfix (tpar TheAction1 TheAction2 trec))
-    Using termLTS. *)
+    Using termLTS.
 
-  (* MeBi Show LTS
+  MeBi Check LTS Is Bounded 2 
     Of (tfix (tpar TheAction1 TheAction2 trec))
-    Using termLTS. *)
+    Using termLTS.
 
 End Test2.
 
@@ -154,19 +148,6 @@ Module BisimTest1.
   | tfix : term -> term
   | tact : action -> term -> term
   | tpar : action -> action -> term -> term.
-  (* | tcho : choice -> term
-  with choice : Type := | nil | cons (o:action -> term -> term) (t:choice).
-  (* with opt : Type := topt : action -> term -> term. *)
-
-  Example exa1 : term := tcho (cons (tact TheAction1 tend) (cons (tact TheAction2 tend) nil)).
-  Print exa1.
-
-  Notation "x :: l" := (cons x l) (at level 60, right associativity).
-  Notation "[ ]" := nil.
-  Notation "[ x ; .. ; y ]" := (cons x .. (cons y nil) ..).
-
-  Example exa2 : term := tcho [(tact TheAction1 tend); (tact TheAction2 tend)].
-  Print exa2. *)
 
   Fixpoint subst (t1 : term) (t2 : term) :=
     match t2 with
@@ -175,10 +156,6 @@ Module BisimTest1.
     | tfix t => tfix t
     | tact a t => tact a (subst t1 t)
     | tpar a b t => tpar a b (subst t1 t)
-    (* | tcho c => match c with
-                | nil => c
-                | ()
-                end *)
     end.
 
   Inductive termLTS : term -> action -> term -> Prop :=
@@ -187,8 +164,6 @@ Module BisimTest1.
   | do_par1 : forall a b t, termLTS (tpar a b t) a (tact b t)
 
   | do_par2 : forall a b t, termLTS (tpar a b t) b (tact a t)
-
-  (* | do_cho1 : forall a b t, termLTS (tcho ) *)
 
   | do_fix : forall a t t',
       termLTS (subst (tfix t) t) a t' ->

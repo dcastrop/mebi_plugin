@@ -1158,6 +1158,7 @@ let result_to_string (r : result_kind) : string =
 
 let handle_output (o : output_kind) (r : result_kind) : unit mm =
   match o with
+  | Check () -> return ()
   | Show () ->
     let s : string = result_to_string r in
     Log.normal ~params:default_params s;
@@ -1172,28 +1173,34 @@ let handle_output (o : output_kind) (r : result_kind) : unit mm =
     return ()
 ;;
 
+exception ExceededBoundBeforeLTSCompleted of (int)
+
 let vernac (o : output_kind) (r : run_params) : unit mm =
   let* (graphM : (module GraphB)) = make_graph_builder in
   let module G = (val graphM) in
   let build_lts_graph
-    (b : int)
+    (fail_if_incomplete:bool)
+    (bound : int)
     (t : Constrexpr.constr_expr)
     (l : Libnames.qualid list)
     : (Lts.lts * G.DeCoq.coq_translation) mm
     =
     let lts_grefs : Names.GlobRef.t list = Mebi_utils.ref_list_to_glob_list l in
-    let* graph_lts = G.build_graph b t lts_grefs in
-    G.DeCoq.lts_graph b graph_lts
+    let* graph_lts = G.build_graph bound t lts_grefs in
+    let* the_lts_translation = G.DeCoq.lts_graph bound graph_lts in
+    match fail_if_incomplete, Utils.is_complete (fst the_lts_translation).info with
+    | true, Some false -> raise (ExceededBoundBeforeLTSCompleted bound)
+    | _, _ -> return the_lts_translation
   in
   match r with
-  | LTS (b, t), l ->
-    let* the_lts, _ = build_lts_graph b t l in
+  | LTS (f, b, t), l ->
+    let* the_lts, _ = build_lts_graph f b t l in
     handle_output o (LTS the_lts)
-  | FSM (b, t), l ->
-    let* the_lts, _ = build_lts_graph b t l in
+  | FSM (f, b, t), l ->
+    let* the_lts, _ = build_lts_graph f b t l in
     let the_fsm = Translate.to_fsm the_lts in
     handle_output o (FSM the_fsm)
-  | Minim (b, t), l -> return ()
+  | Minim (f, b, t), l -> return ()
   | Merge (x, y), l -> return ()
   | Bisim (x, y), l -> return ()
 ;;
