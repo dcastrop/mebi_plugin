@@ -1021,7 +1021,7 @@ Example P : tm :=
 (***************************)
 Example p0 : tm * env := (P, Env.initial 1).
 
-(* MeBi Dump "p0" LTS Bounded 33 Of p0 Using step. *)
+MeBi Dump "p0" LTS Bounded 33 Of p0 Using step.
 
 (* MeBi Dump "p0" FSM Bounded 150 Of p0 Using step. *)
 (* MeBi Dump "p0" Minim Bounded 33 Of p0 Using step. *)
@@ -1246,8 +1246,14 @@ MeBi Show LTS Bounded 5 Of g1 Using bigstep lts step.
 (**** Bisimilar ? **********)
 (***************************)
 
+(* false *)
 MeBi Show Bisim LTS Bounded 50 Of g1 With bigstep
             And LTS Bounded 50 Of g1 With lts
+            Using bigstep lts step.
+
+(* true ? *)
+MeBi Show Bisim LTS Bounded 50 Of g1  With bigstep  Weak SILENT Of action
+            And LTS Bounded 50 Of g1  With lts      Weak SILENT Of action
             Using bigstep lts step.
 
 (**********************************)
