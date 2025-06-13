@@ -16,7 +16,8 @@ type term_params = bool * int * Constrexpr.constr_expr
 (** [term_params * primary_lts] *)
 type term_lts_params = term_params * Libnames.qualid
 
-type bisim_lts_params = term_lts_params * Libnames.qualid option
+type weak_bisim_params = Constrexpr.constr_expr * Libnames.qualid
+type bisim_lts_params = term_lts_params * weak_bisim_params option
 
 type run_kind =
   | LTS of term_params

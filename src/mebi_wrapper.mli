@@ -1,9 +1,19 @@
 type term = Evd.econstr
 
-type coq_context =
-  { coq_env : Environ.env
-  ; coq_ctx : Evd.evar_map
-  }
+val default_params : unit -> Utils.Logging.params
+val enable_logging : bool ref
+
+type coq_context = {
+  coq_env : Environ.env;
+  coq_ctx : Evd.evar_map;
+}
+
+val coq_env_wrapper : Environ.env ref option ref
+val new_coq_env : unit -> Environ.env ref
+val the_coq_env : ?fresh:bool -> unit -> Environ.env ref
+val coq_ctx_wrapper : Evd.evar_map ref option ref
+val new_coq_ctx : ?fresh:bool -> unit -> Evd.evar_map ref
+val the_coq_ctx : ?fresh:bool -> unit -> Evd.evar_map ref
 
 module F : sig
   type key = term
@@ -21,8 +31,13 @@ module F : sig
   val replace : 'a t -> key -> 'a -> unit
   val mem : 'a t -> key -> bool
   val iter : (key -> 'a -> unit) -> 'a t -> unit
-  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+  val filter_map_inplace :
+    (key -> 'a -> 'a option) -> 'a t -> unit
+
+  val fold :
+    (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
   val length : 'a t -> int
   val stats : 'a t -> Hashtbl.statistics
   val to_seq : 'a t -> (key * 'a) Seq.t
@@ -61,8 +76,13 @@ module type ENCODING_TYPE = sig
     val replace : 'a t -> key -> 'a -> unit
     val mem : 'a t -> key -> bool
     val iter : (key -> 'a -> unit) -> 'a t -> unit
-    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+    val filter_map_inplace :
+      (key -> 'a -> 'a option) -> 'a t -> unit
+
+    val fold :
+      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
     val length : 'a t -> int
     val stats : 'a t -> Hashtbl.statistics
     val to_seq : 'a t -> (key * 'a) Seq.t
@@ -86,17 +106,13 @@ module IntEncoding : ENCODING_TYPE
 module E = IntEncoding
 module B = E.Tbl
 
-type wrapper =
-  { coq_ref : coq_context ref
-  ; fwd_enc : E.t F.t
-  ; bck_enc : term B.t
-  }
+type wrapper = {
+  coq_ref : coq_context ref;
+  fwd_enc : E.t F.t;
+  bck_enc : term B.t;
+}
 
-type 'a in_context =
-  { state : wrapper ref
-  ; value : 'a
-  }
-
+type 'a in_context = { state : wrapper ref; value : 'a }
 type 'a mm = wrapper ref -> 'a in_context
 
 val run : ?keep_encoding:bool -> 'a mm -> 'a
@@ -112,30 +128,36 @@ module type ERROR_TYPE = sig
     | InvalidArity of Environ.env * Evd.evar_map * Constr.t
     | InvalidLTSRef of Names.GlobRef.t
     | UnknownTermType of
-        (Environ.env * Evd.evar_map * (term * term * term list))
-    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
-    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
+        (Environ.env
+        * Evd.evar_map
+        * (term * term * term list))
+    | PrimaryLTSNotFound of
+        (Environ.env * Evd.evar_map * term * term list)
+    | UnknownDecodeKey of
+        (Environ.env * Evd.evar_map * E.t * term B.t)
+    | ExpectedCoqIndDefOfLTSNotType of unit
 
   exception MEBI_exn of mebi_error
 
   val invalid_sort : Sorts.family -> exn
-  val invalid_arity : Environ.env -> Evd.evar_map -> Constr.t -> exn
+
+  val invalid_arity :
+    Environ.env -> Evd.evar_map -> Constr.t -> exn
+
   val invalid_ref : Names.GlobRef.t -> exn
+  val invalid_cindef_kind : unit -> exn
 
-  val unknown_term_type
-    :  Environ.env
-    -> Evd.evar_map
-    -> term * term * term list
-    -> exn
+  val unknown_term_type :
+    Environ.env ->
+    Evd.evar_map ->
+    term * term * term list ->
+    exn
 
-  val primary_lts_not_found
-    :  Environ.env
-    -> Evd.evar_map
-    -> term
-    -> term list
-    -> exn
+  val primary_lts_not_found :
+    Environ.env -> Evd.evar_map -> term -> term list -> exn
 
-  val unknown_decode_key : Environ.env -> Evd.evar_map -> E.t -> term B.t -> exn
+  val unknown_decode_key :
+    Environ.env -> Evd.evar_map -> E.t -> term B.t -> exn
 end
 
 module Error : ERROR_TYPE
@@ -143,6 +165,7 @@ module Error : ERROR_TYPE
 val invalid_arity : Constr.t -> 'a mm
 val invalid_sort : Sorts.family -> 'a mm
 val invalid_ref : Names.GlobRef.t -> 'a mm
+val invalid_cindef_kind : 'b -> 'a mm
 val unknown_term_type : term * term * term list -> 'a mm
 val primary_lts_not_found : term * term list -> 'a mm
 val unknown_decode_key : E.t * term B.t -> 'a mm
@@ -151,10 +174,10 @@ val get_sigma : wrapper ref -> Evd.evar_map in_context
 val get_fwd_enc : wrapper ref -> E.t F.t in_context
 val get_bck_enc : wrapper ref -> term B.t in_context
 
-val state
-  :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-  -> wrapper ref
-  -> 'a in_context
+val state :
+  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) ->
+  wrapper ref ->
+  'a in_context
 
 val sandbox : 'a mm -> wrapper ref -> 'a in_context
 val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit mm
@@ -163,17 +186,21 @@ module type MEBI_MONAD_SYNTAX = sig
   val ( let+ ) : 'a mm -> ('a -> 'b) -> 'b mm
   val ( let* ) : 'a mm -> ('a -> 'b mm) -> 'b mm
 
-  val ( let$ )
-    :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-    -> ('a -> 'b mm)
-    -> 'b mm
+  val ( let$ ) :
+    (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) ->
+    ('a -> 'b mm) ->
+    'b mm
 
-  val ( let$* )
-    :  (Environ.env -> Evd.evar_map -> Evd.evar_map)
-    -> (unit -> 'b mm)
-    -> 'b mm
+  val ( let$* ) :
+    (Environ.env -> Evd.evar_map -> Evd.evar_map) ->
+    (unit -> 'b mm) ->
+    'b mm
 
-  val ( let$+ ) : (Environ.env -> Evd.evar_map -> 'a) -> ('a -> 'b mm) -> 'b mm
+  val ( let$+ ) :
+    (Environ.env -> Evd.evar_map -> 'a) ->
+    ('a -> 'b mm) ->
+    'b mm
+
   val ( and+ ) : 'a mm -> 'b mm -> ('a * 'b) mm
 end
 
@@ -181,6 +208,10 @@ module Syntax : MEBI_MONAD_SYNTAX
 
 val encode : term -> E.t mm
 val decode : E.t -> term mm
+val encode_opt : term -> E.t option mm
+val decode_opt : E.t -> term option mm
+val has_encoding : term -> bool mm
+val has_decoding : E.t -> bool mm
 val encode_map : 'a F.t -> 'a B.t mm
 val decode_map : 'a B.t -> 'a F.t mm
 val constr_to_string : Constr.t -> string
@@ -204,14 +235,13 @@ val normalize_econstr : term -> term mm
 val type_of_econstr : term -> term mm
 val type_of_tref : Constrexpr.constr_expr -> term mm
 
-val make_transition_tbl
-  :  wrapper ref
-  -> (module Hashtbl.S with type key = E.t) in_context
+val make_transition_tbl :
+  wrapper ref ->
+  (module Hashtbl.S with type key = E.t) in_context
 
-val make_state_set
-  :  wrapper ref
-  -> (module Set.S with type elt = E.t) in_context
+val make_state_set :
+  wrapper ref -> (module Set.S with type elt = E.t) in_context
 
-val make_state_tree_pair_set
-  :  wrapper ref
-  -> (module Set.S with type elt = E.t * Constr_tree.t) in_context
+val make_state_tree_pair_set :
+  wrapper ref ->
+  (module Set.S with type elt = E.t * Constr_tree.t) in_context

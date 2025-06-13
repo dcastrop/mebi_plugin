@@ -236,12 +236,14 @@ module type ERROR_TYPE = sig
         (Environ.env * Evd.evar_map * (term * term * term list))
     | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
     | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
+    | ExpectedCoqIndDefOfLTSNotType of unit
 
   exception MEBI_exn of mebi_error
 
   val invalid_sort : Sorts.family -> exn
   val invalid_arity : Environ.env -> Evd.evar_map -> Constr.types -> exn
   val invalid_ref : Names.GlobRef.t -> exn
+  val invalid_cindef_kind : unit -> exn
 
   val unknown_term_type
     :  Environ.env
@@ -268,6 +270,7 @@ module Error : ERROR_TYPE = struct
         (Environ.env * Evd.evar_map * (term * term * term list))
     | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
     | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
+    | ExpectedCoqIndDefOfLTSNotType of unit
 
   exception MEBI_exn of mebi_error
 
@@ -279,6 +282,9 @@ module Error : ERROR_TYPE = struct
 
   (** Error when input LTS reference is invalid (e.g. non existing) *)
   let invalid_ref r = MEBI_exn (InvalidLTSRef r)
+
+  (** Error when input LTS reference is invalid (e.g. non existing) *)
+  let invalid_cindef_kind () = MEBI_exn (ExpectedCoqIndDefOfLTSNotType ())
 
   (** Error when term is of unknown type *)
   let unknown_term_type ev sg tmty = MEBI_exn (UnknownTermType (ev, sg, tmty))
@@ -296,6 +302,10 @@ module Error : ERROR_TYPE = struct
   open Pp
 
   let mebi_handler = function
+    | ExpectedCoqIndDefOfLTSNotType () ->
+      str
+        "cindef (Coq Inductive Definition) of LTS was expected, but Type was \
+         used."
     | InvalidLTSSort f ->
       str "Invalid LTS Sort: expecting Prop, got " ++ Sorts.pr_sort_family f
     | InvalidArity (ev, sg, t) ->
@@ -348,7 +358,14 @@ module Error : ERROR_TYPE = struct
                      (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg k)))
                  trkeys))
     | PrimaryLTSNotFound (ev, sg, t, names) ->
-      str "(TODO: primary lts not found error)"
+      str "Primary LTS Not found for term: "
+      ++ Printer.pr_econstr_env ev sg t
+      ++ strbrk "\n\n"
+      ++ str "constructor names: "
+      ++ List.fold_left
+           (fun (acc : Pp.t) (name : EConstr.t) -> acc)
+           (Printer.pr_econstr_env ev sg (List.hd names))
+           (List.tl names)
     | UnknownDecodeKey (ev, sg, k, bckmap) ->
       str "(TODO: unknown decode key error)"
   ;;
@@ -378,6 +395,11 @@ let invalid_sort (x : Sorts.family) : 'a mm =
 (** Error when input LTS reference is invalid (e.g. non existing) *)
 let invalid_ref (x : Names.GlobRef.t) : 'a mm =
   fun st -> raise (Error.invalid_ref x)
+;;
+
+(** Error when input LTS reference is invalid (e.g. non existing) *)
+let invalid_cindef_kind unit : 'a mm =
+  fun st -> raise (Error.invalid_cindef_kind ())
 ;;
 
 (** Error when term is of unknown type *)
@@ -493,6 +515,44 @@ let decode (k : E.t) : term mm =
   fun (st : wrapper ref) ->
   let decoding : term = E.decode !st.bck_enc k in
   { state = st; value = decoding }
+;;
+
+(********************************************)
+(****** ENCODE/DECODE OPT *******************)
+(********************************************)
+
+let encode_opt (k : term) : E.t option mm =
+  fun (st : wrapper ref) ->
+  match F.find_opt !st.fwd_enc k with
+  | None -> { state = st; value = None }
+  | Some e -> { state = st; value = Some e }
+;;
+
+(** dual to [encode] except we cannot handle new values *)
+let decode_opt (k : E.t) : term option mm =
+  fun (st : wrapper ref) ->
+  match B.find_opt !st.bck_enc k with
+  | None -> { state = st; value = None }
+  | Some e -> { state = st; value = Some e }
+;;
+
+(********************************************)
+(****** ENCODE/DECODE CHECKs ****************)
+(********************************************)
+
+let has_encoding (k : term) : bool mm =
+  fun (st : wrapper ref) ->
+  match F.find_opt !st.fwd_enc k with
+  | None -> { state = st; value = false }
+  | Some _ -> { state = st; value = true }
+;;
+
+(** dual to [encode] except we cannot handle new values *)
+let has_decoding (k : E.t) : bool mm =
+  fun (st : wrapper ref) ->
+  match B.find_opt !st.bck_enc k with
+  | None -> { state = st; value = false }
+  | Some _ -> { state = st; value = true }
 ;;
 
 (**********************************)

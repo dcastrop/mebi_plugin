@@ -21,6 +21,16 @@ let default_params : Params.log = Params.Default.log ~mode:(Coq ()) ()
 *)
 let default_bound : int = 10
 
+let arity_is_type (mip : Declarations.one_inductive_body) : unit mm =
+  let open Declarations in
+  match mip.mind_arity with
+  | RegularArity s ->
+    (match s.mind_sort with
+     | Type _ -> return ()
+     | _ -> invalid_sort (Sorts.family s.mind_sort))
+  | TemplateArity t -> invalid_sort (Sorts.family t.template_level)
+;;
+
 (** [arity_is_prop mip] raises an error if [mip.mind_arity] is not a [prop]. *)
 let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
   let open Declarations in
@@ -57,57 +67,119 @@ let get_lts_labels_and_terms
 ;;
 
 (** *)
-type raw_lts =
+(* type raw_lts =
   { index : int
   ; coq_lts : EConstr.t
   ; trm_type : EConstr.types
   ; lbl_type : EConstr.types
   ; coq_ctor_names : Names.Id.t array
   ; constructor_transitions : (Constr.rel_context * Constr.types) array
-  }
+  } *)
 
 (* type term_type_map = (EConstr.types, raw_lts) Hashtbl.t *)
 
-(** [_log_raw_lts] *)
-let _log_raw_lts ?(params : Params.log = default_params) (rlts : raw_lts)
-  : unit mm
+(** coq_inductive_lts *)
+type cind_lts =
+  { trm_type : EConstr.t
+  ; lbl_type : EConstr.t
+  ; constr_transitions : (Constr.rel_context * Constr.t) array
+  }
+
+type coq_def_kind =
+  | Type of unit
+  | LTS of cind_lts
+
+(** coq_inductive_def_info *)
+type cindef_info =
+  { name : EConstr.t
+  ; constr_names : Names.variable array
+  }
+
+(** coq_inductive_def *)
+type cindef =
+  { index : int
+  ; info : cindef_info
+  ; kind : coq_def_kind
+  }
+
+let lts_cindef_trm_type (c : cindef) : EConstr.t mm =
+  match c.kind with LTS l -> return l.trm_type | _ -> invalid_cindef_kind ()
+;;
+
+let _lts_cindef_lbl_type (c : cindef) : EConstr.t mm =
+  match c.kind with LTS l -> return l.lbl_type | _ -> invalid_cindef_kind ()
+;;
+
+let lts_cindef_constr_transitions (c : cindef)
+  : (Constr.rel_context * Constr.t) array mm
   =
-  Log.override
-    ~params
-    (Printf.sprintf
-       "(a) Types of terms: %s.\n"
-       (econstr_to_string rlts.trm_type));
-  Log.override
-    ~params
-    (Printf.sprintf
-       "(b)\n   Types of labels: %s.\n"
-       (econstr_to_string rlts.lbl_type));
-  Log.override
-    ~params
-    (Printf.sprintf
-       "(c) Constructors: %s.\n"
-       (Pp.string_of_ppcmds
-          (Pp.prvect_with_sep
-             (fun _ -> Pp.str ", ")
-             Names.Id.print
-             rlts.coq_ctor_names)));
-  Log.override
-    ~params
-    (Printf.sprintf
-       "(d) Types of\n   coq_lts: %s.\n"
-       (econstr_to_string rlts.coq_lts));
-  (* log ~params (Printf.sprintf "(f) Transitions (do not be alarmed by any
-     _UNBOUND_ below): %s.\n" (if Array.length rlts.constructor_transitions < 1
-     then "[] (empty)" else Printf.sprintf "[%s]" (Array.fold_left (fun (acc :
-     string) (tr : Constr.rel_context * Constr.t) -> Printf.sprintf "%s %s\n"
-     acc (constr_to_string (snd tr))) "\n" rlts.constructor_transitions))); *)
+  match c.kind with
+  | LTS l -> return l.constr_transitions
+  | _ -> invalid_cindef_kind ()
+;;
+
+(** [_log_cindef] *)
+let _log_cindef ?(params : Params.log = default_params) (c : cindef) : unit mm =
+  let name = econstr_to_string c.info.name in
+  let constr_names =
+    Pp.string_of_ppcmds
+      (Pp.prvect_with_sep
+         (fun _ -> Pp.str ", ")
+         Names.Id.print
+         c.info.constr_names)
+  in
+  (match c.kind with
+   | Type () ->
+     Log.normal
+       (Printf.sprintf "cindef Type: %s\nconstrs: %s\n" name constr_names)
+   | LTS l ->
+     let term_type = econstr_to_string l.trm_type in
+     let label_type = econstr_to_string l.lbl_type in
+     let constr_transitions =
+       if Array.length l.constr_transitions < 1
+       then "[] (empty)"
+       else
+         Printf.sprintf
+           "[%s]"
+           (Array.fold_left
+              (fun (acc : string) (tr : Constr.rel_context * Constr.t) ->
+                Printf.sprintf "%s %s\n" acc (constr_to_string (snd tr)))
+              "\n"
+              l.constr_transitions)
+     in
+     Log.normal
+       (Printf.sprintf
+          "cindef LTS: %s\n\
+           constrs: %s\n\
+           term type: %s\n\
+           label type: %s\n\
+           constr transitions: %s\n"
+          name
+          constr_names
+          term_type
+          label_type
+          constr_transitions));
   return ()
 ;;
 
-(** [check_ref_lts gref] is the [raw_lts] of [gref].
+let check_ref_type (gref : Names.GlobRef.t) : cindef_info mm =
+  let open Names.GlobRef in
+  match gref with
+  | IndRef i ->
+    let* env = get_env in
+    let mib, mip = Inductive.lookup_mind_specif env i in
+    let* _ = arity_is_type mip in
+    let univ = mib.mind_univ_hyps in
+    let type_term = EConstr.mkIndU (i, EConstr.EInstance.make univ) in
+    return { name = type_term; constr_names = mip.mind_consnames }
+  (* raise error if [gref] is not an inductive type *)
+  | _ -> invalid_ref gref
+;;
+
+(** [check_ref_lts gref] is the [cindef] of [gref].
 
     @raise invalid_ref if [gref] is not a reference to an inductive type. *)
-let check_ref_lts (index : int) (gref : Names.GlobRef.t) : raw_lts mm =
+let check_ref_lts (gref : Names.GlobRef.t) : (cindef_info * cind_lts) mm =
   let open Names.GlobRef in
   match gref with
   | IndRef i ->
@@ -117,17 +189,25 @@ let check_ref_lts (index : int) (gref : Names.GlobRef.t) : raw_lts mm =
     let* lbl, term = get_lts_labels_and_terms mib mip in
     let univ = mib.mind_univ_hyps in
     (* lts of inductive type *)
-    let lts = EConstr.mkIndU (i, EConstr.EInstance.make univ) in
+    let lts_term = EConstr.mkIndU (i, EConstr.EInstance.make univ) in
     return
-      { index
-      ; coq_lts = lts
-      ; trm_type = EConstr.of_constr (Context.Rel.Declaration.get_type term)
-      ; lbl_type = EConstr.of_constr (Context.Rel.Declaration.get_type lbl)
-      ; coq_ctor_names = mip.mind_consnames
-      ; constructor_transitions = mip.mind_nf_lc
-      }
+      ( { name = lts_term; constr_names = mip.mind_consnames }
+      , { trm_type = EConstr.of_constr (Context.Rel.Declaration.get_type term)
+        ; lbl_type = EConstr.of_constr (Context.Rel.Declaration.get_type lbl)
+        ; constr_transitions = mip.mind_nf_lc
+        } )
   (* raise error if [gref] is not an inductive type *)
   | _ -> invalid_ref gref
+;;
+
+let get_lts_cindef (i : int) (gref : Names.GlobRef.t) : cindef mm =
+  let* ((c_info, c_lts) : cindef_info * cind_lts) = check_ref_lts gref in
+  return { index = i; info = c_info; kind = LTS c_lts }
+;;
+
+let get_type_cindef (i : int) (gref : Names.GlobRef.t) : cindef mm =
+  let* (c_info : cindef_info) = check_ref_type gref in
+  return { index = i; info = c_info; kind = Type () }
 ;;
 
 (* FIXME: All of the code below, up to [check_valid_constructor] needs
@@ -279,7 +359,7 @@ let rec retrieve_tgt_nodes
 let rec check_updated_ctx
           ?(params : Params.log = default_params)
           (acc : int * (Constr_tree.t * unif_problem) list list)
-          (fn_rlts : raw_lts F.t)
+          (fn_cindef : cindef F.t)
   :  EConstr.t list * EConstr.rel_declaration list
   -> (int * (Constr_tree.t * unif_problem) list list) option mm
   = function
@@ -291,24 +371,26 @@ let rec check_updated_ctx
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with
      | App (fn, args) ->
-       (match F.find_opt fn_rlts fn with
+       (match F.find_opt fn_cindef fn with
         | None ->
           Log.warning
             ~params
             (Printf.sprintf
-               "check_updated_ctx, fn_rlts does not have corresponding fn: %s."
+               "check_updated_ctx, fn_cindef does not have corresponding fn: \
+                %s."
                (econstr_to_string fn));
-          check_updated_ctx acc fn_rlts (substl, tl)
-        | Some rlts ->
+          check_updated_ctx acc fn_cindef (substl, tl)
+        | Some c ->
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
+          let* c_constr_transitions = lts_cindef_constr_transitions c in
           let* ctors =
             check_valid_constructor
               ~params
-              rlts.constructor_transitions
-              fn_rlts
+              c_constr_transitions
+              fn_cindef
               nextT
               (Some args.(1))
-              rlts.index
+              c.index
           in
           if List.is_empty ctors
           then return None
@@ -332,9 +414,9 @@ let rec check_updated_ctx
               , List.concat_map
                   (fun x -> List.map (fun y -> y :: x) ctors)
                   (snd acc) )
-              fn_rlts
+              fn_cindef
               (substl, tl)))
-     | _ -> check_updated_ctx acc fn_rlts (substl, tl))
+     | _ -> check_updated_ctx acc fn_cindef (substl, tl))
   | _, _ -> assert false
 (* Impossible! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
@@ -343,7 +425,7 @@ let rec check_updated_ctx
 and check_valid_constructor
       ?(params : Params.log = default_params)
       (ctor_transitions : (Constr.rel_context * Constr.types) array)
-      (fn_rlts : raw_lts F.t)
+      (fn_cindef : cindef F.t)
       (t' : EConstr.t)
       (ma : EConstr.t option)
       (lts_index : int)
@@ -373,7 +455,11 @@ and check_valid_constructor
         let* (next_ctors :
                (int * (Constr_tree.t * unif_problem) list list) option)
           =
-          check_updated_ctx ~params (lts_index, [ [] ]) fn_rlts (substl, ctx_tys)
+          check_updated_ctx
+            ~params
+            (lts_index, [ [] ])
+            fn_cindef
+            (substl, ctx_tys)
         in
         let$+ act env sigma = Reductionops.nf_all env sigma act in
         let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in
@@ -442,8 +528,9 @@ module type GraphB = sig
 
   val build_lts_graph
     :  ?params:Params.log
-    -> raw_lts
-    -> raw_lts B.t
+    -> ?weak:E.t option
+    -> cindef
+    -> cindef B.t
     -> lts_graph
     -> int
     -> lts_graph mm
@@ -451,7 +538,7 @@ module type GraphB = sig
   val build_graph
     :  ?params:Params.log
     -> ?primary_lts:Libnames.qualid option
-    -> ?weak:Libnames.qualid option
+    -> ?weak:Vernac.weak_bisim_params option
     -> int
     -> Constrexpr.constr_expr
     -> Names.GlobRef.t list
@@ -479,7 +566,7 @@ module MkGraph
     (N : Set.S with type elt = E.t)
     (P : Set.S with type elt = E.t * Constr_tree.t) : GraphB = struct
   (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t] and also
-     is used for mapping term types to [raw_lts]. *)
+     is used for mapping term types to [cindef]. *)
   module H = M
 
   (* [S] is the set of states, of [EConstr.t]. *)
@@ -567,7 +654,7 @@ module MkGraph
   (******** below are debugging printouts *******************************)
   (**********************************************************************)
 
-  let _print_constr_names (rlts_map : raw_lts H.t) : unit mm =
+  let _print_constr_names (cindef_map : cindef H.t) : unit mm =
     Log.override
       ~params:default_params
       (Printf.sprintf
@@ -577,9 +664,9 @@ module MkGraph
             ""
             (H.fold
                (fun _k v (acc : string list) ->
-                 let l : string = econstr_to_string v.coq_lts in
+                 let l : string = econstr_to_string v.info.name in
                  if List.mem l acc then acc else l :: acc)
-               rlts_map
+               cindef_map
                [])));
     return ()
   ;;
@@ -755,8 +842,19 @@ module MkGraph
     return ()
   ;;
 
+  let is_silent_transition (weak : E.t option) (act : EConstr.t) : bool mm =
+    match weak with
+    | None -> return false
+    | Some w ->
+      let* act_encoding = encode_opt act in
+      (match act_encoding with
+       | None -> return false
+       | Some e -> return (E.eq w e))
+  ;;
+
   let get_new_states
         ?(params : Params.log = default_params)
+        ?(weak : E.t option = None)
         (t : E.t)
         (g : lts_graph)
         (ctors : coq_ctor list)
@@ -765,9 +863,7 @@ module MkGraph
     let iter_body (i : int) (new_states : S.t) =
       let (act, tgt, int_tree) : coq_ctor = List.nth ctors i in
       let* (encoding : E.t) = encode tgt in
-      (* let* sigma = get_sigma in *)
-      (* TODO: detect tau transitions and then defer to [Fsm.tau] instead. *)
-      let is_tau : bool = false in
+      let* is_tau : bool = is_silent_transition weak act in
       let (label : string) = econstr_to_string act in
       let to_add : Mebi_action.action = { label; is_tau } in
       let* _ =
@@ -797,15 +893,16 @@ module MkGraph
   let get_new_constrs
         ?(params : Params.log = default_params)
         (encoded_t : E.t)
-        (primary : raw_lts)
-        (rlts_map : raw_lts B.t)
+        (primary : cindef)
+        (rlts_map : cindef B.t)
     : coq_ctor list mm
     =
     let* (t : EConstr.t) = decode encoded_t in
-    let* (decoded_map : raw_lts F.t) = decode_map rlts_map in
+    let* (decoded_map : cindef F.t) = decode_map rlts_map in
+    let* primary_constr_transitions = lts_cindef_constr_transitions primary in
     check_valid_constructor
       ~params
-      primary.constructor_transitions
+      primary_constr_transitions
       decoded_map
       t
       None
@@ -813,14 +910,15 @@ module MkGraph
   ;;
 
   (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
-      @param fn_rlts maps coq-term names to [raw_lts].
+      @param fn_rlts maps coq-term names to [cindef].
       @param g is an [lts_graph] accumulated while exploring [rlts].
       @param bound is the number of states to explore until.
       @return an [lts_graph] with a maximum of [bound] many states. *)
   let rec build_lts_graph
             ?(params : Params.log = default_params)
-            (primary : raw_lts)
-            (rlts_map : raw_lts B.t)
+            ?(weak : E.t option = None)
+            (the_primary_lts : cindef)
+            (rlts_map : cindef B.t)
             (g : lts_graph)
             (bound : int)
     : lts_graph mm
@@ -833,105 +931,148 @@ module MkGraph
     else (
       let encoded_t : E.t = Queue.pop g.to_visit in
       let* (new_constrs : coq_ctor list) =
-        get_new_constrs ~params encoded_t primary rlts_map
+        get_new_constrs ~params encoded_t the_primary_lts rlts_map
       in
       (* [get_new_states] also updates [g.to_visit] *)
       let* (new_states : S.t) =
-        get_new_states ~params encoded_t g new_constrs
+        get_new_states ~params ~weak encoded_t g new_constrs
       in
       let g : lts_graph = { g with states = S.union g.states new_states } in
       (* let* _ = _run_all_checks ~prefix:"build_graph, " g in *)
-      build_lts_graph ~params primary rlts_map g bound)
+      build_lts_graph ~params the_primary_lts rlts_map g bound)
+  ;;
+
+  let check_for_primary_lts
+        (c : cindef)
+        (ty : EConstr.t)
+        ((fn_opt, cindef_map) : E.t option * cindef B.t)
+    : (E.t option * cindef B.t) mm
+    =
+    (* normalize term type and check if primary *)
+    let* term_type = lts_cindef_trm_type c in
+    let* (trmty : EConstr.t) = normalize_econstr term_type in
+    let* sigma = get_sigma in
+    match fn_opt, EConstr.eq_constr sigma ty trmty with
+    | None, true ->
+      let* (encoding : E.t) = encode c.info.name in
+      return (Some encoding, cindef_map)
+    | Some _, true ->
+      Log.warning
+        ~params:default_params
+        (Printf.sprintf
+           "Found inductive definition that could be primary, when primary has \
+            already been selected.\n\
+            Please make sure that the primary LTS is provided first when using \
+            the command.");
+      return (fn_opt, cindef_map)
+    | _, false -> return (fn_opt, cindef_map)
+  ;;
+
+  let handle_weak_lts
+        (weak : Vernac.weak_bisim_params option)
+        (cindef_map : cindef B.t)
+        (i : int)
+    : E.t option mm
+    =
+    match weak with
+    | None -> return None
+    | Some (a, constr_ref) ->
+      let constr = Mebi_utils.ref_to_glob constr_ref in
+      let* (c : cindef) = get_type_cindef i constr in
+      (* add name of inductive prop *)
+      let* (encoding : E.t) = encode c.info.name in
+      B.add cindef_map encoding c;
+      return (Some encoding)
+  ;;
+
+  let resolve_primary_lts
+        ?(primary_lts : Libnames.qualid option = None)
+        (primary_enc_opt : E.t option)
+        (ty : EConstr.t)
+        (cindef_map : cindef B.t)
+        (i : int)
+    : E.t mm
+    =
+    match primary_lts with
+    | None ->
+      (* if no primary explicitly provided, check we found one. *)
+      (match primary_enc_opt with
+       | None ->
+         let* decoded_map = decode_map cindef_map in
+         primary_lts_not_found (ty, List.of_seq (F.to_seq_keys decoded_map))
+       | Some p -> return p)
+    | Some primary_lts ->
+      (* obtain the encoding for the explicitly provide primary lts *)
+      let* (c : cindef) =
+        get_lts_cindef i (Mebi_utils.ref_to_glob primary_lts)
+      in
+      let* (encoding : E.t) = encode c.info.name in
+      return encoding
   ;;
 
   (** @return
         the key for the primary lts and hashtable mapping the name of the coq definition to the rlts.
   *)
-  let build_rlts_map
-        ?(disable_warning : bool = false)
+  let build_cindef_map
+        ?(primary_lts : Libnames.qualid option = None)
+        ?(weak : Vernac.weak_bisim_params option = None)
         (t' : EConstr.t)
         (grefs : Names.GlobRef.t list)
-    : (E.t * raw_lts B.t) mm
+    : (E.t * E.t option * cindef B.t) mm
     =
     (* normalize the initial term *)
     let* (t : EConstr.t) = normalize_econstr t' in
     let* (ty : EConstr.t) = type_of_econstr t in
     (* prepare for iterating through [grefs] *)
     let num_grefs : int = List.length grefs in
-    let trmap : raw_lts B.t = B.create num_grefs in
-    let iter_body (i : int) ((fn_opt, acc_map) : E.t option * raw_lts B.t) =
+    let trmap : cindef B.t = B.create num_grefs in
+    let iter_body (i : int) ((fn_opt, acc_map) : E.t option * cindef B.t) =
       let gref : Names.GlobRef.t = List.nth grefs i in
-      let* (rlts : raw_lts) = check_ref_lts i gref in
+      let* (c : cindef) = get_lts_cindef i gref in
       (* add name of inductive prop *)
-      let* (encoding : E.t) = encode rlts.coq_lts in
-      B.add acc_map encoding rlts;
-      (* normalize term type and check if primary *)
-      let* (trmty : EConstr.t) = normalize_econstr rlts.trm_type in
-      let* sigma = get_sigma in
-      match fn_opt, EConstr.eq_constr sigma ty trmty with
-      | None, true ->
-        let* (encoding : E.t) = encode rlts.coq_lts in
-        return (Some encoding, acc_map)
-      | Some _, true ->
-        if Bool.not disable_warning
-        then
-          Log.warning
-            ~params:default_params
-            (Printf.sprintf
-               "Found inductive definition that could be primary, when primary \
-                has already been selected.\n\
-                Please make sure that the primary LTS is provided first when \
-                using the command.");
-        return (fn_opt, acc_map)
-      | _, false -> return (fn_opt, acc_map)
+      let* (encoding : E.t) = encode c.info.name in
+      B.add acc_map encoding c;
+      (* check if primary lts *)
+      if Option.has_some primary_lts
+      then return (fn_opt, acc_map)
+      else check_for_primary_lts c ty (fn_opt, acc_map)
     in
-    let* primary, rlts_map =
+    let* (primary_enc_opt, cindef_map) : E.t option * cindef B.t =
       iterate 0 (num_grefs - 1) (None, trmap) iter_body
     in
-    match primary with
-    | None ->
-      let* decoded_map = decode_map rlts_map in
-      primary_lts_not_found (ty, List.of_seq (F.to_seq_keys decoded_map))
-    | Some p -> return (p, rlts_map)
-  ;;
-
-  let resolve_primary_lts (explicit : Libnames.qualid option) (obtained : E.t)
-    : E.t mm
-    =
-    match explicit with
-    | None -> return obtained
-    | Some explicit ->
-      let* (rlts : raw_lts) =
-        check_ref_lts 0 (Mebi_utils.ref_to_glob explicit)
-      in
-      let* (encoding : E.t) = encode rlts.coq_lts in
-      return encoding
+    let* (the_primary_enc : E.t) =
+      resolve_primary_lts ~primary_lts primary_enc_opt ty cindef_map num_grefs
+    in
+    let* weak_enc_opt : E.t option =
+      handle_weak_lts weak cindef_map (num_grefs + 1)
+    in
+    return (the_primary_enc, weak_enc_opt, cindef_map)
   ;;
 
   (** [build_graph rlts_map fn_rlts tref bound] is the entry point for [build_lts_graph].
-      @param rlts_map maps coq-term types to [raw_lts].
+      @param rlts_map maps coq-term types to [cindef].
       @param tref is the original coq-term.
       @param bound is the number of states to explore until. *)
   let build_graph
         ?(params : Params.log = default_params)
         ?(primary_lts : Libnames.qualid option = None)
-        ?(weak : Libnames.qualid option = None)
+        ?(weak : Vernac.weak_bisim_params option = None)
         (bound : int)
         (tref : Constrexpr.constr_expr)
         (grefs : Names.GlobRef.t list)
     : lts_graph mm
     =
-    (* should be able to get the type now -- fail otherwise *)
-    let* (t : EConstr.t) = tref_to_econstr tref in
     (* make map of term types *)
-    let* (primary, rlts_map) : E.t * raw_lts B.t =
-      build_rlts_map ~disable_warning:(Option.has_some primary_lts) t grefs
+    let* (t : EConstr.t) = tref_to_econstr tref in
+    let* (the_primary_enc, the_weak_opt_enc, cindef_map)
+      : E.t * E.t option * cindef B.t
+      =
+      build_cindef_map ~primary_lts ~weak t grefs
     in
-    (* resolve the primary lts *)
-    let* the_primary_lts = resolve_primary_lts primary_lts primary in
     (* update environment by typechecking *)
-    let (the_lts : raw_lts) = B.find rlts_map the_primary_lts in
-    let$* u env sigma = Typing.check env sigma t the_lts.trm_type in
+    let (the_primary_lts : cindef) = B.find cindef_map the_primary_enc in
+    let* primary_trm_type = lts_cindef_trm_type the_primary_lts in
+    let$* u env sigma = Typing.check env sigma t primary_trm_type in
     let$ init env sigma = sigma, Reductionops.nf_all env sigma t in
     let* encoded_init = encode init in
     let q = Queue.create () in
@@ -939,8 +1080,9 @@ module MkGraph
     let* g =
       build_lts_graph
         ~params
-        the_lts
-        rlts_map
+        ~weak:the_weak_opt_enc
+        the_primary_lts
+        cindef_map
         { to_visit = q
         ; states = S.empty
         ; init = encoded_init
@@ -948,7 +1090,7 @@ module MkGraph
         }
         bound
     in
-    let* _ = _print_finished_build_graph ~params g the_primary_lts in
+    let* _ = _print_finished_build_graph ~params g the_primary_enc in
     (* let* _ = _run_all_checks ~prefix:"build_graph, " g in *)
     return g
   ;;
@@ -1149,11 +1291,11 @@ end
 (** [make_graph_builder] is ... *)
 let make_graph_builder =
   let* h = make_transition_tbl in
-  (* hashtabl of terms to (edges) or (raw_lts) *)
+  (* hashtabl of terms to (edges) or (cindef) *)
   let* s = make_state_set in
   (* set of states (econstr term) *)
   let* d = make_state_tree_pair_set in
-  (* hashtabl mapping term type or raw_lts *)
+  (* hashtabl mapping term type or cindef *)
   let module G : GraphB = MkGraph ((val h)) ((val s)) ((val d)) in
   return (module G : GraphB)
 ;;
@@ -1241,7 +1383,7 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
   let module G = (val graphM) in
   let build_lts_graph
         ?(primary_lts : Libnames.qualid option = None)
-        ?(weak : Libnames.qualid option = None)
+        ?(weak : weak_bisim_params option = None)
         (fail_if_incomplete : bool)
         (bound : int)
         (t : Constrexpr.constr_expr)
