@@ -13,17 +13,19 @@ type result_kind =
 (** [fail_if_incomplete * bounds * initial_term] *)
 type term_params = bool * int * Constrexpr.constr_expr
 
-(** [term_params * primary_lts] *)
-type term_lts_params = term_params * Libnames.qualid
+(** [silent_transition * type_of_actions] *)
+type weak_params = Constrexpr.constr_expr * Libnames.qualid
 
-type weak_bisim_params = Constrexpr.constr_expr * Libnames.qualid
-type bisim_lts_params = term_lts_params * weak_bisim_params option
+(** [(term_params * weak_params) * ]*)
+type lts_params = term_params * weak_params option
+
+type multi_lts_params = lts_params * Libnames.qualid
 
 type run_kind =
-  | LTS of term_params
-  | FSM of term_params
-  | Minim of term_params
-  | Merge of (term_lts_params * term_lts_params)
-  | Bisim of (bisim_lts_params * bisim_lts_params)
+  | LTS of lts_params
+  | FSM of lts_params
+  | Minim of lts_params
+  | Merge of (multi_lts_params * multi_lts_params)
+  | Bisim of (multi_lts_params * multi_lts_params)
 
 type run_params = run_kind * Libnames.qualid list

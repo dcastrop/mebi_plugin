@@ -85,9 +85,9 @@ let get_filename ((n, f) : string * filename_kind) (is_complete_str : string)
 type filetype_kind = JSON of unit
 
 let build_filename
-  (fnk : string * filename_kind)
-  (filetype : filetype_kind)
-  (is_complete : bool option)
+      (fnk : string * filename_kind)
+      (filetype : filetype_kind)
+      (is_complete : bool option)
   : string
   =
   let is_complete_str =
@@ -101,10 +101,10 @@ let build_filename
 ;;
 
 let build_filepath
-  (output_dir : output_dir_kind)
-  (fnk : string * filename_kind)
-  (filetype : filetype_kind)
-  (is_complete : bool option)
+      (output_dir : output_dir_kind)
+      (fnk : string * filename_kind)
+      (filetype : filetype_kind)
+      (is_complete : bool option)
   : string
   =
   match output_dir, filetype with
@@ -115,7 +115,8 @@ let build_filepath
   | Exact s, _ -> Filename.concat s (build_filename fnk filetype is_complete)
 ;;
 
-(** https://discuss.ocaml.org/t/how-to-create-a-new-file-while-automatically-creating-any-intermediate-directories/14837/5 *)
+(** https://discuss.ocaml.org/t/how-to-create-a-new-file-while-automatically-creating-any-intermediate-directories/14837/5
+*)
 let rec create_parent_dir (fn : string) =
   let parent_dir = Filename.dirname fn in
   if not (Sys.file_exists parent_dir)
@@ -157,9 +158,11 @@ type json_state = json_state_name * json_state_info
    String.compare (snd a) (snd b) | n -> n ;; end) *)
 
 type json_edge_info = string
+type json_edge_silent = string
 
 type json_edge =
-  (json_state_name * json_state_name) * (json_action_name * json_edge_info)
+  (json_state_name * json_state_name)
+  * (json_action_name * json_edge_silent * json_edge_info)
 
 (* module JSON_Edges = Set.Make (struct type t = json_edge
 
@@ -187,6 +190,10 @@ let string_opt (s : string option) : string =
   match s with None -> "null" | Some s -> Printf.sprintf "\"%s\"" (clean s)
 ;;
 
+let bool_opt (b : bool option) : string =
+  match b with None -> "null" | Some b -> Printf.sprintf "%b" b
+;;
+
 let is_model_complete (m : json_model) : bool option =
   match m.info.extra with None -> None | Some e -> Some e.is_complete
 ;;
@@ -212,7 +219,8 @@ let to_json_model (filename : string) (model : Vernac.result_kind) : json_model 
       Lts.Transitions.fold
         (fun (edge : Lts.transition) (acc : json_edge Queue.t) ->
           Queue.push
-            ((edge.from, edge.destination), (edge.label, string_opt edge.info))
+            ( (edge.from, edge.destination)
+            , (edge.label, bool_opt edge.is_silent, string_opt edge.info) )
             acc;
           acc)
         s.transitions
@@ -352,7 +360,8 @@ let write_json_edges_to_file (oc : out_channel) (i : json_edge Queue.t) : unit =
       match n with
       | 0 -> ()
       | _ ->
-        let (from_state, dest_state), (action_label, action_info) =
+        let (from_state, dest_state), (action_label, action_silent, action_info)
+          =
           Queue.pop i
         in
         Printf.fprintf oc "%s" (handle_if_first is_first);
@@ -360,7 +369,8 @@ let write_json_edges_to_file (oc : out_channel) (i : json_edge Queue.t) : unit =
         Printf.fprintf oc "\t\t\t\"from\": \"%s\",\n" from_state;
         Printf.fprintf oc "\t\t\t\"dest\": \"%s\",\n" dest_state;
         Printf.fprintf oc "\t\t\t\"labl\": \"%s\",\n" action_label;
-        Printf.fprintf oc "\t\t\t\"info\": %s\n" action_info;
+        Printf.fprintf oc "\t\t\t\"info\": %s,\n" action_info;
+        Printf.fprintf oc "\t\t\t\"tau\": %s\n" action_silent;
         Printf.fprintf oc "\t\t}";
         iterate (n - 1) ()
     in
@@ -389,10 +399,10 @@ let write_json_to_file (m : json_model) (filepath : string) : unit =
 ;;
 
 let write_to_file
-  (output_dir : output_dir_kind)
-  (fnk : string option * filename_kind)
-  (filetype : filetype_kind)
-  (result : Vernac.result_kind)
+      (output_dir : output_dir_kind)
+      (fnk : string option * filename_kind)
+      (filetype : filetype_kind)
+      (result : Vernac.result_kind)
   : string
   =
   let filename = match fst fnk with None -> "unknown" | Some n -> n in

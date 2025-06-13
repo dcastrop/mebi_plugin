@@ -11,19 +11,15 @@ type result_kind =
   | Bisim of Bisimilarity.result_kind
 
 type term_params = bool * int * Constrexpr.constr_expr
-type term_lts_params = term_params * Libnames.qualid
-
-type weak_bisim_params =
-  Constrexpr.constr_expr * Libnames.qualid
-
-type bisim_lts_params =
-  term_lts_params * weak_bisim_params option
+type weak_params = Constrexpr.constr_expr * Libnames.qualid
+type lts_params = term_params * weak_params option
+type multi_lts_params = lts_params * Libnames.qualid
 
 type run_kind =
-  | LTS of term_params
-  | FSM of term_params
-  | Minim of term_params
-  | Merge of (term_lts_params * term_lts_params)
-  | Bisim of (bisim_lts_params * bisim_lts_params)
+  | LTS of lts_params
+  | FSM of lts_params
+  | Minim of lts_params
+  | Merge of (multi_lts_params * multi_lts_params)
+  | Bisim of (multi_lts_params * multi_lts_params)
 
 type run_params = run_kind * Libnames.qualid list

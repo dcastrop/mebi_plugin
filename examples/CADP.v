@@ -1022,6 +1022,7 @@ Example P : tm :=
 Example p0 : tm * env := (P, Env.initial 1).
 
 MeBi Dump "p0" LTS Bounded 33 Of p0 Using step.
+MeBi Dump "p0-silent" LTS Bounded 33 Of p0 Weak SILENT Of action Using step.
 
 (* MeBi Dump "p0" FSM Bounded 150 Of p0 Using step. *)
 (* MeBi Dump "p0" Minim Bounded 33 Of p0 Using step. *)
@@ -1238,7 +1239,7 @@ Example g1 : sys * resource := compose (create 1 P).
 (* MeBi Dump "g1_FSM" FSM Bounded 5 Of g1 Using bigstep lts step. *)
 (* MeBi Show FSM Bounded 5 Of g1 Using bigstep lts step. *)
 
-MeBi Show LTS Bounded 5 Of g1 Using bigstep lts step.
+(* MeBi Show LTS Bounded 5 Of g1 Using bigstep lts step. *)
 
 
 
