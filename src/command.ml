@@ -86,7 +86,7 @@ type cind_lts =
   }
 
 type coq_def_kind =
-  | Type of unit
+  | Type of EConstr.t option
   | LTS of cind_lts
 
 (** coq_inductive_def_info *)
@@ -119,7 +119,17 @@ let lts_cindef_constr_transitions (c : cindef)
 ;;
 
 (** [_log_cindef] *)
-let _log_cindef ?(params : Params.log = default_params) (c : cindef) : unit mm =
+let _log_cindef
+      ?(params : Params.log = default_params)
+      ?(key : E.t option)
+      (c : cindef)
+  : unit mm
+  =
+  let key_str =
+    match key with
+    | None -> ""
+    | Some k -> Printf.sprintf "(key %s) " (E.to_string k)
+  in
   let name = econstr_to_string c.info.name in
   let constr_names =
     Pp.string_of_ppcmds
@@ -129,37 +139,78 @@ let _log_cindef ?(params : Params.log = default_params) (c : cindef) : unit mm =
          c.info.constr_names)
   in
   (match c.kind with
-   | Type () ->
+   | Type v ->
+     let opt_val_str =
+       match v with None -> "(no value given)" | Some v -> econstr_to_string v
+     in
      Log.normal
-       (Printf.sprintf "cindef Type: %s\nconstrs: %s\n" name constr_names)
+       (Printf.sprintf
+          "cindef %sType: %s\nof value: %s\nconstrs: %s\n"
+          key_str
+          name
+          opt_val_str
+          constr_names)
    | LTS l ->
      let term_type = econstr_to_string l.trm_type in
      let label_type = econstr_to_string l.lbl_type in
      let constr_transitions =
-       if Array.length l.constr_transitions < 1
-       then "[] (empty)"
-       else
-         Printf.sprintf
-           "[%s]"
-           (Array.fold_left
-              (fun (acc : string) (tr : Constr.rel_context * Constr.t) ->
-                Printf.sprintf "%s %s\n" acc (constr_to_string (snd tr)))
-              "\n"
-              l.constr_transitions)
+       "..."
+       (* if Array.length l.constr_transitions < 1
+          then "[] (empty)"
+          else
+          Printf.sprintf
+          "[%s]"
+          (Array.fold_left
+          (fun (acc : string) (tr : Constr.rel_context * Constr.t) ->
+          Printf.sprintf "%s %s\n" acc (constr_to_string (snd tr)))
+          "\n"
+          l.constr_transitions) *)
      in
      Log.normal
        (Printf.sprintf
-          "cindef LTS: %s\n\
+          "cindef %sLTS: %s\n\
            constrs: %s\n\
            term type: %s\n\
            label type: %s\n\
-           constr transitions: %s\n"
+           constr transitions: %s"
+          key_str
           name
           constr_names
           term_type
           label_type
           constr_transitions));
   return ()
+;;
+
+let _log_cindef_map
+      ?(params : Params.log = default_params)
+      (primary_enc : E.t)
+      (weak_enc : E.t option)
+      (cindef_map : cindef B.t)
+  : unit mm
+  =
+  Log.normal "\n/////////// log cindef map";
+  (* output cindef map*)
+  let cindef_list = List.of_seq (B.to_seq cindef_map) in
+  let iter_body (i : int) () =
+    let key, c = List.nth cindef_list i in
+    _log_cindef ~params ~key c
+  in
+  let* _ = iterate 0 (List.length cindef_list - 1) () iter_body in
+  (* output primary lts *)
+  Log.normal
+    (Printf.sprintf "cindef, primary: (enc => %s)" (E.to_string primary_enc));
+  (* output weak type *)
+  match weak_enc with
+  | None ->
+    Log.normal (Printf.sprintf "cindef, no weak enc.");
+    Log.normal "///////////\n";
+    return ()
+  | Some w ->
+    Log.normal (Printf.sprintf "cindef, weak: (enc => %s)" (E.to_string w));
+    let* _ = _log_cindef ~params ~key:w (B.find cindef_map w) in
+    Log.normal "///////////\n";
+    return ()
 ;;
 
 let check_ref_type (gref : Names.GlobRef.t) : cindef_info mm =
@@ -205,9 +256,11 @@ let get_lts_cindef (i : int) (gref : Names.GlobRef.t) : cindef mm =
   return { index = i; info = c_info; kind = LTS c_lts }
 ;;
 
-let get_type_cindef (i : int) (gref : Names.GlobRef.t) : cindef mm =
+let get_type_cindef (i : int) (gref : Names.GlobRef.t) (v : EConstr.t option)
+  : cindef mm
+  =
   let* (c_info : cindef_info) = check_ref_type gref in
-  return { index = i; info = c_info; kind = Type () }
+  return { index = i; info = c_info; kind = Type v }
 ;;
 
 (* FIXME: All of the code below, up to [check_valid_constructor] needs
@@ -538,7 +591,7 @@ module type GraphB = sig
   val build_graph
     :  ?params:Params.log
     -> ?primary_lts:Libnames.qualid option
-    -> ?weak:Vernac.weak_bisim_params option
+    -> ?weak:Vernac.weak_params option
     -> int
     -> Constrexpr.constr_expr
     -> Names.GlobRef.t list
@@ -842,14 +895,37 @@ module MkGraph
     return ()
   ;;
 
-  let is_silent_transition (weak : E.t option) (act : EConstr.t) : bool mm =
+  let is_silent_transition (weak : E.t option) (act : EConstr.t)
+    : bool option mm
+    =
     match weak with
-    | None -> return false
+    | None ->
+      (* Log.warning ~params:default_params "NO SILENT"; *)
+      return None
     | Some w ->
       let* act_encoding = encode_opt act in
       (match act_encoding with
-       | None -> return false
-       | Some e -> return (E.eq w e))
+       | None ->
+         (* let* w_term = decode w in
+            let w_label = econstr_to_string w_term in
+            let a_label = econstr_to_string act in
+            Log.warning
+            ~params:default_params
+            (Printf.sprintf
+            "is_silent_transition: (no decode) (str => %b)"
+            (String.equal a_label w_label)); *)
+         return (Some false)
+       | Some e ->
+         (* let* w_term = decode w in
+            let w_label = econstr_to_string w_term in
+            let a_label = econstr_to_string act in
+            Log.warning
+            ~params:default_params
+            (Printf.sprintf
+            "is_silent_transition: (enc => %b) (str => %b)"
+            (E.eq w e)
+            (String.equal a_label w_label)); *)
+         return (Some (E.eq w e)))
   ;;
 
   let get_new_states
@@ -863,7 +939,7 @@ module MkGraph
     let iter_body (i : int) (new_states : S.t) =
       let (act, tgt, int_tree) : coq_ctor = List.nth ctors i in
       let* (encoding : E.t) = encode tgt in
-      let* is_tau : bool = is_silent_transition weak act in
+      let* is_tau : bool option = is_silent_transition weak act in
       let (label : string) = econstr_to_string act in
       let to_add : Mebi_action.action = { label; is_tau } in
       let* _ =
@@ -939,7 +1015,7 @@ module MkGraph
       in
       let g : lts_graph = { g with states = S.union g.states new_states } in
       (* let* _ = _run_all_checks ~prefix:"build_graph, " g in *)
-      build_lts_graph ~params the_primary_lts rlts_map g bound)
+      build_lts_graph ~params ~weak the_primary_lts rlts_map g bound)
   ;;
 
   let check_for_primary_lts
@@ -969,20 +1045,26 @@ module MkGraph
   ;;
 
   let handle_weak_lts
-        (weak : Vernac.weak_bisim_params option)
+        (weak : Vernac.weak_params option)
         (cindef_map : cindef B.t)
         (i : int)
     : E.t option mm
     =
     match weak with
-    | None -> return None
-    | Some (a, constr_ref) ->
+    | None ->
+      (* Log.override "handle_weak_lts NO WEAK"; *)
+      return None
+    | Some (a_ref, constr_ref) ->
+      let* (a : EConstr.t) = tref_to_econstr a_ref in
       let constr = Mebi_utils.ref_to_glob constr_ref in
-      let* (c : cindef) = get_type_cindef i constr in
-      (* add name of inductive prop *)
-      let* (encoding : E.t) = encode c.info.name in
-      B.add cindef_map encoding c;
-      return (Some encoding)
+      let* (c : cindef) = get_type_cindef i constr (Some a) in
+      (* encode silent action type *)
+      let* (constr_enc : E.t) = encode c.info.name in
+      B.add cindef_map constr_enc c;
+      (* return encode silent action *)
+      let* (a_enc : E.t) = encode a in
+      B.add cindef_map a_enc c;
+      return (Some a_enc)
   ;;
 
   let resolve_primary_lts
@@ -1015,7 +1097,7 @@ module MkGraph
   *)
   let build_cindef_map
         ?(primary_lts : Libnames.qualid option = None)
-        ?(weak : Vernac.weak_bisim_params option = None)
+        ?(weak : Vernac.weak_params option = None)
         (t' : EConstr.t)
         (grefs : Names.GlobRef.t list)
     : (E.t * E.t option * cindef B.t) mm
@@ -1056,7 +1138,7 @@ module MkGraph
   let build_graph
         ?(params : Params.log = default_params)
         ?(primary_lts : Libnames.qualid option = None)
-        ?(weak : Vernac.weak_bisim_params option = None)
+        ?(weak : Vernac.weak_params option = None)
         (bound : int)
         (tref : Constrexpr.constr_expr)
         (grefs : Names.GlobRef.t list)
@@ -1069,6 +1151,9 @@ module MkGraph
       =
       build_cindef_map ~primary_lts ~weak t grefs
     in
+    (* let* _ =
+      _log_cindef_map ~params the_primary_enc the_weak_opt_enc cindef_map
+    in *)
     (* update environment by typechecking *)
     let (the_primary_lts : cindef) = B.find cindef_map the_primary_enc in
     let* primary_trm_type = lts_cindef_trm_type the_primary_lts in
@@ -1223,7 +1308,8 @@ module MkGraph
           decode_constr_tree_lts constr_tree
         in
         let constr_tree_str : string = pstr_decoded_tree decoded_constr_tree in
-        return ((from_str, a_str, dest_str, Some constr_tree_str) :: acc)
+        return
+          ((from_str, a_str, dest_str, a.is_tau, Some constr_tree_str) :: acc)
       in
       iterate 0 (List.length transitions_list - 1) [] iter_body
     ;;
@@ -1383,7 +1469,7 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
   let module G = (val graphM) in
   let build_lts_graph
         ?(primary_lts : Libnames.qualid option = None)
-        ?(weak : weak_bisim_params option = None)
+        ?(weak : weak_params option = None)
         (fail_if_incomplete : bool)
         (bound : int)
         (t : Constrexpr.constr_expr)
@@ -1400,22 +1486,22 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
     | _, _ -> return the_lts_translation
   in
   match r with
-  | LTS (f, b, t), l ->
-    let* the_lts, _ = build_lts_graph f b t l in
+  | LTS ((f, b, t), w), l ->
+    let* the_lts, _ = build_lts_graph ~weak:w f b t l in
     handle_output o (LTS the_lts)
-  | FSM (f, b, t), l ->
-    let* the_lts, _ = build_lts_graph f b t l in
+  | FSM ((f, b, t), w), l ->
+    let* the_lts, _ = build_lts_graph ~weak:w f b t l in
     let the_fsm = Translate.to_fsm the_lts in
     handle_output o (FSM the_fsm)
-  | Minim (f, b, t), l -> return ()
-  | Merge (((f1, b1, t1), p1), ((f2, b2, t2), p2)), l ->
+  | Minim ((f, b, t), w), l -> return ()
+  | Merge ((((f1, b1, t1), w1), p1), (((f2, b2, t2), w2), p2)), l ->
     let* the_lts_1, _ = build_lts_graph ~primary_lts:(Some p1) f1 b1 t1 l in
     let the_fsm_1 = Translate.to_fsm the_lts_1 in
     let* the_lts_2, _ = build_lts_graph ~primary_lts:(Some p2) f2 b2 t2 l in
     let the_fsm_2 = Translate.to_fsm the_lts_2 in
     let the_merged_fsm, _ = Fsm.Merge.fsms the_fsm_1 the_fsm_2 in
     handle_output o (Merge (the_fsm_1, the_fsm_2, the_merged_fsm))
-  | Bisim ((((f1, b1, t1), p1), w1), (((f2, b2, t2), p2), w2)), l ->
+  | Bisim ((((f1, b1, t1), w1), p1), (((f2, b2, t2), w2), p2)), l ->
     let weak =
       match w1, w2 with
       | None, None -> false

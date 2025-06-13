@@ -1,5 +1,8 @@
-type raw_flat_lts = (string * string * string * string option) list
-type raw_nested_lts = (string * (string * string list) list) list
+type raw_flat_lts =
+  (string * string * string * bool option * string option) list
+
+type raw_nested_lts =
+  (string * (string * string list) list) list
 
 type raw_states =
   | JustName of string list
@@ -9,13 +12,14 @@ type raw_transitions =
   | Flat of (raw_flat_lts * raw_states option)
   | Nested of (raw_nested_lts * raw_states option)
 
-type transition =
-  { id : int
-  ; from : string
-  ; label : string
-  ; destination : string
-  ; info : string option
-  }
+type transition = {
+  id : int;
+  from : string;
+  label : string;
+  destination : string;
+  is_silent : bool option;
+  info : string option;
+}
 
 module Transitions : sig
   type elt = transition
@@ -66,10 +70,7 @@ module Transitions : sig
   val of_seq : elt Seq.t -> t
 end
 
-type state =
-  { name : string
-  ; info : string option
-  }
+type state = { name : string; info : string option }
 
 module States : sig
   type elt = state
@@ -120,30 +121,49 @@ module States : sig
   val of_seq : elt Seq.t -> t
 end
 
-type lts =
-  { init : string option
-  ; transitions : Transitions.t
-  ; states : States.t
-  ; info : Utils.model_info option
-  }
+type lts = {
+  init : string option;
+  transitions : Transitions.t;
+  states : States.t;
+  info : Utils.model_info option;
+}
 
 module PStr : sig
-  val transition : ?params:Utils.Formatting.pstr_params -> transition -> string
+  val transition :
+    ?params:Utils.Formatting.pstr_params ->
+    transition ->
+    string
 
-  val transitions
-    :  ?params:Utils.Formatting.pstr_params
-    -> Transitions.t
-    -> string
+  val transitions :
+    ?params:Utils.Formatting.pstr_params ->
+    Transitions.t ->
+    string
 
-  val state : ?params:Utils.Formatting.pstr_params -> state -> string
-  val states : ?params:Utils.Formatting.pstr_params -> States.t -> string
-  val lts : ?params:Utils.Formatting.pstr_params -> lts -> string
+  val state :
+    ?params:Utils.Formatting.pstr_params -> state -> string
+
+  val states :
+    ?params:Utils.Formatting.pstr_params -> States.t -> string
+
+  val lts :
+    ?params:Utils.Formatting.pstr_params -> lts -> string
 end
 
 module Create : sig
   type transition_params =
-    | Of of (int * string * string * string * string option)
+    | Of of
+        (int
+        * string
+        * string
+        * string
+        * bool option
+        * string option)
 
   val transition : transition_params -> transition
-  val lts : ?init:string -> ?info:Utils.model_info -> raw_transitions -> lts
+
+  val lts :
+    ?init:string ->
+    ?info:Utils.model_info ->
+    raw_transitions ->
+    lts
 end

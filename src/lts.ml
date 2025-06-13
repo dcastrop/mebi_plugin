@@ -1,4 +1,6 @@
-type raw_flat_lts = (string * string * string * string option) list
+type raw_flat_lts =
+  (string * string * string * bool option * string option) list
+
 type raw_nested_lts = (string * (string * string list) list) list
 
 type raw_states =
@@ -14,6 +16,7 @@ type transition =
   ; from : string
   ; label : string
   ; destination : string
+  ; is_silent : bool option
   ; info : string option
   }
 
@@ -56,8 +59,8 @@ module PStr = struct
   open Utils
 
   let transition
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (t : transition)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (t : transition)
     : string
     =
     let _params : Params.fmt = Params.handle params in
@@ -93,8 +96,8 @@ module PStr = struct
   ;;
 
   let transitions
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (ts : Transitions.t)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (ts : Transitions.t)
     : string
     =
     if Transitions.is_empty ts
@@ -131,8 +134,8 @@ module PStr = struct
   ;;
 
   let states
-    ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-    (ss : States.t)
+        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
+        (ss : States.t)
     : string
     =
     if States.is_empty ss
@@ -186,18 +189,18 @@ end
 
 module Create = struct
   type transition_params =
-    | Of of (int * string * string * string * string option)
+    | Of of (int * string * string * string * bool option * string option)
 
   let transition (params : transition_params) : transition =
     match params with
-    | Of (id, from, label, destination, info) ->
-      { id; from; label; destination; info }
+    | Of (id, from, label, destination, is_silent, info) ->
+      { id; from; label; destination; is_silent; info }
   ;;
 
   let lts
-    ?(init : string option)
-    ?(info : Utils.model_info option)
-    (raw : raw_transitions)
+        ?(init : string option)
+        ?(info : Utils.model_info option)
+        (raw : raw_transitions)
     : lts
     =
     let (transitions, states) : Transitions.t * States.t =
@@ -224,8 +227,8 @@ module Create = struct
         in
         ( List.fold_left
             (fun (acc : Transitions.t)
-              ((from, label, destination, constr_info) :
-                string * string * string * string option) ->
+              ((from, label, destination, is_silent, constr_info) :
+                string * string * string * bool option * string option) ->
               Transitions.add
                 (transition
                    (Of
@@ -233,6 +236,7 @@ module Create = struct
                       , from
                       , label
                       , destination
+                      , is_silent
                       , constr_info )))
                 acc)
             Transitions.empty
@@ -273,6 +277,7 @@ module Create = struct
                               , from
                               , label
                               , destination
+                              , None
                               , None )))
                         acc'')
                     acc'
