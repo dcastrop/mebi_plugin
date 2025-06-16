@@ -1,20 +1,19 @@
 (* modules in this file follow the sections in Chapter 3 of
    [`Advanced Topics in Bisimulation and Coinduction`].
    (See https://doi.org/10.1017/CBO9780511792588.) *)
+open Model
 
-open Fsm
-
-type fsm_pair = fsm * fsm
-type run_params = fsm_pair * Merge.merged_fsm_result_kind option
-
-type result_kind =
-  fsm_pair * Merge.merged_fsm_result_kind * (Partition.t * Partition.t)
+type fsm_pair = Fsm.t * Fsm.t
+type run_params = fsm_pair * Fsm.t option
+type result_kind = fsm_pair * Fsm.t * (Partition.t * Partition.t)
 
 let get_pair_from_result (p, _, _) : fsm_pair = p
 
-let resolve ((_,_,(_,non_bisim_states)):result_kind) : bool = Partition.is_empty non_bisim_states
+let resolve ((_, _, (_, non_bisim_states)) : result_kind) : bool =
+  Partition.is_empty non_bisim_states
+;;
 
-exception CouldNotFindOriginOfState of state
+exception CouldNotFindOriginOfState of Model_state.t
 
 (** [block_has_shared_origin block the_states_1 the_states_2 map_of_states] is [true] if [block] contains states that originated in both [the_states_1] and [the_states_2].
     @param map_of_states
@@ -25,14 +24,13 @@ exception CouldNotFindOriginOfState of state
 let block_has_shared_origin
       (block : States.t)
       (the_states_1 : States.t)
-      (the_states_2 : States.t)
-      (map_of_states : Merge.merged_state_map)
+      (the_states_2 : States.t) (* (map_of_states : Merge.merged_state_map) *)
   : bool
   =
   let is_1_origin = ref false in
   let is_2_origin = ref false in
   States.iter
-    (fun (s : state) ->
+    (fun (s : Model_state.t) ->
       match Hashtbl.find_opt map_of_states s with
       | None ->
         (* no translation for [2], must be [1] *)
@@ -53,8 +51,7 @@ let block_has_shared_origin
 let split_bisimilar
       (pi : Partition.t)
       (the_states_1 : States.t)
-      (the_states_2 : States.t)
-      (map_of_states : Merge.merged_state_map)
+      (the_states_2 : States.t) (* (map_of_states : Merge.merged_state_map) *)
   : Partition.t * Partition.t
   =
   Partition.fold
@@ -75,22 +72,22 @@ let saturate_fsms (the_fsm_1 : fsm) (the_fsm_2 : fsm) : fsm_pair =
 let handle_run_params
       (((the_fsm_1, the_fsm_2), pre_merged_fsm) : run_params)
       (weak : bool)
-  : Merge.merged_fsm_result_kind
+  : Fsm.fsm
   =
   match weak, pre_merged_fsm with
   (* strong *)
-  | false, None -> Fsm.Merge.fsms the_fsm_1 the_fsm_2
-  | false, Some (merged_fsm, state_translation) -> merged_fsm, state_translation
+  | false, None -> Fsm.merge the_fsm_1 the_fsm_2
+  | false, Some merged_fsm -> merged_fsm
   (* weak *)
   | true, None ->
     let to_merge_1, to_merge_2 = saturate_fsms the_fsm_1 the_fsm_2 in
-    Fsm.Merge.fsms to_merge_1 to_merge_2
+    Fsm.merge to_merge_1 to_merge_2
   | true, Some (merged_fsm, state_translation) ->
     Utils.Logging.Log.warning
       "Checking weak bisimilarity, will re-merge FSMs after saturating them. \
        (Ignoring provided merged FSM.)";
     let the_sat_1, the_sat_2 = saturate_fsms the_fsm_1 the_fsm_2 in
-    Fsm.Merge.fsms the_sat_1 the_sat_2
+    Fsm.merge the_sat_1 the_sat_2
 ;;
 
 let reachable_blocks (actions : States.t Actions.t) (pi : Partition.t)
@@ -116,7 +113,7 @@ let add_to_block_option (s : state) (block : States.t option) : States.t option 
 
 let split_block
       (block : States.t)
-      (a : action)
+      (a : Model_action.t)
       (edges_of_a : States.t Actions.t Edges.t)
       (pi : Partition.t)
   : States.t * States.t option
@@ -128,7 +125,7 @@ let split_block
   let s_reachable_blocks = reachable_blocks s_actions pi in
   (* check rest of [block] *)
   States.fold
-    (fun (t : state) ((b1, b2) : States.t * States.t option) ->
+    (fun (t : Model_state.t) ((b1, b2) : States.t * States.t option) ->
       let t_actions = Fsm.Get.actions_from t edges_of_a in
       let t_reachable_blocks = reachable_blocks t_actions pi in
       match s_reachable_blocks, t_reachable_blocks with
@@ -159,7 +156,7 @@ let iterate
     (fun (b : States.t) ->
       let b = ref b in
       Alphabet.iter
-        (fun (a : action) ->
+        (fun (a : Model_action.t) ->
           let edges_of_a = Fsm.Get.edges_of ~weak a edges in
           (* TODO: [Fsm.Saturate.fsm] doesn't clean up unreachable states/edges yet. *)
           if Edges.length edges_of_a > 0
@@ -179,7 +176,7 @@ let iterate
 
 let run ?(weak : bool = false) (r : run_params) : result_kind =
   let the_fsm_1, the_fsm_2 = fst r in
-  let the_merged_fsm, the_state_translation = handle_run_params r weak in
+  let the_merged_fsm = handle_run_params r weak in
   match the_merged_fsm with
   | { alphabet; states; edges; _ } ->
     let pi = ref (Partition.of_list [ states ]) in
@@ -190,14 +187,8 @@ let run ?(weak : bool = false) (r : run_params) : result_kind =
       iterate alphabet edges pi changed weak
     done;
     let bisim_states, non_bisim_states =
-      split_bisimilar
-        !pi
-        the_fsm_1.states
-        the_fsm_2.states
-        the_state_translation
+      split_bisimilar !pi the_fsm_1.states the_fsm_2.states
+      (* the_state_translation *)
     in
-      ( (the_fsm_1, the_fsm_2)
-      , (the_merged_fsm, the_state_translation)
-      , (bisim_states, non_bisim_states) )
-    
+    (the_fsm_1, the_fsm_2), the_merged_fsm, (bisim_states, non_bisim_states)
 ;;
