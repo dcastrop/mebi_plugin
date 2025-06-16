@@ -25,8 +25,8 @@ src/utils.mli
 # src/mebi_errors.ml
 # src/mebi_errors.mli
 
-src/mebi_action.ml
-src/mebi_action.mli
+# src/mebi_action.ml
+# src/mebi_action.mli
 # src/constr_tree.ml
 # src/constr_tree.mli
 
@@ -34,6 +34,21 @@ src/mebi_wrapper.ml
 src/mebi_wrapper.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
+
+
+src/model_state.ml
+src/model_state.mli
+src/model_label.ml
+src/model_label.mli
+src/model_action.ml
+src/model_action.mli
+src/model_edge.ml
+src/model_edge.mli
+src/model_transition.ml
+src/model_transition.mli
+src/model.ml
+src/model.mli
+
 
 src/lts.ml
 src/lts.mli
@@ -55,8 +70,8 @@ src/minimize.mli
 src/command.ml
 src/command.mli
 
-src/examples.ml
-src/examples.mli
+# src/examples.ml
+# src/examples.mli
 
 src/g_mebi.mlg
 src/mebi_plugin.mlpack

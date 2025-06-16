@@ -22,10 +22,16 @@
  (modules
   utils
   ; mebi_errors
-  mebi_action
+  ; mebi_action
   ; constr_tree
   mebi_wrapper
   mebi_utils
+  model_state
+  model_label
+  model_action
+  model_transition
+  model_edge
+  model
   lts
   fsm
   translate
@@ -34,7 +40,7 @@
   bisimilarity
   minimize
   command
-  examples
+  ; examples
   g_mebi))
 
 (coq.pp ; This will let Dune know about Coq's .mlg grammar files.
