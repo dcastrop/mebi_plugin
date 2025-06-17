@@ -1233,7 +1233,8 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 Example g1 : sys * resource := compose (create 1 P).
 (* MeBi Dump "g1_noglue" LTS Bounded 37 Of g1 Using lts step. *)
 
-(* MeBi Dump "g1" LTS Bounded 5 Of g1 Using bigstep lts step. *)
+MeBi Dump "g1" LTS Bounded 5 Of g1 Using bigstep lts step.
+MeBi Dump "g1_weak" LTS Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step.
 
 (* MeBi Dump "g1_LTS" LTS Bounded 5 Of g1 Using bigstep lts step. *)
 (* MeBi Dump "g1_FSM" FSM Bounded 5 Of g1 Using bigstep lts step. *)
