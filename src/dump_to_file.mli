@@ -45,7 +45,7 @@ type json_edge_silent = json_edge_info
 
 type json_edge =
   (json_edge_silent * json_edge_silent)
-  * (json_edge_silent * json_edge_silent * json_edge_silent)
+  * (json_edge_silent * json_edge_silent)
 
 type model_info = {
   name : json_edge_silent;
