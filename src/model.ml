@@ -1,7 +1,7 @@
 module States = Set.Make (struct
     type t = Model_state.t
 
-    let compare a b = Mebi_wrapper.E.compare a b
+    let compare a b = Model_state.compare a b
   end)
 
 module Partition = Set.Make (States)
@@ -22,8 +22,8 @@ module Actions = Hashtbl.Make (struct
 module Edges = Hashtbl.Make (struct
     type t = Model_state.t
 
-    let equal t1 t2 = Mebi_wrapper.E.eq t1 t2
-    let hash t = Mebi_wrapper.E.hash t
+    let equal t1 t2 = Model_state.eq t1 t2
+    let hash t = Model_state.hash t
   end)
 
 (** used by LTS *)
@@ -195,6 +195,14 @@ let alphabet_from_edges (es : States.t Actions.t Edges.t) : Alphabet.t =
     (fun (_ : Model_state.t) (aa : States.t Actions.t) (acc : Alphabet.t) ->
       alphabet_from_actions ~acc aa)
     es
+    Alphabet.empty
+;;
+
+let alphabet_from_transitions (ts : Transitions.t) : Alphabet.t =
+  Transitions.fold
+    (fun ((_from, a, _dest, _meta) : Model_transition.t) (acc : Alphabet.t) ->
+      Alphabet.add a acc)
+    ts
     Alphabet.empty
 ;;
 

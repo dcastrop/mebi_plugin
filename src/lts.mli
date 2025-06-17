@@ -1,5 +1,6 @@
 type t = {
   init : Model_state.t option;
+  alphabet : Model.Alphabet.t;
   states : Model.States.t;
   transitions : Model.Transitions.t;
   info : Utils.model_info option;
@@ -7,6 +8,7 @@ type t = {
 
 val create :
   Model_state.t option ->
+  Model.Alphabet.t ->
   Model.States.t ->
   Model.Transitions.t ->
   Utils.model_info option ->

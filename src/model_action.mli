@@ -5,7 +5,7 @@ type t = {
   mutable annos : annotations;
 }
 
-and annotation_pair = Model_label.t * t
+and annotation_pair = Model_state.t * t
 and annotation = annotation_pair list
 and annotations = annotation list
 
@@ -20,7 +20,7 @@ val to_label_meta_pair : t -> Model_label.t * Model_label.meta
 val eq : t -> t -> bool
 val anno_eq : annotation -> annotation -> bool
 val annos_eq : annotations -> annotations -> bool
-val compare : t -> t -> int
-val anno_compare : annotation -> annotation -> int
-val annos_compare : annotations -> annotations -> int
+val compare : t -> t -> Int.t
+val anno_compare : annotation -> annotation -> Int.t
+val annos_compare : annotations -> annotations -> Int.t
 val hash : t -> int
