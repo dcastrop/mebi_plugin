@@ -385,7 +385,7 @@ let write_json_edges_to_file (oc : out_channel) (i : json_edge Queue.t) : unit =
         Printf.fprintf oc "\t\t\t\"from\": \"%s\",\n" from_state;
         Printf.fprintf oc "\t\t\t\"dest\": \"%s\",\n" dest_state;
         Printf.fprintf oc "\t\t\t\"labl\": \"%s\",\n" action_label;
-        Printf.fprintf oc "\t\t\t\"info\": %s,\n" action_info;
+        Printf.fprintf oc "\t\t\t\"info\": \"%s\",\n" action_info;
         Printf.fprintf oc "\t\t\t\"tau\": %s\n" action_silent;
         Printf.fprintf oc "\t\t}";
         iterate (n - 1) ()
