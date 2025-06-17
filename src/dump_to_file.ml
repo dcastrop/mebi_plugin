@@ -159,8 +159,7 @@ type json_edge_info = string
 type json_edge_silent = string
 
 type json_edge =
-  (json_state_name * json_state_name)
-  * (json_action_name * json_edge_silent * json_edge_info)
+  (json_state_name * json_state_name) * (json_action_name * json_edge_info)
 
 (* module JSON_Edges = Set.Make (struct type t = json_edge
 
@@ -231,14 +230,12 @@ let to_json_model (filename : string) (model : Vernac.result_kind) : json_model 
       Model.Transitions.fold
         (fun (edge : Model_transition.t) (acc : json_edge Queue.t) ->
           let from, label, dest, meta = edge in
-          let is_silent, edge_info =
-            match meta with
-            | None -> "null", "null"
-            | Some meta -> bool_opt meta.is_silent, string_opt meta.info
+          let edge_info =
+            match meta with None -> "null" | Some meta -> string_opt meta.info
           in
           Queue.push
             ( (Model_state.to_string from, Model_state.to_string dest)
-            , (Model_label.to_string label, is_silent, edge_info) )
+            , (Model_label.to_string label, edge_info) )
             acc;
           acc)
         g.transitions
@@ -373,8 +370,7 @@ let write_json_edges_to_file (oc : out_channel) (i : json_edge Queue.t) : unit =
       match n with
       | 0 -> ()
       | _ ->
-        let (from_state, dest_state), (action_label, action_silent, action_info)
-          =
+        let (from_state, dest_state), (action_label, action_info) =
           Queue.pop i
         in
         Printf.fprintf oc "%s" (handle_if_first is_first);
@@ -382,8 +378,8 @@ let write_json_edges_to_file (oc : out_channel) (i : json_edge Queue.t) : unit =
         Printf.fprintf oc "\t\t\t\"from\": %s,\n" from_state;
         Printf.fprintf oc "\t\t\t\"dest\": %s,\n" dest_state;
         Printf.fprintf oc "\t\t\t\"labl\": %s,\n" action_label;
-        Printf.fprintf oc "\t\t\t\"info\": \"%s\",\n" action_info;
-        Printf.fprintf oc "\t\t\t\"tau\": %s\n" action_silent;
+        Printf.fprintf oc "\t\t\t\"info\": \"%s\"\n" action_info;
+        (* Printf.fprintf oc "\t\t\t\"tau\": %s\n" action_silent; *)
         Printf.fprintf oc "\t\t}";
         iterate (n - 1) ()
     in
