@@ -1,5 +1,5 @@
 module States : sig
-  type elt = Model_label.t
+  type elt = Model_state.t
   type t
 
   val empty : t
@@ -97,7 +97,7 @@ module Partition : sig
 end
 
 module Alphabet : sig
-  type elt = States.elt
+  type elt = Model_label.t
   type t
 
   val empty : t
@@ -179,7 +179,7 @@ module Actions : sig
 end
 
 module Edges : sig
-  type key = States.elt
+  type key = Model_state.t
   type !'a t
 
   val create : int -> 'a t
@@ -290,21 +290,23 @@ val alphabet_from_actions :
 val alphabet_from_edges :
   States.t Actions.t Edges.t -> Alphabet.t
 
+val alphabet_from_transitions : Transitions.t -> Alphabet.t
+
 val add_action :
-  States.t Actions.t -> Model_action.t -> Model_label.t -> unit
+  States.t Actions.t -> Model_action.t -> Model_state.t -> unit
 
 val add_edge :
   States.t Actions.t Edges.t ->
-  Model_label.t ->
+  Model_state.t ->
   Model_action.t ->
-  Model_label.t ->
+  Model_state.t ->
   unit
 
 val get_actions :
   States.t Actions.t Edges.t -> States.t Actions.t
 
 val get_actions_from :
-  Model_label.t ->
+  Model_state.t ->
   States.t Actions.t Edges.t ->
   States.t Actions.t
 
@@ -324,7 +326,7 @@ val get_edges_with_label :
   States.t Actions.t Edges.t
 
 val get_edges_from :
-  Model_label.t ->
+  Model_state.t ->
   States.t Actions.t Edges.t ->
   States.t Actions.t Edges.t
 
