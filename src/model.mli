@@ -1,5 +1,5 @@
 module States : sig
-  type elt = Model_state.t
+  type elt = Model_label.t
   type t
 
   val empty : t
@@ -97,7 +97,7 @@ module Partition : sig
 end
 
 module Alphabet : sig
-  type elt = Model_label.t
+  type elt = States.elt
   type t
 
   val empty : t
@@ -179,7 +179,7 @@ module Actions : sig
 end
 
 module Edges : sig
-  type key = Model_state.t
+  type key = States.elt
   type !'a t
 
   val create : int -> 'a t
@@ -211,6 +211,57 @@ module Edges : sig
   val of_seq : (key * 'a) Seq.t -> 'a t
 end
 
+module Transitions : sig
+  type elt = Model_transition.t
+  type t
+
+  val empty : t
+  val add : elt -> t -> t
+  val singleton : elt -> t
+  val remove : elt -> t -> t
+  val union : t -> t -> t
+  val inter : t -> t -> t
+  val disjoint : t -> t -> bool
+  val diff : t -> t -> t
+  val cardinal : t -> int
+  val elements : t -> elt list
+  val min_elt : t -> elt
+  val min_elt_opt : t -> elt option
+  val max_elt : t -> elt
+  val max_elt_opt : t -> elt option
+  val choose : t -> elt
+  val choose_opt : t -> elt option
+  val find : elt -> t -> elt
+  val find_opt : elt -> t -> elt option
+  val find_first : (elt -> bool) -> t -> elt
+  val find_first_opt : (elt -> bool) -> t -> elt option
+  val find_last : (elt -> bool) -> t -> elt
+  val find_last_opt : (elt -> bool) -> t -> elt option
+  val iter : (elt -> unit) -> t -> unit
+  val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+  val map : (elt -> elt) -> t -> t
+  val filter : (elt -> bool) -> t -> t
+  val filter_map : (elt -> elt option) -> t -> t
+  val partition : (elt -> bool) -> t -> t * t
+  val split : elt -> t -> t * bool * t
+  val is_empty : t -> bool
+  val mem : elt -> t -> bool
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val subset : t -> t -> bool
+  val for_all : (elt -> bool) -> t -> bool
+  val exists : (elt -> bool) -> t -> bool
+  val to_list : t -> elt list
+  val of_list : elt list -> t
+  val to_seq_from : elt -> t -> elt Seq.t
+  val to_seq : t -> elt Seq.t
+  val to_rev_seq : t -> elt Seq.t
+  val add_seq : elt Seq.t -> t -> t
+  val of_seq : elt Seq.t -> t
+end
+
+type action_pair = Model_action.t * States.t
+
 val label_to_action :
   ?meta:Model_label.meta option ->
   Model_label.t ->
@@ -220,6 +271,12 @@ val action_to_label : Model_action.t -> Model_label.t
 
 val edges_to_list :
   States.t Actions.t Edges.t -> Model_edge.t list
+
+val edges_to_transitions :
+  States.t Actions.t Edges.t -> Transitions.t
+
+val transitions_to_edges :
+  Transitions.t -> States.t Actions.t Edges.t
 
 val edges_to_transition_list :
   States.t Actions.t Edges.t -> Model_transition.t list
@@ -232,3 +289,64 @@ val alphabet_from_actions :
 
 val alphabet_from_edges :
   States.t Actions.t Edges.t -> Alphabet.t
+
+val add_action :
+  States.t Actions.t -> Model_action.t -> Model_label.t -> unit
+
+val add_edge :
+  States.t Actions.t Edges.t ->
+  Model_label.t ->
+  Model_action.t ->
+  Model_label.t ->
+  unit
+
+val get_actions :
+  States.t Actions.t Edges.t -> States.t Actions.t
+
+val get_actions_from :
+  Model_label.t ->
+  States.t Actions.t Edges.t ->
+  States.t Actions.t
+
+val get_actions_of :
+  Model_action.t ->
+  States.t Actions.t Edges.t ->
+  States.t Actions.t
+
+val get_actions_with_label :
+  Model_label.t ->
+  States.t Actions.t Edges.t ->
+  States.t Actions.t
+
+val get_edges_with_label :
+  Model_label.t ->
+  States.t Actions.t Edges.t ->
+  States.t Actions.t Edges.t
+
+val get_edges_from :
+  Model_label.t ->
+  States.t Actions.t Edges.t ->
+  States.t Actions.t Edges.t
+
+val get_destinations : States.t Actions.t -> States.t
+
+val get_reachable_blocks :
+  States.t Actions.t -> Partition.t -> Partition.t
+
+val get_reachable_blocks_opt :
+  States.t Actions.t -> Partition.t -> Partition.t option
+
+val pstr_alphabet :
+  ?skip_leading_tab:bool ->
+  ?indents:int ->
+  Alphabet.t ->
+  string
+
+val pstr_states :
+  ?skip_leading_tab:bool -> ?indents:int -> States.t -> string
+
+val pstr_partition :
+  ?skip_leading_tab:bool ->
+  ?indents:int ->
+  Partition.t ->
+  string

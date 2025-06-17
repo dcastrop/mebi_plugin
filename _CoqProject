@@ -16,9 +16,6 @@ examples/CADP.v
 # examples/properties/mutual_exclusion.v
 # examples/properties/no_starvation.v
 
-test/tests.ml
-test/tests.mli
-
 src/utils.ml
 src/utils.mli
 
@@ -72,6 +69,9 @@ src/command.mli
 
 # src/examples.ml
 # src/examples.mli
+
+# test/tests.ml
+# test/tests.mli
 
 src/g_mebi.mlg
 src/mebi_plugin.mlpack

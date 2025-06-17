@@ -4,10 +4,10 @@ type output_kind =
   | Dump of string option
 
 type result_kind =
-  | LTS of Lts.lts
-  | FSM of Fsm.fsm
-  | Minim of (Fsm.fsm * Fsm.fsm)
-  | Merge of (Fsm.fsm * Fsm.fsm * Fsm.fsm)
+  | LTS of Lts.t
+  | FSM of Fsm.t
+  | Minim of Fsm.pair
+  | Merge of (Fsm.pair * Fsm.t)
   | Bisim of Bisimilarity.result_kind
 
 (** [fail_if_incomplete * bounds * initial_term] *)
