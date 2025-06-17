@@ -1,7 +1,7 @@
 module States = Set.Make (struct
     type t = Model_state.t
 
-    let compare a b = Mebi_wrapper.E.compare a b
+    let compare a b = Model_state.compare a b
   end)
 
 module Partition = Set.Make (States)
@@ -22,8 +22,8 @@ module Actions = Hashtbl.Make (struct
 module Edges = Hashtbl.Make (struct
     type t = Model_state.t
 
-    let equal t1 t2 = Mebi_wrapper.E.eq t1 t2
-    let hash t = Mebi_wrapper.E.hash t
+    let equal t1 t2 = Model_state.eq t1 t2
+    let hash t = Model_state.hash t
   end)
 
 (** used by LTS *)
