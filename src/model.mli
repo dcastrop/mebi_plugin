@@ -290,6 +290,8 @@ val alphabet_from_actions :
 val alphabet_from_edges :
   States.t Actions.t Edges.t -> Alphabet.t
 
+val alphabet_from_transitions : Transitions.t -> Alphabet.t
+
 val add_action :
   States.t Actions.t -> Model_action.t -> Model_state.t -> unit
 
