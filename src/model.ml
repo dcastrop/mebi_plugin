@@ -198,6 +198,14 @@ let alphabet_from_edges (es : States.t Actions.t Edges.t) : Alphabet.t =
     Alphabet.empty
 ;;
 
+let alphabet_from_transitions (ts : Transitions.t) : Alphabet.t =
+  Transitions.fold
+    (fun ((_from, a, _dest, _meta) : Model_transition.t) (acc : Alphabet.t) ->
+      Alphabet.add a acc)
+    ts
+    Alphabet.empty
+;;
+
 (*********************************************************************)
 (****** Add **********************************************************)
 (*********************************************************************)

@@ -924,26 +924,27 @@ module MkGraph
     =
     let iter_body (i : int) (new_states : S.t) =
       let (act, tgt, int_tree) : coq_ctor = List.nth ctors i in
-      let* (encoding : E.t) = encode tgt in
+      let* (tgt_enc : E.t) = encode tgt in
+      let* (act_enc : E.t) = encode act in
       let* is_silent : bool option = is_silent_transition weak act in
       let to_add : Model_action.t =
-        { label = encoding; is_silent; info = None; annos = [] }
+        { label = act_enc, None; is_silent; info = None; annos = [] }
       in
       let* _ =
         match H.find_opt g.transitions t with
-        | None -> add_new_term_constr_transition g t to_add encoding int_tree
+        | None -> add_new_term_constr_transition g t to_add tgt_enc int_tree
         | Some actions ->
-          insert_constr_transition actions to_add encoding int_tree
+          insert_constr_transition actions to_add tgt_enc int_tree
       in
       (* if [tgt] has not been explored then add [to_visit] *)
       if
-        H.mem g.transitions encoding
+        H.mem g.transitions tgt_enc
         (* || EConstr.eq_constr sigma tgt t *)
-        || S.mem encoding g.states
+        || S.mem tgt_enc g.states
       then ()
-      else Queue.push encoding g.to_visit;
+      else Queue.push tgt_enc g.to_visit;
       (* add [tgt] to [new_states] *)
-      return (S.add encoding new_states)
+      return (S.add tgt_enc new_states)
     in
     iterate 0 (List.length ctors - 1) (S.singleton t) iter_body
   ;;
@@ -1178,42 +1179,59 @@ module MkGraph
         ; num_edges = num_transitions g.transitions
         }
     in
-    let init : Model_state.t option = Some g.init in
-    let states : Model.States.t =
-      S.fold
-        (fun (s : E.t) (acc : Model.States.t) -> Model.States.add s acc)
-        g.states
-        Model.States.empty
+    let* init_decoding = decode g.init in
+    let init : Model_state.t option =
+      Some (g.init, Some (econstr_to_string init_decoding))
     in
-    let transitions : Model.Transitions.t =
+    let* states : Model.States.t =
+      S.fold
+        (fun (s : E.t) (acc : Model.States.t mm) ->
+          let* acc = acc in
+          let* s_decoding = decode s in
+          return (Model.States.add (s, Some (econstr_to_string s_decoding)) acc))
+        g.states
+        (return Model.States.empty)
+    in
+    let* transitions : Model.Transitions.t =
       H.fold
         (fun (from : E.t)
           (ts : constr_transitions)
-          (acc0 : Model.Transitions.t) ->
+          (acc0 : Model.Transitions.t mm) ->
+          let* from_decoding = decode from in
+          let from_str = econstr_to_string from_decoding in
           Hashtbl.fold
             (fun (a : Model_action.t)
               (dests : D.t)
-              (acc1 : Model.Transitions.t) ->
+              (acc1 : Model.Transitions.t mm) ->
+              let* a_decoding = decode (fst a.label) in
+              let a_str = econstr_to_string a_decoding in
               D.fold
                 (fun ((dest, tree) : E.t * Constr_tree.t)
-                  (acc2 : Model.Transitions.t) ->
-                  Model.Transitions.add
-                    ( from
-                    , a.label
-                    , dest
-                    , Some
-                        { is_silent = a.is_silent
-                        ; info = Some (Constr_tree.pstr tree)
-                        } )
-                    acc2)
+                  (acc2 : Model.Transitions.t mm) ->
+                  let* acc2 = acc2 in
+                  let* dest_decoding = decode dest in
+                  let from = from, Some from_str in
+                  let dest = dest, Some (econstr_to_string dest_decoding) in
+                  let act = fst a.label, Some a_str in
+                  return
+                    (Model.Transitions.add
+                       ( from
+                       , act
+                       , dest
+                       , Some
+                           { is_silent = a.is_silent
+                           ; info = Some (Constr_tree.pstr tree)
+                           } )
+                       acc2))
                 dests
                 acc1)
             ts
             acc0)
         g.transitions
-        Model.Transitions.empty
+        (return Model.Transitions.empty)
     in
-    return (Lts.create init states transitions info)
+    let alphabet = Model.alphabet_from_transitions transitions in
+    return (Lts.create init alphabet states transitions info)
   ;;
 end
 
