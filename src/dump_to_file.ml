@@ -149,8 +149,10 @@ type json_action =
    -> n | n, _ -> n) | n -> n ;; end) *)
 
 type json_state_name = string
-type json_state_info = string
-type json_state = json_state_name * json_state_info
+
+(* type json_state_info = string
+   type json_state = json_state_name * json_state_info *)
+type json_state = json_state_name
 
 (* module JSON_States = Set.Make (struct type t = json_state
 
@@ -186,8 +188,16 @@ type json_model =
   ; edge_list : json_edge Queue.t
   }
 
+let state_to_str (s : Model_state.t) : string =
+  Printf.sprintf "\"%s\"" (clean (Model_state.to_string s))
+;;
+
+let state_opt_to_str (s : Model_state.t option) : string =
+  match s with None -> "null" | Some s -> state_to_str s
+;;
+
 let string_opt (s : string option) : string =
-  match s with None -> "null" | Some s -> Printf.sprintf "\"%s\"" (clean s)
+  match s with None -> "null" | Some s -> Printf.sprintf "%s" s
 ;;
 
 let bool_opt (b : bool option) : string =
@@ -202,28 +212,34 @@ exception ResultKindNotImplemented of Vernac.result_kind
 
 let to_json_model (filename : string) (model : Vernac.result_kind) : json_model =
   match model with
-  | LTS s ->
-    let extra = s.info in
+  | LTS g ->
+    let extra = g.info in
     let info = { name = filename; kind = "lts"; extra } in
     let alphabet = Queue.create () in
-    let initial_state = string_opt s.init in
+    let initial_state = state_opt_to_str g.init in
     let state_list =
-      Lts.States.fold
-        (fun (state : Lts.state) (acc : json_state Queue.t) ->
-          Queue.push (state.name, string_opt state.info) acc;
+      Model.States.fold
+        (fun (s : Model_state.t) (acc : json_state Queue.t) ->
+          Queue.push (state_to_str s) acc;
           acc)
-        s.states
+        g.states
         (Queue.create ())
     in
     let edge_list =
-      Lts.Transitions.fold
-        (fun (edge : Lts.transition) (acc : json_edge Queue.t) ->
+      Model.Transitions.fold
+        (fun (edge : Model_transition.t) (acc : json_edge Queue.t) ->
+          let from, label, dest, meta = edge in
+          let is_silent, edge_info =
+            match meta with
+            | None -> "null", "null"
+            | Some meta -> bool_opt meta.is_silent, string_opt meta.info
+          in
           Queue.push
-            ( (edge.from, edge.destination)
-            , (edge.label, bool_opt edge.is_silent, string_opt edge.info) )
+            ( (Model_state.to_string from, Model_state.to_string dest)
+            , (Model_label.to_string label, is_silent, edge_info) )
             acc;
           acc)
-        s.transitions
+        g.transitions
         (Queue.create ())
     in
     { info; alphabet; initial_state; state_list; edge_list }
@@ -335,14 +351,14 @@ let write_json_states_to_file (oc : out_channel) (i : json_state Queue.t) : unit
       match n with
       | 0 -> ()
       | _ ->
-        let state_name, state_info = Queue.pop i in
+        let state_name = Queue.pop i in
         Printf.fprintf oc "%s" (handle_if_first is_first);
         Printf.fprintf oc "\t\t{\n";
         Printf.fprintf oc "\t\t\t\"name\": \"%s\",\n" state_name;
         (* Printf.fprintf oc "\t\t\t\"info\": %s\n" state_info; *)
-        Printf.fprintf oc "\t\t\t\"info\": ";
+        (* Printf.fprintf oc "\t\t\t\"info\": ";
         write_xl_string_to_file oc state_info;
-        Printf.fprintf oc "\n";
+        Printf.fprintf oc "\n"; *)
         Printf.fprintf oc "\t\t}";
         iterate (n - 1) ()
     in

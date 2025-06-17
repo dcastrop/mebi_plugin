@@ -1,58 +1,36 @@
-type fsm_pair = Fsm.fsm * Fsm.fsm
-
-type run_params =
-  fsm_pair * Fsm.Merge.merged_fsm_result_kind option
+type run_params = Fsm.pair * Fsm.t option
 
 type result_kind =
-  fsm_pair
-  * Fsm.Merge.merged_fsm_result_kind
-  * (Fsm.Partition.t * Fsm.Partition.t)
+  (Fsm.pair * Fsm.t) * (Model.Partition.t * Model.Partition.t)
 
-val get_pair_from_result : fsm_pair * 'a * 'b -> fsm_pair
-val resolve : result_kind -> bool
-
-exception CouldNotFindOriginOfState of Fsm.state
+exception CouldNotFindOriginOfState of Model_state.t
 
 val block_has_shared_origin :
-  Fsm.States.t ->
-  Fsm.States.t ->
-  Fsm.States.t ->
-  Fsm.Merge.merged_state_map ->
-  bool
+  Model.States.t -> Fsm.t -> Fsm.t -> bool
 
 val split_bisimilar :
-  Fsm.Partition.t ->
-  Fsm.States.t ->
-  Fsm.States.t ->
-  Fsm.Merge.merged_state_map ->
-  Fsm.Partition.t * Fsm.Partition.t
+  Model.Partition.t ->
+  Fsm.t ->
+  Fsm.t ->
+  Model.Partition.t * Model.Partition.t
 
-val saturate_fsms : Fsm.fsm -> Fsm.fsm -> fsm_pair
-
-val handle_run_params :
-  run_params -> bool -> Fsm.Merge.merged_fsm_result_kind
-
-val reachable_blocks :
-  Fsm.States.t Fsm.Actions.t ->
-  Fsm.Partition.t ->
-  Fsm.Partition.t option
+val handle_run_params : run_params -> bool -> Fsm.t
 
 val add_to_block_option :
-  Fsm.state -> Fsm.States.t option -> Fsm.States.t option
+  Model_state.t ->
+  Model.States.t option ->
+  Model.States.t option
 
 val split_block :
-  Fsm.States.t ->
-  Fsm.action ->
-  Fsm.States.t Fsm.Actions.t Fsm.Edges.t ->
-  Fsm.Partition.t ->
-  Fsm.States.t * Fsm.States.t option
-
-val update_if_changed : unit
+  Model.States.t ->
+  Model.States.t Model.Actions.t Model.Edges.t ->
+  Model.Partition.t ->
+  Model.States.t * Model.States.t option
 
 val iterate :
-  Fsm.Alphabet.t ->
-  Fsm.States.t Fsm.Actions.t Fsm.Edges.t ->
-  Fsm.Partition.t ref ->
+  Model.Alphabet.t ->
+  Model.States.t Model.Actions.t Model.Edges.t ->
+  Model.Partition.t ref ->
   bool ref ->
   bool ->
   unit

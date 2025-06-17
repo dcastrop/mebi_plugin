@@ -39,9 +39,8 @@ type json_action =
   * (json_action_silent * json_action_annotations)
 
 type json_state_name = json_action_name
-type json_state_info = json_state_name
-type json_state = json_state_info * json_state_info
-type json_edge_info = json_state_info
+type json_state = json_state_name
+type json_edge_info = json_state
 type json_edge_silent = json_edge_info
 
 type json_edge =
@@ -58,10 +57,12 @@ type json_model = {
   info : model_info;
   alphabet : json_action Queue.t;
   initial_state : json_action_name;
-  state_list : json_state Queue.t;
+  state_list : json_action_name Queue.t;
   edge_list : json_edge Queue.t;
 }
 
+val state_to_str : Model_state.t -> string
+val state_opt_to_str : Model_state.t option -> string
 val string_opt : string option -> string
 val bool_opt : bool option -> string
 val is_model_complete : json_model -> bool option

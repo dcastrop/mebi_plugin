@@ -1248,8 +1248,8 @@ Example g1 : sys * resource := compose (create 1 P).
 (***************************)
 
 (* false *)
-MeBi Show Bisim LTS Bounded 50 Of g1 With bigstep
-            And LTS Bounded 50 Of g1 With lts
+MeBi Show Bisim LTS Bounded 50 Of g1  With bigstep
+            And LTS Bounded 50 Of g1  With lts
             Using bigstep lts step.
 
 (* true ? *)
