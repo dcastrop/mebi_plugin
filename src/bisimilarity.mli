@@ -1,60 +1,34 @@
-type fsm_pair = Fsm.fsm * Fsm.fsm
+type run_params = Fsm.pair * Fsm.t option
+type result_kind = (Fsm.pair * Fsm.t) * (Model.Partition.t * Model.Partition.t)
 
-type run_params =
-  fsm_pair * Fsm.Merge.merged_fsm_result_kind option
+exception CouldNotFindOriginOfState of Model.State.t
 
-type result_kind =
-  fsm_pair
-  * Fsm.Merge.merged_fsm_result_kind
-  * (Fsm.Partition.t * Fsm.Partition.t)
+val block_has_shared_origin : Model.States.t -> Fsm.t -> Fsm.t -> bool
 
-val get_pair_from_result : fsm_pair * 'a * 'b -> fsm_pair
-val resolve : result_kind -> bool
+val split_bisimilar
+  :  Model.Partition.t
+  -> Fsm.t
+  -> Fsm.t
+  -> Model.Partition.t * Model.Partition.t
 
-exception CouldNotFindOriginOfState of Fsm.state
+val add_to_block_option
+  :  Model.State.t
+  -> Model.States.t option
+  -> Model.States.t option
 
-val block_has_shared_origin :
-  Fsm.States.t ->
-  Fsm.States.t ->
-  Fsm.States.t ->
-  Fsm.Merge.merged_state_map ->
-  bool
+val split_block
+  :  Model.States.t
+  -> Model.States.t Model.Actions.t Model.Edges.t
+  -> Model.Partition.t
+  -> Model.States.t * Model.States.t option
 
-val split_bisimilar :
-  Fsm.Partition.t ->
-  Fsm.States.t ->
-  Fsm.States.t ->
-  Fsm.Merge.merged_state_map ->
-  Fsm.Partition.t * Fsm.Partition.t
+val iterate
+  :  Model.Alphabet.t
+  -> Model.States.t Model.Actions.t Model.Edges.t
+  -> Model.Partition.t ref
+  -> bool ref
+  -> bool
+  -> unit
 
-val saturate_fsms : Fsm.fsm -> Fsm.fsm -> fsm_pair
-
-val handle_run_params :
-  run_params -> bool -> Fsm.Merge.merged_fsm_result_kind
-
-val reachable_blocks :
-  Fsm.States.t Fsm.Actions.t ->
-  Fsm.Partition.t ->
-  Fsm.Partition.t option
-
-val add_to_block_option :
-  Fsm.state -> Fsm.States.t option -> Fsm.States.t option
-
-val split_block :
-  Fsm.States.t ->
-  Fsm.action ->
-  Fsm.States.t Fsm.Actions.t Fsm.Edges.t ->
-  Fsm.Partition.t ->
-  Fsm.States.t * Fsm.States.t option
-
-val update_if_changed : unit
-
-val iterate :
-  Fsm.Alphabet.t ->
-  Fsm.States.t Fsm.Actions.t Fsm.Edges.t ->
-  Fsm.Partition.t ref ->
-  bool ref ->
-  bool ->
-  unit
-
+val handle_run_params : run_params -> bool -> Fsm.t
 val run : ?weak:bool -> run_params -> result_kind

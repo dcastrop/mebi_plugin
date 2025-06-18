@@ -3,11 +3,18 @@ type output_kind =
   | Show of unit
   | Dump of string option
 
+let get_name ?(default : string = "unnamed") (o : output_kind) : string =
+  match o with
+  | Check () -> default
+  | Show () -> default
+  | Dump name -> (match name with None -> default | Some name -> name)
+;;
+
 type result_kind =
-  | LTS of Lts.lts
-  | FSM of Fsm.fsm
-  | Minim of (Fsm.fsm * Fsm.fsm)
-  | Merge of (Fsm.fsm * Fsm.fsm * Fsm.fsm)
+  | LTS of Lts.t
+  | FSM of Fsm.t
+  | Minim of Fsm.pair
+  | Merge of (Fsm.pair * Fsm.t)
   | Bisim of Bisimilarity.result_kind
 
 (** [fail_if_incomplete * bounds * initial_term] *)

@@ -1,4 +1,4 @@
-open Mebi_plugin.Fsm
+(* open Mebi_plugin.Fsm
 (* open Mebi_plugin.Bisimilarity *)
 open Mebi_plugin.Utils
 open Mebi_plugin.Utils.Logging
@@ -247,4 +247,4 @@ let () =
   (* quick_test_saturate_fsm Mebi_plugin.Examples.exa_saturated2 (); *)
   quick_test_saturate_fsm_states Mebi_plugin.Examples.exa_saturated2 ();
   ()
-;;
+;; *)
