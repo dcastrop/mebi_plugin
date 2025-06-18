@@ -3,11 +3,13 @@ type output_kind =
   | Show of unit
   | Dump of string option
 
+val get_name : ?default:string -> output_kind -> string
+
 type result_kind =
-  | LTS of Lts.lts
-  | FSM of Fsm.fsm
-  | Minim of (Fsm.fsm * Fsm.fsm)
-  | Merge of (Fsm.fsm * Fsm.fsm * Fsm.fsm)
+  | LTS of Lts.t
+  | FSM of Fsm.t
+  | Minim of Fsm.pair
+  | Merge of (Fsm.pair * Fsm.t)
   | Bisim of Bisimilarity.result_kind
 
 type term_params = bool * int * Constrexpr.constr_expr

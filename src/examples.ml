@@ -1,21 +1,21 @@
 (** [Examples] contains examples to be used by either [KS90] or [PT87]. *)
-open Fsm
 
 type bisim_exa =
-  { s : fsm
-  ; t : fsm
+  { s : Fsm.t
+  ; t : Fsm.t
   ; are_bisimilar : bool
   }
 
-type minim_exa = { the_fsm : fsm }
+type minim_exa = { the_fsm : Fsm.t }
 
 type exa_kind =
   | Bisim of bisim_exa
   | Minim of minim_exa
   | Weak of bisim_exa
-  | Saturate of fsm
+  | Saturate of Fsm.t
 
-(** [example] is a type for denoting pairs of fsms that we check are bisimilar. *)
+(** [example] is a type for denoting pairs of fsms that we check are bisimilar.
+*)
 type example =
   { name : string
   ; kind : exa_kind
@@ -26,8 +26,8 @@ let exa (name : string) (kind : exa_kind) : example = { name; kind }
 (** [exa_1] is `Example 3.2.5` on page 106. *)
 let exa_1 : example =
   (* s *)
-  let (s : fsm) =
-    Translate.to_fsm
+  let (s : Fsm.t) =
+    Translate.lts_to_fsm
       (Lts.Create.lts
          ~init:"s0"
          (Nested
@@ -36,8 +36,10 @@ let exa_1 : example =
               ; "s2", [ "b", [ "s2" ] ]
               ]
             , None )))
-  and (* t *)
-    (t : fsm) =
+  and
+    (* t *)
+      (t : fsm)
+    =
     Translate.to_fsm
       (Lts.Create.lts
          ~init:"t0"
@@ -61,8 +63,10 @@ let exa_2 : example =
               ; "s4", [ "a", [ "s0" ] ]
               ]
             , None )))
-  and (* t *)
-    (t : fsm) =
+  and
+    (* t *)
+      (t : fsm)
+    =
     Translate.to_fsm
       (Lts.Create.lts
          ~init:"t0"
@@ -80,7 +84,8 @@ let exa_2 : example =
 ;;
 
 (** [exa_mc] ...
-    I was wondering about how to encode mixed-states using either mixed-choice or silent transitions -- Jonah *)
+    I was wondering about how to encode mixed-states using either mixed-choice or silent transitions -- Jonah
+*)
 let exa_mc : example =
   (* [s] has a mixed-choice *)
   let (s : fsm) =
@@ -93,8 +98,10 @@ let exa_mc : example =
               ; "s2", [ "send", [ "s3" ] ]
               ]
             , None )))
-  and (* [t] has silent transitions *)
-    (t : fsm) =
+  and
+    (* [t] has silent transitions *)
+      (t : fsm)
+    =
     Translate.to_fsm
       (Lts.Create.lts
          ~init:"t0"
@@ -118,8 +125,10 @@ let exa_self_rec_nondet : example =
          ~init:"s0"
          (Nested
             ([ "s0", [ "a", [ "s1" ] ]; "s1", [ "a", [ "s1"; "s2" ] ] ], None)))
-  and (* t *)
-    (t : fsm) =
+  and
+    (* t *)
+      (t : fsm)
+    =
     Translate.to_fsm
       (Lts.Create.lts
          ~init:"t0"
@@ -142,8 +151,10 @@ let exa_self_rec_nondet_inf : example =
               ; "s2", [ "a", [ "s0" ] ]
               ]
             , None )))
-  and (* t *)
-    (t : fsm) =
+  and
+    (* t *)
+      (t : fsm)
+    =
     Translate.to_fsm
       (Lts.Create.lts
          ~init:"t0"
@@ -167,8 +178,10 @@ let exa_self_rec_det : example =
          (Nested
             ( [ "s0", [ "a", [ "s1" ] ]; "s1", [ "a", [ "s1" ]; "b", [ "s2" ] ] ]
             , None )))
-  and (* t *)
-    (t : fsm) =
+  and
+    (* t *)
+      (t : fsm)
+    =
     Translate.to_fsm
       (Lts.Create.lts
          ~init:"t0"
@@ -192,8 +205,10 @@ let exa_self_rec_det_inf : example =
               ; "s2", [ "a", [ "s2" ] ]
               ]
             , None )))
-  and (* t *)
-    (t : fsm) =
+  and
+    (* t *)
+      (t : fsm)
+    =
     Translate.to_fsm
       (Lts.Create.lts
          ~init:"t0"
@@ -215,8 +230,10 @@ let exa_rec_1 : example =
       (Lts.Create.lts
          ~init:"s0"
          (Nested ([ "s0", [ "a", [ "s1" ] ]; "s1", [ "b", [ "s0" ] ] ], None)))
-  and (* t *)
-    (t : fsm) =
+  and
+    (* t *)
+      (t : fsm)
+    =
     Translate.to_fsm
       (Lts.Create.lts
          ~init:"t0"
@@ -239,8 +256,10 @@ let exa_rec_2 : example =
       (Lts.Create.lts
          ~init:"s0"
          (Nested ([ "s0", [ "a", [ "s1" ] ]; "s1", [ "b", [ "s0" ] ] ], None)))
-  and (* t *)
-    (t : fsm) =
+  and
+    (* t *)
+      (t : fsm)
+    =
     Translate.to_fsm
       (Lts.Create.lts
          ~init:"t0"
@@ -267,8 +286,10 @@ let exa_par_1 : example =
               ; "s2", [ "a", [ "s3" ] ]
               ]
             , None )))
-  and (* t *)
-    (t : fsm) =
+  and
+    (* t *)
+      (t : fsm)
+    =
     Translate.to_fsm
       (Lts.Create.lts
          ~init:"t0"
@@ -287,8 +308,10 @@ let exa_self_act1 : example =
   let (s : fsm) =
     Translate.to_fsm
       (Lts.Create.lts ~init:"s0" (Nested ([ "s0", [ "a", [ "s1" ] ] ], None)))
-  and (* t *)
-    (t : fsm) =
+  and
+    (* t *)
+      (t : fsm)
+    =
     Translate.to_fsm
       (Lts.Create.lts ~init:"t0" (Nested ([ "t0", [ "a", [ "t1" ] ] ], None)))
   in
@@ -347,8 +370,10 @@ let exa_weak1 : example =
               ; "s4", [ "d", [ "s5" ] ]
               ]
             , None )))
-  and (* t *)
-    (t : fsm) =
+  and
+    (* t *)
+      (t : fsm)
+    =
     Translate.to_fsm
       (Lts.Create.lts
          ~init:"t0"
@@ -378,8 +403,10 @@ let exa_weak2 : example =
               ; "s6", [ "~", [ "s2" ]; "f", [ "s7" ] ]
               ]
             , None )))
-  and (* t *)
-    (t : fsm) =
+  and
+    (* t *)
+      (t : fsm)
+    =
     Translate.to_fsm
       (Lts.Create.lts
          ~init:"t1"

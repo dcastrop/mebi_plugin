@@ -1,5 +1,17 @@
 # todo
 
+- [ ] investigate why `MkGraph.lts_graph` reports 1 more edge than in the `MkGraph.decoq_lts`
+- [ ] investigate why when providing the `SILENT` action for `Weak`, the `SILENT` action does not appear in the alphabet
+
+- [ ] step through bisimilarity algorithm result and check it is correct
+- [ ] re-add support for dumping bisimilarity algorithm results to json
+
+
+- [ ] generalise the pstr-functions in `Model.ml` -- too much code duplication. maybe make a centralised string-indentation-formatter for this
+
+
+---
+
 - [ ] fix the printouts/dumps for FSMs, generalize the dumps using a functor to handle either LTS or FSM
 - [ ] overhaul utils.params and utils.logging
 - [ ] sometimes when writing to a file [dump_to_file.ml] appears to just crash without any kind of warning (only tested using COQ examples during compilation)

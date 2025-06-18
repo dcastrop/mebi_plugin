@@ -1,293 +1,144 @@
-type raw_flat_lts =
-  (string * string * string * bool option * string option) list
+open Model
 
-type raw_nested_lts = (string * (string * string list) list) list
-
-type raw_states =
-  | JustName of string list
-  | WithInfo of (string * string) list
-
-type raw_transitions =
-  | Flat of (raw_flat_lts * raw_states option)
-  | Nested of (raw_nested_lts * raw_states option)
-
-type transition =
-  { id : int
-  ; from : string
-  ; label : string
-  ; destination : string
-  ; is_silent : bool option
-  ; info : string option
-  }
-
-module Transitions = Set.Make (struct
-    type t = transition
-
-    let compare a b = compare a.id b.id
-  end)
-
-type state =
-  { name : string
-  ; info : string option
-  }
-
-module States = Set.Make (struct
-    type t = state
-
-    let compare a b =
-      match String.compare a.name b.name with
-      | 0 ->
-        (match a.info, b.info with
-         | None, None -> 0
-         | Some ai, Some bi -> String.compare ai bi
-         | Some _, None -> 1
-         | None, Some _ -> -1)
-      | x -> x
-    ;;
-  end)
-
-type lts =
-  { init : string option
-  ; transitions : Transitions.t
+type t =
+  { init : State.t option
+  ; alphabet : Alphabet.t
   ; states : States.t
-  ; info : Utils.model_info option
+  ; transitions : Transitions.t
+  ; info : Info.t option
   }
 
-module PStr = struct
-  open Utils.Logging
-  open Utils.Formatting
-  open Utils
+let create
+      (init : State.t option)
+      (alphabet : Alphabet.t)
+      (states : States.t)
+      (transitions : Transitions.t)
+      (info : Info.t option)
+  : t
+  =
+  { init; alphabet; states; transitions; info }
+;;
 
-  let transition
-        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-        (t : transition)
-    : string
-    =
-    let _params : Params.fmt = Params.handle params in
-    let tabs : string = str_tabs _params.tabs
-    and tabs' : string = str_tabs (_params.tabs + 2) in
-    Printf.sprintf
-      "%s%s"
-      (if _params.no_leading_tab then "" else tabs)
-      (let normal_pstr : string =
-         (* Printf.sprintf "(%s --<%s>--> %s)" t.from t.label t.destination *)
-         Printf.sprintf
-           "%s\n%s--<%s>-->\n%s%s\n"
-           t.from
-           tabs'
-           t.label
-           tabs'
-           t.destination
-       and detail_pstr : string =
-         Printf.sprintf
-           "#%d %s\n%s--<%s>-->\n%s%s\n"
-           t.id
-           t.from
-           tabs'
-           t.label
-           tabs'
-           t.destination
-       in
-       match _params.params.kind with
-       | Normal () -> normal_pstr
-       | Details () -> detail_pstr
-       | Debug () -> detail_pstr
-       | Warning () -> detail_pstr)
-  ;;
+(*********************************************************************)
+(****** Add **********************************************************)
+(*********************************************************************)
 
-  let transitions
-        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-        (ts : Transitions.t)
-    : string
-    =
-    if Transitions.is_empty ts
-    then "[ ] (empty)"
-    else (
-      (* increment tab of inner elements of set *)
-      let _params : Params.fmt = Params.handle params in
-      let _params' : Params.fmt = inc_tab _params
-      and tabs : string = str_tabs _params.tabs in
-      Printf.sprintf
-        "%s[%s%s]"
-        (if _params.no_leading_tab then "" else tabs)
-        (Transitions.fold
-           (fun (t : transition) (acc : string) ->
-             Printf.sprintf
-               "%s%s\n"
-               acc
-               (transition ~params:(Fmt (no_leading_tab false _params')) t))
-           ts
-           "\n")
-        tabs)
-  ;;
+(* let add_label (g : t) (l : Action.Label.t) : t =
+  match g with
+  | { alphabet; _ } -> { g with alphabet = Alphabet.add l alphabet }
+;;
 
-  let state ?(params : Params.pstr = Fmt (Params.Default.fmt ())) (s : state)
-    : string
-    =
-    let info_str : string =
-      (* FIXME: need to overhaul params *)
-      match s.info, true (* params.params.options.show_detailed_output*) with
-      | Some i, true -> Printf.sprintf " (%s)" i
-      | _, _ -> ""
-    in
-    Printf.sprintf "%s%s" s.name info_str
-  ;;
+let add_label_list (g : t) (ls : Action.Label.t list) : t =
+  match g with
+  | { alphabet; _ } ->
+    { g with alphabet = Alphabet.add_seq (List.to_seq ls) alphabet }
+;; *)
 
-  let states
-        ?(params : Params.pstr = Fmt (Params.Default.fmt ()))
-        (ss : States.t)
-    : string
-    =
-    if States.is_empty ss
-    then "[ ] (empty)"
-    else (
-      (* increment tab of inner elements of set *)
-      let _params : Params.fmt = Params.handle params in
-      let _params' : Params.fmt = inc_tab _params
-      and tabs : string = str_tabs _params.tabs in
-      let tabs' : string = str_tabs _params'.tabs in
-      Printf.sprintf
-        "%s[%s%s]"
-        (if _params.no_leading_tab then "" else tabs)
-        (States.fold
-           (fun (s : state) (acc : string) ->
-             Printf.sprintf "%s%s%s\n" acc tabs' (state ~params s))
-           ss
-           "\n")
-        tabs)
-  ;;
+let add_action (m : t) (a : Action.t) : t =
+  match m with
+  | { alphabet; _ } -> { m with alphabet = Alphabet.add a alphabet }
+;;
 
-  let lts ?(params : Params.pstr = Fmt (Params.Default.fmt ())) (the_lts : lts)
-    : string
-    =
-    (* increment tab of inner elements of fsm *)
-    let _params : Params.fmt = Params.handle params in
-    let _params' : Params.fmt = inc_tab ~by:2 _params
-    and tabs : string = str_tabs _params.tabs
-    and tabs' : string = str_tabs (_params.tabs + 1) in
-    Printf.sprintf
-      "{ %s; %s; %s; %s\n%s}"
-      (Printf.sprintf
-         "\n%sinitial state: %s"
-         tabs'
-         (match the_lts.init with None -> "None" | Some init' -> init'))
-      (Printf.sprintf
-         "\n%smeta info: %s"
-         tabs'
-         (Utils.PStr.model_info the_lts.info))
-      (Printf.sprintf
-         "\n%sstates: %s"
-         tabs'
-         (states ~params:(Fmt _params') the_lts.states))
-      (Printf.sprintf
-         "\n%stransitions: %s"
-         tabs'
-         (transitions ~params:(Fmt _params') the_lts.transitions))
-      tabs
-  ;;
-end
+let add_action_list (m : t) (al : Action.t list) : t =
+  match m with
+  | { alphabet; _ } ->
+    { m with alphabet = Alphabet.add_seq (List.to_seq al) alphabet }
+;;
 
-module Create = struct
-  type transition_params =
-    | Of of (int * string * string * string * bool option * string option)
+let add_state (g : t) (s : State.t) : t =
+  match g with
+  | { init; alphabet; states; transitions; info } ->
+    { g with states = States.add s states }
+;;
 
-  let transition (params : transition_params) : transition =
-    match params with
-    | Of (id, from, label, destination, is_silent, info) ->
-      { id; from; label; destination; is_silent; info }
-  ;;
+let add_state_list (g : t) (ss : State.t list) : t =
+  match g with
+  | { init; alphabet; states; transitions; info } ->
+    { g with states = States.add_seq (List.to_seq ss) states }
+;;
 
-  let lts
-        ?(init : string option)
-        ?(info : Utils.model_info option)
-        (raw : raw_transitions)
-    : lts
-    =
-    let (transitions, states) : Transitions.t * States.t =
-      match raw with
-      | Flat (raw', states) ->
-        let states' : States.t =
-          match states with
-          | None -> States.empty
-          | Some states' ->
-            States.of_list
-              (match states' with
-               | JustName states'' ->
-                 List.fold_left
-                   (fun (acc : state list) (name : string) ->
-                     { name; info = None } :: acc)
-                   []
-                   states''
-               | WithInfo states'' ->
-                 List.fold_left
-                   (fun (acc : state list) ((name, info) : string * string) ->
-                     { name; info = Some info } :: acc)
-                   []
-                   states'')
-        in
-        ( List.fold_left
-            (fun (acc : Transitions.t)
-              ((from, label, destination, is_silent, constr_info) :
-                string * string * string * bool option * string option) ->
-              Transitions.add
-                (transition
-                   (Of
-                      ( Transitions.cardinal acc
-                      , from
-                      , label
-                      , destination
-                      , is_silent
-                      , constr_info )))
-                acc)
-            Transitions.empty
-            raw'
-        , states' )
-      | Nested (raw', states) ->
-        let states' : States.t =
-          match states with
-          | None -> States.empty
-          | Some states' ->
-            States.of_list
-              (match states' with
-               | JustName states'' ->
-                 List.fold_left
-                   (fun (acc : state list) (name : string) ->
-                     { name; info = None } :: acc)
-                   []
-                   states''
-               | WithInfo states'' ->
-                 List.fold_left
-                   (fun (acc : state list) ((name, info) : string * string) ->
-                     { name; info = Some info } :: acc)
-                   []
-                   states'')
-        in
-        ( List.fold_left
-            (fun (acc : Transitions.t)
-              ((from, actions) : string * (string * string list) list) ->
-              List.fold_left
-                (fun (acc' : Transitions.t)
-                  ((label, destinations) : string * string list) ->
-                  List.fold_left
-                    (fun (acc'' : Transitions.t) (destination : string) ->
-                      Transitions.add
-                        (transition
-                           (Of
-                              ( Transitions.cardinal acc''
-                              , from
-                              , label
-                              , destination
-                              , None
-                              , None )))
-                        acc'')
-                    acc'
-                    destinations)
-                acc
-                actions)
-            Transitions.empty
-            raw'
-        , states' )
-    in
-    { init; transitions; states; info }
-  ;;
-end
+let add_states (g : t) (ss : States.t) : t =
+  match g with
+  | { init; alphabet; states; transitions; info } ->
+    { g with states = States.union ss states }
+;;
+
+let add_transition
+      (g : t)
+      (from : State.t)
+      (l : Action.Label.t)
+      (dest : State.t)
+      (meta : Action.MetaData.t option)
+  : t
+  =
+  match g with
+  | { init; alphabet; states; transitions; info } ->
+    { g with transitions = Transitions.add (from, l, dest, meta) transitions }
+;;
+
+let add_transition_from_action
+      (g : t)
+      (from : State.t)
+      (a : Action.t)
+      (dest : State.t)
+  : t
+  =
+  add_transition g from a.label dest (Some a.meta)
+;;
+
+(*********************************************************************)
+(****** Pretty-Strings ***********************************************)
+(*********************************************************************)
+
+let to_string
+      ?(pstr : bool = false)
+      ?(skip_leading_tab : bool = false)
+      ?(indents : int = 0)
+      (g : t)
+  : string
+  =
+  let str_indent0 = Utils.str_tabs indents in
+  let str_indent1 = Utils.str_tabs (indents + 1) in
+  let outer, sep =
+    if pstr
+    then str_indent0, Printf.sprintf "\n%s%s; " str_indent0 str_indent1
+    else "", ""
+  in
+  let num_alpha_str = Printf.sprintf "(%i) " (Alphabet.cardinal g.alphabet) in
+  let num_states_str = Printf.sprintf "(%i) " (States.cardinal g.states) in
+  let num_edges_str =
+    Printf.sprintf "(%i) " (Transitions.cardinal g.transitions)
+  in
+  Printf.sprintf
+    "\n\
+     %s%s{ initial state: %s\n\
+     %sinfo: %s\n\
+     %salphabet: %s%s\n\
+     %sstates: %s%s\n\
+     %stransitions: %s%s\n\
+     %s}"
+    (if skip_leading_tab then "" else str_indent0)
+    outer
+    (pstr_state_opt ~indents:(indents + 1) g.init)
+    sep
+    (pstr_info_opt ~indents:(indents + 1) g.info)
+    sep
+    num_alpha_str
+    (pstr_alphabet ~skip_leading_tab:true ~indents:(indents + 1) g.alphabet)
+    sep
+    num_states_str
+    (pstr_states ~skip_leading_tab:true ~indents:(indents + 1) g.states)
+    sep
+    num_edges_str
+    (pstr_transitions
+       ~skip_leading_tab:true
+       ~indents:(indents + 1)
+       g.transitions)
+    outer
+;;
+
+let pstr ?(skip_leading_tab : bool = false) ?(indents : int = 0) (g : t)
+  : string
+  =
+  to_string ~pstr:true ~skip_leading_tab ~indents g
+;;

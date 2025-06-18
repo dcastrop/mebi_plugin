@@ -1,4 +1,5 @@
 (* open Fsm *)
+open Model
 open Lts
 
 let dir_perm : int = 0o777
@@ -8,39 +9,6 @@ let default_output_dir : string = "./_dumps/"
 let open_out_channel () = function
   | filepath ->
     open_out_gen [ Open_creat; Open_text; Open_append ] out_perm filepath
-;;
-
-(** removes all newlines, excess spaces from string, and makes " " safe *)
-let clean (s : string) : string =
-  let writing_space : bool ref = ref true in
-  String.fold_left
-    (fun (acc : string) (c : char) ->
-      Printf.sprintf
-        "%s%s"
-        acc
-        (if String.contains "\n\r\t" c
-         then
-           if !writing_space
-           then ""
-           else (
-             writing_space := true;
-             " ")
-         else (
-           let c_str : string = String.make 1 c in
-           if String.contains "\"" c
-           then "'"
-           else (
-             match String.equal " " c_str, !writing_space with
-             | true, true -> ""
-             | true, false ->
-               writing_space := true;
-               c_str
-             | false, true ->
-               writing_space := false;
-               c_str
-             | false, false -> c_str))))
-    ""
-    s
 ;;
 
 type output_dir_kind =
@@ -134,11 +102,9 @@ let rec create_parent_dir (fn : string) =
    ;; *)
 
 type json_action_name = string
-type json_action_silent = bool
-type json_action_annotations = string list
-
-type json_action =
-  json_action_name * (json_action_silent * json_action_annotations)
+type json_label_name = string
+type json_action_silent = bool option
+type json_action = (json_action_name * json_label_name) * json_action_silent
 
 (* module JSON_Alphabet = Set.Make (struct type t = json_action_name *
    (json_action_silent * json_action_annotations)
@@ -161,8 +127,7 @@ type json_edge_info = string
 type json_edge_silent = string
 
 type json_edge =
-  (json_state_name * json_state_name)
-  * (json_action_name * json_edge_silent * json_edge_info)
+  (json_state_name * json_state_name) * (json_action_name * json_edge_info)
 
 (* module JSON_Edges = Set.Make (struct type t = json_edge
 
@@ -175,7 +140,7 @@ type json_edge =
 type model_info =
   { name : string
   ; kind : string
-  ; extra : Utils.model_info option
+  ; extra : Info.t option
   }
 
 type json_model =
@@ -186,8 +151,18 @@ type json_model =
   ; edge_list : json_edge Queue.t
   }
 
+let label_to_str (l : Action.Label.t) : string =
+  Utils.clean_string (Action.Label.to_string l)
+;;
+
+let state_to_str (s : State.t) : string = Utils.clean_string (State.to_string s)
+
+let state_opt_to_str (s : State.t option) : string =
+  match s with None -> "null" | Some s -> state_to_str s
+;;
+
 let string_opt (s : string option) : string =
-  match s with None -> "null" | Some s -> Printf.sprintf "\"%s\"" (clean s)
+  match s with None -> "null" | Some s -> Printf.sprintf "%s" s
 ;;
 
 let bool_opt (b : bool option) : string =
@@ -200,32 +175,68 @@ let is_model_complete (m : json_model) : bool option =
 
 exception ResultKindNotImplemented of Vernac.result_kind
 
+let transitions_to_json_model_edges (ts : Model.Transitions.t)
+  : json_edge Queue.t
+  =
+  Model.Transitions.fold
+    (fun (edge : Transition.t) (acc : json_edge Queue.t) ->
+      let from, label, dest, meta = edge in
+      let edge_info =
+        match meta with None -> "null" | Some meta -> string_opt meta.info
+      in
+      Queue.push
+        ( (State.to_string from, State.to_string dest)
+        , (Action.Label.to_string label, edge_info) )
+        acc;
+      acc)
+    ts
+    (Queue.create ())
+;;
+
+let edges_to_json_model_edges (es : States.t Actions.t Edges.t)
+  : json_edge Queue.t
+  =
+  transitions_to_json_model_edges (Model.edges_to_transitions es)
+;;
+
+let alphabet_to_json_model_alphabet (al : Alphabet.t) : json_action Queue.t =
+  Alphabet.fold
+    (fun (a : Action.t) (acc : json_action Queue.t) ->
+      Queue.push
+        ( (label_to_str a.label, Utils.clean_string (string_opt (snd a.label)))
+        , None )
+        acc;
+      acc)
+    al
+    (Queue.create ())
+;;
+
+let states_to_json_model_states (ss : States.t) : json_state Queue.t =
+  Model.States.fold
+    (fun (s : State.t) (acc : json_state Queue.t) ->
+      Queue.push (state_to_str s, Utils.clean_string (string_opt (snd s))) acc;
+      acc)
+    ss
+    (Queue.create ())
+;;
+
 let to_json_model (filename : string) (model : Vernac.result_kind) : json_model =
   match model with
-  | LTS s ->
-    let extra = s.info in
+  | FSM m ->
+    let extra = m.info in
+    let info = { name = filename; kind = "fsm"; extra } in
+    let alphabet = alphabet_to_json_model_alphabet m.alphabet in
+    let initial_state = state_opt_to_str m.init in
+    let state_list = states_to_json_model_states m.states in
+    let edge_list = edges_to_json_model_edges m.edges in
+    { info; alphabet; initial_state; state_list; edge_list }
+  | LTS g ->
+    let extra = g.info in
     let info = { name = filename; kind = "lts"; extra } in
-    let alphabet = Queue.create () in
-    let initial_state = string_opt s.init in
-    let state_list =
-      Lts.States.fold
-        (fun (state : Lts.state) (acc : json_state Queue.t) ->
-          Queue.push (state.name, string_opt state.info) acc;
-          acc)
-        s.states
-        (Queue.create ())
-    in
-    let edge_list =
-      Lts.Transitions.fold
-        (fun (edge : Lts.transition) (acc : json_edge Queue.t) ->
-          Queue.push
-            ( (edge.from, edge.destination)
-            , (edge.label, bool_opt edge.is_silent, string_opt edge.info) )
-            acc;
-          acc)
-        s.transitions
-        (Queue.create ())
-    in
+    let alphabet = alphabet_to_json_model_alphabet g.alphabet in
+    let initial_state = state_opt_to_str g.init in
+    let state_list = states_to_json_model_states g.states in
+    let edge_list = transitions_to_json_model_edges g.transitions in
     { info; alphabet; initial_state; state_list; edge_list }
   | _ -> raise (ResultKindNotImplemented model)
 ;;
@@ -240,9 +251,7 @@ let handle_if_first (b : bool ref) : string =
   else ",\n"
 ;;
 
-let write_json_extra_to_file (oc : out_channel) (i : Utils.model_info option)
-  : unit
-  =
+let write_json_extra_to_file (oc : out_channel) (i : Info.t option) : unit =
   match i with
   | None -> Printf.fprintf oc "\t\t\"extra\": null\n"
   | Some i ->
@@ -274,22 +283,17 @@ let write_json_alphabet_to_file (oc : out_channel) (i : json_action Queue.t)
       match n with
       | 0 -> ()
       | _ ->
-        let action_name, (action_silent, action_annotations) = Queue.pop i in
+        let (action_name, action_label), action_silent = Queue.pop i in
         Printf.fprintf oc "%s" (handle_if_first is_first);
         Printf.fprintf oc "\t\t{\n";
-        Printf.fprintf oc "\t\t\t\"action\": \"%s\",\n" action_name;
-        Printf.fprintf oc "\t\t\t\"is_silent\": %b,\n" action_silent;
-        if List.is_empty action_annotations
-        then Printf.fprintf oc "\t\t\t\"annotations\": [],\n"
-        else (
-          let is_first' = ref true in
-          Printf.fprintf oc "\t\t\t\"annotations\": [\n";
-          List.iter
-            (fun action_annotation ->
-              Printf.fprintf oc "%s" (handle_if_first is_first');
-              Printf.fprintf oc "\t\t\t\t\"%s\"" action_annotation)
-            action_annotations;
-          Printf.fprintf oc "\t\t\t],\n");
+        Printf.fprintf oc "\t\t\t\"action\": %s,\n" action_name;
+        Printf.fprintf oc "\t\t\t\"label\": \"%s\",\n" action_label;
+        Printf.fprintf oc "\t\t\t\"is_silent\": %s\n" (bool_opt action_silent);
+        (* if List.is_empty action_annotations
+           then Printf.fprintf oc "\t\t\t\"annotations\": [],\n"
+           else (
+           let is_first' = ref true in
+           Printf.fprintf oc "\t\t\t\"annotations\": [\n"; List.iter (fun action_annotation -> Printf.fprintf oc "%s" (handle_if_first is_first'); Printf.fprintf oc "\t\t\t\t\"%s\"" action_annotation) action_annotations; Printf.fprintf oc "\t\t\t],\n"); *)
         Printf.fprintf oc "\t\t}";
         iterate (n - 1) ()
     in
@@ -338,11 +342,11 @@ let write_json_states_to_file (oc : out_channel) (i : json_state Queue.t) : unit
         let state_name, state_info = Queue.pop i in
         Printf.fprintf oc "%s" (handle_if_first is_first);
         Printf.fprintf oc "\t\t{\n";
-        Printf.fprintf oc "\t\t\t\"name\": \"%s\",\n" state_name;
+        Printf.fprintf oc "\t\t\t\"name\": %s,\n" state_name;
         (* Printf.fprintf oc "\t\t\t\"info\": %s\n" state_info; *)
-        Printf.fprintf oc "\t\t\t\"info\": ";
+        Printf.fprintf oc "\t\t\t\"info\": \"";
         write_xl_string_to_file oc state_info;
-        Printf.fprintf oc "\n";
+        Printf.fprintf oc "\"\n";
         Printf.fprintf oc "\t\t}";
         iterate (n - 1) ()
     in
@@ -360,17 +364,16 @@ let write_json_edges_to_file (oc : out_channel) (i : json_edge Queue.t) : unit =
       match n with
       | 0 -> ()
       | _ ->
-        let (from_state, dest_state), (action_label, action_silent, action_info)
-          =
+        let (from_state, dest_state), (action_label, action_info) =
           Queue.pop i
         in
         Printf.fprintf oc "%s" (handle_if_first is_first);
         Printf.fprintf oc "\t\t{\n";
-        Printf.fprintf oc "\t\t\t\"from\": \"%s\",\n" from_state;
-        Printf.fprintf oc "\t\t\t\"dest\": \"%s\",\n" dest_state;
-        Printf.fprintf oc "\t\t\t\"labl\": \"%s\",\n" action_label;
-        Printf.fprintf oc "\t\t\t\"info\": %s,\n" action_info;
-        Printf.fprintf oc "\t\t\t\"tau\": %s\n" action_silent;
+        Printf.fprintf oc "\t\t\t\"from\": %s,\n" from_state;
+        Printf.fprintf oc "\t\t\t\"dest\": %s,\n" dest_state;
+        Printf.fprintf oc "\t\t\t\"labl\": %s,\n" action_label;
+        Printf.fprintf oc "\t\t\t\"info\": \"%s\"\n" action_info;
+        (* Printf.fprintf oc "\t\t\t\"tau\": %s\n" action_silent; *)
         Printf.fprintf oc "\t\t}";
         iterate (n - 1) ()
     in

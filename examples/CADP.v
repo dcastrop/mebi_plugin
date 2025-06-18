@@ -1233,7 +1233,22 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 Example g1 : sys * resource := compose (create 1 P).
 (* MeBi Dump "g1_noglue" LTS Bounded 37 Of g1 Using lts step. *)
 
-(* MeBi Dump "g1" LTS Bounded 5 Of g1 Using bigstep lts step. *)
+
+MeBi Show LTS Bounded 5 Of g1 Using bigstep lts step.
+MeBi Show LTS Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step.
+
+
+MeBi Show FSM Bounded 5 Of g1 Using bigstep lts step.
+MeBi Show FSM Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step.
+
+
+MeBi Dump "g1_LTS" LTS Bounded 5 Of g1 Using bigstep lts step.
+MeBi Dump "g1_LTS_weak" LTS Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step.
+
+
+MeBi Dump "g1_FSM" FSM Bounded 5 Of g1 Using bigstep lts step.
+MeBi Dump "g1_FSM_weak" FSM Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step.
+
 
 (* MeBi Dump "g1_LTS" LTS Bounded 5 Of g1 Using bigstep lts step. *)
 (* MeBi Dump "g1_FSM" FSM Bounded 5 Of g1 Using bigstep lts step. *)
@@ -1248,14 +1263,14 @@ Example g1 : sys * resource := compose (create 1 P).
 (***************************)
 
 (* false *)
-MeBi Show Bisim LTS Bounded 50 Of g1 With bigstep
-            And LTS Bounded 50 Of g1 With lts
-            Using bigstep lts step.
+(* MeBi Show Bisim LTS Bounded 50 Of g1  With bigstep
+            And LTS Bounded 50 Of g1  With lts
+            Using bigstep lts step. *)
 
 (* true ? *)
-MeBi Show Bisim LTS Bounded 50 Of g1  With bigstep  Weak SILENT Of action
+(* MeBi Show Bisim LTS Bounded 50 Of g1  With bigstep  Weak SILENT Of action
             And LTS Bounded 50 Of g1  With lts      Weak SILENT Of action
-            Using bigstep lts step.
+            Using bigstep lts step. *)
 
 (**********************************)
 (**** System size: 2 (identical) **)
