@@ -1,20 +1,9 @@
 val split_at : int -> 'a list -> 'a list -> 'a list * 'a list
 val strip_snd : ('a * 'a) list -> 'a list
 val is_unit_option : unit option -> bool
-val default_opt : 'a -> 'a option -> 'a
-
-type model_info =
-  { is_complete : bool
-  ; bound : int
-  ; num_states : int
-  ; num_edges : int
-  }
-
-val is_complete : model_info option -> bool option
-
-module PStr : sig
-  val model_info : model_info option -> string
-end
+val bool_opt_to_string : string -> bool option -> string
+val string_opt_to_string : string -> string option -> string
+val clean_string : string -> string
 
 module Logging : sig
   type output_modes =

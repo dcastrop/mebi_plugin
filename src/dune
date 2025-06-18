@@ -26,11 +26,11 @@
   ; constr_tree
   mebi_wrapper
   mebi_utils
-  model_state
-  model_label
-  model_action
-  model_transition
-  model_edge
+  ; model_state
+  ; model_label
+  ; model_action
+  ; model_transition
+  ; model_edge
   model
   lts
   fsm

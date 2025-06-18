@@ -16,36 +16,46 @@ let is_unit_option (override : unit option) : bool =
   match override with None -> false | Some () -> true
 ;;
 
-let default_opt (default : 'a) (opt : 'a option) : 'a =
-  match opt with None -> default | Some o -> o
+let bool_opt_to_string (default : string) (opt : bool option) : string =
+  match opt with None -> default | Some o -> Bool.to_string o
 ;;
 
-(** used to store info on if a model is complete or the number of bounds required
-*)
-type model_info =
-  { is_complete : bool
-  ; bound : int
-  ; num_states : int
-  ; num_edges : int
-  }
-
-let is_complete (m : model_info option) : bool option =
-  match m with None -> None | Some i -> Some i.is_complete
+let string_opt_to_string (default : string) (opt : string option) : string =
+  Option.default default opt
 ;;
 
-module PStr = struct
-  let model_info (m : model_info option) : string =
-    match m with
-    | None -> "None"
-    | Some i ->
+(** removes all newlines, excess spaces from string, and makes " " safe *)
+let clean_string (s : string) : string =
+  let writing_space : bool ref = ref true in
+  String.fold_left
+    (fun (acc : string) (c : char) ->
       Printf.sprintf
-        "{| is complete: %b; bound: %i; num states: %i; num edges: %i |}"
-        i.is_complete
-        i.bound
-        i.num_states
-        i.num_edges
-  ;;
-end
+        "%s%s"
+        acc
+        (if String.contains "\n\r\t" c
+         then
+           if !writing_space
+           then ""
+           else (
+             writing_space := true;
+             " ")
+         else (
+           let c_str : string = String.make 1 c in
+           if String.contains "\"" c
+           then "'"
+           else (
+             match String.equal " " c_str, !writing_space with
+             | true, true -> ""
+             | true, false ->
+               writing_space := true;
+               c_str
+             | false, true ->
+               writing_space := false;
+               c_str
+             | false, false -> c_str))))
+    ""
+    s
+;;
 
 module Logging = struct
   type output_modes =
