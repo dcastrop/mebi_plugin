@@ -3,6 +3,13 @@ type output_kind =
   | Show of unit
   | Dump of string option
 
+let get_name ?(default : string = "unnamed") (o : output_kind) : string =
+  match o with
+  | Check () -> default
+  | Show () -> default
+  | Dump name -> (match name with None -> default | Some name -> name)
+;;
+
 type result_kind =
   | LTS of Lts.t
   | FSM of Fsm.t

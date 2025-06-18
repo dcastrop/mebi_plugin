@@ -1,33 +1,45 @@
-type t = {
-  init : Model_state.t option;
-  alphabet : Model.Alphabet.t;
-  states : Model.States.t;
-  transitions : Model.Transitions.t;
-  info : Utils.model_info option;
-}
+type t =
+  { init : Model.State.t option
+  ; alphabet : Model.Alphabet.t
+  ; states : Model.States.t
+  ; transitions : Model.Transitions.t
+  ; info : Model.Info.t option
+  }
 
-val create :
-  Model_state.t option ->
-  Model.Alphabet.t ->
-  Model.States.t ->
-  Model.Transitions.t ->
-  Utils.model_info option ->
-  t
+val create
+  :  Model.State.t option
+  -> Model.Alphabet.t
+  -> Model.States.t
+  -> Model.Transitions.t
+  -> Model.Info.t option
+  -> t
 
-val add_state : t -> Model_state.t -> t
-val add_state_list : t -> Model_state.t list -> t
+val add_action : t -> Model.Action.t -> t
+val add_action_list : t -> Model.Action.t list -> t
+val add_state : t -> Model.State.t -> t
+val add_state_list : t -> Model.State.t list -> t
 val add_states : t -> Model.States.t -> t
 
-val add_transition :
-  t ->
-  Model_state.t ->
-  Model_label.t ->
-  Model_state.t ->
-  Model_label.meta option ->
-  t
+val add_transition
+  :  t
+  -> Model.State.t
+  -> Model.Action.Label.t
+  -> Model.State.t
+  -> Model.Action.MetaData.t option
+  -> t
 
-val add_transition_from_action :
-  t -> Model_state.t -> Model_action.t -> Model_state.t -> t
+val add_transition_from_action
+  :  t
+  -> Model.State.t
+  -> Model.Action.t
+  -> Model.State.t
+  -> t
 
-val pstr :
-  ?skip_leading_tab:bool -> ?indents:int -> t -> string
+val to_string
+  :  ?pstr:bool
+  -> ?skip_leading_tab:bool
+  -> ?indents:int
+  -> t
+  -> string
+
+val pstr : ?skip_leading_tab:bool -> ?indents:int -> t -> string

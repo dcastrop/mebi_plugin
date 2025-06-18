@@ -1,4 +1,5 @@
 (* open Fsm *)
+open Model
 open Lts
 
 let dir_perm : int = 0o777
@@ -8,39 +9,6 @@ let default_output_dir : string = "./_dumps/"
 let open_out_channel () = function
   | filepath ->
     open_out_gen [ Open_creat; Open_text; Open_append ] out_perm filepath
-;;
-
-(** removes all newlines, excess spaces from string, and makes " " safe *)
-let clean (s : string) : string =
-  let writing_space : bool ref = ref true in
-  String.fold_left
-    (fun (acc : string) (c : char) ->
-      Printf.sprintf
-        "%s%s"
-        acc
-        (if String.contains "\n\r\t" c
-         then
-           if !writing_space
-           then ""
-           else (
-             writing_space := true;
-             " ")
-         else (
-           let c_str : string = String.make 1 c in
-           if String.contains "\"" c
-           then "'"
-           else (
-             match String.equal " " c_str, !writing_space with
-             | true, true -> ""
-             | true, false ->
-               writing_space := true;
-               c_str
-             | false, true ->
-               writing_space := false;
-               c_str
-             | false, false -> c_str))))
-    ""
-    s
 ;;
 
 type output_dir_kind =
@@ -172,7 +140,7 @@ type json_edge =
 type model_info =
   { name : string
   ; kind : string
-  ; extra : Utils.model_info option
+  ; extra : Info.t option
   }
 
 type json_model =
@@ -183,10 +151,13 @@ type json_model =
   ; edge_list : json_edge Queue.t
   }
 
-let label_to_str (l : Model_label.t) : string = clean (Model_label.to_string l)
-let state_to_str (s : Model_state.t) : string = clean (Model_state.to_string s)
+let label_to_str (l : Action.Label.t) : string =
+  Utils.clean_string (Action.Label.to_string l)
+;;
 
-let state_opt_to_str (s : Model_state.t option) : string =
+let state_to_str (s : State.t) : string = Utils.clean_string (State.to_string s)
+
+let state_opt_to_str (s : State.t option) : string =
   match s with None -> "null" | Some s -> state_to_str s
 ;;
 
@@ -204,43 +175,68 @@ let is_model_complete (m : json_model) : bool option =
 
 exception ResultKindNotImplemented of Vernac.result_kind
 
+let transitions_to_json_model_edges (ts : Model.Transitions.t)
+  : json_edge Queue.t
+  =
+  Model.Transitions.fold
+    (fun (edge : Transition.t) (acc : json_edge Queue.t) ->
+      let from, label, dest, meta = edge in
+      let edge_info =
+        match meta with None -> "null" | Some meta -> string_opt meta.info
+      in
+      Queue.push
+        ( (State.to_string from, State.to_string dest)
+        , (Action.Label.to_string label, edge_info) )
+        acc;
+      acc)
+    ts
+    (Queue.create ())
+;;
+
+let edges_to_json_model_edges (es : States.t Actions.t Edges.t)
+  : json_edge Queue.t
+  =
+  transitions_to_json_model_edges (Model.edges_to_transitions es)
+;;
+
+let alphabet_to_json_model_alphabet (al : Alphabet.t) : json_action Queue.t =
+  Alphabet.fold
+    (fun (a : Action.t) (acc : json_action Queue.t) ->
+      Queue.push
+        ( (label_to_str a.label, Utils.clean_string (string_opt (snd a.label)))
+        , None )
+        acc;
+      acc)
+    al
+    (Queue.create ())
+;;
+
+let states_to_json_model_states (ss : States.t) : json_state Queue.t =
+  Model.States.fold
+    (fun (s : State.t) (acc : json_state Queue.t) ->
+      Queue.push (state_to_str s, Utils.clean_string (string_opt (snd s))) acc;
+      acc)
+    ss
+    (Queue.create ())
+;;
+
 let to_json_model (filename : string) (model : Vernac.result_kind) : json_model =
   match model with
+  | FSM m ->
+    let extra = m.info in
+    let info = { name = filename; kind = "fsm"; extra } in
+    let alphabet = alphabet_to_json_model_alphabet m.alphabet in
+    let initial_state = state_opt_to_str m.init in
+    let state_list = states_to_json_model_states m.states in
+    let edge_list = edges_to_json_model_edges m.edges in
+    { info; alphabet; initial_state; state_list; edge_list }
   | LTS g ->
     let extra = g.info in
     let info = { name = filename; kind = "lts"; extra } in
-    let alphabet =
-      Model.Alphabet.fold
-        (fun (l : Model_label.t) (acc : json_action Queue.t) ->
-          Queue.push ((label_to_str l, clean (string_opt (snd l))), None) acc;
-          acc)
-        g.alphabet
-        (Queue.create ())
-    in
+    let alphabet = alphabet_to_json_model_alphabet g.alphabet in
     let initial_state = state_opt_to_str g.init in
-    let state_list =
-      Model.States.fold
-        (fun (s : Model_state.t) (acc : json_state Queue.t) ->
-          Queue.push (state_to_str s, clean (string_opt (snd s))) acc;
-          acc)
-        g.states
-        (Queue.create ())
-    in
-    let edge_list =
-      Model.Transitions.fold
-        (fun (edge : Model_transition.t) (acc : json_edge Queue.t) ->
-          let from, label, dest, meta = edge in
-          let edge_info =
-            match meta with None -> "null" | Some meta -> string_opt meta.info
-          in
-          Queue.push
-            ( (Model_state.to_string from, Model_state.to_string dest)
-            , (Model_label.to_string label, edge_info) )
-            acc;
-          acc)
-        g.transitions
-        (Queue.create ())
-    in
+    let state_list = states_to_json_model_states g.states in
+    let edge_list = transitions_to_json_model_edges g.transitions in
     { info; alphabet; initial_state; state_list; edge_list }
   | _ -> raise (ResultKindNotImplemented model)
 ;;
@@ -255,9 +251,7 @@ let handle_if_first (b : bool ref) : string =
   else ",\n"
 ;;
 
-let write_json_extra_to_file (oc : out_channel) (i : Utils.model_info option)
-  : unit
-  =
+let write_json_extra_to_file (oc : out_channel) (i : Info.t option) : unit =
   match i with
   | None -> Printf.fprintf oc "\t\t\"extra\": null\n"
   | Some i ->

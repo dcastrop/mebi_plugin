@@ -7,6 +7,7 @@
 (* open the wrapper *)
 open Mebi_wrapper
 open Mebi_wrapper.Syntax
+open Model
 
 (* *)
 open Utils.Logging
@@ -555,7 +556,7 @@ module type GraphB = sig
   module S : Set.S with type elt = E.t
   module D : Set.S with type elt = E.t * Constr_tree.t
 
-  type constr_transitions = (Model_action.t, D.t) Hashtbl.t
+  type constr_transitions = (Action.t, D.t) Hashtbl.t
 
   type lts_graph =
     { to_visit : E.t Queue.t
@@ -566,7 +567,7 @@ module type GraphB = sig
 
   val insert_constr_transition
     :  constr_transitions
-    -> Model_action.t
+    -> Action.t
     -> E.t
     -> Constr_tree.t
     -> unit mm
@@ -574,7 +575,7 @@ module type GraphB = sig
   val add_new_term_constr_transition
     :  lts_graph
     -> E.t
-    -> Model_action.t
+    -> Action.t
     -> E.t
     -> Constr_tree.t
     -> unit mm
@@ -597,7 +598,12 @@ module type GraphB = sig
     -> Names.GlobRef.t list
     -> lts_graph mm
 
-  val decoq_lts : ?name:string -> int -> lts_graph -> Lts.t mm
+  val decoq_lts
+    :  ?cache_decoding:bool
+    -> ?name:string
+    -> int
+    -> lts_graph
+    -> Lts.t mm
 end
 
 (** [MkGraph M] is ...
@@ -619,13 +625,13 @@ module MkGraph
 
   (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t].
   *)
-  type constr_transitions = (Model_action.t, D.t) Hashtbl.t
+  type constr_transitions = (Action.t, D.t) Hashtbl.t
 
   let num_transitions (ts : constr_transitions H.t) : int =
     H.fold
       (fun (_from : E.t) (transitions : constr_transitions) (acc : int) ->
         Hashtbl.fold
-          (fun (_a : Model_action.t) (destinations : D.t) (acc' : int) ->
+          (fun (_a : Action.t) (destinations : D.t) (acc' : int) ->
             acc' + D.cardinal destinations)
           transitions
           acc)
@@ -634,33 +640,31 @@ module MkGraph
   ;;
 
   let _flatten_transitions (ts : constr_transitions H.t)
-    : (S.elt * Model_action.t * S.elt * Constr_tree.t) list mm
+    : (S.elt * Action.t * S.elt * Constr_tree.t) list mm
     =
     let raw_list : (E.t * constr_transitions) list =
       List.of_seq (H.to_seq ts)
     in
     let from_body
           (i : int)
-          (new_transitions :
-            (S.elt * Model_action.t * S.elt * Constr_tree.t) list)
+          (new_transitions : (S.elt * Action.t * S.elt * Constr_tree.t) list)
       =
       let (from, actions) : E.t * constr_transitions = List.nth raw_list i in
-      let raw_actions : (Model_action.t * D.t) list =
+      let raw_actions : (Action.t * D.t) list =
         List.of_seq (Hashtbl.to_seq actions)
       in
       let action_body
             (j : int)
-            (new_transitions :
-              (S.elt * Model_action.t * S.elt * Constr_tree.t) list)
+            (new_transitions : (S.elt * Action.t * S.elt * Constr_tree.t) list)
         =
-        let (a, destinations) : Model_action.t * D.t = List.nth raw_actions j in
+        let (a, destinations) : Action.t * D.t = List.nth raw_actions j in
         let raw_destinations : (E.t * Constr_tree.t) list =
           D.elements destinations
         in
         let destination_body
               (k : int)
               (new_transitions :
-                (S.elt * Model_action.t * S.elt * Constr_tree.t) list)
+                (S.elt * Action.t * S.elt * Constr_tree.t) list)
           =
           let (destination, constr_tree) : E.t * Constr_tree.t =
             List.nth raw_destinations k
@@ -753,7 +757,7 @@ module MkGraph
            "")
   ;;
 
-  (* let _pstr_constr_transition (f : EConstr.t) (a : Model_action.t) ((d,
+  (* let _pstr_constr_transition (f : EConstr.t) (a : Action.t) ((d,
      c) : EConstr.t * Constr_tree.t) : string = Printf.sprintf "{|from: %s;
      label: %s; dest: %s; tree: %s|}" (econstr_to_string f) a.label
      (econstr_to_string d) (Constr_tree.pstr c) ;; *)
@@ -786,7 +790,7 @@ module MkGraph
      flattened_transitions in Log.override ~params:default_params
      (Printf.sprintf "_check_for_duplicate_transitions, found (%i) to check."
      _num_transitions); let iter_dupe (i : int) ((acc, cache) : string list *
-     (S.elt * Model_action.t * S.elt * Constr_tree.t) list) = if Int.equal
+     (S.elt * Action.t * S.elt * Constr_tree.t) list) = if Int.equal
      ((i + 1) mod 25) 0 then Log.override ~params:default_params (Printf.sprintf
      "_check_for_duplicate_transitions, checking i: %i / %i." (i + 1)
      _num_transitions); let t1 = List.nth flattened_transitions i in let from1,
@@ -822,7 +826,7 @@ module MkGraph
      mm = Log.override ~params:default_params (Printf.sprintf
      "%s_check_transition_states, begin." prefix); H.iter (fun (from :
      EConstr.t) (actions : constr_transitions) -> (* check [from] is in
-     [g.states] *) Hashtbl.iter (fun (a : Model_action.t) (destinations :
+     [g.states] *) Hashtbl.iter (fun (a : Action.t) (destinations :
      D.t) -> D.iter (fun ((destination, _constr_tree) : D.elt) -> let
      is_from_missing : bool = Bool.not (S.mem from g.states) in let
      is_dest_missing : bool = Bool.not (S.mem destination g.states) in if Bool.(
@@ -855,7 +859,7 @@ module MkGraph
   *)
   let insert_constr_transition
         (constrs : constr_transitions)
-        (a : Model_action.t)
+        (a : Action.t)
         (d : E.t)
         (c : Constr_tree.t)
     : unit mm
@@ -869,7 +873,7 @@ module MkGraph
   let add_new_term_constr_transition
         (g : lts_graph)
         (t : E.t)
-        (a : Model_action.t)
+        (a : Action.t)
         (d : E.t)
         (c : Constr_tree.t)
     : unit mm
@@ -927,9 +931,8 @@ module MkGraph
       let* (tgt_enc : E.t) = encode tgt in
       let* (act_enc : E.t) = encode act in
       let* is_silent : bool option = is_silent_transition weak act in
-      let to_add : Model_action.t =
-        { label = act_enc, None; is_silent; info = None; annos = [] }
-      in
+      let meta : Action.MetaData.t = { is_silent; info = None } in
+      let to_add : Action.t = { label = act_enc, None; meta; annos = [] } in
       let* _ =
         match H.find_opt g.transitions t with
         | None -> add_new_term_constr_transition g t to_add tgt_enc int_tree
@@ -1168,10 +1171,14 @@ module MkGraph
     return g
   ;;
 
-  let decoq_lts ?(name : string = "unnamed") (bound : int) (g : lts_graph)
+  let decoq_lts
+        ?(cache_decoding : bool = false)
+        ?(name : string = "unnamed")
+        (bound : int)
+        (g : lts_graph)
     : Lts.t mm
     =
-    let info : Utils.model_info option =
+    let info : Info.t option =
       Some
         { is_complete = Queue.is_empty g.to_visit
         ; bound
@@ -1180,15 +1187,25 @@ module MkGraph
         }
     in
     let* init_decoding = decode g.init in
-    let init : Model_state.t option =
-      Some (g.init, Some (econstr_to_string init_decoding))
+    let init : State.t option =
+      let cached_decoding =
+        if cache_decoding
+        then Some (Utils.clean_string (econstr_to_string init_decoding))
+        else None
+      in
+      Some (g.init, cached_decoding)
     in
     let* states : Model.States.t =
       S.fold
         (fun (s : E.t) (acc : Model.States.t mm) ->
           let* acc = acc in
           let* s_decoding = decode s in
-          return (Model.States.add (s, Some (econstr_to_string s_decoding)) acc))
+          let cached_decoding =
+            if cache_decoding
+            then Some (Utils.clean_string (econstr_to_string s_decoding))
+            else None
+          in
+          return (Model.States.add (s, cached_decoding) acc))
         g.states
         (return Model.States.empty)
     in
@@ -1197,32 +1214,43 @@ module MkGraph
         (fun (from : E.t)
           (ts : constr_transitions)
           (acc0 : Model.Transitions.t mm) ->
-          let* from_decoding = decode from in
-          let from_str = econstr_to_string from_decoding in
+          let* from_cached =
+            if cache_decoding
+            then
+              let* from_decoding = decode from in
+              return
+                (Some (Utils.clean_string (econstr_to_string from_decoding)))
+            else return None
+          in
           Hashtbl.fold
-            (fun (a : Model_action.t)
-              (dests : D.t)
-              (acc1 : Model.Transitions.t mm) ->
-              let* a_decoding = decode (fst a.label) in
-              let a_str = econstr_to_string a_decoding in
+            (fun (a : Action.t) (dests : D.t) (acc1 : Model.Transitions.t mm) ->
+              let* a_cached =
+                if cache_decoding
+                then
+                  let* a_decoding = decode (fst a.label) in
+                  return
+                    (Some (Utils.clean_string (econstr_to_string a_decoding)))
+                else return None
+              in
               D.fold
                 (fun ((dest, tree) : E.t * Constr_tree.t)
                   (acc2 : Model.Transitions.t mm) ->
                   let* acc2 = acc2 in
-                  let* dest_decoding = decode dest in
-                  let from = from, Some from_str in
-                  let dest = dest, Some (econstr_to_string dest_decoding) in
-                  let act = fst a.label, Some a_str in
+                  let* dest_cached =
+                    if cache_decoding
+                    then
+                      let* dest_decoding = decode dest in
+                      return
+                        (Some
+                           (Utils.clean_string
+                              (econstr_to_string dest_decoding)))
+                    else return None
+                  in
+                  let from = from, from_cached in
+                  let dest = dest, dest_cached in
+                  let act = fst a.label, a_cached in
                   return
-                    (Model.Transitions.add
-                       ( from
-                       , act
-                       , dest
-                       , Some
-                           { is_silent = a.is_silent
-                           ; info = Some (Constr_tree.pstr tree)
-                           } )
-                       acc2))
+                    (Model.Transitions.add (from, act, dest, Some a.meta) acc2))
                 dests
                 acc1)
             ts
@@ -1319,6 +1347,10 @@ let handle_output (o : output_kind) (r : result_kind) : unit mm =
     return ()
 ;;
 
+let should_cache_decoding (o : output_kind) : bool =
+  match o with Check _ -> false | Show _ -> true | Dump _ -> true
+;;
+
 (* exception ExceededBoundBeforeLTSCompleted of int *)
 exception WeakBisimilarityRequiresSilentConstrForEachTerm of unit
 
@@ -1336,7 +1368,13 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
     =
     let lts_grefs : Names.GlobRef.t list = Mebi_utils.ref_list_to_glob_list l in
     let* graph_lts = G.build_graph ~primary_lts ~weak bound t lts_grefs in
-    let the_lts = G.decoq_lts bound graph_lts in
+    let the_lts =
+      G.decoq_lts
+        ~cache_decoding:(should_cache_decoding o)
+        ~name:(Vernac.get_name o)
+        bound
+        graph_lts
+    in
     the_lts
     (* let* the_lts_translation = G.DeCoq.lts_graph bound graph_lts in
        match

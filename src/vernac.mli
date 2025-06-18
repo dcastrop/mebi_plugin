@@ -3,6 +3,8 @@ type output_kind =
   | Show of unit
   | Dump of string option
 
+val get_name : ?default:string -> output_kind -> string
+
 type result_kind =
   | LTS of Lts.t
   | FSM of Fsm.t

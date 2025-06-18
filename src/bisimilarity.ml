@@ -6,7 +6,7 @@ open Model
 type run_params = Fsm.pair * Fsm.t option
 type result_kind = (Fsm.pair * Fsm.t) * (Partition.t * Partition.t)
 
-exception CouldNotFindOriginOfState of Model_state.t
+exception CouldNotFindOriginOfState of State.t
 
 (** is [true] if [block] has states that originate from both [the_fsm_1] and [the_fsm_2]
 *)
@@ -18,7 +18,7 @@ let block_has_shared_origin
   =
   let ref_1, ref_2 = ref false, ref false in
   States.iter
-    (fun (s : Model_state.t) ->
+    (fun (s : State.t) ->
       match Fsm.state_origin (the_fsm_1, the_fsm_2) s with
       | 0 ->
         ref_1 := true;
@@ -44,7 +44,7 @@ let split_bisimilar (pi : Partition.t) (the_fsm_1 : Fsm.t) (the_fsm_2 : Fsm.t)
     (Partition.empty, Partition.empty)
 ;;
 
-let add_to_block_option (s : Model_state.t) (block : States.t option)
+let add_to_block_option (s : State.t) (block : States.t option)
   : States.t option
   =
   Some
@@ -66,7 +66,7 @@ let split_block
   let s_reachable_blocks = Model.get_reachable_blocks_opt s_actions pi in
   (* check rest of [block] *)
   States.fold
-    (fun (t : Model_state.t) ((b1, b2) : States.t * States.t option) ->
+    (fun (t : State.t) ((b1, b2) : States.t * States.t option) ->
       let t_actions = Model.get_actions_from t edges_of_a in
       let t_reachable_blocks = Model.get_reachable_blocks_opt t_actions pi in
       match s_reachable_blocks, t_reachable_blocks with
@@ -95,8 +95,8 @@ let iterate
     (fun (b : States.t) ->
       let b = ref b in
       Alphabet.iter
-        (fun (l : Model_label.t) ->
-          let edges_of_a = Model.get_edges_with_label l edges in
+        (fun (a : Action.t) ->
+          let edges_of_a = Model.get_edges_with_label a.label edges in
           (* TODO: [Fsm.Saturate.fsm] doesn't clean up unreachable states/edges yet. *)
           if Edges.length edges_of_a > 0
           then (
