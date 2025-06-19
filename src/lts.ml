@@ -8,6 +8,10 @@ type t =
   ; info : Info.t option
   }
 
+let to_model (m : t) : Model.t =
+  LTS (m.init, m.alphabet, m.states, m.transitions, m.info)
+;;
+
 let create
       (init : State.t option)
       (alphabet : Alphabet.t)
@@ -16,6 +20,7 @@ let create
       (info : Info.t option)
   : t
   =
+  Model.check_info (LTS (init, alphabet, states, transitions, info));
   { init; alphabet; states; transitions; info }
 ;;
 

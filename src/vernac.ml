@@ -15,7 +15,7 @@ type result_kind =
   | FSM of Fsm.t
   | Minim of Fsm.pair
   | Merge of (Fsm.pair * Fsm.t)
-  | Bisim of Bisimilarity.result_kind
+  | Alg of Algorithms.result
 
 (** [fail_if_incomplete * bounds * initial_term] *)
 type term_params = bool * int * Constrexpr.constr_expr

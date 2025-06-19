@@ -10,7 +10,7 @@ type result_kind =
   | FSM of Fsm.t
   | Minim of Fsm.pair
   | Merge of (Fsm.pair * Fsm.t)
-  | Bisim of Bisimilarity.result_kind
+  | Alg of Algorithms.result
 
 type term_params = bool * int * Constrexpr.constr_expr
 type weak_params = Constrexpr.constr_expr * Libnames.qualid

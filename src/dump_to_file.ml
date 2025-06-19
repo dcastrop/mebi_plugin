@@ -37,7 +37,7 @@ type filename_kind =
   | Auto of unit
   | Just of string
 
-let get_name (f : filename_kind) : string =
+let _get_name (f : filename_kind) : string =
   match f with Auto () -> "unknown" | Just s -> s
 ;;
 
@@ -124,7 +124,7 @@ type json_state = json_state_name * json_state_info
    String.compare (snd a) (snd b) | n -> n ;; end) *)
 
 type json_edge_info = string
-type json_edge_silent = string
+(* type json_edge_silent = string *)
 
 type json_edge =
   (json_state_name * json_state_name) * (json_action_name * json_edge_info)
@@ -137,14 +137,11 @@ type json_edge =
    (snd b)) in match c1, c2, c3, c4 with | 0, 0, 0, 0 -> 0 | 0, 0, 0, n -> n |
    0, 0, n, _ -> n | 0, n, _, _ -> n | n, _, _, _ -> n ;; end) *)
 
-type model_info =
+type json_model =
   { name : string
   ; kind : string
-  ; extra : Info.t option
-  }
-
-type json_model =
-  { info : model_info
+  ; info : Info.t option
+  ; result : (Algorithms.result * (string * string) option) option
   ; alphabet : json_action Queue.t
   ; initial_state : json_state_name
   ; state_list : json_state Queue.t
@@ -170,7 +167,7 @@ let bool_opt (b : bool option) : string =
 ;;
 
 let is_model_complete (m : json_model) : bool option =
-  match m.info.extra with None -> None | Some e -> Some e.is_complete
+  match m.info with None -> None | Some e -> Some e.is_complete
 ;;
 
 exception ResultKindNotImplemented of Vernac.result_kind
@@ -220,24 +217,64 @@ let states_to_json_model_states (ss : States.t) : json_state Queue.t =
     (Queue.create ())
 ;;
 
-let to_json_model (filename : string) (model : Vernac.result_kind) : json_model =
+let to_json_model
+      ?(bisim_args : (string * string) option * bool option = None, None)
+      (filename : string)
+      (model : Vernac.result_kind)
+  : json_model
+  =
+  let name = filename in
   match model with
-  | FSM m ->
-    let extra = m.info in
-    let info = { name = filename; kind = "fsm"; extra } in
-    let alphabet = alphabet_to_json_model_alphabet m.alphabet in
-    let initial_state = state_opt_to_str m.init in
-    let state_list = states_to_json_model_states m.states in
-    let edge_list = edges_to_json_model_edges m.edges in
-    { info; alphabet; initial_state; state_list; edge_list }
   | LTS g ->
-    let extra = g.info in
-    let info = { name = filename; kind = "lts"; extra } in
+    let kind = "lts" in
+    let info = g.info in
+    let result = None in
     let alphabet = alphabet_to_json_model_alphabet g.alphabet in
     let initial_state = state_opt_to_str g.init in
     let state_list = states_to_json_model_states g.states in
     let edge_list = transitions_to_json_model_edges g.transitions in
-    { info; alphabet; initial_state; state_list; edge_list }
+    { name; kind; info; result; alphabet; initial_state; state_list; edge_list }
+  | FSM m ->
+    let kind = "fsm" in
+    let info = m.info in
+    let result = None in
+    let alphabet = alphabet_to_json_model_alphabet m.alphabet in
+    let initial_state = state_opt_to_str m.init in
+    let state_list = states_to_json_model_states m.states in
+    let edge_list = edges_to_json_model_edges m.edges in
+    { name; kind; info; result; alphabet; initial_state; state_list; edge_list }
+  | Alg r ->
+    (match r with
+     | Bisim b ->
+       let kind = "bisim" in
+       let (_, the_merged_fsm), _ = b in
+       let m = the_merged_fsm in
+       let info = m.info in
+       let result = Some (r, fst bisim_args) in
+       let alphabet = alphabet_to_json_model_alphabet m.alphabet in
+       let initial_state = state_opt_to_str m.init in
+       let state_list = states_to_json_model_states m.states in
+       let edge_list = edges_to_json_model_edges m.edges in
+       { name
+       ; kind
+       ; info
+       ; result
+       ; alphabet
+       ; initial_state
+       ; state_list
+       ; edge_list
+       })
+  | Merge b ->
+    let kind = "merge" in
+    let (_, the_merged_fsm), _ = b in
+    let m = the_merged_fsm in
+    let info = m.info in
+    let result = None in
+    let alphabet = alphabet_to_json_model_alphabet m.alphabet in
+    let initial_state = state_opt_to_str m.init in
+    let state_list = states_to_json_model_states m.states in
+    let edge_list = edges_to_json_model_edges m.edges in
+    { name; kind; info; result; alphabet; initial_state; state_list; edge_list }
   | _ -> raise (ResultKindNotImplemented model)
 ;;
 
@@ -251,24 +288,51 @@ let handle_if_first (b : bool ref) : string =
   else ",\n"
 ;;
 
-let write_json_extra_to_file (oc : out_channel) (i : Info.t option) : unit =
-  match i with
-  | None -> Printf.fprintf oc "\t\t\"extra\": null\n"
-  | Some i ->
-    Printf.fprintf oc "\t\t\"extra\": {\n";
-    Printf.fprintf oc "\t\t\t\"is_complete\": %b,\n" i.is_complete;
-    Printf.fprintf oc "\t\t\t\"bound\": %i,\n" i.bound;
-    Printf.fprintf oc "\t\t\t\"num_states\": %i,\n" i.num_states;
-    Printf.fprintf oc "\t\t\t\"num_edges\": %i\n" i.num_edges;
-    Printf.fprintf oc "\t\t}\n"
+let write_json_result_to_file
+      (oc : out_channel)
+      (r : (Algorithms.result * (string * string) option) option)
+  : unit
+  =
+  match r with
+  | None -> Printf.fprintf oc "\t\"result\": null,\n"
+  | Some r ->
+    (match r with
+     | Bisim b, tup ->
+       let _, (_bisim_states, _non_bisim_states) = b in
+       Printf.fprintf oc "\t\"result\": {\n";
+       Printf.fprintf
+         oc
+         "\t\t\"bisimilar\": %b,\n"
+         (Algorithms.result_to_bool (fst r));
+       (match tup with
+        | None -> Printf.fprintf oc "\t\t\"fsm_names\": null,\n"
+        | Some tup ->
+          Printf.fprintf
+            oc
+            "\t\t\"fsm_names\": [\"%s\", \"%s\"],\n"
+            (fst tup)
+            (snd tup));
+       Printf.fprintf oc "\t\t\"bisimilar states\": [\n";
+       Printf.fprintf oc "\t\t\t{\"TODO\": true}\n";
+       Printf.fprintf oc "\t\t],\n";
+       Printf.fprintf oc "\t\t\"non-bisimilar states\": [\n";
+       Printf.fprintf oc "\t\t\t{\"TODO\": true}\n";
+       Printf.fprintf oc "\t\t]\n";
+       Printf.fprintf oc "\t},\n";
+       ())
 ;;
 
-let write_json_info_to_file (oc : out_channel) (i : model_info) : unit =
-  Printf.fprintf oc (* open info *) "\t\"info\": {\n";
-  Printf.fprintf oc "\t\t\"name\": \"%s\",\n" i.name;
-  Printf.fprintf oc "\t\t\"kind\": \"%s\",\n" i.kind;
-  write_json_extra_to_file oc i.extra;
-  Printf.fprintf oc (* close info *) "\t},\n"
+let write_json_info_to_file (oc : out_channel) (i : Info.t option) : unit =
+  match i with
+  | None -> Printf.fprintf oc "\t\"info\": null,\n"
+  | Some i ->
+    Printf.fprintf oc "\t\"info\": {\n";
+    Printf.fprintf oc "\t\t\"complete\": %b,\n" i.is_complete;
+    Printf.fprintf oc "\t\t\"bound\": %i,\n" i.bound;
+    Printf.fprintf oc "\t\t\"num actions\": %i,\n" i.num_actions;
+    Printf.fprintf oc "\t\t\"num states\": %i,\n" i.num_states;
+    Printf.fprintf oc "\t\t\"num edges\": %i\n" i.num_edges;
+    Printf.fprintf oc "\t},\n"
 ;;
 
 let write_json_alphabet_to_file (oc : out_channel) (i : json_action Queue.t)
@@ -288,7 +352,7 @@ let write_json_alphabet_to_file (oc : out_channel) (i : json_action Queue.t)
         Printf.fprintf oc "\t\t{\n";
         Printf.fprintf oc "\t\t\t\"action\": %s,\n" action_name;
         Printf.fprintf oc "\t\t\t\"label\": \"%s\",\n" action_label;
-        Printf.fprintf oc "\t\t\t\"is_silent\": %s\n" (bool_opt action_silent);
+        Printf.fprintf oc "\t\t\t\"silent\": %s\n" (bool_opt action_silent);
         (* if List.is_empty action_annotations
            then Printf.fprintf oc "\t\t\t\"annotations\": [],\n"
            else (
@@ -372,7 +436,7 @@ let write_json_edges_to_file (oc : out_channel) (i : json_edge Queue.t) : unit =
         Printf.fprintf oc "\t\t\t\"from\": %s,\n" from_state;
         Printf.fprintf oc "\t\t\t\"dest\": %s,\n" dest_state;
         Printf.fprintf oc "\t\t\t\"labl\": %s,\n" action_label;
-        Printf.fprintf oc "\t\t\t\"info\": \"%s\"\n" action_info;
+        Printf.fprintf oc "\t\t\t\"info\": %s\n" action_info;
         (* Printf.fprintf oc "\t\t\t\"tau\": %s\n" action_silent; *)
         Printf.fprintf oc "\t\t}";
         iterate (n - 1) ()
@@ -384,7 +448,12 @@ let write_json_edges_to_file (oc : out_channel) (i : json_edge Queue.t) : unit =
 let write_json_to_file (m : json_model) (filepath : string) : unit =
   let oc = open_out_channel () filepath in
   Printf.fprintf (* open json *) oc "{\n";
+  Printf.fprintf oc "\t\"name\": \"%s\",\n" m.name;
+  Printf.fprintf oc "\t\"kind\": \"%s\",\n" m.kind;
   write_json_info_to_file oc m.info;
+  close_out oc;
+  let oc = open_out_channel () filepath in
+  write_json_result_to_file oc m.result;
   close_out oc;
   let oc = open_out_channel () filepath in
   write_json_alphabet_to_file oc m.alphabet;
@@ -401,26 +470,117 @@ let write_json_to_file (m : json_model) (filepath : string) : unit =
   close_out oc
 ;;
 
+let build_json_from_single_model
+      (filename : string)
+      (result : Vernac.result_kind)
+  : json_model * bool option
+  =
+  match result with
+  | LTS _ ->
+    let json = to_json_model filename result in
+    let is_complete = is_model_complete json in
+    json, is_complete
+  | FSM _ ->
+    let json = to_json_model filename result in
+    let is_complete = is_model_complete json in
+    json, is_complete
+  | _ -> raise (ResultKindNotImplemented result)
+;;
+
 let write_to_file
       (output_dir : output_dir_kind)
-      (fnk : string option * filename_kind)
+      ((filename, kind) : string * filename_kind)
+      (filetype : filetype_kind)
+      (json : json_model)
+  : string
+  =
+  let filepath =
+    build_filepath output_dir (filename, kind) filetype (is_model_complete json)
+  in
+  create_parent_dir filepath;
+  write_json_to_file json filepath;
+  filepath
+;;
+
+let build_json_from_merged_model
+      (output_dir : output_dir_kind)
+      ((filename, context, kind) : string * string * filename_kind)
+      (filetype : filetype_kind)
+      (result : Vernac.result_kind)
+      (((the_fsm_1, the_fsm_2), the_merged_fsm) : Fsm.pair * Fsm.t)
+  : (json_model * bool option) * string
+  =
+  let the_fsm_1_name = Printf.sprintf "%s | %s (fsm 1)" context filename in
+  let json_1, is_complete_1 =
+    build_json_from_single_model the_fsm_1_name (FSM the_fsm_1)
+  in
+  let _ = write_to_file output_dir (the_fsm_1_name, kind) filetype json_1 in
+  let the_fsm_2_name = Printf.sprintf "%s | %s (fsm 2)" context filename in
+  let json_2, is_complete_2 =
+    build_json_from_single_model the_fsm_2_name (FSM the_fsm_2)
+  in
+  let _ = write_to_file output_dir (the_fsm_2_name, kind) filetype json_2 in
+  let the_merged_fsm, is_merged_complete =
+    match json_1.info, json_2.info with
+    | Some info_1, Some info_2 ->
+      the_merged_fsm, Some (Bool.( && ) info_1.is_complete info_2.is_complete)
+    | _, _ -> the_merged_fsm, None
+  in
+  let the_merged_name = Printf.sprintf "%s | %s (merged)" context filename in
+  let json =
+    to_json_model
+      ~bisim_args:(Some (the_fsm_1_name, the_fsm_2_name), is_merged_complete)
+      the_merged_name
+      result
+  in
+  ( ( { json with
+        info =
+          (match the_merged_fsm.info, is_merged_complete with
+           | None, None -> None
+           | None, Some is_complete ->
+             Some
+               { is_complete
+               ; bound = -1
+               ; num_actions = Model.Alphabet.cardinal the_merged_fsm.alphabet
+               ; num_states = Model.States.cardinal the_merged_fsm.states
+               ; num_edges = Model.get_num_edges the_merged_fsm.edges
+               }
+           | Some info, Some is_complete -> Some { info with is_complete }
+           | Some info, None -> Some info)
+      }
+    , is_merged_complete )
+  , the_merged_name )
+;;
+
+let run
+      (output_dir : output_dir_kind)
+      ((filename, kind) : string option * filename_kind)
       (filetype : filetype_kind)
       (result : Vernac.result_kind)
   : string
   =
-  let filename = match fst fnk with None -> "unknown" | Some n -> n in
-  (* convert model to json *)
-  let json = to_json_model filename result in
-  let is_complete = is_model_complete json in
-  (* build filepath *)
-  let filepath =
-    build_filepath output_dir (filename, snd fnk) filetype is_complete
+  let filename = match filename with None -> "unknown" | Some n -> n in
+  let (json, is_complete), filename =
+    match result with
+    | LTS _ -> build_json_from_single_model filename result, filename
+    | FSM _ -> build_json_from_single_model filename result, filename
+    | Alg b ->
+      (match b with
+       | Bisim b ->
+         build_json_from_merged_model
+           output_dir
+           (filename, "bisim", kind)
+           filetype
+           result
+           (fst b))
+    | Merge b ->
+      build_json_from_merged_model
+        output_dir
+        (filename, "merge", kind)
+        filetype
+        result
+        b
+    | _ -> raise (ResultKindNotImplemented result)
   in
-  (* check parent directory exists *)
-  create_parent_dir filepath;
-  (* write to file *)
-  (* List.iter (fun (line : string) -> Printf.fprintf oc "%s" line) lines; *)
-  write_json_to_file json filepath;
-  (* return filepath *)
-  filepath
+  write_to_file output_dir (filename, kind) filetype json
 ;;

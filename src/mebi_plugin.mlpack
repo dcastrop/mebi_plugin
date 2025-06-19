@@ -4,9 +4,8 @@ Mebi_utils
 Model
 Lts
 Fsm
+Algorithms
 Vernac
-Bisimilarity
-Minimize
 Dump_to_file
 Command
 G_mebi
