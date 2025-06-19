@@ -1178,14 +1178,6 @@ module MkGraph
         (g : lts_graph)
     : Lts.t mm
     =
-    let info : Info.t option =
-      Some
-        { is_complete = Queue.is_empty g.to_visit
-        ; bound
-        ; num_states = S.cardinal g.states
-        ; num_edges = num_transitions g.transitions
-        }
-    in
     let* init_decoding = decode g.init in
     let init : State.t option =
       let cached_decoding =
@@ -1209,11 +1201,11 @@ module MkGraph
         g.states
         (return Model.States.empty)
     in
-    let* transitions : Model.Transitions.t =
+    let* ((transitions, alphabet) : Model.Transitions.t * Model.Alphabet.t) =
       H.fold
         (fun (from : E.t)
           (ts : constr_transitions)
-          (acc0 : Model.Transitions.t mm) ->
+          (acc0 : (Model.Transitions.t * Model.Alphabet.t) mm) ->
           let* from_cached =
             if cache_decoding
             then
@@ -1222,8 +1214,12 @@ module MkGraph
                 (Some (Utils.clean_string (econstr_to_string from_decoding)))
             else return None
           in
+          let from = from, from_cached in
           Hashtbl.fold
-            (fun (a : Action.t) (dests : D.t) (acc1 : Model.Transitions.t mm) ->
+            (fun (a : Action.t)
+              (dests : D.t)
+              (acc1 : (Model.Transitions.t * Model.Alphabet.t) mm) ->
+              let* acc1a, acc1b = acc1 in
               let* a_cached =
                 if cache_decoding
                 then
@@ -1232,33 +1228,51 @@ module MkGraph
                     (Some (Utils.clean_string (econstr_to_string a_decoding)))
                 else return None
               in
-              D.fold
-                (fun ((dest, tree) : E.t * Constr_tree.t)
-                  (acc2 : Model.Transitions.t mm) ->
-                  let* acc2 = acc2 in
-                  let* dest_cached =
-                    if cache_decoding
-                    then
-                      let* dest_decoding = decode dest in
-                      return
-                        (Some
-                           (Utils.clean_string
-                              (econstr_to_string dest_decoding)))
-                    else return None
-                  in
-                  let from = from, from_cached in
-                  let dest = dest, dest_cached in
-                  let act = fst a.label, a_cached in
-                  return
-                    (Model.Transitions.add (from, act, dest, Some a.meta) acc2))
-                dests
-                acc1)
+              let act : Model.Action.Label.t = fst a.label, a_cached in
+              let acc1b =
+                Model.Alphabet.add
+                  { a with label = fst a.label, a_cached }
+                  acc1b
+              in
+              let* acc1a =
+                D.fold
+                  (fun ((dest, tree) : E.t * Constr_tree.t)
+                    (acc2 : Model.Transitions.t mm) ->
+                    let* acc2 = acc2 in
+                    let* dest_cached =
+                      if cache_decoding
+                      then
+                        let* dest_decoding = decode dest in
+                        return
+                          (Some
+                             (Utils.clean_string
+                                (econstr_to_string dest_decoding)))
+                      else return None
+                    in
+                    let dest = dest, dest_cached in
+                    return
+                      (Model.Transitions.add
+                         (from, act, dest, Some a.meta)
+                         acc2))
+                  dests
+                  (return acc1a)
+              in
+              return (acc1a, acc1b))
             ts
             acc0)
         g.transitions
-        (return Model.Transitions.empty)
+        (return (Model.Transitions.empty, Model.Alphabet.empty))
     in
-    let alphabet = Model.alphabet_from_transitions transitions in
+    (* let alphabet = Model.alphabet_from_transitions transitions in *)
+    let info : Info.t option =
+      Some
+        { is_complete = Queue.is_empty g.to_visit
+        ; bound
+        ; num_actions = Model.Alphabet.cardinal alphabet
+        ; num_states = S.cardinal g.states
+        ; num_edges = num_transitions g.transitions
+        }
+    in
     return (Lts.create init alphabet states transitions info)
   ;;
 end
