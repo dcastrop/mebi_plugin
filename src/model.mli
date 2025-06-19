@@ -2,6 +2,7 @@ module Info : sig
   type t =
     { is_complete : bool
     ; bound : int
+    ; num_actions : int
     ; num_states : int
     ; num_edges : int
     }
@@ -85,9 +86,9 @@ module Action : sig
   val eq : t -> t -> bool
   val anno_eq : annotation -> annotation -> bool
   val annos_eq : annotations -> annotations -> bool
-  val compare : t -> t -> int
-  val anno_compare : annotation -> annotation -> int
-  val annos_compare : annotations -> annotations -> int
+  val compare : t -> t -> Int.t
+  val anno_compare : annotation -> annotation -> Int.t
+  val annos_compare : annotations -> annotations -> Int.t
   val hash : t -> int
 end
 
@@ -365,6 +366,16 @@ module Transitions : sig
   val of_seq : elt Seq.t -> t
 end
 
+type t =
+  | LTS of
+      (State.t option * Alphabet.t * States.t * Transitions.t * Info.t option)
+  | FSM of
+      (State.t option
+      * Alphabet.t
+      * States.t
+      * States.t Actions.t Edges.t
+      * Info.t option)
+
 type action_pair = Action.t * States.t
 
 val label_to_action
@@ -492,3 +503,5 @@ val pstr_edges
   -> ?indents:int
   -> States.t Actions.t Edges.t
   -> string
+
+val check_info : t -> unit

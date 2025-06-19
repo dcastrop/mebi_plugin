@@ -19,6 +19,15 @@ let create
   { init; alphabet; states; edges; info }
 ;;
 
+let create_from (m : Model.t) : t =
+  match m with
+  | LTS (init, alphabet, states, transitions, info) ->
+    let edges = Model.transitions_to_edges transitions in
+    create init alphabet states edges info
+  | FSM (init, alphabet, states, edges, info) ->
+    create init alphabet states edges info
+;;
+
 let clone (m : t) : t =
   match m with
   | { init; alphabet; states; edges; info } ->

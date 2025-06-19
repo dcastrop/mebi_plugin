@@ -2,6 +2,7 @@ module Info = struct
   type t =
     { is_complete : bool
     ; bound : int
+    ; num_actions : int
     ; num_states : int
     ; num_edges : int
     }
@@ -15,11 +16,14 @@ module Info = struct
       else "", ""
     in
     Printf.sprintf
-      "%s{| is complete: %b%s; bound: %i%s; num states: %i%s; num edges: %i%s|}"
+      "%s{| is complete: %b%s; bound: %i%s; num actions: %i%s; num states: \
+       %i%s; num edges: %i%s|}"
       outer
       i.is_complete
       sep
       i.bound
+      sep
+      i.num_actions
       sep
       i.num_states
       sep
@@ -433,6 +437,20 @@ module Transitions = Set.Make (struct
 
     let compare a b = Transition.compare a b
   end)
+
+(*********************************************************************)
+(****** Model Kinds **************************************************)
+(*********************************************************************)
+
+type t =
+  | LTS of
+      (State.t option * Alphabet.t * States.t * Transitions.t * Info.t option)
+  | FSM of
+      (State.t option
+      * Alphabet.t
+      * States.t
+      * States.t Actions.t Edges.t
+      * Info.t option)
 
 (*********************************************************************)
 (****** Pairs ********************************************************)
@@ -947,4 +965,55 @@ let pstr_edges
          es
          "")
       str_indent
+;;
+
+(*********************************************************************)
+(****** Info Utils ***************************************************)
+(*********************************************************************)
+
+let check_info (m : t) : unit =
+  match
+    match m with
+    | LTS (_init, alphabet, states, transitions, info) ->
+      (match info with
+       | None -> None
+       | Some info ->
+         Some
+           (List.combine
+              [ "alphabet"; "states"; "transitions" ]
+              (List.combine
+                 [ Alphabet.cardinal alphabet
+                 ; States.cardinal states
+                 ; Transitions.cardinal transitions
+                 ]
+                 [ info.num_actions; info.num_states; info.num_edges ])))
+    | FSM (_init, alphabet, states, edges, info) ->
+      (match info with
+       | None -> None
+       | Some info ->
+         Some
+           (List.combine
+              [ "alphabet"; "states"; "edges" ]
+              (List.combine
+                 [ Alphabet.cardinal alphabet
+                 ; States.cardinal states
+                 ; get_num_edges edges
+                 ]
+                 [ info.num_actions; info.num_states; info.num_edges ])))
+  with
+  | None -> ()
+  | Some info_list ->
+    List.iter
+      (fun (name, (real_num, info_num)) ->
+        if Int.equal real_num info_num
+        then ()
+        else
+          Utils.Logging.Log.warning
+            (Printf.sprintf
+               "Model.check_info, discrepency found in num of \"%s\": expected \
+                (%i) but counted (%i)"
+               name
+               info_num
+               real_num))
+      info_list
 ;;

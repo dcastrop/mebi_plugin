@@ -14,6 +14,7 @@ val create
   -> Model.Info.t option
   -> t
 
+val create_from : Model.t -> t
 val clone : t -> t
 val add_action : t -> Model.Action.t -> t
 val add_action_list : t -> Model.Action.t list -> t
@@ -83,4 +84,12 @@ exception StateOriginNotFound of (pair * Model.State.t)
 val state_origin_opt : pair -> Model.State.t -> int option
 val state_origin : pair -> Model.State.t -> int
 val merge : pair -> t
+
+val to_string
+  :  ?pstr:bool
+  -> ?skip_leading_tab:bool
+  -> ?indents:int
+  -> t
+  -> string
+
 val pstr : ?skip_leading_tab:bool -> ?indents:int -> t -> string

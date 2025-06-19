@@ -19,6 +19,15 @@ let create
   { init; alphabet; states; transitions; info }
 ;;
 
+let create_from (m : Model.t) : t =
+  match m with
+  | LTS (init, alphabet, states, transitions, info) ->
+    create init alphabet states transitions info
+  | FSM (init, alphabet, states, edges, info) ->
+    let transitions = Model.edges_to_transitions edges in
+    create init alphabet states transitions info
+;;
+
 (*********************************************************************)
 (****** Add **********************************************************)
 (*********************************************************************)

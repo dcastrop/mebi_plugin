@@ -14,6 +14,7 @@ val create
   -> Model.Info.t option
   -> t
 
+val create_from : Model.t -> t
 val add_action : t -> Model.Action.t -> t
 val add_action_list : t -> Model.Action.t list -> t
 val add_state : t -> Model.State.t -> t
