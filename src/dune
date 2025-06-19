@@ -34,10 +34,9 @@
   model
   lts
   fsm
+  algorithms
   vernac
   dump_to_file
-  bisimilarity
-  minimize
   command
   ; examples
   g_mebi))

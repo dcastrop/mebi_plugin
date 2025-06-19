@@ -86,9 +86,9 @@ module Action : sig
   val eq : t -> t -> bool
   val anno_eq : annotation -> annotation -> bool
   val annos_eq : annotations -> annotations -> bool
-  val compare : t -> t -> Int.t
-  val anno_compare : annotation -> annotation -> Int.t
-  val annos_compare : annotations -> annotations -> Int.t
+  val compare : t -> t -> int
+  val anno_compare : annotation -> annotation -> int
+  val annos_compare : annotations -> annotations -> int
   val hash : t -> int
 end
 

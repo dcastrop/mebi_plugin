@@ -6,6 +6,8 @@ type t =
   ; info : Model.Info.t option
   }
 
+val to_model : t -> Model.t
+
 val create
   :  Model.State.t option
   -> Model.Alphabet.t

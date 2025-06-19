@@ -52,15 +52,15 @@ src/lts.mli
 src/fsm.ml
 src/fsm.mli
 
+src/algorithms.ml
+src/algorithms.mli
 src/vernac.ml
 src/vernac.mli
+
+
 src/dump_to_file.ml
 src/dump_to_file.mli
 
-src/bisimilarity.ml
-src/bisimilarity.mli
-src/minimize.ml
-src/minimize.mli
 
 src/command.ml
 src/command.mli
