@@ -35,8 +35,19 @@ let create_from (m : Model.t) : t =
 
 let clone (m : t) : t =
   match m with
-  | { init; alphabet; states; edges; info } ->
-    { init; alphabet; states; edges = Edges.copy edges; info }
+  | { init; alphabet; states; edges = to_copy; info } ->
+    (* let edges : States.t Actions.t Edges.t =
+       Edges.create (Edges.length to_copy)
+       in
+       Edges.iter
+       (fun (from : State.t) (aa_to_copy : States.t Actions.t) ->
+       let aa = Actions.create (Actions.length aa_to_copy) in
+       Actions.iter
+       (fun (a : Action.t) (dests : States.t) -> Actions.add aa a dests)
+       aa_to_copy;
+       Edges.add edges from aa)
+       to_copy; *)
+    { init; alphabet; states; edges = Edges.copy to_copy; info }
 ;;
 
 (*********************************************************************)
@@ -220,44 +231,44 @@ let rec get_annotated_actions
           dest_actions
           acc1)
     to_visit
-    []
+    acc0
 ;;
 
 let saturate_actions (m : t) (from : State.t) (aa : States.t Actions.t)
-  : States.t Actions.t
+  : action_pair list
   =
-  let actions : States.t Actions.t = Actions.create 0 in
-  Actions.iter
-    (fun (a : Action.t) (dests : States.t) ->
+  (* let actions : States.t Actions.t = Actions.create 0 in *)
+  Actions.fold
+    (fun (a : Action.t) (dests : States.t) (acc : action_pair list) ->
       match Action.Label.is_silent a.label with
       | None -> raise (CannotSaturateActionsWithUnknownVisibility a)
       | Some is_silent ->
-        let annotated_actions : (Action.t * States.t) list =
-          get_annotated_actions
-            m
-            (Hashtbl.create (States.cardinal m.states))
-            [ from, a ]
-            dests
-            None
-            []
-        in
-        Actions.add_seq actions (List.to_seq annotated_actions))
-    aa;
-  actions
+        get_annotated_actions
+          m
+          (Hashtbl.create (States.cardinal m.states))
+          [ from, a ]
+          dests
+          None
+          acc)
+    aa
+    []
 ;;
 
-let saturate_edges (m : t) : t =
+let saturate_edges (m : t) : States.t Actions.t Edges.t =
   let edges : States.t Actions.t Edges.t = Edges.create 0 in
   Edges.iter
     (fun (from : State.t) (aa : States.t Actions.t) ->
-      Edges.add edges from (saturate_actions m from aa))
+      match saturate_actions m from aa with
+      | [] -> ()
+      | saturated_actions ->
+        Edges.add edges from (Actions.of_seq (List.to_seq saturated_actions)))
     m.edges;
-  { m with edges }
+  edges
 ;;
 
 let saturate (m : t) : t =
   let m = clone m in
-  saturate_edges m
+  { m with edges = saturate_edges m }
 ;;
 
 (*********************************************************************)
@@ -292,25 +303,15 @@ let state_origin (p : pair) (s : State.t) : int =
 
 let merge (p : pair) : t =
   let m1, m2 = p in
-  let init = None in
+  let init =
+    match m1.init, m2.init with
+    | Some i1, Some i2 -> if State.eq i1 i2 then Some i1 else None
+    | _, _ -> None
+  in
   let alphabet = Alphabet.union m1.alphabet m2.alphabet in
   let states = States.union m1.states m2.states in
   let merged = add_edge_list m1 (edges_to_list m2.edges) in
   let edges = merged.edges in
-  (* if Bool.not (Alphabet.equal alphabet merged.alphabet)
-  then
-    Utils.Logging.Log.warning
-      (Printf.sprintf
-         "Fsm.merge, yielded different alphabets.\nA: %s\nB:%s"
-         (Model.pstr_alphabet alphabet)
-         (Model.pstr_alphabet merged.alphabet)); *)
-  (* if Bool.not (States.equal states merged.states)
-  then
-    Utils.Logging.Log.warning
-      (Printf.sprintf
-         "Fsm.merge, yielded different states.\nA: %s\nB:%s"
-         (Model.pstr_states states)
-         (Model.pstr_states merged.states)); *)
   let info = None in
   { init; alphabet; states; edges; info }
 ;;
