@@ -1226,8 +1226,13 @@ let result_to_string (r : result_kind) : string =
          (Fsm.pstr the_merged_fsm)
          (Fsm.pstr the_fsm_1)
          (Fsm.pstr the_fsm_2))
-  | Merge _ -> "TODO: finish handle output for Merge"
-  | _ -> "TODO: finish handle output for unknown"
+  | Merge ((the_fsm_1, the_fsm_2), the_merged_fsm) ->
+    Printf.sprintf
+      "FSM merged: %s\n\nFSM A: %s\n\nFSM B: %s"
+      (Fsm.pstr the_merged_fsm)
+      (Fsm.pstr the_fsm_1)
+      (Fsm.pstr the_fsm_2)
+  | Minim _ -> "TODO: finish handle output for Minim"
 ;;
 
 let handle_output (o : output_kind) (r : result_kind) : unit mm =
