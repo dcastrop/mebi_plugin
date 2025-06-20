@@ -1,7 +1,8 @@
 # todo
 
-- [ ] investigate why `MkGraph.lts_graph` reports 1 more edge than in the `MkGraph.decoq_lts`
-- [ ] investigate why when providing the `SILENT` action for `Weak`, the `SILENT` action does not appear in the alphabet
+- [x] investigate why `MkGraph.lts_graph` reports 1 more edge than in the `MkGraph.decoq_lts`
+- [x] investigate why when providing the `SILENT` action for `Weak`, the `SILENT` action does not appear in the alphabet
+> the above were the comparison function of `Model.Transition`, which occured during `MkGraph.decoq_lts`
 
 - [ ] step through bisimilarity algorithm result and check it is correct
 - [ ] re-add support for dumping bisimilarity algorithm results to json
