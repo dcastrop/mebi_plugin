@@ -236,7 +236,7 @@ module Action = struct
   let saturated ?(anno : annotation = []) (a : t) : t =
     { label = a.label
     ; meta = a.meta (* { a.meta with is_silent = Some true } *)
-    ; annos = anno :: a.annos
+    ; annos = List.rev anno :: a.annos
     }
   ;;
 

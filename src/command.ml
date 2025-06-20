@@ -1439,7 +1439,18 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
     let* the_lts = build_lts_graph ~weak:w f b t l in
     let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
     handle_output o (FSM the_fsm)
-  | Minim ((f, b, t), w), l -> return ()
+  | Minim ((f, b, t), w), l ->
+    (* FIXME: currently just a test for saturation, does not do minimization *)
+    let* the_lts = build_lts_graph ~weak:w f b t l in
+    let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+    let the_sat = Fsm.saturate the_fsm in
+    (* let the_merged_fsm = Fsm.merge (the_fsm, the_sat) in *)
+    (* handle_output o (Merge ((the_fsm, the_sat), the_merged_fsm)) *)
+    (* sanity check, should be bisimilar to saturated self *)
+    handle_output
+      o
+      (Alg (Algorithms.run (Bisim (true, ((the_fsm, the_sat), None)))))
+    (* return () *)
   | Merge ((((f1, b1, t1), w1), p1), (((f2, b2, t2), w2), p2)), l ->
     let* the_lts_1 =
       build_lts_graph ~primary_lts:(Some p1) ~weak:w1 f1 b1 t1 l

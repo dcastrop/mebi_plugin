@@ -1021,8 +1021,8 @@ Example P : tm :=
 (***************************)
 Example p0 : tm * env := (P, Env.initial 1).
 
-MeBi Dump "p0" LTS Bounded 33 Of p0 Using step.
-MeBi Dump "p0-silent" LTS Bounded 33 Of p0 Weak SILENT Of action Using step.
+(* MeBi Dump "p0" LTS Bounded 33 Of p0 Using step. *)
+(* MeBi Dump "p0-silent" LTS Bounded 33 Of p0 Weak SILENT Of action Using step. *)
 
 (* MeBi Dump "p0" FSM Bounded 150 Of p0 Using step. *)
 (* MeBi Dump "p0" Minim Bounded 33 Of p0 Using step. *)
@@ -1242,12 +1242,12 @@ MeBi Show LTS Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step. *)
 MeBi Show FSM Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step. *)
 
 
-MeBi Dump "g1_LTS" LTS Bounded 5 Of g1 Using bigstep lts step.
-MeBi Dump "g1_LTS_weak" LTS Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step.
+(* MeBi Dump "g1_LTS_strong" LTS Bounded 5 Of g1 Using bigstep lts step.
+MeBi Dump "g1_LTS_weak" LTS Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step. *)
 
 
-MeBi Dump "g1_FSM" FSM Bounded 5 Of g1 Using bigstep lts step.
-MeBi Dump "g1_FSM_weak" FSM Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step.
+(* MeBi Dump "g1_FSM_strong" FSM Bounded 5 Of g1 Using bigstep lts step.
+MeBi Dump "g1_FSM_weak" FSM Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step. *)
 
 
 (***************************)
@@ -1255,36 +1255,54 @@ MeBi Dump "g1_FSM_weak" FSM Bounded 5 Of g1 Weak SILENT Of action Using bigstep 
 (***************************)
 
 
-MeBi 
+(* MeBi 
   (* Show *)
   Dump "g1_strong" 
      Merge LTS Bounded 50 Of g1  With bigstep
        And LTS Bounded 50 Of g1  With lts
-       Using bigstep lts step.
+       Using bigstep lts step. *)
 
-MeBi 
+(* MeBi 
   (* Show *)
   Dump "g1_weak" 
      Merge LTS Bounded 50 Of g1  With bigstep  Weak SILENT Of action
        And LTS Bounded 50 Of g1  With lts      Weak SILENT Of action
-       Using bigstep lts step.
+       Using bigstep lts step. *)
+
+(***************************)
+(**** Saturate FSMs ********)
+(**** (Temp: via Minim) ****)
+(***************************)
+
+(* sanity check, should be bisimilar to saturated self *)
+(* MeBi Dump "g1_FSM_sat" Minim Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step.  *)
+
 
 (***************************)
 (**** Bisimilar ? **********)
 (***************************)
 
 (* false *)
-MeBi 
-  (* Show *)
-  Dump "g1_strong" 
+(* MeBi 
+  Show
+  (* Dump "g1_strong"  *)
      Bisim LTS Bounded 50 Of g1  With bigstep
        And LTS Bounded 50 Of g1  With lts
-       Using bigstep lts step.
+       Using bigstep lts step. *)
 
 (* true ? *)
 MeBi 
   (* Show *)
   Dump "g1_weak" 
+     Bisim LTS Bounded 50 Of g1  With bigstep  Weak SILENT Of action
+       And LTS Bounded 50 Of g1  With lts      Weak SILENT Of action
+       Using bigstep lts step.
+
+
+
+MeBi 
+  Show
+  (* Dump "g1_weak"  *)
      Bisim LTS Bounded 50 Of g1  With bigstep  Weak SILENT Of action
        And LTS Bounded 50 Of g1  With lts      Weak SILENT Of action
        Using bigstep lts step.
@@ -1318,6 +1336,11 @@ Example g6 : sys * resource := compose (create 6 P).
 
 Example g8 : sys * resource := compose (create 8 P).
 (* MeBi Dump "g8" LTS Bounded 8192 Of g8 Using bigstep lts step. *)
+
+
+(** below are to test *)
+Example g12 : sys * resource := compose (create 12 P).
+(* MeBi Dump "g12" LTS Bounded 8192 Of g12 Using bigstep lts step. *)
 
 Example g16 : sys * resource := compose (create 16 P).
 (* MeBi Dump "g16" LTS Bounded 8192 Of g16 Using bigstep lts step. *)

@@ -104,6 +104,8 @@ let rec create_parent_dir (fn : string) =
 type json_action_name = string
 type json_label_name = string
 type json_action_silent = bool option
+
+(* type json_action_annotations = string *)
 type json_action = (json_action_name * json_label_name) * json_action_silent
 
 (* module JSON_Alphabet = Set.Make (struct type t = json_action_name *
@@ -124,10 +126,13 @@ type json_state = json_state_name * json_state_info
    String.compare (snd a) (snd b) | n -> n ;; end) *)
 
 type json_edge_info = string
+
 (* type json_edge_silent = string *)
+type json_edge_annotations = string list
 
 type json_edge =
-  (json_state_name * json_state_name) * (json_action_name * json_edge_info)
+  (json_state_name * json_state_name)
+  * (json_action_name * (json_edge_info * json_edge_annotations option))
 
 (* module JSON_Edges = Set.Make (struct type t = json_edge
 
@@ -185,7 +190,7 @@ let transitions_to_json_model_edges (ts : Model.Transitions.t)
       in
       Queue.push
         ( (State.to_string from, State.to_string dest)
-        , (Action.Label.to_string label, edge_info) )
+        , (Action.Label.to_string label, (edge_info, None)) )
         acc;
       acc)
     ts
@@ -195,7 +200,23 @@ let transitions_to_json_model_edges (ts : Model.Transitions.t)
 let edges_to_json_model_edges (es : States.t Actions.t Edges.t)
   : json_edge Queue.t
   =
-  transitions_to_json_model_edges (Model.edges_to_transitions es)
+  List.fold_left
+    (fun (acc : json_edge Queue.t) (e : Model.Edge.t) ->
+      let from, action, dest = e in
+      Queue.push
+        ( (State.to_string from, State.to_string dest)
+        , ( Action.Label.to_string action.label
+          , ( Action.MetaData.to_string action.meta
+            , Some
+                (List.fold_left
+                   (fun (acc1 : string list) anno ->
+                     Action.annotation_to_string anno :: acc1)
+                   []
+                   action.annos) ) ) )
+        acc;
+      acc)
+    (Queue.create ())
+    (edges_to_list es)
 ;;
 
 let alphabet_to_json_model_alphabet (al : Alphabet.t) : json_action Queue.t =
@@ -355,11 +376,6 @@ let write_json_alphabet_to_file (oc : out_channel) (i : json_action Queue.t)
         Printf.fprintf oc "\t\t\t\"action\": %s,\n" action_name;
         Printf.fprintf oc "\t\t\t\"label\": \"%s\",\n" action_label;
         Printf.fprintf oc "\t\t\t\"silent\": %s\n" (bool_opt action_silent);
-        (* if List.is_empty action_annotations
-           then Printf.fprintf oc "\t\t\t\"annotations\": [],\n"
-           else (
-           let is_first' = ref true in
-           Printf.fprintf oc "\t\t\t\"annotations\": [\n"; List.iter (fun action_annotation -> Printf.fprintf oc "%s" (handle_if_first is_first'); Printf.fprintf oc "\t\t\t\t\"%s\"" action_annotation) action_annotations; Printf.fprintf oc "\t\t\t],\n"); *)
         Printf.fprintf oc "\t\t}";
         iterate (n - 1) ()
     in
@@ -430,7 +446,9 @@ let write_json_edges_to_file (oc : out_channel) (i : json_edge Queue.t) : unit =
       match n with
       | 0 -> ()
       | _ ->
-        let (from_state, dest_state), (action_label, action_info) =
+        let ( (from_state, dest_state)
+            , (action_label, (action_info, action_annotations)) )
+          =
           Queue.pop i
         in
         Printf.fprintf oc "%s" (handle_if_first is_first);
@@ -438,8 +456,17 @@ let write_json_edges_to_file (oc : out_channel) (i : json_edge Queue.t) : unit =
         Printf.fprintf oc "\t\t\t\"from\": %s,\n" from_state;
         Printf.fprintf oc "\t\t\t\"dest\": %s,\n" dest_state;
         Printf.fprintf oc "\t\t\t\"action\": %s,\n" action_label;
-        Printf.fprintf oc "\t\t\t\"info\": \"%s\"\n" action_info;
-        (* Printf.fprintf oc "\t\t\t\"tau\": %s\n" action_silent; *)
+        Printf.fprintf oc "\t\t\t\"info\": \"%s\",\n" action_info;
+        (match action_annotations with
+         | None -> Printf.fprintf oc "\t\t\t\"annos\": %s" "null\n"
+         | Some [] -> Printf.fprintf oc "\t\t\t\"annos\": %s" "[]\n"
+         | Some (h :: t) ->
+           Printf.fprintf oc "\t\t\t\"annos\": [\n";
+           Printf.fprintf oc "\t\t\t\t\"%s\"" h;
+           List.iter
+             (fun (anno : string) -> Printf.fprintf oc ",\n\t\t\t\t\"%s\"" anno)
+             t;
+           Printf.fprintf oc "\n\t\t\t]\n");
         Printf.fprintf oc "\t\t}";
         iterate (n - 1) ()
     in
