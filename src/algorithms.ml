@@ -91,8 +91,8 @@ module Bisimilarity = struct
       (fun (b : States.t) ->
         let b = ref b in
         Alphabet.iter
-          (fun (a : Action.t) ->
-            let edges_of_a = Model.get_edges_with_label a.label edges in
+          (fun (l : Action.Label.t) ->
+            let edges_of_a = Model.get_edges_with_label l edges in
             (* TODO: [Fsm.Saturate.fsm] doesn't clean up unreachable states/edges yet. *)
             if Edges.length edges_of_a > 0
             then (
