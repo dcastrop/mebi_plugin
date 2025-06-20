@@ -95,7 +95,7 @@ end
 
 module Action = struct
   module Label = struct
-    type t = Mebi_wrapper.E.t * string option
+    type t = Mebi_wrapper.E.t * (string option * bool option)
 
     let to_string (t : t) = Mebi_wrapper.E.to_string (fst t)
 
@@ -103,59 +103,53 @@ module Action = struct
       Printf.sprintf "%s%s" (Utils.str_tabs indents) (to_string t)
     ;;
 
+    let is_silent t = snd (snd t)
     let eq (t1 : t) (t2 : t) = Mebi_wrapper.E.eq (fst t1) (fst t2)
     let compare (t1 : t) (t2 : t) = Mebi_wrapper.E.compare (fst t1) (fst t2)
     let hash (t : t) = Mebi_wrapper.E.hash (fst t)
   end
 
   module MetaData = struct
-    type t =
-      { is_silent : bool option
-      ; info : string option
-      }
+    type t = string list
 
-    let from_opt (t : t option) =
-      match t with None -> { is_silent = None; info = None } | Some t -> t
-    ;;
+    let from_opt (t : t option) = match t with None -> None | Some t -> Some t
 
-    let to_string (m : t) =
-      Printf.sprintf
-        "(%s, %s)"
-        (match m.is_silent with
-         | None -> "N/A"
-         | Some true -> "silent"
-         | Some false -> "visible")
-        (Utils.string_opt_to_string "No info" m.info)
+    let to_string (m : t) : string =
+      match m with
+      | [] -> "(No MetaData)"
+      | h :: t ->
+        Printf.sprintf
+          "(%s)"
+          (Printf.sprintf
+             "[%s]"
+             (List.fold_left
+                (fun (acc : string) (i : string) ->
+                  Printf.sprintf "%s; %s" acc i)
+                h
+                t))
     ;;
 
     let eq m1 m2 =
-      match m1, m2 with
-      | { is_silent = t1; info = i1 }, { is_silent = t2; info = i2 } ->
-        (match t1, t2 with
-         | None, None -> true
-         | Some t1, Some t2 -> Bool.equal t1 t2
-         | _, _ -> false)
-        &&
-          (match i1, i2 with
-          | None, None -> true
-          | Some s1, Some s2 -> String.equal s1 s2
-          | _, _ -> false)
+      List.for_all
+        (fun ((i1, i2) : string * string) -> String.equal i1 i2)
+        (List.combine m1 m2)
     ;;
 
-    let compare m1 m2 =
+    let eq_opt m1 m2 =
       match m1, m2 with
-      | { is_silent = t1; info = i1 }, { is_silent = t2; info = i2 } ->
-        Int.compare
-          (match t1, t2 with
-           | None, None -> 0
-           | None, Some _ -> -1
-           | Some _, None -> 1
-           | Some t1, Some t2 -> Bool.compare t1 t2)
-          (match i1, i2 with
-           | None, None -> 0
-           | None, Some _ -> -1
-           | Some _, None -> 1
-           | Some s1, Some s2 -> String.compare s1 s2)
+      | None, None -> true
+      | Some i1, Some i2 -> eq i1 i2
+      | _, _ -> false
+    ;;
+
+    let compare m1 m2 = List.compare (fun a b -> String.compare a b) m1 m2
+
+    let compare_opt m1 m2 =
+      match m1, m2 with
+      | None, None -> 0
+      | None, Some _ -> -1
+      | Some _, None -> 1
+      | Some i1, Some i2 -> compare i1 i2
     ;;
   end
 
@@ -208,16 +202,23 @@ module Action = struct
     | true ->
       let str_indent = Utils.str_tabs indents in
       Printf.sprintf
-        "%s%s( encodingACTION: %s\n\
-         %s; decodingACTION: %s\n\
-         %s; metaACTION: %s\n\
-         %s; annotationsACTION: %s\n\
+        "%s%s( encoding: %s\n\
+         %s; decoding: %s\n\
+         %s; silent: %s\n\
+         %s; meta: %s\n\
+         %s; annotations: %s\n\
          %s)"
         (if pstr then "\n" else "")
         (if skip_leading_tab then "" else str_indent)
         label_str
         str_indent
-        (match snd a.label with None -> "None" | Some decoding -> decoding)
+        (match fst (snd a.label) with
+         | None -> "None"
+         | Some decoding -> decoding)
+        str_indent
+        (match snd (snd a.label) with
+         | None -> "None"
+         | Some silent -> Bool.to_string silent)
         str_indent
         (MetaData.to_string a.meta)
         str_indent
@@ -234,7 +235,7 @@ module Action = struct
 
   let saturated ?(anno : annotation = []) (a : t) : t =
     { label = a.label
-    ; meta = { a.meta with is_silent = Some true }
+    ; meta = a.meta (* { a.meta with is_silent = Some true } *)
     ; annos = anno :: a.annos
     }
   ;;
@@ -244,7 +245,7 @@ module Action = struct
   exception ActionSilenceIsNone of t
 
   let is_silent (a : t) : bool =
-    match a.meta.is_silent with
+    match snd (snd a.label) with
     | None -> raise (ActionSilenceIsNone a)
     | Some b -> b
   ;;
@@ -277,9 +278,12 @@ module Action = struct
     match a1, a2 with
     | ( { label = v1; meta = m1; annos = a1 }
       , { label = v2; meta = m2; annos = a2 } ) ->
-      Int.compare
-        (Label.compare v1 v2)
-        (Int.compare (annos_compare a1 a2) (MetaData.compare m1 m2))
+      if Label.eq v1 v2
+      then
+        if MetaData.eq m1 m2
+        then if annos_eq a1 a2 then 0 else annos_compare a1 a2
+        else MetaData.compare m1 m2
+      else Label.compare v1 v2
 
   and anno_compare (a1 : annotation) (a2 : annotation) : int =
     match a1, a2 with
@@ -336,20 +340,18 @@ module Transition = struct
   let compare (t1 : t) (t2 : t) =
     match t1, t2 with
     | (from1, a1, dest1, meta1), (from2, a2, dest2, meta2) ->
-      Int.compare
-        (Int.compare (State.compare from1 from2) (State.compare dest1 dest2))
-        (Int.compare
-           (Action.Label.compare a1 a2)
-           (match meta1, meta2 with
-            | None, None -> 0
-            | None, Some _ -> -1
-            | Some _, None -> 1
-            | Some m1, Some m2 ->
-              (match m1.is_silent, m2.is_silent with
-               | None, None -> 0
-               | None, Some _ -> -1
-               | Some _, None -> 1
-               | Some s1, Some s2 -> Bool.compare s1 s2)))
+      if State.eq from1 from2
+      then
+        if Action.Label.eq a1 a2
+        then
+          if State.eq dest1 dest2
+          then
+            if Action.MetaData.eq_opt meta1 meta2
+            then 0
+            else Action.MetaData.compare_opt meta1 meta2
+          else State.compare dest1 dest2
+        else Action.Label.compare a1 a2
+      else State.compare from1 from2
   ;;
 end
 
@@ -412,9 +414,9 @@ module States = Set.Make (struct
 module Partition = Set.Make (States)
 
 module Alphabet = Set.Make (struct
-    type t = Action.t
+    type t = Action.Label.t
 
-    let compare a b = Action.compare a b
+    let compare (a : t) (b : t) = Action.Label.compare a b
   end)
 
 module Actions = Hashtbl.Make (struct
@@ -468,11 +470,20 @@ let label_to_action
   : Action.t
   =
   match meta with
-  | None -> { label = l; meta = { is_silent = None; info = None }; annos = [] }
+  | None -> { label = l; meta = []; annos = [] }
   | Some m -> { label = l; meta = m; annos = [] }
 ;;
 
 let action_to_label (a : Action.t) : Action.Label.t = a.label
+
+let action_list_to_label_list (aa : Action.t list) : Action.Label.t list =
+  List.rev
+    (List.fold_left
+       (fun (acc : Action.Label.t list) (a : Action.t) ->
+         action_to_label a :: acc)
+       []
+       aa)
+;;
 
 (*********************************************************************)
 (****** Edges <-> Edge List ******************************************)
@@ -588,7 +599,8 @@ let alphabet_from_actions
   : Alphabet.t
   =
   Actions.fold
-    (fun (a : Action.t) (_ : States.t) (acc : Alphabet.t) -> Alphabet.add a acc)
+    (fun (a : Action.t) (_ : States.t) (acc : Alphabet.t) ->
+      Alphabet.add a.label acc)
     aa
     acc
 ;;
@@ -605,7 +617,8 @@ let alphabet_from_transitions (ts : Transitions.t) : Alphabet.t =
   Transitions.fold
     (fun ((_from, a, _dest, meta) : Transition.t) (acc : Alphabet.t) ->
       Alphabet.add
-        { label = a; meta = Action.MetaData.from_opt meta; annos = [] }
+        (* { label = a; meta = Action.MetaData.from_opt meta; annos = [] } *)
+        a
         acc)
     ts
     Alphabet.empty
@@ -757,9 +770,7 @@ let pstr_label ?(indents : int = 0) (l : Action.Label.t) : string =
   Action.Label.pstr ~indents l
 ;;
 
-let pstr_action ?(indents : int = 0) ?(details : bool = false) (a : Action.t)
-  : string
-  =
+let pstr_action ?(indents : int = 0) (a : Action.t) : string =
   Action.pstr ~indents a
 ;;
 
@@ -778,11 +789,8 @@ let pstr_alphabet
       "%s[%s%s]"
       (if skip_leading_tab then "" else str_indent)
       (Alphabet.fold
-         (fun (a : Action.t) (acc : string) ->
-           Printf.sprintf
-             "%s%s\n"
-             acc
-             (pstr_action ~details ~indents:(indents + 1) a))
+         (fun (l : Action.Label.t) (acc : string) ->
+           Printf.sprintf "%s%s\n" acc (pstr_label ~indents:(indents + 1) l))
          ls
          "")
       str_indent

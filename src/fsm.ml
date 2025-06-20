@@ -45,13 +45,18 @@ let clone (m : t) : t =
 
 let add_action (m : t) (a : Action.t) : t =
   match m with
-  | { alphabet; _ } -> { m with alphabet = Alphabet.add a alphabet }
+  | { alphabet; _ } -> { m with alphabet = Alphabet.add a.label alphabet }
 ;;
 
-let add_action_list (m : t) (al : Action.t list) : t =
+let add_action_list (m : t) (aa : Action.t list) : t =
   match m with
   | { alphabet; _ } ->
-    { m with alphabet = Alphabet.add_seq (List.to_seq al) alphabet }
+    { m with
+      alphabet =
+        Alphabet.add_seq
+          (List.to_seq (Model.action_list_to_label_list aa))
+          alphabet
+    }
 ;;
 
 let add_state (m : t) (s : State.t) : t =
@@ -181,7 +186,7 @@ let rec get_annotated_actions
         if can_revisit dest visited_states then log_visit dest visited_states;
         Actions.fold
           (fun (a : Action.t) (dests : States.t) (acc2 : action_pair list) ->
-            match a.meta.is_silent, named_action with
+            match Action.Label.is_silent a.label, named_action with
             | None, _ -> raise (CannotSaturateActionsWithUnknownVisibility a)
             (* stop if [a] is not silent and already have [named_action] *)
             | Some false, Some _ -> acc2
@@ -224,7 +229,7 @@ let saturate_actions (m : t) (from : State.t) (aa : States.t Actions.t)
   let actions : States.t Actions.t = Actions.create 0 in
   Actions.iter
     (fun (a : Action.t) (dests : States.t) ->
-      match a.meta.is_silent with
+      match Action.Label.is_silent a.label with
       | None -> raise (CannotSaturateActionsWithUnknownVisibility a)
       | Some is_silent ->
         let annotated_actions : (Action.t * States.t) list =

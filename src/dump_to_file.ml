@@ -179,7 +179,9 @@ let transitions_to_json_model_edges (ts : Model.Transitions.t)
     (fun (edge : Transition.t) (acc : json_edge Queue.t) ->
       let from, label, dest, meta = edge in
       let edge_info =
-        match meta with None -> "null" | Some meta -> string_opt meta.info
+        match meta with
+        | None -> "null"
+        | Some meta -> Action.MetaData.to_string meta
       in
       Queue.push
         ( (State.to_string from, State.to_string dest)
@@ -198,10 +200,10 @@ let edges_to_json_model_edges (es : States.t Actions.t Edges.t)
 
 let alphabet_to_json_model_alphabet (al : Alphabet.t) : json_action Queue.t =
   Alphabet.fold
-    (fun (a : Action.t) (acc : json_action Queue.t) ->
+    (fun (l : Action.Label.t) (acc : json_action Queue.t) ->
       Queue.push
-        ( (label_to_str a.label, Utils.clean_string (string_opt (snd a.label)))
-        , None )
+        ( (label_to_str l, Utils.clean_string (string_opt (fst (snd l))))
+        , snd (snd l) )
         acc;
       acc)
     al
@@ -435,8 +437,8 @@ let write_json_edges_to_file (oc : out_channel) (i : json_edge Queue.t) : unit =
         Printf.fprintf oc "\t\t{\n";
         Printf.fprintf oc "\t\t\t\"from\": %s,\n" from_state;
         Printf.fprintf oc "\t\t\t\"dest\": %s,\n" dest_state;
-        Printf.fprintf oc "\t\t\t\"labl\": %s,\n" action_label;
-        Printf.fprintf oc "\t\t\t\"info\": %s\n" action_info;
+        Printf.fprintf oc "\t\t\t\"action\": %s,\n" action_label;
+        Printf.fprintf oc "\t\t\t\"info\": \"%s\"\n" action_info;
         (* Printf.fprintf oc "\t\t\t\"tau\": %s\n" action_silent; *)
         Printf.fprintf oc "\t\t}";
         iterate (n - 1) ()

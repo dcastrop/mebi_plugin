@@ -41,7 +41,7 @@ let create_from (m : Model.t) : t =
   match g with
   | { alphabet; _ } -> { g with alphabet = Alphabet.add l alphabet }
 ;;
-
+ 
 let add_label_list (g : t) (ls : Action.Label.t list) : t =
   match g with
   | { alphabet; _ } ->
@@ -50,13 +50,18 @@ let add_label_list (g : t) (ls : Action.Label.t list) : t =
 
 let add_action (m : t) (a : Action.t) : t =
   match m with
-  | { alphabet; _ } -> { m with alphabet = Alphabet.add a alphabet }
+  | { alphabet; _ } -> { m with alphabet = Alphabet.add a.label alphabet }
 ;;
 
-let add_action_list (m : t) (al : Action.t list) : t =
+let add_action_list (m : t) (aa : Action.t list) : t =
   match m with
   | { alphabet; _ } ->
-    { m with alphabet = Alphabet.add_seq (List.to_seq al) alphabet }
+    { m with
+      alphabet =
+        Alphabet.add_seq
+          (List.to_seq (Model.action_list_to_label_list aa))
+          alphabet
+    }
 ;;
 
 let add_state (g : t) (s : State.t) : t =
