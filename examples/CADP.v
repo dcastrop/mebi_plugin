@@ -1275,7 +1275,11 @@ MeBi Dump "g1_FSM_weak" FSM Bounded 5 Of g1 Weak SILENT Of action Using bigstep 
 (***************************)
 
 (* sanity check, should be bisimilar to saturated self *)
-(* MeBi Dump "g1_FSM_sat" Minim Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step.  *)
+MeBi Dump "g1_FSM_sat_glued" Minim Bounded 5 Of g1 Weak SILENT Of action Using bigstep lts step. 
+
+
+MeBi Dump "g1_FSM_sat_noglue" Minim Bounded 33 Of g1 Weak SILENT Of action Using lts step. 
+
 
 
 (***************************)
