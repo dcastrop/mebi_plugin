@@ -25,9 +25,11 @@ let exa (name : string) (kind : exa_kind) : example = { name; kind }
 
 (** [exa_1] is `Example 3.2.5` on page 106. *)
 let exa_1 : example =
-  (* s *)
+
+  let s : Lts.t = 
+
   let (s : Fsm.t) =
-    Translate.lts_to_fsm
+    Fsm.create_from (LTS ( ))
       (Lts.Create.lts
          ~init:"s0"
          (Nested

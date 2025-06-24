@@ -18,6 +18,7 @@ val create :
 
 val create_from : Model.t -> t
 val clone : t -> t
+val update_info : t -> t
 val add_action : t -> Model.Action.t -> t
 val add_action_list : t -> Model.Action.t list -> t
 val add_state : t -> Model.State.t -> t
@@ -58,13 +59,16 @@ val can_revisit :
 val log_visit :
   Model.State.t -> (Model.State.t, int) Hashtbl.t -> unit
 
-exception CannotSaturateActionWithNoNamedAction of unit
-
 val annotate_action :
   Model.Action.annotation_pair ->
-  Model.Action.t option ->
+  Model.Action.t ->
   Model.Action.annotation ->
   Model.Action.t
+
+val opt_silent_action :
+  Model.Action.t option ->
+  Model.Action.t ->
+  Model.Action.t option
 
 exception
   CannotSaturateActionsWithUnknownVisibility of Model.Action.t
@@ -74,6 +78,7 @@ val get_annotated_actions :
   (Model.State.t, int) Hashtbl.t ->
   Model.Action.annotation ->
   Model.States.t ->
+  Model.Action.t option ->
   Model.Action.t option ->
   Model.action_pair list ->
   Model.action_pair list
