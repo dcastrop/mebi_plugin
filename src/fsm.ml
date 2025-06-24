@@ -209,15 +209,16 @@ let rec get_annotated_actions
               | Some false, Some _ -> acc2
               (* if [a] is silent and have not yet found [named_action] *)
               | Some true, None ->
-                let silent_action = opt_silent_action silent_action a in
+                (* let silent_action = opt_silent_action silent_action a in *)
                 get_annotated_actions
                   m
                   visited_states
                   ((dest, a) :: anno)
                   dests
                   named_action
-                  silent_action
-                  ((annotate_action (dest, a) a anno, dests) :: acc2)
+                  (opt_silent_action silent_action a)
+                  (* ((annotate_action (dest, a) a anno, dests) :: acc2) *)
+                  acc2
               (* if [a] is silent and have already found [named_action] *)
               | Some true, Some named_action' ->
                 get_annotated_actions
@@ -256,7 +257,7 @@ let saturate_actions (m : t) (from : State.t) (aa : States.t Actions.t)
         let anno = [ from, a ] in
         let named_action = if is_silent then None else Some a in
         let silent_action = if is_silent then Some a else None in
-        let acc = (a, dests) :: acc in
+        let acc = if is_silent then acc else (a, dests) :: acc in
         let visited_states = Hashtbl.create (States.cardinal m.states) in
         log_visit from visited_states;
         get_annotated_actions
