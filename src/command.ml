@@ -1303,7 +1303,7 @@ module MkGraph
       Some
         { is_complete = Queue.is_empty g.to_visit
         ; bound
-        ; num_actions = Model.Alphabet.cardinal alphabet
+        ; num_labels = Model.Alphabet.cardinal alphabet
         ; num_states = S.cardinal g.states
         ; num_edges = num_transitions g.transitions
         }

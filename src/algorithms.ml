@@ -117,7 +117,8 @@ module Bisimilarity = struct
     | false, None -> Fsm.merge the_fsm_pair
     | false, Some merged_fsm -> merged_fsm
     (* weak *)
-    | true, None -> Fsm.merge (Fsm.saturate_pair the_fsm_pair)
+    (* | true, None -> Fsm.merge (Fsm.saturate_pair the_fsm_pair) *)
+    | true, None -> Fsm.saturate (Fsm.merge the_fsm_pair)
     | true, Some merged_fsm ->
       Utils.Logging.Log.warning
         "Checking weak bisimilarity, will re-merge FSMs after saturating them. \

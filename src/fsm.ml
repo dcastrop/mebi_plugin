@@ -33,10 +33,31 @@ let create_from (m : Model.t) : t =
     create init alphabet states edges info
 ;;
 
+(* | NestedStrList args ->
+   let (init, alphabet, states, edges) = Model.handle_nested_str_list_to_edges  args in
+   create init alphabet states edges None *)
+
 let clone (m : t) : t =
   match m with
   | { init; alphabet; states; edges = to_copy; info } ->
     { init; alphabet; states; edges = Edges.copy to_copy; info }
+;;
+
+let update_info (m : t) : t =
+  match m with
+  | { init; alphabet; states; edges; info = to_update } ->
+    (match to_update with
+     | None -> m
+     | Some i ->
+       { m with
+         info =
+           Some
+             { i with
+               num_labels = Alphabet.cardinal alphabet
+             ; num_states = States.cardinal states
+             ; num_edges = get_num_edges edges
+             }
+       })
 ;;
 
 (*********************************************************************)
@@ -147,24 +168,17 @@ let log_visit (s : State.t) (visited_states : (State.t, int) Hashtbl.t) : unit =
   | Some n -> Hashtbl.replace visited_states s (n + 1)
 ;;
 
-exception CannotSaturateActionWithNoNamedAction of unit
-
 let annotate_action
       (p : Action.annotation_pair)
-      (named_action : Action.t option)
+      (action_to_annotate : Action.t)
       (anno : Action.annotation)
   : Action.t
   =
-  match named_action with
-  | None ->
-    (match
-       List.find_opt
-         (fun ((_s, b) : Action.annotation_pair) -> Action.is_silent b)
-         anno
-     with
-     | None -> raise (CannotSaturateActionWithNoNamedAction ())
-     | Some (_s, b) -> Action.saturated ?anno:(Some (p :: anno)) b)
-  | Some b -> Action.saturated ?anno:(Some (p :: anno)) b
+  Action.saturated ?anno:(Some (p :: anno)) action_to_annotate
+;;
+
+let opt_silent_action (o : Action.t option) (a : Action.t) : Action.t option =
+  match o with None -> Some a | Some _ -> o
 ;;
 
 exception CannotSaturateActionsWithUnknownVisibility of Action.t
@@ -175,6 +189,7 @@ let rec get_annotated_actions
           (anno : Action.annotation)
           (to_visit : States.t)
           (named_action : Action.t option)
+          (silent_action : Action.t option)
           (acc0 : action_pair list)
   : action_pair list
   =
@@ -183,42 +198,49 @@ let rec get_annotated_actions
       match Edges.find_opt m.edges dest with
       | None -> acc1 (* terminal state *)
       | Some dest_actions ->
-        if can_revisit dest visited_states then log_visit dest visited_states;
-        Actions.fold
-          (fun (a : Action.t) (dests : States.t) (acc2 : action_pair list) ->
-            match Action.Label.is_silent a.label, named_action with
-            | None, _ -> raise (CannotSaturateActionsWithUnknownVisibility a)
-            (* stop if [a] is not silent and already have [named_action] *)
-            | Some false, Some _ -> acc2
-            (* if [a] is silent and have not yet found [named_action] *)
-            | Some true, None ->
-              get_annotated_actions
-                m
-                visited_states
-                ((dest, a) :: anno)
-                dests
-                named_action
-                acc2
-            (* if [a] is silent and have already found [named_action] *)
-            | Some true, Some _ ->
-              get_annotated_actions
-                m
-                visited_states
-                ((dest, a) :: anno)
-                dests
-                named_action
-                ((annotate_action (dest, a) named_action anno, dests) :: acc2)
-            (* if [a] is not silent and have not yet found [named_action] *)
-            | Some false, None ->
-              get_annotated_actions
-                m
-                visited_states
-                ((dest, a) :: anno)
-                dests
-                (Some a)
-                ((annotate_action (dest, a) (Some a) anno, dests) :: acc2))
-          dest_actions
-          acc1)
+        if can_revisit dest visited_states
+        then (
+          log_visit dest visited_states;
+          Actions.fold
+            (fun (a : Action.t) (dests : States.t) (acc2 : action_pair list) ->
+              match Action.Label.is_silent a.label, named_action with
+              | None, _ -> raise (CannotSaturateActionsWithUnknownVisibility a)
+              (* stop if [a] is not silent and already have [named_action] *)
+              | Some false, Some _ -> acc2
+              (* if [a] is silent and have not yet found [named_action] *)
+              | Some true, None ->
+                let silent_action = opt_silent_action silent_action a in
+                get_annotated_actions
+                  m
+                  visited_states
+                  ((dest, a) :: anno)
+                  dests
+                  named_action
+                  silent_action
+                  ((annotate_action (dest, a) a anno, dests) :: acc2)
+              (* if [a] is silent and have already found [named_action] *)
+              | Some true, Some named_action' ->
+                get_annotated_actions
+                  m
+                  visited_states
+                  ((dest, a) :: anno)
+                  dests
+                  named_action
+                  (opt_silent_action silent_action a)
+                  ((annotate_action (dest, a) named_action' anno, dests) :: acc2)
+              (* if [a] is not silent and have not yet found [named_action] *)
+              | Some false, None ->
+                get_annotated_actions
+                  m
+                  visited_states
+                  ((dest, a) :: anno)
+                  dests
+                  (Some a)
+                  silent_action
+                  ((annotate_action (dest, a) a anno, dests) :: acc2))
+            dest_actions
+            acc1)
+        else acc1)
     to_visit
     acc0
 ;;
@@ -226,18 +248,24 @@ let rec get_annotated_actions
 let saturate_actions (m : t) (from : State.t) (aa : States.t Actions.t)
   : action_pair list
   =
-  (* let actions : States.t Actions.t = Actions.create 0 in *)
   Actions.fold
     (fun (a : Action.t) (dests : States.t) (acc : action_pair list) ->
       match Action.Label.is_silent a.label with
       | None -> raise (CannotSaturateActionsWithUnknownVisibility a)
       | Some is_silent ->
+        let anno = [ from, a ] in
+        let named_action = if is_silent then None else Some a in
+        let silent_action = if is_silent then Some a else None in
+        let acc = (a, dests) :: acc in
+        let visited_states = Hashtbl.create (States.cardinal m.states) in
+        log_visit from visited_states;
         get_annotated_actions
           m
-          (Hashtbl.create (States.cardinal m.states))
-          [ from, a ]
+          visited_states
+          anno
           dests
-          None
+          named_action
+          silent_action
           acc)
     aa
     []
@@ -257,7 +285,7 @@ let saturate_edges (m : t) : States.t Actions.t Edges.t =
 
 let saturate (m : t) : t =
   let m = clone m in
-  { m with edges = saturate_edges m }
+  update_info { m with edges = saturate_edges m }
 ;;
 
 (*********************************************************************)

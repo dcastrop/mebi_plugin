@@ -393,7 +393,7 @@ let write_json_info_to_file (oc : out_channel) (i : Info.t option) : unit =
     Printf.fprintf oc "\t\"info\": {\n";
     Printf.fprintf oc "\t\t\"complete\": %b,\n" i.is_complete;
     Printf.fprintf oc "\t\t\"bound\": %i,\n" i.bound;
-    Printf.fprintf oc "\t\t\"num actions\": %i,\n" i.num_actions;
+    Printf.fprintf oc "\t\t\"num labels\": %i,\n" i.num_labels;
     Printf.fprintf oc "\t\t\"num states\": %i,\n" i.num_states;
     Printf.fprintf oc "\t\t\"num edges\": %i\n" i.num_edges;
     Printf.fprintf oc "\t},\n"
@@ -611,7 +611,7 @@ let build_json_from_merged_model
              Some
                { is_complete
                ; bound = -1
-               ; num_actions = Model.Alphabet.cardinal the_merged_fsm.alphabet
+               ; num_labels = Model.Alphabet.cardinal the_merged_fsm.alphabet
                ; num_states = Model.States.cardinal the_merged_fsm.states
                ; num_edges = Model.get_num_edges the_merged_fsm.edges
                }

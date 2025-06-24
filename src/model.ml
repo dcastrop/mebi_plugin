@@ -2,7 +2,7 @@ module Info = struct
   type t =
     { is_complete : bool
     ; bound : int
-    ; num_actions : int
+    ; num_labels : int
     ; num_states : int
     ; num_edges : int
     }
@@ -16,14 +16,14 @@ module Info = struct
       else "", ""
     in
     Printf.sprintf
-      "%s{| is complete: %b%s; bound: %i%s; num actions: %i%s; num states: \
+      "%s{| is complete: %b%s; bound: %i%s; num labels: %i%s; num states: \
        %i%s; num edges: %i%s|}"
       outer
       i.is_complete
       sep
       i.bound
       sep
-      i.num_actions
+      i.num_labels
       sep
       i.num_states
       sep
@@ -131,22 +131,27 @@ module Action = struct
                 t))
     ;;
 
-    let eq m1 m2 =
-      List.for_all
-        (fun ((i1, i2) : string * string) -> String.equal i1 i2)
-        (List.combine m1 m2)
+    let eq (m1 : t) (m2 : t) : bool =
+      if Int.equal (List.length m1) (List.length m2)
+      then
+        List.for_all
+          (fun ((i1, i2) : string * string) -> String.equal i1 i2)
+          (List.combine m1 m2)
+      else false
     ;;
 
-    let eq_opt m1 m2 =
+    let eq_opt (m1 : t option) (m2 : t option) : bool =
       match m1, m2 with
       | None, None -> true
       | Some i1, Some i2 -> eq i1 i2
       | _, _ -> false
     ;;
 
-    let compare m1 m2 = List.compare (fun a b -> String.compare a b) m1 m2
+    let compare (m1 : t) (m2 : t) : int =
+      List.compare (fun a b -> String.compare a b) m1 m2
+    ;;
 
-    let compare_opt m1 m2 =
+    let compare_opt (m1 : t option) (m2 : t option) : int =
       match m1, m2 with
       | None, None -> 0
       | None, Some _ -> -1
@@ -164,6 +169,13 @@ module Action = struct
   and annotation_pair = State.t * t
   and annotation = annotation_pair list
   and annotations = annotation list
+
+  let saturated ?(anno : annotation = []) (a : t) : t =
+    { label = a.label
+    ; meta = a.meta (* { a.meta with is_silent = Some true } *)
+    ; annos = List.rev anno :: a.annos
+    }
+  ;;
 
   exception CannotMergeActionWithDifferentLabels of (t * t)
 
@@ -250,13 +262,6 @@ module Action = struct
       "%s%s"
       (Utils.str_tabs indents)
       (to_string ~pstr:true ~indents t)
-  ;;
-
-  let saturated ?(anno : annotation = []) (a : t) : t =
-    { label = a.label
-    ; meta = a.meta (* { a.meta with is_silent = Some true } *)
-    ; annos = List.rev anno :: a.annos
-    }
   ;;
 
   let annotate (a : t) (anno : annotation) : unit = a.annos <- anno :: a.annos
@@ -488,6 +493,10 @@ type t =
       * States.t
       * States.t Actions.t Edges.t
       * Info.t option)
+(* | NestedStrList of
+   (string option
+   * string option
+   * (string * (string * string list) list) list) *)
 
 (*********************************************************************)
 (****** Pairs ********************************************************)
@@ -689,7 +698,7 @@ let add_edge
 (****** Get **********************************************************)
 (*********************************************************************)
 
-let get_num_actions ?(num : int = 0) (aa : States.t Actions.t) : int =
+let get_num_labels ?(num : int = 0) (aa : States.t Actions.t) : int =
   Actions.fold
     (fun (_ : Action.t) (dests : States.t) (num : int) ->
       num + States.cardinal dests)
@@ -700,7 +709,7 @@ let get_num_actions ?(num : int = 0) (aa : States.t Actions.t) : int =
 let get_num_edges ?(num : int = 0) (es : States.t Actions.t Edges.t) : int =
   Edges.fold
     (fun (_ : State.t) (aa : States.t Actions.t) (num : int) ->
-      get_num_actions ~num aa)
+      get_num_labels ~num aa)
     es
     num
 ;;
@@ -797,9 +806,18 @@ let get_num_blocks (pi : Partition.t) : int =
 ;;
 
 (*********************************************************************)
+(****** Makers *******************************************************)
+(*********************************************************************)
+
+(* let handle_nested_str_list_to_edges ((init,silent,nested_edges):(string option
+   * string option
+   * (string * (string * string list) list) list)) : (State.t option * Alphabet.t * States.t * (States.t Actions.t Edges.t)) =
+
+   ;; *)
+
+(*********************************************************************)
 (****** Merge ********************************************************)
 (*********************************************************************)
-exception FoundDuplicatesWhenReducingActions of unit
 
 let merge_actions (aa1 : States.t Actions.t) (aa2 : States.t Actions.t)
   : States.t Actions.t
@@ -1099,7 +1117,7 @@ let check_info (m : t) : unit =
                  ; States.cardinal states
                  ; Transitions.cardinal transitions
                  ]
-                 [ info.num_actions; info.num_states; info.num_edges ])))
+                 [ info.num_labels; info.num_states; info.num_edges ])))
     | FSM (_init, alphabet, states, edges, info) ->
       (match info with
        | None -> None
@@ -1112,7 +1130,8 @@ let check_info (m : t) : unit =
                  ; States.cardinal states
                  ; get_num_edges edges
                  ]
-                 [ info.num_actions; info.num_states; info.num_edges ])))
+                 [ info.num_labels; info.num_states; info.num_edges ])))
+    (* | NestedStrList _ -> None *)
   with
   | None -> ()
   | Some info_list ->

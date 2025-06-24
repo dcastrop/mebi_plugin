@@ -2,7 +2,7 @@ module Info : sig
   type t = {
     is_complete : bool;
     bound : int;
-    num_actions : int;
+    num_labels : int;
     num_states : int;
     num_edges : int;
   }
@@ -62,15 +62,10 @@ module Action : sig
     val merge : t -> t -> t
     val from_opt : t option -> t option
     val to_string : t -> string
-    val eq : string list -> string list -> bool
-
-    val eq_opt :
-      string list option -> string list option -> bool
-
-    val compare : string list -> string list -> int
-
-    val compare_opt :
-      string list option -> string list option -> int
+    val eq : t -> t -> bool
+    val eq_opt : t option -> t option -> bool
+    val compare : t -> t -> int
+    val compare_opt : t option -> t option -> int
   end
 
   type t = {
@@ -82,6 +77,8 @@ module Action : sig
   and annotation_pair = State.t * t
   and annotation = annotation_pair list
   and annotations = annotation list
+
+  val saturated : ?anno:annotation -> t -> t
 
   exception CannotMergeActionWithDifferentLabels of (t * t)
 
@@ -98,7 +95,6 @@ module Action : sig
     string
 
   val pstr : ?indents:int -> t -> string
-  val saturated : ?anno:annotation -> t -> t
   val annotate : t -> annotation -> unit
 
   exception ActionSilenceIsNone of t
@@ -463,7 +459,7 @@ val add_edge :
   State.t ->
   unit
 
-val get_num_actions : ?num:int -> States.t Actions.t -> int
+val get_num_labels : ?num:int -> States.t Actions.t -> int
 
 val get_num_edges :
   ?num:int -> States.t Actions.t Edges.t -> int
@@ -501,8 +497,6 @@ val get_reachable_blocks_opt :
   States.t Actions.t -> Partition.t -> Partition.t option
 
 val get_num_blocks : Partition.t -> int
-
-exception FoundDuplicatesWhenReducingActions of unit
 
 val merge_actions :
   States.t Actions.t ->
