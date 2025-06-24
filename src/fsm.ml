@@ -217,7 +217,6 @@ let rec get_annotated_actions
                   dests
                   named_action
                   (opt_silent_action silent_action a)
-                  (* ((annotate_action (dest, a) a anno, dests) :: acc2) *)
                   acc2
               (* if [a] is silent and have already found [named_action] *)
               | Some true, Some named_action' ->
