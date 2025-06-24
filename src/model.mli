@@ -66,10 +66,10 @@ module Action : sig
     val eq_opt :
       string list option -> string list option -> bool
 
-    val compare : string list -> string list -> int
+    val compare : String.t list -> String.t list -> int
 
     val compare_opt :
-      string list option -> string list option -> int
+      String.t list option -> String.t list option -> int
   end
 
   type t = {
@@ -104,9 +104,9 @@ module Action : sig
   val eq : t -> t -> bool
   val anno_eq : annotation -> annotation -> bool
   val annos_eq : annotations -> annotations -> bool
-  val compare : t -> t -> int
-  val anno_compare : annotation -> annotation -> int
-  val annos_compare : annotations -> annotations -> int
+  val compare : t -> t -> Int.t
+  val anno_compare : annotation -> annotation -> Int.t
+  val annos_compare : annotations -> annotations -> Int.t
   val hash : t -> int
 end
 
@@ -492,6 +492,7 @@ val get_reachable_blocks :
 val get_reachable_blocks_opt :
   States.t Actions.t -> Partition.t -> Partition.t option
 
+val get_num_blocks : Partition.t -> int
 val pstr_info : ?indents:int -> Info.t -> string
 val pstr_info_opt : ?indents:int -> Info.t option -> string
 val pstr_label : ?indents:int -> Action.Label.t -> string
