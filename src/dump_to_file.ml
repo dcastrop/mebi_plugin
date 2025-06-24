@@ -382,7 +382,7 @@ let write_json_result_to_file
          oc
          "\t\t\"non-bisimilar states\": %s"
          (partition_to_json_list (snd (snd b)));
-       Printf.fprintf oc "\t},\n";
+       Printf.fprintf oc "\n\t},\n";
        ())
 ;;
 

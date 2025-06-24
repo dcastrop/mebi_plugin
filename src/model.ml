@@ -95,6 +95,7 @@ end
 
 module Action = struct
   module Label = struct
+    (** (encoding, (?cached_decoding, ?is_silent)) *)
     type t = Mebi_wrapper.E.t * (string option * bool option)
 
     let to_string (t : t) = Mebi_wrapper.E.to_string (fst t)
@@ -112,6 +113,7 @@ module Action = struct
   module MetaData = struct
     type t = string list
 
+    let merge (m1 : t) (m2 : t) : t = List.append m1 m2
     let from_opt (t : t option) = match t with None -> None | Some t -> Some t
 
     let to_string (m : t) : string =
@@ -162,6 +164,23 @@ module Action = struct
   and annotation_pair = State.t * t
   and annotation = annotation_pair list
   and annotations = annotation list
+
+  exception CannotMergeActionWithDifferentLabels of (t * t)
+
+  let merge (a1 : t) (a2 : t) : t =
+    if Label.eq a1.label a2.label
+    then
+      { a1 with
+        meta = MetaData.merge a1.meta a2.meta
+      ; annos =
+          List.fold_left
+            (fun (acc : annotations) (anno : annotation) ->
+              if List.mem anno acc then acc else anno :: acc)
+            a1.annos
+            a2.annos
+      }
+    else raise (CannotMergeActionWithDifferentLabels (a1, a2))
+  ;;
 
   let rec annotation_pair_to_string (p : annotation_pair) : string =
     Printf.sprintf "(%s, %s)" (State.to_string (fst p)) (to_string (snd p))
@@ -358,6 +377,16 @@ end
 module Edge = struct
   type t = State.t * Action.t * State.t
 
+  exception CannotMergeEdgeWithDifferentStates of (t * t)
+
+  let merge (e1 : t) (e2 : t) : t =
+    match e1, e2 with
+    | (from1, action1, dest1), (from2, action2, dest2) ->
+      if State.eq from1 from2 && State.eq dest1 dest2
+      then from1, Action.merge action1 action2, dest2
+      else raise (CannotMergeEdgeWithDifferentStates (e1, e2))
+  ;;
+
   let to_string
         ?(skip_leading_tab : bool = false)
         ?(indents : int = 0)
@@ -418,6 +447,12 @@ module Alphabet = Set.Make (struct
 
     let compare (a : t) (b : t) = Action.Label.compare a b
   end)
+
+(* module ActionSet = Set.Make (struct
+   type t = Action.t
+
+   let compare (a : t) (b : t) = Action.compare ~ignore_annos:true a b
+   end) *)
 
 module Actions = Hashtbl.Make (struct
     type t = Action.t
@@ -759,6 +794,69 @@ let get_num_blocks (pi : Partition.t) : int =
     (fun (ss : States.t) (num : int) -> States.cardinal ss + num)
     pi
     0
+;;
+
+(*********************************************************************)
+(****** Merge ********************************************************)
+(*********************************************************************)
+exception FoundDuplicatesWhenReducingActions of unit
+
+let merge_actions (aa1 : States.t Actions.t) (aa2 : States.t Actions.t)
+  : States.t Actions.t
+  =
+  let a1_keys = List.of_seq (Actions.to_seq_keys aa1) in
+  let a2_keys = List.of_seq (Actions.to_seq_keys aa2) in
+  (* let action_keys = List.append a1_keys a2_keys in *)
+  let labels =
+    Alphabet.union (alphabet_from_actions aa1) (alphabet_from_actions aa2)
+  in
+  let actions : States.t Actions.t = Actions.create 0 in
+  Alphabet.iter
+    (fun (l : Action.Label.t) ->
+      match
+        ( List.find_opt
+            (fun (akey : Action.t) -> Action.Label.eq l akey.label)
+            a1_keys
+        , List.find_opt
+            (fun (akey : Action.t) -> Action.Label.eq l akey.label)
+            a2_keys )
+      with
+      | None, None -> (* impossible *) ()
+      | None, Some a2 -> Actions.add actions a2 (Actions.find aa2 a2)
+      | Some a1, None -> Actions.add actions a1 (Actions.find aa1 a1)
+      | Some a1, Some a2 ->
+        (* should me able to merge *)
+        let dests = States.union (Actions.find aa1 a1) (Actions.find aa2 a2) in
+        let merged_action = Action.merge a1 a2 in
+        Actions.add actions merged_action dests)
+    labels;
+  actions
+;;
+
+let merge_edges
+      (e1 : States.t Actions.t Edges.t)
+      (e2 : States.t Actions.t Edges.t)
+  : States.t Actions.t Edges.t
+  =
+  let from_states =
+    States.union
+      (States.of_seq (Edges.to_seq_keys e1))
+      (States.of_seq (Edges.to_seq_keys e2))
+  in
+  let edges : States.t Actions.t Edges.t =
+    Edges.create (States.cardinal from_states)
+  in
+  States.iter
+    (fun (from : State.t) ->
+      match Edges.find_opt e1 from, Edges.find_opt e2 from with
+      | None, None -> () (* impossible ? *)
+      | None, Some a2 -> Edges.add edges from a2
+      | Some a1, None -> Edges.add edges from a1
+      | Some a1, Some a2 ->
+        let merged_actions = merge_actions a1 a2 in
+        Edges.add edges from merged_actions)
+    from_states;
+  edges
 ;;
 
 (*********************************************************************)

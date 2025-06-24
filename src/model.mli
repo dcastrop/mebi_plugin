@@ -59,6 +59,7 @@ module Action : sig
   module MetaData : sig
     type t = string list
 
+    val merge : t -> t -> t
     val from_opt : t option -> t option
     val to_string : t -> string
     val eq : string list -> string list -> bool
@@ -66,10 +67,10 @@ module Action : sig
     val eq_opt :
       string list option -> string list option -> bool
 
-    val compare : String.t list -> String.t list -> int
+    val compare : string list -> string list -> int
 
     val compare_opt :
-      String.t list option -> String.t list option -> int
+      string list option -> string list option -> int
   end
 
   type t = {
@@ -82,6 +83,9 @@ module Action : sig
   and annotation = annotation_pair list
   and annotations = annotation list
 
+  exception CannotMergeActionWithDifferentLabels of (t * t)
+
+  val merge : t -> t -> t
   val annotation_pair_to_string : annotation_pair -> string
   val annotation_to_string : annotation -> string
   val annotations_to_string : annotations -> string
@@ -104,9 +108,9 @@ module Action : sig
   val eq : t -> t -> bool
   val anno_eq : annotation -> annotation -> bool
   val annos_eq : annotations -> annotations -> bool
-  val compare : t -> t -> Int.t
-  val anno_compare : annotation -> annotation -> Int.t
-  val annos_compare : annotations -> annotations -> Int.t
+  val compare : t -> t -> int
+  val anno_compare : annotation -> annotation -> int
+  val annos_compare : annotations -> annotations -> int
   val hash : t -> int
 end
 
@@ -125,6 +129,10 @@ end
 
 module Edge : sig
   type t = State.t * Action.t * State.t
+
+  exception CannotMergeEdgeWithDifferentStates of (t * t)
+
+  val merge : t -> t -> t
 
   val to_string :
     ?skip_leading_tab:bool ->
@@ -493,6 +501,19 @@ val get_reachable_blocks_opt :
   States.t Actions.t -> Partition.t -> Partition.t option
 
 val get_num_blocks : Partition.t -> int
+
+exception FoundDuplicatesWhenReducingActions of unit
+
+val merge_actions :
+  States.t Actions.t ->
+  States.t Actions.t ->
+  States.t Actions.t
+
+val merge_edges :
+  States.t Actions.t Edges.t ->
+  States.t Actions.t Edges.t ->
+  States.t Actions.t Edges.t
+
 val pstr_info : ?indents:int -> Info.t -> string
 val pstr_info_opt : ?indents:int -> Info.t option -> string
 val pstr_label : ?indents:int -> Action.Label.t -> string

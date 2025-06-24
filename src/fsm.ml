@@ -299,8 +299,7 @@ let merge (p : pair) : t =
   in
   let alphabet = Alphabet.union m1.alphabet m2.alphabet in
   let states = States.union m1.states m2.states in
-  let merged = add_edge_list m1 (edges_to_list m2.edges) in
-  let edges = merged.edges in
+  let edges = Model.merge_edges m1.edges m2.edges in
   let info = None in
   { init; alphabet; states; edges; info }
 ;;
