@@ -36,17 +36,6 @@ let create_from (m : Model.t) : t =
 let clone (m : t) : t =
   match m with
   | { init; alphabet; states; edges = to_copy; info } ->
-    (* let edges : States.t Actions.t Edges.t =
-       Edges.create (Edges.length to_copy)
-       in
-       Edges.iter
-       (fun (from : State.t) (aa_to_copy : States.t Actions.t) ->
-       let aa = Actions.create (Actions.length aa_to_copy) in
-       Actions.iter
-       (fun (a : Action.t) (dests : States.t) -> Actions.add aa a dests)
-       aa_to_copy;
-       Edges.add edges from aa)
-       to_copy; *)
     { init; alphabet; states; edges = Edges.copy to_copy; info }
 ;;
 

@@ -209,7 +209,7 @@ let edges_to_json_model_edges (es : States.t Actions.t Edges.t)
           , ( Action.MetaData.to_string action.meta
             , Some
                 (List.fold_left
-                   (fun (acc1 : string list) anno ->
+                   (fun (acc1 : string list) (anno : Action.annotation) ->
                      Action.annotation_to_string anno :: acc1)
                    []
                    action.annos) ) ) )
@@ -311,6 +311,34 @@ let handle_if_first (b : bool ref) : string =
   else ",\n"
 ;;
 
+let states_to_json_list (ss : States.t) : string =
+  let raw_ss = States.to_list ss in
+  match raw_ss with
+  | [] -> "[]"
+  | h :: t ->
+    Printf.sprintf
+      "\t\t\t[%s]"
+      (List.fold_left
+         (fun (acc : string) (s : State.t) ->
+           Printf.sprintf "%s, %s" acc (State.to_string ~pstr:false s))
+         (State.to_string ~pstr:false h)
+         t)
+;;
+
+let partition_to_json_list (pi : Partition.t) : string =
+  let raw_pi = Partition.to_list pi in
+  match raw_pi with
+  | [] -> "[]"
+  | h :: t ->
+    Printf.sprintf
+      "[\n%s\n\t\t]"
+      (List.fold_left
+         (fun (acc : string) (ss : States.t) ->
+           Printf.sprintf "%s,\n%s" acc (states_to_json_list ss))
+         (states_to_json_list h)
+         t)
+;;
+
 let write_json_result_to_file
       (oc : out_channel)
       (r : (Algorithms.result * (string * string) option) option)
@@ -327,20 +355,33 @@ let write_json_result_to_file
          oc
          "\t\t\"bisimilar\": %b,\n"
          (Algorithms.result_to_bool (fst r));
-       (match tup with
-        | None -> Printf.fprintf oc "\t\t\"fsm_names\": null,\n"
-        | Some tup ->
-          Printf.fprintf
-            oc
-            "\t\t\"fsm_names\": [\"%s\", \"%s\"],\n"
-            (fst tup)
-            (snd tup));
-       Printf.fprintf oc "\t\t\"bisimilar states\": [\n";
-       Printf.fprintf oc "\t\t\t{\"TODO\": true}\n";
-       Printf.fprintf oc "\t\t],\n";
-       Printf.fprintf oc "\t\t\"non-bisimilar states\": [\n";
-       Printf.fprintf oc "\t\t\t{\"TODO\": true}\n";
-       Printf.fprintf oc "\t\t]\n";
+       Printf.fprintf
+         oc
+         "\t\t\"fsm names\": %s,\n"
+         (match tup with
+          | None -> "null"
+          | Some tup -> Printf.sprintf "[\"%s\", \"%s\"]" (fst tup) (snd tup));
+       Printf.fprintf
+         oc
+         "\t\t\"state totals\": %s,\n"
+         (match tup with
+          | None -> "null"
+          | Some tup ->
+            Printf.sprintf
+              "[ {\"bisim\": [%i, %i]}, {\"non bisim\": [%i, %i]} ]"
+              (Model.get_num_blocks (fst (snd b)))
+              (Partition.cardinal (fst (snd b)))
+              (Model.get_num_blocks (snd (snd b)))
+              (Partition.cardinal (snd (snd b))));
+       Printf.fprintf
+         oc
+         "\t\t\"bisimilar states\": %s"
+         (partition_to_json_list (fst (snd b)));
+       Printf.fprintf oc ",\n";
+       Printf.fprintf
+         oc
+         "\t\t\"non-bisimilar states\": %s"
+         (partition_to_json_list (snd (snd b)));
        Printf.fprintf oc "\t},\n";
        ())
 ;;
@@ -458,8 +499,8 @@ let write_json_edges_to_file (oc : out_channel) (i : json_edge Queue.t) : unit =
         Printf.fprintf oc "\t\t\t\"action\": %s,\n" action_label;
         Printf.fprintf oc "\t\t\t\"info\": \"%s\",\n" action_info;
         (match action_annotations with
-         | None -> Printf.fprintf oc "\t\t\t\"annos\": %s" "null\n"
-         | Some [] -> Printf.fprintf oc "\t\t\t\"annos\": %s" "[]\n"
+         | None -> Printf.fprintf oc "\t\t\t\"annos\": null\n"
+         | Some [] -> Printf.fprintf oc "\t\t\t\"annos\": []\n"
          | Some (h :: t) ->
            Printf.fprintf oc "\t\t\t\"annos\": [\n";
            Printf.fprintf oc "\t\t\t\t\"%s\"" h;

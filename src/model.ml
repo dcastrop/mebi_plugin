@@ -754,6 +754,13 @@ let get_reachable_blocks_opt (aa : States.t Actions.t) (pi : Partition.t)
   if Partition.is_empty blocks then None else Some blocks
 ;;
 
+let get_num_blocks (pi : Partition.t) : int =
+  Partition.fold
+    (fun (ss : States.t) (num : int) -> States.cardinal ss + num)
+    pi
+    0
+;;
+
 (*********************************************************************)
 (****** Pretty-Strings ***********************************************)
 (*********************************************************************)
