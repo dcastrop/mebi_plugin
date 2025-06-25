@@ -395,7 +395,49 @@ let write_json_info_to_file (oc : out_channel) (i : Info.t option) : unit =
     Printf.fprintf oc "\t\t\"bound\": %i,\n" i.bound;
     Printf.fprintf oc "\t\t\"num labels\": %i,\n" i.num_labels;
     Printf.fprintf oc "\t\t\"num states\": %i,\n" i.num_states;
-    Printf.fprintf oc "\t\t\"num edges\": %i\n" i.num_edges;
+    Printf.fprintf oc "\t\t\"num edges\": %i,\n" i.num_edges;
+    (match i.coq_info with
+     | None -> Printf.fprintf oc "\t\t\"coq info:\": null\n"
+     | Some [] -> Printf.fprintf oc "\t\t\"coq info:\": []\n"
+     | Some (h :: t) ->
+       Printf.fprintf oc "\t\t\"coq info:\": [\n";
+       let str_cindef
+             ((enc, (dec, names)) : Mebi_wrapper.E.t * (string * string list))
+         : string
+         =
+         Printf.sprintf
+           "\t\t\t{\n\
+            \t\t\t\t\"enc\": %s,\n\
+            \t\t\t\t\"def\": \"%s\",\n\
+            \t\t\t\t\"names\": [%s]\n\
+            \t\t\t}"
+           (Mebi_wrapper.E.to_string enc)
+           dec
+           (match names with
+            | [] -> ""
+            | nh :: nt ->
+              if List.is_empty nt
+              then Printf.sprintf " \"%s\" " (Utils.clean_string nh)
+              else
+                Printf.sprintf
+                  "%s\n\t\t\t\t"
+                  (List.fold_left
+                     (fun (acc : string) (name : string) ->
+                       Printf.sprintf
+                         "%s,\n\t\t\t\t\t\"%s\""
+                         acc
+                         (Utils.clean_string name))
+                     (Printf.sprintf
+                        "\n\t\t\t\t\t\"%s\""
+                        (Utils.clean_string nh))
+                     nt))
+       in
+       Printf.fprintf oc "%s" (str_cindef h);
+       List.iter
+         (fun (cindef : Mebi_wrapper.E.t * (string * string list)) ->
+           Printf.fprintf oc ",\n%s" (str_cindef cindef))
+         t;
+       Printf.fprintf oc "\n\t\t]");
     Printf.fprintf oc "\t},\n"
 ;;
 
@@ -614,6 +656,7 @@ let build_json_from_merged_model
                ; num_labels = Model.Alphabet.cardinal the_merged_fsm.alphabet
                ; num_states = Model.States.cardinal the_merged_fsm.states
                ; num_edges = Model.get_num_edges the_merged_fsm.edges
+               ; coq_info = None
                }
            | Some info, Some is_complete -> Some { info with is_complete }
            | Some info, None -> Some info)

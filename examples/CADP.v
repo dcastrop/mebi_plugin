@@ -1181,45 +1181,58 @@ Definition do_release (c:tm) (s:state) (r:resource)
   end
   .
 
+
+Definition do_main_loop (b:tm) (s:state) (r:resource)
+  : sys * resource
+  :=
+  (* REC_DEF 0 *)
+  (PRC (unfold (PMainLoopDef, b) b) s, r)
+  .
+
 Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 (*  0 *)
+| DO_MAIN_LOOP : forall b s r,
+  bigstep (PRC (REC_DEF PMainLoopDef (SEQ Acquire b)) s, r) SILENT (do_main_loop b s r)
+
+(*  1 *)
 | DO_ACQUIRE : forall c s r,
-  bigstep (PRC (REC_DEF PMainLoopDef (SEQ Acquire c)) s, r)
+  bigstep (PRC (SEQ (Acquire) (c)) s, r)
+  (* bigstep (PRC (REC_DEF PMainLoopDef (SEQ Acquire c)) s, r) *)
           SILENT
           (do_acquire c s r)
 
-(*  1 *)
+(*  2 *)
 | DO_RELEASE : forall c s r,
   bigstep (PRC (SEQ (Release) (c)) s, r)
           SILENT
           (do_release c s r)
 
-(*  2 *)
+(*  3 *)
 | DO_ACQUIRE_INNER : forall c s r,
   bigstep (PRC (SEQ (AcquireInnerLoop) c) s, r)
           SILENT
           (do_acquire_inner c s r)
 
-(*  3 *)
+(*  4 *)
 | DO_RELEASE_INNER : forall c s r,
   bigstep (PRC (SEQ (ReleaseInnerLoop) c) s, r)
           SILENT
           (do_release_inner c s r)
 
-(*  4 *)
+(*  5 *)
 | DO_SEQ_ACT_ENTER : forall y s r,
   bigstep (PRC (SEQ (ACT ENTER) y) s, r) (LABEL (ENTER, (get_pid s))) (PRC y s, r)
 
-(*  5 *)
+(*  6 *)
 | DO_SEQ_ACT_LEAVE : forall y s r,
   bigstep (PRC (SEQ (ACT LEAVE) y) s, r) (LABEL (LEAVE, (get_pid s))) (PRC y s, r)
 
-(*  6 *)
+(*  7 *)
 | DO_PAR_L : forall a l1 l2 r gr1 gr2,
   bigstep (l1, gr1) a (l2, gr2) ->
   bigstep (PAR l1 r, gr1) a (PAR l2 r, gr2)
 
-(*  7 *)
+(*  8 *)
 | DO_PAR_R : forall a l r1 r2 gr1 gr2,
   bigstep (r1, gr1) a (r2, gr2) ->
   bigstep (PAR l r1, gr1) a (PAR l r2, gr2)

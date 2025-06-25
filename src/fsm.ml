@@ -328,7 +328,18 @@ let merge (p : pair) : t =
   let alphabet = Alphabet.union m1.alphabet m2.alphabet in
   let states = States.union m1.states m2.states in
   let edges = Model.merge_edges m1.edges m2.edges in
-  let info = None in
+  let info : Model.Info.t option =
+    match m1.info, m2.info with
+    | Some i1, Some i2 ->
+      Some
+        (Model.Info.merge
+           ~num_labels:(Alphabet.cardinal alphabet)
+           ~num_states:(States.cardinal states)
+           ~num_edges:(Model.get_num_edges edges)
+           i1
+           i2)
+    | _, _ -> None
+  in
   { init; alphabet; states; edges; info }
 ;;
 
