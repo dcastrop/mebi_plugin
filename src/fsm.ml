@@ -147,7 +147,7 @@ let has_state (m : t) (s : State.t) : bool = States.mem s m.states
 (****** Saturate *****************************************************)
 (*********************************************************************)
 
-let max_revisit_num : int = 2
+let max_revisit_num : int = 0
 
 let can_revisit (s : State.t) (visited_states : (State.t, int) Hashtbl.t) : bool
   =
@@ -171,6 +171,37 @@ let annotate_action
   : Action.t
   =
   Action.saturated ?anno:(Some (p :: anno)) action_to_annotate
+;;
+
+exception FoundDuplicateActionPairInList of unit
+
+let add_annotated_action
+      (acc0 : action_pair list)
+      (p : Action.annotation_pair)
+      (action_to_annotate : Action.t)
+      (anno : Action.annotation)
+      (dests : States.t)
+  : action_pair list
+  =
+  (* first search for an action inside acc that already describes this *)
+  match
+    List.fold_left
+      (fun ((matchopt, acc) : Action.t option * action_pair list)
+        (a : action_pair) ->
+        match
+          ( matchopt
+          , Action.Label.eq (fst a).label action_to_annotate.label
+            && Action.MetaData.eq (fst a).meta action_to_annotate.meta )
+        with
+        | None, true -> Some (fst a), acc
+        | None, false -> None, a :: acc
+        | Some b, true -> raise (FoundDuplicateActionPairInList ())
+        | Some b, false -> Some b, a :: acc)
+      (None, [])
+      acc0
+  with
+  | None, acc -> (annotate_action p action_to_annotate anno, dests) :: acc
+  | Some a, acc -> (annotate_action p a anno, dests) :: acc
 ;;
 
 let opt_silent_action (o : Action.t option) (a : Action.t) : Action.t option =
@@ -223,7 +254,8 @@ let rec get_annotated_actions
                   dests
                   named_action
                   (opt_silent_action silent_action a)
-                  ((annotate_action (dest, a) named_action' anno, dests) :: acc2)
+                  (add_annotated_action acc2 (dest, a) named_action' anno dests)
+              (* ((annotate_action (dest, a) named_action' anno, dests) :: acc2) *)
               (* if [a] is not silent and have not yet found [named_action] *)
               | Some false, None ->
                 get_annotated_actions
@@ -233,7 +265,8 @@ let rec get_annotated_actions
                   dests
                   (Some a)
                   silent_action
-                  ((annotate_action (dest, a) a anno, dests) :: acc2))
+                  (add_annotated_action acc2 (dest, a) a anno dests)
+              (* ((annotate_action (dest, a) a anno, dests) :: acc2) *))
             dest_actions
             acc1)
         else acc1)

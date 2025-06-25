@@ -17,6 +17,7 @@ module Bisimilarity : sig
 
   val split_block
     :  Model.States.t
+    -> Model.Alphabet.elt
     -> Model.States.t Model.Actions.t Model.Edges.t
     -> Model.Partition.t
     -> Model.States.t * Model.States.t option

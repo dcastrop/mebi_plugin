@@ -51,11 +51,24 @@ module Bisimilarity = struct
 
   let split_block
         (block : States.t)
-        (edges_of_a : States.t Actions.t Edges.t)
-        (pi : Partition.t)
+        (l : Action.Label.t)
+        (edges : States.t Actions.t Edges.t)
+        (* (edges_of_a : States.t Actions.t Edges.t) *)
+          (pi : Partition.t)
     : States.t * States.t option
     =
     assert (Bool.not (States.is_empty block));
+    let edges_of_a = Model.get_edges_with_label l edges in
+    if Int.equal 0 (Edges.length edges_of_a)
+    then
+      Utils.Logging.Log.warning
+        (Printf.sprintf "No edges of (%s)." (Action.Label.to_string l));
+    (* else
+      Utils.Logging.Log.warning
+        (Printf.sprintf
+           "Edges of (%s): %s"
+           (Action.Label.to_string l)
+           (pstr_edges edges_of_a)); *)
     (* selects some state [s] from [block] *)
     let s = States.min_elt block in
     let s_actions = Model.get_actions_from s edges_of_a in
@@ -63,18 +76,43 @@ module Bisimilarity = struct
     (* check rest of [block] *)
     States.fold
       (fun (t : State.t) ((b1, b2) : States.t * States.t option) ->
-        let t_actions = Model.get_actions_from t edges_of_a in
-        let t_reachable_blocks = Model.get_reachable_blocks_opt t_actions pi in
-        match s_reachable_blocks, t_reachable_blocks with
-        | None, None -> States.add t b1, b2
-        | Some s_blocks, Some t_blocks ->
-          if
-            Partition.equal
-              (Partition.inter s_blocks t_blocks)
-              (Partition.union s_blocks t_blocks)
-          then States.add t b1, b2
-          else b1, add_to_block_option t b2
-        | _, _ -> b1, add_to_block_option t b2)
+        if State.eq s t
+        then States.add s b1, b2
+        else (
+          let t_actions = Model.get_actions_from t edges_of_a in
+          let t_reachable_blocks =
+            Model.get_reachable_blocks_opt t_actions pi
+          in
+          match s_reachable_blocks, t_reachable_blocks with
+          | None, None ->
+            Utils.Logging.Log.warning
+              (Printf.sprintf
+                 "split_block (%s): (%s, None), (%s, None)"
+                 (Action.Label.to_string l)
+                 (State.to_string s)
+                 (State.to_string t));
+            States.add t b1, b2
+          | Some s_blocks, Some t_blocks ->
+            Utils.Logging.Log.warning
+              (Printf.sprintf
+                 "split_block (%s): (%s, Some), (%s, Some)"
+                 (Action.Label.to_string l)
+                 (State.to_string s)
+                 (State.to_string t));
+            if
+              Partition.equal
+                (Partition.inter s_blocks t_blocks)
+                (Partition.union s_blocks t_blocks)
+            then States.add t b1, b2
+            else b1, add_to_block_option t b2
+          | _, _ ->
+            Utils.Logging.Log.warning
+              (Printf.sprintf
+                 "split_block (%s): (%s, _), (%s, _)"
+                 (Action.Label.to_string l)
+                 (State.to_string s)
+                 (State.to_string t));
+            b1, add_to_block_option t b2))
       block
       (States.empty, None)
   ;;
@@ -92,19 +130,19 @@ module Bisimilarity = struct
         let b = ref b in
         Alphabet.iter
           (fun (l : Action.Label.t) ->
-            let edges_of_a = Model.get_edges_with_label l edges in
-            (* TODO: [Fsm.Saturate.fsm] doesn't clean up unreachable states/edges yet. *)
-            if Edges.length edges_of_a > 0
-            then (
-              match split_block !b edges_of_a !pi with
-              | b1, None ->
-                assert (Int.equal (States.cardinal b1) (States.cardinal !b))
-              | b1, Some b2 ->
-                pi := Partition.remove !b !pi;
-                pi := Partition.add b2 (Partition.add b1 !pi);
-                (* TODO: is find necessary? just use [b1] ? *)
-                b := Partition.find b1 !pi;
-                changed := true))
+            (* let edges_of_a = Model.get_edges_with_label l edges in
+               (* TODO: [Fsm.Saturate.fsm] doesn't clean up unreachable states/edges yet. *)
+               if Edges.length edges_of_a > 0
+               then ( *)
+            match split_block !b (*edges_of_a*) l edges !pi with
+            | b1, None ->
+              assert (Int.equal (States.cardinal b1) (States.cardinal !b))
+            | b1, Some b2 ->
+              pi := Partition.remove !b !pi;
+              pi := Partition.add b2 (Partition.add b1 !pi);
+              (* TODO: is find necessary? just use [b1] ? *)
+              b := Partition.find b1 !pi;
+              changed := true)
           alphabet)
       !pi
   ;;
