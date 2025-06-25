@@ -1,5 +1,13 @@
 # todo
 
+- [x] investigate refactored bisimilarity algorithm -- each partition should only contain states that are bisimilar (i.e., via the same action they reach a state that is also bisimilar) 
+      > fixed this, turns out the annotations were not being correctly merged. now there are far fewer edges, which makes sense. ***however***, currently it looks like there are too many annotations being added. need to fix this
+
+- [x] fixed issue with CADP where the glued version would terminate while the unglued one would not -- this was due to gluing the first rec-def, which meant that we didn't allow for any changes to the global state on each iteration. ungluing this resolves this issue.
+
+
+---
+
 - [x] investigate why `MkGraph.lts_graph` reports 1 more edge than in the `MkGraph.decoq_lts`
 - [x] investigate why when providing the `SILENT` action for `Weak`, the `SILENT` action does not appear in the alphabet
 > the above were the comparison function of `Model.Transition`, which occured during `MkGraph.decoq_lts`
