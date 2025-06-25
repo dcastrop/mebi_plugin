@@ -1192,12 +1192,13 @@ Definition do_main_loop (b:tm) (s:state) (r:resource)
 Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 (*  0 *)
 | DO_MAIN_LOOP : forall b s r,
-  bigstep (PRC (REC_DEF PMainLoopDef (SEQ Acquire b)) s, r) SILENT (do_main_loop b s r)
+  bigstep (PRC (REC_DEF PMainLoopDef b) s, r) 
+          SILENT 
+          (do_main_loop b s r)
 
 (*  1 *)
 | DO_ACQUIRE : forall c s r,
   bigstep (PRC (SEQ (Acquire) (c)) s, r)
-  (* bigstep (PRC (REC_DEF PMainLoopDef (SEQ Acquire c)) s, r) *)
           SILENT
           (do_acquire c s r)
 
@@ -1221,11 +1222,15 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 
 (*  5 *)
 | DO_SEQ_ACT_ENTER : forall y s r,
-  bigstep (PRC (SEQ (ACT ENTER) y) s, r) (LABEL (ENTER, (get_pid s))) (PRC y s, r)
+  bigstep (PRC (SEQ (ACT ENTER) y) s, r) 
+          (LABEL (ENTER, (get_pid s))) 
+          (PRC y s, r)
 
 (*  6 *)
 | DO_SEQ_ACT_LEAVE : forall y s r,
-  bigstep (PRC (SEQ (ACT LEAVE) y) s, r) (LABEL (LEAVE, (get_pid s))) (PRC y s, r)
+  bigstep (PRC (SEQ (ACT LEAVE) y) s, r) 
+          (LABEL (LEAVE, (get_pid s))) 
+          (PRC y s, r)
 
 (*  7 *)
 | DO_PAR_L : forall a l1 l2 r gr1 gr2,
