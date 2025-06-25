@@ -8,6 +8,7 @@ module Info : sig
   type t =
     { is_complete : bool
     ; bound : int
+    ; num_terminals : int
     ; num_labels : int
     ; num_states : int
     ; num_edges : int
@@ -16,6 +17,7 @@ module Info : sig
 
   val merge
     :  ?bound:int
+    -> ?num_terminals:int
     -> ?num_labels:int
     -> ?num_states:int
     -> ?num_edges:int
@@ -393,9 +395,15 @@ end
 
 type t =
   | LTS of
-      (State.t option * Alphabet.t * States.t * Transitions.t * Info.t option)
+      (State.t option
+      * States.t
+      * Alphabet.t
+      * States.t
+      * Transitions.t
+      * Info.t option)
   | FSM of
       (State.t option
+      * States.t
       * Alphabet.t
       * States.t
       * States.t Actions.t Edges.t
