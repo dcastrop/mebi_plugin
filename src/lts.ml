@@ -2,6 +2,7 @@ open Model
 
 type t =
   { init : State.t option
+  ; terminals : States.t
   ; alphabet : Alphabet.t
   ; states : States.t
   ; transitions : Transitions.t
@@ -9,28 +10,29 @@ type t =
   }
 
 let to_model (m : t) : Model.t =
-  LTS (m.init, m.alphabet, m.states, m.transitions, m.info)
+  LTS (m.init, m.terminals, m.alphabet, m.states, m.transitions, m.info)
 ;;
 
 let create
       (init : State.t option)
+      (terminals : States.t)
       (alphabet : Alphabet.t)
       (states : States.t)
       (transitions : Transitions.t)
       (info : Info.t option)
   : t
   =
-  Model.check_info (LTS (init, alphabet, states, transitions, info));
-  { init; alphabet; states; transitions; info }
+  Model.check_info (LTS (init, terminals, alphabet, states, transitions, info));
+  { init; terminals; alphabet; states; transitions; info }
 ;;
 
 let create_from (m : Model.t) : t =
   match m with
-  | LTS (init, alphabet, states, transitions, info) ->
-    create init alphabet states transitions info
-  | FSM (init, alphabet, states, edges, info) ->
+  | LTS (init, terminals, alphabet, states, transitions, info) ->
+    create init terminals alphabet states transitions info
+  | FSM (init, terminals, alphabet, states, edges, info) ->
     let transitions = Model.edges_to_transitions edges in
-    create init alphabet states transitions info
+    create init terminals alphabet states transitions info
 ;;
 
 (*********************************************************************)
@@ -65,21 +67,15 @@ let add_action_list (m : t) (aa : Action.t list) : t =
 ;;
 
 let add_state (g : t) (s : State.t) : t =
-  match g with
-  | { init; alphabet; states; transitions; info } ->
-    { g with states = States.add s states }
+  { g with states = States.add s g.states }
 ;;
 
 let add_state_list (g : t) (ss : State.t list) : t =
-  match g with
-  | { init; alphabet; states; transitions; info } ->
-    { g with states = States.add_seq (List.to_seq ss) states }
+  { g with states = States.add_seq (List.to_seq ss) g.states }
 ;;
 
 let add_states (g : t) (ss : States.t) : t =
-  match g with
-  | { init; alphabet; states; transitions; info } ->
-    { g with states = States.union ss states }
+  { g with states = States.union ss g.states }
 ;;
 
 let add_transition
@@ -90,9 +86,7 @@ let add_transition
       (meta : Action.MetaData.t option)
   : t
   =
-  match g with
-  | { init; alphabet; states; transitions; info } ->
-    { g with transitions = Transitions.add (from, l, dest, meta) transitions }
+  { g with transitions = Transitions.add (from, l, dest, meta) g.transitions }
 ;;
 
 let add_transition_from_action
@@ -124,6 +118,7 @@ let to_string
     else "", ""
   in
   let num_alpha_str = Printf.sprintf "(%i) " (Alphabet.cardinal g.alphabet) in
+  let num_terms_str = Printf.sprintf "(%i) " (States.cardinal g.terminals) in
   let num_states_str = Printf.sprintf "(%i) " (States.cardinal g.states) in
   let num_edges_str =
     Printf.sprintf "(%i) " (Transitions.cardinal g.transitions)
@@ -132,6 +127,7 @@ let to_string
     "\n\
      %s%s{ initial state: %s\n\
      %sinfo: %s\n\
+     %sterminals: %s%s\n\
      %salphabet: %s%s\n\
      %sstates: %s%s\n\
      %stransitions: %s%s\n\
@@ -141,6 +137,9 @@ let to_string
     (pstr_state_opt ~indents:(indents + 1) g.init)
     sep
     (pstr_info_opt ~indents:(indents + 1) g.info)
+    sep
+    num_terms_str
+    (pstr_states ~skip_leading_tab:true ~indents:(indents + 1) g.terminals)
     sep
     num_alpha_str
     (pstr_alphabet ~skip_leading_tab:true ~indents:(indents + 1) g.alphabet)

@@ -24,6 +24,7 @@ module Info = struct
   type t =
     { is_complete : bool
     ; bound : int
+    ; num_terminals : int
     ; num_labels : int
     ; num_states : int
     ; num_edges : int
@@ -32,6 +33,7 @@ module Info = struct
 
   let merge
         ?(bound : int = -1)
+        ?(num_terminals : int = -1)
         ?(num_labels : int = -1)
         ?(num_states : int = -1)
         ?(num_edges : int = -1)
@@ -41,6 +43,7 @@ module Info = struct
     =
     { is_complete = i1.is_complete && i2.is_complete
     ; bound
+    ; num_terminals
     ; num_labels
     ; num_states
     ; num_edges
@@ -543,9 +546,15 @@ module Transitions = Set.Make (struct
 
 type t =
   | LTS of
-      (State.t option * Alphabet.t * States.t * Transitions.t * Info.t option)
+      (State.t option
+      * States.t
+      * Alphabet.t
+      * States.t
+      * Transitions.t
+      * Info.t option)
   | FSM of
       (State.t option
+      * States.t
       * Alphabet.t
       * States.t
       * States.t Actions.t Edges.t
@@ -1162,32 +1171,42 @@ let pstr_edges
 let check_info (m : t) : unit =
   match
     match m with
-    | LTS (_init, alphabet, states, transitions, info) ->
+    | LTS (_init, terminals, alphabet, states, transitions, info) ->
       (match info with
        | None -> None
        | Some info ->
          Some
            (List.combine
-              [ "alphabet"; "states"; "transitions" ]
+              [ "terminals"; "alphabet"; "states"; "transitions" ]
               (List.combine
-                 [ Alphabet.cardinal alphabet
+                 [ States.cardinal terminals
+                 ; Alphabet.cardinal alphabet
                  ; States.cardinal states
                  ; Transitions.cardinal transitions
                  ]
-                 [ info.num_labels; info.num_states; info.num_edges ])))
-    | FSM (_init, alphabet, states, edges, info) ->
+                 [ info.num_terminals
+                 ; info.num_labels
+                 ; info.num_states
+                 ; info.num_edges
+                 ])))
+    | FSM (_init, terminals, alphabet, states, edges, info) ->
       (match info with
        | None -> None
        | Some info ->
          Some
            (List.combine
-              [ "alphabet"; "states"; "edges" ]
+              [ "terminals"; "alphabet"; "states"; "edges" ]
               (List.combine
-                 [ Alphabet.cardinal alphabet
+                 [ States.cardinal terminals
+                 ; Alphabet.cardinal alphabet
                  ; States.cardinal states
                  ; get_num_edges edges
                  ]
-                 [ info.num_labels; info.num_states; info.num_edges ])))
+                 [ info.num_terminals
+                 ; info.num_labels
+                 ; info.num_states
+                 ; info.num_edges
+                 ])))
     (* | NestedStrList _ -> None *)
   with
   | None -> ()

@@ -1,5 +1,6 @@
 type t =
   { init : Model.State.t option
+  ; terminals : Model.States.t
   ; alphabet : Model.Alphabet.t
   ; states : Model.States.t
   ; transitions : Model.Transitions.t
@@ -10,6 +11,7 @@ val to_model : t -> Model.t
 
 val create
   :  Model.State.t option
+  -> Model.States.t
   -> Model.Alphabet.t
   -> Model.States.t
   -> Model.Transitions.t
@@ -26,7 +28,7 @@ val add_states : t -> Model.States.t -> t
 val add_transition
   :  t
   -> Model.State.t
-  -> Model.Action.Label.t
+  -> Model.Alphabet.elt
   -> Model.State.t
   -> Model.Action.MetaData.t option
   -> t

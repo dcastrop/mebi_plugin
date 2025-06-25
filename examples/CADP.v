@@ -1064,7 +1064,7 @@ Definition do_acquire (c:tm) (s:state) (r:resource)
   :=
   let e : env := (s, r) in
   (* REC_DEF 0 *)
-  let c:tm := unfold (PMainLoopDef, c) c in
+  (* let c:tm := unfold (PMainLoopDef, c) c in *)
   (* ACT (WRITE_NEXT THE_PID NIL) *)
   match write_next THE_PID NIL e with
   | None => (PRC ERR

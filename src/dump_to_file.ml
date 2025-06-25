@@ -149,6 +149,7 @@ type json_model =
   ; result : (Algorithms.result * (string * string) option) option
   ; alphabet : json_action Queue.t
   ; initial_state : json_state_name
+  ; terminal_list : string Queue.t
   ; state_list : json_state Queue.t
   ; edge_list : json_edge Queue.t
   }
@@ -240,6 +241,15 @@ let states_to_json_model_states (ss : States.t) : json_state Queue.t =
     (Queue.create ())
 ;;
 
+let terminals_to_json_model_terminals (ss : States.t) : string Queue.t =
+  Model.States.fold
+    (fun (s : State.t) (acc : string Queue.t) ->
+      Queue.push (state_to_str s) acc;
+      acc)
+    ss
+    (Queue.create ())
+;;
+
 let to_json_model
       ?(bisim_args : (string * string) option * bool option = None, None)
       (filename : string)
@@ -255,8 +265,18 @@ let to_json_model
     let alphabet = alphabet_to_json_model_alphabet g.alphabet in
     let initial_state = state_opt_to_str g.init in
     let state_list = states_to_json_model_states g.states in
+    let terminal_list = terminals_to_json_model_terminals g.terminals in
     let edge_list = transitions_to_json_model_edges g.transitions in
-    { name; kind; info; result; alphabet; initial_state; state_list; edge_list }
+    { name
+    ; kind
+    ; info
+    ; result
+    ; alphabet
+    ; initial_state
+    ; terminal_list
+    ; state_list
+    ; edge_list
+    }
   | FSM m ->
     let kind = "fsm" in
     let info = m.info in
@@ -264,8 +284,18 @@ let to_json_model
     let alphabet = alphabet_to_json_model_alphabet m.alphabet in
     let initial_state = state_opt_to_str m.init in
     let state_list = states_to_json_model_states m.states in
+    let terminal_list = terminals_to_json_model_terminals m.terminals in
     let edge_list = edges_to_json_model_edges m.edges in
-    { name; kind; info; result; alphabet; initial_state; state_list; edge_list }
+    { name
+    ; kind
+    ; info
+    ; result
+    ; alphabet
+    ; initial_state
+    ; terminal_list
+    ; state_list
+    ; edge_list
+    }
   | Alg r ->
     (match r with
      | Bisim b ->
@@ -277,6 +307,7 @@ let to_json_model
        let alphabet = alphabet_to_json_model_alphabet m.alphabet in
        let initial_state = state_opt_to_str m.init in
        let state_list = states_to_json_model_states m.states in
+       let terminal_list = terminals_to_json_model_terminals m.terminals in
        let edge_list = edges_to_json_model_edges m.edges in
        { name
        ; kind
@@ -284,6 +315,7 @@ let to_json_model
        ; result
        ; alphabet
        ; initial_state
+       ; terminal_list
        ; state_list
        ; edge_list
        })
@@ -296,18 +328,30 @@ let to_json_model
     let alphabet = alphabet_to_json_model_alphabet m.alphabet in
     let initial_state = state_opt_to_str m.init in
     let state_list = states_to_json_model_states m.states in
+    let terminal_list = terminals_to_json_model_terminals m.terminals in
     let edge_list = edges_to_json_model_edges m.edges in
-    { name; kind; info; result; alphabet; initial_state; state_list; edge_list }
+    { name
+    ; kind
+    ; info
+    ; result
+    ; alphabet
+    ; initial_state
+    ; terminal_list
+    ; state_list
+    ; edge_list
+    }
   | _ -> raise (ResultKindNotImplemented model)
 ;;
 
 (* | FSM s, JSON () -> JSON.FSM.fsm filename s, Utils.is_complete s.info *)
 
-let handle_if_first (b : bool ref) : string =
+let handle_if_first ?(inline : bool = false) (b : bool ref) : string =
   if !b
   then (
     b := false;
-    "\n")
+    if inline then "" else "\n")
+  else if inline
+  then ", "
   else ",\n"
 ;;
 
@@ -393,6 +437,7 @@ let write_json_info_to_file (oc : out_channel) (i : Info.t option) : unit =
     Printf.fprintf oc "\t\"info\": {\n";
     Printf.fprintf oc "\t\t\"complete\": %b,\n" i.is_complete;
     Printf.fprintf oc "\t\t\"bound\": %i,\n" i.bound;
+    Printf.fprintf oc "\t\t\"num terminals\": %i,\n" i.num_terminals;
     Printf.fprintf oc "\t\t\"num labels\": %i,\n" i.num_labels;
     Printf.fprintf oc "\t\t\"num states\": %i,\n" i.num_states;
     Printf.fprintf oc "\t\t\"num edges\": %i,\n" i.num_edges;
@@ -493,10 +538,32 @@ let write_xl_string_to_file (oc : out_channel) (xlstr : string) : unit =
   else Printf.fprintf oc "%s" xlstr
 ;;
 
+let write_json_terminals_to_file (oc : out_channel) (i : string Queue.t) : unit =
+  if Queue.is_empty i
+  then Printf.fprintf oc "\t\"terminals\": [],\n"
+  else (
+    Printf.fprintf oc "\t\"terminals\": [";
+    let is_first = ref true in
+    let rec iterate (n : int) () : unit =
+      match n with
+      | 0 -> ()
+      | _ ->
+        let terminal_name = Queue.pop i in
+        Printf.fprintf
+          oc
+          "%s%s"
+          (handle_if_first ~inline:true is_first)
+          terminal_name;
+        iterate (n - 1) ()
+    in
+    iterate (Queue.length i) ();
+    Printf.fprintf oc "],\n")
+;;
+
 let write_json_states_to_file (oc : out_channel) (i : json_state Queue.t) : unit
   =
   if Queue.is_empty i
-  then Printf.fprintf oc "\t\"states\": [],\n"
+  then Printf.fprintf oc "\t\"states\": []\n"
   else (
     Printf.fprintf oc "\t\"states\": [";
     let is_first = ref true in
@@ -572,6 +639,11 @@ let write_json_to_file (m : json_model) (filepath : string) : unit =
   close_out oc;
   let oc = open_out_channel () filepath in
   Printf.fprintf oc "\t\"initial_state\": %s,\n" m.initial_state;
+  close_out oc;
+  let oc = open_out_channel () filepath in
+  write_json_terminals_to_file oc m.terminal_list;
+  close_out oc;
+  let oc = open_out_channel () filepath in
   write_json_edges_to_file oc m.edge_list;
   close_out oc;
   let oc = open_out_channel () filepath in
@@ -653,6 +725,7 @@ let build_json_from_merged_model
              Some
                { is_complete
                ; bound = -1
+               ; num_terminals = Model.States.cardinal the_merged_fsm.terminals
                ; num_labels = Model.Alphabet.cardinal the_merged_fsm.alphabet
                ; num_states = Model.States.cardinal the_merged_fsm.states
                ; num_edges = Model.get_num_edges the_merged_fsm.edges

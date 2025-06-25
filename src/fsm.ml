@@ -2,6 +2,7 @@ open Model
 
 type t =
   { init : State.t option
+  ; mutable terminals : States.t
   ; mutable alphabet : Alphabet.t
   ; mutable states : States.t
   ; mutable edges : States.t Actions.t Edges.t
@@ -9,55 +10,50 @@ type t =
   }
 
 let to_model (m : t) : Model.t =
-  FSM (m.init, m.alphabet, m.states, m.edges, m.info)
+  FSM (m.init, m.terminals, m.alphabet, m.states, m.edges, m.info)
 ;;
 
 let create
       (init : State.t option)
+      (terminals : States.t)
       (alphabet : Alphabet.t)
       (states : States.t)
       (edges : States.t Actions.t Edges.t)
       (info : Info.t option)
   : t
   =
-  Model.check_info (FSM (init, alphabet, states, edges, info));
-  { init; alphabet; states; edges; info }
+  Model.check_info (FSM (init, terminals, alphabet, states, edges, info));
+  { init; terminals; alphabet; states; edges; info }
 ;;
 
 let create_from (m : Model.t) : t =
   match m with
-  | LTS (init, alphabet, states, transitions, info) ->
+  | LTS (init, terminals, alphabet, states, transitions, info) ->
     let edges = Model.transitions_to_edges transitions in
-    create init alphabet states edges info
-  | FSM (init, alphabet, states, edges, info) ->
-    create init alphabet states edges info
+    create init terminals alphabet states edges info
+  | FSM (init, terminals, alphabet, states, edges, info) ->
+    create init terminals alphabet states edges info
 ;;
 
 (* | NestedStrList args ->
    let (init, alphabet, states, edges) = Model.handle_nested_str_list_to_edges  args in
    create init alphabet states edges None *)
 
-let clone (m : t) : t =
-  match m with
-  | { init; alphabet; states; edges = to_copy; info } ->
-    { init; alphabet; states; edges = Edges.copy to_copy; info }
-;;
+let clone (m : t) : t = { m with edges = Edges.copy m.edges }
 
 let update_info (m : t) : t =
-  match m with
-  | { init; alphabet; states; edges; info = to_update } ->
-    (match to_update with
-     | None -> m
-     | Some i ->
-       { m with
-         info =
-           Some
-             { i with
-               num_labels = Alphabet.cardinal alphabet
-             ; num_states = States.cardinal states
-             ; num_edges = get_num_edges edges
-             }
-       })
+  match m.info with
+  | None -> m
+  | Some i ->
+    { m with
+      info =
+        Some
+          { i with
+            num_labels = Alphabet.cardinal m.alphabet
+          ; num_states = States.cardinal m.states
+          ; num_edges = get_num_edges m.edges
+          }
+    }
 ;;
 
 (*********************************************************************)
@@ -325,6 +321,7 @@ let merge (p : pair) : t =
     | Some i1, Some i2 -> if State.eq i1 i2 then Some i1 else None
     | _, _ -> None
   in
+  let terminals = States.union m1.terminals m2.terminals in
   let alphabet = Alphabet.union m1.alphabet m2.alphabet in
   let states = States.union m1.states m2.states in
   let edges = Model.merge_edges m1.edges m2.edges in
@@ -333,6 +330,7 @@ let merge (p : pair) : t =
     | Some i1, Some i2 ->
       Some
         (Model.Info.merge
+           ~num_terminals:(States.cardinal terminals)
            ~num_labels:(Alphabet.cardinal alphabet)
            ~num_states:(States.cardinal states)
            ~num_edges:(Model.get_num_edges edges)
@@ -340,7 +338,7 @@ let merge (p : pair) : t =
            i2)
     | _, _ -> None
   in
-  { init; alphabet; states; edges; info }
+  { init; terminals; alphabet; states; edges; info }
 ;;
 
 (*********************************************************************)
@@ -361,12 +359,14 @@ let to_string
     else "", ""
   in
   let num_alpha_str = Printf.sprintf "(%i) " (Alphabet.cardinal m.alphabet) in
+  let num_terms_str = Printf.sprintf "(%i) " (States.cardinal m.terminals) in
   let num_states_str = Printf.sprintf "(%i) " (States.cardinal m.states) in
   let num_edges_str = Printf.sprintf "(%i) " (get_num_edges m.edges) in
   Printf.sprintf
     "\n\
      %s%s{ initial state: %s\n\
      %sinfo: %s\n\
+     %sterminals: %s%s\n\
      %salphabet: %s%s\n\
      %sstates: %s%s\n\
      %sedges: %s%s\n\
@@ -376,6 +376,9 @@ let to_string
     (pstr_state_opt ~indents:(indents + 1) m.init)
     sep
     (pstr_info_opt ~indents:(indents + 1) m.info)
+    sep
+    num_terms_str
+    (pstr_states ~skip_leading_tab:true ~indents:(indents + 1) m.terminals)
     sep
     num_alpha_str
     (pstr_alphabet ~skip_leading_tab:true ~indents:(indents + 1) m.alphabet)

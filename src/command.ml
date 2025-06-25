@@ -561,6 +561,7 @@ module type GraphB = sig
   type lts_graph =
     { to_visit : E.t Queue.t
     ; init : E.t
+    ; terminals : S.t
     ; states : S.t
     ; transitions : constr_transitions H.t
     ; cindefs : (E.t * cindef) list
@@ -690,6 +691,7 @@ module MkGraph
   type lts_graph =
     { to_visit : E.t Queue.t
     ; init : E.t
+    ; terminals : S.t
     ; states : S.t
     ; transitions : constr_transitions H.t
     ; cindefs : (E.t * cindef) list
@@ -1136,8 +1138,9 @@ module MkGraph
         the_primary_lts
         cindef_map
         { to_visit = q
-        ; states = S.empty
         ; init = encoded_init
+        ; terminals = S.empty
+        ; states = S.empty
         ; transitions = H.create 0
         ; cindefs =
             B.fold
@@ -1148,7 +1151,10 @@ module MkGraph
         }
         bound
     in
-    return g
+    let terminals =
+      S.filter (fun (s : S.elt) -> Bool.not (H.mem g.transitions s)) g.states
+    in
+    return { g with terminals }
   ;;
 
   let decoq_enc ?(cache_decoding : bool = false) (s_enc : E.t)
@@ -1180,13 +1186,16 @@ module MkGraph
   let decoq_states ?(cache_decoding : bool = false) (ss : S.t)
     : Model.States.t mm
     =
-    let raw_ss = S.to_list ss in
-    let iter_body (i : int) (acc : Model.States.t) : Model.States.t mm =
-      let state_enc = List.nth raw_ss i in
-      let* state = decoq_state ~cache_decoding state_enc in
-      return (Model.States.add state acc)
-    in
-    iterate 0 (List.length raw_ss - 1) Model.States.empty iter_body
+    if S.is_empty ss
+    then return Model.States.empty
+    else (
+      let raw_ss = S.to_list ss in
+      let iter_body (i : int) (acc : Model.States.t) : Model.States.t mm =
+        let state_enc = List.nth raw_ss i in
+        let* state = decoq_state ~cache_decoding state_enc in
+        return (Model.States.add state acc)
+      in
+      iterate 0 (List.length raw_ss - 1) Model.States.empty iter_body)
   ;;
 
   let decoq_action ?(cache_decoding : bool = false) (a : Model.Action.t)
@@ -1207,46 +1216,49 @@ module MkGraph
         (dests : D.t)
     : Model.Transitions.t mm
     =
-    let raw_dests = D.to_list dests in
-    let iter_dests (i : int) (acc_trans : Model.Transitions.t)
-      : Model.Transitions.t mm
-      =
-      let dest, constr_tree = List.nth raw_dests i in
-      let* dest = decoq_state ~cache_decoding dest in
-      (* let num_trans = Model.Transitions.cardinal acc_trans in *)
-      let new_trans = from, action.label, dest, Some action.meta in
-      let acc_trans = Model.Transitions.add new_trans acc_trans in
-      (* let num_trans' = Model.Transitions.cardinal acc_trans in
-         if Int.equal num_trans num_trans'
-         then
-         Log.warning
-         (Printf.sprintf
-         "decoq_destinations, transition not added (%i // %i)\n\
-         from: %s\n\
-         action: %s\n\
-         dest: %s\n\n\
-         exists?: %b\n\
-         compare?: %i\n\
-         acc_trans: %s"
-         num_trans
-         num_trans'
-         (Model.State.pstr from)
-         (Model.Action.pstr action)
-         (Model.State.pstr dest)
-         (Model.Transitions.exists
-         (fun tr -> Model.Transition.eq tr new_trans)
-         acc_trans)
-         (Model.Transitions.fold
-         (fun tr acc ->
-         if Int.equal acc 5
-         then Model.Transition.compare tr new_trans
-         else acc)
-         acc_trans
-         5)
-         (Model.pstr_transitions acc_trans)); *)
-      return acc_trans
-    in
-    iterate 0 (List.length raw_dests - 1) acc_trans iter_dests
+    if D.is_empty dests
+    then return Model.Transitions.empty
+    else (
+      let raw_dests = D.to_list dests in
+      let iter_dests (i : int) (acc_trans : Model.Transitions.t)
+        : Model.Transitions.t mm
+        =
+        let dest, constr_tree = List.nth raw_dests i in
+        let* dest = decoq_state ~cache_decoding dest in
+        (* let num_trans = Model.Transitions.cardinal acc_trans in *)
+        let new_trans = from, action.label, dest, Some action.meta in
+        let acc_trans = Model.Transitions.add new_trans acc_trans in
+        (* let num_trans' = Model.Transitions.cardinal acc_trans in
+           if Int.equal num_trans num_trans'
+           then
+           Log.warning
+           (Printf.sprintf
+           "decoq_destinations, transition not added (%i // %i)\n\
+           from: %s\n\
+           action: %s\n\
+           dest: %s\n\n\
+           exists?: %b\n\
+           compare?: %i\n\
+           acc_trans: %s"
+           num_trans
+           num_trans'
+           (Model.State.pstr from)
+           (Model.Action.pstr action)
+           (Model.State.pstr dest)
+           (Model.Transitions.exists
+           (fun tr -> Model.Transition.eq tr new_trans)
+           acc_trans)
+           (Model.Transitions.fold
+           (fun tr acc ->
+           if Int.equal acc 5
+           then Model.Transition.compare tr new_trans
+           else acc)
+           acc_trans
+           5)
+           (Model.pstr_transitions acc_trans)); *)
+        return acc_trans
+      in
+      iterate 0 (List.length raw_dests - 1) acc_trans iter_dests)
   ;;
 
   let decoq_actions
@@ -1256,21 +1268,24 @@ module MkGraph
         (actions : constr_transitions)
     : (Model.Alphabet.t * Model.Transitions.t) mm
     =
-    let raw_actions = List.of_seq (Hashtbl.to_seq actions) in
-    let iter_actions
-          (i : int)
-          ((acc_alpha, acc_trans) : Model.Alphabet.t * Model.Transitions.t)
-      : (Model.Alphabet.t * Model.Transitions.t) mm
-      =
-      let action, dests = List.nth raw_actions i in
-      let* action = decoq_action ~cache_decoding action in
-      let acc_alpha = Model.Alphabet.add action.label acc_alpha in
-      let* acc_trans =
-        decoq_destinations ~cache_decoding acc_trans from action dests
+    if Int.equal 0 (Hashtbl.length actions)
+    then return (Model.Alphabet.empty, Model.Transitions.empty)
+    else (
+      let raw_actions = List.of_seq (Hashtbl.to_seq actions) in
+      let iter_actions
+            (i : int)
+            ((acc_alpha, acc_trans) : Model.Alphabet.t * Model.Transitions.t)
+        : (Model.Alphabet.t * Model.Transitions.t) mm
+        =
+        let action, dests = List.nth raw_actions i in
+        let* action = decoq_action ~cache_decoding action in
+        let acc_alpha = Model.Alphabet.add action.label acc_alpha in
+        let* acc_trans =
+          decoq_destinations ~cache_decoding acc_trans from action dests
+        in
+        return (acc_alpha, acc_trans)
       in
-      return (acc_alpha, acc_trans)
-    in
-    iterate 0 (List.length raw_actions - 1) acc iter_actions
+      iterate 0 (List.length raw_actions - 1) acc iter_actions)
   ;;
 
   let decoq_transitions
@@ -1278,37 +1293,43 @@ module MkGraph
         (transitions : constr_transitions H.t)
     : (Model.Alphabet.t * Model.Transitions.t) mm
     =
-    let raw_transitions = List.of_seq (H.to_seq transitions) in
-    let iter_from (i : int) (acc : Model.Alphabet.t * Model.Transitions.t)
-      : (Model.Alphabet.t * Model.Transitions.t) mm
-      =
-      let from, actions = List.nth raw_transitions i in
-      let* from = decoq_state ~cache_decoding from in
-      decoq_actions ~cache_decoding acc from actions
-    in
-    iterate
-      0
-      (List.length raw_transitions - 1)
-      (Model.Alphabet.empty, Model.Transitions.empty)
-      iter_from
+    if Int.equal 0 (H.length transitions)
+    then return (Model.Alphabet.empty, Model.Transitions.empty)
+    else (
+      let raw_transitions = List.of_seq (H.to_seq transitions) in
+      let iter_from (i : int) (acc : Model.Alphabet.t * Model.Transitions.t)
+        : (Model.Alphabet.t * Model.Transitions.t) mm
+        =
+        let from, actions = List.nth raw_transitions i in
+        let* from = decoq_state ~cache_decoding from in
+        decoq_actions ~cache_decoding acc from actions
+      in
+      iterate
+        0
+        (List.length raw_transitions - 1)
+        (Model.Alphabet.empty, Model.Transitions.empty)
+        iter_from)
   ;;
 
   let decoq_cindefs (cindefs : (E.t * cindef) list)
     : (E.t * (string * string list)) list mm
     =
-    let iter_body (i : int) (acc : (E.t * (string * string list)) list) =
-      let ((enc, c) : E.t * cindef) = List.nth cindefs i in
-      let def_str : string = econstr_to_string c.info.name in
-      let names_list : string list =
-        Array.fold_left
-          (fun (acc : string list) (name : Names.variable) ->
-            Names.Id.to_string name :: acc)
-          []
-          c.info.constr_names
+    if List.is_empty cindefs
+    then return []
+    else (
+      let iter_body (i : int) (acc : (E.t * (string * string list)) list) =
+        let ((enc, c) : E.t * cindef) = List.nth cindefs i in
+        let def_str : string = econstr_to_string c.info.name in
+        let names_list : string list =
+          Array.fold_left
+            (fun (acc : string list) (name : Names.variable) ->
+              Names.Id.to_string name :: acc)
+            []
+            c.info.constr_names
+        in
+        return ((enc, (def_str, List.rev names_list)) :: acc)
       in
-      return ((enc, (def_str, List.rev names_list)) :: acc)
-    in
-    iterate 0 (List.length cindefs - 1) [] iter_body
+      iterate 0 (List.length cindefs - 1) [] iter_body)
   ;;
 
   let decoq_lts
@@ -1322,6 +1343,7 @@ module MkGraph
        Utils.Logging.Log.warning pstr_lts; *)
     let* init : State.t option = decoq_state_opt ~cache_decoding g.init in
     let* states : Model.States.t = decoq_states ~cache_decoding g.states in
+    let* terminals = decoq_states ~cache_decoding g.terminals in
     let* ((alphabet, transitions) : Model.Alphabet.t * Model.Transitions.t) =
       decoq_transitions ~cache_decoding g.transitions
     in
@@ -1332,13 +1354,14 @@ module MkGraph
       Some
         { is_complete = Queue.is_empty g.to_visit
         ; bound
+        ; num_terminals = S.cardinal g.terminals
         ; num_labels = Model.Alphabet.cardinal alphabet
         ; num_states = S.cardinal g.states
         ; num_edges = num_transitions g.transitions
         ; coq_info = Some cindefs
         }
     in
-    return (Lts.create init alphabet states transitions info)
+    return (Lts.create init terminals alphabet states transitions info)
   ;;
 end
 
