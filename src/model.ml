@@ -1,11 +1,55 @@
 module Info = struct
+  module Coq = struct
+    type t = Mebi_wrapper.E.t * (string * string list)
+
+    let to_string ((enc, (dec, names)) : t) : string =
+      Printf.sprintf
+        "(%s => %s, [%s])"
+        (Mebi_wrapper.E.to_string enc)
+        dec
+        (match names with
+         | [] -> ""
+         | nh :: nt ->
+           if List.is_empty nt
+           then nh
+           else
+             List.fold_left
+               (fun (acc : string) (name : string) ->
+                 Printf.sprintf "%s, %s" acc name)
+               nh
+               nt)
+    ;;
+  end
+
   type t =
     { is_complete : bool
     ; bound : int
     ; num_labels : int
     ; num_states : int
     ; num_edges : int
+    ; coq_info : Coq.t list option
     }
+
+  let merge
+        ?(bound : int = -1)
+        ?(num_labels : int = -1)
+        ?(num_states : int = -1)
+        ?(num_edges : int = -1)
+        (i1 : t)
+        (i2 : t)
+    : t
+    =
+    { is_complete = i1.is_complete && i2.is_complete
+    ; bound
+    ; num_labels
+    ; num_states
+    ; num_edges
+    ; coq_info =
+        (match i1.coq_info, i2.coq_info with
+         | Some c1, Some c2 -> Some c1
+         | _, _ -> None)
+    }
+  ;;
 
   let to_string ?(pstr : bool = false) ?(indents : int = 0) (i : t) : string =
     let outer, sep =
@@ -17,7 +61,7 @@ module Info = struct
     in
     Printf.sprintf
       "%s{| is complete: %b%s; bound: %i%s; num labels: %i%s; num states: \
-       %i%s; num edges: %i%s|}"
+       %i%s; num edges: %i%s; coq info: %s%s|}"
       outer
       i.is_complete
       sep
@@ -28,6 +72,19 @@ module Info = struct
       i.num_states
       sep
       i.num_edges
+      sep
+      (match i.coq_info with
+       | None -> "None"
+       | Some [] -> "[]"
+       | Some (h :: t) ->
+         if List.is_empty t
+         then Coq.to_string h
+         else
+           List.fold_left
+             (fun (acc : string) c_info ->
+               Printf.sprintf "%s, %s" acc (Coq.to_string c_info))
+             (Coq.to_string h)
+             t)
       outer
   ;;
 

@@ -563,6 +563,7 @@ module type GraphB = sig
     ; init : E.t
     ; states : S.t
     ; transitions : constr_transitions H.t
+    ; cindefs : (E.t * cindef) list
     }
 
   val insert_constr_transition
@@ -602,7 +603,7 @@ module type GraphB = sig
     :  ?cache_decoding:bool
     -> ?name:string
     -> int
-    -> lts_graph
+    -> lts_graph (* -> cindef * cindef B.t *)
     -> Lts.t mm
 end
 
@@ -691,6 +692,7 @@ module MkGraph
     ; init : E.t
     ; states : S.t
     ; transitions : constr_transitions H.t
+    ; cindefs : (E.t * cindef) list
     }
 
   let _get_num_transitions (ts : constr_transitions H.t) : int =
@@ -814,7 +816,8 @@ module MkGraph
       (Printf.sprintf
          "\n\
           { init state: %s\n\
-          ; states (%i): [%s\n\
+         \ \n\
+         \          ; states (%i): [%s\n\
           ]\n\
           ; transitions (%i): [%s\n\
           ]\n\
@@ -982,7 +985,6 @@ module MkGraph
         get_new_states ~params ~weak encoded_t g new_constrs
       in
       let g : lts_graph = { g with states = S.union g.states new_states } in
-      (* let* _ = _run_all_checks ~prefix:"build_graph, " g in *)
       build_lts_graph ~params ~weak the_primary_lts rlts_map g bound)
   ;;
 
@@ -1137,6 +1139,12 @@ module MkGraph
         ; states = S.empty
         ; init = encoded_init
         ; transitions = H.create 0
+        ; cindefs =
+            B.fold
+              (fun (_key : E.t) (_val : cindef) (acc : (E.t * cindef) list) ->
+                match _val.kind with LTS _ -> (_key, _val) :: acc | _ -> acc)
+              cindef_map
+              []
         }
         bound
     in
@@ -1285,6 +1293,24 @@ module MkGraph
       iter_from
   ;;
 
+  let decoq_cindefs (cindefs : (E.t * cindef) list)
+    : (E.t * (string * string list)) list mm
+    =
+    let iter_body (i : int) (acc : (E.t * (string * string list)) list) =
+      let ((enc, c) : E.t * cindef) = List.nth cindefs i in
+      let def_str : string = econstr_to_string c.info.name in
+      let names_list : string list =
+        Array.fold_left
+          (fun (acc : string list) (name : Names.variable) ->
+            Names.Id.to_string name :: acc)
+          []
+          c.info.constr_names
+      in
+      return ((enc, (def_str, List.rev names_list)) :: acc)
+    in
+    iterate 0 (List.length cindefs - 1) [] iter_body
+  ;;
+
   let decoq_lts
         ?(cache_decoding : bool = false)
         ?(name : string = "unnamed")
@@ -1299,6 +1325,9 @@ module MkGraph
     let* ((alphabet, transitions) : Model.Alphabet.t * Model.Transitions.t) =
       decoq_transitions ~cache_decoding g.transitions
     in
+    let* cindefs : (E.t * (string * string list)) list =
+      decoq_cindefs g.cindefs
+    in
     let info : Info.t option =
       Some
         { is_complete = Queue.is_empty g.to_visit
@@ -1306,6 +1335,7 @@ module MkGraph
         ; num_labels = Model.Alphabet.cardinal alphabet
         ; num_states = S.cardinal g.states
         ; num_edges = num_transitions g.transitions
+        ; coq_info = Some cindefs
         }
     in
     return (Lts.create init alphabet states transitions info)
