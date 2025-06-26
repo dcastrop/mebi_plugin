@@ -1,5 +1,19 @@
 # todo
 
+## longterm list
+- [ ] develop coq-side API for using plugin
+- [ ] overhaul [Utils.Logging]
+- [ ] make [Mebi_wrapper] a parametric functor (currently just uses [IntEncoding] as [E])
+
+
+## active list
+
+- [ ] tidy up the refactored functions for saturating fsms (currently there is some overlap with a helper function in [model.ml])
+- [ ] experiment with bisimilarity proof by hand
+
+---
+
+
 - [x] investigate refactored bisimilarity algorithm -- each partition should only contain states that are bisimilar (i.e., via the same action they reach a state that is also bisimilar) 
       > fixed this, turns out the annotations were not being correctly merged. now there are far fewer edges, which makes sense. ***however***, currently it looks like there are too many annotations being added. need to fix this
 
