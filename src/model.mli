@@ -100,18 +100,30 @@ module Action : sig
     -> string
 
   val pstr : ?indents:int -> t -> string
-  val annotate : t -> annotation -> unit
 
   exception ActionSilenceIsNone of t
 
   val is_silent : t -> bool
   val has_label : Label.t -> t -> bool
-  val eq : t -> t -> bool
-  val anno_eq : annotation -> annotation -> bool
-  val annos_eq : annotations -> annotations -> bool
-  val compare : t -> t -> int
-  val anno_compare : annotation -> annotation -> int
-  val annos_compare : annotations -> annotations -> int
+  val eq : ?annos:bool -> ?meta:bool -> t -> t -> bool
+  val anno_eq : ?annos:bool -> ?meta:bool -> annotation -> annotation -> bool
+  val annos_eq : ?annos:bool -> ?meta:bool -> annotations -> annotations -> bool
+  val compare : ?annos:bool -> ?meta:bool -> t -> t -> int
+
+  val anno_compare
+    :  ?annos:bool
+    -> ?meta:bool
+    -> annotation
+    -> annotation
+    -> int
+
+  val annos_compare
+    :  ?annos:bool
+    -> ?meta:bool
+    -> annotations
+    -> annotations
+    -> int
+
   val hash : t -> int
 end
 
@@ -393,6 +405,64 @@ module Transitions : sig
   val of_seq : elt Seq.t -> t
 end
 
+module ActionPair : sig
+  type t = Action.t * States.t
+
+  val compare : Action.t * States.t -> Action.t * States.t -> int
+end
+
+module ActionPairs : sig
+  type elt = ActionPair.t
+  type t
+
+  val empty : t
+  val add : elt -> t -> t
+  val singleton : elt -> t
+  val remove : elt -> t -> t
+  val union : t -> t -> t
+  val inter : t -> t -> t
+  val disjoint : t -> t -> bool
+  val diff : t -> t -> t
+  val cardinal : t -> int
+  val elements : t -> elt list
+  val min_elt : t -> elt
+  val min_elt_opt : t -> elt option
+  val max_elt : t -> elt
+  val max_elt_opt : t -> elt option
+  val choose : t -> elt
+  val choose_opt : t -> elt option
+  val find : elt -> t -> elt
+  val find_opt : elt -> t -> elt option
+  val find_first : (elt -> bool) -> t -> elt
+  val find_first_opt : (elt -> bool) -> t -> elt option
+  val find_last : (elt -> bool) -> t -> elt
+  val find_last_opt : (elt -> bool) -> t -> elt option
+  val iter : (elt -> unit) -> t -> unit
+  val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+  val map : (elt -> elt) -> t -> t
+  val filter : (elt -> bool) -> t -> t
+  val filter_map : (elt -> elt option) -> t -> t
+  val partition : (elt -> bool) -> t -> t * t
+  val split : elt -> t -> t * bool * t
+  val is_empty : t -> bool
+  val mem : elt -> t -> bool
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val subset : t -> t -> bool
+  val for_all : (elt -> bool) -> t -> bool
+  val exists : (elt -> bool) -> t -> bool
+  val to_list : t -> elt list
+  val of_list : elt list -> t
+  val to_seq_from : elt -> t -> elt Seq.t
+  val to_seq : t -> elt Seq.t
+  val to_rev_seq : t -> elt Seq.t
+  val add_seq : elt Seq.t -> t -> t
+  val of_seq : elt Seq.t -> t
+end
+
+val merge_action_pairs : ActionPairs.t -> ActionPairs.t -> ActionPairs.t
+val action_pairs_to_list : ActionPairs.t -> ActionPair.t list
+
 type t =
   | LTS of
       (State.t option
@@ -408,8 +478,6 @@ type t =
       * States.t
       * States.t Actions.t Edges.t
       * Info.t option)
-
-type action_pair = Action.t * States.t
 
 val label_to_action
   :  ?meta:Action.MetaData.t option

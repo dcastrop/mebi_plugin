@@ -48,38 +48,53 @@ val add_edges_from_label_list
 
 val get_actions_from : t -> Model.State.t -> Model.States.t Model.Actions.t
 val has_state : t -> Model.State.t -> bool
-val max_revisit_num : int
+val max_visit_num : int
 val can_revisit : Model.State.t -> (Model.State.t, int) Hashtbl.t -> bool
 val log_visit : Model.State.t -> (Model.State.t, int) Hashtbl.t -> unit
 
-val annotate_action
-  :  Model.Action.annotation_pair
-  -> Model.Action.t
-  -> Model.Action.annotation
-  -> Model.Action.t
-
-val opt_silent_action
-  :  Model.Action.t option
-  -> Model.Action.t
-  -> Model.Action.t option
-
 exception CannotSaturateActionsWithUnknownVisibility of Model.Action.t
 
-val get_annotated_actions
-  :  t
-  -> (Model.State.t, int) Hashtbl.t
+val resolve_saturated_action
+  :  ?named:Model.Action.t option
+  -> Model.ActionPairs.t
+  -> Model.State.t
   -> Model.Action.annotation
-  -> Model.States.t
-  -> Model.Action.t option
-  -> Model.Action.t option
-  -> Model.action_pair list
-  -> Model.action_pair list
+  -> Model.ActionPairs.t
 
-val saturate_actions
-  :  t
+val saturate_action_from
+  :  ?named:Model.Action.t option
+  -> Model.ActionPairs.t
+  -> Model.State.t
+  -> Model.Action.annotation
+  -> (Model.State.t, int) Hashtbl.t
+  -> Model.States.t Model.Actions.t Model.Edges.t
+  -> Model.ActionPairs.t
+
+val saturate_dest_actions
+  :  ?named:Model.Action.t option
+  -> Model.ActionPairs.t
+  -> Model.States.t
+  -> Model.Action.annotation
+  -> (Model.State.t, int) Hashtbl.t
+  -> Model.States.t Model.Actions.t Model.Edges.t
+  -> Model.ActionPairs.t
+
+val saturate_actions_from
+  :  ?named:Model.Action.t option
+  -> Model.ActionPairs.t
   -> Model.State.t
   -> Model.States.t Model.Actions.t
-  -> Model.action_pair list
+  -> Model.Action.annotation
+  -> (Model.State.t, int) Hashtbl.t
+  -> Model.States.t Model.Actions.t Model.Edges.t
+  -> Model.ActionPairs.t
+
+val saturate_edges_from
+  :  ?named:Model.Action.t option
+  -> Model.States.t Model.Actions.t Model.Edges.t
+  -> Model.State.t
+  -> Model.States.t Model.Actions.t
+  -> Model.ActionPairs.t
 
 val saturate_edges : t -> Model.States.t Model.Actions.t Model.Edges.t
 val saturate : t -> t
