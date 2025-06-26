@@ -1,3 +1,19 @@
+(** To run tests...
+
+    - First build the project:
+
+    make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile
+
+    - Next, run the tests:
+
+    _build/default/test/tests.exe *)
+let () =
+  let open Saturation in
+  dump "m1" m1;
+  dump "m2" m2;
+  ()
+;;
+
 (* open Mebi_plugin.Fsm
 (* open Mebi_plugin.Bisimilarity *)
 open Mebi_plugin.Utils
