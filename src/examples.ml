@@ -1,6 +1,6 @@
 (** [Examples] contains examples to be used by either [KS90] or [PT87]. *)
 
-type bisim_exa =
+(* type bisim_exa =
   { s : Fsm.t
   ; t : Fsm.t
   ; are_bisimilar : bool
@@ -23,10 +23,87 @@ type example =
 
 let exa (name : string) (kind : exa_kind) : example = { name; kind }
 
-(** [exa_1] is `Example 3.2.5` on page 106. *)
+let exa_1 : example =
+  exa
+    "exa_1"
+    (Saturate
+       { init = Some (Mebi_wrapper.E.of_int 1, None)
+       ; terminals =
+           Model.States.of_list
+             [ Mebi_wrapper.E.of_int 5, None; Mebi_wrapper.E.of_int 6, None ]
+       ; alphabet =
+           Model.Alphabet.of_list
+             [ Mebi_wrapper.E.of_int 7, (Some "a", Some false)
+             ; Mebi_wrapper.E.of_int 8, (Some "b", Some false)
+             ; Mebi_wrapper.E.of_int 9, (Some "t", Some true)
+             ; Mebi_wrapper.E.of_int 10, (Some "c", Some false)
+             ; Mebi_wrapper.E.of_int 11, (Some "d", Some false)
+             ]
+       ; states =
+           Model.States.of_list
+             [ Mebi_wrapper.E.of_int 1, None
+             ; Mebi_wrapper.E.of_int 2, None
+             ; Mebi_wrapper.E.of_int 3, None
+             ; Mebi_wrapper.E.of_int 4, None
+             ; Mebi_wrapper.E.of_int 5, None
+             ; Mebi_wrapper.E.of_int 6, None
+             ]
+       ; edges =
+           Model.transition_list_to_edges
+             [ ( (Mebi_wrapper.E.of_int 1, None)
+               , (Mebi_wrapper.E.of_int 9, (Some "t", Some false))
+               , (Mebi_wrapper.E.of_int 2, None)
+               , None )
+             ; ( (Mebi_wrapper.E.of_int 1, None)
+               , (Mebi_wrapper.E.of_int 7, (Some "a", Some false))
+               , (Mebi_wrapper.E.of_int 3, None)
+               , None )
+             ; ( (Mebi_wrapper.E.of_int 3, None)
+               , (Mebi_wrapper.E.of_int 10, (Some "c", Some false))
+               , (Mebi_wrapper.E.of_int 5, None)
+               , None )
+             ; ( (Mebi_wrapper.E.of_int 2, None)
+               , (Mebi_wrapper.E.of_int 9, (Some "t", Some false))
+               , (Mebi_wrapper.E.of_int 1, None)
+               , None )
+             ; ( (Mebi_wrapper.E.of_int 2, None)
+               , (Mebi_wrapper.E.of_int 8, (Some "b", Some false))
+               , (Mebi_wrapper.E.of_int 4, None)
+               , None )
+             ; ( (Mebi_wrapper.E.of_int 4, None)
+               , (Mebi_wrapper.E.of_int 11, (Some "d", Some false))
+               , (Mebi_wrapper.E.of_int 6, None)
+               , None )
+             ]
+       ; info = None
+       })
+;; *)
+
+(*
+   ( [ "1", [ "a", [ "3" ]; "~", [ "2" ] ] ; "2", [ "b", [ "4" ]; "~", [ "1" ] ] ; "3", [ "c", [ "5" ] ] ; "4", [ "d", [ "6" ] ] ]
+   , None )))
+   in
+   exa "exa_saturated1" (Saturate s)
+   ;; *)
+
+(** [exa_saturated2] ... *)
+(* let exa_saturated2 : example =
+   (* s *)
+   let (s : fsm) =
+   Translate.to_fsm
+   (Lts.Create.lts
+   ~init:"1"
+   (Nested
+   ( [ "1", [ "a", [ "2" ]; "b", [ "3" ]; "~", [ "4" ] ] ; "2", [ "e", [ "6" ] ] ; "3", [ "~", [ "2"; "4" ]; "d", [ "5" ] ] ; "4", [ "c", [ "5" ]; "~", [ "2" ] ] ; "5", [ "g", [ "7" ] ] ; "6", [ "~", [ "2" ]; "f", [ "7" ] ] ] *)
+
+(*
+   (** [exa_1] is `Example 3.2.5` on page 106. *)
 let exa_1 : example =
 
-  let s : Lts.t = 
+  let s : Lts.t = {
+init = Some (1, None)
+; 
+  } in
 
   let (s : Fsm.t) =
     Fsm.create_from (LTS ( ))
@@ -427,4 +504,4 @@ let exa_weak2 : example =
             , None )))
   in
   exa "exa_weak2" (Weak { s; t; are_bisimilar = true })
-;;
+;; *)
