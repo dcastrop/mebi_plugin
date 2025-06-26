@@ -324,7 +324,7 @@ module Action = struct
       (to_string ~pstr:true ~indents t)
   ;;
 
-  let annotate (a : t) (anno : annotation) : unit = a.annos <- anno :: a.annos
+  (* let annotate (a : t) (anno : annotation) : unit = a.annos <- anno :: a.annos *)
 
   exception ActionSilenceIsNone of t
 
@@ -336,54 +336,99 @@ module Action = struct
 
   let has_label (l : Label.t) (a : t) : bool = Label.eq l a.label
 
-  let rec eq (a1 : t) (a2 : t) : bool =
+  let rec eq ?(annos : bool = true) ?(meta : bool = true) (a1 : t) (a2 : t)
+    : bool
+    =
     match a1, a2 with
     | ( { label = v1; meta = m1; annos = a1 }
       , { label = v2; meta = m2; annos = a2 } ) ->
-      Label.eq v1 v2 && MetaData.eq m1 m2 && annos_eq a1 a2
+      Label.eq v1 v2
+      &&
+      if meta
+      then MetaData.eq m1 m2
+      else if annos
+      then annos_eq ~annos ~meta a1 a2
+      else true
 
-  and anno_eq (a1 : annotation) (a2 : annotation) : bool =
+  and anno_eq
+        ?(annos : bool = true)
+        ?(meta : bool = true)
+        (a1 : annotation)
+        (a2 : annotation)
+    : bool
+    =
     match a1, a2 with
     | [], [] -> true
     | [], h :: t -> false
     | h :: t, [] -> false
     | (e1, s1) :: t1, (e2, s2) :: t2 ->
-      State.eq e1 e2 && eq s1 s2 && anno_eq t1 t2
+      State.eq e1 e2 && eq ~annos ~meta s1 s2 && anno_eq ~annos ~meta t1 t2
 
-  and annos_eq (a1 : annotations) (a2 : annotations) : bool =
+  and annos_eq
+        ?(annos : bool = true)
+        ?(meta : bool = true)
+        (a1 : annotations)
+        (a2 : annotations)
+    : bool
+    =
     match a1, a2 with
     | [], [] -> true
     | [], h :: t -> false
     | h :: t, [] -> false
-    | h1 :: t1, h2 :: t2 -> anno_eq h1 h2 && annos_eq t1 t2
+    | h1 :: t1, h2 :: t2 ->
+      anno_eq ~annos ~meta h1 h2 && annos_eq ~annos ~meta t1 t2
   ;;
 
-  let rec compare (a1 : t) (a2 : t) : int =
+  let rec compare ?(annos : bool = true) ?(meta : bool = true) (a1 : t) (a2 : t)
+    : int
+    =
     match a1, a2 with
     | ( { label = v1; meta = m1; annos = a1 }
       , { label = v2; meta = m2; annos = a2 } ) ->
       if Label.eq v1 v2
       then
-        if MetaData.eq m1 m2
-        then if annos_eq a1 a2 then 0 else annos_compare a1 a2
-        else MetaData.compare m1 m2
+        if meta
+        then
+          if MetaData.eq m1 m2
+          then 0
+          else if annos
+          then
+            if annos_eq ~annos ~meta a1 a2
+            then 0
+            else annos_compare ~annos ~meta a1 a2
+          else MetaData.compare m1 m2
+        else Label.compare v1 v2
       else Label.compare v1 v2
 
-  and anno_compare (a1 : annotation) (a2 : annotation) : int =
+  and anno_compare
+        ?(annos : bool = true)
+        ?(meta : bool = true)
+        (a1 : annotation)
+        (a2 : annotation)
+    : int
+    =
     match a1, a2 with
     | [], [] -> 0
     | [], h :: t -> -1
     | h :: t, [] -> 1
     | (e1, s1) :: t1, (e2, s2) :: t2 ->
-      Int.compare (State.compare e1 e2) (compare s1 s2)
+      Int.compare (State.compare e1 e2) (compare ~annos ~meta s1 s2)
 
-  and annos_compare (a1 : annotations) (a2 : annotations) : int =
+  and annos_compare
+        ?(annos : bool = true)
+        ?(meta : bool = true)
+        (a1 : annotations)
+        (a2 : annotations)
+    : int
+    =
     match a1, a2 with
     | [], [] -> 0
     | [], h :: t -> -1
     | h :: t, [] -> 1
     | h1 :: t1, h2 :: t2 ->
-      Int.compare (anno_compare h1 h2) (annos_compare t1 t2)
+      Int.compare
+        (anno_compare ~annos ~meta h1 h2)
+        (annos_compare ~annos ~meta t1 t2)
   ;;
 
   let hash (a : t) : int = match a with { label; _ } -> Label.hash label
@@ -541,6 +586,33 @@ module Transitions = Set.Make (struct
   end)
 
 (*********************************************************************)
+(****** Pairs ********************************************************)
+(*********************************************************************)
+
+module ActionPair = struct
+  type t = Action.t * States.t
+
+  let compare a b =
+    match Action.compare (fst a) (fst b) with
+    | 0 -> States.compare (snd a) (snd b)
+    | n -> n
+  ;;
+end
+
+module ActionPairs = Set.Make (struct
+    type t = ActionPair.t
+
+    let compare a b = ActionPair.compare a b
+  end)
+
+let action_pairs_to_list (aps : ActionPairs.t) : ActionPair.t list =
+  ActionPairs.fold
+    (fun (ap : ActionPair.t) (acc : ActionPair.t list) -> ap :: acc)
+    aps
+    []
+;;
+
+(*********************************************************************)
 (****** Model Kinds **************************************************)
 (*********************************************************************)
 
@@ -563,12 +635,6 @@ type t =
    (string option
    * string option
    * (string * (string * string list) list) list) *)
-
-(*********************************************************************)
-(****** Pairs ********************************************************)
-(*********************************************************************)
-
-type action_pair = Action.t * States.t
 
 (*********************************************************************)
 (****** Labels <-> Actions *******************************************)
@@ -1227,4 +1293,53 @@ let check_info (m : t) : unit =
                info_num
                real_num))
       info_list
+;;
+
+let merge_action_pairs (ap : ActionPairs.t) (bp : ActionPairs.t) : ActionPairs.t
+  =
+  ActionPairs.fold
+    (fun ((b, dests) : ActionPair.t) (acc0 : ActionPairs.t) ->
+      match
+        ActionPairs.fold
+          (fun ((a, dests') : ActionPair.t)
+            ((acc1a, acc1b) : Action.t list * ActionPairs.t) ->
+            if
+              Action.eq ~annos:false ~meta:false b a
+              && States.equal
+                   (States.union dests dests')
+                   (States.inter dests dests')
+            then a :: acc1a, acc1b
+            else acc1a, ActionPairs.add (a, dests') acc1b)
+          acc0
+          ([], ActionPairs.empty)
+      with
+      | [], acc0 ->
+        (* no other matches, add *)
+        Utils.Logging.Log.warning
+          (Printf.sprintf
+             "merge_action_pairs, adding new (%s) "
+             (Action.to_string b));
+        ActionPairs.add (b, dests) acc0
+      | a :: [], acc0 ->
+        (* single match found, merge annotations *)
+        Utils.Logging.Log.warning
+          (Printf.sprintf
+             "merge_action_pairs, merging (%s) with (%s)"
+             (Action.to_string b)
+             (Action.to_string a));
+        ActionPairs.add
+          ({ a with annos = List.append a.annos b.annos }, dests)
+          acc0
+      | multi, acc0 ->
+        (* many matches found *)
+        Utils.Logging.Log.warning
+          (Printf.sprintf
+             "merge_action_pairs, found (%i) action pairs matching named \
+              action (%s).\n\
+              TEMP: dropping dupes and adding as fresh"
+             (List.length multi)
+             (Action.to_string b));
+        ActionPairs.add (b, dests) acc0)
+    bp
+    ap
 ;;

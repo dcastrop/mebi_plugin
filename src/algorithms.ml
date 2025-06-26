@@ -85,20 +85,20 @@ module Bisimilarity = struct
           in
           match s_reachable_blocks, t_reachable_blocks with
           | None, None ->
-            Utils.Logging.Log.warning
-              (Printf.sprintf
-                 "split_block (%s): (%s, None), (%s, None)"
-                 (Action.Label.to_string l)
-                 (State.to_string s)
-                 (State.to_string t));
+            (* Utils.Logging.Log.warning
+               (Printf.sprintf
+               "split_block (%s): (%s, None), (%s, None)"
+               (Action.Label.to_string l)
+               (State.to_string s)
+               (State.to_string t)); *)
             States.add t b1, b2
           | Some s_blocks, Some t_blocks ->
-            Utils.Logging.Log.warning
-              (Printf.sprintf
-                 "split_block (%s): (%s, Some), (%s, Some)"
-                 (Action.Label.to_string l)
-                 (State.to_string s)
-                 (State.to_string t));
+            (* Utils.Logging.Log.warning
+               (Printf.sprintf
+               "split_block (%s): (%s, Some), (%s, Some)"
+               (Action.Label.to_string l)
+               (State.to_string s)
+               (State.to_string t)); *)
             if
               Partition.equal
                 (Partition.inter s_blocks t_blocks)
@@ -106,12 +106,12 @@ module Bisimilarity = struct
             then States.add t b1, b2
             else b1, add_to_block_option t b2
           | _, _ ->
-            Utils.Logging.Log.warning
-              (Printf.sprintf
-                 "split_block (%s): (%s, _), (%s, _)"
-                 (Action.Label.to_string l)
-                 (State.to_string s)
-                 (State.to_string t));
+            (* Utils.Logging.Log.warning
+               (Printf.sprintf
+               "split_block (%s): (%s, _), (%s, _)"
+               (Action.Label.to_string l)
+               (State.to_string s)
+               (State.to_string t)); *)
             b1, add_to_block_option t b2))
       block
       (States.empty, None)
