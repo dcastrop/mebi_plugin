@@ -832,42 +832,6 @@ Definition compose (s:system) : composition :=
   end.
 
 (*************************************************************************)
-(**** Proof Utils ********************************************************)
-(*************************************************************************)
-
-(** Thank you paulo for the tip! -- (see below, reworded by Jonah)
-      A lemma/property can be used to help tell
-      Coq how to unify existential variables. *)
-Lemma STEP_ACT_helper:
-  forall a e x y z,
-  x = (ACT a, e) ->
-  y = get_action a e ->
-  z = do_act a e ->
-  x --<{y}>--> z.
-Proof.
-  intros; subst.
-  constructor.
-Qed.
-
-Inductive step_transitive_closure : tm * env -> Prop :=
-| trans_step : forall t a t' e' e,
-    (t, e) --<{ a }>--> (t', e') ->
-    step_transitive_closure (t', e') ->
-    step_transitive_closure (t, e)
-
-| no_step : forall t e, step_transitive_closure (t, e)
-.
-
-Inductive lts_transitive_closure : sys * resource -> Prop :=
-| trans_lts : forall t a t' e' e,
-    (t, e) ==<{ a }>==> (t', e') ->
-    lts_transitive_closure (t', e') ->
-    lts_transitive_closure (t, e)
-
-| no_lts : forall t e, lts_transitive_closure (t, e)
-.
-
-(*************************************************************************)
 (**** Tests: Lock ********************************************************)
 (*************************************************************************)
 
@@ -1250,6 +1214,94 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 (***************************)
 Example g1 : sys * resource := compose (create 1 P).
 (* MeBi Dump "g1_noglue" LTS Bounded 37 Of g1 Using lts step. *)
+
+
+(*************************************************************************)
+(**** Proof Utils ********************************************************)
+(*************************************************************************)
+
+(** Thank you paulo for the tip! -- (see below, reworded by Jonah)
+      A lemma/property can be used to help tell
+      Coq how to unify existential variables. *)
+Lemma STEP_ACT_helper:
+  forall a e x y z,
+  x = (ACT a, e) ->
+  y = get_action a e ->
+  z = do_act a e ->
+  x --<{y}>--> z.
+Proof.
+  intros; subst.
+  constructor.
+Qed.
+
+Inductive step_transitive_closure : tm * env -> Prop :=
+| trans_step : forall t a t' e' e,
+    step (t, e) a (t', e') ->
+    step_transitive_closure (t', e') ->
+    step_transitive_closure (t, e)
+
+| no_step : forall t e, step_transitive_closure (t, e)
+.
+
+Inductive lts_transitive_closure : sys * resource -> Prop :=
+| trans_lts : forall t a t' e' e,
+    lts (t, e) a (t', e') ->
+    lts_transitive_closure (t', e') ->
+    lts_transitive_closure (t, e)
+
+| no_lts : forall t e, lts_transitive_closure (t, e)
+.
+
+Inductive bigstep_transitive_closure : sys * resource -> Prop :=
+| trans_lts : forall t a t' e' e,
+    bigstep (t, e) a (t', e') ->
+    bigstep_transitive_closure (t', e') ->
+    bigstep_transitive_closure (t, e)
+
+| no_lts : forall t e, bigstep_transitive_closure (t, e)
+.
+
+(*********************************)
+(**** Manual Bisimilarity Proof **)
+(*********************************)
+
+
+(* Fixpoint weak_transition (p : sys * resource) (m : action) : Prop :=
+  forall (n : action) (p' : sys * resource),
+  lts p n p' ->
+  ( m = n -> p')
+  ( m = SILENT -> weak_transition p' ) /\
+  ( m <> SILENT -> ) *)
+
+
+(* Fixpoint weak_bisimilar_semantics 
+  (p : sys * resource) 
+  (q : sys * resource) : Prop 
+  := 
+  ( forall (m : action) (p' : sys * resource),
+    lts p m p' ->
+    exists (q' : sys * resource), 
+    lts q m q' /\ weak_bisimilar_semantics p' q'
+  ) \/ 
+  ( forall (p' : sys * resource),
+    lts p SILENT p' ->
+
+  )
+
+
+  exists (n : action) (q' : sys * resource), 
+  lts q n q' -> (
+    (m = n /\ weak_bisimilar_semantics bp ap w ) \/ 
+    (m = w /\ weak_bisimilar_semantics )
+  )
+
+
+
+Lemma glued_bisim : forall (a : action) (p : sys * resource),
+  g1  *)
+
+
+
 
 
 (* MeBi Show LTS Bounded 5 Of g1 Using bigstep lts step.

@@ -1485,11 +1485,11 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
       graph_lts
   in
   match r with
-  | LTS ((f, b, t), w), l ->
-    let* the_lts = build_lts_graph ~weak:w f b t l in
+  | LTS (((f, b, t), w), primary_lts), l ->
+    let* the_lts = build_lts_graph ~primary_lts ~weak:w f b t l in
     handle_output o (LTS the_lts)
-  | FSM ((f, b, t), w), l ->
-    let* the_lts = build_lts_graph ~weak:w f b t l in
+  | FSM (((f, b, t), w), primary_lts), l ->
+    let* the_lts = build_lts_graph ~primary_lts ~weak:w f b t l in
     let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
     handle_output o (FSM the_fsm)
   | Minim ((f, b, t), w), l ->
