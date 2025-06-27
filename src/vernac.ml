@@ -29,8 +29,8 @@ type lts_params = term_params * weak_params option
 type multi_lts_params = lts_params * Libnames.qualid
 
 type run_kind =
-  | LTS of lts_params
-  | FSM of lts_params
+  | LTS of lts_params * Libnames.qualid option
+  | FSM of lts_params * Libnames.qualid option
   | Minim of lts_params
   | Merge of (multi_lts_params * multi_lts_params)
   | Bisim of (multi_lts_params * multi_lts_params)

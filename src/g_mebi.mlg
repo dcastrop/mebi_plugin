@@ -99,77 +99,151 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 
 (* LTS -- no silent actions *)
 | [ "MeBi" "Check" "LTS" "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS ((false, Command.default_bound, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((false, Command.default_bound, t), None), None), r))}
 
 | [ "MeBi" "Check" "LTS" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS ((false, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((false, i, t), None), None), r))}
 
 | [ "MeBi" "Check" "LTS" "Is" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS ((true, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((true, i, t), None), None), r))}
 
 | [ "MeBi" "Show" "LTS" "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS ((false, Command.default_bound, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (((false, Command.default_bound, t), None), None), r))}
 
 | [ "MeBi" "Show" "LTS" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS ((false, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (((false, i, t), None), None), r))}
 
 | [ "MeBi" "Show" "LTS" "Is" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS ((true, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (((true, i, t), None), None), r))}
 
 | [ "MeBi" "Dump" "LTS" "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS ((false, Command.default_bound, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (((false, Command.default_bound, t), None), None), r))}
 
 | [ "MeBi" "Dump" "LTS" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS ((false, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (((false, i, t), None), None), r))}
 
 | [ "MeBi" "Dump" "LTS" "Is" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS ((true, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (((true, i, t), None), None), r))}
 
 | [ "MeBi" "Dump" string(n) "LTS" "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS ((false, Command.default_bound, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (((false, Command.default_bound, t), None), None), r))}
 
 | [ "MeBi" "Dump" string(n) "LTS" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS ((false, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (((false, i, t), None), None), r))}
 
 | [ "MeBi" "Dump" string(n) "LTS" "Is" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS ((true, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (((true, i, t), None), None), r))}
 
 (* LTS -- with silent actions *)
 | [ "MeBi" "Check" "LTS" "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS ((false, Command.default_bound, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((false, Command.default_bound, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Check" "LTS" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS ((false, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((false, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Check" "LTS" "Is" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS ((true, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((true, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Show" "LTS" "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS ((false, Command.default_bound, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (((false, Command.default_bound, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Show" "LTS" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS ((false, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (((false, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Show" "LTS" "Is" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS ((true, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (((true, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Dump" "LTS" "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS ((false, Command.default_bound, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (((false, Command.default_bound, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Dump" "LTS" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS ((false, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (((false, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Dump" "LTS" "Is" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS ((true, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (((true, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Dump" string(n) "LTS" "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS ((false, Command.default_bound, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (((false, Command.default_bound, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Dump" string(n) "LTS" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS ((false, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (((false, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Dump" string(n) "LTS" "Is" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS ((true, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (((true, i, t), Some (a, w)), None), r))}
+
+(* LTS -- no silent actions -- explicit lts *)
+| [ "MeBi" "Check" "LTS" "Of" constr(t) "With" reference (l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((false, Command.default_bound, t), None), Some l), r))}
+
+| [ "MeBi" "Check" "LTS" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((false, i, t), None), Some l), r))}
+
+| [ "MeBi" "Check" "LTS" "Is" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((true, i, t), None), Some l), r))}
+
+| [ "MeBi" "Show" "LTS" "Of" constr(t) "With" reference (l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (((false, Command.default_bound, t), None), Some l), r))}
+
+| [ "MeBi" "Show" "LTS" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (((false, i, t), None), Some l), r))}
+
+| [ "MeBi" "Show" "LTS" "Is" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (((true, i, t), None), Some l), r))}
+
+| [ "MeBi" "Dump" "LTS" "Of" constr(t) "With" reference (l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (((false, Command.default_bound, t), None), Some l), r))}
+
+| [ "MeBi" "Dump" "LTS" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (((false, i, t), None), Some l), r))}
+
+| [ "MeBi" "Dump" "LTS" "Is" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (((true, i, t), None), Some l), r))}
+
+| [ "MeBi" "Dump" string(n) "LTS" "Of" constr(t) "With" reference (l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (((false, Command.default_bound, t), None), Some l), r))}
+
+| [ "MeBi" "Dump" string(n) "LTS" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (((false, i, t), None), Some l), r))}
+
+| [ "MeBi" "Dump" string(n) "LTS" "Is" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (((true, i, t), None), Some l), r))}
+
+(* LTS -- with silent actions -- explicit lts *)
+| [ "MeBi" "Check" "LTS" "Of" constr(t) "With" reference (l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((false, Command.default_bound, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Check" "LTS" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((false, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Check" "LTS" "Is" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((true, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Show" "LTS" "Of" constr(t) "With" reference (l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (((false, Command.default_bound, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Show" "LTS" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (((false, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Show" "LTS" "Is" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.LTS (((true, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Dump" "LTS" "Of" constr(t) "With" reference (l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (((false, Command.default_bound, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Dump" "LTS" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (((false, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Dump" "LTS" "Is" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.LTS (((true, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Dump" string(n) "LTS" "Of" constr(t) "With" reference (l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (((false, Command.default_bound, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Dump" string(n) "LTS" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (((false, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Dump" string(n) "LTS" "Is" "Bounded" int(i) "Of" constr(t) "With" reference (l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.LTS (((true, i, t), Some (a, w)), Some l), r))}
 
 (******************************)
 (** Build FSM from coq term ***) (* same as the above but with [Vernac.FSM] *)
@@ -177,77 +251,151 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 
 (* FSM -- no silent actions *)
 | [ "MeBi" "Check" "FSM" "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM ((false, Command.default_bound, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM (((false, Command.default_bound, t), None), None), r))}
 
 | [ "MeBi" "Check" "FSM" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM ((false, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM (((false, i, t), None), None), r))}
 
 | [ "MeBi" "Check" "FSM" "Is" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM ((true, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM (((true, i, t), None), None), r))}
 
 | [ "MeBi" "Show" "FSM" "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM ((false, Command.default_bound, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (((false, Command.default_bound, t), None), None), r))}
 
 | [ "MeBi" "Show" "FSM" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM ((false, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (((false, i, t), None), None), r))}
 
 | [ "MeBi" "Show" "FSM" "Is" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM ((true, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (((true, i, t), None), None), r))}
 
 | [ "MeBi" "Dump" "FSM" "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM ((false, Command.default_bound, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (((false, Command.default_bound, t), None), None), r))}
 
 | [ "MeBi" "Dump" "FSM" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM ((false, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (((false, i, t), None), None), r))}
 
 | [ "MeBi" "Dump" "FSM" "Is" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM ((true, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (((true, i, t), None), None), r))}
 
 | [ "MeBi" "Dump" string(n) "FSM" "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM ((false, Command.default_bound, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (((false, Command.default_bound, t), None), None), r))}
 
 | [ "MeBi" "Dump" string(n) "FSM" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM ((false, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (((false, i, t), None), None), r))}
 
 | [ "MeBi" "Dump" string(n) "FSM" "Is" "Bounded" int(i) "Of" constr(t) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM ((true, i, t), None), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (((true, i, t), None), None), r))}
 
 (* FSM -- with silent actions *)
 | [ "MeBi" "Check" "FSM" "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM ((false, Command.default_bound, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM (((false, Command.default_bound, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Check" "FSM" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM ((false, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM (((false, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Check" "FSM" "Is" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM ((true, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM (((true, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Show" "FSM" "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM ((false, Command.default_bound, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (((false, Command.default_bound, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Show" "FSM" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM ((false, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (((false, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Show" "FSM" "Is" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM ((true, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (((true, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Dump" "FSM" "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM ((false, Command.default_bound, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (((false, Command.default_bound, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Dump" "FSM" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM ((false, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (((false, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Dump" "FSM" "Is" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM ((true, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (((true, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Dump" string(n) "FSM" "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM ((false, Command.default_bound, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (((false, Command.default_bound, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Dump" string(n) "FSM" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM ((false, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (((false, i, t), Some (a, w)), None), r))}
 
 | [ "MeBi" "Dump" string(n) "FSM" "Is" "Bounded" int(i) "Of" constr(t) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
-    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM ((true, i, t), Some (a, w)), r))}
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (((true, i, t), Some (a, w)), None), r))}
+
+(* FSM -- no silent actions -- explicit lts *)
+| [ "MeBi" "Check" "FSM" "Of" constr(t) "With" reference(l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM (((false, Command.default_bound, t), None), Some l), r))}
+
+| [ "MeBi" "Check" "FSM" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM (((false, i, t), None), Some l), r))}
+
+| [ "MeBi" "Check" "FSM" "Is" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM (((true, i, t), None), Some l), r))}
+
+| [ "MeBi" "Show" "FSM" "Of" constr(t) "With" reference(l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (((false, Command.default_bound, t), None), Some l), r))}
+
+| [ "MeBi" "Show" "FSM" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (((false, i, t), None), Some l), r))}
+
+| [ "MeBi" "Show" "FSM" "Is" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (((true, i, t), None), Some l), r))}
+
+| [ "MeBi" "Dump" "FSM" "Of" constr(t) "With" reference(l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (((false, Command.default_bound, t), None), Some l), r))}
+
+| [ "MeBi" "Dump" "FSM" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (((false, i, t), None), Some l), r))}
+
+| [ "MeBi" "Dump" "FSM" "Is" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (((true, i, t), None), Some l), r))}
+
+| [ "MeBi" "Dump" string(n) "FSM" "Of" constr(t) "With" reference(l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (((false, Command.default_bound, t), None), Some l), r))}
+
+| [ "MeBi" "Dump" string(n) "FSM" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (((false, i, t), None), Some l), r))}
+
+| [ "MeBi" "Dump" string(n) "FSM" "Is" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (((true, i, t), None), Some l), r))}
+
+(* FSM -- with silent actions -- explicit lts *)
+| [ "MeBi" "Check" "FSM" "Of" constr(t) "With" reference(l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM (((false, Command.default_bound, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Check" "FSM" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM (((false, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Check" "FSM" "Is" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.FSM (((true, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Show" "FSM" "Of" constr(t) "With" reference(l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (((false, Command.default_bound, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Show" "FSM" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (((false, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Show" "FSM" "Is" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Show ()) (Vernac.FSM (((true, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Dump" "FSM" "Of" constr(t) "With" reference(l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (((false, Command.default_bound, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Dump" "FSM" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (((false, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Dump" "FSM" "Is" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump None) (Vernac.FSM (((true, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Dump" string(n) "FSM" "Of" constr(t) "With" reference(l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (((false, Command.default_bound, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Dump" string(n) "FSM" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (((false, i, t), Some (a, w)), Some l), r))}
+
+| [ "MeBi" "Dump" string(n) "FSM" "Is" "Bounded" int(i) "Of" constr(t) "With" reference(l) "Weak" constr(a) "Of" reference(w) "Using" reference_list(r) ] ->
+    {Mebi_wrapper.run (Command.vernac (Vernac.Dump (Some n)) (Vernac.FSM (((true, i, t), Some (a, w)), Some l), r))}
 
 (******************************)
 (** Run Minim Algorithm on ****)
