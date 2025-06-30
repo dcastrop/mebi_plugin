@@ -1253,12 +1253,12 @@ Inductive lts_transitive_closure : sys * resource -> Prop :=
 .
 
 Inductive bigstep_transitive_closure : sys * resource -> Prop :=
-| trans_lts : forall t a t' e' e,
+| trans_bigstep : forall t a t' e' e,
     bigstep (t, e) a (t', e') ->
     bigstep_transitive_closure (t', e') ->
     bigstep_transitive_closure (t, e)
 
-| no_lts : forall t e, bigstep_transitive_closure (t, e)
+| no_bigstep : forall t e, bigstep_transitive_closure (t, e)
 .
 
 (*********************************)
