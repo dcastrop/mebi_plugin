@@ -2,9 +2,57 @@ Require Import MEBI.Examples.CADP.
 
 (* https://rocq-prover.org/doc/v8.9/stdlib/Coq.Relations.Relation_Operators.html *)
 Require Import Relation_Definitions.
+Require Import Relation_Operators.
 (* Variable R1 : relation M. *)
 
 Set Primitive Projections.
+
+Section Definitions.
+  Context (M : Type) (A : Type).
+  Definition LTS : Type := M -> option A -> M -> Prop.
+  (* tau-labelled transition *)
+  Definition tau (R : LTS) : relation M := fun x y => R x None y.
+End Definitions.
+Arguments tau {M A} R.
+
+Section WeakTrans.
+  Context {M : Type} {A : Type} (lts : LTS M A).
+
+  (* trace of tau-labelled transitions *)
+  Definition silent : relation M := clos_refl_trans_1n M (tau lts).
+  Definition silent1 : relation M := clos_trans_1n M (tau lts).
+
+  (*  x ==> pre_str ->^a post_str ==> y *)
+  Record weak_tr (x z : M) a (t y : M) : Prop :=
+    Pack_weak { pre : silent x z; str : lts z a t; post : silent t y }.
+  Definition weak (x : M) a (y : M) : Prop :=
+    exists z t, weak_tr x z a t y.
+End WeakTrans.
+
+Section WeakSim.
+  Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
+
+  Record simF G m1 n1 :=
+    Pack_sim
+      { sim_weak : forall m2 a,
+          weak ltsM m1 (Some a) m2 ->
+          exists n2, weak ltsN n1 (Some a) n2 /\ G m2 n2;
+        sim_tau : forall m2,
+          (*  weak ltsM m1 None m2 -> *)
+          silent1 ltsM m1 m2 ->
+          exists n2, silent ltsN n1 n2 /\ G m2 n2;
+      }.
+
+  CoInductive weak_sim (s : M) (t : N) : Prop
+    := In_sim { out_sim :  simF weak_sim s t }.
+End WeakSim.
+
+Section WeakBisim.
+  Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
+
+  Definition weak_bisim (s : M) (t : N) : Prop
+    := weak_sim ltsM ltsN s t /\ weak_sim ltsN ltsM t s.
+End WeakBisim.
 
 Section Definitions.
   Context
