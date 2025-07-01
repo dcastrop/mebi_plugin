@@ -772,9 +772,11 @@ Inductive sys : Type :=
   | PAR : sys -> sys -> sys
   .
 
+Definition composition : Type := sys * resource.
+
 Reserved Notation "t '==<{' a '}>==>' t'" (at level 40).
 
-Inductive lts : sys * resource -> action -> sys * resource -> Prop :=
+Inductive lts : composition -> action -> composition -> Prop :=
 | LTS_PRC : forall a t1 t2 s1 s2 r1 r2,
   (t1, (s1, r1)) --<{a}>--> (t2, (s2, r2)) ->
   (PRC t1 s1, r1) ==<{a}>==> (PRC t2 s2, r2)
@@ -825,7 +827,6 @@ Fixpoint load (ps:list process) : sys :=
     end
   end.
 
-Definition composition : Type := sys * resource.
 Definition compose (s:system) : composition :=
   match s with
   | (ps, r) => (load ps, r)
@@ -839,7 +840,7 @@ Definition compose (s:system) : composition :=
 (**** FETCH_AND_STORE ****)
 (*************************)
 
-Example Lock_FaS_1 : sys * resource :=
+Example Lock_FaS_1 : composition :=
   compose (create 2 (
       REC_DEF 0 (
         SEQ (ACT FETCH_AND_STORE) (
@@ -850,7 +851,7 @@ Example Lock_FaS_1 : sys * resource :=
   )).
 (* MeBi Dump "Lock_FaS_1" LTS Bounded 16384 Of Lock_FaS_1 Using lts step. *)
 
-Example Lock_FaS_2 : sys * resource :=
+Example Lock_FaS_2 : composition :=
   compose (create 2 (
       REC_DEF 0 (
         SEQ (ACT FETCH_AND_STORE) (
@@ -874,7 +875,7 @@ Example Lock_FaS_2 : sys * resource :=
 (**** FETCH_AND_STORE & COMPARE_AND_SWAP ***)
 (*******************************************)
 
-Example Lock_CaS_1 : sys * resource :=
+Example Lock_CaS_1 : composition :=
   compose (create 2 (
       REC_DEF 0 (
         SEQ (ACT COMPARE_AND_SWAP) (
@@ -890,7 +891,7 @@ Example Lock_CaS_1 : sys * resource :=
   )).
 (* MeBi Dump "Lock_CaS_1" LTS Bounded 16384 Of Lock_CaS_1 Using lts step. *)
 
-(* Example Lock_CaS_2 : sys * resource :=
+(* Example Lock_CaS_2 : composition :=
   compose (create 2 (
       REC_DEF 0 (
         SEQ (ACT COMPARE_AND_SWAP) (
@@ -913,7 +914,7 @@ MeBi Dump "Lock_CaS_2" LTS Bounded 16384 Of Lock_CaS_2 Using lts step. *)
 (* Example Mem_Rn_a : tm := *)
 
 
-(* Example Mem_Rn_a1 : sys * resource := compose (create 1 Mem_Rn_a).
+(* Example Mem_Rn_a1 : composition := compose (create 1 Mem_Rn_a).
 MeBi Dump "Mem_Rn_a1" LTS Bounded 16384 Of Mem_Rn_a1 Using lts step. *)
 
 
@@ -998,7 +999,7 @@ Example p0 : tm * env := (P, Env.initial 1).
 (*************************************************************************)
 
 Definition do_acquire_inner (c:tm) (s:state) (r:resource)
-  : sys * resource
+  : composition
   :=
   let e : env := (s, r) in
   (* REC_DEF 2 *)
@@ -1024,7 +1025,7 @@ Definition do_acquire_inner (c:tm) (s:state) (r:resource)
 
 
 Definition do_acquire (c:tm) (s:state) (r:resource)
-  : sys * resource
+  : composition
   :=
   let e : env := (s, r) in
   (* REC_DEF 0 *)
@@ -1072,7 +1073,7 @@ Definition do_acquire (c:tm) (s:state) (r:resource)
   .
 
 Definition do_release_inner (c:tm) (s:state) (r:resource)
-  : sys * resource
+  : composition
   :=
   let e : env := (s, r) in
   (* REC_DEF 1 *)
@@ -1102,7 +1103,7 @@ Definition do_release_inner (c:tm) (s:state) (r:resource)
   .
 
 Definition do_release (c:tm) (s:state) (r:resource)
-  : sys * resource
+  : composition
   :=
   let e : env := (s, r) in
   (* ACT READ_NEXT *)
@@ -1147,13 +1148,13 @@ Definition do_release (c:tm) (s:state) (r:resource)
 
 
 Definition do_main_loop (b:tm) (s:state) (r:resource)
-  : sys * resource
+  : composition
   :=
   (* REC_DEF 0 *)
   (PRC (unfold (PMainLoopDef, b) b) s, r)
   .
 
-Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
+Inductive bigstep : composition -> action -> composition -> Prop :=
 (*  0 *)
 | DO_MAIN_LOOP : forall b s r,
   bigstep (PRC (REC_DEF PMainLoopDef b) s, r) 
@@ -1212,7 +1213,7 @@ Inductive bigstep : sys * resource -> action -> sys * resource -> Prop :=
 (***************************)
 (**** System size: 1 *******)
 (***************************)
-Example g1 : sys * resource := compose (create 1 P).
+Example g1 : composition := compose (create 1 P).
 (* MeBi Dump "g1_noglue" LTS Bounded 37 Of g1 Using lts step. *)
 
 
@@ -1243,7 +1244,7 @@ Inductive step_transitive_closure : tm * env -> Prop :=
 | no_step : forall t e, step_transitive_closure (t, e)
 .
 
-Inductive lts_transitive_closure : sys * resource -> Prop :=
+Inductive lts_transitive_closure : composition -> Prop :=
 | trans_lts : forall t a t' e' e,
     lts (t, e) a (t', e') ->
     lts_transitive_closure (t', e') ->
@@ -1252,7 +1253,7 @@ Inductive lts_transitive_closure : sys * resource -> Prop :=
 | no_lts : forall t e, lts_transitive_closure (t, e)
 .
 
-Inductive bigstep_transitive_closure : sys * resource -> Prop :=
+Inductive bigstep_transitive_closure : composition -> Prop :=
 | trans_bigstep : forall t a t' e' e,
     bigstep (t, e) a (t', e') ->
     bigstep_transitive_closure (t', e') ->
@@ -1266,8 +1267,8 @@ Inductive bigstep_transitive_closure : sys * resource -> Prop :=
 (*********************************)
 
 
-(* Fixpoint weak_transition (p : sys * resource) (m : action) : Prop :=
-  forall (n : action) (p' : sys * resource),
+(* Fixpoint weak_transition (p : composition) (m : action) : Prop :=
+  forall (n : action) (p' : composition),
   lts p n p' ->
   ( m = n -> p')
   ( m = SILENT -> weak_transition p' ) /\
@@ -1275,21 +1276,21 @@ Inductive bigstep_transitive_closure : sys * resource -> Prop :=
 
 
 (* Fixpoint weak_bisimilar_semantics 
-  (p : sys * resource) 
-  (q : sys * resource) : Prop 
+  (p : composition) 
+  (q : composition) : Prop 
   := 
-  ( forall (m : action) (p' : sys * resource),
+  ( forall (m : action) (p' : composition),
     lts p m p' ->
-    exists (q' : sys * resource), 
+    exists (q' : composition), 
     lts q m q' /\ weak_bisimilar_semantics p' q'
   ) \/ 
-  ( forall (p' : sys * resource),
+  ( forall (p' : composition),
     lts p SILENT p' ->
 
   )
 
 
-  exists (n : action) (q' : sys * resource), 
+  exists (n : action) (q' : composition), 
   lts q n q' -> (
     (m = n /\ weak_bisimilar_semantics bp ap w ) \/ 
     (m = w /\ weak_bisimilar_semantics )
@@ -1297,7 +1298,7 @@ Inductive bigstep_transitive_closure : sys * resource -> Prop :=
 
 
 
-Lemma glued_bisim : forall (a : action) (p : sys * resource),
+Lemma glued_bisim : forall (a : action) (p : composition),
   g1  *)
 
 
@@ -1384,7 +1385,7 @@ MeBi
 (**********************************)
 (**** System size: 2 (identical) **)
 (**********************************)
-Example g2 : sys * resource := compose (create 2 P).
+Example g2 : composition := compose (create 2 P).
 (* MeBi Dump "g2_noglue" LTS Bounded 5000 Of g2 Using lts step. *)
 
 (* MeBi Dump "g2" LTS Bounded 1024 Of g2 Using bigstep lts step. *)
@@ -1395,28 +1396,28 @@ Example g2 : sys * resource := compose (create 2 P).
 (* MeBi Dump "g2" LTS Bounded 65538 Of g2 Using bigstep lts step. *)
 (* MeBi Dump "g2" LTS Bounded 100000 Of g2 Using bigstep lts step. *)
 
-Example g3 : sys * resource := compose (create 3 P).
+Example g3 : composition := compose (create 3 P).
 (* MeBi Dump "g3" LTS Bounded 8192 Of g3 Using bigstep lts step. *)
 
-Example g4 : sys * resource := compose (create 4 P).
+Example g4 : composition := compose (create 4 P).
 (* MeBi Dump "g4" LTS Bounded 8192 Of g4 Using bigstep lts step. *)
 
-Example g5 : sys * resource := compose (create 5 P).
+Example g5 : composition := compose (create 5 P).
 (* MeBi Dump "g5" LTS Bounded 8192 Of g5 Using bigstep lts step. *)
 
-Example g6 : sys * resource := compose (create 6 P).
+Example g6 : composition := compose (create 6 P).
 (* MeBi Dump "g6" LTS Bounded 8192 Of g6 Using bigstep lts step. *)
 
 
-Example g8 : sys * resource := compose (create 8 P).
+Example g8 : composition := compose (create 8 P).
 (* MeBi Dump "g8" LTS Bounded 8192 Of g8 Using bigstep lts step. *)
 
 
 (** below are to test *)
-Example g12 : sys * resource := compose (create 12 P).
+Example g12 : composition := compose (create 12 P).
 (* MeBi Dump "g12" LTS Bounded 8192 Of g12 Using bigstep lts step. *)
 
-Example g16 : sys * resource := compose (create 16 P).
+Example g16 : composition := compose (create 16 P).
 (* MeBi Dump "g16" LTS Bounded 8192 Of g16 Using bigstep lts step. *)
 
 
@@ -1426,14 +1427,14 @@ Example g16 : sys * resource := compose (create 16 P).
 (***************************)
 (***************************)
 
-Example gTest1 : sys * resource :=
+Example gTest1 : composition :=
   (
     (PRC P (State.create 0))
   , Resource.initial 1
   ).
 (* MeBi Dump "gTest1" LTS Bounded 16384 Of gTest1 Using bigstep lts step. *)
 
-Example gTest2 : sys * resource :=
+Example gTest2 : composition :=
   (
     PAR (PRC P (State.create 0))
         (PRC OK (State.create 1))
@@ -1441,7 +1442,7 @@ Example gTest2 : sys * resource :=
   ).
 (* MeBi Dump "gTest2" LTS Bounded 16384 Of gTest2 Using bigstep lts step. *)
 
-Example gTest2b : sys * resource :=
+Example gTest2b : composition :=
   (
     PAR (PRC P (State.create 0))
         (PRC (SEQ OK OK) (State.create 1))
@@ -1449,7 +1450,7 @@ Example gTest2b : sys * resource :=
   ).
 (* MeBi Dump "gTest2b" LTS Bounded 16384 Of gTest2b Using bigstep lts step. *)
 
-Example gTest3 : sys * resource :=
+Example gTest3 : composition :=
   (
     PAR (PRC P (State.create 0))
         (PRC P (State.create 1))
@@ -1461,16 +1462,16 @@ Example gTest3 : sys * resource :=
 (* MeBi Show LTS Bounded 16384 Of g2 Using bigstep lts step. *)
 
 (*
-Example g3 : sys * resource := compose (create 3 P).
+Example g3 : composition := compose (create 3 P).
 MeBi Dump "g3" LTS Bounded 16384 Of g3 Using bigstep lts step.
 
-Example g4 : sys * resource := compose (create 4 P).
+Example g4 : composition := compose (create 4 P).
 MeBi Dump "g4" LTS Bounded 16384 Of g4 Using bigstep lts step.
 
-Example g5 : sys * resource := compose (create 5 P).
+Example g5 : composition := compose (create 5 P).
 MeBi Dump "g5" LTS Bounded 16384 Of g5 Using bigstep lts step.
 
-Example g6 : sys * resource := compose (create 6 P).
+Example g6 : composition := compose (create 6 P).
 MeBi Dump "g6" LTS Bounded 16384 Of g6 Using bigstep lts step. *)
 
 (*************************************************************************)
