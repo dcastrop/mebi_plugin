@@ -23,10 +23,12 @@ End Definitions.
 Lemma sim_refl (M A : Set) (LTS : M -> A -> M -> Prop) (m : M)
   : sim LTS LTS m m.
 Proof.
+  About sim.
   revert m.
   cofix CH.
   intros m.
   constructor.
+  unfold simF. (* not needed, can be omitted *)
   intros m' a tr.
   exists m'.
   split.
@@ -66,6 +68,7 @@ Inductive StreamLTS A : stream A -> A -> stream A -> Prop :=
 Example stream_sim : sim (StreamLTS nat) (StreamLTS nat) zplus1 ones.
   cofix CH.
   constructor.
+  unfold simF.
   intros s' a H. inversion_clear H; subst.
   inversion H0; subst.
   exists ones.

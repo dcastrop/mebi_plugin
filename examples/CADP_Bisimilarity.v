@@ -54,6 +54,124 @@ Section WeakBisim.
     := weak_sim ltsM ltsN s t /\ weak_sim ltsN ltsM t s.
 End WeakBisim.
 
+Module BisimTest1.
+  Inductive action : Type := | TheAction1 | TheAction2.
+
+  Inductive term : Type :=
+    | trec : term
+    | tend : term
+    | tfix : term -> term
+    | tact : action -> term -> term
+    | tpar : action -> action -> term -> term
+    .
+
+  Fixpoint subst (t1 : term) (t2 : term) :=
+    match t2 with
+    | trec => t1
+    | tend => tend
+    | tfix t => tfix t
+    | tact a t => tact a (subst t1 t)
+    | tpar a b t => tpar a b (subst t1 t)
+    end.
+
+  Inductive termLTS : term -> option action -> term -> Prop :=
+    | do_act1 : forall t, termLTS (tact TheAction1 t) 
+                                  (Some TheAction1) 
+                                  t
+    
+    | do_act2 : forall t, termLTS (tact TheAction2 t) 
+                                  None 
+                                  t
+
+    | do_par1l : forall b t, termLTS (tpar TheAction1 b t) 
+                                     (Some TheAction1) 
+                                     (tact b t)
+
+    | do_par1r : forall a t, termLTS (tpar a TheAction1 t) 
+                                     (Some TheAction1) 
+                                     (tact a t)
+
+    | do_par2l : forall b t, termLTS (tpar TheAction2 b t) 
+                                     None 
+                                     (tact b t)
+
+    | do_par2r : forall a t, termLTS (tpar a TheAction2 t) 
+                                     None 
+                                     (tact a t)
+
+    | do_fix : forall a t t',
+        termLTS (subst (tfix t) t) a t' ->
+        termLTS (tfix t) a t'
+    .
+
+  About weak_tr.
+  About Pack_weak.
+  About weak.
+
+  About simF.
+  About Pack_sim.
+  About weak_sim.
+
+  Example test1_m := (tfix (tact TheAction1 trec)).
+  Example test1_n := (tact TheAction1 (tfix (tact TheAction1 trec))).
+
+  Goal weak_sim termLTS termLTS test1_m test1_n.    
+  Proof.    
+    cofix CH.
+    constructor.
+    split.
+    About weak_sim.
+    About simF.
+    - intros m' a Hm. 
+      inversion_clear Hm. 
+      inversion H. 
+      exists m'. 
+      
+
+
+    (* split.
+      + unfold weak. unfold weak in tr. constructor. *)
+  Qed.
+  
+  Goal weak_sim termLTS termLTS
+    (tfix (tpar TheAction1 TheAction2 trec))
+    (tact TheAction1 (tfix (tact TheAction1 trec))).
+  Proof.
+    
+  Qed.
+
+End BisimTest1.
+
+
+
+Lemma glued_sim : weak_sim (lts g1 action) bigstep. 
+  
+Lemma glued_bisim (g1 g2 : composition) : 
+
+
+(* Lemma weak_sim_refl (M A : Type) (ltsM : LTS M A) (m : M)
+  : weak_sim ltsM ltsM  m m.
+Proof.
+  revert m.
+  cofix CH.
+  intros m.
+  constructor.
+  
+  constructor.
+  
+  (* eapply simF. *)
+  simpl.
+  About simF.
+  unfold simF.
+  intros m' a tr.
+  exists m'.
+  split.
+  - exact tr.
+  - apply CH. Guarded.
+Qed. *)
+
+
+
 Section Definitions.
   Context
     {M : Type}        (* term of lts 1 *)
@@ -122,8 +240,8 @@ Section Definitions.
       () *)
 
 
-  CoInductive wsim (s : M) (t : N) : Prop :=
-    In_wsim { out_wsim :  wsimF wsim s t }.
+  (* CoInductive wsim (s : M) (t : N) : Prop :=
+    In_wsim { out_wsim :  wsimF wsim s t }. *)
 
 
 End Definitions.
