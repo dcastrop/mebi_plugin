@@ -4,7 +4,7 @@ Require Import MEBI.Examples.CADP.
 Require Import Relation_Definitions.
 Require Import Relation_Operators.
 Require Import Operators_Properties.
-(* Variable R1 : relation M. *)
+(* Require Import FunInd. *)
 
 Set Primitive Projections.
 
@@ -13,6 +13,10 @@ Section Definitions.
   Definition LTS : Type := M -> option A -> M -> Prop.
   (* tau-labelled transition *)
   Definition tau (R : LTS) : relation M := fun (x y : M) => R x None y.
+  About tau.
+  Check tau.
+  Compute tau.
+  (* Functional Scheme tau_ind := Induction for tau Sort Type. *)
 End Definitions.
 Arguments tau {M A} R.
 
@@ -23,60 +27,183 @@ Section WeakTrans.
   Definition silent : relation M := clos_refl_trans_1n M (tau lts).
   Definition silent1 : relation M := clos_trans_1n M (tau lts).
 
+  Lemma silent_refl : forall m1 m2,
+    (* silent m1 m2 /\ silent1 m1 m2 -> *)
+    silent m1 m2 -> silent1 m1 m2 ->
+    (* silent1 m1 m2 -> silent m1 m2 -> *)
+      exists m3, 
+      silent m1 m3 /\ silent m3 m2.
+  Proof.
+    (* intros m1 m2 [H H1]. *)
+    (* intros m1 m2 H1 H. *)
+    intros m1 m2 H H1.
+    eexists.
+    split.
+    - constructor.
+    - apply H.
+  Qed.
+    
+
+
+
   Print clos_refl_trans_1n.
+
+  (* Lemma silent_pred : forall m1 m2,
+    silent m1 m2 -> m1 = m2 \/ silent1 m1 m2.
+  Proof.
+    intros m1 m2 H.
+    constructor. *)
+    
+
+  (* Lemma silent_tau : forall m m', silent m m' -> tau lts m m'.
+  Proof.
+    intros m m'.
+    compute.
+    destruct H as [ | H1 ].
+    - assumption. *)
+    
+  (* Lemma silent_tau : forall m m', tau lts m m' -> silent1 m m' -> silent m m'.
+  Proof.
+    intros m m' Ht H1.
+    (* compute in Ht. *)
+    (* revert Ht. *)
+    (* revert H1. *)
+    (* compute. *)
+    edestruct H1 as [ m' Ht' | m' H1' ].
+    - intros H'. *)
+
+  Check tau.
+  About tau.
+  (* Lemma silent1_step : forall m m', 
+    silent1 m m' ->
+    exists m'',
+    silent m m''.
+  Proof.
+    intros m m' H1.
+    eexists.
+    constructor.
+  Qed. *)
+
+  (* Lemma silent1_step : forall m m', 
+    silent1 m m' -> silent m m'.
+  Proof.
+    intros m m'.
+    compute.
+    intros H.
+    transitivity H.
+    compute.
+    
+
+
+    destruct H1 as [ m' H1 | m' H2 ].
+    - 
+
+    (* eexists. *)
+    constructor.
+  Qed. *)
+  
+  Lemma silent1_step : forall m, exists m', 
+    silent1 m m' -> silent m m'.
+  Proof.
+    intros m.
+    eexists m. (* this doesnt always make sense? *)
+    constructor.
+  Qed.
+
+  (* Lemma silent_step : forall m m', 
+    silent m m' ->
+    silent m' m \/ 
+    silent1 m m'.
+  Proof.
+    intros m m' H1.
+    constructor.
+  Qed. *)
+
+  Lemma silent_step : forall m, exists m',
+    silent m m' /\ (silent1 m m' -> 
+                    exists m'', 
+                      (* ((silent1 m m'' -> silent m'' m') \/ 
+                       (silent m m'' -> silent1 m'' m')) /\ *)
+                      silent m m'' -> silent m'' m').
+  Proof.
+    intros m.
+    eexists m. (* this doesnt always make sense? *)
+    split.
+    - constructor.
+    - intros H1. 
+      eexists m. (* this doesnt always make sense? *)
+      constructor.
+  Qed.
 
   (* Lemma rt_from_t : 
     forall R m m',
     inclusion (clos_refl_trans_1n R m m') (clos_trans_1n R m m'). *)
   
-  Lemma clos_rt_from_t : forall x y z,
-    clos_trans_1n M (tau lts) x y ->
+  Lemma clos_rt_from_t : forall x z,
     clos_trans_1n M (tau lts) x z ->
-
-  Print clos_rt_t.
-  About clos_rt_t.
-  Check clos_rt_t.
-  (* Lemma clos_rt_t_1n : forall x y z, 
-    clos_refl_trans_1n M (tau lts) x y -> 
-    clos_trans_1n M (tau lts) y z -> 
-    clos_trans_1n M (tau lts) x z.
+    exists y, 
+      clos_refl_trans_1n M (tau lts) x y /\ clos_trans_1n M (tau lts) y z.
   Proof.
-    intros x y z Hxy Hyz.
-    constructor.
-    match z with
-    | y => reflexivity
-    | _ => 
-    end. *)
-  
-  (* Lemma rt_from_t : 
-    forall m m',
-    clos_trans_1n M (tau lts) m m' -> 
-    clos_refl_trans_1n M (tau lts) m m'.
+    intros x z Hxz.
+    eexists.
+    split.
+    - constructor.
+    - apply Hxz.
+  Qed.
+
+  Lemma expand_silent1 : forall m m', 
+    silent1 m m' ->
+    exists m'', 
+      silent m m'' /\ silent1 m'' m'.
   Proof.
-    intros m m' H.
-    Print clos_rt_t.
-    About clos_rt_t.
-    Check clos_rt_t.
-    apply clos_rt_t.
-    apply (@clos_rt_t M (tau lts) m m' _).
-    Print clos_trans_1n.
-    Print clos_refl_trans_1n.
-    Print clos_rt_t. *)
-    (* constructor. *)
+    intros m m' H1.
+    eexists.
+    split.
+    - constructor.
+    - apply H1.
+  Qed.
 
-
-    (* intros m m'. *)
-    (* destruct clos_trans_1n. *)
-    (* destruct clos_refl_trans_1n. *)
-    (* constructor. *)
-
-
+  (* Lemma expand_silent1_to_silent : forall m m', 
+    silent1 m m' ->
+    exists m'', 
+      silent m m'' /\ silent m'' m'.
+  Proof.
+    intros m m' H1.
+    eexists.
+    split.
+    - constructor.
+    - 
+      apply H1.
+  Qed. *)
 
   (* Lemma silent_from_silent1 : forall m m', silent1 m m' -> silent m m'.
   Proof.
-    intros m m' H. *)
-
+    intros m m' H1.
+    eapply expand_silent1 in H1.
+    (* revert H1. *)
+    eapply silent_step with (m:=m) in H1.
     
+
+
+
+    Check silent1_step.
+    eapply silent1_step in H1.
+    (* specialize H1 with (m'':=m'). *)
+    (* eapply silent1_step with (m':=m') in H1. *)
+    (* revert H1. *)
+    destruct H1.
+    revert H.
+    
+    compute.
+    (* eexists m' in H1. *)
+    split.
+    eexists m'.
+
+    eapply expand_silent1.
+
+    unfold silent1. unfold silent.
+    constructor.
+  Qed. *)
     
 
   (*  x ==> pre_str ->^a post_str ==> y *)
@@ -101,8 +228,59 @@ Section WeakSim.
       }.
 
   CoInductive weak_sim (s : M) (t : N) : Prop
-    := In_sim { out_sim :  simF weak_sim s t }.
+    := In_sim { out_sim : simF weak_sim s t }.
 End WeakSim.
+
+
+Lemma weak_sim_tau_refl (M A : Type) (ltsM : LTS M A) : forall m1,
+  weak_sim ltsM ltsM m1 m1 /\ 
+  exists m2, 
+    silent1 ltsM m1 m2 ->
+    silent ltsM m1 m2 /\ weak_sim ltsM ltsM m2 m2.
+Proof.
+  intros m1.
+  split.
+  - revert m1. 
+    cofix CH.
+    intros m1.
+    constructor. 
+    constructor. 
+    + intros m2 a Hm.
+      eexists m2.
+      split.
+      * apply Hm.
+      * apply CH.
+    +
+
+      intros m2 Hm.
+      eexists m2.
+      split.
+      * 
+        revert Hm.
+        eapply (@silent_refl _ _ ltsM m1 m2).
+
+
+      compute.
+
+
+      About silent1_step.
+      apply silent1_step. 
+
+
+      intros m2 Hm.
+      eexists m2.
+      split.
+      * appl 
+
+    
+    
+        (* revert CH. *)
+        (* intros.  *)
+        
+      
+      
+        assumption. constructor. apply CH. 
+
 
 Section WeakBisim.
   Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
@@ -112,30 +290,83 @@ Section WeakBisim.
 End WeakBisim.
 
 
-Check tau.
-About tau.
-(* Lemma silent_refl (M : Type) : forall m m', 
-  clos_refl_trans_1n M (fun x y => R x None y) m m' -> *)
-
-
 Lemma weak_sim_refl (M A : Type) (ltsM : LTS M A) (m : M)
   : weak_sim ltsM ltsM m m.
 Proof.
   revert m.
   cofix CH.
-  intros m.
+  intros m1.
   constructor 1.
   split.
-  - intros m' a Hm.
-    exists m'.
+  - intros m2 a Hm.
+    eexists m2.
     split.
     + apply Hm.
     + apply CH. Guarded.
-  - intros m' Hm. 
-    exists m'.
-    (* unfold silent1 in Hm. *)
+  - 
+    intros m2 Hm.
+    eapply (@silent_refl _ _ ltsM m1 m2).
+    eexists m2.
     split. 
-    + 
+    +
+      About silent_refl.
+      revert Hm.
+      eapply (@silent_refl _ _ ltsM m1 m2).
+      
+      revert Hm.
+      About silent1_step.
+      apply silent1_step.
+      eapply (@silent1_step _ _ ltsM).
+
+
+      (* unfold silent1. unfold silent. *)
+      (* compute. *)
+      (* pattern (tau ltsM). *)
+      (* compute. *)
+      (* set (fun x y : M => ltsM x None y). *)
+      (* apply (P m1 m2). *)
+
+      (* revert m1 m2. *)
+      constructor.
+      
+    
+      revert Hm.
+      eapply silent1_stepB.
+      constructor.
+
+
+
+  
+    (* About silent1_stepB. *)
+    (* eapply (@silent1_stepB _ _ ltsM). *)
+    intros m' Hm.
+    edestruct Hm as [ m' H | m' Hm' ].
+    + eexists m'.
+      (* revert H. *)
+      (* inversion H. *)
+      split. 
+      * 
+        revert H. 
+        (* compute. *)
+        (* unfold silent. *)
+        (* unfold tau. *)
+      
+      apply H.
+
+
+
+      (* compute. *)
+      About silent.
+      (* unfold silent. *)
+      Compute (tau ltsM m m').
+      (* replace (tau ltsM) with (tau ltsM m m'). *)
+      (* functional induction (tau ltsM) using tau_ind. *)
+      compute.
+
+
+      constructor.
+
+      apply clos_rt_from_t.
       Print clos_rt_t.
       Check clos_rt_t.
       About clos_rt_t.
