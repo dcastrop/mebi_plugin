@@ -27,7 +27,15 @@ Section WeakTrans.
   Definition silent : relation M := clos_refl_trans_1n M (tau lts).
   Definition silent1 : relation M := clos_trans_1n M (tau lts).
 
-  Lemma silent_refl : forall m1 m2,
+  Lemma silent1_step : forall m m', 
+    silent1 m m' -> silent m m'.
+  Proof.
+    intros m1 m2 H1.
+    induction H1 as [ m1 m2 H1 | ].
+  - Admitted.
+
+
+  (* Lemma silent_refl : forall m1 m2,
     (* silent m1 m2 /\ silent1 m1 m2 -> *)
     silent m1 m2 -> silent1 m1 m2 ->
     (* silent1 m1 m2 -> silent m1 m2 -> *)
@@ -42,7 +50,7 @@ Section WeakTrans.
     - constructor.
     - apply H.
   Qed.
-    
+     *)
 
 
 
@@ -102,13 +110,14 @@ Section WeakTrans.
     constructor.
   Qed. *)
   
-  Lemma silent1_step : forall m, exists m', 
-    silent1 m m' -> silent m m'.
-  Proof.
-    intros m.
+    (* compute. *)
+    (* Print clos_trans_1n. *)
+    (* intros H1.
+    induction H1.
     eexists m. (* this doesnt always make sense? *)
-    constructor.
-  Qed.
+    constructor. *)
+  (* Admitted. *)
+  (* Qed. *)
 
   (* Lemma silent_step : forall m m', 
     silent m m' ->
@@ -231,65 +240,6 @@ Section WeakSim.
     := In_sim { out_sim : simF weak_sim s t }.
 End WeakSim.
 
-
-Lemma weak_sim_tau_refl (M A : Type) (ltsM : LTS M A) : forall m1,
-  weak_sim ltsM ltsM m1 m1 /\ 
-  exists m2, 
-    silent1 ltsM m1 m2 ->
-    silent ltsM m1 m2 /\ weak_sim ltsM ltsM m2 m2.
-Proof.
-  intros m1.
-  split.
-  - revert m1. 
-    cofix CH.
-    intros m1.
-    constructor. 
-    constructor. 
-    + intros m2 a Hm.
-      eexists m2.
-      split.
-      * apply Hm.
-      * apply CH.
-    +
-
-      intros m2 Hm.
-      eexists m2.
-      split.
-      * 
-        revert Hm.
-        eapply (@silent_refl _ _ ltsM m1 m2).
-
-
-      compute.
-
-
-      About silent1_step.
-      apply silent1_step. 
-
-
-      intros m2 Hm.
-      eexists m2.
-      split.
-      * appl 
-
-    
-    
-        (* revert CH. *)
-        (* intros.  *)
-        
-      
-      
-        assumption. constructor. apply CH. 
-
-
-Section WeakBisim.
-  Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
-
-  Definition weak_bisim (s : M) (t : N) : Prop
-    := weak_sim ltsM ltsN s t /\ weak_sim ltsN ltsM t s.
-End WeakBisim.
-
-
 Lemma weak_sim_refl (M A : Type) (ltsM : LTS M A) (m : M)
   : weak_sim ltsM ltsM m m.
 Proof.
@@ -303,117 +253,24 @@ Proof.
     split.
     + apply Hm.
     + apply CH. Guarded.
-  - 
-    intros m2 Hm.
-    eapply (@silent_refl _ _ ltsM m1 m2).
+  - intros m2 Hm.
     eexists m2.
     split. 
-    +
-      About silent_refl.
-      revert Hm.
-      eapply (@silent_refl _ _ ltsM m1 m2).
-      
-      revert Hm.
-      About silent1_step.
-      apply silent1_step.
-      eapply (@silent1_step _ _ ltsM).
+    + apply silent1_step. apply Hm.
+    + apply CH.
+Qed.  
 
+Section WeakBisim.
+  Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
 
-      (* unfold silent1. unfold silent. *)
-      (* compute. *)
-      (* pattern (tau ltsM). *)
-      (* compute. *)
-      (* set (fun x y : M => ltsM x None y). *)
-      (* apply (P m1 m2). *)
+  Definition weak_bisim (s : M) (t : N) : Prop
+    := weak_sim ltsM ltsN s t /\ weak_sim ltsN ltsM t s.
+End WeakBisim.
 
-      (* revert m1 m2. *)
-      constructor.
-      
-    
-      revert Hm.
-      eapply silent1_stepB.
-      constructor.
-
-
-
-  
-    (* About silent1_stepB. *)
-    (* eapply (@silent1_stepB _ _ ltsM). *)
-    intros m' Hm.
-    edestruct Hm as [ m' H | m' Hm' ].
-    + eexists m'.
-      (* revert H. *)
-      (* inversion H. *)
-      split. 
-      * 
-        revert H. 
-        (* compute. *)
-        (* unfold silent. *)
-        (* unfold tau. *)
-      
-      apply H.
-
-
-
-      (* compute. *)
-      About silent.
-      (* unfold silent. *)
-      Compute (tau ltsM m m').
-      (* replace (tau ltsM) with (tau ltsM m m'). *)
-      (* functional induction (tau ltsM) using tau_ind. *)
-      compute.
-
-
-      constructor.
-
-      apply clos_rt_from_t.
-      Print clos_rt_t.
-      Check clos_rt_t.
-      About clos_rt_t.
-      (* apply (@clos_rt_t M (silent ltsM) m m'). *)
-      
-      
-      Check silent1.
-      Check silent.
-      About silent1.
-      About silent.
-      (* exact (tau ltsM m m'). *)
-      (* constructor. *)
-      unfold silent.
-      Print clos_refl_trans_1n.
-
-      (* unfold silent1 in Hm. *)
-      (* apply clos_rt_t in Hm. *)
-      (* induction . *)
-
-      (* apply tau with (y:=m). *)
-      (* unfold tau. *)
-      constructor.
-
-      (* Show Proof. *)
-      (* match goal with 
-      | [ x ] => constructor
-      end. *)
-
-      Check tau.
-      (* replace y with m'. *)
-      (* exists y. *)
-      constructor.
-      Check clos_refl_trans_1n.
-      About clos_refl_trans_1n.
-      constructor.
-    apply Hm.   
-
-  
-  (* eapply simF. *)
-  simpl.
-  About simF.
-  unfold simF.
-  intros m' a tr.
-  exists m'.
-  split.
-  - exact tr.
-  - apply CH. Guarded.
+Lemma weak_bisim_refl (M A : Type) (ltsM : LTS M A) (m : M)
+  : weak_bisim ltsM ltsM m m.
+Proof.
+  constructor 1; try apply weak_sim_refl.
 Qed.
 
 Module BisimTest1.
@@ -423,8 +280,8 @@ Module BisimTest1.
     | trec : term
     | tend : term
     | tfix : term -> term
-    | tact : action -> term -> term
-    | tpar : action -> action -> term -> term
+    | tact : option action -> term -> term
+    | tpar : option action -> option action -> term -> term
     .
 
   Fixpoint subst (t1 : term) (t2 : term) :=
@@ -437,78 +294,96 @@ Module BisimTest1.
     end.
 
   Inductive termLTS : term -> option action -> term -> Prop :=
-    | do_act1 : forall t, termLTS (tact TheAction1 t) 
-                                  (Some TheAction1) 
-                                  t
-    
-    | do_act2 : forall t, termLTS (tact TheAction2 t) 
-                                  None 
+    | do_act : forall a t, termLTS (tact a t) 
+                                  a 
                                   t
 
-    | do_par1l : forall b t, termLTS (tpar TheAction1 b t) 
-                                     (Some TheAction1) 
+    | do_parl : forall a b t, termLTS (tpar a b t) 
+                                     a 
                                      (tact b t)
 
-    | do_par1r : forall a t, termLTS (tpar a TheAction1 t) 
-                                     (Some TheAction1) 
+    | do_parr : forall a b t, termLTS (tpar a b t) 
+                                     b 
                                      (tact a t)
 
-    | do_par2l : forall b t, termLTS (tpar TheAction2 b t) 
-                                     None 
-                                     (tact b t)
-
-    | do_par2r : forall a t, termLTS (tpar a TheAction2 t) 
-                                     None 
-                                     (tact a t)
 
     | do_fix : forall a t t',
         termLTS (subst (tfix t) t) a t' ->
         termLTS (tfix t) a t'
     .
 
+  Example m1 := (tfix (tact (Some TheAction1) trec)).
+  Example n1 := (tact (Some TheAction1) (tfix (tact (Some TheAction1) trec))).
 
-  Ltac example_tactic CH :=
-   let r := fresh "r" in
-   let a := fresh "a" in
-   let tr := fresh "tr" in
-   constructor; intros r a tr;
-
-   (*  *)
-   repeat
-     match goal with
-     | [ H : termLTS ?l ?a ?r |- _ ] =>
-         inversion_clear H; simpl in *
-     end;
-   (*  *)
-
-   eexists;
-   split; [ repeat constructor | idtac ];
-   try apply sim_refl; try apply CH.
-
-  Ltac example_bisim :=
-    let CH := fresh "CH" in
-    cofix CH; repeat (example_tactic CH).
-
-  About weak_tr.
-  About Pack_weak.
-  About weak.
-
-  About simF.
-  About Pack_sim.
-  About weak_sim.
-
-  Example test1_m := (tfix (tact TheAction1 trec)).
-  Example test1_n := (tact TheAction1 (tfix (tact TheAction1 trec))).
-
-  Goal weak_sim termLTS termLTS test1_m test1_n.    
-  Proof. example_bisim. Qed.
-
-  
-  Goal weak_sim termLTS termLTS test1_m test1_n.    
-  Proof. 
-    unfold test1_m.
-    unfold test1_n.
+  Goal weak_sim termLTS termLTS m1 n1.
+  Proof.
     cofix CH.
+    constructor.
+    constructor.
+    {
+      intros m2 a1 Hw1.
+      eexists.
+      induction a1; split.
+      { unfold weak; eexists; eexists. constructor.
+        - constructor.
+        - apply do_act.
+        - constructor. }
+      { constructor; constructor.
+        - intros m3 a2 Hw2; eexists.
+          induction a2; split.
+          + { unfold weak; eexists; eexists. constructor.
+              - constructor.
+              - apply do_fix. constructor.
+              - constructor. }
+          + { constructor; constructor.
+        - intros m4 a3 Hw3; eexists.
+          induction a3; split.
+          + { unfold weak; eexists; eexists. constructor.
+              - constructor.
+              - apply do_fix. constructor.
+              - constructor. }
+          + { constructor; constructor. }  }  }
+
+
+      split.
+      -
+      
+        + 
+          unfold weak. 
+          eexists; eexists.
+          constructor.
+          * constructor.
+          * apply do_act1.
+          * constructor.
+        +
+          unfold weak.
+          eexists; eexists.
+          constructor.
+          *
+            constructor.
+          *
+            apply act. 
+
+            discriminate. 
+            apply do_act2.
+          * constructor. 
+        + apply do_act2.
+
+        unfold weak.
+        eexists; eexists.
+        Print weak_tr.
+        constructor.
+        + constructor.
+        +
+          
+
+    }
+
+
+
+    (* unfold test1_m. *)
+    (* unfold test1_n. *)
+    (* cofix CH. *)
     constructor.
     split.
     (* About weak_sim. *)
@@ -522,7 +397,7 @@ Module BisimTest1.
         constructor 1.
         * constructor 1.
         * 
-          (* eapply do_act1.  *)
+          eapply do_act1. 
           constructor 1. 
       
       
