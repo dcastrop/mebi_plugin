@@ -34,187 +34,6 @@ Section WeakTrans.
     induction H1 as [ m1 m2 H1 | ].
   - Admitted.
 
-
-  (* Lemma silent_refl : forall m1 m2,
-    (* silent m1 m2 /\ silent1 m1 m2 -> *)
-    silent m1 m2 -> silent1 m1 m2 ->
-    (* silent1 m1 m2 -> silent m1 m2 -> *)
-      exists m3, 
-      silent m1 m3 /\ silent m3 m2.
-  Proof.
-    (* intros m1 m2 [H H1]. *)
-    (* intros m1 m2 H1 H. *)
-    intros m1 m2 H H1.
-    eexists.
-    split.
-    - constructor.
-    - apply H.
-  Qed.
-     *)
-
-
-
-  Print clos_refl_trans_1n.
-
-  (* Lemma silent_pred : forall m1 m2,
-    silent m1 m2 -> m1 = m2 \/ silent1 m1 m2.
-  Proof.
-    intros m1 m2 H.
-    constructor. *)
-    
-
-  (* Lemma silent_tau : forall m m', silent m m' -> tau lts m m'.
-  Proof.
-    intros m m'.
-    compute.
-    destruct H as [ | H1 ].
-    - assumption. *)
-    
-  (* Lemma silent_tau : forall m m', tau lts m m' -> silent1 m m' -> silent m m'.
-  Proof.
-    intros m m' Ht H1.
-    (* compute in Ht. *)
-    (* revert Ht. *)
-    (* revert H1. *)
-    (* compute. *)
-    edestruct H1 as [ m' Ht' | m' H1' ].
-    - intros H'. *)
-
-  Check tau.
-  About tau.
-  (* Lemma silent1_step : forall m m', 
-    silent1 m m' ->
-    exists m'',
-    silent m m''.
-  Proof.
-    intros m m' H1.
-    eexists.
-    constructor.
-  Qed. *)
-
-  (* Lemma silent1_step : forall m m', 
-    silent1 m m' -> silent m m'.
-  Proof.
-    intros m m'.
-    compute.
-    intros H.
-    transitivity H.
-    compute.
-    
-
-
-    destruct H1 as [ m' H1 | m' H2 ].
-    - 
-
-    (* eexists. *)
-    constructor.
-  Qed. *)
-  
-    (* compute. *)
-    (* Print clos_trans_1n. *)
-    (* intros H1.
-    induction H1.
-    eexists m. (* this doesnt always make sense? *)
-    constructor. *)
-  (* Admitted. *)
-  (* Qed. *)
-
-  (* Lemma silent_step : forall m m', 
-    silent m m' ->
-    silent m' m \/ 
-    silent1 m m'.
-  Proof.
-    intros m m' H1.
-    constructor.
-  Qed. *)
-
-  Lemma silent_step : forall m, exists m',
-    silent m m' /\ (silent1 m m' -> 
-                    exists m'', 
-                      (* ((silent1 m m'' -> silent m'' m') \/ 
-                       (silent m m'' -> silent1 m'' m')) /\ *)
-                      silent m m'' -> silent m'' m').
-  Proof.
-    intros m.
-    eexists m. (* this doesnt always make sense? *)
-    split.
-    - constructor.
-    - intros H1. 
-      eexists m. (* this doesnt always make sense? *)
-      constructor.
-  Qed.
-
-  (* Lemma rt_from_t : 
-    forall R m m',
-    inclusion (clos_refl_trans_1n R m m') (clos_trans_1n R m m'). *)
-  
-  Lemma clos_rt_from_t : forall x z,
-    clos_trans_1n M (tau lts) x z ->
-    exists y, 
-      clos_refl_trans_1n M (tau lts) x y /\ clos_trans_1n M (tau lts) y z.
-  Proof.
-    intros x z Hxz.
-    eexists.
-    split.
-    - constructor.
-    - apply Hxz.
-  Qed.
-
-  Lemma expand_silent1 : forall m m', 
-    silent1 m m' ->
-    exists m'', 
-      silent m m'' /\ silent1 m'' m'.
-  Proof.
-    intros m m' H1.
-    eexists.
-    split.
-    - constructor.
-    - apply H1.
-  Qed.
-
-  (* Lemma expand_silent1_to_silent : forall m m', 
-    silent1 m m' ->
-    exists m'', 
-      silent m m'' /\ silent m'' m'.
-  Proof.
-    intros m m' H1.
-    eexists.
-    split.
-    - constructor.
-    - 
-      apply H1.
-  Qed. *)
-
-  (* Lemma silent_from_silent1 : forall m m', silent1 m m' -> silent m m'.
-  Proof.
-    intros m m' H1.
-    eapply expand_silent1 in H1.
-    (* revert H1. *)
-    eapply silent_step with (m:=m) in H1.
-    
-
-
-
-    Check silent1_step.
-    eapply silent1_step in H1.
-    (* specialize H1 with (m'':=m'). *)
-    (* eapply silent1_step with (m':=m') in H1. *)
-    (* revert H1. *)
-    destruct H1.
-    revert H.
-    
-    compute.
-    (* eexists m' in H1. *)
-    split.
-    eexists m'.
-
-    eapply expand_silent1.
-
-    unfold silent1. unfold silent.
-    constructor.
-  Qed. *)
-    
-
   (*  x ==> pre_str ->^a post_str ==> y *)
   Record weak_tr (x z : M) a (t y : M) : Prop :=
     Pack_weak { pre : silent x z; str : lts z a t; post : silent t y }.
@@ -239,6 +58,49 @@ Section WeakSim.
   CoInductive weak_sim (s : M) (t : N) : Prop
     := In_sim { out_sim : simF weak_sim s t }.
 End WeakSim.
+
+Check weak_sim.
+Check In_sim.
+Check out_sim.
+Check simF.
+Check sim_weak.
+Check sim_tau.
+(* Infinite case *)
+(* Inductive StreamLTS 
+{M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A)
+: weak_sim ltsM ltsN M N -> option A -> weak_sim ltsM ltsN -> Prop :=
+  | stream_step : 
+      (* forall m1 m2 n1 n2 w1 x w2,  *)
+      forall x m' n' w1 w2, 
+      out_sim m n = 
+        sim_weak 
+        x m' n'
+        (* consF x s' -> StreamLTS A s x s' *)
+        (* sim_weak x m2 n2  *)
+        (* sim_tau weak_sim m1 n1 x m2 n2  *)
+        
+        -> StreamLTS m n w1 x w2 
+  . *)
+
+
+  (* Inductive sim_step : 
+  Prop :=
+    | step_sim_weak :  *)
+
+  (* Check (sim_weak weak_sim _ _). *)
+
+  (* Inductive simLTS (s : M) (t : N) : 
+  weak_sim s t -> option A -> weak_sim s t -> Prop :=
+    | sim_step: forall a s' t', 
+        out_sim s t = 
+          sim_weak weak_sim s t -> 
+          (* simF sim_weak  ->  *)
+        (* out_sim s t = y ->  *)
+        (* sim_weak weak_sim s t  s' a t' ->  *)
+        simLTS s t a s' t'
+    (* | tau_step: forall s s', out_sim s = sim_tau  *)
+    . *)
+(* End WeakSim. *)
 
 Lemma weak_sim_refl (M A : Type) (ltsM : LTS M A) (m : M)
   : weak_sim ltsM ltsM m m.
@@ -269,9 +131,7 @@ End WeakBisim.
 
 Lemma weak_bisim_refl (M A : Type) (ltsM : LTS M A) (m : M)
   : weak_bisim ltsM ltsM m m.
-Proof.
-  constructor 1; try apply weak_sim_refl.
-Qed.
+Proof. constructor 1; try apply weak_sim_refl. Qed.
 
 Module BisimTest1.
   Inductive action : Type := | TheAction1 | TheAction2.
@@ -294,31 +154,117 @@ Module BisimTest1.
     end.
 
   Inductive termLTS : term -> option action -> term -> Prop :=
-    | do_act : forall a t, termLTS (tact a t) 
-                                  a 
-                                  t
+    | do_act : forall a t, 
+        (* out_sim (tact a t) = consF a t -> *)
+        termLTS (tact a t) a t
 
-    | do_parl : forall a b t, termLTS (tpar a b t) 
-                                     a 
-                                     (tact b t)
+    | do_parl : forall a b t, 
+        (* out_sim (tpar a b t) = consF a (tact b t) -> *)
+        termLTS (tpar a b t) a (tact b t)
 
-    | do_parr : forall a b t, termLTS (tpar a b t) 
-                                     b 
-                                     (tact a t)
-
+    | do_parr : forall a b t, 
+        (* out_sim (tpar a b t) = consF a (tact a t) -> *)
+        termLTS (tpar a b t) b (tact a t)
 
     | do_fix : forall a t t',
+        (* out_sim (tfix t) = consF a t' -> *)
         termLTS (subst (tfix t) t) a t' ->
         termLTS (tfix t) a t'
     .
 
+  Inductive termLTS_tc : term -> Prop :=
+    | do_step : forall t a t', termLTS t a t' -> termLTS_tc t' -> termLTS_tc t
+    | do_none : forall t, termLTS_tc t
+    .
+
+  Example m1 := (tact None (tact (Some TheAction1) (tact None tend))).
+  Example n1 := (tact (Some TheAction1) tend).
+
+  Goal weak_sim termLTS termLTS m1 n1.
+  Proof. 
+    unfold m1; unfold n1. 
+    cofix CH. constructor. 
+    split. 
+    { intros m2 a1 H1. 
+      inversion_clear H1; subst.
+      inversion H; subst.
+      eexists.
+      induction a1.
+      { split.
+        - unfold weak. eexists; eexists.
+          constructor.
+            + constructor.
+            + apply do_act.
+            + constructor.
+        - (* m2 must be tend or have silent transitions until tend *)
+        
+        constructor; constructor.
+          + intros m3 a2 h2. induction a2.
+            {
+              eexists. constructor.
+              - unfold weak; eexists; eexists; constructor.
+                + constructor.
+                + apply do_act.
+                + constructor.
+            }  
+      }
+    }
+
+      revert Hw1. 
+      (* unfold m1 in Hw1. *)
+      induction a1.
+      + eexists. split.
+        *  
+      
+      
+
+
   Example m1 := (tfix (tact (Some TheAction1) trec)).
   Example n1 := (tact (Some TheAction1) (tfix (tact (Some TheAction1) trec))).
+
+  Compute (weak_sim termLTS termLTS m1 n1).
+  Compute (In_sim termLTS termLTS m1 n1).
+  Compute (out_sim termLTS termLTS m1 n1).
 
   Goal weak_sim termLTS termLTS m1 n1.
   Proof.
     cofix CH.
     constructor.
+    split.
+    { intros m2 a1 Hw1.
+
+      (* inversion_clear Hw1; subst. *)
+      (* inversion H; subst. *)
+
+      induction a1.
+      {
+        inversion_clear Hw1; subst.
+        inversion H; subst.
+        compute in H0.
+
+        eexists.
+        split.
+        - unfold weak; eexists; eexists.
+          constructor.
+          + constructor.
+          + apply do_act.
+          + constructor.
+        - constructor. constructor.
+          + intros m3 a2 Hw2.
+             
+        eapply do_act.  
+
+      }
+      constructor.
+      eexists. 
+      unfold weak.
+
+    }
+    About simF.
+    unfold simF.
+
+
+
     constructor.
     {
       intros m2 a1 Hw1.

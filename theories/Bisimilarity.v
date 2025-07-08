@@ -13,6 +13,8 @@ Section Definitions.
       exists t',
         LTS2 t a t' /\ Sim s' t'.
 
+  (* Print simF. *)
+
   Set Primitive Projections.
   CoInductive sim (s : M) (t : N) : Prop :=
     In_sim { out_sim :  simF sim s t }.
@@ -61,6 +63,10 @@ CoFixpoint ones : stream nat := In_stream (consF 1 ones).
 
 Definition zplus1 : stream nat := fmap S zeros.
 
+Check In_stream.
+Check out_stream.
+Check consF.
+
 (* Infinite case *)
 Inductive StreamLTS A : stream A -> A -> stream A -> Prop :=
 | stream_step : forall s x s', out_stream s = consF x s' -> StreamLTS A s x s'.
@@ -68,13 +74,14 @@ Inductive StreamLTS A : stream A -> A -> stream A -> Prop :=
 Example stream_sim : sim (StreamLTS nat) (StreamLTS nat) zplus1 ones.
   cofix CH.
   constructor.
+  About simF.
   unfold simF.
   intros s' a H. inversion_clear H; subst.
   inversion H0; subst.
   exists ones.
   split.
-  apply stream_step; reflexivity.
-  apply CH. Guarded.
+  - apply stream_step. reflexivity.
+  - apply CH. Guarded.
 Qed.
 
 End StreamExample.
