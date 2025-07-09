@@ -79,19 +79,72 @@ Lemma weak_sim_refl (M A : Type) (ltsM : LTS M A) (m : M)
   : weak_sim ltsM ltsM m m.
 Proof.
   revert m; cofix CH; intros m1.
-  constructor.
-  split.
-  - intros m2 a Hm.
-    eexists m2.
-    split.
+  apply In_sim. apply Pack_sim.
+  - intros m2 a Hm; eexists m2; split.
     + apply Hm.
     + apply CH. Guarded.
-  - intros m2 Hm.
-    eexists m2.
-    split. 
+  - intros m2 Hm; eexists m2; split. 
     + apply silent1_step. apply Hm.
     + apply CH. Guarded.
-Qed.  
+Qed.
+
+Print silent.
+Print silent1.
+Print weak_sim.
+Print Pack_sim.
+Lemma weak_sim_trans (M A : Type) (ltsM : LTS M A) (x y z : M)
+  : weak_sim ltsM ltsM x y -> 
+    weak_sim ltsM ltsM y z -> 
+    weak_sim ltsM ltsM x z.
+Proof.
+  revert x y z; cofix CH; intros x1 y1 z1.
+  intros Hxy Hyz.
+
+
+  
+  apply In_sim; apply Pack_sim.
+  { intros x2 axy Hx. eexists ?[z2]. 
+    destruct Hx. destruct H. destruct H. destruct pre0. 
+    -  
+  }
+
+
+
+(* Lemma weak_sim_trans (M N A : Type) (ltsM : LTS M A) 
+                                    (ltsN : LTS N A)
+  : forall m1 n1, weak_sim ltsM ltsN m1 n1 -> 
+    forall m2 act, weak ltsM m1 act m2 ->
+    exists n2, weak ltsN n1 act n2 /\ weak_sim ltsM ltsN m2 n2.
+Proof.
+  intros m1 n1 Hw.
+  inversion Hw.
+  intros m2 act Hwm.
+  induction act.
+  { destruct Hwm. destruct H. destruct H. destruct pre0.
+    - eexists. split.
+      + unfold weak. eexists; eexists. constructor.
+        * constructor.
+        * 
+  }
+  (* Print weak.
+  eexists. split.
+  -   *)
+  
+  destruct Hwm. destruct H. destruct H.
+   (* destruct pre0. *)
+  induction act.
+  -
+    destruct pre0.
+   
+    (* apply In_sim. *)
+    (* apply Pack_sim. *)
+    apply sim_weak.
+   
+  inversion Hwm. inversion H. inversion H0.
+Admitted. *)
+
+
+
 
 Section WeakBisim.
   Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
@@ -103,6 +156,8 @@ End WeakBisim.
 Lemma weak_bisim_refl (M A : Type) (ltsM : LTS M A) (m : M)
   : weak_bisim ltsM ltsM m m.
 Proof. constructor 1; try apply weak_sim_refl. Qed.
+
+Lemma weak_bisim_trans
 
 Module BisimTest1.
   Inductive action : Type := | TheAction1 | TheAction2.
@@ -148,20 +203,37 @@ Module BisimTest1.
     | do_none : forall t, termLTS_tc t
     .
 
+  Lemma sim_tend : weak_sim termLTS termLTS (tend) (tend).
+  Proof. apply weak_sim_refl. Qed.
+
   Example m1 := (tact None (tact (Some TheAction1) (tact None tend))).
   Example n1 := (tact (Some TheAction1) tend).
 
   Goal weak_sim termLTS termLTS m1 n1.
   Proof. 
     (* unfold m1; unfold n1.  *)
-    cofix CH. 
+    (* cofix CH.  *)
+    apply In_sim.
+    apply Pack_sim.
+    { intros m2 a Hw. destruct Hw. destruct H. destruct H.
+      destruct pre0.
+      inversion str0.
+      inversion H; subst. destruct pre0; [| inversion H0].
+      clear H. inversion str0. subst. clear str0. inversion post0. subst.
+      exists tend. split.
+      - do 2 eexists. do 2 constructor. 
+      - 
+      
+      
+      }
+    Print Pack_sim.
     constructor. split. 
 
     (**** issue with picking constructor from Pack_sim ******)
 
     (** below asserts the kind of action, but both constructors are shown **)
 
-    (* { intros m2 a1.
+    { intros m2 a1.
       replace a1 with TheAction1.
       { intros H1; eexists.
         split. 
@@ -184,7 +256,7 @@ Module BisimTest1.
 
       }
 
-    } *)
+    }
 
     (** below shows for induction on action, which includes impossible cases **)
 
