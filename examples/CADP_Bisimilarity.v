@@ -14,8 +14,9 @@ Section Definitions.
   (* tau-labelled transition *)
   Definition tau (R : LTS) : relation M := fun (x y : M) => R x None y.
   About tau.
-  Check tau.
+  Print tau.
   Compute tau.
+  Compute (relation M).
   (* Functional Scheme tau_ind := Induction for tau Sort Type. *)
 End Definitions.
 Arguments tau {M A} R.
@@ -27,12 +28,20 @@ Section WeakTrans.
   Definition silent : relation M := clos_refl_trans_1n M (tau lts).
   Definition silent1 : relation M := clos_trans_1n M (tau lts).
 
+  Compute (tau lts).
+
   Lemma silent1_step : forall m m', 
     silent1 m m' -> silent m m'.
   Proof.
     intros m1 m2 H1.
+    (* revert H1; compute; intros H1. *)
     induction H1 as [ m1 m2 H1 | ].
-  - Admitted.
+    - (* issue: Unable to find an instance for the variable y. *)
+      (* get stuck -- can't apply H1 *)
+      unfold silent. compute.
+      (* while H1 can resolve as expected *)
+      compute in H1.
+  Admitted.
 
   (*  x ==> pre_str ->^a post_str ==> y *)
   Record weak_tr (x z : M) a (t y : M) : Prop :=
@@ -105,10 +114,8 @@ Check sim_tau.
 Lemma weak_sim_refl (M A : Type) (ltsM : LTS M A) (m : M)
   : weak_sim ltsM ltsM m m.
 Proof.
-  revert m.
-  cofix CH.
-  intros m1.
-  constructor 1.
+  revert m; cofix CH; intros m1.
+  constructor.
   split.
   - intros m2 a Hm.
     eexists m2.
@@ -119,7 +126,7 @@ Proof.
     eexists m2.
     split. 
     + apply silent1_step. apply Hm.
-    + apply CH.
+    + apply CH. Guarded.
 Qed.  
 
 Section WeakBisim.
@@ -182,13 +189,46 @@ Module BisimTest1.
 
   Goal weak_sim termLTS termLTS m1 n1.
   Proof. 
-    unfold m1; unfold n1. 
-    cofix CH. constructor. 
-    split. 
-    { intros m2 a1 H1. 
+    (* unfold m1; unfold n1.  *)
+    cofix CH. 
+    constructor. split. 
+
+    (**** issue with picking constructor from Pack_sim ******)
+
+    (** below asserts the kind of action, but both constructors are shown **)
+
+    (* { intros m2 a1.
+      replace a1 with TheAction1.
+      { intros H1; eexists.
+        split. 
+        Print weak.
+        - unfold weak. eexists; eexists. constructor.
+          + constructor.
+          + apply do_act.
+          + constructor.
+        - constructor. Print simF.
+          (* how to pick the constructor? surely only one is needed *)
+          apply sim_tau. 
+          constructor.
+          (* *)
+          
+          { intros m3 a2.
+            replace 
+
+          }
+      
+
+      }
+
+    } *)
+
+    (** below shows for induction on action, which includes impossible cases **)
+
+    (* { intros m2 a1 H1.
       inversion_clear H1; subst.
       inversion H; subst.
       eexists.
+
       induction a1.
       { split.
         - unfold weak. eexists; eexists.
@@ -215,7 +255,7 @@ Module BisimTest1.
       induction a1.
       + eexists. split.
         *  
-      
+       *)
       
 
 
