@@ -74,42 +74,6 @@ Check out_sim.
 Check simF.
 Check sim_weak.
 Check sim_tau.
-(* Infinite case *)
-(* Inductive StreamLTS 
-{M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A)
-: weak_sim ltsM ltsN M N -> option A -> weak_sim ltsM ltsN -> Prop :=
-  | stream_step : 
-      (* forall m1 m2 n1 n2 w1 x w2,  *)
-      forall x m' n' w1 w2, 
-      out_sim m n = 
-        sim_weak 
-        x m' n'
-        (* consF x s' -> StreamLTS A s x s' *)
-        (* sim_weak x m2 n2  *)
-        (* sim_tau weak_sim m1 n1 x m2 n2  *)
-        
-        -> StreamLTS m n w1 x w2 
-  . *)
-
-
-  (* Inductive sim_step : 
-  Prop :=
-    | step_sim_weak :  *)
-
-  (* Check (sim_weak weak_sim _ _). *)
-
-  (* Inductive simLTS (s : M) (t : N) : 
-  weak_sim s t -> option A -> weak_sim s t -> Prop :=
-    | sim_step: forall a s' t', 
-        out_sim s t = 
-          sim_weak weak_sim s t -> 
-          (* simF sim_weak  ->  *)
-        (* out_sim s t = y ->  *)
-        (* sim_weak weak_sim s t  s' a t' ->  *)
-        simLTS s t a s' t'
-    (* | tau_step: forall s s', out_sim s = sim_tau  *)
-    . *)
-(* End WeakSim. *)
 
 Lemma weak_sim_refl (M A : Type) (ltsM : LTS M A) (m : M)
   : weak_sim ltsM ltsM m m.
