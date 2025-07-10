@@ -76,7 +76,10 @@ Example stream_sim : sim (StreamLTS nat) (StreamLTS nat) zplus1 ones.
   constructor.
   About simF.
   unfold simF.
-  intros s' a H. inversion_clear H; subst.
+  intros s' a H. 
+  Print StreamLTS.
+  inversion_clear H; subst.
+  Print out_stream.
   inversion H0; subst.
   exists ones.
   split.
