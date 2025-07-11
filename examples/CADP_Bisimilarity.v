@@ -1,9 +1,10 @@
 Require Import MEBI.Examples.CADP.
 
 (* https://rocq-prover.org/doc/v8.9/stdlib/Coq.Relations.Relation_Operators.html *)
-Require Import Relation_Definitions.
-Require Import Relation_Operators.
-Require Import Operators_Properties.
+Require Import Coq.Relations.Relation_Definitions.
+Require Import Coq.Relations.Relation_Operators.
+Require Import Coq.Relations.Operators_Properties.
+Require Import Coq.Classes.RelationClasses.
 (* Require Import FunInd. *)
 
 Set Primitive Projections.
@@ -15,6 +16,16 @@ Section Definitions.
   Definition tau (R : LTS) : relation M := fun (x y : M) => R x None y.
 End Definitions.
 Arguments tau {M A} R.
+
+(* Lemma tau_trans (M A: Type) (lts : LTS M A): forall x y z, 
+  tau lts x y -> tau lts y z -> tau lts x z.
+Proof.
+  intros x y z Hxy Hyz.
+  apply clos_rt1n_step in Hxy; apply clos_rt1n_rt in Hxy.
+  apply clos_rt1n_step in Hyz; apply clos_rt1n_rt in Hyz.
+  apply (@clos_rt_t M (tau lts) x y z Hxy Hyz). 
+  *)
+  
 
 Section WeakTrans.
   Context {M : Type} {A : Type} (lts : LTS M A).
@@ -30,111 +41,25 @@ Section WeakTrans.
     exists z t, weak_tr x z a t y.
 End WeakTrans.
 
-(* Lemma clos_direct_rt1n (M A: Type) (lts : LTS M A): forall m1 m2, 
-  clos_refl_trans_1n M (tau lts) m1 m2 ->
-  clos_refl_trans M (tau lts) m1 m2.
-Proof. apply clos_rt1n_rt. Qed. *)
-
-Lemma clos__rt1n (M A: Type) (lts : LTS M A): forall x y z, 
-  clos_refl_trans_1n M (tau lts) x y ->
-  clos_trans_1n M (tau lts) y z -> 
-  clos_trans M (tau lts) x z.
-Proof. 
-  intros x y z Hxy Hyz.
-  apply clos_rt1n_rt in Hxy; apply clos_t1n_trans in Hyz.
-  apply (@clos_rt_t M (tau lts) x y z Hxy Hyz).
-Qed.
-
-
-Lemma clos_silent (M A: Type) (lts : LTS M A): forall m1 m2, 
+Lemma clos_silent (M A: Type) (lts : LTS M A) : forall m1 m2, 
   clos_trans_1n M (tau lts) m1 m2 -> 
   clos_refl_trans_1n M (tau lts) m1 m2.
 Proof.
-  intros m1 m2 Ht. 
-  (* destruct Ht as [ m2 Ht1 | m2 m3 Ht2 ]. *)
-  induction Ht as [ m1 m2 Ht1 | m1 m2 m3 Ht2 ].
-  - apply clos_rt1n_step. apply Ht1.
-  -
+  intros x y Hxy. 
+  (* destruct Hxy as [ y Hxyt | y z Hyzt Hyztr ]. *)
+  induction Hxy as [ x y Hxyt | x y z Hxytr Hyzt Hyztr ].
+  - apply clos_rt1n_step; apply Hxyt.
+  - apply clos_rt1n_step in Hxytr; apply clos_rt1n_rt in Hxytr.
+    apply clos_t1n_trans in Hyzt. apply clos_rt1n_rt in Hyztr. 
 
-    apply clos_rt1n_step in Ht2.
-    apply clos_rt1n_rt in Ht2; apply clos_t1n_trans in Ht.
-    apply clos_rt1n_rt in IHHt.
+    (* apply (@clos_rt_t M (tau lts) x y z Hxytr Hyzt). *)
 
-    Print rt_trans.
-    Print rt1n_trans.
-    (* apply clos_rt1n_step. *)
-    (* apply rt1n_trans. *)
-    apply (@rt1n_trans M (tau lts) m1 m2 m3).
-
-
-
-    apply clos_rt1n_step.
-    (* apply clos_t1n_trans. *)
-
-
-    (* apply (@clos_rt_t M (tau lts) ). *)
-
-    apply (@clos_rt_t M (tau lts) m1 m2 m3 Ht2 Ht).
-
-
-    apply clos_direct_rt1n.
-    apply clos_rt1n_rt.
-
-    (* revert Ht. *)
-    (* revert Ht2. *)
-    apply clos_rt_t.
-
-    inversion_clear Ht; subst.
-    + 
-      apply clos_rt1n_step in H.
-      apply clos_refl_tran
-
-
-    
-    apply clos_rt1n_step in Ht.
-    apply
-    inversion_clear Ht2; subst.
-    + apply clos_rt1n_step. apply Ht1.
-    (* apply clos_rt1n_trans in Ht2. *)
-    apply clos_rt1n_rt in Ht2.
-    apply clos_t1n_trans in Ht.
-
-  
-    (* apply clos_t1n_trans in Ht. *)
-  
-  
-  apply clos_rt1n_step in Ht.
-  apply clos_rt1n_step.
-
-  
-  apply clos_rt_rt1n in Ht.  
-
-
-  inversion_clear Ht; subst.
-  - apply H.
-  - 
-  
-  apply clos_t1n_trans in Ht.
-  (* apply clos_rt_rt1n. *) 
-  
-
-  Print clos_rt_t.
-  - 
+    admit.
+Admitted. 
 
 Lemma silent1_step (M A: Type) (lts : LTS M A): forall m m', 
   silent1 lts m m' -> silent lts m m'.
-Proof.
-  intros m1 m2 H1.
-  revert H1; compute; intros H1.
-  apply clos_rt.
-  induction H1 as [ m1 m2 H1 | ].
-  - (* issue: Unable to find an instance for the variable y. *)
-    (* get stuck -- can't apply H1 *)
-    unfold silent. compute.
-    (* while H1 can resolve as expected *)
-    compute in H1.
-Admitted.
-
+Proof. intros m1 m2. apply clos_silent. Qed.
 
 Section WeakSim.
   Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
@@ -154,31 +79,27 @@ Section WeakSim.
     In_sim { out_sim : simF weak_sim s t }.
 End WeakSim.
 
-Check weak_sim.
-Check In_sim.
-Check out_sim.
-Check simF.
-Check sim_weak.
-Check sim_tau.
-
-Lemma weak_sim_refl (M A : Type) (ltsM : LTS M A) (m : M)
-  : weak_sim ltsM ltsM m m.
+(* Lemma w (M A : Type) (ltsM : LTS M A) (m : M)
+: weak_sim ltsM ltsM m m ->
+  forall y z,
+  tau ltsM m y -> clos_trans_1n M (tau ltsM) y z -> tau ltsM m z.
 Proof.
-  revert m; cofix CH; intros m1.
-  apply In_sim. apply Pack_sim.
-  - intros m2 a Hm; eexists m2; split.
-    + apply Hm.
-    + apply CH. Guarded.
-  - intros m2 Hm; eexists m2; split. 
-    + apply silent1_step. apply Hm.
-    + apply CH. Guarded.
-Qed.
+  revert m; intros x Hxx y z Hxy Hyz.
+  destruct Hyz as [y Hyz | ]. 
+  - apply clos_rt1n_step. apply H.  *)
 
-(* Lemma w1 (M A : Type) (ltsM : LTS M A) (x1 y1 : M) :
-  weak_sim ltsM ltsM x1 y1 *)
+(* Lemma w (M A : Type) (ltsM : LTS M A) :
 
-Check ( Pack_sim).
-Check sim_tau.
+forall x y z,
+clos_refl_trans_1n M (tau ltsM) x y -> clos_refl_trans_1n M (silent ltsM) y z -> clos_refl_trans_1n M (silent ltsM) x z
+.
+Proof.
+  intros x y z Hxy Hyz.
+  Print clos_refl_trans_1n.
+
+  (* apply (@rt1n_trans M (tau ltsM) x y) in Hxy. *)
+  apply rt1n_trans in Hxy. *)
+
 
 Lemma weak_sim_step_none (M A : Type) (ltsM : LTS M A) 
 : forall x1 y1, 
@@ -200,80 +121,255 @@ Proof.
   inversion_clear Hw1; subst. inversion out_sim0; subst. apply sim_weak0.
 Qed.
 
-Lemma weak_sim_step (M A : Type) (ltsM : LTS M A) 
-: forall x1 y1,
-  weak_sim ltsM ltsM x1 y1 ->
-  ( forall x2 a,
-    weak ltsM x1 (Some a) x2 ->
-    exists y2, weak ltsM y1 (Some a) y2 /\ weak_sim ltsM ltsM x2 y2 )
-  \/ 
-  ( forall x2,
-    silent1 ltsM x1 x2 ->
-    exists y2, silent ltsM y1 y2 /\ weak_sim ltsM ltsM x2 y2 ).
-Proof. intros x1 y1 Hw1. left. apply weak_sim_step_some. apply Hw1. Qed.
-
-
-CoInductive stream :=
-  | cons : nat -> stream -> stream.
-
-Definition sunf s :=
-  match s with cons n s' => cons n s' end.
-
-Lemma sunf_eq : forall s, s = sunf s.
-Proof.
-  destruct s; auto.
+Lemma weak_sim_step (M N A : Type) (ltsM : LTS M A) 
+                                   (ltsN : LTS N A) (m1 : M) (n1 : N)
+: weak_sim ltsM ltsN m1 n1 ->
+  ( forall m2 a, weak ltsM m1 (Some a) m2 ->
+    exists n2, weak ltsN n1 (Some a) n2 /\ weak_sim ltsM ltsN m2 n2)
+  \/
+  ( forall m2, silent1 ltsM m1 m2 ->
+    exists n2, silent ltsN n1 n2 /\ weak_sim ltsM ltsN m2 n2 ).
+Proof. 
+  intros Hw1. left. 
+  inversion_clear Hw1; subst. inversion out_sim0; subst. apply sim_weak0.
 Qed.
 
-
-CoFixpoint enumerate n : stream :=
-  cons n (enumerate (S n)).
-
-CoFixpoint map f s : stream :=
-  match s with cons n s' => cons (f n) (map f s') end.
-
-Inductive seq_gen seq : stream -> stream -> Prop :=
-  | _seq_gen : forall n s1 s2 (R : seq s1 s2 : Prop), seq_gen seq (cons n s1) (cons n s2).
-Hint Constructors seq_gen.
-
-CoInductive seq : stream -> stream -> Prop :=
-  | seq_fold : forall s1 s2, seq_gen seq s1 s2 -> seq s1 s2.
-
-Theorem example : forall n, seq (enumerate n) (cons n (map S (enumerate n))).
+Lemma weak_sim_refl (M A : Type) (ltsM : LTS M A) (m : M)
+: weak_sim ltsM ltsM m m.
 Proof.
-  cofix CIH.
-  intros. apply seq_fold.
-  (* pattern (enumerate n) at 1; rewrite sunf_eq; simpl. *)
-  rewrite sunf_eq at 1; simpl.
-  constructor.
-  rewrite (sunf_eq (enumerate n)). simpl.
-  rewrite (sunf_eq (map _ _)). simpl.
-  apply CIH.
+  revert m; cofix CH; intros m1.
+  apply In_sim. apply Pack_sim.
+  - intros m2 a Hm; eexists m2; split.
+    + apply Hm.
+    + apply CH. Guarded.
+  - intros m2 Hm; eexists m2; split. 
+    + apply silent1_step. apply Hm.
+    + apply CH. Guarded.
 Qed.
 
+Lemma weak_sim_trans (X Y Z A : Type) 
+(ltsX : LTS X A) (ltsY : LTS Y A) (ltsZ : LTS Z A) 
+: forall x y z,
+  weak_sim ltsX ltsY x y -> 
+  weak_sim ltsY ltsZ y z -> 
+  weak_sim ltsX ltsZ x z.
+Proof.
+Admitted.
+
+(***********************************************)
 
 
+Section WeakBisim.
+  Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
+
+  Definition weak_bisim (s : M) (t : N) : Prop
+    := weak_sim ltsM ltsN s t /\ weak_sim ltsN ltsM t s.
+End WeakBisim.
+
+Lemma weak_bisim_refl (M A : Type) (ltsM : LTS M A) (m : M)
+  : weak_bisim ltsM ltsM m m.
+Proof. constructor 1; try apply weak_sim_refl. Qed.
 
 
+Lemma weak_bisim_sym (M N A : Type) (ltsM : LTS M A) 
+                                    (ltsN : LTS N A) (m : M) (n : N)
+: weak_bisim ltsM ltsN m n ->
+  (weak_sim ltsM ltsN m n -> weak_sim ltsN ltsM n m) /\
+  (weak_sim ltsN ltsM n m -> weak_sim ltsM ltsN m n).
+Proof.
+  intros Hb. split.
+  - destruct Hb as [_ Hnm]. intros _. apply Hnm.
+  - destruct Hb as [Hmn _]. intros _. apply Hmn.
+Qed.
 
+Lemma weak_bisim_trans (X Y Z A : Type) 
+(ltsX : LTS X A) (ltsY : LTS Y A) (ltsZ : LTS Z A) 
+: forall x y z,
+  weak_bisim ltsX ltsY x y ->
+  weak_bisim ltsY ltsZ y z ->
+  weak_bisim ltsX ltsZ x z.
+Proof.
+  intros x y z Hbxy Hbyz.
+  destruct Hbxy as [Hsxy Hsyx]. destruct Hbyz as [Hsyz Hszy].
+  split. 
+  - apply (@weak_sim_trans X Y Z A ltsX ltsY ltsZ x y z).
+    + apply Hsxy.
+    + apply Hsyz.
+  - apply (@weak_sim_trans Z Y X A ltsZ ltsY ltsX z y x).
+    + apply Hszy.
+    + apply Hsyx.
+Qed.
 
 
 
 
 Lemma weak_sim_trans (M A : Type) (ltsM : LTS M A) (x y z : M)
-  : weak_sim ltsM ltsM x y -> 
-    weak_sim ltsM ltsM y z -> 
-    weak_sim ltsM ltsM x z.
+: weak_sim ltsM ltsM x y -> 
+  weak_sim ltsM ltsM y z -> 
+  weak_sim ltsM ltsM x z.
 Proof.
-  (* revert x y z; cofix CH; intros x1 y1 z1. *)
-  revert x y z; intros x1 y1 z1; cofix CH.
+  revert x y z; cofix CH; intros x1 y1 z1.
+  intros Hxy Hyz.
+  apply In_sim. apply Pack_sim. 
+  { intros x2 a Hx.
+
+    destruct Hyz as [Hyz]; destruct Hyz as [Hyz_weak Hyz_tau].
+    (* apply Hyz_weak. *)
+
+
+    (* inversion_clear Hx; subst; inversion_clear H; subst; inversion H0; subst.  *)
+    (* inversion pre0; subst; inversion post0; subst. *)
+
+
+    About sim_weak.
+    apply (@sim_weak M M A ltsM ltsM _ x1 _).
+    {
+      admit.
+    }
+    - apply Hx.
+  }
+  { intros x2 Hx. 
+    (* apply silent1_step in Hx. *)
+    }
+    apply Hyz_weak.
+
+
+(* Lemma w (M A : Type) (ltsM : LTS M A) (x y : M)
+: weak_sim ltsM ltsM x y ->
+  weak *)
+
+
+    (* apply weak_sim_refl in Hxy.  *)
+    (* apply weak_sim_refl in Hx.  *)
+
+    apply Hxy.
+    destruct Hxy as [Hxy]; destruct Hxy as [Hxy_weak Hxy_tau].
+
+
+    apply Hxy_weak.
+
+    (* destruct Hx; destruct H; destruct H.  *)
+    inversion_clear Hx; subst; inversion_clear H; subst; inversion H0; subst. 
+    (* inversion pre0; subst. inversion post0; subst. *)
+
+
+    apply Hx.
+
+    apply Hxy_weak.
+    
+    inversion Hxy; subst.
+
+  }
+
+
+
+
+  destruct Hxy as [out_Hxy].
+  destruct out_Hxy as [Hxy_weak Hxy_tau].
+
+
+
+  (* apply In_sim in out_Hxy.  *)
+
+
+  (* apply Pack_sim in out_Hxy.  *)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  (* revert x y z; intros x1 y1 z1; cofix CH. *)
   intros Hxy Hyz.
   (* inversion Hxy; subst; inversion Hyz; subst. *)
   (* inversion out_sim0; subst. *)
 
+  (* destruct Hxy as [Hxy]; destruct Hxy as [Hxy_weak Hxy_tau]. *)
+  (* destruct Hyz as [Hyz]; destruct Hyz as [Hyz_weak Hyz_tau]. *)
+  (* compute in Hxy_weak. *)
+
   apply In_sim. apply Pack_sim. 
   
-  - intros x2 a.
-    apply weak_sim_step_some. 
+  - intros x2 ax Hwx. 
+    About sim_weak.
+    (* eexists ?[z2].  *)
+    apply (@sim_weak M M A ltsM ltsM (weak_sim ltsM ltsM) z1 _).
+    (* apply (@sim_weak M M A ltsM ltsM (weak_sim ltsM ltsM) x1 z1). *)
+    (* apply (@sim_weak M M A ltsM ltsM (weak_sim ltsM ltsM) x2 z1). *)
+    + apply Pack_sim; apply weak_sim_refl.
+    +
+      inversion_clear Hwx; subst.
+      inversion_clear H; subst.
+      unfold weak.
+      apply H0. 
+      unfold weak_tr. 
+      apply Pack_weak.
+      
+      Print weak.
+      unfold weak. 
+      apply Pack_weak.
+
+      * intros z2 az Hwz. 
+    
+    
+    eexists ?[z2]. 
+    split.
+    + apply sim_weak. 
+  
+    destruct Hxy as [Hxy]; destruct Hxy as [Hxy_weak Hxy_tau].
+    destruct Hyz as [Hyz]; destruct Hyz as [Hyz_weak Hyz_tau].
+
+    
+
+    inversion_clear Hxy; subst. inversion_clear out_sim0; subst.
+    apply sim_weak0 in out_sim0.
+
+    apply Pack_weak in .
+
+    (* apply sim_weak in Hyz. *)
+    (* apply sim_weak in Hyz. *)
+  
+    apply out_sim.
+    apply sim_weak.
+    intros x2 a Hwx.
+
+    inversion_clear Hxy; subst. inversion out_sim0; subst.
+    
+    
+    apply sim_weak0 in out_sim0.
+    revert x2 a Hwx. apply sim_weak0.
+
+
+
+
+    apply weak_sim_step_some.
+
+
+    apply clos_rt1n_step in Hxy.
+
+
+
+    
+
+
+
+    apply weak_sim_step_some.
+
+    admit.
+
+  - intros x2.
+    apply weak_sim_step_none.
+
+
     (* revert Hxy Hyz. *)
     apply CH. apply Hxy. apply Hyz. Guarded.
     (* apply CH. Guarded. *)
@@ -450,19 +546,6 @@ Admitted. *)
 
 
 
-
-Section WeakBisim.
-  Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
-
-  Definition weak_bisim (s : M) (t : N) : Prop
-    := weak_sim ltsM ltsN s t /\ weak_sim ltsN ltsM t s.
-End WeakBisim.
-
-Lemma weak_bisim_refl (M A : Type) (ltsM : LTS M A) (m : M)
-  : weak_bisim ltsM ltsM m m.
-Proof. constructor 1; try apply weak_sim_refl. Qed.
-
-Lemma weak_bisim_trans
 
 Module BisimTest1.
   Inductive action : Type := | TheAction1 | TheAction2.
@@ -919,5 +1002,66 @@ Proof.
   (* - exact tr. *)
   (* - apply CH. Guarded. *)
 Abort.
+
+
+
+
+
+
+(* example from online *)
+
+
+
+
+
+
+
+
+
+
+
+
+CoInductive stream :=
+  | cons : nat -> stream -> stream.
+
+Definition sunf s :=
+  match s with cons n s' => cons n s' end.
+
+Lemma sunf_eq : forall s, s = sunf s.
+Proof.
+  destruct s; auto.
+Qed.
+
+
+CoFixpoint enumerate n : stream :=
+  cons n (enumerate (S n)).
+
+CoFixpoint map f s : stream :=
+  match s with cons n s' => cons (f n) (map f s') end.
+
+Inductive seq_gen seq : stream -> stream -> Prop :=
+  | _seq_gen : forall n s1 s2 (R : seq s1 s2 : Prop), seq_gen seq (cons n s1) (cons n s2).
+Hint Constructors seq_gen.
+
+CoInductive seq : stream -> stream -> Prop :=
+  | seq_fold : forall s1 s2, seq_gen seq s1 s2 -> seq s1 s2.
+
+Theorem example : forall n, seq (enumerate n) (cons n (map S (enumerate n))).
+Proof.
+  cofix CIH.
+  intros. apply seq_fold.
+  (* pattern (enumerate n) at 1; rewrite sunf_eq; simpl. *)
+  rewrite sunf_eq at 1; simpl.
+  constructor.
+  rewrite (sunf_eq (enumerate n)). simpl.
+  rewrite (sunf_eq (map _ _)). simpl.
+  apply CIH.
+Qed.
+
+
+
+
+
+
 
 
