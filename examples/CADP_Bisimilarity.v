@@ -101,43 +101,43 @@ Proof.
   apply rt1n_trans in Hxy. *)
 
 
-Lemma weak_sim_step_none (M A : Type) (ltsM : LTS M A) 
+Lemma weak_sim_step_none (M N A : Type) (ltsM : LTS M A) (ltsN : LTS N A) 
 : forall x1 y1, 
-  weak_sim ltsM ltsM x1 y1 ->
+  weak_sim ltsM ltsN x1 y1 ->
   forall x2, silent1 ltsM x1 x2 ->
-  exists y2, silent ltsM y1 y2 /\ weak_sim ltsM ltsM x2 y2.
+  exists y2, silent ltsN y1 y2 /\ weak_sim ltsM ltsN x2 y2.
 Proof.
   intros x1 y1 Hw1.
   inversion_clear Hw1; subst. inversion out_sim0; subst. apply sim_tau0.
 Qed.
 
-Lemma weak_sim_step_some (M A : Type) (ltsM : LTS M A) 
+Lemma weak_sim_step_some (M N A : Type) (ltsM : LTS M A) (ltsN : LTS N A) 
 : forall x1 y1, 
-  weak_sim ltsM ltsM x1 y1 ->
+  weak_sim ltsM ltsN x1 y1 ->
   forall x2 a, weak ltsM x1 (Some a) x2 ->
-  exists y2, weak ltsM y1 (Some a) y2 /\ weak_sim ltsM ltsM x2 y2.
+  exists y2, weak ltsN y1 (Some a) y2 /\ weak_sim ltsM ltsN x2 y2.
 Proof.
   intros x1 y1 Hw1.
   inversion_clear Hw1; subst. inversion out_sim0; subst. apply sim_weak0.
 Qed.
 
-Lemma weak_sim_step (M N A : Type) (ltsM : LTS M A) 
-                                   (ltsN : LTS N A) (m1 : M) (n1 : N)
-: weak_sim ltsM ltsN m1 n1 ->
+Lemma weak_sim_step (M N A : Type) (ltsM : LTS M A) (ltsN : LTS N A)
+: forall m1 n1,
+  weak_sim ltsM ltsN m1 n1 ->
   ( forall m2 a, weak ltsM m1 (Some a) m2 ->
     exists n2, weak ltsN n1 (Some a) n2 /\ weak_sim ltsM ltsN m2 n2)
   \/
   ( forall m2, silent1 ltsM m1 m2 ->
     exists n2, silent ltsN n1 n2 /\ weak_sim ltsM ltsN m2 n2 ).
 Proof. 
-  intros Hw1. left. 
+  intros m1 n1 Hw1. left. 
   inversion_clear Hw1; subst. inversion out_sim0; subst. apply sim_weak0.
 Qed.
 
-Lemma weak_sim_refl (M A : Type) (ltsM : LTS M A) (m : M)
-: weak_sim ltsM ltsM m m.
+Lemma weak_sim_refl (M A : Type) (ltsM : LTS M A)
+: forall m, weak_sim ltsM ltsM m m.
 Proof.
-  revert m; cofix CH; intros m1.
+  cofix CH; intros m1.
   apply In_sim. apply Pack_sim.
   - intros m2 a Hm; eexists m2; split.
     + apply Hm.
@@ -154,9 +154,27 @@ Lemma weak_sim_trans (X Y Z A : Type)
   weak_sim ltsY ltsZ y z -> 
   weak_sim ltsX ltsZ x z.
 Proof.
+  cofix CH; intros x y z Hxy Hyz.
+  (* destruct Hxy as [Hxy]; destruct Hxy as [Hxy_weak Hxy_tau]. *)
+  (* destruct Hyz as [Hyz]; destruct Hyz as [Hyz_weak Hyz_tau]. *)
+  apply In_sim; apply Pack_sim.
+  { intros x2 ax Hx.
+    About weak_sim_step_some.
+    apply (@weak_sim_step_some X Z A ltsX ltsZ x z).
+    - admit.
+    - apply Hx. }
+  { intros x2 Hx. 
+    About weak_sim_step_none.
+    apply (@weak_sim_step_none X Z A ltsX ltsZ x z).
+    - admit.
+    - apply Hx. }
 Admitted.
+  
 
-(***********************************************)
+  inversion_clear Hxy; subst. destruct out_sim0.
+  destruct Hxy.
+
+  apply In_sim; apply Pack_sim.
 
 
 Section WeakBisim.
@@ -166,18 +184,17 @@ Section WeakBisim.
     := weak_sim ltsM ltsN s t /\ weak_sim ltsN ltsM t s.
 End WeakBisim.
 
-Lemma weak_bisim_refl (M A : Type) (ltsM : LTS M A) (m : M)
-  : weak_bisim ltsM ltsM m m.
+Lemma weak_bisim_refl (M A : Type) (ltsM : LTS M A)
+: forall m, weak_bisim ltsM ltsM m m.
 Proof. constructor 1; try apply weak_sim_refl. Qed.
 
-
-Lemma weak_bisim_sym (M N A : Type) (ltsM : LTS M A) 
-                                    (ltsN : LTS N A) (m : M) (n : N)
-: weak_bisim ltsM ltsN m n ->
+Lemma weak_bisim_sym (M N A : Type) (ltsM : LTS M A) (ltsN : LTS N A) 
+: forall m n,
+  weak_bisim ltsM ltsN m n ->
   (weak_sim ltsM ltsN m n -> weak_sim ltsN ltsM n m) /\
   (weak_sim ltsN ltsM n m -> weak_sim ltsM ltsN m n).
 Proof.
-  intros Hb. split.
+  intros m n Hb. split.
   - destruct Hb as [_ Hnm]. intros _. apply Hnm.
   - destruct Hb as [Hmn _]. intros _. apply Hmn.
 Qed.
