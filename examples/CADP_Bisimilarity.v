@@ -147,6 +147,51 @@ Proof.
     + apply CH. Guarded.
 Qed.
 
+
+
+Lemma weak_sim_trans_some (X Y Z A : Type) 
+(ltsX : LTS X A) (ltsY : LTS Y A) (ltsZ : LTS Z A) 
+: forall x y z,
+  weak_sim ltsX ltsY x y -> 
+  weak_sim ltsY ltsZ y z -> 
+  forall x2 a,
+  weak ltsX x (Some a) x2 ->
+  exists y2, weak ltsY y (Some a) y2 -> weak_sim ltsX ltsY x2 y2 /\
+  exists z2, weak ltsZ z (Some a) z2 -> weak_sim ltsY ltsZ y2 z2 
+  .
+  (* -> *)
+  (* weak_sim ltsX ltsZ x2 z2. *)
+Proof.
+  intros x1 y1 z1.
+  intros Hxy Hyz.
+
+  inversion Hxy as [Hxy_simF]; subst. 
+  inversion Hxy_simF as [Hxy_weak Hxy_tau]; subst.
+  
+  intros x2 a.
+
+  intros Hx.
+  Search weak.
+  apply weak_sim_step in Hxy.
+  apply Hxy_weak in Hx.
+
+  inversion Hx as [y2 Hy_xy].
+  eexists y2.
+  intros Hy.
+  split.
+  - apply Hy_xy.
+  - 
+    inversion Hyz as [Hyz_simF]; subst. 
+    inversion Hyz_simF as [Hyz_weak Hyz_tau]; subst.
+    apply Hyz_weak in Hy.
+    inversion Hy as [z2 Hz_yz].
+    eexists z2.
+    intros Hz.
+    apply Hz_yz.
+Qed.
+    (* intros Hyz2. *)
+
+
 Lemma weak_sim_trans (X Y Z A : Type) 
 (ltsX : LTS X A) (ltsY : LTS Y A) (ltsZ : LTS Z A) 
 : forall x y z,
@@ -154,14 +199,90 @@ Lemma weak_sim_trans (X Y Z A : Type)
   weak_sim ltsY ltsZ y z -> 
   weak_sim ltsX ltsZ x z.
 Proof.
-  cofix CH; intros x y z Hxy Hyz.
+  cofix CH; intros x y z.
+
+  intros Hxy. intros Hyz.
+
   (* destruct Hxy as [Hxy]; destruct Hxy as [Hxy_weak Hxy_tau]. *)
   (* destruct Hyz as [Hyz]; destruct Hyz as [Hyz_weak Hyz_tau]. *)
+
+  inversion Hxy as [Hxy_inv]; destruct Hxy_inv as [Hxy_weak Hxy_tau].
+  inversion Hyz as [Hyz_inv]; destruct Hyz_inv as [Hyz_weak Hyz_tau].
+
+  apply In_sim. apply Pack_sim.
+  {
+    intros x2 ax Hx.
+
+    
+    apply Hxy_weak in Hx. 
+    apply weak_sim_step_some.
+  }
+
+  
+
+  apply out_sim in Hxy.
+  induction Hxy.
+  
+  apply out_sim in Hyz.
+
+  apply Hxy_weak in Hxy.
+
   apply In_sim; apply Pack_sim.
-  { intros x2 ax Hx.
+
+
+
+  (* apply out_sim in Hxy. *)
+  (* inversion Hxy; subst. induction out_s. *)
+  apply sim_weak0 in Hx.
+
+  apply In_sim; apply Pack_sim.
+  { intros x2 ax.
+    intros Hx.
     About weak_sim_step_some.
+    
+    (* inversion Hxy; subst. *)
+    (* inversion out_sim0; subst. *)
+    apply out_sim in Hxy.
+    induction Hxy.
+    apply sim_weak0 in Hx.
+    
+    apply out_sim in Hyz.
+    induction Hyz.
+    apply sim_weak1.
+
+    (* apply (@weak_sim_step_some X Y A ltsX ltsY x y _ x2 ax). *)
+    (* apply @weak_sim_step_some. *)
+    (* apply sim_weak0. *)
+    apply sim_weak0 in Hx.
+    About weak_sim.
+    (* apply (@weak_sim X Y A ltsX ltsY x y) in Hx. *)
+    About sim_weak.
+    (* apply (@sim_weak X Y A ltsX ltsY _ x y) in Hx. *)
+    
+    Print weak_sim_step_some.
+    About weak_sim_step_some.
+    (* apply (@weak_sim_step_some X Y A ltsX ltsY x y _ x2 ax) in Hx. *)
+
+    apply out_sim in Hyz.
+    induction Hyz.
+    apply (@weak_sim_step_some X Y A ltsX ltsY x y) in Hx.
+    
+    apply sim_tau1 in Hx.
+
+    apply Hx.
+    (* apply weak_sim_step_some in sim_weak0. *)
+    Print Pack_sim.
+    apply sim_weak in Hxy.
+
+    apply (@weak_sim_step_some X Y A ltsX ltsY x y).
+
+
     apply (@weak_sim_step_some X Z A ltsX ltsZ x z).
-    - admit.
+    - 
+      Print weak_sim.
+      Print weak.
+      
+      admit.
     - apply Hx. }
   { intros x2 Hx. 
     About weak_sim_step_none.
