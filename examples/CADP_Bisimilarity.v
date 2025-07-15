@@ -79,6 +79,25 @@ Section WeakSim.
     In_sim { out_sim : simF weak_sim s t }.
 End WeakSim.
 
+(* Lemma sim_tau_refl (X Y A : Type) (ltsX : LTS X A) (ltsY : LTS Y A)
+: forall x1 y1,
+  weak_sim ltsX ltsY x1 y1 ->
+  exists x2,
+  silent ltsX x1 x2 -> 
+  weak_sim ltsX ltsY x1 y1.
+Proof.
+  intros x1 y1 Hxy.
+  inversion Hxy as [Hxy_simF]; subst.
+  inversion Hxy_simF as [Hxy_weak Hxy_tau]; subst.
+  eexists ?[x2].
+  intros Hx.
+  induction Hx as [x1a x1b Hx].
+  - apply Hxy.
+  -   *)
+
+  
+
+
 (* Lemma w (M A : Type) (ltsM : LTS M A) (m : M)
 : weak_sim ltsM ltsM m m ->
   forall y z,
@@ -99,6 +118,18 @@ Proof.
 
   (* apply (@rt1n_trans M (tau ltsM) x y) in Hxy. *)
   apply rt1n_trans in Hxy. *)
+(* 
+Lemma tau_refl (M A : Type) (ltsM : LTS M A)
+: forall x1, 
+  weak_sim ltsM ltsM x1 x1 ->
+  forall x2, 
+  silent ltsM x1 x2 ->
+  weak_sim ltsM ltsM x1 x2.
+Proof.
+  intros x1 Hx x2 Hx2.
+   *)
+
+
 
 
 Lemma weak_sim_step_none (M N A : Type) (ltsM : LTS M A) (ltsN : LTS N A) 
@@ -120,6 +151,42 @@ Proof.
   intros x1 y1 Hw1.
   inversion_clear Hw1; subst. inversion out_sim0; subst. apply sim_weak0.
 Qed.
+
+(* Lemma weak_sim_step_any (X Y A : Type) (ltsX : LTS X A) (ltsY : LTS Y A) 
+: forall x1 y1, 
+  weak_sim ltsX ltsY x1 y1 ->
+  forall x2, silent ltsX x1 x2 ->
+  exists y2, silent ltsY y1 y2 /\ weak_sim ltsX ltsY x2 y2.
+Proof.
+  intros x1 y1 Hw.
+
+  inversion Hw as [Hw_simF]; subst.
+  inversion_clear Hw_simF as [Hw_weak Hw_tau]; subst.
+
+  intros x2.
+  intros Hx.
+
+  destruct Hx as [ | x2 ].
+  {
+
+  }
+
+  induction Hx as [ x1 | x x2 Hx ].
+  {
+    eexists 
+  }
+
+  Check silent1_step.
+  apply silent1_step in Hx.
+  apply (@silent1_step X A ltsX x1 x2) in Hx.
+
+  intros x2 Hx.
+
+  induction Hx as [ x | x x' Hx ].
+  -
+  
+  inversion_clear Hw; subst. inversion out_sim0; subst. apply sim_tau0.
+Qed. *)
 
 Lemma weak_sim_step (M N A : Type) (ltsM : LTS M A) (ltsN : LTS N A)
 : forall m1 n1,
@@ -149,6 +216,29 @@ Qed.
 
 
 
+Lemma weak_sim_trans_silent (X Y Z A : Type) 
+(ltsX : LTS X A) (ltsY : LTS Y A) (ltsZ : LTS Z A) 
+: forall x y z,
+  weak_sim ltsX ltsY x y -> 
+  weak_sim ltsY ltsZ y z -> 
+  forall x2,
+  silent ltsX x x2 ->
+  exists y2, silent ltsY y y2 -> weak_sim ltsX ltsY x2 y2 /\
+  exists z2, silent ltsZ z z2 -> weak_sim ltsY ltsZ y2 z2 
+  .
+Proof.
+  intros x1 y1 z2.
+  intros Hxy. intros Hyz.
+  intros x2.
+  
+  inversion Hxy as [Hxy_simF]; subst. 
+  inversion Hxy_simF as [Hxy_weak Hxy_tau]; subst.
+
+  intros Hx.
+  
+
+  
+
 Lemma weak_sim_trans_some (X Y Z A : Type) 
 (ltsX : LTS X A) (ltsY : LTS Y A) (ltsZ : LTS Z A) 
 : forall x y z,
@@ -172,7 +262,7 @@ Proof.
 
   intros Hx.
   Search weak.
-  apply weak_sim_step in Hxy.
+  (* apply weak_sim_step in Hxy. *)
   apply Hxy_weak in Hx.
 
   inversion Hx as [y2 Hy_xy].
@@ -199,19 +289,98 @@ Lemma weak_sim_trans (X Y Z A : Type)
   weak_sim ltsY ltsZ y z -> 
   weak_sim ltsX ltsZ x z.
 Proof.
-  cofix CH; intros x y z.
+  cofix CH; intros x1 y1 z1.
 
   intros Hxy. intros Hyz.
+
+
+
+  
 
   (* destruct Hxy as [Hxy]; destruct Hxy as [Hxy_weak Hxy_tau]. *)
   (* destruct Hyz as [Hyz]; destruct Hyz as [Hyz_weak Hyz_tau]. *)
 
-  inversion Hxy as [Hxy_inv]; destruct Hxy_inv as [Hxy_weak Hxy_tau].
-  inversion Hyz as [Hyz_inv]; destruct Hyz_inv as [Hyz_weak Hyz_tau].
+  inversion Hxy as [Hxy_inv]; subst; destruct Hxy_inv as [Hxy_weak Hxy_tau].
+  inversion Hyz as [Hyz_inv]; subst; destruct Hyz_inv as [Hyz_weak Hyz_tau].
 
   apply In_sim. apply Pack_sim.
   {
     intros x2 ax Hx.
+
+    apply Hxy_weak in Hx.
+    inversion_clear Hx as [y2 Hy_xy]; subst.
+    induction Hy_xy as [Hy Hxy2].
+
+    apply Hyz_weak in Hy.
+    inversion_clear Hy as [z2 Hz_yz]; subst.
+    induction Hz_yz as [Hz Hyz2].
+
+    eexists z2.
+    split.
+    - apply Hz.
+    - About CH. apply (@CH x2 y2 z2 Hxy2 Hyz2). Guarded.
+  }
+  {
+    intros x2 Hx.
+
+    induction Hx as [ x1 x2 Hx | ].
+    - inversion Hx. 
+
+    apply Hxy_tau in Hx.
+    inversion_clear Hx as [y2 Hy_xy]; subst.
+    induction Hy_xy as [Hy Hxy2].
+
+
+
+    induction Hy as [ y' | y y' y2 Hy_tau Hy_rt IHy ].
+    {
+      eexists ?[z2].
+      split.
+      - Search silent.
+        (* compute. *)
+        (* apply Pack_weak. *)
+        (* apply silent1_step. *)
+        constructor.
+        (* ! check this *)
+      - About CH. apply (@CH x2 y' z1 Hxy2 Hyz). Guarded.
+        apply In_sim. apply Pack_sim.
+        {
+          intros 
+        }
+        constructor.
+        constructor.
+        inversion_clear Hxy2 as [Hxy2_xy]; subst.
+        induction Hxy2_xy as [Hxy2_y Hxy3].
+        
+         
+
+
+
+      admit.  
+      (* apply Hxy_tau in Hxy2. *)
+    }
+    {
+
+    }  
+
+    About Hyz_tau. apply (@Hyz_tau y2 Hy) in Hy.
+    inversion_clear Hy as [z2 Hz_yz]; subst.
+  }   
+
+
+
+  eexists y2.
+  intros Hy.
+  split.
+  - apply Hy_xy.
+  - 
+    inversion Hyz as [Hyz_simF]; subst. 
+    inversion Hyz_simF as [Hyz_weak Hyz_tau]; subst.
+    apply Hyz_weak in Hy.
+    inversion Hy as [z2 Hz_yz].
+    eexists z2.
+    intros Hz.
+    apply Hz_yz.
 
     
     apply Hxy_weak in Hx. 
