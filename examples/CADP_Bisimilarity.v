@@ -191,16 +191,377 @@ Proof.
   inversion_clear Hw1; subst. inversion out_sim0; subst. apply sim_weak0.
 Qed.
 
+
+(* Lemma _w (X A : Type) (lts : LTS X A)
+: forall x, 
+  weak_sim lts lts x x -> 
+  forall y, 
+  silent1 lts x y -> 
+  silent lts x y ->
+  exists z,
+  silent1 lts x z -> 
+  silent lts z y.
+Proof.
+  intros x Hxx y Hxy1 Hxy. *)
+
+
+(* Lemma _w (X A : Type) (lts : LTS X A)
+: forall x, 
+  weak_sim lts lts x x -> 
+  forall y, 
+  silent1 lts x y -> 
+  exists z,
+  silent lts x z ->
+  silent1 lts z y.
+Proof.
+  intros x Hxx_sim y Hxy.
+
+  (* apply clos_t1n_trans in Hxy.
+  inversion Hxy as [|z]; subst.
+  - eexists x. intros Hxx. apply clos_trans_t1n. apply Hxy.
+  - eexists z. intros Hxz. apply clos_trans_t1n. apply H0.
+Qed. *)
+
+
+  apply clos_t1n_trans in Hxy.
+  inversion Hxy as [|_z z]; subst.
+  - apply clos_rt1n_step. apply H.
+  - apply clos_rt_rt1n.
+
+
+    (* apply (@clos_rt_t X (tau lts) x y z _ _ ). *)
+    (* apply (@clos_rt_t X (tau lts) x y z) in H. *)
+
+
+    apply t_step in Hxy.
+
+    About rt_trans.
+    apply (@rt_trans X (tau lts) x z y).
+    + apply (@rt_trans X (tau lts) x y z).
+
+
+    About clos_rt_t.
+    (* apply (@clos_rt_t X (tau lts) x y z (clos_refl_trans X (tau lts) x y) H0    ) in H. *)
+    apply (@clos_rt_t X (tau lts) x z y _ H0) in Hxy.
+
+
+
+
+  destruct Hxy.
+  - apply clos_rt1n_step. apply H.
+  - 
+    apply clos_rt_rt1n.
+    apply clos_t1n_trans in Hxy.
+    apply (@clos_rt_t X (tau lts) x y z _ Hxy   ) in Hxy.
+
+    
+    apply (@rt_trans) in H.
+
+
+  apply clos_t1n_trans in Hxy.
+  inversion Hxy; subst.
+  - apply clos_rt1n_step. apply H.
+  - apply clos_rt_rt1n.
+    (* About clos_rt_t.  *)
+    (* apply (@clos_rt_t X (tau lts) x ) in H. *)
+    (* apply (@clos_rt_t X (tau lts) x ) in H0. *)
+    apply (@clos_rt_t X (tau lts) x ).
+    +  *)
+
+  
+Lemma silent_trans_l (X A : Type) (lts : LTS X A)
+: forall x, 
+  weak_sim lts lts x x -> 
+  forall y, 
+  silent1 lts x y -> 
+  exists z,
+  silent lts x z ->
+  silent1 lts z y.
+Proof.
+  intros x Hxx_sim y Hxy.
+
+  apply clos_t1n_trans in Hxy.
+  inversion Hxy as [|z]; subst.
+  - eexists x. intros Hxx. apply clos_trans_t1n. apply Hxy.
+  - eexists z. intros Hxz. apply clos_trans_t1n. apply H0.
+Qed.
+
+Lemma silent_trans_r (X A : Type) (lts : LTS X A)
+: forall x, 
+  weak_sim lts lts x x -> 
+  forall y, 
+  silent1 lts x y -> 
+  exists z,
+  silent1 lts x z ->
+  silent lts z y.
+Proof.
+  intros x Hxx_sim y Hxy.
+  eexists y. intros _Hxy.
+  constructor.
+Qed.
+
+(* Lemma weak_sim_refl_weak (X A : Type) (lts : LTS X A)
+: forall x, 
+  weak_sim lts lts x x ->
+  forall y a,
+  weak lts x (Some a) y ->
+  exists z,
+  weak lts x (Some a) z /\
+  weak_sim lts lts y z.
+Proof. intros x Hxx_sim. apply Hxx_sim. Qed.  *)
+
+Lemma silent_trans (X A : Type) (lts : LTS X A)
+: forall x, 
+  weak_sim lts lts x x -> 
+  forall y, 
+  silent1 lts x y -> 
+  exists z1 z2,
+  silent lts x z1 ->
+  silent1 lts z1 z2 ->
+  silent lts z2 y.
+Proof.
+  intros x Hxx_sim y Hxy. 
+  assert (Hxy_l := Hxy); apply silent_trans_l in Hxy_l; [| apply Hxx_sim].
+  destruct Hxy_l as [z1 Hxy_l]; eexists z1.
+  
+  assert (Hxy_r := Hxy_l); apply silent_trans_r in Hxy_r.
+  { destruct Hxy_r as [z2 Hxy_r]; eexists z2.
+    intros Hxz Hzz. apply Hxy_r. apply Hzz. 
+  }
+  { admit. }
+  { admit. }
+Admitted.
+
+
+
+  (* assert (Hxy_r := Hxy_l). apply silent_trans_r in Hxy_r.
+  { destruct Hxy_r as [z2 Hxy_r]. eexists z2. 
+    intros Hxz Hzz. apply Hxy_r. apply Hzz. }
+  { admit. }
+  {
+    destruct Hxy_l; subst.
+  }
+
+
+  {
+    cofix CHz1. 
+    apply In_sim. apply Pack_sim.
+    - intros z1b a Hzz1. eexists z1b. split.
+      + apply Hzz1.
+      + apply CHz1. 
+    
+    apply weak_sim_refl_weak. apply CHz1. Guarded.  
+
+  }
+  - apply Hzz.
+  - admit.
+  - destruct Hxy_l.
+  
+  apply Hxy_l.  
+  eexists z2.
+
+
+
+
+
+
+
+
+
+
+
+
+  intros x Hxx_sim y Hxy. 
+  assert (Hxy_r := Hxy); apply silent_trans_r in Hxy_r; [| apply Hxx_sim].
+  destruct Hxy_r as [z1 Hxy_r]; eexists z1.
+  
+  assert (Hxy_l := Hxy_r).
+  apply silent_trans_l in Hxy.
+
+
+  assert (Hxy_l' := Hxy_r); destruct Hxy_l'; subst.
+  - apply Hxy_r. 
+  apply silent_trans_l in Hxy_l.
+   [| apply Hxx_sim].
+  destruct Hxy_l as [z2 Hxy_l]; eexists z2.
+
+
+
+
+
+  (** prove that z1 z1 is weak_sim *)
+  assert (weak_sim lts lts z1 z1).
+  {
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+  assert (Hxy_r := Hxy); apply silent_trans_r in Hxy_r; [| apply Hxx_sim].
+  destruct Hxy_r as [z2 Hxy_r]; eexists z2.
+
+  intros Hxz1. apply Hxy_l in Hxz1.
+  (* intros Hzz. *)
+  About silent_trans_r.
+  apply (@silent_trans_r X A lts x Hxx_sim y ).
+  
+  
+  (* eexists ?[z2]. *)
+  intros Hxz1. apply Hxy_l in Hxz1.
+
+
+
+
+
+
+
+
+  assert (Hxy_r := Hxz1); apply silent_trans_r in Hxy_r.
+  destruct Hxy_r as [z2 Hxy_r]. 
+  intros Hzz. apply Hxy_r in Hzz.
+  eexists z2.
+
+
+
+  assert (Hxy_r := Hxy); apply silent_trans_r in Hxy_r; [| apply Hxx_sim].
+  destruct Hxy_r as [z2 Hxy_r]; eexists z2.
+
+  intros Hxz1. apply Hxy_l in Hxz1.
+  
+  intros Hzz.
+
+  inversion Hxy_l; subst.
+   *)
+
+(* Lemma silent_trans_refl (X A : Type) (lts : LTS X A)
+: forall x, 
+  weak_sim lts lts x x -> 
+  silent lts x x -> 
+  forall y, 
+  weak_sim lts lts y y ->
+  silent lts x y -> 
+  weak_sim lts lts x y.
+Proof.
+  (* cofix CH. *)
+  intros x Hxx_sim Hxx y Hyy_sim Hxy.
+
+  inversion Hxx_sim as [Hxx_simF]; subst;
+  inversion_clear Hxx_simF as [Hxx_weak Hxx_tau]; subst.
+
+  inversion Hyy_sim as [Hyy_simF]; subst;
+  inversion_clear Hyy_simF as [Hyy_weak Hyy_tau]; subst.
+
+  apply In_sim; apply Pack_sim.
+  - intros z a Hxz_weak. eexists z. split. (* [| apply CH]. Guarded. *)
+    + apply Hxx_weak in Hxz_weak.
+      inversion Hxz_weak as [z']; subst.
+    
+    apply Hyy_weak.
+      constructor. apply Hx.
+    + apply CH. Guarded.
+
+  apply clos_t1n_trans in Hxy.
+  inversion Hxy as [|z]; subst.
+  - eexists x. intros Hxx. apply clos_trans_t1n. apply Hxy.
+  - eexists z. intros Hxz. apply clos_trans_t1n. apply H0.
+Qed. *)
+
+
 Lemma weak_sim_refl (X A : Type) (lts : LTS X A)
 : forall x, weak_sim lts lts x x.
 Proof.
-  cofix CH; intros x.
+  cofix CH; intros x. cofix Hxx_sim.
   apply In_sim. apply Pack_sim.
-  - intros y a Hxy; eexists y; split.
+  { intros y a Hxy; eexists y; split.
     + apply Hxy.
     + apply CH. Guarded.
+  }
+  { intros y Hxy.
+    eexists y.
+    split.
+    - 
+      About silent_trans.
+      apply (@silent_trans_l X A lts x Hxx_sim y) in Hxy.
+      destruct Hxy as [z Hxzzy].
+      apply silent_trans_r in Hxzzy.
 
-  - intros y Hxy.
+
+      About silent_trans2.
+      apply (@silent_trans2 X A lts x Hxx_sim y ) in Hxy.
+
+
+    - constructor.
+    - destruct Hxy.
+
+    (* apply (@silent_trans X A lts x Hxx_sim y) in Hxy. *)
+    apply (@silent_trans X A lts x Hxx_sim y) in Hxy.
+    destruct Hxy as [z].
+    - eexists z. split.
+      +
+      
+        destruct H.
+        * admit. 
+        * admit. 
+        * admit. 
+      split.
+      * apply H.  
+
+    eexists ?[z].
+    
+  }
+
+    eexists y. split; [| apply CH]. Guarded.
+
+    About silent_trans.
+    apply (@silent_trans X A lts x Hxx_sim y y).
+
+    apply clos_t1n_trans in Hxy.
+
+
+    inversion Hxy; subst.
+    { apply clos_rt1n_step. apply H. }
+    { apply clos_t1n_trans in H0.
+      apply clos_rt_rt1n.
+      
+      apply (@rt_trans X (tau lts) x y0 y).
+      - admit.
+      - About clos_rt_t. apply clos_rt_t.
+
+    }
+      apply clos_rt_rt1n.
+      apply (@rt_trans X (tau lts) x y0 y).
+      * apply clos_rt_rt1n in H.   
+
+
+      apply clos_rt1n_step.
+      
+      assert ((tau lts x y0 -> clos_trans X (tau lts) y0 y) -> tau lts x y).
+      { 
+        intros Ha. destruct Ha.
+        - apply H.
+        - apply clos_t1n_trans in Hxy.  
+          destruct H0.
+          + assert ((tau lts x y0 /\ tau lts y0 y) -> tau lts x y) as Hb.
+            {
+              intros Hb'.
+              destruct Hb'.
+              About clos_refl_trans_1n.
+              About rt_trans.
+              About rt1n_trans.
+              apply (@rt_trans X (tau lts) x y0 y).  
+            }
+
+      }
+      { About H1. apply H1; intros _H. apply H0. }
     
     About silent_geq_1.
     (* inversion Hxy as [_y Hxy_t| z _y Hxz_t Hzy]; subst. *)
