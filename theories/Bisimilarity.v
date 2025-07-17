@@ -1,238 +1,233 @@
+Require Import MEBI.Examples.CADP.
 
-Section Definitions.
-  Context
-    {M : Set}
-    {A : Set}
-    (LTS1 : M -> A -> M -> Prop)
-    {N : Set}
-    (LTS2 : N -> A -> N -> Prop).
-
-  Definition simF (Sim : M -> N -> Prop) (s : M) (t : N) : Prop :=
-    forall s' a,
-      LTS1 s a s' ->
-      exists t',
-        LTS2 t a t' /\ Sim s' t'.
-
-  (* Print simF. *)
-
-  Set Primitive Projections.
-  CoInductive sim (s : M) (t : N) : Prop :=
-    In_sim { out_sim :  simF sim s t }.
-  Unset Primitive Projections.
-
-End Definitions.
-
-Lemma sim_refl (M A : Set) (LTS : M -> A -> M -> Prop) (m : M)
-  : sim LTS LTS m m.
-Proof.
-  About sim.
-  revert m.
-  cofix CH.
-  intros m.
-  constructor.
-  unfold simF. (* not needed, can be omitted *)
-  intros m' a tr.
-  exists m'.
-  split.
-  - exact tr.
-  - apply CH. Guarded.
-Qed.
-
-Section StreamExample.
-   (* WARNING! We cannot do this with our approach because not an FSM *)
-Inductive streamF_ (Stream : Set -> Set) (A : Set) :=
-  | nilF : streamF_ Stream A
-  | consF : A -> Stream A -> streamF_ Stream A.
-Arguments nilF & {_}{_}.
-Arguments consF & {_}{_}.
+(* https://rocq-prover.org/doc/v8.9/stdlib/Coq.Relations.Relation_Operators.html *)
+Require Import Coq.Relations.Relation_Definitions.
+Require Import Coq.Relations.Relation_Operators.
+Require Import Coq.Relations.Operators_Properties.
+Require Import Coq.Classes.RelationClasses.
 
 Set Primitive Projections.
-CoInductive stream (A : Set) : Set := In_stream { out_stream : streamF_ stream A }.
-Unset Primitive Projections.
-Arguments out_stream {A%_type_scope} s.
-Arguments In_stream {A%_type_scope}.
 
-CoFixpoint fmap {A B : Set} (f : A -> B) (s : stream A) : stream B :=
-  match out_stream s with
-  | nilF => In_stream nilF
-  | consF x xs => In_stream (consF (f x) (fmap f xs))
-  end.
+(**************************************)
+Section Definitions.
+  Context (M : Type) (A : Type).
+  (* option A = None -> silent (tau-labelled) transition *)
+  Definition LTS : Type := M -> option A -> M -> Prop.
+  (* tau-labelled transition *)
+  Definition tau (R : LTS) : relation M := fun (x y : M) => R x None y.
+End Definitions.
+Arguments tau {M A} R.
 
-CoFixpoint zeros : stream nat := In_stream (consF 0 zeros).
-CoFixpoint ones : stream nat := In_stream (consF 1 ones).
+(**************************************)
+Section WeakTrans.
+  Context {M : Type} {A : Type} (lts : LTS M A).
 
-Definition zplus1 : stream nat := fmap S zeros.
+  (* trace of tau-labelled transitions *)
+  Definition silent  : relation M := clos_refl_trans_1n M (tau lts).
+  Definition silent1 : relation M := clos_trans_1n M (tau lts).
 
-Check In_stream.
-Check out_stream.
-Check consF.
+  (* x ==> pre_str ->^a post_str ==> y *)
+  Record weak_tr (x z : M) a (t y : M) : Prop :=
+    Pack_weak { pre : silent x z; str : lts z a t; post : silent t y }.
+  Definition weak (x : M) a (y : M) : Prop := exists z t, weak_tr x z a t y.
+End WeakTrans.
 
-(* Infinite case *)
-Inductive StreamLTS A : stream A -> A -> stream A -> Prop :=
-| stream_step : forall s x s', out_stream s = consF x s' -> StreamLTS A s x s'.
+(**************************************)
+Section WeakSim.
+  Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
 
-Example stream_sim : sim (StreamLTS nat) (StreamLTS nat) zplus1 ones.
-  cofix CH.
-  constructor.
-  About simF.
-  unfold simF.
-  intros s' a H. 
-  Print StreamLTS.
-  inversion_clear H; subst.
-  Print out_stream.
-  inversion H0; subst.
-  exists ones.
-  split.
-  - apply stream_step. reflexivity.
-  - apply CH. Guarded.
+  Record simF G m1 n1 :=
+    Pack_sim
+      { sim_weak : forall m2 a,
+          weak ltsM m1 (Some a) m2 ->
+          exists n2, weak ltsN n1 (Some a) n2 /\ G m2 n2;
+        sim_tau : forall m2,
+          (* weak ltsM m1 None m2 -> *)
+          silent1 ltsM m1 m2 ->
+          exists n2, silent ltsN n1 n2 /\ G m2 n2;
+      }.
+
+  CoInductive weak_sim (s : M) (t : N) : Prop := 
+    In_sim { out_sim : simF weak_sim s t }.
+End WeakSim.
+
+(** (unused) **************************)
+Lemma _weak_sim_silent_refl (X A : Type) (lts : LTS X A)
+: forall x, weak_sim lts lts x x -> silent lts x x.
+Proof. intros x Hxx. constructor. Qed.
+
+(** (unused) **************************)
+Lemma _weak_sim_silent_geq_1 (X A : Type) (lts : LTS X A)
+: forall x, weak_sim lts lts x x -> silent lts x x ->
+  exists y, silent1 lts x y -> silent lts x y /\ weak_sim lts lts x y.
+Proof. 
+  intros x Hxx_sim Hxx. eexists x. intros _. split.
+  - apply Hxx.
+  - apply Hxx_sim. 
 Qed.
 
-End StreamExample.
+(** (unused) **************************)
+Lemma _silent_geq_1 (X A : Type) (lts : LTS X A)
+: forall x, silent lts x x ->
+  exists y, silent1 lts x y -> silent lts x y.
+Proof. intros x Hxx. eexists x. intros _. apply Hxx. Qed.
 
-Module BisimTest1.
-  Inductive action : Set := | TheAction1 | TheAction2.
-  Inductive term : Set :=
-  | trec : term
-  | tend : term
-  | tfix : term -> term
-  | tact : action -> term -> term
-  | tpar : action -> action -> term -> term
-  .
+(** (1 admitted case) *****************)
+Lemma silent1_step (M A: Type) (lts : LTS M A)
+: forall x y, silent1 lts x y -> silent lts x y.
+Proof.
+  intros x y Hxy.
+  inversion Hxy; subst.
+  - apply clos_rt1n_step. apply H.
+  - apply clos_rt1n_step. admit.
+Admitted.
 
-  Fixpoint subst (t1 : term) (t2 : term) :=
-    match t2 with
-    | trec => t1
-    | tend => tend
-    | tfix t => tfix t
-    | tact a t => tact a (subst t1 t)
-    | tpar a b t => tpar a b (subst t1 t)
-    end.
+(** (depends on Lemma [silent1_step]) *)
+Lemma weak_sim_refl (X A : Type) (lts : LTS X A)
+: forall x, weak_sim lts lts x x.
+Proof.
+  cofix CH; intros x. 
+  (* cofix Hxx_sim. *)
+  apply In_sim. apply Pack_sim.
+  { intros y a Hxy; eexists y; split.
+    - apply Hxy.
+    - apply CH. Guarded. }
+  { intros y Hxy.
+    eexists y. split; [| apply CH]. Guarded.
+    (*****************************)
+    (* silent  ltsX x y       -> *)
+    (* silent1 ltsX x y          *)
+    (*****************************)
+    apply silent1_step. apply Hxy. }
+Qed.
 
-  Inductive termLTS : term -> action -> term -> Prop :=
-  | do_act : forall a t, termLTS (tact a t) a t
+(**************************************)
+Lemma silent_trans_l (X A : Type) (lts : LTS X A)
+: forall x y, silent1 lts x y -> 
+  exists z, silent lts x z -> silent1 lts z y.
+Proof.
+  intros x y Hxy. apply clos_t1n_trans in Hxy.
+  inversion Hxy as [|z]; subst.
+  - eexists x. intros Hxx. apply clos_trans_t1n. apply Hxy.
+  - eexists z. intros Hxz. apply clos_trans_t1n. apply H0.
+Qed.
 
-  | do_par1 : forall a b t, termLTS (tpar a b t) a (tact b t)
+(**************************************)
+Lemma silent_trans_r (X A : Type) (lts : LTS X A)
+: forall x y, silent1 lts x y -> 
+  exists z, silent1 lts x z -> silent lts z y.
+Proof. intros x y Hxy. eexists y. intros _. constructor. Qed.
 
-  | do_par2 : forall a b t, termLTS (tpar a b t) b (tact a t)
+(** (unused, 1 admitted case) *********)
+Lemma _silent_trans (X A : Type) (lts : LTS X A)
+: forall x, weak_sim lts lts x x -> 
+  forall y, silent1 lts x y -> 
+  exists z1 z2, silent lts x z1 -> silent1 lts z1 z2 -> silent lts z2 y.
+Proof.
+  intros x Hxx_sim y Hxy.
 
-  | do_fix : forall a t t',
-      termLTS (subst (tfix t) t) a t' ->
-      termLTS (tfix t) a t'.
+  assert (Hxy_z := Hxy); apply silent_trans_l in Hxy_z.
+  destruct Hxy_z as [z1 Hxy_z]; eexists z1.
+  apply silent_trans_r in Hxy_z.
+  { destruct Hxy_z as [z2 Hxy_z]; eexists z2.
+    intros Hxz Hzz. apply Hxy_z. apply Hzz. }
+  { (********************************)
+    (* Hxy : silent1 lts x y        *)
+    (* apply silent_trans_l in Hxy. *)
+    About silent_trans_l.
+    (* Hxy : silent lts x z1 ->     *)
+    (*       silent lts z1 y        *)
+    (* apply silent_trans_r in Hxy. *)
+    About silent_trans_r.
+    (* Hxy : silent lts x z1   ->   *)
+    (*       silent1 lts z1 z2 ->   *)
+    (*       silent lts z2 y        *)
+    (********************************)
+    admit. }
+Admitted.
 
-  Ltac example_tactic CH :=
-   let r := fresh "r" in
-   let a := fresh "a" in
-   let tr := fresh "tr" in
-   constructor; intros r a tr;
+(** (1 admitted case) *****************)
+Lemma weak_sim_trans (X Y Z A : Type) 
+(ltsX : LTS X A) (ltsY : LTS Y A) (ltsZ : LTS Z A) 
+: forall x y z,
+  weak_sim ltsX ltsY x y -> 
+  weak_sim ltsY ltsZ y z -> 
+  weak_sim ltsX ltsZ x z.
+Proof.
+  cofix CH; intros x1 y1 z1.
+  intros Hxy. intros Hyz.
 
-   (*  *)
-   repeat
-     match goal with
-     | [ H : termLTS ?l ?a ?r |- _ ] =>
-         inversion_clear H; simpl in *
-     end;
-   (*  *)
+  inversion Hxy as [Hxy_inv]; subst; destruct Hxy_inv as [Hxy_weak Hxy_tau].
+  inversion Hyz as [Hyz_inv]; subst; destruct Hyz_inv as [Hyz_weak Hyz_tau].
 
-   eexists;
-   split; [ repeat constructor | idtac ];
-   try apply sim_refl; try apply CH.
+  apply In_sim. apply Pack_sim.
+  { intros x2 ax Hx. 
+  
+    apply Hxy_weak in Hx; inversion_clear Hx as [y2 Hy_xy]; subst.
+    destruct Hy_xy as [Hy Hxy2].
 
-  Ltac example_bisim :=
-    let CH := fresh "CH" in
-    cofix CH; repeat (example_tactic CH).
+    apply Hyz_weak in Hy; inversion_clear Hy as [z2 Hz_yz]; subst.
+    destruct Hz_yz as [Hz Hyz2].
 
-  Goal sim termLTS termLTS
-    (tfix (tact TheAction1 trec))
-    (tact TheAction1 (tfix (tact TheAction1 trec))).
-  Proof.
-    example_bisim.
-  Qed.
+    eexists z2. split.
+    - apply Hz.
+    - About CH. apply (@CH x2 y2 z2 Hxy2 Hyz2). Guarded. }
+  { intros x2 Hx. eexists ?[z2]. split.
+    { constructor. }
+    { apply (@CH x2 y1 z1); [| apply Hyz]. Guarded.
+    
+      apply Hxy_tau in Hx; inversion_clear Hx as [y2 Hy]; subst.
+      destruct Hy as [Hy Hxy2]. inversion Hy; subst.
+      { apply Hxy2. }
+      { (*******************************)
+        (* weak_sim ltsX ltsY x1 y1 /\ *)
+        (* silent1 ltsX x1 x2       /\ *)
+        (* silent  ltsY y1 y2       /\ *)
+        (* weak_sim ltsX ltsY x2 y2 -> *)
 
-  Goal sim termLTS termLTS
-    (tact TheAction1 (tfix (tact TheAction1 trec)))
-    (tfix (tact TheAction1 trec)).
-  Proof.
-    example_bisim.
-  Qed.
+        (* weak_sim ltsX ltsY x2 y1    *)
+        (*******************************)
+        admit. } } }
+Admitted.
 
-  Goal sim termLTS termLTS
-    (tfix (tact TheAction1 (tact TheAction2 trec)))
-    (tact TheAction1 (tfix (tact TheAction2 (tact TheAction1 trec)))).
-  Proof.
-    example_bisim.
-  Qed.
 
-  Goal sim
-    termLTS termLTS
-      (tfix (tpar TheAction1 TheAction2 trec))
-      (tfix (tpar TheAction1 TheAction2 trec)).
-    cofix CH.
+(**************************************)
+Section WeakBisim.
+  Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
 
-   let r := fresh "r" in
-   let a := fresh "a" in
-   let tr := fresh "tr" in
-   constructor; intros r a tr.
-   repeat
-     match goal with
-     | [ H : termLTS ?l ?a ?r |- _ ] =>
-         inversion_clear H; simpl in *
-     end.
-   eexists; split; [ repeat constructor | idtac ].
-   apply sim_refl.
-   simpl.
+  Definition weak_bisim (s : M) (t : N) : Prop
+    := weak_sim ltsM ltsN s t /\ weak_sim ltsN ltsM t s.
+End WeakBisim.
 
-   eexists.
-   split.
-   repeat constructor.
-   apply sim_refl.
-   Qed.
+(**************************************)
+Lemma weak_bisim_refl (M A : Type) (ltsM : LTS M A)
+: forall m, weak_bisim ltsM ltsM m m.
+Proof. constructor 1; try apply weak_sim_refl. Qed.
 
-  Section NonDetExamples.
-    Inductive Action := A | B.
+(**************************************)
+Lemma weak_bisim_sym (X Y A : Type) (ltsX : LTS X A) (ltsY : LTS Y A) 
+: forall x y, weak_bisim ltsX ltsY x y -> weak_bisim ltsY ltsX y x.
+Proof. 
+  intros x y Hxy. split.
+  - destruct Hxy as [_ Hyx]. apply Hyx.
+  - destruct Hxy as [Hxy _]. apply Hxy.
+Qed.
 
-    Inductive TM1 := S | S1 | S2.
-    Inductive TM2 := T | T1.
-
-    Inductive LTS1 : TM1 -> Action -> TM1 -> Prop :=
-    | SS1A : LTS1 S A S1
-    | SS2A : LTS1 S A S2
-    | S1S2B : LTS1 S1 B S2
-    | S2S2B : LTS1 S2 B S2.
-
-    Inductive LTS2 : TM2 -> Action -> TM2 -> Prop :=
-    | TT1A : LTS2 T A T1
-    | T1T1A : LTS2 T1 A T1
-    | T1T1B : LTS2 T1 B T1.
-
-    Goal sim LTS2 LTS1 T S.
-      cofix CH.
-      constructor.
-      intros r a tr.
-      inversion_clear tr.
-      eexists.
-      split.
-      constructor.
-
-      cofix CH1.
-      constructor.
-      clear r a.
-      intros r a tr.
-      inversion_clear tr.
-      eexists.
-      Abort.
-    (*   split. *)
-    (*   constructor. *)
-
-    (*   cofix CH2. *)
-    (*   constructor. *)
-    (*   clear r a. *)
-    (*   intros r a tr. *)
-    (*   inversion_clear tr. *)
-    (*   eexists. *)
-    (*   split. *)
-    (*   constructor. *)
-    (*   apply CH2. *)
-    (* Qed. *)
-
-  End NonDetExamples.
-End BisimTest1.
+(**************************************)
+Lemma weak_bisim_trans (X Y Z A : Type) 
+(ltsX : LTS X A) (ltsY : LTS Y A) (ltsZ : LTS Z A) 
+: forall x y z,
+  weak_bisim ltsX ltsY x y ->
+  weak_bisim ltsY ltsZ y z ->
+  weak_bisim ltsX ltsZ x z.
+Proof.
+  intros x y z Hbxy Hbyz.
+  destruct Hbxy as [Hsxy Hsyx]. destruct Hbyz as [Hsyz Hszy].
+  split. 
+  - apply (@weak_sim_trans X Y Z A ltsX ltsY ltsZ x y z).
+    + apply Hsxy.
+    + apply Hsyz.
+  - apply (@weak_sim_trans Z Y X A ltsZ ltsY ltsX z y x).
+    + apply Hszy.
+    + apply Hsyx.
+Qed.

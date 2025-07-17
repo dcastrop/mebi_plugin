@@ -51,10 +51,6 @@ Proof.
     admit.
 Admitted. 
 
-Lemma silent1_step (M A: Type) (lts : LTS M A): forall m m', 
-  silent1 lts m m' -> silent lts m m'.
-Proof. intros m1 m2. apply clos_silent. Qed.
-
 Lemma _clos_silent (X A : Type) (lts : LTS X A)
 : forall x y,
   clos_trans_1n X (tau lts) x y ->
@@ -69,7 +65,7 @@ Proof.
   - eexists z. intros _Hxz. apply Hzy.
 Qed.  
 
-Lemma silent_geq_1 (X A : Type) (lts : LTS X A)
+Lemma silent_geq_1 (M A : Type) (lts : LTS M A)
 : forall x y,
   silent1 lts x y ->
   exists z,
@@ -88,6 +84,92 @@ Proof.
     apply clos_rt1n_step. apply Hxy_t.
 Qed.
   
+Lemma silent_geq_1_test (M A : Type) (lts : LTS M A)
+: forall x y,
+  silent1 lts x y ->
+  exists z,
+  silent lts x z -> 
+  silent1 lts z y ->
+  silent lts x y.
+Proof.
+  intros x y.
+  unfold silent. unfold silent1.
+  intros Hxy1.
+
+  inversion Hxy1 as [ _y Hxy_t | z _y Hxz_t Hzy ]; subst.
+  - eexists x; intros Hxx_t Hxy. 
+    apply clos_rt1n_step. apply Hxy_t.
+  - eexists y. intros Hxy_t Hyy. apply Hxy_t. 
+Qed.
+  
+Lemma silent1_step (M A: Type) (lts : LTS M A): forall x y, 
+  silent1 lts x y -> silent lts x y.
+(* Proof. intros x y. apply clos_silent. Qed. *)
+Proof.
+  intros x y Hxy. 
+  (* destruct Hxy.  *)
+  (* inversion H; subst. *)
+
+
+
+  inversion Hxy as [| z _y Hxz Hzy]; subst.
+  - apply clos_rt1n_step. apply H.
+  - apply silent_geq_1_test in Hxy.
+    apply clos_rt1n_step.
+    
+
+
+(* Proof.
+  intros x y Hxy.
+  induction Hxy.
+  - apply clos_rt1n_step. apply H.
+  - 
+  
+  
+
+  apply silent_geq_1 in Hxy.
+  eexists s in Hxy.
+  destruct Hxy as [z].
+  destruct H.
+
+
+  inversion Hxy as [| z _y Hxz Hzy]; subst.
+  - apply clos_rt1n_step. apply H.
+  - 
+    apply silent_geq_1 in Hxy.
+    destruct Hxy as [y].
+
+    set (z := y) in Hxy.
+    destruct Hxy.
+  
+  
+  apply silent_geq_1 in Hxy.
+    inversion Hxy; subst.
+    + apply clos_t1n_trans in Hzy.
+
+  
+  unfold silent.
+  unfold silent1.
+
+  About _clos_silent.
+  apply (@_clos_silent M A lts x y  ).
+  
+  Hxy.
+
+  apply _clos_silent in Hxy.
+  unfold silent.
+  apply Hxy.
+
+
+
+
+  apply silent_geq_1 in Hxy.
+  inversion Hxy as [z]; subst.
+  apply clos_rt1n_step.
+  destruct H.
+  - unfold silent. *)
+  
+
   (* eexists z; intros _.
 
     apply clos_rt1n_step in Hxz.
@@ -475,6 +557,54 @@ Proof.
   - eexists z. intros Hxz. apply clos_trans_t1n. apply H0.
 Qed. *)
 
+(* Lemma test3 (X Y A : Type) (ltsX : LTS X A) (ltsY : LTS Y A)
+: forall x1 y1, 
+  weak_sim ltsX ltsY x1 y1 ->
+  forall y2,
+  silent ltsY y1 y2 ->
+  forall x2,
+  weak_sim ltsX ltsY x2 y2 ->
+  silent ltsX x1 x2.
+  (* weak_sim ltsX ltsY x2 y2 -> *)
+  (* silent1 ltsX x1 x2. *)
+  (* exists x2,  *)
+  (* silent1 ltsX x1 x2 /\ *)
+Proof.
+  intros x1 y1 Hxy_sim y2 Hyy.
+  inversion Hxy_sim as [Hxy_simF]; subst;
+  inversion_clear Hxy_simF as [_ Hxy_tau]; subst.
+  intros x2 Hxx.
+  split.
+  apply Hxy_tau.
+  apply Hxy_tau in Hxx.
+  destruct Hxx. *)
+  
+
+
+Lemma test1 (X A : Type) (lts : LTS X A)
+: forall x, 
+  weak_sim lts lts x x ->
+  forall y,
+  silent1 lts x y ->
+  silent lts x y ->
+  silent1 lts x y.
+Proof.
+  intros x Hxx_sim y Hxy1 Hxy.
+  apply Hxy1.
+Qed.
+
+Lemma test2 (X A : Type) (lts : LTS X A)
+: forall x y, 
+  weak_sim lts lts x y ->
+  silent lts x y ->
+  weak_sim lts lts x x.
+Proof.
+  cofix CH.
+  intros x y Hxy_sim Hxy.
+  inversion Hxy; subst.
+  - apply Hxy_sim.
+  - 
+Qed.
 
 Lemma weak_sim_refl (X A : Type) (lts : LTS X A)
 : forall x, weak_sim lts lts x x.
@@ -492,6 +622,12 @@ Proof.
       About silent_trans.
       apply (@silent_trans_l X A lts x Hxx_sim y) in Hxy.
       destruct Hxy as [z Hxzzy].
+      destruct Hxzzy.
+      + admit.
+      + admit.
+      + admit.
+      
+      as [z Hxzzy].
       apply silent_trans_r in Hxzzy.
 
 
@@ -829,7 +965,7 @@ Admitted.
   }
 Admitted.
 
-  
+
 Section WeakBisim.
   Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
 
