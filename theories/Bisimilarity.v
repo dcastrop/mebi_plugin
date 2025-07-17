@@ -72,8 +72,8 @@ Lemma _silent_geq_1 (X A : Type) (lts : LTS X A)
   exists y, silent1 lts x y -> silent lts x y.
 Proof. intros x Hxx. eexists x. intros _. apply Hxx. Qed.
 
-(**************************************)
-Lemma tau_silent1 (X A: Type) (lts : LTS X A)
+(** (unused) **************************)
+Lemma _tau_silent1 (X A: Type) (lts : LTS X A)
 : forall x y, tau lts x y -> silent1 lts x y.
 Proof. intros x y Hxy. constructor. apply Hxy. Qed.
 
