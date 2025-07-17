@@ -3,7 +3,7 @@ Require Import MEBI.Examples.CADP.
 (* https://rocq-prover.org/doc/v8.9/stdlib/Coq.Relations.Relation_Operators.html *)
 Require Import Coq.Relations.Relation_Definitions.
 Require Import Coq.Relations.Relation_Operators.
-Require Import Coq.Relations.Operators_Properties.
+Require Coq.Relations.Operators_Properties.
 Require Import Coq.Classes.RelationClasses.
 
 Set Primitive Projections.
@@ -81,12 +81,10 @@ Proof. intros x y Hxy. constructor. apply Hxy. Qed.
 Lemma silent1_step (X A: Type) (lts : LTS X A)
 : forall x y, silent1 lts x y -> silent lts x y.
 Proof.
-  intros x y Hxy.
-  destruct Hxy.
-  - apply clos_rt1n_step. apply H.
-  - apply clos_rt1n_step. 
-    admit.
-Admitted.
+  intros x y Hxy. induction Hxy.
+  - eapply rt1n_trans. apply H. apply rt1n_refl.
+  - apply (rt1n_trans _ _ _ _ _ H IHHxy).
+Qed.
 
 (** (depends on Lemma [silent1_step]) *)
 Lemma weak_sim_refl (X A : Type) (lts : LTS X A)
@@ -108,12 +106,12 @@ Proof.
 Qed.
 
 (**************************************)
-Lemma silent_trans_l (X A : Type) (lts : LTS X A)
+(* Lemma silent_trans_l (X A : Type) (lts : LTS X A)
 : forall x y, silent1 lts x y -> 
   exists z, silent lts x z -> silent1 lts z y.
 Proof.
   intros x y Hxy. apply clos_t1n_trans in Hxy.
-  inversion Hxy as [|z]; subst.
+  inversion  Hxy as [|z]; subst.
   - eexists x. intros Hxx. apply clos_trans_t1n. apply Hxy.
   - eexists z. intros Hxz. apply clos_trans_t1n. apply H0.
 Qed.
@@ -150,7 +148,23 @@ Proof.
     (*       silent lts z2 y        *)
     (********************************)
     admit. }
-Admitted.
+Admitted. *)
+
+Lemma rt_t {X A : Type} {ltsX : LTS X A}
+: forall {x1 x2 x3},
+  tau ltsX x1 x2 ->
+  clos_refl_trans_1n X (tau ltsX) x2 x3 ->
+  clos_trans_1n X (tau ltsX) x1 x3.
+Proof.
+  intros x y z Hxy Hyz.
+  revert x Hxy.
+  induction Hyz.
+  - intros x0 Hxy. eapply t1n_step, Hxy.
+  - intros x0 Hxy.  
+    eapply t1n_trans.
+    + apply Hxy.
+    + apply IHHyz. apply H.   
+Qed.
 
 (** (1 admitted case) *****************)
 Lemma weak_sim_trans (X Y Z A : Type) 
@@ -178,24 +192,21 @@ Proof.
     eexists z2. split.
     - apply Hz.
     - About CH. apply (@CH x2 y2 z2 Hxy2 Hyz2). Guarded. }
-  { intros x2 Hx. eexists ?[z2]. split.
-    { constructor. }
-    { apply (@CH x2 y1 z1); [| apply Hyz]. Guarded.
-    
-      apply Hxy_tau in Hx; inversion_clear Hx as [y2 Hy]; subst.
-      destruct Hy as [Hy Hxy2]. inversion Hy; subst.
-      { apply Hxy2. }
-      { (*******************************)
-        (* weak_sim ltsX ltsY x1 y1 /\ *)
-        (* silent1 ltsX x1 x2       /\ *)
-        (* silent  ltsY y1 y2       /\ *)
-        (* weak_sim ltsX ltsY x2 y2 -> *)
+  { intros x2 Hx.
+  
+    apply Hxy_tau in Hx. destruct Hx as [y2 [[|y2a y2b Hy12a] H0]].
+    - eexists z1. split.
+      + apply rt1n_refl.
+      + eapply CH. apply H0. apply Hyz. Guarded.
+    - (* turn into lemma *)
 
-        (* weak_sim ltsX ltsY x2 y1    *)
-        (*******************************)
-        admit. } } }
-Admitted.
-
+      About rt_t.
+      apply (rt_t Hy12a) in H.
+      apply Hyz_tau in H. destruct H as [z2 [Hzz Hyz2]].
+      eexists z2. split.
+      apply Hzz. eapply CH. apply H0. apply Hyz2. Guarded.
+  } 
+Qed.
 
 (**************************************)
 Section WeakBisim.
