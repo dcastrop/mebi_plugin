@@ -231,3 +231,97 @@ Proof.
     + apply Hszy.
     + apply Hsyx.
 Qed.
+
+(**************************************)
+Module BisimTest1.
+  Inductive action : Type := | TheAction1 | TheAction2.
+
+  Inductive term : Type :=
+    | trec : term
+    | tend : term
+    | tfix : term -> term
+    | tact : option action -> term -> term
+    | tpar : option action -> option action -> term -> term
+    .
+
+  Fixpoint subst (t1 : term) (t2 : term) :=
+    match t2 with
+    | trec => t1
+    | tend => tend
+    | tfix t => tfix t
+    | tact a t => tact a (subst t1 t)
+    | tpar a b t => tpar a b (subst t1 t)
+    end.
+
+  Inductive termLTS : term -> option action -> term -> Prop :=
+    | do_act : forall a t, 
+        (* out_sim (tact a t) = consF a t -> *)
+        termLTS (tact a t) a t
+
+    | do_parl : forall a b t, 
+        (* out_sim (tpar a b t) = consF a (tact b t) -> *)
+        termLTS (tpar a b t) a (tact b t)
+
+    | do_parr : forall a b t, 
+        (* out_sim (tpar a b t) = consF a (tact a t) -> *)
+        termLTS (tpar a b t) b (tact a t)
+
+    | do_fix : forall a t t',
+        (* out_sim (tfix t) = consF a t' -> *)
+        termLTS (subst (tfix t) t) a t' ->
+        termLTS (tfix t) a t'
+    .
+
+  Inductive termLTS_tc : term -> Prop :=
+    | do_step : forall t a t', termLTS t a t' -> termLTS_tc t' -> termLTS_tc t
+    | do_none : forall t, termLTS_tc t
+    .
+
+  Lemma sim_tend : weak_sim termLTS termLTS (tend) (tend).
+  Proof. apply weak_sim_refl. Qed.
+End BisimTest1.
+
+(**************************************)
+Module BisimExa1. Import BisimTest1.
+
+  Example m1 := (tact None (tact (Some TheAction1) (tact None tend))).
+  Example n1 := (tact (Some TheAction1) tend).
+
+  Goal weak_sim termLTS termLTS m1 n1.
+  Proof. 
+    apply In_sim. apply Pack_sim.
+    { intros m2 a Hw. destruct Hw. destruct H. destruct H.
+      destruct pre0.
+      inversion str0.
+      inversion H; subst. 
+      destruct pre0; [| inversion H0]. (* clear H. *)
+      inversion str0; subst. (* clear str0. *)
+      inversion post0; subst.
+      - eexists tend. split.
+        + do 2 eexists. do 2 constructor. 
+        + admit.
+      - eexists tend. split.
+        + do 2 eexists. do 2 constructor.
+        + admit.
+    }
+    { intros m2 Hw. eexists n1. split.
+      - constructor.
+      - admit. 
+    }
+  Admitted. 
+End BisimExa1.
+
+(**************************************)
+Module BisimExa2. Import BisimTest1.
+  Example m1 := (tfix (tact (Some TheAction1) trec)).
+  Example n1 := (tact (Some TheAction1) (tfix (tact (Some TheAction1) trec))).
+  
+  Goal weak_sim termLTS termLTS m1 n1.
+  Proof.
+    apply In_sim; apply Pack_sim.
+  
+  Admitted.
+
+End BisimExa2.
+
+
