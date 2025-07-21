@@ -116,14 +116,33 @@ Ltac bisim_cofix :=
 Tactic Notation "solve_bisim" integer(t) := bisim_cofix; eauto t with rel_db.
 
 Lemma weak_sim_refl {M A} (lts : LTS M A) : forall x, weak_sim lts lts x x.
-Proof. solve_bisim 8. Qed.
+Proof.
+  solve_bisim 8. (* cofix CH. intros x. apply In_sim, Pack_sim; eauto with rel_db. *)
+  (* NOTES: eauto will use the lemmas added as hints above, so it will already
+   * know how to covert silent1 to silent
+   *)
+Qed.
 Hint Resolve weak_sim_refl : rel_db.
 
 Lemma weak_sim_trans {M N R A}
   (ltsM : LTS M A) (ltsN : LTS N A) (ltsR : LTS R A)
   : forall x y r, weak_sim ltsM ltsN x y -> weak_sim ltsN ltsR y r ->
                   weak_sim ltsM ltsR x r.
-Proof. solve_bisim 19. Qed.
+Proof.
+  solve_bisim 19.
+  (* (* NOTES: Uncomment for step-by-step. *) *)
+  (* Restart. *)
+  (* cofix CH. intros x y z H0 H1. apply out_sim in H0, H1. *)
+  (* apply In_sim, Pack_sim. *)
+  (* - intros m2 a T.  *)
+  (*   destruct (sim_weak H0 T) as [y2 [T' S]], (sim_weak H1 T') as [z2 [T'' S']]. *)
+  (*   exists z2. split; trivial. apply (CH _ _ _ S S'). *)
+  (* - intros m2 T. destruct (sim_tau H0 T) as [y2 [[|?? H T'] S]]. *)
+  (*   + exists z. split; [apply rt1n_refl|]. apply (CH _ _ _ S), In_sim, H1. *)
+  (*   + pose proof (clos_rt_clos_t H T') as T''. *)
+  (*     destruct (sim_tau H1 T'') as [z2 [T''' S']]. *)
+  (*     exists z2; split; trivial. apply (CH _ _ _ S S'). *)
+Qed.
 Hint Immediate weak_sim_trans : rel_db.
 
 Section WeakBisim.
