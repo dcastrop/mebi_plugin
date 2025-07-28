@@ -7,45 +7,24 @@ src/META.coq-mebi
 
 theories/loader.v
 theories/Test.v
-
-# examples/SimpleCADP.v
-
-# examples/Proc.v
+theories/Bisimilarity.v
 
 examples/CADP.v
 examples/properties/mutual_exclusion.v
 # examples/properties/no_starvation.v
+# examples/SimpleCADP.v
+# examples/Proc.v
 
 src/utils.ml
 src/utils.mli
-
-# src/mebi_errors.ml
-# src/mebi_errors.mli
-
-# src/mebi_action.ml
-# src/mebi_action.mli
-# src/constr_tree.ml
-# src/constr_tree.mli
 
 src/mebi_wrapper.ml
 src/mebi_wrapper.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
 
-
-# src/model_state.ml
-# src/model_state.mli
-# src/model_label.ml
-# src/model_label.mli
-# src/model_action.ml
-# src/model_action.mli
-# src/model_edge.ml
-# src/model_edge.mli
-# src/model_transition.ml
-# src/model_transition.mli
 src/model.ml
 src/model.mli
-
 
 src/lts.ml
 src/lts.mli
@@ -57,10 +36,8 @@ src/algorithms.mli
 src/vernac.ml
 src/vernac.mli
 
-
 src/dump_to_file.ml
 src/dump_to_file.mli
-
 
 src/command.ml
 src/command.mli
