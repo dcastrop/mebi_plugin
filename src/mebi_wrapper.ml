@@ -231,7 +231,8 @@ module type ERROR_TYPE = sig
   type mebi_error =
     | InvalidLTSSort of Sorts.family
     | InvalidArity of Environ.env * Evd.evar_map * Constr.types
-    | InvalidLTSRef of Names.GlobRef.t
+    | InvalidRefLTS of Names.GlobRef.t
+    | InvalidRefType of Names.GlobRef.t
     | UnknownTermType of
         (Environ.env * Evd.evar_map * (term * term * term list))
     | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
@@ -242,7 +243,8 @@ module type ERROR_TYPE = sig
 
   val invalid_sort : Sorts.family -> exn
   val invalid_arity : Environ.env -> Evd.evar_map -> Constr.types -> exn
-  val invalid_ref : Names.GlobRef.t -> exn
+  val invalid_ref_lts : Names.GlobRef.t -> exn
+  val invalid_ref_type : Names.GlobRef.t -> exn
   val invalid_cindef_kind : unit -> exn
 
   val unknown_term_type
@@ -265,7 +267,8 @@ module Error : ERROR_TYPE = struct
   type mebi_error =
     | InvalidLTSSort of Sorts.family
     | InvalidArity of Environ.env * Evd.evar_map * Constr.types
-    | InvalidLTSRef of Names.GlobRef.t
+    | InvalidRefLTS of Names.GlobRef.t
+    | InvalidRefType of Names.GlobRef.t
     | UnknownTermType of
         (Environ.env * Evd.evar_map * (term * term * term list))
     | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
@@ -281,7 +284,9 @@ module Error : ERROR_TYPE = struct
   let invalid_arity ev sg t = MEBI_exn (InvalidArity (ev, sg, t))
 
   (** Error when input LTS reference is invalid (e.g. non existing) *)
-  let invalid_ref r = MEBI_exn (InvalidLTSRef r)
+  let invalid_ref_lts r = MEBI_exn (InvalidRefLTS r)
+
+  let invalid_ref_type r = MEBI_exn (InvalidRefType r)
 
   (** Error when input LTS reference is invalid (e.g. non existing) *)
   let invalid_cindef_kind () = MEBI_exn (ExpectedCoqIndDefOfLTSNotType ())
@@ -313,7 +318,8 @@ module Error : ERROR_TYPE = struct
       ++ Printer.pr_constr_env ev sg t
       ++ strbrk "\n"
       ++ str "Expecting: forall params, ?terms -> ?labels -> ?terms -> Prop"
-    | InvalidLTSRef r -> str "Invalid LTS ref: " ++ Printer.pr_global r
+    | InvalidRefLTS r -> str "Invalid ref LTS: " ++ Printer.pr_global r
+    | InvalidRefType r -> str "Invalid ref Type: " ++ Printer.pr_global r
     | UnknownTermType (ev, sg, (tm, ty, trkeys)) ->
       str
         "None of the constructors provided matched type of term to visit. \
@@ -393,8 +399,13 @@ let invalid_sort (x : Sorts.family) : 'a mm =
 ;;
 
 (** Error when input LTS reference is invalid (e.g. non existing) *)
-let invalid_ref (x : Names.GlobRef.t) : 'a mm =
-  fun st -> raise (Error.invalid_ref x)
+let invalid_ref_lts (x : Names.GlobRef.t) : 'a mm =
+  fun st -> raise (Error.invalid_ref_lts x)
+;;
+
+(** Error when input Type reference is invalid (e.g. non existing) *)
+let invalid_ref_type (x : Names.GlobRef.t) : 'a mm =
+  fun st -> raise (Error.invalid_ref_type x)
 ;;
 
 (** Error when input LTS reference is invalid (e.g. non existing) *)

@@ -224,13 +224,12 @@ let check_ref_type (gref : Names.GlobRef.t) : cindef_info mm =
     let univ = mib.mind_univ_hyps in
     let type_term = EConstr.mkIndU (i, EConstr.EInstance.make univ) in
     return { name = type_term; constr_names = mip.mind_consnames }
-  (* raise error if [gref] is not an inductive type *)
-  | _ -> invalid_ref gref
+  | _ -> invalid_ref_type gref
 ;;
 
 (** [check_ref_lts gref] is the [cindef] of [gref].
 
-    @raise invalid_ref if [gref] is not a reference to an inductive type. *)
+    @raise invalid_ref_lts if [gref] is not a reference to an inductive type. *)
 let check_ref_lts (gref : Names.GlobRef.t) : (cindef_info * cind_lts) mm =
   let open Names.GlobRef in
   match gref with
@@ -249,7 +248,7 @@ let check_ref_lts (gref : Names.GlobRef.t) : (cindef_info * cind_lts) mm =
         ; constr_transitions = mip.mind_nf_lc
         } )
   (* raise error if [gref] is not an inductive type *)
-  | _ -> invalid_ref gref
+  | _ -> invalid_ref_lts gref
 ;;
 
 let get_lts_cindef (i : int) (gref : Names.GlobRef.t) : cindef mm =
