@@ -668,21 +668,19 @@ Definition do_act (a:act) (e:env) : (tm * env) :=
     end
   end.
 
-Definition named_action : Type := act * pid.
+Definition label : Type := act * pid.
 
-Inductive action : Type :=
-  | SILENT : action
-  | LABEL  : named_action -> action.
-
-Definition visible_action (a:act) (e:env) : action :=
-  LABEL (a, (get_pid (get_state e))).
+ Inductive action : Type := 
+  | LABEL : label -> action
+  | SILENT : action 
+  .
 
 Definition get_action (a:act) (e:env) : action :=
   match a with
-  | NCS   => SILENT (* visible_action a e *)
-  | ENTER => visible_action a e
-  | LEAVE => visible_action a e
-  | _ => SILENT
+  | ENTER => LABEL (a, (get_pid (get_state e)))
+  | LEAVE => LABEL (a, (get_pid (get_state e)))
+  | NCS   => SILENT
+  | _     => SILENT
   end.
 
 (*************************************************************************)

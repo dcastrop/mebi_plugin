@@ -23,7 +23,7 @@ Definition pid_of_action (a:action) : option pid :=
   | LABEL (_, p) => Some p
   end.
 
-Definition log : Type := list named_action.
+Definition log : Type := list label.
 
 Definition update_log (l:log) (a:action) : log :=
   match a with 
