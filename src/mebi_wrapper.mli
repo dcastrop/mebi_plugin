@@ -1,4 +1,4 @@
-type term = Evd.econstr
+type term = EConstr.t
 
 val default_params : unit -> Utils.Logging.params
 val enable_logging : bool ref
@@ -126,7 +126,8 @@ module type ERROR_TYPE = sig
   type mebi_error =
     | InvalidLTSSort of Sorts.family
     | InvalidArity of Environ.env * Evd.evar_map * Constr.t
-    | InvalidLTSRef of Names.GlobRef.t
+    | InvalidRefLTS of Names.GlobRef.t
+    | InvalidRefType of Names.GlobRef.t
     | UnknownTermType of
         (Environ.env
         * Evd.evar_map
@@ -144,7 +145,8 @@ module type ERROR_TYPE = sig
   val invalid_arity :
     Environ.env -> Evd.evar_map -> Constr.t -> exn
 
-  val invalid_ref : Names.GlobRef.t -> exn
+  val invalid_ref_lts : Names.GlobRef.t -> exn
+  val invalid_ref_type : Names.GlobRef.t -> exn
   val invalid_cindef_kind : unit -> exn
 
   val unknown_term_type :
@@ -164,7 +166,8 @@ module Error : ERROR_TYPE
 
 val invalid_arity : Constr.t -> 'a mm
 val invalid_sort : Sorts.family -> 'a mm
-val invalid_ref : Names.GlobRef.t -> 'a mm
+val invalid_ref_lts : Names.GlobRef.t -> 'a mm
+val invalid_ref_type : Names.GlobRef.t -> 'a mm
 val invalid_cindef_kind : 'b -> 'a mm
 val unknown_term_type : term * term * term list -> 'a mm
 val primary_lts_not_found : term * term list -> 'a mm
@@ -215,7 +218,7 @@ val has_decoding : E.t -> bool mm
 val encode_map : 'a F.t -> 'a B.t mm
 val decode_map : 'a B.t -> 'a F.t mm
 val constr_to_string : Constr.t -> string
-val econstr_to_string : Evd.econstr -> string
+val econstr_to_string : EConstr.t -> string
 
 module Constr_tree : sig
   type 'a tree = Node of 'a * 'a tree list
