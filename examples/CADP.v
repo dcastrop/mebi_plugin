@@ -17,17 +17,12 @@ Fixpoint app {X:Type} (l1 l2 : list X) : list X :=
 (**** Basic defs *********************************************************)
 (*************************************************************************)
 
-
 (* pid is a non-nil index *)
 Definition pid   : Type  := nat.
 Definition index : Type  := option pid.
 Definition Nil   : index := None.
 
-(* recursive definition identifier and optional iteration limit *)
 Definition idef : Type := nat.
-(* Definition irec : Type := nat. *)
-(* Definition idef : Type := irec * option nat. *)
-
 
 Module Index.
 
@@ -223,6 +218,7 @@ Record error := { error_code : nat
 (*************************************************************************)
 (**** (Global) Resource **************************************************)
 (*************************************************************************)
+
 Definition resource : Type := mem * lock.
 
 Module Resource.
@@ -245,6 +241,7 @@ Definition set_lock_i (new_i:index) (r:resource) : resource :=
 (*************************************************************************)
 (**** (Local) State ******************************************************)
 (*************************************************************************)
+
 Definition state : Type := pid * local_vars * (option (list error)).
 
 Module State.
@@ -426,16 +423,6 @@ Fixpoint eval (e:expr) (s:state) : (option value) * (option (list value)) :=
 
   end.
 
-(* Compute (eval (EQ (VAR PREDECESSOR) (VAL (GET THE_PID))) ((0, {| var_predecessor := Some 1; var_locked := false; var_next := None; var_swap := false |}, None))). *)
-
-
-(* Compute (eval (VAL (BOOL true)) State.initial). *)
-(* Compute (eval (VAL (BOOL false)) State.initial). *)
-
-(* Compute (eval (VAL NIL) State.initial). *)
-(* Compute (eval (VAR PREDECESSOR) State.initial). *)
-
-
 Definition handle_value (v:value) (s:state) : option value * option (list value) :=
   match v with
   | GET n => eval (VAR n) s
@@ -471,8 +458,8 @@ Definition set_resource (r:resource) (e:env) : env :=
 (*************************************************************************)
 
 (** [read_next e] will set [mem_next] and local var [next] to be the value
-    currently of the [qnode.next] corresponding to the [pid] of the process
-    in the state *)
+  * currently of the [qnode.next] corresponding to the [pid] of the process
+  * in the state *)
 Definition read_next (e:env) : option env :=
   (* get pid *)
   let s:state := get_state e in
@@ -493,8 +480,8 @@ Definition read_next (e:env) : option env :=
   end.
 
 (** [read_locked e] will set [mem_locked] and local var [locked] to be the value
-    currently of the [qnode.locked] corresponding to the [pid] of the process
-    in the state *)
+  * currently of the [qnode.locked] corresponding to the [pid] of the process
+  *  in the state *)
 Definition read_locked (e:env) : option env :=
   (* get pid *)
   let s:state := get_state e in
@@ -514,9 +501,8 @@ Definition read_locked (e:env) : option env :=
     Some (set_vars v s, set_mem m r)
   end.
 
-(** [write_next to_write next e] will set the
-    field [qnode.next] of the [qnode] of the
-    index [to_write] to the value of [next]. *)
+(** [write_next to_write next e] will set the field [qnode.next] of the [qnode] 
+  * of the index [to_write] to the value of [next]. *)
 Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
   let s:state := get_state e in
   (* get value of [next] *)
@@ -552,9 +538,8 @@ Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
     end
   end.
 
-(** [write_locked to_write locked e] will set the
-    field [qnode.locked] of the [qnode] of the
-    index [to_write] to the value of [locked]. *)
+(** [write_locked to_write locked e] will set the  field [qnode.locked] of the 
+  * [qnode] of the index [to_write] to the value of [locked]. *)
 Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env :=
   (* get pid from [to_write] *)
   let s:state := get_state e in
@@ -593,7 +578,8 @@ Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env
     end
   end.
 
-(** stores the current contents of [i] of the lock in the global resource [e] within the local var [predecessor], and sets [i] to contain the [pid]. *)
+(** stores the current contents of [i] of the lock in the global resource [e] 
+  * within the local var [predecessor], and sets [i] to contain the [pid]. *)
 Definition fetch_and_store (e:env) : option env :=
   (* get [i] from lock in global resource [e] *)
   let r:resource := get_resource e in
@@ -609,8 +595,9 @@ Definition fetch_and_store (e:env) : option env :=
   (* update env *)
   Some (s, r).
 
-(** if [i] and [j] of the lock of the global resource [e] are the same then sets local var [swap] to [true] and sets [i] to [NIL]. otherwise, sets local var [swap] to [false] and [i] and [j] are unchanged. *)
-(* if [i] of the global resource lock is the same as [pid], then set [i] to [NIL] and set [swap] to [true]. Otherwise, set [swap] to [false] and leave [i] unchanged. *)
+(** if [i] of the global resource lock is the same as [pid], then set [i] to 
+  * [NIL] and set [swap] to [true]. Otherwise, set [swap] to [false] and leave 
+  * [i] unchanged. *)
 Definition compare_and_swap (e:env) : option env :=
   (* set [j] of lock (in global resource [e]) to [pid] *)
   let s:state := get_state e in
@@ -726,7 +713,7 @@ Definition take_branch (c:expr) (t1:tm) (t2:tm) (e:env) : tm * env :=
   match eval c (get_state e) with
   | (Some (BOOL true), None) => (t1, e)
   | (Some (BOOL false), None) => (t2, e)
-  (* error occurred *)
+  (** NOTE: the below are for detecting errors *)
   | (Some other, None) => (ERR, ((add_error (Build_error 1 "conditional statement evaluated to non-bool type" (Build_error_info (Some (c, Some [other])) (None, None))) (get_state e)), get_resource e))
 
   | (Some other, Some errs) => (ERR, ((add_error (Build_error 2 "conditional statement evaluated to non-bool type with caused error" (Build_error_info (Some (c, Some (other :: errs))) (None, None))) (get_state e)), get_resource e))
@@ -786,7 +773,8 @@ Inductive lts : composition -> action -> composition -> Prop :=
 | LTS_PAR_R : forall a l r1 r2 gr1 gr2,
   (r1, gr1) ==<{a}>==> (r2, gr2) ->
   (PAR l r1, gr1) ==<{a}>==> (PAR l r2, gr2)
-
+(** NOTE: the transitions below stop the term from growing in size, 
+  * but instead cause the state-space to grow far bigger. *)
 (* | LTS_OK_L : forall s r g, (PAR (PRC OK s) r, g) ==<{SILENT}>==> (r, g) *)
 
 (* | LTS_OK_R : forall l s g, (PAR l (PRC OK s), g) ==<{SILENT}>==> (l, g) *)
@@ -888,33 +876,6 @@ Example Lock_CaS_1 : composition :=
       )
   )).
 (* MeBi Dump "Lock_CaS_1" LTS Bounded 16384 Of Lock_CaS_1 Using lts step. *)
-
-(* Example Lock_CaS_2 : composition :=
-  compose (create 2 (
-      REC_DEF 0 (
-        SEQ (ACT COMPARE_AND_SWAP) (
-          (* end if value already in fetch-and-store is our own PID *)
-          IF (EQ (VAR PREDECESSOR) (VAL (GET THE_PID))) (OK) (
-            SEQ (ACT FETCH_AND_STORE) (
-              (* if swap then lock [i] contained our own PID, end *)
-              IF (VAR SWAP) (OK) (REC_CALL 0)
-            )
-          )
-        )
-      )
-  )).
-MeBi Dump "Lock_CaS_2" LTS Bounded 16384 Of Lock_CaS_2 Using lts step. *)
-
-(*************************************************************************)
-(**** Tests: Memory ******************************************************)
-(*************************************************************************)
-
-(* Example Mem_Rn_a : tm := *)
-
-
-(* Example Mem_Rn_a1 : composition := compose (create 1 Mem_Rn_a).
-MeBi Dump "Mem_Rn_a1" LTS Bounded 16384 Of Mem_Rn_a1 Using lts step. *)
-
 
 (*************************************************************************)
 (**** Example: Full CADP *************************************************)
@@ -1026,8 +987,6 @@ Definition do_acquire (c:tm) (s:state) (r:resource)
   : composition
   :=
   let e : env := (s, r) in
-  (* REC_DEF 0 *)
-  (* let c:tm := unfold (PMainLoopDef, c) c in *)
   (* ACT (WRITE_NEXT THE_PID NIL) *)
   match write_next THE_PID NIL e with
   | None => (PRC ERR
