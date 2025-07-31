@@ -1,13 +1,7 @@
 Require Import MEBI.Bisimilarity.
 
-Section stream0.
-  Variable A : Type.
-
-  CoInductive stream' : Type :=
-  | Cons : A -> stream' -> stream'.
-End stream0.
-
 Set Primitive Projections.
+
 Inductive streamF (Stream : Set -> Set) (A : Set) :=
 | nilF : streamF Stream A
 | consF : A -> Stream A -> streamF Stream A.
@@ -19,54 +13,42 @@ CoInductive stream (A : Set) : Set :=
 Arguments out_stream {A%_type_scope} s.
 Arguments In_stream {A%_type_scope}.
 
-Print stream'.
-Print stream.
-
-Definition stream_hd_opt {A : Set} (s : stream A) : option A :=
-  match out_stream s with
-  | consF n _ns => Some n
-  | nilF => None
-  end.
-
-Definition stream_hd {A : Set} (d : A) (s : stream A) : A :=
-  match stream_hd_opt s with
-  | Some n => n
-  | None => d
-  end.
-
-Definition stream_tl {A : Set} (s : stream A) : stream A :=
-  match out_stream s with
-  | consF _n ns => ns
-  | nilF => In_stream nilF
-  end.
-
 CoFixpoint fmap {A B : Set} (f : A -> B) (s : stream A) : stream B :=
   match out_stream s with
   | nilF => In_stream nilF
   | consF h t => In_stream (consF (f h) (fmap f t))
   end.
 
+(*************************************)
 Inductive parity : Type :=
-| EVN : nat -> parity
-| ODD : nat -> parity
-| NIL : parity.
+| EVN : parity
+| ODD : parity
+.
 
-Definition inv_parity (a b : parity) : Prop :=
-match a, b with
-| EVN _, ODD _ => True
-| ODD _, EVN _ => True
-| _, _ => False
-end.
-
-Definition get_parity (n : nat) : parity := 
-  if Nat.even n then EVN n else ODD n.
-
-Definition stream_parity (s : stream nat) : parity :=
-  match out_stream s with
-  | nilF => NIL
-  | consF n _ => get_parity n
+Definition eq_parity (a b : parity) : Prop :=
+  match a, b with
+  | EVN, EVN => True
+  | ODD, ODD => True
+  | _, _ => False
   end.
 
+Lemma assoc_parity (a b : parity) : eq_parity a b -> eq_parity b a.
+Proof. induction a, b; simpl; trivial. Qed.
+
+Definition get_parity (n : nat) : parity := if Nat.even n then EVN else ODD.
+
+Lemma refl_parity : forall n, eq_parity (get_parity n) (get_parity n).
+Proof. intros n. destruct (get_parity n); simpl; trivial. Qed.
+
+Lemma equiv_parity : forall x y, eq_parity (get_parity x) (get_parity y) ->
+  get_parity x = get_parity y.
+Proof. 
+  intros x y Hxy. destruct (get_parity x), (get_parity y); simpl; trivial.
+  - destruct Hxy. 
+  - destruct Hxy.
+Qed.
+
+(*************************************)
 Inductive plus_1 : stream nat -> option parity -> stream nat -> Prop :=
 | PLUS_ONE : forall n ns,
   plus_1  (In_stream (consF n ns)) 
@@ -74,76 +56,151 @@ Inductive plus_1 : stream nat -> option parity -> stream nat -> Prop :=
           (In_stream (consF (S n) (In_stream (consF n ns))))
 .
 
-Lemma nats_plus_1 : forall s n ns a c, 
+Lemma nats_plus_1_c : forall n ns a c, 
   plus_1 (In_stream (consF n ns)) a c -> 
-  out_stream c = consF (S n) s.
-Proof. Admitted.
+  out_stream c = consF (S n) (In_stream (consF n ns)).
+Proof. intros n ns a c Hin. inversion Hin; subst. simpl; reflexivity. Qed.
 
+Lemma nats_plus_1_s : forall n ns a s, 
+  plus_1 s a (In_stream (consF (S n) (In_stream (consF n ns)))) -> 
+  out_stream s = consF n ns.
+Proof. intros n ns a s Hin. inversion Hin; subst. simpl; reflexivity. Qed.
+
+Inductive clos_t_plus_1 : stream nat -> Prop :=
+| TRANS_PLUS_ONE : forall s1 s2 p, 
+  plus_1 s1 p s2 ->
+  clos_t_plus_1 s2 ->
+  clos_t_plus_1 s1
+.
+
+(*************************************)
 Inductive plus_2 : stream nat -> option parity -> stream nat -> Prop :=
-| PLUS_TWO : forall s0 s1 a0 a1 n ns,
-  plus_1 s0 a0 s1 ->
-  plus_1 s1 a1 (In_stream (consF n ns)) -> 
-  plus_2 s0 (Some (get_parity n)) (In_stream (consF n ns))
+| PLUS_TWO : forall n ns,
+  plus_2  (In_stream (consF n ns)) 
+          (Some (get_parity (S (S n))))
+          (In_stream (consF (S (S n)) (In_stream (consF n ns))))
 .
 
+Inductive clos_t_plus_2 : stream nat -> Prop :=
+| TRANS_PLUS_TWo : forall s1 s2 p, 
+  plus_2 s1 p s2 ->
+  clos_t_plus_2 s2 ->
+  clos_t_plus_2 s1
+.
+
+(*************************************)
 Inductive plus_3 : stream nat -> option parity -> stream nat -> Prop :=
-| PLUS_THREE : forall s0 s1 a0 a1 n ns,
-  plus_1 s0 a0 s1 ->
-  plus_2 s1 a1 (In_stream (consF n ns)) -> 
-  plus_3 s0 (Some (get_parity n)) (In_stream (consF n ns))
+| PLUS_THREE : forall n ns,
+  plus_3  (In_stream (consF n ns)) 
+          (Some (get_parity (S (S (S n)))))
+          (In_stream (consF (S (S (S n))) (In_stream (consF n ns))))
 .
 
-CoFixpoint zeros : stream nat := In_stream (consF 0 zeros).
-CoFixpoint nats_from (n : nat) : stream nat := 
-  In_stream (consF n (nats_from (S n))).
+Inductive clos_t_plus_3 : stream nat -> Prop :=
+| TRANS_PLUS_TWREE : forall s1 s2 p, 
+  plus_3 s1 p s2 ->
+  clos_t_plus_3 s2 ->
+  clos_t_plus_3 s1
+.
 
-Lemma stream_plus_1 : forall n a s,
-  plus_1 (nats_from n) a s -> s = nats_from (S n).
-Proof. Admitted.
+(*************************************)
+Inductive plus_1_twice : stream nat -> option parity -> stream nat -> Prop :=
+| PLUS_TWICE : forall n ns,
+  plus_1 (In_stream (consF n ns)) (Some (get_parity (S n))) (In_stream (consF (S n) (In_stream (consF n ns)))) -> 
+  plus_1 (In_stream (consF (S n) (In_stream (consF n ns)))) (Some (get_parity (S (S n)))) (In_stream (consF (S (S n)) (In_stream (consF (S n) (In_stream (consF n ns)))))) -> 
+  plus_1_twice  (In_stream (consF n ns)) 
+                (Some (get_parity (S (S n))))
+                (In_stream (consF (S (S n)) (In_stream (consF n ns))))
+.
 
-Definition geq0 : stream nat := nats_from 0.
-Definition geq2 : stream nat := nats_from 2.
+Lemma nats_plus_1_twice_s : forall n ns a s, 
+  plus_1_twice s a (In_stream (consF (S (S n)) (In_stream (consF n ns)))) -> 
+  out_stream s = consF n ns.
+Proof. intros n ns a2 s Hin. inversion Hin; subst; simpl. reflexivity. Qed.
 
-Example bisim_odd_parity : weak_bisim plus_1 plus_3 geq0 geq2.
-Proof. Admitted.
+Inductive clos_t_plus_1_twice : stream nat -> Prop :=
+| TRANS_PLUS_TWICE : forall s1 s2 p, 
+  plus_1_twice s1 p s2 ->
+  clos_t_plus_1_twice s2 ->
+  clos_t_plus_1_twice s1
+.
 
+(*************************************)
+Inductive plus_1_thrice : stream nat -> option parity -> stream nat -> Prop :=
+| PLUS_THRICE : forall n ns,
+  plus_1 (In_stream (consF n ns)) (Some (get_parity (S n))) (In_stream (consF (S n) (In_stream (consF n ns)))) -> 
+  plus_1 (In_stream (consF (S n) (In_stream (consF n ns)))) (Some (get_parity (S (S n)))) (In_stream (consF (S (S n)) (In_stream (consF (S n) (In_stream (consF n ns)))))) -> 
+  plus_1 (In_stream (consF (S (S n)) (In_stream (consF (S n) (In_stream (consF n ns)))))) (Some (get_parity (S (S (S n))))) (In_stream (consF (S (S (S n))) (In_stream (consF n ns)))) -> 
+  plus_1_thrice (In_stream (consF n ns)) 
+                (Some (get_parity (S (S (S n))))) 
+                (In_stream (consF (S (S (S n))) (In_stream (consF n ns))))
+.
 
-Module StreamTest.
-  (* http://adam.chlipala.net/cpdt/html/Coinductive.html *)
+Lemma nats_plus_1_thrice_s : forall n ns a s, 
+  plus_1_thrice s a (In_stream (consF (S (S (S n))) (In_stream (consF n ns)))) -> 
+  out_stream s = consF n ns.
+Proof. intros n ns a2 s Hin. inversion Hin; subst; simpl. reflexivity. Qed.
 
-  Section stream.
-    Variable A : Type.
+Inductive clos_t_plus_1_thrice : stream nat -> Prop :=
+| TRANS_PLUS_THRICE : forall s1 s2 p, 
+  plus_1_thrice s1 p s2 ->
+  clos_t_plus_1_thrice s2 ->
+  clos_t_plus_1_thrice s1
+.
 
-    CoInductive stream : Type :=
-    | Cons : A -> stream -> stream.
-  End stream.
+(*************************************)
+CoFixpoint zeroes : stream nat := In_stream (consF 0 zeroes).
 
-  CoFixpoint zeroes : stream nat := Cons _ 0 zeroes.
+(*************************************)
+Example plus_two_sim_twice : forall x xs y ys,
+  eq_parity (get_parity x) (get_parity y) -> 
+  weak_sim plus_2 plus_1_twice 
+    (In_stream (consF x xs)) (In_stream (consF y ys)).
+Proof.
+  cofix CH. intros x0 xs0 y0 ys0 Hxy0. apply In_sim, Pack_sim.
+  assert (get_parity (S (S x0)) = get_parity (S (S y0))) as Hp.
+  { apply equiv_parity, Hxy0. }
+  { intros xs1 px01 Hx01.
+    destruct Hx01 as [xs0a H], H as [xs0b H], H as [Hpre Hstr Hpost].
+    exists ({| out_stream := consF (S (S y0)) (In_stream (consF y0 ys0)) |}).
+    split.
+    { unfold weak; 
+      exists ({| out_stream := consF y0 ys0 |});
+      exists ({| out_stream := consF (S (S y0)) (In_stream (consF y0 ys0)) |}).
+      apply Pack_weak; try constructor.
+      destruct Hpost as [|ns0a ns0b Hns01].
+      - destruct Hpre; inversion Hstr; subst.
+        + rewrite Hp; apply PLUS_TWICE; apply PLUS_ONE.
+        + inversion H. 
+      - destruct Hpre; inversion Hstr; subst.
+        + rewrite Hp; apply PLUS_TWICE; apply PLUS_ONE.
+        + inversion H.
+    }
+    { destruct Hpost as [|ns0a ns0b Hns01].
+      - destruct Hpre; inversion Hstr; subst; apply CH. Guarded.
+        + apply Hxy0.
+        + inversion H.
+      - inversion Hns01.
+    }
+  }
+  { intros xs1 Hx01. destruct Hx01; inversion_clear H. }
+Qed. 
 
-  CoFixpoint trues_falses : stream bool := Cons _ true falses_trues
-  with falses_trues : stream bool := Cons _ false trues_falses.
+Example plus_twice_sim_two : forall x xs y ys,
+  eq_parity (get_parity x) (get_parity y) -> 
+  weak_sim plus_1_twice plus_2 
+    (In_stream (consF x xs)) (In_stream (consF y ys)).
+Proof.
+  cofix CH.
+Admitted.
 
-  Fixpoint approx A (s : stream A) (n : nat) : list A :=
-    match n with
-    | 0 => nil
-    | S n' => 
-      match s with 
-      | Cons _ h t => h :: approx _ t n'
-      end
-    end.
-  
-  Eval simpl in approx nat zeroes 10.
+Example plus_bisim_two_twice : forall x xs y ys,
+  eq_parity (get_parity x) (get_parity y) -> 
+  weak_bisim plus_2 plus_1_twice 
+    (In_stream (consF x xs)) (In_stream (consF y ys)).
+Proof. 
+  split. apply plus_two_sim_twice, H. 
+  apply plus_twice_sim_two, assoc_parity, H. 
+Qed.
 
-  Eval simpl in approx bool trues_falses 10.
-
-  Section map.
-    Variables A B : Type.
-    Variable f : A -> B.
-
-    CoFixpoint map (s : stream A) : stream B :=
-      match s with 
-      | Cons _ h t => Cons _ (f h) (map t)
-    end.
-  End map.
-
-End StreamTest.
+(*************************************)
