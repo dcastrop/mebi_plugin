@@ -8,8 +8,7 @@ Inductive streamF (Stream : Set -> Set) (A : Set) :=
 Arguments nilF & {_}{_}.
 Arguments consF & {_}{_}.
 
-CoInductive stream (A : Set) : Set := 
-  In_stream { out_stream : streamF stream A }.
+CoInductive stream (A : Set) : Set := In_stream { out_stream : streamF stream A }.
 Arguments out_stream {A%_type_scope} s.
 Arguments In_stream {A%_type_scope}.
 
@@ -43,7 +42,9 @@ Proof. intros n; destruct (get_parity n). apply TEVN. apply TODD. Qed.
 
 Lemma parity_equiv : forall x y, eq_parity (get_parity x) (get_parity y) ->
   get_parity x = get_parity y.
-Proof. intros x y Hxy. destruct (get_parity x), (get_parity y); simpl; trivial; destruct Hxy; reflexivity. Qed.
+Proof. intros x y Hxy. 
+  destruct (get_parity x), (get_parity y); trivial; destruct Hxy; reflexivity. 
+Qed.
 
 Definition inv_parity (p : parity): parity :=
   match p with
@@ -61,9 +62,8 @@ Lemma parity_inv_inv : forall n, get_parity n = inv_parity (inv_parity (get_pari
 Proof. intros n. destruct (get_parity n); simpl; reflexivity. Qed.
 
 Lemma parity_inv_incr : forall n, get_parity (S n) = inv_parity (get_parity n).
-Proof. intros n. induction n.
-  - simpl; trivial.
-  - rewrite IHn; rewrite <- parity_inv_inv; apply eq_refl.
+Proof. intros n. induction n; simpl; trivial.
+  rewrite IHn; rewrite <- parity_inv_inv; apply eq_refl.
 Qed. 
 
 Lemma parity_trans : forall x y, eq_parity (get_parity x) (get_parity y) ->
@@ -86,9 +86,9 @@ Qed.
 (*************************************)
 Inductive plus_1 : stream nat -> option parity -> stream nat -> Prop :=
 | PLUS_ONE : forall n ns,
-  plus_1  (In_stream (consF n ns)) 
-          (Some (get_parity (S n)))
-          (In_stream (consF (S n) (In_stream (consF n ns))))
+  plus_1 (In_stream (consF n ns)) 
+         (Some (get_parity (S n)))
+         (In_stream (consF (S n) (In_stream (consF n ns))))
 .
 
 Lemma nats_plus_1_c : forall n ns a c, 
@@ -111,9 +111,9 @@ Inductive clos_t_plus_1 : stream nat -> Prop :=
 (*************************************)
 Inductive plus_2 : stream nat -> option parity -> stream nat -> Prop :=
 | PLUS_TWO : forall n ns,
-  plus_2  (In_stream (consF n ns)) 
-          (Some (get_parity (S (S n))))
-          (In_stream (consF (S (S n)) (In_stream (consF n ns))))
+  plus_2 (In_stream (consF n ns)) 
+         (Some (get_parity (S (S n))))
+         (In_stream (consF (S (S n)) (In_stream (consF n ns))))
 .
 
 Inductive clos_t_plus_2 : stream nat -> Prop :=
@@ -126,9 +126,9 @@ Inductive clos_t_plus_2 : stream nat -> Prop :=
 (*************************************)
 Inductive plus_3 : stream nat -> option parity -> stream nat -> Prop :=
 | PLUS_THREE : forall n ns,
-  plus_3  (In_stream (consF n ns)) 
-          (Some (get_parity (S (S (S n)))))
-          (In_stream (consF (S (S (S n))) (In_stream (consF n ns))))
+  plus_3 (In_stream (consF n ns)) 
+         (Some (get_parity (S (S (S n)))))
+         (In_stream (consF (S (S (S n))) (In_stream (consF n ns))))
 .
 
 Inductive clos_t_plus_3 : stream nat -> Prop :=
@@ -141,11 +141,15 @@ Inductive clos_t_plus_3 : stream nat -> Prop :=
 (*************************************)
 Inductive plus_1_twice : stream nat -> option parity -> stream nat -> Prop :=
 | PLUS_TWICE : forall n ns,
-  plus_1 (In_stream (consF n ns)) (Some (get_parity (S n))) (In_stream (consF (S n) (In_stream (consF n ns)))) -> 
-  plus_1 (In_stream (consF (S n) (In_stream (consF n ns)))) (Some (get_parity (S (S n)))) (In_stream (consF (S (S n)) (In_stream (consF (S n) (In_stream (consF n ns)))))) -> 
-  plus_1_twice  (In_stream (consF n ns)) 
-                (Some (get_parity (S (S n))))
-                (In_stream (consF (S (S n)) (In_stream (consF n ns))))
+  plus_1 (In_stream (consF n ns)) 
+         (Some (get_parity (S n)))
+         (In_stream (consF (S n) (In_stream (consF n ns)))) -> 
+  plus_1 (In_stream (consF (S n) (In_stream (consF n ns)))) 
+         (Some (get_parity (S (S n))))
+         (In_stream (consF (S (S n)) (In_stream (consF (S n) (In_stream (consF n ns)))))) -> 
+  plus_1_twice (In_stream (consF n ns)) 
+               (Some (get_parity (S (S n))))
+               (In_stream (consF (S (S n)) (In_stream (consF n ns))))
 .
 
 Lemma nats_plus_1_twice_s : forall n ns a s, 
@@ -163,9 +167,15 @@ Inductive clos_t_plus_1_twice : stream nat -> Prop :=
 (*************************************)
 Inductive plus_1_thrice : stream nat -> option parity -> stream nat -> Prop :=
 | PLUS_THRICE : forall n ns,
-  plus_1 (In_stream (consF n ns)) (Some (get_parity (S n))) (In_stream (consF (S n) (In_stream (consF n ns)))) -> 
-  plus_1 (In_stream (consF (S n) (In_stream (consF n ns)))) (Some (get_parity (S (S n)))) (In_stream (consF (S (S n)) (In_stream (consF (S n) (In_stream (consF n ns)))))) -> 
-  plus_1 (In_stream (consF (S (S n)) (In_stream (consF (S n) (In_stream (consF n ns)))))) (Some (get_parity (S (S (S n))))) (In_stream (consF (S (S (S n))) (In_stream (consF n ns)))) -> 
+  plus_1 (In_stream (consF n ns)) 
+         (Some (get_parity (S n))) 
+         (In_stream (consF (S n) (In_stream (consF n ns)))) -> 
+  plus_1 (In_stream (consF (S n) (In_stream (consF n ns)))) 
+         (Some (get_parity (S (S n)))) 
+         (In_stream (consF (S (S n)) (In_stream (consF (S n) (In_stream (consF n ns)))))) -> 
+  plus_1 (In_stream (consF (S (S n)) (In_stream (consF (S n) (In_stream (consF n ns)))))) 
+         (Some (get_parity (S (S (S n))))) 
+         (In_stream (consF (S (S (S n))) (In_stream (consF n ns)))) -> 
   plus_1_thrice (In_stream (consF n ns)) 
                 (Some (get_parity (S (S (S n))))) 
                 (In_stream (consF (S (S (S n))) (In_stream (consF n ns))))
