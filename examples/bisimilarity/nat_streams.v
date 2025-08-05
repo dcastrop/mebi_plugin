@@ -203,7 +203,7 @@ Example plus_two_sim_twice : forall x xs y ys,
     (In_stream (consF x xs)) (In_stream (consF y ys)).
 Proof. cofix CH. intros x0 xs0 y0 ys0 Hxy0. apply In_sim, Pack_sim.
   { intros xs1 px01 Hx01.
-    destruct Hx01 as [xs0a H], H as [xs0b H], H as [Hpre Hstr Hpost].
+    destruct Hx01 as [xs01a [xs01b [Hpre Hstr Hpost]]].
     exists ({| out_stream := consF (S (S y0)) (In_stream (consF y0 ys0)) |}).
     split.
     { unfold weak; exists ({| out_stream := consF y0 ys0 |});
@@ -246,7 +246,7 @@ Example plus_twice_sim_two : forall x xs y ys,
     (In_stream (consF x xs)) (In_stream (consF y ys)).
 Proof. cofix CH. intros x0 xs0 y0 ys0 Hxy0. apply In_sim, Pack_sim.
   { intros xs1 px01 Hx01.
-    destruct Hx01 as [xs0a H], H as [xs0b H], H as [Hpre Hstr Hpost].
+    destruct Hx01 as [xs01a [xs01b [Hpre Hstr Hpost]]].
     exists ({| out_stream := consF (S (S y0)) (In_stream (consF y0 ys0)) |}).
     split.
     { unfold weak; 
@@ -265,7 +265,7 @@ Proof. cofix CH. intros x0 xs0 y0 ys0 Hxy0. apply In_sim, Pack_sim.
       (* - destruct Hpre; inversion Hstr; subst. *)
         (* + replace (get_parity (S (S x0))) with (get_parity (S (S y0))).  *)
           (* { apply PLUS_TWO. } *)
-          (* { symmetry; apply parity_eq; do 2 apply parity_trans in Hxy0; apply Hxy0. }  *)
+          (* { symmetry; apply parity_eq. do 2 apply parity_trans in Hxy0. apply Hxy0. }  *)
         (* + inversion H.  *)
       (* - destruct Hpre; inversion Hstr; subst. *)
         (* + replace (get_parity (S (S x0))) with (get_parity (S (S y0))).  *)
@@ -300,7 +300,7 @@ Example parity_one_sim_three : forall x xs y ys,
     (In_stream (consF x xs)) (In_stream (consF y ys)).
 Proof. cofix CH. intros x0 xs0 y0 ys0 Hxy0. apply In_sim, Pack_sim.
   { intros x1 pOdd Hx01.
-    destruct Hx01 as [xs01a H], H as [xs01b H], H as [Hpre Hstr Hpost].
+    destruct Hx01 as [xs01a [xs01b [Hpre Hstr Hpost]]].
     exists ({| out_stream := consF (S (S (S y0))) (In_stream (consF y0 ys0)) |}).
     split.
     { unfold weak; 
@@ -363,3 +363,68 @@ Proof. split.
   - apply parity_three_sim_one, parity_assoc, H. 
 Qed.
 
+(*************************************)
+(*************************************)
+(*************************************)
+ Ltac sim_nats_act_trans vy1 y0 ys CH Hxy Hp :=
+  exists ({| out_stream := consF vy1 {| out_stream := consF y0 ys |} |});
+  inversion_clear Hstr; subst; split; 
+  first 
+    [ unfold weak;
+      exists ({| out_stream := consF y0 ys |});
+      exists ({| out_stream := consF vy1 (In_stream (consF y0 ys)) |});
+      apply Pack_weak; try constructor; rewrite Hp;
+      first [ simpl; constructor 
+            | symmetry; apply parity_eq; apply Hp ]
+    | apply CH; 
+      first [ apply parity_trans in Hxy; apply Hxy
+            | inversion H ]
+    ].
+
+Ltac sim_nats_act vx1 vy1 CH x0 xs y0 ys Hxy :=
+  assert (get_parity vx1 = get_parity vy1) as Hp; 
+  first 
+    [ unfold vx1, vy1; apply parity_eq; 
+      repeat match goal with 
+      | [ Hxy : @eq_parity _ (@get_parity ?py) |- @eq_parity _ (@get_parity ?py) ] => apply Hxy
+      | [ Hxy : @eq_parity _ (@get_parity _) |- _ ] => apply parity_trans in Hxy
+      end
+    | unfold vx1, vy1 in Hp; simpl in Hp;
+      intros x1 p1 [xs01a [xs01b [[|_xs01a _xs01b H01ab H01rt] Hstr [|ns0a ns0b Hns01tau Hns01rt]]]]
+      ;
+      match goal with 
+      | [ Hns01tau : tau _ ?xs01b ?ns0a |- exists _, weak _ _ _ _ /\ weak_sim _ _ _ _ ] => inversion Hns01tau
+      | [ H01ab : tau _ {| out_stream := _ |} ?_xs01a |- exists _, weak _ _ _ _ /\ weak_sim _ _ _ _ ] => inversion H01ab
+      | |- exists _, weak _ _ _ _ /\ weak_sim _ _ _ _ => sim_nats_act_trans vy1 y0 ys CH Hxy Hp 
+      end
+    ].
+
+Ltac sim_nats_tau := intros xs1 Hx01; destruct Hx01; inversion_clear H.
+
+Ltac sim_nats_parity xin yin :=
+  let CH := fresh "CH" in 
+  cofix CH; intros x0 xs y0 ys Hxy;
+  pose xin as dx; pose yin as dy;
+  pose (Nat.add dx x0) as vx1; pose (Nat.add dy y0) as vy1; 
+  simpl in vy1, vy1;
+  apply In_sim, Pack_sim; 
+  first [ sim_nats_act vx1 vy1 CH x0 xs y0 ys Hxy | sim_nats_tau ].
+Tactic Notation "solve_nats" constr(xin) constr(yin) := sim_nats_parity xin yin.
+
+Example ltac_parity_one_sim_three : forall x xs y ys,
+  eq_parity (get_parity x) (get_parity y) -> 
+  weak_sim plus_1 plus_3
+    (In_stream (consF x xs)) (In_stream (consF y ys)).
+Proof. solve_nats 1 3. Qed.
+
+Example ltac_parity_three_sim_one : forall x xs y ys,
+  eq_parity (get_parity x) (get_parity y) -> 
+  weak_sim plus_3 plus_1
+    (In_stream (consF x xs)) (In_stream (consF y ys)).
+Proof. 
+  (* solve_nats 3 1.  *)
+Admitted.
+
+(*************************************)
+(* Ltac bisim_nats_parity := split.  *)
+(* TODO *)
