@@ -119,9 +119,7 @@ Inductive plus_2 : stream nat -> option parity -> stream nat -> Prop :=
 
 Inductive clos_t_plus_2 : stream nat -> Prop :=
 | TRANS_PLUS_TWo : forall s1 s2 p, 
-  plus_2 s1 p s2 ->
-  clos_t_plus_2 s2 ->
-  clos_t_plus_2 s1
+  plus_2 s1 p s2 -> clos_t_plus_2 s2 -> clos_t_plus_2 s1
 .
 
 (*************************************)
@@ -134,9 +132,7 @@ Inductive plus_3 : stream nat -> option parity -> stream nat -> Prop :=
 
 Inductive clos_t_plus_3 : stream nat -> Prop :=
 | TRANS_PLUS_TWREE : forall s1 s2 p, 
-  plus_3 s1 p s2 ->
-  clos_t_plus_3 s2 ->
-  clos_t_plus_3 s1
+  plus_3 s1 p s2 -> clos_t_plus_3 s2 -> clos_t_plus_3 s1
 .
 
 (*************************************)
@@ -160,9 +156,7 @@ Proof. intros n ns a2 s Hin. inversion Hin; subst; simpl. reflexivity. Qed.
 
 Inductive clos_t_plus_1_twice : stream nat -> Prop :=
 | TRANS_PLUS_TWICE : forall s1 s2 p, 
-  plus_1_twice s1 p s2 ->
-  clos_t_plus_1_twice s2 ->
-  clos_t_plus_1_twice s1
+  plus_1_twice s1 p s2 -> clos_t_plus_1_twice s2 -> clos_t_plus_1_twice s1
 .
 
 (*************************************)
@@ -189,9 +183,7 @@ Proof. intros n ns a2 s Hin. inversion Hin; subst; simpl. reflexivity. Qed.
 
 Inductive clos_t_plus_1_thrice : stream nat -> Prop :=
 | TRANS_PLUS_THRICE : forall s1 s2 p, 
-  plus_1_thrice s1 p s2 ->
-  clos_t_plus_1_thrice s2 ->
-  clos_t_plus_1_thrice s1
+  plus_1_thrice s1 p s2 -> clos_t_plus_1_thrice s2 -> clos_t_plus_1_thrice s1
 .
 
 (*************************************)
@@ -415,6 +407,7 @@ Ltac sim_nats_parity_intro xin yin :=
     ].
 Tactic Notation "solve_sim_nats" constr(xin) constr(yin) := sim_nats_parity_intro xin yin.
 
+(*************************************)
 Example ltac_parity_one_sim_three : forall x xs y ys,
   eq_parity (get_parity x) (get_parity y) -> 
   weak_sim plus_1 plus_3
@@ -428,6 +421,41 @@ Example ltac_parity_three_sim_one : forall x xs y ys,
 Proof. solve_sim_nats 3 1. Qed.
 
 (*************************************)
+Example ltac_parity_two_sim_twice : forall x xs y ys,
+  eq_parity (get_parity x) (get_parity y) -> 
+  weak_sim plus_2 plus_1_twice
+    (In_stream (consF x xs)) (In_stream (consF y ys)).
+Proof. 
+  (* NOTE: "No applicable tactic." *)
+  (* solve_sim_nats 2 2. *)
+Admitted.
+
+Example ltac_parity_twice_sim_two : forall x xs y ys,
+  eq_parity (get_parity x) (get_parity y) -> 
+  weak_sim plus_1_twice plus_2
+    (In_stream (consF x xs)) (In_stream (consF y ys)).
+Proof. 
+  (* NOTE: ["eq_parity (get_parity (S (S x0))) (get_parity vy1)"]*)
+  (* solve_sim_nats 2 2. *)
+Admitted.
+
+(*************************************)
+Example ltac_parity_three_sim_thrice : forall x xs y ys,
+  eq_parity (get_parity x) (get_parity y) -> 
+  weak_sim plus_3 plus_1_thrice
+    (In_stream (consF x xs)) (In_stream (consF y ys)).
+Proof. 
+  (* NOTE: doesn't handle the multiple layers of [plus_1_thrice] *)
+  (* solve_sim_nats 3 3. *)
+Admitted.
+
+Example ltac_parity_thrice_sim_three : forall x xs y ys,
+  eq_parity (get_parity x) (get_parity y) -> 
+  weak_sim plus_1_thrice plus_3
+    (In_stream (consF x xs)) (In_stream (consF y ys)).
+Proof. solve_sim_nats 3 3. Qed.
+
+(******************************************************************************)
 Ltac bisim_nats_parity xin yin := 
   split; Coq.Program.Tactics.reverse;
   first 
@@ -456,3 +484,23 @@ Example ltac_bisim_odd_one_or_three : forall x xs y ys,
   weak_bisim plus_1 plus_3
     (In_stream (consF x xs)) (In_stream (consF y ys)).
 Proof. solve_bisim_nats 1 3. Qed.
+
+(******************************************************************************)
+Example ltac_bisim_parity_incr_two : forall x xs y ys,
+  eq_parity (get_parity x) (get_parity y) -> 
+  weak_bisim plus_2 plus_1_twice
+    (In_stream (consF x xs)) (In_stream (consF y ys)).
+Proof. 
+  (* NOTE: "No applicable tactic." *)
+  (* solve_bisim_nats 2 2. *)
+Admitted.
+
+
+Example ltac_bisim_parity_incr_three : forall x xs y ys,
+  eq_parity (get_parity x) (get_parity y) -> 
+  weak_bisim plus_3 plus_1_thrice
+    (In_stream (consF x xs)) (In_stream (consF y ys)).
+Proof. 
+  (* NOTE: doesn't handle the multiple layers of [plus_1_thrice] *)
+  (* solve_bisim_nats 3 3.  *)
+Admitted.
