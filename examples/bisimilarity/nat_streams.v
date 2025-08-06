@@ -1,4 +1,5 @@
 Require Import MEBI.Bisimilarity.
+Require Coq.Program.Tactics.
 
 Set Primitive Projections.
 
@@ -379,46 +380,47 @@ Qed.
             | inversion H ]
     ].
 
-Ltac sim_nats_act vx1 vy1 CH x0 xs y0 ys Hxy Hp :=
+Ltac sim_nats_act vy1 y0 ys CH Hxy Hp :=
   intros x1 p1 [xs01a [xs01b [[|_xs01a _xs01b H01ab H01rt] Hstr [|ns0a ns0b Hns01tau Hns01rt]]]];
   match goal with 
-  | [ Hns01tau : tau _ ?xs01b ?ns0a |- exists _, weak _ _ _ _ /\ weak_sim _ _ _ _ ] => inversion Hns01tau
-  | [ H01ab : tau _ {| out_stream := _ |} ?_xs01a |- exists _, weak _ _ _ _ /\ weak_sim _ _ _ _ ] => inversion H01ab
+  | [ Hns01tau : tau _ ?xs01b ?ns0a 
+    |- exists _, weak _ _ _ _ /\ weak_sim _ _ _ _ ] => inversion Hns01tau
+  | [ H01ab : tau _ {| out_stream := _ |} ?_xs01a 
+    |- exists _, weak _ _ _ _ /\ weak_sim _ _ _ _ ] => inversion H01ab
   | |- exists _, weak _ _ _ _ /\ weak_sim _ _ _ _ => sim_nats_act_trans vy1 y0 ys CH Hxy Hp 
   end.
 
 Ltac sim_nats_tau := intros xs1 Hx01; destruct Hx01; inversion_clear H.
 
-Ltac sim_nats_parity vx1 vy1 x0 xs y0 ys CH Hxy Hp :=
+Ltac sim_nats_parity vy1 y0 ys CH Hxy Hp :=
   apply In_sim, Pack_sim; 
-  first [ sim_nats_act vx1 vy1 CH x0 xs y0 ys Hxy Hp | sim_nats_tau ].
+  first [ sim_nats_act vy1 y0 ys CH Hxy Hp | sim_nats_tau ].
 
 Ltac sim_nats_parity_intro xin yin := 
   let CH := fresh "CH" in 
   cofix CH; intros x0 xs y0 ys Hxy;
   pose xin as dx; pose yin as dy;
-  pose (Nat.add dx x0) as vx1; pose (Nat.add dy y0) as vy1; 
-  simpl in vy1, vy1;
+  pose (Nat.add dx x0) as vx1; pose (Nat.add dy y0) as vy1; simpl in vy1, vy1;
   assert (get_parity vx1 = get_parity vy1) as Hp; 
   first 
     [ unfold vx1, vy1; apply parity_eq; 
       repeat match goal with 
-      | [ Hxy : @eq_parity _ (@get_parity ?py) |- @eq_parity _ (@get_parity ?py) ] => apply Hxy
-      | [ Hxy : @eq_parity _ (@get_parity _) |- _ ] => apply parity_trans in Hxy
+      | [ Hxy : @eq_parity _ (@get_parity ?py) 
+      |- @eq_parity _ (@get_parity ?py) ] => apply Hxy
+      | [ Hxy : @eq_parity _ (@get_parity _) 
+      |- _ ] => apply parity_trans in Hxy
       end
     | unfold vx1, vy1 in Hp; simpl in Hp;
-      sim_nats_parity vx1 vy1 x0 xs y0 ys CH Hxy Hp
+      sim_nats_parity vy1 y0 ys CH Hxy Hp
     ].
 Tactic Notation "solve_sim_nats" constr(xin) constr(yin) := sim_nats_parity_intro xin yin.
 
-(*************************************)
 Example ltac_parity_one_sim_three : forall x xs y ys,
   eq_parity (get_parity x) (get_parity y) -> 
   weak_sim plus_1 plus_3
     (In_stream (consF x xs)) (In_stream (consF y ys)).
 Proof. solve_sim_nats 1 3. Qed.
 
-(*************************************)
 Example ltac_parity_three_sim_one : forall x xs y ys,
   eq_parity (get_parity x) (get_parity y) -> 
   weak_sim plus_3 plus_1
@@ -426,110 +428,31 @@ Example ltac_parity_three_sim_one : forall x xs y ys,
 Proof. solve_sim_nats 3 1. Qed.
 
 (*************************************)
-Require Coq.Program.Tactics.
 Ltac bisim_nats_parity xin yin := 
   split; Coq.Program.Tactics.reverse;
-  first [ sim_nats_parity_intro xin yin
-        | let CH := fresh "CH" in 
-          cofix CH; intros y0 ys x0 xs Hxy;
-          (* pose xin as dy; pose yin as dx; *)
-          (* sim_nats_parity dx dy x0 xs y0 ys CH Hxy *)
-
-
-          pose xin as dx; pose yin as dy;
-          pose (Nat.add dx x0) as vx1; pose (Nat.add dy y0) as vy1; 
-          simpl in vy1, vy1;
-          assert (get_parity vx1 = get_parity vy1) as Hp; 
-          first 
-            [ unfold vx1, vy1; apply parity_eq; 
-              repeat match goal with 
-              | [ Hxy : @eq_parity _ (@get_parity ?py) |- @eq_parity _ (@get_parity ?py) ] => apply Hxy
-              | [ Hxy : @eq_parity _ (@get_parity _) |- _ ] => apply parity_trans in Hxy
-              end
-            | unfold vx1, vy1 in Hp; simpl in Hp;
-              sim_nats_parity vx1 vy1 x0 xs y0 ys CH Hxy
-            ]
-
-        ].
+  first 
+    [ sim_nats_parity_intro xin yin
+    | let CH := fresh "CH" in 
+      cofix CH; intros x0 xs y0 ys Hxy;
+      pose xin as dx; pose yin as dy;
+      pose (Nat.add dx x0) as vx1; pose (Nat.add dy y0) as vy1; 
+      simpl in vx1, vy1;
+      assert (get_parity vx1 = get_parity vy1) as Hp; 
+      first 
+        [ unfold vx1, vy1; apply parity_eq; 
+          repeat match goal with 
+          | [ Hxy : @eq_parity _ (@get_parity ?py) |- @eq_parity _ (@get_parity ?py) ] => apply Hxy
+          | [ Hxy : @eq_parity _ (@get_parity _) |- _ ] => apply parity_trans in Hxy
+          end
+        | unfold vx1, vy1 in Hp; simpl in Hp; 
+          (* since this is [y => x], we need to swap [Hp] and [y] for [x]. *)
+          symmetry in Hp; sim_nats_parity vx1 x0 xs CH Hxy Hp
+        ]
+    ].
 Tactic Notation "solve_bisim_nats" constr(xin) constr(yin) := bisim_nats_parity xin yin.
-
 
 Example ltac_bisim_odd_one_or_three : forall x xs y ys,
   eq_parity (get_parity x) (get_parity y) -> 
   weak_bisim plus_1 plus_3
     (In_stream (consF x xs)) (In_stream (consF y ys)).
-Proof. 
-  (* solve_bisim_nats 1 3. *)
-
-  split; Coq.Program.Tactics.reverse.
-  - sim_nats_parity_intro 1 3.
-  - let CH := fresh "CH" in 
-    cofix CH; intros y0 ys x0 xs Hxy.
-    pose 3 as dx; pose 1 as dy.
-    (* apply parity_assoc in Hxy. *)
-
-          (* pose xin as dx; pose yin as dy; *)
-          pose (Nat.add dx x0) as vx1; pose (Nat.add dy y0) as vy1. 
-          simpl in vx1, vy1.
-          assert (get_parity vx1 = get_parity vy1) as Hp. 
-          + unfold vx1, vy1. apply parity_eq. 
-              (* repeat *)
-               match goal with 
-              | [ Hxy : @eq_parity _ (@get_parity ?py) |- @eq_parity _ (@get_parity ?py) ] => apply Hxy
-              | [ Hxy : @eq_parity _ (@get_parity _) |- _ ] => apply parity_trans in Hxy
-              end.
-            | unfold vx1, vy1 in Hp; simpl in Hp;
-              sim_nats_parity vx1 vy1 x0 xs y0 ys CH Hxy
-            ].
-
-
-
-    (* sim_nats_parity dx dy x0 xs y0 ys CH Hxy. *)
-    pose (Nat.add dx x0) as vx1; pose (Nat.add dy y0) as vy1; 
-    simpl in vy1, vy1;
-    apply In_sim, Pack_sim. 
-    { 
-      (* sim_nats_act vx1 vy1 CH x0 xs y0 ys Hxy. *)
-      assert (get_parity vx1 = get_parity vy1) as Hp. 
-      * unfold vx1, vy1; apply parity_eq; 
-        repeat match goal with 
-        | [ Hxy : @eq_parity _ (@get_parity ?py) |- @eq_parity _ (@get_parity ?py) ] => apply Hxy
-        | [ Hxy : @eq_parity _ (@get_parity _) |- _ ] => apply parity_trans in Hxy
-        end.
-      * unfold vx1, vy1 in Hp; simpl in Hp;
-        intros x1 p1 [xs01a [xs01b [[|_xs01a _xs01b H01ab H01rt] Hstr [|ns0a ns0b Hns01tau Hns01rt]]]]
-        . 
-        match goal with 
-        | [ Hns01tau : tau _ ?xs01b ?ns0a |- exists _, weak _ _ _ _ /\ weak_sim _ _ _ _ ] => inversion Hns01tau
-        | [ H01ab : tau _ {| out_stream := _ |} ?_xs01a |- exists _, weak _ _ _ _ /\ weak_sim _ _ _ _ ] => inversion H01ab
-        | |- exists _, weak _ _ _ _ /\ weak_sim _ _ _ _ => 
-            (* sim_nats_act_trans vy1 y0 ys CH Hxy Hp  *)
-            exists ({| out_stream := consF vy1 {| out_stream := consF y0 ys |} |});
-            inversion_clear Hstr; subst; split 
-        end.
-          - unfold weak;
-                exists ({| out_stream := consF y0 ys |});
-                exists ({| out_stream := consF vy1 (In_stream (consF y0 ys)) |}).
-                apply Pack_weak; try constructor. rewrite Hp.
-                first [ simpl; constructor 
-                      | symmetry; apply parity_eq; apply Hp ].
-          - apply CH; 
-                first [ apply parity_trans in Hxy; apply Hxy
-                      | inversion H ]
-              ]
-        end.
-
-    }
-    + sim_nats_tau.
-
-
-
-  (* split; Coq.Program.Tactics.reverse. *)
-  (* sim_nats_parity 1 3. *)
-  (* sim_nats_parity 3 1. *)
-
-
-  split.
-  - apply ltac_parity_one_sim_three, H. 
-  - apply ltac_parity_three_sim_one, parity_assoc, H. 
-Qed.
+Proof. solve_bisim_nats 1 3. Qed.
