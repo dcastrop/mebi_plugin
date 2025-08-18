@@ -95,6 +95,16 @@ Proof. intros x y H. destruct x.
 Qed.
 
 (******************************************************************************)
+(* Inductive stream_parity : stream nat -> Type :=
+| SEVN : forall s x c, out_stream s = consF x c -> get_parity x = EVN -> 
+    stream_parity s
+| SODD : forall s x c, out_stream s = consF x c -> get_parity x = ODD -> 
+    stream_parity s
+.  *)
+
+(* Fail (stream_parity (In_stream nilF)). *)
+(* Check (stream_parity (In_stream (consF 0 (In_stream nilF)))). *)
+
 Definition get_stream_parity (s : stream nat) : option parity := 
   match get_opt_hd s with
   | None => None
@@ -215,25 +225,6 @@ Proof.
   - rewrite parity_inv_incr, <- IHx. apply parity_inv_incr.
 Qed.
 
-Lemma parity_plus_1_3_odd_trans : forall hx sx0 sx1 sx2 hy sy0 sy1 sy2,
-  out_stream sx1 = consF hx sx0 ->
-  out_stream sy1 = consF hy sy0 ->
-  get_parity hx = get_parity hy ->
-  plus_1 sx1 (Some (get_parity (1 + hx))) sx2 ->
-  plus_3 sy1 (Some (get_parity (3 + hy))) sy2 ->
-  out_stream sx2 = consF (1 + hx) sx1 ->
-  out_stream sy2 = consF (3 + hy) sy1 ->
-  get_parity (1 + hx) = get_parity (3 + hy).
-Proof.
-  intros hx sx0 sx1 sx2 hy sy0 sy1 sy2. 
-  intros Hsx1o Hsy1o Hxy1; intros Htx Hty; intros Hsx2o Hsy2o.
-  replace (1 + hx) with (hx + 1).
-  replace (3 + hy) with (hy + 3).
-  rewrite !parity_plus_odd; [apply parity_inv_eq; apply Hxy1 | | ]; trivial.
-  rewrite !plus_Sn_m, <- !plus_n_Sm, <- plus_n_O, plus_O_n; reflexivity.
-  rewrite !plus_Sn_m, <- !plus_n_Sm, <- plus_n_O, plus_O_n; reflexivity.
-Qed.
-
 Lemma parity_plus_odd_trans 
 (ltsX ltsY : stream nat -> option parity -> stream nat -> Prop) 
 : forall dx dy hx sx0 sx1 sx2 hy sy0 sy1 sy2,
@@ -253,6 +244,44 @@ Proof.
   rewrite !parity_plus_odd; [apply parity_inv_eq, Hxy1 | apply Hdy | apply Hdx].
 Qed.
 
+Lemma parity_some_opt : forall x y, 
+  get_parity x = get_parity y ->
+  Some (get_parity x) = Some (get_parity y).
+Proof. intros x y Hxy. destruct (get_parity x); rewrite Hxy; reflexivity. Qed.
+
+Lemma parity_opt_some : forall x y, 
+  Some (get_parity x) = Some (get_parity y) ->
+  get_parity x = get_parity y.
+Proof. intros x y Hxy. inversion Hxy. reflexivity. Qed.
+
+Lemma parity_eq_impl_stream
+: forall hx sx0 sx1 hy sy0 sy1,
+  out_stream sx1 = consF hx sx0 ->
+  out_stream sy1 = consF hy sy0 ->
+  get_parity hx = get_parity hy ->
+  get_stream_parity sx1 = get_stream_parity sy1.
+Proof.
+  intros hx sx0 sx1 hy sy0 sy1 Hsx1o Hsy1o Hxy.
+  inversion Hsx1o as [Hsxp]; apply parity_stream_cons in Hsxp; subst.
+  inversion Hsy1o as [Hsyp]; apply parity_stream_cons in Hsyp; subst.
+  rewrite Hsxp, Hsyp. 
+  apply parity_some_opt, Hxy.
+Qed.
+
+Lemma parity_stream_eq_impl
+: forall hx sx0 sx1 hy sy0 sy1,
+  out_stream sx1 = consF hx sx0 ->
+  out_stream sy1 = consF hy sy0 ->
+  get_stream_parity sx1 = get_stream_parity sy1 ->
+  get_parity hx = get_parity hy.
+Proof.
+  intros hx sx0 sx1 hy sy0 sy1 Hsx1o Hsy1o Hxy.
+  inversion Hsx1o as [Hsxp]; apply parity_stream_cons in Hsxp; subst.
+  inversion Hsy1o as [Hsyp]; apply parity_stream_cons in Hsyp; subst.
+  rewrite Hsxp, Hsyp in Hxy. 
+  apply parity_opt_some, Hxy.
+Qed.
+
 Lemma parity_plus_odd_trans_stream
 (ltsX ltsY : stream nat -> option parity -> stream nat -> Prop) 
 : forall dx dy hx sx0 sx1 sx2 hy sy0 sy1 sy2,
@@ -260,90 +289,24 @@ Lemma parity_plus_odd_trans_stream
   get_parity dy = ODD ->
   out_stream sx1 = consF hx sx0 ->
   out_stream sy1 = consF hy sy0 ->
-  get_stream_parity sx0 = get_stream_parity sy0 ->
+  get_stream_parity sx1 = get_stream_parity sy1 ->
   ltsX sx1 (Some (get_parity (hx + dx))) sx2 ->
   ltsY sy1 (Some (get_parity (hy + dy))) sy2 ->
   out_stream sx2 = consF (hx + dx) sx1 ->
   out_stream sy2 = consF (hy + dy) sy1 ->
   get_stream_parity sx2 = get_stream_parity sy2.
 Proof.
-  intros dx dy. intros hx sx0 sx1 sx2 hy sy0 sy1 sy2. 
-  intros Hdx Hdy. intros Hsx1o Hsy1o Hxy1; intros Htx Hty; intros Hsx2o Hsy2o.
+  intros dx dy; intros hx sx0 sx1 sx2 hy sy0 sy1 sy2. 
+  intros Hdx Hdy; intros Hsx1o Hsy1o Hxy1; intros Htx Hty; intros Hsx2o Hsy2o.
 
-  inversion Hsx1o as [Hsxp]; apply parity_stream_cons in Hsxp; subst.
-  inversion Hsy1o as [Hsyp]; apply parity_stream_cons in Hsyp; subst.
+  inversion Hsx2o as [Hsxp2]; apply parity_stream_cons in Hsxp2; subst.
+  inversion Hsy2o as [Hsyp2]; apply parity_stream_cons in Hsyp2; subst.
+  rewrite Hsxp2, Hsyp2; apply parity_some_opt.
 
-  destruct get_stream_parity. admit.
-  - 
+  apply (@parity_plus_odd_trans ltsX ltsY dx dy hx sx0 sx1 sx2 hy sy0 sy1 sy2); trivial.
 
-  
-  intros hx sx0 sx1 hy sy0 sy1 Hsxy Hsxo Hsyo Htx Hty.
-
-  inversion Hsxo as [Hsxp]; apply parity_stream_cons in Hsxp; subst.
-  inversion Hsyo as [Hsyp]; apply parity_stream_cons in Hsyp; subst.
-
-
-  (* unfold get_stream_parity, get_opt_hd in H0; rewrite Hsxo in H0. *)
-
-  apply parity_stream_cons in Hsxo, Hsyo; rewrite Hsxo, Hsyo.
-
-  unfold get_stream_parity in Hsxo, Hsyo; unfold get_opt_hd in Hsxo, Hsyo.
-
-
-  
-  - 
-
-  destruct (get_parity hx).
-  - 
-
-
-
-  destruct (get_parity hx), (get_parity hy); try reflexivity.
-  - inversion Hsxo.
-
-
-    inversion Htx; subst. 
-    inversion Hty; subst.
-    + inversion Hsxy.
-  
-    destruct (get_stream_parity sx1).
-  
-
-  inversion Htx; subst. inversion Hty; subst.
-  - trivial.
-  - inversion  
-  
-
-
-  apply parity_stream_cons in Hsxo. 
-
-
-  (* unfold get_stream_parity. *)
-  (* apply parity_stream_cons.  *)
-  apply parity_stream_cons in Hsxo. 
-
-  inversion Htx; subst. 
-  - 
-    (* rewrite H.  *)
-    inversion Hty; subst.
-
-
-  destruct (out_stream sx1) as [|]; [inversion Hsxo|]. 
-  inversion Hsxo; subst.
-
-  inversion Htx; subst.
-  
-  unfold get_stream_parity in Hsxy. 
-  destruct (get_opt_hd sx0) as [AA|], (get_opt_hd sy0) as [BB|].
-  - admit.
-
-
-
-  destruct (get_stream_parity sx0) as [px|], (get_stream_parity sy0) as [py|].
-  - admit.
-  - inversion Hsxy.
-  - inversion Hsxy. 
-  - admit.
+  apply (@parity_stream_eq_impl hx sx0 sx1 hy sy0 sy1); trivial.
+Qed.
 
 (******************************************************************************)
 Example parity_plus_one_sim_plus_three : forall sx sy,
