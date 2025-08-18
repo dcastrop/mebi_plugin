@@ -73,6 +73,10 @@ Proof. intros n. induction n; simpl; trivial.
   rewrite IHn; rewrite <- parity_inv_inv; apply eq_refl.
 Qed. 
 
+Lemma parity_inv_eq : forall x y, get_parity x = get_parity y -> 
+  inv_parity (get_parity x) = inv_parity (get_parity y).
+Proof. intros x y Hxy. rewrite Hxy. reflexivity. Qed.
+
 Lemma parity_trans : forall x y, eq_parity (get_parity x) (get_parity y) ->
   eq_parity (get_parity (S x)) (get_parity (S y)).
 Proof. intros x y H. destruct x.
@@ -202,20 +206,16 @@ Proof. intros s0 p s1 [s01a [s01b [Hpre Hstr Hpost]]].
   destruct Hpre, Hpost; try apply Hstr; inversion H.
 Qed. 
 
-Lemma parity_plus_odd : forall x sx0 sx1 n,
-  get_parity n = ODD ->
-  out_stream sx1 = consF x sx0 ->
-  get_parity (n + x) = inv_parity (get_parity x).
+Lemma parity_plus_odd : forall x incr,
+  get_parity incr = ODD ->
+  get_parity (x + incr) = inv_parity (get_parity x).
 Proof.
-  intros x sx0 sx1 n Hpn Hsx1o.
+  intros x incr Hpn. induction x.
+  - apply Hpn.
+  - rewrite parity_inv_incr, <- IHx. apply parity_inv_incr.
+Qed.
 
-Admitted.
-  
-
-
-
-
-Lemma parity_plus_odd_trans : forall hx sx0 sx1 sx2 hy sy0 sy1 sy2,
+Lemma parity_plus_1_3_odd_trans : forall hx sx0 sx1 sx2 hy sy0 sy1 sy2,
   out_stream sx1 = consF hx sx0 ->
   out_stream sy1 = consF hy sy0 ->
   get_parity hx = get_parity hy ->
@@ -227,46 +227,56 @@ Lemma parity_plus_odd_trans : forall hx sx0 sx1 sx2 hy sy0 sy1 sy2,
 Proof.
   intros hx sx0 sx1 sx2 hy sy0 sy1 sy2. 
   intros Hsx1o Hsy1o Hxy1; intros Htx Hty; intros Hsx2o Hsy2o.
+  replace (1 + hx) with (hx + 1).
+  replace (3 + hy) with (hy + 3).
+  rewrite !parity_plus_odd; [apply parity_inv_eq; apply Hxy1 | | ]; trivial.
+  rewrite !plus_Sn_m, <- !plus_n_Sm, <- plus_n_O, plus_O_n; reflexivity.
+  rewrite !plus_Sn_m, <- !plus_n_Sm, <- plus_n_O, plus_O_n; reflexivity.
+Qed.
 
-  inversion Htx as [_sx1 Hsx1 |]; [rewrite Hsx1o in Hsx1; inversion Hsx1 |]; subst.
-  
-  destruct (get_parity hx).
-  -  
-
-
-  inversion Hty as [_sy1 Hsy1 |]; [rewrite Hsy1o in Hsy1; inversion Hsy1 |]; subst.
-    {
-
-    }
-
-  } 
-  admit. 
-  admit. 
-  admit. 
-  
-  
-
-  destruct hx1.
-
-
-  destruct (get_parity hx1).
-
-  apply parity_stream_cons in Hsx2o.
-
-
-
-  inversion Htx; subst. inversion Hty; subst.
-
-
-
-Lemma parity_plus_odd_trans_stream : forall hx sx0 sx1 hy sy0 sy1,
-  get_stream_parity sx0 = get_stream_parity sy0 ->
+Lemma parity_plus_odd_trans 
+(ltsX ltsY : stream nat -> option parity -> stream nat -> Prop) 
+: forall dx dy hx sx0 sx1 sx2 hy sy0 sy1 sy2,
+  get_parity dx = ODD -> 
+  get_parity dy = ODD ->
   out_stream sx1 = consF hx sx0 ->
   out_stream sy1 = consF hy sy0 ->
-  plus_1 sx0 (Some (get_parity hx)) sx1 ->
-  plus_3 sy0 (Some (get_parity hy)) sy1 ->
-  get_stream_parity sx1 = get_stream_parity sy1.
+  get_parity hx = get_parity hy ->
+  ltsX sx1 (Some (get_parity (hx + dx))) sx2 ->
+  ltsY sy1 (Some (get_parity (hy + dy))) sy2 ->
+  out_stream sx2 = consF (hx + dx) sx1 ->
+  out_stream sy2 = consF (hy + dy) sy1 ->
+  get_parity (hx + dx) = get_parity (hy + dy).
 Proof.
+  intros dx dy. intros hx sx0 sx1 sx2 hy sy0 sy1 sy2. 
+  intros Hdx Hdy. intros Hsx1o Hsy1o Hxy1; intros Htx Hty; intros Hsx2o Hsy2o.
+  rewrite !parity_plus_odd; [apply parity_inv_eq, Hxy1 | apply Hdy | apply Hdx].
+Qed.
+
+Lemma parity_plus_odd_trans_stream
+(ltsX ltsY : stream nat -> option parity -> stream nat -> Prop) 
+: forall dx dy hx sx0 sx1 sx2 hy sy0 sy1 sy2,
+  get_parity dx = ODD -> 
+  get_parity dy = ODD ->
+  out_stream sx1 = consF hx sx0 ->
+  out_stream sy1 = consF hy sy0 ->
+  get_stream_parity sx0 = get_stream_parity sy0 ->
+  ltsX sx1 (Some (get_parity (hx + dx))) sx2 ->
+  ltsY sy1 (Some (get_parity (hy + dy))) sy2 ->
+  out_stream sx2 = consF (hx + dx) sx1 ->
+  out_stream sy2 = consF (hy + dy) sy1 ->
+  get_stream_parity sx2 = get_stream_parity sy2.
+Proof.
+  intros dx dy. intros hx sx0 sx1 sx2 hy sy0 sy1 sy2. 
+  intros Hdx Hdy. intros Hsx1o Hsy1o Hxy1; intros Htx Hty; intros Hsx2o Hsy2o.
+
+  inversion Hsx1o as [Hsxp]; apply parity_stream_cons in Hsxp; subst.
+  inversion Hsy1o as [Hsyp]; apply parity_stream_cons in Hsyp; subst.
+
+  destruct get_stream_parity. admit.
+  - 
+
+  
   intros hx sx0 sx1 hy sy0 sy1 Hsxy Hsxo Hsyo Htx Hty.
 
   inversion Hsxo as [Hsxp]; apply parity_stream_cons in Hsxp; subst.
