@@ -125,6 +125,10 @@ Definition get_stream_parity (s : stream nat) : option parity :=
   | None => None
   | Some x => Some (get_parity x)
   end.
+  (* match out_stream s with
+  | nilF => None
+  | consF x _xs => Some (get_parity x)
+  end. *)
 
 Lemma parity_stream_nil : forall s,
   out_stream s = nilF -> get_stream_parity s = None.
@@ -190,13 +194,19 @@ Proof. intros a ax bx Haax Habx.
   inversion H0; subst; reflexivity.
 Qed.
 
-(* Lemma parity_stream_some_hd_opt : forall a ax,
+Lemma parity_stream_some_hd_opt : forall a ax,
   get_stream_parity a = Some (get_parity ax) ->
   get_opt_hd a = Some ax.
 Proof. intros a ax Ha.
   inversion Ha. unfold get_stream_parity in H0.
-  destruct (get_opt_hd a); [| discriminate H0].
-Admitted. *)
+  
+  unfold get_opt_hd in H0.
+  unfold get_opt_hd.
+
+  destruct (out_stream a); [discriminate H0 |].
+
+  (* destruct (get_opt_hd a); [| discriminate H0]. *)
+Admitted.
 
 (* TODO: *)
 Lemma parity_stream_eq_some_cons : forall a b ac bc ax bx,
@@ -207,6 +217,8 @@ Lemma parity_stream_eq_some_cons : forall a b ac bc ax bx,
   out_stream b = consF bx bc.
 Proof.
   intros a b ac bc ax bx Hab Ha Hb Hao.
+
+
 Admitted.
 
 Lemma parity_stream_eq_impl
