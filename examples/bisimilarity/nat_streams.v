@@ -190,14 +190,15 @@ Proof. intros a ax bx Haax Habx.
   inversion H0; subst; reflexivity.
 Qed.
 
-Lemma parity_stream_some_hd_opt : forall a ax,
+(* Lemma parity_stream_some_hd_opt : forall a ax,
   get_stream_parity a = Some (get_parity ax) ->
   get_opt_hd a = Some ax.
 Proof. intros a ax Ha.
   inversion Ha. unfold get_stream_parity in H0.
   destruct (get_opt_hd a); [| discriminate H0].
-Admitted.
+Admitted. *)
 
+(* TODO: *)
 Lemma parity_stream_eq_some_cons : forall a b ac bc ax bx,
   get_stream_parity a = get_stream_parity b ->
   get_stream_parity a = Some (get_parity ax) ->
