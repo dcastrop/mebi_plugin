@@ -59,14 +59,6 @@ Module NoBranching.
   | do_assocr : forall t1 t2 t3,                      (* 8*)
       termLTS (tpar (tpar t1 t2) t3) false (tpar t1 (tpar t2 t3))
   .
-
-  Inductive transitive_closure : term -> Prop :=
-  | trans_step : forall t a t', termLTS t a t' ->
-                                transitive_closure t' ->
-                                transitive_closure t
-
-  | no_step : forall t, transitive_closure t
-  .
 End NoBranching.
 
 Module WithBranching.
@@ -151,16 +143,18 @@ Module WithBranching.
       termLTS (tpar p tr) true c ->
       termLTS (tpar p (topt tl tr)) true c *)
   .
-  
-  Inductive transitive_closure : term -> Prop :=
-  | trans_step : forall t a t', termLTS t a t' ->
-                                transitive_closure t' ->
-                                transitive_closure t
-
-  | no_step : forall t, transitive_closure t
-  .
 End WithBranching.
 
+Import NoBranching.
+(* Import WithBranching. *)
+
+Inductive transitive_closure : term -> Prop :=
+| trans_step : forall t a t', termLTS t a t' ->
+                              transitive_closure t' ->
+                              transitive_closure t
+
+| no_step : forall t, transitive_closure t
+.
 
 (*************************************)
 (** Basic: No recursion or branches **)
