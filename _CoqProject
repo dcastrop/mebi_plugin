@@ -10,10 +10,16 @@ theories/Test.v
 theories/Bisimilarity.v
 
 examples/CADP.v
+examples/CADP_simple.v
+examples/Proc.v
+
 examples/properties/mutual_exclusion.v
 # examples/properties/no_starvation.v
-# examples/SimpleCADP.v
-# examples/Proc.v
+
+# examples/bisimilarity/nat_streams.v
+# examples/bisimilarity/CADP_simple.v
+# examples/bisimilarity/Proc.v
+
 
 src/utils.ml
 src/utils.mli
