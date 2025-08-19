@@ -13,8 +13,6 @@ Fixpoint app {X:Type} (l1 l2 : list X) : list X :=
   | h :: t => h :: (app t l2)
   end.
 
-
-
 Inductive act : Type :=
   | ENTER : act
   | LEAVE : act

@@ -2,109 +2,165 @@ Require Import MEBI.loader.
 
 Inductive action : Set := | ASend | ARecv | BSend | BRecv | CSend | CRecv.
 
-Inductive term : Set :=
-| trec : term
-| tend : term
-| tfix : term -> term
-| tact : action -> term -> term
+Module NoBranching.
 
-(* parallel *)
-| tpar : term -> term -> term
+  Inductive term : Set :=
+  | trec : term
+  | tend : term
+  | tfix : term -> term
+  | tact : action -> term -> term
+  | tpar : term -> term -> term
+  .
 
-(* active selection/branching *)
-(* | tbra : term -> term -> term  *)
+  Fixpoint tsubst (t1 : term) (t2 : term) :=
+    match t2 with
+    | trec => t1
+    | tend => tend
+    | tfix t => tfix t
+    | tact a t => tact a (tsubst t1 t)
+    | tpar tl tr => tpar (tsubst t1 tl) (tsubst t1 tr)
+    end.
 
-(* passive option selection/branching *)
-(* | topt : term -> term -> term  *)
-.
+  (* true: "comm", false: "silent" *)
+  Inductive termLTS : term -> bool -> term -> Prop :=
+  (* syncrhonous communication, i.e., send/recv in parallel *)
 
-Fixpoint tsubst (t1 : term) (t2 : term) :=
-  match t2 with
-  | trec => t1
-  | tend => tend
-  | tfix t => tfix t
-  | tact a t => tact a (tsubst t1 t)
-  | tpar tl tr => tpar (tsubst t1 tl) (tsubst t1 tr)
-  (* | tbra tl tr => tbra (tsubst t1 tl) (tsubst t1 tr) *)
-  (* | topt tl tr => topt (tsubst t1 tl) (tsubst t1 tr) *)
-  end.
+  | do_senda : forall tl tr,                          (* 0*)
+      termLTS (tpar (tact ASend tl) (tact ARecv tr))
+        true  (tpar tl tr)
 
-(* true: "comm", false: "silent" *)
-Inductive termLTS : term -> bool -> term -> Prop :=
-(* syncrhonous communication, i.e., send/recv in parallel *)
+  | do_sendb : forall tl tr,                          (* 1*)
+      termLTS (tpar (tact BSend tl) (tact BRecv tr))
+        true  (tpar tl tr)
 
-| do_senda : forall tl tr,                          (* 0*)
-    termLTS (tpar (tact ASend tl) (tact ARecv tr))
-      true  (tpar tl tr)
+  | do_sendc : forall tl tr,                          (* 2*)
+      termLTS (tpar (tact CSend tl) (tact CRecv tr))
+        true  (tpar tl tr)
 
-| do_sendb : forall tl tr,                          (* 1*)
-    termLTS (tpar (tact BSend tl) (tact BRecv tr))
-      true  (tpar tl tr)
+  (* non-deterministic parallel step *)
+  | do_parl : forall a tl tl' tr,                     (* 3*)
+      termLTS tl a tl' ->
+      termLTS (tpar tl tr) a (tpar tl' tr)
 
-| do_sendc : forall tl tr,                          (* 2*)
-    termLTS (tpar (tact CSend tl) (tact CRecv tr))
-      true  (tpar tl tr)
+  | do_parr : forall a tl tr tr',                     (* 4*)
+      termLTS tr a tr' ->
+      termLTS (tpar tl tr) a (tpar tl tr')
 
-(* non-deterministic parallel step *)
-| do_parl : forall a tl tl' tr,                     (* 3*)
-    termLTS tl a tl' ->
-    termLTS (tpar tl tr) a (tpar tl' tr)
+  (* These below capture "structural congruence": using "silent" transitions *)
+  | do_fix : forall t,                                (* 5*)
+      termLTS (tfix t) false (tsubst (tfix t) t)
 
-| do_parr : forall a tl tr tr',                     (* 4*)
-    termLTS tr a tr' ->
-    termLTS (tpar tl tr) a (tpar tl tr')
+  | do_comm : forall tl tr,                           (* 6*)
+      termLTS (tpar tl tr) false (tpar tr tl)
 
-(* These below capture "structural congruence": using "silent" transitions *)
-| do_fix : forall t,                                (* 5*)
-    termLTS (tfix t) false (tsubst (tfix t) t)
+  | do_assocl : forall t1 t2 t3,                      (* 7*)
+      termLTS (tpar t1 (tpar t2 t3)) false (tpar (tpar t1 t2) t3)
 
-| do_comm : forall tl tr,                           (* 6*)
-    termLTS (tpar tl tr) false (tpar tr tl)
+  | do_assocr : forall t1 t2 t3,                      (* 8*)
+      termLTS (tpar (tpar t1 t2) t3) false (tpar t1 (tpar t2 t3))
+  .
 
-| do_assocl : forall t1 t2 t3,                      (* 7*)
-    termLTS (tpar t1 (tpar t2 t3)) false (tpar (tpar t1 t2) t3)
+  Inductive transitive_closure : term -> Prop :=
+  | trans_step : forall t a t', termLTS t a t' ->
+                                transitive_closure t' ->
+                                transitive_closure t
 
-| do_assocr : forall t1 t2 t3,                      (* 8*)
-    termLTS (tpar (tpar t1 t2) t3) false (tpar t1 (tpar t2 t3))
+  | no_step : forall t, transitive_closure t
+  .
+End NoBranching.
 
-(* non-deterministic selection between tl and tr *)
-(* | do_bral : forall a tl tr tl',                     (* 9*)
-    termLTS tl a tl' ->
-    termLTS (tbra tl tr) a tl'
+Module WithBranching.
+  Inductive term : Set :=
+  | trec : term
+  | tend : term
+  | tfix : term -> term
+  | tact : action -> term -> term
+  | tpar : term -> term -> term
 
-| do_brar : forall a tl tr tr',                     (*10*)
-    termLTS tr a tr' ->
-    termLTS (tbra tl tr) a tr' *)
+  (* active selection/branching *)
+  (* | tbra : term -> term -> term  *)
 
-(* non-deterministic branch in reaction to ready party p *)
-(* | do_optl : forall tl tr p c,                       (*11*)
-    termLTS (tpar p tl) true c ->
-    termLTS (tpar p (topt tl tr)) true c
+  (* passive option selection/branching *)
+  (* | topt : term -> term -> term  *)
+  .
 
-| do_optr : forall tl tr p c,                       (*12*)
-    termLTS (tpar p tr) true c ->
-    termLTS (tpar p (topt tl tr)) true c *)
+  Fixpoint tsubst (t1 : term) (t2 : term) :=
+    match t2 with
+    | trec => t1
+    | tend => tend
+    | tfix t => tfix t
+    | tact a t => tact a (tsubst t1 t)
+    | tpar tl tr => tpar (tsubst t1 tl) (tsubst t1 tr)
+    (* | tbra tl tr => tbra (tsubst t1 tl) (tsubst t1 tr) *)
+    (* | topt tl tr => topt (tsubst t1 tl) (tsubst t1 tr) *)
+    end.
 
+  (* "comm", false: "silent" *)
+  Inductive termLTS : term -> bool -> term -> Prop :=
+  (* syncrhonous communication, i.e., send/recv in parallel *)
 
-(* Below are attempts to "clean up" recursive terms. *)
-(* | do_clean :                                        (*13*)
-    termLTS (tpar tend tend) false tend
+  | do_senda : forall tl tr,                          (* 0*)
+      termLTS (tpar (tact ASend tl) (tact ARecv tr))
+        true  (tpar tl tr)
 
-| do_clean_l : forall tr,                           (*14*)
-    termLTS (tpar tend tr) false tr
+  | do_sendb : forall tl tr,                          (* 1*)
+      termLTS (tpar (tact BSend tl) (tact BRecv tr))
+        true  (tpar tl tr)
 
-| do_clean_r : forall tl,                           (*15*)
-    termLTS (tpar tl tend) false tl *)
-.
+  | do_sendc : forall tl tr,                          (* 2*)
+      termLTS (tpar (tact CSend tl) (tact CRecv tr))
+        true  (tpar tl tr)
 
+  (* non-deterministic parallel step *)
+  | do_parl : forall a tl tl' tr,                     (* 3*)
+      termLTS tl a tl' ->
+      termLTS (tpar tl tr) a (tpar tl' tr)
 
-Inductive transitive_closure : term -> Prop :=
-| trans_step : forall t a t', termLTS t a t' ->
-                              transitive_closure t' ->
-                              transitive_closure t
+  | do_parr : forall a tl tr tr',                     (* 4*)
+      termLTS tr a tr' ->
+      termLTS (tpar tl tr) a (tpar tl tr')
 
-| no_step : forall t, transitive_closure t
-.
+  (* These below capture "structural congruence": using "silent" transitions *)
+  | do_fix : forall t,                                (* 5*)
+      termLTS (tfix t) false (tsubst (tfix t) t)
+
+  | do_comm : forall tl tr,                           (* 6*)
+      termLTS (tpar tl tr) false (tpar tr tl)
+
+  | do_assocl : forall t1 t2 t3,                      (* 7*)
+      termLTS (tpar t1 (tpar t2 t3)) false (tpar (tpar t1 t2) t3)
+
+  | do_assocr : forall t1 t2 t3,                      (* 8*)
+      termLTS (tpar (tpar t1 t2) t3) false (tpar t1 (tpar t2 t3))
+
+  (* non-deterministic selection between tl and tr *)
+  (* | do_bral : forall a tl tr tl',                     (* 9*)
+      termLTS tl a tl' ->
+      termLTS (tbra tl tr) a tl'
+
+  | do_brar : forall a tl tr tr',                     (*10*)
+      termLTS tr a tr' ->
+      termLTS (tbra tl tr) a tr' *)
+
+  (* non-deterministic branch in reaction to ready party p *)
+  (* | do_optl : forall tl tr p c,                       (*11*)
+      termLTS (tpar p tl) true c ->
+      termLTS (tpar p (topt tl tr)) true c
+
+  | do_optr : forall tl tr p c,                       (*12*)
+      termLTS (tpar p tr) true c ->
+      termLTS (tpar p (topt tl tr)) true c *)
+  .
+  
+  Inductive transitive_closure : term -> Prop :=
+  | trans_step : forall t a t', termLTS t a t' ->
+                                transitive_closure t' ->
+                                transitive_closure t
+
+  | no_step : forall t, transitive_closure t
+  .
+End WithBranching.
+
 
 (*************************************)
 (** Basic: No recursion or branches **)
