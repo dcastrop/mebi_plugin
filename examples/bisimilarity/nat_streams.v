@@ -171,17 +171,6 @@ Proof.
   apply parity_stream_nil, HaNil.
 Qed.
 
-(* Lemma parity_stream_some_hd : forall a ax p,
-  get_stream_parity a = Some p ->
-  get_opt_hd a = Some ax ->
-  get_parity ax = p.
-Proof.
-  intros a ax p HaSome Hhd. 
-  unfold get_stream_parity in HaSome.
-  rewrite Hhd in HaSome.
-  inversion HaSome; reflexivity.
-Qed. *)
-
 Lemma parity_stream_some_out_parity : forall a ax ac,
   out_stream a = consF ax ac ->
   get_stream_parity a = Some (get_parity ax).
@@ -201,18 +190,29 @@ Proof.
   inversion HaSome; reflexivity.
 Qed.
 
-Lemma parity_stream_eq_some_cons : forall a b ax ac,
+(* Lemma parity_stream_some_hd : forall a ax p,
+  get_stream_parity a = Some p ->
+  get_opt_hd a = Some ax ->
+  get_parity ax = p.
+Proof.
+  intros a ax p HaSome Hhd. 
+  unfold get_stream_parity in HaSome.
+  rewrite Hhd in HaSome.
+  inversion HaSome; reflexivity.
+Qed. *)
+
+Lemma parity_stream_eq_some_cons : forall a b ac bc ax bx,
   get_stream_parity a = get_stream_parity b ->
   get_stream_parity a = Some (get_parity ax) ->
+  get_stream_parity b = Some (get_parity bx) ->
   out_stream a = consF ax ac ->
-  exists bx bc,
-    out_stream b = consF bx bc /\ 
-    get_stream_parity b = Some (get_parity bx).
+  out_stream b = consF bx bc.
 Proof.
-  intros a b ax ac Hab Ha Hao.
+  intros a b ac bc ax bx Hab Ha Hb Hao.
+
 Admitted.
 
-Lemma parity_stream_eq_cons_OLD : forall a b ax ac bx bc,
+(* Lemma parity_stream_eq_cons_OLD : forall a b ax ac bx bc,
   get_stream_parity a = get_stream_parity b ->
   out_stream a = consF ax ac ->
   out_stream b = consF bx bc ->
@@ -227,96 +227,7 @@ Proof.
     rewrite Hpab. apply H0.
   - symmetry in Hpab. apply parity_stream_none_out in Hpab.
     rewrite HbCons in Hpab. inversion Hpab.
-Qed.
-
-
-(* Lemma parity_stream_eq_conf : forall a b,
-  get_stream_parity a = get_stream_parity b ->
-  get_stream_parity a = None -> 
-    (out_stream a = nilF -> out_stream b = nilF) /\ 
-  get_stream_parity a = Some _ -> 
-  (exists ax ac, out_stream a = consF ax ac -> exists bx bc, out_stream b = consF bx bc).
-  (* (out_stream a = consF ax ac /\ out_stream b = consF bx bc). *)
-Proof.
-  intros a b Hab; split.
-  { intros Ha. apply parity_stream_none_out.
-    rewrite <- Hab. unfold get_stream_parity, get_opt_hd.
-    rewrite Ha. reflexivity. }
-  {
-    unfold get_stream_parity, get_opt_hd in Hab.
-    destruct (out_stream a). 
-
-  } *)
-
-
-(* Lemma parity_stream_eq_cons : forall a b ax ac bx bc,
-  get_stream_parity a = get_stream_parity b ->
-  out_stream a = consF ax ac ->
-  out_stream b = consF bx bc.
-Proof.
-  intros a b ax ac bx bc Hpab HaCons; do 3 inversion Hpab.
-
-  destruct (get_stream_parity b) in H0;
-  destruct (get_stream_parity a) in H0, H1; inversion H0; subst.
-  
-  destruct (out_stream a); inversion HaCons.
-  unfold get_stream_parity, get_opt_hd in Hpab.  
-  destruct (consF bx bc).
-
-
-  destruct (out_stream b).
-
-  admit. 
-  induction p.
-
-
-
-  unfold get_stream_parity, get_opt_hd in Hpab. 
-  destruct (out_stream b) in Hpab.
-  - rewrite HaCons in Hpab. inversion Hpab.
-  -
-    unfold get_stream_parity, get_opt_hd in H0; rewrite HaCons in H0, Hpab.
-
-    rewrite Hpab in H0.
-    destruct (get_parity ax).
-
-    inversion Hpab; rewrite <- H2 in H0. 
-    destruct (consF bx bc).
-    destruct (out_stream b).
-    inversion H0. constructor.
-
-
-  
-  destruct (get_stream_parity b) in Hpab.
-
-  rewrite <- parity_stream_some_out in Hpab.
-
-
-  - apply (@parity_stream_some_out a ax ac p) in HaCons.
-    apply (@parity_stream_some_out b bx bc p) in HbCons.
-    rewrite HaCons, HbCons; reflexivity.
-    rewrite Hpab; reflexivity.
-    rewrite Hpab. apply H0.
-  - symmetry in Hpab. apply parity_stream_none_out in Hpab.
-    rewrite HbCons in Hpab. inversion Hpab.
 Qed. *)
-
-
-
-
-Lemma parity_eq_impl_stream
-: forall hx sx0 sx1 hy sy0 sy1,
-  out_stream sx1 = consF hx sx0 ->
-  out_stream sy1 = consF hy sy0 ->
-  get_parity hx = get_parity hy ->
-  get_stream_parity sx1 = get_stream_parity sy1.
-Proof.
-  intros hx sx0 sx1 hy sy0 sy1 Hsx1o Hsy1o Hxy.
-  inversion Hsx1o as [Hsxp]; apply parity_stream_cons in Hsxp; subst.
-  inversion Hsy1o as [Hsyp]; apply parity_stream_cons in Hsyp; subst.
-  rewrite Hsxp, Hsyp. 
-  apply parity_some_opt, Hxy.
-Qed.
 
 Lemma parity_stream_eq_impl
 : forall hx sx0 sx1 hy sy0 sy1,
@@ -449,8 +360,7 @@ Qed.
 Example parity_plus_one_sim_plus_three : forall sx sy,
   get_stream_parity sx = get_stream_parity sy ->
   weak_sim plus_1 plus_3 sx sy.
-Proof. cofix CH. intros sx1 sy1 Hsxy. 
-  apply In_sim, Pack_sim.
+Proof. cofix CH. intros sx1 sy1 Hsxy. apply In_sim, Pack_sim.
   { intros sx2 p Htx; apply silent_plus_1 in Htx.
 
     inversion Htx as 
@@ -460,243 +370,76 @@ Proof. cofix CH. intros sx1 sy1 Hsxy.
       apply parity_stream_eq_nil in Hsy1Nil; [| apply Hsx1Nil].
 
       exists ({| out_stream := consF 3 sy1 |}); split.
-      {
-        (* apply silent_plus_3. *)
-        (* apply parity_plus_odd_trans_stream. *)
-        admit.
-      }
-      { apply CH. Guarded. simpl. reflexivity. }
-    }
+      { unfold weak. 
+        exists sy1, {| out_stream := consF 3 sy1 |}.
+        apply Pack_weak; constructor; apply Hsy1Nil. }        
+      { apply CH. Guarded. simpl. reflexivity. } }
     (* sx1 = consF hx sx0 *)
-    { 
-      Check parity_stream_eq_nil.
-      (* Check parity_stream_eq_cons. *)
-      inversion Hsxy as [Hsy01].
+    { inversion Hsxy as [Hsxy1]. 
+      unfold get_stream_parity, get_opt_hd in Hsxy1; rewrite Hsx01 in Hsxy1. 
+      destruct (out_stream sy1) as [| hy1 sy0]; [inversion Hsxy1; subst |].
+      inversion Hsxy1 as [Hpxy].
 
-
+      assert (Hhx1S : S hx1 = hx1 + 1). 
+      { symmetry. rewrite plus_n_O. simpl; rewrite !plus_n_Sm; reflexivity. }
       
-       (* symmetry in Hsy01. *)
-      apply parity_stream_eq_cons in Hsy01.
+      assert (Hhy1S : S (S (S hy1)) = hy1 + 3). 
+      { symmetry. rewrite plus_n_O. simpl; rewrite !plus_n_Sm; reflexivity. }
 
-      Search parity stream.
+      assert (Hsy01 : out_stream sy1 = consF hy1 sy0). 
+      { apply (@parity_stream_eq_some_cons sx1 sy1 sx0 sy0 hx1 hy1).
+        - apply Hsxy.
+        - unfold get_stream_parity, get_opt_hd. rewrite Hsx01. reflexivity.
+        - rewrite <- Hsxy, <- Hsxy1.
+          unfold get_stream_parity, get_opt_hd. rewrite Hsx01. reflexivity.
+        - apply Hsx01. }
 
-      Check parity_stream_eq_.
+      assert (Hty : plus_3 sy1 (Some (get_parity (hy1 + 3))) {| out_stream := consF (hy1 + 3) sy1 |}).
+      { rewrite <- Hhy1S. apply (@PLUS_THREE_CONS sy1 hy1 sy0 Hsy01). }
 
-      inversion Hsxy as [Hsy01]; symmetry in Hsy01.
-      apply parity_stream_eq_cons in Hsy01.
+      assert (Hsxy2 : get_parity (hx1 + 1) = get_parity (hy1 + 3)).
+      { apply (@parity_plus_odd_trans 
+                  plus_1 plus_3 1 3 
+                  hx1 sx0 sx1 {| out_stream := consF (hx1 + 1) sx1 |}
+                  hy1 sy0 sy1 {| out_stream := consF (hy1 + 3) sy1 |}
+                  ); try reflexivity.
+        - apply Hsx01.
+        - apply Hsy01.
+        - apply Hpxy.
+        - rewrite <- Hhx1S; apply Htx.
+        - apply Hty. }
 
-
-      Check parity_stream_eq_cons.
-      rewrite (@parity_stream_eq_cons sx1 sy1 hx1 sx0 _ _ Hsxy Hsx01) in Hsy01.
-
-
-      exists ({| out_stream := consF (hy1 + 3) sy1 |}).
-      inversion Hsxy as [Hsy01].
-      apply (@parity_stream_eq_cons sx1 sy1 hx1 sx0 ) in Hsy01.
-
-      Check parity_stream_eq_cons.
-
-      apply parity_stream_eq_cons in Hsy01. [| apply Hsx01].
-      
-      exists ({| out_stream := consF (3 + hy) sy1 |}); split.
-
-    }
-
-
-        rewrite parity_stream_nil in Hsxy. 
-        rewrite parity_stream_nil in Hsxy. 
-      
-    }
-
-    (* ; subst. *)
-    { 
-
-    }
-
-
-  }
-
-
-
-
-
-
-Lemma parity_from_plus_1 : forall s0 p s1, plus_1 s0 (Some p) s1 -> 
-  exists v, out_stream s1 = consF v s0 -> (get_parity v) = p.
-Proof. intros s0 p s1 Ht. inversion Ht; subst; eexists; intros Hs1; reflexivity.
+      exists ({| out_stream := consF (hy1 + 3) sy1 |}); split.
+      { rewrite Hhx1S, Hsxy2.
+        unfold weak. exists sy1, {| out_stream := consF (hy1 + 3) sy1 |}. 
+        apply Pack_weak.
+        - constructor.
+        - apply Hty. 
+        - constructor. }  
+      { apply CH. Guarded.
+        apply (@parity_plus_odd_trans_stream 
+                  plus_1 plus_3 1 3 
+                  hx1 sx0 sx1 ({| out_stream := consF (S hx1) sx1 |}) 
+                  hy1 sy0 sy1 ({| out_stream := consF (hy1 + 3) sy1 |})); 
+                  try reflexivity.
+        - apply Hsx01.
+        - apply Hsy01.
+        - apply Hsxy.
+        - rewrite <- Hhx1S; apply Htx.
+        - apply Hty. 
+        - simpl. rewrite Hhx1S. reflexivity. } } } 
+  { intros sx2 Htx. destruct Htx; inversion_clear H. }
 Qed.
 
-(* Lemma parity_trans_plus_one_three : forall sx0 sy0,
-  get_stream_parity sx0 = get_stream_parity sy0 ->
-  forall sx1 vx, out_stream sx1 = consF vx sx0 ->
-  plus_1 sx0 (Some (get_parity vx)) sx1 ->
-  forall sy1 vy, out_stream sy1 = consF vy sy0 ->
-  plus_3 sy0 (Some (get_parity vy)) sy1 ->
-  get_stream_parity sx1 = get_stream_parity sy1.
-Proof. 
-  intros sx0 sy0 Hsxy0. 
-  intros sx1 vx Hsx1 Hpl1.
-  
-
-  
-
-  intros sy1 vy Hsy1 Hpl3.
-  unfold get_stream_parity.
-  
-  induction (get_hd sx1) as [| nx], (get_hd sy1) as [| ny]; trivial.
-  assert (get_parity (S ny) = EVN).
-  {
-
-  }
-  
-
-
-  
-
-  apply parity_from_plus_1 in Hpl1.
-
-  Hpl1 Hpl3.
-  apply parity_from_plus_1 in Hpl1. inversion Hpl1; subst.
-  
-
-  inversion Hpl1; subst.
-  - 
-
-  induction (get_stream_parity sx0).
-  {
-
-  }  *)
-
-(* Lemma parity_of_stream : forall s,
-  get_stream_parity s -> 
-  match out_stream s with
-  | nilF -> get_parity  *)
-
-
-Example cons_parity_plus_one_sim_plus_three : forall hx0 sx0 sx1 hy0 sy0 sy1,
-  out_stream sx1 = consF hx0 sx0 ->
-  out_stream sy1 = consF hy0 sy0 ->
-  get_parity hx0 = get_parity hy0 ->
-  weak_sim plus_1 plus_3 sx1 sy1.
-Proof.
-  intros hx0 sx0 sx1.
-  intros hy0 sy0 sy1.
-  intros Hsx01.
-  intros Hsy01.
-  intros Hp0.
-
-  apply In_sim, Pack_sim.
-
-  { intros sx2 p Htx; apply silent_plus_1 in Htx.
-
-    inversion Htx; subst.
-
-
-    induction Htx as [ sx1 HsxNil | sx1 hx0' sx0' Hsx01' ].
-    - rewrite Hsx01 in HsxNil; inversion HsxNil.
-    - rewrite Hsx01 in Hsx01'.    
-      contradiction.
-    
-      inversion Hsx. 
-
-
-  }
-
-
-
-(******************************************************************************)
-Example parity_plus_one_sim_plus_three : forall sx sy,
-  get_stream_parity sx = get_stream_parity sy ->
-  weak_sim plus_1 plus_3 sx sy.
-Proof. cofix CH. intros sx0 sy0 Hsxy. apply In_sim, Pack_sim.
-
-  { intros sx1 p Htx. apply silent_plus_1 in Htx.
-    exists (In_stream (consF (S (get_hd sy0)) sy0)); split.
-    { admit. }
-    { apply CH. Guarded.
-      inversion Htx as [ _sx0 Hsx0 | _sx0 xn xns Hsx0 ]; subst.
-      - unfold get_stream_parity, get_parity. simpl.
-        destruct (get_hd sy0).
-        + reflexivity.
-        + 
-    }
-
-
-
-    { inversion Htx as [ _sx0 Hsx0 | _sx0 xn xns Hsx0 ]; subst; 
-      destruct get_stream_parity.
-      -  
-
-      Print parity_trans.
-      rewrite parity_trans in Hsxy.
-
-
-      destruct (get_stream_parity sy0).
-      - 
-      - 
-    
-      rewrite parity_nil_stream in Hsxy. 
-
-    }
 
 
 
 
-    { inversion Htx as [ _sx0 Hsx0 | _sx0 xn xns Hsx0 ]; subst.
-      - rewrite parity_nil_stream in Hsxy. 
-        assert (get_parity (get_hd sx0) = EVN) as Hsxp.
-        { 
+(*************************************)
 
-        }
-        destruct (get_stream_parity sx0) in Hsxy.
-        destruct (get_stream_parity sy0).
-      - admit. 
-    } 
-    { apply CH. Guarded. 
+(*************************************)
 
-    }
-    inversion Htx as [ _sx0 Hsx0 | _sx0 xn xns Hsx0 ]; subst.
-    {
-      rewrite parity_nil_stream in Hsxy. 
-      assert (get_parity (get_hd sx0) = EVN) as Hsxp.
-      { 
-
-      }
-      destruct (get_stream_parity sx0) in Hsxy.
-      destruct (get_stream_parity sy0).
-
-    }
-    {
-
-    }
-    inversion sy0 as [Hsy0]; inversion_clear Hsy0 as [| bb cc]; subst.
-    admit. 
-    admit. 
-    admit. 
-    admit. 
-    { split.
-      - 
-        unfold weak.
-      
-      apply silent_plus_3.
-
-    }
-    { 
-
-    }
-    
-
-  }
-
-
-
-
-
-
-
-
-
-
+(*************************************)
 
 (*************************************)
 Inductive plus_1_twice : stream nat -> option parity -> stream nat -> Prop :=
