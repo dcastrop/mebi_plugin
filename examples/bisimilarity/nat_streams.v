@@ -19,8 +19,13 @@ CoFixpoint fmap {A B : Set} (f : A -> B) (s : stream A) : stream B :=
   | consF h t => In_stream (consF (f h) (fmap f t))
   end.
 
+(* CoInductive stream (A:Set) : Type := *)
+(* | Cons : A -> stream A -> stream A. *)
+(* Arguments Cons {A%_type_scope}. *)
+
 Definition get_opt_hd (s : stream nat) : option nat :=
   match out_stream s with
+  (* | Cons h t => Some h *)
   | nilF => None
   | consF x _xs => Some x
   end.
@@ -136,16 +141,13 @@ Proof.
   rewrite Hs; reflexivity.
 Qed.
 
-(* Lemma parity_stream_not_nil : forall s sx sc,
-  (out_stream s = nilF -> False) -> out_stream s = consF sx sc. *)
-
 Lemma parity_stream_none_hd : forall a,
   get_stream_parity a = None ->
   get_opt_hd a = None.
 Proof.
   intros a HaNone. 
   unfold get_stream_parity in HaNone. destruct (get_opt_hd a). 
-  - inversion HaNone. 
+  - discriminate HaNone. 
   - reflexivity.
 Qed.
 
@@ -157,7 +159,7 @@ Proof.
   apply parity_stream_none_hd in HaNone. unfold get_opt_hd in HaNone.
   destruct (out_stream a). 
   - reflexivity. 
-  - inversion HaNone.
+  - discriminate HaNone.
 Qed.
 
 Lemma parity_stream_eq_nil : forall a b,
@@ -179,27 +181,22 @@ Proof.
   unfold get_stream_parity, get_opt_hd. rewrite HaCons. reflexivity.
 Qed.
 
-Lemma parity_stream_some_out : forall a ax ac p,
-  get_stream_parity a = Some p ->
-  out_stream a = consF ax ac ->
-  get_parity ax = p.
-Proof.
-  intros a ax ac p HaSome Hao.
-  unfold get_stream_parity, get_opt_hd in HaSome.
-  rewrite Hao in HaSome.
-  inversion HaSome; reflexivity.
+Lemma parity_stream_some_hd_opt_eq : forall a ax bx,
+  get_opt_hd a = Some ax ->
+  get_opt_hd a = Some bx ->
+  ax = bx.
+Proof. intros a ax bx Haax Habx.
+  inversion Haax; rewrite Habx in H0.
+  inversion H0; subst; reflexivity.
 Qed.
 
-(* Lemma parity_stream_some_hd : forall a ax p,
-  get_stream_parity a = Some p ->
-  get_opt_hd a = Some ax ->
-  get_parity ax = p.
-Proof.
-  intros a ax p HaSome Hhd. 
-  unfold get_stream_parity in HaSome.
-  rewrite Hhd in HaSome.
-  inversion HaSome; reflexivity.
-Qed. *)
+Lemma parity_stream_some_hd_opt : forall a ax,
+  get_stream_parity a = Some (get_parity ax) ->
+  get_opt_hd a = Some ax.
+Proof. intros a ax Ha.
+  inversion Ha. unfold get_stream_parity in H0.
+  destruct (get_opt_hd a); [| discriminate H0].
+Admitted.
 
 Lemma parity_stream_eq_some_cons : forall a b ac bc ax bx,
   get_stream_parity a = get_stream_parity b ->
@@ -209,25 +206,7 @@ Lemma parity_stream_eq_some_cons : forall a b ac bc ax bx,
   out_stream b = consF bx bc.
 Proof.
   intros a b ac bc ax bx Hab Ha Hb Hao.
-
 Admitted.
-
-(* Lemma parity_stream_eq_cons_OLD : forall a b ax ac bx bc,
-  get_stream_parity a = get_stream_parity b ->
-  out_stream a = consF ax ac ->
-  out_stream b = consF bx bc ->
-  get_parity ax = get_parity bx.
-Proof.
-  intros a b ax ac bx bc Hpab HaCons HbCons.
-  inversion Hpab. destruct (get_stream_parity a) in Hpab.
-  - apply (@parity_stream_some_out a ax ac p) in HaCons.
-    apply (@parity_stream_some_out b bx bc p) in HbCons.
-    rewrite HaCons, HbCons; reflexivity.
-    rewrite Hpab; reflexivity.
-    rewrite Hpab. apply H0.
-  - symmetry in Hpab. apply parity_stream_none_out in Hpab.
-    rewrite HbCons in Hpab. inversion Hpab.
-Qed. *)
 
 Lemma parity_stream_eq_impl
 : forall hx sx0 sx1 hy sy0 sy1,
