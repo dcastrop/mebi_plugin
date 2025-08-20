@@ -9,7 +9,8 @@ Module NoBranching.
   | tend : term
   | tfix : term -> term
   | tact : action -> term -> term
-  | tpar : term -> term -> term
+  | tpar : term -> term -> term 
+  | tseq : term -> term -> term 
   .
 
   Fixpoint tsubst (t1 : term) (t2 : term) :=
@@ -19,12 +20,13 @@ Module NoBranching.
     | tfix t => tfix t
     | tact a t => tact a (tsubst t1 t)
     | tpar tl tr => tpar (tsubst t1 tl) (tsubst t1 tr)
+    | tseq t s => tseq t (tsubst t1 s)
     end.
-
+  
   (* true: "comm", false: "silent" *)
   Inductive termLTS : term -> bool -> term -> Prop :=
-  (* syncrhonous communication, i.e., send/recv in parallel *)
 
+  (* syncrhonous communication, i.e., send/recv in parallel *)
   | do_senda : forall tl tr,                          (* 0*)
       termLTS (tpar (tact ASend tl) (tact ARecv tr))
         true  (tpar tl tr)
@@ -37,14 +39,32 @@ Module NoBranching.
       termLTS (tpar (tact CSend tl) (tact CRecv tr))
         true  (tpar tl tr)
 
+  (* asyncrhonous communication, i.e., send/recv in parallel *)
+  (* | do_senda : forall tl tr,                          (* 0*)
+      termLTS (tpar (tact ASend tl) (tact ARecv tr))
+        true  (tpar tl tr)
+
+  | do_sendb : forall tl tr,                          (* 1*)
+      termLTS (tpar (tact BSend tl) (tact BRecv tr))
+        true  (tpar tl tr)
+
+  | do_sendc : forall tl tr,                          (* 2*)
+      termLTS (tpar (tact CSend tl) (tact CRecv tr))
+        true  (tpar tl tr) *)
+
   (* non-deterministic parallel step *)
-  | do_parl : forall a tl tl' tr,                     (* 3*)
+  (* | do_parl : forall a tl tl' tr,                     (* 3*)
       termLTS tl a tl' ->
       termLTS (tpar tl tr) a (tpar tl' tr)
 
   | do_parr : forall a tl tr tr',                     (* 4*)
       termLTS tr a tr' ->
-      termLTS (tpar tl tr) a (tpar tl tr')
+      termLTS (tpar tl tr) a (tpar tl tr') *)
+  | do_seq : forall t t' s a,
+      termLTS t a t' -> termLTS (tseq t s) a s
+
+  | do_seq_end : forall s, termLTS (tseq tend s) false s
+  | do_par_end : termLTS (tpar tend tend) false tend
 
   (* These below capture "structural congruence": using "silent" transitions *)
   | do_fix : forall t,                                (* 5*)
