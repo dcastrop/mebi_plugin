@@ -9,49 +9,100 @@ Require Coq.Program.Tactics.
 Import NoBranching.
 
 Inductive bLTS : term -> option bool -> term -> Prop :=
-| BISIM_WRAP : forall t1 a t2, termLTS t1 a t2 -> bLTS t1 (Some a) t2.
+| BISIM_WRAP : forall t1 t2 a, termLTS t1 a t2 -> bLTS t1 (Some a) t2.
 
-Lemma blts_some_label : forall t1 l t2, bLTS t1 l t2 -> l <> None.
-Proof. intros t1 l t2 Ht HlNone. rewrite HlNone in Ht. inversion Ht. Qed.
+Lemma bLTS_unwrap : forall x1 x2 a, bLTS x1 (Some a) x2 -> termLTS x1 a x2.
+Proof. intros x1 x2 a Ht. inversion Ht; subst. apply H1. Qed.
+
+Lemma blts_not_none_label : forall x1 x2 a, bLTS x1 a x2 -> a <> None.
+Proof. intros x1 x2 a Ht HlNone. rewrite HlNone in Ht. inversion Ht. Qed.
+
+Lemma blts_weak_some_label : forall x1 x2 a, 
+  weak bLTS x1 a x2 -> exists l, a = (Some l).
+Proof. intros x1 x2 a [x1b [x2a Hwtr]]. 
+  inversion Hwtr as [Hpre Hstr Hpost]. destruct Hpre, Hpost; try inversion H.
+  inversion Hstr; subst. exists a0. reflexivity.
+Qed.  
+
+Lemma blts_weak_silent : forall x1 x2 l,
+  weak bLTS x1 (Some l) x2 -> bLTS x1 (Some l) x2.
+Proof. intros x1 x2 l [x1b [x2a [Hpre Hstr Hpost]]].
+  destruct Hpre, Hpost; try apply Hstr; inversion H.
+Qed.  
 
 Lemma blts_silent1_refl : forall x1 x2, silent1 bLTS x1 x2 -> x1 = x2.
 Proof. intros x1 x2 Hs1. inversion Hs1; subst. inversion H. inversion H. Qed.
 
-(* Lemma blts_silent1_wsim (ltsX ltsY:term -> option bool -> term -> Prop) 
-: forall x1 x2 y1, weak_sim ltsX ltsY x1 y1 -> silent1 bLTS x1 x2 -> 
-  exists y2, silent bLTS y1 y2 /\ weak_sim ltsX ltsY x2 y2.
-Proof.
-  intros x1 x2 y1 Hxy Htx.
-  exists y1. split.
-  -  *)
-
+Lemma blts_wsim_silent1 : forall x1 x2 y1, weak_sim bLTS bLTS x1 y1 ->
+  silent1 bLTS x1 x2 -> exists y2, 
+    silent bLTS y1 y2 /\ weak_sim bLTS bLTS x2 y2.
+Proof. intros x1 x2 y1 Hxy Htx. exists y1. split; [ constructor | 
+  apply blts_silent1_refl in Htx; rewrite <- Htx; apply Hxy ].
+Qed.
 
 Module Test1.
   Example x : term := tfix (tact ASend trec).  
   Example y : term := tfix (tact ASend (tact ASend trec)). 
 
-  Theorem r : forall x0 y0, x0 = x -> y0 = y -> weak_sim bLTS bLTS x y.
-  Proof. unfold x, y. intros x0 y0 Hx0 Hy0. cofix CH1. rewrite <- Hx0, <- Hy0. 
-    apply In_sim, Pack_sim; 
-      [ | intros x1 Htx; apply blts_silent1_refl in Htx; 
-          rewrite <- Htx; exists y0; 
-          split; [ constructor | rewrite Hx0, Hy0; apply CH1 ] ].
+  Theorem ws_xy : forall x0 y0, x0 = x -> y0 = y -> weak_sim bLTS bLTS x0 y0.
+  Proof. intros x0 y0 Hx0 Hy0; unfold x, y in Hx0, Hy0. 
 
-    intros x1 ax01 Htx. 
-    (* TODO: Htx weak -> no silent actions, make new lemma *)
-    (* unfold weak in Htx. inversion Htx as [_x0 Htx']. inversion Htx' as [_x1 Htx'']. *)
-    remember (tsubst y0 (tact ASend (tact ASend trec))) as y1; exists y1.
-    split.
-    {
-      unfold weak. exists y0, y1. apply Pack_weak.
-      - constructor. 
-      - apply BISIM_WRAP. rewrite Heqy1, !Hy0. 
-        (* TODO: determine that ax01 is false *)
-        apply do_fix. constructor. constructor.
-      - constructor. 
-    }
-    { cofix CH2. apply In_sim, Pack_sim.
-      { admit. }
-      { admit. } (* silent -- generalize lines 2-5 of proof here. *)
-    }
+    cofix CH1. apply In_sim, Pack_sim; 
+    (* [| intros x1 Htx; apply (@blts_wsim_silent1 x0 x1 y0 CH1 Htx)]. *)
+    (* NOTE: the above can't pass CH1 to another lemma -- ill-formed. *)
+    [ | intros _x1 Htx; apply blts_silent1_refl in Htx; 
+        rewrite <- Htx; exists y0; split; [ constructor | apply CH1] ]. 
+    Guarded.
+
+    intros x1 ax01 Htx1. 
+    apply blts_weak_silent, bLTS_unwrap in Htx1. rewrite Hx0 in Htx1.
+    inversion Htx1 as [| | | | |x2 Hx2 Hax01 Hx1| | |]; symmetry in Hx1.
+    (* remember (tact ASend trec) as x2 eqn:Hx2 in |- . *)
+    (* remember (tsubst x0 (tact ASend trec)) eqn:Hx1.  *)
+    remember (tsubst y0 (tact ASend (tact ASend trec))) as y1 eqn:Hy1; 
+    exists y1.
+    rewrite <- Hx1; split.
+    { unfold weak; exists y0, y1; apply Pack_weak; constructor.
+      rewrite Hy1, Hy0. apply do_fix. }
+    { cofix CH2. apply In_sim, Pack_sim;
+      [ | intros _x2 Htx; apply blts_silent1_refl in Htx; 
+          rewrite <- Htx; exists y1; split; [ constructor | apply CH2] ]. 
+      Guarded.
+
+      intros _x2 ax02 Htx2.
+      apply blts_weak_silent, bLTS_unwrap in Htx2. rewrite Hx1 in Htx2.
+      inversion Htx2. }
+  Qed.
+  
+  Theorem ws_yx : forall x0 y0, x0 = x -> y0 = y -> weak_sim bLTS bLTS y0 x0.
+  Proof. intros x0 y0 Hx0 Hy0; unfold x, y in Hx0, Hy0.
+    
+    cofix CH1. apply In_sim, Pack_sim; 
+    [ | intros _y1 Hty; apply blts_silent1_refl in Hty; 
+        rewrite <- Hty; exists x0; split; [ constructor | apply CH1] ]. 
+    Guarded.
+
+    intros y1 ay01 Hty1. 
+    apply blts_weak_silent, bLTS_unwrap in Hty1. rewrite Hy0 in Hty1.
+    inversion Hty1 as [| | | | |y2 Hy2 Hay01 Hy1| | |]; symmetry in Hy1.
+    remember (tsubst x0 (tact ASend trec)) as x1 eqn:Hx1; 
+    exists x1.
+    rewrite <- Hy1; split.
+    { unfold weak. exists x0, x1. apply Pack_weak; constructor.
+      rewrite Hx1, Hx0. apply do_fix. }
+    { cofix CH2. apply In_sim, Pack_sim;
+      [ | intros _y2 Hty; apply blts_silent1_refl in Hty; 
+          rewrite <- Hty; exists x1; split; [ constructor | apply CH2] ]. 
+      Guarded.
+
+      intros _y2 ay02 Hty2.
+      apply blts_weak_silent, bLTS_unwrap in Hty2. rewrite Hy1 in Hty2.
+      inversion Hty2. }
+  Qed.
+
+  Theorem bs_xy : forall x0 y0, x0 = x -> y0 = y -> weak_bisim bLTS bLTS y0 x0.
+  Proof. intros x0 y0 Hx0 Hy0; unfold x, y in Hx0, Hy0. rewrite Hx0, Hy0.
+    unfold weak_bisim; split; [apply ws_yx | apply ws_xy]; trivial.
+  Qed.
+
 End Test1.
