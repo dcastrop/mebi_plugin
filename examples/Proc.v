@@ -61,7 +61,7 @@ Module NoBranching.
       termLTS tr a tr' ->
       termLTS (tpar tl tr) a (tpar tl tr') *)
   | do_seq : forall t t' s a,
-      termLTS t a t' -> termLTS (tseq t s) a s
+      termLTS t a t' -> termLTS (tseq t s) a (tseq t' s)
 
   | do_seq_end : forall s, termLTS (tseq tend s) false s
   | do_par_end : termLTS (tpar tend tend) false tend
