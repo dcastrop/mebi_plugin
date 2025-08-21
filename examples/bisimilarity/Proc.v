@@ -236,8 +236,20 @@ Module Test2.
                                  (tseq (tpar (tact ASend tend) 
                                              (tact ARecv tend)) trec)).
 
+  Ltac sim_silent_refl y0 CH :=
+    intros _x Htx; apply blts_silent1_refl in Htx;
+    rewrite <- Htx; exists y0; split; [ constructor | apply CH ].
+
+  Ltac sim_cofix y0 :=
+    let CH := fresh "CH" in
+    cofix CH; intros; apply In_sim, Pack_sim; [ | sim_silent_refl y0 CH ].
+
+  Tactic Notation "solve_sim" := 
+    intros x0 y0 Hx0 Hy0; unfold x, y in Hx0, Hy0; sim_cofix y0.
+
   Theorem ws_xy : forall x0 y0, x0 = x -> y0 = y -> weak_sim bLTS bLTS x0 y0.
   Proof. 
+    solve_sim.
     intros x0 y0 Hx0 Hy0; unfold x, y in Hx0, Hy0. 
   Admitted.
 
