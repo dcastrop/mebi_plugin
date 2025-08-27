@@ -231,8 +231,8 @@ Module Test2.
   Example x : term := tfix (tseq (tpar (tact ASend tend) 
                                        (tact ARecv tend)) trec).
 
-  Example y : term := tfix (tseq (tpar (tact ASend tend) 
-                                       (tact ARecv tend)) 
+  Example y : term := tfix (tseq (tpar (tact ARecv tend) 
+                                       (tact ASend tend)) 
                                  (tseq (tpar (tact ASend tend) 
                                              (tact ARecv tend)) trec)).
 
@@ -378,6 +378,29 @@ Module Test2.
   Tactic Notation "solve_sim" := 
     sim_pre_cofix_unfold.
 
+
+  (* Lemma handle_seq : 
+    forall tx tx1 tx2 tx1l tx1r, tx = (tseq tx1 tx2) -> (tx1 = tpar tx1l tx1r) ->
+      exists nx nx1 a, nx = (tseq nx1 tx2) -> 
+      termLTS tx1 a nx1 -> termLTS tx a nx.
+  Proof.
+    intros tx tx1 tx2 tx1l tx1r Htx Htx1.
+
+    
+
+    do 3 eexists.
+    intros Hnx Htrx1.
+    inversion Htrx1; subst.
+    - inversion H1. admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+     *)
+
   Theorem ws_xy : forall x0 y0, x0 = x -> y0 = y -> weak_sim bLTS bLTS x0 y0.
   Proof. 
     solve_sim.
@@ -385,29 +408,106 @@ Module Test2.
     
     sim_cofix.
     handle_constr_x. 
-    - handle_constr_x. 
+    - handle_constr_x.
 
       (* handle_constr_y. *)
       match goal with
-      | [ 
-        (* CH0 : @weak_sim _ _ _ _ _ ?tx ?ty *)
-      (* Htx : ?tx = tseq ?vx1 ?vx2 *)
-      Hty : ?ty = tseq ?vy1 ?vy2
-      (* Ha :  *)
-      (* , Hnx : ?nx = ?vnx *)
-      (* , Htr : termLTS (tseq ?vy1 ?vx2) ?a ?nx *)
-      (* , Hx1 : termLTS ?vx1 ?a ?nx1 *)
+      | [ Hty : ?ty = tseq ?vy1 ?vy2
         |- 
           exists eny, @weak _ _ _ (tseq ?vy1 ?vy2) (Some ?a) eny /\ 
             @weak_sim _ _ _ _ _ ?nx eny
       ] => 
-        (* symmetry in Hnx; rewrite <- Hnx; inversion Hx1  *)
-        simpl
+        let Hty1 := fresh "Hty1" in let ty1 := fresh "ty1" in 
+        remember vy1 as ty1 eqn:Hty1; rewrite Hty1; rewrite Hty1 in Hty
+        (* let Hty2 := fresh "Hty2" in let ty2 := fresh "ty2" in  *)
+        (* remember vy2 as ty2 eqn:Hty2 *)
+    
       end.
+
+      match goal with
+      | [ Hty : ?ty = tseq ?vy1 ?vy2
+        , Hty1 : ?ty1 = tpar ?ty1l ?ty1r
+        |- 
+          exists eny, @weak _ _ _ (tseq (tpar ?ty1l ?ty1r) ?vy2) (Some ?a) eny /\ 
+            @weak_sim _ _ _ _ _ ?nx eny
+        ] =>
+          simpl
+      end.
+
+      (* assert (
+        forall (exists n2, weak b)
+      ) *)
+
+      (* TODO: need to try and resolve the inner transition first *)
+
+      subst.
+      econstructor.
+      econstructor.
+      econstructor.
+      econstructor.
+      econstructor.
+      econstructor.
+      econstructor.
+      apply do_seq.
+      eapply do_senda.
+      econstructor.
+      
+
+      admit.
+      admit.
+      admit.
+      admit.
+      admit.
+
+
+
+      econstructor.
+      econstructor.
+      econstructor.
+      econstructor.
+      econstructor.
+      econstructor.
+      econstructor.
+      econstructor.
+      (* assert (?t' = ) *)
+      refine ?[t'].
+      
+
+      econstructor.
+      econstructor.
+      econstructor.
+
+
+
+      (* inversion P. *)
+
+      { assert (ny1l : term); assert (ny1r : term); trivial.
+        exists (tpar ny1l ny1r). apply do_senda.
+      }
+    
 
     eexists. split.
     (* handle_weak_transition. *)
-    unfold weak. exists ny. 
+    + unfold weak; exists ny; rewrite Hny. 
+      assert (exists ny1, termLTS )
+      eexists;
+      constructor; constructor.
+
+    apply do_seq. 
+    (* constructor. *)
+    
+    apply do_senda.
+
+    constructor.
+    
+    try constructor. 
+    constructor.
+    constructor.
+    constructor.
+
+
+
+     
     (* exists n2. *)
     (* pose (termLTS ny (true) ?n2). *)
     (* remember (transitive_closure ny). *)
