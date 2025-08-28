@@ -3,228 +3,12 @@ Require Coq.Program.Tactics.
 
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.Proc.
-Import NoBranching.
 
-Inductive bLTS : term -> option bool -> term -> Prop :=
-| BISIM_WRAP : forall t1 t2 a, termLTS t1 a t2 -> bLTS t1 (Some a) t2.
+Inductive bLTS : term -> option label -> term -> Prop :=
+| BISIM_WRAP : forall t1 t2 a, termLTS t1 a t2 -> bLTS t1 a t2.
 
-Lemma bLTS_unwrap : forall x1 x2 a, bLTS x1 (Some a) x2 -> termLTS x1 a x2.
-Proof. intros x1 x2 a Ht. inversion Ht; subst. apply H1. Qed.
-
-Lemma blts_not_none_label : forall x1 x2 a, bLTS x1 a x2 -> a <> None.
-Proof. intros x1 x2 a Ht HlNone. rewrite HlNone in Ht. inversion Ht. Qed.
-
-Lemma blts_weak_some_label : forall x1 x2 a, 
-  weak bLTS x1 a x2 -> exists l, a = (Some l).
-Proof. intros x1 x2 a [x1b [x2a Hwtr]]. 
-  inversion Hwtr as [Hpre Hstr Hpost]. destruct Hpre, Hpost; try inversion H.
-  inversion Hstr; subst. exists a0. reflexivity.
-Qed.  
-
-Lemma blts_weak_silent : forall x1 x2 l,
-  weak bLTS x1 (Some l) x2 -> bLTS x1 (Some l) x2.
-Proof. intros x1 x2 l [x1b [x2a [Hpre Hstr Hpost]]].
-  destruct Hpre, Hpost; try apply Hstr; inversion H.
-Qed.  
-
-Lemma blts_silent1_refl : forall x1 x2, silent1 bLTS x1 x2 -> x1 = x2.
-Proof. intros x1 x2 Hs1. inversion Hs1; subst. inversion H. inversion H. Qed.
-
-Lemma blts_wsim_silent1 : forall x1 x2 y1, weak_sim bLTS bLTS x1 y1 ->
-  silent1 bLTS x1 x2 -> exists y2, 
-    silent bLTS y1 y2 /\ weak_sim bLTS bLTS x2 y2.
-Proof. intros x1 x2 y1 Hxy Htx. exists y1. split; [ constructor | 
-  apply blts_silent1_refl in Htx; rewrite <- Htx; apply Hxy ].
-Qed.
-
-(* NOTE: very basic example -- doesn't actually do anything. *)
-Module Test1.
-  (* these do nothing, should be of[tpar (tact ASend ...) (tact ARecv ...)] *)
-  Example x : term := tfix (tact ASend trec).  
-  Example y : term := tfix (tact ASend (tact ASend trec)). 
-
-  Theorem ws_xy : forall x0 y0, x0 = x -> y0 = y -> weak_sim bLTS bLTS x0 y0.
-  Proof. intros x0 y0 Hx0 Hy0; unfold x, y in Hx0, Hy0. 
-
-    cofix CH1. apply In_sim, Pack_sim; 
-    (* [| intros x1 Htx; apply (@blts_wsim_silent1 x0 x1 y0 CH1 Htx)]. *)
-    (* NOTE: the above can't pass CH1 to another lemma -- ill-formed. *)
-    [ | intros _x1 Htx; apply blts_silent1_refl in Htx; 
-        rewrite <- Htx; exists y0; split; [ constructor | apply CH1] ]. 
-    Guarded.
-
-    intros x1 ax01 Htx1. 
-    apply blts_weak_silent, bLTS_unwrap in Htx1. rewrite Hx0 in Htx1.
-    inversion Htx1 as [| | | | | | x2 Hx2 Hax01 Hx1 | | |]. symmetry in Hx1.
-    (* remember (tact ASend trec) as x2 eqn:Hx2 in |- . *)
-    (* remember (tsubst x0 (tact ASend trec)) eqn:Hx1.  *)
-    remember (tsubst y0 (tact ASend (tact ASend trec))) as y1 eqn:Hy1; 
-    exists y1.
-    rewrite <- Hx1; split.
-    { unfold weak; exists y0, y1; apply Pack_weak; constructor.
-      rewrite Hy1, Hy0. apply do_fix. }
-    { cofix CH2. apply In_sim, Pack_sim;
-      [ | intros _x2 Htx; apply blts_silent1_refl in Htx; 
-          rewrite <- Htx; exists y1; split; [ constructor | apply CH2] ]. 
-      Guarded.
-
-      intros _x2 ax02 Htx2.
-      apply blts_weak_silent, bLTS_unwrap in Htx2. rewrite Hx1 in Htx2.
-      inversion Htx2. }
-  Qed.
-  
-  Theorem ws_yx : forall x0 y0, x0 = x -> y0 = y -> weak_sim bLTS bLTS y0 x0.
-  Proof. intros x0 y0 Hx0 Hy0; unfold x, y in Hx0, Hy0.
-    
-    cofix CH1. apply In_sim, Pack_sim; 
-    [ | intros _y1 Hty; apply blts_silent1_refl in Hty; 
-        rewrite <- Hty; exists x0; split; [ constructor | apply CH1] ]. 
-    Guarded.
-
-    intros y1 ay01 Hty1. 
-    apply blts_weak_silent, bLTS_unwrap in Hty1. rewrite Hy0 in Hty1.
-    inversion Hty1 as [| | | | | | y2 Hy2 Hay01 Hy1 | | |]; symmetry in Hy1.
-    remember (tsubst x0 (tact ASend trec)) as x1 eqn:Hx1; 
-    exists x1.
-    rewrite <- Hy1; split.
-    { unfold weak. exists x0, x1. apply Pack_weak; constructor.
-      rewrite Hx1, Hx0. apply do_fix. }
-    { cofix CH2. apply In_sim, Pack_sim;
-      [ | intros _y2 Hty; apply blts_silent1_refl in Hty; 
-          rewrite <- Hty; exists x1; split; [ constructor | apply CH2] ]. 
-      Guarded.
-
-      intros _y2 ay02 Hty2.
-      apply blts_weak_silent, bLTS_unwrap in Hty2. rewrite Hy1 in Hty2.
-      inversion Hty2. }
-  Qed.
-
-  Theorem bs_xy : forall x0 y0, x0 = x -> y0 = y -> weak_bisim bLTS bLTS y0 x0.
-  Proof. intros x0 y0 Hx0 Hy0; unfold x, y in Hx0, Hy0. rewrite Hx0, Hy0.
-    unfold weak_bisim; split; [apply ws_yx | apply ws_xy]; trivial.
-  Qed.
-End Test1.
-
-(* NOTE: given up, very long. going to try make Ltac. *)
-Module Test2_manual.
-  Example x : term := tfix (tseq (tpar (tact ASend tend) 
-                                       (tact ARecv tend)) trec).
-
-  Example y : term := tfix (tseq (tpar (tact ASend tend) 
-                                       (tact ARecv tend)) 
-                                 (tseq (tpar (tact ASend tend) 
-                                             (tact ARecv tend)) trec)).
-
-  Theorem ws_xy : forall x0 y0, x0 = x -> y0 = y -> weak_sim bLTS bLTS x0 y0.
-  Proof. intros x0 y0 Hx0 Hy0; unfold x, y in Hx0, Hy0. 
-
-    cofix CH1. apply In_sim, Pack_sim; 
-    [ | intros _x1 Htx; apply blts_silent1_refl in Htx; 
-        rewrite <- Htx; exists y0; split; [ constructor | apply CH1] ]. 
-    Guarded.
-
-    intros x1 ax01 Htx1. 
-    apply blts_weak_silent, bLTS_unwrap in Htx1. rewrite Hx0 in Htx1.
-    inversion Htx1 as [ | | | | | | x1t Hx1t Hax01 Hx1 | | | ]; symmetry in Hx1.
-    rewrite <- Hx1; compute in Hx1; rewrite !Hx1. 
-    remember (tsubst y0 (tseq (tpar (tact ASend tend) 
-                                    (tact ARecv tend)) 
-                              (tseq (tpar (tact ASend tend) 
-                                          (tact ARecv tend)) trec))) 
-    as y1 eqn:Hy1; compute in Hy1; rewrite Hy0 in Hy1; exists y1. split.
-    { unfold weak; exists y0, y1; apply Pack_weak; constructor.
-      rewrite Hy1, Hy0. apply do_fix. }
-    { rewrite <- Hx1. cofix CH2. apply In_sim, Pack_sim;
-      [ | intros _x2 Htx; apply blts_silent1_refl in Htx; 
-          rewrite <- Htx; exists y1; split; [ constructor | apply CH2] ]. 
-      Guarded.
-
-      intros x2 ax12 Htx2.
-      apply blts_weak_silent, bLTS_unwrap in Htx2. rewrite Hx1 in Htx2.
-      inversion Htx2 as 
-        [ | | | x2s x2c x2_x0 _ax12 Htx2sc Hx2s H_ax12 Hx2 | | | | | | ];
-      symmetry in Hx2; rename H into Hx2_x0. rewrite Hy1.
-      assert (x0 = x2_x0) as Hx0eqx2_x0; [rewrite Hx0, Hx2_x0; reflexivity |].
-
-      inversion Htx2sc as 
-        [ x2l x2r Hx2l Hax12 Hx2c | | | | | | 
-        | x2l x2r Hx2l Hax12 Hx2c | |];
-      rename H into Hx2r; symmetry in Hx2c; 
-      rewrite Hx2c in Hx2; rewrite Hx2c, <- Hax12 in Htx2sc.
-      { remember (tseq (tpar tend tend) 
-                       (tseq (tpar (tact ASend tend) (tact ARecv tend)) y0))
-        as y2 eqn:Hy2; rewrite Hy0 in Hy2; exists y2. split.
-        { unfold weak; exists y1, y2. 
-          rewrite Hy2, Hy1; apply Pack_weak; constructor.
-          apply do_seq, do_senda. }
-        { rewrite <- Hx2. cofix CH3. apply In_sim, Pack_sim;
-          [ | intros _x3 Htx; apply blts_silent1_refl in Htx; 
-              rewrite <- Htx; exists y2; split; [ constructor | apply CH3] ].
-          Guarded.
-
-          intros x3 ax23 Htx3.
-          apply blts_weak_silent, bLTS_unwrap in Htx3. rewrite Hx2 in Htx3.
-          inversion Htx3 as 
-            [ | | | x3s x3c x3_x0 _ax23 Htx3sc Hx3s H_ax23 Hx3 | | | | | | ];
-          symmetry in Hx3; rename H into Hx3_x0. rewrite Hy2.
-          assert (x0 = x3_x0) as Hx0eqx3_x0; 
-            [rewrite Hx0, Hx3_x0; reflexivity |].
-
-          inversion Htx3sc as
-            [ | | | | | _H Hax23 Hx3c | | x3l x3r Hx3l Hax23 Hx3c | | ]; 
-          symmetry in Hx3c; [| rename H into Hx3r ];
-          rewrite Hx3c in Hx3; rewrite Hx3c, <- Hax23 in Htx3sc.
-          { remember 
-              (tseq tend (tseq (tpar (tact ASend tend) (tact ARecv tend)) y0))
-            as y3 eqn:Hy3; rewrite Hy0 in Hy3; exists y3. split.
-            { unfold weak; exists y2, y3. 
-              rewrite Hy3, Hy2; apply Pack_weak; constructor.
-              apply do_seq, do_par_end. }
-            { rewrite <- Hx3; cofix CH4. apply In_sim, Pack_sim;
-              [ | intros _x4 Htx; apply blts_silent1_refl in Htx; 
-                  rewrite <- Htx; exists y3; 
-                  split; [ constructor | apply CH4] ].
-              Guarded.
-
-              (* and so on ... *)
-              admit.
-            } }
-          { remember (tseq (tpar tend tend) (tseq (tpar (tact ASend tend) (tact ARecv tend)) y0))
-            as y3 eqn:Hy3; rewrite Hy0 in Hy3; exists y3. split. 
-            { unfold weak; exists y2, y3. 
-              rewrite Hy3, Hy2; apply Pack_weak; constructor.
-              apply do_seq, do_comm. }
-            { rewrite <- Hx3.
-              replace x3 with x2. replace y3 with y2. apply CH3.
-              { rewrite Hy2, Hy3; reflexivity. }
-              { rewrite Hx2, Hx3; reflexivity. }
-            } } } }
-      { remember (tseq (tpar (tact ARecv tend) (tact ASend tend)) 
-                       (tseq (tpar (tact ASend tend) (tact ARecv tend)) y0))
-        as y2 eqn:Hy2; rewrite Hy0 in Hy2; exists y2. split.
-        { unfold weak; exists y1, y2. 
-          rewrite Hy2, Hy1; apply Pack_weak; constructor.
-          apply do_seq, do_comm. }
-        { rewrite <- Hx2. cofix CH3. 
-          (* and so on ... *)
-          admit.
-        }
-      }
-    }
-    
-  Admitted.
-  
-  Theorem ws_yx : forall x0 y0, x0 = x -> y0 = y -> weak_sim bLTS bLTS y0 x0.
-  Proof. 
-    intros x0 y0 Hx0 Hy0; unfold x, y in Hx0, Hy0.
-  Admitted.
-
-  Theorem bs_xy : forall x0 y0, x0 = x -> y0 = y -> weak_bisim bLTS bLTS y0 x0.
-  Proof. 
-    intros x0 y0 Hx0 Hy0; unfold x, y in Hx0, Hy0. rewrite Hx0, Hy0.
-    unfold weak_bisim; split; [apply ws_yx | apply ws_xy]; trivial.
-  Qed.
-End Test2_manual.
+Lemma bLTS_unwrap : forall x1 x2 a, bLTS x1 a x2 -> termLTS x1 a x2.
+Proof. intros x1 x2 a Ht. inversion Ht; subst. apply H. Qed.
 
 (* TODO *)
 Module Test2.
@@ -236,7 +20,7 @@ Module Test2.
                                  (tseq (tpar (tact ASend tend) 
                                              (tact ARecv tend)) trec)).
 
-  Ltac sim_silent1_refl :=
+  (* Ltac sim_silent1_refl :=
     match goal with 
     | [ Hx : ?tx = _
       , Hy : ?ty = ?vy 
@@ -249,7 +33,7 @@ Module Test2.
         intros _x Htx; apply blts_silent1_refl in Htx;
         rewrite <- Htx; exists vy; rewrite <- Hy; 
         split; [ constructor | apply CH ]
-    end.
+    end. *)
 
   Ltac handle_weak_transition :=
     match goal with 
@@ -259,25 +43,6 @@ Module Test2.
       ] =>
       unfold weak; exists ty, ny; rewrite Hty, Hny; 
       apply Pack_weak; try constructor; constructor
-    end.
-
-  Ltac handle_constr_y :=
-    match goal with 
-
-    (* do_fix *)
-    | [ CH0 : @weak_sim _ _ _ _ _ ?tx ?ty
-      , Htx : ?tx = ?vx
-      , Hty : ?ty = (tfix ?vy)
-      , Htr : termLTS ?vx ?a ?nx
-      , Hnx : ?nx = _
-        |- 
-          exists eny, @weak _ _ _ (tfix ?vy) (Some false) eny /\ 
-            @weak_sim _ _ _ _ _ ?nx eny
-      ] => 
-        let Hny := fresh "Hny" in let ny := fresh "ny" in 
-        remember (tsubst (tfix vy) vy) as ny eqn:Hny; compute in Hny; 
-        exists ny; split; [ handle_weak_transition | ]
-
     end.
 
   Ltac handle_constr_x :=
@@ -307,16 +72,6 @@ Module Test2.
         symmetry in Hnx; rewrite <- Hnx; inversion Hx1 
         (* ; handle_constr_x *)
 
-    (* do_seq_end *)
-    (* | [ 
-        |- _
-      ] => simpl *)
-
-    (* do_par_end *)
-    (* | [ 
-        |- _
-      ] => simpl *)
-
     (* do_fix *)
     | [ CH0 : @weak_sim _ _ _ _ _ ?tx ?ty
       , Htx : ?tx = tfix ?vx
@@ -331,23 +86,29 @@ Module Test2.
         symmetry in Hnx, Hax; rewrite <- Hnx; compute in Hnx
         (* ; handle_constr_y *)
 
-    (* do_comm *)
-    (* | [ 
-        |- _
-      ] => simpl *)
-
-    (* do_assocl *)
-    (* | [ 
-        |- _
-      ] => simpl *)
-
-    (* do_assocr *)
-    (* | [ 
-        |- _
-      ] => simpl *)
     end.
 
-  Ltac sim_visible :=
+  Ltac handle_constr_y :=
+    match goal with 
+
+    (* do_fix *)
+    | [ CH0 : @weak_sim _ _ _ _ _ ?tx ?ty
+      , Htx : ?tx = ?vx
+      , Hty : ?ty = (tfix ?vy)
+      , Htr : termLTS ?vx ?a ?nx
+      , Hnx : ?nx = _
+        |- 
+          exists eny, @silent _ _ _ (tfix ?vy) eny /\ 
+            @weak_sim _ _ _ _ _ ?nx eny
+      ] => 
+        let Hny := fresh "Hny" in let ny := fresh "ny" in 
+        remember (tsubst (tfix vy) vy) as ny eqn:Hny; compute in Hny; 
+        exists ny
+        (* ; split; [ handle_weak_transition | ] *)
+
+    end.
+
+  (* Ltac sim_visible :=
     intros; 
     match goal with
     | [ Hx : ?tx = _
@@ -361,49 +122,299 @@ Module Test2.
         rewrite Hy; rewrite Hx in Htx; 
         inversion Htx
         (* ; handle_constr_x *)
+
+    end. *)
+
+  (* NOTE: makes goals easier to read e.g., [H : tend = t] -> [H : t = tend] *)
+  Ltac ltr_sym :=
+    repeat match goal with
+    | [ t : term, H : tend = ?t |- _ ] => symmetry in H
+    | [ t : term, H : trec = ?t |- _ ] => symmetry in H
+    | [ t : term, H : tfix _ = ?t |- _ ] => symmetry in H
+    | [ t : term, H : tsubst _ _ = ?t |- _ ] => compute in H
+    | [ t : term, H : tact _ _ = ?t |- _ ] => symmetry in H
+    | [ t : term, H : tseq _ _ = ?t |- _ ] => symmetry in H
+    | [ t : term, H : tpar _ _ = ?t |- _ ] => symmetry in H
+    | [ |- _ ] => idtac
     end.
 
-  Ltac sim_cofix :=
-    let CH := fresh "CH" in cofix CH; 
-    apply In_sim, Pack_sim; [ sim_visible | sim_silent1_refl ].
+  Ltac compute_tsubst :=
+    ltr_sym;
+    repeat match goal with
+    | [ t : term, H : tsubst _ _ = ?t |- _ ] => compute in H
+    | [ |- _ ] => idtac
+    end.
 
-  Ltac sim_pre_cofix_unfold :=
+  (* NOTE: for silent actions that occur within a weak visible action *)
+  Ltac wsim_weak_silent_action :=
+   match goal with
+    | [ Hx : ?tx = ?vx, Hy : ?ty = ?vy
+      , Htx : @weak _ ?_M ?_A ?vx (Some ?a) ?nx
+      , Hpre : silent _ ?vx ?tx'
+      , Hstr : _ ?tx' (Some ?a) ?nx'
+      , Hpost : silent _ ?nx' ?nx
+      |- exists eny, @weak _ _ _ ?vy (Some ?a) eny /\ 
+          @weak_sim _ _ _ _ _ ?nx eny
+      ] => 
+        destruct Hpre
+        ; [ destruct Hpost; inversion Hstr
+          ; match goal with  
+            | [ H : termLTS ?vx (Some ?a) ?nx |- _ ] => inversion H
+            end
+          | inversion H
+            ; match goal with 
+              | [ Hpre : Relation_Operators.clos_refl_trans_1n term _ ?vxb ?nxa
+                , H : termLTS ?vx None ?vxb 
+                |- _ ] => 
+                inversion H; compute_tsubst
+                (* ; inversion Hpre *)
+                (* NOTE: leaves only the case where the visible action is later *)
+              end
+          ]
+    end.
+
+  (* NOTE: the first constructor of [Pack_sim] -- for weakly-similar actions *)
+  Ltac wsim_weak :=
+    intros; 
+    match goal with
+    | [ Hx : ?tx = _, Hy : ?ty = ?vy
+      , _Htx : @weak _ _ _ ?tx (Some ?a) ?nx
+      |- exists eny, @weak _ _ _ ?ty (Some ?a) eny /\ 
+          @weak_sim _ _ _ _ _ ?nx eny
+      ] => 
+        let Htx := fresh "Htx" in rename _Htx into Htx
+        ; rewrite Hy; rewrite Hx in Htx
+        ; let Htx_w := fresh "Htx_w" in inversion Htx as [? Htx_w']
+        ; inversion_clear Htx_w' as [? Htx_w]
+        ; let Hpre := fresh "Hpre" in let Hstr := fresh "Hstr" in 
+          let Hpost := fresh "Hpost" in destruct Htx_w as [Hpre Hstr Hpost]
+        (* ; wsim_weak_silent_action *)
+    end.
+
+  (* NOTE: the second constructor of [Pack_sim] -- for silent actions *)
+  Ltac wsim_silent :=
+    intros; 
+    match goal with
+    | [ Hx : ?tx = _
+      , Hy : ?ty = ?vy
+      , Htx : @silent1 _ _ _ ?tx ?nx
+      |- 
+        exists eny, @silent _ _ _ ?ty eny /\ 
+          @weak_sim _ _ _ _ _ ?nx eny
+      ] => 
+        rewrite Hy
+        ; rewrite Hx in Htx
+    end.
+
+  (* NOTE: called at the beginning of each new proof that terms are wsim. *)
+  Ltac wsim_cofix :=
+    let CH := fresh "CH" in cofix CH; 
+    apply In_sim, Pack_sim; [ wsim_weak | wsim_silent ].
+
+  (* NOTE: entrypoint, handles first cofix before [wsim_cofix]. *)
+  Ltac wsim_pre_cofix_unfold :=
     intros;
     match goal with 
-    | [ Hx : ?tx = ?vx
-      , Hy : ?ty = ?vy |- @weak_sim _ _ _ _ _ ?tx ?ty 
-      ] => unfold vx, vy in Hx, Hy; sim_cofix
+    | [ _Hx : ?tx = ?vx
+      , _Hy : ?ty = ?vy |- @weak_sim _ _ _ _ _ ?tx ?ty 
+      ] => 
+        let Hx := fresh "Hx" in rename _Hx into Hx;
+        let Hy := fresh "Hy" in rename _Hy into Hy;
+        unfold vx, vy in Hx, Hy; wsim_cofix
     end.
 
-  Tactic Notation "solve_sim" := 
-    sim_pre_cofix_unfold.
-
-
-  (* Lemma handle_seq : 
-    forall tx tx1 tx2 tx1l tx1r, tx = (tseq tx1 tx2) -> (tx1 = tpar tx1l tx1r) ->
-      exists nx nx1 a, nx = (tseq nx1 tx2) -> 
-      termLTS tx1 a nx1 -> termLTS tx a nx.
-  Proof.
-    intros tx tx1 tx2 tx1l tx1r Htx Htx1.
-
-    
-
-    do 3 eexists.
-    intros Hnx Htrx1.
-    inversion Htrx1; subst.
-    - inversion H1. admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-     *)
+  Tactic Notation "solve_wsim" := wsim_pre_cofix_unfold.
 
   Theorem ws_xy : forall x0 y0, x0 = x -> y0 = y -> weak_sim bLTS bLTS x0 y0.
   Proof. 
-    solve_sim.
+    solve_wsim.
+    -
+    match goal with
+    | [ Hx : ?tx = ?vx, Hy : ?ty = ?vy
+      , Htx : @weak _ ?_M ?_A ?vx (Some ?a) ?nx
+      , Hpre : silent _ ?vx ?tx'
+      , Hstr : _ ?tx' (Some ?a) ?nx'
+      , Hpost : silent _ ?nx' ?nx
+      |- exists eny, @weak _ _ _ ?vy (Some ?a) eny /\ 
+          @weak_sim _ _ _ _ _ ?nx eny
+      ] => 
+        destruct Hpre
+        ; [ destruct Hpost; inversion Hstr
+          ; match goal with  
+            | [ H : termLTS ?vx (Some ?a) ?nx |- _ ] => inversion H
+            end
+          | inversion H
+            ; match goal with 
+              | [ Hpre : Relation_Operators.clos_refl_trans_1n term _ ?vxb ?nxa
+                , H : termLTS ?vx None ?vxb 
+                |- _ ] => 
+                inversion H; compute_tsubst
+                (* ; inversion Hpre *)
+              end
+          ]
+    end.
+
+    (* inversion H.  *)
+    inversion H0; ltr_sym. compute in H6. 
+
+    inversion Hstr. inversion H0. 
+    +   
+
+    inversion H.
+    inversion H0.
+
+
+    -
+    match goal with
+    | [ Hx : ?tx = ?vx, Hy : ?ty = ?vy
+      , Htx : @weak _ ?_M ?_A ?vx (Some ?a) ?nx
+      , Hpre : silent _ ?vx ?tx'
+      , Hstr : _ ?tx' (Some ?a) ?nx'
+      , Hpost : silent _ ?nx' ?nx
+      |- exists eny, @weak _ _ _ ?vy (Some ?a) eny /\ 
+          @weak_sim _ _ _ _ _ ?nx eny
+      ] => 
+        destruct Hpre
+        ; [ destruct Hpost; inversion Hstr
+        ; match goal with  
+          | [ H : termLTS ?vx (Some ?a) ?nx |- _ ] => inversion H
+          end
+        | ]
+    end.
+
+
+
+    { destruct Hpost. 
+      - inversion Hstr. inversion H.
+      - inversion Hstr. inversion H0. }
+
+
+
+    {
+      
+      destruct H1. destruct H1. destruct H1. 
+
+      (* NOTE: case where head term only has silent actions *)
+      destruct pre.
+      
+      (* NOTE: case where no silent action before expected visible *)
+      { destruct post; inversion str; [ inversion H1 | inversion H2 ]. }
+      
+      (* NOTE: case where some silent actions can occur before visible *)
+      { inversion H1. inversion H2. 
+        (* NOTE: now we can realise what the silent action yields *)
+        symmetry in H8; compute in H8.
+
+        (* rewrite H8 in pre.  *)
+        inversion pre.
+        { symmetry in H6. inversion str. 
+          inversion H9; ltr_sym.
+          Check H14.
+          - l_to_r_sym.  l_to_r_sym.  l_to_r_sym.  l_to_r_sym. 
+            symmetry in H13, H14, H15. admit.
+          - symmetry in H13, H14, H15. admit.
+          - symmetry in H13, H14, H15. admit.
+          - symmetry in H14, H15, H16. admit.
+          - symmetry in H13, H14, H15. 
+          - symmetry in H13, H14, H15. 
+          inversion H17.
+        }
+
+        inversion str. subst. 
+        { inversion str. inversion H2. }
+        { inversion str. inversion H2. } }
+      {}
+      
+
+      destruct pre; destruct post; inversion str.
+      - inversion H1.
+      - inversion H2.
+      - assert (forall a, termLTS x0 a x2 -> a = None).
+      
+      inversion H2.
+      
+      assert (forall a, termLTS x0 a x2 -> a = None); subst.
+
+      - intros; inversion H1.
+      - inversion H1.
+      - intros. inversion H2.
+      - inversion H2.
+      - intros. inversion H; reflexivity.
+      - inversion H2. rewrite <- H in pre. inversion pre.
+      
+      intros. inversion H; reflexivity.
+       inversion H1; reflexivity.
+
+      [
+        
+      | ].
+      
+      subst; 
+      - apply H1 in H2; discriminate H2.
+      - apply H1 in H3; discriminate H3.
+      - inversion pre; subst. apply H1 in H3; discriminate H3.
+      - apply H1 in H2; discriminate H2.
+      - apply H1 in H2; discriminate H2.
+      - apply H1 in H2; discriminate H2.
+
+      discriminate H1.
+
+      generalize H1.
+      rewrite H2.  in H1.
+
+
+
+      inversion H1. inversion H6.
+      apply H1 in H2.
+      discriminate H1.
+
+      destruct post, pre; inversion str; subst; inversion H1; subst.
+
+      admit. 
+      admit. 
+      admit. 
+
+
+      - discriminate H8 
+
+      
+      inversion H1; inversion H2; inversion H3; subst.
+      inversion pre; subst. 
+      + inversion post; subst.
+        * inversion str; subst. 
+          inversion H; subst.
+        * inversion H0; subst.
+          -  inversion H0. inversion H4; constructor. 
+      + inversion post; subst. 
+        * admit.
+        * admit.
+    }- 
+        inversion str; subst. 
+          inversion H; subst.
+      inversion post; subst. 
+      inversion H0; subst. 
+      inversion H; subst. 
+      
+      inversion H; subst.
+      destruct H4.
+      admit.
+      admit.
+      admit.
+    - 
+    
+      inversion H1. inversion H2. inversion H3. 
+      inversion pre. inversion post.
+
+      rewrite <- H4 in str. 
+      (* rewrite <- H5 in str.  *)
+      inversion str.
+      inversion H6.
+      inversion H5.
+
+    apply BISIM_WRAP in str.  
+
+
+
     handle_constr_x. handle_constr_y.
     
     sim_cofix.
@@ -426,13 +437,173 @@ Module Test2.
 
       match goal with
       | [ Hty : ?ty = tseq ?vy1 ?vy2
-        , Hty1 : ?ty1 = tpar ?ty1l ?ty1r
+        , Hty1 : ?ty1 = tpar (tact ASend ?ty1l) (tact ARecv ?ty1r)
         |- 
-          exists eny, @weak _ _ _ (tseq (tpar ?ty1l ?ty1r) ?vy2) (Some ?a) eny /\ 
+          exists eny, @weak _ _ _ (tseq (tpar (tact ASend ?ty1l) (tact ARecv ?ty1r)) ?vy2) (Some ?a) eny /\ 
             @weak_sim _ _ _ _ _ ?nx eny
         ] =>
+          let Hny := fresh "Hny" in let ny := fresh "ny" in
+          remember (tseq (tpar tend tend) vy2) as ny eqn:Hny;
+          (* exists ny; rewrite Hny; split; 
+          [ unfold weak; exists (tseq (tpar (tact ASend ty1l) (tact ARecv ty1r)) vy2), ny; 
+            rewrite Hny; apply Pack_weak; try constructor;
+            apply do_seq
+            (* ; apply do_senda *)
+            (* ; constructor *)
+          | ] *)
           simpl
+
+      | [ Hty : ?ty = tseq ?vy1 ?vy2
+        , Hty1 : ?ty1 = tpar (tact ARecv ?ty1l) (tact ASend ?ty1r)
+        |- 
+          exists eny, @weak _ _ _ (tseq (tpar (tact ARecv ?ty1l) (tact ASend ?ty1r)) ?vy2) (Some ?a) eny /\ 
+            @weak_sim _ _ _ _ _ ?nx eny
+        ] =>
+          let Hny := fresh "Hny" in let ny := fresh "ny" in
+          remember (tseq (tpar (tact ASend ty1l) (tact ARecv ty1r)) vy2) as ny eqn:Hny;
+          exists ny; rewrite Hny; split; 
+          [ unfold weak
+          ; exists (tseq (tpar (tact ARecv ty1l) (tact ASend ty1r)) vy2), (tseq (tpar (tact ASend ty1l) (tact ARecv ty1r)) vy2)
+          (* , ny *)
+          (* ; rewrite Hny *)
+          ; apply Pack_weak
+            ; try constructor
+            ; apply do_seq
+            (* ; apply do_senda *)
+            (* ; constructor *)
+          | ] 
+          (* simpl *)
       end.
+
+      constructor.
+
+       apply do_comm.
+
+
+
+      split. 
+      unfold weak; exists ty, ny; rewrite Hty, Hny; 
+      apply Pack_weak; try constructor; constructor
+      
+      handle_weak_transition.
+
+
+          (* assert (
+            (* forall ny1l ny1r,  *)
+            termLTS (tpar ty1l ty1r) a (tpar ny1l ny1r) ->
+            termLTS (tseq (tpar ty1l ty1r) vy2) a (tseq (tpar ny1l ny1r) vy2)
+          ) ; [ intros Hy1l_par; constructor; apply Hy1l_par | ] *)
+
+
+          assert (
+            (* forall ny1l ny1r,  *)
+            termLTS (tpar ty1l ty1r) a (tpar tend tend) ->
+            termLTS (tseq (tpar ty1l ty1r) vy2) a (tseq (tpar tend tend) vy2)
+          ) ; [ intros Hy1l_par; constructor; apply Hy1l_par | ]
+
+      end.
+
+      (* NOTE: manually handling the inner [tpar ... ...] transition.  *)
+      (* NOTE: unsure how to automate this at this point in the proof. *)
+      (* NOTE: am assuming that the plugin will be able to make this "jump". *)
+      remember ()
+
+      rewrite <- Hny.
+      replace (weak bLTS ny (Some true)) 
+        with  (termLTS ny true).
+      rewrite Hny.
+
+      apply H15.
+
+
+      destruct H15.
+      induction ny1l, ny1r.
+
+
+      admit.
+      admit.
+      admit.
+      admit.
+
+
+
+
+
+
+
+      eexists.
+      split. 
+      (* handle_weak_transition. *)
+      match goal with 
+      | [ Hty : ?ty = ?vy
+        , Hny : ?ny = ?nvy
+          |- @weak _ _ _ ?vy _ ?ny
+        ] =>
+        unfold weak; exists ty, ny; rewrite Hty, Hny; 
+        apply Pack_weak; try constructor; constructor
+      | [ Hty : ?ty = ?vy
+          |- @weak _ _ _ ?vy (Some ?a) ?ny
+        ] =>
+        (* simpl *)
+        let ny := fresh "ny" in 
+        (* assert (ny:term); [ trivial |] *)
+        (* ;  *)
+        assert (forall ny:term, termLTS vy a ny)
+        (* ; induction (termLTS vy a ny)  *)
+      | [ |- _] => fail 0
+      end.
+
+      generalize ny0.
+      intros.
+
+      constructor.
+
+      induction (termLTS vy a ny). 
+
+
+
+      inversion ny0; subst. 
+      admit.
+      admit.
+      admit.
+      admit.
+      admit.
+      +   
+
+      apply handle_seq_termLTS.
+
+
+      
+
+      simpl in HeqP.
+      compute in HeqP.
+
+
+
+      unfold weak.
+
+      (* destruct (exists n2, termLTS ny true n2). *)
+      (* assumption *)
+
+      (* eapply handle_weak_seq. *)
+
+
+      (* remember  *)
+
+
+      eexists.
+      refine ?[n2].
+      split; [exists ny; rewrite Hny | ]. 
+      (* exists ?[n2]. *)
+      econstructor.
+
+
+      (* eapply handle_weak.  *)
+      eapply Pack_weak; constructor.
+      apply do_seq.
+      trivial.  
+
+      apply handle_weak_seq.
 
       (* assert (
         forall (exists n2, weak b)
