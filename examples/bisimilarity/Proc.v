@@ -220,6 +220,27 @@ Section Test2.
                                              (tact (recv A) tend)) trec)).
 
   (****************************************************************************)
+
+  Definition raw_statespace : Type := list (term * list (option label * list term)).
+
+  Inductive valid_statespace : raw_statespace -> Prop :=
+  | empty : valid_statespace []
+  
+  | state_trans : forall from d a dests actions tail, 
+      termLTS from a d ->
+      valid_statespace ((from, (a, dests) :: actions) :: tail) -> 
+      valid_statespace ((from, (a, d::dests) :: actions) :: tail)
+
+  | next_actions : forall from a actions tail, 
+      valid_statespace ((from, actions) :: tail) -> 
+      valid_statespace ((from, (a, []) :: actions) :: tail)
+
+  | next_states : forall from tail, 
+      valid_statespace tail -> 
+      valid_statespace ((from, []) :: tail)
+  .
+
+  (****************************************************************************)
   (* NOTE: these would be obtained via the plugin *)
   Example p1 : term := tseq (tpar (tact (send A) tend) 
                                   (tact (recv A) tend)) 
@@ -306,13 +327,14 @@ Section Test2.
 
   (****************************************************************************)
   
-  Definition p_states : list (term * list term) := 
-    [ (p,  [p1])
-    ; (p1, [p2; p3])
-    ; (p2, [p1]) 
-    ; (p3, [p3; p4]) 
-    ; (p4, [p]) ].
+  Definition p_states := valid_statespace
+    [ (p,  [ (None, [p1]) ])
+    ; (p1, [ (None, [p2]); (Some A, [p3]) ])
+    ; (p2, [ (None, [p1]) ]) 
+    ; (p3, [ (None, [p3; p4]) ]) 
+    ; (p4, [ (None, [p]) ]) ].
 
+  (* TODO: update below similar to above *)
   Definition q_states : list (term * list term) := 
     [ (q,  [q1])
     ; (q1, [q2])
