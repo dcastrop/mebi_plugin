@@ -4,6 +4,92 @@ Require Coq.Program.Tactics.
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.Proc.
 
+Require Import Notations.
+Require Import List.
+Import ListNotations.
+  
+Require Import Relation_Definitions.
+Require Import Relation_Operators.
+Require Operators_Properties.
+
+  (****************************************************************************)
+
+  Lemma is_strong : forall t1 t2 a, 
+    termLTS t1 (Some a) t2 -> weak termLTS t1 (Some a) t2.
+  Proof. intros. exists t1, t2. apply Pack_weak; try constructor; apply H. Qed.
+
+  Lemma is_silent1 : forall t1 t2, termLTS t1 None t2 -> silent1 termLTS t1 t2.
+  Proof. intros. inversion H; constructor; constructor; apply H0. Qed.
+  
+  Lemma is_silent1_start : forall x1 x2 x3,
+    termLTS x1 None x2 -> silent termLTS x2 x3 -> silent1 termLTS x1 x3.
+  Proof. intros x1 x2 x3 Ht12 Hs23. eauto with rel_db. Qed.
+
+  Lemma is_silent : forall t1 t2, termLTS t1 None t2 -> silent termLTS t1 t2.
+  Proof. intros. 
+    inversion H; apply clos_t_clos_rt; constructor; constructor. apply H0. Qed.
+
+  Lemma silent_with_silent1_start : forall x1 x2 x3,
+    termLTS x1 None x2 ->
+    silent termLTS x2 x3 ->
+    silent termLTS x1 x3.
+  Proof. intros x1 x2 x3 Ht12 Hs23. eauto with rel_db. Qed.
+  (* Proof. intros x1 x2 x3 Ht12 Hs23. unfold silent. unfold silent in Hs23.
+    apply clos_t_clos_rt.
+    apply (@clos_rt_clos_t _ (tau termLTS) x1 x2 x3); [| apply Hs23 ].
+    eauto with rel_db.
+  Qed. *)
+
+  (* NOTE: x => y *)
+  Lemma do_weak : forall x0 x1 y0 y1 y2 y3 y4 a, 
+    weak_sim termLTS termLTS x0 y0 ->
+    weak termLTS x0 (Some a) x1 ->
+    termLTS y0 None y1 -> 
+    silent termLTS y1 y2 ->
+    termLTS y2 (Some a) y3 -> 
+    silent termLTS y3 y4 ->
+    weak termLTS y0 (Some a) y4.
+  Proof. 
+    intros x0 x1 y0 y1 y2 y3 y4 a Hws Hwx Hty01 Hsy12 Hwy23 Hsy34. 
+    exists y2, y3. eauto with rel_db. 
+    (* apply Pack_weak.
+    - apply (@silent_with_silent1_start y0 y1 y2 Hty01 Hsy12).
+    - apply Hwy23.
+    - apply Hsy34. *)
+  Qed.  
+
+  Lemma wsim_explore_silent1 : 
+    forall x0 y0, weak_sim termLTS termLTS x0 y0 ->
+    forall x1, silent1 termLTS x0 x1 ->
+    exists x1a, termLTS x0 None x1a /\ silent termLTS x1a x1.
+  Proof. intros. inversion H0; subst; [ exists x1 | exists y ].
+    - split; [ apply H1 | apply rt1n_refl ].
+    - split; [ apply H1 | apply clos_t_clos_rt in H2; apply H2 ].
+  Qed.
+
+  Lemma wsim_explore_silent :
+    forall x0 y0, weak_sim termLTS termLTS x0 y0 ->
+    forall x1, silent1 termLTS x0 x1 ->
+    (exists y1, silent termLTS y0 y1 /\ weak_sim termLTS termLTS x1 y1) ->
+    (weak_sim termLTS termLTS x1 y0) \/ (
+      exists y1a y1, termLTS y0 None y1a /\ silent termLTS y1a y1
+    ).
+  Proof.
+    intros. 
+    apply (@wsim_explore_silent1 x0 y0) in H0; [| apply H].
+
+    inversion H0 as [x1a []]. inversion H1 as [y1a []].
+
+    inversion H4; subst; [ left; apply H5 | right; exists y1a ].
+
+    inversion H7; exists y1a; subst; [ split; [ apply H6 | apply rt1n_refl ] |].
+    
+    split; [| apply rt1n_refl].
+
+    (* NOTE: from here we need the information from the plugin. *)
+    (* NOTE: I.e., next state reached *)
+  Admitted.
+
 (****************************************************************************)
 (* NOTE: makes goals easier to read, e.g., [H : tend = t] -> [H : t = tend] *)
 Ltac ltr_goals :=
@@ -34,8 +120,10 @@ Ltac fmt_goals := ltr_goals; compute_goals.
 Ltac wsim_case_weak_action_filter_from_silent :=
   let xa := fresh "xa0" in let xb := fresh "xb0" in 
   let xc := fresh "xc0" in let xd := fresh "xd0" in 
-  let Hpre_tau := fresh "Hpre_tau0" in let Hpre_cft := fresh "Hpre_cft0" in 
-  let Hstr := fresh "Hstr0" in let Hpost := fresh "Hpost0" in 
+  let Hpre_tau := fresh "Hpre_tau0" in 
+  let Hpre_cft := fresh "Hpre_cft0" in 
+  let Hstr := fresh "Hstr0" in 
+  let Hpost := fresh "Hpost0" in 
   inversion Htx as [xa [xd [[| xb xc Hpre_tau Hpre_cft] Hstr Hpost]]]; 
   [ destruct Hpost; inversion Hstr | ].
 
@@ -71,13 +159,23 @@ Ltac wsim_case_weak_action :=
 (****************************************************************************)
 (* NOTE: *)
 
-Ltac wsim_case_silent_action := idtac.
+Ltac wsim_case_silent_action := 
+  let nx := fresh "x0" in intros nx;
+  let Htx := fresh "Htx0" in intros Htx;
+  match goal with
+  | [ Hx : ?cx = ?vx, Hy : ?cy = ?vy
+    , Htx : @silent1 _ _ _ ?cx nx 
+    |- exists ny, @silent _ _ _ ?cy ny /\ @weak_sim _ _ _ _ _ nx ny ] => 
+      rewrite Hy; rewrite Hx in Htx; 
+      first [ wsim_case_weak_action_filter | idtac ]
+  end.
 
 (****************************************************************************)
 (* NOTE: called at the beginning of each new proof that terms are wsim. *)
 Ltac wsim_new_cofix :=
   let CH := fresh "CH0" in cofix CH; 
   apply In_sim, Pack_sim; [ wsim_case_weak_action | wsim_case_silent_action ].
+Tactic Notation "wsim_next" := wsim_new_cofix.
 
 (* NOTE: entrypoint, handles first cofix before [wsim_new_cofix]. *)
 Ltac wsim_pre_cofix_unfold :=
@@ -89,8 +187,22 @@ Ltac wsim_pre_cofix_unfold :=
   | [ Hx : ?x = ?vx, Hy : ?y = ?vy 
     |- @weak_sim _ _ _ _ _ ?x ?y ] => unfold vx, vy in Hx, Hy; wsim_new_cofix
   end.
-
 Tactic Notation "solve_wsim" := wsim_pre_cofix_unfold.
+
+Ltac wsim_pre_cofix_unfold_with_states :=
+  let x := fresh "x0" in intros x;
+  let y := fresh "y0" in intros y;
+  let xstates := fresh "xstates0" in intros xstates;
+  let ystates := fresh "ystates0" in intros ystates;
+  let HMx := fresh "HMx0" in intros HMx;
+  let HMy := fresh "HMy0" in intros HMy;
+  let Hx := fresh "Hx0" in intros Hx;
+  let Hy := fresh "Hy0" in intros Hy;
+  match goal with 
+  | [ Hx : ?x = ?vx, Hy : ?y = ?vy 
+    |- @weak_sim _ _ _ _ _ ?x ?y ] => unfold vx, vy in Hx, Hy; wsim_new_cofix
+  end.
+Tactic Notation "solve_wsim_with_states" := wsim_pre_cofix_unfold_with_states.
 
 (****************************************************************************)
 Section Test2.
@@ -108,6 +220,118 @@ Section Test2.
                                              (tact (recv A) tend)) trec)).
 
   (****************************************************************************)
+  (* NOTE: these would be obtained via the plugin *)
+  Example p1 : term := tseq (tpar (tact (send A) tend) 
+                                  (tact (recv A) tend)) 
+                            (tfix (tseq (tpar (tact (send A) tend) 
+                                              (tact (recv A) tend)) trec)).
+  Example p2 : term := tseq (tpar (tact (recv A) tend) 
+                                  (tact (send A) tend)) 
+                            (tfix (tseq (tpar (tact (send A) tend) 
+                                              (tact (recv A) tend)) trec)).
+  Example p3 : term := tseq (tpar tend tend) 
+                            (tfix (tseq (tpar (tact (send A) tend) 
+                                              (tact (recv A) tend)) trec)).
+  Example p4 : term := tseq tend 
+                            (tfix (tseq (tpar (tact (send A) tend) 
+                                              (tact (recv A) tend)) trec)).
+
+  (* NOTE: these would be obtained via the plugin *)
+  Example q1 : term := tseq (tpar (tact (recv A) tend) 
+                                  (tact (send A) tend)) 
+                            (tseq (tpar (tact (send A) tend) 
+                                        (tact (recv A) tend)) 
+                                  (tfix (tseq (tpar (tact (recv A) tend) 
+                                                    (tact (send A) tend)) 
+                                              (tseq (tpar (tact (send A) tend) 
+                                                          (tact (recv A) tend)) trec)))).
+  Example q2 : term := tseq (tpar (tact (send A) tend) 
+                                  (tact (recv A) tend)) 
+                            (tseq (tpar (tact (send A) tend) 
+                                        (tact (recv A) tend)) 
+                                  (tfix (tseq (tpar (tact (recv A) tend) 
+                                                    (tact (send A) tend)) 
+                                              (tseq (tpar (tact (send A) tend) 
+                                                          (tact (recv A) tend)) trec)))).
+  Example q3 : term := tseq (tpar tend tend) 
+                            (tseq (tpar (tact (send A) tend) 
+                                        (tact (recv A) tend)) 
+                                  (tfix (tseq (tpar (tact (recv A) tend) 
+                                                    (tact (send A) tend)) 
+                                              (tseq (tpar (tact (send A) tend) 
+                                                          (tact (recv A) tend)) trec)))).
+  Example q4 : term := tseq tend 
+                            (tseq (tpar (tact (send A) tend) 
+                                        (tact (recv A) tend)) 
+                                  (tfix (tseq (tpar (tact (recv A) tend) 
+                                                    (tact (send A) tend)) 
+                                              (tseq (tpar (tact (send A) tend) 
+                                                          (tact (recv A) tend)) trec)))).
+  Example q5 : term := tseq (tpar (tact (send A) tend) 
+                                  (tact (recv A) tend)) 
+                            (tfix (tseq (tpar (tact (recv A) tend) 
+                                              (tact (send A) tend)) 
+                                        (tseq (tpar (tact (send A) tend) 
+                                                    (tact (recv A) tend)) trec))).
+  Example q6 : term := tseq (tpar (tact (recv A) tend) 
+                                  (tact (send A) tend)) 
+                            (tfix (tseq (tpar (tact (recv A) tend) 
+                                              (tact (send A) tend)) 
+                                        (tseq (tpar (tact (send A) tend) 
+                                                    (tact (recv A) tend)) trec))).
+  Example q7 : term := tseq (tpar tend tend) 
+                            (tfix (tseq (tpar (tact (recv A) tend) 
+                                              (tact (send A) tend)) 
+                                        (tseq (tpar (tact (send A) tend) 
+                                                    (tact (recv A) tend)) trec))).
+  Example q8 : term := tseq tend 
+                            (tfix (tseq (tpar (tact (recv A) tend) 
+                                              (tact (send A) tend)) 
+                                        (tseq (tpar (tact (send A) tend) 
+                                                    (tact (recv A) tend)) trec))).
+
+  (* NOTE: these would be obtained via the plugin *)
+  Example r1 : term := tseq (tpar (tact (send A) tend) 
+                                  (tact (recv A) tend)) 
+                            (tfix (tseq (tpar (tact (send A) tend) 
+                                              (tact (recv A) tend)) trec)).
+  Example r2 : term := tseq (tpar tend tend) 
+                            (tfix (tseq (tpar (tact (send A) tend) 
+                                              (tact (recv A) tend)) trec)).
+  Example r3 : term := tseq tend 
+                            (tfix (tseq (tpar (tact (send A) tend) 
+                                              (tact (recv A) tend)) trec)).
+  Example r4 : term := tfix (tseq (tpar (tact (send A) tend) 
+                                        (tact (recv A) tend)) trec).
+
+  (****************************************************************************)
+  
+  Definition p_states : list (term * list term) := 
+    [ (p,  [p1])
+    ; (p1, [p2; p3])
+    ; (p2, [p1]) 
+    ; (p3, [p3; p4]) 
+    ; (p4, [p]) ].
+
+  Definition q_states : list (term * list term) := 
+    [ (q,  [q1])
+    ; (q1, [q2])
+    ; (q2, [q1; q3])
+    ; (q3, [q3; q4])
+    ; (q4, [q5])
+    ; (q5, [q6; q7])
+    ; (q6, [q5])
+    ; (q7, [q7; q8])
+    ; (q8, [q]) ].
+
+  Definition r_states : list (term * list term) := 
+    [ (r,  [r1])
+    ; (r1, [r; r2])
+    ; (r2, [r2; r3])
+    ; (r3, [r4])
+    ; (r4, [r1]) ].
+
+  (****************************************************************************)
   (* NOTE: quick checks to see if current ltac breaks any of the other cases *)
   Example wsim_test_pq : forall x y, x = p -> y = q -> weak_sim termLTS termLTS x y. Proof. solve_wsim. Admitted.
   Example wsim_test_pr : forall x y, x = p -> y = r -> weak_sim termLTS termLTS x y. Proof. solve_wsim. Admitted.
@@ -117,61 +341,12 @@ Section Test2.
   Example wsim_test_rq : forall x y, x = r -> y = q -> weak_sim termLTS termLTS x y. Proof. solve_wsim. Admitted.
 
   (****************************************************************************)
-
-  Lemma do_strong : forall t1 t2 a, 
-    termLTS t1 (Some a) t2 -> weak termLTS t1 (Some a) t2.
-  Proof. intros. exists t1, t2. apply Pack_weak; try constructor; apply H. Qed.
-
-  Lemma is_silent1 : forall t1 t2, termLTS t1 None t2 -> silent1 termLTS t1 t2.
-  Proof. intros. inversion H; constructor; constructor; apply H0. Qed.
-  
-  (* NOTE: [termLTS] has no reflexive [None] actions *)
-  Lemma no_refl : forall t1 t2, termLTS t1 None t2 -> t1 <> t2.
-  Proof.
-    unfold not; intros.
-    
-
-    inversion H. inversion H0; subst. inversion H4. destruct H2.
-    - 
-    
-    unfold silent, tau in H0. inversion H0; subst. 
-    {
-      inversion H. inversion H4.
-    }
-    
-    constructor; unfold tau.
-
-
-
-  Lemma is_silent : forall t1 t2, silent termLTS t1 t2 -> silent1 termLTS t1 t2.
-  Proof. intros.
-    unfold silent, tau in H. destruct H; constructor; unfold tau.
-    induction t1; .
-
-    induction t1; inversion H; subst; constructor; unfold tau. 
-     admit.
-
-  inversion H; constructor; constructor; apply H0. Qed.
-  
-  Lemma do_weak : forall t1 t2 t3 a, 
-    termLTS t1 None t2 -> weak termLTS t2 (Some a) t3 -> 
-    weak termLTS t1 (Some a) t3.
-  Proof. 
-    intros. exists t2, t3. 
-    apply Pack_weak; destruct H0 as [?t2a [?t2b [Hpre Hstr Hpost]]].
-    {
-      inversion Hpre; subst.
-
-    }
-    
-    
-    subst.
-  try constructor; apply H. Qed.
-
-  (****************************************************************************)
   (* NOTE: below is the "hands-on" proof for testing *)
   Example wsim_testing : forall x y,
-    x = p -> y = q ->
+    forall (xstates ystates : list (term * list term)),
+    xstates = p_states -> ystates = q_states ->
+    (*********************)
+    x = p -> y = q -> 
     (* x = p -> y = r -> *)
     (* x = q -> y = p -> *)
     (* x = q -> y = r -> *)
@@ -179,8 +354,39 @@ Section Test2.
     (* x = r -> y = q -> *)
     weak_sim termLTS termLTS x y.
   Proof.
-    solve_wsim.
+    (* solve_wsim. *)
+    solve_wsim_with_states.
+
+    (* TODO: inductively define statespaces for the lists, which ensure there is a transition *)
+    (* TODO: make ltac that use the provided information *)
+
+    { admit. }
     {
+      unfold silent.
+
+      Check wsim_explore_silent1.
+      rewrite <- Hx0 in Htx0; apply (@wsim_explore_silent1 x0 y0) in Htx0; rewrite Hx0 in Htx0.
+      apply (@wsim_explore_silent1 x0 y0 CH0 x1) in Htx0.
+
+      apply is_silent1 in Htx0.
+      (* apply do_silent1 in Htx0.
+      inversion_clear Htx0 as [?x1_pre [?x2_post [Htx0_pre [Htx0_str Htx0_post]]]]. *)
+
+
+
+    }
+
+      (* first [ wsim_case_weak_action_filter | idtac ] *)
+
+      eexists. 
+
+      ltac:(exact x0).
+
+      Check ?[n2].
+      split; [| wsim_new_cofix].
+      (* apply do_weak. *)
+
+      About do_weak.
       
 
 
