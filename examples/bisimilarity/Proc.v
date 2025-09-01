@@ -107,8 +107,7 @@ Section Test2.
                            (tfix (tseq (tpar (tact (send A) tend) 
                                              (tact (recv A) tend)) trec)).
 
-(****************************************************************************)
-  
+  (****************************************************************************)
   (* NOTE: quick checks to see if current ltac breaks any of the other cases *)
   Example wsim_test_pq : forall x y, x = p -> y = q -> weak_sim termLTS termLTS x y. Proof. solve_wsim. Admitted.
   Example wsim_test_pr : forall x y, x = p -> y = r -> weak_sim termLTS termLTS x y. Proof. solve_wsim. Admitted.
@@ -117,6 +116,59 @@ Section Test2.
   Example wsim_test_rp : forall x y, x = r -> y = p -> weak_sim termLTS termLTS x y. Proof. solve_wsim. Admitted.
   Example wsim_test_rq : forall x y, x = r -> y = q -> weak_sim termLTS termLTS x y. Proof. solve_wsim. Admitted.
 
+  (****************************************************************************)
+
+  Lemma do_strong : forall t1 t2 a, 
+    termLTS t1 (Some a) t2 -> weak termLTS t1 (Some a) t2.
+  Proof. intros. exists t1, t2. apply Pack_weak; try constructor; apply H. Qed.
+
+  Lemma is_silent1 : forall t1 t2, termLTS t1 None t2 -> silent1 termLTS t1 t2.
+  Proof. intros. inversion H; constructor; constructor; apply H0. Qed.
+  
+  (* NOTE: [termLTS] has no reflexive [None] actions *)
+  Lemma no_refl : forall t1 t2, termLTS t1 None t2 -> t1 <> t2.
+  Proof.
+    unfold not; intros.
+    
+
+    inversion H. inversion H0; subst. inversion H4. destruct H2.
+    - 
+    
+    unfold silent, tau in H0. inversion H0; subst. 
+    {
+      inversion H. inversion H4.
+    }
+    
+    constructor; unfold tau.
+
+
+
+  Lemma is_silent : forall t1 t2, silent termLTS t1 t2 -> silent1 termLTS t1 t2.
+  Proof. intros.
+    unfold silent, tau in H. destruct H; constructor; unfold tau.
+    induction t1; .
+
+    induction t1; inversion H; subst; constructor; unfold tau. 
+     admit.
+
+  inversion H; constructor; constructor; apply H0. Qed.
+  
+  Lemma do_weak : forall t1 t2 t3 a, 
+    termLTS t1 None t2 -> weak termLTS t2 (Some a) t3 -> 
+    weak termLTS t1 (Some a) t3.
+  Proof. 
+    intros. exists t2, t3. 
+    apply Pack_weak; destruct H0 as [?t2a [?t2b [Hpre Hstr Hpost]]].
+    {
+      inversion Hpre; subst.
+
+    }
+    
+    
+    subst.
+  try constructor; apply H. Qed.
+
+  (****************************************************************************)
   (* NOTE: below is the "hands-on" proof for testing *)
   Example wsim_testing : forall x y,
     x = p -> y = q ->
@@ -128,9 +180,20 @@ Section Test2.
     weak_sim termLTS termLTS x y.
   Proof.
     solve_wsim.
-     
-     
     {
+      
+
+
+      assert (termLTS_tc y0).
+      { 
+
+        trivial. termLTS_tc.
+      rewrite Hy0. 
+        Check termLTS_ts.
+        apply (termLTS_ts _ _ _).  }
+    }
+
+
       (* inversion Htx0 as [?xa [?xb [Hpre Hstr Hpost]]]. *)
       (* inversion Htx0 as [?xa [?xd [[| ?xb ?xc Hpre_tau Hpre_cft] Hstr Hpost]]]. *)
       (* inversion Htx0 as [?xa [?xd [Hpre Hstr Hpost]]]. *)
