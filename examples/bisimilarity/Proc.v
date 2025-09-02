@@ -12,62 +12,113 @@ Require Import Relation_Definitions.
 Require Import Relation_Operators.
 Require Operators_Properties.
 
-  (****************************************************************************)
+(****************************************************************************)
+Section Lemmas.
+  (* Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A). *)
+  Context {M A : Type} (lts : LTS M A).
 
-  Lemma is_strong : forall t1 t2 a, 
-    termLTS t1 (Some a) t2 -> weak termLTS t1 (Some a) t2.
-  Proof. intros. exists t1, t2. apply Pack_weak; try constructor; apply H. Qed.
+  Lemma is_silent1 : forall t1 t2, lts t1 None t2 -> silent1 lts t1 t2.
+  Proof. intros. auto with rel_db. Qed.
 
-  Lemma is_silent1 : forall t1 t2, termLTS t1 None t2 -> silent1 termLTS t1 t2.
-  Proof. intros. inversion H; constructor; constructor; apply H0. Qed.
-
-  Lemma is_silent : forall x y, silent1 termLTS x y -> silent termLTS x y.
-  Proof. intros. eauto with rel_db. Qed.
-
-  (* NOTE: x => y *)
-  (* Lemma do_weak : forall x0 x1 y0 y1 y2 y3 y4 a, 
-    weak_sim termLTS termLTS x0 y0 ->
-    weak termLTS x0 (Some a) x1 ->
-    termLTS y0 None y1 -> 
-    silent termLTS y1 y2 ->
-    termLTS y2 (Some a) y3 -> 
-    silent termLTS y3 y4 ->
-    weak termLTS y0 (Some a) y4.
-  Proof. intros ? ? ? ? y2 y3; intros. exists y2, y3. eauto with rel_db. Qed. *)
-
-  (* Lemma wsim_explore_silent1 : 
-    forall x0 y0, weak_sim termLTS termLTS x0 y0 ->
-    forall x1, silent1 termLTS x0 x1 ->
-    exists x1a, termLTS x0 None x1a /\ silent termLTS x1a x1.
-  Proof. intros. inversion H0; subst; [ exists x1 | exists y ].
-    - split; [ apply H1 | apply rt1n_refl ].
-    - split; [ apply H1 | apply clos_t_clos_rt in H2; apply H2 ].
-  Qed. *)
-
-  (* Lemma wsim_explore_silent :
-    forall x0 y0, weak_sim termLTS termLTS x0 y0 ->
-    forall x1, silent1 termLTS x0 x1 ->
-    (exists y1, silent termLTS y0 y1 /\ weak_sim termLTS termLTS x1 y1) ->
-    (weak_sim termLTS termLTS x1 y0) \/ (
-      exists y1a y1, termLTS y0 None y1a /\ silent termLTS y1a y1
-    ).
-  Proof.
-    intros. 
-    apply (@wsim_explore_silent1 x0 y0) in H0; [| apply H].
-
-    inversion H0 as [x1a []]. inversion H1 as [y1a []].
-
-    inversion H4; subst; [ left; apply H5 | right; exists y1a ].
-
-    inversion H7; exists y1a; subst; [ split; [ apply H6 | apply rt1n_refl ] |].
-    
-    split; [| apply rt1n_refl].
-
-    (* NOTE: from here we need the information from the plugin. *)
-    (* NOTE: I.e., next state reached *)
+  Lemma is_silent : forall x y, silent1 lts x y -> silent lts x y.
+  Proof. intros. auto with rel_db. Qed.
 
 
-  Admitted. *)
+  Lemma expand_silent1 : forall x y z, 
+    silent1 lts x y -> silent lts y z -> silent1 lts x z.
+  Proof. intros x y z Hxy Hyz.
+    inversion Hyz as [| w ? Hyw Hwz ]; subst; [ apply Hxy |].
+
+    apply clos_t_clos_rt, Operators_Properties.clos_rt1n_rt in Hxy.
+
+    apply Operators_Properties.clos_trans_t1n.
+    apply (@Operators_Properties.clos_rt_t _ _ x y z); [ apply Hxy |].
+
+    eapply clos_rt_clos_t in Hyz.
+    - 
+      (* eapply Operators_Properties.clos_t1n_trans in Hyz.  *)
+      (* apply (@Operators_Properties.clos_rt_t _ _ ) in Hwz. *)
+      (* eapply (@clos_t_clos_rt _ _ y z) in Hyz. *)
+      (* eapply clos_rt_clos_t in Hyz. *)
+      (* eapply Operators_Properties.clos_rt1n_rt in Hyz. *)
+      (* apply Hyz.  *)
+      
+      (* TODO: determins what ?x will be *)
+      (* eapply Hyz. *)
+  Admitted.
+
+
+
+
+  Lemma strong_is_weakly_visible : forall t1 t2 a, 
+    lts t1 (Some a) t2 -> weak lts t1 (Some a) t2.
+  Proof. intros. exists t1, t2. auto with rel_db. Qed.
+
+  Lemma silent_leading_weakly_visible : forall t1 t1b t2 a, 
+    silent1 lts t1 t1b ->
+    lts t1b (Some a) t2 ->
+    weak lts t1 (Some a) t2.
+  Proof. intros. do 2 eexists. eauto with rel_db. Qed.
+
+  Lemma silent_after_weakly_visible : forall t1 t1b t2a t2 a, 
+    silent lts t1 t1b ->
+    lts t1b (Some a) t2 ->
+    silent1 lts t2a t2 ->
+    weak lts t1 (Some a) t2.
+  Proof. intros. do 2 eexists. eauto with rel_db. Qed.
+
+  Lemma is_visible : forall t1 t1b t2a t2 a, 
+    silent lts t1 t1b ->
+    lts t1b (Some a) t2a -> 
+    silent lts t2a t2 ->
+    weak lts t1 (Some a) t2.
+  Proof. intros. do 2 eexists. eauto with rel_db. Qed.
+
+(* NOTE: x => y *)
+(* Lemma do_weak : forall x0 x1 y0 y1 y2 y3 y4 a, 
+  weak_sim termLTS termLTS x0 y0 ->
+  weak termLTS x0 (Some a) x1 ->
+  termLTS y0 None y1 -> 
+  silent termLTS y1 y2 ->
+  termLTS y2 (Some a) y3 -> 
+  silent termLTS y3 y4 ->
+  weak termLTS y0 (Some a) y4.
+Proof. intros ? ? ? ? y2 y3; intros. exists y2, y3. eauto with rel_db. Qed. *)
+
+(* Lemma wsim_explore_silent1 : 
+  forall x0 y0, weak_sim termLTS termLTS x0 y0 ->
+  forall x1, silent1 termLTS x0 x1 ->
+  exists x1a, termLTS x0 None x1a /\ silent termLTS x1a x1.
+Proof. intros. inversion H0; subst; [ exists x1 | exists y ].
+  - split; [ apply H1 | apply rt1n_refl ].
+  - split; [ apply H1 | apply clos_t_clos_rt in H2; apply H2 ].
+Qed. *)
+
+(* Lemma wsim_explore_silent :
+  forall x0 y0, weak_sim termLTS termLTS x0 y0 ->
+  forall x1, silent1 termLTS x0 x1 ->
+  (exists y1, silent termLTS y0 y1 /\ weak_sim termLTS termLTS x1 y1) ->
+  (weak_sim termLTS termLTS x1 y0) \/ (
+    exists y1a y1, termLTS y0 None y1a /\ silent termLTS y1a y1
+  ).
+Proof.
+  intros. 
+  apply (@wsim_explore_silent1 x0 y0) in H0; [| apply H].
+
+  inversion H0 as [x1a []]. inversion H1 as [y1a []].
+
+  inversion H4; subst; [ left; apply H5 | right; exists y1a ].
+
+  inversion H7; exists y1a; subst; [ split; [ apply H6 | apply rt1n_refl ] |].
+  
+  split; [| apply rt1n_refl].
+
+  (* NOTE: from here we need the information from the plugin. *)
+  (* NOTE: I.e., next state reached *)
+
+
+Admitted. *)
+End Lemmas.
 
 (****************************************************************************)
 (* NOTE: makes goals easier to read, e.g., [H : tend = t] -> [H : t = tend] *)
@@ -206,57 +257,25 @@ Section Test2.
   Proof.
     solve_wsim.
     {
-      (* NOTE: are we to use the plugin to provide the following? *)
-      remember (tsubst y0 (tseq (tpar (tact (recv A) tend) 
-                                      (tact (send A) tend)) 
-                                (tseq (tpar (tact (send A) tend) 
-                                            (tact (recv A) tend)) trec))) 
-      as y1 eqn:Hy1; compute in Hy1; rewrite Hy0 in Hy1. 
-
-      remember (tseq (tpar (tact (send A) tend) 
-                           (tact (recv A) tend)) 
-                     (tseq (tpar (tact (send A) tend) 
-                                 (tact (recv A) tend)) 
-                           (tfix (tseq (tpar (tact (recv A) tend) 
-                                             (tact (send A) tend)) 
-                                       (tseq (tpar (tact (send A) tend) 
-                                                   (tact (recv A) tend)) trec)))))
-      as y2 eqn:Hy2.
-
-      remember (tseq (tpar tend tend) 
-                     (tseq (tpar (tact (send A) tend) 
-                                 (tact (recv A) tend)) 
-                           (tfix (tseq (tpar (tact (recv A) tend) 
-                                             (tact (send A) tend)) 
-                                       (tseq (tpar (tact (send A) tend) 
-                                                   (tact (recv A) tend)) trec)))))
-      as y3 eqn:Hy3.
-
-      exists y3; split; [rewrite Hy3 |].
-      { unfold weak. exists y2, y3.
-        apply Pack_weak. 
-        - rewrite Hy2.
-          (* apply do_fix. *)
-          (* apply do_comm. *)
-          admit.
-        - rewrite Hy2, Hy3. 
-          apply do_seq. 
-          (* apply do_handshake. *)
-          admit.
-        - rewrite <- Hy3. apply rt1n_refl. }
+      eexists. split. 
       {
-        wsim_case_weak_action_filter_from_silent Htx0.
-        (* TODO: determine a cleaner [x1] *)
 
-        (* need to figure out what [x1] could be before continuing *)
-        - wsim_next. admit. admit.
-        - wsim_next. admit. admit.
-        - admit.  
-        - admit.  
-        - admit.
+
+        (* unfold weak. do 2 eexists. apply Pack_weak. *)
+
+        (* eapply do_fix. *)
+
+
+        unfold weak. eapply silent_leading_weakly_visible.
+        - eapply expand_silent1. (* can keep expanding until we find the right term. *)
+          + eapply is_silent1. eapply do_fix; compute. trivial.
+          + eapply is_silent, is_silent1. eapply do_seq, do_comm. 
+        - eapply do_seq.
+          eapply do_handshake. 
+          eauto with rel_db. 
       }
+
     }
-    { admit. }
 
   Admitted.
 

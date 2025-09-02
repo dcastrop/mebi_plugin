@@ -66,8 +66,8 @@ Inductive termLTS : term -> option label -> term -> Prop :=
 | do_end : termLTS tend None tend
 
 (* These below capture "structural congruence": using "silent" transitions *)
-| do_fix    : forall t, 
-    termLTS (tfix t) None (tsubst (tfix t) t)
+| do_fix    : forall t t', t' = tsubst (tfix t) t ->
+    termLTS (tfix t) None t'
 
 | do_comm   : forall tl tr, 
     termLTS (tpar tl tr) None (tpar tr tl)
