@@ -2,10 +2,25 @@ Require Import MEBI.loader.
 
 Inductive label : Set := | A | B | C.
 
+Definition label_eq (a b:label) : bool :=
+  match a, b with
+  | A, A => true
+  | B, B => true
+  | C, C => true
+  | _, _ => false
+  end.
+
 Inductive action : Set := 
 | send : label -> action 
 | recv : label -> action 
 .
+
+Definition action_eq (a b:action) : bool :=
+  match a, b with
+  | send a, send b => label_eq a b
+  | recv a, recv b => label_eq a b
+  | _, _ => false
+  end.
 
 Inductive term : Set :=
 | trec : term
@@ -15,6 +30,17 @@ Inductive term : Set :=
 | tpar : term -> term -> term 
 | tseq : term -> term -> term 
 .
+
+Fixpoint term_eq (a b:term) : bool :=
+  match a, b with
+  | trec, trec => true
+  | tend, tend => true
+  | tfix a, tfix b => term_eq a b
+  | tact a ac, tact b bc => action_eq a b && term_eq ac bc
+  | tpar al ar, tpar bl br => term_eq al bl && term_eq ar br
+  | tseq al ar, tseq bl br => term_eq al bl && term_eq ar br
+  | _, _ => false
+  end.
 
 Fixpoint tsubst (t1 : term) (t2 : term) :=
   match t2 with
