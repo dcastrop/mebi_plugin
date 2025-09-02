@@ -12,62 +12,17 @@ Require Import Relation_Definitions.
 Require Import Relation_Operators.
 Require Operators_Properties.
 
-  (****************************************************************************)
+(****************************************************************************)
 
-  Lemma is_strong : forall t1 t2 a, 
-    termLTS t1 (Some a) t2 -> weak termLTS t1 (Some a) t2.
-  Proof. intros. exists t1, t2. apply Pack_weak; try constructor; apply H. Qed.
+Lemma is_strong : forall t1 t2 a, 
+  termLTS t1 (Some a) t2 -> weak termLTS t1 (Some a) t2.
+Proof. intros. exists t1, t2. apply Pack_weak; try constructor; apply H. Qed.
 
-  Lemma is_silent1 : forall t1 t2, termLTS t1 None t2 -> silent1 termLTS t1 t2.
-  Proof. intros. inversion H; constructor; constructor; apply H0. Qed.
+Lemma is_silent1 : forall t1 t2, termLTS t1 None t2 -> silent1 termLTS t1 t2.
+Proof. intros. inversion H; constructor; constructor; apply H0. Qed.
 
-  Lemma is_silent : forall x y, silent1 termLTS x y -> silent termLTS x y.
-  Proof. intros. eauto with rel_db. Qed.
-
-  (* NOTE: x => y *)
-  (* Lemma do_weak : forall x0 x1 y0 y1 y2 y3 y4 a, 
-    weak_sim termLTS termLTS x0 y0 ->
-    weak termLTS x0 (Some a) x1 ->
-    termLTS y0 None y1 -> 
-    silent termLTS y1 y2 ->
-    termLTS y2 (Some a) y3 -> 
-    silent termLTS y3 y4 ->
-    weak termLTS y0 (Some a) y4.
-  Proof. intros ? ? ? ? y2 y3; intros. exists y2, y3. eauto with rel_db. Qed. *)
-
-  (* Lemma wsim_explore_silent1 : 
-    forall x0 y0, weak_sim termLTS termLTS x0 y0 ->
-    forall x1, silent1 termLTS x0 x1 ->
-    exists x1a, termLTS x0 None x1a /\ silent termLTS x1a x1.
-  Proof. intros. inversion H0; subst; [ exists x1 | exists y ].
-    - split; [ apply H1 | apply rt1n_refl ].
-    - split; [ apply H1 | apply clos_t_clos_rt in H2; apply H2 ].
-  Qed. *)
-
-  (* Lemma wsim_explore_silent :
-    forall x0 y0, weak_sim termLTS termLTS x0 y0 ->
-    forall x1, silent1 termLTS x0 x1 ->
-    (exists y1, silent termLTS y0 y1 /\ weak_sim termLTS termLTS x1 y1) ->
-    (weak_sim termLTS termLTS x1 y0) \/ (
-      exists y1a y1, termLTS y0 None y1a /\ silent termLTS y1a y1
-    ).
-  Proof.
-    intros. 
-    apply (@wsim_explore_silent1 x0 y0) in H0; [| apply H].
-
-    inversion H0 as [x1a []]. inversion H1 as [y1a []].
-
-    inversion H4; subst; [ left; apply H5 | right; exists y1a ].
-
-    inversion H7; exists y1a; subst; [ split; [ apply H6 | apply rt1n_refl ] |].
-    
-    split; [| apply rt1n_refl].
-
-    (* NOTE: from here we need the information from the plugin. *)
-    (* NOTE: I.e., next state reached *)
-
-
-  Admitted. *)
+Lemma is_silent : forall x y, silent1 termLTS x y -> silent termLTS x y.
+Proof. intros. eauto with rel_db. Qed.
 
 (****************************************************************************)
 Record rss_action : Type := { the_action   : option label
@@ -175,6 +130,16 @@ Inductive valid_statespace : list rss_state -> Prop :=
                 forall dest, Is_action_of from a dest r ->
                 termLTS from a dest -> valid_statespace r
 .
+
+(* Lemma is_valid_statespace : forall r, valid_statespace r -> Is_valid_statespace r.
+Proof. intros. induction r; [simpl; trivial |].
+
+  apply
+
+  inversion H; subst.
+
+  inversion H; subst; [simpl; trivial |].
+  unfold Is_valid_statespace. compute. compute. *)
 
 (* Lemma is_valid_statespace 
 : forall r, valid_statespace r -> 
@@ -412,37 +377,30 @@ Section Test2.
 
   (****************************************************************************)
   
-  (* Definition p_states : list rss_state := 
+  Definition p_states : list rss_state := 
     [ Build_rss_state p  [ Build_rss_action None [p1] ]
     ; Build_rss_state p1 [ Build_rss_action None [p2]; Build_rss_action (Some A) [p3] ]
     ; Build_rss_state p2 [ Build_rss_action None [p1] ] 
     ; Build_rss_state p3 [ Build_rss_action None [p3; p4] ] 
-    ; Build_rss_state p4 [ Build_rss_action None [p] ] ]. *)
+    ; Build_rss_state p4 [ Build_rss_action None [p] ] ].
 
-  Definition p_states : raw_statespace := 
-    [ (p,  [ (None, [p1]) ])
-    ; (p1, [ (None, [p2]); (Some A, [p3]) ])
-    ; (p2, [ (None, [p1]) ]) 
-    ; (p3, [ (None, [p3; p4]) ]) 
-    ; (p4, [ (None, [p]) ]) ].
+  Definition q_states : list rss_state := 
+    [ Build_rss_state q  [ Build_rss_action None [q1] ]
+    ; Build_rss_state q1 [ Build_rss_action None [q2] ]
+    ; Build_rss_state q2 [ Build_rss_action None [q1]; Build_rss_action (Some A) [q3] ]
+    ; Build_rss_state q3 [ Build_rss_action None [q3; q4] ]
+    ; Build_rss_state q4 [ Build_rss_action None [q5] ]
+    ; Build_rss_state q5 [ Build_rss_action None [q6]; Build_rss_action (Some A) [q7] ]
+    ; Build_rss_state q6 [ Build_rss_action None [q5] ]
+    ; Build_rss_state q7 [ Build_rss_action None [q7; q8] ]
+    ; Build_rss_state q8 [ Build_rss_action None [q] ] ].
 
-  Definition q_states : raw_statespace := 
-    [ (q,  [ (None, [q1]) ])
-    ; (q1, [ (None, [q2]) ])
-    ; (q2, [ (None, [q1]); (Some A, [q3]) ])
-    ; (q3, [ (None, [q3; q4]) ])
-    ; (q4, [ (None, [q5]) ])
-    ; (q5, [ (None, [q6]); (Some A, [q7]) ])
-    ; (q6, [ (None, [q5]) ])
-    ; (q7, [ (None, [q7; q8]) ])
-    ; (q8, [ (None, [q]) ]) ].
-
-  Definition r_states : raw_statespace := 
-    [ (r,  [ (None, [r1]) ])
-    ; (r1, [ (None, [r]); (Some A, [r2]) ])
-    ; (r2, [ (None, [r2; r3]) ])
-    ; (r3, [ (None, [r4]) ])
-    ; (r4, [ (None, [r1]) ]) ].
+  Definition r_states : list rss_state := 
+    [ Build_rss_state r  [ Build_rss_action None [r1] ]
+    ; Build_rss_state r1 [ Build_rss_action None [r]; Build_rss_action (Some A) [r2] ]
+    ; Build_rss_state r2 [ Build_rss_action None [r2; r3] ]
+    ; Build_rss_state r3 [ Build_rss_action None [r4] ]
+    ; Build_rss_state r4 [ Build_rss_action None [r1] ] ].
 
   (****************************************************************************)
   (* NOTE: quick checks to see if current ltac breaks any of the other cases *)
@@ -455,8 +413,27 @@ Section Test2.
 
   (****************************************************************************)
   (* NOTE: below is the "hands-on" proof for testing *)
+
+  Lemma rss_implies_action 
+  : forall r, valid_statespace r -> 
+    forall from a dest, Is_action_of from a dest r -> termLTS from a dest.
+  Proof.
+    intros r H. 
+
+
+  Lemma find_actions_of : forall x0 x1 y a (xstates:list rss_state), 
+    weak_sim_termLTS termLTS x0 y ->
+    weak termLTS x0 a x1 -> 
+    exists xactions, 
+    
+
+  (* Lemma explore_rss : forall  *)
+
+
+
+
   Example wsim_testing : forall x y,
-    forall (xstates ystates : raw_statespace),
+    forall (xstates ystates : list rss_state),
     xstates = p_states -> ystates = q_states -> x = p -> y = q -> 
     (* xstates = p_states -> ystates = r_states -> x = p -> y = r -> *)
     (* xstates = q_states -> ystates = p_states -> x = q -> y = p -> *)
@@ -474,6 +451,11 @@ Section Test2.
   Proof.
     (* solve_wsim. *)
     solve_wsim_with_states. 
+
+    match goal with
+    | [ |- _ ] => idtac
+    end.
+
 
     (* TODO: inductively define statespaces for the lists, which ensure there is a transition *)
     (* TODO: make ltac that use the provided information *)
