@@ -20,28 +20,12 @@ Require Operators_Properties.
 
   Lemma is_silent1 : forall t1 t2, termLTS t1 None t2 -> silent1 termLTS t1 t2.
   Proof. intros. inversion H; constructor; constructor; apply H0. Qed.
-  
-  Lemma is_silent1_start : forall x1 x2 x3,
-    termLTS x1 None x2 -> silent termLTS x2 x3 -> silent1 termLTS x1 x3.
-  Proof. intros x1 x2 x3 Ht12 Hs23. eauto with rel_db. Qed.
 
-  Lemma is_silent : forall t1 t2, termLTS t1 None t2 -> silent termLTS t1 t2.
-  Proof. intros. 
-    inversion H; apply clos_t_clos_rt; constructor; constructor. apply H0. Qed.
-
-  Lemma silent_with_silent1_start : forall x1 x2 x3,
-    termLTS x1 None x2 ->
-    silent termLTS x2 x3 ->
-    silent termLTS x1 x3.
-  Proof. intros x1 x2 x3 Ht12 Hs23. eauto with rel_db. Qed.
-  (* Proof. intros x1 x2 x3 Ht12 Hs23. unfold silent. unfold silent in Hs23.
-    apply clos_t_clos_rt.
-    apply (@clos_rt_clos_t _ (tau termLTS) x1 x2 x3); [| apply Hs23 ].
-    eauto with rel_db.
-  Qed. *)
+  Lemma is_silent : forall x y, silent1 termLTS x y -> silent termLTS x y.
+  Proof. intros. eauto with rel_db. Qed.
 
   (* NOTE: x => y *)
-  Lemma do_weak : forall x0 x1 y0 y1 y2 y3 y4 a, 
+  (* Lemma do_weak : forall x0 x1 y0 y1 y2 y3 y4 a, 
     weak_sim termLTS termLTS x0 y0 ->
     weak termLTS x0 (Some a) x1 ->
     termLTS y0 None y1 -> 
@@ -49,25 +33,18 @@ Require Operators_Properties.
     termLTS y2 (Some a) y3 -> 
     silent termLTS y3 y4 ->
     weak termLTS y0 (Some a) y4.
-  Proof. 
-    intros x0 x1 y0 y1 y2 y3 y4 a Hws Hwx Hty01 Hsy12 Hwy23 Hsy34. 
-    exists y2, y3. eauto with rel_db. 
-    (* apply Pack_weak.
-    - apply (@silent_with_silent1_start y0 y1 y2 Hty01 Hsy12).
-    - apply Hwy23.
-    - apply Hsy34. *)
-  Qed.  
+  Proof. intros ? ? ? ? y2 y3; intros. exists y2, y3. eauto with rel_db. Qed. *)
 
-  Lemma wsim_explore_silent1 : 
+  (* Lemma wsim_explore_silent1 : 
     forall x0 y0, weak_sim termLTS termLTS x0 y0 ->
     forall x1, silent1 termLTS x0 x1 ->
     exists x1a, termLTS x0 None x1a /\ silent termLTS x1a x1.
   Proof. intros. inversion H0; subst; [ exists x1 | exists y ].
     - split; [ apply H1 | apply rt1n_refl ].
     - split; [ apply H1 | apply clos_t_clos_rt in H2; apply H2 ].
-  Qed.
+  Qed. *)
 
-  Lemma wsim_explore_silent :
+  (* Lemma wsim_explore_silent :
     forall x0 y0, weak_sim termLTS termLTS x0 y0 ->
     forall x1, silent1 termLTS x0 x1 ->
     (exists y1, silent termLTS y0 y1 /\ weak_sim termLTS termLTS x1 y1) ->
@@ -88,7 +65,132 @@ Require Operators_Properties.
 
     (* NOTE: from here we need the information from the plugin. *)
     (* NOTE: I.e., next state reached *)
-  Admitted.
+
+
+  Admitted. *)
+
+(****************************************************************************)
+Record rss_action : Type := { the_action   : option label
+                            ; destinations : list term   }.
+
+Record rss_state : Type := { the_state : term
+                           ; actions   : list rss_action }.
+
+Fixpoint Is_valid_action (from:term) (a:option label) (ds:list term) : Prop :=
+  match ds with
+  | [] => True
+  | h :: t => termLTS from a h /\ Is_valid_action from a t
+  end.
+
+Fixpoint Is_valid_state (from:term) (acts:list rss_action) : Prop :=
+  match acts with
+  | [] => True
+  | h :: t => Is_valid_action from (the_action h) (destinations h) /\ 
+              Is_valid_state from t
+  end.
+
+Fixpoint Is_valid_statespace (r:list rss_state) : Prop :=
+  match r with
+  | [] => True
+  | h :: t => Is_valid_state (the_state h) (actions h) /\ 
+              Is_valid_statespace t
+  end.
+
+(****************************************************************************)
+Fixpoint is_outgoing_state (tm:term) (r:list rss_state) : bool :=
+  match r with
+  | [] => false
+  | h :: t =>
+    if term_eq tm (the_state h) then true else is_outgoing_state tm t
+  end.
+Definition Is_outgoing_state (tm:term) (r:list rss_state) : Prop :=
+  Bool.Is_true (is_outgoing_state tm r).
+
+Fixpoint is_outgoing_action (a:option label) (r:list rss_action) : bool :=
+  match r with
+  | [] => false
+  | h :: t =>
+    match a, (the_action h) with
+    | None, None => true
+    | Some b, Some c => if label_eq b c then true else is_outgoing_action a t 
+    | _, _ => is_outgoing_action a t 
+    end
+  end.
+Definition Is_outgoing_action (a:option label) (r:list rss_action) : Prop :=
+  Bool.Is_true (is_outgoing_action a r).
+
+Fixpoint is_outgoing_action_from (from:term) (a:option label) (r:list rss_state) 
+: bool :=
+  match r with
+  | [] => false
+  | h :: t =>
+    if term_eq from (the_state h) 
+    then is_outgoing_action a (actions h) 
+    else is_outgoing_action_from from a t
+  end.
+Definition Is_outgoing_action_from (from:term) (a:option label) (r:list rss_state) 
+: Prop :=
+  Bool.Is_true (is_outgoing_action_from from a r).
+
+Fixpoint is_state_in (s:term) (r:list term) : bool :=
+  match r with
+  | [] => false
+  | h :: t => term_eq s h && is_state_in s t
+  end.
+Definition Is_state_in (s:term) (r:list term) : Prop := Bool.Is_true (is_state_in s r).
+
+Fixpoint is_destination_of_action (a:option label) (dest:term) (r:list rss_action) : bool :=
+  match r with
+  | [] => false
+  | h :: t =>
+    match a, (the_action h) with
+    | None, None => is_state_in dest (destinations h)
+    | Some b, Some c => 
+      if label_eq b c then is_state_in dest (destinations h) 
+      else is_destination_of_action a dest t 
+    | _, _ => is_destination_of_action a dest t 
+    end
+  end.
+Definition Is_destination_of_action (a:option label) (dest:term) (r:list rss_action) : Prop :=
+  Bool.Is_true (is_destination_of_action a dest r).
+
+Fixpoint is_action_of (s:term) (a:option label) (dest:term) (r:list rss_state) : bool :=
+  match r with
+  | [] => false
+  | h :: t =>
+    if term_eq s (the_state h) 
+    then is_destination_of_action a dest (actions h) 
+    else is_action_of s a dest t
+  end.
+Definition Is_action_of (s:term) (a:option label) (dest:term) (r:list rss_state) : Prop :=
+  Bool.Is_true (is_action_of s a dest r).
+
+
+(****************************************************************************)
+Inductive valid_statespace : list rss_state -> Prop :=
+| empty : valid_statespace []
+
+| state_trans : forall r from, Is_outgoing_state from r ->
+                forall a, Is_outgoing_action_from from a r ->
+                forall dest, Is_action_of from a dest r ->
+                termLTS from a dest -> valid_statespace r
+.
+
+(* Lemma is_valid_statespace 
+: forall r, valid_statespace r -> 
+  forall from a dest, Is_action_of from a dest r -> termLTS from a dest.
+Proof.
+  intros.  *)
+
+(****************************************************************************)
+
+(* Lemma explore_statespace_l : forall x0 x1 a rss,
+  valid_statespace rss ->
+  termLTS x0 a x1 ->
+  In x1 (get_dests_from x0 a rss).
+Proof. 
+  intros. 
+  inversion H; subst. *)
 
 (****************************************************************************)
 (* NOTE: makes goals easier to read, e.g., [H : tend = t] -> [H : t = tend] *)
@@ -184,8 +286,8 @@ Ltac wsim_pre_cofix_unfold :=
   let Hx := fresh "Hx0" in intros Hx;
   let Hy := fresh "Hy0" in intros Hy;
   match goal with 
-  | [ Hx : ?x = ?vx, Hy : ?y = ?vy 
-    |- @weak_sim _ _ _ _ _ ?x ?y ] => unfold vx, vy in Hx, Hy; wsim_new_cofix
+  | [ Hx : x = ?vx, Hy : y = ?vy 
+    |- @weak_sim _ _ _ _ _ x y ] => unfold vx, vy in Hx, Hy; wsim_new_cofix
   end.
 Tactic Notation "solve_wsim" := wsim_pre_cofix_unfold.
 
@@ -199,8 +301,12 @@ Ltac wsim_pre_cofix_unfold_with_states :=
   let Hx := fresh "Hx0" in intros Hx;
   let Hy := fresh "Hy0" in intros Hy;
   match goal with 
-  | [ Hx : ?x = ?vx, Hy : ?y = ?vy 
-    |- @weak_sim _ _ _ _ _ ?x ?y ] => unfold vx, vy in Hx, Hy; wsim_new_cofix
+  | [ Hx : x = ?vx, Hy : y = ?vy 
+    , HMx : xstates = ?vxstates, HMy : ystates = ?vystates
+    |- @weak_sim _ _ _ _ _ x y ] => 
+      unfold vx in Hx; unfold vy in Hy; 
+      unfold vxstates in HMx; unfold vystates in HMy; 
+      wsim_new_cofix
   end.
 Tactic Notation "solve_wsim_with_states" := wsim_pre_cofix_unfold_with_states.
 
@@ -218,27 +324,6 @@ Section Test2.
                                  (tact (send A) tend)) 
                            (tfix (tseq (tpar (tact (send A) tend) 
                                              (tact (recv A) tend)) trec)).
-
-  (****************************************************************************)
-
-  Definition raw_statespace : Type := list (term * list (option label * list term)).
-
-  Inductive valid_statespace : raw_statespace -> Prop :=
-  | empty : valid_statespace []
-  
-  | state_trans : forall from d a dests actions tail, 
-      termLTS from a d ->
-      valid_statespace ((from, (a, dests) :: actions) :: tail) -> 
-      valid_statespace ((from, (a, d::dests) :: actions) :: tail)
-
-  | next_actions : forall from a actions tail, 
-      valid_statespace ((from, actions) :: tail) -> 
-      valid_statespace ((from, (a, []) :: actions) :: tail)
-
-  | next_states : forall from tail, 
-      valid_statespace tail -> 
-      valid_statespace ((from, []) :: tail)
-  .
 
   (****************************************************************************)
   (* NOTE: these would be obtained via the plugin *)
@@ -327,31 +412,37 @@ Section Test2.
 
   (****************************************************************************)
   
-  Definition p_states := valid_statespace
+  (* Definition p_states : list rss_state := 
+    [ Build_rss_state p  [ Build_rss_action None [p1] ]
+    ; Build_rss_state p1 [ Build_rss_action None [p2]; Build_rss_action (Some A) [p3] ]
+    ; Build_rss_state p2 [ Build_rss_action None [p1] ] 
+    ; Build_rss_state p3 [ Build_rss_action None [p3; p4] ] 
+    ; Build_rss_state p4 [ Build_rss_action None [p] ] ]. *)
+
+  Definition p_states : raw_statespace := 
     [ (p,  [ (None, [p1]) ])
     ; (p1, [ (None, [p2]); (Some A, [p3]) ])
     ; (p2, [ (None, [p1]) ]) 
     ; (p3, [ (None, [p3; p4]) ]) 
     ; (p4, [ (None, [p]) ]) ].
 
-  (* TODO: update below similar to above *)
-  Definition q_states : list (term * list term) := 
-    [ (q,  [q1])
-    ; (q1, [q2])
-    ; (q2, [q1; q3])
-    ; (q3, [q3; q4])
-    ; (q4, [q5])
-    ; (q5, [q6; q7])
-    ; (q6, [q5])
-    ; (q7, [q7; q8])
-    ; (q8, [q]) ].
+  Definition q_states : raw_statespace := 
+    [ (q,  [ (None, [q1]) ])
+    ; (q1, [ (None, [q2]) ])
+    ; (q2, [ (None, [q1]); (Some A, [q3]) ])
+    ; (q3, [ (None, [q3; q4]) ])
+    ; (q4, [ (None, [q5]) ])
+    ; (q5, [ (None, [q6]); (Some A, [q7]) ])
+    ; (q6, [ (None, [q5]) ])
+    ; (q7, [ (None, [q7; q8]) ])
+    ; (q8, [ (None, [q]) ]) ].
 
-  Definition r_states : list (term * list term) := 
-    [ (r,  [r1])
-    ; (r1, [r; r2])
-    ; (r2, [r2; r3])
-    ; (r3, [r4])
-    ; (r4, [r1]) ].
+  Definition r_states : raw_statespace := 
+    [ (r,  [ (None, [r1]) ])
+    ; (r1, [ (None, [r]); (Some A, [r2]) ])
+    ; (r2, [ (None, [r2; r3]) ])
+    ; (r3, [ (None, [r4]) ])
+    ; (r4, [ (None, [r1]) ]) ].
 
   (****************************************************************************)
   (* NOTE: quick checks to see if current ltac breaks any of the other cases *)
@@ -365,10 +456,15 @@ Section Test2.
   (****************************************************************************)
   (* NOTE: below is the "hands-on" proof for testing *)
   Example wsim_testing : forall x y,
-    forall (xstates ystates : list (term * list term)),
-    xstates = p_states -> ystates = q_states ->
+    forall (xstates ystates : raw_statespace),
+    xstates = p_states -> ystates = q_states -> x = p -> y = q -> 
+    (* xstates = p_states -> ystates = r_states -> x = p -> y = r -> *)
+    (* xstates = q_states -> ystates = p_states -> x = q -> y = p -> *)
+    (* xstates = q_states -> ystates = r_states -> x = q -> y = r -> *)
+    (* xstates = r_states -> ystates = p_states -> x = r -> y = p -> *)
+    (* xstates = r_states -> ystates = q_states -> x = r -> y = q -> *)
     (*********************)
-    x = p -> y = q -> 
+    (* x = p -> y = q ->  *)
     (* x = p -> y = r -> *)
     (* x = q -> y = p -> *)
     (* x = q -> y = r -> *)
@@ -377,7 +473,7 @@ Section Test2.
     weak_sim termLTS termLTS x y.
   Proof.
     (* solve_wsim. *)
-    solve_wsim_with_states.
+    solve_wsim_with_states. 
 
     (* TODO: inductively define statespaces for the lists, which ensure there is a transition *)
     (* TODO: make ltac that use the provided information *)
