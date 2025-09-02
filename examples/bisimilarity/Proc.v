@@ -70,129 +70,6 @@ Require Operators_Properties.
   Admitted. *)
 
 (****************************************************************************)
-Record rss_action : Type := { the_action   : option label
-                            ; destinations : list term   }.
-
-Record rss_state : Type := { the_state : term
-                           ; actions   : list rss_action }.
-
-Fixpoint Is_valid_action (from:term) (a:option label) (ds:list term) : Prop :=
-  match ds with
-  | [] => True
-  | h :: t => termLTS from a h /\ Is_valid_action from a t
-  end.
-
-Fixpoint Is_valid_state (from:term) (acts:list rss_action) : Prop :=
-  match acts with
-  | [] => True
-  | h :: t => Is_valid_action from (the_action h) (destinations h) /\ 
-              Is_valid_state from t
-  end.
-
-Fixpoint Is_valid_statespace (r:list rss_state) : Prop :=
-  match r with
-  | [] => True
-  | h :: t => Is_valid_state (the_state h) (actions h) /\ 
-              Is_valid_statespace t
-  end.
-
-(****************************************************************************)
-Fixpoint is_outgoing_state (tm:term) (r:list rss_state) : bool :=
-  match r with
-  | [] => false
-  | h :: t =>
-    if term_eq tm (the_state h) then true else is_outgoing_state tm t
-  end.
-Definition Is_outgoing_state (tm:term) (r:list rss_state) : Prop :=
-  Bool.Is_true (is_outgoing_state tm r).
-
-Fixpoint is_outgoing_action (a:option label) (r:list rss_action) : bool :=
-  match r with
-  | [] => false
-  | h :: t =>
-    match a, (the_action h) with
-    | None, None => true
-    | Some b, Some c => if label_eq b c then true else is_outgoing_action a t 
-    | _, _ => is_outgoing_action a t 
-    end
-  end.
-Definition Is_outgoing_action (a:option label) (r:list rss_action) : Prop :=
-  Bool.Is_true (is_outgoing_action a r).
-
-Fixpoint is_outgoing_action_from (from:term) (a:option label) (r:list rss_state) 
-: bool :=
-  match r with
-  | [] => false
-  | h :: t =>
-    if term_eq from (the_state h) 
-    then is_outgoing_action a (actions h) 
-    else is_outgoing_action_from from a t
-  end.
-Definition Is_outgoing_action_from (from:term) (a:option label) (r:list rss_state) 
-: Prop :=
-  Bool.Is_true (is_outgoing_action_from from a r).
-
-Fixpoint is_state_in (s:term) (r:list term) : bool :=
-  match r with
-  | [] => false
-  | h :: t => term_eq s h && is_state_in s t
-  end.
-Definition Is_state_in (s:term) (r:list term) : Prop := Bool.Is_true (is_state_in s r).
-
-Fixpoint is_destination_of_action (a:option label) (dest:term) (r:list rss_action) : bool :=
-  match r with
-  | [] => false
-  | h :: t =>
-    match a, (the_action h) with
-    | None, None => is_state_in dest (destinations h)
-    | Some b, Some c => 
-      if label_eq b c then is_state_in dest (destinations h) 
-      else is_destination_of_action a dest t 
-    | _, _ => is_destination_of_action a dest t 
-    end
-  end.
-Definition Is_destination_of_action (a:option label) (dest:term) (r:list rss_action) : Prop :=
-  Bool.Is_true (is_destination_of_action a dest r).
-
-Fixpoint is_action_of (s:term) (a:option label) (dest:term) (r:list rss_state) : bool :=
-  match r with
-  | [] => false
-  | h :: t =>
-    if term_eq s (the_state h) 
-    then is_destination_of_action a dest (actions h) 
-    else is_action_of s a dest t
-  end.
-Definition Is_action_of (s:term) (a:option label) (dest:term) (r:list rss_state) : Prop :=
-  Bool.Is_true (is_action_of s a dest r).
-
-
-(****************************************************************************)
-Inductive valid_statespace : list rss_state -> Prop :=
-| empty : valid_statespace []
-
-| state_trans : forall r from, Is_outgoing_state from r ->
-                forall a, Is_outgoing_action_from from a r ->
-                forall dest, Is_action_of from a dest r ->
-                termLTS from a dest -> valid_statespace r
-.
-
-(* Lemma is_valid_statespace 
-: forall r, valid_statespace r -> 
-  forall from a dest, Is_action_of from a dest r -> termLTS from a dest.
-Proof.
-  intros.  *)
-
-(****************************************************************************)
-
-(* Lemma explore_statespace_l : forall x0 x1 a rss,
-  valid_statespace rss ->
-  termLTS x0 a x1 ->
-  In x1 (get_dests_from x0 a rss).
-Proof. 
-  intros. 
-  inversion H; subst. *)
-
-(****************************************************************************)
 (* NOTE: makes goals easier to read, e.g., [H : tend = t] -> [H : t = tend] *)
 Ltac ltr_goals :=
   repeat match goal with
@@ -291,25 +168,6 @@ Ltac wsim_pre_cofix_unfold :=
   end.
 Tactic Notation "solve_wsim" := wsim_pre_cofix_unfold.
 
-Ltac wsim_pre_cofix_unfold_with_states :=
-  let x := fresh "x0" in intros x;
-  let y := fresh "y0" in intros y;
-  let xstates := fresh "xstates0" in intros xstates;
-  let ystates := fresh "ystates0" in intros ystates;
-  let HMx := fresh "HMx0" in intros HMx;
-  let HMy := fresh "HMy0" in intros HMy;
-  let Hx := fresh "Hx0" in intros Hx;
-  let Hy := fresh "Hy0" in intros Hy;
-  match goal with 
-  | [ Hx : x = ?vx, Hy : y = ?vy 
-    , HMx : xstates = ?vxstates, HMy : ystates = ?vystates
-    |- @weak_sim _ _ _ _ _ x y ] => 
-      unfold vx in Hx; unfold vy in Hy; 
-      unfold vxstates in HMx; unfold vystates in HMy; 
-      wsim_new_cofix
-  end.
-Tactic Notation "solve_wsim_with_states" := wsim_pre_cofix_unfold_with_states.
-
 (****************************************************************************)
 Section Test2.
   Example p : term := tfix (tseq (tpar (tact (send A) tend) 
@@ -326,125 +184,6 @@ Section Test2.
                                              (tact (recv A) tend)) trec)).
 
   (****************************************************************************)
-  (* NOTE: these would be obtained via the plugin *)
-  Example p1 : term := tseq (tpar (tact (send A) tend) 
-                                  (tact (recv A) tend)) 
-                            (tfix (tseq (tpar (tact (send A) tend) 
-                                              (tact (recv A) tend)) trec)).
-  Example p2 : term := tseq (tpar (tact (recv A) tend) 
-                                  (tact (send A) tend)) 
-                            (tfix (tseq (tpar (tact (send A) tend) 
-                                              (tact (recv A) tend)) trec)).
-  Example p3 : term := tseq (tpar tend tend) 
-                            (tfix (tseq (tpar (tact (send A) tend) 
-                                              (tact (recv A) tend)) trec)).
-  Example p4 : term := tseq tend 
-                            (tfix (tseq (tpar (tact (send A) tend) 
-                                              (tact (recv A) tend)) trec)).
-
-  (* NOTE: these would be obtained via the plugin *)
-  Example q1 : term := tseq (tpar (tact (recv A) tend) 
-                                  (tact (send A) tend)) 
-                            (tseq (tpar (tact (send A) tend) 
-                                        (tact (recv A) tend)) 
-                                  (tfix (tseq (tpar (tact (recv A) tend) 
-                                                    (tact (send A) tend)) 
-                                              (tseq (tpar (tact (send A) tend) 
-                                                          (tact (recv A) tend)) trec)))).
-  Example q2 : term := tseq (tpar (tact (send A) tend) 
-                                  (tact (recv A) tend)) 
-                            (tseq (tpar (tact (send A) tend) 
-                                        (tact (recv A) tend)) 
-                                  (tfix (tseq (tpar (tact (recv A) tend) 
-                                                    (tact (send A) tend)) 
-                                              (tseq (tpar (tact (send A) tend) 
-                                                          (tact (recv A) tend)) trec)))).
-  Example q3 : term := tseq (tpar tend tend) 
-                            (tseq (tpar (tact (send A) tend) 
-                                        (tact (recv A) tend)) 
-                                  (tfix (tseq (tpar (tact (recv A) tend) 
-                                                    (tact (send A) tend)) 
-                                              (tseq (tpar (tact (send A) tend) 
-                                                          (tact (recv A) tend)) trec)))).
-  Example q4 : term := tseq tend 
-                            (tseq (tpar (tact (send A) tend) 
-                                        (tact (recv A) tend)) 
-                                  (tfix (tseq (tpar (tact (recv A) tend) 
-                                                    (tact (send A) tend)) 
-                                              (tseq (tpar (tact (send A) tend) 
-                                                          (tact (recv A) tend)) trec)))).
-  Example q5 : term := tseq (tpar (tact (send A) tend) 
-                                  (tact (recv A) tend)) 
-                            (tfix (tseq (tpar (tact (recv A) tend) 
-                                              (tact (send A) tend)) 
-                                        (tseq (tpar (tact (send A) tend) 
-                                                    (tact (recv A) tend)) trec))).
-  Example q6 : term := tseq (tpar (tact (recv A) tend) 
-                                  (tact (send A) tend)) 
-                            (tfix (tseq (tpar (tact (recv A) tend) 
-                                              (tact (send A) tend)) 
-                                        (tseq (tpar (tact (send A) tend) 
-                                                    (tact (recv A) tend)) trec))).
-  Example q7 : term := tseq (tpar tend tend) 
-                            (tfix (tseq (tpar (tact (recv A) tend) 
-                                              (tact (send A) tend)) 
-                                        (tseq (tpar (tact (send A) tend) 
-                                                    (tact (recv A) tend)) trec))).
-  Example q8 : term := tseq tend 
-                            (tfix (tseq (tpar (tact (recv A) tend) 
-                                              (tact (send A) tend)) 
-                                        (tseq (tpar (tact (send A) tend) 
-                                                    (tact (recv A) tend)) trec))).
-
-  (* NOTE: these would be obtained via the plugin *)
-  Example r1 : term := tseq (tpar (tact (send A) tend) 
-                                  (tact (recv A) tend)) 
-                            (tfix (tseq (tpar (tact (send A) tend) 
-                                              (tact (recv A) tend)) trec)).
-  Example r2 : term := tseq (tpar tend tend) 
-                            (tfix (tseq (tpar (tact (send A) tend) 
-                                              (tact (recv A) tend)) trec)).
-  Example r3 : term := tseq tend 
-                            (tfix (tseq (tpar (tact (send A) tend) 
-                                              (tact (recv A) tend)) trec)).
-  Example r4 : term := tfix (tseq (tpar (tact (send A) tend) 
-                                        (tact (recv A) tend)) trec).
-
-  (****************************************************************************)
-  
-  (* Definition p_states : list rss_state := 
-    [ Build_rss_state p  [ Build_rss_action None [p1] ]
-    ; Build_rss_state p1 [ Build_rss_action None [p2]; Build_rss_action (Some A) [p3] ]
-    ; Build_rss_state p2 [ Build_rss_action None [p1] ] 
-    ; Build_rss_state p3 [ Build_rss_action None [p3; p4] ] 
-    ; Build_rss_state p4 [ Build_rss_action None [p] ] ]. *)
-
-  Definition p_states : raw_statespace := 
-    [ (p,  [ (None, [p1]) ])
-    ; (p1, [ (None, [p2]); (Some A, [p3]) ])
-    ; (p2, [ (None, [p1]) ]) 
-    ; (p3, [ (None, [p3; p4]) ]) 
-    ; (p4, [ (None, [p]) ]) ].
-
-  Definition q_states : raw_statespace := 
-    [ (q,  [ (None, [q1]) ])
-    ; (q1, [ (None, [q2]) ])
-    ; (q2, [ (None, [q1]); (Some A, [q3]) ])
-    ; (q3, [ (None, [q3; q4]) ])
-    ; (q4, [ (None, [q5]) ])
-    ; (q5, [ (None, [q6]); (Some A, [q7]) ])
-    ; (q6, [ (None, [q5]) ])
-    ; (q7, [ (None, [q7; q8]) ])
-    ; (q8, [ (None, [q]) ]) ].
-
-  Definition r_states : raw_statespace := 
-    [ (r,  [ (None, [r1]) ])
-    ; (r1, [ (None, [r]); (Some A, [r2]) ])
-    ; (r2, [ (None, [r2; r3]) ])
-    ; (r3, [ (None, [r4]) ])
-    ; (r4, [ (None, [r1]) ]) ].
-
-  (****************************************************************************)
   (* NOTE: quick checks to see if current ltac breaks any of the other cases *)
   Example wsim_test_pq : forall x y, x = p -> y = q -> weak_sim termLTS termLTS x y. Proof. solve_wsim. Admitted.
   Example wsim_test_pr : forall x y, x = p -> y = r -> weak_sim termLTS termLTS x y. Proof. solve_wsim. Admitted.
@@ -456,15 +195,7 @@ Section Test2.
   (****************************************************************************)
   (* NOTE: below is the "hands-on" proof for testing *)
   Example wsim_testing : forall x y,
-    forall (xstates ystates : raw_statespace),
-    xstates = p_states -> ystates = q_states -> x = p -> y = q -> 
-    (* xstates = p_states -> ystates = r_states -> x = p -> y = r -> *)
-    (* xstates = q_states -> ystates = p_states -> x = q -> y = p -> *)
-    (* xstates = q_states -> ystates = r_states -> x = q -> y = r -> *)
-    (* xstates = r_states -> ystates = p_states -> x = r -> y = p -> *)
-    (* xstates = r_states -> ystates = q_states -> x = r -> y = q -> *)
-    (*********************)
-    (* x = p -> y = q ->  *)
+    x = p -> y = q ->
     (* x = p -> y = r -> *)
     (* x = q -> y = p -> *)
     (* x = q -> y = r -> *)
@@ -472,8 +203,7 @@ Section Test2.
     (* x = r -> y = q -> *)
     weak_sim termLTS termLTS x y.
   Proof.
-    (* solve_wsim. *)
-    solve_wsim_with_states. 
+    solve_wsim.
 
     (* TODO: inductively define statespaces for the lists, which ensure there is a transition *)
     (* TODO: make ltac that use the provided information *)
