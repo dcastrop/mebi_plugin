@@ -12,113 +12,140 @@ Require Import Relation_Definitions.
 Require Import Relation_Operators.
 Require Operators_Properties.
 
+
+(****************************************************************************)
+Ltac silent_to_clos_rt :=
+  repeat match goal with
+  | [ H : @silent _ _ _ ?x ?y |- _ ] => apply Operators_Properties.clos_rt1n_rt in H
+  | [ |- @silent _ _ _ ?x ?y ] => apply Operators_Properties.clos_rt_rt1n
+  | |- _ => idtac
+  end.
+
 (****************************************************************************)
 Section Lemmas.
-  (* Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A). *)
   Context {M A : Type} (lts : LTS M A).
 
-  Lemma is_silent1 : forall t1 t2, lts t1 None t2 -> silent1 lts t1 t2.
-  Proof. intros. auto with rel_db. Qed.
+  (****************************************************************************)
+  Lemma tau_rt_to_silent1 : 
+        forall x y z, tau lts x y -> silent lts y z -> silent1 lts x z.
+  Proof. intros x y z Hxy Hyz. eauto with rel_db. Qed. 
+  Hint Resolve tau_rt_to_silent1 : rel_db.
+  
+  (****************************************************************************)
+  Lemma expand_weak_to_strong : 
+        forall x y a, lts x (Some a) y -> weak lts x (Some a) y.
+  Proof. intros x y a Hxy. exists x, y. auto with rel_db. Qed.
+  Hint Resolve expand_weak_to_strong : rel_db.
+  
+  (****************************************************************************)
+  Lemma is_silent1 : forall x y, lts x None y -> silent1 lts x y.
+  Proof. intros x y Hxy. auto with rel_db. Qed.
+  Hint Resolve is_silent1 : rel_db.
 
   Lemma is_silent : forall x y, silent1 lts x y -> silent lts x y.
-  Proof. intros. auto with rel_db. Qed.
+  Proof. intros x y Hxy. auto with rel_db. Qed.
+  Hint Resolve is_silent : rel_db.
+
+  (****************************************************************************)
+  Lemma expand_silent1 : 
+        forall x y z, silent1 lts x y -> silent lts y z -> 
+                      silent1 lts x z.
+  Proof. intros x y z Hxy Hyz. induction Hxy; eapply clos_rt_clos_t.
+    { exact H. } { exact Hyz. } { exact H. } 
+    { apply clos_t_clos_rt, IHHxy; exact Hyz. }
+  Qed.
+  Hint Resolve expand_silent1 : rel_db.
 
 
-  Lemma expand_silent1 : forall x y z, 
-    silent1 lts x y -> silent lts y z -> silent1 lts x z.
-  Proof. intros x y z Hxy Hyz.
-    inversion Hyz as [| w ? Hyw Hwz ]; subst; [ apply Hxy |].
+  Lemma do_expand_silent1 : 
+        forall x z, silent1 lts x z -> 
+          exists y, silent1 lts x y -> silent lts y z.
+  Proof. intros x z Hxz.
+    induction Hxz. 
+    - exists y. intros. apply rt1n_refl.
+    - exists y. intros. apply clos_t_clos_rt in Hxz. apply Hxz.
+  Qed.
 
-    apply clos_t_clos_rt, Operators_Properties.clos_rt1n_rt in Hxy.
+  (* Lemma do_expand_silent_pre_some : 
+        forall x y z a, silent lts x y -> lts y (Some a) z -> 
+                        silent1 lts x y.
+              (* exists w, silent1 lts x y -> . *)
+  Proof.
+    intros x y z a Hxy Hyz.
+    einduction Hxy.
+    admit.
+    apply is_silent1. 
+    eapply IHs.
 
-    apply Operators_Properties.clos_trans_t1n.
-    apply (@Operators_Properties.clos_rt_t _ _ x y z); [ apply Hxy |].
+    eapply is_silent in Hxy.
 
-    eapply clos_rt_clos_t in Hyz.
-    - 
-      (* eapply Operators_Properties.clos_t1n_trans in Hyz.  *)
-      (* apply (@Operators_Properties.clos_rt_t _ _ ) in Hwz. *)
-      (* eapply (@clos_t_clos_rt _ _ y z) in Hyz. *)
-      (* eapply clos_rt_clos_t in Hyz. *)
-      (* eapply Operators_Properties.clos_rt1n_rt in Hyz. *)
-      (* apply Hyz.  *)
-      
-      (* TODO: determins what ?x will be *)
-      (* eapply Hyz. *)
-  Admitted.
+    induction Hxy.
+     (* eapply clos_rt_clos_t. *)
+    admit.
+  Admitted. *)
 
-
-
-
-  Lemma strong_is_weakly_visible : forall t1 t2 a, 
-    lts t1 (Some a) t2 -> weak lts t1 (Some a) t2.
-  Proof. intros. exists t1, t2. auto with rel_db. Qed.
-
-  Lemma silent_leading_weakly_visible : forall t1 t1b t2 a, 
-    silent1 lts t1 t1b ->
-    lts t1b (Some a) t2 ->
-    weak lts t1 (Some a) t2.
-  Proof. intros. do 2 eexists. eauto with rel_db. Qed.
-
-  Lemma silent_after_weakly_visible : forall t1 t1b t2a t2 a, 
-    silent lts t1 t1b ->
-    lts t1b (Some a) t2 ->
-    silent1 lts t2a t2 ->
-    weak lts t1 (Some a) t2.
-  Proof. intros. do 2 eexists. eauto with rel_db. Qed.
-
-  Lemma is_visible : forall t1 t1b t2a t2 a, 
-    silent lts t1 t1b ->
-    lts t1b (Some a) t2a -> 
-    silent lts t2a t2 ->
-    weak lts t1 (Some a) t2.
-  Proof. intros. do 2 eexists. eauto with rel_db. Qed.
-
-(* NOTE: x => y *)
-(* Lemma do_weak : forall x0 x1 y0 y1 y2 y3 y4 a, 
-  weak_sim termLTS termLTS x0 y0 ->
-  weak termLTS x0 (Some a) x1 ->
-  termLTS y0 None y1 -> 
-  silent termLTS y1 y2 ->
-  termLTS y2 (Some a) y3 -> 
-  silent termLTS y3 y4 ->
-  weak termLTS y0 (Some a) y4.
-Proof. intros ? ? ? ? y2 y3; intros. exists y2, y3. eauto with rel_db. Qed. *)
-
-(* Lemma wsim_explore_silent1 : 
-  forall x0 y0, weak_sim termLTS termLTS x0 y0 ->
-  forall x1, silent1 termLTS x0 x1 ->
-  exists x1a, termLTS x0 None x1a /\ silent termLTS x1a x1.
-Proof. intros. inversion H0; subst; [ exists x1 | exists y ].
-  - split; [ apply H1 | apply rt1n_refl ].
-  - split; [ apply H1 | apply clos_t_clos_rt in H2; apply H2 ].
-Qed. *)
-
-(* Lemma wsim_explore_silent :
-  forall x0 y0, weak_sim termLTS termLTS x0 y0 ->
-  forall x1, silent1 termLTS x0 x1 ->
-  (exists y1, silent termLTS y0 y1 /\ weak_sim termLTS termLTS x1 y1) ->
-  (weak_sim termLTS termLTS x1 y0) \/ (
-    exists y1a y1, termLTS y0 None y1a /\ silent termLTS y1a y1
-  ).
-Proof.
-  intros. 
-  apply (@wsim_explore_silent1 x0 y0) in H0; [| apply H].
-
-  inversion H0 as [x1a []]. inversion H1 as [y1a []].
-
-  inversion H4; subst; [ left; apply H5 | right; exists y1a ].
-
-  inversion H7; exists y1a; subst; [ split; [ apply H6 | apply rt1n_refl ] |].
+  (****************************************************************************)
+  Lemma expand_silent1_pre_weak : 
+        forall x y z a, silent1 lts x y -> lts y (Some a) z -> 
+                        weak lts x (Some a) z.
+  Proof. intros x y z a Hxy Hyz. unfold weak. exists y, z.
+    apply Pack_weak; [ apply is_silent, Hxy | apply Hyz | apply rt1n_refl ].
+  Qed.
+  Hint Resolve expand_silent1_pre_weak : rel_db.
   
-  split; [| apply rt1n_refl].
+  Lemma expand_silent1_post_weak : 
+        forall x y z a, lts x (Some a) y -> silent1 lts y z ->
+                        weak lts x (Some a) z.
+  Proof. intros x y z a Hxy Hyz. unfold weak. exists x, y.
+    apply Pack_weak; [ apply rt1n_refl | apply Hxy | apply is_silent, Hyz ].
+  Qed.
+  Hint Resolve expand_silent1_post_weak : rel_db.
+  
+  Lemma expand_silent1_both_weak : 
+        forall w x y z a, silent1 lts w x -> lts x (Some a) y -> 
+                          silent1 lts y z -> weak lts w (Some a) z.
+  Proof. intros w x y z a Hwx Hxy Hyz. unfold weak. exists x, y.
+    apply Pack_weak; [ apply is_silent, Hwx | apply Hxy | apply is_silent, Hyz ].
+  Qed.
+  Hint Resolve expand_silent1_both_weak : rel_db.
 
-  (* NOTE: from here we need the information from the plugin. *)
-  (* NOTE: I.e., next state reached *)
+  (****************************************************************************)
+  Lemma expand_silent_pre_weak : 
+        forall x y z a, silent lts x y -> weak lts y (Some a) z -> 
+                        weak lts x (Some a) z.
+  Proof. intros x y z a Hxy Hyz. 
+    inversion Hyz as [ ?y [ ?z [ Hpre Hstr Hpost ]]]; exists y0, z0. 
+    apply Pack_weak; [ | apply Hstr | apply Hpost ].
+    induction Hxy; [ apply Hpre | ].
+    eapply rt1n_trans; [ apply H | ].
+    apply IHHxy; [ apply Hyz | apply Hpre ]. 
+  Qed. 
 
+  Lemma expand_silent_post_weak : 
+        forall x y z a, weak lts x (Some a) y -> silent lts y z -> 
+                        weak lts x (Some a) z.
+  Proof. intros x y z a Hxy Hyz.
+    inversion Hxy as [ ?x [ ?y [ Hpre Hstr Hpost ]]]; exists x0, y0.
+    apply Pack_weak; [ apply Hpre | apply Hstr | ].
+    silent_to_clos_rt; apply (@rt_trans _ _ y0 y z); [ apply Hpost | apply Hyz ].
+  Qed.  
+  Hint Resolve expand_silent_pre_weak expand_silent_post_weak : rel_db.
+  
+  (****************************************************************************)
+  Lemma expand_weak_pre_silent1 : 
+        forall x y z a, weak lts x (Some a) z -> silent1 lts x y -> 
+                        lts y (Some a) z.
+  Proof. intros x y z a Hxz Hxy.
+    
 
-Admitted. *)
+    (* eauto with rel_db.
+    apply expand_silent1_post_weak.
+
+    einduction Hxz as [xy [zz [Hpre Hstr Hpost]]]. *)
+  Admitted.
+    
 End Lemmas.
+
 
 (****************************************************************************)
 (* NOTE: makes goals easier to read, e.g., [H : tend = t] -> [H : t = tend] *)
@@ -260,6 +287,101 @@ Section Test2.
       eexists. split. 
       {
 
+        (* NOTE: expand [y] as far as we can *)
+        eapply expand_silent1_pre_weak. 
+        
+        eapply expand_silent1; [ | eapply is_silent ].
+        eapply is_silent1, do_fix; compute; apply eq_refl.
+
+        eapply t1n_step; unfold tau.
+        eapply do_seq, do_comm.
+
+        eapply do_seq.
+        (* eapply do_handshake.  *)
+        (* NOTE: we can't apply the above since we don't know what [a0] is *)
+
+        (* NOTE: first need to determine [a0] -- by expanding [Htx0] *)
+        induction Htx0 as [x0b [x1a [Hpre Hstr Hpost]]].
+
+        (* NOTE: it cannot be that [x0=x0b] *)
+        destruct Hpre; [ rewrite Hx0 in Hstr; inversion Hstr | ].
+        
+        (* NOTE: turn [H] and [Hpre] into [silent1 x0 z] *)
+        eapply tau_rt_to_silent1 in H; [ | apply Hpre ].
+
+        eapply do_expand_silent1 in H as [].
+
+
+  Admitted.
+
+        rewrite Hx0 in H. unfold tau in H.
+        inversion H; compute in H1. rewrite 
+        eapply do_fix in H. 
+
+        (* induction a0.
+        admit.
+
+        inversion Hpre. 
+        - rewrite <- H, Hx0 in Hstr. inversion Hstr.
+        - 
+
+
+        induction Hpre; [ rewrite Hx0 in Hstr; inversion Hstr | ].
+
+
+
+
+        eapply do_expand_silent1 in Hpre.
+
+        eapply (@expand_silent _ _ _ x0 x0b x1a) in Hpre; [| apply Hstr].
+
+        eapply do_expand_silent1 in Hpre; destruct Hpre as [x0a H]; rewrite Hx0 in H. 
+        einduction H; [ | | apply is_silent1, do_fix; compute ].
+        admit. admit.
+        
+        
+        
+        
+        apply is_silent1 in H.
+        apply do_fix; compute.
+ 
+        admit.
+        
+        admit.
+        
+
+
+        (* Check expand_silent1. *)
+        eapply (@expand_silent1 _ _ _ x0 x0b) in Hpre.
+
+
+
+        eapply Relation_Operators.rt1n_trans in Hpre. *)
+
+
+
+
+
+        (* NOTE: now that we know [a0] -- expand y *)
+        eapply do_handshake. 
+        (* eapply do_comm.  *)
+
+
+
+        (* edestruct ?[t']. *)
+        einduction ?[t'].
+        - discriminate Hx0.
+        - discriminate Hx0.
+        - discriminate Hx0.
+
+
+        einduction (termLTS (tpar (tact (send A) tend) (tact (recv A) tend)) (Some a0) ?t').
+
+
+        (* { *)
+
+        (* }  *)
+
 
         (* unfold weak. do 2 eexists. apply Pack_weak. *)
 
@@ -267,7 +389,8 @@ Section Test2.
 
 
         unfold weak. eapply silent_leading_weakly_visible.
-        - eapply expand_silent1. (* can keep expanding until we find the right term. *)
+        - eapply expand_silent1. 
+          (* can keep expanding until we find the right term. *)
           + eapply is_silent1. eapply do_fix; compute. trivial.
           + eapply is_silent, is_silent1. eapply do_seq, do_comm. 
         - eapply do_seq.
