@@ -54,10 +54,12 @@ Fixpoint tsubst (t1 : term) (t2 : term) :=
 
 Inductive termLTS : term -> option label -> term -> Prop :=
 
-| do_handshake : forall a l r, 
-    termLTS (tpar (tact (send a) l) (tact (recv a) r)) (Some a) (tpar l r)
+| do_handshake : 
+  forall a l r, 
+  termLTS (tpar (tact (send a) l) (tact (recv a) r)) (Some a) (tpar l r)
 
-| do_seq  : forall t t' s a, termLTS t a t' -> termLTS (tseq t s) a (tseq t' s)
+| do_seq : 
+  forall t t' s a, termLTS t a t' -> termLTS (tseq t s) a (tseq t' s)
 
 | do_seq_end : forall s, termLTS (tseq tend s) None s
 
@@ -66,11 +68,11 @@ Inductive termLTS : term -> option label -> term -> Prop :=
 | do_end : termLTS tend None tend
 
 (* These below capture "structural congruence": using "silent" transitions *)
-| do_fix    : forall t t', t' = tsubst (tfix t) t ->
-    termLTS (tfix t) None t'
+| do_fix : 
+  forall t t', t' = tsubst (tfix t) t -> termLTS (tfix t) None t'
 
-| do_comm   : forall tl tr, 
-    termLTS (tpar tl tr) None (tpar tr tl)
+| do_comm : 
+  forall tl tr, termLTS (tpar tl tr) None (tpar tr tl)
 
 | do_assocl : forall t1 t2 t3, 
     termLTS (tpar t1 (tpar t2 t3)) None (tpar (tpar t1 t2) t3)

@@ -12,13 +12,72 @@ Require Import Relation_Definitions.
 Require Import Relation_Operators.
 Require Operators_Properties.
 
-
 (****************************************************************************)
 Ltac silent_to_clos_rt :=
   repeat match goal with
   | [ H : @silent _ _ _ ?x ?y |- _ ] => apply Operators_Properties.clos_rt1n_rt in H
   | [ |- @silent _ _ _ ?x ?y ] => apply Operators_Properties.clos_rt_rt1n
   | |- _ => idtac
+  end.
+
+(****************************************************************************)
+(* NOTE: makes goals easier to read, e.g., [H : tend = t] -> [H : t = tend] *)
+Ltac ltr_goals :=
+  repeat match goal with
+  | [ t : term, H : tend       = ?t |- _ ] => symmetry in H
+  | [ t : term, H : trec       = ?t |- _ ] => symmetry in H
+  | [ t : term, H : tfix _     = ?t |- _ ] => symmetry in H
+  | [ t : term, H : tact _ _   = ?t |- _ ] => symmetry in H
+  | [ t : term, H : tseq _ _   = ?t |- _ ] => symmetry in H
+  | [ t : term, H : tpar _ _   = ?t |- _ ] => symmetry in H
+  | [ t : term, H : tsubst _ _ = ?t |- _ ] => symmetry in H
+  | |- _  => idtac
+  end.
+
+(* NOTE: computes certain fun, e.g., [tsubst _ _] for recursive unfoldings *)
+Ltac compute_goals :=
+  repeat match goal with
+  | [ t : term, H : ?t = tsubst _ _ |- _ ] => compute in H
+  | |- _ => idtac
+  end.
+
+(* NOTE: reformats all goals in a consistent way, resolves certain fun calls *)
+Ltac fmt_goals := ltr_goals; compute_goals.
+
+(* NOTE: *)
+Ltac pack_hyp_weak :=
+  ltr_goals;
+  match goal with
+  (* do nothing if both are vars with defined goals *)
+  | [ Hx0 : ?xv0 = ?xt0, Hy0 : ?yv0 = ?yt0 
+    |- @weak_sim _ _ _ _ _ ?xv0 ?yv0 ] => idtac
+  (* otherwise, repackage the terms as variables in the goal *)
+  | |- _ =>
+    repeat match goal with
+    (* if [x] term is defined and unpacked then repack *)
+    | [ Hx0 : ?xv0 = ?xt0, Hx1 : ?xv1 = ?xt1
+      , Htx : @weak _ _ _ ?xv0 (Some _) ?xv1
+      |- @weak_sim _ _ _ _ _ ?xt1 _ ] => rewrite <- Hx1
+    (* if [y] term is defined and unpacked then repack *)
+    | [ Hx1 : ?xv1 = ?xt1, Hy1 : ?yv1 = ?yt1
+      |- @weak_sim _ _ _ _ _ ?xv1 ?yt1 ] => rewrite <- Hy1
+    (* if current hypothesis has unpackaged y term: *)
+    | [ Hx0 : ?xv0 = ?xt0
+      (* , Hx1 : ?xv1 = ?xt1 *)
+      , Htx : @weak _ _ _ ?xv0 (Some _) ?xv1
+      |- @weak_sim _ _ _ _ _ ?xv1 _ ] => 
+      let y1 := fresh "y0" in let Hy1 := fresh "Hy0" in 
+      match goal with 
+      | |- @weak_sim _ _ _ _ _ ?xv1 tend                 => remember tend               as y1 eqn:Hy1
+      | |- @weak_sim _ _ _ _ _ ?xv1 trec                 => remember trec               as y1 eqn:Hy1
+      | |- @weak_sim _ _ _ _ _ ?xv1 (tfix ?yt1)          => remember (tfix yt1)         as y1 eqn:Hy1
+      | |- @weak_sim _ _ _ _ _ ?xv1 (tact ?yt1a ?yt1b)   => remember (tact yt1a yt1b)   as y1 eqn:Hy1
+      | |- @weak_sim _ _ _ _ _ ?xv1 (tseq ?yt1a ?yt1b)   => remember (tseq yt1a yt1b)   as y1 eqn:Hy1
+      | |- @weak_sim _ _ _ _ _ ?xv1 (tseq ?yt1a ?yt1b)   => remember (tseq yt1a yt1b)   as y1 eqn:Hy1
+      | |- @weak_sim _ _ _ _ _ ?xv1 (tpar ?yt1a ?yt1b)   => remember (tpar yt1a yt1b)   as y1 eqn:Hy1
+      | |- @weak_sim _ _ _ _ _ ?xv1 (tsubst ?yt1a ?yt1b) => remember (tsubst yt1a yt1b) as y1 eqn:Hy1
+      end
+    end
   end.
 
 (****************************************************************************)
@@ -56,7 +115,6 @@ Section Lemmas.
   Qed.
   Hint Resolve expand_silent1 : rel_db.
 
-
   Lemma do_expand_silent1 : 
         forall x z, silent1 lts x z -> 
           exists y, silent1 lts x y -> silent lts y z.
@@ -65,24 +123,6 @@ Section Lemmas.
     - exists y. intros. apply rt1n_refl.
     - exists y. intros. apply clos_t_clos_rt in Hxz. apply Hxz.
   Qed.
-
-  (* Lemma do_expand_silent_pre_some : 
-        forall x y z a, silent lts x y -> lts y (Some a) z -> 
-                        silent1 lts x y.
-              (* exists w, silent1 lts x y -> . *)
-  Proof.
-    intros x y z a Hxy Hyz.
-    einduction Hxy.
-    admit.
-    apply is_silent1. 
-    eapply IHs.
-
-    eapply is_silent in Hxy.
-
-    induction Hxy.
-     (* eapply clos_rt_clos_t. *)
-    admit.
-  Admitted. *)
 
   (****************************************************************************)
   Lemma expand_silent1_pre_weak : 
@@ -120,6 +160,7 @@ Section Lemmas.
     eapply rt1n_trans; [ apply H | ].
     apply IHHxy; [ apply Hyz | apply Hpre ]. 
   Qed. 
+  Hint Resolve expand_silent_pre_weak : rel_db.
 
   Lemma expand_silent_post_weak : 
         forall x y z a, weak lts x (Some a) y -> silent lts y z -> 
@@ -129,47 +170,78 @@ Section Lemmas.
     apply Pack_weak; [ apply Hpre | apply Hstr | ].
     silent_to_clos_rt; apply (@rt_trans _ _ y0 y z); [ apply Hpost | apply Hyz ].
   Qed.  
-  Hint Resolve expand_silent_pre_weak expand_silent_post_weak : rel_db.
+  Hint Resolve expand_silent_post_weak : rel_db.
   
   (****************************************************************************)
-  Lemma expand_weak_pre_silent1 : 
+  Lemma do_expand_weak_pre_silent1 : 
         forall x y z a, weak lts x (Some a) z -> silent1 lts x y -> 
-                        lts y (Some a) z.
-  Proof. intros x y z a Hxz Hxy.
+                        weak lts y (Some a) z ->
+            exists w v, silent lts y w -> lts w (Some a) v -> silent lts v z.
+              (* exists w, silent lts y w /\  *)
+              (* exists v, lts w (Some a) v /\ silent lts v z. *)
+  Proof. intros x y z a Hxz Hxy Hyz.
+    eauto with rel_db. 
+  Qed.
+    (* eapply expand_silent_pre_weak in Hxz as [xx [zz [Hpre Hstr Hpost]]]
+    ; [| apply rt1n_refl]
+    .
+    exists xx, zz. 
+    
+    
+    split. 
+
+    exists zz. split; [ apply Hstr | apply Hpost ].
+    
+    
+    intros Hyxx.
+    exists zz. intros Hxxzz.
+    apply Hpost.
+
+    inversion Hpost; subst; [apply Hstr | ].
+    admit.
+    apply rt1n_refl.
+    
+
+
+    eauto with rel_db.
+
+
+
+    (* eapply expand_silent_pre_weak in Hxz. *)
+    (* eapply expand_silent1_pre_weak in Hxy. *)
+
+
+
+
+    revert Hxy.
+
+    admit.
+
+    inversion Hxy; subst.
+    admit.
+
+
+    inversion Hxz as [xx [yy [Hpre Hstr Hpost]]].
+
+    eapply Pack_weak in Hxz as [Hpre Hstr Hpost].
+    
+    admit.
+    eapply rt1n_refl.
+    
+    [| eapply Hpre | eapply Hpost].
+    eapply Pack_weak in Hxz.
+    inversion Hxz as [].
+
     
 
     (* eauto with rel_db.
     apply expand_silent1_post_weak.
 
     einduction Hxz as [xy [zz [Hpre Hstr Hpost]]]. *)
-  Admitted.
+  Admitted. *)
     
 End Lemmas.
 
-
-(****************************************************************************)
-(* NOTE: makes goals easier to read, e.g., [H : tend = t] -> [H : t = tend] *)
-Ltac ltr_goals :=
-  repeat match goal with
-  | [ t : term, H : tend       = ?t |- _ ] => symmetry in H
-  | [ t : term, H : trec       = ?t |- _ ] => symmetry in H
-  | [ t : term, H : tfix _     = ?t |- _ ] => symmetry in H
-  | [ t : term, H : tact _ _   = ?t |- _ ] => symmetry in H
-  | [ t : term, H : tseq _ _   = ?t |- _ ] => symmetry in H
-  | [ t : term, H : tpar _ _   = ?t |- _ ] => symmetry in H
-  | [ t : term, H : tsubst _ _ = ?t |- _ ] => symmetry in H
-  | |- _  => idtac
-  end.
-
-(* NOTE: computes certain fun, e.g., [tsubst _ _] for recursive unfoldings *)
-Ltac compute_goals :=
-  repeat match goal with
-  | [ t : term, H : ?t = tsubst _ _ |- _ ] => compute in H
-  | |- _ => idtac
-  end.
-
-(* NOTE: reformats all goals in a consistent way, resolves certain fun calls *)
-Ltac fmt_goals := ltr_goals; compute_goals.
 
 (****************************************************************************)
 (* NOTE: *)
@@ -283,119 +355,127 @@ Section Test2.
     weak_sim termLTS termLTS x y.
   Proof.
     solve_wsim.
-    {
-      eexists. split. 
+    { eexists. 
+      (* NOTE: first need to determine [a0] -- by expanding [Htx0] *)
+      (* NOTE: [einduction] keeps [Htx0] -- used by [pack_hyp_weak] *)
+      einduction Htx0 as [x0b [x1a [Hpre Hstr Hpost]]].
+
+      (* NOTE: it cannot be that [x0=x0b] *)
+      inversion Hpre as [ Heqx0b | x0c x0d Htx0c Htx0cb Heqx0db ];
+        [ rewrite <- Heqx0b, Hx0 in Hstr; inversion Hstr | ]; subst x0d.
+
+      rewrite Hx0 in Htx0c; inversion Htx0c. subst t; subst t'; rename H0 into Hx0c.
+
+      inversion Htx0cb; subst x0b.
+      { rewrite Hx0c in Hstr; inversion Hstr; fmt_goals. 
+          subst t; subst a; subst s. subst x1a.
+        inversion H3; fmt_goals.
+          subst a; subst l; subst r0; subst a0; subst t';
+          clear H2; rename H3 into Htx0_inner.
+
+        (* determine *)
+        inversion Hpost; fmt_goals; rename H into Hx1.
+        { split.
+          { (* NOTE: expand [y] as far as we can *)
+            eapply expand_silent1_pre_weak; [ | eapply do_seq, do_handshake ]. 
+            eapply expand_silent1; [ | eapply is_silent ].
+              { eapply is_silent1, do_fix; compute; apply eq_refl. }
+              { eapply t1n_step; unfold tau. eapply do_seq, do_comm. } }
+          {
+            subst x0c; clear Htx0cb; clear Htx0c; clear Htx0_inner; clear Hstr; clear Hpre; clear Hpost. 
+            pack_hyp_weak.
+            
+            wsim_next.
+
+
+          }
+
+            (* NOTE: first need to determine [a0] -- by expanding [Htx0] *)
+            (* induction Htx0 as [x0b [x1a [Hpre Hstr Hpost]]]. *)
+
+            (* NOTE: it cannot be that [x0=x0b] *)
+            (* induction Hpre as [| x0 x0d x0e Htx0cd];  *)
+              (* [ rewrite Hx0 in Hstr; inversion Hstr | ]; rename Hpre into Htx0de. *)
+
+            (* inversion Hpre as [ Heqx0b | x0c x0d Htx0c Htx0cb Heqx0db ];
+              [ rewrite <- Heqx0b, Hx0 in Hstr; inversion Hstr | ]; subst x0d.
+            (* eapply tau_rt_to_silent1 in Htx0cb; [ | apply Htx0c]. *)
+
+
+            rewrite Hx0 in Htx0c; inversion Htx0c. 
+            subst t; subst t'; rename H0 into Hx0c.
+
+            inversion Htx0cb; subst x0b. *)
+
+              rewrite Hx0c in Hstr; inversion Hstr; inversion H3; 
+              (* NOTE: now that we know [a0] -- expand y *)
+              eapply do_handshake.
+              remember true as AA eqn:HAA.
+
+              (* NOTE: need lemma to handle cycling-par behaviour *)
+              (* NOTE: as this can insert infinite [None] before [Some a0] *)
+              admit.
+
+        }
+
+      }
+        
+
+      
+      
+      
+      split. 
       {
 
         (* NOTE: expand [y] as far as we can *)
         eapply expand_silent1_pre_weak. 
+          eapply expand_silent1; [ | eapply is_silent ].
+            
+            eapply is_silent1, do_fix; compute; apply eq_refl.
+            
+            eapply t1n_step; unfold tau. 
+            eapply do_seq, do_comm.
+
+          eapply do_seq.
+          (* NOTE: we can't apply [do_handshake] since we don't know [a0] *)
+          (* eapply do_handshake.  *)
+
+          (* NOTE: first need to determine [a0] -- by expanding [Htx0] *)
+          induction Htx0 as [x0b [x1a [Hpre Hstr Hpost]]].
+
+          (* NOTE: it cannot be that [x0=x0b] *)
+          (* induction Hpre as [| x0 x0d x0e Htx0cd];  *)
+            (* [ rewrite Hx0 in Hstr; inversion Hstr | ]; rename Hpre into Htx0de. *)
+
+          inversion Hpre as [ Heqx0b | x0c x0d Htx0c Htx0cb Heqx0db ];
+            [ rewrite <- Heqx0b, Hx0 in Hstr; inversion Hstr | ]; subst x0d.
+          (* eapply tau_rt_to_silent1 in Htx0cb; [ | apply Htx0c]. *)
+
+
+          rewrite Hx0 in Htx0c; inversion Htx0c. 
+          subst t; subst t'; rename H0 into Hx0c.
+
+          inversion Htx0cb; subst x0b.
+
+            rewrite Hx0c in Hstr; inversion Hstr; inversion H3; 
+            (* NOTE: now that we know [a0] -- expand y *)
+            eapply do_handshake.
+            remember true as AA eqn:HAA.
+
+            (* NOTE: need lemma to handle cycling-par behaviour *)
+            (* NOTE: as this can insert infinite [None] before [Some a0] *)
+            admit.
+      }
+      { 
+        pack_hyp_weak. 
+
+        eapply do_expand_weak_pre_silent1 in Htx0.
+        rewrite Hx0 in Htx0. inversion Htx0. 
         
-        eapply expand_silent1; [ | eapply is_silent ].
-        eapply is_silent1, do_fix; compute; apply eq_refl.
+        inversion H.
+  
 
-        eapply t1n_step; unfold tau.
-        eapply do_seq, do_comm.
-
-        eapply do_seq.
-        (* eapply do_handshake.  *)
-        (* NOTE: we can't apply the above since we don't know what [a0] is *)
-
-        (* NOTE: first need to determine [a0] -- by expanding [Htx0] *)
-        induction Htx0 as [x0b [x1a [Hpre Hstr Hpost]]].
-
-        (* NOTE: it cannot be that [x0=x0b] *)
-        destruct Hpre; [ rewrite Hx0 in Hstr; inversion Hstr | ].
-        
-        (* NOTE: turn [H] and [Hpre] into [silent1 x0 z] *)
-        eapply tau_rt_to_silent1 in H; [ | apply Hpre ].
-
-        eapply do_expand_silent1 in H as [].
-
-
-  Admitted.
-
-        rewrite Hx0 in H. unfold tau in H.
-        inversion H; compute in H1. rewrite 
-        eapply do_fix in H. 
-
-        (* induction a0.
-        admit.
-
-        inversion Hpre. 
-        - rewrite <- H, Hx0 in Hstr. inversion Hstr.
-        - 
-
-
-        induction Hpre; [ rewrite Hx0 in Hstr; inversion Hstr | ].
-
-
-
-
-        eapply do_expand_silent1 in Hpre.
-
-        eapply (@expand_silent _ _ _ x0 x0b x1a) in Hpre; [| apply Hstr].
-
-        eapply do_expand_silent1 in Hpre; destruct Hpre as [x0a H]; rewrite Hx0 in H. 
-        einduction H; [ | | apply is_silent1, do_fix; compute ].
-        admit. admit.
-        
-        
-        
-        
-        apply is_silent1 in H.
-        apply do_fix; compute.
- 
-        admit.
-        
-        admit.
-        
-
-
-        (* Check expand_silent1. *)
-        eapply (@expand_silent1 _ _ _ x0 x0b) in Hpre.
-
-
-
-        eapply Relation_Operators.rt1n_trans in Hpre. *)
-
-
-
-
-
-        (* NOTE: now that we know [a0] -- expand y *)
-        eapply do_handshake. 
-        (* eapply do_comm.  *)
-
-
-
-        (* edestruct ?[t']. *)
-        einduction ?[t'].
-        - discriminate Hx0.
-        - discriminate Hx0.
-        - discriminate Hx0.
-
-
-        einduction (termLTS (tpar (tact (send A) tend) (tact (recv A) tend)) (Some a0) ?t').
-
-
-        (* { *)
-
-        (* }  *)
-
-
-        (* unfold weak. do 2 eexists. apply Pack_weak. *)
-
-        (* eapply do_fix. *)
-
-
-        unfold weak. eapply silent_leading_weakly_visible.
-        - eapply expand_silent1. 
-          (* can keep expanding until we find the right term. *)
-          + eapply is_silent1. eapply do_fix; compute. trivial.
-          + eapply is_silent, is_silent1. eapply do_seq, do_comm. 
-        - eapply do_seq.
-          eapply do_handshake. 
-          eauto with rel_db. 
+        wsim_next.
       }
 
     }
