@@ -2,7 +2,11 @@ Require Import MEBI.loader.
 
 Inductive label : Set := | A | B | C.
 
-Definition label_eq (a b:label) : bool :=
+Definition label_eq : forall a b : label, {a = b} + {a <> b}.
+  decide equality.
+Defined.
+
+Definition label_eqb (a b : label): bool := 
   match a, b with
   | A, A => true
   | B, B => true
@@ -15,12 +19,16 @@ Inductive action : Set :=
 | recv : label -> action 
 .
 
-Definition action_eq (a b:action) : bool :=
-  match a, b with
-  | send a, send b => label_eq a b
-  | recv a, recv b => label_eq a b
-  | _, _ => false
+Definition action_label (a : action) : label :=
+  match a with
+  | send l => l
+  | recv l => l
   end.
+
+Definition action_eq : forall a b : action, {a = b} + {a <> b}.
+  intros [[]|[]] [[]|[]]; decide equality; decide equality.
+    (* (left; reflexivity) || (right; intros; discriminate H). *)
+Defined.
 
 Inductive term : Set :=
 | trec : term
@@ -31,16 +39,9 @@ Inductive term : Set :=
 | tseq : term -> term -> term 
 .
 
-Fixpoint term_eq (a b:term) : bool :=
-  match a, b with
-  | trec, trec => true
-  | tend, tend => true
-  | tfix a, tfix b => term_eq a b
-  | tact a ac, tact b bc => action_eq a b && term_eq ac bc
-  | tpar al ar, tpar bl br => term_eq al bl && term_eq ar br
-  | tseq al ar, tseq bl br => term_eq al bl && term_eq ar br
-  | _, _ => false
-  end.
+Definition term_eq : forall a b : term, {a = b} + {a <> b}.
+  intros [] []; decide equality; decide equality; decide equality.
+Defined.
 
 Fixpoint tsubst (t1 : term) (t2 : term) :=
   match t2 with

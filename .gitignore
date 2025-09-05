@@ -31,3 +31,4 @@ CoqMakefile*
 # ignore dumps
 **/_dumps
 src/_dump
+examples/bisimilarity/mebi_plugin_coq.code-workspace

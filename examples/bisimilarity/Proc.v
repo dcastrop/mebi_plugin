@@ -67,6 +67,7 @@ Ltac move_terms_to_hypothesis :=
 (****************************************************************************)
 Require Import Notations.
 Require Import List.
+Require Import Lists.ListSet.
 Import ListNotations.
   
 Require Import Relation_Definitions.
@@ -74,6 +75,7 @@ Require Import Relation_Operators.
 Require Operators_Properties.
 
 (****************************************************************************)
+(* NOTE: useful for using [clos_rt_t] *)
 Ltac silent_to_clos_rt :=
   repeat match goal with
   | [ H : @silent _ _ _ ?x ?y |- _ ] => apply Operators_Properties.clos_rt1n_rt in H
@@ -81,10 +83,360 @@ Ltac silent_to_clos_rt :=
   | |- _ => idtac
   end.
 
+Section Definitions.
+  (* NOTE: this is only *syntactic* *)
+  Fixpoint silent_upto_strong (x : term) : list term :=
+    match x with
+    | trec => [x]
+    | tend => [x]
+    | tact m y => [x]
+    | tfix b => silent_upto_strong b
+    | tpar l r => 
+      match l, r with
+      | tact _ _, tact _ _ => [x]
+      | _, tact _ _ => [x]
+      | tact _ _, _ => [x]
+      | _, _ => set_union term_eq (silent_upto_strong l) (silent_upto_strong r)
+      end
+    | tseq l r =>
+      match silent_upto_strong l with
+      | [] => (silent_upto_strong r)
+      | ts => ts
+      end
+    end.
+
+  Definition label_eqb (a b : label): bool := 
+    match a, b with
+    | A, A => true
+    | B, B => true
+    | C, C => true
+    | _, _ => false
+    end.
+
+  Definition action_label (a : action) : label :=
+    match a with
+    | send l => l
+    | recv l => l
+    end.
+
+  Fixpoint get_next_strong_label (x : term) : list label :=
+    match x with
+    | trec => []
+    | tend => []
+    | tact m y => [action_label m]
+    | tfix b => get_next_strong_label b
+    | tpar l r => set_union label_eq (get_next_strong_label l) (get_next_strong_label r)
+    | tseq l r =>
+      match get_next_strong_label l with
+      | [] => (get_next_strong_label r)
+      | ts => ts
+      end
+    end.
+
+  (* NOTE: [a] is not necessarily the *only* next strong *)
+  Definition is_next_strong (x : term) (a : label) : bool :=
+    set_mem label_eq a (get_next_strong_label x).
+
+  Lemma seq_label :
+        forall tx ty tz a, termLTS (tseq tx tz) (Some a) (tseq ty tz) ->
+          termLTS tx (Some a) ty.
+  Proof. intros. inversion H; apply H3. Qed.
+
+  Inductive pre_strong_hole (x : term) : term -> Prop :=
+  | is_hole : pre_strong_hole x x
+  | go_hole : 
+    forall a b, pre_strong_hole x a ->
+                pre_strong_hole x (tseq a b)
+  .
+
+
+  Inductive next_strong : term -> label -> Prop :=
+  | check_next : 
+    forall x y a, termLTS x None y -> next_strong y a -> next_strong x a 
+
+  | found_strong : 
+    forall x y a, termLTS x (Some a) y -> next_strong x a 
+  .
+  
+  Lemma is_next_strong1 :
+        forall x y a, termLTS x (Some a) y -> next_strong x a.
+  Proof. intros. inversion H; subst. 
+    eapply found_strong, H.
+    eapply check_next; [ eapply ].
+
+
+  Lemma weak_next_strong :
+        forall x y a, weak termLTS x (Some a) y -> next_strong x a.
+  Proof.
+    intros.
+    inversion H as [? [? [Hpre Hstr Hpost]]].
+
+
+
+  Lemma strong_action :
+        forall x y a, termLTS x (Some a) y -> 
+
+
+
+
+  Lemma t : 
+        forall x y z a, silent termLTS x y /\ termLTS y (Some a) z ->
+                        is_next_strong x a = true.
+  Proof. intros x y z a [Hxy Hyz].
+    unfold is_next_strong.
+    generalize dependent x.
+
+    induction a.
+    {
+      intros. inversion Hxy; subst.
+      {
+        inversion Hyz; subst. 
+        { compute. reflexivity. }
+        { 
+          
+        }
+      }
+    }
+
+    inversion Hyz; subst. 
+      intros.
+      inversion Hxy; subst.
+        induction a; compute; reflexivity.
+        
+    
+    induction a. intros. compute. reflexivity.
+
+    induction Hxy; subst.
+      inversion Hyz; [ induction a; compute; reflexivity | ].
+
+      .
+
+      induction a. inversion H.
+    
+
+    destruct (get_next_strong_label x).
+    unfold get_next_strong_label.
+
+    admit.
+
+
+    (* match x with
+    | trec => false
+    | tend => false
+    | tact m y => label_eqb (action_label m) a
+    | tfix b => is_next_strong b a
+    | tpar l r => is_next_strong l a || is_next_strong r a
+    | tseq l r => is_next_strong l a 
+    end. *)
+
+  (* Fixpoint is_upto_strong (x y : term) : bool := *)
+
+
+  Lemma t : forall x y z a, silent termLTS x y /\ termLTS y (Some a) z ->
+
+
+
+  Lemma t : forall x y a, termLTS x (Some a) y -> 
+  set_mem term_eq x (silent_upto_strong x) = true.
+  Proof. intros.
+    (* unfold silent_upto_strong.  *)
+    inversion H. 
+      subst x; subst y. 
+      destruct silent_upto_strong. simpl.
+
+
+
+    inversion H as [? [? [Hpre Hstr Hpost]]].
+    inversion Hstr.
+
+    cbv.
+
+
+    unfold silent_upto_strong.
+
+  Fixpoint extract_labels_from_actions (xs : list term) : list label :=
+    match xs with
+    | [] => []
+    | h :: t => 
+      match h with
+      | tact (send l) _ => set_add label_eq l (extract_labels_from_actions t)
+      | tact (recv l) _ => set_add label_eq l (extract_labels_from_actions t)
+      | _ => extract_labels_from_actions t
+      end 
+    end.
+
+  Definition next_strong_labels (x : term) : list label :=
+    extract_labels_from_actions (silent_upto_strong x).
+
+  (****************************************************************************)
+  Lemma tseq_label_trans : 
+        forall xa ya b l, termLTS xa l ya -> termLTS (tseq xa b) l (tseq ya b).
+  Proof. intros. apply do_seq, H. Qed.
+
+  (* Lemma t : forall x y a, termLTS x (Some a) y -> (next_strong_labels x) = [a].
+  Proof. intros x y a Hxy. 
+    (* unfold next_strong_labels. *)
+    (* unfold extract_labels_from_actions. *)
+    (* unfold silent_upto_strong. *)
+
+    induction a; (inversion Hxy; [ compute; reflexivity | ]); subst x; subst y. 
+
+    eapply tseq_label_trans in Hxy.
+
+    inversion Hxy.
+    
+  Admitted.
+
+
+    compute. 
+    .
+    
+    ; [compute; exact I |]; subst x; subst y.
+    inversion Hxy
+
+
+  Lemma t :
+        forall x y a, termLTS x (Some a) y -> 
+                      Bool.Is_true (set_mem label_eq a (next_strong_labels x)).
+  Proof. intros x y a Hxy; unfold Bool.Is_true.
+
+    (* generalize dependent x.
+
+    induction a.
+    intros x Hxy. 
+    inversion Hxy; [compute; exact I |]; subst x; subst y.
+
+    inversion t. *)
+
+    unfold next_strong_labels.
+    unfold extract_labels_from_actions.
+    unfold silent_upto_strong.
+
+    destruct a; (inversion Hxy; [ compute; exact I | ]); subst x; subst y.
+    {
+
+    }
+
+    (* destruct a. inversion Hxy.  compute; exact I. *)
+    
+    
+    inversion H.
+    
+
+
+    admit.
+    admit.
+
+
+
+    generalize dependent Hxy.
+    generalize dependent H.
+    compute.
+
+    cbv.
+
+    simpl.
+
+
+  Admitted.
+
+
+  Lemma t :
+        forall x y a, weak termLTS x (Some a) y -> 
+                      Bool.Is_true (set_mem label_eq a (next_strong_labels x)).
+  Proof. intros x y a Hxy; unfold Bool.Is_true.
+    inversion Hxy as [? [? [Hpre Hstr Hpost]]].
+
+    destruct Hpre.
+
+    admit.
+
+
+    - inversion Hstr.
+      + subst x1; subst x; subst a0. 
+        induction a; compute; exact I.
+      + subst x; subst x1; subst a0.
+        induction a. 
+        induction H. *)
+  
+  Inductive red_ctx : term -> Prop :=
+  | rc_trec : red_ctx trec
+  | rc_tend : red_ctx tend
+  | rc_tfix : forall y, red_ctx y -> red_ctx (tfix y)
+  | rc_tact : forall a y, red_ctx y -> red_ctx (tact a y)
+  | rc_tpar : forall l r, red_ctx l -> red_ctx r -> red_ctx (tpar l r)
+  | rc_tseq : forall l r, red_ctx l -> red_ctx r -> red_ctx (tseq l r)
+  .
+
+  Inductive silent_red_ctx : term -> Prop :=
+  | tau_rc_trec : silent_red_ctx trec
+  | tau_rc_tend : silent_red_ctx tend
+  | tau_rc_tfix : forall y, silent_red_ctx y -> silent_red_ctx (tfix y)
+  | tau_rc_tact : forall m y, silent_red_ctx (tact m y)
+  | tau_rc_tpar : forall l r, silent_red_ctx l -> silent_red_ctx r -> silent_red_ctx (tpar l r)
+  | tau_rc_tseq : forall l r, silent_red_ctx l -> silent_red_ctx r -> silent_red_ctx (tseq l r)
+  .
+
+  (* Lemma t : forall x y, silent x y -> *)
+
+  (* Lemma t : forall x, silent_red_ctx x -> red_ctx x. *)
+  Lemma t : forall x, red_ctx x -> silent_red_ctx x.
+  Proof. intros. 
+    (* induction x. *)
+    
+    induction H. 
+    constructor. 
+    constructor. 
+    constructor. 
+      (* apply IHsilent_red_ctx. *)
+      apply IHred_ctx.
+    
+    - subst y.
+    (* admit. *)
+
+    constructor. apply IHsilent_red_ctx1. apply IHsilent_red_ctx2.
+    constructor. apply IHsilent_red_ctx1. apply IHsilent_red_ctx2.
+End Definitions.
+
 (****************************************************************************)
 Section Lemmas.
-  Context {M A : Type} (lts : LTS M A).
+  Context {M L : Type} (lts : LTS M L).
+
+  (* NOTE: Reduction Context -- list of terms up-to next strong action. *)
+  Definition rctx_upto_strong (x : M) (f : M -> list M) : list M := f x.
+
+  (* NOTE: Reduction Context -- list of labels of next strong action. *)
+  Definition rctx_next_strong (x : M) (f : M -> list L) : list L := f x.
+
+  (* Inductive silent_reduction_ctx (x : M) (f : M -> list M) : Set :=
+  | rc_nil : silent_reduction_ctx x f
+  | rc_cons : 
+  . *)
+
+  (****************************************************************************)
+  (* Lemma t (Heq : forall (a b : L), {a = b} + {a <> b}) (f : M -> list L) :
+        forall x y a, weak lts x (Some a) y -> 
+                      Bool.Is_true (set_mem Heq a (rctx_next_strong x f)).
+  Proof. intros x y a Hxy; unfold Bool.Is_true.
+    inversion Hxy as [? [? [Hpre Hstr Hpost]]].
+
+
+
+  Admitted. *)
+
+
+  (****************************************************************************)
+  (* Lemma t :
+        forall x y a, weak lts x (Some a) y -> set_mem label_eq a (next_weak_labels x).
+
+  Lemma silent_reduction_context :
+        forall x y, silent lts x y -> silent_red_ctx x = y. *)
+
   
+  (****************************************************************************)
+  (****************************************************************************)
+  (****************************************************************************)
+
   (****************************************************************************)
   Lemma tau_is_silent1 : forall x y, lts x None y -> silent1 lts x y.
   Proof. intros x y Hxy. info_auto with rel_db. Qed.
@@ -167,7 +519,58 @@ Section Lemmas.
                         weak lts y (Some a) z ->
             exists w v, silent lts y w -> lts w (Some a) v -> silent lts v z.
   Proof. intros x y z a Hxz Hxy Hyz. info_eauto with rel_db. Qed.
+
+  (****************************************************************************)
+  (****************************************************************************)
+  (****************************************************************************)
+
+  Lemma weak_to_strong :
+        forall x z a, weak lts x (Some a) z -> 
+          exists y w, silent lts x y /\ lts y (Some a) w /\ silent lts w z.
+  Proof. intros x z a Hxz. inversion Hxz as [y [w [Hpre Hstr Hpost]]]. 
+    exists y, w. split; [ apply Hpre | split; [ apply Hstr | apply Hpost ]].
+  Qed.
+
+  (* Lemma ssss :
+        forall x z a, weak lts x (Some a) z -> *)
+
+
+  (* Lemma weak_to_strong2 :
+        forall x z a, weak lts x (Some a) z -> 
+            exists w, silent lts w z /\ 
+            forall y, lts y (Some a) w -> silent lts x y.
+  Proof. intros x z a Hxz. inversion Hxz as [y [w [Hpre Hstr Hpost]]]. 
+    exists w. split; [ apply Hpost | ].
+    intros. 
+    eauto with rel_db.
+    split; [ apply Hpre | split; [ apply Hstr | apply Hpost ]].
+  Qed. *)
+
 End Lemmas.
+
+(* 
+Ltac determine_term_of_strong :=
+  match goal with
+  | [ Hx0 : ?x0 = ?xt0
+    , Htx0_pre : @silent ?M ?A ?lts ?x0 ?x0b 
+    , Htx0_str : ?lts ?x0b (Some ?a) ?x1a 
+    , Htx0_post : @silent ?M ?A ?lts ?x1a ?x1 
+    |- _ ] => idtac
+  | |- _ => fail 1
+  end.
+*)
+
+
+  Example z : term := tseq (tpar (tact (recv A) tend) 
+                                 (tact (send A) tend)) 
+                           (tfix (tseq (tpar (tact (send A) tend) 
+                                             (tact (recv A) tend)) trec)).
+
+
+
+  Compute (rctx_upto_strong z silent_upto_strong).
+  Compute (rctx_next_strong z next_weak_labels).
+
 
 (****************************************************************************)
 Ltac wsim_case_weak_action_filter_from_silent Htx :=
@@ -257,7 +660,33 @@ Section Test2.
     weak_sim termLTS termLTS x y.
   Proof.
     solve_wsim.
-    { eexists. 
+    { 
+      eapply weak_to_strong in Htx0 as [x0b [x1a [Htx_pre [Htx_str Htx_post]]]].
+      
+      generalize dependent Htx_pre. 
+      cbv delta.
+      cbv fix.
+      cbv beta.
+      cbv match.
+
+      (* generalize dependent Htx_pre.  *)
+      (* generalize dependent (termLTS x0 (Some a0) x1a).  *)
+
+      match goal with
+      | [ Hx0 : ?x0 = ?xt0
+        , Htx0_pre : @silent ?M ?A ?lts ?x0 ?x0b 
+        , Htx0_str : ?lts ?x0b (Some ?a) ?x1a 
+        , Htx0_post : @silent ?M ?A ?lts ?x1a ?x1 
+        |- _ ] => 
+          match goal with 
+          | [
+            |- _ ] => idtac
+          | |- _ => idtac
+          end
+      | |- _ => fail 1
+      end.
+    
+      eexists. 
       (* NOTE: first need to determine [a0] -- by expanding [Htx0] *)
       (* NOTE: [einduction] keeps [Htx0] -- used by [pack_hyp_weak] *)
       einduction Htx0 as [x0b [x1a [Hpre Hstr Hpost]]].
