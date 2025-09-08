@@ -245,6 +245,8 @@ Section Test2.
   Example wsim_test_rp : forall x y, x = r -> y = p -> weak_sim termLTS termLTS x y. Proof. solve_wsim. Admitted.
   Example wsim_test_rq : forall x y, x = r -> y = q -> weak_sim termLTS termLTS x y. Proof. solve_wsim. Admitted.
 
+  Require Import Coq.Program.Equality.
+
   (****************************************************************************)
   (* NOTE: below is the "hands-on" proof for testing *)
   Example wsim_testing : forall x y,
@@ -256,61 +258,174 @@ Section Test2.
     (* x = r -> y = q -> *)
     weak_sim termLTS termLTS x y.
   Proof.
-    solve_wsim.
-    { eexists. 
-      (* NOTE: first need to determine [a0] -- by expanding [Htx0] *)
-      (* NOTE: [einduction] keeps [Htx0] -- used by [pack_hyp_weak] *)
-      einduction Htx0 as [x0b [x1a [Hpre Hstr Hpost]]].
+    intros; subst; unfold p, q.
 
-      (* NOTE: it cannot be that [x0 = x0b] *)
-      inversion Hpre as [ Heqx0b | x0c x0d Htx0c Htx0cb Heqx0db ];
-        [ rewrite <- Heqx0b, Hx0 in Hstr; inversion Hstr | ]; subst x0d.
+    (* NOTES:
+     - Removed the use of induction, but induction may be needed somewhere in
+     the below proof due to cycles in the LTS. We should recognise this every
+     time that, by saturation, we produce terms that we had already considered.
+     - We may avoid the use of induction if we can produce some lemma that allows
+     us to consider *only* distinct states. Not sure what that would look like.
+     *)
+    cofix CH.
+    apply In_sim, Pack_sim; intros.
+    { repeat destruct H.
+      inversion pre; subst; [inversion str|].
+      inversion H; subst; unfold tsubst in H, H0; clear H.
+      inversion H0; subst.
+      { clear pre H0. inversion str; subst.
+        inversion H3; subst. clear H2 H3 str.
+        unfold silent in post.
+        inversion post; subst.
+        { clear post.
+          eexists. split. econstructor. eexists. constructor.
+          eapply rt1n_trans. econstructor. unfold tsubst. reflexivity.
+          eapply rt1n_trans. unfold tau. eapply do_seq. eapply do_comm.
+          eapply rt1n_refl.
+          constructor. constructor.
+          eapply rt1n_trans. eapply do_seq, do_par_end.
+          eapply rt1n_trans. eapply do_seq_end.
+          eapply rt1n_refl.
 
-      rewrite Hx0 in Htx0c; inversion Htx0c. subst t; subst t'; rename H0 into Hx0c.
+          cofix CH0.
+          apply In_sim , Pack_sim; intros.
+          { repeat destruct H.
+            inversion pre; subst; [inversion str; subst; inversion H3|].
+            inversion H; subst; unfold tsubst in H, H0; clear H.
+            inversion H5; subst.
+            { clear H5. inversion H0; subst; [inversion str; subst; inversion H4|].
+              inversion H; subst; [inversion H6; subst |].
+              clear H.
+              inversion H1; subst; [inversion str|].
+              inversion H; subst. unfold tsubst in *.
+              clear H. inversion H2; subst.
+              { clear H0 H1 H2. inversion str; subst. inversion H3; subst.
+                clear H2 str pre H3.
+                inversion post; subst.
+                { clear post; eexists; split.
+                  eexists. eexists. eapply Pack_weak.
+                  eapply rt1n_refl.
+                  constructor. constructor.
+                  eapply rt1n_trans. eapply do_seq, do_par_end.
+                  eapply rt1n_trans. eapply do_seq_end.
+                  eapply rt1n_refl.
+                  (* Cannot use CH0 due to ill guarded recursion *)
 
-      inversion Htx0cb; subst x0b.
-      { rewrite Hx0c in Hstr; inversion Hstr. subst t; subst a; subst s; subst x1a.
-        (* NOTE: determine that [a0 = A] *)
-        inversion H3. subst a; subst l; subst r0; subst a0; subst t';
-          clear H2; rename H3 into Htx0_inner.
+                  cofix CH1.
+          apply In_sim , Pack_sim; intros.
+          { repeat destruct H.
+            inversion pre; subst; [inversion str; subst; inversion H3|].
+            inversion H; subst; unfold tsubst in H, H0; clear H.
+            inversion H5; subst.
+            { clear H5. inversion H0; subst; [inversion str; subst; inversion H4|].
+              inversion H; subst; [inversion H6; subst |].
+              clear H.
+              inversion H1; subst; [inversion str|].
+              inversion H; subst. unfold tsubst in *.
+              clear H. inversion H2; subst.
+              { clear H0 H1 H2. inversion str; subst. inversion H3; subst.
+                clear H2 str pre H3.
+                inversion post; subst.
+                { clear post; eexists; split.
+                  eexists. eexists. eapply Pack_weak.
+                  eapply rt1n_trans. eapply do_fix. unfold tsubst. reflexivity.
+                  eapply rt1n_trans. eapply do_seq. eapply do_comm.
+                  eapply rt1n_refl.
+                  constructor. constructor.
+                  eapply rt1n_trans. eapply do_seq, do_par_end.
+                  eapply rt1n_trans. eapply do_seq_end.
+                  eapply rt1n_refl.
+                  eapply CH0.
+                }
+                {
+                  admit.
+                }
+              }
+              { admit. }
+              }
+              { admit. }
+              }
+              { admit. }}
+              { admit. }}
+              { admit. }}
+              { admit. }}
+              { admit. }}
+              { admit. }}
+              { admit. }}
+              { admit. }}
+    (*     } *)
+    (*     inversion post. *)
+    (*   } *)
+    (*   unfold tau in H. *)
+    (*   inversion H; subst. *)
+    (*   (* Need induction due to commutativity *) *)
+    (*   inversion H6; subst. *)
+    (*   inversion H; subst; inversion H6; subst. *)
+    (*   inversion H1; subst. inversion str; subst. *)
 
-        (* NOTE: we can now resolve [y1] *)
-        split.
-        { (* NOTE: expand [y] as far as we can *)
-          eapply silent1_pre_weak; [ | eapply do_seq, do_handshake ]. 
-          eapply expand_silent1; [ | eapply silent1_is_silent ].
-            { eapply tau_is_silent1, do_fix; compute; apply eq_refl. }
-            { eapply t1n_step; unfold tau. eapply do_seq, do_comm. } }
-        { (* NOTE: package [y1] *)
-          move_terms_to_hypothesis.
+    (*   { *)
+    (*     admit. *)
+    (*     inversion H1. *)
+    (*   } *)
+    (* } *)
 
-          (* NOTE: need determine [x1] *)
-          (* wsim_next. *)
-          admit. 
-        } }
-      { (* NOTE: handle the case where [do_comm] for ever *)
-        rewrite Hx0c in H; inversion H; fmt_goals.
-          subst t; subst s; subst a; subst y.
-        admit. 
-      } }
-    { exists y0. split; [ rewrite <- Hy0; eapply rt1n_refl |]. 
 
-      (* NOTE: determine [x1] *)
-      inversion Htx0; [ subst y | subst z; rename y into x0b ].
-      { (* NOTE: case [termLTS x0 None x1] *)
-        rewrite Hx0 in H; inversion_clear H; rename H0 into Hx1.
-        
-        wsim_next.
-        admit. admit. 
-      }
-      { (* NOTE: case [termLTS x0 None x0b /\ silent termLTS x0b x1]*)
-        rewrite Hx0 in H; inversion_clear H; 
-          rename H0 into Htxb1; rename H1 into Hx0b.
 
-        (* NOTE: need to determine [x1] *)
-        (* wsim_next. *)
-        admit. }
-    }
+    (* solve_wsim. *)
+    (* { eexists.  *)
+    (*   (* NOTE: first need to determine [a0] -- by expanding [Htx0] *) *)
+    (*   (* NOTE: [einduction] keeps [Htx0] -- used by [pack_hyp_weak] *) *)
+    (*   einduction Htx0 as [x0b [x1a [Hpre Hstr Hpost]]]. *)
+
+    (*   (* NOTE: it cannot be that [x0 = x0b] *) *)
+    (*   inversion Hpre as [ Heqx0b | x0c x0d Htx0c Htx0cb Heqx0db ]; *)
+    (*     [ rewrite <- Heqx0b, Hx0 in Hstr; inversion Hstr | ]; subst x0d. *)
+
+    (*   rewrite Hx0 in Htx0c; inversion Htx0c. subst t; subst t'; rename H0 into Hx0c. *)
+
+    (*   inversion Htx0cb; subst x0b. *)
+    (*   { rewrite Hx0c in Hstr; inversion Hstr. subst t; subst a; subst s; subst x1a. *)
+    (*     (* NOTE: determine that [a0 = A] *) *)
+    (*     inversion H3. subst a; subst l; subst r0; subst a0; subst t'; *)
+    (*       clear H2; rename H3 into Htx0_inner. *)
+
+    (*     (* NOTE: we can now resolve [y1] *) *)
+    (*     split. *)
+    (*     { (* NOTE: expand [y] as far as we can *) *)
+    (*       eapply silent1_pre_weak; [ | eapply do_seq, do_handshake ].  *)
+    (*       eapply expand_silent1; [ | eapply silent1_is_silent ]. *)
+    (*         { eapply tau_is_silent1, do_fix; compute; apply eq_refl. } *)
+    (*         { eapply t1n_step; unfold tau. eapply do_seq, do_comm. } } *)
+    (*     { (* NOTE: package [y1] *) *)
+    (*       move_terms_to_hypothesis. *)
+
+    (*       (* NOTE: need determine [x1] *) *)
+    (*       (* wsim_next. *) *)
+    (*       admit.  *)
+    (*     } } *)
+    (*   { (* NOTE: handle the case where [do_comm] for ever *) *)
+    (*     rewrite Hx0c in H; inversion H; fmt_goals. *)
+    (*       subst t; subst s; subst a; subst y. *)
+    (*     admit.  *)
+    (*   } } *)
+    (* { exists y0. split; [ rewrite <- Hy0; eapply rt1n_refl |].  *)
+
+    (*   (* NOTE: determine [x1] *) *)
+    (*   inversion Htx0; [ subst y | subst z; rename y into x0b ]. *)
+    (*   { (* NOTE: case [termLTS x0 None x1] *) *)
+    (*     rewrite Hx0 in H; inversion_clear H; rename H0 into Hx1. *)
+
+    (*     wsim_next. *)
+    (*     admit. admit.  *)
+    (*   } *)
+    (*   { (* NOTE: case [termLTS x0 None x0b /\ silent termLTS x0b x1]*) *)
+    (*     rewrite Hx0 in H; inversion_clear H;  *)
+    (*       rename H0 into Htxb1; rename H1 into Hx0b. *)
+
+    (*     (* NOTE: need to determine [x1] *) *)
+    (*     (* wsim_next. *) *)
+    (*     admit. } *)
+    (* } *)
   Admitted.
                             
 (****************************************************************************)
