@@ -83,7 +83,24 @@ Ltac silent_to_clos_rt :=
   | |- _ => idtac
   end.
 
-Section Definitions.
+(* Section Definitions.
+  (* NOTE: this is only *syntactic* *)
+  Fixpoint silent_upto_strong (x : term): 
+            forall y z a, weak lts x (Some a) z -> {lts x (Some a) z} + 
+                                                     {true}.
+
+
+
+
+
+
+
+
+
+
+
+
+
   (* NOTE: this is only *syntactic* *)
   Fixpoint silent_upto_strong (x : term) : list term :=
     match x with
@@ -103,20 +120,6 @@ Section Definitions.
       | [] => (silent_upto_strong r)
       | ts => ts
       end
-    end.
-
-  Definition label_eqb (a b : label): bool := 
-    match a, b with
-    | A, A => true
-    | B, B => true
-    | C, C => true
-    | _, _ => false
-    end.
-
-  Definition action_label (a : action) : label :=
-    match a with
-    | send l => l
-    | recv l => l
     end.
 
   Fixpoint get_next_strong_label (x : term) : list label :=
@@ -396,11 +399,77 @@ Section Definitions.
 
     constructor. apply IHsilent_red_ctx1. apply IHsilent_red_ctx2.
     constructor. apply IHsilent_red_ctx1. apply IHsilent_red_ctx2.
-End Definitions.
+End Definitions. *)
 
 (****************************************************************************)
 Section Lemmas.
   Context {M L : Type} (lts : LTS M L).
+
+  Lemma unpack_weak :
+        forall w z a, weak lts w (Some a) z -> 
+          exists x y, silent lts w x /\
+                      lts x (Some a) y /\
+                      silent lts y z.
+  Proof. intros. 
+    inversion H as [?x [?y []]]. exists x, y. eauto with rel_db. 
+  Qed.
+
+  About silent.
+
+  (****************************************************************************)
+  Lemma tau_is_silent1 : forall x y, lts x None y -> silent1 lts x y.
+  Proof. intros x y Hxy. info_auto with rel_db. Qed.
+
+  Lemma silent1_is_silent : forall x y, silent1 lts x y -> silent lts x y.
+  Proof. intros x y Hxy. info_auto with rel_db. Qed.
+
+  Lemma tau_silent_is_silent1 : 
+        forall x y z, tau lts x y -> silent lts y z -> silent1 lts x z.
+  Proof. intros x y z Hxy Hyz. info_eauto with rel_db. Qed. 
+  
+  Lemma strong_is_weak : 
+        forall x y a, lts x (Some a) y -> weak lts x (Some a) y.
+  Proof. intros x y a Hxy. exists x, y. info_auto with rel_db. Qed.
+  
+  (****************************************************************************)
+  Definition has_silent_action (x : M) : 
+        exists y : M, lts x None y -> silent1 lts x y.
+  Proof. eexists; intros Hxy. apply t1n_step, Hxy. 
+    Unshelve. assumption.
+  Defined.
+
+  (* Definition has_strong_action (x : M) :
+        exists (y : M) (a : L), lts x (Some a) y.
+  Proof. 
+    intros. do 2 eexists.
+    eauto with rel_db. *)
+
+  Definition weak_either_strong_or_silent :
+        forall x y a, weak lts x (Some a) y -> 
+        exists w z : M, 
+  (* NOTE: tried to use [ { } + { } ] notation, but below was in Set not Prop *)
+            (silent lts x w /\ lts w (Some a) z /\ silent lts z y) \/
+            (silent1 lts x w /\ lts w (Some a) z /\ silent lts z y)
+            .
+  Proof. intros.
+    inversion H as [?w [?z [Hpre Hstr Hpost]]]. destruct Hpre as [| v w ].
+    - exists x, z; left. eauto with rel_db.
+      (* split; [ apply rt1n_refl | split; [ apply Hstr | apply Hpost ] ]. *)
+    - exists w, z; right. eauto with rel_db.
+      (* split; [ eapply tau_silent_is_silent1; [ apply H0 | apply Hpre] *)
+      (*       | split; [ apply Hstr | apply Hpost ]].                   *)
+  Defined.
+
+
+  (* Fixpoint up_to_strong (x : M) (a : L) :
+        forall y, lts x (Some a) y \/ (lts x None y /\ (up_to_strong y a)).
+
+
+  Lemma up_to_strong :
+        forall x y a, weak lts x (Some a) y -> 
+                      lts x (Some a) y \/  *)
+
+
 
   (* NOTE: Reduction Context -- list of terms up-to next strong action. *)
   Definition rctx_upto_strong (x : M) (f : M -> list M) : list M := f x.
@@ -408,6 +477,9 @@ Section Lemmas.
   (* NOTE: Reduction Context -- list of labels of next strong action. *)
   Definition rctx_next_strong (x : M) (f : M -> list L) : list L := f x.
 
+
+
+  
   (* Inductive silent_reduction_ctx (x : M) (f : M -> list M) : Set :=
   | rc_nil : silent_reduction_ctx x f
   | rc_cons : 
@@ -437,21 +509,6 @@ Section Lemmas.
   (****************************************************************************)
   (****************************************************************************)
 
-  (****************************************************************************)
-  Lemma tau_is_silent1 : forall x y, lts x None y -> silent1 lts x y.
-  Proof. intros x y Hxy. info_auto with rel_db. Qed.
-
-  Lemma silent1_is_silent : forall x y, silent1 lts x y -> silent lts x y.
-  Proof. intros x y Hxy. info_auto with rel_db. Qed.
-
-  Lemma tau_silent_is_silent1 : 
-        forall x y z, tau lts x y -> silent lts y z -> silent1 lts x z.
-  Proof. intros x y z Hxy Hyz. info_eauto with rel_db. Qed. 
-  
-  Lemma strong_is_weak : 
-        forall x y a, lts x (Some a) y -> weak lts x (Some a) y.
-  Proof. intros x y a Hxy. exists x, y. info_auto with rel_db. Qed.
-  
   (****************************************************************************)
   Lemma expand_silent1 : 
         forall x y z, silent1 lts x y -> silent lts y z -> 
@@ -660,8 +717,13 @@ Section Test2.
     weak_sim termLTS termLTS x y.
   Proof.
     solve_wsim.
-    { 
-      eapply weak_to_strong in Htx0 as [x0b [x1a [Htx_pre [Htx_str Htx_post]]]].
+    {
+      
+      apply weak_either_strong_or_silent in Htx0 as [? [? ]].
+
+      destruct H.
+
+      (* eapply weak_to_strong in Htx0 as [x0b [x1a [Htx_pre [Htx_str Htx_post]]]]. *)
       
       generalize dependent Htx_pre. 
       cbv delta.
