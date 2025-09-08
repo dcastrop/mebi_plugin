@@ -15,18 +15,12 @@ Arguments tau {M A} R.
 Hint Constructors clos_refl_trans_1n clos_trans_1n : rel_db.
 Lemma clos_t_clos_rt {A : Type} (R : relation A) :
       forall x y, clos_trans_1n A R x y -> clos_refl_trans_1n A R x y.
-Proof. intros x y H; 
-  induction H; eauto with rel_db. 
-  (* induction H. info_eauto with rel_db. info_eauto with rel_db.  *)
-Qed.
+Proof. intros x y H; induction H; eauto with rel_db. Qed.
 
 Lemma clos_rt_clos_t {A : Type} {R : relation A} :
       forall {x y z}, R x y -> clos_refl_trans_1n A R y z ->
                     clos_trans_1n A R x z.
-Proof. intros x y z Rxy H. revert x Rxy. 
-  induction H; eauto with rel_db. 
-  (* induction H. info_eauto with rel_db. info_eauto with rel_db.  *)
-Qed.
+Proof. intros x y z Rxy H. revert x Rxy. induction H; eauto with rel_db. Qed.
 
 Hint Resolve clos_t_clos_rt clos_rt_clos_t : rel_db.
 
@@ -122,38 +116,14 @@ Ltac bisim_cofix :=
 Tactic Notation "solve_bisim" integer(t) := bisim_cofix; eauto t with rel_db.
 
 Lemma weak_sim_refl {M A} (lts : LTS M A) : forall x, weak_sim lts lts x x.
-Proof.
-  solve_bisim 8. 
-  (* cofix CH. intros x. apply In_sim, Pack_sim; eauto with rel_db. *)
-  (* NOTES: eauto will use the lemmas added as hints above, so it will already
-   * know how to covert silent1 to silent. (I.e., [clos_t_clos_rt].)
-   *)  
-  (* cofix CH. intros x. apply In_sim, Pack_sim. info_eauto with rel_db. info_eauto with rel_db. *)
-  (* COMMENT: [info_auto] shows the second case uses the previously defined: 
-   * `progress bisim_simpl' -- but still works without that definition.
-   * - Jonah
-   *)
-Qed.
+Proof. solve_bisim 8. Qed.
 Hint Resolve weak_sim_refl : rel_db.
 
 Lemma weak_sim_trans {M N R A}
   (ltsM : LTS M A) (ltsN : LTS N A) (ltsR : LTS R A)
   : forall x y r, weak_sim ltsM ltsN x y -> weak_sim ltsN ltsR y r ->
                   weak_sim ltsM ltsR x r.
-Proof.
-  solve_bisim 19.
-  (* (* NOTES: Uncomment for step-by-step. *) *)
-  (* cofix CH. intros x y z H0 H1. apply out_sim in H0, H1. *)
-  (* apply In_sim, Pack_sim. *)
-  (* - intros m2 a T. *)
-    (* destruct (sim_weak H0 T) as [y2 [T' S]], (sim_weak H1 T') as [z2 [T'' S']]. *)
-    (* exists z2. split; trivial. apply (CH _ _ _ S S'). *)
-  (* - intros m2 T. destruct (sim_tau H0 T) as [y2 [[|?? H T'] S]]. *)
-    (* + exists z. split; [apply rt1n_refl|]. apply (CH _ _ _ S), In_sim, H1. *)
-    (* + pose proof (clos_rt_clos_t H T') as T''. *)
-      (* destruct (sim_tau H1 T'') as [z2 [T''' S']]. *)
-      (* exists z2; split; trivial. apply (CH _ _ _ S S'). *)
-Qed.
+Proof. solve_bisim 19. Qed.
 Hint Immediate weak_sim_trans : rel_db.
 
 Section WeakBisim.
