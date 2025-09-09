@@ -22,7 +22,15 @@ Lemma clos_rt_clos_t {A : Type} {R : relation A} :
                     clos_trans_1n A R x z.
 Proof. intros x y z Rxy H. revert x Rxy. induction H; eauto with rel_db. Qed.
 
-Hint Resolve clos_t_clos_rt clos_rt_clos_t : rel_db.
+Lemma clos_rt_trans {A : Type} {R : relation A} : forall {x y z},
+    clos_refl_trans_1n A R x y -> clos_refl_trans_1n A R y z ->
+    clos_refl_trans_1n A R x z.
+Proof.
+  intros. revert z H0. induction H; eauto.
+  intros; eapply rt1n_trans; eauto.
+Qed.
+
+Hint Resolve clos_t_clos_rt clos_rt_clos_t clos_rt_trans : rel_db.
 
 Section WeakTrans.
   Context {M : Type} {A : Type} (lts : LTS M A).
@@ -33,14 +41,17 @@ Section WeakTrans.
 
   (*  x ==> pre_str ->^a post_str ==> y *)
   Record weak_tr (x z : M) a (t y : M) : Prop :=
-    Pack_weak { pre : silent x z; str : lts z a t; post : silent t y }.
-  Definition weak (x : M) a (y : M) : Prop :=
-    exists z t, weak_tr x z a t y.
-End WeakTrans.
-Hint Constructors weak_tr : rel_db.
-Hint Resolve pre post : rel_db.
-Hint Unfold silent silent1 weak : rel_db.
+    Pack_weak { pre : silent x z; str : lts z (Some a) t; post : silent t y }.
+  Inductive weak (x : M) (y : M) : option A -> Prop :=
+  | wk_some : forall a z t, weak_tr x z a t y -> weak x y (Some a)
+  | wk_none : silent x y -> weak x y None.
 
+  Lemma inject_weak : forall m a n, lts m a n -> weak m n a.
+  Proof. intros. destruct a; repeat econstructor; eauto with rel_db. Qed.
+End WeakTrans.
+Hint Constructors weak_tr weak : rel_db.
+Hint Resolve pre post Pack_weak inject_weak : rel_db.
+Hint Unfold silent silent1 : rel_db.
 
 Section WeakSim.
   Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
@@ -48,83 +59,69 @@ Section WeakSim.
   Record simF G m1 n1 :=
     Pack_sim
       { sim_weak : forall m2 a,
-          weak ltsM m1 (Some a) m2 ->
-          exists n2, weak ltsN n1 (Some a) n2 /\ G m2 n2;
-        sim_tau : forall m2,
-          (*  weak ltsM m1 None m2 -> *)
-          silent1 ltsM m1 m2 ->
-          exists n2, silent ltsN n1 n2 /\ G m2 n2;
+          ltsM m1 a m2 -> exists n2, weak ltsN n1 n2 a /\ G m2 n2
       }.
 
   CoInductive weak_sim (s : M) (t : N) : Prop
     := In_sim { out_sim :  simF weak_sim s t }.
 End WeakSim.
 Arguments Pack_sim {M N A}%_type_scope & {ltsM ltsN G}%_function_scope
-  {m1 n1} (sim_weak sim_tau)%_function_scope.
+  {m1 n1} (sim_weak)%_function_scope.
 Arguments sim_weak {M N A}%_type_scope & {ltsM ltsN G%_function_scope m1 n1} s
   {m2 a} _.
-Arguments sim_tau {M N A}%_type_scope & {ltsM ltsN G%_function_scope m1 n1} s
-  {m2} _.
+Arguments out_sim {M N A}%_type_scope & {ltsM ltsN s t} w.
 Hint Constructors simF : rel_db.
 Hint Constructors weak_sim : rel_db.
-Hint Resolve sim_weak sim_tau : rel_db.
-
-Ltac needs_weak_simpl ltsR x a :=
-  match goal with
-  | [ H : @weak _ _ ltsR x a _ |- _ ] => fail 1
-  | |- _ => idtac
-  end.
-
-Ltac needs_silent_simpl ltsM ltsN x y :=
-  unfold silent, silent1, tau in *;
-  match goal with
-  | [ H : @clos_trans_1n _ (fun a b => ltsM a None b) x ?y
-    , W : @weak_sim _ _ _ ltsM ltsN ?y y
-    |- _ ]
-      => fail 1
-  | [ H : @clos_trans_1n _ (fun a b => ltsN a None b) y _ |- _ ]
-      => fail 1
-  | |- _ => idtac
-  end.
-
-Ltac bisim_simpl :=
-  unfold silent, silent1, tau in *;
-  repeat match goal with
-  | [ H : _ /\ _ |- _] => destruct H
-  | [ H : exists _, _ |- _ ] => destruct H
-  | [ H : @simF _ _ _ ?ltsM ?ltsR _ ?m ?n, W : @weak _ _ ?ltsM ?m ?a _ |- _] =>
-    needs_weak_simpl ltsR n a;
-    destruct (@sim_weak _ _ _ _ _ _ _ _ H _ _ W) as [?[??]]
-  | [ H : @simF _ _ _ ?ltsM ?ltsN _ ?m ?n
-    , T : @clos_trans_1n _ (fun a b => ?ltsM a None b) ?m _
-    |- _ ] =>
-      needs_silent_simpl ltsM ltsN m n;
-      let Th := fresh "Th" in
-      let Tt := fresh "Tt" in
-      destruct (@sim_tau _ _ _ _ _ _ _ _ H _ T) as [?[[|?? Th Tt]?]];
-      [|pose proof (@clos_rt_clos_t _ _ _ _ _ Th Tt)]
-  end.
-
-Hint Extern 0 => progress bisim_simpl : rel_db.
-
-Ltac bisim_cofix :=
-  let CH := fresh "CH" in
-  cofix CH; intros; constructor;
-  (repeat match goal with
-         | [ H : @weak_sim _ _ _ _ _ _ _ |- _ ] => apply out_sim in H
-         end).
-Tactic Notation "solve_bisim" integer(t) := bisim_cofix; eauto t with rel_db.
+Hint Resolve sim_weak : rel_db.
 
 Lemma weak_sim_refl {M A} (lts : LTS M A) : forall x, weak_sim lts lts x x.
-Proof. solve_bisim 8. Qed.
+Proof.
+  cofix CH; intros; repeat constructor; intros; exists m2.
+  split; eauto with rel_db.
+Qed.
 Hint Resolve weak_sim_refl : rel_db.
+
+Lemma weak_sim_silent_clos : forall {M N A ltsM ltsN m1 n1},
+    @weak_sim M N A ltsM ltsN m1 n1 ->
+    forall m2, silent ltsM m1 m2 ->
+                 exists n2, silent ltsN n1 n2 /\ weak_sim ltsM ltsN m2 n2.
+Proof.
+  intros; revert n1 H. induction H0 as [|????? Ih]; intros; eauto with rel_db.
+  apply out_sim in H1. destruct H1 as [H1].
+  specialize (H1 _ _ H). destruct H1 as [n2 [W Ws]].
+  apply Ih in Ws. destruct Ws as [n3 [St Ws]].
+  exists n3. split; eauto with rel_db.
+  inversion W. eapply clos_rt_trans; eauto.
+Qed.
+
+Lemma weak_sim_act_clos : forall {M N A ltsM ltsN m1 n1},
+    @weak_sim M N A ltsM ltsN m1 n1 ->
+    forall m2 a, weak ltsM m1 m2 a ->
+                 exists n2, weak ltsN n1 n2 a /\ weak_sim ltsM ltsN m2 n2.
+Proof.
+  intros. destruct H0 as [a m1' m2' [PRE ACT POST]|TAUs].
+  - apply (weak_sim_silent_clos H) in PRE. destruct PRE as [n2 [S1 W1]].
+    destruct (sim_weak (out_sim W1) ACT) as [n3 [WA2 W2]].
+    apply (weak_sim_silent_clos W2) in POST. destruct POST as [n4 [S2 W3]].
+    exists n4; split; auto.
+    inversion WA2; subst. destruct H1 as [PRE' ACT' POST'].
+    eauto 10 with rel_db.
+  - apply (weak_sim_silent_clos H) in TAUs.
+    destruct TAUs as [n2 [SIL Wk]]; eauto with rel_db.
+Qed.
 
 Lemma weak_sim_trans {M N R A}
   (ltsM : LTS M A) (ltsN : LTS N A) (ltsR : LTS R A)
   : forall x y r, weak_sim ltsM ltsN x y -> weak_sim ltsN ltsR y r ->
                   weak_sim ltsM ltsR x r.
-Proof. solve_bisim 19. Qed.
-Hint Immediate weak_sim_trans : rel_db.
+Proof.
+  cofix CH; intros; repeat constructor; intros.
+  apply out_sim in H; destruct H as [H].
+  specialize (H _ _ H1); destruct H as [n2 [W Ws]].
+  eapply weak_sim_act_clos in H0; eauto. destruct H0 as [n3 [W' Ws']].
+  exists n3. split; eauto with rel_db.
+Qed.
+Hint Resolve weak_sim_trans : rel_db.
 
 Section WeakBisim.
   Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
@@ -139,8 +136,62 @@ Proof. eauto with rel_db. Qed.
 
 Lemma wk_bisim_trans {M A} (lts : LTS M A) : forall x y z,
     weak_bisim lts lts x y -> weak_bisim lts lts y z -> weak_bisim lts lts x z.
-Proof. eauto with rel_db. Qed.
+Admitted.
 
 Lemma wk_bisim_sym {M A} (lts : LTS M A) : forall x y,
     weak_bisim lts lts x y -> weak_bisim lts lts y x.
-Proof. eauto with rel_db. Qed.
+Admitted.
+
+(* DELETE ALL OF THE BELOW *)
+Section WeakSim2.
+  Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
+
+  Record simF2 G m1 n1 :=
+    Pack_sim2
+      { sim_weak2 : forall m2 a,
+          weak ltsM m1 m2 (Some a) ->
+          exists n2, weak ltsN n1 n2  (Some a) /\ G m2 n2;
+        sim_tau2 : forall m2,
+          (*  weak ltsM m1 None m2 -> *)
+          silent1 ltsM m1 m2 ->
+          exists n2, silent ltsN n1 n2 /\ G m2 n2;
+      }.
+
+  CoInductive weak_sim2 (s : M) (t : N) : Prop
+    := In_sim2 { out_sim2 :  simF2 weak_sim2 s t }.
+End WeakSim2.
+Arguments Pack_sim2 {M N A}%_type_scope & {ltsM ltsN G}%_function_scope
+  {m1 n1} (sim_weak2 sim_tau2)%_function_scope.
+Arguments sim_weak2 {M N A}%_type_scope & {ltsM ltsN G%_function_scope m1 n1} s
+  {m2 a} _.
+Arguments sim_tau2 {M N A}%_type_scope & {ltsM ltsN G%_function_scope m1 n1} s
+  {m2} _.
+Hint Constructors simF2 : rel_db.
+Hint Constructors weak_sim2 : rel_db.
+Hint Resolve sim_weak2 sim_tau2 : rel_db.
+
+Goal forall M N A ltsM ltsN m n , @weak_sim M N A ltsM ltsN m n -> @weak_sim2 M N A ltsM ltsN m n.
+Proof.
+  cofix CH.
+  intros; repeat constructor; intros.
+  - eapply weak_sim_act_clos in H; eauto. destruct H as [n2 [W Ws]].
+    exists n2; split; eauto.
+  - apply clos_t_clos_rt in H0.
+    eapply weak_sim_silent_clos in H; eauto. destruct H as [n2 [W Ws]].
+    exists n2; split; eauto.
+Qed.
+
+
+Goal forall M N A ltsM ltsN m n , @weak_sim2 M N A ltsM ltsN m n -> @weak_sim M N A ltsM ltsN m n.
+Proof.
+  cofix CH.
+  intros; repeat constructor; intros. destruct a.
+  - eapply out_sim2, sim_weak2 in H.
+    2: { eapply inject_weak; eauto. }
+    destruct H as [n2 [W Ws]].
+    exists n2; split; eauto.
+  - eapply out_sim2, sim_tau2 in H.
+    2: { apply t1n_step. apply H0. }
+    destruct H as [n2 [W Ws]].
+    exists n2; split; eauto with rel_db.
+Qed.
