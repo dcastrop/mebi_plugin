@@ -269,296 +269,404 @@ Section Test2.
      *)
     cofix CH.
     apply In_sim, Pack_sim; intros.
+    (**=> weak 0 *)
     { repeat destruct H.
       inversion pre; subst; [inversion str|].
       inversion H; subst; unfold tsubst in H, H0; clear H.
       inversion H0; subst.
+    (* ?> weak 0 | CH_ | m2 = tseq (tpar send recv) (tfix ...) *)
       { clear pre H0. inversion str; subst.
         inversion H3; subst. clear H2 H3 str.
         unfold silent in post.
         inversion post; subst.
-        { clear post.
-          eexists. split. econstructor. eexists. constructor.
-          eapply rt1n_trans. econstructor. unfold tsubst. reflexivity.
-          eapply rt1n_trans. unfold tau. eapply do_seq. eapply do_comm.
+    (* ?> weak 0 | CH_ | m2 = tseq (tpar tend tend) (tfix ...) *)
+      { clear post. eexists. split. 
+        { do 2 eexists. apply Pack_weak.
+          eapply rt1n_trans. apply do_fix. unfold tsubst; reflexivity.
+          eapply rt1n_trans. apply do_seq, do_comm.
+          eapply rt1n_refl. apply do_seq, do_handshake.
+          eapply rt1n_trans. apply do_seq, do_par_end.
+          eapply rt1n_trans. apply do_seq_end.
           eapply rt1n_refl.
-          constructor. constructor.
-          eapply rt1n_trans. eapply do_seq, do_par_end.
-          eapply rt1n_trans. eapply do_seq_end.
+        }
+
+        cofix CH0.
+        apply In_sim , Pack_sim; intros.
+    (**=> weak 1 *)
+    { repeat destruct H.
+      inversion pre; subst; [inversion str; subst; inversion H3|].
+      inversion H; subst; unfold tsubst in H, H0; clear H.
+      inversion H5; subst.
+      { clear H5. inversion H0; subst; [inversion str; subst; inversion H4|].
+        inversion H; subst; [inversion H6; subst |].
+        clear H.
+        inversion H1; subst; [inversion str|].
+        inversion H; subst. unfold tsubst in *.
+        clear H. inversion H2; subst.
+        { clear H0 H1 H2. inversion str; subst. inversion H3; subst.
+          clear H2 str pre H3.
+          inversion post; subst.
+    (* ?> weak 1 | CH0 | m2 = tseq (tpar tend tend) (tfix ...) *)
+      { clear post; eexists; split.
+        { do 2 eexists. eapply Pack_weak.
+          eapply rt1n_refl. apply do_seq, do_handshake.
+          eapply rt1n_trans. apply do_seq, do_par_end.
+          eapply rt1n_trans. apply do_seq_end.
           eapply rt1n_refl.
+        }
+        (* Cannot use CH0 due to ill guarded recursion *)
 
-          cofix CH0.
-          apply In_sim , Pack_sim; intros.
-          { repeat destruct H.
-            inversion pre; subst; [inversion str; subst; inversion H3|].
-            inversion H; subst; unfold tsubst in H, H0; clear H.
-            inversion H5; subst.
-            { clear H5. inversion H0; subst; [inversion str; subst; inversion H4|].
-              inversion H; subst; [inversion H6; subst |].
-              clear H.
-              inversion H1; subst; [inversion str|].
-              inversion H; subst. unfold tsubst in *.
-              clear H. inversion H2; subst.
-              { clear H0 H1 H2. inversion str; subst. inversion H3; subst.
-                clear H2 str pre H3.
-                inversion post; subst.
-                { clear post; eexists; split.
-                  eexists. eexists. eapply Pack_weak.
-                  eapply rt1n_refl.
-                  constructor. constructor.
-                  eapply rt1n_trans. eapply do_seq, do_par_end.
-                  eapply rt1n_trans. eapply do_seq_end.
-                  eapply rt1n_refl.
-                  (* Cannot use CH0 due to ill guarded recursion *)
+        cofix CH1.
+        apply In_sim , Pack_sim; intros.
+    (**=> weak 2 *)
+    { repeat destruct H.
+      inversion pre; subst; [inversion str; subst; inversion H3|].
+      inversion H; subst; unfold tsubst in H, H0; clear H.
+      inversion H5; subst.
+      { clear H5. inversion H0; subst; [inversion str; subst; inversion H4|].
+        inversion H; subst; [inversion H6; subst |]; clear H.
+        inversion H1; subst; [inversion str|].
+        inversion H; subst. unfold tsubst in *.
+        clear H. inversion H2; subst.
+        { clear H0 H1 H2. inversion str; subst. inversion H3; subst.
+          clear H2 str pre H3.
 
-                  cofix CH1.
-          apply In_sim , Pack_sim; intros.
-          { repeat destruct H.
-            inversion pre; subst; [inversion str; subst; inversion H3|].
-            inversion H; subst; unfold tsubst in H, H0; clear H.
-            inversion H5; subst.
-            { clear H5. inversion H0; subst; [inversion str; subst; inversion H4|].
-              inversion H; subst; [inversion H6; subst |].
-              clear H.
-              inversion H1; subst; [inversion str|].
-              inversion H; subst. unfold tsubst in *.
-              clear H. inversion H2; subst.
-              { clear H0 H1 H2. inversion str; subst. inversion H3; subst.
-                clear H2 str pre H3.
-                inversion post; subst.
-                { clear post; eexists; split.
-                  eexists. eexists. eapply Pack_weak.
-                  eapply rt1n_trans. eapply do_fix. unfold tsubst. reflexivity.
-                  eapply rt1n_trans. eapply do_seq. eapply do_comm.
-                  eapply rt1n_refl.
-                  constructor. constructor.
-                  eapply rt1n_trans. eapply do_seq, do_par_end.
-                  eapply rt1n_trans. eapply do_seq_end.
-                  eapply rt1n_refl.
-                  eapply CH0.
-                }
-                (* NOTE: continuing from here *)
-                { clear post; eexists; split. 
-                  do 2 eexists. apply Pack_weak. 
-                  eapply rt1n_trans. apply do_fix. unfold tsubst. reflexivity.
-                  eapply rt1n_trans. apply do_seq, do_comm.
-                  eapply rt1n_refl.
-                  constructor. constructor.
-                  eapply rt1n_trans. apply do_seq, do_par_end. 
-                  eapply rt1n_trans. apply do_seq_end.
-                  apply rt1n_refl.
+          eexists; split. 
+          { do 2 eexists. apply Pack_weak. 
+            eapply rt1n_trans. apply do_fix. unfold tsubst; reflexivity.
+            eapply rt1n_trans. apply do_seq, do_comm.
+            eapply rt1n_refl. apply do_seq, do_handshake.
+            eapply rt1n_trans. apply do_seq, do_par_end. 
+            eapply rt1n_trans. apply do_seq_end.
+            apply rt1n_refl.
+          }
 
-                  (* inversion H; subst. inversion H5; subst.
-                  { admit. }
-                  { admit. }
-                  inversion H0; subst.  *)
-                  
+          inversion post; subst; [apply CH0|]; clear post.
+          inversion H; subst. inversion H5; subst.
+    (* !> weak 2 | CH1 | m2 = ... *)
+      { clear H H5. inversion_clear H0; subst; [clear m2|].
+    (* ?> weak 2 | CH1 | m2 = tseq tend (tfix ...) *)
+      { cofix CH2.
+        admit.
+      }
+    (* !> weak 2 | CH1 | m2 = ... *)
+      { inversion H; subst; [inversion H5|]; clear H.
+        inversion H1; subst.
+    (* ?> weak 2 | CH1 | m2 = tfix ... *)
+      { clear H1; cofix CH2. 
+        admit.
+      }
+    (* !> weak 2 | CH1 | m2 = ... *)
+      { inversion H; subst. unfold tsubst in *.
+        inversion H0; subst.
+    (* ?> weak 2 | CH1 | m2 = tseq (tpar send recv) (tfix ...) *)
+      { 
+        (* unfold tau in H; generalize dependent H. cofix CH2_test. intros CH2_H.  *)
+clear H H0 H1; cofix CH2.
+        (* clear H0 H1; cofix CH2. *)
+        apply In_sim , Pack_sim; intros.
+    (**=> weak 3 | CH2 *)
+    { repeat destruct H.
+      admit.
+    }
+    (**=> tau 3 | CH2 *)
+    { eexists. split; [eapply rt1n_refl|]. inversion_clear H; subst.
+      { unfold tau in H0. inversion H0; subst. inversion H4; subst.
+    (* ?> tau 3 | CH2 | m2 = tseq (tpar send recv) (tfix ...) *)
+      clear H0 H4; cofix CH3. apply In_sim , Pack_sim; intros.
+    (**=> weak 4 (tau 3) | CH3 *)
+    { repeat destruct H.
+      admit. 
+    }
+    (**=> tau 4 (tau 3) | CH3 *)
+    { eexists. split; [eapply rt1n_refl|]. inversion_clear H; subst.
+      { unfold tau in H0. inversion H0; subst. inversion H4; subst.
+    (* ?> tau 4 | CH3 | m2 = tseq (tpar send recv) (tfix ...) *)
+        apply CH2. Guarded. } 
+    (* !> tau 4 | CH3 | m2 = ... *)
+      { inversion H0; subst. inversion H5; subst. clear H0 H5.
+        inversion H1; subst; unfold tau in H.
+    (* ?> tau 4 | CH3 | m2 = tseq (tpar recv send) (tfix ...) *)
+      { inversion H; subst. inversion H5; subst. apply CH3. Guarded. }
+      { clear H1; inversion H; subst. inversion H5; subst.
+        clear H H5. inversion H0; subst; unfold tau in H. 
+        { inversion H; subst. inversion H5; subst. apply CH2. Guarded. }
+        {           
+          admit.
+        } } } } }
+    (**=> tau 5 (weak 3) | CH2 *)
+    { inversion H0; subst. inversion H5; subst. clear H0 H5.
+      inversion H1; subst; unfold tau in H.
+      { inversion H; subst. inversion H5; subst. clear H H1 H5.
+        apply CH2. Guarded. }
+      {
+        clear H1. inversion H; subst. inversion H5; subst. clear H H5.
+        inversion H0; subst; unfold tau in H.
+        { admit. } 
+        { admit. }
+         
+      
+      
+        inversion H; subst. inversion H6; subst. clear H H6.
+        inversion H0; subst.
+    (* ?> tau 5 | CH3 | m2 = tseq (tpar recv send) (tfix ...) *)
+        { inversion H; subst. inversion H6; subst.
+          cofix CH3.
 
-                  (* NOTE: allows us to "switch" the constructor we're following *)
-                  (* eapply rt1n_trans in H0; [|apply H]; clear H H5. *)
+          
+
+        }
+      }
+
+    }
+
+        
+          
+          inversion H; subst. 
+          inversion H1; subst. inversion H2; subst.
 
 
+          inversion H; subst. inversion H6; subst. 
+          (* clear H H6.  *)
+          inversion H1; subst.
+          { inversion H6; subst. inversion H12; subst.
 
-                  (* NOTE: handle each case of [m2] *)
-              inversion H; subst. inversion H5; subst.
-              { clear H. inversion_clear H0; subst; [clear m2|].
-                { (* NOTE: case where [m2 = tseq tend (tfix ...)] *)
-              cofix CH2.
-              admit.
-                }
-                { inversion H; subst; [inversion H6|].
-                  clear H H5. inversion_clear H1; subst; [clear m2|].
-                  { (* NOTE: [m2 = tseq (tfix ...) trec] *)
-              cofix CH2. 
-              admit.
-                  }
-                  { inversion H; subst; simpl in H, H0. 
-                    clear H. inversion_clear H0; subst; [clear m2|].
-                    { (* NOTE: [m2 = tseq (tpar send recv) (tfix ...)] *)
-              cofix CH2.
-              admit.
-                    }
-                    { inversion H; subst. inversion H5; subst.
-                      clear H H5. inversion_clear H1; subst; [clear m2|].
-                      { (* NOTE: [m2 = tseq (tpar recv send) (tfix ...)]*)
-              cofix CH2.
-              admit.
-                      }
-                      { inversion H; subst. inversion H5; subst.
-                        clear H H5. inversion_clear H0; subst; [clear m2|].
-                        { (* NOTE: [m2 = tseq (tpar send recv) (tfix ...)] *)
-              (* NOTE: same as 2 cases above  *)
-              admit.
-                        } 
-                        {
-              (* NOTE: will be same as 2 cases above  *)
-              admit.      
-                        }
-                      }
-                    }
-                  }
-                }
+          }
+
+          (* clear H H0 H5 H8.  *)
+          (* clear H H0 H2 H5 H7.  *)
+          (* inversion H1; subst. inversion H6; subst. *)
+          inversion H3; subst. inversion H11; subst.
+          inversion H4; subst. admit.
+
+          } 
+        }
+
+      }
+      }
+    
+
+      }
+    
+      eexists. split.
+
+    }
+        
+
+      }
+      {
+
+      } }
+
+      }
+
+          { inversion H; subst; [inversion H6|].
+            clear H H5. inversion_clear H1; subst; [clear m2|].
+            { (* NOTE: [m2 = tseq (tfix ...) trec] *)
+        cofix CH2. 
+        admit.
+            }
+            { inversion H; subst; simpl in H, H0. 
+              clear H. inversion_clear H0; subst; [clear m2|].
+              { (* NOTE: [m2 = tseq (tpar send recv) (tfix ...)] *)
+        cofix CH2.
+        admit.
               }
-              { clear H5 H. 
-                inversion_clear H0; subst; [clear m2|].
-                { (* NOTE: [m2 = tseq (tpar tend tend) (tfix ...)] *)
-            cofix CH2.
-            admit.
+              { inversion H; subst. inversion H5; subst.
+                clear H H5. inversion_clear H1; subst; [clear m2|].
+                { (* NOTE: [m2 = tseq (tpar recv send) (tfix ...)]*)
+        cofix CH2.
+        admit.
                 }
-                { inversion H; subst. inversion H5; subst. 
-                  { (* NOTE: tpar tend tend => tend *)
-                    clear H H5. inversion_clear H1; subst; [clear m2|].
-                    { (* NOTE: [m2 = tseq tend (tfix ...)] *)
-            cofix CH2.
-            admit.
-                    } 
-                    { inversion H; subst; [inversion H5|].
-                      clear H. inversion_clear H0; subst; [clear m2|].
-                      { (* NOTE: [m2 = tfix ...] *)
-            cofix CH2.
-            admit.
-                      }
-                      { inversion H; subst. simpl in H, H1. 
-                        clear H. inversion_clear H1; subst; [clear m2|].
-                        { (* NOTE: [m2 = tseq (tpar send recv) (tfix ...)] *)
-            cofix CH2.
-            admit.
-                        }
-                        { inversion H; subst. inversion H5; subst.
-                          clear H H5. inversion_clear H0; subst; [clear m2|].
-                          { (* NOTE: [m2 = tseq (tpar recv send) (tfix ...)] *)
-            cofix CH2.
-            admit.
-                          }
-                          { inversion H; subst. inversion H5; subst.
-                            clear H H5. inversion_clear H1; subst; [clear m2|].
-                            { (* NOTE: [m2 = tseq (tpar send recv) (tfix ...)] *)
-            (* NOTE: same as case 2 above *)
-            admit.
-                            }
-                            {
-            (* NOTE: will be same as 2 cases above  *)
-            admit.
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                  { (* NOTE: tpar tend tend => tpar tend tend *)
-                    clear H5 H. inversion_clear H1; [clear m2|].
-                    { (* NOTE: [m2 = tseq (tpar tend tend) (tfix ...)] *)
-            cofix CH2.
-            admit.
-                    }
-                    { inversion H; subst. inversion H5; subst. 
-                      { (* NOTE: tpar tend tend => tend *)
-            (* NOTE: same as an outer-case *)
-            admit.
-                      }
-                      { (* NOTE: tpar tend tend => tpar tend tend *)
-            (* NOTE: same as an outer-case *)
-            admit.
-                      }
-                    }
+                { inversion H; subst. inversion H5; subst.
+                  clear H H5. inversion_clear H0; subst; [clear m2|].
+                  { (* NOTE: [m2 = tseq (tpar send recv) (tfix ...)] *)
+        (* NOTE: same as 2 cases above  *)
+        admit.
+                  } 
+                  {
+        (* NOTE: will be same as 2 cases above  *)
+        admit.      
                   }
                 }
               }
             }
           }
-          { clear H H0 H1 H2 H3 y. 
-            inversion pre; subst; [inversion str; subst; inversion H3|].
-            inversion H; subst. inversion H5; subst.
-            { clear H H5 pre. 
-              inversion H0; subst; [inversion str; subst; inversion H4|].
-              inversion H; subst; [inversion H6|]. clear H H0.
-              inversion H1; subst; [inversion str|]. clear H1. 
-              inversion H; subst. simpl in H0, H. clear H. 
-              inversion H0; subst.
-              { clear H0. inversion str; subst. 
-                inversion H3; subst. clear str H2 H3.
-                inversion post; subst.
-                { clear post. eexists. split.
-                  do 2 eexists. eapply Pack_weak.
-                  eapply rt1n_trans. apply do_fix. simpl; reflexivity.
-                  eapply rt1n_trans. apply do_seq, do_comm.
-                  eapply rt1n_refl. apply do_seq, do_handshake. 
-                  eapply rt1n_trans. apply do_seq, do_par_end.
-                  eapply rt1n_trans. apply do_seq_end.
-                  eapply rt1n_refl.
-                  apply CH0.
+        }
+        { clear H5 H. 
+          inversion_clear H0; subst; [clear m2|].
+          { (* NOTE: [m2 = tseq (tpar tend tend) (tfix ...)] *)
+      cofix CH2.
+      admit.
+          }
+          { inversion H; subst. inversion H5; subst. 
+            { (* NOTE: tpar tend tend => tend *)
+              clear H H5. inversion_clear H1; subst; [clear m2|].
+              { (* NOTE: [m2 = tseq tend (tfix ...)] *)
+      cofix CH2.
+      admit.
+              } 
+              { inversion H; subst; [inversion H5|].
+                clear H. inversion_clear H0; subst; [clear m2|].
+                { (* NOTE: [m2 = tfix ...] *)
+      cofix CH2.
+      admit.
                 }
-                { clear post. eexists. split.
-                  do 2 eexists. eapply Pack_weak.
-                  eapply rt1n_trans. apply do_fix. simpl; reflexivity.
-                  eapply rt1n_trans. apply do_seq, do_comm.
-                  eapply rt1n_refl. apply do_seq, do_handshake. 
-                  eapply rt1n_trans. apply do_seq, do_par_end.
-                  eapply rt1n_trans. apply do_seq_end.
-                  eapply rt1n_refl.
-
-                  inversion H; subst. 
-                  eapply rt1n_trans in H0; [|apply H]; clear H H5.
-                   
-                  inversion H0; subst; [apply CH0|]. 
-
+                { inversion H; subst. simpl in H, H1. 
+                  clear H. inversion_clear H1; subst; [clear m2|].
+                  { (* NOTE: [m2 = tseq (tpar send recv) (tfix ...)] *)
+      cofix CH2.
+      admit.
+                  }
+                  { inversion H; subst. inversion H5; subst.
+                    clear H H5. inversion_clear H0; subst; [clear m2|].
+                    { (* NOTE: [m2 = tseq (tpar recv send) (tfix ...)] *)
+      cofix CH2.
+      admit.
+                    }
+                    { inversion H; subst. inversion H5; subst.
+                      clear H H5. inversion_clear H1; subst; [clear m2|].
+                      { (* NOTE: [m2 = tseq (tpar send recv) (tfix ...)] *)
+      (* NOTE: same as case 2 above *)
+      admit.
+                      }
+                      {
+      (* NOTE: will be same as 2 cases above  *)
+      admit.
+                      }
+                    }
+                  }
                 }
               }
-              {
-
+            }
+            { (* NOTE: tpar tend tend => tpar tend tend *)
+              clear H5 H. inversion_clear H1; [clear m2|].
+              { (* NOTE: [m2 = tseq (tpar tend tend) (tfix ...)] *)
+      cofix CH2.
+      admit.
               }
+              { inversion H; subst. inversion H5; subst. 
+                { (* NOTE: tpar tend tend => tend *)
+      (* NOTE: same as an outer-case *)
+      admit.
+                }
+                { (* NOTE: tpar tend tend => tpar tend tend *)
+      (* NOTE: same as an outer-case *)
+      admit.
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    { clear H H0 H1 H2 H3 y. 
+      inversion pre; subst; [inversion str; subst; inversion H3|].
+      inversion H; subst. inversion H5; subst.
+      { clear H H5 pre. 
+        inversion H0; subst; [inversion str; subst; inversion H4|].
+        inversion H; subst; [inversion H6|]. clear H H0.
+        inversion H1; subst; [inversion str|]. clear H1. 
+        inversion H; subst. simpl in H0, H. clear H.
+        inversion H0; subst.
+        { clear H0. inversion str; subst. 
+          inversion H3; subst. clear str H2 H3.
+          inversion post; subst.
+          { clear post. eexists. split.
+            do 2 eexists. eapply Pack_weak.
+            eapply rt1n_trans. apply do_fix. simpl; reflexivity.
+            eapply rt1n_trans. apply do_seq, do_comm.
+            eapply rt1n_refl. apply do_seq, do_handshake. 
+            eapply rt1n_trans. apply do_seq, do_par_end.
+            eapply rt1n_trans. apply do_seq_end.
+            eapply rt1n_refl.
+            apply CH0.
+          }
+          { clear post. eexists. split.
+            do 2 eexists. eapply Pack_weak.
+            eapply rt1n_trans. apply do_fix. simpl; reflexivity.
+            eapply rt1n_trans. apply do_seq, do_comm.
+            eapply rt1n_refl. apply do_seq, do_handshake. 
+            eapply rt1n_trans. apply do_seq, do_par_end.
+            eapply rt1n_trans. apply do_seq_end.
+            eapply rt1n_refl.
+
+            inversion H; subst. 
+            eapply rt1n_trans in H0; [|apply H]; clear H H5.
               
+            inversion H0; subst; [apply CH0|]. 
 
+            inversion H; subst. inversion H6; subst.
+            { admit. }
+            { admit. }
+          }
+        }
+        { clear H0. inversion H; subst. inversion H5; subst. clear H H5.
+          inversion H1; subst; [inversion str; subst; inversion H4|].
 
-
-            } 
-            {
-
-            }
-            
-            ; unfold tsubst in H, H0; clear H.
-            inversion H5; subst.
-
-          inversion pre. 
-            inversion H0.
-            
-            clear H0 H1 H2. inversion str; subst. inversion H3; subst.
-            clear H2 str pre H3.
+          inversion H; subst; inversion H6; subst; clear H H6.
+          inversion H0; subst.
+          { clear H0. inversion str; subst.
+            inversion H4; subst. clear str H1 H3 H4.
             inversion post; subst.
-            { clear post; eexists; split.
-              eexists. eexists. eapply Pack_weak.
-              eapply rt1n_trans. eapply do_fix. unfold tsubst. reflexivity.
-              eapply rt1n_trans. eapply do_seq. eapply do_comm.
+            { clear post. eexists. split.
+              do 2 eexists. eapply Pack_weak.
+              eapply rt1n_trans. apply do_fix. simpl; reflexivity.
+              eapply rt1n_trans. apply do_seq, do_comm.
+              eapply rt1n_refl. apply do_seq, do_handshake. 
+              eapply rt1n_trans. apply do_seq, do_par_end.
+              eapply rt1n_trans. apply do_seq_end.
               eapply rt1n_refl.
-              constructor. constructor.
-              eapply rt1n_trans. eapply do_seq, do_par_end.
-              eapply rt1n_trans. eapply do_seq_end.
-              eapply rt1n_refl.
-              eapply CH0.
+              apply CH0.
             }
+            { clear post. eexists. split.
+              do 2 eexists. eapply Pack_weak.
+              eapply rt1n_trans. apply do_fix. simpl; reflexivity.
+              eapply rt1n_trans. apply do_seq, do_comm.
+              eapply rt1n_refl. apply do_seq, do_handshake. 
+              eapply rt1n_trans. apply do_seq, do_par_end.
+              eapply rt1n_trans. apply do_seq_end.
+              eapply rt1n_refl.
+
+              inversion H; subst. clear H. inversion H5; subst; clear H5. 
+              { admit. }
+              { admit. } } }
+          { clear H0.
+            admit. 
+          } } }
+          {
+            admit.
+          } } }
+          {
             admit.
           } }
-          { admit.
+          {
+            admit.
+          } } 
+          {
+            admit.
+          } } 
+          {
+            admit.
+          } } 
+          {
+            admit.
+          } } 
+          {
+            admit.
+          } } 
+          {
+            admit.
+          } } 
+          {
+            admit.
           } }
-          { admit.
-          } }
-          { admit.
-          } }
-          { admit.
-          } }
-          { admit.
-          } }
-          { admit.
-          } }
-          { admit.
-          } }
-          { admit.
-          } }
-          { admit.
-          } 
+          {
+            admit.
+          }
+
           
-
-
+  
     (*     } *)
     (*     inversion post. *)
     (*   } *)
