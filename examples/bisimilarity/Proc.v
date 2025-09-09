@@ -337,8 +337,21 @@ Section Test2.
                   eapply rt1n_refl.
                   eapply CH0.
                 }
-                {
-                  admit.
+                { econstructor. split. 
+                  do 2 eexists. apply Pack_weak. 
+                  eapply rt1n_trans. apply do_fix. unfold tsubst. reflexivity.
+                  eapply rt1n_trans. apply do_seq, do_comm.
+                  eapply rt1n_refl.
+                  constructor. constructor.
+                  eapply rt1n_trans. apply do_seq, do_par_end. 
+                  apply rt1n_refl.
+
+                  inversion H0; subst.
+                    inversion H; subst. inversion H5; subst.
+                    admit.
+                    eapply CH0.
+                  
+                  
                 }
               }
               { admit. }
