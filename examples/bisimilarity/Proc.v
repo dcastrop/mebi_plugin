@@ -348,72 +348,20 @@ Section Test2.
                   eapply rt1n_trans. apply do_seq_end.
                   apply rt1n_refl.
 
-                  inversion H; subst.
-                  eapply rt1n_trans in H0; [|apply H]; clear H H5 t'.
-                  inversion H0; subst; [apply CH0|]. clear H0.
+                  (* inversion H; subst. inversion H5; subst.
+                  { admit. }
+                  { admit. }
+                  inversion H0; subst.  *)
                   
-                  inversion H; subst. inversion H5; subst.
-                  { eapply rt1n_trans in H1; [|apply H]. clear H H5.
-                    inversion H1; subst; [apply CH0|]. clear H0.
 
-                    inversion H; subst. inversion H5; subst.
+                  (* NOTE: allows us to "switch" the constructor we're following *)
+                  (* eapply rt1n_trans in H0; [|apply H]; clear H H5. *)
 
 
-                  }
-
-
-                  (* inversion H; subst.
-                  eapply rt1n_trans in H1; [|apply H]; clear H H5 t'.
-                  inversion H1; subst; [apply CH0|]. clear H1.
-
-                  inversion H; subst.
-                  eapply rt1n_trans in H0; [|apply H]; clear H H5 t'.
-                  inversion H0; subst; [apply CH0|]. clear H0.
-
-                  inversion H; subst.
-                  eapply rt1n_trans in H1; [|apply H]; clear H H5 t'.
-                  inversion H1; subst; [apply CH0|]. clear H1.
-
-                  eapply rt1n_trans in H1; [|apply H].
-                  
-                  clear H H5 t'.
-                  inversion H1; subst.
-                  { clear H1. inversion H6; subst.
-
-
-
-                  }
-                  {
-
-                  } 
-                    inversion H6; subst.
-                    admit. 
-
-
-
-                   *)
-
-                  (* NOTE: CHm2 stops repeatitive cases later on *)
-                  cofix CHm2.
-                  inversion H0; subst.
-                  { apply CHm2. Guarded. } (* Without CHm2 would go on forever *)
-                  { 
-                    cofix CHm2_1.
-                    clear H0. inversion H; subst.
-                    eapply rt1n_trans in H1; [|apply H]; clear H H5 t'.
-                    inversion H1; subst.
-                    { apply CHm2_1. Guarded.  
-                    clear H1. cofix CH2.
-                      admit.
-                    }
-                    { apply CHm2_1. Guarded.  }
-                  }
-                  
-                  [eapply CH0|].
 
                   (* NOTE: handle each case of [m2] *)
               inversion H; subst. inversion H5; subst.
-              { clear H post. inversion_clear H0; subst; [clear m2|].
+              { clear H. inversion_clear H0; subst; [clear m2|].
                 { (* NOTE: case where [m2 = tseq tend (tfix ...)] *)
               cofix CH2.
               admit.
@@ -451,7 +399,7 @@ Section Test2.
                   }
                 }
               }
-              { clear H5 H post. 
+              { clear H5 H. 
                 inversion_clear H0; subst; [clear m2|].
                 { (* NOTE: [m2 = tseq (tpar tend tend) (tfix ...)] *)
             cofix CH2.
