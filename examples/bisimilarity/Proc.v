@@ -237,8 +237,75 @@ Section Test1.
     
   Example wsim_rq : weak_sim termLTS termLTS r q. 
   Proof. intros; subst; unfold r, q.
-  Admitted.
     
+    cofix CH0; apply In_sim, Pack_sim; intros.
+    inversion H; subst. inversion H4; subst; clear H H4.
+    eexists; split.
+    { eapply wk_none; unfold silent.
+      eapply rt1n_trans. do 2 constructor. unfold tsubst in *.
+      eapply rt1n_trans. do 2 constructor.
+      eauto with rel_db. }
+    
+    cofix CH1; apply In_sim, Pack_sim; intros.
+    inversion H; subst. inversion H4; subst; clear H H4; try clear H3.
+    { eexists; split.
+      { eapply wk_some; unfold silent.
+        eauto with rel_db. do 2 constructor.
+        eapply rt1n_trans. do 2 constructor.
+        eapply rt1n_trans. do 2 constructor.
+        eauto with rel_db. }
+      
+      cofix CH2; apply In_sim, Pack_sim; intros.
+      inversion H; subst. inversion H4; subst; clear H H4.
+      { eexists; split. eauto with rel_db.
+
+        cofix CH3; apply In_sim, Pack_sim; intros.
+        inversion H; subst; [inversion H4|]; clear H.
+        eexists; split. eauto with rel_db.
+
+        cofix CH4; apply In_sim, Pack_sim; intros.
+        inversion H; subst; clear H.
+        eexists; split. eauto with rel_db.
+        
+        cofix CH5; apply In_sim, Pack_sim; intros.
+        inversion H; subst. inversion H4; subst; clear H H4; try clear H3.
+        { eexists; split.
+          { eapply wk_some; unfold silent.
+            eauto with rel_db. do 2 constructor.
+            eapply rt1n_trans. do 2 constructor.
+            eapply rt1n_trans. do 2 constructor.
+            eapply rt1n_trans. do 2 constructor. unfold tsubst in *.
+            eapply rt1n_trans. do 2 constructor.
+            eauto with rel_db. }
+
+          cofix CH6; apply In_sim, Pack_sim; intros.
+          inversion H; subst. inversion H4; subst; clear H H4.
+          { eexists; split. eauto with rel_db.
+
+            cofix CH7; apply In_sim, Pack_sim; intros.
+            inversion H; subst; [inversion H4|]; clear H.
+            eexists; split. eauto with rel_db. 
+
+            cofix CH8; apply In_sim, Pack_sim; intros.
+            inversion H; subst.
+            eauto with rel_db. Guarded. }
+          { eexists; split. eauto with rel_db.
+            eauto with rel_db. Guarded. } }
+        { eexists; split. eauto with rel_db.
+
+          cofix CH6; apply In_sim, Pack_sim; intros.
+          inversion H; subst. inversion H4; subst; clear H H4.
+          eauto with rel_db. Guarded. } }
+      { eexists; split. eauto with rel_db.
+        eauto with rel_db. Guarded. } }
+    { eexists; split. eauto with rel_db.
+
+      cofix CH2; apply In_sim, Pack_sim; intros.
+      inversion H; subst. inversion H4; subst; clear H H4.
+      eexists; split. eauto with rel_db.
+      eauto with rel_db. Guarded. }
+  Qed.
+  
   Theorem wbisim_qr : weak_bisim termLTS termLTS q r.
   Proof. unfold weak_bisim; split; [apply wsim_qr | apply wsim_rq]. Qed.
 
