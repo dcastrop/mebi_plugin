@@ -1323,12 +1323,12 @@ MeBi Dump "g1_FSM_weak" FSM Bounded 5 Of g1 Weak SILENT Of action Using bigstep 
        Using bigstep lts step. *)
 
 (* true ? *)
-MeBi 
+(* MeBi 
   (* Show *)
   Dump "g1_weak" 
      Bisim LTS Bounded 50 Of g1  With bigstep  Weak SILENT Of action
        And LTS Bounded 50 Of g1  With lts      Weak SILENT Of action
-       Using bigstep lts step.
+       Using bigstep lts step. *)
 
 
 
