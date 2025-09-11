@@ -410,8 +410,8 @@ Module Test2.
           inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
           { eexists; split.
             { eapply wk_some; unfold silent.
-              eapply rt1n_trans. do 2 constructor. unfold tsubst in *; reflexivity.
-              eapply rt1n_trans. do 2 constructor. unfold tsubst in *; reflexivity.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
               eauto with rel_db. do 2 constructor.
               eauto with rel_db. }
             
@@ -505,8 +505,8 @@ Module Test2.
           { eexists; split.
             { eapply wk_some; unfold silent.
               eauto with rel_db. do 2 constructor.
-              eapply rt1n_trans. do 2 constructor. unfold tsubst in *; reflexivity.
-              eapply rt1n_trans. do 2 constructor. unfold tsubst in *; reflexivity.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
               eauto with rel_db. }
 
             cofix CH5; apply In_sim, Pack_sim; intros.
@@ -529,11 +529,293 @@ Module Test2.
           eauto with rel_db. Guarded. } } }
     { eexists; split. eauto with rel_db.
 
-      admit. }
+      cofix CH1; apply In_sim, Pack_sim; intros.
+      inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+      { eexists; split. eauto with rel_db.
+
+        cofix CH2; apply In_sim, Pack_sim; intros.
+        inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+        { eexists; split.
+          { eapply wk_some; unfold silent.
+            eauto with rel_db. do 2 constructor.
+            eauto with rel_db. }
+          
+          cofix CH3; apply In_sim, Pack_sim; intros.
+          inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+          { eexists; split.
+            { eapply wk_some; unfold silent.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+              eauto with rel_db. do 2 constructor.
+              eauto with rel_db. }
+            
+            cofix CH4; apply In_sim, Pack_sim; intros.
+            inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+            { eexists; split. eauto with rel_db.
+
+              cofix CH5; apply In_sim, Pack_sim; intros.
+              inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+              { eexists; split. eauto with rel_db.
+                eauto with rel_db. Guarded. }
+              { eexists; split. eauto with rel_db.
+              
+                cofix CH6; apply In_sim, Pack_sim; intros.
+                inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+                { eexists; split. eauto with rel_db.
+                  
+                  cofix CH7; apply In_sim, Pack_sim; intros.
+                  inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+                  
+                  eexists; split. eauto with rel_db.
+                  eauto with rel_db. Guarded. }
+                { eexists; split. eauto with rel_db.
+                  eauto with rel_db. Guarded. } } }
+            { eexists; split. eauto with rel_db.
+              eauto with rel_db. Guarded. }
+            { eexists; split. eauto with rel_db.
+
+              cofix CH5; apply In_sim, Pack_sim; intros.
+              inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+              { eexists; split. eauto with rel_db.
+
+                cofix CH6; apply In_sim, Pack_sim; intros.
+                inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+                { eexists; split. eauto with rel_db.
+
+                  cofix CH7; apply In_sim, Pack_sim; intros.
+                  inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+                  eexists; split. eauto with rel_db.
+                  eauto with rel_db. Guarded. } 
+                { eexists; split. eauto with rel_db.
+                  eauto with rel_db. Guarded. } }
+              { eexists; split. eauto with rel_db.
+
+                cofix CH6; apply In_sim, Pack_sim; intros.
+                  inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+                  { eexists; split. eauto with rel_db.
+
+                    cofix CH7; apply In_sim, Pack_sim; intros.
+                    inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+                    eexists; split. eauto with rel_db.
+                    eauto with rel_db. Guarded. } 
+                  { eexists; split. eauto with rel_db.
+
+                    cofix CH7; apply In_sim, Pack_sim; intros.
+                    inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+                    { eexists; split. eauto with rel_db.
+                      eauto with rel_db. Guarded. }
+                    { eexists; split. eauto with rel_db.
+                      eauto with rel_db. Guarded. } } }
+              { eexists; split. eauto with rel_db.
+                eauto with rel_db. Guarded. } } }
+          { eexists; split.
+            { eapply wk_none; unfold silent.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+              eauto with rel_db. }
+            
+            cofix CH4; apply In_sim, Pack_sim; intros.
+            inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+            eexists; split. eauto with rel_db.
+            
+            cofix CH5; apply In_sim, Pack_sim; intros.
+            inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+            { eexists; split.
+              { eapply wk_some; unfold silent.
+                eauto with rel_db. do 2 constructor.
+                eauto with rel_db. }
+              eauto with rel_db. Guarded. }
+            { eexists; split. eauto with rel_db.
+              eauto with rel_db. Guarded. } } }
+        { eexists; split. eauto with rel_db. 
+
+          cofix CH3; apply In_sim, Pack_sim; intros.
+          inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+          eexists; split. eauto with rel_db.
+          eauto with rel_db. Guarded. } }
+      { eexists; split. eauto with rel_db.
+       
+        cofix CH2; apply In_sim, Pack_sim; intros.
+        inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+        { eexists; split. eauto with rel_db.
+    
+          cofix CH3; apply In_sim, Pack_sim; intros.
+          inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+          eexists; split. eauto with rel_db.
+    
+          cofix CH4; apply In_sim, Pack_sim; intros.
+          inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+          { eexists; split.
+            { eapply wk_some; unfold silent.
+              eauto with rel_db. do 2 constructor.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+              eauto with rel_db. }
+            
+            cofix CH5; apply In_sim, Pack_sim; intros.
+            inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+            { eexists; split.
+              { eapply wk_some; unfold silent.
+                eauto with rel_db. do 2 constructor.
+                eauto with rel_db. }
+              eauto with rel_db. Guarded. } 
+            { eexists; split. eauto with rel_db. 
+
+              cofix CH6; apply In_sim, Pack_sim; intros.
+              inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+              eexists; split. eauto with rel_db.
+              eauto with rel_db. Guarded. } }
+          { eexists; split. eauto with rel_db.
+            eauto with rel_db. Guarded. } }
+        { eexists; split. eauto with rel_db.
+          eauto with rel_db. Guarded. } } }
     { eexists; split. eauto with rel_db.
 
-      admit. }
-  Admitted.
+      cofix CH1; apply In_sim, Pack_sim; intros.
+      inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+      { eexists; split. eauto with rel_db.
+
+        cofix CH2; apply In_sim, Pack_sim; intros.
+        inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+        { eexists; split. eauto with rel_db.
+    
+          cofix CH3; apply In_sim, Pack_sim; intros.
+          inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+          eexists; split. eauto with rel_db.
+    
+          cofix CH4; apply In_sim, Pack_sim; intros.
+          inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+          { eexists; split.
+            { eapply wk_some; unfold silent.
+              eauto with rel_db. do 2 constructor.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+              eauto with rel_db. }
+
+            cofix CH5; apply In_sim, Pack_sim; intros.
+            inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+            { eexists; split.
+              { eapply wk_some; unfold silent.
+                eauto with rel_db. do 2 constructor.
+                eauto with rel_db. }
+              eauto with rel_db. Guarded. } 
+            { eexists; split. eauto with rel_db. 
+
+              cofix CH6; apply In_sim, Pack_sim; intros.
+              inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+              eexists; split. eauto with rel_db.
+              eauto with rel_db. Guarded. } }
+          { eexists; split. eauto with rel_db.
+            eauto with rel_db. Guarded. } }
+        { eexists; split. eauto with rel_db.
+    
+          cofix CH3; apply In_sim, Pack_sim; intros.
+          inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+          { eexists; split. eauto with rel_db.
+    
+            cofix CH4; apply In_sim, Pack_sim; intros.
+            inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+            { eexists; split. 
+              { eapply wk_some; unfold silent.
+                eauto with rel_db. do 2 constructor.
+                eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+                eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+                eauto with rel_db. }
+                
+              cofix CH5; apply In_sim, Pack_sim; intros.
+              inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+              { eexists; split.
+                { eapply wk_some; unfold silent.
+                  eauto with rel_db. do 2 constructor.
+                  eauto with rel_db. }
+                eauto with rel_db. Guarded. } 
+              { eexists; split. eauto with rel_db. 
+
+                cofix CH6; apply In_sim, Pack_sim; intros.
+                inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+                eexists; split. eauto with rel_db.
+                eauto with rel_db. Guarded. } }
+            { eexists; split. eauto with rel_db.
+
+              cofix CH5; apply In_sim, Pack_sim; intros.
+              inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+              eexists; split. eauto with rel_db.
+              eauto with rel_db. Guarded. } }
+          { eexists; split. eauto with rel_db.
+            eauto with rel_db. Guarded. } } }
+      { eexists; split. eauto with rel_db.
+
+        cofix CH2; apply In_sim, Pack_sim; intros.
+        inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+        { eexists; split. eauto with rel_db.
+    
+          cofix CH3; apply In_sim, Pack_sim; intros.
+          inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+          eexists; split. eauto with rel_db.
+    
+          cofix CH4; apply In_sim, Pack_sim; intros.
+          inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+          { eexists; split. 
+            { eapply wk_some; unfold silent.
+              eauto with rel_db. do 2 constructor.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+              eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+              eauto with rel_db. }
+              
+            cofix CH5; apply In_sim, Pack_sim; intros.
+            inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+            { eexists; split.
+              { eapply wk_some; unfold silent.
+                eauto with rel_db. do 2 constructor.
+                eauto with rel_db. }
+              eauto with rel_db. Guarded. } 
+            { eexists; split. eauto with rel_db.
+
+              cofix CH6; apply In_sim, Pack_sim; intros.
+              inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+              eexists; split. eauto with rel_db.
+              eauto with rel_db. Guarded. } }
+          { eexists; split. eauto with rel_db.
+            eauto with rel_db. Guarded. } }
+        { eexists; split. eauto with rel_db.
+    
+          cofix CH3; apply In_sim, Pack_sim; intros.
+          inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+          { eexists; split. eauto with rel_db.
+
+            cofix CH4; apply In_sim, Pack_sim; intros.
+            inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+            { eexists; split. 
+              { eapply wk_some; unfold silent.
+                eauto with rel_db. do 2 constructor.
+                eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+                eapply rt1n_trans. do 3 constructor. unfold tsubst in *.
+                eauto with rel_db. }
+                
+              cofix CH5; apply In_sim, Pack_sim; intros.
+              inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+              { eexists; split.
+                { eapply wk_some; unfold silent.
+                  eauto with rel_db. do 2 constructor.
+                  eauto with rel_db. }
+                eauto with rel_db. Guarded. } 
+              { eexists; split. eauto with rel_db. 
+
+                cofix CH6; apply In_sim, Pack_sim; intros.
+                inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+                eexists; split. eauto with rel_db.
+                eauto with rel_db. Guarded. } }
+            { eexists; split. eauto with rel_db.
+
+              cofix CH5; apply In_sim, Pack_sim; intros.
+              inversion H; subst; try (inversion H4; subst; clear H4); clear H; try clear H3.
+              eexists; split. eauto with rel_db.
+              eauto with rel_db. Guarded. } } 
+          { eexists; split. eauto with rel_db.
+            eauto with rel_db. Guarded. } } }
+      { eexists; split. eauto with rel_db.
+        eauto with rel_db. Guarded. } }
+  Qed.
 
   Example wsim_qp : weak_sim termLTS termLTS q p. 
   Proof. intros; subst; unfold q, p.
