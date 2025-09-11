@@ -74,7 +74,7 @@ Module Test1.
                            (tfix (tseq (tpar (tact (send A) tend) 
                                              (tact (recv A) tend)) trec)).
 
-Section ManualProofs.
+Module ManualProofs.
   (****************************************************************************)
   Example wsim_pq : weak_sim termLTS termLTS p q. 
   Proof. intros; subst; unfold p, q.
@@ -419,6 +419,7 @@ Section ManualProofs.
   Proof. unfold weak_bisim; split; [apply wsim_pr | apply wsim_rp]. Qed.
 End ManualProofs.
 
+Module LtacProofs.
   (****************************************************************************)
   Ltac wsim_handle_wk_trans :=
     match goal with
@@ -498,6 +499,7 @@ End ManualProofs.
 
   Theorem wbisim_pr : weak_bisim termLTS termLTS p r.
   Proof. unfold weak_bisim; split; [apply wsim_pr | apply wsim_rp]. Qed.
+End LtacProofs.
 End Test1.
 
 Module Test2.
