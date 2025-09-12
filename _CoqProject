@@ -18,7 +18,7 @@ examples/properties/mutual_exclusion.v
 
 # examples/bisimilarity/nat_streams.v
 # examples/bisimilarity/CADP_simple.v
-# examples/bisimilarity/Proc.v
+examples/bisimilarity/Proc.v
 
 
 src/utils.ml

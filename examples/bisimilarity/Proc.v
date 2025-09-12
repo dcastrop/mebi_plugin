@@ -462,7 +462,7 @@ Module LtacProofs.
 
   Ltac wsim_next_case :=
     tryif solve [eauto with rel_db] 
-    then idtac "solved case" else wsim_cofix.
+    then idtac (* "solved case" *) else wsim_cofix.
 
   Ltac wsim_begin := 
     intros; subst;
@@ -984,7 +984,7 @@ Module Test2.
 
   Ltac wsim_next_case :=
     tryif solve [eauto with rel_db] 
-    then idtac "solved case" else wsim_cofix.
+    then idtac (* "solved case" *) else wsim_cofix.
 
   Ltac wsim_begin := 
     intros; subst;
