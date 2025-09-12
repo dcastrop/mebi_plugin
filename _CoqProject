@@ -18,6 +18,8 @@ examples/properties/mutual_exclusion.v
 
 # examples/bisimilarity/nat_streams.v
 # examples/bisimilarity/CADP_simple.v
+
+### NOTE: csaes compilation to take far longer
 examples/bisimilarity/Proc.v
 
 
