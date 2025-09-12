@@ -418,6 +418,7 @@ let rec check_updated_ctx
   = function
   | [], [] -> return (Some acc)
   | _ :: substl, t :: tl ->
+    (* Log.warning ~params "B"; *)
     let$+ upd_t env sigma =
       EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
     in
@@ -426,12 +427,33 @@ let rec check_updated_ctx
      | App (fn, args) ->
        (match F.find_opt fn_cindef fn with
         | None ->
+          (* TODO: investigate why this causes an index out of bounds error *)
+          (* let* success = m_unify ~params args.(1) args.(2) in
+             if success
+             then (
+             Log.warning
+             ~params
+             (Printf.sprintf
+             "check_updated_ctx, unified non-lts fn \"%s (%s) (%s)\"."
+             (econstr_to_string fn)
+             (econstr_to_string args.(1))
+             (econstr_to_string args.(2)));
+             check_updated_ctx
+             acc
+             (* ( fst acc
+             , List.concat_map
+             (fun x -> List.map (fun y -> y :: x) ctors)
+             (snd acc) ) *)
+             fn_cindef
+             (substl, tl))
+             else *)
           Log.warning
             ~params
             (Printf.sprintf
-               "check_updated_ctx, fn_cindef does not have corresponding fn: \
-                %s."
-               (econstr_to_string fn));
+               "check_updated_ctx, fn_cindef does not have corresponding fn \
+                \"%s\" with args: %s."
+               (econstr_to_string fn)
+               (econstr_list_to_string (Array.to_list args)));
           check_updated_ctx acc fn_cindef (substl, tl)
         | Some c ->
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
@@ -487,6 +509,7 @@ and check_valid_constructor
   params.kind <- Debug ();
   (* let$+ t env sigma = Reductionops.nf_all env sigma t' in *)
   let* (t : EConstr.t) = normalize_econstr t' in
+  (* Log.warning ~params "A"; *)
   let iter_body (i : int) (ctor_vals : coq_ctor list) =
     (* let* _ = if is_output_kind_enabled params then debug (fun env sigma ->
        str "CHECKING CONSTRUCTOR " ++ int i ++ str ". Term: " ++
@@ -514,6 +537,7 @@ and check_valid_constructor
             fn_cindef
             (substl, ctx_tys)
         in
+        (* Log.warning ~params "C"; *)
         let$+ act env sigma = Reductionops.nf_all env sigma act in
         let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in
         match next_ctors with

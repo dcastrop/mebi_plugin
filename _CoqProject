@@ -1,7 +1,11 @@
 src/META.coq-mebi
 -R theories/ MEBI
 -R examples/ MEBI.Examples
--R examples/properties/ MEBI.Examples.Properties
+# -R examples/bisimilarity/Proc/Test1/ MEBI.Examples.ProcTest1
+# -R examples/bisimilarity/Proc/Test2/ MEBI.Examples.ProcTest2
+# -R examples/bisimilarity/Proc/Test1/ MEBI.Exampless.Bisimilarity.Proc.Test1.Terms
+# -R examples/bisimilarity/Proc/Test2/ MEBI.Exampless.Bisimilarity.Proc.Test2.Terms
+# -R examples/properties/ MEBI.Examples.Properties
 -I src/
 -arg "-w all"
 
@@ -19,9 +23,14 @@ examples/properties/mutual_exclusion.v
 # examples/bisimilarity/nat_streams.v
 # examples/bisimilarity/CADP_simple.v
 
-### NOTE: csaes compilation to take far longer
-examples/bisimilarity/Proc.v
+examples/bisimilarity/Proc/Test1/Terms.v
+examples/bisimilarity/Proc/Test2/Terms.v
 
+### NOTE: makes compilation to take far longer
+# examples/bisimilarity/Proc/Test1/ManualProofs.v
+# examples/bisimilarity/Proc/Test1/LtacProofs.v
+# examples/bisimilarity/Proc/Test2/ManualProofs.v
+# examples/bisimilarity/Proc/Test2/LtacProofs.v
 
 src/utils.ml
 src/utils.mli
