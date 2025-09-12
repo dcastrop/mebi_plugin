@@ -622,6 +622,51 @@ let econstr_to_string (x : EConstr.t) : string =
   run ~keep_encoding:true s_mm
 ;;
 
+let constr_list_to_string (xs : Constr.t list) : string =
+  match xs with
+  | [] -> "[]"
+  | h :: [] -> constr_to_string h
+  | h :: t ->
+    let s_mm : string mm =
+      let open Syntax in
+      let* env = get_env in
+      let* sigma = get_sigma in
+      return
+        (List.fold_left
+           (fun (str : string) (x : Constr.t) ->
+             Printf.sprintf
+               ", %s"
+               (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma x)))
+           (constr_to_string h)
+           t)
+    in
+    run ~keep_encoding:true s_mm
+;;
+
+let econstr_list_to_string (xs : EConstr.t list) : string =
+  match xs with
+  | [] -> "[]"
+  | h :: [] -> Printf.sprintf "[%s]" (econstr_to_string h)
+  | h :: t ->
+    let s_mm : string mm =
+      let open Syntax in
+      let* env = get_env in
+      let* sigma = get_sigma in
+      return
+        (Printf.sprintf
+           "[%s]"
+           (List.fold_left
+              (fun (acc : string) (x : EConstr.t) ->
+                Printf.sprintf
+                  "%s, %s"
+                  acc
+                  (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma x)))
+              (econstr_to_string h)
+              t))
+    in
+    run ~keep_encoding:true s_mm
+;;
+
 (********************************************)
 (****** COQ CONSTR TREE *********************)
 (********************************************)

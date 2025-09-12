@@ -1,4 +1,4 @@
-(* Require Import MEBI.loader. *)
+Require Import MEBI.loader.
 Require Coq.Program.Tactics.
 
 Require Import MEBI.Bisimilarity.
@@ -9,7 +9,7 @@ Require Import Relation_Operators.
 Require Operators_Properties.
 
 (****************************************************************************)
-Module Flat_Tests.
+Module FlatTests.
 Import Flat.
 
 (****************************************************************************)
@@ -1022,4 +1022,36 @@ Module Test2.
   Theorem wbisim_pr : weak_bisim termLTS termLTS p r.
   Proof. unfold weak_bisim; split; [apply wsim_pr | apply wsim_rp]. Qed.
 End Test2.
-End Flat_Tests.
+End FlatTests.
+
+Module PluginTest1.
+  Import Flat.
+  Import Flat.Simple.
+  Import FlatTests.Test1.
+  Print p.
+
+MeBi Dump "proc_t1_p" LTS Bounded 1000 Of p Using termLTS.
+MeBi Dump "proc_t1_q" LTS Bounded 1000 Of q Using termLTS.
+MeBi Dump "proc_t1_r" LTS Bounded 1000 Of r Using termLTS.
+
+End PluginTest1.
+
+Module PluginTest2.
+  Import Flat.
+  Import Flat.Complex.
+  Import FlatTests.Test2.
+
+MeBi Dump "proc_t2_p" LTS Bounded 1000 Of p Using termLTS.
+MeBi Dump "proc_t2_q" LTS Bounded 1000 Of q Using termLTS.
+MeBi Dump "proc_t2_r" LTS Bounded 1000 Of r Using termLTS.
+
+End PluginTest2.
+
+Import Flat.
+Print FlatTests.Test1.p.
+Print FlatTests.Test1.q.
+Print FlatTests.Test1.r.
+
+Print FlatTests.Test2.p.
+Print FlatTests.Test2.q.
+Print FlatTests.Test2.r.
