@@ -224,217 +224,6 @@ let rec iterate
 ;;
 
 (********************************************)
-(****** ERRORS ******************************)
-(********************************************)
-
-module type ERROR_TYPE = sig
-  type mebi_error =
-    | InvalidLTSSort of Sorts.family
-    | InvalidArity of Environ.env * Evd.evar_map * Constr.types
-    | InvalidRefLTS of Names.GlobRef.t
-    | InvalidRefType of Names.GlobRef.t
-    | UnknownTermType of
-        (Environ.env * Evd.evar_map * (term * term * term list))
-    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
-    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
-    | ExpectedCoqIndDefOfLTSNotType of unit
-
-  exception MEBI_exn of mebi_error
-
-  val invalid_sort : Sorts.family -> exn
-  val invalid_arity : Environ.env -> Evd.evar_map -> Constr.types -> exn
-  val invalid_ref_lts : Names.GlobRef.t -> exn
-  val invalid_ref_type : Names.GlobRef.t -> exn
-  val invalid_cindef_kind : unit -> exn
-
-  val unknown_term_type
-    :  Environ.env
-    -> Evd.evar_map
-    -> term * term * term list
-    -> exn
-
-  val primary_lts_not_found
-    :  Environ.env
-    -> Evd.evar_map
-    -> term
-    -> term list
-    -> exn
-
-  val unknown_decode_key : Environ.env -> Evd.evar_map -> E.t -> term B.t -> exn
-end
-
-module Error : ERROR_TYPE = struct
-  type mebi_error =
-    | InvalidLTSSort of Sorts.family
-    | InvalidArity of Environ.env * Evd.evar_map * Constr.types
-    | InvalidRefLTS of Names.GlobRef.t
-    | InvalidRefType of Names.GlobRef.t
-    | UnknownTermType of
-        (Environ.env * Evd.evar_map * (term * term * term list))
-    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
-    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
-    | ExpectedCoqIndDefOfLTSNotType of unit
-
-  exception MEBI_exn of mebi_error
-
-  (** Error when input LTS has the wrong arity *)
-  let invalid_sort f = MEBI_exn (InvalidLTSSort f)
-
-  (** Error when input LTS has the wrong Sort *)
-  let invalid_arity ev sg t = MEBI_exn (InvalidArity (ev, sg, t))
-
-  (** Error when input LTS reference is invalid (e.g. non existing) *)
-  let invalid_ref_lts r = MEBI_exn (InvalidRefLTS r)
-
-  let invalid_ref_type r = MEBI_exn (InvalidRefType r)
-
-  (** Error when input LTS reference is invalid (e.g. non existing) *)
-  let invalid_cindef_kind () = MEBI_exn (ExpectedCoqIndDefOfLTSNotType ())
-
-  (** Error when term is of unknown type *)
-  let unknown_term_type ev sg tmty = MEBI_exn (UnknownTermType (ev, sg, tmty))
-
-  (** Error when multiple coq-LTS provided, but none of them match term. *)
-  let primary_lts_not_found ev sg t names =
-    MEBI_exn (PrimaryLTSNotFound (ev, sg, t, names))
-  ;;
-
-  (** Error when multiple coq-LTS provided, but none of them match term. *)
-  let unknown_decode_key ev sg k bckmap =
-    MEBI_exn (UnknownDecodeKey (ev, sg, k, bckmap))
-  ;;
-
-  open Pp
-
-  let mebi_handler = function
-    | ExpectedCoqIndDefOfLTSNotType () ->
-      str
-        "cindef (Coq Inductive Definition) of LTS was expected, but Type was \
-         used."
-    | InvalidLTSSort f ->
-      str "Invalid LTS Sort: expecting Prop, got " ++ Sorts.pr_sort_family f
-    | InvalidArity (ev, sg, t) ->
-      str "Invalid arity for LTS: "
-      ++ Printer.pr_constr_env ev sg t
-      ++ strbrk "\n"
-      ++ str "Expecting: forall params, ?terms -> ?labels -> ?terms -> Prop"
-    | InvalidRefLTS r -> str "Invalid ref LTS: " ++ Printer.pr_global r
-    | InvalidRefType r -> str "Invalid ref Type: " ++ Printer.pr_global r
-    | UnknownTermType (ev, sg, (tm, ty, trkeys)) ->
-      str
-        "None of the constructors provided matched type of term to visit. \
-         (unknown_term_type) "
-      ++ strbrk "\n\n"
-      ++ str "Term: "
-      ++ Printer.pr_econstr_env ev sg tm
-      ++ strbrk "\n\n"
-      ++ str "Type: "
-      ++ Printer.pr_econstr_env ev sg ty
-      ++ strbrk "\n\n"
-      ++ str
-           (Printf.sprintf
-              "Keys: %s"
-              (if List.is_empty trkeys
-               then "[ ] (empty)"
-               else
-                 Printf.sprintf
-                   "[%s ]"
-                   (List.fold_left
-                      (fun (acc : string) (k : term) ->
-                        Printf.sprintf
-                          "%s '%s'"
-                          acc
-                          (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg k)))
-                      ""
-                      trkeys)))
-      ++ strbrk "\n\n"
-      ++ str
-           (Printf.sprintf
-              "Does Type match EConstr of any Key? = %b"
-              (List.exists (fun (k : term) -> EConstr.eq_constr sg ty k) trkeys))
-      ++ strbrk "\n"
-      ++ str
-           (let tystr = Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg ty) in
-            Printf.sprintf
-              "Does Type match String of any Key? = %b"
-              (List.exists
-                 (fun (k : term) ->
-                   String.equal
-                     tystr
-                     (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg k)))
-                 trkeys))
-    | PrimaryLTSNotFound (ev, sg, t, names) ->
-      str "Primary LTS Not found for term: "
-      ++ Printer.pr_econstr_env ev sg t
-      ++ strbrk "\n\n"
-      ++ str "constructor names: "
-      ++ List.fold_left
-           (fun (acc : Pp.t) (name : EConstr.t) -> acc)
-           (Printer.pr_econstr_env ev sg (List.hd names))
-           (List.tl names)
-    | UnknownDecodeKey (ev, sg, k, bckmap) ->
-      str "(TODO: unknown decode key error)"
-  ;;
-
-  let _ =
-    CErrors.register_handler (fun e ->
-      match e with MEBI_exn e -> Some (mebi_handler e) | _ -> None)
-  ;;
-end
-
-(**********************************)
-(****** ERROR FUNCTIONS ***********)
-(**********************************)
-
-(** Error when input LTS has the wrong arity *)
-let invalid_arity (x : Constr.types) : 'a mm =
-  fun st ->
-  let coq_st = !st.coq_ref in
-  raise (Error.invalid_arity !coq_st.coq_env !coq_st.coq_ctx x)
-;;
-
-(** Error when input LTS has the wrong Sort *)
-let invalid_sort (x : Sorts.family) : 'a mm =
-  fun st -> raise (Error.invalid_sort x)
-;;
-
-(** Error when input LTS reference is invalid (e.g. non existing) *)
-let invalid_ref_lts (x : Names.GlobRef.t) : 'a mm =
-  fun st -> raise (Error.invalid_ref_lts x)
-;;
-
-(** Error when input Type reference is invalid (e.g. non existing) *)
-let invalid_ref_type (x : Names.GlobRef.t) : 'a mm =
-  fun st -> raise (Error.invalid_ref_type x)
-;;
-
-(** Error when input LTS reference is invalid (e.g. non existing) *)
-let invalid_cindef_kind unit : 'a mm =
-  fun st -> raise (Error.invalid_cindef_kind ())
-;;
-
-(** Error when term is of unknown type *)
-let unknown_term_type (tmty : term * term * term list) : 'a mm =
-  fun st ->
-  let coq_st = !st.coq_ref in
-  raise (Error.unknown_term_type !coq_st.coq_env !coq_st.coq_ctx tmty)
-;;
-
-(** Error when multiple coq-LTS provided, but none of them match term. *)
-let primary_lts_not_found ((t, names) : term * term list) : 'a mm =
-  fun st ->
-  let coq_st = !st.coq_ref in
-  raise (Error.primary_lts_not_found !coq_st.coq_env !coq_st.coq_ctx t names)
-;;
-
-(** Error when try to decode key that does not exist in decode map. *)
-let unknown_decode_key ((k, bckmap) : E.t * term B.t) : 'a mm =
-  fun st ->
-  let coq_st = !st.coq_ref in
-  raise (Error.unknown_decode_key !coq_st.coq_env !coq_st.coq_ctx k bckmap)
-;;
-
-(********************************************)
 (****** GET & PUT STATE *********************)
 (********************************************)
 
@@ -510,6 +299,395 @@ module Syntax : MEBI_MONAD_SYNTAX = struct
   let ( let$+ ) f g = bind (state (fun e s -> s, f e s)) g
   let ( and+ ) x y = product x y
 end
+
+(**********************************)
+(****** COQ TERM TO STRING ********)
+(**********************************)
+
+(** *)
+let constr_to_string (x : Constr.t) : string =
+  let s_mm : string mm =
+    let open Syntax in
+    let* env = get_env in
+    let* sigma = get_sigma in
+    return (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma x))
+  in
+  run ~keep_encoding:true s_mm
+;;
+
+let econstr_to_string (x : EConstr.t) : string =
+  let s_mm : string mm =
+    let open Syntax in
+    let* env = get_env in
+    let* sigma = get_sigma in
+    return (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma x))
+  in
+  run ~keep_encoding:true s_mm
+;;
+
+let constr_rel_decl_to_string (rd : Constr.rel_declaration) : string =
+  let s_mm : string mm =
+    let open Syntax in
+    let* env = get_env in
+    let* sigma = get_sigma in
+    return (Pp.string_of_ppcmds (Printer.pr_rel_decl env sigma rd))
+  in
+  run ~keep_encoding:true s_mm
+;;
+
+let econstr_rel_decl_to_string (rd : EConstr.rel_declaration) : string =
+  let s_mm : string mm =
+    let open Syntax in
+    let* env = get_env in
+    let* sigma = get_sigma in
+    return (Pp.string_of_ppcmds (Printer.pr_erel_decl env sigma rd))
+  in
+  run ~keep_encoding:true s_mm
+;;
+
+let constr_list_to_string (xs : Constr.t list) : string =
+  match xs with
+  | [] -> "[]"
+  | h :: [] -> constr_to_string h
+  | h :: t ->
+    List.fold_left
+      (fun (acc : string) (x : Constr.t) ->
+        Printf.sprintf "%s, %s" acc (constr_to_string x))
+      (constr_to_string h)
+      t
+;;
+
+let econstr_list_to_string (xs : EConstr.t list) : string =
+  match xs with
+  | [] -> "[]"
+  | h :: [] -> Printf.sprintf "[%s]" (econstr_to_string h)
+  | h :: t ->
+    Printf.sprintf
+      "[%s]"
+      (List.fold_left
+         (fun (acc : string) (x : EConstr.t) ->
+           Printf.sprintf "%s, %s" acc (econstr_to_string x))
+         (econstr_to_string h)
+         t)
+;;
+
+let constr_rel_decl_list_to_string (xs : Constr.rel_declaration list) : string =
+  match xs with
+  | [] -> "[]"
+  | h :: [] -> Printf.sprintf "[%s]" (constr_rel_decl_to_string h)
+  | h :: t ->
+    Printf.sprintf
+      "[%s]"
+      (List.fold_left
+         (fun (acc : string) (x : Constr.rel_declaration) ->
+           Printf.sprintf "%s, %s" acc (constr_rel_decl_to_string x))
+         (constr_rel_decl_to_string h)
+         t)
+;;
+
+let econstr_rel_decl_list_to_string (xs : EConstr.rel_declaration list) : string
+  =
+  match xs with
+  | [] -> "[]"
+  | h :: [] -> Printf.sprintf "[%s]" (econstr_rel_decl_to_string h)
+  | h :: t ->
+    Printf.sprintf
+      "[%s]"
+      (List.fold_left
+         (fun (acc : string) (x : EConstr.rel_declaration) ->
+           Printf.sprintf "%s, %s" acc (econstr_rel_decl_to_string x))
+         (econstr_rel_decl_to_string h)
+         t)
+;;
+
+(********************************************)
+(****** ERRORS ******************************)
+(********************************************)
+
+module type ERROR_TYPE = sig
+  type mebi_error =
+    | InvalidLTSArgsLength of int
+    | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
+    | InvalidLTSSort of Sorts.family
+    | InvalidArity of Environ.env * Evd.evar_map * Constr.types
+    | InvalidRefLTS of Names.GlobRef.t
+    | InvalidRefType of Names.GlobRef.t
+    | UnknownTermType of
+        (Environ.env * Evd.evar_map * (term * term * term list))
+    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
+    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
+    | ExpectedCoqIndDefOfLTSNotType of unit
+    | InvalidCheckUpdatedCtx of
+        (Environ.env
+        * Evd.evar_map
+        * EConstr.t list
+        * EConstr.rel_declaration list)
+
+  exception MEBI_exn of mebi_error
+
+  val invalid_lts_args_length : int -> exn
+  val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
+  val invalid_sort : Sorts.family -> exn
+  val invalid_arity : Environ.env -> Evd.evar_map -> Constr.types -> exn
+  val invalid_ref_lts : Names.GlobRef.t -> exn
+  val invalid_ref_type : Names.GlobRef.t -> exn
+  val invalid_cindef_kind : unit -> exn
+
+  val unknown_term_type
+    :  Environ.env
+    -> Evd.evar_map
+    -> term * term * term list
+    -> exn
+
+  val primary_lts_not_found
+    :  Environ.env
+    -> Evd.evar_map
+    -> term
+    -> term list
+    -> exn
+
+  val unknown_decode_key : Environ.env -> Evd.evar_map -> E.t -> term B.t -> exn
+
+  val invalid_check_updated_ctx
+    :  Environ.env
+    -> Evd.evar_map
+    -> EConstr.t list
+    -> EConstr.rel_declaration list
+    -> exn
+end
+
+module Error : ERROR_TYPE = struct
+  type mebi_error =
+    | InvalidLTSArgsLength of int
+    | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
+    | InvalidLTSSort of Sorts.family
+    | InvalidArity of Environ.env * Evd.evar_map * Constr.types
+    | InvalidRefLTS of Names.GlobRef.t
+    | InvalidRefType of Names.GlobRef.t
+    | UnknownTermType of
+        (Environ.env * Evd.evar_map * (term * term * term list))
+    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
+    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
+    | ExpectedCoqIndDefOfLTSNotType of unit
+    | InvalidCheckUpdatedCtx of
+        (Environ.env
+        * Evd.evar_map
+        * EConstr.t list
+        * EConstr.rel_declaration list)
+
+  exception MEBI_exn of mebi_error
+
+  (** Assert args length == 3 in [Command.extract_args]. *)
+  let invalid_lts_args_length i = MEBI_exn (InvalidLTSArgsLength i)
+
+  (** Assert Constr.kind tm is App _ in [Command.extract_args]. *)
+  let invalid_lts_term_kind ev sg x = MEBI_exn (InvalidLTSTermKind (ev, sg, x))
+
+  (** Error when input LTS has the wrong arity *)
+  let invalid_sort f = MEBI_exn (InvalidLTSSort f)
+
+  (** Error when input LTS has the wrong Sort *)
+  let invalid_arity ev sg t = MEBI_exn (InvalidArity (ev, sg, t))
+
+  (** Error when input LTS reference is invalid (e.g. non existing) *)
+  let invalid_ref_lts r = MEBI_exn (InvalidRefLTS r)
+
+  let invalid_ref_type r = MEBI_exn (InvalidRefType r)
+
+  (** Error when input LTS reference is invalid (e.g. non existing) *)
+  let invalid_cindef_kind () = MEBI_exn (ExpectedCoqIndDefOfLTSNotType ())
+
+  (** Error when term is of unknown type *)
+  let unknown_term_type ev sg tmty = MEBI_exn (UnknownTermType (ev, sg, tmty))
+
+  (** Error when multiple coq-LTS provided, but none of them match term. *)
+  let primary_lts_not_found ev sg t names =
+    MEBI_exn (PrimaryLTSNotFound (ev, sg, t, names))
+  ;;
+
+  (** Error when multiple coq-LTS provided, but none of them match term. *)
+  let unknown_decode_key ev sg k bckmap =
+    MEBI_exn (UnknownDecodeKey (ev, sg, k, bckmap))
+  ;;
+
+  let invalid_check_updated_ctx ev sg x y =
+    MEBI_exn (InvalidCheckUpdatedCtx (ev, sg, x, y))
+  ;;
+
+  open Pp
+
+  let mebi_handler = function
+    | ExpectedCoqIndDefOfLTSNotType () ->
+      str
+        "cindef (Coq Inductive Definition) of LTS was expected, but Type was \
+         used."
+    | InvalidLTSArgsLength i ->
+      str
+        (Printf.sprintf
+           "Command.extract_args, assertion: Array.length args == 3 failed. \
+            Got %i"
+           i)
+    | InvalidLTSTermKind (ev, sg, tm) ->
+      str
+        "Command.extract_args, assertion: Constr.kind tm matches App _ failed. \
+         Got "
+      ++ Printer.pr_constr_env ev sg tm
+      ++ str " which matches with "
+      ++ str
+           (match Constr.kind tm with
+            | Rel _ -> "Rel"
+            | Var _ -> "Var"
+            | Meta _ -> "Meta"
+            | Evar _ -> "EVar"
+            | Sort _ -> "Sort"
+            | Cast _ -> "Cast"
+            | Prod _ -> "Prod"
+            | Lambda _ -> "Lambda"
+            | LetIn _ -> "LetIn"
+            | App _ -> "App"
+            | Const _ -> "Const"
+            | Ind _ -> "Ind"
+            | Construct _ -> "Construct"
+            | Case _ -> "Case"
+            | Fix _ -> "Fix"
+            | CoFix _ -> "CoFix"
+            | Proj _ -> "Proj"
+            | Int _ -> "Int"
+            | Float _ -> "Float"
+            | String _ -> "String"
+            | Array _ -> "Array")
+      ++ str "."
+    | InvalidCheckUpdatedCtx (ev, sg, x, y) ->
+      str
+        "Invalid Args to check_updated_ctx. Should both be empty, or both have \
+         some."
+      ++ strbrk "\n"
+      ++ str (Printf.sprintf "substls: %s." (econstr_list_to_string x))
+      ++ strbrk "\n"
+      ++ str (Printf.sprintf "ctx_tys: %s." (econstr_rel_decl_list_to_string y))
+    | InvalidLTSSort f ->
+      str "Invalid LTS Sort: expecting Prop, got " ++ Sorts.pr_sort_family f
+    | InvalidArity (ev, sg, t) ->
+      str "Invalid arity for LTS: "
+      ++ Printer.pr_constr_env ev sg t
+      ++ strbrk "\n"
+      ++ str "Expecting: forall params, ?terms -> ?labels -> ?terms -> Prop"
+    | InvalidRefLTS r -> str "Invalid ref LTS: " ++ Printer.pr_global r
+    | InvalidRefType r -> str "Invalid ref Type: " ++ Printer.pr_global r
+    | UnknownTermType (ev, sg, (tm, ty, trkeys)) ->
+      str
+        "None of the constructors provided matched type of term to visit. \
+         (unknown_term_type) "
+      ++ strbrk "\n\n"
+      ++ str "Term: "
+      ++ Printer.pr_econstr_env ev sg tm
+      ++ strbrk "\n\n"
+      ++ str "Type: "
+      ++ Printer.pr_econstr_env ev sg ty
+      ++ strbrk "\n\n"
+      ++ str (Printf.sprintf "Keys: %s" (econstr_list_to_string trkeys))
+      ++ strbrk "\n\n"
+      ++ str
+           (Printf.sprintf
+              "Does Type match EConstr of any Key? = %b"
+              (List.exists (fun (k : term) -> EConstr.eq_constr sg ty k) trkeys))
+      ++ strbrk "\n"
+      ++ str
+           (let tystr = Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg ty) in
+            Printf.sprintf
+              "Does Type match String of any Key? = %b"
+              (List.exists
+                 (fun (k : term) ->
+                   String.equal
+                     tystr
+                     (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg k)))
+                 trkeys))
+    | PrimaryLTSNotFound (ev, sg, t, names) ->
+      str "Primary LTS Not found for term: "
+      ++ Printer.pr_econstr_env ev sg t
+      ++ strbrk "\n\n"
+      ++ str "constructor names: "
+      ++ List.fold_left
+           (fun (acc : Pp.t) (name : EConstr.t) -> acc)
+           (Printer.pr_econstr_env ev sg (List.hd names))
+           (List.tl names)
+    | UnknownDecodeKey (ev, sg, k, bckmap) ->
+      str "(TODO: unknown decode key error)"
+  ;;
+
+  let _ =
+    CErrors.register_handler (fun e ->
+      match e with MEBI_exn e -> Some (mebi_handler e) | _ -> None)
+  ;;
+end
+
+(**********************************)
+(****** ERROR FUNCTIONS ***********)
+(**********************************)
+
+let invalid_check_updated_ctx x y : 'a mm =
+  fun st ->
+  let coq_st = !st.coq_ref in
+  raise (Error.invalid_check_updated_ctx !coq_st.coq_env !coq_st.coq_ctx x y)
+;;
+
+let invalid_lts_args_length (x : int) : 'a mm =
+  fun st -> raise (Error.invalid_lts_args_length x)
+;;
+
+let invalid_lts_term_kind (x : Constr.t) : 'a mm =
+  fun st ->
+  let coq_st = !st.coq_ref in
+  raise (Error.invalid_lts_term_kind !coq_st.coq_env !coq_st.coq_ctx x)
+;;
+
+(** Error when input LTS has the wrong arity *)
+let invalid_arity (x : Constr.types) : 'a mm =
+  fun st ->
+  let coq_st = !st.coq_ref in
+  raise (Error.invalid_arity !coq_st.coq_env !coq_st.coq_ctx x)
+;;
+
+(** Error when input LTS has the wrong Sort *)
+let invalid_sort (x : Sorts.family) : 'a mm =
+  fun st -> raise (Error.invalid_sort x)
+;;
+
+(** Error when input LTS reference is invalid (e.g. non existing) *)
+let invalid_ref_lts (x : Names.GlobRef.t) : 'a mm =
+  fun st -> raise (Error.invalid_ref_lts x)
+;;
+
+(** Error when input Type reference is invalid (e.g. non existing) *)
+let invalid_ref_type (x : Names.GlobRef.t) : 'a mm =
+  fun st -> raise (Error.invalid_ref_type x)
+;;
+
+(** Error when input LTS reference is invalid (e.g. non existing) *)
+let invalid_cindef_kind unit : 'a mm =
+  fun st -> raise (Error.invalid_cindef_kind ())
+;;
+
+(** Error when term is of unknown type *)
+let unknown_term_type (tmty : term * term * term list) : 'a mm =
+  fun st ->
+  let coq_st = !st.coq_ref in
+  raise (Error.unknown_term_type !coq_st.coq_env !coq_st.coq_ctx tmty)
+;;
+
+(** Error when multiple coq-LTS provided, but none of them match term. *)
+let primary_lts_not_found ((t, names) : term * term list) : 'a mm =
+  fun st ->
+  let coq_st = !st.coq_ref in
+  raise (Error.primary_lts_not_found !coq_st.coq_env !coq_st.coq_ctx t names)
+;;
+
+(** Error when try to decode key that does not exist in decode map. *)
+let unknown_decode_key ((k, bckmap) : E.t * term B.t) : 'a mm =
+  fun st ->
+  let coq_st = !st.coq_ref in
+  raise (Error.unknown_decode_key !coq_st.coq_env !coq_st.coq_ctx k bckmap)
+;;
 
 (********************************************)
 (****** ENCODE/DECODE ***********************)
@@ -596,76 +774,6 @@ let decode_map (m : 'a B.t) : 'a F.t mm =
 (********************************************)
 (****** UTILS *******************************)
 (********************************************)
-
-(**********************************)
-(****** COQ TERM TO STRING ********)
-(**********************************)
-
-(** *)
-let constr_to_string (x : Constr.t) : string =
-  let s_mm : string mm =
-    let open Syntax in
-    let* env = get_env in
-    let* sigma = get_sigma in
-    return (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma x))
-  in
-  run ~keep_encoding:true s_mm
-;;
-
-let econstr_to_string (x : EConstr.t) : string =
-  let s_mm : string mm =
-    let open Syntax in
-    let* env = get_env in
-    let* sigma = get_sigma in
-    return (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma x))
-  in
-  run ~keep_encoding:true s_mm
-;;
-
-let constr_list_to_string (xs : Constr.t list) : string =
-  match xs with
-  | [] -> "[]"
-  | h :: [] -> constr_to_string h
-  | h :: t ->
-    let s_mm : string mm =
-      let open Syntax in
-      let* env = get_env in
-      let* sigma = get_sigma in
-      return
-        (List.fold_left
-           (fun (str : string) (x : Constr.t) ->
-             Printf.sprintf
-               ", %s"
-               (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma x)))
-           (constr_to_string h)
-           t)
-    in
-    run ~keep_encoding:true s_mm
-;;
-
-let econstr_list_to_string (xs : EConstr.t list) : string =
-  match xs with
-  | [] -> "[]"
-  | h :: [] -> Printf.sprintf "[%s]" (econstr_to_string h)
-  | h :: t ->
-    let s_mm : string mm =
-      let open Syntax in
-      let* env = get_env in
-      let* sigma = get_sigma in
-      return
-        (Printf.sprintf
-           "[%s]"
-           (List.fold_left
-              (fun (acc : string) (x : EConstr.t) ->
-                Printf.sprintf
-                  "%s, %s"
-                  acc
-                  (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma x)))
-              (econstr_to_string h)
-              t))
-    in
-    run ~keep_encoding:true s_mm
-;;
 
 (********************************************)
 (****** COQ CONSTR TREE *********************)

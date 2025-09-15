@@ -24,6 +24,6 @@ Example r : term := tseq (tpar (tact (recv A) tend)
                          (tfix (tseq (tpar (tact (send A) tend) 
                                            (tact (recv A) tend)) trec)).
 
-MeBi Dump "proc_t1_p" LTS Bounded 1000 Of p Using termLTS.
-MeBi Dump "proc_t1_q" LTS Bounded 1000 Of q Using termLTS.
-MeBi Dump "proc_t1_r" LTS Bounded 1000 Of r Using termLTS.
+MeBi Show (* Dump "proc_t1_p" *) LTS Bounded 1000 Of p Using termLTS.
+(* MeBi Dump "proc_t1_q" LTS Bounded 1000 Of q Using termLTS. *)
+(* MeBi Dump "proc_t1_r" LTS Bounded 1000 Of r Using termLTS. *)

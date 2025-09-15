@@ -118,6 +118,8 @@ val iterate : int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
 
 module type ERROR_TYPE = sig
   type mebi_error =
+    | InvalidLTSArgsLength of int
+    | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
     | InvalidLTSSort of Sorts.family
     | InvalidArity of Environ.env * Evd.evar_map * Constr.t
     | InvalidRefLTS of Names.GlobRef.t
@@ -127,9 +129,16 @@ module type ERROR_TYPE = sig
     | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
     | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
     | ExpectedCoqIndDefOfLTSNotType of unit
+    | InvalidCheckUpdatedCtx of
+        (Environ.env
+        * Evd.evar_map
+        * EConstr.t list
+        * EConstr.rel_declaration list)
 
   exception MEBI_exn of mebi_error
 
+  val invalid_lts_args_length : int -> exn
+  val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
   val invalid_sort : Sorts.family -> exn
   val invalid_arity : Environ.env -> Evd.evar_map -> Constr.t -> exn
   val invalid_ref_lts : Names.GlobRef.t -> exn
@@ -150,18 +159,31 @@ module type ERROR_TYPE = sig
     -> exn
 
   val unknown_decode_key : Environ.env -> Evd.evar_map -> E.t -> term B.t -> exn
+
+  val invalid_check_updated_ctx
+    :  Environ.env
+    -> Evd.evar_map
+    -> EConstr.t list
+    -> EConstr.rel_declaration list
+    -> exn
+
 end
 
 module Error : ERROR_TYPE
 
-val invalid_arity : Constr.t -> 'a mm
+val invalid_lts_args_length : int -> 'a mm
+val invalid_lts_term_kind : Constr.t -> 'a mm
 val invalid_sort : Sorts.family -> 'a mm
+val invalid_arity : Constr.t -> 'a mm
 val invalid_ref_lts : Names.GlobRef.t -> 'a mm
 val invalid_ref_type : Names.GlobRef.t -> 'a mm
 val invalid_cindef_kind : 'b -> 'a mm
+
 val unknown_term_type : term * term * term list -> 'a mm
 val primary_lts_not_found : term * term list -> 'a mm
 val unknown_decode_key : E.t * term B.t -> 'a mm
+val invalid_check_updated_ctx : term list -> EConstr.rel_declaration list -> 'a mm
+
 val get_env : wrapper ref -> Environ.env in_context
 val get_sigma : wrapper ref -> Evd.evar_map in_context
 val get_fwd_enc : wrapper ref -> E.t F.t in_context
@@ -207,6 +229,11 @@ val constr_to_string : Constr.t -> string
 val econstr_to_string : EConstr.t -> string
 val constr_list_to_string : Constr.t list -> string
 val econstr_list_to_string : EConstr.t list -> string
+
+val constr_rel_decl_to_string : Constr.rel_declaration -> string
+val econstr_rel_decl_to_string : EConstr.rel_declaration -> string
+val constr_rel_decl_list_to_string : Constr.rel_declaration list -> string
+val econstr_rel_decl_list_to_string : EConstr.rel_declaration list -> string
 
 module Constr_tree : sig
   type 'a tree = Node of 'a * 'a tree list

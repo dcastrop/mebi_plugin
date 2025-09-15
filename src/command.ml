@@ -311,14 +311,19 @@ let rec mk_ctx_substl (substl : EConstr.t list)
 
 (** Extract args of a type [LTS termL act termR]
     Prerequisite: input *must* be of this shape *)
-let extract_args (substl : EConstr.Vars.substl) (tm : Constr.t) =
+let extract_args (substl : EConstr.Vars.substl) (tm : Constr.t)
+  : (term * term * term) mm
+  =
   match Constr.kind tm with
   | App (_, args) ->
-    assert (Array.length args == 3);
-    let args = EConstr.of_constr_array args in
-    let args = Array.map (EConstr.Vars.substl substl) args in
-    args.(0), args.(1), args.(2)
-  | _ -> assert false
+    if Array.length args == 3
+    then (
+      (* assert (Array.length args == 3); *)
+      let args = EConstr.of_constr_array args in
+      let args = Array.map (EConstr.Vars.substl substl) args in
+      return (args.(0), args.(1), args.(2)))
+    else invalid_lts_args_length (Array.length args)
+  | _ -> (* assert false *) invalid_lts_term_kind tm
 ;;
 
 type unif_problem =
@@ -408,6 +413,33 @@ let rec retrieve_tgt_nodes
          (lts_index, nctors))
 ;;
 
+(* *)
+(* TODO: investigate why this causes an index out of bounds error *)
+let handle_eq_premise
+      ?(params : Params.log = default_params)
+      (fn : EConstr.t)
+      (args : EConstr.t array)
+      (acc : int * (Constr_tree.t * unif_problem) list list)
+      (substl : EConstr.t list)
+      (tl : EConstr.rel_declaration list)
+  : ((int * (Constr_tree.t * unif_problem) list list)
+    * EConstr.t list
+    * EConstr.rel_declaration list)
+      mm
+  =
+  (* NOTE: in case of example, [rhs] below is term to use for continuation *)
+  let* (lhs : EConstr.t) = normalize_econstr args.(1) in
+  let* (rhs : EConstr.t) = normalize_econstr args.(2) in
+  Log.warning
+    ~params
+    (Printf.sprintf
+       "check_updated_ctx, unified non-lts fn \"%s (%s) (%s)\"."
+       (econstr_to_string fn)
+       (econstr_to_string lhs)
+       (econstr_to_string rhs));
+  return (acc, substl, tl)
+;;
+
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
           ?(params : Params.log = default_params)
@@ -418,43 +450,50 @@ let rec check_updated_ctx
   = function
   | [], [] -> return (Some acc)
   | _ :: substl, t :: tl ->
-    (* Log.warning ~params "B"; *)
+    Log.warning
+      ~params
+      (Printf.sprintf "G:\nsubstl = %s" (econstr_list_to_string substl));
+    Log.warning
+      ~params
+      (Printf.sprintf
+         "H:\nt :: tl = %s :: %s"
+         (econstr_rel_decl_to_string t)
+         (econstr_rel_decl_list_to_string tl));
+    Log.warning ~params (Printf.sprintf "I1: %s" (econstr_rel_decl_to_string t));
     let$+ upd_t env sigma =
       EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
     in
+    (* Log.warning
+      ~params
+      (Printf.sprintf "G2:\nsubstl = %s" (econstr_list_to_string substl)); *)
+    (* Log.warning
+      ~params
+      (Printf.sprintf
+         "H2:\nt :: tl = %s :: %s"
+         (econstr_rel_decl_to_string t)
+         (econstr_rel_decl_list_to_string tl)); *)
+    Log.warning ~params (Printf.sprintf "I2: %s" (econstr_to_string upd_t));
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with
      | App (fn, args) ->
        (match F.find_opt fn_cindef fn with
         | None ->
-          (* TODO: investigate why this causes an index out of bounds error *)
-          (* let* success = m_unify ~params args.(1) args.(2) in
-             if success
-             then (
+          (* NOTE: testing handling the [@eq] premises *)
+          (match econstr_to_string fn with
+           | "@eq" ->
+             let* acc, substl, tl =
+               handle_eq_premise ~params fn args acc substl tl
+             in
+             check_updated_ctx acc fn_cindef (substl, tl)
+           | _ ->
              Log.warning
-             ~params
-             (Printf.sprintf
-             "check_updated_ctx, unified non-lts fn \"%s (%s) (%s)\"."
-             (econstr_to_string fn)
-             (econstr_to_string args.(1))
-             (econstr_to_string args.(2)));
-             check_updated_ctx
-             acc
-             (* ( fst acc
-             , List.concat_map
-             (fun x -> List.map (fun y -> y :: x) ctors)
-             (snd acc) ) *)
-             fn_cindef
-             (substl, tl))
-             else *)
-          Log.warning
-            ~params
-            (Printf.sprintf
-               "check_updated_ctx, fn_cindef does not have corresponding fn \
-                \"%s\" with args: %s."
-               (econstr_to_string fn)
-               (econstr_list_to_string (Array.to_list args)));
-          check_updated_ctx acc fn_cindef (substl, tl)
+               ~params
+               (Printf.sprintf
+                  "check_updated_ctx, fn_cindef does not have corresponding fn \
+                   \"%s\" with args: %s."
+                  (econstr_to_string fn)
+                  (econstr_list_to_string (Array.to_list args)));
+             check_updated_ctx acc fn_cindef (substl, tl))
         | Some c ->
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
           let* c_constr_transitions = lts_cindef_constr_transitions c in
@@ -492,7 +531,7 @@ let rec check_updated_ctx
               fn_cindef
               (substl, tl)))
      | _ -> check_updated_ctx acc fn_cindef (substl, tl))
-  | _, _ -> assert false
+  | _substl, _ctxl -> invalid_check_updated_ctx _substl _ctxl
 (* Impossible! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
@@ -509,25 +548,44 @@ and check_valid_constructor
   params.kind <- Debug ();
   (* let$+ t env sigma = Reductionops.nf_all env sigma t' in *)
   let* (t : EConstr.t) = normalize_econstr t' in
-  (* Log.warning ~params "A"; *)
+  Log.warning ~params (Printf.sprintf "A: %s" (econstr_to_string t));
   let iter_body (i : int) (ctor_vals : coq_ctor list) =
     (* let* _ = if is_output_kind_enabled params then debug (fun env sigma ->
        str "CHECKING CONSTRUCTOR " ++ int i ++ str ". Term: " ++
        Printer.pr_econstr_env env sigma t) else return () in *)
     let (ctx, tm) : Constr.rel_context * Constr.t = ctor_transitions.(i) in
+    Log.warning ~params (Printf.sprintf "B (%i): %s" i (econstr_to_string t));
+    (* Log.warning ~params (Printf.sprintf "B: %s" (constr_to_string tm)); *)
     let ctx_tys : EConstr.rel_declaration list =
       List.map EConstr.of_rel_decl ctx
     in
     let* substl = mk_ctx_substl [] (List.rev ctx_tys) in
-    let (termL, act, termR) : Evd.econstr * Evd.econstr * Evd.econstr =
+    let* (termL, act, termR) : Evd.econstr * Evd.econstr * Evd.econstr =
       extract_args substl tm
     in
+    Log.warning
+      ~params
+      (Printf.sprintf "C (%i): substl = %s" i (econstr_list_to_string substl));
+    Log.warning
+      ~params
+      (Printf.sprintf
+         "D (%i): tl = %s"
+         i
+         (econstr_rel_decl_list_to_string ctx_tys));
     let* success = m_unify t termL in
     if success
-    then
+    then (
+      Log.warning
+        ~params
+        (Printf.sprintf
+           "E (%i): (%s) U (%s)"
+           i
+           (econstr_to_string t)
+           (econstr_to_string termL));
       let* success = Option.cata (fun a -> m_unify a act) (return true) ma in
       if success
-      then
+      then (
+        Log.warning ~params (Printf.sprintf "F (%i): successs" i);
         let* (next_ctors :
                (int * (Constr_tree.t * unif_problem) list list) option)
           =
@@ -537,8 +595,7 @@ and check_valid_constructor
             fn_cindef
             (substl, ctx_tys)
         in
-        (* Log.warning ~params "C"; *)
-        let$+ act env sigma = Reductionops.nf_all env sigma act in
+        let* (act : EConstr.t) = normalize_econstr act in
         let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in
         match next_ctors with
         | None -> return ctor_vals
@@ -565,8 +622,8 @@ and check_valid_constructor
                  tgt_term
                  index_ctor_pair
              in
-             tgt_nodes)
-      else return ctor_vals
+             tgt_nodes))
+      else return ctor_vals)
     else return ctor_vals
   in
   iterate 0 (Array.length ctor_transitions - 1) [] iter_body
