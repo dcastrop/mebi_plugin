@@ -293,33 +293,6 @@ let rec retrieve_tgt_nodes
          (lts_index, nctors))
 ;;
 
-(* *)
-(* TODO: investigate why this causes an index out of bounds error *)
-let handle_eq_premise
-      ?(params : Params.log = default_params)
-      (fn : EConstr.t)
-      (args : EConstr.t array)
-      (acc : int * (Constr_tree.t * unif_problem) list list)
-      (substl : EConstr.t list)
-      (tl : EConstr.rel_declaration list)
-  : ((int * (Constr_tree.t * unif_problem) list list)
-    * EConstr.t list
-    * EConstr.rel_declaration list)
-      mm
-  =
-  (* NOTE: in case of example, [rhs] below is term to use for continuation *)
-  let* (lhs : EConstr.t) = normalize_econstr args.(1) in
-  let* (rhs : EConstr.t) = normalize_econstr args.(2) in
-  Log.warning
-    ~params
-    (Printf.sprintf
-       "check_updated_ctx, unified non-lts fn \"%s (%s) (%s)\"."
-       (econstr_to_string fn)
-       (econstr_to_string lhs)
-       (econstr_to_string rhs));
-  return (acc, substl, tl)
-;;
-
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
           ?(params : Params.log = default_params)
@@ -329,30 +302,25 @@ let rec check_updated_ctx
   -> (int * (Constr_tree.t * unif_problem) list list) option mm
   = function
   | [], [] -> return (Some acc)
-  | _ :: substl, t :: tl ->
-    Log.warning
-      ~params
-      (Printf.sprintf "G:\nsubstl = %s" (econstr_list_to_string substl));
-    Log.warning
+  | _hsubstl :: substl, t :: tl ->
+    (* Log.warning
       ~params
       (Printf.sprintf
-         "H:\nt :: tl = %s :: %s"
+         "G: _hsubstl :: substl,\n_hsubstl = %s\nsubstl = %s"
+         (econstr_to_string _hsubstl)
+         (econstr_list_to_string substl)); *)
+    (* Log.warning
+      ~params
+      (Printf.sprintf
+         "H: t :: tl,\nt = %s\ntl = %s"
          (econstr_rel_decl_to_string t)
-         (econstr_rel_decl_list_to_string tl));
-    Log.warning ~params (Printf.sprintf "I1: %s" (econstr_rel_decl_to_string t));
+         (econstr_rel_decl_list_to_string tl)); *)
     let$+ upd_t env sigma =
       EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
     in
     (* Log.warning
-      ~params
-      (Printf.sprintf "G2:\nsubstl = %s" (econstr_list_to_string substl)); *)
-    (* Log.warning
-      ~params
-      (Printf.sprintf
-         "H2:\nt :: tl = %s :: %s"
-         (econstr_rel_decl_to_string t)
-         (econstr_rel_decl_list_to_string tl)); *)
-    Log.warning ~params (Printf.sprintf "I2: %s" (econstr_to_string upd_t));
+       ~params
+       (Printf.sprintf "I: upd_t = %s" (econstr_to_string upd_t)); *)
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with
      | App (fn, args) ->
@@ -361,10 +329,64 @@ let rec check_updated_ctx
           (* NOTE: testing handling the [@eq] premises *)
           (match econstr_to_string fn with
            | "@eq" ->
-             let* acc, substl, tl =
-               handle_eq_premise ~params fn args acc substl tl
+             (* Log.warning
+               ~params
+               (Printf.sprintf
+                  "N: acc (%i): [%s]"
+                  (fst acc)
+                  (List.fold_left
+                     (fun (acc : string)
+                       (nctor : (Constr_tree.t * unif_problem) list) ->
+                       if List.is_empty nctor
+                       then "[]"
+                       else
+                         List.fold_left
+                           (fun (acc2 : string)
+                             (ctor : Constr_tree.t * unif_problem) ->
+                             Printf.sprintf
+                               "%s\n( tree: %s\n; {| termL: %s\n   ; termR: %s)"
+                               acc2
+                               (Constr_tree.pstr (fst ctor))
+                               (econstr_to_string (snd ctor).termL)
+                               (econstr_to_string (snd ctor).termR))
+                           acc
+                           nctor)
+                     ""
+                     (snd acc))); *)
+             let* (lhs : EConstr.t) = normalize_econstr args.(1) in
+             let* (rhs : EConstr.t) = normalize_econstr args.(2) in
+             Log.warning
+               ~params
+               (Printf.sprintf
+                  "TODO: check_updated_ctx, handle premise (normalized):\n\
+                   fn: %s\n\
+                   lhs: %s\n\
+                   rhs: %s"
+                  (econstr_to_string fn)
+                  (econstr_to_string lhs)
+                  (econstr_to_string rhs));
+             (* TODO: find way to propagate this *)
+             let* (to_subst :
+                    (int * (Constr_tree.t * unif_problem) list list) option)
+               =
+               check_updated_ctx acc fn_cindef (substl, tl)
              in
-             check_updated_ctx acc fn_cindef (substl, tl)
+             return to_subst
+             (* NOTE: below trying *)
+             (* (match to_subst with
+              | None -> return to_subst
+              | Some to_subst' ->
+                return
+                  (Some
+                     ( fst to_subst'
+                     , List.concat_map
+                         (fun (x : (Constr_tree.t * unif_problem) list) ->
+                           (* x :: [] *)
+                           List.map
+                             (fun (y : Constr_tree.t * unif_problem) ->
+                               (fst y, { termL = lhs; termR = rhs }) :: x)
+                             x)
+                         (snd to_subst') ))) *)
            | _ ->
              Log.warning
                ~params
@@ -377,7 +399,7 @@ let rec check_updated_ctx
         | Some c ->
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
           let* c_constr_transitions = lts_cindef_constr_transitions c in
-          let* ctors =
+          let* (ctors : coq_ctor list) =
             check_valid_constructor
               ~params
               c_constr_transitions
@@ -389,12 +411,50 @@ let rec check_updated_ctx
           if List.is_empty ctors
           then return None
           else (
-            let ctors =
+            let ctree_unif_probs : (Constr_tree.t * unif_problem) list =
               List.map
                 (fun (_, (tL : EConstr.t), (i : Constr_tree.t)) ->
                   i, { termL = tL; termR = args.(2) })
                 ctors
             in
+            (* Log.warning
+              ~params
+              (Printf.sprintf
+                 "K: acc: [%s]"
+                 (List.fold_left
+                    (fun (acc : string)
+                      (nctor : (Constr_tree.t * unif_problem) list) ->
+                      if List.is_empty nctor
+                      then "[]"
+                      else
+                        List.fold_left
+                          (fun (acc2 : string)
+                            (ctor : Constr_tree.t * unif_problem) ->
+                            Printf.sprintf
+                              "%s\n( tree: %s\n; {| termL: %s\n   ; termR: %s)"
+                              acc2
+                              (Constr_tree.pstr (fst ctor))
+                              (econstr_to_string (snd ctor).termL)
+                              (econstr_to_string (snd ctor).termR))
+                          acc
+                          nctor)
+                    ""
+                    (snd acc))); *)
+            (* Log.warning
+              ~params
+              (Printf.sprintf
+                 "L: ctree_unif_probs: [%s]"
+                 (List.fold_left
+                    (fun (acc2 : string)
+                      (ctor : Constr_tree.t * unif_problem) ->
+                      Printf.sprintf
+                        "%s\n( tree: %s\n; {| termL: %s\n   ; termR: %s)"
+                        acc2
+                        (Constr_tree.pstr (fst ctor))
+                        (econstr_to_string (snd ctor).termL)
+                        (econstr_to_string (snd ctor).termR))
+                    ""
+                    ctree_unif_probs)); *)
             (* We need to cross-product all possible unifications. This is in
                case we have a constructor of the form LTS t11 a1 t12 -> LTS t21
                a2 t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
@@ -403,13 +463,38 @@ let rec check_updated_ctx
             (* FIXME: Test this *)
             (* replace [rtls] in [rtls_ctx] *)
             (* let rtls_ctx':rlts_list = List.append [ ] in *)
-            check_updated_ctx
-              ( fst acc
-              , List.concat_map
-                  (fun x -> List.map (fun y -> y :: x) ctors)
-                  (snd acc) )
-              fn_cindef
-              (substl, tl)))
+            let acc' : (Constr_tree.t * unif_problem) list list =
+              List.concat_map
+                (fun (x : (Constr_tree.t * unif_problem) list) ->
+                  List.map
+                    (fun (y : Constr_tree.t * unif_problem) -> y :: x)
+                    ctree_unif_probs)
+                (snd acc)
+            in
+            (* Log.warning
+              ~params
+              (Printf.sprintf
+                 "M: acc': [%s]"
+                 (List.fold_left
+                    (fun (acc : string)
+                      (nctor : (Constr_tree.t * unif_problem) list) ->
+                      if List.is_empty nctor
+                      then "[]"
+                      else
+                        List.fold_left
+                          (fun (acc2 : string)
+                            (ctor : Constr_tree.t * unif_problem) ->
+                            Printf.sprintf
+                              "%s\n( tree: %s\n; {| termL: %s\n   ; termR: %s)"
+                              acc2
+                              (Constr_tree.pstr (fst ctor))
+                              (econstr_to_string (snd ctor).termL)
+                              (econstr_to_string (snd ctor).termR))
+                          acc
+                          nctor)
+                    ""
+                    acc')); *)
+            check_updated_ctx (fst acc, acc') fn_cindef (substl, tl)))
      | _ -> check_updated_ctx acc fn_cindef (substl, tl))
   | _substl, _ctxl -> invalid_check_updated_ctx _substl _ctxl
 (* Impossible! *)
@@ -428,14 +513,10 @@ and check_valid_constructor
   params.kind <- Debug ();
   (* let$+ t env sigma = Reductionops.nf_all env sigma t' in *)
   let* (t : EConstr.t) = normalize_econstr t' in
-  Log.warning ~params (Printf.sprintf "A: %s" (econstr_to_string t));
+  (* Log.warning ~params (Printf.sprintf "A: %s" (econstr_to_string t)); *)
   let iter_body (i : int) (ctor_vals : coq_ctor list) =
-    (* let* _ = if is_output_kind_enabled params then debug (fun env sigma ->
-       str "CHECKING CONSTRUCTOR " ++ int i ++ str ". Term: " ++
-       Printer.pr_econstr_env env sigma t) else return () in *)
+    (* Log.warning ~params (Printf.sprintf "B (%i): %s" i (econstr_to_string t)); *)
     let (ctx, tm) : Constr.rel_context * Constr.t = ctor_transitions.(i) in
-    Log.warning ~params (Printf.sprintf "B (%i): %s" i (econstr_to_string t));
-    (* Log.warning ~params (Printf.sprintf "B: %s" (constr_to_string tm)); *)
     let ctx_tys : EConstr.rel_declaration list =
       List.map EConstr.of_rel_decl ctx
     in
@@ -443,29 +524,31 @@ and check_valid_constructor
     let* (termL, act, termR) : Evd.econstr * Evd.econstr * Evd.econstr =
       extract_args substl tm
     in
-    Log.warning
+    (* Log.warning
       ~params
-      (Printf.sprintf "C (%i): substl = %s" i (econstr_list_to_string substl));
-    Log.warning
+      (Printf.sprintf "C (%i): substl = %s" i (econstr_list_to_string substl)); *)
+    (* Log.warning
       ~params
       (Printf.sprintf
          "D (%i): tl = %s"
          i
-         (econstr_rel_decl_list_to_string ctx_tys));
+         (econstr_rel_decl_list_to_string ctx_tys)); *)
     let* success = m_unify t termL in
     if success
-    then (
-      Log.warning
-        ~params
-        (Printf.sprintf
-           "E (%i): (%s) U (%s)"
-           i
-           (econstr_to_string t)
-           (econstr_to_string termL));
+    then
+      (* Log.warning
+         ~params
+         (Printf.sprintf
+         "E (%i): (%s) U (%s)"
+         i
+         (econstr_to_string t)
+         (econstr_to_string termL)); *)
       let* success = Option.cata (fun a -> m_unify a act) (return true) ma in
       if success
-      then (
-        Log.warning ~params (Printf.sprintf "F (%i): successs" i);
+      then
+        (* Log.warning ~params (Printf.sprintf "F (%i): successs" i); *)
+        let* (act : EConstr.t) = normalize_econstr act in
+        let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in
         let* (next_ctors :
                (int * (Constr_tree.t * unif_problem) list list) option)
           =
@@ -475,13 +558,14 @@ and check_valid_constructor
             fn_cindef
             (substl, ctx_tys)
         in
-        let* (act : EConstr.t) = normalize_econstr act in
-        let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in
         match next_ctors with
         | None -> return ctor_vals
         | Some index_ctor_pair ->
           (match snd index_ctor_pair with
            | [] ->
+             (* Log.warning
+                ~params
+                (Printf.sprintf "J (%i): snd next_ctors is empty" i); *)
              let* sigma = get_sigma in
              if EConstr.isEvar sigma tgt_term
              then return ctor_vals
@@ -493,6 +577,30 @@ and check_valid_constructor
                   )
                   :: ctor_vals)
            | nctors ->
+             (* Log.warning
+               ~params
+               (Printf.sprintf
+                  "J (%i): snd next_ctors is non-empty: [%s]"
+                  i
+                  (List.fold_left
+                     (fun (acc : string)
+                       (nctor : (Constr_tree.t * unif_problem) list) ->
+                       if List.is_empty nctor
+                       then "[]"
+                       else
+                         List.fold_left
+                           (fun (acc2 : string)
+                             (ctor : Constr_tree.t * unif_problem) ->
+                             Printf.sprintf
+                               "%s\n( tree: %s\n; {| termL: %s\n   ; termR: %s)"
+                               acc2
+                               (Constr_tree.pstr (fst ctor))
+                               (econstr_to_string (snd ctor).termL)
+                               (econstr_to_string (snd ctor).termR))
+                           acc
+                           nctor)
+                     ""
+                     nctors)); *)
              let tgt_nodes =
                retrieve_tgt_nodes
                  ~params
@@ -502,8 +610,8 @@ and check_valid_constructor
                  tgt_term
                  index_ctor_pair
              in
-             tgt_nodes))
-      else return ctor_vals)
+             tgt_nodes)
+      else return ctor_vals
     else return ctor_vals
   in
   iterate 0 (Array.length ctor_transitions - 1) [] iter_body
