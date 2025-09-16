@@ -27,3 +27,19 @@ Example r : term := tseq (tpar (tact (recv A) tend)
 MeBi Show (* Dump "proc_t1_p" *) LTS Bounded 1000 Of p Using termLTS.
 (* MeBi Dump "proc_t1_q" LTS Bounded 1000 Of q Using termLTS. *)
 (* MeBi Dump "proc_t1_r" LTS Bounded 1000 Of r Using termLTS. *)
+
+
+(* MeBi Dump "testA" Bisim LTS Bounded 50 Of p  With termLTS
+       And LTS Bounded 50 Of q  With termLTS
+       Using termLTS.  *)
+
+
+(* MeBi Dump "testB" Minim Bounded 5 Of p Weak None Of TESTACTION Using termLTS. 
+MeBi Dump "testC" Minim Bounded 5 Of q Weak None Of TESTACTION Using termLTS.  *)
+
+
+(* Print can_you_find_me_test. *)
+
+(* About build_model. *)
+(* Print build_model. *)
+(* Check (loader.LTS term label p termLTS). *)
