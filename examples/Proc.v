@@ -65,11 +65,12 @@ Module Flat.
 
     | do_seq_end : forall s, termLTS (tseq tend s) None s
 
-    | do_par_end : termLTS (tpar tend tend) None tend
+    (* | do_par_end : termLTS (tpar tend tend) None tend *)
 
     (* These below capture "structural congruence": using "silent" transitions *)
     | do_fix : 
-      forall t t', t' = tsubst (tfix t) t -> termLTS (tfix t) None t'
+      (* forall t t', t' = tsubst (tfix t) t -> termLTS (tfix t) None t' *)
+      forall t , termLTS (tfix t) None (tsubst (tfix t) t)
 
     | do_comm : 
       forall tl tr, termLTS (tpar tl tr) None (tpar tr tl)
