@@ -657,17 +657,12 @@ Definition do_act (a:act) (e:env) : (tm * env) :=
 
 Definition label : Type := act * pid.
 
- Inductive action : Type := 
-  | LABEL : label -> action
-  | SILENT : action 
-  .
-
-Definition get_action (a:act) (e:env) : action :=
+Definition get_action (a:act) (e:env) : option label :=
   match a with
-  | ENTER => LABEL (a, (get_pid (get_state e)))
-  | LEAVE => LABEL (a, (get_pid (get_state e)))
-  | NCS   => SILENT
-  | _     => SILENT
+  | ENTER => Some (a, (get_pid (get_state e)))
+  | LEAVE => Some (a, (get_pid (get_state e)))
+  | NCS   => None
+  | _     => None
   end.
 
 (*************************************************************************)
@@ -731,20 +726,20 @@ Definition take_branch (c:expr) (t1:tm) (t2:tm) (e:env) : tm * env :=
 
 Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
 
-Inductive step : (tm * env) -> action -> (tm * env) -> Prop :=
+Inductive step : (tm * env) -> option label -> (tm * env) -> Prop :=
 | STEP_ACT : forall a e, (ACT a, e) --<{get_action a e}>--> (do_act a e)
 
-| STEP_SEQ_END : forall r e, (SEQ OK r, e) --<{SILENT}>--> (r, e)
+| STEP_SEQ_END : forall r e, (SEQ OK r, e) --<{None}>--> (r, e)
 
 | STEP_SEQ : forall a l1 l2 r e1 e2,
   (l1, e1) --<{a}>--> (l2, e2) ->
   (SEQ l1 r, e1) --<{a}>--> (SEQ l2 r, e2)
 
 | STEP_IF : forall c t1 t2 e,
-  (IF c t1 t2, e) --<{SILENT}>--> (take_branch c t1 t2 e)
+  (IF c t1 t2, e) --<{None}>--> (take_branch c t1 t2 e)
 
 | STEP_REC_DEF : forall i b e,
-  (REC_DEF i b, e) --<{SILENT}>--> (unfold (i, b) b, e)
+  (REC_DEF i b, e) --<{None}>--> (unfold (i, b) b, e)
 
 where "t '--<{' a '}>-->' t'" := (step t a t').
 
@@ -761,7 +756,7 @@ Definition composition : Type := sys * resource.
 
 Reserved Notation "t '==<{' a '}>==>' t'" (at level 40).
 
-Inductive lts : composition -> action -> composition -> Prop :=
+Inductive lts : composition -> option label -> composition -> Prop :=
 | LTS_PRC : forall a t1 t2 s1 s2 r1 r2,
   (t1, (s1, r1)) --<{a}>--> (t2, (s2, r2)) ->
   (PRC t1 s1, r1) ==<{a}>==> (PRC t2 s2, r2)
@@ -1111,47 +1106,47 @@ Definition do_main_loop (b:tm) (s:state) (r:resource)
   (PRC (unfold (PMainLoopDef, b) b) s, r)
   .
 
-Inductive bigstep : composition -> action -> composition -> Prop :=
+Inductive bigstep : composition -> option label -> composition -> Prop :=
 (*  0 *)
 | DO_MAIN_LOOP : forall b s r,
   bigstep (PRC (REC_DEF PMainLoopDef b) s, r) 
-          SILENT 
+          None 
           (do_main_loop b s r)
 
 (*  1 *)
 | DO_ACQUIRE : forall c s r,
   bigstep (PRC (SEQ (Acquire) (c)) s, r)
-          SILENT
+          None
           (do_acquire c s r)
 
 (*  2 *)
 | DO_RELEASE : forall c s r,
   bigstep (PRC (SEQ (Release) (c)) s, r)
-          SILENT
+          None
           (do_release c s r)
 
 (*  3 *)
 | DO_ACQUIRE_INNER : forall c s r,
   bigstep (PRC (SEQ (AcquireInnerLoop) c) s, r)
-          SILENT
+          None
           (do_acquire_inner c s r)
 
 (*  4 *)
 | DO_RELEASE_INNER : forall c s r,
   bigstep (PRC (SEQ (ReleaseInnerLoop) c) s, r)
-          SILENT
+          None
           (do_release_inner c s r)
 
 (*  5 *)
 | DO_SEQ_ACT_ENTER : forall y s r,
   bigstep (PRC (SEQ (ACT ENTER) y) s, r) 
-          (LABEL (ENTER, (get_pid s))) 
+          (Some (ENTER, (get_pid s))) 
           (PRC y s, r)
 
 (*  6 *)
 | DO_SEQ_ACT_LEAVE : forall y s r,
   bigstep (PRC (SEQ (ACT LEAVE) y) s, r) 
-          (LABEL (LEAVE, (get_pid s))) 
+          (Some (LEAVE, (get_pid s))) 
           (PRC y s, r)
 
 (*  7 *)
@@ -1222,6 +1217,29 @@ Inductive bigstep_transitive_closure : composition -> Prop :=
 (*********************************)
 (**** Manual Bisimilarity Proof **)
 (*********************************)
+
+Require Import MEBI.Bisimilarity.
+
+Print composition.
+Print sys.
+Print resource.
+Example p := (P,Env.initial 1).
+Example q := (PRC P State.initial, Resource.initial 1).
+
+Example wsim_pq : weak_sim step bigstep p q. 
+Proof. intros; subst; unfold p, q.
+  unfold P, PMainLoopDef, Release.
+  unfold Env.initial, State.initial, Resource.initial.
+  unfold State.create, Memory.create, Lock.initial.
+  unfold Vars.initial, Qnode.create, Index.initial, Qnode.initial.
+
+  cofix CH0; apply In_sim, Pack_sim; intros.
+  inversion H; subst; unfold unfold in *; clear H.
+  eexists; split.
+
+  (* info_eauto with rel_db. *)
+Admitted.
+
 
 
 (* Fixpoint weak_transition (p : composition) (m : action) : Prop :=
