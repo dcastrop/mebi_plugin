@@ -67,22 +67,10 @@ let get_lts_labels_and_terms
   | _ -> invalid_arity typ
 ;;
 
-(** *)
-(* type raw_lts =
-  { index : int
-  ; coq_lts : EConstr.t
-  ; trm_type : EConstr.types
-  ; lbl_type : EConstr.types
-  ; coq_ctor_names : Names.Id.t array
-  ; constructor_transitions : (Constr.rel_context * Constr.types) array
-  } *)
-
-(* type term_type_map = (EConstr.types, raw_lts) Hashtbl.t *)
-
 (** coq_inductive_lts *)
 type cind_lts =
   { trm_type : EConstr.t
-  ; lbl_type : EConstr.t
+  ; _lbl_type : EConstr.t
   ; constr_transitions : (Constr.rel_context * Constr.t) array
   }
 
@@ -107,111 +95,12 @@ let lts_cindef_trm_type (c : cindef) : EConstr.t mm =
   match c.kind with LTS l -> return l.trm_type | _ -> invalid_cindef_kind ()
 ;;
 
-let _lts_cindef_lbl_type (c : cindef) : EConstr.t mm =
-  match c.kind with LTS l -> return l.lbl_type | _ -> invalid_cindef_kind ()
-;;
-
 let lts_cindef_constr_transitions (c : cindef)
   : (Constr.rel_context * Constr.t) array mm
   =
   match c.kind with
   | LTS l -> return l.constr_transitions
   | _ -> invalid_cindef_kind ()
-;;
-
-(** [_log_cindef] *)
-let _log_cindef
-      ?(params : Params.log = default_params)
-      ?(key : E.t option)
-      (c : cindef)
-  : unit mm
-  =
-  let key_str =
-    match key with
-    | None -> ""
-    | Some k -> Printf.sprintf "(key %s) " (E.to_string k)
-  in
-  let name = econstr_to_string c.info.name in
-  let constr_names =
-    Pp.string_of_ppcmds
-      (Pp.prvect_with_sep
-         (fun _ -> Pp.str ", ")
-         Names.Id.print
-         c.info.constr_names)
-  in
-  (match c.kind with
-   | Type v ->
-     let opt_val_str =
-       match v with None -> "(no value given)" | Some v -> econstr_to_string v
-     in
-     Log.normal
-       (Printf.sprintf
-          "cindef %sType: %s\nof value: %s\nconstrs: %s\n"
-          key_str
-          name
-          opt_val_str
-          constr_names)
-   | LTS l ->
-     let term_type = econstr_to_string l.trm_type in
-     let label_type = econstr_to_string l.lbl_type in
-     let constr_transitions =
-       "..."
-       (* if Array.length l.constr_transitions < 1
-          then "[] (empty)"
-          else
-          Printf.sprintf
-          "[%s]"
-          (Array.fold_left
-          (fun (acc : string) (tr : Constr.rel_context * Constr.t) ->
-          Printf.sprintf "%s %s\n" acc (constr_to_string (snd tr)))
-          "\n"
-          l.constr_transitions) *)
-     in
-     Log.normal
-       (Printf.sprintf
-          "cindef %sLTS: %s\n\
-           constrs: %s\n\
-           term type: %s\n\
-           label type: %s\n\
-           constr transitions: %s"
-          key_str
-          name
-          constr_names
-          term_type
-          label_type
-          constr_transitions));
-  return ()
-;;
-
-let _log_cindef_map
-      ?(params : Params.log = default_params)
-      (primary_enc : E.t)
-      (weak_enc : E.t option)
-      (cindef_map : cindef B.t)
-  : unit mm
-  =
-  Log.normal "\n/////////// log cindef map";
-  (* output cindef map*)
-  let cindef_list = List.of_seq (B.to_seq cindef_map) in
-  let iter_body (i : int) () =
-    let key, c = List.nth cindef_list i in
-    _log_cindef ~params ~key c
-  in
-  let* _ = iterate 0 (List.length cindef_list - 1) () iter_body in
-  (* output primary lts *)
-  Log.normal
-    (Printf.sprintf "cindef, primary: (enc => %s)" (E.to_string primary_enc));
-  (* output weak type *)
-  match weak_enc with
-  | None ->
-    Log.normal (Printf.sprintf "cindef, no weak enc.");
-    Log.normal "///////////\n";
-    return ()
-  | Some w ->
-    Log.normal (Printf.sprintf "cindef, weak: (enc => %s)" (E.to_string w));
-    let* _ = _log_cindef ~params ~key:w (B.find cindef_map w) in
-    Log.normal "///////////\n";
-    return ()
 ;;
 
 let check_ref_type (gref : Names.GlobRef.t) : cindef_info mm =
@@ -244,7 +133,7 @@ let check_ref_lts (gref : Names.GlobRef.t) : (cindef_info * cind_lts) mm =
     return
       ( { name = lts_term; constr_names = mip.mind_consnames }
       , { trm_type = EConstr.of_constr (Context.Rel.Declaration.get_type term)
-        ; lbl_type = EConstr.of_constr (Context.Rel.Declaration.get_type lbl)
+        ; _lbl_type = EConstr.of_constr (Context.Rel.Declaration.get_type lbl)
         ; constr_transitions = mip.mind_nf_lc
         } )
   (* raise error if [gref] is not an inductive type *)
@@ -330,15 +219,6 @@ type unif_problem =
   { termL : EConstr.t
   ; termR : EConstr.t
   }
-
-let _pstr_unif_problem (t : unif_problem) : string =
-  match t with
-  | { termL; termR; _ } ->
-    Printf.sprintf
-      "{ L: %s;\n  R: %s; }"
-      (econstr_to_string termL)
-      (econstr_to_string termR)
-;;
 
 let rec unify_all
           ?(params : Params.log = default_params)
@@ -721,51 +601,6 @@ module MkGraph
       0
   ;;
 
-  let _flatten_transitions (ts : constr_transitions H.t)
-    : (S.elt * Action.t * S.elt * Constr_tree.t) list mm
-    =
-    let raw_list : (E.t * constr_transitions) list =
-      List.of_seq (H.to_seq ts)
-    in
-    let from_body
-          (i : int)
-          (new_transitions : (S.elt * Action.t * S.elt * Constr_tree.t) list)
-      =
-      let (from, actions) : E.t * constr_transitions = List.nth raw_list i in
-      let raw_actions : (Action.t * D.t) list =
-        List.of_seq (Hashtbl.to_seq actions)
-      in
-      let action_body
-            (j : int)
-            (new_transitions : (S.elt * Action.t * S.elt * Constr_tree.t) list)
-        =
-        let (a, destinations) : Action.t * D.t = List.nth raw_actions j in
-        let raw_destinations : (E.t * Constr_tree.t) list =
-          D.elements destinations
-        in
-        let destination_body
-              (k : int)
-              (new_transitions :
-                (S.elt * Action.t * S.elt * Constr_tree.t) list)
-          =
-          let (destination, constr_tree) : E.t * Constr_tree.t =
-            List.nth raw_destinations k
-          in
-          return ((from, a, destination, constr_tree) :: new_transitions)
-        in
-        let* new_transitions' =
-          iterate 0 (List.length raw_destinations - 1) [] destination_body
-        in
-        return (List.append new_transitions' new_transitions)
-      in
-      let* new_transitions' =
-        iterate 0 (List.length raw_actions - 1) [] action_body
-      in
-      return (List.append new_transitions' new_transitions)
-    in
-    iterate 0 (List.length raw_list - 1) [] from_body
-  ;;
-
   (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t].
   *)
   type lts_graph =
@@ -776,144 +611,6 @@ module MkGraph
     ; transitions : constr_transitions H.t
     ; cindefs : (E.t * cindef) list
     }
-
-  let _get_num_transitions (ts : constr_transitions H.t) : int =
-    H.fold
-      (fun (from : E.t) (actions : constr_transitions) (num : int) ->
-        Hashtbl.fold
-          (fun (action : Action.t) (dests : D.t) (num : int) ->
-            num + D.cardinal dests)
-          actions
-          num)
-      ts
-      0
-  ;;
-
-  let _pstr_enc ?(cache_decoding : bool = false) (s_enc : E.t) : string mm =
-    if cache_decoding
-    then
-      let* s_decoding = decode s_enc in
-      return
-        (Printf.sprintf
-           "(%s, %s)"
-           (E.to_string s_enc)
-           (Utils.clean_string (econstr_to_string s_decoding)))
-    else return (Printf.sprintf "(%s, ...)" (E.to_string s_enc))
-  ;;
-
-  let _pstr_state ?(cache_decoding : bool = false) (s_enc : E.t) : string mm =
-    _pstr_enc ~cache_decoding s_enc
-  ;;
-
-  let pstr_states ?(cache_decoding : bool = false) (ss : S.t) : string mm =
-    let raw_ss = S.to_list ss in
-    let iter_body (i : int) (acc : string) : string mm =
-      let state_enc = List.nth raw_ss i in
-      let* state = _pstr_state ~cache_decoding state_enc in
-      return (Printf.sprintf "%s\n\t%s" acc state)
-    in
-    iterate 0 (List.length raw_ss - 1) "" iter_body
-  ;;
-
-  let _pstr_destinations
-        ?(cache_decoding : bool = false)
-        (acc0 : string)
-        (from : string)
-        (action : string)
-        (meta : string)
-        (dests : D.t)
-    : string mm
-    =
-    let raw_dests = D.to_list dests in
-    let iter_dests (i : int) (acc : string) : string mm =
-      let dest, constr_tree = List.nth raw_dests i in
-      let* dest = _pstr_state ~cache_decoding dest in
-      return
-        (Printf.sprintf
-           "%s\n\
-            \t( from: %s\n\
-            \t; dest: %s\n\
-            \t; labl: %s\n\
-            \t; tree: %s\n\
-            \t; meta: %s\n\
-            \t)\n"
-           acc
-           from
-           dest
-           action
-           (Constr_tree.pstr constr_tree)
-           meta)
-    in
-    iterate 0 (List.length raw_dests - 1) acc0 iter_dests
-  ;;
-
-  let _pstr_actions
-        ?(cache_decoding : bool = false)
-        (acc0 : string)
-        (from : string)
-        (actions : constr_transitions)
-    : string mm
-    =
-    let raw_actions = List.of_seq (Hashtbl.to_seq actions) in
-    let iter_actions (i : int) (acc : string) : string mm =
-      let action, dests = List.nth raw_actions i in
-      let meta = Model.Action.MetaData.to_string action.meta in
-      let action = Model.Action.to_string action in
-      _pstr_destinations ~cache_decoding acc from action meta dests
-    in
-    iterate 0 (List.length raw_actions - 1) acc0 iter_actions
-  ;;
-
-  let _pstr_transitions
-        ?(cache_decoding : bool = false)
-        (transitions : constr_transitions H.t)
-    : string mm
-    =
-    let raw_transitions = List.of_seq (H.to_seq transitions) in
-    let iter_from (i : int) (acc : string) : string mm =
-      let from, actions = List.nth raw_transitions i in
-      let* from = _pstr_state ~cache_decoding from in
-      _pstr_actions ~cache_decoding acc from actions
-    in
-    iterate 0 (List.length raw_transitions - 1) "" iter_from
-  ;;
-
-  let _pstr_to_visit ?(cache_decoding : bool = false) (to_visit : E.t Queue.t)
-    : string mm
-    =
-    let raw_to_visit = List.of_seq (Queue.to_seq to_visit) in
-    let iter_to_visit (i : int) (acc : string) : string mm =
-      let to_visit = List.nth raw_to_visit i in
-      let* to_visit = _pstr_enc ~cache_decoding to_visit in
-      return (Printf.sprintf "%s\n\t%s" acc to_visit)
-    in
-    iterate 0 (List.length raw_to_visit - 1) "" iter_to_visit
-  ;;
-
-  let _pstr_lts_graph (g : lts_graph) : string mm =
-    let* states = pstr_states g.states in
-    let* transitions = _pstr_transitions g.transitions in
-    let* to_visit = _pstr_to_visit g.to_visit in
-    return
-      (Printf.sprintf
-         "\n\
-          { init state: %s\n\
-         \ \n\
-         \          ; states (%i): [%s\n\
-          ]\n\
-          ; transitions (%i): [%s\n\
-          ]\n\
-          ; to visit (%i): [%s\n\
-          ]\n\
-          }"
-         (E.to_string g.init)
-         (S.cardinal g.states)
-         states
-         (_get_num_transitions g.transitions)
-         transitions
-         (Queue.length g.to_visit)
-         to_visit)
-  ;;
 
   (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions].
   *)
@@ -949,33 +646,12 @@ module MkGraph
     : bool option mm
     =
     match weak with
-    | None ->
-      (* Log.warning ~params:default_params "NO SILENT"; *)
-      return None
+    | None -> return None
     | Some w ->
       let* act_encoding = encode_opt act in
       (match act_encoding with
-       | None ->
-         (* let* w_term = decode w in
-            let w_label = econstr_to_string w_term in
-            let a_label = econstr_to_string act in
-            Log.warning
-            ~params:default_params
-            (Printf.sprintf
-            "is_silent_transition: (no decode) (str => %b)"
-            (String.equal a_label w_label)); *)
-         return (Some false)
-       | Some e ->
-         (* let* w_term = decode w in
-            let w_label = econstr_to_string w_term in
-            let a_label = econstr_to_string act in
-            Log.warning
-            ~params:default_params
-            (Printf.sprintf
-            "is_silent_transition: (enc => %b) (str => %b)"
-            (E.eq w e)
-            (String.equal a_label w_label)); *)
-         return (Some (E.eq w e)))
+       | None -> return (Some false)
+       | Some e -> return (Some (E.eq w e)))
   ;;
 
   let get_new_states
@@ -1455,30 +1131,6 @@ let make_graph_builder =
   (* hashtabl mapping term type or cindef *)
   let module G : GraphB = MkGraph ((val h)) ((val s)) ((val d)) in
   return (module G : GraphB)
-;;
-
-let _print_incomplete_lts_warning
-      ?(params : Params.log = default_params)
-      (name : string)
-      (bound : int)
-  : unit
-  =
-  Log.warning
-    ~params
-    (Printf.sprintf
-       "LTS graph (%s) is incomplete, exceeded bound: %i.\n"
-       name
-       bound)
-;;
-
-let _print_complete_lts_notice
-      ?(params : Params.log = default_params)
-      (name : string)
-  : unit
-  =
-  Log.override
-    ~params
-    (Printf.sprintf "- - - - (finished build lts of: %s)" name)
 ;;
 
 (**********************)
