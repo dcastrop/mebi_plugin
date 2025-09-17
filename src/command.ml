@@ -328,6 +328,13 @@ let rec check_updated_ctx
         | None ->
           (* NOTE: testing handling the [@eq] premises *)
           (match econstr_to_string fn with
+           | "option" ->
+             Log.warning
+               ~params
+               (Printf.sprintf
+                  "check_updated_ctx, fn_cindef \"option\" has args: %s"
+                  (econstr_list_to_string (Array.to_list args)));
+             check_updated_ctx acc fn_cindef (substl, tl)
            | "@eq" ->
              (* Log.warning
                ~params

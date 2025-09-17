@@ -24,7 +24,21 @@ Example r : term := tseq (tpar (tact (recv A) tend)
                          (tfix (tseq (tpar (tact (send A) tend) 
                                            (tact (recv A) tend)) trec)).
 
-MeBi Show (* Dump "proc_t1_p" *) LTS Bounded 1000 Of p Using termLTS.
+
+
+(* MeBi Check (MakeLTS term (option label) p None (Some _) None (OutputMode None RunCheck)). *)
+
+(* MeBi Check (MakeFSM term (option label) p None (Some _) None (OutputMode None RunCheck)). *)
+
+(* MeBi Check (CheckSaturation term (option label) p None (Some _) None (OutputMode None RunCheck)). *)
+
+(* MeBi Run (CheckBisimilarity 
+          term (option label)   term (option label) 
+          p None (Some _) None  q None (Some _) None 
+          (OutputMode None RunCheck)). *)
+
+
+(* MeBi Dump "proc_t1_p" LTS Bounded 1000 Of p Using termLTS. *)
 (* MeBi Dump "proc_t1_q" LTS Bounded 1000 Of q Using termLTS. *)
 (* MeBi Dump "proc_t1_r" LTS Bounded 1000 Of r Using termLTS. *)
 
