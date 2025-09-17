@@ -97,6 +97,10 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 (** Build LTS from coq term ***)
 (******************************)
 
+| ["MeBi" "Check" constr(x) ] -> {Mebi_wrapper.run (Mebi_api.check x)}
+
+| ["MeBi" "Run" constr(x) ] -> {Mebi_wrapper.run (Mebi_api.run x)}
+
 (* LTS -- no silent actions *)
 | [ "MeBi" "Check" "LTS" "Of" constr(t) "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((false, Command.default_bound, t), None), None), r))}

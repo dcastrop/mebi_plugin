@@ -38,6 +38,7 @@
   vernac
   dump_to_file
   command
+  mebi_api
   ; examples
   g_mebi))
 

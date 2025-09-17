@@ -59,6 +59,9 @@ src/dump_to_file.mli
 src/command.ml
 src/command.mli
 
+src/mebi_api.ml
+src/mebi_api.mli
+
 # src/examples.ml
 # src/examples.mli
 

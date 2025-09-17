@@ -1,60 +1,30 @@
 Set Debug "backtrace".
 Declare ML Module "coq-mebi.mebi".
 
-Inductive output_mode : Set :=
-| RunCheck : output_mode (* only warning printouts *)
-| ShowInfo : output_mode (* show more printouts *)
-| Verbose  : output_mode (* show more detailed printouts *)
+Inductive printout_mode : Set :=
+| RunCheck : printout_mode (* only warning printouts *)
+| ShowInfo : printout_mode (* show more printouts *)
+| Verbose  : printout_mode (* show more detailed printouts *)
 .
-Definition DefaultOutputMode := RunCheck.
+Definition DefaultPrintoutMode := RunCheck.
 
-Inductive plugin_model_kind : Set :=
-| AsLTS : plugin_model_kind
-| AsFSM : plugin_model_kind
-.
-Definition DefaultPluginModelKind := AsLTS.
+Require Export String.
+Inductive output_mode : Set := 
+| OutputMode : option string -> printout_mode -> output_mode.
+Definition DefaultOutputMode := OutputMode None DefaultPrintoutMode.
 
-Section Definitions.
-  Context (M : Type) (A : Type).
-  Definition LTS : Type := M -> option A -> M -> Prop.
-  Inductive term_to_model : Type := ModelInfo : A -> LTS -> term_to_model.
-End Definitions.
-About ModelInfo.
-Arguments term_to_model {M A}.
-
-(* Section ModelCommands.
-  Context (M : Type) (A : Type).
-  Inductive plugin_model_params : Type := 
-  | Model : plugin_model_kind -> option nat -> term_to_model -> plugin_model_params
-.
-Definition DefaultPluginModel := Model DefaultPluginModelKind None.
-
-Inductive dev_plugin_command : Type :=
-| Saturate : plugin_model_params -> dev_plugin_command
+(** debugging commands *)
+Inductive single_model_commands (A B : Type) : Type :=
+| MakeLTS : A -> B -> B -> option nat -> output_mode -> single_model_commands A B 
+| MakeFSM : A -> B -> B -> option nat -> output_mode -> single_model_commands A B 
+| CheckSaturation : A -> B -> B -> option nat -> output_mode -> single_model_commands A B 
 .
 
-Inductive plugin_command : Type :=
-| Bisim : plugin_model_params -> plugin_model_params
+Inductive plugin_command (A B C D : Type) : Type :=
+| CheckBisimilarity : A -> B -> B -> option nat -> 
+                      C -> D -> D -> option nat -> 
+                      output_mode -> plugin_command A B C D.
 
 
-End API. *)
-
-
-
-
-(* Definition  *)
-(* Record coq_lts := { term_type  : A; label_type : B }. *)
-
-(* Definition term {A B : Type} :=  *)
-
-(* Inductive build_model {A B : Type} (p:A) (ls:list coq_lts) := *)
-(* | *)
-
-(* Inductive build_model (A:Type) (B:Type) (a:A) (l:(A -> option B -> A -> Prop)) : Type :=
-| LTS : build_model A B a l
-| FSM : build_model A B a l
-. *)
-
-
-(* Inductive run_mode : Set :=
-|  *)
+(* Check (MakeLTS nat bool 0 false true None DefaultOutputMode). *)
+(* Check (MakeLTS nat (option bool) 0 None (Some _) None DefaultOutputMode). *)
