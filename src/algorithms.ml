@@ -1,44 +1,8 @@
-module Bisimilarity = struct
+module Minimize = struct
   open Model
 
-  type t = Fsm.pair * Fsm.t option
-  type result = (Fsm.pair * Fsm.t) * (Partition.t * Partition.t)
-
-  (** is [true] if [block] has states that originate from both [the_fsm_1] and [the_fsm_2]
-  *)
-  let block_has_shared_origin
-        (block : States.t)
-        (the_fsm_1 : Fsm.t)
-        (the_fsm_2 : Fsm.t)
-    : bool
-    =
-    let ref_1, ref_2 = ref false, ref false in
-    States.iter
-      (fun (s : State.t) ->
-        match Fsm.state_origin (the_fsm_1, the_fsm_2) s with
-        | 0 ->
-          ref_1 := true;
-          ref_2 := true
-        | n -> if n < 0 then ref_1 := true else ref_2 := true)
-      block;
-    !ref_1 && !ref_2
-  ;;
-
-  (** [split_bisimilar pi the_states_1 the_states_2] separates the blocks in [pi] into two distinct partitions of bisimilar and non-bisimilar blocks.
-  *)
-  let split_bisimilar (pi : Partition.t) (the_fsm_1 : Fsm.t) (the_fsm_2 : Fsm.t)
-    : Partition.t * Partition.t
-    =
-    Partition.fold
-      (fun (block : States.t)
-        ((bisim_states, non_bisim_states) : Partition.t * Partition.t) ->
-        (* check that another state in block is from another fsm. *)
-        if block_has_shared_origin block the_fsm_1 the_fsm_2
-        then Partition.add block bisim_states, non_bisim_states
-        else bisim_states, Partition.add block non_bisim_states)
-      pi
-      (Partition.empty, Partition.empty)
-  ;;
+  type t = Fsm.t
+  type result = Fsm.t * Partition.t
 
   let add_to_block_option (s : State.t) (block : States.t option)
     : States.t option
@@ -147,27 +111,8 @@ module Bisimilarity = struct
       !pi
   ;;
 
-  let handle_run_params ((the_fsm_pair, pre_merged_fsm) : t) (weak : bool)
-    : Fsm.t
-    =
-    match weak, pre_merged_fsm with
-    (* strong *)
-    | false, None -> Fsm.merge the_fsm_pair
-    | false, Some merged_fsm -> merged_fsm
-    (* weak *)
-    (* | true, None -> Fsm.merge (Fsm.saturate_pair the_fsm_pair) *)
-    | true, None -> Fsm.saturate (Fsm.merge the_fsm_pair)
-    | true, Some merged_fsm ->
-      Utils.Logging.Log.warning
-        "Checking weak bisimilarity, will re-merge FSMs after saturating them. \
-         (Ignoring provided merged FSM.)";
-      Fsm.merge (Fsm.saturate_pair the_fsm_pair)
-  ;;
-
-  let run ?(weak : bool = false) (r : t) : result =
-    let the_fsm_1, the_fsm_2 = fst r in
-    let the_merged_fsm = handle_run_params r weak in
-    match the_merged_fsm with
+  let run ?(weak : bool = false) (the_fsm : t) : result =
+    match the_fsm with
     | { alphabet; states; edges; _ } ->
       let pi = ref (Partition.of_list [ states ]) in
       let changed = ref true in
@@ -176,11 +121,54 @@ module Bisimilarity = struct
         changed := false;
         iterate alphabet edges pi changed weak
       done;
-      let bisim_states, non_bisim_states =
-        split_bisimilar !pi the_fsm_1 the_fsm_2
-        (* the_state_translation *)
-      in
-      ((the_fsm_1, the_fsm_2), the_merged_fsm), (bisim_states, non_bisim_states)
+      the_fsm, !pi
+  ;;
+end
+
+module Bisimilar = struct
+  open Model
+
+  type t = Fsm.pair * Fsm.t * Partition.t
+  type result = Fsm.pair * Fsm.t * (Partition.t * Partition.t)
+
+  (** is [true] if [block] has states that originate from both [the_fsm_1] and [the_fsm_2]
+  *)
+  let block_has_shared_origin
+        (block : States.t)
+        (the_fsm_1 : Fsm.t)
+        (the_fsm_2 : Fsm.t)
+    : bool
+    =
+    let ref_1, ref_2 = ref false, ref false in
+    States.iter
+      (fun (s : State.t) ->
+        match Fsm.state_origin (the_fsm_1, the_fsm_2) s with
+        | 0 ->
+          ref_1 := true;
+          ref_2 := true
+        | n -> if n < 0 then ref_1 := true else ref_2 := true)
+      block;
+    !ref_1 && !ref_2
+  ;;
+
+  (** [split_bisimilar pi the_states_1 the_states_2] separates the blocks in [pi] into two distinct partitions of bisimilar and non-bisimilar blocks.
+  *)
+  let split_bisimilar (pi : Partition.t) (the_fsm_1 : Fsm.t) (the_fsm_2 : Fsm.t)
+    : Partition.t * Partition.t
+    =
+    Partition.fold
+      (fun (block : States.t)
+        ((bisim_states, non_bisim_states) : Partition.t * Partition.t) ->
+        (* check that another state in block is from another fsm. *)
+        if block_has_shared_origin block the_fsm_1 the_fsm_2
+        then Partition.add block bisim_states, non_bisim_states
+        else bisim_states, Partition.add block non_bisim_states)
+      pi
+      (Partition.empty, Partition.empty)
+  ;;
+
+  let run (((the_fsm_1, the_fsm_2), merged_fsm, pi) : t) : result =
+    (the_fsm_1, the_fsm_2), merged_fsm, split_bisimilar pi the_fsm_1 the_fsm_2
   ;;
 end
 
@@ -188,20 +176,42 @@ end
 (** Algorithms ************************************************************)
 (**************************************************************************)
 
-type t = Bisim of (bool * Bisimilarity.t)
-type result = Bisim of Bisimilarity.result
+type t =
+  | Satur of Fsm.t
+  | Minim of (bool * Minimize.t)
+  | Bisim of (bool * Fsm.pair)
 
-let run (t : t) : result =
-  match t with
+type result =
+  | Satur of Fsm.t
+  | Minim of Minimize.result
+  | Bisim of Bisimilar.result
+
+let run (args : t) : result =
+  match args with
+  | Satur the_fsm -> Satur (Fsm.saturate the_fsm)
+  | Minim params ->
+    Minim
+      (Minimize.run
+         (match params with
+          | true, the_fsm -> Fsm.saturate the_fsm
+          | _, the_fsm -> the_fsm))
   | Bisim params ->
-    let weak, params = params in
-    Bisim (Bisimilarity.run ~weak params)
+    Bisim
+      (Bisimilar.run
+         (match params with
+          | true, (the_fsm_1, the_fsm_2) ->
+            let the_saturated_pair : Fsm.pair =
+              Fsm.saturate the_fsm_1, Fsm.saturate the_fsm_2
+            in
+            let merged_fsm : Fsm.t = Fsm.merge the_saturated_pair in
+            the_saturated_pair, merged_fsm, snd (Minimize.run merged_fsm)
+          | _, the_fsm_pair ->
+            let merged_fsm : Fsm.t = Fsm.merge the_fsm_pair in
+            the_fsm_pair, merged_fsm, snd (Minimize.run merged_fsm)))
 ;;
 
-let result_to_bool (r : result) =
+let bisim_result_to_bool (r : Bisimilar.result) =
   match r with
-  | Bisim r ->
-    (match r with
-     | _, (_bisim_states, non_bisim_states) ->
-       Model.Partition.is_empty non_bisim_states)
+  | _, _, (_bisim_states, non_bisim_states) ->
+    Model.Partition.is_empty non_bisim_states
 ;;
