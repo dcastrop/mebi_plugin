@@ -1260,8 +1260,12 @@ let result_to_string (r : result_kind) : string =
   | FSM the_fsm -> Printf.sprintf "FSM: %s" (Fsm.pstr the_fsm)
   | Alg r ->
     (match r with
+     | Satur the_fsm -> Printf.sprintf "FSM saturated: %s" (Fsm.pstr the_fsm)
+     | Minim (the_fsm, the_partition) ->
+       Printf.sprintf "FSM saturated: %s" (Fsm.pstr the_fsm)
      | Bisim
-         ( ((the_fsm_1, the_fsm_2), the_merged_fsm)
+         ( (the_fsm_1, the_fsm_2)
+         , the_merged_fsm
          , (bisim_states, non_bisim_states) ) ->
        Printf.sprintf
          "Bisimilar: %b\n\n\
@@ -1340,16 +1344,12 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
     let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
     handle_output o (FSM the_fsm)
   | Minim ((f, b, t), w), l ->
-    (* FIXME: currently just a test for saturation, does not do minimization *)
     let* the_lts = build_lts_graph ~weak:w f b t l in
     let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-    let the_sat = Fsm.saturate the_fsm in
     (* let the_merged_fsm = Fsm.merge (the_fsm, the_sat) in *)
     (* handle_output o (Merge ((the_fsm, the_sat), the_merged_fsm)) *)
     (* sanity check, should be bisimilar to saturated self *)
-    handle_output
-      o
-      (Alg (Algorithms.run (Bisim (true, ((the_fsm, the_sat), None)))))
+    handle_output o (Alg (Algorithms.run (Minim (Option.has_some w, the_fsm))))
     (* return () *)
   | Merge ((((f1, b1, t1), w1), p1), (((f2, b2, t2), w2), p2)), l ->
     let* the_lts_1 =
@@ -1379,5 +1379,5 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
     let the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
     handle_output
       o
-      (Alg (Algorithms.run (Bisim (weak, ((the_fsm_1, the_fsm_2), None)))))
+      (Alg (Algorithms.run (Bisim (weak, (the_fsm_1, the_fsm_2)))))
 ;;

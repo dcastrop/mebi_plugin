@@ -101,6 +101,26 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 
 | ["MeBi" "Run" constr(x) ] -> {Mebi_wrapper.run (Mebi_api.run x)}
 
+(* | [ "MeBi" string(mode) string(model) "Of" constr(t) "Using" reference_list(r) ] -> 
+  { match (
+      match mode with 
+        | "Check" -> Some (Vernac.Check ())
+        | "Show" -> Some (Vernac.Show ())
+        | "Dump" -> Some (Vernac.Dump None)
+        | _ -> None
+    ) with 
+    | None -> Feedback.msg_notice (str "unrecognized mode: " ++ str mode)
+    | Some mode -> (
+      match model with 
+        | "LTS" -> Vernac.LTS (((true, Command.default_bound, t), ), r)
+        | _ -> None
+    )
+
+
+    Mebi_wrapper.run (Mebi_api.run x)
+  } *)
+
+
 (* LTS -- no silent actions *)
 | [ "MeBi" "Check" "LTS" "Of" constr(t) "Using" reference_list(r) ] ->
     {Mebi_wrapper.run (Command.vernac (Vernac.Check ()) (Vernac.LTS (((false, Command.default_bound, t), None), None), r))}

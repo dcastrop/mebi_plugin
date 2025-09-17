@@ -298,9 +298,48 @@ let to_json_model
     }
   | Alg r ->
     (match r with
+     | Satur m ->
+       let kind = "satur" in
+       let info = m.info in
+       let result = Some (r, fst bisim_args) in
+       let alphabet = alphabet_to_json_model_alphabet m.alphabet in
+       let initial_state = state_opt_to_str m.init in
+       let state_list = states_to_json_model_states m.states in
+       let terminal_list = terminals_to_json_model_terminals m.terminals in
+       let edge_list = edges_to_json_model_edges m.edges in
+       { name
+       ; kind
+       ; info
+       ; result
+       ; alphabet
+       ; initial_state
+       ; terminal_list
+       ; state_list
+       ; edge_list
+       }
+     | Minim b ->
+       let kind = "minim" in
+       let m, _ = b in
+       let info = m.info in
+       let result = Some (r, fst bisim_args) in
+       let alphabet = alphabet_to_json_model_alphabet m.alphabet in
+       let initial_state = state_opt_to_str m.init in
+       let state_list = states_to_json_model_states m.states in
+       let terminal_list = terminals_to_json_model_terminals m.terminals in
+       let edge_list = edges_to_json_model_edges m.edges in
+       { name
+       ; kind
+       ; info
+       ; result
+       ; alphabet
+       ; initial_state
+       ; terminal_list
+       ; state_list
+       ; edge_list
+       }
      | Bisim b ->
        let kind = "bisim" in
-       let (_, the_merged_fsm), _ = b in
+       let _, the_merged_fsm, _ = b in
        let m = the_merged_fsm in
        let info = m.info in
        let result = Some (r, fst bisim_args) in
@@ -392,13 +431,22 @@ let write_json_result_to_file
   | None -> Printf.fprintf oc "\t\"result\": null,\n"
   | Some r ->
     (match r with
+     | Satur _, _ -> ()
+     | Minim (_, p), tup ->
+       Printf.fprintf oc "\t\"result\": {\n";
+       Printf.fprintf
+         oc
+         "\t\t\"minimized states\": %s"
+         (partition_to_json_list p);
+       Printf.fprintf oc "\n\t},\n";
+       ()
      | Bisim b, tup ->
-       let _, (_bisim_states, _non_bisim_states) = b in
+       let _, _, (bisim_states, non_bisim_states) = b in
        Printf.fprintf oc "\t\"result\": {\n";
        Printf.fprintf
          oc
          "\t\t\"bisimilar\": %b,\n"
-         (Algorithms.result_to_bool (fst r));
+         (Algorithms.bisim_result_to_bool b);
        Printf.fprintf
          oc
          "\t\t\"fsm names\": %s,\n"
@@ -413,19 +461,19 @@ let write_json_result_to_file
           | Some tup ->
             Printf.sprintf
               "[ {\"bisim\": [%i, %i]}, {\"non bisim\": [%i, %i]} ]"
-              (Model.get_num_blocks (fst (snd b)))
-              (Partition.cardinal (fst (snd b)))
-              (Model.get_num_blocks (snd (snd b)))
-              (Partition.cardinal (snd (snd b))));
+              (Model.get_num_blocks bisim_states)
+              (Partition.cardinal bisim_states)
+              (Model.get_num_blocks non_bisim_states)
+              (Partition.cardinal non_bisim_states));
        Printf.fprintf
          oc
          "\t\t\"bisimilar states\": %s"
-         (partition_to_json_list (fst (snd b)));
+         (partition_to_json_list bisim_states);
        Printf.fprintf oc ",\n";
        Printf.fprintf
          oc
          "\t\t\"non-bisimilar states\": %s"
-         (partition_to_json_list (snd (snd b)));
+         (partition_to_json_list non_bisim_states);
        Printf.fprintf oc "\n\t},\n";
        ())
 ;;
@@ -752,13 +800,15 @@ let run
     | FSM _ -> build_json_from_single_model filename result, filename
     | Alg b ->
       (match b with
-       | Bisim b ->
+       | Satur m -> build_json_from_single_model filename (FSM m), filename
+       | Minim (m, _) -> build_json_from_single_model filename (FSM m), filename
+       | Bisim (b, m, _) ->
          build_json_from_merged_model
            output_dir
            (filename, "bisim", kind)
            filetype
            result
-           (fst b))
+           (b, m))
     | Merge b ->
       build_json_from_merged_model
         output_dir
