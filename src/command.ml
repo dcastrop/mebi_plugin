@@ -262,10 +262,11 @@ let get_type_cindef (i : int) (gref : Names.GlobRef.t) (v : EConstr.t option)
     - Is [w_unify] the best way?
     - ... *)
 let m_unify (t0 : EConstr.t) (t1 : EConstr.t) : bool mm =
-  (* let* _ = if is_output_kind_enabled params then debug (fun (env :
-     Environ.env) (sigma : Evd.evar_map) -> str "Unifying (t0) :: " ++
-     Printer.pr_econstr_env env sigma t0 ++ strbrk "\nUnifying (t1) :: " ++
-     Printer.pr_econstr_env env sigma t1) else return () in *)
+  (* Log.debug
+     (Printf.sprintf
+     "Unifying\nt0: \"%s\"\nt1: \"%s\""
+     (econstr_to_string t0)
+     (econstr_to_string t1)); *)
   state (fun (env : Environ.env) (sigma : Evd.evar_map) ->
     try
       let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
@@ -278,13 +279,11 @@ let m_unify (t0 : EConstr.t) (t1 : EConstr.t) : bool mm =
     with
     | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify (m, n, e))
       ->
-      if !Logging.show_detailed_messages
-      then
-        Log.warning
-          (Printf.sprintf
-             "Could not unify \"%s\" with \"%s\""
-             (econstr_to_string t0)
-             (econstr_to_string t1));
+      (* Log.debug
+         (Printf.sprintf
+         "Could not unify \"%s\" with \"%s\""
+         (econstr_to_string t0)
+         (econstr_to_string t1)); *)
       sigma, false)
 ;;
 
@@ -1383,6 +1382,106 @@ let make_graph_builder =
 
 let () = Logging.set_output_mode (Coq ())
 
+let show_instructions_to_toggle_weak () : unit =
+  if !weak_mode
+  then
+    Log.notice
+      "Checking for Weak Bisimilarity.\n\
+       To check for Strong Bisimilarity use the command \"MeBi WeakMode False\""
+  else
+    Log.notice
+      "Checking for Strong Bisimilarity (since weak mode is disabled)\n\
+       To Check for Weak Bisimilarity use the command \"MeBi WeakMode True\""
+;;
+
+let show_instructions_to_enable_weak () : unit =
+  Log.notice
+    "Weak mode is not currently enabled.\n\
+     Use the command \"MeBi WeakMode True\" to enable it (and \"MeBi WeakMode \
+     False\" to disable it).\n"
+;;
+
+let show_instructions_to_set_weak () : unit =
+  Log.notice
+    "Cannot saturate without any silent actions.\n\
+     Use the command \"MeBi SetWeak ...\" to specify how you are encoding \
+     silent transitions.\n\
+     For example:\n\
+    \  1) \"MeBi SetWeak Option nat\" is for labels of type \"option nat\", \
+     where silent actions are \"None\" and visible actions are \"Some _\"\n\
+    \  2) \"MeBi SetWeak TAU of ACTION\" is for labels of inductive type \
+     \"ACTION\" that has some constructor \"TAU\"\n"
+;;
+
+let show_help_basic () : unit =
+  Log.notice
+    "All commands begin with \"MeBi\" and are followed one of the following:\n\
+     SetBound, DumpToFile, ShowDebug, WeakMode, SetWeak, Check, LTS, FSM, \
+     Saturate, Minimize, Bisim.\n\n\
+     For more information use the command \"MeBi Help x\" (where x is one of \
+     the terms above)\n"
+;;
+
+let show_help_set_bound () : unit = Log.notice "Use the command \"MeBi ...\"\n"
+
+let show_help_dump_to_file () : unit =
+  Log.notice "Use the command \"MeBi ...\"\n"
+;;
+
+let show_help_show_debug () : unit = Log.notice "Use the command \"MeBi ...\"\n"
+
+let show_help_weak_mode () : unit =
+  Log.notice
+    "Use the command \"MeBi WeakMode True\" to enable it (and \"MeBi WeakMode \
+     False\" to disable it).\n"
+;;
+
+let show_help_check () : unit =
+  Log.notice
+    "Use the command \"MeBi Check x\" to see what any of SetBound, DumpToFile, \
+     ShowDebug, WeakMode, SetWeak are set to.\n"
+;;
+
+let show_help_set_weak () : unit =
+  Log.notice
+    "Use the command \"MeBi SetWeak ...\" to specify how you are encoding \
+     silent transitions.\n\
+     For example:\n\
+    \  1) \"MeBi SetWeak Option nat\" is for labels of type \"option nat\", \
+     where silent actions are \"None\" and visible actions are \"Some _\"\n\
+    \  2) \"MeBi SetWeak TAU of ACTION\" is for labels of inductive type \
+     \"ACTION\" that has some constructor \"TAU\"\n"
+;;
+
+let show_help_lts () : unit = Log.notice "Use the command \"MeBi LTS ...\"\n"
+let show_help_fsm () : unit = Log.notice "Use the command \"MeBi FSM ...\"\n"
+
+let show_help_saturate () : unit =
+  Log.notice "Use the command \"MeBi Saturate ...\"\n"
+;;
+
+let show_help_minimize () : unit =
+  Log.notice "Use the command \"MeBi Minimize ...\"\n"
+;;
+
+let show_help_bisim () : unit =
+  Log.notice "Use the command \"MeBi Bisim ...\"\n"
+;;
+
+type help_kind =
+  | Basic
+  | SetBound
+  | DumpToFile
+  | ShowDebug
+  | WeakMode
+  | SetWeak
+  | Check
+  | LTS
+  | FSM
+  | Saturate
+  | Minimize
+  | Bisim
+
 type model_kind =
   | LTS
   | FSM
@@ -1391,6 +1490,7 @@ type coq_model = Constrexpr.constr_expr * Libnames.qualid
 type make_model = model_kind * coq_model
 
 type command_kind =
+  | Help of help_kind
   | MakeModel of make_model
   | SaturateModel of coq_model
   | MinimizeModel of coq_model
@@ -1425,7 +1525,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
     (match kind with
      | LTS ->
        if !dump_to_file_flag
-       then Log.notice "command.run, MakeModel LTS -- TODO dump to file";
+       then Log.notice "command.run, MakeModel LTS -- TODO dump to file\n";
        return ()
      | FSM ->
        let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
@@ -1436,28 +1536,96 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
               "command.run, MakeModel FSM, finished: %s"
               (Fsm.to_string the_fsm));
        if !dump_to_file_flag
-       then Log.notice "command.run, MakeModel FSM -- TODO dump to file";
+       then Log.notice "command.run, MakeModel FSM -- TODO dump to file\n";
        return ())
   | SaturateModel (x, primary_lts) ->
-    Log.notice "command.run, SaturateModel";
-    let* the_lts = build_lts_graph primary_lts x in
-    let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-    let _the_saturated = Fsm.saturate the_fsm in
-    Log.notice "command.run, SaturateModel -- TODO finished";
-    return ()
+    (match !weak_type with
+     | None ->
+       if !weak_mode = false then show_instructions_to_enable_weak ();
+       show_instructions_to_set_weak ();
+       Log.notice "Aborting command.\n";
+       return ()
+     | Some _ ->
+       if !weak_mode = false
+       then (
+         show_instructions_to_enable_weak ();
+         Log.notice "Aborting command.\n";
+         return ())
+       else (
+         Log.notice "command.run, SaturateModel";
+         let* the_lts = build_lts_graph primary_lts x in
+         let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+         let the_saturated = Fsm.saturate the_fsm in
+         if !Logging.show_debug_messages
+         then
+           Log.override
+             (Printf.sprintf
+                "command.run, SaturateModel, finished: %s"
+                (Fsm.to_string the_saturated));
+         if !dump_to_file_flag
+         then Log.notice "command.run, SaturateModel -- TODO dump to file\n";
+         return ()))
   | MinimizeModel (x, primary_lts) ->
-    Log.notice "command.run, MinimizeModel";
-    let* the_lts = build_lts_graph primary_lts x in
-    let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-    let _the_minimized = Algorithms.run (Minim (!weak_mode, the_fsm)) in
-    Log.notice "command.run, MinimizeModel -- TODO finished";
-    return ()
+    (match !weak_type with
+     | None ->
+       show_instructions_to_set_weak ();
+       Log.notice "Aborting command.\n";
+       return ()
+     | Some _ ->
+       if !weak_mode = false
+       then (
+         show_instructions_to_enable_weak ();
+         Log.notice "Aborting command.\n";
+         return ())
+       else (
+         Log.notice "command.run, MinimizeModel";
+         let* the_lts = build_lts_graph primary_lts x in
+         let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+         let the_minimized = Algorithms.run (Minim (!weak_mode, the_fsm)) in
+         Log.notice
+           (Printf.sprintf
+              "command.run, MinimizeModel, finished: %s\n"
+              (Algorithms.pstr the_minimized));
+         if !dump_to_file_flag
+         then Log.notice "command.run, MinimizeModel -- TODO dump to file\n";
+         return ()))
   | CheckBisimilarity ((x, a), (y, b)) ->
     Log.notice "command.run, CheckBisimilarity";
+    show_instructions_to_toggle_weak ();
     let* the_lts_1 = build_lts_graph a x in
     let* the_lts_2 = build_lts_graph b y in
-    let _the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
-    let _the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
-    Log.notice "command.run, CheckBisimilarity -- TODO finished";
+    let the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
+    let the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
+    if !Logging.show_debug_messages
+    then
+      Log.override
+        (Printf.sprintf
+           "command.run, CheckBisimilarity:\nFSM 1: %s\n\nFSM 2: %s"
+           (Fsm.to_string the_fsm_1)
+           (Fsm.to_string the_fsm_2));
+    let the_bisimilar =
+      Algorithms.run (Bisim (!weak_mode, (the_fsm_1, the_fsm_2)))
+    in
+    Log.notice
+      (Printf.sprintf
+         "command.run, CheckBisimilarity, finished: %s\n"
+         (Algorithms.pstr the_bisimilar));
+    if !dump_to_file_flag
+    then Log.notice "command.run, CheckBisimilarity -- TODO dump to file\n";
+    return ()
+  | Help c ->
+    (match c with
+     | Basic -> show_help_basic ()
+     | SetBound -> show_help_set_bound ()
+     | DumpToFile -> show_help_dump_to_file ()
+     | ShowDebug -> show_help_show_debug ()
+     | WeakMode -> show_help_weak_mode ()
+     | SetWeak -> show_help_set_weak ()
+     | Check -> show_help_check ()
+     | LTS -> show_help_lts ()
+     | FSM -> show_help_fsm ()
+     | Saturate -> show_help_saturate ()
+     | Minimize -> show_help_minimize ()
+     | Bisim -> show_help_bisim ());
     return ()
 ;;

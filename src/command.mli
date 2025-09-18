@@ -24,7 +24,23 @@ type model_kind =
 type coq_model = Constrexpr.constr_expr * Libnames.qualid
 type make_model = model_kind * coq_model
 
+type help_kind =
+  | Basic
+  | SetBound
+  | DumpToFile
+  | ShowDebug
+  | WeakMode
+  | SetWeak
+  | Check
+  | LTS
+  | FSM
+  | Saturate
+  | Minimize
+  | Bisim
+
+
 type command_kind =
+  | Help of help_kind
   | MakeModel of make_model
   | SaturateModel of coq_model
   | MinimizeModel of coq_model
