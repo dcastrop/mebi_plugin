@@ -1,13 +1,11 @@
-type term = EConstr.t
+open Logging
 
-let default_params () : Utils.Params.log =
-  Utils.Params.Default.log ~mode:(Coq ()) ()
-;;
+type term = EConstr.t
 
 let enable_logging : bool ref = ref true
 
 (********************************************)
-(****** COQ ENVIRONMENT *********************)
+(****** COQ ENVIRONMENT/CONTEXT *************)
 (********************************************)
 
 type coq_context =
@@ -15,14 +13,11 @@ type coq_context =
   ; coq_ctx : Evd.evar_map
   }
 
+(** *)
 let coq_env_wrapper : Environ.env ref option ref = ref None
 
 let new_coq_env () : Environ.env ref =
-  if !enable_logging
-  then
-    Utils.Logging.Log.override
-      ~params:(default_params ())
-      "Created new coq env.";
+  if !enable_logging then Log.override "Created new coq env.";
   let env = ref (Global.env ()) in
   coq_env_wrapper := Some env;
   env
@@ -34,14 +29,11 @@ let the_coq_env ?(fresh : bool = false) () : Environ.env ref =
   | Some env -> if fresh then new_coq_env () else env
 ;;
 
+(** *)
 let coq_ctx_wrapper : Evd.evar_map ref option ref = ref None
 
 let new_coq_ctx ?(fresh : bool = false) () : Evd.evar_map ref =
-  if !enable_logging
-  then
-    Utils.Logging.Log.override
-      ~params:(default_params ())
-      "Created new coq ctx.";
+  if !enable_logging then Log.override "Created new coq ctx.";
   let ctx = ref (Evd.from_env !(the_coq_env ~fresh ())) in
   coq_ctx_wrapper := Some ctx;
   ctx

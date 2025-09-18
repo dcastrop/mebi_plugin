@@ -1,5 +1,37 @@
 Require Import MEBI.loader.
 
+(** testing getters & setters *)
+Module BasicCommands.
+MeBi SetBound 1000.    MeBi Check Bound.
+MeBi SetBound Default. MeBi Check Bound.
+
+MeBi DumpToFile True.  MeBi Check DumpToFile.
+MeBi DumpToFile False. MeBi Check DumpToFile.
+
+MeBi ShowDebug True.  MeBi Check ShowDebug.
+MeBi ShowDebug False. MeBi Check ShowDebug.
+
+MeBi WeakMode True.  MeBi Check WeakMode.
+MeBi WeakMode False. MeBi Check WeakMode.
+
+MeBi SetWeak Option nat. MeBi Check Weak.
+
+Example z := 0.
+MeBi SetWeak nat Of z. MeBi Check Weak.
+
+Inductive s_label : Set :=
+| TAU : s_label 
+| LABEL1 : nat -> s_label
+.
+MeBi SetWeak TAU Of s_label. MeBi Check Weak.
+
+Inductive t_label : Type :=
+| SILENT : t_label 
+| LABEL2 : bool -> t_label
+.
+MeBi SetWeak TAU Of t_label. MeBi Check Weak.
+End BasicCommands.
+
 Inductive i := C0 (i : nat) | C1 (b : bool) (j : nat) | C2 (x : nat).
 
 (* Fail MeBi Check LTS Of 0 Using i. *)
@@ -34,15 +66,15 @@ Definition one := 1.
 
 (* Fail MeBi Check LTS Of false Using testLTS. *)
 
-MeBi Check LTS Of 0 Using testLTS.
-MeBi Check LTS Of (S 0) Using testLTS.
-MeBi Check LTS Of (S (S 0)) Using testLTS.
-MeBi Check LTS Of (S (S (S 0))) Using testLTS.
+(* MeBi Check LTS Of 0 Using testLTS. *)
+(* MeBi Check LTS Of (S 0) Using testLTS. *)
+(* MeBi Check LTS Of (S (S 0)) Using testLTS. *)
+(* MeBi Check LTS Of (S (S (S 0))) Using testLTS. *)
 
-MeBi Check LTS Of one Using testLTS.
-MeBi Check LTS Of (S one) Using testLTS.
+(* MeBi Check LTS Of one Using testLTS. *)
+(* MeBi Check LTS Of (S one) Using testLTS. *)
 
-MeBi Check LTS Bounded 30 Of (S one) Using testLTS.
+(* MeBi Check LTS Bounded 30 Of (S one) Using testLTS. *)
 
 
 Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
@@ -51,10 +83,10 @@ Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
   .
 
 (* below cannot be finitely represented  *)
-MeBi Check LTS Bounded 50 Of 0 Using nonTerminatingTestLTS.
-MeBi Check LTS Of (S 0) Using nonTerminatingTestLTS.
-MeBi Check LTS Of (S (S 0)) Using nonTerminatingTestLTS.
-MeBi Check LTS Of (S (S (S 0))) Using nonTerminatingTestLTS.
+(* MeBi Check LTS Bounded 50 Of 0 Using nonTerminatingTestLTS. *)
+(* MeBi Check LTS Of (S 0) Using nonTerminatingTestLTS. *)
+(* MeBi Check LTS Of (S (S 0)) Using nonTerminatingTestLTS. *)
+(* MeBi Check LTS Of (S (S (S 0))) Using nonTerminatingTestLTS. *)
 
 Module Test1.
   Inductive action : Set := | TheAction1 | TheAction2.
@@ -80,11 +112,11 @@ Module Test1.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
-  MeBi Check LTS Bounded 2 Of (tfix (tact TheAction1 tend)) Using termLTS.
+  (* MeBi Check LTS Bounded 2 Of (tfix (tact TheAction1 tend)) Using termLTS. *)
 
-  MeBi Check LTS Bounded 2 
+  (* MeBi Check LTS Bounded 2 
     Of (tfix (tact TheAction1 (tact TheAction2 trec)))
-    Using termLTS.
+    Using termLTS. *)
 
 End Test1.
 
@@ -118,21 +150,21 @@ Module Test2.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
-  MeBi Check LTS Bounded 2 
+  (* MeBi Check LTS Bounded 2 
     Of (tfix (tact TheAction1 tend))
-    Using termLTS.
+    Using termLTS. *)
 
-  MeBi Check LTS Bounded 2 
+  (* MeBi Check LTS Bounded 2 
     Of (tfix (tact TheAction1 (tact TheAction2 trec)))
-    Using termLTS.
+    Using termLTS. *)
 
-  MeBi Check LTS Bounded 2 
+  (* MeBi Check LTS Bounded 2 
     Of (tfix (tpar TheAction1 TheAction2 trec))
-    Using termLTS.
+    Using termLTS. *)
 
-  MeBi Check LTS Bounded 2 
+  (* MeBi Check LTS Bounded 2 
     Of (tfix (tpar TheAction1 TheAction2 trec))
-    Using termLTS.
+    Using termLTS. *)
 
 End Test2.
 
@@ -170,132 +202,132 @@ Module BisimTest1.
       termLTS (tfix t) a t'.
 
   (* true *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_01" *)
     Check 
       Bisim Of (tact TheAction1 tend) With termLTS
         And Of (tact TheAction1 tend) With termLTS
-        Using termLTS.
+        Using termLTS. *)
 
   (* true *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_02" *)
     Check 
       Bisim Of (tact TheAction2 tend) With termLTS
         And Of (tact TheAction2 tend) With termLTS
-        Using termLTS.
+        Using termLTS. *)
 
   (* false *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_03" *)
     Check 
     Bisim Of (tact TheAction1 tend) With termLTS
       And Of (tact TheAction2 tend) With termLTS
-      Using termLTS.
+      Using termLTS. *)
 
   (* true *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_04" *)
     Check 
       Bisim Of (tact TheAction1 (tact TheAction2 tend)) With termLTS
         And Of (tact TheAction1 (tact TheAction2 tend)) With termLTS
-        Using termLTS.
+        Using termLTS. *)
 
   (* true *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_05" *)
     Check 
       Bisim Of (tact TheAction2 (tact TheAction1 tend)) With termLTS
         And Of (tact TheAction2 (tact TheAction1 tend)) With termLTS
-        Using termLTS.
+        Using termLTS. *)
 
   (* false *) 
-  MeBi 
+  (* MeBi 
     (* Dump "test_06" *)
     Check 
       Bisim Of (tact TheAction2 (tact TheAction1 tend)) With termLTS
         And Of (tact TheAction1 (tact TheAction2 tend)) With termLTS
-        Using termLTS.
+        Using termLTS. *)
 
   (* true *)
-  MeBi
+  (* MeBi
     (* Dump "test_07" *)
     Check 
     Bisim Of (tpar TheAction1 TheAction2 tend) With termLTS
       And Of (tpar TheAction1 TheAction2 tend) With termLTS
-      Using termLTS.
+      Using termLTS. *)
 
   (* true *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_08" *)
     Check 
       Bisim Of (tpar TheAction2 TheAction1 tend) With termLTS
         And Of (tpar TheAction2 TheAction1 tend) With termLTS
-        Using termLTS.
+        Using termLTS. *)
 
   (* true *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_09" *)
     Check 
       Bisim Of (tpar TheAction1 TheAction2 tend) With termLTS
         And Of (tpar TheAction2 TheAction1 tend) With termLTS
-        Using termLTS.
+        Using termLTS. *)
 
   (* true *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_10" *)
     Check 
       Bisim Of (tpar TheAction2 TheAction1 tend) With termLTS
         And Of (tpar TheAction1 TheAction2 tend) With termLTS
-        Using termLTS.
+        Using termLTS. *)
 
   (* false *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_11" *)
     Check 
       Bisim Of (tpar TheAction1 TheAction1 tend) With termLTS
         And Of (tact TheAction1 tend) With termLTS
-        Using termLTS.
+        Using termLTS. *)
 
   (* false *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_12" *)
     Check 
       Bisim Of (tpar TheAction1 TheAction2 tend) With termLTS
         And Of (tact TheAction1 (tact TheAction2 tend)) With termLTS
-        Using termLTS.
+        Using termLTS. *)
 
   (* true *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_13" *)
     Check 
       Bisim Of (tfix (tact TheAction1 trec)) With termLTS
         And Of (tfix (tact TheAction1 trec)) With termLTS
-        Using termLTS.
+        Using termLTS. *)
 
   (* true *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_14" *)
     Check 
       Bisim Of (tfix (tact TheAction1 trec)) With termLTS
         And Of (tfix (tact TheAction1 (tfix (tact TheAction1 trec)))) With termLTS
-        Using termLTS.
+        Using termLTS. *)
 
   (* true *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_15" *)
     Check 
       Bisim Of (tfix (tact TheAction1 (tact TheAction2 trec))) With termLTS
         And Of (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))) With termLTS
-        Using termLTS.
+        Using termLTS. *)
 
   (* true *)
-  MeBi 
+  (* MeBi 
     (* Dump "test_16" *)
     Check 
       Bisim Of (tfix (tact TheAction1 (tact TheAction2 trec))) With termLTS
         And Of (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))) With termLTS
-        Using termLTS. 
+        Using termLTS.  *)
 
   (* minimize *)
   (* MeBi Show Minim

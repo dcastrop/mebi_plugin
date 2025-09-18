@@ -2,7 +2,7 @@
 
 ## longterm list
 - [ ] develop coq-side API for using plugin
-- [ ] overhaul [Utils.Logging]
+- [ ] overhaul [Logging]
 - [ ] make [Mebi_wrapper] a parametric functor (currently just uses [IntEncoding] as [E])
 
 
@@ -36,7 +36,7 @@
 ---
 
 - [ ] fix the printouts/dumps for FSMs, generalize the dumps using a functor to handle either LTS or FSM
-- [ ] overhaul utils.params and utils.logging
+- [ ] overhaul utils.params and Logging
 - [ ] sometimes when writing to a file [dump_to_file.ml] appears to just crash without any kind of warning (only tested using COQ examples during compilation)
 
 
