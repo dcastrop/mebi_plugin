@@ -269,12 +269,22 @@ let m_unify (t0 : EConstr.t) (t1 : EConstr.t) : bool mm =
   state (fun (env : Environ.env) (sigma : Evd.evar_map) ->
     try
       let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
-      (* log  "\t\tSuccess"; *)
+      (* Log.debug
+         (Printf.sprintf
+         "Success, unified \"%s\" with \"%s\""
+         (econstr_to_string t0)
+         (econstr_to_string t1)); *)
       sigma, true
     with
     | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify (m, n, e))
       ->
-      Log.warning "\t\tCould not unify";
+      if !Logging.show_detailed_messages
+      then
+        Log.warning
+          (Printf.sprintf
+             "Could not unify \"%s\" with \"%s\""
+             (econstr_to_string t0)
+             (econstr_to_string t1));
       sigma, false)
 ;;
 
@@ -1394,26 +1404,39 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
         (t : Constrexpr.constr_expr)
     : Lts.t mm
     =
-    Log.notice "A";
-    let lts_grefs : Names.GlobRef.t list =
-      Mebi_utils.ref_list_to_glob_list (primary_lts :: refs)
+    let* graph_lts =
+      G.build_graph
+        primary_lts
+        t
+        (Mebi_utils.ref_list_to_glob_list (primary_lts :: refs))
     in
-    Log.notice "B";
-    let* graph_lts = G.build_graph primary_lts t lts_grefs in
-    Log.notice "C";
     G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts
   in
   match k with
   | MakeModel (kind, (x, primary_lts)) ->
     Log.notice "command.run, MakeModel";
     let* the_lts = build_lts_graph primary_lts x in
+    if !Logging.show_debug_messages
+    then
+      Log.override
+        (Printf.sprintf
+           "command.run, MakeModel LTS, finished: %s"
+           (Lts.to_string the_lts));
     (match kind with
      | LTS ->
-       Log.notice "command.run, MakeModel LTS -- TODO finished";
+       if !dump_to_file_flag
+       then Log.notice "command.run, MakeModel LTS -- TODO dump to file";
        return ()
      | FSM ->
-       let _the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-       Log.notice "command.run, MakeModel FSM -- TODO finished";
+       let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+       if !Logging.show_debug_messages
+       then
+         Log.override
+           (Printf.sprintf
+              "command.run, MakeModel FSM, finished: %s"
+              (Fsm.to_string the_fsm));
+       if !dump_to_file_flag
+       then Log.notice "command.run, MakeModel FSM -- TODO dump to file";
        return ())
   | SaturateModel (x, primary_lts) ->
     Log.notice "command.run, SaturateModel";
