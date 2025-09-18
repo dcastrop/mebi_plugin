@@ -21,6 +21,7 @@
   )
  (modules
   utils
+  logging
   ; mebi_errors
   ; mebi_action
   ; constr_tree
@@ -35,7 +36,7 @@
   lts
   fsm
   algorithms
-  vernac
+  ; vernac
   dump_to_file
   command
   mebi_api

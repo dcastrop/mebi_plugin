@@ -188,13 +188,13 @@ let resolve_saturated_action
          ([], ActionPairs.empty)
      with
      | [], acc0 ->
-       (* Utils.Logging.Log.warning
+       (* Logging.Log.warning
           (Printf.sprintf
           "resolve_saturated_action, adding new (%s) "
           (Action.to_string a)); *)
        ActionPairs.add ({ a with annos = [ anno ] }, States.singleton dest) acc0
      | b :: [], acc0 ->
-       (* Utils.Logging.Log.warning
+       (* Logging.Log.warning
           (Printf.sprintf
           "resolve_saturated_action, merging (%s) with (%s)"
           (Action.to_string a)
@@ -207,7 +207,7 @@ let resolve_saturated_action
          , States.singleton dest )
          acc0
      | multi, acc0 ->
-       Utils.Logging.Log.warning
+       Logging.Log.warning
          (Printf.sprintf
             "resolve_saturated_action, found (%i) action pairs matching named \
              action (%s).\n\
@@ -228,7 +228,7 @@ let rec saturate_action_from
   : ActionPairs.t
   =
   log_visit s visited;
-  (* Utils.Logging.Log.warning
+  (* Logging.Log.warning
      (Printf.sprintf
      "saturate_action_from (%s), can revisit (%b)"
      (State.to_string s)
@@ -266,7 +266,7 @@ and saturate_actions_from
       (unsaturated_es : States.t Actions.t Edges.t)
   : ActionPairs.t
   =
-  (* Utils.Logging.Log.warning
+  (* Logging.Log.warning
      (Printf.sprintf "saturate_actions_from (%s)" (State.to_string from)); *)
   snd
     (Actions.fold
@@ -276,7 +276,7 @@ and saturate_actions_from
          match Action.Label.is_silent a.label with
          | None -> raise (CannotSaturateActionsWithUnknownVisibility a)
          | Some true ->
-           (* Utils.Logging.Log.warning
+           (* Logging.Log.warning
               (Printf.sprintf
               "saturate_actions_from (%s) -- (%s) silent"
               (State.to_string from)
@@ -293,7 +293,7 @@ and saturate_actions_from
            (match named with
             (* found named action, continue *)
             | None ->
-              (* Utils.Logging.Log.warning
+              (* Logging.Log.warning
                  (Printf.sprintf
                  "saturate_actions_from (%s) -- (%s) named"
                  (State.to_string from)
@@ -307,7 +307,7 @@ and saturate_actions_from
                   visited
                   unsaturated_es )
             | Some _ ->
-              (* Utils.Logging.Log.warning
+              (* Logging.Log.warning
                 (Printf.sprintf
                    "saturate_actions_from (%s) -- (%s) abort"
                    (State.to_string from)
@@ -341,7 +341,7 @@ let saturate_edges_from
           (fun (dest : State.t) (acc1 : ActionPairs.t) ->
             let visited : (State.t, int) Hashtbl.t = Hashtbl.create 0 in
             log_visit from visited;
-            (* Utils.Logging.Log.warning
+            (* Logging.Log.warning
                (Printf.sprintf
                "_saturate_edges_from (%s) to (%s)"
                (State.to_string from)

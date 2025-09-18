@@ -12,5 +12,4 @@ val run
   :  output_dir_kind
   -> string option * filename_kind
   -> filetype_kind
-  -> Vernac.result_kind
   -> string

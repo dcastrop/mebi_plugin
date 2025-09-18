@@ -1,7 +1,6 @@
 type term = EConstr.t
 
-val default_params : unit -> Utils.Logging.params
-val enable_logging : bool ref
+(* val enable_logging : bool ref *)
 
 type coq_context =
   { coq_env : Environ.env
