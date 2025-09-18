@@ -100,7 +100,15 @@ let get_weak_type () : unit mm =
 
 let set_weak_type (k : weak_action_kinds) : unit mm =
   weak_type := Some k;
-  get_weak_type ()
+  (match k with
+   | Option c ->
+     Log.notice
+       "Set weak type to an Option of \"\" (where silent actions are None)"
+   | Custom (x, y) ->
+     Log.notice
+       "Set weak type to a Custom type of \"TODO\" where silent actions are \
+        \"TODO\"");
+  return ()
 ;;
 
 open Mebi_wrapper.Syntax
