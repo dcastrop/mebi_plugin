@@ -27,7 +27,7 @@ Example r : term := tseq (tpar (tact (recv A) tend)
 
 MeBi WeakMode True.
 (* TODO: fix the plugin so the below works *)
-MeBi SetWeak Option label.
+(* MeBi SetWeak Option label. *)
 MeBi Saturate p Using termLTS.
 
 
