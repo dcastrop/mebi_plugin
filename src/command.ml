@@ -736,9 +736,7 @@ module type GraphB = sig
     -> lts_graph mm
 
   val build_graph
-    :  ?primary_lts:Libnames.qualid option
-    -> ?weak:(Constrexpr.constr_expr * Libnames.qualid) option
-    -> int
+    :  Libnames.qualid
     -> Constrexpr.constr_expr
     -> Names.GlobRef.t list
     -> lts_graph mm
@@ -746,7 +744,6 @@ module type GraphB = sig
   val decoq_lts
     :  ?cache_decoding:bool
     -> ?name:string
-    -> int
     -> lts_graph (* -> cindef * cindef B.t *)
     -> Lts.t mm
 end
@@ -919,85 +916,85 @@ module MkGraph
       build_lts_graph ~weak the_primary_lts rlts_map g bound)
   ;;
 
-  let check_for_primary_lts
-        (c : cindef)
-        (ty : EConstr.t)
-        ((fn_opt, cindef_map) : E.t option * cindef B.t)
-    : (E.t option * cindef B.t) mm
-    =
-    (* normalize term type and check if primary *)
-    let* term_type = lts_cindef_trm_type c in
-    let* (trmty : EConstr.t) = normalize_econstr term_type in
-    let* sigma = get_sigma in
-    match fn_opt, EConstr.eq_constr sigma ty trmty with
-    | None, true ->
-      let* (encoding : E.t) = encode c.info.name in
-      return (Some encoding, cindef_map)
-    | Some _, true ->
-      Log.warning
-        (Printf.sprintf
-           "Found inductive definition that could be primary, when primary has \
-            already been selected.\n\
-            Please make sure that the primary LTS is provided first when using \
-            the command.");
-      return (fn_opt, cindef_map)
-    | _, false -> return (fn_opt, cindef_map)
-  ;;
+  (* let check_for_primary_lts
+     (c : cindef)
+     (ty : EConstr.t)
+     ((fn_opt, cindef_map) : E.t option * cindef B.t)
+     : (E.t option * cindef B.t) mm
+     =
+     (* normalize term type and check if primary *)
+     let* term_type = lts_cindef_trm_type c in
+     let* (trmty : EConstr.t) = normalize_econstr term_type in
+     let* sigma = get_sigma in
+     match fn_opt, EConstr.eq_constr sigma ty trmty with
+     | None, true ->
+     let* (encoding : E.t) = encode c.info.name in
+     return (Some encoding, cindef_map)
+     | Some _, true ->
+     Log.warning
+     (Printf.sprintf
+     "Found inductive definition that could be primary, when primary has \
+     already been selected.\n\
+     Please make sure that the primary LTS is provided first when using \
+     the command.");
+     return (fn_opt, cindef_map)
+     | _, false -> return (fn_opt, cindef_map)
+     ;; *)
 
-  let handle_weak_lts
-        (weak : (Constrexpr.constr_expr * Libnames.qualid) option)
-        (cindef_map : cindef B.t)
-        (i : int)
-    : E.t option mm
-    =
-    match weak with
-    | None ->
-      (* Log.override "handle_weak_lts NO WEAK"; *)
-      return None
-    | Some (a_ref, constr_ref) ->
-      let* (a : EConstr.t) = tref_to_econstr a_ref in
-      let constr = Mebi_utils.ref_to_glob constr_ref in
-      let* (c : cindef) = get_type_cindef i constr (Some a) in
-      (* encode silent action type *)
-      let* (constr_enc : E.t) = encode c.info.name in
-      B.add cindef_map constr_enc c;
-      (* return encode silent action *)
-      let* (a_enc : E.t) = encode a in
-      B.add cindef_map a_enc c;
-      return (Some a_enc)
-  ;;
+  (* let resolve_primary_lts
+     (primary_lts : Libnames.qualid)
+     (primary_enc_opt : E.t option)
+     (ty : EConstr.t)
+     (cindef_map : cindef B.t)
+     (i : int)
+     : E.t mm
+     =
+     (* match primary_lts with
+     | None ->
+     (* if no primary explicitly provided, check we found one. *)
+     (match primary_enc_opt with
+     | None ->
+     let* decoded_map = decode_map cindef_map in
+     primary_lts_not_found (ty, List.of_seq (F.to_seq_keys decoded_map))
+     | Some p -> return p)
+     | Some primary_lts -> *)
+     (* obtain the encoding for the explicitly provide primary lts *)
+     let* (c : cindef) = get_lts_cindef i (Mebi_utils.ref_to_glob primary_lts) in
+     let* (encoding : E.t) = encode c.info.name in
+     return encoding
+     ;; *)
 
-  let resolve_primary_lts
-        ?(primary_lts : Libnames.qualid option = None)
-        (primary_enc_opt : E.t option)
-        (ty : EConstr.t)
-        (cindef_map : cindef B.t)
-        (i : int)
-    : E.t mm
-    =
-    match primary_lts with
-    | None ->
-      (* if no primary explicitly provided, check we found one. *)
-      (match primary_enc_opt with
-       | None ->
-         let* decoded_map = decode_map cindef_map in
-         primary_lts_not_found (ty, List.of_seq (F.to_seq_keys decoded_map))
-       | Some p -> return p)
-    | Some primary_lts ->
-      (* obtain the encoding for the explicitly provide primary lts *)
-      let* (c : cindef) =
-        get_lts_cindef i (Mebi_utils.ref_to_glob primary_lts)
-      in
-      let* (encoding : E.t) = encode c.info.name in
-      return encoding
+  let handle_weak (cindef_map : cindef B.t) (i : int) : E.t option mm =
+    if !weak_mode
+    then (
+      match !weak_type with
+      | None -> return None
+      | Some weak_kind ->
+        (match weak_kind with
+         | Option label_type ->
+           Log.warning
+             "command.MkGraph.handle_weak, Option weak_kind -- TODO fix \
+              support for \"option _\" labels in coq lts.";
+           return None
+         | Custom (tau_term, label_type) ->
+           let* (a : EConstr.t) = tref_to_econstr tau_term in
+           let constr = Mebi_utils.ref_to_glob label_type in
+           let* (c : cindef) = get_type_cindef i constr (Some a) in
+           (* encode silent action type *)
+           let* (constr_enc : E.t) = encode c.info.name in
+           B.add cindef_map constr_enc c;
+           (* return encode silent action *)
+           let* (a_enc : E.t) = encode a in
+           B.add cindef_map a_enc c;
+           return (Some a_enc)))
+    else return None
   ;;
 
   (** @return
         the key for the primary lts and hashtable mapping the name of the coq definition to the rlts.
   *)
   let build_cindef_map
-        ?(primary_lts : Libnames.qualid option = None)
-        ?(weak : (Constrexpr.constr_expr * Libnames.qualid) option = None)
+        (primary_lts : Libnames.qualid)
         (t' : EConstr.t)
         (grefs : Names.GlobRef.t list)
     : (E.t * E.t option * cindef B.t) mm
@@ -1014,31 +1011,39 @@ module MkGraph
       (* add name of inductive prop *)
       let* (encoding : E.t) = encode c.info.name in
       B.add acc_map encoding c;
-      (* check if primary lts *)
-      if Option.has_some primary_lts
-      then return (fn_opt, acc_map)
-      else check_for_primary_lts c ty (fn_opt, acc_map)
+      return (fn_opt, acc_map)
     in
     let* (primary_enc_opt, cindef_map) : E.t option * cindef B.t =
       iterate 0 (num_grefs - 1) (None, trmap) iter_body
     in
-    let* (the_primary_enc : E.t) =
-      resolve_primary_lts ~primary_lts primary_enc_opt ty cindef_map num_grefs
+    (* encode the primary lts *)
+    let* (c : cindef) =
+      get_lts_cindef num_grefs (Mebi_utils.ref_to_glob primary_lts)
     in
-    let* weak_enc_opt : E.t option =
-      handle_weak_lts weak cindef_map (num_grefs + 1)
-    in
+    let* (the_primary_enc : E.t) = encode c.info.name in
+    let* weak_enc_opt : E.t option = handle_weak cindef_map (num_grefs + 1) in
     return (the_primary_enc, weak_enc_opt, cindef_map)
   ;;
+
+  (* return (fn_opt, acc_map)
+     in
+     let* (primary_enc_opt, cindef_map) : E.t option * cindef B.t =
+     iterate 0 (num_grefs - 1) (None, trmap) iter_body
+     in
+     (* obtain the encoding for the explicitly provide primary lts *)
+     let* (c : cindef) =
+     get_lts_cindef num_grefs (Mebi_utils.ref_to_glob primary_lts)
+     in
+     let* (the_primary_enc : E.t) = encode c.info.name in
+     let* weak_enc_opt : E.t option = handle_weak cindef_map (num_grefs + 1) in
+     return (the_primary_enc, weak_enc_opt, cindef_map) *)
 
   (** [build_graph rlts_map fn_rlts tref bound] is the entry point for [build_lts_graph].
       @param rlts_map maps coq-term types to [cindef].
       @param tref is the original coq-term.
       @param bound is the number of states to explore until. *)
   let build_graph
-        ?(primary_lts : Libnames.qualid option = None)
-        ?(weak : (Constrexpr.constr_expr * Libnames.qualid) option = None)
-        (bound : int)
+        (primary_lts : Libnames.qualid)
         (tref : Constrexpr.constr_expr)
         (grefs : Names.GlobRef.t list)
     : lts_graph mm
@@ -1048,7 +1053,7 @@ module MkGraph
     let* (the_primary_enc, the_weak_opt_enc, cindef_map)
       : E.t * E.t option * cindef B.t
       =
-      build_cindef_map ~primary_lts ~weak t grefs
+      build_cindef_map primary_lts t grefs
     in
     (* update environment by typechecking *)
     let (the_primary_lts : cindef) = B.find cindef_map the_primary_enc in
@@ -1075,7 +1080,7 @@ module MkGraph
               cindef_map
               []
         }
-        bound
+        !bound
     in
     let terminals =
       S.filter (fun (s : S.elt) -> Bool.not (H.mem g.transitions s)) g.states
@@ -1261,7 +1266,6 @@ module MkGraph
   let decoq_lts
         ?(cache_decoding : bool = false)
         ?(name : string = "unnamed")
-        (bound : int)
         (g : lts_graph)
     : Lts.t mm
     =
@@ -1279,7 +1283,7 @@ module MkGraph
     let info : Info.t option =
       Some
         { is_complete = Queue.is_empty g.to_visit
-        ; bound
+        ; bound = !bound
         ; num_terminals = S.cardinal g.terminals
         ; num_labels = Model.Alphabet.cardinal alphabet
         ; num_states = S.cardinal g.states
@@ -1367,109 +1371,70 @@ let make_graph_builder =
    match o with Check _ -> false | Show _ -> true | Dump _ -> true
    ;; *)
 
-(* exception ExceededBoundBeforeLTSCompleted of int *)
-exception WeakBisimilarityRequiresSilentConstrForEachTerm of unit
-
-type output_kind =
-  | Check of unit
-  | Show of unit
-  | Dump of string option
-
-(** [fail_if_incomplete * bounds * initial_term] *)
-type term_params = bool * int * Constrexpr.constr_expr
-
-(** [(term_params * weak_params) * ]*)
-type lts_params =
-  term_params * (Constrexpr.constr_expr * Libnames.qualid) option
-
-type multi_lts_params = lts_params * Libnames.qualid
-
-type run_kind =
-  | LTS of lts_params * Libnames.qualid option
-  | FSM of lts_params * Libnames.qualid option
-  | Minim of lts_params
-  | Merge of (multi_lts_params * multi_lts_params)
-  | Bisim of (multi_lts_params * multi_lts_params)
-
-type run_params = run_kind * Libnames.qualid list
-
 let () = Logging.set_output_mode (Coq ())
 
-let vernac (o : output_kind) (r : run_params) : unit mm =
+type model_kind =
+  | LTS
+  | FSM
+
+type coq_model = Constrexpr.constr_expr * Libnames.qualid
+type make_model = model_kind * coq_model
+
+type command_kind =
+  | MakeModel of make_model
+  | SaturateModel of coq_model
+  | MinimizeModel of coq_model
+  | CheckBisimilarity of (coq_model * coq_model)
+
+let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
   let* (graphM : (module GraphB)) = make_graph_builder in
   let module G = (val graphM) in
   let build_lts_graph
-        ?(primary_lts : Libnames.qualid option = None)
-        ?(weak : (Constrexpr.constr_expr * Libnames.qualid) option = None)
-        (fail_if_incomplete : bool)
-        (bound : int)
+        (primary_lts : Libnames.qualid)
         (t : Constrexpr.constr_expr)
-        (l : Libnames.qualid list)
     : Lts.t mm
     =
-    let lts_grefs : Names.GlobRef.t list = Mebi_utils.ref_list_to_glob_list l in
-    let* graph_lts = G.build_graph ~primary_lts ~weak bound t lts_grefs in
-    G.decoq_lts
-    (* ~cache_decoding:(should_cache_decoding o) *)
-    (* ~name:(Vernac.get_name o) *)
-      ~cache_decoding:true
-      ~name:"TODO: fix name"
-      bound
-      graph_lts
+    Log.notice "A";
+    let lts_grefs : Names.GlobRef.t list =
+      Mebi_utils.ref_list_to_glob_list (primary_lts :: refs)
+    in
+    Log.notice "B";
+    let* graph_lts = G.build_graph primary_lts t lts_grefs in
+    Log.notice "C";
+    G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts
   in
-  match r with
-  | LTS (((f, b, t), w), primary_lts), l ->
-    let* the_lts = build_lts_graph ~primary_lts ~weak:w f b t l in
-    (* handle_output o (LTS the_lts) *)
-    Log.warning "TODO: command.vernac, build_lts_graph LTS";
+  match k with
+  | MakeModel (kind, (x, primary_lts)) ->
+    Log.notice "command.run, MakeModel";
+    let* the_lts = build_lts_graph primary_lts x in
+    (match kind with
+     | LTS ->
+       Log.notice "command.run, MakeModel LTS -- TODO finished";
+       return ()
+     | FSM ->
+       let _the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+       Log.notice "command.run, MakeModel FSM -- TODO finished";
+       return ())
+  | SaturateModel (x, primary_lts) ->
+    Log.notice "command.run, SaturateModel";
+    let* the_lts = build_lts_graph primary_lts x in
+    let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+    let _the_saturated = Fsm.saturate the_fsm in
+    Log.notice "command.run, SaturateModel -- TODO finished";
     return ()
-  | FSM (((f, b, t), w), primary_lts), l ->
-    let* the_lts = build_lts_graph ~primary_lts ~weak:w f b t l in
-    let _the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-    Log.warning "TODO: command.vernac, build_lts_graph FSM";
+  | MinimizeModel (x, primary_lts) ->
+    Log.notice "command.run, MinimizeModel";
+    let* the_lts = build_lts_graph primary_lts x in
+    let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+    let _the_minimized = Algorithms.run (Minim (!weak_mode, the_fsm)) in
+    Log.notice "command.run, MinimizeModel -- TODO finished";
     return ()
-    (* handle_output o (FSM the_fsm) *)
-  | Minim ((f, b, t), w), l ->
-    let* the_lts = build_lts_graph ~weak:w f b t l in
-    let _the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-    (* let the_merged_fsm = Fsm.merge (the_fsm, the_sat) in *)
-    (* handle_output o (Merge ((the_fsm, the_sat), the_merged_fsm)) *)
-    (* sanity check, should be bisimilar to saturated self *)
-    Log.warning "TODO: command.vernac, build_lts_graph Minim";
-    return ()
-    (* handle_output o (Alg (Algorithms.run (Minim (Option.has_some w, the_fsm)))) *)
-    (* return () *)
-  | Merge ((((f1, b1, t1), w1), p1), (((f2, b2, t2), w2), p2)), l ->
-    let* the_lts_1 =
-      build_lts_graph ~primary_lts:(Some p1) ~weak:w1 f1 b1 t1 l
-    in
-    let the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
-    let* the_lts_2 =
-      build_lts_graph ~primary_lts:(Some p2) ~weak:w2 f2 b2 t2 l
-    in
-    let the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
-    let _the_merged_fsm = Fsm.merge (the_fsm_1, the_fsm_2) in
-    Log.warning "TODO: command.vernac, build_lts_graph Merge";
-    return ()
-    (* handle_output o (Merge ((the_fsm_1, the_fsm_2), the_merged_fsm)) *)
-  | Bisim ((((f1, b1, t1), w1), p1), (((f2, b2, t2), w2), p2)), l ->
-    let _weak =
-      match w1, w2 with
-      | None, None -> false
-      | Some _, Some _ -> true
-      | _, _ -> raise (WeakBisimilarityRequiresSilentConstrForEachTerm ())
-    in
-    let* the_lts_1 =
-      build_lts_graph ~primary_lts:(Some p1) ~weak:w1 f1 b1 t1 l
-    in
+  | CheckBisimilarity ((x, a), (y, b)) ->
+    Log.notice "command.run, CheckBisimilarity";
+    let* the_lts_1 = build_lts_graph a x in
+    let* the_lts_2 = build_lts_graph b y in
     let _the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
-    let* the_lts_2 =
-      build_lts_graph ~primary_lts:(Some p2) ~weak:w2 f2 b2 t2 l
-    in
     let _the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
-    Log.warning "TODO: command.vernac, build_lts_graph Bisim";
+    Log.notice "command.run, CheckBisimilarity -- TODO finished";
     return ()
 ;;
-(* handle_output
-   o
-   (Alg (Algorithms.run (Bisim (weak, (the_fsm_1, the_fsm_2))))) *)

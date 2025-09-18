@@ -17,45 +17,48 @@ MeBi WeakMode False. MeBi Check WeakMode.
 MeBi SetWeak Option nat. MeBi Check Weak.
 
 Example z := 0.
-MeBi SetWeak nat Of z. MeBi Check Weak.
+MeBi SetWeak nat Of z. 
+(* MeBi Check Weak. *)
 
 Inductive s_label : Set :=
 | TAU : s_label 
 | LABEL1 : nat -> s_label
 .
-MeBi SetWeak TAU Of s_label. MeBi Check Weak.
+MeBi SetWeak TAU Of s_label. 
+(* MeBi Check Weak. *)
 
 Inductive t_label : Type :=
 | SILENT : t_label 
 | LABEL2 : bool -> t_label
 .
-MeBi SetWeak TAU Of t_label. MeBi Check Weak.
+MeBi SetWeak TAU Of t_label. 
+(* MeBi Check Weak. *)
 End BasicCommands.
 
 Inductive i := C0 (i : nat) | C1 (b : bool) (j : nat) | C2 (x : nat).
 
-(* Fail MeBi Check LTS Of 0 Using i. *)
-(* Fail MeBi Check LTS Of 0 Using j. *)
+Fail MeBi LTS 0 Using i.
+Fail MeBi LTS 0 Using j.
 
 Definition k := 0.
-(* Fail MeBi Check LTS Of 0 Using k. *)
-(* Fail MeBi Check LTS Of 0 Using nat. *)
+Fail MeBi LTS 0 Using k.
+Fail MeBi LTS 0 Using nat.
 
 Definition nnat := nat.
-(* Fail MeBi Check LTS Of 0 Using nnat. *)
-(* Fail MeBi Check LTS Of 0 Using False. *)
+Fail MeBi LTS 0 Using nnat.
+Fail MeBi LTS 0 Using False.
 
 CoInductive co_nat := CoZ | CoS : co_nat -> co_nat.
 
 Inductive test_lts A : co_nat -> nat -> nat -> Prop :=
 | less_lt (x : A) (i : co_nat) (j : nat) : test_lts A (CoS i) 1 j.
 
-(* Fail MeBi Check LTS Of 0 Using test_lts. *)
+Fail MeBi LTS 0 Using test_lts.
 
 Inductive test_mut A : Prop := Mk1 (x : A) (y : test_mut2 A)
 with test_mut2 A : Prop := Mk2 (y : test_mut A).
 
-(* Fail MeBi Check LTS Of 0 Using test_mut2. *)
+Fail MeBi LTS 0 Using test_mut2.
 
 
 Inductive testLTS : nat -> bool -> nat -> Prop :=
@@ -64,15 +67,15 @@ Inductive testLTS : nat -> bool -> nat -> Prop :=
 
 Definition one := 1.
 
-(* Fail MeBi Check LTS Of false Using testLTS. *)
+Fail MeBi LTS false Using testLTS.
 
-(* MeBi Check LTS Of 0 Using testLTS. *)
-(* MeBi Check LTS Of (S 0) Using testLTS. *)
-(* MeBi Check LTS Of (S (S 0)) Using testLTS. *)
-(* MeBi Check LTS Of (S (S (S 0))) Using testLTS. *)
+(* MeBi LTS 0 Using testLTS. *)
+(* MeBi LTS (S 0) Using testLTS. *)
+(* MeBi LTS (S (S 0)) Using testLTS. *)
+(* MeBi LTS (S (S (S 0))) Using testLTS. *)
 
-(* MeBi Check LTS Of one Using testLTS. *)
-(* MeBi Check LTS Of (S one) Using testLTS. *)
+(* MeBi LTS one Using testLTS. *)
+(* MeBi LTS (S one) Using testLTS. *)
 
 (* MeBi Check LTS Bounded 30 Of (S one) Using testLTS. *)
 
@@ -84,9 +87,9 @@ Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
 
 (* below cannot be finitely represented  *)
 (* MeBi Check LTS Bounded 50 Of 0 Using nonTerminatingTestLTS. *)
-(* MeBi Check LTS Of (S 0) Using nonTerminatingTestLTS. *)
-(* MeBi Check LTS Of (S (S 0)) Using nonTerminatingTestLTS. *)
-(* MeBi Check LTS Of (S (S (S 0))) Using nonTerminatingTestLTS. *)
+(* MeBi LTS (S 0) Using nonTerminatingTestLTS. *)
+(* MeBi LTS (S (S 0)) Using nonTerminatingTestLTS. *)
+(* MeBi LTS (S (S (S 0))) Using nonTerminatingTestLTS. *)
 
 Module Test1.
   Inductive action : Set := | TheAction1 | TheAction2.

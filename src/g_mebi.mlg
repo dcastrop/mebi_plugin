@@ -44,17 +44,30 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "Check" "Weak"] -> {Mebi_wrapper.run (Command.get_weak_type ())}
 
 
-| ["MeBi" "LTS" constr(x) "Using" reference_list(rs)] -> 
-  { Feedback.msg_notice (Pp.str "TODO: \"MeBi LTS (x) Using (rs)\"") }
-| ["MeBi" "FSM" constr(x) "Using" reference_list(rs)] -> 
-  { Feedback.msg_notice (Pp.str "TODO: \"MeBi FSM (x) Using (rs)\"") }
+| ["MeBi" "LTS" constr(x) "Using" reference(r) ] -> 
+  { Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) [])}
+| ["MeBi" "LTS" constr(x) "Using" reference(r) reference_list(rs)] -> 
+  { Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) rs)}
 
+| ["MeBi" "FSM" constr(x) "Using" reference(r) ] -> 
+  { Mebi_wrapper.run (Command.run (Command.MakeModel (Command.FSM, (x, r))) [])}
+| ["MeBi" "FSM" constr(x) "Using" reference(r) reference_list(rs)] -> 
+  { Mebi_wrapper.run (Command.run (Command.MakeModel (Command.FSM, (x, r))) rs)}
+
+| ["MeBi" "Saturate" constr(x) "Using" reference(r) ] -> 
+  { Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) [])}
+| ["MeBi" "Saturate" constr(x) "Using" reference(r) reference_list(rs)] -> 
+  { Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) rs)}
+
+| ["MeBi" "Minimize" constr(x) "Using" reference(r) ] -> 
+  { Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) [])}
+| ["MeBi" "Minimize" constr(x) "Using" reference(r) reference_list(rs)] -> 
+  { Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) rs)}
+
+| ["MeBi" "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] -> 
+  { Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) [])}
 | ["MeBi" "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
-  { Feedback.msg_notice (Pp.str "TODO: \"MeBi Bisim (x) With (a) And (y) With (b) Using (rs)\"") }
+  { Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) rs)}
 
-
-
-| ["MeBi" "Saturate" constr(x) "Using" reference_list(rs)] -> 
-  { Feedback.msg_notice (Pp.str "TODO: \"MeBi Saturate (x) Using (rs)\"") }
 
 END
