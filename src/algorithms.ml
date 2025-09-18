@@ -25,10 +25,10 @@ module Minimize = struct
     let edges_of_a = Model.get_edges_with_label l edges in
     if Int.equal 0 (Edges.length edges_of_a)
     then
-      Utils.Logging.Log.warning
+      Logging.Log.warning
         (Printf.sprintf "No edges of (%s)." (Action.Label.to_string l));
     (* else
-      Utils.Logging.Log.warning
+      Logging.Log.warning
         (Printf.sprintf
            "Edges of (%s): %s"
            (Action.Label.to_string l)
@@ -49,7 +49,7 @@ module Minimize = struct
           in
           match s_reachable_blocks, t_reachable_blocks with
           | None, None ->
-            (* Utils.Logging.Log.warning
+            (* Logging.Log.warning
                (Printf.sprintf
                "split_block (%s): (%s, None), (%s, None)"
                (Action.Label.to_string l)
@@ -57,7 +57,7 @@ module Minimize = struct
                (State.to_string t)); *)
             States.add t b1, b2
           | Some s_blocks, Some t_blocks ->
-            (* Utils.Logging.Log.warning
+            (* Logging.Log.warning
                (Printf.sprintf
                "split_block (%s): (%s, Some), (%s, Some)"
                (Action.Label.to_string l)
@@ -70,7 +70,7 @@ module Minimize = struct
             then States.add t b1, b2
             else b1, add_to_block_option t b2
           | _, _ ->
-            (* Utils.Logging.Log.warning
+            (* Logging.Log.warning
                (Printf.sprintf
                "split_block (%s): (%s, _), (%s, _)"
                (Action.Label.to_string l)

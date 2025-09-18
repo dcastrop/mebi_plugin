@@ -8,7 +8,7 @@ open Mebi_plugin
    (JSON ())
    (FSM m)
    in
-   Utils.Logging.Log.normal
+   Logging.Log.notice
    ~params:(Utils.Params.Default.log ~mode:(OCaml ()) ())
    (Printf.sprintf "dumped file to: '%s'" output_path1);
    let output_path2 : string =
@@ -18,7 +18,7 @@ open Mebi_plugin
    (JSON ())
    (FSM (Fsm.saturate m))
    in
-   Utils.Logging.Log.normal
+   Logging.Log.notice
    ~params:(Utils.Params.Default.log ~mode:(OCaml ()) ())
    (Printf.sprintf "dumped file to: '%s'" output_path2)
    ;; *)

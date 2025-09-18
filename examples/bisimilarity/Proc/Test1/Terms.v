@@ -26,6 +26,8 @@ Example r : term := tseq (tpar (tact (recv A) tend)
 
 
 
+                                           
+
 (* MeBi Check (MakeLTS term (option label) p None (Some _) None (OutputMode None RunCheck)). *)
 
 (* MeBi Check (MakeFSM term (option label) p None (Some _) None (OutputMode None RunCheck)). *)

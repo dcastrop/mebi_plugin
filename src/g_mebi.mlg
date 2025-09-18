@@ -22,46 +22,39 @@ open Stdarg
 
 VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 
-| ["MeBi" "DumpToFile" "True"] -> {Mebi_wrapper.run (Command.set_dump_to_file_flag true)}
+| ["MeBi" "SetBound" "Default" ] -> {Mebi_wrapper.run (Command.set_bound Command.default_bound)}
+| ["MeBi" "SetBound" int(b)    ] -> {Mebi_wrapper.run (Command.set_bound b)}
+| ["MeBi" "Check" "Bound"      ] -> {Mebi_wrapper.run (Command.get_bound ())}
+
+| ["MeBi" "DumpToFile" "True" ] -> {Mebi_wrapper.run (Command.set_dump_to_file_flag true)}
 | ["MeBi" "DumpToFile" "False"] -> {Mebi_wrapper.run (Command.set_dump_to_file_flag false)}
+| ["MeBi" "Check" "DumpToFile"] -> {Mebi_wrapper.run (Command.get_dump_to_file_flag ())}
 
-| ["MeBi" "ShowDebug" "True"] -> {Mebi_wrapper.run (Command.set_show_debug_flag true)}
+| ["MeBi" "ShowDebug" "True" ] -> {Mebi_wrapper.run (Command.set_show_debug_flag true)}
 | ["MeBi" "ShowDebug" "False"] -> {Mebi_wrapper.run (Command.set_show_debug_flag false)}
+| ["MeBi" "Check" "ShowDebug"] -> {Mebi_wrapper.run (Command.get_show_debug_flag ())}
 
-| ["MeBi" "Check" constr(x) ] -> {Mebi_wrapper.run (Mebi_api.check x)}
+| ["MeBi" "WeakMode" "True" ] -> {Mebi_wrapper.run (Command.set_weak_mode true)}
+| ["MeBi" "WeakMode" "False"] -> {Mebi_wrapper.run (Command.set_weak_mode false)}
+| ["MeBi" "Check" "WeakMode"] -> {Mebi_wrapper.run (Command.get_weak_mode ())}
 
-| ["MeBi" "Run" constr(x) ] -> {Mebi_wrapper.run (Mebi_api.run x)}
-
-(* | [ "MeBi" string(mode) string(model) "Of" constr(t) "Using" reference_list(r) ] -> 
-  { match (
-      match mode with 
-        | "Check" -> Some (Vernac.Check ())
-        | "Show" -> Some (Vernac.Show ())
-        | "Dump" -> Some (Vernac.Dump None)
-        | _ -> None
-    ) with 
-    | None -> Feedback.msg_notice (str "unrecognized mode: " ++ str mode)
-    | Some mode -> (
-      match model with 
-        | "LTS" -> Vernac.LTS (((true, Command.default_bound, t), ), r)
-        | _ -> None
-    )
+| ["MeBi" "SetWeak" "Option" constr(x) ] -> { Mebi_wrapper.run (Command.set_weak_type (Command.Option x)) }
+| ["MeBi" "SetWeak" constr(x) "Of" 
+                          reference(y) ] -> { Mebi_wrapper.run (Command.set_weak_type (Command.Custom (x, y))) }
+| ["MeBi" "Check" "Weak"] -> {Mebi_wrapper.run (Command.get_weak_type ())}
 
 
-    Mebi_wrapper.run (Mebi_api.run x)
-  } *)
+| ["MeBi" "LTS" constr(x) "Using" reference_list(rs)] -> 
+  { Feedback.msg_notice (Pp.str "TODO: \"MeBi LTS (x) Using (rs)\"") }
+| ["MeBi" "FSM" constr(x) "Using" reference_list(rs)] -> 
+  { Feedback.msg_notice (Pp.str "TODO: \"MeBi FSM (x) Using (rs)\"") }
 
-| ["MeBi" "Check" "LTS" "Of" constr(x) "Using" reference_list(rs)] -> 
-  { Feedback.msg_notice (Pp.str "TODO: \"MeBi Check LTS Of (x) Using (rs)\"") }
-| ["MeBi" "Check" "FSM" "Of" constr(x) "Using" reference_list(rs)] -> 
-  { Feedback.msg_notice (Pp.str "TODO: \"MeBi Check FSM Of (x) Using (rs)\"") }
+| ["MeBi" "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
+  { Feedback.msg_notice (Pp.str "TODO: \"MeBi Bisim (x) With (a) And (y) With (b) Using (rs)\"") }
 
-| ["MeBi" "Check" "Bisim" "Of" constr(x) "With" reference(a) "And" "Of" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
-  { Feedback.msg_notice (Pp.str "TODO: \"MeBi Check Bisim Of (x) With (a) And Of (y) With (b) Using (rs)\"") }
 
-| ["MeBi" "Check" "LTS" "Bounded" int(b) "Of" constr(x) "Using" reference_list(rs)] -> 
-  { Feedback.msg_notice (Pp.str "TODO: \"MeBi Check LTS Bounded (b) Of (x) Using (rs)\"") }
-| ["MeBi" "Check" "FSM" "Bounded" int(b) "Of" constr(x) "Using" reference_list(rs)] -> 
-  { Feedback.msg_notice (Pp.str "TODO: \"MeBi Check FSM Bounded (b) Of (x) Using (rs)\"") }
+
+| ["MeBi" "Saturate" constr(x) "Using" reference_list(rs)] -> 
+  { Feedback.msg_notice (Pp.str "TODO: \"MeBi Saturate (x) Using (rs)\"") }
 
 END

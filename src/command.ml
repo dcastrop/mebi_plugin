@@ -4,38 +4,114 @@
 (* open Mebi_monad *)
 (* open Mebi_monad.Monad_syntax *)
 
-(* open the wrapper *)
 open Mebi_wrapper
+open Logging
 
-let dump_to_file_flag : bool ref = ref true
+(** [bound] is the total number of states to be allowed when building an LTS. *)
+let default_bound : int = 10
 
-let set_dump_to_file_flag (b : bool) : unit mm =
-  dump_to_file_flag := b;
+let bound : int ref = ref default_bound
+
+let get_bound () : unit mm =
+  Log.override
+    (Printf.sprintf
+       "Bound set to: %i.%s"
+       !bound
+       (if !bound = default_bound then " (default)" else ""));
   return ()
 ;;
 
-let show_debug_flag : bool ref = ref true
+let set_bound (b : int) : unit mm =
+  bound := b;
+  Log.override
+    (Printf.sprintf
+       "Set bound to: %i.%s"
+       !bound
+       (if !bound = default_bound then " (default)" else ""));
+  return ()
+;;
+
+(** *)
+let dump_to_file_flag : bool ref = ref true
+
+let get_dump_to_file_flag () : unit mm =
+  Log.notice
+    (if !dump_to_file_flag
+     then "File dumps enabled."
+     else "File dumps disabled.");
+  return ()
+;;
+
+let set_dump_to_file_flag (b : bool) : unit mm =
+  dump_to_file_flag := b;
+  Log.notice
+    (if !dump_to_file_flag
+     then "Enabled File dumps."
+     else "Disabled File dumps.");
+  return ()
+;;
+
+(** *)
+let get_show_debug_flag () : unit mm = return Logging.get_show_debug_messages
 
 let set_show_debug_flag (b : bool) : unit mm =
-  show_debug_flag := b;
+  return (Logging.set_show_debug_messages b)
+;;
+
+(** *)
+let weak_mode : bool ref = ref true
+
+let get_weak_mode () : unit mm =
+  Log.notice
+    (Printf.sprintf
+       "Currently in %s mode."
+       (if !weak_mode then "weak" else "strong"));
   return ()
+;;
+
+let set_weak_mode (b : bool) : unit mm =
+  weak_mode := b;
+  Log.notice
+    (Printf.sprintf "Now in %s mode." (if !weak_mode then "weak" else "strong"));
+  return ()
+;;
+
+(** *)
+type weak_action_kinds =
+  | Option of Constrexpr.constr_expr
+  | Custom of Constrexpr.constr_expr * Libnames.qualid
+
+let weak_type : weak_action_kinds option ref = ref None
+
+let get_weak_type () : unit mm =
+  (match !weak_type with
+   | None -> Log.notice "Weak type not set. (Is None)"
+   | Some o ->
+     (match o with
+      | Option c ->
+        Log.notice
+          "Weak type is an Option of \"\" (where silent actions are None)"
+      | Custom (x, y) ->
+        Log.notice
+          "Weak type is a Custom type of \"TODO\" where silent actions are \
+           \"TODO\""));
+  return ()
+;;
+
+let set_weak_type (k : weak_action_kinds) : unit mm =
+  weak_type := Some k;
+  get_weak_type ()
 ;;
 
 open Mebi_wrapper.Syntax
 open Model
 
 (* *)
-open Utils.Logging
+open Logging
 
 (* open Utils.Formatting *)
 open Utils
 (* open Fsm *)
-
-let default_params : Params.log = Params.Default.log ~mode:(Coq ()) ()
-
-(** [default_bound] is the total depth that will be explored of a given lts by [explore_lts].
-*)
-let default_bound : int = 10
 
 let arity_is_type (mip : Declarations.one_inductive_body) : unit mm =
   let open Declarations in
@@ -177,13 +253,7 @@ let get_type_cindef (i : int) (gref : Names.GlobRef.t) (v : EConstr.t option)
     - Conversion.CUMUL?
     - Is [w_unify] the best way?
     - ... *)
-let m_unify
-      ?(params : Params.log = default_params)
-      (t0 : EConstr.t)
-      (t1 : EConstr.t)
-  : bool mm
-  =
-  params.kind <- Debug ();
+let m_unify (t0 : EConstr.t) (t1 : EConstr.t) : bool mm =
   (* let* _ = if is_output_kind_enabled params then debug (fun (env :
      Environ.env) (sigma : Evd.evar_map) -> str "Unifying (t0) :: " ++
      Printer.pr_econstr_env env sigma t0 ++ strbrk "\nUnifying (t1) :: " ++
@@ -191,12 +261,12 @@ let m_unify
   state (fun (env : Environ.env) (sigma : Evd.evar_map) ->
     try
       let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
-      (* log ~params "\t\tSuccess"; *)
+      (* log  "\t\tSuccess"; *)
       sigma, true
     with
     | Pretype_errors.PretypeError (_, _, Pretype_errors.CannotUnify (m, n, e))
       ->
-      log ~params "\t\tCould not unify";
+      Log.warning "\t\tCould not unify";
       sigma, false)
 ;;
 
@@ -235,12 +305,9 @@ type unif_problem =
   ; termR : EConstr.t
   }
 
-let rec unify_all
-          ?(params : Params.log = default_params)
-          (i : (Constr_tree.t * unif_problem) list)
+let rec unify_all (i : (Constr_tree.t * unif_problem) list)
   : Constr_tree.t list option mm
   =
-  params.kind <- Debug ();
   match i with
   | [] -> return (Some [])
   | (ctor_tree, u) :: t ->
@@ -248,10 +315,10 @@ let rec unify_all
        str "UNIFYALL (termL) :::::::::: " ++ Printer.pr_econstr_env env sigma
        u.termL ++ strbrk "\nUNIFYALL (termR) :::::::::: " ++
        Printer.pr_econstr_env env sigma u.termR) else return () in *)
-    let* success = m_unify ~params u.termL u.termR in
+    let* success = m_unify u.termL u.termR in
     if success
     then
-      let* unified = unify_all ~params t in
+      let* unified = unify_all t in
       match unified with
       | None -> return None
       | Some unified -> return (Some (ctor_tree :: unified))
@@ -259,7 +326,6 @@ let rec unify_all
 ;;
 
 let sandboxed_unify
-      ?(params : Params.log = default_params)
       (tgt_term : EConstr.t)
       (u : (Constr_tree.t * unif_problem) list)
   : (EConstr.t * Constr_tree.t list) option mm
@@ -268,7 +334,7 @@ let sandboxed_unify
      "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term) else return ()
      in *)
   sandbox
-    (let* success = unify_all ~params u in
+    (let* success = unify_all u in
      match success with
      | None -> return None
      | Some unified ->
@@ -285,7 +351,6 @@ type coq_ctor = EConstr.t * EConstr.t * Constr_tree.t
 
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
-          ?(params : Params.log = default_params)
           (acc : coq_ctor list)
           (i : int)
           (act : EConstr.t)
@@ -294,13 +359,12 @@ let rec retrieve_tgt_nodes
   = function
   | _, [] -> return acc
   | lts_index, u1 :: nctors ->
-    let* success = sandboxed_unify ~params tgt_term u1 in
+    let* success = sandboxed_unify tgt_term u1 in
     (match success with
-     | None -> retrieve_tgt_nodes ~params acc i act tgt_term (lts_index, nctors)
+     | None -> retrieve_tgt_nodes acc i act tgt_term (lts_index, nctors)
      | Some (tgt, ctor_tree) ->
        let$+ act env sigma = Reductionops.nf_all env sigma act in
        retrieve_tgt_nodes
-         ~params
          ((act, tgt, Node ((E.of_int lts_index, i), ctor_tree)) :: acc)
          i
          act
@@ -310,7 +374,6 @@ let rec retrieve_tgt_nodes
 
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
-          ?(params : Params.log = default_params)
           (acc : int * (Constr_tree.t * unif_problem) list list)
           (fn_cindef : cindef F.t)
   :  EConstr.t list * EConstr.rel_declaration list
@@ -319,13 +382,13 @@ let rec check_updated_ctx
   | [], [] -> return (Some acc)
   | _hsubstl :: substl, t :: tl ->
     (* Log.warning
-      ~params
+      
       (Printf.sprintf
          "G: _hsubstl :: substl,\n_hsubstl = %s\nsubstl = %s"
          (econstr_to_string _hsubstl)
          (econstr_list_to_string substl)); *)
     (* Log.warning
-      ~params
+      
       (Printf.sprintf
          "H: t :: tl,\nt = %s\ntl = %s"
          (econstr_rel_decl_to_string t)
@@ -334,7 +397,7 @@ let rec check_updated_ctx
       EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
     in
     (* Log.warning
-       ~params
+
        (Printf.sprintf "I: upd_t = %s" (econstr_to_string upd_t)); *)
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with
@@ -345,14 +408,13 @@ let rec check_updated_ctx
           (match econstr_to_string fn with
            | "option" ->
              Log.warning
-               ~params
                (Printf.sprintf
                   "check_updated_ctx, fn_cindef \"option\" has args: %s"
                   (econstr_list_to_string (Array.to_list args)));
              check_updated_ctx acc fn_cindef (substl, tl)
            | "@eq" ->
              (* Log.warning
-               ~params
+               
                (Printf.sprintf
                   "N: acc (%i): [%s]"
                   (fst acc)
@@ -378,7 +440,6 @@ let rec check_updated_ctx
              let* (lhs : EConstr.t) = normalize_econstr args.(1) in
              let* (rhs : EConstr.t) = normalize_econstr args.(2) in
              Log.warning
-               ~params
                (Printf.sprintf
                   "TODO: check_updated_ctx, handle premise (normalized):\n\
                    fn: %s\n\
@@ -411,7 +472,6 @@ let rec check_updated_ctx
                          (snd to_subst') ))) *)
            | _ ->
              Log.warning
-               ~params
                (Printf.sprintf
                   "check_updated_ctx, fn_cindef does not have corresponding fn \
                    \"%s\" with args: %s."
@@ -423,7 +483,6 @@ let rec check_updated_ctx
           let* c_constr_transitions = lts_cindef_constr_transitions c in
           let* (ctors : coq_ctor list) =
             check_valid_constructor
-              ~params
               c_constr_transitions
               fn_cindef
               nextT
@@ -440,7 +499,7 @@ let rec check_updated_ctx
                 ctors
             in
             (* Log.warning
-              ~params
+              
               (Printf.sprintf
                  "K: acc: [%s]"
                  (List.fold_left
@@ -463,7 +522,7 @@ let rec check_updated_ctx
                     ""
                     (snd acc))); *)
             (* Log.warning
-              ~params
+              
               (Printf.sprintf
                  "L: ctree_unif_probs: [%s]"
                  (List.fold_left
@@ -494,7 +553,7 @@ let rec check_updated_ctx
                 (snd acc)
             in
             (* Log.warning
-              ~params
+              
               (Printf.sprintf
                  "M: acc': [%s]"
                  (List.fold_left
@@ -524,7 +583,6 @@ let rec check_updated_ctx
 
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
-      ?(params : Params.log = default_params)
       (ctor_transitions : (Constr.rel_context * Constr.types) array)
       (fn_cindef : cindef F.t)
       (t' : EConstr.t)
@@ -532,12 +590,11 @@ and check_valid_constructor
       (lts_index : int)
   : coq_ctor list mm
   =
-  params.kind <- Debug ();
   (* let$+ t env sigma = Reductionops.nf_all env sigma t' in *)
   let* (t : EConstr.t) = normalize_econstr t' in
-  (* Log.warning ~params (Printf.sprintf "A: %s" (econstr_to_string t)); *)
+  (* Log.warning  (Printf.sprintf "A: %s" (econstr_to_string t)); *)
   let iter_body (i : int) (ctor_vals : coq_ctor list) =
-    (* Log.warning ~params (Printf.sprintf "B (%i): %s" i (econstr_to_string t)); *)
+    (* Log.warning  (Printf.sprintf "B (%i): %s" i (econstr_to_string t)); *)
     let (ctx, tm) : Constr.rel_context * Constr.t = ctor_transitions.(i) in
     let ctx_tys : EConstr.rel_declaration list =
       List.map EConstr.of_rel_decl ctx
@@ -547,10 +604,10 @@ and check_valid_constructor
       extract_args substl tm
     in
     (* Log.warning
-      ~params
+      
       (Printf.sprintf "C (%i): substl = %s" i (econstr_list_to_string substl)); *)
     (* Log.warning
-      ~params
+      
       (Printf.sprintf
          "D (%i): tl = %s"
          i
@@ -559,7 +616,7 @@ and check_valid_constructor
     if success
     then
       (* Log.warning
-         ~params
+
          (Printf.sprintf
          "E (%i): (%s) U (%s)"
          i
@@ -568,17 +625,13 @@ and check_valid_constructor
       let* success = Option.cata (fun a -> m_unify a act) (return true) ma in
       if success
       then
-        (* Log.warning ~params (Printf.sprintf "F (%i): successs" i); *)
+        (* Log.warning  (Printf.sprintf "F (%i): successs" i); *)
         let* (act : EConstr.t) = normalize_econstr act in
         let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in
         let* (next_ctors :
                (int * (Constr_tree.t * unif_problem) list list) option)
           =
-          check_updated_ctx
-            ~params
-            (lts_index, [ [] ])
-            fn_cindef
-            (substl, ctx_tys)
+          check_updated_ctx (lts_index, [ [] ]) fn_cindef (substl, ctx_tys)
         in
         match next_ctors with
         | None -> return ctor_vals
@@ -586,7 +639,7 @@ and check_valid_constructor
           (match snd index_ctor_pair with
            | [] ->
              (* Log.warning
-                ~params
+
                 (Printf.sprintf "J (%i): snd next_ctors is empty" i); *)
              let* sigma = get_sigma in
              if EConstr.isEvar sigma tgt_term
@@ -600,7 +653,7 @@ and check_valid_constructor
                   :: ctor_vals)
            | nctors ->
              (* Log.warning
-               ~params
+               
                (Printf.sprintf
                   "J (%i): snd next_ctors is non-empty: [%s]"
                   i
@@ -624,13 +677,7 @@ and check_valid_constructor
                      ""
                      nctors)); *)
              let tgt_nodes =
-               retrieve_tgt_nodes
-                 ~params
-                 ctor_vals
-                 i
-                 act
-                 tgt_term
-                 index_ctor_pair
+               retrieve_tgt_nodes ctor_vals i act tgt_term index_ctor_pair
              in
              tgt_nodes)
       else return ctor_vals
@@ -673,8 +720,7 @@ module type GraphB = sig
     -> unit mm
 
   val build_lts_graph
-    :  ?params:Params.log
-    -> ?weak:E.t option
+    :  ?weak:E.t option
     -> cindef
     -> cindef B.t
     -> lts_graph
@@ -682,8 +728,7 @@ module type GraphB = sig
     -> lts_graph mm
 
   val build_graph
-    :  ?params:Params.log
-    -> ?primary_lts:Libnames.qualid option
+    :  ?primary_lts:Libnames.qualid option
     -> ?weak:(Constrexpr.constr_expr * Libnames.qualid) option
     -> int
     -> Constrexpr.constr_expr
@@ -785,7 +830,6 @@ module MkGraph
   ;;
 
   let get_new_states
-        ?(params : Params.log = default_params)
         ?(weak : E.t option = None)
         (from : E.t)
         (g : lts_graph)
@@ -825,18 +869,13 @@ module MkGraph
       @raise CannotFindTypeOfTermToVisit
         if none of the constructors provided in [rlts_map] yield constructors from [check_valid_constructors].
   *)
-  let get_new_constrs
-        ?(params : Params.log = default_params)
-        (from : E.t)
-        (primary : cindef)
-        (rlts_map : cindef B.t)
+  let get_new_constrs (from : E.t) (primary : cindef) (rlts_map : cindef B.t)
     : coq_ctor list mm
     =
     let* (from_dec : EConstr.t) = decode from in
     let* (decoded_map : cindef F.t) = decode_map rlts_map in
     let* primary_constr_transitions = lts_cindef_constr_transitions primary in
     check_valid_constructor
-      ~params
       primary_constr_transitions
       decoded_map
       from_dec
@@ -850,7 +889,6 @@ module MkGraph
       @param bound is the number of states to explore until.
       @return an [lts_graph] with a maximum of [bound] many states. *)
   let rec build_lts_graph
-            ?(params : Params.log = default_params)
             ?(weak : E.t option = None)
             (the_primary_lts : cindef)
             (rlts_map : cindef B.t)
@@ -858,7 +896,6 @@ module MkGraph
             (bound : int)
     : lts_graph mm
     =
-    params.kind <- Debug ();
     if Queue.is_empty g.to_visit
     then return g (* finished if no more to visit*)
     else if S.cardinal g.states > bound
@@ -866,14 +903,12 @@ module MkGraph
     else (
       let encoded_t : E.t = Queue.pop g.to_visit in
       let* (new_constrs : coq_ctor list) =
-        get_new_constrs ~params encoded_t the_primary_lts rlts_map
+        get_new_constrs encoded_t the_primary_lts rlts_map
       in
       (* [get_new_states] also updates [g.to_visit] *)
-      let* (new_states : S.t) =
-        get_new_states ~params ~weak encoded_t g new_constrs
-      in
+      let* (new_states : S.t) = get_new_states ~weak encoded_t g new_constrs in
       let g : lts_graph = { g with states = S.union g.states new_states } in
-      build_lts_graph ~params ~weak the_primary_lts rlts_map g bound)
+      build_lts_graph ~weak the_primary_lts rlts_map g bound)
   ;;
 
   let check_for_primary_lts
@@ -892,7 +927,6 @@ module MkGraph
       return (Some encoding, cindef_map)
     | Some _, true ->
       Log.warning
-        ~params:default_params
         (Printf.sprintf
            "Found inductive definition that could be primary, when primary has \
             already been selected.\n\
@@ -994,7 +1028,6 @@ module MkGraph
       @param tref is the original coq-term.
       @param bound is the number of states to explore until. *)
   let build_graph
-        ?(params : Params.log = default_params)
         ?(primary_lts : Libnames.qualid option = None)
         ?(weak : (Constrexpr.constr_expr * Libnames.qualid) option = None)
         (bound : int)
@@ -1019,7 +1052,6 @@ module MkGraph
     let* _ = return (Queue.push encoded_init q) in
     let* g =
       build_lts_graph
-        ~params
         ~weak:the_weak_opt_enc
         the_primary_lts
         cindef_map
@@ -1226,7 +1258,7 @@ module MkGraph
     : Lts.t mm
     =
     (* let* pstr_lts = pstr_lts_graph g in
-       Utils.Logging.Log.warning pstr_lts; *)
+       Logging.Log.warning pstr_lts; *)
     let* init : State.t option = decoq_state_opt ~cache_decoding g.init in
     let* states : Model.States.t = decoq_states ~cache_decoding g.states in
     let* terminals = decoq_states ~cache_decoding g.terminals in
@@ -1311,14 +1343,14 @@ let make_graph_builder =
    | Check () -> return ()
    | Show () ->
    let s : string = result_to_string r in
-   Log.normal ~params:default_params s;
+   Log.notice  s;
    return ()
    | Dump name_opt ->
    let output_path : string =
    Dump_to_file.run (Default ()) (name_opt, Auto ()) (JSON ()) r
    in
-   Log.normal
-   ~params:default_params
+   Log.notice
+
    (Printf.sprintf "dumped file to: '%s'" output_path);
    return ()
    ;;
@@ -1352,6 +1384,8 @@ type run_kind =
   | Bisim of (multi_lts_params * multi_lts_params)
 
 type run_params = run_kind * Libnames.qualid list
+
+let () = Logging.set_output_mode (Coq ())
 
 let vernac (o : output_kind) (r : run_params) : unit mm =
   let* (graphM : (module GraphB)) = make_graph_builder in
