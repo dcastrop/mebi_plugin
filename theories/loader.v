@@ -1,7 +1,7 @@
 Set Debug "backtrace".
 Declare ML Module "coq-mebi.mebi".
 
-Inductive printout_mode : Set :=
+(* Inductive printout_mode : Set :=
 | RunCheck : printout_mode (* only warning printouts *)
 | ShowInfo : printout_mode (* show more printouts *)
 | Verbose  : printout_mode (* show more detailed printouts *)
@@ -23,7 +23,7 @@ Inductive single_model_commands (A B : Type) : Type :=
 Inductive plugin_command (A B C D : Type) : Type :=
 | CheckBisimilarity : A -> B -> B -> option nat -> 
                       C -> D -> D -> option nat -> 
-                      output_mode -> plugin_command A B C D.
+                      output_mode -> plugin_command A B C D. *)
 
 
 (* Check (MakeLTS nat bool 0 false true None DefaultOutputMode). *)

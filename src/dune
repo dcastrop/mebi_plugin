@@ -35,7 +35,7 @@
   lts
   fsm
   algorithms
-  vernac
+  ; vernac
   dump_to_file
   command
   mebi_api
