@@ -35,6 +35,9 @@ examples/bisimilarity/Proc/Test2/Terms.v
 src/utils.ml
 src/utils.mli
 
+src/logging.ml
+src/logging.mli
+
 src/mebi_wrapper.ml
 src/mebi_wrapper.mli
 src/mebi_utils.ml
@@ -50,8 +53,8 @@ src/fsm.mli
 
 src/algorithms.ml
 src/algorithms.mli
-src/vernac.ml
-src/vernac.mli
+# src/vernac.ml
+# src/vernac.mli
 
 src/dump_to_file.ml
 src/dump_to_file.mli

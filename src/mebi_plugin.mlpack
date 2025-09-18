@@ -1,11 +1,11 @@
 Utils
+Logging
 Mebi_wrapper
 Mebi_utils
 Model
 Lts
 Fsm
 Algorithms
-Vernac
 Dump_to_file
 Command
 Mebi_api

@@ -9,14 +9,13 @@ module Bisimilar : sig
 end
 
 type t =
-  | Satur of Fsm.t
   | Minim of (bool * Fsm.t)
   | Bisim of (bool * Fsm.pair)
 
 type result =
-  | Satur of Fsm.t
   | Minim of Minimize.result
   | Bisim of Bisimilar.result
 
 val run : t -> result
 val bisim_result_to_bool : Bisimilar.result -> bool
+val pstr : result -> string

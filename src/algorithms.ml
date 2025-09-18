@@ -25,10 +25,10 @@ module Minimize = struct
     let edges_of_a = Model.get_edges_with_label l edges in
     if Int.equal 0 (Edges.length edges_of_a)
     then
-      Utils.Logging.Log.warning
+      Logging.Log.warning
         (Printf.sprintf "No edges of (%s)." (Action.Label.to_string l));
     (* else
-      Utils.Logging.Log.warning
+      Logging.Log.warning
         (Printf.sprintf
            "Edges of (%s): %s"
            (Action.Label.to_string l)
@@ -49,7 +49,7 @@ module Minimize = struct
           in
           match s_reachable_blocks, t_reachable_blocks with
           | None, None ->
-            (* Utils.Logging.Log.warning
+            (* Logging.Log.warning
                (Printf.sprintf
                "split_block (%s): (%s, None), (%s, None)"
                (Action.Label.to_string l)
@@ -57,7 +57,7 @@ module Minimize = struct
                (State.to_string t)); *)
             States.add t b1, b2
           | Some s_blocks, Some t_blocks ->
-            (* Utils.Logging.Log.warning
+            (* Logging.Log.warning
                (Printf.sprintf
                "split_block (%s): (%s, Some), (%s, Some)"
                (Action.Label.to_string l)
@@ -70,7 +70,7 @@ module Minimize = struct
             then States.add t b1, b2
             else b1, add_to_block_option t b2
           | _, _ ->
-            (* Utils.Logging.Log.warning
+            (* Logging.Log.warning
                (Printf.sprintf
                "split_block (%s): (%s, _), (%s, _)"
                (Action.Label.to_string l)
@@ -168,7 +168,10 @@ module Bisimilar = struct
   ;;
 
   let run (((the_fsm_1, the_fsm_2), merged_fsm, pi) : t) : result =
-    (the_fsm_1, the_fsm_2), merged_fsm, split_bisimilar pi the_fsm_1 the_fsm_2
+    let (bisim_states, non_bisim_states) : Partition.t * Partition.t =
+      split_bisimilar pi the_fsm_1 the_fsm_2
+    in
+    (the_fsm_1, the_fsm_2), merged_fsm, (bisim_states, non_bisim_states)
   ;;
 end
 
@@ -177,18 +180,15 @@ end
 (**************************************************************************)
 
 type t =
-  | Satur of Fsm.t
   | Minim of (bool * Minimize.t)
   | Bisim of (bool * Fsm.pair)
 
 type result =
-  | Satur of Fsm.t
   | Minim of Minimize.result
   | Bisim of Bisimilar.result
 
 let run (args : t) : result =
   match args with
-  | Satur the_fsm -> Satur (Fsm.saturate the_fsm)
   | Minim params ->
     Minim
       (Minimize.run
@@ -214,4 +214,28 @@ let bisim_result_to_bool (r : Bisimilar.result) =
   match r with
   | _, _, (_bisim_states, non_bisim_states) ->
     Model.Partition.is_empty non_bisim_states
+;;
+
+let pstr (r : result) : string =
+  match r with
+  | Minim (the_fsm, the_partition) ->
+    Printf.sprintf
+      "\nMinimized FSM: %s\nMinimized Partition: %s"
+      (Fsm.pstr the_fsm)
+      (Model.pstr_partition the_partition)
+  | Bisim ((the_fsm_1, the_fsm_2), merged_fsm, (bisim_states, non_bisim_states))
+    ->
+    let are_bisimilar : bool = Model.Partition.is_empty non_bisim_states in
+    Printf.sprintf
+      "\n\
+       Bisimilar: %b\n\
+       Bisimilar states: %s\n\
+       Non-bisimilar states: %s\n\n\
+       FSM 1: %s\n\n\
+       FSM 2: %s\n"
+      are_bisimilar
+      (Model.pstr_partition bisim_states)
+      (Model.pstr_partition non_bisim_states)
+      (Fsm.pstr the_fsm_1)
+      (Fsm.pstr the_fsm_2)
 ;;

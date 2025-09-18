@@ -161,7 +161,7 @@ module Action = struct
     let to_string (t : t) = Mebi_wrapper.E.to_string (fst t)
 
     let pstr ?(indents : int = 0) (t : t) =
-      Printf.sprintf "%s%s" (Utils.str_tabs indents) (to_string t)
+      Printf.sprintf "\n%s%s" (Utils.str_tabs indents) (to_string t)
     ;;
 
     let is_silent t = snd (snd t)
@@ -1285,7 +1285,7 @@ let check_info (m : t) : unit =
         if Int.equal real_num info_num
         then ()
         else
-          Utils.Logging.Log.warning
+          Logging.Log.warning
             (Printf.sprintf
                "Model.check_info, discrepency found in num of \"%s\": expected \
                 (%i) but counted (%i)"
@@ -1315,14 +1315,14 @@ let merge_action_pairs (ap : ActionPairs.t) (bp : ActionPairs.t) : ActionPairs.t
       with
       | [], acc0 ->
         (* no other matches, add *)
-        Utils.Logging.Log.warning
+        Logging.Log.warning
           (Printf.sprintf
              "merge_action_pairs, adding new (%s) "
              (Action.to_string b));
         ActionPairs.add (b, dests) acc0
       | a :: [], acc0 ->
         (* single match found, merge annotations *)
-        Utils.Logging.Log.warning
+        Logging.Log.warning
           (Printf.sprintf
              "merge_action_pairs, merging (%s) with (%s)"
              (Action.to_string b)
@@ -1332,7 +1332,7 @@ let merge_action_pairs (ap : ActionPairs.t) (bp : ActionPairs.t) : ActionPairs.t
           acc0
       | multi, acc0 ->
         (* many matches found *)
-        Utils.Logging.Log.warning
+        Logging.Log.warning
           (Printf.sprintf
              "merge_action_pairs, found (%i) action pairs matching named \
               action (%s).\n\
