@@ -69,5 +69,18 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
   { Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) rs)}
 
+| ["MeBi" "Help" ] -> { Mebi_wrapper.run (Command.run (Command.Help Command.Basic) [])}
+| ["MeBi" "Help" "SetBound"] -> { Mebi_wrapper.run (Command.run (Command.Help Command.SetBound) [])}
+| ["MeBi" "Help" "DumpToFile"] -> { Mebi_wrapper.run (Command.run (Command.Help Command.DumpToFile) [])}
+| ["MeBi" "Help" "ShowDebug"] -> { Mebi_wrapper.run (Command.run (Command.Help Command.ShowDebug) [])}
+| ["MeBi" "Help" "WeakMode"] -> { Mebi_wrapper.run (Command.run (Command.Help Command.WeakMode) [])}
+| ["MeBi" "Help" "SetWeak"] -> { Mebi_wrapper.run (Command.run (Command.Help Command.SetWeak) [])}
+| ["MeBi" "Help" "Check"] -> { Mebi_wrapper.run (Command.run (Command.Help Command.Check) [])}
+| ["MeBi" "Help" "LTS"] -> { Mebi_wrapper.run (Command.run (Command.Help Command.LTS) [])}
+| ["MeBi" "Help" "FSM"] -> { Mebi_wrapper.run (Command.run (Command.Help Command.FSM) [])}
+| ["MeBi" "Help" "Saturate"] -> { Mebi_wrapper.run (Command.run (Command.Help Command.Saturate) [])}
+| ["MeBi" "Help" "Minimize"] -> { Mebi_wrapper.run (Command.run (Command.Help Command.Minimize) [])}
+| ["MeBi" "Help" "Bisim"] -> { Mebi_wrapper.run (Command.run (Command.Help Command.Bisim) [])}
+
 
 END
