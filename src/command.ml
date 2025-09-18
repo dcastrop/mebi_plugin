@@ -6,6 +6,21 @@
 
 (* open the wrapper *)
 open Mebi_wrapper
+
+let dump_to_file_flag : bool ref = ref true
+
+let set_dump_to_file_flag (b : bool) : unit mm =
+  dump_to_file_flag := b;
+  return ()
+;;
+
+let show_debug_flag : bool ref = ref true
+
+let set_show_debug_flag (b : bool) : unit mm =
+  show_debug_flag := b;
+  return ()
+;;
+
 open Mebi_wrapper.Syntax
 open Model
 
@@ -669,7 +684,7 @@ module type GraphB = sig
   val build_graph
     :  ?params:Params.log
     -> ?primary_lts:Libnames.qualid option
-    -> ?weak:Vernac.weak_params option
+    -> ?weak:(Constrexpr.constr_expr * Libnames.qualid) option
     -> int
     -> Constrexpr.constr_expr
     -> Names.GlobRef.t list
@@ -888,7 +903,7 @@ module MkGraph
   ;;
 
   let handle_weak_lts
-        (weak : Vernac.weak_params option)
+        (weak : (Constrexpr.constr_expr * Libnames.qualid) option)
         (cindef_map : cindef B.t)
         (i : int)
     : E.t option mm
@@ -940,7 +955,7 @@ module MkGraph
   *)
   let build_cindef_map
         ?(primary_lts : Libnames.qualid option = None)
-        ?(weak : Vernac.weak_params option = None)
+        ?(weak : (Constrexpr.constr_expr * Libnames.qualid) option = None)
         (t' : EConstr.t)
         (grefs : Names.GlobRef.t list)
     : (E.t * E.t option * cindef B.t) mm
@@ -981,7 +996,7 @@ module MkGraph
   let build_graph
         ?(params : Params.log = default_params)
         ?(primary_lts : Libnames.qualid option = None)
-        ?(weak : Vernac.weak_params option = None)
+        ?(weak : (Constrexpr.constr_expr * Libnames.qualid) option = None)
         (bound : int)
         (tref : Constrexpr.constr_expr)
         (grefs : Names.GlobRef.t list)
@@ -1252,75 +1267,98 @@ let make_graph_builder =
 (** Entry point *******)
 (**********************)
 
-open Vernac
+(* open Vernac
 
-let result_to_string (r : result_kind) : string =
-  match r with
-  | LTS the_lts -> Printf.sprintf "LTS: %s" (Lts.pstr the_lts)
-  | FSM the_fsm -> Printf.sprintf "FSM: %s" (Fsm.pstr the_fsm)
-  | Alg r ->
-    (match r with
-     | Satur the_fsm -> Printf.sprintf "FSM saturated: %s" (Fsm.pstr the_fsm)
-     | Minim (the_fsm, the_partition) ->
-       Printf.sprintf "FSM saturated: %s" (Fsm.pstr the_fsm)
-     | Bisim
-         ( (the_fsm_1, the_fsm_2)
-         , the_merged_fsm
-         , (bisim_states, non_bisim_states) ) ->
-       Printf.sprintf
-         "Bisimilar: %b\n\n\
-          Bisimilar States (%i): %s\n\
-          Non-Bisimilar States (%i): %s\n\n\
-          FSM merged: %s\n\n\
-          FSM A: %s\n\n\
-          FSM B: %s"
-         (Model.Partition.is_empty non_bisim_states)
-         (Model.Partition.cardinal bisim_states)
-         (Model.pstr_partition bisim_states)
-         (Model.Partition.cardinal non_bisim_states)
-         (Model.pstr_partition non_bisim_states)
-         (Fsm.pstr the_merged_fsm)
-         (Fsm.pstr the_fsm_1)
-         (Fsm.pstr the_fsm_2))
-  | Merge ((the_fsm_1, the_fsm_2), the_merged_fsm) ->
-    Printf.sprintf
-      "FSM merged: %s\n\nFSM A: %s\n\nFSM B: %s"
-      (Fsm.pstr the_merged_fsm)
-      (Fsm.pstr the_fsm_1)
-      (Fsm.pstr the_fsm_2)
-  | Minim _ -> "TODO: finish handle output for Minim"
-;;
+   let result_to_string (r : result_kind) : string =
+   match r with
+   | LTS the_lts -> Printf.sprintf "LTS: %s" (Lts.pstr the_lts)
+   | FSM the_fsm -> Printf.sprintf "FSM: %s" (Fsm.pstr the_fsm)
+   | Alg r ->
+   (match r with
+   | Satur the_fsm -> Printf.sprintf "FSM saturated: %s" (Fsm.pstr the_fsm)
+   | Minim (the_fsm, the_partition) ->
+   Printf.sprintf "FSM saturated: %s" (Fsm.pstr the_fsm)
+   | Bisim
+   ( (the_fsm_1, the_fsm_2)
+   , the_merged_fsm
+   , (bisim_states, non_bisim_states) ) ->
+   Printf.sprintf
+   "Bisimilar: %b\n\n\
+   Bisimilar States (%i): %s\n\
+   Non-Bisimilar States (%i): %s\n\n\
+   FSM merged: %s\n\n\
+   FSM A: %s\n\n\
+   FSM B: %s"
+   (Model.Partition.is_empty non_bisim_states)
+   (Model.Partition.cardinal bisim_states)
+   (Model.pstr_partition bisim_states)
+   (Model.Partition.cardinal non_bisim_states)
+   (Model.pstr_partition non_bisim_states)
+   (Fsm.pstr the_merged_fsm)
+   (Fsm.pstr the_fsm_1)
+   (Fsm.pstr the_fsm_2))
+   | Merge ((the_fsm_1, the_fsm_2), the_merged_fsm) ->
+   Printf.sprintf
+   "FSM merged: %s\n\nFSM A: %s\n\nFSM B: %s"
+   (Fsm.pstr the_merged_fsm)
+   (Fsm.pstr the_fsm_1)
+   (Fsm.pstr the_fsm_2)
+   | Minim _ -> "TODO: finish handle output for Minim"
+   ;;
 
-let handle_output (o : output_kind) (r : result_kind) : unit mm =
-  match o with
-  | Check () -> return ()
-  | Show () ->
-    let s : string = result_to_string r in
-    Log.normal ~params:default_params s;
-    return ()
-  | Dump name_opt ->
-    let output_path : string =
-      Dump_to_file.run (Default ()) (name_opt, Auto ()) (JSON ()) r
-    in
-    Log.normal
-      ~params:default_params
-      (Printf.sprintf "dumped file to: '%s'" output_path);
-    return ()
-;;
+   let handle_output (o : output_kind) (r : result_kind) : unit mm =
+   match o with
+   | Check () -> return ()
+   | Show () ->
+   let s : string = result_to_string r in
+   Log.normal ~params:default_params s;
+   return ()
+   | Dump name_opt ->
+   let output_path : string =
+   Dump_to_file.run (Default ()) (name_opt, Auto ()) (JSON ()) r
+   in
+   Log.normal
+   ~params:default_params
+   (Printf.sprintf "dumped file to: '%s'" output_path);
+   return ()
+   ;;
 
-let should_cache_decoding (o : output_kind) : bool =
-  match o with Check _ -> false | Show _ -> true | Dump _ -> true
-;;
+   let should_cache_decoding (o : output_kind) : bool =
+   match o with Check _ -> false | Show _ -> true | Dump _ -> true
+   ;; *)
 
 (* exception ExceededBoundBeforeLTSCompleted of int *)
 exception WeakBisimilarityRequiresSilentConstrForEachTerm of unit
+
+type output_kind =
+  | Check of unit
+  | Show of unit
+  | Dump of string option
+
+(** [fail_if_incomplete * bounds * initial_term] *)
+type term_params = bool * int * Constrexpr.constr_expr
+
+(** [(term_params * weak_params) * ]*)
+type lts_params =
+  term_params * (Constrexpr.constr_expr * Libnames.qualid) option
+
+type multi_lts_params = lts_params * Libnames.qualid
+
+type run_kind =
+  | LTS of lts_params * Libnames.qualid option
+  | FSM of lts_params * Libnames.qualid option
+  | Minim of lts_params
+  | Merge of (multi_lts_params * multi_lts_params)
+  | Bisim of (multi_lts_params * multi_lts_params)
+
+type run_params = run_kind * Libnames.qualid list
 
 let vernac (o : output_kind) (r : run_params) : unit mm =
   let* (graphM : (module GraphB)) = make_graph_builder in
   let module G = (val graphM) in
   let build_lts_graph
         ?(primary_lts : Libnames.qualid option = None)
-        ?(weak : weak_params option = None)
+        ?(weak : (Constrexpr.constr_expr * Libnames.qualid) option = None)
         (fail_if_incomplete : bool)
         (bound : int)
         (t : Constrexpr.constr_expr)
@@ -1330,26 +1368,34 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
     let lts_grefs : Names.GlobRef.t list = Mebi_utils.ref_list_to_glob_list l in
     let* graph_lts = G.build_graph ~primary_lts ~weak bound t lts_grefs in
     G.decoq_lts
-      ~cache_decoding:(should_cache_decoding o)
-      ~name:(Vernac.get_name o)
+    (* ~cache_decoding:(should_cache_decoding o) *)
+    (* ~name:(Vernac.get_name o) *)
+      ~cache_decoding:true
+      ~name:"TODO: fix name"
       bound
       graph_lts
   in
   match r with
   | LTS (((f, b, t), w), primary_lts), l ->
     let* the_lts = build_lts_graph ~primary_lts ~weak:w f b t l in
-    handle_output o (LTS the_lts)
+    (* handle_output o (LTS the_lts) *)
+    Log.warning "TODO: command.vernac, build_lts_graph LTS";
+    return ()
   | FSM (((f, b, t), w), primary_lts), l ->
     let* the_lts = build_lts_graph ~primary_lts ~weak:w f b t l in
-    let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-    handle_output o (FSM the_fsm)
+    let _the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+    Log.warning "TODO: command.vernac, build_lts_graph FSM";
+    return ()
+    (* handle_output o (FSM the_fsm) *)
   | Minim ((f, b, t), w), l ->
     let* the_lts = build_lts_graph ~weak:w f b t l in
-    let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+    let _the_fsm = Fsm.create_from (Lts.to_model the_lts) in
     (* let the_merged_fsm = Fsm.merge (the_fsm, the_sat) in *)
     (* handle_output o (Merge ((the_fsm, the_sat), the_merged_fsm)) *)
     (* sanity check, should be bisimilar to saturated self *)
-    handle_output o (Alg (Algorithms.run (Minim (Option.has_some w, the_fsm))))
+    Log.warning "TODO: command.vernac, build_lts_graph Minim";
+    return ()
+    (* handle_output o (Alg (Algorithms.run (Minim (Option.has_some w, the_fsm)))) *)
     (* return () *)
   | Merge ((((f1, b1, t1), w1), p1), (((f2, b2, t2), w2), p2)), l ->
     let* the_lts_1 =
@@ -1360,10 +1406,12 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
       build_lts_graph ~primary_lts:(Some p2) ~weak:w2 f2 b2 t2 l
     in
     let the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
-    let the_merged_fsm = Fsm.merge (the_fsm_1, the_fsm_2) in
-    handle_output o (Merge ((the_fsm_1, the_fsm_2), the_merged_fsm))
+    let _the_merged_fsm = Fsm.merge (the_fsm_1, the_fsm_2) in
+    Log.warning "TODO: command.vernac, build_lts_graph Merge";
+    return ()
+    (* handle_output o (Merge ((the_fsm_1, the_fsm_2), the_merged_fsm)) *)
   | Bisim ((((f1, b1, t1), w1), p1), (((f2, b2, t2), w2), p2)), l ->
-    let weak =
+    let _weak =
       match w1, w2 with
       | None, None -> false
       | Some _, Some _ -> true
@@ -1372,12 +1420,14 @@ let vernac (o : output_kind) (r : run_params) : unit mm =
     let* the_lts_1 =
       build_lts_graph ~primary_lts:(Some p1) ~weak:w1 f1 b1 t1 l
     in
-    let the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
+    let _the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
     let* the_lts_2 =
       build_lts_graph ~primary_lts:(Some p2) ~weak:w2 f2 b2 t2 l
     in
-    let the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
-    handle_output
-      o
-      (Alg (Algorithms.run (Bisim (weak, (the_fsm_1, the_fsm_2)))))
+    let _the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
+    Log.warning "TODO: command.vernac, build_lts_graph Bisim";
+    return ()
 ;;
+(* handle_output
+   o
+   (Alg (Algorithms.run (Bisim (weak, (the_fsm_1, the_fsm_2))))) *)

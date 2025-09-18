@@ -1,27 +1,27 @@
 open Mebi_plugin
 
-let dump (prefix : string) (m : Fsm.t) : unit =
-  let output_path1 : string =
-    Dump_to_file.run
-      (Default ())
-      (Some (Printf.sprintf "%s test_pre_sat" prefix), Auto ())
-      (JSON ())
-      (FSM m)
-  in
-  Utils.Logging.Log.normal
-    ~params:(Utils.Params.Default.log ~mode:(OCaml ()) ())
-    (Printf.sprintf "dumped file to: '%s'" output_path1);
-  let output_path2 : string =
-    Dump_to_file.run
-      (Default ())
-      (Some (Printf.sprintf "%s test_post_sat" prefix), Auto ())
-      (JSON ())
-      (FSM (Fsm.saturate m))
-  in
-  Utils.Logging.Log.normal
-    ~params:(Utils.Params.Default.log ~mode:(OCaml ()) ())
-    (Printf.sprintf "dumped file to: '%s'" output_path2)
-;;
+(* let dump (prefix : string) (m : Fsm.t) : unit =
+   let output_path1 : string =
+   Dump_to_file.run
+   (Default ())
+   (Some (Printf.sprintf "%s test_pre_sat" prefix), Auto ())
+   (JSON ())
+   (FSM m)
+   in
+   Utils.Logging.Log.normal
+   ~params:(Utils.Params.Default.log ~mode:(OCaml ()) ())
+   (Printf.sprintf "dumped file to: '%s'" output_path1);
+   let output_path2 : string =
+   Dump_to_file.run
+   (Default ())
+   (Some (Printf.sprintf "%s test_post_sat" prefix), Auto ())
+   (JSON ())
+   (FSM (Fsm.saturate m))
+   in
+   Utils.Logging.Log.normal
+   ~params:(Utils.Params.Default.log ~mode:(OCaml ()) ())
+   (Printf.sprintf "dumped file to: '%s'" output_path2)
+   ;; *)
 
 let m1 : Fsm.t =
   { init = Some (Mebi_wrapper.E.of_int 1, None)

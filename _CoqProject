@@ -10,7 +10,7 @@ src/META.coq-mebi
 -arg "-w all"
 
 theories/loader.v
-theories/Test.v
+# theories/Test.v
 theories/Bisimilarity.v
 
 # examples/CADP.v
@@ -50,8 +50,8 @@ src/fsm.mli
 
 src/algorithms.ml
 src/algorithms.mli
-src/vernac.ml
-src/vernac.mli
+# src/vernac.ml
+# src/vernac.mli
 
 src/dump_to_file.ml
 src/dump_to_file.mli
