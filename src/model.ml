@@ -161,7 +161,7 @@ module Action = struct
     let to_string (t : t) = Mebi_wrapper.E.to_string (fst t)
 
     let pstr ?(indents : int = 0) (t : t) =
-      Printf.sprintf "%s%s" (Utils.str_tabs indents) (to_string t)
+      Printf.sprintf "\n%s%s" (Utils.str_tabs indents) (to_string t)
     ;;
 
     let is_silent t = snd (snd t)

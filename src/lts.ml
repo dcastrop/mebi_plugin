@@ -125,7 +125,8 @@ let to_string
   in
   Printf.sprintf
     "\n\
-     %s%s{ initial state: %s\n\
+     %s%s{\n\
+     %sinitial state: %s\n\
      %sinfo: %s\n\
      %sterminals: %s%s\n\
      %salphabet: %s%s\n\
@@ -134,6 +135,7 @@ let to_string
      %s}"
     (if skip_leading_tab then "" else str_indent0)
     outer
+    sep
     (pstr_state_opt ~indents:(indents + 1) g.init)
     sep
     (pstr_info_opt ~indents:(indents + 1) g.info)

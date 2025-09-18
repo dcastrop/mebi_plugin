@@ -69,15 +69,16 @@ Definition one := 1.
 
 Fail MeBi LTS false Using testLTS.
 
-(* MeBi LTS 0 Using testLTS. *)
-(* MeBi LTS (S 0) Using testLTS. *)
-(* MeBi LTS (S (S 0)) Using testLTS. *)
-(* MeBi LTS (S (S (S 0))) Using testLTS. *)
+MeBi ShowDebug True.
+MeBi LTS 0 Using testLTS.
+MeBi LTS (S 0) Using testLTS.
+MeBi LTS (S (S 0)) Using testLTS.
+MeBi LTS (S (S (S 0))) Using testLTS.
 
-(* MeBi LTS one Using testLTS. *)
-(* MeBi LTS (S one) Using testLTS. *)
+MeBi LTS one Using testLTS.
+MeBi LTS (S one) Using testLTS.
 
-(* MeBi Check LTS Bounded 30 Of (S one) Using testLTS. *)
+MeBi LTS (S one) Using testLTS.
 
 
 Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
@@ -86,10 +87,10 @@ Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
   .
 
 (* below cannot be finitely represented  *)
-(* MeBi Check LTS Bounded 50 Of 0 Using nonTerminatingTestLTS. *)
-(* MeBi LTS (S 0) Using nonTerminatingTestLTS. *)
-(* MeBi LTS (S (S 0)) Using nonTerminatingTestLTS. *)
-(* MeBi LTS (S (S (S 0))) Using nonTerminatingTestLTS. *)
+MeBi LTS 0 Using nonTerminatingTestLTS.
+MeBi LTS (S 0) Using nonTerminatingTestLTS.
+MeBi LTS (S (S 0)) Using nonTerminatingTestLTS.
+MeBi LTS (S (S (S 0))) Using nonTerminatingTestLTS.
 
 Module Test1.
   Inductive action : Set := | TheAction1 | TheAction2.
