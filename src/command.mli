@@ -45,6 +45,7 @@ type help_kind =
   | Saturate of unit
   | Minimize of unit
   | Bisim of unit
+  | Info of unit
   | Unrecognized of unit
 
 type command_kind =
@@ -53,5 +54,6 @@ type command_kind =
   | SaturateModel of coq_model
   | MinimizeModel of coq_model
   | CheckBisimilarity of (coq_model * coq_model)
+  | Info of unit
 
 val run :  command_kind-> Libnames.qualid list-> unit Mebi_wrapper.mm 

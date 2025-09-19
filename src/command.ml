@@ -121,24 +121,27 @@ open Model
 open Utils
 
 let arity_is_type (mip : Declarations.one_inductive_body) : unit mm =
+  Log.debug "arity_is_type";
   let open Declarations in
   match mip.mind_arity with
   | RegularArity s ->
     (match s.mind_sort with
      | Type _ -> return ()
-     | _ -> invalid_sort (Sorts.family s.mind_sort))
-  | TemplateArity t -> invalid_sort (Sorts.family t.template_level)
+     | Set -> return ()
+     | _ -> invalid_sort_type (Sorts.family s.mind_sort))
+  | TemplateArity t -> invalid_sort_type (Sorts.family t.template_level)
 ;;
 
 (** [arity_is_prop mip] raises an error if [mip.mind_arity] is not a [prop]. *)
 let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
+  Log.debug "arity_is_prop";
   let open Declarations in
   match mip.mind_arity with
   | RegularArity s ->
     if not (Sorts.is_prop s.mind_sort)
-    then invalid_sort (Sorts.family s.mind_sort)
+    then invalid_sort_lts (Sorts.family s.mind_sort)
     else return ()
-  | TemplateArity t -> invalid_sort (Sorts.family t.template_level)
+  | TemplateArity t -> invalid_sort_lts (Sorts.family t.template_level)
 ;;
 
 (** [get_lts_labels_and_terms mib mip] is the mapping of terms (states) and labels (outgoing edges) from [mip].
@@ -203,20 +206,6 @@ let lts_cindef_constr_transitions (c : cindef)
   | _ -> invalid_cindef_kind ()
 ;;
 
-let check_ref_type (gref : Names.GlobRef.t) : cindef_info mm =
-  Log.debug "check_ref_type";
-  let open Names.GlobRef in
-  match gref with
-  | IndRef i ->
-    let* env = get_env in
-    let mib, mip = Inductive.lookup_mind_specif env i in
-    let* _ = arity_is_type mip in
-    let univ = mib.mind_univ_hyps in
-    let type_term = EConstr.mkIndU (i, EConstr.EInstance.make univ) in
-    return { name = type_term; constr_names = mip.mind_consnames }
-  | _ -> invalid_ref_type gref
-;;
-
 (** [check_ref_lts gref] is the [cindef] of [gref].
 
     @raise invalid_ref_lts if [gref] is not a reference to an inductive type. *)
@@ -239,17 +228,37 @@ let check_ref_lts (gref : Names.GlobRef.t) : (cindef_info * cind_lts) mm =
         ; constr_transitions = mip.mind_nf_lc
         } )
   (* raise error if [gref] is not an inductive type *)
-  | _ -> invalid_ref_lts gref
+  | _ ->
+    Log.debug "check_ref_lts, invalid gref";
+    invalid_ref_lts gref
 ;;
 
 let get_lts_cindef (i : int) (gref : Names.GlobRef.t) : cindef mm =
+  Log.debug "get_lts_cindef";
   let* ((c_info, c_lts) : cindef_info * cind_lts) = check_ref_lts gref in
   return { index = i; info = c_info; kind = LTS c_lts }
+;;
+
+let check_ref_type (gref : Names.GlobRef.t) : cindef_info mm =
+  Log.debug "check_ref_type";
+  let open Names.GlobRef in
+  match gref with
+  | IndRef i ->
+    let* env = get_env in
+    let mib, mip = Inductive.lookup_mind_specif env i in
+    let* _ = arity_is_type mip in
+    let univ = mib.mind_univ_hyps in
+    let type_term = EConstr.mkIndU (i, EConstr.EInstance.make univ) in
+    return { name = type_term; constr_names = mip.mind_consnames }
+  | _ ->
+    Log.debug "check_ref_type, invalid gref";
+    invalid_ref_type gref
 ;;
 
 let get_type_cindef (i : int) (gref : Names.GlobRef.t) (v : EConstr.t option)
   : cindef mm
   =
+  Log.debug "get_type_cindef";
   let* (c_info : cindef_info) = check_ref_type gref in
   return { index = i; info = c_info; kind = Type v }
 ;;
@@ -660,7 +669,7 @@ and check_valid_constructor
            | [] ->
              (* Log.warning
 
-                (Printf.sprintf "J (%i): snd next_ctors is empty" i); *)
+                (Printf.sprintf "J (%i): snd next_mactors is empty" i); *)
              let* sigma = get_sigma in
              if EConstr.isEvar sigma tgt_term
              then return ctor_vals
@@ -988,16 +997,28 @@ module MkGraph
       | Some weak_kind ->
         (match weak_kind with
          | Option label_type ->
+           Log.debug "MkGraph.handle_weak Option";
            Log.warning
              "command.MkGraph.handle_weak, Option weak_kind -- TODO fix \
               support for \"option _\" labels in coq lts.";
            return None
          | Custom (tau_term, label_type) ->
+           Log.debug "MkGraph.handle_weak, Custom";
            let* (a : EConstr.t) = tref_to_econstr tau_term in
-           let constr = Mebi_utils.ref_to_glob label_type in
+           Log.debug
+             (Printf.sprintf
+                "MkGraph.handle_weak, Custom, tau is \"%s\""
+                (econstr_to_string a));
+           let constr : Names.GlobRef.t = Mebi_utils.ref_to_glob label_type in
            let* (c : cindef) = get_type_cindef i constr (Some a) in
            (* encode silent action type *)
            let* (constr_enc : E.t) = encode c.info.name in
+           Log.debug
+             (Printf.sprintf
+                "MkGraph.handle_weak Custom, encoded \"%s\" of \"%s\" as \"%s\""
+                (econstr_to_string a)
+                (econstr_to_string c.info.name)
+                (E.to_string constr_enc));
            B.add cindef_map constr_enc c;
            (* return encode silent action *)
            let* (a_enc : E.t) = encode a in
@@ -1412,6 +1433,23 @@ let show_help_bisim () : unit =
   Log.notice "Use the command \"MeBi Bisim ...\"\n"
 ;;
 
+let show_help_info () : unit =
+  Log.notice
+    "Use the command \"MeBi Info\" to be shown information about the plugin, \
+     including a some guidelines and a list of limitations."
+;;
+
+let show_guidelines_and_limitations () : unit =
+  Log.notice
+    "Guidelines & Limitations\n\n\
+     - To construct the LTS from a term, the term must be an inductive type of \
+     the shape:\n\
+     \tterm -> label -> term -> Prop\n\
+     where \"term\" and \"label\" are defined elsewhere.\n\n\
+     - The \"label\" type must be of either Type or Set.\n\n\
+    \ TODO..."
+;;
+
 type help_set_kind =
   | General
   | Bound
@@ -1430,6 +1468,7 @@ type help_kind =
   | Saturate of unit
   | Minimize of unit
   | Bisim of unit
+  | Info of unit
   | Unrecognized of unit
 
 type model_kind =
@@ -1445,6 +1484,7 @@ type command_kind =
   | SaturateModel of coq_model
   | MinimizeModel of coq_model
   | CheckBisimilarity of (coq_model * coq_model)
+  | Info of unit
 
 let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
   let* (graphM : (module GraphB)) = make_graph_builder in
@@ -1502,6 +1542,10 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
          Log.debug "command.run, SaturateModel";
          let* the_lts = build_lts_graph primary_lts x in
          let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+         Log.details
+           (Printf.sprintf
+              "command.run, unsaturated FSM: %s"
+              (Fsm.to_string the_fsm));
          let the_saturated = Fsm.saturate the_fsm in
          Log.details
            (Printf.sprintf
@@ -1556,6 +1600,9 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
     if !dump_to_file_flag
     then Log.debug "command.run, CheckBisimilarity -- TODO dump to file\n";
     return ()
+  | Info () ->
+    show_guidelines_and_limitations ();
+    return ()
   | Help c ->
     (match c with
      | Basic () -> show_help_basic ()
@@ -1574,6 +1621,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
      | Saturate () -> show_help_saturate ()
      | Minimize () -> show_help_minimize ()
      | Bisim () -> show_help_bisim ()
+     | Info () -> show_help_info ()
      | Unrecognized () -> show_help_unrecognized_command ());
     return ()
 ;;

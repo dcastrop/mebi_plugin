@@ -401,6 +401,7 @@ module type ERROR_TYPE = sig
     | InvalidLTSArgsLength of int
     | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
     | InvalidLTSSort of Sorts.family
+    | InvalidTypeSort of Sorts.family
     | InvalidArity of Environ.env * Evd.evar_map * Constr.types
     | InvalidRefLTS of Names.GlobRef.t
     | InvalidRefType of Names.GlobRef.t
@@ -419,7 +420,8 @@ module type ERROR_TYPE = sig
 
   val invalid_lts_args_length : int -> exn
   val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
-  val invalid_sort : Sorts.family -> exn
+  val invalid_sort_lts : Sorts.family -> exn
+  val invalid_sort_type : Sorts.family -> exn
   val invalid_arity : Environ.env -> Evd.evar_map -> Constr.types -> exn
   val invalid_ref_lts : Names.GlobRef.t -> exn
   val invalid_ref_type : Names.GlobRef.t -> exn
@@ -453,6 +455,7 @@ module Error : ERROR_TYPE = struct
     | InvalidLTSArgsLength of int
     | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
     | InvalidLTSSort of Sorts.family
+    | InvalidTypeSort of Sorts.family
     | InvalidArity of Environ.env * Evd.evar_map * Constr.types
     | InvalidRefLTS of Names.GlobRef.t
     | InvalidRefType of Names.GlobRef.t
@@ -476,7 +479,10 @@ module Error : ERROR_TYPE = struct
   let invalid_lts_term_kind ev sg x = MEBI_exn (InvalidLTSTermKind (ev, sg, x))
 
   (** Error when input LTS has the wrong arity *)
-  let invalid_sort f = MEBI_exn (InvalidLTSSort f)
+  let invalid_sort_lts f = MEBI_exn (InvalidLTSSort f)
+
+  (** Error when input Type has the wrong arity *)
+  let invalid_sort_type f = MEBI_exn (InvalidTypeSort f)
 
   (** Error when input LTS has the wrong Sort *)
   let invalid_arity ev sg t = MEBI_exn (InvalidArity (ev, sg, t))
@@ -559,6 +565,9 @@ module Error : ERROR_TYPE = struct
       ++ str (Printf.sprintf "ctx_tys: %s." (econstr_rel_decl_list_to_string y))
     | InvalidLTSSort f ->
       str "Invalid LTS Sort: expecting Prop, got " ++ Sorts.pr_sort_family f
+    | InvalidTypeSort f ->
+      str "Invalid Type Sort: expecting Type or Set, got "
+      ++ Sorts.pr_sort_family f
     | InvalidArity (ev, sg, t) ->
       str "Invalid arity for LTS: "
       ++ Printer.pr_constr_env ev sg t
@@ -640,9 +649,14 @@ let invalid_arity (x : Constr.types) : 'a mm =
   raise (Error.invalid_arity !coq_st.coq_env !coq_st.coq_ctx x)
 ;;
 
-(** Error when input LTS has the wrong Sort *)
-let invalid_sort (x : Sorts.family) : 'a mm =
-  fun st -> raise (Error.invalid_sort x)
+(** Error when input LTS has the wrong sort *)
+let invalid_sort_lts (x : Sorts.family) : 'a mm =
+  fun st -> raise (Error.invalid_sort_lts x)
+;;
+
+(** Error when input Type has the wrong sort *)
+let invalid_sort_type (x : Sorts.family) : 'a mm =
+  fun st -> raise (Error.invalid_sort_type x)
 ;;
 
 (** Error when input LTS reference is invalid (e.g. non existing) *)

@@ -90,5 +90,9 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 
 | ["MeBi" "Help" "Bisim"] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Bisim ())) [])}
 
+| ["MeBi" "Help" "Info"] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Info ())) [])}
+
 | ["MeBi" ] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Unrecognized ())) [])}
+
+| ["MeBi" "Info"] -> {Mebi_wrapper.run (Command.run (Command.Info ()) [])}
 END
