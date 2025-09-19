@@ -2,36 +2,36 @@ Require Import MEBI.loader.
 
 (** testing getters & setters *)
 Module BasicCommands.
-MeBi SetBound 1000.    MeBi Check Bound.
-MeBi SetBound Default. MeBi Check Bound.
+MeBi Set Bound 1000.    MeBi Check Bound.
+MeBi Set Bound Default. MeBi Check Bound.
 
-MeBi DumpToFile True.  MeBi Check DumpToFile.
-MeBi DumpToFile False. MeBi Check DumpToFile.
+MeBi Set DumpToFile True.  MeBi Check DumpToFile.
+MeBi Set DumpToFile False. MeBi Check DumpToFile.
 
-MeBi ShowDebug True.  MeBi Check ShowDebug.
-MeBi ShowDebug False. MeBi Check ShowDebug.
+MeBi Set ShowDebug True.  MeBi Check ShowDebug.
+MeBi Set ShowDebug False. MeBi Check ShowDebug.
 
-MeBi WeakMode True.  MeBi Check WeakMode.
-MeBi WeakMode False. MeBi Check WeakMode.
+MeBi Set WeakMode True.  MeBi Check WeakMode.
+MeBi Set WeakMode False. MeBi Check WeakMode.
 
-MeBi SetWeak Option nat. MeBi Check Weak.
+MeBi Set Weak Option nat. MeBi Check Weak.
 
 Example z := 0.
-MeBi SetWeak nat Of z. 
+MeBi Set Weak nat Of z. 
 (* MeBi Check Weak. *)
 
 Inductive s_label : Set :=
 | TAU : s_label 
 | LABEL1 : nat -> s_label
 .
-MeBi SetWeak TAU Of s_label. 
+MeBi Set Weak TAU Of s_label. 
 (* MeBi Check Weak. *)
 
 Inductive t_label : Type :=
 | SILENT : t_label 
 | LABEL2 : bool -> t_label
 .
-MeBi SetWeak TAU Of t_label. 
+MeBi Set Weak TAU Of t_label. 
 (* MeBi Check Weak. *)
 End BasicCommands.
 
