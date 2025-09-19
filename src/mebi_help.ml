@@ -22,17 +22,16 @@ type help_kind =
   | Unrecognized of unit
 
 let show_instructions_to_toggle_weak (weak_mode : bool) : unit =
-  if weak_mode
-  then
-    Log.notice
-      "Checking for Weak Bisimilarity.\n\
-       To check for Strong Bisimilarity use the command \"MeBi Set WeakMode \
-       False\""
-  else
-    Log.notice
-      "Checking for Strong Bisimilarity (since weak mode is disabled)\n\
-       To Check for Weak Bisimilarity use the command \"MeBi Set WeakMode \
-       True\""
+  Log.debug
+    (if weak_mode
+     then
+       "Checking for Weak Bisimilarity.\n\
+        To check for Strong Bisimilarity use the command \"MeBi Set WeakMode \
+        False\""
+     else
+       "Checking for Strong Bisimilarity (since weak mode is disabled)\n\
+        To Check for Weak Bisimilarity use the command \"MeBi Set WeakMode \
+        True\"")
 ;;
 
 let show_instructions_to_enable_weak () : unit =
@@ -175,7 +174,14 @@ let show_guidelines_and_limitations () : unit =
      \tInductive lts : nat -> bool -> nat -> Prop :=\n\
      \t| do_action : forall a t, lts t a (some_fun t)\n\n\
      - \n\n\
-    \ TODO..."
+     -----------\n\n\
+     TODO:\n\
+     - Make \"weak_type\" a Set, so that different LTS can have different \
+     kinds of silent actions and be more easily compared, and for different \
+     layers of a multi-layered LTS to have different silent actions. Then, \
+     instead of calling \"MkGraph.handle_weak\" before we begin building the \
+     LTS, in \"MkGraph.get_new_states\" we must check if any of the outgoing \
+     actions appear in the Set of \"weak_type\"."
 ;;
 
 let handle_help (c : help_kind) : unit =

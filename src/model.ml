@@ -29,6 +29,7 @@ module Info = struct
     ; num_states : int
     ; num_edges : int
     ; coq_info : Coq.t list option
+    ; weak_info : Mebi_wrapper.E.t list option
     }
 
   let merge
@@ -51,6 +52,23 @@ module Info = struct
         (match i1.coq_info, i2.coq_info with
          | Some c1, Some c2 -> Some c1
          | _, _ -> None)
+    ; weak_info =
+        (match i1.weak_info, i2.weak_info with
+         | Some s1, None -> Some s1
+         | None, Some s2 -> Some s2
+         | Some s1, Some s2 ->
+           Some
+             (List.fold_left
+                (fun (acc : Mebi_wrapper.E.t list) (w : Mebi_wrapper.E.t) ->
+                  if
+                    List.exists
+                      (fun (t : Mebi_wrapper.E.t) -> Mebi_wrapper.E.eq w t)
+                      acc
+                  then acc
+                  else w :: acc)
+                s1
+                s2)
+         | None, None -> None)
     }
   ;;
 
@@ -64,7 +82,7 @@ module Info = struct
     in
     Printf.sprintf
       "%s{| is complete: %b%s; bound: %i%s; num labels: %i%s; num states: \
-       %i%s; num edges: %i%s; coq info: %s%s|}"
+       %i%s; num edges: %i%s; coq info: %s%s; silent info: %s%s|}"
       outer
       i.is_complete
       sep
@@ -87,6 +105,19 @@ module Info = struct
              (fun (acc : string) c_info ->
                Printf.sprintf "%s, %s" acc (Coq.to_string c_info))
              (Coq.to_string h)
+             t)
+      sep
+      (match i.weak_info with
+       | None -> "None"
+       | Some [] -> "[]"
+       | Some (h :: t) ->
+         if List.is_empty t
+         then Mebi_wrapper.E.to_string h
+         else
+           List.fold_left
+             (fun (acc : string) (w : Mebi_wrapper.E.t) ->
+               Printf.sprintf "%s, %s" acc (Mebi_wrapper.E.to_string w))
+             (Mebi_wrapper.E.to_string h)
              t)
       outer
   ;;
@@ -1315,16 +1346,16 @@ let merge_action_pairs (ap : ActionPairs.t) (bp : ActionPairs.t) : ActionPairs.t
       with
       | [], acc0 ->
         (* no other matches, add *)
-        Logging.Log.warning
+        Logging.Log.debug
           (Printf.sprintf
-             "merge_action_pairs, adding new (%s) "
+             "model.merge_action_pairs, adding new (%s) "
              (Action.to_string b));
         ActionPairs.add (b, dests) acc0
       | a :: [], acc0 ->
         (* single match found, merge annotations *)
-        Logging.Log.warning
+        Logging.Log.debug
           (Printf.sprintf
-             "merge_action_pairs, merging (%s) with (%s)"
+             "model.merge_action_pairs, merging (%s) with (%s)"
              (Action.to_string b)
              (Action.to_string a));
         ActionPairs.add
@@ -1332,9 +1363,9 @@ let merge_action_pairs (ap : ActionPairs.t) (bp : ActionPairs.t) : ActionPairs.t
           acc0
       | multi, acc0 ->
         (* many matches found *)
-        Logging.Log.warning
+        Logging.Log.debug
           (Printf.sprintf
-             "merge_action_pairs, found (%i) action pairs matching named \
+             "model.merge_action_pairs, found (%i) action pairs matching named \
               action (%s).\n\
               TEMP: dropping dupes and adding as fresh"
              (List.length multi)

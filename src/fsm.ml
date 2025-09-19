@@ -137,11 +137,69 @@ let get_actions_from (m : t) (from : State.t) : States.t Actions.t =
   | Some aa -> aa
 ;;
 
+let get_states_reachable_from (m : t) (from : State.t) : States.t =
+  Actions.fold
+    (fun (_ : Action.t) (dests : States.t) (acc : States.t) ->
+      States.union dests acc)
+    (get_actions_from m from)
+    States.empty
+;;
+
 (*********************************************************************)
 (****** Checks/Boolean Ops *******************************************)
 (*********************************************************************)
 
 let has_state (m : t) (s : State.t) : bool = States.mem s m.states
+
+(*********************************************************************)
+(****** Prune ********************************************************)
+(*********************************************************************)
+
+let _prune_unreachable_edges (m : t) : t =
+  match m.init with
+  | None -> m
+  | Some init ->
+    let rec prune_unreachable_edges
+              (from : State.t)
+              (acc : (State.t * States.t Actions.t) list)
+      : (State.t * States.t Actions.t) list
+      =
+      let reachable_states = get_states_reachable_from m from in
+      if
+        States.for_all
+          (fun (s : State.t) ->
+            List.exists
+              (fun ((t, _) : State.t * States.t Actions.t) -> State.eq s t)
+              acc)
+          reachable_states
+      then acc
+      else
+        States.fold
+          (fun (s : State.t) (acc1 : (State.t * States.t Actions.t) list) ->
+            prune_unreachable_edges s acc1)
+          reachable_states
+          (if
+             List.exists
+               (fun ((t, _) : State.t * States.t Actions.t) -> State.eq from t)
+               acc
+           then acc
+           else (from, get_actions_from m from) :: acc)
+    in
+    { m with
+      edges = Edges.of_seq (List.to_seq (prune_unreachable_edges init []))
+    }
+;;
+
+let _prune_unreachable_states (m : t) : t =
+  let pruned_states : States.t =
+    Edges.fold
+      (fun (from : State.t) (actions : States.t Actions.t) (acc : States.t) ->
+        States.union (get_states_reachable_from m from) (States.add from acc))
+      m.edges
+      States.empty
+  in
+  { m with states = pruned_states }
+;;
 
 (*********************************************************************)
 (****** Saturate *****************************************************)
@@ -365,7 +423,7 @@ let saturate_edges_from
       [m] with saturated edges. Saturation removes silent actions, replacing them with (potentially multiple) explicit non-silent actions that may otherwise be taken immediately following some sequence of silent actions.
 *)
 let saturate_edges (m : t) : States.t Actions.t Edges.t =
-  let edges : States.t Actions.t Edges.t = Edges.create 0 in
+  let edges : States.t Actions.t Edges.t = Edges.copy m.edges in
   Edges.iter
     (fun (from : State.t) (aa : States.t Actions.t) ->
       let actions : States.t Actions.t = Actions.create 0 in

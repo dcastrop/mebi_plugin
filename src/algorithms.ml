@@ -17,22 +17,17 @@ module Minimize = struct
         (block : States.t)
         (l : Action.Label.t)
         (edges : States.t Actions.t Edges.t)
-        (* (edges_of_a : States.t Actions.t Edges.t) *)
-          (pi : Partition.t)
+        (pi : Partition.t)
     : States.t * States.t option
     =
     assert (Bool.not (States.is_empty block));
     let edges_of_a = Model.get_edges_with_label l edges in
     if Int.equal 0 (Edges.length edges_of_a)
     then
-      Logging.Log.warning
-        (Printf.sprintf "No edges of (%s)." (Action.Label.to_string l));
-    (* else
-      Logging.Log.warning
+      Logging.Log.debug
         (Printf.sprintf
-           "Edges of (%s): %s"
-           (Action.Label.to_string l)
-           (pstr_edges edges_of_a)); *)
+           "algorithms.Minimize.split_block, No edges of (%s)."
+           (Action.Label.to_string l));
     (* selects some state [s] from [block] *)
     let s = States.min_elt block in
     let s_actions = Model.get_actions_from s edges_of_a in
@@ -227,15 +222,8 @@ let pstr (r : result) : string =
     ->
     let are_bisimilar : bool = Model.Partition.is_empty non_bisim_states in
     Printf.sprintf
-      "\n\
-       Bisimilar: %b\n\
-       Bisimilar states: %s\n\
-       Non-bisimilar states: %s\n\n\
-       FSM 1: %s\n\n\
-       FSM 2: %s\n"
+      "\nBisimilar: %b\nBisimilar states: %s\nNon-bisimilar states: %s\n"
       are_bisimilar
       (Model.pstr_partition bisim_states)
       (Model.pstr_partition non_bisim_states)
-      (Fsm.pstr the_fsm_1)
-      (Fsm.pstr the_fsm_2)
 ;;
