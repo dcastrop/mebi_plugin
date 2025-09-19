@@ -302,18 +302,35 @@ Module BisimTest2.
 
   | do_fix : forall t, termLTS (tfix t) TAU (subst (tfix t) t).
 
-  MeBi Set ShowDebug True.
-  MeBi Set ShowDetails True.
+  (* MeBi Set ShowDebug True. *)
+  (* MeBi Set ShowDetails True. *)
 
   Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
 
   MeBi Set WeakMode False.
   MeBi FSM exa1 Using termLTS.
+  MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
 
   MeBi Set WeakMode True.
   MeBi Set Weak TAU Of action.
-  MeBi Saturate exa1 Using termLTS.
+  MeBi FSM exa1 Using termLTS.
+  (* MeBi Saturate exa1 Using termLTS.
   MeBi Minimize exa1 Using termLTS.
+  MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS. *)
+
+  Example exa2 := (tfix (tact TheAction1 (tact TheAction2 trec))).
+  
+  Example exa3 := (tact TheAction1 (tfix (tact TheAction2 (tact TheAction1 trec)))).
+  
+  (* MeBi Bisim exa1 With termLTS And exa2 With termLTS Using termLTS.
+  MeBi Bisim exa1 With termLTS And exa3 With termLTS Using termLTS.
+
+  MeBi Bisim exa2 With termLTS And exa1 With termLTS Using termLTS.
+  MeBi Bisim exa2 With termLTS And exa3 With termLTS Using termLTS.
+
+  MeBi Bisim exa3 With termLTS And exa1 With termLTS Using termLTS.
+  MeBi Bisim exa3 With termLTS And exa2 With termLTS Using termLTS. *)
+
 End BisimTest2.
 
 Module BisimTest3.
@@ -344,18 +361,35 @@ Module BisimTest3.
 
   | do_fix : forall t, termLTS (tfix t) None (subst (tfix t) t).
 
-  MeBi Set ShowDebug True.
-  MeBi Set ShowDetails True.
+  (* MeBi Set ShowDebug True. *)
+  (* MeBi Set ShowDetails True. *)
 
   Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
 
   MeBi Set WeakMode False.
-  MeBi FSM exa1 Using termLTS.
+  (* MeBi FSM exa1 Using termLTS. *)
+  (* MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS. *)
 
   MeBi Set WeakMode True.
   MeBi Set Weak Option action.
-  MeBi Saturate exa1 Using termLTS.
-  MeBi Minimize exa1 Using termLTS.
+  (* MeBi FSM exa1 Using termLTS. *)
+  (* MeBi Saturate exa1 Using termLTS. *)
+  (* MeBi Minimize exa1 Using termLTS. *)
+  (* MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS. *)
+
+  Example exa2 := (tfix (tact TheAction1 (tact TheAction2 trec))).
+  
+  Example exa3 := (tact TheAction1 (tfix (tact TheAction2 (tact TheAction1 trec)))).
+  
+  (* MeBi Bisim exa1 With termLTS And exa2 With termLTS Using termLTS. *)
+  (* MeBi Bisim exa1 With termLTS And exa3 With termLTS Using termLTS. *)
+
+  (* MeBi Bisim exa2 With termLTS And exa1 With termLTS Using termLTS. *)
+  (* MeBi Bisim exa2 With termLTS And exa3 With termLTS Using termLTS. *)
+
+  (* MeBi Bisim exa3 With termLTS And exa1 With termLTS Using termLTS. *)
+  (* MeBi Bisim exa3 With termLTS And exa2 With termLTS Using termLTS. *)
+
 End BisimTest3.
 
 

@@ -734,6 +734,7 @@ module type GraphB = sig
     ; states : S.t
     ; transitions : constr_transitions H.t
     ; cindefs : (E.t * cindef) list
+    ; weak : E.t option
     }
 
   val insert_constr_transition
@@ -814,6 +815,7 @@ module MkGraph
     ; states : S.t
     ; transitions : constr_transitions H.t
     ; cindefs : (E.t * cindef) list
+    ; weak : E.t option
     }
 
   (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions].
@@ -1108,6 +1110,7 @@ module MkGraph
                 match _val.kind with LTS _ -> (_key, _val) :: acc | _ -> acc)
               cindef_map
               []
+        ; weak = the_weak_opt_enc
         }
         !bound
     in
@@ -1287,6 +1290,7 @@ module MkGraph
         ; num_states = S.cardinal g.states
         ; num_edges = num_transitions g.transitions
         ; coq_info = Some cindefs
+        ; weak_info = (match g.weak with None -> None | Some w -> Some [ w ])
         }
     in
     return (Lts.create init terminals alphabet states transitions info)
@@ -1346,18 +1350,22 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
   | MakeModel (kind, (x, primary_lts)) ->
     Log.debug "command.run, MakeModel";
     let* the_lts = build_lts_graph primary_lts x in
-    Log.details
-      (Printf.sprintf
-         "command.run, MakeModel LTS, finished: %s"
-         (Lts.to_string the_lts));
     (match kind with
      | LTS ->
+       Log.notice
+         (Printf.sprintf
+            "command.run, MakeModel LTS, finished: %s"
+            (Lts.to_string the_lts));
        if !dump_to_file_flag
        then Log.debug "command.run, MakeModel LTS -- TODO dump to file\n";
        return ()
      | FSM ->
-       let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
        Log.details
+         (Printf.sprintf
+            "command.run, MakeModel LTS, finished: %s"
+            (Lts.to_string the_lts));
+       let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+       Log.notice
          (Printf.sprintf
             "command.run, MakeModel FSM, finished: %s"
             (Fsm.to_string the_fsm));
@@ -1386,7 +1394,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
               "command.run, unsaturated FSM: %s"
               (Fsm.to_string the_fsm));
          let the_saturated = Fsm.saturate the_fsm in
-         Log.details
+         Log.notice
            (Printf.sprintf
               "command.run, SaturateModel, finished: %s"
               (Fsm.to_string the_saturated));
@@ -1410,7 +1418,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
          let* the_lts = build_lts_graph primary_lts x in
          let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
          let the_minimized = Algorithms.run (Minim (!weak_mode, the_fsm)) in
-         Log.debug
+         Log.details
            (Printf.sprintf
               "command.run, MinimizeModel, finished: %s\n"
               (Algorithms.pstr the_minimized));
@@ -1432,7 +1440,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
     let the_bisimilar =
       Algorithms.run (Bisim (!weak_mode, (the_fsm_1, the_fsm_2)))
     in
-    Log.debug
+    Log.notice
       (Printf.sprintf
          "command.run, CheckBisimilarity, finished: %s\n"
          (Algorithms.pstr the_bisimilar));
