@@ -120,6 +120,7 @@ module type ERROR_TYPE = sig
     | InvalidLTSArgsLength of int
     | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
     | InvalidLTSSort of Sorts.family
+    | InvalidTypeSort of Sorts.family
     | InvalidArity of Environ.env * Evd.evar_map * Constr.t
     | InvalidRefLTS of Names.GlobRef.t
     | InvalidRefType of Names.GlobRef.t
@@ -138,7 +139,8 @@ module type ERROR_TYPE = sig
 
   val invalid_lts_args_length : int -> exn
   val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
-  val invalid_sort : Sorts.family -> exn
+  val invalid_sort_lts : Sorts.family -> exn
+  val invalid_sort_type : Sorts.family -> exn
   val invalid_arity : Environ.env -> Evd.evar_map -> Constr.t -> exn
   val invalid_ref_lts : Names.GlobRef.t -> exn
   val invalid_ref_type : Names.GlobRef.t -> exn
@@ -172,7 +174,8 @@ module Error : ERROR_TYPE
 
 val invalid_lts_args_length : int -> 'a mm
 val invalid_lts_term_kind : Constr.t -> 'a mm
-val invalid_sort : Sorts.family -> 'a mm
+val invalid_sort_lts : Sorts.family -> 'a mm
+val invalid_sort_type : Sorts.family -> 'a mm
 val invalid_arity : Constr.t -> 'a mm
 val invalid_ref_lts : Names.GlobRef.t -> 'a mm
 val invalid_ref_type : Names.GlobRef.t -> 'a mm
