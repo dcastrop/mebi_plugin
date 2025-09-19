@@ -28,29 +28,8 @@ type model_kind =
 type coq_model = Constrexpr.constr_expr * Libnames.qualid
 type make_model = model_kind * coq_model
 
-type help_set_kind =
-  | General
-  | Bound
-  | DumpToFile
-  | ShowDebug
-  | ShowDetails
-  | WeakMode
-  | Weak
-
-type help_kind =
-  | Basic of unit
-  | Set of help_set_kind
-  | Check of unit
-  | LTS of unit
-  | FSM of unit
-  | Saturate of unit
-  | Minimize of unit
-  | Bisim of unit
-  | Info of unit
-  | Unrecognized of unit
-
 type command_kind =
-  | Help of help_kind
+  | Help of Mebi_help.help_kind
   | MakeModel of make_model
   | SaturateModel of coq_model
   | MinimizeModel of coq_model

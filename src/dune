@@ -22,21 +22,13 @@
  (modules
   utils
   logging
-  ; mebi_errors
-  ; mebi_action
-  ; constr_tree
+  mebi_help
   mebi_wrapper
   mebi_utils
-  ; model_state
-  ; model_label
-  ; model_action
-  ; model_transition
-  ; model_edge
   model
   lts
   fsm
   algorithms
-  ; vernac
   dump_to_file
   command
   mebi_api

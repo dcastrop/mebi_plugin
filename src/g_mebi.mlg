@@ -61,9 +61,9 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "Saturate" constr(x) "Using" reference(r) 
                                  reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) rs)}
 
-| ["MeBi" "Minimize" constr(x) "Using" reference(r)] -> {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) [])}
+| ["MeBi" "Minimize" constr(x) "Using" reference(r)] -> {Mebi_wrapper.run (Command.run (Command.MinimizeModel (x, r)) [])}
 | ["MeBi" "Minimize" constr(x) "Using" reference(r) 
-                                 reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) rs)}
+                                 reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.MinimizeModel (x, r)) rs)}
 
 | ["MeBi" "Bisim" constr(x) "With" reference(a) 
             "And" constr(y) "With" reference(b)] -> {Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) [])}
@@ -71,29 +71,29 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
             "And" constr(y) "With" reference(b) 
                      "Using" reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) rs)}
 
-| ["MeBi" "Help"] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Basic ())) [])}
+| ["MeBi" "Help"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Basic ())) [])}
 
-| ["MeBi" "Help" "Set"              ] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Set Command.General)) [])}
-| ["MeBi" "Help" "Set" "Bound"      ] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Set Command.Bound)) [])}
-| ["MeBi" "Help" "Set" "DumpToFile" ] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Set Command.DumpToFile)) [])}
-| ["MeBi" "Help" "Set" "ShowDebug"  ] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Set Command.ShowDebug)) [])}
-| ["MeBi" "Help" "Set" "ShowDetails"] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Set Command.ShowDetails)) [])}
-| ["MeBi" "Help" "Set" "WeakMode"   ] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Set Command.WeakMode)) [])}
-| ["MeBi" "Help" "Set" "Weak"       ] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Set Command.Weak)) [])}
+| ["MeBi" "Help" "Set"              ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.General ()))) [])}
+| ["MeBi" "Help" "Set" "Bound"      ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.Bound (Command.default_bound)))) [])}
+| ["MeBi" "Help" "Set" "DumpToFile" ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.DumpToFile ()))) [])}
+| ["MeBi" "Help" "Set" "ShowDebug"  ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowDebug ()))) [])}
+| ["MeBi" "Help" "Set" "ShowDetails"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowDetails ()))) [])}
+| ["MeBi" "Help" "Set" "WeakMode"   ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.WeakMode ()))) [])}
+| ["MeBi" "Help" "Set" "Weak"       ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.Weak ()))) [])}
 
-| ["MeBi" "Help" "Check"] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Check ())) [])}
+| ["MeBi" "Help" "Check"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Check ())) [])}
 
-| ["MeBi" "Help" "LTS"] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.LTS ())) [])}
-| ["MeBi" "Help" "FSM"] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.FSM ())) [])}
+| ["MeBi" "Help" "LTS"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.LTS ())) [])}
+| ["MeBi" "Help" "FSM"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.FSM ())) [])}
 
-| ["MeBi" "Help" "Saturate"] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Saturate ())) [])}
-| ["MeBi" "Help" "Minimize"] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Minimize ())) [])}
+| ["MeBi" "Help" "Saturate"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Saturate ())) [])}
+| ["MeBi" "Help" "Minimize"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Minimize ())) [])}
 
-| ["MeBi" "Help" "Bisim"] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Bisim ())) [])}
+| ["MeBi" "Help" "Bisim"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Bisim ())) [])}
 
-| ["MeBi" "Help" "Info"] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Info ())) [])}
+| ["MeBi" "Help" "Info"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Info ())) [])}
 
-| ["MeBi" ] -> {Mebi_wrapper.run (Command.run (Command.Help (Command.Unrecognized ())) [])}
+| ["MeBi" ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Unrecognized ())) [])}
 
 | ["MeBi" "Info"] -> {Mebi_wrapper.run (Command.run (Command.Info ()) [])}
 END
