@@ -230,6 +230,11 @@ type weak_action_arg =
 
 let the_weak_actions : weak_action_arg list ref = ref []
 
+let set_weak_type (a : weak_action_arg) : unit mm =
+  the_weak_actions := a :: !the_weak_actions;
+  return ()
+;;
+
 let get_single_weak_type (k : weak_action_arg) : unit mm =
   match k with
   | OptionRef label_ref ->
@@ -273,17 +278,65 @@ let get_weak_type () : unit mm =
   iterate 0 (List.length !the_weak_actions - 1) () iter_body
 ;;
 
-let set_weak_type (k : weak_action_arg) : unit mm =
-  the_weak_actions := k :: !the_weak_actions;
-  get_weak_type ()
-;;
-
 type weak_action_kinds =
   | OptionRef of (E.t * Names.GlobRef.t)
   | OptionConstr of E.t
   | Custom of E.t * (E.t * Names.GlobRef.t)
 
 let weak_type : weak_action_kinds option ref = ref None
+
+let reinstantiate_weak_type (k : weak_action_arg) : unit mm =
+  match k with
+  | OptionRef label_ref ->
+    let label_glob = Mebi_utils.ref_to_glob label_ref in
+    let* (ct : cindef_info) = check_ref_type label_glob in
+    let* (label_enc : E.t) = encode ct.name in
+    weak_type := Some (OptionRef (label_enc, label_glob));
+    (* Log.notice
+       (Printf.sprintf
+       "Set weak type to an Option of \"%s\" (where silent actions are None)"
+       (econstr_to_string ct.name)); *)
+    return ()
+  | OptionConstr label_type ->
+    (* encode tau *)
+    let* (label : EConstr.t) = tref_to_econstr label_type in
+    let* (label_enc : E.t) = encode label in
+    weak_type := Some (OptionConstr label_enc);
+    (* Log.notice
+       (Printf.sprintf
+       "Set weak type to an Option of \"%s\" (where silent actions are None)"
+       (econstr_to_string label)); *)
+    return ()
+  | Custom (tau_term, label_type) ->
+    (* encode tau *)
+    let* (tau : EConstr.t) = tref_to_econstr tau_term in
+    let* (tau_enc : E.t) = encode tau in
+    (* encode silent action type *)
+    let label_glob_ref = Mebi_utils.ref_to_glob label_type in
+    let* (ct : cindef_info) = check_ref_type label_glob_ref in
+    let* (label_constr_enc : E.t) = encode ct.name in
+    weak_type := Some (Custom (tau_enc, (label_constr_enc, label_glob_ref)));
+    (* Log.notice
+       (Printf.sprintf
+       "Set weak type to a Custom type of \"%s\" where silent actions are \
+       \"%s\""
+       (econstr_to_string ct.name)
+       (econstr_to_string tau)); *)
+    return ()
+;;
+
+let reinstantiate_weak_types () : unit mm =
+  if !weak_mode = false
+  then return ()
+  else if Int.equal 1 (List.length !the_weak_actions)
+  then reinstantiate_weak_type (List.hd !the_weak_actions)
+  else (
+    let iter_body (i : int) () : unit mm =
+      reinstantiate_weak_type (List.nth !the_weak_actions i)
+    in
+    let* _ = iterate 0 (List.length !the_weak_actions - 2) () iter_body in
+    reinstantiate_weak_type (List.hd !the_weak_actions))
+;;
 
 (* let get_weak_type () : unit mm =
    match !weak_type with
@@ -1408,6 +1461,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
   match k with
   | MakeModel (kind, (x, primary_lts)) ->
     Log.debug "command.run, MakeModel";
+    let* _ = reinstantiate_weak_types () in
     let* the_lts = build_lts_graph primary_lts x in
     (match kind with
      | LTS ->
@@ -1446,6 +1500,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
          return ())
        else (
          Log.debug "command.run, SaturateModel";
+         let* _ = reinstantiate_weak_types () in
          let* the_lts = build_lts_graph primary_lts x in
          let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
          Log.details
@@ -1474,6 +1529,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
          return ())
        else (
          Log.debug "command.run, MinimizeModel";
+         let* _ = reinstantiate_weak_types () in
          let* the_lts = build_lts_graph primary_lts x in
          let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
          let the_minimized = Algorithms.run (Minim (!weak_mode, the_fsm)) in
@@ -1487,6 +1543,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
   | CheckBisimilarity ((x, a), (y, b)) ->
     Log.debug "command.run, CheckBisimilarity";
     Mebi_help.show_instructions_to_toggle_weak !weak_mode;
+    let* _ = reinstantiate_weak_types () in
     let* the_lts_1 = build_lts_graph a x in
     let* the_lts_2 = build_lts_graph b y in
     let the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
