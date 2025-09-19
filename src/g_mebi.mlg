@@ -24,29 +24,30 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 
 | ["MeBi" "Set"   "Bound" "Default"] -> {Mebi_wrapper.run (Command.set_bound Command.default_bound)}
 | ["MeBi" "Set"   "Bound" int(b)   ] -> {Mebi_wrapper.run (Command.set_bound b)}
-| ["MeBi" "Check" "Bound"          ] -> {Mebi_wrapper.run (Command.get_bound ())}
+| ["MeBi" "Check" "Bound"          ] -> {Mebi_wrapper.run (Mebi_wrapper.return (Command.get_bound ()))}
 
 | ["MeBi" "Set"   "DumpToFile" "True" ] -> {Mebi_wrapper.run (Command.set_dump_to_file_flag true)}
 | ["MeBi" "Set"   "DumpToFile" "False"] -> {Mebi_wrapper.run (Command.set_dump_to_file_flag false)}
-| ["MeBi" "Check" "DumpToFile"        ] -> {Mebi_wrapper.run (Command.get_dump_to_file_flag ())}
+| ["MeBi" "Check" "DumpToFile"        ] -> {Mebi_wrapper.run (Mebi_wrapper.return (Command.get_dump_to_file_flag ()))}
 
 | ["MeBi" "Set"   "ShowDebug" "True" ] -> {Mebi_wrapper.run (Command.set_show_debug_flag true)}
 | ["MeBi" "Set"   "ShowDebug" "False"] -> {Mebi_wrapper.run (Command.set_show_debug_flag false)}
-| ["MeBi" "Check" "ShowDebug"        ] -> {Mebi_wrapper.run (Command.get_show_debug_flag ())}
+| ["MeBi" "Check" "ShowDebug"        ] -> {Mebi_wrapper.run (Mebi_wrapper.return (Command.get_show_debug_flag ()))}
 
 | ["MeBi" "Set"   "ShowDetails" "True" ] -> {Mebi_wrapper.run (Command.set_show_details_flag true)}
 | ["MeBi" "Set"   "ShowDetails" "False"] -> {Mebi_wrapper.run (Command.set_show_details_flag false)}
-| ["MeBi" "Check" "ShowDetails"        ] -> {Mebi_wrapper.run (Command.get_show_details_flag ())}
+| ["MeBi" "Check" "ShowDetails"        ] -> {Mebi_wrapper.run (Mebi_wrapper.return (Command.get_show_details_flag ()))}
 
 | ["MeBi" "Set"   "WeakMode" "True" ] -> {Mebi_wrapper.run (Command.set_weak_mode true)}
 | ["MeBi" "Set"   "WeakMode" "False"] -> {Mebi_wrapper.run (Command.set_weak_mode false)}
-| ["MeBi" "Check" "WeakMode"        ] -> {Mebi_wrapper.run (Command.get_weak_mode ())}
+| ["MeBi" "Check" "WeakMode"        ] -> {Mebi_wrapper.run (Mebi_wrapper.return (Command.get_weak_mode ()))}
 
 | ["MeBi" "Set"   "Weak" "Option" constr(x)] -> {Mebi_wrapper.run (Command.set_weak_type (Command.Option x))}
 | ["MeBi" "Set"   "Weak" constr(x) "Of" 
                                reference(y)] -> {Mebi_wrapper.run (Command.set_weak_type (Command.Custom (x, y)))}
-| ["MeBi" "Check" "Weak"                   ] -> {Mebi_wrapper.run (Command.get_weak_type ())}
+| ["MeBi" "Check" "Weak"                   ] -> {Mebi_wrapper.run (Mebi_wrapper.return (Command.get_weak_type ()))}
 
+| ["MeBi" "Check" "All"] -> {Mebi_wrapper.run (Command.check_all ())}
 
 | ["MeBi" "LTS" constr(x) "Using" reference(r)] -> {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) [])}
 | ["MeBi" "LTS" constr(x) "Using" reference(r) 

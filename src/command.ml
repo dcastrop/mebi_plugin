@@ -6,13 +6,12 @@ let default_bound : int = 10
 
 let bound : int ref = ref default_bound
 
-let get_bound () : unit mm =
+let get_bound () : unit =
   Log.override
     (Printf.sprintf
        "Bound set to: %i.%s"
        !bound
-       (if !bound = default_bound then " (default)" else ""));
-  return ()
+       (if !bound = default_bound then " (default)" else ""))
 ;;
 
 let set_bound (b : int) : unit mm =
@@ -28,12 +27,11 @@ let set_bound (b : int) : unit mm =
 (** *)
 let dump_to_file_flag : bool ref = ref true
 
-let get_dump_to_file_flag () : unit mm =
+let get_dump_to_file_flag () : unit =
   Log.notice
     (if !dump_to_file_flag
      then "File dumps enabled."
-     else "File dumps disabled.");
-  return ()
+     else "File dumps disabled.")
 ;;
 
 let set_dump_to_file_flag (b : bool) : unit mm =
@@ -46,18 +44,14 @@ let set_dump_to_file_flag (b : bool) : unit mm =
 ;;
 
 (** *)
-let get_show_debug_flag () : unit mm =
-  return (Logging.get_show_debug_messages ())
-;;
+let get_show_debug_flag () : unit = Logging.get_show_debug_messages ()
 
 let set_show_debug_flag (b : bool) : unit mm =
   return (Logging.set_show_debug_messages b)
 ;;
 
 (** *)
-let get_show_details_flag () : unit mm =
-  return (Logging.get_show_detailed_messages ())
-;;
+let get_show_details_flag () : unit = Logging.get_show_detailed_messages ()
 
 let set_show_details_flag (b : bool) : unit mm =
   return (Logging.set_show_detailed_messages b)
@@ -66,12 +60,11 @@ let set_show_details_flag (b : bool) : unit mm =
 (** *)
 let weak_mode : bool ref = ref true
 
-let get_weak_mode () : unit mm =
+let get_weak_mode () : unit =
   Log.notice
     (Printf.sprintf
        "Currently in %s mode."
-       (if !weak_mode then "weak" else "strong"));
-  return ()
+       (if !weak_mode then "weak" else "strong"))
 ;;
 
 let set_weak_mode (b : bool) : unit mm =
@@ -88,19 +81,18 @@ type weak_action_kinds =
 
 let weak_type : weak_action_kinds option ref = ref None
 
-let get_weak_type () : unit mm =
-  (match !weak_type with
-   | None -> Log.notice "Weak type not set. (Is None)"
-   | Some o ->
-     (match o with
-      | Option c ->
-        Log.notice
-          "Weak type is an Option of \"\" (where silent actions are None)"
-      | Custom (x, y) ->
-        Log.notice
-          "Weak type is a Custom type of \"TODO\" where silent actions are \
-           \"TODO\""));
-  return ()
+let get_weak_type () : unit =
+  match !weak_type with
+  | None -> Log.notice "Weak type not set. (Is None)"
+  | Some o ->
+    (match o with
+     | Option c ->
+       Log.notice
+         "Weak type is an Option of \"\" (where silent actions are None)"
+     | Custom (x, y) ->
+       Log.notice
+         "Weak type is a Custom type of \"TODO\" where silent actions are \
+          \"TODO\"")
 ;;
 
 let set_weak_type (k : weak_action_kinds) : unit mm =
@@ -113,6 +105,17 @@ let set_weak_type (k : weak_action_kinds) : unit mm =
      Log.notice
        "Set weak type to a Custom type of \"TODO\" where silent actions are \
         \"TODO\"");
+  return ()
+;;
+
+let check_all () : unit mm =
+  Log.notice "Current plugin configuration:";
+  get_bound ();
+  get_dump_to_file_flag ();
+  get_show_debug_flag ();
+  get_show_details_flag ();
+  get_weak_mode ();
+  get_weak_type ();
   return ()
 ;;
 
@@ -1415,7 +1418,8 @@ let show_help_set_weak () : unit =
 let show_help_check () : unit =
   Log.notice
     "Use the command \"MeBi Check x\" to see what any of Bound, DumpToFile, \
-     ShowDebug, WeakMode, Weak are set to.\n"
+     ShowDebug, WeakMode, Weak are set to.\n\
+     Use the command \"MeBi Check All\" to see for them all.\n"
 ;;
 
 let show_help_lts () : unit = Log.notice "Use the command \"MeBi LTS ...\"\n"

@@ -24,6 +24,8 @@ Example r : term := tseq (tpar (tact (recv A) tend)
                          (tfix (tseq (tpar (tact (send A) tend) 
                                            (tact (recv A) tend)) trec)).
 
+MeBi Check All.
+
 (* MeBi Set ShowDebug True.
 MeBi Set ShowDetails True.
 MeBi Set WeakMode True.
