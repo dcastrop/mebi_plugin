@@ -42,10 +42,11 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "Set"   "WeakMode" "False"] -> {Mebi_wrapper.run (Command.set_weak_mode false)}
 | ["MeBi" "Check" "WeakMode"        ] -> {Mebi_wrapper.run (Mebi_wrapper.return (Command.get_weak_mode ()))}
 
-| ["MeBi" "Set"   "Weak" "Option" constr(x)] -> {Mebi_wrapper.run (Command.set_weak_type (Command.Option x))}
+| ["MeBi" "Set"   "Weak" "Option" reference(x)] -> {Mebi_wrapper.run (Command.set_weak_type (Command.OptionRef x))}
+| ["MeBi" "Set"   "Weak" "Option" constr(x)   ] -> {Mebi_wrapper.run (Command.set_weak_type (Command.OptionConstr x))}
 | ["MeBi" "Set"   "Weak" constr(x) "Of" 
-                               reference(y)] -> {Mebi_wrapper.run (Command.set_weak_type (Command.Custom (x, y)))}
-| ["MeBi" "Check" "Weak"                   ] -> {Mebi_wrapper.run (Mebi_wrapper.return (Command.get_weak_type ()))}
+                                  reference(y)] -> {Mebi_wrapper.run (Command.set_weak_type (Command.Custom (x, y)))}
+| ["MeBi" "Check" "Weak"                      ] -> {Mebi_wrapper.run (Command.get_weak_type ())}
 
 | ["MeBi" "Check" "All"] -> {Mebi_wrapper.run (Command.check_all ())}
 

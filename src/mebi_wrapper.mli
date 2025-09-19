@@ -237,6 +237,8 @@ val econstr_rel_decl_to_string : EConstr.rel_declaration -> string
 val constr_rel_decl_list_to_string : Constr.rel_declaration list -> string
 val econstr_rel_decl_list_to_string : EConstr.rel_declaration list -> string
 
+val debug_encoding : unit -> unit mm
+
 module Constr_tree : sig
   type 'a tree = Node of 'a * 'a tree list
   type t = (E.t * int) tree

@@ -702,6 +702,11 @@ let unknown_decode_key ((k, bckmap) : E.t * term B.t) : 'a mm =
 let encode (k : term) : E.t mm =
   fun (st : wrapper ref) ->
   let encoding : E.t = E.encode !st.fwd_enc !st.bck_enc k in
+  Logging.Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.encode, \"%s\" into (%s)"
+       (econstr_to_string k)
+       (E.to_string encoding));
   { state = st; value = encoding }
 ;;
 
@@ -709,6 +714,11 @@ let encode (k : term) : E.t mm =
 let decode (k : E.t) : term mm =
   fun (st : wrapper ref) ->
   let decoding : term = E.decode !st.bck_enc k in
+  Logging.Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.decode, \"%s\" into (%s)"
+       (E.to_string k)
+       (econstr_to_string decoding));
   { state = st; value = decoding }
 ;;
 
@@ -780,6 +790,31 @@ let decode_map (m : 'a B.t) : 'a F.t mm =
 (********************************************)
 (****** UTILS *******************************)
 (********************************************)
+
+let debug_encoding () : unit mm =
+  fun (st : wrapper ref) ->
+  if Int.equal 0 (F.length !st.fwd_enc)
+  then (
+    Logging.Log.debug "mebi_wrapper.debug_encoding, fwd encoding is empty";
+    if Int.equal 0 (B.length !st.bck_enc)
+    then Logging.Log.debug "mebi_wrapper.debug_encoding, bck encoding is empty"
+    else
+      B.iter
+        (fun (enc : E.t) (t : term) ->
+          Logging.Log.debug
+            (Printf.sprintf
+               "(%s) => %s "
+               (E.to_string enc)
+               (econstr_to_string t)))
+        !st.bck_enc)
+  else
+    F.iter
+      (fun (t : term) (enc : E.t) ->
+        Logging.Log.debug
+          (Printf.sprintf "(%s) => %s " (E.to_string enc) (econstr_to_string t)))
+      !st.fwd_enc;
+  { state = st; value = () }
+;;
 
 (********************************************)
 (****** COQ CONSTR TREE *********************)
