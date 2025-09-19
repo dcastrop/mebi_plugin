@@ -305,7 +305,7 @@ Module BisimTest2.
 
   MeBi Set ShowDebug True.
   MeBi Set ShowDetails True.
-  
+
   Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
 
   MeBi Set WeakMode False.
@@ -314,10 +314,7 @@ Module BisimTest2.
   MeBi Set WeakMode True.
   MeBi Set Weak TAU Of action.
   MeBi Saturate exa1 Using termLTS.
-
-
-
-
+  MeBi Minimize exa1 Using termLTS.
 End BisimTest2.
 
 (* Section BisimDef.
