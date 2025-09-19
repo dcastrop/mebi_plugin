@@ -1447,6 +1447,19 @@ let show_guidelines_and_limitations () : unit =
      \tterm -> label -> term -> Prop\n\
      where \"term\" and \"label\" are defined elsewhere.\n\n\
      - The \"label\" type must be of either Type or Set.\n\n\
+     - The plugin supports multi-layered LTS definitions, where the \
+     constructors of the inductive type have premises that are either \
+     recursive or reference a different inductive LTS proposition type.\n\n\
+     - The premises of the constructors in the inductive LTS proposition types \
+     must only contain other propositions and not, e.g., equalities.\n\
+     In cases such as equality, you must simply \"inline\" it by substitution.\n\
+     For example, instead of writing:\n\
+     \tInductive lts : nat -> bool -> nat -> Prop :=\n\
+     \t| do_action : forall a t t', t' = some_fun t -> lts t a t'\n\n\
+     You must write:\n\
+     \tInductive lts : nat -> bool -> nat -> Prop :=\n\
+     \t| do_action : forall a t, lts t a (some_fun t)\n\n\
+     - \n\n\
     \ TODO..."
 ;;
 
