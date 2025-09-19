@@ -274,7 +274,6 @@ Module BisimTest1.
     Using termLTS.
 End BisimTest1.
 
-
 Module BisimTest2.
   Inductive action : Set := | TAU | TheAction1 | TheAction2.
 
@@ -316,6 +315,50 @@ Module BisimTest2.
   MeBi Saturate exa1 Using termLTS.
   MeBi Minimize exa1 Using termLTS.
 End BisimTest2.
+
+Module BisimTest3.
+  Inductive action : Set := | TheAction1 | TheAction2.
+
+  Inductive term : Set :=
+  | trec : term
+  | tend : term
+  | tfix : term -> term
+  | tact : action -> term -> term
+  | tpar : action -> action -> term -> term.
+
+  Fixpoint subst (t1 : term) (t2 : term) :=
+    match t2 with
+    | trec => t1
+    | tend => tend
+    | tfix t => tfix t
+    | tact a t => tact a (subst t1 t)
+    | tpar a b t => tpar a b (subst t1 t)
+    end.
+
+  Inductive termLTS : term -> option action -> term -> Prop :=
+  | do_act : forall a t, termLTS (tact a t) (Some a) t
+
+  | do_par1 : forall a b t, termLTS (tpar a b t) (Some a) (tact b t)
+
+  | do_par2 : forall a b t, termLTS (tpar a b t) (Some b) (tact a t)
+
+  | do_fix : forall t, termLTS (tfix t) None (subst (tfix t) t).
+
+  MeBi Set ShowDebug True.
+  MeBi Set ShowDetails True.
+
+  Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
+
+  MeBi Set WeakMode False.
+  MeBi FSM exa1 Using termLTS.
+
+  MeBi Set WeakMode True.
+  MeBi Set Weak Option action.
+  MeBi Saturate exa1 Using termLTS.
+  MeBi Minimize exa1 Using termLTS.
+End BisimTest3.
+
+
 
 (* Section BisimDef.
   Context (Term1 Term2 : Set)  (Action1 Action2 : Set)

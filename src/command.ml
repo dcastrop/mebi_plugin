@@ -1310,184 +1310,6 @@ let make_graph_builder =
 (** Entry point *******)
 (**********************)
 
-let show_instructions_to_toggle_weak () : unit =
-  if !weak_mode
-  then
-    Log.notice
-      "Checking for Weak Bisimilarity.\n\
-       To check for Strong Bisimilarity use the command \"MeBi Set WeakMode \
-       False\""
-  else
-    Log.notice
-      "Checking for Strong Bisimilarity (since weak mode is disabled)\n\
-       To Check for Weak Bisimilarity use the command \"MeBi Set WeakMode \
-       True\""
-;;
-
-let show_instructions_to_enable_weak () : unit =
-  Log.notice
-    "Weak mode is not currently enabled.\n\
-     Use the command \"MeBi Set WeakMode True\" to enable it (and \"MeBi Set \
-     WeakMode False\" to disable it).\n"
-;;
-
-let show_instructions_to_set_weak () : unit =
-  Log.notice
-    "Cannot saturate without any silent actions.\n\
-     Use the command \"MeBi Set Weak ...\" to specify how you are encoding \
-     silent transitions.\n\
-     For example:\n\
-    \  1) \"MeBi Set Weak Option nat\" is for labels of type \"option nat\", \
-     where silent actions are \"None\" and visible actions are \"Some _\"\n\
-    \  2) \"MeBi Set Weak TAU of ACTION\" is for labels of inductive type \
-     \"ACTION\" that has some constructor \"TAU\"\n"
-;;
-
-let show_help_basic () : unit =
-  Log.notice
-    "All commands for this plugin begin with \"MeBi\" and are followed one of \
-     the following:\n\
-     Set, Check, LTS, FSM, Saturate, Minimize, Bisim.\n\n\
-     Use the command \"MeBi Help x\" for more information\n\
-     (where x is one of the terms above)\n"
-;;
-
-let show_help_unrecognized_command () : unit =
-  Log.notice "Command not recognized.\n";
-  show_help_basic ()
-;;
-
-let show_help_set () : unit =
-  Log.notice
-    (Printf.sprintf
-       "Certain commands set parameters the plugin uses when running other \
-        commands.\n\
-        These parameters are: Bound, DumpToFile, ShowDebug, WeakMode, Weak\n\n\
-        Use the command \"MeBi Help Set x\" for more information\n\
-        (where x is one of the parameters above)\n")
-;;
-
-let show_help_set_bound () : unit =
-  Log.notice
-    (Printf.sprintf
-       "Use the command \"MeBi Set Bound n\" to set the upper-bound of the \
-        number of unique states that can be reached when building the LTS from \
-        a coq term, where \"n\" is an natural integer number.\n\n\
-        Use command \"MeBi Set Bound Default\" to reset this to the default, \
-        which is: %i"
-       default_bound)
-;;
-
-let show_help_set_dump_to_file () : unit =
-  Log.notice
-    "Use the command \"MeBi Set DumpToFile True\" to enable the internal \
-     results (and/or models) of any command run to a (JSON) file.\n\
-     Disable this behaviour using \"MeBi Set DumpToFile False\"\n"
-;;
-
-let show_help_set_show_debug () : unit =
-  Log.notice
-    "Use the command \"MeBi Set ShowDebug True\" to enable debug messages.\n\
-     Disable them using \"MeBi Set ShowDebug False\"\n"
-;;
-
-let show_help_set_show_details () : unit =
-  Log.notice
-    "Use the command \"MeBi Set ShowDetails True\" to enable additional detail \
-     messages.\n\
-     Disable them using \"MeBi Set ShowDetails False\"\n"
-;;
-
-let show_help_set_weak_mode () : unit =
-  Log.notice
-    "Use the command \"MeBi Set WeakMode True\" to enable it (and \"MeBi \
-     WeakMode False\" to disable it).\n"
-;;
-
-let show_help_set_weak () : unit =
-  Log.notice
-    "Use the command \"MeBi Set Weak ...\" to specify how you are encoding \
-     silent transitions.\n\
-     For example:\n\
-    \  1) \"MeBi Set Weak Option nat\" is for labels of type \"option nat\", \
-     where silent actions are \"None\" and visible actions are \"Some _\"\n\
-    \  2) \"MeBi Set Weak TAU of ACTION\" is for labels of inductive type \
-     \"ACTION\" that has some constructor \"TAU\"\n"
-;;
-
-let show_help_check () : unit =
-  Log.notice
-    "Use the command \"MeBi Check x\" to see what any of Bound, DumpToFile, \
-     ShowDebug, WeakMode, Weak are set to.\n\
-     Use the command \"MeBi Check All\" to see for them all.\n"
-;;
-
-let show_help_lts () : unit = Log.notice "Use the command \"MeBi LTS ...\"\n"
-let show_help_fsm () : unit = Log.notice "Use the command \"MeBi FSM ...\"\n"
-
-let show_help_saturate () : unit =
-  Log.notice "Use the command \"MeBi Saturate ...\"\n"
-;;
-
-let show_help_minimize () : unit =
-  Log.notice "Use the command \"MeBi Minimize ...\"\n"
-;;
-
-let show_help_bisim () : unit =
-  Log.notice "Use the command \"MeBi Bisim ...\"\n"
-;;
-
-let show_help_info () : unit =
-  Log.notice
-    "Use the command \"MeBi Info\" to be shown information about the plugin, \
-     including a some guidelines and a list of limitations."
-;;
-
-let show_guidelines_and_limitations () : unit =
-  Log.notice
-    "Guidelines & Limitations\n\n\
-     - To construct the LTS from a term, the term must be an inductive type of \
-     the shape:\n\
-     \tterm -> label -> term -> Prop\n\
-     where \"term\" and \"label\" are defined elsewhere.\n\n\
-     - The \"label\" type must be of either Type or Set.\n\n\
-     - The plugin supports multi-layered LTS definitions, where the \
-     constructors of the inductive type have premises that are either \
-     recursive or reference a different inductive LTS proposition type.\n\n\
-     - The premises of the constructors in the inductive LTS proposition types \
-     must only contain other propositions and not, e.g., equalities.\n\
-     In cases such as equality, you must simply \"inline\" it by substitution.\n\
-     For example, instead of writing:\n\
-     \tInductive lts : nat -> bool -> nat -> Prop :=\n\
-     \t| do_action : forall a t t', t' = some_fun t -> lts t a t'\n\n\
-     You must write:\n\
-     \tInductive lts : nat -> bool -> nat -> Prop :=\n\
-     \t| do_action : forall a t, lts t a (some_fun t)\n\n\
-     - \n\n\
-    \ TODO..."
-;;
-
-type help_set_kind =
-  | General
-  | Bound
-  | DumpToFile
-  | ShowDebug
-  | ShowDetails
-  | WeakMode
-  | Weak
-
-type help_kind =
-  | Basic of unit
-  | Set of help_set_kind
-  | Check of unit
-  | LTS of unit
-  | FSM of unit
-  | Saturate of unit
-  | Minimize of unit
-  | Bisim of unit
-  | Info of unit
-  | Unrecognized of unit
-
 type model_kind =
   | LTS
   | FSM
@@ -1496,7 +1318,7 @@ type coq_model = Constrexpr.constr_expr * Libnames.qualid
 type make_model = model_kind * coq_model
 
 type command_kind =
-  | Help of help_kind
+  | Help of Mebi_help.help_kind
   | MakeModel of make_model
   | SaturateModel of coq_model
   | MinimizeModel of coq_model
@@ -1545,14 +1367,14 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
   | SaturateModel (x, primary_lts) ->
     (match !weak_type with
      | None ->
-       if !weak_mode = false then show_instructions_to_enable_weak ();
-       show_instructions_to_set_weak ();
+       if !weak_mode = false then Mebi_help.show_instructions_to_enable_weak ();
+       Mebi_help.show_instructions_to_set_weak ();
        Log.warning "Aborting command.\n";
        return ()
      | Some _ ->
        if !weak_mode = false
        then (
-         show_instructions_to_enable_weak ();
+         Mebi_help.show_instructions_to_enable_weak ();
          Log.warning "Aborting command.\n";
          return ())
        else (
@@ -1574,13 +1396,13 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
   | MinimizeModel (x, primary_lts) ->
     (match !weak_type with
      | None ->
-       show_instructions_to_set_weak ();
+       Mebi_help.show_instructions_to_set_weak ();
        Log.warning "Aborting command.\n";
        return ()
      | Some _ ->
        if !weak_mode = false
        then (
-         show_instructions_to_enable_weak ();
+         Mebi_help.show_instructions_to_enable_weak ();
          Log.warning "Aborting command.\n";
          return ())
        else (
@@ -1597,7 +1419,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
          return ()))
   | CheckBisimilarity ((x, a), (y, b)) ->
     Log.debug "command.run, CheckBisimilarity";
-    show_instructions_to_toggle_weak ();
+    Mebi_help.show_instructions_to_toggle_weak !weak_mode;
     let* the_lts_1 = build_lts_graph a x in
     let* the_lts_2 = build_lts_graph b y in
     let the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
@@ -1618,28 +1440,10 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
     then Log.debug "command.run, CheckBisimilarity -- TODO dump to file\n";
     return ()
   | Info () ->
-    show_guidelines_and_limitations ();
+    Mebi_help.show_guidelines_and_limitations ();
     return ()
   | Help c ->
-    (match c with
-     | Basic () -> show_help_basic ()
-     | Set s ->
-       (match s with
-        | General -> show_help_set ()
-        | Bound -> show_help_set_bound ()
-        | DumpToFile -> show_help_set_dump_to_file ()
-        | ShowDebug -> show_help_set_show_debug ()
-        | ShowDetails -> show_help_set_show_details ()
-        | WeakMode -> show_help_set_weak_mode ()
-        | Weak -> show_help_set_weak ())
-     | Check () -> show_help_check ()
-     | LTS () -> show_help_lts ()
-     | FSM () -> show_help_fsm ()
-     | Saturate () -> show_help_saturate ()
-     | Minimize () -> show_help_minimize ()
-     | Bisim () -> show_help_bisim ()
-     | Info () -> show_help_info ()
-     | Unrecognized () -> show_help_unrecognized_command ());
+    Mebi_help.handle_help c;
     return ()
 ;;
 

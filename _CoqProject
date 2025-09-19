@@ -37,6 +37,8 @@ src/utils.mli
 
 src/logging.ml
 src/logging.mli
+src/mebi_help.ml
+src/mebi_help.mli
 
 src/mebi_wrapper.ml
 src/mebi_wrapper.mli
