@@ -24,10 +24,14 @@ Example r : term := tseq (tpar (tact (recv A) tend)
                          (tfix (tseq (tpar (tact (send A) tend) 
                                            (tact (recv A) tend)) trec)).
 
+MeBi Set ShowDebug True.
+MeBi Set WeakMode True.
 
-MeBi WeakMode True.
 (* TODO: fix the plugin so the below works *)
-(* MeBi SetWeak Option label. *)
+(* MeBi Set Weak Option (label). *)
+(* MeBi Set Weak Option (option label). *)
+MeBi Set Weak Option (Datatypes.option label).
+
 MeBi Saturate p Using termLTS.
 
 
