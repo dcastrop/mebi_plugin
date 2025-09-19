@@ -1,5 +1,8 @@
 open Mebi_wrapper
+open Mebi_wrapper.Syntax
 open Logging
+open Model
+open Utils
 
 (** [bound] is the total number of states to be allowed when building an LTS. *)
 let default_bound : int = 10
@@ -74,55 +77,6 @@ let set_weak_mode (b : bool) : unit mm =
   return ()
 ;;
 
-(** *)
-type weak_action_kinds =
-  | Option of Constrexpr.constr_expr
-  | Custom of Constrexpr.constr_expr * Libnames.qualid
-
-let weak_type : weak_action_kinds option ref = ref None
-
-let get_weak_type () : unit =
-  match !weak_type with
-  | None -> Log.notice "Weak type not set. (Is None)"
-  | Some o ->
-    (match o with
-     | Option c ->
-       Log.notice
-         "Weak type is an Option of \"\" (where silent actions are None)"
-     | Custom (x, y) ->
-       Log.notice
-         "Weak type is a Custom type of \"TODO\" where silent actions are \
-          \"TODO\"")
-;;
-
-let set_weak_type (k : weak_action_kinds) : unit mm =
-  weak_type := Some k;
-  (match k with
-   | Option c ->
-     Log.notice
-       "Set weak type to an Option of \"\" (where silent actions are None)"
-   | Custom (x, y) ->
-     Log.notice
-       "Set weak type to a Custom type of \"TODO\" where silent actions are \
-        \"TODO\"");
-  return ()
-;;
-
-let check_all () : unit mm =
-  Log.notice "Current plugin configuration:";
-  get_bound ();
-  get_dump_to_file_flag ();
-  get_show_debug_flag ();
-  get_show_details_flag ();
-  get_weak_mode ();
-  get_weak_type ();
-  return ()
-;;
-
-open Mebi_wrapper.Syntax
-open Model
-open Utils
-
 let arity_is_type (mip : Declarations.one_inductive_body) : unit mm =
   Log.debug "arity_is_type";
   let open Declarations in
@@ -179,7 +133,7 @@ type cind_lts =
   }
 
 type coq_def_kind =
-  | Type of EConstr.t option
+  (* | Type of EConstr.t option *)
   | LTS of cind_lts
 
 (** coq_inductive_def_info *)
@@ -196,24 +150,26 @@ type cindef =
   }
 
 let lts_cindef_trm_type (c : cindef) : EConstr.t mm =
-  Log.debug "lts_cindef_trm_type";
-  match c.kind with LTS l -> return l.trm_type | _ -> invalid_cindef_kind ()
+  Log.debug "command.lts_cindef_trm_type";
+  match c.kind with LTS l -> return l.trm_type
 ;;
+
+(* | _ -> invalid_cindef_kind () *)
 
 let lts_cindef_constr_transitions (c : cindef)
   : (Constr.rel_context * Constr.t) array mm
   =
-  Log.debug "lts_cindef_constr_transitions";
-  match c.kind with
-  | LTS l -> return l.constr_transitions
-  | _ -> invalid_cindef_kind ()
+  Log.debug "command.lts_cindef_constr_transitions";
+  match c.kind with LTS l -> return l.constr_transitions
 ;;
+
+(* | _ -> invalid_cindef_kind () *)
 
 (** [check_ref_lts gref] is the [cindef] of [gref].
 
     @raise invalid_ref_lts if [gref] is not a reference to an inductive type. *)
 let check_ref_lts (gref : Names.GlobRef.t) : (cindef_info * cind_lts) mm =
-  Log.debug "check_ref_lts";
+  Log.debug "command.check_ref_lts";
   let open Names.GlobRef in
   match gref with
   | IndRef i ->
@@ -232,18 +188,18 @@ let check_ref_lts (gref : Names.GlobRef.t) : (cindef_info * cind_lts) mm =
         } )
   (* raise error if [gref] is not an inductive type *)
   | _ ->
-    Log.debug "check_ref_lts, invalid gref";
+    Log.debug "command.check_ref_lts, invalid gref";
     invalid_ref_lts gref
 ;;
 
 let get_lts_cindef (i : int) (gref : Names.GlobRef.t) : cindef mm =
-  Log.debug "get_lts_cindef";
+  Log.debug "command.get_lts_cindef";
   let* ((c_info, c_lts) : cindef_info * cind_lts) = check_ref_lts gref in
   return { index = i; info = c_info; kind = LTS c_lts }
 ;;
 
 let check_ref_type (gref : Names.GlobRef.t) : cindef_info mm =
-  Log.debug "check_ref_type";
+  Log.debug "command.check_ref_type";
   let open Names.GlobRef in
   match gref with
   | IndRef i ->
@@ -254,16 +210,137 @@ let check_ref_type (gref : Names.GlobRef.t) : cindef_info mm =
     let type_term = EConstr.mkIndU (i, EConstr.EInstance.make univ) in
     return { name = type_term; constr_names = mip.mind_consnames }
   | _ ->
-    Log.debug "check_ref_type, invalid gref";
+    Log.debug "command.check_ref_type, invalid gref";
     invalid_ref_type gref
 ;;
 
-let get_type_cindef (i : int) (gref : Names.GlobRef.t) (v : EConstr.t option)
+(* let get_type_cindef (i : int) (gref : Names.GlobRef.t) (v : EConstr.t option)
   : cindef mm
   =
-  Log.debug "get_type_cindef";
+  Log.debug "command.get_type_cindef";
   let* (c_info : cindef_info) = check_ref_type gref in
   return { index = i; info = c_info; kind = Type v }
+;; *)
+
+(** *)
+type weak_action_arg =
+  | OptionRef of Libnames.qualid
+  | OptionConstr of Constrexpr.constr_expr
+  | Custom of Constrexpr.constr_expr * Libnames.qualid
+
+let the_weak_actions : weak_action_arg list ref = ref []
+
+let get_single_weak_type (k : weak_action_arg) : unit mm =
+  match k with
+  | OptionRef label_ref ->
+    let label_glob = Mebi_utils.ref_to_glob label_ref in
+    let* (ct : cindef_info) = check_ref_type label_glob in
+    let* (label_enc : E.t) = encode ct.name in
+    Log.notice
+      (Printf.sprintf
+         "Weak type Option of \"%s\" (where silent actions are None)"
+         (econstr_to_string ct.name));
+    return ()
+  | OptionConstr label_type ->
+    (* encode tau *)
+    let* (label : EConstr.t) = tref_to_econstr label_type in
+    let* (label_enc : E.t) = encode label in
+    Log.notice
+      (Printf.sprintf
+         "Weak type Option of \"%s\" (where silent actions are None)"
+         (econstr_to_string label));
+    return ()
+  | Custom (tau_term, label_type) ->
+    (* encode tau *)
+    let* (tau : EConstr.t) = tref_to_econstr tau_term in
+    let* (tau_enc : E.t) = encode tau in
+    (* encode silent action type *)
+    let label_glob_ref = Mebi_utils.ref_to_glob label_type in
+    let* (ct : cindef_info) = check_ref_type label_glob_ref in
+    let* (label_constr_enc : E.t) = encode ct.name in
+    Log.notice
+      (Printf.sprintf
+         "Weak type Custom type of \"%s\" where silent actions are \"%s\""
+         (econstr_to_string ct.name)
+         (econstr_to_string tau));
+    return ()
+;;
+
+let get_weak_type () : unit mm =
+  let iter_body (i : int) () : unit mm =
+    get_single_weak_type (List.nth !the_weak_actions i)
+  in
+  iterate 0 (List.length !the_weak_actions - 1) () iter_body
+;;
+
+let set_weak_type (k : weak_action_arg) : unit mm =
+  the_weak_actions := k :: !the_weak_actions;
+  get_weak_type ()
+;;
+
+type weak_action_kinds =
+  | OptionRef of (E.t * Names.GlobRef.t)
+  | OptionConstr of E.t
+  | Custom of E.t * (E.t * Names.GlobRef.t)
+
+let weak_type : weak_action_kinds option ref = ref None
+
+(* let get_weak_type () : unit mm =
+   match !weak_type with
+   | None ->
+   Log.notice "Weak type not set. (Is None)";
+   return ()
+   | Some o ->
+   (match o with
+   | OptionRef c ->
+   Log.debug
+   (Printf.sprintf
+   "command.get_weak_type OptionRef (%s)"
+   (E.to_string (fst c)));
+   let* _ = Mebi_wrapper.debug_encoding () in
+   let* decoded_tau = decode (fst c) in
+   Log.notice
+   (Printf.sprintf
+   "Weak type is an Option of \"%s\" (where silent actions are None)"
+   (econstr_to_string decoded_tau));
+   return ()
+   | OptionConstr c ->
+   Log.debug
+   (Printf.sprintf
+   "command.get_weak_type OptionConstr (%s)"
+   (E.to_string c));
+   let* _ = Mebi_wrapper.debug_encoding () in
+   let* decoded_tau = decode c in
+   Log.notice
+   (Printf.sprintf
+   "Weak type is an Option of \"%s\" (where silent actions are None)"
+   (econstr_to_string decoded_tau));
+   return ()
+   | Custom (x, y) ->
+   Log.debug
+   (Printf.sprintf
+   "command.get_weak_type Custom (%s, %s)"
+   (E.to_string x)
+   (E.to_string (fst y)));
+   let* decoded_tau = decode x in
+   let* decoded_label = decode (fst y) in
+   Log.notice
+   (Printf.sprintf
+   "Weak type is a Custom type of \"%s\" where silent actions are \
+   \"%s\""
+   (econstr_to_string decoded_tau)
+   (econstr_to_string decoded_label));
+   return ())
+   ;; *)
+
+let check_all () : unit mm =
+  Log.notice "Current plugin configuration:";
+  get_bound ();
+  get_dump_to_file_flag ();
+  get_show_debug_flag ();
+  get_show_details_flag ();
+  get_weak_mode ();
+  get_weak_type ()
 ;;
 
 (* FIXME: All of the code below, up to [check_valid_constructor] needs
@@ -1001,34 +1078,15 @@ module MkGraph
       | None -> return None
       | Some weak_kind ->
         (match weak_kind with
-         | Option label_type ->
-           Log.debug "MkGraph.handle_weak Option";
-           Log.warning
-             "command.MkGraph.handle_weak, Option weak_kind -- TODO fix \
-              support for \"option _\" labels in coq lts.";
-           return None
+         | OptionRef label_type ->
+           Log.debug "MkGraph.handle_weak OptionRef";
+           return (Some (fst label_type))
+         | OptionConstr label_enc ->
+           Log.debug "MkGraph.handle_weak OptionConstr";
+           return (Some label_enc)
          | Custom (tau_term, label_type) ->
            Log.debug "MkGraph.handle_weak, Custom";
-           let* (a : EConstr.t) = tref_to_econstr tau_term in
-           Log.debug
-             (Printf.sprintf
-                "MkGraph.handle_weak, Custom, tau is \"%s\""
-                (econstr_to_string a));
-           let constr : Names.GlobRef.t = Mebi_utils.ref_to_glob label_type in
-           let* (c : cindef) = get_type_cindef i constr (Some a) in
-           (* encode silent action type *)
-           let* (constr_enc : E.t) = encode c.info.name in
-           Log.debug
-             (Printf.sprintf
-                "MkGraph.handle_weak Custom, encoded \"%s\" of \"%s\" as \"%s\""
-                (econstr_to_string a)
-                (econstr_to_string c.info.name)
-                (E.to_string constr_enc));
-           B.add cindef_map constr_enc c;
-           (* return encode silent action *)
-           let* (a_enc : E.t) = encode a in
-           B.add cindef_map a_enc c;
-           return (Some a_enc)))
+           return (Some (fst label_type))))
     else return None
   ;;
 
@@ -1107,7 +1165,8 @@ module MkGraph
         ; cindefs =
             B.fold
               (fun (_key : E.t) (_val : cindef) (acc : (E.t * cindef) list) ->
-                match _val.kind with LTS _ -> (_key, _val) :: acc | _ -> acc)
+                match _val.kind with LTS _ -> (_key, _val) :: acc
+                (* | _ -> acc *))
               cindef_map
               []
         ; weak = the_weak_opt_enc

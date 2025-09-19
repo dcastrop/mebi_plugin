@@ -14,25 +14,28 @@ MeBi Set ShowDebug False. MeBi Check ShowDebug.
 MeBi Set WeakMode True.  MeBi Check WeakMode.
 MeBi Set WeakMode False. MeBi Check WeakMode.
 
-MeBi Set Weak Option nat. MeBi Check Weak.
+MeBi Set ShowDebug True.
+
+MeBi Set Weak Option nat. 
+MeBi Check Weak.
 
 Example z := 0.
-MeBi Set Weak nat Of z. 
-(* MeBi Check Weak. *)
+MeBi Set Weak z Of nat. 
+MeBi Check Weak.
 
 Inductive s_label : Set :=
 | TAU : s_label 
 | LABEL1 : nat -> s_label
 .
 MeBi Set Weak TAU Of s_label. 
-(* MeBi Check Weak. *)
+MeBi Check Weak.
 
 Inductive t_label : Type :=
 | SILENT : t_label 
 | LABEL2 : bool -> t_label
 .
 MeBi Set Weak TAU Of t_label. 
-(* MeBi Check Weak. *)
+MeBi Check Weak.
 End BasicCommands.
 
 Inductive i := C0 (i : nat) | C1 (b : bool) (j : nat) | C2 (x : nat).
