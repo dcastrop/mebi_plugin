@@ -7,7 +7,7 @@ open Logging
 (** [bound] is the total number of states to be allowed when building an LTS. *)
 let default_bound : int = 10
 
-(** Allows for a secondary bound to be specified. *)
+(** If snd is none, then fst is used for both. *)
 let default_bounds : int * int option = default_bound, None
 
 let the_bounds : (int * int option) ref = ref default_bounds
@@ -113,11 +113,190 @@ let set_weak_mode (b : bool) : unit =
 ;;
 
 (**********************)
-(** Weak Mode *********)
+(** Weak Type Args ****)
 (**********************)
 
+module WeakArgs = struct
+  type t =
+    | OptionRef of Libnames.qualid
+    | OptionConstr of Constrexpr.constr_expr
+    | CustomRef of Libnames.qualid * Libnames.qualid
+    | CustomConstr of Constrexpr.constr_expr * Libnames.qualid
+end
+
+(** If snd is none, then fst is used for both. *)
+let default_weak_type_args : WeakArgs.t option * WeakArgs.t option = None, None
+
+let the_weak_type_args : (WeakArgs.t option * WeakArgs.t option) ref =
+  ref default_weak_type_args
+;;
+
+let reset_weak_type_args () : unit =
+  the_weak_type_args := default_weak_type_args
+;;
+
 (**********************)
-(** Check All *********)
+(** Weak Type Kind ****)
+(**********************)
+
+(* must be re-obtained for each mebi_wrapper.run (...) *)
+module WeakKind = struct
+  type t =
+    | OptionRef of (Mebi_wrapper.E.t * Names.GlobRef.t)
+    | OptionConstr of Mebi_wrapper.E.t
+    | CustomRef of
+        (Mebi_wrapper.E.t * Names.GlobRef.t)
+        * (Mebi_wrapper.E.t * Names.GlobRef.t)
+    | CustomConstr of Mebi_wrapper.E.t * (Mebi_wrapper.E.t * Names.GlobRef.t)
+
+  let to_string (x : t) : string =
+    match x with
+    | OptionRef (label_enc, label_gref) -> "TODO: OptionRef"
+    | OptionConstr label_enc -> "TODO: OptionConstr"
+    | CustomRef ((tau_enc, tau_gref), (label_enc, label_gref)) ->
+      "TODO: CustomRef"
+    | CustomConstr (tau_enc, (label_enc, label_gref)) -> "TODO: CustomConstr"
+  ;;
+
+  let eq x y : bool =
+    match x, y with
+    | OptionRef (x, _), OptionRef (y, _) -> Mebi_wrapper.E.eq x y
+    | OptionConstr x, OptionConstr y -> Mebi_wrapper.E.eq x y
+    | CustomRef ((x1, _), (x2, _)), CustomRef ((y1, _), (y2, _)) ->
+      Mebi_wrapper.E.eq x1 y1 && Mebi_wrapper.E.eq x2 y2
+    | CustomConstr (x1, (x2, _)), CustomConstr (y1, (y2, _)) ->
+      Mebi_wrapper.E.eq x1 y1 && Mebi_wrapper.E.eq x2 y2
+    | _, _ -> false
+  ;;
+end
+
+(** If snd is none, then fst is used for both. *)
+let default_weak_types : WeakKind.t option * WeakKind.t option = None, None
+
+let the_weak_types : (WeakKind.t option * WeakKind.t option) ref =
+  ref default_weak_types
+;;
+
+let fst_weak_type () : WeakKind.t option = fst !the_weak_types
+
+let snd_weak_type () : WeakKind.t option =
+  match !the_weak_types with _, Some a -> Some a | a, None -> a
+;;
+
+let reset_weak_types () : unit =
+  the_weak_types := default_weak_types;
+  reset_weak_type_args ()
+;;
+
+let printout_fst_weak_type_str () : string =
+  match fst !the_weak_types with
+  | None -> "Weak 1 is None (unset)"
+  | Some w -> WeakKind.to_string w
+;;
+
+let printout_fst_weak_type () : unit =
+  Log.notice (printout_fst_weak_type_str ())
+;;
+
+let printout_snd_weak_type_str () : string =
+  match snd !the_weak_types with
+  | None -> "Weak 2 is None (unset)"
+  | Some w -> WeakKind.to_string w
+;;
+
+let printout_snd_weak_type () : unit =
+  Log.notice (printout_snd_weak_type_str ())
+;;
+
+let printout_weak_types_str () : string =
+  Printf.sprintf "TODO: Params.printout_weak_types_str"
+;;
+
+let printout_weak_types () : unit = Log.notice (printout_weak_types_str ())
+
+let weak_type_arg_to_kind (t : WeakArgs.t) : WeakKind.t Mebi_wrapper.mm =
+  let open Mebi_wrapper in
+  let open Mebi_wrapper.Syntax in
+  let open Mebi_utils in
+  match t with
+  | OptionRef label_ref ->
+    let* (label_enc : E.t) = encode_ref label_ref in
+    return (WeakKind.OptionRef (label_enc, ref_to_glob label_ref))
+  | OptionConstr label_tref ->
+    let* (label_enc : E.t) = encode_tref label_tref in
+    return (WeakKind.OptionConstr label_enc)
+  | CustomRef (tau_ref, label_ref) ->
+    let* (tau_enc : E.t) = encode_ref tau_ref in
+    let* (label_enc : E.t) = encode_ref label_ref in
+    return
+      (WeakKind.CustomRef
+         ((tau_enc, ref_to_glob tau_ref), (label_enc, ref_to_glob label_ref)))
+  | CustomConstr (tau_tref, label_ref) ->
+    let* (tau_enc : E.t) = encode_tref tau_tref in
+    let* (label_enc : E.t) = encode_ref label_ref in
+    return (WeakKind.CustomConstr (tau_enc, (label_enc, ref_to_glob label_ref)))
+;;
+
+let weak_type_arg_to_kind_opt (t : WeakArgs.t option)
+  : WeakKind.t option Mebi_wrapper.mm
+  =
+  let open Mebi_wrapper in
+  let open Mebi_wrapper.Syntax in
+  match t with
+  | Some x ->
+    let* y = weak_type_arg_to_kind x in
+    return (Some y)
+  | None -> return None
+;;
+
+let set_fst_weak_type_arg (t : WeakArgs.t) : unit =
+  the_weak_type_args := Some t, snd !the_weak_type_args;
+  Log.debug
+    (Printf.sprintf
+       "Set Weak1 type to: %s"
+       (WeakKind.to_string (Mebi_wrapper.run (weak_type_arg_to_kind t))))
+;;
+
+let set_snd_weak_type_arg (t : WeakArgs.t) : unit =
+  the_weak_type_args := fst !the_weak_type_args, Some t;
+  Log.debug
+    (Printf.sprintf
+       "Set Weak2 type to: %s"
+       (WeakKind.to_string (Mebi_wrapper.run (weak_type_arg_to_kind t))))
+;;
+
+let set_weak_types_args (t : WeakArgs.t * WeakArgs.t option) : unit =
+  set_fst_weak_type_arg (fst t);
+  match t with _, Some b -> set_snd_weak_type_arg b | _, None -> ()
+;;
+
+(**********************)
+(** Run ***************)
+(**********************)
+
+let obtain_weak_kinds_from_args () : unit Mebi_wrapper.mm =
+  let open Mebi_wrapper in
+  if !the_weak_mode
+  then (
+    let open Mebi_wrapper.Syntax in
+    let* the_fst = weak_type_arg_to_kind_opt (fst !the_weak_type_args) in
+    let* the_snd = weak_type_arg_to_kind_opt (snd !the_weak_type_args) in
+    the_weak_types := the_fst, the_snd;
+    return ())
+  else (
+    match !the_weak_type_args with
+    | None, None -> return ()
+    | _, _ ->
+      Log.warning "(Not in weak mode, resetting weak params.)";
+      reset_weak_types ();
+      return ())
+;;
+
+let get_fst_params () : int * WeakKind.t option = fst_bound (), fst_weak_type ()
+let get_snd_params () : int * WeakKind.t option = snd_bound (), snd_weak_type ()
+
+(**********************)
+(** All ***************)
 (**********************)
 
 let printout_all () : unit =
@@ -129,6 +308,16 @@ let printout_all () : unit =
        (printout_show_debug_str ())
        (printout_show_details_str ())
        (printout_weak_mode_str ())
-       (* (printout_weak_type_str ()) *)
-       "TODO: WEAK TYPE")
+       (printout_weak_types_str ()))
+;;
+
+let reset_all () : unit =
+  reset_bounds ();
+  reset_dump_to_file ();
+  reset_show_debug ();
+  reset_show_details ();
+  reset_weak_mode ();
+  reset_weak_types ();
+  Log.notice "Reset all plugin params.";
+  printout_all ()
 ;;

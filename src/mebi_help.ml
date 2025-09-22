@@ -127,9 +127,9 @@ let show_help_set_weak () : unit =
 
 let show_help_check () : unit =
   Log.notice
-    "Use the command \"MeBi Check x\" to see what any of Bound, DumpToFile, \
+    "Use the command \"MeBi See x\" to see what any of Bound, DumpToFile, \
      ShowDebug, WeakMode, Weak are set to.\n\
-     Use the command \"MeBi Check All\" to see for them all.\n"
+     Use the command \"MeBi See All\" to see for them all.\n"
 ;;
 
 let show_help_lts () : unit = Log.notice "Use the command \"MeBi LTS ...\"\n"

@@ -726,7 +726,7 @@ let decode (k : E.t) : term mm =
 (****** ENCODE/DECODE OPT *******************)
 (********************************************)
 
-let encode_opt (k : term) : E.t option mm =
+let get_encoding_opt (k : term) : E.t option mm =
   fun (st : wrapper ref) ->
   match F.find_opt !st.fwd_enc k with
   | None -> { state = st; value = None }
@@ -734,7 +734,7 @@ let encode_opt (k : term) : E.t option mm =
 ;;
 
 (** dual to [encode] except we cannot handle new values *)
-let decode_opt (k : E.t) : term option mm =
+let get_decoding_opt (k : E.t) : term option mm =
   fun (st : wrapper ref) ->
   match B.find_opt !st.bck_enc k with
   | None -> { state = st; value = None }
