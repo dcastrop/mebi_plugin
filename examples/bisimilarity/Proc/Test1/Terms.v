@@ -24,7 +24,8 @@ Example r : term := tseq (tpar (tact (recv A) tend)
                          (tfix (tseq (tpar (tact (send A) tend) 
                                            (tact (recv A) tend)) trec)).
 
-MeBi Check All.
+MeBi Divider "Examples.Bisimilarity.Proc.Test1.Terms".
+MeBi See All.
 
 (* MeBi Set ShowDebug True.
 MeBi Set ShowDetails True.

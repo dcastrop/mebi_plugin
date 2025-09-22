@@ -221,8 +221,8 @@ module Syntax : MEBI_MONAD_SYNTAX
 
 val encode : term -> E.t mm
 val decode : E.t -> term mm
-val encode_opt : term -> E.t option mm
-val decode_opt : E.t -> term option mm
+val get_encoding_opt : term -> E.t option mm
+val get_decoding_opt : E.t -> term option mm
 val has_encoding : term -> bool mm
 val has_decoding : E.t -> bool mm
 val encode_map : 'a F.t -> 'a B.t mm

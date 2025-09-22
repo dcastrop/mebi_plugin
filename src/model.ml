@@ -29,7 +29,7 @@ module Info = struct
     ; num_states : int
     ; num_edges : int
     ; coq_info : Coq.t list option
-    ; weak_info : Mebi_wrapper.E.t list option
+    ; weak_info : Params.WeakKind.t list option
     }
 
   let merge
@@ -59,10 +59,10 @@ module Info = struct
          | Some s1, Some s2 ->
            Some
              (List.fold_left
-                (fun (acc : Mebi_wrapper.E.t list) (w : Mebi_wrapper.E.t) ->
+                (fun (acc : Params.WeakKind.t list) (w : Params.WeakKind.t) ->
                   if
                     List.exists
-                      (fun (t : Mebi_wrapper.E.t) -> Mebi_wrapper.E.eq w t)
+                      (fun (t : Params.WeakKind.t) -> Params.WeakKind.eq w t)
                       acc
                   then acc
                   else w :: acc)
@@ -112,12 +112,12 @@ module Info = struct
        | Some [] -> "[]"
        | Some (h :: t) ->
          if List.is_empty t
-         then Mebi_wrapper.E.to_string h
+         then Params.WeakKind.to_string h
          else
            List.fold_left
-             (fun (acc : string) (w : Mebi_wrapper.E.t) ->
-               Printf.sprintf "%s, %s" acc (Mebi_wrapper.E.to_string w))
-             (Mebi_wrapper.E.to_string h)
+             (fun (acc : string) (w : Params.WeakKind.t) ->
+               Printf.sprintf "%s, %s" acc (Params.WeakKind.to_string w))
+             (Params.WeakKind.to_string h)
              t)
       outer
   ;;
