@@ -13,18 +13,24 @@ type output_kind =
 
 type output_options =
   { mutable output_enabled : bool
-  ; mutable _show_notice_enabled : bool
+  ; mutable show_notice_enabled : bool
   ; mutable show_debug_enabled : bool
-  ; mutable show_detailed_enabled : bool
-  ; mutable _show_warning_enabled : bool
+  ; mutable show_details_enabled : bool
+  ; mutable show_warning_enabled : bool
   }
 
+let default_output_enabled : bool = true
+let default_show_notice_enabled : bool = true
+let default_show_debug_enabled : bool = false
+let default_show_details_enabled : bool = false
+let default_show_warning_enabled : bool = true
+
 let default_output_options : output_options =
-  { output_enabled = true
-  ; _show_notice_enabled = true
-  ; show_debug_enabled = false
-  ; show_detailed_enabled = false
-  ; _show_warning_enabled = true
+  { output_enabled = default_output_enabled
+  ; show_notice_enabled = default_show_notice_enabled
+  ; show_debug_enabled = default_show_debug_enabled
+  ; show_details_enabled = default_show_details_enabled
+  ; show_warning_enabled = default_show_warning_enabled
   }
 ;;
 
@@ -39,14 +45,34 @@ let the_params : params ref =
     { mode = default_mode; options = default_output_options; override = false }
 ;;
 
+let reset_output_enabled () : unit =
+  !the_params.options.output_enabled <- default_output_enabled
+;;
+
+let reset_show_notice_enabled () : unit =
+  !the_params.options.show_notice_enabled <- default_show_notice_enabled
+;;
+
+let reset_show_debug_enabled () : unit =
+  !the_params.options.show_debug_enabled <- default_show_debug_enabled
+;;
+
+let reset_show_details_enabled () : unit =
+  !the_params.options.show_details_enabled <- default_show_details_enabled
+;;
+
+let reset_show_warning_enabled () : unit =
+  !the_params.options.show_warning_enabled <- default_show_warning_enabled
+;;
+
 let is_output_kind_enabled (kind : output_kind) : bool =
   !the_params.options.output_enabled
   &&
   match kind with
-  | Notice -> !the_params.options._show_notice_enabled
+  | Notice -> !the_params.options.show_notice_enabled
   | Debug -> !the_params.options.show_debug_enabled
-  | Details -> !the_params.options.show_detailed_enabled
-  | Warning -> !the_params.options._show_warning_enabled
+  | Details -> !the_params.options.show_details_enabled
+  | Warning -> !the_params.options.show_warning_enabled
 ;;
 
 (** only used when not in [Coq ()] mode *)
@@ -86,25 +112,14 @@ module Log = struct
   let warning (s : string) : unit = log Warning s
 end
 
+let is_show_debug_enabled () : bool = !the_params.options.show_debug_enabled
+let is_show_details_enabled () : bool = !the_params.options.show_details_enabled
+
 (** *)
 let get_output_mode () : unit =
   match !the_params.mode with
   | Coq () -> Log.override "Output mode is for Coq."
   | OCaml () -> Log.override "Output mode is for OCaml."
-;;
-
-let get_show_debug_messages () : unit =
-  Log.override
-    (if !the_params.options.show_debug_enabled
-     then "Debug messages will be shown."
-     else "Debug messages set to be hidden.")
-;;
-
-let get_show_detailed_messages () : unit =
-  Log.override
-    (if !the_params.options.show_detailed_enabled
-     then "Detailed messages will be shown. (where possible)"
-     else "Detailed messages set to be hidden.")
 ;;
 
 (** *)
@@ -113,16 +128,13 @@ let set_output_mode (m : output_mode) : unit =
   get_output_mode ()
 ;;
 
-let set_show_debug_messages (b : bool) : unit =
-  !the_params.options.show_debug_enabled <- b;
-  get_show_debug_messages ()
+let set_show_debug (b : bool) : unit =
+  !the_params.options.show_debug_enabled <- b
 ;;
 
-let set_show_detailed_messages (b : bool) : unit =
-  !the_params.options.show_detailed_enabled <- b;
-  get_show_detailed_messages ()
+let set_show_details (b : bool) : unit =
+  !the_params.options.show_details_enabled <- b
 ;;
 
-(* *)
 let enable_output () : unit = !the_params.options.output_enabled <- true
 let disable_output () : unit = !the_params.options.output_enabled <- false

@@ -22,25 +22,33 @@ open Stdarg
 
 VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 
-| ["MeBi" "Set"   "Bound" "Default"] -> {Mebi_wrapper.run (Command.set_bound Command.default_bound)}
-| ["MeBi" "Set"   "Bound" int(b)   ] -> {Mebi_wrapper.run (Command.set_bound b)}
-| ["MeBi" "Check" "Bound"          ] -> {Mebi_wrapper.run (Mebi_wrapper.return (Command.get_bound ()))}
+| ["MeBi" "Set"   "Bound" int(b)       ] -> {Params.set_bounds (b, None)}
+| ["MeBi" "Set"   "Bound" int(b) int(a)] -> {Params.set_bounds (b, Some a)}
 
-| ["MeBi" "Set"   "DumpToFile" "True" ] -> {Mebi_wrapper.run (Command.set_dump_to_file_flag true)}
-| ["MeBi" "Set"   "DumpToFile" "False"] -> {Mebi_wrapper.run (Command.set_dump_to_file_flag false)}
-| ["MeBi" "Check" "DumpToFile"        ] -> {Mebi_wrapper.run (Mebi_wrapper.return (Command.get_dump_to_file_flag ()))}
+| ["MeBi" "Set"   "DumpToFile"  "True" ] -> {Params.set_dump_to_file true}
+| ["MeBi" "Set"   "DumpToFile"  "False"] -> {Params.set_dump_to_file false}
 
-| ["MeBi" "Set"   "ShowDebug" "True" ] -> {Mebi_wrapper.run (Command.set_show_debug_flag true)}
-| ["MeBi" "Set"   "ShowDebug" "False"] -> {Mebi_wrapper.run (Command.set_show_debug_flag false)}
-| ["MeBi" "Check" "ShowDebug"        ] -> {Mebi_wrapper.run (Mebi_wrapper.return (Command.get_show_debug_flag ()))}
+| ["MeBi" "Set"   "ShowDebug"   "True" ] -> {Params.set_show_debug true}
+| ["MeBi" "Set"   "ShowDebug"   "False"] -> {Params.set_show_debug false}
 
-| ["MeBi" "Set"   "ShowDetails" "True" ] -> {Mebi_wrapper.run (Command.set_show_details_flag true)}
-| ["MeBi" "Set"   "ShowDetails" "False"] -> {Mebi_wrapper.run (Command.set_show_details_flag false)}
-| ["MeBi" "Check" "ShowDetails"        ] -> {Mebi_wrapper.run (Mebi_wrapper.return (Command.get_show_details_flag ()))}
+| ["MeBi" "Set"   "ShowDetails" "True" ] -> {Params.set_show_details true}
+| ["MeBi" "Set"   "ShowDetails" "False"] -> {Params.set_show_details false}
 
-| ["MeBi" "Set"   "WeakMode" "True" ] -> {Mebi_wrapper.run (Command.set_weak_mode true)}
-| ["MeBi" "Set"   "WeakMode" "False"] -> {Mebi_wrapper.run (Command.set_weak_mode false)}
-| ["MeBi" "Check" "WeakMode"        ] -> {Mebi_wrapper.run (Mebi_wrapper.return (Command.get_weak_mode ()))}
+| ["MeBi" "Set"   "WeakMode"    "True" ] -> {Params.set_weak_mode true}
+| ["MeBi" "Set"   "WeakMode"    "False"] -> {Params.set_weak_mode false}
+
+| ["MeBi" "Reset" "Bound"      ] -> {Params.reset_bounds ()}
+| ["MeBi" "Reset" "DumpToFile" ] -> {Params.reset_dump_to_file ()}
+| ["MeBi" "Reset" "ShowDebug"  ] -> {Params.reset_show_debug ()}
+| ["MeBi" "Reset" "ShowDetails"] -> {Params.reset_show_details ()}
+| ["MeBi" "Reset" "WeakMode"   ] -> {Params.reset_weak_mode ()}
+
+| ["MeBi" "Check" "Bound"      ] -> {Params.printout_bounds ()}
+| ["MeBi" "Check" "DumpToFile" ] -> {Params.printout_dump_to_file ()}
+| ["MeBi" "Check" "ShowDebug"  ] -> {Params.printout_show_debug ()}
+| ["MeBi" "Check" "ShowDetails"] -> {Params.printout_show_details ()}
+| ["MeBi" "Check" "WeakMode"   ] -> {Params.printout_weak_mode ()}
+| ["MeBi" "Check" "All"        ] -> {Params.printout_all ()}
 
 | ["MeBi" "Set"   "Weak" "Option" reference(x)] -> {Mebi_wrapper.run (Command.set_weak_type (Command.OptionRef x))}
 | ["MeBi" "Set"   "Weak" "Option" constr(x)   ] -> {Mebi_wrapper.run (Command.set_weak_type (Command.OptionConstr x))}
@@ -48,7 +56,6 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
                                   reference(y)] -> {Mebi_wrapper.run (Command.set_weak_type (Command.Custom (x, y)))}
 | ["MeBi" "Check" "Weak"                      ] -> {Mebi_wrapper.run (Command.get_weak_type ())}
 
-| ["MeBi" "Check" "All"] -> {Mebi_wrapper.run (Command.check_all ())}
 
 | ["MeBi" "LTS" constr(x) "Using" reference(r)] -> {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) [])}
 | ["MeBi" "LTS" constr(x) "Using" reference(r) 
@@ -75,7 +82,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "Help"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Basic ())) [])}
 
 | ["MeBi" "Help" "Set"              ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.General ()))) [])}
-| ["MeBi" "Help" "Set" "Bound"      ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.Bound (Command.default_bound)))) [])}
+| ["MeBi" "Help" "Set" "Bound"      ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.Bound ()))) [])}
 | ["MeBi" "Help" "Set" "DumpToFile" ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.DumpToFile ()))) [])}
 | ["MeBi" "Help" "Set" "ShowDebug"  ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowDebug ()))) [])}
 | ["MeBi" "Help" "Set" "ShowDetails"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowDetails ()))) [])}

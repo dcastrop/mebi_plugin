@@ -1,84 +1,13 @@
 open Mebi_wrapper
 open Mebi_wrapper.Syntax
+
+(* open Params *)
 open Logging
 open Model
 open Utils
 
-(** [bound] is the total number of states to be allowed when building an LTS. *)
-let default_bound : int = 10
-
-let bound : int ref = ref default_bound
-
-let get_bound () : unit =
-  Log.override
-    (Printf.sprintf
-       "Bound set to: %i.%s"
-       !bound
-       (if !bound = default_bound then " (default)" else ""))
-;;
-
-let set_bound (b : int) : unit mm =
-  bound := b;
-  Log.override
-    (Printf.sprintf
-       "Set bound to: %i.%s"
-       !bound
-       (if !bound = default_bound then " (default)" else ""));
-  return ()
-;;
-
-(** *)
-let dump_to_file_flag : bool ref = ref true
-
-let get_dump_to_file_flag () : unit =
-  Log.notice
-    (if !dump_to_file_flag
-     then "File dumps enabled."
-     else "File dumps disabled.")
-;;
-
-let set_dump_to_file_flag (b : bool) : unit mm =
-  dump_to_file_flag := b;
-  Log.notice
-    (if !dump_to_file_flag
-     then "Enabled File dumps."
-     else "Disabled File dumps.");
-  return ()
-;;
-
-(** *)
-let get_show_debug_flag () : unit = Logging.get_show_debug_messages ()
-
-let set_show_debug_flag (b : bool) : unit mm =
-  return (Logging.set_show_debug_messages b)
-;;
-
-(** *)
-let get_show_details_flag () : unit = Logging.get_show_detailed_messages ()
-
-let set_show_details_flag (b : bool) : unit mm =
-  return (Logging.set_show_detailed_messages b)
-;;
-
-(** *)
-let weak_mode : bool ref = ref true
-
-let get_weak_mode () : unit =
-  Log.notice
-    (Printf.sprintf
-       "Currently in %s mode."
-       (if !weak_mode then "weak" else "strong"))
-;;
-
-let set_weak_mode (b : bool) : unit mm =
-  weak_mode := b;
-  Log.notice
-    (Printf.sprintf "Now in %s mode." (if !weak_mode then "weak" else "strong"));
-  return ()
-;;
-
 let arity_is_type (mip : Declarations.one_inductive_body) : unit mm =
-  Log.debug "arity_is_type";
+  Log.debug "command.arity_is_type";
   let open Declarations in
   match mip.mind_arity with
   | RegularArity s ->
@@ -91,7 +20,7 @@ let arity_is_type (mip : Declarations.one_inductive_body) : unit mm =
 
 (** [arity_is_prop mip] raises an error if [mip.mind_arity] is not a [prop]. *)
 let arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
-  Log.debug "arity_is_prop";
+  Log.debug "command.arity_is_prop";
   let open Declarations in
   match mip.mind_arity with
   | RegularArity s ->
@@ -288,6 +217,7 @@ let weak_type : weak_action_kinds option ref = ref None
 let reinstantiate_weak_type (k : weak_action_arg) : unit mm =
   match k with
   | OptionRef label_ref ->
+    Log.debug "command.reinstate_weak_type, OptionRef";
     let label_glob = Mebi_utils.ref_to_glob label_ref in
     let* (ct : cindef_info) = check_ref_type label_glob in
     let* (label_enc : E.t) = encode ct.name in
@@ -298,6 +228,7 @@ let reinstantiate_weak_type (k : weak_action_arg) : unit mm =
        (econstr_to_string ct.name)); *)
     return ()
   | OptionConstr label_type ->
+    Log.debug "command.reinstate_weak_type, OptionConstr";
     (* encode tau *)
     let* (label : EConstr.t) = tref_to_econstr label_type in
     let* (label_enc : E.t) = encode label in
@@ -308,6 +239,7 @@ let reinstantiate_weak_type (k : weak_action_arg) : unit mm =
        (econstr_to_string label)); *)
     return ()
   | Custom (tau_term, label_type) ->
+    Log.debug "command.reinstate_weak_type, Custom";
     (* encode tau *)
     let* (tau : EConstr.t) = tref_to_econstr tau_term in
     let* (tau_enc : E.t) = encode tau in
@@ -326,7 +258,8 @@ let reinstantiate_weak_type (k : weak_action_arg) : unit mm =
 ;;
 
 let reinstantiate_weak_types () : unit mm =
-  if !weak_mode = false
+  Log.debug "command.reinstate_weak_types";
+  if !Params.the_weak_mode = false
   then return ()
   else if Int.equal 1 (List.length !the_weak_actions)
   then reinstantiate_weak_type (List.hd !the_weak_actions)
@@ -385,16 +318,6 @@ let reinstantiate_weak_types () : unit mm =
    (econstr_to_string decoded_label));
    return ())
    ;; *)
-
-let check_all () : unit mm =
-  Log.notice "Current plugin configuration:";
-  get_bound ();
-  get_dump_to_file_flag ();
-  get_show_debug_flag ();
-  get_show_details_flag ();
-  get_weak_mode ();
-  get_weak_type ()
-;;
 
 (* FIXME: All of the code below, up to [check_valid_constructor] needs
    reworking *)
@@ -894,12 +817,14 @@ module type GraphB = sig
     :  Libnames.qualid
     -> Constrexpr.constr_expr
     -> Names.GlobRef.t list
+    -> int
     -> lts_graph mm
 
   val decoq_lts
     :  ?cache_decoding:bool
     -> ?name:string
     -> lts_graph (* -> cindef * cindef B.t *)
+    -> int
     -> Lts.t mm
 end
 
@@ -997,7 +922,7 @@ module MkGraph
         (ctors : coq_ctor list)
     : S.t mm
     =
-    Log.debug "MkGraph.get_new_states";
+    Log.debug "command.MkGraph.get_new_states";
     let iter_body (i : int) (new_states : S.t) =
       let (act, tgt, int_tree) : coq_ctor = List.nth ctors i in
       let* (tgt_enc : E.t) = encode tgt in
@@ -1034,7 +959,7 @@ module MkGraph
   let get_new_constrs (from : E.t) (primary : cindef) (rlts_map : cindef B.t)
     : coq_ctor list mm
     =
-    Log.debug "MkGraph.get_new_constrs";
+    Log.debug "command.MkGraph.get_new_constrs";
     let* (from_dec : EConstr.t) = decode from in
     let* (decoded_map : cindef F.t) = decode_map rlts_map in
     let* primary_constr_transitions = lts_cindef_constr_transitions primary in
@@ -1059,7 +984,7 @@ module MkGraph
             (bound : int)
     : lts_graph mm
     =
-    Log.debug "MkGraph.build_lts_graph";
+    Log.debug "command.MkGraph.build_lts_graph";
     if Queue.is_empty g.to_visit
     then return g (* finished if no more to visit*)
     else if S.cardinal g.states > bound
@@ -1124,21 +1049,21 @@ module MkGraph
      ;; *)
 
   let handle_weak (cindef_map : cindef B.t) (i : int) : E.t option mm =
-    Log.debug "MkGraph.handle_weak";
-    if !weak_mode
+    Log.debug "command.MkGraph.handle_weak";
+    if !Params.the_weak_mode
     then (
       match !weak_type with
       | None -> return None
       | Some weak_kind ->
         (match weak_kind with
          | OptionRef label_type ->
-           Log.debug "MkGraph.handle_weak OptionRef";
+           Log.debug "command.MkGraph.handle_weak OptionRef";
            return (Some (fst label_type))
          | OptionConstr label_enc ->
-           Log.debug "MkGraph.handle_weak OptionConstr";
+           Log.debug "command.MkGraph.handle_weak OptionConstr";
            return (Some label_enc)
          | Custom (tau_term, label_type) ->
-           Log.debug "MkGraph.handle_weak, Custom";
+           Log.debug "command.MkGraph.handle_weak, Custom";
            return (Some (fst label_type))))
     else return None
   ;;
@@ -1152,7 +1077,7 @@ module MkGraph
         (grefs : Names.GlobRef.t list)
     : (E.t * E.t option * cindef B.t) mm
     =
-    Log.debug "MkGraph.build_cindef_map";
+    Log.debug "command.MkGraph.build_cindef_map";
     (* normalize the initial term *)
     let* (t : EConstr.t) = normalize_econstr t' in
     let* (ty : EConstr.t) = type_of_econstr t in
@@ -1187,10 +1112,11 @@ module MkGraph
         (primary_lts : Libnames.qualid)
         (tref : Constrexpr.constr_expr)
         (grefs : Names.GlobRef.t list)
+        (bound : int)
     : lts_graph mm
     =
     (* make map of term types *)
-    Log.debug "MkGraph.build_graph";
+    Log.debug "command.MkGraph.build_graph";
     let* (t : EConstr.t) = tref_to_econstr tref in
     let* (the_primary_enc, the_weak_opt_enc, cindef_map)
       : E.t * E.t option * cindef B.t
@@ -1224,7 +1150,7 @@ module MkGraph
               []
         ; weak = the_weak_opt_enc
         }
-        !bound
+        bound
     in
     let terminals =
       S.filter (fun (s : S.elt) -> Bool.not (H.mem g.transitions s)) g.states
@@ -1381,9 +1307,10 @@ module MkGraph
         ?(cache_decoding : bool = false)
         ?(name : string = "unnamed")
         (g : lts_graph)
+        (bound : int)
     : Lts.t mm
     =
-    Log.debug "MkGraph.decoq_lts";
+    Log.debug "command.MkGraph.decoq_lts";
     let* init : State.t option = decoq_state_opt ~cache_decoding g.init in
     let* states : Model.States.t = decoq_states ~cache_decoding g.states in
     let* terminals = decoq_states ~cache_decoding g.terminals in
@@ -1396,7 +1323,7 @@ module MkGraph
     let info : Info.t option =
       Some
         { is_complete = Queue.is_empty g.to_visit
-        ; bound = !bound
+        ; bound
         ; num_terminals = S.cardinal g.terminals
         ; num_labels = Model.Alphabet.cardinal alphabet
         ; num_states = S.cardinal g.states
@@ -1411,7 +1338,7 @@ end
 
 (** [make_graph_builder] is ... *)
 let make_graph_builder =
-  Log.debug "make_graph_builder";
+  Log.debug "command.make_graph_builder";
   let* h = make_transition_tbl in
   (* hashtabl of terms to (edges) or (cindef) *)
   let* s = make_state_set in
@@ -1447,6 +1374,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
   let build_lts_graph
         (primary_lts : Libnames.qualid)
         (t : Constrexpr.constr_expr)
+        (bound : int)
     : Lts.t mm
     =
     Log.debug "command.run.build_lts_graph";
@@ -1455,21 +1383,22 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
         primary_lts
         t
         (Mebi_utils.ref_list_to_glob_list (primary_lts :: refs))
+        bound
     in
-    G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts
+    G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts bound
   in
   match k with
   | MakeModel (kind, (x, primary_lts)) ->
     Log.debug "command.run, MakeModel";
     let* _ = reinstantiate_weak_types () in
-    let* the_lts = build_lts_graph primary_lts x in
+    let* the_lts = build_lts_graph primary_lts x (Params.fst_bound ()) in
     (match kind with
      | LTS ->
        Log.notice
          (Printf.sprintf
             "command.run, MakeModel LTS, finished: %s"
             (Lts.to_string the_lts));
-       if !dump_to_file_flag
+       if !Params.the_dump_to_file
        then Log.debug "command.run, MakeModel LTS -- TODO dump to file\n";
        return ()
      | FSM ->
@@ -1482,18 +1411,19 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
          (Printf.sprintf
             "command.run, MakeModel FSM, finished: %s"
             (Fsm.to_string the_fsm));
-       if !dump_to_file_flag
+       if !Params.the_dump_to_file
        then Log.debug "command.run, MakeModel FSM -- TODO dump to file\n";
        return ())
   | SaturateModel (x, primary_lts) ->
     (match !weak_type with
      | None ->
-       if !weak_mode = false then Mebi_help.show_instructions_to_enable_weak ();
+       if !Params.the_weak_mode = false
+       then Mebi_help.show_instructions_to_enable_weak ();
        Mebi_help.show_instructions_to_set_weak ();
        Log.warning "Aborting command.\n";
        return ()
      | Some _ ->
-       if !weak_mode = false
+       if !Params.the_weak_mode = false
        then (
          Mebi_help.show_instructions_to_enable_weak ();
          Log.warning "Aborting command.\n";
@@ -1501,7 +1431,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
        else (
          Log.debug "command.run, SaturateModel";
          let* _ = reinstantiate_weak_types () in
-         let* the_lts = build_lts_graph primary_lts x in
+         let* the_lts = build_lts_graph primary_lts x (Params.fst_bound ()) in
          let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
          Log.details
            (Printf.sprintf
@@ -1512,7 +1442,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
            (Printf.sprintf
               "command.run, SaturateModel, finished: %s"
               (Fsm.to_string the_saturated));
-         if !dump_to_file_flag
+         if !Params.the_dump_to_file
          then Log.debug "command.run, SaturateModel -- TODO dump to file\n";
          return ()))
   | MinimizeModel (x, primary_lts) ->
@@ -1522,7 +1452,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
        Log.warning "Aborting command.\n";
        return ()
      | Some _ ->
-       if !weak_mode = false
+       if !Params.the_weak_mode = false
        then (
          Mebi_help.show_instructions_to_enable_weak ();
          Log.warning "Aborting command.\n";
@@ -1530,22 +1460,24 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
        else (
          Log.debug "command.run, MinimizeModel";
          let* _ = reinstantiate_weak_types () in
-         let* the_lts = build_lts_graph primary_lts x in
+         let* the_lts = build_lts_graph primary_lts x (Params.fst_bound ()) in
          let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-         let the_minimized = Algorithms.run (Minim (!weak_mode, the_fsm)) in
+         let the_minimized =
+           Algorithms.run (Minim (!Params.the_weak_mode, the_fsm))
+         in
          Log.details
            (Printf.sprintf
               "command.run, MinimizeModel, finished: %s\n"
               (Algorithms.pstr the_minimized));
-         if !dump_to_file_flag
+         if !Params.the_dump_to_file
          then Log.debug "command.run, MinimizeModel -- TODO dump to file\n";
          return ()))
   | CheckBisimilarity ((x, a), (y, b)) ->
     Log.debug "command.run, CheckBisimilarity";
-    Mebi_help.show_instructions_to_toggle_weak !weak_mode;
+    Mebi_help.show_instructions_to_toggle_weak !Params.the_weak_mode;
     let* _ = reinstantiate_weak_types () in
-    let* the_lts_1 = build_lts_graph a x in
-    let* the_lts_2 = build_lts_graph b y in
+    let* the_lts_1 = build_lts_graph a x (Params.fst_bound ()) in
+    let* the_lts_2 = build_lts_graph b y (Params.snd_bound ()) in
     let the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
     let the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
     Log.details
@@ -1554,13 +1486,13 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
          (Fsm.to_string the_fsm_1)
          (Fsm.to_string the_fsm_2));
     let the_bisimilar =
-      Algorithms.run (Bisim (!weak_mode, (the_fsm_1, the_fsm_2)))
+      Algorithms.run (Bisim (!Params.the_weak_mode, (the_fsm_1, the_fsm_2)))
     in
     Log.notice
       (Printf.sprintf
          "command.run, CheckBisimilarity, finished: %s\n"
          (Algorithms.pstr the_bisimilar));
-    if !dump_to_file_flag
+    if !Params.the_dump_to_file
     then Log.debug "command.run, CheckBisimilarity -- TODO dump to file\n";
     return ()
   | Info () ->

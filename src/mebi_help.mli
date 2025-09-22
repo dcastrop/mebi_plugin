@@ -1,6 +1,6 @@
 type help_set_kind =
   | General of unit
-  | Bound of int
+  | Bound of unit
   | DumpToFile of unit
   | ShowDebug of unit
   | ShowDetails of unit
@@ -25,7 +25,7 @@ val show_instructions_to_set_weak : unit -> unit
 val show_help_basic : unit -> unit
 val show_help_unrecognized_command : unit -> unit
 val show_help_set : unit -> unit
-val show_help_set_bound : int -> unit
+val show_help_set_bound : unit -> unit
 val show_help_set_dump_to_file : unit -> unit
 val show_help_set_show_debug : unit -> unit
 val show_help_set_show_details : unit -> unit

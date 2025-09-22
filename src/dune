@@ -30,6 +30,7 @@
   fsm
   algorithms
   dump_to_file
+  params
   command
   mebi_api
   ; examples

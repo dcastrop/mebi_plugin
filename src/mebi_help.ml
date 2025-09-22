@@ -2,7 +2,7 @@ open Logging
 
 type help_set_kind =
   | General of unit
-  | Bound of int
+  | Bound of unit
   | DumpToFile of unit
   | ShowDebug of unit
   | ShowDetails of unit
@@ -77,7 +77,7 @@ let show_help_set () : unit =
         (where x is one of the parameters above)\n")
 ;;
 
-let show_help_set_bound (default_bound : int) : unit =
+let show_help_set_bound () : unit =
   Log.notice
     (Printf.sprintf
        "Use the command \"MeBi Set Bound n\" to set the upper-bound of the \
@@ -85,7 +85,7 @@ let show_help_set_bound (default_bound : int) : unit =
         a coq term, where \"n\" is an natural integer number.\n\n\
         Use command \"MeBi Set Bound Default\" to reset this to the default, \
         which is: %i"
-       default_bound)
+       Params.default_bound)
 ;;
 
 let show_help_set_dump_to_file () : unit =
