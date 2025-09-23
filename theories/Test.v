@@ -395,8 +395,8 @@ Module BisimTest3.
   MeBi Set WeakMode True.
   MeBi Set Weak Option action. 
   
-  (* MeBi Set ShowDebug True. *)
-  (* MeBi Set ShowDetails True. *)
+  MeBi Set ShowDebug True.
+  MeBi Set ShowDetails True.
 
   Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
   MeBi FSM exa1 Using termLTS.

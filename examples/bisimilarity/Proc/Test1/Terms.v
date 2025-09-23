@@ -31,6 +31,8 @@ MeBi Set Weak Option label.
 
 MeBi FSM p Using termLTS.
 
+Print Registered.
+
 
 (* MeBi Set ShowDebug True. *)
 (* MeBi Set ShowDetails True.  *)
@@ -38,6 +40,7 @@ MeBi FSM p Using termLTS.
 (* MeBi Minimize p Using termLTS. *)
 (* MeBi Bisim p With termLTS And p With termLTS Using termLTS. *)
 
+MeBi Set ShowDetails False.
 MeBi Set ShowDetails True.
 
 MeBi Bisim p With termLTS And q With termLTS Using termLTS.

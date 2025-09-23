@@ -448,6 +448,8 @@ module MkGraph
          if E.eq label_enc ty_enc
          then return (Some false)
          else
+           (* let* b = is_silent act in *)
+           (* return (Some b) *)
            (* NOTE: could be the [None] type? *)
            return (Some (String.equal "None" (econstr_to_string act)))
        | OptionConstr label_enc ->
@@ -461,6 +463,8 @@ module MkGraph
          if E.eq label_enc ty_enc
          then return (Some false)
          else
+           (* let* b = is_silent act in *)
+           (* return (Some b) *)
            (* NOTE: could be the [None] type? *)
            return (Some (String.equal "None" (econstr_to_string act)))
        | CustomRef ((tau_enc, _tau_gref), (label_enc, _label_gref)) ->

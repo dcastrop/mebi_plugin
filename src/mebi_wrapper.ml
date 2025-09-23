@@ -156,6 +156,7 @@ type wrapper =
   { coq_ref : coq_context ref
   ; fwd_enc : E.t F.t
   ; bck_enc : term B.t
+  ; none_tm : term
   }
 
 type 'a in_context =
@@ -173,11 +174,21 @@ type 'a mm = wrapper ref -> 'a in_context
 let run ?(keep_encoding : bool = false) (x : 'a mm) : 'a =
   let env = !(the_coq_env ~fresh:true ()) in
   let sigma = !(the_coq_ctx ()) in
+  (* get None type (used for silent actions) *)
+  let sigma, none_tm =
+    Evd.fresh_global env sigma (Coqlib.lib_ref "core.option.None")
+  in
   let coq_ref : coq_context ref = ref { coq_env = env; coq_ctx = sigma } in
   if keep_encoding then () else E.reset ();
   let fwd_enc : E.t F.t = F.create 0 in
   let bck_enc = B.create 0 in
-  let a = x (ref { coq_ref; fwd_enc; bck_enc }) in
+  if keep_encoding
+  then ()
+  else (
+    (* populate with None *)
+    let _ = E.encode fwd_enc bck_enc none_tm in
+    ());
+  let a = x (ref { coq_ref; fwd_enc; bck_enc; none_tm }) in
   enable_logging := false;
   a.value
 ;;
@@ -744,6 +755,18 @@ let unknown_decode_key ((k, bckmap) : E.t * term B.t) : 'a mm =
 (********************************************)
 (****** ENCODE/DECODE ***********************)
 (********************************************)
+
+let is_silent (t : term) : bool mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  { state = st
+  ; value =
+      (* E.eq
+         (E.encode !st.fwd_enc !st.bck_enc !st.none_tm)
+         (E.encode !st.fwd_enc !st.bck_enc t) *)
+      EConstr.eq_constr !coq_st.coq_ctx !st.none_tm t
+  }
+;;
 
 let encode (k : term) : E.t mm =
   fun (st : wrapper ref) ->
