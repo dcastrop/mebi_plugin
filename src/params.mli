@@ -12,6 +12,24 @@ val printout_bounds : unit -> unit
 val set_bounds : (int * (int option)) -> unit 
 
 (**********************)
+(** Fail if incomplete*)
+(**********************)
+
+val the_fail_if_incomplete : bool ref
+val reset_fail_if_incomplete : unit -> unit
+val printout_fail_if_incomplete : unit -> unit 
+val set_fail_if_incomplete : bool -> unit 
+
+(**********************)
+(** Fail if not bisim *)
+(**********************)
+
+val the_fail_if_not_bisim : bool ref
+val reset_fail_if_not_bisim : unit -> unit
+val printout_fail_if_not_bisim : unit -> unit 
+val set_fail_if_not_bisim : bool -> unit 
+
+(**********************)
 (** File Dump *********)
 (**********************)
 

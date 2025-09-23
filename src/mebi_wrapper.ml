@@ -403,6 +403,8 @@ let econstr_rel_decl_list_to_string (xs : EConstr.rel_declaration list) : string
 
 module type ERROR_TYPE = sig
   type mebi_error =
+    | ParamsFailIfIncomplete of unit
+    | ParamsFailIfNotBisim of unit
     | InvalidLTSArgsLength of int
     | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
     | InvalidLTSSort of Sorts.family
@@ -423,6 +425,8 @@ module type ERROR_TYPE = sig
 
   exception MEBI_exn of mebi_error
 
+  val params_fail_if_incomplete : unit -> exn
+  val params_fail_if_not_bisim : unit -> exn
   val invalid_lts_args_length : int -> exn
   val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
   val invalid_sort_lts : Sorts.family -> exn
@@ -457,6 +461,8 @@ end
 
 module Error : ERROR_TYPE = struct
   type mebi_error =
+    | ParamsFailIfIncomplete of unit
+    | ParamsFailIfNotBisim of unit
     | InvalidLTSArgsLength of int
     | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
     | InvalidLTSSort of Sorts.family
@@ -476,6 +482,9 @@ module Error : ERROR_TYPE = struct
         * EConstr.rel_declaration list)
 
   exception MEBI_exn of mebi_error
+
+  let params_fail_if_incomplete () = MEBI_exn (ParamsFailIfIncomplete ())
+  let params_fail_if_not_bisim () = MEBI_exn (ParamsFailIfNotBisim ())
 
   (** Assert args length == 3 in [Command.extract_args]. *)
   let invalid_lts_args_length i = MEBI_exn (InvalidLTSArgsLength i)
@@ -520,6 +529,12 @@ module Error : ERROR_TYPE = struct
   open Pp
 
   let mebi_handler = function
+    | ParamsFailIfIncomplete () ->
+      str
+        "Params are configured to fail if cannot construct complete LTS from \
+         term."
+    | ParamsFailIfNotBisim () ->
+      str "Params are configured to fail if terms not bisim."
     | ExpectedCoqIndDefOfLTSNotType () ->
       str
         "cindef (Coq Inductive Definition) of LTS was expected, but Type was \
@@ -648,6 +663,14 @@ end
 (**********************************)
 (****** ERROR FUNCTIONS ***********)
 (**********************************)
+
+let params_fail_if_incomplete () : 'a mm =
+  fun st -> raise (Error.params_fail_if_incomplete ())
+;;
+
+let params_fail_if_not_bisim () : 'a mm =
+  fun st -> raise (Error.params_fail_if_not_bisim ())
+;;
 
 let invalid_check_updated_ctx x y : 'a mm =
   fun st ->

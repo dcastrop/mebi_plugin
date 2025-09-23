@@ -1,6 +1,8 @@
 type help_set_kind =
   | General of unit
   | Bound of unit
+  | FailIfIncomplete of unit
+  | FailIfNotBisim of unit
   | DumpToFile of unit
   | ShowDebug of unit
   | ShowDetails of unit

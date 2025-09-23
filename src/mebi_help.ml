@@ -3,6 +3,8 @@ open Logging
 type help_set_kind =
   | General of unit
   | Bound of unit
+  | FailIfIncomplete of unit
+  | FailIfNotBisim of unit
   | DumpToFile of unit
   | ShowDebug of unit
   | ShowDetails of unit
@@ -98,6 +100,22 @@ let show_help_set_bound () : unit =
         Use command \"MeBi Set Bound Default\" to reset this to the default, \
         which is: %i"
        Params.default_bound)
+;;
+
+let show_help_set_fail_if_incomplete () : unit =
+  Log.notice
+    "Use the command \"MeBi Set FailIfIncomplete True\" to configure the \
+     plugin to fail in the case that the plugin cannot finish constructing an \
+     LTS from the given term (e.g., if the bounds are set too low).\n\
+     Disable this behaviour using \"MeBi Set FailIfIncomplete False\"\n"
+;;
+
+let show_help_set_fail_if_not_bisim () : unit =
+  Log.notice
+    "Use the command \"MeBi Set FailIfNotBisim True\" to configure the plugin \
+     to fail in the case that the bisimilarity algorithm deems two terms are \
+     not bisimilar.\n\
+     Disable this behaviour using \"MeBi Set FailIfNotBisim False\"\n"
 ;;
 
 let show_help_set_dump_to_file () : unit =
@@ -204,6 +222,8 @@ let handle_help (c : help_kind) : unit =
     (match s with
      | General () -> show_help_set ()
      | Bound b -> show_help_set_bound b
+     | FailIfIncomplete () -> show_help_set_fail_if_incomplete ()
+     | FailIfNotBisim () -> show_help_set_fail_if_not_bisim ()
      | DumpToFile () -> show_help_set_dump_to_file ()
      | ShowDebug () -> show_help_set_show_debug ()
      | ShowDetails () -> show_help_set_show_details ()
