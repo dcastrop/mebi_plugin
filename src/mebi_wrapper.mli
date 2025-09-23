@@ -100,6 +100,7 @@ type wrapper =
   { coq_ref : coq_context ref
   ; fwd_enc : E.t F.t
   ; bck_enc : term B.t
+  ; none_tm : term
   }
 
 type 'a in_context =
@@ -225,6 +226,8 @@ module type MEBI_MONAD_SYNTAX = sig
 end
 
 module Syntax : MEBI_MONAD_SYNTAX
+
+val is_silent : term -> bool mm
 
 val encode : term -> E.t mm
 val decode : E.t -> term mm
