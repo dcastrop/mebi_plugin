@@ -1,3 +1,5 @@
+open Logging
+
 module Info = struct
   module Coq = struct
     type t = Mebi_wrapper.E.t * (string * string list)
@@ -29,7 +31,7 @@ module Info = struct
     ; num_states : int
     ; num_edges : int
     ; coq_info : Coq.t list option
-    ; weak_info : Mebi_wrapper.E.t list option
+    ; weak_info : Params.WeakKindEnc.t list option
     }
 
   let merge
@@ -42,6 +44,7 @@ module Info = struct
         (i2 : t)
     : t
     =
+    Log.debug "model.Info.merge";
     { is_complete = i1.is_complete && i2.is_complete
     ; bound
     ; num_terminals
@@ -59,10 +62,12 @@ module Info = struct
          | Some s1, Some s2 ->
            Some
              (List.fold_left
-                (fun (acc : Mebi_wrapper.E.t list) (w : Mebi_wrapper.E.t) ->
+                (fun (acc : Params.WeakKindEnc.t list)
+                  (w : Params.WeakKindEnc.t) ->
                   if
                     List.exists
-                      (fun (t : Mebi_wrapper.E.t) -> Mebi_wrapper.E.eq w t)
+                      (fun (t : Params.WeakKindEnc.t) ->
+                        Params.WeakKindEnc.eq w t)
                       acc
                   then acc
                   else w :: acc)
@@ -112,12 +117,12 @@ module Info = struct
        | Some [] -> "[]"
        | Some (h :: t) ->
          if List.is_empty t
-         then Mebi_wrapper.E.to_string h
+         then Params.WeakKindEnc.to_string h
          else
            List.fold_left
-             (fun (acc : string) (w : Mebi_wrapper.E.t) ->
-               Printf.sprintf "%s, %s" acc (Mebi_wrapper.E.to_string w))
-             (Mebi_wrapper.E.to_string h)
+             (fun (acc : string) (w : Params.WeakKindEnc.t) ->
+               Printf.sprintf "%s, %s" acc (Params.WeakKindEnc.to_string w))
+             (Params.WeakKindEnc.to_string h)
              t)
       outer
   ;;
@@ -1204,7 +1209,7 @@ let pstr_edges_from_a
   match States.is_empty dests with
   | true ->
     Printf.sprintf
-      "%s => {[ %s => {[ (empty) ]} ]}"
+      "%s => {[ %s => {[ (empty) ]} ]}\n"
       (pstr_state from)
       (pstr_action a)
   | false ->
@@ -1228,7 +1233,15 @@ let pstr_edges_from
   : string
   =
   match Int.equal 0 (Actions.length aa) with
-  | true -> Printf.sprintf "%s => {| |} (empty)" (pstr_state from)
+  | true ->
+    Log.warning
+      (Printf.sprintf
+         "model.pstr_edges_from, FSM has empty outgoing edges from: %s"
+         (pstr_state from));
+    Printf.sprintf
+      "(| from:%s => {| |} (empty)\n%s|)\n\n"
+      (pstr_state ~skip_leading_tab:false ~indents:(indents + 1) from)
+      (Utils.str_tabs (indents - 1))
   | false ->
     Actions.fold
       (fun (a : Action.t) (dests : States.t) (acc : string) ->

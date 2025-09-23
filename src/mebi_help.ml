@@ -2,7 +2,7 @@ open Logging
 
 type help_set_kind =
   | General of unit
-  | Bound of int
+  | Bound of unit
   | DumpToFile of unit
   | ShowDebug of unit
   | ShowDetails of unit
@@ -12,7 +12,8 @@ type help_set_kind =
 type help_kind =
   | Basic of unit
   | Set of help_set_kind
-  | Check of unit
+  | Reset of unit
+  | See of unit
   | LTS of unit
   | FSM of unit
   | Saturate of unit
@@ -72,12 +73,23 @@ let show_help_set () : unit =
     (Printf.sprintf
        "Certain commands set parameters the plugin uses when running other \
         commands.\n\
-        These parameters are: Bound, DumpToFile, ShowDebug, WeakMode, Weak\n\n\
+        These parameters are: Bound, DumpToFile, ShowDetails ShowDebug, \
+        WeakMode, Weak\n\n\
         Use the command \"MeBi Help Set x\" for more information\n\
         (where x is one of the parameters above)\n")
 ;;
 
-let show_help_set_bound (default_bound : int) : unit =
+let show_help_reset () : unit =
+  Log.notice
+    (Printf.sprintf
+       "Use the command \"MeBi Reset x\" to reset some plugin parameter x\n\
+        Alternatively, all of the plugin parameters can be reset by using the \
+        command \"MeBi Reset All\".\n\
+        Use the command \"MeBi Help Set\" for an overviwe of the plugin \
+        parameters.\n")
+;;
+
+let show_help_set_bound () : unit =
   Log.notice
     (Printf.sprintf
        "Use the command \"MeBi Set Bound n\" to set the upper-bound of the \
@@ -85,7 +97,7 @@ let show_help_set_bound (default_bound : int) : unit =
         a coq term, where \"n\" is an natural integer number.\n\n\
         Use command \"MeBi Set Bound Default\" to reset this to the default, \
         which is: %i"
-       default_bound)
+       Params.default_bound)
 ;;
 
 let show_help_set_dump_to_file () : unit =
@@ -125,11 +137,12 @@ let show_help_set_weak () : unit =
      \"ACTION\" that has some constructor \"TAU\"\n"
 ;;
 
-let show_help_check () : unit =
+let show_help_see () : unit =
   Log.notice
-    "Use the command \"MeBi Check x\" to see what any of Bound, DumpToFile, \
+    "Use the command \"MeBi See x\" to see what any of Bound, DumpToFile, \
      ShowDebug, WeakMode, Weak are set to.\n\
-     Use the command \"MeBi Check All\" to see for them all.\n"
+     Use the command \"MeBi See All\" to see them all.\n\
+     Use command \"MeBi Reset All\" to reset them all.\n"
 ;;
 
 let show_help_lts () : unit = Log.notice "Use the command \"MeBi LTS ...\"\n"
@@ -196,7 +209,8 @@ let handle_help (c : help_kind) : unit =
      | ShowDetails () -> show_help_set_show_details ()
      | WeakMode () -> show_help_set_weak_mode ()
      | Weak () -> show_help_set_weak ())
-  | Check () -> show_help_check ()
+  | Reset () -> show_help_reset ()
+  | See () -> show_help_see ()
   | LTS () -> show_help_lts ()
   | FSM () -> show_help_fsm ()
   | Saturate () -> show_help_saturate ()

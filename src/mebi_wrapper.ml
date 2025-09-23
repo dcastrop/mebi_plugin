@@ -87,6 +87,7 @@ module type ENCODING_TYPE = sig
 
   exception InvalidDecodeKey of (t * term Tbl.t)
 
+  val decode_opt : term Tbl.t -> t -> term option
   val decode : term Tbl.t -> t -> term
 end
 
@@ -134,6 +135,8 @@ module IntEncoding : ENCODING_TYPE = struct
   ;;
 
   exception InvalidDecodeKey of (t * term Tbl.t)
+
+  let decode_opt (bck : term Tbl.t) (k : t) : term option = Tbl.find_opt bck k
 
   let decode (bck : term Tbl.t) (k : t) : term =
     match Tbl.find_opt bck k with
@@ -316,6 +319,8 @@ let econstr_to_string (x : EConstr.t) : string =
   in
   run ~keep_encoding:true s_mm
 ;;
+
+let term_to_string (x : term) : string = econstr_to_string x
 
 let constr_rel_decl_to_string (rd : Constr.rel_declaration) : string =
   let s_mm : string mm =
@@ -609,11 +614,29 @@ module Error : ERROR_TYPE = struct
       ++ strbrk "\n\n"
       ++ str "constructor names: "
       ++ List.fold_left
-           (fun (acc : Pp.t) (name : EConstr.t) -> acc)
+           (fun (acc : Pp.t) (name : EConstr.t) ->
+             acc ++ strbrk "\n\n" ++ Printer.pr_econstr_env ev sg name)
            (Printer.pr_econstr_env ev sg (List.hd names))
            (List.tl names)
     | UnknownDecodeKey (ev, sg, k, bckmap) ->
-      str "(TODO: unknown decode key error)"
+      str "Unknown decode key: "
+      ++ str (E.to_string k)
+      ++ strbrk "\n\n"
+      ++ str "Decode map: ["
+      ++
+      if Int.equal (B.length bckmap) 0
+      then str " ] (empty)"
+      else
+        B.fold
+          (fun (t : E.t) (v : term) (acc : Pp.t) ->
+            acc
+            ++ strbrk "\n\n"
+            ++ str (E.to_string t)
+            ++ str " => "
+            ++ Printer.pr_econstr_env ev sg v)
+          bckmap
+          (str "")
+        ++ str " ]"
   ;;
 
   let _ =
@@ -702,21 +725,49 @@ let unknown_decode_key ((k, bckmap) : E.t * term B.t) : 'a mm =
 let encode (k : term) : E.t mm =
   fun (st : wrapper ref) ->
   let encoding : E.t = E.encode !st.fwd_enc !st.bck_enc k in
+  Logging.Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.encode, \"%s\" into (%s)"
+       (econstr_to_string k)
+       (E.to_string encoding));
+  assert (F.mem !st.fwd_enc k);
+  assert (B.mem !st.bck_enc encoding);
   { state = st; value = encoding }
 ;;
 
 (** dual to [encode] except we cannot handle new values *)
 let decode (k : E.t) : term mm =
   fun (st : wrapper ref) ->
-  let decoding : term = E.decode !st.bck_enc k in
-  { state = st; value = decoding }
+  match E.decode_opt !st.bck_enc k with
+  | Some decoding ->
+    Logging.Log.debug
+      (Printf.sprintf
+         "mebi_wrapper.decode, \"%s\" into (%s)"
+         (E.to_string k)
+         (econstr_to_string decoding));
+    { state = st; value = decoding }
+  | None ->
+    let coq_st = !st.coq_ref in
+    raise
+      (Error.unknown_decode_key !coq_st.coq_env !coq_st.coq_ctx k !st.bck_enc)
+;;
+
+let decode_to_string (x : E.t) : string =
+  let s_mm : string mm =
+    let open Syntax in
+    let* y = decode x in
+    let* env = get_env in
+    let* sigma = get_sigma in
+    return (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma y))
+  in
+  run ~keep_encoding:true s_mm
 ;;
 
 (********************************************)
 (****** ENCODE/DECODE OPT *******************)
 (********************************************)
 
-let encode_opt (k : term) : E.t option mm =
+let get_encoding_opt (k : term) : E.t option mm =
   fun (st : wrapper ref) ->
   match F.find_opt !st.fwd_enc k with
   | None -> { state = st; value = None }
@@ -724,7 +775,7 @@ let encode_opt (k : term) : E.t option mm =
 ;;
 
 (** dual to [encode] except we cannot handle new values *)
-let decode_opt (k : E.t) : term option mm =
+let get_decoding_opt (k : E.t) : term option mm =
   fun (st : wrapper ref) ->
   match B.find_opt !st.bck_enc k with
   | None -> { state = st; value = None }
@@ -780,6 +831,31 @@ let decode_map (m : 'a B.t) : 'a F.t mm =
 (********************************************)
 (****** UTILS *******************************)
 (********************************************)
+
+let debug_encoding () : unit mm =
+  fun (st : wrapper ref) ->
+  if Int.equal 0 (F.length !st.fwd_enc)
+  then (
+    Logging.Log.debug "mebi_wrapper.debug_encoding, fwd encoding is empty";
+    if Int.equal 0 (B.length !st.bck_enc)
+    then Logging.Log.debug "mebi_wrapper.debug_encoding, bck encoding is empty"
+    else
+      B.iter
+        (fun (enc : E.t) (t : term) ->
+          Logging.Log.debug
+            (Printf.sprintf
+               "(%s) => %s "
+               (E.to_string enc)
+               (econstr_to_string t)))
+        !st.bck_enc)
+  else
+    F.iter
+      (fun (t : term) (enc : E.t) ->
+        Logging.Log.debug
+          (Printf.sprintf "(%s) => %s " (E.to_string enc) (econstr_to_string t)))
+      !st.fwd_enc;
+  { state = st; value = () }
+;;
 
 (********************************************)
 (****** COQ CONSTR TREE *********************)

@@ -34,16 +34,18 @@ examples/bisimilarity/Proc/Test2/Terms.v
 
 src/utils.ml
 src/utils.mli
-
 src/logging.ml
 src/logging.mli
-src/mebi_help.ml
-src/mebi_help.mli
 
 src/mebi_wrapper.ml
 src/mebi_wrapper.mli
+src/mebi_ind.ml
+src/mebi_ind.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
+
+src/params.ml
+src/params.mli
 
 src/model.ml
 src/model.mli
@@ -60,6 +62,9 @@ src/algorithms.mli
 
 src/dump_to_file.ml
 src/dump_to_file.mli
+
+src/mebi_help.ml
+src/mebi_help.mli
 
 src/command.ml
 src/command.mli

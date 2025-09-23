@@ -1,40 +1,53 @@
 Require Import MEBI.loader.
 
 (** testing getters & setters *)
+MeBi Divider "Theories.Test.BasicCommands".
 Module BasicCommands.
-MeBi Set Bound 1000.    MeBi Check Bound.
-MeBi Set Bound Default. MeBi Check Bound.
+  MeBi Set Bound 1000. MeBi See Bound.
+  MeBi Reset Bound.    MeBi See Bound.
 
-MeBi Set DumpToFile True.  MeBi Check DumpToFile.
-MeBi Set DumpToFile False. MeBi Check DumpToFile.
+  MeBi Set Bound 9 33. MeBi See Bound.
+  MeBi Reset Bound.    MeBi See Bound.
 
-MeBi Set ShowDebug True.  MeBi Check ShowDebug.
-MeBi Set ShowDebug False. MeBi Check ShowDebug.
+  MeBi Set DumpToFile True.  MeBi See DumpToFile.
+  MeBi Set DumpToFile False. MeBi See DumpToFile.
 
-MeBi Set WeakMode True.  MeBi Check WeakMode.
-MeBi Set WeakMode False. MeBi Check WeakMode.
+  MeBi Set ShowDebug True.  MeBi See ShowDebug.
+  MeBi Set ShowDebug False. MeBi See ShowDebug.
 
-MeBi Set Weak Option nat. MeBi Check Weak.
+  MeBi Set ShowDetails True.  MeBi See ShowDetails.
+  MeBi Set ShowDetails False. MeBi See ShowDetails.
 
-Example z := 0.
-MeBi Set Weak nat Of z. 
-(* MeBi Check Weak. *)
+  MeBi Set WeakMode True.  MeBi See WeakMode.
+  MeBi Set WeakMode False. MeBi See WeakMode.
+  
+  (* MeBi Set ShowDebug True. MeBi Set ShowDetails True. *)
 
-Inductive s_label : Set :=
-| TAU : s_label 
-| LABEL1 : nat -> s_label
-.
-MeBi Set Weak TAU Of s_label. 
-(* MeBi Check Weak. *)
+  MeBi Set Weak Option nat. 
+  MeBi See Weak.
 
-Inductive t_label : Type :=
-| SILENT : t_label 
-| LABEL2 : bool -> t_label
-.
-MeBi Set Weak TAU Of t_label. 
-(* MeBi Check Weak. *)
+  Example z := 0.
+  MeBi Set Weak z Of nat. 
+  MeBi See Weak.
+
+  Inductive s_label : Set :=
+  | TAU : s_label 
+  | LABEL1 : nat -> s_label
+  .
+  MeBi Set Weak TAU Of s_label. 
+  MeBi See Weak.
+
+  Inductive t_label : Type :=
+  | SILENT : t_label 
+  | LABEL2 : bool -> t_label
+  .
+  MeBi Set Weak SILENT Of t_label. 
+  MeBi See Weak.
+
+  MeBi See All.
 End BasicCommands.
 
+MeBi Divider "Theories.Test.GeneralTests".
 Inductive i := C0 (i : nat) | C1 (b : bool) (j : nat) | C2 (x : nat).
 
 Fail MeBi LTS 0 Using i.
@@ -91,6 +104,7 @@ MeBi LTS (S 0) Using nonTerminatingTestLTS.
 MeBi LTS (S (S 0)) Using nonTerminatingTestLTS.
 MeBi LTS (S (S (S 0))) Using nonTerminatingTestLTS.
 
+MeBi Divider "Theories.Test.Test1".
 Module Test1.
   Inductive action : Set := | TheAction1 | TheAction2.
   Inductive term : Set :=
@@ -119,6 +133,7 @@ Module Test1.
   MeBi LTS(tfix (tact TheAction1 (tact TheAction2 trec))) Using termLTS.
 End Test1.
 
+MeBi Divider "Theories.Test.Test2".
 Module Test2.
   Inductive action : Set := | TheAction1 | TheAction2.
   Inductive term : Set :=
@@ -155,8 +170,7 @@ Module Test2.
   MeBi LTS (tfix (tpar TheAction1 TheAction2 trec)) Using termLTS.
 End Test2.
 
-
-
+MeBi Divider "Theories.Test.BisimTest1".
 Module BisimTest1.
   Inductive action : Set := | TheAction1 | TheAction2.
 
@@ -274,6 +288,7 @@ Module BisimTest1.
     Using termLTS.
 End BisimTest1.
 
+MeBi Divider "Theories.Test.BisimTest2".
 Module BisimTest2.
   Inductive action : Set := | TAU | TheAction1 | TheAction2.
 
@@ -308,31 +323,31 @@ Module BisimTest2.
   Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
 
   MeBi Set WeakMode False.
-  MeBi FSM exa1 Using termLTS.
+  (* MeBi FSM exa1 Using termLTS. *)
   MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
 
   MeBi Set WeakMode True.
   MeBi Set Weak TAU Of action.
-  MeBi FSM exa1 Using termLTS.
-  (* MeBi Saturate exa1 Using termLTS.
+  (* MeBi FSM exa1 Using termLTS. *)
+  MeBi Saturate exa1 Using termLTS.
   MeBi Minimize exa1 Using termLTS.
-  MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS. *)
+  MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
 
   Example exa2 := (tfix (tact TheAction1 (tact TheAction2 trec))).
   
   Example exa3 := (tact TheAction1 (tfix (tact TheAction2 (tact TheAction1 trec)))).
   
-  (* MeBi Bisim exa1 With termLTS And exa2 With termLTS Using termLTS.
+  MeBi Bisim exa1 With termLTS And exa2 With termLTS Using termLTS.
   MeBi Bisim exa1 With termLTS And exa3 With termLTS Using termLTS.
 
   MeBi Bisim exa2 With termLTS And exa1 With termLTS Using termLTS.
   MeBi Bisim exa2 With termLTS And exa3 With termLTS Using termLTS.
 
   MeBi Bisim exa3 With termLTS And exa1 With termLTS Using termLTS.
-  MeBi Bisim exa3 With termLTS And exa2 With termLTS Using termLTS. *)
-
+  MeBi Bisim exa3 With termLTS And exa2 With termLTS Using termLTS.
 End BisimTest2.
 
+MeBi Divider "Theories.Test.BisimTest3".
 Module BisimTest3.
   Inductive action : Set := | TheAction1 | TheAction2.
 
@@ -361,35 +376,42 @@ Module BisimTest3.
 
   | do_fix : forall t, termLTS (tfix t) None (subst (tfix t) t).
 
+  MeBi See Weak.
+  MeBi Reset Weak.
+
+  MeBi Set WeakMode True.
+  MeBi Set Weak Option action. 
+  
   (* MeBi Set ShowDebug True. *)
   (* MeBi Set ShowDetails True. *)
 
   Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
+  MeBi FSM exa1 Using termLTS.
 
-  MeBi Set WeakMode False.
-  (* MeBi FSM exa1 Using termLTS. *)
-  (* MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS. *)
+  (* MeBi See Weak.
+  MeBi See Weak1.
+  MeBi See Weak2.
+  MeBi See All. *)
 
-  MeBi Set WeakMode True.
-  MeBi Set Weak Option action.
   (* MeBi FSM exa1 Using termLTS. *)
   (* MeBi Saturate exa1 Using termLTS. *)
   (* MeBi Minimize exa1 Using termLTS. *)
   (* MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS. *)
 
   Example exa2 := (tfix (tact TheAction1 (tact TheAction2 trec))).
+  MeBi FSM exa2 Using termLTS.
   
   Example exa3 := (tact TheAction1 (tfix (tact TheAction2 (tact TheAction1 trec)))).
+  MeBi FSM exa2 Using termLTS.
   
-  (* MeBi Bisim exa1 With termLTS And exa2 With termLTS Using termLTS. *)
-  (* MeBi Bisim exa1 With termLTS And exa3 With termLTS Using termLTS. *)
+  MeBi Bisim exa1 With termLTS And exa2 With termLTS Using termLTS.
+  MeBi Bisim exa1 With termLTS And exa3 With termLTS Using termLTS.
 
-  (* MeBi Bisim exa2 With termLTS And exa1 With termLTS Using termLTS. *)
-  (* MeBi Bisim exa2 With termLTS And exa3 With termLTS Using termLTS. *)
+  MeBi Bisim exa2 With termLTS And exa1 With termLTS Using termLTS.
+  MeBi Bisim exa2 With termLTS And exa3 With termLTS Using termLTS.
 
-  (* MeBi Bisim exa3 With termLTS And exa1 With termLTS Using termLTS. *)
-  (* MeBi Bisim exa3 With termLTS And exa2 With termLTS Using termLTS. *)
-
+  MeBi Bisim exa3 With termLTS And exa1 With termLTS Using termLTS.
+  MeBi Bisim exa3 With termLTS And exa2 With termLTS Using termLTS.
 End BisimTest3.
 
 

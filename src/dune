@@ -22,14 +22,16 @@
  (modules
   utils
   logging
-  mebi_help
+  mebi_ind
   mebi_wrapper
   mebi_utils
+  params
   model
   lts
   fsm
   algorithms
   dump_to_file
+  mebi_help
   command
   mebi_api
   ; examples
