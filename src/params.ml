@@ -39,6 +39,58 @@ let set_bounds (b : int * int option) : unit =
 ;;
 
 (**********************)
+(** Fail if incomplete*)
+(**********************)
+
+let default_fail_if_incomplete : bool = true
+let the_fail_if_incomplete : bool ref = ref default_fail_if_incomplete
+
+let reset_fail_if_incomplete () : unit =
+  the_fail_if_incomplete := default_fail_if_incomplete
+;;
+
+let printout_fail_if_incomplete_str () : string =
+  if !the_fail_if_incomplete
+  then "Fail if incomplete."
+  else "Will not fail if incomplete."
+;;
+
+let printout_fail_if_incomplete () : unit =
+  Log.notice (printout_fail_if_incomplete_str ())
+;;
+
+let set_fail_if_incomplete (b : bool) : unit =
+  the_fail_if_incomplete := b;
+  Log.debug (printout_fail_if_incomplete_str ())
+;;
+
+(**********************)
+(** Fail if not bisim *)
+(**********************)
+
+let default_fail_if_not_bisim : bool = true
+let the_fail_if_not_bisim : bool ref = ref default_fail_if_not_bisim
+
+let reset_fail_if_not_bisim () : unit =
+  the_fail_if_not_bisim := default_fail_if_not_bisim
+;;
+
+let printout_fail_if_not_bisim_str () : string =
+  if !the_fail_if_not_bisim
+  then "Fail if terms not Bisimilar."
+  else "Will not fail if terms are not Bisimilar."
+;;
+
+let printout_fail_if_not_bisim () : unit =
+  Log.notice (printout_fail_if_not_bisim_str ())
+;;
+
+let set_fail_if_not_bisim (b : bool) : unit =
+  the_fail_if_not_bisim := b;
+  Log.debug (printout_fail_if_not_bisim_str ())
+;;
+
+(**********************)
 (** File Dump *********)
 (**********************)
 
@@ -374,8 +426,10 @@ let printout_all () : unit Mebi_wrapper.mm =
   let* s = printout_weak_types_str () in
   Log.notice
     (Printf.sprintf
-       "Current plugin configuration:\n%s\n%s\n%s\n%s\n%s\n%s\n"
+       "Current plugin configuration:\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n"
        (printout_bounds_str ())
+       (printout_fail_if_incomplete_str ())
+       (printout_fail_if_not_bisim_str ())
        (printout_dump_to_file_str ())
        (printout_show_debug_str ())
        (printout_show_details_str ())
@@ -387,6 +441,8 @@ let printout_all () : unit Mebi_wrapper.mm =
 let reset_all () : unit Mebi_wrapper.mm =
   Log.debug "params.reset_all";
   reset_bounds ();
+  reset_fail_if_incomplete ();
+  reset_fail_if_not_bisim ();
   reset_dump_to_file ();
   reset_show_debug ();
   reset_show_details ();

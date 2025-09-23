@@ -118,6 +118,8 @@ val iterate : int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
 
 module type ERROR_TYPE = sig
   type mebi_error =
+    | ParamsFailIfIncomplete of unit
+    | ParamsFailIfNotBisim of unit
     | InvalidLTSArgsLength of int
     | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
     | InvalidLTSSort of Sorts.family
@@ -138,6 +140,8 @@ module type ERROR_TYPE = sig
 
   exception MEBI_exn of mebi_error
 
+  val params_fail_if_incomplete : unit -> exn
+  val params_fail_if_not_bisim : unit -> exn
   val invalid_lts_args_length : int -> exn
   val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
   val invalid_sort_lts : Sorts.family -> exn
@@ -173,6 +177,8 @@ end
 
 module Error : ERROR_TYPE
 
+val params_fail_if_incomplete : unit -> 'a mm
+val params_fail_if_not_bisim : unit -> 'a mm
 val invalid_lts_args_length : int -> 'a mm
 val invalid_lts_term_kind : Constr.t -> 'a mm
 val invalid_sort_lts : Sorts.family -> 'a mm

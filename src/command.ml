@@ -903,7 +903,12 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
         (Mebi_utils.ref_list_to_glob_list (primary_lts :: refs))
         params
     in
-    G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts params
+    if
+      !Params.the_fail_if_incomplete
+      && Bool.not (Queue.is_empty graph_lts.to_visit)
+    then params_fail_if_incomplete ()
+    else
+      G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts params
   in
   let* _ = Params.obtain_weak_kinds_from_args () in
   match k with
@@ -1013,7 +1018,12 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
          (Algorithms.pstr the_bisimilar));
     if !Params.the_dump_to_file
     then Log.debug "command.run, CheckBisimilarity -- TODO dump to file\n";
-    return ()
+    (match the_bisimilar with
+     | Bisim b ->
+       if !Params.the_fail_if_not_bisim && Algorithms.bisim_result_to_bool b
+       then return ()
+       else params_fail_if_not_bisim ()
+     | _ -> return ())
   | Info () ->
     Mebi_help.show_guidelines_and_limitations ();
     return ()

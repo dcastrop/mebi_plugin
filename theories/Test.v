@@ -9,6 +9,12 @@ Module BasicCommands.
   MeBi Set Bound 9 33. MeBi See Bound.
   MeBi Reset Bound.    MeBi See Bound.
 
+  MeBi Set FailIfIncomplete True. MeBi See FailIfIncomplete.
+  MeBi Set FailIfIncomplete False. MeBi See FailIfIncomplete.
+
+  MeBi Set FailIfNotBisim True. MeBi See FailIfNotBisim.
+  MeBi Set FailIfNotBisim False. MeBi See FailIfNotBisim.
+
   MeBi Set DumpToFile True.  MeBi See DumpToFile.
   MeBi Set DumpToFile False. MeBi See DumpToFile.
 
@@ -201,6 +207,8 @@ Module BisimTest1.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
+  MeBi Set FailIfNotBisim True.
+
   (* true *)
   MeBi Bisim (tact TheAction1 tend) With termLTS
          And (tact TheAction1 tend) With termLTS
@@ -212,11 +220,13 @@ Module BisimTest1.
          Using termLTS.
 
   (* false *)
+  Fail 
   MeBi Bisim (tact TheAction1 tend) With termLTS
          And (tact TheAction2 tend) With termLTS
          Using termLTS.
 
   (* false *)
+  Fail 
   MeBi Bisim (tact TheAction2 tend) With termLTS
          And (tact TheAction1 tend) With termLTS
          Using termLTS.
@@ -233,6 +243,7 @@ Module BisimTest1.
 
 
   (* false *) 
+  Fail 
   MeBi Bisim (tact TheAction1 (tact TheAction2 tend)) With termLTS
          And (tact TheAction2 (tact TheAction1 tend)) With termLTS
          Using termLTS.
@@ -253,11 +264,13 @@ Module BisimTest1.
          Using termLTS.
 
   (* false *)
+  Fail 
   MeBi Bisim (tpar TheAction1 TheAction1 tend) With termLTS
          And (tact TheAction1 tend) With termLTS
          Using termLTS.
 
   (* false *)
+  Fail 
   MeBi Bisim (tpar TheAction1 TheAction2 tend) With termLTS
          And (tact TheAction1 tend) With termLTS
          Using termLTS.
