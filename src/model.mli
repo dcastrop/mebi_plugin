@@ -14,7 +14,7 @@ module Info : sig
     num_states : int;
     num_edges : int;
     coq_info : Coq.t list option;
-    weak_info : Mebi_wrapper.IntEncoding.t list option;
+    weak_info : Params.WeakKindEnc.t list option;
   }
 
   val merge :
@@ -136,21 +136,21 @@ module Action : sig
     annotations ->
     bool
 
-  val compare : ?annos:bool -> ?meta:bool -> t -> t -> int
+  val compare : ?annos:bool -> ?meta:bool -> t -> t -> Int.t
 
   val anno_compare :
     ?annos:bool ->
     ?meta:bool ->
     annotation ->
     annotation ->
-    int
+    Int.t
 
   val annos_compare :
     ?annos:bool ->
     ?meta:bool ->
     annotations ->
     annotations ->
-    int
+    Int.t
 
   val hash : t -> int
 end
@@ -452,7 +452,7 @@ module ActionPair : sig
   type t = Action.t * States.t
 
   val compare :
-    Action.t * States.t -> Action.t * States.t -> int
+    Action.t * States.t -> Action.t * States.t -> Int.t
 end
 
 module ActionPairs : sig

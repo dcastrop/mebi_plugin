@@ -24,7 +24,40 @@ Example r : term := tseq (tpar (tact (recv A) tend)
                          (tfix (tseq (tpar (tact (send A) tend) 
                                            (tact (recv A) tend)) trec)).
 
-MeBi Check All.
+MeBi Divider "Examples.Bisimilarity.Proc.Test1.Terms".
+MeBi See All.
+
+MeBi Set Weak Option label.
+
+MeBi FSM p Using termLTS.
+
+
+(* MeBi Set ShowDebug True. *)
+(* MeBi Set ShowDetails True.  *)
+(* MeBi Saturate p Using termLTS. *)
+(* MeBi Minimize p Using termLTS. *)
+(* MeBi Bisim p With termLTS And p With termLTS Using termLTS. *)
+
+MeBi Set ShowDetails True.
+
+MeBi Bisim p With termLTS And q With termLTS Using termLTS.
+MeBi Bisim q With termLTS And p With termLTS Using termLTS.
+
+(* MeBi Set ShowDetails True. *)
+MeBi Bisim q With termLTS And r With termLTS Using termLTS.
+MeBi Bisim r With termLTS And q With termLTS Using termLTS.
+
+(* MeBi Set ShowDetails True. *)
+MeBi Bisim p With termLTS And r With termLTS Using termLTS.
+MeBi Bisim r With termLTS And p With termLTS Using termLTS.
+
+(* MeBi Set ShowDebug True. *)
+(* MeBi Set ShowDetails True. *)
+(* MeBi Bisim p With termLTS And (tfix (tseq (tpar (tact (send B) tend) (tact (recv B) tend)) trec)) With termLTS Using termLTS. *)
+
+(* MeBi Bisim p With termLTS And (tfix trec) With termLTS Using termLTS. *)
+
+
 
 (* MeBi Set ShowDebug True.
 MeBi Set ShowDetails True.

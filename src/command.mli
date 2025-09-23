@@ -1,26 +1,4 @@
 
-val default_bound : int
-val get_bound : unit -> unit 
-val set_bound : int -> unit Mebi_wrapper.mm
-
-val get_dump_to_file_flag : unit -> unit 
-val set_dump_to_file_flag : bool -> unit Mebi_wrapper.mm
-
-val get_show_debug_flag : unit -> unit 
-val set_show_debug_flag : bool -> unit Mebi_wrapper.mm
-
-val get_show_details_flag : unit -> unit 
-val set_show_details_flag : bool -> unit Mebi_wrapper.mm
-
-val get_weak_mode : unit -> unit 
-val set_weak_mode : bool -> unit Mebi_wrapper.mm
-
-type weak_action_kinds = | Option of Constrexpr.constr_expr | Custom of Constrexpr.constr_expr * Libnames.qualid
-val get_weak_type : unit -> unit 
-val set_weak_type : weak_action_kinds -> unit Mebi_wrapper.mm
-
-val check_all : unit -> unit Mebi_wrapper.mm
-
 type model_kind =
   | LTS
   | FSM
