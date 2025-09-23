@@ -117,12 +117,14 @@ let get_ind_lts (i : int) (gref : Names.GlobRef.t) : Mebi_ind.t mm =
 let encode_econstr (t : EConstr.t) : E.t mm = encode t
 
 let encode_tref (t : Constrexpr.constr_expr) : E.t mm =
+  Log.debug "mebi_utils.encode_tref";
   let open Mebi_wrapper.Syntax in
   let* (t' : EConstr.t) = tref_to_econstr t in
   encode_econstr t'
 ;;
 
 let encode_ref (t : Libnames.qualid) : E.t mm =
+  Log.debug "mebi_utils.encode_ref";
   let open Mebi_wrapper.Syntax in
   let* (info : Mebi_ind.info) = get_ind_info (ref_to_glob t) in
   encode_econstr info.name

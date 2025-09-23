@@ -54,7 +54,7 @@ module WeakKind : sig
         * (Mebi_wrapper.E.t * Names.GlobRef.t)
     | CustomConstr of Mebi_wrapper.E.t * (Mebi_wrapper.E.t * Names.GlobRef.t)
 
-  val to_string : t -> string 
+  val to_string : t -> string Mebi_wrapper.mm 
 
   val eq : t -> t -> bool
 end
@@ -65,9 +65,9 @@ val fst_weak_type : unit -> WeakKind.t option
 val snd_weak_type : unit -> WeakKind.t option
 
 val reset_weak_types : unit -> unit
-val printout_weak_types : unit -> unit 
-val printout_fst_weak_type : unit -> unit 
-val printout_snd_weak_type : unit -> unit 
+val printout_weak_types : unit -> unit Mebi_wrapper.mm 
+val printout_fst_weak_type : unit -> unit Mebi_wrapper.mm 
+val printout_snd_weak_type : unit -> unit Mebi_wrapper.mm 
 
 module WeakArgs : sig
   type t =
@@ -77,7 +77,7 @@ module WeakArgs : sig
     | CustomConstr of Constrexpr.constr_expr * Libnames.qualid
 end
 
-val set_fst_weak_type_arg : WeakArgs.t -> unit
+val set_fst_weak_type_arg : WeakArgs.t -> unit 
 val set_snd_weak_type_arg : WeakArgs.t -> unit
 val set_weak_types_args : WeakArgs.t * WeakArgs.t option -> unit
 
@@ -94,6 +94,23 @@ val get_snd_params : unit -> int * WeakKind.t option
 (** All ***************)
 (**********************)
 
-val printout_all : unit -> unit
-val reset_all : unit -> unit
+val printout_all : unit -> unit Mebi_wrapper.mm
+val reset_all : unit -> unit Mebi_wrapper.mm
 
+(**********************)
+(** Encoding only *****)
+(**********************)
+
+module WeakKindEnc : sig
+  type t =
+    | OptionRef of Mebi_wrapper.IntEncoding.t
+    | OptionConstr of Mebi_wrapper.IntEncoding.t
+    | CustomRef of
+        Mebi_wrapper.IntEncoding.t * Mebi_wrapper.IntEncoding.t
+    | CustomConstr of
+        Mebi_wrapper.IntEncoding.t * Mebi_wrapper.IntEncoding.t
+
+  val of_full : WeakKind.t -> t
+  val to_string : t -> string
+  val eq : t -> t -> bool
+end

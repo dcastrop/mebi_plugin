@@ -15,8 +15,13 @@ Module BasicCommands.
   MeBi Set ShowDebug True.  MeBi See ShowDebug.
   MeBi Set ShowDebug False. MeBi See ShowDebug.
 
+  MeBi Set ShowDetails True.  MeBi See ShowDetails.
+  MeBi Set ShowDetails False. MeBi See ShowDetails.
+
   MeBi Set WeakMode True.  MeBi See WeakMode.
   MeBi Set WeakMode False. MeBi See WeakMode.
+  
+  (* MeBi Set ShowDebug True. MeBi Set ShowDetails True. *)
 
   MeBi Set Weak Option nat. 
   MeBi See Weak.
@@ -371,25 +376,33 @@ Module BisimTest3.
 
   | do_fix : forall t, termLTS (tfix t) None (subst (tfix t) t).
 
+  MeBi See Weak.
+  MeBi Reset Weak.
+
+  MeBi Set WeakMode True.
+  MeBi Set Weak Option action. 
+  
   (* MeBi Set ShowDebug True. *)
   (* MeBi Set ShowDetails True. *)
 
   Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
+  MeBi FSM exa1 Using termLTS.
 
-  MeBi Set WeakMode False.
-  (* MeBi FSM exa1 Using termLTS. *)
-  (* MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS. *)
+  (* MeBi See Weak.
+  MeBi See Weak1.
+  MeBi See Weak2.
+  MeBi See All. *)
 
-  MeBi Set WeakMode True.
-  MeBi Set Weak Option action.
   (* MeBi FSM exa1 Using termLTS. *)
   (* MeBi Saturate exa1 Using termLTS. *)
   (* MeBi Minimize exa1 Using termLTS. *)
   (* MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS. *)
 
   Example exa2 := (tfix (tact TheAction1 (tact TheAction2 trec))).
+  MeBi FSM exa2 Using termLTS.
   
   Example exa3 := (tact TheAction1 (tfix (tact TheAction2 (tact TheAction1 trec)))).
+  MeBi FSM exa2 Using termLTS.
   
   MeBi Bisim exa1 With termLTS And exa2 With termLTS Using termLTS.
   MeBi Bisim exa1 With termLTS And exa3 With termLTS Using termLTS.

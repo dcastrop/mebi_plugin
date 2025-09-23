@@ -66,7 +66,7 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "Reset" "ShowDetails"] -> {Params.reset_show_details ()}
 | ["MeBi" "Reset" "WeakMode"   ] -> {Params.reset_weak_mode ()}
 | ["MeBi" "Reset" "Weak"       ] -> {Params.reset_weak_types ()}
-| ["MeBi" "Reset" "All"        ] -> {Params.reset_all ()}
+| ["MeBi" "Reset" "All"        ] -> {Mebi_wrapper.run (Params.reset_all ())}
 
 (* check plugin params *)
 | ["MeBi" "See" "Bound"      ] -> {Params.printout_bounds ()}
@@ -74,10 +74,10 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "See" "ShowDebug"  ] -> {Params.printout_show_debug ()}
 | ["MeBi" "See" "ShowDetails"] -> {Params.printout_show_details ()}
 | ["MeBi" "See" "WeakMode"   ] -> {Params.printout_weak_mode ()}
-| ["MeBi" "See" "Weak"       ] -> {Params.printout_weak_types ()}
-| ["MeBi" "See" "Weak1"      ] -> {Params.printout_fst_weak_type ()}
-| ["MeBi" "See" "Weak2"      ] -> {Params.printout_snd_weak_type ()}
-| ["MeBi" "See" "All"        ] -> {Params.printout_all ()}
+| ["MeBi" "See" "Weak"       ] -> {Mebi_wrapper.run (Params.printout_weak_types ())}
+| ["MeBi" "See" "Weak1"      ] -> {Mebi_wrapper.run (Params.printout_fst_weak_type ())}
+| ["MeBi" "See" "Weak2"      ] -> {Mebi_wrapper.run (Params.printout_snd_weak_type ())}
+| ["MeBi" "See" "All"        ] -> {Mebi_wrapper.run (Params.printout_all ())}
 
 
 | ["MeBi" "LTS" constr(x) "Using" reference(r)] -> {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) [])}
@@ -112,7 +112,8 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "Help" "Set" "WeakMode"   ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.WeakMode ()))) [])}
 | ["MeBi" "Help" "Set" "Weak"       ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.Weak ()))) [])}
 
-| ["MeBi" "Help" "Check"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Check ())) [])}
+| ["MeBi" "Help" "Reset"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Reset ())) [])}
+| ["MeBi" "Help" "Check"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.See ())) [])}
 
 | ["MeBi" "Help" "LTS"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.LTS ())) [])}
 | ["MeBi" "Help" "FSM"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.FSM ())) [])}

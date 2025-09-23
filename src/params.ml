@@ -149,16 +149,38 @@ module WeakKind = struct
         * (Mebi_wrapper.E.t * Names.GlobRef.t)
     | CustomConstr of Mebi_wrapper.E.t * (Mebi_wrapper.E.t * Names.GlobRef.t)
 
-  let to_string (x : t) : string =
+  let to_string (x : t) : string Mebi_wrapper.mm =
+    Log.debug "params.WeakKind.to_string";
+    let open Mebi_wrapper in
     match x with
-    | OptionRef (label_enc, label_gref) -> "TODO: OptionRef"
-    | OptionConstr label_enc -> "TODO: OptionConstr"
+    | OptionRef (label_enc, label_gref) ->
+      return
+        (Printf.sprintf
+           "TODO: OptionRef %s => %s"
+           (E.to_string label_enc)
+           (decode_to_string label_enc))
+    | OptionConstr label_enc ->
+      return
+        (Printf.sprintf
+           "TODO: OptionConstr %s => %s"
+           (E.to_string label_enc)
+           (decode_to_string label_enc))
     | CustomRef ((tau_enc, tau_gref), (label_enc, label_gref)) ->
-      "TODO: CustomRef"
-    | CustomConstr (tau_enc, (label_enc, label_gref)) -> "TODO: CustomConstr"
+      return
+        (Printf.sprintf
+           "TODO: CustomRef %s %s"
+           (Mebi_wrapper.E.to_string tau_enc)
+           (Mebi_wrapper.E.to_string label_enc))
+    | CustomConstr (tau_enc, (label_enc, label_gref)) ->
+      return
+        (Printf.sprintf
+           "TODO: CustomConstr %s %s"
+           (Mebi_wrapper.E.to_string tau_enc)
+           (Mebi_wrapper.E.to_string label_enc))
   ;;
 
   let eq x y : bool =
+    Log.debug "params.WeakKind.eq";
     match x, y with
     | OptionRef (x, _), OptionRef (y, _) -> Mebi_wrapper.E.eq x y
     | OptionConstr x, OptionConstr y -> Mebi_wrapper.E.eq x y
@@ -184,62 +206,111 @@ let snd_weak_type () : WeakKind.t option =
 ;;
 
 let reset_weak_types () : unit =
+  Log.debug "params.reset_weak_types";
   the_weak_types := default_weak_types;
   reset_weak_type_args ()
 ;;
 
-let printout_fst_weak_type_str () : string =
+let printout_fst_weak_type_str () : string Mebi_wrapper.mm =
+  Log.debug "params.printout_fst_weak_type_str";
+  let open Mebi_wrapper in
+  let open Mebi_wrapper.Syntax in
   match fst !the_weak_types with
-  | None -> "Weak 1 is None (unset)"
-  | Some w -> WeakKind.to_string w
+  | None -> return "Weak 1 is None (unset)"
+  | Some w ->
+    let* s = WeakKind.to_string w in
+    return (Printf.sprintf "Weak 1 is %s" s)
 ;;
 
-let printout_fst_weak_type () : unit =
-  Log.notice (printout_fst_weak_type_str ())
+let printout_fst_weak_type () : unit Mebi_wrapper.mm =
+  Log.debug "params.printout_fst_weak_type";
+  let open Mebi_wrapper in
+  let open Mebi_wrapper.Syntax in
+  let* s = printout_fst_weak_type_str () in
+  Log.notice s;
+  return ()
 ;;
 
-let printout_snd_weak_type_str () : string =
+let printout_snd_weak_type_str () : string Mebi_wrapper.mm =
+  Log.debug "params.printout_snd_weak_type_str";
+  let open Mebi_wrapper in
+  let open Mebi_wrapper.Syntax in
   match snd !the_weak_types with
-  | None -> "Weak 2 is None (unset)"
-  | Some w -> WeakKind.to_string w
+  | None -> return "Weak 2 is None (unset, will use Weak 1)"
+  | Some w ->
+    let* s = WeakKind.to_string w in
+    return (Printf.sprintf "Weak 1 is %s" s)
 ;;
 
-let printout_snd_weak_type () : unit =
-  Log.notice (printout_snd_weak_type_str ())
+let printout_snd_weak_type () : unit Mebi_wrapper.mm =
+  Log.debug "params.printout_snd_weak_type";
+  let open Mebi_wrapper in
+  let open Mebi_wrapper.Syntax in
+  let* s = printout_snd_weak_type_str () in
+  Log.notice s;
+  return ()
 ;;
 
-let printout_weak_types_str () : string =
-  Printf.sprintf "TODO: Params.printout_weak_types_str"
+let printout_weak_types_str () : string Mebi_wrapper.mm =
+  Log.debug "params.printout_weak_types_str";
+  let open Mebi_wrapper in
+  let open Mebi_wrapper.Syntax in
+  match snd !the_weak_types with
+  | None ->
+    (match fst !the_weak_types with
+     | None -> return (Printf.sprintf "Weak Params: None (unset)")
+     | Some w ->
+       let* s = WeakKind.to_string w in
+       return (Printf.sprintf "Weak Params: %s" s))
+  | Some _ ->
+    let* x = printout_fst_weak_type_str () in
+    let* y = printout_snd_weak_type_str () in
+    return (Printf.sprintf "Weak Params:\n- %s\n- %s" x y)
 ;;
 
-let printout_weak_types () : unit = Log.notice (printout_weak_types_str ())
+let printout_weak_types () : unit Mebi_wrapper.mm =
+  Log.debug "params.printout_weak_types";
+  let open Mebi_wrapper in
+  let open Mebi_wrapper.Syntax in
+  let* s = printout_weak_types_str () in
+  Log.notice s;
+  return ()
+;;
 
 let weak_type_arg_to_kind (t : WeakArgs.t) : WeakKind.t Mebi_wrapper.mm =
+  Log.debug "params.weak_type_arg_to_kind";
   let open Mebi_wrapper in
   let open Mebi_wrapper.Syntax in
   let open Mebi_utils in
   match t with
   | OptionRef label_ref ->
     let* (label_enc : E.t) = encode_ref label_ref in
+    let* _ = decode label_enc in
     return (WeakKind.OptionRef (label_enc, ref_to_glob label_ref))
   | OptionConstr label_tref ->
     let* (label_enc : E.t) = encode_tref label_tref in
+    let* _ = decode label_enc in
     return (WeakKind.OptionConstr label_enc)
   | CustomRef (tau_ref, label_ref) ->
     let* (tau_enc : E.t) = encode_ref tau_ref in
     let* (label_enc : E.t) = encode_ref label_ref in
+    let* _ = decode tau_enc in
+    let* _ = decode label_enc in
     return
       (WeakKind.CustomRef
          ((tau_enc, ref_to_glob tau_ref), (label_enc, ref_to_glob label_ref)))
   | CustomConstr (tau_tref, label_ref) ->
     let* (tau_enc : E.t) = encode_tref tau_tref in
     let* (label_enc : E.t) = encode_ref label_ref in
+    let* _ = decode tau_enc in
+    let* _ = decode label_enc in
     return (WeakKind.CustomConstr (tau_enc, (label_enc, ref_to_glob label_ref)))
 ;;
 
 let weak_type_arg_to_kind_opt (t : WeakArgs.t option)
   : WeakKind.t option Mebi_wrapper.mm
   =
+  Log.debug "params.weak_type_arg_to_kind_opt";
   let open Mebi_wrapper in
   let open Mebi_wrapper.Syntax in
   match t with
@@ -250,22 +321,17 @@ let weak_type_arg_to_kind_opt (t : WeakArgs.t option)
 ;;
 
 let set_fst_weak_type_arg (t : WeakArgs.t) : unit =
-  the_weak_type_args := Some t, snd !the_weak_type_args;
-  Log.debug
-    (Printf.sprintf
-       "Set Weak1 type to: %s"
-       (WeakKind.to_string (Mebi_wrapper.run (weak_type_arg_to_kind t))))
+  Log.debug "params.set_fst_weak_type_arg";
+  the_weak_type_args := Some t, snd !the_weak_type_args
 ;;
 
 let set_snd_weak_type_arg (t : WeakArgs.t) : unit =
-  the_weak_type_args := fst !the_weak_type_args, Some t;
-  Log.debug
-    (Printf.sprintf
-       "Set Weak2 type to: %s"
-       (WeakKind.to_string (Mebi_wrapper.run (weak_type_arg_to_kind t))))
+  Log.debug "params.set_snd_weak_type_arg";
+  the_weak_type_args := fst !the_weak_type_args, Some t
 ;;
 
 let set_weak_types_args (t : WeakArgs.t * WeakArgs.t option) : unit =
+  Log.debug "params.set_weak_types_args";
   set_fst_weak_type_arg (fst t);
   match t with _, Some b -> set_snd_weak_type_arg b | _, None -> ()
 ;;
@@ -275,6 +341,7 @@ let set_weak_types_args (t : WeakArgs.t * WeakArgs.t option) : unit =
 (**********************)
 
 let obtain_weak_kinds_from_args () : unit Mebi_wrapper.mm =
+  Log.debug "params.obtain_weak_kinds_from_args";
   let open Mebi_wrapper in
   if !the_weak_mode
   then (
@@ -299,7 +366,12 @@ let get_snd_params () : int * WeakKind.t option = snd_bound (), snd_weak_type ()
 (** All ***************)
 (**********************)
 
-let printout_all () : unit =
+let printout_all () : unit Mebi_wrapper.mm =
+  Log.debug "params.printout_all";
+  let open Mebi_wrapper in
+  let open Mebi_wrapper.Syntax in
+  (* let* _ = obtain_weak_kinds_from_args () in *)
+  let* s = printout_weak_types_str () in
   Log.notice
     (Printf.sprintf
        "Current plugin configuration:\n%s\n%s\n%s\n%s\n%s\n%s\n"
@@ -308,10 +380,12 @@ let printout_all () : unit =
        (printout_show_debug_str ())
        (printout_show_details_str ())
        (printout_weak_mode_str ())
-       (printout_weak_types_str ()))
+       s);
+  (* printout_weak_types () *) return ()
 ;;
 
-let reset_all () : unit =
+let reset_all () : unit Mebi_wrapper.mm =
+  Log.debug "params.reset_all";
   reset_bounds ();
   reset_dump_to_file ();
   reset_show_debug ();
@@ -321,3 +395,53 @@ let reset_all () : unit =
   Log.notice "Reset all plugin params.";
   printout_all ()
 ;;
+
+(**********************)
+(** Encoding only *****)
+(**********************)
+
+module WeakKindEnc = struct
+  type t =
+    | OptionRef of Mebi_wrapper.E.t
+    | OptionConstr of Mebi_wrapper.E.t
+    | CustomRef of Mebi_wrapper.E.t * Mebi_wrapper.E.t
+    | CustomConstr of Mebi_wrapper.E.t * Mebi_wrapper.E.t
+
+  let of_full (x : WeakKind.t) : t =
+    Log.debug "params.WeakKindEnv.of_full";
+    match x with
+    | OptionRef (x, _) -> OptionRef x
+    | OptionConstr x -> OptionConstr x
+    | CustomRef ((x1, _), (x2, _)) -> CustomRef (x1, x2)
+    | CustomConstr (x1, (x2, _)) -> CustomConstr (x1, x2)
+  ;;
+
+  let to_string (x : t) : string =
+    Log.debug "params.WeakKindEnv.to_string";
+    let open Mebi_wrapper in
+    match x with
+    | OptionRef label_enc ->
+      Printf.sprintf "OptionRef %s" (E.to_string label_enc)
+    | OptionConstr label_enc ->
+      Printf.sprintf "OptionConstr %s" (E.to_string label_enc)
+    | CustomRef (tau_enc, label_enc) ->
+      Printf.sprintf
+        "CustomRef %s %s"
+        (Mebi_wrapper.E.to_string tau_enc)
+        (Mebi_wrapper.E.to_string label_enc)
+    | CustomConstr (tau_enc, label_enc) ->
+      Printf.sprintf "CustomConstr %s" (Mebi_wrapper.E.to_string tau_enc)
+  ;;
+
+  let eq x y : bool =
+    Log.debug "params.WeakKindEnv.eq";
+    match x, y with
+    | OptionRef x, OptionRef y -> Mebi_wrapper.E.eq x y
+    | OptionConstr x, OptionConstr y -> Mebi_wrapper.E.eq x y
+    | CustomRef (x1, x2), CustomRef (y1, y2) ->
+      Mebi_wrapper.E.eq x1 y1 && Mebi_wrapper.E.eq x2 y2
+    | CustomConstr (x1, x2), CustomConstr (y1, y2) ->
+      Mebi_wrapper.E.eq x1 y1 && Mebi_wrapper.E.eq x2 y2
+    | _, _ -> false
+  ;;
+end

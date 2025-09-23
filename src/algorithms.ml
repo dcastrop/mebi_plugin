@@ -1,3 +1,5 @@
+open Logging
+
 module Minimize = struct
   open Model
 
@@ -22,12 +24,11 @@ module Minimize = struct
     =
     assert (Bool.not (States.is_empty block));
     let edges_of_a = Model.get_edges_with_label l edges in
-    if Int.equal 0 (Edges.length edges_of_a)
-    then
-      Logging.Log.debug
-        (Printf.sprintf
-           "algorithms.Minimize.split_block, No edges of (%s)."
-           (Action.Label.to_string l));
+    Log.debug
+      (Printf.sprintf
+         "algorithms.Minimize.split_block, (%i) edges of (%s)."
+         (Edges.length edges_of_a)
+         (Action.Label.to_string l));
     (* selects some state [s] from [block] *)
     let s = States.min_elt block in
     let s_actions = Model.get_actions_from s edges_of_a in
@@ -44,20 +45,20 @@ module Minimize = struct
           in
           match s_reachable_blocks, t_reachable_blocks with
           | None, None ->
-            (* Logging.Log.warning
-               (Printf.sprintf
-               "split_block (%s): (%s, None), (%s, None)"
-               (Action.Label.to_string l)
-               (State.to_string s)
-               (State.to_string t)); *)
+            Log.debug
+              (Printf.sprintf
+                 "algorithms.Minimize.split_block (%s): (%s, None), (%s, None)"
+                 (Action.Label.to_string l)
+                 (State.to_string s)
+                 (State.to_string t));
             States.add t b1, b2
           | Some s_blocks, Some t_blocks ->
-            (* Logging.Log.warning
-               (Printf.sprintf
-               "split_block (%s): (%s, Some), (%s, Some)"
-               (Action.Label.to_string l)
-               (State.to_string s)
-               (State.to_string t)); *)
+            Log.debug
+              (Printf.sprintf
+                 "algorithms.Minimize.split_block (%s): (%s, Some), (%s, Some)"
+                 (Action.Label.to_string l)
+                 (State.to_string s)
+                 (State.to_string t));
             if
               Partition.equal
                 (Partition.inter s_blocks t_blocks)
@@ -65,12 +66,12 @@ module Minimize = struct
             then States.add t b1, b2
             else b1, add_to_block_option t b2
           | _, _ ->
-            (* Logging.Log.warning
-               (Printf.sprintf
-               "split_block (%s): (%s, _), (%s, _)"
-               (Action.Label.to_string l)
-               (State.to_string s)
-               (State.to_string t)); *)
+            Log.debug
+              (Printf.sprintf
+                 "algorithms.Minimize.split_block (%s): (%s, _), (%s, _)"
+                 (Action.Label.to_string l)
+                 (State.to_string s)
+                 (State.to_string t));
             b1, add_to_block_option t b2))
       block
       (States.empty, None)
@@ -185,6 +186,7 @@ type result =
 let run (args : t) : result =
   match args with
   | Minim params ->
+    Log.debug "algorithms.run, Minim";
     Minim
       (Minimize.run
          (match params with
@@ -195,13 +197,36 @@ let run (args : t) : result =
       (Bisimilar.run
          (match params with
           | true, (the_fsm_1, the_fsm_2) ->
+            Log.debug "algorithms.run, Bisim (weak)";
             let the_saturated_pair : Fsm.pair =
               Fsm.saturate the_fsm_1, Fsm.saturate the_fsm_2
             in
+            if Logging.is_show_details_enabled ()
+            then
+              Log.debug
+                (Printf.sprintf
+                   "algorithms.run, Bisim (weak) saturated\n\
+                    FSM 1: %s\n\n\
+                    FSM 2: %s\n"
+                   (Fsm.to_string (fst the_saturated_pair))
+                   (Fsm.to_string (snd the_saturated_pair)));
             let merged_fsm : Fsm.t = Fsm.merge the_saturated_pair in
+            if Logging.is_show_details_enabled ()
+            then
+              Log.debug
+                (Printf.sprintf
+                   "algorithms.run, Bisim (weak) merged fsm: %s\n"
+                   (Fsm.to_string merged_fsm));
             the_saturated_pair, merged_fsm, snd (Minimize.run merged_fsm)
-          | _, the_fsm_pair ->
+          | false, the_fsm_pair ->
+            Log.debug "algorithms.run, Bisim (strong)";
             let merged_fsm : Fsm.t = Fsm.merge the_fsm_pair in
+            if Logging.is_show_details_enabled ()
+            then
+              Log.debug
+                (Printf.sprintf
+                   "algorithms.run, Bisim (strong) merged fsm: %s\n"
+                   (Fsm.to_string merged_fsm));
             the_fsm_pair, merged_fsm, snd (Minimize.run merged_fsm)))
 ;;
 

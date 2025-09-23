@@ -14,7 +14,7 @@ module Info : sig
     num_states : int;
     num_edges : int;
     coq_info : Coq.t list option;
-    weak_info : Params.WeakKind.t list option;
+    weak_info : Params.WeakKindEnc.t list option;
   }
 
   val merge :
