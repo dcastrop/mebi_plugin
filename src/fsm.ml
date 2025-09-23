@@ -1,3 +1,4 @@
+open Logging
 open Model
 
 type t =
@@ -265,10 +266,10 @@ let resolve_saturated_action
          , States.singleton dest )
          acc0
      | multi, acc0 ->
-       Logging.Log.warning
+       Log.warning
          (Printf.sprintf
-            "resolve_saturated_action, found (%i) action pairs matching named \
-             action (%s).\n\
+            "fsm.resolve_saturated_action, found (%i) action pairs matching \
+             named action (%s).\n\
              TEMP: dropping dupes and adding as fresh"
             (List.length multi)
             (Action.to_string a));
@@ -279,25 +280,45 @@ let resolve_saturated_action
 let rec saturate_action_from
           ?(named : Action.t option = None)
           (acc1 : ActionPairs.t)
-          (s : State.t)
+          (from : State.t)
           (anno : Action.annotation)
           (visited : (State.t, int) Hashtbl.t)
           (unsaturated_es : States.t Actions.t Edges.t)
   : ActionPairs.t
   =
-  log_visit s visited;
-  (* Logging.Log.warning
-     (Printf.sprintf
-     "saturate_action_from (%s), can revisit (%b)"
-     (State.to_string s)
-     (can_revisit s visited)); *)
-  if can_revisit s visited
+  log_visit from visited;
+  if can_revisit from visited
   then (
-    match Edges.find_opt unsaturated_es s with
-    | None -> resolve_saturated_action ~named acc1 s anno (* terminal state *)
+    Log.debug
+      (Printf.sprintf "fsm.saturate_action_from (%s)" (State.to_string from));
+    match Edges.find_opt unsaturated_es from with
+    | None ->
+      resolve_saturated_action ~named acc1 from anno (* terminal state *)
     | Some s_actions ->
-      saturate_actions_from ~named acc1 s s_actions anno visited unsaturated_es)
-  else acc1
+      saturate_actions_from
+        ~named
+        acc1
+        from
+        s_actions
+        anno
+        visited
+        unsaturated_es)
+  else (
+    match named with
+    | None ->
+      Log.debug
+        (Printf.sprintf
+           "fsm.saturate_action_from (%s) ! abort, already visited and no \
+            named action found"
+           (State.to_string from));
+      acc1
+    | Some _ ->
+      Log.debug
+        (Printf.sprintf
+           "fsm.saturate_action_from (%s) ! stop, already visited and named \
+            action found"
+           (State.to_string from));
+      resolve_saturated_action ~named acc1 from anno)
 
 and saturate_dest_actions
       ?(named : Action.t option = None)
@@ -308,6 +329,7 @@ and saturate_dest_actions
       (unsaturated_es : States.t Actions.t Edges.t)
   : ActionPairs.t
   =
+  Log.debug "fsm.saturate_dest_actions";
   States.fold
     (fun (dest : State.t) (acc2 : ActionPairs.t) ->
       saturate_action_from ~named acc2 dest anno visited unsaturated_es)
@@ -324,8 +346,8 @@ and saturate_actions_from
       (unsaturated_es : States.t Actions.t Edges.t)
   : ActionPairs.t
   =
-  (* Logging.Log.warning
-     (Printf.sprintf "saturate_actions_from (%s)" (State.to_string from)); *)
+  Log.debug
+    (Printf.sprintf "fsm.saturate_actions_from (%s)" (State.to_string from));
   snd
     (Actions.fold
        (fun (a : Action.t)
@@ -334,11 +356,11 @@ and saturate_actions_from
          match Action.Label.is_silent a.label with
          | None -> raise (CannotSaturateActionsWithUnknownVisibility a)
          | Some true ->
-           (* Logging.Log.warning
-              (Printf.sprintf
-              "saturate_actions_from (%s) -- (%s) silent"
-              (State.to_string from)
-              (Action.to_string a)); *)
+           Log.debug
+             (Printf.sprintf
+                "fsm.saturate_actions_from (%s) silent action (%s)"
+                (State.to_string from)
+                (Action.to_string a));
            ( added
            , saturate_dest_actions
                ~named
@@ -351,11 +373,11 @@ and saturate_actions_from
            (match named with
             (* found named action, continue *)
             | None ->
-              (* Logging.Log.warning
-                 (Printf.sprintf
-                 "saturate_actions_from (%s) -- (%s) named"
-                 (State.to_string from)
-                 (Action.to_string a)); *)
+              Log.debug
+                (Printf.sprintf
+                   "fsm.saturate_actions_from (%s) named action (%s)"
+                   (State.to_string from)
+                   (Action.to_string a));
               ( added
               , saturate_dest_actions
                   ~named:(Some a)
@@ -365,11 +387,11 @@ and saturate_actions_from
                   visited
                   unsaturated_es )
             | Some _ ->
-              (* Logging.Log.warning
+              Log.debug
                 (Printf.sprintf
-                   "saturate_actions_from (%s) -- (%s) abort"
+                   "fsm.saturate_actions_from (%s) named action (%s) ! abort"
                    (State.to_string from)
-                   (Action.to_string a)); *)
+                   (Action.to_string a));
               (* some other named action, stop saturating and add *)
               if added
               then added, acc2
@@ -388,6 +410,7 @@ let saturate_edges_from
       (aa : States.t Actions.t)
   : ActionPairs.t
   =
+  Log.debug "fsm.saturate_edges_from";
   Actions.fold
     (fun (a : Action.t) (dests : States.t) (acc0 : ActionPairs.t) ->
       match Action.Label.is_silent a.label with
@@ -399,11 +422,11 @@ let saturate_edges_from
           (fun (dest : State.t) (acc1 : ActionPairs.t) ->
             let visited : (State.t, int) Hashtbl.t = Hashtbl.create 0 in
             log_visit from visited;
-            (* Logging.Log.warning
-               (Printf.sprintf
-               "_saturate_edges_from (%s) to (%s)"
-               (State.to_string from)
-               (State.to_string dest)); *)
+            Log.debug
+              (Printf.sprintf
+                 "fsm.saturate_edges_from (%s) to (%s)"
+                 (State.to_string from)
+                 (State.to_string dest));
             Model.merge_action_pairs
               acc1
               (saturate_action_from
@@ -423,14 +446,18 @@ let saturate_edges_from
       [m] with saturated edges. Saturation removes silent actions, replacing them with (potentially multiple) explicit non-silent actions that may otherwise be taken immediately following some sequence of silent actions.
 *)
 let saturate_edges (m : t) : States.t Actions.t Edges.t =
+  Log.debug "fsm.saturate_edges";
   let edges : States.t Actions.t Edges.t = Edges.copy m.edges in
+  if Logging.is_show_details_enabled ()
+  then
+    Log.debug (Printf.sprintf "fsm.saturate_edges, copy: %s" (pstr_edges edges));
   Edges.iter
     (fun (from : State.t) (aa : States.t Actions.t) ->
       let actions : States.t Actions.t = Actions.create 0 in
       ActionPairs.iter
         (fun ((saturated_action, dests) : ActionPair.t) ->
           Actions.add actions saturated_action dests)
-        (saturate_edges_from m.edges from aa);
+        (saturate_edges_from edges from aa);
       Edges.add edges from actions)
     m.edges;
   edges
@@ -438,6 +465,7 @@ let saturate_edges (m : t) : States.t Actions.t Edges.t =
 
 (** @return [m] with saturated edges. *)
 let saturate (m : t) : t =
+  Log.debug "fsm.saturate";
   let m = clone m in
   update_info { m with edges = saturate_edges m }
 ;;

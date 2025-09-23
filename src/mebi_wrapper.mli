@@ -88,6 +88,7 @@ module type ENCODING_TYPE = sig
 
   exception InvalidDecodeKey of (t * term Tbl.t)
 
+  val decode_opt : term Tbl.t -> t -> term option
   val decode : term Tbl.t -> t -> term
 end
 
@@ -221,6 +222,7 @@ module Syntax : MEBI_MONAD_SYNTAX
 
 val encode : term -> E.t mm
 val decode : E.t -> term mm
+val decode_to_string : E.t -> string
 val get_encoding_opt : term -> E.t option mm
 val get_decoding_opt : E.t -> term option mm
 val has_encoding : term -> bool mm
@@ -229,6 +231,7 @@ val encode_map : 'a F.t -> 'a B.t mm
 val decode_map : 'a B.t -> 'a F.t mm
 val constr_to_string : Constr.t -> string
 val econstr_to_string : EConstr.t -> string
+val term_to_string : term -> string
 val constr_list_to_string : Constr.t list -> string
 val econstr_list_to_string : EConstr.t list -> string
 
