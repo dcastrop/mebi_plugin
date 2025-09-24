@@ -31,7 +31,7 @@ module Info = struct
     ; num_states : int
     ; num_edges : int
     ; coq_info : Coq.t list option
-    ; weak_info : Params.WeakKindEnc.t list option
+    ; weak_info : string list option
     }
 
   let merge
@@ -60,19 +60,7 @@ module Info = struct
          | Some s1, None -> Some s1
          | None, Some s2 -> Some s2
          | Some s1, Some s2 ->
-           Some
-             (List.fold_left
-                (fun (acc : Params.WeakKindEnc.t list)
-                  (w : Params.WeakKindEnc.t) ->
-                  if
-                    List.exists
-                      (fun (t : Params.WeakKindEnc.t) ->
-                        Params.WeakKindEnc.eq w t)
-                      acc
-                  then acc
-                  else w :: acc)
-                s1
-                s2)
+           Some (List.merge (fun a b -> String.compare a b) s1 s2)
          | None, None -> None)
     }
   ;;
@@ -114,16 +102,7 @@ module Info = struct
       sep
       (match i.weak_info with
        | None -> "None"
-       | Some [] -> "[]"
-       | Some (h :: t) ->
-         if List.is_empty t
-         then Params.WeakKindEnc.to_string h
-         else
-           List.fold_left
-             (fun (acc : string) (w : Params.WeakKindEnc.t) ->
-               Printf.sprintf "%s, %s" acc (Params.WeakKindEnc.to_string w))
-             (Params.WeakKindEnc.to_string h)
-             t)
+       | Some ws -> Utils.pstr_string_list ws)
       outer
   ;;
 

@@ -100,7 +100,6 @@ type wrapper =
   { coq_ref : coq_context ref
   ; fwd_enc : E.t F.t
   ; bck_enc : term B.t
-  ; none_tm : term
   }
 
 type 'a in_context =
@@ -116,6 +115,7 @@ val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
 val map : ('a -> 'b) -> 'a mm -> 'b mm
 val product : 'a mm -> 'b mm -> ('a * 'b) mm
 val iterate : int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
+val term_eq : term -> term -> bool mm
 
 module type ERROR_TYPE = sig
   type mebi_error =
@@ -173,7 +173,6 @@ module type ERROR_TYPE = sig
     -> EConstr.t list
     -> EConstr.rel_declaration list
     -> exn
-
 end
 
 module Error : ERROR_TYPE
@@ -188,11 +187,14 @@ val invalid_arity : Constr.t -> 'a mm
 val invalid_ref_lts : Names.GlobRef.t -> 'a mm
 val invalid_ref_type : Names.GlobRef.t -> 'a mm
 val invalid_cindef_kind : 'b -> 'a mm
-
 val unknown_term_type : term * term * term list -> 'a mm
 val primary_lts_not_found : term * term list -> 'a mm
 val unknown_decode_key : E.t * term B.t -> 'a mm
-val invalid_check_updated_ctx : term list -> EConstr.rel_declaration list -> 'a mm
+
+val invalid_check_updated_ctx
+  :  term list
+  -> EConstr.rel_declaration list
+  -> 'a mm
 
 val get_env : wrapper ref -> Environ.env in_context
 val get_sigma : wrapper ref -> Evd.evar_map in_context
@@ -227,8 +229,7 @@ end
 
 module Syntax : MEBI_MONAD_SYNTAX
 
-val is_silent : term -> bool mm
-
+val is_none_term : term -> bool mm
 val encode : term -> E.t mm
 val decode : E.t -> term mm
 val decode_to_string : E.t -> string
@@ -243,12 +244,10 @@ val econstr_to_string : EConstr.t -> string
 val term_to_string : term -> string
 val constr_list_to_string : Constr.t list -> string
 val econstr_list_to_string : EConstr.t list -> string
-
 val constr_rel_decl_to_string : Constr.rel_declaration -> string
 val econstr_rel_decl_to_string : EConstr.rel_declaration -> string
 val constr_rel_decl_list_to_string : Constr.rel_declaration list -> string
 val econstr_rel_decl_list_to_string : EConstr.rel_declaration list -> string
-
 val debug_encoding : unit -> unit mm
 
 module Constr_tree : sig
@@ -264,10 +263,10 @@ type decoded_tree = (string * int) Constr_tree.tree
 
 val decode_constr_tree_lts : Constr_tree.t -> decoded_tree mm
 val pstr_decoded_tree : decoded_tree -> string
-val tref_to_econstr : Constrexpr.constr_expr -> term mm
+val constrexpr_to_econstr : Constrexpr.constr_expr -> term mm
 val normalize_econstr : term -> term mm
 val type_of_econstr : term -> term mm
-val type_of_tref : Constrexpr.constr_expr -> term mm
+val type_of_constrexpr : Constrexpr.constr_expr -> term mm
 
 val make_transition_tbl
   :  wrapper ref

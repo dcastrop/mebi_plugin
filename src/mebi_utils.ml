@@ -116,10 +116,10 @@ let get_ind_lts (i : int) (gref : Names.GlobRef.t) : Mebi_ind.t mm =
 
 let encode_econstr (t : EConstr.t) : E.t mm = encode t
 
-let encode_tref (t : Constrexpr.constr_expr) : E.t mm =
-  Log.debug "mebi_utils.encode_tref";
+let encode_constrexpr (t : Constrexpr.constr_expr) : E.t mm =
+  Log.debug "mebi_utils.encode_constrexpr";
   let open Mebi_wrapper.Syntax in
-  let* (t' : EConstr.t) = tref_to_econstr t in
+  let* (t' : EConstr.t) = constrexpr_to_econstr t in
   encode_econstr t'
 ;;
 

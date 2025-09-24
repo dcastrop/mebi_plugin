@@ -418,6 +418,8 @@ Module BisimTest3.
   MeBi FSM exa2 Using termLTS.
   
   MeBi Bisim exa1 With termLTS And exa2 With termLTS Using termLTS.
+
+  MeBi See All.
   MeBi Bisim exa1 With termLTS And exa3 With termLTS Using termLTS.
 
   MeBi Bisim exa2 With termLTS And exa1 With termLTS Using termLTS.
