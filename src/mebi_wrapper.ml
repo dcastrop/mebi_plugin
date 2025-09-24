@@ -156,7 +156,6 @@ type wrapper =
   { coq_ref : coq_context ref
   ; fwd_enc : E.t F.t
   ; bck_enc : term B.t
-  ; none_tm : term
   }
 
 type 'a in_context =
@@ -174,38 +173,29 @@ type 'a mm = wrapper ref -> 'a in_context
 let run ?(keep_encoding : bool = false) (x : 'a mm) : 'a =
   let env = !(the_coq_env ~fresh:true ()) in
   let sigma = !(the_coq_ctx ()) in
-  (* get None type (used for silent actions) *)
-  let sigma, none_tm =
-    Evd.fresh_global env sigma (Coqlib.lib_ref "core.option.None")
-  in
   let coq_ref : coq_context ref = ref { coq_env = env; coq_ctx = sigma } in
   if keep_encoding then () else E.reset ();
   let fwd_enc : E.t F.t = F.create 0 in
   let bck_enc = B.create 0 in
-  if keep_encoding
-  then ()
-  else (
-    (* populate with None *)
-    let _ = E.encode fwd_enc bck_enc none_tm in
-    ());
-  let a = x (ref { coq_ref; fwd_enc; bck_enc; none_tm }) in
+  let a = x (ref { coq_ref; fwd_enc; bck_enc }) in
   enable_logging := false;
   a.value
 ;;
 
-let return (x : 'a) : 'a mm = fun st -> { state = st; value = x }
+let return (x : 'a) : 'a mm =
+  fun (st : wrapper ref) -> { state = st; value = x }
 [@@inline always]
 ;;
 
 let bind (x : 'a mm) (f : 'a -> 'b mm) : 'b mm =
-  fun st ->
+  fun (st : wrapper ref) ->
   let a = x st in
   f a.value a.state
 [@@inline always]
 ;;
 
 let map (f : 'a -> 'b) (x : 'a mm) : 'b mm =
-  fun st ->
+  fun (st : wrapper ref) ->
   let x_st = x st in
   { x_st with value = f x_st.value }
 [@@inline always]
@@ -276,6 +266,56 @@ let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
 ;;
 
 (********************************************)
+(****** UTILS *******************************)
+(********************************************)
+
+let term_eq (a : term) (b : term) : bool mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  { state = st; value = EConstr.eq_constr !coq_st.coq_ctx a b }
+;;
+
+(**********************************)
+(****** COQ TERMS *****************)
+(**********************************)
+
+let constrexpr_to_econstr (t : Constrexpr.constr_expr) : term mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  let sigma, t =
+    Constrintern.interp_constr_evars !coq_st.coq_env !coq_st.coq_ctx t
+  in
+  coq_st := { !coq_st with coq_ctx = sigma };
+  (* let open Syntax in
+     let$ t env sigma = Constrintern.interp_constr_evars env sigma t in
+     return t *)
+  { state = st; value = t }
+;;
+
+let normalize_econstr (t : term) : term mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  let t = Reductionops.nf_all !coq_st.coq_env !coq_st.coq_ctx t in
+  (* let open Syntax in
+     let$+ t env sigma = Reductionops.nf_all env sigma t in
+     return t *)
+  { state = st; value = t }
+;;
+
+let type_of_econstr (t : term) : term mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  let t = Reductionops.nf_all !coq_st.coq_env !coq_st.coq_ctx t in
+  let sigma, t = Typing.type_of !coq_st.coq_env !coq_st.coq_ctx t in
+  coq_st := { !coq_st with coq_ctx = sigma };
+  (* let open Syntax in
+     let* (t : term) = normalize_econstr t in
+     let$ ty env sigma = Typing.type_of env sigma t in
+     return ty *)
+  { state = st; value = t }
+;;
+
+(********************************************)
 (****** SYNTAX ******************************)
 (********************************************)
 
@@ -310,7 +350,6 @@ end
 (****** COQ TERM TO STRING ********)
 (**********************************)
 
-(** *)
 let constr_to_string (x : Constr.t) : string =
   let s_mm : string mm =
     let open Syntax in
@@ -676,78 +715,78 @@ end
 (**********************************)
 
 let params_fail_if_incomplete () : 'a mm =
-  fun st -> raise (Error.params_fail_if_incomplete ())
+  fun (st : wrapper ref) -> raise (Error.params_fail_if_incomplete ())
 ;;
 
 let params_fail_if_not_bisim () : 'a mm =
-  fun st -> raise (Error.params_fail_if_not_bisim ())
+  fun (st : wrapper ref) -> raise (Error.params_fail_if_not_bisim ())
 ;;
 
 let invalid_check_updated_ctx x y : 'a mm =
-  fun st ->
+  fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   raise (Error.invalid_check_updated_ctx !coq_st.coq_env !coq_st.coq_ctx x y)
 ;;
 
 let invalid_lts_args_length (x : int) : 'a mm =
-  fun st -> raise (Error.invalid_lts_args_length x)
+  fun (st : wrapper ref) -> raise (Error.invalid_lts_args_length x)
 ;;
 
 let invalid_lts_term_kind (x : Constr.t) : 'a mm =
-  fun st ->
+  fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   raise (Error.invalid_lts_term_kind !coq_st.coq_env !coq_st.coq_ctx x)
 ;;
 
 (** Error when input LTS has the wrong arity *)
 let invalid_arity (x : Constr.types) : 'a mm =
-  fun st ->
+  fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   raise (Error.invalid_arity !coq_st.coq_env !coq_st.coq_ctx x)
 ;;
 
 (** Error when input LTS has the wrong sort *)
 let invalid_sort_lts (x : Sorts.family) : 'a mm =
-  fun st -> raise (Error.invalid_sort_lts x)
+  fun (st : wrapper ref) -> raise (Error.invalid_sort_lts x)
 ;;
 
 (** Error when input Type has the wrong sort *)
 let invalid_sort_type (x : Sorts.family) : 'a mm =
-  fun st -> raise (Error.invalid_sort_type x)
+  fun (st : wrapper ref) -> raise (Error.invalid_sort_type x)
 ;;
 
 (** Error when input LTS reference is invalid (e.g. non existing) *)
 let invalid_ref_lts (x : Names.GlobRef.t) : 'a mm =
-  fun st -> raise (Error.invalid_ref_lts x)
+  fun (st : wrapper ref) -> raise (Error.invalid_ref_lts x)
 ;;
 
 (** Error when input Type reference is invalid (e.g. non existing) *)
 let invalid_ref_type (x : Names.GlobRef.t) : 'a mm =
-  fun st -> raise (Error.invalid_ref_type x)
+  fun (st : wrapper ref) -> raise (Error.invalid_ref_type x)
 ;;
 
 (** Error when input LTS reference is invalid (e.g. non existing) *)
 let invalid_cindef_kind unit : 'a mm =
-  fun st -> raise (Error.invalid_cindef_kind ())
+  fun (st : wrapper ref) -> raise (Error.invalid_cindef_kind ())
 ;;
 
 (** Error when term is of unknown type *)
 let unknown_term_type (tmty : term * term * term list) : 'a mm =
-  fun st ->
+  fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   raise (Error.unknown_term_type !coq_st.coq_env !coq_st.coq_ctx tmty)
 ;;
 
 (** Error when multiple coq-LTS provided, but none of them match term. *)
 let primary_lts_not_found ((t, names) : term * term list) : 'a mm =
-  fun st ->
+  fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   raise (Error.primary_lts_not_found !coq_st.coq_env !coq_st.coq_ctx t names)
 ;;
 
 (** Error when try to decode key that does not exist in decode map. *)
 let unknown_decode_key ((k, bckmap) : E.t * term B.t) : 'a mm =
-  fun st ->
+  fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   raise (Error.unknown_decode_key !coq_st.coq_env !coq_st.coq_ctx k bckmap)
 ;;
@@ -755,18 +794,6 @@ let unknown_decode_key ((k, bckmap) : E.t * term B.t) : 'a mm =
 (********************************************)
 (****** ENCODE/DECODE ***********************)
 (********************************************)
-
-let is_silent (t : term) : bool mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  { state = st
-  ; value =
-      (* E.eq
-         (E.encode !st.fwd_enc !st.bck_enc !st.none_tm)
-         (E.encode !st.fwd_enc !st.bck_enc t) *)
-      EConstr.eq_constr !coq_st.coq_ctx !st.none_tm t
-  }
-;;
 
 let encode (k : term) : E.t mm =
   fun (st : wrapper ref) ->
@@ -1017,33 +1044,62 @@ let rec pstr_decoded_tree (t1 : decoded_tree) : string =
 ;;
 
 (**********************************)
-(****** COQ TERMS *****************)
+(****** UTILS *********************)
 (**********************************)
 
-let tref_to_econstr (tref : Constrexpr.constr_expr) : term mm =
+let type_of_constrexpr (tref : Constrexpr.constr_expr) : term mm =
   let open Syntax in
-  let$ t env sigma = Constrintern.interp_constr_evars env sigma tref in
-  return t
-;;
-
-let normalize_econstr (t' : term) : term mm =
-  let open Syntax in
-  let$+ t env sigma = Reductionops.nf_all env sigma t' in
-  return t
-;;
-
-let type_of_econstr (t' : term) : term mm =
-  let open Syntax in
-  let* (t : term) = normalize_econstr t' in
-  let$ ty env sigma = Typing.type_of env sigma t in
-  return ty
-;;
-
-(** *)
-let type_of_tref (tref : Constrexpr.constr_expr) : term mm =
-  let open Syntax in
-  let* (t : term) = tref_to_econstr tref in
+  let* (t : term) = constrexpr_to_econstr tref in
   type_of_econstr t
+;;
+
+(**********************************)
+(****** COQ NONE TYPE *************)
+(**********************************)
+
+let the_none_ref () : Names.GlobRef.t = Coqlib.lib_ref "core.option.None"
+
+let the_none_term () : term mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  let sigma, the_none =
+    Evd.fresh_global !coq_st.coq_env !coq_st.coq_ctx (the_none_ref ())
+  in
+  (* !st.coq_ref := { !coq_st with coq_ctx = sigma }; *)
+  coq_st := { !coq_st with coq_ctx = sigma };
+  { state = st; value = the_none }
+;;
+
+let is_none_term (t : term) : bool mm =
+  let open Syntax in
+  let* none : term = the_none_term () in
+  (* let* sigma = get_sigma in *)
+  (* let none = EConstr.to_constr sigma none in *)
+  (* let none = EConstr.of_constr none in *)
+  (* let none = EConstr.mkApp (none, Array.of_list []) in *)
+  (* let none = EConstr.mkSet none in *)
+  let* b = term_eq none t in
+  Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.is_none_term: %s = %s => %b"
+       (econstr_to_string t)
+       (econstr_to_string none)
+       b);
+  let* none_typ = type_of_econstr none in
+  Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.is_none_term, type of none: %s"
+       (econstr_to_string none_typ));
+  (* let* sigma = get_sigma in
+     (match EConstr.kind_of_type sigma none with
+     | SortType _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: SortType"
+     | CastType _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: CastType"
+     | ProdType _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: ProdType"
+     | LetInType _ ->
+     Log.debug "mebi_wrapper.is_none_term, none is kind: LetInType"
+     | AtomicType _ ->
+     Log.debug "mebi_wrapper.is_none_term, none is kind: AtomicType"); *)
+  return b
 ;;
 
 (********************************************)

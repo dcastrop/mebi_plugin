@@ -9,3 +9,4 @@ val default_indent_val : int
 val str_tabs : ?size:int -> int -> string
 val get_key_of_val : ('a, 'b) Hashtbl.t -> 'b -> 'a option
 val new_int_counter : ?start:int -> unit -> unit -> int
+val pstr_string_list : string list -> string

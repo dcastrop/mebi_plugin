@@ -101,3 +101,21 @@ let new_int_counter ?(start : int = 0) () : unit -> int =
   in
   get_and_incr_counter
 ;;
+
+(********************)
+(*** pretty print ***)
+(********************)
+
+let pstr_string_list (ss : string list) : string =
+  match ss with
+  | [] -> "[ ] (empty)"
+  | h :: [] -> Printf.sprintf "[ %s ]" h
+  | h :: t ->
+    Printf.sprintf
+      "[\n%s\n]"
+      (List.fold_left
+         (fun (acc : string) (s : string) ->
+           Printf.sprintf ",\n%s%s" (str_tabs 1) s)
+         (Printf.sprintf "%s%s" (str_tabs 1) h)
+         t)
+;;

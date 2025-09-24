@@ -310,7 +310,7 @@ module type GraphB = sig
     ; states : S.t
     ; transitions : constr_transitions H.t
     ; cindefs : (E.t * Mebi_ind.t) list
-    ; weak : Params.WeakKind.t option
+    ; weak : Params.WeakEnc.t option
     }
 
   val insert_constr_transition
@@ -332,21 +332,21 @@ module type GraphB = sig
     :  Mebi_ind.t
     -> Mebi_ind.t B.t
     -> lts_graph
-    -> int * Params.WeakKind.t option
+    -> int * Params.WeakEnc.t option
     -> lts_graph mm
 
   val build_graph
     :  Libnames.qualid
     -> Constrexpr.constr_expr
     -> Names.GlobRef.t list
-    -> int * Params.WeakKind.t option
+    -> int * Params.WeakEnc.t option
     -> lts_graph mm
 
   val decoq_lts
     :  ?cache_decoding:bool
     -> ?name:string
     -> lts_graph (* -> cindef * cindef B.t *)
-    -> int * Params.WeakKind.t option
+    -> int * Params.WeakEnc.t option
     -> Lts.t mm
 end
 
@@ -392,7 +392,7 @@ module MkGraph
     ; states : S.t
     ; transitions : constr_transitions H.t
     ; cindefs : (E.t * Mebi_ind.t) list
-    ; weak : Params.WeakKind.t option
+    ; weak : Params.WeakEnc.t option
     }
 
   (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions].
@@ -425,7 +425,7 @@ module MkGraph
     return ()
   ;;
 
-  let is_silent_transition (weak : Params.WeakKind.t option) (act : EConstr.t)
+  let is_silent_transition (weak : Params.WeakEnc.t option) (act : EConstr.t)
     : bool option mm
     =
     match weak with
@@ -435,9 +435,13 @@ module MkGraph
       let* (act_enc : E.t) = encode act in
       let* (ty : EConstr.t) = type_of_econstr act in
       let* (ty_enc : E.t) = encode ty in
-      let open Params.WeakKind in
+      Log.debug
+        (Printf.sprintf
+           "command.MkGraph.is_silent_transition, type of act: %s"
+           (econstr_to_string ty));
+      let open Params.WeakEnc in
       (match weak_kind with
-       | OptionRef (label_enc, _label_gref) ->
+       | OptionRef label_enc ->
          let* decoding = decode label_enc in
          Log.debug
            (Printf.sprintf
@@ -448,7 +452,7 @@ module MkGraph
          if E.eq label_enc ty_enc
          then return (Some false)
          else
-           (* let* b = is_silent act in *)
+           (* let* b = is_none_term act in *)
            (* return (Some b) *)
            (* NOTE: could be the [None] type? *)
            return (Some (String.equal "None" (econstr_to_string act)))
@@ -463,11 +467,11 @@ module MkGraph
          if E.eq label_enc ty_enc
          then return (Some false)
          else
-           (* let* b = is_silent act in *)
+           (* let* b = is_none_term act in *)
            (* return (Some b) *)
            (* NOTE: could be the [None] type? *)
            return (Some (String.equal "None" (econstr_to_string act)))
-       | CustomRef ((tau_enc, _tau_gref), (label_enc, _label_gref)) ->
+       | CustomRef (tau_enc, label_enc) ->
          let* tau_decoding = decode tau_enc in
          let* label_decoding = decode label_enc in
          Log.debug
@@ -480,7 +484,7 @@ module MkGraph
               (E.to_string label_enc)
               (econstr_to_string label_decoding));
          return (Some (E.eq tau_enc act_enc))
-       | CustomConstr (tau_enc, (label_enc, _label_gref)) ->
+       | CustomConstr (tau_enc, label_enc) ->
          let* tau_decoding = decode tau_enc in
          let* label_decoding = decode label_enc in
          Log.debug
@@ -496,7 +500,7 @@ module MkGraph
   ;;
 
   let get_new_states
-        ?(weak_type : Params.WeakKind.t option = None)
+        ?(weak_type : Params.WeakEnc.t option = None)
         (from : E.t)
         (g : lts_graph)
         (ctors : coq_ctor list)
@@ -563,7 +567,7 @@ module MkGraph
             (the_primary_lts : Mebi_ind.t)
             (rlts_map : Mebi_ind.t B.t)
             (g : lts_graph)
-            ((bound, weak_type) : int * Params.WeakKind.t option)
+            ((bound, weak_type) : int * Params.WeakEnc.t option)
     : lts_graph mm
     =
     Log.debug "command.MkGraph.build_lts_graph";
@@ -627,12 +631,12 @@ module MkGraph
         (primary_lts : Libnames.qualid)
         (tref : Constrexpr.constr_expr)
         (grefs : Names.GlobRef.t list)
-        ((bound, weak_type) : int * Params.WeakKind.t option)
+        ((bound, weak_type) : int * Params.WeakEnc.t option)
     : lts_graph mm
     =
     (* make map of term types *)
     Log.debug "command.MkGraph.build_graph";
-    let* (t : EConstr.t) = tref_to_econstr tref in
+    let* (t : EConstr.t) = constrexpr_to_econstr tref in
     let* (the_primary_enc, cindef_map) : E.t * Mebi_ind.t B.t =
       build_cindef_map primary_lts t grefs
     in
@@ -821,11 +825,15 @@ module MkGraph
       iterate 0 (List.length cindefs - 1) [] iter_body)
   ;;
 
+  let decoq_weak_enc (w : Params.WeakEnc.t option) : string list mm =
+    return [ "TODO: decoq_weak_enc" ]
+  ;;
+
   let decoq_lts
         ?(cache_decoding : bool = false)
         ?(name : string = "unnamed")
         (g : lts_graph)
-        ((bound, weak_type) : int * Params.WeakKind.t option)
+        ((bound, weak_type) : int * Params.WeakEnc.t option)
     : Lts.t mm
     =
     Log.debug "command.MkGraph.decoq_lts";
@@ -838,6 +846,7 @@ module MkGraph
     let* cindefs : (E.t * (string * string list)) list =
       decoq_cindefs g.cindefs
     in
+    let* w : string list = decoq_weak_enc g.weak in
     let info : Info.t option =
       Some
         { is_complete = Queue.is_empty g.to_visit
@@ -847,10 +856,7 @@ module MkGraph
         ; num_states = S.cardinal g.states
         ; num_edges = num_transitions g.transitions
         ; coq_info = Some cindefs
-        ; weak_info =
-            (match g.weak with
-             | None -> None
-             | Some w -> Some [ Params.WeakKindEnc.of_full w ])
+        ; weak_info = Some w
         }
     in
     return (Lts.create init terminals alphabet states transitions info)
@@ -896,7 +902,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
   let build_lts_graph
         (primary_lts : Libnames.qualid)
         (t : Constrexpr.constr_expr)
-        (params : int * Params.WeakKind.t option)
+        (params : int * Params.WeakEnc.t option)
     : Lts.t mm
     =
     Log.debug "command.run.build_lts_graph";
