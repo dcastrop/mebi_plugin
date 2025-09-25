@@ -63,9 +63,7 @@ val set_weak_mode : bool -> unit
 
 module WeakEnc : sig
   type t =
-    | OptionRef of Mebi_wrapper.E.t
     | OptionConstr of Mebi_wrapper.E.t
-    | CustomRef of Mebi_wrapper.E.t * Mebi_wrapper.E.t
     | CustomConstr of Mebi_wrapper.E.t * Mebi_wrapper.E.t
 
   val to_string : t -> string Mebi_wrapper.mm
@@ -82,9 +80,7 @@ val printout_snd_weak_type : unit -> unit Mebi_wrapper.mm
 
 module WeakArgs : sig
   type t =
-    | OptionRef of Libnames.qualid
     | OptionConstr of Constrexpr.constr_expr
-    | CustomRef of Libnames.qualid * Libnames.qualid
     | CustomConstr of Constrexpr.constr_expr * Libnames.qualid
 end
 

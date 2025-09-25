@@ -315,6 +315,14 @@ let type_of_econstr (t : term) : term mm =
   { state = st; value = t }
 ;;
 
+let new_evar_of_econstr (t : term) : term mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  let sigma, instance = Evarutil.new_evar !coq_st.coq_env !coq_st.coq_ctx t in
+  coq_st := { !coq_st with coq_ctx = sigma };
+  { state = st; value = instance }
+;;
+
 (********************************************)
 (****** SYNTAX ******************************)
 (********************************************)
@@ -1065,14 +1073,118 @@ let the_none_term () : term mm =
   let sigma, the_none =
     Evd.fresh_global !coq_st.coq_env !coq_st.coq_ctx (the_none_ref ())
   in
-  (* !st.coq_ref := { !coq_st with coq_ctx = sigma }; *)
   coq_st := { !coq_st with coq_ctx = sigma };
   { state = st; value = the_none }
+;;
+
+let test_checks (t : term) : unit mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.test_checks:\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n"
+       (Printf.sprintf
+          "isRel %s = %b"
+          (econstr_to_string t)
+          (EConstr.isRel !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isVar %s = %b"
+          (econstr_to_string t)
+          (EConstr.isVar !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isInd %s = %b"
+          (econstr_to_string t)
+          (EConstr.isInd !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isRef %s = %b"
+          (econstr_to_string t)
+          (EConstr.isRef !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isEvar %s = %b"
+          (econstr_to_string t)
+          (EConstr.isEvar !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isMeta %s = %b"
+          (econstr_to_string t)
+          (EConstr.isMeta !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isSort %s = %b"
+          (econstr_to_string t)
+          (EConstr.isSort !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isCast %s = %b"
+          (econstr_to_string t)
+          (EConstr.isCast !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isApp %s = %b"
+          (econstr_to_string t)
+          (EConstr.isApp !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isLambda %s = %b"
+          (econstr_to_string t)
+          (EConstr.isLambda !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isLetIn %s = %b"
+          (econstr_to_string t)
+          (EConstr.isLetIn !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isProd %s = %b"
+          (econstr_to_string t)
+          (EConstr.isProd !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isConst %s = %b"
+          (econstr_to_string t)
+          (EConstr.isConst !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isConstruct %s = %b"
+          (econstr_to_string t)
+          (EConstr.isConstruct !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isFix %s = %b"
+          (econstr_to_string t)
+          (EConstr.isFix !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isCoFix %s = %b"
+          (econstr_to_string t)
+          (EConstr.isCoFix !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isCase %s = %b"
+          (econstr_to_string t)
+          (EConstr.isCase !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isProj %s = %b"
+          (econstr_to_string t)
+          (EConstr.isProj !coq_st.coq_ctx t))
+       (Printf.sprintf
+          "isType %s = %b"
+          (econstr_to_string t)
+          (EConstr.isType !coq_st.coq_ctx t)));
+  { state = st; value = () }
 ;;
 
 let is_none_term (t : term) : bool mm =
   let open Syntax in
   let* none : term = the_none_term () in
+  let* _ = test_checks none in
   (* let* sigma = get_sigma in *)
   (* let none = EConstr.to_constr sigma none in *)
   (* let none = EConstr.of_constr none in *)
@@ -1088,8 +1200,27 @@ let is_none_term (t : term) : bool mm =
   let* none_typ = type_of_econstr none in
   Log.debug
     (Printf.sprintf
-       "mebi_wrapper.is_none_term, type of none: %s"
+       "mebi_wrapper.is_none_term, type of %s: %s"
+       (econstr_to_string none)
        (econstr_to_string none_typ));
+  let* t_typ = type_of_econstr t in
+  Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.is_none_term, type of %s: %s"
+       (econstr_to_string t)
+       (econstr_to_string t_typ));
+  let n = EConstr.mkApp (none, [||]) in
+  Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.is_none_term, mkApp %s: %s"
+       (econstr_to_string none)
+       (econstr_to_string n));
+  let* n = new_evar_of_econstr none in
+  Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.is_none_term, new_evar_of_econstr %s: %s"
+       (econstr_to_string none)
+       (econstr_to_string n));
   (* let* sigma = get_sigma in
      (match EConstr.kind_of_type sigma none with
      | SortType _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: SortType"
