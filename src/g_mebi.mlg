@@ -45,24 +45,15 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "Set" "WeakMode"    "False"] -> {Params.set_weak_mode false}
 
 (* set the weak transitions -- bisim will use for both terms unless specified *)
-| ["MeBi" "Set" "Weak" "Option" reference(x)] -> {Params.set_weak_types_args (Params.WeakArgs.OptionRef x, None)}
 | ["MeBi" "Set" "Weak" "Option" constr(x)   ] -> {Params.set_weak_types_args (Params.WeakArgs.OptionConstr x, None)}
-
-| ["MeBi" "Set" "Weak" reference(x) "Of" reference(y)] -> {Params.set_weak_types_args (Params.WeakArgs.CustomRef (x, y), None)}
 | ["MeBi" "Set" "Weak" constr(x)    "Of" reference(y)] -> {Params.set_weak_types_args (Params.WeakArgs.CustomConstr (x, y), None)}
 
 (* specify weak transition for first lts *)
-| ["MeBi" "Set" "Weak1" "Option" reference(x)] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.OptionRef x)}
 | ["MeBi" "Set" "Weak1" "Option" constr(x)   ] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.OptionConstr x)}
-
-| ["MeBi" "Set" "Weak1" reference(x) "Of" reference(y)] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.CustomRef (x, y))}
 | ["MeBi" "Set" "Weak1" constr(x)    "Of" reference(y)] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.CustomConstr (x, y))}
 
 (* specify weak transition for second lts *)
-| ["MeBi" "Set" "Weak2" "Option" reference(x)] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.OptionRef x)}
 | ["MeBi" "Set" "Weak2" "Option" constr(x)   ] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.OptionConstr x)}
-
-| ["MeBi" "Set" "Weak2" reference(x) "Of" reference(y)] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.CustomRef (x, y))}
 | ["MeBi" "Set" "Weak2" constr(x)    "Of" reference(y)] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.CustomConstr (x, y))}
 
 (* reset plugin params *)

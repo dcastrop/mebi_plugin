@@ -441,21 +441,6 @@ module MkGraph
            (econstr_to_string ty));
       let open Params.WeakEnc in
       (match weak_kind with
-       | OptionRef label_enc ->
-         let* decoding = decode label_enc in
-         Log.debug
-           (Printf.sprintf
-              "command.MkGraph.is_silent_transition, OptionRef (%s) => %s"
-              (E.to_string label_enc)
-              (econstr_to_string decoding));
-         (* all non-silent actions should be of this type *)
-         if E.eq label_enc ty_enc
-         then return (Some false)
-         else
-           (* let* b = is_none_term act in *)
-           (* return (Some b) *)
-           (* NOTE: could be the [None] type? *)
-           return (Some (String.equal "None" (econstr_to_string act)))
        | OptionConstr label_enc ->
          let* decoding = decode label_enc in
          Log.debug
@@ -471,19 +456,6 @@ module MkGraph
            (* return (Some b) *)
            (* NOTE: could be the [None] type? *)
            return (Some (String.equal "None" (econstr_to_string act)))
-       | CustomRef (tau_enc, label_enc) ->
-         let* tau_decoding = decode tau_enc in
-         let* label_decoding = decode label_enc in
-         Log.debug
-           (Printf.sprintf
-              "command.MkGraph.is_silent_transition, CustomRef\n\
-               - tau: (%s) => %s\n\
-               - label: (%s) => %s"
-              (E.to_string tau_enc)
-              (econstr_to_string tau_decoding)
-              (E.to_string label_enc)
-              (econstr_to_string label_decoding));
-         return (Some (E.eq tau_enc act_enc))
        | CustomConstr (tau_enc, label_enc) ->
          let* tau_decoding = decode tau_enc in
          let* label_decoding = decode label_enc in
