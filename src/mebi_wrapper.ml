@@ -1096,7 +1096,7 @@ let the_none_term () : term mm =
   { state = st; value = the_none }
 ;;
 
-let test_checks (t : term) : unit mm =
+let _test_checks (t : term) : unit mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   Log.debug
@@ -1200,72 +1200,40 @@ let test_checks (t : term) : unit mm =
   { state = st; value = () }
 ;;
 
+let _test_constr_kind (t : Constr.t) : unit =
+  match Constr.kind t with
+  | Rel _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Rel"
+  | Var _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Var"
+  | Meta _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Meta"
+  | Evar _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Evar"
+  | Sort _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Sort"
+  | Cast _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Cast"
+  | Prod _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Prod"
+  | Lambda _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Lambda"
+  | LetIn _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: LetIn"
+  | App _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: App"
+  | Const _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Const"
+  | Ind _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Ind"
+  | Construct _ -> Log.debug "mebi_wrapper.is_none_term, none is t: Construct"
+  | Case _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Case"
+  | Fix _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Fix"
+  | CoFix _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: CoFix"
+  | Proj _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Proj"
+  | Int _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Int"
+  | Float _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Float"
+  | String _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: String"
+  | Array _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Array"
+;;
+
 let is_none_term (t : term) : bool mm =
   let open Syntax in
-  let* none : term = the_none_term () in
-  let* _ = test_checks none in
-  (* let* sigma = get_sigma in *)
-  (* let none = EConstr.to_constr sigma none in *)
-  (* let none = EConstr.of_constr none in *)
-  (* let none = EConstr.mkApp (none, Array.of_list []) in *)
-  (* let none = EConstr.mkSet none in *)
-  let* b = term_eq none t in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.is_none_term: %s = %s => %b"
-       (econstr_to_string t)
-       (econstr_to_string none)
-       b);
-  let* none_typ = type_of_econstr none in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.is_none_term, type of %s: %s"
-       (econstr_to_string none)
-       (econstr_to_string none_typ));
-  let* t_typ = type_of_econstr t in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.is_none_term, type of %s: %s"
-       (econstr_to_string t)
-       (econstr_to_string t_typ));
-  let n = EConstr.mkApp (none, [||]) in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.is_none_term, mkApp %s: %s"
-       (econstr_to_string none)
-       (econstr_to_string n));
-  (* let* n = new_evar_of_econstr none in
-     Log.debug
-     (Printf.sprintf
-     "mebi_wrapper.is_none_term, new_evar_of_econstr %s: %s"
-     (econstr_to_string none)
-     (econstr_to_string n)); *)
-  let* n = term_to_constr none in
-  let* sigma = get_sigma in
-  (match Constr.kind n with
-   | Rel _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Rel"
-   | Var _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Var"
-   | Meta _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Meta"
-   | Evar _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Evar"
-   | Sort _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Sort"
-   | Cast _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Cast"
-   | Prod _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Prod"
-   | Lambda _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Lambda"
-   | LetIn _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: LetIn"
-   | App _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: App"
-   | Const _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Const"
-   | Ind _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Ind"
-   | Construct _ ->
-     Log.debug "mebi_wrapper.is_none_term, none is kind: Construct"
-   | Case _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Case"
-   | Fix _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Fix"
-   | CoFix _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: CoFix"
-   | Proj _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Proj"
-   | Int _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Int"
-   | Float _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Float"
-   | String _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: String"
-   | Array _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Array");
-  return b
+  let* t : Constr.t = term_to_constr t in
+  match Constr.kind t with
+  | App (t, _) ->
+    let* none : term = the_none_term () in
+    let* n : Constr.t = term_to_constr none in
+    return (Constr.equal n t)
+  | _ -> return false
 ;;
 
 (********************************************)
