@@ -265,63 +265,77 @@ let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
     sigma, ())
 ;;
 
-(********************************************)
-(****** UTILS *******************************)
-(********************************************)
+(**********************************)
+(****** COQ TERMS *****************)
+(**********************************)
 
-let term_eq (a : term) (b : term) : bool mm =
+let econstr_eq (a : term) (b : term) : bool mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   { state = st; value = EConstr.eq_constr !coq_st.coq_ctx a b }
 ;;
 
-(**********************************)
-(****** COQ TERMS *****************)
-(**********************************)
+let term_eq (a : term) (b : term) : bool mm = econstr_eq a b
 
-let constrexpr_to_econstr (t : Constrexpr.constr_expr) : term mm =
+let econstr_to_constr ?(abort_on_undefined_evars : bool = false) (x : EConstr.t)
+  : Constr.t mm
+  =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  { state = st
+  ; value = EConstr.to_constr ~abort_on_undefined_evars !coq_st.coq_ctx x
+  }
+;;
+
+let term_to_constr ?(abort_on_undefined_evars : bool = false) (x : term)
+  : Constr.t mm
+  =
+  econstr_to_constr x
+;;
+
+let constrexpr_to_econstr (t : Constrexpr.constr_expr) : EConstr.t mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   let sigma, t =
     Constrintern.interp_constr_evars !coq_st.coq_env !coq_st.coq_ctx t
   in
   coq_st := { !coq_st with coq_ctx = sigma };
-  (* let open Syntax in
-     let$ t env sigma = Constrintern.interp_constr_evars env sigma t in
-     return t *)
   { state = st; value = t }
 ;;
 
-let normalize_econstr (t : term) : term mm =
+let constrexpr_to_term (t : Constrexpr.constr_expr) : term mm =
+  constrexpr_to_econstr t
+;;
+
+let normalize_econstr (t : EConstr.t) : EConstr.t mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   let t = Reductionops.nf_all !coq_st.coq_env !coq_st.coq_ctx t in
-  (* let open Syntax in
-     let$+ t env sigma = Reductionops.nf_all env sigma t in
-     return t *)
   { state = st; value = t }
 ;;
 
-let type_of_econstr (t : term) : term mm =
+let normalize_term (t : term) : term mm = normalize_econstr t
+
+let type_of_econstr (t : EConstr.t) : EConstr.t mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   let t = Reductionops.nf_all !coq_st.coq_env !coq_st.coq_ctx t in
   let sigma, t = Typing.type_of !coq_st.coq_env !coq_st.coq_ctx t in
   coq_st := { !coq_st with coq_ctx = sigma };
-  (* let open Syntax in
-     let* (t : term) = normalize_econstr t in
-     let$ ty env sigma = Typing.type_of env sigma t in
-     return ty *)
   { state = st; value = t }
 ;;
 
-let new_evar_of_econstr (t : term) : term mm =
+let type_of_term (t : term) : term mm = type_of_econstr t
+
+let new_evar_of_econstr (t : EConstr.t) : EConstr.t mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   let sigma, instance = Evarutil.new_evar !coq_st.coq_env !coq_st.coq_ctx t in
   coq_st := { !coq_st with coq_ctx = sigma };
   { state = st; value = instance }
 ;;
+
+let new_evar_of_term (t : term) : term mm = new_evar_of_econstr t
 
 (********************************************)
 (****** SYNTAX ******************************)
@@ -353,6 +367,16 @@ module Syntax : MEBI_MONAD_SYNTAX = struct
   let ( let$+ ) f g = bind (state (fun e s -> s, f e s)) g
   let ( and+ ) x y = product x y
 end
+
+(**********************************)
+(****** UTILS *********************)
+(**********************************)
+
+let type_of_constrexpr (tref : Constrexpr.constr_expr) : term mm =
+  let open Syntax in
+  let* t : term = constrexpr_to_econstr tref in
+  type_of_econstr t
+;;
 
 (**********************************)
 (****** COQ TERM TO STRING ********)
@@ -590,9 +614,14 @@ module Error : ERROR_TYPE = struct
     | ParamsFailIfIncomplete () ->
       str
         "Params are configured to fail if cannot construct complete LTS from \
-         term."
+         term.\n\n\
+         Use command \"MeBi Set FailIfIncomplete False\" to disable this \
+         behaviour."
     | ParamsFailIfNotBisim () ->
-      str "Params are configured to fail if terms not bisim."
+      str
+        "Params are configured to fail if terms not bisim.\n\n\
+         Use command \"MeBi Set FailIfNotBisim False\" to disable this \
+         behaviour."
     | ExpectedCoqIndDefOfLTSNotType () ->
       str
         "cindef (Coq Inductive Definition) of LTS was expected, but Type was \
@@ -1018,7 +1047,7 @@ let decode_constr_tree_lts (tree : Constr_tree.t) : decoded_tree mm =
   let rec decode_tree (t : Constr_tree.t) : decoded_tree mm =
     match t with
     | Node (leaf, stem) ->
-      let* (decoded_leaf_lts : term) = decode (fst leaf) in
+      let* decoded_leaf_lts : term = decode (fst leaf) in
       let decoded_leaf = econstr_to_string decoded_leaf_lts, snd leaf in
       let* decoded_stem = decode_tree_list stem in
       return (Constr_tree.Node (decoded_leaf, decoded_stem))
@@ -1049,16 +1078,6 @@ let rec pstr_decoded_tree (t1 : decoded_tree) : string =
              Printf.sprintf "%s, %s" acc (pstr_decoded_tree rhs_int_tree))
            (pstr_decoded_tree (List.hd rhs_int_tree_list))
            (List.tl rhs_int_tree_list))
-;;
-
-(**********************************)
-(****** UTILS *********************)
-(**********************************)
-
-let type_of_constrexpr (tref : Constrexpr.constr_expr) : term mm =
-  let open Syntax in
-  let* (t : term) = constrexpr_to_econstr tref in
-  type_of_econstr t
 ;;
 
 (**********************************)
@@ -1215,21 +1234,37 @@ let is_none_term (t : term) : bool mm =
        "mebi_wrapper.is_none_term, mkApp %s: %s"
        (econstr_to_string none)
        (econstr_to_string n));
-  let* n = new_evar_of_econstr none in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.is_none_term, new_evar_of_econstr %s: %s"
-       (econstr_to_string none)
-       (econstr_to_string n));
-  (* let* sigma = get_sigma in
-     (match EConstr.kind_of_type sigma none with
-     | SortType _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: SortType"
-     | CastType _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: CastType"
-     | ProdType _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: ProdType"
-     | LetInType _ ->
-     Log.debug "mebi_wrapper.is_none_term, none is kind: LetInType"
-     | AtomicType _ ->
-     Log.debug "mebi_wrapper.is_none_term, none is kind: AtomicType"); *)
+  (* let* n = new_evar_of_econstr none in
+     Log.debug
+     (Printf.sprintf
+     "mebi_wrapper.is_none_term, new_evar_of_econstr %s: %s"
+     (econstr_to_string none)
+     (econstr_to_string n)); *)
+  let* n = term_to_constr none in
+  let* sigma = get_sigma in
+  (match Constr.kind n with
+   | Rel _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Rel"
+   | Var _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Var"
+   | Meta _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Meta"
+   | Evar _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Evar"
+   | Sort _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Sort"
+   | Cast _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Cast"
+   | Prod _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Prod"
+   | Lambda _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Lambda"
+   | LetIn _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: LetIn"
+   | App _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: App"
+   | Const _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Const"
+   | Ind _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Ind"
+   | Construct _ ->
+     Log.debug "mebi_wrapper.is_none_term, none is kind: Construct"
+   | Case _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Case"
+   | Fix _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Fix"
+   | CoFix _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: CoFix"
+   | Proj _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Proj"
+   | Int _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Int"
+   | Float _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Float"
+   | String _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: String"
+   | Array _ -> Log.debug "mebi_wrapper.is_none_term, none is kind: Array");
   return b
 ;;
 

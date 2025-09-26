@@ -202,6 +202,10 @@ module WeakEnc = struct
     | OptionConstr of Mebi_wrapper.E.t
     | CustomConstr of Mebi_wrapper.E.t * Mebi_wrapper.E.t
 
+  (* let is_option (x : t) : bool =
+     match x with OptionConstr _ -> true | _ -> false
+     ;; *)
+
   let to_string (x : t) : string Mebi_wrapper.mm =
     Log.debug "params.WeakEnc.to_string";
     let open Mebi_wrapper in
@@ -323,12 +327,12 @@ let weak_type_arg_to_kind (t : WeakArgs.t) : WeakEnc.t Mebi_wrapper.mm =
   let open Mebi_utils in
   match t with
   | OptionConstr label_tref ->
-    let* (label_enc : E.t) = encode_constrexpr label_tref in
+    let* label_enc : E.t = encode_constrexpr label_tref in
     let* _ = decode label_enc in
     return (WeakEnc.OptionConstr label_enc)
   | CustomConstr (tau_tref, label_ref) ->
-    let* (tau_enc : E.t) = encode_constrexpr tau_tref in
-    let* (label_enc : E.t) = encode_ref label_ref in
+    let* tau_enc : E.t = encode_constrexpr tau_tref in
+    let* label_enc : E.t = encode_ref label_ref in
     let* _ = decode tau_enc in
     let* _ = decode label_enc in
     return (WeakEnc.CustomConstr (tau_enc, label_enc))

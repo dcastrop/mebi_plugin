@@ -115,7 +115,6 @@ val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
 val map : ('a -> 'b) -> 'a mm -> 'b mm
 val product : 'a mm -> 'b mm -> ('a * 'b) mm
 val iterate : int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
-val term_eq : term -> term -> bool mm
 
 module type ERROR_TYPE = sig
   type mebi_error =
@@ -229,7 +228,26 @@ end
 
 module Syntax : MEBI_MONAD_SYNTAX
 
-val is_none_term : term -> bool mm
+(* *)
+val type_of_constrexpr : Constrexpr.constr_expr -> term mm
+
+(* *)
+val econstr_eq : EConstr.t -> EConstr.t -> bool mm
+val term_eq : term -> term -> bool mm
+
+(* *)
+val econstr_to_constr : ?abort_on_undefined_evars:bool -> term -> Constr.t mm
+val term_to_constr : ?abort_on_undefined_evars:bool -> term -> Constr.t mm
+val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
+val constrexpr_to_term : Constrexpr.constr_expr -> term mm
+val normalize_econstr : EConstr.t -> EConstr.t mm
+val normalize_term : term -> term mm
+val type_of_econstr : EConstr.t -> EConstr.t mm
+val type_of_term : term -> term mm
+val new_evar_of_econstr : EConstr.t -> EConstr.t mm
+val new_evar_of_term : term -> term mm
+
+(* *)
 val encode : term -> E.t mm
 val decode : E.t -> term mm
 val decode_to_string : E.t -> string
@@ -239,6 +257,12 @@ val has_encoding : term -> bool mm
 val has_decoding : E.t -> bool mm
 val encode_map : 'a F.t -> 'a B.t mm
 val decode_map : 'a B.t -> 'a F.t mm
+
+(* *)
+val is_none_term : term -> bool mm
+
+(* *)
+
 val constr_to_string : Constr.t -> string
 val econstr_to_string : EConstr.t -> string
 val term_to_string : term -> string
@@ -261,12 +285,8 @@ end
 
 type decoded_tree = (string * int) Constr_tree.tree
 
-val decode_constr_tree_lts : Constr_tree.t -> decoded_tree mm
 val pstr_decoded_tree : decoded_tree -> string
-val constrexpr_to_econstr : Constrexpr.constr_expr -> term mm
-val normalize_econstr : term -> term mm
-val type_of_econstr : term -> term mm
-val type_of_constrexpr : Constrexpr.constr_expr -> term mm
+val decode_constr_tree_lts : Constr_tree.t -> decoded_tree mm
 
 val make_transition_tbl
   :  wrapper ref

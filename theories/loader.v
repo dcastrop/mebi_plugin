@@ -1,6 +1,10 @@
 Set Debug "backtrace".
 Declare ML Module "coq-mebi.mebi".
 
+MeBi Divider "Loading MeBi Plugin".
+MeBi Reset All.
+MeBi Divider.
+
 (* Inductive printout_mode : Set :=
 | RunCheck : printout_mode (* only warning printouts *)
 | ShowInfo : printout_mode (* show more printouts *)
