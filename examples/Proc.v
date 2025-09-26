@@ -110,7 +110,8 @@ Module Flat.
 
     (* These below capture "structural congruence": using "silent" transitions *)
     | do_fix : 
-      forall t t', t' = tsubst (tfix t) t -> termLTS (tfix t) None t'
+      (* forall t t', t' = tsubst (tfix t) t -> termLTS (tfix t) None t' *)
+      forall t , termLTS (tfix t) None (tsubst (tfix t) t)
 
     | do_comm : 
       forall tl tr, termLTS (tpar tl tr) None (tpar tr tl)
@@ -172,7 +173,8 @@ Module Layered.
 
   (* These below capture "structural congruence": using "silent" transitions *)
   | do_fix : 
-    forall t t', t' = tsubst (tfix t) t -> termLTS (tfix t) None t'
+    (* forall t t', t' = tsubst (tfix t) t -> termLTS (tfix t) None t' *)
+    forall t , termLTS (tfix t) None (tsubst (tfix t) t)
   .
 
   Inductive termLTS_tc : term -> Prop :=

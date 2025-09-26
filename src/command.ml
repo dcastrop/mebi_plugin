@@ -163,7 +163,7 @@ let rec check_updated_ctx
           (match econstr_to_string fn with
            | "option" ->
              (* if Params.WeakEnc.is_option () then *)
-             if Logging.is_show_details_enabled ()
+             if Logging.is_details_enabled ()
              then
                Log.warning
                  (Printf.sprintf
@@ -452,13 +452,11 @@ module MkGraph
               (E.to_string label_enc)
               (econstr_to_string decoding));
          (* all non-silent actions should be of this type *)
-         if E.eq label_enc ty_enc
+         (* if E.eq label_enc ty_enc
          then return (Some false)
-         else
-           let* b = is_none_term act in
-           return (Some b)
-         (* NOTE: could be the [None] type? *)
-         (* return (Some (String.equal "None" (econstr_to_string act))) *)
+         else *)
+         let* b = is_none_term act in
+         return (Some b)
        | CustomConstr (tau_enc, label_enc) ->
          let* tau_decoding = decode tau_enc in
          let* label_decoding = decode label_enc in
@@ -902,7 +900,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
     let* the_lts = build_lts_graph primary_lts x (Params.get_fst_params ()) in
     (match kind with
      | LTS ->
-       Log.notice
+       Log.result
          (Printf.sprintf
             "command.run, MakeModel LTS, finished: %s\n"
             (Lts.to_string the_lts));
@@ -915,7 +913,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
             "command.run, MakeModel LTS, finished: %s\n"
             (Lts.to_string the_lts));
        let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-       Log.notice
+       Log.result
          (Printf.sprintf
             "command.run, MakeModel FSM, finished: %s\n"
             (Fsm.to_string the_fsm));
@@ -947,7 +945,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
               "command.run, unsaturated FSM: %s\n"
               (Fsm.to_string the_fsm));
          let the_saturated = Fsm.saturate the_fsm in
-         Log.notice
+         Log.result
            (Printf.sprintf
               "command.run, SaturateModel, finished: %s\n"
               (Fsm.to_string the_saturated));
@@ -975,7 +973,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
          let the_minimized =
            Algorithms.run (Minim (!Params.the_weak_mode, the_fsm))
          in
-         Log.details
+         Log.result
            (Printf.sprintf
               "command.run, MinimizeModel, finished: %s\n"
               (Algorithms.pstr the_minimized));
@@ -984,6 +982,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
          return ()))
   | CheckBisimilarity ((x, a), (y, b)) ->
     Log.debug "command.run, CheckBisimilarity";
+    if is_details_enabled () then Params.printout_weak_mode ();
     Mebi_help.show_instructions_to_toggle_weak !Params.the_weak_mode;
     let* the_lts_1 = build_lts_graph a x (Params.get_fst_params ()) in
     let* the_lts_2 = build_lts_graph b y (Params.get_snd_params ()) in
@@ -997,7 +996,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
     let the_bisimilar =
       Algorithms.run (Bisim (!Params.the_weak_mode, (the_fsm_1, the_fsm_2)))
     in
-    Log.notice
+    Log.result
       (Printf.sprintf
          "command.run, CheckBisimilarity, finished: %s\n"
          (Algorithms.pstr the_bisimilar));

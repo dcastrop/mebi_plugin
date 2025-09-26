@@ -329,7 +329,12 @@ and saturate_dest_actions
       (unsaturated_es : States.t Actions.t Edges.t)
   : ActionPairs.t
   =
-  Log.debug "fsm.saturate_dest_actions";
+  Log.debug
+    (Printf.sprintf
+       "fsm.saturate_dest_actions (%s)"
+       (match named with
+        | None -> "no named action"
+        | Some a -> Action.to_string a));
   States.fold
     (fun (dest : State.t) (acc2 : ActionPairs.t) ->
       saturate_action_from ~named acc2 dest anno visited unsaturated_es)
@@ -448,7 +453,7 @@ let saturate_edges_from
 let saturate_edges (m : t) : States.t Actions.t Edges.t =
   Log.debug "fsm.saturate_edges";
   let edges : States.t Actions.t Edges.t = Edges.copy m.edges in
-  if Logging.is_show_details_enabled ()
+  if Logging.is_details_enabled ()
   then
     Log.debug (Printf.sprintf "fsm.saturate_edges, copy: %s" (pstr_edges edges));
   Edges.iter
@@ -456,9 +461,10 @@ let saturate_edges (m : t) : States.t Actions.t Edges.t =
       let actions : States.t Actions.t = Actions.create 0 in
       ActionPairs.iter
         (fun ((saturated_action, dests) : ActionPair.t) ->
-          Actions.add actions saturated_action dests)
+          if States.cardinal dests > 0
+          then Actions.add actions saturated_action dests)
         (saturate_edges_from edges from aa);
-      Edges.add edges from actions)
+      if Actions.length actions > 0 then Edges.add edges from actions)
     m.edges;
   edges
 ;;

@@ -35,11 +35,23 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "Set" "DumpToFile"  "True" ] -> {Params.set_dump_to_file true}
 | ["MeBi" "Set" "DumpToFile"  "False"] -> {Params.set_dump_to_file false}
 
+| ["MeBi" "Set" "ShowAny"   "True" ] -> {Params.set_show_any true}
+| ["MeBi" "Set" "ShowAny"   "False"] -> {Params.set_show_any false}
+
+| ["MeBi" "Set" "ShowNotices"   "True" ] -> {Params.set_show_notice true}
+| ["MeBi" "Set" "ShowNotices"   "False"] -> {Params.set_show_notice false}
+
 | ["MeBi" "Set" "ShowDebug"   "True" ] -> {Params.set_show_debug true}
 | ["MeBi" "Set" "ShowDebug"   "False"] -> {Params.set_show_debug false}
 
 | ["MeBi" "Set" "ShowDetails" "True" ] -> {Params.set_show_details true}
 | ["MeBi" "Set" "ShowDetails" "False"] -> {Params.set_show_details false}
+
+| ["MeBi" "Set" "ShowResults"   "True" ] -> {Params.set_show_result true}
+| ["MeBi" "Set" "ShowResults"   "False"] -> {Params.set_show_result false}
+
+| ["MeBi" "Set" "ShowWarnings"   "True" ] -> {Params.set_show_warning true}
+| ["MeBi" "Set" "ShowWarnings"   "False"] -> {Params.set_show_warning false}
 
 | ["MeBi" "Set" "WeakMode"    "True" ] -> {Params.set_weak_mode true}
 | ["MeBi" "Set" "WeakMode"    "False"] -> {Params.set_weak_mode false}
@@ -49,20 +61,24 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "Set" "Weak" constr(x)    "Of" reference(y)] -> {Params.set_weak_types_args (Params.WeakArgs.CustomConstr (x, y), None)}
 
 (* specify weak transition for first lts *)
-| ["MeBi" "Set" "Weak1" "Option" constr(x)   ] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.OptionConstr x)}
-| ["MeBi" "Set" "Weak1" constr(x)    "Of" reference(y)] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.CustomConstr (x, y))}
+| ["MeBi" "Set" "Weak1" "Option" constr(x)   ] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.OptionConstr x); Logging.Log.notice "Set Weak1 param."}
+| ["MeBi" "Set" "Weak1" constr(x)    "Of" reference(y)] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.CustomConstr (x, y)); Logging.Log.notice "Set Weak1 param."}
 
 (* specify weak transition for second lts *)
-| ["MeBi" "Set" "Weak2" "Option" constr(x)   ] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.OptionConstr x)}
-| ["MeBi" "Set" "Weak2" constr(x)    "Of" reference(y)] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.CustomConstr (x, y))}
+| ["MeBi" "Set" "Weak2" "Option" constr(x)   ] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.OptionConstr x); Logging.Log.notice "Set Weak2 param."}
+| ["MeBi" "Set" "Weak2" constr(x)    "Of" reference(y)] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.CustomConstr (x, y)); Logging.Log.notice "Set Weak2 param."}
 
 (* reset plugin params *)
 | ["MeBi" "Reset" "Bound"      ] -> {Params.reset_bounds ()}
 | ["MeBi" "Reset" "FailIfIncomplete" ] -> {Params.reset_fail_if_incomplete ()}
 | ["MeBi" "Reset" "FailIfNotBisim" ] -> {Params.reset_fail_if_not_bisim ()}
 | ["MeBi" "Reset" "DumpToFile" ] -> {Params.reset_dump_to_file ()}
+| ["MeBi" "Reset" "ShowAny"  ] -> {Params.reset_show_any ()}
+| ["MeBi" "Reset" "ShowNotice"  ] -> {Params.reset_show_notice ()}
 | ["MeBi" "Reset" "ShowDebug"  ] -> {Params.reset_show_debug ()}
 | ["MeBi" "Reset" "ShowDetails"] -> {Params.reset_show_details ()}
+| ["MeBi" "Reset" "ShowResults"] -> {Params.reset_show_result ()}
+| ["MeBi" "Reset" "ShowWarning"] -> {Params.reset_show_warning ()}
 | ["MeBi" "Reset" "WeakMode"   ] -> {Params.reset_weak_mode ()}
 | ["MeBi" "Reset" "Weak"       ] -> {Params.reset_weak_types ()}
 | ["MeBi" "Reset" "All"        ] -> {Mebi_wrapper.run (Params.reset_all ())}
@@ -72,8 +88,12 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "See" "FailIfIncomplete" ] -> {Params.printout_fail_if_incomplete ()}
 | ["MeBi" "See" "FailIfNotBisim" ] -> {Params.printout_fail_if_not_bisim ()}
 | ["MeBi" "See" "DumpToFile" ] -> {Params.printout_dump_to_file ()}
+| ["MeBi" "See" "ShowAny"  ] -> {Params.printout_show_any ()}
+| ["MeBi" "See" "ShowNotice"  ] -> {Params.printout_show_notice ()}
 | ["MeBi" "See" "ShowDebug"  ] -> {Params.printout_show_debug ()}
 | ["MeBi" "See" "ShowDetails"] -> {Params.printout_show_details ()}
+| ["MeBi" "See" "ShowResults"] -> {Params.printout_show_result ()}
+| ["MeBi" "See" "ShowWarning"] -> {Params.printout_show_warning ()}
 | ["MeBi" "See" "WeakMode"   ] -> {Params.printout_weak_mode ()}
 | ["MeBi" "See" "Weak"       ] -> {Mebi_wrapper.run (Params.printout_weak_types ())}
 | ["MeBi" "See" "Weak1"      ] -> {Mebi_wrapper.run (Params.printout_fst_weak_type ())}
@@ -110,8 +130,12 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "Help" "Set" "FailIfIncomplete" ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.FailIfIncomplete ()))) [])}
 | ["MeBi" "Help" "Set" "FailIfNotBisim" ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.FailIfNotBisim ()))) [])}
 | ["MeBi" "Help" "Set" "DumpToFile" ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.DumpToFile ()))) [])}
+| ["MeBi" "Help" "Set" "ShowAny"  ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowAny ()))) [])}
+| ["MeBi" "Help" "Set" "ShowNotice"  ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowNotices ()))) [])}
 | ["MeBi" "Help" "Set" "ShowDebug"  ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowDebug ()))) [])}
 | ["MeBi" "Help" "Set" "ShowDetails"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowDetails ()))) [])}
+| ["MeBi" "Help" "Set" "ShowResults"  ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowResults ()))) [])}
+| ["MeBi" "Help" "Set" "ShowWarning"  ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowWarnings ()))) [])}
 | ["MeBi" "Help" "Set" "WeakMode"   ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.WeakMode ()))) [])}
 | ["MeBi" "Help" "Set" "Weak"       ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.Weak ()))) [])}
 
@@ -133,11 +157,11 @@ VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 | ["MeBi" "Info"] -> {Mebi_wrapper.run (Command.run (Command.Info ()) [])}
 
 (* for outputting messages -- useful for sifting through compiler output *)
-| ["MeBi" "Message" string(x)] -> {Logging.Log.notice x}
+| ["MeBi" "Message" string(x)] -> {Logging.Log.override x}
 | ["MeBi" "Debug"   string(x)] -> {Logging.Log.debug x}
-| ["MeBi" "Divider"          ] -> {Logging.Log.notice "\n- - - - - - - - - - - - - - - -\n"}
-| ["MeBi" string(x) "Divider"] -> {Logging.Log.notice (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n" x)}
-| ["MeBi" "Divider" string(x)] -> {Logging.Log.notice (Printf.sprintf "\n- - - - - - - - - - - - - - - -\n%s\n" x)}
+| ["MeBi" "Divider"          ] -> {Logging.Log.override "\n- - - - - - - - - - - - - - - -\n"}
+| ["MeBi" string(x) "Divider"] -> {Logging.Log.override (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n" x)}
+| ["MeBi" "Divider" string(x)] -> {Logging.Log.override (Printf.sprintf "\n- - - - - - - - - - - - - - - -\n%s\n" x)}
 | ["MeBi" string(x) "Divider" string(y)] -> 
-  {Logging.Log.notice (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n%s\n" x y)}
+  {Logging.Log.override (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n%s\n" x y)}
 END

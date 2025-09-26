@@ -6,8 +6,12 @@ type help_set_kind =
   | FailIfIncomplete of unit
   | FailIfNotBisim of unit
   | DumpToFile of unit
+  | ShowAny of unit
+  | ShowNotices of unit
   | ShowDebug of unit
   | ShowDetails of unit
+  | ShowResults of unit
+  | ShowWarnings of unit
   | WeakMode of unit
   | Weak of unit
 
@@ -125,6 +129,18 @@ let show_help_set_dump_to_file () : unit =
      Disable this behaviour using \"MeBi Set DumpToFile False\"\n"
 ;;
 
+let show_help_set_show_any () : unit =
+  Log.notice
+    "Use the command \"MeBi Set ShowAny True\" to enable  any output messages.\n\
+     Disable them using \"MeBi Set ShowAny False\"\n"
+;;
+
+let show_help_set_show_notice () : unit =
+  Log.notice
+    "Use the command \"MeBi Set ShowNotices True\" to enable messages.\n\
+     Disable them using \"MeBi Set ShowNotices False\"\n"
+;;
+
 let show_help_set_show_debug () : unit =
   Log.notice
     "Use the command \"MeBi Set ShowDebug True\" to enable debug messages.\n\
@@ -136,6 +152,18 @@ let show_help_set_show_details () : unit =
     "Use the command \"MeBi Set ShowDetails True\" to enable additional detail \
      messages.\n\
      Disable them using \"MeBi Set ShowDetails False\"\n"
+;;
+
+let show_help_set_show_result () : unit =
+  Log.notice
+    "Use the command \"MeBi Set ShowResults True\" to enable result messages.\n\
+     Disable them using \"MeBi Set ShowResults False\"\n"
+;;
+
+let show_help_set_show_warning () : unit =
+  Log.notice
+    "Use the command \"MeBi Set ShowWarnings True\" to enable warning messages.\n\
+     Disable them using \"MeBi Set ShowWarnings False\"\n"
 ;;
 
 let show_help_set_weak_mode () : unit =
@@ -225,8 +253,12 @@ let handle_help (c : help_kind) : unit =
      | FailIfIncomplete () -> show_help_set_fail_if_incomplete ()
      | FailIfNotBisim () -> show_help_set_fail_if_not_bisim ()
      | DumpToFile () -> show_help_set_dump_to_file ()
+     | ShowAny () -> show_help_set_show_any ()
+     | ShowNotices () -> show_help_set_show_notice ()
      | ShowDebug () -> show_help_set_show_debug ()
      | ShowDetails () -> show_help_set_show_details ()
+     | ShowResults () -> show_help_set_show_result ()
+     | ShowWarnings () -> show_help_set_show_warning ()
      | WeakMode () -> show_help_set_weak_mode ()
      | Weak () -> show_help_set_weak ())
   | Reset () -> show_help_reset ()

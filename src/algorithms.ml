@@ -201,7 +201,7 @@ let run (args : t) : result =
             let the_saturated_pair : Fsm.pair =
               Fsm.saturate the_fsm_1, Fsm.saturate the_fsm_2
             in
-            if Logging.is_show_details_enabled ()
+            if Logging.is_details_enabled ()
             then
               Log.debug
                 (Printf.sprintf
@@ -211,7 +211,7 @@ let run (args : t) : result =
                    (Fsm.to_string (fst the_saturated_pair))
                    (Fsm.to_string (snd the_saturated_pair)));
             let merged_fsm : Fsm.t = Fsm.merge the_saturated_pair in
-            if Logging.is_show_details_enabled ()
+            if Logging.is_details_enabled ()
             then
               Log.debug
                 (Printf.sprintf
@@ -221,7 +221,7 @@ let run (args : t) : result =
           | false, the_fsm_pair ->
             Log.debug "algorithms.run, Bisim (strong)";
             let merged_fsm : Fsm.t = Fsm.merge the_fsm_pair in
-            if Logging.is_show_details_enabled ()
+            if Logging.is_details_enabled ()
             then
               Log.debug
                 (Printf.sprintf

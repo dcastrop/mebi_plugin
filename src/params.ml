@@ -90,7 +90,7 @@ let printout_fail_if_not_bisim () : unit =
 let set_fail_if_not_bisim (b : bool) : unit =
   Log.debug "params.set_fail_if_not_bisim";
   the_fail_if_not_bisim := b;
-  Log.debug (printout_fail_if_not_bisim_str ())
+  printout_fail_if_not_bisim ()
 ;;
 
 (**********************)
@@ -110,17 +110,52 @@ let printout_dump_to_file () : unit = Log.notice (printout_dump_to_file_str ())
 let set_dump_to_file (b : bool) : unit =
   Log.debug "params.set_dump_to_file";
   the_dump_to_file := b;
-  Log.debug (printout_dump_to_file_str ())
+  printout_dump_to_file ()
 ;;
 
 (**********************)
 (** Messages **********)
 (**********************)
 
+(* *)
+let reset_show_any () : unit = Logging.reset_output_enabled ()
+
+let printout_show_any_str () : string =
+  if is_output_enabled ()
+  then "Notice messages will be shown."
+  else "Notice messages set to be hidden."
+;;
+
+let printout_show_any () : unit = Log.notice (printout_show_any_str ())
+
+let set_show_any (b : bool) : unit =
+  Log.debug "params.set_show_any";
+  Logging.set_output_enabled b;
+  printout_show_any ()
+;;
+
+(* *)
+let reset_show_notice () : unit = Logging.reset_show_notice_enabled ()
+
+let printout_show_notice_str () : string =
+  if is_notice_enabled ()
+  then "Notice messages will be shown."
+  else "Notice messages set to be hidden."
+;;
+
+let printout_show_notice () : unit = Log.notice (printout_show_notice_str ())
+
+let set_show_notice (b : bool) : unit =
+  Log.debug "params.set_show_notice";
+  Logging.set_show_notice b;
+  printout_show_notice ()
+;;
+
+(* *)
 let reset_show_debug () : unit = Logging.reset_show_debug_enabled ()
 
 let printout_show_debug_str () : string =
-  if is_show_debug_enabled ()
+  if is_debug_enabled ()
   then "Debug messages will be shown."
   else "Debug messages set to be hidden."
 ;;
@@ -130,13 +165,14 @@ let printout_show_debug () : unit = Log.notice (printout_show_debug_str ())
 let set_show_debug (b : bool) : unit =
   Log.debug "params.set_show_debug";
   Logging.set_show_debug b;
-  Log.debug (printout_show_debug_str ())
+  printout_show_debug ()
 ;;
 
+(* *)
 let reset_show_details () : unit = Logging.reset_show_details_enabled ()
 
 let printout_show_details_str () : string =
-  if is_show_details_enabled ()
+  if is_details_enabled ()
   then "Detailed messages will be shown. (where possible)"
   else "Detailed messages set to be hidden."
 ;;
@@ -146,14 +182,48 @@ let printout_show_details () : unit = Log.notice (printout_show_details_str ())
 let set_show_details (b : bool) : unit =
   Log.debug "params.set_show_details";
   Logging.set_show_details b;
-  Log.debug (printout_show_details_str ())
+  printout_show_details ()
+;;
+
+(* *)
+let reset_show_result () : unit = Logging.reset_show_result_enabled ()
+
+let printout_show_result_str () : string =
+  if is_result_enabled ()
+  then "Result messages will be shown."
+  else "Result messages set to be hidden."
+;;
+
+let printout_show_result () : unit = Log.notice (printout_show_result_str ())
+
+let set_show_result (b : bool) : unit =
+  Log.debug "params.set_show_result";
+  Logging.set_show_result b;
+  printout_show_result ()
+;;
+
+(* *)
+let reset_show_warning () : unit = Logging.reset_show_warning_enabled ()
+
+let printout_show_warning_str () : string =
+  if is_warning_enabled ()
+  then "Result messages will be shown."
+  else "Result messages set to be hidden."
+;;
+
+let printout_show_warning () : unit = Log.notice (printout_show_warning_str ())
+
+let set_show_warning (b : bool) : unit =
+  Log.debug "params.set_show_warning";
+  Logging.set_show_warning b;
+  printout_show_warning ()
 ;;
 
 (**********************)
 (** Weak Mode *********)
 (**********************)
 
-let default_weak_mode : bool = true
+let default_weak_mode : bool = false
 let the_weak_mode : bool ref = ref default_weak_mode
 let reset_weak_mode () : unit = the_weak_mode := default_weak_mode
 
@@ -168,7 +238,7 @@ let printout_weak_mode () : unit = Log.notice (printout_weak_mode_str ())
 let set_weak_mode (b : bool) : unit =
   Log.debug "params.set_weak_mode";
   the_weak_mode := b;
-  Log.debug (printout_weak_mode_str ())
+  printout_weak_mode ()
 ;;
 
 (**********************)
@@ -364,7 +434,8 @@ let set_snd_weak_type_arg (t : WeakArgs.t) : unit =
 let set_weak_types_args (t : WeakArgs.t * WeakArgs.t option) : unit =
   Log.debug "params.set_weak_types_args";
   set_fst_weak_type_arg (fst t);
-  match t with _, Some b -> set_snd_weak_type_arg b | _, None -> ()
+  (match t with _, Some b -> set_snd_weak_type_arg b | _, None -> ());
+  Log.notice "Set the Weak params."
 ;;
 
 (**********************)
@@ -405,13 +476,29 @@ let printout_all () : unit Mebi_wrapper.mm =
   let* s = printout_weak_types_str () in
   Log.notice
     (Printf.sprintf
-       "Current plugin configuration:\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n"
+       "Current plugin configuration:\n\
+        %s\n\
+        %s\n\
+        %s\n\
+        %s\n\
+        %s\n\
+        %s\n\
+        %s\n\
+        %s\n\
+        %s\n\
+        %s\n\
+        %s\n\
+        %s\n"
        (printout_bounds_str ())
        (printout_fail_if_incomplete_str ())
        (printout_fail_if_not_bisim_str ())
        (printout_dump_to_file_str ())
+       (printout_show_any_str ())
+       (printout_show_notice_str ())
        (printout_show_debug_str ())
        (printout_show_details_str ())
+       (printout_show_result_str ())
+       (printout_show_warning_str ())
        (printout_weak_mode_str ())
        s);
   (* printout_weak_types () *) return ()
@@ -423,8 +510,12 @@ let reset_all () : unit Mebi_wrapper.mm =
   reset_fail_if_incomplete ();
   reset_fail_if_not_bisim ();
   reset_dump_to_file ();
+  reset_show_any ();
+  reset_show_notice ();
   reset_show_debug ();
   reset_show_details ();
+  reset_show_result ();
+  reset_show_warning ();
   reset_weak_mode ();
   reset_weak_types ();
   Log.notice "Reset all plugin params.";
