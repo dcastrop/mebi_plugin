@@ -1096,6 +1096,17 @@ let the_none_term () : term mm =
   { state = st; value = the_none }
 ;;
 
+let is_none_term (t : term) : bool mm =
+  let open Syntax in
+  let* t : Constr.t = term_to_constr t in
+  match Constr.kind t with
+  | App (t, _) ->
+    let* none : term = the_none_term () in
+    let* n : Constr.t = term_to_constr none in
+    return (Constr.equal n t)
+  | _ -> return false
+;;
+
 let _test_checks (t : term) : unit mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
@@ -1223,17 +1234,6 @@ let _test_constr_kind (t : Constr.t) : unit =
   | Float _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Float"
   | String _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: String"
   | Array _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Array"
-;;
-
-let is_none_term (t : term) : bool mm =
-  let open Syntax in
-  let* t : Constr.t = term_to_constr t in
-  match Constr.kind t with
-  | App (t, _) ->
-    let* none : term = the_none_term () in
-    let* n : Constr.t = term_to_constr none in
-    return (Constr.equal n t)
-  | _ -> return false
 ;;
 
 (********************************************)

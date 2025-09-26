@@ -1,11 +1,16 @@
+
 type help_set_kind =
   | General of unit
   | Bound of unit
   | FailIfIncomplete of unit
   | FailIfNotBisim of unit
   | DumpToFile of unit
+  | ShowAny of unit
+  | ShowNotices of unit
   | ShowDebug of unit
   | ShowDetails of unit
+  | ShowResults of unit
+  | ShowWarnings of unit
   | WeakMode of unit
   | Weak of unit
 

@@ -41,12 +41,35 @@ val set_dump_to_file : bool -> unit
 (** Messages **********)
 (**********************)
 
+(* show any *)
+val reset_show_any : unit -> unit
+val printout_show_any : unit -> unit
+val set_show_any : bool -> unit
+
+(* notice *)
+val reset_show_notice : unit -> unit
+val printout_show_notice : unit -> unit
+val set_show_notice : bool -> unit
+
+(* debug *)
 val reset_show_debug : unit -> unit
 val printout_show_debug : unit -> unit
 val set_show_debug : bool -> unit
+
+(* details *)
 val reset_show_details : unit -> unit
 val printout_show_details : unit -> unit
 val set_show_details : bool -> unit
+
+(* results *)
+val reset_show_result : unit -> unit
+val printout_show_result : unit -> unit
+val set_show_result : bool -> unit
+
+(* warning *)
+val reset_show_warning : unit -> unit
+val printout_show_warning : unit -> unit
+val set_show_warning : bool -> unit
 
 (**********************)
 (** Weak Mode *********)

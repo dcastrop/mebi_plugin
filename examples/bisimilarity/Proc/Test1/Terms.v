@@ -25,78 +25,28 @@ Example r : term := tseq (tpar (tact (recv A) tend)
                                            (tact (recv A) tend)) trec)).
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.Terms".
-MeBi See All.
-
+MeBi Reset All.
+(* MeBi Set ShowAny      True. *)
+(* MeBi Set ShowNotices  True. *)
+(* MeBi Set ShowDebug    True. *)
+(* MeBi Set ShowDetails  True. *)
+(* MeBi Set ShowResults  True. *)
+(* MeBi Set ShowWarnings True. *)
+(* MeBi Set Bound 100. *)
+MeBi Set WeakMode     True.
 MeBi Set Weak Option label.
+(* MeBi See All.  *)
+MeBi Set ShowAny False.
 
-MeBi FSM p Using termLTS.
-
-Print Registered.
-
-
-(* MeBi Set ShowDebug True. *)
-(* MeBi Set ShowDetails True.  *)
-(* MeBi Saturate p Using termLTS. *)
-(* MeBi Minimize p Using termLTS. *)
-(* MeBi Bisim p With termLTS And p With termLTS Using termLTS. *)
-
-MeBi Set ShowDetails False.
-MeBi Set ShowDetails True.
+MeBi FSM p Using termLTS. MeBi Saturate p Using termLTS.
+MeBi FSM q Using termLTS. MeBi Saturate q Using termLTS.
+MeBi FSM r Using termLTS. MeBi Saturate r Using termLTS.
 
 MeBi Bisim p With termLTS And q With termLTS Using termLTS.
 MeBi Bisim q With termLTS And p With termLTS Using termLTS.
 
-(* MeBi Set ShowDetails True. *)
 MeBi Bisim q With termLTS And r With termLTS Using termLTS.
 MeBi Bisim r With termLTS And q With termLTS Using termLTS.
 
-(* MeBi Set ShowDetails True. *)
 MeBi Bisim p With termLTS And r With termLTS Using termLTS.
 MeBi Bisim r With termLTS And p With termLTS Using termLTS.
-
-(* MeBi Set ShowDebug True. *)
-(* MeBi Set ShowDetails True. *)
-(* MeBi Bisim p With termLTS And (tfix (tseq (tpar (tact (send B) tend) (tact (recv B) tend)) trec)) With termLTS Using termLTS. *)
-
-(* MeBi Bisim p With termLTS And (tfix trec) With termLTS Using termLTS. *)
-
-
-
-(* MeBi Set ShowDebug True.
-MeBi Set ShowDetails True.
-MeBi Set WeakMode True.
-
-(* TODO: fix the plugin so the below works *)
-(* MeBi Set Weak Option (label). *)
-(* MeBi Set Weak Option (option label). *)
-MeBi Set Weak Option (Datatypes.option label).
-
-MeBi Saturate p Using termLTS. *)
-
-
-(* MeBi Dump "proc_t1_p" LTS Bounded 1000 Of p Using termLTS. *)
-(* MeBi Dump "proc_t1_q" LTS Bounded 1000 Of q Using termLTS. *)
-(* MeBi Dump "proc_t1_r" LTS Bounded 1000 Of r Using termLTS. *)
-
-
-(* MeBi 
-  Dump "proc_t1_p" 
-  Minim Bounded 1000 Of p Label (option label) Using termLTS.  *)
-
-
-(* MeBi 
-  Dump "testA" 
-  Bisim LTS Bounded 50 Of p  With termLTS
-    And LTS Bounded 50 Of q  With termLTS
-    Using termLTS.  *)
-
-
-(* MeBi Dump "testB" Minim Bounded 5 Of p Weak None Of TESTACTION Using termLTS. 
-MeBi Dump "testC" Minim Bounded 5 Of q Weak None Of TESTACTION Using termLTS.  *)
-
-
-(* Print can_you_find_me_test. *)
-
-(* About build_model. *)
-(* Print build_model. *)
-(* Check (loader.LTS term label p termLTS). *)
