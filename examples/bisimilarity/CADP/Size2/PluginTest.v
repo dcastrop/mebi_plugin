@@ -38,7 +38,7 @@ MeBi Set ShowAny      True.
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.PluginTest.Composition".
 Example c1 : composition := compose (create 2 P).
 MeBi FSM c1 Using lts step.
-(* MeBi Saturate c1 Using lts step.
+(MeBi Saturate c1 Using lts step.
 MeBi Minimize c1 Using lts step.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.PluginTest.Glued".
@@ -47,4 +47,4 @@ MeBi Saturate c1 Using bigstep lts step.
 MeBi Minimize c1 Using bigstep lts step.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.PluginTest.Bisim".
-MeBi Bisim c1 With bigstep And c1 With lts Using step. *)
+MeBi Bisim c1 With bigstep And c1 With lts Using step. 
