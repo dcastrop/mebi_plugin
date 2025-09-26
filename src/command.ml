@@ -456,9 +456,9 @@ module MkGraph
          then return (Some false)
          else
            let* b = is_none_term act in
-           (* return (Some b) *)
-           (* NOTE: could be the [None] type? *)
-           return (Some (String.equal "None" (econstr_to_string act)))
+           return (Some b)
+         (* NOTE: could be the [None] type? *)
+         (* return (Some (String.equal "None" (econstr_to_string act))) *)
        | CustomConstr (tau_enc, label_enc) ->
          let* tau_decoding = decode tau_enc in
          let* label_decoding = decode label_enc in
