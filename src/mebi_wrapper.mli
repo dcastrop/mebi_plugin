@@ -7,10 +7,10 @@ type coq_context =
   ; coq_ctx : Evd.evar_map
   }
 
-val coq_env_wrapper : Environ.env ref option ref
+val the_coq_env_opt : Environ.env ref option ref
 val new_coq_env : unit -> Environ.env ref
 val the_coq_env : ?fresh:bool -> unit -> Environ.env ref
-val coq_ctx_wrapper : Evd.evar_map ref option ref
+val the_coq_ctx_opt : Evd.evar_map ref option ref
 val new_coq_ctx : ?fresh:bool -> unit -> Evd.evar_map ref
 val the_coq_ctx : ?fresh:bool -> unit -> Evd.evar_map ref
 

@@ -14,33 +14,33 @@ type coq_context =
   }
 
 (** *)
-let coq_env_wrapper : Environ.env ref option ref = ref None
+let the_coq_env_opt : Environ.env ref option ref = ref None
 
 let new_coq_env () : Environ.env ref =
   if !enable_logging then Log.override "Created new coq env.";
-  let env = ref (Global.env ()) in
-  coq_env_wrapper := Some env;
+  let env : Environ.env ref = ref (Global.env ()) in
+  the_coq_env_opt := Some env;
   env
 ;;
 
 let the_coq_env ?(fresh : bool = false) () : Environ.env ref =
-  match !coq_env_wrapper with
+  match !the_coq_env_opt with
   | None -> new_coq_env ()
   | Some env -> if fresh then new_coq_env () else env
 ;;
 
 (** *)
-let coq_ctx_wrapper : Evd.evar_map ref option ref = ref None
+let the_coq_ctx_opt : Evd.evar_map ref option ref = ref None
 
 let new_coq_ctx ?(fresh : bool = false) () : Evd.evar_map ref =
   if !enable_logging then Log.override "Created new coq ctx.";
   let ctx = ref (Evd.from_env !(the_coq_env ~fresh ())) in
-  coq_ctx_wrapper := Some ctx;
+  the_coq_ctx_opt := Some ctx;
   ctx
 ;;
 
 let the_coq_ctx ?(fresh : bool = false) () : Evd.evar_map ref =
-  match !coq_ctx_wrapper with
+  match !the_coq_ctx_opt with
   | None -> new_coq_ctx ()
   | Some ctx -> if fresh then new_coq_ctx ~fresh () else ctx
 ;;
