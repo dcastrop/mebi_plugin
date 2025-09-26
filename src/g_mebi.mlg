@@ -22,6 +22,8 @@ open Stdarg
 
 VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
 
+| ["MeBi" "ProofTest"] -> {Mebi_wrapper.run (Command.run (Command.ProofTest ()) [])}
+
 (* set plugin params *)
 | ["MeBi" "Set" "Bound" int(b)       ] -> {Params.set_bounds (b, None)}
 | ["MeBi" "Set" "Bound" int(b) int(a)] -> {Params.set_bounds (b, Some a)}

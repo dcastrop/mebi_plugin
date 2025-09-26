@@ -299,3 +299,10 @@ val make_state_set
 val make_state_tree_pair_set
   :  wrapper ref
   -> (module Set.S with type elt = E.t * Constr_tree.t) in_context
+
+
+
+
+
+(*  *)
+val proof_test : unit -> unit mm

@@ -1288,3 +1288,59 @@ let make_state_tree_pair_set (st : wrapper ref)
   ; value = (module PairSet : Set.S with type elt = E.t * Constr_tree.t)
   }
 ;;
+
+let proof_test () : unit mm =
+  fun (st : wrapper ref) ->
+  Log.debug "mebi_wrapper.proof_test";
+  let coq_st = !st.coq_ref in
+  (* *)
+  let ((_en, pv) : Proofview.entry * Proofview.proofview) =
+    Proofview.init !coq_st.coq_ctx []
+    (* [!coq_st.coq_env, _] *)
+  in
+  Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.proof_test: is finished => %b"
+       (Proofview.finished pv));
+  (* *)
+  let rel_ctx : EConstr.rel_context = EConstr.rel_context !coq_st.coq_env in
+  Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.proof_test: rel_ctx => \"%s\""
+       (Pp.string_of_ppcmds
+          (Printer.pr_rel_context
+             !coq_st.coq_env
+             !coq_st.coq_ctx
+             (EConstr.to_rel_context !coq_st.coq_ctx rel_ctx))));
+  (* *)
+  let named_ctx : EConstr.named_context =
+    EConstr.named_context !coq_st.coq_env
+  in
+  Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.proof_test: named_ctx => \"%s\""
+       (Pp.string_of_ppcmds
+          (Printer.pr_named_context
+             !coq_st.coq_env
+             !coq_st.coq_ctx
+             (EConstr.to_named_context !coq_st.coq_ctx named_ctx))));
+  (*  *)
+  (* Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.proof_test: default_goal => %s"
+       (Pp.string_of_ppcmds
+          (Goal_select.pr_goal_selector
+             (Goal_select.get_default_goal_selector ())))); *)
+  (*  *)
+  (* let p : Proof.t =
+     Proof.start
+     ~name:(Names.Id.of_string "test_proof")
+     ~poly:false
+     !coq_st.coq_ctx
+     []
+     in
+     Log.debug
+     (Printf.sprintf "mebi_wrapper.proof_test: is done => %b" (Proof.is_done p)); *)
+  (* *)
+  { state = st; value = () }
+;;
