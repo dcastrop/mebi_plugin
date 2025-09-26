@@ -162,14 +162,17 @@ let rec check_updated_ctx
           (* NOTE: testing handling the [@eq] premises *)
           (match econstr_to_string fn with
            | "option" ->
-             Log.warning
-               (Printf.sprintf
-                  "check_updated_ctx, fn_cindef \"option\" has args: %s"
-                  (econstr_list_to_string (Array.to_list args)));
+             (* if Params.WeakEnc.is_option () then *)
+             if Logging.is_show_details_enabled ()
+             then
+               Log.warning
+                 (Printf.sprintf
+                    "check_updated_ctx, fn_cindef \"option\" has args: %s"
+                    (econstr_list_to_string (Array.to_list args)));
              check_updated_ctx acc fn_cindef (substl, tl)
            | "@eq" ->
-             let* (lhs : EConstr.t) = normalize_econstr args.(1) in
-             let* (rhs : EConstr.t) = normalize_econstr args.(2) in
+             let* lhs : EConstr.t = normalize_econstr args.(1) in
+             let* rhs : EConstr.t = normalize_econstr args.(2) in
              Log.warning
                (Printf.sprintf
                   "TODO: check_updated_ctx, handle premise (normalized):\n\
@@ -180,8 +183,8 @@ let rec check_updated_ctx
                   (econstr_to_string lhs)
                   (econstr_to_string rhs));
              (* TODO: find way to propagate this *)
-             let* (to_subst :
-                    (int * (Constr_tree.t * unif_problem) list list) option)
+             let* to_subst
+               : (int * (Constr_tree.t * unif_problem) list list) option
                =
                check_updated_ctx acc fn_cindef (substl, tl)
              in
@@ -197,7 +200,7 @@ let rec check_updated_ctx
         | Some c ->
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
           let* c_constr_transitions = Mebi_ind.get_constr_transitions c in
-          let* (ctors : coq_ctor list) =
+          let* ctors : coq_ctor list =
             check_valid_constructor
               c_constr_transitions
               fn_cindef
@@ -245,7 +248,7 @@ and check_valid_constructor
       (lts_index : int)
   : coq_ctor list mm
   =
-  let* (t : EConstr.t) = normalize_econstr t' in
+  let* t : EConstr.t = normalize_econstr t' in
   let iter_body (i : int) (ctor_vals : coq_ctor list) =
     let (ctx, tm) : Constr.rel_context * Constr.t = ctor_transitions.(i) in
     let ctx_tys : EConstr.rel_declaration list =
@@ -261,10 +264,10 @@ and check_valid_constructor
       let* success = Option.cata (fun a -> m_unify a act) (return true) ma in
       if success
       then
-        let* (act : EConstr.t) = normalize_econstr act in
+        let* act : EConstr.t = normalize_econstr act in
         let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in
-        let* (next_ctors :
-               (int * (Constr_tree.t * unif_problem) list list) option)
+        let* next_ctors
+          : (int * (Constr_tree.t * unif_problem) list list) option
           =
           check_updated_ctx (lts_index, [ [] ]) fn_cindef (substl, ctx_tys)
         in
@@ -432,9 +435,9 @@ module MkGraph
     | None -> return None
     | Some weak_kind ->
       Log.debug "command.MkGraph.is_silent_transition";
-      let* (act_enc : E.t) = encode act in
-      let* (ty : EConstr.t) = type_of_econstr act in
-      let* (ty_enc : E.t) = encode ty in
+      let* act_enc : E.t = encode act in
+      let* ty : EConstr.t = type_of_econstr act in
+      let* ty_enc : E.t = encode ty in
       Log.debug
         (Printf.sprintf
            "command.MkGraph.is_silent_transition, type of act: %s"
@@ -452,7 +455,7 @@ module MkGraph
          if E.eq label_enc ty_enc
          then return (Some false)
          else
-           (* let* b = is_none_term act in *)
+           let* b = is_none_term act in
            (* return (Some b) *)
            (* NOTE: could be the [None] type? *)
            return (Some (String.equal "None" (econstr_to_string act)))
@@ -481,8 +484,8 @@ module MkGraph
     Log.debug "command.MkGraph.get_new_states";
     let iter_body (i : int) (new_states : S.t) =
       let (act, tgt, int_tree) : coq_ctor = List.nth ctors i in
-      let* (tgt_enc : E.t) = encode tgt in
-      let* (act_enc : E.t) = encode act in
+      let* tgt_enc : E.t = encode tgt in
+      let* act_enc : E.t = encode act in
       let* is_silent : bool option = is_silent_transition weak_type act in
       let meta : Action.MetaData.t = [ Constr_tree.pstr int_tree ] in
       let to_add : Action.t =
@@ -519,8 +522,8 @@ module MkGraph
     : coq_ctor list mm
     =
     Log.debug "command.MkGraph.get_new_constrs";
-    let* (from_dec : EConstr.t) = decode from in
-    let* (decoded_map : Mebi_ind.t F.t) = decode_map rlts_map in
+    let* from_dec : EConstr.t = decode from in
+    let* decoded_map : Mebi_ind.t F.t = decode_map rlts_map in
     let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
     check_valid_constructor
       primary_constr_transitions
@@ -549,11 +552,11 @@ module MkGraph
     then return g (* exit if bound reached *)
     else (
       let encoded_t : E.t = Queue.pop g.to_visit in
-      let* (new_constrs : coq_ctor list) =
+      let* new_constrs : coq_ctor list =
         get_new_constrs encoded_t the_primary_lts rlts_map
       in
       (* [get_new_states] also updates [g.to_visit] *)
-      let* (new_states : S.t) =
+      let* new_states : S.t =
         get_new_states ~weak_type encoded_t g new_constrs
       in
       let g : lts_graph = { g with states = S.union g.states new_states } in
@@ -571,16 +574,16 @@ module MkGraph
     =
     Log.debug "command.MkGraph.build_cindef_map";
     (* normalize the initial term *)
-    let* (t : EConstr.t) = normalize_econstr t' in
-    let* (ty : EConstr.t) = type_of_econstr t in
+    let* t : EConstr.t = normalize_econstr t' in
+    let* ty : EConstr.t = type_of_econstr t in
     (* prepare for iterating through [grefs] *)
     let num_grefs : int = List.length grefs in
     let trmap : Mebi_ind.t B.t = B.create num_grefs in
     let iter_body (i : int) ((fn_opt, acc_map) : E.t option * Mebi_ind.t B.t) =
       let gref : Names.GlobRef.t = List.nth grefs i in
-      let* (c : Mebi_ind.t) = Mebi_utils.get_ind_lts i gref in
+      let* c : Mebi_ind.t = Mebi_utils.get_ind_lts i gref in
       (* add name of inductive prop *)
-      let* (encoding : E.t) = encode c.info.name in
+      let* encoding : E.t = encode c.info.name in
       B.add acc_map encoding c;
       return (fn_opt, acc_map)
     in
@@ -588,10 +591,10 @@ module MkGraph
       iterate 0 (num_grefs - 1) (None, trmap) iter_body
     in
     (* encode the primary lts *)
-    let* (c : Mebi_ind.t) =
+    let* c : Mebi_ind.t =
       Mebi_utils.get_ind_lts num_grefs (Mebi_utils.ref_to_glob primary_lts)
     in
-    let* (the_primary_enc : E.t) = encode c.info.name in
+    let* the_primary_enc : E.t = encode c.info.name in
     return (the_primary_enc, cindef_map)
   ;;
 
@@ -608,7 +611,7 @@ module MkGraph
     =
     (* make map of term types *)
     Log.debug "command.MkGraph.build_graph";
-    let* (t : EConstr.t) = constrexpr_to_econstr tref in
+    let* t : EConstr.t = constrexpr_to_econstr tref in
     let* (the_primary_enc, cindef_map) : E.t * Mebi_ind.t B.t =
       build_cindef_map primary_lts t grefs
     in
@@ -618,7 +621,7 @@ module MkGraph
       else None
     in *)
     (* update environment by typechecking *)
-    let (the_primary_lts : Mebi_ind.t) = B.find cindef_map the_primary_enc in
+    let the_primary_lts : Mebi_ind.t = B.find cindef_map the_primary_enc in
     let* primary_trm_type = Mebi_ind.get_lts_trm_type the_primary_lts in
     let$* u env sigma = Typing.check env sigma t primary_trm_type in
     let$ init env sigma = sigma, Reductionops.nf_all env sigma t in
@@ -869,7 +872,7 @@ type command_kind =
 
 let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
   Log.debug "command.run";
-  let* (graphM : (module GraphB)) = make_graph_builder in
+  let* graphM : (module GraphB) = make_graph_builder in
   let module G = (val graphM) in
   let build_lts_graph
         (primary_lts : Libnames.qualid)

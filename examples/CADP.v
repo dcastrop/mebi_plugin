@@ -1,4 +1,4 @@
-Require Import MEBI.loader.
+(* Require Import MEBI.loader. *)
 
 Require Export String.
 Require Import PeanoNat.
@@ -813,6 +813,84 @@ Definition compose (s:system) : composition :=
   | (ps, r) => (load ps, r)
   end.
 
+
+Module Protocol.
+
+  Import CADP.Expr.
+
+Example AcquireInnerDef : idef := 2.
+Example AcquireInnerBody : tm :=
+  SEQ 
+    (ACT READ_LOCKED) 
+    (IF (VAR LOCKED) 
+      (REC_CALL (AcquireInnerDef)) 
+      (OK)).
+
+Example AcquireInnerLoop : tm := 
+  REC_DEF (AcquireInnerDef) (AcquireInnerBody).
+
+Example Acquire : tm :=
+  SEQ 
+    (ACT (WRITE_NEXT THE_PID NIL)) 
+    (SEQ 
+      (ACT FETCH_AND_STORE) 
+      (IF (EQ (VAR PREDECESSOR) (VAL NIL)) 
+        (OK) 
+        (SEQ 
+          (ACT (WRITE_LOCKED THE_PID (BOOL true))) 
+          (SEQ 
+            (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) 
+            (AcquireInnerLoop))))).
+
+Example ReleaseInnerDef : idef := 1.
+Example ReleaseInnerBody : tm :=
+  SEQ 
+    (ACT READ_NEXT) 
+    (IF (EQ (VAL NIL) (VAR NEXT))
+      (REC_CALL (ReleaseInnerDef))
+      (ACT (WRITE_LOCKED NEXT (BOOL false)))).
+
+Example ReleaseInnerLoop : tm := 
+  REC_DEF (ReleaseInnerDef) (ReleaseInnerBody).
+
+Example Release : tm :=
+  SEQ 
+    (ACT READ_NEXT) 
+    (IF (EQ (VAL NIL) (VAR NEXT)) 
+      (SEQ 
+        (ACT COMPARE_AND_SWAP) 
+        (IF (EQ FLS (VAR SWAP)) 
+          (ReleaseInnerLoop) 
+          (OK))) 
+      (ACT (WRITE_LOCKED NEXT (BOOL false)))).
+
+Example PMainLoopDef : idef := 0.
+Example P : tm :=
+  REC_DEF (PMainLoopDef) (
+    (* SEQ (ACT NCS) ( *)
+    SEQ (Acquire) (
+    SEQ (ACT ENTER) (
+    SEQ (ACT LEAVE) (
+    SEQ (Release) (
+    REC_CALL (PMainLoopDef)))))(* ) *)).
+
+
+End Protocol.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (*************************************************************************)
 (**** Tests: Lock ********************************************************)
 (*************************************************************************)
@@ -872,301 +950,11 @@ Example Lock_CaS_1 : composition :=
   )).
 (* MeBi Dump "Lock_CaS_1" LTS Bounded 16384 Of Lock_CaS_1 Using lts step. *)
 
-(*************************************************************************)
-(**** Example: Full CADP *************************************************)
-(*************************************************************************)
-
-Import Expr.
-
-Example AcquireInnerDef : idef := 2.
-Example AcquireInnerBody : tm :=
-  SEQ (ACT READ_LOCKED) (
-    IF (VAR LOCKED) (REC_CALL (AcquireInnerDef)) (OK)
-  ).
-
-Example AcquireInnerLoop : tm := REC_DEF (AcquireInnerDef) (AcquireInnerBody).
-
-Example Acquire : tm :=
-  SEQ (ACT (WRITE_NEXT THE_PID NIL)) (
-    SEQ (ACT FETCH_AND_STORE) (
-      IF (EQ (VAR PREDECESSOR) (VAL NIL)) (OK) (
-        SEQ (ACT (WRITE_LOCKED THE_PID (BOOL true))) (
-          SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) (AcquireInnerLoop)
-        )
-      )
-    )
-  ).
-
-Example ReleaseInnerDef : idef := 1.
-Example ReleaseInnerBody : tm :=
-  SEQ (ACT READ_NEXT) (
-    IF (EQ (VAL NIL) (VAR NEXT))
-      (REC_CALL (ReleaseInnerDef))
-      (ACT (WRITE_LOCKED NEXT (BOOL false)))
-  ).
-
-Example ReleaseInnerLoop : tm := REC_DEF (ReleaseInnerDef) (ReleaseInnerBody).
-
-Example Release : tm :=
-  SEQ (ACT READ_NEXT) (
-    IF (EQ (VAL NIL) (VAR NEXT)) (
-      SEQ (ACT COMPARE_AND_SWAP) (
-        IF (EQ FLS (VAR SWAP)) (ReleaseInnerLoop) (OK)
-      )
-    ) (ACT (WRITE_LOCKED NEXT (BOOL false)))
-  ).
-
-Example PMainLoopDef : idef := 0.
-Example P : tm :=
-  REC_DEF (PMainLoopDef) (
-    (* SEQ (ACT NCS) ( *)
-      SEQ Acquire (
-        SEQ (ACT ENTER) (
-          SEQ (ACT LEAVE) (
-            SEQ Release (REC_CALL (PMainLoopDef))
-          )
-        )
-      )
-    (* ) *)
-  )
-  .
-
-(*************************************************************************)
-(**** Instance of P ******************************************************)
-(*************************************************************************)
-
-(***************************)
-(**** Single process *******)
-(***************************)
-Example p0 : tm * env := (P, Env.initial 1).
-
-(* MeBi Dump "p0" LTS Bounded 33 Of p0 Using step. *)
-(* MeBi Dump "p0-silent" LTS Bounded 33 Of p0 Weak SILENT Of action Using step. *)
-
-(* MeBi Dump "p0" FSM Bounded 150 Of p0 Using step. *)
-(* MeBi Dump "p0" Minim Bounded 33 Of p0 Using step. *)
-
 
 
 (*************************************************************************)
 (**** Example: Glued CADP ************************************************)
 (*************************************************************************)
-
-Definition do_acquire_inner (c:tm) (s:state) (r:resource)
-  : composition
-  :=
-  let e : env := (s, r) in
-  (* REC_DEF 2 *)
-  let t : tm := unfold (AcquireInnerDef, AcquireInnerBody) AcquireInnerBody in
-  (* ACT READ_LOCKED *)
-  match read_locked e with
-  | None => (PRC ERR
-                (add_error (Build_error 40
-                  "do_acquire_inner, read_locked e failed" (Build_error_info None (None, None))) s),
-                r)
-  | Some e =>
-    (* IF (VAR LOCKED) *)
-    match (get_local_var_value LOCKED (get_state e)) with
-    | BOOL true => (* REC_CALL 2 *) (PRC (SEQ t c) (get_state e), get_resource e)
-    | BOOL false => (PRC c (get_state e), get_resource e)
-    | _ => (PRC ERR
-                (add_error (Build_error 41
-                  "do_acquire_inner, var locked not bool" (Build_error_info None (None, None))) (get_state e)),
-                get_resource e)
-    end
-  end
-  .
-
-
-Definition do_acquire (c:tm) (s:state) (r:resource)
-  : composition
-  :=
-  let e : env := (s, r) in
-  (* ACT (WRITE_NEXT THE_PID NIL) *)
-  match write_next THE_PID NIL e with
-  | None => (PRC ERR
-                (add_error (Build_error 50
-                  "do_acquire, write_next THE_PID NIL failed" (Build_error_info None (None, None))) s),
-                r)
-  | Some e =>
-    (* ACT FETCH_AND_STORE *)
-    match fetch_and_store e with
-    | None => (PRC ERR
-                  (add_error (Build_error 51
-                    "do_acquire, fetch_and_store failed" (Build_error_info None (None, None))) (get_state e)),
-                  (get_resource e))
-    | Some e =>
-      (* IF (EQ (VAR PREDECESSOR) (VAL NIL)) *)
-      match (get_local_var_value PREDECESSOR (get_state e)) with
-      | NIL => (* OK *) (PRC c (get_state e), get_resource e)
-      | _ =>
-        (* ACT (WRITE_LOCKED THE_PID (BOOL true)) *)
-        match write_locked THE_PID (BOOL true) e with
-        | None => (PRC ERR
-                      (add_error (Build_error 52
-                        "do_acquire, write_locked THE_PID (BOOL true) failed" (Build_error_info None (None, None))) (get_state e)),
-                  (get_resource e))
-        | Some e =>
-          (* ACT (WRITE_NEXT PREDECESSOR (GET THE_PID)) *)
-          match write_next PREDECESSOR (GET THE_PID) e with
-          | None => (PRC ERR
-                        (add_error (Build_error 53
-                          "do_acquire, write_next PREDECESSOR (GET THE_PID) failed" (Build_error_info None (None, None))) (get_state e)),
-                    (get_resource e))
-          | Some e =>
-            (PRC (SEQ (AcquireInnerLoop) c) (get_state e)
-            , get_resource e
-            )
-          end
-        end
-      end
-    end
-  end
-  .
-
-Definition do_release_inner (c:tm) (s:state) (r:resource)
-  : composition
-  :=
-  let e : env := (s, r) in
-  (* REC_DEF 1 *)
-  let t : tm := unfold (ReleaseInnerDef, ReleaseInnerBody) ReleaseInnerBody in
-  (* ACT READ_NEXT *)
-  match read_next e with
-  | None => (PRC ERR
-                (add_error (Build_error 45
-                  "do_release_inner, read_next e failed" (Build_error_info None (None, None))) s),
-                r)
-  | Some e =>
-    (* IF (EQ (VAL NIL) (VAR NEXT)) *)
-    match (get_local_var_value NEXT (get_state e)) with
-    | NIL => (* REC_CALL 1 *) (PRC (SEQ t c) (get_state e), get_resource e)
-    | _ =>
-      (* ACT (WRITE_LOCKED NEXT (BOOL false)) *)
-      match write_locked NEXT (BOOL false) e with
-      | None => (PRC ERR
-                    (add_error (Build_error 46
-                      "do_release_inner, write_locked NEXT (BOOL false) failed" (Build_error_info None (None, None))) (get_state e)),
-                    (get_resource e))
-      | Some e =>
-        (PRC c (get_state e), get_resource e)
-      end
-    end
-  end
-  .
-
-Definition do_release (c:tm) (s:state) (r:resource)
-  : composition
-  :=
-  let e : env := (s, r) in
-  (* ACT READ_NEXT *)
-  match read_next e with
-  | None => (PRC ERR
-                (add_error (Build_error 60
-                  "do_release, read_next e failed" (Build_error_info None (None, None))) s),
-                r)
-  | Some e =>
-    (* IF (EQ (VAL NIL) (VAR NEXT)) *)
-    match (get_local_var_value NEXT (get_state e)) with
-    | NIL =>
-      (* ACT COMPARE_AND_SWAP *)
-      match compare_and_swap e with
-      | None => (PRC ERR
-                    (add_error (Build_error 61
-                      "do_acquire, compare_and_swap failed" (Build_error_info None (None, None))) (get_state e)),
-                    (get_resource e))
-      | Some e =>
-        (* IF (EQ FLS (VAR SWAP)) *)
-        match (get_local_var_value SWAP (get_state e)) with
-        | BOOL false =>
-          (PRC (SEQ (ReleaseInnerLoop) c) (get_state e)
-          , get_resource e)
-        | _ => (* OK *) (PRC c (get_state e), get_resource e)
-        end
-      end
-
-    | _ =>
-      (* ACT (WRITE_LOCKED NEXT (BOOL false)) *)
-      match write_locked NEXT (BOOL false) e with
-      | None => (PRC ERR
-                    (add_error (Build_error 61
-                      "do_release, write_locked NEXT (BOOL false) failed" (Build_error_info None (None, None))) (get_state e)),
-                    (get_resource e))
-      | Some e =>
-        (PRC c (get_state e), get_resource e)
-      end
-    end
-  end
-  .
-
-
-Definition do_main_loop (b:tm) (s:state) (r:resource)
-  : composition
-  :=
-  (* REC_DEF 0 *)
-  (PRC (unfold (PMainLoopDef, b) b) s, r)
-  .
-
-Inductive bigstep : composition -> option label -> composition -> Prop :=
-(*  0 *)
-| DO_MAIN_LOOP : forall b s r,
-  bigstep (PRC (REC_DEF PMainLoopDef b) s, r) 
-          None 
-          (do_main_loop b s r)
-
-(*  1 *)
-| DO_ACQUIRE : forall c s r,
-  bigstep (PRC (SEQ (Acquire) (c)) s, r)
-          None
-          (do_acquire c s r)
-
-(*  2 *)
-| DO_RELEASE : forall c s r,
-  bigstep (PRC (SEQ (Release) (c)) s, r)
-          None
-          (do_release c s r)
-
-(*  3 *)
-| DO_ACQUIRE_INNER : forall c s r,
-  bigstep (PRC (SEQ (AcquireInnerLoop) c) s, r)
-          None
-          (do_acquire_inner c s r)
-
-(*  4 *)
-| DO_RELEASE_INNER : forall c s r,
-  bigstep (PRC (SEQ (ReleaseInnerLoop) c) s, r)
-          None
-          (do_release_inner c s r)
-
-(*  5 *)
-| DO_SEQ_ACT_ENTER : forall y s r,
-  bigstep (PRC (SEQ (ACT ENTER) y) s, r) 
-          (Some (ENTER, (get_pid s))) 
-          (PRC y s, r)
-
-(*  6 *)
-| DO_SEQ_ACT_LEAVE : forall y s r,
-  bigstep (PRC (SEQ (ACT LEAVE) y) s, r) 
-          (Some (LEAVE, (get_pid s))) 
-          (PRC y s, r)
-
-(*  7 *)
-| DO_PAR_L : forall a l1 l2 r gr1 gr2,
-  bigstep (l1, gr1) a (l2, gr2) ->
-  bigstep (PAR l1 r, gr1) a (PAR l2 r, gr2)
-
-(*  8 *)
-| DO_PAR_R : forall a l r1 r2 gr1 gr2,
-  bigstep (r1, gr1) a (r2, gr2) ->
-  bigstep (PAR l r1, gr1) a (PAR l r2, gr2)
-
-.
-
-
-(***************************)
-(**** System size: 1 *******)
-(***************************)
-Example g1 : composition := compose (create 1 P).
-(* MeBi Dump "g1_noglue" LTS Bounded 37 Of g1 Using lts step. *)
 
 
 (*************************************************************************)
@@ -1205,20 +993,20 @@ Inductive lts_transitive_closure : composition -> Prop :=
 | no_lts : forall t e, lts_transitive_closure (t, e)
 .
 
-Inductive bigstep_transitive_closure : composition -> Prop :=
+(* Inductive bigstep_transitive_closure : composition -> Prop :=
 | trans_bigstep : forall t a t' e' e,
     bigstep (t, e) a (t', e') ->
     bigstep_transitive_closure (t', e') ->
     bigstep_transitive_closure (t, e)
 
 | no_bigstep : forall t e, bigstep_transitive_closure (t, e)
-.
+. *)
 
 (*********************************)
 (**** Manual Bisimilarity Proof **)
 (*********************************)
 
-Require Import MEBI.Bisimilarity.
+(* Require Import MEBI.Bisimilarity.
 
 Print composition.
 Print sys.
@@ -1238,7 +1026,7 @@ Proof. intros; subst; unfold p, q.
   eexists; split.
 
   (* info_eauto with rel_db. *)
-Admitted.
+Admitted. *)
 
 
 
@@ -1365,7 +1153,7 @@ MeBi Dump "g1_FSM_weak" FSM Bounded 5 Of g1 Weak SILENT Of action Using bigstep 
 (**********************************)
 (**** System size: 2 (identical) **)
 (**********************************)
-Example g2 : composition := compose (create 2 P).
+(* Example g2 : composition := compose (create 2 P).
 (* MeBi Dump "g2_noglue" LTS Bounded 5000 Of g2 Using lts step. *)
 
 (* MeBi Dump "g2" LTS Bounded 1024 Of g2 Using bigstep lts step. *)
@@ -1435,7 +1223,7 @@ Example gTest3 : composition :=
     PAR (PRC P (State.create 0))
         (PRC P (State.create 1))
   , Resource.initial 2
-  ).
+  ). *)
 (* MeBi Dump "gTest3" LTS Bounded 16384 Of gTest3 Using bigstep lts step. *)
 
 

@@ -66,6 +66,7 @@ module WeakEnc : sig
     | OptionConstr of Mebi_wrapper.E.t
     | CustomConstr of Mebi_wrapper.E.t * Mebi_wrapper.E.t
 
+  (* val is_option : t -> bool *)
   val to_string : t -> string Mebi_wrapper.mm
   val eq : t -> t -> bool
 end
