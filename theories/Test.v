@@ -455,6 +455,29 @@ Module BisimTest3.
   MeBi Bisim exa3 With termLTS And exa2 With termLTS Using termLTS.
 End BisimTest3.
 
+(* MeBi Divider "Theories.Test.ProofTest".
+Module ProofTest.
+
+  MeBi Reset All.
+  MeBi Set ShowDebug True.
+  MeBi Set ShowDetails True.
+
+(* Example bool_assoc : forall a b c, (a -> b) -> (b -> c) -> (a -> c).
+Proof.
+  (* intros.  *)
+  (* MeBi_intro. *)
+  
+  (* intros a. *)
+  (* MeBi_intro a. *)
+  (* MeBi_intro "a". *)
+  (* MeBi_intros a. *)
+  MeBi_intros_only x y z.
+
+
+Admitted. *)
+
+
+End ProofTest. *)
 
 
 (* Section BisimDef.

@@ -22,9 +22,10 @@
  (modules
   utils
   logging
-  mebi_ind
   mebi_wrapper
+  mebi_ind
   mebi_utils
+  mebi_tactics
   params
   model
   lts

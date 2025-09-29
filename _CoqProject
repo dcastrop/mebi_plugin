@@ -4,9 +4,10 @@ src/META.coq-mebi
 -I src/
 -arg "-w all"
 
-theories/loader.v
-theories/Test.v
-theories/Bisimilarity.v
+theories/loader.v ###
+theories/Test.v ###
+
+theories/Bisimilarity.v ###
 
 ################
 ### Coq Examples 
@@ -26,8 +27,8 @@ examples/bisimilarity/Proc/Test1/PluginProofs.v ###
 # examples/bisimilarity/Proc/Test2/LtacProofs.v
 
 ### CADP
-examples/CADP.v ###
-examples/bisimilarity/CADP/Glued.v ###
+# examples/CADP.v ###
+# examples/bisimilarity/CADP/Glued.v ###
 
 # examples/bisimilarity/CADP/Size1/PluginTest.v ###
 # examples/bisimilarity/CADP/Size1/ManualProofs.v
@@ -63,6 +64,8 @@ src/mebi_ind.ml
 src/mebi_ind.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
+src/mebi_tactics.ml
+src/mebi_tactics.mli
 
 src/params.ml
 src/params.mli

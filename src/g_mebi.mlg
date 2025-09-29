@@ -5,7 +5,7 @@ DECLARE PLUGIN "coq-mebi.mebi"
   TACTIC EXTEND, as below, then we get the strange error message
   no implementation available for Tacentries, only when compiling
   theories/Loader.v *)
-(* open Ltac_plugin *)
+open Ltac_plugin
 
 open Stdarg
 (* open Pp *)
@@ -19,10 +19,74 @@ open Stdarg
 
 (* https://github.com/ybertot/plugin_tutorials/blob/master/tuto1/src/g_tuto1.mlg *)
 
+(* TACTIC EXTEND MeBi_unfold
+| [ "MeBi_unfold" reference(i) ] -> { Tactics.unfold_body i }
+(* | [ "MeBi_unfold" ident(i) ident(j) ] -> { Proofview.tclTHEN (Tactics.unfold_body i)(Tactics.unfold_body j) } *)
+(* | [ "MeBi_unfold" ] -> { Tactics.unfold_body (Names.Id.of_string_soft "TheH") } *)
+END *)
 
-VERNAC COMMAND EXTEND MeBiLTS CLASSIFIED AS QUERY
+(* TACTIC EXTEND MeBi_intro
+| [ "MeBi_intro" ident(i) ] -> { Tactics.introduction i }
+| [ "MeBi_intro" ] -> { Tactics.introduction (Names.Id.of_string_soft "TheH") }
+END *)
 
-| ["MeBi" "ProofTest"] -> {Mebi_wrapper.run (Command.run (Command.ProofTest ()) [])}
+
+(*** Exploring proof state ***)
+
+(*
+ * This command demonstrates exploring the proof state from within
+ * a command.
+ *
+ * Note that Pfedit.get_current_context gets us the environment
+ * and state within a proof, as opposed to the global environment
+ * and state. This is important within tactics.
+ *)
+VERNAC COMMAND EXTEND MeBi_ExploreProof CLASSIFIED AS QUERY
+| ![ proof_query ] [ "MeBi_ExploreProof" ] ->
+  { fun ~pstate ->
+    let sigma, env = Declare.Proof.get_current_context pstate in
+    let pprf = Proof.partial_proof (Declare.Proof.get pstate) in
+    Feedback.msg_notice
+      (Pp.prlist_with_sep Pp.fnl (Printer.pr_econstr_env env sigma) pprf)
+  }
+END
+
+TACTIC EXTEND MeBi_unfold
+| ["MeBi_unfold" reference(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold (Mebi_tactics.Gr x))}
+| ["MeBi_unfold" constr(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold (Mebi_tactics.Ex x))}
+| ["MeBi_unfold" ident(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold (Mebi_tactics.Id x))}
+END
+
+TACTIC EXTEND MeBi_intros
+| ["MeBi_intros"] -> {Mebi_tactics.intros ~all:true () []}
+| ["MeBi_intros" string(s)] -> {Mebi_tactics.intros ~all:true () [(Mebi_tactics.Str s)]}
+| ["MeBi_intros" string_list(s)] -> {Mebi_tactics.intros ~all:true () (List.map (fun (a:string) -> Mebi_tactics.Str a) s)}
+| ["MeBi_intros" ident(i)] -> {Mebi_tactics.intros ~all:true () [(Mebi_tactics.Id i)]}
+END
+
+TACTIC EXTEND MeBi_intros_only
+| ["MeBi_intros_only"] -> {Mebi_tactics.intros () []}
+| ["MeBi_intros_only" string(s)] -> {Mebi_tactics.intros () [(Mebi_tactics.Str s)]}
+| ["MeBi_intros_only" string_list(s)] -> {Mebi_tactics.intros () (List.map (fun (a:string) -> Mebi_tactics.Str a) s)}
+| ["MeBi_intros_only" ident(i)] -> {Mebi_tactics.intros () [(Mebi_tactics.Id i)]}
+END
+
+TACTIC EXTEND MeBi_intro
+| ["MeBi_intro"] -> {Mebi_tactics.intro (Mebi_tactics.Unk ())}
+| ["MeBi_intro" string(s)] -> {Mebi_tactics.intro (Mebi_tactics.Str s)}
+| ["MeBi_intro" ident(i)] -> {Mebi_tactics.intro (Mebi_tactics.Id i)}
+END
+
+TACTIC EXTEND MeBiTactic
+| ["MeBi" "ProofTest0"] -> {Mebi_tactics.intro (Mebi_tactics.Unk ())}
+| ["MeBi" "ProofTest0" string(s)] -> {Mebi_tactics.intro (Mebi_tactics.Str s)}
+| ["MeBi" "ProofTest0" ident(i)] -> {Mebi_tactics.intro (Mebi_tactics.Id i)}
+| ["MeBi" "ProofTest1"] -> {Proofview.tclUNIT ()}
+| ["MeBi" "ProofTest2"] -> {Mebi_wrapper.run (Command.tactic (Command.ProofTest ()) )}
+(* | [ "pack" "hypothesis" ident(i) ] ->{ Tuto_tactic.pack_tactic i } *)
+END
+
+VERNAC COMMAND EXTEND MeBiRun CLASSIFIED AS QUERY
 
 (* set plugin params *)
 | ["MeBi" "Set" "Bound" int(b)       ] -> {Params.set_bounds (b, None)}

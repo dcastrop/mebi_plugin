@@ -3,6 +3,7 @@ Logging
 Mebi_wrapper
 Mebi_ind
 Mebi_utils
+Mebi_tactics
 Params
 Model
 Lts
