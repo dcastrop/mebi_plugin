@@ -28,7 +28,20 @@ MeBi Set Weak Option label.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
-Proof. 
-  remember 3 as x.
-  MeBi ProofTest.
+Proof.
+  MeBi_ExploreProof.
+  MeBi_ExploreProof.
+  MeBi_unfold p.
+  MeBi_ExploreProof.
+  MeBi_ExploreProof.
+  MeBi_unfold q.
+  MeBi_ExploreProof.
+  MeBi_ExploreProof.
+
+  (* unfold p.  *)
+
+  (* MeBi_unfold p. *)
+  (* MeBi_intro. *)
+  (* remember 3 as x. *)
+  (* MeBi ProofTest1. *)
 Admitted.

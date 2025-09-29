@@ -861,7 +861,6 @@ type coq_model = Constrexpr.constr_expr * Libnames.qualid
 type make_model = model_kind * coq_model
 
 type command_kind =
-  | ProofTest of unit
   | Help of Mebi_help.help_kind
   | MakeModel of make_model
   | SaturateModel of coq_model
@@ -896,11 +895,6 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
   in
   let* _ = Params.obtain_weak_kinds_from_args () in
   match k with
-  | ProofTest () ->
-    Log.debug "command.run, ProofTest";
-    let* _ = Mebi_wrapper.proof_test () in
-    return ()
-  (**********************)
   | MakeModel (kind, (x, primary_lts)) ->
     Log.debug "command.run, MakeModel";
     let* the_lts = build_lts_graph primary_lts x (Params.get_fst_params ()) in
@@ -1023,3 +1017,14 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
 ;;
 
 (* let () = Logging.set_output_mode (Coq ()) *)
+
+type tactic_kind = ProofTest of unit
+
+let tactic (k : tactic_kind) : unit Proofview.tactic mm =
+  Log.debug "command.tactic";
+  match k with
+  | ProofTest () ->
+    Log.debug "command.tactic, ProofTest";
+    Mebi_wrapper.proof_test ()
+;;
+(* return () *)

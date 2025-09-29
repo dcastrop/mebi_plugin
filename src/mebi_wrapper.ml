@@ -1107,12 +1107,12 @@ let is_none_term (t : term) : bool mm =
   | _ -> return false
 ;;
 
-let _test_checks (t : term) : unit mm =
+let debug_econstr_kind (t : EConstr.t) : unit mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   Log.debug
     (Printf.sprintf
-       "mebi_wrapper.test_checks:\n\
+       "mebi_wrapper.debug_econstr_kind:\n\
        \ - %s\n\
        \ - %s\n\
        \ - %s\n\
@@ -1211,29 +1211,83 @@ let _test_checks (t : term) : unit mm =
   { state = st; value = () }
 ;;
 
-let _test_constr_kind (t : Constr.t) : unit =
-  match Constr.kind t with
-  | Rel _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Rel"
-  | Var _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Var"
-  | Meta _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Meta"
-  | Evar _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Evar"
-  | Sort _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Sort"
-  | Cast _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Cast"
-  | Prod _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Prod"
-  | Lambda _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Lambda"
-  | LetIn _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: LetIn"
-  | App _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: App"
-  | Const _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Const"
-  | Ind _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Ind"
-  | Construct _ -> Log.debug "mebi_wrapper.is_none_term, none is t: Construct"
-  | Case _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Case"
-  | Fix _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Fix"
-  | CoFix _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: CoFix"
-  | Proj _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Proj"
-  | Int _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Int"
-  | Float _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Float"
-  | String _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: String"
-  | Array _ -> Log.debug "mebi_wrapper.is_none_term, t is kind: Array"
+let debug_term_kind (t : term) : unit mm = debug_econstr_kind t
+
+let debug_constr_kind (t : Constr.t) : unit mm =
+  fun (st : wrapper ref) ->
+  Log.debug
+    (Printf.sprintf
+       "mebi_wrapper.debug_constr_kind:\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n\
+       \ - %s\n"
+       (Printf.sprintf "isRel %s = %b" (constr_to_string t) (Constr.isRel t))
+       (Printf.sprintf "isVar %s = %b" (constr_to_string t) (Constr.isVar t))
+       (Printf.sprintf "isInd %s = %b" (constr_to_string t) (Constr.isInd t))
+       (Printf.sprintf "isRef %s = %b" (constr_to_string t) (Constr.isRef t))
+       (Printf.sprintf "isEvar %s = %b" (constr_to_string t) (Constr.isEvar t))
+       (Printf.sprintf "isMeta %s = %b" (constr_to_string t) (Constr.isMeta t))
+       (Printf.sprintf "isSort %s = %b" (constr_to_string t) (Constr.isSort t))
+       (Printf.sprintf "isCast %s = %b" (constr_to_string t) (Constr.isCast t))
+       (Printf.sprintf "isApp %s = %b" (constr_to_string t) (Constr.isApp t))
+       (Printf.sprintf
+          "isLambda %s = %b"
+          (constr_to_string t)
+          (Constr.isLambda t))
+       (Printf.sprintf
+          "isLetIn %s = %b"
+          (constr_to_string t)
+          (Constr.isLetIn t))
+       (Printf.sprintf "isProd %s = %b" (constr_to_string t) (Constr.isProd t))
+       (Printf.sprintf
+          "isConst %s = %b"
+          (constr_to_string t)
+          (Constr.isConst t))
+       (Printf.sprintf
+          "isConstruct %s = %b"
+          (constr_to_string t)
+          (Constr.isConstruct t))
+       (Printf.sprintf "isFix %s = %b" (constr_to_string t) (Constr.isFix t))
+       (Printf.sprintf
+          "isCoFix %s = %b"
+          (constr_to_string t)
+          (Constr.isCoFix t))
+       (Printf.sprintf "isCase %s = %b" (constr_to_string t) (Constr.isCase t))
+       (Printf.sprintf "isProj %s = %b" (constr_to_string t) (Constr.isProj t))
+       (Printf.sprintf
+          "is_Prop %s = %b"
+          (constr_to_string t)
+          (Constr.is_Prop t))
+       (Printf.sprintf
+          "is_Type %s = %b"
+          (constr_to_string t)
+          (Constr.is_Type t))
+       (Printf.sprintf "is_Set %s = %b" (constr_to_string t) (Constr.is_Set t)));
+  { state = st; value = () }
+;;
+
+let debug_term_constr_kind (t : term) : unit mm =
+  let open Syntax in
+  let* t = term_to_constr t in
+  debug_constr_kind t
 ;;
 
 (********************************************)
@@ -1289,10 +1343,206 @@ let make_state_tree_pair_set (st : wrapper ref)
   }
 ;;
 
-let proof_test () : unit mm =
+(****************************************************************************)
+
+(* source: https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto3/src/tuto_tactic.ml *)
+
+(* todo: move to monad *)
+let constants = ref ([] : EConstr.t list)
+
+(* This is a pattern to collect terms from the Coq memory of valid terms
+   and proofs.  This pattern extends all the way to the definition of function
+   c_U *)
+let collect_bisimilarity_theories () =
+  match !constants with
+  | [] ->
+    let open Names in
+    let open EConstr in
+    let open UnivGen in
+    let find_reference path id =
+      let path = DirPath.make (List.rev_map Id.of_string path) in
+      let fp = Libnames.make_path path (Id.of_string id) in
+      Nametab.global_of_path fp
+    in
+    (* let gr_M = find_reference ["theories"; "Bisimilarity"] "M" in *)
+    (* let gr_A = find_reference ["theories"; "Bisimilarity"] "A" in *)
+    let gr_LTS = find_reference [ "theories"; "Bisimilarity" ] "LTS" in
+    let gr_tau = find_reference [ "theories"; "Bisimilarity" ] "tau" in
+    let gr_silent = find_reference [ "theories"; "Bisimilarity" ] "silent" in
+    let gr_silent1 = find_reference [ "theories"; "Bisimilarity" ] "silent1" in
+    let gr_weak = find_reference [ "theories"; "Bisimilarity" ] "weak" in
+    let gr_simF = find_reference [ "theories"; "Bisimilarity" ] "simF" in
+    let gr_weak_sim =
+      find_reference [ "theories"; "Bisimilarity" ] "weak_sim"
+    in
+    let gr_Pack_sim =
+      find_reference [ "theories"; "Bisimilarity" ] "Pack_sim"
+    in
+    let gr_out_sim = find_reference [ "theories"; "Bisimilarity" ] "out_sim" in
+    let gr_weak_bisim =
+      find_reference [ "theories"; "Bisimilarity" ] "weak_bisim"
+    in
+    constants
+    := List.map
+         (fun x -> of_constr (constr_of_monomorphic_global (Global.env ()) x))
+         [ (* gr_M; gr_A; *)
+           gr_LTS
+         ; gr_tau
+         ; gr_silent
+         ; gr_silent1
+         ; gr_weak
+         ; gr_simF
+         ; gr_weak_sim
+         ; gr_Pack_sim
+         ; gr_out_sim
+         ; gr_weak_bisim
+         ];
+    !constants
+  | _ -> !constants
+;;
+
+let _c_LTS () =
+  match collect_bisimilarity_theories () with
+  | it :: _ -> it
+  | _ ->
+    failwith
+      "could not obtain an internal representation of Theories.Bisimilarity.LTS"
+;;
+
+let _c_tau () =
+  match collect_bisimilarity_theories () with
+  | _ :: it :: _ -> it
+  | _ ->
+    failwith
+      "could not obtain an internal representation of Theories.Bisimilarity.tau"
+;;
+
+let _c_silent () =
+  match collect_bisimilarity_theories () with
+  | _ :: _ :: it :: _ -> it
+  | _ ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.silent"
+;;
+
+let _c_silent1 () =
+  match collect_bisimilarity_theories () with
+  | _ :: _ :: _ :: it :: _ -> it
+  | _ ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.silent1"
+;;
+
+let _c_weak () =
+  match collect_bisimilarity_theories () with
+  | _ :: _ :: _ :: _ :: it :: _ -> it
+  | _ ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.weak"
+;;
+
+let _c_simF () =
+  match collect_bisimilarity_theories () with
+  | _ :: _ :: _ :: _ :: _ :: it :: _ -> it
+  | _ ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.simF"
+;;
+
+let _c_weak_sim () =
+  match collect_bisimilarity_theories () with
+  | _ :: _ :: _ :: _ :: _ :: _ :: it :: _ -> it
+  | _ ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.weak_sim"
+;;
+
+let _c_Pack_sim () =
+  match collect_bisimilarity_theories () with
+  | _ :: _ :: _ :: _ :: _ :: _ :: _ :: it :: _ -> it
+  | _ ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.Pack_sim"
+;;
+
+let _c_out_sim () =
+  match collect_bisimilarity_theories () with
+  | _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: it :: _ -> it
+  | _ ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.out_sim"
+;;
+
+let _c_weak_bisim () =
+  match collect_bisimilarity_theories () with
+  | _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: it :: _ -> it
+  | _ ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.weak_bisim"
+;;
+
+(* The following tactic is meant to pack an hypothesis when no other
+   data is already packed.
+
+   The main difficulty in defining this tactic is to understand how to
+   construct the input expected by apply_in. *)
+let _package i =
+  Proofview.Goal.enter (fun gl ->
+    Tactics.apply_in
+      true
+      false
+      i
+      [ (* this means that the applied theorem is not to be cleared. *)
+        (* None, (CAst.make (c_M (), *)
+        (* we don't specialize the theorem with extra values. *)
+        (* Tactypes.NoBindings)) *) ]
+      (* we don't destruct the result according to any intro_pattern *)
+      None)
+;;
+
+(* In the environment of the goal, we can get the type of an assumption
+   directly by a lookup.  The other solution is to call a low-cost retyping
+   function like *)
+let _get_type_of_hyp env id =
+  match EConstr.lookup_named id env with
+  | Context.Named.Declaration.LocalAssum (_, ty) -> ty
+  | _ ->
+    CErrors.user_err
+      (let open Pp in
+       str (Names.Id.to_string id) ++ str " is not a plain hypothesis")
+;;
+
+let proof_test () : unit Proofview.tactic mm =
   fun (st : wrapper ref) ->
   Log.debug "mebi_wrapper.proof_test";
-  let coq_st = !st.coq_ref in
+  let _h_hyps_id = Names.Id.of_string "TestPacked" in
+  (* *)
+  { state = st
+  ; value =
+      Proofview.Goal.enter (fun gl ->
+        let _hyps = Environ.named_context_val (Proofview.Goal.env gl) in
+        Proofview.tclUNIT ())
+      (* let x = Proofview.Goal.goal gl in
+
+         if Termops.mem_named_context_val h_hyps_id hyps then
+         Proofview.tclTHEN (repackage i h_hyps_id)
+         (Proofview.tclTHEN (Tactics.clear [h_hyps_id; i])
+         (Tactics.introduction h_hyps_id))
+         else
+         Proofview.tclTHEN (package i)
+         (Proofview.tclTHEN (Tactics.rename_hyp [i, h_hyps_id])
+         (Tactics.move_hyp h_hyps_id Logic.MoveLast)) *)
+  }
+;;
+(* let coq_st = !st.coq_ref in
   (* *)
   let ((_en, pv) : Proofview.entry * Proofview.proofview) =
     Proofview.init !coq_st.coq_ctx []
@@ -1324,15 +1574,21 @@ let proof_test () : unit mm =
              !coq_st.coq_env
              !coq_st.coq_ctx
              (EConstr.to_named_context !coq_st.coq_ctx named_ctx))));
-  (*  *)
-  (* Log.debug
+  (* *)
+  { state = st; value = (Proofview.Goal.enter begin fun gl ->
+    let hyps = Environ.named_context_val (Proofview.Goal.env gl) in
+    
+  end
+    ) } *)
+(*  *)
+(* Log.debug
     (Printf.sprintf
        "mebi_wrapper.proof_test: default_goal => %s"
        (Pp.string_of_ppcmds
           (Goal_select.pr_goal_selector
              (Goal_select.get_default_goal_selector ())))); *)
-  (*  *)
-  (* let p : Proof.t =
+(*  *)
+(* let p : Proof.t =
      Proof.start
      ~name:(Names.Id.of_string "test_proof")
      ~poly:false
@@ -1341,6 +1597,3 @@ let proof_test () : unit mm =
      in
      Log.debug
      (Printf.sprintf "mebi_wrapper.proof_test: is done => %b" (Proof.is_done p)); *)
-  (* *)
-  { state = st; value = () }
-;;
