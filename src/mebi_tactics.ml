@@ -6,10 +6,35 @@ open Mebi_wrapper
    let* first = first in
    return (Proofview.tclTHEN first sec ) *)
 
-let seq (pre : 'a Proofview.tactic option) (x : unit Proofview.tactic)
-  : unit Proofview.tactic
+let seq (pre : 'a Proofview.tactic option)
+  : unit Proofview.tactic -> unit Proofview.tactic
+  = function
+  | x -> (match pre with None -> x | Some y -> Proofview.tclTHEN x y)
+;;
+
+let unfold_constrexpr ?(pre : 'a Proofview.tactic option = None)
+  : Constrexpr.constr_expr -> unit Proofview.tactic mm
+  = function
+  | x ->
+    Log.debug "mebi_tactics.unfold_constrexpr";
+    let open Mebi_wrapper.Syntax in
+    let* y = constrexpr_to_econstr x in
+    let* z = econstr_to_constr y in
+    (match Constr.kind z with
+     | Const (c, _) ->
+       Log.debug "mebi_tactics.unfold_constrexpr, const";
+       return (seq pre (Tactics.unfold_constr (Names.GlobRef.ConstRef c)))
+     | _ ->
+       Log.warning "mebi_tactics.unfold_constrexpr -- not Constr!";
+       return (seq pre (Proofview.tclUNIT ())))
+;;
+
+let bisim_unfold_terms (a : Constrexpr.constr_expr) (b : Constrexpr.constr_expr)
+  : unit Proofview.tactic mm
   =
-  match pre with None -> x | Some y -> Proofview.tclTHEN x y
+  let open Mebi_wrapper.Syntax in
+  let* a = unfold_constrexpr a in
+  unfold_constrexpr ~pre:(Some a) b
 ;;
 
 type unfold_kind =

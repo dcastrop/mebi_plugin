@@ -30,23 +30,51 @@ END *)
 | [ "MeBi_intro" ] -> { Tactics.introduction (Names.Id.of_string_soft "TheH") }
 END *)
 
+(* VERNAC COMMAND EXTEND MeBi_Proof CLASSIFIED AS QUERY
+| ![ proof ]["MeBi_Proof"] -> 
+  { fun ~pstate ->
+
+  }
+END *)
+
+VERNAC COMMAND EXTEND MeBi_cofix CLASSIFIED AS QUERY
+| ![ proof ]["MeBi_cofix"] -> 
+   { fun ~pstate -> 
+      let p = Mebi_wrapper.run ~keep_names:true (
+        let open Mebi_wrapper.Syntax in
+        let* _ = Mebi_wrapper.show_names () in 
+        let* n = Mebi_wrapper.new_name_of_string "TestCofix" in
+        let* _ = Mebi_wrapper.show_names () in 
+        let (p, _b) = Declare.Proof.by (Tactics.cofix (n)) pstate in 
+        Mebi_wrapper.return p ) in 
+      Logging.Log.override "vernac, check names:";
+      let _ = Mebi_wrapper.run ~keep_names:true (
+        let open Mebi_wrapper.Syntax in
+        let* _ = Mebi_wrapper.show_names () in 
+        Mebi_wrapper.return ()) in
+      p
+   }
+END
+
 VERNAC COMMAND EXTEND MeBi_Bisimilarity CLASSIFIED AS QUERY
 | ![ proof ] 
    [ "MeBi_Bisimilarity" constr(x) "With" reference(a) 
                    "And" constr(y) "With" reference(b) ] -> 
-   { fun ~pstate -> Mebi_wrapper.run (
+   { fun ~pstate -> Mebi_wrapper.run ~keep_names:false (
       let open Mebi_wrapper.Syntax in 
+      let* _ = Mebi_wrapper.show_names () in 
       let* t = Command.tactic (Command.Bisimilarity (((x, a), (y, b)), [])) in 
       let (p, _b) = Declare.Proof.by t pstate in
-      Mebi_wrapper.return p
-    )}
+      Mebi_wrapper.return p )
+    }
 
 | ![ proof ] 
    [ "MeBi_Bisimilarity" constr(x) "With" reference(a) 
                    "And" constr(y) "With" reference(b) 
                    "Using" reference_list(rs) ] -> 
-    { fun ~pstate -> Mebi_wrapper.run (
+    { fun ~pstate -> Mebi_wrapper.run ~keep_names:false (
       let open Mebi_wrapper.Syntax in 
+      let* _ = Mebi_wrapper.show_names () in 
       let* t = Command.tactic (Command.Bisimilarity (((x, a), (y, b)), rs)) in 
       let (p, _b) = Declare.Proof.by t pstate in
       Mebi_wrapper.return p
