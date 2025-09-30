@@ -1107,6 +1107,36 @@ let is_none_term (t : term) : bool mm =
   | _ -> return false
 ;;
 
+(****************************************************************************)
+
+let proof_query (pstate : Declare.Proof.t) : Proof.t = Declare.Proof.get pstate
+let proof_partial (p : Proof.t) : EConstr.t list = Proof.partial_proof p
+
+let proof_test () : unit Proofview.tactic mm =
+  fun (st : wrapper ref) ->
+  Log.debug "mebi_wrapper.proof_test";
+  let _h_hyps_id = Names.Id.of_string "TestPacked" in
+  (* *)
+  { state = st
+  ; value =
+      Proofview.Goal.enter (fun gl ->
+        let _hyps = Environ.named_context_val (Proofview.Goal.env gl) in
+        Proofview.tclUNIT ())
+      (* let x = Proofview.Goal.goal gl in
+
+         if Termops.mem_named_context_val h_hyps_id hyps then
+         Proofview.tclTHEN (repackage i h_hyps_id)
+         (Proofview.tclTHEN (Tactics.clear [h_hyps_id; i])
+         (Tactics.introduction h_hyps_id))
+         else
+         Proofview.tclTHEN (package i)
+         (Proofview.tclTHEN (Tactics.rename_hyp [i, h_hyps_id])
+         (Tactics.move_hyp h_hyps_id Logic.MoveLast)) *)
+  }
+;;
+
+(****************************************************************************)
+
 let debug_econstr_kind (t : EConstr.t) : unit mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
@@ -1519,7 +1549,7 @@ let _get_type_of_hyp env id =
       (let open Pp in
        str (Names.Id.to_string id) ++ str " is not a plain hypothesis")
 ;;
-
+(* 
 let proof_test () : unit Proofview.tactic mm =
   fun (st : wrapper ref) ->
   Log.debug "mebi_wrapper.proof_test";
@@ -1541,7 +1571,7 @@ let proof_test () : unit Proofview.tactic mm =
          (Proofview.tclTHEN (Tactics.rename_hyp [i, h_hyps_id])
          (Tactics.move_hyp h_hyps_id Logic.MoveLast)) *)
   }
-;;
+;; *)
 (* let coq_st = !st.coq_ref in
   (* *)
   let ((_en, pv) : Proofview.entry * Proofview.proofview) =

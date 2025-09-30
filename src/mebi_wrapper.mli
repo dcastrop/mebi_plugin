@@ -300,8 +300,12 @@ val make_state_tree_pair_set
   :  wrapper ref
   -> (module Set.S with type elt = E.t * Constr_tree.t) in_context
 
+(* *)
+val proof_query : Declare.Proof.t -> Proof.t
+val proof_partial : Proof.t -> EConstr.t list
 
-
+(*  *)
+val proof_test : unit -> unit Proofview.tactic mm
 
 
 (*  *)
@@ -311,6 +315,3 @@ val debug_term_kind : term -> unit mm
 val debug_constr_kind : Constr.t -> unit mm 
 val debug_term_constr_kind : term -> unit mm 
 
-
-(*  *)
-val proof_test : unit -> unit Proofview.tactic mm

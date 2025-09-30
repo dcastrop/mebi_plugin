@@ -17,7 +17,8 @@ MeBi Reset All.
 MeBi Set ShowAny      True.
 (* MeBi Set ShowNotices  True. *)
 MeBi Set ShowDebug    True.
-MeBi Set ShowDetails  True.
+(* MeBi Set ShowDetails  True. *)
+MeBi Set ShowDetails  False.
 MeBi Set ShowResults  True.
 (* MeBi Set ShowWarnings True. *)
 (* MeBi Set Bound 100. *)
@@ -29,14 +30,17 @@ MeBi Set Weak Option label.
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof.
-  MeBi_ExploreProof.
+  MeBi_Bisimilarity p With termLTS And q With termLTS Using termLTS.
+
+  
+  (* MeBi_ExploreProof.
   MeBi_ExploreProof.
   MeBi_unfold p.
   MeBi_ExploreProof.
   MeBi_ExploreProof.
   MeBi_unfold q.
   MeBi_ExploreProof.
-  MeBi_ExploreProof.
+  MeBi_ExploreProof. *)
 
   (* unfold p.  *)
 
