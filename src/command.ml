@@ -1086,10 +1086,7 @@ let tactic (k : tactic_kind) : unit Proofview.tactic mm =
       | _ -> return ()
     in
     Log.debug "command.tactic, - - - - - - - - - - - - - - -\n";
-    Log.debug "command.tactic: unfold x";
-    let* u1 = Mebi_tactics.unfold () (Mebi_tactics.Ce x) in
-    Log.debug "command.tactic: unfold y";
-    let* u2 = Mebi_tactics.unfold () (Mebi_tactics.Ce y) in
-    return (Proofview.tclTHEN u1 u2)
+    let* r = Mebi_tactics.bisim_unfold_terms x y in
+    return r
 ;;
 (* return () *)

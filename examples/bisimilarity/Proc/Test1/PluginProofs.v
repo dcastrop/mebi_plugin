@@ -31,7 +31,11 @@ MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof.
   MeBi_Bisimilarity p With termLTS And q With termLTS Using termLTS.
-
+  MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.cofix".
+  MeBi_cofix.
+  MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.cofix".
+  (* MeBi_cofix. *)
+  Fail MeBi_cofix.
   
   (* MeBi_ExploreProof.
   MeBi_ExploreProof.

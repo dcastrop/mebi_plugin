@@ -5,6 +5,7 @@ type term = EConstr.t
 type coq_context =
   { coq_env : Environ.env
   ; coq_ctx : Evd.evar_map
+  ; names : Names.Id.Set.t
   }
 
 val the_coq_env_opt : Environ.env ref option ref
@@ -109,7 +110,7 @@ type 'a in_context =
 
 type 'a mm = wrapper ref -> 'a in_context
 
-val run : ?keep_encoding:bool -> 'a mm -> 'a
+val run : ?keep_encoding:bool -> ?keep_names:bool -> 'a mm -> 'a
 val return : 'a -> 'a mm
 val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
 val map : ('a -> 'b) -> 'a mm -> 'b mm
@@ -197,6 +198,7 @@ val invalid_check_updated_ctx
 
 val get_env : wrapper ref -> Environ.env in_context
 val get_sigma : wrapper ref -> Evd.evar_map in_context
+val get_names : wrapper ref -> Names.Id.Set.t in_context
 val get_fwd_enc : wrapper ref -> E.t F.t in_context
 val get_bck_enc : wrapper ref -> term B.t in_context
 
@@ -207,6 +209,9 @@ val state
 
 val sandbox : 'a mm -> wrapper ref -> 'a in_context
 val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit mm
+
+val show_names : unit -> unit mm
+val new_name_of_string: string -> Names.variable mm
 
 module type MEBI_MONAD_SYNTAX = sig
   val ( let+ ) : 'a mm -> ('a -> 'b) -> 'b mm

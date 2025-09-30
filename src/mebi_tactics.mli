@@ -1,11 +1,29 @@
+val seq :
+  unit Proofview.tactic option ->
+  unit Proofview.tactic ->
+  unit Proofview.tactic
+
+val unfold_constrexpr :
+  ?pre:unit Proofview.tactic option ->
+  Constrexpr.constr_expr ->
+  unit Proofview.tactic Mebi_wrapper.mm
+
+val bisim_unfold_terms :
+  Constrexpr.constr_expr ->
+  Constrexpr.constr_expr ->
+  unit Proofview.tactic Mebi_wrapper.mm
+
 type unfold_kind =
   | Gr of Names.GlobRef.t
   | Id of Names.variable
-  | Ex of EConstr.t
+  | Ex of Evd.econstr
   | Ce of Constrexpr.constr_expr
 
-val unfold : ?pre:unit Proofview.tactic option -> unit ->
-  unfold_kind -> unit Proofview.tactic Mebi_wrapper.mm
+val unfold :
+  ?pre:unit Proofview.tactic option ->
+  unit ->
+  unfold_kind ->
+  unit Proofview.tactic Mebi_wrapper.mm
 
 val unknown_counter : int ref
 val new_auto_name : ?prefix:string -> unit -> string
@@ -16,7 +34,15 @@ type id_kind =
   | Str of string
   | Unk of unit
 
-val intro : ?pre:unit Proofview.tactic option -> unit -> id_kind -> unit Proofview.tactic
+val intro :
+  ?pre:unit Proofview.tactic option ->
+  unit ->
+  id_kind ->
+  unit Proofview.tactic
 
 val intros :
-  ?all:bool -> ?pre:unit Proofview.tactic option -> unit -> id_kind list -> unit Proofview.tactic
+  ?all:bool ->
+  ?pre:unit Proofview.tactic option ->
+  unit ->
+  id_kind list ->
+  unit Proofview.tactic
