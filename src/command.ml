@@ -1018,13 +1018,78 @@ let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
 
 (* let () = Logging.set_output_mode (Coq ()) *)
 
-type tactic_kind = ProofTest of unit
+type tactic_kind =
+  | ProofTest of unit
+  | Bisimilarity of ((coq_model * coq_model) * Libnames.qualid list)
 
 let tactic (k : tactic_kind) : unit Proofview.tactic mm =
   Log.debug "command.tactic";
+  let* graphM : (module GraphB) = make_graph_builder in
+  let module G = (val graphM) in
+  let build_lts_graph
+        (primary_lts : Libnames.qualid)
+        (t : Constrexpr.constr_expr)
+        (params : int * Params.WeakEnc.t option)
+        (refs : Libnames.qualid list)
+    : Lts.t mm
+    =
+    Log.debug "command.run.build_lts_graph";
+    let* graph_lts =
+      G.build_graph
+        primary_lts
+        t
+        (Mebi_utils.ref_list_to_glob_list (primary_lts :: refs))
+        params
+    in
+    if
+      !Params.the_fail_if_incomplete
+      && Bool.not (Queue.is_empty graph_lts.to_visit)
+    then params_fail_if_incomplete ()
+    else
+      G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts params
+  in
+  let* _ = Params.obtain_weak_kinds_from_args () in
   match k with
   | ProofTest () ->
     Log.debug "command.tactic, ProofTest";
     Mebi_wrapper.proof_test ()
+  | Bisimilarity (((x, a), (y, b)), refs) ->
+    Log.debug "command.tactic, Bisimilarity";
+    if is_details_enabled () then Params.printout_weak_mode ();
+    Mebi_help.show_instructions_to_toggle_weak !Params.the_weak_mode;
+    let* the_lts_1 = build_lts_graph a x (Params.get_fst_params ()) refs in
+    let* the_lts_2 = build_lts_graph b y (Params.get_snd_params ()) refs in
+    let the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
+    let the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
+    Log.details
+      (Printf.sprintf
+         "command.tactic, CheckBisimilarity:\nFSM 1: %s\n\nFSM 2: %s\n"
+         (Fsm.to_string the_fsm_1)
+         (Fsm.to_string the_fsm_2));
+    let the_bisimilar =
+      Algorithms.run (Bisim (!Params.the_weak_mode, (the_fsm_1, the_fsm_2)))
+    in
+    Log.result
+      (Printf.sprintf
+         "command.tactic, CheckBisimilarity, finished: %s\n"
+         (Algorithms.pstr the_bisimilar));
+    if !Params.the_dump_to_file
+    then Log.debug "command.tactic, CheckBisimilarity -- TODO dump to file\n";
+    let* _ =
+      match the_bisimilar with
+      | Bisim b ->
+        if
+          !Params.the_fail_if_not_bisim
+          && Bool.not (Algorithms.bisim_result_to_bool b)
+        then params_fail_if_not_bisim ()
+        else return ()
+      | _ -> return ()
+    in
+    Log.debug "command.tactic, - - - - - - - - - - - - - - -\n";
+    Log.debug "command.tactic: unfold x";
+    let* u1 = Mebi_tactics.unfold () (Mebi_tactics.Ce x) in
+    Log.debug "command.tactic: unfold y";
+    let* u2 = Mebi_tactics.unfold () (Mebi_tactics.Ce y) in
+    return (Proofview.tclTHEN u1 u2)
 ;;
 (* return () *)

@@ -4,7 +4,7 @@ type unfold_kind =
   | Ex of EConstr.t
   | Ce of Constrexpr.constr_expr
 
-val unfold :
+val unfold : ?pre:unit Proofview.tactic option -> unit ->
   unfold_kind -> unit Proofview.tactic Mebi_wrapper.mm
 
 val unknown_counter : int ref
@@ -16,7 +16,7 @@ type id_kind =
   | Str of string
   | Unk of unit
 
-val intro : id_kind -> unit Proofview.tactic
+val intro : ?pre:unit Proofview.tactic option -> unit -> id_kind -> unit Proofview.tactic
 
 val intros :
-  ?all:bool -> unit -> id_kind list -> unit Proofview.tactic
+  ?all:bool -> ?pre:unit Proofview.tactic option -> unit -> id_kind list -> unit Proofview.tactic

@@ -18,5 +18,6 @@ val run :  command_kind-> Libnames.qualid list-> unit Mebi_wrapper.mm
 
 type tactic_kind = 
   | ProofTest of unit
+  | Bisimilarity of ((coq_model * coq_model) * Libnames.qualid list)
 
 val tactic :  tactic_kind-> unit Proofview.tactic Mebi_wrapper.mm 

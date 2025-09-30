@@ -30,6 +30,29 @@ END *)
 | [ "MeBi_intro" ] -> { Tactics.introduction (Names.Id.of_string_soft "TheH") }
 END *)
 
+VERNAC COMMAND EXTEND MeBi_Bisimilarity CLASSIFIED AS QUERY
+| ![ proof ] 
+   [ "MeBi_Bisimilarity" constr(x) "With" reference(a) 
+                   "And" constr(y) "With" reference(b) ] -> 
+   { fun ~pstate -> Mebi_wrapper.run (
+      let open Mebi_wrapper.Syntax in 
+      let* t = Command.tactic (Command.Bisimilarity (((x, a), (y, b)), [])) in 
+      let (p, _b) = Declare.Proof.by t pstate in
+      Mebi_wrapper.return p
+    )}
+
+| ![ proof ] 
+   [ "MeBi_Bisimilarity" constr(x) "With" reference(a) 
+                   "And" constr(y) "With" reference(b) 
+                   "Using" reference_list(rs) ] -> 
+    { fun ~pstate -> Mebi_wrapper.run (
+      let open Mebi_wrapper.Syntax in 
+      let* t = Command.tactic (Command.Bisimilarity (((x, a), (y, b)), rs)) in 
+      let (p, _b) = Declare.Proof.by t pstate in
+      Mebi_wrapper.return p
+    )}
+
+END
 
 (*** Exploring proof state ***)
 
@@ -52,9 +75,9 @@ VERNAC COMMAND EXTEND MeBi_ExploreProof CLASSIFIED AS QUERY
 END
 
 TACTIC EXTEND MeBi_unfold
-| ["MeBi_unfold" reference(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold (Mebi_tactics.Gr x))}
-| ["MeBi_unfold" constr(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold (Mebi_tactics.Ex x))}
-| ["MeBi_unfold" ident(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold (Mebi_tactics.Id x))}
+| ["MeBi_unfold" reference(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold () (Mebi_tactics.Gr x))}
+| ["MeBi_unfold" constr(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold () (Mebi_tactics.Ex x))}
+| ["MeBi_unfold" ident(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold () (Mebi_tactics.Id x))}
 END
 
 TACTIC EXTEND MeBi_intros
@@ -72,15 +95,15 @@ TACTIC EXTEND MeBi_intros_only
 END
 
 TACTIC EXTEND MeBi_intro
-| ["MeBi_intro"] -> {Mebi_tactics.intro (Mebi_tactics.Unk ())}
-| ["MeBi_intro" string(s)] -> {Mebi_tactics.intro (Mebi_tactics.Str s)}
-| ["MeBi_intro" ident(i)] -> {Mebi_tactics.intro (Mebi_tactics.Id i)}
+| ["MeBi_intro"] -> {Mebi_tactics.intro () (Mebi_tactics.Unk ())}
+| ["MeBi_intro" string(s)] -> {Mebi_tactics.intro () (Mebi_tactics.Str s)}
+| ["MeBi_intro" ident(i)] -> {Mebi_tactics.intro () (Mebi_tactics.Id i)}
 END
 
 TACTIC EXTEND MeBiTactic
-| ["MeBi" "ProofTest0"] -> {Mebi_tactics.intro (Mebi_tactics.Unk ())}
-| ["MeBi" "ProofTest0" string(s)] -> {Mebi_tactics.intro (Mebi_tactics.Str s)}
-| ["MeBi" "ProofTest0" ident(i)] -> {Mebi_tactics.intro (Mebi_tactics.Id i)}
+| ["MeBi" "ProofTest0"] -> {Mebi_tactics.intro () (Mebi_tactics.Unk ())}
+| ["MeBi" "ProofTest0" string(s)] -> {Mebi_tactics.intro () (Mebi_tactics.Str s)}
+| ["MeBi" "ProofTest0" ident(i)] -> {Mebi_tactics.intro () (Mebi_tactics.Id i)}
 | ["MeBi" "ProofTest1"] -> {Proofview.tclUNIT ()}
 | ["MeBi" "ProofTest2"] -> {Mebi_wrapper.run (Command.tactic (Command.ProofTest ()) )}
 (* | [ "pack" "hypothesis" ident(i) ] ->{ Tuto_tactic.pack_tactic i } *)
