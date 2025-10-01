@@ -37,6 +37,25 @@ END *)
   }
 END *)
 
+(* NOTE: vernac states: 
+https://data.code.gouv.fr/hosts/GitHub/repositories/coq%2Fplatform?sha=V8.17.0&path=coqpp%2Fcoqpp_main.ml 
+
+let understand_state = function
+  | "close_proof" -> "vtcloseproof", false
+  | "open_proof" -> "vtopenproof", true
+  | "proof" -> "vtmodifyproof", false
+  | "proof_opt_query" -> "vtreadproofopt", false
+  | "proof_query" -> "vtreadproof", false
+  | "read_program" -> "vtreadprogram", false
+  | "program" -> "vtmodifyprogram", false
+  | "declare_program" -> "vtdeclareprogram", false
+  | "program_interactive" -> "vtopenproofprogram", false
+  | s -> fatal ("unsupported state specifier: " ^ s) 
+
+
+*)
+
+(* NOTE: ![proof] is modify state: https://rocq-prover.org/doc/V8.20.0/api/coq-core/Vernactypes/index.html#val-vtmodifyproof  *)
 VERNAC COMMAND EXTEND MeBi_cofix CLASSIFIED AS QUERY
 | ![ proof ]["MeBi_cofix"] -> 
    { fun ~pstate -> 
