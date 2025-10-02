@@ -22,20 +22,23 @@ type coq_context =
 (* *)
 let the_proofv_opt : proof_context option ref option ref = ref None
 
-let new_proofv
-      ?(names : Names.Id.Set.t = Names.Id.Set.empty)
-      (proof : Declare.Proof.t)
+let new_proofv (proof : Declare.Proof.t) (names : Names.Id.Set.t)
   : proof_context option ref
   =
-  Log.debug "mebi_wrapper.new_proofv: Created new proofv.";
+  Log.trace "mebi_wrapper.new_proofv: Created new proofv.";
   let the_proofv : proof_context option ref = ref (Some { proof; names }) in
   the_proofv_opt := Some the_proofv;
   the_proofv
 ;;
 
-let the_coq_proofv ?(proof : Declare.Proof.t option = None) ()
+let the_coq_proofv
+      ?(proof : Declare.Proof.t option = None)
+      ?(names : Names.Id.Set.t option = None)
+      ()
   : proof_context option ref
   =
+  let new_names = match names with None -> Names.Id.Set.empty | Some s -> s in
+  Log.trace "mebi_wrapper.the_coq_proofv";
   match proof with
   | None ->
     (match !the_proofv_opt with
@@ -44,12 +47,24 @@ let the_coq_proofv ?(proof : Declare.Proof.t option = None) ()
   | Some proof ->
     (match !the_proofv_opt with
      | None ->
-       Log.debug "mebi_wrapper.the_coq_proofv, is Some and have None";
-       new_proofv proof
-     | Some _old_proof ->
-       Log.warning "mebi_wrapper.the_coq_proofv, both Some, overriding.";
-       Log.debug "mebi_wrapper.the_coq_proofv, carry over names?";
-       new_proofv proof)
+       Log.debug
+         "mebi_wrapper.the_coq_proofv, initialising new proof (new names).";
+       new_proofv proof new_names
+     | Some old_proofv ->
+       (match !old_proofv with
+        | None ->
+          Log.debug "mebi_wrapper.the_coq_proofv, overriding proof (new names).";
+          new_proofv proof new_names
+        | Some old_proofv ->
+          (match names with
+           | None ->
+             Log.debug
+               "mebi_wrapper.the_coq_proofv, overriding proof (empty names).";
+             new_proofv proof Names.Id.Set.empty
+           | Some s ->
+             Log.debug
+               "mebi_wrapper.the_coq_proofv, overriding proof (old names).";
+             new_proofv proof s)))
 ;;
 
 (** *)
@@ -218,6 +233,7 @@ let run
       (x : 'a mm)
   : 'a
   =
+  Log.trace "mebi_wrapper.run";
   let coq_env : Environ.env = !(the_coq_env ~fresh ()) in
   let coq_ctx : Evd.evar_map = !(the_coq_ctx ()) in
   let proofv : proof_context option = !(the_coq_proofv ~proof ()) in
@@ -271,6 +287,21 @@ let rec iterate
 (****** GET & PUT STATE *********************)
 (********************************************)
 
+let set_proof (new_proof : Declare.Proof.t) (st : wrapper ref) : unit in_context
+  =
+  Log.trace "mebi_wrapper.set_proof";
+  let coq_st = !st.coq_ref in
+  let names =
+    match !coq_st.proofv with
+    | None -> Some Names.Id.Set.empty
+    | Some proofv -> Some proofv.names
+  in
+  let proofv = !(the_coq_proofv ~proof:(Some new_proof) ~names ()) in
+  coq_st := { !coq_st with proofv };
+  st := { !st with coq_ref = coq_st };
+  { state = st; value = () }
+;;
+
 let get_env (st : wrapper ref) : Environ.env in_context =
   let coq_st = !st.coq_ref in
   { state = st; value = !coq_st.coq_env }
@@ -318,6 +349,20 @@ let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
     sigma, ())
 ;;
 
+let show_proof () : unit mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  (match !coq_st.proofv with
+   | None -> Log.debug "mebi_wrapper.show_proof, proofv is None"
+   | Some proofv ->
+     Log.debug
+       (Printf.sprintf
+          "mebi_wrapper.show_proof: %s"
+          (Pp.string_of_ppcmds
+             (Proof.pr_proof (Declare.Proof.get proofv.proof)))));
+  { state = st; value = () }
+;;
+
 let show_names () : unit mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
@@ -327,15 +372,20 @@ let show_names () : unit mm =
      Log.debug
        (Printf.sprintf
           "mebi_wrapper.show_names: %s"
-          (if Names.Id.Set.is_empty proofv.names then "[ ] (empty)" else ""));
-     Names.Id.Set.iter
-       (fun (n : Names.Id.t) ->
-         Log.debug
-           (Printf.sprintf
-              "%s : %s"
-              (Names.Id.to_string n)
-              (Pp.string_of_ppcmds (Names.Id.print n))))
-       proofv.names);
+          (if Names.Id.Set.is_empty proofv.names
+           then "[ ] (empty)"
+           else
+             Printf.sprintf
+               "[%s\n]"
+               (Names.Id.Set.fold
+                  (fun (n : Names.Id.t) (acc : string) ->
+                    Printf.sprintf
+                      "%s\n\t%s : %s"
+                      acc
+                      (Names.Id.to_string n)
+                      (Pp.string_of_ppcmds (Names.Id.print n)))
+                  proofv.names
+                  ""))));
   { state = st; value = () }
 ;;
 
@@ -410,58 +460,6 @@ let new_evar_of_econstr (t : EConstr.t) : EConstr.t mm =
 ;;
 
 let new_evar_of_term (t : term) : term mm = new_evar_of_econstr t
-
-(* names *)
-let new_name_of_string (s : string) : Names.Id.t mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  match !coq_st.proofv with
-  | None ->
-    Log.warning "mebi_wrapper.new_name_of_string st.coq_st.proofv is None";
-    assert false
-  | Some proofv ->
-    let n : Names.Id.t = Names.Id.of_string s in
-    let n' : Names.Id.t = Namegen.next_ident_away n proofv.names in
-    Log.debug
-      (Printf.sprintf
-         "mebi_wrapper.new_name_of_string, A:\n\
-          - (mem:%b) n  = %s\n\
-          - (mem:%b) n' = %s\n\
-          - n = n' => %b\n"
-         (Names.Id.Set.mem n proofv.names)
-         (Names.Id.to_string n)
-         (Names.Id.Set.mem n' proofv.names)
-         (Names.Id.to_string n')
-         (Names.Id.equal n n'));
-    (* let names =  in *)
-    proofv.names <- Names.Id.Set.add n' proofv.names;
-    coq_st := { !coq_st with proofv = Some proofv };
-    Log.debug
-      (Printf.sprintf
-         "mebi_wrapper.new_name_of_string, B:\n\
-          - (mem:%b) n  = %s\n\
-          - (mem:%b) n' = %s\n\
-          - n = n' => %b\n"
-         (Names.Id.Set.mem n proofv.names)
-         (Names.Id.to_string n)
-         (Names.Id.Set.mem n' proofv.names)
-         (Names.Id.to_string n')
-         (Names.Id.equal n n'));
-    let m : Names.Id.t = Namegen.next_ident_away n proofv.names in
-    Log.debug
-      (Printf.sprintf
-         "mebi_wrapper.new_name_of_string, C:\n\
-          - (mem:%b) n = %s\n\
-          - (mem:%b) m = %s\n\
-          - n = m => %b\n"
-         (Names.Id.Set.mem n proofv.names)
-         (Names.Id.to_string n)
-         (Names.Id.Set.mem m proofv.names)
-         (Names.Id.to_string m)
-         (Names.Id.equal n m));
-    (* st := { !st with coq_ref = coq_st }; *)
-    { state = st; value = n' }
-;;
 
 (********************************************)
 (****** SYNTAX ******************************)
@@ -611,6 +609,7 @@ let econstr_rel_decl_list_to_string (xs : EConstr.rel_declaration list) : string
 
 module type ERROR_TYPE = sig
   type mebi_error =
+    | ProofvIsNone of unit
     | ParamsFailIfIncomplete of unit
     | ParamsFailIfNotBisim of unit
     | InvalidLTSArgsLength of int
@@ -633,6 +632,7 @@ module type ERROR_TYPE = sig
 
   exception MEBI_exn of mebi_error
 
+  val proofv_is_none : unit -> exn
   val params_fail_if_incomplete : unit -> exn
   val params_fail_if_not_bisim : unit -> exn
   val invalid_lts_args_length : int -> exn
@@ -669,6 +669,7 @@ end
 
 module Error : ERROR_TYPE = struct
   type mebi_error =
+    | ProofvIsNone of unit
     | ParamsFailIfIncomplete of unit
     | ParamsFailIfNotBisim of unit
     | InvalidLTSArgsLength of int
@@ -691,6 +692,7 @@ module Error : ERROR_TYPE = struct
 
   exception MEBI_exn of mebi_error
 
+  let proofv_is_none () = MEBI_exn (ProofvIsNone ())
   let params_fail_if_incomplete () = MEBI_exn (ParamsFailIfIncomplete ())
   let params_fail_if_not_bisim () = MEBI_exn (ParamsFailIfNotBisim ())
 
@@ -737,6 +739,7 @@ module Error : ERROR_TYPE = struct
   open Pp
 
   let mebi_handler = function
+    | ProofvIsNone () -> str "Tried to access contents of proofv which is None."
     | ParamsFailIfIncomplete () ->
       str
         "Params are configured to fail if cannot construct complete LTS from \
@@ -876,6 +879,10 @@ end
 (**********************************)
 (****** ERROR FUNCTIONS ***********)
 (**********************************)
+
+let proofv_is_none () : 'a mm =
+  fun (st : wrapper ref) -> raise (Error.proofv_is_none ())
+;;
 
 let params_fail_if_incomplete () : 'a mm =
   fun (st : wrapper ref) -> raise (Error.params_fail_if_incomplete ())
@@ -1065,35 +1072,6 @@ let decode_map (m : 'a B.t) : 'a F.t mm =
 ;;
 
 (********************************************)
-(****** UTILS *******************************)
-(********************************************)
-
-let debug_encoding () : unit mm =
-  fun (st : wrapper ref) ->
-  if Int.equal 0 (F.length !st.fwd_enc)
-  then (
-    Logging.Log.debug "mebi_wrapper.debug_encoding, fwd encoding is empty";
-    if Int.equal 0 (B.length !st.bck_enc)
-    then Logging.Log.debug "mebi_wrapper.debug_encoding, bck encoding is empty"
-    else
-      B.iter
-        (fun (enc : E.t) (t : term) ->
-          Logging.Log.debug
-            (Printf.sprintf
-               "(%s) => %s "
-               (E.to_string enc)
-               (econstr_to_string t)))
-        !st.bck_enc)
-  else
-    F.iter
-      (fun (t : term) (enc : E.t) ->
-        Logging.Log.debug
-          (Printf.sprintf "(%s) => %s " (E.to_string enc) (econstr_to_string t)))
-      !st.fwd_enc;
-  { state = st; value = () }
-;;
-
-(********************************************)
 (****** COQ CONSTR TREE *********************)
 (********************************************)
 
@@ -1233,35 +1211,229 @@ let is_none_term (t : term) : bool mm =
   | _ -> return false
 ;;
 
-(****************************************************************************)
+(**********************************)
+(****** COQ PROOF THEORIES ********)
+(**********************************)
+(* source: https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto3/src/tuto_tactic.ml *)
 
-let proof_query (pstate : Declare.Proof.t) : Proof.t = Declare.Proof.get pstate
-let proof_partial (p : Proof.t) : EConstr.t list = Proof.partial_proof p
+(* In the environment of the goal, we can get the type of an assumption
+   directly by a lookup.  The other solution is to call a low-cost retyping
+   function like *)
+let get_type_of_hyp (id : Names.Id.t) : EConstr.t mm =
+  let open Syntax in
+  let* env = get_env in
+  match EConstr.lookup_named id env with
+  | Context.Named.Declaration.LocalAssum (_pbinder_annot, ty) ->
+    Log.debug
+      (Printf.sprintf
+         "mebi_wrapper.get_type_of_hyp, LocalAssum: %s"
+         (econstr_to_string ty));
+    return ty
+  | Context.Named.Declaration.LocalDef (_pbinder_annot, _constr, ty) ->
+    Log.debug
+      (Printf.sprintf
+         "mebi_wrapper.get_type_of_hyp, LocalDef: %s := %s"
+         (econstr_to_string ty)
+         (econstr_to_string _constr));
+    return ty
+;;
 
-let proof_test () : unit Proofview.tactic mm =
-  fun (st : wrapper ref) ->
-  Log.debug "mebi_wrapper.proof_test";
-  let _h_hyps_id = Names.Id.of_string "TestPacked" in
-  (* *)
+(**********************************)
+(****** COQ PROOF CONTEXT *********)
+(**********************************)
+
+let get_proof () : Declare.Proof.t mm =
+  Log.trace "mebi_wrapper.get_proof";
+  let open Syntax in
+  let* proofv : proof_context option = get_proofv in
+  match proofv with
+  | None -> proofv_is_none ()
+  | Some proofv -> return proofv.proof
+;;
+
+let get_proof_names () : Names.Id.Set.t mm =
+  Log.trace "mebi_wrapper.get_proof_names";
+  let open Syntax in
+  let* proofv : proof_context option = get_proofv in
+  match proofv with
+  | None -> proofv_is_none ()
+  | Some proofv -> return proofv.names
+;;
+
+let update_names
+      ?(replace : bool = false)
+      (new_names : Names.Id.Set.t)
+      (st : wrapper ref)
+  : unit in_context
+  =
+  let coq_st = !st.coq_ref in
+  match !coq_st.proofv with
+  | None ->
+    Log.warning "mebi_wrapper.update_names, proofv is None (do nothing)";
+    { state = st; value = () }
+  | Some proofv ->
+    proofv.names
+    <- (if replace then new_names else Names.Id.Set.union proofv.names new_names);
+    { state = st; value = () }
+;;
+
+let add_name (name : Names.Id.t) (st : wrapper ref) : unit in_context =
+  let coq_st = !st.coq_ref in
+  match !coq_st.proofv with
+  | None ->
+    Log.warning "mebi_wrapper.add_name, proofv is None (do nothing)";
+    { state = st; value = () }
+  | Some proofv ->
+    proofv.names <- Names.Id.Set.add name proofv.names;
+    { state = st; value = () }
+;;
+
+(**********************************)
+(****** COQ PROOF NAMES ***********)
+(**********************************)
+
+let next_name_of (n : Names.Id.t) : Names.Id.t mm =
+  let open Syntax in
+  let* names = get_proof_names () in
+  return (Namegen.next_ident_away n names)
+;;
+
+let new_name_of_string ?(add : bool = true) (s : string) : Names.Id.t mm =
+  Log.trace "mebi_wrapper.new_name_of_string";
+  let open Syntax in
+  let* name = next_name_of (Names.Id.of_string s) in
+  let* _ = show_names () in
+  let* _ = if add then add_name name else return () in
+  let* _ = show_names () in
+  return name
+;;
+
+(**********************************)
+(****** COQ PROOF TACTICS *********)
+(**********************************)
+
+let update_proof_by_tactic (t : unit Proofview.tactic) : unit mm =
+  Log.trace "mebi_wrapper.update_proof_by_tactic";
+  let open Syntax in
+  let* the_proof = get_proof () in
+  let new_proof, is_safe_tactic = Declare.Proof.by t the_proof in
+  if Bool.not is_safe_tactic
+  then Log.warning "mebi_wrapper.update_proof_by_tactic, unsafe tactic used";
+  let* _ = set_proof new_proof in
+  return ()
+;;
+
+let update_proof_by_tactic_mm (t : unit Proofview.tactic mm) : unit mm =
+  let open Syntax in
+  let* t = t in
+  update_proof_by_tactic t
+;;
+
+let rec update_proof_by_tactics : unit Proofview.tactic list -> unit mm
+  = function
+  | [] -> return ()
+  | h :: t ->
+    let open Syntax in
+    let* _ = update_proof_by_tactic h in
+    update_proof_by_tactics t
+;;
+
+(* NOTE: same as above, but for list of elems wrapped in [mm] *)
+let rec update_proof_by_tactics_mm : unit Proofview.tactic mm list -> unit mm
+  = function
+  | [] -> return ()
+  | h :: t ->
+    let open Syntax in
+    let* _ = update_proof_by_tactic_mm h in
+    update_proof_by_tactics_mm t
+;;
+
+(* TODO: [Declare.Proof.by tac proofv.proof] *)
+(* TODO: [Declare.Proof.get proofv.proof -> Proof.] *)
+
+(* TODO: [Proofview.tactic?] swap between them all *)
+
+(********************************************)
+(****** GRAPH *******************************)
+(********************************************)
+
+let make_transition_tbl (st : wrapper ref)
+  : (module Hashtbl.S with type key = E.t) in_context
+  =
+  let eqf = E.eq in
+  let hashf = E.hash in
+  let module TransitionTbl =
+    Hashtbl.Make (struct
+      type t = E.t
+
+      let equal t1 t2 = eqf t1 t2
+      let hash t = hashf t
+    end)
+  in
+  { state = st; value = (module TransitionTbl : Hashtbl.S with type key = E.t) }
+;;
+
+let make_state_set (st : wrapper ref)
+  : (module Set.S with type elt = E.t) in_context
+  =
+  let comparef = E.compare in
+  let module StateSet =
+    Set.Make (struct
+      type t = E.t
+
+      let compare t1 t2 = comparef t1 t2
+    end)
+  in
+  { state = st; value = (module StateSet : Set.S with type elt = E.t) }
+;;
+
+let make_state_tree_pair_set (st : wrapper ref)
+  : (module Set.S with type elt = E.t * Constr_tree.t) in_context
+  =
+  let module PairSet =
+    Set.Make (struct
+      type t = E.t * Constr_tree.t
+
+      let compare t1 t2 =
+        match E.compare (fst t1) (fst t2) with
+        | 0 -> Constr_tree.compare (snd t1) (snd t2)
+        | c -> c
+      ;;
+    end)
+  in
   { state = st
-  ; value =
-      Proofview.Goal.enter (fun gl ->
-        let _hyps = Environ.named_context_val (Proofview.Goal.env gl) in
-        Proofview.tclUNIT ())
-      (* let x = Proofview.Goal.goal gl in
-
-         if Termops.mem_named_context_val h_hyps_id hyps then
-         Proofview.tclTHEN (repackage i h_hyps_id)
-         (Proofview.tclTHEN (Tactics.clear [h_hyps_id; i])
-         (Tactics.introduction h_hyps_id))
-         else
-         Proofview.tclTHEN (package i)
-         (Proofview.tclTHEN (Tactics.rename_hyp [i, h_hyps_id])
-         (Tactics.move_hyp h_hyps_id Logic.MoveLast)) *)
+  ; value = (module PairSet : Set.S with type elt = E.t * Constr_tree.t)
   }
 ;;
 
-(****************************************************************************)
+(********************************************)
+(****** DEBUG *******************************)
+(********************************************)
+
+let debug_encoding () : unit mm =
+  fun (st : wrapper ref) ->
+  if Int.equal 0 (F.length !st.fwd_enc)
+  then (
+    Logging.Log.debug "mebi_wrapper.debug_encoding, fwd encoding is empty";
+    if Int.equal 0 (B.length !st.bck_enc)
+    then Logging.Log.debug "mebi_wrapper.debug_encoding, bck encoding is empty"
+    else
+      B.iter
+        (fun (enc : E.t) (t : term) ->
+          Logging.Log.debug
+            (Printf.sprintf
+               "(%s) => %s "
+               (E.to_string enc)
+               (econstr_to_string t)))
+        !st.bck_enc)
+  else
+    F.iter
+      (fun (t : term) (enc : E.t) ->
+        Logging.Log.debug
+          (Printf.sprintf "(%s) => %s " (E.to_string enc) (econstr_to_string t)))
+      !st.fwd_enc;
+  { state = st; value = () }
+;;
 
 let debug_econstr_kind (t : EConstr.t) : unit mm =
   fun (st : wrapper ref) ->
@@ -1446,239 +1618,14 @@ let debug_term_constr_kind (t : term) : unit mm =
   debug_constr_kind t
 ;;
 
-(********************************************)
-(****** GRAPH *******************************)
-(********************************************)
-
-let make_transition_tbl (st : wrapper ref)
-  : (module Hashtbl.S with type key = E.t) in_context
-  =
-  let eqf = E.eq in
-  let hashf = E.hash in
-  let module TransitionTbl =
-    Hashtbl.Make (struct
-      type t = E.t
-
-      let equal t1 t2 = eqf t1 t2
-      let hash t = hashf t
-    end)
-  in
-  { state = st; value = (module TransitionTbl : Hashtbl.S with type key = E.t) }
-;;
-
-let make_state_set (st : wrapper ref)
-  : (module Set.S with type elt = E.t) in_context
-  =
-  let comparef = E.compare in
-  let module StateSet =
-    Set.Make (struct
-      type t = E.t
-
-      let compare t1 t2 = comparef t1 t2
-    end)
-  in
-  { state = st; value = (module StateSet : Set.S with type elt = E.t) }
-;;
-
-let make_state_tree_pair_set (st : wrapper ref)
-  : (module Set.S with type elt = E.t * Constr_tree.t) in_context
-  =
-  let module PairSet =
-    Set.Make (struct
-      type t = E.t * Constr_tree.t
-
-      let compare t1 t2 =
-        match E.compare (fst t1) (fst t2) with
-        | 0 -> Constr_tree.compare (snd t1) (snd t2)
-        | c -> c
-      ;;
-    end)
-  in
-  { state = st
-  ; value = (module PairSet : Set.S with type elt = E.t * Constr_tree.t)
-  }
-;;
-
 (****************************************************************************)
 
-(* source: https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto3/src/tuto_tactic.ml *)
+let proof_query (pstate : Declare.Proof.t) : Proof.t = Declare.Proof.get pstate
+let proof_partial (p : Proof.t) : EConstr.t list = Proof.partial_proof p
 
-(* todo: move to monad *)
-let constants = ref ([] : EConstr.t list)
-
-(* This is a pattern to collect terms from the Coq memory of valid terms
-   and proofs.  This pattern extends all the way to the definition of function
-   c_U *)
-let collect_bisimilarity_theories () =
-  match !constants with
-  | [] ->
-    let open Names in
-    let open EConstr in
-    let open UnivGen in
-    let find_reference path id =
-      let path = DirPath.make (List.rev_map Id.of_string path) in
-      let fp = Libnames.make_path path (Id.of_string id) in
-      Nametab.global_of_path fp
-    in
-    (* let gr_M = find_reference ["theories"; "Bisimilarity"] "M" in *)
-    (* let gr_A = find_reference ["theories"; "Bisimilarity"] "A" in *)
-    let gr_LTS = find_reference [ "theories"; "Bisimilarity" ] "LTS" in
-    let gr_tau = find_reference [ "theories"; "Bisimilarity" ] "tau" in
-    let gr_silent = find_reference [ "theories"; "Bisimilarity" ] "silent" in
-    let gr_silent1 = find_reference [ "theories"; "Bisimilarity" ] "silent1" in
-    let gr_weak = find_reference [ "theories"; "Bisimilarity" ] "weak" in
-    let gr_simF = find_reference [ "theories"; "Bisimilarity" ] "simF" in
-    let gr_weak_sim =
-      find_reference [ "theories"; "Bisimilarity" ] "weak_sim"
-    in
-    let gr_Pack_sim =
-      find_reference [ "theories"; "Bisimilarity" ] "Pack_sim"
-    in
-    let gr_out_sim = find_reference [ "theories"; "Bisimilarity" ] "out_sim" in
-    let gr_weak_bisim =
-      find_reference [ "theories"; "Bisimilarity" ] "weak_bisim"
-    in
-    constants
-    := List.map
-         (fun x -> of_constr (constr_of_monomorphic_global (Global.env ()) x))
-         [ (* gr_M; gr_A; *)
-           gr_LTS
-         ; gr_tau
-         ; gr_silent
-         ; gr_silent1
-         ; gr_weak
-         ; gr_simF
-         ; gr_weak_sim
-         ; gr_Pack_sim
-         ; gr_out_sim
-         ; gr_weak_bisim
-         ];
-    !constants
-  | _ -> !constants
-;;
-
-let _c_LTS () =
-  match collect_bisimilarity_theories () with
-  | it :: _ -> it
-  | _ ->
-    failwith
-      "could not obtain an internal representation of Theories.Bisimilarity.LTS"
-;;
-
-let _c_tau () =
-  match collect_bisimilarity_theories () with
-  | _ :: it :: _ -> it
-  | _ ->
-    failwith
-      "could not obtain an internal representation of Theories.Bisimilarity.tau"
-;;
-
-let _c_silent () =
-  match collect_bisimilarity_theories () with
-  | _ :: _ :: it :: _ -> it
-  | _ ->
-    failwith
-      "could not obtain an internal representation of \
-       Theories.Bisimilarity.silent"
-;;
-
-let _c_silent1 () =
-  match collect_bisimilarity_theories () with
-  | _ :: _ :: _ :: it :: _ -> it
-  | _ ->
-    failwith
-      "could not obtain an internal representation of \
-       Theories.Bisimilarity.silent1"
-;;
-
-let _c_weak () =
-  match collect_bisimilarity_theories () with
-  | _ :: _ :: _ :: _ :: it :: _ -> it
-  | _ ->
-    failwith
-      "could not obtain an internal representation of \
-       Theories.Bisimilarity.weak"
-;;
-
-let _c_simF () =
-  match collect_bisimilarity_theories () with
-  | _ :: _ :: _ :: _ :: _ :: it :: _ -> it
-  | _ ->
-    failwith
-      "could not obtain an internal representation of \
-       Theories.Bisimilarity.simF"
-;;
-
-let _c_weak_sim () =
-  match collect_bisimilarity_theories () with
-  | _ :: _ :: _ :: _ :: _ :: _ :: it :: _ -> it
-  | _ ->
-    failwith
-      "could not obtain an internal representation of \
-       Theories.Bisimilarity.weak_sim"
-;;
-
-let _c_Pack_sim () =
-  match collect_bisimilarity_theories () with
-  | _ :: _ :: _ :: _ :: _ :: _ :: _ :: it :: _ -> it
-  | _ ->
-    failwith
-      "could not obtain an internal representation of \
-       Theories.Bisimilarity.Pack_sim"
-;;
-
-let _c_out_sim () =
-  match collect_bisimilarity_theories () with
-  | _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: it :: _ -> it
-  | _ ->
-    failwith
-      "could not obtain an internal representation of \
-       Theories.Bisimilarity.out_sim"
-;;
-
-let _c_weak_bisim () =
-  match collect_bisimilarity_theories () with
-  | _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: it :: _ -> it
-  | _ ->
-    failwith
-      "could not obtain an internal representation of \
-       Theories.Bisimilarity.weak_bisim"
-;;
-
-(* The following tactic is meant to pack an hypothesis when no other
-   data is already packed.
-
-   The main difficulty in defining this tactic is to understand how to
-   construct the input expected by apply_in. *)
-let _package i =
-  Proofview.Goal.enter (fun gl ->
-    Tactics.apply_in
-      true
-      false
-      i
-      [ (* this means that the applied theorem is not to be cleared. *)
-        (* None, (CAst.make (c_M (), *)
-        (* we don't specialize the theorem with extra values. *)
-        (* Tactypes.NoBindings)) *) ]
-      (* we don't destruct the result according to any intro_pattern *)
-      None)
-;;
-
-(* In the environment of the goal, we can get the type of an assumption
-   directly by a lookup.  The other solution is to call a low-cost retyping
-   function like *)
-let _get_type_of_hyp env id =
-  match EConstr.lookup_named id env with
-  | Context.Named.Declaration.LocalAssum (_, ty) -> ty
-  | _ ->
-    CErrors.user_err
-      (let open Pp in
-       str (Names.Id.to_string id) ++ str " is not a plain hypothesis")
-;;
-(* 
 let proof_test () : unit Proofview.tactic mm =
   fun (st : wrapper ref) ->
-  Log.debug "mebi_wrapper.proof_test";
+  Log.trace "mebi_wrapper.proof_test";
   let _h_hyps_id = Names.Id.of_string "TestPacked" in
   (* *)
   { state = st
@@ -1697,59 +1644,4 @@ let proof_test () : unit Proofview.tactic mm =
          (Proofview.tclTHEN (Tactics.rename_hyp [i, h_hyps_id])
          (Tactics.move_hyp h_hyps_id Logic.MoveLast)) *)
   }
-;; *)
-(* let coq_st = !st.coq_ref in
-  (* *)
-  let ((_en, pv) : Proofview.entry * Proofview.proofview) =
-    Proofview.init !coq_st.coq_ctx []
-    (* [!coq_st.coq_env, _] *)
-  in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.proof_test: is finished => %b"
-       (Proofview.finished pv));
-  (* *)
-  let rel_ctx : EConstr.rel_context = EConstr.rel_context !coq_st.coq_env in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.proof_test: rel_ctx => \"%s\""
-       (Pp.string_of_ppcmds
-          (Printer.pr_rel_context
-             !coq_st.coq_env
-             !coq_st.coq_ctx
-             (EConstr.to_rel_context !coq_st.coq_ctx rel_ctx))));
-  (* *)
-  let named_ctx : EConstr.named_context =
-    EConstr.named_context !coq_st.coq_env
-  in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.proof_test: named_ctx => \"%s\""
-       (Pp.string_of_ppcmds
-          (Printer.pr_named_context
-             !coq_st.coq_env
-             !coq_st.coq_ctx
-             (EConstr.to_named_context !coq_st.coq_ctx named_ctx))));
-  (* *)
-  { state = st; value = (Proofview.Goal.enter begin fun gl ->
-    let hyps = Environ.named_context_val (Proofview.Goal.env gl) in
-    
-  end
-    ) } *)
-(*  *)
-(* Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.proof_test: default_goal => %s"
-       (Pp.string_of_ppcmds
-          (Goal_select.pr_goal_selector
-             (Goal_select.get_default_goal_selector ())))); *)
-(*  *)
-(* let p : Proof.t =
-     Proof.start
-     ~name:(Names.Id.of_string "test_proof")
-     ~poly:false
-     !coq_st.coq_ctx
-     []
-     in
-     Log.debug
-     (Printf.sprintf "mebi_wrapper.proof_test: is done => %b" (Proof.is_done p)); *)
+;;

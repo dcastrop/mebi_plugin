@@ -1,4 +1,5 @@
 Set Debug "backtrace".
+From MEBI Require Export Bisimilarity.
 Declare ML Module "coq-mebi.mebi".
 
 MeBi Divider "Loading MeBi Plugin".

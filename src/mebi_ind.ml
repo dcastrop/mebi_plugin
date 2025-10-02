@@ -10,7 +10,7 @@ type kind =
 
 type info =
   { name : EConstr.t
-  ; constr_names : Names.variable array
+  ; constr_names : Names.Id.t array
   }
 
 type t =

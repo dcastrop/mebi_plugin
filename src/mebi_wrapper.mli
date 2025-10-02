@@ -128,6 +128,7 @@ val iterate : int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
 
 module type ERROR_TYPE = sig
   type mebi_error =
+    | ProofvIsNone of unit
     | ParamsFailIfIncomplete of unit
     | ParamsFailIfNotBisim of unit
     | InvalidLTSArgsLength of int
@@ -150,6 +151,7 @@ module type ERROR_TYPE = sig
 
   exception MEBI_exn of mebi_error
 
+  val proofv_is_none : unit -> exn
   val params_fail_if_incomplete : unit -> exn
   val params_fail_if_not_bisim : unit -> exn
   val invalid_lts_args_length : int -> exn
@@ -186,6 +188,7 @@ end
 
 module Error : ERROR_TYPE
 
+val proofv_is_none : unit -> 'a mm
 val params_fail_if_incomplete : unit -> 'a mm
 val params_fail_if_not_bisim : unit -> 'a mm
 val invalid_lts_args_length : int -> 'a mm
@@ -205,6 +208,7 @@ val invalid_check_updated_ctx
   -> EConstr.rel_declaration list
   -> 'a mm
 
+val set_proof :Declare.Proof.t -> wrapper ref -> unit in_context
 val get_env : wrapper ref -> Environ.env in_context
 val get_sigma : wrapper ref -> Evd.evar_map in_context
 val get_proofv : wrapper ref -> proof_context option in_context
@@ -219,8 +223,8 @@ val state
 val sandbox : 'a mm -> wrapper ref -> 'a in_context
 val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit mm
 
+val show_proof : unit -> unit mm
 val show_names : unit -> unit mm
-val new_name_of_string: string -> Names.variable mm
 
 module type MEBI_MONAD_SYNTAX = sig
   val ( let+ ) : 'a mm -> ('a -> 'b) -> 'b mm
@@ -276,7 +280,24 @@ val decode_map : 'a B.t -> 'a F.t mm
 val is_none_term : term -> bool mm
 
 (* *)
+val get_type_of_hyp : Names.Id.t -> EConstr.t mm
 
+(* *)
+val get_proof : unit -> Declare.Proof.t mm
+val get_proof_names : unit ->  Names.Id.Set.t mm
+
+val update_names : ?replace:bool -> Names.Id.Set.t -> wrapper ref -> unit in_context
+val add_name : Names.Id.t -> wrapper ref -> unit in_context
+
+val next_name_of : Names.Id.t -> Names.Id.t mm
+val new_name_of_string : ?add:bool -> string -> Names.Id.t mm
+
+val update_proof_by_tactic : unit Proofview.tactic -> unit mm
+val update_proof_by_tactic_mm : unit Proofview.tactic mm -> unit mm
+val update_proof_by_tactics : unit Proofview.tactic list -> unit mm
+val update_proof_by_tactics_mm : unit Proofview.tactic mm list -> unit mm
+
+(*  *)
 val constr_to_string : Constr.t -> string
 val econstr_to_string : EConstr.t -> string
 val term_to_string : term -> string

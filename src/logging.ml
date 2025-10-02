@@ -6,8 +6,9 @@ let default_mode : output_mode = Coq ()
 
 type output_kind =
   | Notice
-  | Details
   | Debug
+  | Trace
+  | Details
   | Result
   | Warning
 
@@ -118,6 +119,7 @@ let is_output_kind_enabled (kind : output_kind) : bool =
   match kind with
   | Notice -> is_notice_enabled ()
   | Debug -> is_debug_enabled ()
+  | Trace -> is_debug_enabled () && is_details_enabled ()
   | Details -> is_details_enabled ()
   | Result -> is_result_enabled ()
   | Warning -> is_warning_enabled ()
@@ -128,6 +130,7 @@ let message_prefix (kind : output_kind) : string =
   match kind with
   | Notice -> "( Notice ) "
   | Debug -> "( Debug ) "
+  | Trace -> "( Trace ) "
   | Details -> "( Details ) "
   | Result -> "( Result ) "
   | Warning -> "( Warning ) "
@@ -142,6 +145,7 @@ let log (kind : output_kind) (s : string) : unit =
       (match kind with
        | Notice -> Feedback.msg_notice (Pp.str msg)
        | Debug -> Feedback.msg_debug (Pp.str msg)
+       | Trace -> Feedback.msg_debug (Pp.str msg)
        | Details -> Feedback.msg_info (Pp.str msg)
        | Result -> Feedback.msg_info (Pp.str msg)
        | Warning -> Feedback.msg_warning (Pp.str msg))
@@ -158,6 +162,7 @@ module Log = struct
 
   let notice (s : string) : unit = log Notice s
   let debug (s : string) : unit = log Debug s
+  let trace (s : string) : unit = log Trace s
   let details (s : string) : unit = log Details s
   let result (s : string) : unit = log Result s
   let warning (s : string) : unit = log Warning s
