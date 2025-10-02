@@ -25,6 +25,7 @@
   mebi_wrapper
   mebi_ind
   mebi_utils
+  mebi_theories
   mebi_tactics
   params
   model

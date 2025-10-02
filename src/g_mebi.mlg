@@ -37,6 +37,29 @@ END *)
   }
 END *)
 
+VERNAC COMMAND EXTEND MeBi_Debug CLASSIFIED AS QUERY
+| [ "MeBi_Debug" "ProofNames" ] ->
+  { Mebi_wrapper.run (
+      if Logging.is_debug_enabled () then Logging.Log.override "\n";
+      Logging.Log.debug "MeBi_Debug:ProofNames: BEGIN";
+      let open Mebi_wrapper.Syntax in 
+      let* _ = Mebi_wrapper.show_names () in
+      Logging.Log.debug "MeBi_Debug:ProofNames: END";
+      Mebi_wrapper.return ()
+    ) 
+  }
+| [ "MeBi_Debug" "ThisProof" ] ->
+  { Mebi_wrapper.run (
+      if Logging.is_debug_enabled () then Logging.Log.override "\n";
+      Logging.Log.debug "MeBi_Debug:ThisProof: BEGIN";
+      let open Mebi_wrapper.Syntax in 
+      let* _ = Mebi_wrapper.show_proof () in
+      Logging.Log.debug "MeBi_Debug:ThisProof: END";
+      Mebi_wrapper.return ()
+    ) 
+  }
+END
+
 (* NOTE: vernac states: 
 https://data.code.gouv.fr/hosts/GitHub/repositories/coq%2Fplatform?sha=V8.17.0&path=coqpp%2Fcoqpp_main.ml 
 
@@ -52,15 +75,6 @@ let understand_state = function
   | "program_interactive" -> "vtopenproofprogram", false
   | s -> fatal ("unsupported state specifier: " ^ s) 
 *)
-
-VERNAC COMMAND EXTEND MeBi_Debug CLASSIFIED AS QUERY
-| [ "MeBi_Debug" "ProofNames" ] ->
-  { Mebi_wrapper.run (
-      Logging.Log.debug "MeBi_Debug:ProofNames:";
-      Mebi_wrapper.show_names ()
-    ) 
-  }
-END
 
 (* NOTE: ![proof] is modify state: https://rocq-prover.org/doc/V8.20.0/api/coq-core/Vernactypes/index.html#val-vtmodifyproof  *)
 (* VERNAC COMMAND EXTEND MeBi_cofix CLASSIFIED AS QUERY
@@ -81,43 +95,100 @@ END
       p
    }
 END *)
-VERNAC COMMAND EXTEND MeBi_Begin CLASSIFIED AS QUERY
+VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
 |![ proof ] 
-    [ "MeBi_Begin" constr(x) "With" reference(a) 
-                    "And" constr(y) "With" reference(b) 
-                    "Using" reference_list(rs) ] -> 
+  [ "MeBiSim" "TODO" ] ->
   { fun ~pstate -> 
-    let p = Mebi_wrapper.run ~proof:(Some pstate) (
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.show_names () in 
-      let* t = Command.tactic (Command.Bisimilarity (((x, a), (y, b)), [])) in 
-      let* s = Mebi_wrapper.get_proofv in 
-      let (p, _b) = (
-        match s with 
-        | None -> Logging.Log.warning "MeBi_Begin, proofv is None";
-                  Declare.Proof.by t pstate 
-        | Some s -> Declare.Proof.by t s.proof 
-      ) in
-      Logging.Log.debug "MeBi_Begin, post A:";
-      let* _ = Mebi_wrapper.show_names () in 
-      Mebi_wrapper.return p 
-    ) in
-    let t = Mebi_wrapper.run (
-      let open Mebi_wrapper.Syntax in 
-      let* n = Mebi_wrapper.new_name_of_string "TestCofix" in
-      Logging.Log.debug "MeBi_Begin, post B:";
-      let* _ = Mebi_wrapper.show_names () in 
-      Mebi_wrapper.return (Tactics.cofix (n))
-    ) in
-    let (q, _b) = Declare.Proof.by t p in 
-    let _ = Mebi_wrapper.run (
-      let open Mebi_wrapper.Syntax in 
-      Logging.Log.debug "MeBi_Begin, post C:";
-      let* _ = Mebi_wrapper.show_names () in 
-      Mebi_wrapper.return ()
-    ) in
-    q
+    Mebi_wrapper.run ~proof:(Some pstate) (
+      if Logging.is_debug_enabled () then Logging.Log.override "\n";
+      Logging.Log.debug "MeBiSim:TODO BEGIN";
+      (*  *)
+      Logging.Log.debug "MeBiSim:TODO END";
+      Mebi_wrapper.get_proof ()
+    )
   }
+(*  *)
+|![ proof ] 
+  [ "MeBiSim" "Inv" ] ->
+  (* TODO: maybe this stuff could be in coq anyway, and used by [mebi_theories] *)
+  { fun ~pstate -> 
+    Mebi_wrapper.run ~proof:(Some pstate) (
+      if Logging.is_debug_enabled () then Logging.Log.override "\n";
+      Logging.Log.debug "MeBiSim:TODO BEGIN";
+      (*  *)
+      Logging.Log.debug "MeBiSim:TODO END";
+      Mebi_wrapper.get_proof ()
+    )
+  }
+(*  *)
+|![ proof ] 
+  [ "MeBiSim" "Intros" ] ->
+  { fun ~pstate -> 
+    Mebi_wrapper.run ~proof:(Some pstate) (
+      if Logging.is_debug_enabled () then Logging.Log.override "\n";
+      Logging.Log.debug "MeBiSim:Intros BEGIN";
+      let open Mebi_wrapper.Syntax in 
+      let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
+        [ Mebi_tactics.intro_of_string "m1"
+        ; Mebi_tactics.intro_of_string "act_1"
+        ; Mebi_tactics.intro_of_string "H"
+        ] in 
+      Logging.Log.debug "MeBiSim:Intros END";
+      Mebi_wrapper.get_proof ()
+    )
+   }
+|![ proof ] 
+  [ "MeBiSim" "Cofix" ] ->
+  { fun ~pstate -> 
+    Mebi_wrapper.run ~proof:(Some pstate) (
+      if Logging.is_debug_enabled () then Logging.Log.override "\n";
+      Logging.Log.debug "MeBiSim:Cofix BEGIN";
+      let open Mebi_wrapper.Syntax in 
+      let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
+        [ Mebi_tactics.cofix ()
+        ; Mebi_tactics.apply_In_sim ()
+        ; Mebi_tactics.apply_Pack_sim ()
+        ] in 
+      Logging.Log.debug "MeBiSim:Cofix END";
+      Mebi_wrapper.get_proof ()
+    )
+   }
+|![ proof ] 
+  [ "MeBiSim" "Begin" constr(x) constr(y) ] -> 
+  { fun ~pstate -> 
+    Mebi_wrapper.run ~proof:(Some pstate) (
+      if Logging.is_debug_enabled () then Logging.Log.override "\n";
+      Logging.Log.debug "MeBiSim:Begin BEGIN";
+      let open Mebi_wrapper.Syntax in 
+      let* t = Mebi_tactics.unfold_constrexpr_list [x; y] in 
+      let* _ = Mebi_wrapper.update_proof_by_tactic t in 
+      Logging.Log.debug "MeBiSim:Begin END";
+      Mebi_wrapper.get_proof ()
+    )
+  }
+(* |![ proof ] 
+  [ "MeBiSim" "Begin" 
+    constr(x) (* "With" reference(a) "And" *)
+    constr(y) (* "With" reference(b) "Using" reference_list(rs) *) ] -> 
+  { fun ~pstate -> 
+    Mebi_wrapper.run ~proof:(Some pstate) (
+      if Logging.is_debug_enabled () then Logging.Log.override "\n";
+      Logging.Log.debug "MeBiSim:Begin BEGIN";
+      let open Mebi_wrapper.Syntax in 
+      let* _ = Mebi_wrapper.update_proof_by_tactics_mm [
+        Mebi_tactics.unfold_constrexpr_list [x; y]
+      ; Mebi_tactics.cofix ()
+      ; Mebi_tactics.apply_In_sim ()
+      ; Mebi_tactics.apply_Pack_sim ()
+      (* ; Mebi_tactics.intros_all () *)
+      ; Mebi_tactics.intro "m1"
+      ; Mebi_tactics.intro "a0_1"
+      ; Mebi_tactics.intro "Hm0_1"
+      ] in 
+      Logging.Log.debug "MeBiSim:Begin END";
+      Mebi_wrapper.get_proof ()
+    )
+  } *)
 END
 
 VERNAC COMMAND EXTEND MeBi_BeginProof CLASSIFIED AS QUERY
@@ -231,9 +302,7 @@ END *)
 END *)
 
 TACTIC EXTEND MeBi_unfold
-| ["MeBi_unfold" reference(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold () (Mebi_tactics.Gr x))}
-| ["MeBi_unfold" constr(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold () (Mebi_tactics.Ex x))}
-| ["MeBi_unfold" ident(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold () (Mebi_tactics.Id x))}
+| ["MeBi_unfold" constr(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold_econstr x)}
 END
 
 (* TACTIC EXTEND MeBi_intros

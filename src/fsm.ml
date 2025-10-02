@@ -415,7 +415,7 @@ let saturate_edges_from
       (aa : States.t Actions.t)
   : ActionPairs.t
   =
-  Log.debug "fsm.saturate_edges_from";
+  Log.trace "fsm.saturate_edges_from";
   Actions.fold
     (fun (a : Action.t) (dests : States.t) (acc0 : ActionPairs.t) ->
       match Action.Label.is_silent a.label with
@@ -451,7 +451,7 @@ let saturate_edges_from
       [m] with saturated edges. Saturation removes silent actions, replacing them with (potentially multiple) explicit non-silent actions that may otherwise be taken immediately following some sequence of silent actions.
 *)
 let saturate_edges (m : t) : States.t Actions.t Edges.t =
-  Log.debug "fsm.saturate_edges";
+  Log.trace "fsm.saturate_edges";
   let edges : States.t Actions.t Edges.t = Edges.copy m.edges in
   if Logging.is_details_enabled ()
   then
@@ -471,7 +471,7 @@ let saturate_edges (m : t) : States.t Actions.t Edges.t =
 
 (** @return [m] with saturated edges. *)
 let saturate (m : t) : t =
-  Log.debug "fsm.saturate";
+  Log.trace "fsm.saturate";
   let m = clone m in
   update_info { m with edges = saturate_edges m }
 ;;

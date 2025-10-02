@@ -255,7 +255,7 @@ and check_valid_constructor
       List.map EConstr.of_rel_decl ctx
     in
     let* substl = mk_ctx_substl [] (List.rev ctx_tys) in
-    let* (termL, act, termR) : Evd.econstr * Evd.econstr * Evd.econstr =
+    let* (termL, act, termR) : EConstr.t * EConstr.t * EConstr.t =
       extract_args substl tm
     in
     let* success = m_unify t termL in
@@ -788,7 +788,7 @@ module MkGraph
         let def_str : string = econstr_to_string c.info.name in
         let names_list : string list =
           Array.fold_left
-            (fun (acc : string list) (name : Names.variable) ->
+            (fun (acc : string list) (name : Names.Id.t) ->
               Names.Id.to_string name :: acc)
             []
             c.info.constr_names
@@ -838,7 +838,7 @@ end
 
 (** [make_graph_builder] is ... *)
 let make_graph_builder =
-  Log.debug "command.make_graph_builder";
+  Log.trace "command.make_graph_builder";
   let* h = make_transition_tbl in
   (* hashtabl of terms to (edges) or (cindef) *)
   let* s = make_state_set in
@@ -868,8 +868,8 @@ type command_kind =
   | CheckBisimilarity of (coq_model * coq_model)
   | Info of unit
 
-let run (k : command_kind) (refs : Libnames.qualid list) : unit mm =
-  Log.debug "command.run";
+let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
+  Log.trace "command.run";
   let* graphM : (module GraphB) = make_graph_builder in
   let module G = (val graphM) in
   let build_lts_graph
@@ -1023,7 +1023,7 @@ type tactic_kind =
   | Bisimilarity of ((coq_model * coq_model) * Libnames.qualid list)
 
 let tactic (k : tactic_kind) : unit Proofview.tactic mm =
-  Log.debug "command.tactic";
+  Log.trace "command.tactic";
   let* graphM : (module GraphB) = make_graph_builder in
   let module G = (val graphM) in
   let build_lts_graph
@@ -1086,7 +1086,7 @@ let tactic (k : tactic_kind) : unit Proofview.tactic mm =
       | _ -> return ()
     in
     Log.debug "command.tactic, - - - - - - - - - - - - - - -\n";
-    let* r = Mebi_tactics.bisim_unfold_terms x y in
-    return r
+    let* do_unfold = Mebi_tactics.unfold_constrexpr_list [ x; y ] in
+    (* let* update_proof_by_tactic do_unfold in *)
+    return do_unfold
 ;;
-(* return () *)

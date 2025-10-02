@@ -15,7 +15,7 @@ let ref_list_to_glob_list (l : Libnames.qualid list) : Names.GlobRef.t list =
 open Mebi_wrapper
 
 let assert_mip_arity_is_type (mip : Declarations.one_inductive_body) : unit mm =
-  Log.debug "mebi_utils.assert_mip_arity_is_type";
+  Log.trace "mebi_utils.assert_mip_arity_is_type";
   let open Declarations in
   match mip.mind_arity with
   | RegularArity s ->
@@ -27,7 +27,7 @@ let assert_mip_arity_is_type (mip : Declarations.one_inductive_body) : unit mm =
 ;;
 
 let assert_mip_arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
-  Log.debug "mebi_utils.assert_mip_arity_is_prop";
+  Log.trace "mebi_utils.assert_mip_arity_is_prop";
   let open Declarations in
   match mip.mind_arity with
   | RegularArity s ->
@@ -47,7 +47,7 @@ let get_lts_labels_and_terms
       (mip : Declarations.one_inductive_body)
   : (Constr.rel_declaration * Constr.rel_declaration) mm
   =
-  Log.debug "mebi_utils.get_lts_labels_and_terms";
+  Log.trace "mebi_utils.get_lts_labels_and_terms";
   let open Declarations in
   (* get the type of [mip] from [mib]. *)
   let typ = Inductive.type_of_inductive (UVars.in_punivs (mib, mip)) in
@@ -63,7 +63,7 @@ let get_lts_labels_and_terms
 ;;
 
 let get_ind_info (gref : Names.GlobRef.t) : Mebi_ind.info mm =
-  Log.debug "mebi_utils.get_ind_info";
+  Log.trace "mebi_utils.get_ind_info";
   let open Names.GlobRef in
   let open Mebi_wrapper.Syntax in
   match gref with
@@ -82,7 +82,7 @@ let get_ind_info (gref : Names.GlobRef.t) : Mebi_ind.info mm =
 
 (** @raise invalid_ref_lts if [gref] is not a reference to an inductive type. *)
 let get_ind_lts (i : int) (gref : Names.GlobRef.t) : Mebi_ind.t mm =
-  Log.debug "mebi_utils.get_ind_lts";
+  Log.trace "mebi_utils.get_ind_lts";
   let open Names.GlobRef in
   let open Mebi_wrapper.Syntax in
   match gref with
@@ -117,14 +117,14 @@ let get_ind_lts (i : int) (gref : Names.GlobRef.t) : Mebi_ind.t mm =
 let encode_econstr (t : EConstr.t) : E.t mm = encode t
 
 let encode_constrexpr (t : Constrexpr.constr_expr) : E.t mm =
-  Log.debug "mebi_utils.encode_constrexpr";
+  Log.trace "mebi_utils.encode_constrexpr";
   let open Mebi_wrapper.Syntax in
   let* t' : EConstr.t = constrexpr_to_econstr t in
   encode_econstr t'
 ;;
 
 let encode_ref (t : Libnames.qualid) : E.t mm =
-  Log.debug "mebi_utils.encode_ref";
+  Log.trace "mebi_utils.encode_ref";
   let open Mebi_wrapper.Syntax in
   let* info : Mebi_ind.info = get_ind_info (ref_to_glob t) in
   encode_econstr info.name

@@ -64,6 +64,8 @@ src/mebi_ind.ml
 src/mebi_ind.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
+src/mebi_theories.ml
+src/mebi_theories.mli
 src/mebi_tactics.ml
 src/mebi_tactics.mli
 
