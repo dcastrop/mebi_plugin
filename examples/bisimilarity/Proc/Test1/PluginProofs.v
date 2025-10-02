@@ -37,6 +37,7 @@ Proof.
   (* MeBi_BeginSim p With termLTS And q With termLTS Using termLTS. *)
   MeBiSim Begin p q.
   MeBiSim Cofix.
+  (* TODO: why does Cofix vanish from names? *)
   MeBiSim Intros.
 
   inversion H; subst; unfold tsubst in *; clear H.
