@@ -8,32 +8,56 @@ let enable_logging : bool ref = ref true
 (****** COQ ENVIRONMENT/CONTEXT *************)
 (********************************************)
 
+type proof_context =
+  { mutable proof : Declare.Proof.t
+  ; mutable names : Names.Id.Set.t
+  }
+
 type coq_context =
   { coq_env : Environ.env
   ; coq_ctx : Evd.evar_map
-  ; names : Names.Id.Set.t
+  ; proofv : proof_context option
   }
 
-let the_names_opt : Names.Id.Set.t ref option ref = ref None
+(* *)
+let the_proofv_opt : proof_context option ref option ref = ref None
 
-let new_names () : Names.Id.Set.t ref =
-  if !enable_logging then Log.override "Created new set of names.";
-  let the_names = ref Names.Id.Set.empty in
-  the_names_opt := Some the_names;
-  the_names
+let new_proofv
+      ?(names : Names.Id.Set.t = Names.Id.Set.empty)
+      (proof : Declare.Proof.t)
+  : proof_context option ref
+  =
+  Log.debug "mebi_wrapper.new_proofv: Created new proofv.";
+  let the_proofv : proof_context option ref = ref (Some { proof; names }) in
+  the_proofv_opt := Some the_proofv;
+  the_proofv
 ;;
 
-let the_coq_names ?(keep_names : bool = true) () : Names.Id.Set.t ref =
-  match !the_names_opt with
-  | None -> new_names ()
-  | Some names -> if keep_names then names else new_names ()
+let the_coq_proofv ?(proof : Declare.Proof.t option = None) ()
+  : proof_context option ref
+  =
+  match proof with
+  | None ->
+    (match !the_proofv_opt with
+     | None -> ref None
+     | Some the_proofv -> the_proofv)
+  | Some proof ->
+    (match !the_proofv_opt with
+     | None ->
+       Log.debug "mebi_wrapper.the_coq_proofv, is Some and have None";
+       new_proofv proof
+     | Some _old_proof ->
+       Log.warning "mebi_wrapper.the_coq_proofv, both Some, overriding.";
+       Log.debug "mebi_wrapper.the_coq_proofv, carry over names?";
+       new_proofv proof)
 ;;
 
 (** *)
 let the_coq_env_opt : Environ.env ref option ref = ref None
 
 let new_coq_env () : Environ.env ref =
-  if !enable_logging then Log.override "Created new coq env.";
+  if !enable_logging
+  then Log.debug "mebi_wrapper.new_coq_env: Created new coq env.";
   let env : Environ.env ref = ref (Global.env ()) in
   the_coq_env_opt := Some env;
   env
@@ -49,7 +73,8 @@ let the_coq_env ?(fresh : bool = false) () : Environ.env ref =
 let the_coq_ctx_opt : Evd.evar_map ref option ref = ref None
 
 let new_coq_ctx ?(fresh : bool = false) () : Evd.evar_map ref =
-  if !enable_logging then Log.override "Created new coq ctx.";
+  if !enable_logging
+  then Log.debug "mebi_wrapper.new_coq_ctx: Created new coq ctx.";
   let ctx = ref (Evd.from_env !(the_coq_env ~fresh ())) in
   the_coq_ctx_opt := Some ctx;
   ctx
@@ -186,16 +211,17 @@ type 'a mm = wrapper ref -> 'a in_context
       is [true] when this is called mid-run.
       E.g., via [econstr_to_string]
     @param x is the command to run inside the [wrapper] state monad. *)
-let run ?(keep_encoding : bool = false) ?(keep_names : bool = true) (x : 'a mm)
+let run
+      ?(keep_encoding : bool = false)
+      ?(fresh : bool = true)
+      ?(proof : Declare.Proof.t option = None)
+      (x : 'a mm)
   : 'a
   =
-  let coq_ref : coq_context ref =
-    ref
-      { coq_env = !(the_coq_env ~fresh:true ())
-      ; coq_ctx = !(the_coq_ctx ())
-      ; names = !(the_coq_names ~keep_names ())
-      }
-  in
+  let coq_env : Environ.env = !(the_coq_env ~fresh ()) in
+  let coq_ctx : Evd.evar_map = !(the_coq_ctx ()) in
+  let proofv : proof_context option = !(the_coq_proofv ~proof ()) in
+  let coq_ref : coq_context ref = ref { coq_env; coq_ctx; proofv } in
   if keep_encoding then () else E.reset ();
   let fwd_enc : E.t F.t = F.create 0 in
   let bck_enc = B.create 0 in
@@ -255,9 +281,9 @@ let get_sigma (st : wrapper ref) : Evd.evar_map in_context =
   { state = st; value = !coq_st.coq_ctx }
 ;;
 
-let get_names (st : wrapper ref) : Names.Id.Set.t in_context =
+let get_proofv (st : wrapper ref) : proof_context option in_context =
   let coq_st = !st.coq_ref in
-  { state = st; value = !coq_st.names }
+  { state = st; value = !coq_st.proofv }
 ;;
 
 let get_fwd_enc (st : wrapper ref) : E.t F.t in_context =
@@ -295,18 +321,21 @@ let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
 let show_names () : unit mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.show_names: %s"
-       (if Names.Id.Set.is_empty !coq_st.names then "[ ] (empty)" else ""));
-  Names.Id.Set.iter
-    (fun (n : Names.Id.t) ->
-      Log.debug
-        (Printf.sprintf
-           "%s : %s"
-           (Names.Id.to_string n)
-           (Pp.string_of_ppcmds (Names.Id.print n))))
-    !coq_st.names;
+  (match !coq_st.proofv with
+   | None -> Log.debug "mebi_wrapper.show_names, proofv is None"
+   | Some proofv ->
+     Log.debug
+       (Printf.sprintf
+          "mebi_wrapper.show_names: %s"
+          (if Names.Id.Set.is_empty proofv.names then "[ ] (empty)" else ""));
+     Names.Id.Set.iter
+       (fun (n : Names.Id.t) ->
+         Log.debug
+           (Printf.sprintf
+              "%s : %s"
+              (Names.Id.to_string n)
+              (Pp.string_of_ppcmds (Names.Id.print n))))
+       proofv.names);
   { state = st; value = () }
 ;;
 
@@ -386,46 +415,52 @@ let new_evar_of_term (t : term) : term mm = new_evar_of_econstr t
 let new_name_of_string (s : string) : Names.Id.t mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
-  let n : Names.Id.t = Names.Id.of_string s in
-  let n' : Names.Id.t = Namegen.next_ident_away n !coq_st.names in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.new_name_of_string, A:\n\
-        - (mem:%b) n  = %s\n\
-        - (mem:%b) n' = %s\n\
-        - n = n' => %b\n"
-       (Names.Id.Set.mem n !coq_st.names)
-       (Names.Id.to_string n)
-       (Names.Id.Set.mem n' !coq_st.names)
-       (Names.Id.to_string n')
-       (Names.Id.equal n n'));
-  let names = Names.Id.Set.add n' !coq_st.names in
-  coq_st := { !coq_st with names };
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.new_name_of_string, B:\n\
-        - (mem:%b) n  = %s\n\
-        - (mem:%b) n' = %s\n\
-        - n = n' => %b\n"
-       (Names.Id.Set.mem n !coq_st.names)
-       (Names.Id.to_string n)
-       (Names.Id.Set.mem n' !coq_st.names)
-       (Names.Id.to_string n')
-       (Names.Id.equal n n'));
-  let m : Names.Id.t = Namegen.next_ident_away n !coq_st.names in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.new_name_of_string, C:\n\
-        - (mem:%b) n = %s\n\
-        - (mem:%b) m = %s\n\
-        - n = m => %b\n"
-       (Names.Id.Set.mem n !coq_st.names)
-       (Names.Id.to_string n)
-       (Names.Id.Set.mem m !coq_st.names)
-       (Names.Id.to_string m)
-       (Names.Id.equal n m));
-  (* st := { !st with coq_ref = coq_st }; *)
-  { state = st; value = n' }
+  match !coq_st.proofv with
+  | None ->
+    Log.warning "mebi_wrapper.new_name_of_string st.coq_st.proofv is None";
+    assert false
+  | Some proofv ->
+    let n : Names.Id.t = Names.Id.of_string s in
+    let n' : Names.Id.t = Namegen.next_ident_away n proofv.names in
+    Log.debug
+      (Printf.sprintf
+         "mebi_wrapper.new_name_of_string, A:\n\
+          - (mem:%b) n  = %s\n\
+          - (mem:%b) n' = %s\n\
+          - n = n' => %b\n"
+         (Names.Id.Set.mem n proofv.names)
+         (Names.Id.to_string n)
+         (Names.Id.Set.mem n' proofv.names)
+         (Names.Id.to_string n')
+         (Names.Id.equal n n'));
+    (* let names =  in *)
+    proofv.names <- Names.Id.Set.add n' proofv.names;
+    coq_st := { !coq_st with proofv = Some proofv };
+    Log.debug
+      (Printf.sprintf
+         "mebi_wrapper.new_name_of_string, B:\n\
+          - (mem:%b) n  = %s\n\
+          - (mem:%b) n' = %s\n\
+          - n = n' => %b\n"
+         (Names.Id.Set.mem n proofv.names)
+         (Names.Id.to_string n)
+         (Names.Id.Set.mem n' proofv.names)
+         (Names.Id.to_string n')
+         (Names.Id.equal n n'));
+    let m : Names.Id.t = Namegen.next_ident_away n proofv.names in
+    Log.debug
+      (Printf.sprintf
+         "mebi_wrapper.new_name_of_string, C:\n\
+          - (mem:%b) n = %s\n\
+          - (mem:%b) m = %s\n\
+          - n = m => %b\n"
+         (Names.Id.Set.mem n proofv.names)
+         (Names.Id.to_string n)
+         (Names.Id.Set.mem m proofv.names)
+         (Names.Id.to_string m)
+         (Names.Id.equal n m));
+    (* st := { !st with coq_ref = coq_st }; *)
+    { state = st; value = n' }
 ;;
 
 (********************************************)
