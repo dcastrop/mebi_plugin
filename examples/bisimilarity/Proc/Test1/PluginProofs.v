@@ -53,7 +53,8 @@ Proof.
   (* MeBi_Debug ProofNames. *)
 
   (* MeBi_Debug ThisProof. *)
-
+MeBi Set ShowDetails True.
+MeBi Bisim p With termLTS And q With termLTS Using termLTS.
 
 
   (* MeBi_Bisimilarity p With termLTS And q With termLTS Using termLTS.

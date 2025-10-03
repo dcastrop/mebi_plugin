@@ -109,6 +109,31 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
   }
 (*  *)
 |![ proof ] 
+  [ "MeBiSim" "WeakNone" ] ->
+  { fun ~pstate -> 
+    Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
+      if Logging.is_debug_enabled () then Logging.Log.override "\n";
+      Logging.Log.debug "MeBiSim:WeakNone BEGIN";
+      (* TODO: do as many weak actions as possible  *)
+      (*  *)
+      Logging.Log.debug "MeBiSim:WeakNone END";
+      Mebi_wrapper.get_proof ()
+    )
+  }
+|![ proof ] 
+  [ "MeBiSim" "WeakSome" ] ->
+  { fun ~pstate -> 
+    Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
+      if Logging.is_debug_enabled () then Logging.Log.override "\n";
+      Logging.Log.debug "MeBiSim:WeakSome BEGIN";
+      (* TODO: do strong action *)
+      (*  *)
+      Logging.Log.debug "MeBiSim:WeakSome END";
+      Mebi_wrapper.get_proof ()
+    )
+  }
+(*  *)
+|![ proof ] 
   [ "MeBiSim" "Inv" ] ->
   (* TODO: maybe this stuff could be in coq anyway, and used by [mebi_theories] *)
   { fun ~pstate -> 
