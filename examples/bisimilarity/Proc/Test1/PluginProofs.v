@@ -42,6 +42,25 @@ Proof.
   inversion H; subst; unfold tsubst in *; clear H.
   eexists; split.
 
+  (* NOTE: the below reveals a change in the Proof.data.stack (focus stack) *)
+  - 
+  MeBiSim WeakNone. 
+  (* eapply rt1n_trans. *)
+
+  (* MeBi_Debug ThisProof. *)
+  MeBiSim FocusTest.
+  (* MeBiSim GoalTest. *)
+
+
+(* {  *)
+  (* apply wk_none; unfold silent. *)
+    (* eapply rt1n_trans.  *)
+    do 2 constructor. unfold tsubst in *.
+    eapply rt1n_trans. do 2 constructor.
+    eauto with rel_db. 
+    (* } *)
+
+
   MeBi_Debug ProofNames.
 
 
@@ -53,8 +72,7 @@ Proof.
   (* MeBi_Debug ProofNames. *)
 
   (* MeBi_Debug ThisProof. *)
-MeBi Set ShowDetails True.
-MeBi Bisim p With termLTS And q With termLTS Using termLTS.
+(* MeBi Set ShowDetails True. MeBi Bisim p With termLTS And q With termLTS Using termLTS. *)
 
 
   (* MeBi_Bisimilarity p With termLTS And q With termLTS Using termLTS.

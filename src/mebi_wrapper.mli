@@ -224,6 +224,7 @@ val state
 val sandbox : 'a mm -> wrapper ref -> 'a in_context
 val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit mm
 
+val show_proof_data : unit -> unit mm
 val show_proof : unit -> unit mm
 val show_names : unit -> unit mm
 

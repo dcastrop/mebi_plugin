@@ -102,12 +102,13 @@ let new_int_counter ?(start : int = 0) () : unit -> int =
   get_and_incr_counter
 ;;
 
+let ppstr (x : Pp.t) : string = Pp.string_of_ppcmds x
+
 (********************)
 (*** pretty print ***)
 (********************)
 
-let pstr_string_list (ss : string list) : string =
-  match ss with
+let pstr_string_list ?(indent : int = 1) : string list -> string = function
   | [] -> "[ ] (empty)"
   | h :: [] -> Printf.sprintf "[ %s ]" h
   | h :: t ->
@@ -115,7 +116,24 @@ let pstr_string_list (ss : string list) : string =
       "[\n%s\n]"
       (List.fold_left
          (fun (acc : string) (s : string) ->
-           Printf.sprintf ",\n%s%s" (str_tabs 1) s)
-         (Printf.sprintf "%s%s" (str_tabs 1) h)
+           Printf.sprintf "%s,\n%s%s" acc (str_tabs indent) s)
+         (Printf.sprintf "%s%s" (str_tabs indent) h)
+         t)
+;;
+
+let pstr_evar_list ?(indent : int = 1) : Evar.t list -> string = function
+  | [] -> "[ ] (empty)"
+  | h :: [] -> Printf.sprintf "[ \"%s\" ]" (ppstr (Evar.print h))
+  | h :: t ->
+    Printf.sprintf
+      "[\n%s\n]"
+      (List.fold_left
+         (fun (acc : string) (x : Evar.t) ->
+           Printf.sprintf
+             "%s,\n%s\"%s\""
+             acc
+             (str_tabs indent)
+             (ppstr (Evar.print x)))
+         (Printf.sprintf "%s\"%s\"" (str_tabs indent) (ppstr (Evar.print h)))
          t)
 ;;

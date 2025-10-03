@@ -1,11 +1,20 @@
-val apply_In_sim :
-  unit -> unit Proofview.tactic Mebi_wrapper.mm
+val apply : Evd.econstr -> unit Proofview.tactic
 
-val apply_Pack_sim :
-  unit -> unit Proofview.tactic Mebi_wrapper.mm
+val apply_mm :
+  Evd.econstr Mebi_wrapper.mm ->
+  unit Proofview.tactic Mebi_wrapper.mm
+
+  val eapply : Evd.econstr -> unit Proofview.tactic
+
+val eapply_mm :
+  Evd.econstr Mebi_wrapper.mm ->
+  unit Proofview.tactic Mebi_wrapper.mm
 
 val unfold_econstr :
-  EConstr.t -> unit Proofview.tactic Mebi_wrapper.mm
+  Evd.econstr -> unit Proofview.tactic Mebi_wrapper.mm
+
+val unfold_econstr_mm :
+  Evd.econstr Mebi_wrapper.mm -> unit Proofview.tactic Mebi_wrapper.mm
 
 val unfold_constrexpr :
   Constrexpr.constr_expr ->

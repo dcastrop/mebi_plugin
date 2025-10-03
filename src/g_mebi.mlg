@@ -7,6 +7,7 @@ DECLARE PLUGIN "coq-mebi.mebi"
   theories/Loader.v *)
 open Ltac_plugin
 
+(* This one is necessary, to avoid message about missing wit_string *)
 open Stdarg
 (* open Pp *)
 }
@@ -109,13 +110,93 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
   }
 (*  *)
 |![ proof ] 
+  [ "MeBiSim" "GoalTest" ] ->
+  { fun ~pstate -> 
+    Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
+      if Logging.is_debug_enabled () then Logging.Log.override "\n";
+      Logging.Log.debug "MeBiSim:GoalTest BEGIN";
+      (* let open Mebi_wrapper.Syntax in  *)
+      (* TODO: check out using [tclSELECT] https://rocq-prover.org/doc/V8.20.0/api/coq-core/Goal_select/index.html *)
+      Logging.Log.debug "MeBiSim:GoalTest END";
+      Mebi_wrapper.get_proof ()
+    )
+  }
+(*  *)
+|![ proof ] 
+  [ "MeBiSim" "FocusTest" ] ->
+  { fun ~pstate -> 
+    Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
+      if Logging.is_debug_enabled () then Logging.Log.override "\n";
+      Logging.Log.debug "MeBiSim:FocusTest BEGIN";
+      (* NOTE: tests *)
+      let open Mebi_wrapper.Syntax in 
+      let* proof = Mebi_wrapper.get_proof () in
+      let the_proof : Proof.t = Declare.Proof.get proof in
+      let _focus_kind = Proof.new_focus_kind "test_focus_kind" in
+      let _focus_cond = Proof.no_cond _focus_kind in
+      let _focused_proof : Proof.t =
+        Proof.focus _focus_cond "test_focus_kind" 1 the_proof
+      in
+      let the_data = Proof.data the_proof in
+     let goals_string = Utils.pstr_evar_list the_data.goals in
+     let all_goals_string =
+       Utils.pstr_evar_list (Evar.Set.to_list (Proof.all_goals the_proof))
+     in
+     let stack_string =
+       if List.is_empty the_data.stack
+       then "[ ] (empty)"
+       else
+         Printf.sprintf
+           "[%s]"
+           (List.fold_left
+              (fun (acc : string) ((a, b) : Evar.t list * Evar.t list) ->
+                Printf.sprintf
+                  "%s\n%s%s,\n%s%s\n"
+                  acc
+                  (Utils.str_tabs 1)
+                  (Utils.pstr_evar_list ~indent:2 a)
+                  (Utils.str_tabs 1)
+                  (Utils.pstr_evar_list ~indent:2 b))
+              ""
+              the_data.stack)
+     in
+     Logging.Log.debug
+       (Printf.sprintf
+          "MeBiSim:FocusTest, name: %s\n\
+           - is done: %b\n\
+           - no focused goal: %b\n\
+           - goals: %s\n\
+           - all goals: %s\n\
+           - stack %s\n\
+           - pr_proof %s\n"
+          (Names.Id.to_string the_data.name)
+          (Proof.is_done the_proof)
+          (Proof.no_focused_goal the_proof)
+          goals_string
+          all_goals_string
+          stack_string
+          (Utils.ppstr (Proof.pr_proof the_proof)));
+      Logging.Log.debug "MeBiSim:FocusTest END";
+      Mebi_wrapper.return proof
+    )
+  }
+(*  *)
+|![ proof ] 
   [ "MeBiSim" "WeakNone" ] ->
   { fun ~pstate -> 
     Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim:WeakNone BEGIN";
-      (* TODO: do as many weak actions as possible  *)
-      (*  *)
+      (* NOTE: do as many weak actions as possible  *)
+      let open Mebi_wrapper.Syntax in 
+      let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
+        [ Mebi_tactics.apply_mm Mebi_theories.c_wk_none
+        ; Mebi_tactics.unfold_econstr_mm Mebi_theories.c_silent
+        ; Mebi_tactics.eapply_mm Mebi_theories.c_rt1n_trans
+        ; Mebi_tactics.unfold_econstr_mm Mebi_theories.c_tau
+        (* TODO: figure out how to actually get the term in the goal *)
+        ] in 
+      let* _ = Mebi_wrapper.show_proof_data () in 
       Logging.Log.debug "MeBiSim:WeakNone END";
       Mebi_wrapper.get_proof ()
     )
@@ -127,6 +208,10 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim:WeakSome BEGIN";
       (* TODO: do strong action *)
+      let open Mebi_wrapper.Syntax in 
+      let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
+        [ Mebi_tactics.apply_mm Mebi_theories.c_wk_some
+        ] in 
       (*  *)
       Logging.Log.debug "MeBiSim:WeakSome END";
       Mebi_wrapper.get_proof ()
@@ -171,8 +256,8 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       let open Mebi_wrapper.Syntax in 
       let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
         [ Mebi_tactics.cofix ()
-        ; Mebi_tactics.apply_In_sim ()
-        ; Mebi_tactics.apply_Pack_sim ()
+        ; Mebi_tactics.apply_mm Mebi_theories.c_In_sim 
+        ; Mebi_tactics.apply_mm Mebi_theories.c_Pack_sim 
         ] in 
       Logging.Log.debug "MeBiSim:Cofix END";
       Mebi_wrapper.get_proof ()
@@ -203,8 +288,8 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       let* _ = Mebi_wrapper.update_proof_by_tactics_mm [
         Mebi_tactics.unfold_constrexpr_list [x; y]
       ; Mebi_tactics.cofix ()
-      ; Mebi_tactics.apply_In_sim ()
-      ; Mebi_tactics.apply_Pack_sim ()
+      ; Mebi_tactics.apply_mm Mebi_theories.In_sim ()
+      ; Mebi_tactics.apply_mm Mebi_theories.Pack_sim ()
       (* ; Mebi_tactics.intros_all () *)
       ; Mebi_tactics.intro "m1"
       ; Mebi_tactics.intro "a0_1"
