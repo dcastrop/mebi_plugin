@@ -37,20 +37,22 @@ Proof.
   (* MeBi_BeginSim p With termLTS And q With termLTS Using termLTS. *)
   MeBiSim Begin p q.
   MeBiSim Cofix.
-  (* TODO: why does Cofix vanish from names? *)
   MeBiSim Intros.
 
   inversion H; subst; unfold tsubst in *; clear H.
   eexists; split.
+
+  MeBi_Debug ProofNames.
+
 
   (* TODO: use the plugin info next... *)
 
   (* apply In_sim, Pack_sim. *)
   (* MeBi_unfold weak_sim. *)
 
-  MeBi_Debug ProofNames.
+  (* MeBi_Debug ProofNames. *)
 
-  MeBi_Debug ThisProof.
+  (* MeBi_Debug ThisProof. *)
 
 
 

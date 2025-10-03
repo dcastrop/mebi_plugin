@@ -99,7 +99,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
 |![ proof ] 
   [ "MeBiSim" "TODO" ] ->
   { fun ~pstate -> 
-    Mebi_wrapper.run ~proof:(Some pstate) (
+    Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim:TODO BEGIN";
       (*  *)
@@ -112,7 +112,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
   [ "MeBiSim" "Inv" ] ->
   (* TODO: maybe this stuff could be in coq anyway, and used by [mebi_theories] *)
   { fun ~pstate -> 
-    Mebi_wrapper.run ~proof:(Some pstate) (
+    Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim:TODO BEGIN";
       (*  *)
@@ -124,7 +124,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
 |![ proof ] 
   [ "MeBiSim" "Intros" ] ->
   { fun ~pstate -> 
-    Mebi_wrapper.run ~proof:(Some pstate) (
+    Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim:Intros BEGIN";
       let open Mebi_wrapper.Syntax in 
@@ -140,7 +140,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
 |![ proof ] 
   [ "MeBiSim" "Cofix" ] ->
   { fun ~pstate -> 
-    Mebi_wrapper.run ~proof:(Some pstate) (
+    Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim:Cofix BEGIN";
       let open Mebi_wrapper.Syntax in 
@@ -156,7 +156,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
 |![ proof ] 
   [ "MeBiSim" "Begin" constr(x) constr(y) ] -> 
   { fun ~pstate -> 
-    Mebi_wrapper.run ~proof:(Some pstate) (
+    Mebi_wrapper.run ~new_proof:true ~proof:(Some pstate) (
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim:Begin BEGIN";
       let open Mebi_wrapper.Syntax in 
