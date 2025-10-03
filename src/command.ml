@@ -971,12 +971,12 @@ let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
          in
          let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
          let the_minimized =
-           Algorithms.run (Minim (!Params.the_weak_mode, the_fsm))
+           Algorithms.Minimize.run ~weak:!Params.the_weak_mode the_fsm
          in
          Log.result
            (Printf.sprintf
               "command.run, MinimizeModel, finished: %s\n"
-              (Algorithms.pstr the_minimized));
+              (Algorithms.Minimize.pstr the_minimized));
          if !Params.the_dump_to_file
          then Log.debug "command.run, MinimizeModel -- TODO dump to file\n";
          return ()))
@@ -994,20 +994,24 @@ let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
          (Fsm.to_string the_fsm_1)
          (Fsm.to_string the_fsm_2));
     let the_bisimilar =
-      Algorithms.run (Bisim (!Params.the_weak_mode, (the_fsm_1, the_fsm_2)))
+      Algorithms.Bisimilar.run ~weak:!Params.the_weak_mode (the_fsm_1, the_fsm_2)
     in
     Log.result
       (Printf.sprintf
          "command.run, CheckBisimilarity, finished: %s\n"
-         (Algorithms.pstr the_bisimilar));
+         (Algorithms.Bisimilar.pstr the_bisimilar));
+    Log.details
+      (Printf.sprintf
+         "command.run, CheckBisimilarity:\nFSM 1: %s\n\nFSM 2: %s\n"
+         (Fsm.to_string (fst (fst (fst the_bisimilar))))
+         (Fsm.to_string (snd (fst (fst the_bisimilar)))));
     if !Params.the_dump_to_file
     then Log.debug "command.run, CheckBisimilarity -- TODO dump to file\n";
-    (match the_bisimilar with
-     | Bisim b ->
-       if !Params.the_fail_if_not_bisim && Algorithms.bisim_result_to_bool b
-       then return ()
-       else params_fail_if_not_bisim ()
-     | _ -> return ())
+    if
+      !Params.the_fail_if_not_bisim
+      && Algorithms.Bisimilar.result_to_bool the_bisimilar
+    then return ()
+    else params_fail_if_not_bisim ()
   | Info () ->
     Mebi_help.show_guidelines_and_limitations ();
     return ()
@@ -1067,26 +1071,23 @@ let tactic (k : tactic_kind) : unit Proofview.tactic mm =
          (Fsm.to_string the_fsm_1)
          (Fsm.to_string the_fsm_2));
     let the_bisimilar =
-      Algorithms.run (Bisim (!Params.the_weak_mode, (the_fsm_1, the_fsm_2)))
+      Algorithms.Bisimilar.run ~weak:!Params.the_weak_mode (the_fsm_1, the_fsm_2)
     in
     Log.result
       (Printf.sprintf
          "command.tactic, CheckBisimilarity, finished: %s\n"
-         (Algorithms.pstr the_bisimilar));
+         (Algorithms.Bisimilar.pstr the_bisimilar));
     if !Params.the_dump_to_file
     then Log.debug "command.tactic, CheckBisimilarity -- TODO dump to file\n";
     let* _ =
-      match the_bisimilar with
-      | Bisim b ->
-        if
-          !Params.the_fail_if_not_bisim
-          && Bool.not (Algorithms.bisim_result_to_bool b)
-        then params_fail_if_not_bisim ()
-        else return ()
-      | _ -> return ()
+      if
+        !Params.the_fail_if_not_bisim
+        && Bool.not (Algorithms.Bisimilar.result_to_bool the_bisimilar)
+      then params_fail_if_not_bisim ()
+      else return ()
     in
     Log.debug "command.tactic, - - - - - - - - - - - - - - -\n";
-    let* do_unfold = Mebi_tactics.unfold_constrexpr_list [ x; y ] in
-    (* let* update_proof_by_tactic do_unfold in *)
-    return do_unfold
+    (* TODO: use bisim result to find a state that is bisimilar to [m2] that originates in saturated [n] that is reachable from [n1] via only [None] actions *)
+    let _t : unit Proofview.tactic = Proofview.tclUNIT () in
+    return _t
 ;;

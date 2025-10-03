@@ -3,7 +3,6 @@ open Logging
 module Minimize = struct
   open Model
 
-  type t = Fsm.t
   type result = Fsm.t * Partition.t
 
   let add_to_block_option (s : State.t) (block : States.t option)
@@ -107,7 +106,8 @@ module Minimize = struct
       !pi
   ;;
 
-  let run ?(weak : bool = false) (the_fsm : t) : result =
+  let run ?(weak : bool = false) (the_fsm : Fsm.t) : result =
+    let the_fsm : Fsm.t = if weak then Fsm.saturate the_fsm else the_fsm in
     match the_fsm with
     | { alphabet; states; edges; _ } ->
       let pi = ref (Partition.of_list [ states ]) in
@@ -119,13 +119,21 @@ module Minimize = struct
       done;
       the_fsm, !pi
   ;;
+
+  let pstr (r : result) : string =
+    match r with
+    | the_fsm, the_partition ->
+      Printf.sprintf
+        "\nMinimized FSM: %s\nMinimized Partition: %s"
+        (Fsm.pstr the_fsm)
+        (Model.pstr_partition the_partition)
+  ;;
 end
 
 module Bisimilar = struct
   open Model
 
-  type t = Fsm.pair * Fsm.t * Partition.t
-  type result = Fsm.pair * Fsm.t * (Partition.t * Partition.t)
+  type result = (Fsm.pair * Fsm.t) * (Partition.t * Partition.t)
 
   (** is [true] if [block] has states that originate from both [the_fsm_1] and [the_fsm_2]
   *)
@@ -163,92 +171,29 @@ module Bisimilar = struct
       (Partition.empty, Partition.empty)
   ;;
 
-  let run (((the_fsm_1, the_fsm_2), merged_fsm, pi) : t) : result =
+  let run ?(weak : bool = false) (the_fsm_pair : Fsm.pair) : result =
+    let the_fsm_pair, merged_fsm = Fsm.saturate_and_merge ~weak the_fsm_pair in
+    let pi : Partition.t = snd (Minimize.run merged_fsm) in
     let (bisim_states, non_bisim_states) : Partition.t * Partition.t =
-      split_bisimilar pi the_fsm_1 the_fsm_2
+      split_bisimilar pi (fst the_fsm_pair) (snd the_fsm_pair)
     in
-    (the_fsm_1, the_fsm_2), merged_fsm, (bisim_states, non_bisim_states)
+    (the_fsm_pair, merged_fsm), (bisim_states, non_bisim_states)
+  ;;
+
+  let result_to_bool (r : result) : bool =
+    match r with
+    | _, (_bisim_states, non_bisim_states) ->
+      Model.Partition.is_empty non_bisim_states
+  ;;
+
+  let pstr (r : result) : string =
+    match r with
+    | (_the_fsm_pair, merged_fsm), (bisim_states, non_bisim_states) ->
+      let are_bisimilar : bool = Model.Partition.is_empty non_bisim_states in
+      Printf.sprintf
+        "\nBisimilar: %b\nBisimilar states: %s\nNon-bisimilar states: %s\n"
+        are_bisimilar
+        (Model.pstr_partition bisim_states)
+        (Model.pstr_partition non_bisim_states)
   ;;
 end
-
-(**************************************************************************)
-(** Algorithms ************************************************************)
-(**************************************************************************)
-
-type t =
-  | Minim of (bool * Minimize.t)
-  | Bisim of (bool * Fsm.pair)
-
-type result =
-  | Minim of Minimize.result
-  | Bisim of Bisimilar.result
-
-let run (args : t) : result =
-  match args with
-  | Minim params ->
-    Log.debug "algorithms.run, Minim";
-    Minim
-      (Minimize.run
-         (match params with
-          | true, the_fsm -> Fsm.saturate the_fsm
-          | _, the_fsm -> the_fsm))
-  | Bisim params ->
-    Bisim
-      (Bisimilar.run
-         (match params with
-          | true, (the_fsm_1, the_fsm_2) ->
-            Log.debug "algorithms.run, Bisim (weak)";
-            let the_saturated_pair : Fsm.pair =
-              Fsm.saturate the_fsm_1, Fsm.saturate the_fsm_2
-            in
-            if Logging.is_details_enabled ()
-            then
-              Log.debug
-                (Printf.sprintf
-                   "algorithms.run, Bisim (weak) saturated\n\
-                    FSM 1: %s\n\n\
-                    FSM 2: %s\n"
-                   (Fsm.to_string (fst the_saturated_pair))
-                   (Fsm.to_string (snd the_saturated_pair)));
-            let merged_fsm : Fsm.t = Fsm.merge the_saturated_pair in
-            if Logging.is_details_enabled ()
-            then
-              Log.debug
-                (Printf.sprintf
-                   "algorithms.run, Bisim (weak) merged fsm: %s\n"
-                   (Fsm.to_string merged_fsm));
-            the_saturated_pair, merged_fsm, snd (Minimize.run merged_fsm)
-          | false, the_fsm_pair ->
-            Log.debug "algorithms.run, Bisim (strong)";
-            let merged_fsm : Fsm.t = Fsm.merge the_fsm_pair in
-            if Logging.is_details_enabled ()
-            then
-              Log.debug
-                (Printf.sprintf
-                   "algorithms.run, Bisim (strong) merged fsm: %s\n"
-                   (Fsm.to_string merged_fsm));
-            the_fsm_pair, merged_fsm, snd (Minimize.run merged_fsm)))
-;;
-
-let bisim_result_to_bool (r : Bisimilar.result) =
-  match r with
-  | _, _, (_bisim_states, non_bisim_states) ->
-    Model.Partition.is_empty non_bisim_states
-;;
-
-let pstr (r : result) : string =
-  match r with
-  | Minim (the_fsm, the_partition) ->
-    Printf.sprintf
-      "\nMinimized FSM: %s\nMinimized Partition: %s"
-      (Fsm.pstr the_fsm)
-      (Model.pstr_partition the_partition)
-  | Bisim ((the_fsm_1, the_fsm_2), merged_fsm, (bisim_states, non_bisim_states))
-    ->
-    let are_bisimilar : bool = Model.Partition.is_empty non_bisim_states in
-    Printf.sprintf
-      "\nBisimilar: %b\nBisimilar states: %s\nNon-bisimilar states: %s\n"
-      are_bisimilar
-      (Model.pstr_partition bisim_states)
-      (Model.pstr_partition non_bisim_states)
-;;

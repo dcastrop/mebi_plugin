@@ -533,6 +533,16 @@ let merge (p : pair) : t =
   { init; terminals; alphabet; states; edges; info }
 ;;
 
+let saturate_and_merge ?(weak : bool = false) (the_fsm_pair : pair) : pair * t =
+  match weak with
+  | false -> the_fsm_pair, merge the_fsm_pair
+  | true ->
+    let the_saturated_pair : pair =
+      saturate (fst the_fsm_pair), saturate (snd the_fsm_pair)
+    in
+    the_saturated_pair, merge the_saturated_pair
+;;
+
 (*********************************************************************)
 (****** Pretty-Strings ***********************************************)
 (*********************************************************************)
