@@ -8,63 +8,87 @@ let enable_logging : bool ref = ref true
 (****** COQ ENVIRONMENT/CONTEXT *************)
 (********************************************)
 
+(* TODO: move proof stuff to own monad/wrapper *)
 type proof_context =
-  { mutable proof : Declare.Proof.t
-  ; mutable names : Names.Id.Set.t
+  { mutable proof : Declare.Proof.t option
+  ; mutable names : Names.Id.Set.t option
   }
 
 type coq_context =
   { coq_env : Environ.env
   ; coq_ctx : Evd.evar_map
-  ; proofv : proof_context option
+  ; proofv : proof_context
   }
 
 (* *)
-let the_proofv_opt : proof_context option ref option ref = ref None
+let the_proofv_opt : proof_context ref option ref = ref None
 
-let new_proofv (proof : Declare.Proof.t) (names : Names.Id.Set.t)
-  : proof_context option ref
+let new_proofv (proof : Declare.Proof.t option) (names : Names.Id.Set.t option)
+  : proof_context ref
   =
   Log.trace "mebi_wrapper.new_proofv: Created new proofv.";
-  let the_proofv : proof_context option ref = ref (Some { proof; names }) in
+  let the_proofv : proof_context ref = ref { proof; names } in
   the_proofv_opt := Some the_proofv;
   the_proofv
 ;;
 
 let the_coq_proofv
+      ?(new_proof : bool = false)
       ?(proof : Declare.Proof.t option = None)
       ?(names : Names.Id.Set.t option = None)
       ()
-  : proof_context option ref
+  : proof_context ref
   =
-  let new_names = match names with None -> Names.Id.Set.empty | Some s -> s in
   Log.trace "mebi_wrapper.the_coq_proofv";
-  match proof with
+  match !the_proofv_opt with
   | None ->
-    (match !the_proofv_opt with
-     | None -> ref None
-     | Some the_proofv -> the_proofv)
-  | Some proof ->
-    (match !the_proofv_opt with
-     | None ->
-       Log.debug
-         "mebi_wrapper.the_coq_proofv, initialising new proof (new names).";
-       new_proofv proof new_names
-     | Some old_proofv ->
-       (match !old_proofv with
+    Log.debug "mebi_wrapper.the_coq_proofv: proofv is None, using args";
+    new_proofv proof names
+  | Some proofv ->
+    if new_proof
+    then (
+      Log.debug "mebi_wrapper.the_coq_proofv: new proof";
+      new_proofv proof names)
+    else (
+      let the_proof =
+        match !proofv.proof with
         | None ->
-          Log.debug "mebi_wrapper.the_coq_proofv, overriding proof (new names).";
-          new_proofv proof new_names
-        | Some old_proofv ->
+          Log.debug
+            "mebi_wrapper.the_coq_proofv: proofv.proof is None, using proof arg";
+          proof
+        | Some _ ->
+          (match proof with
+           | None ->
+             Log.debug
+               "mebi_wrapper.the_coq_proofv: proofv.proof is Some and proof \
+                arg is None, preserving proofv.proof";
+             !proofv.proof
+           | Some q ->
+             Log.debug
+               "mebi_wrapper.the_coq_proofv: proofv.proof and proof arg are \
+                Some, overriding, using new proof arg";
+             proof)
+      in
+      let the_names =
+        match !proofv.names with
+        | None ->
+          Log.debug
+            "mebi_wrapper.the_coq_proofv: proofv.names is None, using names arg";
+          names
+        | Some _ ->
           (match names with
            | None ->
              Log.debug
-               "mebi_wrapper.the_coq_proofv, overriding proof (empty names).";
-             new_proofv proof Names.Id.Set.empty
-           | Some s ->
+               "mebi_wrapper.the_coq_proofv: proofv.names is Some and names \
+                arg is None, preserving proofv.names";
+             !proofv.names
+           | Some q ->
              Log.debug
-               "mebi_wrapper.the_coq_proofv, overriding proof (old names).";
-             new_proofv proof s)))
+               "mebi_wrapper.the_coq_proofv: proofv.names and names arg are \
+                Some, overriding, using new names arg";
+             names)
+      in
+      new_proofv the_proof the_names)
 ;;
 
 (** *)
@@ -229,6 +253,7 @@ type 'a mm = wrapper ref -> 'a in_context
 let run
       ?(keep_encoding : bool = false)
       ?(fresh : bool = true)
+      ?(new_proof : bool = false)
       ?(proof : Declare.Proof.t option = None)
       (x : 'a mm)
   : 'a
@@ -236,7 +261,7 @@ let run
   Log.trace "mebi_wrapper.run";
   let coq_env : Environ.env = !(the_coq_env ~fresh ()) in
   let coq_ctx : Evd.evar_map = !(the_coq_ctx ()) in
-  let proofv : proof_context option = !(the_coq_proofv ~proof ()) in
+  let proofv : proof_context = !(the_coq_proofv ~new_proof ~proof ()) in
   let coq_ref : coq_context ref = ref { coq_env; coq_ctx; proofv } in
   if keep_encoding then () else E.reset ();
   let fwd_enc : E.t F.t = F.create 0 in
@@ -291,11 +316,7 @@ let set_proof (new_proof : Declare.Proof.t) (st : wrapper ref) : unit in_context
   =
   Log.trace "mebi_wrapper.set_proof";
   let coq_st = !st.coq_ref in
-  let names =
-    match !coq_st.proofv with
-    | None -> Some Names.Id.Set.empty
-    | Some proofv -> Some proofv.names
-  in
+  let names = !coq_st.proofv.names in
   let proofv = !(the_coq_proofv ~proof:(Some new_proof) ~names ()) in
   coq_st := { !coq_st with proofv };
   st := { !st with coq_ref = coq_st };
@@ -312,7 +333,7 @@ let get_sigma (st : wrapper ref) : Evd.evar_map in_context =
   { state = st; value = !coq_st.coq_ctx }
 ;;
 
-let get_proofv (st : wrapper ref) : proof_context option in_context =
+let get_proofv (st : wrapper ref) : proof_context in_context =
   let coq_st = !st.coq_ref in
   { state = st; value = !coq_st.proofv }
 ;;
@@ -352,27 +373,26 @@ let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
 let show_proof () : unit mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
-  (match !coq_st.proofv with
-   | None -> Log.debug "mebi_wrapper.show_proof, proofv is None"
-   | Some proofv ->
+  (match !coq_st.proofv.proof with
+   | None -> Log.debug "mebi_wrapper.show_proof, proofv.proof is None"
+   | Some proof ->
      Log.debug
        (Printf.sprintf
           "mebi_wrapper.show_proof: %s"
-          (Pp.string_of_ppcmds
-             (Proof.pr_proof (Declare.Proof.get proofv.proof)))));
+          (Pp.string_of_ppcmds (Proof.pr_proof (Declare.Proof.get proof)))));
   { state = st; value = () }
 ;;
 
 let show_names () : unit mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
-  (match !coq_st.proofv with
-   | None -> Log.debug "mebi_wrapper.show_names, proofv is None"
-   | Some proofv ->
+  (match !coq_st.proofv.names with
+   | None -> Log.debug "mebi_wrapper.show_names, proofv.names is None"
+   | Some names ->
      Log.debug
        (Printf.sprintf
           "mebi_wrapper.show_names: %s"
-          (if Names.Id.Set.is_empty proofv.names
+          (if Names.Id.Set.is_empty names
            then "[ ] (empty)"
            else
              Printf.sprintf
@@ -384,7 +404,7 @@ let show_names () : unit mm =
                       acc
                       (Names.Id.to_string n)
                       (Pp.string_of_ppcmds (Names.Id.print n)))
-                  proofv.names
+                  names
                   ""))));
   { state = st; value = () }
 ;;
@@ -1245,19 +1265,19 @@ let get_type_of_hyp (id : Names.Id.t) : EConstr.t mm =
 let get_proof () : Declare.Proof.t mm =
   Log.trace "mebi_wrapper.get_proof";
   let open Syntax in
-  let* proofv : proof_context option = get_proofv in
-  match proofv with
+  let* proofv : proof_context = get_proofv in
+  match proofv.proof with
   | None -> proofv_is_none ()
-  | Some proofv -> return proofv.proof
+  | Some proof -> return proof
 ;;
 
 let get_proof_names () : Names.Id.Set.t mm =
   Log.trace "mebi_wrapper.get_proof_names";
   let open Syntax in
-  let* proofv : proof_context option = get_proofv in
-  match proofv with
-  | None -> proofv_is_none ()
-  | Some proofv -> return proofv.names
+  let* proofv : proof_context = get_proofv in
+  match proofv.names with
+  | None -> return Names.Id.Set.empty
+  | Some names -> return names
 ;;
 
 let update_names
@@ -1267,24 +1287,26 @@ let update_names
   : unit in_context
   =
   let coq_st = !st.coq_ref in
-  match !coq_st.proofv with
+  match !coq_st.proofv.names with
   | None ->
-    Log.warning "mebi_wrapper.update_names, proofv is None (do nothing)";
+    Log.warning "mebi_wrapper.update_names, proofv.names is None (create new)";
+    !coq_st.proofv.names <- Some new_names;
     { state = st; value = () }
-  | Some proofv ->
-    proofv.names
-    <- (if replace then new_names else Names.Id.Set.union proofv.names new_names);
+  | Some names ->
+    !coq_st.proofv.names
+    <- Some (if replace then new_names else Names.Id.Set.union names new_names);
     { state = st; value = () }
 ;;
 
 let add_name (name : Names.Id.t) (st : wrapper ref) : unit in_context =
   let coq_st = !st.coq_ref in
-  match !coq_st.proofv with
+  match !coq_st.proofv.names with
   | None ->
-    Log.warning "mebi_wrapper.add_name, proofv is None (do nothing)";
+    Log.warning "mebi_wrapper.add_name, proofv.names is None (create new)";
+    !coq_st.proofv.names <- Some (Names.Id.Set.singleton name);
     { state = st; value = () }
-  | Some proofv ->
-    proofv.names <- Names.Id.Set.add name proofv.names;
+  | Some names ->
+    !coq_st.proofv.names <- Some (Names.Id.Set.add name names);
     { state = st; value = () }
 ;;
 

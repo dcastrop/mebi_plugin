@@ -3,14 +3,14 @@ type term = EConstr.t
 (* val enable_logging : bool ref *)
 
 type proof_context =
-  { mutable proof : Declare.Proof.t
-  ; mutable names : Names.Id.Set.t
+  { mutable proof : Declare.Proof.t option
+  ; mutable names : Names.Id.Set.t option
   }
 
 type coq_context =
   { coq_env : Environ.env
   ; coq_ctx : Evd.evar_map
-  ; proofv : proof_context option
+  ; proofv : proof_context
   }
 
 val the_coq_env_opt : Environ.env ref option ref
@@ -117,6 +117,7 @@ type 'a mm = wrapper ref -> 'a in_context
 
 val run : ?keep_encoding:bool ->
 ?fresh:bool ->
+      ?new_proof : bool ->
 ?proof:Declare.Proof.t option ->
 'a mm ->
 'a
@@ -211,7 +212,7 @@ val invalid_check_updated_ctx
 val set_proof :Declare.Proof.t -> wrapper ref -> unit in_context
 val get_env : wrapper ref -> Environ.env in_context
 val get_sigma : wrapper ref -> Evd.evar_map in_context
-val get_proofv : wrapper ref -> proof_context option in_context
+val get_proofv : wrapper ref -> proof_context in_context
 val get_fwd_enc : wrapper ref -> E.t F.t in_context
 val get_bck_enc : wrapper ref -> term B.t in_context
 
