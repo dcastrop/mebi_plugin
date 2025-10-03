@@ -364,10 +364,64 @@ let sandbox (m : 'a mm) (st : wrapper ref) : 'a in_context =
   { state = st; value = res.value }
 ;;
 
+(**********************************)
+(****** DEBUG PRINTOUTS ***********)
+(**********************************)
+
 let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
   state (fun env sigma ->
     Feedback.msg_debug (f env sigma);
     sigma, ())
+;;
+
+let show_proof_data () : unit mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  (match !coq_st.proofv.proof with
+   | None -> Log.debug "mebi_wrapper.show_proof, proofv.proof is None"
+   | Some proof ->
+     let the_proof : Proof.t = Declare.Proof.get proof in
+     let the_data = Proof.data the_proof in
+     let goals_string = Utils.pstr_evar_list the_data.goals in
+     let all_goals_string =
+       Utils.pstr_evar_list (Evar.Set.to_list (Proof.all_goals the_proof))
+     in
+     let stack_string =
+       if List.is_empty the_data.stack
+       then "[ ] (empty)"
+       else
+         Printf.sprintf
+           "[%s]"
+           (List.fold_left
+              (fun (acc : string) ((a, b) : Evar.t list * Evar.t list) ->
+                Printf.sprintf
+                  "%s\n%s%s,\n%s%s\n"
+                  acc
+                  (Utils.str_tabs 1)
+                  (Utils.pstr_evar_list ~indent:2 a)
+                  (Utils.str_tabs 1)
+                  (Utils.pstr_evar_list ~indent:2 b))
+              ""
+              the_data.stack)
+     in
+     Log.debug
+       (Printf.sprintf
+          "mebi_wrapper.show_proof_data, name: %s\n\
+           - is done: %b\n\
+           - no focused goal: %b\n\
+           - goals: %s\n\
+           - all goals: %s\n\
+           - stack %s\n\
+           - pr_proof %s\n"
+          (Names.Id.to_string the_data.name)
+          (Proof.is_done the_proof)
+          (Proof.no_focused_goal the_proof)
+          goals_string
+          all_goals_string
+          stack_string
+          (Utils.ppstr (Proof.pr_proof the_proof))));
+  (* *)
+  { state = st; value = () }
 ;;
 
 let show_proof () : unit mm =
@@ -376,10 +430,12 @@ let show_proof () : unit mm =
   (match !coq_st.proofv.proof with
    | None -> Log.debug "mebi_wrapper.show_proof, proofv.proof is None"
    | Some proof ->
+     let the_proof : Proof.t = Declare.Proof.get proof in
+     let proof_string = Utils.ppstr (Proof.pr_proof the_proof) in
      Log.debug
        (Printf.sprintf
-          "mebi_wrapper.show_proof: %s"
-          (Pp.string_of_ppcmds (Proof.pr_proof (Declare.Proof.get proof)))));
+          "mebi_wrapper.show_proof, Proof.pr_proof: %s"
+          proof_string));
   { state = st; value = () }
 ;;
 
@@ -403,7 +459,7 @@ let show_names () : unit mm =
                       "%s\n\t%s : %s"
                       acc
                       (Names.Id.to_string n)
-                      (Pp.string_of_ppcmds (Names.Id.print n)))
+                      (Utils.ppstr (Names.Id.print n)))
                   names
                   ""))));
   { state = st; value = () }
@@ -531,7 +587,7 @@ let constr_to_string (x : Constr.t) : string =
     let open Syntax in
     let* env = get_env in
     let* sigma = get_sigma in
-    return (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma x))
+    return (Utils.ppstr (Printer.pr_constr_env env sigma x))
   in
   run ~keep_encoding:true s_mm
 ;;
@@ -541,7 +597,7 @@ let econstr_to_string (x : EConstr.t) : string =
     let open Syntax in
     let* env = get_env in
     let* sigma = get_sigma in
-    return (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma x))
+    return (Utils.ppstr (Printer.pr_econstr_env env sigma x))
   in
   run ~keep_encoding:true s_mm
 ;;
@@ -553,7 +609,7 @@ let constr_rel_decl_to_string (rd : Constr.rel_declaration) : string =
     let open Syntax in
     let* env = get_env in
     let* sigma = get_sigma in
-    return (Pp.string_of_ppcmds (Printer.pr_rel_decl env sigma rd))
+    return (Utils.ppstr (Printer.pr_rel_decl env sigma rd))
   in
   run ~keep_encoding:true s_mm
 ;;
@@ -563,7 +619,7 @@ let econstr_rel_decl_to_string (rd : EConstr.rel_declaration) : string =
     let open Syntax in
     let* env = get_env in
     let* sigma = get_sigma in
-    return (Pp.string_of_ppcmds (Printer.pr_erel_decl env sigma rd))
+    return (Utils.ppstr (Printer.pr_erel_decl env sigma rd))
   in
   run ~keep_encoding:true s_mm
 ;;
@@ -850,14 +906,14 @@ module Error : ERROR_TYPE = struct
               (List.exists (fun (k : term) -> EConstr.eq_constr sg ty k) trkeys))
       ++ strbrk "\n"
       ++ str
-           (let tystr = Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg ty) in
+           (let tystr = Utils.ppstr (Printer.pr_econstr_env ev sg ty) in
             Printf.sprintf
               "Does Type match String of any Key? = %b"
               (List.exists
                  (fun (k : term) ->
                    String.equal
                      tystr
-                     (Pp.string_of_ppcmds (Printer.pr_econstr_env ev sg k)))
+                     (Utils.ppstr (Printer.pr_econstr_env ev sg k)))
                  trkeys))
     | PrimaryLTSNotFound (ev, sg, t, names) ->
       str "Primary LTS Not found for term: "
@@ -1021,7 +1077,7 @@ let decode_to_string (x : E.t) : string =
     let* y = decode x in
     let* env = get_env in
     let* sigma = get_sigma in
-    return (Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma y))
+    return (Utils.ppstr (Printer.pr_econstr_env env sigma y))
   in
   run ~keep_encoding:true s_mm
 ;;

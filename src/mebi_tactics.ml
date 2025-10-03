@@ -1,16 +1,24 @@
 open Logging
 open Mebi_wrapper
 
-let apply_In_sim () : unit Proofview.tactic mm =
-  let open Mebi_wrapper.Syntax in
-  let* t = Mebi_theories.c_In_sim () in
-  return (Proofview.Goal.enter (fun gl -> Tactics.apply t))
+let apply (c : EConstr.t) : unit Proofview.tactic =
+  Proofview.Goal.enter (fun gl -> Tactics.apply c)
 ;;
 
-let apply_Pack_sim () : unit Proofview.tactic mm =
+let apply_mm (c : EConstr.t mm) : unit Proofview.tactic mm =
   let open Mebi_wrapper.Syntax in
-  let* t = Mebi_theories.c_Pack_sim () in
-  return (Proofview.Goal.enter (fun gl -> Tactics.apply t))
+  let* c = c in
+  return (apply c)
+;;
+
+let eapply (c : EConstr.t) : unit Proofview.tactic =
+  Proofview.Goal.enter (fun gl -> Tactics.eapply c)
+;;
+
+let eapply_mm (c : EConstr.t mm) : unit Proofview.tactic mm =
+  let open Mebi_wrapper.Syntax in
+  let* c = c in
+  return (eapply c)
 ;;
 
 (****************************************************************************)
@@ -27,6 +35,13 @@ let unfold_econstr : EConstr.t -> unit Proofview.tactic mm = function
      | _ ->
        Log.warning "mebi_tactics.unfold_econstr -- not Constr!";
        return (Proofview.tclUNIT ()))
+;;
+
+let unfold_econstr_mm : EConstr.t mm -> unit Proofview.tactic mm = function
+  | x ->
+    let open Syntax in
+    let* x : EConstr.t = x in
+    unfold_econstr x
 ;;
 
 let unfold_constrexpr : Constrexpr.constr_expr -> unit Proofview.tactic mm
