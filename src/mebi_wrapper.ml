@@ -203,6 +203,7 @@ module IntEncoding : ENCODING_TYPE = struct
     end)
 
   let encode (fwd : t F.t) (bck : term Tbl.t) (k : term) : t =
+    Log.trace "Mebi_wrapper.IntEncoding.encode";
     match F.find_opt fwd k with
     | None ->
       (* map to next encoding and return *)
@@ -210,8 +211,17 @@ module IntEncoding : ENCODING_TYPE = struct
       counter := !counter + 1;
       F.add fwd k next_enc;
       Tbl.add bck next_enc k;
+      Log.debug
+        (Printf.sprintf
+           "Mebi_wrapper.IntEncoding.encode, new encoding: %s"
+           (to_string next_enc));
       next_enc
-    | Some enc -> enc
+    | Some enc ->
+      Log.debug
+        (Printf.sprintf
+           "Mebi_wrapper.IntEncoding.encode -- already encoded as (%s)"
+           (to_string enc));
+      enc
   ;;
 
   exception InvalidDecodeKey of (t * term Tbl.t)
@@ -409,6 +419,7 @@ let show_proof_data () : unit mm =
           "mebi_wrapper.show_proof_data, name: %s\n\
            - is done: %b\n\
            - no focused goal: %b\n\
+           - unfocused: %b\n\
            - goals: %s\n\
            - all goals: %s\n\
            - stack %s\n\
@@ -416,6 +427,7 @@ let show_proof_data () : unit mm =
           (Names.Id.to_string the_data.name)
           (Proof.is_done the_proof)
           (Proof.no_focused_goal the_proof)
+          (Proof.unfocused the_proof)
           goals_string
           all_goals_string
           stack_string
@@ -536,6 +548,14 @@ let new_evar_of_econstr (t : EConstr.t) : EConstr.t mm =
 ;;
 
 let new_evar_of_term (t : term) : term mm = new_evar_of_econstr t
+
+(* let evar_to_econstr (t:Evar.t) : EConstr.t mm = 
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  (* let sigma, t = EConstr.mkLEvar sigma *)
+  let x = Evarutil. in
+  { state = st; value = t }
+  ;; *)
 
 (********************************************)
 (****** SYNTAX ******************************)

@@ -25,7 +25,7 @@ val unfold_constrexpr_list :
   unit Proofview.tactic Mebi_wrapper.mm
 
 val cofix :
-  ?name:Names.variable option ->
+  ?name:Names.Id.t option ->
   unit ->
   unit Proofview.tactic Mebi_wrapper.mm
 

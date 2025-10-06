@@ -12,14 +12,11 @@ module Info = struct
         (match names with
          | [] -> ""
          | nh :: nt ->
-           if List.is_empty nt
-           then nh
-           else
-             List.fold_left
-               (fun (acc : string) (name : string) ->
-                 Printf.sprintf "%s, %s" acc name)
-               nh
-               nt)
+           List.fold_left
+             (fun (acc : string) (nt_str : string) ->
+               Printf.sprintf "%s, %s" acc nt_str)
+             (Printf.sprintf "%s" nh)
+             nt)
     ;;
   end
 

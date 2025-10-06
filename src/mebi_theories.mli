@@ -22,4 +22,4 @@ val c_clos_refl_trans_1n : Evd.econstr Mebi_wrapper.mm
 val c_rt1n_refl : Evd.econstr Mebi_wrapper.mm
 val c_rt1n_trans : Evd.econstr Mebi_wrapper.mm
 val c_clos_trans_1n : Evd.econstr Mebi_wrapper.mm
-val _package : Names.variable -> unit Proofview.tactic
+val _package : Names.Id.t -> unit Proofview.tactic

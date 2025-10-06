@@ -12,6 +12,17 @@ Import Flat.Simple.
 
 Require Import MEBI.Examples.bisimilarity.Proc.Test1.Terms.
 
+MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.Bisim".
+MeBi Set ShowAny True. 
+MeBi Set ShowNotices  True.
+MeBi Set ShowDebug    True.
+MeBi Set ShowDetails  True.
+MeBi Set ShowResults  True.
+MeBi Set ShowWarnings True.
+MeBi Set WeakMode     True.
+MeBi Set Weak Option label.
+MeBi Bisim p With termLTS And q With termLTS Using termLTS.
+
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs".
 MeBi Reset All.
 MeBi Set ShowAny      True.
@@ -24,8 +35,12 @@ MeBi Set ShowResults  True.
 (* MeBi Set Bound 100. *)
 MeBi Set WeakMode     True.
 MeBi Set Weak Option label.
+MeBi Set FailIfIncomplete True.
+MeBi Set FailIfNotBisim True.
 (* MeBi See All.  *)
 (* MeBi Set ShowAny False. *)
+
+
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
@@ -42,26 +57,42 @@ Proof.
   inversion H; subst; unfold tsubst in *; clear H.
   eexists; split.
 
+  (* MeBiSim Proofview_monadTest. *)
+  MeBiSim FocusTest. MeBiSim GoalTest.
+  MeBi_Debug ThisProof. MeBi_Debug ProofNames.
+
+    (* do 2 constructor. unfold tsubst in *.
+    eapply rt1n_trans. do 2 constructor.
+    eauto with rel_db.  *)
+
   (* NOTE: the below reveals a change in the Proof.data.stack (focus stack) *)
   - 
-  MeBiSim WeakNone. 
+  MeBiSim FocusTest. MeBiSim GoalTest.
+  MeBi_Debug ThisProof. MeBi_Debug ProofNames.
+
+  MeBiSim Proofview_monadTest.
+
+
+
+  (* MeBiSim WeakNone.  *)
+  (* shelve. shelve. Unshelve. *)
+
+  (* MeBi FSM p Using termLTS. *)
+
+
   (* eapply rt1n_trans. *)
 
   (* MeBi_Debug ThisProof. *)
-  MeBiSim FocusTest.
-  (* MeBiSim GoalTest. *)
 
 
 (* {  *)
   (* apply wk_none; unfold silent. *)
-    (* eapply rt1n_trans.  *)
+    (* eapply rt1n_trans. 
     do 2 constructor. unfold tsubst in *.
     eapply rt1n_trans. do 2 constructor.
-    eauto with rel_db. 
+    eauto with rel_db.  *)
     (* } *)
 
-
-  MeBi_Debug ProofNames.
 
 
   (* TODO: use the plugin info next... *)
@@ -70,9 +101,6 @@ Proof.
   (* MeBi_unfold weak_sim. *)
 
   (* MeBi_Debug ProofNames. *)
-
-  (* MeBi_Debug ThisProof. *)
-(* MeBi Set ShowDetails True. MeBi Bisim p With termLTS And q With termLTS Using termLTS. *)
 
 
   (* MeBi_Bisimilarity p With termLTS And q With termLTS Using termLTS.

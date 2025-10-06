@@ -55,6 +55,7 @@ VERNAC COMMAND EXTEND MeBi_Debug CLASSIFIED AS QUERY
       Logging.Log.debug "MeBi_Debug:ThisProof: BEGIN";
       let open Mebi_wrapper.Syntax in 
       let* _ = Mebi_wrapper.show_proof () in
+      let* _ = Mebi_wrapper.show_proof_data () in 
       Logging.Log.debug "MeBi_Debug:ThisProof: END";
       Mebi_wrapper.return ()
     ) 
@@ -104,7 +105,38 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim:TODO BEGIN";
       (*  *)
+      (* let open Mebi_wrapper.Syntax in  *)
+      (*  *)
       Logging.Log.debug "MeBiSim:TODO END";
+      Mebi_wrapper.get_proof ()
+    )
+  }
+(*  *)
+|![ proof ] 
+  [ "MeBiSim" "Proofview_monadTest" ] ->
+  { fun ~pstate -> 
+    Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
+      if Logging.is_debug_enabled () then Logging.Log.override "\n";
+      Logging.Log.debug "MeBiSim:Proofview_monadTest BEGIN";
+      (*  *)
+      (* let open Mebi_wrapper.Syntax in  *)
+      (* let* the_proof : Declare.Proof.t = Mebi_wrapper.get_proof () in 
+      let the_proof : Proof.t = Declare.Proof.get the_proof in
+      let the_data : Proof.data = Proof.data the_proof in
+      let* _ = (match the_data.stack with 
+      | [] -> 
+        Logging.Log.debug "MeBiSim:Proofview_monadTest, stack: empty";
+        Mebi_wrapper.return ()
+      | h::_ -> (
+        Logging.Log.debug (Printf.sprintf "MeBiSim:Proofview_monadTest, stack:\n- h.1: %s\n- h.2" (Utils.pstr_evar_list (fst h)) (Utils.pstr_evar_list (snd h)));
+        let _goal_state : Proofview_monad.goal_with_state = 
+          Proofview_monad.with_empty_state h 
+        in
+        let _the_concl : EConstr.types = Tacmatch.pf_concl 
+        Mebi_wrapper.return ()
+      )) in  *)
+      (*  *)
+      Logging.Log.debug "MeBiSim:Proofview_monadTest END";
       Mebi_wrapper.get_proof ()
     )
   }
@@ -117,6 +149,10 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       Logging.Log.debug "MeBiSim:GoalTest BEGIN";
       (* let open Mebi_wrapper.Syntax in  *)
       (* TODO: check out using [tclSELECT] https://rocq-prover.org/doc/V8.20.0/api/coq-core/Goal_select/index.html *)
+      Logging.Log.debug (Printf.sprintf "MeBiSim:GoalTest, Default Goal Selector: %s" (Utils.ppstr (Goal_select.pr_goal_selector (Goal_select.get_default_goal_selector ()))));
+      let open Mebi_wrapper.Syntax in 
+      let* _ = Mebi_wrapper.update_proof_by_tactic (Goal_select.tclSELECT (Goal_select.get_default_goal_selector ()) (Proofview.tclUNIT ())) in
+      let* _ = Mebi_wrapper.show_proof_data () in 
       Logging.Log.debug "MeBiSim:GoalTest END";
       Mebi_wrapper.get_proof ()
     )
@@ -132,16 +168,23 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       let open Mebi_wrapper.Syntax in 
       let* proof = Mebi_wrapper.get_proof () in
       let the_proof : Proof.t = Declare.Proof.get proof in
-      let _focus_kind = Proof.new_focus_kind "test_focus_kind" in
+      (* let _focus_kind = Proof.new_focus_kind "test_focus_kind" in
       let _focus_cond = Proof.no_cond _focus_kind in
       let _focused_proof : Proof.t =
         Proof.focus _focus_cond "test_focus_kind" 1 the_proof
-      in
+      in *)
       let the_data = Proof.data the_proof in
      let goals_string = Utils.pstr_evar_list the_data.goals in
      let all_goals_string =
        Utils.pstr_evar_list (Evar.Set.to_list (Proof.all_goals the_proof))
      in
+     (* let* sigma = get_sigma in 
+     Evar.Set.iter (fun (e:Evar.t) -> 
+      Logging.Log.debug (
+        Printf.sprintf "MeBiSim:FocusTest, all goals (%s) is_ground_term %b, is_ground_env %b, has_undefined_evars: %b" 
+        (Utils.ppstr (Evar.print e)) 
+        (Evarutils.is_ground_term sigma ))) 
+      (Proof.all_goals the_proof); *)
      let stack_string =
        if List.is_empty the_data.stack
        then "[ ] (empty)"
@@ -176,6 +219,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
           all_goals_string
           stack_string
           (Utils.ppstr (Proof.pr_proof the_proof)));
+    
       Logging.Log.debug "MeBiSim:FocusTest END";
       Mebi_wrapper.return proof
     )

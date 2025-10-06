@@ -56,7 +56,7 @@ let rec mk_ctx_substl (substl : EConstr.t list)
 (** Extract args of a type [LTS termL act termR]
     Prerequisite: input *must* be of this shape *)
 let extract_args (substl : EConstr.Vars.substl) (tm : Constr.t)
-  : (term * term * term) mm
+  : (EConstr.t * EConstr.t * EConstr.t) mm
   =
   match Constr.kind tm with
   | App (_, args) ->
@@ -162,6 +162,7 @@ let rec check_updated_ctx
           (* NOTE: testing handling the [@eq] premises *)
           (match econstr_to_string fn with
            | "option" ->
+             (* TODO: fail if weak is not Params.WeakEnc.OptionConstr *)
              (* if Params.WeakEnc.is_option () then *)
              if Logging.is_details_enabled ()
              then
@@ -172,6 +173,8 @@ let rec check_updated_ctx
                     (econstr_list_to_string (Array.to_list args)));
              check_updated_ctx acc lts_ind_def_encmap (substl, tl)
            | "@eq" ->
+             (* TODO: fail, or *)
+             (* TODO: find way to propagate this (replace in F map?) *)
              let* lhs : EConstr.t = normalize_econstr args.(1) in
              let* rhs : EConstr.t = normalize_econstr args.(2) in
              Log.warning
@@ -183,14 +186,9 @@ let rec check_updated_ctx
                   (econstr_to_string fn)
                   (econstr_to_string lhs)
                   (econstr_to_string rhs));
-             (* TODO: find way to propagate this *)
-             let* to_subst
-               : (int * (Constr_tree.t * unif_problem) list list) option
-               =
-               check_updated_ctx acc lts_ind_def_encmap (substl, tl)
-             in
-             return to_subst
+             check_updated_ctx acc lts_ind_def_encmap (substl, tl)
            | _ ->
+             (* TODO: fail ? *)
              Log.warning
                (Printf.sprintf
                   "check_updated_ctx, lts_ind_def_encmap does not have \
@@ -316,7 +314,8 @@ module type GraphB = sig
     ; terminals : S.t
     ; states : S.t
     ; transitions : constr_transitions H.t
-    ; ind_defs : (E.t * Mebi_ind.t) list
+      (* ; ind_defs : (E.t * Mebi_ind.t) list *)
+    ; ind_defs : Mebi_ind.t B.t
     ; weak : Params.WeakEnc.t option
     }
 
@@ -398,7 +397,8 @@ module MkGraph
     ; terminals : S.t
     ; states : S.t
     ; transitions : constr_transitions H.t
-    ; ind_defs : (E.t * Mebi_ind.t) list
+      (* ; ind_defs : (E.t * Mebi_ind.t) list *)
+    ; ind_defs : Mebi_ind.t B.t
     ; weak : Params.WeakEnc.t option
     }
 
@@ -512,20 +512,20 @@ module MkGraph
     iterate 0 (List.length ctors - 1) (S.singleton from) iter_body
   ;;
 
-  (** [get_new_constrs t lts_ind_def_decmap] returns the list of constructors applicable to term [t], using those provided in [lts_ind_def_decmap].
-      If no immediate constructor is found matching [t] in [lts_ind_def_decmap] (likely due to unification problems), then each constructor in [lts_ind_def_decmap] is tried sequentially, until one of them returns some valid constructors.
+  (** [get_new_constrs t lts_ind_def_map] returns the list of constructors applicable to term [t], using those provided in [lts_ind_def_map].
+      If no immediate constructor is found matching [t] in [lts_ind_def_map] (likely due to unification problems), then each constructor in [lts_ind_def_map] is tried sequentially, until one of them returns some valid constructors.
       @raise CannotFindTypeOfTermToVisit
-        if none of the constructors provided in [lts_ind_def_decmap] yield constructors from [check_valid_constructors].
+        if none of the constructors provided in [lts_ind_def_map] yield constructors from [check_valid_constructors].
   *)
   let get_new_constrs
         (from : E.t)
         (primary : Mebi_ind.t)
-        (lts_ind_def_decmap : Mebi_ind.t B.t)
+        (lts_ind_def_map : Mebi_ind.t B.t)
     : coq_ctor list mm
     =
     Log.trace "command.MkGraph.get_new_constrs";
     let* from_dec : EConstr.t = decode from in
-    let* decoded_map : Mebi_ind.t F.t = decode_map lts_ind_def_decmap in
+    let* decoded_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
     let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
     check_valid_constructor
       primary_constr_transitions
@@ -542,7 +542,7 @@ module MkGraph
       @return an [lts_graph] with a maximum of [bound] many states. *)
   let rec build_lts_graph
             (the_primary_lts : Mebi_ind.t)
-            (lts_ind_def_decmap : Mebi_ind.t B.t)
+            (lts_ind_def_map : Mebi_ind.t B.t)
             (g : lts_graph)
             ((bound, weak_type) : int * Params.WeakEnc.t option)
     : lts_graph mm
@@ -555,37 +555,51 @@ module MkGraph
     else (
       let encoded_t : E.t = Queue.pop g.to_visit in
       let* new_constrs : coq_ctor list =
-        get_new_constrs encoded_t the_primary_lts lts_ind_def_decmap
+        get_new_constrs encoded_t the_primary_lts lts_ind_def_map
       in
       (* [get_new_states] also updates [g.to_visit] *)
       let* new_states : S.t =
         get_new_states ~weak_type encoded_t g new_constrs
       in
       let g : lts_graph = { g with states = S.union g.states new_states } in
-      build_lts_graph the_primary_lts lts_ind_def_decmap g (bound, weak_type))
+      build_lts_graph the_primary_lts lts_ind_def_map g (bound, weak_type))
   ;;
 
   (** @return
         the key for the primary lts and hashtable mapping the name of the coq definition to the rlts.
   *)
-  let build_lts_ind_def_decmap (grefs : Names.GlobRef.t list)
-    : Mebi_ind.t B.t mm
-    =
-    Log.trace "command.MkGraph.build_lts_ind_def_decmap";
+  let build_lts_ind_def_map (grefs : Names.GlobRef.t list) : Mebi_ind.t B.t mm =
+    Log.trace "command.MkGraph.build_lts_ind_def_map";
     let num_grefs : int = List.length grefs in
     let iter_body (i : int) (acc_map : Mebi_ind.t B.t) =
       let gref : Names.GlobRef.t = List.nth grefs i in
       let* lts_ind_def : Mebi_ind.t = Mebi_utils.get_ind_lts i gref in
       (* add name of inductive prop *)
       let* encoding : E.t = encode lts_ind_def.info.name in
-      B.add acc_map encoding lts_ind_def;
+      if Bool.not (B.mem acc_map encoding)
+      then B.add acc_map encoding lts_ind_def;
       return acc_map
     in
     iterate 0 (num_grefs - 1) (B.create num_grefs) iter_body
   ;;
 
-  (** [build_graph lts_ind_def_decmap fn_rlts tref bound] is the entry point for [build_lts_graph].
-      @param lts_ind_def_decmap maps coq-term types to [Mebi_ind.t].
+  let get_primary_lts
+        (primary_lts : Libnames.qualid)
+        (grefs : Names.GlobRef.t list)
+        (lts_ind_def_map : Mebi_ind.t B.t)
+    : Mebi_ind.t mm
+    =
+    let open Mebi_utils in
+    (* encode the primary lts *)
+    let* primary_lts_ind_def : Mebi_ind.t =
+      get_ind_lts (List.length grefs) (ref_to_glob primary_lts)
+    in
+    let* the_primary_enc : E.t = encode primary_lts_ind_def.info.name in
+    return (B.find lts_ind_def_map the_primary_enc)
+  ;;
+
+  (** [build_graph lts_ind_def_map fn_rlts tref bound] is the entry point for [build_lts_graph].
+      @param lts_ind_def_map maps coq-term types to [Mebi_ind.t].
       @param tref is the original coq-term.
       @param bound is the number of states to explore until. *)
   let build_graph
@@ -599,20 +613,13 @@ module MkGraph
     (* normalize the initial term *)
     let* t : EConstr.t = constrexpr_to_econstr tref in
     let* t : EConstr.t = normalize_econstr t in
-    let* lts_ind_def_decmap : Mebi_ind.t B.t = build_lts_ind_def_decmap grefs in
-    (* encode the primary lts *)
-    let* c : Mebi_ind.t =
-      Mebi_utils.get_ind_lts
-        (List.length grefs)
-        (Mebi_utils.ref_to_glob primary_lts)
-    in
-    let* the_primary_enc : E.t = encode c.info.name in
+    (* encode lts inductive definitions *)
+    let* lts_ind_def_map : Mebi_ind.t B.t = build_lts_ind_def_map grefs in
+    let* the_primary_lts = get_primary_lts primary_lts grefs lts_ind_def_map in
     (* update environment by typechecking *)
-    let the_primary_lts : Mebi_ind.t =
-      B.find lts_ind_def_decmap the_primary_enc
-    in
     let* primary_trm_type = Mebi_ind.get_lts_trm_type the_primary_lts in
     let$* u env sigma = Typing.check env sigma t primary_trm_type in
+    (* get initial term *)
     let$ init env sigma = sigma, Reductionops.nf_all env sigma t in
     let* encoded_init = encode init in
     let q = Queue.create () in
@@ -620,20 +627,21 @@ module MkGraph
     let* g =
       build_lts_graph
         the_primary_lts
-        lts_ind_def_decmap
+        lts_ind_def_map
         { to_visit = q
         ; init = encoded_init
         ; terminals = S.empty
         ; states = S.empty
         ; transitions = H.create 0
         ; ind_defs =
-            B.fold
-              (fun (_key : E.t)
-                (_val : Mebi_ind.t)
-                (acc : (E.t * Mebi_ind.t) list) ->
-                match _val.kind with LTS _ -> (_key, _val) :: acc | _ -> acc)
-              lts_ind_def_decmap
-              []
+            lts_ind_def_map
+            (* B.fold
+               (fun (_key : E.t)
+               (_val : Mebi_ind.t)
+               (acc : (E.t * Mebi_ind.t) list) ->
+               match _val.kind with LTS _ -> (_key, _val) :: acc | _ -> acc)
+               lts_ind_def_map
+               [] *)
         ; weak = weak_type
         }
         (bound, weak_type)
@@ -768,25 +776,34 @@ module MkGraph
         iter_from)
   ;;
 
-  let decoq_ind_defs (ind_defs : (E.t * Mebi_ind.t) list)
-    : (E.t * (string * string list)) list mm
+  let decoq_lts_ind_def_map (lts_ind_def_map : Mebi_ind.t B.t)
+    : (E.t * (string * string list)) list
     =
-    if List.is_empty ind_defs
-    then return []
-    else (
-      let iter_body (i : int) (acc : (E.t * (string * string list)) list) =
-        let ((enc, ind_def) : E.t * Mebi_ind.t) = List.nth ind_defs i in
-        let def_str : string = econstr_to_string ind_def.info.name in
-        let names_list : string list =
-          Array.fold_left
-            (fun (acc : string list) (name : Names.Id.t) ->
-              Names.Id.to_string name :: acc)
-            []
-            ind_def.info.constr_names
-        in
-        return ((enc, (def_str, List.rev names_list)) :: acc)
-      in
-      iterate 0 (List.length ind_defs - 1) [] iter_body)
+    let x = ref 0 in
+    let xpp () =
+      let y = !x in
+      x := y + 1;
+      y
+    in
+    B.fold
+      (fun (lts_enc : E.t)
+        (the_ind_def : Mebi_ind.t)
+        (acc : (E.t * (string * string list)) list) ->
+        match the_ind_def.kind with
+        | LTS the_lts_ind_def ->
+          let lts_name = econstr_to_string the_ind_def.info.name in
+          let lts_name = Printf.sprintf "%s_%i" lts_name (xpp ()) in
+          let lts_constrs =
+            Array.fold_left
+              (fun (acc : string list) (name : Names.Id.t) ->
+                Names.Id.to_string name :: acc)
+              []
+              the_ind_def.info.constr_names
+          in
+          (lts_enc, (lts_name, lts_constrs)) :: acc
+        | _ -> acc)
+      lts_ind_def_map
+      []
   ;;
 
   let decoq_weak_enc (w : Params.WeakEnc.t option) : string list mm =
@@ -807,8 +824,8 @@ module MkGraph
     let* ((alphabet, transitions) : Model.Alphabet.t * Model.Transitions.t) =
       decoq_transitions ~cache_decoding g.transitions
     in
-    let* ind_defs : (E.t * (string * string list)) list =
-      decoq_ind_defs g.ind_defs
+    let ind_defs : (E.t * (string * string list)) list =
+      decoq_lts_ind_def_map g.ind_defs
     in
     let* w : string list = decoq_weak_enc g.weak in
     let info : Info.t option =
@@ -1079,6 +1096,11 @@ let tactic (k : tactic_kind) : unit Proofview.tactic mm =
     in
     Log.debug "command.tactic, - - - - - - - - - - - - - - -\n";
     (* TODO: use bisim result to find a state that is bisimilar to [m2] that originates in saturated [n] that is reachable from [n1] via only [None] actions *)
+    (* let* proof = Mebi_wrapper.get_proof () in *)
+    (* let the_proof : Proof.t = Declare.Proof.get proof in *)
+    (* let the_data : Proof.data = Proof.data the_proof in *)
+    (* let the_goals : Evar.t list = the_data.goals in *)
+    (* let _t : unit Proofview.tactic = Proofview.shelve_unifiable in *)
     let _t : unit Proofview.tactic = Proofview.tclUNIT () in
     return _t
 ;;
