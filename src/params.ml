@@ -266,6 +266,26 @@ let reset_weak_type_args () : unit =
 (** Weak Type Kind ****)
 (**********************)
 
+(* type weak_type_kind =
+   | Kind_Option
+   | Kind_Custom
+
+   let weak_type_kind_default : weak_type_kind option = None
+   let weak_type_kind : weak_type_kind option ref = ref weak_type_kind_default
+   let reset_weak_type_kind () : unit = weak_type_kind := weak_type_kind_default
+
+   let is_weak_type_kind_option () : bool =
+   match !weak_type_kind with
+   | None -> false
+   | Some w -> (match w with Kind_Option -> true | _ -> false)
+   ;;
+
+   let is_weak_type_kind_custom () : bool =
+   match !weak_type_kind with
+   | None -> false
+   | Some w -> (match w with Kind_Custom -> true | _ -> false)
+   ;; *)
+
 (* must be re-obtained for each mebi_wrapper.run (...) *)
 module WeakEnc = struct
   type t =
@@ -444,6 +464,7 @@ let set_weak_types_args (t : WeakArgs.t * WeakArgs.t option) : unit =
 
 let obtain_weak_kinds_from_args () : unit Mebi_wrapper.mm =
   Log.debug "params.obtain_weak_kinds_from_args";
+  (* reset_weak_type_kind (); *)
   let open Mebi_wrapper in
   if !the_weak_mode
   then (

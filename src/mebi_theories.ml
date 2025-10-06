@@ -5,6 +5,18 @@ open Logging
 
 let constants : EConstr.t list ref = ref ([] : EConstr.t list)
 
+(* let find_reference (path : string list) (id : string) : Names.GlobRef.t =
+   let path = Names.DirPath.make (List.rev_map Names.Id.of_string path) in
+   let fp = Libnames.make_path path (Names.Id.of_string id) in
+   Nametab.global_of_path fp*)
+let find_reference = Coqlib.find_reference [@ocaml.warning "-3"]
+
+(****************************************************************************)
+
+(* NOTE: for handling *)
+
+(****************************************************************************)
+
 (* This is a pattern to collect terms from the Coq memory of valid terms
    and proofs.  This pattern extends all the way to the definition of function
    c_U *)
@@ -14,12 +26,6 @@ let collect_bisimilarity_theories () : EConstr.t list mm =
   | [] ->
     let open Mebi_wrapper.Syntax in
     let* env = get_env in
-    (* let find_reference (path : string list) (id : string) : Names.GlobRef.t =
-       let path = Names.DirPath.make (List.rev_map Names.Id.of_string path) in
-       let fp = Libnames.make_path path (Names.Id.of_string id) in
-       Nametab.global_of_path fp
-       in *)
-    let find_reference = (Coqlib.find_reference [@ocaml.warning "-3"]) in
     Log.debug "mebi_theories.collect_bisimilarity_theories, mapping constants";
     constants
     := List.map

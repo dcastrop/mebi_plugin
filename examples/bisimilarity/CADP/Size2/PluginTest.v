@@ -22,6 +22,8 @@ MeBi Reset All.
 (* MeBi Set Bound 8000. *)
 MeBi Set WeakMode     True.
 MeBi Set Weak Option label.
+MeBi Set FailIfIncomplete True.
+MeBi Set FailIfNotBisim True.
 (* MeBi See All.  *)
 MeBi Set ShowAny False.
 
