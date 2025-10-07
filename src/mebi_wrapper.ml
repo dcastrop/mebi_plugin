@@ -673,7 +673,7 @@ let show_proof_data () : unit mm =
      let goals : Proofview.Goal.t Proofview.tactic list Proofview.tactic =
        Proofview.Goal.goals
      in
-     let goals = goals in
+     let _goals = goals in
      let the_proof : Proof.t = Declare.Proof.get proof in
      let the_data = Proof.data the_proof in
      let goals_string = Utils.pstr_evar_list the_data.goals in
