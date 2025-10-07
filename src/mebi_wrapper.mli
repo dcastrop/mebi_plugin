@@ -121,6 +121,7 @@ val run : ?keep_encoding:bool ->
 ?proof:Declare.Proof.t option ->
 'a mm ->
 'a
+val string_mm : string mm -> string
 val return : 'a -> 'a mm
 val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
 val map : ('a -> 'b) -> 'a mm -> 'b mm
@@ -249,15 +250,18 @@ end
 module Syntax : MEBI_MONAD_SYNTAX
 
 (* *)
-val type_of_constrexpr : Constrexpr.constr_expr -> term mm
+val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
+val econstr_list_to_constr : ?abort_on_undefined_evars:bool -> EConstr.t list -> Constr.t list mm
 
 (* *)
 val econstr_eq : EConstr.t -> EConstr.t -> bool mm
 val term_eq : term -> term -> bool mm
 
 (* *)
-val econstr_to_constr : ?abort_on_undefined_evars:bool -> term -> Constr.t mm
+val econstr_to_constr : ?abort_on_undefined_evars:bool -> EConstr.t -> Constr.t mm
 val term_to_constr : ?abort_on_undefined_evars:bool -> term -> Constr.t mm
+val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
+val term_to_constr_opt : term -> Constr.t option mm
 val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
 val constrexpr_to_term : Constrexpr.constr_expr -> term mm
 val normalize_econstr : EConstr.t -> EConstr.t mm
@@ -304,11 +308,13 @@ val constr_to_string : Constr.t -> string
 val econstr_to_string : EConstr.t -> string
 val term_to_string : term -> string
 val constr_list_to_string : Constr.t list -> string
+val constr_opt_list_to_string : Constr.t option list -> string
 val econstr_list_to_string : EConstr.t list -> string
 val constr_rel_decl_to_string : Constr.rel_declaration -> string
 val econstr_rel_decl_to_string : EConstr.rel_declaration -> string
 val constr_rel_decl_list_to_string : Constr.rel_declaration list -> string
 val econstr_rel_decl_list_to_string : EConstr.rel_declaration list -> string
+val econstr_list_to_constr_opt_string : EConstr.t list -> string mm
 val debug_encoding : unit -> unit mm
 
 module Constr_tree : sig

@@ -57,21 +57,24 @@ Proof.
   inversion H; subst; unfold tsubst in *; clear H.
   eexists; split.
 
-  (* MeBiSim Proofview_monadTest. *)
-  MeBiSim FocusTest. MeBiSim GoalTest.
-  MeBi_Debug ThisProof. MeBi_Debug ProofNames.
+  MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.UnFocus".
+  MeBiSim FocusTest. 
+  (* MeBiSim GoalTest. *)
 
-    (* do 2 constructor. unfold tsubst in *.
-    eapply rt1n_trans. do 2 constructor.
-    eauto with rel_db.  *)
+  (* do 2 constructor. unfold tsubst in *.
+  eapply rt1n_trans. do 2 constructor.
+  eauto with rel_db.  *)
 
+  MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.Focus".
   (* NOTE: the below reveals a change in the Proof.data.stack (focus stack) *)
   - 
-  MeBiSim FocusTest. MeBiSim GoalTest.
-  MeBi_Debug ThisProof. MeBi_Debug ProofNames.
-
+  MeBiSim FocusTest. 
+  (* MeBiSim GoalTest. *)
   MeBiSim Proofview_monadTest.
 
+  MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.END".
+  MeBi_Debug ThisProof. 
+  MeBi_Debug ProofNames.
 
 
   (* MeBiSim WeakNone.  *)

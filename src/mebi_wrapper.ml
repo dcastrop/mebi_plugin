@@ -281,6 +281,8 @@ let run
   a.value
 ;;
 
+let string_mm (s : string mm) : string = run ~keep_encoding:true s
+
 let return (x : 'a) : 'a mm =
   fun (st : wrapper ref) -> { state = st; value = x }
 [@@inline always]
@@ -375,109 +377,6 @@ let sandbox (m : 'a mm) (st : wrapper ref) : 'a in_context =
 ;;
 
 (**********************************)
-(****** DEBUG PRINTOUTS ***********)
-(**********************************)
-
-let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
-  state (fun env sigma ->
-    Feedback.msg_debug (f env sigma);
-    sigma, ())
-;;
-
-let show_proof_data () : unit mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  (match !coq_st.proofv.proof with
-   | None -> Log.debug "mebi_wrapper.show_proof, proofv.proof is None"
-   | Some proof ->
-     let the_proof : Proof.t = Declare.Proof.get proof in
-     let the_data = Proof.data the_proof in
-     let goals_string = Utils.pstr_evar_list the_data.goals in
-     let all_goals_string =
-       Utils.pstr_evar_list (Evar.Set.to_list (Proof.all_goals the_proof))
-     in
-     let stack_string =
-       if List.is_empty the_data.stack
-       then "[ ] (empty)"
-       else
-         Printf.sprintf
-           "[%s]"
-           (List.fold_left
-              (fun (acc : string) ((a, b) : Evar.t list * Evar.t list) ->
-                Printf.sprintf
-                  "%s\n%s%s,\n%s%s\n"
-                  acc
-                  (Utils.str_tabs 1)
-                  (Utils.pstr_evar_list ~indent:2 a)
-                  (Utils.str_tabs 1)
-                  (Utils.pstr_evar_list ~indent:2 b))
-              ""
-              the_data.stack)
-     in
-     Log.debug
-       (Printf.sprintf
-          "mebi_wrapper.show_proof_data, name: %s\n\
-           - is done: %b\n\
-           - no focused goal: %b\n\
-           - unfocused: %b\n\
-           - goals: %s\n\
-           - all goals: %s\n\
-           - stack %s\n\
-           - pr_proof %s\n"
-          (Names.Id.to_string the_data.name)
-          (Proof.is_done the_proof)
-          (Proof.no_focused_goal the_proof)
-          (Proof.unfocused the_proof)
-          goals_string
-          all_goals_string
-          stack_string
-          (Utils.ppstr (Proof.pr_proof the_proof))));
-  (* *)
-  { state = st; value = () }
-;;
-
-let show_proof () : unit mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  (match !coq_st.proofv.proof with
-   | None -> Log.debug "mebi_wrapper.show_proof, proofv.proof is None"
-   | Some proof ->
-     let the_proof : Proof.t = Declare.Proof.get proof in
-     let proof_string = Utils.ppstr (Proof.pr_proof the_proof) in
-     Log.debug
-       (Printf.sprintf
-          "mebi_wrapper.show_proof, Proof.pr_proof: %s"
-          proof_string));
-  { state = st; value = () }
-;;
-
-let show_names () : unit mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  (match !coq_st.proofv.names with
-   | None -> Log.debug "mebi_wrapper.show_names, proofv.names is None"
-   | Some names ->
-     Log.debug
-       (Printf.sprintf
-          "mebi_wrapper.show_names: %s"
-          (if Names.Id.Set.is_empty names
-           then "[ ] (empty)"
-           else
-             Printf.sprintf
-               "[%s\n]"
-               (Names.Id.Set.fold
-                  (fun (n : Names.Id.t) (acc : string) ->
-                    Printf.sprintf
-                      "%s\n\t%s : %s"
-                      acc
-                      (Names.Id.to_string n)
-                      (Utils.ppstr (Names.Id.print n)))
-                  names
-                  ""))));
-  { state = st; value = () }
-;;
-
-(**********************************)
 (****** COQ TERMS *****************)
 (**********************************)
 
@@ -504,6 +403,14 @@ let term_to_constr ?(abort_on_undefined_evars : bool = false) (x : term)
   =
   econstr_to_constr x
 ;;
+
+let econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  { state = st; value = EConstr.to_constr_opt !coq_st.coq_ctx x }
+;;
+
+let term_to_constr_opt (x : term) : Constr.t option mm = econstr_to_constr_opt x
 
 let constrexpr_to_econstr (t : Constrexpr.constr_expr) : EConstr.t mm =
   fun (st : wrapper ref) ->
@@ -598,6 +505,28 @@ let type_of_constrexpr (tref : Constrexpr.constr_expr) : term mm =
   type_of_econstr t
 ;;
 
+let rec econstr_list_to_constr ?(abort_on_undefined_evars : bool = false)
+  : EConstr.t list -> Constr.t list mm
+  = function
+  | [] -> return []
+  | h :: t ->
+    let open Syntax in
+    let* h = econstr_to_constr ~abort_on_undefined_evars h in
+    let* t = econstr_list_to_constr ~abort_on_undefined_evars t in
+    return (h :: t)
+;;
+
+let rec econstr_list_to_constr_opt ?(abort_on_undefined_evars : bool = false)
+  : EConstr.t list -> Constr.t option list mm
+  = function
+  | [] -> return []
+  | h :: t ->
+    let open Syntax in
+    let* h = econstr_to_constr_opt h in
+    let* t = econstr_list_to_constr_opt t in
+    return (h :: t)
+;;
+
 (**********************************)
 (****** COQ TERM TO STRING ********)
 (**********************************)
@@ -609,7 +538,7 @@ let constr_to_string (x : Constr.t) : string =
     let* sigma = get_sigma in
     return (Utils.ppstr (Printer.pr_constr_env env sigma x))
   in
-  run ~keep_encoding:true s_mm
+  string_mm s_mm
 ;;
 
 let econstr_to_string (x : EConstr.t) : string =
@@ -619,7 +548,7 @@ let econstr_to_string (x : EConstr.t) : string =
     let* sigma = get_sigma in
     return (Utils.ppstr (Printer.pr_econstr_env env sigma x))
   in
-  run ~keep_encoding:true s_mm
+  string_mm s_mm
 ;;
 
 let term_to_string (x : term) : string = econstr_to_string x
@@ -631,7 +560,7 @@ let constr_rel_decl_to_string (rd : Constr.rel_declaration) : string =
     let* sigma = get_sigma in
     return (Utils.ppstr (Printer.pr_rel_decl env sigma rd))
   in
-  run ~keep_encoding:true s_mm
+  string_mm s_mm
 ;;
 
 let econstr_rel_decl_to_string (rd : EConstr.rel_declaration) : string =
@@ -641,19 +570,39 @@ let econstr_rel_decl_to_string (rd : EConstr.rel_declaration) : string =
     let* sigma = get_sigma in
     return (Utils.ppstr (Printer.pr_erel_decl env sigma rd))
   in
-  run ~keep_encoding:true s_mm
+  string_mm s_mm
 ;;
 
 let constr_list_to_string (xs : Constr.t list) : string =
   match xs with
   | [] -> "[]"
-  | h :: [] -> constr_to_string h
+  | h :: [] -> Printf.sprintf "[%s]" (constr_to_string h)
   | h :: t ->
-    List.fold_left
-      (fun (acc : string) (x : Constr.t) ->
-        Printf.sprintf "%s, %s" acc (constr_to_string x))
-      (constr_to_string h)
-      t
+    Printf.sprintf
+      "[%s]"
+      (List.fold_left
+         (fun (acc : string) (x : Constr.t) ->
+           Printf.sprintf "%s, %s" acc (constr_to_string x))
+         (constr_to_string h)
+         t)
+;;
+
+let constr_opt_list_to_string (xs : Constr.t option list) : string =
+  match xs with
+  | [] -> "[]"
+  | None :: [] -> "[None]"
+  | Some h :: [] -> Printf.sprintf "[%s]" (constr_to_string h)
+  | h :: t ->
+    Printf.sprintf
+      "[%s]"
+      (List.fold_left
+         (fun (acc : string) (x : Constr.t option) ->
+           Printf.sprintf
+             "%s, %s"
+             acc
+             (match x with None -> "None" | Some x -> constr_to_string x))
+         (match h with None -> "None" | Some h -> constr_to_string h)
+         t)
 ;;
 
 let econstr_list_to_string (xs : EConstr.t list) : string =
@@ -697,6 +646,134 @@ let econstr_rel_decl_list_to_string (xs : EConstr.rel_declaration list) : string
            Printf.sprintf "%s, %s" acc (econstr_rel_decl_to_string x))
          (econstr_rel_decl_to_string h)
          t)
+;;
+
+let econstr_list_to_constr_opt_string (es : EConstr.t list) : string mm =
+  let open Syntax in
+  let* es = econstr_list_to_constr_opt es in
+  return (constr_opt_list_to_string es)
+;;
+
+(**********************************)
+(****** DEBUG PRINTOUTS ***********)
+(**********************************)
+
+let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
+  state (fun env sigma ->
+    Feedback.msg_debug (f env sigma);
+    sigma, ())
+;;
+
+let show_proof_data () : unit mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  (match !coq_st.proofv.proof with
+   | None -> Log.debug "mebi_wrapper.show_proof, proofv.proof is None"
+   | Some proof ->
+     let goals : Proofview.Goal.t Proofview.tactic list Proofview.tactic =
+       Proofview.Goal.goals
+     in
+     let goals = goals in
+     let the_proof : Proof.t = Declare.Proof.get proof in
+     let the_data = Proof.data the_proof in
+     let goals_string = Utils.pstr_evar_list the_data.goals in
+     let all_goals_string =
+       Utils.pstr_evar_list (Evar.Set.to_list (Proof.all_goals the_proof))
+     in
+     let _partial_proof : EConstr.constr list =
+       Proof.partial_proof the_proof
+       (* Proofview.partial_proof the_data.entry *)
+     in
+     let _x = econstr_list_to_constr_opt_string _partial_proof in
+     (* let _y = string_mm _x in *)
+     let partial_proof_string =
+       "TODO -- (obtaining string from wrapper causes \"Anomaly Uncaught \
+        exception Not_found\")"
+       (* _y *)
+     in
+     (* let _pv = match the_proof with | { proofview; focus_stack; entry; name; poly } -> proofview
+    in *)
+     let stack_string =
+       if List.is_empty the_data.stack
+       then "[ ] (empty)"
+       else
+         Printf.sprintf
+           "[%s]"
+           (List.fold_left
+              (fun (acc : string) ((a, b) : Evar.t list * Evar.t list) ->
+                Printf.sprintf
+                  "%s\n%s%s,\n%s%s\n"
+                  acc
+                  (Utils.str_tabs 1)
+                  (Utils.pstr_evar_list ~indent:2 a)
+                  (Utils.str_tabs 1)
+                  (Utils.pstr_evar_list ~indent:2 b))
+              ""
+              the_data.stack)
+     in
+     Log.debug
+       (Printf.sprintf
+          "mebi_wrapper.show_proof_data, name: %s\n\
+           - is done: %b\n\
+           - no focused goal: %b\n\
+           - unfocused: %b\n\
+           - goals: %s\n\
+           - all goals: %s\n\
+           - stack: %s\n\
+           - partial proof: %s\n\
+           - pr_proof: %s\n"
+          (Names.Id.to_string the_data.name)
+          (Proof.is_done the_proof)
+          (Proof.no_focused_goal the_proof)
+          (Proof.unfocused the_proof)
+          goals_string
+          all_goals_string
+          stack_string
+          partial_proof_string
+          (Utils.ppstr (Proof.pr_proof the_proof))));
+  (* *)
+  { state = st; value = () }
+;;
+
+let show_proof () : unit mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  (match !coq_st.proofv.proof with
+   | None -> Log.debug "mebi_wrapper.show_proof, proofv.proof is None"
+   | Some proof ->
+     let the_proof : Proof.t = Declare.Proof.get proof in
+     let proof_string = Utils.ppstr (Proof.pr_proof the_proof) in
+     Log.debug
+       (Printf.sprintf
+          "mebi_wrapper.show_proof, Proof.pr_proof: %s"
+          proof_string));
+  { state = st; value = () }
+;;
+
+let show_names () : unit mm =
+  fun (st : wrapper ref) ->
+  let coq_st = !st.coq_ref in
+  (match !coq_st.proofv.names with
+   | None -> Log.debug "mebi_wrapper.show_names, proofv.names is None"
+   | Some names ->
+     Log.debug
+       (Printf.sprintf
+          "mebi_wrapper.show_names: %s"
+          (if Names.Id.Set.is_empty names
+           then "[ ] (empty)"
+           else
+             Printf.sprintf
+               "[%s\n]"
+               (Names.Id.Set.fold
+                  (fun (n : Names.Id.t) (acc : string) ->
+                    Printf.sprintf
+                      "%s\n\t%s : %s"
+                      acc
+                      (Names.Id.to_string n)
+                      (Utils.ppstr (Names.Id.print n)))
+                  names
+                  ""))));
+  { state = st; value = () }
 ;;
 
 (********************************************)
@@ -1099,7 +1176,7 @@ let decode_to_string (x : E.t) : string =
     let* sigma = get_sigma in
     return (Utils.ppstr (Printer.pr_econstr_env env sigma y))
   in
-  run ~keep_encoding:true s_mm
+  string_mm s_mm
 ;;
 
 (********************************************)
@@ -1413,12 +1490,11 @@ let new_name_of_string ?(add : bool = true) (s : string) : Names.Id.t mm =
 let update_proof_by_tactic (t : unit Proofview.tactic) : unit mm =
   Log.trace "mebi_wrapper.update_proof_by_tactic";
   let open Syntax in
-  let* the_proof = get_proof () in
+  let* the_proof : Declare.Proof.t = get_proof () in
   let new_proof, is_safe_tactic = Declare.Proof.by t the_proof in
   if Bool.not is_safe_tactic
   then Log.warning "mebi_wrapper.update_proof_by_tactic, unsafe tactic used";
-  let* _ = set_proof new_proof in
-  return ()
+  set_proof new_proof
 ;;
 
 let update_proof_by_tactic_mm (t : unit Proofview.tactic mm) : unit mm =
