@@ -113,35 +113,6 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
   }
 (*  *)
 |![ proof ] 
-  [ "MeBiSim" "Proofview_monadTest" ] ->
-  { fun ~pstate -> 
-    Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBiSim:Proofview_monadTest BEGIN";
-      (*  *)
-      (* let open Mebi_wrapper.Syntax in  *)
-      (* let* the_proof : Declare.Proof.t = Mebi_wrapper.get_proof () in 
-      let the_proof : Proof.t = Declare.Proof.get the_proof in
-      let the_data : Proof.data = Proof.data the_proof in
-      let* _ = (match the_data.stack with 
-      | [] -> 
-        Logging.Log.debug "MeBiSim:Proofview_monadTest, stack: empty";
-        Mebi_wrapper.return ()
-      | h::_ -> (
-        Logging.Log.debug (Printf.sprintf "MeBiSim:Proofview_monadTest, stack:\n- h.1: %s\n- h.2" (Utils.pstr_evar_list (fst h)) (Utils.pstr_evar_list (snd h)));
-        let _goal_state : Proofview_monad.goal_with_state = 
-          Proofview_monad.with_empty_state h 
-        in
-        let _the_concl : EConstr.types = Tacmatch.pf_concl 
-        Mebi_wrapper.return ()
-      )) in  *)
-      (*  *)
-      Logging.Log.debug "MeBiSim:Proofview_monadTest END";
-      Mebi_wrapper.get_proof ()
-    )
-  }
-(*  *)
-|![ proof ] 
   [ "MeBiSim" "GoalTest" ] ->
   { fun ~pstate -> 
     Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
@@ -149,9 +120,12 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       Logging.Log.debug "MeBiSim:GoalTest BEGIN";
       (* let open Mebi_wrapper.Syntax in  *)
       (* TODO: check out using [tclSELECT] https://rocq-prover.org/doc/V8.20.0/api/coq-core/Goal_select/index.html *)
-      Logging.Log.debug (Printf.sprintf "MeBiSim:GoalTest, Default Goal Selector: %s" (Utils.ppstr (Goal_select.pr_goal_selector (Goal_select.get_default_goal_selector ()))));
+      (* Logging.Log.debug (Printf.sprintf "MeBiSim:GoalTest, Default Goal Selector: %s" (Utils.ppstr (Goal_select.pr_goal_selector (Goal_select.get_default_goal_selector ()))));
       let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.update_proof_by_tactic (Goal_select.tclSELECT (Goal_select.get_default_goal_selector ()) (Proofview.tclUNIT ())) in
+      let* _ = Mebi_wrapper.update_proof_by_tactic (Goal_select.tclSELECT (Goal_select.get_default_goal_selector ()) (Proofview.tclUNIT ())) in *)
+      (*  *)
+      (* let goals = Proofview.Goals.goals in 
+      let goals = Proofview.Monad *)
       let* _ = Mebi_wrapper.show_proof_data () in 
       Logging.Log.debug "MeBiSim:GoalTest END";
       Mebi_wrapper.get_proof ()
@@ -627,9 +601,9 @@ VERNAC COMMAND EXTEND MeBiRun CLASSIFIED AS QUERY
 (* for outputting messages -- useful for sifting through compiler output *)
 | ["MeBi" "Message" string(x)] -> {Logging.Log.override x}
 | ["MeBi" "Debug"   string(x)] -> {Logging.Log.debug x}
-| ["MeBi" "Divider"          ] -> {Logging.Log.override "\n- - - - - - - - - - - - - - - -\n"}
-| ["MeBi" string(x) "Divider"] -> {Logging.Log.override (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n" x)}
-| ["MeBi" "Divider" string(x)] -> {Logging.Log.override (Printf.sprintf "\n- - - - - - - - - - - - - - - -\n%s\n" x)}
+| ["MeBi" "Divider"          ] -> {Logging.Log.override "\n- - - - - - - - - - - - - - - -"}
+| ["MeBi" string(x) "Divider"] -> {Logging.Log.override (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -" x)}
+| ["MeBi" "Divider" string(x)] -> {Logging.Log.override (Printf.sprintf "\n- - - - - - - - - - - - - - - -\n%s" x)}
 | ["MeBi" string(x) "Divider" string(y)] -> 
-  {Logging.Log.override (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n%s\n" x y)}
+  {Logging.Log.override (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n%s" x y)}
 END
