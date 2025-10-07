@@ -70,7 +70,6 @@ Proof.
   - 
   MeBiSim FocusTest. 
   (* MeBiSim GoalTest. *)
-  MeBiSim Proofview_monadTest.
 
   MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.END".
   MeBi_Debug ThisProof. 

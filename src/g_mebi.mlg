@@ -118,7 +118,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
     Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim:GoalTest BEGIN";
-      (* let open Mebi_wrapper.Syntax in  *)
+      let open Mebi_wrapper.Syntax in 
       (* TODO: check out using [tclSELECT] https://rocq-prover.org/doc/V8.20.0/api/coq-core/Goal_select/index.html *)
       (* Logging.Log.debug (Printf.sprintf "MeBiSim:GoalTest, Default Goal Selector: %s" (Utils.ppstr (Goal_select.pr_goal_selector (Goal_select.get_default_goal_selector ()))));
       let open Mebi_wrapper.Syntax in 
