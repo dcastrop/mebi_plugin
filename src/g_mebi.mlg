@@ -257,8 +257,8 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       Logging.Log.debug "MeBiSim:Intros BEGIN";
       let open Mebi_wrapper.Syntax in 
       let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
-        [ Mebi_tactics.intro_of_string "m1"
-        ; Mebi_tactics.intro_of_string "act_1"
+        [ Mebi_tactics.intro_of_string ~track:false "m1"
+        ; Mebi_tactics.intro_of_string ~track:false "act_1"
         ; Mebi_tactics.intro_of_string "H"
         ] in 
       Logging.Log.debug "MeBiSim:Intros END";

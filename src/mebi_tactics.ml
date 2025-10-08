@@ -88,10 +88,12 @@ let intros_all () : unit Proofview.tactic mm =
   return Tactics.intros
 ;;
 
-let intro_of_string (s : string) : unit Proofview.tactic mm =
+let intro_of_string ?(track : bool = true) (s : string)
+  : unit Proofview.tactic mm
+  =
   Log.trace "mebi_tactics.intro_of_string";
   let open Mebi_wrapper.Syntax in
-  let* name = Mebi_wrapper.new_name_of_string ~add:true s in
+  let* name = Mebi_wrapper.new_name_of_string ~add:track s in
   return (Tactics.introduction name)
 ;;
 

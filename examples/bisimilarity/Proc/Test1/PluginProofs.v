@@ -54,8 +54,12 @@ Proof.
   MeBiSim Cofix.
   MeBiSim Intros.
 
-  inversion H; subst; unfold tsubst in *; clear H.
+  inversion H; subst. 
+  simpl in *.
   eexists; split.
+
+  MeBiSim WeakNone. 
+
 
   MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.UnFocus".
   MeBiSim FocusTest. 
