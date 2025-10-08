@@ -24,50 +24,52 @@ let collect_bisimilarity_theories () : EConstr.t list mm =
   Log.trace "mebi_theories.collect_bisimilarity_theories";
   match !constants with
   | [] ->
-    let open Mebi_wrapper.Syntax in
-    let* env = get_env in
     Log.debug "mebi_theories.collect_bisimilarity_theories, mapping constants";
-    constants
-    := List.map
-         (fun (x : Names.GlobRef.t) ->
-           EConstr.of_constr (UnivGen.constr_of_monomorphic_global env x))
-         [ find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "LTS"
-         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "tau"
-         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "silent"
-         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "silent1"
-         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "weak"
-         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "wk_some"
-         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "wk_none"
-         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "simF"
-         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "Pack_sim"
-         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "sim_weak"
-         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "weak_sim"
-         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "In_sim"
-         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "out_sim"
-         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "weak_bisim"
-           (* NOTE: if updating to rocq change "Coq" to "Corelib" *)
-           (* NOTE: docs say "Coq" should be "Stdlib" for version prior to rocq, but this doesn't work for me *)
-         ; find_reference
-             "MEBI"
-             [ "Coq"; "Relations"; "Relation_Definitions" ]
-             "relation"
-         ; find_reference
-             "MEBI"
-             [ "Coq"; "Relations"; "Relation_Operators" ]
-             "clos_refl_trans_1n"
-         ; find_reference
-             "MEBI"
-             [ "Coq"; "Relations"; "Relation_Operators" ]
-             "rt1n_refl"
-         ; find_reference
-             "MEBI"
-             [ "Coq"; "Relations"; "Relation_Operators" ]
-             "rt1n_trans"
-         ; find_reference
-             "MEBI"
-             [ "Coq"; "Relations"; "Relation_Operators" ]
-             "clos_trans_1n"
-         ];
+    let open Mebi_wrapper.Syntax in
+    (* TODO: why does error "Not_found" occur if line below is removed? *)
+    let* env = get_env in
+    let* new_constants : EConstr.t list =
+      Mebi_wrapper.map_list_mm
+        (fun (x : Names.GlobRef.t) -> Mebi_wrapper.globref_to_econstr x)
+        [ find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "LTS"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "tau"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "silent"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "silent1"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "weak"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "wk_some"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "wk_none"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "simF"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "Pack_sim"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "sim_weak"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "weak_sim"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "In_sim"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "out_sim"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "weak_bisim"
+          (* NOTE: if updating to rocq change "Coq" to "Corelib" *)
+          (* NOTE: docs say "Coq" should be "Stdlib" for version prior to rocq, but this doesn't work for me *)
+        ; find_reference
+            "MEBI"
+            [ "Coq"; "Relations"; "Relation_Definitions" ]
+            "relation"
+        ; find_reference
+            "MEBI"
+            [ "Coq"; "Relations"; "Relation_Operators" ]
+            "clos_refl_trans_1n"
+        ; find_reference
+            "MEBI"
+            [ "Coq"; "Relations"; "Relation_Operators" ]
+            "rt1n_refl"
+        ; find_reference
+            "MEBI"
+            [ "Coq"; "Relations"; "Relation_Operators" ]
+            "rt1n_trans"
+        ; find_reference
+            "MEBI"
+            [ "Coq"; "Relations"; "Relation_Operators" ]
+            "clos_trans_1n"
+        ]
+    in
+    constants := new_constants;
     Mebi_wrapper.return !constants
   | _ -> Mebi_wrapper.return !constants
 ;;

@@ -115,12 +115,14 @@ type 'a in_context =
 
 type 'a mm = wrapper ref -> 'a in_context
 
-val run : ?keep_encoding:bool ->
-?fresh:bool ->
-      ?new_proof : bool ->
-?proof:Declare.Proof.t option ->
-'a mm ->
-'a
+val run
+  :  ?keep_encoding:bool
+  -> ?fresh:bool
+  -> ?new_proof:bool
+  -> ?proof:Declare.Proof.t option
+  -> 'a mm
+  -> 'a
+
 val string_mm : string mm -> string
 val return : 'a -> 'a mm
 val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
@@ -210,7 +212,7 @@ val invalid_check_updated_ctx
   -> EConstr.rel_declaration list
   -> 'a mm
 
-val set_proof :Declare.Proof.t -> wrapper ref -> unit in_context
+val set_proof : Declare.Proof.t -> wrapper ref -> unit in_context
 val get_env : wrapper ref -> Environ.env in_context
 val get_sigma : wrapper ref -> Evd.evar_map in_context
 val get_proofv : wrapper ref -> proof_context in_context
@@ -224,7 +226,6 @@ val state
 
 val sandbox : 'a mm -> wrapper ref -> 'a in_context
 val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit mm
-
 val show_proof_data : unit -> unit mm
 val show_proof : unit -> unit mm
 val show_names : unit -> unit mm
@@ -250,20 +251,31 @@ end
 module Syntax : MEBI_MONAD_SYNTAX
 
 (* *)
+val map_list_mm : ('a -> 'b mm) -> 'a list -> 'b list mm
 val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
-val econstr_list_to_constr : ?abort_on_undefined_evars:bool -> EConstr.t list -> Constr.t list mm
+
+val econstr_list_to_constr
+  :  ?abort_on_undefined_evars:bool
+  -> EConstr.t list
+  -> Constr.t list mm
 
 (* *)
 val econstr_eq : EConstr.t -> EConstr.t -> bool mm
 val term_eq : term -> term -> bool mm
 
 (* *)
-val econstr_to_constr : ?abort_on_undefined_evars:bool -> EConstr.t -> Constr.t mm
+val econstr_to_constr
+  :  ?abort_on_undefined_evars:bool
+  -> EConstr.t
+  -> Constr.t mm
+
 val term_to_constr : ?abort_on_undefined_evars:bool -> term -> Constr.t mm
 val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
 val term_to_constr_opt : term -> Constr.t option mm
 val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
 val constrexpr_to_term : Constrexpr.constr_expr -> term mm
+val globref_to_econstr : Names.GlobRef.t -> EConstr.t mm
+val globref_to_term : Names.GlobRef.t -> term mm
 val normalize_econstr : EConstr.t -> EConstr.t mm
 val normalize_term : term -> term mm
 val type_of_econstr : EConstr.t -> EConstr.t mm
@@ -290,20 +302,25 @@ val get_type_of_hyp : Names.Id.t -> EConstr.t mm
 
 (* *)
 val get_proof : unit -> Declare.Proof.t mm
-val get_proof_names : unit ->  Names.Id.Set.t mm
+val get_proof_env : unit -> Environ.env mm
+val get_proof_sigma : unit -> Evd.evar_map mm
+val get_proof_names : unit -> Names.Id.Set.t mm
 
-val update_names : ?replace:bool -> Names.Id.Set.t -> wrapper ref -> unit in_context
+val update_names
+  :  ?replace:bool
+  -> Names.Id.Set.t
+  -> wrapper ref
+  -> unit in_context
+
 val add_name : Names.Id.t -> wrapper ref -> unit in_context
-
 val next_name_of : Names.Id.t -> Names.Id.t mm
 val new_name_of_string : ?add:bool -> string -> Names.Id.t mm
-
 val update_proof_by_tactic : unit Proofview.tactic -> unit mm
 val update_proof_by_tactic_mm : unit Proofview.tactic mm -> unit mm
 val update_proof_by_tactics : unit Proofview.tactic list -> unit mm
 val update_proof_by_tactics_mm : unit Proofview.tactic mm list -> unit mm
 
-(*  *)
+(* *)
 val constr_to_string : Constr.t -> string
 val econstr_to_string : EConstr.t -> string
 val term_to_string : term -> string
@@ -347,14 +364,11 @@ val make_state_tree_pair_set
 val proof_query : Declare.Proof.t -> Proof.t
 val proof_partial : Proof.t -> EConstr.t list
 
-(*  *)
+(* *)
 val proof_test : unit -> unit Proofview.tactic mm
 
-
-(*  *)
-val debug_econstr_kind : EConstr.t -> unit mm 
-val debug_term_kind : term -> unit mm 
-
-val debug_constr_kind : Constr.t -> unit mm 
-val debug_term_constr_kind : term -> unit mm 
-
+(* *)
+val debug_econstr_kind : EConstr.t -> unit mm
+val debug_term_kind : term -> unit mm
+val debug_constr_kind : Constr.t -> unit mm
+val debug_term_constr_kind : term -> unit mm
