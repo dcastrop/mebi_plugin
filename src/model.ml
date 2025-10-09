@@ -11,12 +11,7 @@ module Info = struct
         dec
         (match names with
          | [] -> ""
-         | nh :: nt ->
-           List.fold_left
-             (fun (acc : string) (nt_str : string) ->
-               Printf.sprintf "%s, %s" acc nt_str)
-             (Printf.sprintf "%s" nh)
-             nt)
+         | nh :: nt -> Utils.pstr_list Utils.Strfy.str nt)
     ;;
   end
 
@@ -84,22 +79,13 @@ module Info = struct
       sep
       i.num_edges
       sep
-      (match i.coq_info with
-       | None -> "None"
-       | Some [] -> "[]"
-       | Some (h :: t) ->
-         if List.is_empty t
-         then Coq.to_string h
-         else
-           List.fold_left
-             (fun (acc : string) c_info ->
-               Printf.sprintf "%s, %s" acc (Coq.to_string c_info))
-             (Coq.to_string h)
-             t)
+      (Utils.Strfy.option
+         (Utils.pstr_list (fun (c_info : Coq.t) -> Coq.to_string c_info))
+         i.coq_info)
       sep
       (match i.weak_info with
        | None -> "None"
-       | Some ws -> Utils.pstr_string_list ws)
+       | Some ws -> Utils.pstr_list Utils.Strfy.str ws)
       outer
   ;;
 
@@ -189,18 +175,7 @@ module Action = struct
     let from_opt (t : t option) = match t with None -> None | Some t -> Some t
 
     let to_string (m : t) : string =
-      match m with
-      | [] -> "(No MetaData)"
-      | h :: t ->
-        Printf.sprintf
-          "(%s)"
-          (Printf.sprintf
-             "[%s]"
-             (List.fold_left
-                (fun (acc : string) (i : string) ->
-                  Printf.sprintf "%s; %s" acc i)
-                h
-                t))
+      Utils.pstr_list ~empty_msg:"No MetaData" Utils.Strfy.str m
     ;;
 
     let eq (m1 : t) (m2 : t) : bool =
@@ -270,28 +245,10 @@ module Action = struct
     Printf.sprintf "(%s, %s)" (State.to_string (fst p)) (to_string (snd p))
 
   and annotation_to_string (anno : annotation) : string =
-    if List.is_empty anno
-    then "[ ] (empty)"
-    else
-      Printf.sprintf
-        "[%s]"
-        (List.fold_left
-           (fun (acc : string) (p : annotation_pair) ->
-             Printf.sprintf "%s; %s" acc (annotation_pair_to_string p))
-           (annotation_pair_to_string (List.hd anno))
-           (List.tl anno))
+    Utils.pstr_list annotation_pair_to_string anno
 
   and annotations_to_string (annos : annotations) : string =
-    if List.is_empty annos
-    then "[ ] (empty)"
-    else
-      Printf.sprintf
-        "[%s]"
-        (List.fold_left
-           (fun (acc : string) (anno : annotation) ->
-             Printf.sprintf "%s; %s" acc (annotation_to_string anno))
-           (annotation_to_string (List.hd annos))
-           (List.tl annos))
+    Utils.pstr_list annotation_to_string annos
 
   and to_string
         ?(skip_leading_tab : bool = false)

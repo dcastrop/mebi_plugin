@@ -140,62 +140,13 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       Logging.Log.debug "MeBiSim:FocusTest BEGIN";
       (* NOTE: tests *)
       let open Mebi_wrapper.Syntax in 
-      let* proof = Mebi_wrapper.get_proof () in
-      let the_proof : Proof.t = Declare.Proof.get proof in
-      (* let _focus_kind = Proof.new_focus_kind "test_focus_kind" in
-      let _focus_cond = Proof.no_cond _focus_kind in
-      let _focused_proof : Proof.t =
-        Proof.focus _focus_cond "test_focus_kind" 1 the_proof
-      in *)
-      let the_data = Proof.data the_proof in
-     let goals_string = Utils.pstr_evar_list the_data.goals in
-     let all_goals_string =
-       Utils.pstr_evar_list (Evar.Set.to_list (Proof.all_goals the_proof))
-     in
-     (* let* sigma = get_sigma in 
-     Evar.Set.iter (fun (e:Evar.t) -> 
-      Logging.Log.debug (
-        Printf.sprintf "MeBiSim:FocusTest, all goals (%s) is_ground_term %b, is_ground_env %b, has_undefined_evars: %b" 
-        (Utils.ppstr (Evar.print e)) 
-        (Evarutils.is_ground_term sigma ))) 
-      (Proof.all_goals the_proof); *)
-     let stack_string =
-       if List.is_empty the_data.stack
-       then "[ ] (empty)"
-       else
-         Printf.sprintf
-           "[%s]"
-           (List.fold_left
-              (fun (acc : string) ((a, b) : Evar.t list * Evar.t list) ->
-                Printf.sprintf
-                  "%s\n%s%s,\n%s%s\n"
-                  acc
-                  (Utils.str_tabs 1)
-                  (Utils.pstr_evar_list ~indent:2 a)
-                  (Utils.str_tabs 1)
-                  (Utils.pstr_evar_list ~indent:2 b))
-              ""
-              the_data.stack)
-     in
-     Logging.Log.debug
-       (Printf.sprintf
-          "MeBiSim:FocusTest, name: %s\n\
-           - is done: %b\n\
-           - no focused goal: %b\n\
-           - goals: %s\n\
-           - all goals: %s\n\
-           - stack %s\n\
-           - pr_proof %s\n"
-          (Names.Id.to_string the_data.name)
-          (Proof.is_done the_proof)
-          (Proof.no_focused_goal the_proof)
-          goals_string
-          all_goals_string
-          stack_string
-          (Utils.ppstr (Proof.pr_proof the_proof)));
+      let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
+        [ Mebi_tactics.goal_test () 
+        ] in 
+      let* _ = Mebi_wrapper.show_proof_data () in 
     
       Logging.Log.debug "MeBiSim:FocusTest END";
-      Mebi_wrapper.return proof
+      Mebi_wrapper.get_proof ()
     )
   }
 (*  *)

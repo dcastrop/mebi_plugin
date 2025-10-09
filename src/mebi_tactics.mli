@@ -1,3 +1,5 @@
+val goal_test : unit -> unit Proofview.tactic Mebi_wrapper.mm
+
 val apply : Evd.econstr -> unit Proofview.tactic
 
 val apply_mm

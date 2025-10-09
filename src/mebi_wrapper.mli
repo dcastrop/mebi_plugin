@@ -123,7 +123,9 @@ val run
   -> 'a mm
   -> 'a
 
-val string_mm : string mm -> string
+(* val string_mm : string mm -> string *)
+val wrap : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
+
 val return : 'a -> 'a mm
 val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
 val map : ('a -> 'b) -> 'a mm -> 'b mm
@@ -324,13 +326,13 @@ val update_proof_by_tactics_mm : unit Proofview.tactic mm list -> unit mm
 val constr_to_string : Constr.t -> string
 val econstr_to_string : EConstr.t -> string
 val term_to_string : term -> string
-val constr_list_to_string : Constr.t list -> string
-val constr_opt_list_to_string : Constr.t option list -> string
-val econstr_list_to_string : EConstr.t list -> string
+(* val constr_list_to_string : Constr.t list -> string *)
+(* val constr_opt_list_to_string : Constr.t option list -> string *)
+(* val econstr_list_to_string : EConstr.t list -> string *)
 val constr_rel_decl_to_string : Constr.rel_declaration -> string
 val econstr_rel_decl_to_string : EConstr.rel_declaration -> string
-val constr_rel_decl_list_to_string : Constr.rel_declaration list -> string
-val econstr_rel_decl_list_to_string : EConstr.rel_declaration list -> string
+(* val constr_rel_decl_list_to_string : Constr.rel_declaration list -> string *)
+(* val econstr_rel_decl_list_to_string : EConstr.rel_declaration list -> string *)
 val econstr_list_to_constr_opt_string : EConstr.t list -> string mm
 val debug_encoding : unit -> unit mm
 

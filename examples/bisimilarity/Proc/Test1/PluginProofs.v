@@ -63,6 +63,12 @@ Proof.
 
   MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.UnFocus".
   MeBiSim FocusTest. 
+
+  Check H.
+  About H.
+  Print H.
+  Compute H.
+
   (* MeBiSim GoalTest. *)
 
   (* do 2 constructor. unfold tsubst in *.

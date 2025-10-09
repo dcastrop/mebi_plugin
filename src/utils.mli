@@ -10,5 +10,50 @@ val str_tabs : ?size:int -> int -> string
 val get_key_of_val : ('a, 'b) Hashtbl.t -> 'b -> 'a option
 val new_int_counter : ?start:int -> unit -> unit -> int
 val ppstr : Pp.t -> string
-val pstr_string_list : ?indent:int -> string list -> string
-val pstr_evar_list : ?indent:int -> Evar.t list -> string
+
+val pstr_list :
+  ?force_newline:bool ->
+  ?empty_msg:string ->
+  ?indent:int ->
+  ('a -> string) ->
+  'a list ->
+  string
+
+val pstr_list2 :
+  ?empty_msgA:string ->
+  ?empty_msgB:string ->
+  ?indent:int ->
+  ('b -> string) ->
+  ('c -> string) ->
+  ('b list * 'c list) list ->
+  string
+
+module Strfy : sig
+  val str : string -> string
+  val option : ('a -> string) -> 'a option -> string
+  val evar : Evar.t -> string
+
+  val constr :
+    Environ.env -> Evd.evar_map -> Constr.t -> string
+
+  val constr_opt :
+    Environ.env -> Evd.evar_map -> Constr.t option -> string
+
+  val constr_rel_decl :
+    Environ.env ->
+    Evd.evar_map ->
+    Constr.rel_declaration ->
+    string
+
+  val econstr :
+    Environ.env -> Evd.evar_map -> Evd.econstr -> string
+
+  val econstr_rel_decl :
+    Environ.env ->
+    Evd.evar_map ->
+    EConstr.rel_declaration ->
+    string
+
+  val goal : Environ.env -> Evd.evar_map -> Evar.t -> string
+  val global : Names.GlobRef.t -> string
+end

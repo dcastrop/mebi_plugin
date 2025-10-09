@@ -1,6 +1,98 @@
 open Logging
 open Mebi_wrapper
 
+let _update_names () : unit Proofview.tactic mm =
+  return
+    (Proofview.Goal.enter (fun gl ->
+       let hyps : EConstr.named_context = Proofview.Goal.hyps gl in
+       let _current_names : Names.Id.Set.t = Context.Named.to_vars hyps in
+       Proofview.tclUNIT ()))
+;;
+
+let goal_test () : unit Proofview.tactic mm =
+  Log.debug "mebi_tactics.goal_test";
+  (* let* env = get_env in *)
+  (* let* sigma = get_sigma in *)
+  return
+    (Proofview.Goal.enter (fun gl ->
+       let env1 : Environ.env = Proofview.Goal.env gl in
+       let sigma1 : Evd.evar_map = Proofview.Goal.sigma gl in
+       let goal : Evar.t = Proofview.Goal.goal gl in
+       let goalstr : string = Utils.Strfy.goal env1 sigma1 goal in
+       let concl : EConstr.constr = Proofview.Goal.concl gl in
+       let concl1str : string = Utils.Strfy.econstr env1 sigma1 concl in
+       Log.debug
+         (Printf.sprintf
+            "mebi_tactics.goal_test (%s) concl is App\n- %s\n- %s"
+            goalstr
+            concl1str
+            (match EConstr.kind sigma1 concl with
+             | App (econstr, econstr_arr) ->
+               Printf.sprintf
+                 "%s => %s"
+                 (Utils.Strfy.econstr env1 sigma1 econstr)
+                 (Utils.pstr_list
+                    (Utils.Strfy.econstr env1 sigma1)
+                    (Array.to_list econstr_arr))
+             | _ -> "(Err: Not kind App)"));
+       let hyps : EConstr.named_context = Proofview.Goal.hyps gl in
+       Log.debug
+         (Printf.sprintf
+            "mebi_tactics.goal_test (%s) hyps, evars of named context: %s"
+            goalstr
+            (Utils.pstr_list
+               Utils.Strfy.evar
+               (Evar.Set.to_list (Evd.evars_of_named_context sigma1 hyps))));
+       List.iter
+         (fun (hyp :
+                ( EConstr.constr
+                  , EConstr.types
+                  , EConstr.ERelevance.t )
+                  Context.Named.Declaration.pt) ->
+           let name : Names.Id.t = Context.Named.Declaration.get_id hyp in
+           let name_str : string = Names.Id.to_string name in
+           let rel : EConstr.ERelevance.t =
+             Context.Named.Declaration.get_relevance hyp
+           in
+           let rel_bool : bool = EConstr.ERelevance.is_irrelevant sigma1 rel in
+           let tys : EConstr.types = Context.Named.Declaration.get_type hyp in
+           let tys_str : string =
+             match EConstr.kind_of_type sigma1 tys with
+             | AtomicType (ty, ty_arr) ->
+               Printf.sprintf
+                 "%s => %s"
+                 (Utils.Strfy.econstr env1 sigma1 ty)
+                 (Utils.pstr_list
+                    (Utils.Strfy.econstr env1 sigma1)
+                    (Array.to_list ty_arr))
+             | _ -> "(Err: Not kind AtomicType)"
+           in
+           (* Utils.pstr_list (Utils.Strfy.evar) (Evar.Set.to_list (Evd.evars_of_named_context sigma1 hyps)) *)
+           Log.debug
+             (Printf.sprintf
+                "mebi_tactics.goal_test (%s) hyp (%s) is %s"
+                goalstr
+                name_str
+                (match hyp with
+                 | Context.Named.Declaration.LocalAssum (_, _) ->
+                   Printf.sprintf
+                     "LocalAssum:\n- name: %s\n- is irrelevant: %b\n- %s"
+                     name_str
+                     rel_bool
+                     tys_str
+                 | Context.Named.Declaration.LocalDef (_, econstr, _) ->
+                   Printf.sprintf
+                     "LocalDef:\n- name: %s\n- is irrelevant: %b\n- %s\n- (%s)"
+                     name_str
+                     rel_bool
+                     tys_str
+                     (Utils.Strfy.econstr env1 sigma1 econstr))))
+         hyps;
+       Proofview.tclUNIT ()))
+;;
+
+(****************************************************************************)
+
 let apply (c : EConstr.t) : unit Proofview.tactic =
   Proofview.Goal.enter (fun gl -> Tactics.apply c)
 ;;

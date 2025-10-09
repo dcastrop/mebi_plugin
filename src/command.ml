@@ -154,6 +154,7 @@ let rec check_updated_ctx
     let$+ upd_t env sigma =
       EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
     in
+    let* env = get_env in
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with
      | App (fn, args) ->
@@ -170,7 +171,9 @@ let rec check_updated_ctx
                  (Printf.sprintf
                     "check_updated_ctx, lts_ind_def_encmap \"option\" has \
                      args: %s"
-                    (econstr_list_to_string (Array.to_list args)));
+                    (Utils.pstr_list
+                       (Utils.Strfy.econstr env sigma)
+                       (Array.to_list args)));
              check_updated_ctx acc lts_ind_def_encmap (substl, tl)
            | "@eq" ->
              (* TODO: fail, or *)
@@ -194,7 +197,9 @@ let rec check_updated_ctx
                   "check_updated_ctx, lts_ind_def_encmap does not have \
                    corresponding fn \"%s\" with args: %s."
                   (econstr_to_string fn)
-                  (econstr_list_to_string (Array.to_list args)));
+                  (Utils.pstr_list
+                     (Utils.Strfy.econstr env sigma)
+                     (Array.to_list args)));
              check_updated_ctx acc lts_ind_def_encmap (substl, tl))
         | Some c ->
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
