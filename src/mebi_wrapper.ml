@@ -281,8 +281,6 @@ let run
   a.value
 ;;
 
-let string_mm (s : string mm) : string = run ~keep_encoding:true s
-
 let return (x : 'a) : 'a mm =
   fun (st : wrapper ref) -> { state = st; value = x }
 [@@inline always]
@@ -554,127 +552,55 @@ let rec econstr_list_to_constr_opt ?(abort_on_undefined_evars : bool = false)
 (****** COQ TERM TO STRING ********)
 (**********************************)
 
-let constr_to_string (x : Constr.t) : string =
-  let s_mm : string mm =
-    let open Syntax in
-    let* env = get_env in
-    let* sigma = get_sigma in
-    return (Utils.ppstr (Printer.pr_constr_env env sigma x))
-  in
-  string_mm s_mm
+let wrap (f : Environ.env -> Evd.evar_map -> 'a -> string) : 'a -> string =
+  run
+    ~keep_encoding:true
+    (let open Syntax in
+     let* env = get_env in
+     let* sigma = get_sigma in
+     return (f env sigma))
 ;;
 
-let econstr_to_string (x : EConstr.t) : string =
-  let s_mm : string mm =
-    let open Syntax in
-    let* env = get_env in
-    let* sigma = get_sigma in
-    return (Utils.ppstr (Printer.pr_econstr_env env sigma x))
-  in
-  string_mm s_mm
+(* TODO: point to Utils.Strfy, use wrap to provide env and sigma *)
+(* module Strfy = struct
+  let constr x = (wrap Utils.Strfy.constr) x
+
+
+let constr_rel_decl x : string =
+  (wrap Utils.Strfy.constr_rel_decl) x
 ;;
 
+let econstr x : string = (wrap Utils.Strfy.econstr) x
+let term x : string = econstr  x
+
+let econstr_rel_decl x : string =
+  (wrap Utils.Strfy.econstr_rel_decl) x
+;;
+
+(* let econstr_list_to_constr_opt_string (es : EConstr.t list) : string mm =
+  let open Syntax in
+  let* es = econstr_list_to_constr_opt es in
+  return (Utils.pstr_list (Utils.Strfy.option (wrap Utils.Strfy.constr)) es)
+;; *)
+end *)
+
+let constr_to_string (x : Constr.t) : string = (wrap Utils.Strfy.constr) x
+
+let constr_rel_decl_to_string (x : Constr.rel_declaration) : string =
+  (wrap Utils.Strfy.constr_rel_decl) x
+;;
+
+let econstr_to_string (x : EConstr.t) : string = (wrap Utils.Strfy.econstr) x
 let term_to_string (x : term) : string = econstr_to_string x
 
-let constr_rel_decl_to_string (rd : Constr.rel_declaration) : string =
-  let s_mm : string mm =
-    let open Syntax in
-    let* env = get_env in
-    let* sigma = get_sigma in
-    return (Utils.ppstr (Printer.pr_rel_decl env sigma rd))
-  in
-  string_mm s_mm
-;;
-
-let econstr_rel_decl_to_string (rd : EConstr.rel_declaration) : string =
-  let s_mm : string mm =
-    let open Syntax in
-    let* env = get_env in
-    let* sigma = get_sigma in
-    return (Utils.ppstr (Printer.pr_erel_decl env sigma rd))
-  in
-  string_mm s_mm
-;;
-
-let constr_list_to_string (xs : Constr.t list) : string =
-  match xs with
-  | [] -> "[]"
-  | h :: [] -> Printf.sprintf "[%s]" (constr_to_string h)
-  | h :: t ->
-    Printf.sprintf
-      "[%s]"
-      (List.fold_left
-         (fun (acc : string) (x : Constr.t) ->
-           Printf.sprintf "%s, %s" acc (constr_to_string x))
-         (constr_to_string h)
-         t)
-;;
-
-let constr_opt_list_to_string (xs : Constr.t option list) : string =
-  match xs with
-  | [] -> "[]"
-  | None :: [] -> "[None]"
-  | Some h :: [] -> Printf.sprintf "[%s]" (constr_to_string h)
-  | h :: t ->
-    Printf.sprintf
-      "[%s]"
-      (List.fold_left
-         (fun (acc : string) (x : Constr.t option) ->
-           Printf.sprintf
-             "%s, %s"
-             acc
-             (match x with None -> "None" | Some x -> constr_to_string x))
-         (match h with None -> "None" | Some h -> constr_to_string h)
-         t)
-;;
-
-let econstr_list_to_string (xs : EConstr.t list) : string =
-  match xs with
-  | [] -> "[]"
-  | h :: [] -> Printf.sprintf "[%s]" (econstr_to_string h)
-  | h :: t ->
-    Printf.sprintf
-      "[%s]"
-      (List.fold_left
-         (fun (acc : string) (x : EConstr.t) ->
-           Printf.sprintf "%s, %s" acc (econstr_to_string x))
-         (econstr_to_string h)
-         t)
-;;
-
-let constr_rel_decl_list_to_string (xs : Constr.rel_declaration list) : string =
-  match xs with
-  | [] -> "[]"
-  | h :: [] -> Printf.sprintf "[%s]" (constr_rel_decl_to_string h)
-  | h :: t ->
-    Printf.sprintf
-      "[%s]"
-      (List.fold_left
-         (fun (acc : string) (x : Constr.rel_declaration) ->
-           Printf.sprintf "%s, %s" acc (constr_rel_decl_to_string x))
-         (constr_rel_decl_to_string h)
-         t)
-;;
-
-let econstr_rel_decl_list_to_string (xs : EConstr.rel_declaration list) : string
-  =
-  match xs with
-  | [] -> "[]"
-  | h :: [] -> Printf.sprintf "[%s]" (econstr_rel_decl_to_string h)
-  | h :: t ->
-    Printf.sprintf
-      "[%s]"
-      (List.fold_left
-         (fun (acc : string) (x : EConstr.rel_declaration) ->
-           Printf.sprintf "%s, %s" acc (econstr_rel_decl_to_string x))
-         (econstr_rel_decl_to_string h)
-         t)
+let econstr_rel_decl_to_string (x : EConstr.rel_declaration) : string =
+  (wrap Utils.Strfy.econstr_rel_decl) x
 ;;
 
 let econstr_list_to_constr_opt_string (es : EConstr.t list) : string mm =
   let open Syntax in
   let* es = econstr_list_to_constr_opt es in
-  return (constr_opt_list_to_string es)
+  return (Utils.pstr_list (Utils.Strfy.option (wrap Utils.Strfy.constr)) es)
 ;;
 
 (********************************************)
@@ -774,7 +700,9 @@ module Error : ERROR_TYPE = struct
   let invalid_lts_args_length i = MEBI_exn (InvalidLTSArgsLength i)
 
   (** Assert Constr.kind tm is App _ in [Command.extract_args]. *)
-  let invalid_lts_term_kind ev sg x = MEBI_exn (InvalidLTSTermKind (ev, sg, x))
+  let invalid_lts_term_kind env sigma x =
+    MEBI_exn (InvalidLTSTermKind (env, sigma, x))
+  ;;
 
   (** Error when input LTS has the wrong arity *)
   let invalid_sort_lts f = MEBI_exn (InvalidLTSSort f)
@@ -783,7 +711,7 @@ module Error : ERROR_TYPE = struct
   let invalid_sort_type f = MEBI_exn (InvalidTypeSort f)
 
   (** Error when input LTS has the wrong Sort *)
-  let invalid_arity ev sg t = MEBI_exn (InvalidArity (ev, sg, t))
+  let invalid_arity env sigma t = MEBI_exn (InvalidArity (env, sigma, t))
 
   (** Error when input LTS reference is invalid (e.g. non existing) *)
   let invalid_ref_lts r = MEBI_exn (InvalidRefLTS r)
@@ -794,20 +722,22 @@ module Error : ERROR_TYPE = struct
   let invalid_cindef_kind () = MEBI_exn (ExpectedCoqIndDefOfLTSNotType ())
 
   (** Error when term is of unknown type *)
-  let unknown_term_type ev sg tmty = MEBI_exn (UnknownTermType (ev, sg, tmty))
-
-  (** Error when multiple coq-LTS provided, but none of them match term. *)
-  let primary_lts_not_found ev sg t names =
-    MEBI_exn (PrimaryLTSNotFound (ev, sg, t, names))
+  let unknown_term_type env sigma tmty =
+    MEBI_exn (UnknownTermType (env, sigma, tmty))
   ;;
 
   (** Error when multiple coq-LTS provided, but none of them match term. *)
-  let unknown_decode_key ev sg k bckmap =
-    MEBI_exn (UnknownDecodeKey (ev, sg, k, bckmap))
+  let primary_lts_not_found env sigma t names =
+    MEBI_exn (PrimaryLTSNotFound (env, sigma, t, names))
   ;;
 
-  let invalid_check_updated_ctx ev sg x y =
-    MEBI_exn (InvalidCheckUpdatedCtx (ev, sg, x, y))
+  (** Error when multiple coq-LTS provided, but none of them match term. *)
+  let unknown_decode_key env sigma k bckmap =
+    MEBI_exn (UnknownDecodeKey (env, sigma, k, bckmap))
+  ;;
+
+  let invalid_check_updated_ctx env sigma x y =
+    MEBI_exn (InvalidCheckUpdatedCtx (env, sigma, x, y))
   ;;
 
   open Pp
@@ -835,11 +765,11 @@ module Error : ERROR_TYPE = struct
            "Command.extract_args, assertion: Array.length args == 3 failed. \
             Got %i"
            i)
-    | InvalidLTSTermKind (ev, sg, tm) ->
+    | InvalidLTSTermKind (env, sigma, tm) ->
       str
         "Command.extract_args, assertion: Constr.kind tm matches App _ failed. \
          Got "
-      ++ Printer.pr_constr_env ev sg tm
+      ++ str (Utils.Strfy.constr env sigma tm)
       ++ str " which matches with "
       ++ str
            (match Constr.kind tm with
@@ -865,65 +795,77 @@ module Error : ERROR_TYPE = struct
             | String _ -> "String"
             | Array _ -> "Array")
       ++ str "."
-    | InvalidCheckUpdatedCtx (ev, sg, x, y) ->
+    | InvalidCheckUpdatedCtx (env, sigma, x, y) ->
       str
         "Invalid Args to check_updated_ctx. Should both be empty, or both have \
          some."
       ++ strbrk "\n"
-      ++ str (Printf.sprintf "substls: %s." (econstr_list_to_string x))
+      ++ str
+           (Printf.sprintf
+              "substls: %s."
+              (Utils.pstr_list (Utils.Strfy.econstr env sigma) x))
       ++ strbrk "\n"
-      ++ str (Printf.sprintf "ctx_tys: %s." (econstr_rel_decl_list_to_string y))
+      ++ str
+           (Printf.sprintf
+              "ctx_tys: %s."
+              (Utils.pstr_list (wrap Utils.Strfy.econstr_rel_decl) y))
     | InvalidLTSSort f ->
       str "Invalid LTS Sort: expecting Prop, got " ++ Sorts.pr_sort_family f
     | InvalidTypeSort f ->
       str "Invalid Type Sort: expecting Type or Set, got "
       ++ Sorts.pr_sort_family f
-    | InvalidArity (ev, sg, t) ->
+    | InvalidArity (env, sigma, t) ->
       str "Invalid arity for LTS: "
-      ++ Printer.pr_constr_env ev sg t
+      ++ str (Utils.Strfy.constr env sigma t)
       ++ strbrk "\n"
       ++ str "Expecting: forall params, ?terms -> ?labels -> ?terms -> Prop"
-    | InvalidRefLTS r -> str "Invalid ref LTS: " ++ Printer.pr_global r
-    | InvalidRefType r -> str "Invalid ref Type: " ++ Printer.pr_global r
-    | UnknownTermType (ev, sg, (tm, ty, trkeys)) ->
+    | InvalidRefLTS r -> str "Invalid ref LTS: " ++ str (Utils.Strfy.global r)
+    | InvalidRefType r -> str "Invalid ref Type: " ++ str (Utils.Strfy.global r)
+    | UnknownTermType (env, sigma, (tm, ty, trkeys)) ->
       str
         "None of the constructors provided matched type of term to visit. \
          (unknown_term_type) "
       ++ strbrk "\n\n"
       ++ str "Term: "
-      ++ Printer.pr_econstr_env ev sg tm
+      ++ str (Utils.Strfy.econstr env sigma tm)
       ++ strbrk "\n\n"
       ++ str "Type: "
-      ++ Printer.pr_econstr_env ev sg ty
+      ++ str (Utils.Strfy.econstr env sigma ty)
       ++ strbrk "\n\n"
-      ++ str (Printf.sprintf "Keys: %s" (econstr_list_to_string trkeys))
+      ++ str
+           (Printf.sprintf
+              "Keys: %s"
+              (Utils.pstr_list (Utils.Strfy.econstr env sigma) trkeys))
       ++ strbrk "\n\n"
       ++ str
            (Printf.sprintf
               "Does Type match EConstr of any Key? = %b"
-              (List.exists (fun (k : term) -> EConstr.eq_constr sg ty k) trkeys))
+              (List.exists
+                 (fun (k : term) -> EConstr.eq_constr sigma ty k)
+                 trkeys))
       ++ strbrk "\n"
       ++ str
-           (let tystr = Utils.ppstr (Printer.pr_econstr_env ev sg ty) in
+           (let tystr = Utils.ppstr (Printer.pr_econstr_env env sigma ty) in
             Printf.sprintf
               "Does Type match String of any Key? = %b"
               (List.exists
                  (fun (k : term) ->
                    String.equal
                      tystr
-                     (Utils.ppstr (Printer.pr_econstr_env ev sg k)))
+                     (Utils.ppstr (Printer.pr_econstr_env env sigma k)))
                  trkeys))
-    | PrimaryLTSNotFound (ev, sg, t, names) ->
+    | PrimaryLTSNotFound (env, sigma, t, names) ->
       str "Primary LTS Not found for term: "
-      ++ Printer.pr_econstr_env ev sg t
+      ++ str (Utils.Strfy.econstr env sigma t)
       ++ strbrk "\n\n"
       ++ str "constructor names: "
-      ++ List.fold_left
-           (fun (acc : Pp.t) (name : EConstr.t) ->
-             acc ++ strbrk "\n\n" ++ Printer.pr_econstr_env ev sg name)
-           (Printer.pr_econstr_env ev sg (List.hd names))
-           (List.tl names)
-    | UnknownDecodeKey (ev, sg, k, bckmap) ->
+      ++ str
+           (Utils.pstr_list
+              ~force_newline:true
+              ~empty_msg:"No Names"
+              (Utils.Strfy.econstr env sigma)
+              names)
+    | UnknownDecodeKey (env, sigma, k, bckmap) ->
       str "Unknown decode key: "
       ++ str (E.to_string k)
       ++ strbrk "\n\n"
@@ -938,7 +880,7 @@ module Error : ERROR_TYPE = struct
             ++ strbrk "\n\n"
             ++ str (E.to_string t)
             ++ str " => "
-            ++ Printer.pr_econstr_env ev sg v)
+            ++ Printer.pr_econstr_env env sigma v)
           bckmap
           (str "")
         ++ str " ]"
@@ -1070,14 +1012,19 @@ let decode (k : E.t) : term mm =
 ;;
 
 let decode_to_string (x : E.t) : string =
-  let s_mm : string mm =
-    let open Syntax in
-    let* y = decode x in
-    let* env = get_env in
-    let* sigma = get_sigma in
-    return (Utils.ppstr (Printer.pr_econstr_env env sigma y))
-  in
-  string_mm s_mm
+  (* let s_mm : string mm =
+     let open Syntax in
+     let* y = decode x in
+     let* env = get_env in
+     let* sigma = get_sigma in
+     return (Utils.ppstr (Printer.pr_econstr_env env sigma y))
+     in
+     string_mm s_mm *)
+  run
+    ~keep_encoding:true
+    (let open Syntax in
+     let* y = decode x in
+     return ((wrap Utils.Strfy.econstr) y))
 ;;
 
 (********************************************)
@@ -1204,12 +1151,7 @@ module Constr_tree = struct
         (match List.length rhs_int_tree_list with
          | 0 -> ""
          | 1 -> pstr (List.hd rhs_int_tree_list)
-         | _ ->
-           List.fold_left
-             (fun (acc : string) (rhs_int_tree : t) ->
-               Printf.sprintf "%s, %s" acc (pstr rhs_int_tree))
-             (pstr (List.hd rhs_int_tree_list))
-             (List.tl rhs_int_tree_list))
+         | _ -> Utils.pstr_list pstr rhs_int_tree_list)
   ;;
 end
 
@@ -1250,12 +1192,7 @@ let rec pstr_decoded_tree (t1 : decoded_tree) : string =
       (match List.length rhs_int_tree_list with
        | 0 -> ""
        | 1 -> pstr_decoded_tree (List.hd rhs_int_tree_list)
-       | _ ->
-         List.fold_left
-           (fun (acc : string) (rhs_int_tree : decoded_tree) ->
-             Printf.sprintf "%s, %s" acc (pstr_decoded_tree rhs_int_tree))
-           (pstr_decoded_tree (List.hd rhs_int_tree_list))
-           (List.tl rhs_int_tree_list))
+       | _ -> Utils.pstr_list pstr_decoded_tree rhs_int_tree_list)
 ;;
 
 (**********************************)
@@ -1410,9 +1347,12 @@ let show_proof_data () : unit mm =
      let _goals = goals in
      let the_proof : Proof.t = Declare.Proof.get proof in
      let the_data = Proof.data the_proof in
-     let goals_string = Utils.pstr_evar_list the_data.goals in
+     let goals_string = Utils.pstr_list Utils.Strfy.evar the_data.goals in
      let all_goals_string =
-       Utils.pstr_evar_list (Evar.Set.to_list (Proof.all_goals the_proof))
+       Utils.pstr_list
+         ~indent:2
+         Utils.Strfy.evar
+         (Evar.Set.to_list (Proof.all_goals the_proof))
      in
      let _partial_proof : EConstr.constr list =
        Proof.partial_proof the_proof
@@ -1425,25 +1365,12 @@ let show_proof_data () : unit mm =
         exception Not_found\")"
        (* _y *)
      in
-     (* let _pv = match the_proof with | { proofview; focus_stack; entry; name; poly } -> proofview
-    in *)
      let stack_string =
-       if List.is_empty the_data.stack
-       then "[ ] (empty)"
-       else
-         Printf.sprintf
-           "[%s]"
-           (List.fold_left
-              (fun (acc : string) ((a, b) : Evar.t list * Evar.t list) ->
-                Printf.sprintf
-                  "%s\n%s%s,\n%s%s\n"
-                  acc
-                  (Utils.str_tabs 1)
-                  (Utils.pstr_evar_list ~indent:2 a)
-                  (Utils.str_tabs 1)
-                  (Utils.pstr_evar_list ~indent:2 b))
-              ""
-              the_data.stack)
+       Utils.pstr_list2
+         ~indent:2
+         Utils.Strfy.evar
+         Utils.Strfy.evar
+         the_data.stack
      in
      Log.debug
        (Printf.sprintf
@@ -1505,33 +1432,9 @@ let show_names () : unit mm =
                    (let lookup_n : EConstr.named_declaration =
                       EConstr.lookup_named n env
                     in
-                    (match lookup_n with
-                     | Context.Named.Declaration.LocalAssum _ ->
-                       Log.debug
-                         (Printf.sprintf
-                            "mebi_wrapper.show_names, folding on: %s is \
-                             LocalAssum"
-                            (Names.Id.to_string n))
-                     | Context.Named.Declaration.LocalDef _ ->
-                       Log.debug
-                         (Printf.sprintf
-                            "mebi_wrapper.show_names, folding on: %s is \
-                             LocalDef"
-                            (Names.Id.to_string n)));
                     match Context.Named.Declaration.get_value lookup_n with
-                    | None ->
-                      Log.debug
-                        (Printf.sprintf
-                           "mebi_wrapper.show_names, folding on: %s -> None"
-                           (Names.Id.to_string n));
-                      "(No value found)"
-                    | Some v ->
-                      Log.debug
-                        (Printf.sprintf
-                           "mebi_wrapper.show_names, folding on: %s -> %s"
-                           (Names.Id.to_string n)
-                           (econstr_to_string v));
-                      econstr_to_string v))
+                    | None -> "(No value found)"
+                    | Some v -> econstr_to_string v))
                names
                "")));
   return ()
