@@ -22,17 +22,19 @@
  (modules
   utils
   logging
+  mebi_enc
+  mebi_setup
+  model
+  lts
+  fsm
+  algorithms
   mebi_wrapper
   mebi_ind
   mebi_utils
   mebi_theories
   mebi_tactics
   params
-  model
-  lts
-  fsm
-  algorithms
-  dump_to_file
+  ; dump_to_file
   mebi_help
   command
   ; examples

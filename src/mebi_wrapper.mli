@@ -1,114 +1,14 @@
-type term = EConstr.t
-
-(* val enable_logging : bool ref *)
-
-type proof_context =
-  { mutable proof : Declare.Proof.t option
-  ; mutable names : Names.Id.Set.t option
-  }
-
-type coq_context =
-  { coq_env : Environ.env
-  ; coq_ctx : Evd.evar_map
-  ; proofv : proof_context
-  }
-
-val the_coq_env_opt : Environ.env ref option ref
-val new_coq_env : unit -> Environ.env ref
-val the_coq_env : ?fresh:bool -> unit -> Environ.env ref
-val the_coq_ctx_opt : Evd.evar_map ref option ref
-val new_coq_ctx : ?fresh:bool -> unit -> Evd.evar_map ref
-val the_coq_ctx : ?fresh:bool -> unit -> Evd.evar_map ref
-
-module F : sig
-  type key = term
-  type !'a t
-
-  val create : int -> 'a t
-  val clear : 'a t -> unit
-  val reset : 'a t -> unit
-  val copy : 'a t -> 'a t
-  val add : 'a t -> key -> 'a -> unit
-  val remove : 'a t -> key -> unit
-  val find : 'a t -> key -> 'a
-  val find_opt : 'a t -> key -> 'a option
-  val find_all : 'a t -> key -> 'a list
-  val replace : 'a t -> key -> 'a -> unit
-  val mem : 'a t -> key -> bool
-  val iter : (key -> 'a -> unit) -> 'a t -> unit
-  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-  val length : 'a t -> int
-  val stats : 'a t -> Hashtbl.statistics
-  val to_seq : 'a t -> (key * 'a) Seq.t
-  val to_seq_keys : 'a t -> key Seq.t
-  val to_seq_values : 'a t -> 'a Seq.t
-  val add_seq : 'a t -> (key * 'a) Seq.t -> unit
-  val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
-  val of_seq : (key * 'a) Seq.t -> 'a t
-end
-
-module type ENCODING_TYPE = sig
-  type t
-
-  val init : t
-  val cache : t ref
-  val reset : unit -> unit
-  val eq : t -> t -> bool
-  val compare : t -> t -> int
-  val hash : t -> int
-  val to_string : t -> string
-  val of_int : int -> t
-
-  module type ENC_TBL = sig
-    type key = t
-    type !'a t
-
-    val create : int -> 'a t
-    val clear : 'a t -> unit
-    val reset : 'a t -> unit
-    val copy : 'a t -> 'a t
-    val add : 'a t -> key -> 'a -> unit
-    val remove : 'a t -> key -> unit
-    val find : 'a t -> key -> 'a
-    val find_opt : 'a t -> key -> 'a option
-    val find_all : 'a t -> key -> 'a list
-    val replace : 'a t -> key -> 'a -> unit
-    val mem : 'a t -> key -> bool
-    val iter : (key -> 'a -> unit) -> 'a t -> unit
-    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-    val length : 'a t -> int
-    val stats : 'a t -> Hashtbl.statistics
-    val to_seq : 'a t -> (key * 'a) Seq.t
-    val to_seq_keys : 'a t -> key Seq.t
-    val to_seq_values : 'a t -> 'a Seq.t
-    val add_seq : 'a t -> (key * 'a) Seq.t -> unit
-    val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
-    val of_seq : (key * 'a) Seq.t -> 'a t
-  end
-
-  module Tbl : ENC_TBL
-
-  val encode : t F.t -> term Tbl.t -> term -> t
-
-  exception InvalidDecodeKey of (t * term Tbl.t)
-
-  val decode_opt : term Tbl.t -> t -> term option
-  val decode : term Tbl.t -> t -> term
-end
-
-module IntEncoding : ENCODING_TYPE
-module E = IntEncoding
-module B = E.Tbl
+module F = Mebi_setup.F
+module E = Mebi_setup.E
+module B = Mebi_setup.B
 
 type wrapper =
-  { coq_ref : coq_context ref
+  { coq_ref : Mebi_setup.coq_context ref
   ; fwd_enc : E.t F.t
-  ; bck_enc : term B.t
+  ; bck_enc : EConstr.t B.t
   }
 
-type 'a in_context =
+type 'a in_context = 
   { state : wrapper ref
   ; value : 'a
   }
@@ -145,9 +45,9 @@ module type ERROR_TYPE = sig
     | InvalidRefLTS of Names.GlobRef.t
     | InvalidRefType of Names.GlobRef.t
     | UnknownTermType of
-        (Environ.env * Evd.evar_map * (term * term * term list))
-    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
-    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
+        (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t * EConstr.t list))
+    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * EConstr.t * EConstr.t list)
+    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * EConstr.t B.t)
     | ExpectedCoqIndDefOfLTSNotType of unit
     | InvalidCheckUpdatedCtx of
         (Environ.env
@@ -172,17 +72,17 @@ module type ERROR_TYPE = sig
   val unknown_term_type
     :  Environ.env
     -> Evd.evar_map
-    -> term * term * term list
+    -> EConstr.t * EConstr.t * EConstr.t list
     -> exn
 
   val primary_lts_not_found
     :  Environ.env
     -> Evd.evar_map
-    -> term
-    -> term list
+    -> EConstr.t
+    -> EConstr.t list
     -> exn
 
-  val unknown_decode_key : Environ.env -> Evd.evar_map -> E.t -> term B.t -> exn
+  val unknown_decode_key : Environ.env -> Evd.evar_map -> E.t -> EConstr.t B.t -> exn
 
   val invalid_check_updated_ctx
     :  Environ.env
@@ -205,21 +105,21 @@ val invalid_arity : Constr.t -> 'a mm
 val invalid_ref_lts : Names.GlobRef.t -> 'a mm
 val invalid_ref_type : Names.GlobRef.t -> 'a mm
 val invalid_cindef_kind : 'b -> 'a mm
-val unknown_term_type : term * term * term list -> 'a mm
-val primary_lts_not_found : term * term list -> 'a mm
-val unknown_decode_key : E.t * term B.t -> 'a mm
+val unknown_term_type : EConstr.t * EConstr.t * EConstr.t list -> 'a mm
+val primary_lts_not_found : EConstr.t * EConstr.t list -> 'a mm
+val unknown_decode_key : E.t * EConstr.t B.t -> 'a mm
 
 val invalid_check_updated_ctx
-  :  term list
+  :  EConstr.t list
   -> EConstr.rel_declaration list
   -> 'a mm
 
 val set_proof : Declare.Proof.t -> wrapper ref -> unit in_context
 val get_env : wrapper ref -> Environ.env in_context
 val get_sigma : wrapper ref -> Evd.evar_map in_context
-val get_proofv : wrapper ref -> proof_context in_context
+val get_proofv : wrapper ref -> Mebi_setup.proof_context in_context
 val get_fwd_enc : wrapper ref -> E.t F.t in_context
-val get_bck_enc : wrapper ref -> term B.t in_context
+val get_bck_enc : wrapper ref -> EConstr.t B.t in_context
 
 val state
   :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
@@ -263,7 +163,6 @@ val econstr_list_to_constr
 
 (* *)
 val econstr_eq : EConstr.t -> EConstr.t -> bool mm
-val term_eq : term -> term -> bool mm
 
 (* *)
 val econstr_to_constr
@@ -271,33 +170,26 @@ val econstr_to_constr
   -> EConstr.t
   -> Constr.t mm
 
-val term_to_constr : ?abort_on_undefined_evars:bool -> term -> Constr.t mm
 val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
-val term_to_constr_opt : term -> Constr.t option mm
 val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
-val constrexpr_to_term : Constrexpr.constr_expr -> term mm
 val globref_to_econstr : Names.GlobRef.t -> EConstr.t mm
-val globref_to_term : Names.GlobRef.t -> term mm
 val normalize_econstr : EConstr.t -> EConstr.t mm
-val normalize_term : term -> term mm
 val type_of_econstr : EConstr.t -> EConstr.t mm
-val type_of_term : term -> term mm
 val new_evar_of_econstr : EConstr.t -> EConstr.t mm
-val new_evar_of_term : term -> term mm
 
 (* *)
-val encode : term -> E.t mm
-val decode : E.t -> term mm
+val encode : EConstr.t -> E.t mm
+val decode : E.t -> EConstr.t mm
 val decode_to_string : E.t -> string
-val get_encoding_opt : term -> E.t option mm
-val get_decoding_opt : E.t -> term option mm
-val has_encoding : term -> bool mm
+val get_encoding_opt : EConstr.t -> E.t option mm
+val get_decoding_opt : E.t -> EConstr.t option mm
+val has_encoding : EConstr.t -> bool mm
 val has_decoding : E.t -> bool mm
 val encode_map : 'a F.t -> 'a B.t mm
 val decode_map : 'a B.t -> 'a F.t mm
 
 (* *)
-val is_none_term : term -> bool mm
+val is_none_term : EConstr.t -> bool mm
 
 (* *)
 val get_type_of_hyp : Names.Id.t -> EConstr.t mm
@@ -325,14 +217,8 @@ val update_proof_by_tactics_mm : unit Proofview.tactic mm list -> unit mm
 (* *)
 val constr_to_string : Constr.t -> string
 val econstr_to_string : EConstr.t -> string
-val term_to_string : term -> string
-(* val constr_list_to_string : Constr.t list -> string *)
-(* val constr_opt_list_to_string : Constr.t option list -> string *)
-(* val econstr_list_to_string : EConstr.t list -> string *)
 val constr_rel_decl_to_string : Constr.rel_declaration -> string
 val econstr_rel_decl_to_string : EConstr.rel_declaration -> string
-(* val constr_rel_decl_list_to_string : Constr.rel_declaration list -> string *)
-(* val econstr_rel_decl_list_to_string : EConstr.rel_declaration list -> string *)
 val econstr_list_to_constr_opt_string : EConstr.t list -> string mm
 val debug_encoding : unit -> unit mm
 
@@ -371,6 +257,5 @@ val proof_test : unit -> unit Proofview.tactic mm
 
 (* *)
 val debug_econstr_kind : EConstr.t -> unit mm
-val debug_term_kind : term -> unit mm
 val debug_constr_kind : Constr.t -> unit mm
-val debug_term_constr_kind : term -> unit mm
+val debug_econstr_constr_kind : EConstr.t -> unit mm

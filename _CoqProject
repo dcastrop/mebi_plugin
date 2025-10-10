@@ -58,6 +58,20 @@ src/utils.mli
 src/logging.ml
 src/logging.mli
 
+src/mebi_enc.ml
+src/mebi_enc.mli
+src/mebi_setup.ml
+src/mebi_setup.mli
+
+src/model.ml
+src/model.mli
+src/lts.ml
+src/lts.mli
+src/fsm.ml
+src/fsm.mli
+src/algorithms.ml
+src/algorithms.mli
+
 src/mebi_wrapper.ml
 src/mebi_wrapper.mli
 src/mebi_ind.ml
@@ -72,19 +86,8 @@ src/mebi_tactics.mli
 src/params.ml
 src/params.mli
 
-src/model.ml
-src/model.mli
-
-src/lts.ml
-src/lts.mli
-src/fsm.ml
-src/fsm.mli
-
-src/algorithms.ml
-src/algorithms.mli
-
-src/dump_to_file.ml
-src/dump_to_file.mli
+# src/dump_to_file.ml
+# src/dump_to_file.mli
 
 src/mebi_help.ml
 src/mebi_help.mli
