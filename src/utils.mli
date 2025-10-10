@@ -9,29 +9,37 @@ val default_indent_val : int
 val str_tabs : ?size:int -> int -> string
 val get_key_of_val : ('a, 'b) Hashtbl.t -> 'b -> 'a option
 val new_int_counter : ?start:int -> unit -> unit -> int
-val ppstr : Pp.t -> string
+val ppstr : ?clean:bool -> Pp.t -> string
+
+val nlsep :
+  ?force_newline:bool -> ?indent:int -> unit -> string
 
 val pstr_list :
   ?force_newline:bool ->
-  ?empty_msg:string ->
+  ?label:string ->
   ?indent:int ->
+  ?use:string * string ->
   ('a -> string) ->
   'a list ->
   string
 
-val pstr_list2 :
-  ?empty_msgA:string ->
-  ?empty_msgB:string ->
-  ?indent:int ->
-  ('b -> string) ->
-  ('c -> string) ->
-  ('b list * 'c list) list ->
-  string
-
 module Strfy : sig
   val str : string -> string
+  val int : int -> string
+  val bool : bool -> string
   val option : ('a -> string) -> 'a option -> string
+
+  val tuple :
+    ?force_newline:bool ->
+    ?is_keyval:bool ->
+    ?indent:int ->
+    ('a -> string) ->
+    ('b -> string) ->
+    'a * 'b ->
+    string
+
   val evar : Evar.t -> string
+  val evar' : Environ.env -> Evd.evar_map -> Evar.t -> string
 
   val constr :
     Environ.env -> Evd.evar_map -> Constr.t -> string
@@ -54,6 +62,34 @@ module Strfy : sig
     EConstr.rel_declaration ->
     string
 
-  val goal : Environ.env -> Evd.evar_map -> Evar.t -> string
+  val econstr_types :
+    ?indent:int ->
+    Environ.env ->
+    Evd.evar_map ->
+    Evd.econstr ->
+    string
+
+  val name_id : Names.variable -> string
   val global : Names.GlobRef.t -> string
+
+  val concl :
+    Environ.env -> Evd.evar_map -> Evd.econstr -> string
+
+  val erel : 'a -> Evd.evar_map -> Evd.erelevance -> string
+
+  type hyp =
+    ( Evd.econstr,
+      Evd.econstr,
+      Evd.erelevance )
+    Context.Named.Declaration.pt
+
+  val hyp :
+    ?force_newline:bool ->
+    ?indent:int ->
+    Environ.env ->
+    Evd.evar_map ->
+    hyp ->
+    string
+
+  val goal : ?indent:int -> Proofview.Goal.t -> string
 end

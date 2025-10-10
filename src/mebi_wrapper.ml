@@ -862,7 +862,7 @@ module Error : ERROR_TYPE = struct
       ++ str
            (Utils.pstr_list
               ~force_newline:true
-              ~empty_msg:"No Names"
+              ~label:"Names"
               (Utils.Strfy.econstr env sigma)
               names)
     | UnknownDecodeKey (env, sigma, k, bckmap) ->
@@ -1337,9 +1337,10 @@ let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
 
 let show_proof_data () : unit mm =
   fun (st : wrapper ref) ->
+  Log.trace "mebi_wrapper.show_proof_data";
   let coq_st = !st.coq_ref in
   (match !coq_st.proofv.proof with
-   | None -> Log.debug "mebi_wrapper.show_proof, proofv.proof is None"
+   | None -> Log.debug "mebi_wrapper.show_proof_data, proofv.proof is None"
    | Some proof ->
      let goals : Proofview.Goal.t Proofview.tactic list Proofview.tactic =
        Proofview.Goal.goals
@@ -1366,11 +1367,18 @@ let show_proof_data () : unit mm =
        (* _y *)
      in
      let stack_string =
-       Utils.pstr_list2
-         ~indent:2
-         Utils.Strfy.evar
-         Utils.Strfy.evar
+       Utils.pstr_list
+         ~force_newline:true
+         ~indent:1
+         (Utils.Strfy.tuple
+            (Utils.pstr_list ~force_newline:true ~indent:2 Utils.Strfy.evar)
+            (Utils.pstr_list ~force_newline:true ~indent:2 Utils.Strfy.evar))
          the_data.stack
+       (* Utils.pstr_list2
+          ~indent:2
+          Utils.Strfy.evar
+          Utils.Strfy.evar
+          the_data.stack *)
      in
      Log.debug
        (Printf.sprintf

@@ -59,15 +59,16 @@ Proof.
   eexists; split.
 
   MeBiSim WeakNone. 
-
-
-  MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.UnFocus".
+  MeBi Set ShowDetails True.
   MeBiSim FocusTest. 
 
-  Check H.
+
+  (* MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest". *)
+
+  (* Check H.
   About H.
   Print H.
-  Compute H.
+  Compute H. *)
 
   (* MeBiSim GoalTest. *)
 
@@ -75,18 +76,20 @@ Proof.
   eapply rt1n_trans. do 2 constructor.
   eauto with rel_db.  *)
 
-  MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.Focus".
+  (* MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.Focus". *)
   (* NOTE: the below reveals a change in the Proof.data.stack (focus stack) *)
-  - 
-  MeBiSim FocusTest. 
+  (* - 
+MeBi Set ShowDetails  True.
+  MeBiSim FocusTest.  *)
   (* MeBiSim GoalTest. *)
 
-  MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.END".
+  (* MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.END".
   MeBi_Debug ThisProof. 
-  MeBi_Debug ProofNames.
+  MeBi_Debug ProofNames. *)
 
 
   (* MeBiSim WeakNone.  *)
+  (* MeBiSim FocusTest.  *)
   (* shelve. shelve. Unshelve. *)
 
   (* MeBi FSM p Using termLTS. *)
