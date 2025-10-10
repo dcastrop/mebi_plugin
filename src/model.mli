@@ -1,6 +1,6 @@
 module Info : sig
   module Coq : sig
-    type t = Mebi_wrapper.IntEncoding.t * (string * string list)
+    type t = Mebi_setup.E.t * (string * string list)
 
     val to_string : t -> string
   end
@@ -34,7 +34,7 @@ module Info : sig
 end
 
 module State : sig
-  type t = Mebi_wrapper.IntEncoding.t * string option
+  type t = Mebi_setup.E.t * string option
 
   val eq : t -> t -> bool
   val compare : t -> t -> int
@@ -52,7 +52,7 @@ end
 
 module Action : sig
   module Label : sig
-    type t = Mebi_wrapper.IntEncoding.t * (string option * bool option)
+    type t = Mebi_setup.E.t * (string option * bool option)
 
     val to_string : t -> string
     val pstr : ?indents:int -> t -> string

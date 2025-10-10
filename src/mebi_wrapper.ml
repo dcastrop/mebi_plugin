@@ -1,242 +1,8 @@
 open Logging
-
-type term = EConstr.t
-
-let enable_logging : bool ref = ref true
-
-(********************************************)
-(****** COQ ENVIRONMENT/CONTEXT *************)
-(********************************************)
-
-(* TODO: move proof stuff to own monad/wrapper *)
-type proof_context =
-  { mutable proof : Declare.Proof.t option
-  ; mutable names : Names.Id.Set.t option
-  }
-
-type coq_context =
-  { coq_env : Environ.env
-  ; coq_ctx : Evd.evar_map
-  ; proofv : proof_context
-  }
-
-(* *)
-let the_proofv_opt : proof_context ref option ref = ref None
-
-let new_proofv (proof : Declare.Proof.t option) (names : Names.Id.Set.t option)
-  : proof_context ref
-  =
-  Log.trace "mebi_wrapper.new_proofv: Created new proofv.";
-  let the_proofv : proof_context ref = ref { proof; names } in
-  the_proofv_opt := Some the_proofv;
-  the_proofv
-;;
-
-let the_coq_proofv
-      ?(new_proof : bool = false)
-      ?(proof : Declare.Proof.t option = None)
-      ?(names : Names.Id.Set.t option = None)
-      ()
-  : proof_context ref
-  =
-  Log.trace "mebi_wrapper.the_coq_proofv";
-  match !the_proofv_opt with
-  | None ->
-    Log.debug "mebi_wrapper.the_coq_proofv: proofv is None, using args";
-    new_proofv proof names
-  | Some proofv ->
-    if new_proof
-    then (
-      Log.debug "mebi_wrapper.the_coq_proofv: new proof";
-      new_proofv proof names)
-    else (
-      let the_proof =
-        match !proofv.proof with
-        | None ->
-          Log.debug
-            "mebi_wrapper.the_coq_proofv: proofv.proof is None, using proof arg";
-          proof
-        | Some _ ->
-          (match proof with
-           | None ->
-             Log.debug
-               "mebi_wrapper.the_coq_proofv: proofv.proof is Some and proof \
-                arg is None, preserving proofv.proof";
-             !proofv.proof
-           | Some q ->
-             Log.debug
-               "mebi_wrapper.the_coq_proofv: proofv.proof and proof arg are \
-                Some, overriding, using new proof arg";
-             proof)
-      in
-      let the_names =
-        match !proofv.names with
-        | None ->
-          Log.debug
-            "mebi_wrapper.the_coq_proofv: proofv.names is None, using names arg";
-          names
-        | Some _ ->
-          (match names with
-           | None ->
-             Log.debug
-               "mebi_wrapper.the_coq_proofv: proofv.names is Some and names \
-                arg is None, preserving proofv.names";
-             !proofv.names
-           | Some q ->
-             Log.debug
-               "mebi_wrapper.the_coq_proofv: proofv.names and names arg are \
-                Some, overriding, using new names arg";
-             names)
-      in
-      new_proofv the_proof the_names)
-;;
-
-(** *)
-let the_coq_env_opt : Environ.env ref option ref = ref None
-
-let new_coq_env () : Environ.env ref =
-  if !enable_logging
-  then Log.debug "mebi_wrapper.new_coq_env: Created new coq env.";
-  let env : Environ.env ref = ref (Global.env ()) in
-  the_coq_env_opt := Some env;
-  env
-;;
-
-let the_coq_env ?(fresh : bool = false) () : Environ.env ref =
-  match !the_coq_env_opt with
-  | None -> new_coq_env ()
-  | Some env -> if fresh then new_coq_env () else env
-;;
-
-(** *)
-let the_coq_ctx_opt : Evd.evar_map ref option ref = ref None
-
-let new_coq_ctx ?(fresh : bool = false) () : Evd.evar_map ref =
-  if !enable_logging
-  then Log.debug "mebi_wrapper.new_coq_ctx: Created new coq ctx.";
-  let ctx = ref (Evd.from_env !(the_coq_env ~fresh ())) in
-  the_coq_ctx_opt := Some ctx;
-  ctx
-;;
-
-let the_coq_ctx ?(fresh : bool = false) () : Evd.evar_map ref =
-  match !the_coq_ctx_opt with
-  | None -> new_coq_ctx ~fresh ()
-  | Some ctx -> if fresh then new_coq_ctx ~fresh () else ctx
-;;
-
-(********************************************)
-(****** FORWARD ENCODING MAP ****************)
-(********************************************)
-
-module F : Hashtbl.S with type key = term = Hashtbl.Make (struct
-    type t = term
-
-    let equal t1 t2 = EConstr.eq_constr !(the_coq_ctx ()) t1 t2
-
-    let hash t =
-      Constr.hash
-        (EConstr.to_constr
-           ?abort_on_undefined_evars:(Some false)
-           !(the_coq_ctx ())
-           t)
-    ;;
-  end)
-
-(********************************************)
-(****** ENCODINGS ***************************)
-(********************************************)
-
-module type ENCODING_TYPE = sig
-  type t
-
-  val init : t
-  val cache : t ref
-  val reset : unit -> unit
-  val eq : t -> t -> bool
-  val compare : t -> t -> int
-  val hash : t -> int
-  val to_string : t -> string
-  val of_int : int -> t
-
-  module type ENC_TBL = Hashtbl.S with type key = t
-
-  module Tbl : ENC_TBL
-
-  val encode : t F.t -> term Tbl.t -> term -> t
-
-  exception InvalidDecodeKey of (t * term Tbl.t)
-
-  val decode_opt : term Tbl.t -> t -> term option
-  val decode : term Tbl.t -> t -> term
-end
-
-(**********************************)
-(****** INTEGER ENCODING **********)
-(**********************************)
-
-module IntEncoding : ENCODING_TYPE = struct
-  type t = int
-
-  let init : t = 0
-  let cache : t ref = ref init
-  let counter = cache
-
-  let reset () =
-    cache := init;
-    ()
-  ;;
-
-  let eq t1 t2 = Int.equal t1 t2
-  let compare t1 t2 = Int.compare t1 t2
-  let hash t = Int.hash t
-  let to_string t : string = Printf.sprintf "%i" t
-  let of_int (i : int) : t = i
-
-  module type ENC_TBL = Hashtbl.S with type key = t
-
-  module Tbl : ENC_TBL = Hashtbl.Make (struct
-      type t = int
-
-      let equal t1 t2 = eq t1 t2
-      let hash t = hash t
-    end)
-
-  let encode (fwd : t F.t) (bck : term Tbl.t) (k : term) : t =
-    Log.trace "Mebi_wrapper.IntEncoding.encode";
-    match F.find_opt fwd k with
-    | None ->
-      (* map to next encoding and return *)
-      let next_enc : t = !counter in
-      counter := !counter + 1;
-      F.add fwd k next_enc;
-      Tbl.add bck next_enc k;
-      Log.debug
-        (Printf.sprintf
-           "Mebi_wrapper.IntEncoding.encode, new encoding: %s"
-           (to_string next_enc));
-      next_enc
-    | Some enc ->
-      Log.debug
-        (Printf.sprintf
-           "Mebi_wrapper.IntEncoding.encode -- already encoded as (%s)"
-           (to_string enc));
-      enc
-  ;;
-
-  exception InvalidDecodeKey of (t * term Tbl.t)
-
-  let decode_opt (bck : term Tbl.t) (k : t) : term option = Tbl.find_opt bck k
-
-  let decode (bck : term Tbl.t) (k : t) : term =
-    match Tbl.find_opt bck k with
-    | None -> raise (InvalidDecodeKey (k, bck))
-    | Some enc -> enc
-  ;;
-end
-
-module E = IntEncoding
-module B = E.Tbl
+open Mebi_setup
+module F = Mebi_setup.F
+module E = Mebi_setup.E
+module B = Mebi_setup.B
 
 (********************************************)
 (****** WRAPPER & CONTEXT *******************)
@@ -245,7 +11,7 @@ module B = E.Tbl
 type wrapper =
   { coq_ref : coq_context ref
   ; fwd_enc : E.t F.t
-  ; bck_enc : term B.t
+  ; bck_enc : EConstr.t B.t
   }
 
 type 'a in_context =
@@ -352,7 +118,7 @@ let get_fwd_enc (st : wrapper ref) : E.t F.t in_context =
   { state = st; value = !st.fwd_enc }
 ;;
 
-let get_bck_enc (st : wrapper ref) : term B.t in_context =
+let get_bck_enc (st : wrapper ref) : EConstr.t B.t in_context =
   { state = st; value = !st.bck_enc }
 ;;
 
@@ -373,105 +139,6 @@ let sandbox (m : 'a mm) (st : wrapper ref) : 'a in_context =
   st := st_contents;
   { state = st; value = res.value }
 ;;
-
-(**********************************)
-(****** COQ TERMS *****************)
-(**********************************)
-
-let econstr_eq (a : term) (b : term) : bool mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  { state = st; value = EConstr.eq_constr !coq_st.coq_ctx a b }
-;;
-
-let term_eq (a : term) (b : term) : bool mm = econstr_eq a b
-
-let econstr_to_constr ?(abort_on_undefined_evars : bool = false) (x : EConstr.t)
-  : Constr.t mm
-  =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  { state = st
-  ; value = EConstr.to_constr ~abort_on_undefined_evars !coq_st.coq_ctx x
-  }
-;;
-
-let term_to_constr ?(abort_on_undefined_evars : bool = false) (x : term)
-  : Constr.t mm
-  =
-  econstr_to_constr x
-;;
-
-let econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  { state = st; value = EConstr.to_constr_opt !coq_st.coq_ctx x }
-;;
-
-let term_to_constr_opt (x : term) : Constr.t option mm = econstr_to_constr_opt x
-
-let constrexpr_to_econstr (t : Constrexpr.constr_expr) : EConstr.t mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  let sigma, t =
-    Constrintern.interp_constr_evars !coq_st.coq_env !coq_st.coq_ctx t
-  in
-  coq_st := { !coq_st with coq_ctx = sigma };
-  { state = st; value = t }
-;;
-
-let constrexpr_to_term (t : Constrexpr.constr_expr) : term mm =
-  constrexpr_to_econstr t
-;;
-
-let globref_to_econstr (x : Names.GlobRef.t) : EConstr.t mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  { state = st
-  ; value =
-      EConstr.of_constr (UnivGen.constr_of_monomorphic_global !coq_st.coq_env x)
-  }
-;;
-
-let globref_to_term (x : Names.GlobRef.t) : term mm = globref_to_econstr x
-
-let normalize_econstr (t : EConstr.t) : EConstr.t mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  let t = Reductionops.nf_all !coq_st.coq_env !coq_st.coq_ctx t in
-  { state = st; value = t }
-;;
-
-let normalize_term (t : term) : term mm = normalize_econstr t
-
-let type_of_econstr (t : EConstr.t) : EConstr.t mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  let t = Reductionops.nf_all !coq_st.coq_env !coq_st.coq_ctx t in
-  let sigma, t = Typing.type_of !coq_st.coq_env !coq_st.coq_ctx t in
-  coq_st := { !coq_st with coq_ctx = sigma };
-  { state = st; value = t }
-;;
-
-let type_of_term (t : term) : term mm = type_of_econstr t
-
-let new_evar_of_econstr (t : EConstr.t) : EConstr.t mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  let sigma, instance = Evarutil.new_evar !coq_st.coq_env !coq_st.coq_ctx t in
-  coq_st := { !coq_st with coq_ctx = sigma };
-  { state = st; value = instance }
-;;
-
-let new_evar_of_term (t : term) : term mm = new_evar_of_econstr t
-
-(* let evar_to_econstr (t:Evar.t) : EConstr.t mm = 
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  (* let sigma, t = EConstr.mkLEvar sigma *)
-  let x = Evarutil. in
-  { state = st; value = t }
-  ;; *)
 
 (********************************************)
 (****** SYNTAX ******************************)
@@ -505,6 +172,69 @@ module Syntax : MEBI_MONAD_SYNTAX = struct
 end
 
 (**********************************)
+(****** COQ TERMS *****************)
+(**********************************)
+
+let type_of_econstr (t : EConstr.t) : EConstr.t mm =
+  fun (st : wrapper ref) ->
+  let coq_st : coq_context ref = !st.coq_ref in
+  let env : Environ.env = !coq_st.coq_env in
+  let sigma : Evd.evar_map = !coq_st.coq_ctx in
+  let t : EConstr.t = Reductionops.nf_all env sigma t in
+  let sigma, t = Typing.type_of env sigma t in
+  coq_st := { !coq_st with coq_ctx = sigma };
+  { state = st; value = t }
+
+and constrexpr_to_econstr (t : Constrexpr.constr_expr) : EConstr.t mm =
+  fun (st : wrapper ref) ->
+  let coq_st : coq_context ref = !st.coq_ref in
+  let env : Environ.env = !coq_st.coq_env in
+  let sigma : Evd.evar_map = !coq_st.coq_ctx in
+  let sigma, t = Constrintern.interp_constr_evars env sigma t in
+  coq_st := { !coq_st with coq_ctx = sigma };
+  { state = st; value = t }
+
+and new_evar_of_econstr (t : EConstr.t) : EConstr.t mm =
+  fun (st : wrapper ref) ->
+  let coq_st : coq_context ref = !st.coq_ref in
+  let env : Environ.env = !coq_st.coq_env in
+  let sigma : Evd.evar_map = !coq_st.coq_ctx in
+  let sigma, instance = Evarutil.new_evar env sigma t in
+  coq_st := { !coq_st with coq_ctx = sigma };
+  { state = st; value = instance }
+
+and econstr_eq (a : EConstr.t) (b : EConstr.t) : bool mm =
+  let open Syntax in
+  let* sigma = get_sigma in
+  return (EConstr.eq_constr sigma a b)
+
+and econstr_to_constr ?(abort_on_undefined_evars : bool = false) (x : EConstr.t)
+  : Constr.t mm
+  =
+  let open Syntax in
+  let* sigma = get_sigma in
+  return (EConstr.to_constr ~abort_on_undefined_evars sigma x)
+
+and econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
+  let open Syntax in
+  let* sigma = get_sigma in
+  return (EConstr.to_constr_opt sigma x)
+
+and globref_to_econstr (x : Names.GlobRef.t) : EConstr.t mm =
+  let open Syntax in
+  let* env = get_env in
+  return (EConstr.of_constr (UnivGen.constr_of_monomorphic_global env x))
+
+and normalize_econstr (t : EConstr.t) : EConstr.t mm =
+  fun (st : wrapper ref) ->
+  let coq_st : coq_context ref = !st.coq_ref in
+  let env : Environ.env = !coq_st.coq_env in
+  let sigma : Evd.evar_map = !coq_st.coq_ctx in
+  let t : EConstr.t = Reductionops.nf_all env sigma t in
+  { state = st; value = t }
+;;
+
+(**********************************)
 (****** UTILS *********************)
 (**********************************)
 
@@ -520,9 +250,9 @@ let map_list_mm (f : 'a -> 'b mm) (ls : 'a list) : 'b list mm =
   iterate 0 (List.length ls - 1) [] iter_body
 ;;
 
-let type_of_constrexpr (tref : Constrexpr.constr_expr) : term mm =
+let type_of_constrexpr (tref : Constrexpr.constr_expr) : EConstr.t mm =
   let open Syntax in
-  let* t : term = constrexpr_to_econstr tref in
+  let* t : EConstr.t = constrexpr_to_econstr tref in
   type_of_econstr t
 ;;
 
@@ -591,7 +321,6 @@ let constr_rel_decl_to_string (x : Constr.rel_declaration) : string =
 ;;
 
 let econstr_to_string (x : EConstr.t) : string = (wrap Utils.Strfy.econstr) x
-let term_to_string (x : term) : string = econstr_to_string x
 
 let econstr_rel_decl_to_string (x : EConstr.rel_declaration) : string =
   (wrap Utils.Strfy.econstr_rel_decl) x
@@ -620,9 +349,10 @@ module type ERROR_TYPE = sig
     | InvalidRefLTS of Names.GlobRef.t
     | InvalidRefType of Names.GlobRef.t
     | UnknownTermType of
-        (Environ.env * Evd.evar_map * (term * term * term list))
-    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
-    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
+        (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t * EConstr.t list))
+    | PrimaryLTSNotFound of
+        (Environ.env * Evd.evar_map * EConstr.t * EConstr.t list)
+    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * EConstr.t B.t)
     | ExpectedCoqIndDefOfLTSNotType of unit
     | InvalidCheckUpdatedCtx of
         (Environ.env
@@ -647,17 +377,22 @@ module type ERROR_TYPE = sig
   val unknown_term_type
     :  Environ.env
     -> Evd.evar_map
-    -> term * term * term list
+    -> EConstr.t * EConstr.t * EConstr.t list
     -> exn
 
   val primary_lts_not_found
     :  Environ.env
     -> Evd.evar_map
-    -> term
-    -> term list
+    -> EConstr.t
+    -> EConstr.t list
     -> exn
 
-  val unknown_decode_key : Environ.env -> Evd.evar_map -> E.t -> term B.t -> exn
+  val unknown_decode_key
+    :  Environ.env
+    -> Evd.evar_map
+    -> E.t
+    -> EConstr.t B.t
+    -> exn
 
   val invalid_check_updated_ctx
     :  Environ.env
@@ -680,9 +415,10 @@ module Error : ERROR_TYPE = struct
     | InvalidRefLTS of Names.GlobRef.t
     | InvalidRefType of Names.GlobRef.t
     | UnknownTermType of
-        (Environ.env * Evd.evar_map * (term * term * term list))
-    | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * term * term list)
-    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * term B.t)
+        (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t * EConstr.t list))
+    | PrimaryLTSNotFound of
+        (Environ.env * Evd.evar_map * EConstr.t * EConstr.t list)
+    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * EConstr.t B.t)
     | ExpectedCoqIndDefOfLTSNotType of unit
     | InvalidCheckUpdatedCtx of
         (Environ.env
@@ -841,7 +577,7 @@ module Error : ERROR_TYPE = struct
            (Printf.sprintf
               "Does Type match EConstr of any Key? = %b"
               (List.exists
-                 (fun (k : term) -> EConstr.eq_constr sigma ty k)
+                 (fun (k : EConstr.t) -> EConstr.eq_constr sigma ty k)
                  trkeys))
       ++ strbrk "\n"
       ++ str
@@ -849,7 +585,7 @@ module Error : ERROR_TYPE = struct
             Printf.sprintf
               "Does Type match String of any Key? = %b"
               (List.exists
-                 (fun (k : term) ->
+                 (fun (k : EConstr.t) ->
                    String.equal
                      tystr
                      (Utils.ppstr (Printer.pr_econstr_env env sigma k)))
@@ -875,7 +611,7 @@ module Error : ERROR_TYPE = struct
       then str " ] (empty)"
       else
         B.fold
-          (fun (t : E.t) (v : term) (acc : Pp.t) ->
+          (fun (t : E.t) (v : EConstr.t) (acc : Pp.t) ->
             acc
             ++ strbrk "\n\n"
             ++ str (E.to_string t)
@@ -957,21 +693,21 @@ let invalid_cindef_kind unit : 'a mm =
 ;;
 
 (** Error when term is of unknown type *)
-let unknown_term_type (tmty : term * term * term list) : 'a mm =
+let unknown_term_type (tmty : EConstr.t * EConstr.t * EConstr.t list) : 'a mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   raise (Error.unknown_term_type !coq_st.coq_env !coq_st.coq_ctx tmty)
 ;;
 
 (** Error when multiple coq-LTS provided, but none of them match term. *)
-let primary_lts_not_found ((t, names) : term * term list) : 'a mm =
+let primary_lts_not_found ((t, names) : EConstr.t * EConstr.t list) : 'a mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   raise (Error.primary_lts_not_found !coq_st.coq_env !coq_st.coq_ctx t names)
 ;;
 
 (** Error when try to decode key that does not exist in decode map. *)
-let unknown_decode_key ((k, bckmap) : E.t * term B.t) : 'a mm =
+let unknown_decode_key ((k, bckmap) : E.t * EConstr.t B.t) : 'a mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   raise (Error.unknown_decode_key !coq_st.coq_env !coq_st.coq_ctx k bckmap)
@@ -981,7 +717,7 @@ let unknown_decode_key ((k, bckmap) : E.t * term B.t) : 'a mm =
 (****** ENCODE/DECODE ***********************)
 (********************************************)
 
-let encode (k : term) : E.t mm =
+let encode (k : EConstr.t) : E.t mm =
   fun (st : wrapper ref) ->
   let encoding : E.t = E.encode !st.fwd_enc !st.bck_enc k in
   Logging.Log.debug
@@ -995,7 +731,7 @@ let encode (k : term) : E.t mm =
 ;;
 
 (** dual to [encode] except we cannot handle new values *)
-let decode (k : E.t) : term mm =
+let decode (k : E.t) : EConstr.t mm =
   fun (st : wrapper ref) ->
   match E.decode_opt !st.bck_enc k with
   | Some decoding ->
@@ -1031,7 +767,7 @@ let decode_to_string (x : E.t) : string =
 (****** ENCODE/DECODE OPT *******************)
 (********************************************)
 
-let get_encoding_opt (k : term) : E.t option mm =
+let get_encoding_opt (k : EConstr.t) : E.t option mm =
   fun (st : wrapper ref) ->
   match F.find_opt !st.fwd_enc k with
   | None -> { state = st; value = None }
@@ -1039,7 +775,7 @@ let get_encoding_opt (k : term) : E.t option mm =
 ;;
 
 (** dual to [encode] except we cannot handle new values *)
-let get_decoding_opt (k : E.t) : term option mm =
+let get_decoding_opt (k : E.t) : EConstr.t option mm =
   fun (st : wrapper ref) ->
   match B.find_opt !st.bck_enc k with
   | None -> { state = st; value = None }
@@ -1050,7 +786,7 @@ let get_decoding_opt (k : E.t) : term option mm =
 (****** ENCODE/DECODE CHECKs ****************)
 (********************************************)
 
-let has_encoding (k : term) : bool mm =
+let has_encoding (k : EConstr.t) : bool mm =
   fun (st : wrapper ref) ->
   match F.find_opt !st.fwd_enc k with
   | None -> { state = st; value = false }
@@ -1073,7 +809,7 @@ let encode_map (m : 'a F.t) : 'a B.t mm =
   fun (st : wrapper ref) ->
   let encoded_map : 'a B.t = B.create (F.length m) in
   F.iter
-    (fun (k : term) (v : 'a) ->
+    (fun (k : EConstr.t) (v : 'a) ->
       let encoding : E.t = E.encode !st.fwd_enc !st.bck_enc k in
       B.add encoded_map encoding v)
     m;
@@ -1086,7 +822,7 @@ let decode_map (m : 'a B.t) : 'a F.t mm =
   let decoded_map : 'a F.t = F.create (B.length m) in
   B.iter
     (fun (k : E.t) (v : 'a) ->
-      let decoding : term = E.decode !st.bck_enc k in
+      let decoding : EConstr.t = E.decode !st.bck_enc k in
       F.add decoded_map decoding v)
     m;
   { state = st; value = decoded_map }
@@ -1167,7 +903,7 @@ let decode_constr_tree_lts (tree : Constr_tree.t) : decoded_tree mm =
   let rec decode_tree (t : Constr_tree.t) : decoded_tree mm =
     match t with
     | Node (leaf, stem) ->
-      let* decoded_leaf_lts : term = decode (fst leaf) in
+      let* decoded_leaf_lts : EConstr.t = decode (fst leaf) in
       let decoded_leaf = econstr_to_string decoded_leaf_lts, snd leaf in
       let* decoded_stem = decode_tree_list stem in
       return (Constr_tree.Node (decoded_leaf, decoded_stem))
@@ -1201,7 +937,7 @@ let rec pstr_decoded_tree (t1 : decoded_tree) : string =
 
 let the_none_ref () : Names.GlobRef.t = Coqlib.lib_ref "core.option.None"
 
-let the_none_term () : term mm =
+let the_none_term () : EConstr.t mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
   let sigma, the_none =
@@ -1211,13 +947,13 @@ let the_none_term () : term mm =
   { state = st; value = the_none }
 ;;
 
-let is_none_term (t : term) : bool mm =
+let is_none_term (t : EConstr.t) : bool mm =
   let open Syntax in
-  let* t : Constr.t = term_to_constr t in
+  let* t : Constr.t = econstr_to_constr t in
   match Constr.kind t with
   | App (t, _) ->
-    let* none : term = the_none_term () in
-    let* n : Constr.t = term_to_constr none in
+    let* none : EConstr.t = the_none_term () in
+    let* n : Constr.t = econstr_to_constr none in
     return (Constr.equal n t)
   | _ -> return false
 ;;
@@ -1578,7 +1314,7 @@ let debug_encoding () : unit mm =
     then Logging.Log.debug "mebi_wrapper.debug_encoding, bck encoding is empty"
     else
       B.iter
-        (fun (enc : E.t) (t : term) ->
+        (fun (enc : E.t) (t : EConstr.t) ->
           Logging.Log.debug
             (Printf.sprintf
                "(%s) => %s "
@@ -1587,7 +1323,7 @@ let debug_encoding () : unit mm =
         !st.bck_enc)
   else
     F.iter
-      (fun (t : term) (enc : E.t) ->
+      (fun (t : EConstr.t) (enc : E.t) ->
         Logging.Log.debug
           (Printf.sprintf "(%s) => %s " (E.to_string enc) (econstr_to_string t)))
       !st.fwd_enc;
@@ -1698,8 +1434,6 @@ let debug_econstr_kind (t : EConstr.t) : unit mm =
   { state = st; value = () }
 ;;
 
-let debug_term_kind (t : term) : unit mm = debug_econstr_kind t
-
 let debug_constr_kind (t : Constr.t) : unit mm =
   fun (st : wrapper ref) ->
   Log.debug
@@ -1771,9 +1505,9 @@ let debug_constr_kind (t : Constr.t) : unit mm =
   { state = st; value = () }
 ;;
 
-let debug_term_constr_kind (t : term) : unit mm =
+let debug_econstr_constr_kind (t : EConstr.t) : unit mm =
   let open Syntax in
-  let* t = term_to_constr t in
+  let* t = econstr_to_constr t in
   debug_constr_kind t
 ;;
 
