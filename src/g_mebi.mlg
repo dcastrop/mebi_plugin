@@ -144,7 +144,10 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
         [ Mebi_tactics.goal_test () 
         ] in 
       let* _ = Mebi_wrapper.show_proof_data () in 
-    
+      let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
+        [ Mebi_tactics.update_goals () 
+        ] in 
+      Logging.Log.debug (Printf.sprintf "MeBiSim:FocusTest, goals:\n%s" (Mebi_tactics.pstr_the_goals ()));
       Logging.Log.debug "MeBiSim:FocusTest END";
       Mebi_wrapper.get_proof ()
     )

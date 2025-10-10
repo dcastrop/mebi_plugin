@@ -175,7 +175,7 @@ module Action = struct
     let from_opt (t : t option) = match t with None -> None | Some t -> Some t
 
     let to_string (m : t) : string =
-      Utils.pstr_list ~empty_msg:"No MetaData" Utils.Strfy.str m
+      Utils.pstr_list ~label:"MetaData" Utils.Strfy.str m
     ;;
 
     let eq (m1 : t) (m2 : t) : bool =
