@@ -495,7 +495,7 @@ let write_json_info_to_file (oc : out_channel) (i : Info.t option) : unit =
      | Some (h :: t) ->
        Printf.fprintf oc "\t\t\"coq info:\": [\n";
        let str_cindef
-             ((enc, (dec, names)) : Mebi_wrapper.E.t * (string * string list))
+             ((enc, (dec, names)) : Mebi_wrapper.Enc.t * (string * string list))
          : string
          =
          Printf.sprintf
@@ -504,7 +504,7 @@ let write_json_info_to_file (oc : out_channel) (i : Info.t option) : unit =
             \t\t\t\t\"def\": \"%s\",\n\
             \t\t\t\t\"names\": [%s]\n\
             \t\t\t}"
-           (Mebi_wrapper.E.to_string enc)
+           (Mebi_wrapper.Enc.to_string enc)
            dec
            (match names with
             | [] -> ""
@@ -527,7 +527,7 @@ let write_json_info_to_file (oc : out_channel) (i : Info.t option) : unit =
        in
        Printf.fprintf oc "%s" (str_cindef h);
        List.iter
-         (fun (cindef : Mebi_wrapper.E.t * (string * string list)) ->
+         (fun (cindef : Mebi_wrapper.Enc.t * (string * string list)) ->
            Printf.fprintf oc ",\n%s" (str_cindef cindef))
          t;
        Printf.fprintf oc "\n\t\t]");

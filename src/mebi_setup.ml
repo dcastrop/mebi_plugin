@@ -147,5 +147,10 @@ module F = FwdMap
 (****** ENCODINGS ***************************)
 (********************************************)
 
-module E = Mebi_enc.IntEncoding (FwdMap)
-module B = E.Tbl
+module Enc = Mebi_enc.IntEncoding (FwdMap)
+module B = Enc.Tbl
+
+module Eq = struct
+  let enc = Enc.eq
+  let econstr sigma = EConstr.eq_constr sigma
+end

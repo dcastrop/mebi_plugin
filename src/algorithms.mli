@@ -7,7 +7,12 @@ end
 
 module Bisimilar : sig
   type result =
-    (Fsm.pair * Fsm.t) * (Model.Partition.t * Model.Partition.t)
+    { the_fsm_1 : Fsm.t
+    ; the_fsm_2 : Fsm.t
+    ; merged_fsm : Fsm.t
+    ; bisim_states : Model.Partition.t
+    ; non_bisim_states : Model.Partition.t
+    }
 
   val run : ?weak:bool -> Fsm.pair -> result
   val result_to_bool : result -> bool

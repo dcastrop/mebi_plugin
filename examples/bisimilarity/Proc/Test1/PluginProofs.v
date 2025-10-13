@@ -45,22 +45,30 @@ MeBi Set FailIfNotBisim True.
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof.
-  (* MeBi_Bisimilarity p With termLTS And q With termLTS Using termLTS. *)
   
-  MeBi_Debug ProofNames.
+  (* MeBi_Debug ProofNames. *)
 
-  (* MeBi_BeginSim p With termLTS And q With termLTS Using termLTS. *)
-  MeBiSim Begin p q.
-  MeBiSim Cofix.
-  MeBiSim Intros.
+  MeBiSim Begin termLTS p And termLTS q Using termLTS.
+  (* MeBiSim Cofix. *)
+  (* MeBiSim Intros. *)
+  (* MeBi Set ShowDetails True. *)
+  (* MeBiSim FocusTest.  *)
 
   inversion H; subst. 
   simpl in *.
   eexists; split.
 
-  MeBiSim WeakNone. 
-  MeBi Set ShowDetails True.
-  MeBiSim FocusTest. 
+  (* MeBi Set ShowDetails True. *)
+  (* MeBiSim FocusTest.  *)
+  (* MeBi Set ShowDetails True. *)
+
+
+  (* TODO: Fix enc maps empty *)
+  (* MeBiSim GoalTest.
+  MeBiSim WeakNone. *)
+   
+  (* MeBi Set ShowDetails True. *)
+  (* MeBiSim FocusTest.  *)
 
 
   (* MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest". *)

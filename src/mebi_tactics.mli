@@ -3,30 +3,35 @@ val _update_names :
 
 val the_goals : (int, Proofview.Goal.t) Hashtbl.t ref
 val reset_the_goals : unit -> unit
-val pstr_the_goals : unit -> string
 val add_goal : Proofview.Goal.t -> unit
 
 val update_goals :
   unit -> unit Proofview.tactic Mebi_wrapper.mm
 
+val get_the_goals :
+  unit ->
+  (int, Proofview.Goal.t) Hashtbl.t Proofview.tactic
+  Mebi_wrapper.mm
+
+val pstr_the_goals : unit -> string
 val goal_test : unit -> unit Proofview.tactic Mebi_wrapper.mm
-val apply : Evd.econstr -> unit Proofview.tactic
+val apply : EConstr.t -> unit Proofview.tactic
 
 val apply_mm :
-  Evd.econstr Mebi_wrapper.mm ->
+  EConstr.t Mebi_wrapper.mm ->
   unit Proofview.tactic Mebi_wrapper.mm
 
-val eapply : Evd.econstr -> unit Proofview.tactic
+val eapply : EConstr.t -> unit Proofview.tactic
 
 val eapply_mm :
-  Evd.econstr Mebi_wrapper.mm ->
+  EConstr.t Mebi_wrapper.mm ->
   unit Proofview.tactic Mebi_wrapper.mm
 
 val unfold_econstr :
-  Evd.econstr -> unit Proofview.tactic Mebi_wrapper.mm
+  EConstr.t -> unit Proofview.tactic Mebi_wrapper.mm
 
 val unfold_econstr_mm :
-  Evd.econstr Mebi_wrapper.mm ->
+  EConstr.t Mebi_wrapper.mm ->
   unit Proofview.tactic Mebi_wrapper.mm
 
 val unfold_constrexpr :

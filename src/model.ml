@@ -2,16 +2,15 @@ open Logging
 
 module Info = struct
   module Coq = struct
-    type t = Mebi_wrapper.E.t * (string * string list)
+    type t = Mebi_setup.Enc.t * (string * string list)
 
     let to_string ((enc, (dec, names)) : t) : string =
       Printf.sprintf
         "(%s => %s, [%s])"
-        (Mebi_wrapper.E.to_string enc)
+        (Mebi_setup.Enc.to_string enc)
         dec
-        (match names with
-         | [] -> ""
-         | nh :: nt -> Utils.pstr_list Utils.Strfy.str nt)
+        (* (match names with [] -> "" | nh :: nt -> Strfy.list Strfy.str nt) *)
+        "TODO: move Model.Info.Coq.to_string to Strfy"
     ;;
   end
 
@@ -79,13 +78,15 @@ module Info = struct
       sep
       i.num_edges
       sep
-      (Utils.Strfy.option
-         (Utils.pstr_list (fun (c_info : Coq.t) -> Coq.to_string c_info))
-         i.coq_info)
+      (* (Strfy.option
+         (Strfy.list (fun (c_info : Coq.t) -> Coq.to_string c_info))
+         i.coq_info) *)
+      "TODO: move Model.Info.to_string to Strfy"
       sep
-      (match i.weak_info with
-       | None -> "None"
-       | Some ws -> Utils.pstr_list Utils.Strfy.str ws)
+      "TODO: move Model.Info.to_string to Strfy"
+      (* (match i.weak_info with
+         | None -> "None"
+         | Some ws -> Strfy.list Strfy.str ws) *)
       outer
   ;;
 
@@ -119,11 +120,11 @@ module Info = struct
 end
 
 module State = struct
-  type t = Mebi_wrapper.E.t * string option
+  type t = Mebi_setup.Enc.t * string option
 
-  let eq (s1 : t) (s2 : t) = Mebi_wrapper.E.eq (fst s1) (fst s2)
-  let compare (s1 : t) (s2 : t) = Mebi_wrapper.E.compare (fst s1) (fst s2)
-  let hash (t : t) = Mebi_wrapper.E.hash (fst t)
+  let eq (s1 : t) (s2 : t) = Mebi_setup.Enc.eq (fst s1) (fst s2)
+  let compare (s1 : t) (s2 : t) = Mebi_setup.Enc.compare (fst s1) (fst s2)
+  let hash (t : t) = Mebi_setup.Enc.hash (fst t)
 
   let to_string
         ?(skip_leading_tab : bool = false)
@@ -131,7 +132,7 @@ module State = struct
         ?(pstr : bool = false)
         (t : t)
     =
-    let state_str = Mebi_wrapper.E.to_string (fst t) in
+    let state_str = Mebi_setup.Enc.to_string (fst t) in
     match pstr with
     | false -> state_str
     | true ->
@@ -154,18 +155,18 @@ end
 module Action = struct
   module Label = struct
     (** (encoding, (?cached_decoding, ?is_silent)) *)
-    type t = Mebi_wrapper.E.t * (string option * bool option)
+    type t = Mebi_setup.Enc.t * (string option * bool option)
 
-    let to_string (t : t) = Mebi_wrapper.E.to_string (fst t)
+    let to_string (t : t) = Mebi_setup.Enc.to_string (fst t)
 
     let pstr ?(indents : int = 0) (t : t) =
       Printf.sprintf "\n%s%s" (Utils.str_tabs indents) (to_string t)
     ;;
 
     let is_silent t = snd (snd t)
-    let eq (t1 : t) (t2 : t) = Mebi_wrapper.E.eq (fst t1) (fst t2)
-    let compare (t1 : t) (t2 : t) = Mebi_wrapper.E.compare (fst t1) (fst t2)
-    let hash (t : t) = Mebi_wrapper.E.hash (fst t)
+    let eq (t1 : t) (t2 : t) = Mebi_setup.Enc.eq (fst t1) (fst t2)
+    let compare (t1 : t) (t2 : t) = Mebi_setup.Enc.compare (fst t1) (fst t2)
+    let hash (t : t) = Mebi_setup.Enc.hash (fst t)
   end
 
   module MetaData = struct
@@ -175,7 +176,8 @@ module Action = struct
     let from_opt (t : t option) = match t with None -> None | Some t -> Some t
 
     let to_string (m : t) : string =
-      Utils.pstr_list ~label:"MetaData" Utils.Strfy.str m
+      (* Strfy.list ~label:"MetaData" Strfy.str m *)
+      "TODO: move Model.Action.MetaData.to_string to Strfy"
     ;;
 
     let eq (m1 : t) (m2 : t) : bool =
@@ -245,10 +247,12 @@ module Action = struct
     Printf.sprintf "(%s, %s)" (State.to_string (fst p)) (to_string (snd p))
 
   and annotation_to_string (anno : annotation) : string =
-    Utils.pstr_list annotation_pair_to_string anno
+    (* Strfy.list annotation_pair_to_string anno *)
+    "TODO: move Model.Action.annotation_to_string to Strfy"
 
   and annotations_to_string (annos : annotations) : string =
-    Utils.pstr_list annotation_to_string annos
+    (* Strfy.list annotation_to_string annos *)
+    "TODO: move Model.Action.annotations_to_string to Strfy"
 
   and to_string
         ?(skip_leading_tab : bool = false)
@@ -842,6 +846,22 @@ let get_actions_of (a : Action.t) (es : States.t Actions.t Edges.t)
   result
 ;;
 
+exception
+  CouldNotFindActionWithMatchingLabel of (Action.Label.t * States.t Actions.t)
+
+let get_action_with_label (actions : States.t Actions.t)
+  : Action.Label.t -> Action.t
+  =
+  fun x ->
+  match
+    List.find_opt
+      (fun ({ label; _ } : Action.t) -> Action.Label.eq x label)
+      (List.of_seq (Actions.to_seq_keys actions))
+  with
+  | Some a -> a
+  | None -> raise (CouldNotFindActionWithMatchingLabel (x, actions))
+;;
+
 let get_actions_with_label
       (l : Action.Label.t)
       (es : States.t Actions.t Edges.t)
@@ -875,6 +895,18 @@ let get_edges_from (from : State.t) (es : States.t Actions.t Edges.t)
    | None -> ()
    | Some aa -> Edges.add result from aa);
   result
+;;
+
+let get_destinations_of_label
+      (l : Action.Label.t)
+      (actions : States.t Actions.t)
+  : States.t
+  =
+  Actions.fold
+    (fun (a : Action.t) (dests : States.t) (acc : States.t) ->
+      if Action.has_label l a then States.union acc dests else acc)
+    actions
+    States.empty
 ;;
 
 let get_destinations (aa : States.t Actions.t) : States.t =
@@ -1320,3 +1352,7 @@ let merge_action_pairs (ap : ActionPairs.t) (bp : ActionPairs.t) : ActionPairs.t
     bp
     ap
 ;;
+
+(*********************************************************************)
+(******  ***********************************************)
+(*********************************************************************)

@@ -1,5 +1,3 @@
-
-
 val enable_logging : bool ref
 
 type proof_context = {
@@ -35,7 +33,7 @@ val new_coq_ctx : ?fresh:bool -> unit -> Evd.evar_map ref
 val the_coq_ctx : ?fresh:bool -> unit -> Evd.evar_map ref
 
 module FwdMap : sig
-  type key = EConstr.t
+  type key = Evd.econstr
   type !'a t
 
   val create : int -> 'a t
@@ -69,11 +67,10 @@ end
 
 module F = FwdMap
 
-
-module E : sig
+module Enc : sig
   module F : sig
     type key = Evd.econstr
-    type 'a t = 'a FwdMap.t
+    type 'a t = 'a F.t
 
     val create : int -> 'a t
     val clear : 'a t -> unit
@@ -190,4 +187,12 @@ module E : sig
   val decode_opt : Evd.econstr Tbl.t -> t -> Evd.econstr option
   val decode : Evd.econstr Tbl.t -> t -> Evd.econstr
 end
-module B = E.Tbl
+
+module B = Enc.Tbl
+
+module Eq : sig
+  val enc : Enc.t -> Enc.t -> bool
+
+  val econstr :
+    Evd.evar_map -> Evd.econstr -> Evd.econstr -> bool
+end

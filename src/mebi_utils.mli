@@ -16,10 +16,10 @@ val get_lts_labels_and_terms
 
 val get_ind_info : Names.GlobRef.t -> Mebi_ind.info Mebi_wrapper.mm
 val get_ind_lts : int -> Names.GlobRef.t -> Mebi_ind.t Mebi_wrapper.mm
-val encode_econstr : EConstr.t -> Mebi_wrapper.E.t Mebi_wrapper.mm
+val encode_econstr : EConstr.t -> Mebi_wrapper.Enc.t Mebi_wrapper.mm
 
 val encode_constrexpr
   :  Constrexpr.constr_expr
-  -> Mebi_wrapper.E.t Mebi_wrapper.mm
+  -> Mebi_wrapper.Enc.t Mebi_wrapper.mm
 
-val encode_ref : Libnames.qualid -> Mebi_wrapper.E.t Mebi_wrapper.mm
+val encode_ref : Libnames.qualid -> Mebi_wrapper.Enc.t Mebi_wrapper.mm

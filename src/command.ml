@@ -135,7 +135,7 @@ let rec retrieve_tgt_nodes
      | Some (tgt, ctor_tree) ->
        let$+ act env sigma = Reductionops.nf_all env sigma act in
        retrieve_tgt_nodes
-         ((act, tgt, Node ((E.of_int lts_index, i), ctor_tree)) :: acc)
+         ((act, tgt, Node ((Enc.of_int lts_index, i), ctor_tree)) :: acc)
          i
          act
          tgt_term
@@ -171,9 +171,7 @@ let rec check_updated_ctx
                  (Printf.sprintf
                     "check_updated_ctx, lts_ind_def_encmap \"option\" has \
                      args: %s"
-                    (Utils.pstr_list
-                       (Utils.Strfy.econstr env sigma)
-                       (Array.to_list args)));
+                    (Strfy.list (Strfy.econstr env sigma) (Array.to_list args)));
              check_updated_ctx acc lts_ind_def_encmap (substl, tl)
            | "@eq" ->
              (* TODO: fail, or *)
@@ -197,9 +195,7 @@ let rec check_updated_ctx
                   "check_updated_ctx, lts_ind_def_encmap does not have \
                    corresponding fn \"%s\" with args: %s."
                   (econstr_to_string fn)
-                  (Utils.pstr_list
-                     (Utils.Strfy.econstr env sigma)
-                     (Array.to_list args)));
+                  (Strfy.list (Strfy.econstr env sigma) (Array.to_list args)));
              check_updated_ctx acc lts_ind_def_encmap (substl, tl))
         | Some c ->
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
@@ -290,7 +286,7 @@ and check_valid_constructor
                return
                  (( act
                   , tgt_term
-                  , Constr_tree.Node ((E.of_int (fst index_ctor_pair), i), [])
+                  , Constr_tree.Node ((Enc.of_int (fst index_ctor_pair), i), [])
                   )
                   :: ctor_vals)
            | nctors ->
@@ -307,19 +303,19 @@ and check_valid_constructor
 (** [GraphB] is ...
     (Essentially acts as a `.mli` for the [MkGraph] module.) *)
 module type GraphB = sig
-  module H : Hashtbl.S with type key = E.t
-  module S : Set.S with type elt = E.t
-  module D : Set.S with type elt = E.t * Constr_tree.t
+  module H : Hashtbl.S with type key = Enc.t
+  module S : Set.S with type elt = Enc.t
+  module D : Set.S with type elt = Enc.t * Constr_tree.t
 
   type constr_transitions = (Action.t, D.t) Hashtbl.t
 
   type lts_graph =
-    { to_visit : E.t Queue.t
-    ; init : E.t
+    { to_visit : Enc.t Queue.t
+    ; init : Enc.t
     ; terminals : S.t
     ; states : S.t
     ; transitions : constr_transitions H.t
-      (* ; ind_defs : (E.t * Mebi_ind.t) list *)
+      (* ; ind_defs : (Enc.t * Mebi_ind.t) list *)
     ; ind_defs : Mebi_ind.t B.t
     ; weak : Params.WeakEnc.t option
     }
@@ -327,15 +323,15 @@ module type GraphB = sig
   val insert_constr_transition
     :  constr_transitions
     -> Action.t
-    -> E.t
+    -> Enc.t
     -> Constr_tree.t
     -> unit mm
 
   val add_new_term_constr_transition
     :  lts_graph
-    -> E.t
+    -> Enc.t
     -> Action.t
-    -> E.t
+    -> Enc.t
     -> Constr_tree.t
     -> unit mm
 
@@ -364,9 +360,9 @@ end
 (** [MkGraph M] is ...
     [M] is a ... *)
 module MkGraph
-    (M : Hashtbl.S with type key = E.t)
-    (N : Set.S with type elt = E.t)
-    (P : Set.S with type elt = E.t * Constr_tree.t) : GraphB = struct
+    (M : Hashtbl.S with type key = Enc.t)
+    (N : Set.S with type elt = Enc.t)
+    (P : Set.S with type elt = Enc.t * Constr_tree.t) : GraphB = struct
   (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t] and also
      is used for mapping term types to [cindef]. *)
   module H = M
@@ -384,7 +380,7 @@ module MkGraph
 
   let num_transitions (ts : constr_transitions H.t) : int =
     H.fold
-      (fun (_from : E.t) (transitions : constr_transitions) (acc : int) ->
+      (fun (_from : Enc.t) (transitions : constr_transitions) (acc : int) ->
         Hashtbl.fold
           (fun (_a : Action.t) (destinations : D.t) (acc' : int) ->
             acc' + D.cardinal destinations)
@@ -397,12 +393,12 @@ module MkGraph
   (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t].
   *)
   type lts_graph =
-    { to_visit : E.t Queue.t
-    ; init : E.t
+    { to_visit : Enc.t Queue.t
+    ; init : Enc.t
     ; terminals : S.t
     ; states : S.t
     ; transitions : constr_transitions H.t
-      (* ; ind_defs : (E.t * Mebi_ind.t) list *)
+      (* ; ind_defs : (Enc.t * Mebi_ind.t) list *)
     ; ind_defs : Mebi_ind.t B.t
     ; weak : Params.WeakEnc.t option
     }
@@ -412,7 +408,7 @@ module MkGraph
   let insert_constr_transition
         (constrs : constr_transitions)
         (a : Action.t)
-        (d : E.t)
+        (d : Enc.t)
         (c : Constr_tree.t)
     : unit mm
     =
@@ -424,9 +420,9 @@ module MkGraph
 
   let add_new_term_constr_transition
         (g : lts_graph)
-        (t : E.t)
+        (t : Enc.t)
         (a : Action.t)
-        (d : E.t)
+        (d : Enc.t)
         (c : Constr_tree.t)
     : unit mm
     =
@@ -444,9 +440,9 @@ module MkGraph
     | None -> return None
     | Some weak_kind ->
       Log.trace "command.MkGraph.is_silent_transition";
-      let* act_enc : E.t = encode act in
+      let* act_enc : Enc.t = encode act in
       let* ty : EConstr.t = type_of_econstr act in
-      let* ty_enc : E.t = encode ty in
+      let* ty_enc : Enc.t = encode ty in
       Log.debug
         (Printf.sprintf
            "command.MkGraph.is_silent_transition, type of act: %s"
@@ -458,10 +454,10 @@ module MkGraph
          Log.debug
            (Printf.sprintf
               "command.MkGraph.is_silent_transition, OptionConstr (%s) => %s"
-              (E.to_string label_enc)
+              (Enc.to_string label_enc)
               (econstr_to_string decoding));
          (* all non-silent actions should be of this type *)
-         (* if E.eq label_enc ty_enc
+         (* if Enc.eq label_enc ty_enc
          then return (Some false)
          else *)
          let* b = is_none_term act in
@@ -474,16 +470,16 @@ module MkGraph
               "command.MkGraph.is_silent_transition, CustomRef\n\
                - tau: (%s) => %s\n\
                - label: (%s) => %s"
-              (E.to_string tau_enc)
+              (Enc.to_string tau_enc)
               (econstr_to_string tau_decoding)
-              (E.to_string label_enc)
+              (Enc.to_string label_enc)
               (econstr_to_string label_decoding));
-         return (Some (E.eq tau_enc act_enc)))
+         return (Some (Enc.eq tau_enc act_enc)))
   ;;
 
   let get_new_states
         ?(weak_type : Params.WeakEnc.t option = None)
-        (from : E.t)
+        (from : Enc.t)
         (g : lts_graph)
         (ctors : coq_ctor list)
     : S.t mm
@@ -491,8 +487,8 @@ module MkGraph
     Log.trace "command.MkGraph.get_new_states";
     let iter_body (i : int) (new_states : S.t) =
       let (act, tgt, int_tree) : coq_ctor = List.nth ctors i in
-      let* tgt_enc : E.t = encode tgt in
-      let* act_enc : E.t = encode act in
+      let* tgt_enc : Enc.t = encode tgt in
+      let* act_enc : Enc.t = encode act in
       let* is_silent : bool option = is_silent_transition weak_type act in
       let meta : Action.MetaData.t = [ Constr_tree.pstr int_tree ] in
       let to_add : Action.t =
@@ -523,7 +519,7 @@ module MkGraph
         if none of the constructors provided in [lts_ind_def_map] yield constructors from [check_valid_constructors].
   *)
   let get_new_constrs
-        (from : E.t)
+        (from : Enc.t)
         (primary : Mebi_ind.t)
         (lts_ind_def_map : Mebi_ind.t B.t)
     : coq_ctor list mm
@@ -558,7 +554,7 @@ module MkGraph
     else if S.cardinal g.states > bound
     then return g (* exit if bound reached *)
     else (
-      let encoded_t : E.t = Queue.pop g.to_visit in
+      let encoded_t : Enc.t = Queue.pop g.to_visit in
       let* new_constrs : coq_ctor list =
         get_new_constrs encoded_t the_primary_lts lts_ind_def_map
       in
@@ -580,7 +576,7 @@ module MkGraph
       let gref : Names.GlobRef.t = List.nth grefs i in
       let* lts_ind_def : Mebi_ind.t = Mebi_utils.get_ind_lts i gref in
       (* add name of inductive prop *)
-      let* encoding : E.t = encode lts_ind_def.info.name in
+      let* encoding : Enc.t = encode lts_ind_def.info.name in
       if Bool.not (B.mem acc_map encoding)
       then B.add acc_map encoding lts_ind_def;
       return acc_map
@@ -599,7 +595,7 @@ module MkGraph
     let* primary_lts_ind_def : Mebi_ind.t =
       get_ind_lts (List.length grefs) (ref_to_glob primary_lts)
     in
-    let* the_primary_enc : E.t = encode primary_lts_ind_def.info.name in
+    let* the_primary_enc : Enc.t = encode primary_lts_ind_def.info.name in
     return (B.find lts_ind_def_map the_primary_enc)
   ;;
 
@@ -641,9 +637,9 @@ module MkGraph
         ; ind_defs =
             lts_ind_def_map
             (* B.fold
-               (fun (_key : E.t)
+               (fun (_key : Enc.t)
                (_val : Mebi_ind.t)
-               (acc : (E.t * Mebi_ind.t) list) ->
+               (acc : (Enc.t * Mebi_ind.t) list) ->
                match _val.kind with LTS _ -> (_key, _val) :: acc | _ -> acc)
                lts_ind_def_map
                [] *)
@@ -657,7 +653,7 @@ module MkGraph
     return { g with terminals }
   ;;
 
-  let decoq_enc ?(cache_decoding : bool = false) (s_enc : E.t)
+  let decoq_enc ?(cache_decoding : bool = false) (s_enc : Enc.t)
     : Model.State.t mm
     =
     let* cached_decoding =
@@ -670,13 +666,13 @@ module MkGraph
     return (s_enc, cached_decoding)
   ;;
 
-  let decoq_state ?(cache_decoding : bool = false) (s_enc : E.t)
+  let decoq_state ?(cache_decoding : bool = false) (s_enc : Enc.t)
     : Model.State.t mm
     =
     decoq_enc ~cache_decoding s_enc
   ;;
 
-  let decoq_state_opt ?(cache_decoding : bool = false) (s_enc : E.t)
+  let decoq_state_opt ?(cache_decoding : bool = false) (s_enc : Enc.t)
     : Model.State.t option mm
     =
     let* state = decoq_state ~cache_decoding s_enc in
@@ -782,7 +778,7 @@ module MkGraph
   ;;
 
   let decoq_lts_ind_def_map (lts_ind_def_map : Mebi_ind.t B.t)
-    : (E.t * (string * string list)) list
+    : (Enc.t * (string * string list)) list
     =
     let x = ref 0 in
     let xpp () =
@@ -791,9 +787,9 @@ module MkGraph
       y
     in
     B.fold
-      (fun (lts_enc : E.t)
+      (fun (lts_enc : Enc.t)
         (the_ind_def : Mebi_ind.t)
-        (acc : (E.t * (string * string list)) list) ->
+        (acc : (Enc.t * (string * string list)) list) ->
         match the_ind_def.kind with
         | LTS the_lts_ind_def ->
           let lts_name = econstr_to_string the_ind_def.info.name in
@@ -829,7 +825,7 @@ module MkGraph
     let* ((alphabet, transitions) : Model.Alphabet.t * Model.Transitions.t) =
       decoq_transitions ~cache_decoding g.transitions
     in
-    let ind_defs : (E.t * (string * string list)) list =
+    let ind_defs : (Enc.t * (string * string list)) list =
       decoq_lts_ind_def_map g.ind_defs
     in
     let* w : string list = decoq_weak_enc g.weak in
@@ -862,6 +858,30 @@ let make_graph_builder =
   return (module G : GraphB)
 ;;
 
+let build_lts_graph
+      (primary_lts : Libnames.qualid)
+      (t : Constrexpr.constr_expr)
+      (params : int * Params.WeakEnc.t option)
+      (refs : Libnames.qualid list)
+  : Lts.t mm
+  =
+  Log.debug "command.run.build_lts_graph";
+  let* graphM : (module GraphB) = make_graph_builder in
+  let module G = (val graphM) in
+  let* graph_lts =
+    G.build_graph
+      primary_lts
+      t
+      (Mebi_utils.ref_list_to_glob_list (primary_lts :: refs))
+      params
+  in
+  if
+    !Params.the_fail_if_incomplete
+    && Bool.not (Queue.is_empty graph_lts.to_visit)
+  then params_fail_if_incomplete ()
+  else G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts params
+;;
+
 (**********************)
 (** Entry point *******)
 (**********************)
@@ -883,34 +903,13 @@ type command_kind =
 
 let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
   Log.trace "command.run";
-  let* graphM : (module GraphB) = make_graph_builder in
-  let module G = (val graphM) in
-  let build_lts_graph
-        (primary_lts : Libnames.qualid)
-        (t : Constrexpr.constr_expr)
-        (params : int * Params.WeakEnc.t option)
-    : Lts.t mm
-    =
-    Log.debug "command.run.build_lts_graph";
-    let* graph_lts =
-      G.build_graph
-        primary_lts
-        t
-        (Mebi_utils.ref_list_to_glob_list (primary_lts :: refs))
-        params
-    in
-    if
-      !Params.the_fail_if_incomplete
-      && Bool.not (Queue.is_empty graph_lts.to_visit)
-    then params_fail_if_incomplete ()
-    else
-      G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts params
-  in
   let* _ = Params.obtain_weak_kinds_from_args () in
   match k with
   | MakeModel (kind, (x, primary_lts)) ->
     Log.debug "command.run, MakeModel";
-    let* the_lts = build_lts_graph primary_lts x (Params.get_fst_params ()) in
+    let* the_lts : Lts.t =
+      build_lts_graph primary_lts x (Params.get_fst_params ()) refs
+    in
     (match kind with
      | LTS ->
        Log.result
@@ -950,7 +949,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
        else (
          Log.debug "command.run, SaturateModel";
          let* the_lts =
-           build_lts_graph primary_lts x (Params.get_fst_params ())
+           build_lts_graph primary_lts x (Params.get_fst_params ()) refs
          in
          let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
          Log.details
@@ -980,7 +979,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
        else (
          Log.debug "command.run, MinimizeModel";
          let* the_lts =
-           build_lts_graph primary_lts x (Params.get_fst_params ())
+           build_lts_graph primary_lts x (Params.get_fst_params ()) refs
          in
          let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
          let the_minimized =
@@ -997,8 +996,8 @@ let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
     Log.debug "command.run, CheckBisimilarity";
     if is_details_enabled () then Params.printout_weak_mode ();
     Mebi_help.show_instructions_to_toggle_weak !Params.the_weak_mode;
-    let* the_lts_1 = build_lts_graph a x (Params.get_fst_params ()) in
-    let* the_lts_2 = build_lts_graph b y (Params.get_snd_params ()) in
+    let* the_lts_1 = build_lts_graph a x (Params.get_fst_params ()) refs in
+    let* the_lts_2 = build_lts_graph b y (Params.get_snd_params ()) refs in
     let the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
     let the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
     Log.details
@@ -1009,6 +1008,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
     let the_bisimilar =
       Algorithms.Bisimilar.run ~weak:!Params.the_weak_mode (the_fsm_1, the_fsm_2)
     in
+    Mebi_bisim.set_the_result the_bisimilar;
     Log.result
       (Printf.sprintf
          "command.run, CheckBisimilarity, finished: %s\n"
@@ -1016,8 +1016,8 @@ let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
     Log.details
       (Printf.sprintf
          "command.run, CheckBisimilarity:\nFSM 1: %s\n\nFSM 2: %s\n"
-         (Fsm.to_string (fst (fst (fst the_bisimilar))))
-         (Fsm.to_string (snd (fst (fst the_bisimilar)))));
+         (Fsm.to_string the_bisimilar.the_fsm_1)
+         (Fsm.to_string the_bisimilar.the_fsm_2));
     if !Params.the_dump_to_file
     then Log.debug "command.run, CheckBisimilarity -- TODO dump to file\n";
     if
@@ -1033,79 +1033,21 @@ let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
     return ()
 ;;
 
-(* let () = Logging.set_output_mode (Coq ()) *)
-
-type tactic_kind =
-  | ProofTest of unit
-  | Bisimilarity of ((coq_model * coq_model) * Libnames.qualid list)
-
-let tactic (k : tactic_kind) : unit Proofview.tactic mm =
-  Log.trace "command.tactic";
-  let* graphM : (module GraphB) = make_graph_builder in
-  let module G = (val graphM) in
-  let build_lts_graph
-        (primary_lts : Libnames.qualid)
-        (t : Constrexpr.constr_expr)
-        (params : int * Params.WeakEnc.t option)
-        (refs : Libnames.qualid list)
-    : Lts.t mm
-    =
-    Log.debug "command.run.build_lts_graph";
-    let* graph_lts =
-      G.build_graph
-        primary_lts
-        t
-        (Mebi_utils.ref_list_to_glob_list (primary_lts :: refs))
-        params
-    in
-    if
-      !Params.the_fail_if_incomplete
-      && Bool.not (Queue.is_empty graph_lts.to_visit)
-    then params_fail_if_incomplete ()
-    else
-      G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts params
+let proof_intro
+      ((x, a) : coq_model)
+      ((y, b) : coq_model)
+      (refs : Libnames.qualid list)
+  : Declare.Proof.t mm
+  =
+  let* _ = run (CheckBisimilarity ((x, a), (y, b))) refs in
+  let* _ =
+    Mebi_wrapper.update_proof_by_tactics_mm
+      [ Mebi_tactics.unfold_constrexpr_list [ x; y ]
+      ; Mebi_tactics.cofix ()
+      ; Mebi_tactics.apply_mm Mebi_theories.c_In_sim
+      ; Mebi_tactics.apply_mm Mebi_theories.c_Pack_sim
+      ; Mebi_tactics.intros_all ()
+      ]
   in
-  let* _ = Params.obtain_weak_kinds_from_args () in
-  match k with
-  | ProofTest () ->
-    Log.debug "command.tactic, ProofTest";
-    Mebi_wrapper.proof_test ()
-  | Bisimilarity (((x, a), (y, b)), refs) ->
-    Log.debug "command.tactic, Bisimilarity";
-    if is_details_enabled () then Params.printout_weak_mode ();
-    Mebi_help.show_instructions_to_toggle_weak !Params.the_weak_mode;
-    let* the_lts_1 = build_lts_graph a x (Params.get_fst_params ()) refs in
-    let* the_lts_2 = build_lts_graph b y (Params.get_snd_params ()) refs in
-    let the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
-    let the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
-    Log.details
-      (Printf.sprintf
-         "command.tactic, CheckBisimilarity:\nFSM 1: %s\n\nFSM 2: %s\n"
-         (Fsm.to_string the_fsm_1)
-         (Fsm.to_string the_fsm_2));
-    let the_bisimilar =
-      Algorithms.Bisimilar.run ~weak:!Params.the_weak_mode (the_fsm_1, the_fsm_2)
-    in
-    Log.result
-      (Printf.sprintf
-         "command.tactic, CheckBisimilarity, finished: %s\n"
-         (Algorithms.Bisimilar.pstr the_bisimilar));
-    if !Params.the_dump_to_file
-    then Log.debug "command.tactic, CheckBisimilarity -- TODO dump to file\n";
-    let* _ =
-      if
-        !Params.the_fail_if_not_bisim
-        && Bool.not (Algorithms.Bisimilar.result_to_bool the_bisimilar)
-      then params_fail_if_not_bisim ()
-      else return ()
-    in
-    Log.debug "command.tactic, - - - - - - - - - - - - - - -\n";
-    (* TODO: use bisim result to find a state that is bisimilar to [m2] that originates in saturated [n] that is reachable from [n1] via only [None] actions *)
-    (* let* proof = Mebi_wrapper.get_proof () in *)
-    (* let the_proof : Proof.t = Declare.Proof.get proof in *)
-    (* let the_data : Proof.data = Proof.data the_proof in *)
-    (* let the_goals : Evar.t list = the_data.goals in *)
-    (* let _t : unit Proofview.tactic = Proofview.shelve_unifiable in *)
-    let _t : unit Proofview.tactic = Proofview.tclUNIT () in
-    return _t
+  Mebi_wrapper.get_proof ()
 ;;

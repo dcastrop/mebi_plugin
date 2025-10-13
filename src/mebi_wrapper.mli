@@ -1,10 +1,10 @@
 module F = Mebi_setup.F
-module E = Mebi_setup.E
+module Enc = Mebi_setup.Enc
 module B = Mebi_setup.B
 
 type wrapper =
   { coq_ref : Mebi_setup.coq_context ref
-  ; fwd_enc : E.t F.t
+  ; fwd_enc : Enc.t F.t
   ; bck_enc : EConstr.t B.t
   }
 
@@ -34,6 +34,19 @@ val iterate : int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
 
 module type ERROR_TYPE = sig
   type mebi_error =
+    | Invalid_KindOfTypeEConstr_Expected_Atomic of
+        (Mebi_setup.coq_context ref * EConstr.t)
+    | Invalid_KindOfTypeEConstr_Expected_Cast of
+        (Mebi_setup.coq_context ref * EConstr.t)
+    | Invalid_KindOfTypeEConstr_Expected_LetIn of
+        (Mebi_setup.coq_context ref * EConstr.t)
+    | Invalid_KindOfTypeEConstr_Expected_Prod of
+        (Mebi_setup.coq_context ref * EConstr.t)
+    | Invalid_KindOfTypeEConstr_Expected_Sort of
+        (Mebi_setup.coq_context ref * EConstr.t)
+    | UnknownEncodeKey of (Mebi_setup.coq_context ref * B.key F.t * EConstr.t)
+    | UnknownDecodeKey of (Mebi_setup.coq_context ref * EConstr.t B.t * Enc.t)
+    | NoBisimResult of unit
     | ProofvIsNone of unit
     | ParamsFailIfIncomplete of unit
     | ParamsFailIfNotBisim of unit
@@ -47,7 +60,7 @@ module type ERROR_TYPE = sig
     | UnknownTermType of
         (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t * EConstr.t list))
     | PrimaryLTSNotFound of (Environ.env * Evd.evar_map * EConstr.t * EConstr.t list)
-    | UnknownDecodeKey of (Environ.env * Evd.evar_map * E.t * EConstr.t B.t)
+    (* | UnknownDecodeKey of (Environ.env * Evd.evar_map * Enc.t * EConstr.t B.t) *)
     | ExpectedCoqIndDefOfLTSNotType of unit
     | InvalidCheckUpdatedCtx of
         (Environ.env
@@ -57,6 +70,39 @@ module type ERROR_TYPE = sig
 
   exception MEBI_exn of mebi_error
 
+  val invalid_kind_of_econstr_expected_atomic
+    :  Mebi_setup.coq_context ref
+    -> EConstr.t
+    -> exn
+
+  val invalid_kind_of_econstr_expected_cast
+    :  Mebi_setup.coq_context ref
+    -> EConstr.t
+    -> exn
+
+  val invalid_kind_of_econstr_expected_letin
+    :  Mebi_setup.coq_context ref
+    -> EConstr.t
+    -> exn
+
+  val invalid_kind_of_econstr_expected_prod
+    :  Mebi_setup.coq_context ref
+    -> EConstr.t
+    -> exn
+
+  val invalid_kind_of_econstr_expected_sort
+    :  Mebi_setup.coq_context ref
+    -> EConstr.t
+    -> exn
+
+
+   val cannot_get_encoding_of_unencoded_econstr : Mebi_setup.coq_context ref -> B.key F.t -> EConstr.t -> exn
+   val cannot_get_decoding_of_unencoded_econstr : Mebi_setup.coq_context ref -> EConstr.t B.t -> Enc.t -> exn
+
+
+(************8*)
+
+  val missing_bisim_result : unit -> exn
   val proofv_is_none : unit -> exn
   val params_fail_if_incomplete : unit -> exn
   val params_fail_if_not_bisim : unit -> exn
@@ -82,7 +128,7 @@ module type ERROR_TYPE = sig
     -> EConstr.t list
     -> exn
 
-  val unknown_decode_key : Environ.env -> Evd.evar_map -> E.t -> EConstr.t B.t -> exn
+  (* val unknown_decode_key : Environ.env -> Evd.evar_map -> Enc.t -> EConstr.t B.t -> exn *)
 
   val invalid_check_updated_ctx
     :  Environ.env
@@ -94,6 +140,26 @@ end
 
 module Error : ERROR_TYPE
 
+val invalid_kind_of_econstr_expected_atomic
+  :  EConstr.t -> 'a mm
+
+val invalid_kind_of_econstr_expected_cast
+  :  EConstr.t -> 'a mm
+
+val invalid_kind_of_econstr_expected_letin
+  :  EConstr.t -> 'a mm
+
+val invalid_kind_of_econstr_expected_prod
+  :  EConstr.t -> 'a mm
+
+val invalid_kind_of_econstr_expected_sort
+  :  EConstr.t -> 'a mm
+
+val cannot_get_encoding_of_unencoded_econstr : EConstr.t -> 'a mm
+val cannot_get_decoding_of_unencoded_econstr : Enc.t -> 'a mm
+
+
+val missing_bisim_result : unit -> 'a mm
 val proofv_is_none : unit -> 'a mm
 val params_fail_if_incomplete : unit -> 'a mm
 val params_fail_if_not_bisim : unit -> 'a mm
@@ -107,7 +173,7 @@ val invalid_ref_type : Names.GlobRef.t -> 'a mm
 val invalid_cindef_kind : 'b -> 'a mm
 val unknown_term_type : EConstr.t * EConstr.t * EConstr.t list -> 'a mm
 val primary_lts_not_found : EConstr.t * EConstr.t list -> 'a mm
-val unknown_decode_key : E.t * EConstr.t B.t -> 'a mm
+(* val unknown_decode_key : Enc.t * EConstr.t B.t -> 'a mm *)
 
 val invalid_check_updated_ctx
   :  EConstr.t list
@@ -118,7 +184,7 @@ val set_proof : Declare.Proof.t -> wrapper ref -> unit in_context
 val get_env : wrapper ref -> Environ.env in_context
 val get_sigma : wrapper ref -> Evd.evar_map in_context
 val get_proofv : wrapper ref -> Mebi_setup.proof_context in_context
-val get_fwd_enc : wrapper ref -> E.t F.t in_context
+val get_fwd_enc : wrapper ref -> Enc.t F.t in_context
 val get_bck_enc : wrapper ref -> EConstr.t B.t in_context
 
 val state
@@ -178,13 +244,15 @@ val type_of_econstr : EConstr.t -> EConstr.t mm
 val new_evar_of_econstr : EConstr.t -> EConstr.t mm
 
 (* *)
-val encode : EConstr.t -> E.t mm
-val decode : E.t -> EConstr.t mm
-val decode_to_string : E.t -> string
-val get_encoding_opt : EConstr.t -> E.t option mm
-val get_decoding_opt : E.t -> EConstr.t option mm
+val encode : EConstr.t -> Enc.t mm
+val decode : Enc.t -> EConstr.t mm
+val decode_to_string : Enc.t -> string
+val get_encoding_opt : EConstr.t -> Enc.t option mm
+val get_decoding_opt : Enc.t -> EConstr.t option mm
+val get_encoding : EConstr.t -> Enc.t mm
+val get_decoding : Enc.t -> EConstr.t mm
 val has_encoding : EConstr.t -> bool mm
-val has_decoding : E.t -> bool mm
+val has_decoding : Enc.t -> bool mm
 val encode_map : 'a F.t -> 'a B.t mm
 val decode_map : 'a B.t -> 'a F.t mm
 
@@ -224,7 +292,7 @@ val debug_encoding : unit -> unit mm
 
 module Constr_tree : sig
   type 'a tree = Node of 'a * 'a tree list
-  type t = (E.t * int) tree
+  type t = (Enc.t * int) tree
 
   val eq : t -> t -> bool
   val compare : t -> t -> int
@@ -238,15 +306,15 @@ val decode_constr_tree_lts : Constr_tree.t -> decoded_tree mm
 
 val make_transition_tbl
   :  wrapper ref
-  -> (module Hashtbl.S with type key = E.t) in_context
+  -> (module Hashtbl.S with type key = Enc.t) in_context
 
 val make_state_set
   :  wrapper ref
-  -> (module Set.S with type elt = E.t) in_context
+  -> (module Set.S with type elt = Enc.t) in_context
 
 val make_state_tree_pair_set
   :  wrapper ref
-  -> (module Set.S with type elt = E.t * Constr_tree.t) in_context
+  -> (module Set.S with type elt = Enc.t * Constr_tree.t) in_context
 
 (* *)
 val proof_query : Declare.Proof.t -> Proof.t
@@ -259,3 +327,7 @@ val proof_test : unit -> unit Proofview.tactic mm
 val debug_econstr_kind : EConstr.t -> unit mm
 val debug_constr_kind : Constr.t -> unit mm
 val debug_econstr_constr_kind : EConstr.t -> unit mm
+
+
+val show_fwd_map : unit -> unit mm
+val show_bck_map : unit -> unit mm
