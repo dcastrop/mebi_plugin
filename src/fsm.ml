@@ -132,10 +132,8 @@ let rec add_edges_from_label_list
 (****** Get **********************************************************)
 (*********************************************************************)
 
-let get_actions_from (m : t) (from : State.t) : States.t Actions.t =
-  match Edges.find_opt m.edges from with
-  | None -> Actions.of_seq (List.to_seq [])
-  | Some aa -> aa
+let get_actions_from (m : t) : State.t -> States.t Actions.t =
+  fun x -> Model.get_actions_from x m.edges
 ;;
 
 let get_states_reachable_from (m : t) (from : State.t) : States.t =

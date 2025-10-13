@@ -86,8 +86,8 @@ val set_weak_mode : bool -> unit
 
 module WeakEnc : sig
   type t =
-    | OptionConstr of Mebi_wrapper.E.t
-    | CustomConstr of Mebi_wrapper.E.t * Mebi_wrapper.E.t
+    | OptionConstr of Mebi_wrapper.Enc.t
+    | CustomConstr of Mebi_wrapper.Enc.t * Mebi_wrapper.Enc.t
 
   (* val is_option : t -> bool *)
   val to_string : t -> string Mebi_wrapper.mm

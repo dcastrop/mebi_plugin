@@ -6,11 +6,13 @@ Model
 Lts
 Fsm
 Algorithms
+Strfy
 Mebi_wrapper
 Mebi_ind
 Mebi_utils
 Mebi_theories
 Mebi_tactics
+Mebi_bisim
 Params
 Dump_to_file
 Mebi_help

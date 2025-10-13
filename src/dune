@@ -28,11 +28,13 @@
   lts
   fsm
   algorithms
+  strfy
   mebi_wrapper
   mebi_ind
   mebi_utils
   mebi_theories
   mebi_tactics
+  mebi_bisim
   params
   ; dump_to_file
   mebi_help

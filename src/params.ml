@@ -289,8 +289,8 @@ let reset_weak_type_args () : unit =
 (* must be re-obtained for each mebi_wrapper.run (...) *)
 module WeakEnc = struct
   type t =
-    | OptionConstr of Mebi_wrapper.E.t
-    | CustomConstr of Mebi_wrapper.E.t * Mebi_wrapper.E.t
+    | OptionConstr of Mebi_wrapper.Enc.t
+    | CustomConstr of Mebi_wrapper.Enc.t * Mebi_wrapper.Enc.t
 
   (* let is_option (x : t) : bool =
      match x with OptionConstr _ -> true | _ -> false
@@ -304,23 +304,23 @@ module WeakEnc = struct
       return
         (Printf.sprintf
            "TODO: OptionConstr %s => %s"
-           (E.to_string label_enc)
+           (Enc.to_string label_enc)
            (* (decode_to_string label_enc) *)
            "TODO")
     | CustomConstr (tau_enc, label_enc) ->
       return
         (Printf.sprintf
            "TODO: CustomConstr %s %s"
-           (Mebi_wrapper.E.to_string tau_enc)
-           (Mebi_wrapper.E.to_string label_enc))
+           (Mebi_wrapper.Enc.to_string tau_enc)
+           (Mebi_wrapper.Enc.to_string label_enc))
   ;;
 
   let eq x y : bool =
     Log.debug "params.WeakEnc.eq";
     match x, y with
-    | OptionConstr x, OptionConstr y -> Mebi_wrapper.E.eq x y
+    | OptionConstr x, OptionConstr y -> Mebi_wrapper.Enc.eq x y
     | CustomConstr (x1, x2), CustomConstr (y1, y2) ->
-      Mebi_wrapper.E.eq x1 y1 && Mebi_wrapper.E.eq x2 y2
+      Mebi_wrapper.Enc.eq x1 y1 && Mebi_wrapper.Enc.eq x2 y2
     | _, _ -> false
   ;;
 end
@@ -417,12 +417,12 @@ let weak_type_arg_to_kind (t : WeakArgs.t) : WeakEnc.t Mebi_wrapper.mm =
   let open Mebi_utils in
   match t with
   | OptionConstr label_tref ->
-    let* label_enc : E.t = encode_constrexpr label_tref in
+    let* label_enc : Enc.t = encode_constrexpr label_tref in
     let* _ = decode label_enc in
     return (WeakEnc.OptionConstr label_enc)
   | CustomConstr (tau_tref, label_ref) ->
-    let* tau_enc : E.t = encode_constrexpr tau_tref in
-    let* label_enc : E.t = encode_ref label_ref in
+    let* tau_enc : Enc.t = encode_constrexpr tau_tref in
+    let* label_enc : Enc.t = encode_ref label_ref in
     let* _ = decode tau_enc in
     let* _ = decode label_enc in
     return (WeakEnc.CustomConstr (tau_enc, label_enc))

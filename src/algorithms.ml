@@ -133,7 +133,13 @@ end
 module Bisimilar = struct
   open Model
 
-  type result = (Fsm.pair * Fsm.t) * (Partition.t * Partition.t)
+  type result =
+    { the_fsm_1 : Fsm.t
+    ; the_fsm_2 : Fsm.t
+    ; merged_fsm : Fsm.t
+    ; bisim_states : Partition.t
+    ; non_bisim_states : Partition.t
+    }
 
   (** is [true] if [block] has states that originate from both [the_fsm_1] and [the_fsm_2]
   *)
@@ -177,23 +183,23 @@ module Bisimilar = struct
     let (bisim_states, non_bisim_states) : Partition.t * Partition.t =
       split_bisimilar pi (fst the_fsm_pair) (snd the_fsm_pair)
     in
-    (the_fsm_pair, merged_fsm), (bisim_states, non_bisim_states)
+    { the_fsm_1 = fst the_fsm_pair
+    ; the_fsm_2 = snd the_fsm_pair
+    ; merged_fsm
+    ; bisim_states
+    ; non_bisim_states
+    }
   ;;
 
   let result_to_bool (r : result) : bool =
-    match r with
-    | _, (_bisim_states, non_bisim_states) ->
-      Model.Partition.is_empty non_bisim_states
+    Model.Partition.is_empty r.non_bisim_states
   ;;
 
   let pstr (r : result) : string =
-    match r with
-    | (_the_fsm_pair, merged_fsm), (bisim_states, non_bisim_states) ->
-      let are_bisimilar : bool = Model.Partition.is_empty non_bisim_states in
-      Printf.sprintf
-        "\nBisimilar: %b\nBisimilar states: %s\nNon-bisimilar states: %s\n"
-        are_bisimilar
-        (Model.pstr_partition bisim_states)
-        (Model.pstr_partition non_bisim_states)
+    Printf.sprintf
+      "\nBisimilar: %b\nBisimilar states: %s\nNon-bisimilar states: %s\n"
+      (Model.Partition.is_empty r.non_bisim_states)
+      (Model.pstr_partition r.bisim_states)
+      (Model.pstr_partition r.non_bisim_states)
   ;;
 end

@@ -363,7 +363,7 @@ let proof_test () : unit Proofview.tactic mm =
   Log.debug
     (Printf.sprintf
        "mebi_wrapper.proof_test: rel_ctx => \"%s\""
-       (Utils.ppstr
+       (Strfy.pp
           (Printer.pr_rel_context
              !coq_st.coq_env
              !coq_st.coq_ctx
@@ -375,7 +375,7 @@ let proof_test () : unit Proofview.tactic mm =
   Log.debug
     (Printf.sprintf
        "mebi_wrapper.proof_test: named_ctx => \"%s\""
-       (Utils.ppstr
+       (Strfy.pp
           (Printer.pr_named_context
              !coq_st.coq_env
              !coq_st.coq_ctx
@@ -390,7 +390,7 @@ let proof_test () : unit Proofview.tactic mm =
 (* Log.debug
     (Printf.sprintf
        "mebi_wrapper.proof_test: default_goal => %s"
-       (Utils.ppstr
+       (Strfy.pp
           (Goal_select.pr_goal_selector
              (Goal_select.get_default_goal_selector ())))); *)
 (*  *)
