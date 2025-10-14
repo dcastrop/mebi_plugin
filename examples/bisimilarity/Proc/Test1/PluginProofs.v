@@ -63,7 +63,6 @@ Proof.
   (* MeBi Set ShowDetails True. *)
 
 
-  (* TODO: Fix enc maps empty *)
   MeBiSim GoalTest.
   MeBiSim WeakNone.
    
