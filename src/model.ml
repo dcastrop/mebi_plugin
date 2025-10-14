@@ -825,7 +825,7 @@ let get_num_edges ?(num : int = 0) (es : States.t Actions.t Edges.t) : int =
 let get_actions (es : States.t Actions.t Edges.t) : States.t Actions.t =
   let aa : States.t Actions.t = Actions.create 0 in
   List.iter
-    (fun ((_from, a, dests) : Edge.t) -> add_action aa a dests)
+    (fun ((_from, a, dest) : Edge.t) -> add_action aa a dest)
     (edges_to_list es);
   aa
 ;;
@@ -853,6 +853,7 @@ let get_action_with_label (actions : States.t Actions.t)
   : Action.Label.t -> Action.t
   =
   fun x ->
+  Log.trace "model.get_action_with_label";
   match
     List.find_opt
       (fun ({ label; _ } : Action.t) -> Action.Label.eq x label)
@@ -867,6 +868,7 @@ let get_actions_with_label
       (es : States.t Actions.t Edges.t)
   : States.t Actions.t
   =
+  Log.trace "model.get_actions_with_label";
   let result : States.t Actions.t = Actions.create 0 in
   List.iter
     (fun ((_from, a, dests) : Edge.t) ->

@@ -445,11 +445,43 @@ let saturate_edges_from
     ActionPairs.empty
 ;;
 
+exception CouldNotFindSilentAction_Of_FSM of unit
+(* exception FoundMultipleSilentActions_Of_FSM of unit *)
+
+let get_the_silent_action (m : t) : Action.t =
+  match
+    Actions.fold
+      (fun a _dests acc ->
+        match Action.Label.is_silent a.label with
+        | None -> raise (CouldNotFindSilentAction_Of_FSM ())
+        | Some b ->
+          if b
+          then (
+            Log.debug
+              (Printf.sprintf
+                 "fsm.get_the_silent_action, add %s\nwith dests: %s"
+                 (Model.pstr_action a)
+                 (Model.pstr_states _dests));
+            a :: acc)
+          else acc)
+      (Model.get_actions m.edges)
+      []
+  with
+  | [] -> raise (CouldNotFindSilentAction_Of_FSM ())
+  | h :: [] -> h
+  | h :: _ ->
+    (* raise (FoundMultipleSilentActions_Of_FSM ()) *)
+    Log.warning
+      "fsm.get_the_silent_action, multiple found. TODO: rework Mode.get_actions";
+    h
+;;
+
 (** @return
-      [m] with saturated edges. Saturation removes silent actions, replacing them with (potentially multiple) explicit non-silent actions that may otherwise be taken immediately following some sequence of silent actions.
+      [m] with saturated edges. Saturation removes non-reflexive silent actions, replacing them with (potentially multiple) explicit non-silent actions that may otherwise be taken immediately following some sequence of silent actions. All states are saturated with a silent reflexive transition.
 *)
 let saturate_edges (m : t) : States.t Actions.t Edges.t =
   Log.trace "fsm.saturate_edges";
+  let the_silent_action : Action.t = get_the_silent_action m in
   let edges : States.t Actions.t Edges.t = Edges.copy m.edges in
   if Logging.is_details_enabled ()
   then
@@ -457,12 +489,20 @@ let saturate_edges (m : t) : States.t Actions.t Edges.t =
   Edges.iter
     (fun (from : State.t) (aa : States.t Actions.t) ->
       let actions : States.t Actions.t = Actions.create 0 in
+      (* add silent reflexive action *)
+      Model.add_action actions the_silent_action from;
       ActionPairs.iter
         (fun ((saturated_action, dests) : ActionPair.t) ->
           if States.cardinal dests > 0
-          then Actions.add actions saturated_action dests)
+          then
+            Actions.replace
+              actions
+              saturated_action
+              (match Actions.find_opt actions saturated_action with
+               | None -> dests
+               | Some dests' -> States.union dests dests'))
         (saturate_edges_from edges from aa);
-      if Actions.length actions > 0 then Edges.add edges from actions)
+      if Actions.length actions > 0 then Edges.replace edges from actions)
     m.edges;
   edges
 ;;
