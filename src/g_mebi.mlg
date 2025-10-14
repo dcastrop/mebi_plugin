@@ -172,7 +172,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
         ; Mebi_tactics.unfold_econstr_mm Mebi_theories.c_tau
         (* TODO: figure out how to actually get the term in the goal *)
         ] in 
-      let* _ = Mebi_wrapper.show_proof_data () in 
+      (* let* _ = Mebi_wrapper.show_proof_data () in  *)
       Logging.Log.debug "MeBiSim:WeakNone END";
       Mebi_wrapper.get_proof ()
     )
@@ -259,7 +259,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
                 "And" reference(b) constr(y)
                 "Using" reference_list(rs) ] -> 
   { fun ~pstate -> 
-    let p = Mebi_wrapper.run ~keep_encoding:false ~new_proof:true ~proof:(Some pstate) (
+    Mebi_wrapper.run ~keep_encoding:false ~new_proof:true ~proof:(Some pstate) (
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim: BEGIN";
       let t = Command.proof_intro (x, a) (y, b) rs in 
@@ -268,24 +268,13 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       let* _ = Mebi_wrapper.show_bck_map () in
       Logging.Log.debug "MeBiSim: END";
       t
-    ) in
-    (* Proofview.tclTHEN p (
-    Mebi_wrapper.run ~keep_encoding:true ~fresh:false ~new_proof:true ~proof:(Some pstate) (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBiSim: (post) BEGIN";
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.show_fwd_map () in
-      let* _ = Mebi_wrapper.show_bck_map () in
-      Logging.Log.debug "MeBiSim: (post) END";
-      Mebi_wrapper.return ()
-    )) *)
-     p
+    ) 
   }
 |![ proof ] 
   [ "MeBiSim" "Begin" reference(a) constr(x)  
                 "And" reference(b) constr(y) ] -> 
   { fun ~pstate -> 
-    let p = Mebi_wrapper.run ~keep_encoding:false ~new_proof:true ~proof:(Some pstate) (
+    Mebi_wrapper.run ~keep_encoding:false ~new_proof:true ~proof:(Some pstate) (
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim: BEGIN";
       let t = Command.proof_intro (x, a) (y, b) [] in 
@@ -294,18 +283,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       let* _ = Mebi_wrapper.show_bck_map () in
       Logging.Log.debug "MeBiSim: END";
       t
-    ) in
-    (* Proofview.tclTHEN p (
-    Mebi_wrapper.run ~keep_encoding:true ~fresh:false ~new_proof:true ~proof:(Some pstate) (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBiSim: (post) BEGIN";
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.show_fwd_map () in
-      let* _ = Mebi_wrapper.show_bck_map () in
-      Logging.Log.debug "MeBiSim: (post) END";
-      Mebi_wrapper.return ()
-    )) *)
-     p
+    ) 
   }
 
 

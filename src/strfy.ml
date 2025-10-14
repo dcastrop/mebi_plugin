@@ -29,7 +29,7 @@ let list
     Printf.sprintf "%s %s %s%s %s" lhs (strfy h) sep rhs suffix
   | h :: t ->
     let lhs, rhs = use in
-    let sep : string = nlsep ~force_newline ~indent () in
+    let sep = nlsep ~force_newline ~indent () in
     let len = List.length t + 1 in
     let suffix =
       if use = ("[", "]") then Printf.sprintf "(%s: %i)" label len else ""
@@ -234,6 +234,39 @@ let goal ?(indent : int = 0) : Proofview.Goal.t -> string =
 (****** MODEL *********************)
 (**********************************)
 
+let enc : Mebi_setup.Enc.t -> string = Mebi_setup.Enc.to_string
+
+let enc_econstr_pair ?(indent : int = 0) env sigma
+  : Mebi_setup.Enc.t * EConstr.t -> string
+  =
+  fun (x : Mebi_setup.Enc.t * EConstr.t) ->
+  Printf.sprintf
+    "%s%s"
+    (str_tabs indent)
+    (tuple
+       ~force_newline:true
+       ~indent
+       str
+       str
+       ( tuple ~is_keyval:true str enc ("encoding", fst x)
+       , tuple ~is_keyval:true str (econstr env sigma) ("econstr", snd x) ))
+;;
+
+let enc_econstr_opt_pair ?(indent : int = 0) env sigma
+  : Mebi_setup.Enc.t option * EConstr.t -> string
+  =
+  fun (x : Mebi_setup.Enc.t option * EConstr.t) ->
+  Printf.sprintf
+    "%s%s"
+    (str_tabs indent)
+    (tuple
+       ~indent
+       str
+       str
+       ( tuple ~is_keyval:true str (option enc) ("encoding", fst x)
+       , tuple ~is_keyval:true str (econstr env sigma) ("econstr", snd x) ))
+;;
+
 let coq_info ?(indent : int = 0) : Model.Info.Coq.t -> string =
   fun (enc, (dec, names)) ->
   let sep = nlsep ~force_newline:(Bool.not (List.is_empty names)) ~indent () in
@@ -249,25 +282,93 @@ let info ?(indent : int = 0) : Model.Info.t -> string = fun x -> ""
 
 let state ?(indent : int = 0) : Model.State.t -> string =
   fun x ->
-  let sep = nlsep ~force_newline:(Option.has_some (snd x)) ~indent () in
   Printf.sprintf
-    "( encState: %s%s, decState: %s )"
-    (Mebi_setup.Enc.to_string (fst x))
-    sep
-    (option str (snd x))
+    "%s%s"
+    (str_tabs indent)
+    (tuple
+       ~indent
+       str
+       str
+       ( tuple ~is_keyval:true ~indent str enc ("encState", fst x)
+       , tuple ~is_keyval:true ~indent str (option str) ("decState", snd x) ))
 ;;
 
 let states ?(indent : int = 0) : Model.States.t -> string =
-  fun x -> list state (Model.States.to_list x)
+  fun x ->
+  list
+    ~force_newline:true
+    ~indent
+    ~label:"States"
+    state
+    (Model.States.to_list x)
 ;;
 
 let action_label ?(indent : int = 0) : Model.Action.Label.t -> string =
-  fun x -> Mebi_setup.Enc.to_string (fst x)
+  fun x -> enc (fst x)
 ;;
 
 let action_metadata ?(indent : int = 0) : Model.Action.MetaData.t -> string =
   fun x -> list ~label:"MetaData" str x
 ;;
-(* let action ?(indent : int = 0) : Model.Action.t -> string =
-   fun x -> Mebi_setup.Enc.to_string (fst x)
-   ;; *)
+
+let rec action_annotation_pair ?(indent : int = 0)
+  : Model.Action.annotation_pair -> string
+  =
+  fun x -> tuple ~indent state action x
+
+and action_annotation ?(indent : int = 0) : Model.Action.annotation -> string =
+  fun x -> list action_annotation_pair x
+
+and action_annotations ?(indent : int = 0) : Model.Action.annotations -> string =
+  fun x -> list ~label:"Annotations" action_annotation x
+
+and action ?(indent : int = 0) : Model.Action.t -> string =
+  fun (x : Model.Action.t) ->
+  Printf.sprintf
+    "%s%s"
+    (str_tabs indent)
+    (list
+       ~force_newline:true
+       ~indent:(indent + 1)
+       ~use:("{", "}")
+       str
+       [ tuple
+           ~is_keyval:true
+           ~indent:(indent + 1)
+           str
+           action_label
+           ("encLabel", x.label)
+       ; tuple
+           ~is_keyval:true
+           ~indent:(indent + 1)
+           str
+           (option str)
+           ("decLabel", fst (snd x.label))
+       ; tuple
+           ~is_keyval:true
+           ~indent:(indent + 1)
+           str
+           (option bool)
+           ("silent", snd (snd x.label))
+       ; tuple
+           ~is_keyval:true
+           ~indent:(indent + 1)
+           str
+           action_metadata
+           ("metaData", x.meta)
+       ; tuple
+           ~is_keyval:true
+           ~indent:(indent + 1)
+           str
+           str
+           ("annotations", "TODO")
+         (* action_annotations
+            ("annotations", x.annos) *)
+       ])
+;;
+(* Mebi_setup.Enc.to_string (fst x) *)
+(* Printf.sprintf
+    "( encState: %s%s, decState: %s )"
+    (Mebi_setup.Enc.to_string x.)
+    sep
+    (option str (snd x)) *)

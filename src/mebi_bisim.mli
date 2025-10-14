@@ -26,6 +26,11 @@ exception
 val find_state_of_enc :
   Mebi_setup.Enc.t -> Model.States.t -> Model.State.t
 
+val find_state_of_enc_opt :
+  Mebi_setup.Enc.t option ->
+  Model.States.t ->
+  Model.State.t option
+
 exception
   Label_Of_Enc_NotFound of
     (Mebi_setup.Enc.t * Model.Alphabet.t)
@@ -37,21 +42,18 @@ exception
 val find_label_of_enc :
   Mebi_setup.Enc.t -> Model.Alphabet.t -> Model.Alphabet.elt
 
-val get_concl_transition :
-  Fsm.t ->
-  'a ->
-  Evd.evar_map ->
-  EConstr.t ->
-  transition Mebi_wrapper.mm
+val econstr_to_enc : EConstr.t -> Mebi_setup.Enc.t
+
+val econstr_to_enc_opt :
+  Evd.evar_map -> EConstr.t -> Mebi_setup.Enc.t option
 
 exception Invalid_KindOf_EConstr_Expected_Atomic of EConstr.t
 
-val get_econstr_transition :
-  Fsm.t ->
-  'a ->
-  Evd.evar_map ->
-  EConstr.t ->
-  EConstr.t * EConstr.t * EConstr.t
+type econstr_enc = Mebi_setup.Enc.t * EConstr.t
+type econstr_evar = Mebi_setup.Enc.t option * EConstr.t
+
+val get_transition :
+  Fsm.t -> 'a -> Evd.evar_map -> EConstr.t -> transition
 
 exception
   Invalid_KindOfTypeEConstr_Expected_Atomic of EConstr.t

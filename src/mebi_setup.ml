@@ -1,6 +1,7 @@
 open Logging
 
 let enable_logging : bool ref = ref true
+let the_none_ref () : Names.GlobRef.t = Coqlib.lib_ref "core.option.None"
 
 (********************************************)
 (****** COQ ENVIRONMENT/CONTEXT *************)
@@ -40,50 +41,50 @@ let the_coq_proofv
   Log.trace "mebi_setup.the_coq_proofv";
   match !the_proofv_opt with
   | None ->
-    Log.debug "mebi_setup.the_coq_proofv: proofv is None, using args";
+    (* Log.debug "mebi_setup.the_coq_proofv: proofv is None, using args"; *)
     new_proofv proof names
   | Some proofv ->
     if new_proof
-    then (
-      Log.debug "mebi_setup.the_coq_proofv: new proof";
-      new_proofv proof names)
+    then
+      (* Log.debug "mebi_setup.the_coq_proofv: new proof"; *)
+      new_proofv proof names
     else (
       let the_proof =
         match !proofv.proof with
         | None ->
-          Log.debug
-            "mebi_setup.the_coq_proofv: proofv.proof is None, using proof arg";
+          (* Log.debug
+             "mebi_setup.the_coq_proofv: proofv.proof is None, using proof arg"; *)
           proof
         | Some _ ->
           (match proof with
            | None ->
-             Log.debug
-               "mebi_setup.the_coq_proofv: proofv.proof is Some and proof arg \
-                is None, preserving proofv.proof";
+             (* Log.debug
+                "mebi_setup.the_coq_proofv: proofv.proof is Some and proof arg \
+                is None, preserving proofv.proof"; *)
              !proofv.proof
            | Some q ->
-             Log.debug
-               "mebi_setup.the_coq_proofv: proofv.proof and proof arg are \
-                Some, overriding, using new proof arg";
+             (* Log.debug
+                "mebi_setup.the_coq_proofv: proofv.proof and proof arg are \
+                Some, overriding, using new proof arg"; *)
              proof)
       in
       let the_names =
         match !proofv.names with
         | None ->
-          Log.debug
-            "mebi_setup.the_coq_proofv: proofv.names is None, using names arg";
+          (* Log.debug
+             "mebi_setup.the_coq_proofv: proofv.names is None, using names arg"; *)
           names
         | Some _ ->
           (match names with
            | None ->
-             Log.debug
-               "mebi_setup.the_coq_proofv: proofv.names is Some and names arg \
-                is None, preserving proofv.names";
+             (* Log.debug
+                "mebi_setup.the_coq_proofv: proofv.names is Some and names arg \
+                is None, preserving proofv.names"; *)
              !proofv.names
            | Some q ->
-             Log.debug
-               "mebi_setup.the_coq_proofv: proofv.names and names arg are \
-                Some, overriding, using new names arg";
+             (* Log.debug
+                "mebi_setup.the_coq_proofv: proofv.names and names arg are \
+                Some, overriding, using new names arg"; *)
              names)
       in
       new_proofv the_proof the_names)

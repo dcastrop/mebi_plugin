@@ -64,8 +64,8 @@ Proof.
 
 
   (* TODO: Fix enc maps empty *)
-  (* MeBiSim GoalTest.
-  MeBiSim WeakNone. *)
+  MeBiSim GoalTest.
+  MeBiSim WeakNone.
    
   (* MeBi Set ShowDetails True. *)
   (* MeBiSim FocusTest.  *)
