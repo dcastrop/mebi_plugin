@@ -29,6 +29,10 @@ module type ENCODING_TYPE = sig
 
   val decode_opt : EConstr.t Tbl.t -> t -> EConstr.t option
   val decode : EConstr.t Tbl.t -> t -> EConstr.t
+
+  (* *)
+  val fwd_to_list : t F.t -> (EConstr.t * t) list
+  val bck_to_list : EConstr.t Tbl.t -> (t * EConstr.t) list
 end
 
 (**********************************)
@@ -100,5 +104,15 @@ functor
       match Tbl.find_opt bck k with
       | None -> raise (InvalidDecodeKey (k, bck))
       | Some enc -> enc
+    ;;
+
+    let fwd_to_list : t F.t -> (EConstr.t * t) list =
+      fun (x : t F.t) ->
+      List.sort (fun (_, a) (_, b) -> compare a b) (List.of_seq (F.to_seq x))
+    ;;
+
+    let bck_to_list : EConstr.t Tbl.t -> (t * EConstr.t) list =
+      fun (x : EConstr.t Tbl.t) ->
+      List.sort (fun (a, _) (b, _) -> compare a b) (List.of_seq (Tbl.to_seq x))
     ;;
   end
