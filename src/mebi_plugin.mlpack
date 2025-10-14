@@ -14,7 +14,6 @@ Mebi_theories
 Mebi_tactics
 Mebi_bisim
 Params
-Dump_to_file
 Mebi_help
 Command
 G_mebi
