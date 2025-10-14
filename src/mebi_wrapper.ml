@@ -8,6 +8,29 @@ module B = Mebi_setup.B
 (****** WRAPPER & CONTEXT *******************)
 (********************************************)
 
+let the_enc_maps_cache : (Enc.t F.t * EConstr.t B.t) ref option ref = ref None
+
+let get_the_enc_maps ?(keep_encoding : bool = false) ()
+  : (Enc.t F.t * EConstr.t B.t) ref
+  =
+  match !the_enc_maps_cache with
+  | None ->
+    let the_fwd_map : Enc.t F.t = F.create 0 in
+    let the_bck_map : EConstr.t B.t = B.create 0 in
+    let the_enc_maps = ref (the_fwd_map, the_bck_map) in
+    the_enc_maps_cache := Some the_enc_maps;
+    the_enc_maps
+  | Some the_enc_maps ->
+    if keep_encoding
+    then the_enc_maps
+    else (
+      let the_fwd_map : Enc.t F.t = F.create 0 in
+      let the_bck_map : EConstr.t B.t = B.create 0 in
+      let the_enc_maps = ref (the_fwd_map, the_bck_map) in
+      the_enc_maps_cache := Some the_enc_maps;
+      the_enc_maps)
+;;
+
 type wrapper =
   { coq_ref : coq_context ref
   ; fwd_enc : Enc.t F.t
@@ -39,15 +62,10 @@ let run
   let coq_ctx : Evd.evar_map = !(the_coq_ctx ()) in
   let proofv : proof_context = !(the_coq_proofv ~new_proof ~proof ()) in
   let coq_ref : coq_context ref = ref { coq_env; coq_ctx; proofv } in
-  if keep_encoding
-  then ()
-  else (
-    Log.debug "mebi_wrapper.run, resetting encoding";
-    Enc.reset ());
-  let fwd_enc : Enc.t F.t = F.create 0 in
-  let bck_enc = B.create 0 in
+  let fwd_enc, bck_enc = !(get_the_enc_maps ~keep_encoding ()) in
   let a = x (ref { coq_ref; fwd_enc; bck_enc }) in
   (* enable_logging := false; *)
+  the_enc_maps_cache := Some (ref (!(a.state).fwd_enc, !(a.state).bck_enc));
   a.value
 ;;
 
@@ -119,10 +137,12 @@ let get_proofv (st : wrapper ref) : proof_context in_context =
 ;;
 
 let get_fwd_enc (st : wrapper ref) : Enc.t F.t in_context =
+  Log.trace "mebi_wrapper.get_fwd_enc";
   { state = st; value = !st.fwd_enc }
 ;;
 
 let get_bck_enc (st : wrapper ref) : EConstr.t B.t in_context =
+  Log.trace "mebi_wrapper.get_bck_enc";
   { state = st; value = !st.bck_enc }
 ;;
 
@@ -907,6 +927,7 @@ let primary_lts_not_found ((t, names) : EConstr.t * EConstr.t list) : 'a mm =
 
 let encode (k : EConstr.t) : Enc.t mm =
   fun (st : wrapper ref) ->
+  Log.trace "mebi_wrapper.encode";
   let encoding : Enc.t = Enc.encode !st.fwd_enc !st.bck_enc k in
   Logging.Log.debug
     (Printf.sprintf
@@ -920,6 +941,7 @@ let encode (k : EConstr.t) : Enc.t mm =
 
 (** dual to [encode] except we cannot handle new values *)
 let decode (k : Enc.t) : EConstr.t mm =
+  Log.trace "mebi_wrapper.decode";
   let open Syntax in
   let* bck_enc = get_bck_enc in
   match Enc.decode_opt bck_enc k with
@@ -956,6 +978,7 @@ let decode_to_string (x : Enc.t) : string =
 
 let get_encoding_opt (k : EConstr.t) : Enc.t option mm =
   fun (st : wrapper ref) ->
+  Log.trace "mebi_wrapper.get_encoding_opt";
   match F.find_opt !st.fwd_enc k with
   | None -> { state = st; value = None }
   | Some e -> { state = st; value = Some e }
@@ -964,6 +987,7 @@ let get_encoding_opt (k : EConstr.t) : Enc.t option mm =
 (** dual to [encode] except we cannot handle new values *)
 let get_decoding_opt (k : Enc.t) : EConstr.t option mm =
   fun (st : wrapper ref) ->
+  Log.trace "mebi_wrapper.get_decoding_opt";
   match B.find_opt !st.bck_enc k with
   | None -> { state = st; value = None }
   | Some e -> { state = st; value = Some e }
@@ -974,15 +998,24 @@ let get_decoding_opt (k : Enc.t) : EConstr.t option mm =
 (********************************************)
 
 let get_encoding (k : EConstr.t) : Enc.t mm =
+  Log.trace "mebi_wrapper.get_encoding";
   let open Syntax in
-  let* fwd_enc = get_fwd_enc in
-  match F.find_opt fwd_enc k with
-  | None -> cannot_get_encoding_of_unencoded_econstr k
-  | Some e -> return e
+  (* let* fwd_enc = get_fwd_enc in *)
+  let* opt = get_encoding_opt k in
+  Log.trace "mebi_wrapper.get_encoding AAA";
+  (* match F.find_opt fwd_enc k with *)
+  match opt with
+  | None ->
+    Log.trace "mebi_wrapper.get_encoding BBB";
+    cannot_get_encoding_of_unencoded_econstr k
+  | Some e ->
+    Log.trace "mebi_wrapper.get_encoding CCC";
+    return e
 ;;
 
 (** dual to [encode] except we cannot handle new values *)
 let get_decoding (k : Enc.t) : EConstr.t mm =
+  Log.trace "mebi_wrapper.get_decoding";
   let open Syntax in
   let* bck_enc = get_bck_enc in
   match B.find_opt bck_enc k with
@@ -996,6 +1029,7 @@ let get_decoding (k : Enc.t) : EConstr.t mm =
 
 let has_encoding (k : EConstr.t) : bool mm =
   fun (st : wrapper ref) ->
+  Log.trace "mebi_wrapper.has_encoding";
   match F.find_opt !st.fwd_enc k with
   | None -> { state = st; value = false }
   | Some _ -> { state = st; value = true }
@@ -1004,6 +1038,7 @@ let has_encoding (k : EConstr.t) : bool mm =
 (** dual to [encode] except we cannot handle new values *)
 let has_decoding (k : Enc.t) : bool mm =
   fun (st : wrapper ref) ->
+  Log.trace "mebi_wrapper.has_decoding";
   match B.find_opt !st.bck_enc k with
   | None -> { state = st; value = false }
   | Some _ -> { state = st; value = true }
@@ -1315,9 +1350,24 @@ let show_bck_map () : unit mm =
   let* bck_map = get_bck_enc in
   Log.debug
     (Printf.sprintf
-       "mebi_wrapper.show_bck_map: %s"
+       "mebi_wrapper.show_bck_map: \n%s"
        (Strfy.list
-          (Strfy.tuple Enc.to_string (Strfy.econstr env sigma))
+          ~force_newline:true
+          (Strfy.tuple
+             ~force_newline:true
+             ~indent:1
+             (fun (x : Enc.t) ->
+               Strfy.tuple
+                 ~is_keyval:true
+                 Strfy.str
+                 Enc.to_string
+                 ("encoding", x))
+             (fun (x : EConstr.t) ->
+               Strfy.tuple
+                 ~is_keyval:true
+                 Strfy.str
+                 (Strfy.econstr env sigma)
+                 ("econstr", x)))
           (Enc.bck_to_list bck_map)));
   return ()
 ;;
