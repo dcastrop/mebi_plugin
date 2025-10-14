@@ -65,7 +65,7 @@ Proof.
 
   MeBiSim GoalTest.
   MeBiSim WeakNone.
-  MeBiSim GoalTest.
+  (* MeBiSim GoalTest. *)
    
   (* MeBi Set ShowDetails True. *)
   (* MeBiSim FocusTest.  *)
