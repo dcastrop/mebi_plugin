@@ -94,58 +94,76 @@ exception Invalid_KindOf_EConstr_Expected_Atomic of EConstr.t
 type econstr_enc = Enc.t * EConstr.t
 type econstr_evar = Enc.t option * EConstr.t
 
+let get_weak_sim_transition (m : Fsm.t) sigma (tys : EConstr.t array)
+  : transition
+  =
+  assert (EConstr.isInd sigma tys.(0) && EConstr.isRef sigma tys.(0));
+  assert (EConstr.isInd sigma tys.(1) && EConstr.isRef sigma tys.(1));
+  assert (EConstr.isInd sigma tys.(2) && EConstr.isRef sigma tys.(2));
+  assert (EConstr.isApp sigma tys.(3));
+  assert (EConstr.isApp sigma tys.(4) || EConstr.isEvar sigma tys.(4));
+  assert (EConstr.isApp sigma tys.(5));
+  (* *)
+  let from_enc = econstr_to_enc tys.(3) in
+  let from = find_state_of_enc from_enc m.states in
+  Log.debug
+    (Printf.sprintf "mebi_bisim.get_transition, from:\n%s" (Strfy.state from));
+  (* *)
+  let label_enc = econstr_to_enc tys.(5) in
+  let label = find_label_of_enc label_enc m.alphabet in
+  Log.debug
+    (Printf.sprintf
+       "mebi_bisim.get_transition, label:\n%s"
+       (Strfy.action_label label));
+  let actions = Model.get_actions_from from m.edges in
+  Log.debug
+    (Printf.sprintf
+       "mebi_bisim.get_transition, actions:\n[%s]"
+       (Model.Actions.fold
+          (fun a d acc ->
+            Printf.sprintf
+              "%s { action: \n  %s\n  ; states: %s\n  }\n "
+              acc
+              (Strfy.action ~indent:2 a)
+              (Strfy.states d))
+          actions
+          ""));
+  let action = Model.get_action_with_label actions label in
+  Log.debug
+    (Printf.sprintf
+       "mebi_bisim.get_transition, action:\n%s"
+       (Strfy.action action));
+  (* *)
+  let dest_enc = econstr_to_enc_opt sigma tys.(4) in
+  let dest = find_state_of_enc_opt dest_enc m.states in
+  Log.debug
+    (Printf.sprintf
+       "mebi_bisim.get_transition, dest:\n%s"
+       (Strfy.option Strfy.state dest));
+  { from; action; dest }
+;;
+
+exception UnhandledTysSize of int
+
 let get_transition (m : Fsm.t) env sigma : EConstr.t -> transition =
   fun (x : EConstr.t) ->
   Log.trace "mebi_bisim.get_transition";
   Log.debug (Printf.sprintf "mebi_bisim.get_transition, fsm: %s" (Fsm.pstr m));
   match EConstr.kind_of_type sigma x with
   | AtomicType (_ty, tys) ->
-    Log.debug "mebi_bisim.get_transition A A";
-    assert (Array.length tys = 6);
-    assert (EConstr.isInd sigma tys.(0) && EConstr.isRef sigma tys.(0));
-    assert (EConstr.isInd sigma tys.(1) && EConstr.isRef sigma tys.(1));
-    assert (EConstr.isInd sigma tys.(2) && EConstr.isRef sigma tys.(2));
-    assert (EConstr.isApp sigma tys.(3));
-    assert (EConstr.isApp sigma tys.(4) || EConstr.isEvar sigma tys.(4));
-    assert (EConstr.isApp sigma tys.(5));
-    (* *)
-    let from_enc = econstr_to_enc tys.(3) in
-    let from = find_state_of_enc from_enc m.states in
-    Log.debug
-      (Printf.sprintf "mebi_bisim.get_transition, from:\n%s" (Strfy.state from));
-    (* *)
-    let label_enc = econstr_to_enc tys.(5) in
-    let label = find_label_of_enc label_enc m.alphabet in
-    Log.debug
-      (Printf.sprintf
-         "mebi_bisim.get_transition, label:\n%s"
-         (Strfy.action_label label));
-    let actions = Model.get_actions_from from m.edges in
-    Log.debug
-      (Printf.sprintf
-         "mebi_bisim.get_transition, actions:\n[%s]"
-         (Model.Actions.fold
-            (fun a d acc ->
-              Printf.sprintf
-                "%s { action: \n  %s\n  ; states: %s\n  }\n "
-                acc
-                (Strfy.action ~indent:2 a)
-                (Strfy.states d))
-            actions
-            ""));
-    let action = Model.get_action_with_label actions label in
-    Log.debug
-      (Printf.sprintf
-         "mebi_bisim.get_transition, action:\n%s"
-         (Strfy.action action));
-    (* *)
-    let dest_enc = econstr_to_enc_opt sigma tys.(4) in
-    let dest = find_state_of_enc_opt dest_enc m.states in
-    Log.debug
-      (Printf.sprintf
-         "mebi_bisim.get_transition, dest:\n%s"
-         (Strfy.option Strfy.state dest));
-    { from; action; dest }
+    (match Array.length tys with
+     | 6 -> get_weak_sim_transition m sigma tys
+     (* | 3 -> get_lts_transition m sigma tys *)
+     | size ->
+       Log.debug
+         (Printf.sprintf
+            "mebi_bisim.get_transition, unhandled size %i:\n%s"
+            size
+            (Strfy.list
+               ~force_newline:true
+               (Strfy.econstr_types ~indent:1 env sigma)
+               (Array.to_list tys)));
+       raise (UnhandledTysSize size))
   | _ -> raise (Invalid_KindOf_EConstr_Expected_Atomic x)
 ;;
 
