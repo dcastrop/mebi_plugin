@@ -16,46 +16,48 @@ type transition = {
   dest : Model.State.t option;
 }
 
-exception
-  State_Of_Enc_NotFound of (Mebi_setup.Enc.t * Model.States.t)
+exception State_Of_Enc_NotFound of (int * Model.States.t)
 
 exception
-  Error_Multiple_States_Of_Enc_Found of
-    (Mebi_setup.Enc.t * Model.States.t)
+  Error_Multiple_States_Of_Enc_Found of (int * Model.States.t)
 
-val find_state_of_enc :
-  Mebi_setup.Enc.t -> Model.States.t -> Model.State.t
+val find_state_of_enc : int -> Model.States.t -> Model.State.t
 
 val find_state_of_enc_opt :
-  Mebi_setup.Enc.t option ->
-  Model.States.t ->
-  Model.State.t option
+  int option -> Model.States.t -> Model.State.t option
 
-exception
-  Label_Of_Enc_NotFound of
-    (Mebi_setup.Enc.t * Model.Alphabet.t)
+exception Label_Of_Enc_NotFound of (int * Model.Alphabet.t)
 
 exception
   Error_Multiple_Labels_Of_Enc_Found of
-    (Mebi_setup.Enc.t * Model.Alphabet.t)
+    (int * Model.Alphabet.t)
 
 val find_label_of_enc :
-  Mebi_setup.Enc.t -> Model.Alphabet.t -> Model.Alphabet.elt
+  int -> Model.Alphabet.t -> Model.Alphabet.elt
 
-val econstr_to_enc : EConstr.t -> Mebi_setup.Enc.t
+val econstr_to_enc : Evd.econstr -> int
 
 val econstr_to_enc_opt :
-  Evd.evar_map -> EConstr.t -> Mebi_setup.Enc.t option
+  Evd.evar_map -> Evd.econstr -> int option
 
-exception Invalid_KindOf_EConstr_Expected_Atomic of EConstr.t
+exception Invalid_KindOf_EConstr_Expected_Atomic of Evd.econstr
 
-type econstr_enc = Mebi_setup.Enc.t * EConstr.t
-type econstr_evar = Mebi_setup.Enc.t option * EConstr.t
+type econstr_enc = int * Evd.econstr
+type econstr_evar = int option * Evd.econstr
+
+val get_weak_sim_transition :
+  Fsm.t -> Evd.evar_map -> Evd.econstr array -> transition
+
+exception UnhandledTysSize of int
 
 val get_transition :
-  Fsm.t -> 'a -> Evd.evar_map -> EConstr.t -> transition
+  Fsm.t ->
+  Environ.env ->
+  Evd.evar_map ->
+  Evd.econstr ->
+  transition
 
 exception
-  Invalid_KindOfTypeEConstr_Expected_Atomic of EConstr.t
+  Invalid_KindOfTypeEConstr_Expected_Atomic of Evd.econstr
 
 val get_test : unit -> unit Proofview.tactic Mebi_wrapper.mm
