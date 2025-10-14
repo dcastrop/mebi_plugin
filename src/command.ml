@@ -904,6 +904,8 @@ type command_kind =
 let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
   Log.trace "command.run";
   let* _ = Params.obtain_weak_kinds_from_args () in
+  (* if !Params.the_weak_mode = true then *)
+  (* let* _ = Mebi_wrapper.load_none_term () in *)
   match k with
   | MakeModel (kind, (x, primary_lts)) ->
     Log.debug "command.run, MakeModel";
@@ -1039,7 +1041,11 @@ let proof_intro
       (refs : Libnames.qualid list)
   : Declare.Proof.t mm
   =
+  Log.trace "command.proof_intro";
   let* _ = run (CheckBisimilarity ((x, a), (y, b))) refs in
+  Log.debug "command.proof_intro, post bisim";
+  let* _ = Mebi_wrapper.show_fwd_map () in
+  let* _ = Mebi_wrapper.show_bck_map () in
   let* _ =
     Mebi_wrapper.update_proof_by_tactics_mm
       [ Mebi_tactics.unfold_constrexpr_list [ x; y ]

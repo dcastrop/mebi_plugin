@@ -1,3 +1,5 @@
+let swap : 'a * 'b -> 'b * 'a = fun (a, b) -> b, a
+
 (** [split_at i l acc] is a tuple containing two lists [(l', acc)] split from list [l] at index [i].
 *)
 let rec split_at i l acc =

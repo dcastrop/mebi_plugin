@@ -1,4 +1,5 @@
 val enable_logging : bool ref
+val the_none_ref : unit -> Names.GlobRef.t
 
 type proof_context = {
   mutable proof : Declare.Proof.t option;
@@ -107,9 +108,9 @@ module Enc : sig
   val cache : t ref
   val counter : t ref
   val reset : unit -> unit
-  val eq : Int.t -> Int.t -> bool
-  val compare : Int.t -> Int.t -> int
-  val hash : Int.t -> int
+  val eq : int -> int -> bool
+  val compare : int -> int -> int
+  val hash : int -> int
   val to_string : int -> string
   val of_int : int -> t
 
@@ -194,7 +195,7 @@ end
 module B = Enc.Tbl
 
 module Eq : sig
-  val enc : Int.t -> Int.t -> bool
+  val enc : int -> int -> bool
 
   val econstr :
     Evd.evar_map -> Evd.econstr -> Evd.econstr -> bool

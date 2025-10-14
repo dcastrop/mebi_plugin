@@ -1000,17 +1000,10 @@ let get_decoding_opt (k : Enc.t) : EConstr.t option mm =
 let get_encoding (k : EConstr.t) : Enc.t mm =
   Log.trace "mebi_wrapper.get_encoding";
   let open Syntax in
-  (* let* fwd_enc = get_fwd_enc in *)
   let* opt = get_encoding_opt k in
-  Log.trace "mebi_wrapper.get_encoding AAA";
-  (* match F.find_opt fwd_enc k with *)
   match opt with
-  | None ->
-    Log.trace "mebi_wrapper.get_encoding BBB";
-    cannot_get_encoding_of_unencoded_econstr k
-  | Some e ->
-    Log.trace "mebi_wrapper.get_encoding CCC";
-    return e
+  | None -> cannot_get_encoding_of_unencoded_econstr k
+  | Some e -> return e
 ;;
 
 (** dual to [encode] except we cannot handle new values *)
@@ -1178,8 +1171,6 @@ let rec pstr_decoded_tree (t1 : decoded_tree) : string =
 (****** COQ NONE TYPE *************)
 (**********************************)
 
-let the_none_ref () : Names.GlobRef.t = Coqlib.lib_ref "core.option.None"
-
 let the_none_term () : EConstr.t mm =
   fun (st : wrapper ref) ->
   let coq_st = !st.coq_ref in
@@ -1190,12 +1181,20 @@ let the_none_term () : EConstr.t mm =
   { state = st; value = the_none }
 ;;
 
+(* let load_none_term () : unit mm =
+   let open Syntax in
+   let* none : EConstr.t = the_none_term () in
+   let* _ = encode none in
+   return ()
+   ;; *)
+
 let is_none_term (t : EConstr.t) : bool mm =
   let open Syntax in
   let* t : Constr.t = econstr_to_constr t in
   match Constr.kind t with
   | App (t, _) ->
     let* none : EConstr.t = the_none_term () in
+    (* let* _ = encode none in *)
     let* n : Constr.t = econstr_to_constr none in
     return (Constr.equal n t)
   | _ -> return false

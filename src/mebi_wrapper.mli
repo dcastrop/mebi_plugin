@@ -258,6 +258,7 @@ val decode_map : 'a B.t -> 'a F.t mm
 
 (* *)
 val is_none_term : EConstr.t -> bool mm
+(* val load_none_term : unit -> unit mm *)
 
 (* *)
 val get_type_of_hyp : Names.Id.t -> EConstr.t mm

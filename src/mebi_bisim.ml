@@ -52,6 +52,12 @@ let find_state_of_enc (x : Mebi_wrapper.Enc.t) (s : Model.States.t)
   | _ :: _ -> raise (Error_Multiple_States_Of_Enc_Found (x, s))
 ;;
 
+let find_state_of_enc_opt (x : Mebi_wrapper.Enc.t option) (s : Model.States.t)
+  : Model.State.t option
+  =
+  match x with None -> None | Some x -> Some (find_state_of_enc x s)
+;;
+
 exception Label_Of_Enc_NotFound of (Mebi_wrapper.Enc.t * Model.Alphabet.t)
 
 exception
@@ -70,119 +76,79 @@ let find_label_of_enc (x : Mebi_wrapper.Enc.t) (s : Model.Alphabet.t)
   | _ :: _ -> raise (Error_Multiple_Labels_Of_Enc_Found (x, s))
 ;;
 
-let get_concl_transition (m : Fsm.t) env sigma : EConstr.t -> transition mm =
-  (* let get_transition (m : Fsm.t) env sigma : EConstr.t -> transition mm = *)
+let econstr_to_enc : EConstr.t -> Enc.t =
   fun (x : EConstr.t) ->
-  Log.trace "mebi_bisim.get_concl_transition";
-  match EConstr.kind_of_type sigma x with
-  | AtomicType (_ty, tys) ->
-    assert (Array.length tys = 6);
-    (* assert (EConstr.isInd sigma tys.(0) && EConstr.isRef sigma tys.(0));
-    assert (EConstr.isInd sigma tys.(1) && EConstr.isRef sigma tys.(1));
-    assert (EConstr.isInd sigma tys.(2) && EConstr.isRef sigma tys.(2)); *)
-    (* assert (EConstr.isApp sigma tys.(3)); *)
-    (* assert (EConstr.isApp sigma tys.(4)); *)
-    (* assert (EConstr.isApp sigma tys.(5)); *)
-    let open Syntax in
-    let* _ = Mebi_wrapper.debug_econstr_kind tys.(3) in
-    Log.debug "mebi_bisim.get_concl_transition, from_enc";
-    let* from_enc = Mebi_wrapper.get_encoding tys.(3) in
-    let* _ = Mebi_wrapper.debug_econstr_kind tys.(4) in
-    Log.debug "mebi_bisim.get_concl_transition, label_enc";
-    let* label_enc = Mebi_wrapper.get_encoding tys.(4) in
-    let* _ = Mebi_wrapper.debug_econstr_kind tys.(5) in
-    Log.debug "mebi_bisim.get_concl_transition, dest_enc";
-    let* dest_enc = Mebi_wrapper.get_encoding tys.(5) in
-    let from = find_state_of_enc from_enc m.states in
-    let label = find_label_of_enc from_enc m.alphabet in
-    let actions = Model.get_actions_from from m.edges in
-    let action = Model.get_action_with_label actions label in
-    return { from; action; dest = None }
-  | _ -> invalid_kind_of_econstr_expected_atomic x
+  Mebi_wrapper.run
+    ~keep_encoding:true
+    ~fresh:false
+    (Mebi_wrapper.get_encoding x)
 ;;
 
-(* let get_hyp_transition (m : Fsm.t) env sigma : EConstr.t -> transition mm =
+let econstr_to_enc_opt (sigma : Evd.evar_map) : EConstr.t -> Enc.t option =
   fun (x : EConstr.t) ->
-  Log.trace "mebi_bisim.get_hyp_transition";
-  match EConstr.kind_of_type sigma x with
-  | AtomicType (_ty, tys) ->
-    assert (Array.length tys = 3);
-    let open Syntax in
-    let* from_enc = Mebi_wrapper.get_encoding tys.(3) in
-    let from = find_state_of_enc from_enc m.states in
-    let* dest_enc = Mebi_wrapper.get_encoding tys.(4) in
-    let dest = Some (find_state_of_enc from_enc m.states) in
-    let* label_enc = Mebi_wrapper.get_encoding tys.(5) in
-    let label = find_label_of_enc from_enc m.alphabet in
-    let actions = Model.get_actions_from from m.edges in
-    let action = Model.get_action_with_label actions label in
-    return { from; action; dest }
-  | _ -> invalid_kind_of_econstr_expected_atomic x
-;; *)
+  if EConstr.isEvar sigma x then None else Some (econstr_to_enc x)
+;;
 
 exception Invalid_KindOf_EConstr_Expected_Atomic of EConstr.t
 
-let get_econstr_transition (m : Fsm.t) env sigma
-  : EConstr.t -> EConstr.t * EConstr.t * EConstr.t
-  =
-  (* let get_transition (m : Fsm.t) env sigma : EConstr.t -> transition mm = *)
+type econstr_enc = Enc.t * EConstr.t
+type econstr_evar = Enc.t option * EConstr.t
+
+let get_transition (m : Fsm.t) env sigma : EConstr.t -> transition =
   fun (x : EConstr.t) ->
-  Log.trace "mebi_bisim.get_econstr_transition";
+  Log.trace "mebi_bisim.get_transition";
+  Log.debug (Printf.sprintf "mebi_bisim.get_transition, fsm: %s" (Fsm.pstr m));
   match EConstr.kind_of_type sigma x with
   | AtomicType (_ty, tys) ->
+    Log.debug "mebi_bisim.get_transition A A";
     assert (Array.length tys = 6);
     assert (EConstr.isInd sigma tys.(0) && EConstr.isRef sigma tys.(0));
     assert (EConstr.isInd sigma tys.(1) && EConstr.isRef sigma tys.(1));
     assert (EConstr.isInd sigma tys.(2) && EConstr.isRef sigma tys.(2));
     assert (EConstr.isApp sigma tys.(3));
-    (* Log.debug
-       (Printf.sprintf
-       "mebi_bisim.get_econstr_transition, 0: %s"
-       (Strfy.econstr_kind env sigma tys.(0)));
-       Log.debug
-       (Printf.sprintf
-       "mebi_bisim.get_econstr_transition, 1: %s"
-       (Strfy.econstr_kind env sigma tys.(1)));
-       Log.debug
-       (Printf.sprintf
-       "mebi_bisim.get_econstr_transition, 2: %s"
-       (Strfy.econstr_kind env sigma tys.(2)));
-       Log.debug
-       (Printf.sprintf
-       "mebi_bisim.get_econstr_transition, 3: %s"
-       (Strfy.econstr_kind env sigma tys.(3)));
-       Log.debug
-       (Printf.sprintf
-       "mebi_bisim.get_econstr_transition, 4: %s"
-       (Strfy.econstr_kind env sigma tys.(4)));
-       Log.debug
-       (Printf.sprintf
-       "mebi_bisim.get_econstr_transition, 5: %s"
-       (Strfy.econstr_kind env sigma tys.(5))); *)
     assert (EConstr.isApp sigma tys.(4) || EConstr.isEvar sigma tys.(4));
     assert (EConstr.isApp sigma tys.(5));
-    tys.(3), tys.(4), tys.(5)
+    (* *)
+    let from_enc = econstr_to_enc tys.(3) in
+    let from = find_state_of_enc from_enc m.states in
+    Log.debug
+      (Printf.sprintf "mebi_bisim.get_transition, from:\n%s" (Strfy.state from));
+    (* *)
+    let label_enc = econstr_to_enc tys.(5) in
+    let label = find_label_of_enc label_enc m.alphabet in
+    Log.debug
+      (Printf.sprintf
+         "mebi_bisim.get_transition, label:\n%s"
+         (Strfy.action_label label));
+    let actions = Model.get_actions_from from m.edges in
+    Log.debug
+      (Printf.sprintf
+         "mebi_bisim.get_transition, actions:\n[%s]"
+         (Model.Actions.fold
+            (fun a d acc ->
+              Printf.sprintf
+                "%s { action: \n  %s\n  ; states: %s\n  }\n "
+                acc
+                (Strfy.action ~indent:2 a)
+                (Strfy.states d))
+            actions
+            ""));
+    let action = Model.get_action_with_label actions label in
+    Log.debug
+      (Printf.sprintf
+         "mebi_bisim.get_transition, action:\n%s"
+         (Strfy.action action));
+    (* *)
+    let dest_enc = econstr_to_enc_opt sigma tys.(4) in
+    let dest = find_state_of_enc_opt dest_enc m.states in
+    Log.debug
+      (Printf.sprintf
+         "mebi_bisim.get_transition, dest:\n%s"
+         (Strfy.option Strfy.state dest));
+    { from; action; dest }
   | _ -> raise (Invalid_KindOf_EConstr_Expected_Atomic x)
 ;;
 
-(* let get_concl_transition (n:Fsm.t) env sigma : EConstr.t -> concl_transition mm =
-  fun (x:EConstr.t) ->
-  match EConstr.kind_of_type sigma x with
-    | AtomicType (_ty, tys) ->
-      let open Syntax in
-      assert (Array.length tys = 3);
-      let* from_enc = Mebi_wrapper.get_encoding (tys.(0)) in 
-      let* action_enc = Mebi_wrapper.get_encoding (tys.(1)) in 
-      let* dest_enc = Mebi_wrapper.get_encoding (tys.(2)) in 
-      let from = find_state_of_enc from_enc n.states in
-      let action = find_action_of_enc from_enc n.states in
-      let dest = find_state_of_enc from_enc n.states in
-return
-
-      {from  
-      ; action; dest }
-
-    | _ -> raise (Invalid_KindOfTypeEConstr_Expected_Atomic  x) *)
 exception Invalid_KindOfTypeEConstr_Expected_Atomic of EConstr.t
 
 let get_test () : unit Proofview.tactic mm =
@@ -196,33 +162,20 @@ let get_test () : unit Proofview.tactic mm =
        let env : Environ.env = Proofview.Goal.env x in
        let sigma : Evd.evar_map = Proofview.Goal.sigma x in
        let the_concl : EConstr.t = Proofview.Goal.concl x in
-       let n1, n2, n_act =
-         get_econstr_transition !the_result.the_fsm_2 env sigma the_concl
+       let { from = n1; action = n_act; dest = n2 } =
+         get_transition !the_result.the_fsm_2 env sigma the_concl
        in
-       Log.debug
+       Log.notice
          (Printf.sprintf
-            "mebi_bisim.get_test, the concl:\n- n1: %s\n- n2: %s\n- n_act: %s"
-            (Strfy.econstr env sigma n1)
-            (Strfy.econstr env sigma n2)
-            (Strfy.econstr env sigma n_act));
-       (* let the_hyps : EConstr.named_context = Proofview.Goal.hyps x in *)
-       let { from = _m1; action = _mAct; dest = _m2 } =
-         Mebi_wrapper.run
-           ~keep_encoding:true
-           ~fresh:false
-           (get_concl_transition !the_result.the_fsm_1 env sigma the_concl)
-       in
-       (* let {n1=from; nAct=action;n2=dest} = get_concl_transition the_result.n env sigma in  *)
-       Proofview.tclUNIT ()
-       (* return () *)))
+            "mebi_bisim.get_test, the concl:\n\
+             - n1:\n\
+             %s\n\
+             - n_act:\n\
+             %s\n\
+             - n2:\n\
+             %s"
+            (Strfy.state ~indent:1 n1)
+            (Strfy.action ~indent:1 n_act)
+            (Strfy.option Strfy.state n2));
+       Proofview.tclUNIT ()))
 ;;
-
-(* type isolated_terms = {m1:Model.State.t;m2:Model.State.t;n1:Model.State.t;n2:Model.State.t option}
-
-
-
-let get_isolated_terms () : Proofview.Goal.t -> isolated_terms = 
-    fun (x : Proofview.Goal.t) ->
-    let env : Environ.env = Proofview.Goal.env x in
-    let sigma : Evd.evar_map = Proofview.Goal.sigma x in
-*)
