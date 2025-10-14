@@ -39,7 +39,11 @@ let run
   let coq_ctx : Evd.evar_map = !(the_coq_ctx ()) in
   let proofv : proof_context = !(the_coq_proofv ~new_proof ~proof ()) in
   let coq_ref : coq_context ref = ref { coq_env; coq_ctx; proofv } in
-  if keep_encoding then () else Enc.reset ();
+  if keep_encoding
+  then ()
+  else (
+    Log.debug "mebi_wrapper.run, resetting encoding";
+    Enc.reset ());
   let fwd_enc : Enc.t F.t = F.create 0 in
   let bck_enc = B.create 0 in
   let a = x (ref { coq_ref; fwd_enc; bck_enc }) in
@@ -1282,10 +1286,25 @@ let show_fwd_map () : unit mm =
   let* fwd_map = get_fwd_enc in
   Log.debug
     (Printf.sprintf
-       "mebi_wrapper.show_fwd_map: %s"
+       "mebi_wrapper.show_fwd_map: \n%s"
        (Strfy.list
-          (Strfy.tuple (Strfy.econstr env sigma) Enc.to_string)
-          (List.of_seq (F.to_seq fwd_map))));
+          ~force_newline:true
+          (Strfy.tuple
+             ~force_newline:true
+             ~indent:1
+             (fun (x : EConstr.t) ->
+               Strfy.tuple
+                 ~is_keyval:true
+                 Strfy.str
+                 (Strfy.econstr env sigma)
+                 ("econstr", x))
+             (fun (x : Enc.t) ->
+               Strfy.tuple
+                 ~is_keyval:true
+                 Strfy.str
+                 Enc.to_string
+                 ("encoding", x)))
+          (Enc.fwd_to_list fwd_map)));
   return ()
 ;;
 
@@ -1299,7 +1318,7 @@ let show_bck_map () : unit mm =
        "mebi_wrapper.show_bck_map: %s"
        (Strfy.list
           (Strfy.tuple Enc.to_string (Strfy.econstr env sigma))
-          (List.of_seq (B.to_seq bck_map))));
+          (Enc.bck_to_list bck_map)));
   return ()
 ;;
 

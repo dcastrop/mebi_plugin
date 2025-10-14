@@ -101,15 +101,16 @@ module Enc : sig
     val of_seq : (key * 'a) Seq.t -> 'a t
   end
 
-  type t = Mebi_enc.IntEncoding(FwdMap).t
+  type t = int
 
   val init : t
   val cache : t ref
+  val counter : t ref
   val reset : unit -> unit
-  val eq : t -> t -> bool
-  val compare : t -> t -> int
-  val hash : t -> int
-  val to_string : t -> string
+  val eq : Int.t -> Int.t -> bool
+  val compare : Int.t -> Int.t -> int
+  val hash : Int.t -> int
+  val to_string : int -> string
   val of_int : int -> t
 
   module type ENC_TBL = sig
@@ -186,12 +187,14 @@ module Enc : sig
 
   val decode_opt : Evd.econstr Tbl.t -> t -> Evd.econstr option
   val decode : Evd.econstr Tbl.t -> t -> Evd.econstr
+  val fwd_to_list : t F.t -> (Evd.econstr * t) list
+  val bck_to_list : Evd.econstr Tbl.t -> (t * Evd.econstr) list
 end
 
 module B = Enc.Tbl
 
 module Eq : sig
-  val enc : Enc.t -> Enc.t -> bool
+  val enc : Int.t -> Int.t -> bool
 
   val econstr :
     Evd.evar_map -> Evd.econstr -> Evd.econstr -> bool
