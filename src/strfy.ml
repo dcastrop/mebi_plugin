@@ -175,16 +175,10 @@ let erel _env sigma : EConstr.ERelevance.t -> string =
   if EConstr.ERelevance.is_irrelevant sigma x then "irrelevant" else "relevant"
 ;;
 
-type hyp =
-  ( EConstr.constr
-    , EConstr.types
-    , EConstr.ERelevance.t )
-    Context.Named.Declaration.pt
-
 let hyp ?(force_newline : bool = false) ?(indent : int = 0) env sigma
-  : hyp -> string
+  : Mebi_setup.hyp -> string
   =
-  fun (x : hyp) ->
+  fun (x : Mebi_setup.hyp) ->
   list
     ~force_newline:true
     ~indent:(indent + 1)

@@ -1050,8 +1050,8 @@ let proof_intro
     Mebi_wrapper.update_proof_by_tactics_mm
       [ Mebi_tactics.unfold_constrexpr_list [ x; y ]
       ; Mebi_tactics.cofix ()
-      ; Mebi_tactics.apply_mm Mebi_theories.c_In_sim
-      ; Mebi_tactics.apply_mm Mebi_theories.c_Pack_sim
+      ; Mebi_wrapper.return (Mebi_tactics.apply (Mebi_theories.c_In_sim ()))
+      ; Mebi_wrapper.return (Mebi_tactics.apply (Mebi_theories.c_Pack_sim ()))
       ; Mebi_tactics.intros_all ()
       ]
   in

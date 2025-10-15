@@ -1,5 +1,7 @@
 open Logging
 
+type hyp = (EConstr.t, EConstr.t, Evd.erelevance) Context.Named.Declaration.pt
+
 let enable_logging : bool ref = ref true
 let the_none_ref () : Names.GlobRef.t = Coqlib.lib_ref "core.option.None"
 
@@ -151,7 +153,14 @@ module F = FwdMap
 module Enc = Mebi_enc.IntEncoding (FwdMap)
 module B = Enc.Tbl
 
-module Eq = struct
-  let enc = Enc.eq
-  let econstr sigma = EConstr.eq_constr sigma
-end
+module EqF =
+functor
+  (Enc : Mebi_enc.ENCODING_TYPE)
+  (* (FwdMap : Hashtbl.S with type key = EConstr.t) *)
+  ->
+  struct
+    let enc = Enc.eq
+    let econstr sigma = EConstr.eq_constr sigma
+  end
+
+module Eq = EqF (Enc)
