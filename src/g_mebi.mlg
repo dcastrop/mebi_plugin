@@ -165,13 +165,16 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       Logging.Log.debug "MeBiSim:WeakNone BEGIN";
       (* NOTE: do as many weak actions as possible  *)
       let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
-        [ Mebi_tactics.apply_mm Mebi_theories.c_wk_none
-        ; Mebi_tactics.unfold_econstr_mm Mebi_theories.c_silent
-        ; Mebi_tactics.eapply_mm Mebi_theories.c_rt1n_trans
-        ; Mebi_tactics.unfold_econstr_mm Mebi_theories.c_tau
+      let* _ = Mebi_wrapper.update_proof_by_tactic 
+        (Mebi_tactics.apply (Mebi_theories.c_wk_none ())) in
+      let* _ = Mebi_wrapper.update_proof_by_tactic_mm 
+        (Mebi_tactics.unfold_econstr (Mebi_theories.c_silent ())) in
+      let* _ = Mebi_wrapper.update_proof_by_tactic 
+        (Mebi_tactics.eapply (Mebi_theories.c_rt1n_trans ())) in
+      let* _ = Mebi_wrapper.update_proof_by_tactic_mm 
+        (Mebi_tactics.unfold_econstr (Mebi_theories.c_tau ()))
         (* TODO: figure out how to actually get the term in the goal *)
-        ] in 
+      in 
       (* let* _ = Mebi_wrapper.show_proof_data () in  *)
       Logging.Log.debug "MeBiSim:WeakNone END";
       Mebi_wrapper.get_proof ()
@@ -185,9 +188,9 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       Logging.Log.debug "MeBiSim:WeakSome BEGIN";
       (* TODO: do strong action *)
       let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
-        [ Mebi_tactics.apply_mm Mebi_theories.c_wk_some
-        ] in 
+      let* _ = Mebi_wrapper.update_proof_by_tactic
+        (Mebi_tactics.apply (Mebi_theories.c_wk_some ()))
+      in 
       (*  *)
       Logging.Log.debug "MeBiSim:WeakSome END";
       Mebi_wrapper.get_proof ()
@@ -230,10 +233,11 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim:Cofix BEGIN";
       let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
-        [ Mebi_tactics.cofix ()
-        ; Mebi_tactics.apply_mm Mebi_theories.c_In_sim 
-        ; Mebi_tactics.apply_mm Mebi_theories.c_Pack_sim 
+      let* _ = Mebi_wrapper.update_proof_by_tactic_mm 
+        ( Mebi_tactics.cofix ()) in
+        let* _ = Mebi_wrapper.update_proof_by_tactics
+        [ Mebi_tactics.apply (Mebi_theories.c_In_sim ())
+        ; Mebi_tactics.apply (Mebi_theories.c_Pack_sim ()) 
         ] in 
       Logging.Log.debug "MeBiSim:Cofix END";
       Mebi_wrapper.get_proof ()
@@ -263,9 +267,9 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim: BEGIN";
       let t = Command.proof_intro (x, a) (y, b) rs in 
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.show_fwd_map () in
-      let* _ = Mebi_wrapper.show_bck_map () in
+      (* let open Mebi_wrapper.Syntax in  *)
+      (* let* _ = Mebi_wrapper.show_fwd_map () in *)
+      (* let* _ = Mebi_wrapper.show_bck_map () in *)
       Logging.Log.debug "MeBiSim: END";
       t
     ) 
@@ -278,9 +282,9 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
       if Logging.is_debug_enabled () then Logging.Log.override "\n";
       Logging.Log.debug "MeBiSim: BEGIN";
       let t = Command.proof_intro (x, a) (y, b) [] in 
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.show_fwd_map () in
-      let* _ = Mebi_wrapper.show_bck_map () in
+      (* let open Mebi_wrapper.Syntax in  *)
+      (* let* _ = Mebi_wrapper.show_fwd_map () in *)
+      (* let* _ = Mebi_wrapper.show_bck_map () in *)
       Logging.Log.debug "MeBiSim: END";
       t
     ) 

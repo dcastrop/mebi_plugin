@@ -54,6 +54,7 @@ Proof.
   (* MeBi Set ShowDetails True. *)
   (* MeBiSim FocusTest.  *)
 
+  MeBiSim GoalTest.
   inversion H; subst. 
   simpl in *.
   eexists; split.
@@ -65,7 +66,11 @@ Proof.
 
   MeBiSim GoalTest.
   MeBiSim WeakNone.
-  (* MeBiSim GoalTest. *)
+  MeBiSim GoalTest.
+
+
+  admit. admit.
+  MeBiSim GoalTest.
    
   (* MeBi Set ShowDetails True. *)
   (* MeBiSim FocusTest.  *)

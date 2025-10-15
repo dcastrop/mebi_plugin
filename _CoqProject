@@ -53,6 +53,8 @@ examples/bisimilarity/Proc/Test1/PluginProofs.v ###
 ################
 ### OCaml Plugin
 ################
+src/.ml
+src/utils.mli
 src/utils.ml
 src/utils.mli
 src/logging.ml

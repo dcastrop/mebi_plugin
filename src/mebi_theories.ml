@@ -1,4 +1,3 @@
-open Mebi_wrapper
 open Logging
 
 (* source: https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto3/src/tuto_tactic.ml *)
@@ -20,17 +19,18 @@ let find_reference = Coqlib.find_reference [@ocaml.warning "-3"]
 (* This is a pattern to collect terms from the Coq memory of valid terms
    and proofs.  This pattern extends all the way to the definition of function
    c_U *)
-let collect_bisimilarity_theories () : EConstr.t list mm =
+let collect_bisimilarity_theories () : EConstr.t list =
   Log.trace "mebi_theories.collect_bisimilarity_theories";
   match !constants with
   | [] ->
     Log.debug "mebi_theories.collect_bisimilarity_theories, mapping constants";
-    let open Mebi_wrapper.Syntax in
     (* TODO: why does error "Not_found" occur if line below is removed? *)
-    let* env = get_env in
-    let* new_constants : EConstr.t list =
-      Mebi_wrapper.map_list_mm
-        (fun (x : Names.GlobRef.t) -> Mebi_wrapper.globref_to_econstr x)
+    let new_constants : EConstr.t list =
+      List.map
+        (fun (x : Names.GlobRef.t) ->
+          (* Mebi_wrapper.globref_to_econstr x *)
+          EConstr.of_constr
+            (UnivGen.constr_of_monomorphic_global (Global.env ()) x))
         [ find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "LTS"
         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "tau"
         ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "silent"
@@ -70,8 +70,8 @@ let collect_bisimilarity_theories () : EConstr.t list mm =
         ]
     in
     constants := new_constants;
-    Mebi_wrapper.return !constants
-  | _ -> Mebi_wrapper.return !constants
+    !constants
+  | _ -> !constants
 ;;
 
 let rec indexed_c : int * EConstr.t list -> EConstr.t option = function
@@ -80,238 +80,279 @@ let rec indexed_c : int * EConstr.t list -> EConstr.t option = function
   | i, _ :: t -> indexed_c (i - 1, t)
 ;;
 
-let c_LTS : EConstr.t mm =
+let c_LTS () : EConstr.t =
   Log.trace "mebi_theories.c_LTS";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (0, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of Theories.Bisimilarity.LTS"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_tau : EConstr.t mm =
+let c_tau () : EConstr.t =
   Log.trace "mebi_theories.c_tau";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (1, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of Theories.Bisimilarity.tau"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_silent : EConstr.t mm =
+let c_silent () : EConstr.t =
   Log.trace "mebi_theories.c_silent";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (2, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Theories.Bisimilarity.silent"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_silent1 : EConstr.t mm =
+let c_silent1 () : EConstr.t =
   Log.trace "mebi_theories.c_silent1";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (3, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Theories.Bisimilarity.silent1"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_weak : EConstr.t mm =
+let c_weak () : EConstr.t =
   Log.trace "mebi_theories.c_weak";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (4, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Theories.Bisimilarity.weak"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_wk_some : EConstr.t mm =
+let c_wk_some () : EConstr.t =
   Log.trace "mebi_theories.c_wk_some";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (5, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Theories.Bisimilarity.wk_some"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_wk_none : EConstr.t mm =
+let c_wk_none () : EConstr.t =
   Log.trace "mebi_theories.c_wk_none";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (6, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Theories.Bisimilarity.wk_none"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_simF : EConstr.t mm =
+let c_simF () : EConstr.t =
   Log.trace "mebi_theories.c_simF";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (7, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Theories.Bisimilarity.simF"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_Pack_sim : EConstr.t mm =
+let c_Pack_sim () : EConstr.t =
   Log.trace "mebi_theories.c_Pack_sim";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (8, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Theories.Bisimilarity.Pack_sim"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_sim_weak : EConstr.t mm =
+let c_sim_weak () : EConstr.t =
   Log.trace "mebi_theories.c_sim_weak";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (9, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Theories.Bisimilarity.sim_weak"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_weak_sim : EConstr.t mm =
+let c_weak_sim () : EConstr.t =
   Log.trace "mebi_theories.c_weak_sim";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (10, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Theories.Bisimilarity.weak_sim"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_In_sim : EConstr.t mm =
+let c_In_sim () : EConstr.t =
   Log.trace "mebi_theories.c_In_sim";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (11, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Theories.Bisimilarity.In_sim"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_out_sim : EConstr.t mm =
+let c_out_sim () : EConstr.t =
   Log.trace "mebi_theories.c_out_sim";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (12, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Theories.Bisimilarity.out_sim"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_weak_bisim : EConstr.t mm =
+let c_weak_bisim () : EConstr.t =
   Log.trace "mebi_theories.c_weak_bisim";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (13, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Theories.Bisimilarity.weak_bisim"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_relations : EConstr.t mm =
+let c_relations () : EConstr.t =
   Log.trace "mebi_theories.c_relations";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (14, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Relations.Relation_Definitions.relations"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_clos_refl_trans_1n : EConstr.t mm =
+let c_clos_refl_trans_1n () : EConstr.t =
   Log.trace "mebi_theories.c_clos_refl_trans_1n";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (15, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Relations.Relation_Definitions.clos_refl_trans_1n"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_rt1n_refl : EConstr.t mm =
+let c_rt1n_refl () : EConstr.t =
   Log.trace "mebi_theories.c_rt1n_refl";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (16, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Relations.Relation_Definitions.rt1n_refl"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_rt1n_trans : EConstr.t mm =
+let c_rt1n_trans () : EConstr.t =
   Log.trace "mebi_theories.c_rt1n_trans";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (17, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Relations.Relation_Definitions.rt1n_trans"
-  | Some c -> return c
+  | Some c -> c
 ;;
 
-let c_clos_trans_1n : EConstr.t mm =
+let c_clos_trans_1n () : EConstr.t =
   Log.trace "mebi_theories.c_clos_trans_1n";
-  let open Mebi_wrapper.Syntax in
-  let* cs = collect_bisimilarity_theories () in
+  let cs = collect_bisimilarity_theories () in
   match indexed_c (18, cs) with
   | None ->
     failwith
       "could not obtain an internal representation of \
        Relations.Relation_Definitions.clos_trans_1n"
-  | Some c -> return c
+  | Some c -> c
 ;;
+
+(******)
+
+type theory_kind =
+  | Theories_LTS
+  | Theories_tau
+  | Theories_silent
+  | Theories_silent1
+  | Theories_weak
+  | Theories_wk_some
+  | Theories_wk_none
+  | Theories_simF
+  | Theories_Pack_sim
+  | Theories_sim_weak
+  | Theories_weak_sim
+  | Theories_In_sim
+
+let match_theory_kind sigma : EConstr.t -> theory_kind option =
+  fun (x : EConstr.t) ->
+  let eq : EConstr.t -> bool = Mebi_setup.Eq.econstr sigma x in
+  if eq (c_LTS ())
+  then Some Theories_LTS
+  else if eq (c_tau ())
+  then Some Theories_tau
+  else if eq (c_silent ())
+  then Some Theories_silent
+  else if eq (c_silent1 ())
+  then Some Theories_silent1
+  else if eq (c_weak ())
+  then Some Theories_weak
+  else if eq (c_wk_some ())
+  then Some Theories_wk_some
+  else if eq (c_wk_none ())
+  then Some Theories_wk_none
+  else if eq (c_simF ())
+  then Some Theories_simF
+  else if eq (c_Pack_sim ())
+  then Some Theories_Pack_sim
+  else if eq (c_sim_weak ())
+  then Some Theories_sim_weak
+  else if eq (c_weak_sim ())
+  then Some Theories_weak_sim
+  else if eq (c_In_sim ())
+  then Some Theories_In_sim
+  else None
+;;
+
+let is_cofix (x : Names.Id.t) : bool =
+  Names.Id.equal (Nameops.root_of_id x) (Names.Id.of_string "Cofix")
+;;
+
+let to_invert sigma (x : EConstr.t array) : bool =
+  Bool.not
+    (List.is_empty
+       (List.filter
+          (fun y -> EConstr.isRef sigma y && EConstr.isVar sigma y)
+          (Array.to_list x)))
+;;
+
+(*****************************************************************************)
 
 (* The following tactic is meant to pack an hypothesis when no other
    data is already packed.
 
    The main difficulty in defining this tactic is to understand how to
    construct the input expected by apply_in. *)
-let _package (i : Names.Id.t) : unit Proofview.tactic =
+(* let _package (i : Names.Id.t) : unit Proofview.tactic =
   Proofview.Goal.enter (fun gl ->
     Tactics.apply_in
       true
@@ -323,7 +364,7 @@ let _package (i : Names.Id.t) : unit Proofview.tactic =
         (* Tactypes.NoBindings)) *) ]
       (* we don't destruct the result according to any intro_pattern *)
       None)
-;;
+;; *)
 
 (* 
 let proof_test () : unit Proofview.tactic mm =
