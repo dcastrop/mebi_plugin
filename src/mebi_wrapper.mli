@@ -18,8 +18,8 @@ type 'a mm = wrapper ref -> 'a in_context
 val run
   :  ?keep_encoding:bool
   -> ?fresh:bool
-  -> ?new_proof:bool
-  -> ?proof:Declare.Proof.t option
+  (* -> ?new_proof:bool *)
+  (* -> ?proof:Declare.Proof.t option *)
   -> 'a mm
   -> 'a
 
@@ -47,7 +47,7 @@ module type ERROR_TYPE = sig
     | UnknownEncodeKey of (Mebi_setup.coq_context ref * B.key F.t * EConstr.t)
     | UnknownDecodeKey of (Mebi_setup.coq_context ref * EConstr.t B.t * Enc.t)
     | NoBisimResult of unit
-    | ProofvIsNone of unit
+    (* | ProofvIsNone of unit *)
     | ParamsFailIfIncomplete of unit
     | ParamsFailIfNotBisim of unit
     | InvalidLTSArgsLength of int
@@ -103,7 +103,7 @@ module type ERROR_TYPE = sig
 (************8*)
 
   val missing_bisim_result : unit -> exn
-  val proofv_is_none : unit -> exn
+  (* val proofv_is_none : unit -> exn *)
   val params_fail_if_incomplete : unit -> exn
   val params_fail_if_not_bisim : unit -> exn
   val invalid_lts_args_length : int -> exn
@@ -160,7 +160,7 @@ val cannot_get_decoding_of_unencoded_econstr : Enc.t -> 'a mm
 
 
 val missing_bisim_result : unit -> 'a mm
-val proofv_is_none : unit -> 'a mm
+(* val proofv_is_none : unit -> 'a mm *)
 val params_fail_if_incomplete : unit -> 'a mm
 val params_fail_if_not_bisim : unit -> 'a mm
 val invalid_lts_args_length : int -> 'a mm
@@ -180,10 +180,10 @@ val invalid_check_updated_ctx
   -> EConstr.rel_declaration list
   -> 'a mm
 
-val set_proof : Declare.Proof.t -> wrapper ref -> unit in_context
+(* val set_proof : Declare.Proof.t -> wrapper ref -> unit in_context *)
 val get_env : wrapper ref -> Environ.env in_context
 val get_sigma : wrapper ref -> Evd.evar_map in_context
-val get_proofv : wrapper ref -> Mebi_setup.proof_context in_context
+(* val get_proofv : wrapper ref -> Mebi_setup.proof_context in_context *)
 val get_fwd_enc : wrapper ref -> Enc.t F.t in_context
 val get_bck_enc : wrapper ref -> EConstr.t B.t in_context
 
@@ -194,9 +194,9 @@ val state
 
 val sandbox : 'a mm -> wrapper ref -> 'a in_context
 val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit mm
-val show_proof_data : unit -> unit mm
+(* val show_proof_data : unit -> unit mm
 val show_proof : unit -> unit mm
-val show_names : unit -> unit mm
+val show_names : unit -> unit mm *)
 
 module type MEBI_MONAD_SYNTAX = sig
   val ( let+ ) : 'a mm -> ('a -> 'b) -> 'b mm
@@ -264,24 +264,24 @@ val is_none_term : EConstr.t -> bool mm
 val get_type_of_hyp : Names.Id.t -> EConstr.t mm
 
 (* *)
-val get_proof : unit -> Declare.Proof.t mm
-val get_proof_env : unit -> Environ.env mm
-val get_proof_sigma : unit -> Evd.evar_map mm
-val get_proof_names : unit -> Names.Id.Set.t mm
+(* val get_proof : unit -> Declare.Proof.t mm *)
+(* val get_proof_env : unit -> Environ.env mm *)
+(* val get_proof_sigma : unit -> Evd.evar_map mm *)
+(* val get_proof_names : unit -> Names.Id.Set.t mm *)
 
-val update_names
+(* val update_names
   :  ?replace:bool
   -> Names.Id.Set.t
   -> wrapper ref
-  -> unit in_context
+  -> unit in_context *)
 
-val add_name : Names.Id.t -> wrapper ref -> unit in_context
-val next_name_of : Names.Id.t -> Names.Id.t mm
-val new_name_of_string : ?add:bool -> string -> Names.Id.t mm
-val update_proof_by_tactic : unit Proofview.tactic -> unit mm
-val update_proof_by_tactic_mm : unit Proofview.tactic mm -> unit mm
-val update_proof_by_tactics : unit Proofview.tactic list -> unit mm
-val update_proof_by_tactics_mm : unit Proofview.tactic mm list -> unit mm
+(* val add_name : Names.Id.t -> wrapper ref -> unit in_context *)
+(* val next_name_of : Names.Id.t -> Names.Id.t mm *)
+(* val new_name_of_string : ?add:bool -> string -> Names.Id.t mm *)
+(* val update_proof_by_tactic : unit Proofview.tactic -> unit mm *)
+(* val update_proof_by_tactic_mm : unit Proofview.tactic mm -> unit mm *)
+(* val update_proof_by_tactics : unit Proofview.tactic list -> unit mm *)
+(* val update_proof_by_tactics_mm : unit Proofview.tactic mm list -> unit mm *)
 
 (* *)
 val constr_to_string : Constr.t -> string
@@ -317,12 +317,6 @@ val make_state_tree_pair_set
   :  wrapper ref
   -> (module Set.S with type elt = Enc.t * Constr_tree.t) in_context
 
-(* *)
-val proof_query : Declare.Proof.t -> Proof.t
-val proof_partial : Proof.t -> EConstr.t list
-
-(* *)
-val proof_test : unit -> unit Proofview.tactic mm
 
 (* *)
 val debug_econstr_kind : EConstr.t -> unit mm

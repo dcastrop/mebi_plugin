@@ -1,6 +1,15 @@
-val _update_names :
-  unit -> unit Proofview.tactic Mebi_wrapper.mm
+val update_proof_by_tactic :
+  Declare.Proof.t -> unit Proofview.tactic -> Declare.Proof.t
 
+val update_proof_by_tactics :
+  Declare.Proof.t ->
+  unit Proofview.tactic list ->
+  Declare.Proof.t
+
+val do_inversion : Mebi_setup.hyp -> unit Proofview.tactic
+val subst_all : unit -> unit Proofview.tactic
+val simplify_all : unit -> unit Proofview.tactic
+val simplify_and_subst_all : unit -> unit Proofview.tactic
 val the_goals : (int, Proofview.Goal.t) Hashtbl.t ref
 val reset_the_goals : unit -> unit
 val add_goal : Proofview.Goal.t -> unit
@@ -8,48 +17,26 @@ val add_goal : Proofview.Goal.t -> unit
 val update_goals :
   unit -> unit Proofview.tactic Mebi_wrapper.mm
 
-val get_the_goals :
-  unit ->
-  (int, Proofview.Goal.t) Hashtbl.t Proofview.tactic
-  Mebi_wrapper.mm
-
 val pstr_the_goals : unit -> string
-val goal_test : unit -> unit Proofview.tactic Mebi_wrapper.mm
-val apply : EConstr.t -> unit Proofview.tactic
-
-val apply_mm :
-  EConstr.t Mebi_wrapper.mm ->
-  unit Proofview.tactic Mebi_wrapper.mm
-
-val eapply : EConstr.t -> unit Proofview.tactic
-
-val eapply_mm :
-  EConstr.t Mebi_wrapper.mm ->
-  unit Proofview.tactic Mebi_wrapper.mm
+val goal_test : unit -> unit Proofview.tactic
+val apply : Evd.econstr -> unit Proofview.tactic
+val eapply : Evd.econstr -> unit Proofview.tactic
 
 val unfold_econstr :
-  EConstr.t -> unit Proofview.tactic Mebi_wrapper.mm
-
-val unfold_econstr_mm :
-  EConstr.t Mebi_wrapper.mm ->
-  unit Proofview.tactic Mebi_wrapper.mm
+  Proofview.Goal.t -> Evd.econstr -> unit Proofview.tactic
 
 val unfold_constrexpr :
+  Proofview.Goal.t ->
   Constrexpr.constr_expr ->
-  unit Proofview.tactic Mebi_wrapper.mm
+  unit Proofview.tactic
 
 val unfold_constrexpr_list :
+  Proofview.Goal.t ->
   Constrexpr.constr_expr list ->
-  unit Proofview.tactic Mebi_wrapper.mm
+  unit Proofview.tactic
 
-val cofix :
-  ?name:Names.variable option ->
-  unit ->
-  unit Proofview.tactic Mebi_wrapper.mm
-
-val intros_all : unit -> unit Proofview.tactic Mebi_wrapper.mm
+val cofix : Proofview.Goal.t -> unit Proofview.tactic
+val intros_all : unit -> unit Proofview.tactic
 
 val intro_of_string :
-  ?track:bool ->
-  string ->
-  unit Proofview.tactic Mebi_wrapper.mm
+  Proofview.Goal.t -> string -> unit Proofview.tactic
