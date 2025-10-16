@@ -10,87 +10,86 @@ let the_none_ref () : Names.GlobRef.t = Coqlib.lib_ref "core.option.None"
 (********************************************)
 
 (* TODO: move proof stuff to own monad/wrapper *)
-type proof_context =
+(* type proof_context =
   { mutable proof : Declare.Proof.t option
   ; mutable names : Names.Id.Set.t option
-  }
+  } *)
 
 type coq_context =
   { coq_env : Environ.env
-  ; coq_ctx : Evd.evar_map
-  ; proofv : proof_context
+  ; coq_ctx : Evd.evar_map (* ; proofv : proof_context *)
   }
 
 (* *)
-let the_proofv_opt : proof_context ref option ref = ref None
+(* let the_proofv_opt : proof_context ref option ref = ref None *)
 
-let new_proofv (proof : Declare.Proof.t option) (names : Names.Id.Set.t option)
+(* let new_proofv (proof : Declare.Proof.t option) (names : Names.Id.Set.t option)
   : proof_context ref
   =
   Log.trace "mebi_setup.new_proofv: Created new proofv.";
   let the_proofv : proof_context ref = ref { proof; names } in
   the_proofv_opt := Some the_proofv;
   the_proofv
-;;
+;; *)
 
-let the_coq_proofv
-      ?(new_proof : bool = false)
-      ?(proof : Declare.Proof.t option = None)
-      ?(names : Names.Id.Set.t option = None)
-      ()
-  : proof_context ref
-  =
-  Log.trace "mebi_setup.the_coq_proofv";
-  match !the_proofv_opt with
-  | None ->
-    (* Log.debug "mebi_setup.the_coq_proofv: proofv is None, using args"; *)
-    new_proofv proof names
-  | Some proofv ->
-    if new_proof
-    then
-      (* Log.debug "mebi_setup.the_coq_proofv: new proof"; *)
-      new_proofv proof names
-    else (
-      let the_proof =
-        match !proofv.proof with
-        | None ->
-          (* Log.debug
-             "mebi_setup.the_coq_proofv: proofv.proof is None, using proof arg"; *)
-          proof
-        | Some _ ->
-          (match proof with
-           | None ->
-             (* Log.debug
-                "mebi_setup.the_coq_proofv: proofv.proof is Some and proof arg \
-                is None, preserving proofv.proof"; *)
-             !proofv.proof
-           | Some q ->
-             (* Log.debug
-                "mebi_setup.the_coq_proofv: proofv.proof and proof arg are \
-                Some, overriding, using new proof arg"; *)
-             proof)
-      in
-      let the_names =
-        match !proofv.names with
-        | None ->
-          (* Log.debug
-             "mebi_setup.the_coq_proofv: proofv.names is None, using names arg"; *)
-          names
-        | Some _ ->
-          (match names with
-           | None ->
-             (* Log.debug
-                "mebi_setup.the_coq_proofv: proofv.names is Some and names arg \
-                is None, preserving proofv.names"; *)
-             !proofv.names
-           | Some q ->
-             (* Log.debug
-                "mebi_setup.the_coq_proofv: proofv.names and names arg are \
-                Some, overriding, using new names arg"; *)
-             names)
-      in
-      new_proofv the_proof the_names)
-;;
+(* let the_coq_proofv
+   ?(new_proof : bool = false)
+   ?(proof : Declare.Proof.t option = None)
+   ?(names : Names.Id.Set.t option = None)
+   ()
+   : proof_context ref
+   =
+   Log.trace "mebi_setup.the_coq_proofv";
+   match !the_proofv_opt with
+   | None ->
+   (* Log.debug "mebi_setup.the_coq_proofv: proofv is None, using args"; *)
+   new_proofv proof names
+   | Some proofv ->
+   if new_proof
+   then
+   (* Log.debug "mebi_setup.the_coq_proofv: new proof"; *)
+   new_proofv proof names
+   else (
+   let the_proof =
+   match !proofv.proof with
+   | None ->
+   (* Log.debug
+   "mebi_setup.the_coq_proofv: proofv.proof is None, using proof arg"; *)
+   proof
+   | Some _ ->
+   (match proof with
+   | None ->
+   (* Log.debug
+   "mebi_setup.the_coq_proofv: proofv.proof is Some and proof arg \
+   is None, preserving proofv.proof"; *)
+   !proofv.proof
+   | Some q ->
+   (* Log.debug
+   "mebi_setup.the_coq_proofv: proofv.proof and proof arg are \
+   Some, overriding, using new proof arg"; *)
+   proof)
+   in
+   let the_names =
+   match !proofv.names with
+   | None ->
+   (* Log.debug
+   "mebi_setup.the_coq_proofv: proofv.names is None, using names arg"; *)
+   names
+   | Some _ ->
+   (match names with
+   | None ->
+   (* Log.debug
+   "mebi_setup.the_coq_proofv: proofv.names is Some and names arg \
+   is None, preserving proofv.names"; *)
+   !proofv.names
+   | Some q ->
+   (* Log.debug
+   "mebi_setup.the_coq_proofv: proofv.names and names arg are \
+   Some, overriding, using new names arg"; *)
+   names)
+   in
+   new_proofv the_proof the_names)
+   ;; *)
 
 (** *)
 let the_coq_env_opt : Environ.env ref option ref = ref None
@@ -153,6 +152,10 @@ module F = FwdMap
 module Enc = Mebi_enc.IntEncoding (FwdMap)
 module B = Enc.Tbl
 
+(********************************************)
+(****** Equalities **************************)
+(********************************************)
+
 module EqF =
 functor
   (Enc : Mebi_enc.ENCODING_TYPE)
@@ -164,3 +167,29 @@ functor
   end
 
 module Eq = EqF (Enc)
+
+(********************************************)
+(****** Conversions *************************)
+(********************************************)
+
+module Convert = struct
+  let constrexpr_to_econstr env sigma
+    : Constrexpr.constr_expr -> Evd.evar_map * EConstr.t
+    =
+    Constrintern.interp_constr_evars env sigma
+  ;;
+
+  let econstr_to_constr ?(abort_on_undefined_evars : bool = false) sigma
+    : EConstr.t -> Constr.t
+    =
+    EConstr.to_constr ~abort_on_undefined_evars sigma
+  ;;
+
+  let econstr_to_constr_opt sigma : EConstr.t -> Constr.t option =
+    EConstr.to_constr_opt sigma
+  ;;
+
+  let globref_to_econstr env : Names.GlobRef.t -> EConstr.t =
+    fun x -> EConstr.of_constr (UnivGen.constr_of_monomorphic_global env x)
+  ;;
+end

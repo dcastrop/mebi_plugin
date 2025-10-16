@@ -1036,6 +1036,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
 ;;
 
 let proof_intro
+      (pstate : Declare.Proof.t)
       ((x, a) : coq_model)
       ((y, b) : coq_model)
       (refs : Libnames.qualid list)
@@ -1043,17 +1044,9 @@ let proof_intro
   =
   Log.trace "command.proof_intro";
   let* _ = run (CheckBisimilarity ((x, a), (y, b))) refs in
-  Log.debug "command.proof_intro, post bisim";
-  let* _ = Mebi_wrapper.show_fwd_map () in
-  let* _ = Mebi_wrapper.show_bck_map () in
-  let* _ =
-    Mebi_wrapper.update_proof_by_tactics_mm
-      [ Mebi_tactics.unfold_constrexpr_list [ x; y ]
-      ; Mebi_tactics.cofix ()
-      ; Mebi_wrapper.return (Mebi_tactics.apply (Mebi_theories.c_In_sim ()))
-      ; Mebi_wrapper.return (Mebi_tactics.apply (Mebi_theories.c_Pack_sim ()))
-      ; Mebi_tactics.intros_all ()
-      ]
-  in
-  Mebi_wrapper.get_proof ()
+  return
+    (Mebi_tactics.update_proof_by_tactic
+       pstate
+       (Proofview.Goal.enter (fun gl ->
+          Mebi_tactics.unfold_constrexpr_list gl [ x; y ])))
 ;;

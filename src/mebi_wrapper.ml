@@ -52,16 +52,17 @@ type 'a mm = wrapper ref -> 'a in_context
 let run
       ?(keep_encoding : bool = false)
       ?(fresh : bool = true)
-      ?(new_proof : bool = false)
-      ?(proof : Declare.Proof.t option = None)
-      (x : 'a mm)
+      (* ?(new_proof : bool = false) *)
+      (* ?(proof : Declare.Proof.t option = None) *)
+        (x : 'a mm)
   : 'a
   =
   Log.trace "mebi_wrapper.run";
   let coq_env : Environ.env = !(the_coq_env ~fresh ()) in
   let coq_ctx : Evd.evar_map = !(the_coq_ctx ()) in
-  let proofv : proof_context = !(the_coq_proofv ~new_proof ~proof ()) in
-  let coq_ref : coq_context ref = ref { coq_env; coq_ctx; proofv } in
+  (* let proofv : proof_context = !(the_coq_proofv ~new_proof ~proof ()) in *)
+  (* let coq_ref : coq_context ref = ref { coq_env; coq_ctx; proofv } in *)
+  let coq_ref : coq_context ref = ref { coq_env; coq_ctx } in
   let fwd_enc, bck_enc = !(get_the_enc_maps ~keep_encoding ()) in
   let a = x (ref { coq_ref; fwd_enc; bck_enc }) in
   (* enable_logging := false; *)
@@ -110,7 +111,7 @@ let rec iterate
 (****** GET & PUT STATE *********************)
 (********************************************)
 
-let set_proof (new_proof : Declare.Proof.t) (st : wrapper ref) : unit in_context
+(* let set_proof (new_proof : Declare.Proof.t) (st : wrapper ref) : unit in_context
   =
   Log.trace "mebi_wrapper.set_proof";
   let coq_st = !st.coq_ref in
@@ -119,7 +120,7 @@ let set_proof (new_proof : Declare.Proof.t) (st : wrapper ref) : unit in_context
   coq_st := { !coq_st with proofv };
   st := { !st with coq_ref = coq_st };
   { state = st; value = () }
-;;
+;; *)
 
 let get_env (st : wrapper ref) : Environ.env in_context =
   let coq_st = !st.coq_ref in
@@ -131,10 +132,10 @@ let get_sigma (st : wrapper ref) : Evd.evar_map in_context =
   { state = st; value = !coq_st.coq_ctx }
 ;;
 
-let get_proofv (st : wrapper ref) : proof_context in_context =
+(* let get_proofv (st : wrapper ref) : proof_context in_context =
   let coq_st = !st.coq_ref in
   { state = st; value = !coq_st.proofv }
-;;
+;; *)
 
 let get_fwd_enc (st : wrapper ref) : Enc.t F.t in_context =
   Log.trace "mebi_wrapper.get_fwd_enc";
@@ -215,15 +216,6 @@ let type_of_econstr (t : EConstr.t) : EConstr.t mm =
   coq_st := { !coq_st with coq_ctx = sigma };
   { state = st; value = t }
 
-and constrexpr_to_econstr (t : Constrexpr.constr_expr) : EConstr.t mm =
-  fun (st : wrapper ref) ->
-  let coq_st : coq_context ref = !st.coq_ref in
-  let env : Environ.env = !coq_st.coq_env in
-  let sigma : Evd.evar_map = !coq_st.coq_ctx in
-  let sigma, t = Constrintern.interp_constr_evars env sigma t in
-  coq_st := { !coq_st with coq_ctx = sigma };
-  { state = st; value = t }
-
 and new_evar_of_econstr (t : EConstr.t) : EConstr.t mm =
   fun (st : wrapper ref) ->
   let coq_st : coq_context ref = !st.coq_ref in
@@ -233,22 +225,31 @@ and new_evar_of_econstr (t : EConstr.t) : EConstr.t mm =
   coq_st := { !coq_st with coq_ctx = sigma };
   { state = st; value = instance }
 
+and constrexpr_to_econstr (t : Constrexpr.constr_expr) : EConstr.t mm =
+  fun (st : wrapper ref) ->
+  let coq_st : coq_context ref = !st.coq_ref in
+  let env : Environ.env = !coq_st.coq_env in
+  let sigma : Evd.evar_map = !coq_st.coq_ctx in
+  let sigma, t = Convert.constrexpr_to_econstr env sigma t in
+  coq_st := { !coq_st with coq_ctx = sigma };
+  { state = st; value = t }
+
 and econstr_to_constr ?(abort_on_undefined_evars : bool = false) (x : EConstr.t)
   : Constr.t mm
   =
   let open Syntax in
   let* sigma = get_sigma in
-  return (EConstr.to_constr ~abort_on_undefined_evars sigma x)
+  return (Convert.econstr_to_constr ~abort_on_undefined_evars sigma x)
 
 and econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
   let open Syntax in
   let* sigma = get_sigma in
-  return (EConstr.to_constr_opt sigma x)
+  return (Convert.econstr_to_constr_opt sigma x)
 
 and globref_to_econstr (x : Names.GlobRef.t) : EConstr.t mm =
   let open Syntax in
   let* env = get_env in
-  return (EConstr.of_constr (UnivGen.constr_of_monomorphic_global env x))
+  return (Convert.globref_to_econstr env x)
 
 and normalize_econstr (t : EConstr.t) : EConstr.t mm =
   fun (st : wrapper ref) ->
@@ -379,7 +380,7 @@ module type ERROR_TYPE = sig
     | UnknownDecodeKey of (coq_context ref * EConstr.t B.t * Enc.t)
     (* *)
     | NoBisimResult of unit
-    | ProofvIsNone of unit
+    (* | ProofvIsNone of unit *)
     | ParamsFailIfIncomplete of unit
     | ParamsFailIfNotBisim of unit
     | InvalidLTSArgsLength of int
@@ -442,7 +443,8 @@ module type ERROR_TYPE = sig
 
   (* *)
   val missing_bisim_result : unit -> exn
-  val proofv_is_none : unit -> exn
+
+  (* val proofv_is_none : unit -> exn *)
   val params_fail_if_incomplete : unit -> exn
   val params_fail_if_not_bisim : unit -> exn
   val invalid_lts_args_length : int -> exn
@@ -499,7 +501,7 @@ module Error : ERROR_TYPE = struct
     | UnknownDecodeKey of (coq_context ref * EConstr.t B.t * Enc.t)
     (* *)
     | NoBisimResult of unit
-    | ProofvIsNone of unit
+    (* | ProofvIsNone of unit *)
     | ParamsFailIfIncomplete of unit
     | ParamsFailIfNotBisim of unit
     | InvalidLTSArgsLength of int
@@ -552,7 +554,8 @@ module Error : ERROR_TYPE = struct
   ;;
 
   let missing_bisim_result () = MEBI_exn (NoBisimResult ())
-  let proofv_is_none () = MEBI_exn (ProofvIsNone ())
+
+  (* let proofv_is_none () = MEBI_exn (ProofvIsNone ()) *)
   let params_fail_if_incomplete () = MEBI_exn (ParamsFailIfIncomplete ())
   let params_fail_if_not_bisim () = MEBI_exn (ParamsFailIfNotBisim ())
 
@@ -649,7 +652,7 @@ module Error : ERROR_TYPE = struct
                  (Strfy.econstr !coq_ref.coq_env !coq_ref.coq_ctx))
               (List.of_seq (B.to_seq bck_map))))
     | NoBisimResult () -> str "No cached bisimilarity result found."
-    | ProofvIsNone () -> str "Tried to access contents of proofv which is None."
+    (* | ProofvIsNone () -> str "Tried to access contents of proofv which is None." *)
     (*****************)
     | ParamsFailIfIncomplete () ->
       str
@@ -840,9 +843,9 @@ let missing_bisim_result () : 'a mm =
   fun (st : wrapper ref) -> raise (Error.missing_bisim_result ())
 ;;
 
-let proofv_is_none () : 'a mm =
-  fun (st : wrapper ref) -> raise (Error.proofv_is_none ())
-;;
+(* let proofv_is_none () : 'a mm =
+   fun (st : wrapper ref) -> raise (Error.proofv_is_none ())
+   ;; *)
 
 let params_fail_if_incomplete () : 'a mm =
   fun (st : wrapper ref) -> raise (Error.params_fail_if_incomplete ())
@@ -1231,49 +1234,49 @@ let get_type_of_hyp (id : Names.Id.t) : EConstr.t mm =
 (****** COQ PROOF CONTEXT *********)
 (**********************************)
 
-let get_proof () : Declare.Proof.t mm =
-  Log.trace "mebi_wrapper.get_proof";
-  let open Syntax in
-  let* proofv : proof_context = get_proofv in
-  match proofv.proof with
-  | None -> proofv_is_none ()
-  | Some proof -> return proof
-;;
+(* let get_proof () : Declare.Proof.t mm =
+   Log.trace "mebi_wrapper.get_proof";
+   let open Syntax in
+   let* proofv : proof_context = get_proofv in
+   match proofv.proof with
+   | None -> proofv_is_none ()
+   | Some proof -> return proof
+   ;; *)
 
-let get_proof_env () : Environ.env mm =
-  Log.trace "mebi_wrapper.get_proof_env";
-  let open Syntax in
-  let* proofv : proof_context = get_proofv in
-  match proofv.proof with
-  | None ->
-    Log.warning "mebi_wrapper.get_proof_env, proof is None (using monad env)";
-    get_env
-  | Some proof ->
-    return (snd (Proof.get_proof_context (Declare.Proof.get proof)))
-;;
+(* let get_proof_env () : Environ.env mm =
+   Log.trace "mebi_wrapper.get_proof_env";
+   let open Syntax in
+   let* proofv : proof_context = get_proofv in
+   match proofv.proof with
+   | None ->
+   Log.warning "mebi_wrapper.get_proof_env, proof is None (using monad env)";
+   get_env
+   | Some proof ->
+   return (snd (Proof.get_proof_context (Declare.Proof.get proof)))
+   ;; *)
 
-let get_proof_sigma () : Evd.evar_map mm =
-  Log.trace "mebi_wrapper.get_proof_sigma";
-  let open Syntax in
-  let* proofv : proof_context = get_proofv in
-  match proofv.proof with
-  | None ->
-    Log.warning "mebi_wrapper.get_proof_sigma, proof is None (using monad ctx)";
-    get_sigma
-  | Some proof ->
-    return (fst (Proof.get_proof_context (Declare.Proof.get proof)))
-;;
+(* let get_proof_sigma () : Evd.evar_map mm =
+   Log.trace "mebi_wrapper.get_proof_sigma";
+   let open Syntax in
+   let* proofv : proof_context = get_proofv in
+   match proofv.proof with
+   | None ->
+   Log.warning "mebi_wrapper.get_proof_sigma, proof is None (using monad ctx)";
+   get_sigma
+   | Some proof ->
+   return (fst (Proof.get_proof_context (Declare.Proof.get proof)))
+   ;; *)
 
-let get_proof_names () : Names.Id.Set.t mm =
-  Log.trace "mebi_wrapper.get_proof_names";
-  let open Syntax in
-  let* proofv : proof_context = get_proofv in
-  match proofv.names with
-  | None -> return Names.Id.Set.empty
-  | Some names -> return names
-;;
+(* let get_proof_names () : Names.Id.Set.t mm =
+   Log.trace "mebi_wrapper.get_proof_names";
+   let open Syntax in
+   let* proofv : proof_context = get_proofv in
+   match proofv.names with
+   | None -> return Names.Id.Set.empty
+   | Some names -> return names
+   ;; *)
 
-let update_names
+(* let update_names
       ?(replace : bool = false)
       (new_names : Names.Id.Set.t)
       (st : wrapper ref)
@@ -1289,9 +1292,9 @@ let update_names
     !coq_st.proofv.names
     <- Some (if replace then new_names else Names.Id.Set.union names new_names);
     { state = st; value = () }
-;;
+;; *)
 
-let add_name (name : Names.Id.t) (st : wrapper ref) : unit in_context =
+(* let add_name (name : Names.Id.t) (st : wrapper ref) : unit in_context =
   let coq_st = !st.coq_ref in
   match !coq_st.proofv.names with
   | None ->
@@ -1301,7 +1304,7 @@ let add_name (name : Names.Id.t) (st : wrapper ref) : unit in_context =
   | Some names ->
     !coq_st.proofv.names <- Some (Names.Id.Set.add name names);
     { state = st; value = () }
-;;
+;; *)
 
 (**********************************)
 (****** DEBUG PRINTOUTS ***********)
@@ -1371,7 +1374,7 @@ let show_bck_map () : unit mm =
   return ()
 ;;
 
-let show_proof_data () : unit mm =
+(* let show_proof_data () : unit mm =
   fun (st : wrapper ref) ->
   Log.trace "mebi_wrapper.show_proof_data";
   let coq_st = !st.coq_ref in
@@ -1438,115 +1441,51 @@ let show_proof_data () : unit mm =
           (Strfy.pp (Proof.pr_proof the_proof))));
   (* *)
   { state = st; value = () }
-;;
+;; *)
 
-let show_proof () : unit mm =
-  Log.trace "mebi_wrapper.show_proof";
-  let open Syntax in
-  let* proof = get_proof () in
-  let the_proof : Proof.t = Declare.Proof.get proof in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.show_proof, Proof.pr_proof: %s"
-       (Strfy.pp (Proof.pr_proof the_proof)));
-  return ()
-;;
+(* let show_proof () : unit mm =
+   Log.trace "mebi_wrapper.show_proof";
+   let open Syntax in
+   let* proof = get_proof () in
+   let the_proof : Proof.t = Declare.Proof.get proof in
+   Log.debug
+   (Printf.sprintf
+   "mebi_wrapper.show_proof, Proof.pr_proof: %s"
+   (Strfy.pp (Proof.pr_proof the_proof)));
+   return ()
+   ;; *)
 
-let show_names () : unit mm =
-  Log.trace "mebi_wrapper.show_names";
-  let open Syntax in
-  let* env = get_proof_env () in
-  let* names = get_proof_names () in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.show_names: %s"
-       (if Names.Id.Set.is_empty names
-        then "[ ] (empty)"
-        else
-          Printf.sprintf
-            "[%s\n]"
-            (Names.Id.Set.fold
-               (fun (n : Names.Id.t) (acc : string) ->
-                 Printf.sprintf
-                   "%s\n\t%s : %s"
-                   acc
-                   (Names.Id.to_string n)
-                   (* (Strfy.pp
-                      (Names.Id.print n) *)
-                   (let lookup_n : EConstr.named_declaration =
-                      EConstr.lookup_named n env
-                    in
-                    match Context.Named.Declaration.get_value lookup_n with
-                    | None -> "(No value found)"
-                    | Some v -> econstr_to_string v))
-               names
-               "")));
-  return ()
-;;
-
-(**********************************)
-(****** COQ PROOF NAMES ***********)
-(**********************************)
-
-let next_name_of (n : Names.Id.t) : Names.Id.t mm =
-  let open Syntax in
-  let* names = get_proof_names () in
-  return (Namegen.next_ident_away n names)
-;;
-
-let new_name_of_string ?(add : bool = true) (s : string) : Names.Id.t mm =
-  Log.trace "mebi_wrapper.new_name_of_string";
-  let open Syntax in
-  let* name = next_name_of (Names.Id.of_string s) in
-  (* let* _ = show_names () in *)
-  let* _ = if add then add_name name else return () in
-  (* let* _ = show_names () in *)
-  return name
-;;
-
-(**********************************)
-(****** COQ PROOF TACTICS *********)
-(**********************************)
-
-let update_proof_by_tactic (t : unit Proofview.tactic) : unit mm =
-  Log.trace "mebi_wrapper.update_proof_by_tactic";
-  let open Syntax in
-  let* the_proof : Declare.Proof.t = get_proof () in
-  let new_proof, is_safe_tactic = Declare.Proof.by t the_proof in
-  if Bool.not is_safe_tactic
-  then Log.warning "mebi_wrapper.update_proof_by_tactic, unsafe tactic used";
-  set_proof new_proof
-;;
-
-let update_proof_by_tactic_mm (t : unit Proofview.tactic mm) : unit mm =
-  let open Syntax in
-  let* t = t in
-  update_proof_by_tactic t
-;;
-
-let rec update_proof_by_tactics : unit Proofview.tactic list -> unit mm
-  = function
-  | [] -> return ()
-  | h :: t ->
-    let open Syntax in
-    let* _ = update_proof_by_tactic h in
-    update_proof_by_tactics t
-;;
-
-(* NOTE: same as above, but for list of elems wrapped in [mm] *)
-let rec update_proof_by_tactics_mm : unit Proofview.tactic mm list -> unit mm
-  = function
-  | [] -> return ()
-  | h :: t ->
-    let open Syntax in
-    let* _ = update_proof_by_tactic_mm h in
-    update_proof_by_tactics_mm t
-;;
-
-(* TODO: [Declare.Proof.by tac proofv.proof] *)
-(* TODO: [Declare.Proof.get proofv.proof -> Proof.] *)
-
-(* TODO: [Proofview.tactic?] swap between them all *)
+(* let show_names () : unit mm =
+   Log.trace "mebi_wrapper.show_names";
+   let open Syntax in
+   let* env = get_proof_env () in
+   let* names = get_proof_names () in
+   Log.debug
+   (Printf.sprintf
+   "mebi_wrapper.show_names: %s"
+   (if Names.Id.Set.is_empty names
+   then "[ ] (empty)"
+   else
+   Printf.sprintf
+   "[%s\n]"
+   (Names.Id.Set.fold
+   (fun (n : Names.Id.t) (acc : string) ->
+   Printf.sprintf
+   "%s\n\t%s : %s"
+   acc
+   (Names.Id.to_string n)
+   (* (Strfy.pp
+   (Names.Id.print n) *)
+   (let lookup_n : EConstr.named_declaration =
+   EConstr.lookup_named n env
+   in
+   match Context.Named.Declaration.get_value lookup_n with
+   | None -> "(No value found)"
+   | Some v -> econstr_to_string v))
+   names
+   "")));
+   return ()
+   ;; *)
 
 (********************************************)
 (****** GRAPH *******************************)
@@ -1817,29 +1756,3 @@ let debug_econstr_constr_kind (t : EConstr.t) : unit mm =
 ;;
 
 (****************************************************************************)
-
-let proof_query (pstate : Declare.Proof.t) : Proof.t = Declare.Proof.get pstate
-let proof_partial (p : Proof.t) : EConstr.t list = Proof.partial_proof p
-
-let proof_test () : unit Proofview.tactic mm =
-  fun (st : wrapper ref) ->
-  Log.trace "mebi_wrapper.proof_test";
-  let _h_hyps_id = Names.Id.of_string "TestPacked" in
-  (* *)
-  { state = st
-  ; value =
-      Proofview.Goal.enter (fun gl ->
-        let _hyps = Environ.named_context_val (Proofview.Goal.env gl) in
-        Proofview.tclUNIT ())
-      (* let x = Proofview.Goal.goal gl in
-
-         if Termops.mem_named_context_val h_hyps_id hyps then
-         Proofview.tclTHEN (repackage i h_hyps_id)
-         (Proofview.tclTHEN (Tactics.clear [h_hyps_id; i])
-         (Tactics.introduction h_hyps_id))
-         else
-         Proofview.tclTHEN (package i)
-         (Proofview.tclTHEN (Tactics.rename_hyp [i, h_hyps_id])
-         (Tactics.move_hyp h_hyps_id Logic.MoveLast)) *)
-  }
-;;

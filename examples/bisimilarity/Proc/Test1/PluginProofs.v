@@ -45,32 +45,46 @@ MeBi Set FailIfNotBisim True.
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof.
-  
-  (* MeBi_Debug ProofNames. *)
+  MeBiSim Begin termLTS p And termLTS q Using termLTS. (* unfold p, q. *)
+  MeBiSim ProofStep. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
+  MeBiSim ProofStep. (* inversion H; simpl in *. *)
+  MeBiSim ProofStep.
+  MeBiSim ProofStep.
+  (* MeBiSim ProofStep.
+  MeBiSim ProofStep.
+  MeBiSim ProofStep.
+  MeBiSim ProofStep. *)
 
-  MeBiSim Begin termLTS p And termLTS q Using termLTS.
+  (* MeBiSim ProofStep. *)
+  (* MeBiSim ProofStep. *)
+  (* MeBiSim ProofStep. *)
+  (* MeBiSim ProofStep. *)
+  (* MeBiSim ProofStep. *)
+
+
+
   (* MeBiSim Cofix. *)
   (* MeBiSim Intros. *)
   (* MeBi Set ShowDetails True. *)
   (* MeBiSim FocusTest.  *)
 
-  MeBiSim GoalTest.
-  inversion H; subst. 
+  (* MeBiSim GoalTest. *)
+  (* inversion H; subst. 
   simpl in *.
-  eexists; split.
+  eexists; split. *)
 
   (* MeBi Set ShowDetails True. *)
   (* MeBiSim FocusTest.  *)
   (* MeBi Set ShowDetails True. *)
 
 
-  MeBiSim GoalTest.
-  MeBiSim WeakNone.
-  MeBiSim GoalTest.
+  (* MeBiSim GoalTest. *)
+  (* MeBiSim WeakNone. *)
+  (* MeBiSim GoalTest. *)
 
 
-  admit. admit.
-  MeBiSim GoalTest.
+  (* admit. admit. *)
+  (* MeBiSim GoalTest. *)
    
   (* MeBi Set ShowDetails True. *)
   (* MeBiSim FocusTest.  *)

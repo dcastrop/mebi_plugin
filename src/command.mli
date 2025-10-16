@@ -16,7 +16,8 @@ type command_kind =
 
 val run :  command_kind-> Libnames.qualid list-> unit Mebi_wrapper.mm 
 
-val proof_intro : coq_model ->
+val proof_intro : 
+Declare.Proof.t ->coq_model ->
 coq_model ->
 Libnames.qualid list ->
 Declare.Proof.t Mebi_wrapper.mm

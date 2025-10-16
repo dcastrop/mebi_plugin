@@ -129,7 +129,8 @@ let list_of_constr_kinds : Constr.t -> (string * bool) list =
 
 let list_of_econstr_kinds sigma : EConstr.t -> (string * bool) list =
   fun (x : EConstr.t) ->
-  [ "App", EConstr.isApp sigma x (* ; "Arity", EConstr.isArity sigma x *)
+  [ "App", EConstr.isApp sigma x
+  ; "Arity", EConstr.isArity sigma x
   ; "Case", EConstr.isCase sigma x
   ; "Cast", EConstr.isCast sigma x
   ; "CoFix", EConstr.isCoFix sigma x

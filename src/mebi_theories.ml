@@ -333,17 +333,49 @@ let match_theory_kind sigma : EConstr.t -> theory_kind option =
   else None
 ;;
 
+let is_var sigma (x : EConstr.t) : bool =
+  EConstr.isRef sigma x && EConstr.isVar sigma x
+;;
+
+let need_to_invert sigma (tys : EConstr.t array) : bool =
+  Bool.not
+    (List.is_empty
+       (List.filter (fun ty -> is_var sigma ty) (Array.to_list tys)))
+;;
+
+(*****************************************************************************)
+
+let get_hyp_names (gl : Proofview.Goal.t) : Names.Id.Set.t =
+  Log.trace "mebi_tactics.get_hyp_names";
+  Context.Named.to_vars (Proofview.Goal.hyps gl)
+;;
+
+let next_name_of (names : Names.Id.Set.t) : Names.Id.t -> Names.Id.t =
+  fun x ->
+  Log.trace (Printf.sprintf "mebi_tactics.next_name_of (%s)" (Strfy.name_id x));
+  Namegen.next_ident_away x names
+;;
+
+let new_name_of_string (gl : Proofview.Goal.t) : string -> Names.Id.t =
+  fun x ->
+  Log.trace (Printf.sprintf "mebi_tactics.new_name_of_string (%s)" x);
+  next_name_of (get_hyp_names gl) (Names.Id.of_string x)
+;;
+
 let is_cofix (x : Names.Id.t) : bool =
   Names.Id.equal (Nameops.root_of_id x) (Names.Id.of_string "Cofix")
 ;;
 
-let to_invert sigma (x : EConstr.t array) : bool =
-  Bool.not
-    (List.is_empty
-       (List.filter
-          (fun y -> EConstr.isRef sigma y && EConstr.isVar sigma y)
-          (Array.to_list x)))
+let new_cofix_name (gl : Proofview.Goal.t) : Names.Id.t =
+  new_name_of_string gl "Cofix0"
 ;;
+
+let new_H_name (gl : Proofview.Goal.t) : Names.Id.t = new_name_of_string gl "H0"
+
+(*****************************************************************************)
+
+let get_proof_from_pstate : Declare.Proof.t -> Proof.t = Declare.Proof.get
+let get_partial_proof : Proof.t -> EConstr.t list = Proof.partial_proof
 
 (*****************************************************************************)
 
