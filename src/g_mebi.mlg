@@ -235,7 +235,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
 
 (*  *)
 |![ proof ] 
-  [ "MeBiSim" "ProofStep" ] ->
+  [ "MeBiSim" "Step" ] ->
   { fun ~pstate -> 
     if Logging.is_debug_enabled () then Logging.Log.override "\n";
     Mebi_tactics.update_proof_by_tactic pstate (Mebi_bisim.loop_test ())
