@@ -13,17 +13,12 @@ val simplify_and_subst_all : unit -> unit Proofview.tactic
 val the_goals : (int, Proofview.Goal.t) Hashtbl.t ref
 val reset_the_goals : unit -> unit
 val add_goal : Proofview.Goal.t -> unit
-
-val update_goals :
-  unit -> unit Proofview.tactic Mebi_wrapper.mm
-
-val pstr_the_goals : unit -> string
 val goal_test : unit -> unit Proofview.tactic
-val apply : Evd.econstr -> unit Proofview.tactic
-val eapply : Evd.econstr -> unit Proofview.tactic
+val apply : EConstr.t -> unit Proofview.tactic
+val eapply : EConstr.t -> unit Proofview.tactic
 
 val unfold_econstr :
-  Proofview.Goal.t -> Evd.econstr -> unit Proofview.tactic
+  Proofview.Goal.t -> EConstr.t -> unit Proofview.tactic
 
 val unfold_constrexpr :
   Proofview.Goal.t ->

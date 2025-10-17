@@ -369,23 +369,30 @@ let handle_hyps (gl : Proofview.Goal.t) (r : Algorithms.Bisimilar.result)
 
 (* let temp_evar_econstr () : EConstr.t = *)
 
-let handle_new_cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =
-  Proofview.tclTHEN
-    (Mebi_tactics.cofix gl)
-    (Proofview.tclTHEN
-       (Mebi_tactics.apply (Mebi_theories.c_In_sim ()))
-       (Proofview.tclTHEN
-          (Mebi_tactics.apply (Mebi_theories.c_Pack_sim ()))
-          (Mebi_tactics.intros_all ())
-          (* (Proofview.tclTHEN
-             (Mebi_tactics.intros_all ())
-             (Refine.refine ~typecheck:true (fun sigma -> _ ))) *)))
-;;
-
 let get_all_cofix (gl : Proofview.Goal.t) : Names.Id.Set.t =
   Names.Id.Set.filter
     (fun (x : Names.Id.t) -> Mebi_theories.is_cofix x)
     (Context.Named.to_vars (Proofview.Goal.hyps gl))
+;;
+
+let get_all_non_cofix (gl : Proofview.Goal.t) : Names.Id.Set.t =
+  Names.Id.Set.filter
+    (fun (x : Names.Id.t) -> Bool.not (Mebi_theories.is_cofix x))
+    (Context.Named.to_vars (Proofview.Goal.hyps gl))
+;;
+
+let clear_old_hyps (gl : Proofview.Goal.t) : unit Proofview.tactic =
+  Tactics.clear (Names.Id.Set.to_list (get_all_non_cofix gl))
+;;
+
+let handle_new_cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =
+  Mebi_theories.tactics
+    [ Mebi_tactics.cofix gl
+    ; Mebi_tactics.apply (Mebi_theories.c_In_sim ())
+    ; Mebi_tactics.apply (Mebi_theories.c_Pack_sim ())
+    ; Mebi_tactics.intros_all ()
+    ; clear_old_hyps gl
+    ]
 ;;
 
 type proof_state =
@@ -437,13 +444,10 @@ let handle_eexists
       let n2 : EConstr.t =
         enc_to_econstr (fst (List.hd (States.to_list n_candidates)))
       in
-      (* Log.debug
-         (Printf.sprintf
-         "mebi_bisim.handle_eexists, n2:\n%s"
-         (Strfy.econstr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl) n2)); *)
-      let n2bindings = Tactypes.ImplicitBindings [ n2 ] in
-      let t = Tactics.constructor_tac true None 1 n2bindings in
-      Proofview.tclTHEN t (Tactics.split Tactypes.NoBindings))
+      Mebi_theories.tactics
+        [ Tactics.constructor_tac true None 1 (Tactypes.ImplicitBindings [ n2 ])
+        ; Tactics.split Tactypes.NoBindings
+        ])
     else (
       Log.warning
         (Printf.sprintf
@@ -464,17 +468,17 @@ let handle_weak_transition
   =
   match m2, n2 with
   | Some m2, Some n2 ->
-    Proofview.tclTHEN
-      (Mebi_tactics.apply (Mebi_theories.c_wk_none ()))
-      (Proofview.tclTHEN
-         (Mebi_tactics.unfold_econstr
-            gl
-            (match Action.Label.is_silent mA.label with
-             | Some true -> Mebi_theories.c_silent ()
-             | _ -> Mebi_theories.c_silent1 ()))
-         (if State.eq n1 n2
-          then Mebi_tactics.apply (Mebi_theories.c_rt1n_refl ())
-          else Mebi_tactics.apply (Mebi_theories.c_rt1n_trans ())))
+    Mebi_theories.tactics
+      [ Mebi_tactics.apply (Mebi_theories.c_wk_none ())
+      ; Mebi_tactics.unfold_econstr
+          gl
+          (match Action.Label.is_silent mA.label with
+           | Some true -> Mebi_theories.c_silent ()
+           | _ -> Mebi_theories.c_silent1 ())
+      ; (if State.eq n1 n2
+         then Mebi_tactics.apply (Mebi_theories.c_rt1n_refl ())
+         else Mebi_tactics.apply (Mebi_theories.c_rt1n_trans ()))
+      ]
   | _, _ -> raise (CannotUnpackTransitionsOfMN ())
 ;;
 
@@ -488,7 +492,7 @@ let iter_loop (r : Algorithms.Bisimilar.result) : unit Proofview.tactic =
       Log.notice "mebi_bisim.iter_loop, do inversion";
       p
     | Cofixes cs ->
-      Log.notice "mebi_bisim.iter_loop, hyp cofixes";
+      Log.notice "mebi_bisim.iter_loop, hyp cofixes (does nothing)";
       Proofview.tclUNIT ()
     | H_Transition mt ->
       Log.notice "mebi_bisim.iter_loop, H_transition mt";
@@ -510,7 +514,6 @@ let iter_loop (r : Algorithms.Bisimilar.result) : unit Proofview.tactic =
 let loop_test () : unit Proofview.tactic =
   Log.debug "mebi_bisim.get_test";
   let the_result = get_the_result () in
-  Proofview.tclTHEN
-    (iter_loop !the_result)
-    (Mebi_tactics.simplify_and_subst_all ())
+  Mebi_theories.tactics
+    [ iter_loop !the_result; Mebi_tactics.simplify_and_subst_all () ]
 ;;

@@ -30,10 +30,10 @@
   fsm
   algorithms
   strfy
+  mebi_tactics
   mebi_wrapper
   mebi_ind
   mebi_utils
-  mebi_tactics
   mebi_bisim
   params
   ; dump_to_file
