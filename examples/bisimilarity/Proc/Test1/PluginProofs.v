@@ -47,27 +47,27 @@ MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof.
   MeBiSim Begin termLTS p And termLTS q Using termLTS. (* unfold p, q. *)
-  MeBiSim ProofStep. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
-  MeBiSim ProofStep. (* inversion H; simpl in *. *)
-  MeBiSim ProofStep. (* exists n2 *)
-  MeBiSim ProofStep. (* apply wk_none. apply rt1n_refl. *)
-  MeBiSim ProofStep. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
-  MeBiSim ProofStep. (* inversion H; simpl in *. *)
-  MeBiSim ProofStep. (* inversion H0; simpl in *. *)
-  (* MeBiSim ProofStep. *)
+  MeBiSim Step. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
+  MeBiSim Step. (* inversion H; simpl in *. *)
+  MeBiSim Step. (* exists n2 *)
+  MeBiSim Step. (* apply wk_none. apply rt1n_refl. *)
+  MeBiSim Step. (* clear H; cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
+  MeBiSim Step. (* inversion H; simpl in *. *)
+  MeBiSim Step. (* inversion H0; simpl in *. *)
+  (* MeBiSim Step. *)
 
 
-  (* MeBiSim ProofStep. *) 
-  (* MeBiSim ProofStep.
-  MeBiSim ProofStep.
-  MeBiSim ProofStep.
-  MeBiSim ProofStep. *)
+  (* MeBiSim Step. *) 
+  (* MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step. *)
 
-  (* MeBiSim ProofStep. *)
-  (* MeBiSim ProofStep. *)
-  (* MeBiSim ProofStep. *)
-  (* MeBiSim ProofStep. *)
-  (* MeBiSim ProofStep. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
 
 
 
