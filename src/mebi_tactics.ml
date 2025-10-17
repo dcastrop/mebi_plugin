@@ -1,5 +1,5 @@
 open Logging
-open Mebi_wrapper
+(* open Mebi_wrapper *)
 
 (**********************************)
 (****** COQ PROOF TACTICS *********)
@@ -35,16 +35,17 @@ let simplify_all () : unit Proofview.tactic =
   Proofview.Goal.enter (fun gl ->
     List.fold_left
       (fun acc (h : Mebi_theories.hyp) ->
-        Proofview.tclTHEN
-          acc
-          (Tactics.simpl_in_hyp
-             (Context.Named.Declaration.get_id h, Locus.InHyp)))
+        Mebi_theories.tactics
+          [ acc
+          ; Tactics.simpl_in_hyp
+              (Context.Named.Declaration.get_id h, Locus.InHyp)
+          ])
       Tactics.simpl_in_concl
       (Proofview.Goal.hyps gl))
 ;;
 
 let simplify_and_subst_all () : unit Proofview.tactic =
-  Proofview.tclTHEN (simplify_all ()) (subst_all ())
+  Mebi_theories.tactics [ simplify_all (); subst_all () ]
 ;;
 
 (*************************)
@@ -66,30 +67,30 @@ let add_goal (g : Proofview.Goal.t) : unit =
   Hashtbl.add !the_goals (Evar.hash (Proofview.Goal.goal g)) g
 ;;
 
-let update_goals () : unit Proofview.tactic mm =
-  Log.trace "mebi_tactics.update_goals";
-  reset_the_goals ();
-  return
-    (Proofview.tclBIND
-       Proofview.Goal.goals
-       (fun (gs : Proofview.Goal.t Proofview.tactic list) ->
-       Log.debug
-         (Printf.sprintf "mebi_tactics.update_goals: %i goals" (List.length gs));
-       Proofview.tclIGNORE
-         (List.fold_left
-            (fun (acc : unit Proofview.tactic) g ->
-              (* Log.debug "mebi_tactics.update_goals list iter"; *)
-              Proofview.tclIGNORE
-                (Proofview.tclBIND g (fun g ->
-                   (* Log.debug
-                      (Printf.sprintf
-                      "mebi_tactics.update_goals, adding: %s"
-                      (Strfy.goal g)); *)
-                   add_goal g;
-                   acc)))
-            (Proofview.tclUNIT ())
-            gs)))
-;;
+(* let update_goals () : unit Proofview.tactic mm =
+   Log.trace "mebi_tactics.update_goals";
+   reset_the_goals ();
+   return
+   (Proofview.tclBIND
+   Proofview.Goal.goals
+   (fun (gs : Proofview.Goal.t Proofview.tactic list) ->
+   Log.debug
+   (Printf.sprintf "mebi_tactics.update_goals: %i goals" (List.length gs));
+   Proofview.tclIGNORE
+   (List.fold_left
+   (fun (acc : unit Proofview.tactic) g ->
+   (* Log.debug "mebi_tactics.update_goals list iter"; *)
+   Proofview.tclIGNORE
+   (Proofview.tclBIND g (fun g ->
+   (* Log.debug
+   (Printf.sprintf
+   "mebi_tactics.update_goals, adding: %s"
+   (Strfy.goal g)); *)
+   add_goal g;
+   acc)))
+   (Proofview.tclUNIT ())
+   gs)))
+   ;; *)
 
 (* let get_the_goals () : (int, Proofview.Goal.t) Hashtbl.t Proofview.tactic mm =
    reset_the_goals ();
@@ -109,17 +110,17 @@ let update_goals () : unit Proofview.tactic mm =
    ))
    ;; *)
 
-let pstr_the_goals () : string =
-  Log.trace
-    (Printf.sprintf
-       "mebi_tactics.pstr_the_goals (%i)"
-       (Hashtbl.length !the_goals));
-  Strfy.list
-    ~force_newline:true
-    ~label:"Goals"
-    (Strfy.tuple ~force_newline:true ~indent:1 Strfy.int Strfy.goal)
-    (List.of_seq (Hashtbl.to_seq !the_goals))
-;;
+(* let pstr_the_goals () : string =
+   Log.trace
+   (Printf.sprintf
+   "mebi_tactics.pstr_the_goals (%i)"
+   (Hashtbl.length !the_goals));
+   Strfy.list
+   ~force_newline:true
+   ~label:"Goals"
+   (Strfy.tuple ~force_newline:true ~indent:1 Strfy.int Strfy.goal)
+   (List.of_seq (Hashtbl.to_seq !the_goals))
+   ;; *)
 
 let goal_test () : unit Proofview.tactic =
   Log.trace "mebi_tactics.goal_test";
@@ -251,7 +252,8 @@ let rec unfold_constrexpr_list (gl : Proofview.Goal.t)
   | [] -> Proofview.tclUNIT ()
   | h :: [] -> unfold_constrexpr gl h
   | h :: t ->
-    Proofview.tclTHEN (unfold_constrexpr gl h) (unfold_constrexpr_list gl t)
+    Mebi_theories.tactics
+      [ unfold_constrexpr gl h; unfold_constrexpr_list gl t ]
 ;;
 
 let cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =

@@ -1,5 +1,13 @@
 open Logging
 
+let rec tactics : unit Proofview.tactic list -> unit Proofview.tactic = function
+  | [] -> Proofview.tclUNIT ()
+  | h :: [] -> h
+  | h :: t -> Proofview.tclTHEN h (tactics t)
+;;
+
+(*****************************************************************************)
+
 type hyp = (EConstr.t, EConstr.t, Evd.erelevance) Context.Named.Declaration.pt
 
 (* source: https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto3/src/tuto_tactic.ml *)
@@ -351,13 +359,13 @@ let is_constant sigma (x : EConstr.t) (c : unit -> EConstr.t) : bool =
   | _ -> false
 ;;
 
-(******)
+(*****************************************************************************)
 
 let is_var sigma (x : EConstr.t) : bool =
   EConstr.isRef sigma x && EConstr.isVar sigma x
 ;;
 
-(*****************************************************************************)
+(******)
 
 let get_hyp_names (gl : Proofview.Goal.t) : Names.Id.Set.t =
   Log.trace "mebi_tactics.get_hyp_names";

@@ -39,6 +39,8 @@ val c_ex_intro : unit -> EConstr.t
 val is_constant :
   Evd.evar_map -> EConstr.t -> (unit -> EConstr.t) -> bool
 
+val tactics : unit Proofview.tactic list -> unit Proofview.tactic
+
 val is_var : Evd.evar_map -> EConstr.t -> bool
 val get_hyp_names : Proofview.Goal.t -> Names.Id.Set.t
 
