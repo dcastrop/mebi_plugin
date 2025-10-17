@@ -54,6 +54,9 @@ Proof.
   MeBiSim Step. (* clear H; cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
   MeBiSim Step. (* inversion H; simpl in *. *)
   MeBiSim Step. (* inversion H0; simpl in *. *)
+  MeBiSim Step. (* exists n2 *)
+  
+  eapply wk_some. unfold silent. apply rt1n_refl.
   (* MeBiSim Step. *)
 
 

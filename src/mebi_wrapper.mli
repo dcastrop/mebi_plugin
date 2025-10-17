@@ -324,5 +324,5 @@ val debug_constr_kind : Constr.t -> unit mm
 val debug_econstr_constr_kind : EConstr.t -> unit mm
 
 
-val show_fwd_map : unit -> unit mm
-val show_bck_map : unit -> unit mm
+val show_fwd_map : unit -> unit 
+val show_bck_map : unit -> unit 
