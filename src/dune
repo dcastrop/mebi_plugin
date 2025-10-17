@@ -24,6 +24,7 @@
   logging
   mebi_enc
   mebi_setup
+  mebi_theories
   model
   lts
   fsm
@@ -32,7 +33,6 @@
   mebi_wrapper
   mebi_ind
   mebi_utils
-  mebi_theories
   mebi_tactics
   mebi_bisim
   params

@@ -75,7 +75,7 @@ val hyp
   -> ?indent:int
   -> Environ.env
   -> Evd.evar_map
-  -> Mebi_setup.hyp
+  -> Mebi_theories.hyp
   -> string
 
 val goal : ?indent:int -> Proofview.Goal.t -> string

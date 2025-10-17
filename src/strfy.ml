@@ -176,9 +176,9 @@ let erel _env sigma : EConstr.ERelevance.t -> string =
 ;;
 
 let hyp ?(force_newline : bool = false) ?(indent : int = 0) env sigma
-  : Mebi_setup.hyp -> string
+  : Mebi_theories.hyp -> string
   =
-  fun (x : Mebi_setup.hyp) ->
+  fun (x : Mebi_theories.hyp) ->
   list
     ~force_newline:true
     ~indent:(indent + 1)
