@@ -73,6 +73,10 @@ let econstr_to_enc : EConstr.t -> Enc.t =
   fun (x : EConstr.t) -> run ~keep_encoding:true ~fresh:false (get_encoding x)
 ;;
 
+let enc_to_econstr : Enc.t -> EConstr.t =
+  fun (x : Enc.t) -> run ~keep_encoding:true ~fresh:false (get_decoding x)
+;;
+
 let econstr_to_enc_opt (sigma : Evd.evar_map) : EConstr.t -> Enc.t option =
   fun (x : EConstr.t) ->
   (* if EConstr.isEvar sigma x *)
@@ -119,82 +123,92 @@ let get_cofix (m : Fsm.t) (n : Fsm.t) env sigma (tys : EConstr.t array)
 ;;
 
 exception Invalid_KindOf_EConstr_Expected_Atomic of EConstr.t
+
+let get_atomic_type sigma x : EConstr.t * EConstr.t array =
+  Log.debug "mebi_bisim.get_atomic_type";
+  match EConstr.kind_of_type sigma x with
+  | AtomicType (ty, tys) -> ty, tys
+  | _ -> raise (Invalid_KindOf_EConstr_Expected_Atomic x)
+;;
+
 exception Invalid_KindOf_EConstr_Expected_Lambda of EConstr.t
+
+let get_lambda sigma x
+  : (Names.Name.t, Evd.erelevance) Context.pbinder_annot * EConstr.t * EConstr.t
+  =
+  Log.debug "mebi_bisim.get_lambda";
+  match EConstr.kind sigma x with
+  | Lambda (binder, types, constr) -> binder, types, constr
+  | _ -> raise (Invalid_KindOf_EConstr_Expected_Lambda x)
+;;
+
 exception Invalid_KindOf_EConstr_Expected_App of EConstr.t
-exception ExpectedAppToContainWkTransAndSim of EConstr.t array
-exception UnhandledMebiTheoryKind of Mebi_theories.theory_kind
+
+let get_app sigma x : EConstr.t * EConstr.t array =
+  Log.debug "mebi_bisim.get_app";
+  match EConstr.kind sigma x with
+  | App (ty, tys) -> ty, tys
+  | _ -> raise (Invalid_KindOf_EConstr_Expected_App x)
+;;
+
 exception UnhandledConcl of EConstr.t
 
 let try_get_weak_transition gl n x : transition option =
+  Log.debug "mebi_bisim.try_get_weak_transition";
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  match EConstr.kind_of_type sigma x with
-  | AtomicType (ty, tys) ->
-    (match Mebi_theories.match_theory_kind sigma ty with
-     | Some k ->
-       (match k with
-        | Theories_weak -> Some (get_weak_transition n sigma tys)
-        | _ -> None)
-     | _ -> None)
-  | _ -> raise (Invalid_KindOf_EConstr_Expected_Atomic x)
+  let ty, tys = get_atomic_type sigma x in
+  if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak ())
+  then Some (get_weak_transition n sigma tys)
+  else None
 ;;
 
 let try_get_weak_sim gl x : unit option =
+  Log.debug "mebi_bisim.try_get_weak_sim";
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  match EConstr.kind_of_type sigma x with
-  | AtomicType (ty, tys) ->
-    (match Mebi_theories.match_theory_kind sigma ty with
-     | Some k -> (match k with Theories_weak_sim -> Some () | _ -> None)
-     | _ -> None)
-  | _ -> raise (Invalid_KindOf_EConstr_Expected_Atomic x)
+  let ty, tys = get_atomic_type sigma x in
+  if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
+  then Some ()
+  else None
 ;;
 
 let try_get_m_state_weak_sim gl (m : Fsm.t) x : State.t option =
+  Log.debug "mebi_bisim.try_get_m_state_weak_sim";
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  match EConstr.kind_of_type sigma x with
-  | AtomicType (ty, tys) ->
-    (match Mebi_theories.match_theory_kind sigma ty with
-     | Some k ->
-       (match k with
-        | Theories_weak_sim ->
-          Some (find_state_of_enc (econstr_to_enc tys.(5)) m.states)
-        | k -> raise (UnhandledMebiTheoryKind k))
-     | None -> None)
-  | _ -> raise (Invalid_KindOf_EConstr_Expected_Atomic x)
+  let ty, tys = get_atomic_type sigma x in
+  if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
+  then Some (find_state_of_enc (econstr_to_enc tys.(5)) m.states)
+  else None
 ;;
 
 let try_get_exists gl m n x : (transition * State.t) option =
+  Log.debug "mebi_bisim.try_get_exists";
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  match EConstr.kind_of_type sigma x with
-  | AtomicType (ty, tys) ->
-    (match EConstr.kind sigma tys.(1) with
-     | Lambda (_binder, _types, constr) ->
-       (match EConstr.kind sigma constr with
-        | App (_ty, tys) ->
-          (match Array.to_list tys with
-           | [ wk_trans; wk_sim ] ->
-             (match try_get_weak_transition gl n wk_trans with
-              | None -> None
-              | Some t ->
-                (match try_get_m_state_weak_sim gl m wk_sim with
-                 | None -> None
-                 | Some s -> Some (t, s)))
-           | _ -> None)
-        | _ -> None)
-     | _ -> None)
-  | _ -> raise (Invalid_KindOf_EConstr_Expected_Atomic x)
+  let _ty, tys = get_atomic_type sigma x in
+  Log.debug
+    (Printf.sprintf
+       "mebi_bisim.try_get_exists, x ty: %s"
+       (Strfy.econstr (Proofview.Goal.env gl) sigma _ty));
+  let _binder, _tys, constr = get_lambda sigma tys.(1) in
+  let _ty, tys = get_app sigma constr in
+  Log.debug
+    (Printf.sprintf
+       "mebi_bisim.try_get_exists, constr ty: %s"
+       (Strfy.econstr (Proofview.Goal.env gl) sigma _ty));
+  match Array.to_list tys with
+  | [ wk_trans; wk_sim ] ->
+    let nt = try_get_weak_transition gl n wk_trans in
+    let ms = try_get_m_state_weak_sim gl m wk_sim in
+    (match nt, ms with Some nt, Some ms -> Some (nt, ms) | _, _ -> None)
+  | _ -> None
 ;;
 
 let try_get_lts_transition gl n x : transition option =
+  Log.debug "mebi_bisim.try_get_lts_transition";
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  match EConstr.kind_of_type sigma x with
-  | AtomicType (ty, tys) ->
-    (match Mebi_theories.match_theory_kind sigma ty with
-     | Some k ->
-       (match k with
-        | Theories_LTS -> Some (get_lts_transition n sigma tys)
-        | _ -> None)
-     | _ -> None)
-  | _ -> raise (Invalid_KindOf_EConstr_Expected_Atomic x)
+  let ty, tys = get_atomic_type sigma x in
+  if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_LTS ())
+  then Some (get_lts_transition n sigma tys)
+  else None
 ;;
 
 type concl_result =
@@ -217,66 +231,12 @@ let handle_concl
      | Some () -> New_Weak_Sim
      | None ->
        (match try_get_exists gl m n the_concl with
-        | Some (n_transition, m_state) ->
-          (* let n_states : States.t = get_n_states gl m n bisim_states m_state n_transition
-             in
-             Exists (n_transition, m_state, n_states) *)
-          Exists (n_transition, m_state)
+        | Some (n_transition, m_state) -> Exists (n_transition, m_state)
         | None ->
           (match try_get_lts_transition gl n the_concl with
            | Some t -> LTS_Transition t
            | None -> raise (UnhandledConcl the_concl))))
 ;;
-
-(*
-   match EConstr.kind_of_type sigma the_concl with
-   | AtomicType (ty, tys) ->
-   let open Mebi_theories in
-   (match match_theory_kind sigma ty with
-   | Some k ->
-   (match k with
-   | Theories_weak -> Weak_Transition (get_weak_transition n sigma tys)
-   | Theories_weak_sim -> New_Weak_Sim
-   | k -> raise (UnhandledMebiTheoryKind k))
-   | None ->
-   (match Array.length tys with
-   | 2 ->
-   (match EConstr.kind sigma tys.(1) with
-   | Lambda (_binder, _types, constr) ->
-   (match EConstr.kind sigma constr with
-   | App (_ty, tys) ->
-   (match Array.to_list tys with
-   | [ wk_trans; wk_sim ] ->
-   let n_transition : transition =
-   match EConstr.kind_of_type sigma tys.(0) with
-   | AtomicType (ty, tys) ->
-   (match match_theory_kind sigma ty with
-   | Some k ->
-   (match k with
-   | Theories_weak -> get_weak_transition n sigma tys
-   | k -> raise (UnhandledMebiTheoryKind k))
-   | None -> raise (UnhandledConcl (ty, tys)))
-   | _ -> raise (Invalid_KindOf_EConstr_Expected_Atomic tys.(0))
-   in
-   let m_dest_state : State.t =
-   match EConstr.kind_of_type sigma tys.(1) with
-   | AtomicType (ty, tys) ->
-   (match Mebi_theories.match_theory_kind sigma ty with
-   | Some k ->
-   (match k with
-   | Mebi_theories.Theories_weak_sim ->
-   find_state_of_enc (econstr_to_enc tys.(5)) m.states
-   | k -> raise (UnhandledMebiTheoryKind k))
-   | None -> raise (UnhandledConcl (ty, tys)))
-   | _ -> raise (Invalid_KindOf_EConstr_Expected_Atomic tys.(1))
-   in
-   Exists (n_transition, m_dest_state)
-   | _ -> raise (ExpectedAppToContainWkTransAndSim tys))
-   | _ -> raise (Invalid_KindOf_EConstr_Expected_App constr))
-   | _ -> raise (Invalid_KindOf_EConstr_Expected_Lambda tys.(1)))
-   | 3 -> LTS_Transition (get_lts_transition n sigma tys)
-   | _ -> raise (UnhandledConcl (ty, tys))))
-   | _ -> raise (Invalid_KindOf_EConstr_Expected_Atomic the_concl) *)
 
 type hyp_kind =
   | Cofix of hyp_cofix
@@ -284,31 +244,25 @@ type hyp_kind =
   | H_Transition of transition
   | Pass
 
-exception ExpectedOnlyOne_H_ToBeInverted of Mebi_setup.hyp list
+exception ExpectedOnlyOne_H_ToBeInverted of Mebi_theories.hyp list
 
 let handle_hyp
       ({ the_fsm_1 = m; the_fsm_2 = n; _ } : Algorithms.Bisimilar.result)
       env
       sigma
-      (h : Mebi_setup.hyp)
+      (h : Mebi_theories.hyp)
   : hyp_kind
   =
   Log.debug "mebi_bisim.handle_hyp";
   let h_ty : EConstr.t = Context.Named.Declaration.get_type h in
-  match EConstr.kind_of_type sigma h_ty with
-  | AtomicType (ty, tys) ->
-    (match Mebi_theories.match_theory_kind sigma ty with
-     | Some k ->
-       (match k with
-        | Mebi_theories.Theories_weak_sim -> Cofix (get_cofix m n env sigma tys)
-        | k -> raise (UnhandledMebiTheoryKind k))
-     | None ->
-       if Array.length tys < 3
-       then Pass
-       else if Mebi_theories.need_to_invert sigma tys
-       then H_Inversion (Mebi_tactics.do_inversion h)
-       else H_Transition (get_lts_transition m sigma tys))
-  | _ -> raise (Invalid_KindOf_EConstr_Expected_Atomic h_ty)
+  let ty, tys = get_atomic_type sigma h_ty in
+  if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
+  then Cofix (get_cofix m n env sigma tys)
+  else if Array.length tys < 3
+  then Pass
+  else if Mebi_theories.need_to_invert sigma tys
+  then H_Inversion (Mebi_tactics.do_inversion h)
+  else H_Transition (get_lts_transition m sigma tys)
 ;;
 
 type hyp_result =
@@ -323,7 +277,7 @@ let handle_hyps (gl : Proofview.Goal.t) (r : Algorithms.Bisimilar.result)
   Log.debug "mebi_bisim.handle_hyps";
   let env : Environ.env = Proofview.Goal.env gl in
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  let hyps : Mebi_setup.hyp list = Proofview.Goal.hyps gl in
+  let hyps : Mebi_theories.hyp list = Proofview.Goal.hyps gl in
   let the_hyps : unit Proofview.tactic option * hyp_cofix list * transition list
     =
     List.fold_left
@@ -405,51 +359,85 @@ let get_all_cofix (gl : Proofview.Goal.t) : Names.Id.Set.t =
     (Context.Named.to_vars (Proofview.Goal.hyps gl))
 ;;
 
-(* type iter_result =
-   | Do_Tactic of unit Proofview.tactic
-   | Try_Cofixes of hyp_cofix list
-   | H_Transition of transition *)
-
-(* let iter_hyps r x : hyp_result =
-   match handle_hyps x r with
-   | Do_Inversion p -> Do_Inversion p
-   | H_Transition t -> H_Transition t
-   | Cofixes cs -> Cofixes cs
-   | Empty -> Empty
-   ;;
-
-   let iter_concl r x : unit Proofview.tactic option =
-   match handle_concl x r with
-   | New_Weak_Sim -> Some (handle_new_cofix x)
-   | Weak_Transition _t ->
-   Log.debug "mebi_bisim.iter_concl, Weak_Transition _t (does nothing)";
-   Some (Proofview.tclUNIT ())
-   | LTS_Transition _t ->
-   Log.debug "mebi_bisim.iter_concl, LTS_Transition _t (does nothing)";
-   Some (Proofview.tclUNIT ())
-   | Exists (_nt, _m2) ->
-   Log.debug
-   (Printf.sprintf
-   "mebi_bisim.iter_concl, Exists (_nt, _m) (does nothing)\n\
-   m2:\n\
-   %s\n\n\
-   nt:\n\
-   - from: %s\n\
-   - action: %s\n\
-   - dest: %s"
-     (Strfy.state _m2)
-     (Strfy.state _nt.from)
-     (Strfy.action _nt.action)
-     (Strfy.option Strfy.state _nt.dest));
-     None
-     ;; *)
-
 type proof_state =
   | NewProof
   | NewCofix
   | NewTransition
 
 let determine_proof_state (gl : Proofview.Goal.t) : proof_state option = None
+
+exception CannotUnpackTransitionsOfMN of unit
+
+let get_bisim_states (m : State.t) (n : State.t option) (pi : Partition.t)
+  : States.t
+  =
+  let bisims = Partition.filter (fun p -> States.mem m p) pi in
+  assert (Int.equal 1 (Partition.cardinal bisims));
+  let states : States.t = List.hd (Partition.to_list bisims) in
+  (match n with None -> () | Some n -> assert (States.mem n states));
+  states
+;;
+
+let handle_eexists
+      (gl : Proofview.Goal.t)
+      ({ the_fsm_1 = m; the_fsm_2 = n; bisim_states; _ } :
+        Algorithms.Bisimilar.result)
+      ({ from = m1; action = mA; dest = m2 } : transition)
+      ({ from = n1; action = nA; dest = n2 } : transition)
+      (cm2 : State.t)
+  : unit Proofview.tactic
+  =
+  match m2, n2 with
+  | Some m2, None ->
+    assert (State.eq m2 cm2);
+    assert (Action.eq ~annos:false ~meta:false mA nA);
+    let _from_states = get_bisim_states m1 (Some n1) bisim_states in
+    let dest_states = get_bisim_states m2 n2 bisim_states in
+    let n_actions_all = Edges.find n.edges n1 in
+    let n_actions = Actions.copy n_actions_all in
+    Actions.filter_map_inplace
+      (fun action dests ->
+        match Action.eq ~annos:false ~meta:false nA action with
+        | false -> None
+        | true -> Some dests)
+      n_actions;
+    let n_dests = Actions.find n_actions nA in
+    let n_candidates = States.inter n_dests dest_states in
+    if Int.equal 1 (States.cardinal n_candidates)
+    then (
+      let n2 : EConstr.t =
+        enc_to_econstr (fst (List.hd (States.to_list n_candidates)))
+      in
+      Log.debug
+        (Printf.sprintf
+           "mebi_bisim.handle_eexists, n2:\n%s"
+           (Strfy.econstr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl) n2));
+      (* let _, n2 = Typing.solve_evars (Proofview.Goal.env gl) (Proofview.Goal.sigma gl) n2 in *)
+      (* TODO: how to apply [exists n2] *)
+      (*  *)
+      (* NOTE: Error: Not convertible *)
+      (* let t = Eauto.e_give_exact n2 in *)
+      (* let t = Tactics.exact_check n2 in *)
+      (* NOTE: Error In environment *)
+      (* let t = Tactics.apply_type ~typecheck:true (Mebi_theories.c_ex_intro ()) [ n2 ] in *)
+      (* NOTE: Error: unable to find an instance for the variable x *)
+      (* let t = Tactics.apply (Mebi_theories.c_ex_intro ()) in *)
+      (* NOTE: successfully does [eexists], but how to apply [n2]? *)
+      let t = Tactics.eapply (Mebi_theories.c_ex_intro ()) in
+      (* NOTE: niether of the below work (Error In environment) *)
+      (* let t = Tactics.eapply n2 in *)
+      (* let t = Tactics.apply n2 in *)
+      t)
+    else (
+      Log.warning
+        (Printf.sprintf
+           "mebi_bisim.handle_eexists, more than one candidate for n2: \
+            (skipping)\n\
+            %s"
+           (Strfy.states n_candidates));
+      Proofview.tclUNIT ())
+  | _, _ -> raise (CannotUnpackTransitionsOfMN ())
+;;
 
 let iter_loop (r : Algorithms.Bisimilar.result) : unit Proofview.tactic =
   Proofview.Goal.enter (fun (x : Proofview.Goal.t) ->
@@ -463,7 +451,8 @@ let iter_loop (r : Algorithms.Bisimilar.result) : unit Proofview.tactic =
     | Cofixes cs ->
       Log.notice "mebi_bisim.iter_loop, hyp cofixes";
       Proofview.tclUNIT ()
-    | H_Transition t ->
+    | H_Transition mt ->
+      Log.notice "mebi_bisim.iter_loop, H_transition mt";
       (match handle_concl x r with
        | New_Weak_Sim -> handle_new_cofix x
        | Weak_Transition _t ->
@@ -472,70 +461,17 @@ let iter_loop (r : Algorithms.Bisimilar.result) : unit Proofview.tactic =
        | LTS_Transition _t ->
          Log.notice "mebi_bisim.iter_loop, LTS_Transition _t (does nothing)";
          Proofview.tclUNIT ()
-       | Exists (_nt, _m2) ->
+       | Exists (nt, m2) ->
          Log.notice
-           (Printf.sprintf
-              "mebi_bisim.iter_loop, Exists (_nt, _m) (does nothing)\n\
-               TODO: use the destination of transition H to find bisimilar \
-               states, which are reachable from the beginning of transition Nt.\n\
-               where H:\n\
-               - from: %s\n\
-               - action: %s\n\
-               - dest: %s\n\
-               and Nt begins with:\n\
-               %s"
-              (Strfy.state t.from)
-              (Strfy.action t.action)
-              (Strfy.option Strfy.state t.dest)
-              (Strfy.state _nt.from));
-         Log.debug
-           (Printf.sprintf
-              "m2:\n%s\n\nnt:\n- from: %s\n- action: %s\n- dest: %s"
-              (Strfy.state _m2)
-              (Strfy.state _nt.from)
-              (Strfy.action _nt.action)
-              (Strfy.option Strfy.state _nt.dest));
-         Proofview.tclUNIT ()
-         (* match iter_concl r x with
-            | None ->
-            Log.warning "mebi_bisim.iter_loop, Nothing to do";
-            Proofview.tclUNIT ()
-            | Some p ->
-            Log.notice "mebi_bisim.iter_loop, Some concl to do";
-            Proofview.tclUNIT () *)))
+           "mebi_bisim.iter_loop, Exists (nt m2) (TODO: figure out how to do \
+            `exists n2` from mebi_bisim.handle_eexists)";
+         handle_eexists x r mt nt m2))
 ;;
 
 let loop_test () : unit Proofview.tactic =
   Log.debug "mebi_bisim.get_test";
   let the_result = get_the_result () in
-  (* let iter = iter_loop !the_result in
-     return iter *)
   Proofview.tclTHEN
     (iter_loop !the_result)
     (Mebi_tactics.simplify_and_subst_all ())
 ;;
-(* let iter_body (i:int) (acc:unit Proofview.tactic) =
-
-   return (Proofview.tactic acc) in
-   iterate 0 1 (unit Proofview.tactic) iter_body *)
-
-(*return
-  (
-
-  Proofview.Goal.enter (fun (x : Proofview.Goal.t) ->
-  proof_loop !the_result x
-  (* Log.debug "mebi_bisim.get_test A";
-  match determine_proof_state x with
-  | Some p ->
-  (* NOTE: temporary *)
-  let _ = handle_concl x !the_result in
-  let _ = handle_hyps x !the_result in
-  (match p with
-  | CheckCofix -> Proofview.tclUNIT ()
-  | NewIter -> Proofview.tclUNIT ())
-  (* NOTE: [determine_proof_state] will not be an option *)
-  | None -> Proofview.tclUNIT () *)
-  (* let _ = handle_concl x !the_result in
-  let _ = handle_hyps x !the_result in
-  Proofview.tclUNIT () *)
-  )) *)

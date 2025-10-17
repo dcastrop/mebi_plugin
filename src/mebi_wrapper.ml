@@ -206,33 +206,71 @@ let econstr_eq (a : EConstr.t) (b : EConstr.t) : bool mm =
   return (Eq.econstr sigma a b)
 ;;
 
+let is_none_term (x : EConstr.t) : bool mm =
+  fun (state : wrapper ref) ->
+  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
+  { state; value = Mebi_theories.is_constant sigma x Mebi_theories.c_None }
+;;
+
+(* let env : Environ.env = !(!state.coq_ref).coq_env in
+  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
+  let sigma, y = Mebi_setup.the_none_term env sigma in
+  state
+  := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
+  (* Log.debug
+     (Printf.sprintf
+     "mebi_wrapper.is_none_term, kind\n%s"
+     (Strfy.econstr_kind env sigma (Mebi_theories.c_None ()))); *)
+  match Constr.kind (Mebi_setup.Convert.econstr_to_constr sigma x) with
+  | App (cx, _) ->
+    let cy = Mebi_setup.Convert.econstr_to_constr sigma y in
+    Log.debug
+      (Printf.sprintf
+         "mebi_wrapper.is_none_term\n\
+          - x: %s\n\
+          - none: %s\n\
+          - econstr equal: %b\n\
+          - constr equal: %b"
+         (Strfy.econstr env sigma x)
+         (Strfy.econstr env sigma (Mebi_theories.c_None ()))
+         (Mebi_setup.Eq.econstr sigma x y)
+         (Mebi_setup.Eq.constr cx cy));
+    { state; value = Mebi_setup.Eq.constr cx cy }
+  | _ -> { state; value = false } *)
+
 let type_of_econstr (t : EConstr.t) : EConstr.t mm =
-  fun (st : wrapper ref) ->
-  let coq_st : coq_context ref = !st.coq_ref in
-  let env : Environ.env = !coq_st.coq_env in
-  let sigma : Evd.evar_map = !coq_st.coq_ctx in
+  fun (state : wrapper ref) ->
+  let env : Environ.env = !(!state.coq_ref).coq_env in
+  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
   let t : EConstr.t = Reductionops.nf_all env sigma t in
   let sigma, t = Typing.type_of env sigma t in
-  coq_st := { !coq_st with coq_ctx = sigma };
-  { state = st; value = t }
+  (* let coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } in *)
+  (* state := { !state with coq_ref }; *)
+  state
+  := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
+  { state; value = t }
 
 and new_evar_of_econstr (t : EConstr.t) : EConstr.t mm =
-  fun (st : wrapper ref) ->
-  let coq_st : coq_context ref = !st.coq_ref in
-  let env : Environ.env = !coq_st.coq_env in
-  let sigma : Evd.evar_map = !coq_st.coq_ctx in
+  fun (state : wrapper ref) ->
+  let env : Environ.env = !(!state.coq_ref).coq_env in
+  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
   let sigma, instance = Evarutil.new_evar env sigma t in
-  coq_st := { !coq_st with coq_ctx = sigma };
-  { state = st; value = instance }
+  (* coq_st := { !coq_st with coq_ctx = sigma }; *)
+  (* { state = st; value = instance } *)
+  state
+  := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
+  { state; value = t }
 
 and constrexpr_to_econstr (t : Constrexpr.constr_expr) : EConstr.t mm =
-  fun (st : wrapper ref) ->
-  let coq_st : coq_context ref = !st.coq_ref in
-  let env : Environ.env = !coq_st.coq_env in
-  let sigma : Evd.evar_map = !coq_st.coq_ctx in
+  fun (state : wrapper ref) ->
+  let env : Environ.env = !(!state.coq_ref).coq_env in
+  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
   let sigma, t = Convert.constrexpr_to_econstr env sigma t in
-  coq_st := { !coq_st with coq_ctx = sigma };
-  { state = st; value = t }
+  (* coq_st := { !coq_st with coq_ctx = sigma };
+  { state = st; value = t } *)
+  state
+  := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
+  { state; value = t }
 
 and econstr_to_constr ?(abort_on_undefined_evars : bool = false) (x : EConstr.t)
   : Constr.t mm
@@ -252,12 +290,11 @@ and globref_to_econstr (x : Names.GlobRef.t) : EConstr.t mm =
   return (Convert.globref_to_econstr env x)
 
 and normalize_econstr (t : EConstr.t) : EConstr.t mm =
-  fun (st : wrapper ref) ->
-  let coq_st : coq_context ref = !st.coq_ref in
-  let env : Environ.env = !coq_st.coq_env in
-  let sigma : Evd.evar_map = !coq_st.coq_ctx in
+  fun (state : wrapper ref) ->
+  let env : Environ.env = !(!state.coq_ref).coq_env in
+  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
   let t : EConstr.t = Reductionops.nf_all env sigma t in
-  { state = st; value = t }
+  { state; value = t }
 ;;
 
 (**********************************)
@@ -1168,39 +1205,6 @@ let rec pstr_decoded_tree (t1 : decoded_tree) : string =
        | 0 -> ""
        | 1 -> pstr_decoded_tree (List.hd rhs_int_tree_list)
        | _ -> Strfy.list pstr_decoded_tree rhs_int_tree_list)
-;;
-
-(**********************************)
-(****** COQ NONE TYPE *************)
-(**********************************)
-
-let the_none_term () : EConstr.t mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  let sigma, the_none =
-    Evd.fresh_global !coq_st.coq_env !coq_st.coq_ctx (the_none_ref ())
-  in
-  coq_st := { !coq_st with coq_ctx = sigma };
-  { state = st; value = the_none }
-;;
-
-(* let load_none_term () : unit mm =
-   let open Syntax in
-   let* none : EConstr.t = the_none_term () in
-   let* _ = encode none in
-   return ()
-   ;; *)
-
-let is_none_term (t : EConstr.t) : bool mm =
-  let open Syntax in
-  let* t : Constr.t = econstr_to_constr t in
-  match Constr.kind t with
-  | App (t, _) ->
-    let* none : EConstr.t = the_none_term () in
-    (* let* _ = encode none in *)
-    let* n : Constr.t = econstr_to_constr none in
-    return (Constr.equal n t)
-  | _ -> return false
 ;;
 
 (**********************************)

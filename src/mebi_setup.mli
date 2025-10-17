@@ -1,11 +1,6 @@
-type hyp =
-  ( Evd.econstr,
-    Evd.econstr,
-    Evd.erelevance )
-  Context.Named.Declaration.pt
+
 
 val enable_logging : bool ref
-val the_none_ref : unit -> Names.GlobRef.t
 
 type coq_context = {
   coq_env : Environ.env;
@@ -192,6 +187,8 @@ module Eq : sig
 
   val econstr :
     Evd.evar_map -> Evd.econstr -> Evd.econstr -> bool
+  val constr :
+    Constr.t -> Constr.t -> bool
 end
 
 module Convert : sig

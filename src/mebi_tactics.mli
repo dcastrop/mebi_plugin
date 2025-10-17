@@ -6,7 +6,7 @@ val update_proof_by_tactics :
   unit Proofview.tactic list ->
   Declare.Proof.t
 
-val do_inversion : Mebi_setup.hyp -> unit Proofview.tactic
+val do_inversion : Mebi_theories.hyp -> unit Proofview.tactic
 val subst_all : unit -> unit Proofview.tactic
 val simplify_all : unit -> unit Proofview.tactic
 val simplify_and_subst_all : unit -> unit Proofview.tactic

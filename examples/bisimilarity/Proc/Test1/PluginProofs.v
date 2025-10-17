@@ -48,8 +48,8 @@ Proof.
   MeBiSim Begin termLTS p And termLTS q Using termLTS. (* unfold p, q. *)
   MeBiSim ProofStep. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
   MeBiSim ProofStep. (* inversion H; simpl in *. *)
-  MeBiSim ProofStep.
-  MeBiSim ProofStep.
+  MeBiSim ProofStep. (* eexists. -> but we want -> exists n2 *)
+  (* MeBiSim ProofStep. *) (* NOTE: breaks -- fix previous step *)
   (* MeBiSim ProofStep.
   MeBiSim ProofStep.
   MeBiSim ProofStep.

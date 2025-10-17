@@ -1,5 +1,7 @@
 open Logging
 
+type hyp = (EConstr.t, EConstr.t, Evd.erelevance) Context.Named.Declaration.pt
+
 (* source: https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto3/src/tuto_tactic.ml *)
 
 let constants : EConstr.t list ref = ref ([] : EConstr.t list)
@@ -11,8 +13,6 @@ let constants : EConstr.t list ref = ref ([] : EConstr.t list)
 let find_reference = Coqlib.find_reference [@ocaml.warning "-3"]
 
 (****************************************************************************)
-
-(* NOTE: for handling *)
 
 (****************************************************************************)
 
@@ -67,6 +67,11 @@ let collect_bisimilarity_theories () : EConstr.t list =
             "MEBI"
             [ "Coq"; "Relations"; "Relation_Operators" ]
             "clos_trans_1n"
+        ; find_reference "MEBI" [ "Coq"; "Init"; "Datatypes" ] "option"
+        ; find_reference "MEBI" [ "Coq"; "Init"; "Datatypes" ] "None"
+        ; find_reference "MEBI" [ "Coq"; "Init"; "Datatypes" ] "Some"
+        ; find_reference "MEBI" [ "Coq"; "Init"; "Logic" ] "ex"
+        ; find_reference "MEBI" [ "Coq"; "Init"; "Logic" ] "ex_intro"
         ]
     in
     constants := new_constants;
@@ -250,7 +255,7 @@ let c_clos_refl_trans_1n () : EConstr.t =
   | None ->
     failwith
       "could not obtain an internal representation of \
-       Relations.Relation_Definitions.clos_refl_trans_1n"
+       Relations.Relation_Operators.clos_refl_trans_1n"
   | Some c -> c
 ;;
 
@@ -261,7 +266,7 @@ let c_rt1n_refl () : EConstr.t =
   | None ->
     failwith
       "could not obtain an internal representation of \
-       Relations.Relation_Definitions.rt1n_refl"
+       Relations.Relation_Operators.c_clos_refl_trans_1n.rt1n_refl"
   | Some c -> c
 ;;
 
@@ -272,7 +277,7 @@ let c_rt1n_trans () : EConstr.t =
   | None ->
     failwith
       "could not obtain an internal representation of \
-       Relations.Relation_Definitions.rt1n_trans"
+       Relations.Relation_Operators.c_clos_refl_trans_1n.rt1n_trans"
   | Some c -> c
 ;;
 
@@ -283,55 +288,70 @@ let c_clos_trans_1n () : EConstr.t =
   | None ->
     failwith
       "could not obtain an internal representation of \
-       Relations.Relation_Definitions.clos_trans_1n"
+       Relations.Relation_Operators.clos_trans_1n"
   | Some c -> c
 ;;
 
-(******)
-
-type theory_kind =
-  | Theories_LTS
-  | Theories_tau
-  | Theories_silent
-  | Theories_silent1
-  | Theories_weak
-  | Theories_wk_some
-  | Theories_wk_none
-  | Theories_simF
-  | Theories_Pack_sim
-  | Theories_sim_weak
-  | Theories_weak_sim
-  | Theories_In_sim
-
-let match_theory_kind sigma : EConstr.t -> theory_kind option =
-  fun (x : EConstr.t) ->
-  let eq : EConstr.t -> bool = Mebi_setup.Eq.econstr sigma x in
-  if eq (c_LTS ())
-  then Some Theories_LTS
-  else if eq (c_tau ())
-  then Some Theories_tau
-  else if eq (c_silent ())
-  then Some Theories_silent
-  else if eq (c_silent1 ())
-  then Some Theories_silent1
-  else if eq (c_weak ())
-  then Some Theories_weak
-  else if eq (c_wk_some ())
-  then Some Theories_wk_some
-  else if eq (c_wk_none ())
-  then Some Theories_wk_none
-  else if eq (c_simF ())
-  then Some Theories_simF
-  else if eq (c_Pack_sim ())
-  then Some Theories_Pack_sim
-  else if eq (c_sim_weak ())
-  then Some Theories_sim_weak
-  else if eq (c_weak_sim ())
-  then Some Theories_weak_sim
-  else if eq (c_In_sim ())
-  then Some Theories_In_sim
-  else None
+let c_option () : EConstr.t =
+  Log.trace "mebi_theories.c_option";
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (19, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of Coq.Init.Datatypes.option"
+  | Some c -> c
 ;;
+
+let c_None () : EConstr.t =
+  Log.trace "mebi_theories.c_None";
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (20, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Coq.Init.Datatypes.option.None"
+  | Some c -> c
+;;
+
+let c_Some () : EConstr.t =
+  Log.trace "mebi_theories.c_Some";
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (21, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Coq.Init.Datatypes.option.Some"
+  | Some c -> c
+;;
+
+let c_ex () : EConstr.t =
+  Log.trace "mebi_theories.c_ex";
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (22, cs) with
+  | None ->
+    failwith "could not obtain an internal representation of Coq.Init.Logic.ex"
+  | Some c -> c
+;;
+
+let c_ex_intro () : EConstr.t =
+  Log.trace "mebi_theories.c_ex_intro";
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (23, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Coq.Init.Logic.ex.ex_intro"
+  | Some c -> c
+;;
+
+let is_constant sigma (x : EConstr.t) (c : unit -> EConstr.t) : bool =
+  match Constr.kind (Mebi_setup.Convert.econstr_to_constr sigma x) with
+  | App (x, _) ->
+    Mebi_setup.Eq.constr x (Mebi_setup.Convert.econstr_to_constr sigma (c ()))
+  | _ -> false
+;;
+
+(******)
 
 let is_var sigma (x : EConstr.t) : bool =
   EConstr.isRef sigma x && EConstr.isVar sigma x
@@ -352,7 +372,8 @@ let get_hyp_names (gl : Proofview.Goal.t) : Names.Id.Set.t =
 
 let next_name_of (names : Names.Id.Set.t) : Names.Id.t -> Names.Id.t =
   fun x ->
-  Log.trace (Printf.sprintf "mebi_tactics.next_name_of (%s)" (Strfy.name_id x));
+  Log.trace
+    (Printf.sprintf "mebi_tactics.next_name_of (%s)" (Names.Id.to_string x));
   Namegen.next_ident_away x names
 ;;
 

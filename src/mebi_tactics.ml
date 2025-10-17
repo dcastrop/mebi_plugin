@@ -25,7 +25,7 @@ let rec update_proof_by_tactics (pstate : Declare.Proof.t)
 
 (*************************)
 
-let do_inversion (h : Mebi_setup.hyp) : unit Proofview.tactic =
+let do_inversion (h : Mebi_theories.hyp) : unit Proofview.tactic =
   Inv.inv_tac (Context.Named.Declaration.get_id h)
 ;;
 
@@ -34,7 +34,7 @@ let subst_all () : unit Proofview.tactic = Equality.subst_all ()
 let simplify_all () : unit Proofview.tactic =
   Proofview.Goal.enter (fun gl ->
     List.fold_left
-      (fun acc (h : Mebi_setup.hyp) ->
+      (fun acc (h : Mebi_theories.hyp) ->
         Proofview.tclTHEN
           acc
           (Tactics.simpl_in_hyp
