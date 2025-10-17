@@ -357,12 +357,6 @@ let is_var sigma (x : EConstr.t) : bool =
   EConstr.isRef sigma x && EConstr.isVar sigma x
 ;;
 
-let need_to_invert sigma (tys : EConstr.t array) : bool =
-  Bool.not
-    (List.is_empty
-       (List.filter (fun ty -> is_var sigma ty) (Array.to_list tys)))
-;;
-
 (*****************************************************************************)
 
 let get_hyp_names (gl : Proofview.Goal.t) : Names.Id.Set.t =

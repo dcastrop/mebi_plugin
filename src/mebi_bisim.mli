@@ -44,6 +44,7 @@ val find_label_of_enc :
   Mebi_wrapper.Enc.t -> Model.Alphabet.t -> Model.Alphabet.elt
 
 val econstr_to_enc : EConstr.t -> Mebi_wrapper.Enc.t
+val enc_to_econstr : Mebi_wrapper.Enc.t -> EConstr.t
 
 val econstr_to_enc_opt :
   Evd.evar_map -> EConstr.t -> Mebi_wrapper.Enc.t option
@@ -113,11 +114,13 @@ val handle_concl :
 
 type hyp_kind =
   | Cofix of hyp_cofix
-  | H_Inversion of unit Proofview.tactic
+  | H_Inversion_an2 of unit Proofview.tactic
+  | H_Inversion_a of unit Proofview.tactic
   | H_Transition of transition
   | Pass
 
-exception ExpectedOnlyOne_H_ToBeInverted of Mebi_theories.hyp list
+exception
+  ExpectedOnlyOne_H_ToBeInverted of Mebi_theories.hyp list
 
 val handle_hyp :
   Algorithms.Bisimilar.result ->
@@ -144,6 +147,29 @@ type proof_state = NewProof | NewCofix | NewTransition
 
 val determine_proof_state :
   Proofview.Goal.t -> proof_state option
+
+exception CannotUnpackTransitionsOfMN of unit
+
+val get_bisim_states :
+  Model.State.t ->
+  Model.State.t option ->
+  Model.Partition.t ->
+  Model.States.t
+
+val handle_eexists :
+  Proofview.Goal.t ->
+  Algorithms.Bisimilar.result ->
+  transition ->
+  transition ->
+  Model.State.t ->
+  unit Proofview.tactic
+
+val handle_weak_transition :
+  Proofview.Goal.t ->
+  Algorithms.Bisimilar.result ->
+  transition ->
+  transition ->
+  unit Proofview.tactic
 
 val iter_loop :
   Algorithms.Bisimilar.result -> unit Proofview.tactic

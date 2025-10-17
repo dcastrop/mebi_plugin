@@ -240,7 +240,8 @@ let handle_concl
 
 type hyp_kind =
   | Cofix of hyp_cofix
-  | H_Inversion of unit Proofview.tactic
+  | H_Inversion_an2 of unit Proofview.tactic
+  | H_Inversion_a of unit Proofview.tactic
   | H_Transition of transition
   | Pass
 
@@ -260,8 +261,29 @@ let handle_hyp
   then Cofix (get_cofix m n env sigma tys)
   else if Array.length tys < 3
   then Pass
-  else if Mebi_theories.need_to_invert sigma tys
-  then H_Inversion (Mebi_tactics.do_inversion h)
+  else if Mebi_theories.is_var sigma tys.(1)
+  then
+    if Mebi_theories.is_var sigma tys.(2)
+    then H_Inversion_an2 (Mebi_tactics.do_inversion h)
+    else
+      H_Inversion_a (Mebi_tactics.do_inversion h)
+      (* Log.debug
+         (Printf.sprintf
+         "mebi_bisim.handle_hyp, H_Inversion: %s\n%s"
+         (Strfy.econstr env sigma h_ty)
+         (Strfy.list
+         ~force_newline:true
+         (Strfy.tuple
+         (Strfy.tuple (Strfy.tuple Strfy.bool Strfy.bool) Strfy.bool)
+         (Strfy.econstr env sigma))
+         (Array.fold_left
+         (fun acc e ->
+         ( ( (EConstr.isRef sigma e, EConstr.isVar sigma e)
+         , EConstr.isEvar sigma e )
+         , e )
+         :: acc)
+         []
+         tys))); *)
   else H_Transition (get_lts_transition m sigma tys)
 ;;
 
@@ -278,27 +300,34 @@ let handle_hyps (gl : Proofview.Goal.t) (r : Algorithms.Bisimilar.result)
   let env : Environ.env = Proofview.Goal.env gl in
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   let hyps : Mebi_theories.hyp list = Proofview.Goal.hyps gl in
-  let the_hyps : unit Proofview.tactic option * hyp_cofix list * transition list
+  let the_hyps
+    : (unit Proofview.tactic * bool) option * hyp_cofix list * transition list
     =
     List.fold_left
       (fun (inversion, cofixes, hs) h ->
         match handle_hyp r env sigma h with
         | Cofix x -> inversion, x :: cofixes, hs
-        | H_Inversion p ->
+        | H_Inversion_a p ->
           (match inversion with
-           | None -> Some p, cofixes, hs
-           | Some p' ->
+           | None -> Some (p, false), cofixes, hs
+           | Some (p', false) -> Some (p, false), cofixes, hs
+           | Some (p', true) -> Some (p', true), cofixes, hs)
+        | H_Inversion_an2 p ->
+          (match inversion with
+           | None -> Some (p, true), cofixes, hs
+           | Some (p', false) -> Some (p, true), cofixes, hs
+           | Some (p', true) ->
              Log.warning
                "mebi_bisim.handle_hyps, handle_hyp returned H_Inversion when \
                 one already found. (replacing)";
-             Some p, cofixes, hs)
+             Some (p, true), cofixes, hs)
         | H_Transition t -> inversion, cofixes, t :: hs
         | Pass -> inversion, cofixes, hs)
       (None, [], [])
       hyps
   in
   match the_hyps with
-  | Some inv, _, _ -> Do_Inversion inv
+  | Some (inv, _), _, _ -> Do_Inversion inv
   | None, _, h :: [] -> H_Transition h
   | None, _, h :: tl ->
     Log.warning
@@ -408,26 +437,13 @@ let handle_eexists
       let n2 : EConstr.t =
         enc_to_econstr (fst (List.hd (States.to_list n_candidates)))
       in
-      Log.debug
-        (Printf.sprintf
-           "mebi_bisim.handle_eexists, n2:\n%s"
-           (Strfy.econstr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl) n2));
-      (* let _, n2 = Typing.solve_evars (Proofview.Goal.env gl) (Proofview.Goal.sigma gl) n2 in *)
-      (* TODO: how to apply [exists n2] *)
-      (*  *)
-      (* NOTE: Error: Not convertible *)
-      (* let t = Eauto.e_give_exact n2 in *)
-      (* let t = Tactics.exact_check n2 in *)
-      (* NOTE: Error In environment *)
-      (* let t = Tactics.apply_type ~typecheck:true (Mebi_theories.c_ex_intro ()) [ n2 ] in *)
-      (* NOTE: Error: unable to find an instance for the variable x *)
-      (* let t = Tactics.apply (Mebi_theories.c_ex_intro ()) in *)
-      (* NOTE: successfully does [eexists], but how to apply [n2]? *)
-      let t = Tactics.eapply (Mebi_theories.c_ex_intro ()) in
-      (* NOTE: niether of the below work (Error In environment) *)
-      (* let t = Tactics.eapply n2 in *)
-      (* let t = Tactics.apply n2 in *)
-      t)
+      (* Log.debug
+         (Printf.sprintf
+         "mebi_bisim.handle_eexists, n2:\n%s"
+         (Strfy.econstr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl) n2)); *)
+      let n2bindings = Tactypes.ImplicitBindings [ n2 ] in
+      let t = Tactics.constructor_tac true None 1 n2bindings in
+      Proofview.tclTHEN t (Tactics.split Tactypes.NoBindings))
     else (
       Log.warning
         (Printf.sprintf
@@ -436,6 +452,29 @@ let handle_eexists
             %s"
            (Strfy.states n_candidates));
       Proofview.tclUNIT ())
+  | _, _ -> raise (CannotUnpackTransitionsOfMN ())
+;;
+
+let handle_weak_transition
+      (gl : Proofview.Goal.t)
+      ({ the_fsm_1 = m; the_fsm_2 = n; _ } : Algorithms.Bisimilar.result)
+      ({ from = m1; action = mA; dest = m2 } : transition)
+      ({ from = n1; action = nA; dest = n2 } : transition)
+  : unit Proofview.tactic
+  =
+  match m2, n2 with
+  | Some m2, Some n2 ->
+    Proofview.tclTHEN
+      (Mebi_tactics.apply (Mebi_theories.c_wk_none ()))
+      (Proofview.tclTHEN
+         (Mebi_tactics.unfold_econstr
+            gl
+            (match Action.Label.is_silent mA.label with
+             | Some true -> Mebi_theories.c_silent ()
+             | _ -> Mebi_theories.c_silent1 ()))
+         (if State.eq n1 n2
+          then Mebi_tactics.apply (Mebi_theories.c_rt1n_refl ())
+          else Mebi_tactics.apply (Mebi_theories.c_rt1n_trans ())))
   | _, _ -> raise (CannotUnpackTransitionsOfMN ())
 ;;
 
@@ -454,17 +493,17 @@ let iter_loop (r : Algorithms.Bisimilar.result) : unit Proofview.tactic =
     | H_Transition mt ->
       Log.notice "mebi_bisim.iter_loop, H_transition mt";
       (match handle_concl x r with
-       | New_Weak_Sim -> handle_new_cofix x
-       | Weak_Transition _t ->
-         Log.notice "mebi_bisim.iter_loop, Weak_Transition _t (does nothing)";
-         Proofview.tclUNIT ()
+       | New_Weak_Sim ->
+         Log.notice "mebi_bisim.iter_loop, New_Weak_Sim";
+         handle_new_cofix x
+       | Weak_Transition nt ->
+         Log.notice "mebi_bisim.iter_loop, Weak_Transition nt";
+         handle_weak_transition x r mt nt
        | LTS_Transition _t ->
          Log.notice "mebi_bisim.iter_loop, LTS_Transition _t (does nothing)";
          Proofview.tclUNIT ()
        | Exists (nt, m2) ->
-         Log.notice
-           "mebi_bisim.iter_loop, Exists (nt m2) (TODO: figure out how to do \
-            `exists n2` from mebi_bisim.handle_eexists)";
+         Log.notice "mebi_bisim.iter_loop, Exists n2";
          handle_eexists x r mt nt m2))
 ;;
 
