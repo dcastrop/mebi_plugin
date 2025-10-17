@@ -40,7 +40,6 @@ val is_constant :
   Evd.evar_map -> EConstr.t -> (unit -> EConstr.t) -> bool
 
 val is_var : Evd.evar_map -> EConstr.t -> bool
-val need_to_invert : Evd.evar_map -> EConstr.t array -> bool
 val get_hyp_names : Proofview.Goal.t -> Names.Id.Set.t
 
 val next_name_of :

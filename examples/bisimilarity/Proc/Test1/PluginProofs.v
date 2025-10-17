@@ -40,6 +40,7 @@ MeBi Set FailIfNotBisim True.
 (* MeBi See All.  *)
 (* MeBi Set ShowAny False. *)
 
+Require Import Logic.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
@@ -48,8 +49,15 @@ Proof.
   MeBiSim Begin termLTS p And termLTS q Using termLTS. (* unfold p, q. *)
   MeBiSim ProofStep. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
   MeBiSim ProofStep. (* inversion H; simpl in *. *)
-  MeBiSim ProofStep. (* eexists. -> but we want -> exists n2 *)
-  (* MeBiSim ProofStep. *) (* NOTE: breaks -- fix previous step *)
+  MeBiSim ProofStep. (* exists n2 *)
+  MeBiSim ProofStep. (* apply wk_none. apply rt1n_refl. *)
+  MeBiSim ProofStep. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
+  MeBiSim ProofStep. (* inversion H; simpl in *. *)
+  MeBiSim ProofStep. (* inversion H0; simpl in *. *)
+  (* MeBiSim ProofStep. *)
+
+
+  (* MeBiSim ProofStep. *) 
   (* MeBiSim ProofStep.
   MeBiSim ProofStep.
   MeBiSim ProofStep.
