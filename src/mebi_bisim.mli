@@ -17,89 +17,94 @@ type transition = {
 }
 
 exception
-  State_Of_Enc_NotFound of
-    (Mebi_wrapper.Enc.t * Model.States.t)
+  Enc_Of_EConstr_NotFound of (Evd.econstr * Model.States.t)
+
+exception State_Of_Enc_NotFound of (int * Model.States.t)
 
 exception
-  Error_Multiple_States_Of_Enc_Found of
-    (Mebi_wrapper.Enc.t * Model.States.t)
+  Error_Multiple_States_Of_Enc_Found of (int * Model.States.t)
 
-val find_state_of_enc :
-  Mebi_wrapper.Enc.t -> Model.States.t -> Model.State.t
+val find_state_of_enc : int -> Model.States.t -> Model.State.t
 
 val find_state_of_enc_opt :
-  Mebi_wrapper.Enc.t option ->
-  Model.States.t ->
-  Model.State.t option
+  int -> Model.States.t -> Model.State.t option
 
-exception
-  Label_Of_Enc_NotFound of
-    (Mebi_wrapper.Enc.t * Model.Alphabet.t)
+exception Label_Of_Enc_NotFound of (int * Model.Alphabet.t)
 
 exception
   Error_Multiple_Labels_Of_Enc_Found of
-    (Mebi_wrapper.Enc.t * Model.Alphabet.t)
+    (int * Model.Alphabet.t)
 
 val find_label_of_enc :
-  Mebi_wrapper.Enc.t -> Model.Alphabet.t -> Model.Alphabet.elt
+  int -> Model.Alphabet.t -> Model.Alphabet.elt
 
-val econstr_to_enc : EConstr.t -> Mebi_wrapper.Enc.t
-val enc_to_econstr : Mebi_wrapper.Enc.t -> EConstr.t
+val econstr_to_enc : Evd.econstr -> int
+val enc_to_econstr : int -> Evd.econstr
 
 val econstr_to_enc_opt :
-  Evd.evar_map -> EConstr.t -> Mebi_wrapper.Enc.t option
+  Evd.evar_map -> Evd.econstr -> int option
 
 val get_weak_transition :
-  Fsm.t -> Evd.evar_map -> EConstr.t array -> transition
+  Fsm.t -> Evd.evar_map -> Evd.econstr array -> transition
 
 val get_lts_transition :
-  Fsm.t -> Evd.evar_map -> EConstr.t array -> transition
+  Fsm.t -> Evd.evar_map -> Evd.econstr array -> transition
+
+val get_hyp_transition :
+  Fsm.t ->
+  Evd.evar_map ->
+  Evd.econstr array ->
+  transition option
 
 val get_cofix :
-  Fsm.t -> Fsm.t -> 'a -> 'b -> EConstr.t array -> hyp_cofix
+  Fsm.t -> Fsm.t -> 'a -> 'b -> Evd.econstr array -> hyp_cofix
 
-exception Invalid_KindOf_EConstr_Expected_Atomic of EConstr.t
+exception Invalid_KindOf_EConstr_Expected_Atomic of Evd.econstr
 
 val get_atomic_type :
-  Evd.evar_map -> EConstr.t -> EConstr.t * EConstr.t array
+  Evd.evar_map ->
+  Evd.econstr ->
+  Evd.econstr * Evd.econstr array
 
-exception Invalid_KindOf_EConstr_Expected_Lambda of EConstr.t
+exception Invalid_KindOf_EConstr_Expected_Lambda of Evd.econstr
 
 val get_lambda :
   Evd.evar_map ->
-  EConstr.t ->
+  Evd.econstr ->
   (Names.Name.t, Evd.erelevance) Context.pbinder_annot
-  * EConstr.t
-  * EConstr.t
+  * Evd.econstr
+  * Evd.econstr
 
-exception Invalid_KindOf_EConstr_Expected_App of EConstr.t
+exception Invalid_KindOf_EConstr_Expected_App of Evd.econstr
 
 val get_app :
-  Evd.evar_map -> EConstr.t -> EConstr.t * EConstr.t array
+  Evd.evar_map ->
+  Evd.econstr ->
+  Evd.econstr * Evd.econstr array
 
-exception UnhandledConcl of EConstr.t
+exception UnhandledConcl of Evd.econstr
 
 val try_get_weak_transition :
-  Proofview.Goal.t -> Fsm.t -> EConstr.t -> transition option
+  Proofview.Goal.t -> Fsm.t -> Evd.econstr -> transition option
 
 val try_get_weak_sim :
-  Proofview.Goal.t -> EConstr.t -> unit option
+  Proofview.Goal.t -> Evd.econstr -> unit option
 
 val try_get_m_state_weak_sim :
   Proofview.Goal.t ->
   Fsm.t ->
-  EConstr.t ->
+  Evd.econstr ->
   Model.State.t option
 
 val try_get_exists :
   Proofview.Goal.t ->
   Fsm.t ->
   Fsm.t ->
-  EConstr.t ->
+  Evd.econstr ->
   (transition * Model.State.t) option
 
 val try_get_lts_transition :
-  Proofview.Goal.t -> Fsm.t -> EConstr.t -> transition option
+  Proofview.Goal.t -> Fsm.t -> Evd.econstr -> transition option
 
 type concl_result =
   | New_Weak_Sim
@@ -138,10 +143,12 @@ type hyp_result =
 val handle_hyps :
   Proofview.Goal.t -> Algorithms.Bisimilar.result -> hyp_result
 
+val get_all_cofix : Proofview.Goal.t -> Names.Id.Set.t
+val get_all_non_cofix : Proofview.Goal.t -> Names.Id.Set.t
+val clear_old_hyps : Proofview.Goal.t -> unit Proofview.tactic
+
 val handle_new_cofix :
   Proofview.Goal.t -> unit Proofview.tactic
-
-val get_all_cofix : Proofview.Goal.t -> Names.Id.Set.t
 
 type proof_state = NewProof | NewCofix | NewTransition
 

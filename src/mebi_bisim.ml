@@ -37,6 +37,7 @@ type transition =
   ; dest : State.t option
   }
 
+exception Enc_Of_EConstr_NotFound of (EConstr.t * States.t)
 exception State_Of_Enc_NotFound of (Enc.t * States.t)
 exception Error_Multiple_States_Of_Enc_Found of (Enc.t * States.t)
 
@@ -51,8 +52,16 @@ let find_state_of_enc (x : Enc.t) (s : States.t) : State.t =
   | _ :: _ -> raise (Error_Multiple_States_Of_Enc_Found (x, s))
 ;;
 
-let find_state_of_enc_opt (x : Enc.t option) (s : States.t) : State.t option =
-  match x with None -> None | Some x -> Some (find_state_of_enc x s)
+let find_state_of_enc_opt (x : Enc.t) (s : States.t) : State.t option =
+  (* match x with None -> None | Some x -> Some (find_state_of_enc x s) *)
+  match
+    List.filter
+      (fun ((y, _) : State.t) -> Mebi_setup.Eq.enc x y)
+      (States.to_list s)
+  with
+  | h :: [] -> Some h
+  | [] -> None
+  | _ :: _ -> raise (Error_Multiple_States_Of_Enc_Found (x, s))
 ;;
 
 exception Label_Of_Enc_NotFound of (Enc.t * Alphabet.t)
@@ -73,32 +82,41 @@ let econstr_to_enc : EConstr.t -> Enc.t =
   fun (x : EConstr.t) -> run ~keep_encoding:true ~fresh:false (get_encoding x)
 ;;
 
+let econstr_to_enc_opt : EConstr.t -> Enc.t option =
+  fun (x : EConstr.t) ->
+  run ~keep_encoding:true ~fresh:false (get_encoding_opt x)
+;;
+
 let enc_to_econstr : Enc.t -> EConstr.t =
   fun (x : Enc.t) -> run ~keep_encoding:true ~fresh:false (get_decoding x)
 ;;
 
+(* let econstr_to_enc_opt (sigma : Evd.evar_map) : EConstr.t -> Enc.t option =
+   fun (x : EConstr.t) ->
+   if EConstr.isRel sigma x then None else Some (econstr_to_enc x)
+   ;; *)
+
 let econstr_to_enc_opt (sigma : Evd.evar_map) : EConstr.t -> Enc.t option =
   fun (x : EConstr.t) ->
-  (* if EConstr.isEvar sigma x *)
-  if EConstr.isRel sigma x then None else Some (econstr_to_enc x)
+  if EConstr.isRel sigma x then None else econstr_to_enc_opt x
 ;;
 
 let get_weak_transition (m : Fsm.t) sigma (tys : EConstr.t array) : transition =
-  Log.trace "mebi_bisim.get_weak_transition";
+  Log.debug "mebi_bisim.get_weak_transition";
   let from = find_state_of_enc (econstr_to_enc tys.(3)) m.states in
   let action =
     get_action_with_label
       (get_actions_from from m.edges)
       (find_label_of_enc (econstr_to_enc tys.(5)) m.alphabet)
   in
-  let dest =
-    find_state_of_enc_opt (econstr_to_enc_opt sigma tys.(4)) m.states
-  in
-  { from; action; dest }
+  match econstr_to_enc_opt sigma tys.(4) with
+  | None -> { from; action; dest = None }
+  | Some dest_enc ->
+    { from; action; dest = find_state_of_enc_opt dest_enc m.states }
 ;;
 
 let get_lts_transition (m : Fsm.t) sigma (tys : EConstr.t array) : transition =
-  Log.trace "mebi_bisim.get_lts_transition";
+  Log.debug "mebi_bisim.get_lts_transition";
   (* Log.debug
      (Printf.sprintf "mebi_bisim.get_lts_transition, %i" (Array.length tys)); *)
   let from = find_state_of_enc (econstr_to_enc tys.(0)) m.states in
@@ -107,16 +125,43 @@ let get_lts_transition (m : Fsm.t) sigma (tys : EConstr.t array) : transition =
       (get_actions_from from m.edges)
       (find_label_of_enc (econstr_to_enc tys.(1)) m.alphabet)
   in
-  let dest =
-    find_state_of_enc_opt (econstr_to_enc_opt sigma tys.(2)) m.states
-  in
-  { from; action; dest }
+  match econstr_to_enc_opt sigma tys.(2) with
+  | None -> raise (Enc_Of_EConstr_NotFound (tys.(2), m.states))
+  | Some dest_enc ->
+    let dest = find_state_of_enc_opt dest_enc m.states in
+    { from; action; dest }
+;;
+
+let get_hyp_transition (m : Fsm.t) sigma (tys : EConstr.t array)
+  : transition option
+  =
+  Log.debug "mebi_bisim.get_hyp_transition";
+  match econstr_to_enc_opt sigma tys.(0) with
+  | None -> None
+  | Some from_enc ->
+    (match find_state_of_enc_opt from_enc m.states with
+     | None -> None
+     | Some from ->
+       (match econstr_to_enc_opt sigma tys.(1) with
+        | None -> raise (Enc_Of_EConstr_NotFound (tys.(2), m.states))
+        | Some action_enc ->
+          (match econstr_to_enc_opt sigma tys.(2) with
+           | None -> None
+           | Some dest_enc ->
+             Some
+               { from
+               ; action =
+                   get_action_with_label
+                     (get_actions_from from m.edges)
+                     (find_label_of_enc action_enc m.alphabet)
+               ; dest = find_state_of_enc_opt dest_enc m.states
+               })))
 ;;
 
 let get_cofix (m : Fsm.t) (n : Fsm.t) env sigma (tys : EConstr.t array)
   : hyp_cofix
   =
-  Log.trace "mebi_bisim.get_cofix";
+  Log.debug "mebi_bisim.get_cofix";
   { m = find_state_of_enc (econstr_to_enc tys.(5)) m.states
   ; n = find_state_of_enc (econstr_to_enc tys.(6)) n.states
   }
@@ -261,30 +306,19 @@ let handle_hyp
   then Cofix (get_cofix m n env sigma tys)
   else if Array.length tys < 3
   then Pass
+  else if Mebi_theories.is_var sigma tys.(2)
+  then (
+    Log.debug "mebi_bisim.handle_hyp, H_Inversion_an2";
+    H_Inversion_an2 (Mebi_tactics.do_inversion h))
   else if Mebi_theories.is_var sigma tys.(1)
-  then
-    if Mebi_theories.is_var sigma tys.(2)
-    then H_Inversion_an2 (Mebi_tactics.do_inversion h)
-    else
-      H_Inversion_a (Mebi_tactics.do_inversion h)
-      (* Log.debug
-         (Printf.sprintf
-         "mebi_bisim.handle_hyp, H_Inversion: %s\n%s"
-         (Strfy.econstr env sigma h_ty)
-         (Strfy.list
-         ~force_newline:true
-         (Strfy.tuple
-         (Strfy.tuple (Strfy.tuple Strfy.bool Strfy.bool) Strfy.bool)
-         (Strfy.econstr env sigma))
-         (Array.fold_left
-         (fun acc e ->
-         ( ( (EConstr.isRef sigma e, EConstr.isVar sigma e)
-         , EConstr.isEvar sigma e )
-         , e )
-         :: acc)
-         []
-         tys))); *)
-  else H_Transition (get_lts_transition m sigma tys)
+  then (
+    Log.debug "mebi_bisim.handle_hyp, H_Inversion_a";
+    H_Inversion_a (Mebi_tactics.do_inversion h))
+  else (
+    Log.debug "mebi_bisim.handle_hyp, H_Transition";
+    match get_hyp_transition m sigma tys with
+    | None -> Pass
+    | Some t -> H_Transition t)
 ;;
 
 type hyp_result =
@@ -469,7 +503,11 @@ let handle_weak_transition
   match m2, n2 with
   | Some m2, Some n2 ->
     Mebi_theories.tactics
-      [ Mebi_tactics.apply (Mebi_theories.c_wk_none ())
+      [ (match Action.Label.is_silent mA.label with
+         | Some true -> Mebi_tactics.apply (Mebi_theories.c_wk_none ())
+         | _ -> Mebi_tactics.eapply (Mebi_theories.c_wk_some ()))
+        (* TODO: need to be smarter about applying silent, maybe do this on an iteration. *)
+        (* TODO: then we will use the constructors from the bisim result *)
       ; Mebi_tactics.unfold_econstr
           gl
           (match Action.Label.is_silent mA.label with
@@ -513,6 +551,8 @@ let iter_loop (r : Algorithms.Bisimilar.result) : unit Proofview.tactic =
 
 let loop_test () : unit Proofview.tactic =
   Log.debug "mebi_bisim.get_test";
+  (* Mebi_wrapper.show_fwd_map (); *)
+  (* Mebi_wrapper.show_bck_map (); *)
   let the_result = get_the_result () in
   Mebi_theories.tactics
     [ iter_loop !the_result; Mebi_tactics.simplify_and_subst_all () ]

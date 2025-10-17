@@ -1320,62 +1320,68 @@ let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
     sigma, ())
 ;;
 
-let show_fwd_map () : unit mm =
-  let open Syntax in
-  let* env = get_env in
-  let* sigma = get_sigma in
-  let* fwd_map = get_fwd_enc in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.show_fwd_map: \n%s"
-       (Strfy.list
-          ~force_newline:true
-          (Strfy.tuple
+let show_fwd_map () : unit =
+  run
+    ~keep_encoding:true
+    ~fresh:false
+    (let open Syntax in
+     let* env = get_env in
+     let* sigma = get_sigma in
+     let* fwd_map = get_fwd_enc in
+     Log.debug
+       (Printf.sprintf
+          "mebi_wrapper.show_fwd_map: \n%s"
+          (Strfy.list
              ~force_newline:true
-             ~indent:1
-             (fun (x : EConstr.t) ->
-               Strfy.tuple
-                 ~is_keyval:true
-                 Strfy.str
-                 (Strfy.econstr env sigma)
-                 ("econstr", x))
-             (fun (x : Enc.t) ->
-               Strfy.tuple
-                 ~is_keyval:true
-                 Strfy.str
-                 Enc.to_string
-                 ("encoding", x)))
-          (Enc.fwd_to_list fwd_map)));
-  return ()
+             (Strfy.tuple
+                ~force_newline:true
+                ~indent:1
+                (fun (x : EConstr.t) ->
+                  Strfy.tuple
+                    ~is_keyval:true
+                    Strfy.str
+                    (Strfy.econstr env sigma)
+                    ("econstr", x))
+                (fun (x : Enc.t) ->
+                  Strfy.tuple
+                    ~is_keyval:true
+                    Strfy.str
+                    Enc.to_string
+                    ("encoding", x)))
+             (Enc.fwd_to_list fwd_map)));
+     return ())
 ;;
 
-let show_bck_map () : unit mm =
-  let open Syntax in
-  let* env = get_env in
-  let* sigma = get_sigma in
-  let* bck_map = get_bck_enc in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.show_bck_map: \n%s"
-       (Strfy.list
-          ~force_newline:true
-          (Strfy.tuple
+let show_bck_map () : unit =
+  run
+    ~keep_encoding:true
+    ~fresh:false
+    (let open Syntax in
+     let* env = get_env in
+     let* sigma = get_sigma in
+     let* bck_map = get_bck_enc in
+     Log.debug
+       (Printf.sprintf
+          "mebi_wrapper.show_bck_map: \n%s"
+          (Strfy.list
              ~force_newline:true
-             ~indent:1
-             (fun (x : Enc.t) ->
-               Strfy.tuple
-                 ~is_keyval:true
-                 Strfy.str
-                 Enc.to_string
-                 ("encoding", x))
-             (fun (x : EConstr.t) ->
-               Strfy.tuple
-                 ~is_keyval:true
-                 Strfy.str
-                 (Strfy.econstr env sigma)
-                 ("econstr", x)))
-          (Enc.bck_to_list bck_map)));
-  return ()
+             (Strfy.tuple
+                ~force_newline:true
+                ~indent:1
+                (fun (x : Enc.t) ->
+                  Strfy.tuple
+                    ~is_keyval:true
+                    Strfy.str
+                    Enc.to_string
+                    ("encoding", x))
+                (fun (x : EConstr.t) ->
+                  Strfy.tuple
+                    ~is_keyval:true
+                    Strfy.str
+                    (Strfy.econstr env sigma)
+                    ("econstr", x)))
+             (Enc.bck_to_list bck_map)));
+     return ())
 ;;
 
 (* let show_proof_data () : unit mm =
