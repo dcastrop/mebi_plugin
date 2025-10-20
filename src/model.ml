@@ -177,7 +177,10 @@ module Action = struct
 
     let to_string (m : t) : string =
       (* Strfy.list ~label:"MetaData" Strfy.str m *)
-      "TODO: move Model.Action.MetaData.to_string to Strfy"
+      (* "TODO: move Model.Action.MetaData.to_string to Strfy" *)
+      Printf.sprintf
+        "[%s]"
+        (List.fold_left (fun acc x -> Printf.sprintf "%s,%s" acc x) "" m)
     ;;
 
     let eq (m1 : t) (m2 : t) : bool =
@@ -248,11 +251,25 @@ module Action = struct
 
   and annotation_to_string (anno : annotation) : string =
     (* Strfy.list annotation_pair_to_string anno *)
-    "TODO: move Model.Action.annotation_to_string to Strfy"
+    (* "TODO: move Model.Action.annotation_to_string to Strfy" *)
+    Printf.sprintf
+      "[%s]"
+      (List.fold_left
+         (fun acc anno_pair ->
+           Printf.sprintf "%s,\n%s" acc (annotation_pair_to_string anno_pair))
+         ""
+         anno)
 
   and annotations_to_string (annos : annotations) : string =
     (* Strfy.list annotation_to_string annos *)
-    "TODO: move Model.Action.annotations_to_string to Strfy"
+    (* "TODO: move Model.Action.annotations_to_string to Strfy" *)
+    Printf.sprintf
+      "[%s]"
+      (List.fold_left
+         (fun acc anno ->
+           Printf.sprintf "%s,\n%s" acc (annotation_to_string anno))
+         ""
+         annos)
 
   and to_string
         ?(skip_leading_tab : bool = false)
