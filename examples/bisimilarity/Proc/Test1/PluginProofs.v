@@ -56,7 +56,12 @@ Proof.
   MeBiSim Step. (* inversion H0; simpl in *. *)
   MeBiSim Step. (* exists n2 *)
   
-  eapply wk_some. unfold silent. apply rt1n_refl.
+  (* eapply wk_some.  *)
+  (* unfold silent.  *)
+  (* apply rt1n_refl. *)
+  MeBiSim Step.
+  (* apply rt1n_refl. *)
+
   (* MeBiSim Step. *)
 
 

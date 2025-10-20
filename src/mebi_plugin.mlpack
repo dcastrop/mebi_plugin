@@ -2,6 +2,7 @@ Utils
 Logging
 Mebi_enc
 Mebi_setup
+Mebi_constr_tree
 Mebi_theories
 Model
 Lts

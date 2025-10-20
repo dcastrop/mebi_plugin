@@ -24,6 +24,7 @@
   logging
   mebi_enc
   mebi_setup
+  mebi_constr_tree
   mebi_theories
   model
   lts

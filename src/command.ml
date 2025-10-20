@@ -75,8 +75,8 @@ type unif_problem =
   ; termR : EConstr.t
   }
 
-let rec unify_all (i : (Constr_tree.t * unif_problem) list)
-  : Constr_tree.t list option mm
+let rec unify_all (i : (Mebi_constr_tree.t * unif_problem) list)
+  : Mebi_constr_tree.t list option mm
   =
   match i with
   | [] -> return (Some [])
@@ -97,8 +97,8 @@ let rec unify_all (i : (Constr_tree.t * unif_problem) list)
 
 let sandboxed_unify
       (tgt_term : EConstr.t)
-      (u : (Constr_tree.t * unif_problem) list)
-  : (EConstr.t * Constr_tree.t list) option mm
+      (u : (Mebi_constr_tree.t * unif_problem) list)
+  : (EConstr.t * Mebi_constr_tree.t list) option mm
   =
   (* let* _ = if is_output_kind_enabled params then debug (fun env sigma -> str
      "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term) else return ()
@@ -116,8 +116,8 @@ let sandboxed_unify
 (** [coq_ctor]
     - [EConstr.t] action
     - [EConstr.t] destination
-    - [Constr_tree.t] coq-constructor index *)
-type coq_ctor = EConstr.t * EConstr.t * Constr_tree.t
+    - [Mebi_constr_tree.t] coq-constructor index *)
+type coq_ctor = EConstr.t * EConstr.t * Mebi_constr_tree.t
 
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
@@ -125,7 +125,7 @@ let rec retrieve_tgt_nodes
           (i : int)
           (act : EConstr.t)
           (tgt_term : EConstr.t)
-  : int * (Constr_tree.t * unif_problem) list list -> coq_ctor list mm
+  : int * (Mebi_constr_tree.t * unif_problem) list list -> coq_ctor list mm
   = function
   | _, [] -> return acc
   | lts_index, u1 :: nctors ->
@@ -144,10 +144,10 @@ let rec retrieve_tgt_nodes
 
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
-          (acc : int * (Constr_tree.t * unif_problem) list list)
+          (acc : int * (Mebi_constr_tree.t * unif_problem) list list)
           (lts_ind_def_encmap : Mebi_ind.t F.t)
   :  EConstr.t list * EConstr.rel_declaration list
-  -> (int * (Constr_tree.t * unif_problem) list list) option mm
+  -> (int * (Mebi_constr_tree.t * unif_problem) list list) option mm
   = function
   | [], [] -> return (Some acc)
   | _hsubstl :: substl, t :: tl ->
@@ -211,9 +211,9 @@ let rec check_updated_ctx
           if List.is_empty ctors
           then return None
           else (
-            let ctree_unif_probs : (Constr_tree.t * unif_problem) list =
+            let ctree_unif_probs : (Mebi_constr_tree.t * unif_problem) list =
               List.map
-                (fun (_, (tL : EConstr.t), (i : Constr_tree.t)) ->
+                (fun (_, (tL : EConstr.t), (i : Mebi_constr_tree.t)) ->
                   i, { termL = tL; termR = args.(2) })
                 ctors
             in
@@ -225,11 +225,11 @@ let rec check_updated_ctx
             (* FIXME: Test this *)
             (* replace [rtls] in [rtls_ctx] *)
             (* let rtls_ctx':rlts_list = List.append [ ] in *)
-            let acc' : (Constr_tree.t * unif_problem) list list =
+            let acc' : (Mebi_constr_tree.t * unif_problem) list list =
               List.concat_map
-                (fun (x : (Constr_tree.t * unif_problem) list) ->
+                (fun (x : (Mebi_constr_tree.t * unif_problem) list) ->
                   List.map
-                    (fun (y : Constr_tree.t * unif_problem) -> y :: x)
+                    (fun (y : Mebi_constr_tree.t * unif_problem) -> y :: x)
                     ctree_unif_probs)
                 (snd acc)
             in
@@ -267,7 +267,7 @@ and check_valid_constructor
         let* act : EConstr.t = normalize_econstr act in
         let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in
         let* next_ctors
-          : (int * (Constr_tree.t * unif_problem) list list) option
+          : (int * (Mebi_constr_tree.t * unif_problem) list list) option
           =
           check_updated_ctx
             (lts_index, [ [] ])
@@ -286,8 +286,8 @@ and check_valid_constructor
                return
                  (( act
                   , tgt_term
-                  , Constr_tree.Node ((Enc.of_int (fst index_ctor_pair), i), [])
-                  )
+                  , Mebi_constr_tree.Node
+                      ((Enc.of_int (fst index_ctor_pair), i), []) )
                   :: ctor_vals)
            | nctors ->
              let tgt_nodes =
@@ -305,7 +305,7 @@ and check_valid_constructor
 module type GraphB = sig
   module H : Hashtbl.S with type key = Enc.t
   module S : Set.S with type elt = Enc.t
-  module D : Set.S with type elt = Enc.t * Constr_tree.t
+  module D : Set.S with type elt = Enc.t * Mebi_constr_tree.t
 
   type constr_transitions = (Action.t, D.t) Hashtbl.t
 
@@ -324,7 +324,7 @@ module type GraphB = sig
     :  constr_transitions
     -> Action.t
     -> Enc.t
-    -> Constr_tree.t
+    -> Mebi_constr_tree.t
     -> unit mm
 
   val add_new_term_constr_transition
@@ -332,7 +332,7 @@ module type GraphB = sig
     -> Enc.t
     -> Action.t
     -> Enc.t
-    -> Constr_tree.t
+    -> Mebi_constr_tree.t
     -> unit mm
 
   val build_lts_graph
@@ -362,7 +362,7 @@ end
 module MkGraph
     (M : Hashtbl.S with type key = Enc.t)
     (N : Set.S with type elt = Enc.t)
-    (P : Set.S with type elt = Enc.t * Constr_tree.t) : GraphB = struct
+    (P : Set.S with type elt = Enc.t * Mebi_constr_tree.t) : GraphB = struct
   (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t] and also
      is used for mapping term types to [cindef]. *)
   module H = M
@@ -371,10 +371,10 @@ module MkGraph
   module S = N
 
   (* [D] is the set of destination tuples, each comprised of a term [EConstr.t]
-     and the corresponding [Constr_tree.t]. *)
+     and the corresponding [Mebi_constr_tree.t]. *)
   module D = P
 
-  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Constr_tree.t].
+  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Mebi_constr_tree.t].
   *)
   type constr_transitions = (Action.t, D.t) Hashtbl.t
 
@@ -390,7 +390,7 @@ module MkGraph
       0
   ;;
 
-  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Constr_tree.t].
+  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Mebi_constr_tree.t].
   *)
   type lts_graph =
     { to_visit : Enc.t Queue.t
@@ -403,13 +403,13 @@ module MkGraph
     ; weak : Params.WeakEnc.t option
     }
 
-  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Constr_tree.t)] in a given [constr_transitions].
+  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Mebi_constr_tree.t)] in a given [constr_transitions].
   *)
   let insert_constr_transition
         (constrs : constr_transitions)
         (a : Action.t)
         (d : Enc.t)
-        (c : Constr_tree.t)
+        (c : Mebi_constr_tree.t)
     : unit mm
     =
     (match Hashtbl.find_opt constrs a with
@@ -423,7 +423,7 @@ module MkGraph
         (t : Enc.t)
         (a : Action.t)
         (d : Enc.t)
-        (c : Constr_tree.t)
+        (c : Mebi_constr_tree.t)
     : unit mm
     =
     H.add
@@ -490,7 +490,7 @@ module MkGraph
       let* tgt_enc : Enc.t = encode tgt in
       let* act_enc : Enc.t = encode act in
       let* is_silent : bool option = is_silent_transition weak_type act in
-      let meta : Action.MetaData.t = [ Constr_tree.pstr int_tree ] in
+      let meta : Action.MetaData.t = [ int_tree ] in
       let to_add : Action.t =
         { label = act_enc, (None, is_silent); meta; annos = [] }
       in
