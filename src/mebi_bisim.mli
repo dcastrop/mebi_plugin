@@ -16,6 +16,8 @@ type transition = {
   dest : Model.State.t option;
 }
 
+val pstr_transition : transition -> string
+
 exception
   Enc_Of_EConstr_NotFound of (Evd.econstr * Model.States.t)
 
@@ -39,10 +41,18 @@ val find_label_of_enc :
   int -> Model.Alphabet.t -> Model.Alphabet.elt
 
 val econstr_to_enc : Evd.econstr -> int
+val run_econstr_to_enc_opt : Evd.econstr -> int option
 val enc_to_econstr : int -> Evd.econstr
 
 val econstr_to_enc_opt :
   Evd.evar_map -> Evd.econstr -> int option
+
+val get_concl_transition :
+  ?abort_on_failed_dest_enc:bool ->
+  Fsm.t ->
+  Evd.evar_map ->
+  Evd.econstr * Evd.econstr * Evd.econstr ->
+  transition
 
 val get_weak_transition :
   Fsm.t -> Evd.evar_map -> Evd.econstr array -> transition
@@ -84,8 +94,35 @@ val get_app :
 
 exception UnhandledConcl of Evd.econstr
 
+type concl_transition =
+  | Weak_Transition
+  | Silent_Transition
+  | Silent1_Transition
+  | LTS_Transition
+
 val try_get_weak_transition :
-  Proofview.Goal.t -> Fsm.t -> Evd.econstr -> transition option
+  Evd.evar_map ->
+  Fsm.t ->
+  Evd.econstr * Evd.econstr array ->
+  (concl_transition * transition) option
+
+val try_get_silent_transition :
+  Evd.evar_map ->
+  Fsm.t ->
+  Evd.econstr * Evd.econstr array ->
+  (concl_transition * transition) option
+
+val try_get_lts_transition :
+  Evd.evar_map ->
+  Fsm.t ->
+  Evd.econstr * Evd.econstr array ->
+  (concl_transition * transition) option
+
+val try_get_concl_transition :
+  Proofview.Goal.t ->
+  Fsm.t ->
+  Evd.econstr ->
+  (concl_transition * transition) option
 
 val try_get_weak_sim :
   Proofview.Goal.t -> Evd.econstr -> unit option
@@ -103,24 +140,21 @@ val try_get_exists :
   Evd.econstr ->
   (transition * Model.State.t) option
 
-val try_get_lts_transition :
-  Proofview.Goal.t -> Fsm.t -> Evd.econstr -> transition option
-
 type concl_result =
   | New_Weak_Sim
   | Exists of (transition * Model.State.t)
-  | Weak_Transition of transition
-  | LTS_Transition of transition
+  | Transition of (concl_transition * transition)
 
 val handle_concl :
   Proofview.Goal.t ->
   Algorithms.Bisimilar.result ->
   concl_result
 
+type hyp_transition = Full | Layer
+
 type hyp_kind =
   | Cofix of hyp_cofix
-  | H_Inversion_an2 of unit Proofview.tactic
-  | H_Inversion_a of unit Proofview.tactic
+  | H_Inversion of (hyp_transition * unit Proofview.tactic)
   | H_Transition of transition
   | Pass
 
@@ -139,6 +173,18 @@ type hyp_result =
   | H_Transition of transition
   | Cofixes of hyp_cofix list
   | Empty
+
+val warning_multiple_h_transitions_to_invert :
+  transition -> transition list -> unit
+
+val handle_the_hyps :
+  Algorithms.Bisimilar.result ->
+  'a ->
+  Evd.evar_map ->
+  Mebi_theories.hyp list ->
+  (unit Proofview.tactic * bool) option
+  * hyp_cofix list
+  * transition list
 
 val handle_hyps :
   Proofview.Goal.t -> Algorithms.Bisimilar.result -> hyp_result

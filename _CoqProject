@@ -64,6 +64,8 @@ src/mebi_enc.ml
 src/mebi_enc.mli
 src/mebi_setup.ml
 src/mebi_setup.mli
+src/mebi_constr_tree.ml
+src/mebi_constr_tree.mli
 src/mebi_theories.ml
 src/mebi_theories.mli
 

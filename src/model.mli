@@ -1,6 +1,6 @@
 module Info : sig
   module Coq : sig
-    type t = Mebi_setup.Enc.t * (string * string list)
+    type t = int * (string * string list)
 
     val to_string : t -> string
   end
@@ -44,7 +44,7 @@ module Info : sig
 end
 
 module State : sig
-  type t = Mebi_setup.Enc.t * string option
+  type t = int * string option
 
   val eq : t -> t -> bool
   val compare : t -> t -> int
@@ -63,7 +63,7 @@ end
 
 module Action : sig
   module Label : sig
-    type t = Mebi_setup.Enc.t * (string option * bool option)
+    type t = int * (string option * bool option)
 
     val to_string : t -> string
     val pstr : ?indents:int -> t -> string
@@ -74,7 +74,7 @@ module Action : sig
   end
 
   module MetaData : sig
-    type t = string list
+    type t = Mebi_constr_tree.t list
 
     val merge : t -> t -> t
     val from_opt : t option -> t option

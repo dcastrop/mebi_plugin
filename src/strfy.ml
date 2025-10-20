@@ -302,7 +302,7 @@ let action_label ?(indent : int = 0) : Model.Action.Label.t -> string =
 ;;
 
 let action_metadata ?(indent : int = 0) : Model.Action.MetaData.t -> string =
-  fun x -> list ~label:"MetaData" str x
+  fun x -> list ~label:"MetaData" Mebi_constr_tree.pstr x
 ;;
 
 let rec action_annotation_pair ?(indent : int = 0)

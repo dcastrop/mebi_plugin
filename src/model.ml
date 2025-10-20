@@ -170,7 +170,7 @@ module Action = struct
   end
 
   module MetaData = struct
-    type t = string list
+    type t = Mebi_constr_tree.t list
 
     let merge (m1 : t) (m2 : t) : t = List.append m1 m2
     let from_opt (t : t option) = match t with None -> None | Some t -> Some t
@@ -178,16 +178,27 @@ module Action = struct
     let to_string (m : t) : string =
       (* Strfy.list ~label:"MetaData" Strfy.str m *)
       (* "TODO: move Model.Action.MetaData.to_string to Strfy" *)
-      Printf.sprintf
-        "[%s]"
-        (List.fold_left (fun acc x -> Printf.sprintf "%s,%s" acc x) "" m)
+      match m with
+      | [] -> "(No MetaData)"
+      | h :: t ->
+        let do_pstr i = Printf.sprintf "(%s)" (Mebi_constr_tree.pstr i) in
+        Printf.sprintf
+          "(%s)"
+          (Printf.sprintf
+             "[%s]"
+             (List.fold_left
+                (fun (acc : string) (i : Mebi_constr_tree.t) ->
+                  Printf.sprintf "%s; %s" acc (do_pstr i))
+                (do_pstr h)
+                t))
     ;;
 
     let eq (m1 : t) (m2 : t) : bool =
       if Int.equal (List.length m1) (List.length m2)
       then
         List.for_all
-          (fun ((i1, i2) : string * string) -> String.equal i1 i2)
+          (fun ((i1, i2) : Mebi_constr_tree.t * Mebi_constr_tree.t) ->
+            Mebi_constr_tree.eq i1 i2)
           (List.combine m1 m2)
       else false
     ;;
@@ -200,7 +211,7 @@ module Action = struct
     ;;
 
     let compare (m1 : t) (m2 : t) : int =
-      List.compare (fun a b -> String.compare a b) m1 m2
+      List.compare (fun a b -> Mebi_constr_tree.compare a b) m1 m2
     ;;
 
     let compare_opt (m1 : t option) (m2 : t option) : int =
@@ -218,6 +229,10 @@ module Action = struct
     ; mutable annos : annotations
     }
 
+  (* TODO: Continue from here *)
+  (* and annotation_data = State.t * t * MetaData.t *)
+  (* and annotation = annotation_data list *)
+  (* and annotations = annotation list *)
   and annotation_pair = State.t * t
   and annotation = annotation_pair list
   and annotations = annotation list
@@ -252,24 +267,30 @@ module Action = struct
   and annotation_to_string (anno : annotation) : string =
     (* Strfy.list annotation_pair_to_string anno *)
     (* "TODO: move Model.Action.annotation_to_string to Strfy" *)
-    Printf.sprintf
-      "[%s]"
-      (List.fold_left
-         (fun acc anno_pair ->
-           Printf.sprintf "%s,\n%s" acc (annotation_pair_to_string anno_pair))
-         ""
-         anno)
+    if List.is_empty anno
+    then "[ ] (empty)"
+    else
+      Printf.sprintf
+        "[%s]"
+        (List.fold_left
+           (fun (acc : string) (p : annotation_pair) ->
+             Printf.sprintf "%s; %s" acc (annotation_pair_to_string p))
+           (annotation_pair_to_string (List.hd anno))
+           (List.tl anno))
 
   and annotations_to_string (annos : annotations) : string =
     (* Strfy.list annotation_to_string annos *)
     (* "TODO: move Model.Action.annotations_to_string to Strfy" *)
-    Printf.sprintf
-      "[%s]"
-      (List.fold_left
-         (fun acc anno ->
-           Printf.sprintf "%s,\n%s" acc (annotation_to_string anno))
-         ""
-         annos)
+    if List.is_empty annos
+    then "[ ] (empty)"
+    else
+      Printf.sprintf
+        "[%s]"
+        (List.fold_left
+           (fun (acc : string) (anno : annotation) ->
+             Printf.sprintf "%s; %s" acc (annotation_to_string anno))
+           (annotation_to_string (List.hd annos))
+           (List.tl annos))
 
   and to_string
         ?(skip_leading_tab : bool = false)
