@@ -229,10 +229,6 @@ module Action = struct
     ; mutable annos : annotations
     }
 
-  (* TODO: Continue from here *)
-  (* and annotation_data = State.t * t * MetaData.t *)
-  (* and annotation = annotation_data list *)
-  (* and annotations = annotation list *)
   and annotation_pair = State.t * t
   and annotation = annotation_pair list
   and annotations = annotation list
@@ -300,7 +296,7 @@ module Action = struct
     =
     let label_str = Label.to_string a.label in
     match pstr with
-    | false -> label_str
+    | false -> Printf.sprintf "%s => %s" label_str (MetaData.to_string a.meta)
     | true ->
       let str_indent = Utils.str_tabs indents in
       Printf.sprintf
