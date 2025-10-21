@@ -59,7 +59,6 @@ Proof.
   (* eapply wk_some.  *)
   (* unfold silent.  *)
   (* apply rt1n_refl. *)
-  (* TODO: expand [Model.Action.annotation] to include [Model.Action.MetaData] so that [Fsm.saturate] captures all the necessary information on which constructors to apply *)
   MeBiSim Step.
   (* apply rt1n_refl. *)
 
