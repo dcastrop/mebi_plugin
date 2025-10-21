@@ -209,12 +209,88 @@ val get_bisim_states :
   Model.Partition.t ->
   Model.States.t
 
+val get_n_candidate_actions :
+  'a ->
+  'b ->
+  Fsm.t ->
+  Model.Action.t ->
+  Model.State.t ->
+  Model.States.t ->
+  Model.States.t Model.Actions.t
+
+val get_n_candidate_action_list :
+  'a ->
+  'b ->
+  Fsm.t ->
+  Model.Action.t ->
+  Model.State.t ->
+  Model.States.t ->
+  (Model.Action.t * Model.State.t) list
+
+val warning_multiple_n_candidates :
+  (Model.Action.t * Model.State.t) list -> unit
+
+val get_n_candidate_action :
+  'a ->
+  'b ->
+  Fsm.t ->
+  Model.Action.t ->
+  Model.State.t ->
+  Model.States.t ->
+  Model.Action.t * Model.State.t
+
+val get_n_candidate :
+  'a ->
+  'b ->
+  Fsm.t ->
+  Model.Action.t ->
+  Model.State.t ->
+  Model.States.t ->
+  Model.State.t
+
 val handle_eexists :
   Proofview.Goal.t ->
   Algorithms.Bisimilar.result ->
   transition ->
   transition ->
   Model.State.t ->
+  unit Proofview.tactic
+
+val handle_weak_silent_transition :
+  Proofview.Goal.t ->
+  Model.State.t ->
+  Model.State.t ->
+  unit Proofview.tactic
+
+val warning_multiple_n_dests : Model.States.t -> unit
+
+val get_from_state_of_relation :
+  Proofview.Goal.t ->
+  Model.States.t ->
+  Evd.econstr ->
+  Model.State.t
+
+val build_tactics_from_constr_tree :
+  Proofview.Goal.t ->
+  Mebi_constr_tree.t ->
+  unit Proofview.tactic list
+
+val apply_lts_constructor :
+  Proofview.Goal.t ->
+  Mebi_constr_tree.t ->
+  unit Proofview.tactic
+
+val handle_weak_constructors :
+  Proofview.Goal.t ->
+  'a ->
+  Model.Action.annotation ->
+  unit Proofview.tactic
+
+val handle_weak_visible_transition :
+  Proofview.Goal.t ->
+  Algorithms.Bisimilar.result ->
+  Model.State.t * Model.Action.t * Model.State.t ->
+  Model.State.t * Model.Action.t * Model.State.t ->
   unit Proofview.tactic
 
 val handle_weak_transition :

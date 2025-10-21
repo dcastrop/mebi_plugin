@@ -31,8 +31,9 @@ let do_inversion (h : Mebi_theories.hyp) : unit Proofview.tactic =
 
 let subst_all () : unit Proofview.tactic = Equality.subst_all ()
 
-let simplify_all () : unit Proofview.tactic =
-  Proofview.Goal.enter (fun gl ->
+let simplify_all ?(gl : Proofview.Goal.t option) () : unit Proofview.tactic =
+  let the_fun =
+    fun gl ->
     List.fold_left
       (fun acc (h : Mebi_theories.hyp) ->
         Mebi_theories.tactics
@@ -41,11 +42,17 @@ let simplify_all () : unit Proofview.tactic =
               (Context.Named.Declaration.get_id h, Locus.InHyp)
           ])
       Tactics.simpl_in_concl
-      (Proofview.Goal.hyps gl))
+      (Proofview.Goal.hyps gl)
+  in
+  match gl with None -> Proofview.Goal.enter the_fun | Some gl -> the_fun gl
 ;;
 
-let simplify_and_subst_all () : unit Proofview.tactic =
-  Mebi_theories.tactics [ simplify_all (); subst_all () ]
+let simplify_and_subst_all ?(gl : Proofview.Goal.t option) ()
+  : unit Proofview.tactic
+  =
+  match gl with
+  | None -> Mebi_theories.tactics [ simplify_all (); subst_all () ]
+  | Some gl -> Mebi_theories.tactics [ simplify_all ~gl (); subst_all () ]
 ;;
 
 (*************************)
@@ -203,12 +210,18 @@ let goal_test () : unit Proofview.tactic =
 
 (****************************************************************************)
 
-let apply (c : EConstr.t) : unit Proofview.tactic =
-  Proofview.Goal.enter (fun gl -> Tactics.apply c)
+let apply ?(gl : Proofview.Goal.t option) (c : EConstr.t)
+  : unit Proofview.tactic
+  =
+  let the_fun = fun gl -> Tactics.apply c in
+  match gl with None -> Proofview.Goal.enter the_fun | Some gl -> the_fun gl
 ;;
 
-let eapply (c : EConstr.t) : unit Proofview.tactic =
-  Proofview.Goal.enter (fun gl -> Tactics.eapply c)
+let eapply ?(gl : Proofview.Goal.t option) (c : EConstr.t)
+  : unit Proofview.tactic
+  =
+  let the_fun = fun gl -> Tactics.eapply c in
+  match gl with None -> Proofview.Goal.enter the_fun | Some gl -> the_fun gl
 ;;
 
 (****************************************************************************)

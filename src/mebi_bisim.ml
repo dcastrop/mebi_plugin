@@ -501,8 +501,8 @@ let clear_old_hyps (gl : Proofview.Goal.t) : unit Proofview.tactic =
 let handle_new_cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =
   Mebi_theories.tactics
     [ Mebi_tactics.cofix gl
-    ; Mebi_tactics.apply (Mebi_theories.c_In_sim ())
-    ; Mebi_tactics.apply (Mebi_theories.c_Pack_sim ())
+    ; Mebi_tactics.apply ~gl (Mebi_theories.c_In_sim ())
+    ; Mebi_tactics.apply ~gl (Mebi_theories.c_Pack_sim ())
     ; Mebi_tactics.intros_all ()
     ; clear_old_hyps gl
     ]
@@ -579,14 +579,7 @@ let get_n_candidate_action_list
     []
 ;;
 
-let get_n_candidate_action bisim_states m2 (n : Fsm.t) n_action n1 dests
-  : Action.t * State.t
-  =
-  Log.debug "mebi_bisim.get_n_candidate_action";
-  let candidates =
-    get_n_candidate_action_list bisim_states m2 n n_action n1 dests
-  in
-  let the_candidate = List.hd candidates in
+let warning_multiple_n_candidates candidates =
   if Bool.not (Int.equal 1 (List.length candidates))
   then
     Log.warning
@@ -597,7 +590,18 @@ let get_n_candidate_action bisim_states m2 (n : Fsm.t) n_action n1 dests
          (Strfy.list
             ~force_newline:true
             (Strfy.tuple Model.pstr_action Model.pstr_state)
-            candidates));
+            candidates))
+;;
+
+let get_n_candidate_action bisim_states m2 (n : Fsm.t) n_action n1 dests
+  : Action.t * State.t
+  =
+  Log.debug "mebi_bisim.get_n_candidate_action";
+  let candidates =
+    get_n_candidate_action_list bisim_states m2 n n_action n1 dests
+  in
+  warning_multiple_n_candidates candidates;
+  let the_candidate = List.hd candidates in
   the_candidate
 ;;
 
@@ -633,49 +637,126 @@ let handle_eexists
 let handle_weak_silent_transition gl n1 n2 : unit Proofview.tactic =
   Log.debug "mebi_bisim.handle_weak_silent_transition";
   Mebi_theories.tactics
-    [ Mebi_tactics.apply (Mebi_theories.c_wk_none ())
+    [ Mebi_tactics.apply ~gl (Mebi_theories.c_wk_none ())
     ; Mebi_tactics.unfold_econstr gl (Mebi_theories.c_silent ())
     ; (if State.eq n1 n2
-       then Mebi_tactics.apply (Mebi_theories.c_rt1n_refl ())
-       else Mebi_tactics.apply (Mebi_theories.c_rt1n_trans ()))
+       then Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ())
+       else Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_trans ()))
     ]
 ;;
 
-(* let rec handle_weak_constructors (h_action:Action.t) : 'a list -> unit Proofview.tactic =
-   function | [] -> Mebi_tactics.apply (Mebi_theories.c_rt1n_refl ())
-   | h::t ->
-   let lts_term = enc_to_econstr h_action.meta
-   Proofview.tclTHEN (
+let warning_multiple_n_dests n_dests =
+  if Bool.not (Int.equal 1 (States.cardinal n_dests))
+  then
+    Log.warning
+      (Printf.sprintf
+         "mebi_bisim.warning_multiple_n_dests, multiple candidate destss found \
+          (returning hd):\n\
+          %s"
+         (Model.pstr_states n_dests))
+;;
 
-   ) (handle_weak_constructors t)
-
-   ;; *)
-
-let handle_weak_visible_transition
-      gl
-      ({ the_fsm_1 = m; the_fsm_2 = n; bisim_states; _ } :
-        Algorithms.Bisimilar.result)
-      (m1, mA, m2)
-      (n1, nA, n2)
-  : unit Proofview.tactic
-  =
+let get_from_state_of_relation gl states (rel : EConstr.t) : State.t =
+  let sigma = Proofview.Goal.sigma gl in
+  let ty, tys = get_atomic_type sigma rel in
+  assert (Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_clos_refl_trans_1n ()));
   Log.debug
     (Printf.sprintf
-       "mebi_bisim.handle_weak_visible_transition\nm2:\n%s"
-       (Model.pstr_state m2));
+       "mebi_bisim.get_from_state_of_relation, %i"
+       (Array.length tys));
+  find_state_of_enc (econstr_to_enc tys.(1)) states
+;;
+
+let build_tactics_from_constr_tree gl
+  : Mebi_constr_tree.t -> unit Proofview.tactic list
+  = function
+  | Node ((enc, index), []) ->
+    Log.debug "mebi_bisim.build_tactics_from_constr_tree, last";
+    [ Tactics.one_constructor (index + 1) Tactypes.NoBindings
+    ; Mebi_tactics.simplify_and_subst_all ~gl ()
+    ]
+  | Node ((enc, index), tree) ->
+    Log.debug "mebi_bisim.build_tactics_from_constr_tree, list";
+    (* Tactics.one_constructor (index + 1) Tactypes.NoBindings
+       :: build_tactics_from_constr_tree (List.hd tree) *)
+    [ Tactics.one_constructor (index + 1) Tactypes.NoBindings
+    ; Mebi_tactics.simplify_and_subst_all ~gl ()
+    ]
+;;
+
+let apply_lts_constructor gl (constrs : Mebi_constr_tree.t)
+  : unit Proofview.tactic
+  =
+  Log.debug "mebi_bisim.apply_lts_constructor, rt1n_trans";
+  Mebi_tactics.eapply ~gl (Mebi_theories.c_rt1n_trans ())
+;;
+
+(* Mebi_theories.tactics
+   (Mebi_tactics.eapply  ~gl (Mebi_theories.c_rt1n_trans ())
+   :: [] build_tactics_from_constr_tree ~gl constrs) *)
+
+let handle_weak_constructors gl states
+  : Model.Action.annotation -> unit Proofview.tactic
+  = function
+  | [] ->
+    Log.debug "mebi_bisim.handle_weak_constructors, rt1n_refl";
+    (* Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()) *)
+    Proofview.tclUNIT ()
+  | (_tgt, action) :: t ->
+    (* let lts_term = enc_to_econstr h_action.meta in *)
+    Log.debug
+      (Printf.sprintf
+         "mebi_bisim.handle_weak_constructors, anno: %s"
+         (Model.Action.annotation_pair_to_string (_tgt, action)));
+    let do_constr = apply_lts_constructor gl (List.hd action.meta) in
+    (* let next_constrs = handle_weak_constructors gl states t in *)
+    (* Proofview.tclTHEN do_constr (next_constrs) *)
+    do_constr
+;;
+
+let handle_weak_visible_transition
+      (gl : Proofview.Goal.t)
+      ({ the_fsm_1 = m; the_fsm_2 = n; bisim_states; _ } :
+        Algorithms.Bisimilar.result)
+      ((m1, mA, m2) : State.t * Action.t * State.t)
+      ((n1, nA, n2) : State.t * Action.t * State.t)
+  : unit Proofview.tactic
+  =
+  (* Log.debug
+     (Printf.sprintf
+     "mebi_bisim.handle_weak_visible_transition\nm2:\n%s"
+     (Model.pstr_state m2)); *)
   let dests : States.t = get_bisim_states m2 (Some n2) bisim_states in
   assert (States.mem n2 dests);
   let n_actions = Edges.find n.edges n1 in
+  (* Log.debug
+     (Printf.sprintf
+     "mebi_bisim.handle_weak_visible_transition\nn_actions:\n%s"
+     (Strfy.list
+     ~force_newline:true
+     (Strfy.tuple Model.pstr_action Model.pstr_states)
+     (List.of_seq (Actions.to_seq n_actions)))); *)
+  let n_action = Model.get_action_with_label n_actions nA.label in
+  let n_dests = Actions.find n_actions n_action in
   Log.debug
     (Printf.sprintf
-       "mebi_bisim.handle_weak_visible_transition\nn_actions:\n%s"
-       (Strfy.list
-          ~force_newline:true
-          (Strfy.tuple Model.pstr_action Model.pstr_states)
-          (List.of_seq (Actions.to_seq n_actions))));
+       "mebi_bisim.handle_weak_visible_transition\nn_dests:\n%s"
+       (Model.pstr_states n_dests));
+  Log.debug
+    (Printf.sprintf
+       "mebi_bisim.handle_weak_visible_transition\nn_annos hd:\n%s"
+       (Model.Action.annotation_to_string (List.hd n_action.annos)));
+  warning_multiple_n_dests n_dests;
+  let _the_dest = List.hd (States.to_list n_dests) in
+  let _do_constrs =
+    handle_weak_constructors gl n.states (List.hd n_action.annos)
+  in
   Mebi_theories.tactics
-    [ Mebi_tactics.eapply (Mebi_theories.c_wk_some ())
+    [ Mebi_tactics.eapply ~gl (Mebi_theories.c_wk_some ())
     ; Mebi_tactics.unfold_econstr gl (Mebi_theories.c_silent ())
+      (* TODO: save for next iteration of loop, seems to be applying to the wrong goal -> MAYBE: active some proof state now, that shortcuts to this? *)
+      (* ; Mebi_tactics.eapply ~gl (Mebi_theories.c_rt1n_trans ())  *)
+      (* ; do_constrs *)
     ]
 ;;
 
