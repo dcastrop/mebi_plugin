@@ -135,7 +135,7 @@ let rec retrieve_tgt_nodes
      | Some (tgt, ctor_tree) ->
        let$+ act env sigma = Reductionops.nf_all env sigma act in
        retrieve_tgt_nodes
-         ((act, tgt, Node ((Enc.of_int lts_index, i), ctor_tree)) :: acc)
+         ((act, tgt, Node ((Enc.of_int lts_index, i + 1), ctor_tree)) :: acc)
          i
          act
          tgt_term
@@ -1044,6 +1044,7 @@ let proof_intro
   =
   Log.trace "command.proof_intro";
   let* _ = run (CheckBisimilarity ((x, a), (y, b))) refs in
+  Mebi_bisim.reset_the_proof_state ();
   return
     (Mebi_tactics.update_proof_by_tactic
        pstate
