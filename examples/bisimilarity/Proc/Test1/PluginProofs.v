@@ -60,6 +60,11 @@ Proof.
   (* unfold silent.  *)
   (* apply rt1n_refl. *)
   MeBiSim Step.
+  (* unfold silent.  *)
+  (* eapply rt1n_trans. constructor. *)
+
+
+  (* MeBiSim Step. *)
   (* apply rt1n_refl. *)
 
   (* MeBiSim Step. *)

@@ -8,17 +8,26 @@ val update_proof_by_tactics :
 
 val do_inversion : Mebi_theories.hyp -> unit Proofview.tactic
 val subst_all : unit -> unit Proofview.tactic
-val simplify_all : unit -> unit Proofview.tactic
-val simplify_and_subst_all : unit -> unit Proofview.tactic
+
+val simplify_all :
+  ?gl:Proofview.Goal.t -> unit -> unit Proofview.tactic
+
+val simplify_and_subst_all :
+  ?gl:Proofview.Goal.t -> unit -> unit Proofview.tactic
+
 val the_goals : (int, Proofview.Goal.t) Hashtbl.t ref
 val reset_the_goals : unit -> unit
 val add_goal : Proofview.Goal.t -> unit
 val goal_test : unit -> unit Proofview.tactic
-val apply : EConstr.t -> unit Proofview.tactic
-val eapply : EConstr.t -> unit Proofview.tactic
+
+val apply :
+  ?gl:Proofview.Goal.t -> Evd.econstr -> unit Proofview.tactic
+
+val eapply :
+  ?gl:Proofview.Goal.t -> Evd.econstr -> unit Proofview.tactic
 
 val unfold_econstr :
-  Proofview.Goal.t -> EConstr.t -> unit Proofview.tactic
+  Proofview.Goal.t -> Evd.econstr -> unit Proofview.tactic
 
 val unfold_constrexpr :
   Proofview.Goal.t ->
