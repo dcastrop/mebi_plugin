@@ -26,7 +26,7 @@ MeBi Bisim p With termLTS And q With termLTS Using termLTS.
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs".
 MeBi Reset All.
 MeBi Set ShowAny      True.
-(* MeBi Set ShowNotices  True. *)
+MeBi Set ShowNotices  True.
 MeBi Set ShowDebug    True.
 (* MeBi Set ShowDetails  True. *)
 MeBi Set ShowDetails  False.
@@ -46,7 +46,9 @@ Require Import Logic.
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof.
-  MeBiSim Begin termLTS p And termLTS q Using termLTS. (* unfold p, q. *)
+  MeBiSim Begin termLTS p And termLTS q Using termLTS. 
+  (* unfold p, q. *)
+
   MeBiSim Step. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
   MeBiSim Step. (* inversion H; simpl in *. *)
   MeBiSim Step. (* exists n2 *)
@@ -55,137 +57,49 @@ Proof.
   MeBiSim Step. (* inversion H; simpl in *. *)
   MeBiSim Step. (* inversion H0; simpl in *. *)
   MeBiSim Step. (* exists n2 *)
+  MeBiSim Step. (* eapply wk_some; unfold silent. *)
+  MeBiSim Step. (* eapply rt1n_trans. *)
+  MeBiSim Step. (* constructor 4. simpl in *. *)
+  MeBiSim Step. (* eapply rt1n_trans. *)
+  MeBiSim Step. (* constructor 2. *)
+  MeBiSim Step. (* constructor 5. *)
+  MeBiSim Step. (* apply rt1n_refl. *)
+  MeBiSim Step. (* constructor 2. *)
+  MeBiSim Step. (* constructor 1. *)
+  MeBiSim Step. (* apply rt1n_refl. *)
+  MeBiSim Step. (* constructor 2. *)
+  MeBiSim Step. (* constructor 5. *)
+  MeBiSim Step. (* apply rt1n_refl. *)
+  MeBiSim Step. (* clear H; cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
   
-  (* eapply wk_some.  *)
-  (* unfold silent.  *)
+  (* apply rt1n_refl. constructor 2. constructor 1.  *)
+
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+
+  (* exact Cofix2. *)
+  (* apply Cofix2. *)
+  (* TODO: figure out how to apply hypothesis *)
+  (* NOTE: apply and exact don't appear to work from the API? *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+
+
+  (* constructor 5. *)
+  (* eapply rt1n_trans. constructor 2. constructor 5. *)
+  (* MeBiSim Step. *)
+  (* constructor 4. simpl in *. *)
+
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* eapply rt1n_trans. constructor 4. simpl in *. *)
+  (* eapply rt1n_trans. constructor 2. constructor 5. *)
+  (* apply rt1n_refl. constructor 2. constructor 1.  *)
   (* apply rt1n_refl. *)
-  MeBiSim Step.
-  (* unfold silent.  *)
-  (* eapply rt1n_trans. constructor. *)
 
 
-  (* MeBiSim Step. *)
-  (* apply rt1n_refl. *)
-
-  (* MeBiSim Step. *)
-
-
-  (* MeBiSim Step. *) 
-  (* MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step. *)
-
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-
-
-
-  (* MeBiSim Cofix. *)
-  (* MeBiSim Intros. *)
-  (* MeBi Set ShowDetails True. *)
-  (* MeBiSim FocusTest.  *)
-
-  (* MeBiSim GoalTest. *)
-  (* inversion H; subst. 
-  simpl in *.
-  eexists; split. *)
-
-  (* MeBi Set ShowDetails True. *)
-  (* MeBiSim FocusTest.  *)
-  (* MeBi Set ShowDetails True. *)
-
-
-  (* MeBiSim GoalTest. *)
-  (* MeBiSim WeakNone. *)
-  (* MeBiSim GoalTest. *)
-
-
-  (* admit. admit. *)
-  (* MeBiSim GoalTest. *)
-   
-  (* MeBi Set ShowDetails True. *)
-  (* MeBiSim FocusTest.  *)
-
-
-  (* MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest". *)
-
-  (* Check H.
-  About H.
-  Print H.
-  Compute H. *)
-
-  (* MeBiSim GoalTest. *)
-
-  (* do 2 constructor. unfold tsubst in *.
-  eapply rt1n_trans. do 2 constructor.
-  eauto with rel_db.  *)
-
-  (* MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.Focus". *)
-  (* NOTE: the below reveals a change in the Proof.data.stack (focus stack) *)
-  (* - 
-MeBi Set ShowDetails  True.
-  MeBiSim FocusTest.  *)
-  (* MeBiSim GoalTest. *)
-
-  (* MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.END".
-  MeBi_Debug ThisProof. 
-  MeBi_Debug ProofNames. *)
-
-
-  (* MeBiSim WeakNone.  *)
-  (* MeBiSim FocusTest.  *)
-  (* shelve. shelve. Unshelve. *)
-
-  (* MeBi FSM p Using termLTS. *)
-
-
-  (* eapply rt1n_trans. *)
-
-  (* MeBi_Debug ThisProof. *)
-
-
-(* {  *)
-  (* apply wk_none; unfold silent. *)
-    (* eapply rt1n_trans. 
-    do 2 constructor. unfold tsubst in *.
-    eapply rt1n_trans. do 2 constructor.
-    eauto with rel_db.  *)
-    (* } *)
-
-
-
-  (* TODO: use the plugin info next... *)
-
-  (* apply In_sim, Pack_sim. *)
-  (* MeBi_unfold weak_sim. *)
-
-  (* MeBi_Debug ProofNames. *)
-
-
-  (* MeBi_Bisimilarity p With termLTS And q With termLTS Using termLTS.
-  MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.cofix".
-  MeBi_cofix.
-  MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.cofix".
-  (* MeBi_cofix. *)
-  Fail MeBi_cofix. *)
-  
-  (* MeBi_ExploreProof.
-  MeBi_ExploreProof.
-  MeBi_unfold p.
-  MeBi_ExploreProof.
-  MeBi_ExploreProof.
-  MeBi_unfold q.
-  MeBi_ExploreProof.
-  MeBi_ExploreProof. *)
-
-  (* unfold p.  *)
-
-  (* MeBi_unfold p. *)
-  (* MeBi_intro. *)
-  (* remember 3 as x. *)
-  (* MeBi ProofTest1. *)
 Admitted.

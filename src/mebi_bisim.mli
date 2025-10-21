@@ -1,13 +1,3 @@
-val the_cached_result :
-  Algorithms.Bisimilar.result ref option ref
-
-val reset_the_cached_result : unit -> unit
-
-exception MissingBisimResult of unit
-
-val get_the_result : unit -> Algorithms.Bisimilar.result ref
-val set_the_result : Algorithms.Bisimilar.result -> unit
-
 type hyp_cofix = { m : Model.State.t; n : Model.State.t }
 
 type transition = {
@@ -16,6 +6,32 @@ type transition = {
   dest : Model.State.t option;
 }
 
+type proof_state =
+  | NewProof
+  | NewWeakSim
+  | NewCofix
+  | NewTransition of transition
+  | GoalTransition of transition
+  | Constructors of
+      (Model.Action.annotation
+      * (unit -> unit Proofview.tactic) list option)
+
+val the_proof_state : proof_state ref
+val reset_the_proof_state : unit -> unit
+
+val the_cached_result :
+  Algorithms.Bisimilar.result ref option ref
+
+val reset_the_cached_result : unit -> unit
+
+exception MissingBisimResult of unit
+
+val get_the_result : unit -> Algorithms.Bisimilar.result ref
+val get_m : unit -> Fsm.t
+val get_n : unit -> Fsm.t
+val get_bisim_states : unit -> Model.Partition.t
+val get_non_bisim_states : unit -> Model.Partition.t
+val set_the_result : Algorithms.Bisimilar.result -> unit
 val pstr_transition : transition -> string
 
 exception
@@ -125,7 +141,7 @@ val try_get_concl_transition :
   (concl_transition * transition) option
 
 val try_get_weak_sim :
-  Proofview.Goal.t -> Evd.econstr -> unit option
+  Proofview.Goal.t -> Evd.econstr -> Evd.econstr option
 
 val try_get_m_state_weak_sim :
   Proofview.Goal.t ->
@@ -141,7 +157,7 @@ val try_get_exists :
   (transition * Model.State.t) option
 
 type concl_result =
-  | New_Weak_Sim
+  | New_Weak_Sim of Evd.econstr
   | Exists of (transition * Model.State.t)
   | Transition of (concl_transition * transition)
 
@@ -189,29 +205,24 @@ val handle_the_hyps :
 val handle_hyps :
   Proofview.Goal.t -> Algorithms.Bisimilar.result -> hyp_result
 
-val get_all_cofix : Proofview.Goal.t -> Names.Id.Set.t
+val get_all_cofix_names : Proofview.Goal.t -> Names.Id.Set.t
+
+val find_cofix_opt :
+  Proofview.Goal.t ->
+  Evd.econstr ->
+  (Names.variable * Evd.econstr) option
+
 val get_all_non_cofix : Proofview.Goal.t -> Names.Id.Set.t
 val clear_old_hyps : Proofview.Goal.t -> unit Proofview.tactic
-
-val handle_new_cofix :
-  Proofview.Goal.t -> unit Proofview.tactic
-
-type proof_state = NewProof | NewCofix | NewTransition
-
-val determine_proof_state :
-  Proofview.Goal.t -> proof_state option
+val do_new_cofix : Proofview.Goal.t -> unit Proofview.tactic
 
 exception CannotUnpackTransitionsOfMN of unit
 
-val get_bisim_states :
-  Model.State.t ->
-  Model.State.t option ->
-  Model.Partition.t ->
-  Model.States.t
+val get_bisim_states_of :
+  Model.State.t -> Model.State.t option -> Model.States.t
 
 val get_n_candidate_actions :
   'a ->
-  'b ->
   Fsm.t ->
   Model.Action.t ->
   Model.State.t ->
@@ -220,7 +231,6 @@ val get_n_candidate_actions :
 
 val get_n_candidate_action_list :
   'a ->
-  'b ->
   Fsm.t ->
   Model.Action.t ->
   Model.State.t ->
@@ -232,7 +242,6 @@ val warning_multiple_n_candidates :
 
 val get_n_candidate_action :
   'a ->
-  'b ->
   Fsm.t ->
   Model.Action.t ->
   Model.State.t ->
@@ -241,7 +250,6 @@ val get_n_candidate_action :
 
 val get_n_candidate :
   'a ->
-  'b ->
   Fsm.t ->
   Model.Action.t ->
   Model.State.t ->
@@ -250,7 +258,6 @@ val get_n_candidate :
 
 val handle_eexists :
   Proofview.Goal.t ->
-  Algorithms.Bisimilar.result ->
   transition ->
   transition ->
   Model.State.t ->
@@ -263,6 +270,7 @@ val handle_weak_silent_transition :
   unit Proofview.tactic
 
 val warning_multiple_n_dests : Model.States.t -> unit
+val debug_constrs : Proofview.Goal.t -> unit
 
 val get_from_state_of_relation :
   Proofview.Goal.t ->
@@ -271,36 +279,65 @@ val get_from_state_of_relation :
   Model.State.t
 
 val build_tactics_from_constr_tree :
-  Proofview.Goal.t ->
-  Mebi_constr_tree.t ->
-  unit Proofview.tactic list
-
-val apply_lts_constructor :
-  Proofview.Goal.t ->
-  Mebi_constr_tree.t ->
-  unit Proofview.tactic
-
-val handle_weak_constructors :
-  Proofview.Goal.t ->
   'a ->
+  (int * int) Mebi_constr_tree.tree ->
+  (unit -> unit Proofview.tactic) list
+
+val build_constructors :
+  Proofview.Goal.t ->
   Model.Action.annotation ->
   unit Proofview.tactic
 
 val handle_weak_visible_transition :
   Proofview.Goal.t ->
-  Algorithms.Bisimilar.result ->
   Model.State.t * Model.Action.t * Model.State.t ->
   Model.State.t * Model.Action.t * Model.State.t ->
   unit Proofview.tactic
 
 val handle_weak_transition :
   Proofview.Goal.t ->
-  Algorithms.Bisimilar.result ->
   transition ->
   transition ->
   unit Proofview.tactic
 
+exception CouldNotHandle_NewTransition of unit
+
+val handle_new_transition :
+  Proofview.Goal.t -> transition -> unit Proofview.tactic
+
+exception CouldNotHandle_GoalTransition of unit
+
+val handle_goal_transition :
+  Proofview.Goal.t -> transition -> unit Proofview.tactic
+
+exception CouldNotHandle_NewCofix of unit
+
+val handle_new_cofix :
+  Proofview.Goal.t -> unit Proofview.tactic
+
+exception CouldNotHandle_NewWeakSim of unit
+
+val handle_new_weak_sim :
+  Proofview.Goal.t -> unit Proofview.tactic
+
+val do_simplify : Proofview.Goal.t -> unit Proofview.tactic
+
+val handle_constuctors :
+  Proofview.Goal.t ->
+  Model.Action.annotation
+  * (unit -> unit Proofview.tactic) list option ->
+  unit Proofview.tactic
+
+exception CouldNotHandle_BuildConstructors of unit
+exception CouldNotHandle_NewProof of unit
+
+val handle_new_proof :
+  Proofview.Goal.t -> unit Proofview.tactic
+
+val handle_proof_state : unit -> unit Proofview.tactic
+val loop_test : unit -> unit Proofview.tactic
+
 val iter_loop :
   Algorithms.Bisimilar.result -> unit Proofview.tactic
 
-val loop_test : unit -> unit Proofview.tactic
+val _loop_test : unit -> unit Proofview.tactic

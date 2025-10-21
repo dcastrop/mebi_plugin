@@ -2,6 +2,37 @@ open Logging
 open Mebi_wrapper
 open Model
 
+type hyp_cofix =
+  { m : State.t
+  ; n : State.t
+  }
+
+type transition =
+  { from : State.t
+  ; action : Action.t
+  ; dest : State.t option
+  }
+
+type proof_state =
+  | NewProof
+  | NewWeakSim
+  | NewCofix
+  | NewTransition of transition
+  | GoalTransition of transition
+  (* | BuildConstructors of
+      (State.t * Action.t * State.t)
+      * (State.t * Action.t * State.t)
+      * Model.Action.annotation *)
+  (* | ApplyConstructors of unit Proofview.tactic list *)
+  | Constructors of
+      (* (Model.Action.annotation * (unit Proofview.tactic list * unit Proofview.tactic list) option) *)
+      (Model.Action.annotation * (unit -> unit Proofview.tactic) list option)
+
+let the_proof_state : proof_state ref = ref NewProof
+let reset_the_proof_state () : unit = the_proof_state := NewProof
+
+(***********)
+
 let the_cached_result : Algorithms.Bisimilar.result ref option ref = ref None
 let reset_the_cached_result () : unit = the_cached_result := None
 
@@ -12,6 +43,14 @@ let get_the_result () : Algorithms.Bisimilar.result ref =
   match !the_cached_result with
   | None -> raise (MissingBisimResult ()) (* missing_bisim_result () *)
   | Some r -> r
+;;
+
+let get_m () : Fsm.t = !(get_the_result ()).the_fsm_1
+let get_n () : Fsm.t = !(get_the_result ()).the_fsm_2
+let get_bisim_states () : Partition.t = !(get_the_result ()).bisim_states
+
+let get_non_bisim_states () : Partition.t =
+  !(get_the_result ()).non_bisim_states
 ;;
 
 let set_the_result (new_r : Algorithms.Bisimilar.result) : unit =
@@ -25,17 +64,6 @@ let set_the_result (new_r : Algorithms.Bisimilar.result) : unit =
 ;;
 
 (********************************)
-
-type hyp_cofix =
-  { m : State.t
-  ; n : State.t
-  }
-
-type transition =
-  { from : State.t
-  ; action : Action.t
-  ; dest : State.t option
-  }
 
 let pstr_transition (x : transition) : string =
   Printf.sprintf
@@ -280,12 +308,12 @@ let try_get_concl_transition gl n x : (concl_transition * transition) option =
   | _ -> None
 ;;
 
-let try_get_weak_sim gl x : unit option =
+let try_get_weak_sim gl x : EConstr.t option =
   Log.debug "mebi_bisim.try_get_weak_sim";
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   let ty, tys = get_atomic_type sigma x in
   if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
-  then Some ()
+  then Some x
   else None
 ;;
 
@@ -323,7 +351,7 @@ let try_get_exists gl m n x : (transition * State.t) option =
 ;;
 
 type concl_result =
-  | New_Weak_Sim
+  | New_Weak_Sim of EConstr.t
   | Exists of (transition * State.t)
   | Transition of (concl_transition * transition)
 (* | Weak_Transition of transition *)
@@ -340,7 +368,7 @@ let handle_concl
   | Some t -> Transition t
   | None ->
     (match try_get_weak_sim gl the_concl with
-     | Some () -> New_Weak_Sim
+     | Some x -> New_Weak_Sim x
      | None ->
        (match try_get_exists gl m n the_concl with
         | Some (n_transition, m_state) -> Exists (n_transition, m_state)
@@ -482,10 +510,28 @@ let handle_hyps (gl : Proofview.Goal.t) (r : Algorithms.Bisimilar.result)
 
 (* let temp_evar_econstr () : EConstr.t = *)
 
-let get_all_cofix (gl : Proofview.Goal.t) : Names.Id.Set.t =
+let get_all_cofix_names (gl : Proofview.Goal.t) : Names.Id.Set.t =
   Names.Id.Set.filter
     (fun (x : Names.Id.t) -> Mebi_theories.is_cofix x)
     (Context.Named.to_vars (Proofview.Goal.hyps gl))
+;;
+
+let find_cofix_opt (gl : Proofview.Goal.t) (x : EConstr.t)
+  : (Names.Id.t * EConstr.t) option
+  =
+  let eq = Mebi_setup.Eq.econstr (Proofview.Goal.sigma gl) x in
+  match
+    List.find_opt
+      (fun v -> eq (Context.Named.Declaration.get_type v))
+      (Proofview.Goal.hyps gl)
+  with
+  | None -> None
+  | Some h ->
+    let name = Context.Named.Declaration.get_id h in
+    let h_ty : EConstr.t = Context.Named.Declaration.get_type h in
+    (* let ty, tys = get_atomic_type (Proofview.Goal.sigma gl) h_ty in *)
+    (* let v : EConstr.t =  in  *)
+    Some (name, h_ty)
 ;;
 
 let get_all_non_cofix (gl : Proofview.Goal.t) : Names.Id.Set.t =
@@ -498,7 +544,8 @@ let clear_old_hyps (gl : Proofview.Goal.t) : unit Proofview.tactic =
   Tactics.clear (Names.Id.Set.to_list (get_all_non_cofix gl))
 ;;
 
-let handle_new_cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =
+let do_new_cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =
+  Log.notice "clear H; cofix Cofix0; apply In_sim, Pack_sim; intros.";
   Mebi_theories.tactics
     [ Mebi_tactics.cofix gl
     ; Mebi_tactics.apply ~gl (Mebi_theories.c_In_sim ())
@@ -508,27 +555,20 @@ let handle_new_cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =
     ]
 ;;
 
-type proof_state =
-  | NewProof
-  | NewCofix
-  | NewTransition
-
-let determine_proof_state (gl : Proofview.Goal.t) : proof_state option = None
-
 exception CannotUnpackTransitionsOfMN of unit
 
-let get_bisim_states (m : State.t) (n : State.t option) (pi : Partition.t)
-  : States.t
-  =
-  Log.debug "mebi_bisim.get_bisim_states";
-  let bisims = Partition.filter (fun p -> States.mem m p) pi in
+let get_bisim_states_of (m : State.t) (n : State.t option) : States.t =
+  Log.debug "mebi_bisim.get_bisim_states_of";
+  let bisims =
+    Partition.filter (fun p -> States.mem m p) (get_bisim_states ())
+  in
   assert (Int.equal 1 (Partition.cardinal bisims));
   let states : States.t = List.hd (Partition.to_list bisims) in
   (match n with None -> () | Some n -> assert (States.mem n states));
   states
 ;;
 
-let get_n_candidate_actions bisim_states m2 (n : Fsm.t) n_action n1 dest_states
+let get_n_candidate_actions m2 (n : Fsm.t) n_action n1 dest_states
   : States.t Actions.t
   =
   Log.debug "mebi_bisim.get_n_candidate_actions";
@@ -548,13 +588,7 @@ let get_n_candidate_actions bisim_states m2 (n : Fsm.t) n_action n1 dest_states
   n_actions
 ;;
 
-let get_n_candidate_action_list
-      bisim_states
-      m2
-      (n : Fsm.t)
-      n_action
-      n1
-      dest_states
+let get_n_candidate_action_list m2 (n : Fsm.t) n_action n1 dest_states
   : (Action.t * State.t) list
   =
   Log.debug "mebi_bisim.get_n_candidate_action_list";
@@ -575,7 +609,7 @@ let get_n_candidate_action_list
           (k, d) :: acc0)
         v
         acc)
-    (get_n_candidate_actions bisim_states m2 n n_action n1 dest_states)
+    (get_n_candidate_actions m2 n n_action n1 dest_states)
     []
 ;;
 
@@ -593,27 +627,22 @@ let warning_multiple_n_candidates candidates =
             candidates))
 ;;
 
-let get_n_candidate_action bisim_states m2 (n : Fsm.t) n_action n1 dests
-  : Action.t * State.t
+let get_n_candidate_action m2 (n : Fsm.t) n_action n1 dests : Action.t * State.t
   =
   Log.debug "mebi_bisim.get_n_candidate_action";
-  let candidates =
-    get_n_candidate_action_list bisim_states m2 n n_action n1 dests
-  in
+  let candidates = get_n_candidate_action_list m2 n n_action n1 dests in
   warning_multiple_n_candidates candidates;
   let the_candidate = List.hd candidates in
   the_candidate
 ;;
 
-let get_n_candidate bisim_states m2 (n : Fsm.t) n_action n1 dests : State.t =
+let get_n_candidate m2 (n : Fsm.t) n_action n1 dests : State.t =
   Log.debug "mebi_bisim.get_n_candidate";
-  snd (get_n_candidate_action bisim_states m2 n n_action n1 dests)
+  snd (get_n_candidate_action m2 n n_action n1 dests)
 ;;
 
 let handle_eexists
       (gl : Proofview.Goal.t)
-      ({ the_fsm_1 = m; the_fsm_2 = n; bisim_states; _ } :
-        Algorithms.Bisimilar.result)
       ({ from = m1; action = mA; dest = m2 } : transition)
       ({ from = n1; action = nA; dest = n2 } : transition)
       (cm2 : State.t)
@@ -624,8 +653,8 @@ let handle_eexists
   | Some m2, None ->
     assert (State.eq m2 cm2);
     assert (Action.eq ~annos:false ~meta:false mA nA);
-    let dests : States.t = get_bisim_states m2 n2 bisim_states in
-    let n_candidate : State.t = get_n_candidate bisim_states m2 n nA n1 dests in
+    let dests : States.t = get_bisim_states_of m2 n2 in
+    let n_candidate : State.t = get_n_candidate m2 (get_n ()) nA n1 dests in
     let n2 : EConstr.t = enc_to_econstr (fst n_candidate) in
     Mebi_theories.tactics
       [ Tactics.constructor_tac true None 1 (Tactypes.ImplicitBindings [ n2 ])
@@ -640,8 +669,12 @@ let handle_weak_silent_transition gl n1 n2 : unit Proofview.tactic =
     [ Mebi_tactics.apply ~gl (Mebi_theories.c_wk_none ())
     ; Mebi_tactics.unfold_econstr gl (Mebi_theories.c_silent ())
     ; (if State.eq n1 n2
-       then Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ())
-       else Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_trans ()))
+       then (
+         Log.notice "apply rt1n_refl.";
+         Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()))
+       else (
+         Log.notice "apply rt1n_trans.";
+         Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_trans ())))
     ]
 ;;
 
@@ -656,6 +689,24 @@ let warning_multiple_n_dests n_dests =
          (Model.pstr_states n_dests))
 ;;
 
+let debug_constrs gl =
+  let cl = Tacmach.pf_concl gl in
+  let env = Proofview.Goal.env gl in
+  let (ind, _), redcl =
+    Tacmach.pf_apply Tacred.reduce_to_quantified_ind gl cl
+  in
+  let consnames = (snd (Inductive.lookup_mind_specif env ind)).mind_consnames in
+  let nconstr = Array.length consnames in
+  Log.warning
+    (Printf.sprintf
+       "mebi_bisim.debug_constrs, num constrs: (%i)\n%s"
+       nconstr
+       (Array.fold_left
+          (fun acc s -> Printf.sprintf "%s, %s" acc (Names.Id.to_string s))
+          ""
+          consnames))
+;;
+
 let get_from_state_of_relation gl states (rel : EConstr.t) : State.t =
   let sigma = Proofview.Goal.sigma gl in
   let ty, tys = get_atomic_type sigma rel in
@@ -667,68 +718,86 @@ let get_from_state_of_relation gl states (rel : EConstr.t) : State.t =
   find_state_of_enc (econstr_to_enc tys.(1)) states
 ;;
 
-let build_tactics_from_constr_tree gl
-  : Mebi_constr_tree.t -> unit Proofview.tactic list
+let rec build_tactics_from_constr_tree gl
+  : Mebi_constr_tree.t -> (unit -> unit Proofview.tactic) list
   = function
   | Node ((enc, index), []) ->
-    Log.debug "mebi_bisim.build_tactics_from_constr_tree, last";
-    [ Tactics.one_constructor (index + 1) Tactypes.NoBindings
-    ; Mebi_tactics.simplify_and_subst_all ~gl ()
+    (* Log.debug
+       (Printf.sprintf "mebi_bisim.build_tactics_from_constr_tree, last (%i)" index); *)
+    [ (fun () ->
+        Log.notice (Printf.sprintf "constructor %i." index);
+        Tactics.one_constructor index Tactypes.NoBindings)
+      (* ; Mebi_tactics.simplify_and_subst_all ~gl () *)
     ]
   | Node ((enc, index), tree) ->
-    Log.debug "mebi_bisim.build_tactics_from_constr_tree, list";
-    (* Tactics.one_constructor (index + 1) Tactypes.NoBindings
-       :: build_tactics_from_constr_tree (List.hd tree) *)
-    [ Tactics.one_constructor (index + 1) Tactypes.NoBindings
-    ; Mebi_tactics.simplify_and_subst_all ~gl ()
-    ]
+    (* Log.debug
+       (Printf.sprintf "mebi_bisim.build_tactics_from_constr_tree, list (%i)" index); *)
+    (fun () ->
+      Log.notice (Printf.sprintf "constructor %i." index);
+      Tactics.one_constructor index Tactypes.NoBindings)
+    :: build_tactics_from_constr_tree gl (List.hd tree)
 ;;
 
-let apply_lts_constructor gl (constrs : Mebi_constr_tree.t)
-  : unit Proofview.tactic
-  =
-  Log.debug "mebi_bisim.apply_lts_constructor, rt1n_trans";
-  Mebi_tactics.eapply ~gl (Mebi_theories.c_rt1n_trans ())
-;;
-
-(* Mebi_theories.tactics
-   (Mebi_tactics.eapply  ~gl (Mebi_theories.c_rt1n_trans ())
-   :: [] build_tactics_from_constr_tree ~gl constrs) *)
-
-let handle_weak_constructors gl states
-  : Model.Action.annotation -> unit Proofview.tactic
+let build_constructors gl : Model.Action.annotation -> unit Proofview.tactic
   = function
   | [] ->
-    Log.debug "mebi_bisim.handle_weak_constructors, rt1n_refl";
-    (* Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()) *)
-    Proofview.tclUNIT ()
+    Log.debug "mebi_bisim.build_constructors, rt1n_refl";
+    Log.notice "apply rt1n_refl.";
+    Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ())
+    (* | (_tgt, action) :: ((_tgt', action')::t) ->
+       (   match Action.is_silent action, Action.is_silent action with
+       | true, true ->
+
+       ;
+       let pre_meta, post_meta = (List.hd action.meta) in
+       let pre_constrs = build_tactics_from_constr_tree gl (pre_meta) in
+       the_proof_state := Constructors (t, Some (pre_constrs, post_constrs));
+       Mebi_tactics.eapply ~gl (Mebi_theories.c_rt1n_trans ())) *)
   | (_tgt, action) :: t ->
-    (* let lts_term = enc_to_econstr h_action.meta in *)
+    (* the_proof_state := BuildConstructors (mt, nt, t); *)
     Log.debug
       (Printf.sprintf
-         "mebi_bisim.handle_weak_constructors, anno: %s"
+         "mebi_bisim.build_constructors, anno: %s"
          (Model.Action.annotation_pair_to_string (_tgt, action)));
-    let do_constr = apply_lts_constructor gl (List.hd action.meta) in
-    (* let next_constrs = handle_weak_constructors gl states t in *)
-    (* Proofview.tclTHEN do_constr (next_constrs) *)
-    do_constr
+    (* let pre_meta, post_meta = (List.hd action.meta) in *)
+    (* let pre_constrs = build_tactics_from_constr_tree gl (pre_meta) in *)
+    (* the_proof_state := Constructors (t, Some (pre_constrs, post_constrs)); *)
+    let constrs = build_tactics_from_constr_tree gl (List.hd action.meta) in
+    the_proof_state := Constructors (t, Some constrs);
+    Mebi_tactics.eapply
+      ~gl
+      (if Action.is_silent action
+       then (
+         Log.notice "eapply rt1n_trans.";
+         Mebi_theories.c_rt1n_trans ())
+       else (
+         Log.notice "eapply rt1n_refl.";
+         Mebi_theories.c_rt1n_refl ()))
 ;;
+
+(*  :: build_constructors gl (* mt nt *) t *)
+
+(* let do_constr = apply_lts_constructor gl (List.hd action.meta) in *)
+(* let next_constrs = handle_weak_constructors gl mt nt t in *)
+(* Proofview.tclTHEN do_constr next_constrs *)
+(* do_constr *)
+
+(* do_constr *)
 
 let handle_weak_visible_transition
       (gl : Proofview.Goal.t)
-      ({ the_fsm_1 = m; the_fsm_2 = n; bisim_states; _ } :
-        Algorithms.Bisimilar.result)
       ((m1, mA, m2) : State.t * Action.t * State.t)
       ((n1, nA, n2) : State.t * Action.t * State.t)
   : unit Proofview.tactic
   =
+  Log.debug "mebi_bisim.handle_weak_visible_transition";
   (* Log.debug
      (Printf.sprintf
      "mebi_bisim.handle_weak_visible_transition\nm2:\n%s"
      (Model.pstr_state m2)); *)
-  let dests : States.t = get_bisim_states m2 (Some n2) bisim_states in
+  let dests : States.t = get_bisim_states_of m2 (Some n2) in
   assert (States.mem n2 dests);
-  let n_actions = Edges.find n.edges n1 in
+  let n_actions = Edges.find (get_n ()).edges n1 in
   (* Log.debug
      (Printf.sprintf
      "mebi_bisim.handle_weak_visible_transition\nn_actions:\n%s"
@@ -738,19 +807,23 @@ let handle_weak_visible_transition
      (List.of_seq (Actions.to_seq n_actions)))); *)
   let n_action = Model.get_action_with_label n_actions nA.label in
   let n_dests = Actions.find n_actions n_action in
-  Log.debug
-    (Printf.sprintf
-       "mebi_bisim.handle_weak_visible_transition\nn_dests:\n%s"
-       (Model.pstr_states n_dests));
+  (* Log.debug
+     (Printf.sprintf
+     "mebi_bisim.handle_weak_visible_transition\nn_dests:\n%s"
+     (Model.pstr_states n_dests)); *)
   Log.debug
     (Printf.sprintf
        "mebi_bisim.handle_weak_visible_transition\nn_annos hd:\n%s"
        (Model.Action.annotation_to_string (List.hd n_action.annos)));
   warning_multiple_n_dests n_dests;
-  let _the_dest = List.hd (States.to_list n_dests) in
-  let _do_constrs =
-    handle_weak_constructors gl n.states (List.hd n_action.annos)
-  in
+  let the_dest = List.hd (States.to_list n_dests) in
+  assert (States.mem the_dest dests);
+  (* let _do_constrs =
+     handle_weak_constructors gl (get_n ()).states (List.hd n_action.annos)
+     in *)
+  (* the_proof_state
+  := BuildConstructors ((m1, mA, m2), (n1, nA, n2), List.hd n_action.annos); *)
+  the_proof_state := Constructors (List.hd n_action.annos, None);
   Mebi_theories.tactics
     [ Mebi_tactics.eapply ~gl (Mebi_theories.c_wk_some ())
     ; Mebi_tactics.unfold_econstr gl (Mebi_theories.c_silent ())
@@ -762,129 +835,289 @@ let handle_weak_visible_transition
 
 let handle_weak_transition
       (gl : Proofview.Goal.t)
-      (r : Algorithms.Bisimilar.result)
       (mt : transition)
       (nt : transition)
   : unit Proofview.tactic
   =
-  Log.debug
-    (Printf.sprintf
-       "mebi_bisim.handle_weak_visible_transition\nmt:\n%s\n\nnt:\n%s\n"
-       (pstr_transition mt)
-       (pstr_transition nt));
+  (* Log.debug
+     (Printf.sprintf
+     "mebi_bisim.handle_weak_transition\nmt:\n%s\n\nnt:\n%s\n"
+     (pstr_transition mt)
+     (pstr_transition nt)); *)
   let { from = m1; action = mA; dest = m2 } = mt in
   let { from = n1; action = nA; dest = n2 } = nt in
   match m2, n2 with
   | Some m2, Some n2 ->
     (match Action.Label.is_silent mA.label with
-     | Some true -> handle_weak_silent_transition gl n1 n2
-     | _ -> handle_weak_visible_transition gl r (m1, mA, m2) (n1, nA, n2))
+     | Some true ->
+       the_proof_state := NewWeakSim;
+       handle_weak_silent_transition gl n1 n2
+     | _ -> handle_weak_visible_transition gl (m1, mA, m2) (n1, nA, n2))
   | _, _ -> raise (CannotUnpackTransitionsOfMN ())
+;;
+
+(* match handle_concl gl !(get_the_result ()) with *)
+(* | Empty ->
+     Log.notice
+     "mebi_bisim.handle_build_constuctors, Empty hyps (start of proof?)";
+     let t = do_new_cofix gl in
+     Log.notice "NewProof -> NewCofix";
+     the_proof_state := NewCofix;
+     t *)
+(* | _ -> raise (CouldNotHandle_BuildConstructors ()) *)
+
+exception CouldNotHandle_NewTransition of unit
+
+let handle_new_transition gl mt : unit Proofview.tactic =
+  Log.debug "mebi_bisim.handle_new_transition";
+  Log.debug
+    (Printf.sprintf
+       "mebi_bisim.handle_new_transition, mt:\n%s"
+       (pstr_transition mt));
+  match handle_concl gl !(get_the_result ()) with
+  | Exists (nt, m2) ->
+    Log.debug
+      (Printf.sprintf
+         "mebi_bisim.handle_new_transition, Exists (n2, m2)\n- m2: %s\n\n%s"
+         (Model.pstr_state m2)
+         (pstr_transition nt));
+    the_proof_state := GoalTransition mt;
+    Log.notice "eexists n2";
+    handle_eexists gl mt nt m2
+  | _ -> raise (CouldNotHandle_NewTransition ())
+;;
+
+exception CouldNotHandle_GoalTransition of unit
+
+let handle_goal_transition (gl : Proofview.Goal.t) mt : unit Proofview.tactic =
+  Log.debug "mebi_bisim.handle_goal_transition";
+  Log.debug
+    (Printf.sprintf
+       "mebi_bisim.handle_goal_transition, mt:\n%s"
+       (pstr_transition mt));
+  match handle_concl gl !(get_the_result ()) with
+  | Transition (Weak_Transition, nt) ->
+    Log.debug "mebi_bisim.handle_goal_transition, Weak_Transition";
+    handle_weak_transition gl mt nt
+  | Transition (Silent_Transition, nt) ->
+    Log.warning
+      "mebi_bisim.handle_goal_transition, Silent_Transition (does nothing)";
+    Proofview.tclUNIT ()
+  | Transition (Silent1_Transition, nt) ->
+    Log.warning
+      "mebi_bisim.handle_goal_transition, Silent1_Transition (does nothing)";
+    Proofview.tclUNIT ()
+  | Transition (LTS_Transition, nt) ->
+    Log.warning
+      "mebi_bisim.handle_goal_transition, LTS_Transition (does nothing)";
+    Proofview.tclUNIT ()
+  | _ -> raise (CouldNotHandle_GoalTransition ())
+;;
+
+exception CouldNotHandle_NewCofix of unit
+
+let handle_new_cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =
+  Log.debug "mebi_bisim.handle_new_cofix";
+  match handle_hyps gl !(get_the_result ()) with
+  | Do_Inversion p ->
+    Log.debug "mebi_bisim.handle_new_cofix, do inversion";
+    Log.notice "inversion H.";
+    p
+  | H_Transition mt ->
+    Log.debug
+      (Printf.sprintf
+         "mebi_bisim.handle_new_cofix, H_transition mt\n%s"
+         (pstr_transition mt));
+    the_proof_state := NewTransition mt;
+    handle_new_transition gl mt
+  | _ -> raise (CouldNotHandle_NewCofix ())
+;;
+
+exception CouldNotHandle_NewWeakSim of unit
+
+let handle_new_weak_sim (gl : Proofview.Goal.t) : unit Proofview.tactic =
+  match handle_concl gl !(get_the_result ()) with
+  | New_Weak_Sim x ->
+    Log.debug "mebi_bisim.handle_new_weak_sim, New_Weak_Sim";
+    (match find_cofix_opt gl x with
+     | Some (n, h) ->
+       Log.notice (Printf.sprintf "apply %s." (Names.Id.to_string n));
+       Log.debug
+         (Printf.sprintf
+            "mebi_bisim.handle_new_weak_sim, apply:\n%s"
+            (Strfy.econstr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl) h));
+       Tactics.exact_check h
+     | None ->
+       the_proof_state := NewCofix;
+       do_new_cofix gl)
+  | _ -> raise (CouldNotHandle_NewWeakSim ())
+;;
+
+(* let handle_apply_constuctors gl
+   : unit Proofview.tactic list -> unit Proofview.tactic
+   = function
+   | [] ->
+   Log.debug "mebi_bisim.handle_apply_constuctors -> NewWeakSim";
+   the_proof_state := NewWeakSim;
+   handle_new_weak_sim gl
+   | h :: t ->
+   Log.debug "mebi_bisim.handle_apply_constuctors";
+   the_proof_state := ApplyConstructors t;
+   h
+   ;; *)
+
+let do_simplify gl : unit Proofview.tactic =
+  Log.notice "simpl in *.";
+  Mebi_tactics.simplify_and_subst_all ~gl ()
+;;
+
+let handle_constuctors gl
+  :  Model.Action.annotation * (unit -> unit Proofview.tactic) list option
+  -> unit Proofview.tactic
+  = function
+  | [], None ->
+    Log.debug "mebi_bisim.handle_constuctors, ([], None)";
+    the_proof_state := NewWeakSim;
+    (* handle_new_weak_sim gl *)
+    Log.notice "apply rt1n_refl.";
+    Mebi_theories.tactics
+      [ Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()); do_simplify gl ]
+  | [], Some [] ->
+    Log.debug "mebi_bisim.handle_constuctors, ([], Some [])";
+    the_proof_state := NewWeakSim;
+    (* handle_new_weak_sim gl *)
+    Log.notice "apply rt1n_refl.";
+    Mebi_theories.tactics
+      [ Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()); do_simplify gl ]
+  | ls, Some [] ->
+    Log.debug "mebi_bisim.handle_constuctors, (ls, Some [])";
+    Log.debug
+      (Printf.sprintf
+         "mebi_bisim.handle_constuctors, ls:\n%s"
+         (Model.Action.annotation_to_string ls));
+    Mebi_theories.tactics [ do_simplify gl; build_constructors gl ls ]
+  | ls, None ->
+    Log.debug "mebi_bisim.handle_constuctors, (ls, None)";
+    build_constructors gl ls
+  | ls, Some (h :: t) ->
+    Log.debug "mebi_bisim.handle_constuctors, (ls, Some h::t)";
+    (* build_constructors gl ls *)
+    the_proof_state := Constructors (ls, Some t);
+    h ()
+;;
+
+exception CouldNotHandle_BuildConstructors of unit
+
+(* let handle_build_constuctors gl mt nt constrs : unit Proofview.tactic =
+   Log.debug "mebi_bisim.handle_build_constuctors";
+   Log.warning "mebi_bisim.handle_build_constuctors, ...";
+   Log.notice
+   (Printf.sprintf
+   "mebi_bisim.handle_build_constuctors\nconstrs:\n%s"
+   (Model.Action.annotation_to_string constrs));
+   let constrs = build_constructors gl mt nt constrs in
+   if List.is_empty constrs
+   then Log.warning "mebi_bisim.handle_build_constuctors, empty"
+   else
+   Log.debug
+   (Printf.sprintf
+   "mebi_bisim.handle_build_constuctors, (%i)"
+   (List.length constrs));
+   the_proof_state := ApplyConstructors constrs;
+   Proofview.tclUNIT ()
+   ;; *)
+
+exception CouldNotHandle_NewProof of unit
+
+let handle_new_proof gl : unit Proofview.tactic =
+  Log.debug "mebi_bisim.handle_new_proof";
+  match handle_hyps gl !(get_the_result ()) with
+  | Empty ->
+    Log.debug "mebi_bisim.handle_new_proof, Empty hyps (start of proof)";
+    the_proof_state := NewWeakSim;
+    handle_new_weak_sim gl
+  | _ -> raise (CouldNotHandle_NewProof ())
+;;
+
+let handle_proof_state () : unit Proofview.tactic =
+  Proofview.Goal.enter (fun gl ->
+    match !the_proof_state with
+    | NewProof -> handle_new_proof gl
+    | NewWeakSim -> handle_new_weak_sim gl
+    | NewCofix -> handle_new_cofix gl
+    | NewTransition mt -> handle_new_transition gl mt
+    | GoalTransition mt -> handle_goal_transition gl mt
+    (* | BuildConstructors (mt, nt, constrs) ->
+      handle_build_constuctors gl mt nt constrs *)
+    (* | ApplyConstructors tactics -> handle_apply_constuctors gl tactics *)
+    | Constructors (anno, tacs) -> handle_constuctors gl (anno, tacs))
+;;
+
+let loop_test () : unit Proofview.tactic =
+  Log.debug "mebi_bisim.loop_test";
+  Mebi_theories.tactics
+    [ handle_proof_state (); Mebi_tactics.simplify_and_subst_all () ]
 ;;
 
 let iter_loop (r : Algorithms.Bisimilar.result) : unit Proofview.tactic =
   Proofview.Goal.enter (fun (x : Proofview.Goal.t) ->
     match handle_hyps x r with
     | Empty ->
-      Log.notice "mebi_bisim.iter_loop, Empty hyps (start of proof?)";
-      handle_new_cofix x
+      Log.debug "mebi_bisim.iter_loop, Empty hyps (start of proof?)";
+      do_new_cofix x
     | Do_Inversion p ->
-      Log.notice "mebi_bisim.iter_loop, do inversion";
+      Log.debug "mebi_bisim.iter_loop, do inversion";
       p
     | Cofixes cs ->
-      Log.notice "mebi_bisim.iter_loop, hyp cofixes (does nothing)";
+      Log.debug "mebi_bisim.iter_loop, hyp cofixes (does nothing)";
       Proofview.tclUNIT ()
     | H_Transition mt ->
-      Log.notice
+      Log.debug
         (Printf.sprintf
            "mebi_bisim.iter_loop, H_transition mt\n%s"
            (pstr_transition mt));
       (match handle_concl x r with
-       | New_Weak_Sim ->
-         Log.notice "mebi_bisim.iter_loop, New_Weak_Sim";
-         handle_new_cofix x
+       | New_Weak_Sim _ ->
+         Log.debug "mebi_bisim.iter_loop, New_Weak_Sim";
+         do_new_cofix x
        | Transition t ->
          (match t with
           | Weak_Transition, nt ->
-            Log.notice
+            Log.debug
               (Printf.sprintf
                  "mebi_bisim.iter_loop, Weak_Transition nt\n%s"
                  (pstr_transition nt));
-            handle_weak_transition x r mt nt
+            handle_weak_transition x mt nt
           | Silent_Transition, nt ->
-            Log.notice
+            Log.debug
               (Printf.sprintf
                  "mebi_bisim.iter_loop, Silent nt (does nothing)\n%s"
                  (pstr_transition nt));
             (* handle_weak_transition x r mt nt *)
             Proofview.tclUNIT ()
           | Silent1_Transition, nt ->
-            Log.notice
+            Log.debug
               (Printf.sprintf
                  "mebi_bisim.iter_loop, Silent1 nt (does nothing)\n%s"
                  (pstr_transition nt));
             (* handle_weak_transition x r mt nt *)
             Proofview.tclUNIT ()
           | LTS_Transition, _t ->
-            Log.notice
+            Log.debug
               (Printf.sprintf
                  "mebi_bisim.iter_loop, LTS_Transition _t (does nothing)\n%s"
                  (pstr_transition _t));
             Proofview.tclUNIT ())
        | Exists (nt, m2) ->
-         Log.notice
+         Log.debug
            (Printf.sprintf
               "mebi_bisim.iter_loop, Exists (n2, m2)\n- m2: %s\n\n%s"
               (Model.pstr_state m2)
               (pstr_transition nt));
-         handle_eexists x r mt nt m2)
-    (* | H_Transition (Layer, mt) ->
-       Log.notice
-       (Printf.sprintf
-       "mebi_bisim.iter_loop, H_transition Layer mt\n%s"
-       (pstr_transition mt));
-       (match handle_concl x r with
-       | New_Weak_Sim ->
-       Log.notice "mebi_bisim.iter_loop, New_Weak_Sim";
-       handle_new_cofix x
-       | Transition t ->
-       (match t with
-       | Weak_Transition, nt ->
-       Log.notice
-       (Printf.sprintf
-       "mebi_bisim.iter_loop, Weak_Transition nt\n%s"
-       (pstr_transition nt));
-       handle_weak_transition x r mt nt
-       | Silent_Transition, nt ->
-       Log.notice
-       (Printf.sprintf
-       "mebi_bisim.iter_loop, Silent nt (does nothing)\n%s"
-       (pstr_transition nt));
-       (* handle_weak_transition x r mt nt *)
-       Proofview.tclUNIT ()
-       | Silent1_Transition, nt ->
-       Log.notice
-       (Printf.sprintf
-       "mebi_bisim.iter_loop, Silent1 nt (does nothing)\n%s"
-       (pstr_transition nt));
-       (* handle_weak_transition x r mt nt *)
-       Proofview.tclUNIT ()
-       | LTS_Transition, _t ->
-       Log.notice
-       (Printf.sprintf
-       "mebi_bisim.iter_loop, LTS_Transition _t (does nothing)\n%s"
-       (pstr_transition _t));
-       Proofview.tclUNIT ())
-       | Exists (nt, m2) ->
-       Log.notice
-       (Printf.sprintf
-       "mebi_bisim.iter_loop, Exists (n2, m2)\n- m2: %s\n\n%s"
-       (Model.pstr_state m2)
-       (pstr_transition nt));
-       handle_eexists x r mt nt m2) *))
+         handle_eexists x mt nt m2))
 ;;
 
-let loop_test () : unit Proofview.tactic =
+let _loop_test () : unit Proofview.tactic =
   Log.debug "mebi_bisim.get_test";
   (* Mebi_wrapper.show_fwd_map (); *)
   (* Mebi_wrapper.show_bck_map (); *)
