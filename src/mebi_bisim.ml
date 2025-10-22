@@ -940,13 +940,13 @@ let handle_new_weak_sim (gl : Proofview.Goal.t) : unit Proofview.tactic =
   | New_Weak_Sim x ->
     Log.debug "mebi_bisim.handle_new_weak_sim, New_Weak_Sim";
     (match find_cofix_opt gl x with
-     | Some (n, h) ->
-       Log.notice (Printf.sprintf "apply %s." (Names.Id.to_string n));
+     | Some (n, _h) ->
+       Log.notice (Printf.sprintf "apply %s. (trivial)" (Names.Id.to_string n));
        Log.debug
          (Printf.sprintf
             "mebi_bisim.handle_new_weak_sim, apply:\n%s"
-            (Strfy.econstr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl) h));
-       Tactics.exact_check h
+            (Strfy.econstr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl) _h));
+       Auto.gen_trivial ~debug:Hints.Info [] None
      | None ->
        the_proof_state := NewCofix;
        do_new_cofix gl)
@@ -1057,71 +1057,4 @@ let loop_test () : unit Proofview.tactic =
   Log.debug "mebi_bisim.loop_test";
   Mebi_theories.tactics
     [ handle_proof_state (); Mebi_tactics.simplify_and_subst_all () ]
-;;
-
-let iter_loop (r : Algorithms.Bisimilar.result) : unit Proofview.tactic =
-  Proofview.Goal.enter (fun (x : Proofview.Goal.t) ->
-    match handle_hyps x r with
-    | Empty ->
-      Log.debug "mebi_bisim.iter_loop, Empty hyps (start of proof?)";
-      do_new_cofix x
-    | Do_Inversion p ->
-      Log.debug "mebi_bisim.iter_loop, do inversion";
-      p
-    | Cofixes cs ->
-      Log.debug "mebi_bisim.iter_loop, hyp cofixes (does nothing)";
-      Proofview.tclUNIT ()
-    | H_Transition mt ->
-      Log.debug
-        (Printf.sprintf
-           "mebi_bisim.iter_loop, H_transition mt\n%s"
-           (pstr_transition mt));
-      (match handle_concl x r with
-       | New_Weak_Sim _ ->
-         Log.debug "mebi_bisim.iter_loop, New_Weak_Sim";
-         do_new_cofix x
-       | Transition t ->
-         (match t with
-          | Weak_Transition, nt ->
-            Log.debug
-              (Printf.sprintf
-                 "mebi_bisim.iter_loop, Weak_Transition nt\n%s"
-                 (pstr_transition nt));
-            handle_weak_transition x mt nt
-          | Silent_Transition, nt ->
-            Log.debug
-              (Printf.sprintf
-                 "mebi_bisim.iter_loop, Silent nt (does nothing)\n%s"
-                 (pstr_transition nt));
-            (* handle_weak_transition x r mt nt *)
-            Proofview.tclUNIT ()
-          | Silent1_Transition, nt ->
-            Log.debug
-              (Printf.sprintf
-                 "mebi_bisim.iter_loop, Silent1 nt (does nothing)\n%s"
-                 (pstr_transition nt));
-            (* handle_weak_transition x r mt nt *)
-            Proofview.tclUNIT ()
-          | LTS_Transition, _t ->
-            Log.debug
-              (Printf.sprintf
-                 "mebi_bisim.iter_loop, LTS_Transition _t (does nothing)\n%s"
-                 (pstr_transition _t));
-            Proofview.tclUNIT ())
-       | Exists (nt, m2) ->
-         Log.debug
-           (Printf.sprintf
-              "mebi_bisim.iter_loop, Exists (n2, m2)\n- m2: %s\n\n%s"
-              (Model.pstr_state m2)
-              (pstr_transition nt));
-         handle_eexists x mt nt m2))
-;;
-
-let _loop_test () : unit Proofview.tactic =
-  Log.debug "mebi_bisim.get_test";
-  (* Mebi_wrapper.show_fwd_map (); *)
-  (* Mebi_wrapper.show_bck_map (); *)
-  let the_result = get_the_result () in
-  Mebi_theories.tactics
-    [ iter_loop !the_result; Mebi_tactics.simplify_and_subst_all () ]
 ;;

@@ -28,10 +28,10 @@ MeBi Reset All.
 MeBi Set ShowAny      True.
 MeBi Set ShowNotices  True.
 MeBi Set ShowDebug    True.
-(* MeBi Set ShowDetails  True. *)
+MeBi Set ShowDetails  True.
 MeBi Set ShowDetails  False.
 MeBi Set ShowResults  True.
-(* MeBi Set ShowWarnings True. *)
+MeBi Set ShowWarnings True.
 (* MeBi Set Bound 100. *)
 MeBi Set WeakMode     True.
 MeBi Set Weak Option label.
@@ -71,35 +71,10 @@ Proof.
   MeBiSim Step. (* constructor 5. *)
   MeBiSim Step. (* apply rt1n_refl. *)
   MeBiSim Step. (* clear H; cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
-  
-  (* apply rt1n_refl. constructor 2. constructor 1.  *)
-
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-
-  (* exact Cofix2. *)
-  (* apply Cofix2. *)
-  (* TODO: figure out how to apply hypothesis *)
-  (* NOTE: apply and exact don't appear to work from the API? *)
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-
-
-  (* constructor 5. *)
-  (* eapply rt1n_trans. constructor 2. constructor 5. *)
-  (* MeBiSim Step. *)
-  (* constructor 4. simpl in *. *)
+  MeBiSim Step. (* inversion H; simpl in *. *)
+  MeBiSim Step. (* inversion H4; simpl in *. *)
 
   (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-  (* eapply rt1n_trans. constructor 4. simpl in *. *)
-  (* eapply rt1n_trans. constructor 2. constructor 5. *)
-  (* apply rt1n_refl. constructor 2. constructor 1.  *)
-  (* apply rt1n_refl. *)
 
 
 Admitted.

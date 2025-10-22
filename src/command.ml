@@ -1043,8 +1043,21 @@ let proof_intro
   : Declare.Proof.t mm
   =
   Log.trace "command.proof_intro";
-  let* _ = run (CheckBisimilarity ((x, a), (y, b))) refs in
   Mebi_bisim.reset_the_proof_state ();
+  let* _ = run (CheckBisimilarity ((x, a), (y, b))) refs in
+  let r = !(Mebi_bisim.get_the_result ()) in
+  Log.debug
+    (Printf.sprintf
+       "command.proof_intro, bisim result:\n%s"
+       (Algorithms.Bisimilar.pstr r));
+  Log.debug
+    (Printf.sprintf
+       "command.proof_intro, the_fsm_1:\n%s"
+       (Fsm.pstr r.the_fsm_1));
+  Log.debug
+    (Printf.sprintf
+       "command.proof_intro, the_fsm_2:\n%s"
+       (Fsm.pstr r.the_fsm_2));
   return
     (Mebi_tactics.update_proof_by_tactic
        pstate
