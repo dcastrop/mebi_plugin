@@ -25,7 +25,7 @@ let m_unify (t0 : EConstr.t) (t1 : EConstr.t) : bool mm =
       let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
       (* Log.debug
          (Printf.sprintf
-         "Success, unified \"%s\" with \"%s\""
+         "command.m_unitfy, Success, unified \"%s\" with \"%s\""
          (econstr_to_string t0)
          (econstr_to_string t1)); *)
       sigma, true
@@ -34,7 +34,7 @@ let m_unify (t0 : EConstr.t) (t1 : EConstr.t) : bool mm =
       ->
       (* Log.debug
          (Printf.sprintf
-         "Could not unify \"%s\" with \"%s\""
+         "command.m_unitfy, Could not unify \"%s\" with \"%s\""
          (econstr_to_string t0)
          (econstr_to_string t1)); *)
       sigma, false)
@@ -70,13 +70,8 @@ let extract_args (substl : EConstr.Vars.substl) (tm : Constr.t)
   | _ -> (* assert false *) invalid_lts_term_kind tm
 ;;
 
-type unif_problem =
-  { termL : EConstr.t
-  ; termR : EConstr.t
-  }
-
-let rec unify_all (i : (Mebi_constr_tree.t * unif_problem) list)
-  : Mebi_constr_tree.t list option mm
+let rec unify_all (i : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list)
+  : Mebi_constr.Tree.t list option mm
   =
   match i with
   | [] -> return (Some [])
@@ -97,8 +92,8 @@ let rec unify_all (i : (Mebi_constr_tree.t * unif_problem) list)
 
 let sandboxed_unify
       (tgt_term : EConstr.t)
-      (u : (Mebi_constr_tree.t * unif_problem) list)
-  : (EConstr.t * Mebi_constr_tree.t list) option mm
+      (u : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list)
+  : (EConstr.t * Mebi_constr.Tree.t list) option mm
   =
   (* let* _ = if is_output_kind_enabled params then debug (fun env sigma -> str
      "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term) else return ()
@@ -113,19 +108,14 @@ let sandboxed_unify
        if is_undefined then return None else return (Some (term, unified)))
 ;;
 
-(** [coq_ctor]
-    - [EConstr.t] action
-    - [EConstr.t] destination
-    - [Mebi_constr_tree.t] coq-constructor index *)
-type coq_ctor = EConstr.t * EConstr.t * Mebi_constr_tree.t
-
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
-          (acc : coq_ctor list)
+          (acc : Mebi_constr.t list)
           (i : int)
           (act : EConstr.t)
           (tgt_term : EConstr.t)
-  : int * (Mebi_constr_tree.t * unif_problem) list list -> coq_ctor list mm
+  :  int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list
+  -> Mebi_constr.t list mm
   = function
   | _, [] -> return acc
   | lts_index, u1 :: nctors ->
@@ -135,19 +125,95 @@ let rec retrieve_tgt_nodes
      | Some (tgt, ctor_tree) ->
        let$+ act env sigma = Reductionops.nf_all env sigma act in
        retrieve_tgt_nodes
-         ((act, tgt, Node ((Enc.of_int lts_index, i + 1), ctor_tree)) :: acc)
+         ((act, tgt, Node ((Enc.of_int lts_index, i), ctor_tree)) :: acc)
          i
          act
          tgt_term
          (lts_index, nctors))
 ;;
 
+let unify_args_with
+      (term_to_unify : EConstr.t)
+      (action_to_unify : EConstr.t option)
+      ((termL, act, termR) : EConstr.t * EConstr.t * EConstr.t)
+  : bool mm
+  =
+  let* unified_termL = m_unify term_to_unify termL in
+  if unified_termL
+  then Option.cata (fun a -> m_unify a act) (return true) action_to_unify
+  else return false
+;;
+
+let _debug_check_valid_constructor_acc lts_index ctor_index t ctor_vals
+  : unit mm
+  =
+  let* env = get_env in
+  let* sigma = get_sigma in
+  Log.debug
+    (Printf.sprintf
+       "check_valid_constructor (%i:%i),\nfrom: %s\nctors:\n%s"
+       lts_index
+       ctor_index
+       (Strfy.econstr env sigma t)
+       (Strfy.list
+          ~force_newline:true
+          ~label:"ctors"
+          (Strfy.lts_constr ~indent:1 env sigma)
+          ctor_vals));
+  return ()
+;;
+
+let _debug_check_valid_constructor_ctx_tm tm : unit mm =
+  Log.debug
+    (Printf.sprintf
+       "check_valid_constructor (ctx, tm), tm:\n%s"
+       (constr_to_string tm));
+  return ()
+;;
+
+let next_constrs_to_string
+      (ctors : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+  : string
+  =
+  Strfy.list
+    ~force_newline:true
+    Strfy.constr_tree
+    (List.fold_left
+       (fun acc0 xs -> List.fold_left (fun acc1 (x, _) -> x :: acc1) acc0 xs)
+       []
+       ctors)
+;;
+
+let _debug_check_updated_ctx_acc
+      ((lts_index, acc) :
+        int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+  : unit
+  =
+  Log.debug
+    (Printf.sprintf
+       "check_updated_ctx, (%i) acc:\n%s"
+       lts_index
+       (next_constrs_to_string acc))
+;;
+
+let _debug_cross_product_acc
+      ((lts_index, acc) :
+        int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+  : unit
+  =
+  Log.debug
+    (Printf.sprintf
+       "cross_product, (%i) acc:\n%s"
+       lts_index
+       (next_constrs_to_string acc))
+;;
+
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
-          (acc : int * (Mebi_constr_tree.t * unif_problem) list list)
-          (lts_ind_def_encmap : Mebi_ind.t F.t)
+          (acc : int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+          (lts_encmap : Mebi_ind.t F.t)
   :  EConstr.t list * EConstr.rel_declaration list
-  -> (int * (Mebi_constr_tree.t * unif_problem) list list) option mm
+  -> (int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list) option mm
   = function
   | [], [] -> return (Some acc)
   | _hsubstl :: substl, t :: tl ->
@@ -158,146 +224,166 @@ let rec check_updated_ctx
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with
      | App (fn, args) ->
-       (match F.find_opt lts_ind_def_encmap fn with
+       (match F.find_opt lts_encmap fn with
         | None ->
-          (* NOTE: testing handling the [@eq] premises *)
-          (match econstr_to_string fn with
-           | "option" ->
-             (* TODO: fail if weak is not Params.WeakEnc.OptionConstr *)
-             (* if Params.WeakEnc.is_option () then *)
-             if Logging.is_details_enabled ()
-             then
-               Log.warning
-                 (Printf.sprintf
-                    "check_updated_ctx, lts_ind_def_encmap \"option\" has \
-                     args: %s"
-                    (Strfy.list (Strfy.econstr env sigma) (Array.to_list args)));
-             check_updated_ctx acc lts_ind_def_encmap (substl, tl)
-           | "@eq" ->
-             (* TODO: fail, or *)
-             (* TODO: find way to propagate this (replace in F map?) *)
-             let* lhs : EConstr.t = normalize_econstr args.(1) in
-             let* rhs : EConstr.t = normalize_econstr args.(2) in
-             Log.warning
-               (Printf.sprintf
-                  "TODO: check_updated_ctx, handle premise (normalized):\n\
-                   fn: %s\n\
-                   lhs: %s\n\
-                   rhs: %s"
-                  (econstr_to_string fn)
-                  (econstr_to_string lhs)
-                  (econstr_to_string rhs));
-             check_updated_ctx acc lts_ind_def_encmap (substl, tl)
-           | _ ->
-             (* TODO: fail ? *)
-             Log.warning
-               (Printf.sprintf
-                  "check_updated_ctx, lts_ind_def_encmap does not have \
-                   corresponding fn \"%s\" with args: %s."
-                  (econstr_to_string fn)
-                  (Strfy.list (Strfy.econstr env sigma) (Array.to_list args)));
-             check_updated_ctx acc lts_ind_def_encmap (substl, tl))
+          handle_unrecognized_ctor_fn (fn, args) acc lts_encmap (substl, tl)
         | Some c ->
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
           let* c_constr_transitions = Mebi_ind.get_constr_transitions c in
-          let* ctors : coq_ctor list =
+          let* ctors : Mebi_constr.t list =
             check_valid_constructor
               c_constr_transitions
-              lts_ind_def_encmap
+              lts_encmap
               nextT
               (Some args.(1))
               c.index
           in
-          if List.is_empty ctors
-          then return None
-          else (
-            let ctree_unif_probs : (Mebi_constr_tree.t * unif_problem) list =
-              List.map
-                (fun (_, (tL : EConstr.t), (i : Mebi_constr_tree.t)) ->
-                  i, { termL = tL; termR = args.(2) })
-                ctors
-            in
-            (* We need to cross-product all possible unifications. This is in
-               case we have a constructor of the form LTS t11 a1 t12 -> LTS t21
-               a2 t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
-               unavoidable, but we should make sure we understand well the
-               problem before removing the source of repetition. *)
-            (* FIXME: Test this *)
-            (* replace [rtls] in [rtls_ctx] *)
-            (* let rtls_ctx':rlts_list = List.append [ ] in *)
-            let acc' : (Mebi_constr_tree.t * unif_problem) list list =
-              List.concat_map
-                (fun (x : (Mebi_constr_tree.t * unif_problem) list) ->
-                  List.map
-                    (fun (y : Mebi_constr_tree.t * unif_problem) -> y :: x)
-                    ctree_unif_probs)
-                (snd acc)
-            in
-            check_updated_ctx (fst acc, acc') lts_ind_def_encmap (substl, tl)))
-     | _ -> check_updated_ctx acc lts_ind_def_encmap (substl, tl))
+          (match ctors with
+           | [] -> return None
+           | ctors ->
+             let ctors_unif_probs
+               : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list
+               =
+               List.map
+                 (fun (_tAct, (tDest : EConstr.t), (i : Mebi_constr.Tree.t)) ->
+                   let unif_prob : Mebi_setup.unif_problem =
+                     { termL = tDest; termR = args.(2) }
+                   in
+                   i, unif_prob)
+                 ctors
+             in
+             (cross_product acc ctors_unif_probs) lts_encmap (substl, tl)))
+     | _ -> check_updated_ctx acc lts_encmap (substl, tl))
   | _substl, _ctxl -> invalid_check_updated_ctx _substl _ctxl
 (* Impossible! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
+and cross_product (lts_index, acc) ctree_unif_probs =
+  _debug_check_updated_ctx_acc (lts_index, acc);
+  (* We need to cross-product all possible unifications. This is in
+     case we have a constructor of the form LTS t11 a1 t12 -> LTS t21
+     a2 t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
+     unavoidable, but we should make sure we understand well the
+     problem before removing the source of repetition. *)
+  let acc : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list =
+    List.fold_left
+      (fun (acc0 : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+        x ->
+        List.fold_left
+          (fun (acc1 : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+            y -> (y :: x) :: acc1)
+          acc0
+          ctree_unif_probs)
+      []
+      acc
+  in
+  _debug_cross_product_acc (lts_index, acc);
+  check_updated_ctx (lts_index, acc)
+
+and check_next_constructors
+      ((i, ctor_vals) : int * Mebi_constr.t list)
+      (next_ctors :
+        (int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list) option)
+      ((act, tgt_term) : EConstr.t * EConstr.t)
+  : Mebi_constr.t list mm
+  =
+  match next_ctors with
+  | None -> return ctor_vals
+  | Some index_ctor_pair ->
+    (match snd index_ctor_pair with
+     | [] ->
+       let* sigma = get_sigma in
+       if EConstr.isEvar sigma tgt_term
+       then return ctor_vals
+       else (
+         let constr_tree : Mebi_constr.Tree.t =
+           Mebi_constr.Tree.Node ((Enc.of_int (fst index_ctor_pair), i), [])
+         in
+         return ((act, tgt_term, constr_tree) :: ctor_vals))
+     | nctors ->
+       let tgt_nodes =
+         retrieve_tgt_nodes ctor_vals i act tgt_term index_ctor_pair
+       in
+       tgt_nodes)
+
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
       (ctor_transitions : (Constr.rel_context * Constr.types) array)
-      (lts_ind_def_encmap : Mebi_ind.t F.t)
-      (t' : EConstr.t)
-      (ma : EConstr.t option)
+      (lts_encmap : Mebi_ind.t F.t)
+      (t : EConstr.t)
+      (ctor_action : EConstr.t option)
       (lts_index : int)
-  : coq_ctor list mm
+  : Mebi_constr.t list mm
   =
-  let* t : EConstr.t = normalize_econstr t' in
-  let iter_body (i : int) (ctor_vals : coq_ctor list) =
+  let* t : EConstr.t = normalize_econstr t in
+  let iter_body (i : int) (ctor_vals : Mebi_constr.t list) =
+    let* () = _debug_check_valid_constructor_acc lts_index i t ctor_vals in
     let (ctx, tm) : Constr.rel_context * Constr.t = ctor_transitions.(i) in
-    let ctx_tys : EConstr.rel_declaration list =
-      List.map EConstr.of_rel_decl ctx
-    in
+    (* let* () = _debug_check_valid_constructor_ctx_tm tm in *)
+    let ctx_tys = List.map EConstr.of_rel_decl ctx in
     let* substl = mk_ctx_substl [] (List.rev ctx_tys) in
-    let* (termL, act, termR) : EConstr.t * EConstr.t * EConstr.t =
-      extract_args substl tm
-    in
-    let* success = m_unify t termL in
-    if success
-    then
-      let* success = Option.cata (fun a -> m_unify a act) (return true) ma in
-      if success
-      then
-        let* act : EConstr.t = normalize_econstr act in
-        let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in
-        let* next_ctors
-          : (int * (Mebi_constr_tree.t * unif_problem) list list) option
-          =
-          check_updated_ctx
-            (lts_index, [ [] ])
-            lts_ind_def_encmap
-            (substl, ctx_tys)
-        in
-        match next_ctors with
-        | None -> return ctor_vals
-        | Some index_ctor_pair ->
-          (match snd index_ctor_pair with
-           | [] ->
-             let* sigma = get_sigma in
-             if EConstr.isEvar sigma tgt_term
-             then return ctor_vals
-             else
-               return
-                 (( act
-                  , tgt_term
-                  , Mebi_constr_tree.Node
-                      ((Enc.of_int (fst index_ctor_pair), i), []) )
-                  :: ctor_vals)
-           | nctors ->
-             let tgt_nodes =
-               retrieve_tgt_nodes ctor_vals i act tgt_term index_ctor_pair
-             in
-             tgt_nodes)
-      else return ctor_vals
+    let* args = extract_args substl tm in
+    let* successfully_unified : bool = unify_args_with t ctor_action args in
+    if successfully_unified
+    then (
+      let (_termL, act, termR) : EConstr.t * EConstr.t * EConstr.t = args in
+      let* act : EConstr.t = normalize_econstr act in
+      let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in
+      let* next_ctors =
+        check_updated_ctx (lts_index, [ [] ]) lts_encmap (substl, ctx_tys)
+      in
+      check_next_constructors (i, ctor_vals) next_ctors (act, tgt_term))
     else return ctor_vals
   in
   iterate 0 (Array.length ctor_transitions - 1) [] iter_body
+
+(** raises exception -- we don't yet support these kinds of arguments
+    - TODO: finish handling these, or throw helpful error *)
+and handle_unrecognized_ctor_fn
+      ((fn, args) : EConstr.t * EConstr.t array)
+      acc
+      lts_encmap
+      (substl, tl)
+  : (int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list) option mm
+  =
+  let* env = get_env in
+  let* sigma = get_sigma in
+  (* NOTE: testing handling the [@eq] premises *)
+  match econstr_to_string fn with
+  | "option" ->
+    (* TODO: fail if weak is not Params.WeakEnc.OptionConstr *)
+    (* if Params.WeakEnc.is_option () then *)
+    if Logging.is_details_enabled ()
+    then
+      Log.warning
+        (Printf.sprintf
+           "check_updated_ctx, lts_encmap \"option\" has args: %s"
+           (Strfy.list (Strfy.econstr env sigma) (Array.to_list args)));
+    check_updated_ctx acc lts_encmap (substl, tl)
+  | "@eq" ->
+    (* TODO: fail, or *)
+    (* TODO: find way to propagate this (replace in F map?) *)
+    let* lhs : EConstr.t = normalize_econstr args.(1) in
+    let* rhs : EConstr.t = normalize_econstr args.(2) in
+    Log.warning
+      (Printf.sprintf
+         "TODO: check_updated_ctx, handle premise (normalized):\n\
+          fn: %s\n\
+          lhs: %s\n\
+          rhs: %s"
+         (econstr_to_string fn)
+         (econstr_to_string lhs)
+         (econstr_to_string rhs));
+    check_updated_ctx acc lts_encmap (substl, tl)
+  | _ ->
+    (* TODO: fail ? *)
+    Log.warning
+      (Printf.sprintf
+         "check_updated_ctx, lts_encmap does not have corresponding fn \"%s\" \
+          with args: %s."
+         (econstr_to_string fn)
+         (Strfy.list (Strfy.econstr env sigma) (Array.to_list args)));
+    check_updated_ctx acc lts_encmap (substl, tl)
 ;;
 
 (** [GraphB] is ...
@@ -305,7 +391,7 @@ and check_valid_constructor
 module type GraphB = sig
   module H : Hashtbl.S with type key = Enc.t
   module S : Set.S with type elt = Enc.t
-  module D : Set.S with type elt = Enc.t * Mebi_constr_tree.t
+  module D : Set.S with type elt = Enc.t * Mebi_constr.Tree.t
 
   type constr_transitions = (Action.t, D.t) Hashtbl.t
 
@@ -324,7 +410,7 @@ module type GraphB = sig
     :  constr_transitions
     -> Action.t
     -> Enc.t
-    -> Mebi_constr_tree.t
+    -> Mebi_constr.Tree.t
     -> unit mm
 
   val add_new_term_constr_transition
@@ -332,7 +418,7 @@ module type GraphB = sig
     -> Enc.t
     -> Action.t
     -> Enc.t
-    -> Mebi_constr_tree.t
+    -> Mebi_constr.Tree.t
     -> unit mm
 
   val build_lts_graph
@@ -362,7 +448,7 @@ end
 module MkGraph
     (M : Hashtbl.S with type key = Enc.t)
     (N : Set.S with type elt = Enc.t)
-    (P : Set.S with type elt = Enc.t * Mebi_constr_tree.t) : GraphB = struct
+    (P : Set.S with type elt = Enc.t * Mebi_constr.Tree.t) : GraphB = struct
   (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t] and also
      is used for mapping term types to [cindef]. *)
   module H = M
@@ -371,10 +457,10 @@ module MkGraph
   module S = N
 
   (* [D] is the set of destination tuples, each comprised of a term [EConstr.t]
-     and the corresponding [Mebi_constr_tree.t]. *)
+     and the corresponding [Mebi_constr.Tree.t]. *)
   module D = P
 
-  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Mebi_constr_tree.t].
+  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Mebi_constr.Tree.t].
   *)
   type constr_transitions = (Action.t, D.t) Hashtbl.t
 
@@ -390,7 +476,7 @@ module MkGraph
       0
   ;;
 
-  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Mebi_constr_tree.t].
+  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Mebi_constr.Tree.t].
   *)
   type lts_graph =
     { to_visit : Enc.t Queue.t
@@ -403,13 +489,13 @@ module MkGraph
     ; weak : Params.WeakEnc.t option
     }
 
-  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Mebi_constr_tree.t)] in a given [constr_transitions].
+  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Mebi_constr.Tree.t)] in a given [constr_transitions].
   *)
   let insert_constr_transition
         (constrs : constr_transitions)
         (a : Action.t)
         (d : Enc.t)
-        (c : Mebi_constr_tree.t)
+        (c : Mebi_constr.Tree.t)
     : unit mm
     =
     (match Hashtbl.find_opt constrs a with
@@ -423,7 +509,7 @@ module MkGraph
         (t : Enc.t)
         (a : Action.t)
         (d : Enc.t)
-        (c : Mebi_constr_tree.t)
+        (c : Mebi_constr.Tree.t)
     : unit mm
     =
     H.add
@@ -481,16 +567,20 @@ module MkGraph
         ?(weak_type : Params.WeakEnc.t option = None)
         (from : Enc.t)
         (g : lts_graph)
-        (ctors : coq_ctor list)
+        (ctors : Mebi_constr.t list)
     : S.t mm
     =
     Log.trace "command.MkGraph.get_new_states";
     let iter_body (i : int) (new_states : S.t) =
-      let (act, tgt, int_tree) : coq_ctor = List.nth ctors i in
+      let (act, tgt, int_tree) : Mebi_constr.t = List.nth ctors i in
       let* tgt_enc : Enc.t = encode tgt in
       let* act_enc : Enc.t = encode act in
       let* is_silent : bool option = is_silent_transition weak_type act in
       let meta : Action.MetaData.t = [ int_tree ] in
+      Log.debug
+        (Printf.sprintf
+           "command.MkGraph.get_new_states, new meta: %s"
+           (Action.MetaData.to_string meta));
       let to_add : Action.t =
         { label = act_enc, (None, is_silent); meta; annos = [] }
       in
@@ -522,7 +612,7 @@ module MkGraph
         (from : Enc.t)
         (primary : Mebi_ind.t)
         (lts_ind_def_map : Mebi_ind.t B.t)
-    : coq_ctor list mm
+    : Mebi_constr.t list mm
     =
     Log.trace "command.MkGraph.get_new_constrs";
     let* from_dec : EConstr.t = decode from in
@@ -555,7 +645,7 @@ module MkGraph
     then return g (* exit if bound reached *)
     else (
       let encoded_t : Enc.t = Queue.pop g.to_visit in
-      let* new_constrs : coq_ctor list =
+      let* new_constrs : Mebi_constr.t list =
         get_new_constrs encoded_t the_primary_lts lts_ind_def_map
       in
       (* [get_new_states] also updates [g.to_visit] *)
