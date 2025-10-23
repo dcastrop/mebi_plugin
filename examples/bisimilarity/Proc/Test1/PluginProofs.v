@@ -13,12 +13,13 @@ Import Flat.Simple.
 Require Import MEBI.Examples.bisimilarity.Proc.Test1.Terms.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.Bisim".
-MeBi Set ShowAny True. 
-MeBi Set ShowNotices  True.
-MeBi Set ShowDebug    True.
-MeBi Set ShowDetails  True.
-MeBi Set ShowResults  True.
-MeBi Set ShowWarnings True.
+(* MeBi Set ShowAny True.  *)
+MeBi Set ShowAny False.
+(* MeBi Set ShowNotices  True. *)
+(* MeBi Set ShowDebug    True. *)
+(* MeBi Set ShowDetails  True. *)
+(* MeBi Set ShowResults  True. *)
+(* MeBi Set ShowWarnings True. *)
 MeBi Set WeakMode     True.
 MeBi Set Weak Option label.
 MeBi Bisim p With termLTS And q With termLTS Using termLTS.
@@ -46,8 +47,7 @@ Require Import Logic.
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof.
-  MeBiSim Begin termLTS p And termLTS q Using termLTS. 
-  (* unfold p, q. *)
+  MeBiSim Begin termLTS p And termLTS q Using termLTS. (* unfold p, q. *)
 
   MeBiSim Step. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
   MeBiSim Step. (* inversion H; simpl in *. *)
@@ -71,43 +71,72 @@ Proof.
   MeBiSim Step. (* constructor 5. *)
   MeBiSim Step. (* apply rt1n_refl. *)
   MeBiSim Step. (* clear H; cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
-  
-  (* apply rt1n_refl. constructor 2. constructor 1.  *)
-
   MeBiSim Step. (* inversion H; simpl in *. *)
   MeBiSim Step. (* inversion H4; simpl in *. *)
   MeBiSim Step.
-  (* MeBiSim Step.
-  MeBiSim Step.
-
-  MeBiSim Step.
-  MeBiSim Step. (* NOTE: when [Proc.Flat.Simpl.termLTS.do_par_end] is commented out the proof reaches a state not reached by the plugin when constructing the graph. How is this? *)
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-  MeBiSim Step. *)
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
 
-  (* exact Cofix2. *)
-  (* apply Cofix2. *)
-  (* TODO: figure out how to apply hypothesis *)
-  (* NOTE: apply and exact don't appear to work from the API? *)
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
+  (* MeBiSim Step.  *)
 
-
-  (* constructor 5. *)
-  (* eapply rt1n_trans. constructor 2. constructor 5. *)
-  (* MeBiSim Step. *)
-  (* constructor 4. simpl in *. *)
-
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-  (* eapply rt1n_trans. constructor 4. simpl in *. *)
-  (* eapply rt1n_trans. constructor 2. constructor 5. *)
-  (* apply rt1n_refl. constructor 2. constructor 1.  *)
-  (* apply rt1n_refl. *)
 
 
 Admitted.
