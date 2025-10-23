@@ -449,6 +449,7 @@ exception CouldNotFindSilentAction_Of_FSM of unit
 (* exception FoundMultipleSilentActions_Of_FSM of unit *)
 
 let get_the_silent_action (m : t) : Action.t =
+  Log.trace "fsm.get_the_silent_action";
   match
     Actions.fold
       (fun a _dests acc ->

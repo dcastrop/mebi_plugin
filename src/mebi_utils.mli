@@ -23,3 +23,5 @@ val encode_constrexpr
   -> Mebi_wrapper.Enc.t Mebi_wrapper.mm
 
 val encode_ref : Libnames.qualid -> Mebi_wrapper.Enc.t Mebi_wrapper.mm
+
+val econstr_kind : Evd.econstr -> Rocq_utils.constr_kind Mebi_wrapper.mm

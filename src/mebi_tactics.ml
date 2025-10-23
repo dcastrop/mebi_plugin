@@ -25,7 +25,7 @@ let rec update_proof_by_tactics (pstate : Declare.Proof.t)
 
 (*************************)
 
-let do_inversion (h : Mebi_theories.hyp) : unit Proofview.tactic =
+let do_inversion (h : Rocq_utils.hyp) : unit Proofview.tactic =
   Inv.inv_tac (Context.Named.Declaration.get_id h)
 ;;
 
@@ -35,7 +35,7 @@ let simplify_all ?(gl : Proofview.Goal.t option) () : unit Proofview.tactic =
   let the_fun =
     fun gl ->
     List.fold_left
-      (fun acc (h : Mebi_theories.hyp) ->
+      (fun acc (h : Rocq_utils.hyp) ->
         Mebi_theories.tactics
           [ acc
           ; Tactics.simpl_in_hyp
@@ -231,7 +231,7 @@ let unfold_econstr (gl : Proofview.Goal.t) : EConstr.t -> unit Proofview.tactic
   | x ->
     Log.trace "mebi_tactics.unfold_econstr";
     let sigma = Proofview.Goal.sigma gl in
-    let y = Mebi_setup.Convert.econstr_to_constr sigma x in
+    let y = Rocq_convert.econstr_to_constr sigma x in
     (match Constr.kind y with
      | Const (c, _) ->
        Log.debug "mebi_tactics.unfold_econstr, const";
@@ -248,8 +248,8 @@ let unfold_constrexpr (gl : Proofview.Goal.t)
     Log.trace "mebi_tactics.unfold_constrexpr";
     let env = Proofview.Goal.env gl in
     let sigma = Proofview.Goal.sigma gl in
-    let sigma, y = Mebi_setup.Convert.constrexpr_to_econstr env sigma x in
-    let z = Mebi_setup.Convert.econstr_to_constr sigma y in
+    let sigma, y = Rocq_convert.constrexpr_to_econstr env sigma x in
+    let z = Rocq_convert.econstr_to_constr sigma y in
     (match Constr.kind z with
      | Const (c, _) ->
        Log.debug "mebi_tactics.unfold_constrexpr, const";

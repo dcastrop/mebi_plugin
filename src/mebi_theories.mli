@@ -1,8 +1,3 @@
-type hyp =
-  ( EConstr.t,
-    EConstr.t,
-    Evd.erelevance )
-  Context.Named.Declaration.pt
 
 val constants : EConstr.t list ref
 

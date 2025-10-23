@@ -129,3 +129,9 @@ let encode_ref (t : Libnames.qualid) : Enc.t mm =
   let* info : Mebi_ind.info = get_ind_info (ref_to_glob t) in
   encode_econstr info.name
 ;;
+
+let econstr_kind (t : EConstr.t) : Rocq_utils.constr_kind mm =
+  let open Mebi_wrapper.Syntax in
+  let* sigma = get_sigma in
+  return (EConstr.kind sigma t)
+;;

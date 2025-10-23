@@ -176,13 +176,13 @@ type hyp_kind =
   | Pass
 
 exception
-  ExpectedOnlyOne_H_ToBeInverted of Mebi_theories.hyp list
+  ExpectedOnlyOne_H_ToBeInverted of Rocq_utils.hyp list
 
 val handle_hyp :
   Algorithms.Bisimilar.result ->
   Environ.env ->
   Evd.evar_map ->
-  Mebi_theories.hyp ->
+  Rocq_utils.hyp ->
   hyp_kind
 
 type hyp_result =
@@ -200,7 +200,7 @@ val handle_the_hyps :
   Algorithms.Bisimilar.result ->
   Environ.env ->
   Evd.evar_map ->
-  Mebi_theories.hyp list ->
+  Rocq_utils.hyp list ->
   (unit Proofview.tactic * bool) option
   * hyp_cofix list
   * transition list
@@ -283,7 +283,7 @@ val get_from_state_of_relation :
 
 val build_tactics_from_constr_tree :
   'a ->
-  (int * int) Mebi_constr_tree.tree ->
+  (int * int) Mebi_constr.Tree.tree ->
   (unit -> unit Proofview.tactic) list
 
 val build_constructors :
