@@ -78,6 +78,7 @@ val get_lts_transition :
 
 val get_hyp_transition :
   Fsm.t ->
+  Environ.env ->
   Evd.evar_map ->
   Evd.econstr array ->
   transition option
@@ -179,7 +180,7 @@ exception
 
 val handle_hyp :
   Algorithms.Bisimilar.result ->
-  'a ->
+  Environ.env ->
   Evd.evar_map ->
   Mebi_theories.hyp ->
   hyp_kind
@@ -190,12 +191,14 @@ type hyp_result =
   | Cofixes of hyp_cofix list
   | Empty
 
+val hyp_result_string : hyp_result -> string
+
 val warning_multiple_h_transitions_to_invert :
   transition -> transition list -> unit
 
 val handle_the_hyps :
   Algorithms.Bisimilar.result ->
-  'a ->
+  Environ.env ->
   Evd.evar_map ->
   Mebi_theories.hyp list ->
   (unit Proofview.tactic * bool) option
@@ -328,7 +331,6 @@ val handle_constuctors :
   * (unit -> unit Proofview.tactic) list option ->
   unit Proofview.tactic
 
-exception CouldNotHandle_BuildConstructors of unit
 exception CouldNotHandle_NewProof of unit
 
 val handle_new_proof :
@@ -336,8 +338,3 @@ val handle_new_proof :
 
 val handle_proof_state : unit -> unit Proofview.tactic
 val loop_test : unit -> unit Proofview.tactic
-
-val iter_loop :
-  Algorithms.Bisimilar.result -> unit Proofview.tactic
-
-val _loop_test : unit -> unit Proofview.tactic

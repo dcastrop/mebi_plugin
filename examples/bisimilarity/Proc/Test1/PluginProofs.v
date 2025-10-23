@@ -74,10 +74,18 @@ Proof.
   
   (* apply rt1n_refl. constructor 2. constructor 1.  *)
 
+  MeBiSim Step. (* inversion H; simpl in *. *)
+  MeBiSim Step. (* inversion H4; simpl in *. *)
+  MeBiSim Step.
+  (* MeBiSim Step.
+  MeBiSim Step.
+
+  MeBiSim Step.
+  MeBiSim Step. (* NOTE: when [Proc.Flat.Simpl.termLTS.do_par_end] is commented out the proof reaches a state not reached by the plugin when constructing the graph. How is this? *)
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-  MeBiSim Step.
+  MeBiSim Step. *)
 
   (* exact Cofix2. *)
   (* apply Cofix2. *)
