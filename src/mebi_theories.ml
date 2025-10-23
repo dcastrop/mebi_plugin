@@ -8,8 +8,6 @@ let rec tactics : unit Proofview.tactic list -> unit Proofview.tactic = function
 
 (*****************************************************************************)
 
-type hyp = (EConstr.t, EConstr.t, Evd.erelevance) Context.Named.Declaration.pt
-
 (* source: https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto3/src/tuto_tactic.ml *)
 
 let constants : EConstr.t list ref = ref ([] : EConstr.t list)
@@ -353,9 +351,9 @@ let c_ex_intro () : EConstr.t =
 ;;
 
 let is_constant sigma (x : EConstr.t) (c : unit -> EConstr.t) : bool =
-  match Constr.kind (Mebi_setup.Convert.econstr_to_constr sigma x) with
+  match Constr.kind (Rocq_convert.econstr_to_constr sigma x) with
   | App (x, _) ->
-    Mebi_setup.Eq.constr x (Mebi_setup.Convert.econstr_to_constr sigma (c ()))
+    Mebi_setup.Eq.constr x (Rocq_convert.econstr_to_constr sigma (c ()))
   | _ -> false
 ;;
 

@@ -292,10 +292,10 @@ val econstr_list_to_constr_opt_string : EConstr.t list -> string mm
 val debug_encoding : unit -> unit mm
 
 
-type decoded_tree = (string * int) Mebi_constr_tree.tree
+type decoded_tree = (string * int) Mebi_constr.Tree.tree
 
 val pstr_decoded_tree : decoded_tree -> string
-val decode_constr_tree_lts : Mebi_constr_tree.t -> decoded_tree mm
+val decode_constr_tree_lts : Mebi_constr.Tree.t -> decoded_tree mm
 
 val make_transition_tbl
   :  wrapper ref
@@ -307,7 +307,7 @@ val make_state_set
 
 val make_state_tree_pair_set
   :  wrapper ref
-  -> (module Set.S with type elt = Enc.t * Mebi_constr_tree.t) in_context
+  -> (module Set.S with type elt = Enc.t * Mebi_constr.Tree.t) in_context
 
 
 (* *)

@@ -221,9 +221,9 @@ let is_none_term (x : EConstr.t) : bool mm =
      (Printf.sprintf
      "mebi_wrapper.is_none_term, kind\n%s"
      (Strfy.econstr_kind env sigma (Mebi_theories.c_None ()))); *)
-  match Constr.kind (Mebi_setup.Convert.econstr_to_constr sigma x) with
+  match Constr.kind (Rocq_convert.econstr_to_constr sigma x) with
   | App (cx, _) ->
-    let cy = Mebi_setup.Convert.econstr_to_constr sigma y in
+    let cy = Rocq_convert.econstr_to_constr sigma y in
     Log.debug
       (Printf.sprintf
          "mebi_wrapper.is_none_term\n\
@@ -265,7 +265,7 @@ and constrexpr_to_econstr (t : Constrexpr.constr_expr) : EConstr.t mm =
   fun (state : wrapper ref) ->
   let env : Environ.env = !(!state.coq_ref).coq_env in
   let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
-  let sigma, t = Convert.constrexpr_to_econstr env sigma t in
+  let sigma, t = Rocq_convert.constrexpr_to_econstr env sigma t in
   (* coq_st := { !coq_st with coq_ctx = sigma };
   { state = st; value = t } *)
   state
@@ -277,17 +277,17 @@ and econstr_to_constr ?(abort_on_undefined_evars : bool = false) (x : EConstr.t)
   =
   let open Syntax in
   let* sigma = get_sigma in
-  return (Convert.econstr_to_constr ~abort_on_undefined_evars sigma x)
+  return (Rocq_convert.econstr_to_constr ~abort_on_undefined_evars sigma x)
 
 and econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
   let open Syntax in
   let* sigma = get_sigma in
-  return (Convert.econstr_to_constr_opt sigma x)
+  return (Rocq_convert.econstr_to_constr_opt sigma x)
 
 and globref_to_econstr (x : Names.GlobRef.t) : EConstr.t mm =
   let open Syntax in
   let* env = get_env in
-  return (Convert.globref_to_econstr env x)
+  return (Rocq_convert.globref_to_econstr env x)
 
 and normalize_econstr (t : EConstr.t) : EConstr.t mm =
   fun (state : wrapper ref) ->
@@ -1108,19 +1108,19 @@ let decode_map (m : 'a B.t) : 'a F.t mm =
 (****** DECODE CONSTR TREE ********)
 (**********************************)
 
-type decoded_tree = (string * int) Mebi_constr_tree.tree
+type decoded_tree = (string * int) Mebi_constr.Tree.tree
 
 (** decodes the parts of the tree corresponding to the LTS into string form. *)
-let decode_constr_tree_lts (tree : Mebi_constr_tree.t) : decoded_tree mm =
+let decode_constr_tree_lts (tree : Mebi_constr.Tree.t) : decoded_tree mm =
   let open Syntax in
-  let rec decode_tree (t : Mebi_constr_tree.t) : decoded_tree mm =
+  let rec decode_tree (t : Mebi_constr.Tree.t) : decoded_tree mm =
     match t with
     | Node (leaf, stem) ->
       let* decoded_leaf_lts : EConstr.t = decode (fst leaf) in
       let decoded_leaf = econstr_to_string decoded_leaf_lts, snd leaf in
       let* decoded_stem = decode_tree_list stem in
-      return (Mebi_constr_tree.Node (decoded_leaf, decoded_stem))
-  and decode_tree_list (l : Mebi_constr_tree.t list) : decoded_tree list mm =
+      return (Mebi_constr.Tree.Node (decoded_leaf, decoded_stem))
+  and decode_tree_list (l : Mebi_constr.Tree.t list) : decoded_tree list mm =
     match l with
     | [] -> return []
     | h :: t ->
@@ -1133,7 +1133,7 @@ let decode_constr_tree_lts (tree : Mebi_constr_tree.t) : decoded_tree mm =
 
 let rec pstr_decoded_tree (t1 : decoded_tree) : string =
   match t1 with
-  | Mebi_constr_tree.Node (lhs_int, rhs_int_tree_list) ->
+  | Mebi_constr.Tree.Node (lhs_int, rhs_int_tree_list) ->
     Printf.sprintf
       "(%s:%i) [%s]"
       (fst lhs_int)
@@ -1471,21 +1471,21 @@ let make_state_set (st : wrapper ref)
 ;;
 
 let make_state_tree_pair_set (st : wrapper ref)
-  : (module Set.S with type elt = Enc.t * Mebi_constr_tree.t) in_context
+  : (module Set.S with type elt = Enc.t * Mebi_constr.Tree.t) in_context
   =
   let module PairSet =
     Set.Make (struct
-      type t = Enc.t * Mebi_constr_tree.t
+      type t = Enc.t * Mebi_constr.Tree.t
 
       let compare t1 t2 =
         match Enc.compare (fst t1) (fst t2) with
-        | 0 -> Mebi_constr_tree.compare (snd t1) (snd t2)
+        | 0 -> Mebi_constr.Tree.compare (snd t1) (snd t2)
         | c -> c
       ;;
     end)
   in
   { state = st
-  ; value = (module PairSet : Set.S with type elt = Enc.t * Mebi_constr_tree.t)
+  ; value = (module PairSet : Set.S with type elt = Enc.t * Mebi_constr.Tree.t)
   }
 ;;
 

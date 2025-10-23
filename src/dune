@@ -21,16 +21,18 @@
   )
  (modules
   utils
+  rocq_utils
+  rocq_convert
   logging
   mebi_enc
   mebi_setup
-  mebi_constr_tree
+  strfy
+  mebi_constr
   mebi_theories
   model
   lts
   fsm
   algorithms
-  strfy
   mebi_tactics
   mebi_wrapper
   mebi_ind

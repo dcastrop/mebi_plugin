@@ -388,13 +388,13 @@ type hyp_kind =
   | H_Transition of transition
   | Pass
 
-exception ExpectedOnlyOne_H_ToBeInverted of Mebi_theories.hyp list
+exception ExpectedOnlyOne_H_ToBeInverted of Rocq_utils.hyp list
 
 let handle_hyp
       ({ the_fsm_1 = m; the_fsm_2 = n; _ } : Algorithms.Bisimilar.result)
       env
       sigma
-      (h : Mebi_theories.hyp)
+      (h : Rocq_utils.hyp)
   : hyp_kind
   =
   Log.debug "mebi_bisim.handle_hyp";
@@ -514,7 +514,7 @@ let handle_hyps (gl : Proofview.Goal.t) (r : Algorithms.Bisimilar.result)
   Log.debug "mebi_bisim.handle_hyps";
   let env : Environ.env = Proofview.Goal.env gl in
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  let hyps : Mebi_theories.hyp list = Proofview.Goal.hyps gl in
+  let hyps : Rocq_utils.hyp list = Proofview.Goal.hyps gl in
   match handle_the_hyps r env sigma hyps with
   | Some (inv, _), _, _ -> Do_Inversion inv
   | None, _, h :: [] -> H_Transition h
@@ -736,19 +736,19 @@ let get_from_state_of_relation gl states (rel : EConstr.t) : State.t =
 ;;
 
 let rec build_tactics_from_constr_tree gl
-  : Mebi_constr_tree.t -> (unit -> unit Proofview.tactic) list
+  : Mebi_constr.Tree.t -> (unit -> unit Proofview.tactic) list
   = function
   | Node ((enc, index), []) ->
-    (* Log.debug
-       (Printf.sprintf "mebi_bisim.build_tactics_from_constr_tree, last (%i)" index); *)
+    (* NOTE: constructors index from 1, not 0 *)
+    let index = index + 1 in
     [ (fun () ->
         Log.notice (Printf.sprintf "constructor %i." index);
         Tactics.one_constructor index Tactypes.NoBindings)
       (* ; Mebi_tactics.simplify_and_subst_all ~gl () *)
     ]
   | Node ((enc, index), tree) ->
-    (* Log.debug
-       (Printf.sprintf "mebi_bisim.build_tactics_from_constr_tree, list (%i)" index); *)
+    (* NOTE: constructors index from 1, not 0 *)
+    let index = index + 1 in
     (fun () ->
       Log.notice (Printf.sprintf "constructor %i." index);
       Tactics.one_constructor index Tactypes.NoBindings)
