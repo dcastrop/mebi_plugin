@@ -969,11 +969,11 @@ let encode (k : EConstr.t) : Enc.t mm =
   fun (st : wrapper ref) ->
   Log.trace "mebi_wrapper.encode";
   let encoding : Enc.t = Enc.encode !st.fwd_enc !st.bck_enc k in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.encode, \"%s\" into (%s)"
-       (econstr_to_string k)
-       (Enc.to_string encoding));
+  (* Log.debug
+     (Printf.sprintf
+     "mebi_wrapper.encode, \"%s\" into (%s)"
+     (econstr_to_string k)
+     (Enc.to_string encoding)); *)
   assert (F.mem !st.fwd_enc k);
   assert (B.mem !st.bck_enc encoding);
   { state = st; value = encoding }
