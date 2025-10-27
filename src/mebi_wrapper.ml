@@ -1257,6 +1257,12 @@ let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
     sigma, ())
 ;;
 
+let debug_str (f : Environ.env -> Evd.evar_map -> string) : string mm =
+  state (fun env sigma ->
+    let x : string = f env sigma in
+    sigma, x)
+;;
+
 let show_fwd_map () : unit =
   run
     ~keep_encoding:true

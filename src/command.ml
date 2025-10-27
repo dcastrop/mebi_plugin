@@ -12,26 +12,26 @@ let unif_probs_to_string
   Strfy.list
     ~force_newline:true
     (Strfy.tuple
+       ~force_newline:true
        Strfy.constr_tree
        (fun ({ termL; termR } : Mebi_setup.unif_problem) ->
        Strfy.tuple
-         (Strfy.econstr env sigma)
-         (Strfy.econstr env sigma)
-         (termL, termR)))
+         ~force_newline:true
+         (Strfy.tuple ~is_keyval:true Strfy.str (Strfy.econstr env sigma))
+         (Strfy.tuple ~is_keyval:true Strfy.str (Strfy.econstr env sigma))
+         (("termL", termL), ("termR", termR))
+       (* (Strfy.tuple ~is_keyval:true Strfy.str (Strfy.econstr env sigma))
+          ("termL", termL) *)))
     probs
 ;;
 
 let next_constrs_to_string
+      env
+      sigma
       (ctors : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
   : string
   =
-  Strfy.list
-    ~force_newline:true
-    Strfy.constr_tree
-    (List.fold_left
-       (fun acc0 xs -> List.fold_left (fun acc1 (x, _) -> x :: acc1) acc0 xs)
-       []
-       ctors)
+  Strfy.list ~force_newline:true (unif_probs_to_string env sigma) ctors
 ;;
 
 let _warn_econstr_kind_not_app lts_index env sigma t : unit mm =
@@ -41,6 +41,22 @@ let _warn_econstr_kind_not_app lts_index env sigma t : unit mm =
        lts_index
        (Strfy.econstr env sigma t));
   return ()
+;;
+
+let _debug_unify_all (u : Mebi_setup.unif_problem) : unit mm =
+  let open Pp in
+  Mebi_wrapper.debug (fun env sigma ->
+    str "UNIFYALL (termL) :::::::::: "
+    ++ Printer.pr_econstr_env env sigma u.termL
+    ++ strbrk "\n"
+    ++ str "UNIFYALL (termR) :::::::::: "
+    ++ Printer.pr_econstr_env env sigma u.termR)
+;;
+
+let _debug_sandboxed_unify (tgt_term : EConstr.t) : unit mm =
+  let open Pp in
+  Mebi_wrapper.debug (fun env sigma ->
+    str "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term)
 ;;
 
 let _debug_ctors prefix z lts_index ctor_index ctor_vals : unit mm =
@@ -173,26 +189,32 @@ let _debug_acc
       prefix
       ((lts_index, acc) :
         int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
-  : unit
+  : unit mm
   =
+  let* env = get_env in
+  let* sigma = get_sigma in
   Log.debug
     (Printf.sprintf
        "%s, (%i) acc:\n%s"
        prefix
        lts_index
-       (next_constrs_to_string acc))
+       (next_constrs_to_string env sigma acc));
+  return ()
 ;;
 
 let _debug_cross_product_acc
       ((lts_index, acc) :
         int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
-  : unit
+  : unit mm
   =
+  let* env = get_env in
+  let* sigma = get_sigma in
   Log.debug
     (Printf.sprintf
        "cross_product, (%i) acc:\n%s"
        lts_index
-       (next_constrs_to_string acc))
+       (next_constrs_to_string env sigma acc));
+  return ()
 ;;
 
 (* FIXME: All of the code below, up to [check_valid_constructor] needs
@@ -268,10 +290,7 @@ let rec unify_all (i : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list)
   match i with
   | [] -> return (Some [])
   | (ctor_tree, u) :: t ->
-    (* let* _ = if is_output_kind_enabled params then debug (fun env sigma ->
-       str "UNIFYALL (termL) :::::::::: " ++ Printer.pr_econstr_env env sigma
-       u.termL ++ strbrk "\nUNIFYALL (termR) :::::::::: " ++
-       Printer.pr_econstr_env env sigma u.termR) else return () in *)
+    (* let* () = _debug_unify_all u in *)
     let* success = m_unify u.termL u.termR in
     if success
     then
@@ -287,9 +306,7 @@ let sandboxed_unify
       (u : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list)
   : (EConstr.t * Mebi_constr.Tree.t list) option mm
   =
-  (* let* _ = if is_output_kind_enabled params then debug (fun env sigma -> str
-     "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term) else return ()
-     in *)
+  (* let* _ = _debug_sandboxed_unify tgt_term in *)
   sandbox
     (let* success = unify_all u in
      match success with
@@ -320,7 +337,8 @@ let rec retrieve_tgt_nodes
          (Printf.sprintf
             "retrieve_tgt_nodes (%i:%i), sandboxed_unify failed.\n\
              - tgt_term: %s\n\
-             - u1: %s"
+             - u1:\n\
+             %s"
             lts_index
             i
             (econstr_to_string tgt_term)
@@ -334,14 +352,15 @@ let rec retrieve_tgt_nodes
             "retrieve_tgt_nodes (%i:%i), sandboxed_unify success.\n\
              - tgt_term: %s\n\
              - tgt: %s\n\
-             - u1: %s\n\
-             - tree: %s"
+             - tree: %s\n\
+             - u1:\n\
+             %s"
             lts_index
             i
             (econstr_to_string tgt_term)
             (econstr_to_string tgt)
-            (unif_probs_to_string env sigma u1)
-            (Strfy.list Mebi_constr.Tree.pstr ctor_tree));
+            (Strfy.list Mebi_constr.Tree.pstr ctor_tree)
+            (unif_probs_to_string env sigma u1));
        let$+ act env sigma = Reductionops.nf_all env sigma act in
        retrieve_tgt_nodes
          ((act, tgt, Node ((Enc.of_int lts_index, i), ctor_tree)) :: acc)
@@ -349,6 +368,23 @@ let rec retrieve_tgt_nodes
          act
          tgt_term
          (lts_index, nctors))
+;;
+
+(* TODO: try to figure out how to make sure the evars routed through here aren't all unified at once. unless, we need to instead fix this at an earlier point? so that they won't be unified together. *)
+let new_unif_prob (termL : EConstr.t) (termR : EConstr.t)
+  : Mebi_setup.unif_problem mm
+  =
+  (* let* sigma = get_sigma in
+     let* termR =
+     if EConstr.isEvar sigma termR
+     then
+     let* termR_ty = type_of_econstr termR in
+     let$ termR env sigma = Evarutil.new_evar env sigma termR_ty in
+     return termR
+     else return termR
+     in *)
+  let r : Mebi_setup.unif_problem = { termL; termR } in
+  return r
 ;;
 
 let merge_ctors a b : Mebi_constr.t list mm =
@@ -373,7 +409,7 @@ let merge_ctors a b : Mebi_constr.t list mm =
 let unify_args_with
       (term_to_unify : EConstr.t)
       (action_to_unify : EConstr.t option)
-      ((termL, act, termR) : EConstr.t * EConstr.t * EConstr.t)
+      ((termL, act, _termR) : EConstr.t * EConstr.t * EConstr.t)
   : bool mm
   =
   let* unified_termL = m_unify term_to_unify termL in
@@ -383,9 +419,9 @@ let unify_args_with
 ;;
 
 let cross_product (lts_index, acc) ctree_unif_probs
-  : int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list
+  : (int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list) mm
   =
-  _debug_acc "cross_product" (lts_index, acc);
+  let* () = _debug_acc "cross_product" (lts_index, acc) in
   (* We need to cross-product all possible unifications. This is in
      case we have a constructor of the form LTS t11 a1 t12 -> LTS t21
      a2 t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
@@ -403,8 +439,8 @@ let cross_product (lts_index, acc) ctree_unif_probs
       []
       acc
   in
-  _debug_cross_product_acc (lts_index, acc);
-  lts_index, acc
+  let* () = _debug_acc "cross_product" (lts_index, acc) in
+  return (lts_index, acc)
 ;;
 
 (* Should return a list of unification problems *)
@@ -430,13 +466,11 @@ let rec check_updated_ctx
           check_updated_ctx z acc lts_encmap (substls, decls)
         | Some c ->
           let* acc_opt = check_next_updated_context z acc lts_encmap args c in
-          Log.info "->>>>>>>>>>>>>>>> A";
           (match acc_opt with
            | None -> return None
            | Some acc -> check_updated_ctx z acc lts_encmap (substls, decls)))
      | _ ->
        (* let* _ = _warn_econstr_kind_not_app (fst acc) env sigma upd_t in *)
-       Log.info "->>>>>>>>>>>>>>>> B";
        check_updated_ctx z acc lts_encmap (substls, decls))
   | _substl, _ctxl -> invalid_check_updated_ctx _substl _ctxl
 (* Impossible! *)
@@ -472,18 +506,23 @@ and check_next_updated_context z (lts_index, acc) lts_encmap args c =
   match merged_ctors with
   | [] -> return None
   | ctors ->
-    let ctors_unif_probs =
-      List.map
-        (fun (_tAct, (tDest : EConstr.t), (i : Mebi_constr.Tree.t)) ->
-          let unif_prob : Mebi_setup.unif_problem =
-            { termL = tDest; termR = args.(2) }
-          in
-          i, unif_prob)
-        ctors
+    (* let ctors_unif_probs =
+       List.map
+       (fun (_tAct, (tDest : EConstr.t), (i : Mebi_constr.Tree.t)) ->
+       i, new_unif_prob tDest args.(2))
+       ctors
+       in *)
+    let iter_body (i : int) ctors_unif_probs =
+      let (_tAct, termL, i) : Mebi_constr.t = List.nth ctors i in
+      let* r = new_unif_prob termL args.(2) in
+      return ((i, r) :: ctors_unif_probs)
     in
-    let* () = _debug_unif_probs lts_index ctors_unif_probs in
-    Log.info "->>>>>>>>>>>>>>>> C";
-    return (Some (cross_product (lts_index, acc) ctors_unif_probs))
+    let* ctors_unif_probs : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list =
+      iterate 0 (List.length ctors - 1) [] iter_body
+    in
+    (* let* () = _debug_unif_probs lts_index ctors_unif_probs in *)
+    let* acc = cross_product (lts_index, acc) ctors_unif_probs in
+    return (Some acc)
 
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
@@ -514,7 +553,6 @@ and check_valid_constructor
         _debug_ctors "check_valid_constructor" z lts_index i ctor_vals
         (* _debug_ctor_acc _prefix_str z lts_index i t ctor_action ctor_vals *)
       in
-      Log.info "->>>>>>>>>>>>>>>> D1";
       let* next_ctors =
         check_updated_ctx
           (z + 1)
@@ -522,13 +560,11 @@ and check_valid_constructor
           lts_encmap
           (substl, ctx_tys)
       in
-      Log.info "->>>>>>>>>>>>>>>> D2";
       check_next_constructors z (i, ctor_vals) next_ctors (act, tgt_term))
     else
       let* () =
         _debug_ctors "check_valid_constructor" z lts_index i ctor_vals
       in
-      Log.info "->>>>>>>>>>>>>>>> E";
       return ctor_vals
   in
   iterate 0 (Array.length ctor_transitions - 1) [] iter_body
@@ -553,18 +589,22 @@ and check_next_constructors
          let constr_tree : Mebi_constr.Tree.t =
            Mebi_constr.Tree.Node ((Enc.of_int lts_index, i), [])
          in
-         Log.info "->>>>>>>>>>>>>>>> F";
          return ((act, tgt_term, constr_tree) :: ctor_vals))
-     | nctors ->
-       Log.info "->>>>>>>>>>>>>>>> G1";
-       _debug_acc "check_next_constructors" (lts_index, unif_probs);
+     | unif_probs ->
+       let* _ = _debug_acc "check_next_constructors" (lts_index, unif_probs) in
        let* tgt_nodes =
-         retrieve_tgt_nodes ctor_vals i act tgt_term (lts_index, unif_probs)
+         (* FIXME: the order of [unif_probs] causes bug *)
+         (* retrieve_tgt_nodes ctor_vals i act tgt_term (lts_index, unif_probs) *)
+         retrieve_tgt_nodes
+           ctor_vals
+           i
+           act
+           tgt_term
+           (lts_index, List.rev unif_probs)
        in
        let* () =
          _debug_ctors "check_next_constructors" z lts_index i tgt_nodes
        in
-       Log.info "->>>>>>>>>>>>>>>> G2";
        return tgt_nodes)
 
 (** raises exception -- we don't yet support these kinds of arguments
