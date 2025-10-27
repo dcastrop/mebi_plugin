@@ -18,6 +18,7 @@ MeBi Set ShowAny False.
 (* MeBi Set ShowNotices  True. *)
 (* MeBi Set ShowDebug    True. *)
 (* MeBi Set ShowDetails  True. *)
+MeBi Set ShowDetails  False.
 (* MeBi Set ShowResults  True. *)
 (* MeBi Set ShowWarnings True. *)
 MeBi Set WeakMode     True.
@@ -135,7 +136,10 @@ Proof.
   MeBiSim Step. 
   MeBiSim Step. 
 
-  (* MeBiSim Step.  *)
+  (* (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) *)
+  (* (tseq (tpar tend tend) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) *)
+  (* (tseq (tpar (tact (recv A) tend) (tact (send A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) *)
+  MeBiSim Step. 
 
 
 
