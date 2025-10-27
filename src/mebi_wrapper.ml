@@ -969,7 +969,7 @@ let encode (k : EConstr.t) : Enc.t mm =
   fun (st : wrapper ref) ->
   Log.trace "mebi_wrapper.encode";
   let encoding : Enc.t = Enc.encode !st.fwd_enc !st.bck_enc k in
-  Logging.Log.debug
+  Log.debug
     (Printf.sprintf
        "mebi_wrapper.encode, \"%s\" into (%s)"
        (econstr_to_string k)
@@ -986,11 +986,11 @@ let decode (k : Enc.t) : EConstr.t mm =
   let* bck_enc = get_bck_enc in
   match Enc.decode_opt bck_enc k with
   | Some decoding ->
-    Logging.Log.debug
-      (Printf.sprintf
-         "mebi_wrapper.decode, \"%s\" into (%s)"
-         (Enc.to_string k)
-         (econstr_to_string decoding));
+    (* Log.debug
+       (Printf.sprintf
+       "mebi_wrapper.decode, \"%s\" into (%s)"
+       (Enc.to_string k)
+       (econstr_to_string decoding)); *)
     return decoding
   | None -> cannot_get_decoding_of_unencoded_econstr k
 ;;
