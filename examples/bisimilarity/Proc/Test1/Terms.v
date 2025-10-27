@@ -38,7 +38,7 @@ MeBi Set Weak Option label.
 MeBi Set FailIfIncomplete True.
 MeBi Set FailIfNotBisim True.
 (* MeBi See All.  *)
-(* MeBi Set ShowAny False. *)
+MeBi Set ShowAny False.
 
 MeBi FSM p Using termLTS. MeBi Saturate p Using termLTS.
 MeBi FSM q Using termLTS. MeBi Saturate q Using termLTS.
