@@ -1084,29 +1084,26 @@ let minimize_model ((x, primary_lts) : coq_model) refs : unit mm =
 
 let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
   Log.trace "command.check_bisimilarity";
-  only_in_weak_mode
-    (let* the_fsm_1 = build_fsm a x (Params.get_fst_params ()) refs in
-     let* the_fsm_2 = build_fsm b y (Params.get_fst_params ()) refs in
-     let the_bisimilar =
-       Algorithms.Bisimilar.run
-         ~weak:!Params.the_weak_mode
-         (the_fsm_1, the_fsm_2)
-     in
-     Mebi_bisim.set_the_result the_bisimilar;
-     Log.result
-       (Printf.sprintf
-          "command.run, CheckBisimilarity, finished: %s\n"
-          (Algorithms.Bisimilar.pstr the_bisimilar));
-     Log.details
-       (Printf.sprintf
-          "command.run, CheckBisimilarity, saturated:\nFSM 1: %s\n\nFSM 2: %s\n"
-          (Fsm.to_string the_bisimilar.the_fsm_1)
-          (Fsm.to_string the_bisimilar.the_fsm_2));
-     if
-       !Params.the_fail_if_not_bisim
-       && Algorithms.Bisimilar.result_to_bool the_bisimilar
-     then return ()
-     else params_fail_if_not_bisim ())
+  let* the_fsm_1 = build_fsm a x (Params.get_fst_params ()) refs in
+  let* the_fsm_2 = build_fsm b y (Params.get_fst_params ()) refs in
+  let the_bisimilar =
+    Algorithms.Bisimilar.run ~weak:!Params.the_weak_mode (the_fsm_1, the_fsm_2)
+  in
+  Mebi_bisim.set_the_result the_bisimilar;
+  Log.result
+    (Printf.sprintf
+       "command.run, CheckBisimilarity, finished: %s\n"
+       (Algorithms.Bisimilar.pstr the_bisimilar));
+  Log.details
+    (Printf.sprintf
+       "command.run, CheckBisimilarity, saturated:\nFSM 1: %s\n\nFSM 2: %s\n"
+       (Fsm.to_string the_bisimilar.the_fsm_1)
+       (Fsm.to_string the_bisimilar.the_fsm_2));
+  if
+    !Params.the_fail_if_not_bisim
+    && Algorithms.Bisimilar.result_to_bool the_bisimilar
+  then return ()
+  else params_fail_if_not_bisim ()
 ;;
 
 let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
