@@ -4,6 +4,7 @@ val default_mode : output_mode
 
 type output_kind =
   | Notice
+  | Info
   | Debug
   | Trace
   | Details
@@ -62,6 +63,7 @@ val log : output_kind -> string -> unit
 module Log : sig
   val override : string -> unit
   val notice : string -> unit
+  val info : string -> unit
   val debug : string -> unit
   val trace : string -> unit
   val details : string -> unit

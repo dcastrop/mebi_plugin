@@ -6,6 +6,7 @@ let default_mode : output_mode = Coq ()
 
 type output_kind =
   | Notice
+  | Info
   | Debug
   | Trace
   | Details
@@ -118,6 +119,7 @@ let is_output_kind_enabled (kind : output_kind) : bool =
   &&
   match kind with
   | Notice -> is_notice_enabled ()
+  | Info -> is_notice_enabled ()
   | Debug -> is_debug_enabled ()
   | Trace -> is_debug_enabled () && is_details_enabled ()
   | Details -> is_details_enabled ()
@@ -129,6 +131,7 @@ let is_output_kind_enabled (kind : output_kind) : bool =
 let message_prefix (kind : output_kind) : string =
   match kind with
   | Notice -> "( Notice ) "
+  | Info -> "( Info ) "
   | Debug -> "( Debug ) "
   | Trace -> "( Trace ) "
   | Details -> "( Details ) "
@@ -144,6 +147,7 @@ let log (kind : output_kind) (s : string) : unit =
       let msg : string = Printf.sprintf "%s" s in
       (match kind with
        | Notice -> Feedback.msg_notice (Pp.str msg)
+       | Info -> Feedback.msg_info (Pp.str msg)
        | Debug -> Feedback.msg_debug (Pp.str msg)
        | Trace -> Feedback.msg_debug (Pp.str msg)
        | Details -> Feedback.msg_info (Pp.str msg)
@@ -161,6 +165,7 @@ module Log = struct
   ;;
 
   let notice (s : string) : unit = log Notice s
+  let info (s : string) : unit = log Info s
   let debug (s : string) : unit = log Debug s
   let trace (s : string) : unit = log Trace s
   let details (s : string) : unit = log Details s
