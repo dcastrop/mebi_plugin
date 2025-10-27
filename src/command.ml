@@ -216,9 +216,9 @@ let rec check_updated_ctx
   -> (int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list) option mm
   = function
   | [], [] -> return (Some acc)
-  | _hsubstl :: substl, t :: tl ->
+  | _hsubstl :: substls, t_decl :: decls ->
     let$+ upd_t env sigma =
-      EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
+      EConstr.Vars.substl substls (Context.Rel.Declaration.get_type t_decl)
     in
     let* env = get_env in
     let* sigma = get_sigma in
@@ -226,7 +226,8 @@ let rec check_updated_ctx
      | App (fn, args) ->
        (match F.find_opt lts_encmap fn with
         | None ->
-          handle_unrecognized_ctor_fn (fn, args) acc lts_encmap (substl, tl)
+          let* _ = handle_unrecognized_ctor_fn (fn, args) in
+          check_updated_ctx acc lts_encmap (substls, decls)
         | Some c ->
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
           let* c_constr_transitions = Mebi_ind.get_constr_transitions c in
@@ -252,13 +253,17 @@ let rec check_updated_ctx
                    i, unif_prob)
                  ctors
              in
-             (cross_product acc ctors_unif_probs) lts_encmap (substl, tl)))
-     | _ -> check_updated_ctx acc lts_encmap (substl, tl))
+             (cross_product acc ctors_unif_probs) lts_encmap (substls, decls)))
+     | _ -> check_updated_ctx acc lts_encmap (substls, decls))
   | _substl, _ctxl -> invalid_check_updated_ctx _substl _ctxl
 (* Impossible! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
-and cross_product (lts_index, acc) ctree_unif_probs =
+and cross_product (lts_index, acc) ctree_unif_probs
+  :  Mebi_ind.t F.t
+  -> EConstr.Vars.substl * EConstr.rel_declaration list
+  -> (int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list) option mm
+  =
   _debug_check_updated_ctx_acc (lts_index, acc);
   (* We need to cross-product all possible unifications. This is in
      case we have a constructor of the form LTS t11 a1 t12 -> LTS t21
@@ -339,27 +344,21 @@ and check_valid_constructor
 
 (** raises exception -- we don't yet support these kinds of arguments
     - TODO: finish handling these, or throw helpful error *)
-and handle_unrecognized_ctor_fn
-      ((fn, args) : EConstr.t * EConstr.t array)
-      acc
-      lts_encmap
-      (substl, tl)
-  : (int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list) option mm
+and handle_unrecognized_ctor_fn ((fn, args) : EConstr.t * EConstr.t array)
+  : unit mm
   =
   let* env = get_env in
   let* sigma = get_sigma in
+  Log.warning
+    (Printf.sprintf
+       "check_updated_ctx, unrecognized in lts_encmap:\n- fn (%s)\n- args: %s"
+       (Strfy.econstr env sigma fn)
+       (Strfy.list (Strfy.econstr env sigma) (Array.to_list args)));
   (* NOTE: testing handling the [@eq] premises *)
   match econstr_to_string fn with
   | "option" ->
     (* TODO: fail if weak is not Params.WeakEnc.OptionConstr *)
-    (* if Params.WeakEnc.is_option () then *)
-    if Logging.is_details_enabled ()
-    then
-      Log.warning
-        (Printf.sprintf
-           "check_updated_ctx, lts_encmap \"option\" has args: %s"
-           (Strfy.list (Strfy.econstr env sigma) (Array.to_list args)));
-    check_updated_ctx acc lts_encmap (substl, tl)
+    return ()
   | "@eq" ->
     (* TODO: fail, or *)
     (* TODO: find way to propagate this (replace in F map?) *)
@@ -374,16 +373,10 @@ and handle_unrecognized_ctor_fn
          (econstr_to_string fn)
          (econstr_to_string lhs)
          (econstr_to_string rhs));
-    check_updated_ctx acc lts_encmap (substl, tl)
+    return ()
   | _ ->
-    (* TODO: fail ? *)
-    Log.warning
-      (Printf.sprintf
-         "check_updated_ctx, lts_encmap does not have corresponding fn \"%s\" \
-          with args: %s."
-         (econstr_to_string fn)
-         (Strfy.list (Strfy.econstr env sigma) (Array.to_list args)));
-    check_updated_ctx acc lts_encmap (substl, tl)
+    (* TODO: fail? *)
+    return ()
 ;;
 
 (** [GraphB] is ...
@@ -972,6 +965,36 @@ let build_lts_graph
   else G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts params
 ;;
 
+let build_fsm
+      ?(saturate : bool = false)
+      ?(minimize : bool = false)
+      (primary_lts : Libnames.qualid)
+      (t : Constrexpr.constr_expr)
+      (params : int * Params.WeakEnc.t option)
+      (refs : Libnames.qualid list)
+  : Fsm.t mm
+  =
+  let* the_lts =
+    build_lts_graph primary_lts t (Params.get_fst_params ()) refs
+  in
+  let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+  Log.warning
+    (Printf.sprintf "command.build_fsm:\n%s\n" (Fsm.to_string the_fsm));
+  if minimize
+  then (
+    let the_minimized_fsm, _bisim_states =
+      Algorithms.Minimize.run ~weak:!Params.the_weak_mode the_fsm
+    in
+    Log.details
+      (Printf.sprintf
+         "command.build_fsm, minimized & bisim states: %s\n"
+         (Algorithms.Minimize.pstr (the_minimized_fsm, _bisim_states)));
+    return the_minimized_fsm)
+  else if saturate
+  then return (Fsm.saturate the_fsm)
+  else return the_fsm
+;;
+
 (**********************)
 (** Entry point *******)
 (**********************)
@@ -991,132 +1014,111 @@ type command_kind =
   | CheckBisimilarity of (coq_model * coq_model)
   | Info of unit
 
+let make_model args refs =
+  Log.trace "command.make_model";
+  let* result_str : string * string =
+    match args with
+    | LTS, (x, primary_lts) ->
+      let* the_lts : Lts.t =
+        build_lts_graph primary_lts x (Params.get_fst_params ()) refs
+      in
+      return ("LTS", Lts.to_string the_lts)
+    | FSM, (x, primary_lts) ->
+      let* the_fsm : Fsm.t =
+        build_fsm primary_lts x (Params.get_fst_params ()) refs
+      in
+      return ("FSM", Fsm.to_string the_fsm)
+  in
+  Log.result
+    (Printf.sprintf
+       "command.make_model, finished %s:\n%s\n"
+       (fst result_str)
+       (snd result_str));
+  return ()
+;;
+
+let only_in_weak_mode (f : 'a mm) : unit mm =
+  match Params.fst_weak_type () with
+  | None ->
+    if !Params.the_weak_mode = false
+    then Mebi_help.show_instructions_to_enable_weak ();
+    Mebi_help.show_instructions_to_set_weak ();
+    Log.warning "Aborting command.\n";
+    return ()
+  | Some _ ->
+    if !Params.the_weak_mode = false
+    then (
+      Mebi_help.show_instructions_to_enable_weak ();
+      Log.warning "Aborting command.\n";
+      return ())
+    else
+      let* _ = f in
+      return ()
+;;
+
+let saturate_model ((x, primary_lts) : coq_model) refs : unit mm =
+  Log.trace "command.saturate_model";
+  only_in_weak_mode
+    (let* the_saturated_fsm =
+       build_fsm ~saturate:true primary_lts x (Params.get_fst_params ()) refs
+     in
+     Log.result
+       (Printf.sprintf
+          "command.saturate_model, finished: %s\n"
+          (Fsm.to_string the_saturated_fsm));
+     return ())
+;;
+
+let minimize_model ((x, primary_lts) : coq_model) refs : unit mm =
+  Log.trace "command.minimize_model";
+  only_in_weak_mode
+    (let* the_minimized_fsm =
+       build_fsm ~minimize:true primary_lts x (Params.get_fst_params ()) refs
+     in
+     Log.result
+       (Printf.sprintf
+          "command.minimize_model, finished: %s\n"
+          (Fsm.to_string the_minimized_fsm));
+     return ())
+;;
+
+let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
+  Log.trace "command.check_bisimilarity";
+  only_in_weak_mode
+    (let* the_fsm_1 = build_fsm a x (Params.get_fst_params ()) refs in
+     let* the_fsm_2 = build_fsm b y (Params.get_fst_params ()) refs in
+     let the_bisimilar =
+       Algorithms.Bisimilar.run
+         ~weak:!Params.the_weak_mode
+         (the_fsm_1, the_fsm_2)
+     in
+     Mebi_bisim.set_the_result the_bisimilar;
+     Log.result
+       (Printf.sprintf
+          "command.run, CheckBisimilarity, finished: %s\n"
+          (Algorithms.Bisimilar.pstr the_bisimilar));
+     Log.details
+       (Printf.sprintf
+          "command.run, CheckBisimilarity, saturated:\nFSM 1: %s\n\nFSM 2: %s\n"
+          (Fsm.to_string the_bisimilar.the_fsm_1)
+          (Fsm.to_string the_bisimilar.the_fsm_2));
+     if
+       !Params.the_fail_if_not_bisim
+       && Algorithms.Bisimilar.result_to_bool the_bisimilar
+     then return ()
+     else params_fail_if_not_bisim ())
+;;
+
 let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
   Log.trace "command.run";
   let* _ = Params.obtain_weak_kinds_from_args () in
   (* if !Params.the_weak_mode = true then *)
   (* let* _ = Mebi_wrapper.load_none_term () in *)
   match k with
-  | MakeModel (kind, (x, primary_lts)) ->
-    Log.debug "command.run, MakeModel";
-    let* the_lts : Lts.t =
-      build_lts_graph primary_lts x (Params.get_fst_params ()) refs
-    in
-    (match kind with
-     | LTS ->
-       Log.result
-         (Printf.sprintf
-            "command.run, MakeModel LTS, finished: %s\n"
-            (Lts.to_string the_lts));
-       if !Params.the_dump_to_file
-       then Log.debug "command.run, MakeModel LTS -- TODO dump to file\n";
-       return ()
-     | FSM ->
-       Log.details
-         (Printf.sprintf
-            "command.run, MakeModel LTS, finished: %s\n"
-            (Lts.to_string the_lts));
-       let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-       Log.result
-         (Printf.sprintf
-            "command.run, MakeModel FSM, finished: %s\n"
-            (Fsm.to_string the_fsm));
-       if !Params.the_dump_to_file
-       then Log.debug "command.run, MakeModel FSM -- TODO dump to file\n";
-       return ())
-  | SaturateModel (x, primary_lts) ->
-    (match Params.fst_weak_type () with
-     | None ->
-       if !Params.the_weak_mode = false
-       then Mebi_help.show_instructions_to_enable_weak ();
-       Mebi_help.show_instructions_to_set_weak ();
-       Log.warning "Aborting command.\n";
-       return ()
-     | Some _ ->
-       if !Params.the_weak_mode = false
-       then (
-         Mebi_help.show_instructions_to_enable_weak ();
-         Log.warning "Aborting command.\n";
-         return ())
-       else (
-         Log.debug "command.run, SaturateModel";
-         let* the_lts =
-           build_lts_graph primary_lts x (Params.get_fst_params ()) refs
-         in
-         let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-         Log.details
-           (Printf.sprintf
-              "command.run, unsaturated FSM: %s\n"
-              (Fsm.to_string the_fsm));
-         let the_saturated = Fsm.saturate the_fsm in
-         Log.result
-           (Printf.sprintf
-              "command.run, SaturateModel, finished: %s\n"
-              (Fsm.to_string the_saturated));
-         if !Params.the_dump_to_file
-         then Log.debug "command.run, SaturateModel -- TODO dump to file\n";
-         return ()))
-  | MinimizeModel (x, primary_lts) ->
-    (match Params.fst_weak_type () with
-     | None ->
-       Mebi_help.show_instructions_to_set_weak ();
-       Log.warning "Aborting command.\n";
-       return ()
-     | Some _ ->
-       if !Params.the_weak_mode = false
-       then (
-         Mebi_help.show_instructions_to_enable_weak ();
-         Log.warning "Aborting command.\n";
-         return ())
-       else (
-         Log.debug "command.run, MinimizeModel";
-         let* the_lts =
-           build_lts_graph primary_lts x (Params.get_fst_params ()) refs
-         in
-         let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-         let the_minimized =
-           Algorithms.Minimize.run ~weak:!Params.the_weak_mode the_fsm
-         in
-         Log.result
-           (Printf.sprintf
-              "command.run, MinimizeModel, finished: %s\n"
-              (Algorithms.Minimize.pstr the_minimized));
-         if !Params.the_dump_to_file
-         then Log.debug "command.run, MinimizeModel -- TODO dump to file\n";
-         return ()))
-  | CheckBisimilarity ((x, a), (y, b)) ->
-    Log.debug "command.run, CheckBisimilarity";
-    if is_details_enabled () then Params.printout_weak_mode ();
-    Mebi_help.show_instructions_to_toggle_weak !Params.the_weak_mode;
-    let* the_lts_1 = build_lts_graph a x (Params.get_fst_params ()) refs in
-    let* the_lts_2 = build_lts_graph b y (Params.get_snd_params ()) refs in
-    let the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
-    let the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
-    Log.details
-      (Printf.sprintf
-         "command.run, CheckBisimilarity:\nFSM 1: %s\n\nFSM 2: %s\n"
-         (Fsm.to_string the_fsm_1)
-         (Fsm.to_string the_fsm_2));
-    let the_bisimilar =
-      Algorithms.Bisimilar.run ~weak:!Params.the_weak_mode (the_fsm_1, the_fsm_2)
-    in
-    Mebi_bisim.set_the_result the_bisimilar;
-    Log.result
-      (Printf.sprintf
-         "command.run, CheckBisimilarity, finished: %s\n"
-         (Algorithms.Bisimilar.pstr the_bisimilar));
-    Log.details
-      (Printf.sprintf
-         "command.run, CheckBisimilarity:\nFSM 1: %s\n\nFSM 2: %s\n"
-         (Fsm.to_string the_bisimilar.the_fsm_1)
-         (Fsm.to_string the_bisimilar.the_fsm_2));
-    if !Params.the_dump_to_file
-    then Log.debug "command.run, CheckBisimilarity -- TODO dump to file\n";
-    if
-      !Params.the_fail_if_not_bisim
-      && Algorithms.Bisimilar.result_to_bool the_bisimilar
-    then return ()
-    else params_fail_if_not_bisim ()
+  | MakeModel args -> make_model args refs
+  | SaturateModel args -> saturate_model args refs
+  | MinimizeModel args -> minimize_model args refs
+  | CheckBisimilarity args -> check_bisimilarity args refs
   | Info () ->
     Mebi_help.show_guidelines_and_limitations ();
     return ()
