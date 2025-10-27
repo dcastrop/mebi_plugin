@@ -419,6 +419,9 @@ module Action = struct
     | [], h :: t -> -1
     | h :: t, [] -> 1
     | (e1, s1) :: t1, (e2, s2) :: t2 ->
+      (* match State.compare e1 e2 with
+         | 0 -> (compare ~annos ~meta s1 s2)
+         | c -> c *)
       Int.compare (State.compare e1 e2) (compare ~annos ~meta s1 s2)
 
   and annos_compare
