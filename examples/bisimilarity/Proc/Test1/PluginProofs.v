@@ -139,7 +139,8 @@ Proof.
   (* (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) *)
   (* (tseq (tpar tend tend) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) *)
   (* (tseq (tpar (tact (recv A) tend) (tact (send A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) *)
-  MeBiSim Step. 
+  (* MeBiSim Step.  *)
+  (* TODO: investigate sandboxed_unify *)
 
 
 
