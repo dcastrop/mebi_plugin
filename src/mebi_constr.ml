@@ -42,7 +42,7 @@ module Tree = struct
     tree_compare t1 t2
   ;;
 
-  let rec pstr (t1 : t) : string =
+  let rec to_string (t1 : t) : string =
     match t1 with
     | Node (lhs_int, rhs_int_tree_list) ->
       Printf.sprintf
@@ -51,15 +51,17 @@ module Tree = struct
         (snd lhs_int)
         (match List.length rhs_int_tree_list with
          | 0 -> ""
-         | 1 -> pstr (List.hd rhs_int_tree_list)
+         | 1 -> to_string (List.hd rhs_int_tree_list)
          | _ ->
            (* Strfy.list pstr rhs_int_tree_list *)
            List.fold_left
              (fun (acc : string) (rhs_int_tree : t) ->
-               Printf.sprintf "%s, %s" acc (pstr rhs_int_tree))
-             (pstr (List.hd rhs_int_tree_list))
+               Printf.sprintf "%s, %s" acc (to_string rhs_int_tree))
+             (to_string (List.hd rhs_int_tree_list))
              (List.tl rhs_int_tree_list))
   ;;
+
+  let pstr = to_string
 end
 
 (** A triple denoting a constructor of an rocq LTS definition.

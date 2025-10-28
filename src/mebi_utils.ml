@@ -12,7 +12,9 @@ let ref_list_to_glob_list (l : Libnames.qualid list) : Names.GlobRef.t list =
 
 (*********************************************************)
 
+open Mebi_setup
 open Mebi_wrapper
+open Mebi_wrapper.Syntax
 
 let assert_mip_arity_is_type (mip : Declarations.one_inductive_body) : unit mm =
   Log.trace "mebi_utils.assert_mip_arity_is_type";
@@ -65,7 +67,6 @@ let get_lts_labels_and_terms
 let get_ind_info (gref : Names.GlobRef.t) : Mebi_ind.info mm =
   Log.trace "mebi_utils.get_ind_info";
   let open Names.GlobRef in
-  let open Mebi_wrapper.Syntax in
   match gref with
   | IndRef i ->
     let* env = get_env in
@@ -84,7 +85,6 @@ let get_ind_info (gref : Names.GlobRef.t) : Mebi_ind.info mm =
 let get_ind_lts (i : int) (gref : Names.GlobRef.t) : Mebi_ind.t mm =
   Log.trace "mebi_utils.get_ind_lts";
   let open Names.GlobRef in
-  let open Mebi_wrapper.Syntax in
   match gref with
   | IndRef ind ->
     let* env = get_env in
@@ -114,24 +114,78 @@ let get_ind_lts (i : int) (gref : Names.GlobRef.t) : Mebi_ind.t mm =
 
 (*********************************************************)
 
-let encode_econstr (t : EConstr.t) : Enc.t mm = encode t
+let econstr_eq a b : bool mm =
+  state (fun env sigma -> sigma, Eq.econstr sigma a b)
+;;
 
-let encode_constrexpr (t : Constrexpr.constr_expr) : Enc.t mm =
+let econstr_normalize (x : EConstr.t) : EConstr.t mm =
+  let$+ t env sigma = Reductionops.nf_all env sigma x in
+  return t
+;;
+
+let econstr_kind (x : EConstr.t) : Rocq_utils.constr_kind mm =
+  state (fun env sigma -> sigma, EConstr.kind sigma x)
+;;
+
+let econstr_is_evar (x : EConstr.t) : bool mm =
+  state (fun env sigma -> sigma, EConstr.isEvar sigma x)
+;;
+
+let econstr_to_constr ?(abort_on_undefined_evars : bool = false) (x : EConstr.t)
+  : Constr.t mm
+  =
+  state (fun env sigma -> sigma, Rocq_convert.econstr_to_constr sigma x)
+;;
+
+let econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
+  state (fun env sigma -> sigma, Rocq_convert.econstr_to_constr_opt sigma x)
+;;
+
+(*********************************************************)
+
+let constrexpr_to_econstr (x : Constrexpr.constr_expr) : EConstr.t mm =
+  state (fun env sigma -> Rocq_convert.constrexpr_to_econstr env sigma x)
+;;
+
+let globref_to_econstr (x : Names.GlobRef.t) : EConstr.t mm =
+  state (fun env sigma -> sigma, Rocq_convert.globref_to_econstr env x)
+;;
+
+(*********************************************************)
+
+let type_of_econstr (x : EConstr.t) : EConstr.t mm =
+  let* t : EConstr.t = econstr_normalize x in
+  state (fun env sigma -> Typing.type_of env sigma t)
+;;
+
+let type_of_constrexpr (x : Constrexpr.constr_expr) : EConstr.t mm =
+  let* t : EConstr.t = constrexpr_to_econstr x in
+  type_of_econstr t
+;;
+
+(*********************************************************)
+
+let new_evar_of (x : EConstr.t) : EConstr.t mm =
+  state (fun env sigma -> Evarutil.new_evar env sigma x)
+;;
+
+let is_none_term (x : EConstr.t) : bool mm =
+  state (fun env sigma ->
+    sigma, Mebi_theories.is_constant sigma x Mebi_theories.c_None)
+;;
+
+(*********************************************************)
+
+let encode_econstr (x : EConstr.t) : Enc.t mm = encode x
+
+let encode_constrexpr (x : Constrexpr.constr_expr) : Enc.t mm =
   Log.trace "mebi_utils.encode_constrexpr";
-  let open Mebi_wrapper.Syntax in
-  let* t' : EConstr.t = constrexpr_to_econstr t in
+  let* t' : EConstr.t = constrexpr_to_econstr x in
   encode_econstr t'
 ;;
 
-let encode_ref (t : Libnames.qualid) : Enc.t mm =
+let encode_ref (x : Libnames.qualid) : Enc.t mm =
   Log.trace "mebi_utils.encode_ref";
-  let open Mebi_wrapper.Syntax in
-  let* info : Mebi_ind.info = get_ind_info (ref_to_glob t) in
+  let* info : Mebi_ind.info = get_ind_info (ref_to_glob x) in
   encode_econstr info.name
-;;
-
-let econstr_kind (t : EConstr.t) : Rocq_utils.constr_kind mm =
-  let open Mebi_wrapper.Syntax in
-  let* sigma = get_sigma in
-  return (EConstr.kind sigma t)
 ;;

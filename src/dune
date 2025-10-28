@@ -41,6 +41,7 @@
   params
   ; dump_to_file
   mebi_help
+  unify
   command
   ; examples
   g_mebi))

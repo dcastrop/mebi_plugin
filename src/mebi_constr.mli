@@ -4,6 +4,7 @@ module Tree : sig
 
   val eq : t -> t -> bool
   val compare : t -> t -> int
+  val to_string : t -> string
   val pstr : t -> string
 end
 type t = EConstr.t * EConstr.t * Tree.t
