@@ -472,7 +472,7 @@ let new_unif_prob (termL : EConstr.t) (termR : EConstr.t)
      let* termR =
      if EConstr.isEvar sigma termR
      then
-     let* termR_ty = type_of_econstr termR in
+     let* termR_ty = Mebi_utils.type_of_econstr termR in
      let$ termR env sigma = Evarutil.new_evar env sigma termR_ty in
      return termR
      else return termR
@@ -565,7 +565,7 @@ and check_valid_constructor
       (lts_index : int)
   : Mebi_constr.t list mm
   =
-  let* t : EConstr.t = normalize_econstr t in
+  let* t : EConstr.t = Mebi_utils.econstr_normalize t in
   let iter_body (i : int) (ctor_vals : Mebi_constr.t list) =
     (* let* () = _debug_cvcb z lts_index i t ctor_action ctor_vals in *)
     let (ctx, tm) : Constr.rel_context * Constr.t = ctor_transitions.(i) in
@@ -578,7 +578,7 @@ and check_valid_constructor
     then
       let* () = _debug_cvcu z lts_index i t ctor_action ctor_vals in
       let (_termL, act, tgt_term) : EConstr.t * EConstr.t * EConstr.t = args in
-      let* act : EConstr.t = normalize_econstr act in
+      let* act : EConstr.t = Mebi_utils.econstr_normalize act in
       (* let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in *)
       (* NOTE: calling this once causes the next first constructor to successfully unify to determine:
          - if ctor_action=Some ?x, then set what ?x is, meaning later constructors cannot be applied
@@ -641,8 +641,8 @@ and handle_unrecognized_ctor_fn ((fn, args) : EConstr.t * EConstr.t array)
   | "@eq" ->
     (* TODO: fail, or *)
     (* TODO: find way to propagate this (replace in F map?) *)
-    let* lhs : EConstr.t = normalize_econstr args.(1) in
-    let* rhs : EConstr.t = normalize_econstr args.(2) in
+    let* lhs : EConstr.t = Mebi_utils.econstr_normalize args.(1) in
+    let* rhs : EConstr.t = Mebi_utils.econstr_normalize args.(2) in
     Log.warning
       (Printf.sprintf
          "TODO: check_updated_ctx, handle premise (normalized):\n\
@@ -799,7 +799,7 @@ module MkGraph
     | Some weak_kind ->
       Log.trace "command.MkGraph.is_silent_transition";
       let* act_enc : Enc.t = encode act in
-      let* ty : EConstr.t = type_of_econstr act in
+      let* ty : EConstr.t = Mebi_utils.type_of_econstr act in
       let* ty_enc : Enc.t = encode ty in
       Log.debug
         (Printf.sprintf
@@ -818,7 +818,7 @@ module MkGraph
          (* if Enc.eq label_enc ty_enc
          then return (Some false)
          else *)
-         let* b = is_none_term act in
+         let* b = Mebi_utils.is_none_term act in
          return (Some b)
        | CustomConstr (tau_enc, label_enc) ->
          let* tau_decoding = decode tau_enc in
@@ -975,8 +975,8 @@ module MkGraph
     =
     Log.trace "command.MkGraph.build_graph";
     (* normalize the initial term *)
-    let* t : EConstr.t = constrexpr_to_econstr tref in
-    let* t : EConstr.t = normalize_econstr t in
+    let* t : EConstr.t = Mebi_utils.constrexpr_to_econstr tref in
+    let* t : EConstr.t = Mebi_utils.econstr_normalize t in
     (* encode lts inductive definitions *)
     let* lts_ind_def_map : Mebi_ind.t B.t = build_lts_ind_def_map grefs in
     let* the_primary_lts = get_primary_lts primary_lts grefs lts_ind_def_map in
