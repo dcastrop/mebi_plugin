@@ -45,7 +45,15 @@ MeBi Set FailIfNotBisim True.
 Require Import Logic.
 
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
+MeBi Divider "Testing ctor trees".
+
+Example e1 : term := (tseq (tseq (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) tend) tend).
+
+MeBi FSM e1 Using termLTS. 
+(* MeBi Saturate e1 Using termLTS. *)
+
+
+(* MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof.
   MeBiSim Begin termLTS p And termLTS q Using termLTS. (* unfold p, q. *)
@@ -144,4 +152,4 @@ Proof.
 
 
 
-Admitted.
+Admitted. *)
