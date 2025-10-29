@@ -80,6 +80,11 @@ let rec str_tabs ?(size : int = default_indent_val) (n : int) : string =
   else ""
 ;;
 
+let prefix : string -> string = function
+  | "" -> ""
+  | p -> Printf.sprintf "%s, " p
+;;
+
 (** [get_key_of_val tbl v] is a reverse-lookup in [tbl] for the key of value [v].
 *)
 let get_key_of_val (tbl : ('a, 'b) Hashtbl.t) (v : 'b) : 'a option =
