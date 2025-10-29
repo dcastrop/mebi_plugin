@@ -53,19 +53,22 @@ examples/bisimilarity/Proc/Test1/PluginProofs.v ###
 ################
 ### OCaml Plugin
 ################
-src/.ml
-src/utils.mli
 src/utils.ml
 src/utils.mli
 src/logging.ml
 src/logging.mli
 
+src/rocq_utils.ml
+src/rocq_utils.mli
+src/rocq_convert.ml
+src/rocq_convert.mli
+
 src/mebi_enc.ml
 src/mebi_enc.mli
 src/mebi_setup.ml
 src/mebi_setup.mli
-src/mebi_constr_tree.ml
-src/mebi_constr_tree.mli
+src/mebi_constr.ml
+src/mebi_constr.mli
 src/mebi_theories.ml
 src/mebi_theories.mli
 
@@ -101,6 +104,8 @@ src/params.mli
 src/mebi_help.ml
 src/mebi_help.mli
 
+src/unify.ml
+src/unify.mli
 src/command.ml
 src/command.mli
 

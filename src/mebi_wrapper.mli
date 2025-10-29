@@ -100,7 +100,6 @@ module type ERROR_TYPE = sig
    val cannot_get_decoding_of_unencoded_econstr : Mebi_setup.coq_context ref -> EConstr.t B.t -> Enc.t -> exn
 
 
-(************8*)
 
   val missing_bisim_result : unit -> exn
   (* val proofv_is_none : unit -> exn *)
@@ -194,6 +193,7 @@ val state
 
 val sandbox : 'a mm -> wrapper ref -> 'a in_context
 val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit mm
+val debug_str : (Environ.env -> Evd.evar_map -> string) -> string mm
 (* val show_proof_data : unit -> unit mm
 val show_proof : unit -> unit mm
 val show_names : unit -> unit mm *)
@@ -219,29 +219,29 @@ end
 module Syntax : MEBI_MONAD_SYNTAX
 
 (* *)
-val map_list_mm : ('a -> 'b mm) -> 'a list -> 'b list mm
-val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
+(* val map_list_mm : ('a -> 'b mm) -> 'a list -> 'b list mm *)
+(* val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm *)
 
-val econstr_list_to_constr
+(* val econstr_list_to_constr
   :  ?abort_on_undefined_evars:bool
   -> EConstr.t list
-  -> Constr.t list mm
+  -> Constr.t list mm *)
 
 (* *)
-val econstr_eq : EConstr.t -> EConstr.t -> bool mm
+(* val econstr_eq : EConstr.t -> EConstr.t -> bool mm *)
 
 (* *)
-val econstr_to_constr
+(* val econstr_to_constr
   :  ?abort_on_undefined_evars:bool
   -> EConstr.t
-  -> Constr.t mm
+  -> Constr.t mm *)
 
-val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
-val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
-val globref_to_econstr : Names.GlobRef.t -> EConstr.t mm
-val normalize_econstr : EConstr.t -> EConstr.t mm
-val type_of_econstr : EConstr.t -> EConstr.t mm
-val new_evar_of_econstr : EConstr.t -> EConstr.t mm
+(* val econstr_to_constr_opt : EConstr.t -> Constr.t option mm *)
+(* val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm *)
+(* val globref_to_econstr : Names.GlobRef.t -> EConstr.t mm *)
+(* val normalize_econstr : EConstr.t -> EConstr.t mm *)
+(* val type_of_econstr : EConstr.t -> EConstr.t mm *)
+(* val new_evar_of_econstr : EConstr.t -> EConstr.t mm *)
 
 (* *)
 val encode : EConstr.t -> Enc.t mm
@@ -257,11 +257,11 @@ val encode_map : 'a F.t -> 'a B.t mm
 val decode_map : 'a B.t -> 'a F.t mm
 
 (* *)
-val is_none_term : EConstr.t -> bool mm
+(* val is_none_term : EConstr.t -> bool mm *)
 (* val load_none_term : unit -> unit mm *)
 
 (* *)
-val get_type_of_hyp : Names.Id.t -> EConstr.t mm
+(* val get_type_of_hyp : Names.Id.t -> EConstr.t mm *)
 
 (* *)
 (* val get_proof : unit -> Declare.Proof.t mm *)
@@ -286,16 +286,16 @@ val get_type_of_hyp : Names.Id.t -> EConstr.t mm
 (* *)
 val constr_to_string : Constr.t -> string
 val econstr_to_string : EConstr.t -> string
-val constr_rel_decl_to_string : Constr.rel_declaration -> string
-val econstr_rel_decl_to_string : EConstr.rel_declaration -> string
-val econstr_list_to_constr_opt_string : EConstr.t list -> string mm
-val debug_encoding : unit -> unit mm
+(* val constr_rel_decl_to_string : Constr.rel_declaration -> string *)
+(* val econstr_rel_decl_to_string : EConstr.rel_declaration -> string *)
+(* val econstr_list_to_constr_opt_string : EConstr.t list -> string mm *)
+(* val debug_encoding : unit -> unit mm *)
 
 
-type decoded_tree = (string * int) Mebi_constr_tree.tree
+type decoded_tree = (string * int) Mebi_constr.Tree.tree
 
 val pstr_decoded_tree : decoded_tree -> string
-val decode_constr_tree_lts : Mebi_constr_tree.t -> decoded_tree mm
+val decode_constr_tree_lts : Mebi_constr.Tree.t -> decoded_tree mm
 
 val make_transition_tbl
   :  wrapper ref
@@ -307,13 +307,13 @@ val make_state_set
 
 val make_state_tree_pair_set
   :  wrapper ref
-  -> (module Set.S with type elt = Enc.t * Mebi_constr_tree.t) in_context
+  -> (module Set.S with type elt = Enc.t * Mebi_constr.Tree.t) in_context
 
 
 (* *)
-val debug_econstr_kind : EConstr.t -> unit mm
+(* val debug_econstr_kind : EConstr.t -> unit mm
 val debug_constr_kind : Constr.t -> unit mm
-val debug_econstr_constr_kind : EConstr.t -> unit mm
+val debug_econstr_constr_kind : EConstr.t -> unit mm *)
 
 
 val show_fwd_map : unit -> unit 

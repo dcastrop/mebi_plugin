@@ -26,10 +26,10 @@ Example r : term := tseq (tpar (tact (recv A) tend)
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.Terms".
 MeBi Reset All.
-(* MeBi Set ShowAny      True. *)
-(* MeBi Set ShowNotices  True. *)
-(* MeBi Set ShowDebug    True. *)
-(* MeBi Set ShowDetails  True. *)
+MeBi Set ShowAny      True.
+MeBi Set ShowNotices  True.
+MeBi Set ShowDebug    True.
+MeBi Set ShowDetails  True.
 (* MeBi Set ShowResults  True. *)
 (* MeBi Set ShowWarnings True. *)
 (* MeBi Set Bound 100. *)

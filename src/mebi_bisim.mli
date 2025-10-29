@@ -70,6 +70,7 @@ val get_lts_transition
 
 val get_hyp_transition
   :  Fsm.t
+  -> Environ.env
   -> Evd.evar_map
   -> Evd.econstr array
   -> transition option
@@ -163,13 +164,13 @@ type hyp_kind =
   | H_Transition of transition
   | Pass
 
-exception ExpectedOnlyOne_H_ToBeInverted of Mebi_theories.hyp list
+exception ExpectedOnlyOne_H_ToBeInverted of Rocq_utils.hyp list
 
 val handle_hyp
   :  Algorithms.Bisimilar.result
-  -> 'a
+  -> Environ.env
   -> Evd.evar_map
-  -> Mebi_theories.hyp
+  -> Rocq_utils.hyp
   -> hyp_kind
 
 type hyp_result =
@@ -178,6 +179,8 @@ type hyp_result =
   | Cofixes of hyp_cofix list
   | Empty
 
+val hyp_result_string : hyp_result -> string
+
 val warning_multiple_h_transitions_to_invert
   :  transition
   -> transition list
@@ -185,9 +188,9 @@ val warning_multiple_h_transitions_to_invert
 
 val handle_the_hyps
   :  Algorithms.Bisimilar.result
-  -> 'a
+  -> Environ.env
   -> Evd.evar_map
-  -> Mebi_theories.hyp list
+  -> Rocq_utils.hyp list
   -> (unit Proofview.tactic * bool) option * hyp_cofix list * transition list
 
 val handle_hyps : Proofview.Goal.t -> Algorithms.Bisimilar.result -> hyp_result
@@ -269,7 +272,7 @@ val get_from_state_of_relation
 
 val build_tactics_from_constr_tree
   :  'a
-  -> (int * int) Mebi_constr_tree.tree
+  -> (int * int) Mebi_constr.Tree.tree
   -> (unit -> unit Proofview.tactic) list
 
 val build_constructors
@@ -317,7 +320,6 @@ val handle_constuctors
   -> Model.Action.annotation * (unit -> unit Proofview.tactic) list option
   -> unit Proofview.tactic
 
-exception CouldNotHandle_BuildConstructors of unit
 exception CouldNotHandle_NewProof of unit
 
 val handle_new_proof : Proofview.Goal.t -> unit Proofview.tactic

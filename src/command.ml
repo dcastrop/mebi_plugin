@@ -3,6 +3,254 @@ open Mebi_wrapper.Syntax
 open Logging
 open Model
 
+let unif_probs_to_string
+      env
+      sigma
+      (probs : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list)
+  : string
+  =
+  Strfy.list
+    ~force_newline:true
+    (Strfy.tuple
+       ~force_newline:true
+       Strfy.constr_tree
+       (fun ({ termL; termR } : Mebi_setup.unif_problem) ->
+       Strfy.tuple
+         ~force_newline:true
+         (Strfy.tuple ~is_keyval:true Strfy.str (Strfy.econstr env sigma))
+         (Strfy.tuple ~is_keyval:true Strfy.str (Strfy.econstr env sigma))
+         (("termL", termL), ("termR", termR))
+       (* (Strfy.tuple ~is_keyval:true Strfy.str (Strfy.econstr env sigma))
+          ("termL", termL) *)))
+    probs
+;;
+
+let next_constrs_to_string
+      env
+      sigma
+      (ctors : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+  : string
+  =
+  Strfy.list ~force_newline:true (unif_probs_to_string env sigma) ctors
+;;
+
+let _warn_econstr_kind_not_app lts_index env sigma t : unit mm =
+  Log.warning
+    (Printf.sprintf
+       "check_updated_ctx, (%i) econstr not App: %s"
+       lts_index
+       (Strfy.econstr env sigma t));
+  return ()
+;;
+
+let _warn_cannot_extract_args fn : unit mm =
+  let* env = get_env in
+  let* sigma = get_sigma in
+  Log.warning
+    (Printf.sprintf "cannot extract args from: %s" (Strfy.constr env sigma fn));
+  return ()
+;;
+
+let _debug_unify_all (u : Mebi_setup.unif_problem) : unit mm =
+  let open Pp in
+  Mebi_wrapper.debug (fun env sigma ->
+    str "UNIFYALL (termL) :::::::::: "
+    ++ Printer.pr_econstr_env env sigma u.termL
+    ++ strbrk "\n"
+    ++ str "UNIFYALL (termR) :::::::::: "
+    ++ Printer.pr_econstr_env env sigma u.termR)
+;;
+
+let _debug_sandboxed_unify (tgt_term : EConstr.t) : unit mm =
+  let open Pp in
+  Mebi_wrapper.debug (fun env sigma ->
+    str "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term)
+;;
+
+let _debug_ctors prefix z lts_index ctor_index ctor_vals : unit mm =
+  let* env = get_env in
+  let* sigma = get_sigma in
+  Log.debug
+    (Printf.sprintf
+       "%s #%i (%i:%i),%s"
+       prefix
+       z
+       lts_index
+       ctor_index
+       (if List.is_empty ctor_vals
+        then " ctors empty"
+        else
+          Printf.sprintf
+            "\nctors:\n%s"
+            (Strfy.list
+               ~force_newline:true
+               ~label:"ctors"
+               (Strfy.lts_constr ~indent:1 env sigma)
+               ctor_vals)));
+  return ()
+;;
+
+let _debug_ctor_acc prefix z lts_index ctor_index t ctor_action ctor_vals
+  : unit mm
+  =
+  let* env = get_env in
+  let* sigma = get_sigma in
+  Log.debug
+    (Printf.sprintf
+       "%s #%i (%i:%i),\nfrom: %s\naction: %s\nctors:%s%s"
+       prefix
+       z
+       lts_index
+       ctor_index
+       (Strfy.econstr env sigma t)
+       (match ctor_action with
+        | None -> "None"
+        | Some a -> Printf.sprintf "Some %s" (Strfy.econstr env sigma a))
+       (if List.is_empty ctor_vals then " " else "\n")
+       (Strfy.list
+          ~force_newline:true
+          ~label:"ctors"
+          (Strfy.lts_constr ~indent:1 env sigma)
+          ctor_vals));
+  return ()
+;;
+
+let _debug_cvcb = _debug_ctor_acc "check_valid_constructor: iterbody "
+let _debug_cvcu = _debug_ctor_acc "check_valid_constructor: unified  "
+let _debug_cvcf = _debug_ctor_acc "check_valid_constructor: no unify "
+let _debug_cnuc = _debug_ctor_acc "check_next_updated_context, next_ctors"
+
+let _debug_next_ctors
+      prefix
+      z
+      lts_index
+      ctor_index
+      t
+      ctor_action
+      (next_ctors :
+        (int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list) option)
+  : unit mm
+  =
+  let* env = get_env in
+  let* sigma = get_sigma in
+  Log.debug
+    (Printf.sprintf
+       "%s #%i (%i:%i),\nfrom: %s\naction: %s\nnextctors:%s"
+       prefix
+       z
+       lts_index
+       ctor_index
+       (Strfy.econstr env sigma t)
+       (match ctor_action with
+        | None -> "None"
+        | Some a -> Printf.sprintf "Some %s" (Strfy.econstr env sigma a))
+       (match next_ctors with
+        | None -> " None"
+        | Some (i, next_ctors) ->
+          if List.is_empty next_ctors
+          then " Some [ ] (empty)"
+          else
+            Printf.sprintf
+              " (%i)\n%s"
+              i
+              (next_constrs_to_string env sigma next_ctors)));
+  return ()
+;;
+
+let _debug_cvcn = _debug_next_ctors "check_valid_constructor: nextctors"
+
+let _debug_ctor_unif_failed lts_index i t ctor_action args : unit mm =
+  let (_termL, _act, _termR) : EConstr.t * EConstr.t * EConstr.t = args in
+  (* let* unified_termL = m_unify t _termL in *)
+  (* let* unified_act =
+        Option.cata (fun a -> m_unify a _act) (return true) ctor_action
+      in *)
+  let* env = get_env in
+  let* sigma = get_sigma in
+  Log.warning
+    (Printf.sprintf
+       "check_valid_constructor (%i:%i) unification failed,\n\
+        - termL unifies: %s\n\
+       \  with         : %s\n\n\
+        - action unifies: %s\n\
+       \  with          : %s"
+       lts_index
+       i
+       (* unified_termL *)
+       (Strfy.econstr env sigma t)
+       (Strfy.econstr env sigma _termL)
+       (* unified_act *)
+       (Option.cata (fun x -> Strfy.econstr env sigma x) "None" ctor_action)
+       (Strfy.econstr env sigma _act));
+  return ()
+;;
+
+let _debug_check_next_updated_context lts_index acc next_t : unit mm =
+  let* env = get_env in
+  let* sigma = get_sigma in
+  Log.debug
+    (Printf.sprintf
+       "check_next_updated_context (%i)\n- next_t: %s"
+       lts_index
+       (Strfy.econstr env sigma next_t));
+  return ()
+;;
+
+let _debug_check_valid_constructor_ctx_tm tm : unit mm =
+  Log.debug
+    (Printf.sprintf
+       "check_valid_constructor (ctx, tm), tm:\n%s"
+       (constr_to_string tm));
+  return ()
+;;
+
+let _debug_unif_probs
+      lts_index
+      (acc : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list)
+  : unit mm
+  =
+  let* env = get_env in
+  let* sigma = get_sigma in
+  Log.debug
+    (Printf.sprintf
+       "unif_probs, (%i) acc:\n%s"
+       lts_index
+       (unif_probs_to_string env sigma acc));
+  return ()
+;;
+
+let _debug_acc
+      prefix
+      ((lts_index, acc) :
+        int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+  : unit mm
+  =
+  let* env = get_env in
+  let* sigma = get_sigma in
+  Log.debug
+    (Printf.sprintf
+       "%s, (%i) acc:\n%s"
+       prefix
+       lts_index
+       (next_constrs_to_string env sigma acc));
+  return ()
+;;
+
+let _debug_cross_product_acc
+      ((lts_index, acc) :
+        int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+  : unit mm
+  =
+  let* env = get_env in
+  let* sigma = get_sigma in
+  Log.debug
+    (Printf.sprintf
+       "cross_product, (%i) acc:\n%s"
+       lts_index
+       (next_constrs_to_string env sigma acc));
+  return ()
+;;
+
 (* FIXME: All of the code below, up to [check_valid_constructor] needs
    reworking *)
 (* FIXME: Weird interaction between exceptions and monadic code. Try/cut *)
@@ -25,7 +273,7 @@ let m_unify (t0 : EConstr.t) (t1 : EConstr.t) : bool mm =
       let sigma = Unification.w_unify env sigma Conversion.CUMUL t0 t1 in
       (* Log.debug
          (Printf.sprintf
-         "Success, unified \"%s\" with \"%s\""
+         "command.m_unitfy, Success, unified \"%s\" with \"%s\""
          (econstr_to_string t0)
          (econstr_to_string t1)); *)
       sigma, true
@@ -34,13 +282,12 @@ let m_unify (t0 : EConstr.t) (t1 : EConstr.t) : bool mm =
       ->
       (* Log.debug
          (Printf.sprintf
-         "Could not unify \"%s\" with \"%s\""
+         "command.m_unitfy, Could not unify \"%s\" with \"%s\""
          (econstr_to_string t0)
          (econstr_to_string t1)); *)
       sigma, false)
 ;;
 
-(** [mk_ctx_substl] *)
 let rec mk_ctx_substl (substl : EConstr.t list)
   : ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list -> EConstr.t list mm
   = function
@@ -50,6 +297,10 @@ let rec mk_ctx_substl (substl : EConstr.t list)
     let ty = EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t) in
     (* *)
     let$ vt env sigma = Evarutil.new_evar env sigma ty in
+    (* let* env = get_env in
+       let* sigma = get_sigma in
+       Log.debug
+       (Printf.sprintf "mk_ctx_substl, vt: %s" (Strfy.econstr env sigma vt)); *)
     mk_ctx_substl (vt :: substl) ts
 ;;
 
@@ -59,32 +310,25 @@ let extract_args (substl : EConstr.Vars.substl) (tm : Constr.t)
   : (EConstr.t * EConstr.t * EConstr.t) mm
   =
   match Constr.kind tm with
-  | App (_, args) ->
+  | App (_fn, args) ->
     if Array.length args == 3
     then (
-      (* assert (Array.length args == 3); *)
       let args = EConstr.of_constr_array args in
       let args = Array.map (EConstr.Vars.substl substl) args in
       return (args.(0), args.(1), args.(2)))
-    else invalid_lts_args_length (Array.length args)
+    else
+      let* () = _warn_cannot_extract_args _fn in
+      invalid_lts_args_length (Array.length args)
   | _ -> (* assert false *) invalid_lts_term_kind tm
 ;;
 
-type unif_problem =
-  { termL : EConstr.t
-  ; termR : EConstr.t
-  }
-
-let rec unify_all (i : (Mebi_constr_tree.t * unif_problem) list)
-  : Mebi_constr_tree.t list option mm
+let rec unify_all (i : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list)
+  : Mebi_constr.Tree.t list option mm
   =
   match i with
   | [] -> return (Some [])
   | (ctor_tree, u) :: t ->
-    (* let* _ = if is_output_kind_enabled params then debug (fun env sigma ->
-       str "UNIFYALL (termL) :::::::::: " ++ Printer.pr_econstr_env env sigma
-       u.termL ++ strbrk "\nUNIFYALL (termR) :::::::::: " ++
-       Printer.pr_econstr_env env sigma u.termR) else return () in *)
+    (* let* () = _debug_unify_all u in *)
     let* success = m_unify u.termL u.termR in
     if success
     then
@@ -97,12 +341,10 @@ let rec unify_all (i : (Mebi_constr_tree.t * unif_problem) list)
 
 let sandboxed_unify
       (tgt_term : EConstr.t)
-      (u : (Mebi_constr_tree.t * unif_problem) list)
-  : (EConstr.t * Mebi_constr_tree.t list) option mm
+      (u : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list)
+  : (EConstr.t * Mebi_constr.Tree.t list) option mm
   =
-  (* let* _ = if is_output_kind_enabled params then debug (fun env sigma -> str
-     "TGT:::::: " ++ Printer.pr_econstr_env env sigma tgt_term) else return ()
-     in *)
+  (* let* _ = _debug_sandboxed_unify tgt_term in *)
   sandbox
     (let* success = unify_all u in
      match success with
@@ -113,191 +355,307 @@ let sandboxed_unify
        if is_undefined then return None else return (Some (term, unified)))
 ;;
 
-(** [coq_ctor]
-    - [EConstr.t] action
-    - [EConstr.t] destination
-    - [Mebi_constr_tree.t] coq-constructor index *)
-type coq_ctor = EConstr.t * EConstr.t * Mebi_constr_tree.t
-
 (* [act] should probably come from the unification problems? *)
 let rec retrieve_tgt_nodes
-          (acc : coq_ctor list)
+          (acc : Mebi_constr.t list)
           (i : int)
           (act : EConstr.t)
           (tgt_term : EConstr.t)
-  : int * (Mebi_constr_tree.t * unif_problem) list list -> coq_ctor list mm
+  :  int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list
+  -> Mebi_constr.t list mm
   = function
   | _, [] -> return acc
   | lts_index, u1 :: nctors ->
     let* success = sandboxed_unify tgt_term u1 in
     (match success with
-     | None -> retrieve_tgt_nodes acc i act tgt_term (lts_index, nctors)
+     | None ->
+       let* env = get_env in
+       let* sigma = get_sigma in
+       Log.debug
+         (Printf.sprintf
+            "retrieve_tgt_nodes (%i:%i), sandboxed_unify failed.\n\
+             - tgt_term: %s\n\
+             - u1:\n\
+             %s"
+            lts_index
+            i
+            (econstr_to_string tgt_term)
+            (unif_probs_to_string env sigma u1));
+       retrieve_tgt_nodes acc i act tgt_term (lts_index, nctors)
      | Some (tgt, ctor_tree) ->
+       let* env = get_env in
+       let* sigma = get_sigma in
+       Log.debug
+         (Printf.sprintf
+            "retrieve_tgt_nodes (%i:%i), sandboxed_unify success.\n\
+             - tgt_term: %s\n\
+             - tgt: %s\n\
+             - tree: %s\n\
+             - u1:\n\
+             %s"
+            lts_index
+            i
+            (econstr_to_string tgt_term)
+            (econstr_to_string tgt)
+            (Strfy.list Mebi_constr.Tree.pstr ctor_tree)
+            (unif_probs_to_string env sigma u1));
        let$+ act env sigma = Reductionops.nf_all env sigma act in
        retrieve_tgt_nodes
-         ((act, tgt, Node ((Enc.of_int lts_index, i + 1), ctor_tree)) :: acc)
+         ((act, tgt, Node ((Enc.of_int lts_index, i), ctor_tree)) :: acc)
          i
          act
          tgt_term
          (lts_index, nctors))
 ;;
 
+(* let merge_ctors a b : Mebi_constr.t list mm =
+   let* sigma = get_sigma in
+   return
+   (List.fold_left
+   (fun acc (a1, d1, t1) ->
+   if
+   List.exists
+   (fun (a2, d2, t2) ->
+   let aeq = EConstr.eq_constr sigma a1 a2 in
+   let deq = EConstr.eq_constr sigma d1 d2 in
+   let teq = Mebi_constr.Tree.eq t1 t2 in
+   aeq && deq && teq)
+   acc
+   then acc
+   else (a1, d1, t1) :: acc)
+   a
+   b)
+   ;; *)
+
+let unify_args_with
+      (term_to_unify : EConstr.t)
+      (action_to_unify : EConstr.t option)
+      ((termL, act, _termR) : EConstr.t * EConstr.t * EConstr.t)
+  : bool mm
+  =
+  let* unified_termL = m_unify term_to_unify termL in
+  if unified_termL
+  then Option.cata (fun a -> m_unify a act) (return true) action_to_unify
+  else return false
+;;
+
+let cross_product (lts_index, acc) ctree_unif_probs
+  : (int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list) mm
+  =
+  let* () = _debug_acc "cross_product" (lts_index, acc) in
+  (* We need to cross-product all possible unifications. This is in
+     case we have a constructor of the form LTS t11 a1 t12 -> LTS t21
+     a2 t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
+     unavoidable, but we should make sure we understand well the
+     problem before removing the source of repetition. *)
+  let acc : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list =
+    List.fold_left
+      (fun (acc0 : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+        x ->
+        List.fold_left
+          (fun (acc1 : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+            y -> (y :: x) :: acc1)
+          acc0
+          ctree_unif_probs)
+      []
+      acc
+  in
+  let* () = _debug_acc "cross_product" (lts_index, acc) in
+  return (lts_index, acc)
+;;
+
+(* TODO: try to figure out how to make sure the evars routed through here aren't all unified at once. unless, we need to instead fix this at an earlier point? so that they won't be unified together. *)
+let new_unif_prob (termL : EConstr.t) (termR : EConstr.t)
+  : Mebi_setup.unif_problem mm
+  =
+  (* let* sigma = get_sigma in
+     let* termR =
+     if EConstr.isEvar sigma termR
+     then
+     let* termR_ty = Mebi_utils.type_of_econstr termR in
+     let$ termR env sigma = Evarutil.new_evar env sigma termR_ty in
+     return termR
+     else return termR
+     in *)
+  let r : Mebi_setup.unif_problem = { termL; termR } in
+  return r
+;;
+
+let map_ctor_unif_probs ctors args
+  : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list mm
+  =
+  (* let ctors_unif_probs =
+     List.map
+     (fun (_tAct, (tDest : EConstr.t), (i : Mebi_constr.Tree.t)) ->
+     i, new_unif_prob tDest args.(2))
+     ctors
+     in *)
+  let iter_body (i : int) ctors_unif_probs =
+    let (_tAct, tDest, i) : Mebi_constr.t = List.nth ctors i in
+    let* r = new_unif_prob tDest args.(2) in
+    return ((i, r) :: ctors_unif_probs)
+  in
+  let* ctors_unif_probs = iterate 0 (List.length ctors - 1) [] iter_body in
+  return ctors_unif_probs
+;;
+
 (* Should return a list of unification problems *)
 let rec check_updated_ctx
-          (acc : int * (Mebi_constr_tree.t * unif_problem) list list)
-          (lts_ind_def_encmap : Mebi_ind.t F.t)
+          z
+          (acc : int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+          (lts_encmap : Mebi_ind.t F.t)
   :  EConstr.t list * EConstr.rel_declaration list
-  -> (int * (Mebi_constr_tree.t * unif_problem) list list) option mm
+  -> (int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list) option mm
   = function
   | [], [] -> return (Some acc)
-  | _hsubstl :: substl, t :: tl ->
-    let$+ upd_t env sigma =
-      EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
-    in
-    let* env = get_env in
+  | _hsubstl :: substls, t_decl :: decls ->
+    let t_ty : EConstr.t = Context.Rel.Declaration.get_type t_decl in
+    let$+ upd_t env sigma = EConstr.Vars.substl substls t_ty in
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with
      | App (fn, args) ->
-       (match F.find_opt lts_ind_def_encmap fn with
+       (match F.find_opt lts_encmap fn with
         | None ->
-          (* NOTE: testing handling the [@eq] premises *)
-          (match econstr_to_string fn with
-           | "option" ->
-             (* TODO: fail if weak is not Params.WeakEnc.OptionConstr *)
-             (* if Params.WeakEnc.is_option () then *)
-             if Logging.is_details_enabled ()
-             then
-               Log.warning
-                 (Printf.sprintf
-                    "check_updated_ctx, lts_ind_def_encmap \"option\" has \
-                     args: %s"
-                    (Strfy.list (Strfy.econstr env sigma) (Array.to_list args)));
-             check_updated_ctx acc lts_ind_def_encmap (substl, tl)
-           | "@eq" ->
-             (* TODO: fail, or *)
-             (* TODO: find way to propagate this (replace in F map?) *)
-             let* lhs : EConstr.t = normalize_econstr args.(1) in
-             let* rhs : EConstr.t = normalize_econstr args.(2) in
-             Log.warning
-               (Printf.sprintf
-                  "TODO: check_updated_ctx, handle premise (normalized):\n\
-                   fn: %s\n\
-                   lhs: %s\n\
-                   rhs: %s"
-                  (econstr_to_string fn)
-                  (econstr_to_string lhs)
-                  (econstr_to_string rhs));
-             check_updated_ctx acc lts_ind_def_encmap (substl, tl)
-           | _ ->
-             (* TODO: fail ? *)
-             Log.warning
-               (Printf.sprintf
-                  "check_updated_ctx, lts_ind_def_encmap does not have \
-                   corresponding fn \"%s\" with args: %s."
-                  (econstr_to_string fn)
-                  (Strfy.list (Strfy.econstr env sigma) (Array.to_list args)));
-             check_updated_ctx acc lts_ind_def_encmap (substl, tl))
+          let* _ = handle_unrecognized_ctor_fn (fn, args) in
+          check_updated_ctx z acc lts_encmap (substls, decls)
         | Some c ->
-          let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
-          let* c_constr_transitions = Mebi_ind.get_constr_transitions c in
-          let* ctors : coq_ctor list =
-            check_valid_constructor
-              c_constr_transitions
-              lts_ind_def_encmap
-              nextT
-              (Some args.(1))
-              c.index
-          in
-          if List.is_empty ctors
-          then return None
-          else (
-            let ctree_unif_probs : (Mebi_constr_tree.t * unif_problem) list =
-              List.map
-                (fun (_, (tL : EConstr.t), (i : Mebi_constr_tree.t)) ->
-                  i, { termL = tL; termR = args.(2) })
-                ctors
-            in
-            (* We need to cross-product all possible unifications. This is in
-               case we have a constructor of the form LTS t11 a1 t12 -> LTS t21
-               a2 t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
-               unavoidable, but we should make sure we understand well the
-               problem before removing the source of repetition. *)
-            (* FIXME: Test this *)
-            (* replace [rtls] in [rtls_ctx] *)
-            (* let rtls_ctx':rlts_list = List.append [ ] in *)
-            let acc' : (Mebi_constr_tree.t * unif_problem) list list =
-              List.concat_map
-                (fun (x : (Mebi_constr_tree.t * unif_problem) list) ->
-                  List.map
-                    (fun (y : Mebi_constr_tree.t * unif_problem) -> y :: x)
-                    ctree_unif_probs)
-                (snd acc)
-            in
-            check_updated_ctx (fst acc, acc') lts_ind_def_encmap (substl, tl)))
-     | _ -> check_updated_ctx acc lts_ind_def_encmap (substl, tl))
+          let* acc_opt = check_next_updated_context z acc lts_encmap args c in
+          (match acc_opt with
+           | None -> return None
+           | Some acc -> check_updated_ctx z acc lts_encmap (substls, decls)))
+     | _ -> check_updated_ctx z acc lts_encmap (substls, decls))
   | _substl, _ctxl -> invalid_check_updated_ctx _substl _ctxl
 (* Impossible! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
+and check_next_updated_context z (lts_index, acc) lts_encmap args c =
+  let$+ nextT env sigma = Reductionops.nf_evar sigma args.(0) in
+  let* () = _debug_check_next_updated_context lts_index acc nextT in
+  let* c_constr_transitions = Mebi_ind.get_constr_transitions c in
+  (* NOTE: we do two passes so that we don't prematurely restrict what kind of action can occur. *)
+  (* NOTE: since [args.(1)] is an evar, once it is unified it will be determined to be a certain value, and so we then won't be able to freely match on other applicable constructors. *)
+  let get_next_ctors =
+    check_valid_constructor z c_constr_transitions lts_encmap nextT
+  in
+  (* let* some_ctors = get_next_ctors (Some args.(1)) c.index in
+     let* none_ctors = get_next_ctors None c.index in
+     let* next_ctors = merge_ctors some_ctors none_ctors in *)
+  (* let* sigma = get_sigma in
+  let ctor_action : EConstr.t option =
+    if EConstr.isEvar sigma args.(1) then None else Some args.(1)
+  in *)
+  let ctor_action : EConstr.t option = Some args.(1) in
+  let* next_ctors = get_next_ctors ctor_action c.index in
+  let* () = _debug_cnuc z lts_index (-1) nextT (Some args.(1)) next_ctors in
+  match next_ctors with
+  | [] -> return None
+  | ctors ->
+    let* ctors_unif_probs = map_ctor_unif_probs ctors args in
+    let* () = _debug_unif_probs lts_index ctors_unif_probs in
+    let* acc = cross_product (lts_index, acc) ctors_unif_probs in
+    return (Some acc)
+
 (** Checks possible transitions for this term: *)
 and check_valid_constructor
+      z
       (ctor_transitions : (Constr.rel_context * Constr.types) array)
-      (lts_ind_def_encmap : Mebi_ind.t F.t)
-      (t' : EConstr.t)
-      (ma : EConstr.t option)
+      (lts_encmap : Mebi_ind.t F.t)
+      (t : EConstr.t)
+      (ctor_action : EConstr.t option)
       (lts_index : int)
-  : coq_ctor list mm
+  : Mebi_constr.t list mm
   =
-  let* t : EConstr.t = normalize_econstr t' in
-  let iter_body (i : int) (ctor_vals : coq_ctor list) =
+  let* t : EConstr.t = Mebi_utils.econstr_normalize t in
+  let iter_body (i : int) (ctor_vals : Mebi_constr.t list) =
+    (* let* () = _debug_cvcb z lts_index i t ctor_action ctor_vals in *)
     let (ctx, tm) : Constr.rel_context * Constr.t = ctor_transitions.(i) in
-    let ctx_tys : EConstr.rel_declaration list =
-      List.map EConstr.of_rel_decl ctx
-    in
+    (* let* () = _debug_check_valid_constructor_ctx_tm tm in *)
+    let ctx_tys = List.map EConstr.of_rel_decl ctx in
     let* substl = mk_ctx_substl [] (List.rev ctx_tys) in
-    let* (termL, act, termR) : EConstr.t * EConstr.t * EConstr.t =
-      extract_args substl tm
-    in
-    let* success = m_unify t termL in
-    if success
+    let* args = extract_args substl tm in
+    let* successfully_unified : bool = unify_args_with t ctor_action args in
+    if successfully_unified
     then
-      let* success = Option.cata (fun a -> m_unify a act) (return true) ma in
-      if success
-      then
-        let* act : EConstr.t = normalize_econstr act in
-        let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in
-        let* next_ctors
-          : (int * (Mebi_constr_tree.t * unif_problem) list list) option
-          =
-          check_updated_ctx
-            (lts_index, [ [] ])
-            lts_ind_def_encmap
-            (substl, ctx_tys)
-        in
-        match next_ctors with
-        | None -> return ctor_vals
-        | Some index_ctor_pair ->
-          (match snd index_ctor_pair with
-           | [] ->
-             let* sigma = get_sigma in
-             if EConstr.isEvar sigma tgt_term
-             then return ctor_vals
-             else
-               return
-                 (( act
-                  , tgt_term
-                  , Mebi_constr_tree.Node
-                      ((Enc.of_int (fst index_ctor_pair), i), []) )
-                  :: ctor_vals)
-           | nctors ->
-             let tgt_nodes =
-               retrieve_tgt_nodes ctor_vals i act tgt_term index_ctor_pair
-             in
-             tgt_nodes)
-      else return ctor_vals
-    else return ctor_vals
+      let* () = _debug_cvcu z lts_index i t ctor_action ctor_vals in
+      let (_termL, act, tgt_term) : EConstr.t * EConstr.t * EConstr.t = args in
+      let* act : EConstr.t = Mebi_utils.econstr_normalize act in
+      (* let tgt_term : EConstr.t = EConstr.Vars.substl substl termR in *)
+      (* NOTE: calling this once causes the next first constructor to successfully unify to determine:
+         - if ctor_action=Some ?x, then set what ?x is, meaning later constructors cannot be applied
+         - and even if we compensate for that, since termR=?r then the first to be unified will also determine what the destimation state can be. *)
+      let* next_ctors =
+        check_updated_ctx
+          (z + 1)
+          (lts_index, [ [] ])
+          lts_encmap
+          (substl, ctx_tys)
+      in
+      let* () = _debug_cvcn z lts_index i t ctor_action next_ctors in
+      check_next_constructors z (i, ctor_vals) next_ctors (act, tgt_term)
+    else
+      let* () = _debug_cvcf z lts_index i t ctor_action ctor_vals in
+      return ctor_vals
   in
   iterate 0 (Array.length ctor_transitions - 1) [] iter_body
+
+and check_next_constructors
+      z
+      ((i, ctor_vals) : int * Mebi_constr.t list)
+      (next_ctors :
+        (int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list) option)
+      ((act, tgt_term) : EConstr.t * EConstr.t)
+  : Mebi_constr.t list mm
+  =
+  match next_ctors with
+  | None -> return ctor_vals
+  | Some (lts_index, []) ->
+    let* sigma = get_sigma in
+    if EConstr.isEvar sigma tgt_term
+    then return ctor_vals
+    else (
+      let constr_tree = Mebi_constr.Tree.Node ((Enc.of_int lts_index, i), []) in
+      return ((act, tgt_term, constr_tree) :: ctor_vals))
+  | Some (lts_index, unif_probs) ->
+    let* _ = _debug_acc "check_next_constructors" (lts_index, unif_probs) in
+    (* FIXME: the order of [unif_probs] causes bug *)
+    (* retrieve_tgt_nodes ctor_vals i act tgt_term (lts_index, unif_probs) *)
+    retrieve_tgt_nodes ctor_vals i act tgt_term (lts_index, unif_probs)
+
+(** raises exception -- we don't yet support these kinds of arguments
+    - TODO: finish handling these, or throw helpful error *)
+and handle_unrecognized_ctor_fn ((fn, args) : EConstr.t * EConstr.t array)
+  : unit mm
+  =
+  let* env = get_env in
+  let* sigma = get_sigma in
+  Log.warning
+    (Printf.sprintf
+       "check_updated_ctx, unrecognized in lts_encmap:\n- fn (%s)\n- args: %s"
+       (Strfy.econstr env sigma fn)
+       (Strfy.list (Strfy.econstr env sigma) (Array.to_list args)));
+  (* NOTE: testing handling the [@eq] premises *)
+  match econstr_to_string fn with
+  | "option" ->
+    (* TODO: fail if weak is not Params.WeakEnc.OptionConstr *)
+    return ()
+  | "@eq" ->
+    (* TODO: fail, or *)
+    (* TODO: find way to propagate this (replace in F map?) *)
+    let* lhs : EConstr.t = Mebi_utils.econstr_normalize args.(1) in
+    let* rhs : EConstr.t = Mebi_utils.econstr_normalize args.(2) in
+    Log.warning
+      (Printf.sprintf
+         "TODO: check_updated_ctx, handle premise (normalized):\n\
+          fn: %s\n\
+          lhs: %s\n\
+          rhs: %s"
+         (econstr_to_string fn)
+         (econstr_to_string lhs)
+         (econstr_to_string rhs));
+    return ()
+  | _ ->
+    (* TODO: fail? *)
+    return ()
 ;;
 
 (** [GraphB] is ...
@@ -305,7 +663,7 @@ and check_valid_constructor
 module type GraphB = sig
   module H : Hashtbl.S with type key = Enc.t
   module S : Set.S with type elt = Enc.t
-  module D : Set.S with type elt = Enc.t * Mebi_constr_tree.t
+  module D : Set.S with type elt = Enc.t * Mebi_constr.Tree.t
 
   type constr_transitions = (Action.t, D.t) Hashtbl.t
 
@@ -324,7 +682,7 @@ module type GraphB = sig
     :  constr_transitions
     -> Action.t
     -> Enc.t
-    -> Mebi_constr_tree.t
+    -> Mebi_constr.Tree.t
     -> unit mm
 
   val add_new_term_constr_transition
@@ -332,7 +690,7 @@ module type GraphB = sig
     -> Enc.t
     -> Action.t
     -> Enc.t
-    -> Mebi_constr_tree.t
+    -> Mebi_constr.Tree.t
     -> unit mm
 
   val build_lts_graph
@@ -362,7 +720,7 @@ end
 module MkGraph
     (M : Hashtbl.S with type key = Enc.t)
     (N : Set.S with type elt = Enc.t)
-    (P : Set.S with type elt = Enc.t * Mebi_constr_tree.t) : GraphB = struct
+    (P : Set.S with type elt = Enc.t * Mebi_constr.Tree.t) : GraphB = struct
   (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t] and also
      is used for mapping term types to [cindef]. *)
   module H = M
@@ -371,10 +729,10 @@ module MkGraph
   module S = N
 
   (* [D] is the set of destination tuples, each comprised of a term [EConstr.t]
-     and the corresponding [Mebi_constr_tree.t]. *)
+     and the corresponding [Mebi_constr.Tree.t]. *)
   module D = P
 
-  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Mebi_constr_tree.t].
+  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Mebi_constr.Tree.t].
   *)
   type constr_transitions = (Action.t, D.t) Hashtbl.t
 
@@ -390,7 +748,7 @@ module MkGraph
       0
   ;;
 
-  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Mebi_constr_tree.t].
+  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Mebi_constr.Tree.t].
   *)
   type lts_graph =
     { to_visit : Enc.t Queue.t
@@ -403,13 +761,13 @@ module MkGraph
     ; weak : Params.WeakEnc.t option
     }
 
-  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Mebi_constr_tree.t)] in a given [constr_transitions].
+  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Mebi_constr.Tree.t)] in a given [constr_transitions].
   *)
   let insert_constr_transition
         (constrs : constr_transitions)
         (a : Action.t)
         (d : Enc.t)
-        (c : Mebi_constr_tree.t)
+        (c : Mebi_constr.Tree.t)
     : unit mm
     =
     (match Hashtbl.find_opt constrs a with
@@ -423,7 +781,7 @@ module MkGraph
         (t : Enc.t)
         (a : Action.t)
         (d : Enc.t)
-        (c : Mebi_constr_tree.t)
+        (c : Mebi_constr.Tree.t)
     : unit mm
     =
     H.add
@@ -441,7 +799,7 @@ module MkGraph
     | Some weak_kind ->
       Log.trace "command.MkGraph.is_silent_transition";
       let* act_enc : Enc.t = encode act in
-      let* ty : EConstr.t = type_of_econstr act in
+      let* ty : EConstr.t = Mebi_utils.type_of_econstr act in
       let* ty_enc : Enc.t = encode ty in
       Log.debug
         (Printf.sprintf
@@ -460,7 +818,7 @@ module MkGraph
          (* if Enc.eq label_enc ty_enc
          then return (Some false)
          else *)
-         let* b = is_none_term act in
+         let* b = Mebi_utils.is_none_term act in
          return (Some b)
        | CustomConstr (tau_enc, label_enc) ->
          let* tau_decoding = decode tau_enc in
@@ -481,16 +839,20 @@ module MkGraph
         ?(weak_type : Params.WeakEnc.t option = None)
         (from : Enc.t)
         (g : lts_graph)
-        (ctors : coq_ctor list)
+        (ctors : Mebi_constr.t list)
     : S.t mm
     =
     Log.trace "command.MkGraph.get_new_states";
     let iter_body (i : int) (new_states : S.t) =
-      let (act, tgt, int_tree) : coq_ctor = List.nth ctors i in
+      let (act, tgt, int_tree) : Mebi_constr.t = List.nth ctors i in
       let* tgt_enc : Enc.t = encode tgt in
       let* act_enc : Enc.t = encode act in
       let* is_silent : bool option = is_silent_transition weak_type act in
       let meta : Action.MetaData.t = [ int_tree ] in
+      Log.debug
+        (Printf.sprintf
+           "command.MkGraph.get_new_states, new meta: %s"
+           (Action.MetaData.to_string meta));
       let to_add : Action.t =
         { label = act_enc, (None, is_silent); meta; annos = [] }
       in
@@ -522,13 +884,14 @@ module MkGraph
         (from : Enc.t)
         (primary : Mebi_ind.t)
         (lts_ind_def_map : Mebi_ind.t B.t)
-    : coq_ctor list mm
+    : Mebi_constr.t list mm
     =
     Log.trace "command.MkGraph.get_new_constrs";
     let* from_dec : EConstr.t = decode from in
     let* decoded_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
     let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
     check_valid_constructor
+      0
       primary_constr_transitions
       decoded_map
       from_dec
@@ -555,7 +918,7 @@ module MkGraph
     then return g (* exit if bound reached *)
     else (
       let encoded_t : Enc.t = Queue.pop g.to_visit in
-      let* new_constrs : coq_ctor list =
+      let* new_constrs : Mebi_constr.t list =
         get_new_constrs encoded_t the_primary_lts lts_ind_def_map
       in
       (* [get_new_states] also updates [g.to_visit] *)
@@ -612,14 +975,14 @@ module MkGraph
     =
     Log.trace "command.MkGraph.build_graph";
     (* normalize the initial term *)
-    let* t : EConstr.t = constrexpr_to_econstr tref in
-    let* t : EConstr.t = normalize_econstr t in
+    let* t : EConstr.t = Mebi_utils.constrexpr_to_econstr tref in
+    let* t : EConstr.t = Mebi_utils.econstr_normalize t in
     (* encode lts inductive definitions *)
     let* lts_ind_def_map : Mebi_ind.t B.t = build_lts_ind_def_map grefs in
     let* the_primary_lts = get_primary_lts primary_lts grefs lts_ind_def_map in
     (* update environment by typechecking *)
     let* primary_trm_type = Mebi_ind.get_lts_trm_type the_primary_lts in
-    let$* u env sigma = Typing.check env sigma t primary_trm_type in
+    let$* _unit env sigma = Typing.check env sigma t primary_trm_type in
     (* get initial term *)
     let$ init env sigma = sigma, Reductionops.nf_all env sigma t in
     let* encoded_init = encode init in
@@ -882,6 +1245,36 @@ let build_lts_graph
   else G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts params
 ;;
 
+let build_fsm
+      ?(saturate : bool = false)
+      ?(minimize : bool = false)
+      (primary_lts : Libnames.qualid)
+      (t : Constrexpr.constr_expr)
+      (params : int * Params.WeakEnc.t option)
+      (refs : Libnames.qualid list)
+  : Fsm.t mm
+  =
+  let* the_lts =
+    build_lts_graph primary_lts t (Params.get_fst_params ()) refs
+  in
+  let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+  Log.details
+    (Printf.sprintf "command.build_fsm:\n%s\n" (Fsm.to_string the_fsm));
+  if minimize
+  then (
+    let the_minimized_fsm, _bisim_states =
+      Algorithms.Minimize.run ~weak:!Params.the_weak_mode the_fsm
+    in
+    Log.details
+      (Printf.sprintf
+         "command.build_fsm, minimized & bisim states: %s\n"
+         (Algorithms.Minimize.pstr (the_minimized_fsm, _bisim_states)));
+    return the_minimized_fsm)
+  else if saturate
+  then return (Fsm.saturate the_fsm)
+  else return the_fsm
+;;
+
 (**********************)
 (** Entry point *******)
 (**********************)
@@ -901,132 +1294,108 @@ type command_kind =
   | CheckBisimilarity of (coq_model * coq_model)
   | Info of unit
 
+let make_model args refs =
+  Log.trace "command.make_model";
+  let* result_str : string * string =
+    match args with
+    | LTS, (x, primary_lts) ->
+      let* the_lts : Lts.t =
+        build_lts_graph primary_lts x (Params.get_fst_params ()) refs
+      in
+      return ("LTS", Lts.to_string the_lts)
+    | FSM, (x, primary_lts) ->
+      let* the_fsm : Fsm.t =
+        build_fsm primary_lts x (Params.get_fst_params ()) refs
+      in
+      return ("FSM", Fsm.to_string the_fsm)
+  in
+  Log.result
+    (Printf.sprintf
+       "command.make_model, finished %s:\n%s\n"
+       (fst result_str)
+       (snd result_str));
+  return ()
+;;
+
+let only_in_weak_mode (f : 'a mm) : unit mm =
+  match Params.fst_weak_type () with
+  | None ->
+    if !Params.the_weak_mode = false
+    then Mebi_help.show_instructions_to_enable_weak ();
+    Mebi_help.show_instructions_to_set_weak ();
+    Log.warning "Aborting command.\n";
+    return ()
+  | Some _ ->
+    if !Params.the_weak_mode = false
+    then (
+      Mebi_help.show_instructions_to_enable_weak ();
+      Log.warning "Aborting command.\n";
+      return ())
+    else
+      let* _ = f in
+      return ()
+;;
+
+let saturate_model ((x, primary_lts) : coq_model) refs : unit mm =
+  Log.trace "command.saturate_model";
+  only_in_weak_mode
+    (let* the_saturated_fsm =
+       build_fsm ~saturate:true primary_lts x (Params.get_fst_params ()) refs
+     in
+     Log.result
+       (Printf.sprintf
+          "command.saturate_model, finished: %s\n"
+          (Fsm.to_string the_saturated_fsm));
+     return ())
+;;
+
+let minimize_model ((x, primary_lts) : coq_model) refs : unit mm =
+  Log.trace "command.minimize_model";
+  only_in_weak_mode
+    (let* the_minimized_fsm =
+       build_fsm ~minimize:true primary_lts x (Params.get_fst_params ()) refs
+     in
+     Log.result
+       (Printf.sprintf
+          "command.minimize_model, finished: %s\n"
+          (Fsm.to_string the_minimized_fsm));
+     return ())
+;;
+
+let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
+  Log.trace "command.check_bisimilarity";
+  let* the_fsm_1 = build_fsm a x (Params.get_fst_params ()) refs in
+  let* the_fsm_2 = build_fsm b y (Params.get_fst_params ()) refs in
+  let the_bisimilar =
+    Algorithms.Bisimilar.run ~weak:!Params.the_weak_mode (the_fsm_1, the_fsm_2)
+  in
+  Mebi_bisim.set_the_result the_bisimilar;
+  Log.result
+    (Printf.sprintf
+       "command.run, CheckBisimilarity, finished: %s\n"
+       (Algorithms.Bisimilar.pstr the_bisimilar));
+  Log.details
+    (Printf.sprintf
+       "command.run, CheckBisimilarity, saturated:\nFSM 1: %s\n\nFSM 2: %s\n"
+       (Fsm.to_string the_bisimilar.the_fsm_1)
+       (Fsm.to_string the_bisimilar.the_fsm_2));
+  if
+    !Params.the_fail_if_not_bisim
+    && Algorithms.Bisimilar.result_to_bool the_bisimilar
+  then return ()
+  else params_fail_if_not_bisim ()
+;;
+
 let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
   Log.trace "command.run";
   let* _ = Params.obtain_weak_kinds_from_args () in
   (* if !Params.the_weak_mode = true then *)
   (* let* _ = Mebi_wrapper.load_none_term () in *)
   match k with
-  | MakeModel (kind, (x, primary_lts)) ->
-    Log.debug "command.run, MakeModel";
-    let* the_lts : Lts.t =
-      build_lts_graph primary_lts x (Params.get_fst_params ()) refs
-    in
-    (match kind with
-     | LTS ->
-       Log.result
-         (Printf.sprintf
-            "command.run, MakeModel LTS, finished: %s\n"
-            (Lts.to_string the_lts));
-       if !Params.the_dump_to_file
-       then Log.debug "command.run, MakeModel LTS -- TODO dump to file\n";
-       return ()
-     | FSM ->
-       Log.details
-         (Printf.sprintf
-            "command.run, MakeModel LTS, finished: %s\n"
-            (Lts.to_string the_lts));
-       let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-       Log.result
-         (Printf.sprintf
-            "command.run, MakeModel FSM, finished: %s\n"
-            (Fsm.to_string the_fsm));
-       if !Params.the_dump_to_file
-       then Log.debug "command.run, MakeModel FSM -- TODO dump to file\n";
-       return ())
-  | SaturateModel (x, primary_lts) ->
-    (match Params.fst_weak_type () with
-     | None ->
-       if !Params.the_weak_mode = false
-       then Mebi_help.show_instructions_to_enable_weak ();
-       Mebi_help.show_instructions_to_set_weak ();
-       Log.warning "Aborting command.\n";
-       return ()
-     | Some _ ->
-       if !Params.the_weak_mode = false
-       then (
-         Mebi_help.show_instructions_to_enable_weak ();
-         Log.warning "Aborting command.\n";
-         return ())
-       else (
-         Log.debug "command.run, SaturateModel";
-         let* the_lts =
-           build_lts_graph primary_lts x (Params.get_fst_params ()) refs
-         in
-         let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-         Log.details
-           (Printf.sprintf
-              "command.run, unsaturated FSM: %s\n"
-              (Fsm.to_string the_fsm));
-         let the_saturated = Fsm.saturate the_fsm in
-         Log.result
-           (Printf.sprintf
-              "command.run, SaturateModel, finished: %s\n"
-              (Fsm.to_string the_saturated));
-         if !Params.the_dump_to_file
-         then Log.debug "command.run, SaturateModel -- TODO dump to file\n";
-         return ()))
-  | MinimizeModel (x, primary_lts) ->
-    (match Params.fst_weak_type () with
-     | None ->
-       Mebi_help.show_instructions_to_set_weak ();
-       Log.warning "Aborting command.\n";
-       return ()
-     | Some _ ->
-       if !Params.the_weak_mode = false
-       then (
-         Mebi_help.show_instructions_to_enable_weak ();
-         Log.warning "Aborting command.\n";
-         return ())
-       else (
-         Log.debug "command.run, MinimizeModel";
-         let* the_lts =
-           build_lts_graph primary_lts x (Params.get_fst_params ()) refs
-         in
-         let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
-         let the_minimized =
-           Algorithms.Minimize.run ~weak:!Params.the_weak_mode the_fsm
-         in
-         Log.result
-           (Printf.sprintf
-              "command.run, MinimizeModel, finished: %s\n"
-              (Algorithms.Minimize.pstr the_minimized));
-         if !Params.the_dump_to_file
-         then Log.debug "command.run, MinimizeModel -- TODO dump to file\n";
-         return ()))
-  | CheckBisimilarity ((x, a), (y, b)) ->
-    Log.debug "command.run, CheckBisimilarity";
-    if is_details_enabled () then Params.printout_weak_mode ();
-    Mebi_help.show_instructions_to_toggle_weak !Params.the_weak_mode;
-    let* the_lts_1 = build_lts_graph a x (Params.get_fst_params ()) refs in
-    let* the_lts_2 = build_lts_graph b y (Params.get_snd_params ()) refs in
-    let the_fsm_1 = Fsm.create_from (Lts.to_model the_lts_1) in
-    let the_fsm_2 = Fsm.create_from (Lts.to_model the_lts_2) in
-    Log.details
-      (Printf.sprintf
-         "command.run, CheckBisimilarity:\nFSM 1: %s\n\nFSM 2: %s\n"
-         (Fsm.to_string the_fsm_1)
-         (Fsm.to_string the_fsm_2));
-    let the_bisimilar =
-      Algorithms.Bisimilar.run ~weak:!Params.the_weak_mode (the_fsm_1, the_fsm_2)
-    in
-    Mebi_bisim.set_the_result the_bisimilar;
-    Log.result
-      (Printf.sprintf
-         "command.run, CheckBisimilarity, finished: %s\n"
-         (Algorithms.Bisimilar.pstr the_bisimilar));
-    Log.details
-      (Printf.sprintf
-         "command.run, CheckBisimilarity:\nFSM 1: %s\n\nFSM 2: %s\n"
-         (Fsm.to_string the_bisimilar.the_fsm_1)
-         (Fsm.to_string the_bisimilar.the_fsm_2));
-    if !Params.the_dump_to_file
-    then Log.debug "command.run, CheckBisimilarity -- TODO dump to file\n";
-    if
-      !Params.the_fail_if_not_bisim
-      && Algorithms.Bisimilar.result_to_bool the_bisimilar
-    then return ()
-    else params_fail_if_not_bisim ()
+  | MakeModel args -> make_model args refs
+  | SaturateModel args -> saturate_model args refs
+  | MinimizeModel args -> minimize_model args refs
+  | CheckBisimilarity args -> check_bisimilarity args refs
   | Info () ->
     Mebi_help.show_guidelines_and_limitations ();
     return ()
@@ -1045,19 +1414,14 @@ let proof_intro
   Log.trace "command.proof_intro";
   Mebi_bisim.reset_the_proof_state ();
   let* _ = run (CheckBisimilarity ((x, a), (y, b))) refs in
-  let r = !(Mebi_bisim.get_the_result ()) in
-  Log.debug
-    (Printf.sprintf
-       "command.proof_intro, bisim result:\n%s"
-       (Algorithms.Bisimilar.pstr r));
   Log.debug
     (Printf.sprintf
        "command.proof_intro, the_fsm_1:\n%s"
-       (Fsm.pstr r.the_fsm_1));
+       (Fsm.pstr !(Mebi_bisim.get_the_result ()).the_fsm_1));
   Log.debug
     (Printf.sprintf
        "command.proof_intro, the_fsm_2:\n%s"
-       (Fsm.pstr r.the_fsm_2));
+       (Fsm.pstr !(Mebi_bisim.get_the_result ()).the_fsm_2));
   return
     (Mebi_tactics.update_proof_by_tactic
        pstate

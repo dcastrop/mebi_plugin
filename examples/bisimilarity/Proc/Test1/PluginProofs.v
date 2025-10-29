@@ -13,12 +13,14 @@ Import Flat.Simple.
 Require Import MEBI.Examples.bisimilarity.Proc.Test1.Terms.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.Bisim".
-MeBi Set ShowAny True. 
-MeBi Set ShowNotices  True.
-MeBi Set ShowDebug    True.
-MeBi Set ShowDetails  True.
-MeBi Set ShowResults  True.
-MeBi Set ShowWarnings True.
+(* MeBi Set ShowAny True.  *)
+MeBi Set ShowAny False.
+(* MeBi Set ShowNotices  True. *)
+(* MeBi Set ShowDebug    True. *)
+(* MeBi Set ShowDetails  True. *)
+MeBi Set ShowDetails  False.
+(* MeBi Set ShowResults  True. *)
+(* MeBi Set ShowWarnings True. *)
 MeBi Set WeakMode     True.
 MeBi Set Weak Option label.
 MeBi Bisim p With termLTS And q With termLTS Using termLTS.
@@ -43,11 +45,18 @@ MeBi Set FailIfNotBisim True.
 Require Import Logic.
 
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
+MeBi Divider "Testing ctor trees".
+
+Example e1 : term := (tseq (tseq (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) tend) tend).
+
+MeBi FSM e1 Using termLTS. 
+(* MeBi Saturate e1 Using termLTS. *)
+
+
+(* MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof.
-  MeBiSim Begin termLTS p And termLTS q Using termLTS. 
-  (* unfold p, q. *)
+  MeBiSim Begin termLTS p And termLTS q Using termLTS. (* unfold p, q. *)
 
   MeBiSim Step. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
   MeBiSim Step. (* inversion H; simpl in *. *)
@@ -73,8 +82,74 @@ Proof.
   MeBiSim Step. (* clear H; cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
   MeBiSim Step. (* inversion H; simpl in *. *)
   MeBiSim Step. (* inversion H4; simpl in *. *)
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
+  MeBiSim Step. 
 
-  (* MeBiSim Step. *)
+  (* (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) *)
+  (* (tseq (tpar tend tend) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) *)
+  (* (tseq (tpar (tact (recv A) tend) (tact (send A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) *)
+  (* MeBiSim Step.  *)
+  (* TODO: investigate sandboxed_unify *)
 
 
-Admitted.
+
+Admitted. *)

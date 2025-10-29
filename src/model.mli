@@ -74,7 +74,7 @@ module Action : sig
   end
 
   module MetaData : sig
-    type t = Mebi_constr_tree.t list
+    type t = Mebi_constr.Tree.t list
 
     val merge : t -> t -> t
     val from_opt : t option -> t option

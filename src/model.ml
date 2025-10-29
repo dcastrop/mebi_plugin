@@ -170,7 +170,7 @@ module Action = struct
   end
 
   module MetaData = struct
-    type t = Mebi_constr_tree.t list
+    type t = Mebi_constr.Tree.t list
 
     let merge (m1 : t) (m2 : t) : t = List.append m1 m2
     let from_opt (t : t option) = match t with None -> None | Some t -> Some t
@@ -181,13 +181,13 @@ module Action = struct
       match m with
       | [] -> "(No MetaData)"
       | h :: t ->
-        let do_pstr i = Printf.sprintf "(%s)" (Mebi_constr_tree.pstr i) in
+        let do_pstr i = Printf.sprintf "(%s)" (Mebi_constr.Tree.pstr i) in
         Printf.sprintf
           "(%s)"
           (Printf.sprintf
              "[%s]"
              (List.fold_left
-                (fun (acc : string) (i : Mebi_constr_tree.t) ->
+                (fun (acc : string) (i : Mebi_constr.Tree.t) ->
                   Printf.sprintf "%s; %s" acc (do_pstr i))
                 (do_pstr h)
                 t))
@@ -197,8 +197,8 @@ module Action = struct
       if Int.equal (List.length m1) (List.length m2)
       then
         List.for_all
-          (fun ((i1, i2) : Mebi_constr_tree.t * Mebi_constr_tree.t) ->
-            Mebi_constr_tree.eq i1 i2)
+          (fun ((i1, i2) : Mebi_constr.Tree.t * Mebi_constr.Tree.t) ->
+            Mebi_constr.Tree.eq i1 i2)
           (List.combine m1 m2)
       else false
     ;;
@@ -211,7 +211,7 @@ module Action = struct
     ;;
 
     let compare (m1 : t) (m2 : t) : int =
-      List.compare (fun a b -> Mebi_constr_tree.compare a b) m1 m2
+      List.compare (fun a b -> Mebi_constr.Tree.compare a b) m1 m2
     ;;
 
     let compare_opt (m1 : t option) (m2 : t option) : int =
@@ -419,6 +419,9 @@ module Action = struct
     | [], h :: t -> -1
     | h :: t, [] -> 1
     | (e1, s1) :: t1, (e2, s2) :: t2 ->
+      (* match State.compare e1 e2 with
+         | 0 -> (compare ~annos ~meta s1 s2)
+         | c -> c *)
       Int.compare (State.compare e1 e2) (compare ~annos ~meta s1 s2)
 
   and annos_compare

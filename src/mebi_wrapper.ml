@@ -60,12 +60,9 @@ let run
   Log.trace "mebi_wrapper.run";
   let coq_env : Environ.env = !(the_coq_env ~fresh ()) in
   let coq_ctx : Evd.evar_map = !(the_coq_ctx ()) in
-  (* let proofv : proof_context = !(the_coq_proofv ~new_proof ~proof ()) in *)
-  (* let coq_ref : coq_context ref = ref { coq_env; coq_ctx; proofv } in *)
   let coq_ref : coq_context ref = ref { coq_env; coq_ctx } in
   let fwd_enc, bck_enc = !(get_the_enc_maps ~keep_encoding ()) in
-  let a = x (ref { coq_ref; fwd_enc; bck_enc }) in
-  (* enable_logging := false; *)
+  let a : 'a in_context = x (ref { coq_ref; fwd_enc; bck_enc }) in
   the_enc_maps_cache := Some (ref (!(a.state).fwd_enc, !(a.state).bck_enc));
   a.value
 ;;
@@ -77,14 +74,14 @@ let return (x : 'a) : 'a mm =
 
 let bind (x : 'a mm) (f : 'a -> 'b mm) : 'b mm =
   fun (st : wrapper ref) ->
-  let a = x st in
+  let a : 'a in_context = x st in
   f a.value a.state
 [@@inline always]
 ;;
 
 let map (f : 'a -> 'b) (x : 'a mm) : 'b mm =
   fun (st : wrapper ref) ->
-  let x_st = x st in
+  let x_st : 'a in_context = x st in
   { x_st with value = f x_st.value }
 [@@inline always]
 ;;
@@ -111,39 +108,19 @@ let rec iterate
 (****** GET & PUT STATE *********************)
 (********************************************)
 
-(* let set_proof (new_proof : Declare.Proof.t) (st : wrapper ref) : unit in_context
-  =
-  Log.trace "mebi_wrapper.set_proof";
-  let coq_st = !st.coq_ref in
-  let names = !coq_st.proofv.names in
-  let proofv = !(the_coq_proofv ~proof:(Some new_proof) ~names ()) in
-  coq_st := { !coq_st with proofv };
-  st := { !st with coq_ref = coq_st };
-  { state = st; value = () }
-;; *)
-
 let get_env (st : wrapper ref) : Environ.env in_context =
-  let coq_st = !st.coq_ref in
-  { state = st; value = !coq_st.coq_env }
+  { state = st; value = !(!st.coq_ref).coq_env }
 ;;
 
 let get_sigma (st : wrapper ref) : Evd.evar_map in_context =
-  let coq_st = !st.coq_ref in
-  { state = st; value = !coq_st.coq_ctx }
+  { state = st; value = !(!st.coq_ref).coq_ctx }
 ;;
 
-(* let get_proofv (st : wrapper ref) : proof_context in_context =
-  let coq_st = !st.coq_ref in
-  { state = st; value = !coq_st.proofv }
-;; *)
-
 let get_fwd_enc (st : wrapper ref) : Enc.t F.t in_context =
-  Log.trace "mebi_wrapper.get_fwd_enc";
   { state = st; value = !st.fwd_enc }
 ;;
 
 let get_bck_enc (st : wrapper ref) : EConstr.t B.t in_context =
-  Log.trace "mebi_wrapper.get_bck_enc";
   { state = st; value = !st.bck_enc }
 ;;
 
@@ -152,15 +129,16 @@ let state
       (st : wrapper ref)
   : 'a in_context
   =
-  let coq_st = !st.coq_ref in
+  let coq_st : coq_context ref = !st.coq_ref in
   let sigma, a = f !coq_st.coq_env !coq_st.coq_ctx in
   coq_st := { !coq_st with coq_ctx = sigma };
+  st := { !st with coq_ref = coq_st };
   { state = st; value = a }
 ;;
 
 let sandbox (m : 'a mm) (st : wrapper ref) : 'a in_context =
-  let st_contents = !st in
-  let res = m st in
+  let st_contents : wrapper = !st in
+  let res : 'a in_context = m st in
   st := st_contents;
   { state = st; value = res.value }
 ;;
@@ -200,17 +178,17 @@ end
 (****** COQ TERMS *****************)
 (**********************************)
 
-let econstr_eq (a : EConstr.t) (b : EConstr.t) : bool mm =
-  let open Syntax in
-  let* sigma = get_sigma in
-  return (Eq.econstr sigma a b)
-;;
+(* let econstr_eq (a : EConstr.t) (b : EConstr.t) : bool mm =
+   let open Syntax in
+   let* sigma = get_sigma in
+   return (Eq.econstr sigma a b)
+   ;; *)
 
-let is_none_term (x : EConstr.t) : bool mm =
+(* let is_none_term (x : EConstr.t) : bool mm =
   fun (state : wrapper ref) ->
   let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
   { state; value = Mebi_theories.is_constant sigma x Mebi_theories.c_None }
-;;
+;; *)
 
 (* let env : Environ.env = !(!state.coq_ref).coq_env in
   let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
@@ -221,9 +199,9 @@ let is_none_term (x : EConstr.t) : bool mm =
      (Printf.sprintf
      "mebi_wrapper.is_none_term, kind\n%s"
      (Strfy.econstr_kind env sigma (Mebi_theories.c_None ()))); *)
-  match Constr.kind (Mebi_setup.Convert.econstr_to_constr sigma x) with
+  match Constr.kind (Rocq_convert.econstr_to_constr sigma x) with
   | App (cx, _) ->
-    let cy = Mebi_setup.Convert.econstr_to_constr sigma y in
+    let cy = Rocq_convert.econstr_to_constr sigma y in
     Log.debug
       (Printf.sprintf
          "mebi_wrapper.is_none_term\n\
@@ -238,7 +216,7 @@ let is_none_term (x : EConstr.t) : bool mm =
     { state; value = Mebi_setup.Eq.constr cx cy }
   | _ -> { state; value = false } *)
 
-let type_of_econstr (t : EConstr.t) : EConstr.t mm =
+(* let type_of_econstr (t : EConstr.t) : EConstr.t mm =
   fun (state : wrapper ref) ->
   let env : Environ.env = !(!state.coq_ref).coq_env in
   let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
@@ -248,9 +226,9 @@ let type_of_econstr (t : EConstr.t) : EConstr.t mm =
   (* state := { !state with coq_ref }; *)
   state
   := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
-  { state; value = t }
+  { state; value = t } *)
 
-and new_evar_of_econstr (t : EConstr.t) : EConstr.t mm =
+(* and new_evar_of_econstr (t : EConstr.t) : EConstr.t mm =
   fun (state : wrapper ref) ->
   let env : Environ.env = !(!state.coq_ref).coq_env in
   let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
@@ -259,87 +237,78 @@ and new_evar_of_econstr (t : EConstr.t) : EConstr.t mm =
   (* { state = st; value = instance } *)
   state
   := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
-  { state; value = t }
+  { state; value = t } *)
 
-and constrexpr_to_econstr (t : Constrexpr.constr_expr) : EConstr.t mm =
+(* and constrexpr_to_econstr (t : Constrexpr.constr_expr) : EConstr.t mm =
   fun (state : wrapper ref) ->
   let env : Environ.env = !(!state.coq_ref).coq_env in
   let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
-  let sigma, t = Convert.constrexpr_to_econstr env sigma t in
+  let sigma, t = Rocq_convert.constrexpr_to_econstr env sigma t in
   (* coq_st := { !coq_st with coq_ctx = sigma };
   { state = st; value = t } *)
   state
   := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
-  { state; value = t }
+  { state; value = t } *)
 
-and econstr_to_constr ?(abort_on_undefined_evars : bool = false) (x : EConstr.t)
-  : Constr.t mm
-  =
-  let open Syntax in
-  let* sigma = get_sigma in
-  return (Convert.econstr_to_constr ~abort_on_undefined_evars sigma x)
+(* and econstr_to_constr ?(abort_on_undefined_evars : bool = false) (x : EConstr.t)
+   : Constr.t mm
+   =
+   let open Syntax in
+   let* sigma = get_sigma in
+   return (Rocq_convert.econstr_to_constr ~abort_on_undefined_evars sigma x) *)
 
-and econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
-  let open Syntax in
-  let* sigma = get_sigma in
-  return (Convert.econstr_to_constr_opt sigma x)
+(* and econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
+   let open Syntax in
+   let* sigma = get_sigma in
+   return (Rocq_convert.econstr_to_constr_opt sigma x) *)
 
-and globref_to_econstr (x : Names.GlobRef.t) : EConstr.t mm =
-  let open Syntax in
-  let* env = get_env in
-  return (Convert.globref_to_econstr env x)
+(* and globref_to_econstr (x : Names.GlobRef.t) : EConstr.t mm =
+   let open Syntax in
+   let* env = get_env in
+   return (Rocq_convert.globref_to_econstr env x) *)
 
-and normalize_econstr (t : EConstr.t) : EConstr.t mm =
-  fun (state : wrapper ref) ->
-  let env : Environ.env = !(!state.coq_ref).coq_env in
-  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
-  let t : EConstr.t = Reductionops.nf_all env sigma t in
-  { state; value = t }
-;;
+(* and normalize_econstr (t : EConstr.t) : EConstr.t mm =
+   let open Syntax in
+   let$+ t env sigma = Reductionops.nf_all env sigma t in
+   return t *)
 
 (**********************************)
 (****** UTILS *********************)
 (**********************************)
 
-let map_list_mm (f : 'a -> 'b mm) (ls : 'a list) : 'b list mm =
-  let ls : 'a list = List.rev ls in
-  let open Syntax in
-  (* let* env = get_env in *)
-  let iter_body (i : int) (acc : 'b list) =
-    let x : 'a = List.nth ls i in
-    let* y : 'b = f x in
-    return (y :: acc)
-  in
-  iterate 0 (List.length ls - 1) [] iter_body
-;;
+(* let map_list_mm (f : 'a -> 'b mm) (ls : 'a list) : 'b list mm =
+   let ls : 'a list = List.rev ls in
+   let open Syntax in
+   (* let* env = get_env in *)
+   let iter_body (i : int) (acc : 'b list) =
+   let x : 'a = List.nth ls i in
+   let* y : 'b = f x in
+   return (y :: acc)
+   in
+   iterate 0 (List.length ls - 1) [] iter_body
+   ;; *)
 
-let type_of_constrexpr (tref : Constrexpr.constr_expr) : EConstr.t mm =
-  let open Syntax in
-  let* t : EConstr.t = constrexpr_to_econstr tref in
-  type_of_econstr t
-;;
+(* let rec econstr_list_to_constr ?(abort_on_undefined_evars : bool = false)
+   : EConstr.t list -> Constr.t list mm
+   = function
+   | [] -> return []
+   | h :: t ->
+   let open Syntax in
+   let* h = econstr_to_constr ~abort_on_undefined_evars h in
+   let* t = econstr_list_to_constr ~abort_on_undefined_evars t in
+   return (h :: t)
+   ;; *)
 
-let rec econstr_list_to_constr ?(abort_on_undefined_evars : bool = false)
-  : EConstr.t list -> Constr.t list mm
-  = function
-  | [] -> return []
-  | h :: t ->
-    let open Syntax in
-    let* h = econstr_to_constr ~abort_on_undefined_evars h in
-    let* t = econstr_list_to_constr ~abort_on_undefined_evars t in
-    return (h :: t)
-;;
-
-let rec econstr_list_to_constr_opt ?(abort_on_undefined_evars : bool = false)
-  : EConstr.t list -> Constr.t option list mm
-  = function
-  | [] -> return []
-  | h :: t ->
-    let open Syntax in
-    let* h = econstr_to_constr_opt h in
-    let* t = econstr_list_to_constr_opt t in
-    return (h :: t)
-;;
+(* let rec econstr_list_to_constr_opt ?(abort_on_undefined_evars : bool = false)
+   : EConstr.t list -> Constr.t option list mm
+   = function
+   | [] -> return []
+   | h :: t ->
+   let open Syntax in
+   let* h = econstr_to_constr_opt h in
+   let* t = econstr_list_to_constr_opt t in
+   return (h :: t)
+   ;; *)
 
 (**********************************)
 (****** COQ TERM TO STRING ********)
@@ -380,21 +349,21 @@ end *)
 
 let constr_to_string (x : Constr.t) : string = (wrap Strfy.constr) x
 
-let constr_rel_decl_to_string (x : Constr.rel_declaration) : string =
-  (wrap Strfy.constr_rel_decl) x
-;;
+(* let constr_rel_decl_to_string (x : Constr.rel_declaration) : string =
+   (wrap Strfy.constr_rel_decl) x
+   ;; *)
 
 let econstr_to_string (x : EConstr.t) : string = (wrap Strfy.econstr) x
 
-let econstr_rel_decl_to_string (x : EConstr.rel_declaration) : string =
-  (wrap Strfy.econstr_rel_decl) x
-;;
+(* let econstr_rel_decl_to_string (x : EConstr.rel_declaration) : string =
+   (wrap Strfy.econstr_rel_decl) x
+   ;; *)
 
-let econstr_list_to_constr_opt_string (es : EConstr.t list) : string mm =
-  let open Syntax in
-  let* es = econstr_list_to_constr_opt es in
-  return (Strfy.list (Strfy.option (wrap Strfy.constr)) es)
-;;
+(* let econstr_list_to_constr_opt_string (es : EConstr.t list) : string mm =
+   let open Syntax in
+   let* es = econstr_list_to_constr_opt es in
+   return (Strfy.list (Strfy.option (wrap Strfy.constr)) es)
+   ;; *)
 
 (********************************************)
 (****** ERRORS ******************************)
@@ -969,11 +938,11 @@ let encode (k : EConstr.t) : Enc.t mm =
   fun (st : wrapper ref) ->
   Log.trace "mebi_wrapper.encode";
   let encoding : Enc.t = Enc.encode !st.fwd_enc !st.bck_enc k in
-  Logging.Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.encode, \"%s\" into (%s)"
-       (econstr_to_string k)
-       (Enc.to_string encoding));
+  (* Log.debug
+     (Printf.sprintf
+     "mebi_wrapper.encode, \"%s\" into (%s)"
+     (econstr_to_string k)
+     (Enc.to_string encoding)); *)
   assert (F.mem !st.fwd_enc k);
   assert (B.mem !st.bck_enc encoding);
   { state = st; value = encoding }
@@ -986,11 +955,11 @@ let decode (k : Enc.t) : EConstr.t mm =
   let* bck_enc = get_bck_enc in
   match Enc.decode_opt bck_enc k with
   | Some decoding ->
-    Logging.Log.debug
-      (Printf.sprintf
-         "mebi_wrapper.decode, \"%s\" into (%s)"
-         (Enc.to_string k)
-         (econstr_to_string decoding));
+    (* Log.debug
+       (Printf.sprintf
+       "mebi_wrapper.decode, \"%s\" into (%s)"
+       (Enc.to_string k)
+       (econstr_to_string decoding)); *)
     return decoding
   | None -> cannot_get_decoding_of_unencoded_econstr k
 ;;
@@ -1108,19 +1077,19 @@ let decode_map (m : 'a B.t) : 'a F.t mm =
 (****** DECODE CONSTR TREE ********)
 (**********************************)
 
-type decoded_tree = (string * int) Mebi_constr_tree.tree
+type decoded_tree = (string * int) Mebi_constr.Tree.tree
 
 (** decodes the parts of the tree corresponding to the LTS into string form. *)
-let decode_constr_tree_lts (tree : Mebi_constr_tree.t) : decoded_tree mm =
+let decode_constr_tree_lts (tree : Mebi_constr.Tree.t) : decoded_tree mm =
   let open Syntax in
-  let rec decode_tree (t : Mebi_constr_tree.t) : decoded_tree mm =
+  let rec decode_tree (t : Mebi_constr.Tree.t) : decoded_tree mm =
     match t with
     | Node (leaf, stem) ->
       let* decoded_leaf_lts : EConstr.t = decode (fst leaf) in
       let decoded_leaf = econstr_to_string decoded_leaf_lts, snd leaf in
       let* decoded_stem = decode_tree_list stem in
-      return (Mebi_constr_tree.Node (decoded_leaf, decoded_stem))
-  and decode_tree_list (l : Mebi_constr_tree.t list) : decoded_tree list mm =
+      return (Mebi_constr.Tree.Node (decoded_leaf, decoded_stem))
+  and decode_tree_list (l : Mebi_constr.Tree.t list) : decoded_tree list mm =
     match l with
     | [] -> return []
     | h :: t ->
@@ -1133,7 +1102,7 @@ let decode_constr_tree_lts (tree : Mebi_constr_tree.t) : decoded_tree mm =
 
 let rec pstr_decoded_tree (t1 : decoded_tree) : string =
   match t1 with
-  | Mebi_constr_tree.Node (lhs_int, rhs_int_tree_list) ->
+  | Mebi_constr.Tree.Node (lhs_int, rhs_int_tree_list) ->
     Printf.sprintf
       "(%s:%i) [%s]"
       (fst lhs_int)
@@ -1152,7 +1121,7 @@ let rec pstr_decoded_tree (t1 : decoded_tree) : string =
 (* In the environment of the goal, we can get the type of an assumption
    directly by a lookup.  The other solution is to call a low-cost retyping
    function like *)
-let get_type_of_hyp (id : Names.Id.t) : EConstr.t mm =
+(* let get_type_of_hyp (id : Names.Id.t) : EConstr.t mm =
   let open Syntax in
   let* env = get_env in
   match EConstr.lookup_named id env with
@@ -1169,7 +1138,7 @@ let get_type_of_hyp (id : Names.Id.t) : EConstr.t mm =
          (econstr_to_string ty)
          (econstr_to_string _constr));
     return ty
-;;
+;; *)
 
 (**********************************)
 (****** COQ PROOF CONTEXT *********)
@@ -1255,6 +1224,12 @@ let debug (f : Environ.env -> Evd.evar_map -> Pp.t) : unit mm =
   state (fun env sigma ->
     Feedback.msg_debug (f env sigma);
     sigma, ())
+;;
+
+let debug_str (f : Environ.env -> Evd.evar_map -> string) : string mm =
+  state (fun env sigma ->
+    let x : string = f env sigma in
+    sigma, x)
 ;;
 
 let show_fwd_map () : unit =
@@ -1471,21 +1446,21 @@ let make_state_set (st : wrapper ref)
 ;;
 
 let make_state_tree_pair_set (st : wrapper ref)
-  : (module Set.S with type elt = Enc.t * Mebi_constr_tree.t) in_context
+  : (module Set.S with type elt = Enc.t * Mebi_constr.Tree.t) in_context
   =
   let module PairSet =
     Set.Make (struct
-      type t = Enc.t * Mebi_constr_tree.t
+      type t = Enc.t * Mebi_constr.Tree.t
 
       let compare t1 t2 =
         match Enc.compare (fst t1) (fst t2) with
-        | 0 -> Mebi_constr_tree.compare (snd t1) (snd t2)
+        | 0 -> Mebi_constr.Tree.compare (snd t1) (snd t2)
         | c -> c
       ;;
     end)
   in
   { state = st
-  ; value = (module PairSet : Set.S with type elt = Enc.t * Mebi_constr_tree.t)
+  ; value = (module PairSet : Set.S with type elt = Enc.t * Mebi_constr.Tree.t)
   }
 ;;
 
@@ -1493,7 +1468,7 @@ let make_state_tree_pair_set (st : wrapper ref)
 (****** DEBUG *******************************)
 (********************************************)
 
-let debug_encoding () : unit mm =
+(* let debug_encoding () : unit mm =
   fun (st : wrapper ref) ->
   if Int.equal 0 (F.length !st.fwd_enc)
   then (
@@ -1700,6 +1675,6 @@ let debug_econstr_constr_kind (t : EConstr.t) : unit mm =
   let open Syntax in
   let* t = econstr_to_constr t in
   debug_constr_kind t
-;;
+;; *)
 
 (****************************************************************************)

@@ -176,9 +176,9 @@ let erel _env sigma : EConstr.ERelevance.t -> string =
 ;;
 
 let hyp ?(force_newline : bool = false) ?(indent : int = 0) env sigma
-  : Mebi_theories.hyp -> string
+  : Rocq_utils.hyp -> string
   =
-  fun (x : Mebi_theories.hyp) ->
+  fun (x : Rocq_utils.hyp) ->
   list
     ~force_newline:true
     ~indent:(indent + 1)
@@ -302,7 +302,7 @@ let action_label ?(indent : int = 0) : Model.Action.Label.t -> string =
 ;;
 
 let action_metadata ?(indent : int = 0) : Model.Action.MetaData.t -> string =
-  fun x -> list ~label:"MetaData" Mebi_constr_tree.pstr x
+  fun x -> list ~label:"MetaData" Mebi_constr.Tree.pstr x
 ;;
 
 let rec action_annotation_pair ?(indent : int = 0)
@@ -360,9 +360,38 @@ and action ?(indent : int = 0) : Model.Action.t -> string =
             ("annotations", x.annos) *)
        ])
 ;;
+
 (* Mebi_setup.Enc.to_string (fst x) *)
 (* Printf.sprintf
     "( encState: %s%s, decState: %s )"
     (Mebi_setup.Enc.to_string x.)
     sep
     (option str (snd x)) *)
+
+let constr_tree ?(indent : int = 0) : Mebi_constr.Tree.t -> string =
+  let rec tree_to_string : Mebi_constr.Tree.t -> string = function
+    | Node ((lts_enc, ctor_index), rhs_tree_list) ->
+      Printf.sprintf
+        "(%s:%i) %s"
+        (enc lts_enc)
+        ctor_index
+        (list
+           ~force_newline:true
+           ~indent:(indent + 1)
+           tree_to_string
+           rhs_tree_list)
+  in
+  tree_to_string
+;;
+
+let lts_constr ?(indent : int = 0) env sigma : Mebi_constr.t -> string =
+  fun ((action, destination, tree) : Mebi_constr.t) ->
+  list
+    ~force_newline:true
+    ~indent
+    str
+    [ tuple ~is_keyval:true str (econstr env sigma) ("action", action)
+    ; tuple ~is_keyval:true str (econstr env sigma) ("destination", destination)
+    ; tuple ~is_keyval:true str (constr_tree ~indent:(indent + 1)) ("tree", tree)
+    ]
+;;
