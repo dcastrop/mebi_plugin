@@ -146,3 +146,102 @@ let rec build_constrs
        let acc = ctor :: acc in
        build_constrs acc ctor_index act tgt (lts_index, unif_probs_list))
 ;;
+
+(*****************************************************************************)
+
+(* type constr_data = { lts_index : int;ctor_index : int  } *)
+
+type data =
+  { ind_map : Mebi_ind.t F.t
+  ; lts_index : int
+  ; acc : unification_problem list list
+  }
+
+exception ConstructorNameNotRecognized of (EConstr.t * EConstr.t)
+
+let fail_if_unrecognized_constructor : bool = true
+
+exception InductiveKindNotLTS of Mebi_ind.t
+
+(** [get_constrs_opt x d] is [Some constrs] if [x] is an [EConstr.t] term corresponding to an inductively defined LTS that has been passed to the plugin as an argument, and already processed and stored within [d.ind_map], otherwise is [None].
+    @param [x]
+      is an [EConstr.t] term assumed to be derived from some declaration within the context of a constructor of an inductively defined LTS.
+    @param [d] is a record [data].
+    @return
+      [None] if [x] does not correspond to an application (i.e., [Constr.App(fn, args)]) else [Some constrs].
+    @raise ConstructorNameNotRecognized
+      if [fail_if_unrecognized_constructor] is set to true, otherwise returns [None].
+    @raise InductiveKindNotLTS if [x] does not *)
+let get_ind_constrs_opt (x : EConstr.t) (d : data)
+  : Rocq_utils.ind_constrs option mm
+  =
+  state (fun env sigma ->
+    match EConstr.kind sigma x with
+    | App (name, args) ->
+      (match F.find_opt d.ind_map name with
+       | None ->
+         if fail_if_unrecognized_constructor
+         then raise (ConstructorNameNotRecognized (x, name))
+         else sigma, None
+       | Some ctor ->
+         (match ctor.kind with
+          | Mebi_ind.LTS l -> sigma, Some l.constr_transitions
+          | _ -> raise (InductiveKindNotLTS ctor)))
+    | _ -> sigma, None)
+;;
+
+let debug_ind_constr p (x : Rocq_utils.ind_constr) : unit mm =
+  state (fun env sigma ->
+    let constr_str : string = Strfy.ind_constr env sigma x in
+    ( sigma
+    , Log.debug (Printf.sprintf "%sind_constr:\n%s" (Utils.prefix p) constr_str)
+    ))
+;;
+
+let debug_ind_constrs p (x : Rocq_utils.ind_constrs) : unit mm =
+  state (fun env sigma ->
+    let constrs_str : string = Strfy.ind_constrs env sigma x in
+    ( sigma
+    , Log.debug
+        (Printf.sprintf "%sind_constrs:\n%s" (Utils.prefix p) constrs_str) ))
+;;
+
+let debug_ind_constrs_opt p (x : Rocq_utils.ind_constrs option) : unit mm =
+  state (fun env sigma ->
+    ( sigma
+    , match x with
+      | None ->
+        Log.debug (Printf.sprintf "%sind_constrs_opt is None" (Utils.prefix p))
+      | Some constrs ->
+        let constrs_str = Strfy.ind_constrs env sigma constrs in
+        Log.debug
+          (Printf.sprintf
+             "%sind_constrs_opt is Some:\n%s"
+             (Utils.prefix p)
+             constrs_str) ))
+;;
+
+(** [collect_valid_constructors from_term constrs d] ...
+(* TODO: finish doc *)
+@see [check_valid_constructor] *)
+let
+  (*rec*)
+    collect_valid_constructors
+    (from_term : EConstr.t)
+    (constrs : Rocq_utils.ind_constrs)
+    (d : data)
+  : Mebi_constr.t list mm
+  =
+  let* () = debug_ind_constrs "Checking new" constrs in
+  let* from_term : EConstr.t = Mebi_utils.econstr_normalize from_term in
+  let iter_body (i : int) (acc : Mebi_constr.t list) : Mebi_constr.t list mm =
+    let (ctx, term) : Constr.rel_context * Constr.t = constrs.(i) in
+    let* () = debug_ind_constr (Printf.sprintf "Checking (%i)" i) (ctx, term) in
+    (* TODO: refactor from mk_ctx_substl, understand *)
+    (* let ctx_tys : Rocq_utils.econstr_decls = List.map EConstr.of_rel_decl ctx in *)
+    return []
+  in
+  iterate 0 (Array.length constrs - 1) [] iter_body
+;;
+
+(* let get_new_constrs *)

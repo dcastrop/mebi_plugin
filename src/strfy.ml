@@ -44,6 +44,18 @@ let list
     Printf.sprintf "%s %s %s%s %s" lhs lstr sep rhs suffix
 ;;
 
+let array
+      ?(force_newline : bool = false)
+      ?(label : string = "List")
+      ?(indent : int = 0)
+      ?(use : string * string = "[", "]")
+      (strfy : 'a -> string)
+      (arr : 'a array)
+  : string
+  =
+  list ~force_newline ~label ~indent ~use strfy (Array.to_list arr)
+;;
+
 let str : string -> string = fun (x : string) -> x
 let int : int -> string = fun (x : int) -> Printf.sprintf "%i" x
 let bool : bool -> string = fun (x : bool) -> Printf.sprintf "%b" x
@@ -96,6 +108,10 @@ let constr_opt env sigma : Constr.t option -> string =
 
 let constr_rel_decl env sigma : Constr.rel_declaration -> string =
   fun (x : Constr.rel_declaration) -> pp (Printer.pr_rel_decl env sigma x)
+;;
+
+let constr_rel_context env sigma : Constr.rel_context -> string =
+  fun (x : Constr.rel_context) -> pp (Printer.pr_rel_context env sigma x)
 ;;
 
 let constr_kind ?(indent : int = 0) env sigma : Constr.t -> string =
@@ -227,6 +243,14 @@ let goal ?(indent : int = 0) : Proofview.Goal.t -> string =
 (**********************************)
 (****** MODEL *********************)
 (**********************************)
+
+let ind_constr env sigma : Rocq_utils.ind_constr -> string =
+  tuple (constr_rel_context env sigma) (constr env sigma)
+;;
+
+let ind_constrs env sigma : Rocq_utils.ind_constrs -> string =
+  array (ind_constr env sigma)
+;;
 
 let enc : Mebi_setup.Enc.t -> string = Mebi_setup.Enc.to_string
 

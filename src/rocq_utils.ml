@@ -7,6 +7,12 @@ type constr_kind =
     , EConstr.EInstance.t
     , Evd.erelevance )
     Constr.kind_of_term
+
+type ind_constr = Constr.rel_context * Constr.t
+type ind_constrs = ind_constr array
+type econstr_decl = EConstr.rel_declaration
+type econstr_decls = econstr_decl list
+
 (*****************************************************************************)
 
 let type_of_econstr_rel
