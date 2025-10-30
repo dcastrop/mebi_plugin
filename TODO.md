@@ -1,10 +1,12 @@
 # todo
 
+
+
 ## longterm list
 - [ ] develop coq-side API for using plugin
 - [ ] overhaul [Logging]
-- [ ] make [Mebi_wrapper] a parametric functor (currently just uses [IntEncoding] as [E])
-
+- [x] make [Mebi_wrapper] a parametric functor (currently just uses [IntEncoding] as [E])
+- [ ] update [Mebi_wrapper.Errors], some are obsolete, standardize naming convention, extract to own file module (construct as functor?)
 
 ## active list
 
