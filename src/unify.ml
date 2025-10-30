@@ -36,19 +36,186 @@ let debug_unification_problem ?(prefix = "") (p : unification_problem) : unit mm
   return (Log.debug (Printf.sprintf "%s unification_problem: %s" prefix s))
 ;;
 
-let debug_unification_problem_list
-      ?(prefix = "")
-      (ps : unification_problem list)
-  : unit mm
+let debugstr_unification_problem_list (ps : unification_problem list)
+  : string mm
   =
   let iter_body (i : int) (acc : string list) =
     let* s = debugstr_unification_problem (List.nth ps i) in
     return (s :: acc)
   in
   let* sl : string list = iterate 0 (List.length ps - 1) [] iter_body in
-  let s : string = Strfy.list Strfy.str sl in
+  return (Strfy.list Strfy.str sl)
+;;
+
+let debug_unification_problem_list
+      ?(prefix = "")
+      (ps : unification_problem list)
+  : unit mm
+  =
+  let* s : string = debugstr_unification_problem_list ps in
   return (Log.debug (Printf.sprintf "%s unification_problem list: %s" prefix s))
 ;;
+
+let debug_unification_problem_list_list
+      ?(prefix = "")
+      (ps : unification_problem list list)
+  : unit mm
+  =
+  let iter_body (i : int) (acc : string list) =
+    let* s = debugstr_unification_problem_list (List.nth ps i) in
+    return (s :: acc)
+  in
+  let* sl : string list = iterate 0 (List.length ps - 1) [] iter_body in
+  let s : string = Strfy.list Strfy.str sl in
+  return
+    (Log.debug (Printf.sprintf "%s unification_problem list list: %s" prefix s))
+;;
+
+let debug_str_mebiconstrslist env sigma cs : string =
+  let f = Strfy.econstr env sigma in
+  Strfy.list
+    ~force_newline:true
+    ~indent:2
+    (fun (action, dest, tree) ->
+      Strfy.list
+        ~force_newline:true
+        ~indent:1
+        Strfy.str
+        [ Strfy.tuple ~is_keyval:true Strfy.str f ("action", action)
+        ; Strfy.tuple ~is_keyval:true Strfy.str f ("dest", dest)
+        ; Strfy.tuple
+            ~is_keyval:true
+            Strfy.str
+            Mebi_constr.Tree.to_string
+            ("tree", tree)
+        ])
+    cs
+;;
+
+let debug_buildconstrs_some act tgt unified_tgt acc : unit mm =
+  state (fun env sigma ->
+    let f = Strfy.econstr env sigma in
+    Log.debug
+      (Printf.sprintf
+         "build_constrs:\n%s"
+         (Strfy.list
+            ~force_newline:true
+            (Strfy.tuple ~is_keyval:true Strfy.str Strfy.str)
+            [ "act", f act
+            ; "tgt", f tgt
+            ; "unified_tgt", f unified_tgt
+            ; "acc", debug_str_mebiconstrslist env sigma acc
+            ]));
+    sigma, ())
+;;
+
+let debug_buildconstrs_none act tgt acc : unit mm =
+  state (fun env sigma ->
+    let f = Strfy.econstr env sigma in
+    Log.debug
+      (Printf.sprintf
+         "build_constrs:\n%s"
+         (Strfy.list
+            ~force_newline:true
+            (Strfy.tuple ~is_keyval:true Strfy.str Strfy.str)
+            [ "act", f act
+            ; "tgt", f tgt
+            ; "acc", debug_str_mebiconstrslist env sigma acc
+            ]));
+    sigma, ())
+;;
+
+(*****************************************************************************)
+
+type data =
+  { ind_map : Mebi_ind.t F.t
+  ; lts_index : int
+  ; mutable to_unify : unification_problem list list
+  }
+
+(* let new_unif_pair (a : EConstr.t) (b : EConstr.t)
+   : Mebi_setup.unif_problem mm
+   =
+   (* let* sigma = get_sigma in
+   let* termR =
+   if EConstr.isEvar sigma termR
+   then
+   let* termR_ty = Mebi_utils.type_of_econstr termR in
+   let$ termR env sigma = Evarutil.new_evar env sigma termR_ty in
+   return termR
+   else return termR
+   in *)
+   return (a,b)
+   ;; *)
+
+(** [next_unification_problems constrs args] creates a new [unification_pair] for the [rhs_term] of each of the next applicable [constrs]. 
+(* NOTE: these have already been checked prior to this point, we are just now preparing them for when we try to unify them again, altogether with any other applicable constructors from some constructor applied earlier in the tree. *)
+(* TODO: finish doc *)
+@see [map_ctor_unif_probs] *)
+let build_next_unification_problems
+      (constrs : Mebi_constr.t list)
+      (args : EConstr.t array)
+  : unification_problem list mm
+  =
+  let iter_body (i : int) (acc : unification_problem list) =
+    let act_term, rhs_term, constr_tree = List.nth constrs i in
+    let rhs_pair : unification_pair = rhs_term, args.(2) in
+    (* NOTE: what if we also tried creating new pairs for the action here? *)
+    return ((rhs_pair, constr_tree) :: acc)
+  in
+  iterate 0 (List.length constrs - 1) [] iter_body
+;;
+
+let debug_update_unification_problems next_problems d new_to_unify : unit mm =
+  let* () =
+    debug_unification_problem_list_list ~prefix:"to_unify acc" d.to_unify
+  in
+  let* () =
+    debug_unification_problem_list ~prefix:"next_problems" next_problems
+  in
+  let* () =
+    debug_unification_problem_list_list ~prefix:"cross product" d.to_unify
+  in
+  return ()
+;;
+
+(* NOTE: this is the original one, unsure if problematic *)
+let cross_product1 acc next_problems : unification_problem list list =
+  List.concat_map
+    (fun d_to_unify ->
+      List.map (fun next_problem -> next_problem :: d_to_unify) next_problems)
+    acc
+;;
+
+(* NOTE: this was what "fixed" the old one, but perhaps causes more issues. for now using old one. *)
+let cross_product2 acc next_problems : unification_problem list list =
+  List.fold_left
+    (fun (acc0 : unification_problem list list) x ->
+      List.fold_left
+        (fun (acc1 : unification_problem list list) y -> (y :: x) :: acc1)
+        acc0
+        next_problems)
+    []
+    acc
+;;
+
+let update_unification_problems
+      (next_constrs : Mebi_constr.t list)
+      (args : EConstr.t array)
+      (d : data)
+  : data mm
+  =
+  let* next_problems = build_next_unification_problems next_constrs args in
+  let new_to_unify : unification_problem list list =
+    (* cross_product1 d.to_unify next_problems *)
+    cross_product2 d.to_unify next_problems
+  in
+  let* () = debug_update_unification_problems next_problems d new_to_unify in
+  d.to_unify <- new_to_unify;
+  return d
+;;
+
+(*****************************************************************************)
 
 (** [unify a b] tries to unify [a] and [b] within the context of the [env] and [sigma] of [mm]. @returns [true] if successful, [false] otherwise. *)
 let unify ((a, b) : unification_pair) : bool mm =
@@ -76,15 +243,18 @@ let debug_unify ((a, b) : unification_pair) : bool mm =
 (** [do_terms_unify ?f a b] checks if terms [a] and [b] unify using [?f] within a sandbox (i.e., ensuring that the [sigma] of the state-monad is not updated).
     @return [true] if [a] and [b] do unify else [false]. *)
 let do_terms_unify ?(f : unification_pair -> bool mm = unify) a b : bool mm =
-  sandbox (f (a, b))
+  (* sandbox (f (a, b)) *)
+  f (a, b)
 ;;
 
 (** [do_terms_unify_opt ?f a b] is the same as [do_terms_unify] except that [a] and [b] are [option].
-    @return [true] if [Some a] and [Some b] unify else [false]. *)
+    @return
+      [false] if [Some a] and [Some b] do NOT unify else [true] (i.e., if either are [None] return [true].)
+*)
 let do_terms_unify_opt ?(f : unification_pair -> bool mm = unify) a b : bool mm =
   match a, b with
   | Some a, Some b -> do_terms_unify ~f a b
-  | _, _ -> return false
+  | _, _ -> return true
 ;;
 
 (** [try_unify_constructor_args ?f from_term action args]
@@ -102,7 +272,6 @@ let try_unify_constructor_args
   (* TODO: this is a new change, check the impact of this *)
   let* lhs_term_unifies : bool = do_terms_unify ~f from_term lhs_term in
   let* act_term_unifies : bool = do_terms_unify_opt ~f action (Some act_term) in
-  (* if lhs_term_unifies && act_term_unifies then return true else return false *)
   return (lhs_term_unifies && act_term_unifies)
 ;;
 
@@ -138,49 +307,59 @@ let rec unify_all_opt ?(f : unification_pair -> bool mm = unify)
     @return
       [None] if [unify_all_opt] is also [None] or if [tgt] is an [Evar], else returns [Some (normalized_tgt, ctor_trees)].
 *)
-let sandbox_unify_all_opt (tgt : EConstr.t) (ps : unification_problem list)
+let sandbox_unify_all_opt
+      ?(f : unification_pair -> bool mm = unify)
+      (tgt : EConstr.t)
+      (ps : unification_problem list)
   : (EConstr.t * Mebi_constr.Tree.t list) option mm
   =
   sandbox
-    (let* unified_all_opt = unify_all_opt ps in
+    (let* unified_all_opt = unify_all_opt ~f ps in
      match unified_all_opt with
      | None -> return None
      | Some ctor_trees ->
        let* term = econstr_normalize tgt in
-       let* is_undefined = econstr_is_evar term in
+       let* is_undefined = Mebi_utils.econstr_is_evar term in
        if is_undefined then return None else return (Some (term, ctor_trees)))
 ;;
 
-(** [build_constrs acc ctor_index act tgt (lts_index, ps)] is ...
+(** [build_constrs (ctor_index,acc) act tgt (lts_index, ps)] is ...
     (* TODO: document *)
-    @param ctor_index is the constructor index (from 0).
+    @param (ctor_index,acc) is the constructor index (from 0).
     @param act is the action (label) that is leads to some [tgt] term.
     @param tgt
       is the term reached by applying constructor [ctor_index] to some term with [act], and will at first be an [evar] but then resolve to some concrete [econstr].
     @return a list containing the
     @see retrieve_tgt_nodes  *)
 let rec build_constrs
-          (acc : Mebi_constr.t list)
-          (ctor_index : int)
+          ?(f : unification_pair -> bool mm = unify)
+          ((ctor_index, acc) : int * Mebi_constr.t list)
           (act : EConstr.t)
           (tgt : EConstr.t)
   : int * unification_problem list list -> Mebi_constr.t list mm
   = function
   | _, [] -> return acc
   | lts_index, unif_probs :: unif_probs_list ->
-    let* success = sandbox_unify_all_opt tgt unif_probs in
+    let* success = sandbox_unify_all_opt ~f tgt unif_probs in
     (match success with
-     | None -> build_constrs acc ctor_index act tgt (lts_index, unif_probs_list)
+     | None ->
+       let* () = debug_buildconstrs_none act tgt acc in
+       build_constrs ~f (ctor_index, acc) act tgt (lts_index, unif_probs_list)
      | Some (unified_tgt, ctor_trees) ->
-       let* act = econstr_normalize act in
+       let* unified_tgt = econstr_normalize unified_tgt in
        let open Mebi_constr.Tree in
        let tree = Node ((Enc.of_int lts_index, ctor_index), ctor_trees) in
-       let ctor = act, tgt, tree in
+       let ctor = act, unified_tgt, tree in
        let acc = ctor :: acc in
-       build_constrs acc ctor_index act tgt (lts_index, unif_probs_list))
+       let* () = debug_buildconstrs_some act tgt unified_tgt acc in
+       build_constrs ~f (ctor_index, acc) act tgt (lts_index, unif_probs_list))
 ;;
 
 (*****************************************************************************)
+
+let subst_of_decl ?(substl : EConstr.Vars.substl = []) x : EConstr.t =
+  EConstr.Vars.substl substl (Context.Rel.Declaration.get_type x)
+;;
 
 (** [mk_ctx_subst ?substl x] returns a new [evar] made from the type of [x], using any [substl] provided.
     @param ?substl
@@ -193,10 +372,7 @@ let mk_ctx_subst
       (x : ('a, EConstr.t, 'b) Context.Rel.Declaration.pt)
   : EConstr.t mm
   =
-  state (fun env sigma ->
-    let ty : EConstr.t = Context.Rel.Declaration.get_type x in
-    let subst : EConstr.t = EConstr.Vars.substl substl ty in
-    Evarutil.new_evar env sigma subst)
+  state (fun env sigma -> Evarutil.new_evar env sigma (subst_of_decl ~substl x))
 ;;
 
 (** [mk_ctx_substl acc ts] makes an [evar] for each term declaration in [ts].
@@ -235,17 +411,22 @@ let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
   | _ -> (* TODO: err *) invalid_lts_term_kind term
 ;;
 
-(* type constr_data = { lts_index : int;ctor_index : int  } *)
-
-type data =
-  { ind_map : Mebi_ind.t F.t
-  ; lts_index : int
-  ; mutable acc : unification_problem list list
-  }
+(*****************************************************************************)
 
 exception ConstructorNameNotRecognized of (EConstr.t * EConstr.t)
 
 let fail_if_unrecognized_constructor : bool = true
+
+let handle_unrecognized_ctor_fn env sigma x name args =
+  if fail_if_unrecognized_constructor
+  then (* TODO: err *) raise (ConstructorNameNotRecognized (x, name))
+  else (
+    Log.warning
+      (Printf.sprintf
+         "unrecognized constructor: %s"
+         (Strfy.econstr env sigma name));
+    sigma, Some (None, args))
+;;
 
 exception InductiveKindNotLTS of Mebi_ind.t
 
@@ -259,52 +440,63 @@ exception InductiveKindNotLTS of Mebi_ind.t
       if [fail_if_unrecognized_constructor] is set to true, otherwise returns [None].
     @raise InductiveKindNotLTS if [x] does not *)
 let get_ind_constrs_opt (x : EConstr.t) (d : data)
-  : Rocq_utils.ind_constrs option mm
+  : ((int * Rocq_utils.ind_constrs) option * EConstr.t array) option mm
   =
   state (fun env sigma ->
     match EConstr.kind sigma x with
     | App (name, args) ->
       (match F.find_opt d.ind_map name with
-       | None ->
-         if fail_if_unrecognized_constructor
-         then (* TODO: err *) raise (ConstructorNameNotRecognized (x, name))
-         else sigma, None
-       | Some ctor ->
-         (match ctor.kind with
-          | Mebi_ind.LTS l -> sigma, Some l.constr_transitions
-          | _ -> (* TODO: err *) raise (InductiveKindNotLTS ctor)))
+       | None -> handle_unrecognized_ctor_fn env sigma x name args
+       | Some ind ->
+         let lts_index = ind.index in
+         (match ind.kind with
+          | Mebi_ind.LTS l ->
+            sigma, Some (Some (lts_index, l.constr_transitions), args)
+          | _ -> (* TODO: err *) raise (InductiveKindNotLTS ind)))
     | _ -> sigma, None)
 ;;
 
 let debug_ind_constr p (x : Rocq_utils.ind_constr) : unit mm =
   state (fun env sigma ->
     let constr_str : string = Strfy.ind_constr env sigma x in
-    ( sigma
-    , Log.debug (Printf.sprintf "%sind_constr:\n%s" (Utils.prefix p) constr_str)
-    ))
+    Log.debug (Printf.sprintf "%sind_constr:\n%s" (Utils.prefix p) constr_str);
+    sigma, ())
 ;;
 
 let debug_ind_constrs p (x : Rocq_utils.ind_constrs) : unit mm =
   state (fun env sigma ->
     let constrs_str : string = Strfy.ind_constrs env sigma x in
-    ( sigma
-    , Log.debug
-        (Printf.sprintf "%sind_constrs:\n%s" (Utils.prefix p) constrs_str) ))
+    Log.debug (Printf.sprintf "%sind_constrs:\n%s" (Utils.prefix p) constrs_str);
+    sigma, ())
 ;;
 
 let debug_ind_constrs_opt p (x : Rocq_utils.ind_constrs option) : unit mm =
   state (fun env sigma ->
-    ( sigma
-    , match x with
-      | None ->
-        Log.debug (Printf.sprintf "%sind_constrs_opt is None" (Utils.prefix p))
-      | Some constrs ->
-        let constrs_str = Strfy.ind_constrs env sigma constrs in
-        Log.debug
-          (Printf.sprintf
-             "%sind_constrs_opt is Some:\n%s"
-             (Utils.prefix p)
-             constrs_str) ))
+    (match x with
+     | None ->
+       Log.debug (Printf.sprintf "%sind_constrs_opt is None" (Utils.prefix p))
+     | Some constrs ->
+       let constrs_str = Strfy.ind_constrs env sigma constrs in
+       Log.debug
+         (Printf.sprintf
+            "%sind_constrs_opt is Some:\n%s"
+            (Utils.prefix p)
+            constrs_str));
+    sigma, ())
+;;
+
+let debug_validconstrs_begin constrs : unit mm =
+  debug_ind_constrs "Checking new" constrs
+;;
+
+let debug_validconstrs_iter i context : unit mm =
+  debug_ind_constr (Printf.sprintf "Checking (%i)" i) context
+;;
+
+let debug_validconstrs_iter_unify i context unifies : unit mm =
+  debug_ind_constr
+    (Printf.sprintf "Checking (%i) unifies (%b)" i unifies)
+    context
 ;;
 
 let debug_args
@@ -313,13 +505,56 @@ let debug_args
   : unit mm
   =
   state (fun env sigma ->
-    let f = Strfy.econstr env sigma in
-    let arg_str =
+    let f : EConstr.t -> string = Strfy.econstr env sigma in
+    let arg_str : string =
       Strfy.list
-        (Strfy.tuple Strfy.str f)
+        ~force_newline:true
+        (Strfy.tuple ~is_keyval:true Strfy.str f)
         [ "lhs", lhs_term; "act", act_term; "rhs", rhs_term ]
     in
-    sigma, Log.debug (Printf.sprintf "%sargs:\n%s" (Utils.prefix p) arg_str))
+    Log.debug (Printf.sprintf "%sargs:\n%s" (Utils.prefix p) arg_str);
+    sigma, ())
+;;
+
+let debug_nextconstrs_none args : unit mm =
+  debug_args
+    "check_for_next_constructors, update sigma failed to fully apply \
+     constructor"
+    args
+;;
+
+let debug_nextconstrs_some_empty args : unit mm =
+  debug_args
+    "check_for_next_constructors, update sigma applied constructor without any \
+     further constructors"
+    args
+;;
+
+let debug_nextconstrs_some_next args : unit mm =
+  debug_args
+    "check_for_next_constructors, update sigma applied constructor with \
+     additional constructors"
+    args
+;;
+
+let debug_updatesigma_none t_subst : unit mm =
+  state (fun env sigma ->
+    let t_str : string = Strfy.econstr env sigma t_subst in
+    Log.debug
+      (Printf.sprintf "update_sigma, t_subst is not an application:\n%s" t_str);
+    sigma, ())
+;;
+
+let debug_updatesigma_some_args args : unit mm =
+  debug_args
+    "update_sigma, found no additional constructors for"
+    (args.(0), args.(1), args.(2))
+;;
+
+let debug_updatesigma_some_pair args : unit mm =
+  debug_args
+    "update_sigma, additional constructors found for"
+    (args.(0), args.(1), args.(2))
 ;;
 
 let make_constr_tree (constr_index : int) (d : data) =
@@ -336,67 +571,125 @@ let rec collect_valid_constructors
           (d : data)
   : Mebi_constr.t list mm
   =
-  let* () = debug_ind_constrs "Checking new" constrs in
-  let* from_term : EConstr.t = Mebi_utils.econstr_normalize from_term in
+  Log.debug "A1";
+  let* () = debug_validconstrs_begin constrs in
+  let* from_term : EConstr.t = econstr_normalize from_term in
   let iter_body (i : int) (acc : Mebi_constr.t list) : Mebi_constr.t list mm =
+    Log.debug "A2";
     let (ctx, term) : Constr.rel_context * Constr.t = constrs.(i) in
-    let* () = debug_ind_constr (Printf.sprintf "Checking (%i)" i) (ctx, term) in
+    let* () = debug_validconstrs_iter i (ctx, term) in
     let decls : Rocq_utils.econstr_decls = List.map EConstr.of_rel_decl ctx in
-    let* substl : EConstr.Vars.substl = mk_ctx_substl [] (List.rev decls) in
+    let* substl : EConstr.Vars.substl = mk_ctx_substl [] decls in
     let* args = extract_args ~substl term in
-    (* TODO: refactor from mk_ctx_substl, understand *)
-    let* terms_unify = try_unify_constructor_args from_term action args in
+    let* terms_unify =
+      try_unify_constructor_args ~f:debug_unify from_term action args
+    in
+    let* () = debug_validconstrs_iter_unify i (ctx, term) terms_unify in
     if terms_unify
-    then collect_next_constructors acc args d (substl, decls)
+    then check_for_next_constructors (i, acc) args d (substl, decls)
     else return acc
   in
   iterate 0 (Array.length constrs - 1) [] iter_body
 
-(** [collect_next_constructors acc args d context]
+(** [check_for_next_constructors acc args d context]
     (* TODO: finish doc *)
     (*NOTE: essnetially a [check_next_constructors] with the call to [check_update_ctx] handled inside (via [update_sigma]) *)
     @return
       [acc] updated with any additional constructors that must be applied from the current constructor [args].
 *)
-and collect_next_constructors
+and check_for_next_constructors
       ((constr_index, acc) : int * Mebi_constr.t list)
-      ((lhs_term, act_term, rhs_term) : EConstr.t * EConstr.t * EConstr.t)
+      (args : EConstr.t * EConstr.t * EConstr.t)
       (d : data)
       (context : EConstr.Vars.substl * EConstr.rel_declaration list)
   : Mebi_constr.t list mm
   =
+  Log.debug "B1, check_for_next_constructors";
+  let lhs_term, act_term, rhs_term = args in
   let* new_data = update_sigma d context in
   match new_data with
   (* NOTE: this constructor cannot be fully applied (some failure later on) *)
-  | None -> return acc
+  | None ->
+    Log.debug "B1A";
+    let* () = debug_nextconstrs_none args in
+    return acc
   (* NOTE: constructor applies without any further constructors *)
-  | Some { acc = []; _ } ->
+  | Some { to_unify = []; _ } ->
+    Log.debug "B1B";
+    let* () = debug_nextconstrs_some_empty args in
     state (fun env sigma ->
       if EConstr.isEvar sigma rhs_term
       then sigma, acc
       else sigma, (act_term, rhs_term, make_constr_tree constr_index d) :: acc)
   (* NOTE: constructor applies with some additional constructors *)
-  | Some new_data ->
-    let* () = debug_args "collect_next_A" (lhs_term, act_term, rhs_term) in
-    let* act_term : EConstr.t = Mebi_utils.econstr_normalize act_term in
-    let* rhs_term : EConstr.t = Mebi_utils.econstr_normalize rhs_term in
-    let* () = debug_args "collect_next_B" (lhs_term, act_term, rhs_term) in
-    (* TODO: finish this *)
-    return acc
+  | Some { lts_index; to_unify; _ } ->
+    Log.debug "B1C";
+    let* () = debug_nextconstrs_some_next args in
+    let* act : EConstr.t = econstr_normalize act_term in
+    let* tgt : EConstr.t = econstr_normalize rhs_term in
+    let* () = (* NOTE: *) debug_args "collect_next_B" (lhs_term, act, tgt) in
+    build_constrs
+      ~f:debug_unify
+      (constr_index, acc)
+      act
+      tgt
+      (lts_index, to_unify)
 
 (** [update_sigma d context]
-    @param context
-      is a tuple of lists [(subst, decls)] ...
-      (* TODO: finish doc *) *)
+    (* TODO: finish doc *)
+    @param context is a tuple of lists [(subst, decls)] ... *)
 and update_sigma (d : data)
   : EConstr.Vars.substl * EConstr.rel_declaration list -> data option mm
   = function
-  | [], [] -> return (Some d)
+  | [], [] ->
+    Log.debug "C1, update_sigma return";
+    return (Some d)
   | _ :: substls, t_decl :: decls ->
-    (* TODO: finish this *)
-    return None
-  | _substl, _decls -> (* TODO: err *) invalid_check_updated_ctx _substl _decls
-;;
-(* let* act_term : EConstr.t = Mebi_utils.econstr_normalize act_term in *)
+    Log.debug "C2";
+    let t_subst = subst_of_decl ~substl:substls t_decl in
+    let* constrs_opt = get_ind_constrs_opt t_subst d in
+    (match constrs_opt with
+     (* NOTE: skip, [t_subst] is not an application. *)
+     | None ->
+       Log.debug "C2A";
+       (* TODO: should we fail here? @see [get_ind_constrs_opt] *)
+       let* () = debug_updatesigma_none t_subst in
+       update_sigma d (substls, decls)
+     (* NOTE: continue, no additional constructors for [t_subst]. *)
+     | Some (None, args) ->
+       Log.debug "C2B";
+       let* () = debug_updatesigma_some_args args in
+       update_sigma d (substls, decls)
+     (* NOTE: found applicable constructors [next_ind] for [t_subst]. *)
+     | Some (Some (next_lts_index, next_ind_constrs), args) ->
+       Log.debug "C2C";
+       let* () = debug_updatesigma_some_pair args in
+       collect_next_constructors
+         (next_ind_constrs, args)
+         { d with lts_index = next_lts_index; to_unify = [] })
+  | _substl, _decls ->
+    Log.debug "C3";
+    (* TODO: err *) invalid_check_updated_ctx _substl _decls
 
-(* let get_new_constrs *)
+and collect_next_constructors
+      ((next_ind_constrs, args) : Rocq_utils.ind_constrs * EConstr.t array)
+      (d : data)
+  =
+  Log.debug "D1";
+  let$+ next_from_term _ sigma = Reductionops.nf_evar sigma args.(0) in
+  let* next_constrs =
+    collect_valid_constructors
+      ~action:(Some args.(1))
+      next_from_term
+      next_ind_constrs
+      d
+  in
+  match next_constrs with
+  | [] ->
+    Log.debug "D1A";
+    return None
+  | next_constrs ->
+    Log.debug "D1B";
+    let* new_d = update_unification_problems next_constrs args d in
+    return (Some new_d)
+;;
