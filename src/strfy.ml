@@ -244,12 +244,15 @@ let goal ?(indent : int = 0) : Proofview.Goal.t -> string =
 (****** MODEL *********************)
 (**********************************)
 
-let ind_constr env sigma : Rocq_utils.ind_constr -> string =
-  tuple (constr_rel_context env sigma) (constr env sigma)
+let ind_constr env sigma ((ctx, tm) : Rocq_utils.ind_constr) : string =
+  tuple
+    (tuple ~is_keyval:true str (constr_rel_context env sigma))
+    (tuple ~is_keyval:true str (constr env sigma))
+    (("context", ctx), ("term", tm))
 ;;
 
 let ind_constrs env sigma : Rocq_utils.ind_constrs -> string =
-  array (ind_constr env sigma)
+  array ~force_newline:true (ind_constr env sigma)
 ;;
 
 let enc : Mebi_setup.Enc.t -> string = Mebi_setup.Enc.to_string

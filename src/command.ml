@@ -459,6 +459,13 @@ let cross_product (lts_index, acc) ctree_unif_probs
           ctree_unif_probs)
       []
       acc
+    (* TODO: both of these have their issues with when layered constructors have different labels. the above ends up being able to capture more states that have the same action but can stop exploring prematurely, whilst the below does usually capture all the states when there aren't multiple constructors that could apply.  *)
+    (* List.concat_map
+       (fun d_to_unify ->
+       List.map
+       (fun next_problem -> next_problem :: d_to_unify)
+       ctree_unif_probs)
+       acc *)
   in
   let* () = _debug_acc "cross_product" (lts_index, acc) in
   return (lts_index, acc)
@@ -880,7 +887,7 @@ module MkGraph
       @raise CannotFindTypeOfTermToVisit
         if none of the constructors provided in [lts_ind_def_map] yield constructors from [check_valid_constructors].
   *)
-  let get_new_constrs
+  let _get_new_constrs_OLD
         (from : Enc.t)
         (primary : Mebi_ind.t)
         (lts_ind_def_map : Mebi_ind.t B.t)
@@ -898,6 +905,55 @@ module MkGraph
       None
       primary.index
   ;;
+
+  let _get_new_constrs_NEW
+        (from : Enc.t)
+        (primary : Mebi_ind.t)
+        (lts_ind_def_map : Mebi_ind.t B.t)
+    : Mebi_constr.t list mm
+    =
+    Log.trace "command.MkGraph.get_new_constrs";
+    let* from_term : EConstr.t = decode from in
+    let* ind_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
+    let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
+    let lts_index : int = primary.index in
+    let* new_constrs =
+      Unify.collect_valid_constructors
+        from_term
+        primary_constr_transitions
+        { ind_map; lts_index; to_unify = [] }
+    in
+    let* _ =
+      state (fun env sigma ->
+        Log.debug
+          (Printf.sprintf
+             "get_new_constrs:\n%s"
+             (Strfy.list
+                ~force_newline:true
+                (fun x ->
+                  let action, dest, tree = x in
+                  let f = Strfy.econstr env sigma in
+                  Strfy.list
+                    ~force_newline:true
+                    ~indent:1
+                    Strfy.str
+                    [ Strfy.tuple ~is_keyval:true Strfy.str f ("action", action)
+                    ; Strfy.tuple ~is_keyval:true Strfy.str f ("dest", dest)
+                    ; Strfy.tuple
+                        ~is_keyval:true
+                        Strfy.str
+                        Mebi_constr.Tree.to_string
+                        ("tree", tree)
+                    ])
+                new_constrs));
+        sigma, ())
+    in
+    return new_constrs
+  ;;
+
+  let get_new_constrs = _get_new_constrs_OLD
+  (* TODO: trace where the [data] is being updated in the new version *)
+  (* let get_new_constrs = _get_new_constrs_NEW *)
 
   (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
       @param fn_rlts maps coq-term names to [cindef].
@@ -1238,11 +1294,15 @@ let build_lts_graph
       (Mebi_utils.ref_list_to_glob_list (primary_lts :: refs))
       params
   in
+  let* the_lts =
+    G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts params
+  in
+  (* Log.debug (Printf.sprintf "build_lts_graph, finished:\n%s" (Lts.pstr the_lts)); *)
   if
     !Params.the_fail_if_incomplete
     && Bool.not (Queue.is_empty graph_lts.to_visit)
   then params_fail_if_incomplete ()
-  else G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts params
+  else return the_lts
 ;;
 
 let build_fsm
