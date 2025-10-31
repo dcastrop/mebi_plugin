@@ -439,37 +439,58 @@ let unify_args_with
   else return false
 ;;
 
-let cross_product (lts_index, acc) ctree_unif_probs
-  : (int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list) mm
+(* NOTE: this is the original one, unsure if problematic *)
+let _cross_product1 acc next_problems
+  : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list
   =
-  let* () = _debug_acc "cross_product" (lts_index, acc) in
-  (* We need to cross-product all possible unifications. This is in
-     case we have a constructor of the form LTS t11 a1 t12 -> LTS t21
-     a2 t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
-     unavoidable, but we should make sure we understand well the
-     problem before removing the source of repetition. *)
-  let acc : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list =
-    List.fold_left
-      (fun (acc0 : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
-        x ->
-        List.fold_left
-          (fun (acc1 : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
-            y -> (y :: x) :: acc1)
-          acc0
-          ctree_unif_probs)
-      []
-      acc
-    (* TODO: both of these have their issues with when layered constructors have different labels. the above ends up being able to capture more states that have the same action but can stop exploring prematurely, whilst the below does usually capture all the states when there aren't multiple constructors that could apply.  *)
-    (* List.concat_map
-       (fun d_to_unify ->
-       List.map
-       (fun next_problem -> next_problem :: d_to_unify)
-       ctree_unif_probs)
-       acc *)
-  in
-  let* () = _debug_acc "cross_product" (lts_index, acc) in
-  return (lts_index, acc)
+  List.concat_map
+    (fun d_to_unify ->
+      List.map (fun next_problem -> next_problem :: d_to_unify) next_problems)
+    acc
 ;;
+
+(* NOTE: this was what "fixed" the old one, but perhaps causes more issues. for now using old one. *)
+let _cross_product2 acc next_problems
+  : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list
+  =
+  List.fold_left
+    (fun acc0 x ->
+      List.fold_left (fun acc1 y -> (y :: x) :: acc1) acc0 next_problems)
+    []
+    acc
+;;
+
+(* let cross_product (lts_index, acc) ctree_unif_probs
+   : (int * (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list) mm
+   =
+   let* () = _debug_acc "cross_product" (lts_index, acc) in
+   (* We need to cross-product all possible unifications. This is in
+   case we have a constructor of the form LTS t11 a1 t12 -> LTS t21
+   a2 t22 -> ... -> LTS tn an t2n. Repetition may occur. It is not
+   unavoidable, but we should make sure we understand well the
+   problem before removing the source of repetition. *)
+   let acc : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list =
+   List.fold_left
+   (fun (acc0 : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+   x ->
+   List.fold_left
+   (fun (acc1 : (Mebi_constr.Tree.t * Mebi_setup.unif_problem) list list)
+   y -> (y :: x) :: acc1)
+   acc0
+   ctree_unif_probs)
+   []
+   acc
+   (* TODO: both of these have their issues with when layered constructors have different labels. the above ends up being able to capture more states that have the same action but can stop exploring prematurely, whilst the below does usually capture all the states when there aren't multiple constructors that could apply.  *)
+   (* List.concat_map
+   (fun d_to_unify ->
+   List.map
+   (fun next_problem -> next_problem :: d_to_unify)
+   ctree_unif_probs)
+   acc *)
+   in
+   let* () = _debug_acc "cross_product" (lts_index, acc) in
+   return (lts_index, acc)
+   ;; *)
 
 (* TODO: try to figure out how to make sure the evars routed through here aren't all unified at once. unless, we need to instead fix this at an earlier point? so that they won't be unified together. *)
 let new_unif_prob (termL : EConstr.t) (termR : EConstr.t)
@@ -559,8 +580,12 @@ and check_next_updated_context z (lts_index, acc) lts_encmap args c =
   | ctors ->
     let* ctors_unif_probs = map_ctor_unif_probs ctors args in
     let* () = _debug_unif_probs lts_index ctors_unif_probs in
-    let* acc = cross_product (lts_index, acc) ctors_unif_probs in
-    return (Some acc)
+    let* () = _debug_acc "before cross_product" (lts_index, acc) in
+    (* NOTE: neither of these are perfect *)
+    let acc = _cross_product1 acc ctors_unif_probs in
+    (* let acc = _cross_product2 acc ctors_unif_probs in *)
+    let* () = _debug_acc "after cross_product" (lts_index, acc) in
+    return (Some (lts_index, acc))
 
 (** Checks possible transitions for this term: *)
 and check_valid_constructor

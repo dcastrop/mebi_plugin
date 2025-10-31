@@ -44,7 +44,7 @@ let debugstr_unification_problem_list (ps : unification_problem list)
     return (s :: acc)
   in
   let* sl : string list = iterate 0 (List.length ps - 1) [] iter_body in
-  return (Strfy.list Strfy.str sl)
+  return (Strfy.list ~force_newline:true ~indent:1 Strfy.str sl)
 ;;
 
 let debug_unification_problem_list
@@ -56,22 +56,30 @@ let debug_unification_problem_list
   return (Log.debug (Printf.sprintf "%s unification_problem list: %s" prefix s))
 ;;
 
-let debug_unification_problem_list_list
+let debugstr_unification_problem_list_list
       ?(prefix = "")
       (ps : unification_problem list list)
-  : unit mm
+  : string mm
   =
   let iter_body (i : int) (acc : string list) =
     let* s = debugstr_unification_problem_list (List.nth ps i) in
     return (s :: acc)
   in
   let* sl : string list = iterate 0 (List.length ps - 1) [] iter_body in
-  let s : string = Strfy.list Strfy.str sl in
+  return (Strfy.list ~force_newline:true Strfy.str sl)
+;;
+
+let debug_unification_problem_list_list
+      ?(prefix = "")
+      (ps : unification_problem list list)
+  : unit mm
+  =
+  let* s : string = debugstr_unification_problem_list_list ps in
   return
     (Log.debug (Printf.sprintf "%s unification_problem list list: %s" prefix s))
 ;;
 
-let debug_str_mebiconstrslist env sigma cs : string =
+let debugstr_mebiconstrs env sigma (cs : Mebi_constr.t list) : string =
   let f = Strfy.econstr env sigma in
   Strfy.list
     ~force_newline:true
@@ -92,6 +100,16 @@ let debug_str_mebiconstrslist env sigma cs : string =
     cs
 ;;
 
+let debug_mebiconstrs p (acc : Mebi_constr.t list) : unit mm =
+  state (fun env sigma ->
+    Log.debug
+      (Printf.sprintf
+         "%sacc:\n%s"
+         (Utils.prefix p)
+         (debugstr_mebiconstrs env sigma acc));
+    sigma, ())
+;;
+
 let debug_buildconstrs_some act tgt unified_tgt acc : unit mm =
   state (fun env sigma ->
     let f = Strfy.econstr env sigma in
@@ -104,7 +122,7 @@ let debug_buildconstrs_some act tgt unified_tgt acc : unit mm =
             [ "act", f act
             ; "tgt", f tgt
             ; "unified_tgt", f unified_tgt
-            ; "acc", debug_str_mebiconstrslist env sigma acc
+            ; "acc", debugstr_mebiconstrs env sigma acc
             ]));
     sigma, ())
 ;;
@@ -120,7 +138,7 @@ let debug_buildconstrs_none act tgt acc : unit mm =
             (Strfy.tuple ~is_keyval:true Strfy.str Strfy.str)
             [ "act", f act
             ; "tgt", f tgt
-            ; "acc", debug_str_mebiconstrslist env sigma acc
+            ; "acc", debugstr_mebiconstrs env sigma acc
             ]));
     sigma, ())
 ;;
@@ -132,6 +150,23 @@ type data =
   ; lts_index : int
   ; mutable to_unify : unification_problem list list
   }
+
+let debugstr_data ({ lts_index; to_unify; _ } : data) : string mm =
+  let* to_unify_str : string =
+    (* if List.is_empty to_unify
+       then return "[ ] (empty)"
+       else *)
+    debugstr_unification_problem_list_list to_unify
+  in
+  return
+    (Printf.sprintf "- lts_index: %i\n- to_unify:\n%s\n" lts_index to_unify_str)
+;;
+
+let debug_data p (d : data) : unit mm =
+  let* s = debugstr_data d in
+  Log.debug (Printf.sprintf "%s\n%s" (Utils.prefix p) s);
+  return ()
+;;
 
 (* let new_unif_pair (a : EConstr.t) (b : EConstr.t)
    : Mebi_setup.unif_problem mm
@@ -557,6 +592,13 @@ let debug_updatesigma_some_pair args : unit mm =
     (args.(0), args.(1), args.(2))
 ;;
 
+let debug_term p t : unit mm =
+  state (fun env sigma ->
+    Log.debug
+      (Printf.sprintf "%sterm: %s" (Utils.prefix p) (Strfy.econstr env sigma t));
+    sigma, ())
+;;
+
 let make_constr_tree (constr_index : int) (d : data) =
   Mebi_constr.Tree.Node ((Enc.of_int d.lts_index, constr_index), [])
 ;;
@@ -571,11 +613,17 @@ let rec collect_valid_constructors
           (d : data)
   : Mebi_constr.t list mm
   =
+  Log.info "\n====================";
   Log.debug "A1";
-  let* () = debug_validconstrs_begin constrs in
   let* from_term : EConstr.t = econstr_normalize from_term in
+  let* () = debug_validconstrs_begin constrs in
+  let* () = debug_term "collect_valid_constructors" from_term in
+  let* () = debug_data "collect_valid_constructors" d in
   let iter_body (i : int) (acc : Mebi_constr.t list) : Mebi_constr.t list mm =
+    Log.info "\n-----------------------";
     Log.debug "A2";
+    let* () = debug_term "collect_valid_constructors" from_term in
+    let* () = debug_mebiconstrs "collect_valid_constructors iter" acc in
     let (ctx, term) : Constr.rel_context * Constr.t = constrs.(i) in
     let* () = debug_validconstrs_iter i (ctx, term) in
     let decls : Rocq_utils.econstr_decls = List.map EConstr.of_rel_decl ctx in
@@ -604,7 +652,9 @@ and check_for_next_constructors
       (context : EConstr.Vars.substl * EConstr.rel_declaration list)
   : Mebi_constr.t list mm
   =
+  Log.info "\n- - - - - - - - - - - - -";
   Log.debug "B1, check_for_next_constructors";
+  let* () = debug_data "check_for_next_constructors" d in
   let lhs_term, act_term, rhs_term = args in
   let* new_data = update_sigma d context in
   match new_data with
@@ -643,9 +693,11 @@ and update_sigma (d : data)
   = function
   | [], [] ->
     Log.debug "C1, update_sigma return";
+    let* () = debug_data "update_sigma" d in
     return (Some d)
   | _ :: substls, t_decl :: decls ->
     Log.debug "C2";
+    let* () = debug_data "update_sigma" d in
     let t_subst = subst_of_decl ~substl:substls t_decl in
     let* constrs_opt = get_ind_constrs_opt t_subst d in
     (match constrs_opt with
@@ -676,6 +728,7 @@ and collect_next_constructors
       (d : data)
   =
   Log.debug "D1";
+  let* () = debug_data "collect_next_constructors" d in
   let$+ next_from_term _ sigma = Reductionops.nf_evar sigma args.(0) in
   let* next_constrs =
     collect_valid_constructors
