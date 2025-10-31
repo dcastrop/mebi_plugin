@@ -119,8 +119,7 @@ let econstr_eq a b : bool mm =
 ;;
 
 let econstr_normalize (x : EConstr.t) : EConstr.t mm =
-  let$+ t env sigma = Reductionops.nf_all env sigma x in
-  return t
+  state (fun env sigma -> sigma, Reductionops.nf_all env sigma x)
 ;;
 
 let econstr_kind (x : EConstr.t) : Rocq_utils.constr_kind mm =

@@ -306,8 +306,13 @@ let try_unify_constructor_args
   (* NOTE: these unification checks are within a [sandbox]. *)
   (* TODO: this is a new change, check the impact of this *)
   let* lhs_term_unifies : bool = do_terms_unify ~f from_term lhs_term in
-  let* act_term_unifies : bool = do_terms_unify_opt ~f action (Some act_term) in
-  return (lhs_term_unifies && act_term_unifies)
+  if lhs_term_unifies
+  then
+    Option.cata
+      (fun a -> do_terms_unify ~f from_term lhs_term)
+      (return true)
+      action
+  else return false
 ;;
 
 (** [unify_all_opt ?f ps] calls [unify] on each unification problems in [ps], aborting at once if any fail to be unified.
@@ -353,9 +358,8 @@ let sandbox_unify_all_opt
      match unified_all_opt with
      | None -> return None
      | Some ctor_trees ->
-       let* term = econstr_normalize tgt in
-       let* is_undefined = Mebi_utils.econstr_is_evar term in
-       if is_undefined then return None else return (Some (term, ctor_trees)))
+       let* is_undefined = Mebi_utils.econstr_is_evar tgt in
+       if is_undefined then return None else return (Some (tgt, ctor_trees)))
 ;;
 
 (** [build_constrs (ctor_index,acc) act tgt (lts_index, ps)] is ...
@@ -373,8 +377,11 @@ let rec build_constrs
           (tgt : EConstr.t)
   : int * unification_problem list list -> Mebi_constr.t list mm
   = function
-  | _, [] -> return acc
+  | _, [] ->
+    Log.debug "build_constrs (return)";
+    return acc
   | lts_index, unif_probs :: unif_probs_list ->
+    Log.debug "build_constrs";
     let* success = sandbox_unify_all_opt ~f tgt unif_probs in
     (match success with
      | None ->
@@ -444,6 +451,16 @@ let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
       return (args.(0), args.(1), args.(2)))
     else (* TODO: err *) invalid_lts_args_length (Array.length args)
   | _ -> (* TODO: err *) invalid_lts_term_kind term
+;;
+
+let normalize_args
+      ((lhs_term, act_term, rhs_term) : EConstr.t * EConstr.t * EConstr.t)
+  : (EConstr.t * EConstr.t * EConstr.t) mm
+  =
+  let* lhs : EConstr.t = econstr_normalize lhs_term in
+  let* act : EConstr.t = econstr_normalize act_term in
+  let* tgt : EConstr.t = econstr_normalize rhs_term in
+  return (lhs, act, tgt)
 ;;
 
 (*****************************************************************************)
@@ -630,6 +647,7 @@ let rec collect_valid_constructors
     let* substl : EConstr.Vars.substl = mk_ctx_substl [] decls in
     let* args = extract_args ~substl term in
     let* terms_unify =
+      (* try_unify_constructor_args from_term action args *)
       try_unify_constructor_args ~f:debug_unify from_term action args
     in
     let* () = debug_validconstrs_iter_unify i (ctx, term) terms_unify in
@@ -655,7 +673,8 @@ and check_for_next_constructors
   Log.info "\n- - - - - - - - - - - - -";
   Log.debug "B1, check_for_next_constructors";
   let* () = debug_data "check_for_next_constructors" d in
-  let lhs_term, act_term, rhs_term = args in
+  let* args = normalize_args args in
+  let _lhs, act, tgt = args in
   let* new_data = update_sigma d context in
   match new_data with
   (* NOTE: this constructor cannot be fully applied (some failure later on) *)
@@ -663,27 +682,28 @@ and check_for_next_constructors
     Log.debug "B1A";
     let* () = debug_nextconstrs_none args in
     return acc
-  (* NOTE: constructor applies without any further constructors *)
-  | Some { to_unify = []; _ } ->
-    Log.debug "B1B";
-    let* () = debug_nextconstrs_some_empty args in
-    state (fun env sigma ->
-      if EConstr.isEvar sigma rhs_term
-      then sigma, acc
-      else sigma, (act_term, rhs_term, make_constr_tree constr_index d) :: acc)
-  (* NOTE: constructor applies with some additional constructors *)
-  | Some { lts_index; to_unify; _ } ->
-    Log.debug "B1C";
-    let* () = debug_nextconstrs_some_next args in
-    let* act : EConstr.t = econstr_normalize act_term in
-    let* tgt : EConstr.t = econstr_normalize rhs_term in
-    let* () = (* NOTE: *) debug_args "collect_next_B" (lhs_term, act, tgt) in
-    build_constrs
-      ~f:debug_unify
-      (constr_index, acc)
-      act
-      tgt
-      (lts_index, to_unify)
+  | Some d ->
+    let* () = debug_data "check_for_next_constructors, update_sigma" d in
+    (match d.to_unify with
+     (* NOTE: constructor applies without any further constructors *)
+     | [] ->
+       Log.debug "B1B";
+       let* () = debug_nextconstrs_some_empty args in
+       state (fun env sigma ->
+         if EConstr.isEvar sigma tgt
+         then sigma, acc
+         else sigma, (act, tgt, make_constr_tree constr_index d) :: acc)
+     (* NOTE: constructor applies with some additional constructors *)
+     | _ ->
+       Log.debug "B1C";
+       let* () = debug_nextconstrs_some_next args in
+       let* () = (* NOTE: *) debug_args "collect_next_B" (_lhs, act, tgt) in
+       build_constrs
+         (* ~f:debug_unify *)
+         (constr_index, acc)
+         act
+         tgt
+         (d.lts_index, d.to_unify))
 
 (** [update_sigma d context]
     (* TODO: finish doc *)

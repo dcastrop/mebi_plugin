@@ -976,9 +976,9 @@ module MkGraph
     return new_constrs
   ;;
 
-  let get_new_constrs = _get_new_constrs_OLD
+  (* let get_new_constrs = _get_new_constrs_OLD *)
   (* TODO: trace where the [data] is being updated in the new version *)
-  (* let get_new_constrs = _get_new_constrs_NEW *)
+  let get_new_constrs = _get_new_constrs_NEW
 
   (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
       @param fn_rlts maps coq-term names to [cindef].
