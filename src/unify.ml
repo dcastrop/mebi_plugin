@@ -663,20 +663,33 @@ let rec collect_valid_constructors
   (* let* () = debug_data "collect_valid_constructors" d to_unify in *)
   let iter_body (i : int) (acc : Mebi_constr.t list) : Mebi_constr.t list mm =
     Log.info "\n-----------------------";
-    Log.debug "A2";
+    Log.debug (Printf.sprintf "collect_valid_constructors: #%i" i);
     let* () = debug_term "collect_valid_constructors" from_term in
     let* () = debug_mebiconstrs "collect_valid_constructors iter" acc in
     let (ctx, term) : Constr.rel_context * Constr.t = constrs.(i) in
-    let* () = debug_validconstrs_iter i (ctx, term) in
+    (* let* () = debug_validconstrs_iter i (ctx, term) in *)
     let decls : Rocq_utils.econstr_decls = List.map EConstr.of_rel_decl ctx in
     let* substl : EConstr.Vars.substl = mk_ctx_substl [] (List.rev decls) in
     let* args = extract_args ~substl term in
     let* terms_unify =
       try_unify_constructor_args ~debug:true from_term action args
     in
-    let* () = debug_validconstrs_iter_unify i (ctx, term) terms_unify in
+    (* let* () = debug_validconstrs_iter_unify i (ctx, term) terms_unify in *)
     if terms_unify
-    then check_for_next_constructors (i, acc) args d [ [] ] (substl, decls)
+    then (
+      let context = substl, decls in
+      (* NOTE: after this point we can have [args = (lhs,?act,?rhs)] *)
+      (* NOTE: the first constructor to unify will resolve [?act] and [?rhs] *)
+      (* NOTE: any other constructors with a greater index will not unify *)
+      (* NOTE: check_for_next_constructors *)
+      (* NOTE: -> update_sigma *)
+      (* NOTE: -> collect_valid_constructors *)
+      (* TODO: debug [decls] and [substl] to check which contains the [evars] *)
+      (* TODO: ideas:
+        - collect_valid_constructors [constrs] could have optional [evar] arguments provided which can be used instead of [args]
+        - check if 
+      *)
+      check_for_next_constructors (i, acc) args d [ [] ] context)
     else return acc
   in
   iterate 0 (Array.length constrs - 1) [] iter_body
@@ -700,8 +713,8 @@ and check_for_next_constructors
   let* () = debug_data "check_for_next_constructors" d to_unify in
   let* args = normalize_args raw_args in
   let lhs, act, tgt = args in
-  let* new_data = update_sigma d to_unify context in
-  match new_data with
+  let* to_unify_opt = update_sigma d to_unify context in
+  match to_unify_opt with
   (* NOTE: this constructor cannot be fully applied (some failure later on) *)
   | None ->
     Log.debug "B1A";

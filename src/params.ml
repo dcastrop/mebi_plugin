@@ -126,7 +126,7 @@ let printout_show_any_str () : string =
   else "Notice messages set to be hidden."
 ;;
 
-let printout_show_any () : unit = Log.notice (printout_show_any_str ())
+let printout_show_any () : unit = Log.override (printout_show_any_str ())
 
 let set_show_any (b : bool) : unit =
   Log.debug "params.set_show_any";
