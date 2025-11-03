@@ -417,6 +417,34 @@ let rec build_constrs
 
 (*****************************************************************************)
 
+let debugstr_substl env sigma (xs : EConstr.Vars.substl) : string =
+  Strfy.list ~force_newline:true (Strfy.econstr env sigma) xs
+;;
+
+let debug_substl p (xs : EConstr.Vars.substl) : unit mm =
+  state (fun env sigma ->
+    Log.debug
+      (Printf.sprintf
+         "%ssubstl:\n%s"
+         (Utils.prefix p)
+         (debugstr_substl env sigma xs));
+    sigma, ())
+;;
+
+let debugstr_decls env sigma (xs : Rocq_utils.econstr_decls) : string =
+  Strfy.list ~force_newline:true (Strfy.econstr_rel_decl env sigma) xs
+;;
+
+let debug_decls p (xs : Rocq_utils.econstr_decls) : unit mm =
+  state (fun env sigma ->
+    Log.debug
+      (Printf.sprintf
+         "%sdecls:\n%s"
+         (Utils.prefix p)
+         (debugstr_decls env sigma xs));
+    sigma, ())
+;;
+
 let subst_of_decl (substl : EConstr.Vars.substl) x : EConstr.t mm =
   let ty = Context.Rel.Declaration.get_type x in
   let$+ subst _ _ = EConstr.Vars.substl substl ty in
@@ -685,9 +713,15 @@ let rec collect_valid_constructors
       (* NOTE: -> update_sigma *)
       (* NOTE: -> collect_valid_constructors *)
       (* TODO: debug [decls] and [substl] to check which contains the [evars] *)
+      (* let* () = debug_decls "A2" decls in *)
+      (* let* () = debug_substl "A2" substl in *)
+      (* NOTE: [substl] contains the terms and evars *)
+      (* NOTE: [decls] contains the types of each *)
       (* TODO: ideas:
-        - collect_valid_constructors [constrs] could have optional [evar] arguments provided which can be used instead of [args]
-        - check if 
+         - move the unification of [action] until [check_for_next_constructors]
+            - also move [decls] and [substl] until later too, we want to create the evars as late as possible, and unify them as late as possible too.
+
+         - [collect_valid_constructors:constrs] could have optional [evar] arguments provided which can be used instead of [args]
       *)
       check_for_next_constructors (i, acc) args d [ [] ] context)
     else return acc
