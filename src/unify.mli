@@ -55,11 +55,18 @@ val debug_buildconstrs_none :
 type data = {
   ind_map : Mebi_ind.t Mebi_setup.FwdMap.t;
   lts_index : int;
-  mutable to_unify : unification_problem list list;
 }
 
-val debugstr_data : data -> string Mebi_wrapper.mm
-val debug_data : string -> data -> unit Mebi_wrapper.mm
+val debugstr_data :
+  data ->
+  unification_problem list list ->
+  string Mebi_wrapper.mm
+
+val debug_data :
+  string ->
+  data ->
+  unification_problem list list ->
+  unit Mebi_wrapper.mm
 
 val build_next_unification_problems :
   Mebi_constr.t list ->
@@ -68,7 +75,7 @@ val build_next_unification_problems :
 
 val debug_update_unification_problems :
   unification_problem list ->
-  data ->
+  unification_problem list list ->
   'a ->
   unit Mebi_wrapper.mm
 
@@ -85,45 +92,49 @@ val cross_product2 :
 val update_unification_problems :
   Mebi_constr.t list ->
   Evd.econstr array ->
-  data ->
-  data Mebi_wrapper.mm
+  unification_problem list list ->
+  unification_problem list list Mebi_wrapper.mm
 
-val unify : unification_pair -> bool Mebi_wrapper.mm
-val debug_unify : unification_pair -> bool Mebi_wrapper.mm
-
-val do_terms_unify :
-  ?f:(unification_pair -> bool Mebi_wrapper.mm) ->
+val debug_unify :
+  Environ.env ->
+  Evd.evar_map ->
   Evd.econstr ->
   Evd.econstr ->
-  bool Mebi_wrapper.mm
+  unit
 
-val do_terms_unify_opt :
-  ?f:(unification_pair -> bool Mebi_wrapper.mm) ->
-  Evd.econstr option ->
-  Evd.econstr option ->
-  bool Mebi_wrapper.mm
+val debug_unifyerr :
+  Environ.env ->
+  Evd.evar_map ->
+  Evd.econstr ->
+  Evd.econstr ->
+  Evd.econstr ->
+  Evd.econstr ->
+  unit
+
+val unify :
+  ?debug:bool -> unification_pair -> bool Mebi_wrapper.mm
 
 val try_unify_constructor_args :
-  ?f:(unification_pair -> bool Mebi_wrapper.mm) ->
+  ?debug:bool ->
   Evd.econstr ->
   Evd.econstr option ->
   Evd.econstr * Evd.econstr * Evd.econstr ->
   bool Mebi_wrapper.mm
 
 val unify_all_opt :
-  ?f:(unification_pair -> bool Mebi_wrapper.mm) ->
+  ?debug:bool ->
   unification_problem list ->
   Mebi_constr.Tree.t list option Mebi_wrapper.mm
 
 val sandbox_unify_all_opt :
-  ?f:(unification_pair -> bool Mebi_wrapper.mm) ->
+  ?debug:bool ->
   Evd.econstr ->
   unification_problem list ->
   (Evd.econstr * Mebi_constr.Tree.t list) option
   Mebi_wrapper.mm
 
 val build_constrs :
-  ?f:(unification_pair -> bool Mebi_wrapper.mm) ->
+  ?debug:bool ->
   int * Mebi_constr.t list ->
   Evd.econstr ->
   Evd.econstr ->
@@ -131,12 +142,12 @@ val build_constrs :
   Mebi_constr.t list Mebi_wrapper.mm
 
 val subst_of_decl :
-  ?substl:EConstr.Vars.substl ->
+  EConstr.Vars.substl ->
   ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt ->
-  Evd.econstr
+  Evd.econstr Mebi_wrapper.mm
 
 val mk_ctx_subst :
-  ?substl:EConstr.Vars.substl ->
+  EConstr.Vars.substl ->
   ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt ->
   Evd.econstr Mebi_wrapper.mm
 
@@ -148,6 +159,10 @@ val mk_ctx_substl :
 val extract_args :
   ?substl:EConstr.Vars.substl ->
   Constr.t ->
+  (Evd.econstr * Evd.econstr * Evd.econstr) Mebi_wrapper.mm
+
+val normalize_args :
+  Evd.econstr * Evd.econstr * Evd.econstr ->
   (Evd.econstr * Evd.econstr * Evd.econstr) Mebi_wrapper.mm
 
 exception
@@ -234,15 +249,18 @@ val check_for_next_constructors :
   int * Mebi_constr.t list ->
   Evd.econstr * Evd.econstr * Evd.econstr ->
   data ->
+  unification_problem list list ->
   EConstr.Vars.substl * Rocq_utils.econstr_decls ->
   Mebi_constr.t list Mebi_wrapper.mm
 
 val update_sigma :
   data ->
+  unification_problem list list ->
   EConstr.Vars.substl * EConstr.rel_declaration list ->
-  data option Mebi_wrapper.mm
+  unification_problem list list option Mebi_wrapper.mm
 
 val collect_next_constructors :
   Rocq_utils.ind_constrs * Evd.econstr array ->
   data ->
-  data option Mebi_wrapper.mm
+  unification_problem list list ->
+  unification_problem list list option Mebi_wrapper.mm

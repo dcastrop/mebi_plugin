@@ -39,7 +39,7 @@ Module BasicCommands.
   MeBi Set WeakMode True.  MeBi See WeakMode.
   MeBi Set WeakMode False. MeBi See WeakMode.
   
-  MeBi Set ShowDebug True. MeBi Set ShowDetails True.
+  (* MeBi Set ShowDebug True. MeBi Set ShowDetails True. *)
 
   MeBi Set Weak Option nat. 
   MeBi See Weak.
