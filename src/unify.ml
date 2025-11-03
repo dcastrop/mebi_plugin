@@ -446,6 +446,15 @@ let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
   | _ -> (* TODO: err *) invalid_lts_term_kind term
 ;;
 
+let normalize_args (lhs_term, act_term, rhs_term)
+  : (EConstr.t * EConstr.t * EConstr.t) mm
+  =
+  let* from : EConstr.t = econstr_normalize lhs_term in
+  let* act : EConstr.t = econstr_normalize act_term in
+  let* tgt : EConstr.t = econstr_normalize rhs_term in
+  return (from, act, tgt)
+;;
+
 (*****************************************************************************)
 
 exception ConstructorNameNotRecognized of (EConstr.t * EConstr.t)
@@ -599,8 +608,8 @@ let debug_term p t : unit mm =
     sigma, ())
 ;;
 
-let make_constr_tree (constr_index : int) (d : data) =
-  Mebi_constr.Tree.Node ((Enc.of_int d.lts_index, constr_index), [])
+let make_constr_tree (constr_index : int) (lts_index : int) =
+  Mebi_constr.Tree.Node ((Enc.of_int lts_index, constr_index), [])
 ;;
 
 (** [collect_valid_constructors from_term constrs d] ...
@@ -647,7 +656,7 @@ let rec collect_valid_constructors
 *)
 and check_for_next_constructors
       ((constr_index, acc) : int * Mebi_constr.t list)
-      (args : EConstr.t * EConstr.t * EConstr.t)
+      (raw_args : EConstr.t * EConstr.t * EConstr.t)
       (d : data)
       (context : EConstr.Vars.substl * EConstr.rel_declaration list)
   : Mebi_constr.t list mm
@@ -655,8 +664,9 @@ and check_for_next_constructors
   Log.info "\n- - - - - - - - - - - - -";
   Log.debug "B1, check_for_next_constructors";
   let* () = debug_data "check_for_next_constructors" d in
-  let lhs_term, act_term, rhs_term = args in
-  let* new_data = update_sigma d context in
+  let* args = normalize_args raw_args in
+  let lhs, act, tgt = args in
+  let* new_data = update_sigma { d with to_unify = [] } context in
   match new_data with
   (* NOTE: this constructor cannot be fully applied (some failure later on) *)
   | None ->
@@ -664,20 +674,21 @@ and check_for_next_constructors
     let* () = debug_nextconstrs_none args in
     return acc
   (* NOTE: constructor applies without any further constructors *)
-  | Some { to_unify = []; _ } ->
+  | Some { lts_index; to_unify = []; _ } ->
     Log.debug "B1B";
     let* () = debug_nextconstrs_some_empty args in
     state (fun env sigma ->
-      if EConstr.isEvar sigma rhs_term
+      if EConstr.isEvar sigma tgt
       then sigma, acc
-      else sigma, (act_term, rhs_term, make_constr_tree constr_index d) :: acc)
+      else (
+        let constr_tree = make_constr_tree constr_index lts_index in
+        let constrs = (act, tgt, constr_tree) :: acc in
+        sigma, constrs))
   (* NOTE: constructor applies with some additional constructors *)
   | Some { lts_index; to_unify; _ } ->
     Log.debug "B1C";
     let* () = debug_nextconstrs_some_next args in
-    let* act : EConstr.t = econstr_normalize act_term in
-    let* tgt : EConstr.t = econstr_normalize rhs_term in
-    let* () = (* NOTE: *) debug_args "collect_next_B" (lhs_term, act, tgt) in
+    let* () = (* NOTE: *) debug_args "collect_next_B" (lhs, act, tgt) in
     build_constrs
       ~f:debug_unify
       (constr_index, acc)
@@ -698,13 +709,12 @@ and update_sigma (d : data)
   | _ :: substls, t_decl :: decls ->
     Log.debug "C2";
     let* () = debug_data "update_sigma" d in
-    let t_subst = subst_of_decl ~substl:substls t_decl in
+    let t_subst : EConstr.t = subst_of_decl ~substl:substls t_decl in
     let* constrs_opt = get_ind_constrs_opt t_subst d in
     (match constrs_opt with
      (* NOTE: skip, [t_subst] is not an application. *)
      | None ->
        Log.debug "C2A";
-       (* TODO: should we fail here? @see [get_ind_constrs_opt] *)
        let* () = debug_updatesigma_none t_subst in
        update_sigma d (substls, decls)
      (* NOTE: continue, no additional constructors for [t_subst]. *)
