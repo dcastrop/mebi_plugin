@@ -247,7 +247,8 @@ module MkGraph
       state (fun env sigma ->
         Log.debug
           (Printf.sprintf
-             "get_new_constrs:\n%s"
+             "from: %s\nget_new_constrs:\n%s"
+             (Strfy.econstr env sigma from_term)
              (Strfy.list
                 ~force_newline:true
                 (fun x ->
