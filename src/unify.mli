@@ -141,6 +141,21 @@ val build_constrs :
   int * unification_problem list list ->
   Mebi_constr.t list Mebi_wrapper.mm
 
+val debugstr_substl :
+  Environ.env -> Evd.evar_map -> EConstr.Vars.substl -> string
+
+val debug_substl :
+  string -> EConstr.Vars.substl -> unit Mebi_wrapper.mm
+
+val debugstr_decls :
+  Environ.env ->
+  Evd.evar_map ->
+  Rocq_utils.econstr_decls ->
+  string
+
+val debug_decls :
+  string -> Rocq_utils.econstr_decls -> unit Mebi_wrapper.mm
+
 val subst_of_decl :
   EConstr.Vars.substl ->
   ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt ->
