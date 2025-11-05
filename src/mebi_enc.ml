@@ -12,6 +12,10 @@ module type ENCODING_TYPE = sig
 
   val init : t
   val cache : t ref
+
+  (* val counter : t ref *)
+  (* val next : t -> t *)
+  (* val get_next : unit -> t *)
   val reset : unit -> unit
   val eq : t -> t -> bool
   val compare : t -> t -> int
@@ -19,100 +23,94 @@ module type ENCODING_TYPE = sig
   val to_string : t -> string
   val of_int : int -> t
 
-  module type ENC_TBL = Hashtbl.S with type key = t
+  module B : Hashtbl.S with type key = t
 
-  module Tbl : ENC_TBL
+  exception InvalidDecodeKey of (t * EConstr.t B.t)
 
-  val encode : t F.t -> EConstr.t Tbl.t -> EConstr.t -> t
-
-  exception InvalidDecodeKey of (t * EConstr.t Tbl.t)
-
-  val decode_opt : EConstr.t Tbl.t -> t -> EConstr.t option
-  val decode : EConstr.t Tbl.t -> t -> EConstr.t
+  val encode : t F.t -> EConstr.t B.t -> EConstr.t -> t
+  val decode_opt : EConstr.t B.t -> t -> EConstr.t option
+  val decode : EConstr.t B.t -> t -> EConstr.t
 
   (* *)
   val fwd_to_list : t F.t -> (EConstr.t * t) list
-  val bck_to_list : EConstr.t Tbl.t -> (t * EConstr.t) list
+  val bck_to_list : EConstr.t B.t -> (t * EConstr.t) list
 end
 
-(**********************************)
-(****** INTEGER ENCODING **********)
-(**********************************)
+module type S = sig
+  module F : Hashtbl.S with type key = EConstr.t
 
-module IntEncoding =
-functor
-  (FwdMap : Hashtbl.S with type key = EConstr.t)
-  ->
-  struct
-    module F = FwdMap
+  type t
 
-    type t = int
+  val init : t
+  val next : t -> t
+  val eq : t -> t -> bool
+  val compare : t -> t -> int
+  val hash : t -> int
+  val to_string : t -> string
+  val of_int : int -> t
+end
 
-    let init : t = 0
-    let cache : t ref = ref init
-    let counter = cache
+module Make (Enc : S) : ENCODING_TYPE = struct
+  include Enc
 
-    let reset () =
-      cache := init;
-      ()
-    ;;
+  let cache : t ref = ref init
+  let counter : t ref = cache
 
-    let eq t1 t2 = Int.equal t1 t2
-    let compare t1 t2 = Int.compare t1 t2
-    let hash t = Int.hash t
-    let to_string t : string = Printf.sprintf "%i" t
-    let of_int (i : int) : t = i
+  let get_next () : t =
+    let x = !counter in
+    counter := next !counter;
+    x
+  ;;
 
-    module type ENC_TBL = Hashtbl.S with type key = t
+  let reset () = cache := init
 
-    module Tbl : ENC_TBL = Hashtbl.Make (struct
-        type t = int
+  module B : Hashtbl.S with type key = t = Hashtbl.Make (struct
+      type t = Enc.t
 
-        let equal t1 t2 = eq t1 t2
-        let hash t = hash t
-      end)
+      let equal a b = eq a b
+      let hash x = Enc.hash x
+    end)
 
-    let encode (fwd : t F.t) (bck : EConstr.t Tbl.t) (k : EConstr.t) : t =
-      Log.trace "Mebi_wrapper.IntEncoding.encode";
-      match F.find_opt fwd k with
-      | None ->
-        (* map to next encoding and return *)
-        let next_enc : t = !counter in
-        counter := !counter + 1;
-        F.add fwd k next_enc;
-        Tbl.add bck next_enc k;
-        Log.debug
-          (Printf.sprintf
-             "Mebi_wrapper.IntEncoding.encode, new encoding: %s"
-             (to_string next_enc));
-        next_enc
-      | Some enc ->
-        Log.debug
-          (Printf.sprintf
-             "Mebi_wrapper.IntEncoding.encode -- already encoded as (%s)"
-             (to_string enc));
-        enc
-    ;;
+  let encode (fwd : t F.t) (bck : EConstr.t B.t) (k : EConstr.t) : t =
+    Log.trace "Mebi_wrapper.IntEncoding.encode";
+    match F.find_opt fwd k with
+    | None ->
+      (* map to next encoding and return *)
+      let next_enc : t = get_next () in
+      F.add fwd k next_enc;
+      B.add bck next_enc k;
+      Log.debug
+        (Printf.sprintf
+           "Mebi_wrapper.IntEncoding.encode, new encoding: %s"
+           (to_string next_enc));
+      next_enc
+    | Some enc ->
+      Log.debug
+        (Printf.sprintf
+           "Mebi_wrapper.IntEncoding.encode -- already encoded as (%s)"
+           (to_string enc));
+      enc
+  ;;
 
-    exception InvalidDecodeKey of (t * EConstr.t Tbl.t)
+  exception InvalidDecodeKey of (t * EConstr.t B.t)
 
-    let decode_opt (bck : EConstr.t Tbl.t) (k : t) : EConstr.t option =
-      Tbl.find_opt bck k
-    ;;
+  let decode_opt (bck : EConstr.t B.t) (k : t) : EConstr.t option =
+    B.find_opt bck k
+  ;;
 
-    let decode (bck : EConstr.t Tbl.t) (k : t) : EConstr.t =
-      match Tbl.find_opt bck k with
-      | None -> raise (InvalidDecodeKey (k, bck))
-      | Some enc -> enc
-    ;;
+  let decode (bck : EConstr.t B.t) (k : t) : EConstr.t =
+    match B.find_opt bck k with
+    | None -> raise (InvalidDecodeKey (k, bck))
+    | Some enc -> enc
+  ;;
 
-    let fwd_to_list : t F.t -> (EConstr.t * t) list =
-      fun (x : t F.t) ->
-      List.sort (fun (_, a) (_, b) -> compare a b) (List.of_seq (F.to_seq x))
-    ;;
+  let fwd_to_list : t F.t -> (EConstr.t * t) list =
+    fun (x : t F.t) ->
+    List.sort (fun (_, a) (_, b) -> compare a b) (List.of_seq (F.to_seq x))
+  ;;
 
-    let bck_to_list : EConstr.t Tbl.t -> (t * EConstr.t) list =
-      fun (x : EConstr.t Tbl.t) ->
-      List.sort (fun (a, _) (b, _) -> compare a b) (List.of_seq (Tbl.to_seq x))
-    ;;
-  end
+  let bck_to_list : EConstr.t B.t -> (t * EConstr.t) list =
+    fun (x : EConstr.t B.t) ->
+    List.sort (fun (a, _) (b, _) -> compare a b) (List.of_seq (B.to_seq x))
+  ;;
+end

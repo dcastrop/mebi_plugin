@@ -1,22 +1,23 @@
 open Logging
 open Mebi_setup
-module F = Mebi_setup.F
 module Enc = Mebi_setup.Enc
-module B = Mebi_setup.B
+module F = Enc.F
+module B = Enc.B
+
+type fwdmap = Enc.t F.t
+type bckmap = EConstr.t B.t
 
 (********************************************)
 (****** WRAPPER & CONTEXT *******************)
 (********************************************)
 
-let the_enc_maps_cache : (Enc.t F.t * EConstr.t B.t) ref option ref = ref None
+let the_enc_maps_cache : (fwdmap * bckmap) ref option ref = ref None
 
-let get_the_enc_maps ?(keep_encoding : bool = false) ()
-  : (Enc.t F.t * EConstr.t B.t) ref
-  =
+let get_the_enc_maps ?(keep_encoding : bool = false) () : (fwdmap * bckmap) ref =
   match !the_enc_maps_cache with
   | None ->
-    let the_fwd_map : Enc.t F.t = F.create 0 in
-    let the_bck_map : EConstr.t B.t = B.create 0 in
+    let the_fwd_map : fwdmap = F.create 0 in
+    let the_bck_map : bckmap = B.create 0 in
     let the_enc_maps = ref (the_fwd_map, the_bck_map) in
     the_enc_maps_cache := Some the_enc_maps;
     the_enc_maps
@@ -24,8 +25,8 @@ let get_the_enc_maps ?(keep_encoding : bool = false) ()
     if keep_encoding
     then the_enc_maps
     else (
-      let the_fwd_map : Enc.t F.t = F.create 0 in
-      let the_bck_map : EConstr.t B.t = B.create 0 in
+      let the_fwd_map : fwdmap = F.create 0 in
+      let the_bck_map : bckmap = B.create 0 in
       let the_enc_maps = ref (the_fwd_map, the_bck_map) in
       the_enc_maps_cache := Some the_enc_maps;
       the_enc_maps)
@@ -33,8 +34,8 @@ let get_the_enc_maps ?(keep_encoding : bool = false) ()
 
 type wrapper =
   { coq_ref : coq_context ref
-  ; fwd_enc : Enc.t F.t
-  ; bck_enc : EConstr.t B.t
+  ; fwd_enc : fwdmap
+  ; bck_enc : bckmap
   }
 
 type 'a in_context =
@@ -116,11 +117,11 @@ let get_sigma (st : wrapper ref) : Evd.evar_map in_context =
   { state = st; value = !(!st.coq_ref).coq_ctx }
 ;;
 
-let get_fwd_enc (st : wrapper ref) : Enc.t F.t in_context =
+let get_fwd_enc (st : wrapper ref) : fwdmap in_context =
   { state = st; value = !st.fwd_enc }
 ;;
 
-let get_bck_enc (st : wrapper ref) : EConstr.t B.t in_context =
+let get_bck_enc (st : wrapper ref) : bckmap in_context =
   { state = st; value = !st.bck_enc }
 ;;
 
@@ -383,7 +384,7 @@ module type ERROR_TYPE = sig
         (Mebi_setup.coq_context ref * EConstr.t)
     (* *)
     | UnknownEncodeKey of (coq_context ref * B.key F.t * EConstr.t)
-    | UnknownDecodeKey of (coq_context ref * EConstr.t B.t * Enc.t)
+    | UnknownDecodeKey of (coq_context ref * bckmap * Enc.t)
     (* *)
     | NoBisimResult of unit
     (* | ProofvIsNone of unit *)
@@ -400,7 +401,7 @@ module type ERROR_TYPE = sig
         (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t * EConstr.t list))
     | PrimaryLTSNotFound of
         (Environ.env * Evd.evar_map * EConstr.t * EConstr.t list)
-    (* | UnknownDecodeKey of (Environ.env * Evd.evar_map * Enc.t * EConstr.t B.t) *)
+    (* | UnknownDecodeKey of (Environ.env * Evd.evar_map * Enc.t * bckmap) *)
     | ExpectedCoqIndDefOfLTSNotType of unit
     | InvalidCheckUpdatedCtx of
         (Environ.env
@@ -443,7 +444,7 @@ module type ERROR_TYPE = sig
 
   val cannot_get_decoding_of_unencoded_econstr
     :  coq_context ref
-    -> EConstr.t B.t
+    -> bckmap
     -> Enc.t
     -> exn
 
@@ -479,7 +480,7 @@ module type ERROR_TYPE = sig
      :  Environ.env
      -> Evd.evar_map
      -> Enc.t
-     -> EConstr.t B.t
+     -> bckmap
      -> exn *)
 
   val invalid_check_updated_ctx
@@ -504,7 +505,7 @@ module Error : ERROR_TYPE = struct
         (Mebi_setup.coq_context ref * EConstr.t)
     (* *)
     | UnknownEncodeKey of (coq_context ref * B.key F.t * EConstr.t)
-    | UnknownDecodeKey of (coq_context ref * EConstr.t B.t * Enc.t)
+    | UnknownDecodeKey of (coq_context ref * bckmap * Enc.t)
     (* *)
     | NoBisimResult of unit
     (* | ProofvIsNone of unit *)
@@ -521,7 +522,7 @@ module Error : ERROR_TYPE = struct
         (Environ.env * Evd.evar_map * (EConstr.t * EConstr.t * EConstr.t list))
     | PrimaryLTSNotFound of
         (Environ.env * Evd.evar_map * EConstr.t * EConstr.t list)
-    (* | UnknownDecodeKey of (Environ.env * Evd.evar_map * Enc.t * EConstr.t B.t) *)
+    (* | UnknownDecodeKey of (Environ.env * Evd.evar_map * Enc.t * bckmap) *)
     | ExpectedCoqIndDefOfLTSNotType of unit
     | InvalidCheckUpdatedCtx of
         (Environ.env
@@ -924,7 +925,7 @@ let primary_lts_not_found ((t, names) : EConstr.t * EConstr.t list) : 'a mm =
 ;;
 
 (** Error when try to decode key that does not exist in decode map. *)
-(* let unknown_decode_key ((k, bckmap) : Enc.t * EConstr.t B.t) : 'a mm =
+(* let unknown_decode_key ((k, bckmap) : Enc.t * bckmap) : 'a mm =
    fun (st : wrapper ref) ->
    let coq_st = !st.coq_ref in
    raise (Error.unknown_decode_key !coq_st.coq_env !coq_st.coq_ctx k bckmap)

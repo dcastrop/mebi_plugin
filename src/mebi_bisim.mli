@@ -33,71 +33,71 @@ val get_non_bisim_states : unit -> Model.Partition.t
 val set_the_result : Algorithms.Bisimilar.result -> unit
 val pstr_transition : transition -> string
 
-exception Enc_Of_EConstr_NotFound of (Evd.econstr * Model.States.t)
-exception State_Of_Enc_NotFound of (int * Model.States.t)
-exception Error_Multiple_States_Of_Enc_Found of (int * Model.States.t)
+exception Enc_Of_EConstr_NotFound of (EConstr.t * Model.States.t)
+exception State_Of_Enc_NotFound of (Mebi_wrapper.Enc.t * Model.States.t)
 
-val find_state_of_enc : int -> Model.States.t -> Model.State.t
-val find_state_of_enc_opt : int -> Model.States.t -> Model.State.t option
+exception
+  Error_Multiple_States_Of_Enc_Found of (Mebi_wrapper.Enc.t * Model.States.t)
 
-exception Label_Of_Enc_NotFound of (int * Model.Alphabet.t)
-exception Error_Multiple_Labels_Of_Enc_Found of (int * Model.Alphabet.t)
+val find_state_of_enc : Mebi_wrapper.Enc.t -> Model.States.t -> Model.State.t
 
-val find_label_of_enc : int -> Model.Alphabet.t -> Model.Alphabet.elt
-val econstr_to_enc : Evd.econstr -> int
-val run_econstr_to_enc_opt : Evd.econstr -> int option
-val enc_to_econstr : int -> Evd.econstr
-val econstr_to_enc_opt : Evd.evar_map -> Evd.econstr -> int option
+val find_state_of_enc_opt
+  :  Mebi_wrapper.Enc.t
+  -> Model.States.t
+  -> Model.State.t option
+
+exception Label_Of_Enc_NotFound of (Mebi_wrapper.Enc.t * Model.Alphabet.t)
+
+exception
+  Error_Multiple_Labels_Of_Enc_Found of (Mebi_wrapper.Enc.t * Model.Alphabet.t)
+
+val find_label_of_enc
+  :  Mebi_wrapper.Enc.t
+  -> Model.Alphabet.t
+  -> Model.Alphabet.elt
+
+val econstr_to_enc : EConstr.t -> Mebi_wrapper.Enc.t
+val run_econstr_to_enc_opt : EConstr.t -> Mebi_wrapper.Enc.t option
+val enc_to_econstr : Mebi_wrapper.Enc.t -> EConstr.t
+val econstr_to_enc_opt : Evd.evar_map -> EConstr.t -> Mebi_wrapper.Enc.t option
 
 val get_concl_transition
   :  ?abort_on_failed_dest_enc:bool
   -> Fsm.t
   -> Evd.evar_map
-  -> Evd.econstr * Evd.econstr * Evd.econstr
+  -> EConstr.t * EConstr.t * EConstr.t
   -> transition
 
-val get_weak_transition
-  :  Fsm.t
-  -> Evd.evar_map
-  -> Evd.econstr array
-  -> transition
-
-val get_lts_transition
-  :  Fsm.t
-  -> Evd.evar_map
-  -> Evd.econstr array
-  -> transition
+val get_weak_transition : Fsm.t -> Evd.evar_map -> EConstr.t array -> transition
+val get_lts_transition : Fsm.t -> Evd.evar_map -> EConstr.t array -> transition
 
 val get_hyp_transition
   :  Fsm.t
   -> Environ.env
   -> Evd.evar_map
-  -> Evd.econstr array
+  -> EConstr.t array
   -> transition option
 
-val get_cofix : Fsm.t -> Fsm.t -> 'a -> 'b -> Evd.econstr array -> hyp_cofix
+val get_cofix : Fsm.t -> Fsm.t -> 'a -> 'b -> EConstr.t array -> hyp_cofix
 
-exception Invalid_KindOf_EConstr_Expected_Atomic of Evd.econstr
+exception Invalid_KindOf_EConstr_Expected_Atomic of EConstr.t
 
-val get_atomic_type
-  :  Evd.evar_map
-  -> Evd.econstr
-  -> Evd.econstr * Evd.econstr array
+val get_atomic_type : Evd.evar_map -> EConstr.t -> EConstr.t * EConstr.t array
 
-exception Invalid_KindOf_EConstr_Expected_Lambda of Evd.econstr
+exception Invalid_KindOf_EConstr_Expected_Lambda of EConstr.t
 
 val get_lambda
   :  Evd.evar_map
-  -> Evd.econstr
+  -> EConstr.t
   -> (Names.Name.t, Evd.erelevance) Context.pbinder_annot
-     * Evd.econstr
-     * Evd.econstr
+     * EConstr.t
+     * EConstr.t
 
-exception Invalid_KindOf_EConstr_Expected_App of Evd.econstr
+exception Invalid_KindOf_EConstr_Expected_App of EConstr.t
 
-val get_app : Evd.evar_map -> Evd.econstr -> Evd.econstr * Evd.econstr array
+val get_app : Evd.evar_map -> EConstr.t -> EConstr.t * EConstr.t array
 
-exception UnhandledConcl of Evd.econstr
+exception UnhandledConcl of EConstr.t
 
 type concl_transition =
   | Weak_Transition
@@ -108,44 +108,44 @@ type concl_transition =
 val try_get_weak_transition
   :  Evd.evar_map
   -> Fsm.t
-  -> Evd.econstr * Evd.econstr array
+  -> Evd.econstr * EConstr.t array
   -> (concl_transition * transition) option
 
 val try_get_silent_transition
   :  Evd.evar_map
   -> Fsm.t
-  -> Evd.econstr * Evd.econstr array
+  -> Evd.econstr * EConstr.t array
   -> (concl_transition * transition) option
 
 val try_get_lts_transition
   :  Evd.evar_map
   -> Fsm.t
-  -> Evd.econstr * Evd.econstr array
+  -> Evd.econstr * EConstr.t array
   -> (concl_transition * transition) option
 
 val try_get_concl_transition
   :  Proofview.Goal.t
   -> Fsm.t
-  -> Evd.econstr
+  -> EConstr.t
   -> (concl_transition * transition) option
 
-val try_get_weak_sim : Proofview.Goal.t -> Evd.econstr -> Evd.econstr option
+val try_get_weak_sim : Proofview.Goal.t -> EConstr.t -> EConstr.t option
 
 val try_get_m_state_weak_sim
   :  Proofview.Goal.t
   -> Fsm.t
-  -> Evd.econstr
+  -> EConstr.t
   -> Model.State.t option
 
 val try_get_exists
   :  Proofview.Goal.t
   -> Fsm.t
   -> Fsm.t
-  -> Evd.econstr
+  -> EConstr.t
   -> (transition * Model.State.t) option
 
 type concl_result =
-  | New_Weak_Sim of Evd.econstr
+  | New_Weak_Sim of EConstr.t
   | Exists of (transition * Model.State.t)
   | Transition of (concl_transition * transition)
 
@@ -198,8 +198,8 @@ val get_all_cofix_names : Proofview.Goal.t -> Names.Id.Set.t
 
 val find_cofix_opt
   :  Proofview.Goal.t
-  -> Evd.econstr
-  -> (Names.variable * Evd.econstr) option
+  -> EConstr.t
+  -> (Names.variable * EConstr.t) option
 
 val get_all_non_cofix : Proofview.Goal.t -> Names.Id.Set.t
 val clear_old_hyps : Proofview.Goal.t -> unit Proofview.tactic
@@ -267,12 +267,12 @@ val debug_constrs : Proofview.Goal.t -> unit
 val get_from_state_of_relation
   :  Proofview.Goal.t
   -> Model.States.t
-  -> Evd.econstr
+  -> EConstr.t
   -> Model.State.t
 
 val build_tactics_from_constr_tree
   :  'a
-  -> (int * int) Mebi_constr.Tree.tree
+  -> (Mebi_setup.Enc.t * int) Mebi_constr.Tree.tree
   -> (unit -> unit Proofview.tactic) list
 
 val build_constructors
