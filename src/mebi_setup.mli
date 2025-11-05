@@ -1,15 +1,14 @@
-
-type unif_problem =
-  { termL : EConstr.t
-  ; termR : EConstr.t
-  }
-
 val enable_logging : bool ref
 
-type coq_context = {
-  coq_env : Environ.env;
-  coq_ctx : Evd.evar_map;
-}
+type unif_problem =
+  { termL : Evd.econstr
+  ; termR : Evd.econstr
+  }
+
+type coq_context =
+  { coq_env : Environ.env
+  ; coq_ctx : Evd.evar_map
+  }
 
 val the_coq_env_opt : Environ.env ref option ref
 val new_coq_env : unit -> Environ.env ref
@@ -34,13 +33,8 @@ module FwdMap : sig
   val replace : 'a t -> key -> 'a -> unit
   val mem : 'a t -> key -> bool
   val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-  val filter_map_inplace :
-    (key -> 'a -> 'a option) -> 'a t -> unit
-
-  val fold :
-    (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
   val length : 'a t -> int
   val stats : 'a t -> Hashtbl.statistics
   val to_seq : 'a t -> (key * 'a) Seq.t
@@ -51,12 +45,12 @@ module FwdMap : sig
   val of_seq : (key * 'a) Seq.t -> 'a t
 end
 
-module F = FwdMap
+module IntEncoding : Mebi_enc.S
 
 module Enc : sig
   module F : sig
     type key = Evd.econstr
-    type 'a t = 'a F.t
+    type 'a t = 'a Mebi_enc.Make(IntEncoding).F.t
 
     val create : int -> 'a t
     val clear : 'a t -> unit
@@ -70,13 +64,8 @@ module Enc : sig
     val replace : 'a t -> key -> 'a -> unit
     val mem : 'a t -> key -> bool
     val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-    val filter_map_inplace :
-      (key -> 'a -> 'a option) -> 'a t -> unit
-
-    val fold :
-      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
     val length : 'a t -> int
     val stats : 'a t -> Hashtbl.statistics
     val to_seq : 'a t -> (key * 'a) Seq.t
@@ -87,21 +76,20 @@ module Enc : sig
     val of_seq : (key * 'a) Seq.t -> 'a t
   end
 
-  type t = int
+  type t = Mebi_enc.Make(IntEncoding).t
 
   val init : t
   val cache : t ref
-  val counter : t ref
   val reset : unit -> unit
-  val eq : int -> int -> bool
-  val compare : int -> int -> int
-  val hash : int -> int
-  val to_string : int -> string
+  val eq : t -> t -> bool
+  val compare : t -> t -> int
+  val hash : t -> int
+  val to_string : t -> string
   val of_int : int -> t
 
-  module type ENC_TBL = sig
+  module B : sig
     type key = t
-    type !'a t
+    type 'a t = 'a Mebi_enc.Make(IntEncoding).B.t
 
     val create : int -> 'a t
     val clear : 'a t -> unit
@@ -115,13 +103,8 @@ module Enc : sig
     val replace : 'a t -> key -> 'a -> unit
     val mem : 'a t -> key -> bool
     val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-    val filter_map_inplace :
-      (key -> 'a -> 'a option) -> 'a t -> unit
-
-    val fold :
-      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
     val length : 'a t -> int
     val stats : 'a t -> Hashtbl.statistics
     val to_seq : 'a t -> (key * 'a) Seq.t
@@ -132,65 +115,17 @@ module Enc : sig
     val of_seq : (key * 'a) Seq.t -> 'a t
   end
 
-  module Tbl : sig
-    type key = t
+  exception InvalidDecodeKey of (t * Evd.econstr B.t)
 
-    type 'a t =
-      'a Mebi_enc.IntEncoding(FwdMap).Tbl.t
-
-    val create : int -> 'a t
-    val clear : 'a t -> unit
-    val reset : 'a t -> unit
-    val copy : 'a t -> 'a t
-    val add : 'a t -> key -> 'a -> unit
-    val remove : 'a t -> key -> unit
-    val find : 'a t -> key -> 'a
-    val find_opt : 'a t -> key -> 'a option
-    val find_all : 'a t -> key -> 'a list
-    val replace : 'a t -> key -> 'a -> unit
-    val mem : 'a t -> key -> bool
-    val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-    val filter_map_inplace :
-      (key -> 'a -> 'a option) -> 'a t -> unit
-
-    val fold :
-      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
-    val length : 'a t -> int
-    val stats : 'a t -> Hashtbl.statistics
-    val to_seq : 'a t -> (key * 'a) Seq.t
-    val to_seq_keys : 'a t -> key Seq.t
-    val to_seq_values : 'a t -> 'a Seq.t
-    val add_seq : 'a t -> (key * 'a) Seq.t -> unit
-    val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
-    val of_seq : (key * 'a) Seq.t -> 'a t
-  end
-
-  val encode : t F.t -> Evd.econstr Tbl.t -> Evd.econstr -> t
-
-  exception InvalidDecodeKey of (t * Evd.econstr Tbl.t)
-
-  val decode_opt : Evd.econstr Tbl.t -> t -> Evd.econstr option
-  val decode : Evd.econstr Tbl.t -> t -> Evd.econstr
+  val encode : t F.t -> Evd.econstr B.t -> Evd.econstr -> t
+  val decode_opt : Evd.econstr B.t -> t -> Evd.econstr option
+  val decode : Evd.econstr B.t -> t -> Evd.econstr
   val fwd_to_list : t F.t -> (Evd.econstr * t) list
-  val bck_to_list : Evd.econstr Tbl.t -> (t * Evd.econstr) list
-end
-
-module B = Enc.Tbl
-
-module EqF : (Enc : Mebi_enc.ENCODING_TYPE) -> sig
-  val enc : Enc.t -> Enc.t -> bool
-
-  val econstr :
-    Evd.evar_map -> Evd.econstr -> Evd.econstr -> bool
+  val bck_to_list : Evd.econstr B.t -> (t * Evd.econstr) list
 end
 
 module Eq : sig
-  val enc : int -> int -> bool
-
-  val econstr :
-    Evd.evar_map -> Evd.econstr -> Evd.econstr -> bool
-  val constr :
-    Constr.t -> Constr.t -> bool
+  val enc : Enc.t -> Enc.t -> bool
+  val econstr : Evd.evar_map -> Evd.econstr -> Evd.econstr -> bool
+  val constr : Constr.t -> Constr.t -> bool
 end

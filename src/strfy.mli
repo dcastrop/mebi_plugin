@@ -102,20 +102,20 @@ val ind_constrs
   -> Rocq_utils.ind_constrs
   -> string
 
-val enc : int -> string
+val enc : Mebi_setup.Enc.t -> string
 
 val enc_econstr_pair
   :  ?indent:int
   -> Environ.env
   -> Evd.evar_map
-  -> int * Evd.econstr
+  -> Mebi_setup.Enc.t * Evd.econstr
   -> string
 
 val enc_econstr_opt_pair
   :  ?indent:int
   -> Environ.env
   -> Evd.evar_map
-  -> int option * Evd.econstr
+  -> Mebi_setup.Enc.t option * Evd.econstr
   -> string
 
 val coq_info : ?indent:int -> Model.Info.Coq.t -> string

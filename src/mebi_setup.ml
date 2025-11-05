@@ -67,28 +67,32 @@ module FwdMap : Hashtbl.S with type key = EConstr.t = Hashtbl.Make (struct
     ;;
   end)
 
-module F = FwdMap
-
 (********************************************)
 (****** ENCODINGS ***************************)
 (********************************************)
 
-module Enc = Mebi_enc.IntEncoding (FwdMap)
-module B = Enc.Tbl
+module IntEncoding : Mebi_enc.S = struct
+  module F = FwdMap
+
+  type t = int
+
+  let init : t = 0
+  let next : t -> t = fun x -> x + 1
+  let eq : t -> t -> bool = Int.equal
+  let compare : t -> t -> int = Int.compare
+  let hash : t -> int = Int.hash
+  let to_string : t -> string = Printf.sprintf "%i"
+  let of_int : int -> t = fun x -> x
+end
+
+module Enc = Mebi_enc.Make (IntEncoding)
 
 (********************************************)
 (****** Equalities **************************)
 (********************************************)
 
-module EqF =
-functor
-  (Enc : Mebi_enc.ENCODING_TYPE)
-  (* (FwdMap : Hashtbl.S with type key = EConstr.t) *)
-  ->
-  struct
-    let enc = Enc.eq
-    let econstr sigma = EConstr.eq_constr sigma
-    let constr = Constr.equal
-  end
-
-module Eq = EqF (Enc)
+module Eq = struct
+  let enc = Enc.eq
+  let econstr sigma = EConstr.eq_constr sigma
+  let constr = Constr.equal
+end
