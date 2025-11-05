@@ -19,5 +19,7 @@ Mebi_bisim
 Params
 Mebi_help
 Unify
+Mebi_unification
+Mebi_unify
 Command
 G_mebi
