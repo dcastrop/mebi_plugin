@@ -6,6 +6,20 @@ open Mebi_wrapper.Syntax
 exception ExitDevelopmentTest of unit
 
 let dev_stop () : unit = raise (ExitDevelopmentTest ())
+let dev_counter : int ref = ref 0
+let dev_stop_at : int = 2
+
+let dev_checkin () : unit =
+  dev_counter := !dev_counter + 1;
+  if !dev_counter == dev_stop_at then dev_stop () else ()
+;;
+
+let debug_term p (x : EConstr.t) : unit mm =
+  state (fun env sigma ->
+    let sx : string = Strfy.econstr env sigma x in
+    Log.debug (Printf.sprintf "%s%s" (Utils.prefix p) sx);
+    sigma, ())
+;;
 
 type data =
   { ind_map : Mebi_ind.t F.t
@@ -118,18 +132,8 @@ let get_ind_constrs_opt (x : EConstr.t) (fmap : Mebi_ind.t F.t)
     | App (name, args) ->
       (match F.find_opt fmap name with
        | None ->
-         Log.warning
-           (Printf.sprintf
-              "get_ind_constrs_opt, %s has unknown name: %s"
-              (Strfy.econstr env sigma x)
-              (Strfy.econstr env sigma name));
-         Log.debug
-           (Printf.sprintf
-              "fmap keys:\n%s"
-              (Strfy.list
-                 ~force_newline:true
-                 (Strfy.econstr env sigma)
-                 (List.of_seq (F.to_seq_keys fmap))));
+         let f = Strfy.econstr env sigma in
+         Log.warning (Printf.sprintf "%s has unknown name: %s" (f x) (f name));
          (* TODO: err *) raise (ConstructorNameNotRecognized (x, name))
        | Some ind ->
          let lts_enc = ind.index in
@@ -153,6 +157,20 @@ type constructor_args =
   ; act : EConstr.t
   ; rhs : EConstr.t
   }
+
+let is_evar sigma : EConstr.t -> bool = EConstr.isEvar sigma
+let lhs_is_evar sigma { lhs; _ } : bool = is_evar sigma lhs
+let act_is_evar sigma { act; _ } : bool = is_evar sigma act
+let rhs_is_evar sigma { rhs; _ } : bool = is_evar sigma rhs
+
+let is_constructor_args_axiom : constructor_args -> bool mm = function
+  | { lhs; act; rhs; _ } ->
+    state (fun env sigma ->
+      let lhs : bool = is_evar sigma lhs in
+      let act : bool = is_evar sigma act in
+      let rhs : bool = is_evar sigma rhs in
+      sigma, lhs && act && rhs)
+;;
 
 let constructor_args_to_string ?(indent : int = 0) env sigma
   : constructor_args -> string
@@ -188,8 +206,7 @@ let constructor_args_to_string ?(indent : int = 0) env sigma
       ]
 ;;
 
-let debug_constructor_args ?(s : string = "constructor_args list") p x : unit mm
-  =
+let debug_constructor_args ?(s : string = "constructor_args") p x : unit mm =
   state (fun env sigma ->
     let sx : string = constructor_args_to_string env sigma x in
     Log.debug (Printf.sprintf "%s%s:\n%s\n" (Utils.prefix p) s sx);
@@ -263,10 +280,21 @@ let debug_split_constructor_args_acc d arg acc : unit mm =
   debug_constructor_args_list ~s:"split acc" m acc
 ;;
 
-let is_evar sigma : EConstr.t -> bool = EConstr.isEvar sigma
-let lhs_is_evar sigma { lhs; _ } : bool = is_evar sigma lhs
-let act_is_evar sigma { act; _ } : bool = is_evar sigma act
-let rhs_is_evar sigma { rhs; _ } : bool = is_evar sigma rhs
+(******************************************************************************)
+
+let unify x y = Unify.unify ~debug:true (x, y)
+let unify_opt x y = Option.cata (fun x -> unify x y) (return true) x
+
+let does_constructor_apply
+      (lhs : EConstr.t)
+      (act : EConstr.t option)
+      (constructor : constructor_args)
+  : bool mm
+  =
+  let* lhs_unifies : bool = unify lhs constructor.lhs in
+  let* act_unifies : bool = unify_opt act constructor.act in
+  return (lhs_unifies && act_unifies)
+;;
 
 let mk_constructor_args
       (lts_enc : Enc.t)
@@ -288,6 +316,45 @@ type split_evar =
   ; fresh : EConstr.t
   }
 
+let split_evar old fresh : split_evar = { old; fresh }
+
+(* let append_constructor_args
+      (original : constructor_args)
+      (fresh : constructor_args)
+  : constructor_args mm
+  =
+  let open Mebi_constr.Tree in
+  let lhs : EConstr.t = fresh.lhs in
+  let constructor : Rocq_utils.ind_constr = fresh.constructor in
+  let decls : Rocq_utils.econstr_decls = fresh.decls in
+  let tree : Mebi_constr.Tree.t = add fresh.tree original.tree in
+  return { lhs; act; rhs; tree; decls; substl; constructor }
+;; *)
+
+(** this is where we handle checking if they sandbox-unify, and if so then we merge, otherwise we return None.
+    (* TODO: don't what to prematurely optimize, but maybe we could also do the evar-replacing here? idk *)
+*)
+let mk_fresh_constructor_args
+      (original : constructor_args)
+      (d : data)
+      (constructor_index : int)
+      (constructor : Rocq_utils.ind_constr)
+  : constructor_args mm
+  =
+  let* fresh : constructor_args =
+    mk_constructor_args d.lts_enc constructor_index constructor
+  in
+  (* let* lhs_unifies = sandbox (unify original.lhs fresh.lhs) in
+     let* act_unifies = sandbox (unify original.act fresh.act) in
+     let* rhs_unifies = sandbox (unify original.rhs fresh.rhs) in
+     (* if Bool.not (lhs_unifies && act_unifies && rhs_unifies) *)
+     (* then return None *)
+     (* else *)
+     let* appended : constructor_args = append_constructor_args original fresh in
+     return appended *)
+  return fresh
+;;
+
 (** [expand_constructor_args_list d acc constructor_args_list] recursively calls [update_constructor_args d] for each [constructor_args] in [constructor_args_list], effectively replacing the original with a list of new [constructor_args]. For any returned, any [evars] have been refreshed and replaced to ensure that each valid trace of constructors that can be applied after this point do not interefere with each other.
 *)
 let rec expand_constructor_args_list (d : data) (acc : constructor_args list)
@@ -299,35 +366,38 @@ let rec expand_constructor_args_list (d : data) (acc : constructor_args list)
   | h :: tl ->
     let* () = debug_expand_constructor_args_list d acc (h :: tl) in
     let* refreshed : constructor_args list = update_constructor_args d h in
-    expand_constructor_args_list d (List.append refreshed acc) tl
+    let () = dev_checkin () in
+    (match refreshed with
+     | [] -> expand_constructor_args_list d (h :: acc) tl
+     | _ -> expand_constructor_args_list d (List.append refreshed acc) tl)
+(* expand_constructor_args_list d (List.append refreshed acc) tl *)
 
 and update_constructor_args (d : data)
   : constructor_args -> constructor_args list mm
   = function
   | the_constructor_args ->
-    let* () = debug_update_constructor_args d the_constructor_args [] in
     let { decls; substl; _ } = the_constructor_args in
-    (* TODO: make a map to keep track of the changed/split evars *)
-    (* let change_map : EConstr.t F.t = F.create 0 in  *)
     (* TODO: see [update_sigma] and [get_ind_constrs_opt] *)
     (* NOTE: we want to turn a single [constructor_args] into a list, where any [evars] in lhs,act,rhs are replaced with new ones, and when we copy over [substl] and [decls] to the new [constructor_args] we need to make sure to replace the old-evars with the corresponding new ones too. *)
     let iter_body (i : int) (acc : constructor_args list)
       : constructor_args list mm
       =
-      (* let* () = debug_update_constructor_args d the_constructor_args acc in *)
-      let* () = debug_update_constructor_args_acc d the_constructor_args acc in
-      (* *)
       let decl : Rocq_utils.econstr_decl = List.nth decls i in
       let substl : EConstr.Vars.substl = List.drop i substl in
       let* premise : EConstr.t = subst_of_decl substl decl in
+      let* () = debug_term "update, premise" premise in
       let* constrs_opt = get_ind_constrs_opt premise d.ind_map in
       match constrs_opt with
       (* NOTE: no other constructors to apply for [premise] *)
       | None ->
+        Log.debug "no constructors apply for premise";
         (* TODO: check if this has any evars? if yes then we need to create a new one ??? *)
         return acc
       (* NOTE: found applicable constructor for [premise] *)
       | Some (next_lts_enc, next_constructors, next_args) ->
+        let* () =
+          debug_update_constructor_args_acc d the_constructor_args acc
+        in
         let* split_evars, next_constructor_args_list =
           split_constructor_args
             { d with lts_enc = next_lts_enc }
@@ -335,15 +405,19 @@ and update_constructor_args (d : data)
             next_args
             the_constructor_args
         in
+        Log.debug "returned from split";
         return (List.append acc next_constructor_args_list)
     in
     iterate 0 (List.length decls - 1) [] iter_body
 
-and split_constructor_args (d : data) next_constructors next_args
+and split_constructor_args
+      (d : data)
+      (next_constructors : Rocq_utils.ind_constrs)
+      (next_args : EConstr.t array)
   : constructor_args -> (split_evar list * constructor_args list) mm
   = function
   | the_constructor_args ->
-    let* () = debug_split_constructor_args d the_constructor_args [] in
+    (* let* () = debug_split_constructor_args d the_constructor_args [] in *)
     let { constructor; decls; substl; tree; lhs; act; rhs } =
       the_constructor_args
     in
@@ -352,16 +426,23 @@ and split_constructor_args (d : data) next_constructors next_args
           ((split_evars, acc) : split_evar list * constructor_args list)
       : (split_evar list * constructor_args list) mm
       =
-      (* let* () = debug_split_constructor_args d the_constructor_args acc in *)
-      let* () = debug_split_constructor_args_acc d the_constructor_args acc in
-      (* *)
-      let* new_constructor_args =
-        mk_constructor_args d.lts_enc i next_constructors.(i)
+      let next_constructor = next_constructors.(i) in
+      let* fresh =
+        mk_fresh_constructor_args the_constructor_args d i next_constructor
       in
-      let _tree = Mebi_constr.Tree.add new_constructor_args.tree tree in
-      (* TODO: how to update the [decls] and [substl]? *)
-      (* TODO: at what point do we start sandbox-unifying stuff again? *)
-      return (split_evars, acc)
+      let* is_axiom : bool = is_constructor_args_axiom fresh in
+      if is_axiom
+      then (
+        (* NOTE: no other constructors to apply, add to acc and stop *)
+        Log.debug "is axiom";
+        return (split_evars, fresh :: acc))
+      else
+        (* NOTE: some unresolved metavariables, indicating more to explore *)
+        (* let* () = debug_constructor_args "fresh" fresh in *)
+        let* acc = expand_constructor_args_list d acc [ fresh ] in
+        let* () = debug_constructor_args_list "split" acc in
+        (* let () = dev_stop () in *)
+        return (split_evars, acc)
     in
     iterate 0 (List.length decls - 1) ([], []) iter_body
 ;;
@@ -384,21 +465,6 @@ let mk_init_constructor_args_list
 ;;
 
 (******************************************************************************)
-
-(* *)
-let unify x y = Unify.unify ~debug:true (x, y)
-let unify_opt x y = Option.cata (fun x -> unify x y) (return true) x
-
-let does_constructor_apply
-      (lhs : EConstr.t)
-      (act : EConstr.t option)
-      (constructor : constructor_args)
-  : bool mm
-  =
-  let* lhs_unifies : bool = unify lhs constructor.lhs in
-  let* act_unifies : bool = unify_opt act constructor.act in
-  return (lhs_unifies && act_unifies)
-;;
 
 let rec filter_valid_constructors
           (lhs : EConstr.t)
@@ -426,6 +492,7 @@ let explore_valid_constructors
   (* NOTE: then for each valid constructor, "split" into fresh constructor_args for the next constructor to be applied -- recursively do this until we have fully explored all possible constructors, for all reachable terms [from_term] *)
   let* fully_expanded_constructors =
     expand_constructor_args_list d [] valid_constructors
+    (* NOTE: we sandbox them individually since otherwise when we "unsandbox" everything and start going through the valid constructors, then they're going to share the same evars and start unifying beyond their scope again. *)
   in
   (* NOTE: next, group each of the [refreshed_constructors] by the first constructor to be applied, and iteratively descend (depth-first) -- agressively culling any that fail sandbox-unification (sandboxed-with their peers), and continue recursively descending until nothing to do *)
   (* TODO: *)
