@@ -714,8 +714,8 @@ let rec collect_valid_constructors
       (* NOTE: -> update_sigma *)
       (* NOTE: -> collect_valid_constructors *)
       (* TODO: debug [decls] and [substl] to check which contains the [evars] *)
-      (* let* () = debug_decls "A2" decls in *)
-      (* let* () = debug_substl "A2" substl in *)
+      let* () = debug_decls "A2" decls in
+      let* () = debug_substl "A2" substl in
       (* NOTE: [substl] contains the terms and evars *)
       (* NOTE: [decls] contains the types of each *)
       (* TODO: ideas:

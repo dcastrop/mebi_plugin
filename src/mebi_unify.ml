@@ -5,7 +5,7 @@ open Mebi_wrapper.Syntax
 
 type data =
   { ind_map : Mebi_ind.t F.t
-  ; lts_index : int
+  ; lts_enc : Enc.t
   }
 
 let debug_collect_valid_constructors
@@ -20,11 +20,11 @@ let debug_collect_valid_constructors
     let constructors_str : string = Strfy.ind_constrs env sigma constructors in
     Log.debug
       (Printf.sprintf
-         "collect_valid_constructors, lts index (%i)\n\
+         "collect_valid_constructors, lts enc (%s)\n\
           - from term: %s\n\
           - constructors:\n\
           %s"
-         d.lts_index
+         (Enc.to_string d.lts_enc)
          from_str
          constructors_str);
     sigma, ())
@@ -94,6 +94,34 @@ let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
   | _ -> (* TODO: err *) invalid_lts_term_kind term
 ;;
 
+exception ConstructorNameNotRecognized of (EConstr.t * EConstr.t)
+exception InductiveKindNotLTS of Mebi_ind.t
+
+(** [get_constrs_opt x d] is [Some constrs] if [x] is an [EConstr.t] term corresponding to an inductively defined LTS that has been passed to the plugin as an argument, and already processed and stored within [d.ind_map], otherwise is [None].
+    @param [x]
+      is an [EConstr.t] term assumed to be derived from some declaration within the context of a constructor of an inductively defined LTS.
+    @param [d] is a record [data].
+    @return
+      [None] if [x] does not correspond to an application (i.e., [Constr.App(fn, args)]) else [Some constrs].
+    @raise ConstructorNameNotRecognized
+      if [fail_if_unrecognized_constructor] is set to true, otherwise returns [None].
+    @raise InductiveKindNotLTS if [x] does not *)
+let get_ind_constrs_opt (x : EConstr.t) (fmap : Mebi_ind.t F.t)
+  : (Enc.t * Rocq_utils.ind_constrs * EConstr.t array) option mm
+  =
+  state (fun env sigma ->
+    match EConstr.kind sigma x with
+    | App (name, args) ->
+      (match F.find_opt fmap name with
+       | None -> (* TODO: err *) raise (ConstructorNameNotRecognized (x, name))
+       | Some ind ->
+         let lts_enc = ind.index in
+         (match ind.kind with
+          | Mebi_ind.LTS l -> sigma, Some (lts_enc, l.constr_transitions, args)
+          | _ -> (* TODO: err *) raise (InductiveKindNotLTS ind)))
+    | _ -> sigma, None)
+;;
+
 (******************************************************************************)
 
 (** create "blank/empty" templates for the constructors, which we will try to unify with (in a sandbox). if the unification succeeds, then we begin to search recursively outwards, and each iteration we "split" the existential variables provided so that each constructor does not interfere with the unification of another (i.e., just replace them with fresh templates, carrying over any hard-set information). this ensures that on the return of the recursion, we have a list corresponding to each leaf of the tree we have explored, where existential variable that remains is unique to that element in the list.
@@ -103,16 +131,18 @@ type constructor_args =
   { constructor : Rocq_utils.ind_constr
   ; decls : Rocq_utils.econstr_decls
   ; substl : EConstr.Vars.substl
+  ; tree : Mebi_constr.Tree.t
   ; lhs : EConstr.t
   ; act : EConstr.t
   ; rhs : EConstr.t
   }
 
 let constructor_args_to_string env sigma : constructor_args -> string = function
-  | { constructor; decls; substl; lhs; act; rhs } ->
+  | { constructor; decls; substl; tree; lhs; act; rhs } ->
     let lhs_str : string = Strfy.econstr env sigma lhs in
     let act_str : string = Strfy.econstr env sigma act in
     let rhs_str : string = Strfy.econstr env sigma rhs in
+    let tree_str : string = Strfy.constr_tree tree in
     let f_decl_str = Strfy.econstr_rel_decl env sigma in
     let decls_str : string = Strfy.list f_decl_str decls in
     let substl_str : string =
@@ -126,6 +156,7 @@ let constructor_args_to_string env sigma : constructor_args -> string = function
       [ "lhs", lhs_str
       ; "act", act_str
       ; "rhs", rhs_str
+      ; "tree", tree_str
       ; "decls", decls_str
       ; "substl", substl_str
       ; "constructor", constructor_str
@@ -140,6 +171,109 @@ let is_evar sigma : EConstr.t -> bool = EConstr.isEvar sigma
 let lhs_is_evar sigma { lhs; _ } : bool = is_evar sigma lhs
 let act_is_evar sigma { act; _ } : bool = is_evar sigma act
 let rhs_is_evar sigma { rhs; _ } : bool = is_evar sigma rhs
+
+let mk_constructor_args
+      (lts_enc : Enc.t)
+      (constructor_index : int)
+      (constructor : Rocq_utils.ind_constr)
+  : constructor_args mm
+  =
+  let (ctx, term) : Constr.rel_context * Constr.t = constructor in
+  let decls : Rocq_utils.econstr_decls = List.map EConstr.of_rel_decl ctx in
+  let* substl : EConstr.Vars.substl = mk_ctx_substl [] (List.rev decls) in
+  let* lhs, act, rhs = extract_args ~substl term in
+  let open Mebi_constr.Tree in
+  let tree : (Enc.t * int) tree = Node ((lts_enc, constructor_index), []) in
+  return { constructor; decls; substl; tree; lhs; act; rhs }
+;;
+
+type split_evar =
+  { old : EConstr.t
+  ; fresh : EConstr.t
+  }
+
+(** [expand_constructor_args_list d acc constructor_args_list] recursively calls [update_constructor_args d] for each [constructor_args] in [constructor_args_list], effectively replacing the original with a list of new [constructor_args]. For any returned, any [evars] have been refreshed and replaced to ensure that each valid trace of constructors that can be applied after this point do not interefere with each other.
+*)
+let rec expand_constructor_args_list (d : data) (acc : constructor_args list)
+  : constructor_args list -> constructor_args list mm
+  = function
+  | [] -> return acc
+  | h :: t ->
+    let* refreshed : constructor_args list = update_constructor_args d h in
+    expand_constructor_args_list d (List.append refreshed acc) t
+
+and update_constructor_args (d : data)
+  : constructor_args -> constructor_args list mm
+  = function
+  | the_constructor_args ->
+    let { decls; substl; _ } = the_constructor_args in
+    (* TODO: make a map to keep track of the changed/split evars *)
+    (* let change_map : EConstr.t F.t = F.create 0 in  *)
+    (* TODO: see [update_sigma] and [get_ind_constrs_opt] *)
+    (* NOTE: we want to turn a single [constructor_args] into a list, where any [evars] in lhs,act,rhs are replaced with new ones, and when we copy over [substl] and [decls] to the new [constructor_args] we need to make sure to replace the old-evars with the corresponding new ones too. *)
+    let iter_body (i : int) (acc : constructor_args list)
+      : constructor_args list mm
+      =
+      let decl : Rocq_utils.econstr_decl = List.nth decls i in
+      let substl : EConstr.Vars.substl = List.drop i substl in
+      let* premise : EConstr.t = subst_of_decl substl decl in
+      let* constrs_opt = get_ind_constrs_opt premise d.ind_map in
+      match constrs_opt with
+      (* NOTE: no other constructors to apply for [premise] *)
+      | None ->
+        (* TODO: check if this has any evars? if yes then we need to create a new one ??? *)
+        return acc
+      (* NOTE: found applicable constructor for [premise] *)
+      | Some (next_lts_enc, next_constructors, next_args) ->
+        let* split_evars, next_constructor_args_list =
+          split_constructor_args
+            { d with lts_enc = next_lts_enc }
+            next_constructors
+            next_args
+            the_constructor_args
+        in
+        return (List.append acc next_constructor_args_list)
+    in
+    iterate 0 (List.length decls - 1) [] iter_body
+
+and split_constructor_args (d : data) next_constructors next_args
+  : constructor_args -> (split_evar list * constructor_args list) mm
+  = function
+  | { constructor; decls; substl; tree; lhs; act; rhs } ->
+    let iter_body
+          (i : int)
+          ((split_evars, acc) : split_evar list * constructor_args list)
+      : (split_evar list * constructor_args list) mm
+      =
+      let* new_constructor_args =
+        mk_constructor_args d.lts_enc i next_constructors.(i)
+      in
+      let _tree = Mebi_constr.Tree.add new_constructor_args.tree tree in
+      (* TODO: how to update the [decls] and [substl]? *)
+      (* TODO: at what point do we start sandbox-unifying stuff again? *)
+      return (split_evars, acc)
+    in
+    iterate 0 (List.length decls - 1) ([], []) iter_body
+;;
+
+let mk_init_constructor_args_list
+      (lts_enc : Enc.t)
+      (raw_constructors : Rocq_utils.ind_constrs)
+  : constructor_args list mm
+  =
+  let iter_body (i : int) (acc : constructor_args list)
+    : constructor_args list mm
+    =
+    let constructor : Rocq_utils.ind_constr = raw_constructors.(i) in
+    let* constructor_args : constructor_args =
+      mk_constructor_args lts_enc i constructor
+    in
+    return (constructor_args :: acc)
+  in
+  iterate 0 (Array.length raw_constructors - 1) [] iter_body
+;;
+
+(******************************************************************************)
 
 (* *)
 let unify x y = Unify.unify ~debug:true (x, y)
@@ -170,63 +304,23 @@ let rec filter_valid_constructors
     else filter_valid_constructors lhs act acc t
 ;;
 
-let split_constructor_args : constructor_args -> constructor_args list mm =
-  function
-  | { constructor; decls; substl; lhs; act; rhs } ->
-    return
-      (List.fold_left
-         (fun acc decl ->
-           (* TODO: see [update_sigma] and [get_ind_constrs_opt] *)
-           (* NOTE: we want to turn a single [constructor_args] into a list, where any [evars] in lhs,act,rhs are replaced with new ones, and when we copy over [substl] and [decls] to the new [constructor_args] we need to make sure to replace the old-evars with the corresponding new ones too. *)
-           acc)
-         []
-         decls)
-;;
-
-let rec refresh_constructor_args_list (d : data) (acc : constructor_args list)
-  : constructor_args list -> constructor_args list mm
-  = function
-  | [] -> return acc
-  | h :: t ->
-    let* refreshed : constructor_args list = split_constructor_args h in
-    refresh_constructor_args_list d (List.append refreshed acc) t
-;;
-
-let
-  (*rec*)
-    explore_valid_constructors
-    (d : data)
-    (from_term : EConstr.t)
-    (action_term : EConstr.t option)
-    (constructors : constructor_args list)
+let explore_valid_constructors
+      (d : data)
+      (from_term : EConstr.t)
+      (action_term : EConstr.t option)
+      (constructors : constructor_args list)
   : Mebi_constr.t list mm
   =
   let* valid_constructors =
     filter_valid_constructors from_term action_term [] constructors
   in
-  (* NOTE: then for each valid constructor, "split" into fresh constructor_args for the next constructor to be applied *)
-  let* refreshed_constructors =
-    refresh_constructor_args_list d [] valid_constructors
+  (* NOTE: then for each valid constructor, "split" into fresh constructor_args for the next constructor to be applied -- recursively do this until we have fully explored all possible constructors, for all reachable terms [from_term] *)
+  let* fully_expanded_constructors =
+    expand_constructor_args_list d [] valid_constructors
   in
+  (* NOTE: next, group each of the [refreshed_constructors] by the first constructor to be applied, and iteratively descend (depth-first) -- agressively culling any that fail sandbox-unification (sandboxed-with their peers), and continue recursively descending until nothing to do *)
+  (* TODO: *)
   return []
-;;
-
-(******************************************************************************)
-
-let mk_init_constructor_args (raw_constructors : Rocq_utils.ind_constrs)
-  : constructor_args list mm
-  =
-  let iter_body (i : int) (acc : constructor_args list)
-    : constructor_args list mm
-    =
-    let constructor : Rocq_utils.ind_constr = raw_constructors.(i) in
-    let (ctx, term) : Constr.rel_context * Constr.t = constructor in
-    let decls : Rocq_utils.econstr_decls = List.map EConstr.of_rel_decl ctx in
-    let* substl : EConstr.Vars.substl = mk_ctx_substl [] (List.rev decls) in
-    let* lhs, act, rhs = extract_args ~substl term in
-    return ({ constructor; decls; substl; lhs; act; rhs } :: acc)
-  in
-  iterate 0 (Array.length raw_constructors - 1) [] iter_body
 ;;
 
 let collect_valid_constructors
@@ -236,6 +330,8 @@ let collect_valid_constructors
   : Mebi_constr.t list mm
   =
   let* () = debug_collect_valid_constructors d from_term raw_constructors in
-  let* constructors = mk_init_constructor_args raw_constructors in
+  let* constructors =
+    mk_init_constructor_args_list d.lts_enc raw_constructors
+  in
   explore_valid_constructors d from_term None constructors
 ;;
