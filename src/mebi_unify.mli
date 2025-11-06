@@ -56,11 +56,23 @@ type constructor_args = {
 val constructor_args_to_string :
   Environ.env -> Evd.evar_map -> constructor_args -> string
 
+val debug_constructor_args :
+  string -> constructor_args -> unit Mebi_wrapper.mm
+
 val constructor_args_list_to_string :
   Environ.env ->
   Evd.evar_map ->
   constructor_args list ->
   string
+
+val debug_constructor_args_list :
+  string -> constructor_args list -> unit Mebi_wrapper.mm
+
+val debug_expand_constructor_args_list :
+  data ->
+  constructor_args list ->
+  'a list ->
+  unit Mebi_wrapper.mm
 
 val is_evar : Evd.evar_map -> Evd.econstr -> bool
 val lhs_is_evar : Evd.evar_map -> constructor_args -> bool
