@@ -1,3 +1,7 @@
+exception ExitDevelopmentTest of unit
+
+val dev_stop : unit -> unit
+
 type data = {
   ind_map : Mebi_ind.t Mebi_wrapper.F.t;
   lts_enc : Mebi_setup.Enc.t;
@@ -54,10 +58,17 @@ type constructor_args = {
 }
 
 val constructor_args_to_string :
-  Environ.env -> Evd.evar_map -> constructor_args -> string
+  ?indent:int ->
+  Environ.env ->
+  Evd.evar_map ->
+  constructor_args ->
+  string
 
 val debug_constructor_args :
-  string -> constructor_args -> unit Mebi_wrapper.mm
+  ?s:string ->
+  string ->
+  constructor_args ->
+  unit Mebi_wrapper.mm
 
 val constructor_args_list_to_string :
   Environ.env ->
@@ -66,12 +77,33 @@ val constructor_args_list_to_string :
   string
 
 val debug_constructor_args_list :
-  string -> constructor_args list -> unit Mebi_wrapper.mm
+  ?s:string ->
+  string ->
+  constructor_args list ->
+  unit Mebi_wrapper.mm
 
 val debug_expand_constructor_args_list :
   data ->
   constructor_args list ->
-  'a list ->
+  constructor_args list ->
+  unit Mebi_wrapper.mm
+
+val debug_update_constructor_args :
+  data -> constructor_args -> 'a list -> unit Mebi_wrapper.mm
+
+val debug_update_constructor_args_acc :
+  data ->
+  constructor_args ->
+  constructor_args list ->
+  unit Mebi_wrapper.mm
+
+val debug_split_constructor_args :
+  data -> constructor_args -> 'a list -> unit Mebi_wrapper.mm
+
+val debug_split_constructor_args_acc :
+  data ->
+  constructor_args ->
+  constructor_args list ->
   unit Mebi_wrapper.mm
 
 val is_evar : Evd.evar_map -> Evd.econstr -> bool
