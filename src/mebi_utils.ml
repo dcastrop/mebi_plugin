@@ -81,8 +81,24 @@ let get_ind_info (gref : Names.GlobRef.t) : Mebi_ind.info mm =
     invalid_ref_type gref
 ;;
 
+let get_name_of_lts (gref : Names.GlobRef.t) : EConstr.t mm =
+  let open Names.GlobRef in
+  match gref with
+  | IndRef ind ->
+    let* env = get_env in
+    let mib, mip = Inductive.lookup_mind_specif env ind in
+    let* _ = assert_mip_arity_is_prop mip in
+    let* lbl, term = get_lts_labels_and_terms mib mip in
+    let univ = mib.mind_univ_hyps in
+    (* lts of inductive type *)
+    return (EConstr.mkIndU (ind, EConstr.EInstance.make univ))
+  | _ ->
+    Log.debug "mebi_utils.get_name_of_lts, invalid gref";
+    invalid_ref_lts gref
+;;
+
 (** @raise invalid_ref_lts if [gref] is not a reference to an inductive type. *)
-let get_ind_lts (i : int) (gref : Names.GlobRef.t) : Mebi_ind.t mm =
+let get_ind_lts (i : Enc.t) (gref : Names.GlobRef.t) : Mebi_ind.t mm =
   Log.trace "mebi_utils.get_ind_lts";
   let open Names.GlobRef in
   match gref with

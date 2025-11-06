@@ -236,12 +236,12 @@ module MkGraph
     let* from_term : EConstr.t = decode from in
     let* ind_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
     let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
-    let lts_index : int = primary.index in
+    let lts_enc : Enc.t = primary.index in
     let* new_constrs =
       Unify.collect_valid_constructors
         from_term
         primary_constr_transitions
-        { ind_map; lts_index }
+        { ind_map; lts_enc }
     in
     let* _ =
       state (fun env sigma ->
@@ -304,31 +304,36 @@ module MkGraph
   (** @return
         the key for the primary lts and hashtable mapping the name of the coq definition to the rlts.
   *)
-  let build_lts_ind_def_map (grefs : Names.GlobRef.t list) : Mebi_ind.t B.t mm =
+  let build_lts_ind_def_map (grefs : Names.GlobRef.t list)
+    : (Enc.t * Mebi_ind.t B.t) mm
+    =
     Log.trace "command.MkGraph.build_lts_ind_def_map";
     let num_grefs : int = List.length grefs in
-    let iter_body (i : int) (acc_map : Mebi_ind.t B.t) =
+    let iter_body
+          (i : int)
+          ((_primary_lts_enc, acc_map) : Enc.t * Mebi_ind.t B.t)
+      =
       let gref : Names.GlobRef.t = List.nth grefs i in
-      let* lts_ind_def : Mebi_ind.t = Mebi_utils.get_ind_lts i gref in
+      let* lts_name : EConstr.t = Mebi_utils.get_name_of_lts gref in
       (* add name of inductive prop *)
-      let* encoding : Enc.t = encode lts_ind_def.info.name in
-      if Bool.not (B.mem acc_map encoding)
-      then B.add acc_map encoding lts_ind_def;
-      return acc_map
+      let* lts_enc : Enc.t = encode lts_name in
+      let* lts_ind_def : Mebi_ind.t = Mebi_utils.get_ind_lts lts_enc gref in
+      if Bool.not (B.mem acc_map lts_enc) then B.add acc_map lts_enc lts_ind_def;
+      return (lts_enc, acc_map)
     in
-    iterate 0 (num_grefs - 1) (B.create num_grefs) iter_body
+    iterate 0 (num_grefs - 1) (Enc.init, B.create num_grefs) iter_body
   ;;
 
   let get_primary_lts
         (primary_lts : Libnames.qualid)
-        (grefs : Names.GlobRef.t list)
+        (primary_lts_enc : Enc.t)
         (lts_ind_def_map : Mebi_ind.t B.t)
     : Mebi_ind.t mm
     =
     let open Mebi_utils in
     (* encode the primary lts *)
     let* primary_lts_ind_def : Mebi_ind.t =
-      get_ind_lts (List.length grefs) (ref_to_glob primary_lts)
+      get_ind_lts primary_lts_enc (ref_to_glob primary_lts)
     in
     let* the_primary_enc : Enc.t = encode primary_lts_ind_def.info.name in
     return (B.find lts_ind_def_map the_primary_enc)
@@ -350,8 +355,12 @@ module MkGraph
     let* t : EConstr.t = Mebi_utils.constrexpr_to_econstr tref in
     let* t : EConstr.t = Mebi_utils.econstr_normalize t in
     (* encode lts inductive definitions *)
-    let* lts_ind_def_map : Mebi_ind.t B.t = build_lts_ind_def_map grefs in
-    let* the_primary_lts = get_primary_lts primary_lts grefs lts_ind_def_map in
+    let* (the_primary_lts_enc, lts_ind_def_map) : Enc.t * Mebi_ind.t B.t =
+      build_lts_ind_def_map grefs
+    in
+    let* the_primary_lts =
+      get_primary_lts primary_lts the_primary_lts_enc lts_ind_def_map
+    in
     (* update environment by typechecking *)
     let* primary_trm_type = Mebi_ind.get_lts_trm_type the_primary_lts in
     let$* _unit env sigma = Typing.check env sigma t primary_trm_type in

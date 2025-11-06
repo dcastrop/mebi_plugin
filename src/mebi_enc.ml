@@ -21,7 +21,6 @@ module type ENCODING_TYPE = sig
   val compare : t -> t -> int
   val hash : t -> int
   val to_string : t -> string
-  val of_int : int -> t
 
   module B : Hashtbl.S with type key = t
 
@@ -47,7 +46,6 @@ module type S = sig
   val compare : t -> t -> int
   val hash : t -> int
   val to_string : t -> string
-  val of_int : int -> t
 end
 
 module Make (Enc : S) : ENCODING_TYPE = struct

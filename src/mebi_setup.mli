@@ -85,7 +85,6 @@ module Enc : sig
   val compare : t -> t -> int
   val hash : t -> int
   val to_string : t -> string
-  val of_int : int -> t
 
   module B : sig
     type key = t
