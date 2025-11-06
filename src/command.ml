@@ -220,12 +220,53 @@ module MkGraph
     iterate 0 (List.length ctors - 1) (S.singleton from) iter_body
   ;;
 
+  let debug_new_constrs new_constrs : unit mm =
+    state (fun env sigma ->
+      Log.debug
+        (Printf.sprintf
+           "get_new_constrs:\n%s"
+           (Strfy.list
+              ~force_newline:true
+              (fun x ->
+                let action, dest, tree = x in
+                let f = Strfy.econstr env sigma in
+                Strfy.list
+                  ~force_newline:true
+                  ~indent:1
+                  Strfy.str
+                  [ Strfy.tuple ~is_keyval:true Strfy.str f ("action", action)
+                  ; Strfy.tuple ~is_keyval:true Strfy.str f ("dest", dest)
+                  ; Strfy.tuple
+                      ~is_keyval:true
+                      Strfy.str
+                      Mebi_constr.Tree.to_string
+                      ("tree", tree)
+                  ])
+              new_constrs));
+      sigma, ())
+  ;;
+
   (** [get_new_constrs t lts_ind_def_map] returns the list of constructors applicable to term [t], using those provided in [lts_ind_def_map].
       (* TODO: update this *)
       If no immediate constructor is found matching [t] in [lts_ind_def_map] (likely due to unification problems), then each constructor in [lts_ind_def_map] is tried sequentially, until one of them returns some valid constructors.
       @raise CannotFindTypeOfTermToVisit
         if none of the constructors provided in [lts_ind_def_map] yield constructors from [check_valid_constructors].
   *)
+  let _get_new_constrs_OLD from_term primary_constr_transitions data
+    : Mebi_constr.t list mm
+    =
+    Unify.collect_valid_constructors from_term primary_constr_transitions data
+  ;;
+
+  let _get_new_constrs_NEW from_term primary_constr_transitions data
+    : Mebi_constr.t list mm
+    =
+    Mebi_unify.collect_valid_constructors
+      data
+      from_term
+      primary_constr_transitions
+  ;;
+
   let get_new_constrs
         (from : Enc.t)
         (primary : Mebi_ind.t)
@@ -237,37 +278,13 @@ module MkGraph
     let* ind_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
     let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
     let lts_enc : Enc.t = primary.index in
+    let _f = _get_new_constrs_OLD in
+    let _f = _get_new_constrs_NEW in
     let* new_constrs =
-      Unify.collect_valid_constructors
-        from_term
-        primary_constr_transitions
-        { ind_map; lts_enc }
+      _f from_term primary_constr_transitions { ind_map; lts_enc }
     in
-    let* _ =
-      state (fun env sigma ->
-        Log.debug
-          (Printf.sprintf
-             "get_new_constrs:\n%s"
-             (Strfy.list
-                ~force_newline:true
-                (fun x ->
-                  let action, dest, tree = x in
-                  let f = Strfy.econstr env sigma in
-                  Strfy.list
-                    ~force_newline:true
-                    ~indent:1
-                    Strfy.str
-                    [ Strfy.tuple ~is_keyval:true Strfy.str f ("action", action)
-                    ; Strfy.tuple ~is_keyval:true Strfy.str f ("dest", dest)
-                    ; Strfy.tuple
-                        ~is_keyval:true
-                        Strfy.str
-                        Mebi_constr.Tree.to_string
-                        ("tree", tree)
-                    ])
-                new_constrs));
-        sigma, ())
-    in
+    (* let new_constrs = get_new_constrs_NEW in *)
+    let* () = debug_new_constrs new_constrs in
     return new_constrs
   ;;
 
