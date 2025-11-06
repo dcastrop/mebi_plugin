@@ -4,6 +4,16 @@ module Tree = struct
   type 'a tree = Node of 'a * 'a tree list
   type t = (Mebi_setup.Enc.t * int) tree
 
+  (** [add x y] inserts [x] to be a new leaf of [y], mutually recursive with [add_list x ys] (where [ys] is a list of [t]).
+  *)
+  let rec add (x : t) : t -> t = function
+    | Node ((enc, index), tl) -> Node ((enc, index), add_list x tl)
+
+  and add_list (x : t) : t list -> t list = function
+    | [] -> [ x ]
+    | h :: tl -> add x h :: add_list x tl
+  ;;
+
   let eq (t1 : t) (t2 : t) : bool =
     let rec tree_eq (t1 : t) (t2 : t) : bool =
       match t1, t2 with
