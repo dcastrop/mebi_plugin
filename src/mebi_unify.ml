@@ -163,8 +163,30 @@ let constructor_args_to_string env sigma : constructor_args -> string = function
       ]
 ;;
 
+let debug_constructor_args p x : unit mm =
+  state (fun env sigma ->
+    let s : string = constructor_args_to_string env sigma x in
+    Log.debug (Printf.sprintf "%sconstructor_args:\n%s" (Utils.prefix p) s);
+    sigma, ())
+;;
+
 let constructor_args_list_to_string env sigma : constructor_args list -> string =
   Strfy.list ~force_newline:true (constructor_args_to_string env sigma)
+;;
+
+let debug_constructor_args_list p x : unit mm =
+  state (fun env sigma ->
+    let s : string = constructor_args_list_to_string env sigma x in
+    Log.debug (Printf.sprintf "%sconstructor_args list:\n%s" (Utils.prefix p) s);
+    sigma, ())
+;;
+
+let debug_expand_constructor_args_list d acc tl : unit mm =
+  let s : string = Enc.to_string d.lts_enc in
+  let p : string =
+    Printf.sprintf "expand (%s) %i / %i" s (List.length acc) (List.length tl)
+  in
+  debug_constructor_args_list p acc
 ;;
 
 let is_evar sigma : EConstr.t -> bool = EConstr.isEvar sigma
@@ -197,8 +219,11 @@ type split_evar =
 let rec expand_constructor_args_list (d : data) (acc : constructor_args list)
   : constructor_args list -> constructor_args list mm
   = function
-  | [] -> return acc
+  | [] ->
+    let* () = debug_expand_constructor_args_list d acc [] in
+    return acc
   | h :: t ->
+    let* () = debug_expand_constructor_args_list d acc t in
     let* refreshed : constructor_args list = update_constructor_args d h in
     expand_constructor_args_list d (List.append refreshed acc) t
 
