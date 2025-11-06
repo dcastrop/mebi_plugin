@@ -82,7 +82,6 @@ module IntEncoding : Mebi_enc.S = struct
   let compare : t -> t -> int = Int.compare
   let hash : t -> int = Int.hash
   let to_string : t -> string = Printf.sprintf "%i"
-  let of_int : int -> t = fun x -> x
 end
 
 module Enc = Mebi_enc.Make (IntEncoding)

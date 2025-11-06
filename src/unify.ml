@@ -147,12 +147,12 @@ let debug_buildconstrs_none act tgt acc : unit mm =
 
 type data =
   { ind_map : Mebi_ind.t F.t
-  ; lts_index : int (* ; mutable to_unify : unification_problem list list *)
+  ; lts_enc : Enc.t (* ; mutable to_unify : unification_problem list list *)
   }
 
-(* let debugstr_data ({ lts_index; to_unify; _ } : data) : string mm = *)
+(* let debugstr_data ({ lts_enc; to_unify; _ } : data) : string mm = *)
 let debugstr_data
-      ({ lts_index; _ } : data)
+      ({ lts_enc; _ } : data)
       (to_unify : unification_problem list list)
   : string mm
   =
@@ -162,8 +162,9 @@ let debugstr_data
        else *)
     debugstr_unification_problem_list_list to_unify
   in
+  let lts_str : string = Enc.to_string lts_enc in
   return
-    (Printf.sprintf "- lts_index: %i\n- to_unify:\n%s\n" lts_index to_unify_str)
+    (Printf.sprintf "- lts_enc: %s\n- to_unify:\n%s\n" lts_str to_unify_str)
 ;;
 
 let debug_data p (d : data) (to_unify : unification_problem list list) : unit mm
@@ -372,7 +373,7 @@ let sandbox_unify_all_opt
        if is_undefined then return None else return (Some (term, ctor_trees)))
 ;;
 
-(** [build_constrs (ctor_index,acc) act tgt (lts_index, ps)] is ...
+(** [build_constrs (ctor_index,acc) act tgt (lts_enc, ps)] is ...
     (* TODO: document *)
     @param (ctor_index,acc) is the constructor index (from 0).
     @param act is the action (label) that is leads to some [tgt] term.
@@ -385,10 +386,10 @@ let rec build_constrs
           ((constr_index, acc) : int * Mebi_constr.t list)
           (act : EConstr.t)
           (tgt : EConstr.t)
-  : int * unification_problem list list -> Mebi_constr.t list mm
+  : Enc.t * unification_problem list list -> Mebi_constr.t list mm
   = function
   | _, [] -> return acc
-  | lts_index, unif_probs :: unif_probs_list ->
+  | lts_enc, unif_probs :: unif_probs_list ->
     let* success = sandbox_unify_all_opt ~debug tgt unif_probs in
     (match success with
      | None ->
@@ -398,12 +399,12 @@ let rec build_constrs
          (constr_index, acc)
          act
          tgt
-         (lts_index, unif_probs_list)
+         (lts_enc, unif_probs_list)
      | Some (unified_tgt, ctor_trees) ->
        let* unified_tgt = econstr_normalize unified_tgt in
        let* act = econstr_normalize act in
        let open Mebi_constr.Tree in
-       let tree = Node ((Enc.of_int lts_index, constr_index), ctor_trees) in
+       let tree = Node ((lts_enc, constr_index), ctor_trees) in
        let ctor = act, unified_tgt, tree in
        let acc = ctor :: acc in
        let* () = debug_buildconstrs_some act tgt unified_tgt acc in
@@ -412,7 +413,7 @@ let rec build_constrs
          (constr_index, acc)
          act
          tgt
-         (lts_index, unif_probs_list))
+         (lts_enc, unif_probs_list))
 ;;
 
 (*****************************************************************************)
@@ -545,7 +546,7 @@ exception InductiveKindNotLTS of Mebi_ind.t
       if [fail_if_unrecognized_constructor] is set to true, otherwise returns [None].
     @raise InductiveKindNotLTS if [x] does not *)
 let get_ind_constrs_opt (x : EConstr.t) (d : data)
-  : ((int * Rocq_utils.ind_constrs) option * EConstr.t array) option mm
+  : ((Enc.t * Rocq_utils.ind_constrs) option * EConstr.t array) option mm
   =
   state (fun env sigma ->
     match EConstr.kind sigma x with
@@ -553,10 +554,10 @@ let get_ind_constrs_opt (x : EConstr.t) (d : data)
       (match F.find_opt d.ind_map name with
        | None -> handle_unrecognized_ctor_fn env sigma x name args
        | Some ind ->
-         let lts_index = ind.index in
+         let lts_enc = ind.index in
          (match ind.kind with
           | Mebi_ind.LTS l ->
-            sigma, Some (Some (lts_index, l.constr_transitions), args)
+            sigma, Some (Some (lts_enc, l.constr_transitions), args)
           | _ -> (* TODO: err *) raise (InductiveKindNotLTS ind)))
     | _ -> sigma, None)
 ;;
@@ -669,8 +670,8 @@ let debug_term p t : unit mm =
     sigma, ())
 ;;
 
-let make_constr_tree (constr_index : int) (lts_index : int) =
-  Mebi_constr.Tree.Node ((Enc.of_int lts_index, constr_index), [])
+let make_constr_tree (constr_index : int) (lts_enc : Enc.t) =
+  Mebi_constr.Tree.Node ((lts_enc, constr_index), [])
 ;;
 
 (** [collect_valid_constructors from_term constrs d] ...
@@ -755,14 +756,14 @@ and check_for_next_constructors
     let* () = debug_nextconstrs_none args in
     return acc
   (* NOTE: constructor applies without any further constructors *)
-  (* | Some { lts_index; to_unify = []; _ } ->
+  (* | Some { lts_enc; to_unify = []; _ } ->
     Log.debug "B1B";
     let* () = debug_nextconstrs_some_empty args in
     state (fun env sigma ->
       if EConstr.isEvar sigma tgt
       then sigma, acc
       else (
-        let constr_tree = make_constr_tree constr_index lts_index in
+        let constr_tree = make_constr_tree constr_index lts_enc in
         let constrs = (act, tgt, constr_tree) :: acc in
         sigma, constrs)) *)
   (* NOTE: constructor applies with some additional constructors *)
@@ -770,7 +771,7 @@ and check_for_next_constructors
     Log.debug "B1C";
     let* () = debug_nextconstrs_some_next args in
     let* () = (* NOTE: *) debug_args "collect_next_B" (lhs, act, tgt) in
-    build_constrs ~debug:true (constr_index, acc) act tgt (d.lts_index, to_unify)
+    build_constrs ~debug:true (constr_index, acc) act tgt (d.lts_enc, to_unify)
 
 (** [update_sigma d context]
     (* TODO: finish doc *)
@@ -800,12 +801,12 @@ and update_sigma (d : data) (to_unify : unification_problem list list)
        let* () = debug_updatesigma_some_args args in
        update_sigma d to_unify (substls, decls)
      (* NOTE: found applicable constructors [next_ind] for [t_subst]. *)
-     | Some (Some (next_lts_index, next_ind_constrs), args) ->
+     | Some (Some (next_lts_enc, next_ind_constrs), args) ->
        Log.debug "C2C";
        let* () = debug_updatesigma_some_pair args in
        collect_next_constructors
          (next_ind_constrs, args)
-         { d with lts_index = next_lts_index }
+         { d with lts_enc = next_lts_enc }
          to_unify)
   | _substl, _decls ->
     Log.debug "C3";
