@@ -7,7 +7,7 @@ exception ExitDevelopmentTest of unit
 
 let dev_stop () : unit = raise (ExitDevelopmentTest ())
 let dev_counter : int ref = ref 0
-let dev_stop_at : int = 2
+let dev_stop_at : int = 3
 
 let dev_checkin () : unit =
   dev_counter := !dev_counter + 1;
@@ -359,7 +359,9 @@ let mk_fresh_constructor_args
 *)
 let rec expand_constructor_args_list (d : data) (acc : constructor_args list)
   : constructor_args list -> constructor_args list mm
-  = function
+  =
+  Log.info "\n====================";
+  function
   | [] ->
     let* () = debug_expand_constructor_args_list d acc [] in
     return acc
@@ -374,7 +376,9 @@ let rec expand_constructor_args_list (d : data) (acc : constructor_args list)
 
 and update_constructor_args (d : data)
   : constructor_args -> constructor_args list mm
-  = function
+  =
+  Log.info "\n--------------------";
+  function
   | the_constructor_args ->
     let { decls; substl; _ } = the_constructor_args in
     (* TODO: see [update_sigma] and [get_ind_constrs_opt] *)
@@ -415,7 +419,9 @@ and split_constructor_args
       (next_constructors : Rocq_utils.ind_constrs)
       (next_args : EConstr.t array)
   : constructor_args -> (split_evar list * constructor_args list) mm
-  = function
+  =
+  Log.info "\n- - - - - - - - - -";
+  function
   | the_constructor_args ->
     (* let* () = debug_split_constructor_args d the_constructor_args [] in *)
     let { constructor; decls; substl; tree; lhs; act; rhs } =
@@ -439,6 +445,20 @@ and split_constructor_args
       else
         (* NOTE: some unresolved metavariables, indicating more to explore *)
         (* let* () = debug_constructor_args "fresh" fresh in *)
+        (* TODO: see [update_sigma] and [collect_next_constructors] *)
+        let$+ next_from_term _ sigma =
+          Reductionops.nf_evar sigma next_args.(0)
+        in
+        (* *)
+        (* *)
+        (* *)
+        (* TODO: here *)
+        (* *)
+        (* *)
+        (* *)
+        (* let* valid_constructors =
+           filter_valid_constructors next_from_term action_term [] constructors
+           in *)
         let* acc = expand_constructor_args_list d acc [ fresh ] in
         let* () = debug_constructor_args_list "split" acc in
         (* let () = dev_stop () in *)
