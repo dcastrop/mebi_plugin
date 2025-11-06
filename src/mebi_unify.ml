@@ -3,6 +3,10 @@ open Mebi_wrapper
 open Mebi_wrapper.Syntax
 (* open Mebi_unification *)
 
+exception ExitDevelopmentTest of unit
+
+let dev_stop () : unit = raise (ExitDevelopmentTest ())
+
 type data =
   { ind_map : Mebi_ind.t F.t
   ; lts_enc : Enc.t
@@ -113,7 +117,20 @@ let get_ind_constrs_opt (x : EConstr.t) (fmap : Mebi_ind.t F.t)
     match EConstr.kind sigma x with
     | App (name, args) ->
       (match F.find_opt fmap name with
-       | None -> (* TODO: err *) raise (ConstructorNameNotRecognized (x, name))
+       | None ->
+         Log.warning
+           (Printf.sprintf
+              "get_ind_constrs_opt, %s has unknown name: %s"
+              (Strfy.econstr env sigma x)
+              (Strfy.econstr env sigma name));
+         Log.debug
+           (Printf.sprintf
+              "fmap keys:\n%s"
+              (Strfy.list
+                 ~force_newline:true
+                 (Strfy.econstr env sigma)
+                 (List.of_seq (F.to_seq_keys fmap))));
+         (* TODO: err *) raise (ConstructorNameNotRecognized (x, name))
        | Some ind ->
          let lts_enc = ind.index in
          (match ind.kind with
@@ -137,56 +154,113 @@ type constructor_args =
   ; rhs : EConstr.t
   }
 
-let constructor_args_to_string env sigma : constructor_args -> string = function
+let constructor_args_to_string ?(indent : int = 0) env sigma
+  : constructor_args -> string
+  = function
   | { constructor; decls; substl; tree; lhs; act; rhs } ->
-    let lhs_str : string = Strfy.econstr env sigma lhs in
-    let act_str : string = Strfy.econstr env sigma act in
-    let rhs_str : string = Strfy.econstr env sigma rhs in
-    let tree_str : string = Strfy.constr_tree tree in
-    let f_decl_str = Strfy.econstr_rel_decl env sigma in
-    let decls_str : string = Strfy.list f_decl_str decls in
-    let substl_str : string =
-      Strfy.list ~force_newline:true (Strfy.econstr env sigma) substl
+    let indent' = indent + 1 in
+    let f = Strfy.tuple ~is_keyval:true ~indent Strfy.str Strfy.str in
+    let g = Strfy.econstr env sigma in
+    let h = Strfy.econstr_rel_decl env sigma in
+    let i = Strfy.list ~force_newline:true ~indent:indent' ~label:"decls" h in
+    let j = Strfy.list ~force_newline:true ~indent:indent' ~label:"substl" g in
+    let k =
+      Strfy.tuple
+        ~is_keyval:true
+        ~indent:indent'
+        Strfy.str
+        (Printf.sprintf "\n%s%s" (Strfy.str_tabs indent'))
     in
-    let constructor_str : string = Strfy.ind_constr env sigma constructor in
-    let f = Strfy.tuple ~is_keyval:true Strfy.str Strfy.str in
+    let l = Strfy.ind_constr ~indent env sigma in
     Strfy.list
       ~force_newline:true
-      f
-      [ "lhs", lhs_str
-      ; "act", act_str
-      ; "rhs", rhs_str
-      ; "tree", tree_str
-      ; "decls", decls_str
-      ; "substl", substl_str
-      ; "constructor", constructor_str
+      ~label:"constructor_args"
+      ~indent
+      ~use:("{", "}")
+      Strfy.str
+      [ k ("constructor", l constructor)
+      ; k ("decls", i decls)
+      ; k ("substl", j substl)
+      ; f ("lhs", g lhs)
+      ; f ("act", g act)
+      ; f ("rhs", g rhs)
+      ; f ("tree", Strfy.constr_tree tree)
       ]
 ;;
 
-let debug_constructor_args p x : unit mm =
+let debug_constructor_args ?(s : string = "constructor_args list") p x : unit mm
+  =
   state (fun env sigma ->
-    let s : string = constructor_args_to_string env sigma x in
-    Log.debug (Printf.sprintf "%sconstructor_args:\n%s" (Utils.prefix p) s);
+    let sx : string = constructor_args_to_string env sigma x in
+    Log.debug (Printf.sprintf "%s%s:\n%s\n" (Utils.prefix p) s sx);
     sigma, ())
 ;;
 
 let constructor_args_list_to_string env sigma : constructor_args list -> string =
-  Strfy.list ~force_newline:true (constructor_args_to_string env sigma)
+  Strfy.list
+    ~force_newline:true
+    (constructor_args_to_string ~indent:1 env sigma)
 ;;
 
-let debug_constructor_args_list p x : unit mm =
+let debug_constructor_args_list ?(s : string = "constructor_args list") p x
+  : unit mm
+  =
   state (fun env sigma ->
-    let s : string = constructor_args_list_to_string env sigma x in
-    Log.debug (Printf.sprintf "%sconstructor_args list:\n%s" (Utils.prefix p) s);
+    let sx : string = constructor_args_list_to_string env sigma x in
+    Log.debug (Printf.sprintf "%s%s:\n%s\n" (Utils.prefix p) s sx);
     sigma, ())
 ;;
 
 let debug_expand_constructor_args_list d acc tl : unit mm =
   let s : string = Enc.to_string d.lts_enc in
   let p : string =
-    Printf.sprintf "expand (%s) %i / %i" s (List.length acc) (List.length tl)
+    Printf.sprintf
+      "expand (lts enc: %s) / (list |%i|) / (acc |%i|)"
+      s
+      (List.length tl)
+      (List.length acc)
   in
-  debug_constructor_args_list p acc
+  let* t : string =
+    state (fun env sigma -> sigma, constructor_args_list_to_string env sigma tl)
+  in
+  let m : string =
+    Printf.sprintf "%sconstructor_args list:\n%s\n\n" (Utils.prefix p) t
+  in
+  debug_constructor_args_list ~s:"expand acc" m acc
+;;
+
+let debug_update_constructor_args d arg acc : unit mm =
+  let s : string = Enc.to_string d.lts_enc in
+  let p : string = Printf.sprintf "update (%s) #%i" s (List.length acc) in
+  debug_constructor_args p arg
+;;
+
+let debug_update_constructor_args_acc d arg acc : unit mm =
+  let s : string = Enc.to_string d.lts_enc in
+  let p : string = Printf.sprintf "update (%s)" s in
+  let* a : string =
+    state (fun env sigma -> sigma, constructor_args_to_string env sigma arg)
+  in
+  let m : string = Printf.sprintf "%sto update:\n%s\n\n" (Utils.prefix p) a in
+  debug_constructor_args_list ~s:"update acc" m acc
+;;
+
+let debug_split_constructor_args d arg acc : unit mm =
+  let s : string = Enc.to_string d.lts_enc in
+  let p : string = Printf.sprintf "split (%s) #%i" s (List.length acc) in
+  debug_constructor_args p arg
+;;
+
+let debug_split_constructor_args_acc d arg acc : unit mm =
+  let s : string = Enc.to_string d.lts_enc in
+  let p : string = Printf.sprintf "split (%s)" s in
+  let* a : string =
+    state (fun env sigma -> sigma, constructor_args_to_string env sigma arg)
+  in
+  let m : string =
+    Printf.sprintf "%sconstructor_args:\n%s\n\n" (Utils.prefix p) a
+  in
+  debug_constructor_args_list ~s:"split acc" m acc
 ;;
 
 let is_evar sigma : EConstr.t -> bool = EConstr.isEvar sigma
@@ -222,15 +296,16 @@ let rec expand_constructor_args_list (d : data) (acc : constructor_args list)
   | [] ->
     let* () = debug_expand_constructor_args_list d acc [] in
     return acc
-  | h :: t ->
-    let* () = debug_expand_constructor_args_list d acc t in
+  | h :: tl ->
+    let* () = debug_expand_constructor_args_list d acc (h :: tl) in
     let* refreshed : constructor_args list = update_constructor_args d h in
-    expand_constructor_args_list d (List.append refreshed acc) t
+    expand_constructor_args_list d (List.append refreshed acc) tl
 
 and update_constructor_args (d : data)
   : constructor_args -> constructor_args list mm
   = function
   | the_constructor_args ->
+    let* () = debug_update_constructor_args d the_constructor_args [] in
     let { decls; substl; _ } = the_constructor_args in
     (* TODO: make a map to keep track of the changed/split evars *)
     (* let change_map : EConstr.t F.t = F.create 0 in  *)
@@ -239,6 +314,9 @@ and update_constructor_args (d : data)
     let iter_body (i : int) (acc : constructor_args list)
       : constructor_args list mm
       =
+      (* let* () = debug_update_constructor_args d the_constructor_args acc in *)
+      let* () = debug_update_constructor_args_acc d the_constructor_args acc in
+      (* *)
       let decl : Rocq_utils.econstr_decl = List.nth decls i in
       let substl : EConstr.Vars.substl = List.drop i substl in
       let* premise : EConstr.t = subst_of_decl substl decl in
@@ -264,12 +342,19 @@ and update_constructor_args (d : data)
 and split_constructor_args (d : data) next_constructors next_args
   : constructor_args -> (split_evar list * constructor_args list) mm
   = function
-  | { constructor; decls; substl; tree; lhs; act; rhs } ->
+  | the_constructor_args ->
+    let* () = debug_split_constructor_args d the_constructor_args [] in
+    let { constructor; decls; substl; tree; lhs; act; rhs } =
+      the_constructor_args
+    in
     let iter_body
           (i : int)
           ((split_evars, acc) : split_evar list * constructor_args list)
       : (split_evar list * constructor_args list) mm
       =
+      (* let* () = debug_split_constructor_args d the_constructor_args acc in *)
+      let* () = debug_split_constructor_args_acc d the_constructor_args acc in
+      (* *)
       let* new_constructor_args =
         mk_constructor_args d.lts_enc i next_constructors.(i)
       in
@@ -323,10 +408,9 @@ let rec filter_valid_constructors
   = function
   | [] -> return acc
   | h :: t ->
+    let* acc = filter_valid_constructors lhs act acc t in
     let* constructor_applies : bool = does_constructor_apply lhs act h in
-    if constructor_applies
-    then filter_valid_constructors lhs act (h :: acc) t
-    else filter_valid_constructors lhs act acc t
+    if constructor_applies then return (h :: acc) else return acc
 ;;
 
 let explore_valid_constructors

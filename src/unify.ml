@@ -272,7 +272,7 @@ let debug_unifyerr env sigma a b c d =
   let f = Strfy.econstr env sigma in
   let s1 = Printf.sprintf "unify, failed:\n- a: %s\n- b: %s" (f a) (f b) in
   let s2 = Printf.sprintf "specifically, \"%s\" with: %s" (f c) (f d) in
-  Log.debug (Printf.sprintf "%s\n%s" s1 s2)
+  Log.debug (Printf.sprintf "%s\n%s\n" s1 s2)
 ;;
 
 (** [unify a b] tries to unify [a] and [b] within the context of the [env] and [sigma] of [mm]. @returns [true] if successful, [false] otherwise. *)
@@ -551,6 +551,18 @@ let get_ind_constrs_opt (x : EConstr.t) (d : data)
   state (fun env sigma ->
     match EConstr.kind sigma x with
     | App (name, args) ->
+      Log.warning
+        (Printf.sprintf
+           "get_ind_constrs_opt, %s has name: %s"
+           (Strfy.econstr env sigma x)
+           (Strfy.econstr env sigma name));
+      Log.debug
+        (Printf.sprintf
+           "fmap keys:\n%s"
+           (Strfy.list
+              ~force_newline:true
+              (Strfy.econstr env sigma)
+              (List.of_seq (F.to_seq_keys d.ind_map))));
       (match F.find_opt d.ind_map name with
        | None -> handle_unrecognized_ctor_fn env sigma x name args
        | Some ind ->
