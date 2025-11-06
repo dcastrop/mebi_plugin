@@ -57,6 +57,14 @@ type constructor_args = {
   rhs : Evd.econstr;
 }
 
+val is_evar : Evd.evar_map -> Evd.econstr -> bool
+val lhs_is_evar : Evd.evar_map -> constructor_args -> bool
+val act_is_evar : Evd.evar_map -> constructor_args -> bool
+val rhs_is_evar : Evd.evar_map -> constructor_args -> bool
+
+val is_constructor_args_axiom :
+  constructor_args -> bool Mebi_wrapper.mm
+
 val constructor_args_to_string :
   ?indent:int ->
   Environ.env ->
@@ -106,10 +114,16 @@ val debug_split_constructor_args_acc :
   constructor_args list ->
   unit Mebi_wrapper.mm
 
-val is_evar : Evd.evar_map -> Evd.econstr -> bool
-val lhs_is_evar : Evd.evar_map -> constructor_args -> bool
-val act_is_evar : Evd.evar_map -> constructor_args -> bool
-val rhs_is_evar : Evd.evar_map -> constructor_args -> bool
+val unify : Evd.econstr -> Evd.econstr -> bool Mebi_wrapper.mm
+
+val unify_opt :
+  Evd.econstr option -> Evd.econstr -> bool Mebi_wrapper.mm
+
+val does_constructor_apply :
+  Evd.econstr ->
+  Evd.econstr option ->
+  constructor_args ->
+  bool Mebi_wrapper.mm
 
 val mk_constructor_args :
   Mebi_setup.Enc.t ->
@@ -118,6 +132,15 @@ val mk_constructor_args :
   constructor_args Mebi_wrapper.mm
 
 type split_evar = { old : Evd.econstr; fresh : Evd.econstr }
+
+val split_evar : Evd.econstr -> Evd.econstr -> split_evar
+
+val mk_fresh_constructor_args :
+  constructor_args ->
+  data ->
+  int ->
+  Rocq_utils.ind_constr ->
+  constructor_args Mebi_wrapper.mm
 
 val expand_constructor_args_list :
   data ->
@@ -141,17 +164,6 @@ val mk_init_constructor_args_list :
   Mebi_setup.Enc.t ->
   Rocq_utils.ind_constrs ->
   constructor_args list Mebi_wrapper.mm
-
-val unify : Evd.econstr -> Evd.econstr -> bool Mebi_wrapper.mm
-
-val unify_opt :
-  Evd.econstr option -> Evd.econstr -> bool Mebi_wrapper.mm
-
-val does_constructor_apply :
-  Evd.econstr ->
-  Evd.econstr option ->
-  constructor_args ->
-  bool Mebi_wrapper.mm
 
 val filter_valid_constructors :
   Evd.econstr ->
