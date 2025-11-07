@@ -279,7 +279,7 @@ module MkGraph
     let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
     let lts_enc : Enc.t = primary.index in
     let _f = _get_new_constrs_OLD in
-    let _f = _get_new_constrs_NEW in
+    (* let _f = _get_new_constrs_NEW in *)
     let* new_constrs =
       _f from_term primary_constr_transitions { ind_map; lts_enc }
     in
