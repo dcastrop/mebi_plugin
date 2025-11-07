@@ -172,6 +172,21 @@ let is_constructor_args_axiom : constructor_args -> bool mm = function
       sigma, lhs && act && rhs)
 ;;
 
+(** represents a sequence of constructor applications *)
+type constructor_datatree = constructor_args Mebi_constr.Tree.tree
+
+let mk_constructor_datatree (x : constructor_args) : constructor_datatree =
+  Mebi_constr.Tree.Node (x, [])
+;;
+
+(** maps a list of [constructor_args] to a list of [constructor_datatree], where each element becomes the root-node of it's own tree.
+*)
+let mk_constructor_datatree_list (xs : constructor_args list)
+  : constructor_datatree list
+  =
+  List.map mk_constructor_datatree xs
+;;
+
 let constructor_args_to_string ?(indent : int = 0) env sigma
   : constructor_args -> string
   = function
@@ -205,6 +220,13 @@ let constructor_args_to_string ?(indent : int = 0) env sigma
       ; f ("tree", Strfy.constr_tree tree)
       ]
 ;;
+
+(* let debug_datatree p (x : constructor_datatree) : unit mm =
+   state (fun env sigma ->
+   let sx : string = Strfy.econstr env sigma x in
+   Log.debug (Printf.sprintf "%s%s" (Utils.prefix p) sx);
+   sigma, ())
+   ;; *)
 
 let debug_constructor_args ?(s : string = "constructor_args") p x : unit mm =
   state (fun env sigma ->
@@ -355,6 +377,36 @@ let mk_fresh_constructor_args
   return fresh
 ;;
 
+let debugstr_constructor_args_lts : constructor_args -> string mm = function
+  | { lhs; act; rhs; _ } ->
+    state (fun env sigma ->
+      let f = Strfy.econstr env sigma in
+      let s =
+        Printf.sprintf "- lhs: %s\n- act: %s\n- rhs: %s" (f lhs) (f act) (f rhs)
+      in
+      sigma, s)
+;;
+
+let handle_acc (d : data) (acc : constructor_args list) (h : constructor_args)
+  : constructor_args list -> constructor_args list mm
+  = function
+  | [] ->
+    (* let acc' = h :: acc in *)
+    let* hlts : string = debugstr_constructor_args_lts h in
+    Log.debug
+      (Printf.sprintf "refreshed yielded empty for (dropping):\n%s" hlts);
+    return acc
+  | refreshed ->
+    let acc' = List.append acc refreshed in
+    let* hlts : string = debugstr_constructor_args_lts h in
+    let* rstr : string =
+      state (fun env sigma ->
+        sigma, constructor_args_list_to_string env sigma refreshed)
+    in
+    Log.debug (Printf.sprintf "for:\n%s\nrefreshed yielded some:\n%s" hlts rstr);
+    return acc'
+;;
+
 (** [expand_constructor_args_list d acc constructor_args_list] recursively calls [update_constructor_args d] for each [constructor_args] in [constructor_args_list], effectively replacing the original with a list of new [constructor_args]. For any returned, any [evars] have been refreshed and replaced to ensure that each valid trace of constructors that can be applied after this point do not interefere with each other.
 *)
 let rec expand_constructor_args_list (d : data) (acc : constructor_args list)
@@ -368,11 +420,9 @@ let rec expand_constructor_args_list (d : data) (acc : constructor_args list)
   | h :: tl ->
     let* () = debug_expand_constructor_args_list d acc (h :: tl) in
     let* refreshed : constructor_args list = update_constructor_args d h in
-    let () = dev_checkin () in
-    (match refreshed with
-     | [] -> expand_constructor_args_list d (h :: acc) tl
-     | _ -> expand_constructor_args_list d (List.append refreshed acc) tl)
-(* expand_constructor_args_list d (List.append refreshed acc) tl *)
+    let* acc : constructor_args list = handle_acc d acc h refreshed in
+    let () = (* ! *) dev_checkin () in
+    expand_constructor_args_list d acc tl
 
 and update_constructor_args (d : data)
   : constructor_args -> constructor_args list mm
@@ -394,7 +444,7 @@ and update_constructor_args (d : data)
       match constrs_opt with
       (* NOTE: no other constructors to apply for [premise] *)
       | None ->
-        Log.debug "no constructors apply for premise";
+        Log.debug "no additional constructors apply for premise";
         (* TODO: check if this has any evars? if yes then we need to create a new one ??? *)
         return acc
       (* NOTE: found applicable constructor for [premise] *)
@@ -467,6 +517,8 @@ and split_constructor_args
     iterate 0 (List.length decls - 1) ([], []) iter_body
 ;;
 
+(******************************************************************************)
+
 let mk_init_constructor_args_list
       (lts_enc : Enc.t)
       (raw_constructors : Rocq_utils.ind_constrs)
@@ -484,8 +536,6 @@ let mk_init_constructor_args_list
   iterate 0 (Array.length raw_constructors - 1) [] iter_body
 ;;
 
-(******************************************************************************)
-
 let rec filter_valid_constructors
           (lhs : EConstr.t)
           (act : EConstr.t option)
@@ -499,6 +549,81 @@ let rec filter_valid_constructors
     if constructor_applies then return (h :: acc) else return acc
 ;;
 
+exception DataTreeLeavesExpectedEmpty of unit
+
+let rec expand_constructor_datatrees
+          (d : data)
+          (acc : constructor_datatree list)
+  : constructor_datatree list -> constructor_datatree list mm
+  = function
+  | [] ->
+    Log.info "\n.....................";
+    return acc
+  | h :: tl ->
+    Log.info "\n=====================";
+    let* h' = expand_constructor_datatree d h in
+    expand_constructor_datatrees d (h' :: acc) tl
+
+and expand_constructor_datatree (d : data)
+  : constructor_datatree -> constructor_datatree mm
+  =
+  let open Mebi_constr.Tree in
+  function
+  | Node (the_constructor_args, []) ->
+    Log.info "\n---------------------";
+    sandbox
+      (let decls = the_constructor_args.decls
+       and substl = the_constructor_args.substl in
+       let* treelist = sandbox_constructor_datatree d [] (substl, decls) in
+       return (Node (the_constructor_args, treelist)))
+  | Node (the_constructor_args, the_next_constructor_args) ->
+    raise (DataTreeLeavesExpectedEmpty ())
+
+and sandbox_constructor_datatree (d : data) (acc : constructor_datatree list)
+  :  EConstr.Vars.substl * Rocq_utils.econstr_decls
+  -> constructor_datatree list mm
+  = function
+  | [], [] ->
+    Log.info "\n. . . . . . . . . . .";
+    return acc
+  | _ :: substls, decl :: decls ->
+    Log.info "\n- - - - - - - - - - -";
+    let* acc =
+      sandbox
+        (let* subst : EConstr.t = subst_of_decl substls decl in
+         let* sigma = get_sigma in
+         match EConstr.kind sigma subst with
+         | App (name, args) ->
+           (match F.find_opt d.ind_map name with
+            | None ->
+              (* TODO: err *) raise (ConstructorNameNotRecognized (subst, name))
+            | Some ind ->
+              (match ind.kind with
+               | Mebi_ind.LTS l ->
+                 let$+ next_from_term _ sigma =
+                   Reductionops.nf_evar sigma args.(0)
+                 in
+                 let* constructors =
+                   mk_init_constructor_args_list ind.index l.constr_transitions
+                 in
+                 let* valid_constructors =
+                   filter_valid_constructors
+                     next_from_term
+                     (Some args.(1))
+                     []
+                     constructors
+                 in
+                 let datatree_constructors : constructor_datatree list =
+                   mk_constructor_datatree_list valid_constructors
+                 in
+                 expand_constructor_datatrees d acc datatree_constructors
+               | _ -> (* TODO: err *) raise (InductiveKindNotLTS ind)))
+         | _ -> return acc)
+    in
+    sandbox_constructor_datatree d acc (substls, decls)
+  | _substl, _decls -> (* TODO: err *) invalid_check_updated_ctx _substl _decls
+;;
+
 let explore_valid_constructors
       (d : data)
       (from_term : EConstr.t)
@@ -509,9 +634,12 @@ let explore_valid_constructors
   let* valid_constructors =
     filter_valid_constructors from_term action_term [] constructors
   in
+  let datatree_constructors : constructor_datatree list =
+    mk_constructor_datatree_list valid_constructors
+  in
   (* NOTE: then for each valid constructor, "split" into fresh constructor_args for the next constructor to be applied -- recursively do this until we have fully explored all possible constructors, for all reachable terms [from_term] *)
-  let* fully_expanded_constructors =
-    expand_constructor_args_list d [] valid_constructors
+  let* fully_expanded_constructors : constructor_datatree list =
+    expand_constructor_datatrees d [] datatree_constructors
     (* NOTE: we sandbox them individually since otherwise when we "unsandbox" everything and start going through the valid constructors, then they're going to share the same evars and start unifying beyond their scope again. *)
   in
   (* NOTE: next, group each of the [refreshed_constructors] by the first constructor to be applied, and iteratively descend (depth-first) -- agressively culling any that fail sandbox-unification (sandboxed-with their peers), and continue recursively descending until nothing to do *)
