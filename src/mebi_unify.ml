@@ -19,8 +19,15 @@ let constructor_args (args : EConstr.t array) : constructor_args =
 
 (** creates unification problems between the rhs of the current constructor and the lhs of the next.
 *)
+
+let map_constr_to_problem args : Mebi_constr.t -> Problem.t = function
+  | _act, lhs, tree ->
+    (* TODO: store the current [args.rhs] and [sigma] elsewhere, replacing the [args.rhs] with a fresh evar *)
+    (lhs, args.rhs), tree
+;;
+
 let map_problems args : Constructors.t -> Problems.t =
-  List.map (fun ((_act, lhs, tree) : Mebi_constr.t) -> (lhs, args.rhs), tree)
+  List.map (map_constr_to_problem args)
 ;;
 
 let cross_product acc problems =
