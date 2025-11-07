@@ -20,10 +20,31 @@ let constructor_args (args : EConstr.t array) : constructor_args =
 (** creates unification problems between the rhs of the current constructor and the lhs of the next.
 *)
 
-let map_constr_to_problem args : Mebi_constr.t -> Problem.t = function
+type store =
+  { problem : Problem.t
+  ; cache : cache
+  }
+
+and cache =
+  { sigma : Evd.evar_map
+  ; term : EConstr.t
+  }
+
+let map_constr_to_problem args : Mebi_constr.t -> store mm = function
   | _act, lhs, tree ->
     (* TODO: store the current [args.rhs] and [sigma] elsewhere, replacing the [args.rhs] with a fresh evar *)
-    (lhs, args.rhs), tree
+    let* sigma = get_sigma in
+    let cache : cache = { sigma; term = args.rhs } in
+    let$ fresh env sigma = Evarutil.new_evar env sigma args.rhs in
+    let problem : Problem.t = (lhs, fresh), tree in
+    let store : store = { problem; cache } in
+    return store
+;;
+
+(* ! see above ! *)
+
+let map_constr_to_problem args : Mebi_constr.t -> Problem.t = function
+  | _act, lhs, tree -> (lhs, args.rhs), tree
 ;;
 
 let map_problems args : Constructors.t -> Problems.t =
@@ -68,9 +89,7 @@ let mk_ctx_subst
   : EConstr.t mm
   =
   let* subst = subst_of_decl substl x in
-  let* env = get_env in
-  let* sigma = get_sigma in
-  let$ vt _ _ = Evarutil.new_evar env sigma subst in
+  let$ vt env sigma = Evarutil.new_evar env sigma subst in
   return vt
 ;;
 
