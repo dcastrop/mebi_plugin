@@ -646,7 +646,7 @@ let get_ind_constrs_opt (x : EConstr.t) (d : data)
       (match F.find_opt d.ind_map name with
        | None -> handle_unrecognized_ctor_fn env sigma x name args
        | Some ind ->
-         let lts_enc = ind.index in
+         let lts_enc = ind.enc in
          (match ind.kind with
           | Mebi_ind.LTS l ->
             sigma, Some (Some (lts_enc, l.constr_transitions), args)

@@ -252,19 +252,28 @@ module MkGraph
       @raise CannotFindTypeOfTermToVisit
         if none of the constructors provided in [lts_ind_def_map] yield constructors from [check_valid_constructors].
   *)
-  let _get_new_constrs_OLD from_term primary_constr_transitions data
+  let _get_new_constrs_OLD from_term primary_constr_transitions ind_map lts_enc
     : Mebi_constr.t list mm
     =
-    Unify.collect_valid_constructors from_term primary_constr_transitions data
-  ;;
-
-  let _get_new_constrs_NEW from_term primary_constr_transitions data
-    : Mebi_constr.t list mm
-    =
-    Mebi_unify.collect_valid_constructors
-      data
+    Unify.collect_valid_constructors
       from_term
       primary_constr_transitions
+      { ind_map; lts_enc }
+  ;;
+
+  let _get_new_constrs_NEW from_term primary_constr_transitions ind_map lts_enc
+    : Mebi_constr.t list mm
+    =
+    (* Mebi_unify.collect_valid_constructors
+       data
+       from_term
+       primary_constr_transitions *)
+    Mebi_unify.check_valid_constructors
+      primary_constr_transitions
+      ind_map
+      from_term
+      None
+      lts_enc
   ;;
 
   let get_new_constrs
@@ -277,11 +286,11 @@ module MkGraph
     let* from_term : EConstr.t = decode from in
     let* ind_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
     let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
-    let lts_enc : Enc.t = primary.index in
+    let lts_enc : Enc.t = primary.enc in
     let _f = _get_new_constrs_OLD in
     (* let _f = _get_new_constrs_NEW in *)
     let* new_constrs =
-      _f from_term primary_constr_transitions { ind_map; lts_enc }
+      _f from_term primary_constr_transitions ind_map lts_enc
     in
     (* let new_constrs = get_new_constrs_NEW in *)
     let* () = debug_new_constrs new_constrs in

@@ -14,7 +14,7 @@ type info =
   }
 
 type t =
-  { index : Mebi_setup.Enc.t
+  { enc : Mebi_setup.Enc.t
   ; info : info
   ; kind : kind
   }

@@ -112,7 +112,7 @@ let get_ind_lts (i : Enc.t) (gref : Names.GlobRef.t) : Mebi_ind.t mm =
     let lts_term = EConstr.mkIndU (ind, EConstr.EInstance.make univ) in
     let open Mebi_ind in
     return
-      { index = i
+      { enc = i
       ; info = { name = lts_term; constr_names = mip.mind_consnames }
       ; kind =
           LTS
