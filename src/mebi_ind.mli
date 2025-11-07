@@ -11,7 +11,7 @@ type info = {
   constr_names : Names.variable array;
 }
 
-type t = { index : Mebi_setup.Enc.t; info : info; kind : kind }
+type t = { enc : Mebi_setup.Enc.t; info : info; kind : kind }
 
 val get_lts_trm_type : t -> Evd.econstr Mebi_wrapper.mm
 
