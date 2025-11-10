@@ -1,7 +1,10 @@
-(* open Logging *)
+open Logging
+open Debug
 open Mebi_wrapper
 open Mebi_wrapper.Syntax
 open Mebi_unification
+
+let show_unification_debug : bool = true
 
 type constructor_args =
   { lhs : EConstr.t
@@ -14,41 +17,32 @@ exception ConstructorArgsExpectsArraySize3 of unit
 let constructor_args (args : EConstr.t array) : constructor_args =
   if Int.equal (Array.length args) 3
   then { lhs = args.(0); act = args.(1); rhs = args.(2) }
-  else raise (ConstructorArgsExpectsArraySize3 ())
+  else raise (*TODO:err*) (ConstructorArgsExpectsArraySize3 ())
+;;
+
+(** [a] may be re-freshed *)
+let map_constr_to_pair (a : EConstr.t) (b : EConstr.t) : Pair.t mm =
+  state (fun env sigma ->
+    if EConstr.isEvar sigma a
+    then sigma, Pair.fresh env sigma a b
+    else sigma, Pair.normal a b)
 ;;
 
 (** creates unification problems between the rhs of the current constructor and the lhs of the next.
 *)
-
-type store =
-  { problem : Problem.t
-  ; cache : cache
-  }
-
-and cache =
-  { sigma : Evd.evar_map
-  ; term : EConstr.t
-  }
-
-let map_constr_to_problem args : Mebi_constr.t -> store mm = function
+let map_constr_to_problem args : Mebi_constr.t -> Problem.t mm = function
   | _act, lhs, tree ->
-    (* TODO: store the current [args.rhs] and [sigma] elsewhere, replacing the [args.rhs] with a fresh evar *)
-    let* sigma = get_sigma in
-    let cache : cache = { sigma; term = args.rhs } in
-    let$ fresh env sigma = Evarutil.new_evar env sigma args.rhs in
-    let problem : Problem.t = (lhs, fresh), tree in
-    let store : store = { problem; cache } in
-    return store
+    let* pair : Pair.t = map_constr_to_pair args.rhs lhs in
+    return (pair, tree)
 ;;
 
-(* ! see above ! *)
-
-let map_constr_to_problem args : Mebi_constr.t -> Problem.t = function
-  | _act, lhs, tree -> (lhs, args.rhs), tree
-;;
-
-let map_problems args : Constructors.t -> Problems.t =
-  List.map (map_constr_to_problem args)
+let map_problems args (constructors : Constructors.t) : Problems.t mm =
+  let iter_body (i : int) (acc : Problems.t) : Problems.t mm =
+    let constructor : Mebi_constr.t = List.nth constructors i in
+    let* problem : Problem.t = map_constr_to_problem args constructor in
+    return (problem :: acc)
+  in
+  iterate 0 (List.length constructors - 1) [] iter_body
 ;;
 
 let cross_product acc problems =
@@ -58,16 +52,16 @@ let cross_product acc problems =
 ;;
 
 let try_unify_constructor_args
-      ?(debug : bool = false)
+      ?(debug : bool = show_unification_debug)
       (lhs : EConstr.t)
       (act : EConstr.t option)
       (args : constructor_args)
   : bool mm
   =
   let f : Pair.t -> bool mm = Pair.unify ~debug in
-  let* lhs_unifies : bool = f (lhs, args.lhs) in
+  let* lhs_unifies : bool = f (Pair.normal args.lhs lhs) in
   if lhs_unifies
-  then Option.cata (fun act -> f (act, args.act)) (return true) act
+  then Option.cata (fun act -> f (Pair.normal args.act act)) (return true) act
   else return false
 ;;
 
@@ -109,6 +103,17 @@ let rec mk_ctx_substl (acc : EConstr.Vars.substl)
     mk_ctx_substl (vt :: acc) ts
 ;;
 
+let debug_extract_args name : constructor_args -> unit mm = function
+  | { lhs; act; rhs } ->
+    state (fun env sigma ->
+      let name : string = Strfy.constr env sigma name in
+      let f = Strfy.econstr env sigma in
+      let m = Printf.sprintf "%s : %s  %s  %s" name (f lhs) (f act) (f rhs) in
+      Log.notice "\n";
+      Log.debug m;
+      sigma, ())
+;;
+
 (** [extract_args ?substl term] returns an [EConstr.t] triple of arguments of an inductively defined LTS, e.g., [term -> option action -> term -> Prop].
     @param ?substl
       is a list of substitutions applied to the terms prior to being returned.
@@ -124,7 +129,9 @@ let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
     then (
       let args = EConstr.of_constr_array args in
       let args = Array.map (EConstr.Vars.substl substl) args in
-      return (constructor_args args))
+      let args = constructor_args args in
+      let* () = debug_extract_args _name args in
+      return args)
     else (* TODO: err *) invalid_lts_args_length (Array.length args)
   | _ -> (* TODO: err *) invalid_lts_term_kind term
 ;;
@@ -148,19 +155,24 @@ let rec check_valid_constructors
     let* args : constructor_args = extract_args ~substl tm in
     let* success = try_unify_constructor_args from_term act_term args in
     if success
-    then
+    then (
+      let () = Scope.start "cvc" () in
       let* act : EConstr.t = Mebi_utils.econstr_normalize args.act in
       let tgt_term : EConstr.t = EConstr.Vars.substl substl args.rhs in
       let* next_constructors : (Enc.t * Problems.t list) option =
         check_updated_ctx lts_enc [ [] ] indmap (substl, decls)
       in
-      check_for_next_constructors
-        i
-        indmap
-        act
-        tgt_term
-        constructors
-        next_constructors
+      let* constructors =
+        check_for_next_constructors
+          i
+          indmap
+          act
+          tgt_term
+          constructors
+          next_constructors
+      in
+      let () = Scope.close "cvc" () in
+      return constructors)
     else return constructors
   in
   iterate 0 (Array.length transitions - 1) [] iter_body
@@ -172,19 +184,32 @@ and check_for_next_constructors
       (tgt_term : EConstr.t)
       (constructors : Constructors.t)
   : (Enc.t * Problems.t list) option -> Constructors.t mm
-  = function
-  | None -> return constructors
+  =
+  let () = Scope.start "cnc" () in
+  function
+  | None ->
+    let () = Scope.close "cnc:None" () in
+    return constructors
   | Some next_params ->
     let next_lts_enc, next_problems = next_params in
     (match next_problems with
      | [] ->
        let* sigma = get_sigma in
        if EConstr.isEvar sigma tgt_term
-       then return constructors
+       then (
+         let () = Scope.close "cnc:Some [] (tgt is Evar)" () in
+         return constructors)
        else (
          let tree = Mebi_constr.Tree.Node ((next_lts_enc, i), []) in
-         return ((act, tgt_term, tree) :: constructors))
-     | _ -> Constructors.retrieve i constructors act tgt_term next_params)
+         let constructors = (act, tgt_term, tree) :: constructors in
+         let () = Scope.close "cnc:Some [] (tgt not Evar)" () in
+         return constructors)
+     | _ ->
+       let* constructors =
+         Constructors.retrieve i constructors act tgt_term next_params
+       in
+       let () = Scope.close "cnc:Some [...]" () in
+       return constructors)
 
 (* Should return a list of unification problems *)
 and check_updated_ctx
@@ -193,8 +218,12 @@ and check_updated_ctx
       (indmap : Mebi_ind.t F.t)
   :  EConstr.Vars.substl * EConstr.rel_declaration list
   -> (Enc.t * Problems.t list) option mm
-  = function
-  | [], [] -> return (Some (lts_enc, acc))
+  =
+  let () = Scope.start "upd_ctx" () in
+  function
+  | [], [] ->
+    let () = Scope.close "upd_ctx:RET" () in
+    return (Some (lts_enc, acc))
   | _hsubstl :: substl, t :: tl ->
     let$+ upd_t env sigma =
       EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
@@ -205,7 +234,9 @@ and check_updated_ctx
      | App (name, args) ->
        (match F.find_opt indmap name with
         | None ->
-          (* TODO: err *) raise (ConstructorNameNotRecognized (upd_t, name))
+          (* (* TODO: err *) raise (ConstructorNameNotRecognized (upd_t, name)) *)
+          let () = Scope.close "upd_ctx:Name Not Recognized" () in
+          check_updated_ctx lts_enc acc indmap (substl, tl)
         | Some c ->
           let args = constructor_args args in
           let$+ nextT env sigma = Reductionops.nf_evar sigma args.lhs in
@@ -214,12 +245,19 @@ and check_updated_ctx
             check_valid_constructors next_lts indmap nextT (Some args.act) c.enc
           in
           (match next_constructors with
-           | [] -> return None
+           | [] ->
+             let () = Scope.close "upd_ctx:Next []" () in
+             return None
            | next_constructors ->
-             let problems : Problems.t = map_problems args next_constructors in
+             let* problems : Problems.t = map_problems args next_constructors in
              let acc : Problems.t list = cross_product acc problems in
-             check_updated_ctx lts_enc acc indmap (substl, tl)))
-     | _ -> check_updated_ctx lts_enc acc indmap (substl, tl))
+             let* acc = check_updated_ctx lts_enc acc indmap (substl, tl) in
+             let () = Scope.close "upd_ctx:Next [...]" () in
+             return acc))
+     | _ ->
+       let* acc = check_updated_ctx lts_enc acc indmap (substl, tl) in
+       let () = Scope.close "upd_ctx:Not App" () in
+       return acc)
   | _substl, _ctxl -> invalid_check_updated_ctx _substl _ctxl
 ;;
 (* ! Impossible ! *)

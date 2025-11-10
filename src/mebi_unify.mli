@@ -1,17 +1,27 @@
 type constructor_args = {
-  lhs : EConstr.t;
-  act : EConstr.t;
-  rhs : EConstr.t;
+  lhs : Evd.econstr;
+  act : Evd.econstr;
+  rhs : Evd.econstr;
 }
 
 exception ConstructorArgsExpectsArraySize3 of unit
 
-val constructor_args : EConstr.t array -> constructor_args
+val constructor_args : Evd.econstr array -> constructor_args
+
+val map_constr_to_pair :
+  Evd.econstr ->
+  Evd.econstr ->
+  Mebi_unification.Pair.t Mebi_wrapper.mm
+
+val map_constr_to_problem :
+  constructor_args ->
+  Mebi_constr.t ->
+  Mebi_unification.Problem.t Mebi_wrapper.mm
 
 val map_problems :
   constructor_args ->
   Mebi_unification.Constructors.t ->
-  Mebi_unification.Problems.t
+  Mebi_unification.Problems.t Mebi_wrapper.mm
 
 val cross_product :
   Mebi_unification.Problems.t list ->
@@ -20,24 +30,24 @@ val cross_product :
 
 val try_unify_constructor_args :
   ?debug:bool ->
-  EConstr.t ->
-  EConstr.t option ->
+  Evd.econstr ->
+  Evd.econstr option ->
   constructor_args ->
   bool Mebi_wrapper.mm
 
 val subst_of_decl :
   EConstr.Vars.substl ->
-  ('a, EConstr.t, 'b) Context.Rel.Declaration.pt ->
-  EConstr.t Mebi_wrapper.mm
+  ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt ->
+  Evd.econstr Mebi_wrapper.mm
 
 val mk_ctx_subst :
   EConstr.Vars.substl ->
-  ('a, EConstr.t, 'b) Context.Rel.Declaration.pt ->
-  EConstr.t Mebi_wrapper.mm
+  ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt ->
+  Evd.econstr Mebi_wrapper.mm
 
 val mk_ctx_substl :
   EConstr.Vars.substl ->
-  ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list ->
+  ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list ->
   EConstr.Vars.substl Mebi_wrapper.mm
 
 val extract_args :
@@ -46,31 +56,29 @@ val extract_args :
   constructor_args Mebi_wrapper.mm
 
 exception
-  ConstructorNameNotRecognized of (EConstr.t * EConstr.t)
+  ConstructorNameNotRecognized of (Evd.econstr * Evd.econstr)
 
 val check_valid_constructors :
   Rocq_utils.ind_constrs ->
   Mebi_ind.t Mebi_wrapper.F.t ->
-  EConstr.t ->
-  EConstr.t option ->
-  Mebi_wrapper.Enc.t ->
+  Evd.econstr ->
+  Evd.econstr option ->
+  Mebi_setup.Enc.t ->
   Mebi_unification.Constructors.t Mebi_wrapper.mm
 
 val check_for_next_constructors :
   int ->
   Mebi_ind.t Mebi_wrapper.F.t ->
-  EConstr.t ->
-  EConstr.t ->
+  Evd.econstr ->
+  Evd.econstr ->
   Mebi_unification.Constructors.t ->
-  (Mebi_wrapper.Enc.t * Mebi_unification.Problems.t list)
-  option ->
+  (Mebi_setup.Enc.t * Mebi_unification.Problems.t list) option ->
   Mebi_unification.Constructors.t Mebi_wrapper.mm
 
 val check_updated_ctx :
-  Mebi_wrapper.Enc.t ->
+  Mebi_setup.Enc.t ->
   Mebi_unification.Problems.t list ->
   Mebi_ind.t Mebi_wrapper.F.t ->
   EConstr.Vars.substl * Rocq_utils.econstr_decls ->
-  (Mebi_wrapper.Enc.t * Mebi_unification.Problems.t list)
-  option
+  (Mebi_setup.Enc.t * Mebi_unification.Problems.t list) option
   Mebi_wrapper.mm
