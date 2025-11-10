@@ -24,6 +24,7 @@
   rocq_utils
   rocq_convert
   logging
+  debug
   mebi_enc
   mebi_setup
   strfy
