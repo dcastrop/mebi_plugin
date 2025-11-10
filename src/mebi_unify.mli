@@ -1,12 +1,10 @@
-type constructor_args = {
-  lhs : Evd.econstr;
-  act : Evd.econstr;
-  rhs : Evd.econstr;
-}
+val show_unification_debug : bool
+val show_extractargs_debug : bool
 
 exception ConstructorArgsExpectsArraySize3 of unit
 
-val constructor_args : Evd.econstr array -> constructor_args
+val constructor_args :
+  Evd.econstr array -> Mebi_unification.constructor_args
 
 val map_constr_to_pair :
   Evd.econstr ->
@@ -14,12 +12,12 @@ val map_constr_to_pair :
   Mebi_unification.Pair.t Mebi_wrapper.mm
 
 val map_constr_to_problem :
-  constructor_args ->
+  Mebi_unification.constructor_args ->
   Mebi_constr.t ->
   Mebi_unification.Problem.t Mebi_wrapper.mm
 
 val map_problems :
-  constructor_args ->
+  Mebi_unification.constructor_args ->
   Mebi_unification.Constructors.t ->
   Mebi_unification.Problems.t Mebi_wrapper.mm
 
@@ -32,7 +30,7 @@ val try_unify_constructor_args :
   ?debug:bool ->
   Evd.econstr ->
   Evd.econstr option ->
-  constructor_args ->
+  Mebi_unification.constructor_args ->
   bool Mebi_wrapper.mm
 
 val subst_of_decl :
@@ -50,10 +48,15 @@ val mk_ctx_substl :
   ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list ->
   EConstr.Vars.substl Mebi_wrapper.mm
 
+val debug_extract_args :
+  Constr.t ->
+  Mebi_unification.constructor_args ->
+  unit Mebi_wrapper.mm
+
 val extract_args :
   ?substl:EConstr.Vars.substl ->
   Constr.t ->
-  constructor_args Mebi_wrapper.mm
+  Mebi_unification.constructor_args Mebi_wrapper.mm
 
 exception
   ConstructorNameNotRecognized of (Evd.econstr * Evd.econstr)

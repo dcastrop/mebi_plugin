@@ -1,6 +1,20 @@
+val default_debug : bool
+val debugerr : bool
+
+type constructor_args = {
+  lhs : Evd.econstr;
+  act : Evd.econstr;
+  rhs : Evd.econstr;
+}
+
 module Constructor_arg : sig
   type t = Normal of Evd.econstr | Fresh of fresh
-  and fresh = { sigma : Evd.evar_map; term : Evd.econstr }
+
+  and fresh = {
+    sigma : Evd.evar_map;
+    term : Evd.econstr;
+    original : Evd.econstr;
+  }
 
   val to_string : Environ.env -> Evd.evar_map -> t -> string
 end
@@ -10,6 +24,15 @@ module Pair : sig
 
   val normal : Evd.econstr -> Evd.econstr -> t
 
+  val _debug_fresh :
+    Environ.env ->
+    'a ->
+    Evd.evar_map ->
+    Evd.econstr ->
+    Evd.econstr ->
+    Evd.econstr ->
+    unit
+
   val fresh :
     Environ.env ->
     Evd.evar_map ->
@@ -17,7 +40,9 @@ module Pair : sig
     Evd.econstr ->
     t
 
-  val to_string : Environ.env -> Evd.evar_map -> t -> string
+  val to_string :
+    ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
+
   val debug_unify : Environ.env -> Evd.evar_map -> t -> unit
 
   val debug_unifyerr :
@@ -37,7 +62,8 @@ end
 module Problem : sig
   type t = Pair.t * Mebi_constr.Tree.t
 
-  val to_string : Environ.env -> Evd.evar_map -> t -> string
+  val to_string :
+    ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
 
   val unify_opt :
     ?debug:bool ->
@@ -48,7 +74,15 @@ end
 module Problems : sig
   type t = Problem.t list
 
-  val to_string : Environ.env -> Evd.evar_map -> t -> string
+  val to_string :
+    ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
+
+  val list_to_string :
+    ?indent:int ->
+    Environ.env ->
+    Evd.evar_map ->
+    t list ->
+    string
 
   val unify_opt :
     ?debug:bool ->
