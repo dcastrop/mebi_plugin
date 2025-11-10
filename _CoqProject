@@ -58,6 +58,8 @@ src/utils.ml
 src/utils.mli
 src/logging.ml
 src/logging.mli
+src/debug.ml
+src/debug.mli
 
 src/rocq_utils.ml
 src/rocq_utils.mli
