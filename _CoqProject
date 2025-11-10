@@ -111,6 +111,8 @@ src/unify.ml
 src/unify.mli
 src/mebi_unification.ml
 src/mebi_unification.mli
+src/mebi_debug.ml
+src/mebi_debug.mli
 src/mebi_unify.ml
 src/mebi_unify.mli
 src/command.ml

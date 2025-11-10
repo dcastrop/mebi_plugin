@@ -80,6 +80,8 @@ let rec str_tabs ?(size : int = default_indent_val) (n : int) : string =
   else ""
 ;;
 
+let infix : string -> string = function "" -> "" | p -> Printf.sprintf "%s" p
+
 let prefix : string -> string = function
   | "" -> ""
   | p -> Printf.sprintf "%s, " p
@@ -104,19 +106,21 @@ let get_key_of_val (tbl : ('a, 'b) Hashtbl.t) (v : 'b) : 'a option =
 
 (** [new_int_counter] returns a function that when called, will return the value of a counter and then increment it by 1, starting from 0.
 *)
-let new_int_counter ?(start : int = 0) () : (unit -> int) * (unit -> int) =
+let new_int_counter ?(start : int = 0) ()
+  : ((unit -> int) * (unit -> int)) * int ref
+  =
   let id_counter : int ref = ref start in
   let get_and_incr_counter () : int =
-    let to_return = !id_counter in
-    id_counter := to_return + 1;
-    to_return
-  in
-  let get_and_decr_counter () : int =
-    let to_return = !id_counter - 1 in
+    let to_return : int = !id_counter + 1 in
     id_counter := to_return;
     to_return
   in
-  get_and_incr_counter, get_and_decr_counter
+  let get_and_decr_counter () : int =
+    let to_return : int = !id_counter in
+    id_counter := to_return - 1;
+    to_return
+  in
+  (get_and_incr_counter, get_and_decr_counter), id_counter
 ;;
 
 let list_of_constr_kinds : Constr.t -> (string * bool) list =
