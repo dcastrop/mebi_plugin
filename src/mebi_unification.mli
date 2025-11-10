@@ -1,11 +1,35 @@
-module Pair : sig
-  type t = Evd.econstr * Evd.econstr
+module Constructor_arg : sig
+  type t = Normal of Evd.econstr | Fresh of fresh
+  and fresh = { sigma : Evd.evar_map; term : Evd.econstr }
 
   val to_string : Environ.env -> Evd.evar_map -> t -> string
-  val debug_unify : ('a -> string) -> 'a -> 'a -> unit
+end
+
+module Pair : sig
+  type t = { a : Constructor_arg.t; b : Evd.econstr }
+
+  val normal : Evd.econstr -> Evd.econstr -> t
+
+  val fresh :
+    Environ.env ->
+    Evd.evar_map ->
+    Evd.econstr ->
+    Evd.econstr ->
+    t
+
+  val to_string : Environ.env -> Evd.evar_map -> t -> string
+  val debug_unify : Environ.env -> Evd.evar_map -> t -> unit
 
   val debug_unifyerr :
-    ('a -> string) -> 'a -> 'a -> 'a -> 'a -> unit
+    Environ.env ->
+    Evd.evar_map ->
+    t ->
+    Evd.econstr ->
+    Evd.econstr ->
+    unit
+
+  val w_unify :
+    Environ.env -> Evd.evar_map -> t -> Evd.evar_map
 
   val unify : ?debug:bool -> t -> bool Mebi_wrapper.mm
 end
@@ -32,18 +56,15 @@ module Problems : sig
     Mebi_constr.Tree.t list option Mebi_wrapper.mm
 end
 
-module Constructor : sig
-  type t = Evd.econstr * Mebi_constr.Tree.t list
+module Constructors : sig
+  type t = Mebi_constr.t list
+  type r = Evd.econstr * Mebi_constr.Tree.t list
 
   val sandbox_unify_all_opt :
     ?debug:bool ->
     Evd.econstr ->
     Problems.t ->
-    t option Mebi_wrapper.mm
-end
-
-module Constructors : sig
-  type t = Mebi_constr.t list
+    r option Mebi_wrapper.mm
 
   val retrieve :
     ?debug:bool ->
@@ -51,6 +72,6 @@ module Constructors : sig
     Mebi_constr.t list ->
     Evd.econstr ->
     Evd.econstr ->
-    Mebi_wrapper.Enc.t * Problems.t list ->
-    Mebi_constr.t list Mebi_wrapper.mm
+    Mebi_setup.Enc.t * Problems.t list ->
+    t Mebi_wrapper.mm
 end
