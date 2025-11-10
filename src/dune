@@ -43,6 +43,7 @@
   ; dump_to_file
   mebi_help
   mebi_unification
+  mebi_debug
   mebi_unify
   unify
   command

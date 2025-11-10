@@ -1,10 +1,37 @@
 module Scope : sig
   val default_show_debug_scope : bool
   val show_debug_scope : bool ref
-  val scope_counter : int ref
-  val the_counter_funs : ((unit -> int) * (unit -> int)) ref
-  val incr : unit -> int
-  val decr : unit -> int
-  val start : string -> unit -> unit
-  val close : string -> unit -> unit
+
+  val msg :
+    ?prefix:string ->
+    ?infix:string ->
+    ?suffix:string ->
+    ?info:string option ->
+    int ->
+    string ->
+    unit
+
+  val return :
+    ?prefix:string ->
+    ?infix:string ->
+    ?suffix:string ->
+    ?info:string option ->
+    unit ->
+    unit
+
+  val start :
+    ?prefix:string ->
+    ?infix:string ->
+    ?suffix:string ->
+    ?info:string option ->
+    unit ->
+    unit
+
+  val close :
+    ?prefix:string ->
+    ?infix:string ->
+    ?suffix:string ->
+    ?info:string option ->
+    unit ->
+    unit
 end
