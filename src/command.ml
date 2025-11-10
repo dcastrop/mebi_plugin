@@ -287,6 +287,7 @@ module MkGraph
     let* ind_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
     let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
     let lts_enc : Enc.t = primary.enc in
+    Log.notice "\n=/=/=/=/=/=/=/=/=/=/=/=/=/=";
     let _f = _get_new_constrs_OLD in
     let _f = _get_new_constrs_NEW in
     let* new_constrs =
