@@ -16,7 +16,7 @@ type unification_problem = unification_pair * Mebi_constr.Tree.t
 let debugstr_unification_pair ((a, b) : unification_pair) : string mm =
   sandbox
     (state (fun env sigma ->
-       let f : EConstr.t -> string = Strfy.econstr env sigma in
+       let f : EConstr.t -> string = Rocq_utils.Strfy.econstr env sigma in
        sigma, Printf.sprintf "(%s, %s)" (f a) (f b)))
 ;;
 
@@ -44,7 +44,7 @@ let debugstr_unification_problem_list (ps : unification_problem list)
     return (s :: acc)
   in
   let* sl : string list = iterate 0 (List.length ps - 1) [] iter_body in
-  return (Strfy.list ~force_newline:true ~indent:1 Strfy.str sl)
+  return (Utils.Strfy.list ~force_newline:true ~indent:1 Utils.Strfy.str sl)
 ;;
 
 let debug_unification_problem_list
@@ -66,7 +66,7 @@ let debugstr_unification_problem_list_list
     return (s :: acc)
   in
   let* sl : string list = iterate 0 (List.length ps - 1) [] iter_body in
-  return (Strfy.list ~force_newline:true Strfy.str sl)
+  return (Utils.Strfy.list ~force_newline:true Utils.Strfy.str sl)
 ;;
 
 let debug_unification_problem_list_list
@@ -80,20 +80,20 @@ let debug_unification_problem_list_list
 ;;
 
 let debugstr_mebiconstrs env sigma (cs : Mebi_constr.t list) : string =
-  let f = Strfy.econstr env sigma in
-  Strfy.list
+  let f = Rocq_utils.Strfy.econstr env sigma in
+  Utils.Strfy.list
     ~force_newline:true
     ~indent:2
     (fun (action, dest, tree) ->
-      Strfy.list
+      Utils.Strfy.list
         ~force_newline:true
         ~indent:1
-        Strfy.str
-        [ Strfy.tuple ~is_keyval:true Strfy.str f ("action", action)
-        ; Strfy.tuple ~is_keyval:true Strfy.str f ("dest", dest)
-        ; Strfy.tuple
+        Utils.Strfy.str
+        [ Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str f ("action", action)
+        ; Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str f ("dest", dest)
+        ; Utils.Strfy.tuple
             ~is_keyval:true
-            Strfy.str
+            Utils.Strfy.str
             Mebi_constr.Tree.to_string
             ("tree", tree)
         ])
@@ -112,13 +112,13 @@ let debug_mebiconstrs p (acc : Mebi_constr.t list) : unit mm =
 
 let debug_buildconstrs_some act tgt unified_tgt acc : unit mm =
   state (fun env sigma ->
-    let f = Strfy.econstr env sigma in
+    let f = Rocq_utils.Strfy.econstr env sigma in
     Log.debug
       (Printf.sprintf
          "build_constrs:\n%s"
-         (Strfy.list
+         (Utils.Strfy.list
             ~force_newline:true
-            (Strfy.tuple ~is_keyval:true Strfy.str Strfy.str)
+            (Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str Utils.Strfy.str)
             [ "act", f act
             ; "tgt", f tgt
             ; "unified_tgt", f unified_tgt
@@ -129,13 +129,13 @@ let debug_buildconstrs_some act tgt unified_tgt acc : unit mm =
 
 let debug_buildconstrs_none act tgt acc : unit mm =
   state (fun env sigma ->
-    let f = Strfy.econstr env sigma in
+    let f = Rocq_utils.Strfy.econstr env sigma in
     Log.debug
       (Printf.sprintf
          "build_constrs:\n%s"
-         (Strfy.list
+         (Utils.Strfy.list
             ~force_newline:true
-            (Strfy.tuple ~is_keyval:true Strfy.str Strfy.str)
+            (Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str Utils.Strfy.str)
             [ "act", f act
             ; "tgt", f tgt
             ; "acc", debugstr_mebiconstrs env sigma acc
@@ -159,19 +159,19 @@ let debug_update_unification_problems next_problems to_unify new_to_unify
 ;;
 
 let debug_unify env sigma a b =
-  let f = Strfy.econstr env sigma in
+  let f = Rocq_utils.Strfy.econstr env sigma in
   Log.debug (Printf.sprintf "unify, unified:\n- a: %s\n- b: %s\n" (f a) (f b))
 ;;
 
 let debug_unifyerr env sigma a b c d =
-  let f = Strfy.econstr env sigma in
+  let f = Rocq_utils.Strfy.econstr env sigma in
   let s1 = Printf.sprintf "unify, failed:\n- a: %s\n- b: %s" (f a) (f b) in
   let s2 = Printf.sprintf "specifically, \"%s\" with: %s" (f c) (f d) in
   Log.debug (Printf.sprintf "%s\n%s\n" s1 s2)
 ;;
 
 let debugstr_substl env sigma (xs : EConstr.Vars.substl) : string =
-  Strfy.list ~force_newline:true (Strfy.econstr env sigma) xs
+  Utils.Strfy.list ~force_newline:true (Rocq_utils.Strfy.econstr env sigma) xs
 ;;
 
 let debug_substl p (xs : EConstr.Vars.substl) : unit mm =
@@ -185,7 +185,10 @@ let debug_substl p (xs : EConstr.Vars.substl) : unit mm =
 ;;
 
 let debugstr_decls env sigma (xs : Rocq_utils.econstr_decls) : string =
-  Strfy.list ~force_newline:true (Strfy.econstr_rel_decl env sigma) xs
+  Utils.Strfy.list
+    ~force_newline:true
+    (Rocq_utils.Strfy.econstr_rel_decl env sigma)
+    xs
 ;;
 
 let debug_decls p (xs : Rocq_utils.econstr_decls) : unit mm =
@@ -247,11 +250,11 @@ let debug_args
   : unit mm
   =
   state (fun env sigma ->
-    let f : EConstr.t -> string = Strfy.econstr env sigma in
+    let f : EConstr.t -> string = Rocq_utils.Strfy.econstr env sigma in
     let arg_str : string =
-      Strfy.list
+      Utils.Strfy.list
         ~force_newline:true
-        (Strfy.tuple ~is_keyval:true Strfy.str f)
+        (Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str f)
         [ "lhs", lhs_term; "act", act_term; "rhs", rhs_term ]
     in
     Log.debug (Printf.sprintf "%sargs:\n%s" (Utils.prefix p) arg_str);
@@ -281,7 +284,7 @@ let debug_nextconstrs_some_next args : unit mm =
 
 let debug_updatesigma_none t_subst : unit mm =
   state (fun env sigma ->
-    let t_str : string = Strfy.econstr env sigma t_subst in
+    let t_str : string = Rocq_utils.Strfy.econstr env sigma t_subst in
     Log.debug
       (Printf.sprintf "update_sigma, t_subst is not an application:\n%s" t_str);
     sigma, ())
@@ -302,7 +305,10 @@ let debug_updatesigma_some_pair args : unit mm =
 let debug_term p t : unit mm =
   state (fun env sigma ->
     Log.debug
-      (Printf.sprintf "%sterm: %s" (Utils.prefix p) (Strfy.econstr env sigma t));
+      (Printf.sprintf
+         "%sterm: %s"
+         (Utils.prefix p)
+         (Rocq_utils.Strfy.econstr env sigma t));
     sigma, ())
 ;;
 
@@ -610,7 +616,7 @@ let handle_unrecognized_ctor_fn env sigma x name args =
     Log.warning
       (Printf.sprintf
          "unrecognized constructor: %s"
-         (Strfy.econstr env sigma name));
+         (Rocq_utils.Strfy.econstr env sigma name));
     sigma, Some (None, args))
 ;;
 
@@ -634,14 +640,14 @@ let get_ind_constrs_opt (x : EConstr.t) (d : data)
       Log.warning
         (Printf.sprintf
            "get_ind_constrs_opt, %s has name: %s"
-           (Strfy.econstr env sigma x)
-           (Strfy.econstr env sigma name));
+           (Rocq_utils.Strfy.econstr env sigma x)
+           (Rocq_utils.Strfy.econstr env sigma name));
       Log.debug
         (Printf.sprintf
            "fmap keys:\n%s"
-           (Strfy.list
+           (Utils.Strfy.list
               ~force_newline:true
-              (Strfy.econstr env sigma)
+              (Rocq_utils.Strfy.econstr env sigma)
               (List.of_seq (F.to_seq_keys d.ind_map))));
       (match F.find_opt d.ind_map name with
        | None -> handle_unrecognized_ctor_fn env sigma x name args

@@ -169,3 +169,88 @@ let list_of_econstr_kinds sigma : EConstr.t -> (string * bool) list =
   ; "Var", EConstr.isVar sigma x
   ]
 ;;
+
+module Strfy = struct
+  (* new line sep *)
+  let nlsep ?(force_newline : bool = false) ?(indent : int = 0) () : string =
+    if force_newline then Printf.sprintf "\n%s" (str_tabs indent) else ""
+  ;;
+
+  (**********************************)
+  (****** OCAML *********************)
+  (**********************************)
+
+  let list
+        ?(force_newline : bool = false)
+        ?(label : string = "List")
+        ?(indent : int = 0)
+        ?(use : string * string = "[", "]")
+        (strfy : 'a -> string)
+    : 'a list -> string
+    = function
+    | [] ->
+      let lhs, rhs = use in
+      Printf.sprintf "%s %s (%s empty)" lhs rhs label
+    | h :: [] ->
+      let lhs, rhs = use in
+      let sep = nlsep ~force_newline ~indent () in
+      let suffix =
+        if use = ("[", "]") then Printf.sprintf "(%s: 1)" label else ""
+      in
+      Printf.sprintf "%s %s %s%s %s" lhs (strfy h) sep rhs suffix
+    | h :: t ->
+      let lhs, rhs = use in
+      let sep = nlsep ~force_newline ~indent () in
+      let len = List.length t + 1 in
+      let suffix =
+        if use = ("[", "]") then Printf.sprintf "(%s: %i)" label len else ""
+      in
+      let lstr =
+        List.fold_left
+          (fun (acc : string) (e : 'a) ->
+            Printf.sprintf "%s%s; %s" acc sep (strfy e))
+          (strfy h)
+          t
+      in
+      Printf.sprintf "%s %s %s%s %s" lhs lstr sep rhs suffix
+  ;;
+
+  let array
+        ?(force_newline : bool = false)
+        ?(label : string = "List")
+        ?(indent : int = 0)
+        ?(use : string * string = "[", "]")
+        (strfy : 'a -> string)
+        (arr : 'a array)
+    : string
+    =
+    list ~force_newline ~label ~indent ~use strfy (Array.to_list arr)
+  ;;
+
+  let str : string -> string = fun (x : string) -> x
+  let int : int -> string = fun (x : int) -> Printf.sprintf "%i" x
+  let bool : bool -> string = fun (x : bool) -> Printf.sprintf "%b" x
+
+  let option (f : 'a -> string) : 'a option -> string = function
+    | None -> "None"
+    | Some x -> Printf.sprintf "Some %s" (f x)
+  ;;
+
+  let tuple
+        ?(force_newline : bool = false)
+        ?(is_keyval : bool = false)
+        ?(indent : int = 0)
+        (f : 'a -> string)
+        (g : 'b -> string)
+    : 'a * 'b -> string
+    =
+    fun ((a, b) : 'a * 'b) ->
+    let sep, con, lhs, rhs =
+      match force_newline, is_keyval with
+      | true, false -> nlsep ~force_newline:true ~indent (), ",", "( ", ")"
+      | _, false -> nlsep ~force_newline ~indent (), ",", "( ", " )"
+      | _, true -> nlsep ~force_newline ~indent (), ":", "", ""
+    in
+    Printf.sprintf "%s%s%s%s %s%s%s" lhs (f a) sep con (g b) sep rhs
+  ;;
+end

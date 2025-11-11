@@ -16,9 +16,46 @@ val get_key_of_val : ('a, 'b) Hashtbl.t -> 'b -> 'a option
 val new_int_counter :
   ?start:int ->
   unit ->
-  ((unit -> int) * (unit -> int)) * (int ref)
+  ((unit -> int) * (unit -> int)) * int ref
 
 val list_of_constr_kinds : Constr.t -> (string * bool) list
 
 val list_of_econstr_kinds :
-  Evd.evar_map -> EConstr.t -> (string * bool) list
+  Evd.evar_map -> Evd.econstr -> (string * bool) list
+
+module Strfy : sig
+  val nlsep :
+    ?force_newline:bool -> ?indent:int -> unit -> string
+
+  val list :
+    ?force_newline:bool ->
+    ?label:string ->
+    ?indent:int ->
+    ?use:string * string ->
+    ('a -> string) ->
+    'a list ->
+    string
+
+  val array :
+    ?force_newline:bool ->
+    ?label:string ->
+    ?indent:int ->
+    ?use:string * string ->
+    ('a -> string) ->
+    'a array ->
+    string
+
+  val str : string -> string
+  val int : int -> string
+  val bool : bool -> string
+  val option : ('a -> string) -> 'a option -> string
+
+  val tuple :
+    ?force_newline:bool ->
+    ?is_keyval:bool ->
+    ?indent:int ->
+    ('a -> string) ->
+    ('b -> string) ->
+    'a * 'b ->
+    string
+end

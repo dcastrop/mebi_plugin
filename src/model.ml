@@ -9,7 +9,7 @@ module Info = struct
         "(%s => %s, [%s])"
         (Mebi_setup.Enc.to_string enc)
         dec
-        (* (match names with [] -> "" | nh :: nt -> Strfy.list Strfy.str nt) *)
+        (* (match names with [] -> "" | nh :: nt -> Utils.Strfy.list Utils.Strfy.str nt) *)
         "TODO: move Model.Info.Coq.to_string to Strfy"
     ;;
   end
@@ -78,15 +78,15 @@ module Info = struct
       sep
       i.num_edges
       sep
-      (* (Strfy.option
-         (Strfy.list (fun (c_info : Coq.t) -> Coq.to_string c_info))
+      (* (Utils.Strfy.option
+         (Utils.Strfy.list (fun (c_info : Coq.t) -> Coq.to_string c_info))
          i.coq_info) *)
       "TODO: move Model.Info.to_string to Strfy"
       sep
       "TODO: move Model.Info.to_string to Strfy"
       (* (match i.weak_info with
          | None -> "None"
-         | Some ws -> Strfy.list Strfy.str ws) *)
+         | Some ws -> Utils.Strfy.list Utils.Strfy.str ws) *)
       outer
   ;;
 
@@ -176,7 +176,7 @@ module Action = struct
     let from_opt (t : t option) = match t with None -> None | Some t -> Some t
 
     let to_string (m : t) : string =
-      (* Strfy.list ~label:"MetaData" Strfy.str m *)
+      (* Utils.Strfy.list ~label:"MetaData" Utils.Strfy.str m *)
       (* "TODO: move Model.Action.MetaData.to_string to Strfy" *)
       match m with
       | [] -> "(No MetaData)"
@@ -261,7 +261,7 @@ module Action = struct
     Printf.sprintf "(%s, %s)" (State.to_string (fst p)) (to_string (snd p))
 
   and annotation_to_string (anno : annotation) : string =
-    (* Strfy.list annotation_pair_to_string anno *)
+    (* Utils.Strfy.list annotation_pair_to_string anno *)
     (* "TODO: move Model.Action.annotation_to_string to Strfy" *)
     if List.is_empty anno
     then "[ ] (empty)"
@@ -275,7 +275,7 @@ module Action = struct
            (List.tl anno))
 
   and annotations_to_string (annos : annotations) : string =
-    (* Strfy.list annotation_to_string annos *)
+    (* Utils.Strfy.list annotation_to_string annos *)
     (* "TODO: move Model.Action.annotations_to_string to Strfy" *)
     if List.is_empty annos
     then "[ ] (empty)"

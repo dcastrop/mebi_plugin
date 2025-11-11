@@ -92,7 +92,7 @@ let add_goal (g : Proofview.Goal.t) : unit =
    (* Log.debug
    (Printf.sprintf
    "mebi_tactics.update_goals, adding: %s"
-   (Strfy.goal g)); *)
+   (Rocq_utils.Strfy.goal g)); *)
    add_goal g;
    acc)))
    (Proofview.tclUNIT ())
@@ -122,10 +122,10 @@ let add_goal (g : Proofview.Goal.t) : unit =
    (Printf.sprintf
    "mebi_tactics.pstr_the_goals (%i)"
    (Hashtbl.length !the_goals));
-   Strfy.list
+   Utils.Strfy.list
    ~force_newline:true
    ~label:"Goals"
-   (Strfy.tuple ~force_newline:true ~indent:1 Strfy.int Strfy.goal)
+   (Utils.Strfy.tuple ~force_newline:true ~indent:1 Utils.Strfy.int Rocq_utils.Strfy.goal)
    (List.of_seq (Hashtbl.to_seq !the_goals))
    ;; *)
 
@@ -138,9 +138,9 @@ let goal_test () : unit Proofview.tactic =
     let env1 : Environ.env = Proofview.Goal.env gl in
     let sigma1 : Evd.evar_map = Proofview.Goal.sigma gl in
     let goal : Evar.t = Proofview.Goal.goal gl in
-    let goalstr : string = Strfy.evar' env1 sigma1 goal in
+    let goalstr : string = Rocq_utils.Strfy.evar' env1 sigma1 goal in
     let concl : EConstr.constr = Proofview.Goal.concl gl in
-    let concl1str : string = Strfy.econstr env1 sigma1 concl in
+    let concl1str : string = Rocq_utils.Strfy.econstr env1 sigma1 concl in
     Log.debug
       (Printf.sprintf
          "mebi_tactics.goal_test (%s) concl is App\n- %s\n- %s"
@@ -150,9 +150,9 @@ let goal_test () : unit Proofview.tactic =
           | App (econstr, econstr_arr) ->
             Printf.sprintf
               "%s => %s"
-              (Strfy.econstr env1 sigma1 econstr)
-              (Strfy.list
-                 (Strfy.econstr env1 sigma1)
+              (Rocq_utils.Strfy.econstr env1 sigma1 econstr)
+              (Utils.Strfy.list
+                 (Rocq_utils.Strfy.econstr env1 sigma1)
                  (Array.to_list econstr_arr))
           | _ -> "(Err: Not kind App)"));
     let hyps : EConstr.named_context = Proofview.Goal.hyps gl in
@@ -160,8 +160,8 @@ let goal_test () : unit Proofview.tactic =
       (Printf.sprintf
          "mebi_tactics.goal_test (%s) hyps, evars of named context: %s"
          goalstr
-         (Strfy.list
-            Strfy.evar
+         (Utils.Strfy.list
+            Rocq_utils.Strfy.evar
             (Evar.Set.to_list (Evd.evars_of_named_context sigma1 hyps))));
     List.iter
       (fun (hyp :
@@ -181,11 +181,13 @@ let goal_test () : unit Proofview.tactic =
           | AtomicType (ty, ty_arr) ->
             Printf.sprintf
               "%s => %s"
-              (Strfy.econstr env1 sigma1 ty)
-              (Strfy.list (Strfy.econstr env1 sigma1) (Array.to_list ty_arr))
+              (Rocq_utils.Strfy.econstr env1 sigma1 ty)
+              (Utils.Strfy.list
+                 (Rocq_utils.Strfy.econstr env1 sigma1)
+                 (Array.to_list ty_arr))
           | _ -> "(Err: Not kind AtomicType)"
         in
-        (* Strfy.list (Strfy.evar) (Evar.Set.to_list (Evd.evars_of_named_context sigma1 hyps)) *)
+        (* Utils.Strfy.list (Strfy.evar) (Evar.Set.to_list (Evd.evars_of_named_context sigma1 hyps)) *)
         Log.debug
           (Printf.sprintf
              "mebi_tactics.goal_test (%s) hyp is %s"
@@ -203,7 +205,7 @@ let goal_test () : unit Proofview.tactic =
                   name_str
                   rel_bool
                   tys_str
-                  (Strfy.econstr env1 sigma1 econstr))))
+                  (Rocq_utils.Strfy.econstr env1 sigma1 econstr))))
       hyps;
     Proofview.tclUNIT ())
 ;;

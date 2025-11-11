@@ -107,8 +107,6 @@ src/params.mli
 src/mebi_help.ml
 src/mebi_help.mli
 
-src/unify.ml
-src/unify.mli
 src/mebi_unification.ml
 src/mebi_unification.mli
 src/mebi_debug.ml

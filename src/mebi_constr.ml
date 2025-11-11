@@ -63,7 +63,7 @@ module Tree = struct
          | 0 -> ""
          | 1 -> to_string (List.hd rhs_int_tree_list)
          | _ ->
-           (* Strfy.list pstr rhs_int_tree_list *)
+           (* Utils.Strfy.list pstr rhs_int_tree_list *)
            List.fold_left
              (fun (acc : string) (rhs_int_tree : t) ->
                Printf.sprintf "%s, %s" acc (to_string rhs_int_tree))
@@ -79,3 +79,23 @@ end
     - [EConstr.t] destination
     - [Mebi_constr.Tree.t] coq-constructor index *)
 type t = EConstr.t * EConstr.t * Tree.t
+
+let to_string ?(indent : int = 0) env sigma : t -> string = function
+  | action, destination, tree ->
+    let action : string = Rocq_utils.Strfy.econstr env sigma action in
+    let destination : string = Rocq_utils.Strfy.econstr env sigma destination in
+    let tree : string = Tree.to_string tree in
+    let f =
+      Utils.Strfy.tuple
+        ~is_keyval:true
+        ~indent:(indent + 1)
+        Utils.Strfy.str
+        Utils.Strfy.str
+    in
+    Utils.Strfy.list
+      ~force_newline:true
+      ~indent
+      ~use:("{", "}")
+      f
+      [ "action", action; "destination", destination; "tree", tree ]
+;;

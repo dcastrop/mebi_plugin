@@ -4,7 +4,7 @@ open Mebi_wrapper
 open Mebi_wrapper.Syntax
 open Mebi_unification
 
-let show_unification_debug : bool = true
+let show_unification_debug : bool = false
 let show_extractargs_debug : bool = false
 
 (****************************************************************************)
@@ -19,10 +19,7 @@ let constructor_args (args : EConstr.t array) : constructor_args =
 
 (** [a] may be re-freshed *)
 let map_constr_to_pair (a : EConstr.t) (b : EConstr.t) : Pair.t mm =
-  state (fun env sigma ->
-    if EConstr.isEvar sigma a
-    then sigma, Pair.fresh env sigma a b
-    else sigma, Pair.normal a b)
+  state (fun env sigma -> sigma, Pair.make env sigma a b)
 ;;
 
 (** creates unification problems between the rhs of the current constructor and the lhs of the next.
@@ -106,8 +103,8 @@ let debug_extract_args name : constructor_args -> unit mm = function
     state (fun env sigma ->
       if show_extractargs_debug
       then (
-        let name : string = Strfy.constr env sigma name in
-        let f = Strfy.econstr env sigma in
+        let name : string = Rocq_utils.Strfy.constr env sigma name in
+        let f = Rocq_utils.Strfy.econstr env sigma in
         let m = Printf.sprintf "%s : %s  %s  %s" name (f lhs) (f act) (f rhs) in
         let () = Debug.Scope.return ~infix:"extract args" ~info:(Some m) () in
         sigma, ())
@@ -150,75 +147,65 @@ let rec check_valid_constructors
   let* from_term : EConstr.t = Mebi_utils.econstr_normalize from_term in
   let* () = debug_validconstrs_start from_term in
   let iter_body (i : int) (constructors : Constructors.t) =
-    let* () = debug_validconstrs_iter_start () in
+    let* () = debug_validconstrs_iter_start constructors in
     let (ctx, tm) : Constr.rel_context * Constr.t = transitions.(i) in
     let decls : Rocq_utils.econstr_decls = List.map EConstr.of_rel_decl ctx in
     let* substl = mk_ctx_substl [] (List.rev decls) in
     let* args : constructor_args = extract_args ~substl tm in
     let* success = try_unify_constructor_args from_term act_term args in
     if success
-    then (
-      let* () = debug_validconstrs_iter_success_start from_term act_term args in
-      let* act : EConstr.t = Mebi_utils.econstr_normalize args.act in
-      let tgt_term : EConstr.t = EConstr.Vars.substl substl args.rhs in
-      let* next_constructors : (Enc.t * Problems.t list) option =
-        check_updated_ctx lts_enc [ [] ] indmap (substl, decls)
-      in
-      let* constructors =
-        check_for_next_constructors
-          i
+    then
+      let* constructors : Constructors.t =
+        explore_valid_constructor
           indmap
-          act
-          tgt_term
-          constructors
-          next_constructors
+          from_term
+          act_term
+          lts_enc
+          args
+          (i, constructors)
+          (substl, decls)
       in
-      Logging.Log.debug
-        (Printf.sprintf "V constructors: %i" (List.length constructors));
-      let* () = debug_validconstrs_iter_success_close from_term act_term args in
-      return constructors)
+      let* () = debug_validconstrs_iter_close constructors in
+      return constructors
     else
-      let* () = debug_validconstrs_iter_close () in
+      let* () = debug_validconstrs_iter_close constructors in
       return constructors
   in
   let* constructors = iterate 0 (Array.length transitions - 1) [] iter_body in
   let* () = debug_validconstrs_close from_term constructors in
   return constructors
 
-and check_for_next_constructors
-      (i : int)
+(** *)
+and explore_valid_constructor
       (indmap : Mebi_ind.t F.t)
-      (act : EConstr.t)
-      (tgt_term : EConstr.t)
-      (constructors : Constructors.t)
-  : (Enc.t * Problems.t list) option -> Constructors.t mm
-  = function
-  | None ->
-    let* () = debug_nextconstrs_return () in
-    return constructors
-  | Some next_params ->
-    let* () = debug_nextconstrs_start () in
-    let next_lts_enc, next_problems = next_params in
-    (match next_problems with
-     | [] ->
-       let* sigma = get_sigma in
-       if EConstr.isEvar sigma tgt_term
-       then
-         let* () = debug_nextconstrs_close next_problems (Some true) in
-         return constructors
-       else (
-         let tree = Mebi_constr.Tree.Node ((next_lts_enc, i), []) in
-         let constructors = (act, tgt_term, tree) :: constructors in
-         let* () = debug_nextconstrs_close next_problems (Some false) in
-         return constructors)
-     | _ ->
-       let* constructors =
-         Constructors.retrieve i constructors act tgt_term next_params
-       in
-       Logging.Log.debug
-         (Printf.sprintf "N constructors: %i" (List.length constructors));
-       let* () = debug_nextconstrs_close next_problems None in
-       return constructors)
+      (from_term : EConstr.t)
+      (act_term : EConstr.t option)
+      (lts_enc : Enc.t)
+      (args : constructor_args)
+      ((i, constructors) : int * Constructors.t)
+      ((substl, decls) : EConstr.Vars.substl * EConstr.rel_declaration list)
+  : Constructors.t mm
+  =
+  let* () = debug_validconstrs_iter_success_start from_term act_term args in
+  let* act : EConstr.t = Mebi_utils.econstr_normalize args.act in
+  let tgt_term : EConstr.t = EConstr.Vars.substl substl args.rhs in
+  let* tgt_term : EConstr.t = Mebi_utils.econstr_normalize tgt_term in
+  let* next_constructors : (Enc.t * Problems.t list) option =
+    check_updated_ctx lts_enc [ [] ] indmap (substl, decls)
+  in
+  let* constructors =
+    check_for_next_constructors
+      i
+      indmap
+      act
+      tgt_term
+      constructors
+      next_constructors
+  in
+  Logging.Log.debug
+    (Printf.sprintf "V constructors: %i" (List.length constructors));
+  let* () = debug_validconstrs_iter_success_close from_term act_term args in
+  return constructors
 
 (* Should return a list of unification problems *)
 and check_updated_ctx
@@ -245,11 +232,12 @@ and check_updated_ctx
           let* () = debug_updtcontext_close_app name in
           check_updated_ctx lts_enc acc indmap (substl, tl)
         | Some c ->
-          let args = constructor_args args in
-          let$+ nextT env sigma = Reductionops.nf_evar sigma args.lhs in
+          let args : constructor_args = constructor_args args in
+          let$+ lhs env sigma = Reductionops.nf_evar sigma args.lhs in
+          let$+ act env sigma = Reductionops.nf_evar sigma args.act in
           let* next_lts = Mebi_ind.get_constr_transitions c in
           let* next_constructors : Constructors.t =
-            check_valid_constructors next_lts indmap nextT (Some args.act) c.enc
+            check_valid_constructors next_lts indmap lhs (Some act) c.enc
           in
           (match next_constructors with
            | [] ->
@@ -258,8 +246,11 @@ and check_updated_ctx
              in
              return None
            | next_constructors ->
+             let* () = debug_constructors_mm next_constructors in
              let* problems : Problems.t = map_problems args next_constructors in
+             let* () = debug_problems_mm problems in
              let acc : Problems.t list = cross_product acc problems in
+             let* () = debug_problems_list_mm acc in
              let* acc = check_updated_ctx lts_enc acc indmap (substl, tl) in
              let* () =
                debug_updtcontext_close_app_known name c next_constructors
@@ -270,6 +261,51 @@ and check_updated_ctx
        let* () = debug_updtcontext_close upd_t None [] in
        return acc)
   | _substl, _ctxl -> invalid_check_updated_ctx _substl _ctxl
+
+and check_for_next_constructors
+      (i : int)
+      (indmap : Mebi_ind.t F.t)
+      (act : EConstr.t)
+      (tgt_term : EConstr.t)
+      (constructors : Constructors.t)
+  : (Enc.t * Problems.t list) option -> Constructors.t mm
+  = function
+  | None ->
+    let* () = debug_nextconstrs_return () in
+    return constructors
+  | Some next_params ->
+    let* () = debug_nextconstrs_start () in
+    let next_lts_enc, next_problems = next_params in
+    (match next_problems with
+     | [] ->
+       let* sigma = get_sigma in
+       if EConstr.isEvar sigma tgt_term
+       then
+         let* () =
+           debug_nextconstrs_close next_problems (Some true) constructors
+         in
+         return constructors
+       else (
+         let tree = Mebi_constr.Tree.Node ((next_lts_enc, i), []) in
+         let constructors = (act, tgt_term, tree) :: constructors in
+         let* () =
+           debug_nextconstrs_close next_problems (Some false) constructors
+         in
+         return constructors)
+     | _ ->
+       let* constructors =
+         Constructors.retrieve
+           ~debug:true
+           i
+           constructors
+           act
+           tgt_term
+           next_params
+       in
+       Logging.Log.debug
+         (Printf.sprintf "N constructors: %i" (List.length constructors));
+       let* () = debug_nextconstrs_close next_problems None constructors in
+       return constructors)
 ;;
 (* ! Impossible ! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)

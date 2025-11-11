@@ -64,7 +64,7 @@ let pstr_transition (x : transition) : string =
     "- from:%s\n- action:%s\n- dest:%s\n"
     (Model.pstr_state x.from)
     (Model.pstr_action x.action)
-    (Strfy.option Model.pstr_state x.dest)
+    (Utils.Strfy.option Model.pstr_state x.dest)
 ;;
 
 exception Enc_Of_EConstr_NotFound of (EConstr.t * States.t)
@@ -190,7 +190,7 @@ let get_hyp_transition (m : Fsm.t) env sigma (tys : EConstr.t array)
           Log.debug
             (Printf.sprintf
                "mebi_bisim.get_hyp_transition, dest:\n%s"
-               (Strfy.econstr env sigma tys.(2)));
+               (Rocq_utils.Strfy.econstr env sigma tys.(2)));
           (match econstr_to_enc_opt sigma tys.(2) with
            | None -> None
            | Some dest_enc ->
@@ -335,13 +335,13 @@ let try_get_exists gl m n x : (transition * State.t) option =
   Log.debug
     (Printf.sprintf
        "mebi_bisim.try_get_exists, x ty: %s"
-       (Strfy.econstr (Proofview.Goal.env gl) sigma _ty));
+       (Rocq_utils.Strfy.econstr (Proofview.Goal.env gl) sigma _ty));
   let _binder, _tys, constr = get_lambda sigma tys.(1) in
   let _ty, tys = get_app sigma constr in
   Log.debug
     (Printf.sprintf
        "mebi_bisim.try_get_exists, constr ty: %s"
-       (Strfy.econstr (Proofview.Goal.env gl) sigma _ty));
+       (Rocq_utils.Strfy.econstr (Proofview.Goal.env gl) sigma _ty));
   match Array.to_list tys with
   | [ wk_trans; wk_sim ] ->
     let nt = try_get_weak_transition sigma n (get_atomic_type sigma wk_trans) in
@@ -438,38 +438,38 @@ let warning_multiple_h_transitions_to_invert h tl =
        "mebi_bisim.handle_hyps, multiple H transitions returned? (only \
         returning head)\n\
         %s"
-       (Strfy.list
+       (Utils.Strfy.list
           ~force_newline:true
           (* (fun ((t, x) : hyp_transition * transition) -> *)
           (fun (x : transition) ->
-            Strfy.list
+            Utils.Strfy.list
               ~force_newline:true
               ~indent:1
-              Strfy.str
-              [ (* Strfy.tuple
+              Utils.Strfy.str
+              [ (* Utils.Strfy.tuple
                    ~is_keyval:true
                    ~indent:2
-                   Strfy.str
-                   Strfy.str
+                   Utils.Strfy.str
+                   Utils.Strfy.str
                    ("kind", match t with Full -> "Full" | Layer -> "Layer")
                    ; *)
-                Strfy.tuple
+                Utils.Strfy.tuple
                   ~is_keyval:true
                   ~indent:2
-                  Strfy.str
+                  Utils.Strfy.str
                   Model.State.pstr
                   ("from", x.from)
-              ; Strfy.tuple
+              ; Utils.Strfy.tuple
                   ~is_keyval:true
                   ~indent:2
-                  Strfy.str
+                  Utils.Strfy.str
                   Model.Action.pstr
                   ("action", x.action)
-              ; Strfy.tuple
+              ; Utils.Strfy.tuple
                   ~is_keyval:true
                   ~indent:2
-                  Strfy.str
-                  (Strfy.option Model.State.pstr)
+                  Utils.Strfy.str
+                  (Utils.Strfy.option Model.State.pstr)
                   ("dest", x.dest)
               ])
           (h :: tl)))
@@ -638,9 +638,9 @@ let warning_multiple_n_candidates candidates =
          "mebi_bisim.get_n_candidate_action, multiple candidates found \
           (returning hd):\n\
           %s"
-         (Strfy.list
+         (Utils.Strfy.list
             ~force_newline:true
-            (Strfy.tuple Model.pstr_action Model.pstr_state)
+            (Utils.Strfy.tuple Model.pstr_action Model.pstr_state)
             candidates))
 ;;
 
@@ -818,9 +818,9 @@ let handle_weak_visible_transition
   (* Log.debug
      (Printf.sprintf
      "mebi_bisim.handle_weak_visible_transition\nn_actions:\n%s"
-     (Strfy.list
+     (Utils.Strfy.list
      ~force_newline:true
-     (Strfy.tuple Model.pstr_action Model.pstr_states)
+     (Utils.Strfy.tuple Model.pstr_action Model.pstr_states)
      (List.of_seq (Actions.to_seq n_actions)))); *)
   let n_action = Model.get_action_with_label n_actions nA.label in
   let n_dests = Actions.find n_actions n_action in
@@ -958,7 +958,10 @@ let handle_new_weak_sim (gl : Proofview.Goal.t) : unit Proofview.tactic =
        Log.debug
          (Printf.sprintf
             "mebi_bisim.handle_new_weak_sim, apply:\n%s"
-            (Strfy.econstr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl) _h));
+            (Rocq_utils.Strfy.econstr
+               (Proofview.Goal.env gl)
+               (Proofview.Goal.sigma gl)
+               _h));
        (* Tactics.exact_check h *)
        Auto.gen_trivial ~debug:Hints.Info [] None
      | None ->
