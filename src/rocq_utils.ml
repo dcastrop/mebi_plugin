@@ -24,6 +24,10 @@ let type_of_econstr_rel
   match substl with None -> ty | Some substl -> EConstr.Vars.substl substl ty
 ;;
 
+let type_of_econstr env sigma (x : EConstr.t) : Evd.evar_map * EConstr.t =
+  Typing.type_of env sigma x
+;;
+
 module Strfy = struct
   open Utils
   open Utils.Strfy

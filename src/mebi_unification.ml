@@ -63,17 +63,18 @@ module Pair = struct
          bstr)
   ;;
 
-  let fresh env sigma' (a : EConstr.t) (b : EConstr.t) : t =
-    let sigma, evar = Evarutil.new_evar env sigma' a in
+  let fresh env sigma' (a : EConstr.t) (b : EConstr.t) : Evd.evar_map * t =
+    let sigma', type_of_a = Rocq_utils.type_of_econstr env sigma' a in
+    let sigma, evar = Evarutil.new_evar env sigma' type_of_a in
     (* let () = _debug_fresh env sigma sigma' fresh original b in *)
     let a : Constructor_arg.t = Fresh { sigma; evar; original = a } in
-    { a; b }
+    sigma', { a; b }
   ;;
 
   let normal (a : EConstr.t) (b : EConstr.t) : t = { a = Normal a; b }
 
-  let make env sigma (a : EConstr.t) (b : EConstr.t) : t =
-    if EConstr.isEvar sigma a then fresh env sigma a b else normal a b
+  let make env sigma (a : EConstr.t) (b : EConstr.t) : Evd.evar_map * t =
+    if EConstr.isEvar sigma a then fresh env sigma a b else sigma, normal a b
   ;;
 
   let debug_unify env sigma (x : t) =

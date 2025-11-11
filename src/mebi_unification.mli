@@ -22,6 +22,9 @@ end
 module Pair : sig
   type t = { a : Constructor_arg.t; b : Evd.econstr }
 
+  val to_string :
+    ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
+
   val _debug_fresh :
     Environ.env ->
     'a ->
@@ -36,7 +39,7 @@ module Pair : sig
     Evd.evar_map ->
     Evd.econstr ->
     Evd.econstr ->
-    t
+    Evd.evar_map * t
 
   val normal : Evd.econstr -> Evd.econstr -> t
 
@@ -45,10 +48,7 @@ module Pair : sig
     Evd.evar_map ->
     Evd.econstr ->
     Evd.econstr ->
-    t
-
-  val to_string :
-    ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
+    Evd.evar_map * t
 
   val debug_unify : Environ.env -> Evd.evar_map -> t -> unit
 
