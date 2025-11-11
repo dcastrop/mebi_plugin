@@ -19,7 +19,7 @@ let constructor_args (args : EConstr.t array) : constructor_args =
 
 (** [a] may be re-freshed *)
 let map_constr_to_pair (a : EConstr.t) (b : EConstr.t) : Pair.t mm =
-  state (fun env sigma -> sigma, Pair.make env sigma a b)
+  state (fun env sigma -> Pair.make env sigma a b)
 ;;
 
 (** creates unification problems between the rhs of the current constructor and the lhs of the next.
@@ -273,9 +273,8 @@ and check_for_next_constructors
   | None ->
     let* () = debug_nextconstrs_return () in
     return constructors
-  | Some next_params ->
+  | Some (next_lts_enc, next_problems) ->
     let* () = debug_nextconstrs_start () in
-    let next_lts_enc, next_problems = next_params in
     (match next_problems with
      | [] ->
        let* sigma = get_sigma in
@@ -300,7 +299,7 @@ and check_for_next_constructors
            constructors
            act
            tgt_term
-           next_params
+           (next_lts_enc, next_problems)
        in
        Logging.Log.debug
          (Printf.sprintf "N constructors: %i" (List.length constructors));

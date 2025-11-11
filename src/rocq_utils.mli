@@ -1,3 +1,4 @@
+
 type hyp =
   ( Evd.econstr,
     Evd.econstr,
@@ -21,6 +22,12 @@ val type_of_econstr_rel :
   ?substl:Evd.econstr list ->
   EConstr.rel_declaration ->
   Evd.econstr
+
+val type_of_econstr :
+  Environ.env ->
+  Evd.evar_map ->
+  Evd.econstr ->
+  Evd.evar_map * Evd.econstr
 
 module Strfy : sig
   val pp : ?clean:bool -> Pp.t -> string
@@ -69,7 +76,7 @@ module Strfy : sig
     Evd.econstr ->
     string
 
-  val name_id : Names.Id.t -> string
+  val name_id : Names.variable -> string
   val global : Names.GlobRef.t -> string
 
   val concl :
