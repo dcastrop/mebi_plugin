@@ -27,12 +27,15 @@ module Pair : sig
 
   val _debug_fresh :
     Environ.env ->
-    'a ->
+    Evd.evar_map ->
     Evd.evar_map ->
     Evd.econstr ->
     Evd.econstr ->
     Evd.econstr ->
     unit
+
+  val naming_template : Namegen.intro_pattern_naming_expr
+  val get_next_naming : Evd.evar_map -> Names.Id.t option
 
   val fresh :
     Environ.env ->
@@ -60,10 +63,12 @@ module Pair : sig
     Evd.econstr ->
     unit
 
-  val w_unify :
-    Environ.env -> Evd.evar_map -> t -> Evd.evar_map
-
-  val unify : ?debug:bool -> t -> bool Mebi_wrapper.mm
+  val unify :
+    ?debug:bool ->
+    Environ.env ->
+    Evd.evar_map ->
+    t ->
+    Evd.evar_map * Constructor_arg.fresh option * bool
 end
 
 module Problem : sig
@@ -75,7 +80,8 @@ module Problem : sig
   val unify_opt :
     ?debug:bool ->
     t ->
-    Mebi_constr.Tree.t option Mebi_wrapper.mm
+    (Constructor_arg.fresh option * Mebi_constr.Tree.t) option
+    Mebi_wrapper.mm
 end
 
 module Problems : sig
@@ -91,10 +97,17 @@ module Problems : sig
     t list ->
     string
 
+  val append_fresh_opt :
+    Constructor_arg.fresh list ->
+    Constructor_arg.fresh option ->
+    Constructor_arg.fresh list
+
   val unify_opt :
     ?debug:bool ->
     t ->
-    Mebi_constr.Tree.t list option Mebi_wrapper.mm
+    (Constructor_arg.fresh list * Mebi_constr.Tree.t list)
+    option
+    Mebi_wrapper.mm
 end
 
 module Constructors : sig
@@ -109,14 +122,14 @@ module Constructors : sig
     ?debug:bool ->
     Evd.econstr ->
     Problems.t ->
-    r option Mebi_wrapper.mm
+    (Constructor_arg.fresh list * r) option Mebi_wrapper.mm
 
   val retrieve :
     ?debug:bool ->
     int ->
-    Mebi_constr.t list ->
+    Constructor_arg.fresh list * t ->
     Evd.econstr ->
     Evd.econstr ->
     Mebi_setup.Enc.t * Problems.t list ->
-    t Mebi_wrapper.mm
+    (Constructor_arg.fresh list * t) Mebi_wrapper.mm
 end
