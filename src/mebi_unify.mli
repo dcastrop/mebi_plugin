@@ -24,7 +24,7 @@ val map_problems :
 val cross_product :
   Mebi_unification.Problems.t list ->
   Mebi_unification.Problem.t list ->
-  Mebi_unification.Problem.t list list
+  Mebi_unification.Problems.t list
 
 val try_unify_constructor_args :
   ?debug:bool ->
@@ -69,6 +69,24 @@ val check_valid_constructors :
   Mebi_setup.Enc.t ->
   Mebi_unification.Constructors.t Mebi_wrapper.mm
 
+val explore_valid_constructor :
+  Mebi_ind.t Mebi_wrapper.F.t ->
+  Evd.econstr ->
+  Evd.econstr option ->
+  Mebi_setup.Enc.t ->
+  Mebi_unification.constructor_args ->
+  int * Mebi_unification.Constructors.t ->
+  EConstr.Vars.substl * Rocq_utils.econstr_decls ->
+  Mebi_unification.Constructors.t Mebi_wrapper.mm
+
+val check_updated_ctx :
+  Mebi_setup.Enc.t ->
+  Mebi_unification.Problems.t list ->
+  Mebi_ind.t Mebi_wrapper.F.t ->
+  EConstr.Vars.substl * EConstr.rel_declaration list ->
+  (Mebi_setup.Enc.t * Mebi_unification.Problems.t list) option
+  Mebi_wrapper.mm
+
 val check_for_next_constructors :
   int ->
   Mebi_ind.t Mebi_wrapper.F.t ->
@@ -76,12 +94,6 @@ val check_for_next_constructors :
   Evd.econstr ->
   Mebi_unification.Constructors.t ->
   (Mebi_setup.Enc.t * Mebi_unification.Problems.t list) option ->
-  Mebi_unification.Constructors.t Mebi_wrapper.mm
-
-val check_updated_ctx :
-  Mebi_setup.Enc.t ->
-  Mebi_unification.Problems.t list ->
-  Mebi_ind.t Mebi_wrapper.F.t ->
-  EConstr.Vars.substl * Rocq_utils.econstr_decls ->
-  (Mebi_setup.Enc.t * Mebi_unification.Problems.t list) option
+  (Mebi_unification.Constructor_arg.fresh list
+  * Mebi_unification.Constructors.t)
   Mebi_wrapper.mm

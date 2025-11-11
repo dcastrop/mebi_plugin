@@ -9,6 +9,8 @@ let show_extractargs_debug : bool = false
 
 (****************************************************************************)
 
+(* let *)
+
 exception ConstructorArgsExpectsArraySize3 of unit
 
 let constructor_args (args : EConstr.t array) : constructor_args =
@@ -46,6 +48,23 @@ let cross_product acc problems : Problems.t list =
     acc
 ;;
 
+exception TryUnifyConstrArgsYieldFresh of unit
+
+let try_unify_constructor_arg
+      ?(debug : bool = show_unification_debug)
+      (a : EConstr.t)
+      (b : EConstr.t)
+  : bool mm
+  =
+  state (fun env sigma ->
+    match Pair.unify ~debug env sigma (Pair.normal a b) with
+    | sigma, _, false -> sigma, false
+    | sigma, None, true -> sigma, true
+    | sigma, Some fresh, true ->
+      Logging.Log.warning "try_to_unify_constructor_args, did not expect fresh";
+      raise (* TODO: err *) (TryUnifyConstrArgsYieldFresh ()))
+;;
+
 let try_unify_constructor_args
       ?(debug : bool = show_unification_debug)
       (lhs : EConstr.t)
@@ -53,10 +72,10 @@ let try_unify_constructor_args
       (args : constructor_args)
   : bool mm
   =
-  let f : Pair.t -> bool mm = Pair.unify ~debug in
-  let* lhs_unifies : bool = f (Pair.normal args.lhs lhs) in
+  let f = try_unify_constructor_arg in
+  let* lhs_unifies : bool = f args.lhs lhs in
   if lhs_unifies
-  then Option.cata (fun act -> f (Pair.normal args.act act)) (return true) act
+  then Option.cata (fun act -> f args.act act) (return true) act
   else return false
 ;;
 
@@ -193,7 +212,7 @@ and explore_valid_constructor
   let* next_constructors : (Enc.t * Problems.t list) option =
     check_updated_ctx lts_enc [ [] ] indmap (substl, decls)
   in
-  let* constructors =
+  let* fresh, constructors =
     check_for_next_constructors
       i
       indmap
@@ -205,6 +224,8 @@ and explore_valid_constructor
   Logging.Log.debug
     (Printf.sprintf "V constructors: %i" (List.length constructors));
   let* () = debug_validconstrs_iter_success_close from_term act_term args in
+  (* NOTE: update our sigma with the successful unifications *)
+  (* TODO: *)
   return constructors
 
 (* Should return a list of unification problems *)
@@ -268,11 +289,12 @@ and check_for_next_constructors
       (act : EConstr.t)
       (tgt_term : EConstr.t)
       (constructors : Constructors.t)
-  : (Enc.t * Problems.t list) option -> Constructors.t mm
+  :  (Enc.t * Problems.t list) option
+  -> (Constructor_arg.fresh list * Constructors.t) mm
   = function
   | None ->
     let* () = debug_nextconstrs_return () in
-    return constructors
+    return ([], constructors)
   | Some (next_lts_enc, next_problems) ->
     let* () = debug_nextconstrs_start () in
     (match next_problems with
@@ -283,20 +305,20 @@ and check_for_next_constructors
          let* () =
            debug_nextconstrs_close next_problems (Some true) constructors
          in
-         return constructors
+         return ([], constructors)
        else (
          let tree = Mebi_constr.Tree.Node ((next_lts_enc, i), []) in
          let constructors = (act, tgt_term, tree) :: constructors in
          let* () =
            debug_nextconstrs_close next_problems (Some false) constructors
          in
-         return constructors)
+         return ([], constructors))
      | _ ->
-       let* constructors =
+       let* fresh, constructors =
          Constructors.retrieve
            ~debug:true
            i
-           constructors
+           ([], constructors)
            act
            tgt_term
            (next_lts_enc, next_problems)
@@ -304,7 +326,7 @@ and check_for_next_constructors
        Logging.Log.debug
          (Printf.sprintf "N constructors: %i" (List.length constructors));
        let* () = debug_nextconstrs_close next_problems None constructors in
-       return constructors)
+       return (fresh, constructors))
 ;;
 (* ! Impossible ! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)

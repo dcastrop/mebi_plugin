@@ -53,8 +53,8 @@ module Pair = struct
 
   let _debug_fresh env sigma sigma' fresh a b : unit =
     let fstr : string = Rocq_utils.Strfy.econstr env sigma' fresh in
-    let astr : string = Rocq_utils.Strfy.econstr env sigma' a in
-    let bstr : string = Rocq_utils.Strfy.econstr env sigma' b in
+    let astr : string = Rocq_utils.Strfy.econstr env sigma a in
+    let bstr : string = Rocq_utils.Strfy.econstr env sigma b in
     Logging.Log.debug
       (Printf.sprintf
          "created new fresh a: %s\nto replace a: %s\npaired with b: %s"
@@ -63,10 +63,40 @@ module Pair = struct
          bstr)
   ;;
 
+  let naming_template : Namegen.intro_pattern_naming_expr =
+    Namegen.IntroIdentifier (Names.Id.of_string "UnifEvar0")
+  ;;
+
+  let naming_template_cache
+    : (Evd.evar_map * Namegen.intro_pattern_naming_expr) option ref
+    =
+    ref None
+  ;;
+
+  (* TODO: ensure that we can increment "UnifEvar0" names across new evars *)
+  let get_next_naming sigma =
+    Option.cata
+      (fun (sigma', naming) ->
+        Logging.Log.warning "next from some A";
+        let next = Evarutil.next_evar_name sigma' naming in
+        naming_template_cache
+        := Some (sigma, Namegen.IntroIdentifier (Option.get next));
+        next)
+      (Logging.Log.warning "next from none B";
+       let next = Evarutil.next_evar_name sigma naming_template in
+       naming_template_cache
+       := Some (sigma, Namegen.IntroIdentifier (Option.get next));
+       next)
+      !naming_template_cache
+  ;;
+
   let fresh env sigma' (a : EConstr.t) (b : EConstr.t) : Evd.evar_map * t =
     let sigma', type_of_a = Rocq_utils.type_of_econstr env sigma' a in
-    let sigma, evar = Evarutil.new_evar env sigma' type_of_a in
-    (* let () = _debug_fresh env sigma sigma' fresh original b in *)
+    let naming =
+      Namegen.IntroIdentifier (Option.get (get_next_naming sigma'))
+    in
+    let sigma, evar = Evarutil.new_evar ~naming env sigma' type_of_a in
+    let () = _debug_fresh env sigma' sigma evar a b in
     let a : Constructor_arg.t = Fresh { sigma; evar; original = a } in
     sigma', { a; b }
   ;;
@@ -87,29 +117,26 @@ module Pair = struct
     Log.debug (Printf.sprintf "%s:\n%s" s1 (to_string env sigma x))
   ;;
 
-  let w_unify env sigma' ({ a; b } : t) : Evd.evar_map =
-    match a with
-    | Normal a' -> Unification.w_unify env sigma' Conversion.CUMUL a' b
-    | Fresh { sigma; evar; original } ->
-      let f =
-        (* Unification.w_unify env sigma' Conversion.CUMUL original *)
-        Unification.w_unify env sigma Conversion.CUMUL evar
-      in
-      f b
-  ;;
-
   (** [unify a b] tries to unify [a] and [b] within the context of the [env] and [sigma] of [mm]. @returns [true] if successful, [false] otherwise. *)
-  let unify ?(debug : bool = default_debug) ({ a; b } : t) : bool mm =
-    state (fun (env : Environ.env) (sigma : Evd.evar_map) ->
-      let open Pretype_errors in
-      try
-        let sigma : Evd.evar_map = w_unify env sigma { a; b } in
-        if debug then debug_unify env sigma { a; b };
-        sigma, true
-      with
-      | PretypeError (_, _, CannotUnify (c, d, _e)) ->
-        if debug || debugerr then debug_unifyerr env sigma { a; b } c d;
-        sigma, false)
+  let unify ?(debug : bool = default_debug) env sigma' ({ a; b } : t)
+    : Evd.evar_map * Constructor_arg.fresh option * bool
+    =
+    let open Pretype_errors in
+    try
+      match a with
+      | Normal a ->
+        let sigma = Unification.w_unify env sigma' Conversion.CUMUL a b in
+        if debug then debug_unify env sigma { a = Normal a; b };
+        sigma, None, true
+      | Fresh { sigma; evar; original } ->
+        let sigma = Unification.w_unify env sigma Conversion.CUMUL evar b in
+        let a : Constructor_arg.fresh = { sigma; evar; original } in
+        if debug then debug_unify env sigma { a = Fresh a; b };
+        sigma', Some a, true
+    with
+    | PretypeError (_, _, CannotUnify (c, d, _e)) ->
+      if debug || debugerr then debug_unifyerr env sigma' { a; b } c d;
+      sigma', None, false
   ;;
 end
 
@@ -145,17 +172,15 @@ module Problem = struct
       [ fs; gs ]
   ;;
 
-  let unify_opt ?(debug : bool = false) : t -> Mebi_constr.Tree.t option mm
+  let unify_opt ?(debug : bool = false)
+    : t -> (Constructor_arg.fresh option * Mebi_constr.Tree.t) option mm
     = function
     | unification_problem, constructor_tree ->
-      let* success = Pair.unify ~debug unification_problem in
-      if success
-      then (
-        Logging.Log.debug (Printf.sprintf "PR0: SOME");
-        return (Some constructor_tree))
-      else (
-        Logging.Log.debug (Printf.sprintf "PR1: NONE");
-        return None)
+      state (fun env sigma ->
+        match Pair.unify ~debug env sigma unification_problem with
+        | sigma, _, false -> sigma, None
+        | sigma, None, true -> sigma, Some (None, constructor_tree)
+        | sigma, Some fresh, true -> sigma, Some (Some fresh, constructor_tree))
   ;;
 end
 
@@ -178,27 +203,36 @@ module Problems = struct
       (to_string ~indent:(indent + 1) env sigma)
   ;;
 
+  let append_fresh_opt (fresh : Constructor_arg.fresh list)
+    : Constructor_arg.fresh option -> Constructor_arg.fresh list
+    = function
+    | None -> fresh
+    | Some a -> a :: fresh
+  ;;
+
   let rec unify_opt ?(debug : bool = false)
-    : t -> Mebi_constr.Tree.t list option mm
+    : t -> (Constructor_arg.fresh list * Mebi_constr.Tree.t list) option mm
     = function
     | [] ->
       Logging.Log.debug (Printf.sprintf "UP0: RETURN");
-      return (Some [])
+      return (Some ([], []))
     | h :: tl ->
       let* success_opt = Problem.unify_opt ~debug h in
       (match success_opt with
        | None ->
          Logging.Log.debug (Printf.sprintf "UP1: NONE");
          return None
-       | Some constructor_tree ->
+       | Some (fresh_opt, constructor_tree) ->
          let* unified_opt = unify_opt ~debug tl in
          (match unified_opt with
           | None ->
             Logging.Log.debug (Printf.sprintf "UP2: NONE");
             return None
-          | Some acc ->
+          | Some (fresh, acc) ->
             Logging.Log.debug (Printf.sprintf "UP3: RETURN");
-            return (Some (constructor_tree :: acc))))
+            let fresh = append_fresh_opt fresh fresh_opt in
+            let acc = constructor_tree :: acc in
+            return (Some (fresh, acc))))
   ;;
 end
 
@@ -220,7 +254,7 @@ module Constructors = struct
         ?(debug : bool = false)
         (tgt : EConstr.t)
         (problems : Problems.t)
-    : r option mm
+    : (Constructor_arg.fresh list * r) option mm
     =
     sandbox
       (let* unified_opt = Problems.unify_opt ~debug problems in
@@ -228,7 +262,7 @@ module Constructors = struct
        | None ->
          Logging.Log.debug (Printf.sprintf "S1: NONE %i" (List.length problems));
          return None
-       | Some constructor_trees ->
+       | Some (fresh, constructor_trees) ->
          let* term = Mebi_utils.econstr_normalize tgt in
          let* is_undefined = Mebi_utils.econstr_is_evar term in
          if is_undefined
@@ -239,34 +273,36 @@ module Constructors = struct
          else (
            Logging.Log.debug
              (Printf.sprintf "S3: RETURN %i" (List.length problems));
-           return (Some (term, constructor_trees))))
+           return (Some (fresh, (term, constructor_trees)))))
   ;;
 
   let rec retrieve
             ?(debug : bool = false)
             (constructor_index : int)
-            (acc : Mebi_constr.t list)
+            (acc : Constructor_arg.fresh list * t)
             (act : EConstr.t)
             (tgt : EConstr.t)
-    : Enc.t * Problems.t list -> t mm
+    : Enc.t * Problems.t list -> (Constructor_arg.fresh list * t) mm
     = function
     | _, [] ->
-      Logging.Log.debug (Printf.sprintf "R0: RETURN %i" (List.length acc));
+      Logging.Log.debug (Printf.sprintf "R0: RETURN %i" (List.length (snd acc)));
       return acc
     | lts_enc, problems :: tl ->
       let* success = sandbox_unify_all_opt ~debug tgt problems in
       (match success with
        | None ->
-         Logging.Log.debug (Printf.sprintf "R1: NONE %i" (List.length acc));
+         Logging.Log.debug
+           (Printf.sprintf "R1: NONE %i" (List.length (snd acc)));
          retrieve ~debug constructor_index acc act tgt (lts_enc, tl)
-       | Some (unified_tgt, ctor_trees) ->
+       | Some (fresh, (unified_tgt, ctor_trees)) ->
          let* unified_tgt = Mebi_utils.econstr_normalize unified_tgt in
          let* act = Mebi_utils.econstr_normalize act in
          let open Mebi_constr.Tree in
          let tree = Node ((lts_enc, constructor_index), ctor_trees) in
          let ctor = act, unified_tgt, tree in
-         let acc' = ctor :: acc in
-         Logging.Log.debug (Printf.sprintf "R2: SOME %i" (List.length acc'));
+         let acc' = List.append fresh (fst acc), ctor :: snd acc in
+         Logging.Log.debug
+           (Printf.sprintf "R2: SOME %i" (List.length (snd acc')));
          retrieve ~debug constructor_index acc' act tgt (lts_enc, tl))
   ;;
 end
