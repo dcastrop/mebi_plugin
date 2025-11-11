@@ -2,11 +2,63 @@ open Debug
 open Mebi_wrapper
 (* open Mebi_wrapper.Syntax *)
 
+let debug_problems env sigma (problems : Mebi_unification.Problems.t) : unit =
+  Logging.Log.debug
+    (Printf.sprintf
+       "unification problems:\n%s\n"
+       (Mebi_unification.Problems.to_string env sigma problems))
+;;
+
+let debug_problems_mm (problems : Mebi_unification.Problems.t) : unit mm =
+  state (fun env sigma ->
+    let () = debug_problems env sigma problems in
+    sigma, ())
+;;
+
+let debug_problems_list env sigma (problems : Mebi_unification.Problems.t list)
+  : unit
+  =
+  Logging.Log.debug
+    (Printf.sprintf
+       "unification problems list:\n%s\n"
+       (Mebi_unification.Problems.list_to_string env sigma problems))
+;;
+
+let debug_problems_list_mm (problems : Mebi_unification.Problems.t list)
+  : unit mm
+  =
+  state (fun env sigma ->
+    let () = debug_problems_list env sigma problems in
+    sigma, ())
+;;
+
+let debug_constructors
+      env
+      sigma
+      (constructors : Mebi_unification.Constructors.t)
+  : unit
+  =
+  Logging.Log.debug
+    (Printf.sprintf
+       "next constructors:\n%s\n"
+       (Mebi_unification.Constructors.to_string env sigma constructors))
+;;
+
+let debug_constructors_mm (constructors : Mebi_unification.Constructors.t)
+  : unit mm
+  =
+  state (fun env sigma ->
+    let () = debug_constructors env sigma constructors in
+    sigma, ())
+;;
+
+(***************************************)
+
 (** Mebi_unify.check_valid_constructors START *)
 let debug_validconstrs_start (from : EConstr.t) : unit mm =
   state (fun env sigma ->
     let infix : string = "valid constructors" in
-    let from : string = Strfy.econstr env sigma from in
+    let from : string = Rocq_utils.Strfy.econstr env sigma from in
     let () = Scope.start ~infix ~suffix:from () in
     sigma, ())
 ;;
@@ -19,8 +71,8 @@ let debug_validconstrs_close
   =
   state (fun env sigma ->
     let l : int = List.length constructors in
-    let infix : string = Printf.sprintf "valid constructors (%i)" l in
-    let from : string = Strfy.econstr env sigma from in
+    let infix : string = Printf.sprintf "valid constructors |%i|" l in
+    let from : string = Rocq_utils.Strfy.econstr env sigma from in
     let () = Scope.close ~infix ~suffix:from () in
     sigma, ())
 ;;
@@ -28,19 +80,29 @@ let debug_validconstrs_close
 (***************************************)
 
 (** Mebi_unify.check_valid_constructors.iter_body START *)
-let debug_validconstrs_iter_start () : unit mm =
+let debug_validconstrs_iter_start
+      (constructors : Mebi_unification.Constructors.t)
+  : unit mm
+  =
   state (fun env sigma ->
     Logging.Log.notice "\n";
     let infix : string = "check valid constructor" in
-    let () = Scope.start ~infix () in
+    let l : int = List.length constructors in
+    let suffix : string = Printf.sprintf "(acc: |%i|)" l in
+    let () = Scope.start ~infix ~suffix () in
     sigma, ())
 ;;
 
 (** Mebi_unify.check_valid_constructors.iter_body CLOSE *)
-let debug_validconstrs_iter_close () : unit mm =
+let debug_validconstrs_iter_close
+      (constructors : Mebi_unification.Constructors.t)
+  : unit mm
+  =
   state (fun env sigma ->
     let infix : string = "check valid constructor" in
-    let () = Scope.close ~infix () in
+    let l : int = List.length constructors in
+    let suffix : string = Printf.sprintf "(acc: |%i|)" l in
+    let () = Scope.close ~infix ~suffix () in
     sigma, ())
 ;;
 
@@ -55,11 +117,11 @@ let debug_validconstrs_iter_success_start
   =
   state (fun env sigma ->
     Logging.Log.notice "\n";
-    let from : string = Strfy.econstr env sigma from in
+    let from : string = Rocq_utils.Strfy.econstr env sigma from in
     let _act : string =
-      Option.cata (fun act -> Strfy.econstr env sigma act) "None" act
+      Option.cata (fun act -> Rocq_utils.Strfy.econstr env sigma act) "None" act
     in
-    let infix : string = "valid constructor" in
+    let infix : string = "explore valid constructor" in
     (* let suffix : string = Printf.sprintf "(from: %s) (act: %s)" from act in *)
     let suffix : string = Printf.sprintf "(from: %s)" from in
     let () = Scope.start ~infix ~suffix () in
@@ -75,11 +137,11 @@ let debug_validconstrs_iter_success_close
   =
   state (fun env sigma ->
     Logging.Log.notice "\n";
-    let from : string = Strfy.econstr env sigma from in
+    let from : string = Rocq_utils.Strfy.econstr env sigma from in
     let _act : string =
-      Option.cata (fun act -> Strfy.econstr env sigma act) "None" act
+      Option.cata (fun act -> Rocq_utils.Strfy.econstr env sigma act) "None" act
     in
-    let infix : string = "valid constructor" in
+    let infix : string = "explore valid constructor" in
     (* let suffix : string = Printf.sprintf "(from: %s) (act: %s)" from act in *)
     let suffix : string = Printf.sprintf "(from: %s)" from in
     let () = Scope.close ~infix ~suffix () in
@@ -100,16 +162,21 @@ let debug_nextconstrs_start () : unit mm =
 let debug_nextconstrs_close
       (problems : Mebi_unification.Problems.t list)
       (is_evar : bool option)
+      (constructors : Mebi_unification.Constructors.t)
   : unit mm
   =
   state (fun env sigma ->
     let l : int = List.length problems in
+    let m : int = List.length constructors in
     let infix = "checking next" in
-    let f = fun e -> Printf.sprintf ", (tgt is evar: %b)" e in
+    let f = fun e -> Printf.sprintf " (tgt is evar: %b)" e in
     let e : string = Option.cata f "" is_evar in
-    let suffix = Printf.sprintf "(problems: %i)%s" l e in
-    let info = Mebi_unification.Problems.list_to_string env sigma problems in
-    let () = Scope.close ~infix ~suffix ~info:(Some info) () in
+    let suffix =
+      Printf.sprintf "(problems: |%i|) (constructors: |%i|)%s" l m e
+    in
+    let () = Scope.close ~infix ~suffix () in
+    let () = debug_problems_list env sigma problems in
+    let () = debug_constructors env sigma constructors in
     sigma, ())
 ;;
 
@@ -139,7 +206,7 @@ let debug_updtcontext_close
   =
   state (fun env sigma ->
     let infix : string = "updating context" in
-    let upd_t : string = Strfy.econstr env sigma upd_t in
+    let upd_t : string = Rocq_utils.Strfy.econstr env sigma upd_t in
     let suffix : string = Printf.sprintf "(is not App: %s)" upd_t in
     let () = Scope.close ~infix ~suffix () in
     sigma, ())
@@ -148,8 +215,8 @@ let debug_updtcontext_close
 let debug_updtcontext_close_app (name : EConstr.t) : unit mm =
   state (fun env sigma ->
     let infix : string = "updating context" in
-    let name : string = Strfy.econstr env sigma name in
-    let suffix : string = Printf.sprintf "(is unrecognized App: %s)" name in
+    let name : string = Rocq_utils.Strfy.econstr env sigma name in
+    let suffix : string = Printf.sprintf "(unrecognized App: %s)" name in
     let () = Scope.close ~infix ~suffix () in
     sigma, ())
 ;;
@@ -162,10 +229,10 @@ let debug_updtcontext_close_app_known
   =
   state (fun env sigma ->
     let infix : string = "updating context" in
-    let name : string = Strfy.econstr env sigma name in
+    let name : string = Rocq_utils.Strfy.econstr env sigma name in
     let suffix : string =
       let l : int = List.length constructors in
-      Printf.sprintf "(is App: %s) (next constructors: %i)" name l
+      Printf.sprintf "(App: %s) (next: |%i|)" name l
     in
     let () = Scope.close ~infix ~suffix () in
     sigma, ())

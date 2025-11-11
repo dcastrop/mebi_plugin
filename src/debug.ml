@@ -1,5 +1,37 @@
 open Logging
 
+module Control = struct
+  exception ExitDevelopmentTest of unit
+
+  let get_fresh_counter () : ((unit -> int) * (unit -> int)) * int ref =
+    Utils.new_int_counter ()
+  ;;
+
+  let default_target : int = 1
+
+  let the_counter_funs : ((((unit -> int) * (unit -> int)) * int ref) * int) ref
+    =
+    ref (get_fresh_counter (), default_target)
+  ;;
+
+  let set_new_target (new_target : int) : unit =
+    the_counter_funs := get_fresh_counter (), new_target
+  ;;
+
+  let incr () : int = (fst (fst (fst !the_counter_funs))) ()
+  let decr () : int = (snd (fst (fst !the_counter_funs))) ()
+  let getvalue () : int = !(snd (fst !the_counter_funs))
+  let gettarget () : int = snd !the_counter_funs
+
+  (** record this call, then check if we've reached the end condition -- raise exception if so.
+  *)
+  let tick () : unit =
+    match Int.compare (incr ()) (gettarget ()) with
+    | 1 -> raise (ExitDevelopmentTest ())
+    | _ -> ()
+  ;;
+end
+
 module Scope = struct
   let default_show_debug_scope : bool = true
   let show_debug_scope : bool ref = ref default_show_debug_scope

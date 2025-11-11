@@ -1,4 +1,3 @@
-
 module Tree : sig
   type 'a tree = Node of 'a * 'a tree list
   type t = (Mebi_setup.Enc.t * int) tree
@@ -12,3 +11,6 @@ module Tree : sig
 end
 
 type t = Evd.econstr * Evd.econstr * Tree.t
+
+val to_string :
+  ?indent:int -> Environ.env -> Evd.evar_map -> t -> string

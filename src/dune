@@ -45,7 +45,6 @@
   mebi_unification
   mebi_debug
   mebi_unify
-  unify
   command
   ; examples
   g_mebi))

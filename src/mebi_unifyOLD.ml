@@ -16,7 +16,7 @@ let dev_checkin () : unit =
 
 let debug_term p (x : EConstr.t) : unit mm =
   state (fun env sigma ->
-    let sx : string = Strfy.econstr env sigma x in
+    let sx : string = Rocq_utils.Strfy.econstr env sigma x in
     Log.debug (Printf.sprintf "%s%s" (Utils.prefix p) sx);
     sigma, ())
 ;;
@@ -34,7 +34,7 @@ let debug_collect_valid_constructors
   =
   Log.info "\n====================";
   state (fun env sigma ->
-    let from_str : string = Strfy.econstr env sigma from_term in
+    let from_str : string = Rocq_utils.Strfy.econstr env sigma from_term in
     let constructors_str : string = Strfy.ind_constrs env sigma constructors in
     Log.debug
       (Printf.sprintf
@@ -132,7 +132,7 @@ let get_ind_constrs_opt (x : EConstr.t) (fmap : Mebi_ind.t F.t)
     | App (name, args) ->
       (match F.find_opt fmap name with
        | None ->
-         let f = Strfy.econstr env sigma in
+         let f = Rocq_utils.Strfy.econstr env sigma in
          Log.warning (Printf.sprintf "%s has unknown name: %s" (f x) (f name));
          (* TODO: err *) raise (ConstructorNameNotRecognized (x, name))
        | Some ind ->
@@ -192,38 +192,44 @@ let constructor_args_to_string ?(indent : int = 0) env sigma
   = function
   | { constructor; decls; substl; tree; lhs; act; rhs } ->
     let indent' = indent + 1 in
-    let f = Strfy.tuple ~is_keyval:true ~indent Strfy.str Strfy.str in
-    let g = Strfy.econstr env sigma in
-    let h = Strfy.econstr_rel_decl env sigma in
-    let i = Strfy.list ~force_newline:true ~indent:indent' ~label:"decls" h in
-    let j = Strfy.list ~force_newline:true ~indent:indent' ~label:"substl" g in
+    let f =
+      Utils.Strfy.tuple ~is_keyval:true ~indent Utils.Strfy.str Utils.Strfy.str
+    in
+    let g = Rocq_utils.Strfy.econstr env sigma in
+    let h = Rocq_utils.Strfy.econstr_rel_decl env sigma in
+    let i =
+      Utils.Strfy.list ~force_newline:true ~indent:indent' ~label:"decls" h
+    in
+    let j =
+      Utils.Strfy.list ~force_newline:true ~indent:indent' ~label:"substl" g
+    in
     let k =
-      Strfy.tuple
+      Utils.Strfy.tuple
         ~is_keyval:true
         ~indent:indent'
-        Strfy.str
-        (Printf.sprintf "\n%s%s" (Strfy.str_tabs indent'))
+        Utils.Strfy.str
+        (Printf.sprintf "\n%s%s" (Utils.Strfy.str_tabs indent'))
     in
     let l = Strfy.ind_constr ~indent env sigma in
-    Strfy.list
+    Utils.Strfy.list
       ~force_newline:true
       ~label:"constructor_args"
       ~indent
       ~use:("{", "}")
-      Strfy.str
+      Utils.Strfy.str
       [ k ("constructor", l constructor)
       ; k ("decls", i decls)
       ; k ("substl", j substl)
       ; f ("lhs", g lhs)
       ; f ("act", g act)
       ; f ("rhs", g rhs)
-      ; f ("tree", Strfy.constr_tree tree)
+      ; f ("tree", Rocq_utils.Strfy.constr_tree tree)
       ]
 ;;
 
 (* let debug_datatree p (x : constructor_datatree) : unit mm =
    state (fun env sigma ->
-   let sx : string = Strfy.econstr env sigma x in
+   let sx : string = Rocq_utils.Strfy.econstr env sigma x in
    Log.debug (Printf.sprintf "%s%s" (Utils.prefix p) sx);
    sigma, ())
    ;; *)
@@ -236,7 +242,7 @@ let debug_constructor_args ?(s : string = "constructor_args") p x : unit mm =
 ;;
 
 let constructor_args_list_to_string env sigma : constructor_args list -> string =
-  Strfy.list
+  Utils.Strfy.list
     ~force_newline:true
     (constructor_args_to_string ~indent:1 env sigma)
 ;;
@@ -380,7 +386,7 @@ let mk_fresh_constructor_args
 let debugstr_constructor_args_lts : constructor_args -> string mm = function
   | { lhs; act; rhs; _ } ->
     state (fun env sigma ->
-      let f = Strfy.econstr env sigma in
+      let f = Rocq_utils.Strfy.econstr env sigma in
       let s =
         Printf.sprintf "- lhs: %s\n- act: %s\n- rhs: %s" (f lhs) (f act) (f rhs)
       in

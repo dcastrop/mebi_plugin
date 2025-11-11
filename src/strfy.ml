@@ -1,244 +1,5 @@
-let str_tabs = Utils.str_tabs
-
-(* new line sep *)
-let nlsep ?(force_newline : bool = false) ?(indent : int = 0) () : string =
-  if force_newline then Printf.sprintf "\n%s" (str_tabs indent) else ""
-;;
-
-(**********************************)
-(****** OCAML *********************)
-(**********************************)
-
-let list
-      ?(force_newline : bool = false)
-      ?(label : string = "List")
-      ?(indent : int = 0)
-      ?(use : string * string = "[", "]")
-      (strfy : 'a -> string)
-  : 'a list -> string
-  = function
-  | [] ->
-    let lhs, rhs = use in
-    Printf.sprintf "%s %s (%s empty)" lhs rhs label
-  | h :: [] ->
-    let lhs, rhs = use in
-    let sep = nlsep ~force_newline ~indent () in
-    let suffix =
-      if use = ("[", "]") then Printf.sprintf "(%s: 1)" label else ""
-    in
-    Printf.sprintf "%s %s %s%s %s" lhs (strfy h) sep rhs suffix
-  | h :: t ->
-    let lhs, rhs = use in
-    let sep = nlsep ~force_newline ~indent () in
-    let len = List.length t + 1 in
-    let suffix =
-      if use = ("[", "]") then Printf.sprintf "(%s: %i)" label len else ""
-    in
-    let lstr =
-      List.fold_left
-        (fun (acc : string) (e : 'a) ->
-          Printf.sprintf "%s%s; %s" acc sep (strfy e))
-        (strfy h)
-        t
-    in
-    Printf.sprintf "%s %s %s%s %s" lhs lstr sep rhs suffix
-;;
-
-let array
-      ?(force_newline : bool = false)
-      ?(label : string = "List")
-      ?(indent : int = 0)
-      ?(use : string * string = "[", "]")
-      (strfy : 'a -> string)
-      (arr : 'a array)
-  : string
-  =
-  list ~force_newline ~label ~indent ~use strfy (Array.to_list arr)
-;;
-
-let str : string -> string = fun (x : string) -> x
-let int : int -> string = fun (x : int) -> Printf.sprintf "%i" x
-let bool : bool -> string = fun (x : bool) -> Printf.sprintf "%b" x
-
-let option (f : 'a -> string) : 'a option -> string = function
-  | None -> "None"
-  | Some x -> Printf.sprintf "Some %s" (f x)
-;;
-
-let tuple
-      ?(force_newline : bool = false)
-      ?(is_keyval : bool = false)
-      ?(indent : int = 0)
-      (f : 'a -> string)
-      (g : 'b -> string)
-  : 'a * 'b -> string
-  =
-  fun ((a, b) : 'a * 'b) ->
-  let sep, con, lhs, rhs =
-    match force_newline, is_keyval with
-    | true, false -> nlsep ~force_newline:true ~indent (), ",", "( ", ")"
-    | _, false -> nlsep ~force_newline ~indent (), ",", "( ", " )"
-    | _, true -> nlsep ~force_newline ~indent (), ":", "", ""
-  in
-  Printf.sprintf "%s%s%s%s %s%s%s" lhs (f a) sep con (g b) sep rhs
-;;
-
-(**********************************)
-(****** ROCQ **********************)
-(**********************************)
-
-let pp ?(clean : bool = true) (x : Pp.t) : string =
-  let s = Pp.string_of_ppcmds x in
-  if clean then Utils.clean_string s else s
-;;
-
-let evar : Evar.t -> string = fun (x : Evar.t) -> pp (Evar.print x)
-
-let evar' env sigma : Evar.t -> string =
-  fun (x : Evar.t) -> pp (Printer.pr_existential_key env sigma x)
-;;
-
-let constr env sigma : Constr.t -> string =
-  fun (x : Constr.t) -> pp (Printer.pr_constr_env env sigma x)
-;;
-
-let constr_opt env sigma : Constr.t option -> string =
-  fun (x : Constr.t option) -> option (constr env sigma) x
-;;
-
-let constr_rel_decl env sigma : Constr.rel_declaration -> string =
-  fun (x : Constr.rel_declaration) -> pp (Printer.pr_rel_decl env sigma x)
-;;
-
-let constr_rel_context env sigma : Constr.rel_context -> string =
-  fun (x : Constr.rel_context) -> pp (Printer.pr_rel_context env sigma x)
-;;
-
-let constr_kind ?(indent : int = 0) env sigma : Constr.t -> string =
-  fun (x : Constr.t) ->
-  list
-    ~indent:(indent + 1)
-    ~use:("{", "}")
-    str
-    [ tuple ~is_keyval:true ~indent str (constr env sigma) ("constr", x)
-    ; list
-        ~label:"Constr kinds"
-        ~indent:(indent + 1)
-        str
-        (List.filter_map
-           (fun (kind, isKind) -> if isKind then Some kind else None)
-           (Utils.list_of_constr_kinds x))
-    ]
-;;
-
-let econstr env sigma : EConstr.t -> string =
-  fun (x : EConstr.t) -> pp (Printer.pr_econstr_env env sigma x)
-;;
-
-let econstr_rel_decl env sigma : EConstr.rel_declaration -> string =
-  fun (x : EConstr.rel_declaration) -> pp (Printer.pr_erel_decl env sigma x)
-;;
-
-let econstr_types ?(indent : int = 0) env sigma : EConstr.types -> string =
-  fun (x : EConstr.types) ->
-  match EConstr.kind_of_type sigma x with
-  | AtomicType (ty, tys) ->
-    Printf.sprintf
-      "%s => \n%s%s"
-      (econstr env sigma ty)
-      (str_tabs indent)
-      (list
-         ~force_newline:true
-         ~label:"Type Arguments"
-         ~indent
-         (econstr env sigma)
-         (Array.to_list tys))
-  | CastType (_tys, _ty) -> "TODO: CastType"
-  | LetInType (_name_binder_annot, _t1, _t2, _t3) -> "TODO: LetInType"
-  | ProdType (_name_binder_annot, _t1, _t2) -> "TODO: ProdType"
-  | SortType _sorts -> "TODO: SortType"
-;;
-
-let econstr_kind ?(indent : int = 0) env sigma : EConstr.t -> string =
-  fun (x : EConstr.t) ->
-  list
-    ~indent:(indent + 1)
-    ~use:("{", "}")
-    str
-    [ tuple ~is_keyval:true ~indent str (econstr env sigma) ("econstr", x)
-    ; list
-        ~label:"EConstr kinds"
-        ~indent:(indent + 1)
-        str
-        (List.filter_map
-           (fun (kind, isKind) -> if isKind then Some kind else None)
-           (Utils.list_of_econstr_kinds sigma x))
-    ]
-;;
-
-let name_id : Names.Id.t -> string = Names.Id.to_string
-
-let global : Names.GlobRef.t -> string =
-  fun (x : Names.GlobRef.t) -> pp (Printer.pr_global x)
-;;
-
-let concl ?(indent : int = 0) env sigma : EConstr.constr -> string =
-  fun (x : EConstr.constr) -> econstr_types ~indent:(indent + 1) env sigma x
-;;
-
-let erel _env sigma : EConstr.ERelevance.t -> string =
-  fun (x : EConstr.ERelevance.t) ->
-  if EConstr.ERelevance.is_irrelevant sigma x then "irrelevant" else "relevant"
-;;
-
-let hyp ?(force_newline : bool = false) ?(indent : int = 0) env sigma
-  : Rocq_utils.hyp -> string
-  =
-  fun (x : Rocq_utils.hyp) ->
-  list
-    ~force_newline:true
-    ~indent:(indent + 1)
-    ~use:("{", "}")
-    (tuple ~is_keyval:true ~indent:(indent + 0) str str)
-    [ "name", name_id (Context.Named.Declaration.get_id x)
-    ; "rel", erel env sigma (Context.Named.Declaration.get_relevance x)
-    ; ( "tys"
-      , econstr_types
-          ~indent:(indent + 2)
-          env
-          sigma
-          (Context.Named.Declaration.get_type x) )
-    ]
-;;
-
-let goal ?(indent : int = 0) : Proofview.Goal.t -> string =
-  fun (x : Proofview.Goal.t) ->
-  let env : Environ.env = Proofview.Goal.env x in
-  let sigma : Evd.evar_map = Proofview.Goal.sigma x in
-  let concl_str =
-    concl env sigma ~indent:(indent + 2) (Proofview.Goal.concl x)
-  in
-  let hyps_str =
-    Printf.sprintf
-      "\n%s%s"
-      (str_tabs (indent + 3))
-      (list
-         ~force_newline:true
-         ~label:"Hypotheses"
-         ~indent:(indent + 3)
-         (hyp ~force_newline:true ~indent:(indent + 3) env sigma)
-         (Proofview.Goal.hyps x))
-  in
-  Printf.sprintf
-    "%s%s"
-    (str_tabs indent)
-    (list
-       ~force_newline:true
-       ~indent:(indent + 2)
-       ~use:("{", "}")
-       (tuple ~is_keyval:true str str)
-       [ "concl", concl_str; "hyps", hyps_str ])
-;;
+open Utils
+open Utils.Strfy
 
 (**********************************)
 (****** MODEL *********************)
@@ -252,11 +13,16 @@ let ind_constr ?(indent : int = 0) env sigma ((ctx, tm) : Rocq_utils.ind_constr)
       ~is_keyval:true
       ~indent
       str
-      (constr_rel_context env sigma)
+      (Rocq_utils.Strfy.constr_rel_context env sigma)
       ("context", ctx)
   in
   let tm_str : string =
-    tuple ~is_keyval:true ~indent str (constr env sigma) ("term   ", tm)
+    tuple
+      ~is_keyval:true
+      ~indent
+      str
+      (Rocq_utils.Strfy.constr env sigma)
+      ("term   ", tm)
   in
   list
     ~force_newline:true
@@ -285,7 +51,11 @@ let enc_econstr_pair ?(indent : int = 0) env sigma
        str
        str
        ( tuple ~is_keyval:true str enc ("encoding", fst x)
-       , tuple ~is_keyval:true str (econstr env sigma) ("econstr", snd x) ))
+       , tuple
+           ~is_keyval:true
+           str
+           (Rocq_utils.Strfy.econstr env sigma)
+           ("econstr", snd x) ))
 ;;
 
 let enc_econstr_opt_pair ?(indent : int = 0) env sigma
@@ -300,7 +70,11 @@ let enc_econstr_opt_pair ?(indent : int = 0) env sigma
        str
        str
        ( tuple ~is_keyval:true str (option enc) ("encoding", fst x)
-       , tuple ~is_keyval:true str (econstr env sigma) ("econstr", snd x) ))
+       , tuple
+           ~is_keyval:true
+           str
+           (Rocq_utils.Strfy.econstr env sigma)
+           ("econstr", snd x) ))
 ;;
 
 let coq_info ?(indent : int = 0) : Model.Info.Coq.t -> string =
@@ -432,8 +206,16 @@ let lts_constr ?(indent : int = 0) env sigma : Mebi_constr.t -> string =
     ~force_newline:true
     ~indent
     str
-    [ tuple ~is_keyval:true str (econstr env sigma) ("action", action)
-    ; tuple ~is_keyval:true str (econstr env sigma) ("destination", destination)
+    [ tuple
+        ~is_keyval:true
+        str
+        (Rocq_utils.Strfy.econstr env sigma)
+        ("action", action)
+    ; tuple
+        ~is_keyval:true
+        str
+        (Rocq_utils.Strfy.econstr env sigma)
+        ("destination", destination)
     ; tuple ~is_keyval:true str (constr_tree ~indent:(indent + 1)) ("tree", tree)
     ]
 ;;

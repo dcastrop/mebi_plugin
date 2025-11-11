@@ -12,7 +12,7 @@ module Constructor_arg : sig
 
   and fresh = {
     sigma : Evd.evar_map;
-    term : Evd.econstr;
+    evar : Evd.econstr;
     original : Evd.econstr;
   }
 
@@ -21,8 +21,6 @@ end
 
 module Pair : sig
   type t = { a : Constructor_arg.t; b : Evd.econstr }
-
-  val normal : Evd.econstr -> Evd.econstr -> t
 
   val _debug_fresh :
     Environ.env ->
@@ -34,6 +32,15 @@ module Pair : sig
     unit
 
   val fresh :
+    Environ.env ->
+    Evd.evar_map ->
+    Evd.econstr ->
+    Evd.econstr ->
+    t
+
+  val normal : Evd.econstr -> Evd.econstr -> t
+
+  val make :
     Environ.env ->
     Evd.evar_map ->
     Evd.econstr ->
@@ -92,6 +99,10 @@ end
 
 module Constructors : sig
   type t = Mebi_constr.t list
+
+  val to_string :
+    ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
+
   type r = Evd.econstr * Mebi_constr.Tree.t list
 
   val sandbox_unify_all_opt :

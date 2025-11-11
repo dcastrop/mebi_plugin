@@ -199,7 +199,7 @@ end
   (* Log.debug
      (Printf.sprintf
      "mebi_wrapper.is_none_term, kind\n%s"
-     (Strfy.econstr_kind env sigma (Mebi_theories.c_None ()))); *)
+     (Rocq_utils.Strfy.econstr_kind env sigma (Mebi_theories.c_None ()))); *)
   match Constr.kind (Rocq_convert.econstr_to_constr sigma x) with
   | App (cx, _) ->
     let cy = Rocq_convert.econstr_to_constr sigma y in
@@ -210,8 +210,8 @@ end
           - none: %s\n\
           - econstr equal: %b\n\
           - constr equal: %b"
-         (Strfy.econstr env sigma x)
-         (Strfy.econstr env sigma (Mebi_theories.c_None ()))
+         (Rocq_utils.Strfy.econstr env sigma x)
+         (Rocq_utils.Strfy.econstr env sigma (Mebi_theories.c_None ()))
          (Mebi_setup.Eq.econstr sigma x y)
          (Mebi_setup.Eq.constr cx cy));
     { state; value = Mebi_setup.Eq.constr cx cy }
@@ -327,43 +327,45 @@ let wrap (f : Environ.env -> Evd.evar_map -> 'a -> string) : 'a -> string =
 
 (* TODO: point to Strfy, use wrap to provide env and sigma *)
 (* module Strfy = struct
-  let constr x = (wrap Strfy.constr) x
+  let constr x = (wrap Rocq_utils.Strfy.constr) x
 
 
 let constr_rel_decl x : string =
-  (wrap Strfy.constr_rel_decl) x
+  (wrap Rocq_utils.Strfy.constr_rel_decl) x
 ;;
 
-let econstr x : string = (wrap Strfy.econstr) x
+let econstr x : string = (wrap Rocq_utils.Strfy.econstr) x
 let term x : string = econstr  x
 
 let econstr_rel_decl x : string =
-  (wrap Strfy.econstr_rel_decl) x
+  (wrap Rocq_utils.Strfy.econstr_rel_decl) x
 ;;
 
 (* let econstr_list_to_constr_opt_string (es : EConstr.t list) : string mm =
   let open Syntax in
   let* es = econstr_list_to_constr_opt es in
-  return (Strfy.list (Strfy.option (wrap Strfy.constr)) es)
+  return (Utils.Strfy.list (Utils.Strfy.option (wrap Rocq_utils.Strfy.constr)) es)
 ;; *)
 end *)
 
-let constr_to_string (x : Constr.t) : string = (wrap Strfy.constr) x
+let constr_to_string (x : Constr.t) : string = (wrap Rocq_utils.Strfy.constr) x
 
 (* let constr_rel_decl_to_string (x : Constr.rel_declaration) : string =
-   (wrap Strfy.constr_rel_decl) x
+   (wrap Rocq_utils.Strfy.constr_rel_decl) x
    ;; *)
 
-let econstr_to_string (x : EConstr.t) : string = (wrap Strfy.econstr) x
+let econstr_to_string (x : EConstr.t) : string =
+  (wrap Rocq_utils.Strfy.econstr) x
+;;
 
 (* let econstr_rel_decl_to_string (x : EConstr.rel_declaration) : string =
-   (wrap Strfy.econstr_rel_decl) x
+   (wrap Rocq_utils.Strfy.econstr_rel_decl) x
    ;; *)
 
 (* let econstr_list_to_constr_opt_string (es : EConstr.t list) : string mm =
    let open Syntax in
    let* es = econstr_list_to_constr_opt es in
-   return (Strfy.list (Strfy.option (wrap Strfy.constr)) es)
+   return (Utils.Strfy.list (Utils.Strfy.option (wrap Rocq_utils.Strfy.constr)) es)
    ;; *)
 
 (********************************************)
@@ -617,35 +619,35 @@ module Error : ERROR_TYPE = struct
       str
         (Printf.sprintf
            "Invalid Kind of type EConstr, expected Atomic, but got: %s"
-           (Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
+           (Rocq_utils.Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
     | Invalid_KindOfTypeEConstr_Expected_Cast (coq_ref, x) ->
       str
         (Printf.sprintf
            "Invalid Kind of type EConstr, expected Cast, but got: %s"
-           (Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
+           (Rocq_utils.Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
     | Invalid_KindOfTypeEConstr_Expected_LetIn (coq_ref, x) ->
       str
         (Printf.sprintf
            "Invalid Kind of type EConstr, expected LetIn, but got: %s"
-           (Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
+           (Rocq_utils.Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
     | Invalid_KindOfTypeEConstr_Expected_Prod (coq_ref, x) ->
       str
         (Printf.sprintf
            "Invalid Kind of type EConstr, expected Prod, but got: %s"
-           (Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
+           (Rocq_utils.Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
     | Invalid_KindOfTypeEConstr_Expected_Sort (coq_ref, x) ->
       str
         (Printf.sprintf
            "Invalid Kind of type EConstr, expected Sort, but got: %s"
-           (Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
+           (Rocq_utils.Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
     | UnknownEncodeKey (coq_ref, fwd_map, x) ->
       str
         (Printf.sprintf
            "Unknown encode key: %s\nEncode map: %s"
-           (Strfy.econstr !coq_ref.coq_env !coq_ref.coq_ctx x)
-           (Strfy.list
-              (Strfy.tuple
-                 (Strfy.econstr !coq_ref.coq_env !coq_ref.coq_ctx)
+           (Rocq_utils.Strfy.econstr !coq_ref.coq_env !coq_ref.coq_ctx x)
+           (Utils.Strfy.list
+              (Utils.Strfy.tuple
+                 (Rocq_utils.Strfy.econstr !coq_ref.coq_env !coq_ref.coq_ctx)
                  Enc.to_string)
               (List.of_seq (F.to_seq fwd_map))))
     | UnknownDecodeKey (coq_ref, bck_map, x) ->
@@ -653,10 +655,10 @@ module Error : ERROR_TYPE = struct
         (Printf.sprintf
            "Unknown decode key: %s\nDecode map: %s"
            (Enc.to_string x)
-           (Strfy.list
-              (Strfy.tuple
+           (Utils.Strfy.list
+              (Utils.Strfy.tuple
                  Enc.to_string
-                 (Strfy.econstr !coq_ref.coq_env !coq_ref.coq_ctx))
+                 (Rocq_utils.Strfy.econstr !coq_ref.coq_env !coq_ref.coq_ctx))
               (List.of_seq (B.to_seq bck_map))))
     | NoBisimResult () -> str "No cached bisimilarity result found."
     (* | ProofvIsNone () -> str "Tried to access contents of proofv which is None." *)
@@ -686,7 +688,7 @@ module Error : ERROR_TYPE = struct
       str
         "Command.extract_args, assertion: Constr.kind tm matches App _ failed. \
          Got "
-      ++ str (Strfy.constr env sigma tm)
+      ++ str (Rocq_utils.Strfy.constr env sigma tm)
       ++ str " which matches with "
       ++ str
            (match Constr.kind tm with
@@ -720,12 +722,12 @@ module Error : ERROR_TYPE = struct
       ++ str
            (Printf.sprintf
               "substls: %s."
-              (Strfy.list (Strfy.econstr env sigma) x))
+              (Utils.Strfy.list (Rocq_utils.Strfy.econstr env sigma) x))
       ++ strbrk "\n"
       ++ str
            (Printf.sprintf
               "ctx_tys: %s."
-              (Strfy.list (wrap Strfy.econstr_rel_decl) y))
+              (Utils.Strfy.list (wrap Rocq_utils.Strfy.econstr_rel_decl) y))
     | InvalidLTSSort f ->
       str "Invalid LTS Sort: expecting Prop, got " ++ Sorts.pr_sort_family f
     | InvalidTypeSort f ->
@@ -733,26 +735,28 @@ module Error : ERROR_TYPE = struct
       ++ Sorts.pr_sort_family f
     | InvalidArity (env, sigma, t) ->
       str "Invalid arity for LTS: "
-      ++ str (Strfy.constr env sigma t)
+      ++ str (Rocq_utils.Strfy.constr env sigma t)
       ++ strbrk "\n"
       ++ str "Expecting: forall params, ?terms -> ?labels -> ?terms -> Prop"
-    | InvalidRefLTS r -> str "Invalid ref LTS: " ++ str (Strfy.global r)
-    | InvalidRefType r -> str "Invalid ref Type: " ++ str (Strfy.global r)
+    | InvalidRefLTS r ->
+      str "Invalid ref LTS: " ++ str (Rocq_utils.Strfy.global r)
+    | InvalidRefType r ->
+      str "Invalid ref Type: " ++ str (Rocq_utils.Strfy.global r)
     | UnknownTermType (env, sigma, (tm, ty, trkeys)) ->
       str
         "None of the constructors provided matched type of term to visit. \
          (unknown_term_type) "
       ++ strbrk "\n\n"
       ++ str "Term: "
-      ++ str (Strfy.econstr env sigma tm)
+      ++ str (Rocq_utils.Strfy.econstr env sigma tm)
       ++ strbrk "\n\n"
       ++ str "Type: "
-      ++ str (Strfy.econstr env sigma ty)
+      ++ str (Rocq_utils.Strfy.econstr env sigma ty)
       ++ strbrk "\n\n"
       ++ str
            (Printf.sprintf
               "Keys: %s"
-              (Strfy.list (Strfy.econstr env sigma) trkeys))
+              (Utils.Strfy.list (Rocq_utils.Strfy.econstr env sigma) trkeys))
       ++ strbrk "\n\n"
       ++ str
            (Printf.sprintf
@@ -762,25 +766,27 @@ module Error : ERROR_TYPE = struct
                  trkeys))
       ++ strbrk "\n"
       ++ str
-           (let tystr = Strfy.pp (Printer.pr_econstr_env env sigma ty) in
+           (let tystr =
+              Rocq_utils.Strfy.pp (Printer.pr_econstr_env env sigma ty)
+            in
             Printf.sprintf
               "Does Type match String of any Key? = %b"
               (List.exists
                  (fun (k : EConstr.t) ->
                    String.equal
                      tystr
-                     (Strfy.pp (Printer.pr_econstr_env env sigma k)))
+                     (Rocq_utils.Strfy.pp (Printer.pr_econstr_env env sigma k)))
                  trkeys))
     | PrimaryLTSNotFound (env, sigma, t, names) ->
       str "Primary LTS Not found for term: "
-      ++ str (Strfy.econstr env sigma t)
+      ++ str (Rocq_utils.Strfy.econstr env sigma t)
       ++ strbrk "\n\n"
       ++ str "constructor names: "
       ++ str
-           (Strfy.list
+           (Utils.Strfy.list
               ~force_newline:true
               ~label:"Names"
-              (Strfy.econstr env sigma)
+              (Rocq_utils.Strfy.econstr env sigma)
               names)
   ;;
 
@@ -971,7 +977,7 @@ let decode_to_string (x : Enc.t) : string =
      let* y = decode x in
      let* env = get_env in
      let* sigma = get_sigma in
-     return (Strfy.pp (Printer.pr_econstr_env env sigma y))
+     return (Rocq_utils.Strfy.pp (Printer.pr_econstr_env env sigma y))
      in
      string_mm s_mm *)
   run
@@ -979,7 +985,7 @@ let decode_to_string (x : Enc.t) : string =
     ~fresh:false
     (let open Syntax in
      let* y = decode x in
-     return ((wrap Strfy.econstr) y))
+     return ((wrap Rocq_utils.Strfy.econstr) y))
 ;;
 
 (********************************************)
@@ -1111,7 +1117,7 @@ let rec pstr_decoded_tree (t1 : decoded_tree) : string =
       (match List.length rhs_int_tree_list with
        | 0 -> ""
        | 1 -> pstr_decoded_tree (List.hd rhs_int_tree_list)
-       | _ -> Strfy.list pstr_decoded_tree rhs_int_tree_list)
+       | _ -> Utils.Strfy.list pstr_decoded_tree rhs_int_tree_list)
 ;;
 
 (**********************************)
@@ -1244,21 +1250,21 @@ let show_fwd_map () : unit =
      Log.debug
        (Printf.sprintf
           "mebi_wrapper.show_fwd_map: \n%s"
-          (Strfy.list
+          (Utils.Strfy.list
              ~force_newline:true
-             (Strfy.tuple
+             (Utils.Strfy.tuple
                 ~force_newline:true
                 ~indent:1
                 (fun (x : EConstr.t) ->
-                  Strfy.tuple
+                  Utils.Strfy.tuple
                     ~is_keyval:true
-                    Strfy.str
-                    (Strfy.econstr env sigma)
+                    Utils.Strfy.str
+                    (Rocq_utils.Strfy.econstr env sigma)
                     ("econstr", x))
                 (fun (x : Enc.t) ->
-                  Strfy.tuple
+                  Utils.Strfy.tuple
                     ~is_keyval:true
-                    Strfy.str
+                    Utils.Strfy.str
                     Enc.to_string
                     ("encoding", x)))
              (Enc.fwd_to_list fwd_map)));
@@ -1276,22 +1282,22 @@ let show_bck_map () : unit =
      Log.debug
        (Printf.sprintf
           "mebi_wrapper.show_bck_map: \n%s"
-          (Strfy.list
+          (Utils.Strfy.list
              ~force_newline:true
-             (Strfy.tuple
+             (Utils.Strfy.tuple
                 ~force_newline:true
                 ~indent:1
                 (fun (x : Enc.t) ->
-                  Strfy.tuple
+                  Utils.Strfy.tuple
                     ~is_keyval:true
-                    Strfy.str
+                    Utils.Strfy.str
                     Enc.to_string
                     ("encoding", x))
                 (fun (x : EConstr.t) ->
-                  Strfy.tuple
+                  Utils.Strfy.tuple
                     ~is_keyval:true
-                    Strfy.str
-                    (Strfy.econstr env sigma)
+                    Utils.Strfy.str
+                    (Rocq_utils.Strfy.econstr env sigma)
                     ("econstr", x)))
              (Enc.bck_to_list bck_map)));
      return ())
@@ -1310,9 +1316,9 @@ let show_bck_map () : unit =
      let _goals = goals in
      let the_proof : Proof.t = Declare.Proof.get proof in
      let the_data = Proof.data the_proof in
-     let goals_string = Strfy.list Strfy.evar the_data.goals in
+     let goals_string = Utils.Strfy.list Rocq_utils.Strfy.evar the_data.goals in
      let all_goals_string =
-       Strfy.list
+       Utils.Strfy.list
          ~indent:2
          Strfy.evar
          (Evar.Set.to_list (Proof.all_goals the_proof))
@@ -1329,14 +1335,14 @@ let show_bck_map () : unit =
        (* _y *)
      in
      let stack_string =
-       Strfy.list
+       Utils.Strfy.list
          ~force_newline:true
          ~indent:1
-         (Strfy.tuple
-            (Strfy.list ~force_newline:true ~indent:2 Strfy.evar)
-            (Strfy.list ~force_newline:true ~indent:2 Strfy.evar))
+         (Utils.Strfy.tuple
+            (Utils.Strfy.list ~force_newline:true ~indent:2 Strfy.evar)
+            (Utils.Strfy.list ~force_newline:true ~indent:2 Strfy.evar))
          the_data.stack
-       (* Strfy.list2
+       (* Utils.Strfy.list2
           ~indent:2
           Strfy.evar
           Strfy.evar
@@ -1361,7 +1367,7 @@ let show_bck_map () : unit =
           all_goals_string
           stack_string
           partial_proof_string
-          (Strfy.pp (Proof.pr_proof the_proof))));
+          (Rocq_utils.Strfy.pp (Proof.pr_proof the_proof))));
   (* *)
   { state = st; value = () }
 ;; *)
@@ -1374,7 +1380,7 @@ let show_bck_map () : unit =
    Log.debug
    (Printf.sprintf
    "mebi_wrapper.show_proof, Proof.pr_proof: %s"
-   (Strfy.pp (Proof.pr_proof the_proof)));
+   (Rocq_utils.Strfy.pp (Proof.pr_proof the_proof)));
    return ()
    ;; *)
 

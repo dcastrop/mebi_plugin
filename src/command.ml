@@ -225,20 +225,28 @@ module MkGraph
       Log.debug
         (Printf.sprintf
            "get_new_constrs:\n%s"
-           (Strfy.list
+           (Utils.Strfy.list
               ~force_newline:true
               (fun x ->
                 let action, dest, tree = x in
-                let f = Strfy.econstr env sigma in
-                Strfy.list
+                let f = Rocq_utils.Strfy.econstr env sigma in
+                Utils.Strfy.list
                   ~force_newline:true
                   ~indent:1
-                  Strfy.str
-                  [ Strfy.tuple ~is_keyval:true Strfy.str f ("action", action)
-                  ; Strfy.tuple ~is_keyval:true Strfy.str f ("dest", dest)
-                  ; Strfy.tuple
+                  Utils.Strfy.str
+                  [ Utils.Strfy.tuple
                       ~is_keyval:true
-                      Strfy.str
+                      Utils.Strfy.str
+                      f
+                      ("action", action)
+                  ; Utils.Strfy.tuple
+                      ~is_keyval:true
+                      Utils.Strfy.str
+                      f
+                      ("dest", dest)
+                  ; Utils.Strfy.tuple
+                      ~is_keyval:true
+                      Utils.Strfy.str
                       Mebi_constr.Tree.to_string
                       ("tree", tree)
                   ])
@@ -252,14 +260,14 @@ module MkGraph
       @raise CannotFindTypeOfTermToVisit
         if none of the constructors provided in [lts_ind_def_map] yield constructors from [check_valid_constructors].
   *)
-  let _get_new_constrs_OLD from_term primary_constr_transitions ind_map lts_enc
+  (* let _get_new_constrs_OLD from_term primary_constr_transitions ind_map lts_enc
     : Mebi_constr.t list mm
     =
     Unify.collect_valid_constructors
       from_term
       primary_constr_transitions
       { ind_map; lts_enc }
-  ;;
+  ;; *)
 
   let _get_new_constrs_NEW from_term primary_constr_transitions ind_map lts_enc
     : Mebi_constr.t list mm
@@ -282,13 +290,14 @@ module MkGraph
         (lts_ind_def_map : Mebi_ind.t B.t)
     : Mebi_constr.t list mm
     =
+    Debug.Control.tick ();
     Log.trace "command.MkGraph.get_new_constrs";
     let* from_term : EConstr.t = decode from in
     let* ind_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
     let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
     let lts_enc : Enc.t = primary.enc in
     Log.notice "\n=/=/=/=/=/=/=/=/=/=/=/=/=/=";
-    let _f = _get_new_constrs_OLD in
+    (* let _f = _get_new_constrs_OLD in *)
     let _f = _get_new_constrs_NEW in
     let* new_constrs =
       _f from_term primary_constr_transitions ind_map lts_enc
