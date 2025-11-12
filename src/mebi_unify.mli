@@ -100,6 +100,12 @@ val check_for_next_constructors
   -> Evd.econstr
   -> Mebi_unification.Constructors.t
   -> (Mebi_setup.Enc.t * Mebi_unification.Problems.t list) option
-  -> (Mebi_unification.Constructor_arg.Fresh.t list
-     * Mebi_unification.Constructors.t)
-       Mebi_wrapper.mm
+  -> Mebi_unification.Constructors.t Mebi_wrapper.mm
+
+val collect_valid_constructors
+  :  (Constr.rel_context * Constr.t) array
+  -> Mebi_ind.t Mebi_wrapper.F.t
+  -> Evd.econstr
+  -> Evd.econstr option
+  -> Mebi_setup.Enc.t
+  -> Mebi_unification.Constructors.t Mebi_wrapper.mm

@@ -218,11 +218,11 @@ module Problems = struct
   ;;
 
   let rec unify_opt ?(debug : bool = false)
-    : t -> (Constructor_arg.Fresh.t list * Mebi_constr.Tree.t list) option mm
+    : t -> (Constructor_arg.Fresh.t option * Mebi_constr.Tree.t) list option mm
     = function
     | [] ->
       Logging.Log.debug (Printf.sprintf "UP0: RETURN");
-      return (Some ([], []))
+      return (Some [])
     | h :: tl ->
       let* success_opt = Problem.unify_opt ~debug h in
       (match success_opt with
@@ -235,11 +235,9 @@ module Problems = struct
           | None ->
             Logging.Log.debug (Printf.sprintf "UP2: NONE");
             return None
-          | Some (fresh, acc) ->
+          | Some acc ->
             Logging.Log.debug (Printf.sprintf "UP3: RETURN");
-            let fresh = append_fresh_opt fresh fresh_opt in
-            let acc = constructor_tree :: acc in
-            return (Some (fresh, acc))))
+            return (Some ((fresh_opt, constructor_tree) :: acc))))
   ;;
 end
 
@@ -257,11 +255,78 @@ module Constructors = struct
   (* unified_tgt, ctor_tree *)
   type r = EConstr.t * Mebi_constr.Tree.t list
 
+  (** monadic List.find_opt.
+      return None if [key] does not appear in [into], else return Some x where x is the [r] in [into] that has a matching [key]
+  *)
+  (* let find_opt_fresh_match (key : EConstr.t) (into : r list) : r option mm =
+     let iter_body (i : int) (acc : r list * r option) =
+     match snd acc with
+     | Some _ -> return acc
+     | None ->
+     let fresh_i = List.nth into i in
+     let* is_match =
+     state (fun env sigma ->
+     sigma, Mebi_setup.Eq.econstr sigma key (fst fresh_i))
+     in
+     if is_match
+     then return (fst acc, Some fresh_i)
+     else return (fresh_i :: fst acc, None)
+     in
+     let* _, result = iterate 0 (List.length into - 1) ([], None) iter_body in
+     return result
+     ;; *)
+
+  let debug_unbox_fresh
+        (tgt : EConstr.t)
+        ({ sigma; evar; original } : Constructor_arg.Fresh.t)
+    : unit mm
+    =
+    state (fun env sigma' ->
+      let tgtstr : string = Rocq_utils.Strfy.econstr env sigma' tgt in
+      let evarstr : string = Rocq_utils.Strfy.econstr env sigma evar in
+      let o1str : string = Rocq_utils.Strfy.econstr env sigma' original in
+      let o2str : string = Rocq_utils.Strfy.econstr env sigma original in
+      Logging.Log.debug
+        (Printf.sprintf
+           "unbox:\n - tgt: %s\n- evar: %s\n- o1: %s\n- o2: %s\n"
+           tgtstr
+           evarstr
+           o1str
+           o2str);
+      sigma', ())
+  ;;
+
+  let sandbox_unbox_fresh
+        (tgt : EConstr.t)
+        ({ sigma; evar; original } : Constructor_arg.Fresh.t)
+    : EConstr.t mm
+    =
+    let* () = debug_unbox_fresh tgt { sigma; evar; original } in
+    (* return evar *)
+    (* TODO: is it as simple as jsut returning the evar sigma? *)
+    state (fun env sigma' -> sigma, evar)
+  ;;
+
+  (** iterate through and remove the Fresh.t part of the tuple. For any None we jsut use the [tgt] provided. For any Some x we sandbox unify with the tgt to obtain what the term should be, and then return it with the tree. The fst of the return tupe is just the head of the list of unboxed-fresh [r], but we use a tuple so that we can easily add any that have None.
+  *)
+  let rec unbox_fresh (tgt : EConstr.t)
+    : (Constructor_arg.Fresh.t option * Mebi_constr.Tree.t) list -> r mm
+    = function
+    | [] -> return (tgt, [])
+    | (None, tree) :: tl ->
+      let* unified_tgt, constructor_trees = unbox_fresh tgt tl in
+      return (unified_tgt, tree :: constructor_trees)
+    | (Some fresh, tree) :: tl ->
+      let* unified_tgt, constructor_trees = unbox_fresh tgt tl in
+      let* unified_tgt = sandbox_unbox_fresh unified_tgt fresh in
+      return (unified_tgt, tree :: constructor_trees)
+  ;;
+
   let sandbox_unify_all_opt
         ?(debug : bool = false)
         (tgt : EConstr.t)
         (problems : Problems.t)
-    : (Constructor_arg.Fresh.t list * r) option mm
+    : r option mm
     =
     sandbox
       (let* unified_opt = Problems.unify_opt ~debug problems in
@@ -269,9 +334,11 @@ module Constructors = struct
        | None ->
          Logging.Log.debug (Printf.sprintf "S1: NONE %i" (List.length problems));
          return None
-       | Some (fresh, constructor_trees) ->
-         let* term = Mebi_utils.econstr_normalize tgt in
-         let* is_undefined = Mebi_utils.econstr_is_evar term in
+       | Some fresh_opt_and_constructor_trees ->
+         let* unified_term, constructor_trees =
+           unbox_fresh tgt fresh_opt_and_constructor_trees
+         in
+         let* is_undefined = Mebi_utils.econstr_is_evar unified_term in
          if is_undefined
          then (
            Logging.Log.debug
@@ -280,36 +347,42 @@ module Constructors = struct
          else (
            Logging.Log.debug
              (Printf.sprintf "S3: RETURN %i" (List.length problems));
-           return (Some (fresh, (term, constructor_trees)))))
+           return (Some (unified_term, constructor_trees))))
   ;;
 
   let rec retrieve
             ?(debug : bool = false)
             (constructor_index : int)
-            (acc : Constructor_arg.Fresh.t list * t)
+            (acc : t)
             (act : EConstr.t)
             (tgt : EConstr.t)
-    : Enc.t * Problems.t list -> (Constructor_arg.Fresh.t list * t) mm
+    : Enc.t * Problems.t list -> t mm
     = function
     | _, [] ->
-      Logging.Log.debug (Printf.sprintf "R0: RETURN %i" (List.length (snd acc)));
+      Logging.Log.debug (Printf.sprintf "R0: RETURN %i" (List.length acc));
       return acc
     | lts_enc, problems :: tl ->
       let* success = sandbox_unify_all_opt ~debug tgt problems in
       (match success with
        | None ->
-         Logging.Log.debug
-           (Printf.sprintf "R1: NONE %i" (List.length (snd acc)));
+         Logging.Log.debug (Printf.sprintf "R1: NONE %i" (List.length acc));
          retrieve ~debug constructor_index acc act tgt (lts_enc, tl)
-       | Some (fresh, (unified_tgt, ctor_trees)) ->
+       | Some (unified_tgt, constructor_trees) ->
          let* unified_tgt = Mebi_utils.econstr_normalize unified_tgt in
          let* act = Mebi_utils.econstr_normalize act in
+         (* let acc =
+            List.map
+            (fun (unified_tgt, trees) ->
+            ( act
+            , unified_tgt
+            , Mebi_constr.Tree.Node ((lts_enc, constructor_index), trees) ))
+            constructor_pairs
+            in *)
          let open Mebi_constr.Tree in
-         let tree = Node ((lts_enc, constructor_index), ctor_trees) in
-         let ctor = act, unified_tgt, tree in
-         let acc' = List.append fresh (fst acc), ctor :: snd acc in
-         Logging.Log.debug
-           (Printf.sprintf "R2: SOME %i" (List.length (snd acc')));
-         retrieve ~debug constructor_index acc' act tgt (lts_enc, tl))
+         let tree = Node ((lts_enc, constructor_index), constructor_trees) in
+         let constructor = act, unified_tgt, tree in
+         let acc = constructor :: acc in
+         Logging.Log.debug (Printf.sprintf "R2: SOME %i" (List.length acc));
+         retrieve ~debug constructor_index acc act tgt (lts_enc, tl))
   ;;
 end
