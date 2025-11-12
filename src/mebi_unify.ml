@@ -290,7 +290,7 @@ and check_for_next_constructors
       (tgt_term : EConstr.t)
       (constructors : Constructors.t)
   :  (Enc.t * Problems.t list) option
-  -> (Constructor_arg.fresh list * Constructors.t) mm
+  -> (Constructor_arg.Fresh.t list * Constructors.t) mm
   = function
   | None ->
     let* () = debug_nextconstrs_return () in
