@@ -2,17 +2,17 @@ val default_debug : bool
 val debugerr : bool
 
 type constructor_args =
-  { lhs : EConstr.t
-  ; act : EConstr.t
-  ; rhs : EConstr.t
+  { lhs : Evd.econstr
+  ; act : Evd.econstr
+  ; rhs : Evd.econstr
   }
 
 module Constructor_arg : sig
   module Fresh : sig
     type t =
       { sigma : Evd.evar_map
-      ; evar : EConstr.t
-      ; original : EConstr.t
+      ; evar : Evd.econstr
+      ; original : Evd.econstr
       }
 
     type cache =
@@ -27,11 +27,15 @@ module Constructor_arg : sig
 
     exception CouldNotGetNextFreshEvarName of unit
 
-    val get_next : Environ.env -> Evd.evar_map -> EConstr.t -> Evd.evar_map * t
+    val get_next
+      :  Environ.env
+      -> Evd.evar_map
+      -> Evd.econstr
+      -> Evd.evar_map * t
   end
 
   type t =
-    | Normal of EConstr.t
+    | Normal of Evd.econstr
     | Fresh of Fresh.t
 
   val to_string : Environ.env -> Evd.evar_map -> t -> string
@@ -40,7 +44,7 @@ end
 module Pair : sig
   type t =
     { a : Constructor_arg.t
-    ; b : EConstr.t
+    ; b : Evd.econstr
     }
 
   val to_string : ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
@@ -57,17 +61,17 @@ module Pair : sig
   val fresh
     :  Environ.env
     -> Evd.evar_map
-    -> EConstr.t
-    -> EConstr.t
+    -> Evd.econstr
+    -> Evd.econstr
     -> Evd.evar_map * t
 
-  val normal : EConstr.t -> EConstr.t -> t
+  val normal : Evd.econstr -> Evd.econstr -> t
 
   val make
     :  Environ.env
     -> Evd.evar_map
-    -> EConstr.t
-    -> EConstr.t
+    -> Evd.econstr
+    -> Evd.econstr
     -> Evd.evar_map * t
 
   val debug_unify : Environ.env -> Evd.evar_map -> t -> unit
@@ -120,7 +124,7 @@ module Problems : sig
   val unify_opt
     :  ?debug:bool
     -> t
-    -> (Constructor_arg.Fresh.t list * Mebi_constr.Tree.t list) option
+    -> (Constructor_arg.Fresh.t option * Mebi_constr.Tree.t) list option
          Mebi_wrapper.mm
 end
 
@@ -129,20 +133,30 @@ module Constructors : sig
 
   val to_string : ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
 
-  type r = EConstr.t * Mebi_constr.Tree.t list
+  type r = Evd.econstr * Mebi_constr.Tree.t list
+
+  val sandbox_unbox_fresh
+    :  Evd.econstr
+    -> Constructor_arg.Fresh.t
+    -> Evd.econstr Mebi_wrapper.mm
+
+  val unbox_fresh
+    :  Evd.econstr
+    -> (Constructor_arg.Fresh.t option * Mebi_constr.Tree.t) list
+    -> r Mebi_wrapper.mm
 
   val sandbox_unify_all_opt
     :  ?debug:bool
-    -> EConstr.t
+    -> Evd.econstr
     -> Problems.t
-    -> (Constructor_arg.Fresh.t list * r) option Mebi_wrapper.mm
+    -> r option Mebi_wrapper.mm
 
   val retrieve
     :  ?debug:bool
     -> int
-    -> Constructor_arg.Fresh.t list * t
-    -> EConstr.t
-    -> EConstr.t
+    -> t
+    -> Evd.econstr
+    -> Evd.econstr
     -> Mebi_setup.Enc.t * Problems.t list
-    -> (Constructor_arg.Fresh.t list * t) Mebi_wrapper.mm
+    -> t Mebi_wrapper.mm
 end

@@ -9,7 +9,18 @@ let show_extractargs_debug : bool = false
 
 (****************************************************************************)
 
-(* let *)
+(** sandbox unifies the fresh with the original, returning the value which is then replaces the destination in the resulting constructor
+*)
+(* let rec fresh_constructors : (Constructor_arg.Fresh.t option * Mebi_constr.t) list -> Constructors.t = function 
+| (None, c) ::tl-> c::  (fresh_constructors tl)
+| (Some {sigma;evar;original},(action,destination,tree))::tl -> 
+  let c' = 
+  sandbox (
+
+  )
+  in
+  c'::  (fresh_constructors tl)
+;; *)
 
 exception ConstructorArgsExpectsArraySize3 of unit
 
@@ -166,7 +177,7 @@ let rec check_valid_constructors
   let* from_term : EConstr.t = Mebi_utils.econstr_normalize from_term in
   let* () = debug_validconstrs_start from_term in
   let iter_body (i : int) (constructors : Constructors.t) =
-    let* () = debug_validconstrs_iter_start constructors in
+    let* () = debug_validconstrs_iter_start i constructors in
     let (ctx, tm) : Constr.rel_context * Constr.t = transitions.(i) in
     let decls : Rocq_utils.econstr_decls = List.map EConstr.of_rel_decl ctx in
     let* substl = mk_ctx_substl [] (List.rev decls) in
@@ -184,10 +195,10 @@ let rec check_valid_constructors
           (i, constructors)
           (substl, decls)
       in
-      let* () = debug_validconstrs_iter_close constructors in
+      let* () = debug_validconstrs_iter_close i constructors in
       return constructors
     else
-      let* () = debug_validconstrs_iter_close constructors in
+      let* () = debug_validconstrs_iter_close i constructors in
       return constructors
   in
   let* constructors = iterate 0 (Array.length transitions - 1) [] iter_body in
@@ -212,7 +223,7 @@ and explore_valid_constructor
   let* next_constructors : (Enc.t * Problems.t list) option =
     check_updated_ctx lts_enc [ [] ] indmap (substl, decls)
   in
-  let* fresh, constructors =
+  let* constructors =
     check_for_next_constructors
       i
       indmap
@@ -289,36 +300,35 @@ and check_for_next_constructors
       (act : EConstr.t)
       (tgt_term : EConstr.t)
       (constructors : Constructors.t)
-  :  (Enc.t * Problems.t list) option
-  -> (Constructor_arg.Fresh.t list * Constructors.t) mm
+  : (Enc.t * Problems.t list) option -> Constructors.t mm
   = function
   | None ->
     let* () = debug_nextconstrs_return () in
-    return ([], constructors)
+    return constructors
   | Some (next_lts_enc, next_problems) ->
     let* () = debug_nextconstrs_start () in
     (match next_problems with
-     | [] ->
+     | [ [] ] ->
        let* sigma = get_sigma in
        if EConstr.isEvar sigma tgt_term
        then
          let* () =
            debug_nextconstrs_close next_problems (Some true) constructors
          in
-         return ([], constructors)
+         return constructors
        else (
          let tree = Mebi_constr.Tree.Node ((next_lts_enc, i), []) in
          let constructors = (act, tgt_term, tree) :: constructors in
          let* () =
            debug_nextconstrs_close next_problems (Some false) constructors
          in
-         return ([], constructors))
+         return constructors)
      | _ ->
-       let* fresh, constructors =
+       let* constructors =
          Constructors.retrieve
            ~debug:true
            i
-           ([], constructors)
+           constructors
            act
            tgt_term
            (next_lts_enc, next_problems)
@@ -326,7 +336,24 @@ and check_for_next_constructors
        Logging.Log.debug
          (Printf.sprintf "N constructors: %i" (List.length constructors));
        let* () = debug_nextconstrs_close next_problems None constructors in
-       return (fresh, constructors))
+       return constructors)
 ;;
+
 (* ! Impossible ! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
+
+let collect_valid_constructors
+      (transitions : (Constr.rel_context * Constr.types) array)
+      (indmap : Mebi_ind.t F.t)
+      (from_term : EConstr.t)
+      (act_term : EConstr.t option)
+      (lts_enc : Enc.t)
+  : Constructors.t mm
+  =
+  let* constructors : Constructors.t =
+    check_valid_constructors transitions indmap from_term act_term lts_enc
+  in
+  Logging.Log.notice "\n=/==/=/=/==/===";
+  let* () = debug_constructors_mm constructors in
+  return constructors
+;;

@@ -96,17 +96,18 @@ MeBi Set Weak Option label.
 (* MeBi Divider "Theories.DevTest.0".
 MeBi FSM (tend) Using termLTS. *)
 
-MeBi Divider "Theories.DevTest.0.1".
+(* MeBi Divider "Theories.DevTest.0.1". *)
 (* MeBi FSM (tseq tend tend) Using termLTS. *)
 
 (* MeBi Divider "Theories.DevTest.0.2". *)
 (* MeBi FSM (tpar tend tend) Using termLTS. *)
 
 (* MeBi Divider "Theories.DevTest.0.3". *)
-MeBi FSM (tseq (tpar tend tend) tend) Using termLTS.
+(* MeBi FSM (tseq (tpar tend tend) tend) Using termLTS. *)
+MeBi FSM (tseq (tpar (tpar tend tend) tend) tend) Using termLTS.
 
-(* MeBi Divider "Theories.DevTest.1".
-MeBi FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) Using termLTS. *)
+(* MeBi Divider "Theories.DevTest.1". *)
+(* MeBi FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) Using termLTS. *)
 
 (* MeBi Divider "Theories.DevTest.2".
 MeBi FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) Using termLTS. *)

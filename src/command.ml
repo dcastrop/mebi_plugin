@@ -276,7 +276,7 @@ module MkGraph
        data
        from_term
        primary_constr_transitions *)
-    Mebi_unify.check_valid_constructors
+    Mebi_unify.collect_valid_constructors
       primary_constr_transitions
       ind_map
       from_term
@@ -290,7 +290,7 @@ module MkGraph
         (lts_ind_def_map : Mebi_ind.t B.t)
     : Mebi_constr.t list mm
     =
-    Debug.Control.tick ();
+    (* Debug.Control.tick (); *)
     Log.trace "command.MkGraph.get_new_constrs";
     let* from_term : EConstr.t = decode from in
     let* ind_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in

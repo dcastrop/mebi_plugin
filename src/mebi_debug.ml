@@ -81,12 +81,13 @@ let debug_validconstrs_close
 
 (** Mebi_unify.check_valid_constructors.iter_body START *)
 let debug_validconstrs_iter_start
+      (i : int)
       (constructors : Mebi_unification.Constructors.t)
   : unit mm
   =
   state (fun env sigma ->
     Logging.Log.notice "\n";
-    let infix : string = "check valid constructor" in
+    let infix : string = Printf.sprintf "check valid constructor (%i)" i in
     let l : int = List.length constructors in
     let suffix : string = Printf.sprintf "(acc: |%i|)" l in
     let () = Scope.start ~infix ~suffix () in
@@ -95,11 +96,12 @@ let debug_validconstrs_iter_start
 
 (** Mebi_unify.check_valid_constructors.iter_body CLOSE *)
 let debug_validconstrs_iter_close
+      (i : int)
       (constructors : Mebi_unification.Constructors.t)
   : unit mm
   =
   state (fun env sigma ->
-    let infix : string = "check valid constructor" in
+    let infix : string = Printf.sprintf "check valid constructor (%i)" i in
     let l : int = List.length constructors in
     let suffix : string = Printf.sprintf "(acc: |%i|)" l in
     let () = Scope.close ~infix ~suffix () in
