@@ -14,15 +14,55 @@ type constructor_args =
   }
 
 module Constructor_arg = struct
+  module Fresh = struct
+    type t =
+      { sigma : Evd.evar_map
+      ; evar : EConstr.t
+      ; original : EConstr.t
+      }
+
+    type cache =
+      { the_prev : Names.Id.Set.t
+      ; the_next : Names.Id.t
+      }
+
+    let the_cache : cache option ref = ref None
+    let the_default_next () : Names.Id.t = Names.Id.of_string "UnifEvar0"
+
+    let the_prev () : Names.Id.Set.t =
+      Option.cata (fun x -> x.the_prev) Names.Id.Set.empty !the_cache
+    ;;
+
+    let the_next () : Names.Id.t =
+      Namegen.next_ident_away
+        (Option.cata (fun x -> x.the_next) (the_default_next ()) !the_cache)
+        (the_prev ())
+    ;;
+
+    exception CouldNotGetNextFreshEvarName of unit
+
+    let get_next (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t)
+      : Evd.evar_map * t
+      =
+      match
+        Evarutil.next_evar_name sigma (Namegen.IntroFresh (the_next ()))
+      with
+      | None -> raise (CouldNotGetNextFreshEvarName ())
+      | Some name ->
+        the_cache
+        := Some
+             { the_prev = Names.Id.Set.add name (the_prev ()); the_next = name };
+        let naming = Namegen.IntroFresh name in
+        let sigma, type_of_x = Rocq_utils.type_of_econstr env sigma x in
+        let sigma', evar = Evarutil.new_evar ~naming env sigma type_of_x in
+        let a : t = { sigma = sigma'; evar; original = x } in
+        sigma, a
+    ;;
+  end
+
   type t =
     | Normal of EConstr.t
-    | Fresh of fresh
-
-  and fresh =
-    { sigma : Evd.evar_map
-    ; evar : EConstr.t
-    ; original : EConstr.t
-    }
+    | Fresh of Fresh.t
 
   let to_string env sigma' : t -> string = function
     | Normal x ->
@@ -63,42 +103,9 @@ module Pair = struct
          bstr)
   ;;
 
-  let naming_template : Namegen.intro_pattern_naming_expr =
-    Namegen.IntroIdentifier (Names.Id.of_string "UnifEvar0")
-  ;;
-
-  let naming_template_cache
-    : (Evd.evar_map * Namegen.intro_pattern_naming_expr) option ref
-    =
-    ref None
-  ;;
-
-  (* TODO: ensure that we can increment "UnifEvar0" names across new evars *)
-  let get_next_naming sigma =
-    Option.cata
-      (fun (sigma', naming) ->
-        Logging.Log.warning "next from some A";
-        let next = Evarutil.next_evar_name sigma' naming in
-        naming_template_cache
-        := Some (sigma, Namegen.IntroIdentifier (Option.get next));
-        next)
-      (Logging.Log.warning "next from none B";
-       let next = Evarutil.next_evar_name sigma naming_template in
-       naming_template_cache
-       := Some (sigma, Namegen.IntroIdentifier (Option.get next));
-       next)
-      !naming_template_cache
-  ;;
-
-  let fresh env sigma' (a : EConstr.t) (b : EConstr.t) : Evd.evar_map * t =
-    let sigma', type_of_a = Rocq_utils.type_of_econstr env sigma' a in
-    let naming =
-      Namegen.IntroIdentifier (Option.get (get_next_naming sigma'))
-    in
-    let sigma, evar = Evarutil.new_evar ~naming env sigma' type_of_a in
-    let () = _debug_fresh env sigma' sigma evar a b in
-    let a : Constructor_arg.t = Fresh { sigma; evar; original = a } in
-    sigma', { a; b }
+  let fresh env sigma (a : EConstr.t) (b : EConstr.t) : Evd.evar_map * t =
+    let sigma, a = Constructor_arg.Fresh.get_next env sigma a in
+    sigma, { a = Fresh a; b }
   ;;
 
   let normal (a : EConstr.t) (b : EConstr.t) : t = { a = Normal a; b }
@@ -119,7 +126,7 @@ module Pair = struct
 
   (** [unify a b] tries to unify [a] and [b] within the context of the [env] and [sigma] of [mm]. @returns [true] if successful, [false] otherwise. *)
   let unify ?(debug : bool = default_debug) env sigma' ({ a; b } : t)
-    : Evd.evar_map * Constructor_arg.fresh option * bool
+    : Evd.evar_map * Constructor_arg.Fresh.t option * bool
     =
     let open Pretype_errors in
     try
@@ -130,7 +137,7 @@ module Pair = struct
         sigma, None, true
       | Fresh { sigma; evar; original } ->
         let sigma = Unification.w_unify env sigma Conversion.CUMUL evar b in
-        let a : Constructor_arg.fresh = { sigma; evar; original } in
+        let a : Constructor_arg.Fresh.t = { sigma; evar; original } in
         if debug then debug_unify env sigma { a = Fresh a; b };
         sigma', Some a, true
     with
@@ -173,7 +180,7 @@ module Problem = struct
   ;;
 
   let unify_opt ?(debug : bool = false)
-    : t -> (Constructor_arg.fresh option * Mebi_constr.Tree.t) option mm
+    : t -> (Constructor_arg.Fresh.t option * Mebi_constr.Tree.t) option mm
     = function
     | unification_problem, constructor_tree ->
       state (fun env sigma ->
@@ -203,15 +210,15 @@ module Problems = struct
       (to_string ~indent:(indent + 1) env sigma)
   ;;
 
-  let append_fresh_opt (fresh : Constructor_arg.fresh list)
-    : Constructor_arg.fresh option -> Constructor_arg.fresh list
+  let append_fresh_opt (fresh : Constructor_arg.Fresh.t list)
+    : Constructor_arg.Fresh.t option -> Constructor_arg.Fresh.t list
     = function
     | None -> fresh
     | Some a -> a :: fresh
   ;;
 
   let rec unify_opt ?(debug : bool = false)
-    : t -> (Constructor_arg.fresh list * Mebi_constr.Tree.t list) option mm
+    : t -> (Constructor_arg.Fresh.t list * Mebi_constr.Tree.t list) option mm
     = function
     | [] ->
       Logging.Log.debug (Printf.sprintf "UP0: RETURN");
@@ -254,7 +261,7 @@ module Constructors = struct
         ?(debug : bool = false)
         (tgt : EConstr.t)
         (problems : Problems.t)
-    : (Constructor_arg.fresh list * r) option mm
+    : (Constructor_arg.Fresh.t list * r) option mm
     =
     sandbox
       (let* unified_opt = Problems.unify_opt ~debug problems in
@@ -279,10 +286,10 @@ module Constructors = struct
   let rec retrieve
             ?(debug : bool = false)
             (constructor_index : int)
-            (acc : Constructor_arg.fresh list * t)
+            (acc : Constructor_arg.Fresh.t list * t)
             (act : EConstr.t)
             (tgt : EConstr.t)
-    : Enc.t * Problems.t list -> (Constructor_arg.fresh list * t) mm
+    : Enc.t * Problems.t list -> (Constructor_arg.Fresh.t list * t) mm
     = function
     | _, [] ->
       Logging.Log.debug (Printf.sprintf "R0: RETURN %i" (List.length (snd acc)));
