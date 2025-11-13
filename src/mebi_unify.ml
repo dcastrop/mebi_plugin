@@ -252,9 +252,8 @@ and check_updated_ctx
     return (Some (lts_enc, acc))
   | _hsubstl :: substl, t :: tl ->
     let* () = debug_updtcontext_start () in
-    let$+ upd_t env sigma =
-      EConstr.Vars.substl substl (Context.Rel.Declaration.get_type t)
-    in
+    let ty_t : EConstr.t = Context.Rel.Declaration.get_type t in
+    let$+ upd_t env sigma = EConstr.Vars.substl substl ty_t in
     let* env = get_env in
     let* sigma = get_sigma in
     (match EConstr.kind sigma upd_t with

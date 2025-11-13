@@ -74,11 +74,11 @@ Inductive termLTS : term -> option label -> term -> Prop :=
 | do_comm : 
   forall tl tr, termLTS (tpar tl tr) None (tpar tr tl)
 
-| do_assocl : forall t1 t2 t3, 
-    termLTS (tpar t1 (tpar t2 t3)) None (tpar (tpar t1 t2) t3)
+(* | do_assocl : forall t1 t2 t3,  *)
+    (* termLTS (tpar t1 (tpar t2 t3)) None (tpar (tpar t1 t2) t3) *)
 
-| do_assocr : forall t1 t2 t3, 
-    termLTS (tpar (tpar t1 t2) t3) None (tpar t1 (tpar t2 t3))
+(* | do_assocr : forall t1 t2 t3,  *)
+    (* termLTS (tpar (tpar t1 t2) t3) None (tpar t1 (tpar t2 t3)) *)
 .
 
 Inductive termLTS_tc : term -> Prop :=
@@ -104,7 +104,17 @@ MeBi FSM (tend) Using termLTS. *)
 
 (* MeBi Divider "Theories.DevTest.0.3". *)
 (* MeBi FSM (tseq (tpar tend tend) tend) Using termLTS. *)
-MeBi FSM (tseq (tpar (tpar tend tend) tend) tend) Using termLTS.
+(* NOTE:        (tseq (tpar tend tend) tend)
+  [ 1 -> [ 3 => (tseq tend tend)
+         ; 5 => (tseq (tpar tend tend) tend)
+         ]
+  ] *)
+(* NOTE:        (tseq tend tend)
+  [ 1 =>        (tend)
+  ] *)
+
+(* MeBi Divider "Theories.DevTest.0.4". *)
+MeBi FSM (tseq (tseq (tpar tend tend) (tpar tend tend)) (tpar tend tend)) Using termLTS.
 
 (* MeBi Divider "Theories.DevTest.1". *)
 (* MeBi FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) Using termLTS. *)

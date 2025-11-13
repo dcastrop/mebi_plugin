@@ -75,11 +75,12 @@ Module Flat.
     | do_comm : 
       forall tl tr, termLTS (tpar tl tr) None (tpar tr tl)
 
-    | do_assocl : forall t1 t2 t3, 
-        termLTS (tpar t1 (tpar t2 t3)) None (tpar (tpar t1 t2) t3)
+      (* NOTE: removing these as without parl/parr we can't go inside of par anyway, so they are just used for handshakes *)
+    (* | do_assocl : forall t1 t2 t3,  *)
+        (* termLTS (tpar t1 (tpar t2 t3)) None (tpar (tpar t1 t2) t3) *)
 
-    | do_assocr : forall t1 t2 t3, 
-        termLTS (tpar (tpar t1 t2) t3) None (tpar t1 (tpar t2 t3))
+    (* | do_assocr : forall t1 t2 t3,  *)
+        (* termLTS (tpar (tpar t1 t2) t3) None (tpar t1 (tpar t2 t3)) *)
     .
 
     Inductive termLTS_tc : term -> Prop :=

@@ -39,6 +39,7 @@
   mebi_ind
   mebi_utils
   mebi_bisim
+  rocq_debug
   params
   ; dump_to_file
   mebi_help
