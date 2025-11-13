@@ -98,6 +98,8 @@ src/mebi_utils.mli
 src/mebi_bisim.ml
 src/mebi_bisim.mli
 
+src/rocq_debug.ml
+src/rocq_debug.mli
 src/params.ml
 src/params.mli
 

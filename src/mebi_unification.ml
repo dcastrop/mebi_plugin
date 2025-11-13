@@ -125,7 +125,7 @@ module Pair = struct
   ;;
 
   (** [unify a b] tries to unify [a] and [b] within the context of the [env] and [sigma] of [mm]. @returns [true] if successful, [false] otherwise. *)
-  let unify ?(debug : bool = default_debug) env sigma' ({ a; b } : t)
+  let unify ?(debug : bool = false) env sigma' ({ a; b } : t)
     : Evd.evar_map * Constructor_arg.Fresh.t option * bool
     =
     let open Pretype_errors in
@@ -255,28 +255,9 @@ module Constructors = struct
   (* unified_tgt, ctor_tree *)
   type r = EConstr.t * Mebi_constr.Tree.t list
 
-  (** monadic List.find_opt.
-      return None if [key] does not appear in [into], else return Some x where x is the [r] in [into] that has a matching [key]
-  *)
-  (* let find_opt_fresh_match (key : EConstr.t) (into : r list) : r option mm =
-     let iter_body (i : int) (acc : r list * r option) =
-     match snd acc with
-     | Some _ -> return acc
-     | None ->
-     let fresh_i = List.nth into i in
-     let* is_match =
-     state (fun env sigma ->
-     sigma, Mebi_setup.Eq.econstr sigma key (fst fresh_i))
-     in
-     if is_match
-     then return (fst acc, Some fresh_i)
-     else return (fresh_i :: fst acc, None)
-     in
-     let* _, result = iterate 0 (List.length into - 1) ([], None) iter_body in
-     return result
-     ;; *)
+  exception NotApp of unit
 
-  let debug_unbox_fresh
+  let _debug_unbox_fresh
         (tgt : EConstr.t)
         ({ sigma; evar; original } : Constructor_arg.Fresh.t)
     : unit mm
@@ -286,14 +267,42 @@ module Constructors = struct
       let evarstr : string = Rocq_utils.Strfy.econstr env sigma evar in
       let o1str : string = Rocq_utils.Strfy.econstr env sigma' original in
       let o2str : string = Rocq_utils.Strfy.econstr env sigma original in
-      Logging.Log.debug
-        (Printf.sprintf
-           "unbox:\n - tgt: %s\n- evar: %s\n- o1: %s\n- o2: %s\n"
-           tgtstr
-           evarstr
-           o1str
-           o2str);
-      sigma', ())
+      let s : EConstr.t = EConstr.Vars.substl [ original; evar ] tgt in
+      let sstr1 : string = Rocq_utils.Strfy.econstr env sigma' s in
+      let sstr2 : string = Rocq_utils.Strfy.econstr env sigma s in
+      match EConstr.kind sigma' tgt with
+      | App (name, args) ->
+        let tgt' : EConstr.t =
+          EConstr.mkApp
+            ( name
+            , Array.map
+                (fun x ->
+                  if Mebi_setup.Eq.econstr sigma' x original then evar else x)
+                args )
+        in
+        let tgt'str1 : string = Rocq_utils.Strfy.econstr env sigma' tgt' in
+        let tgt'str2 : string = Rocq_utils.Strfy.econstr env sigma tgt' in
+        Logging.Log.debug
+          (Printf.sprintf
+             "unbox:\n\
+              - tgt: %s\n\
+              - evar: %s\n\
+              - o1: %s\n\
+              - o2: %s\n\
+              - s1: %s\n\
+              - s2: %s\n\
+              - t1: %s\n\
+              - t2: %s\n"
+             tgtstr
+             evarstr
+             o1str
+             o2str
+             sstr1
+             sstr2
+             tgt'str1
+             tgt'str2);
+        sigma', ()
+      | _ -> raise (NotApp ()))
   ;;
 
   let sandbox_unbox_fresh
@@ -301,10 +310,23 @@ module Constructors = struct
         ({ sigma; evar; original } : Constructor_arg.Fresh.t)
     : EConstr.t mm
     =
-    let* () = debug_unbox_fresh tgt { sigma; evar; original } in
+    (* let* () = debug_unbox_fresh tgt { sigma; evar; original } in *)
     (* return evar *)
     (* TODO: is it as simple as jsut returning the evar sigma? *)
-    state (fun env sigma' -> sigma, evar)
+    state (fun env sigma' ->
+      match EConstr.kind sigma' tgt with
+      | App (name, args) ->
+        let tgt' : EConstr.t =
+          EConstr.mkApp
+            ( name
+            , Array.map
+                (fun x ->
+                  if Mebi_setup.Eq.econstr sigma' x original then evar else x)
+                args )
+        in
+        (* sigma, evar *)
+        sigma, tgt'
+      | _ -> raise (NotApp ()))
   ;;
 
   (** iterate through and remove the Fresh.t part of the tuple. For any None we jsut use the [tgt] provided. For any Some x we sandbox unify with the tgt to obtain what the term should be, and then return it with the tree. The fst of the return tupe is just the head of the list of unboxed-fresh [r], but we use a tuple so that we can easily add any that have None.
@@ -315,10 +337,13 @@ module Constructors = struct
     | [] -> return (tgt, [])
     | (None, tree) :: tl ->
       let* unified_tgt, constructor_trees = unbox_fresh tgt tl in
+      let* () = Rocq_debug.debug_econstr_mm "A" unified_tgt in
       return (unified_tgt, tree :: constructor_trees)
     | (Some fresh, tree) :: tl ->
       let* unified_tgt, constructor_trees = unbox_fresh tgt tl in
+      let* () = Rocq_debug.debug_econstr_mm "B1" unified_tgt in
       let* unified_tgt = sandbox_unbox_fresh unified_tgt fresh in
+      let* () = Rocq_debug.debug_econstr_mm "B2" unified_tgt in
       return (unified_tgt, tree :: constructor_trees)
   ;;
 
@@ -335,6 +360,7 @@ module Constructors = struct
          Logging.Log.debug (Printf.sprintf "S1: NONE %i" (List.length problems));
          return None
        | Some fresh_opt_and_constructor_trees ->
+         Logging.Log.debug "unbox:";
          let* unified_term, constructor_trees =
            unbox_fresh tgt fresh_opt_and_constructor_trees
          in

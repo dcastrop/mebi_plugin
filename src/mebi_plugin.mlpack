@@ -17,6 +17,7 @@ Mebi_wrapper
 Mebi_ind
 Mebi_utils
 Mebi_bisim
+Rocq_debug
 Params
 Mebi_help
 Mebi_unification
