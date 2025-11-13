@@ -27,6 +27,11 @@ let get_lts_trm_type (c : t) : EConstr.t mm =
   match c.kind with LTS l -> return l.trm_type | _ -> invalid_cindef_kind ()
 ;;
 
+let get_lts_label_type (c : t) : EConstr.t mm =
+  Log.trace "mebi_ind.get_lts_label_type";
+  match c.kind with LTS l -> return l.lbl_type | _ -> invalid_cindef_kind ()
+;;
+
 let get_constr_transitions (c : t) : Rocq_utils.ind_constrs mm =
   Log.trace "mebi_ind.get_constr_transitions";
   match c.kind with

@@ -1,3 +1,4 @@
+
 type hyp =
   ( Evd.econstr,
     Evd.econstr,
@@ -110,8 +111,18 @@ val the_next : unit -> Names.variable
 
 exception CouldNotGetNextFreshEvarName of unit
 
-val get_next :
+val get_next_evar :
   Environ.env ->
   Evd.evar_map ->
   Evd.econstr ->
+  Evd.evar_map * Evd.econstr
+
+type evar_source =
+  | TypeOf of Evd.econstr
+  | OfType of Evd.econstr
+
+val get_next :
+  Environ.env ->
+  Evd.evar_map ->
+  evar_source ->
   Evd.evar_map * Evd.econstr

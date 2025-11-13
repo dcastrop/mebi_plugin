@@ -212,7 +212,10 @@ let the_next () : Names.Id.t =
 
 exception CouldNotGetNextFreshEvarName of unit
 
-let get_next (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t)
+let get_next_evar
+      (env : Environ.env)
+      (sigma : Evd.evar_map)
+      (a_type : EConstr.t)
   : Evd.evar_map * EConstr.t
   =
   match Evarutil.next_evar_name sigma (Namegen.IntroFresh (the_next ())) with
@@ -221,6 +224,18 @@ let get_next (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t)
     the_cache
     := Some { the_prev = Names.Id.Set.add name (the_prev ()); the_next = name };
     let naming = Namegen.IntroFresh name in
-    let sigma, type_of_x = type_of_econstr env sigma x in
-    Evarutil.new_evar ~naming env sigma type_of_x
+    Evarutil.new_evar ~naming env sigma a_type
+;;
+
+type evar_source =
+  | TypeOf of EConstr.t
+  | OfType of EConstr.t
+
+let get_next (env : Environ.env) (sigma : Evd.evar_map)
+  : evar_source -> Evd.evar_map * EConstr.t
+  = function
+  | TypeOf a_term ->
+    let sigma, type_of_a_term = type_of_econstr env sigma a_term in
+    get_next_evar env sigma type_of_a_term
+  | OfType a_type -> get_next_evar env sigma a_type
 ;;

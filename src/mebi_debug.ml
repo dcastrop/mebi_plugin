@@ -86,7 +86,7 @@ let debug_validconstrs_iter_start
   : unit mm
   =
   state (fun env sigma ->
-    Logging.Log.notice "\n";
+    (* Logging.Log.notice "\n"; *)
     let infix : string = Printf.sprintf "check valid constructor (%i)" i in
     let l : int = List.length constructors in
     let suffix : string = Printf.sprintf "(acc: |%i|)" l in
@@ -118,7 +118,7 @@ let debug_validconstrs_iter_success_start
   : unit mm
   =
   state (fun env sigma ->
-    Logging.Log.notice "\n";
+    (* Logging.Log.notice "\n"; *)
     let from : string = Rocq_utils.Strfy.econstr env sigma from in
     let _act : string =
       Option.cata (fun act -> Rocq_utils.Strfy.econstr env sigma act) "None" act
@@ -138,7 +138,7 @@ let debug_validconstrs_iter_success_close
   : unit mm
   =
   state (fun env sigma ->
-    Logging.Log.notice "\n";
+    (* Logging.Log.notice "\n"; *)
     let from : string = Rocq_utils.Strfy.econstr env sigma from in
     let _act : string =
       Option.cata (fun act -> Rocq_utils.Strfy.econstr env sigma act) "None" act

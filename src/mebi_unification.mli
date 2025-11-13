@@ -2,17 +2,17 @@ val default_debug : bool
 val debugerr : bool
 
 type constructor_args = {
-  lhs : EConstr.t;
-  act : EConstr.t;
-  rhs : EConstr.t;
+  lhs : Evd.econstr;
+  act : Evd.econstr;
+  rhs : Evd.econstr;
 }
 
 module Constructor_arg : sig
   module Fresh : sig
     type t = {
       sigma : Evd.evar_map;
-      evar : EConstr.t;
-      original : EConstr.t;
+      evar : Evd.econstr;
+      original : Evd.econstr;
     }
 
     exception CouldNotGetNextFreshEvarName of unit
@@ -20,17 +20,17 @@ module Constructor_arg : sig
     val get_next :
       Environ.env ->
       Evd.evar_map ->
-      EConstr.t ->
+      Evd.econstr ->
       Evd.evar_map * t
   end
 
-  type t = Normal of EConstr.t | Fresh of Fresh.t
+  type t = Normal of Evd.econstr | Fresh of Fresh.t
 
   val to_string : Environ.env -> Evd.evar_map -> t -> string
 end
 
 module Pair : sig
-  type t = { a : Constructor_arg.t; b : EConstr.t }
+  type t = { a : Constructor_arg.t; b : Evd.econstr }
 
   val to_string :
     ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
@@ -47,28 +47,42 @@ module Pair : sig
   val fresh :
     Environ.env ->
     Evd.evar_map ->
-    EConstr.t ->
-    EConstr.t ->
+    Evd.econstr ->
+    Evd.econstr ->
     Evd.evar_map * t
 
-  val normal : EConstr.t -> EConstr.t -> t
+  val normal : Evd.econstr -> Evd.econstr -> t
 
   val make :
     Environ.env ->
     Evd.evar_map ->
-    EConstr.t ->
-    EConstr.t ->
+    Evd.econstr ->
+    Evd.econstr ->
     Evd.evar_map * t
 
-  val debug_unify : Environ.env -> Evd.evar_map -> t -> unit
+  val debug_unify :
+    Environ.env ->
+    Evd.evar_map ->
+    Evd.econstr ->
+    Evd.econstr ->
+    unit
 
   val debug_unifyerr :
     Environ.env ->
     Evd.evar_map ->
-    t ->
+    Evd.econstr ->
+    Evd.econstr ->
     Evd.econstr ->
     Evd.econstr ->
     unit
+
+  val w_unify :
+    ?debug:bool ->
+    Environ.env ->
+    Evd.evar_map ->
+    Evd.econstr ->
+    Evd.econstr ->
+    Evd.evar_map * bool
 
   val unify :
     ?debug:bool ->
@@ -124,28 +138,28 @@ module Constructors : sig
   val to_string :
     ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
 
-  type r = EConstr.t * Mebi_constr.Tree.t list
+  type r = Evd.econstr * Mebi_constr.Tree.t list
 
   exception NotApp of unit
 
   val _debug_unbox_fresh :
-    EConstr.t ->
+    Evd.econstr ->
     Constructor_arg.Fresh.t ->
     unit Mebi_wrapper.mm
 
   val sandbox_unbox_fresh :
-    EConstr.t ->
+    Evd.econstr ->
     Constructor_arg.Fresh.t ->
-    EConstr.t Mebi_wrapper.mm
+    Evd.econstr Mebi_wrapper.mm
 
   val unbox_fresh :
-    EConstr.t ->
+    Evd.econstr ->
     (Constructor_arg.Fresh.t option * Mebi_constr.Tree.t) list ->
     r Mebi_wrapper.mm
 
   val sandbox_unify_all_opt :
     ?debug:bool ->
-    EConstr.t ->
+    Evd.econstr ->
     Problems.t ->
     r option Mebi_wrapper.mm
 
@@ -153,8 +167,8 @@ module Constructors : sig
     ?debug:bool ->
     int ->
     t ->
-    EConstr.t ->
-    EConstr.t ->
+    Evd.econstr ->
+    Evd.econstr ->
     Mebi_setup.Enc.t * Problems.t list ->
     t Mebi_wrapper.mm
 end
