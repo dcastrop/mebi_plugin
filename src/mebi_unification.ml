@@ -26,7 +26,7 @@ module Constructor_arg = struct
     let get_next (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t)
       : Evd.evar_map * t
       =
-      let sigma', evar = Rocq_utils.get_next env sigma x in
+      let sigma', evar = Rocq_utils.get_next env sigma (TypeOf x) in
       let a : t = { sigma = sigma'; evar; original = x } in
       sigma, a
     ;;
@@ -86,36 +86,54 @@ module Pair = struct
     if EConstr.isEvar sigma a then fresh env sigma a b else sigma, normal a b
   ;;
 
-  let debug_unify env sigma (x : t) =
-    Log.debug (Printf.sprintf "unified:\n%s" (to_string env sigma x))
+  let debug_unify env sigma a b =
+    let f = Rocq_utils.Strfy.econstr env sigma in
+    let g = Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str f in
+    let s = Utils.Strfy.tuple ~force_newline:true g g (("a", a), ("b", b)) in
+    Log.debug (Printf.sprintf "unified:\n%s" s)
   ;;
 
-  let debug_unifyerr env sigma (x : t) c d =
+  let debug_unifyerr env sigma a b c d =
     let f = Rocq_utils.Strfy.econstr env sigma in
     let s1 = Printf.sprintf "cannot unify \"%s\" with \"%s\"" (f c) (f d) in
-    Log.debug (Printf.sprintf "%s:\n%s" s1 (to_string env sigma x))
+    let g = Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str f in
+    let s2 = Utils.Strfy.tuple ~force_newline:true g g (("a", a), ("b", b)) in
+    Log.debug (Printf.sprintf "%s:\n%s" s1 s2)
+  ;;
+
+  let w_unify
+        ?(debug : bool = default_debug)
+        env
+        sigma
+        (a : EConstr.t)
+        (b : EConstr.t)
+    : Evd.evar_map * bool
+    =
+    let open Pretype_errors in
+    try
+      let sigma = Unification.w_unify env sigma Conversion.CUMUL a b in
+      sigma, true
+    with
+    | PretypeError (_, _, CannotUnify (c, d, _e)) ->
+      if debug || debugerr then debug_unifyerr env sigma a b c d;
+      sigma, false
   ;;
 
   (** [unify a b] tries to unify [a] and [b] within the context of the [env] and [sigma] of [mm]. @returns [true] if successful, [false] otherwise. *)
   let unify ?(debug : bool = default_debug) env sigma' ({ a; b } : t)
     : Evd.evar_map * Constructor_arg.Fresh.t option * bool
     =
-    let open Pretype_errors in
-    try
-      match a with
-      | Normal a ->
-        let sigma = Unification.w_unify env sigma' Conversion.CUMUL a b in
-        if debug then debug_unify env sigma { a = Normal a; b };
-        sigma, None, true
-      | Fresh { sigma; evar; original } ->
-        let sigma = Unification.w_unify env sigma Conversion.CUMUL evar b in
-        let a : Constructor_arg.Fresh.t = { sigma; evar; original } in
-        if debug then debug_unify env sigma { a = Fresh a; b };
-        sigma', Some a, true
-    with
-    | PretypeError (_, _, CannotUnify (c, d, _e)) ->
-      if debug || debugerr then debug_unifyerr env sigma' { a; b } c d;
-      sigma', None, false
+    match a with
+    | Normal a ->
+      let sigma, result = w_unify ~debug env sigma' a b in
+      sigma, None, result
+    | Fresh { sigma; evar; original } ->
+      (match w_unify ~debug env sigma evar b with
+       | sigma, false -> sigma', None, false
+       | sigma, true ->
+         let a : Constructor_arg.Fresh.t = { sigma; evar; original } in
+         if debug then debug_unify env sigma evar b;
+         sigma', Some a, true)
   ;;
 end
 

@@ -269,7 +269,12 @@ module MkGraph
       { ind_map; lts_enc }
   ;; *)
 
-  let _get_new_constrs_NEW from_term primary_constr_transitions ind_map lts_enc
+  let _get_new_constrs_NEW
+        from_term
+        label_type
+        primary_constr_transitions
+        ind_map
+        lts_enc
     : Mebi_constr.t list mm
     =
     (* Mebi_unify.collect_valid_constructors
@@ -280,7 +285,8 @@ module MkGraph
       primary_constr_transitions
       ind_map
       from_term
-      None
+      label_type
+      (* None *)
       lts_enc
   ;;
 
@@ -293,6 +299,7 @@ module MkGraph
     Debug.Control.tick ();
     Log.trace "command.MkGraph.get_new_constrs";
     let* from_term : EConstr.t = decode from in
+    let* label_type : EConstr.t = Mebi_ind.get_lts_label_type primary in
     let* ind_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
     let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
     let lts_enc : Enc.t = primary.enc in
@@ -300,7 +307,7 @@ module MkGraph
     (* let _f = _get_new_constrs_OLD in *)
     let _f = _get_new_constrs_NEW in
     let* new_constrs =
-      _f from_term primary_constr_transitions ind_map lts_enc
+      _f from_term label_type primary_constr_transitions ind_map lts_enc
     in
     (* let new_constrs = get_new_constrs_NEW in *)
     let* () = debug_new_constrs new_constrs in
