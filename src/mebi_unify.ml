@@ -182,18 +182,60 @@ let rec check_valid_constructors
     let decls : Rocq_utils.econstr_decls = List.map EConstr.of_rel_decl ctx in
     let* substl = mk_ctx_substl [] (List.rev decls) in
     let* args : constructor_args = extract_args ~substl tm in
-    let* success = try_unify_constructor_args from_term act_term args in
+    (* TODO: make fresh act_term *)
+    let* fresh_act_opt =
+      state (fun env sigma ->
+        Option.cata
+          (fun x ->
+            let sigma, y = Rocq_utils.get_next env sigma x in
+            sigma, Some (x, y))
+          (sigma, None)
+          act_term)
+    in
+    let* ((original_act, fresh_act) : EConstr.t option * EConstr.t option) =
+      Option.cata
+        (fun ((x, y) : EConstr.t * EConstr.t) ->
+          let* env = get_env in
+          let* sigma = get_sigma in
+          Logging.Log.debug
+            (Printf.sprintf
+               "fresh_act A:\n- act: %s\n- fresh: %s"
+               (Rocq_utils.Strfy.econstr env sigma x)
+               (Rocq_utils.Strfy.econstr env sigma y));
+          return (Some x, Some y))
+        (return (None, None))
+        fresh_act_opt
+    in
+    let* success = try_unify_constructor_args from_term fresh_act args in
     if success
     then
       let* constructors : Constructors.t =
         explore_valid_constructor
           indmap
           from_term
-          act_term
+          fresh_act
           lts_enc
           args
           (i, constructors)
           (substl, decls)
+      in
+      let* env = get_env in
+      let* sigma = get_sigma in
+      let constructors : Constructors.t =
+        match fresh_act_opt with
+        | None -> constructors
+        | Some (original_act, fresh_act) ->
+          Logging.Log.debug
+            (Printf.sprintf
+               "fresh_act B:\n- act: %s\n- fresh: %s"
+               (Rocq_utils.Strfy.econstr env sigma original_act)
+               (Rocq_utils.Strfy.econstr env sigma fresh_act));
+          List.map
+            (fun (x, destination, tree) ->
+              if Mebi_setup.Eq.econstr sigma x original_act
+              then fresh_act, destination, tree
+              else x, destination, tree)
+            constructors
       in
       let* () = debug_validconstrs_iter_close i constructors in
       return constructors
@@ -277,7 +319,11 @@ and check_updated_ctx
              in
              return None
            | next_constructors ->
+             Logging.Log.notice "\n";
+             Logging.Log.debug "ACTFIX:";
              let* () = debug_constructors_mm next_constructors in
+             (* TODO: update the act in args with the ones used in next-constructors *)
+             (* NOTE: cross-product should use this too *)
              let* problems : Problems.t = map_problems args next_constructors in
              let* () = debug_problems_mm problems in
              let acc : Problems.t list = cross_product acc problems in

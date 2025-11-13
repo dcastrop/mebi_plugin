@@ -1,4 +1,3 @@
-
 type hyp =
   ( Evd.econstr,
     Evd.econstr,
@@ -98,3 +97,21 @@ module Strfy : sig
 
   val goal : ?indent:int -> Proofview.Goal.t -> string
 end
+
+type cache = {
+  the_prev : Names.Id.Set.t;
+  the_next : Names.variable;
+}
+
+val the_cache : cache option ref
+val the_default_next : unit -> Names.variable
+val the_prev : unit -> Names.Id.Set.t
+val the_next : unit -> Names.variable
+
+exception CouldNotGetNextFreshEvarName of unit
+
+val get_next :
+  Environ.env ->
+  Evd.evar_map ->
+  Evd.econstr ->
+  Evd.evar_map * Evd.econstr
