@@ -5,7 +5,7 @@ open Mebi_wrapper
 open Mebi_wrapper.Syntax
 
 let default_debug : bool = true
-let debugerr : bool = false
+let debugerr : bool = true
 
 type constructor_args =
   { lhs : EConstr.t
@@ -21,42 +21,14 @@ module Constructor_arg = struct
       ; original : EConstr.t
       }
 
-    type cache =
-      { the_prev : Names.Id.Set.t
-      ; the_next : Names.Id.t
-      }
-
-    let the_cache : cache option ref = ref None
-    let the_default_next () : Names.Id.t = Names.Id.of_string "UnifEvar0"
-
-    let the_prev () : Names.Id.Set.t =
-      Option.cata (fun x -> x.the_prev) Names.Id.Set.empty !the_cache
-    ;;
-
-    let the_next () : Names.Id.t =
-      Namegen.next_ident_away
-        (Option.cata (fun x -> x.the_next) (the_default_next ()) !the_cache)
-        (the_prev ())
-    ;;
-
     exception CouldNotGetNextFreshEvarName of unit
 
     let get_next (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t)
       : Evd.evar_map * t
       =
-      match
-        Evarutil.next_evar_name sigma (Namegen.IntroFresh (the_next ()))
-      with
-      | None -> raise (CouldNotGetNextFreshEvarName ())
-      | Some name ->
-        the_cache
-        := Some
-             { the_prev = Names.Id.Set.add name (the_prev ()); the_next = name };
-        let naming = Namegen.IntroFresh name in
-        let sigma, type_of_x = Rocq_utils.type_of_econstr env sigma x in
-        let sigma', evar = Evarutil.new_evar ~naming env sigma type_of_x in
-        let a : t = { sigma = sigma'; evar; original = x } in
-        sigma, a
+      let sigma', evar = Rocq_utils.get_next env sigma x in
+      let a : t = { sigma = sigma'; evar; original = x } in
+      sigma, a
     ;;
   end
 
@@ -125,7 +97,7 @@ module Pair = struct
   ;;
 
   (** [unify a b] tries to unify [a] and [b] within the context of the [env] and [sigma] of [mm]. @returns [true] if successful, [false] otherwise. *)
-  let unify ?(debug : bool = false) env sigma' ({ a; b } : t)
+  let unify ?(debug : bool = default_debug) env sigma' ({ a; b } : t)
     : Evd.evar_map * Constructor_arg.Fresh.t option * bool
     =
     let open Pretype_errors in
@@ -179,7 +151,7 @@ module Problem = struct
       [ fs; gs ]
   ;;
 
-  let unify_opt ?(debug : bool = false)
+  let unify_opt ?(debug : bool = default_debug)
     : t -> (Constructor_arg.Fresh.t option * Mebi_constr.Tree.t) option mm
     = function
     | unification_problem, constructor_tree ->
@@ -217,7 +189,7 @@ module Problems = struct
     | Some a -> a :: fresh
   ;;
 
-  let rec unify_opt ?(debug : bool = false)
+  let rec unify_opt ?(debug : bool = default_debug)
     : t -> (Constructor_arg.Fresh.t option * Mebi_constr.Tree.t) list option mm
     = function
     | [] ->
@@ -348,7 +320,7 @@ module Constructors = struct
   ;;
 
   let sandbox_unify_all_opt
-        ?(debug : bool = false)
+        ?(debug : bool = default_debug)
         (tgt : EConstr.t)
         (problems : Problems.t)
     : r option mm
@@ -377,7 +349,7 @@ module Constructors = struct
   ;;
 
   let rec retrieve
-            ?(debug : bool = false)
+            ?(debug : bool = default_debug)
             (constructor_index : int)
             (acc : t)
             (act : EConstr.t)

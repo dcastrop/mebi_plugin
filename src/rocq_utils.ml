@@ -191,3 +191,36 @@ module Strfy = struct
          [ "concl", concl_str; "hyps", hyps_str ])
   ;;
 end
+
+type cache =
+  { the_prev : Names.Id.Set.t
+  ; the_next : Names.Id.t
+  }
+
+let the_cache : cache option ref = ref None
+let the_default_next () : Names.Id.t = Names.Id.of_string "UnifEvar0"
+
+let the_prev () : Names.Id.Set.t =
+  Option.cata (fun x -> x.the_prev) Names.Id.Set.empty !the_cache
+;;
+
+let the_next () : Names.Id.t =
+  Namegen.next_ident_away
+    (Option.cata (fun x -> x.the_next) (the_default_next ()) !the_cache)
+    (the_prev ())
+;;
+
+exception CouldNotGetNextFreshEvarName of unit
+
+let get_next (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t)
+  : Evd.evar_map * EConstr.t
+  =
+  match Evarutil.next_evar_name sigma (Namegen.IntroFresh (the_next ())) with
+  | None -> raise (CouldNotGetNextFreshEvarName ())
+  | Some name ->
+    the_cache
+    := Some { the_prev = Names.Id.Set.add name (the_prev ()); the_next = name };
+    let naming = Namegen.IntroFresh name in
+    let sigma, type_of_x = type_of_econstr env sigma x in
+    Evarutil.new_evar ~naming env sigma type_of_x
+;;
