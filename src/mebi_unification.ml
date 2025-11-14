@@ -344,6 +344,12 @@ module Constructors = struct
   ;;
 
   (** iterate through and remove the Fresh.t part of the tuple. For any None we jsut use the [tgt] provided. For any Some x we sandbox unify with the tgt to obtain what the term should be, and then return it with the tree. The fst of the return tupe is just the head of the list of unboxed-fresh [r], but we use a tuple so that we can easily add any that have None.
+      (* TODO: redocument this *)
+
+      @param act
+        is the action from the outer-scope, and is only here to act as a default return parameter in the case that the list provided is empty -- which will not be the case here since we already checked for this in [Mebi_unify.check_for_next_constructors]. This is just here to provide a base-case return parameter for this recursive function.
+      @param tgt
+        is similar to act, except that it is actually used. In the case that we have [Some fresh] we determine which one should be returned via [sandbox_unbox_fresh]
   *)
   let rec unbox_fresh (act : EConstr.t) (tgt : EConstr.t)
     :  (EConstr.t * Constructor_arg.Fresh.t option * Mebi_constr.Tree.t) list

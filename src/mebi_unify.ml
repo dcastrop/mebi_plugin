@@ -287,8 +287,6 @@ and check_updated_ctx
              (* let* () = debug_updtcontext_close_app_known name c next_constructors in *)
              return None
            | next_constructors ->
-             (* TODO: extract the actions from the next-constructors and incoorporate them within the *)
-             (* Logging.Log.notice "\n"; *)
              let* () = Rocq_debug.debug_econstr_mm "CTX act" act in
              let* () = debug_constructors_mm next_constructors in
              let* problems : Problems.t = map_problems args next_constructors in
