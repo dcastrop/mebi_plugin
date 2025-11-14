@@ -93,7 +93,7 @@ module Pair : sig
 end
 
 module Problem : sig
-  type t = Pair.t * Mebi_constr.Tree.t
+  type t = Evd.econstr * Pair.t * Mebi_constr.Tree.t
 
   val to_string :
     ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
@@ -101,7 +101,9 @@ module Problem : sig
   val unify_opt :
     ?debug:bool ->
     t ->
-    (Constructor_arg.Fresh.t option * Mebi_constr.Tree.t)
+    (Evd.econstr
+    * Constructor_arg.Fresh.t option
+    * Mebi_constr.Tree.t)
     option
     Mebi_wrapper.mm
 end
@@ -127,7 +129,10 @@ module Problems : sig
   val unify_opt :
     ?debug:bool ->
     t ->
-    (Constructor_arg.Fresh.t option * Mebi_constr.Tree.t) list
+    (Evd.econstr
+    * Constructor_arg.Fresh.t option
+    * Mebi_constr.Tree.t)
+    list
     option
     Mebi_wrapper.mm
 end
@@ -138,7 +143,7 @@ module Constructors : sig
   val to_string :
     ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
 
-  type r = Evd.econstr * Mebi_constr.Tree.t list
+  type r = Evd.econstr * Evd.econstr * Mebi_constr.Tree.t list
 
   exception NotApp of unit
 
@@ -154,11 +159,16 @@ module Constructors : sig
 
   val unbox_fresh :
     Evd.econstr ->
-    (Constructor_arg.Fresh.t option * Mebi_constr.Tree.t) list ->
+    Evd.econstr ->
+    (Evd.econstr
+    * Constructor_arg.Fresh.t option
+    * Mebi_constr.Tree.t)
+    list ->
     r Mebi_wrapper.mm
 
   val sandbox_unify_all_opt :
     ?debug:bool ->
+    Evd.econstr ->
     Evd.econstr ->
     Problems.t ->
     r option Mebi_wrapper.mm
