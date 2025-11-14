@@ -11,19 +11,33 @@ val map_constr_to_pair :
   Evd.econstr ->
   Mebi_unification.Pair.t Mebi_wrapper.mm
 
+type labelled_problem =
+  Evd.econstr * Mebi_unification.Problem.t
+
+type labelled_problems =
+  Evd.econstr * Mebi_unification.Problems.t
+
 val map_constr_to_problem :
   Mebi_unification.constructor_args ->
   Mebi_constr.t ->
   Mebi_unification.Problem.t Mebi_wrapper.mm
+
+val map_labelled_problems :
+  Mebi_unification.constructor_args ->
+  Mebi_unification.Constructors.t ->
+  labelled_problem list Mebi_wrapper.mm
 
 val map_problems :
   Mebi_unification.constructor_args ->
   Mebi_unification.Constructors.t ->
   Mebi_unification.Problems.t Mebi_wrapper.mm
 
+val flatten_labelled_probelm_list :
+  labelled_problem list -> labelled_problems list
+
 val cross_product :
   Mebi_unification.Problems.t list ->
-  Mebi_unification.Problem.t list ->
+  Mebi_unification.Problems.t ->
   Mebi_unification.Problems.t list
 
 exception TryUnifyConstrArgsYieldFresh of unit

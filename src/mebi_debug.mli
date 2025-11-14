@@ -1,4 +1,3 @@
-
 val debug_problems :
   Environ.env ->
   Evd.evar_map ->
@@ -16,6 +15,42 @@ val debug_problems_list :
 
 val debug_problems_list_mm :
   Mebi_unification.Problems.t list -> unit Mebi_wrapper.mm
+
+val debug_labelled_problem_list :
+  Environ.env ->
+  Evd.evar_map ->
+  (Evd.econstr * Mebi_unification.Problem.t) list ->
+  unit
+
+val debug_labelled_problem_list_mm :
+  (Evd.econstr * Mebi_unification.Problem.t) list ->
+  unit Mebi_wrapper.mm
+
+val debug_labelled_problems_list :
+  Environ.env ->
+  Evd.evar_map ->
+  (Evd.econstr * Mebi_unification.Problems.t) list ->
+  unit
+
+val debug_labelled_problems_list_mm :
+  (Evd.econstr * Mebi_unification.Problems.t) list ->
+  unit Mebi_wrapper.mm
+
+val debug_labelled_cross_product :
+  Environ.env ->
+  Evd.evar_map ->
+  Evd.econstr ->
+  Evd.econstr ->
+  'a ->
+  'b ->
+  unit
+
+val debug_labelled_cross_product_mm :
+  Evd.econstr ->
+  Evd.econstr ->
+  'a ->
+  'b ->
+  unit Mebi_wrapper.mm
 
 val debug_constructors :
   Environ.env ->

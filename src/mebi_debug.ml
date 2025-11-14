@@ -32,6 +32,84 @@ let debug_problems_list_mm (problems : Mebi_unification.Problems.t list)
     sigma, ())
 ;;
 
+(****************************************************)
+
+let debug_labelled_problem_list
+      env
+      sigma
+      (labelled_problems : (EConstr.t * Mebi_unification.Problem.t) list)
+  : unit
+  =
+  List.iter
+    (fun ((action, problem) : EConstr.t * Mebi_unification.Problem.t) ->
+      let action : string = Rocq_utils.Strfy.econstr env sigma action in
+      Logging.Log.debug
+        (Printf.sprintf
+           "labelled unification problem: %s\n%s\n"
+           action
+           (Mebi_unification.Problem.to_string env sigma problem)))
+    labelled_problems
+;;
+
+let debug_labelled_problem_list_mm
+      (labelled_problems : (EConstr.t * Mebi_unification.Problem.t) list)
+  : unit mm
+  =
+  state (fun env sigma ->
+    let () = debug_labelled_problem_list env sigma labelled_problems in
+    sigma, ())
+;;
+
+let debug_labelled_problems_list
+      env
+      sigma
+      (labelled_problems : (EConstr.t * Mebi_unification.Problems.t) list)
+  : unit
+  =
+  List.iter
+    (fun ((action, problems) : EConstr.t * Mebi_unification.Problems.t) ->
+      let action : string = Rocq_utils.Strfy.econstr env sigma action in
+      Logging.Log.debug
+        (Printf.sprintf
+           "labelled unification problem: %s\n%s\n"
+           action
+           (Mebi_unification.Problems.to_string env sigma problems)))
+    labelled_problems
+;;
+
+let debug_labelled_problems_list_mm
+      (labelled_problems : (EConstr.t * Mebi_unification.Problems.t) list)
+  : unit mm
+  =
+  Logging.Log.debug "POST CROSS PRODUCT: B";
+  state (fun env sigma ->
+    let () = debug_labelled_problems_list env sigma labelled_problems in
+    sigma, ())
+;;
+
+let debug_labelled_cross_product env sigma xact yact xproblems yproblem : unit =
+  let f : EConstr.t -> string = Rocq_utils.Strfy.econstr env sigma in
+  let xactevar : bool = EConstr.isEvar sigma xact in
+  let xact : string = f xact in
+  let yactevar : bool = EConstr.isEvar sigma yact in
+  let yact : string = f yact in
+  Logging.Log.debug
+    (Printf.sprintf
+       "labelled cross product:\n- xact (%b): %s\n- yact (%b): %s"
+       xactevar
+       xact
+       yactevar
+       yact)
+;;
+
+let debug_labelled_cross_product_mm xact yact xproblems yproblem : unit mm =
+  state (fun env sigma ->
+    let () =
+      debug_labelled_cross_product env sigma xact yact xproblems yproblem
+    in
+    sigma, ())
+;;
+
 let debug_constructors
       env
       sigma
