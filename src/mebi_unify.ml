@@ -38,8 +38,8 @@ let map_constr_to_pair (a : EConstr.t) (b : EConstr.t) : Pair.t mm =
 (** creates unification problems between the rhs of the current constructor and the lhs of the next.
 *)
 let map_constr_to_problem args : Mebi_constr.t -> Problem.t mm = function
-  | act, lhs, tree ->
-    let* pair : Pair.t = map_constr_to_pair args.rhs lhs in
+  | act, rhs, tree ->
+    let* pair : Pair.t = map_constr_to_pair args.rhs rhs in
     return (act, pair, tree)
 ;;
 
@@ -287,12 +287,12 @@ and check_updated_ctx
              (* let* () = debug_updtcontext_close_app_known name c next_constructors in *)
              return None
            | next_constructors ->
-             let* () = Rocq_debug.debug_econstr_mm "CTX act" act in
-             let* () = debug_constructors_mm next_constructors in
+             (* let* () = Rocq_debug.debug_econstr_mm "CTX act" act in *)
+             (* let* () = debug_constructors_mm next_constructors in *)
              let* problems : Problems.t = map_problems args next_constructors in
-             let* () = debug_problems_mm problems in
+             (* let* () = debug_problems_mm problems in *)
              let acc : Problems.t list = cross_product acc problems in
-             let* () = debug_problems_list_mm acc in
+             (* let* () = debug_problems_list_mm acc in *)
              let* acc = check_updated_ctx lts_enc acc indmap (substl, tl) in
              return acc))
      | _ ->
