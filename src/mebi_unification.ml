@@ -386,14 +386,6 @@ module Constructors = struct
        | Some (unified_tgt, constructor_trees) ->
          let* unified_tgt = Mebi_utils.econstr_normalize unified_tgt in
          let* act = Mebi_utils.econstr_normalize act in
-         (* let acc =
-            List.map
-            (fun (unified_tgt, trees) ->
-            ( act
-            , unified_tgt
-            , Mebi_constr.Tree.Node ((lts_enc, constructor_index), trees) ))
-            constructor_pairs
-            in *)
          let open Mebi_constr.Tree in
          let tree = Node ((lts_enc, constructor_index), constructor_trees) in
          let constructor = act, unified_tgt, tree in
