@@ -39,13 +39,13 @@ let get_the_result () : Algorithms.Bisimilar.result ref =
   | Some r -> r
 ;;
 
-let get_m () : Fsm.t = !(get_the_result ()).the_fsm_1
+(* let get_m () : Fsm.t = !(get_the_result ()).the_fsm_1 *)
 let get_n () : Fsm.t = !(get_the_result ()).the_fsm_2
 let get_bisim_states () : Partition.t = !(get_the_result ()).bisim_states
 
-let get_non_bisim_states () : Partition.t =
-  !(get_the_result ()).non_bisim_states
-;;
+(* let get_non_bisim_states () : Partition.t =
+   !(get_the_result ()).non_bisim_states
+   ;; *)
 
 let set_the_result (new_r : Algorithms.Bisimilar.result) : unit =
   match !the_cached_result with
@@ -1068,8 +1068,35 @@ let handle_proof_state () : unit Proofview.tactic =
     | Constructors (anno, tacs) -> handle_constuctors gl (anno, tacs))
 ;;
 
-let loop_test () : unit Proofview.tactic =
-  Log.debug "mebi_bisim.loop_test";
+let loop_iter () : unit Proofview.tactic =
+  Log.debug "mebi_bisim.loop_iter";
   Mebi_theories.tactics
     [ handle_proof_state (); Mebi_tactics.simplify_and_subst_all () ]
+;;
+
+(** ...
+    @param u
+      is the upper-bound, i.e., the maximum number of iterations to try solve the proof via [loop_iter].
+*)
+let solve (u : int) (pstate : Declare.Proof.t) : Declare.Proof.t =
+  let rec iter_body (n : int) (pstate : Declare.Proof.t) : int * Declare.Proof.t
+    =
+    if Proof.is_done (Declare.Proof.get pstate)
+    then (
+      Log.notice (Printf.sprintf "Solved in (%i) iterations." (u - n));
+      n, pstate)
+    else (
+      match Int.compare n 0 with
+      | -1 ->
+        Log.warning (Printf.sprintf "Could not Solve in (%i) iterations." u);
+        0, pstate
+      | _ ->
+        let pstate : Declare.Proof.t =
+          Mebi_tactics.update_proof_by_tactic pstate (loop_iter ())
+        in
+        iter_body (n - 1) pstate)
+  in
+  let rem, pstate = iter_body u pstate in
+  Log.notice (Printf.sprintf "Stopped after (%i) iterations." (u - rem));
+  pstate
 ;;
