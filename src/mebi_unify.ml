@@ -591,18 +591,31 @@ and check_for_next_constructors
          let constructors = (outer_act, tgt_term, tree) :: constructors in
          return constructors)
      | next_labelled_problems ->
-       let iter_body (j : int) (acc : Constructors.t) : Constructors.t mm =
-         (* let next_act, next_problems = List.nth next_labelled_problems j in *)
+       (* let iter_body (j : int) (acc : Constructors.t) : Constructors.t mm =
+          (* let next_act, next_problems = List.nth next_labelled_problems j in *)
+          Constructors.retrieve
+          ~debug:true
+          i
+          acc
+          outer_act (* next_act *)
+          tgt_term
+          (* (next_lts_enc, [ next_problems ]) *)
+          (next_lts_enc, next_problems)
+          in
+          iterate 0 (List.length next_labelled_problems - 1) constructors iter_body *)
+       let* constructors =
          Constructors.retrieve
            ~debug:true
            i
-           acc
-           outer_act (* next_act *)
+           constructors
+           outer_act
            tgt_term
-           (* (next_lts_enc, [ next_problems ]) *)
            (next_lts_enc, next_problems)
        in
-       iterate 0 (List.length next_labelled_problems - 1) constructors iter_body)
+       Logging.Log.debug
+         (Printf.sprintf "N constructors: %i" (List.length constructors));
+       let* () = debug_nextconstrs_close next_problems None constructors in
+       return constructors)
 ;;
 
 (* let* act = state (fun env sigma -> check_fresh_econstr env sigma act) in *)
