@@ -307,54 +307,6 @@ let get_fresh_evar (original : Rocq_utils.evar_source) : EConstr.t mm =
   state (fun env sigma -> Rocq_utils.get_next env sigma original)
 ;;
 
-(* let make_fresh_econstr env sigma (original : EConstr.t)
-   : Evd.evar_map * (EConstr.t * EConstr.t)
-   =
-   let sigma, fresh = Rocq_utils.get_next env sigma original in
-   sigma, (original, fresh)
-   ;; *)
-
-(* let check_fresh_econstr env sigma (original : EConstr.t)
-   : Evd.evar_map * EConstr.t
-   =
-   if EConstr.isEvar sigma original
-   then (
-   let sigma, (_original, fresh) = make_fresh_econstr env sigma original in
-   sigma, fresh)
-   else sigma, original
-   ;; *)
-
-(* let make_fresh_action_opt (action : EConstr.t option)
-   : (EConstr.t * EConstr.t) option mm
-   =
-   state (fun env sigma ->
-   match action with
-   | None -> sigma, None
-   | Some original ->
-   let sigma, (original, fresh) = make_fresh_econstr env sigma original in
-   sigma, Some (original, fresh))
-   ;; *)
-
-(* let unpack_fresh_action_opt
-   : (EConstr.t * EConstr.t) option -> (EConstr.t option * EConstr.t option) mm
-   = function
-   | None -> return (None, None)
-   | Some (original, fresh) -> return (Some original, Some fresh)
-   ;; *)
-
-(* let update_args_with_fresh_action (args : constructor_args)
-  : EConstr.t option -> constructor_args
-  = function
-  | None -> args
-  | Some fresh -> { args with act = fresh }
-;; *)
-
-(* let update_args_action (args : constructor_args) : constructor_args mm =
-  state (fun env sigma ->
-    let sigma, act = check_fresh_econstr env sigma args.act in
-    sigma, { args with act })
-;; *)
-
 exception ConstructorNameNotRecognized of (EConstr.t * EConstr.t)
 
 (** Checks possible transitions for this term: *)
@@ -364,88 +316,48 @@ let rec check_valid_constructors
           (from_term : EConstr.t)
           (act_term : EConstr.t)
           (lts_enc : Enc.t)
-            (* : ((Evd.econstr * Evd.econstr) option list * Constructors.t) mm *)
   : Constructors.t mm
   =
   let* from_term : EConstr.t = Mebi_utils.econstr_normalize from_term in
   let* () = debug_validconstrs_start from_term in
-  let iter_body
-        (i : int)
-        (* ((fresh_act_ops,constructors) : ((Evd.econstr * Evd.econstr) option list *Constructors.t)) *)
-          (constructors : Constructors.t)
-    =
+  let iter_body (i : int) (constructors : Constructors.t) =
     let* () = debug_validconstrs_iter_start i constructors in
     let (ctx, tm) : Constr.rel_context * Constr.t = transitions.(i) in
     let decls : Rocq_utils.econstr_decls = List.map EConstr.of_rel_decl ctx in
     let* substl = mk_ctx_substl [] (List.rev decls) in
     let* args : constructor_args = extract_args ~substl tm in
+    (* NOTE: make fresh [act_term] *)
     let* act_term : EConstr.t = get_fresh_evar (TypeOf act_term) in
-    (* NOTE: make fresh act_term *)
-    (* let* fresh_act_opt = make_fresh_action_opt act_term in *)
-    (*  *)
-    (*  *)
-    (* let act_term:EConstr.t = match act_term with | None -> (
-      state (fun env sigma -> let sigma, fresh = Rocq_utils.get_next env sigma original in args.act)) *)
-    (*  *)
-    (*  *)
-    (*  *)
-    (*  *)
-    (* let* original_act, fresh_act = unpack_fresh_action_opt fresh_act_opt in *)
-    (* let* success = try_unify_constructor_args from_term fresh_act args in *)
     let* success = try_unify_constructor_args from_term (Some act_term) args in
     if success
     then (
-      (* let* args : constructor_args = update_args_action args in *)
-      (* let* () =
-        Option.cata
-          (fun fresh_act ->
-            Rocq_debug.debug_econstr_mm "A CVC fresh_act" fresh_act)
-          (Rocq_debug.debug_econstr_mm "A CVC args.act" args.act)
-          fresh_act
-      in *)
-      (* let args = update_args_with_fresh_action args fresh_act in *)
-      let* () = Rocq_debug.debug_econstr_mm "A CVC args.act" args.act in
-      let args = { args with act = act_term } in
-      let* () = Rocq_debug.debug_econstr_mm "B CVC args.act" args.act in
+      (* NOTE: replace [act] with the fresh [act_term] *)
+      let args : constructor_args = { args with act = act_term } in
       let* constructors : Constructors.t =
         explore_valid_constructor
           indmap
           from_term
-          (* fresh_act *)
           lts_enc
           args
           (i, constructors)
           (substl, decls)
       in
-      Logging.Log.debug "VC fresh act fix:";
-      (* let* constructors : Constructors.t =
-         update_constructors_fresh_action constructors fresh_act_opt
-         in *)
       let* () = debug_constructors_mm constructors in
       let* () = debug_validconstrs_iter_close i constructors in
-      (* return (fresh_act_opt::fresh_act_ops, constructors) *)
       return constructors)
     else
       let* () = debug_validconstrs_iter_close i constructors in
-      (* return (fresh_act_ops,constructors) *)
       return constructors
   in
-  let*
-    (* (fresh_act_ops,constructors) *)
-      constructors
-    =
-    iterate 0 (Array.length transitions - 1) [] (* ([],[]) *) iter_body
-  in
+  let* constructors = iterate 0 (Array.length transitions - 1) [] iter_body in
   let* () = debug_validconstrs_close from_term constructors in
-  (* return (fresh_act_ops,constructors) *)
   return constructors
 
 (** *)
 and explore_valid_constructor
       (indmap : Mebi_ind.t F.t)
       (from_term : EConstr.t)
-      (* (act_term : EConstr.t option) *)
-        (lts_enc : Enc.t)
+      (lts_enc : Enc.t)
       (args : constructor_args)
       ((i, constructors) : int * Constructors.t)
       ((substl, decls) : EConstr.Vars.substl * EConstr.rel_declaration list)
@@ -454,37 +366,35 @@ and explore_valid_constructor
   let* () =
     debug_validconstrs_iter_success_start from_term (Some args.act) args
   in
-  (* NOTE: if args.act is evar then make fresh *)
-  (* let* args = update_args_action args in *)
-  (* let* fresh_act_opt = make_fresh_action_opt act_term in *)
-  (* let* original_act, fresh_act = unpack_fresh_action_opt fresh_act_opt in *)
+  (* NOTE: unpack and normalize [act] and [tgt] from [args] *)
+  let tgt : EConstr.t = EConstr.Vars.substl substl args.rhs in
+  let* tgt : EConstr.t = Mebi_utils.econstr_normalize tgt in
   let* act : EConstr.t = Mebi_utils.econstr_normalize args.act in
-  let tgt_term : EConstr.t = EConstr.Vars.substl substl args.rhs in
-  let* tgt_term : EConstr.t = Mebi_utils.econstr_normalize tgt_term in
-  (*  *)
-  (*  *)
-  (*  *)
-  (* TODO: we need to somehow obtain all of the actions that [act] turns into *)
-  (* TODO: do we: *)
-  (* TODO:  (1)  extend the problems themselves to contain them, or extend updated_ctx to return them? *)
-  (*  *)
-  (*  *)
-  (*  *)
+  (* ! NOTE: any next consturctors will replace [act] with their own fresh evar *)
   let* () = Rocq_debug.debug_econstr_mm "A EVC act" act in
   let* next_constructor_problems : (Enc.t * Problems.t list) option =
-    (* let* next_constructor_problems : (Enc.t * labelled_problem list list) option = *)
-    (* check_updated_ctx lts_enc [ [] ] indmap (substl, decls) *)
-    (* check_updated_ctx lts_enc [ None, [] ] indmap (substl, decls) *)
-    (* check_updated_ctx lts_enc act [ [] ] indmap (substl, decls) *)
     check_updated_ctx lts_enc [ [] ] indmap (substl, decls)
   in
+  (* ! NOTE: we only have the initial [act] to use for the constructors *)
   let* () = Rocq_debug.debug_econstr_mm "B EVC act" act in
+  (* ?: how can we retain the information of the label for each constructor *)
+  (* TODO: (1) expand [Problems.t] to contain actions? 
+        -> effectively the same as [Mebi_constr.t]
+  *)
+  (* TODO: (2) have [check_updated_ctx] return: 
+                      [(Enc.t * (EConstr.t * Problems.t) list) option] 
+        -> from some tests, this proved to overcomplicate things.
+          - required [(EConstr.t * Problem.t) list] for the cross-product, and the need to check which subset of problems to unify with
+        -> this messes with our pattern matches on "[ [] ]" 
+  *)
+  (*****************************)
+  (* TODO: *)
   let* constructors =
     check_for_next_constructors
       i
       indmap
       act
-      tgt_term
+      tgt
       constructors
       next_constructor_problems
   in
@@ -501,13 +411,9 @@ and explore_valid_constructor
 (* Should return a list of unification problems *)
 and check_updated_ctx
       (lts_enc : Enc.t)
-      (* (outer_act:EConstr.t) *)
-      (* (acc : (EConstr.t option * Problems.t) list) *)
-      (* (acc : labelled_problem list list) *)
-        (acc : Problems.t list)
+      (acc : Problems.t list)
       (indmap : Mebi_ind.t F.t)
   :  EConstr.Vars.substl * EConstr.rel_declaration list
-     (* -> (Enc.t * labelled_problem list list) option mm *)
   -> (Enc.t * Problems.t list) option mm
   = function
   | [], [] ->
@@ -536,36 +442,26 @@ and check_updated_ctx
           in
           (match next_constructors with
            | [] ->
-             (* let* () =
-                debug_updtcontext_close_app_known name c next_constructors
-                in *)
+             (* let* () = debug_updtcontext_close_app_known name c next_constructors in *)
              return None
            | next_constructors ->
              (* TODO: extract the actions from the next-constructors and incoorporate them within the *)
-             let* () = Rocq_debug.debug_econstr_mm "CTX act" act in
              Logging.Log.notice "\n";
-             Logging.Log.debug "ACTFIX:";
-             Logging.Log.debug (Printf.sprintf "ACC: %i" (List.length acc));
+             let* () = Rocq_debug.debug_econstr_mm "CTX act" act in
              let* () = debug_constructors_mm next_constructors in
              let* problems : Problems.t = map_problems args next_constructors in
-             (* Logging.Log.debug
-               (Printf.sprintf "PROBLEMS: %i" (List.length problems)); *)
-             (* let* () = debug_labelled_problem_list_mm problems in *)
-             (* let* acc  = labelled_cross_product acc problems in *)
+             let* () = debug_problems_mm problems in
              let acc : Problems.t list = cross_product acc problems in
-             (* Logging.Log.debug
-               (Printf.sprintf "POST CROSS PRODUCT: %i" (List.length acc)); *)
-             (* let* () = debug_labelled_problems_list_mm acc in *)
+             let* () = debug_problems_list_mm acc in
              let* acc = check_updated_ctx lts_enc acc indmap (substl, tl) in
-             (* let* () =
-                debug_updtcontext_close_app_known name c next_constructors
-                in *)
              return acc))
      | _ ->
        let* acc = check_updated_ctx lts_enc acc indmap (substl, tl) in
        (* let* () = debug_updtcontext_close upd_t None [] in *)
        return acc)
   | _substl, _ctxl -> invalid_check_updated_ctx _substl _ctxl
+(* ! Impossible ! *)
+(* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
 and check_for_next_constructors
       (i : int)
@@ -573,14 +469,13 @@ and check_for_next_constructors
       (outer_act : EConstr.t)
       (tgt_term : EConstr.t)
       (constructors : Constructors.t)
-        (* : (Enc.t * labelled_problem list list) option -> Constructors.t mm *)
   : (Enc.t * Problems.t list) option -> Constructors.t mm
   = function
   | None ->
     let* () = debug_nextconstrs_return () in
     return constructors
-  (* | Some (next_lts_enc, next_labelled_problems) -> *)
   | Some (next_lts_enc, next_problems) ->
+    let* () = Rocq_debug.debug_econstr_mm "CNC act" outer_act in
     (match next_problems with
      | [ [] ] ->
        let* sigma = get_sigma in
@@ -590,19 +485,11 @@ and check_for_next_constructors
          let tree = Mebi_constr.Tree.Node ((next_lts_enc, i), []) in
          let constructors = (outer_act, tgt_term, tree) :: constructors in
          return constructors)
-     | next_labelled_problems ->
-       (* let iter_body (j : int) (acc : Constructors.t) : Constructors.t mm =
-          (* let next_act, next_problems = List.nth next_labelled_problems j in *)
-          Constructors.retrieve
-          ~debug:true
-          i
-          acc
-          outer_act (* next_act *)
-          tgt_term
-          (* (next_lts_enc, [ next_problems ]) *)
-          (next_lts_enc, next_problems)
-          in
-          iterate 0 (List.length next_labelled_problems - 1) constructors iter_body *)
+     | next_problems ->
+       Logging.Log.debug "NC constructors:";
+       let* () = debug_constructors_mm constructors in
+       Logging.Log.debug "NC problems list:";
+       let* () = debug_problems_list_mm next_problems in
        let* constructors =
          Constructors.retrieve
            ~debug:true
@@ -618,51 +505,12 @@ and check_for_next_constructors
        return constructors)
 ;;
 
-(* let* act = state (fun env sigma -> check_fresh_econstr env sigma act) in *)
-(* let* () = debug_nextconstrs_start () in
-let* () = Rocq_debug.debug_econstr_mm "CNC act" act in
-match next_problems with
-| [ [] ] ->
-  let* sigma = get_sigma in
-  if EConstr.isEvar sigma tgt_term
-  then
-    let* () = debug_nextconstrs_close next_problems (Some true) constructors in
-    return constructors
-  else (
-    let tree = Mebi_constr.Tree.Node ((next_lts_enc, i), []) in
-    let constructors = (act, tgt_term, tree) :: constructors in
-    let* () = debug_nextconstrs_close next_problems (Some false) constructors in
-    return constructors)
-| _ ->
-  Logging.Log.debug "NC constructors:";
-  let* () = debug_constructors_mm constructors in
-  Logging.Log.debug "NC problems list:";
-  let* () = debug_problems_list_mm next_problems in
-  let* constructors =
-    Constructors.retrieve
-      ~debug:true
-      i
-      constructors
-      act
-      tgt_term
-      (next_lts_enc, next_problems)
-  in
-  Logging.Log.debug
-    (Printf.sprintf "N constructors: %i" (List.length constructors));
-  let* () = debug_nextconstrs_close next_problems None constructors in
-  return constructors
-;; *)
-
-(* ! Impossible ! *)
-(* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
-
 let collect_valid_constructors
       (transitions : (Constr.rel_context * Constr.types) array)
       (indmap : Mebi_ind.t F.t)
       (from_term : EConstr.t)
       (label_type : EConstr.t)
-      (* (act_term : EConstr.t option) *)
-        (lts_enc : Enc.t)
+      (lts_enc : Enc.t)
   : Constructors.t mm
   =
   let* fresh_evar = get_fresh_evar (Rocq_utils.OfType label_type) in
