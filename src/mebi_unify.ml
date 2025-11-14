@@ -35,12 +35,29 @@ let map_constr_to_pair (a : EConstr.t) (b : EConstr.t) : Pair.t mm =
   state (fun env sigma -> Pair.make env sigma a b)
 ;;
 
+type labelled_problem = EConstr.t * Problem.t
+type labelled_problems = EConstr.t * Problems.t
+
 (** creates unification problems between the rhs of the current constructor and the lhs of the next.
 *)
 let map_constr_to_problem args : Mebi_constr.t -> Problem.t mm = function
   | _act, lhs, tree ->
     let* pair : Pair.t = map_constr_to_pair args.rhs lhs in
     return (pair, tree)
+;;
+
+let map_labelled_problems args (constructors : Constructors.t)
+  : labelled_problem list mm
+  =
+  let iter_body (i : int) (acc : labelled_problem list)
+    : labelled_problem list mm
+    =
+    let constructor : Mebi_constr.t = List.nth constructors i in
+    let* problem : Problem.t = map_constr_to_problem args constructor in
+    let action, _destination, _tree = constructor in
+    return ((action, problem) :: acc)
+  in
+  iterate 0 (List.length constructors - 1) [] iter_body
 ;;
 
 let map_problems args (constructors : Constructors.t) : Problems.t mm =
@@ -52,8 +69,62 @@ let map_problems args (constructors : Constructors.t) : Problems.t mm =
   iterate 0 (List.length constructors - 1) [] iter_body
 ;;
 
-let cross_product acc problems : Problems.t list =
-  Logging.Log.debug "cross product";
+let flatten_labelled_probelm_list (p : labelled_problem list)
+  : labelled_problems list
+  =
+  List.fold_left
+    (fun (acc : labelled_problems list) (action, problem) ->
+      match List.find_opt (fun (x : labelled_problems) -> true) acc with
+      | None -> (action, [ problem ]) :: acc
+      | Some (action, problems) -> (action, problem :: problems) :: acc)
+    []
+    p
+;;
+
+(* let labelled_cross_product
+   (acc' : labelled_problem list list)
+   (problems : labelled_problem list)
+   : labelled_problem list list mm
+   =
+   Logging.Log.debug "labelled cross product";
+   (* let acc' = flatten_labelled_probelm_list acc' in *)
+   (* let cross_map *)
+   let iter_body (i : int) (outer_acc : labelled_problem list list)
+   : labelled_problem list list mm
+   =
+   let xproblems : labelled_problem list = List.nth acc' i in
+   let iter_body2 (j : int) (acc : labelled_problem list list)
+   : labelled_problem list list mm
+   =
+   let (yact, yproblem) : labelled_problem = List.nth problems j in
+   (* let* () = debug_labelled_cross_product_mm xact yact xproblems yproblem in *)
+   (* let (xact, xproblem) : labelled_problem = List.nth xproblems k in *)
+   let* env = get_env in
+   let* sigma = get_sigma in
+   let f = Mebi_setup.Eq.econstr sigma yact in
+   let new_problems : labelled_problem list list =
+   List.map
+   (fun (xact, xproblem) -> if f xact then [] else [ xact, xproblem ])
+   (* if f xact
+   then
+   (* let h =  in  *)
+   (* return ((xact, yproblem :: xproblems) :: acc) *)
+   []
+   else [] *)
+   xproblems
+   in
+   return (List.concat [ new_problems; acc ])
+   (* let* inner_acc = iterate 0 (List.length xproblems - 1) [] iter_body3 in *)
+   (* return (inner_acc :: acc) *)
+   in
+   iterate 0 (List.length problems - 1) outer_acc iter_body2
+   in
+   iterate 0 (List.length acc' - 1) [ [] ] iter_body
+   ;; *)
+
+let cross_product (acc : Problems.t list) (problems : Problems.t)
+  : Problems.t list
+  =
   List.concat_map
     (fun (x : Problems.t) -> List.map (fun (y : Problem.t) -> y :: x) problems)
     acc
@@ -400,9 +471,11 @@ and explore_valid_constructor
   (*  *)
   (*  *)
   let* () = Rocq_debug.debug_econstr_mm "A EVC act" act in
-  (* let* next_constructor_problems : (Enc.t * (EConstr.t * Problems.t) list) option = *)
   let* next_constructor_problems : (Enc.t * Problems.t list) option =
+    (* let* next_constructor_problems : (Enc.t * labelled_problem list list) option = *)
+    (* check_updated_ctx lts_enc [ [] ] indmap (substl, decls) *)
     (* check_updated_ctx lts_enc [ None, [] ] indmap (substl, decls) *)
+    (* check_updated_ctx lts_enc act [ [] ] indmap (substl, decls) *)
     check_updated_ctx lts_enc [ [] ] indmap (substl, decls)
   in
   let* () = Rocq_debug.debug_econstr_mm "B EVC act" act in
@@ -428,11 +501,13 @@ and explore_valid_constructor
 (* Should return a list of unification problems *)
 and check_updated_ctx
       (lts_enc : Enc.t)
+      (* (outer_act:EConstr.t) *)
       (* (acc : (EConstr.t option * Problems.t) list) *)
+      (* (acc : labelled_problem list list) *)
         (acc : Problems.t list)
       (indmap : Mebi_ind.t F.t)
   :  EConstr.Vars.substl * EConstr.rel_declaration list
-     (* -> (Enc.t * (EConstr.t option * Problems.t) list) option mm *)
+     (* -> (Enc.t * labelled_problem list list) option mm *)
   -> (Enc.t * Problems.t list) option mm
   = function
   | [], [] ->
@@ -454,6 +529,7 @@ and check_updated_ctx
           let args : constructor_args = constructor_args args in
           let$+ lhs env sigma = Reductionops.nf_evar sigma args.lhs in
           let$+ act env sigma = Reductionops.nf_evar sigma args.act in
+          let args = { args with lhs; act } in
           let* next_lts = Mebi_ind.get_constr_transitions c in
           let* next_constructors : Constructors.t =
             check_valid_constructors next_lts indmap lhs act c.enc
@@ -469,11 +545,17 @@ and check_updated_ctx
              let* () = Rocq_debug.debug_econstr_mm "CTX act" act in
              Logging.Log.notice "\n";
              Logging.Log.debug "ACTFIX:";
+             Logging.Log.debug (Printf.sprintf "ACC: %i" (List.length acc));
              let* () = debug_constructors_mm next_constructors in
              let* problems : Problems.t = map_problems args next_constructors in
-             let* () = debug_problems_mm problems in
+             (* Logging.Log.debug
+               (Printf.sprintf "PROBLEMS: %i" (List.length problems)); *)
+             (* let* () = debug_labelled_problem_list_mm problems in *)
+             (* let* acc  = labelled_cross_product acc problems in *)
              let acc : Problems.t list = cross_product acc problems in
-             let* () = debug_problems_list_mm acc in
+             (* Logging.Log.debug
+               (Printf.sprintf "POST CROSS PRODUCT: %i" (List.length acc)); *)
+             (* let* () = debug_labelled_problems_list_mm acc in *)
              let* acc = check_updated_ctx lts_enc acc indmap (substl, tl) in
              (* let* () =
                 debug_updtcontext_close_app_known name c next_constructors
@@ -488,53 +570,75 @@ and check_updated_ctx
 and check_for_next_constructors
       (i : int)
       (indmap : Mebi_ind.t F.t)
-      (act : EConstr.t)
+      (outer_act : EConstr.t)
       (tgt_term : EConstr.t)
       (constructors : Constructors.t)
+        (* : (Enc.t * labelled_problem list list) option -> Constructors.t mm *)
   : (Enc.t * Problems.t list) option -> Constructors.t mm
   = function
   | None ->
     let* () = debug_nextconstrs_return () in
     return constructors
+  (* | Some (next_lts_enc, next_labelled_problems) -> *)
   | Some (next_lts_enc, next_problems) ->
-    (* let* act = state (fun env sigma -> check_fresh_econstr env sigma act) in *)
-    let* () = debug_nextconstrs_start () in
-    let* () = Rocq_debug.debug_econstr_mm "CNC act" act in
     (match next_problems with
      | [ [] ] ->
        let* sigma = get_sigma in
        if EConstr.isEvar sigma tgt_term
-       then
-         let* () =
-           debug_nextconstrs_close next_problems (Some true) constructors
-         in
-         return constructors
+       then return constructors
        else (
          let tree = Mebi_constr.Tree.Node ((next_lts_enc, i), []) in
-         let constructors = (act, tgt_term, tree) :: constructors in
-         let* () =
-           debug_nextconstrs_close next_problems (Some false) constructors
-         in
+         let constructors = (outer_act, tgt_term, tree) :: constructors in
          return constructors)
-     | _ ->
-       Logging.Log.debug "NC constructors:";
-       let* () = debug_constructors_mm constructors in
-       Logging.Log.debug "NC problems list:";
-       let* () = debug_problems_list_mm next_problems in
-       let* constructors =
+     | next_labelled_problems ->
+       let iter_body (j : int) (acc : Constructors.t) : Constructors.t mm =
+         (* let next_act, next_problems = List.nth next_labelled_problems j in *)
          Constructors.retrieve
            ~debug:true
            i
-           constructors
-           act
+           acc
+           outer_act (* next_act *)
            tgt_term
+           (* (next_lts_enc, [ next_problems ]) *)
            (next_lts_enc, next_problems)
        in
-       Logging.Log.debug
-         (Printf.sprintf "N constructors: %i" (List.length constructors));
-       let* () = debug_nextconstrs_close next_problems None constructors in
-       return constructors)
+       iterate 0 (List.length next_labelled_problems - 1) constructors iter_body)
 ;;
+
+(* let* act = state (fun env sigma -> check_fresh_econstr env sigma act) in *)
+(* let* () = debug_nextconstrs_start () in
+let* () = Rocq_debug.debug_econstr_mm "CNC act" act in
+match next_problems with
+| [ [] ] ->
+  let* sigma = get_sigma in
+  if EConstr.isEvar sigma tgt_term
+  then
+    let* () = debug_nextconstrs_close next_problems (Some true) constructors in
+    return constructors
+  else (
+    let tree = Mebi_constr.Tree.Node ((next_lts_enc, i), []) in
+    let constructors = (act, tgt_term, tree) :: constructors in
+    let* () = debug_nextconstrs_close next_problems (Some false) constructors in
+    return constructors)
+| _ ->
+  Logging.Log.debug "NC constructors:";
+  let* () = debug_constructors_mm constructors in
+  Logging.Log.debug "NC problems list:";
+  let* () = debug_problems_list_mm next_problems in
+  let* constructors =
+    Constructors.retrieve
+      ~debug:true
+      i
+      constructors
+      act
+      tgt_term
+      (next_lts_enc, next_problems)
+  in
+  Logging.Log.debug
+    (Printf.sprintf "N constructors: %i" (List.length constructors));
+  let* () = debug_nextconstrs_close next_problems None constructors in
+  return constructors
+;; *)
 
 (* ! Impossible ! *)
 (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
