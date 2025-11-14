@@ -16,10 +16,10 @@ theories/Bisimilarity.v ###
 ### NOTE: compilation to take far longer if proofs included
 
 ### Proc
-# examples/Proc.v ###
+examples/Proc.v ###
 
-# examples/bisimilarity/Proc/Test1/Terms.v ###
-# examples/bisimilarity/Proc/Test1/PluginProofs.v ###
+examples/bisimilarity/Proc/Test1/Terms.v ###
+examples/bisimilarity/Proc/Test1/PluginProofs.v ###
 # examples/bisimilarity/Proc/Test1/ManualProofs.v
 # examples/bisimilarity/Proc/Test1/LtacProofs.v
 

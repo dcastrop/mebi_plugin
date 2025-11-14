@@ -44,7 +44,7 @@ MeBi Set FailIfNotBisim True.
 
 Require Import Logic.
 
-(* MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
+MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof.
   MeBiSim Begin termLTS p And termLTS q Using termLTS. (* unfold p, q. *)
@@ -132,15 +132,10 @@ Proof.
   MeBiSim Step. 
   MeBiSim Step. 
   MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-
-  (* (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) *)
-  (* (tseq (tpar tend tend) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) *)
-  (* (tseq (tpar (tact (recv A) tend) (tact (send A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) *)
   (* MeBiSim Step.  *)
-  (* TODO: investigate sandboxed_unify *)
+  (* MeBiSim Step.  *)
 
 
 
-Admitted. *)
+
+Admitted. 
