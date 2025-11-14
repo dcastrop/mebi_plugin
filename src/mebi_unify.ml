@@ -35,29 +35,12 @@ let map_constr_to_pair (a : EConstr.t) (b : EConstr.t) : Pair.t mm =
   state (fun env sigma -> Pair.make env sigma a b)
 ;;
 
-type labelled_problem = EConstr.t * Problem.t
-type labelled_problems = EConstr.t * Problems.t
-
 (** creates unification problems between the rhs of the current constructor and the lhs of the next.
 *)
 let map_constr_to_problem args : Mebi_constr.t -> Problem.t mm = function
-  | _act, lhs, tree ->
+  | act, lhs, tree ->
     let* pair : Pair.t = map_constr_to_pair args.rhs lhs in
-    return (pair, tree)
-;;
-
-let map_labelled_problems args (constructors : Constructors.t)
-  : labelled_problem list mm
-  =
-  let iter_body (i : int) (acc : labelled_problem list)
-    : labelled_problem list mm
-    =
-    let constructor : Mebi_constr.t = List.nth constructors i in
-    let* problem : Problem.t = map_constr_to_problem args constructor in
-    let action, _destination, _tree = constructor in
-    return ((action, problem) :: acc)
-  in
-  iterate 0 (List.length constructors - 1) [] iter_body
+    return (act, pair, tree)
 ;;
 
 let map_problems args (constructors : Constructors.t) : Problems.t mm =
@@ -68,59 +51,6 @@ let map_problems args (constructors : Constructors.t) : Problems.t mm =
   in
   iterate 0 (List.length constructors - 1) [] iter_body
 ;;
-
-let flatten_labelled_probelm_list (p : labelled_problem list)
-  : labelled_problems list
-  =
-  List.fold_left
-    (fun (acc : labelled_problems list) (action, problem) ->
-      match List.find_opt (fun (x : labelled_problems) -> true) acc with
-      | None -> (action, [ problem ]) :: acc
-      | Some (action, problems) -> (action, problem :: problems) :: acc)
-    []
-    p
-;;
-
-(* let labelled_cross_product
-   (acc' : labelled_problem list list)
-   (problems : labelled_problem list)
-   : labelled_problem list list mm
-   =
-   Logging.Log.debug "labelled cross product";
-   (* let acc' = flatten_labelled_probelm_list acc' in *)
-   (* let cross_map *)
-   let iter_body (i : int) (outer_acc : labelled_problem list list)
-   : labelled_problem list list mm
-   =
-   let xproblems : labelled_problem list = List.nth acc' i in
-   let iter_body2 (j : int) (acc : labelled_problem list list)
-   : labelled_problem list list mm
-   =
-   let (yact, yproblem) : labelled_problem = List.nth problems j in
-   (* let* () = debug_labelled_cross_product_mm xact yact xproblems yproblem in *)
-   (* let (xact, xproblem) : labelled_problem = List.nth xproblems k in *)
-   let* env = get_env in
-   let* sigma = get_sigma in
-   let f = Mebi_setup.Eq.econstr sigma yact in
-   let new_problems : labelled_problem list list =
-   List.map
-   (fun (xact, xproblem) -> if f xact then [] else [ xact, xproblem ])
-   (* if f xact
-   then
-   (* let h =  in  *)
-   (* return ((xact, yproblem :: xproblems) :: acc) *)
-   []
-   else [] *)
-   xproblems
-   in
-   return (List.concat [ new_problems; acc ])
-   (* let* inner_acc = iterate 0 (List.length xproblems - 1) [] iter_body3 in *)
-   (* return (inner_acc :: acc) *)
-   in
-   iterate 0 (List.length problems - 1) outer_acc iter_body2
-   in
-   iterate 0 (List.length acc' - 1) [ [] ] iter_body
-   ;; *)
 
 let cross_product (acc : Problems.t list) (problems : Problems.t)
   : Problems.t list
@@ -234,80 +164,9 @@ let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
   | _ -> (* TODO: err *) invalid_lts_term_kind term
 ;;
 
-(* let update_constructor_action
-
-   (constructor:Mebi_constr.t)
-   : (EConstr.t * EConstr.t) option -> Mebi_constr.t mm = function
-   | None -> return constructor
-   | Some (fresh, original) ->
-   let (action, destination, tree) = constructor in
-   state (fun env sigma ->
-   if Mebi_setup.Eq.econstr sigma action original then
-   sigma, (fresh, destination, tree) else
-   sigma, (action, destination, tree)
-   )
-   ;; *)
-
-(*   let update_constructor_actions
-
-     :
-     ((Evd.econstr * Evd.econstr) option list * Constructors.t
-
-     ) ->
-     Constructors.t mm = function | [], constructors -> return constructors
-
-     let constructors : Constructors.t =
-     match fresh_act_opt with
-     | None -> constructors
-     | Some (original_act, fresh_act) ->
-     Logging.Log.debug
-     (Printf.sprintf
-     "fresh_act B:\n- act: %s\n- fresh: %s"
-     (Rocq_utils.Strfy.econstr env sigma original_act)
-     (Rocq_utils.Strfy.econstr env sigma fresh_act));
-     List.map
-     (fun (x, destination, tree) ->
-     if Mebi_setup.Eq.econstr sigma x original_act
-     then fresh_act, destination, tree
-     else x, destination, tree)
-     constructors
-     in *)
-
-let update_constructors_action
-      env
-      sigma
-      original
-      fresh
-      (constructors : Constructors.t)
-  : Constructors.t
-  =
-  List.map
-    (fun (x, destination, tree) ->
-      if Mebi_setup.Eq.econstr sigma x original
-      then fresh, destination, tree
-      else x, destination, tree)
-    constructors
-;;
-
-let update_constructors_fresh_action (constructors : Constructors.t)
-  : (EConstr.t * EConstr.t) option -> Constructors.t mm
-  = function
-  | None -> return constructors
-  | Some (original, fresh) ->
-    state (fun env sigma ->
-      Logging.Log.debug
-        (Printf.sprintf
-           "update fresh_act:\n- original: %s\n- fresh: %s"
-           (Rocq_utils.Strfy.econstr env sigma original)
-           (Rocq_utils.Strfy.econstr env sigma fresh));
-      sigma, update_constructors_action env sigma original fresh constructors)
-;;
-
 let get_fresh_evar (original : Rocq_utils.evar_source) : EConstr.t mm =
   state (fun env sigma -> Rocq_utils.get_next env sigma original)
 ;;
-
-exception ConstructorNameNotRecognized of (EConstr.t * EConstr.t)
 
 (** Checks possible transitions for this term: *)
 let rec check_valid_constructors
@@ -342,6 +201,7 @@ let rec check_valid_constructors
           (i, constructors)
           (substl, decls)
       in
+      Logging.Log.debug "CVC constructors:";
       let* () = debug_constructors_mm constructors in
       let* () = debug_validconstrs_iter_close i constructors in
       return constructors)
@@ -377,18 +237,7 @@ and explore_valid_constructor
   in
   (* ! NOTE: we only have the initial [act] to use for the constructors *)
   let* () = Rocq_debug.debug_econstr_mm "B EVC act" act in
-  (* ?: how can we retain the information of the label for each constructor *)
-  (* TODO: (1) expand [Problems.t] to contain actions? 
-        -> effectively the same as [Mebi_constr.t]
-  *)
-  (* TODO: (2) have [check_updated_ctx] return: 
-                      [(Enc.t * (EConstr.t * Problems.t) list) option] 
-        -> from some tests, this proved to overcomplicate things.
-          - required [(EConstr.t * Problem.t) list] for the cross-product, and the need to check which subset of problems to unify with
-        -> this messes with our pattern matches on "[ [] ]" 
-  *)
-  (*****************************)
-  (* TODO: *)
+  (* NOTE: that is why we now store the action within the problems *)
   let* constructors =
     check_for_next_constructors
       i
@@ -398,14 +247,7 @@ and explore_valid_constructor
       constructors
       next_constructor_problems
   in
-  (* let* constructors : Constructors.t =
-     update_constructors_fresh_action constructors fresh_act_opt
-     in *)
-  Logging.Log.debug
-    (Printf.sprintf "V constructors: %i" (List.length constructors));
   let* () = debug_validconstrs_iter_success_close from_term (Some act) args in
-  (* NOTE: update our sigma with the successful unifications *)
-  (* TODO: *)
   return constructors
 
 (* Should return a list of unification problems *)
@@ -499,8 +341,6 @@ and check_for_next_constructors
            tgt_term
            (next_lts_enc, next_problems)
        in
-       Logging.Log.debug
-         (Printf.sprintf "N constructors: %i" (List.length constructors));
        let* () = debug_nextconstrs_close next_problems None constructors in
        return constructors)
 ;;

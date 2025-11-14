@@ -296,7 +296,7 @@ module MkGraph
         (lts_ind_def_map : Mebi_ind.t B.t)
     : Mebi_constr.t list mm
     =
-    Debug.Control.tick ();
+    (* Debug.Control.tick (); *)
     Log.trace "command.MkGraph.get_new_constrs";
     let* from_term : EConstr.t = decode from in
     let* label_type : EConstr.t = Mebi_ind.get_lts_label_type primary in

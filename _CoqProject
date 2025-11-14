@@ -5,8 +5,8 @@ src/META.coq-mebi
 -arg "-w all"
 
 theories/loader.v ###
-theories/DevTest.v ###
 # theories/Test.v ###
+theories/DevTest.v ###
 
 theories/Bisimilarity.v ###
 
