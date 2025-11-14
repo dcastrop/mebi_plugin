@@ -359,6 +359,12 @@ type concl_result =
 (* | Weak_Transition of transition *)
 (* | LTS_Transition of transition *)
 
+let concl_result_string : concl_result -> string = function
+  | New_Weak_Sim _ -> "New_Weak_Sim"
+  | Exists _ -> "Exists"
+  | Transition _ -> "Transition"
+;;
+
 let handle_concl
       (gl : Proofview.Goal.t)
       ({ the_fsm_1 = m; the_fsm_2 = n; _ } : Algorithms.Bisimilar.result)
@@ -875,6 +881,17 @@ let handle_weak_transition
 
 exception CouldNotHandle_NewTransition of unit
 
+let handle_new_transition_exists gl mt nt m2 : unit Proofview.tactic =
+  Log.debug
+    (Printf.sprintf
+       "mebi_bisim.handle_new_transition, Exists (n2, m2)\n- m2: %s\n\n%s"
+       (Model.pstr_state m2)
+       (pstr_transition nt));
+  the_proof_state := GoalTransition mt;
+  Log.notice "eexists n2";
+  handle_eexists gl mt nt m2
+;;
+
 let handle_new_transition gl mt : unit Proofview.tactic =
   Log.debug "mebi_bisim.handle_new_transition";
   Log.debug
@@ -882,15 +899,7 @@ let handle_new_transition gl mt : unit Proofview.tactic =
        "mebi_bisim.handle_new_transition, mt:\n%s"
        (pstr_transition mt));
   match handle_concl gl !(get_the_result ()) with
-  | Exists (nt, m2) ->
-    Log.debug
-      (Printf.sprintf
-         "mebi_bisim.handle_new_transition, Exists (n2, m2)\n- m2: %s\n\n%s"
-         (Model.pstr_state m2)
-         (pstr_transition nt));
-    the_proof_state := GoalTransition mt;
-    Log.notice "eexists n2";
-    handle_eexists gl mt nt m2
+  | Exists (nt, m2) -> handle_new_transition_exists gl mt nt m2
   | _ -> raise (CouldNotHandle_NewTransition ())
 ;;
 
@@ -967,7 +976,15 @@ let handle_new_weak_sim (gl : Proofview.Goal.t) : unit Proofview.tactic =
      | None ->
        the_proof_state := NewCofix;
        do_new_cofix gl)
-  | _ -> raise (CouldNotHandle_NewWeakSim ())
+  | Exists _ ->
+    Log.debug "handle_new_weak_sim, got Exists, trying handle_new_cofix";
+    handle_new_cofix gl
+  | x ->
+    Log.warning
+      (Printf.sprintf
+         "mebi_bisim.handle_new_weak_sim, ERR: %s"
+         (concl_result_string x));
+    raise (CouldNotHandle_NewWeakSim ())
 ;;
 
 (* let handle_apply_constuctors gl
