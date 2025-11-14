@@ -48,8 +48,8 @@ MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof.
   MeBiSim Begin termLTS p And termLTS q Using termLTS. (* unfold p, q. *)
-
   MeBiSim Solve 200.
+Qed.
 
 (* 
   MeBiSim Step. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
@@ -164,6 +164,6 @@ Proof.
   MeBiSim Step. 
   MeBiSim Step. 
   MeBiSim Step. 
-  MeBiSim Step.  *)
+  MeBiSim Step.
   (* TODO: add script to Fail but say that it is completed and to just Qed. *)
-Qed.
+Qed. *)
