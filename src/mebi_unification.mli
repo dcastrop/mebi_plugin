@@ -1,11 +1,10 @@
-val default_debug : bool
-val debugerr : bool
 
-type constructor_args = {
-  lhs : Evd.econstr;
-  act : Evd.econstr;
-  rhs : Evd.econstr;
-}
+type constructor_args =
+  { lhs : EConstr.t
+  ; act : EConstr.t
+  ; rhs : EConstr.t
+  }
+
 
 module Constructor_arg : sig
   module Fresh : sig
@@ -14,8 +13,6 @@ module Constructor_arg : sig
       evar : Evd.econstr;
       original : Evd.econstr;
     }
-
-    exception CouldNotGetNextFreshEvarName of unit
 
     val get_next :
       Environ.env ->
@@ -35,15 +32,6 @@ module Pair : sig
   val to_string :
     ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
 
-  val _debug_fresh :
-    Environ.env ->
-    Evd.evar_map ->
-    Evd.evar_map ->
-    Evd.econstr ->
-    Evd.econstr ->
-    Evd.econstr ->
-    unit
-
   val fresh :
     Environ.env ->
     Evd.evar_map ->
@@ -60,29 +48,6 @@ module Pair : sig
     Evd.econstr ->
     Evd.evar_map * t
 
-  val debug_unify :
-    Environ.env ->
-    Evd.evar_map ->
-    Evd.econstr ->
-    Evd.econstr ->
-    unit
-
-  val debug_unifyerr :
-    Environ.env ->
-    Evd.evar_map ->
-    Evd.econstr ->
-    Evd.econstr ->
-    Evd.econstr ->
-    Evd.econstr ->
-    unit
-
-  val w_unify :
-    ?debug:bool ->
-    Environ.env ->
-    Evd.evar_map ->
-    Evd.econstr ->
-    Evd.econstr ->
-    Evd.evar_map * bool
 
   val unify :
     ?debug:bool ->
@@ -98,14 +63,6 @@ module Problem : sig
   val to_string :
     ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
 
-  val unify_opt :
-    ?debug:bool ->
-    t ->
-    (Evd.econstr
-    * Constructor_arg.Fresh.t option
-    * Mebi_constr.Tree.t)
-    option
-    Mebi_wrapper.mm
 end
 
 module Problems : sig
@@ -121,20 +78,6 @@ module Problems : sig
     t list ->
     string
 
-  val append_fresh_opt :
-    Constructor_arg.Fresh.t list ->
-    Constructor_arg.Fresh.t option ->
-    Constructor_arg.Fresh.t list
-
-  val unify_opt :
-    ?debug:bool ->
-    t ->
-    (Evd.econstr
-    * Constructor_arg.Fresh.t option
-    * Mebi_constr.Tree.t)
-    list
-    option
-    Mebi_wrapper.mm
 end
 
 module Constructors : sig
@@ -144,34 +87,6 @@ module Constructors : sig
     ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
 
   type r = Evd.econstr * Evd.econstr * Mebi_constr.Tree.t list
-
-  exception NotApp of unit
-
-  val _debug_unbox_fresh :
-    Evd.econstr ->
-    Constructor_arg.Fresh.t ->
-    unit Mebi_wrapper.mm
-
-  val sandbox_unbox_fresh :
-    Evd.econstr ->
-    Constructor_arg.Fresh.t ->
-    Evd.econstr Mebi_wrapper.mm
-
-  val unbox_fresh :
-    Evd.econstr ->
-    Evd.econstr ->
-    (Evd.econstr
-    * Constructor_arg.Fresh.t option
-    * Mebi_constr.Tree.t)
-    list ->
-    r Mebi_wrapper.mm
-
-  val sandbox_unify_all_opt :
-    ?debug:bool ->
-    Evd.econstr ->
-    Evd.econstr ->
-    Problems.t ->
-    r option Mebi_wrapper.mm
 
   val retrieve :
     ?debug:bool ->

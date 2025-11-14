@@ -21,8 +21,6 @@ module Constructor_arg = struct
       ; original : EConstr.t
       }
 
-    exception CouldNotGetNextFreshEvarName of unit
-
     let get_next (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t)
       : Evd.evar_map * t
       =
@@ -209,13 +207,6 @@ module Problems = struct
       (to_string ~indent:(indent + 1) env sigma)
   ;;
 
-  let append_fresh_opt (fresh : Constructor_arg.Fresh.t list)
-    : Constructor_arg.Fresh.t option -> Constructor_arg.Fresh.t list
-    = function
-    | None -> fresh
-    | Some a -> a :: fresh
-  ;;
-
   let rec unify_opt ?(debug : bool = default_debug)
     :  t
     -> (EConstr.t * Constructor_arg.Fresh.t option * Mebi_constr.Tree.t) list
@@ -305,7 +296,26 @@ module Constructors = struct
              tgt'str1
              tgt'str2);
         sigma', ()
-      | _ -> raise (NotApp ()))
+      | _ ->
+        let k : string = Rocq_utils.Strfy.econstr_kind env sigma' tgt in
+        Logging.Log.warning
+          (Printf.sprintf
+             "unbox, NOT APP:\n\
+              - tgt: %s\n\
+              - evar: %s\n\
+              - o1: %s\n\
+              - o2: %s\n\
+              - s1: %s\n\
+              - s2: %s\n\n\
+              - kind: %s"
+             tgtstr
+             evarstr
+             o1str
+             o2str
+             sstr1
+             sstr2
+             k);
+        sigma', ())
   ;;
 
   let sandbox_unbox_fresh
@@ -313,7 +323,7 @@ module Constructors = struct
         ({ sigma; evar; original } : Constructor_arg.Fresh.t)
     : EConstr.t mm
     =
-    (* let* () = debug_unbox_fresh tgt { sigma; evar; original } in *)
+    (* let* () = _debug_unbox_fresh tgt { sigma; evar; original } in *)
     (* return evar *)
     (* TODO: is it as simple as jsut returning the evar sigma? *)
     state (fun env sigma' ->
@@ -329,6 +339,7 @@ module Constructors = struct
         in
         (* sigma, evar *)
         sigma, tgt'
+      | Evar _ -> sigma, evar
       | _ -> raise (NotApp ()))
   ;;
 
