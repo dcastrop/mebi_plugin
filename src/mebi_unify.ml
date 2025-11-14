@@ -288,7 +288,7 @@ and check_updated_ctx
              return None
            | next_constructors ->
              (* TODO: extract the actions from the next-constructors and incoorporate them within the *)
-             Logging.Log.notice "\n";
+             (* Logging.Log.notice "\n"; *)
              let* () = Rocq_debug.debug_econstr_mm "CTX act" act in
              let* () = debug_constructors_mm next_constructors in
              let* problems : Problems.t = map_problems args next_constructors in
@@ -357,7 +357,7 @@ let collect_valid_constructors
   let* constructors : Constructors.t =
     check_valid_constructors transitions indmap from_term fresh_evar lts_enc
   in
-  Logging.Log.notice "\n=/==/=/=/==/===";
+  (* Logging.Log.notice "\n=/==/=/=/==/==="; *)
   let* () = debug_constructors_mm constructors in
   return constructors
 ;;
