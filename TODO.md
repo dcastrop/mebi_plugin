@@ -1,12 +1,17 @@
 # todo
 
+- [ ] in unification: (i) treat act exactly as tgt, (ii) must keep track of the original evars and correctly propogate them during unification to all other parts of the current problems (inner list)
+
+- [ ] make examples that hide certain actions
 
 
-## longterm list
-- [ ] develop coq-side API for using plugin
 - [ ] overhaul [Logging]
 - [x] make [Mebi_wrapper] a parametric functor (currently just uses [IntEncoding] as [E])
 - [ ] update [Mebi_wrapper.Errors], some are obsolete, standardize naming convention, extract to own file module (construct as functor?)
+
+
+
+---
 
 ## active list
 
