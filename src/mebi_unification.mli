@@ -2,13 +2,13 @@ val default_debug : bool
 val debugerr : bool
 
 type constructor_args = {
-  lhs : Evd.econstr;
-  act : Evd.econstr;
-  rhs : Evd.econstr;
+  lhs : EConstr.t;
+  act : EConstr.t;
+  rhs : EConstr.t;
 }
 
 module Pair : sig
-  type t = { a : Evd.econstr; b : Evd.econstr }
+  type t = { a : EConstr.t; b : EConstr.t }
 
   val to_string :
     ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
@@ -25,17 +25,17 @@ module Pair : sig
   val fresh :
     Environ.env ->
     Evd.evar_map ->
-    Evd.econstr ->
-    Evd.econstr ->
+    EConstr.t ->
+    EConstr.t ->
     Evd.evar_map * t
 
-  val normal : Evd.econstr -> Evd.econstr -> t
+  val normal : EConstr.t -> EConstr.t -> t
 
   val make :
     Environ.env ->
     Evd.evar_map ->
-    Evd.econstr ->
-    Evd.econstr ->
+    EConstr.t ->
+    EConstr.t ->
     Evd.evar_map * t
 
   val debug_unify :
@@ -58,8 +58,8 @@ module Pair : sig
     ?debug:bool ->
     Environ.env ->
     Evd.evar_map ->
-    Evd.econstr ->
-    Evd.econstr ->
+    EConstr.t ->
+    EConstr.t ->
     Evd.evar_map * bool
 
   val unify :
@@ -107,10 +107,11 @@ module Problems : sig
 
   val sandbox_unify_all_opt :
     ?debug:bool ->
-    Evd.econstr ->
-    Evd.econstr ->
+    EConstr.t ->
+    EConstr.t ->
     t ->
-    Mebi_constr.Tree.t list option Mebi_wrapper.mm
+    (EConstr.t * EConstr.t * Mebi_constr.Tree.t list) option
+    Mebi_wrapper.mm
 end
 
 module Constructors : sig
@@ -123,8 +124,8 @@ module Constructors : sig
     ?debug:bool ->
     int ->
     t ->
-    Evd.econstr ->
-    Evd.econstr ->
+    EConstr.t ->
+    EConstr.t ->
     Mebi_setup.Enc.t * Problems.t list ->
     t Mebi_wrapper.mm
 end

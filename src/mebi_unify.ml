@@ -42,8 +42,10 @@ let map_constr_to_problem env sigma args
   : Mebi_constr.t -> Evd.evar_map * Problem.t
   = function
   | act, rhs, tree ->
-    let sigma, act = Pair.make env sigma args.act act in
-    let sigma, dest = Pair.make env sigma args.rhs rhs in
+    (* let sigma, act = Pair.make env sigma args.act act in *)
+    (* let sigma, dest = Pair.make env sigma args.rhs rhs in *)
+    let act : Pair.t = { a = args.act; b = act } in
+    let dest : Pair.t = { a = args.rhs; b = rhs } in
     sigma, { act; dest; tree }
 ;;
 
