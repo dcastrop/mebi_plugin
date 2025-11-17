@@ -142,7 +142,7 @@ module Problem = struct
         ~indent:(indent + 3)
         Utils.Strfy.str
         (Pair.to_string ~indent:(indent + 4) env sigma)
-        ("action", act)
+        ("act ", act)
     in
     let f =
       Utils.Strfy.tuple
@@ -179,6 +179,18 @@ module Problem = struct
     function
     | { act; dest; tree } ->
       Logging.Log.debug "UO 1: ENTER";
+      let* () =
+        state (fun env sigma ->
+          let s : string = Pair.to_string env sigma act in
+          Logging.Log.debug (Printf.sprintf "unify_opt act: %s" s);
+          sigma, ())
+      in
+      let* () =
+        state (fun env sigma ->
+          let s : string = Pair.to_string env sigma dest in
+          Logging.Log.debug (Printf.sprintf "unify_opt dest: %s" s);
+          sigma, ())
+      in
       let* unified_act_opt = unify_pair_opt ~debug act in
       Logging.Log.debug "UO 2: ENTER";
       let* unified_dest_opt = unify_pair_opt ~debug dest in
@@ -378,13 +390,25 @@ module Problems = struct
   let sandbox_unify_all_opt
         ?(debug : bool = default_debug)
         (act : EConstr.t)
-        (tgt : EConstr.t)
-    : t -> Mebi_constr.Tree.t list option mm
+        (dest : EConstr.t)
+    : t -> (EConstr.t * EConstr.t * Mebi_constr.Tree.t list) option mm
     =
     Logging.Log.debug "SB 0: ENTER";
     function
     | { sigma = psigma; to_unify } ->
       Logging.Log.debug "SB 0.1: ENTER";
+      let* () =
+        state (fun env sigma ->
+          let s : string = Rocq_utils.Strfy.econstr env sigma act in
+          Logging.Log.debug (Printf.sprintf "sandbox act: %s" s);
+          sigma, ())
+      in
+      let* () =
+        state (fun env sigma ->
+          let s : string = Rocq_utils.Strfy.econstr env sigma dest in
+          Logging.Log.debug (Printf.sprintf "sandbox dest: %s" s);
+          sigma, ())
+      in
       sandbox
         ~using:psigma
         (Logging.Log.debug "SB 0.2: ENTER";
@@ -401,10 +425,10 @@ module Problems = struct
               unbox_fresh act tgt fresh_opt_and_constructor_trees
               in *)
            let$+ act env sigma = Reductionops.nf_all env sigma act in
-           let$+ tgt env sigma = Reductionops.nf_all env sigma tgt in
+           let$+ dest env sigma = Reductionops.nf_all env sigma dest in
            let* is_act_undefined = Mebi_utils.econstr_is_evar act in
-           let* is_tgt_undefined = Mebi_utils.econstr_is_evar tgt in
-           if is_act_undefined && is_tgt_undefined
+           let* is_dest_undefined = Mebi_utils.econstr_is_evar dest in
+           if is_act_undefined && is_dest_undefined
            then (
              Logging.Log.debug
                (Printf.sprintf "SB 2.1: NONE %i" (List.length to_unify));
@@ -412,7 +436,7 @@ module Problems = struct
            else (
              Logging.Log.debug
                (Printf.sprintf "SB 2.2: RETURN %i" (List.length to_unify));
-             return (Some constructor_trees)))
+             return (Some (act, dest, constructor_trees))))
   ;;
 end
 
@@ -451,14 +475,14 @@ module Constructors = struct
        | None ->
          Logging.Log.debug (Printf.sprintf "RT 2.1: NONE %i" (List.length acc));
          retrieve ~debug constructor_index acc act tgt (lts_enc, tl)
-       | Some constructor_trees ->
-         let* unified_act = Mebi_utils.econstr_normalize act in
-         let* unified_tgt = Mebi_utils.econstr_normalize tgt in
+       | Some (act, dest, constructor_trees) ->
+         (* let* unified_act = Mebi_utils.econstr_normalize act in *)
+         (* let* unified_tgt = Mebi_utils.econstr_normalize tgt in *)
          (* let* unified_tgt = Mebi_utils.econstr_normalize unified_tgt in *)
          (* let* act = Mebi_utils.econstr_normalize act in *)
          let open Mebi_constr.Tree in
          let tree = Node ((lts_enc, constructor_index), constructor_trees) in
-         let constructor = unified_act, unified_tgt, tree in
+         let constructor = act, dest, tree in
          let acc = constructor :: acc in
          Logging.Log.debug (Printf.sprintf "RT 2.2: SOME %i" (List.length acc));
          retrieve ~debug constructor_index acc act tgt (lts_enc, tl))
