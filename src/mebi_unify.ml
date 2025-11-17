@@ -35,32 +35,57 @@ let map_constr_to_pair (a : EConstr.t) (b : EConstr.t) : Pair.t mm =
   state (fun env sigma -> Pair.make env sigma a b)
 ;;
 
-(** creates unification problems between the rhs of the current constructor and the lhs of the next.
+(** creates unification problems between the rhs of the current constructor and the lhs of the next, along with the actions of both.
+    (* NOTE: this is only relevant when deciding whether to explore a given constructor from a premise of another *)
 *)
 let map_constr_to_problem args : Mebi_constr.t -> Problem.t mm = function
   | act, rhs, tree ->
-    let* pair : Pair.t = map_constr_to_pair args.rhs rhs in
-    return (act, pair, tree)
+    let* act : Pair.t = map_constr_to_pair args.act act in
+    let* dest : Pair.t = map_constr_to_pair args.rhs rhs in
+    let p : Problem.t = { act; dest; tree } in
+    return p
 ;;
 
 let map_problems args (constructors : Constructors.t) : Problems.t mm =
-  let iter_body (i : int) (acc : Problems.t) : Problems.t mm =
+  let iter_body (i : int) ((sigma, to_unify) : Evd.evar_map * Problem.t list)
+    : (Evd.evar_map * Problem.t list) mm
+    =
     let constructor : Mebi_constr.t = List.nth constructors i in
     let* problem : Problem.t = map_constr_to_problem args constructor in
-    return (problem :: acc)
+    return (sigma, problem :: to_unify)
   in
-  iterate 0 (List.length constructors - 1) [] iter_body
+  let* sigma' = get_sigma in
+  let* sigma, to_unify =
+    iterate 0 (List.length constructors - 1) (sigma', []) iter_body
+  in
+  let p : Problems.t = { sigma; to_unify } in
+  return p
 ;;
 
-let cross_product (acc : Problems.t list) (problems : Problems.t)
+let cross_product (acc : Problems.t list) ({ sigma; to_unify } : Problems.t)
   : Problems.t list
   =
-  List.concat_map
-    (fun (x : Problems.t) -> List.map (fun (y : Problem.t) -> y :: x) problems)
-    acc
+  let p : Problems.t list =
+    List.concat_map
+      (fun ({ sigma = xsigma; to_unify = xs } : Problems.t) : Problems.t list ->
+        let p : Problems.t list =
+          List.map
+            (fun (y : Problem.t) : Problems.t -> { sigma; to_unify = y :: xs })
+            to_unify
+        in
+        p)
+      acc
+  in
+  p
 ;;
 
-exception TryUnifyConstrArgsYieldFresh of unit
+(* let cross_productOLD (acc : Problems.t list) (problems : Problems.t)
+   : Problems.t list
+   =
+   List.concat_map
+   (fun (x : Problems.t) -> List.map (fun (y : Problem.t) -> y :: x) problems)
+   acc
+   ;; *)
 
 let try_unify_constructor_arg
       ?(debug : bool = show_unification_debug)
@@ -68,13 +93,7 @@ let try_unify_constructor_arg
       (b : EConstr.t)
   : bool mm
   =
-  state (fun env sigma ->
-    match Pair.unify ~debug env sigma (Pair.normal a b) with
-    | sigma, _, false -> sigma, false
-    | sigma, None, true -> sigma, true
-    | sigma, Some fresh, true ->
-      Logging.Log.warning "try_to_unify_constructor_args, did not expect fresh";
-      raise (* TODO: err *) (TryUnifyConstrArgsYieldFresh ()))
+  state (fun env sigma -> Pair.unify ~debug env sigma (Pair.normal a b))
 ;;
 
 let try_unify_constructor_args
@@ -168,6 +187,23 @@ let get_fresh_evar (original : Rocq_utils.evar_source) : EConstr.t mm =
   state (fun env sigma -> Rocq_utils.get_next env sigma original)
 ;;
 
+let axiom_constructor
+      (act : EConstr.t)
+      (tgt : EConstr.t)
+      (constructor_index : Enc.t * int)
+      (constructors : Constructors.t)
+  : Constructors.t mm
+  =
+  let* is_evar : bool = Mebi_utils.econstr_is_evar tgt in
+  if is_evar
+  then return constructors
+  else
+    let open Mebi_constr in
+    let tree : Tree.t = Tree.Node (constructor_index, []) in
+    let axiom : Mebi_constr.t = act, tgt, tree in
+    return (axiom :: constructors)
+;;
+
 (** Checks possible transitions for this term: *)
 let rec check_valid_constructors
           (transitions : (Constr.rel_context * Constr.types) array)
@@ -230,10 +266,12 @@ and explore_valid_constructor
   let tgt : EConstr.t = EConstr.Vars.substl substl args.rhs in
   let* tgt : EConstr.t = Mebi_utils.econstr_normalize tgt in
   let* act : EConstr.t = Mebi_utils.econstr_normalize args.act in
+  (* TODO: make fresh sigma from fresh act+tgt, and use that from this point onwards. then, during cross-product, make sure that it is used over the parents sigma stored within the unification problems during ctx *)
   (* ! NOTE: any next consturctors will replace [act] with their own fresh evar *)
   let* () = Rocq_debug.debug_econstr_mm "A EVC act" act in
+  let* empty_problems : Problems.t = Problems.empty () in
   let* next_constructor_problems : (Enc.t * Problems.t list) option =
-    check_updated_ctx lts_enc [ [] ] indmap (substl, decls)
+    check_updated_ctx lts_enc [ empty_problems ] indmap (substl, decls)
   in
   (* ! NOTE: we only have the initial [act] to use for the constructors *)
   let* () = Rocq_debug.debug_econstr_mm "B EVC act" act in
@@ -315,32 +353,27 @@ and check_for_next_constructors
     let* () = debug_nextconstrs_return () in
     return constructors
   | Some (next_lts_enc, next_problems) ->
-    let* () = Rocq_debug.debug_econstr_mm "CNC act" outer_act in
-    (match next_problems with
-     | [ [] ] ->
-       let* sigma = get_sigma in
-       if EConstr.isEvar sigma tgt_term
-       then return constructors
-       else (
-         let tree = Mebi_constr.Tree.Node ((next_lts_enc, i), []) in
-         let constructors = (outer_act, tgt_term, tree) :: constructors in
-         return constructors)
-     | next_problems ->
-       Logging.Log.debug "NC constructors:";
-       let* () = debug_constructors_mm constructors in
-       Logging.Log.debug "NC problems list:";
-       let* () = debug_problems_list_mm next_problems in
-       let* constructors =
-         Constructors.retrieve
-           ~debug:true
-           i
-           constructors
-           outer_act
-           tgt_term
-           (next_lts_enc, next_problems)
-       in
-       let* () = debug_nextconstrs_close next_problems None constructors in
-       return constructors)
+    let* () = debug_nextconstrs_start () in
+    (* let* () = Rocq_debug.debug_econstr_mm "CNC act" outer_act in *)
+    if Problems.list_is_empty next_problems
+    then
+      let* constructors =
+        axiom_constructor outer_act tgt_term (next_lts_enc, i) constructors
+      in
+      let* () = debug_nextconstrs_close next_problems None constructors in
+      return constructors
+    else
+      let* constructors : Mebi_constr.t list =
+        Constructors.retrieve
+          ~debug:true
+          i
+          constructors
+          outer_act
+          tgt_term
+          (next_lts_enc, next_problems)
+      in
+      let* () = debug_nextconstrs_close next_problems None constructors in
+      return constructors
 ;;
 
 let collect_valid_constructors

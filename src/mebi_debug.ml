@@ -2,90 +2,90 @@ open Debug
 open Mebi_wrapper
 (* open Mebi_wrapper.Syntax *)
 
-let debug_problems env sigma (problems : Mebi_unification.Problems.t) : unit =
-  Logging.Log.debug
-    (Printf.sprintf
-       "unification problems:\n%s\n"
-       (Mebi_unification.Problems.to_string env sigma problems))
-;;
+(* let debug_problems env sigma (problems : Mebi_unification.Problems.t) : unit =
+   Logging.Log.debug
+   (Printf.sprintf
+   "unification problems:\n%s\n"
+   (Mebi_unification.Problems.to_string env sigma problems))
+   ;; *)
 
-let debug_problems_mm (problems : Mebi_unification.Problems.t) : unit mm =
-  state (fun env sigma ->
-    let () = debug_problems env sigma problems in
-    sigma, ())
-;;
+(* let debug_problems_mm (problems : Mebi_unification.Problems.t) : unit mm =
+   state (fun env sigma ->
+   let () = debug_problems env sigma problems in
+   sigma, ())
+   ;; *)
 
-let debug_problems_list env sigma (problems : Mebi_unification.Problems.t list)
-  : unit
-  =
-  Logging.Log.debug
-    (Printf.sprintf
-       "unification problems list:\n%s\n"
-       (Mebi_unification.Problems.list_to_string env sigma problems))
-;;
+(* let debug_problems_list env sigma (problems : Mebi_unification.Problems.t list)
+   : unit
+   =
+   Logging.Log.debug
+   (Printf.sprintf
+   "unification problems list:\n%s\n"
+   (Mebi_unification.Problems.list_to_string env sigma problems))
+   ;; *)
 
-let debug_problems_list_mm (problems : Mebi_unification.Problems.t list)
-  : unit mm
-  =
-  state (fun env sigma ->
-    let () = debug_problems_list env sigma problems in
-    sigma, ())
-;;
+(* let debug_problems_list_mm (problems : Mebi_unification.Problems.t list)
+   : unit mm
+   =
+   state (fun env sigma ->
+   let () = debug_problems_list env sigma problems in
+   sigma, ())
+   ;; *)
 
 (****************************************************)
 
-let debug_labelled_problem_list
-      env
-      sigma
-      (labelled_problems : (EConstr.t * Mebi_unification.Problem.t) list)
-  : unit
-  =
-  List.iter
-    (fun ((action, problem) : EConstr.t * Mebi_unification.Problem.t) ->
-      let action : string = Rocq_utils.Strfy.econstr env sigma action in
-      Logging.Log.debug
-        (Printf.sprintf
-           "labelled unification problem: %s\n%s\n"
-           action
-           (Mebi_unification.Problem.to_string env sigma problem)))
-    labelled_problems
-;;
+(* let debug_labelled_problem_list
+   env
+   sigma
+   (labelled_problems : (EConstr.t * Mebi_unification.Problem.t) list)
+   : unit
+   =
+   List.iter
+   (fun ((action, problem) : EConstr.t * Mebi_unification.Problem.t) ->
+   let action : string = Rocq_utils.Strfy.econstr env sigma action in
+   Logging.Log.debug
+   (Printf.sprintf
+   "labelled unification problem: %s\n%s\n"
+   action
+   (Mebi_unification.Problem.to_string env sigma problem)))
+   labelled_problems
+   ;; *)
 
-let debug_labelled_problem_list_mm
-      (labelled_problems : (EConstr.t * Mebi_unification.Problem.t) list)
-  : unit mm
-  =
-  state (fun env sigma ->
-    let () = debug_labelled_problem_list env sigma labelled_problems in
-    sigma, ())
-;;
+(* let debug_labelled_problem_list_mm
+   (labelled_problems : (EConstr.t * Mebi_unification.Problem.t) list)
+   : unit mm
+   =
+   state (fun env sigma ->
+   let () = debug_labelled_problem_list env sigma labelled_problems in
+   sigma, ())
+   ;; *)
 
-let debug_labelled_problems_list
-      env
-      sigma
-      (labelled_problems : (EConstr.t * Mebi_unification.Problems.t) list)
-  : unit
-  =
-  List.iter
-    (fun ((action, problems) : EConstr.t * Mebi_unification.Problems.t) ->
-      let action : string = Rocq_utils.Strfy.econstr env sigma action in
-      Logging.Log.debug
-        (Printf.sprintf
-           "labelled unification problem: %s\n%s\n"
-           action
-           (Mebi_unification.Problems.to_string env sigma problems)))
-    labelled_problems
-;;
+(* let debug_labelled_problems_list
+   env
+   sigma
+   (labelled_problems : (EConstr.t * Mebi_unification.Problems.t) list)
+   : unit
+   =
+   List.iter
+   (fun ((action, problems) : EConstr.t * Mebi_unification.Problems.t) ->
+   let action : string = Rocq_utils.Strfy.econstr env sigma action in
+   Logging.Log.debug
+   (Printf.sprintf
+   "labelled unification problem: %s\n%s\n"
+   action
+   (Mebi_unification.Problems.to_string env sigma problems)))
+   labelled_problems
+   ;; *)
 
-let debug_labelled_problems_list_mm
-      (labelled_problems : (EConstr.t * Mebi_unification.Problems.t) list)
-  : unit mm
-  =
-  Logging.Log.debug "POST CROSS PRODUCT: B";
-  state (fun env sigma ->
-    let () = debug_labelled_problems_list env sigma labelled_problems in
-    sigma, ())
-;;
+(* let debug_labelled_problems_list_mm
+   (labelled_problems : (EConstr.t * Mebi_unification.Problems.t) list)
+   : unit mm
+   =
+   Logging.Log.debug "POST CROSS PRODUCT: B";
+   state (fun env sigma ->
+   let () = debug_labelled_problems_list env sigma labelled_problems in
+   sigma, ())
+   ;; *)
 
 let debug_labelled_cross_product env sigma xact yact xproblems yproblem : unit =
   let f : EConstr.t -> string = Rocq_utils.Strfy.econstr env sigma in
@@ -255,8 +255,8 @@ let debug_nextconstrs_close
       Printf.sprintf "(problems: |%i|) (constructors: |%i|)%s" l m e
     in
     let () = Scope.close ~infix ~suffix () in
-    let () = debug_problems_list env sigma problems in
-    let () = debug_constructors env sigma constructors in
+    (* let () = debug_problems_list env sigma problems in *)
+    (* let () = debug_constructors env sigma constructors in *)
     sigma, ())
 ;;
 
