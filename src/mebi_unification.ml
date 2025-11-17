@@ -106,20 +106,22 @@ module Pair = struct
     =
     let open Pretype_errors in
     try
+      Logging.Log.debug "UW 0: ENTER";
       let sigma = Unification.w_unify env sigma Conversion.CUMUL a b in
       sigma, true
     with
     | PretypeError (_, _, CannotUnify (c, d, _e)) ->
+      Logging.Log.debug "UW 0: ERR";
       if debug || debugerr then debug_unifyerr env sigma a b c d;
       sigma, false
   ;;
 
   (** [unify a b] tries to unify [a] and [b] within the context of the [env] and [sigma] of [mm]. @returns [true] if successful, [false] otherwise. *)
-  let unify ?(debug : bool = default_debug) env sigma' ({ a; b } : t)
+  let unify ?(debug : bool = default_debug) env sigma ({ a; b } : t)
     : Evd.evar_map * bool
     =
-    let sigma, result = w_unify ~debug env sigma' a b in
-    sigma, result
+    Logging.Log.debug "UF 0: ENTER";
+    w_unify ~debug env sigma a b
   ;;
 end
 
@@ -167,18 +169,20 @@ module Problem = struct
   ;;
 
   let unify_pair_opt ?(debug : bool = default_debug) (pair : Pair.t) : bool mm =
-    state (fun env sigma ->
-      match Pair.unify ~debug env sigma pair with
-      | sigma, false -> sigma, false
-      | sigma, true -> sigma, true)
+    state (fun env sigma -> Pair.unify ~debug env sigma pair)
   ;;
 
   let unify_opt ?(debug : bool = default_debug)
     : t -> Mebi_constr.Tree.t option mm
-    = function
+    =
+    Logging.Log.debug "UO 0: ENTER";
+    function
     | { act; dest; tree } ->
+      Logging.Log.debug "UO 1: ENTER";
       let* unified_act_opt = unify_pair_opt ~debug act in
+      Logging.Log.debug "UO 2: ENTER";
       let* unified_dest_opt = unify_pair_opt ~debug dest in
+      Logging.Log.debug "UO 3: ENTER";
       (match unified_act_opt, unified_dest_opt with
        | true, true -> return (Some tree)
        | _, _ -> return None)
@@ -227,24 +231,26 @@ module Problems = struct
 
   let rec unify_list_opt ?(debug : bool = default_debug)
     : Problem.t list -> Mebi_constr.Tree.t list option mm
-    = function
+    =
+    Logging.Log.debug "UP 0: ENTER";
+    function
     | [] ->
-      Logging.Log.debug (Printf.sprintf "UP0: RETURN");
+      Logging.Log.debug (Printf.sprintf "UP 1: RETURN");
       return (Some [])
     | h :: tl ->
       let* success_opt = Problem.unify_opt ~debug h in
       (match success_opt with
        | None ->
-         Logging.Log.debug (Printf.sprintf "UP1: NONE");
+         Logging.Log.debug (Printf.sprintf "UP 2.1: NONE");
          return None
        | Some constructor_tree ->
          let* unified_opt = unify_list_opt ~debug tl in
          (match unified_opt with
           | None ->
-            Logging.Log.debug (Printf.sprintf "UP2: NONE");
+            Logging.Log.debug (Printf.sprintf "UP 2.2: NONE");
             return None
           | Some acc ->
-            Logging.Log.debug (Printf.sprintf "UP3: RETURN");
+            Logging.Log.debug (Printf.sprintf "UP 2.3: RETURN");
             return (Some (constructor_tree :: acc))))
   ;;
 
@@ -374,18 +380,23 @@ module Problems = struct
         (act : EConstr.t)
         (tgt : EConstr.t)
     : t -> Mebi_constr.Tree.t list option mm
-    = function
-    | { sigma; to_unify } ->
+    =
+    Logging.Log.debug "SB 0: ENTER";
+    function
+    | { sigma = psigma; to_unify } ->
+      Logging.Log.debug "SB 0.1: ENTER";
       sandbox
-        ~using:sigma
-        (let* unified_opt = unify_list_opt ~debug to_unify in
+        ~using:psigma
+        (Logging.Log.debug "SB 0.2: ENTER";
+         let* unified_opt = unify_list_opt ~debug to_unify in
+         Logging.Log.debug "SB 0.3: ENTER";
          match unified_opt with
          | None ->
            Logging.Log.debug
-             (Printf.sprintf "S1: NONE %i" (List.length to_unify));
+             (Printf.sprintf "SB 1: NONE %i" (List.length to_unify));
            return None
          | Some constructor_trees ->
-           Logging.Log.debug "unbox:";
+           (* Logging.Log.debug "unbox:"; *)
            (* let* action, unified_term, constructor_trees =
               unbox_fresh act tgt fresh_opt_and_constructor_trees
               in *)
@@ -396,11 +407,11 @@ module Problems = struct
            if is_act_undefined && is_tgt_undefined
            then (
              Logging.Log.debug
-               (Printf.sprintf "S2: NONE %i" (List.length to_unify));
+               (Printf.sprintf "SB 2.1: NONE %i" (List.length to_unify));
              return None)
            else (
              Logging.Log.debug
-               (Printf.sprintf "S3: RETURN %i" (List.length to_unify));
+               (Printf.sprintf "SB 2.2: RETURN %i" (List.length to_unify));
              return (Some constructor_trees)))
   ;;
 end
@@ -427,15 +438,18 @@ module Constructors = struct
             (act : EConstr.t)
             (tgt : EConstr.t)
     : Enc.t * Problems.t list -> t mm
-    = function
+    =
+    Logging.Log.debug "RT 0: ENTER";
+    function
     | _, [] ->
-      Logging.Log.debug (Printf.sprintf "R0: RETURN %i" (List.length acc));
+      Logging.Log.debug (Printf.sprintf "RT 1: RETURN %i" (List.length acc));
       return acc
     | lts_enc, problems :: tl ->
+      Logging.Log.debug (Printf.sprintf "RT 2: ENTER %i" (List.length acc));
       let* success = Problems.sandbox_unify_all_opt ~debug act tgt problems in
       (match success with
        | None ->
-         Logging.Log.debug (Printf.sprintf "R1: NONE %i" (List.length acc));
+         Logging.Log.debug (Printf.sprintf "RT 2.1: NONE %i" (List.length acc));
          retrieve ~debug constructor_index acc act tgt (lts_enc, tl)
        | Some constructor_trees ->
          let* unified_act = Mebi_utils.econstr_normalize act in
@@ -446,7 +460,7 @@ module Constructors = struct
          let tree = Node ((lts_enc, constructor_index), constructor_trees) in
          let constructor = unified_act, unified_tgt, tree in
          let acc = constructor :: acc in
-         Logging.Log.debug (Printf.sprintf "R2: SOME %i" (List.length acc));
+         Logging.Log.debug (Printf.sprintf "RT 2.2: SOME %i" (List.length acc));
          retrieve ~debug constructor_index acc act tgt (lts_enc, tl))
   ;;
 end

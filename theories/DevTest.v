@@ -103,7 +103,7 @@ MeBi FSM (tend) Using termLTS. *)
 (* MeBi FSM (tpar tend tend) Using termLTS. *)
 
 (* MeBi Divider "Theories.DevTest.0.3". *)
-(* MeBi FSM (tseq (tpar tend tend) tend) Using termLTS. *)
+MeBi FSM (tseq (tpar tend tend) tend) Using termLTS.
 (* NOTE:        (tseq (tpar tend tend) tend)
   [ 1 -> [ 3 => (tseq tend tend)
          ; 5 => (tseq (tpar tend tend) tend)
