@@ -2,35 +2,34 @@ open Debug
 open Mebi_wrapper
 (* open Mebi_wrapper.Syntax *)
 
-(* let debug_problems env sigma (problems : Mebi_unification.Problems.t) : unit =
-   Logging.Log.debug
-   (Printf.sprintf
-   "unification problems:\n%s\n"
-   (Mebi_unification.Problems.to_string env sigma problems))
-   ;; *)
+let debug_problems env (problems : Mebi_unification.Problems.t) : unit =
+  Logging.Log.debug
+    (Printf.sprintf
+       "unification problems:\n%s\n"
+       (Mebi_unification.Problems.to_string env problems))
+;;
 
-(* let debug_problems_mm (problems : Mebi_unification.Problems.t) : unit mm =
-   state (fun env sigma ->
-   let () = debug_problems env sigma problems in
-   sigma, ())
-   ;; *)
+let debug_problems_mm (problems : Mebi_unification.Problems.t) : unit mm =
+  state (fun env sigma ->
+    let () = debug_problems env problems in
+    sigma, ())
+;;
 
-(* let debug_problems_list env sigma (problems : Mebi_unification.Problems.t list)
-   : unit
-   =
-   Logging.Log.debug
-   (Printf.sprintf
-   "unification problems list:\n%s\n"
-   (Mebi_unification.Problems.list_to_string env sigma problems))
-   ;; *)
+let debug_problems_list env (problems : Mebi_unification.Problems.t list) : unit
+  =
+  Logging.Log.debug
+    (Printf.sprintf
+       "unification problems list:\n%s\n"
+       (Mebi_unification.Problems.list_to_string env problems))
+;;
 
-(* let debug_problems_list_mm (problems : Mebi_unification.Problems.t list)
-   : unit mm
-   =
-   state (fun env sigma ->
-   let () = debug_problems_list env sigma problems in
-   sigma, ())
-   ;; *)
+let debug_problems_list_mm (problems : Mebi_unification.Problems.t list)
+  : unit mm
+  =
+  state (fun env sigma ->
+    let () = debug_problems_list env problems in
+    sigma, ())
+;;
 
 (****************************************************)
 
