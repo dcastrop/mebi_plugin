@@ -13,23 +13,20 @@ type bckmap = EConstr.t B.t
 
 let the_enc_maps_cache : (fwdmap * bckmap) ref option ref = ref None
 
+let reset_enc_maps () =
+  let () = Enc.reset () in
+  let the_fwd_map : fwdmap = F.create 0 in
+  let the_bck_map : bckmap = B.create 0 in
+  let the_enc_maps = ref (the_fwd_map, the_bck_map) in
+  the_enc_maps_cache := Some the_enc_maps;
+  the_enc_maps
+;;
+
 let get_the_enc_maps ?(keep_encoding : bool = false) () : (fwdmap * bckmap) ref =
   match !the_enc_maps_cache with
-  | None ->
-    let the_fwd_map : fwdmap = F.create 0 in
-    let the_bck_map : bckmap = B.create 0 in
-    let the_enc_maps = ref (the_fwd_map, the_bck_map) in
-    the_enc_maps_cache := Some the_enc_maps;
-    the_enc_maps
+  | None -> reset_enc_maps ()
   | Some the_enc_maps ->
-    if keep_encoding
-    then the_enc_maps
-    else (
-      let the_fwd_map : fwdmap = F.create 0 in
-      let the_bck_map : bckmap = B.create 0 in
-      let the_enc_maps = ref (the_fwd_map, the_bck_map) in
-      the_enc_maps_cache := Some the_enc_maps;
-      the_enc_maps)
+    if keep_encoding then the_enc_maps else reset_enc_maps ()
 ;;
 
 type wrapper =
@@ -59,8 +56,8 @@ let run
   : 'a
   =
   Log.trace "mebi_wrapper.run";
-  let coq_env : Environ.env = !(the_coq_env ~fresh ()) in
-  let coq_ctx : Evd.evar_map = !(the_coq_ctx ()) in
+  let coq_ctx : Evd.evar_map = !(the_coq_ctx ~fresh ()) in
+  let coq_env : Environ.env = !(the_coq_env ()) in
   let coq_ref : coq_context ref = ref { coq_env; coq_ctx } in
   let fwd_enc, bck_enc = !(get_the_enc_maps ~keep_encoding ()) in
   let a : 'a in_context = x (ref { coq_ref; fwd_enc; bck_enc }) in
@@ -146,6 +143,10 @@ let sandbox ?(using : Evd.evar_map option) (m : 'a mm) (st : wrapper ref)
     | None -> st
     | Some sigma ->
       ref { !st with coq_ref = ref { !(!st.coq_ref) with coq_ctx = sigma } }
+    (* let coq_context : coq_context = { !(!st.coq_ref) with coq_ctx = sigma } in
+      let coq_ref : coq_context ref = ref coq_context in
+      let st_sandbox : wrapper = { !st with coq_ref } in
+      ref st_sandbox *)
   in
   let res : 'a in_context = m st_sandbox in
   { state = ref st_contents; value = res.value }
