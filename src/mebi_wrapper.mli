@@ -37,7 +37,7 @@ val state
   -> wrapper ref
   -> 'a in_context
 
-val sandbox : 'a mm -> wrapper ref -> 'a in_context
+val sandbox : ?using:Evd.evar_map -> 'a mm -> wrapper ref -> 'a in_context
 
 module type MEBI_MONAD_SYNTAX = sig
   val ( let+ ) : 'a mm -> ('a -> 'b) -> 'b mm

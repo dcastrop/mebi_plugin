@@ -137,11 +137,18 @@ let state
   { state = st; value = a }
 ;;
 
-let sandbox (m : 'a mm) (st : wrapper ref) : 'a in_context =
+let sandbox ?(using : Evd.evar_map option) (m : 'a mm) (st : wrapper ref)
+  : 'a in_context
+  =
   let st_contents : wrapper = !st in
-  let res : 'a in_context = m st in
-  st := st_contents;
-  { state = st; value = res.value }
+  let st_sandbox : wrapper ref =
+    match using with
+    | None -> st
+    | Some sigma ->
+      ref { !st with coq_ref = ref { !(!st.coq_ref) with coq_ctx = sigma } }
+  in
+  let res : 'a in_context = m st_sandbox in
+  { state = ref st_contents; value = res.value }
 ;;
 
 (********************************************)
