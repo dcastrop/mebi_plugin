@@ -64,6 +64,40 @@ let map_problems args (constructors : Constructors.t) : Problems.t mm =
   return p
 ;;
 
+(*!!!!!!!!!!!!!!*)
+
+(** [a] may be re-freshed *)
+(* let map_constr_to_pair (a : EConstr.t) (b : EConstr.t) : Pair.t mm =
+   state (fun env sigma -> Pair.make env sigma a b)
+   ;; *)
+
+(** creates unification problems between the rhs of the current constructor and the lhs of the next, along with the actions of both.
+    (* NOTE: this is only relevant when deciding whether to explore a given constructor from a premise of another *)
+*)
+(* let map_constr_to_problem args : Mebi_constr.t -> Problem.t mm = function
+  | act, rhs, tree ->
+    let* act : Pair.t = map_constr_to_pair args.act act in
+    let* dest : Pair.t = map_constr_to_pair args.rhs rhs in
+    let p : Problem.t = { act; dest; tree } in
+    return p
+;; *)
+
+(* let map_problems args (constructors : Constructors.t) : Problems.t mm =
+  let iter_body (i : int) ((sigma, to_unify) : Evd.evar_map * Problem.t list)
+    : (Evd.evar_map * Problem.t list) mm
+    =
+    let constructor : Mebi_constr.t = List.nth constructors i in
+    let* problem : Problem.t = map_constr_to_problem args constructor in
+    return (sigma, problem :: to_unify)
+  in
+  let* sigma' = get_sigma in
+  let* sigma, to_unify =
+    iterate 0 (List.length constructors - 1) (sigma', []) iter_body
+  in
+  let p : Problems.t = { sigma; to_unify } in
+  return p
+;; *)
+
 let cross_product (acc : Problems.t list) ({ sigma; to_unify } : Problems.t)
   : Problems.t list
   =
