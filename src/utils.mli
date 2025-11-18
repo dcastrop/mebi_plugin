@@ -18,44 +18,101 @@ val new_int_counter :
   unit ->
   ((unit -> int) * (unit -> int)) * int ref
 
-val list_of_constr_kinds : Constr.t -> (string * bool) list
-
-val list_of_econstr_kinds :
-  Evd.evar_map -> Evd.econstr -> (string * bool) list
-
 module Strfy : sig
-  val nlsep :
-    ?force_newline:bool -> ?indent:int -> unit -> string
+  type collection_delimiter =
+    | Comma
+    | Semi
+    | Colon
+    | Line
+    | Use of string
+
+  val collection_delimiter : collection_delimiter -> string
+
+  type collection_marker =
+    | Brace
+    | Squig
+    | Square
+    | Angle
+    | Use of string * string
+
+  val collection_marker : collection_marker -> string * string
+
+  type collection_style = {
+    marker : collection_marker;
+    delimiter : collection_delimiter;
+    inline : bool;
+    size : bool;
+  }
+
+  type collection_kind =
+    | Tuple
+    | Record
+    | List
+    | Use of collection_style
+
+  val collection_style : collection_kind -> collection_style
+
+  type style_args = {
+    mutable indent : int;
+    mutable newline : bool;
+    mutable nested : bool;
+    name : string option;
+  }
+
+  val style_args :
+    ?indent:int ->
+    ?newline:bool ->
+    ?nested:bool ->
+    ?name:string ->
+    unit ->
+    style_args
+
+  val nest : style_args -> style_args
+
+  val wrap :
+    collection_style -> style_args -> string list -> string
+
+  val str : ?args:style_args -> string -> string
+  val int : ?args:style_args -> int -> string
+  val bool : ?args:style_args -> bool -> string
+  val option : 
+    (?args:style_args -> 'a -> string) -> 
+    ?args:style_args -> 
+    'a option -> 
+    string
+
+  val tuple :
+    (?args:style_args -> 'a -> string) ->
+    (?args:style_args -> 'b -> string) ->
+    ?style:collection_style ->
+    ?args:style_args ->
+    'a * 'b ->
+    string
+  
+  val keyval :
+    (?args:style_args -> 'a -> string) ->
+    ?style:collection_style ->
+    ?args:style_args ->
+    string * 'a ->
+    string
 
   val list :
-    ?force_newline:bool ->
-    ?label:string ->
-    ?indent:int ->
-    ?use:string * string ->
-    ('a -> string) ->
+    (?args:style_args -> 'a -> string) ->
+    ?style:collection_style ->
+    ?args:style_args ->
     'a list ->
     string
 
   val array :
-    ?force_newline:bool ->
-    ?label:string ->
-    ?indent:int ->
-    ?use:string * string ->
-    ('a -> string) ->
+    (?args:style_args -> 'a -> string) ->
+    ?style:collection_style ->
+    ?args:style_args ->
     'a array ->
     string
 
-  val str : string -> string
-  val int : int -> string
-  val bool : bool -> string
-  val option : ('a -> string) -> 'a option -> string
-
-  val tuple :
-    ?force_newline:bool ->
-    ?is_keyval:bool ->
-    ?indent:int ->
-    ('a -> string) ->
-    ('b -> string) ->
-    'a * 'b ->
+  val record :
+    ?style:collection_style ->
+    ?args:style_args ->
+    (string * string) list ->
     string
 end

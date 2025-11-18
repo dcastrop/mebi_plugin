@@ -10,6 +10,7 @@ type command_kind =
   | Help of Mebi_help.help_kind
   | MakeModel of make_model
   | SaturateModel of coq_model
+  | MergeModels of (coq_model * coq_model)
   | MinimizeModel of coq_model
   | CheckBisimilarity of (coq_model * coq_model)
   | Info of unit

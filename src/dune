@@ -27,7 +27,7 @@
   debug
   mebi_enc
   mebi_setup
-  strfy
+  ; strfy
   mebi_constr
   mebi_theories
   model

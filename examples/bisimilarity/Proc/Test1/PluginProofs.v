@@ -68,7 +68,7 @@ Proof.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-  (* MeBiSim Step. *)
+  MeBiSim Step.
   (* info_eauto. *)
   (* MeBiSim Step. *)
   (* MeBiSim Step. *)

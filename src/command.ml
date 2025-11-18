@@ -220,39 +220,24 @@ module MkGraph
     iterate 0 (List.length ctors - 1) (S.singleton from) iter_body
   ;;
 
-  let debug_new_constrs new_constrs : unit mm =
-    state (fun env sigma ->
-      Log.debug
-        (Printf.sprintf
-           "get_new_constrs:\n%s"
-           (Utils.Strfy.list
-              ~force_newline:true
-              (fun x ->
-                let action, dest, tree = x in
-                let f = Rocq_utils.Strfy.econstr env sigma in
-                Utils.Strfy.list
-                  ~force_newline:true
-                  ~indent:1
-                  Utils.Strfy.str
-                  [ Utils.Strfy.tuple
-                      ~is_keyval:true
-                      Utils.Strfy.str
-                      f
-                      ("action", action)
-                  ; Utils.Strfy.tuple
-                      ~is_keyval:true
-                      Utils.Strfy.str
-                      f
-                      ("dest", dest)
-                  ; Utils.Strfy.tuple
-                      ~is_keyval:true
-                      Utils.Strfy.str
-                      Mebi_constr.Tree.to_string
-                      ("tree", tree)
-                  ])
-              new_constrs));
-      sigma, ())
-  ;;
+  (* let debug_new_constrs new_constrs : unit mm =
+     state (fun env sigma ->
+     Log.debug
+     (Printf.sprintf
+     "get_new_constrs:\n%s"
+     (Utils.Strfy.list
+     ~force_newline:true
+     (fun x ->
+     let action, dest, tree = x in
+     let f = Rocq_utils.Strfy.econstr env sigma in
+     Utils.Strfy.list
+     ~force_newline:true
+     ~indent:1
+     Utils.Strfy.str
+     [ Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str f ("action", action) ; Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str f ("dest", dest) ; Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str Mebi_constr.Tree.to_string ("tree", tree) ])
+     new_constrs));
+     sigma, ())
+     ;; *)
 
   (** [get_new_constrs t lts_ind_def_map] returns the list of constructors applicable to term [t], using those provided in [lts_ind_def_map].
       (* TODO: update this *)
@@ -310,7 +295,7 @@ module MkGraph
       _f from_term label_type primary_constr_transitions ind_map lts_enc
     in
     (* let new_constrs = get_new_constrs_NEW in *)
-    let* () = debug_new_constrs new_constrs in
+    (* let* () = debug_new_constrs new_constrs in *)
     return new_constrs
   ;;
 
@@ -718,6 +703,7 @@ type command_kind =
   | Help of Mebi_help.help_kind
   | MakeModel of make_model
   | SaturateModel of coq_model
+  | MergeModels of (coq_model * coq_model)
   | MinimizeModel of coq_model
   | CheckBisimilarity of (coq_model * coq_model)
   | Info of unit
@@ -790,6 +776,32 @@ let minimize_model ((x, primary_lts) : coq_model) refs : unit mm =
      return ())
 ;;
 
+let merge_models ((x, a), (y, b)) refs : unit mm =
+  Log.trace "command.merge_models";
+  let* the_fsm_1 = build_fsm a x (Params.get_fst_params ()) refs in
+  let* the_fsm_2 = build_fsm b y (Params.get_fst_params ()) refs in
+  let weak : bool = !Params.the_weak_mode in
+  let (the_fsm_1, the_fsm_2) : Fsm.pair =
+    if weak
+    then (
+      let the_fsm_1 = Fsm.saturate the_fsm_1 in
+      let the_fsm_2 = Fsm.saturate the_fsm_2 in
+      the_fsm_1, the_fsm_2)
+    else the_fsm_1, the_fsm_2
+  in
+  let merged_fsm = Fsm.merge (the_fsm_1, the_fsm_2) in
+  Log.result
+    (Printf.sprintf
+       "command.run, MergeModels, finished: %s\n"
+       (Fsm.to_string merged_fsm));
+  Log.details
+    (Printf.sprintf
+       "command.run, MergeModels:\nFSM 1: %s\n\nFSM 2: %s\n"
+       (Fsm.to_string the_fsm_1)
+       (Fsm.to_string the_fsm_2));
+  return ()
+;;
+
 let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
   Log.trace "command.check_bisimilarity";
   let* the_fsm_1 = build_fsm a x (Params.get_fst_params ()) refs in
@@ -822,6 +834,7 @@ let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
   match k with
   | MakeModel args -> make_model args refs
   | SaturateModel args -> saturate_model args refs
+  | MergeModels args -> merge_models args refs
   | MinimizeModel args -> minimize_model args refs
   | CheckBisimilarity args -> check_bisimilarity args refs
   | Info () ->

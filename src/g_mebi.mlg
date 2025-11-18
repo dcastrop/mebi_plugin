@@ -546,6 +546,12 @@ VERNAC COMMAND EXTEND MeBiRun CLASSIFIED AS QUERY
 | ["MeBi" "Saturate" constr(x) "Using" reference(r) 
                                  reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) rs)}
 
+| ["MeBi" "Merge" constr(x) "With" reference(a) 
+            "And" constr(y) "With" reference(b)] -> {Mebi_wrapper.run (Command.run (Command.MergeModels ((x, a), (y, b))) [])}
+| ["MeBi" "Merge" constr(x) "With" reference(a) 
+            "And" constr(y) "With" reference(b) 
+                     "Using" reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.MergeModels ((x, a), (y, b))) rs)}
+
 | ["MeBi" "Minimize" constr(x) "Using" reference(r)] -> {Mebi_wrapper.run (Command.run (Command.MinimizeModel (x, r)) [])}
 | ["MeBi" "Minimize" constr(x) "Using" reference(r) 
                                  reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.MinimizeModel (x, r)) rs)}
