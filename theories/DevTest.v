@@ -122,7 +122,105 @@ MeBi FSM (tend) Using termLTS. *)
 (* MeBi Divider "Theories.DevTest.1.1". *)
 (* MeBi FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) Using termLTS. *)
 
-(* MeBi Divider "Theories.DevTest.2". *)
 (* MeBi FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) Using termLTS. *)
 
+(* testing for propagation *)
+MeBi Divider "Theories.DevTest.2".
+Inductive termLTS2 : term -> option label -> term -> Prop :=
 
+| do2_send : 
+  forall a t,
+  termLTS2 (tact (send a) t) (Some a) t
+
+| do2_recv : 
+  forall a t,
+  termLTS2 (tact (recv a) t) (Some a) t
+
+| do2_handshake : 
+  forall a l r, 
+  termLTS2 (tact (send a) l) (Some a) l ->
+  termLTS2 (tact (recv a) r) (Some a) r ->
+  termLTS2 (tpar (tact (send a) l) (tact (recv a) r)) (Some a) (tpar l r)
+
+| do2_seq : 
+  forall t t' s a, termLTS2 t a t' -> termLTS2 (tseq t s) a (tseq t' s)
+
+| do2_seq_end : forall s, termLTS2 (tseq tend s) None s
+
+| do2_par_end : termLTS2 (tpar tend tend) None tend
+
+(* These below capture "structural congruence": using "silent" transitions *)
+| do2_fix : 
+  (* forall t t', t' = tsubst (tfix t) t -> termLTS2 (tfix t) None t' *)
+  forall t , termLTS2 (tfix t) None (tsubst (tfix t) t)
+
+| do2_comm : 
+  forall tl tr, termLTS2 (tpar tl tr) None (tpar tr tl)
+
+(* | do_assocl : forall t1 t2 t3,  *)
+    (* termLTS (tpar t1 (tpar t2 t3)) None (tpar (tpar t1 t2) t3) *)
+
+(* | do_assocr : forall t1 t2 t3,  *)
+    (* termLTS (tpar (tpar t1 t2) t3) None (tpar t1 (tpar t2 t3)) *)
+.
+
+(* MeBi LTS (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) Using termLTS2. *)
+(* MeBi LTS (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) Using termLTS2. *)
+
+
+
+
+(* testing for separation *)
+(* MeBi Divider "Theories.DevTest.3". *)
+Inductive termLTS3 : term -> option label -> term -> Prop :=
+(* 0 *)
+| do3_send : 
+  forall a t,
+  termLTS3 (tact (send a) t) (Some a) t
+(* 1 *)
+| do3_recv : 
+  forall a t,
+  termLTS3 (tact (recv a) t) (Some a) t
+(* 2 *)
+| do3_handshake : 
+  forall a l r, 
+  termLTS3 (tact (send a) l) (Some a) l ->
+  termLTS3 (tact (recv a) r) (Some a) r ->
+  termLTS3 (tpar (tact (send a) l) (tact (recv a) r)) (Some a) (tpar l r)
+(* 3 *)
+| do3_reorder : 
+  forall a b l r, 
+  termLTS3 (tact (send a) l) (Some a) l ->
+  termLTS3 (tact (send b) (tact (recv a) r)) (Some b) (tact (recv a) r) ->
+  termLTS3 (tact (recv a) r) (Some a) r ->
+  termLTS3 (tpar (tact (send a) l) (tact (send b) (tact (recv a) r))) 
+            None 
+            (tpar l (tact (send b) r))
+(* 4 *)
+| do3_seq : 
+  forall t t' s a, termLTS3 t a t' -> termLTS3 (tseq t s) a (tseq t' s)
+(* 5 *)
+| do3_seq_end : forall s, termLTS3 (tseq tend s) None s
+(* 6 *)
+| do3_par_end : termLTS3 (tpar tend tend) None tend
+(* 7 *)
+(* These below capture "structural congruence": using "silent" transitions *)
+| do3_fix : 
+  (* forall t t', t' = tsubst (tfix t) t -> termLTS3 (tfix t) None t' *)
+  forall t , termLTS3 (tfix t) None (tsubst (tfix t) t)
+(* 8 *)
+| do3_comm : 
+  forall tl tr, termLTS3 (tpar tl tr) None (tpar tr tl)
+
+(* | do_assocl : forall t1 t2 t3,  *)
+    (* termLTS (tpar t1 (tpar t2 t3)) None (tpar (tpar t1 t2) t3) *)
+
+(* | do_assocr : forall t1 t2 t3,  *)
+    (* termLTS (tpar (tpar t1 t2) t3) None (tpar t1 (tpar t2 t3)) *)
+.
+
+(* MeBi LTS (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) tend) Using termLTS3. *)
+(* MeBi LTS (tfix (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) trec)) Using termLTS3. *)
+
+(* MeBi Set Bound 50.
+MeBi LTS (tseq (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) tend) (tfix (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) trec))) Using termLTS3. *)
