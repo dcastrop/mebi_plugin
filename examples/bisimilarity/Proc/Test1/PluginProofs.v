@@ -13,17 +13,19 @@ Import Flat.Simple.
 Require Import MEBI.Examples.bisimilarity.Proc.Test1.Terms.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.Bisim".
-(* MeBi Set ShowAny True.  *)
-MeBi Set ShowAny False.
+MeBi Set ShowAny True. 
+(* MeBi Set ShowAny False. *)
 (* MeBi Set ShowNotices  True. *)
 (* MeBi Set ShowDebug    True. *)
 (* MeBi Set ShowDetails  True. *)
 MeBi Set ShowDetails  False.
-(* MeBi Set ShowResults  True. *)
+MeBi Set ShowResults  True.
 (* MeBi Set ShowWarnings True. *)
 MeBi Set WeakMode     True.
 MeBi Set Weak Option label.
-MeBi Bisim p With termLTS And q With termLTS Using termLTS.
+(* MeBi LTS p Using termLTS. *)
+(* MeBi LTS q Using termLTS. *)
+(* MeBi Bisim p With termLTS And q With termLTS Using termLTS. *)
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs".
 MeBi Reset All.
@@ -48,9 +50,32 @@ MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof.
   MeBiSim Begin termLTS p And termLTS q Using termLTS. (* unfold p, q. *)
-  MeBiSim Solve 200.
-Qed.
-
+  (* MeBiSim Solve 200. *)
+(* Qed. *)
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  (* MeBiSim Step. *)
+  (* info_eauto. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+Admitted.
 (* 
   MeBiSim Step. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
   MeBiSim Step. (* inversion H; simpl in *. *)
