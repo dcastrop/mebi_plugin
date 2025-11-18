@@ -39,17 +39,6 @@ let create_from (m : Model.t) : t =
 (****** Add **********************************************************)
 (*********************************************************************)
 
-(* let add_label (g : t) (l : Action.Label.t) : t =
-  match g with
-  | { alphabet; _ } -> { g with alphabet = Alphabet.add l alphabet }
-;;
- 
-let add_label_list (g : t) (ls : Action.Label.t list) : t =
-  match g with
-  | { alphabet; _ } ->
-    { g with alphabet = Alphabet.add_seq (List.to_seq ls) alphabet }
-;; *)
-
 let add_action (m : t) (a : Action.t) : t =
   match m with
   | { alphabet; _ } -> { m with alphabet = Alphabet.add a.label alphabet }

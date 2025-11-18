@@ -6,11 +6,14 @@ module Tree : sig
   val add_list : t -> t list -> t list
   val eq : t -> t -> bool
   val compare : t -> t -> int
-  val to_string : t -> string
-  val pstr : t -> string
+  val to_string : ?args:Utils.Strfy.style_args -> t -> string
 end
 
-type t = Evd.econstr * Evd.econstr * Tree.t
+type t = EConstr.t * EConstr.t * Tree.t
 
 val to_string :
-  ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
+  Environ.env ->
+  Evd.evar_map ->
+  ?args:Utils.Strfy.style_args ->
+  t ->
+  string

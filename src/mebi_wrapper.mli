@@ -59,7 +59,15 @@ end
 
 module Syntax : MEBI_MONAD_SYNTAX
 
-val wrap : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
+val mebi_wrap : 
+  (Environ.env ->
+  Evd.evar_map ->
+  ?args:Utils.Strfy.style_args ->
+  'a ->
+  string) ->
+  ?args:Utils.Strfy.style_args ->
+  'a ->
+  string
 val constr_to_string : Constr.t -> string
 val econstr_to_string : Evd.econstr -> string
 
@@ -215,11 +223,11 @@ val decode_map : 'a B.t -> 'a F.t mm
 type decoded_tree = (string * int) Mebi_constr.Tree.tree
 
 val decode_constr_tree_lts : Mebi_constr.Tree.t -> decoded_tree mm
-val pstr_decoded_tree : decoded_tree -> string
+(* val pstr_decoded_tree : decoded_tree -> string *)
 val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit mm
 val debug_str : (Environ.env -> Evd.evar_map -> string) -> string mm
-val show_fwd_map : unit -> unit
-val show_bck_map : unit -> unit
+(* val show_fwd_map : unit -> unit *)
+(* val show_bck_map : unit -> unit *)
 
 val make_transition_tbl
   :  wrapper ref

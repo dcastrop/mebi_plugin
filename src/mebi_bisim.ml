@@ -13,6 +13,19 @@ type transition =
   ; dest : State.t option
   }
 
+let transition_to_string
+      ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+  : transition -> string
+  = function
+  | { from; action; dest } ->
+    let from : string = Model.State.to_string from in
+    let action : string = Model.Action.to_string action in
+    let dest : string =
+      Option.cata (fun dest -> Model.State.to_string dest) "None" dest
+    in
+    Utils.Strfy.record ~args [ "from", from; "action", action; "dest", dest ]
+;;
+
 type proof_state =
   | NewProof
   | NewWeakSim
@@ -21,6 +34,24 @@ type proof_state =
   | GoalTransition of transition
   | Constructors of
       (Model.Action.annotation * (unit -> unit Proofview.tactic) list option)
+
+let proof_state_to_string : proof_state -> string = function
+  | NewProof -> "NewProo\n"
+  | NewWeakSim -> "NewWeakSim\n"
+  | NewCofix -> "NewCofix\n"
+  | NewTransition transition ->
+    Printf.sprintf "NewTransition:\n%s\n" (transition_to_string transition)
+  | GoalTransition transition ->
+    Printf.sprintf "GoalTransition:\n%s\n" (transition_to_string transition)
+  | Constructors (annotation, tactics_opt) ->
+    Printf.sprintf
+      "Constructors, tactics to apply: %s\n%s\n"
+      (Option.cata
+         (fun tactics -> Printf.sprintf "Some |%i|" (List.length tactics))
+         "None"
+         tactics_opt)
+      (Model.Action.annotation_to_string annotation)
+;;
 
 let the_proof_state : proof_state ref = ref NewProof
 let reset_the_proof_state () : unit = the_proof_state := NewProof
@@ -64,7 +95,7 @@ let pstr_transition (x : transition) : string =
     "- from:%s\n- action:%s\n- dest:%s\n"
     (Model.pstr_state x.from)
     (Model.pstr_action x.action)
-    (Utils.Strfy.option Model.pstr_state x.dest)
+    (Utils.Strfy.option Model.State.to_string x.dest)
 ;;
 
 exception Enc_Of_EConstr_NotFound of (EConstr.t * States.t)
@@ -646,7 +677,7 @@ let warning_multiple_n_candidates candidates =
           %s"
          (Utils.Strfy.list
             ~force_newline:true
-            (Utils.Strfy.tuple Model.pstr_action Model.pstr_state)
+            (Utils.Strfy.tuple Model.Action.to_string Model.State.to_string)
             candidates))
 ;;
 
@@ -767,24 +798,11 @@ let build_constructors gl : Model.Action.annotation -> unit Proofview.tactic
     Log.debug "mebi_bisim.build_constructors, rt1n_refl";
     Log.notice "apply rt1n_refl.";
     Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ())
-    (* | (_tgt, action) :: ((_tgt', action')::t) ->
-       (   match Action.is_silent action, Action.is_silent action with
-       | true, true ->
-
-       ;
-       let pre_meta, post_meta = (List.hd action.meta) in
-       let pre_constrs = build_tactics_from_constr_tree gl (pre_meta) in
-       the_proof_state := Constructors (t, Some (pre_constrs, post_constrs));
-       Mebi_tactics.eapply ~gl (Mebi_theories.c_rt1n_trans ())) *)
   | (_tgt, action) :: t ->
-    (* the_proof_state := BuildConstructors (mt, nt, t); *)
     Log.debug
       (Printf.sprintf
          "mebi_bisim.build_constructors, anno: %s"
          (Model.Action.annotation_pair_to_string (_tgt, action)));
-    (* let pre_meta, post_meta = (List.hd action.meta) in *)
-    (* let pre_constrs = build_tactics_from_constr_tree gl (pre_meta) in *)
-    (* the_proof_state := Constructors (t, Some (pre_constrs, post_constrs)); *)
     let constrs = build_tactics_from_constr_tree gl (List.hd action.meta) in
     the_proof_state := Constructors (t, Some constrs);
     Mebi_tactics.eapply
@@ -797,15 +815,6 @@ let build_constructors gl : Model.Action.annotation -> unit Proofview.tactic
          Log.notice "eapply rt1n_refl.";
          Mebi_theories.c_rt1n_refl ()))
 ;;
-
-(*  :: build_constructors gl (* mt nt *) t *)
-
-(* let do_constr = apply_lts_constructor gl (List.hd action.meta) in *)
-(* let next_constrs = handle_weak_constructors gl mt nt t in *)
-(* Proofview.tclTHEN do_constr next_constrs *)
-(* do_constr *)
-
-(* do_constr *)
 
 let handle_weak_visible_transition
       (gl : Proofview.Goal.t)
@@ -987,22 +996,15 @@ let handle_new_weak_sim (gl : Proofview.Goal.t) : unit Proofview.tactic =
     raise (CouldNotHandle_NewWeakSim ())
 ;;
 
-(* let handle_apply_constuctors gl
-   : unit Proofview.tactic list -> unit Proofview.tactic
-   = function
-   | [] ->
-   Log.debug "mebi_bisim.handle_apply_constuctors -> NewWeakSim";
-   the_proof_state := NewWeakSim;
-   handle_new_weak_sim gl
-   | h :: t ->
-   Log.debug "mebi_bisim.handle_apply_constuctors";
-   the_proof_state := ApplyConstructors t;
-   h
-   ;; *)
-
 let do_simplify gl : unit Proofview.tactic =
   Log.notice "simpl in *.";
   Mebi_tactics.simplify_and_subst_all ~gl ()
+;;
+
+let do_rt1n_refl gl =
+  Log.notice "apply rt1n_refl.";
+  Mebi_theories.tactics
+    [ Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()); do_simplify gl ]
 ;;
 
 let handle_constuctors gl
@@ -1012,17 +1014,11 @@ let handle_constuctors gl
   | [], None ->
     Log.debug "mebi_bisim.handle_constuctors, ([], None)";
     the_proof_state := NewWeakSim;
-    (* handle_new_weak_sim gl *)
-    Log.notice "apply rt1n_refl.";
-    Mebi_theories.tactics
-      [ Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()); do_simplify gl ]
+    do_rt1n_refl gl
   | [], Some [] ->
     Log.debug "mebi_bisim.handle_constuctors, ([], Some [])";
     the_proof_state := NewWeakSim;
-    (* handle_new_weak_sim gl *)
-    Log.notice "apply rt1n_refl.";
-    Mebi_theories.tactics
-      [ Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()); do_simplify gl ]
+    do_rt1n_refl gl
   | ls, Some [] ->
     Log.debug "mebi_bisim.handle_constuctors, (ls, Some [])";
     Log.debug
@@ -1058,6 +1054,7 @@ let handle_new_proof gl : unit Proofview.tactic =
 ;;
 
 let handle_proof_state () : unit Proofview.tactic =
+  Log.debug (proof_state_to_string !the_proof_state);
   Proofview.Goal.enter (fun gl ->
     match !the_proof_state with
     | NewProof -> handle_new_proof gl
@@ -1079,6 +1076,7 @@ let loop_iter () : unit Proofview.tactic =
       is the upper-bound, i.e., the maximum number of iterations to try solve the proof via [loop_iter].
 *)
 let solve (u : int) (pstate : Declare.Proof.t) : Declare.Proof.t =
+  Log.notice (Printf.sprintf "Try to solve (%i) iterations." u);
   let rec iter_body (n : int) (pstate : Declare.Proof.t) : int * Declare.Proof.t
     =
     if Proof.is_done (Declare.Proof.get pstate)
@@ -1091,6 +1089,7 @@ let solve (u : int) (pstate : Declare.Proof.t) : Declare.Proof.t =
         Log.warning (Printf.sprintf "Could not Solve in (%i) iterations." u);
         0, pstate
       | _ ->
+        Log.notice (Printf.sprintf "Solve, iteration: (%i)" (u - n));
         let pstate : Declare.Proof.t =
           Mebi_tactics.update_proof_by_tactic pstate (loop_iter ())
         in

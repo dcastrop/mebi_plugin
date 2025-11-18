@@ -2,45 +2,41 @@ val default_debug : bool
 val debugerr : bool
 
 type constructor_args = {
-  lhs : EConstr.t;
-  act : EConstr.t;
-  rhs : EConstr.t;
+  lhs : Evd.econstr;
+  act : Evd.econstr;
+  rhs : Evd.econstr;
 }
 
 module Pair : sig
-  type t = { a : EConstr.t; b : EConstr.t }
+  type t = { a : Evd.econstr; b : Evd.econstr }
 
   val to_string :
-    ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
-
-  val _debug_fresh :
     Environ.env ->
     Evd.evar_map ->
-    Evd.evar_map ->
-    Evd.econstr ->
-    Evd.econstr ->
-    Evd.econstr ->
-    unit
+    ?args:Utils.Strfy.style_args ->
+    t ->
+    string
 
   val fresh :
     Environ.env ->
     Evd.evar_map ->
-    EConstr.t ->
-    EConstr.t ->
+    Evd.econstr ->
+    Evd.econstr ->
     Evd.evar_map * t
 
-  val normal : EConstr.t -> EConstr.t -> t
+  val normal : Evd.econstr -> Evd.econstr -> t
 
   val make :
     Environ.env ->
     Evd.evar_map ->
-    EConstr.t ->
-    EConstr.t ->
+    Evd.econstr ->
+    Evd.econstr ->
     Evd.evar_map * t
 
   val debug_unify :
     Environ.env ->
     Evd.evar_map ->
+    ?args:Utils.Strfy.style_args ->
     Evd.econstr ->
     Evd.econstr ->
     unit
@@ -48,6 +44,7 @@ module Pair : sig
   val debug_unifyerr :
     Environ.env ->
     Evd.evar_map ->
+    ?args:Utils.Strfy.style_args ->
     Evd.econstr ->
     Evd.econstr ->
     Evd.econstr ->
@@ -58,8 +55,8 @@ module Pair : sig
     ?debug:bool ->
     Environ.env ->
     Evd.evar_map ->
-    EConstr.t ->
-    EConstr.t ->
+    Evd.econstr ->
+    Evd.econstr ->
     Evd.evar_map * bool
 
   val unify :
@@ -78,7 +75,11 @@ module Problem : sig
   }
 
   val to_string :
-    ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
+    Environ.env ->
+    Evd.evar_map ->
+    ?args:Utils.Strfy.style_args ->
+    t ->
+    string
 
   val unify_pair_opt :
     ?debug:bool -> Pair.t -> bool Mebi_wrapper.mm
@@ -95,10 +96,15 @@ module Problems : sig
   val empty : unit -> t Mebi_wrapper.mm
   val is_empty : t -> bool
   val list_is_empty : t list -> bool
-  val to_string : ?indent:int -> Environ.env -> t -> string
+
+  val to_string :
+    Environ.env -> ?args:Utils.Strfy.style_args -> t -> string
 
   val list_to_string :
-    ?indent:int -> Environ.env -> t list -> string
+    Environ.env ->
+    ?args:Utils.Strfy.style_args ->
+    t list ->
+    string
 
   val unify_list_opt :
     ?debug:bool ->
@@ -107,10 +113,11 @@ module Problems : sig
 
   val sandbox_unify_all_opt :
     ?debug:bool ->
-    EConstr.t ->
-    EConstr.t ->
+    Evd.econstr ->
+    Evd.econstr ->
     t ->
-    (EConstr.t * EConstr.t * Mebi_constr.Tree.t list) option
+    (Evd.econstr * Evd.econstr * Mebi_constr.Tree.t list)
+    option
     Mebi_wrapper.mm
 end
 
@@ -118,14 +125,18 @@ module Constructors : sig
   type t = Mebi_constr.t list
 
   val to_string :
-    ?indent:int -> Environ.env -> Evd.evar_map -> t -> string
+    Environ.env ->
+    Evd.evar_map ->
+    ?args:Utils.Strfy.style_args ->
+    t ->
+    string
 
   val retrieve :
     ?debug:bool ->
     int ->
     t ->
-    EConstr.t ->
-    EConstr.t ->
+    Evd.econstr ->
+    Evd.econstr ->
     Mebi_setup.Enc.t * Problems.t list ->
     t Mebi_wrapper.mm
 end

@@ -52,26 +52,28 @@ module Tree = struct
     tree_compare t1 t2
   ;;
 
-  let rec to_string (t1 : t) : string =
-    match t1 with
-    | Node (lhs_int, rhs_int_tree_list) ->
-      Printf.sprintf
-        "(%s:%i) [%s]"
-        (Enc.to_string (fst lhs_int))
-        (snd lhs_int)
-        (match List.length rhs_int_tree_list with
-         | 0 -> ""
-         | 1 -> to_string (List.hd rhs_int_tree_list)
-         | _ ->
-           (* Utils.Strfy.list pstr rhs_int_tree_list *)
-           List.fold_left
-             (fun (acc : string) (rhs_int_tree : t) ->
-               Printf.sprintf "%s, %s" acc (to_string rhs_int_tree))
-             (to_string (List.hd rhs_int_tree_list))
-             (List.tl rhs_int_tree_list))
+  let to_string ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+    : t -> string
+    =
+    let rec to_string (x : t) : string =
+      match x with
+      | Node (lhs_int, rhs_int_tree_list) ->
+        Printf.sprintf
+          "(%s:%i) [%s]"
+          (Enc.to_string (fst lhs_int))
+          (snd lhs_int)
+          (match List.length rhs_int_tree_list with
+           | 0 -> ""
+           | 1 -> to_string (List.hd rhs_int_tree_list)
+           | _ ->
+             List.fold_left
+               (fun (acc : string) (rhs_int_tree : t) ->
+                 Printf.sprintf "%s, %s" acc (to_string rhs_int_tree))
+               (to_string (List.hd rhs_int_tree_list))
+               (List.tl rhs_int_tree_list))
+    in
+    to_string
   ;;
-
-  let pstr = to_string
 end
 
 (** A triple denoting a constructor of an rocq LTS definition.
@@ -80,22 +82,18 @@ end
     - [Mebi_constr.Tree.t] coq-constructor index *)
 type t = EConstr.t * EConstr.t * Tree.t
 
-let to_string ?(indent : int = 0) env sigma : t -> string = function
-  | action, destination, tree ->
-    let action : string = Rocq_utils.Strfy.econstr env sigma action in
-    let destination : string = Rocq_utils.Strfy.econstr env sigma destination in
-    let tree : string = Tree.to_string tree in
-    let f =
-      Utils.Strfy.tuple
-        ~is_keyval:true
-        ~indent:(indent + 1)
-        Utils.Strfy.str
-        Utils.Strfy.str
-    in
-    Utils.Strfy.list
-      ~force_newline:true
-      ~indent
-      ~use:("{", "}")
-      f
-      [ "action", action; "destination", destination; "tree", tree ]
+let to_string
+      env
+      sigma
+      ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+      ((action, destination, tree) : t)
+  : string
+  =
+  let open Utils.Strfy in
+  let open Rocq_utils.Strfy in
+  let action : string = econstr env sigma ~args:(nest args) action in
+  let destination : string = econstr env sigma destination in
+  let tree : string = Tree.to_string tree in
+  Utils.Strfy.record
+    [ "action", action; "destination", destination; "tree", tree ]
 ;;

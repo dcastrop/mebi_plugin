@@ -224,3 +224,15 @@ Inductive termLTS3 : term -> option label -> term -> Prop :=
 
 (* MeBi Set Bound 50.
 MeBi LTS (tseq (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) tend) (tfix (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) trec))) Using termLTS3. *)
+
+
+(* testing merging *)
+
+Example p : term := tfix (tseq (tpar (tact (send A) tend) 
+                                     (tact (recv A) tend)) trec).
+
+Example q : term := tfix (tseq (tpar (tact (recv A) tend) 
+                                     (tact (send A) tend)) 
+                               (tseq (tpar (tact (send A) tend) 
+                                           (tact (recv A) tend)) trec)).
+MeBi Merge p With termLTS And q With termLTS Using termLTS.

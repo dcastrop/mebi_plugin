@@ -130,7 +130,6 @@ module State = struct
         ?(skip_leading_tab : bool = false)
         ?(indents : int = 0)
         ?(pstr : bool = false)
-        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
         (t : t)
     =
     let state_str = Mebi_setup.Enc.to_string (fst t) in
@@ -182,7 +181,7 @@ module Action = struct
       match m with
       | [] -> "(No MetaData)"
       | h :: t ->
-        let do_pstr i = Printf.sprintf "(%s)" (Mebi_constr.Tree.to_string i) in
+        let do_pstr i = Printf.sprintf "(%s)" (Mebi_constr.Tree.pstr i) in
         Printf.sprintf
           "(%s)"
           (Printf.sprintf
@@ -293,7 +292,6 @@ module Action = struct
         ?(skip_leading_tab : bool = false)
         ?(indents : int = 0)
         ?(pstr : bool = false)
-        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
         (a : t)
     =
     let label_str = Label.to_string a.label in
