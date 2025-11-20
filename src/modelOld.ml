@@ -610,9 +610,9 @@ module ActionPair = struct
 end
 
 module ActionPairs = Set.Make (struct
-    type t = ActionPair.t
-
-    let compare a b = ActionPair.compare a b
+    include ActionPair
+    (* type t = ActionPair.t *)
+    (* let compare a b = ActionPair.compare a b *)
   end)
 
 let action_pairs_to_list (aps : ActionPairs.t) : ActionPair.t list =

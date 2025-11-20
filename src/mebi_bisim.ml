@@ -93,8 +93,8 @@ let set_the_result (new_r : Algorithms.Bisimilar.result) : unit =
 let pstr_transition (x : transition) : string =
   Printf.sprintf
     "- from:%s\n- action:%s\n- dest:%s\n"
-    (Model.pstr_state x.from)
-    (Model.pstr_action x.action)
+    (State.to_string x.from)
+    (Action.to_string x.action)
     (Utils.Strfy.option Model.State.to_string x.dest)
 ;;
 
@@ -105,7 +105,7 @@ exception Error_Multiple_States_Of_Enc_Found of (Enc.t * States.t)
 let find_state_of_enc (x : Enc.t) (s : States.t) : State.t =
   match
     List.filter
-      (fun ((y, _) : State.t) -> Mebi_setup.Eq.enc x y)
+      (fun ({ enc = y; _ } : State.t) -> Mebi_setup.Eq.enc x y)
       (States.to_list s)
   with
   | h :: [] -> h
@@ -117,7 +117,7 @@ let find_state_of_enc_opt (x : Enc.t) (s : States.t) : State.t option =
   (* match x with None -> None | Some x -> Some (find_state_of_enc x s) *)
   match
     List.filter
-      (fun ((y, _) : State.t) -> Mebi_setup.Eq.enc x y)
+      (fun ({ enc = y; _ } : State.t) -> Mebi_setup.Eq.enc x y)
       (States.to_list s)
   with
   | h :: [] -> Some h
@@ -128,10 +128,10 @@ let find_state_of_enc_opt (x : Enc.t) (s : States.t) : State.t option =
 exception Label_Of_Enc_NotFound of (Enc.t * Alphabet.t)
 exception Error_Multiple_Labels_Of_Enc_Found of (Enc.t * Alphabet.t)
 
-let find_label_of_enc (x : Enc.t) (s : Alphabet.t) : Action.Label.t =
+let find_label_of_enc (x : Enc.t) (s : Alphabet.t) : Label.t =
   match
     List.filter
-      (fun ((y, _) : Action.Label.t) -> Mebi_setup.Eq.enc x y)
+      (fun ({ enc = y; _ } : Label.t) -> Mebi_setup.Eq.enc x y)
       (Alphabet.to_list s)
   with
   | h :: [] -> h
@@ -476,13 +476,10 @@ let warning_multiple_h_transitions_to_invert h tl =
         returning head)\n\
         %s"
        (Utils.Strfy.list
-          ~force_newline:true
           (* (fun ((t, x) : hyp_transition * transition) -> *)
           (fun (x : transition) ->
             Utils.Strfy.list
-              ~force_newline:true
-              ~indent:1
-              Utils.Strfy.str
+              Utils.Strfy.string
               [ (* Utils.Strfy.tuple
                    ~is_keyval:true
                    ~indent:2
@@ -491,22 +488,16 @@ let warning_multiple_h_transitions_to_invert h tl =
                    ("kind", match t with Full -> "Full" | Layer -> "Layer")
                    ; *)
                 Utils.Strfy.tuple
-                  ~is_keyval:true
-                  ~indent:2
-                  Utils.Strfy.str
-                  Model.State.pstr
+                  Utils.Strfy.string
+                  State.to_string
                   ("from", x.from)
               ; Utils.Strfy.tuple
-                  ~is_keyval:true
-                  ~indent:2
-                  Utils.Strfy.str
-                  Model.Action.pstr
+                  Utils.Strfy.string
+                  Action.to_string
                   ("action", x.action)
               ; Utils.Strfy.tuple
-                  ~is_keyval:true
-                  ~indent:2
-                  Utils.Strfy.str
-                  (Utils.Strfy.option Model.State.pstr)
+                  Utils.Strfy.string
+                  (Utils.Strfy.option State.to_string)
                   ("dest", x.dest)
               ])
           (h :: tl)))
@@ -635,7 +626,12 @@ let get_n_candidate_actions m2 (n : Fsm.t) n_action n1 dest_states
       in
       if States.is_empty bisim_dests
       then ()
-      else if Action.eq ~annos:false ~meta:false n_action action
+      else if
+        Action.check_equal
+          ~annotations:false
+          ~constructor_trees:false
+          n_action
+          action
       then Actions.add n_actions action dests
       else ())
     n_actions_all;
@@ -652,7 +648,7 @@ let get_n_candidate_action_list m2 (n : Fsm.t) n_action n1 dest_states
         (Printf.sprintf
            "mebi_bisim.get_n_candidate_action_list (%i)\nk:\n%s"
            (List.length acc)
-           (Model.pstr_action k));
+           (Action.to_string k));
       States.fold
         (fun d acc0 ->
           Log.debug
@@ -676,8 +672,7 @@ let warning_multiple_n_candidates candidates =
           (returning hd):\n\
           %s"
          (Utils.Strfy.list
-            ~force_newline:true
-            (Utils.Strfy.tuple Model.Action.to_string Model.State.to_string)
+            (Utils.Strfy.tuple Action.to_string State.to_string)
             candidates))
 ;;
 
@@ -705,11 +700,11 @@ let handle_eexists
   Log.debug "mebi_bisim.handle_eexists";
   match m2, n2 with
   | Some m2, None ->
-    assert (State.eq m2 cm2);
-    assert (Action.eq ~annos:false ~meta:false mA nA);
+    assert (State.equal m2 cm2);
+    assert (Action.check_equal ~annotations:false ~constructor_trees:false mA nA);
     let dests : States.t = get_bisim_states_of m2 n2 in
     let n_candidate : State.t = get_n_candidate m2 (get_n ()) nA n1 dests in
-    let n2 : EConstr.t = enc_to_econstr (fst n_candidate) in
+    let n2 : EConstr.t = enc_to_econstr n_candidate.enc in
     Mebi_theories.tactics
       [ Tactics.constructor_tac true None 1 (Tactypes.ImplicitBindings [ n2 ])
       ; Tactics.split Tactypes.NoBindings
@@ -722,7 +717,7 @@ let handle_weak_silent_transition gl n1 n2 : unit Proofview.tactic =
   Mebi_theories.tactics
     [ Mebi_tactics.apply ~gl (Mebi_theories.c_wk_none ())
     ; Mebi_tactics.unfold_econstr gl (Mebi_theories.c_silent ())
-    ; (if State.eq n1 n2
+    ; (if State.equal n1 n2
        then (
          Log.notice "apply rt1n_refl.";
          Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()))
@@ -740,7 +735,7 @@ let warning_multiple_n_dests n_dests =
          "mebi_bisim.warning_multiple_n_dests, multiple candidate destss found \
           (returning hd):\n\
           %s"
-         (Model.pstr_states n_dests))
+         (Model.states_to_string n_dests))
 ;;
 
 let debug_constrs gl =
@@ -798,16 +793,17 @@ let build_constructors gl : Model.Action.annotation -> unit Proofview.tactic
     Log.debug "mebi_bisim.build_constructors, rt1n_refl";
     Log.notice "apply rt1n_refl.";
     Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ())
-  | (_tgt, action) :: t ->
+  | { from; via } :: t ->
     Log.debug
       (Printf.sprintf
          "mebi_bisim.build_constructors, anno: %s"
-         (Model.Action.annotation_pair_to_string (_tgt, action)));
+         (Action.annotation_to_string { from; via }));
+    (* TODO: this is the problem, we are just taking the head rather than looking at what one to take *)
     let constrs = build_tactics_from_constr_tree gl (List.hd action.meta) in
     the_proof_state := Constructors (t, Some constrs);
     Mebi_tactics.eapply
       ~gl
-      (if Action.is_silent action
+      (if Model.is_action_silent via
        then (
          Log.notice "eapply rt1n_trans.";
          Mebi_theories.c_rt1n_trans ())

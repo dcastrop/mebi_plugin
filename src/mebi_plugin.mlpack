@@ -7,9 +7,13 @@ Mebi_enc
 Mebi_setup
 Mebi_constr
 Mebi_theories
+Model_info
+Model_state
+Model_label
+Model_transition
+Model_action
+Model_edge
 Model
-Lts
-Fsm
 Algorithms
 Mebi_tactics
 Mebi_wrapper

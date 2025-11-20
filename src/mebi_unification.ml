@@ -58,10 +58,10 @@ module Pair = struct
     : string
     =
     let f = Rocq_utils.Strfy.econstr env sigma in
-    let g = Utils.Strfy.tuple ~args Utils.Strfy.str f in
+    let g = Utils.Strfy.tuple ~args Utils.Strfy.string f in
     let a : string = g ("a", a) in
     let b : string = g ("b", b) in
-    Utils.Strfy.tuple ~args Utils.Strfy.str Utils.Strfy.str (a, b)
+    Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string (a, b)
   ;;
 
   (* let _debug_fresh env sigma sigma' fresh a b : unit =
@@ -95,10 +95,12 @@ module Pair = struct
         b
     =
     let f = Rocq_utils.Strfy.econstr env sigma in
-    let g = Utils.Strfy.tuple ~args Utils.Strfy.str f in
+    let g = Utils.Strfy.tuple ~args Utils.Strfy.string f in
     let a : string = g ("a", a) in
     let b : string = g ("b", b) in
-    let s = Utils.Strfy.tuple ~args Utils.Strfy.str Utils.Strfy.str (a, b) in
+    let s =
+      Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string (a, b)
+    in
     Log.debug (Printf.sprintf "unified:\n%s" s)
   ;;
 
@@ -113,10 +115,12 @@ module Pair = struct
     =
     let f = Rocq_utils.Strfy.econstr env sigma in
     let s1 = Printf.sprintf "cannot unify \"%s\" with \"%s\"" (f c) (f d) in
-    let g = Utils.Strfy.tuple ~args Utils.Strfy.str f in
+    let g = Utils.Strfy.tuple ~args Utils.Strfy.string f in
     let a : string = g ("a", a) in
     let b : string = g ("b", b) in
-    let s2 = Utils.Strfy.tuple ~args Utils.Strfy.str Utils.Strfy.str (a, b) in
+    let s2 =
+      Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string (a, b)
+    in
     Log.debug (Printf.sprintf "%s:\n%s" s1 s2)
   ;;
 

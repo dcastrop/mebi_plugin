@@ -30,9 +30,15 @@
   ; strfy
   mebi_constr
   mebi_theories
+  model_info
+  model_state
+  model_label
+  model_transition
+  model_action
+  model_edge
   model
-  lts
-  fsm
+  ; lts
+  ; fsm
   algorithms
   mebi_tactics
   mebi_wrapper

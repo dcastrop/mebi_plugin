@@ -4,7 +4,7 @@ module Tree : sig
 
   val add : t -> t -> t
   val add_list : t -> t list -> t list
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
   val compare : t -> t -> int
   val to_string : ?args:Utils.Strfy.style_args -> t -> string
 end

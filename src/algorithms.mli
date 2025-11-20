@@ -1,20 +1,20 @@
 module Minimize : sig
-  type result = Fsm.t * Model.Partition.t
+  type result = Model.Fsm.t * Model.Partition.t
 
-  val run : ?weak:bool -> Fsm.t -> result
-  val pstr : result -> string
+  val run : ?weak:bool -> Model.Fsm.t -> result
+  val to_string : result -> string
 end
 
 module Bisimilar : sig
   type result =
-    { the_fsm_1 : Fsm.t
-    ; the_fsm_2 : Fsm.t
-    ; merged_fsm : Fsm.t
+    { the_fsm_1 : Model.Fsm.t
+    ; the_fsm_2 : Model.Fsm.t
+    ; merged_fsm : Model.Fsm.t
     ; bisim_states : Model.Partition.t
     ; non_bisim_states : Model.Partition.t
     }
 
-  val run : ?weak:bool -> Fsm.pair -> result
+  val run : ?weak:bool -> Model.Fsm.pair -> result
   val result_to_bool : result -> bool
-  val pstr : result -> string
+  val to_string : result -> string
 end
