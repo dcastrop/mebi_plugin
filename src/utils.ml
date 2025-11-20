@@ -202,6 +202,7 @@ module Strfy = struct
     ; mutable newline : bool
     ; mutable nested : bool
     ; name : string option
+    ; style : collection_style option
     }
 
   let style_args
@@ -209,6 +210,7 @@ module Strfy = struct
         ?(newline : bool = false)
         ?(nested : bool = false)
         ?(name : string = String.empty)
+        ?(style : collection_style option = None)
         ()
     : style_args
     =
@@ -216,7 +218,16 @@ module Strfy = struct
     ; newline
     ; nested
     ; name = (if String.equal name String.empty then None else Some name)
+    ; style
     }
+  ;;
+
+  let keyval_style () : collection_style =
+    { (collection_style Record) with inline = true; delimiter = Colon }
+  ;;
+
+  let inline_tuple_style () : collection_style =
+    { (collection_style Tuple) with inline = true }
   ;;
 
   (** newline indent *)
@@ -259,28 +270,34 @@ module Strfy = struct
     push { args with newline = false; nested = true }
   ;;
 
-  let wrap (style : collection_style) (args : style_args)
-    : string list -> string
-    =
-    let prefix : string = prefix args in
-    let ((lhs, rhs) : string * string) = marker style in
-    let delim : string = delimiter style in
-    let f : string -> string -> string =
-      fun acc a -> Printf.sprintf "%s%s %s" acc delim a
-    in
-    function
-    | [] -> Printf.sprintf "%s%s %s (%s)" prefix lhs rhs (empty_msg args)
-    | h :: t ->
-      Printf.sprintf
-        "%s%s %s %s (%s)"
-        prefix
-        lhs
-        (List.fold_left f h t)
-        rhs
-        (size_msg (List.length t + 1) args)
+  let show_empty_string : string = "<<empty string>>"
+
+  let wrap (args : style_args) (alist : string list) : string =
+    match args.style with
+    | None ->
+      (match alist with
+       | [] -> show_empty_string
+       | alist -> String.concat " " alist)
+    | Some style ->
+      let prefix : string = prefix args in
+      let ((lhs, rhs) : string * string) = marker style in
+      let delim : string = delimiter style in
+      let f : string -> string -> string =
+        fun acc a -> Printf.sprintf "%s%s %s" acc delim a
+      in
+      (match alist with
+       | [] -> Printf.sprintf "%s%s %s (%s)" prefix lhs rhs (empty_msg args)
+       | h :: t ->
+         Printf.sprintf
+           "%s%s %s %s (%s)"
+           prefix
+           lhs
+           (List.fold_left f h t)
+           rhs
+           (size_msg (List.length t + 1) args))
   ;;
 
-  let str ?(args : style_args = style_args ()) : string -> string =
+  let string ?(args : style_args = style_args ()) : string -> string =
     fun (x : string) -> x
   ;;
 
@@ -304,52 +321,62 @@ module Strfy = struct
   let tuple
         (f : ?args:style_args -> 'a -> string)
         (g : ?args:style_args -> 'b -> string)
-        ?(style : collection_style = collection_style Tuple)
-        ?(args : style_args = style_args ())
+        ?(args : style_args =
+          style_args ~style:(Some (collection_style Tuple)) ())
     : 'a * 'b -> string
     =
     fun ((a, b) : 'a * 'b) ->
     let astr : string = f ~args:(nest args) a in
     let bstr : string = g ~args:(nest args) b in
-    wrap style args [ astr; bstr ]
+    wrap args [ astr; bstr ]
+  ;;
+
+  let inline_tuple
+        (f : ?args:style_args -> 'a -> string)
+        (g : ?args:style_args -> 'b -> string)
+        ?(args : style_args =
+          style_args ~style:(Some (inline_tuple_style ())) ())
+    : 'a * 'b -> string
+    =
+    tuple f g ~args
   ;;
 
   let keyval
         (f : ?args:style_args -> 'a -> string)
-        ?(style : collection_style = collection_style Record)
-        ?(args : style_args = style_args ())
+        ?(args : style_args = style_args ~style:(Some (keyval_style ())) ())
     : string * 'a -> string
     =
-    tuple ~style:{ style with inline = true; delimiter = Colon } ~args str f
+    tuple ~args string f
   ;;
 
   let list
         (f : ?args:style_args -> 'a -> string)
-        ?(style : collection_style = collection_style List)
-        ?(args : style_args = style_args ())
+        ?(args : style_args =
+          style_args ~style:(Some (collection_style List)) ())
         (alist : 'a list)
     : string
     =
-    wrap style args (List.map (fun a -> f ~args:(nest args) a) alist)
+    wrap args (List.map (fun a -> f ~args:(nest args) a) alist)
   ;;
 
   let array
         (f : ?args:style_args -> 'a -> string)
-        ?(style : collection_style = collection_style List)
-        ?(args : style_args = style_args ())
+        ?(args : style_args =
+          style_args ~style:(Some (collection_style List)) ())
         (arr : 'a array)
     : string
     =
-    list ~style ~args f (Array.to_list arr)
+    list ~args f (Array.to_list arr)
   ;;
 
   let record
-        ?(style : collection_style = collection_style Record)
+        ?(args : style_args =
+          style_args ~style:(Some (collection_style Record)) ())
         ?(args : style_args = style_args ())
         (alist : (string * string) list)
     : string
     =
-    list ~style ~args (keyval ~style str) alist
+    list ~args (keyval string) alist
   ;;
 
   (* new line sep *)

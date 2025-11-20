@@ -75,12 +75,24 @@ src/mebi_constr.mli
 src/mebi_theories.ml
 src/mebi_theories.mli
 
+src/model_info.ml
+src/model_info.mli
+src/model_state.ml
+src/model_state.mli
+src/model_label.ml
+src/model_label.mli
+src/model_transition.ml
+src/model_transition.mli
+src/model_action.ml
+src/model_action.mli
+src/model_edge.ml
+src/model_edge.mli
 src/model.ml
 src/model.mli
-src/lts.ml
-src/lts.mli
-src/fsm.ml
-src/fsm.mli
+# src/lts.ml
+# src/lts.mli
+# src/fsm.ml
+# src/fsm.mli
 src/algorithms.ml
 src/algorithms.mli
 

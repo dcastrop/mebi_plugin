@@ -482,7 +482,7 @@ let get_the_silent_action (m : t) : Action.t =
 *)
 let saturate_edges (m : t) : States.t Actions.t Edges.t =
   Log.trace "fsm.saturate_edges";
-  let the_silent_action : Action.t = get_the_silent_action m in
+  (* let the_silent_action : Action.t = get_the_silent_action m in *)
   let edges : States.t Actions.t Edges.t = Edges.copy m.edges in
   if Logging.is_details_enabled ()
   then
@@ -491,7 +491,7 @@ let saturate_edges (m : t) : States.t Actions.t Edges.t =
     (fun (from : State.t) (aa : States.t Actions.t) ->
       let actions : States.t Actions.t = Actions.create 0 in
       (* add silent reflexive action *)
-      Model.add_action actions the_silent_action from;
+      (* Model.add_action actions the_silent_action from; *)
       ActionPairs.iter
         (fun ((saturated_action, dests) : ActionPair.t) ->
           if States.cardinal dests > 0

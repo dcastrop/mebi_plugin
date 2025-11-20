@@ -14,7 +14,7 @@ module Tree = struct
     | h :: tl -> add x h :: add_list x tl
   ;;
 
-  let eq (t1 : t) (t2 : t) : bool =
+  let equal (t1 : t) (t2 : t) : bool =
     let rec tree_eq (t1 : t) (t2 : t) : bool =
       match t1, t2 with
       | Node (a1, b1), Node (a2, b2) ->

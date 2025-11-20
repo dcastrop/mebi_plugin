@@ -135,9 +135,12 @@ module Strfy = struct
     =
     let k : string =
       list
-        ~style:(collection_style Record)
-        ~args:(style_args ~name:"Constr_kinds" ())
-        str
+        ~args:
+          (style_args
+             ~name:"Constr_kinds"
+             ~style:(Some (collection_style Record))
+             ())
+        string
         (List.filter_map
            (fun (kind, isKind) -> if isKind then Some kind else None)
            (list_of_constr_kinds x))
@@ -172,8 +175,7 @@ module Strfy = struct
     let name : string = Printf.sprintf "%s Type Arguments" name in
     let tys : string =
       array
-        ~style:(collection_style Record)
-        ~args:(style_args ~name ())
+        ~args:(style_args ~name ~style:(Some (collection_style Record)) ())
         (econstr env sigma)
         tys
     in
@@ -213,9 +215,12 @@ module Strfy = struct
     =
     let k : string =
       list
-        ~style:(collection_style Record)
-        ~args:(style_args ~name:"EConstr_kinds" ())
-        str
+        ~args:
+          (style_args
+             ~name:"EConstr_kinds"
+             ~style:(Some (collection_style Record))
+             ())
+        string
         (List.filter_map
            (fun (kind, isKind) -> if isKind then Some kind else None)
            (list_of_econstr_kinds sigma x))
@@ -268,8 +273,11 @@ module Strfy = struct
     let concl = concl env sigma ~args:(nest args) (Proofview.Goal.concl x) in
     let hyps : string =
       list
-        ~style:(collection_style Record)
-        ~args:(style_args ~name:"Hypotheses" ())
+        ~args:
+          (style_args
+             ~name:"Hypotheses"
+             ~style:(Some (collection_style Record))
+             ())
         (hyp env sigma)
         (Proofview.Goal.hyps x)
     in

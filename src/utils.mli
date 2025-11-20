@@ -44,6 +44,9 @@ module Strfy : sig
     size : bool;
   }
 
+  val delimiter : collection_style -> string
+  val marker : collection_style -> string * string
+
   type collection_kind =
     | Tuple
     | Record
@@ -57,6 +60,7 @@ module Strfy : sig
     mutable newline : bool;
     mutable nested : bool;
     name : string option;
+    style : collection_style option;
   }
 
   val style_args :
@@ -64,54 +68,66 @@ module Strfy : sig
     ?newline:bool ->
     ?nested:bool ->
     ?name:string ->
+    ?style:collection_style option ->
     unit ->
     style_args
 
+  val keyval_style : unit -> collection_style
+  val inline_tuple_style : unit -> collection_style
+  val nlindent : int -> string
+  val mkindent : int -> bool -> string
+  val empty_msg : style_args -> string
+  val size_msg : int -> style_args -> string
+  val prefix : style_args -> string
+  val push : style_args -> style_args
+  val _pull : style_args -> style_args
   val nest : style_args -> style_args
-
-  val wrap :
-    collection_style -> style_args -> string list -> string
-
-  val str : ?args:style_args -> string -> string
+  val show_empty_string : string
+  val wrap : style_args -> string list -> string
+  val string : ?args:style_args -> string -> string
   val int : ?args:style_args -> int -> string
   val bool : ?args:style_args -> bool -> string
-  val option : 
-    (?args:style_args -> 'a -> string) -> 
-    ?args:style_args -> 
-    'a option -> 
+
+  val option :
+    (?args:style_args -> 'a -> string) ->
+    ?args:style_args ->
+    'a option ->
     string
 
   val tuple :
     (?args:style_args -> 'a -> string) ->
     (?args:style_args -> 'b -> string) ->
-    ?style:collection_style ->
     ?args:style_args ->
     'a * 'b ->
     string
-  
+
+  val inline_tuple :
+    (?args:style_args -> 'a -> string) ->
+    (?args:style_args -> 'b -> string) ->
+    ?args:style_args ->
+    'a * 'b ->
+    string
+
   val keyval :
     (?args:style_args -> 'a -> string) ->
-    ?style:collection_style ->
     ?args:style_args ->
     string * 'a ->
     string
 
   val list :
     (?args:style_args -> 'a -> string) ->
-    ?style:collection_style ->
     ?args:style_args ->
     'a list ->
     string
 
   val array :
     (?args:style_args -> 'a -> string) ->
-    ?style:collection_style ->
     ?args:style_args ->
     'a array ->
     string
 
   val record :
-    ?style:collection_style ->
+    ?args:style_args ->
     ?args:style_args ->
     (string * string) list ->
     string
