@@ -1,9 +1,16 @@
 module Info = Model_info
 module State = Model_state
 module Label = Model_label
-module Action = Model_action
+module Note = Model_note
 module Transition = Model_transition
+module Transition_opt = Model_transition_opt
+module Action = Model_action
 module Edge = Model_edge
+module Enc = Mebi_setup.Enc
+
+(***********************************************************************)
+(*** States ************************************************************)
+(***********************************************************************)
 
 module States = Set.Make (struct
     include State
@@ -11,19 +18,30 @@ module States = Set.Make (struct
 
 let states_to_string (x : States.t) : string = "TODO: Model.states_to_string"
 
+(***********************************************************************)
+(*** Partition *********************************************************)
+(***********************************************************************)
+
 module Partition = Set.Make (States)
 
 let partition_to_string (x : Partition.t) : string =
   "TODO: Model.partition_to_string"
 ;;
 
-(** Alphabet *)
+(***********************************************************************)
+(*** Alphabet **********************************************************)
+(***********************************************************************)
+
 module Alphabet = Set.Make (struct
     include Label
   end)
 
 let alphabet_to_string (x : Alphabet.t) : string =
   "TODO: Model.alphabet_to_string"
+;;
+
+let find_label_of_enc (x : Mebi_setup.Enc.t) : Alphabet.t -> Label.t =
+  Alphabet.find_first (fun y -> Mebi_setup.Enc.equal x y.enc)
 ;;
 
 let silent_label_opt (xs : Alphabet.t) : Label.t option =
@@ -41,8 +59,12 @@ let silent_label (xs : Alphabet.t) : Label.t =
 ;;
 
 let silent_action (xs : Alphabet.t) : Action.t =
-  { label = silent_label xs; annotations_list = []; constructor_trees = [] }
+  { label = silent_label xs; annotations = []; constructor_trees = [] }
 ;;
+
+(***********************************************************************)
+(*** Transitions *******************************************************)
+(***********************************************************************)
 
 module Transitions = Set.Make (struct
     include Transition
@@ -52,6 +74,10 @@ let transition_to_string (x : Transitions.t) : string =
   "TODO: Model.transition_to_string"
 ;;
 
+(***********************************************************************)
+(*** Actions ***********************************************************)
+(***********************************************************************)
+
 module Actions = Hashtbl.Make (struct
     include Action
   end)
@@ -60,20 +86,81 @@ let actions_to_string (x : States.t Actions.t) : string =
   "TODO: Model.actions_to_string"
 ;;
 
-let update_destinations actions updated_action destinations : States.t =
+(** [is_action_silent x] is an alias for [Label.is_silent x].
+    @return [true] if [x.is_silent] is [Some true], else [false]. *)
+let is_action_silent (x : Action.t) : bool = Label.is_silent x.label
+
+(** [get_action_labelled x actions] returns an action in [actions] that has a label matching [x]. (follows [List.find], so throws error if match is not found)
+*)
+let get_action_labelled (x : Label.t) (actions : States.t Actions.t) : Action.t =
+  Actions.to_seq_keys actions
+  |> List.of_seq
+  |> List.find (fun (y : Action.t) -> Label.equal x y.label)
+;;
+
+let get_action_destinations (actions : States.t Actions.t) : States.t =
+  Actions.to_seq_values actions
+  |> List.of_seq
+  |> List.fold_left
+       (fun acc destinations -> States.union acc destinations)
+       States.empty
+;;
+
+let get_reachable_partition (pi : Partition.t) (actions : States.t Actions.t)
+  : Partition.t
+  =
+  let destinations : States.t = get_action_destinations actions in
+  pi
+  |> Partition.filter (fun (block : States.t) ->
+    Bool.not (States.is_empty (States.inter block destinations)))
+;;
+
+let get_reachable_partition_opt
+      (pi : Partition.t)
+      (actions : States.t Actions.t)
+  : Partition.t option
+  =
+  let pi : Partition.t = get_reachable_partition pi actions in
+  if Partition.is_empty pi then None else Some pi
+;;
+
+(** [update_destinations actions updated_action destinations] maps [updated_action] to [destinations] in [actions], replacing an existing mapping to some set of [old_destinations] with the union of [destinations] and [old_destinations].
+*)
+let update_destinations
+      (actions : States.t Actions.t)
+      (updated_action : Action.t)
+      (destinations : States.t)
+  : States.t
+  =
   match Actions.find_opt actions updated_action with
   | None -> destinations
   | Some old_destinations -> States.union destinations old_destinations
 ;;
 
-let update_action actions updated_action destinations : unit =
+(** [update_action actions updated_action destinations] maps [updated_action] to [destinations] in [actions] only if [destinations] is non-empty, via [update_destinations].
+*)
+let update_action
+      (actions : States.t Actions.t)
+      (updated_action : Action.t)
+      (destinations : States.t)
+  : unit
+  =
   if Bool.not (States.is_empty destinations)
   then
-    Actions.replace
-      actions
-      updated_action
-      (update_destinations actions updated_action destinations)
+    update_destinations actions updated_action destinations
+    |> Actions.replace actions updated_action
 ;;
+
+let alphabet_of_actions (actions : States.t Actions.t) : Alphabet.t =
+  Actions.to_seq_keys actions
+  |> List.of_seq
+  |> List.map (fun (x : Action.t) : Label.t -> x.label)
+  |> Alphabet.of_list
+;;
+
+(***********************************************************************)
+(*** Edges *************************************************************)
+(***********************************************************************)
 
 module Edges = Hashtbl.Make (struct
     include State
@@ -83,47 +170,254 @@ let edges_to_string (x : States.t Actions.t Edges.t) : string =
   "TODO: Model.edges_to_string"
 ;;
 
-module Convert = struct
-  (** edges_to_transitions *)
-  let rec edges_to_transitions (edges : States.t Actions.t Edges.t)
-    : Transitions.t
-    =
-    Edges.fold
-      (fun (from : State.t)
-        (actions : States.t Actions.t)
-        (acc : Transitions.t) -> actions_to_transitions from actions acc)
-      edges
-      Transitions.empty
+let update_edge
+      (edges : States.t Actions.t Edges.t)
+      (from : State.t)
+      (action : Action.t)
+      (destinations : States.t)
+  : unit
+  =
+  match Edges.find_opt edges from with
+  | None ->
+    [ action, destinations ]
+    |> List.to_seq
+    |> Actions.of_seq
+    |> Edges.add edges from
+  | Some actions -> update_action actions action destinations
+;;
 
-  and actions_to_transitions (from : State.t) actions acc =
-    Actions.fold
-      (fun (action : Action.t)
-        (destinations : States.t)
-        (acc : Transitions.t) ->
-        action_destinations_to_transitions from action destinations acc)
-      actions
-      acc
+let add_edge (edges : States.t Actions.t Edges.t) (edge : Edge.t) : unit =
+  States.singleton edge.goto |> update_edge edges edge.from edge.action
+;;
 
-  and action_destinations_to_transitions
-        (from : State.t)
-        (action : Action.t)
-        destinations
-        acc
-    =
-    States.fold
-      (fun (goto : State.t) (acc : Transitions.t) ->
-        let new_transition : Transition.t =
-          { from
-          ; label = action.label
-          ; goto
-          ; constructor_trees = Some action.constructor_trees
-          }
-        in
-        Transitions.add new_transition acc)
-      destinations
-      acc
-  ;;
-end
+let add_edges (edges : States.t Actions.t Edges.t) (to_add : Edge.t list) : unit
+  =
+  List.iter
+    (fun (edge : Edge.t) ->
+      States.singleton edge.goto |> update_edge edges edge.from edge.action)
+    to_add
+;;
+
+(** [get_edges_labelled x edges] returns a copy of [edges] that has been [Edges.filter-map-inplace] so that only actions with a label matching [x] remain.
+*)
+let get_edges_labelled (x : Label.t) (edges : States.t Actions.t Edges.t)
+  : States.t Actions.t Edges.t
+  =
+  let edges' : States.t Actions.t Edges.t = Edges.copy edges in
+  Edges.filter_map_inplace
+    (fun (_ : State.t) (actions : States.t Actions.t) ->
+      let actions' : States.t Actions.t = Actions.copy actions in
+      Actions.filter_map_inplace
+        (fun (action : Action.t) (destinations : States.t) ->
+          if Label.equal x action.label then Some destinations else None)
+        actions';
+      if Actions.length actions' > 0 then Some actions' else None)
+    edges';
+  edges'
+;;
+
+(***********************************************************************)
+(*** Merge *************************************************************)
+(***********************************************************************)
+
+let merge_info_field (x : 'a list option) (y : 'a list option) : 'a list option =
+  match x, y with
+  | None, None -> None
+  | None, Some yy -> Some yy
+  | Some xx, None -> Some xx
+  | Some xx, Some yy -> Some (List.append xx yy)
+;;
+
+let merge_info (x : Info.t) (y : Info.t) : Info.t =
+  { mebi_info = merge_info_field x.mebi_info y.mebi_info
+  ; rocq_info = merge_info_field x.rocq_info y.rocq_info
+  ; weak_info = merge_info_field x.weak_info y.weak_info
+  }
+;;
+
+let merge_action (x : Action.t) (y : Action.t) : Action.t =
+  { x with
+    annotations = List.merge Note.annotation_compare x.annotations y.annotations
+  ; constructor_trees =
+      List.merge
+        Mebi_constr.Tree.compare
+        x.constructor_trees
+        y.constructor_trees
+  }
+;;
+
+let merge_actions (x : States.t Actions.t) (y : States.t Actions.t)
+  : States.t Actions.t
+  =
+  let actions : States.t Actions.t = Actions.create 0 in
+  let f z = Actions.to_seq_keys z |> List.of_seq in
+  let xactions : Action.t list = f x in
+  let yactions : Action.t list = f y in
+  let g label zactions =
+    List.find_opt
+      (fun (action : Action.t) -> Label.equal label action.label)
+      zactions
+  in
+  List.merge Action.compare xactions yactions
+  |> List.map (fun (x : Action.t) : Label.t -> x.label)
+  |> Alphabet.of_list
+  |> Alphabet.iter (fun (label : Label.t) ->
+    match g label xactions, g label yactions with
+    | None, None -> () (* NOTE: impossible *)
+    | None, Some yaction -> Actions.add actions yaction (Actions.find y yaction)
+    | Some xaction, None -> Actions.add actions xaction (Actions.find x xaction)
+    | Some xaction, Some yaction ->
+      let merged_action : Action.t = merge_action xaction yaction in
+      States.union (Actions.find x xaction) (Actions.find y yaction)
+      |> Actions.add actions merged_action);
+  actions
+;;
+
+let merge_edges
+      (x : States.t Actions.t Edges.t)
+      (y : States.t Actions.t Edges.t)
+  : States.t Actions.t Edges.t
+  =
+  let edges : States.t Actions.t Edges.t = Edges.create 0 in
+  let f z = Edges.to_seq_keys z |> States.of_seq in
+  States.union (f x) (f y)
+  |> States.iter (fun (from : State.t) ->
+    match Edges.find_opt x from, Edges.find_opt y from with
+    | None, None -> () (* NOTE: impossible *)
+    | None, Some yactions -> Edges.add edges from yactions
+    | Some xactions, None -> Edges.add edges from xactions
+    | Some xactions, Some yactions ->
+      merge_actions xactions yactions |> Edges.add edges from);
+  edges
+;;
+
+(***********************************************************************)
+(*** Transition -> Action **********************************************)
+(***********************************************************************)
+
+let transition_to_action : Transition.t -> Action.t = function
+  | { from; label; goto; annotations; constructor_trees } ->
+    { label
+    ; annotations = Option.cata (fun x -> x) [] annotations
+    ; constructor_trees = Option.cata (fun x -> x) [] constructor_trees
+    }
+;;
+
+let transition_opt_to_action : Transition_opt.t -> Action.t = function
+  | { from; label; goto; annotations; constructor_trees } ->
+    { label
+    ; annotations = Option.cata (fun x -> x) [] annotations
+    ; constructor_trees = Option.cata (fun x -> x) [] constructor_trees
+    }
+;;
+
+(***********************************************************************)
+(*** Transition -> (From, Action, Goto) ********************************)
+(***********************************************************************)
+
+let transition_to_edge : Transition.t -> Edge.t = function
+  | { from; label; goto; annotations; constructor_trees } ->
+    let action : Action.t =
+      { label
+      ; annotations = Option.cata (fun x -> x) [] annotations
+      ; constructor_trees = Option.cata (fun x -> x) [] constructor_trees
+      }
+    in
+    { from; action; goto }
+;;
+
+(***********************************************************************)
+(*** (From, Action, Goto) -> Transition ********************************)
+(***********************************************************************)
+
+let edge_to_transition : Edge.t -> Transition.t = function
+  | { from; action; goto } ->
+    { from
+    ; label = action.label
+    ; goto
+    ; annotations =
+        (if Note.annotations_is_empty action.annotations
+         then None
+         else Some action.annotations)
+    ; constructor_trees =
+        (if List.is_empty action.constructor_trees
+         then None
+         else Some action.constructor_trees)
+    }
+;;
+
+(***********************************************************************)
+(*** Edges/Actions -> Transitions **************************************)
+(***********************************************************************)
+
+let action_destinations_to_transitions
+      (from : State.t)
+      (action : Action.t)
+      (destinations : States.t)
+      (acc : Transitions.t)
+  =
+  States.fold
+    (fun (goto : State.t) (acc : Transitions.t) ->
+      let new_transition : Transition.t =
+        { from
+        ; label = action.label
+        ; goto
+        ; annotations =
+            (if Note.annotations_is_empty action.annotations
+             then None
+             else Some action.annotations)
+        ; constructor_trees =
+            (if List.is_empty action.constructor_trees
+             then None
+             else Some action.constructor_trees)
+        }
+      in
+      Transitions.add new_transition acc)
+    destinations
+    acc
+;;
+
+let actions_to_transitions (from : State.t) actions acc =
+  Actions.fold
+    (fun (action : Action.t) (destinations : States.t) (acc : Transitions.t) ->
+      action_destinations_to_transitions from action destinations acc)
+    actions
+    acc
+;;
+
+let edges_to_transitions (edges : States.t Actions.t Edges.t) : Transitions.t =
+  Edges.fold
+    (fun (from : State.t)
+      (actions : States.t Actions.t)
+      (acc : Transitions.t) -> actions_to_transitions from actions acc)
+    edges
+    Transitions.empty
+;;
+
+(***********************************************************************)
+(*** Transitions -> Edges/Actions **************************************)
+(***********************************************************************)
+
+let transitions_to_edges (transitions : Transitions.t)
+  : States.t Actions.t Edges.t
+  =
+  let edges : States.t Actions.t Edges.t = Edges.create 0 in
+  Transitions.iter
+    (fun ({ from; label; goto; constructor_trees; annotations } : Transition.t) ->
+      let action : Action.t =
+        { label
+        ; annotations = Option.cata (fun x -> x) [] annotations
+        ; constructor_trees = Option.cata (fun x -> x) [] constructor_trees
+        }
+      in
+      update_edge edges from action (States.singleton goto))
+    transitions;
+  edges
+;;
+
+(***********************************************************************)
+(*** Kind (Lts, Fsm) ***************************************************)
+(***********************************************************************)
 
 type kind =
   | LTS of
@@ -132,14 +426,18 @@ type kind =
       * Alphabet.t
       * States.t
       * Transitions.t
-      * Info.t option)
+      * Info.t)
   | FSM of
       (State.t option
       * States.t
       * Alphabet.t
       * States.t
       * States.t Actions.t Edges.t
-      * Info.t option)
+      * Info.t)
+
+(***********************************************************************)
+(*** Lts ***************************************************************)
+(***********************************************************************)
 
 module Lts = struct
   type t =
@@ -148,7 +446,7 @@ module Lts = struct
     ; alphabet : Alphabet.t
     ; states : States.t
     ; transitions : Transitions.t
-    ; info : Info.t option
+    ; info : Info.t
     }
 
   let to_model ({ init; terminals; alphabet; states; transitions; info } : t)
@@ -161,18 +459,20 @@ module Lts = struct
     | LTS (init, terminals, alphabet, states, transitions, info) ->
       { init; terminals; alphabet; states; transitions; info }
     | FSM (init, terminals, alphabet, states, edges, info) ->
-      let transitions = Convert.edges_to_transitions edges in
+      let transitions = edges_to_transitions edges in
       { init; terminals; alphabet; states; transitions; info }
   ;;
 
-  let to_string
-        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-        (x : t)
-    : string
-    =
+  open Utils.Strfy
+
+  let to_string ?(args : style_args = style_args ()) (x : t) : string =
     "TODO: Model.Lts.to_string"
   ;;
 end
+
+(***********************************************************************)
+(*** Fsm ***************************************************************)
+(***********************************************************************)
 
 module Fsm = struct
   type t =
@@ -181,7 +481,7 @@ module Fsm = struct
     ; alphabet : Alphabet.t
     ; states : States.t
     ; edges : States.t Actions.t Edges.t
-    ; info : Info.t option
+    ; info : Info.t
     }
 
   and pair = t * t
@@ -190,11 +490,24 @@ module Fsm = struct
     FSM (init, terminals, alphabet, states, edges, info)
   ;;
 
+  let of_model : kind -> t = function
+    | LTS (init, terminals, alphabet, states, transitions, info) ->
+      let edges = transitions_to_edges transitions in
+      { init; terminals; alphabet; states; edges; info }
+    | FSM (init, terminals, alphabet, states, edges, info) ->
+      { init; terminals; alphabet; states; edges; info }
+  ;;
+
   let clone (x : t) : t = { x with edges = Edges.copy x.edges }
 
   let merge (a : t) (b : t) : t =
-    Logging.Log.warning "TODO: Model.Fsm.merge";
-    a
+    let init : State.t option = None in
+    let terminals : States.t = States.union a.terminals b.terminals in
+    let alphabet : Alphabet.t = Alphabet.union a.alphabet b.alphabet in
+    let states : States.t = States.union a.states b.states in
+    let edges : States.t Actions.t Edges.t = merge_edges a.edges b.edges in
+    let info : Info.t = merge_info a.info b.info in
+    { init; terminals; alphabet; states; edges; info }
   ;;
 
   exception Model_Fsm_OriginOfStateNotFound of (State.t * pair)
@@ -215,14 +528,16 @@ module Fsm = struct
     | Some i -> i
   ;;
 
-  let to_string
-        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-        (x : t)
-    : string
-    =
+  open Utils.Strfy
+
+  let to_string ?(args : style_args = record_args ()) (x : t) : string =
     "TODO: Model.Fsm.to_string"
   ;;
 end
+
+(***********************************************************************)
+(*** Saturate **********************************************************)
+(***********************************************************************)
 
 module Saturate = struct
   exception
@@ -248,35 +563,23 @@ module Saturate = struct
     | Some n -> StateTracker.replace visited_states s (n + 1)
   ;;
 
-  let is_action_silent (x : Action.t) : bool =
-    match x.label.is_silent with
-    | None ->
-      raise (Model_Saturate_CannotSaturateActionsWithUnknownVisibility x)
-    | Some is_silent -> is_silent
-  ;;
-
   let check_update_named (x : Action.t) : Action.t option -> Action.t option
     = function
     | Some y -> Some y
     | None -> if is_action_silent x then None else Some x
   ;;
 
-  let update_named_annotations
-        (named : Action.t)
-        (annotations : Action.annotations)
+  let update_named_annotation (named : Action.t) (annotation : Note.annotation)
     : Action.t
     =
-    let annotations_list : Action.annotations list =
-      if List.mem annotations named.annotations_list
-      then named.annotations_list
-      else annotations :: named.annotations_list
-    in
-    { named with annotations_list }
+    { named with
+      annotations = Note.add_annotation annotation named.annotations
+    }
   ;;
 
   let stop
         ?(named : Action.t option = None)
-        ?(annotations : Action.annotations = [])
+        ?(annotation : Note.annotation = [])
         (from : State.t)
         (acc : (Action.t * States.t) list)
     : (Action.t * States.t) list
@@ -284,7 +587,7 @@ module Saturate = struct
     match named with
     | None -> acc
     | Some named_action ->
-      (update_named_annotations named_action annotations, States.singleton from)
+      (update_named_annotation named_action annotation, States.singleton from)
       :: acc
   ;;
 
@@ -292,7 +595,7 @@ module Saturate = struct
   *)
   let rec check_from
             ?(named : Action.t option = None)
-            ?(annotations : Action.annotations = [])
+            ?(annotation : Note.annotation = [])
             (old_edges : States.t Actions.t Edges.t)
             (from : State.t)
             (visited : int StateTracker.t)
@@ -303,14 +606,14 @@ module Saturate = struct
     if can_revisit from visited
     then (
       match Edges.find_opt old_edges from with
-      | None -> stop ~named ~annotations from acc
+      | None -> stop ~named ~annotation from acc
       | Some old_actions ->
-        check_actions ~named ~annotations old_edges from old_actions visited acc)
-    else stop ~named ~annotations from acc
+        check_actions ~named ~annotation old_edges from old_actions visited acc)
+    else stop ~named ~annotation from acc
 
   and check_actions
         ?(named : Action.t option = None)
-        ?(annotations : Action.annotations = [])
+        ?(annotation : Note.annotation = [])
         (old_edges : States.t Actions.t Edges.t)
         (from : State.t)
         (old_actions : States.t Actions.t)
@@ -327,12 +630,12 @@ module Saturate = struct
         if is_action_silent the_action
         then (
           (* NOTE: add to annotation, continue exploring outwards *)
-          let annotations : Action.annotations =
-            { from; via = the_action.label } :: annotations
+          let annotation : Note.annotation =
+            Note.add_note { from; via = the_action.label } annotation
           in
           check_destinations
             ~named
-            ~annotations
+            ~annotation
             old_edges
             destinations
             visited
@@ -341,7 +644,7 @@ module Saturate = struct
           (* NOTE: check if we have already found the named action or not *)
           check_named
             ~named
-            ~annotations
+            ~annotation
             old_edges
             from
             the_action
@@ -354,7 +657,7 @@ module Saturate = struct
 
   and check_named
         ?(named : Action.t option = None)
-        ?(annotations : Action.annotations = [])
+        ?(annotation : Note.annotation = [])
         (old_edges : States.t Actions.t Edges.t)
         (from : State.t)
         (the_action : Action.t)
@@ -369,7 +672,7 @@ module Saturate = struct
       (* NOTE: we have found the named action, continue *)
       check_destinations
         ~named:(Some the_action)
-        ~annotations
+        ~annotation
         old_edges
         destinations
         visited
@@ -380,11 +683,11 @@ module Saturate = struct
       then acc
       else (
         skip := true;
-        stop ~named ~annotations from acc)
+        stop ~named ~annotation from acc)
 
   and check_destinations
         ?(named : Action.t option = None)
-        ?(annotations : Action.annotations = [])
+        ?(annotation : Note.annotation = [])
         (old_edges : States.t Actions.t Edges.t)
         (the_destinations : States.t)
         (visited : int StateTracker.t)
@@ -393,16 +696,14 @@ module Saturate = struct
     =
     States.fold
       (fun (destination : State.t) (acc : (Action.t * States.t) list) ->
-        check_from ~named ~annotations old_edges destination visited acc)
+        check_from ~named ~annotation old_edges destination visited acc)
       the_destinations
       acc
   ;;
 
   (** [merge_saturated_tuples a b] merges elements of [b] into [a], either by updating an element in [a] with additional annotations for a saturation tuple that describes the same action-destination, or in the case that the saturation tuple is not described within [a] by inserting it within [a].
   *)
-  let rec merge_saturated_tuples
-            (a : (Action.t * States.t) list)
-              (* (b : (Action.t * States.t) list) *)
+  let rec merge_saturated_tuples (a : (Action.t * States.t) list)
     : (Action.t * States.t) list -> (Action.t * States.t) list
     = function
     | [] -> a
@@ -439,8 +740,8 @@ module Saturate = struct
           then (
             let zaction : Action.t =
               { yaction with
-                annotations_list =
-                  List.append yaction.annotations_list xaction.annotations_list
+                annotations =
+                  Note.union_annotations yaction.annotations xaction.annotations
               ; constructor_trees =
                   List.append
                     yaction.constructor_trees
@@ -457,7 +758,7 @@ module Saturate = struct
       edge -> edge_actions -> edge_action_destinations -> ( ... ) *)
   let edge_action_destinations
         ?(named : Action.t option = None)
-        ?(annotations : Action.annotations = [])
+        ?(annotation : Note.annotation = [])
         (old_edges : States.t Actions.t Edges.t)
         (from : State.t)
         (the_destinations : States.t)
@@ -469,7 +770,7 @@ module Saturate = struct
         let visited : int StateTracker.t = StateTracker.create 0 in
         log_visit from visited;
         let saturated_tuples : (Action.t * States.t) list =
-          check_from ~named ~annotations old_edges the_destination visited []
+          check_from ~named ~annotation old_edges the_destination visited []
         in
         merge_saturated_tuples acc saturated_tuples)
       the_destinations
@@ -480,7 +781,7 @@ module Saturate = struct
       edge -> edge_actions -> edge_action_destinations -> ( ... ) *)
   let edge_actions
         ?(named : Action.t option = None)
-        ?(annotations : Action.annotations = [])
+        ?(annotation : Note.annotation = [])
         (old_edges : States.t Actions.t Edges.t)
         (from : State.t)
         (old_actions : States.t Actions.t)
@@ -492,12 +793,12 @@ module Saturate = struct
         (the_destinations : States.t)
         (acc : (Action.t * States.t) list) ->
         let named : Action.t option = check_update_named the_action named in
-        let annotations : Action.annotations =
+        let annotation : Note.annotation =
           [ { from; via = the_action.label } ]
         in
         edge_action_destinations
           ~named
-          ~annotations
+          ~annotation
           old_edges
           from
           the_destinations

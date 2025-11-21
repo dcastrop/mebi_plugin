@@ -636,10 +636,7 @@ module Error : ERROR_TYPE = struct
            "Unknown encode key: %s\nEncode map: %s"
            (econstr !coq_ref.coq_env !coq_ref.coq_ctx x)
            (list
-              (tuple
-                 ~style:(collection_style Tuple)
-                 (econstr !coq_ref.coq_env !coq_ref.coq_ctx)
-                 enc_to_string)
+              (tuple (econstr !coq_ref.coq_env !coq_ref.coq_ctx) enc_to_string)
               (List.of_seq (F.to_seq fwd_map))))
     | UnknownDecodeKey (coq_ref, bck_map, x) ->
       Pp.str
@@ -647,10 +644,7 @@ module Error : ERROR_TYPE = struct
            "Unknown decode key: %s\nDecode map: %s"
            (Enc.to_string x)
            (list
-              (tuple
-                 ~style:(collection_style Tuple)
-                 enc_to_string
-                 (econstr !coq_ref.coq_env !coq_ref.coq_ctx))
+              (tuple enc_to_string (econstr !coq_ref.coq_env !coq_ref.coq_ctx))
               (List.of_seq (B.to_seq bck_map))))
     | NoBisimResult () -> Pp.str "No cached bisimilarity result found."
     (* | ProofvIsNone () -> str "Tried to access contents of proofv which is None." *)
@@ -1401,7 +1395,7 @@ let debug_str (f : Environ.env -> Evd.evar_map -> string) : string mm =
 let make_transition_tbl (st : wrapper ref)
   : (module Hashtbl.S with type key = Enc.t) in_context
   =
-  let eqf = Enc.eq in
+  let eqf = Enc.equal in
   let hashf = Enc.hash in
   let module TransitionTbl =
     Hashtbl.Make (struct

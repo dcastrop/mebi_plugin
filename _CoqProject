@@ -81,8 +81,12 @@ src/model_state.ml
 src/model_state.mli
 src/model_label.ml
 src/model_label.mli
+src/model_note.ml
+src/model_note.mli
 src/model_transition.ml
 src/model_transition.mli
+src/model_transition_opt.ml
+src/model_transition_opt.mli
 src/model_action.ml
 src/model_action.mli
 src/model_edge.ml

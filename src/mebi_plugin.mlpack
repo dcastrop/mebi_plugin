@@ -10,7 +10,9 @@ Mebi_theories
 Model_info
 Model_state
 Model_label
+Model_note
 Model_transition
+Model_transition_opt
 Model_action
 Model_edge
 Model

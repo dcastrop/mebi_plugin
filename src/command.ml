@@ -81,18 +81,6 @@ module MkGraph
   *)
   type constr_transitions = (Action.t, D.t) Hashtbl.t
 
-  let num_transitions (ts : constr_transitions H.t) : int =
-    H.fold
-      (fun (_from : Enc.t) (transitions : constr_transitions) (acc : int) ->
-        Hashtbl.fold
-          (fun (_a : Action.t) (destinations : D.t) (acc' : int) ->
-            acc' + D.cardinal destinations)
-          transitions
-          acc)
-      ts
-      0
-  ;;
-
   (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Mebi_constr.Tree.t].
   *)
   type lts_graph =
@@ -177,7 +165,7 @@ module MkGraph
               (econstr_to_string tau_decoding)
               (Enc.to_string label_enc)
               (econstr_to_string label_decoding));
-         return (Some (Enc.eq tau_enc act_enc)))
+         return (Some (Enc.equal tau_enc act_enc)))
   ;;
 
   let get_new_states
@@ -193,86 +181,23 @@ module MkGraph
       let* tgt_enc : Enc.t = encode tgt in
       let* act_enc : Enc.t = encode act in
       let* is_silent : bool option = is_silent_transition weak_type act in
-      let meta : Action.MetaData.t = [ int_tree ] in
-      Log.debug
-        (Printf.sprintf
-           "command.MkGraph.get_new_states, new meta: %s"
-           (Action.MetaData.to_string meta));
-      let to_add : Action.t =
-        { label = act_enc, (None, is_silent); meta; annos = [] }
-      in
+      let label : Label.t = { enc = act_enc; is_silent; pp = None } in
+      let constructor_trees : Mebi_constr.Tree.t list = [ int_tree ] in
+      let to_add : Action.t = { label; constructor_trees; annotations = [] } in
       let* _ =
         match H.find_opt g.transitions from with
         | None -> add_new_term_constr_transition g from to_add tgt_enc int_tree
         | Some actions ->
           insert_constr_transition actions to_add tgt_enc int_tree
       in
-      (* if [tgt] has not been explored then add [to_visit] *)
-      if
-        H.mem g.transitions tgt_enc
-        (* || EConstr.eq_constr sigma tgt t *)
-        || S.mem tgt_enc g.states
+      (* NOTE: if [tgt] has not been explored then add [to_visit] *)
+      if H.mem g.transitions tgt_enc || S.mem tgt_enc g.states
       then ()
       else Queue.push tgt_enc g.to_visit;
-      (* add [tgt] to [new_states] *)
+      (* NOTE: add [tgt] to [new_states] *)
       return (S.add tgt_enc new_states)
     in
     iterate 0 (List.length ctors - 1) (S.singleton from) iter_body
-  ;;
-
-  (* let debug_new_constrs new_constrs : unit mm =
-     state (fun env sigma ->
-     Log.debug
-     (Printf.sprintf
-     "get_new_constrs:\n%s"
-     (Utils.Strfy.list
-     ~force_newline:true
-     (fun x ->
-     let action, dest, tree = x in
-     let f = Rocq_utils.Strfy.econstr env sigma in
-     Utils.Strfy.list
-     ~force_newline:true
-     ~indent:1
-     Utils.Strfy.str
-     [ Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str f ("action", action) ; Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str f ("dest", dest) ; Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str Mebi_constr.Tree.to_string ("tree", tree) ])
-     new_constrs));
-     sigma, ())
-     ;; *)
-
-  (** [get_new_constrs t lts_ind_def_map] returns the list of constructors applicable to term [t], using those provided in [lts_ind_def_map].
-      (* TODO: update this *)
-      If no immediate constructor is found matching [t] in [lts_ind_def_map] (likely due to unification problems), then each constructor in [lts_ind_def_map] is tried sequentially, until one of them returns some valid constructors.
-      @raise CannotFindTypeOfTermToVisit
-        if none of the constructors provided in [lts_ind_def_map] yield constructors from [check_valid_constructors].
-  *)
-  (* let _get_new_constrs_OLD from_term primary_constr_transitions ind_map lts_enc
-    : Mebi_constr.t list mm
-    =
-    Unify.collect_valid_constructors
-      from_term
-      primary_constr_transitions
-      { ind_map; lts_enc }
-  ;; *)
-
-  let _get_new_constrs_NEW
-        from_term
-        label_type
-        primary_constr_transitions
-        ind_map
-        lts_enc
-    : Mebi_constr.t list mm
-    =
-    (* Mebi_unify.collect_valid_constructors
-       data
-       from_term
-       primary_constr_transitions *)
-    Mebi_unify.collect_valid_constructors
-      primary_constr_transitions
-      ind_map
-      from_term
-      label_type
-      (* None *)
-      lts_enc
   ;;
 
   let get_new_constrs
@@ -288,11 +213,14 @@ module MkGraph
     let* ind_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
     let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
     let lts_enc : Enc.t = primary.enc in
-    (* Log.notice "\n=/=/=/=/=/=/=/=/=/=/=/=/=/="; *)
-    (* let _f = _get_new_constrs_OLD in *)
-    let _f = _get_new_constrs_NEW in
     let* new_constrs =
-      _f from_term label_type primary_constr_transitions ind_map lts_enc
+      Mebi_unify.collect_valid_constructors
+        primary_constr_transitions
+        ind_map
+        from_term
+        label_type
+        (* None *)
+        lts_enc
     in
     (* let new_constrs = get_new_constrs_NEW in *)
     (* let* () = debug_new_constrs new_constrs in *)
@@ -425,99 +353,96 @@ module MkGraph
     return { g with terminals }
   ;;
 
-  let decoq_enc ?(cache_decoding : bool = false) (s_enc : Enc.t)
-    : Model.State.t mm
+  let decoq_enc ?(cache_decoding : bool = false) (enc : Enc.t)
+    : string option mm
     =
-    let* cached_decoding =
-      if cache_decoding
-      then
-        let* s_decoding = decode s_enc in
-        return (Some (Utils.clean_string (econstr_to_string s_decoding)))
-      else return None
-    in
-    return (s_enc, cached_decoding)
+    if cache_decoding
+    then
+      let* s_decoding = decode enc in
+      return (Some (Utils.clean_string (econstr_to_string s_decoding)))
+    else return None
   ;;
 
-  let decoq_state ?(cache_decoding : bool = false) (s_enc : Enc.t)
-    : Model.State.t mm
-    =
-    decoq_enc ~cache_decoding s_enc
+  let decoq_state ?(cache_decoding : bool = false) (enc : Enc.t) : State.t mm =
+    let* pp = decoq_enc ~cache_decoding enc in
+    let s : State.t = { enc; pp } in
+    return s
   ;;
 
   let decoq_state_opt ?(cache_decoding : bool = false) (s_enc : Enc.t)
-    : Model.State.t option mm
+    : State.t option mm
     =
     let* state = decoq_state ~cache_decoding s_enc in
     return (Some state)
   ;;
 
-  let decoq_states ?(cache_decoding : bool = false) (ss : S.t)
-    : Model.States.t mm
-    =
+  let decoq_states ?(cache_decoding : bool = false) (ss : S.t) : States.t mm =
     if S.is_empty ss
-    then return Model.States.empty
+    then return States.empty
     else (
       let raw_ss = S.to_list ss in
-      let iter_body (i : int) (acc : Model.States.t) : Model.States.t mm =
+      let iter_body (i : int) (acc : States.t) : States.t mm =
         let state_enc = List.nth raw_ss i in
         let* state = decoq_state ~cache_decoding state_enc in
-        return (Model.States.add state acc)
+        return (States.add state acc)
       in
-      iterate 0 (List.length raw_ss - 1) Model.States.empty iter_body)
+      iterate 0 (List.length raw_ss - 1) States.empty iter_body)
   ;;
 
-  let decoq_action ?(cache_decoding : bool = false) (a : Model.Action.t)
-    : Model.Action.t mm
+  let decoq_action ?(cache_decoding : bool = false) (a : Action.t) : Action.t mm
     =
-    match fst (snd a.label) with
-    | None ->
-      let* label_enc, label_dec = decoq_enc ~cache_decoding (fst a.label) in
-      return { a with label = label_enc, (label_dec, snd (snd a.label)) }
-    | Some _decoding -> return a
+    let* pp = decoq_enc ~cache_decoding a.label.enc in
+    let label : Label.t = { a.label with pp } in
+    return { a with label }
   ;;
 
   let decoq_destinations
         ?(cache_decoding : bool = false)
-        (acc_trans : Model.Transitions.t)
-        (from : Model.State.t)
+        (acc_trans : Transitions.t)
+        (from : State.t)
         (action : Action.t)
         (dests : D.t)
-    : Model.Transitions.t mm
+    : Transitions.t mm
     =
     if D.is_empty dests
-    then return Model.Transitions.empty
+    then return Transitions.empty
     else (
       let raw_dests = D.to_list dests in
-      let iter_dests (i : int) (acc_trans : Model.Transitions.t)
-        : Model.Transitions.t mm
-        =
+      let iter_dests (i : int) (acc_trans : Transitions.t) : Transitions.t mm =
         let dest, constr_tree = List.nth raw_dests i in
         let* dest = decoq_state ~cache_decoding dest in
-        let new_trans = from, action.label, dest, Some action.meta in
-        return (Model.Transitions.add new_trans acc_trans)
+        let new_trans : Transition.t =
+          { from
+          ; label = action.label
+          ; goto = dest
+          ; constructor_trees = Some action.constructor_trees
+          ; annotations = None
+          }
+        in
+        return (Transitions.add new_trans acc_trans)
       in
       iterate 0 (List.length raw_dests - 1) acc_trans iter_dests)
   ;;
 
   let decoq_actions
         ?(cache_decoding : bool = false)
-        (acc : Model.Alphabet.t * Model.Transitions.t)
-        (from : Model.State.t)
+        (acc : Alphabet.t * Transitions.t)
+        (from : State.t)
         (actions : constr_transitions)
-    : (Model.Alphabet.t * Model.Transitions.t) mm
+    : (Alphabet.t * Transitions.t) mm
     =
     if Int.equal 0 (Hashtbl.length actions)
-    then return (Model.Alphabet.empty, Model.Transitions.empty)
+    then return (Alphabet.empty, Transitions.empty)
     else (
       let raw_actions = List.of_seq (Hashtbl.to_seq actions) in
       let iter_actions
             (i : int)
-            ((acc_alpha, acc_trans) : Model.Alphabet.t * Model.Transitions.t)
-        : (Model.Alphabet.t * Model.Transitions.t) mm
+            ((acc_alpha, acc_trans) : Alphabet.t * Transitions.t)
+        : (Alphabet.t * Transitions.t) mm
         =
         let action, dests = List.nth raw_actions i in
         let* action = decoq_action ~cache_decoding action in
-        let acc_alpha = Model.Alphabet.add action.label acc_alpha in
+        let acc_alpha = Alphabet.add action.label acc_alpha in
         let* acc_trans =
           decoq_destinations ~cache_decoding acc_trans from action dests
         in
@@ -529,14 +454,14 @@ module MkGraph
   let decoq_transitions
         ?(cache_decoding : bool = false)
         (transitions : constr_transitions H.t)
-    : (Model.Alphabet.t * Model.Transitions.t) mm
+    : (Alphabet.t * Transitions.t) mm
     =
     if Int.equal 0 (H.length transitions)
-    then return (Model.Alphabet.empty, Model.Transitions.empty)
+    then return (Alphabet.empty, Transitions.empty)
     else (
       let raw_transitions = List.of_seq (H.to_seq transitions) in
-      let iter_from (i : int) (acc : Model.Alphabet.t * Model.Transitions.t)
-        : (Model.Alphabet.t * Model.Transitions.t) mm
+      let iter_from (i : int) (acc : Alphabet.t * Transitions.t)
+        : (Alphabet.t * Transitions.t) mm
         =
         let from, actions = List.nth raw_transitions i in
         let* from = decoq_state ~cache_decoding from in
@@ -545,12 +470,12 @@ module MkGraph
       iterate
         0
         (List.length raw_transitions - 1)
-        (Model.Alphabet.empty, Model.Transitions.empty)
+        (Alphabet.empty, Transitions.empty)
         iter_from)
   ;;
 
   let decoq_lts_ind_def_map (lts_ind_def_map : Mebi_ind.t B.t)
-    : (Enc.t * (string * string list)) list
+    : Info.rocq_info list
     =
     let x = ref 0 in
     let xpp () =
@@ -561,7 +486,7 @@ module MkGraph
     B.fold
       (fun (lts_enc : Enc.t)
         (the_ind_def : Mebi_ind.t)
-        (acc : (Enc.t * (string * string list)) list) ->
+        (acc : Info.rocq_info list) ->
         match the_ind_def.kind with
         | LTS the_lts_ind_def ->
           let lts_name = econstr_to_string the_ind_def.info.name in
@@ -573,7 +498,8 @@ module MkGraph
               []
               the_ind_def.info.constr_names
           in
-          (lts_enc, (lts_name, lts_constrs)) :: acc
+          { enc = lts_enc; pp = lts_name; constructor_names = lts_constrs }
+          :: acc
         | _ -> acc)
       lts_ind_def_map
       []
@@ -592,28 +518,28 @@ module MkGraph
     =
     Log.debug "command.MkGraph.decoq_lts";
     let* init : State.t option = decoq_state_opt ~cache_decoding g.init in
-    let* states : Model.States.t = decoq_states ~cache_decoding g.states in
+    let* states : States.t = decoq_states ~cache_decoding g.states in
     let* terminals = decoq_states ~cache_decoding g.terminals in
-    let* ((alphabet, transitions) : Model.Alphabet.t * Model.Transitions.t) =
+    let* ((alphabet, transitions) : Alphabet.t * Transitions.t) =
       decoq_transitions ~cache_decoding g.transitions
     in
-    let ind_defs : (Enc.t * (string * string list)) list =
-      decoq_lts_ind_def_map g.ind_defs
-    in
+    let ind_defs : Info.rocq_info list = decoq_lts_ind_def_map g.ind_defs in
     let* w : string list = decoq_weak_enc g.weak in
-    let info : Info.t option =
-      Some
-        { is_complete = Queue.is_empty g.to_visit
-        ; bound
-        ; num_terminals = S.cardinal g.terminals
-        ; num_labels = Model.Alphabet.cardinal alphabet
-        ; num_states = S.cardinal g.states
-        ; num_edges = num_transitions g.transitions
-        ; coq_info = Some ind_defs
-        ; weak_info = Some w
-        }
+    let info : Info.t =
+      { mebi_info =
+          Some
+            [ { is_complete = Queue.is_empty g.to_visit
+              ; is_merged = false
+              ; bound
+              }
+            ]
+      ; rocq_info = Some ind_defs
+      ; weak_info = Some w
+      }
     in
-    return (Lts.create init terminals alphabet states transitions info)
+    return
+      (Lts.of_model
+         (LTS (init, terminals, alphabet, states, transitions, info)))
   ;;
 end
 
@@ -670,7 +596,7 @@ let build_fsm
   let* the_lts =
     build_lts_graph primary_lts t (Params.get_fst_params ()) refs
   in
-  let the_fsm = Fsm.create_from (Lts.to_model the_lts) in
+  let the_fsm = Fsm.of_model (Lts.to_model the_lts) in
   Log.details
     (Printf.sprintf "command.build_fsm:\n%s\n" (Fsm.to_string the_fsm));
   if minimize
@@ -681,10 +607,10 @@ let build_fsm
     Log.details
       (Printf.sprintf
          "command.build_fsm, minimized & bisim states: %s\n"
-         (Algorithms.Minimize.pstr (the_minimized_fsm, _bisim_states)));
+         (Algorithms.Minimize.to_string (the_minimized_fsm, _bisim_states)));
     return the_minimized_fsm)
   else if saturate
-  then return (Fsm.saturate the_fsm)
+  then return (Saturate.fsm the_fsm)
   else return the_fsm
 ;;
 
@@ -784,12 +710,12 @@ let merge_models ((x, a), (y, b)) refs : unit mm =
   let (the_fsm_1, the_fsm_2) : Fsm.pair =
     if weak
     then (
-      let the_fsm_1 = Fsm.saturate the_fsm_1 in
-      let the_fsm_2 = Fsm.saturate the_fsm_2 in
+      let the_fsm_1 = Saturate.fsm the_fsm_1 in
+      let the_fsm_2 = Saturate.fsm the_fsm_2 in
       the_fsm_1, the_fsm_2)
     else the_fsm_1, the_fsm_2
   in
-  let merged_fsm = Fsm.merge (the_fsm_1, the_fsm_2) in
+  let merged_fsm = Fsm.merge the_fsm_1 the_fsm_2 in
   Log.result
     (Printf.sprintf
        "command.run, MergeModels, finished: %s\n"
@@ -813,7 +739,7 @@ let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
   Log.result
     (Printf.sprintf
        "command.run, CheckBisimilarity, finished: %s\n"
-       (Algorithms.Bisimilar.pstr the_bisimilar));
+       (Algorithms.Bisimilar.to_string the_bisimilar));
   Log.details
     (Printf.sprintf
        "command.run, CheckBisimilarity, saturated:\nFSM 1: %s\n\nFSM 2: %s\n"
@@ -858,11 +784,11 @@ let proof_intro
   Log.debug
     (Printf.sprintf
        "command.proof_intro, the_fsm_1:\n%s"
-       (Fsm.pstr !(Mebi_bisim.get_the_result ()).the_fsm_1));
+       (Fsm.to_string !(Mebi_bisim.get_the_result ()).the_fsm_1));
   Log.debug
     (Printf.sprintf
        "command.proof_intro, the_fsm_2:\n%s"
-       (Fsm.pstr !(Mebi_bisim.get_the_result ()).the_fsm_2));
+       (Fsm.to_string !(Mebi_bisim.get_the_result ()).the_fsm_2));
   return
     (Mebi_tactics.update_proof_by_tactic
        pstate

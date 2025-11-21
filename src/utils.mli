@@ -54,6 +54,11 @@ module Strfy : sig
     | Use of collection_style
 
   val collection_style : collection_kind -> collection_style
+  val tuple_style : unit -> collection_style
+  val record_style : unit -> collection_style
+  val list_style : unit -> collection_style
+  val keyval_style : unit -> collection_style
+  val inline_tuple_style : unit -> collection_style
 
   type style_args = {
     mutable indent : int;
@@ -72,8 +77,7 @@ module Strfy : sig
     unit ->
     style_args
 
-  val keyval_style : unit -> collection_style
-  val inline_tuple_style : unit -> collection_style
+  val record_args : unit -> style_args
   val nlindent : int -> string
   val mkindent : int -> bool -> string
   val empty_msg : style_args -> string

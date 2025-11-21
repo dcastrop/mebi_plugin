@@ -33,7 +33,9 @@
   model_info
   model_state
   model_label
+  model_note
   model_transition
+  model_transition_opt
   model_action
   model_edge
   model

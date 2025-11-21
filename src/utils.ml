@@ -193,6 +193,18 @@ module Strfy = struct
     | Use x -> x
   ;;
 
+  let tuple_style () : collection_style = collection_style Tuple
+  let record_style () : collection_style = collection_style Record
+  let list_style () : collection_style = collection_style List
+
+  let keyval_style () : collection_style =
+    { (record_style ()) with inline = true; delimiter = Colon }
+  ;;
+
+  let inline_tuple_style () : collection_style =
+    { (tuple_style ()) with inline = true }
+  ;;
+
   (** ..
       @param nested
         is is a flag set to true by collection, and is used by other collections to determine how to format their opening marker.
@@ -222,12 +234,8 @@ module Strfy = struct
     }
   ;;
 
-  let keyval_style () : collection_style =
-    { (collection_style Record) with inline = true; delimiter = Colon }
-  ;;
-
-  let inline_tuple_style () : collection_style =
-    { (collection_style Tuple) with inline = true }
+  let record_args () : style_args =
+    style_args ~style:(Some (record_style ())) ()
   ;;
 
   (** newline indent *)
