@@ -7,9 +7,12 @@ module Tree : sig
   val equal : t -> t -> bool
   val compare : t -> t -> int
   val to_string : ?args:Utils.Strfy.style_args -> t -> string
+
+  val list_to_string :
+    ?args:Utils.Strfy.style_args -> t list -> string
 end
 
-type t = EConstr.t * EConstr.t * Tree.t
+type t = Evd.econstr * Evd.econstr * Tree.t
 
 val to_string :
   Environ.env ->

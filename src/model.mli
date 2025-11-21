@@ -1,9 +1,12 @@
 module Info = Model_info
 module State = Model_state
 module Label = Model_label
-module Action = Model_action
+module Note = Model_note
 module Transition = Model_transition
+module Transition_opt = Model_transition_opt
+module Action = Model_action
 module Edge = Model_edge
+module Enc = Mebi_setup.Enc
 
 module States : sig
   type elt = State.t
@@ -157,6 +160,10 @@ module Alphabet : sig
 end
 
 val alphabet_to_string : Alphabet.t -> string
+
+val find_label_of_enc :
+  Mebi_setup.Enc.t -> Alphabet.t -> Label.t
+
 val silent_label_opt : Alphabet.t -> Label.t option
 
 exception Model_Alphabet_SilentLabelNotFound of Alphabet.t
@@ -249,12 +256,26 @@ module Actions : sig
 end
 
 val actions_to_string : States.t Actions.t -> string
+val is_action_silent : Action.t -> bool
+
+val get_action_labelled :
+  Label.t -> States.t Actions.t -> Action.t
+
+val get_action_destinations : States.t Actions.t -> States.t
+
+val get_reachable_partition :
+  Partition.t -> States.t Actions.t -> Partition.t
+
+val get_reachable_partition_opt :
+  Partition.t -> States.t Actions.t -> Partition.t option
 
 val update_destinations :
-  States.t Actions.t -> Actions.key -> States.t -> States.t
+  States.t Actions.t -> Action.t -> States.t -> States.t
 
 val update_action :
-  States.t Actions.t -> Actions.key -> States.t -> unit
+  States.t Actions.t -> Action.t -> States.t -> unit
+
+val alphabet_of_actions : States.t Actions.t -> Alphabet.t
 
 module Edges : sig
   type key = State.t
@@ -291,23 +312,62 @@ end
 
 val edges_to_string : States.t Actions.t Edges.t -> string
 
-module Convert : sig
-  val edges_to_transitions :
-    States.t Actions.t Edges.t -> Transitions.t
+val update_edge :
+  States.t Actions.t Edges.t ->
+  State.t ->
+  Action.t ->
+  States.t ->
+  unit
 
-  val actions_to_transitions :
-    State.t ->
-    States.t Actions.t ->
-    Transitions.t ->
-    Transitions.t
+val add_edge : States.t Actions.t Edges.t -> Edge.t -> unit
 
-  val action_destinations_to_transitions :
-    State.t ->
-    Action.t ->
-    States.t ->
-    Transitions.t ->
-    Transitions.t
-end
+val add_edges :
+  States.t Actions.t Edges.t -> Edge.t list -> unit
+
+val get_edges_labelled :
+  Label.t ->
+  States.t Actions.t Edges.t ->
+  States.t Actions.t Edges.t
+
+val merge_info_field :
+  'a list option -> 'a list option -> 'a list option
+
+val merge_info : Info.t -> Info.t -> Info.t
+val merge_action : Action.t -> Action.t -> Action.t
+
+val merge_actions :
+  States.t Actions.t ->
+  States.t Actions.t ->
+  States.t Actions.t
+
+val merge_edges :
+  States.t Actions.t Edges.t ->
+  States.t Actions.t Edges.t ->
+  States.t Actions.t Edges.t
+
+val transition_to_action : Transition.t -> Action.t
+val transition_opt_to_action : Transition_opt.t -> Action.t
+val transition_to_edge : Transition.t -> Edge.t
+val edge_to_transition : Edge.t -> Transition.t
+
+val action_destinations_to_transitions :
+  State.t ->
+  Action.t ->
+  States.t ->
+  Transitions.t ->
+  Transitions.t
+
+val actions_to_transitions :
+  State.t ->
+  States.t Actions.t ->
+  Transitions.t ->
+  Transitions.t
+
+val edges_to_transitions :
+  States.t Actions.t Edges.t -> Transitions.t
+
+val transitions_to_edges :
+  Transitions.t -> States.t Actions.t Edges.t
 
 type kind =
   | LTS of
@@ -316,14 +376,14 @@ type kind =
       * Alphabet.t
       * States.t
       * Transitions.t
-      * Info.t option)
+      * Info.t)
   | FSM of
       (State.t option
       * States.t
       * Alphabet.t
       * States.t
       * States.t Actions.t Edges.t
-      * Info.t option)
+      * Info.t)
 
 module Lts : sig
   type t = {
@@ -332,7 +392,7 @@ module Lts : sig
     alphabet : Alphabet.t;
     states : States.t;
     transitions : Transitions.t;
-    info : Info.t option;
+    info : Info.t;
   }
 
   val to_model : t -> kind
@@ -347,12 +407,13 @@ module Fsm : sig
     alphabet : Alphabet.t;
     states : States.t;
     edges : States.t Actions.t Edges.t;
-    info : Info.t option;
+    info : Info.t;
   }
 
   and pair = t * t
 
   val to_model : t -> kind
+  val of_model : kind -> t
   val clone : t -> t
   val merge : t -> t -> t
 
@@ -404,24 +465,23 @@ module Saturate : sig
   val max_visit_num : int
   val can_revisit : State.t -> int StateTracker.t -> bool
   val log_visit : State.t -> int StateTracker.t -> unit
-  val is_action_silent : Action.t -> bool
 
   val check_update_named :
     Action.t -> Action.t option -> Action.t option
 
-  val update_named_annotations :
-    Action.t -> Action.annotations -> Action.t
+  val update_named_annotation :
+    Action.t -> Note.annotation -> Action.t
 
   val stop :
     ?named:Action.t option ->
-    ?annotations:Action.annotations ->
+    ?annotation:Note.annotation ->
     State.t ->
     (Action.t * States.t) list ->
     (Action.t * States.t) list
 
   val check_from :
     ?named:Action.t option ->
-    ?annotations:Action.annotations ->
+    ?annotation:Note.annotation ->
     States.t Actions.t Edges.t ->
     State.t ->
     int StateTracker.t ->
@@ -430,7 +490,7 @@ module Saturate : sig
 
   val check_actions :
     ?named:Action.t option ->
-    ?annotations:Action.annotations ->
+    ?annotation:Note.annotation ->
     States.t Actions.t Edges.t ->
     State.t ->
     States.t Actions.t ->
@@ -440,7 +500,7 @@ module Saturate : sig
 
   val check_named :
     ?named:Action.t option ->
-    ?annotations:Action.annotations ->
+    ?annotation:Note.annotation ->
     States.t Actions.t Edges.t ->
     State.t ->
     Action.t ->
@@ -452,7 +512,7 @@ module Saturate : sig
 
   val check_destinations :
     ?named:Action.t option ->
-    ?annotations:Action.annotations ->
+    ?annotation:Note.annotation ->
     States.t Actions.t Edges.t ->
     States.t ->
     int StateTracker.t ->
@@ -471,7 +531,7 @@ module Saturate : sig
 
   val edge_action_destinations :
     ?named:Action.t option ->
-    ?annotations:Action.annotations ->
+    ?annotation:Note.annotation ->
     States.t Actions.t Edges.t ->
     State.t ->
     States.t ->
@@ -480,7 +540,7 @@ module Saturate : sig
 
   val edge_actions :
     ?named:Action.t option ->
-    ?annotations:Action.annotations ->
+    ?annotation:Note.annotation ->
     States.t Actions.t Edges.t ->
     State.t ->
     States.t Actions.t ->

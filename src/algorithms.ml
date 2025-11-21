@@ -1,9 +1,6 @@
-open Logging
 open Model
 
 module Minimize = struct
-  open Model
-
   type result = Fsm.t * Partition.t
 
   let add_to_block_option (s : State.t) (block : States.t option)
@@ -23,56 +20,33 @@ module Minimize = struct
     : States.t * States.t option
     =
     assert (Bool.not (States.is_empty block));
-    let edges_of_a = Model.get_edges_with_label l edges in
-    Log.debug
-      (Printf.sprintf
-         "algorithms.Minimize.split_block, (%i) edges of (%s)."
-         (Edges.length edges_of_a)
-         (Label.to_string l));
-    (* selects some state [s] from [block] *)
-    let s = States.min_elt block in
-    let s_actions = Model.get_actions_from s edges_of_a in
-    let s_reachable_blocks = Model.get_reachable_blocks_opt s_actions pi in
-    (* check rest of [block] *)
+    let edges_of_a : States.t Actions.t Edges.t =
+      Model.get_edges_labelled l edges
+    in
+    (* NOTE: selects some state [s] from [block] *)
+    let s : State.t = States.min_elt block in
+    let s_reachable_blocks : Partition.t option =
+      Edges.find edges_of_a s |> Model.get_reachable_partition_opt pi
+    in
+    (* NOTE: check rest of [block] *)
     States.fold
       (fun (t : State.t) ((b1, b2) : States.t * States.t option) ->
         if State.equal s t
         then States.add s b1, b2
         else (
-          let t_actions = Model.get_actions_from t edges_of_a in
-          let t_reachable_blocks =
-            Model.get_reachable_blocks_opt t_actions pi
+          let t_reachable_blocks : Partition.t option =
+            Edges.find edges_of_a t |> Model.get_reachable_partition_opt pi
           in
           match s_reachable_blocks, t_reachable_blocks with
-          | None, None ->
-            Log.debug
-              (Printf.sprintf
-                 "algorithms.Minimize.split_block (%s): (%s, None), (%s, None)"
-                 (Label.to_string l)
-                 (State.to_string s)
-                 (State.to_string t));
-            States.add t b1, b2
+          | None, None -> States.add t b1, b2
           | Some s_blocks, Some t_blocks ->
-            Log.debug
-              (Printf.sprintf
-                 "algorithms.Minimize.split_block (%s): (%s, Some), (%s, Some)"
-                 (Label.to_string l)
-                 (State.to_string s)
-                 (State.to_string t));
             if
               Partition.equal
                 (Partition.inter s_blocks t_blocks)
                 (Partition.union s_blocks t_blocks)
             then States.add t b1, b2
             else b1, add_to_block_option t b2
-          | _, _ ->
-            Log.debug
-              (Printf.sprintf
-                 "algorithms.Minimize.split_block (%s): (%s, _), (%s, _)"
-                 (Label.to_string l)
-                 (State.to_string s)
-                 (State.to_string t));
-            b1, add_to_block_option t b2))
+          | _, _ -> b1, add_to_block_option t b2))
       block
       (States.empty, None)
   ;;
@@ -90,11 +64,7 @@ module Minimize = struct
         let b = ref b in
         Alphabet.iter
           (fun (l : Label.t) ->
-            (* let edges_of_a = Model.get_edges_with_label l edges in
-               (* TODO: [Fsm.Saturate.fsm] doesn't clean up unreachable states/edges yet. *)
-               if Edges.length edges_of_a > 0
-               then ( *)
-            match split_block !b (*edges_of_a*) l edges !pi with
+            match split_block !b l edges !pi with
             | b1, None ->
               assert (Int.equal (States.cardinal b1) (States.cardinal !b))
             | b1, Some b2 ->
@@ -114,7 +84,7 @@ module Minimize = struct
       let pi = ref (Partition.of_list [ states ]) in
       let changed = ref true in
       while !changed do
-        (* the main loop *)
+        (* NOTE: the main loop *)
         changed := false;
         iterate alphabet edges pi changed weak
       done;
@@ -131,8 +101,6 @@ module Minimize = struct
 end
 
 module Bisimilar = struct
-  open Model
-
   type result =
     { the_fsm_1 : Fsm.t
     ; the_fsm_2 : Fsm.t
@@ -169,7 +137,7 @@ module Bisimilar = struct
     Partition.fold
       (fun (block : States.t)
         ((bisim_states, non_bisim_states) : Partition.t * Partition.t) ->
-        (* check that another state in block is from another fsm. *)
+        (* NOTE: check that another state in block is from another fsm. *)
         if block_has_shared_origin block the_fsm_1 the_fsm_2
         then Partition.add block bisim_states, non_bisim_states
         else bisim_states, Partition.add block non_bisim_states)

@@ -1,21 +1,16 @@
-type hyp_cofix = { m : Model.State.t; n : Model.State.t }
-
-type transition = {
-  from : Model.State.t;
-  action : Model.Action.t;
-  dest : Model.State.t option;
-}
+type hyp_cofix = { m : Model_state.t; n : Model_state.t }
 
 type proof_state =
   | NewProof
   | NewWeakSim
   | NewCofix
-  | NewTransition of transition
-  | GoalTransition of transition
+  | NewTransition of Model_transition_opt.t
+  | GoalTransition of Model_transition_opt.t
   | Constructors of
-      (Model.Action.annotation
+      (Model_note.annotations
       * (unit -> unit Proofview.tactic) list option)
 
+val proof_state_to_string : proof_state -> string
 val the_proof_state : proof_state ref
 val reset_the_proof_state : unit -> unit
 
@@ -27,10 +22,9 @@ val reset_the_cached_result : unit -> unit
 exception MissingBisimResult of unit
 
 val get_the_result : unit -> Algorithms.Bisimilar.result ref
-val get_n : unit -> Fsm.t
+val get_n : unit -> Model.Fsm.t
 val get_bisim_states : unit -> Model.Partition.t
 val set_the_result : Algorithms.Bisimilar.result -> unit
-val pstr_transition : transition -> string
 
 exception
   Enc_Of_EConstr_NotFound of (Evd.econstr * Model.States.t)
@@ -43,10 +37,10 @@ exception
     (Mebi_setup.Enc.t * Model.States.t)
 
 val find_state_of_enc :
-  Mebi_setup.Enc.t -> Model.States.t -> Model.State.t
+  Mebi_setup.Enc.t -> Model.States.t -> Model_state.t
 
 val find_state_of_enc_opt :
-  Mebi_setup.Enc.t -> Model.States.t -> Model.State.t option
+  Mebi_setup.Enc.t -> Model.States.t -> Model_state.t option
 
 exception
   Label_Of_Enc_NotFound of
@@ -57,7 +51,7 @@ exception
     (Mebi_setup.Enc.t * Model.Alphabet.t)
 
 val find_label_of_enc :
-  Mebi_setup.Enc.t -> Model.Alphabet.t -> Model.Alphabet.elt
+  Mebi_setup.Enc.t -> Model.Alphabet.t -> Model_label.t
 
 val econstr_to_enc : Evd.econstr -> Mebi_setup.Enc.t
 
@@ -71,26 +65,37 @@ val econstr_to_enc_opt :
 
 val get_concl_transition :
   ?abort_on_failed_dest_enc:bool ->
-  Fsm.t ->
+  Model.Fsm.t ->
   Evd.evar_map ->
   Evd.econstr * Evd.econstr * Evd.econstr ->
-  transition
+  Model_transition_opt.t
 
 val get_weak_transition :
-  Fsm.t -> Evd.evar_map -> Evd.econstr array -> transition
+  Model.Fsm.t ->
+  Evd.evar_map ->
+  Evd.econstr array ->
+  Model_transition_opt.t
 
 val get_lts_transition :
-  Fsm.t -> Evd.evar_map -> Evd.econstr array -> transition
+  Model.Fsm.t ->
+  Evd.evar_map ->
+  Evd.econstr array ->
+  Model_transition_opt.t
 
 val get_hyp_transition :
-  Fsm.t ->
+  Model.Fsm.t ->
   Environ.env ->
   Evd.evar_map ->
   Evd.econstr array ->
-  transition option
+  Model_transition_opt.t option
 
 val get_cofix :
-  Fsm.t -> Fsm.t -> 'a -> 'b -> Evd.econstr array -> hyp_cofix
+  Model.Fsm.t ->
+  Model.Fsm.t ->
+  'a ->
+  'b ->
+  Evd.econstr array ->
+  hyp_cofix
 
 exception Invalid_KindOf_EConstr_Expected_Atomic of Evd.econstr
 
@@ -125,48 +130,48 @@ type concl_transition =
 
 val try_get_weak_transition :
   Evd.evar_map ->
-  Fsm.t ->
+  Model.Fsm.t ->
   Evd.econstr * Evd.econstr array ->
-  (concl_transition * transition) option
+  (concl_transition * Model_transition_opt.t) option
 
 val try_get_silent_transition :
   Evd.evar_map ->
-  Fsm.t ->
+  Model.Fsm.t ->
   Evd.econstr * Evd.econstr array ->
-  (concl_transition * transition) option
+  (concl_transition * Model_transition_opt.t) option
 
 val try_get_lts_transition :
   Evd.evar_map ->
-  Fsm.t ->
+  Model.Fsm.t ->
   Evd.econstr * Evd.econstr array ->
-  (concl_transition * transition) option
+  (concl_transition * Model_transition_opt.t) option
 
 val try_get_concl_transition :
   Proofview.Goal.t ->
-  Fsm.t ->
+  Model.Fsm.t ->
   Evd.econstr ->
-  (concl_transition * transition) option
+  (concl_transition * Model_transition_opt.t) option
 
 val try_get_weak_sim :
   Proofview.Goal.t -> Evd.econstr -> Evd.econstr option
 
 val try_get_m_state_weak_sim :
   Proofview.Goal.t ->
-  Fsm.t ->
+  Model.Fsm.t ->
   Evd.econstr ->
-  Model.State.t option
+  Model_state.t option
 
 val try_get_exists :
   Proofview.Goal.t ->
-  Fsm.t ->
-  Fsm.t ->
+  Model.Fsm.t ->
+  Model.Fsm.t ->
   Evd.econstr ->
-  (transition * Model.State.t) option
+  (Model_transition_opt.t * Model_state.t) option
 
 type concl_result =
   | New_Weak_Sim of Evd.econstr
-  | Exists of (transition * Model.State.t)
-  | Transition of (concl_transition * transition)
+  | Exists of (Model_transition_opt.t * Model_state.t)
+  | Transition of (concl_transition * Model_transition_opt.t)
 
 val concl_result_string : concl_result -> string
 
@@ -180,7 +185,7 @@ type hyp_transition = Full | Layer
 type hyp_kind =
   | Cofix of hyp_cofix
   | H_Inversion of (hyp_transition * unit Proofview.tactic)
-  | H_Transition of transition
+  | H_Transition of Model_transition_opt.t
   | Pass
 
 exception ExpectedOnlyOne_H_ToBeInverted of Rocq_utils.hyp list
@@ -194,14 +199,12 @@ val handle_hyp :
 
 type hyp_result =
   | Do_Inversion of unit Proofview.tactic
-  | H_Transition of transition
+  | H_Transition of Model_transition_opt.t
   | Cofixes of hyp_cofix list
   | Empty
 
 val hyp_result_string : hyp_result -> string
-
-val warning_multiple_h_transitions_to_invert :
-  transition -> transition list -> unit
+val warning_multiple_h_transitions_to_invert : 'a -> 'b -> unit
 
 val handle_the_hyps :
   Algorithms.Bisimilar.result ->
@@ -210,7 +213,7 @@ val handle_the_hyps :
   Rocq_utils.hyp list ->
   (unit Proofview.tactic * bool) option
   * hyp_cofix list
-  * transition list
+  * Model_transition_opt.t list
 
 val handle_hyps :
   Proofview.Goal.t -> Algorithms.Bisimilar.result -> hyp_result
@@ -229,54 +232,54 @@ val do_new_cofix : Proofview.Goal.t -> unit Proofview.tactic
 exception CannotUnpackTransitionsOfMN of unit
 
 val get_bisim_states_of :
-  Model.State.t -> Model.State.t option -> Model.States.t
+  Model_state.t -> Model_state.t option -> Model.States.t
 
 val get_n_candidate_actions :
   'a ->
-  Fsm.t ->
-  Model.Action.t ->
-  Model.State.t ->
+  Model.Fsm.t ->
+  Model_action.t ->
+  Model_state.t ->
   Model.States.t ->
   Model.States.t Model.Actions.t
 
 val get_n_candidate_action_list :
   'a ->
-  Fsm.t ->
-  Model.Action.t ->
-  Model.State.t ->
+  Model.Fsm.t ->
+  Model_action.t ->
+  Model_state.t ->
   Model.States.t ->
-  (Model.Action.t * Model.State.t) list
+  (Model_action.t * Model_state.t) list
 
 val warning_multiple_n_candidates :
-  (Model.Action.t * Model.State.t) list -> unit
+  (Model_action.t * Model_state.t) list -> unit
 
 val get_n_candidate_action :
   'a ->
-  Fsm.t ->
-  Model.Action.t ->
-  Model.State.t ->
+  Model.Fsm.t ->
+  Model_action.t ->
+  Model_state.t ->
   Model.States.t ->
-  Model.Action.t * Model.State.t
+  Model_action.t * Model_state.t
 
 val get_n_candidate :
-  'a ->
-  Fsm.t ->
-  Model.Action.t ->
-  Model.State.t ->
+  Model_state.t ->
+  Model.Fsm.t ->
+  Model_action.t ->
+  Model_state.t ->
   Model.States.t ->
-  Model.State.t
+  Model_state.t
 
 val handle_eexists :
   Proofview.Goal.t ->
-  transition ->
-  transition ->
-  Model.State.t ->
+  Model_transition_opt.t ->
+  Model_transition_opt.t ->
+  Model_state.t ->
   unit Proofview.tactic
 
 val handle_weak_silent_transition :
   Proofview.Goal.t ->
-  Model.State.t ->
-  Model.State.t ->
+  Model_state.t ->
+  Model_state.t ->
   unit Proofview.tactic
 
 val warning_multiple_n_dests : Model.States.t -> unit
@@ -286,7 +289,7 @@ val get_from_state_of_relation :
   Proofview.Goal.t ->
   Model.States.t ->
   Evd.econstr ->
-  Model.State.t
+  Model_state.t
 
 val build_tactics_from_constr_tree :
   'a ->
@@ -295,37 +298,41 @@ val build_tactics_from_constr_tree :
 
 val build_constructors :
   Proofview.Goal.t ->
-  Model.Action.annotation ->
+  Model_note.annotations ->
   unit Proofview.tactic
 
 val handle_weak_visible_transition :
   Proofview.Goal.t ->
-  Model.State.t * Model.Action.t * Model.State.t ->
-  Model.State.t * Model.Action.t * Model.State.t ->
+  Model_state.t * Model_action.t * Model_state.t ->
+  Model_state.t * Model_action.t * Model_state.t ->
   unit Proofview.tactic
 
 val handle_weak_transition :
   Proofview.Goal.t ->
-  transition ->
-  transition ->
+  Model_transition_opt.t ->
+  Model_transition_opt.t ->
   unit Proofview.tactic
 
 exception CouldNotHandle_NewTransition of unit
 
 val handle_new_transition_exists :
   Proofview.Goal.t ->
-  transition ->
-  transition ->
-  Model.State.t ->
+  Model_transition_opt.t ->
+  Model_transition_opt.t ->
+  Model_state.t ->
   unit Proofview.tactic
 
 val handle_new_transition :
-  Proofview.Goal.t -> transition -> unit Proofview.tactic
+  Proofview.Goal.t ->
+  Model_transition_opt.t ->
+  unit Proofview.tactic
 
 exception CouldNotHandle_GoalTransition of unit
 
 val handle_goal_transition :
-  Proofview.Goal.t -> transition -> unit Proofview.tactic
+  Proofview.Goal.t ->
+  Model_transition_opt.t ->
+  unit Proofview.tactic
 
 exception CouldNotHandle_NewCofix of unit
 
@@ -338,10 +345,11 @@ val handle_new_weak_sim :
   Proofview.Goal.t -> unit Proofview.tactic
 
 val do_simplify : Proofview.Goal.t -> unit Proofview.tactic
+val do_rt1n_refl : Proofview.Goal.t -> unit Proofview.tactic
 
 val handle_constuctors :
   Proofview.Goal.t ->
-  Model.Action.annotation
+  Model_note.annotations
   * (unit -> unit Proofview.tactic) list option ->
   unit Proofview.tactic
 

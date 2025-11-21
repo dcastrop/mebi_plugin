@@ -74,6 +74,15 @@ module Tree = struct
     in
     to_string
   ;;
+
+  let list_to_string
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+        (x : t list)
+    : string
+    =
+    let open Utils.Strfy in
+    list ~args:{ args with name = Some "Constructor Trees" } to_string x
+  ;;
 end
 
 (** A triple denoting a constructor of an rocq LTS definition.
