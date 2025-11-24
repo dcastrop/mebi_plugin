@@ -184,146 +184,10 @@ module Syntax : MEBI_MONAD_SYNTAX = struct
 end
 
 (**********************************)
-(****** COQ TERMS *****************)
-(**********************************)
-
-(* let econstr_eq (a : EConstr.t) (b : EConstr.t) : bool mm =
-   let open Syntax in
-   let* sigma = get_sigma in
-   return (Eq.econstr sigma a b)
-   ;; *)
-
-(* let is_none_term (x : EConstr.t) : bool mm =
-  fun (state : wrapper ref) ->
-  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
-  { state; value = Mebi_theories.is_constant sigma x Mebi_theories.c_None }
-;; *)
-
-(* let env : Environ.env = !(!state.coq_ref).coq_env in
-  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
-  let sigma, y = Mebi_setup.the_none_term env sigma in
-  state
-  := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
-  (* Log.debug
-     (Printf.sprintf
-     "mebi_wrapper.is_none_term, kind\n%s"
-     (Rocq_utils.Strfy.econstr_kind env sigma (Mebi_theories.c_None ()))); *)
-  match Constr.kind (Rocq_convert.econstr_to_constr sigma x) with
-  | App (cx, _) ->
-    let cy = Rocq_convert.econstr_to_constr sigma y in
-    Log.debug
-      (Printf.sprintf
-         "mebi_wrapper.is_none_term\n\
-          - x: %s\n\
-          - none: %s\n\
-          - econstr equal: %b\n\
-          - constr equal: %b"
-         (Rocq_utils.Strfy.econstr env sigma x)
-         (Rocq_utils.Strfy.econstr env sigma (Mebi_theories.c_None ()))
-         (Mebi_setup.Eq.econstr sigma x y)
-         (Mebi_setup.Eq.constr cx cy));
-    { state; value = Mebi_setup.Eq.constr cx cy }
-  | _ -> { state; value = false } *)
-
-(* let type_of_econstr (t : EConstr.t) : EConstr.t mm =
-  fun (state : wrapper ref) ->
-  let env : Environ.env = !(!state.coq_ref).coq_env in
-  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
-  let t : EConstr.t = Reductionops.nf_all env sigma t in
-  let sigma, t = Typing.type_of env sigma t in
-  (* let coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } in *)
-  (* state := { !state with coq_ref }; *)
-  state
-  := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
-  { state; value = t } *)
-
-(* and new_evar_of_econstr (t : EConstr.t) : EConstr.t mm =
-  fun (state : wrapper ref) ->
-  let env : Environ.env = !(!state.coq_ref).coq_env in
-  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
-  let sigma, instance = Evarutil.new_evar env sigma t in
-  (* coq_st := { !coq_st with coq_ctx = sigma }; *)
-  (* { state = st; value = instance } *)
-  state
-  := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
-  { state; value = t } *)
-
-(* and constrexpr_to_econstr (t : Constrexpr.constr_expr) : EConstr.t mm =
-  fun (state : wrapper ref) ->
-  let env : Environ.env = !(!state.coq_ref).coq_env in
-  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
-  let sigma, t = Rocq_convert.constrexpr_to_econstr env sigma t in
-  (* coq_st := { !coq_st with coq_ctx = sigma };
-  { state = st; value = t } *)
-  state
-  := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
-  { state; value = t } *)
-
-(* and econstr_to_constr ?(abort_on_undefined_evars : bool = false) (x : EConstr.t)
-   : Constr.t mm
-   =
-   let open Syntax in
-   let* sigma = get_sigma in
-   return (Rocq_convert.econstr_to_constr ~abort_on_undefined_evars sigma x) *)
-
-(* and econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
-   let open Syntax in
-   let* sigma = get_sigma in
-   return (Rocq_convert.econstr_to_constr_opt sigma x) *)
-
-(* and globref_to_econstr (x : Names.GlobRef.t) : EConstr.t mm =
-   let open Syntax in
-   let* env = get_env in
-   return (Rocq_convert.globref_to_econstr env x) *)
-
-(* and normalize_econstr (t : EConstr.t) : EConstr.t mm =
-   let open Syntax in
-   let$+ t env sigma = Reductionops.nf_all env sigma t in
-   return t *)
-
-(**********************************)
-(****** UTILS *********************)
-(**********************************)
-
-(* let map_list_mm (f : 'a -> 'b mm) (ls : 'a list) : 'b list mm =
-   let ls : 'a list = List.rev ls in
-   let open Syntax in
-   (* let* env = get_env in *)
-   let iter_body (i : int) (acc : 'b list) =
-   let x : 'a = List.nth ls i in
-   let* y : 'b = f x in
-   return (y :: acc)
-   in
-   iterate 0 (List.length ls - 1) [] iter_body
-   ;; *)
-
-(* let rec econstr_list_to_constr ?(abort_on_undefined_evars : bool = false)
-   : EConstr.t list -> Constr.t list mm
-   = function
-   | [] -> return []
-   | h :: t ->
-   let open Syntax in
-   let* h = econstr_to_constr ~abort_on_undefined_evars h in
-   let* t = econstr_list_to_constr ~abort_on_undefined_evars t in
-   return (h :: t)
-   ;; *)
-
-(* let rec econstr_list_to_constr_opt ?(abort_on_undefined_evars : bool = false)
-   : EConstr.t list -> Constr.t option list mm
-   = function
-   | [] -> return []
-   | h :: t ->
-   let open Syntax in
-   let* h = econstr_to_constr_opt h in
-   let* t = econstr_list_to_constr_opt t in
-   return (h :: t)
-   ;; *)
-
-(**********************************)
 (****** COQ TERM TO STRING ********)
 (**********************************)
 
-let mebi_wrap
+let mebi_to_string
       (f :
         Environ.env
         -> Evd.evar_map
@@ -343,11 +207,11 @@ let mebi_wrap
 ;;
 
 let constr_to_string (x : Constr.t) : string =
-  (mebi_wrap Rocq_utils.Strfy.constr) x
+  (mebi_to_string Rocq_utils.Strfy.constr) x
 ;;
 
 let econstr_to_string (x : EConstr.t) : string =
-  (mebi_wrap Rocq_utils.Strfy.econstr) x
+  (mebi_to_string Rocq_utils.Strfy.econstr) x
 ;;
 
 let enc_to_string ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
@@ -708,7 +572,9 @@ module Error : ERROR_TYPE = struct
       ++ Pp.str (Printf.sprintf "substls: %s." (list (econstr env sigma) x))
       ++ strbrk "\n"
       ++ Pp.str
-           (Printf.sprintf "ctx_tys: %s." (list (mebi_wrap econstr_rel_decl) y))
+           (Printf.sprintf
+              "ctx_tys: %s."
+              (list (mebi_to_string econstr_rel_decl) y))
     | InvalidLTSSort f ->
       Pp.str "Invalid LTS Sort: expecting Prop, got " ++ Sorts.pr_sort_family f
     | InvalidTypeSort f ->
@@ -913,11 +779,6 @@ let encode (k : EConstr.t) : Enc.t mm =
   fun (st : wrapper ref) ->
   Log.trace "mebi_wrapper.encode";
   let encoding : Enc.t = Enc.encode !st.fwd_enc !st.bck_enc k in
-  (* Log.debug
-     (Printf.sprintf
-     "mebi_wrapper.encode, \"%s\" into (%s)"
-     (econstr_to_string k)
-     (Enc.to_string encoding)); *)
   assert (F.mem !st.fwd_enc k);
   assert (B.mem !st.bck_enc encoding);
   { state = st; value = encoding }
@@ -929,31 +790,17 @@ let decode (k : Enc.t) : EConstr.t mm =
   let open Syntax in
   let* bck_enc = get_bck_enc in
   match Enc.decode_opt bck_enc k with
-  | Some decoding ->
-    (* Log.debug
-       (Printf.sprintf
-       "mebi_wrapper.decode, \"%s\" into (%s)"
-       (Enc.to_string k)
-       (econstr_to_string decoding)); *)
-    return decoding
+  | Some decoding -> return decoding
   | None -> cannot_get_decoding_of_unencoded_econstr k
 ;;
 
 let decode_to_string (x : Enc.t) : string =
-  (* let s_mm : string mm =
-     let open Syntax in
-     let* y = decode x in
-     let* env = get_env in
-     let* sigma = get_sigma in
-     return (Rocq_utils.Strfy.pp (Printer.pr_econstr_env env sigma y))
-     in
-     string_mm s_mm *)
   run
     ~keep_encoding:true
     ~fresh:false
     (let open Syntax in
      let* y = decode x in
-     return ((mebi_wrap Rocq_utils.Strfy.econstr) y))
+     return ((mebi_to_string Rocq_utils.Strfy.econstr) y))
 ;;
 
 (********************************************)

@@ -18,6 +18,14 @@ module States = Set.Make (struct
 
 let states_to_string (x : States.t) : string = "TODO: Model.states_to_string"
 
+let decode_state_opt (x : Enc.t) : States.t -> State.t option =
+  States.find_first_opt (fun ({ enc = y; _ } : State.t) -> Enc.equal x y)
+;;
+
+let decode_state (x : Enc.t) : States.t -> State.t =
+  States.find_first (fun ({ enc = y; _ } : State.t) -> Enc.equal x y)
+;;
+
 (***********************************************************************)
 (*** Partition *********************************************************)
 (***********************************************************************)
@@ -40,14 +48,12 @@ let alphabet_to_string (x : Alphabet.t) : string =
   "TODO: Model.alphabet_to_string"
 ;;
 
-let find_label_of_enc (x : Mebi_setup.Enc.t) : Alphabet.t -> Label.t =
-  Alphabet.find_first (fun y -> Mebi_setup.Enc.equal x y.enc)
+let find_label_of_enc (x : Enc.t) : Alphabet.t -> Label.t =
+  Alphabet.find_first (fun { enc = y; _ } -> Enc.equal x y)
 ;;
 
-let silent_label_opt (xs : Alphabet.t) : Label.t option =
-  Alphabet.find_first_opt
-    (fun x -> Option.cata (fun y -> y) false x.is_silent)
-    xs
+let silent_label_opt : Alphabet.t -> Label.t option =
+  Alphabet.find_first_opt (fun x -> Option.cata (fun y -> y) false x.is_silent)
 ;;
 
 exception Model_Alphabet_SilentLabelNotFound of Alphabet.t

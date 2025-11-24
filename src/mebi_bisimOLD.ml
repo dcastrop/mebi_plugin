@@ -1,5 +1,6 @@
 open Logging
 open Mebi_wrapper
+open Mebi_proof
 open Model
 
 type hyp_cofix =

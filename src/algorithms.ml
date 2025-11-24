@@ -109,6 +109,20 @@ module Bisimilar = struct
     ; non_bisim_states : Partition.t
     }
 
+  let the_cached_result : result option ref = ref None
+
+  let set_the_result (new_result : result) : unit =
+    the_cached_result := Some new_result
+  ;;
+
+  exception MeBi_Bisim_ResultNotCached of unit
+
+  let get_the_result () : result =
+    match !the_cached_result with
+    | None -> raise (MeBi_Bisim_ResultNotCached ())
+    | Some result -> result
+  ;;
+
   (** is [true] if [block] has states that originate from both [the_fsm_1] and [the_fsm_2]
   *)
   let block_has_shared_origin
