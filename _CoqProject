@@ -111,8 +111,10 @@ src/mebi_ind.ml
 src/mebi_ind.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
-src/mebi_bisim.ml
-src/mebi_bisim.mli
+src/mebi_proof.ml
+src/mebi_proof.mli
+# src/mebi_bisim.ml
+# src/mebi_bisim.mli
 
 src/rocq_debug.ml
 src/rocq_debug.mli

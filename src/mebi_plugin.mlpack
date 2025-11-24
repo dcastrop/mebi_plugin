@@ -21,7 +21,7 @@ Mebi_tactics
 Mebi_wrapper
 Mebi_ind
 Mebi_utils
-Mebi_bisim
+Mebi_proof
 Rocq_debug
 Params
 Mebi_help
