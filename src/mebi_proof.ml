@@ -2,7 +2,19 @@ open Logging
 open Mebi_wrapper
 open Model
 
-let nothing () : unit Proofview.tactic = Proofview.tclUNIT ()
+let do_nothing () : unit Proofview.tactic =
+  Log.warning "mebi_proof, case just does nothing";
+  Proofview.tclUNIT ()
+;;
+
+let do_simplify gl : unit Proofview.tactic =
+  Mebi_tactics.simplify_and_subst_all ~gl ()
+;;
+
+let do_rt1n_refl gl =
+  Mebi_theories.tactics
+    [ Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()); do_simplify gl ]
+;;
 
 (***********************************************************************)
 (*** Proof State *******************************************************)
@@ -51,7 +63,40 @@ let nfsm () : Fsm.t = (Algorithms.Bisimilar.get_the_result ()).the_fsm_2
 (*** Hypothesis ********************************************************)
 (***********************************************************************)
 
-module Hyp = struct
+module type HYP_S = sig
+  type atomic_pair = EConstr.t * EConstr.t array
+
+  exception
+    Mebi_proof_HypIsNot_Atomic of
+      (Evd.evar_map * Rocq_utils.hyp * EConstr.kind_of_type)
+
+  val hyp_to_atomic : Evd.evar_map -> Rocq_utils.hyp -> atomic_pair
+
+  exception
+    Mebi_proof_Hypothesis_Hyp of (Evd.evar_map * Rocq_utils.hyp * atomic_pair)
+
+  exception Mebi_proof_Hypothesis_HTy of (Evd.evar_map * atomic_pair)
+
+  module type HYP_TYPE = sig
+    type t
+
+    val hty_is_a : Evd.evar_map -> atomic_pair -> bool
+    val of_hyp : Evd.evar_map -> Rocq_utils.hyp -> t
+    val opt_of_hyp : Evd.evar_map -> Rocq_utils.hyp -> t option
+    val hyp_is_a : Evd.evar_map -> Rocq_utils.hyp -> bool
+  end
+
+  module Cofix : HYP_TYPE
+  module Invertible : HYP_TYPE
+  module TransOpt : HYP_TYPE
+end
+
+module Hyp : HYP_S = struct
+  (** We abstracted into modules [Cofix], [Invertible] and [TransOpt] the hypothesis relevant to us.
+  *)
+
+  (** [atomic_pair] are the arguments of [AtomicType (ty, tys)] returned by [EConstr.kind_of_type]
+  *)
   type atomic_pair = EConstr.t * EConstr.t array
 
   exception
@@ -326,14 +371,42 @@ let rec handle_new_proof (gl : Proofview.Goal.t) : unit Proofview.tactic =
     Log.warning "New Proof: Expected Hypothesis to be empty";
     raise (Mebi_proof_NewProof ()))
 
+and handle_new_weak_sim (gl : Proofview.Goal.t) : unit Proofview.tactic =
+  do_nothing ()
+
+and handle_new_cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =
+  do_nothing ()
+
+and handle_new_transition
+      (gl : Proofview.Goal.t)
+      (mtransition : Transition_opt.t)
+  : unit Proofview.tactic
+  =
+  do_nothing ()
+
+and handle_goal_transition
+      (gl : Proofview.Goal.t)
+      (mtransition : Transition_opt.t)
+  : unit Proofview.tactic
+  =
+  do_nothing ()
+
+and handle_apply_constructors
+      (gl : Proofview.Goal.t)
+      (napplicable_constructors : PState.applicable_constructors)
+  : unit Proofview.tactic
+  =
+  do_nothing ()
+
 and handle_proof_state (gl : Proofview.Goal.t) : unit Proofview.tactic =
   match !the_proof_state with
   | NewProof -> handle_new_proof gl
-  | NewWeakSim -> nothing ()
-  | NewCofix -> nothing ()
-  | NewTransition mtransition -> nothing ()
-  | GoalTransition mtransition -> nothing ()
-  | ApplyConstructors napplicable_constructors -> nothing ()
+  | NewWeakSim -> handle_new_weak_sim gl
+  | NewCofix -> handle_new_cofix gl
+  | NewTransition mtransition -> handle_new_transition gl mtransition
+  | GoalTransition mtransition -> handle_goal_transition gl mtransition
+  | ApplyConstructors napplicable_constructors ->
+    handle_apply_constructors gl napplicable_constructors
 ;;
 
 (***********************************************************************)

@@ -1,16 +1,18 @@
-val nothing : unit -> unit Proofview.tactic
+val do_nothing : unit -> unit Proofview.tactic
+val do_simplify : Proofview.Goal.t -> unit Proofview.tactic
+val do_rt1n_refl : Proofview.Goal.t -> unit Proofview.tactic
 
 module PState : sig
   type t =
     | NewProof
     | NewWeakSim
     | NewCofix
-    | NewTransition of Model.Transition_opt.t
-    | GoalTransition of Model.Transition_opt.t
+    | NewTransition of Model_transition_opt.t
+    | GoalTransition of Model_transition_opt.t
     | ApplyConstructors of applicable_constructors
 
   and applicable_constructors =
-    { annotation : Model.Note.annotation
+    { annotation : Model_note.annotation
     ; tactics : tactic_to_apply list option
     }
 
@@ -25,8 +27,8 @@ val reset_the_proof_state : unit -> unit
 val mfsm : unit -> Model.Fsm.t
 val nfsm : unit -> Model.Fsm.t
 
-module Hyp : sig
-  type atomic_pair = EConstr.t * EConstr.t array
+module type HYP_S = sig
+  type atomic_pair = Evd.econstr * Evd.econstr array
 
   exception
     Mebi_proof_HypIsNot_Atomic of
@@ -39,22 +41,6 @@ module Hyp : sig
 
   exception Mebi_proof_Hypothesis_HTy of (Evd.evar_map * atomic_pair)
 
-  module type HTY_TYPE = sig
-    type t
-
-    val of_hty : Evd.evar_map -> atomic_pair -> t
-    val opt_of_hty : Evd.evar_map -> atomic_pair -> t option
-    val hty_is_a : Evd.evar_map -> atomic_pair -> bool
-  end
-
-  module type HTY_S = sig
-    type t
-
-    val of_hty : Evd.evar_map -> atomic_pair -> t
-  end
-
-  module MakeHTy : (_ : HTY_S) -> HTY_TYPE
-
   module type HYP_TYPE = sig
     type t
 
@@ -64,20 +50,12 @@ module Hyp : sig
     val hyp_is_a : Evd.evar_map -> Rocq_utils.hyp -> bool
   end
 
-  module type HYP_S = sig
-    module HTy : HTY_TYPE
-
-    type t
-
-    val of_hyp : Evd.evar_map -> Rocq_utils.hyp -> t
-  end
-
-  module MakeHyp : (_ : HYP_S) -> HYP_TYPE
-  module Make : (_ : HTY_S) -> HYP_TYPE
   module Cofix : HYP_TYPE
   module Invertible : HYP_TYPE
   module TransOpt : HYP_TYPE
 end
+
+module Hyp : HYP_S
 
 val hyp_is_something : Evd.evar_map -> Rocq_utils.hyp -> bool
 val hyps_is_essentially_empty : Proofview.Goal.t -> bool
@@ -87,6 +65,24 @@ exception Mebi_proof_NewProof of unit
 exception Mebi_proof_NewWeakSim of unit
 
 val handle_new_proof : Proofview.Goal.t -> unit Proofview.tactic
+val handle_new_weak_sim : Proofview.Goal.t -> unit Proofview.tactic
+val handle_new_cofix : Proofview.Goal.t -> unit Proofview.tactic
+
+val handle_new_transition
+  :  Proofview.Goal.t
+  -> Model_transition_opt.t
+  -> unit Proofview.tactic
+
+val handle_goal_transition
+  :  Proofview.Goal.t
+  -> Model_transition_opt.t
+  -> unit Proofview.tactic
+
+val handle_apply_constructors
+  :  Proofview.Goal.t
+  -> PState.applicable_constructors
+  -> unit Proofview.tactic
+
 val handle_proof_state : Proofview.Goal.t -> unit Proofview.tactic
 val step : unit -> unit Proofview.tactic
 val solve : int -> Declare.Proof.t -> Declare.Proof.t
