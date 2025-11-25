@@ -771,101 +771,84 @@ let primary_lts_not_found ((t, names) : EConstr.t * EConstr.t list) : 'a mm =
    raise (Error.unknown_decode_key !coq_st.coq_env !coq_st.coq_ctx k bckmap)
    ;; *)
 
-(********************************************)
-(****** ENCODE/DECODE ***********************)
-(********************************************)
+(***********************************************************************)
+(*** Encode ************************************************************)
+(***********************************************************************)
 
-let encode (k : EConstr.t) : Enc.t mm =
+(** [encode x] *)
+let encode (x : EConstr.t) : Enc.t mm =
   fun (st : wrapper ref) ->
-  Log.trace "mebi_wrapper.encode";
-  let encoding : Enc.t = Enc.encode !st.fwd_enc !st.bck_enc k in
-  assert (F.mem !st.fwd_enc k);
-  assert (B.mem !st.bck_enc encoding);
-  { state = st; value = encoding }
+  let e : Enc.t = Enc.encode !st.fwd_enc !st.bck_enc x in
+  { state = st; value = e }
 ;;
+
+let encoding (x : EConstr.t) : Enc.t mm =
+  fun (st : wrapper ref) ->
+  let e : Enc.t = F.find !st.fwd_enc x in
+  { state = st; value = e }
+;;
+
+let has_encoding (x : EConstr.t) : bool =
+  run ~keep_encoding:true ~fresh:false (fun (st : wrapper ref) ->
+    { state = st
+    ; value =
+        (match F.find_opt !st.fwd_enc x with None -> false | Some _ -> true)
+    })
+;;
+
+let get_encoding (x : EConstr.t) : Enc.t =
+  run ~keep_encoding:true ~fresh:false (encoding x)
+;;
+
+(** [encoding_opt x] retrieves the encoding [y] of [x] from the [!st.fwd_enc] map and returns [Some y] if it exists, otherwise [None].
+*)
+let encoding_opt (x : EConstr.t) : Enc.t option mm =
+  fun (st : wrapper ref) ->
+  let e_opt : Enc.t option = F.find_opt !st.fwd_enc x in
+  { state = st; value = e_opt }
+;;
+
+let get_encoding_opt (x : EConstr.t) : Enc.t option =
+  run ~keep_encoding:true ~fresh:false (encoding_opt x)
+;;
+
+(***********************************************************************)
+(*** Decode ************************************************************)
+(***********************************************************************)
 
 (** dual to [encode] except we cannot handle new values *)
-let decode (k : Enc.t) : EConstr.t mm =
-  Log.trace "mebi_wrapper.decode";
-  let open Syntax in
-  let* bck_enc = get_bck_enc in
-  match Enc.decode_opt bck_enc k with
-  | Some decoding -> return decoding
-  | None -> cannot_get_decoding_of_unencoded_econstr k
-;;
-
-let decode_to_string (x : Enc.t) : string =
-  run
-    ~keep_encoding:true
-    ~fresh:false
-    (let open Syntax in
-     let* y = decode x in
-     return ((mebi_to_string Rocq_utils.Strfy.econstr) y))
-;;
-
-(********************************************)
-(****** GET ENCODE/DECODE OPT ***************)
-(********************************************)
-
-let get_encoding_opt (k : EConstr.t) : Enc.t option mm =
+let decode (x : Enc.t) : EConstr.t mm =
   fun (st : wrapper ref) ->
-  Log.trace "mebi_wrapper.get_encoding_opt";
-  match F.find_opt !st.fwd_enc k with
-  | None -> { state = st; value = None }
-  | Some e -> { state = st; value = Some e }
+  let d : EConstr.t = Enc.decode !st.bck_enc x in
+  { state = st; value = d }
 ;;
 
-(** dual to [encode] except we cannot handle new values *)
-let get_decoding_opt (k : Enc.t) : EConstr.t option mm =
+let decoding (x : Enc.t) : EConstr.t mm =
   fun (st : wrapper ref) ->
-  Log.trace "mebi_wrapper.get_decoding_opt";
-  match B.find_opt !st.bck_enc k with
-  | None -> { state = st; value = None }
-  | Some e -> { state = st; value = Some e }
+  let d : EConstr.t = B.find !st.bck_enc x in
+  { state = st; value = d }
 ;;
 
-(********************************************)
-(****** GET ENCODE/DECODE *******************)
-(********************************************)
-
-let get_encoding (k : EConstr.t) : Enc.t mm =
-  Log.trace "mebi_wrapper.get_encoding";
-  let open Syntax in
-  let* opt = get_encoding_opt k in
-  match opt with
-  | None -> cannot_get_encoding_of_unencoded_econstr k
-  | Some e -> return e
+let has_decoding (x : Enc.t) : bool =
+  run ~keep_encoding:true ~fresh:false (fun (st : wrapper ref) ->
+    { state = st
+    ; value =
+        (match B.find_opt !st.bck_enc x with None -> false | Some _ -> true)
+    })
 ;;
 
-(** dual to [encode] except we cannot handle new values *)
-let get_decoding (k : Enc.t) : EConstr.t mm =
-  Log.trace "mebi_wrapper.get_decoding";
-  let open Syntax in
-  let* bck_enc = get_bck_enc in
-  match B.find_opt bck_enc k with
-  | None -> cannot_get_decoding_of_unencoded_econstr k
-  | Some e -> return e
+let get_decoding (x : Enc.t) : EConstr.t =
+  run ~keep_encoding:true ~fresh:false (decoding x)
 ;;
 
-(********************************************)
-(****** ENCODE/DECODE CHECKs ****************)
-(********************************************)
-
-let has_encoding (k : EConstr.t) : bool mm =
+let decoding_opt (x : Enc.t) : EConstr.t option mm =
   fun (st : wrapper ref) ->
-  Log.trace "mebi_wrapper.has_encoding";
-  match F.find_opt !st.fwd_enc k with
-  | None -> { state = st; value = false }
-  | Some _ -> { state = st; value = true }
+  let d_opt : EConstr.t option = B.find_opt !st.bck_enc x in
+  { state = st; value = d_opt }
 ;;
 
-(** dual to [encode] except we cannot handle new values *)
-let has_decoding (k : Enc.t) : bool mm =
-  fun (st : wrapper ref) ->
-  Log.trace "mebi_wrapper.has_decoding";
-  match B.find_opt !st.bck_enc k with
-  | None -> { state = st; value = false }
-  | Some _ -> { state = st; value = true }
+let get_decoding_opt (x : Enc.t) : EConstr.t option =
+  run ~keep_encoding:true ~fresh:false (decoding_opt x)
 ;;
 
 (**********************************)

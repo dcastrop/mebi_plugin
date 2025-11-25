@@ -735,7 +735,7 @@ let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
   let the_bisimilar =
     Algorithms.Bisimilar.run ~weak:!Params.the_weak_mode (the_fsm_1, the_fsm_2)
   in
-  Mebi_bisim.set_the_result the_bisimilar;
+  Algorithms.Bisimilar.set_the_result the_bisimilar;
   Log.result
     (Printf.sprintf
        "command.run, CheckBisimilarity, finished: %s\n"
@@ -779,16 +779,16 @@ let proof_intro
   : Declare.Proof.t mm
   =
   Log.trace "command.proof_intro";
-  Mebi_bisim.reset_the_proof_state ();
+  Mebi_proof.reset_the_proof_state ();
   let* _ = run (CheckBisimilarity ((x, a), (y, b))) refs in
   Log.debug
     (Printf.sprintf
        "command.proof_intro, the_fsm_1:\n%s"
-       (Fsm.to_string !(Mebi_bisim.get_the_result ()).the_fsm_1));
+       (Fsm.to_string (Algorithms.Bisimilar.get_the_result ()).the_fsm_1));
   Log.debug
     (Printf.sprintf
        "command.proof_intro, the_fsm_2:\n%s"
-       (Fsm.to_string !(Mebi_bisim.get_the_result ()).the_fsm_2));
+       (Fsm.to_string (Algorithms.Bisimilar.get_the_result ()).the_fsm_2));
   return
     (Mebi_tactics.update_proof_by_tactic
        pstate
