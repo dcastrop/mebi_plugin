@@ -1,3 +1,5 @@
+module Hyp = Mebi_hypothesis
+
 val do_nothing : unit -> unit Proofview.tactic
 val do_simplify : Proofview.Goal.t -> unit Proofview.tactic
 val do_rt1n_refl : Proofview.Goal.t -> unit Proofview.tactic
@@ -27,35 +29,9 @@ val reset_the_proof_state : unit -> unit
 val mfsm : unit -> Model.Fsm.t
 val nfsm : unit -> Model.Fsm.t
 
-module type HYP_S = sig
-  type atomic_pair = Evd.econstr * Evd.econstr array
-
-  exception
-    Mebi_proof_HypIsNot_Atomic of
-      (Evd.evar_map * Rocq_utils.hyp * EConstr.kind_of_type)
-
-  val hyp_to_atomic : Evd.evar_map -> Rocq_utils.hyp -> atomic_pair
-
-  exception
-    Mebi_proof_Hypothesis_Hyp of (Evd.evar_map * Rocq_utils.hyp * atomic_pair)
-
-  exception Mebi_proof_Hypothesis_HTy of (Evd.evar_map * atomic_pair)
-
-  module type HYP_TYPE = sig
-    type t
-
-    val hty_is_a : Evd.evar_map -> atomic_pair -> bool
-    val of_hyp : Evd.evar_map -> Rocq_utils.hyp -> t
-    val opt_of_hyp : Evd.evar_map -> Rocq_utils.hyp -> t option
-    val hyp_is_a : Evd.evar_map -> Rocq_utils.hyp -> bool
-  end
-
-  module Cofix : HYP_TYPE
-  module Invertible : HYP_TYPE
-  module TransOpt : HYP_TYPE
-end
-
-module Hyp : HYP_S
+module Cofix : Hyp.HYP_TYPE
+module Invertible : Hyp.HYP_TYPE
+module TransOpt : Hyp.HYP_TYPE
 
 val hyp_is_something : Evd.evar_map -> Rocq_utils.hyp -> bool
 val hyps_is_essentially_empty : Proofview.Goal.t -> bool

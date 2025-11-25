@@ -46,6 +46,7 @@
   mebi_wrapper
   mebi_ind
   mebi_utils
+  mebi_hypothesis
   mebi_proof
   ; mebi_bisim
   rocq_debug

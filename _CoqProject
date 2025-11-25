@@ -111,6 +111,8 @@ src/mebi_ind.ml
 src/mebi_ind.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
+src/mebi_hypothesis.ml
+src/mebi_hypothesis.mli
 src/mebi_proof.ml
 src/mebi_proof.mli
 # src/mebi_bisim.ml
