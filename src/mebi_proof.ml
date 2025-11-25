@@ -1,6 +1,7 @@
 open Logging
 open Mebi_wrapper
 open Model
+module Hyp = Mebi_hypothesis
 
 let do_nothing () : unit Proofview.tactic =
   Log.warning "mebi_proof, case just does nothing";
@@ -63,256 +64,126 @@ let nfsm () : Fsm.t = (Algorithms.Bisimilar.get_the_result ()).the_fsm_2
 (*** Hypothesis ********************************************************)
 (***********************************************************************)
 
-module type HYP_S = sig
-  type atomic_pair = EConstr.t * EConstr.t array
+module Cofix : Hyp.HYP_TYPE = Hyp.Make (struct
+    type t =
+      { m : State.t
+      ; n : State.t
+      }
 
-  exception
-    Mebi_proof_HypIsNot_Atomic of
-      (Evd.evar_map * Rocq_utils.hyp * EConstr.kind_of_type)
-
-  val hyp_to_atomic : Evd.evar_map -> Rocq_utils.hyp -> atomic_pair
-
-  exception
-    Mebi_proof_Hypothesis_Hyp of (Evd.evar_map * Rocq_utils.hyp * atomic_pair)
-
-  exception Mebi_proof_Hypothesis_HTy of (Evd.evar_map * atomic_pair)
-
-  module type HYP_TYPE = sig
-    type t
-
-    val hty_is_a : Evd.evar_map -> atomic_pair -> bool
-    val of_hyp : Evd.evar_map -> Rocq_utils.hyp -> t
-    val opt_of_hyp : Evd.evar_map -> Rocq_utils.hyp -> t option
-    val hyp_is_a : Evd.evar_map -> Rocq_utils.hyp -> bool
-  end
-
-  module Cofix : HYP_TYPE
-  module Invertible : HYP_TYPE
-  module TransOpt : HYP_TYPE
-end
-
-module Hyp : HYP_S = struct
-  (** We abstracted into modules [Cofix], [Invertible] and [TransOpt] the hypothesis relevant to us.
-  *)
-
-  (** [atomic_pair] are the arguments of [AtomicType (ty, tys)] returned by [EConstr.kind_of_type]
-  *)
-  type atomic_pair = EConstr.t * EConstr.t array
-
-  exception
-    Mebi_proof_HypIsNot_Atomic of
-      (Evd.evar_map * Rocq_utils.hyp * EConstr.kind_of_type)
-
-  let hyp_to_atomic (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : atomic_pair =
-    let h_ty : EConstr.t = Context.Named.Declaration.get_type h in
-    match EConstr.kind_of_type sigma h_ty with
-    | AtomicType (ty, tys) -> ty, tys
-    | k -> raise (Mebi_proof_HypIsNot_Atomic (sigma, h, k))
-  ;;
-
-  exception
-    Mebi_proof_Hypothesis_Hyp of (Evd.evar_map * Rocq_utils.hyp * atomic_pair)
-
-  exception Mebi_proof_Hypothesis_HTy of (Evd.evar_map * atomic_pair)
-
-  module type HTY_TYPE = sig
-    type t
-
-    val of_hty : Evd.evar_map -> atomic_pair -> t
-    val opt_of_hty : Evd.evar_map -> atomic_pair -> t option
-    val hty_is_a : Evd.evar_map -> atomic_pair -> bool
-  end
-
-  module type HTY_S = sig
-    type t
-
-    val of_hty : Evd.evar_map -> atomic_pair -> t
-  end
-
-  module MakeHTy (HTy : HTY_S) : HTY_TYPE = struct
-    include HTy
-
-    let opt_of_hty (sigma : Evd.evar_map) (p : atomic_pair) : HTy.t option =
-      try Some (of_hty sigma p) with Mebi_proof_Hypothesis_HTy _ -> None
+    let of_hty (sigma : Evd.evar_map) ((ty, tys) : Hyp.atomic_pair) : t =
+      if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
+      then (
+        let m : State.t =
+          decode_state (get_encoding tys.(5)) (mfsm ()).states
+        in
+        let n : State.t =
+          decode_state (get_encoding tys.(6)) (nfsm ()).states
+        in
+        { m; n })
+      else raise (Hyp.Mebi_proof_Hypothesis_HTy (sigma, (ty, tys)))
     ;;
+  end)
 
-    let hty_is_a (sigma : Evd.evar_map) (p : atomic_pair) : bool =
-      Option.has_some (opt_of_hty sigma p)
-    ;;
-  end
+module Invertible : Hyp.HYP_TYPE = Hyp.MakeHyp (struct
+    module HTy : Hyp.HTY_TYPE = Hyp.MakeHTy (struct
+        type t =
+          | Full
+          | Layer
 
-  module type HYP_TYPE = sig
-    type t
+        let of_hty (sigma : Evd.evar_map) ((ty, tys) : Hyp.atomic_pair) : t =
+          if Mebi_theories.is_var sigma tys.(2)
+          then Full
+          else if Mebi_theories.is_var sigma tys.(1)
+          then Layer
+          else raise (Hyp.Mebi_proof_Hypothesis_HTy (sigma, (ty, tys)))
+        ;;
+      end)
 
-    (* val of_hty : Evd.evar_map -> atomic_pair -> t *)
-    (* val opt_of_hty : Evd.evar_map -> atomic_pair -> t option *)
-    val hty_is_a : Evd.evar_map -> atomic_pair -> bool
-    val of_hyp : Evd.evar_map -> Rocq_utils.hyp -> t
-    val opt_of_hyp : Evd.evar_map -> Rocq_utils.hyp -> t option
-    val hyp_is_a : Evd.evar_map -> Rocq_utils.hyp -> bool
-  end
+    type t =
+      { kind : HTy.t
+      ; tactic : unit Proofview.tactic
+      }
 
-  module type HYP_S = sig
-    module HTy : HTY_TYPE
-
-    type t
-
-    val of_hyp : Evd.evar_map -> Rocq_utils.hyp -> t
-  end
-
-  module MakeHyp (Hyp : HYP_S) : HYP_TYPE = struct
-    type t = Hyp.t
-
-    let hty_is_a : Evd.evar_map -> atomic_pair -> bool = Hyp.HTy.hty_is_a
-    let of_hyp : Evd.evar_map -> Rocq_utils.hyp -> t = Hyp.of_hyp
-
-    let opt_of_hyp (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : t option =
-      try Some (of_hyp sigma h) with Mebi_proof_Hypothesis_Hyp _ -> None
-    ;;
-
-    let hyp_is_a (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : bool =
-      Option.has_some (opt_of_hyp sigma h)
-    ;;
-  end
-
-  module Make (HTy : HTY_S) : HYP_TYPE = MakeHyp (struct
-      module HTy : HTY_TYPE = MakeHTy (HTy)
-
-      type t = HTy.t
-
-      let of_hyp (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : t =
-        try HTy.of_hty sigma (hyp_to_atomic sigma h) with
-        | Mebi_proof_Hypothesis_HTy (sigma, p) ->
-          raise (Mebi_proof_Hypothesis_Hyp (sigma, h, p))
-      ;;
-    end)
-
-  module Cofix : HYP_TYPE = Make (struct
-      type t =
-        { m : State.t
-        ; n : State.t
+    let of_hyp (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : t =
+      try
+        { kind = HTy.of_hty sigma (Hyp.hyp_to_atomic sigma h)
+        ; tactic = Mebi_tactics.do_inversion h
         }
+      with
+      | Hyp.Mebi_proof_Hypothesis_HTy (sigma, p) ->
+        raise (Hyp.Mebi_proof_Hypothesis_Hyp (sigma, h, p))
+    ;;
+  end)
 
-      let of_hty (sigma : Evd.evar_map) ((ty, tys) : atomic_pair) : t =
-        if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
-        then (
-          let m : State.t =
-            decode_state (get_encoding tys.(5)) (mfsm ()).states
-          in
-          let n : State.t =
-            decode_state (get_encoding tys.(6)) (nfsm ()).states
-          in
-          { m; n })
-        else raise (Mebi_proof_Hypothesis_HTy (sigma, (ty, tys)))
-      ;;
-    end)
+module TransOpt : Hyp.HYP_TYPE = Hyp.Make (struct
+    type t = Transition_opt.t
 
-  module Invertible : HYP_TYPE = MakeHyp (struct
-      module HTy : HTY_TYPE = MakeHTy (struct
-          type t =
-            | Full
-            | Layer
+    let try_decode (sigma : Evd.evar_map) (x : EConstr.t) : Enc.t option =
+      if EConstr.isRel sigma x then None else get_encoding_opt x
+    ;;
 
-          let of_hty (sigma : Evd.evar_map) ((ty, tys) : atomic_pair) : t =
-            if Mebi_theories.is_var sigma tys.(2)
-            then Full
-            else if Mebi_theories.is_var sigma tys.(1)
-            then Layer
-            else raise (Mebi_proof_Hypothesis_HTy (sigma, (ty, tys)))
-          ;;
-        end)
+    let try_find_state
+          (sigma : Evd.evar_map)
+          (x : EConstr.t)
+          (states : States.t)
+      : State.t option
+      =
+      Option.map (fun (y : Enc.t) -> decode_state y states) (try_decode sigma x)
+    ;;
 
-      type t =
-        { kind : HTy.t
-        ; tactic : unit Proofview.tactic
-        }
+    exception
+      Mebi_proof_Hyp_TransOpt_CouldNotDecodeState of
+        (Evd.evar_map * EConstr.t * States.t)
 
-      let of_hyp (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : t =
-        try
-          { kind = HTy.of_hty sigma (hyp_to_atomic sigma h)
-          ; tactic = Mebi_tactics.do_inversion h
-          }
-        with
-        | Mebi_proof_Hypothesis_HTy (sigma, p) ->
-          raise (Mebi_proof_Hypothesis_Hyp (sigma, h, p))
-      ;;
-    end)
+    let find_state (sigma : Evd.evar_map) (x : EConstr.t) (states : States.t)
+      : State.t
+      =
+      match try_find_state sigma x states with
+      | Some s -> s
+      | None ->
+        raise (Mebi_proof_Hyp_TransOpt_CouldNotDecodeState (sigma, x, states))
+    ;;
 
-  module TransOpt : HYP_TYPE = Make (struct
-      type t = Transition_opt.t
+    exception
+      Mebi_proof_Hyp_TransOpt_CouldNotDecodeLabel of
+        (Evd.evar_map * EConstr.t * Alphabet.t)
 
-      let try_decode (sigma : Evd.evar_map) (x : EConstr.t) : Enc.t option =
-        if EConstr.isRel sigma x then None else get_encoding_opt x
-      ;;
+    let try_find_label
+          (sigma : Evd.evar_map)
+          (x : EConstr.t)
+          (labels : Alphabet.t)
+      : Label.t option
+      =
+      Option.map
+        (fun (y : Enc.t) -> find_label_of_enc y labels)
+        (try_decode sigma x)
+    ;;
 
-      let try_find_state
-            (sigma : Evd.evar_map)
-            (x : EConstr.t)
-            (states : States.t)
-        : State.t option
-        =
-        Option.map
-          (fun (y : Enc.t) -> decode_state y states)
-          (try_decode sigma x)
-      ;;
+    let find_label (sigma : Evd.evar_map) (x : EConstr.t) (labels : Alphabet.t)
+      : Label.t
+      =
+      match try_find_label sigma x labels with
+      | Some s -> s
+      | None ->
+        raise (Mebi_proof_Hyp_TransOpt_CouldNotDecodeLabel (sigma, x, labels))
+    ;;
 
-      exception
-        Mebi_proof_Hyp_TransOpt_CouldNotDecodeState of
-          (Evd.evar_map * EConstr.t * States.t)
-
-      let find_state (sigma : Evd.evar_map) (x : EConstr.t) (states : States.t)
-        : State.t
-        =
-        match try_find_state sigma x states with
-        | Some s -> s
-        | None ->
-          raise (Mebi_proof_Hyp_TransOpt_CouldNotDecodeState (sigma, x, states))
-      ;;
-
-      exception
-        Mebi_proof_Hyp_TransOpt_CouldNotDecodeLabel of
-          (Evd.evar_map * EConstr.t * Alphabet.t)
-
-      let try_find_label
-            (sigma : Evd.evar_map)
-            (x : EConstr.t)
-            (labels : Alphabet.t)
-        : Label.t option
-        =
-        Option.map
-          (fun (y : Enc.t) -> find_label_of_enc y labels)
-          (try_decode sigma x)
-      ;;
-
-      let find_label
-            (sigma : Evd.evar_map)
-            (x : EConstr.t)
-            (labels : Alphabet.t)
-        : Label.t
-        =
-        match try_find_label sigma x labels with
-        | Some s -> s
-        | None ->
-          raise (Mebi_proof_Hyp_TransOpt_CouldNotDecodeLabel (sigma, x, labels))
-      ;;
-
-      let of_hty (sigma : Evd.evar_map) ((ty, tys) : atomic_pair) : t =
-        try
-          let states : States.t = (mfsm ()).states in
-          let labels : Alphabet.t = (mfsm ()).alphabet in
-          let from : State.t = find_state sigma tys.(0) states in
-          let label : Label.t = find_label sigma tys.(1) labels in
-          let goto : State.t option = try_find_state sigma tys.(2) states in
-          let { annotations; constructor_trees; _ } : Action.t =
-            get_action_labelled label (Edges.find (mfsm ()).edges from)
-          in
-          Transition_opt.create from label goto annotations constructor_trees
-        with
-        | Mebi_proof_Hyp_TransOpt_CouldNotDecodeState (sigma, x, states) ->
-          raise (Mebi_proof_Hypothesis_HTy (sigma, (ty, tys)))
-      ;;
-    end)
-end
+    let of_hty (sigma : Evd.evar_map) ((ty, tys) : Hyp.atomic_pair) : t =
+      try
+        let states : States.t = (mfsm ()).states in
+        let labels : Alphabet.t = (mfsm ()).alphabet in
+        let from : State.t = find_state sigma tys.(0) states in
+        let label : Label.t = find_label sigma tys.(1) labels in
+        let goto : State.t option = try_find_state sigma tys.(2) states in
+        let { annotations; constructor_trees; _ } : Action.t =
+          get_action_labelled label (Edges.find (mfsm ()).edges from)
+        in
+        Transition_opt.create from label goto annotations constructor_trees
+      with
+      | Mebi_proof_Hyp_TransOpt_CouldNotDecodeState (sigma, x, states) ->
+        raise (Hyp.Mebi_proof_Hypothesis_HTy (sigma, (ty, tys)))
+    ;;
+  end)
 
 (***********************************************************************)
 (*** Proof Tools *******************************************************)
@@ -326,11 +197,11 @@ end
 let hyp_is_something (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : bool =
   try
     let p : Hyp.atomic_pair = Hyp.hyp_to_atomic sigma h in
-    if Hyp.Cofix.hty_is_a sigma p
+    if Cofix.hty_is_a sigma p
     then true
-    else if Hyp.Invertible.hty_is_a sigma p
+    else if Invertible.hty_is_a sigma p
     then true
-    else if Hyp.TransOpt.hty_is_a sigma p
+    else if TransOpt.hty_is_a sigma p
     then true
     else false
   with
