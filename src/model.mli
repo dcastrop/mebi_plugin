@@ -58,6 +58,8 @@ module States : sig
 end
 
 val states_to_string : States.t -> string
+val decode_state_opt : Enc.t -> States.t -> State.t option
+val decode_state : Enc.t -> States.t -> State.t
 
 module Partition : sig
   type elt = States.t
@@ -160,10 +162,7 @@ module Alphabet : sig
 end
 
 val alphabet_to_string : Alphabet.t -> string
-
-val find_label_of_enc :
-  Mebi_setup.Enc.t -> Alphabet.t -> Label.t
-
+val find_label_of_enc : Enc.t -> Alphabet.t -> Label.t
 val silent_label_opt : Alphabet.t -> Label.t option
 
 exception Model_Alphabet_SilentLabelNotFound of Alphabet.t
@@ -238,13 +237,8 @@ module Actions : sig
   val replace : 'a t -> key -> 'a -> unit
   val mem : 'a t -> key -> bool
   val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-  val filter_map_inplace :
-    (key -> 'a -> 'a option) -> 'a t -> unit
-
-  val fold :
-    (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
   val length : 'a t -> int
   val stats : 'a t -> Hashtbl.statistics
   val to_seq : 'a t -> (key * 'a) Seq.t
@@ -257,24 +251,17 @@ end
 
 val actions_to_string : States.t Actions.t -> string
 val is_action_silent : Action.t -> bool
-
-val get_action_labelled :
-  Label.t -> States.t Actions.t -> Action.t
-
+val get_action_labelled : Label.t -> States.t Actions.t -> Action.t
 val get_action_destinations : States.t Actions.t -> States.t
+val get_reachable_partition : Partition.t -> States.t Actions.t -> Partition.t
 
-val get_reachable_partition :
-  Partition.t -> States.t Actions.t -> Partition.t
+val get_reachable_partition_opt
+  :  Partition.t
+  -> States.t Actions.t
+  -> Partition.t option
 
-val get_reachable_partition_opt :
-  Partition.t -> States.t Actions.t -> Partition.t option
-
-val update_destinations :
-  States.t Actions.t -> Action.t -> States.t -> States.t
-
-val update_action :
-  States.t Actions.t -> Action.t -> States.t -> unit
-
+val update_destinations : States.t Actions.t -> Action.t -> States.t -> States.t
+val update_action : States.t Actions.t -> Action.t -> States.t -> unit
 val alphabet_of_actions : States.t Actions.t -> Alphabet.t
 
 module Edges : sig
@@ -293,13 +280,8 @@ module Edges : sig
   val replace : 'a t -> key -> 'a -> unit
   val mem : 'a t -> key -> bool
   val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-  val filter_map_inplace :
-    (key -> 'a -> 'a option) -> 'a t -> unit
-
-  val fold :
-    (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
   val length : 'a t -> int
   val stats : 'a t -> Hashtbl.statistics
   val to_seq : 'a t -> (key * 'a) Seq.t
@@ -312,62 +294,55 @@ end
 
 val edges_to_string : States.t Actions.t Edges.t -> string
 
-val update_edge :
-  States.t Actions.t Edges.t ->
-  State.t ->
-  Action.t ->
-  States.t ->
-  unit
+val update_edge
+  :  States.t Actions.t Edges.t
+  -> State.t
+  -> Action.t
+  -> States.t
+  -> unit
 
 val add_edge : States.t Actions.t Edges.t -> Edge.t -> unit
+val add_edges : States.t Actions.t Edges.t -> Edge.t list -> unit
 
-val add_edges :
-  States.t Actions.t Edges.t -> Edge.t list -> unit
+val get_edges_labelled
+  :  Label.t
+  -> States.t Actions.t Edges.t
+  -> States.t Actions.t Edges.t
 
-val get_edges_labelled :
-  Label.t ->
-  States.t Actions.t Edges.t ->
-  States.t Actions.t Edges.t
-
-val merge_info_field :
-  'a list option -> 'a list option -> 'a list option
-
+val merge_info_field : 'a list option -> 'a list option -> 'a list option
 val merge_info : Info.t -> Info.t -> Info.t
 val merge_action : Action.t -> Action.t -> Action.t
 
-val merge_actions :
-  States.t Actions.t ->
-  States.t Actions.t ->
-  States.t Actions.t
+val merge_actions
+  :  States.t Actions.t
+  -> States.t Actions.t
+  -> States.t Actions.t
 
-val merge_edges :
-  States.t Actions.t Edges.t ->
-  States.t Actions.t Edges.t ->
-  States.t Actions.t Edges.t
+val merge_edges
+  :  States.t Actions.t Edges.t
+  -> States.t Actions.t Edges.t
+  -> States.t Actions.t Edges.t
 
 val transition_to_action : Transition.t -> Action.t
 val transition_opt_to_action : Transition_opt.t -> Action.t
 val transition_to_edge : Transition.t -> Edge.t
 val edge_to_transition : Edge.t -> Transition.t
 
-val action_destinations_to_transitions :
-  State.t ->
-  Action.t ->
-  States.t ->
-  Transitions.t ->
-  Transitions.t
+val action_destinations_to_transitions
+  :  State.t
+  -> Action.t
+  -> States.t
+  -> Transitions.t
+  -> Transitions.t
 
-val actions_to_transitions :
-  State.t ->
-  States.t Actions.t ->
-  Transitions.t ->
-  Transitions.t
+val actions_to_transitions
+  :  State.t
+  -> States.t Actions.t
+  -> Transitions.t
+  -> Transitions.t
 
-val edges_to_transitions :
-  States.t Actions.t Edges.t -> Transitions.t
-
-val transitions_to_edges :
-  Transitions.t -> States.t Actions.t Edges.t
+val edges_to_transitions : States.t Actions.t Edges.t -> Transitions.t
+val transitions_to_edges : Transitions.t -> States.t Actions.t Edges.t
 
 type kind =
   | LTS of
@@ -386,14 +361,14 @@ type kind =
       * Info.t)
 
 module Lts : sig
-  type t = {
-    init : State.t option;
-    terminals : States.t;
-    alphabet : Alphabet.t;
-    states : States.t;
-    transitions : Transitions.t;
-    info : Info.t;
-  }
+  type t =
+    { init : State.t option
+    ; terminals : States.t
+    ; alphabet : Alphabet.t
+    ; states : States.t
+    ; transitions : Transitions.t
+    ; info : Info.t
+    }
 
   val to_model : t -> kind
   val of_model : kind -> t
@@ -401,14 +376,14 @@ module Lts : sig
 end
 
 module Fsm : sig
-  type t = {
-    init : State.t option;
-    terminals : States.t;
-    alphabet : Alphabet.t;
-    states : States.t;
-    edges : States.t Actions.t Edges.t;
-    info : Info.t;
-  }
+  type t =
+    { init : State.t option
+    ; terminals : States.t
+    ; alphabet : Alphabet.t
+    ; states : States.t
+    ; edges : States.t Actions.t Edges.t
+    ; info : Info.t
+    }
 
   and pair = t * t
 
@@ -426,8 +401,7 @@ end
 
 module Saturate : sig
   exception
-    Model_Saturate_CannotSaturateActionsWithUnknownVisibility of
-      Action.t
+    Model_Saturate_CannotSaturateActionsWithUnknownVisibility of Action.t
 
   module StateTracker : sig
     type key = State.t
@@ -445,13 +419,8 @@ module Saturate : sig
     val replace : 'a t -> key -> 'a -> unit
     val mem : 'a t -> key -> bool
     val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-    val filter_map_inplace :
-      (key -> 'a -> 'a option) -> 'a t -> unit
-
-    val fold :
-      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
     val length : 'a t -> int
     val stats : 'a t -> Hashtbl.statistics
     val to_seq : 'a t -> (key * 'a) Seq.t
@@ -465,100 +434,96 @@ module Saturate : sig
   val max_visit_num : int
   val can_revisit : State.t -> int StateTracker.t -> bool
   val log_visit : State.t -> int StateTracker.t -> unit
+  val check_update_named : Action.t -> Action.t option -> Action.t option
+  val update_named_annotation : Action.t -> Note.annotation -> Action.t
 
-  val check_update_named :
-    Action.t -> Action.t option -> Action.t option
+  val stop
+    :  ?named:Action.t option
+    -> ?annotation:Note.annotation
+    -> State.t
+    -> (Action.t * States.t) list
+    -> (Action.t * States.t) list
 
-  val update_named_annotation :
-    Action.t -> Note.annotation -> Action.t
+  val check_from
+    :  ?named:Action.t option
+    -> ?annotation:Note.annotation
+    -> States.t Actions.t Edges.t
+    -> State.t
+    -> int StateTracker.t
+    -> (Action.t * States.t) list
+    -> (Action.t * States.t) list
 
-  val stop :
-    ?named:Action.t option ->
-    ?annotation:Note.annotation ->
-    State.t ->
-    (Action.t * States.t) list ->
-    (Action.t * States.t) list
+  val check_actions
+    :  ?named:Action.t option
+    -> ?annotation:Note.annotation
+    -> States.t Actions.t Edges.t
+    -> State.t
+    -> States.t Actions.t
+    -> int StateTracker.t
+    -> (Action.t * States.t) list
+    -> (Action.t * States.t) list
 
-  val check_from :
-    ?named:Action.t option ->
-    ?annotation:Note.annotation ->
-    States.t Actions.t Edges.t ->
-    State.t ->
-    int StateTracker.t ->
-    (Action.t * States.t) list ->
-    (Action.t * States.t) list
+  val check_named
+    :  ?named:Action.t option
+    -> ?annotation:Note.annotation
+    -> States.t Actions.t Edges.t
+    -> State.t
+    -> Action.t
+    -> States.t
+    -> int StateTracker.t
+    -> (Action.t * States.t) list
+    -> bool ref
+    -> (Action.t * States.t) list
 
-  val check_actions :
-    ?named:Action.t option ->
-    ?annotation:Note.annotation ->
-    States.t Actions.t Edges.t ->
-    State.t ->
-    States.t Actions.t ->
-    int StateTracker.t ->
-    (Action.t * States.t) list ->
-    (Action.t * States.t) list
+  val check_destinations
+    :  ?named:Action.t option
+    -> ?annotation:Note.annotation
+    -> States.t Actions.t Edges.t
+    -> States.t
+    -> int StateTracker.t
+    -> (Action.t * States.t) list
+    -> (Action.t * States.t) list
 
-  val check_named :
-    ?named:Action.t option ->
-    ?annotation:Note.annotation ->
-    States.t Actions.t Edges.t ->
-    State.t ->
-    Action.t ->
-    States.t ->
-    int StateTracker.t ->
-    (Action.t * States.t) list ->
-    bool ref ->
-    (Action.t * States.t) list
+  val merge_saturated_tuples
+    :  (Action.t * States.t) list
+    -> (Action.t * States.t) list
+    -> (Action.t * States.t) list
 
-  val check_destinations :
-    ?named:Action.t option ->
-    ?annotation:Note.annotation ->
-    States.t Actions.t Edges.t ->
-    States.t ->
-    int StateTracker.t ->
-    (Action.t * States.t) list ->
-    (Action.t * States.t) list
+  val try_update_saturated_tuple
+    :  Action.t * States.t
+    -> (Action.t * States.t) list
+    -> (Action.t * States.t) option * (Action.t * States.t) list
 
-  val merge_saturated_tuples :
-    (Action.t * States.t) list ->
-    (Action.t * States.t) list ->
-    (Action.t * States.t) list
+  val edge_action_destinations
+    :  ?named:Action.t option
+    -> ?annotation:Note.annotation
+    -> States.t Actions.t Edges.t
+    -> State.t
+    -> States.t
+    -> (Action.t * States.t) list
+    -> (Action.t * States.t) list
 
-  val try_update_saturated_tuple :
-    Action.t * States.t ->
-    (Action.t * States.t) list ->
-    (Action.t * States.t) option * (Action.t * States.t) list
+  val edge_actions
+    :  ?named:Action.t option
+    -> ?annotation:Note.annotation
+    -> States.t Actions.t Edges.t
+    -> State.t
+    -> States.t Actions.t
+    -> (Action.t * States.t) list
+    -> (Action.t * States.t) list
 
-  val edge_action_destinations :
-    ?named:Action.t option ->
-    ?annotation:Note.annotation ->
-    States.t Actions.t Edges.t ->
-    State.t ->
-    States.t ->
-    (Action.t * States.t) list ->
-    (Action.t * States.t) list
+  val edge
+    :  States.t Actions.t
+    -> States.t Actions.t Edges.t
+    -> State.t
+    -> States.t Actions.t
+    -> unit
 
-  val edge_actions :
-    ?named:Action.t option ->
-    ?annotation:Note.annotation ->
-    States.t Actions.t Edges.t ->
-    State.t ->
-    States.t Actions.t ->
-    (Action.t * States.t) list ->
-    (Action.t * States.t) list
-
-  val edge :
-    States.t Actions.t ->
-    States.t Actions.t Edges.t ->
-    State.t ->
-    States.t Actions.t ->
-    unit
-
-  val edges :
-    Alphabet.t ->
-    States.t ->
-    States.t Actions.t Edges.t ->
-    States.t Actions.t Edges.t
+  val edges
+    :  Alphabet.t
+    -> States.t
+    -> States.t Actions.t Edges.t
+    -> States.t Actions.t Edges.t
 
   val fsm : Fsm.t -> Fsm.t
 end
