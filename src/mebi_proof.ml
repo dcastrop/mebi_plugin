@@ -61,6 +61,119 @@ let mfsm () : Fsm.t = (Algorithms.Bisimilar.get_the_result ()).the_fsm_1
 let nfsm () : Fsm.t = (Algorithms.Bisimilar.get_the_result ()).the_fsm_2
 
 (***********************************************************************)
+(*** Proof Tools *******************************************************)
+(***********************************************************************)
+
+let try_decode (sigma : Evd.evar_map) (x : EConstr.t) : Enc.t option =
+  if EConstr.isRel sigma x then None else get_encoding_opt x
+;;
+
+(***********************************************************************)
+
+let try_find_state (sigma : Evd.evar_map) (x : EConstr.t) (states : States.t)
+  : State.t option
+  =
+  Option.map (fun (y : Enc.t) -> decode_state y states) (try_decode sigma x)
+;;
+
+exception
+  Mebi_proof_CouldNotDecodeState of (Evd.evar_map * EConstr.t * States.t)
+
+let find_state (sigma : Evd.evar_map) (x : EConstr.t) (states : States.t)
+  : State.t
+  =
+  match try_find_state sigma x states with
+  | Some s -> s
+  | None -> raise (Mebi_proof_CouldNotDecodeState (sigma, x, states))
+;;
+
+(***********************************************************************)
+
+exception
+  Mebi_proof_CouldNotDecodeLabel of (Evd.evar_map * EConstr.t * Alphabet.t)
+
+let try_find_label (sigma : Evd.evar_map) (x : EConstr.t) (labels : Alphabet.t)
+  : Label.t option
+  =
+  Option.map
+    (fun (y : Enc.t) -> find_label_of_enc y labels)
+    (try_decode sigma x)
+;;
+
+let find_label (sigma : Evd.evar_map) (x : EConstr.t) (labels : Alphabet.t)
+  : Label.t
+  =
+  match try_find_label sigma x labels with
+  | Some s -> s
+  | None -> raise (Mebi_proof_CouldNotDecodeLabel (sigma, x, labels))
+;;
+
+(***********************************************************************)
+
+exception
+  Mebi_proof_CouldNotDecodeTransition of (Evd.evar_map * EConstr.t * Fsm.t)
+
+let get_transition
+      (sigma : Evd.evar_map)
+      (fromty : EConstr.t)
+      (labelty : EConstr.t)
+      (gototy : EConstr.t)
+      (fsm : Fsm.t)
+  : Transition_opt.t
+  =
+  try
+    let states : States.t = fsm.states in
+    let labels : Alphabet.t = fsm.alphabet in
+    let from : State.t = find_state sigma fromty states in
+    let label : Label.t = find_label sigma labelty labels in
+    let goto : State.t option = try_find_state sigma gototy states in
+    let { annotations; constructor_trees; _ } : Action.t =
+      get_action_labelled label (Edges.find fsm.edges from)
+    in
+    Transition_opt.create from label goto annotations constructor_trees
+  with
+  | Mebi_proof_CouldNotDecodeState (sigma, ty, states) ->
+    raise (Mebi_proof_CouldNotDecodeTransition (sigma, ty, fsm))
+  | Mebi_proof_CouldNotDecodeLabel (sigma, ty, alphabet) ->
+    raise (Mebi_proof_CouldNotDecodeTransition (sigma, ty, fsm))
+;;
+
+let get_lts_transition
+      (sigma : Evd.evar_map)
+      (fsm : Fsm.t)
+      ((_, tys) : Rocq_utils.kind_pair)
+  : Transition_opt.t
+  =
+  get_transition sigma tys.(0) tys.(1) tys.(2) fsm
+;;
+
+let get_weak_transition
+      (sigma : Evd.evar_map)
+      (fsm : Fsm.t)
+      ((_, tys) : Rocq_utils.kind_pair)
+  : Transition_opt.t
+  =
+  get_transition sigma tys.(3) tys.(4) tys.(5) fsm
+;;
+
+(***********************************************************************)
+
+exception Mebi_proof_CouldNotGetStateM of (Evd.evar_map * Rocq_utils.kind_pair)
+
+let weak_sim_get_m_state
+      (sigma : Evd.evar_map)
+      ((ty, tys) : Rocq_utils.kind_pair)
+  : State.t
+  =
+  if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
+  then (
+    try find_state sigma tys.(0) (mfsm ()).states with
+    | Mebi_proof_CouldNotDecodeState (sigma, statety, states) ->
+      raise (Mebi_proof_CouldNotGetStateM (sigma, (ty, tys))))
+  else raise (Mebi_proof_CouldNotGetStateM (sigma, (ty, tys)))
+;;
+
+(***********************************************************************)
 (*** Hypothesis ********************************************************)
 (***********************************************************************)
 
@@ -70,7 +183,7 @@ module Cofix : Hyp.HYP_TYPE = Hyp.Make (struct
       ; n : State.t
       }
 
-    let of_hty (sigma : Evd.evar_map) ((ty, tys) : Hyp.atomic_pair) : t =
+    let of_hty (sigma : Evd.evar_map) ((ty, tys) : Rocq_utils.kind_pair) : t =
       if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
       then (
         let m : State.t =
@@ -90,7 +203,8 @@ module Invertible : Hyp.HYP_TYPE = Hyp.MakeHyp (struct
           | Full
           | Layer
 
-        let of_hty (sigma : Evd.evar_map) ((ty, tys) : Hyp.atomic_pair) : t =
+        let of_hty (sigma : Evd.evar_map) ((ty, tys) : Rocq_utils.kind_pair) : t
+          =
           if Mebi_theories.is_var sigma tys.(2)
           then Full
           else if Mebi_theories.is_var sigma tys.(1)
@@ -106,7 +220,7 @@ module Invertible : Hyp.HYP_TYPE = Hyp.MakeHyp (struct
 
     let of_hyp (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : t =
       try
-        { kind = HTy.of_hty sigma (Hyp.hyp_to_atomic sigma h)
+        { kind = HTy.of_hty sigma (Rocq_utils.hyp_to_atomic sigma h)
         ; tactic = Mebi_tactics.do_inversion h
         }
       with
@@ -118,76 +232,12 @@ module Invertible : Hyp.HYP_TYPE = Hyp.MakeHyp (struct
 module TransOpt : Hyp.HYP_TYPE = Hyp.Make (struct
     type t = Transition_opt.t
 
-    let try_decode (sigma : Evd.evar_map) (x : EConstr.t) : Enc.t option =
-      if EConstr.isRel sigma x then None else get_encoding_opt x
-    ;;
-
-    let try_find_state
-          (sigma : Evd.evar_map)
-          (x : EConstr.t)
-          (states : States.t)
-      : State.t option
-      =
-      Option.map (fun (y : Enc.t) -> decode_state y states) (try_decode sigma x)
-    ;;
-
-    exception
-      Mebi_proof_Hyp_TransOpt_CouldNotDecodeState of
-        (Evd.evar_map * EConstr.t * States.t)
-
-    let find_state (sigma : Evd.evar_map) (x : EConstr.t) (states : States.t)
-      : State.t
-      =
-      match try_find_state sigma x states with
-      | Some s -> s
-      | None ->
-        raise (Mebi_proof_Hyp_TransOpt_CouldNotDecodeState (sigma, x, states))
-    ;;
-
-    exception
-      Mebi_proof_Hyp_TransOpt_CouldNotDecodeLabel of
-        (Evd.evar_map * EConstr.t * Alphabet.t)
-
-    let try_find_label
-          (sigma : Evd.evar_map)
-          (x : EConstr.t)
-          (labels : Alphabet.t)
-      : Label.t option
-      =
-      Option.map
-        (fun (y : Enc.t) -> find_label_of_enc y labels)
-        (try_decode sigma x)
-    ;;
-
-    let find_label (sigma : Evd.evar_map) (x : EConstr.t) (labels : Alphabet.t)
-      : Label.t
-      =
-      match try_find_label sigma x labels with
-      | Some s -> s
-      | None ->
-        raise (Mebi_proof_Hyp_TransOpt_CouldNotDecodeLabel (sigma, x, labels))
-    ;;
-
-    let of_hty (sigma : Evd.evar_map) ((ty, tys) : Hyp.atomic_pair) : t =
-      try
-        let states : States.t = (mfsm ()).states in
-        let labels : Alphabet.t = (mfsm ()).alphabet in
-        let from : State.t = find_state sigma tys.(0) states in
-        let label : Label.t = find_label sigma tys.(1) labels in
-        let goto : State.t option = try_find_state sigma tys.(2) states in
-        let { annotations; constructor_trees; _ } : Action.t =
-          get_action_labelled label (Edges.find (mfsm ()).edges from)
-        in
-        Transition_opt.create from label goto annotations constructor_trees
-      with
-      | Mebi_proof_Hyp_TransOpt_CouldNotDecodeState (sigma, x, states) ->
+    let of_hty (sigma : Evd.evar_map) ((ty, tys) : Rocq_utils.kind_pair) : t =
+      try get_lts_transition sigma (mfsm ()) (ty, tys) with
+      | Mebi_proof_CouldNotDecodeTransition (sigma, x, fsm) ->
         raise (Hyp.Mebi_proof_Hypothesis_HTy (sigma, (ty, tys)))
     ;;
   end)
-
-(***********************************************************************)
-(*** Proof Tools *******************************************************)
-(***********************************************************************)
 
 (** precedence of hyps:
     - cofix
@@ -196,7 +246,7 @@ module TransOpt : Hyp.HYP_TYPE = Hyp.Make (struct
     - transition *)
 let hyp_is_something (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : bool =
   try
-    let p : Hyp.atomic_pair = Hyp.hyp_to_atomic sigma h in
+    let p : Rocq_utils.kind_pair = Rocq_utils.hyp_to_atomic sigma h in
     if Cofix.hty_is_a sigma p
     then true
     else if Invertible.hty_is_a sigma p
@@ -205,7 +255,7 @@ let hyp_is_something (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : bool =
     then true
     else false
   with
-  | Hyp.Mebi_proof_HypIsNot_Atomic _ -> false
+  | Rocq_utils.Rocq_utils_HypIsNot_Atomic _ -> false
 ;;
 
 let hyps_is_essentially_empty (gl : Proofview.Goal.t) : bool =
@@ -222,6 +272,85 @@ let hyps_is_empty (gl : Proofview.Goal.t) : bool =
   if List.is_empty (Proofview.Goal.hyps gl)
   then true
   else hyps_is_essentially_empty gl
+;;
+
+(***********************************************************************)
+(*** Conclusion ********************************************************)
+(***********************************************************************)
+
+(* precedence of concl:
+   - n-transition
+   - new weak sim
+   - exists n2 *)
+
+(* let hty_to_transition_opt *)
+
+(* let concl_is_new_weak_sim
+   (sigma : Evd.evar_map)
+   ((ty, _) : Rocq_utils.kind_pair)
+   : bool
+   =
+   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
+   ;; *)
+
+(* let concl_is_weak_transition
+   (sigma : Evd.evar_map)
+   ((ty, _) : Rocq_utils.kind_pair)
+   : bool
+   =
+   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak ())
+   ;; *)
+
+(* let concl_is_silent_transition
+   (sigma : Evd.evar_map)
+   ((ty, _) : Rocq_utils.kind_pair)
+   : bool
+   =
+   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_silent ())
+   ;; *)
+
+(* let concl_is_silent1_transition
+   (sigma : Evd.evar_map)
+   ((ty, _) : Rocq_utils.kind_pair)
+   : bool
+   =
+   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_silent1 ())
+   ;; *)
+
+(* let concl_is_lts_transition
+   (sigma : Evd.evar_map)
+   ((ty, _) : Rocq_utils.kind_pair)
+   : bool
+   =
+   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_LTS ())
+   ;; *)
+
+exception Mebi_proof_ConclIsNot_Exists of (Evd.evar_map * Rocq_utils.kind_pair)
+
+let concl_get_eexists (sigma : Evd.evar_map) ((ty, tys) : Rocq_utils.kind_pair)
+  : Transition_opt.t * State.t
+  =
+  let _, _, constr = Rocq_utils.econstr_to_lambda sigma tys.(1) in
+  let _, apptys = Rocq_utils.econstr_to_app sigma constr in
+  match Array.to_list apptys with
+  | [ wk_trans; wk_sim ] ->
+    (try
+       let nt : Transition_opt.t =
+         Rocq_utils.econstr_to_atomic sigma wk_trans
+         |> get_weak_transition sigma (nfsm ())
+       in
+       let mstate : State.t =
+         Rocq_utils.econstr_to_atomic sigma wk_sim |> weak_sim_get_m_state sigma
+       in
+       nt, mstate
+     with
+     | Mebi_proof_CouldNotDecodeTransition (sigma, x, fsm) ->
+       raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys)))
+     | Mebi_proof_CouldNotGetStateM (sigma, (ty, tys)) ->
+       raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys)))
+     | Rocq_utils.Rocq_utils_EConstrIsNot_Atomic (sigma, x, k) ->
+       raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys))))
+  | _ -> raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys)))
 ;;
 
 (***********************************************************************)
@@ -243,7 +372,20 @@ let rec handle_new_proof (gl : Proofview.Goal.t) : unit Proofview.tactic =
     raise (Mebi_proof_NewProof ()))
 
 and handle_new_weak_sim (gl : Proofview.Goal.t) : unit Proofview.tactic =
-  do_nothing ()
+  (* TODO: new_weak_sim > exists *)
+  try
+    (* TODO: new_weak_sim *)
+    (* ... *)
+    (* NOTE: eexists*)
+    let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+    let the_concl : EConstr.t = Proofview.Goal.concl gl in
+    let ntransition, mstate =
+      Rocq_utils.econstr_to_atomic sigma the_concl |> concl_get_eexists sigma
+    in
+    the_proof_state := NewCofix;
+    handle_proof_state gl
+  with
+  | Mebi_proof_ConclIsNot_Exists _ -> raise (Mebi_proof_NewWeakSim ())
 
 and handle_new_cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =
   do_nothing ()
