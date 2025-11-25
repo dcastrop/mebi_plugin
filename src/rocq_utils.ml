@@ -1,4 +1,18 @@
-type hyp = (EConstr.t, EConstr.t, Evd.erelevance) Context.Named.Declaration.pt
+(** [kind_pair] are the arguments of [AtomicType (ty, tys)] returned by e.g., [EConstr.kind_of_type]
+*)
+type kind_pair = EConstr.t * EConstr.t array
+
+exception
+  Rocq_utils_EConstrIsNot_Atomic of
+    (Evd.evar_map * EConstr.t * EConstr.kind_of_type)
+
+let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t) : kind_pair =
+  match EConstr.kind_of_type sigma x with
+  | AtomicType (ty, tys) -> ty, tys
+  | k -> raise (Rocq_utils_EConstrIsNot_Atomic (sigma, x, k))
+;;
+
+(*****************************************************************************)
 
 type constr_kind =
   ( EConstr.t
@@ -7,6 +21,45 @@ type constr_kind =
     , EConstr.EInstance.t
     , Evd.erelevance )
     Constr.kind_of_term
+
+exception
+  Rocq_utils_EConstrIsNot_App of (Evd.evar_map * EConstr.t * constr_kind)
+
+let econstr_to_app (sigma : Evd.evar_map) (x : EConstr.t) : kind_pair =
+  match EConstr.kind sigma x with
+  | App (ty, tys) -> ty, tys
+  | k -> raise (Rocq_utils_EConstrIsNot_App (sigma, x, k))
+;;
+
+(*****************************************************************************)
+
+type lambda_triple =
+  (Names.Name.t, Evd.erelevance) Context.pbinder_annot * EConstr.t * EConstr.t
+
+exception
+  Rocq_utils_EConstrIsNot_Lambda of (Evd.evar_map * EConstr.t * constr_kind)
+
+let econstr_to_lambda (sigma : Evd.evar_map) (x : EConstr.t) : lambda_triple =
+  match EConstr.kind sigma x with
+  | Lambda (binder, types, constr) -> binder, types, constr
+  | k -> raise (Rocq_utils_EConstrIsNot_App (sigma, x, k))
+;;
+
+(*****************************************************************************)
+
+type hyp = (EConstr.t, EConstr.t, Evd.erelevance) Context.Named.Declaration.pt
+
+exception
+  Rocq_utils_HypIsNot_Atomic of (Evd.evar_map * hyp * EConstr.kind_of_type)
+
+let hyp_to_atomic (sigma : Evd.evar_map) (h : hyp) : kind_pair =
+  let h_ty : EConstr.t = Context.Named.Declaration.get_type h in
+  try econstr_to_atomic sigma h_ty with
+  | Rocq_utils_EConstrIsNot_Atomic (sigma, h_ty, k) ->
+    raise (Rocq_utils_HypIsNot_Atomic (sigma, h, k))
+;;
+
+(*****************************************************************************)
 
 type ind_constr = Constr.rel_context * Constr.t
 type ind_constrs = ind_constr array
