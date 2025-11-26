@@ -111,6 +111,7 @@ module Partition : sig
 end
 
 val partition_to_string : Partition.t -> string
+val get_bisim_states : State.t -> Partition.t -> States.t
 
 module Alphabet : sig
   type elt = Label.t
@@ -250,6 +251,14 @@ module Actions : sig
 end
 
 val actions_to_string : States.t Actions.t -> string
+
+exception Model_Action_HasNoAnnotations of Action.t
+
+val get_shortest_annotation : Action.t -> Note.annotation
+
+exception Model_Action_HasSilentLabel_ButIsSaturated of Action.t
+
+val is_action_annotated : Action.t -> bool
 val is_action_silent : Action.t -> bool
 val get_action_labelled : Label.t -> States.t Actions.t -> Action.t
 val get_action_destinations : States.t Actions.t -> States.t
@@ -323,6 +332,9 @@ val merge_edges
   -> States.t Actions.t Edges.t
   -> States.t Actions.t Edges.t
 
+exception Model_TransitionOptGotoNone of Transition_opt.t
+
+val transition_opt_to_transition : Transition_opt.t -> Transition.t
 val transition_to_action : Transition.t -> Action.t
 val transition_opt_to_action : Transition_opt.t -> Action.t
 val transition_to_edge : Transition.t -> Edge.t

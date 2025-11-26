@@ -3,20 +3,6 @@ open Mebi_wrapper
 open Model
 module Hyp = Mebi_hypothesis
 
-let do_nothing () : unit Proofview.tactic =
-  Log.warning "mebi_proof, case just does nothing";
-  Proofview.tclUNIT ()
-;;
-
-let do_simplify gl : unit Proofview.tactic =
-  Mebi_tactics.simplify_and_subst_all ~gl ()
-;;
-
-let do_rt1n_refl gl =
-  Mebi_theories.tactics
-    [ Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()); do_simplify gl ]
-;;
-
 (***********************************************************************)
 (*** Proof State *******************************************************)
 (***********************************************************************)
@@ -29,6 +15,7 @@ module PState = struct
     | NewTransition of Transition_opt.t
     | GoalTransition of Transition_opt.t
     | ApplyConstructors of applicable_constructors
+    | DetectState
 
   and applicable_constructors =
     { annotation : Note.annotation
@@ -46,6 +33,7 @@ module PState = struct
     | GoalTransition transition ->
       Printf.sprintf "GoalTransition:\n%s" (Transition_opt.to_string transition)
     | ApplyConstructors applicable_constructors -> ""
+    | DetectState -> "DetectState"
   ;;
 end
 
@@ -57,15 +45,142 @@ let reset_the_proof_state () : unit = the_proof_state := default_proof_state
 (*** Bisimilarity Result ***********************************************)
 (***********************************************************************)
 
-let mfsm () : Fsm.t = (Algorithms.Bisimilar.get_the_result ()).the_fsm_1
-let nfsm () : Fsm.t = (Algorithms.Bisimilar.get_the_result ()).the_fsm_2
+let the_result () : Algorithms.Bisimilar.result =
+  Algorithms.Bisimilar.get_the_result ()
+;;
+
+let mfsm () : Fsm.t = (the_result ()).the_fsm_1
+let nfsm () : Fsm.t = (the_result ()).the_fsm_2
+let the_bisim_states () : Partition.t = (the_result ()).bisim_states
 
 (***********************************************************************)
 (*** Proof Tools *******************************************************)
 (***********************************************************************)
 
+exception Mebi_proof_StatesNotBisimilar of (State.t * State.t * Partition.t)
+
+let get_constructor_annotations
+      (gl : Proofview.Goal.t)
+      (mgoto : State.t)
+      (nfrom : State.t)
+      (nlabel : Label.t)
+      (ngoto : State.t)
+  : PState.applicable_constructors
+  =
+  let msimilar : States.t =
+    Model.get_bisim_states mgoto (the_bisim_states ())
+  in
+  if States.mem ngoto msimilar
+  then (
+    let nactions : States.t Actions.t = Edges.find (nfsm ()).edges nfrom in
+    let naction : Action.t = Model.get_action_labelled nlabel nactions in
+    let annotation : Note.annotation = Model.get_shortest_annotation naction in
+    { annotation; tactics = None })
+  else raise (Mebi_proof_StatesNotBisimilar (mgoto, ngoto, the_bisim_states ()))
+;;
+
+(***********************************************************************)
+
+exception
+  Mebi_proof_TyDoesNotMatchTheories of (Evd.evar_map * Rocq_utils.kind_pair)
+
+let do_nothing () : unit Proofview.tactic =
+  Log.warning "mebi_proof, case just does nothing";
+  Proofview.tclUNIT ()
+;;
+
+let do_simplify (gl : Proofview.Goal.t) : unit Proofview.tactic =
+  Mebi_tactics.simplify_and_subst_all ~gl ()
+;;
+
+let do_rt1n_refl (gl : Proofview.Goal.t) : unit Proofview.tactic =
+  Mebi_theories.tactics
+    [ Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()); do_simplify gl ]
+;;
+
+let do_solve_cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =
+  the_proof_state := DetectState;
+  Auto.gen_trivial ~debug:Hints.Info [] None
+;;
+
+let do_weak_silent_transition
+      (gl : Proofview.Goal.t)
+      (from : State.t)
+      (goto : State.t)
+  : unit Proofview.tactic
+  =
+  the_proof_state := NewWeakSim;
+  Mebi_theories.tactics
+    [ Mebi_tactics.apply ~gl (Mebi_theories.c_wk_none ())
+    ; Mebi_tactics.unfold_econstr gl (Mebi_theories.c_silent ())
+    ; (if State.equal from goto
+       then (
+         Log.notice "apply rt1n_refl.";
+         Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()))
+       else (
+         Log.notice "apply rt1n_trans.";
+         Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_trans ())))
+    ]
+;;
+
+let do_weak_visible_transition
+      (gl : Proofview.Goal.t)
+      (mgoto : State.t)
+      (nfrom : State.t)
+      (nlabel : Label.t)
+      (ngoto : State.t)
+  : unit Proofview.tactic
+  =
+  the_proof_state
+  := ApplyConstructors (get_constructor_annotations gl mgoto nfrom nlabel ngoto);
+  Mebi_theories.tactics
+    [ Mebi_tactics.eapply ~gl (Mebi_theories.c_wk_some ())
+    ; Mebi_tactics.unfold_econstr gl (Mebi_theories.c_silent ())
+    ]
+;;
+
+(***********************************************************************)
+
 let try_decode (sigma : Evd.evar_map) (x : EConstr.t) : Enc.t option =
   if EConstr.isRel sigma x then None else get_encoding_opt x
+;;
+
+let typ_is_weak_sim (sigma : Evd.evar_map) ((ty, _) : Rocq_utils.kind_pair)
+  : bool
+  =
+  Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
+;;
+
+let typ_is_weak_transition
+      (sigma : Evd.evar_map)
+      ((ty, _) : Rocq_utils.kind_pair)
+  : bool
+  =
+  Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak ())
+;;
+
+let typ_is_silent_transition
+      (sigma : Evd.evar_map)
+      ((ty, _) : Rocq_utils.kind_pair)
+  : bool
+  =
+  Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_silent ())
+;;
+
+let typ_is_silent1_transition
+      (sigma : Evd.evar_map)
+      ((ty, _) : Rocq_utils.kind_pair)
+  : bool
+  =
+  Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_silent1 ())
+;;
+
+let typ_is_lts_transition
+      (sigma : Evd.evar_map)
+      ((ty, _) : Rocq_utils.kind_pair)
+  : bool
+  =
+  Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_LTS ())
 ;;
 
 (***********************************************************************)
@@ -141,19 +256,45 @@ let get_transition
 let get_lts_transition
       (sigma : Evd.evar_map)
       (fsm : Fsm.t)
-      ((_, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : Rocq_utils.kind_pair)
   : Transition_opt.t
   =
-  get_transition sigma tys.(0) tys.(1) tys.(2) fsm
+  if typ_is_lts_transition sigma (ty, tys)
+  then get_transition sigma tys.(0) tys.(1) tys.(2) fsm
+  else raise (Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)))
 ;;
 
 let get_weak_transition
       (sigma : Evd.evar_map)
       (fsm : Fsm.t)
-      ((_, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : Rocq_utils.kind_pair)
   : Transition_opt.t
   =
-  get_transition sigma tys.(3) tys.(4) tys.(5) fsm
+  if typ_is_weak_transition sigma (ty, tys)
+  then get_transition sigma tys.(3) tys.(4) tys.(5) fsm
+  else raise (Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)))
+;;
+
+let get_silent_transition
+      (sigma : Evd.evar_map)
+      (fsm : Fsm.t)
+      ((ty, tys) : Rocq_utils.kind_pair)
+  : Transition_opt.t
+  =
+  if typ_is_silent_transition sigma (ty, tys)
+  then get_transition sigma tys.(2) tys.(4) tys.(3) fsm
+  else raise (Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)))
+;;
+
+let get_silent1_transition
+      (sigma : Evd.evar_map)
+      (fsm : Fsm.t)
+      ((ty, tys) : Rocq_utils.kind_pair)
+  : Transition_opt.t
+  =
+  if typ_is_silent1_transition sigma (ty, tys)
+  then get_transition sigma tys.(2) tys.(4) tys.(3) fsm
+  else raise (Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)))
 ;;
 
 (***********************************************************************)
@@ -165,7 +306,7 @@ let weak_sim_get_m_state
       ((ty, tys) : Rocq_utils.kind_pair)
   : State.t
   =
-  if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
+  if typ_is_weak_sim sigma (ty, tys)
   then (
     try find_state sigma tys.(0) (mfsm ()).states with
     | Mebi_proof_CouldNotDecodeState (sigma, statety, states) ->
@@ -236,6 +377,8 @@ module TransOpt : Hyp.HYP_TYPE = Hyp.Make (struct
       try get_lts_transition sigma (mfsm ()) (ty, tys) with
       | Mebi_proof_CouldNotDecodeTransition (sigma, x, fsm) ->
         raise (Hyp.Mebi_proof_Hypothesis_HTy (sigma, (ty, tys)))
+      | Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)) ->
+        raise (Hyp.Mebi_proof_Hypothesis_HTy (sigma, (ty, tys)))
     ;;
   end)
 
@@ -258,6 +401,7 @@ let hyp_is_something (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : bool =
   | Rocq_utils.Rocq_utils_HypIsNot_Atomic _ -> false
 ;;
 
+(** is [true] if none of the hyps appear to be mid-way through a proof. *)
 let hyps_is_essentially_empty (gl : Proofview.Goal.t) : bool =
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   Bool.not
@@ -283,48 +427,6 @@ let hyps_is_empty (gl : Proofview.Goal.t) : bool =
    - new weak sim
    - exists n2 *)
 
-(* let hty_to_transition_opt *)
-
-(* let concl_is_new_weak_sim
-   (sigma : Evd.evar_map)
-   ((ty, _) : Rocq_utils.kind_pair)
-   : bool
-   =
-   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
-   ;; *)
-
-(* let concl_is_weak_transition
-   (sigma : Evd.evar_map)
-   ((ty, _) : Rocq_utils.kind_pair)
-   : bool
-   =
-   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak ())
-   ;; *)
-
-(* let concl_is_silent_transition
-   (sigma : Evd.evar_map)
-   ((ty, _) : Rocq_utils.kind_pair)
-   : bool
-   =
-   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_silent ())
-   ;; *)
-
-(* let concl_is_silent1_transition
-   (sigma : Evd.evar_map)
-   ((ty, _) : Rocq_utils.kind_pair)
-   : bool
-   =
-   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_silent1 ())
-   ;; *)
-
-(* let concl_is_lts_transition
-   (sigma : Evd.evar_map)
-   ((ty, _) : Rocq_utils.kind_pair)
-   : bool
-   =
-   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_LTS ())
-   ;; *)
-
 exception Mebi_proof_ConclIsNot_Exists of (Evd.evar_map * Rocq_utils.kind_pair)
 
 let concl_get_eexists (sigma : Evd.evar_map) ((ty, tys) : Rocq_utils.kind_pair)
@@ -349,8 +451,17 @@ let concl_get_eexists (sigma : Evd.evar_map) ((ty, tys) : Rocq_utils.kind_pair)
      | Mebi_proof_CouldNotGetStateM (sigma, (ty, tys)) ->
        raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys)))
      | Rocq_utils.Rocq_utils_EConstrIsNot_Atomic (sigma, x, k) ->
+       raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys)))
+     | Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)) ->
        raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys))))
   | _ -> raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys)))
+;;
+
+let hyps_has_cofix (sigma : Evd.evar_map) (concl : EConstr.t)
+  : Rocq_utils.hyp list -> bool
+  =
+  List.exists (fun (h : Rocq_utils.hyp) ->
+    Mebi_setup.Eq.econstr sigma concl (Context.Named.Declaration.get_type h))
 ;;
 
 (***********************************************************************)
@@ -359,6 +470,9 @@ let concl_get_eexists (sigma : Evd.evar_map) ((ty, tys) : Rocq_utils.kind_pair)
 
 exception Mebi_proof_NewProof of unit
 exception Mebi_proof_NewWeakSim of unit
+exception Mebi_proof_NewTransition of unit
+exception Mebi_proof_GoalTransition of unit
+exception Mebi_proof_ApplyConstructors of unit
 
 (** [handle_new_proof gl] checks if the [hyps] of [gl] are empty before moving to state [NewWeakSim]
 *)
@@ -372,20 +486,29 @@ let rec handle_new_proof (gl : Proofview.Goal.t) : unit Proofview.tactic =
     raise (Mebi_proof_NewProof ()))
 
 and handle_new_weak_sim (gl : Proofview.Goal.t) : unit Proofview.tactic =
-  (* TODO: new_weak_sim > exists *)
-  try
-    (* TODO: new_weak_sim *)
-    (* ... *)
-    (* NOTE: eexists*)
-    let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-    let the_concl : EConstr.t = Proofview.Goal.concl gl in
-    let ntransition, mstate =
-      Rocq_utils.econstr_to_atomic sigma the_concl |> concl_get_eexists sigma
-    in
-    the_proof_state := NewCofix;
-    handle_proof_state gl
-  with
-  | Mebi_proof_ConclIsNot_Exists _ -> raise (Mebi_proof_NewWeakSim ())
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+  let the_concl : EConstr.t = Proofview.Goal.concl gl in
+  let the_hyps : Rocq_utils.hyp list = Proofview.Goal.hyps gl in
+  let concltyp : Rocq_utils.kind_pair =
+    Rocq_utils.econstr_to_atomic sigma the_concl
+  in
+  (* NOTE: if concl is [weak_sim] and hyp has corresponding [cofix] then [auto]. *)
+  if typ_is_weak_sim sigma concltyp && hyps_has_cofix sigma the_concl the_hyps
+  then do_solve_cofix gl
+  (* NOTE: else, we continue *)
+  else (
+    (* TODO: new_weak_sim > exists *)
+    try
+      (* TODO: new_weak_sim *)
+      (* ... *)
+      (* NOTE: eexists*)
+      let ntransition, mstate =
+        Rocq_utils.econstr_to_atomic sigma the_concl |> concl_get_eexists sigma
+      in
+      the_proof_state := NewCofix;
+      handle_proof_state gl
+    with
+    | Mebi_proof_ConclIsNot_Exists _ -> raise (Mebi_proof_NewWeakSim ()))
 
 and handle_new_cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =
   do_nothing ()
@@ -395,21 +518,35 @@ and handle_new_transition
       (mtransition : Transition_opt.t)
   : unit Proofview.tactic
   =
-  do_nothing ()
+  try do_nothing () with _ -> raise (Mebi_proof_NewTransition ())
 
-and handle_goal_transition
-      (gl : Proofview.Goal.t)
-      (mtransition : Transition_opt.t)
+and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition_opt.t)
   : unit Proofview.tactic
   =
-  do_nothing ()
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+  try
+    let { from = nfrom; label = nlabel; goto = ngoto; _ } : Transition_opt.t =
+      Proofview.Goal.concl gl
+      |> Rocq_utils.econstr_to_atomic sigma
+      |> get_weak_transition sigma (nfsm ())
+    in
+    match mtrans.goto, ngoto with
+    | Some _, Some ngoto ->
+      (* ? TODO: check if this should be [mtrans.label] *)
+      if Label.is_silent nlabel
+      then do_weak_silent_transition gl nfrom ngoto
+      else do_weak_visible_transition gl mtrans.from nfrom nlabel ngoto
+    | _, _ -> raise (Mebi_proof_GoalTransition ())
+  with
+  | Mebi_proof_CouldNotDecodeTransition (sigma, x, fsm) ->
+    raise (Mebi_proof_GoalTransition ())
 
 and handle_apply_constructors
       (gl : Proofview.Goal.t)
       (napplicable_constructors : PState.applicable_constructors)
   : unit Proofview.tactic
   =
-  do_nothing ()
+  try do_nothing () with _ -> raise (Mebi_proof_ApplyConstructors ())
 
 and handle_proof_state (gl : Proofview.Goal.t) : unit Proofview.tactic =
   match !the_proof_state with
@@ -420,6 +557,18 @@ and handle_proof_state (gl : Proofview.Goal.t) : unit Proofview.tactic =
   | GoalTransition mtransition -> handle_goal_transition gl mtransition
   | ApplyConstructors napplicable_constructors ->
     handle_apply_constructors gl napplicable_constructors
+  | DetectState -> detect_proof_state gl
+
+and detect_proof_state (gl : Proofview.Goal.t) : unit Proofview.tactic =
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+  let the_concl : EConstr.t = Proofview.Goal.concl gl in
+  let the_hyps : Rocq_utils.hyp list = Proofview.Goal.hyps gl in
+  let concltyp : Rocq_utils.kind_pair =
+    Rocq_utils.econstr_to_atomic sigma the_concl
+  in
+  if typ_is_weak_sim sigma concltyp && hyps_has_cofix sigma the_concl the_hyps
+  then do_solve_cofix gl
+  else do_nothing ()
 ;;
 
 (***********************************************************************)
