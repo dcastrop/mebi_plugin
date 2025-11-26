@@ -780,6 +780,8 @@ let proof_intro
   =
   Log.trace "command.proof_intro";
   Mebi_proof.reset_the_proof_state ();
+  Params.set_fail_if_incomplete true;
+  Params.set_fail_if_not_bisim true;
   let* _ = run (CheckBisimilarity ((x, a), (y, b))) refs in
   Log.debug
     (Printf.sprintf

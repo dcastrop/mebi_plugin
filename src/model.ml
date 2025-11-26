@@ -36,6 +36,10 @@ let partition_to_string (x : Partition.t) : string =
   "TODO: Model.partition_to_string"
 ;;
 
+let get_bisim_states (x : State.t) : Partition.t -> States.t =
+  Partition.find_first (fun (block : States.t) -> States.mem x block)
+;;
+
 (***********************************************************************)
 (*** Alphabet **********************************************************)
 (***********************************************************************)
@@ -92,9 +96,44 @@ let actions_to_string (x : States.t Actions.t) : string =
   "TODO: Model.actions_to_string"
 ;;
 
-(** [is_action_silent x] is an alias for [Label.is_silent x].
-    @return [true] if [x.is_silent] is [Some true], else [false]. *)
-let is_action_silent (x : Action.t) : bool = Label.is_silent x.label
+exception Model_Action_HasNoAnnotations of Action.t
+
+let get_shortest_annotation (x : Action.t) : Note.annotation =
+  match
+    List.fold_left
+      (fun (acc : Note.annotation option) (y : Note.annotation) ->
+        match acc with
+        | None -> Some y
+        | Some z ->
+          (match Int.compare (List.length y) (List.length z) with
+           | -1 -> Some y
+           | _ -> acc))
+      None
+      x.annotations
+  with
+  | Some x -> x
+  | None -> raise (Model_Action_HasNoAnnotations x)
+;;
+
+exception Model_Action_HasSilentLabel_ButIsSaturated of Action.t
+
+let is_action_annotated (x : Action.t) : bool =
+  Note.annotations_is_empty x.annotations
+;;
+
+(** [is_action_silent x] is an alias for [Label.is_silent x.label].
+    @return [true] if [x.is_silent] is [Some true], else [false].
+    @raise Model_Action_HasSilentLabel_ButIsSaturated
+      if [Label.is_silent x] is [true] but [x.annotations] is non-empty (i.e., it has been saturated and is no longer a silent action)
+*)
+let is_action_silent (x : Action.t) : bool =
+  if Label.is_silent x.label
+  then
+    if is_action_annotated x
+    then raise (Model_Action_HasSilentLabel_ButIsSaturated x)
+    else true
+  else false
+;;
 
 (** [get_action_labelled x actions] returns an action in [actions] that has a label matching [x]. (follows [List.find], so throws error if match is not found)
 *)
@@ -295,6 +334,18 @@ let merge_edges
     | Some xactions, Some yactions ->
       merge_actions xactions yactions |> Edges.add edges from);
   edges
+;;
+
+(***********************************************************************)
+(*** Transition_opt -> Transition **************************************)
+(***********************************************************************)
+
+exception Model_TransitionOptGotoNone of Transition_opt.t
+
+let transition_opt_to_transition : Transition_opt.t -> Transition.t = function
+  | { from; label; goto = Some goto; annotations; constructor_trees } ->
+    { from; label; goto; annotations; constructor_trees }
+  | x -> raise (Model_TransitionOptGotoNone x)
 ;;
 
 (***********************************************************************)
