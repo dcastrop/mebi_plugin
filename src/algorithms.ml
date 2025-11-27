@@ -6,6 +6,7 @@ module Minimize = struct
   let add_to_block_option (s : State.t) (block : States.t option)
     : States.t option
     =
+    Logging.Log.trace "Algorithms.Minimize.add_to_block_option";
     Some
       (match block with
        | None -> States.add s States.empty
@@ -19,6 +20,7 @@ module Minimize = struct
         (pi : Partition.t)
     : States.t * States.t option
     =
+    Logging.Log.trace "Algorithms.Minimize.split_block";
     assert (Bool.not (States.is_empty block));
     let edges_of_a : States.t Actions.t Edges.t =
       Model.get_edges_labelled l edges
@@ -26,7 +28,7 @@ module Minimize = struct
     (* NOTE: selects some state [s] from [block] *)
     let s : State.t = States.min_elt block in
     let s_reachable_blocks : Partition.t option =
-      Edges.find edges_of_a s |> Model.get_reachable_partition_opt pi
+      Model.get_reachable_blocks_opt pi edges_of_a s
     in
     (* NOTE: check rest of [block] *)
     States.fold
@@ -35,7 +37,7 @@ module Minimize = struct
         then States.add s b1, b2
         else (
           let t_reachable_blocks : Partition.t option =
-            Edges.find edges_of_a t |> Model.get_reachable_partition_opt pi
+            Model.get_reachable_blocks_opt pi edges_of_a t
           in
           match s_reachable_blocks, t_reachable_blocks with
           | None, None -> States.add t b1, b2
@@ -59,6 +61,7 @@ module Minimize = struct
         (weak : bool)
     : unit
     =
+    Logging.Log.trace "Algorithms.Minimize.iterate";
     Partition.iter
       (fun (b : States.t) ->
         let b = ref b in
@@ -78,6 +81,7 @@ module Minimize = struct
   ;;
 
   let run ?(weak : bool = false) (the_fsm : Fsm.t) : result =
+    Logging.Log.trace "Algorithms.Minimize.run";
     let the_fsm : Fsm.t = if weak then Saturate.fsm the_fsm else the_fsm in
     match the_fsm with
     | { alphabet; states; edges; _ } ->
