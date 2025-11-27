@@ -7,6 +7,7 @@ module Transition_opt = Model_transition_opt
 module Action = Model_action
 module Edge = Model_edge
 module Enc = Mebi_setup.Enc
+module Tree = Mebi_constr.Tree
 
 module States : sig
   type elt = State.t
@@ -57,7 +58,7 @@ module States : sig
   val of_seq : elt Seq.t -> t
 end
 
-val states_to_string : States.t -> string
+val states_to_string : ?args:Utils.Strfy.style_args -> States.t -> string
 val decode_state_opt : Enc.t -> States.t -> State.t option
 val decode_state : Enc.t -> States.t -> State.t
 
@@ -110,7 +111,7 @@ module Partition : sig
   val of_seq : elt Seq.t -> t
 end
 
-val partition_to_string : Partition.t -> string
+val partition_to_string : ?args:Utils.Strfy.style_args -> Partition.t -> string
 val get_bisim_states : State.t -> Partition.t -> States.t
 
 module Alphabet : sig
@@ -256,6 +257,10 @@ exception Model_Action_HasNoAnnotations of Action.t
 
 val get_shortest_annotation : Action.t -> Note.annotation
 
+exception Model_Action_HasNoConstructors of Action.t
+
+val get_shortest_constructor : Action.t -> Tree.node list
+
 exception Model_Action_HasSilentLabel_ButIsSaturated of Action.t
 
 val is_action_annotated : Action.t -> bool
@@ -317,6 +322,12 @@ val get_edges_labelled
   :  Label.t
   -> States.t Actions.t Edges.t
   -> States.t Actions.t Edges.t
+
+val get_reachable_blocks_opt
+  :  Partition.t
+  -> States.t Actions.t Edges.t
+  -> State.t
+  -> Partition.t option
 
 val merge_info_field : 'a list option -> 'a list option -> 'a list option
 val merge_info : Info.t -> Info.t -> Info.t

@@ -2,7 +2,8 @@ open Mebi_setup
 
 module Tree = struct
   type 'a tree = Node of 'a * 'a tree list
-  type t = (Mebi_setup.Enc.t * int) tree
+  type node = Mebi_setup.Enc.t * int
+  type t = node tree
 
   (** [add x y] inserts [x] to be a new leaf of [y], mutually recursive with [add_list x ys] (where [ys] is a list of [t]).
   *)
@@ -50,6 +51,21 @@ module Tree = struct
       | _ :: _, [] -> 1
     in
     tree_compare t1 t2
+  ;;
+
+  (** converts a given tree into a flattened list with the minimal number of constructors to apply
+  *)
+  let rec minimize : t -> node list = function
+    | Node ((enc, index), []) -> [ enc, index ]
+    | Node ((enc, index), h :: tl) ->
+      (enc, index)
+      :: (List.fold_left (fun acc x -> minimize x :: acc) [] tl
+          |> List.fold_left
+               (fun the_min x ->
+                 match Int.compare (List.length x) (List.length the_min) with
+                 | -1 -> x
+                 | _ -> the_min)
+               (minimize h))
   ;;
 
   let to_string ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())

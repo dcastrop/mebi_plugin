@@ -1,19 +1,25 @@
 type t =
   { from : Model_state.t
-  ; via : Model_label.t
+  ; via : Model_label.t (* ; constructors : Mebi_constr.Tree.t list *)
   }
 
 let equal (a : t) (b : t) : bool =
   let f = Model_state.equal in
   let g = Model_label.equal in
+  (* let h = List.for_all (fun (x, y) -> Mebi_constr.Tree.equal x y) in *)
   f a.from b.from && g a.via b.via
 ;;
+
+(* && h (List.combine a.constructors b.constructors) *)
 
 let compare (a : t) (b : t) : int =
   let f = Model_state.compare in
   let g = Model_label.compare in
+  (* let h = List.compare Mebi_constr.Tree.compare in *)
   Int.compare (f a.from b.from) (g a.via b.via)
 ;;
+
+(* |> Int.compare (h a.constructors b.constructors) *)
 
 (***********************************************************************)
 (*** Annotation ********************************************************)
@@ -82,6 +88,12 @@ open Utils.Strfy
 let to_string ?(args : style_args = style_args ()) (x : t) : string =
   let goto : string = Mebi_setup.Enc.to_string x.from.enc in
   let via : string = Mebi_setup.Enc.to_string x.via.enc in
+  (* let constructors : string =
+    Utils.Strfy.list
+      Utils.Strfy.string
+      (List.map Mebi_constr.Tree.to_string x.constructors)
+  in *)
+  (* Printf.sprintf "<State (%s) Via (%s) :: %s>" goto via constructors *)
   Printf.sprintf "<State (%s) Via (%s)>" goto via
 ;;
 

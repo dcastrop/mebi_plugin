@@ -1,3 +1,4 @@
+open Logging
 module Info = Model_info
 module State = Model_state
 module Label = Model_label
@@ -7,6 +8,14 @@ module Transition_opt = Model_transition_opt
 module Action = Model_action
 module Edge = Model_edge
 module Enc = Mebi_setup.Enc
+module Tree = Mebi_constr.Tree
+
+let nest = Utils.Strfy.nest
+
+type style_args = Utils.Strfy.style_args
+
+let style_args = Utils.Strfy.style_args
+let collection_style = Utils.Strfy.collection_style
 
 (***********************************************************************)
 (*** States ************************************************************)
@@ -16,13 +25,21 @@ module States = Set.Make (struct
     include State
   end)
 
-let states_to_string (x : States.t) : string = "TODO: Model.states_to_string"
+let states_to_string
+      ?(args : style_args = style_args ~style:(Some (collection_style List)) ())
+      (x : States.t)
+  : string
+  =
+  States.to_list x |> Utils.Strfy.list ~args:(nest args) State.to_string
+;;
 
 let decode_state_opt (x : Enc.t) : States.t -> State.t option =
+  Log.trace "Model.decode_state_opt";
   States.find_first_opt (fun ({ enc = y; _ } : State.t) -> Enc.equal x y)
 ;;
 
 let decode_state (x : Enc.t) : States.t -> State.t =
+  Log.trace "Model.decode_state";
   States.find_first (fun ({ enc = y; _ } : State.t) -> Enc.equal x y)
 ;;
 
@@ -32,11 +49,16 @@ let decode_state (x : Enc.t) : States.t -> State.t =
 
 module Partition = Set.Make (States)
 
-let partition_to_string (x : Partition.t) : string =
-  "TODO: Model.partition_to_string"
+let partition_to_string
+      ?(args : style_args = style_args ~style:(Some (collection_style List)) ())
+      (x : Partition.t)
+  : string
+  =
+  Partition.to_list x |> Utils.Strfy.list ~args:(nest args) states_to_string
 ;;
 
 let get_bisim_states (x : State.t) : Partition.t -> States.t =
+  Log.trace "Model.get_bisim_states";
   Partition.find_first (fun (block : States.t) -> States.mem x block)
 ;;
 
@@ -53,22 +75,26 @@ let alphabet_to_string (x : Alphabet.t) : string =
 ;;
 
 let find_label_of_enc (x : Enc.t) : Alphabet.t -> Label.t =
+  Log.trace "Model.find_label_of_enc";
   Alphabet.find_first (fun { enc = y; _ } -> Enc.equal x y)
 ;;
 
 let silent_label_opt : Alphabet.t -> Label.t option =
+  Log.trace "Model.silent_label_opt";
   Alphabet.find_first_opt (fun x -> Option.cata (fun y -> y) false x.is_silent)
 ;;
 
 exception Model_Alphabet_SilentLabelNotFound of Alphabet.t
 
 let silent_label (xs : Alphabet.t) : Label.t =
+  Log.trace "Model.silent_label";
   match silent_label_opt xs with
   | None -> raise (Model_Alphabet_SilentLabelNotFound xs)
   | Some x -> x
 ;;
 
 let silent_action (xs : Alphabet.t) : Action.t =
+  Log.trace "Model.silent_action";
   { label = silent_label xs; annotations = []; constructor_trees = [] }
 ;;
 
@@ -99,25 +125,39 @@ let actions_to_string (x : States.t Actions.t) : string =
 exception Model_Action_HasNoAnnotations of Action.t
 
 let get_shortest_annotation (x : Action.t) : Note.annotation =
-  match
+  Log.trace "Model.get_shortest_annotation";
+  match x.annotations with
+  | [] -> raise (Model_Action_HasNoAnnotations x)
+  | h :: tl ->
     List.fold_left
-      (fun (acc : Note.annotation option) (y : Note.annotation) ->
-        match acc with
-        | None -> Some y
-        | Some z ->
-          (match Int.compare (List.length y) (List.length z) with
-           | -1 -> Some y
-           | _ -> acc))
-      None
-      x.annotations
-  with
-  | Some x -> x
-  | None -> raise (Model_Action_HasNoAnnotations x)
+      (fun the_min y ->
+        match Int.compare (List.length y) (List.length the_min) with
+        | -1 -> y
+        | _ -> the_min)
+      h
+      tl
+;;
+
+exception Model_Action_HasNoConstructors of Action.t
+
+let get_shortest_constructor (x : Action.t) : Tree.node list =
+  Log.trace "Model.get_shortest_constructor";
+  match x.constructor_trees with
+  | [] -> raise (Model_Action_HasNoConstructors x)
+  | h :: tl ->
+    List.map Tree.minimize tl
+    |> List.fold_left
+         (fun the_min y ->
+           match Int.compare (List.length y) (List.length the_min) with
+           | -1 -> y
+           | _ -> the_min)
+         (Tree.minimize h)
 ;;
 
 exception Model_Action_HasSilentLabel_ButIsSaturated of Action.t
 
 let is_action_annotated (x : Action.t) : bool =
+  Log.trace "Model.is_action_annotated";
   Note.annotations_is_empty x.annotations
 ;;
 
@@ -127,6 +167,7 @@ let is_action_annotated (x : Action.t) : bool =
       if [Label.is_silent x] is [true] but [x.annotations] is non-empty (i.e., it has been saturated and is no longer a silent action)
 *)
 let is_action_silent (x : Action.t) : bool =
+  Log.trace "Model.is_action_silent";
   if Label.is_silent x.label
   then
     if is_action_annotated x
@@ -261,6 +302,16 @@ let get_edges_labelled (x : Label.t) (edges : States.t Actions.t Edges.t)
   edges'
 ;;
 
+let get_reachable_blocks_opt
+      (pi : Partition.t)
+      (edges : States.t Actions.t Edges.t)
+      (x : State.t)
+  =
+  match Edges.find_opt edges x with
+  | None -> None
+  | Some blocks -> get_reachable_partition_opt pi blocks
+;;
+
 (***********************************************************************)
 (*** Merge *************************************************************)
 (***********************************************************************)
@@ -284,10 +335,7 @@ let merge_action (x : Action.t) (y : Action.t) : Action.t =
   { x with
     annotations = List.merge Note.annotation_compare x.annotations y.annotations
   ; constructor_trees =
-      List.merge
-        Mebi_constr.Tree.compare
-        x.constructor_trees
-        y.constructor_trees
+      List.merge Tree.compare x.constructor_trees y.constructor_trees
   }
 ;;
 
@@ -620,8 +668,9 @@ module Saturate = struct
     | Some n -> StateTracker.replace visited_states s (n + 1)
   ;;
 
-  let check_update_named (x : Action.t) : Action.t option -> Action.t option
-    = function
+  let check_update_named (x : Action.t) : Action.t option -> Action.t option =
+    Log.trace "Model.Saturate.check_update_named";
+    function
     | Some y -> Some y
     | None -> if is_action_silent x then None else Some x
   ;;
@@ -678,6 +727,7 @@ module Saturate = struct
         (acc : (Action.t * States.t) list)
     : (Action.t * States.t) list
     =
+    Log.trace "Model.Saturate.check_actions";
     (* NOTE: flag used to make sure we don't add duplicates to [acc] in the case that multiple named-actions are outgoing from state [from] when a [named] action has already been identified. *)
     let skip : bool ref = ref false in
     Actions.fold
