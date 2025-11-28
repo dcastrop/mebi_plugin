@@ -77,6 +77,9 @@ end
 
 val states_to_string : ?args:style_args -> States.t -> string
 val decode_state_opt : Enc.t -> States.t -> State.t option
+
+exception Model_CannotDecodeState of (Enc.t * States.t)
+
 val decode_state : Enc.t -> States.t -> State.t
 
 module Partition : sig
