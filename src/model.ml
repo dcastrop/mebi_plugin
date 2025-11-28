@@ -41,12 +41,16 @@ let states_to_string ?(args : style_args = style_args ()) (x : States.t)
 
 let decode_state_opt (x : Enc.t) : States.t -> State.t option =
   Log.trace "Model.decode_state_opt";
-  States.find_first_opt (fun ({ enc = y; _ } : State.t) -> Enc.equal x y)
+  States.find_opt { enc = x; pp = None }
 ;;
 
-let decode_state (x : Enc.t) : States.t -> State.t =
+exception Model_CannotDecodeState of (Enc.t * States.t)
+
+let decode_state (x : Enc.t) (states : States.t) : State.t =
   Log.trace "Model.decode_state";
-  States.find_first (fun ({ enc = y; _ } : State.t) -> Enc.equal x y)
+  match decode_state_opt x states with
+  | None -> raise (Model_CannotDecodeState (x, states))
+  | Some state -> state
 ;;
 
 (***********************************************************************)
