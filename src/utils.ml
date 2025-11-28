@@ -8,6 +8,13 @@ let rec split_at i l acc =
   else (match l with [] -> acc, [] | h :: t -> split_at (i - 1) t (h :: acc))
 ;;
 
+(** for chaining comparisons together *)
+let rec compare_chain : int list -> int = function
+  | [] -> 0
+  | 0 :: tl -> compare_chain tl
+  | n :: _ -> n
+;;
+
 (** [strip_snd l] is the list of rhs elements in a list of tuples [l] (typically a [constr]).
 *)
 let rec strip_snd (l : ('a * 'a) list) : 'a list =
@@ -165,10 +172,10 @@ module Strfy = struct
     ; size : bool
     }
 
-  let delimiter : collection_style -> string = function
+  let delimiter (prefix : string) : collection_style -> string = function
     | { delimiter; inline = true; _ } -> collection_delimiter delimiter
     | { delimiter; inline = false; _ } ->
-      Printf.sprintf "\n%s" (collection_delimiter delimiter)
+      Printf.sprintf "\n%s%s" prefix (collection_delimiter delimiter)
   ;;
 
   let marker : collection_style -> string * string = function
@@ -247,13 +254,15 @@ module Strfy = struct
   ;;
 
   let empty_msg : style_args -> string = function
-    | { name = None; _ } -> "empty"
-    | { name = Some name; _ } -> Printf.sprintf "%s: empty" name
+    | { name = None; _ } -> ""
+    | { name = Some ""; _ } -> "(empty)"
+    | { name = Some name; _ } -> Printf.sprintf "(%s: empty)" name
   ;;
 
   let size_msg (size : int) : style_args -> string = function
-    | { name = None; _ } -> Printf.sprintf "Size: %i" size
-    | { name = Some name; _ } -> Printf.sprintf "%s: %i" name size
+    | { name = None; _ } -> ""
+    | { name = Some ""; _ } -> Printf.sprintf "(Size: %i)" size
+    | { name = Some name; _ } -> Printf.sprintf "(%s: %i)" name size
   ;;
 
   let prefix : style_args -> string = function
@@ -289,15 +298,15 @@ module Strfy = struct
     | Some style ->
       let prefix : string = prefix args in
       let ((lhs, rhs) : string * string) = marker style in
-      let delim : string = delimiter style in
+      let delim : string = delimiter prefix style in
       let f : string -> string -> string =
         fun acc a -> Printf.sprintf "%s%s %s" acc delim a
       in
       (match alist with
-       | [] -> Printf.sprintf "%s%s %s (%s)" prefix lhs rhs (empty_msg args)
+       | [] -> Printf.sprintf "%s%s %s %s" prefix lhs rhs (empty_msg args)
        | h :: t ->
          Printf.sprintf
-           "%s%s %s %s (%s)"
+           "%s%s %s %s %s"
            prefix
            lhs
            (List.fold_left f h t)
@@ -351,9 +360,12 @@ module Strfy = struct
 
   let keyval
         (f : ?args:style_args -> 'a -> string)
-        ?(args : style_args = style_args ~style:(Some (keyval_style ())) ())
+        ?(args : style_args = style_args ())
     : string * 'a -> string
     =
+    let args : style_args =
+      { args with style = Some (keyval_style ()); name = None }
+    in
     tuple ~args string f
   ;;
 
@@ -364,7 +376,7 @@ module Strfy = struct
         (alist : 'a list)
     : string
     =
-    wrap args (List.map (fun a -> f ~args:(nest args) a) alist)
+    wrap args (List.map (fun a -> f ~args a) alist)
   ;;
 
   let array
@@ -380,7 +392,6 @@ module Strfy = struct
   let record
         ?(args : style_args =
           style_args ~style:(Some (collection_style Record)) ())
-        ?(args : style_args = style_args ())
         (alist : (string * string) list)
     : string
     =

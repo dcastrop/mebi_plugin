@@ -185,7 +185,7 @@ module Bisimilar = struct
 
   let to_string (r : result) : string =
     Printf.sprintf
-      "\nBisimilar: %b\nBisimilar states: %s\nNon-bisimilar states: %s\n"
+      "Bisimilar:\n%b\nBisimilar states:\n%s\nNon-bisimilar states:\n%s\n"
       (Partition.is_empty r.non_bisim_states)
       (Model.partition_to_string r.bisim_states)
       (Model.partition_to_string r.non_bisim_states)

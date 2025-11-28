@@ -60,7 +60,7 @@ let check_compare
   | x, None, None -> x
   | x, Some y, None -> Int.compare x y
   | x, None, Some z -> Int.compare x z
-  | x, Some y, Some z -> Int.compare x (Int.compare y z)
+  | x, Some y, Some z -> Utils.compare_chain [ x; y; z ]
 ;;
 
 let compare (a : t) (b : t) : int =

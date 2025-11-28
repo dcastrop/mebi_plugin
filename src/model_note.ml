@@ -67,7 +67,7 @@ let annotations_compare (a : annotations) (b : annotations) : int =
 
 let annotations_is_empty : annotations -> bool = function
   | [] -> true
-  | [ x ] -> annotation_is_empty x
+  | [ [] ] -> true
   | _ -> false
 ;;
 

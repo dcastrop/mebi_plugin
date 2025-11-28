@@ -422,6 +422,10 @@ let collect_valid_constructors
       (lts_enc : Enc.t)
   : Constructors.t mm
   =
+  Logging.Log.debug
+    (Printf.sprintf
+       "mebi_unify.collect_valid_constructors, from: %s"
+       (Mebi_wrapper.econstr_to_string from_term));
   let* fresh_evar = get_fresh_evar (Rocq_utils.OfType label_type) in
   let* constructors : Constructors.t =
     check_valid_constructors transitions indmap from_term fresh_evar lts_enc

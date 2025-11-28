@@ -17,21 +17,28 @@ let equal (a : t) (b : t) : bool =
 ;;
 
 let compare (a : t) (b : t) : int =
-  Int.compare
-    (Model_state.compare a.from b.from)
-    (Int.compare
-       (Model_label.compare a.label b.label)
-       (Int.compare
-          (Model_state.compare a.goto b.goto)
-          (Option.compare
-             (List.compare Mebi_constr.Tree.compare)
-             a.constructor_trees
-             b.constructor_trees)))
+  Utils.compare_chain
+    [ Model_state.compare a.from b.from
+    ; Model_label.compare a.label b.label
+    ; Model_state.compare a.goto b.goto
+    ; Option.compare
+        (List.compare Mebi_constr.Tree.compare)
+        a.constructor_trees
+        b.constructor_trees
+    ]
 ;;
 
 open Utils.Strfy
 
-let to_string ?(args : style_args = record_args ()) (x : t) : string =
+let to_string ?(args : style_args = style_args ()) (x : t) : string =
+  let args : style_args =
+    { args with
+      name = None
+    ; style = Some { (record_style ()) with inline = true }
+    ; newline = false
+    ; nested = false
+    }
+  in
   let from : string = Model_state.to_string ~args:(nest args) x.from in
   let label : string = Model_label.to_string ~args:(nest args) x.label in
   let goto : string = Model_state.to_string ~args:(nest args) x.goto in
@@ -48,7 +55,7 @@ let to_string ?(args : style_args = record_args ()) (x : t) : string =
       x.annotations
   in
   record
-    ~args
+    ~args:{ args with newline = true }
     [ "from", from
     ; "label", label
     ; "goto", goto
