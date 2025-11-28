@@ -11,11 +11,11 @@ let equal (a : t) (b : t) : bool =
 ;;
 
 let compare (a : t) (b : t) : int =
-  Int.compare
-    (Model_state.compare a.from b.from)
-    (Int.compare
-       (Model_action.compare a.action b.action)
-       (Model_state.compare a.goto b.goto))
+  Utils.compare_chain
+    [ Model_state.compare a.from b.from
+    ; Model_action.compare a.action b.action
+    ; Model_state.compare a.goto b.goto
+    ]
 ;;
 
 open Utils.Strfy

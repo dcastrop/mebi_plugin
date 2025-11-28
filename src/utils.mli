@@ -1,5 +1,6 @@
 val swap : 'a * 'b -> 'b * 'a
 val split_at : int -> 'a list -> 'a list -> 'a list * 'a list
+val compare_chain : int list -> int
 val strip_snd : ('a * 'a) list -> 'a list
 val is_unit_option : unit option -> bool
 val bool_opt_to_string : string -> bool option -> string
@@ -13,10 +14,10 @@ val prefix : string -> string
 val suffix : string -> string
 val get_key_of_val : ('a, 'b) Hashtbl.t -> 'b -> 'a option
 
-val new_int_counter :
-  ?start:int ->
-  unit ->
-  ((unit -> int) * (unit -> int)) * int ref
+val new_int_counter
+  :  ?start:int
+  -> unit
+  -> ((unit -> int) * (unit -> int)) * int ref
 
 module Strfy : sig
   type collection_delimiter =
@@ -37,14 +38,14 @@ module Strfy : sig
 
   val collection_marker : collection_marker -> string * string
 
-  type collection_style = {
-    marker : collection_marker;
-    delimiter : collection_delimiter;
-    inline : bool;
-    size : bool;
-  }
+  type collection_style =
+    { marker : collection_marker
+    ; delimiter : collection_delimiter
+    ; inline : bool
+    ; size : bool
+    }
 
-  val delimiter : collection_style -> string
+  val delimiter : string -> collection_style -> string
   val marker : collection_style -> string * string
 
   type collection_kind =
@@ -60,22 +61,22 @@ module Strfy : sig
   val keyval_style : unit -> collection_style
   val inline_tuple_style : unit -> collection_style
 
-  type style_args = {
-    mutable indent : int;
-    mutable newline : bool;
-    mutable nested : bool;
-    name : string option;
-    style : collection_style option;
-  }
+  type style_args =
+    { mutable indent : int
+    ; mutable newline : bool
+    ; mutable nested : bool
+    ; name : string option
+    ; style : collection_style option
+    }
 
-  val style_args :
-    ?indent:int ->
-    ?newline:bool ->
-    ?nested:bool ->
-    ?name:string ->
-    ?style:collection_style option ->
-    unit ->
-    style_args
+  val style_args
+    :  ?indent:int
+    -> ?newline:bool
+    -> ?nested:bool
+    -> ?name:string
+    -> ?style:collection_style option
+    -> unit
+    -> style_args
 
   val record_args : unit -> style_args
   val nlindent : int -> string
@@ -92,47 +93,43 @@ module Strfy : sig
   val int : ?args:style_args -> int -> string
   val bool : ?args:style_args -> bool -> string
 
-  val option :
-    (?args:style_args -> 'a -> string) ->
-    ?args:style_args ->
-    'a option ->
-    string
+  val option
+    :  (?args:style_args -> 'a -> string)
+    -> ?args:style_args
+    -> 'a option
+    -> string
 
-  val tuple :
-    (?args:style_args -> 'a -> string) ->
-    (?args:style_args -> 'b -> string) ->
-    ?args:style_args ->
-    'a * 'b ->
-    string
+  val tuple
+    :  (?args:style_args -> 'a -> string)
+    -> (?args:style_args -> 'b -> string)
+    -> ?args:style_args
+    -> 'a * 'b
+    -> string
 
-  val inline_tuple :
-    (?args:style_args -> 'a -> string) ->
-    (?args:style_args -> 'b -> string) ->
-    ?args:style_args ->
-    'a * 'b ->
-    string
+  val inline_tuple
+    :  (?args:style_args -> 'a -> string)
+    -> (?args:style_args -> 'b -> string)
+    -> ?args:style_args
+    -> 'a * 'b
+    -> string
 
-  val keyval :
-    (?args:style_args -> 'a -> string) ->
-    ?args:style_args ->
-    string * 'a ->
-    string
+  val keyval
+    :  (?args:style_args -> 'a -> string)
+    -> ?args:style_args
+    -> string * 'a
+    -> string
 
-  val list :
-    (?args:style_args -> 'a -> string) ->
-    ?args:style_args ->
-    'a list ->
-    string
+  val list
+    :  (?args:style_args -> 'a -> string)
+    -> ?args:style_args
+    -> 'a list
+    -> string
 
-  val array :
-    (?args:style_args -> 'a -> string) ->
-    ?args:style_args ->
-    'a array ->
-    string
+  val array
+    :  (?args:style_args -> 'a -> string)
+    -> ?args:style_args
+    -> 'a array
+    -> string
 
-  val record :
-    ?args:style_args ->
-    ?args:style_args ->
-    (string * string) list ->
-    string
+  val record : ?args:style_args -> (string * string) list -> string
 end

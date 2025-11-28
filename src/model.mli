@@ -9,6 +9,23 @@ module Edge = Model_edge
 module Enc = Mebi_setup.Enc
 module Tree = Mebi_constr.Tree
 
+val nest : Utils.Strfy.style_args -> Utils.Strfy.style_args
+
+type style_args = Utils.Strfy.style_args
+
+val style_args
+  :  ?indent:int
+  -> ?newline:bool
+  -> ?nested:bool
+  -> ?name:string
+  -> ?style:Utils.Strfy.collection_style option
+  -> unit
+  -> Utils.Strfy.style_args
+
+val collection_style
+  :  Utils.Strfy.collection_kind
+  -> Utils.Strfy.collection_style
+
 module States : sig
   type elt = State.t
   type t
@@ -58,7 +75,7 @@ module States : sig
   val of_seq : elt Seq.t -> t
 end
 
-val states_to_string : ?args:Utils.Strfy.style_args -> States.t -> string
+val states_to_string : ?args:style_args -> States.t -> string
 val decode_state_opt : Enc.t -> States.t -> State.t option
 val decode_state : Enc.t -> States.t -> State.t
 
@@ -111,7 +128,7 @@ module Partition : sig
   val of_seq : elt Seq.t -> t
 end
 
-val partition_to_string : ?args:Utils.Strfy.style_args -> Partition.t -> string
+val partition_to_string : ?args:style_args -> Partition.t -> string
 val get_bisim_states : State.t -> Partition.t -> States.t
 
 module Alphabet : sig
@@ -163,7 +180,7 @@ module Alphabet : sig
   val of_seq : elt Seq.t -> t
 end
 
-val alphabet_to_string : Alphabet.t -> string
+val alphabet_to_string : ?args:style_args -> Alphabet.t -> string
 val find_label_of_enc : Enc.t -> Alphabet.t -> Label.t
 val silent_label_opt : Alphabet.t -> Label.t option
 
@@ -221,7 +238,7 @@ module Transitions : sig
   val of_seq : elt Seq.t -> t
 end
 
-val transition_to_string : Transitions.t -> string
+val transitions_to_string : ?args:style_args -> Transitions.t -> string
 
 module Actions : sig
   type key = Action.t
@@ -251,7 +268,7 @@ module Actions : sig
   val of_seq : (key * 'a) Seq.t -> 'a t
 end
 
-val actions_to_string : States.t Actions.t -> string
+val actions_to_string : ?args:style_args -> States.t Actions.t -> string
 
 exception Model_Action_HasNoAnnotations of Action.t
 
@@ -306,8 +323,6 @@ module Edges : sig
   val of_seq : (key * 'a) Seq.t -> 'a t
 end
 
-val edges_to_string : States.t Actions.t Edges.t -> string
-
 val update_edge
   :  States.t Actions.t Edges.t
   -> State.t
@@ -328,20 +343,6 @@ val get_reachable_blocks_opt
   -> States.t Actions.t Edges.t
   -> State.t
   -> Partition.t option
-
-val merge_info_field : 'a list option -> 'a list option -> 'a list option
-val merge_info : Info.t -> Info.t -> Info.t
-val merge_action : Action.t -> Action.t -> Action.t
-
-val merge_actions
-  :  States.t Actions.t
-  -> States.t Actions.t
-  -> States.t Actions.t
-
-val merge_edges
-  :  States.t Actions.t Edges.t
-  -> States.t Actions.t Edges.t
-  -> States.t Actions.t Edges.t
 
 exception Model_TransitionOptGotoNone of Transition_opt.t
 
@@ -366,6 +367,20 @@ val actions_to_transitions
 
 val edges_to_transitions : States.t Actions.t Edges.t -> Transitions.t
 val transitions_to_edges : Transitions.t -> States.t Actions.t Edges.t
+val edges_to_string : ?args:style_args -> States.t Actions.t Edges.t -> string
+val merge_info_field : 'a list option -> 'a list option -> 'a list option
+val merge_info : Info.t -> Info.t -> Info.t
+val merge_action : Action.t -> Action.t -> Action.t
+
+val merge_actions
+  :  States.t Actions.t
+  -> States.t Actions.t
+  -> States.t Actions.t
+
+val merge_edges
+  :  States.t Actions.t Edges.t
+  -> States.t Actions.t Edges.t
+  -> States.t Actions.t Edges.t
 
 type kind =
   | LTS of
@@ -395,7 +410,7 @@ module Lts : sig
 
   val to_model : t -> kind
   val of_model : kind -> t
-  val to_string : ?args:Utils.Strfy.style_args -> t -> string
+  val to_string : ?args:style_args -> t -> string
 end
 
 module Fsm : sig
@@ -419,7 +434,7 @@ module Fsm : sig
 
   val origin_of_state_opt : State.t -> t -> t -> int option
   val origin_of_state : State.t -> t -> t -> int
-  val to_string : ?args:Utils.Strfy.style_args -> t -> string
+  val to_string : ?args:style_args -> t -> string
 end
 
 module Saturate : sig

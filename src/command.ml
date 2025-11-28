@@ -54,7 +54,6 @@ module type GraphB = sig
 
   val decoq_lts
     :  ?cache_decoding:bool
-    -> ?name:string
     -> lts_graph (* -> cindef * cindef B.t *)
     -> int * Params.WeakEnc.t option
     -> Lts.t mm
@@ -80,6 +79,44 @@ module MkGraph
   (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Mebi_constr.Tree.t].
   *)
   type constr_transitions = (Action.t, D.t) Hashtbl.t
+
+  let constr_transitions_to_string
+        ?(args : style_args = Utils.Strfy.style_args ())
+        (xs : constr_transitions)
+    : string
+    =
+    let open Utils.Strfy in
+    list
+      ~args:{ args with name = Some "constr_transitions" }
+      (tuple
+         Action.to_string
+         (fun
+             ?(args : style_args = record_args ()) (destination_tuples : D.t) ->
+         list
+           (tuple
+              (fun ?(args : style_args = record_args ()) x -> Enc.to_string x)
+              Mebi_constr.Tree.to_string)
+           (D.to_list destination_tuples)))
+      (List.combine
+         (Hashtbl.to_seq_keys xs |> List.of_seq)
+         (Hashtbl.to_seq_values xs |> List.of_seq))
+  ;;
+
+  let transitions_to_string
+        ?(args : style_args = Utils.Strfy.style_args ())
+        (xs : constr_transitions M.t)
+    : string
+    =
+    let open Utils.Strfy in
+    list
+      ~args:{ args with name = Some "transitions" }
+      (tuple
+         (fun ?(args : style_args = record_args ()) x -> Enc.to_string x)
+         constr_transitions_to_string)
+      (List.combine
+         (M.to_seq_keys xs |> List.of_seq)
+         (M.to_seq_values xs |> List.of_seq))
+  ;;
 
   (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Mebi_constr.Tree.t].
   *)
@@ -175,7 +212,10 @@ module MkGraph
         (ctors : Mebi_constr.t list)
     : S.t mm
     =
-    Log.trace "command.MkGraph.get_new_states";
+    Log.trace
+      (Printf.sprintf
+         "command.MkGraph.get_new_states, from: %s"
+         (Enc.to_string from));
     let iter_body (i : int) (new_states : S.t) =
       let (act, tgt, int_tree) : Mebi_constr.t = List.nth ctors i in
       let* tgt_enc : Enc.t = encode tgt in
@@ -184,12 +224,30 @@ module MkGraph
       let label : Label.t = { enc = act_enc; is_silent; pp = None } in
       let constructor_trees : Mebi_constr.Tree.t list = [ int_tree ] in
       let to_add : Action.t = { label; constructor_trees; annotations = [] } in
+      Logging.Log.debug
+        (Printf.sprintf
+           "get_new_states, A transitions:\n%s"
+           (transitions_to_string g.transitions));
       let* _ =
         match H.find_opt g.transitions from with
-        | None -> add_new_term_constr_transition g from to_add tgt_enc int_tree
+        | None ->
+          Log.debug
+            (Printf.sprintf
+               "get_new_states.H.find_opt g.transitions from -> None: %s"
+               (Enc.to_string from));
+          add_new_term_constr_transition g from to_add tgt_enc int_tree
         | Some actions ->
+          Log.debug
+            (Printf.sprintf
+               "get_new_states.H.find_opt g.transitions from -> Some actions: \
+                %s"
+               (Enc.to_string from));
           insert_constr_transition actions to_add tgt_enc int_tree
       in
+      Logging.Log.debug
+        (Printf.sprintf
+           "get_new_states, B transitions:\n%s"
+           (transitions_to_string g.transitions));
       (* NOTE: if [tgt] has not been explored then add [to_visit] *)
       if H.mem g.transitions tgt_enc || S.mem tgt_enc g.states
       then ()
@@ -405,21 +463,27 @@ module MkGraph
     : Transitions.t mm
     =
     if D.is_empty dests
-    then return Transitions.empty
+    then (
+      Logging.Log.debug
+        (Printf.sprintf
+           "decoq_destinations, empty from: %s"
+           (State.to_string from));
+      return Transitions.empty)
     else (
       let raw_dests = D.to_list dests in
       let iter_dests (i : int) (acc_trans : Transitions.t) : Transitions.t mm =
         let dest, constr_tree = List.nth raw_dests i in
-        let* dest = decoq_state ~cache_decoding dest in
+        let* goto : State.t = decoq_state ~cache_decoding dest in
         let new_trans : Transition.t =
           { from
           ; label = action.label
-          ; goto = dest
+          ; goto
           ; constructor_trees = Some action.constructor_trees
           ; annotations = None
           }
         in
-        return (Transitions.add new_trans acc_trans)
+        let acc_trans : Transitions.t = Transitions.add new_trans acc_trans in
+        return acc_trans
       in
       iterate 0 (List.length raw_dests - 1) acc_trans iter_dests)
   ;;
@@ -432,7 +496,10 @@ module MkGraph
     : (Alphabet.t * Transitions.t) mm
     =
     if Int.equal 0 (Hashtbl.length actions)
-    then return (Alphabet.empty, Transitions.empty)
+    then (
+      Logging.Log.debug
+        (Printf.sprintf "decoq_actions, empty from: %s" (State.to_string from));
+      return (Alphabet.empty, Transitions.empty))
     else (
       let raw_actions = List.of_seq (Hashtbl.to_seq actions) in
       let iter_actions
@@ -441,9 +508,9 @@ module MkGraph
         : (Alphabet.t * Transitions.t) mm
         =
         let action, dests = List.nth raw_actions i in
-        let* action = decoq_action ~cache_decoding action in
-        let acc_alpha = Alphabet.add action.label acc_alpha in
-        let* acc_trans =
+        let* action : Action.t = decoq_action ~cache_decoding action in
+        let acc_alpha : Alphabet.t = Alphabet.add action.label acc_alpha in
+        let* acc_trans : Transitions.t =
           decoq_destinations ~cache_decoding acc_trans from action dests
         in
         return (acc_alpha, acc_trans)
@@ -459,12 +526,12 @@ module MkGraph
     if Int.equal 0 (H.length transitions)
     then return (Alphabet.empty, Transitions.empty)
     else (
-      let raw_transitions = List.of_seq (H.to_seq transitions) in
+      let raw_transitions = H.to_seq transitions |> List.of_seq in
       let iter_from (i : int) (acc : Alphabet.t * Transitions.t)
         : (Alphabet.t * Transitions.t) mm
         =
         let from, actions = List.nth raw_transitions i in
-        let* from = decoq_state ~cache_decoding from in
+        let* from : State.t = decoq_state ~cache_decoding from in
         decoq_actions ~cache_decoding acc from actions
       in
       iterate
@@ -511,7 +578,6 @@ module MkGraph
 
   let decoq_lts
         ?(cache_decoding : bool = false)
-        ?(name : string = "unnamed")
         (g : lts_graph)
         ((bound, weak_type) : int * Params.WeakEnc.t option)
     : Lts.t mm
@@ -573,9 +639,7 @@ let build_lts_graph
       (Mebi_utils.ref_list_to_glob_list (primary_lts :: refs))
       params
   in
-  let* the_lts =
-    G.decoq_lts ~cache_decoding:true ~name:"TODO: fix name" graph_lts params
-  in
+  let* the_lts = G.decoq_lts ~cache_decoding:true graph_lts params in
   (* Log.debug (Printf.sprintf "build_lts_graph, finished:\n%s" (Lts.pstr the_lts)); *)
   if
     !Params.the_fail_if_incomplete
@@ -596,9 +660,11 @@ let build_fsm
   let* the_lts =
     build_lts_graph primary_lts t (Params.get_fst_params ()) refs
   in
+  Log.details
+    (Printf.sprintf "command.build_fsm, lts:\n%s\n" (Lts.to_string the_lts));
   let the_fsm = Fsm.of_model (Lts.to_model the_lts) in
   Log.details
-    (Printf.sprintf "command.build_fsm:\n%s\n" (Fsm.to_string the_fsm));
+    (Printf.sprintf "command.build_fsm, fsm:\n%s\n" (Fsm.to_string the_fsm));
   if minimize
   then (
     let the_minimized_fsm, _bisim_states =
@@ -738,11 +804,11 @@ let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
   Algorithms.Bisimilar.set_the_result the_bisimilar;
   Log.result
     (Printf.sprintf
-       "command.run, CheckBisimilarity, finished: %s\n"
+       "command.run, CheckBisimilarity, finished:\n%s\n"
        (Algorithms.Bisimilar.to_string the_bisimilar));
   Log.details
     (Printf.sprintf
-       "command.run, CheckBisimilarity, saturated:\nFSM 1: %s\n\nFSM 2: %s\n"
+       "command.run, CheckBisimilarity, saturated:\nFSM 1:\n%s\n\nFSM 2:\n%s\n"
        (Fsm.to_string the_bisimilar.the_fsm_1)
        (Fsm.to_string the_bisimilar.the_fsm_2));
   if

@@ -14,7 +14,15 @@ let hash (x : t) = Mebi_setup.Enc.hash x.enc
 
 open Utils.Strfy
 
-let to_string ?(args : style_args = record_args ()) (x : t) : string =
+let to_string ?(args : style_args = style_args ()) (x : t) : string =
+  let args : style_args =
+    { args with
+      name = None
+    ; style = Some { (collection_style Tuple) with inline = true }
+    ; newline = false
+    ; nested = false
+    }
+  in
   let enc : string = Mebi_setup.Enc.to_string x.enc in
   let open Utils.Strfy in
   let is_silent : string option =

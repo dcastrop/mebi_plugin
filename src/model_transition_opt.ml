@@ -34,16 +34,15 @@ let equal (a : t) (b : t) : bool =
 ;;
 
 let compare (a : t) (b : t) : int =
-  Int.compare
-    (Model_state.compare a.from b.from)
-    (Int.compare
-       (Model_label.compare a.label b.label)
-       (Int.compare
-          (Option.compare Model_state.compare a.goto b.goto)
-          (Option.compare
-             (List.compare Mebi_constr.Tree.compare)
-             a.constructor_trees
-             b.constructor_trees)))
+  Utils.compare_chain
+    [ Model_state.compare a.from b.from
+    ; Model_label.compare a.label b.label
+    ; Option.compare Model_state.compare a.goto b.goto
+    ; Option.compare
+        (List.compare Mebi_constr.Tree.compare)
+        a.constructor_trees
+        b.constructor_trees
+    ]
 ;;
 
 open Utils.Strfy
