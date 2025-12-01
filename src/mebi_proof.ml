@@ -183,22 +183,26 @@ let _warn_model_action_hasnoannotations (naction : Action.t) : unit =
 exception Mebi_proof_StatesNotBisimilar of (State.t * State.t * Partition.t)
 
 let are_states_bisimilar (m : State.t) (n : State.t) : bool =
+  Log.trace "Mebi_proof.are_states_bisimilar";
   Model.get_bisim_states m (the_bisim_states ()) |> States.mem n
 ;;
 
 let get_naction (nfrom : State.t) (nlabel : Label.t) : Action.t =
+  Log.trace "Mebi_proof.get_naction";
   Edges.find (nfsm ()).edges nfrom |> Model.get_action_labelled nlabel
 ;;
 
 let get_constructor_annotation (nfrom : State.t) (nlabel : Label.t)
   : Note.annotation
   =
+  Log.trace "Mebi_proof.get_constructor_annotation";
   get_naction nfrom nlabel |> Model.get_shortest_annotation nfrom
 ;;
 
 let get_annotation_constructor (nfrom : State.t) (nlabel : Label.t)
   : Tree.node list
   =
+  Log.trace "Mebi_proof.get_annotation_constructor";
   get_naction nfrom nlabel |> Model.get_shortest_constructor
 ;;
 
@@ -543,12 +547,29 @@ let get_transition
   try
     let states : States.t = fsm.states in
     let labels : Alphabet.t = fsm.alphabet in
+    Log.debug "A";
     let from : State.t = find_state sigma fromty states in
+    Log.debug (Printf.sprintf "From: %s" (State.to_string from));
     let label : Label.t = find_label sigma labelty labels in
+    Log.debug (Printf.sprintf "Label: %s" (Label.to_string label));
     let goto : State.t option = try_find_state sigma gototy states in
+    Log.debug
+      (Printf.sprintf
+         "Goto: %s"
+         (Option.cata (fun x -> State.to_string x) "None" goto));
+    Actions.iter
+      (fun x y ->
+        Log.debug
+          (Printf.sprintf
+             "Action:\n%s\nGoto:\n%s"
+             (Action.to_string x)
+             (states_to_string y)))
+      (Edges.find fsm.edges from);
     let { annotations; constructor_trees; _ } : Action.t =
+      (* TODO: [get_action_labelled] does not take into account saturated actions? Or, perhaps the saturated action label isnt updated (and maybe annotations not correctly updated?) *)
       get_action_labelled label (Edges.find fsm.edges from)
     in
+    Log.debug "F";
     Transition_opt.create from label goto annotations constructor_trees
   with
   | Mebi_proof_CouldNotDecodeState (sigma, ty, states) ->

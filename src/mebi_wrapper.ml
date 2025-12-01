@@ -803,12 +803,14 @@ let get_encoding (x : EConstr.t) : Enc.t =
 (** [encoding_opt x] retrieves the encoding [y] of [x] from the [!st.fwd_enc] map and returns [Some y] if it exists, otherwise [None].
 *)
 let encoding_opt (x : EConstr.t) : Enc.t option mm =
+  Log.trace "Mebi_wrapper.encoding_opt";
   fun (st : wrapper ref) ->
-  let e_opt : Enc.t option = F.find_opt !st.fwd_enc x in
-  { state = st; value = e_opt }
+    let e_opt : Enc.t option = F.find_opt !st.fwd_enc x in
+    { state = st; value = e_opt }
 ;;
 
 let get_encoding_opt (x : EConstr.t) : Enc.t option =
+  Log.trace "Mebi_wrapper.get_encoding_opt";
   run ~keep_encoding:true ~fresh:false (encoding_opt x)
 ;;
 
