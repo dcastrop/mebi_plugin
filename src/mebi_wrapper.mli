@@ -6,6 +6,7 @@ type fwdmap = Enc.t F.t
 type bckmap = Evd.econstr B.t
 
 val the_enc_maps_cache : (fwdmap * bckmap) ref option ref
+val reset_enc_maps : unit -> (fwdmap * bckmap) ref
 val get_the_enc_maps : ?keep_encoding:bool -> unit -> (fwdmap * bckmap) ref
 
 type wrapper =
@@ -59,9 +60,19 @@ end
 
 module Syntax : MEBI_MONAD_SYNTAX
 
-val wrap : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
+val mebi_to_string
+  :  (Environ.env
+      -> Evd.evar_map
+      -> ?args:Utils.Strfy.style_args
+      -> 'a
+      -> string)
+  -> ?args:Utils.Strfy.style_args
+  -> 'a
+  -> string
+
 val constr_to_string : Constr.t -> string
 val econstr_to_string : Evd.econstr -> string
+val enc_to_string : ?args:Utils.Strfy.style_args -> Enc.t -> string
 
 module type ERROR_TYPE = sig
   type mebi_error =
@@ -201,25 +212,25 @@ val invalid_cindef_kind : 'b -> 'a mm
 val unknown_term_type : Evd.econstr * Evd.econstr * Evd.econstr list -> 'a mm
 val primary_lts_not_found : Evd.econstr * Evd.econstr list -> 'a mm
 val encode : Evd.econstr -> Enc.t mm
+val encoding : Evd.econstr -> Enc.t mm
+val has_encoding : Evd.econstr -> bool
+val get_encoding : Evd.econstr -> Enc.t
+val encoding_opt : Evd.econstr -> Enc.t option mm
+val get_encoding_opt : Evd.econstr -> Enc.t option
 val decode : Enc.t -> Evd.econstr mm
-val decode_to_string : Enc.t -> string
-val get_encoding_opt : Evd.econstr -> Enc.t option mm
-val get_decoding_opt : Enc.t -> Evd.econstr option mm
-val get_encoding : Evd.econstr -> Enc.t mm
-val get_decoding : Enc.t -> Evd.econstr mm
-val has_encoding : Evd.econstr -> bool mm
-val has_decoding : Enc.t -> bool mm
+val decoding : Enc.t -> Evd.econstr mm
+val has_decoding : Enc.t -> bool
+val get_decoding : Enc.t -> Evd.econstr
+val decoding_opt : Enc.t -> Evd.econstr option mm
+val get_decoding_opt : Enc.t -> Evd.econstr option
 val encode_map : 'a F.t -> 'a B.t mm
 val decode_map : 'a B.t -> 'a F.t mm
 
 type decoded_tree = (string * int) Mebi_constr.Tree.tree
 
 val decode_constr_tree_lts : Mebi_constr.Tree.t -> decoded_tree mm
-val pstr_decoded_tree : decoded_tree -> string
 val debug : (Environ.env -> Evd.evar_map -> Pp.t) -> unit mm
 val debug_str : (Environ.env -> Evd.evar_map -> string) -> string mm
-val show_fwd_map : unit -> unit
-val show_bck_map : unit -> unit
 
 val make_transition_tbl
   :  wrapper ref

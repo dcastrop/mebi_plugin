@@ -17,7 +17,7 @@ module type ENCODING_TYPE = sig
   (* val next : t -> t *)
   (* val get_next : unit -> t *)
   val reset : unit -> unit
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
   val compare : t -> t -> int
   val hash : t -> int
   val to_string : t -> string
@@ -42,7 +42,7 @@ module type S = sig
 
   val init : t
   val next : t -> t
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
   val compare : t -> t -> int
   val hash : t -> int
   val to_string : t -> string
@@ -63,10 +63,7 @@ module Make (Enc : S) : ENCODING_TYPE = struct
   let reset () = cache := init
 
   module B : Hashtbl.S with type key = t = Hashtbl.Make (struct
-      type t = Enc.t
-
-      let equal a b = eq a b
-      let hash x = Enc.hash x
+      include Enc
     end)
 
   let encode (fwd : t F.t) (bck : EConstr.t B.t) (k : EConstr.t) : t =

@@ -72,15 +72,13 @@ module FwdMap : Hashtbl.S with type key = EConstr.t = Hashtbl.Make (struct
 (********************************************)
 
 module IntEncoding : Mebi_enc.S = struct
+  include Int
   module F = FwdMap
 
   type t = int
 
   let init : t = 0
   let next : t -> t = fun x -> x + 1
-  let eq : t -> t -> bool = Int.equal
-  let compare : t -> t -> int = Int.compare
-  let hash : t -> int = Int.hash
   let to_string : t -> string = Printf.sprintf "%i"
 end
 
@@ -91,7 +89,7 @@ module Enc = Mebi_enc.Make (IntEncoding)
 (********************************************)
 
 module Eq = struct
-  let enc = Enc.eq
+  let enc = Enc.equal
   let econstr sigma = EConstr.eq_constr sigma
   let constr = Constr.equal
 end

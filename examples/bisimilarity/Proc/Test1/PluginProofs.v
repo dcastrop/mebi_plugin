@@ -33,7 +33,7 @@ MeBi Set ShowAny      True.
 MeBi Set ShowNotices  True.
 MeBi Set ShowDebug    True.
 MeBi Set ShowDetails  True.
-MeBi Set ShowDetails  False.
+MeBi Set ShowDetails  True.
 MeBi Set ShowResults  True.
 MeBi Set ShowWarnings True.
 (* MeBi Set Bound 100. *)
@@ -55,19 +55,29 @@ Proof.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
+  (* apply wk_none. *)
+  (* unfold silent.  *)
+  (* eapply rt1n_trans. *)
+  (* constructor. simpl. *)
+  (* apply rt1n_refl. *)
+  
+  MeBiSim Step.
+  MeBiSim Step.
+  (* constructor. simpl. *)
+  (* constructor 5. *)
+  MeBiSim Step.
+  (* appl *)
+
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
   (* MeBiSim Step. *)
   (* info_eauto. *)
   (* MeBiSim Step. *)

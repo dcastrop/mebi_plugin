@@ -318,9 +318,9 @@ module WeakEnc = struct
   let eq x y : bool =
     Log.debug "params.WeakEnc.eq";
     match x, y with
-    | OptionConstr x, OptionConstr y -> Mebi_wrapper.Enc.eq x y
+    | OptionConstr x, OptionConstr y -> Mebi_wrapper.Enc.equal x y
     | CustomConstr (x1, x2), CustomConstr (y1, y2) ->
-      Mebi_wrapper.Enc.eq x1 y1 && Mebi_wrapper.Enc.eq x2 y2
+      Mebi_wrapper.Enc.equal x1 y1 && Mebi_wrapper.Enc.equal x2 y2
     | _, _ -> false
   ;;
 end
