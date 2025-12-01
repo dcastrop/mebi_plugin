@@ -1,12 +1,13 @@
 type t =
   { from : Model_state.t
-  ; via : Model_label.t (* ; constructors : Mebi_constr.Tree.t list *)
+  ; via : Model_label.t
   }
+
+let create (from : Model_state.t) (via : Model_label.t) : t = { from; via }
 
 let equal (a : t) (b : t) : bool =
   let f = Model_state.equal in
   let g = Model_label.equal in
-  (* let h = List.for_all (fun (x, y) -> Mebi_constr.Tree.equal x y) in *)
   f a.from b.from && g a.via b.via
 ;;
 
@@ -15,11 +16,8 @@ let equal (a : t) (b : t) : bool =
 let compare (a : t) (b : t) : int =
   let f = Model_state.compare in
   let g = Model_label.compare in
-  (* let h = List.compare Mebi_constr.Tree.compare in *)
-  Int.compare (f a.from b.from) (g a.via b.via)
+  Utils.compare_chain [ f a.from b.from; g a.via b.via ]
 ;;
-
-(* |> Int.compare (h a.constructors b.constructors) *)
 
 (***********************************************************************)
 (*** Annotation ********************************************************)

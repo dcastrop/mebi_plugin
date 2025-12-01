@@ -40,27 +40,17 @@ let check_compare
       (b : t)
   : int
   =
-  let x = Model_label.compare a.label b.label in
-  let y =
-    if annotations
-    then Some (Model_note.annotations_compare a.annotations b.annotations)
-    else None
-  in
-  let z =
-    if constructor_trees
-    then
-      Some
-        (List.compare
-           Mebi_constr.Tree.compare
-           a.constructor_trees
-           b.constructor_trees)
-    else None
-  in
-  match x, y, z with
-  | x, None, None -> x
-  | x, Some y, None -> Int.compare x y
-  | x, None, Some z -> Int.compare x z
-  | x, Some y, Some z -> Utils.compare_chain [ x; y; z ]
+  let f = Model_label.compare in
+  let g = Model_note.annotations_compare in
+  let h = List.compare Mebi_constr.Tree.compare in
+  Utils.compare_chain
+    (List.flatten
+       [ [ f a.label b.label ]
+       ; (if annotations then [ g a.annotations b.annotations ] else [])
+       ; (if constructor_trees
+          then [ h a.constructor_trees b.constructor_trees ]
+          else [])
+       ])
 ;;
 
 let compare (a : t) (b : t) : int =

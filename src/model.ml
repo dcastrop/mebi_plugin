@@ -161,9 +161,22 @@ let actions_to_string
 
 exception Model_Action_HasNoAnnotations of Action.t
 
-let get_shortest_annotation (x : Action.t) : Note.annotation =
+let get_annotations
+      (from : State.t)
+      ({ label; annotations; constructor_trees } : Action.t)
+  : Note.annotations
+  =
+  if List.is_empty annotations
+  then [ [ Note.create from label ] ]
+  else
+    List.map
+      (fun (x : Note.annotation) -> Note.create from label :: x)
+      annotations
+;;
+
+let get_shortest_annotation (from : State.t) (x : Action.t) : Note.annotation =
   Log.trace "Model.get_shortest_annotation";
-  match x.annotations with
+  match get_annotations from x with
   | [] -> raise (Model_Action_HasNoAnnotations x)
   | h :: tl ->
     List.fold_left

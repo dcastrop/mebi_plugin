@@ -1225,14 +1225,9 @@ let debug_str (f : Environ.env -> Evd.evar_map -> string) : string mm =
 let make_transition_tbl (st : wrapper ref)
   : (module Hashtbl.S with type key = Enc.t) in_context
   =
-  let eqf = Enc.equal in
-  let hashf = Enc.hash in
   let module TransitionTbl =
     Hashtbl.Make (struct
-      type t = Enc.t
-
-      let equal t1 t2 = eqf t1 t2
-      let hash t = hashf t
+      include Enc
     end)
   in
   { state = st
@@ -1243,12 +1238,9 @@ let make_transition_tbl (st : wrapper ref)
 let make_state_set (st : wrapper ref)
   : (module Set.S with type elt = Enc.t) in_context
   =
-  let comparef = Enc.compare in
   let module StateSet =
     Set.Make (struct
-      type t = Enc.t
-
-      let compare t1 t2 = comparef t1 t2
+      include Enc
     end)
   in
   { state = st; value = (module StateSet : Set.S with type elt = Enc.t) }
@@ -1262,9 +1254,10 @@ let make_state_tree_pair_set (st : wrapper ref)
       type t = Enc.t * Mebi_constr.Tree.t
 
       let compare t1 t2 =
-        match Enc.compare (fst t1) (fst t2) with
-        | 0 -> Mebi_constr.Tree.compare (snd t1) (snd t2)
-        | c -> c
+        Utils.compare_chain
+          [ Enc.compare (fst t1) (fst t2)
+          ; Mebi_constr.Tree.compare (snd t1) (snd t2)
+          ]
       ;;
     end)
   in
