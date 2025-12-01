@@ -7,6 +7,11 @@ val concl_to_string : Proofview.Goal.t -> string
 val log_trace_concl : Proofview.Goal.t -> string -> unit
 val log_trace_hyps : Proofview.Goal.t -> string -> unit
 
+type tactic =
+  { msg : string option
+  ; x : unit Proofview.tactic
+  }
+
 module PState : sig
   type t =
     | NewProof
@@ -18,14 +23,14 @@ module PState : sig
 
   and applicable_constructors =
     { annotation : Model_note.annotation
-    ; tactics : tactic_to_apply list option
+    ; tactics : tactic list option
     }
 
-  and tactic_to_apply = unit -> unit Proofview.tactic
+  (* and tactic_to_apply = unit -> unit Proofview.tactic *)
 
-  val empty_tactics : tactic_to_apply list option -> bool
+  val empty_tactics : tactic list option -> bool
   val finished_applying_constructors : applicable_constructors -> bool
-  val to_string : t -> string
+  val to_string : ?short:bool -> t -> string
 end
 
 val reset_the_proof_state : unit -> unit

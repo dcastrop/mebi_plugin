@@ -55,20 +55,30 @@ Proof.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
+  (* apply wk_none. *)
+  (* unfold silent.  *)
+  (* eapply rt1n_trans. *)
+  (* constructor. simpl. *)
+  (* apply rt1n_refl. *)
+  
+  MeBiSim Step.
+  MeBiSim Step.
+  (* constructor. simpl. *)
+  (* constructor 5. *)
+  MeBiSim Step.
+  (* appl *)
+
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
+  (* MeBiSim Step. *)
   (* info_eauto. *)
   (* MeBiSim Step. *)
   (* MeBiSim Step. *)
