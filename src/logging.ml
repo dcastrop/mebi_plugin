@@ -149,7 +149,7 @@ let log (kind : output_kind) (s : string) : unit =
        | Notice -> Feedback.msg_notice (Pp.str msg)
        | Info -> Feedback.msg_info (Pp.str msg)
        | Debug -> Feedback.msg_debug (Pp.str msg)
-       | Trace -> Feedback.msg_debug (Pp.str msg)
+       | Trace -> Feedback.msg_debug (Pp.str (Printf.sprintf "%s%!" msg))
        | Details -> Feedback.msg_info (Pp.str msg)
        | Result -> Feedback.msg_info (Pp.str msg)
        | Warning -> Feedback.msg_warning (Pp.str msg))

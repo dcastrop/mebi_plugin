@@ -27,18 +27,28 @@
   debug
   mebi_enc
   mebi_setup
-  strfy
+  ; strfy
   mebi_constr
   mebi_theories
+  model_info
+  model_state
+  model_label
+  model_note
+  model_transition
+  model_transition_opt
+  model_action
+  model_edge
   model
-  lts
-  fsm
+  ; lts
+  ; fsm
   algorithms
   mebi_tactics
   mebi_wrapper
   mebi_ind
   mebi_utils
-  mebi_bisim
+  mebi_hypothesis
+  mebi_proof
+  ; mebi_bisim
   rocq_debug
   params
   ; dump_to_file

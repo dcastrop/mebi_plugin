@@ -237,7 +237,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
   [ "MeBiSim" "Solve" int(upper_bound) ] ->
   { fun ~pstate -> 
     if Logging.is_debug_enabled () then Logging.Log.override "\n";
-    Mebi_bisim.solve upper_bound pstate
+    Mebi_proof.solve upper_bound pstate
   }
 
 (*  *)
@@ -245,7 +245,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
   [ "MeBiSim" "Step" ] ->
   { fun ~pstate -> 
     if Logging.is_debug_enabled () then Logging.Log.override "\n";
-    Mebi_tactics.update_proof_by_tactic pstate (Mebi_bisim.loop_iter ())
+    Mebi_tactics.update_proof_by_tactic pstate (Mebi_proof.step ())
   }
 
 |![ proof ] 
@@ -545,6 +545,12 @@ VERNAC COMMAND EXTEND MeBiRun CLASSIFIED AS QUERY
 | ["MeBi" "Saturate" constr(x) "Using" reference(r)] -> {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) [])}
 | ["MeBi" "Saturate" constr(x) "Using" reference(r) 
                                  reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) rs)}
+
+| ["MeBi" "Merge" constr(x) "With" reference(a) 
+            "And" constr(y) "With" reference(b)] -> {Mebi_wrapper.run (Command.run (Command.MergeModels ((x, a), (y, b))) [])}
+| ["MeBi" "Merge" constr(x) "With" reference(a) 
+            "And" constr(y) "With" reference(b) 
+                     "Using" reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.MergeModels ((x, a), (y, b))) rs)}
 
 | ["MeBi" "Minimize" constr(x) "Using" reference(r)] -> {Mebi_wrapper.run (Command.run (Command.MinimizeModel (x, r)) [])}
 | ["MeBi" "Minimize" constr(x) "Using" reference(r) 

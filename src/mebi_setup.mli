@@ -81,7 +81,7 @@ module Enc : sig
   val init : t
   val cache : t ref
   val reset : unit -> unit
-  val eq : t -> t -> bool
+  val equal : t -> t -> bool
   val compare : t -> t -> int
   val hash : t -> int
   val to_string : t -> string

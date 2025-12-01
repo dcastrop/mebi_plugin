@@ -1,158 +1,29 @@
-module Info : sig
-  module Coq : sig
-    type t = Mebi_setup.Enc.t * (string * string list)
+module Info = Model_info
+module State = Model_state
+module Label = Model_label
+module Note = Model_note
+module Transition = Model_transition
+module Transition_opt = Model_transition_opt
+module Action = Model_action
+module Edge = Model_edge
+module Enc = Mebi_setup.Enc
+module Tree = Mebi_constr.Tree
 
-    val to_string : t -> string
-  end
+val nest : Utils.Strfy.style_args -> Utils.Strfy.style_args
 
-  type t =
-    { is_complete : bool
-    ; bound : int
-    ; num_terminals : int
-    ; num_labels : int
-    ; num_states : int
-    ; num_edges : int
-    ; coq_info : Coq.t list option
-    ; weak_info : string list option
-    }
+type style_args = Utils.Strfy.style_args
 
-  val merge
-    :  ?bound:int
-    -> ?num_terminals:int
-    -> ?num_labels:int
-    -> ?num_states:int
-    -> ?num_edges:int
-    -> t
-    -> t
-    -> t
+val style_args :
+  ?indent:int ->
+  ?newline:bool ->
+  ?nested:bool ->
+  ?name:string ->
+  ?style:Utils.Strfy.collection_style option ->
+  unit ->
+  Utils.Strfy.style_args
 
-  val to_string : ?pstr:bool -> ?indents:int -> t -> string
-  val opt_to_string : ?pstr:bool -> ?indents:int -> t option -> string
-  val pstr : ?skip_leading_tab:bool -> ?indents:int -> t -> string
-  val opt_pstr : ?skip_leading_tab:bool -> ?indents:int -> t option -> string
-  val opt_is_complete : t option -> bool option
-end
-
-module State : sig
-  type t = Mebi_setup.Enc.t * string option
-
-  val eq : t -> t -> bool
-  val compare : t -> t -> int
-  val hash : t -> int
-
-  val to_string
-    :  ?skip_leading_tab:bool
-    -> ?indents:int
-    -> ?pstr:bool
-    -> t
-    -> string
-
-  val pstr : ?skip_leading_tab:bool -> ?indents:int -> t -> string
-end
-
-module Action : sig
-  module Label : sig
-    type t = Mebi_setup.Enc.t * (string option * bool option)
-
-    val to_string : t -> string
-    val pstr : ?indents:int -> t -> string
-    val is_silent : 'a * ('b * 'c) -> 'c
-    val eq : t -> t -> bool
-    val compare : t -> t -> int
-    val hash : t -> int
-  end
-
-  module MetaData : sig
-    type t = Mebi_constr.Tree.t list
-
-    val merge : t -> t -> t
-    val from_opt : t option -> t option
-    val to_string : t -> string
-    val eq : t -> t -> bool
-    val eq_opt : t option -> t option -> bool
-    val compare : t -> t -> int
-    val compare_opt : t option -> t option -> int
-  end
-
-  type t =
-    { label : Label.t
-    ; meta : MetaData.t
-    ; mutable annos : annotations
-    }
-
-  and annotation_pair = State.t * t
-  and annotation = annotation_pair list
-  and annotations = annotation list
-
-  val saturated : ?anno:annotation -> t -> t
-
-  exception CannotMergeActionWithDifferentLabels of (t * t)
-
-  val merge : t -> t -> t
-  val annotation_pair_to_string : annotation_pair -> string
-  val annotation_to_string : annotation -> string
-  val annotations_to_string : annotations -> string
-
-  val to_string
-    :  ?skip_leading_tab:bool
-    -> ?indents:int
-    -> ?pstr:bool
-    -> t
-    -> string
-
-  val pstr : ?indents:int -> t -> string
-
-  exception ActionSilenceIsNone of t
-
-  val is_silent : t -> bool
-  val has_label : Label.t -> t -> bool
-  val eq : ?annos:bool -> ?meta:bool -> t -> t -> bool
-  val anno_eq : ?annos:bool -> ?meta:bool -> annotation -> annotation -> bool
-  val annos_eq : ?annos:bool -> ?meta:bool -> annotations -> annotations -> bool
-  val compare : ?annos:bool -> ?meta:bool -> t -> t -> Int.t
-
-  val anno_compare
-    :  ?annos:bool
-    -> ?meta:bool
-    -> annotation
-    -> annotation
-    -> Int.t
-
-  val annos_compare
-    :  ?annos:bool
-    -> ?meta:bool
-    -> annotations
-    -> annotations
-    -> Int.t
-
-  val hash : t -> int
-end
-
-module Transition : sig
-  type t = State.t * Action.Label.t * State.t * Action.MetaData.t option
-
-  val to_string : t -> string
-  val pstr : ?indents:int -> t -> string
-  val eq : t -> t -> bool
-  val compare : t -> t -> int
-end
-
-module Edge : sig
-  type t = State.t * Action.t * State.t
-
-  exception CannotMergeEdgeWithDifferentStates of (t * t)
-
-  val merge : t -> t -> t
-
-  val to_string
-    :  ?skip_leading_tab:bool
-    -> ?indents:int
-    -> ?pstr:bool
-    -> t
-    -> string
-
-  val pstr : ?skip_leading_tab:bool -> ?indents:int -> t -> string
-end
+val collection_style :
+  Utils.Strfy.collection_kind -> Utils.Strfy.collection_style
 
 module States : sig
   type elt = State.t
@@ -203,6 +74,13 @@ module States : sig
   val of_seq : elt Seq.t -> t
 end
 
+val states_to_string : ?args:style_args -> States.t -> string
+val decode_state_opt : Enc.t -> States.t -> State.t option
+
+exception Model_CannotDecodeState of (Enc.t * States.t)
+
+val decode_state : Enc.t -> States.t -> State.t
+
 module Partition : sig
   type elt = States.t
   type t = Set.Make(States).t
@@ -252,8 +130,13 @@ module Partition : sig
   val of_seq : elt Seq.t -> t
 end
 
+val partition_to_string :
+  ?args:style_args -> Partition.t -> string
+
+val get_bisim_states : State.t -> Partition.t -> States.t
+
 module Alphabet : sig
-  type elt = Action.Label.t
+  type elt = Label.t
   type t
 
   val empty : t
@@ -301,61 +184,16 @@ module Alphabet : sig
   val of_seq : elt Seq.t -> t
 end
 
-module Actions : sig
-  type key = Action.t
-  type !'a t
+val alphabet_to_string :
+  ?args:style_args -> Alphabet.t -> string
 
-  val create : int -> 'a t
-  val clear : 'a t -> unit
-  val reset : 'a t -> unit
-  val copy : 'a t -> 'a t
-  val add : 'a t -> key -> 'a -> unit
-  val remove : 'a t -> key -> unit
-  val find : 'a t -> key -> 'a
-  val find_opt : 'a t -> key -> 'a option
-  val find_all : 'a t -> key -> 'a list
-  val replace : 'a t -> key -> 'a -> unit
-  val mem : 'a t -> key -> bool
-  val iter : (key -> 'a -> unit) -> 'a t -> unit
-  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-  val length : 'a t -> int
-  val stats : 'a t -> Hashtbl.statistics
-  val to_seq : 'a t -> (key * 'a) Seq.t
-  val to_seq_keys : 'a t -> key Seq.t
-  val to_seq_values : 'a t -> 'a Seq.t
-  val add_seq : 'a t -> (key * 'a) Seq.t -> unit
-  val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
-  val of_seq : (key * 'a) Seq.t -> 'a t
-end
+val find_label_of_enc : Enc.t -> Alphabet.t -> Label.t
+val silent_label_opt : Alphabet.t -> Label.t option
 
-module Edges : sig
-  type key = State.t
-  type !'a t
+exception Model_Alphabet_SilentLabelNotFound of Alphabet.t
 
-  val create : int -> 'a t
-  val clear : 'a t -> unit
-  val reset : 'a t -> unit
-  val copy : 'a t -> 'a t
-  val add : 'a t -> key -> 'a -> unit
-  val remove : 'a t -> key -> unit
-  val find : 'a t -> key -> 'a
-  val find_opt : 'a t -> key -> 'a option
-  val find_all : 'a t -> key -> 'a list
-  val replace : 'a t -> key -> 'a -> unit
-  val mem : 'a t -> key -> bool
-  val iter : (key -> 'a -> unit) -> 'a t -> unit
-  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-  val length : 'a t -> int
-  val stats : 'a t -> Hashtbl.statistics
-  val to_seq : 'a t -> (key * 'a) Seq.t
-  val to_seq_keys : 'a t -> key Seq.t
-  val to_seq_values : 'a t -> 'a Seq.t
-  val add_seq : 'a t -> (key * 'a) Seq.t -> unit
-  val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
-  val of_seq : (key * 'a) Seq.t -> 'a t
-end
+val silent_label : Alphabet.t -> Label.t
+val silent_action : Alphabet.t -> Action.t
 
 module Transitions : sig
   type elt = Transition.t
@@ -406,223 +244,375 @@ module Transitions : sig
   val of_seq : elt Seq.t -> t
 end
 
-module ActionPair : sig
-  type t = Action.t * States.t
+val transitions_to_string :
+  ?args:style_args -> Transitions.t -> string
 
-  val compare : Action.t * States.t -> Action.t * States.t -> Int.t
+module Actions : sig
+  type key = Action.t
+  type !'a t
+
+  val create : int -> 'a t
+  val clear : 'a t -> unit
+  val reset : 'a t -> unit
+  val copy : 'a t -> 'a t
+  val add : 'a t -> key -> 'a -> unit
+  val remove : 'a t -> key -> unit
+  val find : 'a t -> key -> 'a
+  val find_opt : 'a t -> key -> 'a option
+  val find_all : 'a t -> key -> 'a list
+  val replace : 'a t -> key -> 'a -> unit
+  val mem : 'a t -> key -> bool
+  val iter : (key -> 'a -> unit) -> 'a t -> unit
+
+  val filter_map_inplace :
+    (key -> 'a -> 'a option) -> 'a t -> unit
+
+  val fold :
+    (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+  val length : 'a t -> int
+  val stats : 'a t -> Hashtbl.statistics
+  val to_seq : 'a t -> (key * 'a) Seq.t
+  val to_seq_keys : 'a t -> key Seq.t
+  val to_seq_values : 'a t -> 'a Seq.t
+  val add_seq : 'a t -> (key * 'a) Seq.t -> unit
+  val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
+  val of_seq : (key * 'a) Seq.t -> 'a t
 end
 
-module ActionPairs : sig
-  type elt = ActionPair.t
-  type t
+val actions_to_string :
+  ?args:style_args -> States.t Actions.t -> string
 
-  val empty : t
-  val add : elt -> t -> t
-  val singleton : elt -> t
-  val remove : elt -> t -> t
-  val union : t -> t -> t
-  val inter : t -> t -> t
-  val disjoint : t -> t -> bool
-  val diff : t -> t -> t
-  val cardinal : t -> int
-  val elements : t -> elt list
-  val min_elt : t -> elt
-  val min_elt_opt : t -> elt option
-  val max_elt : t -> elt
-  val max_elt_opt : t -> elt option
-  val choose : t -> elt
-  val choose_opt : t -> elt option
-  val find : elt -> t -> elt
-  val find_opt : elt -> t -> elt option
-  val find_first : (elt -> bool) -> t -> elt
-  val find_first_opt : (elt -> bool) -> t -> elt option
-  val find_last : (elt -> bool) -> t -> elt
-  val find_last_opt : (elt -> bool) -> t -> elt option
-  val iter : (elt -> unit) -> t -> unit
-  val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
-  val map : (elt -> elt) -> t -> t
-  val filter : (elt -> bool) -> t -> t
-  val filter_map : (elt -> elt option) -> t -> t
-  val partition : (elt -> bool) -> t -> t * t
-  val split : elt -> t -> t * bool * t
-  val is_empty : t -> bool
-  val mem : elt -> t -> bool
-  val equal : t -> t -> bool
-  val compare : t -> t -> int
-  val subset : t -> t -> bool
-  val for_all : (elt -> bool) -> t -> bool
-  val exists : (elt -> bool) -> t -> bool
-  val to_list : t -> elt list
-  val of_list : elt list -> t
-  val to_seq_from : elt -> t -> elt Seq.t
-  val to_seq : t -> elt Seq.t
-  val to_rev_seq : t -> elt Seq.t
-  val add_seq : elt Seq.t -> t -> t
-  val of_seq : elt Seq.t -> t
+exception Model_Action_HasNoAnnotations of Action.t
+
+val get_annotations : State.t -> Action.t -> Note.annotations
+
+val get_shortest_annotation :
+  State.t -> Action.t -> Note.annotation
+
+exception Model_Action_HasNoConstructors of Action.t
+
+val get_shortest_constructor : Action.t -> Tree.node list
+
+exception
+  Model_Action_HasSilentLabel_ButIsSaturated of Action.t
+
+val is_action_annotated : Action.t -> bool
+val is_action_silent : Action.t -> bool
+
+val get_action_labelled :
+  Label.t -> States.t Actions.t -> Action.t
+
+val get_action_destinations : States.t Actions.t -> States.t
+
+val get_reachable_partition :
+  Partition.t -> States.t Actions.t -> Partition.t
+
+val get_reachable_partition_opt :
+  Partition.t -> States.t Actions.t -> Partition.t option
+
+val update_destinations :
+  States.t Actions.t -> Action.t -> States.t -> States.t
+
+val update_action :
+  States.t Actions.t -> Action.t -> States.t -> unit
+
+val alphabet_of_actions : States.t Actions.t -> Alphabet.t
+
+module Edges : sig
+  type key = State.t
+  type !'a t
+
+  val create : int -> 'a t
+  val clear : 'a t -> unit
+  val reset : 'a t -> unit
+  val copy : 'a t -> 'a t
+  val add : 'a t -> key -> 'a -> unit
+  val remove : 'a t -> key -> unit
+  val find : 'a t -> key -> 'a
+  val find_opt : 'a t -> key -> 'a option
+  val find_all : 'a t -> key -> 'a list
+  val replace : 'a t -> key -> 'a -> unit
+  val mem : 'a t -> key -> bool
+  val iter : (key -> 'a -> unit) -> 'a t -> unit
+
+  val filter_map_inplace :
+    (key -> 'a -> 'a option) -> 'a t -> unit
+
+  val fold :
+    (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+  val length : 'a t -> int
+  val stats : 'a t -> Hashtbl.statistics
+  val to_seq : 'a t -> (key * 'a) Seq.t
+  val to_seq_keys : 'a t -> key Seq.t
+  val to_seq_values : 'a t -> 'a Seq.t
+  val add_seq : 'a t -> (key * 'a) Seq.t -> unit
+  val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
+  val of_seq : (key * 'a) Seq.t -> 'a t
 end
 
-val action_pairs_to_list : ActionPairs.t -> ActionPair.t list
+val update_edge :
+  States.t Actions.t Edges.t ->
+  State.t ->
+  Action.t ->
+  States.t ->
+  unit
 
-type t =
+val add_edge : States.t Actions.t Edges.t -> Edge.t -> unit
+
+val add_edges :
+  States.t Actions.t Edges.t -> Edge.t list -> unit
+
+val get_edges_labelled :
+  Label.t ->
+  States.t Actions.t Edges.t ->
+  States.t Actions.t Edges.t
+
+val get_reachable_blocks_opt :
+  Partition.t ->
+  States.t Actions.t Edges.t ->
+  State.t ->
+  Partition.t option
+
+exception Model_TransitionOptGotoNone of Transition_opt.t
+
+val transition_opt_to_transition :
+  Transition_opt.t -> Transition.t
+
+val transition_to_action : Transition.t -> Action.t
+val transition_opt_to_action : Transition_opt.t -> Action.t
+val transition_to_edge : Transition.t -> Edge.t
+val edge_to_transition : Edge.t -> Transition.t
+
+val action_destinations_to_transitions :
+  State.t ->
+  Action.t ->
+  States.t ->
+  Transitions.t ->
+  Transitions.t
+
+val actions_to_transitions :
+  State.t ->
+  States.t Actions.t ->
+  Transitions.t ->
+  Transitions.t
+
+val edges_to_transitions :
+  States.t Actions.t Edges.t -> Transitions.t
+
+val transitions_to_edges :
+  Transitions.t -> States.t Actions.t Edges.t
+
+val edges_to_string :
+  ?args:style_args -> States.t Actions.t Edges.t -> string
+
+val merge_info_field :
+  'a list option -> 'a list option -> 'a list option
+
+val merge_info : Info.t -> Info.t -> Info.t
+val merge_action : Action.t -> Action.t -> Action.t
+
+val merge_actions :
+  States.t Actions.t ->
+  States.t Actions.t ->
+  States.t Actions.t
+
+val merge_edges :
+  States.t Actions.t Edges.t ->
+  States.t Actions.t Edges.t ->
+  States.t Actions.t Edges.t
+
+type kind =
   | LTS of
       (State.t option
       * States.t
       * Alphabet.t
       * States.t
       * Transitions.t
-      * Info.t option)
+      * Info.t)
   | FSM of
       (State.t option
       * States.t
       * Alphabet.t
       * States.t
       * States.t Actions.t Edges.t
-      * Info.t option)
+      * Info.t)
 
-val label_to_action
-  :  ?meta:Action.MetaData.t option
-  -> Action.Label.t
-  -> Action.t
+module Lts : sig
+  type t = {
+    init : State.t option;
+    terminals : States.t;
+    alphabet : Alphabet.t;
+    states : States.t;
+    transitions : Transitions.t;
+    info : Info.t;
+  }
 
-val action_to_label : Action.t -> Action.Label.t
-val action_list_to_label_list : Action.t list -> Action.Label.t list
-val edges_to_list : States.t Actions.t Edges.t -> Edge.t list
-val edges_to_transitions : States.t Actions.t Edges.t -> Transitions.t
-val transitions_to_edges : Transitions.t -> States.t Actions.t Edges.t
-val edges_to_transition_list : States.t Actions.t Edges.t -> Transition.t list
-val transition_list_to_edges : Transition.t list -> States.t Actions.t Edges.t
-val alphabet_from_actions : ?acc:Alphabet.t -> States.t Actions.t -> Alphabet.t
-val alphabet_from_edges : States.t Actions.t Edges.t -> Alphabet.t
-val alphabet_from_transitions : Transitions.t -> Alphabet.t
-val add_action : States.t Actions.t -> Action.t -> State.t -> unit
+  val to_model : t -> kind
+  val of_model : kind -> t
+  val to_string : ?args:style_args -> t -> string
+end
 
-val add_edge
-  :  States.t Actions.t Edges.t
-  -> State.t
-  -> Action.t
-  -> State.t
-  -> unit
+module Fsm : sig
+  type t = {
+    init : State.t option;
+    terminals : States.t;
+    alphabet : Alphabet.t;
+    states : States.t;
+    edges : States.t Actions.t Edges.t;
+    info : Info.t;
+  }
 
-val get_num_labels : ?num:int -> States.t Actions.t -> int
-val get_num_edges : ?num:int -> States.t Actions.t Edges.t -> int
-val get_actions : States.t Actions.t Edges.t -> States.t Actions.t
+  and pair = t * t
 
-val get_actions_from
-  :  State.t
-  -> States.t Actions.t Edges.t
-  -> States.t Actions.t
+  val to_model : t -> kind
+  val of_model : kind -> t
+  val clone : t -> t
+  val merge : t -> t -> t
 
-val get_actions_of
-  :  Action.t
-  -> States.t Actions.t Edges.t
-  -> States.t Actions.t
+  exception Model_Fsm_OriginOfStateNotFound of (State.t * pair)
 
-exception
-  CouldNotFindActionWithMatchingLabel of (Action.Label.t * States.t Actions.t)
+  val origin_of_state_opt : State.t -> t -> t -> int option
+  val origin_of_state : State.t -> t -> t -> int
+  val to_string : ?args:style_args -> t -> string
+end
 
-val get_action_with_label : States.t Actions.t -> Action.Label.t -> Action.t
+module Saturate : sig
+  exception
+    Model_Saturate_CannotSaturateActionsWithUnknownVisibility of
+      Action.t
 
-val get_actions_with_label
-  :  Action.Label.t
-  -> States.t Actions.t Edges.t
-  -> States.t Actions.t
+  module StateTracker : sig
+    type key = State.t
+    type !'a t
 
-val get_edges_with_label
-  :  Action.Label.t
-  -> States.t Actions.t Edges.t
-  -> States.t Actions.t Edges.t
+    val create : int -> 'a t
+    val clear : 'a t -> unit
+    val reset : 'a t -> unit
+    val copy : 'a t -> 'a t
+    val add : 'a t -> key -> 'a -> unit
+    val remove : 'a t -> key -> unit
+    val find : 'a t -> key -> 'a
+    val find_opt : 'a t -> key -> 'a option
+    val find_all : 'a t -> key -> 'a list
+    val replace : 'a t -> key -> 'a -> unit
+    val mem : 'a t -> key -> bool
+    val iter : (key -> 'a -> unit) -> 'a t -> unit
 
-val get_edges_from
-  :  State.t
-  -> States.t Actions.t Edges.t
-  -> States.t Actions.t Edges.t
+    val filter_map_inplace :
+      (key -> 'a -> 'a option) -> 'a t -> unit
 
-val get_destinations_of_label : Action.Label.t -> States.t Actions.t -> States.t
-val get_destinations : States.t Actions.t -> States.t
-val get_reachable_blocks : States.t Actions.t -> Partition.t -> Partition.t
+    val fold :
+      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
 
-val get_reachable_blocks_opt
-  :  States.t Actions.t
-  -> Partition.t
-  -> Partition.t option
+    val length : 'a t -> int
+    val stats : 'a t -> Hashtbl.statistics
+    val to_seq : 'a t -> (key * 'a) Seq.t
+    val to_seq_keys : 'a t -> key Seq.t
+    val to_seq_values : 'a t -> 'a Seq.t
+    val add_seq : 'a t -> (key * 'a) Seq.t -> unit
+    val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
+    val of_seq : (key * 'a) Seq.t -> 'a t
+  end
 
-val get_num_blocks : Partition.t -> int
+  val max_visit_num : int
+  val can_revisit : State.t -> int StateTracker.t -> bool
+  val log_visit : State.t -> int StateTracker.t -> unit
 
-val merge_actions
-  :  States.t Actions.t
-  -> States.t Actions.t
-  -> States.t Actions.t
+  val check_update_named :
+    Action.t -> Action.t option -> Action.t option
 
-val merge_edges
-  :  States.t Actions.t Edges.t
-  -> States.t Actions.t Edges.t
-  -> States.t Actions.t Edges.t
+  val update_named_annotation :
+    Action.t -> Note.annotation -> Action.t
 
-val pstr_info : ?indents:int -> Info.t -> string
-val pstr_info_opt : ?indents:int -> Info.t option -> string
-val pstr_label : ?indents:int -> Action.Label.t -> string
-val pstr_action : ?indents:int -> Action.t -> string
+  val stop :
+    ?named:Action.t option ->
+    ?annotation:Note.annotation ->
+    State.t ->
+    (Action.t * States.t) list ->
+    (Action.t * States.t) list
 
-val pstr_alphabet
-  :  ?skip_leading_tab:bool
-  -> ?indents:int
-  -> ?details:bool
-  -> Alphabet.t
-  -> string
+  val check_from :
+    ?named:Action.t option ->
+    ?annotation:Note.annotation ->
+    States.t Actions.t Edges.t ->
+    State.t ->
+    int StateTracker.t ->
+    (Action.t * States.t) list ->
+    (Action.t * States.t) list
 
-val pstr_state : ?skip_leading_tab:bool -> ?indents:int -> State.t -> string
+  val check_actions :
+    ?named:Action.t option ->
+    ?annotation:Note.annotation ->
+    States.t Actions.t Edges.t ->
+    State.t ->
+    States.t Actions.t ->
+    int StateTracker.t ->
+    (Action.t * States.t) list ->
+    (Action.t * States.t) list
 
-val pstr_state_opt
-  :  ?skip_leading_tab:bool
-  -> ?indents:int
-  -> State.t option
-  -> string
+  val check_named :
+    ?named:Action.t option ->
+    ?annotation:Note.annotation ->
+    States.t Actions.t Edges.t ->
+    State.t ->
+    Action.t ->
+    States.t ->
+    int StateTracker.t ->
+    (Action.t * States.t) list ->
+    bool ref ->
+    (Action.t * States.t) list
 
-val pstr_states
-  :  ?skip_leading_tab:bool
-  -> ?indents:int
-  -> ?details:bool
-  -> States.t
-  -> string
+  val check_destinations :
+    ?named:Action.t option ->
+    ?annotation:Note.annotation ->
+    States.t Actions.t Edges.t ->
+    States.t ->
+    int StateTracker.t ->
+    (Action.t * States.t) list ->
+    (Action.t * States.t) list
 
-val pstr_partition
-  :  ?skip_leading_tab:bool
-  -> ?indents:int
-  -> ?details:bool
-  -> Partition.t
-  -> string
+  val merge_saturated_tuples :
+    (Action.t * States.t) list ->
+    (Action.t * States.t) list ->
+    (Action.t * States.t) list
 
-val pstr_transition : ?indents:int -> Transition.t -> string
+  val try_update_saturated_tuple :
+    Action.t * States.t ->
+    (Action.t * States.t) list ->
+    (Action.t * States.t) option * (Action.t * States.t) list
 
-val pstr_transitions
-  :  ?skip_leading_tab:bool
-  -> ?indents:int
-  -> ?details:bool
-  -> Transitions.t
-  -> string
+  val edge_action_destinations :
+    ?named:Action.t option ->
+    ?annotation:Note.annotation ->
+    States.t Actions.t Edges.t ->
+    State.t ->
+    States.t ->
+    (Action.t * States.t) list ->
+    (Action.t * States.t) list
 
-val pstr_edge : ?skip_leading_tab:bool -> ?indents:int -> Edge.t -> string
+  val edge_actions :
+    ?named:Action.t option ->
+    ?annotation:Note.annotation ->
+    States.t Actions.t Edges.t ->
+    State.t ->
+    States.t Actions.t ->
+    (Action.t * States.t) list ->
+    (Action.t * States.t) list
 
-val pstr_edges_from_a
-  :  ?skip_leading_tab:bool
-  -> ?indents:int
-  -> State.t
-  -> Action.t
-  -> States.t
-  -> string
+  val edge :
+    States.t Actions.t ->
+    States.t Actions.t Edges.t ->
+    State.t ->
+    States.t Actions.t ->
+    unit
 
-val pstr_edges_from
-  :  ?skip_leading_tab:bool
-  -> ?indents:int
-  -> State.t
-  -> States.t Actions.t
-  -> string
+  val edges :
+    Alphabet.t ->
+    States.t ->
+    States.t Actions.t Edges.t ->
+    States.t Actions.t Edges.t
 
-val pstr_edges
-  :  ?skip_leading_tab:bool
-  -> ?indents:int
-  -> States.t Actions.t Edges.t
-  -> string
-
-val check_info : t -> unit
-val merge_action_pairs : ActionPairs.t -> ActionPairs.t -> ActionPairs.t
+  val fsm : Fsm.t -> Fsm.t
+end

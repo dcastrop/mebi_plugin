@@ -50,25 +50,31 @@ module Pair = struct
     ; b : EConstr.t
     }
 
-  let to_string ?(indent : int = 0) env sigma ({ a; b } : t) : string =
-    (* let f' = Constructor_arg.to_string env sigma in *)
-    (* let f = Utils.Strfy.tuple ~is_keyval:true ~indent Utils.Strfy.str f' in *)
-    let f' = Rocq_utils.Strfy.econstr env sigma in
-    let f = Utils.Strfy.tuple ~is_keyval:true ~indent Utils.Strfy.str f' in
-    Utils.Strfy.tuple ~force_newline:true ~indent f f (("a", a), ("b", b))
+  let to_string
+        env
+        sigma
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+        ({ a; b } : t)
+    : string
+    =
+    let f = Rocq_utils.Strfy.econstr env sigma in
+    let g = Utils.Strfy.tuple ~args Utils.Strfy.string f in
+    let a : string = g ("a", a) in
+    let b : string = g ("b", b) in
+    Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string (a, b)
   ;;
 
-  let _debug_fresh env sigma sigma' fresh a b : unit =
-    let fstr : string = Rocq_utils.Strfy.econstr env sigma' fresh in
-    let astr : string = Rocq_utils.Strfy.econstr env sigma a in
-    let bstr : string = Rocq_utils.Strfy.econstr env sigma b in
-    Logging.Log.debug
-      (Printf.sprintf
-         "created new fresh a: %s\nto replace a: %s\npaired with b: %s"
-         fstr
-         astr
-         bstr)
-  ;;
+  (* let _debug_fresh env sigma sigma' fresh a b : unit =
+     let fstr : string = Rocq_utils.Strfy.econstr env sigma' fresh in
+     let astr : string = Rocq_utils.Strfy.econstr env sigma a in
+     let bstr : string = Rocq_utils.Strfy.econstr env sigma b in
+     Logging.Log.debug
+     (Printf.sprintf
+     "created new fresh a: %s\nto replace a: %s\npaired with b: %s"
+     fstr
+     astr
+     bstr)
+     ;; *)
 
   let fresh env sigma (a : EConstr.t) (b : EConstr.t) : Evd.evar_map * t =
     let sigma, a = Rocq_utils.get_next env sigma (TypeOf a) in
@@ -81,18 +87,40 @@ module Pair = struct
     if EConstr.isEvar sigma a then fresh env sigma a b else sigma, normal a b
   ;;
 
-  let debug_unify env sigma a b =
+  let debug_unify
+        env
+        sigma
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+        a
+        b
+    =
     let f = Rocq_utils.Strfy.econstr env sigma in
-    let g = Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str f in
-    let s = Utils.Strfy.tuple ~force_newline:true g g (("a", a), ("b", b)) in
+    let g = Utils.Strfy.tuple ~args Utils.Strfy.string f in
+    let a : string = g ("a", a) in
+    let b : string = g ("b", b) in
+    let s =
+      Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string (a, b)
+    in
     Log.debug (Printf.sprintf "unified:\n%s" s)
   ;;
 
-  let debug_unifyerr env sigma a b c d =
+  let debug_unifyerr
+        env
+        sigma
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+        a
+        b
+        c
+        d
+    =
     let f = Rocq_utils.Strfy.econstr env sigma in
     let s1 = Printf.sprintf "cannot unify \"%s\" with \"%s\"" (f c) (f d) in
-    let g = Utils.Strfy.tuple ~is_keyval:true Utils.Strfy.str f in
-    let s2 = Utils.Strfy.tuple ~force_newline:true g g (("a", a), ("b", b)) in
+    let g = Utils.Strfy.tuple ~args Utils.Strfy.string f in
+    let a : string = g ("a", a) in
+    let b : string = g ("b", b) in
+    let s2 =
+      Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string (a, b)
+    in
     Log.debug (Printf.sprintf "%s:\n%s" s1 s2)
   ;;
 
@@ -134,38 +162,18 @@ module Problem = struct
     ; tree : Mebi_constr.Tree.t
     }
 
-  let to_string ?(indent : int = 0) env sigma ({ act; dest; tree } : t) : string
+  let to_string
+        env
+        sigma
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+        ({ act; dest; tree } : t)
+    : string
     =
-    let e =
-      Utils.Strfy.tuple
-        ~is_keyval:true
-        ~indent:(indent + 3)
-        Utils.Strfy.str
-        (Pair.to_string ~indent:(indent + 4) env sigma)
-        ("act ", act)
-    in
-    let f =
-      Utils.Strfy.tuple
-        ~is_keyval:true
-        ~indent:(indent + 3)
-        Utils.Strfy.str
-        (Pair.to_string ~indent:(indent + 4) env sigma)
-        ("dest", dest)
-    in
-    let g =
-      Utils.Strfy.tuple
-        ~is_keyval:true
-        ~indent:(indent + 3)
-        Utils.Strfy.str
-        Mebi_constr.Tree.to_string
-        ("tree", tree)
-    in
-    Utils.Strfy.list
-      ~force_newline:true
-      ~use:("{", "}")
-      ~indent
-      Utils.Strfy.str
-      [ e; f; g ]
+    let f = Pair.to_string env sigma ~args:(Utils.Strfy.nest args) in
+    let act = f act in
+    let dest = f dest in
+    let tree = Mebi_constr.Tree.to_string ~args:(Utils.Strfy.nest args) tree in
+    Utils.Strfy.record ~args [ "act", act; "dest", dest; "tree", tree ]
   ;;
 
   let unify_pair_opt ?(debug : bool = default_debug) (pair : Pair.t) : bool mm =
@@ -223,22 +231,26 @@ module Problems = struct
     | _ -> false
   ;;
 
-  let to_string ?(indent : int = 0) env : t -> string = function
+  let to_string env ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+    : t -> string
+    = function
     | { sigma; to_unify } ->
-      Utils.Strfy.list
-        ~force_newline:true
-        ~indent
-        ~label:"unification problems"
-        (Problem.to_string ~indent:(indent + 1) env sigma)
+      let open Utils.Strfy in
+      list
+        ~args:{ (nest args) with name = Some "unification problems" }
+        (Problem.to_string env sigma)
         to_unify
   ;;
 
-  let list_to_string ?(indent : int = 0) env : t list -> string =
-    Utils.Strfy.list
-      ~force_newline:true
-      ~indent
-      ~label:"list of unification problems"
-      (to_string ~indent:(indent + 1) env)
+  let list_to_string
+        env
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+    : t list -> string
+    =
+    let open Utils.Strfy in
+    list
+      ~args:{ (nest args) with name = Some "unification problems" }
+      (to_string env)
   ;;
 
   let rec unify_list_opt ?(debug : bool = default_debug)
@@ -443,12 +455,13 @@ end
 module Constructors = struct
   type t = Mebi_constr.t list
 
-  let to_string ?(indent : int = 0) env sigma : t -> string =
-    Utils.Strfy.list
-      ~force_newline:true
-      ~label:"constructors"
-      ~indent
-      (Mebi_constr.to_string ~indent:(indent + 1) env sigma)
+  let to_string
+        env
+        sigma
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+    : t -> string
+    =
+    Utils.Strfy.list ~args (Mebi_constr.to_string env sigma)
   ;;
 
   (* unified_tgt, ctor_tree *)

@@ -184,146 +184,19 @@ module Syntax : MEBI_MONAD_SYNTAX = struct
 end
 
 (**********************************)
-(****** COQ TERMS *****************)
-(**********************************)
-
-(* let econstr_eq (a : EConstr.t) (b : EConstr.t) : bool mm =
-   let open Syntax in
-   let* sigma = get_sigma in
-   return (Eq.econstr sigma a b)
-   ;; *)
-
-(* let is_none_term (x : EConstr.t) : bool mm =
-  fun (state : wrapper ref) ->
-  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
-  { state; value = Mebi_theories.is_constant sigma x Mebi_theories.c_None }
-;; *)
-
-(* let env : Environ.env = !(!state.coq_ref).coq_env in
-  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
-  let sigma, y = Mebi_setup.the_none_term env sigma in
-  state
-  := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
-  (* Log.debug
-     (Printf.sprintf
-     "mebi_wrapper.is_none_term, kind\n%s"
-     (Rocq_utils.Strfy.econstr_kind env sigma (Mebi_theories.c_None ()))); *)
-  match Constr.kind (Rocq_convert.econstr_to_constr sigma x) with
-  | App (cx, _) ->
-    let cy = Rocq_convert.econstr_to_constr sigma y in
-    Log.debug
-      (Printf.sprintf
-         "mebi_wrapper.is_none_term\n\
-          - x: %s\n\
-          - none: %s\n\
-          - econstr equal: %b\n\
-          - constr equal: %b"
-         (Rocq_utils.Strfy.econstr env sigma x)
-         (Rocq_utils.Strfy.econstr env sigma (Mebi_theories.c_None ()))
-         (Mebi_setup.Eq.econstr sigma x y)
-         (Mebi_setup.Eq.constr cx cy));
-    { state; value = Mebi_setup.Eq.constr cx cy }
-  | _ -> { state; value = false } *)
-
-(* let type_of_econstr (t : EConstr.t) : EConstr.t mm =
-  fun (state : wrapper ref) ->
-  let env : Environ.env = !(!state.coq_ref).coq_env in
-  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
-  let t : EConstr.t = Reductionops.nf_all env sigma t in
-  let sigma, t = Typing.type_of env sigma t in
-  (* let coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } in *)
-  (* state := { !state with coq_ref }; *)
-  state
-  := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
-  { state; value = t } *)
-
-(* and new_evar_of_econstr (t : EConstr.t) : EConstr.t mm =
-  fun (state : wrapper ref) ->
-  let env : Environ.env = !(!state.coq_ref).coq_env in
-  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
-  let sigma, instance = Evarutil.new_evar env sigma t in
-  (* coq_st := { !coq_st with coq_ctx = sigma }; *)
-  (* { state = st; value = instance } *)
-  state
-  := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
-  { state; value = t } *)
-
-(* and constrexpr_to_econstr (t : Constrexpr.constr_expr) : EConstr.t mm =
-  fun (state : wrapper ref) ->
-  let env : Environ.env = !(!state.coq_ref).coq_env in
-  let sigma : Evd.evar_map = !(!state.coq_ref).coq_ctx in
-  let sigma, t = Rocq_convert.constrexpr_to_econstr env sigma t in
-  (* coq_st := { !coq_st with coq_ctx = sigma };
-  { state = st; value = t } *)
-  state
-  := { !state with coq_ref = ref { !(!state.coq_ref) with coq_ctx = sigma } };
-  { state; value = t } *)
-
-(* and econstr_to_constr ?(abort_on_undefined_evars : bool = false) (x : EConstr.t)
-   : Constr.t mm
-   =
-   let open Syntax in
-   let* sigma = get_sigma in
-   return (Rocq_convert.econstr_to_constr ~abort_on_undefined_evars sigma x) *)
-
-(* and econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
-   let open Syntax in
-   let* sigma = get_sigma in
-   return (Rocq_convert.econstr_to_constr_opt sigma x) *)
-
-(* and globref_to_econstr (x : Names.GlobRef.t) : EConstr.t mm =
-   let open Syntax in
-   let* env = get_env in
-   return (Rocq_convert.globref_to_econstr env x) *)
-
-(* and normalize_econstr (t : EConstr.t) : EConstr.t mm =
-   let open Syntax in
-   let$+ t env sigma = Reductionops.nf_all env sigma t in
-   return t *)
-
-(**********************************)
-(****** UTILS *********************)
-(**********************************)
-
-(* let map_list_mm (f : 'a -> 'b mm) (ls : 'a list) : 'b list mm =
-   let ls : 'a list = List.rev ls in
-   let open Syntax in
-   (* let* env = get_env in *)
-   let iter_body (i : int) (acc : 'b list) =
-   let x : 'a = List.nth ls i in
-   let* y : 'b = f x in
-   return (y :: acc)
-   in
-   iterate 0 (List.length ls - 1) [] iter_body
-   ;; *)
-
-(* let rec econstr_list_to_constr ?(abort_on_undefined_evars : bool = false)
-   : EConstr.t list -> Constr.t list mm
-   = function
-   | [] -> return []
-   | h :: t ->
-   let open Syntax in
-   let* h = econstr_to_constr ~abort_on_undefined_evars h in
-   let* t = econstr_list_to_constr ~abort_on_undefined_evars t in
-   return (h :: t)
-   ;; *)
-
-(* let rec econstr_list_to_constr_opt ?(abort_on_undefined_evars : bool = false)
-   : EConstr.t list -> Constr.t option list mm
-   = function
-   | [] -> return []
-   | h :: t ->
-   let open Syntax in
-   let* h = econstr_to_constr_opt h in
-   let* t = econstr_list_to_constr_opt t in
-   return (h :: t)
-   ;; *)
-
-(**********************************)
 (****** COQ TERM TO STRING ********)
 (**********************************)
 
-let wrap (f : Environ.env -> Evd.evar_map -> 'a -> string) : 'a -> string =
+let mebi_to_string
+      (f :
+        Environ.env
+        -> Evd.evar_map
+        -> ?args:Utils.Strfy.style_args
+        -> 'a
+        -> string)
+      ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+  : 'a -> string
+  =
   run
     ~keep_encoding:true
     ~fresh:false
@@ -333,48 +206,19 @@ let wrap (f : Environ.env -> Evd.evar_map -> 'a -> string) : 'a -> string =
      return (f env sigma))
 ;;
 
-(* TODO: point to Strfy, use wrap to provide env and sigma *)
-(* module Strfy = struct
-  let constr x = (wrap Rocq_utils.Strfy.constr) x
-
-
-let constr_rel_decl x : string =
-  (wrap Rocq_utils.Strfy.constr_rel_decl) x
+let constr_to_string (x : Constr.t) : string =
+  (mebi_to_string Rocq_utils.Strfy.constr) x
 ;;
-
-let econstr x : string = (wrap Rocq_utils.Strfy.econstr) x
-let term x : string = econstr  x
-
-let econstr_rel_decl x : string =
-  (wrap Rocq_utils.Strfy.econstr_rel_decl) x
-;;
-
-(* let econstr_list_to_constr_opt_string (es : EConstr.t list) : string mm =
-  let open Syntax in
-  let* es = econstr_list_to_constr_opt es in
-  return (Utils.Strfy.list (Utils.Strfy.option (wrap Rocq_utils.Strfy.constr)) es)
-;; *)
-end *)
-
-let constr_to_string (x : Constr.t) : string = (wrap Rocq_utils.Strfy.constr) x
-
-(* let constr_rel_decl_to_string (x : Constr.rel_declaration) : string =
-   (wrap Rocq_utils.Strfy.constr_rel_decl) x
-   ;; *)
 
 let econstr_to_string (x : EConstr.t) : string =
-  (wrap Rocq_utils.Strfy.econstr) x
+  (mebi_to_string Rocq_utils.Strfy.econstr) x
 ;;
 
-(* let econstr_rel_decl_to_string (x : EConstr.rel_declaration) : string =
-   (wrap Rocq_utils.Strfy.econstr_rel_decl) x
-   ;; *)
-
-(* let econstr_list_to_constr_opt_string (es : EConstr.t list) : string mm =
-   let open Syntax in
-   let* es = econstr_list_to_constr_opt es in
-   return (Utils.Strfy.list (Utils.Strfy.option (wrap Rocq_utils.Strfy.constr)) es)
-   ;; *)
+let enc_to_string ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+  : Enc.t -> string
+  =
+  Enc.to_string
+;;
 
 (********************************************)
 (****** ERRORS ******************************)
@@ -621,84 +465,82 @@ module Error : ERROR_TYPE = struct
   ;;
 
   open Pp
+  open Utils.Strfy
+  open Rocq_utils.Strfy
 
   let mebi_handler = function
     | Invalid_KindOfTypeEConstr_Expected_Atomic (coq_ref, x) ->
-      str
+      Pp.str
         (Printf.sprintf
            "Invalid Kind of type EConstr, expected Atomic, but got: %s"
-           (Rocq_utils.Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
+           (econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
     | Invalid_KindOfTypeEConstr_Expected_Cast (coq_ref, x) ->
-      str
+      Pp.str
         (Printf.sprintf
            "Invalid Kind of type EConstr, expected Cast, but got: %s"
-           (Rocq_utils.Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
+           (econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
     | Invalid_KindOfTypeEConstr_Expected_LetIn (coq_ref, x) ->
-      str
+      Pp.str
         (Printf.sprintf
            "Invalid Kind of type EConstr, expected LetIn, but got: %s"
-           (Rocq_utils.Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
+           (econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
     | Invalid_KindOfTypeEConstr_Expected_Prod (coq_ref, x) ->
-      str
+      Pp.str
         (Printf.sprintf
            "Invalid Kind of type EConstr, expected Prod, but got: %s"
-           (Rocq_utils.Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
+           (econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
     | Invalid_KindOfTypeEConstr_Expected_Sort (coq_ref, x) ->
-      str
+      Pp.str
         (Printf.sprintf
            "Invalid Kind of type EConstr, expected Sort, but got: %s"
-           (Rocq_utils.Strfy.econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
+           (econstr_types !coq_ref.coq_env !coq_ref.coq_ctx x))
     | UnknownEncodeKey (coq_ref, fwd_map, x) ->
-      str
+      Pp.str
         (Printf.sprintf
            "Unknown encode key: %s\nEncode map: %s"
-           (Rocq_utils.Strfy.econstr !coq_ref.coq_env !coq_ref.coq_ctx x)
-           (Utils.Strfy.list
-              (Utils.Strfy.tuple
-                 (Rocq_utils.Strfy.econstr !coq_ref.coq_env !coq_ref.coq_ctx)
-                 Enc.to_string)
+           (econstr !coq_ref.coq_env !coq_ref.coq_ctx x)
+           (list
+              (tuple (econstr !coq_ref.coq_env !coq_ref.coq_ctx) enc_to_string)
               (List.of_seq (F.to_seq fwd_map))))
     | UnknownDecodeKey (coq_ref, bck_map, x) ->
-      str
+      Pp.str
         (Printf.sprintf
            "Unknown decode key: %s\nDecode map: %s"
            (Enc.to_string x)
-           (Utils.Strfy.list
-              (Utils.Strfy.tuple
-                 Enc.to_string
-                 (Rocq_utils.Strfy.econstr !coq_ref.coq_env !coq_ref.coq_ctx))
+           (list
+              (tuple enc_to_string (econstr !coq_ref.coq_env !coq_ref.coq_ctx))
               (List.of_seq (B.to_seq bck_map))))
-    | NoBisimResult () -> str "No cached bisimilarity result found."
+    | NoBisimResult () -> Pp.str "No cached bisimilarity result found."
     (* | ProofvIsNone () -> str "Tried to access contents of proofv which is None." *)
     (*****************)
     | ParamsFailIfIncomplete () ->
-      str
+      Pp.str
         "Params are configured to fail if cannot construct complete LTS from \
          term.\n\n\
          Use command \"MeBi Set FailIfIncomplete False\" to disable this \
          behaviour."
     | ParamsFailIfNotBisim () ->
-      str
+      Pp.str
         "Params are configured to fail if terms not bisim.\n\n\
          Use command \"MeBi Set FailIfNotBisim False\" to disable this \
          behaviour."
     | ExpectedCoqIndDefOfLTSNotType () ->
-      str
+      Pp.str
         "cindef (Coq Inductive Definition) of LTS was expected, but Type was \
          used."
     | InvalidLTSArgsLength i ->
-      str
+      Pp.str
         (Printf.sprintf
            "Command.extract_args, assertion: Array.length args == 3 failed. \
             Got %i"
            i)
     | InvalidLTSTermKind (env, sigma, tm) ->
-      str
+      Pp.str
         "Command.extract_args, assertion: Constr.kind tm matches App _ failed. \
          Got "
-      ++ str (Rocq_utils.Strfy.constr env sigma tm)
-      ++ str " which matches with "
-      ++ str
+      ++ Pp.str (constr env sigma tm)
+      ++ Pp.str " which matches with "
+      ++ Pp.str
            (match Constr.kind tm with
             | Rel _ -> "Rel"
             | Var _ -> "Var"
@@ -721,81 +563,65 @@ module Error : ERROR_TYPE = struct
             | Float _ -> "Float"
             | String _ -> "String"
             | Array _ -> "Array")
-      ++ str "."
+      ++ Pp.str "."
     | InvalidCheckUpdatedCtx (env, sigma, x, y) ->
-      str
+      Pp.str
         "Invalid Args to check_updated_ctx. Should both be empty, or both have \
          some."
       ++ strbrk "\n"
-      ++ str
-           (Printf.sprintf
-              "substls: %s."
-              (Utils.Strfy.list (Rocq_utils.Strfy.econstr env sigma) x))
+      ++ Pp.str (Printf.sprintf "substls: %s." (list (econstr env sigma) x))
       ++ strbrk "\n"
-      ++ str
+      ++ Pp.str
            (Printf.sprintf
               "ctx_tys: %s."
-              (Utils.Strfy.list (wrap Rocq_utils.Strfy.econstr_rel_decl) y))
+              (list (mebi_to_string econstr_rel_decl) y))
     | InvalidLTSSort f ->
-      str "Invalid LTS Sort: expecting Prop, got " ++ Sorts.pr_sort_family f
+      Pp.str "Invalid LTS Sort: expecting Prop, got " ++ Sorts.pr_sort_family f
     | InvalidTypeSort f ->
-      str "Invalid Type Sort: expecting Type or Set, got "
+      Pp.str "Invalid Type Sort: expecting Type or Set, got "
       ++ Sorts.pr_sort_family f
     | InvalidArity (env, sigma, t) ->
-      str "Invalid arity for LTS: "
-      ++ str (Rocq_utils.Strfy.constr env sigma t)
+      Pp.str "Invalid arity for LTS: "
+      ++ Pp.str (constr env sigma t)
       ++ strbrk "\n"
-      ++ str "Expecting: forall params, ?terms -> ?labels -> ?terms -> Prop"
-    | InvalidRefLTS r ->
-      str "Invalid ref LTS: " ++ str (Rocq_utils.Strfy.global r)
-    | InvalidRefType r ->
-      str "Invalid ref Type: " ++ str (Rocq_utils.Strfy.global r)
+      ++ Pp.str "Expecting: forall params, ?terms -> ?labels -> ?terms -> Prop"
+    | InvalidRefLTS r -> Pp.str "Invalid ref LTS: " ++ Pp.str (global r)
+    | InvalidRefType r -> Pp.str "Invalid ref Type: " ++ Pp.str (global r)
     | UnknownTermType (env, sigma, (tm, ty, trkeys)) ->
-      str
+      Pp.str
         "None of the constructors provided matched type of term to visit. \
          (unknown_term_type) "
       ++ strbrk "\n\n"
-      ++ str "Term: "
-      ++ str (Rocq_utils.Strfy.econstr env sigma tm)
+      ++ Pp.str "Term: "
+      ++ Pp.str (econstr env sigma tm)
       ++ strbrk "\n\n"
-      ++ str "Type: "
-      ++ str (Rocq_utils.Strfy.econstr env sigma ty)
+      ++ Pp.str "Type: "
+      ++ Pp.str (econstr env sigma ty)
       ++ strbrk "\n\n"
-      ++ str
-           (Printf.sprintf
-              "Keys: %s"
-              (Utils.Strfy.list (Rocq_utils.Strfy.econstr env sigma) trkeys))
+      ++ Pp.str (Printf.sprintf "Keys: %s" (list (econstr env sigma) trkeys))
       ++ strbrk "\n\n"
-      ++ str
+      ++ Pp.str
            (Printf.sprintf
               "Does Type match EConstr of any Key? = %b"
               (List.exists
                  (fun (k : EConstr.t) -> EConstr.eq_constr sigma ty k)
                  trkeys))
       ++ strbrk "\n"
-      ++ str
-           (let tystr =
-              Rocq_utils.Strfy.pp (Printer.pr_econstr_env env sigma ty)
-            in
+      ++ Pp.str
+           (let tystr = pp (Printer.pr_econstr_env env sigma ty) in
             Printf.sprintf
               "Does Type match String of any Key? = %b"
               (List.exists
                  (fun (k : EConstr.t) ->
-                   String.equal
-                     tystr
-                     (Rocq_utils.Strfy.pp (Printer.pr_econstr_env env sigma k)))
+                   String.equal tystr (pp (Printer.pr_econstr_env env sigma k)))
                  trkeys))
     | PrimaryLTSNotFound (env, sigma, t, names) ->
-      str "Primary LTS Not found for term: "
-      ++ str (Rocq_utils.Strfy.econstr env sigma t)
+      Pp.str "Primary LTS Not found for term: "
+      ++ Pp.str (econstr env sigma t)
       ++ strbrk "\n\n"
-      ++ str "constructor names: "
-      ++ str
-           (Utils.Strfy.list
-              ~force_newline:true
-              ~label:"Names"
-              (Rocq_utils.Strfy.econstr env sigma)
-              names)
+      ++ Pp.str "constructor names: "
+      ++ Pp.str
+           (list ~args:(style_args ~name:"Names" ()) (econstr env sigma) names)
   ;;
 
   (* | UnknownDecodeKey (env, sigma, k, bckmap) ->
@@ -945,120 +771,84 @@ let primary_lts_not_found ((t, names) : EConstr.t * EConstr.t list) : 'a mm =
    raise (Error.unknown_decode_key !coq_st.coq_env !coq_st.coq_ctx k bckmap)
    ;; *)
 
-(********************************************)
-(****** ENCODE/DECODE ***********************)
-(********************************************)
+(***********************************************************************)
+(*** Encode ************************************************************)
+(***********************************************************************)
 
-let encode (k : EConstr.t) : Enc.t mm =
+(** [encode x] *)
+let encode (x : EConstr.t) : Enc.t mm =
   fun (st : wrapper ref) ->
-  Log.trace "mebi_wrapper.encode";
-  let encoding : Enc.t = Enc.encode !st.fwd_enc !st.bck_enc k in
-  (* Log.debug
-     (Printf.sprintf
-     "mebi_wrapper.encode, \"%s\" into (%s)"
-     (econstr_to_string k)
-     (Enc.to_string encoding)); *)
-  assert (F.mem !st.fwd_enc k);
-  assert (B.mem !st.bck_enc encoding);
-  { state = st; value = encoding }
+  let e : Enc.t = Enc.encode !st.fwd_enc !st.bck_enc x in
+  { state = st; value = e }
 ;;
+
+let encoding (x : EConstr.t) : Enc.t mm =
+  fun (st : wrapper ref) ->
+  let e : Enc.t = F.find !st.fwd_enc x in
+  { state = st; value = e }
+;;
+
+let has_encoding (x : EConstr.t) : bool =
+  run ~keep_encoding:true ~fresh:false (fun (st : wrapper ref) ->
+    { state = st
+    ; value =
+        (match F.find_opt !st.fwd_enc x with None -> false | Some _ -> true)
+    })
+;;
+
+let get_encoding (x : EConstr.t) : Enc.t =
+  run ~keep_encoding:true ~fresh:false (encoding x)
+;;
+
+(** [encoding_opt x] retrieves the encoding [y] of [x] from the [!st.fwd_enc] map and returns [Some y] if it exists, otherwise [None].
+*)
+let encoding_opt (x : EConstr.t) : Enc.t option mm =
+  fun (st : wrapper ref) ->
+  let e_opt : Enc.t option = F.find_opt !st.fwd_enc x in
+  { state = st; value = e_opt }
+;;
+
+let get_encoding_opt (x : EConstr.t) : Enc.t option =
+  run ~keep_encoding:true ~fresh:false (encoding_opt x)
+;;
+
+(***********************************************************************)
+(*** Decode ************************************************************)
+(***********************************************************************)
 
 (** dual to [encode] except we cannot handle new values *)
-let decode (k : Enc.t) : EConstr.t mm =
-  Log.trace "mebi_wrapper.decode";
-  let open Syntax in
-  let* bck_enc = get_bck_enc in
-  match Enc.decode_opt bck_enc k with
-  | Some decoding ->
-    (* Log.debug
-       (Printf.sprintf
-       "mebi_wrapper.decode, \"%s\" into (%s)"
-       (Enc.to_string k)
-       (econstr_to_string decoding)); *)
-    return decoding
-  | None -> cannot_get_decoding_of_unencoded_econstr k
-;;
-
-let decode_to_string (x : Enc.t) : string =
-  (* let s_mm : string mm =
-     let open Syntax in
-     let* y = decode x in
-     let* env = get_env in
-     let* sigma = get_sigma in
-     return (Rocq_utils.Strfy.pp (Printer.pr_econstr_env env sigma y))
-     in
-     string_mm s_mm *)
-  run
-    ~keep_encoding:true
-    ~fresh:false
-    (let open Syntax in
-     let* y = decode x in
-     return ((wrap Rocq_utils.Strfy.econstr) y))
-;;
-
-(********************************************)
-(****** GET ENCODE/DECODE OPT ***************)
-(********************************************)
-
-let get_encoding_opt (k : EConstr.t) : Enc.t option mm =
+let decode (x : Enc.t) : EConstr.t mm =
   fun (st : wrapper ref) ->
-  Log.trace "mebi_wrapper.get_encoding_opt";
-  match F.find_opt !st.fwd_enc k with
-  | None -> { state = st; value = None }
-  | Some e -> { state = st; value = Some e }
+  let d : EConstr.t = Enc.decode !st.bck_enc x in
+  { state = st; value = d }
 ;;
 
-(** dual to [encode] except we cannot handle new values *)
-let get_decoding_opt (k : Enc.t) : EConstr.t option mm =
+let decoding (x : Enc.t) : EConstr.t mm =
   fun (st : wrapper ref) ->
-  Log.trace "mebi_wrapper.get_decoding_opt";
-  match B.find_opt !st.bck_enc k with
-  | None -> { state = st; value = None }
-  | Some e -> { state = st; value = Some e }
+  let d : EConstr.t = B.find !st.bck_enc x in
+  { state = st; value = d }
 ;;
 
-(********************************************)
-(****** GET ENCODE/DECODE *******************)
-(********************************************)
-
-let get_encoding (k : EConstr.t) : Enc.t mm =
-  Log.trace "mebi_wrapper.get_encoding";
-  let open Syntax in
-  let* opt = get_encoding_opt k in
-  match opt with
-  | None -> cannot_get_encoding_of_unencoded_econstr k
-  | Some e -> return e
+let has_decoding (x : Enc.t) : bool =
+  run ~keep_encoding:true ~fresh:false (fun (st : wrapper ref) ->
+    { state = st
+    ; value =
+        (match B.find_opt !st.bck_enc x with None -> false | Some _ -> true)
+    })
 ;;
 
-(** dual to [encode] except we cannot handle new values *)
-let get_decoding (k : Enc.t) : EConstr.t mm =
-  Log.trace "mebi_wrapper.get_decoding";
-  let open Syntax in
-  let* bck_enc = get_bck_enc in
-  match B.find_opt bck_enc k with
-  | None -> cannot_get_decoding_of_unencoded_econstr k
-  | Some e -> return e
+let get_decoding (x : Enc.t) : EConstr.t =
+  run ~keep_encoding:true ~fresh:false (decoding x)
 ;;
 
-(********************************************)
-(****** ENCODE/DECODE CHECKs ****************)
-(********************************************)
-
-let has_encoding (k : EConstr.t) : bool mm =
+let decoding_opt (x : Enc.t) : EConstr.t option mm =
   fun (st : wrapper ref) ->
-  Log.trace "mebi_wrapper.has_encoding";
-  match F.find_opt !st.fwd_enc k with
-  | None -> { state = st; value = false }
-  | Some _ -> { state = st; value = true }
+  let d_opt : EConstr.t option = B.find_opt !st.bck_enc x in
+  { state = st; value = d_opt }
 ;;
 
-(** dual to [encode] except we cannot handle new values *)
-let has_decoding (k : Enc.t) : bool mm =
-  fun (st : wrapper ref) ->
-  Log.trace "mebi_wrapper.has_decoding";
-  match B.find_opt !st.bck_enc k with
-  | None -> { state = st; value = false }
-  | Some _ -> { state = st; value = true }
+let get_decoding_opt (x : Enc.t) : EConstr.t option =
+  run ~keep_encoding:true ~fresh:false (decoding_opt x)
 ;;
 
 (**********************************)
@@ -1115,18 +905,22 @@ let decode_constr_tree_lts (tree : Mebi_constr.Tree.t) : decoded_tree mm =
   decode_tree tree
 ;;
 
-let rec pstr_decoded_tree (t1 : decoded_tree) : string =
-  match t1 with
-  | Mebi_constr.Tree.Node (lhs_int, rhs_int_tree_list) ->
-    Printf.sprintf
-      "(%s:%i) [%s]"
-      (fst lhs_int)
-      (snd lhs_int)
-      (match List.length rhs_int_tree_list with
-       | 0 -> ""
-       | 1 -> pstr_decoded_tree (List.hd rhs_int_tree_list)
-       | _ -> Utils.Strfy.list pstr_decoded_tree rhs_int_tree_list)
-;;
+(* let rec pstr_decoded_tree
+   ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+   (t1 : decoded_tree)
+   : string
+   =
+   match t1 with
+   | Mebi_constr.Tree.Node (lhs_int, rhs_int_tree_list) ->
+   Printf.sprintf
+   "(%s:%i) [%s]"
+   (fst lhs_int)
+   (snd lhs_int)
+   (match List.length rhs_int_tree_list with
+   | 0 -> ""
+   | 1 -> pstr_decoded_tree (List.hd rhs_int_tree_list)
+   | _ -> Utils.Strfy.list ~args pstr_decoded_tree rhs_int_tree_list)
+   ;; *)
 
 (**********************************)
 (****** COQ PROOF THEORIES ********)
@@ -1247,69 +1041,69 @@ let debug_str (f : Environ.env -> Evd.evar_map -> string) : string mm =
     sigma, x)
 ;;
 
-let show_fwd_map () : unit =
-  run
-    ~keep_encoding:true
-    ~fresh:false
-    (let open Syntax in
-     let* env = get_env in
-     let* sigma = get_sigma in
-     let* fwd_map = get_fwd_enc in
-     Log.debug
-       (Printf.sprintf
-          "mebi_wrapper.show_fwd_map: \n%s"
-          (Utils.Strfy.list
-             ~force_newline:true
-             (Utils.Strfy.tuple
-                ~force_newline:true
-                ~indent:1
-                (fun (x : EConstr.t) ->
-                  Utils.Strfy.tuple
-                    ~is_keyval:true
-                    Utils.Strfy.str
-                    (Rocq_utils.Strfy.econstr env sigma)
-                    ("econstr", x))
-                (fun (x : Enc.t) ->
-                  Utils.Strfy.tuple
-                    ~is_keyval:true
-                    Utils.Strfy.str
-                    Enc.to_string
-                    ("encoding", x)))
-             (Enc.fwd_to_list fwd_map)));
-     return ())
-;;
+(* let show_fwd_map () : unit =
+   run
+   ~keep_encoding:true
+   ~fresh:false
+   (let open Syntax in
+   let* env = get_env in
+   let* sigma = get_sigma in
+   let* fwd_map = get_fwd_enc in
+   Log.debug
+   (Printf.sprintf
+   "mebi_wrapper.show_fwd_map: \n%s"
+   (Utils.Strfy.list
+   ~force_newline:true
+   (Utils.Strfy.tuple
+   ~force_newline:true
+   ~indent:1
+   (fun (x : EConstr.t) ->
+   Utils.Strfy.tuple
+   ~is_keyval:true
+   Utils.Strfy.str
+   (Rocq_utils.Strfy.econstr env sigma)
+   ("econstr", x))
+   (fun (x : Enc.t) ->
+   Utils.Strfy.tuple
+   ~is_keyval:true
+   Utils.Strfy.str
+   Enc.to_string
+   ("encoding", x)))
+   (Enc.fwd_to_list fwd_map)));
+   return ())
+   ;; *)
 
-let show_bck_map () : unit =
-  run
-    ~keep_encoding:true
-    ~fresh:false
-    (let open Syntax in
-     let* env = get_env in
-     let* sigma = get_sigma in
-     let* bck_map = get_bck_enc in
-     Log.debug
-       (Printf.sprintf
-          "mebi_wrapper.show_bck_map: \n%s"
-          (Utils.Strfy.list
-             ~force_newline:true
-             (Utils.Strfy.tuple
-                ~force_newline:true
-                ~indent:1
-                (fun (x : Enc.t) ->
-                  Utils.Strfy.tuple
-                    ~is_keyval:true
-                    Utils.Strfy.str
-                    Enc.to_string
-                    ("encoding", x))
-                (fun (x : EConstr.t) ->
-                  Utils.Strfy.tuple
-                    ~is_keyval:true
-                    Utils.Strfy.str
-                    (Rocq_utils.Strfy.econstr env sigma)
-                    ("econstr", x)))
-             (Enc.bck_to_list bck_map)));
-     return ())
-;;
+(* let show_bck_map () : unit =
+   run
+   ~keep_encoding:true
+   ~fresh:false
+   (let open Syntax in
+   let* env = get_env in
+   let* sigma = get_sigma in
+   let* bck_map = get_bck_enc in
+   Log.debug
+   (Printf.sprintf
+   "mebi_wrapper.show_bck_map: \n%s"
+   (Utils.Strfy.list
+   ~force_newline:true
+   (Utils.Strfy.tuple
+   ~force_newline:true
+   ~indent:1
+   (fun (x : Enc.t) ->
+   Utils.Strfy.tuple
+   ~is_keyval:true
+   Utils.Strfy.str
+   Enc.to_string
+   ("encoding", x))
+   (fun (x : EConstr.t) ->
+   Utils.Strfy.tuple
+   ~is_keyval:true
+   Utils.Strfy.str
+   (Rocq_utils.Strfy.econstr env sigma)
+   ("econstr", x)))
+   (Enc.bck_to_list bck_map)));
+   return ())
+   ;; *)
 
 (* let show_proof_data () : unit mm =
   fun (st : wrapper ref) ->
@@ -1431,14 +1225,9 @@ let show_bck_map () : unit =
 let make_transition_tbl (st : wrapper ref)
   : (module Hashtbl.S with type key = Enc.t) in_context
   =
-  let eqf = Enc.eq in
-  let hashf = Enc.hash in
   let module TransitionTbl =
     Hashtbl.Make (struct
-      type t = Enc.t
-
-      let equal t1 t2 = eqf t1 t2
-      let hash t = hashf t
+      include Enc
     end)
   in
   { state = st
@@ -1449,12 +1238,9 @@ let make_transition_tbl (st : wrapper ref)
 let make_state_set (st : wrapper ref)
   : (module Set.S with type elt = Enc.t) in_context
   =
-  let comparef = Enc.compare in
   let module StateSet =
     Set.Make (struct
-      type t = Enc.t
-
-      let compare t1 t2 = comparef t1 t2
+      include Enc
     end)
   in
   { state = st; value = (module StateSet : Set.S with type elt = Enc.t) }
@@ -1468,9 +1254,10 @@ let make_state_tree_pair_set (st : wrapper ref)
       type t = Enc.t * Mebi_constr.Tree.t
 
       let compare t1 t2 =
-        match Enc.compare (fst t1) (fst t2) with
-        | 0 -> Mebi_constr.Tree.compare (snd t1) (snd t2)
-        | c -> c
+        Utils.compare_chain
+          [ Enc.compare (fst t1) (fst t2)
+          ; Mebi_constr.Tree.compare (snd t1) (snd t2)
+          ]
       ;;
     end)
   in
