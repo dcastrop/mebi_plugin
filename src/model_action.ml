@@ -32,6 +32,10 @@ let equal (a : t) (b : t) : bool =
   check_equal ~annotations:true ~constructor_trees:true a b
 ;;
 
+let wk_equal (a : t) (b : t) : bool =
+  check_equal ~annotations:false ~constructor_trees:false a b
+;;
+
 (** [compare] *)
 let check_compare
       ?(annotations : bool = true)

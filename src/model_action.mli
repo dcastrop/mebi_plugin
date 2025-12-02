@@ -14,6 +14,7 @@ val check_equal :
   bool
 
 val equal : t -> t -> bool
+val wk_equal : t -> t -> bool
 
 val check_compare :
   ?annotations:bool -> ?constructor_trees:bool -> t -> t -> int
