@@ -750,6 +750,12 @@ end
 (***********************************************************************)
 
 module Saturate = struct
+  let add_annotation (from : State.t) (action : Action.t)
+    : Note.annotation -> Note.annotation
+    =
+    Note.add_note { from; via = action.label }
+  ;;
+
   exception
     Model_Saturate_CannotSaturateActionsWithUnknownVisibility of Action.t
 
@@ -844,35 +850,33 @@ module Saturate = struct
       (fun (the_action : Action.t)
         (destinations : States.t)
         (acc : (Action.t * States.t) list) ->
-        Logging.Log.debug
-          (Printf.sprintf
-             "check_actions, the_action: %s"
-             (Action.to_string the_action));
-        if is_action_silent the_action
-        then (
+        match named, is_action_silent the_action with
+        | _, true ->
           (* NOTE: add to annotation, continue exploring outwards *)
-          let annotation : Note.annotation =
-            Note.add_note { from; via = the_action.label } annotation
-          in
           check_destinations
             ~named
-            ~annotation
+            ~annotation:(add_annotation from the_action annotation)
             old_edges
-            destinations
-            visited
-            acc)
-        else
-          (* NOTE: check if we have already found the named action or not *)
-          check_named
-            ~named
-            ~annotation
-            old_edges
-            from
-            the_action
             destinations
             visited
             acc
-            skip)
+        | None, false ->
+          (* NOTE: we have found the named action, add and continue *)
+          check_destinations
+            ~named:(Some the_action)
+            ~annotation:(add_annotation from the_action annotation)
+            old_edges
+            destinations
+            visited
+            acc
+        | Some _, false ->
+          if
+            (* NOTE: we already found the named action, so stop *)
+            !skip
+          then acc
+          else (
+            skip := true;
+            stop ~named ~annotation from acc))
       old_actions
       acc
 
@@ -893,7 +897,7 @@ module Saturate = struct
       (* NOTE: we have found the named action, continue *)
       check_destinations
         ~named:(Some the_action)
-        ~annotation
+        ~annotation:(add_annotation from the_action annotation)
         old_edges
         destinations
         visited
@@ -952,11 +956,7 @@ module Saturate = struct
         | None ->
           let yaction, ydestinations = y in
           if
-            Action.check_equal
-              ~annotations:false
-              ~constructor_trees:false
-              xaction
-              yaction
+            Action.wk_equal xaction yaction
             && States.equal xdestinations ydestinations
           then (
             let zaction : Action.t =
