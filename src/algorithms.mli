@@ -27,11 +27,16 @@ end
 
 module Bisimilar : sig
   type result = {
-    the_fsm_1 : Model.Fsm.t;
-    the_fsm_2 : Model.Fsm.t;
+    the_fsm_1 : fsm_pair;
+    the_fsm_2 : fsm_pair;
     merged_fsm : Model.Fsm.t;
     bisim_states : Model.Partition.t;
     non_bisim_states : Model.Partition.t;
+  }
+
+  and fsm_pair = {
+    original : Model.Fsm.t;
+    saturated : Model.Fsm.t;
   }
 
   val the_cached_result : result option ref

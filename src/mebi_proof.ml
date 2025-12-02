@@ -161,8 +161,18 @@ let the_result () : Algorithms.Bisimilar.result =
   Algorithms.Bisimilar.get_the_result ()
 ;;
 
-let mfsm () : Fsm.t = (the_result ()).the_fsm_1
-let nfsm () : Fsm.t = (the_result ()).the_fsm_2
+let mfsm ?(saturated : bool = false) () : Fsm.t =
+  if saturated
+  then (the_result ()).the_fsm_1.saturated
+  else (the_result ()).the_fsm_1.original
+;;
+
+let nfsm ?(saturated : bool = false) () : Fsm.t =
+  if saturated
+  then (the_result ()).the_fsm_2.saturated
+  else (the_result ()).the_fsm_2.original
+;;
+
 let the_bisim_states () : Partition.t = (the_result ()).bisim_states
 
 (***********************************************************************)
@@ -547,7 +557,6 @@ let get_transition
   try
     let states : States.t = fsm.states in
     let labels : Alphabet.t = fsm.alphabet in
-    Log.debug "A";
     let from : State.t = find_state sigma fromty states in
     Log.debug (Printf.sprintf "From: %s" (State.to_string from));
     let label : Label.t = find_label sigma labelty labels in
@@ -566,10 +575,8 @@ let get_transition
              (states_to_string y)))
       (Edges.find fsm.edges from);
     let { annotations; constructor_trees; _ } : Action.t =
-      (* TODO: [get_action_labelled] does not take into account saturated actions? Or, perhaps the saturated action label isnt updated (and maybe annotations not correctly updated?) *)
-      get_action_labelled label (Edges.find fsm.edges from)
+      get_action_labelled ~annotated:true label (Edges.find fsm.edges from)
     in
-    Log.debug "F";
     Transition_opt.create from label goto annotations constructor_trees
   with
   | Mebi_proof_CouldNotDecodeState (sigma, ty, states) ->
@@ -842,7 +849,7 @@ let concl_get_eexists
     (try
        let nt : Transition_opt.t =
          Rocq_utils.econstr_to_atomic sigma wk_trans
-         |> get_weak_transition sigma (nfsm ())
+         |> get_weak_transition sigma (nfsm ~saturated:true ())
        in
        let mstate : State.t =
          weak_sim_get_m_state sigma (Rocq_utils.econstr_to_atomic sigma wk_sim)
@@ -913,13 +920,18 @@ let do_hyp_inversion (gl : Proofview.Goal.t) : tactic =
 ;;
 
 let get_ngoto
+      ?(saturated : bool = false)
       (mgoto : State.t)
       ({ from = nfrom; label = nlabel; _ } : Transition_opt.t)
   : State.t
   =
   Log.trace "Mebi_proof.get_ngoto";
-  let nactions : States.t Actions.t = Edges.find (nfsm ()).edges nfrom in
-  Model.get_action_labelled nlabel nactions
+  Log.debug "D";
+  let nactions : States.t Actions.t =
+    Edges.find (nfsm ~saturated ()).edges nfrom
+  in
+  Log.debug "E";
+  Model.get_action_labelled ~annotated:saturated nlabel nactions
   |> Actions.find nactions
   |> States.inter (Model.get_bisim_states mgoto (the_bisim_states ()))
   |> States.min_elt
@@ -959,6 +971,7 @@ let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
     |> Rocq_utils.econstr_to_atomic sigma
     |> concl_get_eexists gl
   in
+  Log.debug "A";
   (* ERR: if labels are not consistent *)
   if Bool.not (Label.equal mtransition.label ntransition.label)
   then raise (Mebi_proof_ExIntro_NEqLabel (mtransition, ntransition));
@@ -967,12 +980,15 @@ let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
   then
     raise (Mebi_proof_ExIntro_NotBisimilar (mtransition.from, ntransition.from));
   (* ERR: unless Some mgoto and None ngoto *)
+  Log.debug "B";
   match mtransition.goto, ntransition.goto with
   | Some mgoto, None ->
     (* ERR: if states are not consistent *)
     if Bool.not (State.equal mstate mgoto)
     then raise (Mebi_proof_ExIntro_NEqStateM (mstate, Some mgoto));
+    Log.debug "C";
     the_proof_state := GoalTransition mtransition;
+    (* TODO: in [get_ngoto] we need to sometimes use the [~saturated] nfsm, but need to detect here if that is necessary? or just make the code in [get_ngoto] more robust and figure this out itself *)
     get_ngoto mgoto ntransition |> do_ex_intro gl
   | _, _ -> raise (Mebi_proof_ExIntro_Transitions (mtransition, ntransition))
 ;;
@@ -1084,7 +1100,7 @@ and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition_opt.t)
     let { from = nfrom; label = nlabel; goto = ngoto; _ } : Transition_opt.t =
       Proofview.Goal.concl gl
       |> Rocq_utils.econstr_to_atomic sigma
-      |> get_weak_transition sigma (nfsm ())
+      |> get_weak_transition sigma (nfsm ~saturated:true ())
     in
     match mtrans.goto, ngoto with
     | Some _, Some ngoto ->
@@ -1122,11 +1138,11 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
   | { annotation = []; tactics } ->
     if PState.empty_tactics tactics
     then (
-      Log.debug "A";
+      Log.debug "tactics empty";
       the_proof_state := NewWeakSim;
       do_eapply_rt1n_refl gl)
     else (
-      Log.debug "B";
+      Log.debug "got tactics";
       (* tactic_chain [ do_simplify gl; do_eapply_rt1n_refl gl ] *)
       do_constructor_tactic gl [] tactics)
   | { annotation; tactics } -> do_constructor_tactic gl annotation tactics

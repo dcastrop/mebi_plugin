@@ -809,8 +809,8 @@ let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
   Log.details
     (Printf.sprintf
        "command.run, CheckBisimilarity, saturated:\nFSM 1:\n%s\n\nFSM 2:\n%s\n"
-       (Fsm.to_string the_bisimilar.the_fsm_1)
-       (Fsm.to_string the_bisimilar.the_fsm_2));
+       (Fsm.to_string the_bisimilar.the_fsm_1.saturated)
+       (Fsm.to_string the_bisimilar.the_fsm_2.saturated));
   if
     !Params.the_fail_if_not_bisim
     && Algorithms.Bisimilar.result_to_bool the_bisimilar
@@ -851,12 +851,14 @@ let proof_intro
   let* _ = run (CheckBisimilarity ((x, a), (y, b))) refs in
   Log.debug
     (Printf.sprintf
-       "command.proof_intro, the_fsm_1:\n%s"
-       (Fsm.to_string (Algorithms.Bisimilar.get_the_result ()).the_fsm_1));
+       "command.proof_intro, the_fsm_1: (saturated)\n%s"
+       (Fsm.to_string
+          (Algorithms.Bisimilar.get_the_result ()).the_fsm_1.saturated));
   Log.debug
     (Printf.sprintf
-       "command.proof_intro, the_fsm_2:\n%s"
-       (Fsm.to_string (Algorithms.Bisimilar.get_the_result ()).the_fsm_2));
+       "command.proof_intro, the_fsm_2: (saturated)\n%s"
+       (Fsm.to_string
+          (Algorithms.Bisimilar.get_the_result ()).the_fsm_2.saturated));
   return
     (Mebi_tactics.update_proof_by_tactic
        pstate

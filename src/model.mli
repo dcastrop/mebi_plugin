@@ -301,7 +301,7 @@ val is_action_annotated : Action.t -> bool
 val is_action_silent : Action.t -> bool
 
 val get_action_labelled :
-  Label.t -> States.t Actions.t -> Action.t
+  ?annotated:bool -> Label.t -> States.t Actions.t -> Action.t
 
 val get_action_destinations : States.t Actions.t -> States.t
 
@@ -479,6 +479,9 @@ module Fsm : sig
 end
 
 module Saturate : sig
+  val add_annotation :
+    State.t -> Action.t -> Note.annotation -> Note.annotation
+
   exception
     Model_Saturate_CannotSaturateActionsWithUnknownVisibility of
       Action.t
