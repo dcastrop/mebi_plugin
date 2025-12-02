@@ -98,7 +98,7 @@ let to_string ?(args : style_args = style_args ()) (x : t) : string =
 let annotation_to_string ?(args : style_args = style_args ()) (x : annotation)
   : string
   =
-  list ~args:{ args with name = Some "Annotation" } to_string x
+  list ~args:{ args with name = Some "Annotation" } to_string (List.rev x)
 ;;
 
 let annotations_to_string ?(args : style_args = style_args ()) (x : annotations)
