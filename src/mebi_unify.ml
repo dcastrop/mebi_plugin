@@ -9,19 +9,6 @@ let show_extractargs_debug : bool = false
 
 (****************************************************************************)
 
-(** sandbox unifies the fresh with the original, returning the value which is then replaces the destination in the resulting constructor
-*)
-(* let rec fresh_constructors : (Constructor_arg.Fresh.t option * Mebi_constr.t) list -> Constructors.t = function 
-| (None, c) ::tl-> c::  (fresh_constructors tl)
-| (Some {sigma;evar;original},(action,destination,tree))::tl -> 
-  let c' = 
-  sandbox (
-
-  )
-  in
-  c'::  (fresh_constructors tl)
-;; *)
-
 exception ConstructorArgsExpectsArraySize3 of unit
 
 let constructor_args (args : EConstr.t array) : constructor_args =
@@ -30,91 +17,34 @@ let constructor_args (args : EConstr.t array) : constructor_args =
   else raise (*TODO:err*) (ConstructorArgsExpectsArraySize3 ())
 ;;
 
-(** [a] may be re-freshed *)
-(* let map_constr_to_pair (a : EConstr.t) (b : EConstr.t) : Pair.t mm =
-   state (fun env sigma -> Pair.make env sigma a b)
-   ;; *)
-
 (** creates unification problems between the rhs of the current constructor and the lhs of the next, along with the actions of both.
     (* NOTE: this is only relevant when deciding whether to explore a given constructor from a premise of another *)
 *)
-let map_constr_to_problem env sigma args
-  : Mebi_constr.t -> Evd.evar_map * Problem.t
-  = function
+let constr_to_problem args : Mebi_constr.t -> Problem.t = function
   | act, rhs, tree ->
-    (* let sigma, act = Pair.make env sigma args.act act in *)
-    (* let sigma, dest = Pair.make env sigma args.rhs rhs in *)
     let act : Pair.t = { a = args.act; b = act } in
     let dest : Pair.t = { a = args.rhs; b = rhs } in
-    sigma, { act; dest; tree }
+    { act; dest; tree }
 ;;
 
 let map_problems args (constructors : Constructors.t) : Problems.t mm =
-  let* env = get_env in
-  let iter_body (i : int) ((sigma, to_unify) : Evd.evar_map * Problem.t list)
-    : (Evd.evar_map * Problem.t list) mm
-    =
-    let constructor : Mebi_constr.t = List.nth constructors i in
-    let sigma, problem = map_constr_to_problem env sigma args constructor in
-    return (sigma, problem :: to_unify)
-  in
-  let* sigma' = get_sigma in
-  let* sigma, to_unify =
-    iterate 0 (List.length constructors - 1) (sigma', []) iter_body
+  let* sigma = get_sigma in
+  let to_unify : Problem.t list =
+    List.map (constr_to_problem args) constructors
   in
   let p : Problems.t = { sigma; to_unify } in
   return p
 ;;
-
-(*!!!!!!!!!!!!!!*)
-
-(** [a] may be re-freshed *)
-(* let map_constr_to_pair (a : EConstr.t) (b : EConstr.t) : Pair.t mm =
-   state (fun env sigma -> Pair.make env sigma a b)
-   ;; *)
-
-(** creates unification problems between the rhs of the current constructor and the lhs of the next, along with the actions of both.
-    (* NOTE: this is only relevant when deciding whether to explore a given constructor from a premise of another *)
-*)
-(* let map_constr_to_problem args : Mebi_constr.t -> Problem.t mm = function
-  | act, rhs, tree ->
-    let* act : Pair.t = map_constr_to_pair args.act act in
-    let* dest : Pair.t = map_constr_to_pair args.rhs rhs in
-    let p : Problem.t = { act; dest; tree } in
-    return p
-;; *)
-
-(* let map_problems args (constructors : Constructors.t) : Problems.t mm =
-  let iter_body (i : int) ((sigma, to_unify) : Evd.evar_map * Problem.t list)
-    : (Evd.evar_map * Problem.t list) mm
-    =
-    let constructor : Mebi_constr.t = List.nth constructors i in
-    let* problem : Problem.t = map_constr_to_problem args constructor in
-    return (sigma, problem :: to_unify)
-  in
-  let* sigma' = get_sigma in
-  let* sigma, to_unify =
-    iterate 0 (List.length constructors - 1) (sigma', []) iter_body
-  in
-  let p : Problems.t = { sigma; to_unify } in
-  return p
-;; *)
 
 let cross_product (acc : Problems.t list) ({ sigma; to_unify } : Problems.t)
   : Problems.t list
   =
-  let p : Problems.t list =
-    List.concat_map
-      (fun ({ to_unify = xs; _ } : Problems.t) : Problems.t list ->
-        let p : Problems.t list =
-          List.map
-            (fun (y : Problem.t) : Problems.t -> { sigma; to_unify = y :: xs })
-            to_unify
-        in
-        p)
-      acc
-  in
-  p
+  List.concat_map
+    (fun ({ to_unify = xs; _ } : Problems.t) : Problems.t list ->
+      List.map
+        (fun (y : Problem.t) : Problems.t -> { sigma; to_unify = y :: xs })
+        to_unify)
+    acc
 ;;
 
 (* let cross_productOLD (acc : Problems.t list) (problems : Problems.t)
@@ -275,6 +205,7 @@ let rec check_valid_constructors
           (substl, decls)
       in
       Logging.Log.debug "CVC constructors:";
+      (* ! NOTE: here we obtain the successfully unified and distinct action and destination -- BUT as this is returned, we see that it is actually another evar and this then unifies incorrectly. *)
       let* () = debug_constructors_mm constructors in
       let* () = debug_validconstrs_iter_close i constructors in
       return constructors)
@@ -321,8 +252,6 @@ and explore_valid_constructor
   in
   let* () = debug_validconstrs_iter_success_close from_term (Some act) args in
   return constructors
-(* in
-   return constructors *)
 
 (* Should return a list of unification problems *)
 and check_updated_ctx
@@ -362,6 +291,7 @@ and check_updated_ctx
              return None
            | next_constructors ->
              let* () = Rocq_debug.debug_econstr_mm "CTX act" act in
+             (* ! NOTE: *)
              (* let* () = debug_constructors_mm next_constructors in *)
              let* problems : Problems.t = map_problems args next_constructors in
              let* () = debug_problems_mm problems in
