@@ -127,10 +127,10 @@ let state
       (st : wrapper ref)
   : 'a in_context
   =
-  let coq_st : coq_context ref = !st.coq_ref in
-  let sigma, a = f !coq_st.coq_env !coq_st.coq_ctx in
-  coq_st := { !coq_st with coq_ctx = sigma };
-  st := { !st with coq_ref = coq_st };
+  let coq_ref : coq_context ref = !st.coq_ref in
+  let sigma, a = f !coq_ref.coq_env !coq_ref.coq_ctx in
+  coq_ref := { !coq_ref with coq_ctx = sigma };
+  st := { !st with coq_ref };
   { state = st; value = a }
 ;;
 
@@ -138,18 +138,16 @@ let sandbox ?(using : Evd.evar_map option) (m : 'a mm) (st : wrapper ref)
   : 'a in_context
   =
   let st_contents : wrapper = !st in
-  let st_sandbox : wrapper ref =
-    match using with
-    | None -> st
-    | Some sigma ->
-      ref { !st with coq_ref = ref { !(!st.coq_ref) with coq_ctx = sigma } }
-    (* let coq_context : coq_context = { !(!st.coq_ref) with coq_ctx = sigma } in
-      let coq_ref : coq_context ref = ref coq_context in
-      let st_sandbox : wrapper = { !st with coq_ref } in
-      ref st_sandbox *)
-  in
-  let res : 'a in_context = m st_sandbox in
-  { state = ref st_contents; value = res.value }
+  match using with
+  | None ->
+    let res : 'a in_context = m st in
+    { state = ref st_contents; value = res.value }
+  | Some sigma ->
+    let coq_context : coq_context = !(!st.coq_ref) in
+    let coq_ref : coq_context ref = ref { coq_context with coq_ctx = sigma } in
+    let st : wrapper ref = ref { !st with coq_ref } in
+    let res : 'a in_context = m st in
+    { state = ref st_contents; value = res.value }
 ;;
 
 (********************************************)
