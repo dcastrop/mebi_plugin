@@ -228,10 +228,24 @@ let is_action_silent (x : Action.t) : bool =
 
 (** [get_action_labelled x actions] returns an action in [actions] that has a label matching [x]. (follows [List.find], so throws error if match is not found)
 *)
-let get_action_labelled (x : Label.t) (actions : States.t Actions.t) : Action.t =
+let get_action_labelled
+      ?(annotated : bool = false)
+      (x : Label.t)
+      (actions : States.t Actions.t)
+  : Action.t
+  =
   Actions.to_seq_keys actions
   |> List.of_seq
-  |> List.find (fun (y : Action.t) -> Label.equal x y.label)
+  |> List.find (fun (y : Action.t) ->
+    Label.equal y.label x
+    ||
+    if annotated
+    then (
+      let f (y : Note.annotation) =
+        List.exists (fun ({ via; _ } : Note.t) -> Label.equal x via) y
+      in
+      List.exists f y.annotations)
+    else false)
 ;;
 
 let get_action_destinations (actions : States.t Actions.t) : States.t =

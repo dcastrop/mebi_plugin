@@ -106,11 +106,16 @@ end
 
 module Bisimilar = struct
   type result =
-    { the_fsm_1 : Fsm.t
-    ; the_fsm_2 : Fsm.t
+    { the_fsm_1 : fsm_pair
+    ; the_fsm_2 : fsm_pair
     ; merged_fsm : Fsm.t
     ; bisim_states : Partition.t
     ; non_bisim_states : Partition.t
+    }
+
+  and fsm_pair =
+    { original : Fsm.t
+    ; saturated : Fsm.t
     }
 
   let the_cached_result : result option ref = ref None
@@ -171,8 +176,8 @@ module Bisimilar = struct
     let (bisim_states, non_bisim_states) : Partition.t * Partition.t =
       split_bisimilar pi (fst the_fsm_pair) (snd the_fsm_pair)
     in
-    { the_fsm_1 = fst the_fsm_pair
-    ; the_fsm_2 = snd the_fsm_pair
+    { the_fsm_1 = { original = fst the_fsm_pair; saturated = the_sat_1 }
+    ; the_fsm_2 = { original = snd the_fsm_pair; saturated = the_sat_2 }
     ; merged_fsm
     ; bisim_states
     ; non_bisim_states
