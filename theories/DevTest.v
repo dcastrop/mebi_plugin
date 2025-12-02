@@ -90,6 +90,8 @@ Inductive termLTS_tc : term -> Prop :=
 
 MeBi Set ShowAny      True.
 MeBi Set ShowNotices  True.
+MeBi Set ShowDetails  True.
+MeBi Set ShowResults    True.
 MeBi Set ShowDebug    True.
 MeBi Set WeakMode     True.
 
@@ -226,6 +228,14 @@ Inductive termLTS3 : term -> option label -> term -> Prop :=
 
 (* MeBi Set Bound 50.
 MeBi LTS (tseq (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) tend) (tfix (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) trec))) Using termLTS3. *)
+
+(* MeBi LTS 
+(tfix (tseq (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) trec)) 
+Using termLTS3. *)
+(* 
+MeBi Saturate 
+(tfix (tseq (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) trec)) 
+Using termLTS3. *)
 
 
 (* testing merging *)
