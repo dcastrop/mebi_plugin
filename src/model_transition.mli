@@ -6,8 +6,7 @@ type t = {
   constructor_trees : Mebi_constr.Tree.t list option;
 }
 
-
-
 val equal : t -> t -> bool
 val compare : t -> t -> int
+val annotations_is_empty : t -> bool
 val to_string : ?args:Utils.Strfy.style_args -> t -> string

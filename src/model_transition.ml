@@ -28,6 +28,12 @@ let compare (a : t) (b : t) : int =
     ]
 ;;
 
+let annotations_is_empty : t -> bool = function
+  | { annotations = None; _ } -> true
+  | { annotations = Some annotations; _ } ->
+    Model_note.annotations_is_empty annotations
+;;
+
 open Utils.Strfy
 
 let to_string ?(args : style_args = style_args ()) (x : t) : string =

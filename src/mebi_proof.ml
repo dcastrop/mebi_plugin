@@ -197,16 +197,43 @@ let are_states_bisimilar (m : State.t) (n : State.t) : bool =
   Model.get_bisim_states m (the_bisim_states ()) |> States.mem n
 ;;
 
-let get_naction (nfrom : State.t) (nlabel : Label.t) : Action.t =
+let get_naction ?(saturated : bool = false) (nfrom : State.t) (nlabel : Label.t)
+  : Action.t
+  =
   Log.trace "Mebi_proof.get_naction";
-  Edges.find (nfsm ()).edges nfrom |> Model.get_action_labelled nlabel
+  (* Edges.find (nfsm ()).edges nfrom |> Model.get_action_labelled nlabel *)
+  Model.get_action_labelled_from
+    ~annotated:saturated
+    nfrom
+    nlabel
+    (nfsm ~saturated ()).edges
 ;;
 
 let get_constructor_annotation (nfrom : State.t) (nlabel : Label.t)
   : Note.annotation
   =
   Log.trace "Mebi_proof.get_constructor_annotation";
-  get_naction nfrom nlabel |> Model.get_shortest_annotation nfrom
+  try
+    get_naction ~saturated:false nfrom nlabel
+    |> Model.get_shortest_annotation nfrom
+  with
+  | Model_NoActionLabelledFrom (annotated, from, label, edges) ->
+    (* Log.warning
+       (Printf.sprintf
+       "Mebi_proof.get_constructor_annotation, Model_NoActionLabelledFrom:\n\
+       - annotated: %b\n\
+       - from: %s\n\
+       - label: %s\n\
+       - edges: %s\n\
+       - edges (saturated): %s"
+         annotated
+         (State.to_string from)
+         (Label.to_string label)
+         (Model.edges_to_string edges)
+         (Model.edges_to_string (nfsm ~saturated:true ()).edges));
+         raise (Model_NoActionLabelledFrom (annotated, from, label, edges)) *)
+    get_naction ~saturated:true nfrom nlabel
+    |> Model.get_shortest_annotation nfrom
 ;;
 
 let get_annotation_constructor (nfrom : State.t) (nlabel : Label.t)
@@ -346,6 +373,7 @@ let do_constructor_transition
       (htactic : tactic)
   : tactic
   =
+  Log.trace "Mebi_proof.do_constructor_transition";
   let annotation = get_constructor_annotation nfrom nlabel in
   (* NOTE: update [the_proof_state] *)
   the_proof_state := ApplyConstructors { annotation; tactics = None };
@@ -353,6 +381,7 @@ let do_constructor_transition
 ;;
 
 let do_refl_none (gl : Proofview.Goal.t) : tactic =
+  Log.trace "Mebi_proof.do_refl_none";
   (* NOTE: update [the_proof_state] *)
   the_proof_state := NewWeakSim;
   tactic_chain
@@ -422,7 +451,9 @@ let do_build_constructor_tactics (gl : Proofview.Goal.t)
 
 let do_constructor_tactic (gl : Proofview.Goal.t) (annotation : Note.annotation)
   : tactic list option -> tactic
-  = function
+  =
+  Log.trace "Mebi_proof.do_constructor_tactic";
+  function
   | None -> do_build_constructor_tactics gl annotation
   | Some [] ->
     tactic_chain [ do_simplify gl; do_build_constructor_tactics gl annotation ]
@@ -847,10 +878,12 @@ let concl_get_eexists
   match Array.to_list apptys with
   | [ wk_trans; wk_sim ] ->
     (try
+       Log.trace "Mebi_proof.concl_get_eexists (get nt)";
        let nt : Transition_opt.t =
          Rocq_utils.econstr_to_atomic sigma wk_trans
          |> get_weak_transition sigma (nfsm ~saturated:true ())
        in
+       Log.trace "Mebi_proof.concl_get_eexists (get mstate)";
        let mstate : State.t =
          weak_sim_get_m_state sigma (Rocq_utils.econstr_to_atomic sigma wk_sim)
        in
@@ -919,22 +952,42 @@ let do_hyp_inversion (gl : Proofview.Goal.t) : tactic =
     .tactic
 ;;
 
-let get_ngoto
+(* let find_action_labelled (label:Label.t) (from:State.t) (fsm:Fsm.t) : Action.t =
+   (Edges.find fsm.edges from)
+   |> Model.get *)
+(* 
+let is_action_saturated : Action.t -> bool = function
+  | { annotations; _ } -> Note.annotations_is_empty annotations
+;; *)
+
+exception Mebi_proof_NGotoNotInFsm of unit
+
+let try_get_ngoto
       ?(saturated : bool = false)
       (mgoto : State.t)
       ({ from = nfrom; label = nlabel; _ } : Transition_opt.t)
   : State.t
   =
+  Log.trace "Mebi_proof.try_get_original_ngoto";
+  try
+    let nactions : States.t Actions.t =
+      Edges.find (nfsm ~saturated ()).edges nfrom
+    in
+    Model.get_action_labelled ~annotated:saturated nlabel nactions
+    |> Actions.find nactions
+    |> States.inter (Model.get_bisim_states mgoto (the_bisim_states ()))
+    |> States.min_elt
+  with
+  | Model_NoActionLabelled (annotated, label, actions) ->
+    raise (Mebi_proof_NGotoNotInFsm ())
+;;
+
+let get_ngoto (mgoto : State.t) (ntransition : Transition_opt.t) : State.t =
   Log.trace "Mebi_proof.get_ngoto";
-  Log.debug "D";
-  let nactions : States.t Actions.t =
-    Edges.find (nfsm ~saturated ()).edges nfrom
-  in
-  Log.debug "E";
-  Model.get_action_labelled ~annotated:saturated nlabel nactions
-  |> Actions.find nactions
-  |> States.inter (Model.get_bisim_states mgoto (the_bisim_states ()))
-  |> States.min_elt
+  try try_get_ngoto ~saturated:false mgoto ntransition with
+  | Mebi_proof_NGotoNotInFsm () ->
+    Log.trace "Mebi_proof.get_ngoto (saturated)";
+    try_get_ngoto ~saturated:true mgoto ntransition
 ;;
 
 let do_ex_intro (gl : Proofview.Goal.t) (ngoto : State.t) : tactic =
@@ -971,7 +1024,7 @@ let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
     |> Rocq_utils.econstr_to_atomic sigma
     |> concl_get_eexists gl
   in
-  Log.debug "A";
+  Log.trace "Mebi_proof.do_eexists_transition (got (nt, mstate))";
   (* ERR: if labels are not consistent *)
   if Bool.not (Label.equal mtransition.label ntransition.label)
   then raise (Mebi_proof_ExIntro_NEqLabel (mtransition, ntransition));
@@ -980,13 +1033,16 @@ let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
   then
     raise (Mebi_proof_ExIntro_NotBisimilar (mtransition.from, ntransition.from));
   (* ERR: unless Some mgoto and None ngoto *)
-  Log.debug "B";
+  Log.trace "Mebi_proof.do_eexists_transition (check Some goto)";
   match mtransition.goto, ntransition.goto with
   | Some mgoto, None ->
     (* ERR: if states are not consistent *)
     if Bool.not (State.equal mstate mgoto)
     then raise (Mebi_proof_ExIntro_NEqStateM (mstate, Some mgoto));
-    Log.debug "C";
+    Log.debug
+      (Printf.sprintf
+         "Mebi_proof.do_eexists_transition, mstate:\n%s"
+         (State.to_string mstate));
     the_proof_state := GoalTransition mtransition;
     (* TODO: in [get_ngoto] we need to sometimes use the [~saturated] nfsm, but need to detect here if that is necessary? or just make the code in [get_ngoto] more robust and figure this out itself *)
     get_ngoto mgoto ntransition |> do_ex_intro gl
@@ -1140,7 +1196,7 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
     then (
       Log.debug "tactics empty";
       the_proof_state := NewWeakSim;
-      do_eapply_rt1n_refl gl)
+      tactic_chain [ do_simplify gl; do_eapply_rt1n_refl gl ])
     else (
       Log.debug "got tactics";
       (* tactic_chain [ do_simplify gl; do_eapply_rt1n_refl gl ] *)

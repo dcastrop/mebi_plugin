@@ -63,17 +63,27 @@ Proof.
   
   MeBiSim Step.
   MeBiSim Step.
+  (* constructor 5. simpl. 
+  eapply rt1n_trans.
+  constructor 2. simpl.
+  constructor 6. simpl.
+  eapply rt1n_trans.
+  constructor 2. constructor . *)
   (* constructor. simpl. *)
   (* constructor 5. *)
+  (* simpl. *)
+
   MeBiSim Step.
-  (* appl *)
+
 
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-  (* MeBiSim Step. *)
+  
+  (* TODO: in [Mebi_proof], [get_naction] and [get_ngoto] we need to find a better way to keep track of whether we need to use the saturated action/fsm or not. (Maybe keep a history of previous states would help figure this out, or maybe if we can see that the action has no (or empty) annotations, then we can just use the original? Either way, setting it to use the saturated bydefault is wrong.) *)
+  MeBiSim Step.
   (* MeBiSim Step. *)
   (* MeBiSim Step. *)
   (* MeBiSim Step. *)

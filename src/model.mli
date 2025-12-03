@@ -300,6 +300,10 @@ exception
 val is_action_annotated : Action.t -> bool
 val is_action_silent : Action.t -> bool
 
+exception
+  Model_NoActionLabelled of
+    (bool * Label.t * States.t Actions.t)
+
 val get_action_labelled :
   ?annotated:bool -> Label.t -> States.t Actions.t -> Action.t
 
@@ -363,6 +367,17 @@ val add_edge : States.t Actions.t Edges.t -> Edge.t -> unit
 
 val add_edges :
   States.t Actions.t Edges.t -> Edge.t list -> unit
+
+exception
+  Model_NoActionLabelledFrom of
+    (bool * State.t * Label.t * States.t Actions.t Edges.t)
+
+val get_action_labelled_from :
+  ?annotated:bool ->
+  State.t ->
+  Label.t ->
+  States.t Actions.t Edges.t ->
+  Action.t
 
 val get_edges_labelled :
   Label.t ->
