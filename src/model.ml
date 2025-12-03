@@ -226,6 +226,8 @@ let is_action_silent (x : Action.t) : bool =
   else false
 ;;
 
+exception Model_NoActionLabelled of (bool * Label.t * States.t Actions.t)
+
 (** [get_action_labelled x actions] returns an action in [actions] that has a label matching [x]. (follows [List.find], so throws error if match is not found)
 *)
 let get_action_labelled
@@ -234,18 +236,31 @@ let get_action_labelled
       (actions : States.t Actions.t)
   : Action.t
   =
-  Actions.to_seq_keys actions
-  |> List.of_seq
-  |> List.find (fun (y : Action.t) ->
-    Label.equal y.label x
-    ||
-    if annotated
-    then (
-      let f (y : Note.annotation) =
-        List.exists (fun ({ via; _ } : Note.t) -> Label.equal x via) y
-      in
-      List.exists f y.annotations)
-    else false)
+  try
+    Actions.to_seq_keys actions
+    |> List.of_seq
+    |> List.find (fun (y : Action.t) ->
+      Label.equal y.label x
+      ||
+      if annotated
+      then (
+        let f (y : Note.annotation) =
+          List.exists (fun ({ via; _ } : Note.t) -> Label.equal x via) y
+        in
+        List.exists f y.annotations)
+      else false)
+  with
+  | Not_found ->
+    Log.warning
+      (Printf.sprintf
+         "Model.get_action_labelled, Model_NoActionLabelled:\n\
+          - annotated: %b\n\
+          - x: %s\n\
+          - actions: %s"
+         annotated
+         (Label.to_string x)
+         (actions_to_string actions));
+    raise (Model_NoActionLabelled (annotated, x, actions))
 ;;
 
 let get_action_destinations (actions : States.t Actions.t) : States.t =
@@ -342,6 +357,23 @@ let add_edges (edges : States.t Actions.t Edges.t) (to_add : Edge.t list) : unit
     (fun (edge : Edge.t) ->
       States.singleton edge.goto |> update_edge edges edge.from edge.action)
     to_add
+;;
+
+exception
+  Model_NoActionLabelledFrom of
+    (bool * State.t * Label.t * States.t Actions.t Edges.t)
+
+let get_action_labelled_from
+      ?(annotated : bool = false)
+      (from : State.t)
+      (x : Label.t)
+      (edges : States.t Actions.t Edges.t)
+  : Action.t
+  =
+  try Edges.find edges from |> get_action_labelled ~annotated x with
+  | Not_found -> raise (Model_NoActionLabelledFrom (annotated, from, x, edges))
+  | Model_NoActionLabelled _ ->
+    raise (Model_NoActionLabelledFrom (annotated, from, x, edges))
 ;;
 
 (** [get_edges_labelled x edges] returns a copy of [edges] that has been [Edges.filter-map-inplace] so that only actions with a label matching [x] remain.
