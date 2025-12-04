@@ -22,14 +22,13 @@ module PState : sig
     | DetectState
 
   and applicable_constructors =
-    { annotation : Model_note.annotation
+    { annotation : Model_note.annotation option
     ; tactics : tactic list option
     }
 
   (* and tactic_to_apply = unit -> unit Proofview.tactic *)
 
   val empty_tactics : tactic list option -> bool
-  val finished_applying_constructors : applicable_constructors -> bool
   val to_string : ?short:bool -> t -> string
 end
 
