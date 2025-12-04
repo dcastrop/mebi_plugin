@@ -61,3 +61,16 @@ module Scope : sig
     unit ->
     unit
 end
+
+type 'a to_string =
+  | A of (?args:Utils.Strfy.style_args -> 'a -> string)
+  | B of ('a -> string)
+
+val thing :
+  ?args:Utils.Strfy.style_args ->
+  string ->
+  'a ->
+  'a to_string ->
+  unit
+
+val option : string -> 'a option -> 'a to_string -> unit

@@ -99,3 +99,28 @@ module Scope = struct
     msg ~prefix ~infix ~suffix ~info (decr ()) "## CLOSE"
   ;;
 end
+
+type 'a to_string =
+  | A of (?args:Utils.Strfy.style_args -> 'a -> string)
+  | B of ('a -> string)
+
+let thing
+      ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+      (prefix : string)
+      (x : 'a)
+  : 'a to_string -> unit
+  = function
+  | A f -> Log.debug (Printf.sprintf "%s: %s" prefix (f ~args x))
+  | B f -> Log.debug (Printf.sprintf "%s: %s" prefix (f x))
+;;
+
+let option (prefix : string) (x : 'a option) (f : 'a to_string) : unit =
+  (* NOTE: wrap in fun to avoid printing both *)
+  let y : unit -> unit =
+    Option.cata
+      (fun (x : 'a) -> fun () -> thing (Printf.sprintf "%s Some" prefix) x f)
+      (fun () -> thing prefix "None" (A Utils.Strfy.string))
+      x
+  in
+  y ()
+;;
