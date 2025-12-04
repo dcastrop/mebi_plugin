@@ -218,23 +218,57 @@ let get_annotations
   : Note.annotations
   =
   if List.is_empty annotations
-  then [ [ Note.create from label ] ]
+  then [ { this = Note.create from label; next = None } ]
   else
     List.map
-      (fun (x : Note.annotation) -> Note.create from label :: x)
+      (fun (x : Note.annotation) -> Note.add_note (Note.create from label) x)
       annotations
 ;;
 
-let get_shortest_annotation (from : State.t) (x : Action.t) : Note.annotation =
-  Log.trace "Model.get_shortest_annotation";
+let get_shortest_annotation (x : Action.t) : Note.annotation =
+  Log.trace "Model.get_shortest_annotation_from";
+  match x.annotations with
+  | [] -> raise (Model_Action_HasNoAnnotations x)
+  | h :: [] -> h
+  | h :: tl ->
+    List.fold_left
+      (fun (the_min : Note.annotation) (y : Note.annotation) ->
+        let f = Note.annotation_depth in
+        match Int.compare (f y) (f the_min) with -1 -> y | _ -> the_min)
+      h
+      tl
+;;
+
+let get_shortest_annotation_from (from : State.t) (x : Action.t)
+  : Note.annotation
+  =
+  Log.trace "Model.get_shortest_annotation_from";
   match get_annotations from x with
   | [] -> raise (Model_Action_HasNoAnnotations x)
   | h :: tl ->
     List.fold_left
-      (fun the_min y ->
-        match Int.compare (List.length y) (List.length the_min) with
-        | -1 -> y
-        | _ -> the_min)
+      (fun (the_min : Note.annotation) (y : Note.annotation) ->
+        let f = Note.annotation_depth in
+        match Int.compare (f y) (f the_min) with -1 -> y | _ -> the_min)
+      h
+      tl
+;;
+
+exception Model_Actions_IsEmpty of States.t Actions.t
+
+let get_action_with_shortest_annotation (actions : States.t Actions.t)
+  : Action.t
+  =
+  match Actions.to_seq_keys actions |> List.of_seq with
+  | [] -> raise (Model_Actions_IsEmpty actions)
+  | h :: [] -> h
+  | h :: tl ->
+    List.fold_left
+      (fun (acc : Action.t) (x : Action.t) ->
+        let f (z : Action.t) : int =
+          get_shortest_annotation z |> Note.annotation_depth
+        in
+        match Int.compare (f x) (f acc) with -1 -> x | _ -> acc)
       h
       tl
 ;;
@@ -294,11 +328,7 @@ let get_action_labelled
       Label.equal y.label x
       ||
       if annotated
-      then (
-        let f (y : Note.annotation) =
-          List.exists (fun ({ via; _ } : Note.t) -> Label.equal x via) y
-        in
-        List.exists f y.annotations)
+      then List.exists (Note.exists_label x) y.annotations
       else false)
   with
   | Not_found ->
@@ -421,6 +451,8 @@ let get_action_labelled_from
       (edges : States.t Actions.t Edges.t)
   : Action.t
   =
+  let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
+  Debug.thing (prefix "x") x (A Label.to_string);
   try Edges.find edges from |> get_action_labelled ~annotated x with
   | Not_found -> raise (Model_NoActionLabelledFrom (annotated, from, x, edges))
   | Model_NoActionLabelled _ ->
@@ -896,7 +928,7 @@ module Saturate = struct
 
   let stop
         ?(named : Action.t option = None)
-        ?(annotation : Note.annotation = [])
+        (annotation : Note.annotation)
         (from : State.t)
         (acc : (Action.t * States.t) list)
     : (Action.t * States.t) list
@@ -913,7 +945,7 @@ module Saturate = struct
   *)
   let rec check_from
             ?(named : Action.t option = None)
-            ?(annotation : Note.annotation = [])
+            (annotation : Note.annotation)
             (old_edges : States.t Actions.t Edges.t)
             (from : State.t)
             (visited : int StateTracker.t)
@@ -925,14 +957,14 @@ module Saturate = struct
     if can_revisit from visited
     then (
       match Edges.find_opt old_edges from with
-      | None -> stop ~named ~annotation from acc
+      | None -> stop ~named annotation from acc
       | Some old_actions ->
-        check_actions ~named ~annotation old_edges from old_actions visited acc)
-    else stop ~named ~annotation from acc
+        check_actions ~named annotation old_edges from old_actions visited acc)
+    else stop ~named annotation from acc
 
   and check_actions
         ?(named : Action.t option = None)
-        ?(annotation : Note.annotation = [])
+        (annotation : Note.annotation)
         (old_edges : States.t Actions.t Edges.t)
         (from : State.t)
         (old_actions : States.t Actions.t)
@@ -952,7 +984,7 @@ module Saturate = struct
           (* NOTE: add to annotation, continue exploring outwards *)
           check_destinations
             ~named
-            ~annotation:(add_annotation from the_action annotation)
+            (add_annotation from the_action annotation)
             old_edges
             destinations
             visited
@@ -961,7 +993,7 @@ module Saturate = struct
           (* NOTE: we have found the named action, add and continue *)
           check_destinations
             ~named:(Some the_action)
-            ~annotation:(add_annotation from the_action annotation)
+            (add_annotation from the_action annotation)
             old_edges
             destinations
             visited
@@ -973,13 +1005,13 @@ module Saturate = struct
           then acc
           else (
             skip := true;
-            stop ~named ~annotation from acc))
+            stop ~named annotation from acc))
       old_actions
       acc
 
   and check_named
         ?(named : Action.t option = None)
-        ?(annotation : Note.annotation = [])
+        (annotation : Note.annotation)
         (old_edges : States.t Actions.t Edges.t)
         (from : State.t)
         (the_action : Action.t)
@@ -994,7 +1026,7 @@ module Saturate = struct
       (* NOTE: we have found the named action, continue *)
       check_destinations
         ~named:(Some the_action)
-        ~annotation:(add_annotation from the_action annotation)
+        (add_annotation from the_action annotation)
         old_edges
         destinations
         visited
@@ -1005,11 +1037,11 @@ module Saturate = struct
       then acc
       else (
         skip := true;
-        stop ~named ~annotation from acc)
+        stop ~named annotation from acc)
 
   and check_destinations
         ?(named : Action.t option = None)
-        ?(annotation : Note.annotation = [])
+        (annotation : Note.annotation)
         (old_edges : States.t Actions.t Edges.t)
         (the_destinations : States.t)
         (visited : int StateTracker.t)
@@ -1018,7 +1050,7 @@ module Saturate = struct
     =
     States.fold
       (fun (destination : State.t) (acc : (Action.t * States.t) list) ->
-        check_from ~named ~annotation old_edges destination visited acc)
+        check_from ~named annotation old_edges destination visited acc)
       the_destinations
       acc
   ;;
@@ -1076,7 +1108,7 @@ module Saturate = struct
       edge -> edge_actions -> edge_action_destinations -> ( ... ) *)
   let edge_action_destinations
         ?(named : Action.t option = None)
-        ?(annotation : Note.annotation = [])
+        (annotation : Note.annotation)
         (old_edges : States.t Actions.t Edges.t)
         (from : State.t)
         (the_destinations : States.t)
@@ -1088,7 +1120,7 @@ module Saturate = struct
         let visited : int StateTracker.t = StateTracker.create 0 in
         log_visit from visited;
         let saturated_tuples : (Action.t * States.t) list =
-          check_from ~named ~annotation old_edges the_destination visited []
+          check_from ~named annotation old_edges the_destination visited []
         in
         merge_saturated_tuples acc saturated_tuples)
       the_destinations
@@ -1099,7 +1131,6 @@ module Saturate = struct
       edge -> edge_actions -> edge_action_destinations -> ( ... ) *)
   let edge_actions
         ?(named : Action.t option = None)
-        ?(annotation : Note.annotation = [])
         (old_edges : States.t Actions.t Edges.t)
         (from : State.t)
         (old_actions : States.t Actions.t)
@@ -1112,11 +1143,11 @@ module Saturate = struct
         (acc : (Action.t * States.t) list) ->
         let named : Action.t option = check_update_named the_action named in
         let annotation : Note.annotation =
-          [ { from; via = the_action.label } ]
+          { this = { from; via = the_action.label }; next = None }
         in
         edge_action_destinations
           ~named
-          ~annotation
+          annotation
           old_edges
           from
           the_destinations

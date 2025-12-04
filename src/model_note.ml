@@ -23,30 +23,61 @@ let compare (a : t) (b : t) : int =
 (*** Annotation ********************************************************)
 (***********************************************************************)
 
-type annotation = t list
+type annotation =
+  { this : t
+  ; next : annotation option
+  }
 
-let annotation_equal (a : annotation) (b : annotation) : bool =
-  List.equal equal a b
+let rec annotation_equal
+          ({ this = athis; next = anext } : annotation)
+          ({ this = bthis; next = bnext } : annotation)
+  : bool
+  =
+  equal athis bthis && Option.equal annotation_equal anext bnext
 ;;
 
-let annotation_compare (a : annotation) (b : annotation) : int =
-  List.compare compare a b
+let rec annotation_compare
+          ({ this = athis; next = anext } : annotation)
+          ({ this = bthis; next = bnext } : annotation)
+  : int
+  =
+  match compare athis bthis with
+  | 0 -> Option.compare annotation_compare anext bnext
+  | n -> n
 ;;
 
+(** assumes the annotation is the "root" i.e., in the base case just mirrors a transition
+*)
 let annotation_is_empty : annotation -> bool = function
-  | [] -> true
+  | { this; next = None } -> true
   | _ -> false
 ;;
 
-let add_note (a : t) (bs : annotation) : annotation =
-  if List.mem a bs then bs else a :: bs
+let rec add_note (a : t) : annotation -> annotation = function
+  | { this; next = None } -> { this; next = Some { this = a; next = None } }
+  | { this; next = Some next } -> add_note a next
 ;;
 
-let union_annotation (a : annotation) (b : annotation) : annotation =
-  List.fold_left
-    (fun (acc : annotation) (x : t) -> if List.mem x acc then acc else x :: acc)
-    a
-    b
+let rec annotation_depth : annotation -> int = function
+  | { this; next = None } -> 1
+  | { this; next = Some next } -> 1 + annotation_depth next
+;;
+
+let shorter_annotation (a : annotation) (b : annotation) : annotation =
+  match Int.compare (annotation_depth a) (annotation_depth b) with
+  | -1 -> a
+  | _ -> b
+;;
+
+let rec exists (x : t) : annotation -> bool = function
+  | { this; next = None } -> false
+  | { this; next = Some next } -> if equal x this then true else exists x next
+;;
+
+let rec exists_label (x : Model_label.t) : annotation -> bool = function
+  | { this; next = None } -> false
+  | { this; next = Some next } ->
+    if Model_label.equal x this.via then true else exists_label x next
 ;;
 
 (***********************************************************************)
@@ -65,7 +96,6 @@ let annotations_compare (a : annotations) (b : annotations) : int =
 
 let annotations_is_empty : annotations -> bool = function
   | [] -> true
-  | [ [] ] -> true
   | _ -> false
 ;;
 
@@ -98,7 +128,17 @@ let to_string ?(args : style_args = style_args ()) (x : t) : string =
 let annotation_to_string ?(args : style_args = style_args ()) (x : annotation)
   : string
   =
-  list ~args:{ args with name = Some "Annotation" } to_string (List.rev x)
+  let rec annotation_to_string ?(args : style_args = style_args ())
+    : annotation -> string list
+    = function
+    | { this; next = None } -> [ to_string ~args this ]
+    | { this; next = Some next } ->
+      to_string ~args this :: annotation_to_string ~args next
+  in
+  list
+    ~args:{ args with name = Some "Annotation" }
+    string
+    (annotation_to_string ~args x)
 ;;
 
 let annotations_to_string ?(args : style_args = style_args ()) (x : annotations)

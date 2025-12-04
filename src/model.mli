@@ -75,6 +75,10 @@ module States : sig
 end
 
 val states_to_string : ?args:style_args -> States.t -> string
+
+val destinations_to_string :
+  ?args:style_args -> States.t -> string
+
 val decode_state_opt : Enc.t -> States.t -> State.t option
 
 exception Model_CannotDecodeState of (Enc.t * States.t)
@@ -289,9 +293,15 @@ val action_labels_to_string :
 exception Model_Action_HasNoAnnotations of Action.t
 
 val get_annotations : State.t -> Action.t -> Note.annotations
+val get_shortest_annotation : Action.t -> Note.annotation
 
-val get_shortest_annotation :
+val get_shortest_annotation_from :
   State.t -> Action.t -> Note.annotation
+
+exception Model_Actions_IsEmpty of States.t Actions.t
+
+val get_action_with_shortest_annotation :
+  States.t Actions.t -> Action.t
 
 exception Model_Action_HasNoConstructors of Action.t
 
@@ -549,14 +559,14 @@ module Saturate : sig
 
   val stop :
     ?named:Action.t option ->
-    ?annotation:Note.annotation ->
+    Note.annotation ->
     State.t ->
     (Action.t * States.t) list ->
     (Action.t * States.t) list
 
   val check_from :
     ?named:Action.t option ->
-    ?annotation:Note.annotation ->
+    Note.annotation ->
     States.t Actions.t Edges.t ->
     State.t ->
     int StateTracker.t ->
@@ -565,7 +575,7 @@ module Saturate : sig
 
   val check_actions :
     ?named:Action.t option ->
-    ?annotation:Note.annotation ->
+    Note.annotation ->
     States.t Actions.t Edges.t ->
     State.t ->
     States.t Actions.t ->
@@ -575,7 +585,7 @@ module Saturate : sig
 
   val check_named :
     ?named:Action.t option ->
-    ?annotation:Note.annotation ->
+    Note.annotation ->
     States.t Actions.t Edges.t ->
     State.t ->
     Action.t ->
@@ -587,7 +597,7 @@ module Saturate : sig
 
   val check_destinations :
     ?named:Action.t option ->
-    ?annotation:Note.annotation ->
+    Note.annotation ->
     States.t Actions.t Edges.t ->
     States.t ->
     int StateTracker.t ->
@@ -606,7 +616,7 @@ module Saturate : sig
 
   val edge_action_destinations :
     ?named:Action.t option ->
-    ?annotation:Note.annotation ->
+    Note.annotation ->
     States.t Actions.t Edges.t ->
     State.t ->
     States.t ->
@@ -615,7 +625,6 @@ module Saturate : sig
 
   val edge_actions :
     ?named:Action.t option ->
-    ?annotation:Note.annotation ->
     States.t Actions.t Edges.t ->
     State.t ->
     States.t Actions.t ->
