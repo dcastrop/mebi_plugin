@@ -86,10 +86,10 @@ Proof.
   MeBiSim Step.
   
   MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
   (*
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
   MeBiSim Step.
   *)
 Admitted.
