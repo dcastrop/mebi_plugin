@@ -1,6 +1,7 @@
 open Logging
 open Mebi_wrapper
 open Model
+open Debug
 module Hyp = Mebi_hypothesis
 
 let econstr_to_string (gl : Proofview.Goal.t) : EConstr.t -> string =
@@ -589,14 +590,11 @@ let get_transition
     let states : States.t = fsm.states in
     let labels : Alphabet.t = fsm.alphabet in
     let from : State.t = find_state sigma fromty states in
-    Log.debug (Printf.sprintf "From: %s" (State.to_string from));
+    Debug.thing "Mebi_proof.get_transition, From" from (A State.to_string);
     let label : Label.t = find_label sigma labelty labels in
-    Log.debug (Printf.sprintf "Label: %s" (Label.to_string label));
+    Debug.thing "Mebi_proof.get_transition, Label" label (A Label.to_string);
     let goto : State.t option = try_find_state sigma gototy states in
-    Log.debug
-      (Printf.sprintf
-         "Goto: %s"
-         (Option.cata (fun x -> State.to_string x) "None" goto));
+    Debug.option "Mebi_proof.get_transition, Goto" goto (A State.to_string);
     Actions.iter
       (fun x y ->
         Log.debug
@@ -962,24 +960,34 @@ let is_action_saturated : Action.t -> bool = function
 
 exception Mebi_proof_NGotoNotInFsm of unit
 
-let try_get_ngoto
-      ?(saturated : bool = false)
-      (mgoto : State.t)
-      ({ from = nfrom; label = nlabel; _ } : Transition_opt.t)
-  : State.t
+let try_get_ngoto ?(saturated : bool = false) (mgoto : State.t)
+  : Transition_opt.t -> State.t
   =
   Log.trace "Mebi_proof.try_get_original_ngoto";
-  try
-    let nactions : States.t Actions.t =
-      Edges.find (nfsm ~saturated ()).edges nfrom
-    in
-    Model.get_action_labelled ~annotated:saturated nlabel nactions
-    |> Actions.find nactions
-    |> States.inter (Model.get_bisim_states mgoto (the_bisim_states ()))
-    |> States.min_elt
-  with
-  | Model_NoActionLabelled (annotated, label, actions) ->
-    raise (Mebi_proof_NGotoNotInFsm ())
+  function
+  | { goto = Some goto; _ } ->
+    Log.warning
+      (Printf.sprintf
+         "Mebi_proof.try_get_goto, already have Some goto:\nis bisim: %b\n%s"
+         (Bool.not
+            (States.is_empty
+               (States.inter
+                  (States.singleton goto)
+                  (Model.get_bisim_states mgoto (the_bisim_states ())))))
+         (State.to_string goto));
+    goto
+  | { from = nfrom; label = nlabel; goto = None; _ } ->
+    (try
+       let nactions : States.t Actions.t =
+         Edges.find (nfsm ~saturated ()).edges nfrom
+       in
+       Model.get_action_labelled ~annotated:saturated nlabel nactions
+       |> Actions.find nactions
+       |> States.inter (Model.get_bisim_states mgoto (the_bisim_states ()))
+       |> States.min_elt
+     with
+     | Model_NoActionLabelled (annotated, label, actions) ->
+       raise (Mebi_proof_NGotoNotInFsm ()))
 ;;
 
 let get_ngoto (mgoto : State.t) (ntransition : Transition_opt.t) : State.t =
@@ -1202,17 +1210,6 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
       (* tactic_chain [ do_simplify gl; do_eapply_rt1n_refl gl ] *)
       do_constructor_tactic gl [] tactics)
   | { annotation; tactics } -> do_constructor_tactic gl annotation tactics
-
-(* | { annotation; tactics = None } ->
-    Log.debug "C";
-    do_build_constructor_tactics gl annotation
-  | { annotation; tactics = Some [] } ->
-    Log.debug "D";
-    tactic_chain [ do_simplify gl; do_build_constructor_tactics gl annotation ]
-  | { annotation; tactics = Some (h :: tl) } ->
-    Log.debug "E";
-    the_proof_state := ApplyConstructors { annotation; tactics = Some tl };
-    h *)
 
 and handle_proof_state (gl : Proofview.Goal.t) : tactic =
   Log.trace "Mebi_proof.handle_proof_state";
