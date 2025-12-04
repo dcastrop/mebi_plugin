@@ -283,6 +283,9 @@ end
 val actions_to_string :
   ?args:style_args -> States.t Actions.t -> string
 
+val action_labels_to_string :
+  ?args:style_args -> States.t Actions.t -> string
+
 exception Model_Action_HasNoAnnotations of Action.t
 
 val get_annotations : State.t -> Action.t -> Note.annotations

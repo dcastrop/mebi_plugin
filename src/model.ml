@@ -25,18 +25,23 @@ module States = Set.Make (struct
     include State
   end)
 
-let states_to_string ?(args : style_args = style_args ()) (x : States.t)
+let states_to_string
+      ?(args : style_args = style_args ~name:"States" ())
+      (x : States.t)
   : string
   =
   let args : style_args =
     Utils.Strfy.nest
-      { args with
-        name = Some "States"
-      ; style = Some (collection_style List)
-      ; newline = true
-      }
+      { args with style = Some (collection_style List); newline = true }
   in
   States.to_list x |> Utils.Strfy.list ~args State.to_string
+;;
+
+(** same as [states_to_string] except with name "Destinations" *)
+let destinations_to_string ?(args : style_args = style_args ())
+  : States.t -> string
+  =
+  states_to_string ~args:{ args with name = Some "Destinations" }
 ;;
 
 let decode_state_opt (x : Enc.t) : States.t -> State.t option =
@@ -152,11 +157,57 @@ module Actions = Hashtbl.Make (struct
   end)
 
 let actions_to_string
-      ?(args : style_args = style_args ~style:(Some (collection_style List)) ())
+      ?(args : style_args = style_args ())
       (x : States.t Actions.t)
   : string
   =
-  "TODO: Model.actions_to_string"
+  let args : style_args =
+    { args with name = Some "Actions"; style = Some (collection_style List) }
+  in
+  let open Utils.Strfy in
+  let xs =
+    let args : style_args =
+      nest { args with name = None; style = Some (collection_style Record) }
+    in
+    Actions.fold
+      (fun (action : Action.t) (destinations : States.t) (acc : string list) ->
+        record
+          ~args
+          [ "action", Action.to_string ~args action
+          ; "destinations", destinations_to_string ~args destinations
+          ]
+        :: acc)
+      x
+      []
+  in
+  list ~args string xs
+;;
+
+let action_labels_to_string
+      ?(args : style_args = style_args ())
+      (x : States.t Actions.t)
+  : string
+  =
+  let args : style_args =
+    { args with name = Some "Actions"; style = Some (collection_style List) }
+  in
+  let open Utils.Strfy in
+  let xs =
+    let args : style_args =
+      nest { args with name = None; style = Some (collection_style Record) }
+    in
+    Actions.fold
+      (fun (action : Action.t) (destinations : States.t) (acc : string list) ->
+        record
+          ~args
+          [ "action.label", Label.to_string ~args action.label
+          ; "destinations", destinations_to_string ~args destinations
+          ]
+        :: acc)
+      x
+      []
+  in
+  list ~args string xs
 ;;
 
 exception Model_Action_HasNoAnnotations of Action.t

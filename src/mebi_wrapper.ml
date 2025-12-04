@@ -1,4 +1,3 @@
-open Logging
 open Mebi_setup
 module Enc = Mebi_setup.Enc
 module F = Enc.F
@@ -55,7 +54,6 @@ let run
         (x : 'a mm)
   : 'a
   =
-  Log.trace "mebi_wrapper.run";
   let coq_ctx : Evd.evar_map = !(the_coq_ctx ~fresh ()) in
   let coq_env : Environ.env = !(the_coq_env ()) in
   let coq_ref : coq_context ref = ref { coq_env; coq_ctx } in
@@ -801,14 +799,12 @@ let get_encoding (x : EConstr.t) : Enc.t =
 (** [encoding_opt x] retrieves the encoding [y] of [x] from the [!st.fwd_enc] map and returns [Some y] if it exists, otherwise [None].
 *)
 let encoding_opt (x : EConstr.t) : Enc.t option mm =
-  Log.trace "Mebi_wrapper.encoding_opt";
   fun (st : wrapper ref) ->
-    let e_opt : Enc.t option = F.find_opt !st.fwd_enc x in
-    { state = st; value = e_opt }
+  let e_opt : Enc.t option = F.find_opt !st.fwd_enc x in
+  { state = st; value = e_opt }
 ;;
 
 let get_encoding_opt (x : EConstr.t) : Enc.t option =
-  Log.trace "Mebi_wrapper.get_encoding_opt";
   run ~keep_encoding:true ~fresh:false (encoding_opt x)
 ;;
 

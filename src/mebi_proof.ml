@@ -4,6 +4,10 @@ open Model
 open Debug
 module Hyp = Mebi_hypothesis
 
+(* the prefix *)
+let thep : string = "Mebi_proof"
+let log_trace (x : string) : unit = Log.trace (Printf.sprintf "%s.%s" thep x)
+
 let econstr_to_string (gl : Proofview.Goal.t) : EConstr.t -> string =
   Rocq_utils.Strfy.econstr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl)
 ;;
@@ -80,13 +84,13 @@ module PState = struct
 
   (* and tactic_to_apply = unit -> unit Proofview.tactic *)
 
-  let empty_tactics : tactic list option -> bool =
-    Log.trace "Mebi_proof.PState.empty_tactics";
-    function None -> true | Some [] -> true | Some (_ :: _) -> false
+  let empty_tactics : tactic list option -> bool = function
+    | None -> true
+    | Some [] -> true
+    | Some (_ :: _) -> false
   ;;
 
   let finished_applying_constructors : applicable_constructors -> bool =
-    Log.trace "Mebi_proof.PState.finished_applying_constructors";
     function
     | { annotation = []; tactics = Some (_ :: _) } -> true
     | { annotation = []; tactics = Some [] } -> true
@@ -94,9 +98,7 @@ module PState = struct
     | _ -> false
   ;;
 
-  let to_string ?(short : bool = true) : t -> string =
-    Log.trace "Mebi_proof.PState.to_string";
-    function
+  let to_string ?(short : bool = true) : t -> string = function
     | NewProof -> "NewProof"
     | NewWeakSim -> "NewWeakSim"
     | NewCofix -> "NewCofix"
@@ -194,14 +196,12 @@ let _warn_model_action_hasnoannotations (naction : Action.t) : unit =
 exception Mebi_proof_StatesNotBisimilar of (State.t * State.t * Partition.t)
 
 let are_states_bisimilar (m : State.t) (n : State.t) : bool =
-  Log.trace "Mebi_proof.are_states_bisimilar";
   Model.get_bisim_states m (the_bisim_states ()) |> States.mem n
 ;;
 
 let get_naction ?(saturated : bool = false) (nfrom : State.t) (nlabel : Label.t)
   : Action.t
   =
-  Log.trace "Mebi_proof.get_naction";
   (* Edges.find (nfsm ()).edges nfrom |> Model.get_action_labelled nlabel *)
   Model.get_action_labelled_from
     ~annotated:saturated
@@ -213,7 +213,6 @@ let get_naction ?(saturated : bool = false) (nfrom : State.t) (nlabel : Label.t)
 let get_constructor_annotation (nfrom : State.t) (nlabel : Label.t)
   : Note.annotation
   =
-  Log.trace "Mebi_proof.get_constructor_annotation";
   try
     get_naction ~saturated:false nfrom nlabel
     |> Model.get_shortest_annotation nfrom
@@ -240,7 +239,6 @@ let get_constructor_annotation (nfrom : State.t) (nlabel : Label.t)
 let get_annotation_constructor (nfrom : State.t) (nlabel : Label.t)
   : Tree.node list
   =
-  Log.trace "Mebi_proof.get_annotation_constructor";
   get_naction nfrom nlabel |> Model.get_shortest_constructor
 ;;
 
@@ -250,7 +248,6 @@ exception
   Mebi_proof_TyDoesNotMatchTheories of (Evd.evar_map * Rocq_utils.kind_pair)
 
 let do_nothing () : tactic =
-  Log.trace "Mebi_proof.do_nothing";
   Log.warning "mebi_proof, case just does nothing";
   tactic ~msg:"((do_nothing))" (Proofview.tclUNIT ())
 ;;
@@ -343,7 +340,6 @@ let do_rt1n_via (gl : Proofview.Goal.t) (via : Label.t) : tactic =
 ;;
 
 let do_solve_cofix (gl : Proofview.Goal.t) : tactic =
-  Log.trace "Mebi_proof.do_solve_cofix";
   (* NOTE: update [the_proof_state] *)
   the_proof_state := DetectState;
   tactic ~msg:"(do_solve)" (Auto.gen_trivial ~debug:Hints.Info [] None)
@@ -374,7 +370,6 @@ let do_constructor_transition
       (htactic : tactic)
   : tactic
   =
-  Log.trace "Mebi_proof.do_constructor_transition";
   let annotation = get_constructor_annotation nfrom nlabel in
   (* NOTE: update [the_proof_state] *)
   the_proof_state := ApplyConstructors { annotation; tactics = None };
@@ -382,7 +377,6 @@ let do_constructor_transition
 ;;
 
 let do_refl_none (gl : Proofview.Goal.t) : tactic =
-  Log.trace "Mebi_proof.do_refl_none";
   (* NOTE: update [the_proof_state] *)
   the_proof_state := NewWeakSim;
   tactic_chain
@@ -395,7 +389,7 @@ let do_refl_none (gl : Proofview.Goal.t) : tactic =
    (goto : State.t)
    : tactic
    =
-   Log.trace "Mebi_proof.do_weak_silent_transition";
+   log_trace "do_weak_silent_transition";
    if State.equal from goto
    then (
    (* NOTE: update [the_proof_state] *)
@@ -415,14 +409,13 @@ let do_refl_none (gl : Proofview.Goal.t) : tactic =
    (ngoto : State.t)
    : tactic
    =
-   Log.trace "Mebi_proof.do_weak_visible_transition";
+   log_trace "do_weak_visible_transition";
    if are_states_bisimilar mfrom ngoto
    then do_constructor_transition gl nfrom nlabel (do_eapply_wk_some gl)
    else raise (Mebi_proof_StatesNotBisimilar (mfrom, ngoto, the_bisim_states ()))
    ;; *)
 
 let get_constructor_tactic ((enc, index) : Tree.node) : tactic =
-  Log.trace "Mebi_proof.get_constructor_tactic";
   let index : int = index + 1 in
   tactic
     ~msg:(Printf.sprintf "constructor %i" index)
@@ -430,7 +423,6 @@ let get_constructor_tactic ((enc, index) : Tree.node) : tactic =
 ;;
 
 let rec get_constructor_tactics_to_apply : Tree.node list -> tactic list =
-  Log.trace "Mebi_proof.get_constructor_tactics_to_apply";
   function
   | [] -> []
   | h :: tl -> get_constructor_tactic h :: get_constructor_tactics_to_apply tl
@@ -438,9 +430,7 @@ let rec get_constructor_tactics_to_apply : Tree.node list -> tactic list =
 
 let do_build_constructor_tactics (gl : Proofview.Goal.t)
   : Note.annotation -> tactic
-  =
-  Log.trace "Mebi_proof.do_build_constructor_tactics";
-  function
+  = function
   | [] -> do_nothing ()
   | { from; via } :: annotation ->
     let constructors : Tree.node list = get_annotation_constructor from via in
@@ -452,9 +442,7 @@ let do_build_constructor_tactics (gl : Proofview.Goal.t)
 
 let do_constructor_tactic (gl : Proofview.Goal.t) (annotation : Note.annotation)
   : tactic list option -> tactic
-  =
-  Log.trace "Mebi_proof.do_constructor_tactic";
-  function
+  = function
   | None -> do_build_constructor_tactics gl annotation
   | Some [] ->
     tactic_chain [ do_simplify gl; do_build_constructor_tactics gl annotation ]
@@ -466,20 +454,18 @@ let do_constructor_tactic (gl : Proofview.Goal.t) (annotation : Note.annotation)
 (***********************************************************************)
 
 let try_decode (sigma : Evd.evar_map) (x : EConstr.t) : Enc.t option =
-  Log.trace "Mebi_proof.try_decode";
   if EConstr.isRel sigma x then None else get_encoding_opt x
 ;;
 
 let typ_is_exists (sigma : Evd.evar_map) ((ty, _) : Rocq_utils.kind_pair) : bool
   =
-  Log.trace "Mebi_proof.typ_is_exists";
   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_ex ())
 ;;
 
 let typ_is_weak_sim (sigma : Evd.evar_map) ((ty, _) : Rocq_utils.kind_pair)
   : bool
   =
-  Log.trace "Mebi_proof.typ_is_weak_sim";
+  log_trace __FUNCTION__;
   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
 ;;
 
@@ -488,7 +474,7 @@ let typ_is_weak_transition
       ((ty, _) : Rocq_utils.kind_pair)
   : bool
   =
-  Log.trace "Mebi_proof.typ_is_weak_transition";
+  log_trace __FUNCTION__;
   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak ())
 ;;
 
@@ -497,7 +483,7 @@ let typ_is_silent_transition
       ((ty, _) : Rocq_utils.kind_pair)
   : bool
   =
-  Log.trace "Mebi_proof.typ_is_silent_transition";
+  log_trace __FUNCTION__;
   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_silent ())
 ;;
 
@@ -506,7 +492,7 @@ let typ_is_silent1_transition
       ((ty, _) : Rocq_utils.kind_pair)
   : bool
   =
-  Log.trace "Mebi_proof.typ_is_silent1_transition";
+  log_trace __FUNCTION__;
   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_silent1 ())
 ;;
 
@@ -515,7 +501,7 @@ let typ_is_lts_transition
       ((ty, _) : Rocq_utils.kind_pair)
   : bool
   =
-  Log.trace "Mebi_proof.typ_is_lts_transition";
+  log_trace __FUNCTION__;
   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_LTS ())
 ;;
 
@@ -524,7 +510,7 @@ let typ_is_lts_transition
 let try_find_state (sigma : Evd.evar_map) (x : EConstr.t) (states : States.t)
   : State.t option
   =
-  Log.trace "Mebi_proof.try_find_state";
+  log_trace __FUNCTION__;
   Option.map (fun (y : Enc.t) -> decode_state y states) (try_decode sigma x)
 ;;
 
@@ -534,7 +520,7 @@ exception
 let find_state (sigma : Evd.evar_map) (x : EConstr.t) (states : States.t)
   : State.t
   =
-  Log.trace "Mebi_proof.find_state";
+  log_trace __FUNCTION__;
   try
     match try_find_state sigma x states with
     | Some s -> s
@@ -557,7 +543,7 @@ exception
 let try_find_label (sigma : Evd.evar_map) (x : EConstr.t) (labels : Alphabet.t)
   : Label.t option
   =
-  Log.trace "Mebi_proof.try_find_label";
+  log_trace __FUNCTION__;
   Option.map
     (fun (y : Enc.t) -> find_label_of_enc y labels)
     (try_decode sigma x)
@@ -566,7 +552,7 @@ let try_find_label (sigma : Evd.evar_map) (x : EConstr.t) (labels : Alphabet.t)
 let find_label (sigma : Evd.evar_map) (x : EConstr.t) (labels : Alphabet.t)
   : Label.t
   =
-  Log.trace "Mebi_proof.find_label";
+  log_trace __FUNCTION__;
   match try_find_label sigma x labels with
   | Some s -> s
   | None -> raise (Mebi_proof_CouldNotDecodeLabel (sigma, x, labels))
@@ -585,24 +571,19 @@ let get_transition
       (fsm : Fsm.t)
   : Transition_opt.t
   =
-  Log.trace "Mebi_proof.get_transition";
+  log_trace __FUNCTION__;
+  let prefix : string -> string = Printf.sprintf "%s.%s %s" __FUNCTION__ thep in
   try
     let states : States.t = fsm.states in
     let labels : Alphabet.t = fsm.alphabet in
     let from : State.t = find_state sigma fromty states in
-    Debug.thing "Mebi_proof.get_transition, From" from (A State.to_string);
+    Debug.thing (prefix "From") from (A State.to_string);
     let label : Label.t = find_label sigma labelty labels in
-    Debug.thing "Mebi_proof.get_transition, Label" label (A Label.to_string);
+    Debug.thing (prefix "Label") label (A Label.to_string);
     let goto : State.t option = try_find_state sigma gototy states in
-    Debug.option "Mebi_proof.get_transition, Goto" goto (A State.to_string);
-    Actions.iter
-      (fun x y ->
-        Log.debug
-          (Printf.sprintf
-             "Action:\n%s\nGoto:\n%s"
-             (Action.to_string x)
-             (states_to_string y)))
-      (Edges.find fsm.edges from);
+    Debug.option (prefix "Goto") goto (A State.to_string);
+    let actions : States.t Actions.t = Edges.find fsm.edges from in
+    Debug.thing (prefix "Actions") actions (A action_labels_to_string);
     let { annotations; constructor_trees; _ } : Action.t =
       get_action_labelled ~annotated:true label (Edges.find fsm.edges from)
     in
@@ -620,7 +601,7 @@ let get_lts_transition
       ((ty, tys) : Rocq_utils.kind_pair)
   : Transition_opt.t
   =
-  Log.trace "Mebi_proof.get_lts_transition";
+  log_trace __FUNCTION__;
   if typ_is_lts_transition sigma (ty, tys)
   then get_transition sigma tys.(0) tys.(1) tys.(2) fsm
   else raise (Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)))
@@ -637,7 +618,6 @@ let get_hyp_transition
       (hyps : Rocq_utils.hyp list)
   : Transition_opt.t
   =
-  Log.trace "Mebi_proof.get_hyp_lts_transition";
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   let hyp_transitions : Transition_opt.t list =
     List.filter_map
@@ -672,7 +652,6 @@ let get_weak_transition
       ((ty, tys) : Rocq_utils.kind_pair)
   : Transition_opt.t
   =
-  Log.trace "Mebi_proof.get_weak_transition";
   if typ_is_weak_transition sigma (ty, tys)
   then get_transition sigma tys.(3) tys.(5) tys.(4) fsm
   else raise (Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)))
@@ -684,7 +663,6 @@ let _get_silent_transition
       ((ty, tys) : Rocq_utils.kind_pair)
   : Transition_opt.t
   =
-  Log.trace "Mebi_proof.get_silent_transition";
   if typ_is_silent_transition sigma (ty, tys)
   then get_transition sigma tys.(2) tys.(4) tys.(3) fsm
   else raise (Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)))
@@ -696,7 +674,6 @@ let _get_silent1_transition
       ((ty, tys) : Rocq_utils.kind_pair)
   : Transition_opt.t
   =
-  Log.trace "Mebi_proof.get_silent1_transition";
   if typ_is_silent1_transition sigma (ty, tys)
   then get_transition sigma tys.(2) tys.(4) tys.(3) fsm
   else raise (Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)))
@@ -711,7 +688,6 @@ let weak_sim_get_m_state
       ((ty, tys) : Rocq_utils.kind_pair)
   : State.t
   =
-  Log.trace "Mebi_proof.weak_sim_get_m_state";
   if typ_is_weak_sim sigma (ty, tys)
   then (
     try find_state sigma tys.(5) (mfsm ()).states with
@@ -731,7 +707,6 @@ module Cofix_HTy : Hyp.HTY_S = struct
     }
 
   let of_hty (sigma : Evd.evar_map) ((ty, tys) : Rocq_utils.kind_pair) : t =
-    Log.trace "Mebi_proof.Cofix_HTy.of_hty";
     if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
     then (
       let _m : State.t = decode_state (get_encoding tys.(5)) (mfsm ()).states in
@@ -754,7 +729,6 @@ module Invertible = struct
     | Layer
 
   let of_hty (sigma : Evd.evar_map) ((ty, tys) : Rocq_utils.kind_pair) : k =
-    Log.trace "Mebi_proof.Invertible.of_hty";
     try
       if Mebi_theories.is_var sigma tys.(2)
       then Full
@@ -767,17 +741,14 @@ module Invertible = struct
   ;;
 
   let opt_of_hty (sigma : Evd.evar_map) (p : Rocq_utils.kind_pair) : k option =
-    Log.trace "Mebi_proof.Invertible.opt_of_hty";
     try Some (of_hty sigma p) with Hyp.Mebi_proof_Hypothesis_HTy _ -> None
   ;;
 
   let hty_is_a (sigma : Evd.evar_map) (p : Rocq_utils.kind_pair) : bool =
-    Log.trace "Mebi_proof.Invertible.hty_is_a";
     Option.has_some (opt_of_hty sigma p)
   ;;
 
   let of_hyp (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : t =
-    Log.trace "Mebi_proof.Invertible.of_hyp";
     try
       { kind = of_hty sigma (Rocq_utils.hyp_to_atomic sigma h)
       ; tactic = do_inversion h
@@ -788,12 +759,10 @@ module Invertible = struct
   ;;
 
   let opt_of_hyp (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : t option =
-    Log.trace "Mebi_proof.Invertible.opt_of_hyp";
     try Some (of_hyp sigma h) with Hyp.Mebi_proof_Hypothesis_Hyp _ -> None
   ;;
 
   let hyp_is_a (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : bool =
-    Log.trace "Mebi_proof.Invertible.hyp_is_a";
     Option.has_some (opt_of_hyp sigma h)
   ;;
 end
@@ -802,7 +771,6 @@ module TransOpt : Hyp.HYP_TYPE = Hyp.Make (struct
     type t = Transition_opt.t
 
     let of_hty (sigma : Evd.evar_map) ((ty, tys) : Rocq_utils.kind_pair) : t =
-      Log.trace "Mebi_proof.TransOpt.of_hty";
       try get_lts_transition sigma (mfsm ()) (ty, tys) with
       | Mebi_proof_CouldNotDecodeTransition (sigma, x, fsm) ->
         raise (Hyp.Mebi_proof_Hypothesis_HTy (sigma, (ty, tys)))
@@ -819,7 +787,7 @@ module TransOpt : Hyp.HYP_TYPE = Hyp.Make (struct
     - layer invert
     - transition *)
 let hyp_is_something (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : bool =
-  Log.trace "Mebi_proof.hyp_is_something";
+  log_trace "hyp_is_something";
   try
     let p : Rocq_utils.kind_pair = Rocq_utils.hyp_to_atomic sigma h in
     if Cofix.hty_is_a sigma p
@@ -835,7 +803,6 @@ let hyp_is_something (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : bool =
 
 (** is [true] if none of the hyps appear to be mid-way through a proof. *)
 let hyps_is_essentially_empty (gl : Proofview.Goal.t) : bool =
-  Log.trace "Mebi_proof.hyps_is_essentially_empty";
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   Bool.not
     (List.for_all
@@ -846,7 +813,6 @@ let hyps_is_essentially_empty (gl : Proofview.Goal.t) : bool =
 (** first checks if hypothesis are empty, and if they are not then it checks if [hyps_is_essentially_empty]
 *)
 let hyps_is_empty (gl : Proofview.Goal.t) : bool =
-  Log.trace "Mebi_proof.hyps_is_empty";
   if List.is_empty (Proofview.Goal.hyps gl)
   then true
   else hyps_is_essentially_empty gl
@@ -869,19 +835,18 @@ let concl_get_eexists
         ((ty, tys) : Rocq_utils.kind_pair)
   : Transition_opt.t * State.t
   =
-  Log.trace "Mebi_proof.concl_get_eexists";
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   let _, _, constr = Rocq_utils.econstr_to_lambda sigma tys.(1) in
   let _, apptys = Rocq_utils.econstr_to_app sigma constr in
   match Array.to_list apptys with
   | [ wk_trans; wk_sim ] ->
     (try
-       Log.trace "Mebi_proof.concl_get_eexists (get nt)";
+       log_trace "concl_get_eexists (get nt)";
        let nt : Transition_opt.t =
          Rocq_utils.econstr_to_atomic sigma wk_trans
          |> get_weak_transition sigma (nfsm ~saturated:true ())
        in
-       Log.trace "Mebi_proof.concl_get_eexists (get mstate)";
+       log_trace "concl_get_eexists (get mstate)";
        let mstate : State.t =
          weak_sim_get_m_state sigma (Rocq_utils.econstr_to_atomic sigma wk_sim)
        in
@@ -917,23 +882,20 @@ let concl_get_eexists
 ;;
 
 let hyp_is_invertible (sigma : Evd.evar_map) : Rocq_utils.hyp -> bool =
-  Log.trace "Mebi_proof.hyp_is_invertible";
   fun (x : Rocq_utils.hyp) ->
-    try Invertible.hyp_is_a sigma x with
-    | Hyp.Mebi_proof_Hypothesis_Hyp _ -> false
+  try Invertible.hyp_is_a sigma x with
+  | Hyp.Mebi_proof_Hypothesis_Hyp _ -> false
 ;;
 
 let hyps_get_invertibles (sigma : Evd.evar_map)
   : Rocq_utils.hyp list -> Invertible.t list
   =
-  Log.trace "Mebi_proof.hyps_get_invertibles";
   List.filter_map (fun (x : Rocq_utils.hyp) ->
     try Some (Invertible.of_hyp sigma x) with
     | Hyp.Mebi_proof_Hypothesis_Hyp _ -> None)
 ;;
 
 let hyps_get_invertible (invertibles : Invertible.t list) : Invertible.t =
-  Log.trace "Mebi_proof.hyps_get_invertible";
   let fully_invertibles : Invertible.t list =
     List.filter
       (function ({ kind = Full; _ } : Invertible.t) -> true | _ -> false)
@@ -944,7 +906,6 @@ let hyps_get_invertible (invertibles : Invertible.t list) : Invertible.t =
 ;;
 
 let do_hyp_inversion (gl : Proofview.Goal.t) : tactic =
-  Log.trace "Mebi_proof.do_inversion";
   (hyps_get_invertibles (Proofview.Goal.sigma gl) (Proofview.Goal.hyps gl)
    |> hyps_get_invertible)
     .tactic
@@ -963,7 +924,7 @@ exception Mebi_proof_NGotoNotInFsm of unit
 let try_get_ngoto ?(saturated : bool = false) (mgoto : State.t)
   : Transition_opt.t -> State.t
   =
-  Log.trace "Mebi_proof.try_get_original_ngoto";
+  log_trace __FUNCTION__;
   function
   | { goto = Some goto; _ } ->
     Log.warning
@@ -991,15 +952,15 @@ let try_get_ngoto ?(saturated : bool = false) (mgoto : State.t)
 ;;
 
 let get_ngoto (mgoto : State.t) (ntransition : Transition_opt.t) : State.t =
-  Log.trace "Mebi_proof.get_ngoto";
+  log_trace __FUNCTION__;
   try try_get_ngoto ~saturated:false mgoto ntransition with
   | Mebi_proof_NGotoNotInFsm () ->
-    Log.trace "Mebi_proof.get_ngoto (saturated)";
+    log_trace "get_ngoto (saturated)";
     try_get_ngoto ~saturated:true mgoto ntransition
 ;;
 
 let do_ex_intro (gl : Proofview.Goal.t) (ngoto : State.t) : tactic =
-  Log.trace "Mebi_proof.do_ex_intro";
+  log_trace __FUNCTION__;
   let ngoto : EConstr.t = get_decoding ngoto.enc in
   let ngoto_bindings = Tactypes.ImplicitBindings [ ngoto ] in
   tactic
@@ -1018,7 +979,7 @@ exception
   Mebi_proof_ExIntro_Transitions of (Transition_opt.t * Transition_opt.t)
 
 let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
-  log_trace_hyps gl "Mebi_proof.do_eexists_transition";
+  log_trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   let mtransition : Transition_opt.t =
     get_hyp_transition gl (mfsm ()) (Proofview.Goal.hyps gl)
@@ -1032,7 +993,7 @@ let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
     |> Rocq_utils.econstr_to_atomic sigma
     |> concl_get_eexists gl
   in
-  Log.trace "Mebi_proof.do_eexists_transition (got (nt, mstate))";
+  log_trace "do_eexists_transition (got (nt, mstate))";
   (* ERR: if labels are not consistent *)
   if Bool.not (Label.equal mtransition.label ntransition.label)
   then raise (Mebi_proof_ExIntro_NEqLabel (mtransition, ntransition));
@@ -1041,7 +1002,7 @@ let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
   then
     raise (Mebi_proof_ExIntro_NotBisimilar (mtransition.from, ntransition.from));
   (* ERR: unless Some mgoto and None ngoto *)
-  Log.trace "Mebi_proof.do_eexists_transition (check Some goto)";
+  log_trace "do_eexists_transition (check Some goto)";
   match mtransition.goto, ntransition.goto with
   | Some mgoto, None ->
     (* ERR: if states are not consistent *)
@@ -1062,13 +1023,13 @@ let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
 let hyps_has_cofix (sigma : Evd.evar_map) (concl : EConstr.t)
   : Rocq_utils.hyp list -> bool
   =
-  Log.trace "Mebi_proof.hyps_has_cofix";
+  log_trace __FUNCTION__;
   List.exists (fun (h : Rocq_utils.hyp) ->
     Mebi_setup.Eq.econstr sigma concl (Context.Named.Declaration.get_type h))
 ;;
 
 let hyps_has_invertible (sigma : Evd.evar_map) : Rocq_utils.hyp list -> bool =
-  Log.trace "Mebi_proof.hyps_has_invertible";
+  log_trace __FUNCTION__;
   List.exists (hyp_is_invertible sigma)
 ;;
 
@@ -1085,7 +1046,7 @@ exception Mebi_proof_GoalTransition of unit
 (** [handle_new_proof gl] checks if the [hyps] of [gl] are empty before moving to state [NewWeakSim]
 *)
 let rec handle_new_proof (gl : Proofview.Goal.t) : tactic =
-  Log.trace "Mebi_proof.handle_new_proof";
+  log_trace __FUNCTION__;
   if hyps_is_empty gl
   then (
     the_proof_state := NewWeakSim;
@@ -1095,7 +1056,7 @@ let rec handle_new_proof (gl : Proofview.Goal.t) : tactic =
     raise (Mebi_proof_NewProof ()))
 
 and handle_new_weak_sim (gl : Proofview.Goal.t) : tactic =
-  log_trace_concl gl "Mebi_proof.handle_new_weak_sim";
+  log_trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   let the_concl : EConstr.t = Proofview.Goal.concl gl in
   let concltyp : Rocq_utils.kind_pair =
@@ -1122,7 +1083,7 @@ and handle_new_weak_sim (gl : Proofview.Goal.t) : tactic =
     raise (Mebi_proof_NewWeakSim ()))
 
 and handle_new_cofix (gl : Proofview.Goal.t) : tactic =
-  Log.trace "Mebi_proof.handle_new_cofix";
+  log_trace __FUNCTION__;
   try
     if hyps_has_invertible (Proofview.Goal.sigma gl) (Proofview.Goal.hyps gl)
     then do_hyp_inversion gl
@@ -1158,7 +1119,7 @@ and handle_new_cofix (gl : Proofview.Goal.t) : tactic =
 and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition_opt.t)
   : tactic
   =
-  Log.trace "Mebi_proof.handle_goal_transition";
+  log_trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   try
     let { from = nfrom; label = nlabel; goto = ngoto; _ } : Transition_opt.t =
@@ -1197,7 +1158,7 @@ and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition_opt.t)
 and handle_apply_constructors (gl : Proofview.Goal.t)
   : PState.applicable_constructors -> tactic
   =
-  Log.trace "Mebi_proof.handle_apply_constructors";
+  log_trace __FUNCTION__;
   function
   | { annotation = []; tactics } ->
     if PState.empty_tactics tactics
@@ -1212,7 +1173,7 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
   | { annotation; tactics } -> do_constructor_tactic gl annotation tactics
 
 and handle_proof_state (gl : Proofview.Goal.t) : tactic =
-  Log.trace "Mebi_proof.handle_proof_state";
+  log_trace __FUNCTION__;
   match !the_proof_state with
   | NewProof -> handle_new_proof gl
   | NewWeakSim -> handle_new_weak_sim gl
@@ -1224,7 +1185,7 @@ and handle_proof_state (gl : Proofview.Goal.t) : tactic =
   | DetectState -> detect_proof_state gl
 
 and detect_proof_state (gl : Proofview.Goal.t) : tactic =
-  Log.trace "Mebi_proof.detect_proof_state";
+  log_trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   let the_concl : EConstr.t = Proofview.Goal.concl gl in
   let the_hyps : Rocq_utils.hyp list = Proofview.Goal.hyps gl in
@@ -1241,7 +1202,7 @@ and detect_proof_state (gl : Proofview.Goal.t) : tactic =
 (***********************************************************************)
 
 let step () : unit Proofview.tactic =
-  Log.trace "Mebi_proof.step";
+  log_trace __FUNCTION__;
   Mebi_theories.tactics
     [ Proofview.Goal.enter (fun gl -> get_tactic (handle_proof_state gl))
     ; Mebi_tactics.simplify_and_subst_all ()
@@ -1249,7 +1210,7 @@ let step () : unit Proofview.tactic =
 ;;
 
 let solve (upper_bound : int) (pstate : Declare.Proof.t) : Declare.Proof.t =
-  Log.trace "Mebi_proof.solve";
+  log_trace __FUNCTION__;
   let rec iter_body (n : int) (pstate : Declare.Proof.t) : int * Declare.Proof.t
     =
     match Proof.is_done (Declare.Proof.get pstate), Int.compare n 0 with
