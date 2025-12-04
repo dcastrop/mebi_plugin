@@ -9,11 +9,16 @@ type annotation = { this : t; next : annotation option }
 val annotation_equal : annotation -> annotation -> bool
 val annotation_compare : annotation -> annotation -> int
 val annotation_is_empty : annotation -> bool
-val add_note : t -> annotation -> annotation
 val annotation_depth : annotation -> int
 val shorter_annotation : annotation -> annotation -> annotation
 val exists : t -> annotation -> bool
+val add_note : t -> annotation -> annotation
 val exists_label : Model_label.t -> annotation -> bool
+val last : annotation -> t
+
+exception Model_note_CannotDropLast of annotation
+
+val drop_last : annotation -> annotation
 
 type annotations = annotation list
 
