@@ -1,6 +1,14 @@
 open Logging
 (* open Mebi_wrapper *)
 
+(* the prefix *)
+let trace_enabled : bool = true
+let log_trace (x : string) : unit = if trace_enabled then Log.trace x else ()
+
+let log_tracex (xs : string list) : unit =
+  log_trace (Utils.Strfy.list Utils.Strfy.string xs)
+;;
+
 (**********************************)
 (****** COQ PROOF TACTICS *********)
 (**********************************)
@@ -8,12 +16,11 @@ open Logging
 let update_proof_by_tactic (pstate : Declare.Proof.t)
   : unit Proofview.tactic -> Declare.Proof.t
   =
-  Log.trace "mebi_tactics.update_proof_by_tactic";
   fun x ->
-    let new_pstate, is_safe_tactic = Declare.Proof.by x pstate in
-    if Bool.not is_safe_tactic
-    then Log.warning "mebi_tactics.update_proof_by_tactic, unsafe tactic used";
-    new_pstate
+  let new_pstate, is_safe_tactic = Declare.Proof.by x pstate in
+  if Bool.not is_safe_tactic
+  then Log.warning "mebi_tactics.update_proof_by_tactic, unsafe tactic used";
+  new_pstate
 ;;
 
 let rec update_proof_by_tactics (pstate : Declare.Proof.t)
@@ -62,15 +69,12 @@ let simplify_and_subst_all ?(gl : Proofview.Goal.t option) ()
 let the_goals : (int, Proofview.Goal.t) Hashtbl.t ref = ref (Hashtbl.create 0)
 
 let reset_the_goals () : unit =
-  Log.trace
-    (Printf.sprintf
-       "mebi_tactics.reset_the_goals: (was %i)"
-       (Hashtbl.length !the_goals));
+  log_tracex
+    [ __FUNCTION__; Printf.sprintf "(was %i)" (Hashtbl.length !the_goals) ];
   Hashtbl.clear !the_goals
 ;;
 
 let add_goal (g : Proofview.Goal.t) : unit =
-  Log.trace "mebi_tactics.add_goal";
   Hashtbl.add !the_goals (Evar.hash (Proofview.Goal.goal g)) g
 ;;
 
@@ -130,7 +134,6 @@ let add_goal (g : Proofview.Goal.t) : unit =
    ;; *)
 
 let goal_test () : unit Proofview.tactic =
-  Log.trace "mebi_tactics.goal_test";
   (* let* env = get_env in *)
   (* let* sigma = get_sigma in *)
   (* return *)
@@ -231,7 +234,6 @@ let eapply ?(gl : Proofview.Goal.t option) (c : EConstr.t)
 let unfold_econstr (gl : Proofview.Goal.t) : EConstr.t -> unit Proofview.tactic
   = function
   | x ->
-    Log.trace "mebi_tactics.unfold_econstr";
     let sigma = Proofview.Goal.sigma gl in
     let y = Rocq_convert.econstr_to_constr sigma x in
     (match Constr.kind y with
@@ -247,7 +249,6 @@ let unfold_constrexpr (gl : Proofview.Goal.t)
   : Constrexpr.constr_expr -> unit Proofview.tactic
   = function
   | x ->
-    Log.trace "mebi_tactics.unfold_constrexpr";
     let env = Proofview.Goal.env gl in
     let sigma = Proofview.Goal.sigma gl in
     let sigma, y = Rocq_convert.constrexpr_to_econstr env sigma x in
@@ -272,18 +273,13 @@ let rec unfold_constrexpr_list (gl : Proofview.Goal.t)
 ;;
 
 let cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =
-  Log.trace "mebi_tactics.cofix";
   Tactics.cofix (Mebi_theories.new_cofix_name gl)
 ;;
 
-let intros_all () : unit Proofview.tactic =
-  Log.trace "mebi_tactics.intros_all";
-  Tactics.intros
-;;
+let intros_all () : unit Proofview.tactic = Tactics.intros
 
 let intro_of_string (gl : Proofview.Goal.t) (s : string) : unit Proofview.tactic
   =
-  Log.trace "mebi_tactics.intro_of_string";
   Tactics.introduction (Mebi_theories.new_name_of_string gl s)
 ;;
 
