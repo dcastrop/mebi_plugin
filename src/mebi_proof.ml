@@ -324,13 +324,16 @@ let get_annotation_constructor (nfrom : State.t) (nlabel : Label.t)
 
 (***********************************************************************)
 
+exception Mebi_proof_FailIfNothing of unit
+
+let _do_nothing () : tactic =
+  Log.warning "mebi_proof, case just does nothing";
+  (* tactic ~msg:"((do_nothing))" (Proofview.tclUNIT ()) *)
+  raise (Mebi_proof_FailIfNothing ())
+;;
+
 exception
   Mebi_proof_TyDoesNotMatchTheories of (Evd.evar_map * Rocq_utils.kind_pair)
-
-let do_nothing () : tactic =
-  Log.warning "mebi_proof, case just does nothing";
-  tactic ~msg:"((do_nothing))" (Proofview.tclUNIT ())
-;;
 
 let get_all_non_cofix (gl : Proofview.Goal.t) : Names.Id.Set.t =
   Names.Id.Set.filter
@@ -1260,14 +1263,6 @@ and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition_opt.t)
   =
   log_trace __FUNCTION__;
   let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
-  Log.debug
-    (Printf.sprintf
-       "saturated nfsm: %s"
-       (Model.edges_to_string (nfsm ~saturated:true ()).edges));
-  Log.debug
-    (Printf.sprintf
-       "nfsm: %s"
-       (Model.edges_to_string (nfsm ~saturated:false ()).edges));
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   try
     let { from = nfrom; label = nlabel; goto = ngoto; _ } : Transition_opt.t =
@@ -1308,7 +1303,6 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
     log_tracex [ __FUNCTION__; "annotation None" ];
     (match tactics with
      | Some (h :: tl) ->
-       (* do_constructor_tactic gl annotation tactics *)
        log_tracex [ __FUNCTION__; "tactics Some (h::t)" ];
        set_the_proof_state
          __FUNCTION__
@@ -1334,22 +1328,6 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
          __FUNCTION__
          (ApplyConstructors { annotation = Some annotation; tactics = Some tl });
        h)
-(* ;; *)
-
-(* do_constructor_tactic gl (annotation) tactics *)
-
-(* log_tracex [ __FUNCTION__; "tactics Some []" ];
-   tactic_chain [ do_simplify gl; do_build_constructor_tactics gl annotation ]
-   if PState.empty_tactics
-   then (
-   log_tracex [ __FUNCTION__; "annotation None, empty tactics" ];
-   set_the_proof_state __FUNCTION__ NewWeakSim;
-   tactic_chain [ do_simplify gl; do_eapply_rt1n_refl gl ])
-   else (
-   log_tracex [ __FUNCTION__; "annotation None, empty tactics" ];
-
-   handle_maybe_empty_tactics gl annotation
-   ) *)
 
 and handle_proof_state (gl : Proofview.Goal.t) : tactic =
   log_trace __FUNCTION__;
@@ -1373,7 +1351,10 @@ and detect_proof_state (gl : Proofview.Goal.t) : tactic =
   in
   if typ_is_weak_sim sigma concltyp && hyps_has_cofix sigma the_concl the_hyps
   then do_solve_cofix gl
-  else do_nothing ()
+  else (
+    (* do_nothing () *)
+    set_the_proof_state __FUNCTION__ NewCofix;
+    handle_proof_state gl)
 ;;
 
 (***********************************************************************)

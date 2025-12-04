@@ -937,9 +937,31 @@ module Saturate = struct
     match named with
     | None -> acc
     | Some named_action ->
-      (update_named_annotation named_action annotation, States.singleton from)
-      :: acc
+      let x =
+        update_named_annotation named_action annotation, States.singleton from
+      in
+      Log.debug
+        (Printf.sprintf
+           "Model.Saturate.stop new:\n- from: %s\n- action: %s"
+           (State.to_string from)
+           (Action.to_string (fst x)));
+      x :: acc
   ;;
+
+  (*
+     (* NOTE: remove unnecessary self-transitions at destination *)
+     let annotation : Note.annotation =
+     Option.cata (fun (actions:States.t Actions.t) -> (Option.cata
+     (fun (destinations : States.t) ->
+     if States.exists (fun (goto : State.t) -> true) destinations
+     then Note.drop_last annotation
+     else annotation)
+     annotation
+     (Actions.find_opt actions )
+     )
+     annotation)
+     (Edges.find_opt old_edges from)
+     in *)
 
   (** [check_from] explores the outgoing actions of state [from], which is some destination of another action.
   *)
@@ -979,6 +1001,9 @@ module Saturate = struct
       (fun (the_action : Action.t)
         (destinations : States.t)
         (acc : (Action.t * States.t) list) ->
+        let destinations : States.t =
+          States.singleton from |> States.diff destinations
+        in
         match named, is_action_silent the_action with
         | _, true ->
           (* NOTE: add to annotation, continue exploring outwards *)

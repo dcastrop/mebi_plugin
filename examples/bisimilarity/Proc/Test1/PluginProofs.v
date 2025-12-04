@@ -31,8 +31,8 @@ MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs".
 MeBi Reset All.
 MeBi Set ShowAny      True.
 MeBi Set ShowNotices  True.
-MeBi Set ShowDebug    True.
-MeBi Set ShowDetails  True.
+(* MeBi Set ShowDebug    True. *)
+(* MeBi Set ShowDetails  True. *)
 MeBi Set ShowDetails  True.
 MeBi Set ShowResults  True.
 MeBi Set ShowWarnings True.
@@ -46,166 +46,59 @@ MeBi Set FailIfNotBisim True.
 
 Require Import Logic.
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest".
+MeBi Set ShowAny True.
+MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.pq".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof.
-  MeBiSim Begin termLTS p And termLTS q Using termLTS. (* unfold p, q. *)
-  (* MeBiSim Solve 200. *)
-(* Qed. *)
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  (* apply wk_none. *)
-  (* unfold silent.  *)
-  (* eapply rt1n_trans. *)
-  (* constructor. simpl. *)
-  (* apply rt1n_refl. *)
-  
-  MeBiSim Step.
-  MeBiSim Step.
-  (* constructor 5. simpl. 
-  eapply rt1n_trans.
-  constructor 2. simpl.
-  constructor 6. simpl.
-  eapply rt1n_trans.
-  constructor 2. constructor . *)
-  (* constructor. simpl. *)
-  (* constructor 5. *)
-  (* simpl. *)
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  (*
+  MeBiSim Begin termLTS p And termLTS q Using termLTS. 
+  MeBi Set ShowAny False.
+  MeBiSim Solve 900.
+Qed.
+  (* 
   MeBiSim Step.
   *)
+(* Admitted. *)
+
+MeBi Set ShowAny True.
+
+
+(* MeBi Set ShowDebug True. MeBi Set ShowDetails True. *)
+
+MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.qp".
+Example wsim_qp : weak_sim termLTS termLTS q p. 
+Proof.
+  MeBiSim Begin termLTS q And termLTS p Using termLTS. 
+  (* MeBi Set ShowAny False. *)
+  (* MeBiSim Solve 900. *)
+(* Qed. *)
 Admitted.
-(* 
-  MeBiSim Step. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
-  MeBiSim Step. (* inversion H; simpl in *. *)
-  MeBiSim Step. (* exists n2 *)
-  MeBiSim Step. (* apply wk_none. apply rt1n_refl. *)
-  MeBiSim Step. (* clear H; cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
-  MeBiSim Step. (* inversion H; simpl in *. *)
-  MeBiSim Step. (* inversion H0; simpl in *. *)
-  MeBiSim Step. (* exists n2 *)
-  MeBiSim Step. (* eapply wk_some; unfold silent. *)
-  MeBiSim Step. (* eapply rt1n_trans. *)
-  MeBiSim Step. (* constructor 4. simpl in *. *)
-  MeBiSim Step. (* eapply rt1n_trans. *)
-  MeBiSim Step. (* constructor 2. *)
-  MeBiSim Step. (* constructor 5. *)
-  MeBiSim Step. (* apply rt1n_refl. *)
-  MeBiSim Step. (* constructor 2. *)
-  MeBiSim Step. (* constructor 1. *)
-  MeBiSim Step. (* apply rt1n_refl. *)
-  MeBiSim Step. (* constructor 2. *)
-  MeBiSim Step. (* constructor 5. *)
-  MeBiSim Step. (* apply rt1n_refl. *)
-  MeBiSim Step. (* clear H; cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
-  MeBiSim Step. (* inversion H; simpl in *. *)
-  MeBiSim Step. (* inversion H4; simpl in *. *)
+(* TODO: looks like we try to apply [wk_none] for [Some action] *)
+  (* MeBiSim Solve 30. *)
+  (* MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
-  MeBiSim Step. 
   MeBiSim Step.
-  (* TODO: add script to Fail but say that it is completed and to just Qed. *)
-Qed. *)
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  (* 
+  MeBiSim Step.
+  *)
+Admitted. *)

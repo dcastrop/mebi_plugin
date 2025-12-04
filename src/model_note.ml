@@ -53,11 +53,6 @@ let annotation_is_empty : annotation -> bool = function
   | _ -> false
 ;;
 
-let rec add_note (a : t) : annotation -> annotation = function
-  | { this; next = None } -> { this; next = Some { this = a; next = None } }
-  | { this; next = Some next } -> { this; next = Some (add_note a next) }
-;;
-
 let rec annotation_depth : annotation -> int = function
   | { this; next = None } -> 1
   | { this; next = Some next } -> 1 + annotation_depth next
@@ -74,11 +69,35 @@ let rec exists (x : t) : annotation -> bool = function
   | { this; next = Some next } -> if equal x this then true else exists x next
 ;;
 
+let add_note (x : t) (y : annotation) : annotation =
+  let rec add_note (a : t) : annotation -> annotation = function
+    | { this; next = None } -> { this; next = Some { this = a; next = None } }
+    | { this; next = Some next } -> { this; next = Some (add_note a next) }
+  in
+  if exists x y then y else add_note x y
+;;
+
 let rec exists_label (x : Model_label.t) : annotation -> bool = function
   | { this; next = None } -> false
   | { this; next = Some next } ->
     if Model_label.equal x this.via then true else exists_label x next
 ;;
+
+let rec last : annotation -> t = function
+  | { this; next = None } -> this
+  | { next = Some next; _ } -> last next
+;;
+
+exception Model_note_CannotDropLast of annotation
+
+let rec drop_last : annotation -> annotation = function
+  | { this; next = None } ->
+    raise (Model_note_CannotDropLast { this; next = None })
+  | { this; next = Some { next = None; _ } } -> { this; next = None }
+  | { this = a; next = Some next } -> { this = a; next = Some (drop_last next) }
+;;
+
+(* | { this; next = Some next; } -> drop_last next *)
 
 (***********************************************************************)
 (*** Annotations *******************************************************)
