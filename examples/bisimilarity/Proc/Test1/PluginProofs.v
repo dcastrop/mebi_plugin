@@ -81,16 +81,17 @@ Proof.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-  (* constructor 6. *)
   MeBiSim Step.
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-  (* info_eauto. *)
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
+  MeBiSim Step.
+  MeBiSim Step.
+  
+  MeBiSim Step.
+  (*
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  *)
 Admitted.
 (* 
   MeBiSim Step. (* cofix Cofix0; apply In_sim, Pack_sim; intros. *) 
