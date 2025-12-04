@@ -1276,8 +1276,10 @@ and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition_opt.t)
       |> get_weak_transition sigma (nfsm ~saturated:true ())
     in
     match mtrans.goto, ngoto with
-    | Some _, Some ngoto ->
+    | Some mgoto, Some ngoto ->
       assert_states_bisimilar mtrans.from ngoto;
+      Debug.thing (prefix "mgoto") mgoto (A State.to_string);
+      Debug.thing (prefix "ngoto") ngoto (A State.to_string);
       if State.equal nfrom ngoto
       then do_refl_none gl
       else
@@ -1303,6 +1305,7 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
   log_trace __FUNCTION__;
   function
   | { annotation = None; tactics } ->
+    log_tracex [ __FUNCTION__; "annotation None" ];
     (match tactics with
      | Some (h :: tl) ->
        (* do_constructor_tactic gl annotation tactics *)
@@ -1318,15 +1321,18 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
   | { annotation = Some annotation; tactics } ->
     log_tracex [ __FUNCTION__; "annotation Some" ];
     (match tactics with
-     | None -> do_build_constructor_tactics gl annotation
+     | None ->
+       log_tracex [ __FUNCTION__; "tactics None" ];
+       do_build_constructor_tactics gl annotation
      | Some [] ->
+       log_tracex [ __FUNCTION__; "tactics Some []" ];
        tactic_chain
          [ do_simplify gl; do_build_constructor_tactics gl annotation ]
      | Some (h :: tl) ->
        log_tracex [ __FUNCTION__; "tactics Some (h::t)" ];
        set_the_proof_state
          __FUNCTION__
-         (ApplyConstructors { annotation = None; tactics = Some tl });
+         (ApplyConstructors { annotation = Some annotation; tactics = Some tl });
        h)
 (* ;; *)
 
