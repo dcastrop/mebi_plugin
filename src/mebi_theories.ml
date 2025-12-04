@@ -1,5 +1,15 @@
 open Logging
 
+(* the prefix *)
+let trace_enabled : bool = true
+let log_trace (x : string) : unit = if trace_enabled then Log.trace x else ()
+
+let log_tracex (xs : string list) : unit =
+  log_trace (Utils.Strfy.list Utils.Strfy.string xs)
+;;
+
+(*****************************************************************************)
+
 let rec tactics : unit Proofview.tactic list -> unit Proofview.tactic = function
   | [] -> Proofview.tclUNIT ()
   | h :: [] -> h
@@ -26,7 +36,7 @@ let find_reference = Coqlib.find_reference [@ocaml.warning "-3"]
    and proofs.  This pattern extends all the way to the definition of function
    c_U *)
 let collect_bisimilarity_theories () : EConstr.t list =
-  Log.trace "mebi_theories.collect_bisimilarity_theories";
+  log_trace __FUNCTION__;
   match !constants with
   | [] ->
     Log.debug "mebi_theories.collect_bisimilarity_theories, mapping constants";
@@ -92,7 +102,7 @@ let rec indexed_c : int * EConstr.t list -> EConstr.t option = function
 ;;
 
 let c_LTS () : EConstr.t =
-  Log.trace "mebi_theories.c_LTS";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (0, cs) with
   | None ->
@@ -102,7 +112,7 @@ let c_LTS () : EConstr.t =
 ;;
 
 let c_tau () : EConstr.t =
-  Log.trace "mebi_theories.c_tau";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (1, cs) with
   | None ->
@@ -112,7 +122,7 @@ let c_tau () : EConstr.t =
 ;;
 
 let c_silent () : EConstr.t =
-  Log.trace "mebi_theories.c_silent";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (2, cs) with
   | None ->
@@ -123,7 +133,7 @@ let c_silent () : EConstr.t =
 ;;
 
 let c_silent1 () : EConstr.t =
-  Log.trace "mebi_theories.c_silent1";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (3, cs) with
   | None ->
@@ -134,7 +144,7 @@ let c_silent1 () : EConstr.t =
 ;;
 
 let c_weak () : EConstr.t =
-  Log.trace "mebi_theories.c_weak";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (4, cs) with
   | None ->
@@ -145,7 +155,7 @@ let c_weak () : EConstr.t =
 ;;
 
 let c_wk_some () : EConstr.t =
-  Log.trace "mebi_theories.c_wk_some";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (5, cs) with
   | None ->
@@ -156,7 +166,7 @@ let c_wk_some () : EConstr.t =
 ;;
 
 let c_wk_none () : EConstr.t =
-  Log.trace "mebi_theories.c_wk_none";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (6, cs) with
   | None ->
@@ -167,7 +177,7 @@ let c_wk_none () : EConstr.t =
 ;;
 
 let c_simF () : EConstr.t =
-  Log.trace "mebi_theories.c_simF";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (7, cs) with
   | None ->
@@ -178,7 +188,7 @@ let c_simF () : EConstr.t =
 ;;
 
 let c_Pack_sim () : EConstr.t =
-  Log.trace "mebi_theories.c_Pack_sim";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (8, cs) with
   | None ->
@@ -189,7 +199,7 @@ let c_Pack_sim () : EConstr.t =
 ;;
 
 let c_sim_weak () : EConstr.t =
-  Log.trace "mebi_theories.c_sim_weak";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (9, cs) with
   | None ->
@@ -200,7 +210,7 @@ let c_sim_weak () : EConstr.t =
 ;;
 
 let c_weak_sim () : EConstr.t =
-  Log.trace "mebi_theories.c_weak_sim";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (10, cs) with
   | None ->
@@ -211,7 +221,7 @@ let c_weak_sim () : EConstr.t =
 ;;
 
 let c_In_sim () : EConstr.t =
-  Log.trace "mebi_theories.c_In_sim";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (11, cs) with
   | None ->
@@ -222,7 +232,7 @@ let c_In_sim () : EConstr.t =
 ;;
 
 let c_out_sim () : EConstr.t =
-  Log.trace "mebi_theories.c_out_sim";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (12, cs) with
   | None ->
@@ -233,7 +243,7 @@ let c_out_sim () : EConstr.t =
 ;;
 
 let c_weak_bisim () : EConstr.t =
-  Log.trace "mebi_theories.c_weak_bisim";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (13, cs) with
   | None ->
@@ -244,7 +254,7 @@ let c_weak_bisim () : EConstr.t =
 ;;
 
 let c_relations () : EConstr.t =
-  Log.trace "mebi_theories.c_relations";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (14, cs) with
   | None ->
@@ -255,7 +265,7 @@ let c_relations () : EConstr.t =
 ;;
 
 let c_clos_refl_trans_1n () : EConstr.t =
-  Log.trace "mebi_theories.c_clos_refl_trans_1n";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (15, cs) with
   | None ->
@@ -266,7 +276,7 @@ let c_clos_refl_trans_1n () : EConstr.t =
 ;;
 
 let c_rt1n_refl () : EConstr.t =
-  Log.trace "mebi_theories.c_rt1n_refl";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (16, cs) with
   | None ->
@@ -277,7 +287,7 @@ let c_rt1n_refl () : EConstr.t =
 ;;
 
 let c_rt1n_trans () : EConstr.t =
-  Log.trace "mebi_theories.c_rt1n_trans";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (17, cs) with
   | None ->
@@ -288,7 +298,7 @@ let c_rt1n_trans () : EConstr.t =
 ;;
 
 let c_clos_trans_1n () : EConstr.t =
-  Log.trace "mebi_theories.c_clos_trans_1n";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (18, cs) with
   | None ->
@@ -299,7 +309,7 @@ let c_clos_trans_1n () : EConstr.t =
 ;;
 
 let c_option () : EConstr.t =
-  Log.trace "mebi_theories.c_option";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (19, cs) with
   | None ->
@@ -309,7 +319,7 @@ let c_option () : EConstr.t =
 ;;
 
 let c_None () : EConstr.t =
-  Log.trace "mebi_theories.c_None";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (20, cs) with
   | None ->
@@ -320,7 +330,7 @@ let c_None () : EConstr.t =
 ;;
 
 let c_Some () : EConstr.t =
-  Log.trace "mebi_theories.c_Some";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (21, cs) with
   | None ->
@@ -331,7 +341,7 @@ let c_Some () : EConstr.t =
 ;;
 
 let c_ex () : EConstr.t =
-  Log.trace "mebi_theories.c_ex";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (22, cs) with
   | None ->
@@ -340,7 +350,7 @@ let c_ex () : EConstr.t =
 ;;
 
 let c_ex_intro () : EConstr.t =
-  Log.trace "mebi_theories.c_ex_intro";
+  log_trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (23, cs) with
   | None ->
@@ -366,20 +376,18 @@ let is_var sigma (x : EConstr.t) : bool =
 (******)
 
 let get_hyp_names (gl : Proofview.Goal.t) : Names.Id.Set.t =
-  Log.trace "mebi_tactics.get_hyp_names";
   Context.Named.to_vars (Proofview.Goal.hyps gl)
 ;;
 
 let next_name_of (names : Names.Id.Set.t) : Names.Id.t -> Names.Id.t =
   fun x ->
-  Log.trace
-    (Printf.sprintf "mebi_tactics.next_name_of (%s)" (Names.Id.to_string x));
+  log_tracex [ __FUNCTION__; Names.Id.to_string x ];
   Namegen.next_ident_away x names
 ;;
 
 let new_name_of_string (gl : Proofview.Goal.t) : string -> Names.Id.t =
   fun x ->
-  Log.trace (Printf.sprintf "mebi_tactics.new_name_of_string (%s)" x);
+  log_tracex [ __FUNCTION__; x ];
   next_name_of (get_hyp_names gl) (Names.Id.of_string x)
 ;;
 

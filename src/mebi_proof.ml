@@ -5,8 +5,12 @@ open Debug
 module Hyp = Mebi_hypothesis
 
 (* the prefix *)
-let thep : string = "Mebi_proof"
-let log_trace (x : string) : unit = Log.trace (Printf.sprintf "%s.%s" thep x)
+let trace_enabled : bool = true
+let log_trace (x : string) : unit = if trace_enabled then Log.trace x else ()
+
+let _log_tracex (xs : string list) : unit =
+  log_trace (Utils.Strfy.list Utils.Strfy.string xs)
+;;
 
 let econstr_to_string (gl : Proofview.Goal.t) : EConstr.t -> string =
   Rocq_utils.Strfy.econstr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl)
@@ -572,7 +576,7 @@ let get_transition
   : Transition_opt.t
   =
   log_trace __FUNCTION__;
-  let prefix : string -> string = Printf.sprintf "%s.%s %s" __FUNCTION__ thep in
+  let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
   try
     let states : States.t = fsm.states in
     let labels : Alphabet.t = fsm.alphabet in
@@ -618,6 +622,7 @@ let get_hyp_transition
       (hyps : Rocq_utils.hyp list)
   : Transition_opt.t
   =
+  log_trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   let hyp_transitions : Transition_opt.t list =
     List.filter_map
@@ -652,6 +657,7 @@ let get_weak_transition
       ((ty, tys) : Rocq_utils.kind_pair)
   : Transition_opt.t
   =
+  log_trace __FUNCTION__;
   if typ_is_weak_transition sigma (ty, tys)
   then get_transition sigma tys.(3) tys.(5) tys.(4) fsm
   else raise (Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)))
@@ -663,6 +669,7 @@ let _get_silent_transition
       ((ty, tys) : Rocq_utils.kind_pair)
   : Transition_opt.t
   =
+  log_trace __FUNCTION__;
   if typ_is_silent_transition sigma (ty, tys)
   then get_transition sigma tys.(2) tys.(4) tys.(3) fsm
   else raise (Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)))
@@ -674,6 +681,7 @@ let _get_silent1_transition
       ((ty, tys) : Rocq_utils.kind_pair)
   : Transition_opt.t
   =
+  log_trace __FUNCTION__;
   if typ_is_silent1_transition sigma (ty, tys)
   then get_transition sigma tys.(2) tys.(4) tys.(3) fsm
   else raise (Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)))
