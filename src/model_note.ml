@@ -55,7 +55,7 @@ let annotation_is_empty : annotation -> bool = function
 
 let rec add_note (a : t) : annotation -> annotation = function
   | { this; next = None } -> { this; next = Some { this = a; next = None } }
-  | { this; next = Some next } -> add_note a next
+  | { this; next = Some next } -> { this; next = Some (add_note a next) }
 ;;
 
 let rec annotation_depth : annotation -> int = function
