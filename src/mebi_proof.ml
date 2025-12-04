@@ -288,7 +288,9 @@ let get_naction
   Debug.thing (prefix "nfrom") nfrom (A State.to_string);
   Debug.thing (prefix "nlabel") nlabel (A Label.to_string);
   (* Edges.find (nfsm ()).edges nfrom |> Model.get_action_labelled nlabel *)
-  Model.get_action_labelled_from ~annotated nfrom nlabel nfsm.edges
+  let x = Model.get_action_labelled_from ~annotated nfrom nlabel nfsm.edges in
+  Debug.thing (prefix "@@ naction") x (A Action.to_string);
+  x
 ;;
 
 let get_constructor_annotation (nfrom : State.t) (nlabel : Label.t)
@@ -447,10 +449,13 @@ let do_constructor_transition
       (htactic : tactic)
   : tactic
   =
-  let annotation = Some (get_constructor_annotation nfrom nlabel) in
+  log_trace __FUNCTION__;
+  let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
+  let annotation : Note.annotation = get_constructor_annotation nfrom nlabel in
+  Debug.thing (prefix "annotation") annotation (A Note.annotation_to_string);
   set_the_proof_state
     __FUNCTION__
-    (ApplyConstructors { annotation; tactics = None });
+    (ApplyConstructors { annotation = Some annotation; tactics = None });
   tactic_chain [ htactic; do_unfold_silent gl ]
 ;;
 
@@ -1255,6 +1260,14 @@ and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition_opt.t)
   =
   log_trace __FUNCTION__;
   let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
+  Log.debug
+    (Printf.sprintf
+       "saturated nfsm: %s"
+       (Model.edges_to_string (nfsm ~saturated:true ()).edges));
+  Log.debug
+    (Printf.sprintf
+       "nfsm: %s"
+       (Model.edges_to_string (nfsm ~saturated:false ()).edges));
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   try
     let { from = nfrom; label = nlabel; goto = ngoto; _ } : Transition_opt.t =

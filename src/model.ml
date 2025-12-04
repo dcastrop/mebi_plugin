@@ -212,18 +212,14 @@ let action_labels_to_string
 
 exception Model_Action_HasNoAnnotations of Action.t
 
-let get_annotations
-      (from : State.t)
-      ({ label; annotations; constructor_trees } : Action.t)
-  : Note.annotations
-  =
-  if List.is_empty annotations
-  then [ { this = Note.create from label; next = None } ]
-  else
-    List.map
-      (fun (x : Note.annotation) -> Note.add_note (Note.create from label) x)
-      annotations
-;;
+(* let get_annotations (from : State.t) (x : Action.t) : Note.annotations =
+   if List.is_empty x.annotations
+   then raise (Model_Action_HasNoAnnotations x)
+   else
+   List.map
+   (fun (y : Note.annotation) -> Note.add_note (Note.create from x.label) y)
+   x.annotations
+   ;; *)
 
 let get_shortest_annotation (x : Action.t) : Note.annotation =
   Log.trace "Model.get_shortest_annotation_from";
@@ -243,15 +239,19 @@ let get_shortest_annotation_from (from : State.t) (x : Action.t)
   : Note.annotation
   =
   Log.trace "Model.get_shortest_annotation_from";
-  match get_annotations from x with
-  | [] -> raise (Model_Action_HasNoAnnotations x)
-  | h :: tl ->
-    List.fold_left
-      (fun (the_min : Note.annotation) (y : Note.annotation) ->
-        let f = Note.annotation_depth in
-        match Int.compare (f y) (f the_min) with -1 -> y | _ -> the_min)
-      h
-      tl
+  try
+    match x.annotations with
+    | [] -> { this = Note.create from x.label; next = None }
+    | h :: tl ->
+      List.fold_left
+        (fun (the_min : Note.annotation) (y : Note.annotation) ->
+          let f = Note.annotation_depth in
+          match Int.compare (f y) (f the_min) with -1 -> y | _ -> the_min)
+        h
+        tl
+  with
+  | Model_Action_HasNoAnnotations x ->
+    { this = Note.create from x.label; next = None }
 ;;
 
 exception Model_Actions_IsEmpty of States.t Actions.t

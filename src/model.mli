@@ -292,7 +292,6 @@ val action_labels_to_string :
 
 exception Model_Action_HasNoAnnotations of Action.t
 
-val get_annotations : State.t -> Action.t -> Note.annotations
 val get_shortest_annotation : Action.t -> Note.annotation
 
 val get_shortest_annotation_from :
