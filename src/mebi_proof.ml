@@ -1164,6 +1164,12 @@ let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   try
     let mtransition : Transition_opt.t = get_mtransition gl in
+    (* TODO:
+
+       if Label.is_silent mtrans.label
+       then do_refl_none gl
+       else
+    *)
     let ((ntransition, mstate) : Transition_opt.t * State.t) =
       Proofview.Goal.concl gl
       |> Rocq_utils.econstr_to_atomic sigma
@@ -1178,7 +1184,6 @@ let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
     | Some mgoto, None ->
       Debug.thing (prefix "mstate") mstate (A State.to_string);
       set_the_proof_state __FUNCTION__ (GoalTransition mtransition);
-      (* TODO: in [get_ngoto] we need to sometimes use the [~saturated] nfsm, but need to detect here if that is necessary? or just make the code in [get_ngoto] more robust and figure this out itself *)
       get_ngoto mgoto ntransition |> do_ex_intro gl
     | _, _ -> raise (Mebi_proof_ExIntro_Transitions (mtransition, ntransition))
   with
