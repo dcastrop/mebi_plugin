@@ -59,17 +59,17 @@ MeBi Bisim r With termLTS And p With termLTS Using termLTS.
 
 
 
-MeBi Set ShowAny True.
+(* MeBi Set ShowAny True. *)
 
 
 
-MeBi Divider "Testing".
+(* MeBi Divider "Testing". *)
 
 (* Example e1 : term := (tseq (tseq (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) tend) tend). *)
-Example e1 : term := (tseq (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) tend).
+(* Example e1 : term := (tseq (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) tend). *)
 (* Example e1 : term := (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend). *)
 
-MeBi FSM e1 Using termLTS. 
+(* MeBi FSM e1 Using termLTS.  *)
 (* MeBi Saturate e1 Using termLTS. *)
 
 

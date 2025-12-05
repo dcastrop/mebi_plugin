@@ -166,7 +166,7 @@ let set_the_proof_state ?(short : bool = true) (funstr : string) (x : PState.t)
   the_proof_state := x
 ;;
 
-let debug_proof_state ?(short : bool = true) () : unit =
+let _debug_proof_state ?(short : bool = true) () : unit =
   Log.debug
     (Printf.sprintf
        "Current: %s\n\n\
@@ -180,7 +180,7 @@ let get_tactic ?(short : bool = true) ?(state : bool = true)
   = function
   | { msg = None; x } -> x
   | { msg = Some msg; x } ->
-    if state then debug_proof_state ~short ();
+    (* if state then _debug_proof_state ~short (); *)
     (* NOTE: we pad so that a next iteration is group separately *)
     the_old_proof_states := [] :: !the_old_proof_states;
     Log.notice (Printf.sprintf "%s." msg);
@@ -386,6 +386,7 @@ let do_simplify (gl : Proofview.Goal.t) : tactic =
 ;;
 
 let do_apply_rt1n_refl (gl : Proofview.Goal.t) : tactic =
+  log_trace __FUNCTION__;
   tactic
     ~msg:"apply rt1n_refl"
     (Mebi_theories.tactics
@@ -393,6 +394,7 @@ let do_apply_rt1n_refl (gl : Proofview.Goal.t) : tactic =
 ;;
 
 let do_eapply_rt1n_refl (gl : Proofview.Goal.t) : tactic =
+  log_trace __FUNCTION__;
   tactic
     ~msg:"eapply rt1n_refl"
     (Mebi_theories.tactics
@@ -400,6 +402,7 @@ let do_eapply_rt1n_refl (gl : Proofview.Goal.t) : tactic =
 ;;
 
 let _do_apply_rt1n_trans (gl : Proofview.Goal.t) : tactic =
+  log_trace __FUNCTION__;
   tactic
     ~msg:"apply rt1n_trans"
     (Mebi_theories.tactics
@@ -407,6 +410,7 @@ let _do_apply_rt1n_trans (gl : Proofview.Goal.t) : tactic =
 ;;
 
 let do_eapply_rt1n_trans (gl : Proofview.Goal.t) : tactic =
+  log_trace __FUNCTION__;
   tactic
     ~msg:"eapply rt1n_trans"
     (Mebi_theories.tactics
@@ -414,6 +418,7 @@ let do_eapply_rt1n_trans (gl : Proofview.Goal.t) : tactic =
 ;;
 
 let do_rt1n_via (gl : Proofview.Goal.t) (via : Label.t) : tactic =
+  log_trace __FUNCTION__;
   tactic_chain
     [ (if Label.is_silent via
        then do_eapply_rt1n_trans gl
@@ -423,23 +428,27 @@ let do_rt1n_via (gl : Proofview.Goal.t) (via : Label.t) : tactic =
 ;;
 
 let do_solve_cofix (gl : Proofview.Goal.t) : tactic =
+  log_trace __FUNCTION__;
   set_the_proof_state __FUNCTION__ DetectState;
   tactic ~msg:"(do_solve)" (Auto.gen_trivial ~debug:Hints.Info [] None)
 ;;
 
 let do_apply_wk_none (gl : Proofview.Goal.t) : tactic =
+  log_trace __FUNCTION__;
   tactic
     ~msg:"apply wk_none"
     (Mebi_tactics.apply ~gl (Mebi_theories.c_wk_none ()))
 ;;
 
 let do_unfold_silent (gl : Proofview.Goal.t) : tactic =
+  log_trace __FUNCTION__;
   tactic
     ~msg:"unfold silent"
     (Mebi_tactics.unfold_econstr gl (Mebi_theories.c_silent ()))
 ;;
 
 let do_eapply_wk_some (gl : Proofview.Goal.t) : tactic =
+  log_trace __FUNCTION__;
   tactic
     ~msg:"eapply wk_some"
     (Mebi_tactics.eapply ~gl (Mebi_theories.c_wk_some ()))
@@ -462,7 +471,7 @@ let do_constructor_transition
   tactic_chain [ htactic; do_unfold_silent gl ]
 ;;
 
-let do_refl_none (gl : Proofview.Goal.t) : tactic =
+let _do_refl_none (gl : Proofview.Goal.t) : tactic =
   set_the_proof_state __FUNCTION__ NewWeakSim;
   tactic_chain
     [ do_apply_wk_none gl; do_unfold_silent gl; do_apply_rt1n_refl gl ]
@@ -1275,16 +1284,10 @@ and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition_opt.t)
       assert_states_bisimilar mtrans.from ngoto;
       Debug.thing (prefix "mgoto") mgoto (A State.to_string);
       Debug.thing (prefix "ngoto") ngoto (A State.to_string);
-      if State.equal nfrom ngoto
-      then do_refl_none gl
-      else
-        do_constructor_transition
-          gl
-          nfrom
-          nlabel
-          (if Label.is_silent nlabel
-           then do_apply_wk_none gl
-           else do_eapply_wk_some gl)
+      Debug.thing (prefix "nlabel") nlabel (A Label.to_string);
+      if Label.is_silent nlabel
+      then do_apply_wk_none gl
+      else do_eapply_wk_some gl |> do_constructor_transition gl nfrom nlabel
     | _, _ -> raise (Mebi_proof_GoalTransition ())
   with
   | Mebi_proof_CouldNotDecodeTransition (sigma, x, fsm) ->
@@ -1380,7 +1383,7 @@ let solve (upper_bound : int) (pstate : Declare.Proof.t) : Declare.Proof.t =
       n, pstate
     | false, -1 ->
       Log.notice
-        (Printf.sprintf "Unsolved after (%i) iterations." (upper_bound - n));
+        (Printf.sprintf "Unsolved after (%i) iterations." (upper_bound - n - 1));
       0, pstate
     | false, _ ->
       let pstate = Mebi_tactics.update_proof_by_tactic pstate (step ()) in
