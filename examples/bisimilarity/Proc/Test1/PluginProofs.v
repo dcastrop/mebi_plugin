@@ -27,12 +27,12 @@ MeBi Set Weak Option label.
 MeBi Set FailIfIncomplete True.
 MeBi Set FailIfNotBisim True.
 (* MeBi See All.  *)
-MeBi Set ShowAny False.
+(* MeBi Set ShowAny False. *)
 
 Require Import Logic.
 
-MeBi Set ShowDebug False. 
-MeBi Set ShowDetails False.
+(* MeBi Set ShowDebug False.  *)
+(* MeBi Set ShowDetails False. *)
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.pq".
