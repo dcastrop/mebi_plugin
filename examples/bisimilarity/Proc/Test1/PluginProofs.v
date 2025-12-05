@@ -31,8 +31,8 @@ MeBi Set FailIfNotBisim True.
 
 Require Import Logic.
 
-MeBi Set ShowDebug False. 
-MeBi Set ShowDetails False.
+(* MeBi Set ShowDebug False.  *)
+(* MeBi Set ShowDetails False. *)
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.pq".
