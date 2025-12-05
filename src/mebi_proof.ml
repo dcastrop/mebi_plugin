@@ -180,7 +180,7 @@ let get_tactic ?(short : bool = true) ?(state : bool = true)
   = function
   | { msg = None; x } -> x
   | { msg = Some msg; x } ->
-    (* if state then _debug_proof_state ~short (); *)
+    if state then _debug_proof_state ~short ();
     (* NOTE: we pad so that a next iteration is group separately *)
     the_old_proof_states := [] :: !the_old_proof_states;
     Log.notice (Printf.sprintf "%s." msg);
@@ -656,7 +656,7 @@ let find_state (sigma : Evd.evar_map) (x : EConstr.t) (states : States.t)
     | None -> raise (Mebi_proof_CouldNotDecodeState (sigma, x, states))
   with
   | Model_CannotDecodeState (enc, states) ->
-    Log.warning
+    Log.debug
       (Printf.sprintf
          "Mebi_proof.find_state, Model_CannotDecodeState:\nenc: %s\nstates: %s"
          (Enc.to_string enc)
@@ -772,7 +772,7 @@ let get_hyp_transition
   | [] -> raise (Mebi_proof_CouldNotFindHypTransition (sigma, fsm, hyps))
   | h :: [] -> h
   | h :: _tl ->
-    Log.warning
+    Log.debug
       (Printf.sprintf
          "Mebi_proof.get_hyp_lts_transition, multiple transitions found (%i)"
          (List.length (h :: _tl)));
@@ -804,7 +804,7 @@ let get_weak_ntransition (sigma : Evd.evar_map) (wk_trans : EConstr.t)
   |> get_weak_transition sigma (nfsm ~saturated:true ())
 ;;
 
-let get_silent_transition
+let _get_silent_transition
       (sigma : Evd.evar_map)
       (fsm : Fsm.t)
       ((ty, tys) : Rocq_utils.kind_pair)
@@ -816,7 +816,7 @@ let get_silent_transition
   else raise (Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)))
 ;;
 
-let get_silent1_transition
+let _get_silent1_transition
       (sigma : Evd.evar_map)
       (fsm : Fsm.t)
       ((ty, tys) : Rocq_utils.kind_pair)
@@ -834,11 +834,14 @@ let _get_concl_ntransition
   : Transition_opt.t
   =
   log_trace __FUNCTION__;
+  Log.debug "trying weak";
   try get_weak_transition sigma (nfsm ~saturated:true ()) (ty, tys) with
   | Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)) ->
-    (try get_silent_transition sigma (nfsm ~saturated:true ()) (ty, tys) with
+    Log.debug "trying silent";
+    (try _get_silent_transition sigma (nfsm ~saturated:true ()) (ty, tys) with
      | Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)) ->
-       get_silent1_transition sigma (nfsm ~saturated:true ()) (ty, tys))
+       Log.debug "trying silent1";
+       _get_silent1_transition sigma (nfsm ~saturated:true ()) (ty, tys))
 ;;
 
 (***********************************************************************)
@@ -1014,22 +1017,22 @@ let concl_get_eexists (sigma : Evd.evar_map) ((ty, tys) : Rocq_utils.kind_pair)
        ntransition, mstate
      with
      | Mebi_proof_CouldNotGetStateM (sigma, (ty, tys)) ->
-       Log.warning
+       Log.debug
          (Printf.sprintf
             "Mebi_proof.concl_get_eexists Mebi_proof_CouldNotGetStateM");
        raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys)))
      | Rocq_utils.Rocq_utils_EConstrIsNot_Atomic (sigma, x, k) ->
-       Log.warning
+       Log.debug
          (Printf.sprintf
             "Mebi_proof.concl_get_eexists Rocq_utils_EConstrIsNot_Atomic");
        raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys)))
      | Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)) ->
-       Log.warning
+       Log.debug
          (Printf.sprintf
             "Mebi_proof.concl_get_eexists Mebi_proof_TyDoesNotMatchTheories");
        raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys))))
   | _ ->
-    Log.warning
+    Log.debug
       (Printf.sprintf
          "Mebi_proof.concl_get_eexists array not [wk_trans;wk_sim]");
     raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys)))
@@ -1099,7 +1102,7 @@ let try_get_ngoto ?(saturated : bool = false) (mgoto : State.t)
        raise (Mebi_proof_NGotoNotInFsm ()))
   (* ! shouldn't happen *)
   | { goto = Some ngoto; _ } ->
-    Log.warning
+    Log.debug
       (Printf.sprintf
          "Mebi_proof.try_get_goto, already have Some goto:\nis bisim: %b\n%s"
          (are_states_bisimilar mgoto ngoto)
@@ -1315,27 +1318,52 @@ and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition_opt.t)
   let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   Debug.thing (prefix "mtrans") mtrans (A Transition_opt.to_string);
+  Debug.thing
+    (prefix "concl")
+    (Proofview.Goal.concl gl)
+    (B (econstr_to_string gl));
   try
+    let concltys =
+      Proofview.Goal.concl gl |> Rocq_utils.econstr_to_atomic sigma
+    in
     let { from = nfrom; label = nlabel; goto = ngoto; _ } : Transition_opt.t =
+      try get_weak_transition sigma (nfsm ~saturated:true ()) concltys with
+      | Mebi_proof_TyDoesNotMatchTheories _ ->
+        _get_silent_transition sigma (nfsm ~saturated:true ()) concltys
+    in
+    (* let { from = nfrom; label = nlabel; goto = ngoto; _ } : Transition_opt.t =
       Proofview.Goal.concl gl
       |> Rocq_utils.econstr_to_atomic sigma
       |> get_weak_transition sigma (nfsm ~saturated:true ())
-      (* |> get_concl_ntransition sigma *)
-    in
+    in *)
     match mtrans.goto, ngoto with
     | Some mgoto, Some ngoto ->
       assert_states_bisimilar mtrans.from ngoto;
       Debug.thing (prefix "mgoto") mgoto (A State.to_string);
       Debug.thing (prefix "ngoto") ngoto (A State.to_string);
       Debug.thing (prefix "nlabel") nlabel (A Label.to_string);
-      if Label.is_silent nlabel
-      then do_apply_wk_none gl
-      else do_eapply_wk_some gl |> do_constructor_transition gl nfrom nlabel
+      (if Label.is_silent nlabel
+       then do_apply_wk_none gl
+       else do_eapply_wk_some gl)
+      |> do_constructor_transition gl nfrom nlabel
     | _, _ -> raise (Mebi_proof_GoalTransition ())
   with
   | Mebi_proof_CouldNotDecodeTransitionState (sigma, x, fsm) ->
+    Log.warning
+      (Printf.sprintf
+         "Could not decode transition state: %s"
+         (econstr_to_string gl x));
+    Debug.thing (prefix "fsm.states") fsm.states (A Model.states_to_string);
     raise (Mebi_proof_GoalTransition ())
   | Mebi_proof_CouldNotDecodeTransitionLabel (sigma, x, fsm) ->
+    Log.warning
+      (Printf.sprintf
+         "Could not decode transition label: %s"
+         (econstr_to_string gl x));
+    Debug.thing
+      (prefix "fsm.alphabet")
+      fsm.alphabet
+      (A Model.alphabet_to_string);
     raise (Mebi_proof_GoalTransition ())
   | Mebi_proof_StatesNotBisimilar (mstate, nstate, pi) ->
     Debug.thing (prefix "StatesNotBisimilar, mfrom") mstate (A State.to_string);

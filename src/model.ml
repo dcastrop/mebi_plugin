@@ -346,7 +346,7 @@ let get_action_labelled
       else false)
   with
   | Not_found ->
-    Log.warning
+    Log.debug
       (Printf.sprintf
          "Model.get_action_labelled, Model_NoActionLabelled:\n\
           - annotated: %b\n\
