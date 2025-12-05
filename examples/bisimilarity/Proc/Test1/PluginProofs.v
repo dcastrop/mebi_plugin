@@ -12,27 +12,12 @@ Import Flat.Simple.
 
 Require Import MEBI.Examples.bisimilarity.Proc.Test1.Terms.
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.Bisim".
-MeBi Set ShowAny True. 
-(* MeBi Set ShowAny False. *)
-(* MeBi Set ShowNotices  True. *)
-(* MeBi Set ShowDebug    True. *)
-(* MeBi Set ShowDetails  True. *)
-MeBi Set ShowDetails  False.
-MeBi Set ShowResults  True.
-(* MeBi Set ShowWarnings True. *)
-MeBi Set WeakMode     True.
-MeBi Set Weak Option label.
-(* MeBi LTS p Using termLTS. *)
-(* MeBi LTS q Using termLTS. *)
-(* MeBi Bisim p With termLTS And q With termLTS Using termLTS. *)
-
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs".
 MeBi Reset All.
 MeBi Set ShowAny      True.
 MeBi Set ShowNotices  True.
-(* MeBi Set ShowDebug    True. *)
-(* MeBi Set ShowDetails  True. *)
+MeBi Set ShowDebug    True.
+MeBi Set ShowDetails  True.
 MeBi Set ShowDetails  True.
 MeBi Set ShowResults  True.
 MeBi Set ShowWarnings True.
@@ -46,59 +31,44 @@ MeBi Set FailIfNotBisim True.
 
 Require Import Logic.
 
-MeBi Set ShowAny True.
+MeBi Set ShowDebug False. 
+MeBi Set ShowDetails False.
+
+
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.pq".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
-Proof.
-  MeBiSim Begin termLTS p And termLTS q Using termLTS. 
-  MeBi Set ShowAny False.
+Proof. MeBiSim Begin termLTS p And termLTS q Using termLTS. 
   MeBiSim Solve 900.
 Qed.
-  (* 
-  MeBiSim Step.
-  *)
-(* Admitted. *)
-
-MeBi Set ShowAny True.
-
-
-(* MeBi Set ShowDebug True. MeBi Set ShowDetails True. *)
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.qp".
 Example wsim_qp : weak_sim termLTS termLTS q p. 
-Proof.
-  MeBiSim Begin termLTS q And termLTS p Using termLTS. 
-  (* MeBi Set ShowAny False. *)
-  (* MeBiSim Solve 900. *)
-(* Qed. *)
-Admitted.
-(* TODO: looks like we try to apply [wk_none] for [Some action] *)
-  (* MeBiSim Solve 30. *)
-  (* MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  (* 
-  MeBiSim Step.
-  *)
-Admitted. *)
+Proof. MeBiSim Begin termLTS q And termLTS p Using termLTS. 
+  MeBiSim Solve 1200.
+Qed.
+
+
+MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.qr".
+Example wsim_qr : weak_sim termLTS termLTS q r. 
+Proof. MeBiSim Begin termLTS q And termLTS r Using termLTS. 
+  MeBiSim Solve 1200.
+Qed.
+
+MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.rq".
+Example wsim_rq : weak_sim termLTS termLTS r q. 
+Proof. MeBiSim Begin termLTS r And termLTS q Using termLTS. 
+  MeBiSim Solve 900.
+Qed.
+
+
+MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.pr".
+Example wsim_pr : weak_sim termLTS termLTS p r. 
+Proof. MeBiSim Begin termLTS p And termLTS r Using termLTS. 
+  MeBiSim Solve 300.
+Qed.
+
+MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.rp".
+Example wsim_rp : weak_sim termLTS termLTS r p. 
+Proof. MeBiSim Begin termLTS r And termLTS p Using termLTS. 
+  MeBiSim Solve 350.
+Qed.
