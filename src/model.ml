@@ -78,9 +78,15 @@ let partition_to_string ?(args : style_args = style_args ()) (x : Partition.t)
   Partition.to_list x |> Utils.Strfy.list ~args states_to_string
 ;;
 
-let get_bisim_states (x : State.t) : Partition.t -> States.t =
+exception Model_Bisim_State_NotFound of (State.t * Partition.t)
+
+let get_bisim_states (x : State.t) (pi : Partition.t) : States.t =
   Log.trace "Model.get_bisim_states";
-  Partition.find_first (fun (block : States.t) -> States.mem x block)
+  try
+    Partition.to_list pi
+    |> List.find (fun (block : States.t) -> States.mem x block)
+  with
+  | Not_found -> raise (Model_Bisim_State_NotFound (x, pi))
 ;;
 
 (***********************************************************************)
@@ -105,14 +111,22 @@ let alphabet_to_string ?(args : style_args = style_args ()) (x : Alphabet.t)
   Alphabet.to_list x |> Utils.Strfy.list ~args Label.to_string
 ;;
 
-let find_label_of_enc (x : Enc.t) : Alphabet.t -> Label.t =
+exception Model_Alphabet_LabelOfEncNotFound of (Enc.t * Alphabet.t)
+
+let find_label_of_enc (x : Enc.t) (alphabet : Alphabet.t) : Label.t =
   Log.trace "Model.find_label_of_enc";
-  Alphabet.find_first (fun { enc = y; _ } -> Enc.equal x y)
+  try
+    Alphabet.to_list alphabet
+    |> List.find (fun ({ enc = y; _ } : Label.t) -> Enc.equal x y)
+  with
+  | Not_found -> raise (Model_Alphabet_LabelOfEncNotFound (x, alphabet))
 ;;
 
-let silent_label_opt : Alphabet.t -> Label.t option =
+let silent_label_opt (alphabet : Alphabet.t) : Label.t option =
   Log.trace "Model.silent_label_opt";
-  Alphabet.find_first_opt (fun x -> Option.cata (fun y -> y) false x.is_silent)
+  Alphabet.to_list alphabet
+  |> List.find_opt (fun (x : Label.t) ->
+    Option.cata (fun (y : bool) -> y) false x.is_silent)
 ;;
 
 exception Model_Alphabet_SilentLabelNotFound of Alphabet.t
@@ -332,7 +346,7 @@ let get_action_labelled
       else false)
   with
   | Not_found ->
-    Log.warning
+    Log.debug
       (Printf.sprintf
          "Model.get_action_labelled, Model_NoActionLabelled:\n\
           - annotated: %b\n\
