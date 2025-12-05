@@ -23,7 +23,8 @@ examples/bisimilarity/Proc/Test1/PluginProofs.v ###
 # examples/bisimilarity/Proc/Test1/ManualProofs.v
 # examples/bisimilarity/Proc/Test1/LtacProofs.v
 
-# examples/bisimilarity/Proc/Test2/Terms.v ###
+examples/bisimilarity/Proc/Test2/Terms.v ###
+examples/bisimilarity/Proc/Test2/PluginProofs.v ###
 # examples/bisimilarity/Proc/Test2/ManualProofs.v
 # examples/bisimilarity/Proc/Test2/LtacProofs.v
 

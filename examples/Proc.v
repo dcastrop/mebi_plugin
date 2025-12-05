@@ -69,18 +69,11 @@ Module Flat.
 
     (* These below capture "structural congruence": using "silent" transitions *)
     | do_fix : 
-      (* forall t t', t' = tsubst (tfix t) t -> termLTS (tfix t) None t' *)
       forall t , termLTS (tfix t) None (tsubst (tfix t) t)
 
     | do_comm : 
       forall tl tr, termLTS (tpar tl tr) None (tpar tr tl)
 
-      (* NOTE: removing these as without parl/parr we can't go inside of par anyway, so they are just used for handshakes *)
-    (* | do_assocl : forall t1 t2 t3,  *)
-        (* termLTS (tpar t1 (tpar t2 t3)) None (tpar (tpar t1 t2) t3) *)
-
-    (* | do_assocr : forall t1 t2 t3,  *)
-        (* termLTS (tpar (tpar t1 t2) t3) None (tpar t1 (tpar t2 t3)) *)
     .
 
     Inductive termLTS_tc : term -> Prop :=
@@ -111,7 +104,6 @@ Module Flat.
 
     (* These below capture "structural congruence": using "silent" transitions *)
     | do_fix : 
-      (* forall t t', t' = tsubst (tfix t) t -> termLTS (tfix t) None t' *)
       forall t , termLTS (tfix t) None (tsubst (tfix t) t)
 
     | do_comm : 
