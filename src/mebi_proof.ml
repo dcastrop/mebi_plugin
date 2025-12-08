@@ -471,7 +471,8 @@ let do_constructor_transition
   tactic_chain [ htactic; do_unfold_silent gl ]
 ;;
 
-let _do_refl_none (gl : Proofview.Goal.t) : tactic =
+let do_refl_none (gl : Proofview.Goal.t) : tactic =
+  log_trace __FUNCTION__;
   set_the_proof_state __FUNCTION__ NewWeakSim;
   tactic_chain
     [ do_apply_wk_none gl; do_unfold_silent gl; do_apply_rt1n_refl gl ]
@@ -845,28 +846,6 @@ let _get_concl_ntransition
 ;;
 
 (***********************************************************************)
-
-exception Mebi_proof_CouldNotGetStateM of (Evd.evar_map * Rocq_utils.kind_pair)
-
-let weak_sim_get_m_state
-      (sigma : Evd.evar_map)
-      ((ty, tys) : Rocq_utils.kind_pair)
-  : State.t
-  =
-  if typ_is_weak_sim sigma (ty, tys)
-  then (
-    try find_state sigma tys.(5) (mfsm ()).states with
-    | Mebi_proof_CouldNotDecodeState (sigma, statety, states) ->
-      raise (Mebi_proof_CouldNotGetStateM (sigma, (ty, tys))))
-  else raise (Mebi_proof_CouldNotGetStateM (sigma, (ty, tys)))
-;;
-
-let get_mstate (sigma : Evd.evar_map) (wk_sim : EConstr.t) : State.t =
-  log_trace __FUNCTION__;
-  weak_sim_get_m_state sigma (Rocq_utils.econstr_to_atomic sigma wk_sim)
-;;
-
-(***********************************************************************)
 (*** Hypothesis ********************************************************)
 (***********************************************************************)
 
@@ -999,44 +978,80 @@ let hyps_is_empty (gl : Proofview.Goal.t) : bool =
    - new weak sim
    - exists n2 *)
 
-exception Mebi_proof_ConclIsNot_Exists of (Evd.evar_map * Rocq_utils.kind_pair)
+(* type concl_wk_sim =
+  { m : State.t
+  ; n : State.t
+  } *)
 
-let concl_get_eexists (sigma : Evd.evar_map) ((ty, tys) : Rocq_utils.kind_pair)
-  : Transition_opt.t * State.t
-  =
+type concl_conj =
+  { wk_trans : EConstr.t
+  ; wk_sim : EConstr.t
+  }
+
+exception Mebi_proof_ConclIsNot_Conj of (Evd.evar_map * Rocq_utils.kind_pair)
+
+let concl_wk_sim (gl : Proofview.Goal.t) : concl_conj =
   log_trace __FUNCTION__;
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+  let ty, tys = Rocq_utils.econstr_to_atomic sigma (Proofview.Goal.concl gl) in
   let _, _, constr = Rocq_utils.econstr_to_lambda sigma tys.(1) in
   let _, apptys = Rocq_utils.econstr_to_app sigma constr in
   match Array.to_list apptys with
-  | [ wk_trans; wk_sim ] ->
-    (try
-       let ntransition : Transition_opt.t =
-         get_weak_ntransition sigma wk_trans
-       in
-       let mstate : State.t = get_mstate sigma wk_sim in
-       ntransition, mstate
-     with
-     | Mebi_proof_CouldNotGetStateM (sigma, (ty, tys)) ->
-       Log.debug
-         (Printf.sprintf
-            "Mebi_proof.concl_get_eexists Mebi_proof_CouldNotGetStateM");
-       raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys)))
-     | Rocq_utils.Rocq_utils_EConstrIsNot_Atomic (sigma, x, k) ->
-       Log.debug
-         (Printf.sprintf
-            "Mebi_proof.concl_get_eexists Rocq_utils_EConstrIsNot_Atomic");
-       raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys)))
-     | Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)) ->
-       Log.debug
-         (Printf.sprintf
-            "Mebi_proof.concl_get_eexists Mebi_proof_TyDoesNotMatchTheories");
-       raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys))))
-  | _ ->
-    Log.debug
-      (Printf.sprintf
-         "Mebi_proof.concl_get_eexists array not [wk_trans;wk_sim]");
-    raise (Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys)))
+  | [ wk_trans; wk_sim ] -> { wk_trans; wk_sim }
+  | _ -> raise (Mebi_proof_ConclIsNot_Conj (sigma, (ty, tys)))
 ;;
+
+(***********************************************************************)
+
+exception Mebi_proof_CouldNotGetWkSimState of unit
+
+type wk_sim_state =
+  | M of concl_conj
+  | N of concl_conj
+
+let wk_sim_state (sigma : Evd.evar_map) : wk_sim_state -> EConstr.t =
+  log_trace __FUNCTION__;
+  let f (c : Evd.evar_map -> Rocq_utils.kind_pair -> bool) wk =
+    let x : Rocq_utils.kind_pair = Rocq_utils.econstr_to_atomic sigma wk in
+    if c sigma x then snd x else raise (Mebi_proof_CouldNotGetWkSimState ())
+  in
+  function
+  | M { wk_sim; _ } -> (f typ_is_weak_sim wk_sim).(5)
+  | N { wk_trans; _ } -> (f typ_is_weak_transition wk_trans).(3)
+;;
+
+let wk_conj_get_state
+      (sigma : Evd.evar_map)
+      (stateof : wk_sim_state)
+      (fsm : Fsm.t)
+  : State.t
+  =
+  log_trace __FUNCTION__;
+  try find_state sigma (wk_sim_state sigma stateof) fsm.states with
+  | Mebi_proof_CouldNotDecodeState (sigma, statety, states) ->
+    Debug.thing "states" states (A Model.states_to_string);
+    raise (Mebi_proof_CouldNotGetWkSimState ())
+;;
+
+exception Mebi_proof_CouldNotGetWkSimStateM of (Evd.evar_map * concl_conj)
+
+let get_mstate (sigma : Evd.evar_map) (conj : concl_conj) : State.t =
+  log_trace __FUNCTION__;
+  try wk_conj_get_state sigma (M conj) (mfsm ()) with
+  | Mebi_proof_CouldNotGetWkSimState () ->
+    raise (Mebi_proof_CouldNotGetWkSimStateM (sigma, conj))
+;;
+
+exception Mebi_proof_CouldNotGetWkSimStateN of (Evd.evar_map * concl_conj)
+
+let get_nstate (sigma : Evd.evar_map) (conj : concl_conj) : State.t =
+  log_trace __FUNCTION__;
+  try wk_conj_get_state sigma (N conj) (nfsm ()) with
+  | Mebi_proof_CouldNotGetWkSimState () ->
+    raise (Mebi_proof_CouldNotGetWkSimStateN (sigma, conj))
+;;
+
+(***********************************************************************)
 
 let hyp_is_invertible (sigma : Evd.evar_map) : Rocq_utils.hyp -> bool =
   fun (x : Rocq_utils.hyp) ->
@@ -1130,6 +1145,15 @@ let do_ex_intro (gl : Proofview.Goal.t) (ngoto : State.t) : tactic =
        ])
 ;;
 
+let do_nnone (gl : Proofview.Goal.t) : tactic =
+  log_trace __FUNCTION__;
+  let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+  let nstate : State.t = concl_wk_sim gl |> get_nstate sigma in
+  Debug.thing (prefix "nstate") nstate (A State.to_string);
+  do_ex_intro gl nstate
+;;
+
 exception Mebi_proof_ExIntro_NEqStateM of (State.t * State.t option)
 
 let assert_states_consistent (mstate : State.t) : State.t option -> unit
@@ -1158,39 +1182,63 @@ let assert_transition_opt_labels_eq
 
 exception Mebi_proof_ExIntro_NotBisimilar of (State.t * State.t)
 
-let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
+let do_nsome (gl : Proofview.Goal.t) (mtransition : Transition_opt.t) : tactic =
   log_trace __FUNCTION__;
   let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  try
-    let mtransition : Transition_opt.t = get_mtransition gl in
-    (* TODO:
+  let { wk_trans; wk_sim } : concl_conj = concl_wk_sim gl in
+  let mstate : State.t = get_mstate sigma { wk_trans; wk_sim } in
+  let ntransition : Transition_opt.t = get_weak_ntransition sigma wk_trans in
+  Debug.thing (prefix "mtransition") mtransition (A Transition_opt.to_string);
+  Debug.thing (prefix "ntransition") ntransition (A Transition_opt.to_string);
+  assert_transition_opt_labels_eq mtransition ntransition;
+  assert_transition_opt_states_bisimilar mtransition ntransition;
+  assert_states_consistent mstate mtransition.goto;
+  match mtransition.goto, ntransition.goto with
+  | Some mgoto, None ->
+    Debug.thing (prefix "mstate") mstate (A State.to_string);
+    get_ngoto mgoto ntransition |> do_ex_intro gl
+  | _, _ -> raise (Mebi_proof_ExIntro_Transitions (mtransition, ntransition))
+;;
 
-       if Label.is_silent mtrans.label
-       then do_refl_none gl
-       else
-    *)
-    let ((ntransition, mstate) : Transition_opt.t * State.t) =
-      Proofview.Goal.concl gl
-      |> Rocq_utils.econstr_to_atomic sigma
-      |> concl_get_eexists sigma
-    in
-    Debug.thing (prefix "mtransition") mtransition (A Transition_opt.to_string);
-    Debug.thing (prefix "ntransition") ntransition (A Transition_opt.to_string);
-    assert_transition_opt_labels_eq mtransition ntransition;
-    assert_transition_opt_states_bisimilar mtransition ntransition;
-    assert_states_consistent mstate mtransition.goto;
-    match mtransition.goto, ntransition.goto with
-    | Some mgoto, None ->
-      Debug.thing (prefix "mstate") mstate (A State.to_string);
-      set_the_proof_state __FUNCTION__ (GoalTransition mtransition);
-      get_ngoto mgoto ntransition |> do_ex_intro gl
-    | _, _ -> raise (Mebi_proof_ExIntro_Transitions (mtransition, ntransition))
+exception Mebi_proof_ConclIsNot_Exists of unit
+
+let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
+  log_trace __FUNCTION__;
+  let mtransition : Transition_opt.t = get_mtransition gl in
+  Debug.thing "mtransition" mtransition (A Transition_opt.to_string);
+  set_the_proof_state __FUNCTION__ (GoalTransition mtransition);
+  try
+    if Label.is_silent mtransition.label
+    then do_nnone gl
+    else do_nsome gl mtransition
   with
   | Mebi_proof_StatesNotBisimilar (mstate, nstate, bisim_states) ->
     raise (Mebi_proof_ExIntro_NotBisimilar (mstate, nstate))
   | Mebi_proof_TransitionOptStatesNotBisimilar (mstate, nstate, bisim_states) ->
     raise (Mebi_proof_ExIntro_NotBisimilar (mstate, nstate))
+  | Mebi_proof_CouldNotGetWkSimStateM (sigma, conj) ->
+    Log.debug
+      (Printf.sprintf
+         "Mebi_proof.concl_get_eexists Mebi_proof_CouldNotGetWkSimStateM");
+    Debug.thing "wk_sim" conj.wk_sim (B (econstr_to_string gl));
+    raise (Mebi_proof_ConclIsNot_Exists ())
+  | Mebi_proof_CouldNotGetWkSimStateN (sigma, conj) ->
+    Log.debug
+      (Printf.sprintf
+         "Mebi_proof.concl_get_eexists Mebi_proof_CouldNotGetWkSimStateN");
+    Debug.thing "wk_trans" conj.wk_trans (B (econstr_to_string gl));
+    raise (Mebi_proof_ConclIsNot_Exists ())
+  | Rocq_utils.Rocq_utils_EConstrIsNot_Atomic (sigma, x, k) ->
+    Log.debug
+      (Printf.sprintf
+         "Mebi_proof.concl_get_eexists Rocq_utils_EConstrIsNot_Atomic");
+    raise (Mebi_proof_ConclIsNot_Exists ())
+  | Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)) ->
+    Log.debug
+      (Printf.sprintf
+         "Mebi_proof.concl_get_eexists Mebi_proof_TyDoesNotMatchTheories");
+    raise (Mebi_proof_ConclIsNot_Exists ())
 ;;
 
 (***********************************************************************)
@@ -1289,15 +1337,15 @@ and handle_new_cofix (gl : Proofview.Goal.t) : tactic =
       fsm.alphabet
       (A Model.alphabet_to_string);
     raise (Mebi_proof_NewCofix ())
-  | Mebi_proof_ConclIsNot_Exists (sigma, (ty, tys)) ->
-    Log.warning
-      (Printf.sprintf
-         "Concl is not eexists: %s\n%s"
-         (econstr_to_string gl ty)
-         (Utils.Strfy.array
-            (fun ?(args : style_args = style_args ()) x ->
-              econstr_to_string gl x)
-            tys));
+  | Mebi_proof_ConclIsNot_Exists () ->
+    (* Log.warning
+       (Printf.sprintf
+       "Concl is not eexists: %s\n%s"
+       (econstr_to_string gl ty)
+       (Utils.Strfy.array
+       (fun ?(args : style_args = style_args ()) x ->
+       econstr_to_string gl x)
+       tys)); *)
     raise (Mebi_proof_NewCofix ())
   | Mebi_proof_ExIntro_NEqStateM (mstate, mfrom) ->
     Log.warning "Mebi_proof_ExIntro_NEqStateM";
@@ -1327,62 +1375,66 @@ and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition_opt.t)
     (prefix "concl")
     (Proofview.Goal.concl gl)
     (B (econstr_to_string gl));
-  try
-    let concltys =
-      Proofview.Goal.concl gl |> Rocq_utils.econstr_to_atomic sigma
-    in
-    let { from = nfrom; label = nlabel; goto = ngoto; _ } : Transition_opt.t =
-      try get_weak_transition sigma (nfsm ~saturated:true ()) concltys with
-      | Mebi_proof_TyDoesNotMatchTheories _ ->
-        _get_silent_transition sigma (nfsm ~saturated:true ()) concltys
-    in
-    (* let { from = nfrom; label = nlabel; goto = ngoto; _ } : Transition_opt.t =
-      Proofview.Goal.concl gl
-      |> Rocq_utils.econstr_to_atomic sigma
-      |> get_weak_transition sigma (nfsm ~saturated:true ())
-    in *)
-    match mtrans.goto, ngoto with
-    | Some mgoto, Some ngoto ->
-      assert_states_bisimilar mtrans.from ngoto;
-      Debug.thing (prefix "mgoto") mgoto (A State.to_string);
-      Debug.thing (prefix "ngoto") ngoto (A State.to_string);
-      Debug.thing (prefix "nlabel") nlabel (A Label.to_string);
-      (if Label.is_silent nlabel
-       then do_apply_wk_none gl
-       else do_eapply_wk_some gl)
-      |> do_constructor_transition gl nfrom nlabel
-    | _, _ -> raise (Mebi_proof_GoalTransition ())
-  with
-  | Mebi_proof_CouldNotDecodeTransitionState (sigma, x, fsm) ->
-    Log.warning
-      (Printf.sprintf
-         "Could not decode transition state: %s"
-         (econstr_to_string gl x));
-    Debug.thing (prefix "fsm.states") fsm.states (A Model.states_to_string);
-    raise (Mebi_proof_GoalTransition ())
-  | Mebi_proof_CouldNotDecodeTransitionLabel (sigma, x, fsm) ->
-    Log.warning
-      (Printf.sprintf
-         "Could not decode transition label: %s"
-         (econstr_to_string gl x));
-    Debug.thing
-      (prefix "fsm.alphabet")
-      fsm.alphabet
-      (A Model.alphabet_to_string);
-    raise (Mebi_proof_GoalTransition ())
-  | Mebi_proof_StatesNotBisimilar (mstate, nstate, pi) ->
-    Debug.thing (prefix "StatesNotBisimilar, mfrom") mstate (A State.to_string);
-    Debug.thing (prefix "StatesNotBisimilar, ngoto") nstate (A State.to_string);
-    raise (Mebi_proof_GoalTransition ())
-  | Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)) ->
-    Debug.thing
-      (prefix "Mebi_proof_TyDoesNotMatchTheories")
-      ty
-      (B (econstr_to_string gl));
-    Array.iter
-      (fun ty -> Debug.thing (prefix "tys arg") ty (B (econstr_to_string gl)))
-      tys;
-    raise (Mebi_proof_GoalTransition ())
+  if Label.is_silent mtrans.label
+  then do_refl_none gl
+  else (
+    try
+      let { from = nfrom; label = nlabel; goto = ngoto; _ } : Transition_opt.t =
+        let concltys : Rocq_utils.kind_pair =
+          Proofview.Goal.concl gl |> Rocq_utils.econstr_to_atomic sigma
+        in
+        try get_weak_transition sigma (nfsm ~saturated:true ()) concltys with
+        | Mebi_proof_TyDoesNotMatchTheories _ ->
+          _get_silent_transition sigma (nfsm ~saturated:true ()) concltys
+      in
+      match mtrans.goto, ngoto with
+      | Some mgoto, Some ngoto ->
+        assert_states_bisimilar mtrans.from ngoto;
+        Debug.thing (prefix "mgoto") mgoto (A State.to_string);
+        Debug.thing (prefix "ngoto") ngoto (A State.to_string);
+        Debug.thing (prefix "nlabel") nlabel (A Label.to_string);
+        (if Label.is_silent nlabel
+         then do_apply_wk_none gl
+         else do_eapply_wk_some gl)
+        |> do_constructor_transition gl nfrom nlabel
+      | _, _ -> raise (Mebi_proof_GoalTransition ())
+    with
+    | Mebi_proof_CouldNotDecodeTransitionState (sigma, x, fsm) ->
+      Log.warning
+        (Printf.sprintf
+           "Could not decode transition state: %s"
+           (econstr_to_string gl x));
+      Debug.thing (prefix "fsm.states") fsm.states (A Model.states_to_string);
+      raise (Mebi_proof_GoalTransition ())
+    | Mebi_proof_CouldNotDecodeTransitionLabel (sigma, x, fsm) ->
+      Log.warning
+        (Printf.sprintf
+           "Could not decode transition label: %s"
+           (econstr_to_string gl x));
+      Debug.thing
+        (prefix "fsm.alphabet")
+        fsm.alphabet
+        (A Model.alphabet_to_string);
+      raise (Mebi_proof_GoalTransition ())
+    | Mebi_proof_StatesNotBisimilar (mstate, nstate, pi) ->
+      Debug.thing
+        (prefix "StatesNotBisimilar, mfrom")
+        mstate
+        (A State.to_string);
+      Debug.thing
+        (prefix "StatesNotBisimilar, ngoto")
+        nstate
+        (A State.to_string);
+      raise (Mebi_proof_GoalTransition ())
+    | Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)) ->
+      Debug.thing
+        (prefix "Mebi_proof_TyDoesNotMatchTheories")
+        ty
+        (B (econstr_to_string gl));
+      Array.iter
+        (fun ty -> Debug.thing (prefix "tys arg") ty (B (econstr_to_string gl)))
+        tys;
+      raise (Mebi_proof_GoalTransition ()))
 
 and handle_apply_constructors (gl : Proofview.Goal.t)
   : PState.applicable_constructors -> tactic
