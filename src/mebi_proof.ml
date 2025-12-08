@@ -43,6 +43,19 @@ let log_trace_hyps (gl : Proofview.Goal.t) (prefix : string) : unit =
   Log.trace (Printf.sprintf "%s%s" (Utils.prefix prefix) (hyps_to_string gl))
 ;;
 
+let log_state (prefix : string) (x : State.t) : unit =
+  Debug.thing prefix x (A State.to_string)
+;;
+
+let log_alphabet (prefix : string) (x : Alphabet.t) : unit =
+  Debug.thing "fsm.alphabet" x (A Model.alphabet_to_string)
+;;
+
+let log_econstr (gl : Proofview.Goal.t) (prefix : string) (x : EConstr.t) : unit
+  =
+  Debug.thing prefix x (B (econstr_to_string gl))
+;;
+
 (***********************************************************************)
 (*** Proof State *******************************************************)
 (***********************************************************************)
@@ -77,7 +90,7 @@ module PState = struct
     | NewProof
     | NewWeakSim
     | NewCofix
-    | GoalTransition of Transition_opt.t
+    | GoalTransition of Transition.t
     | ApplyConstructors of applicable_constructors
     | DetectState
 
@@ -103,7 +116,7 @@ module PState = struct
         "GoalTransition%s"
         (if short
          then ""
-         else Printf.sprintf ":\n%s" (Transition_opt.to_string transition))
+         else Printf.sprintf ":\n%s" (Transition.to_string transition))
     | ApplyConstructors { annotation; tactics } ->
       Printf.sprintf
         "ApplyConstructors%s"
@@ -257,13 +270,11 @@ let _are_transition_opt_states_bisimilar
 ;;
 
 let assert_transition_opt_states_bisimilar
-  : Transition_opt.t -> Transition_opt.t -> unit
+  : Transition.t -> Transition_opt.t -> unit
   =
   try
     function
-    | { from = mfrom; goto = None; _ } ->
-      (function { from = nfrom; _ } -> assert_states_bisimilar mfrom nfrom)
-    | { from = mfrom; goto = Some mgoto; _ } ->
+    | { from = mfrom; goto = mgoto; _ } ->
       (function
         | { from = nfrom; goto = None; _ } ->
           assert_states_bisimilar mfrom nfrom
@@ -780,9 +791,16 @@ let get_hyp_transition
     h
 ;;
 
-let get_mtransition (gl : Proofview.Goal.t) : Transition_opt.t =
+exception Mebi_proof_ExpectedMTransition_Some of unit
+
+let get_mtransition (gl : Proofview.Goal.t) : Transition.t =
   log_trace __FUNCTION__;
-  get_hyp_transition gl (mfsm ()) (Proofview.Goal.hyps gl)
+  let { from; label; goto; annotations; constructor_trees } : Transition_opt.t =
+    get_hyp_transition gl (mfsm ()) (Proofview.Goal.hyps gl)
+  in
+  match goto with
+  | Some goto -> { from; label; goto; annotations; constructor_trees }
+  | None -> raise (Mebi_proof_ExpectedMTransition_Some ())
 ;;
 
 let get_weak_transition
@@ -1145,33 +1163,29 @@ let do_ex_intro (gl : Proofview.Goal.t) (ngoto : State.t) : tactic =
        ])
 ;;
 
-let do_nnone (gl : Proofview.Goal.t) : tactic =
-  log_trace __FUNCTION__;
-  let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
-  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  let nstate : State.t = concl_wk_sim gl |> get_nstate sigma in
-  Debug.thing (prefix "nstate") nstate (A State.to_string);
-  do_ex_intro gl nstate
-;;
+(* let do_nnone (gl : Proofview.Goal.t) : tactic =
+   log_trace __FUNCTION__;
+   let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
+   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+   let nstate : State.t = concl_wk_sim gl |> get_nstate sigma in
+   Debug.thing (prefix "nstate") nstate (A State.to_string);
+   do_ex_intro gl nstate
+   ;; *)
 
 exception Mebi_proof_ExIntro_NEqStateM of (State.t * State.t option)
 
-let assert_states_consistent (mstate : State.t) : State.t option -> unit
-  = function
-  | None -> raise (Mebi_proof_ExIntro_NEqStateM (mstate, None))
-  | Some mgoto ->
+let assert_states_consistent (mstate : State.t) : State.t -> unit = function
+  | mgoto ->
     if State.equal mstate mgoto
     then ()
     else raise (Mebi_proof_ExIntro_NEqStateM (mstate, Some mgoto))
 ;;
 
-exception
-  Mebi_proof_ExIntro_Transitions of (Transition_opt.t * Transition_opt.t)
-
-exception Mebi_proof_ExIntro_NEqLabel of (Transition_opt.t * Transition_opt.t)
+exception Mebi_proof_ExIntro_Transitions of (Transition.t * Transition_opt.t)
+exception Mebi_proof_ExIntro_NEqLabel of (Transition.t * Transition_opt.t)
 
 let assert_transition_opt_labels_eq
-      (mtransition : Transition_opt.t)
+      (mtransition : Transition.t)
       (ntransition : Transition_opt.t)
   : unit
   =
@@ -1182,35 +1196,40 @@ let assert_transition_opt_labels_eq
 
 exception Mebi_proof_ExIntro_NotBisimilar of (State.t * State.t)
 
-let do_nsome (gl : Proofview.Goal.t) (mtransition : Transition_opt.t) : tactic =
+let do_nsome (gl : Proofview.Goal.t) (mtransition : Transition.t) : tactic =
   log_trace __FUNCTION__;
   let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   let { wk_trans; wk_sim } : concl_conj = concl_wk_sim gl in
   let mstate : State.t = get_mstate sigma { wk_trans; wk_sim } in
   let ntransition : Transition_opt.t = get_weak_ntransition sigma wk_trans in
-  Debug.thing (prefix "mtransition") mtransition (A Transition_opt.to_string);
+  Debug.thing (prefix "mtransition") mtransition (A Transition.to_string);
   Debug.thing (prefix "ntransition") ntransition (A Transition_opt.to_string);
   assert_transition_opt_labels_eq mtransition ntransition;
   assert_transition_opt_states_bisimilar mtransition ntransition;
   assert_states_consistent mstate mtransition.goto;
-  match mtransition.goto, ntransition.goto with
-  | Some mgoto, None ->
+  match ntransition.goto with
+  | None ->
     Debug.thing (prefix "mstate") mstate (A State.to_string);
-    get_ngoto mgoto ntransition |> do_ex_intro gl
-  | _, _ -> raise (Mebi_proof_ExIntro_Transitions (mtransition, ntransition))
+    get_ngoto mtransition.goto ntransition |> do_ex_intro gl
+  | _ -> raise (Mebi_proof_ExIntro_Transitions (mtransition, ntransition))
 ;;
 
 exception Mebi_proof_ConclIsNot_Exists of unit
 
 let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
   log_trace __FUNCTION__;
-  let mtransition : Transition_opt.t = get_mtransition gl in
-  Debug.thing "mtransition" mtransition (A Transition_opt.to_string);
+  let mtransition : Transition.t = get_mtransition gl in
+  Debug.thing "mtransition" mtransition (A Transition.to_string);
   set_the_proof_state __FUNCTION__ (GoalTransition mtransition);
   try
-    if Label.is_silent mtransition.label
-    then do_nnone gl
+    let nstate : State.t =
+      concl_wk_sim gl |> get_nstate (Proofview.Goal.sigma gl)
+    in
+    if
+      Label.is_silent mtransition.label
+      && are_states_bisimilar mtransition.goto nstate
+    then do_ex_intro gl nstate
     else do_nsome gl mtransition
   with
   | Mebi_proof_StatesNotBisimilar (mstate, nstate, bisim_states) ->
@@ -1364,13 +1383,13 @@ and handle_new_cofix (gl : Proofview.Goal.t) : tactic =
       (A Label.to_string);
     raise (Mebi_proof_NewCofix ())
 
-and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition_opt.t)
+and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition.t)
   : tactic
   =
   log_trace __FUNCTION__;
   let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  Debug.thing (prefix "mtrans") mtrans (A Transition_opt.to_string);
+  Debug.thing (prefix "mtrans") mtrans (A Transition.to_string);
   Debug.thing
     (prefix "concl")
     (Proofview.Goal.concl gl)
@@ -1387,17 +1406,17 @@ and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition_opt.t)
         | Mebi_proof_TyDoesNotMatchTheories _ ->
           _get_silent_transition sigma (nfsm ~saturated:true ()) concltys
       in
-      match mtrans.goto, ngoto with
-      | Some mgoto, Some ngoto ->
+      match ngoto with
+      | Some ngoto ->
         assert_states_bisimilar mtrans.from ngoto;
-        Debug.thing (prefix "mgoto") mgoto (A State.to_string);
+        Debug.thing (prefix "mgoto") mtrans.goto (A State.to_string);
         Debug.thing (prefix "ngoto") ngoto (A State.to_string);
         Debug.thing (prefix "nlabel") nlabel (A Label.to_string);
         (if Label.is_silent nlabel
          then do_apply_wk_none gl
          else do_eapply_wk_some gl)
         |> do_constructor_transition gl nfrom nlabel
-      | _, _ -> raise (Mebi_proof_GoalTransition ())
+      | _ -> raise (Mebi_proof_GoalTransition ())
     with
     | Mebi_proof_CouldNotDecodeTransitionState (sigma, x, fsm) ->
       Log.warning
@@ -1407,30 +1426,16 @@ and handle_goal_transition (gl : Proofview.Goal.t) (mtrans : Transition_opt.t)
       Debug.thing (prefix "fsm.states") fsm.states (A Model.states_to_string);
       raise (Mebi_proof_GoalTransition ())
     | Mebi_proof_CouldNotDecodeTransitionLabel (sigma, x, fsm) ->
-      Log.warning
-        (Printf.sprintf
-           "Could not decode transition label: %s"
-           (econstr_to_string gl x));
-      Debug.thing
-        (prefix "fsm.alphabet")
-        fsm.alphabet
-        (A Model.alphabet_to_string);
+      let f = econstr_to_string gl x in
+      Log.warning (Printf.sprintf "Could not decode transition label: %s" f);
+      log_alphabet (prefix "fsm.alphabet") fsm.alphabet;
       raise (Mebi_proof_GoalTransition ())
     | Mebi_proof_StatesNotBisimilar (mstate, nstate, pi) ->
-      Debug.thing
-        (prefix "StatesNotBisimilar, mfrom")
-        mstate
-        (A State.to_string);
-      Debug.thing
-        (prefix "StatesNotBisimilar, ngoto")
-        nstate
-        (A State.to_string);
+      log_state (prefix "StatesNotBisimilar, mfrom") mstate;
+      log_state (prefix "StatesNotBisimilar, ngoto") nstate;
       raise (Mebi_proof_GoalTransition ())
     | Mebi_proof_TyDoesNotMatchTheories (sigma, (ty, tys)) ->
-      Debug.thing
-        (prefix "Mebi_proof_TyDoesNotMatchTheories")
-        ty
-        (B (econstr_to_string gl));
+      log_econstr gl (prefix "Mebi_proof_TyDoesNotMatchTheories") ty;
       Array.iter
         (fun ty -> Debug.thing (prefix "tys arg") ty (B (econstr_to_string gl)))
         tys;

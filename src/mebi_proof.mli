@@ -17,7 +17,7 @@ module PState : sig
     | NewProof
     | NewWeakSim
     | NewCofix
-    | GoalTransition of Model_transition_opt.t
+    | GoalTransition of Model_transition.t
     | ApplyConstructors of applicable_constructors
     | DetectState
 
