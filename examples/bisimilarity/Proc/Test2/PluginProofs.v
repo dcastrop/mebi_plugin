@@ -40,6 +40,7 @@ Example wsim_pq : weak_sim termLTS termLTS p q.
 Proof. MeBiSim Begin termLTS p And termLTS q Using termLTS. 
   (* MeBiSim Solve 2000.
 Qed. *)
+  (* MeBiSim Solve 5. *)
   MeBiSim Solve 5.
   MeBiSim Solve 5.
   MeBiSim Step.
