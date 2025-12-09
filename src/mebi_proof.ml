@@ -112,6 +112,7 @@ module PState = struct
   and applicable_constructors =
     { annotation : Note.annotation option
     ; tactics : tactic list option
+    ; action : Action.t
     }
 
   (* and tactic_to_apply = unit -> unit Proofview.tactic *)
@@ -137,14 +138,15 @@ module PState = struct
              ":\nmtrans: %s\n\nntrans: %s\n"
              (Transition.to_string mtrans)
              (Transition_opt.to_string ntrans))
-    | ApplyConstructors { annotation; tactics } ->
+    | ApplyConstructors { annotation; tactics; action } ->
       Printf.sprintf
         "ApplyConstructors%s"
         (if short
          then ""
          else
            Printf.sprintf
-             ":\nAnnotation: %s\nTactics: %s"
+             ":\nAction: %s\nAnnotation: %s\nTactics: %s"
+             (Action.to_string action)
              (Option.cata Note.annotation_to_string "None" annotation)
              (Option.cata
                 (fun xs ->
@@ -307,43 +309,34 @@ let assert_transition_opt_states_bisimilar
       (Mebi_proof_TransitionOptStatesNotBisimilar (mstate, nstate, bisim_states))
 ;;
 
-let get_naction
-      ?(annotated : bool = false)
-      (nfrom : State.t)
-      (nlabel : Label.t)
-      (nfsm : Fsm.t)
-  : Action.t
-  =
+let get_naction (nfrom : State.t) (nlabel : Label.t) : Action.t =
   log_trace __FUNCTION__;
-  let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
-  Debug.thing (prefix "nfrom") nfrom (A State.to_string);
-  Debug.thing (prefix "nlabel") nlabel (A Label.to_string);
-  (* Edges.find (nfsm ()).edges nfrom |> Model.get_action_labelled nlabel *)
-  let x = Model.get_action_labelled_from ~annotated nfrom nlabel nfsm.edges in
-  Debug.thing (prefix "@@ naction") x (A Action.to_string);
-  x
-;;
-
-let get_constructor_annotation (nfrom : State.t) (nlabel : Label.t)
-  : Note.annotation
-  =
-  log_trace __FUNCTION__;
-  try
-    get_naction ~annotated:false nfrom nlabel (nfsm ~saturated:false ())
-    |> Model.get_shortest_annotation_from nfrom
-  with
+  let get_naction
+        ?(annotated : bool = false)
+        (nfrom : State.t)
+        (nlabel : Label.t)
+        (nfsm : Fsm.t)
+    : Action.t
+    =
+    log_trace __FUNCTION__;
+    let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
+    Debug.thing (prefix "nfrom") nfrom (A State.to_string);
+    Debug.thing (prefix "nlabel") nlabel (A Label.to_string);
+    let x = Model.get_action_labelled_from ~annotated nfrom nlabel nfsm.edges in
+    Debug.thing (prefix "@@ naction") x (A Action.to_string);
+    x
+  in
+  try get_naction ~annotated:false nfrom nlabel (nfsm ~saturated:false ()) with
   | Model_NoActionLabelledFrom (annotated, from, label, edges) ->
     get_naction ~annotated:true nfrom nlabel (nfsm ~saturated:true ())
-    |> Model.get_shortest_annotation_from nfrom
 ;;
 
-let get_annotation_constructor (nfrom : State.t) (nlabel : Label.t)
-  : Tree.node list
-  =
-  log_trace __FUNCTION__;
-  get_naction ~annotated:true nfrom nlabel (nfsm ~saturated:false ())
-  |> Model.get_shortest_constructor
-;;
+(* let get_annotation_constructor (from : State.t) (via : Label.t) : Tree.node list
+   =
+   log_trace __FUNCTION__;
+   get_naction ~annotated:true from via (nfsm ~saturated:true ())
+   |> Model.get_shortest_constructor
+   ;; *)
 
 (* try
    get_naction ~annotated:true nfrom nlabel (nfsm ~saturated:false ())
@@ -494,11 +487,13 @@ let do_constructor_transition
   =
   log_trace __FUNCTION__;
   let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
-  let annotation : Note.annotation = get_constructor_annotation nfrom nlabel in
+  let naction : Action.t = get_naction nfrom nlabel in
+  let annotation : Note.annotation = naction.annotation in
   Debug.thing (prefix "annotation") annotation (A Note.annotation_to_string);
   set_the_proof_state
     __FUNCTION__
-    (ApplyConstructors { annotation = Some annotation; tactics = None });
+    (ApplyConstructors
+       { annotation = Some annotation; tactics = None; action = naction });
   tactic_chain [ htactic; do_unfold_silent gl ]
 ;;
 
@@ -558,12 +553,13 @@ let do_build_constructor_tactics (gl : Proofview.Goal.t)
     Debug.thing (prefix "from") from (A State.to_string);
     Debug.thing (prefix "via") via (A Label.to_string);
     Debug.option (prefix "next") next (A Note.annotation_to_string);
-    let constructors : Tree.node list = get_annotation_constructor from via in
+    let action : Action.t = get_naction from via in
+    let constructors : Tree.node list = Model.get_shortest_constructor action in
     let tactics : tactic list = get_constructor_tactics_to_apply constructors in
     Debug.option (prefix "next annotation") next (A Note.annotation_to_string);
     set_the_proof_state
       __FUNCTION__
-      (ApplyConstructors { annotation = next; tactics = Some tactics });
+      (ApplyConstructors { annotation = next; tactics = Some tactics; action });
     do_rt1n_via gl via
 ;;
 
@@ -748,10 +744,10 @@ let get_transition
     Debug.option (prefix "Goto") goto (A State.to_string);
     let actions : States.t Actions.t = Edges.find fsm.edges from in
     Debug.thing (prefix "Actions") actions (A action_labels_to_string);
-    let { annotations; constructor_trees; _ } : Action.t =
+    let { annotation; constructor_trees; _ } : Action.t =
       get_action_labelled ~annotated:true label (Edges.find fsm.edges from)
     in
-    Transition_opt.create from label goto annotations constructor_trees
+    Transition_opt.create from label goto annotation constructor_trees
   with
   | Mebi_proof_CouldNotDecodeState (sigma, ty, states) ->
     raise (Mebi_proof_CouldNotDecodeTransitionState (sigma, ty, fsm))
@@ -808,11 +804,11 @@ exception Mebi_proof_ExpectedMTransition_Some of unit
 
 let get_mtransition (gl : Proofview.Goal.t) : Transition.t =
   log_trace __FUNCTION__;
-  let { from; label; goto; annotations; constructor_trees } : Transition_opt.t =
+  let { from; label; goto; annotation; constructor_trees } : Transition_opt.t =
     get_hyp_transition gl (mfsm ()) (Proofview.Goal.hyps gl)
   in
   match goto with
-  | Some goto -> { from; label; goto; annotations; constructor_trees }
+  | Some goto -> { from; label; goto; annotation; constructor_trees }
   | None -> raise (Mebi_proof_ExpectedMTransition_Some ())
 ;;
 
@@ -1483,20 +1479,20 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
   =
   log_trace __FUNCTION__;
   function
-  | { annotation = None; tactics } ->
+  | { annotation = None; tactics; action } ->
     log_tracex [ __FUNCTION__; "annotation None" ];
     (match tactics with
      | Some (h :: tl) ->
        log_tracex [ __FUNCTION__; "tactics Some (h::t)" ];
        set_the_proof_state
          __FUNCTION__
-         (ApplyConstructors { annotation = None; tactics = Some tl });
+         (ApplyConstructors { annotation = None; tactics = Some tl; action });
        h
      | _ ->
        log_tracex [ __FUNCTION__; "tactics empty" ];
        set_the_proof_state __FUNCTION__ NewWeakSim;
        tactic_chain [ do_simplify gl; do_eapply_rt1n_refl gl ])
-  | { annotation = Some annotation; tactics } ->
+  | { annotation = Some annotation; tactics; action } ->
     log_tracex [ __FUNCTION__; "annotation Some" ];
     (match tactics with
      | None ->
@@ -1510,7 +1506,8 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
        log_tracex [ __FUNCTION__; "tactics Some (h::t)" ];
        set_the_proof_state
          __FUNCTION__
-         (ApplyConstructors { annotation = Some annotation; tactics = Some tl });
+         (ApplyConstructors
+            { annotation = Some annotation; tactics = Some tl; action });
        h)
 
 and handle_proof_state (gl : Proofview.Goal.t) : tactic =

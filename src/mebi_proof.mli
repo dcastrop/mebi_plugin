@@ -31,6 +31,7 @@ module PState : sig
   and applicable_constructors =
     { annotation : Model_note.annotation option
     ; tactics : tactic list option
+    ; action : Model_action.t
     }
 
   (* and tactic_to_apply = unit -> unit Proofview.tactic *)

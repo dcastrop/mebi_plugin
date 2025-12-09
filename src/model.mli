@@ -137,6 +137,8 @@ end
 val partition_to_string :
   ?args:style_args -> Partition.t -> string
 
+exception Model_Bisim_State_NotFound of (State.t * Partition.t)
+
 val get_bisim_states : State.t -> Partition.t -> States.t
 
 module Alphabet : sig
@@ -191,13 +193,15 @@ end
 val alphabet_to_string :
   ?args:style_args -> Alphabet.t -> string
 
+exception
+  Model_Alphabet_LabelOfEncNotFound of (Enc.t * Alphabet.t)
+
 val find_label_of_enc : Enc.t -> Alphabet.t -> Label.t
 val silent_label_opt : Alphabet.t -> Label.t option
 
 exception Model_Alphabet_SilentLabelNotFound of Alphabet.t
 
 val silent_label : Alphabet.t -> Label.t
-val silent_action : Alphabet.t -> Action.t
 
 module Transitions : sig
   type elt = Transition.t
@@ -289,18 +293,6 @@ val actions_to_string :
 
 val action_labels_to_string :
   ?args:style_args -> States.t Actions.t -> string
-
-exception Model_Action_HasNoAnnotations of Action.t
-
-val get_shortest_annotation : Action.t -> Note.annotation
-
-val get_shortest_annotation_from :
-  State.t -> Action.t -> Note.annotation
-
-exception Model_Actions_IsEmpty of States.t Actions.t
-
-val get_action_with_shortest_annotation :
-  States.t Actions.t -> Action.t
 
 exception Model_Action_HasNoConstructors of Action.t
 
@@ -506,9 +498,6 @@ module Fsm : sig
 end
 
 module Saturate : sig
-  val add_annotation :
-    State.t -> Action.t -> Note.annotation -> Note.annotation
-
   exception
     Model_Saturate_CannotSaturateActionsWithUnknownVisibility of
       Action.t
@@ -600,6 +589,11 @@ module Saturate : sig
     States.t Actions.t Edges.t ->
     States.t ->
     int StateTracker.t ->
+    (Action.t * States.t) list ->
+    (Action.t * States.t) list
+
+  val correct_constructor_trees :
+    States.t Actions.t Edges.t ->
     (Action.t * States.t) list ->
     (Action.t * States.t) list
 

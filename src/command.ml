@@ -118,6 +118,22 @@ module MkGraph
          (M.to_seq_values xs |> List.of_seq))
   ;;
 
+  let decoq_enc ?(cache_decoding : bool = false) (enc : Enc.t)
+    : string option mm
+    =
+    if cache_decoding
+    then
+      let* s_decoding = decode enc in
+      return (Some (Utils.clean_string (econstr_to_string s_decoding)))
+    else return None
+  ;;
+
+  let decoq_state ?(cache_decoding : bool = false) (enc : Enc.t) : State.t mm =
+    let* pp = decoq_enc ~cache_decoding enc in
+    let s : State.t = { enc; pp } in
+    return s
+  ;;
+
   (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Mebi_constr.Tree.t].
   *)
   type lts_graph =
@@ -223,7 +239,11 @@ module MkGraph
       let* is_silent : bool option = is_silent_transition weak_type act in
       let label : Label.t = { enc = act_enc; is_silent; pp = None } in
       let constructor_trees : Mebi_constr.Tree.t list = [ int_tree ] in
-      let to_add : Action.t = { label; constructor_trees; annotations = [] } in
+      let* decoqfrom = decoq_state from in
+      let annotation : Note.annotation =
+        { this = { from = decoqfrom; via = label }; next = None }
+      in
+      let to_add : Action.t = { label; constructor_trees; annotation } in
       Logging.Log.debug
         (Printf.sprintf
            "get_new_states, A transitions:\n%s"
@@ -411,22 +431,6 @@ module MkGraph
     return { g with terminals }
   ;;
 
-  let decoq_enc ?(cache_decoding : bool = false) (enc : Enc.t)
-    : string option mm
-    =
-    if cache_decoding
-    then
-      let* s_decoding = decode enc in
-      return (Some (Utils.clean_string (econstr_to_string s_decoding)))
-    else return None
-  ;;
-
-  let decoq_state ?(cache_decoding : bool = false) (enc : Enc.t) : State.t mm =
-    let* pp = decoq_enc ~cache_decoding enc in
-    let s : State.t = { enc; pp } in
-    return s
-  ;;
-
   let decoq_state_opt ?(cache_decoding : bool = false) (s_enc : Enc.t)
     : State.t option mm
     =
@@ -451,7 +455,13 @@ module MkGraph
     =
     let* pp = decoq_enc ~cache_decoding a.label.enc in
     let label : Label.t = { a.label with pp } in
-    return { a with label }
+    let* from : State.t =
+      decoq_state ~cache_decoding a.annotation.this.from.enc
+    in
+    let annotation : Note.annotation =
+      { this = { from; via = label }; next = None }
+    in
+    return { a with label; annotation }
   ;;
 
   let decoq_destinations
@@ -472,14 +482,17 @@ module MkGraph
     else (
       let raw_dests = D.to_list dests in
       let iter_dests (i : int) (acc_trans : Transitions.t) : Transitions.t mm =
-        let dest, constr_tree = List.nth raw_dests i in
+        let dest, _constr_tree = List.nth raw_dests i in
+        let annotation : Note.annotation =
+          { this = { from; via = action.label }; next = None }
+        in
         let* goto : State.t = decoq_state ~cache_decoding dest in
         let new_trans : Transition.t =
           { from
           ; label = action.label
           ; goto
           ; constructor_trees = Some action.constructor_trees
-          ; annotations = None
+          ; annotation
           }
         in
         let acc_trans : Transitions.t = Transitions.add new_trans acc_trans in

@@ -27,7 +27,7 @@ MeBi Set Weak Option label.
 MeBi Set FailIfIncomplete True.
 MeBi Set FailIfNotBisim True.
 (* MeBi See All.  *)
-MeBi Set ShowAny False.
+(* MeBi Set ShowAny False. *)
 
 Require Import Logic.
 
@@ -39,8 +39,21 @@ Example wsim_pq : weak_sim termLTS termLTS p q.
 Proof. MeBiSim Begin termLTS p And termLTS q Using termLTS. 
   MeBiSim Solve 900.
 Qed.
+  (* MeBiSim Solve 5.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  (* eapply rt1n_trans. constructor 5. simpl. 
+  eapply rt1n_trans. constructor 2. constructor 6.
+  apply rt1n_refl. constructor 2. constructor 1.
+  eapply rt1n_trans. constructor 2. constructor 4.
+  eapply rt1n_trans. constructor 3.
+  eapply rt1n_refl. *)
+  MeBiSim Step.
+  MeBiSim Step. *)
+(* Admitted. *)
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.qp".
+(* MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.qp".
 Example wsim_qp : weak_sim termLTS termLTS q p. 
 Proof. MeBiSim Begin termLTS q And termLTS p Using termLTS. 
   MeBiSim Solve 1200.
@@ -70,4 +83,4 @@ MeBi Divider "Examples.Bisimilarity.Proc.Test1.PluginProofs.ProofTest.rp".
 Example wsim_rp : weak_sim termLTS termLTS r p. 
 Proof. MeBiSim Begin termLTS r And termLTS p Using termLTS. 
   MeBiSim Solve 350.
-Qed.
+Qed. *)

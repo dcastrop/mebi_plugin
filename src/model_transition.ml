@@ -2,7 +2,7 @@ type t =
   { from : Model_state.t
   ; label : Model_label.t
   ; goto : Model_state.t
-  ; annotations : Model_note.annotations option
+  ; annotation : Model_note.annotation
   ; constructor_trees : Mebi_constr.Tree.t list option
   }
 
@@ -28,10 +28,8 @@ let compare (a : t) (b : t) : int =
     ]
 ;;
 
-let annotations_is_empty : t -> bool = function
-  | { annotations = None; _ } -> true
-  | { annotations = Some annotations; _ } ->
-    Model_note.annotations_is_empty annotations
+let annotation_is_empty (x : t) : bool =
+  Model_note.annotation_is_empty x.annotation
 ;;
 
 open Utils.Strfy
@@ -55,10 +53,7 @@ let to_string ?(args : style_args = style_args ()) (x : t) : string =
       x.constructor_trees
   in
   let annotations : string =
-    Option.cata
-      (fun y -> Model_note.annotations_to_string ~args:(nest args) y)
-      "None"
-      x.annotations
+    Model_note.annotation_to_string ~args:(nest args) x.annotation
   in
   record
     ~args:{ args with newline = true }

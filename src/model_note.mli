@@ -19,21 +19,7 @@ val last : annotation -> t
 exception Model_note_CannotDropLast of annotation
 
 val drop_last : annotation -> annotation
-
-type annotations = annotation list
-
-val annotations_equal : annotations -> annotations -> bool
-val annotations_compare : annotations -> annotations -> int
-val annotations_is_empty : annotations -> bool
-
-val union_annotations :
-  annotations -> annotations -> annotations
-
-val add_annotation : annotation -> annotations -> annotations
 val to_string : ?args:Utils.Strfy.style_args -> t -> string
 
 val annotation_to_string :
   ?args:Utils.Strfy.style_args -> annotation -> string
-
-val annotations_to_string :
-  ?args:Utils.Strfy.style_args -> annotations -> string

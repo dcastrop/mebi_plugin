@@ -138,11 +138,6 @@ let silent_label (xs : Alphabet.t) : Label.t =
   | Some x -> x
 ;;
 
-let silent_action (xs : Alphabet.t) : Action.t =
-  Log.trace "Model.silent_action";
-  { label = silent_label xs; annotations = []; constructor_trees = [] }
-;;
-
 (***********************************************************************)
 (*** Transitions *******************************************************)
 (***********************************************************************)
@@ -224,69 +219,6 @@ let action_labels_to_string
   list ~args string xs
 ;;
 
-exception Model_Action_HasNoAnnotations of Action.t
-
-(* let get_annotations (from : State.t) (x : Action.t) : Note.annotations =
-   if List.is_empty x.annotations
-   then raise (Model_Action_HasNoAnnotations x)
-   else
-   List.map
-   (fun (y : Note.annotation) -> Note.add_note (Note.create from x.label) y)
-   x.annotations
-   ;; *)
-
-let get_shortest_annotation (x : Action.t) : Note.annotation =
-  Log.trace "Model.get_shortest_annotation_from";
-  match x.annotations with
-  | [] -> raise (Model_Action_HasNoAnnotations x)
-  | h :: [] -> h
-  | h :: tl ->
-    List.fold_left
-      (fun (the_min : Note.annotation) (y : Note.annotation) ->
-        let f = Note.annotation_depth in
-        match Int.compare (f y) (f the_min) with -1 -> y | _ -> the_min)
-      h
-      tl
-;;
-
-let get_shortest_annotation_from (from : State.t) (x : Action.t)
-  : Note.annotation
-  =
-  Log.trace "Model.get_shortest_annotation_from";
-  try
-    match x.annotations with
-    | [] -> { this = Note.create from x.label; next = None }
-    | h :: tl ->
-      List.fold_left
-        (fun (the_min : Note.annotation) (y : Note.annotation) ->
-          let f = Note.annotation_depth in
-          match Int.compare (f y) (f the_min) with -1 -> y | _ -> the_min)
-        h
-        tl
-  with
-  | Model_Action_HasNoAnnotations x ->
-    { this = Note.create from x.label; next = None }
-;;
-
-exception Model_Actions_IsEmpty of States.t Actions.t
-
-let get_action_with_shortest_annotation (actions : States.t Actions.t)
-  : Action.t
-  =
-  match Actions.to_seq_keys actions |> List.of_seq with
-  | [] -> raise (Model_Actions_IsEmpty actions)
-  | h :: [] -> h
-  | h :: tl ->
-    List.fold_left
-      (fun (acc : Action.t) (x : Action.t) ->
-        let f (z : Action.t) : int =
-          get_shortest_annotation z |> Note.annotation_depth
-        in
-        match Int.compare (f x) (f acc) with -1 -> x | _ -> acc)
-      h
-      tl
-;;
-
 exception Model_Action_HasNoConstructors of Action.t
 
 let get_shortest_constructor (x : Action.t) : Tree.node list =
@@ -307,13 +239,13 @@ exception Model_Action_HasSilentLabel_ButIsSaturated of Action.t
 
 let is_action_annotated (x : Action.t) : bool =
   Log.trace "Model.is_action_annotated";
-  Note.annotations_is_empty x.annotations |> Bool.not
+  Note.annotation_is_empty x.annotation |> Bool.not
 ;;
 
 (** [is_action_silent x] is an alias for [Label.is_silent x.label].
     @return [true] if [x.is_silent] is [Some true], else [false].
     @raise Model_Action_HasSilentLabel_ButIsSaturated
-      if [Label.is_silent x] is [true] but [x.annotations] is non-empty (i.e., it has been saturated and is no longer a silent action)
+      if [Label.is_silent x] is [true] but [x.annotation] is non-empty (i.e., it has been saturated and is no longer a silent action)
 *)
 let is_action_silent (x : Action.t) : bool =
   Log.trace "Model.is_action_silent";
@@ -335,16 +267,12 @@ let get_action_labelled
       (actions : States.t Actions.t)
   : Action.t
   =
-  try
-    Actions.to_seq_keys actions
-    |> List.of_seq
-    |> List.find (fun (y : Action.t) ->
-      Label.equal y.label x
-      ||
-      if annotated
-      then List.exists (Note.exists_label x) y.annotations
-      else false)
-  with
+  let keys : Action.t list = Actions.to_seq_keys actions |> List.of_seq in
+  let g (y : Note.annotation) : bool =
+    if annotated then Note.exists_label x y else false
+  in
+  let f (y : Action.t) : bool = Label.equal y.label x || g y.annotation in
+  try keys |> List.find f with
   | Not_found ->
     Log.debug
       (Printf.sprintf
@@ -466,10 +394,14 @@ let get_action_labelled_from
   : Action.t
   =
   let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
+  Debug.thing (prefix "from") from (A State.to_string);
   Debug.thing (prefix "x") x (A Label.to_string);
   try Edges.find edges from |> get_action_labelled ~annotated x with
-  | Not_found -> raise (Model_NoActionLabelledFrom (annotated, from, x, edges))
+  | Not_found ->
+    Log.warning "Not_Found";
+    raise (Model_NoActionLabelledFrom (annotated, from, x, edges))
   | Model_NoActionLabelled _ ->
+    Log.warning "Model_NoActionLabelled";
     raise (Model_NoActionLabelledFrom (annotated, from, x, edges))
 ;;
 
@@ -508,8 +440,8 @@ let get_reachable_blocks_opt
 exception Model_TransitionOptGotoNone of Transition_opt.t
 
 let transition_opt_to_transition : Transition_opt.t -> Transition.t = function
-  | { from; label; goto = Some goto; annotations; constructor_trees } ->
-    { from; label; goto; annotations; constructor_trees }
+  | { from; label; goto = Some goto; annotation; constructor_trees } ->
+    { from; label; goto; annotation; constructor_trees }
   | x -> raise (Model_TransitionOptGotoNone x)
 ;;
 
@@ -518,17 +450,17 @@ let transition_opt_to_transition : Transition_opt.t -> Transition.t = function
 (***********************************************************************)
 
 let transition_to_action : Transition.t -> Action.t = function
-  | { from; label; goto; annotations; constructor_trees } ->
+  | { from; label; goto; annotation; constructor_trees } ->
     { label
-    ; annotations = Option.cata (fun x -> x) [] annotations
+    ; annotation
     ; constructor_trees = Option.cata (fun x -> x) [] constructor_trees
     }
 ;;
 
 let transition_opt_to_action : Transition_opt.t -> Action.t = function
-  | { from; label; goto; annotations; constructor_trees } ->
+  | { from; label; goto; annotation; constructor_trees } ->
     { label
-    ; annotations = Option.cata (fun x -> x) [] annotations
+    ; annotation
     ; constructor_trees = Option.cata (fun x -> x) [] constructor_trees
     }
 ;;
@@ -537,15 +469,8 @@ let transition_opt_to_action : Transition_opt.t -> Action.t = function
 (*** Transition -> (From, Action, Goto) ********************************)
 (***********************************************************************)
 
-let transition_to_edge : Transition.t -> Edge.t = function
-  | { from; label; goto; annotations; constructor_trees } ->
-    let action : Action.t =
-      { label
-      ; annotations = Option.cata (fun x -> x) [] annotations
-      ; constructor_trees = Option.cata (fun x -> x) [] constructor_trees
-      }
-    in
-    { from; action; goto }
+let transition_to_edge (x : Transition.t) : Edge.t =
+  { from = x.from; action = transition_to_action x; goto = x.goto }
 ;;
 
 (***********************************************************************)
@@ -554,18 +479,11 @@ let transition_to_edge : Transition.t -> Edge.t = function
 
 let edge_to_transition : Edge.t -> Transition.t = function
   | { from; action; goto } ->
-    { from
-    ; label = action.label
-    ; goto
-    ; annotations =
-        (if Note.annotations_is_empty action.annotations
-         then None
-         else Some action.annotations)
-    ; constructor_trees =
-        (if List.is_empty action.constructor_trees
-         then None
-         else Some action.constructor_trees)
-    }
+    let { label; annotation; constructor_trees } : Action.t = action in
+    let constructor_trees : Mebi_constr.Tree.t list option =
+      if List.is_empty constructor_trees then None else Some constructor_trees
+    in
+    { from; label; goto; annotation; constructor_trees }
 ;;
 
 (***********************************************************************)
@@ -578,21 +496,14 @@ let action_destinations_to_transitions
       (destinations : States.t)
       (acc : Transitions.t)
   =
+  let { label; annotation; constructor_trees } : Action.t = action in
   States.fold
     (fun (goto : State.t) (acc : Transitions.t) ->
+      let constructor_trees : Mebi_constr.Tree.t list option =
+        if List.is_empty constructor_trees then None else Some constructor_trees
+      in
       let new_transition : Transition.t =
-        { from
-        ; label = action.label
-        ; goto
-        ; annotations =
-            (if Note.annotations_is_empty action.annotations
-             then None
-             else Some action.annotations)
-        ; constructor_trees =
-            (if List.is_empty action.constructor_trees
-             then None
-             else Some action.constructor_trees)
-        }
+        { from; label; goto; annotation; constructor_trees }
       in
       Transitions.add new_transition acc)
     destinations
@@ -625,10 +536,10 @@ let transitions_to_edges (transitions : Transitions.t)
   =
   let edges : States.t Actions.t Edges.t = Edges.create 0 in
   Transitions.iter
-    (fun ({ from; label; goto; constructor_trees; annotations } : Transition.t) ->
+    (fun ({ from; label; goto; constructor_trees; annotation } : Transition.t) ->
       let action : Action.t =
         { label
-        ; annotations = Option.cata (fun x -> x) [] annotations
+        ; annotation
         ; constructor_trees = Option.cata (fun x -> x) [] constructor_trees
         }
       in
@@ -673,8 +584,7 @@ let merge_info (x : Info.t) (y : Info.t) : Info.t =
 
 let merge_action (x : Action.t) (y : Action.t) : Action.t =
   { x with
-    annotations = List.merge Note.annotation_compare x.annotations y.annotations
-  ; constructor_trees =
+    constructor_trees =
       List.merge Tree.compare x.constructor_trees y.constructor_trees
   }
 ;;
@@ -686,10 +596,8 @@ let merge_actions (x : States.t Actions.t) (y : States.t Actions.t)
   let f z = Actions.to_seq_keys z |> List.of_seq in
   let xactions : Action.t list = f x in
   let yactions : Action.t list = f y in
-  let g label zactions =
-    List.find_opt
-      (fun (action : Action.t) -> Label.equal label action.label)
-      zactions
+  let g label : Action.t list -> Action.t option =
+    List.find_opt (fun (action : Action.t) -> Label.equal label action.label)
   in
   List.merge Action.compare xactions yactions
   |> List.map (fun (x : Action.t) : Label.t -> x.label)
@@ -893,12 +801,6 @@ end
 (***********************************************************************)
 
 module Saturate = struct
-  let add_annotation (from : State.t) (action : Action.t)
-    : Note.annotation -> Note.annotation
-    =
-    Note.add_note { from; via = action.label }
-  ;;
-
   exception
     Model_Saturate_CannotSaturateActionsWithUnknownVisibility of Action.t
 
@@ -931,51 +833,50 @@ module Saturate = struct
     | None -> if is_action_silent x then None else Some x
   ;;
 
-  let update_named_annotation (named : Action.t) (annotation : Note.annotation)
+  let update_named_annotation
+        (named : Action.t)
+        (x : Note.annotation) (* (constructor_trees : Tree.t list) *)
     : Action.t
     =
     Log.trace "Model.Saturate.update_named_annotation";
     { named with
-      annotations = Note.add_annotation annotation named.annotations
+      annotation =
+        Note.shorter_annotation x named.annotation (* ; constructor_trees *)
     }
   ;;
 
   let stop
         ?(named : Action.t option = None)
         (annotation : Note.annotation)
-        (from : State.t)
+        (destination : State.t)
         (acc : (Action.t * States.t) list)
     : (Action.t * States.t) list
     =
     Log.trace "Model.Saturate.stop";
     match named with
     | None -> acc
-    | Some named_action ->
+    | Some named ->
+      (* let constructor_trees : Tree.t list =
+         Option.cata (fun x -> x) named.constructor_trees constructor_trees
+         in *)
       let x =
-        update_named_annotation named_action annotation, States.singleton from
+        update_named_annotation named annotation, States.singleton destination
       in
       Log.debug
         (Printf.sprintf
-           "Model.Saturate.stop new:\n- from: %s\n- action: %s"
-           (State.to_string from)
-           (Action.to_string (fst x)));
+           "Model.Saturate.stop new:\n- action: %s\n- destination: %s"
+           (Action.to_string (fst x))
+           (State.to_string destination));
+      List.iter
+        (fun (via, dests) ->
+          Log.debug
+            (Printf.sprintf
+               "Model.Saturate.stop acc:\n- via%s\n- dests: %s"
+               (Action.to_string via)
+               (states_to_string dests)))
+        (x :: acc);
       x :: acc
   ;;
-
-  (*
-     (* NOTE: remove unnecessary self-transitions at destination *)
-     let annotation : Note.annotation =
-     Option.cata (fun (actions:States.t Actions.t) -> (Option.cata
-     (fun (destinations : States.t) ->
-     if States.exists (fun (goto : State.t) -> true) destinations
-     then Note.drop_last annotation
-     else annotation)
-     annotation
-     (Actions.find_opt actions )
-     )
-     annotation)
-     (Edges.find_opt old_edges from)
-     in *)
 
   (** [check_from] explores the outgoing actions of state [from], which is some destination of another action.
   *)
@@ -1015,15 +916,40 @@ module Saturate = struct
       (fun (the_action : Action.t)
         (destinations : States.t)
         (acc : (Action.t * States.t) list) ->
+        Log.debug
+          (Printf.sprintf
+             "check_actions, constructor trees: %s"
+             (Tree.list_to_string the_action.constructor_trees));
         let destinations : States.t =
           States.singleton from |> States.diff destinations
         in
-        match named, is_action_silent the_action with
+        match named with
+        | Some _ ->
+          (* NOTE: we already found the named action, so stop *)
+          if !skip
+          then acc
+          else (
+            skip := true;
+            stop ~named annotation from acc)
+        | None ->
+          (* NOTE: add to annotation, continue exploring outwards *)
+          let named : Action.t option = check_update_named the_action named in
+          let annotation : Note.annotation =
+            Note.add_note { from; via = the_action.label } annotation
+          in
+          check_destinations
+            ~named
+            annotation
+            old_edges
+            destinations
+            visited
+            acc
+        (* match named, is_action_silent the_action with
         | _, true ->
           (* NOTE: add to annotation, continue exploring outwards *)
           check_destinations
             ~named
-            (add_annotation from the_action annotation)
+            (Note.add_note { from; via = the_action.label } annotation)
             old_edges
             destinations
             visited
@@ -1032,7 +958,7 @@ module Saturate = struct
           (* NOTE: we have found the named action, add and continue *)
           check_destinations
             ~named:(Some the_action)
-            (add_annotation from the_action annotation)
+            (Note.add_note { from; via = the_action.label } annotation)
             old_edges
             destinations
             visited
@@ -1044,7 +970,7 @@ module Saturate = struct
           then acc
           else (
             skip := true;
-            stop ~named annotation from acc))
+            stop ~named annotation the_action.constructor_trees from acc) *))
       old_actions
       acc
 
@@ -1060,12 +986,13 @@ module Saturate = struct
         (skip : bool ref)
     : (Action.t * States.t) list
     =
+    Log.trace "Model.Saturate.check_named";
     match named with
     | None ->
       (* NOTE: we have found the named action, continue *)
       check_destinations
         ~named:(Some the_action)
-        (add_annotation from the_action annotation)
+        (Note.add_note { from; via = the_action.label } annotation)
         old_edges
         destinations
         visited
@@ -1087,6 +1014,7 @@ module Saturate = struct
         (acc : (Action.t * States.t) list)
     : (Action.t * States.t) list
     =
+    Log.trace "Model.Saturate.check_destinations";
     States.fold
       (fun (destination : State.t) (acc : (Action.t * States.t) list) ->
         check_from ~named annotation old_edges destination visited acc)
@@ -1094,11 +1022,38 @@ module Saturate = struct
       acc
   ;;
 
-  (** [merge_saturated_tuples a b] merges elements of [b] into [a], either by updating an element in [a] with additional annotations for a saturation tuple that describes the same action-destination, or in the case that the saturation tuple is not described within [a] by inserting it within [a].
+  (** corrects the constructor_trees by reverting them back to the one corresponding to the action in the annotation, rather than the one corresponding to the named action -- this is necessary as we lose this information when saturating and exploring the rt-closure
+  *)
+  let correct_constructor_trees (old_edges : States.t Actions.t Edges.t)
+    : (Action.t * States.t) list -> (Action.t * States.t) list
+    =
+    List.map (fun ((action, destinations) : Action.t * States.t) ->
+      Log.debug
+        (Printf.sprintf
+           "annotation: %s"
+           (Note.annotation_to_string action.annotation));
+      let action : Action.t =
+        { action with
+          constructor_trees =
+            (let y : Action.t =
+               get_action_labelled_from
+                 action.annotation.this.from
+                 action.annotation.this.via
+                 old_edges
+             in
+             y.constructor_trees)
+        }
+      in
+      action, destinations)
+  ;;
+
+  (** [merge_saturated_tuples a b] merges elements of [b] into [a], either by updating an element in [a] with additional annotation for a saturation tuple that describes the same action-destination, or in the case that the saturation tuple is not described within [a] by inserting it within [a].
   *)
   let rec merge_saturated_tuples (a : (Action.t * States.t) list)
     : (Action.t * States.t) list -> (Action.t * States.t) list
-    = function
+    =
+    Log.trace "Model.Saturate.merge_saturated_tuples";
+    function
     | [] -> a
     | h :: tl ->
       let (a : (Action.t * States.t) list) =
@@ -1115,6 +1070,7 @@ module Saturate = struct
         (a : (Action.t * States.t) list)
     : (Action.t * States.t) option * (Action.t * States.t) list
     =
+    Log.trace "Model.Saturate.try_update_saturated_tuple";
     List.fold_left
       (fun ((updated_opt, acc) :
              (Action.t * States.t) option * (Action.t * States.t) list)
@@ -1129,8 +1085,8 @@ module Saturate = struct
           then (
             let zaction : Action.t =
               { yaction with
-                annotations =
-                  Note.union_annotations yaction.annotations xaction.annotations
+                annotation =
+                  Note.shorter_annotation yaction.annotation xaction.annotation
               ; constructor_trees =
                   List.append
                     yaction.constructor_trees
@@ -1154,6 +1110,7 @@ module Saturate = struct
         (acc : (Action.t * States.t) list)
     : (Action.t * States.t) list
     =
+    Log.trace "Model.Saturate.edge_action_destinations";
     States.fold
       (fun (the_destination : State.t) (acc : (Action.t * States.t) list) ->
         let visited : int StateTracker.t = StateTracker.create 0 in
@@ -1176,6 +1133,7 @@ module Saturate = struct
         (acc : (Action.t * States.t) list)
     : (Action.t * States.t) list
     =
+    Log.trace "Model.Saturate.edge_actions";
     Actions.fold
       (fun (the_action : Action.t)
         (the_destinations : States.t)
@@ -1190,7 +1148,8 @@ module Saturate = struct
           old_edges
           from
           the_destinations
-          acc)
+          acc
+        |> correct_constructor_trees old_edges)
       old_actions
       acc
   ;;
@@ -1204,6 +1163,7 @@ module Saturate = struct
         (old_actions : States.t Actions.t)
     : unit
     =
+    Log.trace "\nModel.Saturate.edge";
     let updated_actions : (Action.t * States.t) list =
       edge_actions ~named:None old_edges from old_actions []
     in
@@ -1219,6 +1179,7 @@ module Saturate = struct
         (old_edges : States.t Actions.t Edges.t)
     : States.t Actions.t Edges.t
     =
+    Log.trace "Model.Saturate.edges";
     (* TODO: makes sense for this to be empty, as all actions must be saturated with a label *)
     (* let new_edges : States.t Actions.t Edges.t = Edges.copy old_edges in *)
     let new_edges : States.t Actions.t Edges.t = Edges.create 0 in
@@ -1236,6 +1197,7 @@ module Saturate = struct
   ;;
 
   let fsm (x : Fsm.t) : Fsm.t =
+    Log.trace "Model.Saturate.fsm";
     { x with edges = edges x.alphabet x.states (Edges.copy x.edges) }
   ;;
 end

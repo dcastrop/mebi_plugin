@@ -103,32 +103,32 @@ let rec drop_last : annotation -> annotation = function
 (*** Annotations *******************************************************)
 (***********************************************************************)
 
-type annotations = annotation list
+(* type annotations = annotation list
 
-let annotations_equal (a : annotations) (b : annotations) : bool =
-  List.equal annotation_equal a b
-;;
+   let annotations_equal (a : annotations) (b : annotations) : bool =
+   List.equal annotation_equal a b
+   ;;
 
-let annotations_compare (a : annotations) (b : annotations) : int =
-  List.compare annotation_compare a b
-;;
+   let annotations_compare (a : annotations) (b : annotations) : int =
+   List.compare annotation_compare a b
+   ;;
 
-let annotations_is_empty : annotations -> bool = function
-  | [] -> true
-  | _ -> false
-;;
+   let annotations_is_empty : annotations -> bool = function
+   | [] -> true
+   | _ -> false
+   ;;
 
-let union_annotations (a : annotations) (b : annotations) : annotations =
-  List.fold_left
-    (fun (acc : annotations) (x : annotation) ->
-      if List.mem x acc then acc else x :: acc)
-    a
-    b
-;;
+   let union_annotations (a : annotations) (b : annotations) : annotations =
+   List.fold_left
+   (fun (acc : annotations) (x : annotation) ->
+   if List.mem x acc then acc else x :: acc)
+   a
+   b
+   ;;
 
-let add_annotation (a : annotation) (bs : annotations) : annotations =
-  if List.mem a bs then bs else a :: bs
-;;
+   let add_annotation (a : annotation) (bs : annotations) : annotations =
+   if List.mem a bs then bs else a :: bs
+   ;; *)
 
 open Utils.Strfy
 
@@ -160,8 +160,8 @@ let annotation_to_string ?(args : style_args = style_args ()) (x : annotation)
     (annotation_to_string ~args x)
 ;;
 
-let annotations_to_string ?(args : style_args = style_args ()) (x : annotations)
+(* let annotations_to_string ?(args : style_args = style_args ()) (x : annotations)
   : string
   =
   list ~args:{ args with name = Some "Annotations" } annotation_to_string x
-;;
+;; *)
