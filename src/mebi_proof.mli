@@ -17,9 +17,16 @@ module PState : sig
     | NewProof
     | NewWeakSim
     | NewCofix
-    | GoalTransition of Model_transition.t
+    | DoRefl
+    | GoalTransition of transitions
     | ApplyConstructors of applicable_constructors
     | DetectState
+
+  and transitions =
+    { mtrans : Model_transition.t
+    ; ntrans : Model_transition_opt.t
+    }
+
 
   and applicable_constructors =
     { annotation : Model_note.annotation option
