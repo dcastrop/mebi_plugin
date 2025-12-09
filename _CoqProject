@@ -19,7 +19,7 @@ theories/Bisimilarity.v ###
 examples/Proc.v ###
 
 examples/bisimilarity/Proc/Test1/Terms.v ###
-examples/bisimilarity/Proc/Test1/PluginProofs.v ###
+# examples/bisimilarity/Proc/Test1/PluginProofs.v ###
 # examples/bisimilarity/Proc/Test1/ManualProofs.v
 # examples/bisimilarity/Proc/Test1/LtacProofs.v
 
