@@ -137,6 +137,8 @@ end
 val partition_to_string :
   ?args:style_args -> Partition.t -> string
 
+exception Model_Bisim_State_NotFound of (State.t * Partition.t)
+
 val get_bisim_states : State.t -> Partition.t -> States.t
 
 module Alphabet : sig
@@ -190,6 +192,9 @@ end
 
 val alphabet_to_string :
   ?args:style_args -> Alphabet.t -> string
+
+exception
+  Model_Alphabet_LabelOfEncNotFound of (Enc.t * Alphabet.t)
 
 val find_label_of_enc : Enc.t -> Alphabet.t -> Label.t
 val silent_label_opt : Alphabet.t -> Label.t option
@@ -316,8 +321,11 @@ exception
   Model_NoActionLabelled of
     (bool * Label.t * States.t Actions.t)
 
-val get_action_labelled :
-  ?annotated:bool -> Label.t -> States.t Actions.t -> Action.t
+val get_actions_labelled :
+  ?annotated:bool ->
+  Label.t ->
+  States.t Actions.t ->
+  States.t Actions.t
 
 val get_action_destinations : States.t Actions.t -> States.t
 
@@ -384,12 +392,12 @@ exception
   Model_NoActionLabelledFrom of
     (bool * State.t * Label.t * States.t Actions.t Edges.t)
 
-val get_action_labelled_from :
+val get_actions_labelled_from :
   ?annotated:bool ->
   State.t ->
   Label.t ->
   States.t Actions.t Edges.t ->
-  Action.t
+  States.t Actions.t
 
 val get_edges_labelled :
   Label.t ->

@@ -329,21 +329,23 @@ exception Model_NoActionLabelled of (bool * Label.t * States.t Actions.t)
 
 (** [get_action_labelled x actions] returns an action in [actions] that has a label matching [x]. (follows [List.find], so throws error if match is not found)
 *)
-let get_action_labelled
+let get_actions_labelled
       ?(annotated : bool = false)
       (x : Label.t)
       (actions : States.t Actions.t)
-  : Action.t
+  : States.t Actions.t
   =
   try
-    Actions.to_seq_keys actions
+    Actions.to_seq actions
     |> List.of_seq
-    |> List.find (fun (y : Action.t) ->
+    |> List.filter (fun ((y, _) : Action.t * States.t) ->
       Label.equal y.label x
       ||
       if annotated
       then List.exists (Note.exists_label x) y.annotations
       else false)
+    |> List.to_seq
+    |> Actions.of_seq
   with
   | Not_found ->
     Log.debug
@@ -458,16 +460,16 @@ exception
   Model_NoActionLabelledFrom of
     (bool * State.t * Label.t * States.t Actions.t Edges.t)
 
-let get_action_labelled_from
+let get_actions_labelled_from
       ?(annotated : bool = false)
       (from : State.t)
       (x : Label.t)
       (edges : States.t Actions.t Edges.t)
-  : Action.t
+  : States.t Actions.t
   =
   let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
   Debug.thing (prefix "x") x (A Label.to_string);
-  try Edges.find edges from |> get_action_labelled ~annotated x with
+  try Edges.find edges from |> get_actions_labelled ~annotated x with
   | Not_found -> raise (Model_NoActionLabelledFrom (annotated, from, x, edges))
   | Model_NoActionLabelled _ ->
     raise (Model_NoActionLabelledFrom (annotated, from, x, edges))
