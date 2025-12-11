@@ -44,11 +44,15 @@ Qed. *)
   MeBiSim Solve 5.
   MeBiSim Solve 5.
   MeBiSim Solve 5.
+  (* constructor 7. simpl.
+  eapply rt1n_trans. constructor 5. constructor 7. simpl.
+  eapply rt1n_refl. constructor 1. 
+  eapply rt1n_refl. *)
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-  (* MeBiSim Step. *)
-  (* MeBiSim Step. *)
+  MeBiSim Step.
+  MeBiSim Step.
 Admitted.
 
 (*

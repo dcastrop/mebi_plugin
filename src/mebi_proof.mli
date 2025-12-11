@@ -27,10 +27,10 @@ module PState : sig
     ; ntrans : Model_transition_opt.t
     }
 
-
   and applicable_constructors =
     { annotation : Model_note.annotation option
     ; tactics : tactic list option
+    ; goto : Model_state.t
     }
 
   (* and tactic_to_apply = unit -> unit Proofview.tactic *)
