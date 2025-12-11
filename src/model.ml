@@ -937,6 +937,7 @@ module Saturate = struct
     Log.trace "Model.Saturate.update_named_annotation";
     { named with
       annotations = Note.add_annotation annotation named.annotations
+    ; constructor_trees = []
     }
   ;;
 
