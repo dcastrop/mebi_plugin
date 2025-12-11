@@ -329,16 +329,16 @@ exception Model_NoActionLabelled of (bool * Label.t * States.t Actions.t)
 
 (** [get_action_labelled x actions] returns an action in [actions] that has a label matching [x]. (follows [List.find], so throws error if match is not found)
 *)
-let get_action_labelled
+let get_actions_labelled
       ?(annotated : bool = false)
       (x : Label.t)
       (actions : States.t Actions.t)
-  : Action.t
+  : Action.t list
   =
   try
     Actions.to_seq_keys actions
     |> List.of_seq
-    |> List.find (fun (y : Action.t) ->
+    |> List.filter (fun (y : Action.t) ->
       Label.equal y.label x
       ||
       if annotated
@@ -458,16 +458,16 @@ exception
   Model_NoActionLabelledFrom of
     (bool * State.t * Label.t * States.t Actions.t Edges.t)
 
-let get_action_labelled_from
+let get_actions_labelled_from
       ?(annotated : bool = false)
       (from : State.t)
       (x : Label.t)
       (edges : States.t Actions.t Edges.t)
-  : Action.t
+  : Action.t list
   =
   let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
   Debug.thing (prefix "x") x (A Label.to_string);
-  try Edges.find edges from |> get_action_labelled ~annotated x with
+  try Edges.find edges from |> get_actions_labelled ~annotated x with
   | Not_found -> raise (Model_NoActionLabelledFrom (annotated, from, x, edges))
   | Model_NoActionLabelled _ ->
     raise (Model_NoActionLabelledFrom (annotated, from, x, edges))
@@ -931,36 +931,31 @@ module Saturate = struct
     | None -> if is_action_silent x then None else Some x
   ;;
 
-  let update_named_annotation (named : Action.t) (annotation : Note.annotation)
-    : Action.t
-    =
-    Log.trace "Model.Saturate.update_named_annotation";
-    { named with
-      annotations = Note.add_annotation annotation named.annotations
-    ; constructor_trees = []
-    }
-  ;;
-
   let stop
         ?(named : Action.t option = None)
         (annotation : Note.annotation)
-        (from : State.t)
+        (goto : State.t)
         (acc : (Action.t * States.t) list)
     : (Action.t * States.t) list
     =
     Log.trace "Model.Saturate.stop";
     match named with
-    | None -> acc
-    | Some named_action ->
+    | None ->
+      Log.debug ".\n";
+      acc
+    | Some named ->
       let x =
-        update_named_annotation named_action annotation, States.singleton from
+        { named with
+          annotations = Note.add_annotation annotation named.annotations
+        ; constructor_trees = []
+        }
       in
       Log.debug
         (Printf.sprintf
-           "Model.Saturate.stop new:\n- from: %s\n- action: %s"
-           (State.to_string from)
-           (Action.to_string (fst x)));
-      x :: acc
+           "Model.Saturate.stop new:\n- goto: %s\n- action: %s"
+           (State.to_string goto)
+           (Action.to_string x));
+      (x, States.singleton goto) :: acc
   ;;
 
   (*
@@ -989,15 +984,26 @@ module Saturate = struct
             (acc : (Action.t * States.t) list)
     : (Action.t * States.t) list
     =
-    Log.trace "Model.Saturate.check_from";
+    Log.trace
+      (Printf.sprintf
+         "Model.Saturate.check_from: from %s (named: %s)"
+         (Enc.to_string from.enc)
+         (Option.cata
+            (fun (x : Action.t) -> Enc.to_string x.label.enc)
+            "None"
+            named));
     log_visit from visited;
     if can_revisit from visited
     then (
       match Edges.find_opt old_edges from with
-      | None -> stop ~named annotation from acc
+      | None ->
+        Log.debug "\n;A";
+        stop ~named annotation from acc
       | Some old_actions ->
         check_actions ~named annotation old_edges from old_actions visited acc)
-    else stop ~named annotation from acc
+    else (
+      Log.debug "\n;B";
+      stop ~named annotation from acc)
 
   and check_actions
         ?(named : Action.t option = None)
@@ -1009,19 +1015,33 @@ module Saturate = struct
         (acc : (Action.t * States.t) list)
     : (Action.t * States.t) list
     =
-    Log.trace "Model.Saturate.check_actions";
+    Log.trace
+      (Printf.sprintf
+         "Model.Saturate.check_actions: from %s (named: %s)"
+         (Enc.to_string from.enc)
+         (Option.cata
+            (fun (x : Action.t) -> Enc.to_string x.label.enc)
+            "None"
+            named));
     (* NOTE: flag used to make sure we don't add duplicates to [acc] in the case that multiple named-actions are outgoing from state [from] when a [named] action has already been identified. *)
-    let skip : bool ref = ref false in
+    (* let skip : bool ref = ref false in *)
     Actions.fold
       (fun (the_action : Action.t)
         (destinations : States.t)
         (acc : (Action.t * States.t) list) ->
+        Log.trace
+          (Printf.sprintf
+             "Model.Saturate.check_action: (from %s) %s"
+             (Enc.to_string from.enc)
+             (Enc.to_string the_action.label.enc));
         let destinations : States.t =
           States.singleton from |> States.diff destinations
         in
+        Log.debug (Action.to_string the_action);
         match named, is_action_silent the_action with
         | _, true ->
           (* NOTE: add to annotation, continue exploring outwards *)
+          Log.debug "\n;C 1";
           check_destinations
             ~named
             (add_annotation from the_action annotation)
@@ -1031,6 +1051,7 @@ module Saturate = struct
             acc
         | None, false ->
           (* NOTE: we have found the named action, add and continue *)
+          Log.debug "\n;C 2";
           check_destinations
             ~named:(Some the_action)
             (add_annotation from the_action annotation)
@@ -1039,45 +1060,15 @@ module Saturate = struct
             visited
             acc
         | Some _, false ->
-          if
-            (* NOTE: we already found the named action, so stop *)
-            !skip
+          (* NOTE: we already found the named action, so stop *)
+          (* if !skip
           then acc
           else (
-            skip := true;
-            stop ~named annotation from acc))
+            skip := true; *)
+          Log.debug "\n;C 3";
+          stop ~named annotation from acc) (* ) *)
       old_actions
       acc
-
-  and check_named
-        ?(named : Action.t option = None)
-        (annotation : Note.annotation)
-        (old_edges : States.t Actions.t Edges.t)
-        (from : State.t)
-        (the_action : Action.t)
-        (destinations : States.t)
-        (visited : int StateTracker.t)
-        (acc : (Action.t * States.t) list)
-        (skip : bool ref)
-    : (Action.t * States.t) list
-    =
-    match named with
-    | None ->
-      (* NOTE: we have found the named action, continue *)
-      check_destinations
-        ~named:(Some the_action)
-        (add_annotation from the_action annotation)
-        old_edges
-        destinations
-        visited
-        acc
-    | Some _ ->
-      (* NOTE: we already found the named action, so stop *)
-      if !skip
-      then acc
-      else (
-        skip := true;
-        stop ~named annotation from acc)
 
   and check_destinations
         ?(named : Action.t option = None)
@@ -1088,6 +1079,13 @@ module Saturate = struct
         (acc : (Action.t * States.t) list)
     : (Action.t * States.t) list
     =
+    Log.trace
+      (Printf.sprintf
+         "Model.Saturate.check_destinations (named: %s)"
+         (Option.cata
+            (fun (x : Action.t) -> Enc.to_string x.label.enc)
+            "None"
+            named));
     States.fold
       (fun (destination : State.t) (acc : (Action.t * States.t) list) ->
         check_from ~named annotation old_edges destination visited acc)
@@ -1162,6 +1160,7 @@ module Saturate = struct
         let saturated_tuples : (Action.t * States.t) list =
           check_from ~named annotation old_edges the_destination visited []
         in
+        Log.debug "\n----\n";
         merge_saturated_tuples acc saturated_tuples)
       the_destinations
       acc
