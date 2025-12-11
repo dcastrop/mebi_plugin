@@ -451,7 +451,8 @@ let do_eapply_rt1n_trans (gl : Proofview.Goal.t) : tactic =
 let do_rt1n_via (gl : Proofview.Goal.t) (via : Label.t) : tactic =
   log_trace __FUNCTION__;
   tactic_chain
-    [ (if Label.is_silent via
+    [ do_simplify gl
+    ; (if Label.is_silent via
        then do_eapply_rt1n_trans gl
        else do_eapply_rt1n_refl gl)
     ; do_simplify gl
@@ -1495,7 +1496,7 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
      | _ ->
        log_tracex [ __FUNCTION__; "tactics empty" ];
        set_the_proof_state __FUNCTION__ NewWeakSim;
-       tactic_chain [ do_simplify gl; do_eapply_rt1n_refl gl ])
+       tactic_chain [ do_simplify gl; do_eapply_rt1n_refl gl; do_simplify gl ])
   | { annotation = Some annotation; tactics } ->
     log_tracex [ __FUNCTION__; "annotation Some" ];
     (match tactics with
@@ -1504,8 +1505,7 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
        do_build_constructor_tactics gl annotation
      | Some [] ->
        log_tracex [ __FUNCTION__; "tactics Some []" ];
-       tactic_chain
-         [ do_simplify gl; do_build_constructor_tactics gl annotation ]
+       do_build_constructor_tactics gl annotation
      | Some (h :: tl) ->
        log_tracex [ __FUNCTION__; "tactics Some (h::t)" ];
        set_the_proof_state
