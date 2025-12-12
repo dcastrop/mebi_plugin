@@ -144,15 +144,17 @@ let rec drop_last : annotation -> annotation = function
 open Utils.Strfy
 
 let to_string ?(args : style_args = style_args ()) (x : t) : string =
-  let goto : string = Mebi_setup.Enc.to_string x.from.enc in
-  let via : string = Mebi_setup.Enc.to_string x.via.enc in
+  let f : Mebi_setup.Enc.t -> string = Mebi_setup.Enc.to_string in
+  let from : string = f x.from.enc in
+  let goto : string = f x.goto.enc in
+  let via : string = f x.via.enc in
   (* let constructors : string =
     Utils.Strfy.list
       Utils.Strfy.string
       (List.map Mebi_constr.Tree.to_string x.constructors)
   in *)
   (* Printf.sprintf "<State (%s) Via (%s) :: %s>" goto via constructors *)
-  Printf.sprintf "<State (%s) Via (%s)>" goto via
+  Printf.sprintf "<State (%s) Via (%s) Goto (%s)>" from via goto
 ;;
 
 let annotation_to_string ?(args : style_args = style_args ()) (x : annotation)
