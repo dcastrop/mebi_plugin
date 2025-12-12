@@ -929,19 +929,52 @@ module Saturate = struct
     ; tree : Tree.t list
     }
 
+  let log_wips (xs : wip list) : unit =
+    Debug.thing
+      "wips"
+      (List.rev xs)
+      (A
+         (Utils.Strfy.list
+            (fun
+                ?(args : style_args = style_args ())
+                 ({ from; via; tree } : wip)
+               ->
+            Printf.sprintf
+              "<From (%s) Via (%s)>"
+              (Mebi_setup.Enc.to_string from.enc)
+              (Mebi_setup.Enc.to_string via.enc))))
+  ;;
+
+  let log_notes (d : data) : unit =
+    Debug.thing
+      "notes (wip list)"
+      (List.rev d.notes)
+      (A
+         (Utils.Strfy.list
+            (fun
+                ?(args : style_args = style_args ())
+                 ({ from; via; tree } : wip)
+               ->
+            Printf.sprintf
+              "<From (%s) Via (%s)>"
+              (Mebi_setup.Enc.to_string from.enc)
+              (Mebi_setup.Enc.to_string via.enc))))
+  ;;
+
   let log_data ({ named; notes; visited; old_edges } : data) : unit =
     let e (x : Label.t) : string = Enc.to_string x.enc in
     let f (x : Action.t) : string = e x.label in
-    let g (x : State.t) : string = Enc.to_string x.enc in
+    (* let g (x : State.t) : string = Enc.to_string x.enc in *)
     let named : string = Option.cata f "None" named in
     Log.debug (Printf.sprintf "data, named: %s" named);
-    List.iter
-      (fun (n : wip) ->
-        let from : string = g n.from in
-        let via : string = e n.via in
-        let tree : string = Tree.list_to_string n.tree in
-        Log.debug (Printf.sprintf "data, note: (%s, %s); %s" from via tree))
-      notes;
+    (* List.iter
+       (fun (n : wip) ->
+       let from : string = g n.from in
+       let via : string = e n.via in
+       let tree : string = Tree.list_to_string n.tree in
+       Log.debug (Printf.sprintf "data, note: (%s, %s); %s" from via tree))
+       notes; *)
+    log_wips notes;
     Log.debug (Printf.sprintf "data, visited: %s" (states_to_string visited));
     ()
   ;;
@@ -963,7 +996,7 @@ module Saturate = struct
       d.named
   ;;
 
-  let update_named (x : Action.t) (d : data) : data =
+  let _update_named (x : Action.t) (d : data) : data =
     d.named <- f_update_named x d;
     d
   ;;
@@ -985,7 +1018,7 @@ module Saturate = struct
   ;;
 
   (** returns a copy of [d] with the updated notes *)
-  let update_notes' (from : State.t) (action : Action.t) (d : data) : data =
+  let _update_notes' (from : State.t) (action : Action.t) (d : data) : data =
     { d with notes = f_update_notes from action d }
   ;;
 
@@ -995,7 +1028,7 @@ module Saturate = struct
     States.add x d.visited
   ;;
 
-  let update_visited (x : State.t) (d : data) : data =
+  let _update_visited (x : State.t) (d : data) : data =
     d.visited <- f_update_visited x d;
     d
   ;;
@@ -1027,21 +1060,35 @@ module Saturate = struct
   ;;
 
   exception Model_Saturate_WIP_IsEmptyList of unit
-  exception Model_Saturate_WIP_HasNoGoto of wip
 
-  let rec wip_to_annotation : wip list -> Note.annotation =
-    log_trace __FUNCTION__;
-    function
-    | [] -> raise (Model_Saturate_WIP_IsEmptyList ())
-    | { from; via; tree } :: [] ->
-      raise (Model_Saturate_WIP_HasNoGoto { from; via; tree })
-    | [ { from; via; tree }; { from = goto; via = via2; tree = tree2 } ] ->
-      { this = Note.create from via tree goto; next = None }
-    | { from; via; tree } :: h :: tl ->
-      let { from = goto; via = via2; tree = tree2 } = h in
-      { this = Note.create from via tree goto
-      ; next = Some (wip_to_annotation (h :: tl))
-      }
+  let wip_to_annotation (goto : State.t) (xs : wip list) : Note.annotation =
+    let rec f : wip list -> Note.annotation =
+      log_trace __FUNCTION__;
+      function
+      | [] -> raise (Model_Saturate_WIP_IsEmptyList ())
+      | { from; via; tree } :: [] ->
+        { this = Note.create from via tree goto; next = None }
+      | { from; via; tree } :: h :: tl ->
+        let { from = goto; via = via2; tree = tree2 } = h in
+        { this = Note.create from via tree goto; next = Some (f (h :: tl)) }
+    in
+    f (List.rev xs)
+  ;;
+
+  exception Model_Saturate_WIP_HadNoNamedActions of wip list
+  exception Model_Saturate_WIP_HadMultipleNamedActions of wip list
+
+  let validate_wips (xs : wip list) : unit =
+    match
+      List.filter (fun ({ via; _ } : wip) -> Label.is_silent via |> Bool.not) xs
+    with
+    | [] ->
+      log_wips xs;
+      raise (Model_Saturate_WIP_HadNoNamedActions xs)
+    | _ :: [] -> ()
+    | _ :: _ ->
+      log_wips xs;
+      raise (Model_Saturate_WIP_HadMultipleNamedActions xs)
   ;;
 
   (* let new_actionpair_opt : data -> actionpair option =
@@ -1049,12 +1096,19 @@ module Saturate = struct
 
   (** [stop] *)
   let stop (d : data) (goto : State.t) (acc : actionpairs) : actionpairs =
+    Log.debug "\n.\n";
     log_trace __FUNCTION__;
     (* let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in *)
     match d.named with
     | None -> acc
     | Some named ->
-      let annotation = Some (wip_to_annotation d.notes) in
+      validate_wips d.notes;
+      log_notes d;
+      let annotation = Some (wip_to_annotation goto d.notes) in
+      Debug.thing
+        "stop.annotation"
+        annotation
+        (B (Option.cata Note.annotation_to_string "None"));
       let x : Action.t =
         Action.create named.label ~annotation ()
         (* let x =
@@ -1072,36 +1126,64 @@ module Saturate = struct
     : actionpairs
     =
     log_trace __FUNCTION__;
-    (* let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in *)
+    let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
+    Debug.thing (prefix "from") from.enc (B Enc.to_string);
     if already_visited from d
-    then stop d from acc
+    then (
+      Debug.thing (prefix "already visited") from.enc (B Enc.to_string);
+      stop d from acc)
     else (
-      let d : data = update_visited from d in
+      let d : data = _update_visited' from d in
+      log_data d;
       match get_old_actions from d with
-      | None -> stop d from acc
-      | Some old_actions -> check_actions d from old_actions acc)
+      | None ->
+        Debug.thing (prefix "no actions from") from.enc (B Enc.to_string);
+        stop d from acc
+      | Some old_actions ->
+        Debug.thing (prefix "checking actions from") from.enc (B Enc.to_string);
+        check_actions d from old_actions acc)
 
   and check_actions (d : data) (from : State.t) (xs : States.t Actions.t)
     : actionpairs -> actionpairs
     =
     log_trace __FUNCTION__;
-    (* let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in *)
+    let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
+    Debug.thing (prefix "from") from.enc (B Enc.to_string);
+    Actions.iter
+      (fun k _ -> Debug.thing (prefix "action") k.label.enc (B Enc.to_string))
+      xs;
     Actions.fold
       (fun (x : Action.t) (ys : States.t) (acc : actionpairs) ->
-        let destinations : States.t = States.diff ys d.visited in
-        let d : data (* NOTE: copy [d] *) = update_notes' from x d in
         if skip_action x d
-        then stop d from acc
+        then (
+          Debug.thing (prefix "skipping") x.label.enc (B Enc.to_string);
+          stop d from acc)
         else (
-          let d : data = update_named x d in
-          check_destinations d destinations acc))
+          Debug.thing (prefix "continuing") x.label.enc (B Enc.to_string);
+          States.iter
+            (fun x -> Debug.thing (prefix "dest") x.enc (B Enc.to_string))
+            ys;
+          (* TODO: should be able to go from 10 - 16 too @ line 50 proc/text1/terms.v *)
+          (* let destinations : States.t = States.diff ys d.visited in *)
+          let d : data (* NOTE: copy [d] *) = _update_notes' from x d in
+          let d : data = _update_named' x d in
+          check_destinations d from ys acc))
       xs
 
-  and check_destinations (d : data) (xs : States.t) : actionpairs -> actionpairs
+  and check_destinations (d : data) (from : State.t) (xs : States.t)
+    : actionpairs -> actionpairs
     =
     log_trace __FUNCTION__;
-    (* let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in *)
-    States.fold (fun (x : State.t) (acc : actionpairs) -> check_from d x acc) xs
+    let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
+    States.iter
+      (fun x -> Debug.thing (prefix "dest") x.enc (B Enc.to_string))
+      xs;
+    States.fold
+      (fun (x : State.t) (acc : actionpairs) ->
+        Log.debug "\n-\n";
+        Debug.thing (prefix "from") from.enc (B Enc.to_string);
+        check_from d x acc)
+      xs
   ;;
 
   (** [edge_action_destinations] returns a list of saturated actions tupled with their respective destinations, which is the reflexive-transitive closure of visible actions that may weakly be performed from each of [the_destinations].
@@ -1112,7 +1194,10 @@ module Saturate = struct
   let edge_action_destinations (d : data) (from : State.t) (ys : States.t)
     : actionpairs
     =
+    Log.debug "\n---\n";
     log_trace __FUNCTION__;
+    let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
+    Debug.thing (prefix "from") from (A State.to_string);
     log_data d;
     States.fold
       (fun (y : State.t) (acc : actionpairs) -> check_from d y [])
@@ -1131,7 +1216,9 @@ module Saturate = struct
     log_trace __FUNCTION__;
     Actions.fold
       (fun (x : Action.t) (ys : States.t) (acc : actionpairs) ->
-        let d : data = initial_data old_edges |> update_named x in
+        let d : data =
+          initial_data old_edges |> _update_named' x |> _update_notes' from x
+        in
         edge_action_destinations d from ys |> merge_saturated_tuples acc)
       old_actions
       []
