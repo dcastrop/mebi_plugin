@@ -1,10 +1,24 @@
-type t = { from : Model_state.t; via : Model_label.t }
+type t =
+  { from : Model_state.t
+  ; via : Model_label.t
+  ; using : Mebi_constr.Tree.t list
+  ; goto : Model_state.t
+  }
 
-val create : Model_state.t -> Model_label.t -> t
+val create
+  :  Model_state.t
+  -> Model_label.t
+  -> Mebi_constr.Tree.t list
+  -> Model_state.t
+  -> t
+
 val equal : t -> t -> bool
 val compare : t -> t -> int
 
-type annotation = { this : t; next : annotation option }
+type annotation =
+  { this : t
+  ; next : annotation option
+  }
 
 val annotation_equal : annotation -> annotation -> bool
 val annotation_compare : annotation -> annotation -> int
@@ -19,21 +33,5 @@ val last : annotation -> t
 exception Model_note_CannotDropLast of annotation
 
 val drop_last : annotation -> annotation
-
-type annotations = annotation list
-
-val annotations_equal : annotations -> annotations -> bool
-val annotations_compare : annotations -> annotations -> int
-val annotations_is_empty : annotations -> bool
-
-val union_annotations :
-  annotations -> annotations -> annotations
-
-val add_annotation : annotation -> annotations -> annotations
 val to_string : ?args:Utils.Strfy.style_args -> t -> string
-
-val annotation_to_string :
-  ?args:Utils.Strfy.style_args -> annotation -> string
-
-val annotations_to_string :
-  ?args:Utils.Strfy.style_args -> annotations -> string
+val annotation_to_string : ?args:Utils.Strfy.style_args -> annotation -> string
