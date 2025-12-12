@@ -8,11 +8,15 @@ module Tree : sig
   val equal : t -> t -> bool
   val compare : t -> t -> int
   val minimize : t -> node list
+
+  exception Mebi_constr_Tree_EmptyList of unit
+
+  val min : t list -> node list
   val to_string : ?args:Utils.Strfy.style_args -> t -> string
   val list_to_string : ?args:Utils.Strfy.style_args -> t list -> string
 end
 
-type t = Evd.econstr * Evd.econstr * Tree.t
+type t = EConstr.t * EConstr.t * Tree.t
 
 val to_string
   :  Environ.env

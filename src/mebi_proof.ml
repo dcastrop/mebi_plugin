@@ -248,7 +248,7 @@ let the_bisim_states () : Partition.t = (the_result ()).bisim_states
 (*** Warning Messages **************************************************)
 (***********************************************************************)
 
-let _warn_model_action_hasnoannotations (naction : Action.t) : unit =
+let _warn_model_action_hasnoannotation (naction : Action.t) : unit =
   Log.warning
     (Printf.sprintf
        "Model_Action_HasNoAnnotations:\n%s"
@@ -552,7 +552,7 @@ let do_constructor_transition
   let action : Action.t =
     get_action_to ~annotated:true nfrom nlabel goto (nfsm ~saturated:true ())
   in
-  let annotation : Note.annotation = Model.get_shortest_annotation action in
+  let annotation : Note.annotation = Action.annotation action in
   Debug.thing (prefix "annotation") annotation (A Note.annotation_to_string);
   set_the_proof_state
     __FUNCTION__
@@ -606,25 +606,27 @@ let get_constructor_tactic ((enc, index) : Tree.node) : tactic =
 
 let do_build_constructor_tactics
       (gl : Proofview.Goal.t)
-      (goto : State.t)
-      ({ this = { from; via }; next } : Note.annotation)
+      (destination : State.t)
+      ({ this = { from; via; using; goto }; next } : Note.annotation)
   : tactic
   =
   log_trace __FUNCTION__;
   let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
   Debug.thing (prefix "from") from (A State.to_string);
   Debug.thing (prefix "via") via (A Label.to_string);
+  Debug.thing (prefix "goto") goto (A State.to_string);
+  Debug.thing (prefix "using") using (A Tree.list_to_string);
   Debug.option (prefix "next") next (A Note.annotation_to_string);
-  let action : Action.t =
-    let goto : State.t =
+  (* let action : Action.t =
+    (* let goto : State.t =
       Option.cata
         (fun ({ this = { from = goto; _ }; _ } : Note.annotation) -> goto)
         goto
         next
-    in
+    in *)
     get_action_to from via goto (nfsm ~saturated:false ())
-  in
-  let constructor : Tree.node list = Model.get_shortest_constructor action in
+  in *)
+  let constructor : Tree.node list = Tree.min using in
   let tactics : tactic list = List.map get_constructor_tactic constructor in
   set_the_proof_state
     __FUNCTION__
@@ -835,20 +837,20 @@ let get_transition
     Debug.option (prefix "Goto") goto (A State.to_string);
     let actions : States.t Actions.t = Edges.find fsm.edges from in
     Debug.thing (prefix "Actions") actions (A action_labels_to_string);
-    let (annotation, constructor_trees) : Note.annotation list * Tree.t list =
+    let (annotation, constructor_trees) : Note.annotation option * Tree.t list =
       (* get_action_labelled ~annotated:true label (Edges.find fsm.edges from) *)
       Option.cata
         (fun (goto : State.t) ->
-          let { annotations; constructor_trees; _ } : Action.t =
+          let { annotation; constructor_trees; _ } : Action.t =
             get_action_to ~annotated:true from label goto fsm
           in
-          annotations, constructor_trees)
+          annotation, constructor_trees)
         (if need_action
          then raise (Mebi_proof_CouldNotObtainAction (from, label, goto, fsm))
-         else [], [])
+         else None, [])
         goto
     in
-    Transition_opt.create from label goto annotation constructor_trees
+    Transition_opt.create from label goto ~annotation ~constructor_trees ()
   with
   | Mebi_proof_CouldNotDecodeState (sigma, ty, states) ->
     raise (Mebi_proof_CouldNotDecodeTransitionState (sigma, ty, fsm))
@@ -906,11 +908,11 @@ exception Mebi_proof_ExpectedMTransition_Some of unit
 
 let get_mtransition (gl : Proofview.Goal.t) : Transition.t =
   log_trace __FUNCTION__;
-  let { from; label; goto; annotations; constructor_trees } : Transition_opt.t =
+  let { from; label; goto; annotation; constructor_trees } : Transition_opt.t =
     get_hyp_transition gl (mfsm ()) (Proofview.Goal.hyps gl)
   in
   match goto with
-  | Some goto -> { from; label; goto; annotations; constructor_trees }
+  | Some goto -> { from; label; goto; annotation; constructor_trees }
   | None -> raise (Mebi_proof_ExpectedMTransition_Some ())
 ;;
 
@@ -1219,7 +1221,7 @@ let do_hyp_inversion (gl : Proofview.Goal.t) : tactic =
    |> Model.get *)
 (* 
 let is_action_saturated : Action.t -> bool = function
-  | { annotations; _ } -> Note.annotations_is_empty annotations
+  | { annotation; _ } -> Note.annotation_is_empty annotation
 ;; *)
 
 exception Mebi_proof_NGotoNotInFsm of unit

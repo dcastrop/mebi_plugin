@@ -9,6 +9,8 @@ module Edge = Model_edge
 module Enc = Mebi_setup.Enc
 module Tree = Mebi_constr.Tree
 
+val trace_enabled : bool
+val log_trace : string -> unit
 val nest : Utils.Strfy.style_args -> Utils.Strfy.style_args
 
 type style_args = Utils.Strfy.style_args
@@ -197,7 +199,6 @@ val silent_label_opt : Alphabet.t -> Label.t option
 exception Model_Alphabet_SilentLabelNotFound of Alphabet.t
 
 val silent_label : Alphabet.t -> Label.t
-val silent_action : Alphabet.t -> Action.t
 
 module Transitions : sig
   type elt = Transition.t
@@ -282,18 +283,6 @@ val actions_to_string : ?args:style_args -> States.t Actions.t -> string
 val action_labels_to_string : ?args:style_args -> States.t Actions.t -> string
 
 exception Model_Action_HasNoAnnotations of Action.t
-
-val get_shortest_annotation : Action.t -> Note.annotation
-val get_shortest_annotation_from : State.t -> Action.t -> Note.annotation
-
-exception Model_Actions_IsEmpty of States.t Actions.t
-
-val get_action_with_shortest_annotation : States.t Actions.t -> Action.t
-
-exception Model_Action_HasNoConstructors of Action.t
-
-val get_shortest_constructor : Action.t -> Tree.node list
-
 exception Model_Action_HasSilentLabel_ButIsSaturated of Action.t
 
 val is_action_annotated : Action.t -> bool
@@ -403,19 +392,22 @@ val actions_to_transitions
 val edges_to_transitions : States.t Actions.t Edges.t -> Transitions.t
 val transitions_to_edges : Transitions.t -> States.t Actions.t Edges.t
 val edges_to_string : ?args:style_args -> States.t Actions.t Edges.t -> string
-val merge_info_field : 'a list option -> 'a list option -> 'a list option
-val merge_info : Info.t -> Info.t -> Info.t
-val merge_action : Action.t -> Action.t -> Action.t
 
-val merge_actions
-  :  States.t Actions.t
-  -> States.t Actions.t
-  -> States.t Actions.t
+module Merge : sig
+  val info_field : 'a list option -> 'a list option -> 'a list option
+  val info : Info.t -> Info.t -> Info.t
 
-val merge_edges
-  :  States.t Actions.t Edges.t
-  -> States.t Actions.t Edges.t
-  -> States.t Actions.t Edges.t
+  exception Model_Merge_action_DifferentLabels of (Action.t * Action.t)
+
+  val constructor_trees : Tree.t list -> Tree.t list -> Tree.t list
+  val action : Action.t -> Action.t -> Action.t
+  val actions : States.t Actions.t -> States.t Actions.t -> States.t Actions.t
+
+  val edges
+    :  States.t Actions.t Edges.t
+    -> States.t Actions.t Edges.t
+    -> States.t Actions.t Edges.t
+end
 
 type kind =
   | LTS of
@@ -473,118 +465,5 @@ module Fsm : sig
 end
 
 module Saturate : sig
-  val add_annotation : State.t -> Action.t -> Note.annotation -> Note.annotation
-
-  exception
-    Model_Saturate_CannotSaturateActionsWithUnknownVisibility of Action.t
-
-  module StateTracker : sig
-    type key = State.t
-    type !'a t
-
-    val create : int -> 'a t
-    val clear : 'a t -> unit
-    val reset : 'a t -> unit
-    val copy : 'a t -> 'a t
-    val add : 'a t -> key -> 'a -> unit
-    val remove : 'a t -> key -> unit
-    val find : 'a t -> key -> 'a
-    val find_opt : 'a t -> key -> 'a option
-    val find_all : 'a t -> key -> 'a list
-    val replace : 'a t -> key -> 'a -> unit
-    val mem : 'a t -> key -> bool
-    val iter : (key -> 'a -> unit) -> 'a t -> unit
-    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-    val length : 'a t -> int
-    val stats : 'a t -> Hashtbl.statistics
-    val to_seq : 'a t -> (key * 'a) Seq.t
-    val to_seq_keys : 'a t -> key Seq.t
-    val to_seq_values : 'a t -> 'a Seq.t
-    val add_seq : 'a t -> (key * 'a) Seq.t -> unit
-    val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
-    val of_seq : (key * 'a) Seq.t -> 'a t
-  end
-
-  val max_visit_num : int
-  val can_revisit : State.t -> int StateTracker.t -> bool
-  val log_visit : State.t -> int StateTracker.t -> unit
-  val check_update_named : Action.t -> Action.t option -> Action.t option
-
-  val stop
-    :  ?named:Action.t option
-    -> Note.annotation
-    -> State.t
-    -> (Action.t * States.t) list
-    -> (Action.t * States.t) list
-
-  val check_from
-    :  ?named:Action.t option
-    -> Note.annotation
-    -> States.t Actions.t Edges.t
-    -> State.t
-    -> int StateTracker.t
-    -> (Action.t * States.t) list
-    -> (Action.t * States.t) list
-
-  val check_actions
-    :  ?named:Action.t option
-    -> Note.annotation
-    -> States.t Actions.t Edges.t
-    -> State.t
-    -> States.t Actions.t
-    -> int StateTracker.t
-    -> (Action.t * States.t) list
-    -> (Action.t * States.t) list
-
-  val check_destinations
-    :  ?named:Action.t option
-    -> Note.annotation
-    -> States.t Actions.t Edges.t
-    -> States.t
-    -> int StateTracker.t
-    -> (Action.t * States.t) list
-    -> (Action.t * States.t) list
-
-  val merge_saturated_tuples
-    :  (Action.t * States.t) list
-    -> (Action.t * States.t) list
-    -> (Action.t * States.t) list
-
-  val try_update_saturated_tuple
-    :  Action.t * States.t
-    -> (Action.t * States.t) list
-    -> (Action.t * States.t) option * (Action.t * States.t) list
-
-  val edge_action_destinations
-    :  ?named:Action.t option
-    -> Note.annotation
-    -> States.t Actions.t Edges.t
-    -> State.t
-    -> States.t
-    -> (Action.t * States.t) list
-    -> (Action.t * States.t) list
-
-  val edge_actions
-    :  ?named:Action.t option
-    -> States.t Actions.t Edges.t
-    -> State.t
-    -> States.t Actions.t
-    -> (Action.t * States.t) list
-    -> (Action.t * States.t) list
-
-  val edge
-    :  States.t Actions.t
-    -> States.t Actions.t Edges.t
-    -> State.t
-    -> States.t Actions.t
-    -> unit
-
-  val edges
-    :  Alphabet.t
-    -> States.t
-    -> States.t Actions.t Edges.t
-    -> States.t Actions.t Edges.t
-
   val fsm : Fsm.t -> Fsm.t
 end

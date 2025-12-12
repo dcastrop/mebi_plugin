@@ -81,7 +81,7 @@ module Minimize = struct
   ;;
 
   let run ?(weak : bool = false) (the_fsm : Fsm.t) : result =
-    Logging.Log.trace "Algorithms.Minimize.run";
+    Logging.Log.debug (Printf.sprintf "%s, weak: %b" __FUNCTION__ weak);
     let the_fsm : Fsm.t = if weak then Saturate.fsm the_fsm else the_fsm in
     match the_fsm with
     | { alphabet; states; edges; _ } ->
@@ -168,9 +168,13 @@ module Bisimilar = struct
       (Partition.empty, Partition.empty)
   ;;
 
+  let saturate_fsm ?(weak : bool = false) (fsm : Fsm.t) : Fsm.t =
+    if weak then Saturate.fsm fsm else fsm
+  ;;
+
   let run ?(weak : bool = false) (the_fsm_pair : Fsm.pair) : result =
-    let the_sat_1 : Fsm.t = Saturate.fsm (fst the_fsm_pair) in
-    let the_sat_2 : Fsm.t = Saturate.fsm (snd the_fsm_pair) in
+    let the_sat_1 : Fsm.t = saturate_fsm ~weak (fst the_fsm_pair) in
+    let the_sat_2 : Fsm.t = saturate_fsm ~weak (snd the_fsm_pair) in
     let merged_fsm : Fsm.t = Fsm.merge the_sat_1 the_sat_2 in
     let pi : Partition.t = snd (Minimize.run merged_fsm) in
     let (bisim_states, non_bisim_states) : Partition.t * Partition.t =
