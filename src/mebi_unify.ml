@@ -1,8 +1,18 @@
-(* open Logging *)
 open Mebi_debug
 open Mebi_wrapper
 open Mebi_wrapper.Syntax
 open Mebi_unification
+
+module UnifLog : Logger.LOGGER_TYPE =
+  Logger.Make
+    (Logger.Output.Rocq)
+    (struct
+      let prefix : string option = None
+
+      let is_level_enabled : Logger.level -> bool =
+        Logger.level_fun_preset_debug ~trace:false ()
+      ;;
+    end)
 
 let show_unification_debug : bool = false
 let show_extractargs_debug : bool = false
@@ -12,6 +22,7 @@ let show_extractargs_debug : bool = false
 exception ConstructorArgsExpectsArraySize3 of unit
 
 let constructor_args (args : EConstr.t array) : constructor_args =
+  UnifLog.trace __FUNCTION__;
   if Int.equal (Array.length args) 3
   then { lhs = args.(0); act = args.(1); rhs = args.(2) }
   else raise (*TODO:err*) (ConstructorArgsExpectsArraySize3 ())
@@ -20,7 +31,9 @@ let constructor_args (args : EConstr.t array) : constructor_args =
 (** creates unification problems between the rhs of the current constructor and the lhs of the next, along with the actions of both.
     (* NOTE: this is only relevant when deciding whether to explore a given constructor from a premise of another *)
 *)
-let constr_to_problem args : Mebi_constr.t -> Problem.t = function
+let constr_to_problem args : Mebi_constr.t -> Problem.t =
+  UnifLog.trace __FUNCTION__;
+  function
   | act, rhs, tree ->
     let act : Pair.t = { a = args.act; b = act } in
     let dest : Pair.t = { a = args.rhs; b = rhs } in
@@ -28,6 +41,7 @@ let constr_to_problem args : Mebi_constr.t -> Problem.t = function
 ;;
 
 let map_problems args (constructors : Constructors.t) : Problems.t mm =
+  UnifLog.trace __FUNCTION__;
   let* sigma = get_sigma in
   let to_unify : Problem.t list =
     List.map (constr_to_problem args) constructors
@@ -39,6 +53,7 @@ let map_problems args (constructors : Constructors.t) : Problems.t mm =
 let cross_product (acc : Problems.t list) ({ sigma; to_unify } : Problems.t)
   : Problems.t list
   =
+  UnifLog.trace __FUNCTION__;
   List.concat_map
     (fun ({ to_unify = xs; _ } : Problems.t) : Problems.t list ->
       List.map
@@ -47,20 +62,13 @@ let cross_product (acc : Problems.t list) ({ sigma; to_unify } : Problems.t)
     acc
 ;;
 
-(* let cross_productOLD (acc : Problems.t list) (problems : Problems.t)
-   : Problems.t list
-   =
-   List.concat_map
-   (fun (x : Problems.t) -> List.map (fun (y : Problem.t) -> y :: x) problems)
-   acc
-   ;; *)
-
 let try_unify_constructor_arg
       ?(debug : bool = show_unification_debug)
       (a : EConstr.t)
       (b : EConstr.t)
   : bool mm
   =
+  UnifLog.trace __FUNCTION__;
   state (fun env sigma -> Pair.unify ~debug env sigma (Pair.normal a b))
 ;;
 
@@ -71,13 +79,15 @@ let try_unify_constructor_args
       (args : constructor_args)
   : bool mm
   =
+  UnifLog.trace __FUNCTION__;
   let f = try_unify_constructor_arg in
   let* lhs_unifies : bool = f args.lhs lhs in
   if lhs_unifies then f args.act act else return false
 ;;
 
 let subst_of_decl (substl : EConstr.Vars.substl) x : EConstr.t mm =
-  let ty = Context.Rel.Declaration.get_type x in
+  UnifLog.trace __FUNCTION__;
+  let ty : EConstr.t = Context.Rel.Declaration.get_type x in
   let$+ subst _ _ = EConstr.Vars.substl substl ty in
   return subst
 ;;
@@ -93,6 +103,7 @@ let mk_ctx_subst
       (x : ('a, EConstr.t, 'b) Context.Rel.Declaration.pt)
   : EConstr.t mm
   =
+  UnifLog.trace __FUNCTION__;
   let* subst = subst_of_decl substl x in
   let$ vt env sigma = Evarutil.new_evar env sigma subst in
   return vt
@@ -107,14 +118,18 @@ let mk_ctx_subst
 let rec mk_ctx_substl (acc : EConstr.Vars.substl)
   :  ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list
   -> EConstr.Vars.substl mm
-  = function
+  =
+  UnifLog.trace __FUNCTION__;
+  function
   | [] -> return acc
   | t :: ts ->
     let* vt = mk_ctx_subst acc t in
     mk_ctx_substl (vt :: acc) ts
 ;;
 
-let debug_extract_args name : constructor_args -> unit mm = function
+let debug_extract_args name : constructor_args -> unit mm =
+  UnifLog.trace __FUNCTION__;
+  function
   | { lhs; act; rhs } ->
     state (fun env sigma ->
       if show_extractargs_debug
@@ -136,6 +151,7 @@ let debug_extract_args name : constructor_args -> unit mm = function
 let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
   : constructor_args mm
   =
+  UnifLog.trace __FUNCTION__;
   match Constr.kind term with
   | App (_name, args) ->
     if Array.length args == 3
@@ -150,6 +166,7 @@ let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
 ;;
 
 let get_fresh_evar (original : Rocq_utils.evar_source) : EConstr.t mm =
+  UnifLog.trace __FUNCTION__;
   state (fun env sigma -> Rocq_utils.get_next env sigma original)
 ;;
 
@@ -160,6 +177,7 @@ let axiom_constructor
       (constructors : Constructors.t)
   : Constructors.t mm
   =
+  UnifLog.trace __FUNCTION__;
   let* is_evar : bool = Mebi_utils.econstr_is_evar tgt in
   if is_evar
   then return constructors
@@ -179,6 +197,7 @@ let rec check_valid_constructors
           (lts_enc : Enc.t)
   : Constructors.t mm
   =
+  UnifLog.trace __FUNCTION__;
   let* from_term : EConstr.t = Mebi_utils.econstr_normalize from_term in
   let* () = debug_validconstrs_start from_term in
   let iter_body (i : int) (constructors : Constructors.t) =
@@ -204,7 +223,7 @@ let rec check_valid_constructors
           (i, constructors)
           (substl, decls)
       in
-      Logging.Log.debug "CVC constructors:";
+      UnifLog.debug ~__FUNCTION__ "CVC constructors:";
       (* ! NOTE: here we obtain the successfully unified and distinct action and destination -- BUT as this is returned, we see that it is actually another evar and this then unifies incorrectly. *)
       let* () = debug_constructors_mm constructors in
       let* () = debug_validconstrs_iter_close i constructors in
@@ -227,6 +246,7 @@ and explore_valid_constructor
       ((substl, decls) : EConstr.Vars.substl * EConstr.rel_declaration list)
   : Constructors.t mm
   =
+  UnifLog.trace __FUNCTION__;
   let* () =
     debug_validconstrs_iter_success_start from_term (Some args.act) args
   in
@@ -260,7 +280,9 @@ and check_updated_ctx
       (indmap : Mebi_ind.t F.t)
   :  EConstr.Vars.substl * EConstr.rel_declaration list
   -> (Enc.t * Problems.t list) option mm
-  = function
+  =
+  UnifLog.trace __FUNCTION__;
+  function
   | [], [] ->
     let* () = debug_updtcontext_return () in
     return (Some (lts_enc, acc))
@@ -314,23 +336,24 @@ and check_for_next_constructors
       (tgt_term : EConstr.t)
       (constructors : Constructors.t)
   : (Enc.t * Problems.t list) option -> Constructors.t mm
-  = function
+  =
+  UnifLog.trace __FUNCTION__;
+  function
   | None ->
     let* () = debug_nextconstrs_return () in
     return constructors
   | Some (next_lts_enc, next_problems) ->
     let* () = debug_nextconstrs_start () in
-    (* let* () = Rocq_debug.debug_econstr_mm "CNC act" outer_act in *)
     if Problems.list_is_empty next_problems
     then (
-      Logging.Log.debug "CNC axiom";
+      UnifLog.debug ~__FUNCTION__ "CNC axiom";
       let* constructors =
         axiom_constructor outer_act tgt_term (next_lts_enc, i) constructors
       in
       let* () = debug_nextconstrs_close next_problems None constructors in
       return constructors)
     else (
-      Logging.Log.debug "CNC premises";
+      UnifLog.debug ~__FUNCTION__ "CNC premises";
       let* constructors : Mebi_constr.t list =
         Constructors.retrieve
           ~debug:true
@@ -352,15 +375,13 @@ let collect_valid_constructors
       (lts_enc : Enc.t)
   : Constructors.t mm
   =
-  Logging.Log.debug
-    (Printf.sprintf
-       "mebi_unify.collect_valid_constructors, from: %s"
-       (Mebi_wrapper.econstr_to_string from_term));
+  UnifLog.trace __FUNCTION__;
+  UnifLog.thing ~__FUNCTION__ Debug "from" from_term (Of econstr_to_string);
   let* fresh_evar = get_fresh_evar (Rocq_utils.OfType label_type) in
   let* constructors : Constructors.t =
     check_valid_constructors transitions indmap from_term fresh_evar lts_enc
   in
-  (* Logging.Log.notice "\n=/==/=/=/==/==="; *)
+  (* .Log.notice "\n=/==/=/=/==/==="; *)
   let* () = debug_constructors_mm constructors in
   return constructors
 ;;
