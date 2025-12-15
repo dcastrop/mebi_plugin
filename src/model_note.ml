@@ -1,22 +1,33 @@
 type t =
   { from : Model_state.t
   ; via : Model_label.t
+  ; using : Mebi_constr.Tree.t list
+  ; goto : Model_state.t
   }
 
-let create (from : Model_state.t) (via : Model_label.t) : t = { from; via }
+let create
+      (from : Model_state.t)
+      (via : Model_label.t)
+      (using : Mebi_constr.Tree.t list)
+      (goto : Model_state.t)
+  : t
+  =
+  { from; via; using; goto }
+;;
 
 let equal (a : t) (b : t) : bool =
   let f = Model_state.equal in
   let g = Model_label.equal in
-  f a.from b.from && g a.via b.via
+  let h = List.equal Mebi_constr.Tree.equal in
+  f a.from b.from && g a.via b.via && h a.using b.using && f a.goto b.goto
 ;;
-
-(* && h (List.combine a.constructors b.constructors) *)
 
 let compare (a : t) (b : t) : int =
   let f = Model_state.compare in
   let g = Model_label.compare in
-  Utils.compare_chain [ f a.from b.from; g a.via b.via ]
+  let h = List.compare Mebi_constr.Tree.compare in
+  Utils.compare_chain
+    [ f a.from b.from; g a.via b.via; h a.using b.using; f a.goto b.goto ]
 ;;
 
 (***********************************************************************)
@@ -103,45 +114,47 @@ let rec drop_last : annotation -> annotation = function
 (*** Annotations *******************************************************)
 (***********************************************************************)
 
-type annotations = annotation list
+(* type annotations = annotation list
 
-let annotations_equal (a : annotations) (b : annotations) : bool =
-  List.equal annotation_equal a b
-;;
+   let annotations_equal (a : annotations) (b : annotations) : bool =
+   List.equal annotation_equal a b
+   ;;
 
-let annotations_compare (a : annotations) (b : annotations) : int =
-  List.compare annotation_compare a b
-;;
+   let annotations_compare (a : annotations) (b : annotations) : int =
+   List.compare annotation_compare a b
+   ;;
 
-let annotations_is_empty : annotations -> bool = function
-  | [] -> true
-  | _ -> false
-;;
+   let annotations_is_empty : annotations -> bool = function
+   | [] -> true
+   | _ -> false
+   ;;
 
-let union_annotations (a : annotations) (b : annotations) : annotations =
-  List.fold_left
-    (fun (acc : annotations) (x : annotation) ->
-      if List.mem x acc then acc else x :: acc)
-    a
-    b
-;;
+   let union_annotations (a : annotations) (b : annotations) : annotations =
+   List.fold_left
+   (fun (acc : annotations) (x : annotation) ->
+   if List.mem x acc then acc else x :: acc)
+   a
+   b
+   ;;
 
-let add_annotation (a : annotation) (bs : annotations) : annotations =
-  if List.mem a bs then bs else a :: bs
-;;
+   let add_annotation (a : annotation) (bs : annotations) : annotations =
+   if List.mem a bs then bs else a :: bs
+   ;; *)
 
 open Utils.Strfy
 
 let to_string ?(args : style_args = style_args ()) (x : t) : string =
-  let goto : string = Mebi_setup.Enc.to_string x.from.enc in
-  let via : string = Mebi_setup.Enc.to_string x.via.enc in
+  let f : Mebi_setup.Enc.t -> string = Mebi_setup.Enc.to_string in
+  let from : string = f x.from.enc in
+  let goto : string = f x.goto.enc in
+  let via : string = f x.via.enc in
   (* let constructors : string =
     Utils.Strfy.list
       Utils.Strfy.string
       (List.map Mebi_constr.Tree.to_string x.constructors)
   in *)
   (* Printf.sprintf "<State (%s) Via (%s) :: %s>" goto via constructors *)
-  Printf.sprintf "<State (%s) Via (%s)>" goto via
+  Printf.sprintf "<State (%s) Via (%s) Goto (%s)>" from via goto
 ;;
 
 let annotation_to_string ?(args : style_args = style_args ()) (x : annotation)
@@ -160,8 +173,8 @@ let annotation_to_string ?(args : style_args = style_args ()) (x : annotation)
     (annotation_to_string ~args x)
 ;;
 
-let annotations_to_string ?(args : style_args = style_args ()) (x : annotations)
+(* let annotations_to_string ?(args : style_args = style_args ()) (x : annotations)
   : string
   =
   list ~args:{ args with name = Some "Annotations" } annotation_to_string x
-;;
+;; *)
