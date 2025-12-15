@@ -1,15 +1,13 @@
-type output_mode =
-  | Coq
-  | OCaml
+(***********************************************************************)
 
 type level = Feedback.level
 
 let make_level_fun
       ?(debug : bool = false)
       ?(info : bool = false)
-      ?(notice : bool = false)
-      ?(warning : bool = false)
-      ?(error : bool = false)
+      ?(notice : bool = true)
+      ?(warning : bool = true)
+      ?(error : bool = true)
       ()
   : level -> bool
   =
@@ -22,12 +20,24 @@ let make_level_fun
   | Error -> error
 ;;
 
+let level_fun_preset_debug ?(trace : bool = false) () =
+  make_level_fun ~debug:true ~info:trace ()
+;;
+
+let level_fun_preset_results () = make_level_fun ~info:true ()
+
+(***********************************************************************)
+
+(** [Output] handles the different ways we may need to output messages from the plugin. Primarily through [Rocq], but this also supports the [OCaml]'s standard output. See [Output.Make] for more details.
+*)
 module Output = struct
   module type OUTPUT_TYPE = sig
     val output_type_as_string : string
 
     val do_feedback_output
-      :  ?override:bool
+      :  ?__FUNCTION__:string
+      -> ?prefix:string option
+      -> ?override:bool
       -> (level -> bool)
       -> level
       -> string
@@ -36,29 +46,42 @@ module Output = struct
 
   module type S = sig
     val output_type_as_string : string
-    val get_output_fun : level -> string -> unit
+    val get_output_fun : ?prefix:string option -> level -> string -> unit
   end
 
   module Make (X : S) : OUTPUT_TYPE = struct
     include X
 
     let do_feedback_output
+          ?(__FUNCTION__ : string = "")
+          ?(prefix : string option = None)
           ?(override : bool = false)
           (f : level -> bool)
           (x : level)
           (y : string)
       : unit
       =
-      if override || f x then get_output_fun x y
+      let prefix : string option =
+        match __FUNCTION__ with
+        | "" -> prefix
+        | z ->
+          Some (Option.cata (fun p -> Printf.sprintf "%s, %s" z p) z prefix)
+      in
+      if override || f x then get_output_fun ~prefix x y
     ;;
   end
 
   module Rocq : OUTPUT_TYPE = Make (struct
       let output_type_as_string : string = "Rocq"
 
-      let get_output_fun : level -> string -> unit =
+      let get_output_fun ?(prefix : string option = None)
+        : level -> string -> unit
+        =
         let f (x : ?loc:Loc.t -> Pp.t -> unit) : string -> unit =
-          fun (y : string) -> Pp.str y |> x
+          fun (y : string) ->
+          Option.cata (fun z -> Printf.sprintf "%s: %s" z y) y prefix
+          |> Pp.str
+          |> x
         in
         function
         | Debug -> f Feedback.msg_debug
@@ -72,8 +95,13 @@ module Output = struct
   module OCaml : OUTPUT_TYPE = Make (struct
       let output_type_as_string : string = "OCaml"
 
-      let get_output_fun : level -> string -> unit =
-        let f (x : string) : string -> unit = Printf.printf "[%s] %s\n" x in
+      let get_output_fun ?(prefix : string option = None)
+        : level -> string -> unit
+        =
+        let f (x : string) : string -> unit =
+          Option.cata (fun y -> Printf.sprintf "%s: %s" y x) x prefix
+          |> Printf.printf "[%s] %s\n"
+        in
         function
         | Debug -> f "Debug"
         | Info -> f "Info"
@@ -84,61 +112,170 @@ module Output = struct
     end)
 end
 
+(***********************************************************************)
+
+type 'a to_string =
+  | Args of (?args:Utils.Strfy.style_args -> 'a -> string)
+  | Of of ('a -> string)
+
 module type LOGGER_TYPE = sig
   val enabled : bool ref
+  val prefix : string option
 
   (* Rocq's [Feedback.level] messages *)
-  val debug : string -> unit
-  val info : string -> unit
-  val notice : string -> unit
-  val warning : string -> unit
-  val error : string -> unit
+  val debug : ?__FUNCTION__:string -> string -> unit
+  val info : ?__FUNCTION__:string -> string -> unit
+  val notice : ?__FUNCTION__:string -> string -> unit
+  val warning : ?__FUNCTION__:string -> string -> unit
+  val error : ?__FUNCTION__:string -> string -> unit
 
   (* custom printing messages *)
-  val trace : string -> unit
-  val result : string -> unit
-  val override : level -> string -> unit
+  val trace : ?__FUNCTION__:string -> string -> unit
+  val result : ?__FUNCTION__:string -> string -> unit
+  val override : ?__FUNCTION__:string -> level -> string -> unit
+
+  (* utils for printing things *)
+  val thing
+    :  ?__FUNCTION__:string
+    -> ?args:Utils.Strfy.style_args
+    -> level
+    -> string
+    -> 'a
+    -> 'a to_string
+    -> unit
+
+  val option
+    :  ?__FUNCTION__:string
+    -> ?args:Utils.Strfy.style_args
+    -> level
+    -> string
+    -> 'a option
+    -> 'a to_string
+    -> unit
 
   (* user defined *)
   val is_level_enabled : level -> bool
 end
 
 module type S = sig
+  val prefix : string option
   val is_level_enabled : level -> bool
 end
 
 module Make (O : Output.OUTPUT_TYPE) (X : S) : LOGGER_TYPE = struct
   let enabled : bool ref = ref true
+  let prefix : string option = X.prefix
 
   let is_level_enabled : level -> bool =
     if !enabled then X.is_level_enabled else fun _ -> false
   ;;
 
-  let do_feedback_output ?(override : bool = false) : level -> string -> unit =
-    O.do_feedback_output is_level_enabled
+  let do_feedback_output
+        ?(override : bool = false)
+        ?(__FUNCTION__ : string = "")
+    : level -> string -> unit
+    =
+    O.do_feedback_output ~prefix ~override ~__FUNCTION__ is_level_enabled
   ;;
 
-  let debug (x : string) : unit = do_feedback_output Debug x
-  let info (x : string) : unit = do_feedback_output Info x
-  let notice (x : string) : unit = do_feedback_output Notice x
-  let warning (x : string) : unit = do_feedback_output Warning x
-  let error (x : string) : unit = do_feedback_output Error x
+  let debug ?(__FUNCTION__ : string = "") (x : string) : unit =
+    do_feedback_output ~__FUNCTION__ Debug x
+  ;;
+
+  let info ?(__FUNCTION__ : string = "") (x : string) : unit =
+    do_feedback_output ~__FUNCTION__ Info x
+  ;;
+
+  let notice ?(__FUNCTION__ : string = "") (x : string) : unit =
+    do_feedback_output ~__FUNCTION__ Notice x
+  ;;
+
+  let warning ?(__FUNCTION__ : string = "") (x : string) : unit =
+    do_feedback_output ~__FUNCTION__ Warning x
+  ;;
+
+  let error ?(__FUNCTION__ : string = "") (x : string) : unit =
+    do_feedback_output ~__FUNCTION__ Error x
+  ;;
 
   (** [trace x] is not supported by Rocq's [Feedback.level], and so we choose to show the trace only if both [Debug] and [Info] are enabled.
   *)
-  let trace (x : string) : unit = if is_level_enabled Info then debug x
+  let trace ?(__FUNCTION__ : string = "") (x : string) : unit =
+    if is_level_enabled Info then debug ~__FUNCTION__ x
+  ;;
 
   (** [result x] is not supported by Rocq's [Feedback.level], and so we choose to show the trace only if both [Info] and [Notice] are enabled.
   *)
-  let result (x : string) : unit = if is_level_enabled Info then notice x
+  let result ?(__FUNCTION__ : string = "") (x : string) : unit =
+    if is_level_enabled Info then notice ~__FUNCTION__ x
+  ;;
 
   (** [override level x] will always print as [level] *)
-  let override : level -> string -> unit = do_feedback_output ~override:true
+  let override ?(__FUNCTION__ : string = "") : level -> string -> unit =
+    do_feedback_output ~__FUNCTION__ ~override:true
+  ;;
+
+  (** [thing level f x] uses outputs the result of [f x] to [level]. *)
+  let thing
+        ?(__FUNCTION__ : string = "")
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+        (level : level)
+        (prefix : string)
+        (x : 'a)
+        (f : 'a to_string)
+    : unit
+    =
+    let f : 'a -> string = match f with Args f -> f ~args | Of f -> f in
+    do_feedback_output
+      ~__FUNCTION__
+      level
+      (Printf.sprintf "%s%s" (Utils.prefix prefix) (f x))
+  ;;
+
+  let option
+        ?(__FUNCTION__ : string = "")
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+        (level : level)
+        (prefix : string)
+        (x : 'a option)
+        (f : 'a to_string)
+    : unit
+    =
+    match x with
+    | Some x -> thing ~__FUNCTION__ ~args level prefix x f
+    | None ->
+      thing ~__FUNCTION__ ~args level prefix "None" (Of Utils.Strfy.string)
+  ;;
 end
 
-module Test : LOGGER_TYPE =
-  Make
-    (Output.Rocq)
-    (struct
-      let is_level_enabled : level -> bool = make_level_fun ()
-    end)
+let make
+      ?(prefix : string option = None)
+      (is_level_enabled : level -> bool)
+      (module O : Output.OUTPUT_TYPE)
+  : (module LOGGER_TYPE)
+  =
+  let module X : LOGGER_TYPE =
+    Make
+      (O)
+      (struct
+        let prefix : string option = prefix
+        let is_level_enabled : level -> bool = is_level_enabled
+      end)
+  in
+  (module X)
+;;
+
+let debug
+      ?(prefix : string option = None)
+      ?(trace : bool = false)
+      (module O : Output.OUTPUT_TYPE)
+  : (module LOGGER_TYPE)
+  =
+  make ~prefix (level_fun_preset_debug ~trace ()) (module O)
+;;
+
+let results ?(prefix : string option = None) (module O : Output.OUTPUT_TYPE)
+  : (module LOGGER_TYPE)
+  =
+  make ~prefix (level_fun_preset_results ()) (module O)
+;;

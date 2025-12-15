@@ -1,18 +1,13 @@
 open Mebi_wrapper
 open Mebi_wrapper.Syntax
-open Logging
 open Model
-
-(* the prefix *)
-let trace_enabled : bool = true
-let log_trace (x : string) : unit = if trace_enabled then Log.trace x else ()
 
 (** [GraphB] is ...
     (Essentially acts as a `.mli` for the [MkGraph] module.) *)
 module type GraphB = sig
   module H : Hashtbl.S with type key = Enc.t
   module S : Set.S with type elt = Enc.t
-  module D : Set.S with type elt = Enc.t * Mebi_constr.Tree.t
+  module D : Set.S with type elt = Enc.t * Tree.t
 
   type constr_transitions = (Action.t, D.t) Hashtbl.t
 
@@ -31,16 +26,16 @@ module type GraphB = sig
     :  constr_transitions
     -> Action.t
     -> Enc.t
-    -> Mebi_constr.Tree.t
-    -> unit mm
+    -> Tree.t
+    -> unit
 
   val add_new_term_constr_transition
     :  lts_graph
     -> Enc.t
     -> Action.t
     -> Enc.t
-    -> Mebi_constr.Tree.t
-    -> unit mm
+    -> Tree.t
+    -> unit
 
   val build_lts_graph
     :  Mebi_ind.t
@@ -56,6 +51,12 @@ module type GraphB = sig
     -> int * Params.WeakEnc.t option
     -> lts_graph mm
 
+  (* val to_lts
+     :  ?cache:bool
+     -> lts_graph
+     -> int * Params.WeakEnc.t option
+     -> Model.Lts.t mm *)
+
   val decoq_lts
     :  ?cache_decoding:bool
     -> lts_graph (* -> cindef * cindef B.t *)
@@ -68,19 +69,57 @@ end
 module MkGraph
     (M : Hashtbl.S with type key = Enc.t)
     (N : Set.S with type elt = Enc.t)
-    (P : Set.S with type elt = Enc.t * Mebi_constr.Tree.t) : GraphB = struct
-  (* [H] is the hashtbl of outgoing transitions, from some [EConstr.t] and also
-     is used for mapping term types to [cindef]. *)
-  module H = M
+    (P : Set.S with type elt = Enc.t * Tree.t) : GraphB = struct
+  (***********************************************************************)
 
-  (* [S] is the set of states, of [EConstr.t]. *)
-  module S = N
+  (** custom logging for graph builder *)
+  module GraphLog : Logger.LOGGER_TYPE =
+    Logger.Make
+      (Logger.Output.Rocq)
+      (struct
+        let prefix : string option = None
 
-  (* [D] is the set of destination tuples, each comprised of a term [EConstr.t]
-     and the corresponding [Mebi_constr.Tree.t]. *)
-  module D = P
+        let is_level_enabled : Logger.level -> bool =
+          Logger.level_fun_preset_debug ~trace:false ()
+        ;;
+      end)
 
-  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Mebi_constr.Tree.t].
+  let debug_enc ?(__FUNCTION__ : string = "") (p : string) (x : Enc.t) : unit =
+    GraphLog.thing ~__FUNCTION__ Debug p x (Of Enc.to_string)
+  ;;
+
+  let debug_econstr ?(__FUNCTION__ : string = "") (p : string) (x : EConstr.t)
+    : unit
+    =
+    GraphLog.thing ~__FUNCTION__ Debug p x (Of econstr_to_string)
+  ;;
+
+  let debug_dec
+        ?(__FUNCTION__ : string = "")
+        (p : string)
+        (x : Enc.t)
+        (y : EConstr.t)
+    : unit
+    =
+    let f : string -> string = Printf.sprintf "%s %s" p in
+    debug_enc ~__FUNCTION__ (f "enc") x;
+    debug_econstr ~__FUNCTION__ (f "term") y
+  ;;
+
+  (***********************************************************************)
+
+  (** [H] is the hashtbl of outgoing transitions, from some [EConstr.t] and also
+      is used for mapping term types to [cindef]. *)
+  module H : Hashtbl.S with type key = Enc.t = M
+
+  (** [S] is the set of states, of [EConstr.t]. *)
+  module S : Set.S with type elt = Enc.t = N
+
+  (** [D] is the set of destination tuples, each comprised of a term [EConstr.t]
+      and the corresponding [Tree.t]. *)
+  module D : Set.S with type elt = Enc.t * Tree.t = P
+
+  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Tree.t].
   *)
   type constr_transitions = (Action.t, D.t) Hashtbl.t
 
@@ -89,6 +128,7 @@ module MkGraph
         (xs : constr_transitions)
     : string
     =
+    GraphLog.trace __FUNCTION__;
     let open Utils.Strfy in
     list
       ~args:{ args with name = Some "constr_transitions" }
@@ -99,18 +139,19 @@ module MkGraph
          list
            (tuple
               (fun ?(args : style_args = record_args ()) x -> Enc.to_string x)
-              Mebi_constr.Tree.to_string)
+              Tree.to_string)
            (D.to_list destination_tuples)))
       (List.combine
          (Hashtbl.to_seq_keys xs |> List.of_seq)
          (Hashtbl.to_seq_values xs |> List.of_seq))
   ;;
 
-  let transitions_to_string
+  let _transitions_to_string
         ?(args : style_args = Utils.Strfy.style_args ())
         (xs : constr_transitions M.t)
     : string
     =
+    GraphLog.trace __FUNCTION__;
     let open Utils.Strfy in
     list
       ~args:{ args with name = Some "transitions" }
@@ -122,7 +163,7 @@ module MkGraph
          (M.to_seq_values xs |> List.of_seq))
   ;;
 
-  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Mebi_constr.Tree.t].
+  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Tree.t].
   *)
   type lts_graph =
     { to_visit : Enc.t Queue.t
@@ -130,24 +171,23 @@ module MkGraph
     ; terminals : S.t
     ; states : S.t
     ; transitions : constr_transitions H.t
-      (* ; ind_defs : (Enc.t * Mebi_ind.t) list *)
     ; ind_defs : Mebi_ind.t B.t
     ; weak : Params.WeakEnc.t option
     }
 
-  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Mebi_constr.Tree.t)] in a given [constr_transitions].
+  (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Tree.t)] in a given [constr_transitions].
   *)
   let insert_constr_transition
         (constrs : constr_transitions)
         (a : Action.t)
         (d : Enc.t)
-        (c : Mebi_constr.Tree.t)
-    : unit mm
+        (c : Tree.t)
+    : unit
     =
-    (match Hashtbl.find_opt constrs a with
-     | None -> Hashtbl.add constrs a (D.singleton (d, c))
-     | Some ds -> Hashtbl.replace constrs a (D.add (d, c) ds));
-    return ()
+    GraphLog.trace __FUNCTION__;
+    match Hashtbl.find_opt constrs a with
+    | None -> Hashtbl.add constrs a (D.singleton (d, c))
+    | Some ds -> Hashtbl.replace constrs a (D.add (d, c) ds)
   ;;
 
   let add_new_term_constr_transition
@@ -155,57 +195,56 @@ module MkGraph
         (t : Enc.t)
         (a : Action.t)
         (d : Enc.t)
-        (c : Mebi_constr.Tree.t)
-    : unit mm
+        (c : Tree.t)
+    : unit
     =
+    GraphLog.trace __FUNCTION__;
     H.add
       g.transitions
       t
-      (Hashtbl.of_seq (List.to_seq [ a, D.singleton (d, c) ]));
-    return ()
+      (Hashtbl.of_seq (List.to_seq [ a, D.singleton (d, c) ]))
+  ;;
+
+  let handle_updating_transitions
+        (g : lts_graph)
+        (from : Enc.t)
+        (action : Action.t)
+        (goto : Enc.t)
+        (constructors : Tree.t)
+    : unit
+    =
+    GraphLog.trace __FUNCTION__;
+    match H.find_opt g.transitions from with
+    | None -> add_new_term_constr_transition g from action goto constructors
+    | Some actions -> insert_constr_transition actions action goto constructors
   ;;
 
   let is_silent_transition (weak : Params.WeakEnc.t option) (act : EConstr.t)
     : bool option mm
     =
+    GraphLog.trace __FUNCTION__;
     match weak with
     | None -> return None
     | Some weak_kind ->
-      Log.trace "command.MkGraph.is_silent_transition";
       let* act_enc : Enc.t = encode act in
       let* ty : EConstr.t = Mebi_utils.type_of_econstr act in
       let* ty_enc : Enc.t = encode ty in
-      Log.debug
-        (Printf.sprintf
-           "command.MkGraph.is_silent_transition, type of act: %s"
-           (econstr_to_string ty));
+      debug_econstr ~__FUNCTION__ "ty act" ty;
       let open Params.WeakEnc in
       (match weak_kind with
        | OptionConstr label_enc ->
-         let* decoding = decode label_enc in
-         Log.debug
-           (Printf.sprintf
-              "command.MkGraph.is_silent_transition, OptionConstr (%s) => %s"
-              (Enc.to_string label_enc)
-              (econstr_to_string decoding));
-         (* all non-silent actions should be of this type *)
-         (* if Enc.eq label_enc ty_enc
-         then return (Some false)
-         else *)
+         GraphLog.trace ~__FUNCTION__ "OptionConstr (label_enc)";
+         let* label_decoding : EConstr.t = decode label_enc in
+         debug_dec ~__FUNCTION__ "label" label_enc label_decoding;
+         (* NOTE: all non-silent actions should be of this type *)
          let* b = Mebi_utils.is_none_term act in
          return (Some b)
        | CustomConstr (tau_enc, label_enc) ->
-         let* tau_decoding = decode tau_enc in
-         let* label_decoding = decode label_enc in
-         Log.debug
-           (Printf.sprintf
-              "command.MkGraph.is_silent_transition, CustomRef\n\
-               - tau: (%s) => %s\n\
-               - label: (%s) => %s"
-              (Enc.to_string tau_enc)
-              (econstr_to_string tau_decoding)
-              (Enc.to_string label_enc)
-              (econstr_to_string label_decoding));
+         GraphLog.trace ~__FUNCTION__ "CustomConstr (tau_enc, label_enc)";
+         let* tau_decoding : EConstr.t = decode tau_enc in
+         debug_dec ~__FUNCTION__ "tau" tau_enc tau_decoding;
+         let* label_decoding : EConstr.t = decode label_enc in
+         debug_dec ~__FUNCTION__ "label" label_enc label_decoding;
          return (Some (Enc.equal tau_enc act_enc)))
   ;;
 
@@ -216,42 +255,17 @@ module MkGraph
         (ctors : Mebi_constr.t list)
     : S.t mm
     =
-    Log.trace
-      (Printf.sprintf
-         "command.MkGraph.get_new_states, from: %s"
-         (Enc.to_string from));
+    GraphLog.trace __FUNCTION__;
+    GraphLog.thing ~__FUNCTION__ Debug "from" from (Of Enc.to_string);
     let iter_body (i : int) (new_states : S.t) =
       let (act, tgt, int_tree) : Mebi_constr.t = List.nth ctors i in
       let* tgt_enc : Enc.t = encode tgt in
       let* act_enc : Enc.t = encode act in
       let* is_silent : bool option = is_silent_transition weak_type act in
       let label : Label.t = { enc = act_enc; is_silent; pp = None } in
-      let constructor_trees : Mebi_constr.Tree.t list = [ int_tree ] in
+      let constructor_trees : Tree.t list = [ int_tree ] in
       let to_add : Action.t = Action.create label ~constructor_trees () in
-      Logging.Log.debug
-        (Printf.sprintf
-           "get_new_states, A transitions:\n%s"
-           (transitions_to_string g.transitions));
-      let* _ =
-        match H.find_opt g.transitions from with
-        | None ->
-          Log.debug
-            (Printf.sprintf
-               "get_new_states.H.find_opt g.transitions from -> None: %s"
-               (Enc.to_string from));
-          add_new_term_constr_transition g from to_add tgt_enc int_tree
-        | Some actions ->
-          Log.debug
-            (Printf.sprintf
-               "get_new_states.H.find_opt g.transitions from -> Some actions: \
-                %s"
-               (Enc.to_string from));
-          insert_constr_transition actions to_add tgt_enc int_tree
-      in
-      Logging.Log.debug
-        (Printf.sprintf
-           "get_new_states, B transitions:\n%s"
-           (transitions_to_string g.transitions));
+      let _ = handle_updating_transitions g from to_add tgt_enc int_tree in
       (* NOTE: if [tgt] has not been explored then add [to_visit] *)
       if H.mem g.transitions tgt_enc || S.mem tgt_enc g.states
       then ()
@@ -268,25 +282,18 @@ module MkGraph
         (lts_ind_def_map : Mebi_ind.t B.t)
     : Mebi_constr.t list mm
     =
-    (* Debug.Control.tick (); *)
-    Log.trace "command.MkGraph.get_new_constrs";
+    GraphLog.trace __FUNCTION__;
     let* from_term : EConstr.t = decode from in
     let* label_type : EConstr.t = Mebi_ind.get_lts_label_type primary in
     let* ind_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
     let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
     let lts_enc : Enc.t = primary.enc in
-    let* new_constrs =
-      Mebi_unify.collect_valid_constructors
-        primary_constr_transitions
-        ind_map
-        from_term
-        label_type
-        (* None *)
-        lts_enc
-    in
-    (* let new_constrs = get_new_constrs_NEW in *)
-    (* let* () = debug_new_constrs new_constrs in *)
-    return new_constrs
+    Mebi_unify.collect_valid_constructors
+      primary_constr_transitions
+      ind_map
+      from_term
+      label_type
+      lts_enc
   ;;
 
   (** [build_lts_graph fn_rlts g bound] is an [lts_graph] [g] obtained by exploring [fn_rlts].
@@ -301,18 +308,18 @@ module MkGraph
             ((bound, weak_type) : int * Params.WeakEnc.t option)
     : lts_graph mm
     =
-    Log.trace "command.MkGraph.build_lts_graph";
+    GraphLog.trace __FUNCTION__;
     if Queue.is_empty g.to_visit
-    then return g (* finished if no more to visit*)
+    then return g (* NOTE: finished if no more to visit*)
     else if S.cardinal g.states > bound
-    then return g (* exit if bound reached *)
+    then return g (* NOTE: exit if bound reached *)
     else (
       let encoded_t : Enc.t = Queue.pop g.to_visit in
       let* new_constrs : Mebi_constr.t list =
         get_new_constrs encoded_t the_primary_lts lts_ind_def_map
       in
-      (* [get_new_states] also updates [g.to_visit] *)
       let* new_states : S.t =
+        (* NOTE: also updates [g.to_visit ]*)
         get_new_states ~weak_type encoded_t g new_constrs
       in
       let g : lts_graph = { g with states = S.union g.states new_states } in
@@ -325,7 +332,7 @@ module MkGraph
   let build_lts_ind_def_map (grefs : Names.GlobRef.t list)
     : (Enc.t * Mebi_ind.t B.t) mm
     =
-    Log.trace "command.MkGraph.build_lts_ind_def_map";
+    GraphLog.trace __FUNCTION__;
     let num_grefs : int = List.length grefs in
     let iter_body
           (i : int)
@@ -368,56 +375,80 @@ module MkGraph
         ((bound, weak_type) : int * Params.WeakEnc.t option)
     : lts_graph mm
     =
-    Log.trace "command.MkGraph.build_graph";
-    (* normalize the initial term *)
+    GraphLog.trace __FUNCTION__;
+    (* NOTE: normalize the initial term *)
     let* t : EConstr.t = Mebi_utils.constrexpr_to_econstr tref in
     let* t : EConstr.t = Mebi_utils.econstr_normalize t in
-    (* encode lts inductive definitions *)
+    (* NOTE: encode lts inductive definitions *)
     let* (the_primary_lts_enc, lts_ind_def_map) : Enc.t * Mebi_ind.t B.t =
       build_lts_ind_def_map grefs
     in
     let* the_primary_lts =
       get_primary_lts primary_lts the_primary_lts_enc lts_ind_def_map
     in
-    (* update environment by typechecking *)
+    (* NOTE: update environment by typechecking *)
     let* primary_trm_type = Mebi_ind.get_lts_trm_type the_primary_lts in
     let$* _unit env sigma = Typing.check env sigma t primary_trm_type in
-    (* get initial term *)
-    let$ init env sigma = sigma, Reductionops.nf_all env sigma t in
-    let* encoded_init = encode init in
-    let q = Queue.create () in
-    let* _ = return (Queue.push encoded_init q) in
-    let* g =
+    let$ initial_trm env sigma = sigma, Reductionops.nf_all env sigma t in
+    let* initial_enc = encode initial_trm in
+    let to_visit : S.elt Queue.t = Queue.create () in
+    let* _ = return (Queue.push initial_enc to_visit) in
+    let* g : lts_graph =
       build_lts_graph
         the_primary_lts
         lts_ind_def_map
-        { to_visit = q
-        ; init = encoded_init
+        { to_visit
+        ; init = initial_enc
         ; terminals = S.empty
         ; states = S.empty
         ; transitions = H.create 0
-        ; ind_defs =
-            lts_ind_def_map
-            (* B.fold
-               (fun (_key : Enc.t)
-               (_val : Mebi_ind.t)
-               (acc : (Enc.t * Mebi_ind.t) list) ->
-               match _val.kind with LTS _ -> (_key, _val) :: acc | _ -> acc)
-               lts_ind_def_map
-               [] *)
+        ; ind_defs = lts_ind_def_map
         ; weak = weak_type
         }
         (bound, weak_type)
     in
-    let terminals =
+    (* NOTE: terminals are states with no out-going transitions *)
+    let terminals : S.t =
       S.filter (fun (s : S.elt) -> Bool.not (H.mem g.transitions s)) g.states
     in
     return { g with terminals }
   ;;
 
+  (***********************************************************************)
+
+  (* let to_lts
+        ?(cache : bool = false)
+        ({ to_visit; init; terminals; states; transitions; ind_defs; weak } :
+          lts_graph)
+        ((bound, weak_type) : int * Params.WeakEnc.t option)
+    : Model.Lts.t mm
+    =
+    GraphLog.trace __FUNCTION__;
+    let enc_pp (x : Enc.t) : string option mm =
+      if cache
+      then
+        let* dec = decode x in
+        return (Some (Utils.clean_string (econstr_to_string dec)))
+      else return None
+    in
+    let get_state (enc : Enc.t) : State.t mm =
+      let* pp : string option = enc_pp enc in
+      let x : State.t = { enc; pp } in
+      return x
+    in
+    let get_states (encs : S.t) : States.t mm =
+      let* pp : string option = enc_pp enc in
+      let x : State.t = { enc; pp } in
+      return x
+    in
+    return () *)
+
+  (***********************************************************************)
+
   let decoq_enc ?(cache_decoding : bool = false) (enc : Enc.t)
     : string option mm
     =
+    GraphLog.trace __FUNCTION__;
     if cache_decoding
     then
       let* s_decoding = decode enc in
@@ -581,7 +612,7 @@ module MkGraph
         ((bound, weak_type) : int * Params.WeakEnc.t option)
     : Lts.t mm
     =
-    Log.debug "command.MkGraph.decoq_lts";
+    GraphLog.debug __FUNCTION__;
     let* init : State.t option = decoq_state_opt ~cache_decoding g.init in
     let* states : States.t = decoq_states ~cache_decoding g.states in
     let* terminals = decoq_states ~cache_decoding g.terminals in
@@ -608,9 +639,22 @@ module MkGraph
   ;;
 end
 
+(***********************************************************************)
+
+module Log : Logger.LOGGER_TYPE =
+  Logger.Make
+    (Logger.Output.Rocq)
+    (struct
+      let prefix : string option = None
+
+      let is_level_enabled : Logger.level -> bool =
+        Logger.level_fun_preset_debug ~trace:false ()
+      ;;
+    end)
+
 (** [make_graph_builder] is ... *)
 let make_graph_builder =
-  Log.trace "command.make_graph_builder";
+  Log.trace __FUNCTION__;
   let* h = make_transition_tbl in
   (* hashtabl of terms to (edges) or (cindef) *)
   let* s = make_state_set in
@@ -628,7 +672,7 @@ let build_lts_graph
       (refs : Libnames.qualid list)
   : Lts.t mm
   =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let* graphM : (module GraphB) = make_graph_builder in
   let module G = (val graphM) in
   let* graph_lts =
@@ -656,15 +700,13 @@ let build_fsm
       (refs : Libnames.qualid list)
   : Fsm.t mm
   =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let* the_lts =
     build_lts_graph primary_lts t (Params.get_fst_params ()) refs
   in
-  Log.details
-    (Printf.sprintf "command.build_fsm, lts:\n%s\n" (Lts.to_string the_lts));
+  Log.info ~__FUNCTION__ (Printf.sprintf "lts:\n%s\n" (Lts.to_string the_lts));
   let the_fsm = Fsm.of_model (Lts.to_model the_lts) in
-  Log.details
-    (Printf.sprintf "command.build_fsm, fsm:\n%s\n" (Fsm.to_string the_fsm));
+  Log.result ~__FUNCTION__ (Printf.sprintf "fsm:\n%s\n" (Fsm.to_string the_fsm));
   Log.debug "post fsm";
   Log.debug
     (Printf.sprintf "%s, weakmode: %b" __FUNCTION__ !Params.the_weak_mode);
@@ -675,7 +717,7 @@ let build_fsm
     let the_minimized_fsm, _bisim_states =
       Algorithms.Minimize.run ~weak:!Params.the_weak_mode the_fsm
     in
-    Log.details
+    Log.info
       (Printf.sprintf
          "command.build_fsm, minimized & bisim states: %s\n"
          (Algorithms.Minimize.to_string (the_minimized_fsm, _bisim_states)));
@@ -706,7 +748,7 @@ type command_kind =
   | Info of unit
 
 let make_model args refs =
-  Log.trace "command.make_model";
+  Log.trace __FUNCTION__;
   let* result_str : string * string =
     match args with
     | LTS, (x, primary_lts) ->
@@ -729,6 +771,7 @@ let make_model args refs =
 ;;
 
 let only_in_weak_mode (f : 'a mm) : unit mm =
+  Log.trace __FUNCTION__;
   match Params.fst_weak_type () with
   | None ->
     if !Params.the_weak_mode = false
@@ -748,7 +791,7 @@ let only_in_weak_mode (f : 'a mm) : unit mm =
 ;;
 
 let saturate_model ((x, primary_lts) : coq_model) refs : unit mm =
-  Log.trace "command.saturate_model";
+  Log.trace __FUNCTION__;
   only_in_weak_mode
     (let* the_saturated_fsm =
        build_fsm ~saturate:true primary_lts x (Params.get_fst_params ()) refs
@@ -761,7 +804,7 @@ let saturate_model ((x, primary_lts) : coq_model) refs : unit mm =
 ;;
 
 let minimize_model ((x, primary_lts) : coq_model) refs : unit mm =
-  Log.trace "command.minimize_model";
+  Log.trace __FUNCTION__;
   only_in_weak_mode
     (let* the_minimized_fsm =
        build_fsm ~minimize:true primary_lts x (Params.get_fst_params ()) refs
@@ -774,7 +817,7 @@ let minimize_model ((x, primary_lts) : coq_model) refs : unit mm =
 ;;
 
 let merge_models ((x, a), (y, b)) refs : unit mm =
-  Log.trace "command.merge_models";
+  Log.trace __FUNCTION__;
   let* the_fsm_1 = build_fsm a x (Params.get_fst_params ()) refs in
   let* the_fsm_2 = build_fsm b y (Params.get_fst_params ()) refs in
   let weak : bool = !Params.the_weak_mode in
@@ -791,7 +834,7 @@ let merge_models ((x, a), (y, b)) refs : unit mm =
     (Printf.sprintf
        "command.run, MergeModels, finished: %s\n"
        (Fsm.to_string merged_fsm));
-  Log.details
+  Log.info
     (Printf.sprintf
        "command.run, MergeModels:\nFSM 1: %s\n\nFSM 2: %s\n"
        (Fsm.to_string the_fsm_1)
@@ -800,7 +843,7 @@ let merge_models ((x, a), (y, b)) refs : unit mm =
 ;;
 
 let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
-  Log.trace "command.check_bisimilarity";
+  Log.trace __FUNCTION__;
   let* the_fsm_1 = build_fsm a x (Params.get_fst_params ()) refs in
   let* the_fsm_2 = build_fsm b y (Params.get_fst_params ()) refs in
   Log.trace "command.check_bisimilarity B";
@@ -812,7 +855,7 @@ let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
     (Printf.sprintf
        "command.run, CheckBisimilarity, finished:\n%s\n"
        (Algorithms.Bisimilar.to_string the_bisimilar));
-  Log.details
+  Log.info
     (Printf.sprintf
        "command.run, CheckBisimilarity, saturated:\nFSM 1:\n%s\n\nFSM 2:\n%s\n"
        (Fsm.to_string the_bisimilar.the_fsm_1.saturated)
@@ -825,7 +868,7 @@ let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
 ;;
 
 let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
-  Log.trace "command.run";
+  Log.trace __FUNCTION__;
   let* _ = Params.obtain_weak_kinds_from_args () in
   (* if !Params.the_weak_mode = true then *)
   (* let* _ = Mebi_wrapper.load_none_term () in *)
@@ -850,7 +893,7 @@ let proof_intro
       (refs : Libnames.qualid list)
   : Declare.Proof.t mm
   =
-  Log.trace "command.proof_intro";
+  Log.trace __FUNCTION__;
   Mebi_proof.reset_the_proof_state ();
   Params.set_fail_if_incomplete true;
   Params.set_fail_if_not_bisim true;
