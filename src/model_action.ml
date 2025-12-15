@@ -20,7 +20,9 @@ let create
 exception Model_action_AnnotationNone of t
 
 let annotation (x : t) : Model_note.annotation =
-  Option.cata (fun x -> x) (raise (Model_action_AnnotationNone x)) x.annotation
+  match x.annotation with
+  | None -> raise (Model_action_AnnotationNone x)
+  | Some y -> y
 ;;
 
 let hash (x : t) : int = Model_label.hash x.label
