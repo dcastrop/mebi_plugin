@@ -38,7 +38,7 @@ MeBi Set Weak Option label.
 MeBi Set FailIfIncomplete True.
 MeBi Set FailIfNotBisim True.
 (* MeBi See All.  *)
-(* MeBi Set ShowAny False. *)
+MeBi Set ShowAny False.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test1.Terms".

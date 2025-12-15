@@ -13,19 +13,19 @@ Require Import MEBI.Examples.bisimilarity.CADP.Glued.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.PluginTest".
 MeBi Reset All.
-(* MeBi Set ShowAny      True. *)
-(* MeBi Set ShowNotices  True. *)
-(* MeBi Set ShowDebug    True. *)
-(* MeBi Set ShowDetails  True. *)
-(* MeBi Set ShowResults  True. *)
-(* MeBi Set ShowWarnings True. *)
-MeBi Set Bound 100.
+MeBi Set ShowAny      True.
+MeBi Set ShowNotices  True.
+MeBi Set ShowDebug    True.
+MeBi Set ShowDetails  True.
+MeBi Set ShowResults  True.
+MeBi Set ShowWarnings True.
+(* MeBi Set Bound 100. *)
 MeBi Set WeakMode     True.
 MeBi Set Weak Option label.
 MeBi Set FailIfIncomplete True.
 MeBi Set FailIfNotBisim True.
 (* MeBi See All.  *)
-MeBi Set ShowAny False.
+(* MeBi Set ShowAny False. *)
 
 (* MeBi Set ShowDebug True. *)
 (* MeBi Set ShowDetails True. *)
