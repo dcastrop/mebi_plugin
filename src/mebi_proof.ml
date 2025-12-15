@@ -552,6 +552,7 @@ let do_constructor_transition
   let action : Action.t =
     get_action_to ~annotated:true nfrom nlabel goto (nfsm ~saturated:true ())
   in
+  Debug.thing (prefix "action") action (A Action.to_string);
   let annotation : Note.annotation = Action.annotation action in
   Debug.thing (prefix "annotation") annotation (A Note.annotation_to_string);
   set_the_proof_state

@@ -320,6 +320,7 @@ let get_actions_labelled
       (actions : States.t Actions.t)
   : Action.t list
   =
+  log_trace __FUNCTION__;
   try
     Actions.to_seq_keys actions
     |> List.of_seq
@@ -450,9 +451,11 @@ let get_actions_labelled_from
       (edges : States.t Actions.t Edges.t)
   : Action.t list
   =
+  log_trace __FUNCTION__;
   let prefix : string -> string = Printf.sprintf "%s %s" __FUNCTION__ in
   Debug.thing (prefix "x") x (A Label.to_string);
-  try Edges.find edges from |> get_actions_labelled ~annotated x with
+  let actions : States.t Actions.t = Edges.find edges from in
+  try get_actions_labelled ~annotated x actions with
   | Not_found -> raise (Model_NoActionLabelledFrom (annotated, from, x, edges))
   | Model_NoActionLabelled _ ->
     raise (Model_NoActionLabelledFrom (annotated, from, x, edges))
