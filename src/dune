@@ -21,6 +21,7 @@
   )
  (modules
   utils
+  logger
   rocq_utils
   rocq_convert
   logging

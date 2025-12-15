@@ -204,7 +204,8 @@ Module Test2.
 End Test2.
 
 MeBi Divider "Theories.Test.BisimTest1".
-(* MeBi Set FailIfNotBisim True. *)
+MeBi Set FailIfNotBisim True.
+MeBi Set WeakMode False.
 Module BisimTest1.
   Inductive action : Set := | TheAction1 | TheAction2.
 
@@ -316,9 +317,9 @@ Module BisimTest1.
          Using termLTS.
 
   (* saturate *)
-  MeBi Saturate 
+  (* MeBi Saturate 
     (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))) 
-    Using termLTS.
+    Using termLTS. *)
 
   (* minimize *)
   MeBi Minimize 
@@ -327,7 +328,7 @@ Module BisimTest1.
 End BisimTest1.
 
 MeBi Divider "Theories.Test.BisimTest2".
-(* MeBi Set FailIfNotBisim True. *)
+MeBi Set FailIfNotBisim True.
 Module BisimTest2.
   Inductive action : Set := | TAU | TheAction1 | TheAction2.
 
@@ -392,7 +393,7 @@ Module BisimTest2.
 End BisimTest2.
 
 MeBi Divider "Theories.Test.BisimTest3".
-(* MeBi Set FailIfNotBisim True. *) 
+MeBi Set FailIfNotBisim True. 
 Module BisimTest3.
   Inductive action : Set := | TheAction1 | TheAction2.
 

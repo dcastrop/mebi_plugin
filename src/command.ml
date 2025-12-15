@@ -3,6 +3,10 @@ open Mebi_wrapper.Syntax
 open Logging
 open Model
 
+(* the prefix *)
+let trace_enabled : bool = true
+let log_trace (x : string) : unit = if trace_enabled then Log.trace x else ()
+
 (** [GraphB] is ...
     (Essentially acts as a `.mli` for the [MkGraph] module.) *)
 module type GraphB = sig
@@ -223,7 +227,7 @@ module MkGraph
       let* is_silent : bool option = is_silent_transition weak_type act in
       let label : Label.t = { enc = act_enc; is_silent; pp = None } in
       let constructor_trees : Mebi_constr.Tree.t list = [ int_tree ] in
-      let to_add : Action.t = { label; constructor_trees; annotations = [] } in
+      let to_add : Action.t = Action.create label ~constructor_trees () in
       Logging.Log.debug
         (Printf.sprintf
            "get_new_states, A transitions:\n%s"
@@ -458,7 +462,7 @@ module MkGraph
         ?(cache_decoding : bool = false)
         (acc_trans : Transitions.t)
         (from : State.t)
-        (action : Action.t)
+        ({ label; constructor_trees; _ } : Action.t)
         (dests : D.t)
     : Transitions.t mm
     =
@@ -475,12 +479,7 @@ module MkGraph
         let dest, constr_tree = List.nth raw_dests i in
         let* goto : State.t = decoq_state ~cache_decoding dest in
         let new_trans : Transition.t =
-          { from
-          ; label = action.label
-          ; goto
-          ; constructor_trees = Some action.constructor_trees
-          ; annotations = None
-          }
+          Transition.create from label goto ~constructor_trees ()
         in
         let acc_trans : Transitions.t = Transitions.add new_trans acc_trans in
         return acc_trans
@@ -629,7 +628,7 @@ let build_lts_graph
       (refs : Libnames.qualid list)
   : Lts.t mm
   =
-  Log.debug "command.run.build_lts_graph";
+  log_trace __FUNCTION__;
   let* graphM : (module GraphB) = make_graph_builder in
   let module G = (val graphM) in
   let* graph_lts =
@@ -657,6 +656,7 @@ let build_fsm
       (refs : Libnames.qualid list)
   : Fsm.t mm
   =
+  log_trace __FUNCTION__;
   let* the_lts =
     build_lts_graph primary_lts t (Params.get_fst_params ()) refs
   in
@@ -665,6 +665,11 @@ let build_fsm
   let the_fsm = Fsm.of_model (Lts.to_model the_lts) in
   Log.details
     (Printf.sprintf "command.build_fsm, fsm:\n%s\n" (Fsm.to_string the_fsm));
+  Log.debug "post fsm";
+  Log.debug
+    (Printf.sprintf "%s, weakmode: %b" __FUNCTION__ !Params.the_weak_mode);
+  Log.debug (Printf.sprintf "%s, minimize: %b" __FUNCTION__ minimize);
+  Log.debug (Printf.sprintf "%s, saturate: %b" __FUNCTION__ saturate);
   if minimize
   then (
     let the_minimized_fsm, _bisim_states =
@@ -798,6 +803,7 @@ let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
   Log.trace "command.check_bisimilarity";
   let* the_fsm_1 = build_fsm a x (Params.get_fst_params ()) refs in
   let* the_fsm_2 = build_fsm b y (Params.get_fst_params ()) refs in
+  Log.trace "command.check_bisimilarity B";
   let the_bisimilar =
     Algorithms.Bisimilar.run ~weak:!Params.the_weak_mode (the_fsm_1, the_fsm_2)
   in

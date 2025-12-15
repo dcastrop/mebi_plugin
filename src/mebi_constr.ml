@@ -46,6 +46,20 @@ module Tree = struct
                (minimize h))
   ;;
 
+  exception Mebi_constr_Tree_EmptyList of unit
+
+  let min : t list -> node list = function
+    | [] -> raise (Mebi_constr_Tree_EmptyList ())
+    | h :: tl ->
+      List.map minimize tl
+      |> List.fold_left
+           (fun the_min y ->
+             match Int.compare (List.length y) (List.length the_min) with
+             | -1 -> y
+             | _ -> the_min)
+           (minimize h)
+  ;;
+
   let to_string ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
     : t -> string
     =
