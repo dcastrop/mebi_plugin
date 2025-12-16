@@ -8,21 +8,16 @@ Require Operators_Properties.
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.Proc.
 
-Import Flat.
-Import Flat.Simple.
+Import Layered.
 
-Example p : term := tfix (tseq (tpar (tact (send A) tend) 
-                                     (tact (recv A) tend)) trec).
+Example a1 : term := tfix (tseq (tact (send A) tend) trec).
+Example a2 : term := tfix (tseq (tact (recv A) tend) trec).
+Example b1 : term := tfix (tseq (tact (send B) tend) trec).
+Example b2 : term := tfix (tseq (tact (recv B) tend) trec).
 
-Example q : term := tfix (tseq (tpar (tact (recv A) tend) 
-                                     (tact (send A) tend)) 
-                               (tseq (tpar (tact (send A) tend) 
-                                           (tact (recv A) tend)) trec)).
-
-Example r : term := tseq (tpar (tact (recv A) tend) 
-                               (tact (send A) tend)) 
-                         (tfix (tseq (tpar (tact (send A) tend) 
-                                           (tact (recv A) tend)) trec)).
+Example p : comp := cpar (cpar (cprc a1) (cprc a2)) (cpar (cprc b1) (cprc b2)). 
+Example q : comp := cpar (cpar (cprc b2) (cprc a1)) (cpar (cprc a2) (cprc b1)). 
+Example r : comp := cpar (cpar (cpar (cprc a2) (cprc b1)) (cprc a1)) (cprc b2). 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.Terms".
 MeBi Reset All.
@@ -32,37 +27,42 @@ MeBi Set ShowDebug    True.
 MeBi Set ShowDetails  True.
 MeBi Set ShowResults  True.
 MeBi Set ShowWarnings True.
-(* MeBi Set Bound 100. *)
+MeBi Set Bound 1000.
 MeBi Set WeakMode     True.
 MeBi Set Weak Option label.
 MeBi Set FailIfIncomplete True.
 MeBi Set FailIfNotBisim True.
 (* MeBi See All.  *)
-MeBi Set ShowAny False.
+(* MeBi Set ShowAny False. *)
 
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test1.Terms".
+MeBi Divider "Examples.Bisimilarity.Proc.Test3.Terms".
 
-MeBi FSM p Using termLTS. MeBi Saturate p Using termLTS.
-MeBi FSM q Using termLTS. MeBi Saturate q Using termLTS.
-MeBi FSM r Using termLTS. MeBi Saturate r Using termLTS.
+MeBi FSM p Using compLTS termLTS. 
+MeBi Saturate p Using compLTS termLTS.
+
+MeBi FSM q Using compLTS termLTS. 
+MeBi Saturate q Using compLTS termLTS.
+
+MeBi FSM r Using compLTS termLTS. 
+MeBi Saturate r Using compLTS termLTS.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.Bisim.pq".
 
-MeBi Bisim p With termLTS And q With termLTS Using termLTS.
-MeBi Bisim q With termLTS And p With termLTS Using termLTS.
+MeBi Bisim p With compLTS And q With compLTS Using compLTS termLTS.
+MeBi Bisim q With compLTS And p With compLTS Using compLTS termLTS.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.Bisim.qr".
 
-MeBi Bisim q With termLTS And r With termLTS Using termLTS.
-MeBi Bisim r With termLTS And q With termLTS Using termLTS.
+MeBi Bisim q With compLTS And r With compLTS Using compLTS termLTS.
+MeBi Bisim r With compLTS And q With compLTS Using compLTS termLTS.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.Bisim.pr".
 
-MeBi Bisim p With termLTS And r With termLTS Using termLTS.
-MeBi Bisim r With termLTS And p With termLTS Using termLTS.
+MeBi Bisim p With compLTS And r With compLTS Using compLTS termLTS.
+MeBi Bisim r With compLTS And p With compLTS Using compLTS termLTS.
 
 
