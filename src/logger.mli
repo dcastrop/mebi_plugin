@@ -1,5 +1,37 @@
 type level = Feedback.level
 
+val level_enabled_default_debug : bool
+val level_enabled_default_info : bool
+val level_enabled_default_notice : bool
+val level_enabled_default_warning : bool
+val level_enabled_default_error : bool
+val level_defaults : level -> bool
+
+type config = {
+  mutable output_enabled : bool;
+  _level_config : (level, bool) Hashtbl.t;
+  is_level_enabled : config * level -> bool;
+}
+
+val the_config : config ref
+val is_level_enabled_in_config : level -> bool
+val configure_level : level -> bool -> unit
+val reset_level : level -> unit
+val set_output_enabled : bool -> unit
+val reset_output_enabled : unit -> unit
+val enable_output : unit -> unit
+val disable_output : unit -> unit
+val set_debug : bool -> unit
+val set_info : bool -> unit
+val set_notice : bool -> unit
+val set_warning : bool -> unit
+val set_error : bool -> unit
+val reset_debug : unit -> unit
+val reset_info : unit -> unit
+val reset_notice : unit -> unit
+val reset_warning : unit -> unit
+val reset_error : unit -> unit
+
 val make_level_fun :
   ?debug:bool ->
   ?info:bool ->
