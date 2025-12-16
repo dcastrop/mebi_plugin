@@ -1,13 +1,80 @@
-(***********************************************************************)
-
 type level = Feedback.level
 
+let level_enabled_default_debug : bool = false
+let level_enabled_default_info : bool = false
+let level_enabled_default_notice : bool = true
+let level_enabled_default_warning : bool = true
+let level_enabled_default_error : bool = true
+
+let level_defaults : level -> bool = function
+  | Debug -> level_enabled_default_debug
+  | Info -> level_enabled_default_info
+  | Notice -> level_enabled_default_notice
+  | Warning -> level_enabled_default_warning
+  | Error -> level_enabled_default_error
+;;
+
+(***********************************************************************)
+
+type config =
+  { mutable output_enabled : bool
+  ; _level_config : (level, bool) Hashtbl.t
+  ; is_level_enabled : config * level -> bool
+  }
+
+let the_config : config ref =
+  ref
+    { output_enabled = true
+    ; _level_config = Hashtbl.create 0
+    ; is_level_enabled =
+        (fun ({ _level_config; _ }, level) ->
+          match Hashtbl.find_opt _level_config level with
+          | None -> level_defaults level
+          | Some x -> x)
+    }
+;;
+
+let is_level_enabled_in_config (y : level) : bool =
+  !the_config.is_level_enabled (!the_config, y)
+;;
+
+let configure_level (y : level) (z : bool) : unit =
+  Hashtbl.add !the_config._level_config y z
+;;
+
+let reset_level (y : level) : unit =
+  Hashtbl.add !the_config._level_config y (level_defaults y)
+;;
+
+(***********************************************************************)
+
+let set_output_enabled (b : bool) : unit = !the_config.output_enabled <- b
+let reset_output_enabled () : unit = !the_config.output_enabled <- true
+let enable_output () : unit = set_output_enabled true
+let disable_output () : unit = set_output_enabled false
+
+(* set *)
+let set_debug : bool -> unit = configure_level Debug
+let set_info : bool -> unit = configure_level Info
+let set_notice : bool -> unit = configure_level Notice
+let set_warning : bool -> unit = configure_level Warning
+let set_error : bool -> unit = configure_level Error
+
+(* reset *)
+let reset_debug () : unit = reset_level Debug
+let reset_info () : unit = reset_level Info
+let reset_notice () : unit = reset_level Notice
+let reset_warning () : unit = reset_level Warning
+let reset_error () : unit = reset_level Error
+
+(***********************************************************************)
+
 let make_level_fun
-      ?(debug : bool = false)
-      ?(info : bool = false)
-      ?(notice : bool = true)
-      ?(warning : bool = true)
-      ?(error : bool = true)
+      ?(debug : bool = level_enabled_default_debug)
+      ?(info : bool = level_enabled_default_info)
+      ?(notice : bool = level_enabled_default_notice)
+      ?(warning : bool = level_enabled_default_warning)
+      ?(error : bool = level_enabled_default_error)
       ()
   : level -> bool
   =
@@ -19,6 +86,8 @@ let make_level_fun
   | Warning -> warning
   | Error -> error
 ;;
+
+(***********************************************************************)
 
 let level_fun_preset_debug ?(trace : bool = false) () =
   make_level_fun ~debug:true ~info:trace ()
@@ -189,8 +258,8 @@ module Make (O : Output.OUTPUT_TYPE) (X : S) : LOGGER_TYPE = struct
   let enabled : bool ref = ref true
   let prefix : string option = X.prefix
 
-  let is_level_enabled : level -> bool =
-    if !enabled then X.is_level_enabled else fun _ -> false
+  let is_level_enabled (x : level) : bool =
+    !enabled && is_level_enabled_in_config x && X.is_level_enabled x
   ;;
 
   let do_feedback_output
