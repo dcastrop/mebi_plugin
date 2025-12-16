@@ -7,7 +7,7 @@ Require Operators_Properties.
 
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.CADP.
-Import Protocol.
+Import Protocol. 
 
 Require Import MEBI.Examples.CADP_Glued.
 

@@ -1,5 +1,3 @@
-val default_debug : bool
-val debugerr : bool
 
 type constructor_args = {
   lhs : Evd.econstr;
@@ -52,7 +50,6 @@ module Pair : sig
     unit
 
   val w_unify :
-    ?debug:bool ->
     Environ.env ->
     Evd.evar_map ->
     Evd.econstr ->
@@ -60,7 +57,6 @@ module Pair : sig
     Evd.evar_map * bool
 
   val unify :
-    ?debug:bool ->
     Environ.env ->
     Evd.evar_map ->
     t ->
@@ -70,7 +66,7 @@ end
 module Problem : sig
   type t = {
     act : Pair.t;
-    dest : Pair.t;
+    goto : Pair.t;
     tree : Mebi_constr.Tree.t;
   }
 
@@ -82,10 +78,9 @@ module Problem : sig
     string
 
   val unify_pair_opt :
-    ?debug:bool -> Pair.t -> bool Mebi_wrapper.mm
+    Pair.t -> bool Mebi_wrapper.mm
 
   val unify_opt :
-    ?debug:bool ->
     t ->
     Mebi_constr.Tree.t option Mebi_wrapper.mm
 end
@@ -107,12 +102,10 @@ module Problems : sig
     string
 
   val unify_list_opt :
-    ?debug:bool ->
     Problem.t list ->
     Mebi_constr.Tree.t list option Mebi_wrapper.mm
 
   val sandbox_unify_all_opt :
-    ?debug:bool ->
     Evd.econstr ->
     Evd.econstr ->
     t ->
@@ -132,7 +125,6 @@ module Constructors : sig
     string
 
   val retrieve :
-    ?debug:bool ->
     int ->
     t ->
     Evd.econstr ->

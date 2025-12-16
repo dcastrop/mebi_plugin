@@ -33,7 +33,11 @@ module Output : sig
     val output_type_as_string : string
 
     val get_output_fun :
-      ?prefix:string option -> level -> string -> unit
+      ?__FUNCTION__:string ->
+      ?prefix:string option ->
+      level ->
+      string ->
+      unit
   end
 
   module Make : (_ : S) -> OUTPUT_TYPE

@@ -7,6 +7,7 @@ Require Operators_Properties.
 
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.CADP.
+Require Import MEBI.Examples.CADP_Glued.
 
 Require Import MEBI.Examples.bisimilarity.CADP.Size2.Terms.
 

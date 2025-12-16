@@ -1,46 +1,44 @@
 (* TODO: rename to [unifification_structs] since the mebi_wrapper isn't used here *)
 
-open Logging
+(* open Logging *)
 open Mebi_wrapper
 open Mebi_wrapper.Syntax
+module Tree = Mebi_constr.Tree
 
-let default_debug : bool = true
-let debugerr : bool = true
+module UnifLog : Logger.LOGGER_TYPE =
+  Logger.Make
+    (Logger.Output.Rocq)
+    (struct
+      let prefix : string option = None
+
+      let is_level_enabled : Logger.level -> bool =
+        Logger.make_level_fun ~debug:false ~info:false ~error:false ()
+      ;;
+    end)
+
+let debug_econstr
+      ?(__FUNCTION__ : string = "")
+      (prefix : string)
+      (x : EConstr.t)
+  : unit mm
+  =
+  state (fun env sigma ->
+    UnifLog.thing
+      ~__FUNCTION__
+      Debug
+      prefix
+      x
+      (Args (Rocq_utils.Strfy.econstr env sigma));
+    sigma, ())
+;;
+
+(***********************************************************************)
 
 type constructor_args =
   { lhs : EConstr.t
   ; act : EConstr.t
   ; rhs : EConstr.t
   }
-
-(* module Constructor_arg = struct
-  module Fresh = struct
-    type t =
-      { sigma : Evd.evar_map
-      ; evar : EConstr.t
-      ; original : EConstr.t
-      }
-
-    let get_next (env : Environ.env) (sigma : Evd.evar_map) (x : EConstr.t)
-      : Evd.evar_map * t
-      =Rocq_utils.get_next env sigma (TypeOf x) in
-    ;;
-  end
-
-  type t =
-    | Normal of EConstr.t
-    | Fresh of Fresh.t
-
-  let to_string env sigma' : t -> string = function
-    | Normal x ->
-      Printf.sprintf "(Normal: %s)" (Rocq_utils.Strfy.econstr env sigma' x)
-    | Fresh { sigma; evar; original } ->
-      Printf.sprintf
-        "(Fresh: %s) (Original: %s)"
-        (Rocq_utils.Strfy.econstr env sigma evar)
-        (Rocq_utils.Strfy.econstr env sigma' original)
-  ;;
-end *)
 
 module Pair = struct
   (** [fst] is a term (e.g., destination) that we want to check unifies with [snd] (which we have already reached).
@@ -57,6 +55,7 @@ module Pair = struct
         ({ a; b } : t)
     : string
     =
+    UnifLog.trace __FUNCTION__;
     let f = Rocq_utils.Strfy.econstr env sigma in
     let g = Utils.Strfy.tuple ~args Utils.Strfy.string f in
     let a : string = g ("a", a) in
@@ -64,26 +63,19 @@ module Pair = struct
     Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string (a, b)
   ;;
 
-  (* let _debug_fresh env sigma sigma' fresh a b : unit =
-     let fstr : string = Rocq_utils.Strfy.econstr env sigma' fresh in
-     let astr : string = Rocq_utils.Strfy.econstr env sigma a in
-     let bstr : string = Rocq_utils.Strfy.econstr env sigma b in
-     Logging.Log.debug
-     (Printf.sprintf
-     "created new fresh a: %s\nto replace a: %s\npaired with b: %s"
-     fstr
-     astr
-     bstr)
-     ;; *)
-
   let fresh env sigma (a : EConstr.t) (b : EConstr.t) : Evd.evar_map * t =
+    UnifLog.trace __FUNCTION__;
     let sigma, a = Rocq_utils.get_next env sigma (TypeOf a) in
     sigma, { a; b }
   ;;
 
-  let normal (a : EConstr.t) (b : EConstr.t) : t = { a; b }
+  let normal (a : EConstr.t) (b : EConstr.t) : t =
+    UnifLog.trace __FUNCTION__;
+    { a; b }
+  ;;
 
   let make env sigma (a : EConstr.t) (b : EConstr.t) : Evd.evar_map * t =
+    UnifLog.trace __FUNCTION__;
     if EConstr.isEvar sigma a then fresh env sigma a b else sigma, normal a b
   ;;
 
@@ -94,14 +86,13 @@ module Pair = struct
         a
         b
     =
+    UnifLog.trace __FUNCTION__;
     let f = Rocq_utils.Strfy.econstr env sigma in
     let g = Utils.Strfy.tuple ~args Utils.Strfy.string f in
     let a : string = g ("a", a) in
     let b : string = g ("b", b) in
-    let s =
-      Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string (a, b)
-    in
-    Log.debug (Printf.sprintf "unified:\n%s" s)
+    Of (Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string)
+    |> UnifLog.thing ~__FUNCTION__ Debug "unified" (a, b)
   ;;
 
   let debug_unifyerr
@@ -113,52 +104,51 @@ module Pair = struct
         c
         d
     =
+    UnifLog.trace __FUNCTION__;
     let f = Rocq_utils.Strfy.econstr env sigma in
-    let s1 = Printf.sprintf "cannot unify \"%s\" with \"%s\"" (f c) (f d) in
     let g = Utils.Strfy.tuple ~args Utils.Strfy.string f in
     let a : string = g ("a", a) in
     let b : string = g ("b", b) in
-    let s2 =
-      Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string (a, b)
-    in
-    Log.debug (Printf.sprintf "%s:\n%s" s1 s2)
+    Of (Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string)
+    |> UnifLog.thing ~__FUNCTION__ Error "tried to unify" (a, b);
+    Printf.sprintf "cannot unify \"%s\" with \"%s\"" (f c) (f d)
+    |> UnifLog.error ~__FUNCTION__
   ;;
 
-  let w_unify
-        ?(debug : bool = default_debug)
-        env
-        sigma
-        (a : EConstr.t)
-        (b : EConstr.t)
-    : Evd.evar_map * bool
-    =
+  let w_unify env sigma (a : EConstr.t) (b : EConstr.t) : Evd.evar_map * bool =
+    UnifLog.trace __FUNCTION__;
     let open Pretype_errors in
     try
-      Logging.Log.debug "UW 0: ENTER";
       let sigma = Unification.w_unify env sigma Conversion.CUMUL a b in
       sigma, true
     with
     | PretypeError (_, _, CannotUnify (c, d, _e)) ->
-      Logging.Log.debug "UW 0: ERR";
-      if debug || debugerr then debug_unifyerr env sigma a b c d;
+      UnifLog.error ~__FUNCTION__ "PretypeError";
+      debug_unifyerr env sigma a b c d;
       sigma, false
   ;;
 
   (** [unify a b] tries to unify [a] and [b] within the context of the [env] and [sigma] of [mm]. @returns [true] if successful, [false] otherwise. *)
-  let unify ?(debug : bool = default_debug) env sigma ({ a; b } : t)
-    : Evd.evar_map * bool
-    =
-    Logging.Log.debug "UF 0: ENTER";
-    w_unify ~debug env sigma a b
+  let unify env sigma ({ a; b } : t) : Evd.evar_map * bool =
+    UnifLog.trace __FUNCTION__;
+    w_unify env sigma a b
   ;;
 end
+
+let debug_pair ?(__FUNCTION__ : string = "") (prefix : string) (x : Pair.t)
+  : unit mm
+  =
+  state (fun env sigma ->
+    UnifLog.thing ~__FUNCTION__ Debug prefix x (Args (Pair.to_string env sigma));
+    sigma, ())
+;;
 
 module Problem = struct
   (** if [fst] is sucessfully unified then [snd] represents a tree of constructors that lead to that term (from some previously visited term).
   *)
   type t =
     { act : Pair.t
-    ; dest : Pair.t
+    ; goto : Pair.t
     ; tree : Mebi_constr.Tree.t
     }
 
@@ -166,51 +156,38 @@ module Problem = struct
         env
         sigma
         ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-        ({ act; dest; tree } : t)
+        ({ act; goto; tree } : t)
     : string
     =
+    UnifLog.trace __FUNCTION__;
     let open Utils.Strfy in
     let args : style_args =
       { args with name = None; style = Some (tuple_style ()) }
     in
     let f = Pair.to_string env sigma ~args:(nest args) in
-    let act = f act in
-    let dest = f dest in
-    let tree = Mebi_constr.Tree.to_string ~args:(nest args) tree in
+    let act : string = f act in
+    let goto : string = f goto in
+    let tree : string = Tree.to_string ~args:(nest args) tree in
     let args : style_args = { args with style = Some (record_style ()) } in
-    Utils.Strfy.record ~args [ "act", act; "dest", dest; "tree", tree ]
+    Utils.Strfy.record ~args [ "act", act; "goto", goto; "tree", tree ]
   ;;
 
-  let unify_pair_opt ?(debug : bool = default_debug) (pair : Pair.t) : bool mm =
-    state (fun env sigma -> Pair.unify ~debug env sigma pair)
+  let unify_pair_opt (pair : Pair.t) : bool mm =
+    UnifLog.trace __FUNCTION__;
+    state (fun env sigma -> Pair.unify env sigma pair)
   ;;
 
-  let unify_opt ?(debug : bool = default_debug)
-    : t -> Mebi_constr.Tree.t option mm
-    =
-    Logging.Log.debug "UO 0: ENTER";
-    function
-    | { act; dest; tree } ->
-      Logging.Log.debug "UO 1: ENTER";
-      let* () =
-        state (fun env sigma ->
-          let s : string = Pair.to_string env sigma act in
-          Logging.Log.debug (Printf.sprintf "unify_opt act: %s" s);
-          sigma, ())
-      in
-      let* () =
-        state (fun env sigma ->
-          let s : string = Pair.to_string env sigma dest in
-          Logging.Log.debug (Printf.sprintf "unify_opt dest: %s" s);
-          sigma, ())
-      in
-      let* unified_act_opt = unify_pair_opt ~debug act in
-      Logging.Log.debug "UO 2: ENTER";
-      let* unified_dest_opt = unify_pair_opt ~debug dest in
-      Logging.Log.debug "UO 3: ENTER";
-      (match unified_act_opt, unified_dest_opt with
-       | true, true -> return (Some tree)
-       | _, _ -> return None)
+  let unify_opt ({ act; goto; tree } : t) : Mebi_constr.Tree.t option mm =
+    UnifLog.trace __FUNCTION__;
+    let* () = debug_pair ~__FUNCTION__ "act" act in
+    let* () = debug_pair ~__FUNCTION__ "goto" goto in
+    let* unified_act_opt = unify_pair_opt act in
+    UnifLog.trace ~__FUNCTION__ "unified act opt";
+    let* unified_goto_opt = unify_pair_opt goto in
+    UnifLog.trace ~__FUNCTION__ "unified goto opt";
+    match unified_act_opt, unified_goto_opt with
+    | true, true -> return (Some tree)
+    | _, _ -> return None
   ;;
 end
 
@@ -221,34 +198,37 @@ module Problems = struct
     }
 
   let empty () : t mm =
+    UnifLog.trace __FUNCTION__;
     let* sigma = get_sigma in
     return { sigma; to_unify = [] }
   ;;
 
-  let is_empty : t -> bool = function
-    | { to_unify = []; _ } -> true
-    | _ -> false
+  let is_empty : t -> bool =
+    UnifLog.trace __FUNCTION__;
+    function { to_unify = []; _ } -> true | _ -> false
   ;;
 
-  let list_is_empty : t list -> bool = function
-    | [] -> true
-    | [ p ] -> is_empty p
-    | _ -> false
+  let list_is_empty : t list -> bool =
+    UnifLog.trace __FUNCTION__;
+    function [] -> true | [ p ] -> is_empty p | _ -> false
   ;;
 
-  let to_string env ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-    : t -> string
-    = function
-    | { sigma; to_unify } ->
-      let open Utils.Strfy in
-      list
-        ~args:
-          { (nest args) with
-            style = Some (list_style ())
-          ; name = Some "unification problems"
-          }
-        (Problem.to_string env sigma)
-        to_unify
+  let to_string
+        env
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+        ({ sigma; to_unify } : t)
+    : string
+    =
+    UnifLog.trace __FUNCTION__;
+    let open Utils.Strfy in
+    list
+      ~args:
+        { (nest args) with
+          style = Some (list_style ())
+        ; name = Some "unification problems"
+        }
+      (Problem.to_string env sigma)
+      to_unify
   ;;
 
   let list_to_string
@@ -256,6 +236,7 @@ module Problems = struct
         ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
     : t list -> string
     =
+    UnifLog.trace __FUNCTION__;
     let open Utils.Strfy in
     list
       ~args:
@@ -266,90 +247,63 @@ module Problems = struct
       (to_string env)
   ;;
 
-  let rec unify_list_opt ?(debug : bool = default_debug)
-    : Problem.t list -> Mebi_constr.Tree.t list option mm
-    =
-    Logging.Log.debug "UP 0: ENTER";
+  let rec unify_list_opt : Problem.t list -> Mebi_constr.Tree.t list option mm =
+    UnifLog.trace __FUNCTION__;
     function
     | [] ->
-      Logging.Log.debug (Printf.sprintf "UP 1: RETURN");
+      UnifLog.trace ~__FUNCTION__ "return";
       return (Some [])
     | h :: tl ->
-      let* success_opt = Problem.unify_opt ~debug h in
+      let* success_opt = Problem.unify_opt h in
       (match success_opt with
        | None ->
-         Logging.Log.debug (Printf.sprintf "UP 2.1: NONE");
+         UnifLog.trace ~__FUNCTION__ "unify success opt -> None";
          return None
        | Some constructor_tree ->
-         let* unified_opt = unify_list_opt ~debug tl in
+         UnifLog.trace ~__FUNCTION__ "unify success opt -> Some tree";
+         let* unified_opt = unify_list_opt tl in
          (match unified_opt with
           | None ->
-            Logging.Log.debug (Printf.sprintf "UP 2.2: NONE");
+            UnifLog.trace ~__FUNCTION__ "tail unify success opt -> None";
             return None
           | Some acc ->
-            Logging.Log.debug (Printf.sprintf "UP 2.3: RETURN");
+            UnifLog.trace ~__FUNCTION__ "tail unify success opt -> Some acc";
             return (Some (constructor_tree :: acc))))
   ;;
 
   let sandbox_unify_all_opt
-        ?(debug : bool = default_debug)
         (act : EConstr.t)
-        (dest : EConstr.t)
-    : t -> (EConstr.t * EConstr.t * Mebi_constr.Tree.t list) option mm
+        (goto : EConstr.t)
+        ({ sigma = psigma; to_unify } : t)
+    : (EConstr.t * EConstr.t * Mebi_constr.Tree.t list) option mm
     =
-    Logging.Log.debug "SB 0: ENTER";
-    function
-    | { sigma = psigma; to_unify } ->
-      Logging.Log.debug "SB 0.1: ENTER";
-      let* () =
-        state (fun env sigma ->
-          let s : string = Rocq_utils.Strfy.econstr env sigma act in
-          Logging.Log.debug (Printf.sprintf "sandbox act: %s" s);
-          sigma, ())
-      in
-      let* () =
-        state (fun env sigma ->
-          let s : string = Rocq_utils.Strfy.econstr env sigma dest in
-          Logging.Log.debug (Printf.sprintf "sandbox dest: %s" s);
-          sigma, ())
-      in
-      sandbox
-        ~using:psigma
-        (Logging.Log.debug "SB 0.2: ENTER";
-         let* unified_opt = unify_list_opt ~debug to_unify in
-         Logging.Log.debug "SB 0.3: ENTER";
-         match unified_opt with
-         | None ->
-           Logging.Log.debug
-             (Printf.sprintf "SB 1: NONE %i" (List.length to_unify));
-           return None
-         | Some constructor_trees ->
-           Logging.Log.debug
-             (Printf.sprintf
-                "SB 2.0.1:\nact: %s\ndest: %s"
-                (econstr_to_string act)
-                (econstr_to_string dest));
-           let$+ act env sigma = Reductionops.nf_all env sigma act in
-           let$+ dest env sigma = Reductionops.nf_all env sigma dest in
-           (* let* env = get_env in
-              let act = Reductionops.nf_all env psigma act in
-              let dest = Reductionops.nf_all env psigma dest in *)
-           Logging.Log.debug
-             (Printf.sprintf
-                "SB 2.0.2:\nact: %s\ndest: %s"
-                (econstr_to_string act)
-                (econstr_to_string dest));
-           let$+ is_act_undefined _ sigma = EConstr.isEvar sigma act in
-           let$+ is_dest_undefined _ sigma = EConstr.isEvar sigma dest in
-           if is_act_undefined && is_dest_undefined
-           then (
-             Logging.Log.debug
-               (Printf.sprintf "SB 2.1: NONE %i" (List.length to_unify));
-             return None)
-           else (
-             Logging.Log.debug
-               (Printf.sprintf "SB 2.2: RETURN %i" (List.length to_unify));
-             return (Some (act, dest, constructor_trees))))
+    UnifLog.trace __FUNCTION__;
+    let* () = debug_econstr ~__FUNCTION__ "act" act in
+    let* () = debug_econstr ~__FUNCTION__ "goto" goto in
+    sandbox
+      ~using:psigma
+      (let* unified_opt = unify_list_opt to_unify in
+       match unified_opt with
+       | None ->
+         UnifLog.trace ~__FUNCTION__ "unified opt -> None";
+         return None
+       | Some constructor_trees ->
+         UnifLog.trace ~__FUNCTION__ "unified opt -> Some trees";
+         let* () = debug_econstr ~__FUNCTION__ "(unified) act" act in
+         let* () = debug_econstr ~__FUNCTION__ "(unified) goto" goto in
+         let$+ act env sigma = Reductionops.nf_all env sigma act in
+         let$+ goto env sigma = Reductionops.nf_all env sigma goto in
+         let* () = debug_econstr ~__FUNCTION__ "(nf) act" act in
+         let* () = debug_econstr ~__FUNCTION__ "(nf) goto" goto in
+         let$+ is_act_undefined _ sigma = EConstr.isEvar sigma act in
+         let$+ is_goto_undefined _ sigma = EConstr.isEvar sigma goto in
+         if is_act_undefined && is_goto_undefined
+         then (
+           UnifLog.debug ~__FUNCTION__ "act or goto is undefined (return None)";
+           return None)
+         else (
+           UnifLog.debug ~__FUNCTION__ "return Some (act, goto, trees)";
+           return (Some (act, goto, constructor_trees))))
   ;;
 end
 
@@ -362,59 +316,53 @@ module Constructors = struct
         ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
     : t -> string
     =
+    UnifLog.trace __FUNCTION__;
     Utils.Strfy.list ~args (Mebi_constr.to_string env sigma)
   ;;
 
   let rec retrieve
-            ?(debug : bool = default_debug)
             (constructor_index : int)
             (acc : t)
             (act : EConstr.t)
             (tgt : EConstr.t)
     : Enc.t * Problems.t list -> t mm
     =
-    Logging.Log.debug "RT 0: ENTER";
+    UnifLog.trace __FUNCTION__;
     function
     | _, [] ->
-      Logging.Log.debug (Printf.sprintf "RT 1: RETURN %i" (List.length acc));
+      UnifLog.trace ~__FUNCTION__ "return";
       return acc
     | lts_enc, problems :: tl ->
-      Logging.Log.debug (Printf.sprintf "RT 2: ENTER %i" (List.length acc));
-      let* acc = retrieve ~debug constructor_index acc act tgt (lts_enc, tl) in
+      UnifLog.trace ~__FUNCTION__ (Printf.sprintf "(rem %i)" (List.length acc));
+      let* acc = retrieve constructor_index acc act tgt (lts_enc, tl) in
       let* constructor_opt : Mebi_constr.t option =
         sandbox
-          (let* success =
-             Problems.sandbox_unify_all_opt ~debug act tgt problems
-           in
+          (let* success = Problems.sandbox_unify_all_opt act tgt problems in
            match success with
            | None ->
-             (* Logging.Log.debug
-               (Printf.sprintf "RT 2.1: NONE %i" (List.length acc)); *)
-             (* retrieve ~debug constructor_index acc act tgt (lts_enc, tl) *)
+             UnifLog.trace ~__FUNCTION__ "success -> None. return None";
              return None
-           | Some (act, dest, constructor_trees) ->
+           | Some (act, goto, constructor_trees) ->
              let open Mebi_constr.Tree in
              let tree =
                Node ((lts_enc, constructor_index), constructor_trees)
              in
-             let constructor = act, dest, tree in
+             let constructor = act, goto, tree in
+             UnifLog.trace ~__FUNCTION__ "success -> Some. return constructor";
              return (Some constructor))
       in
       (match constructor_opt with
        | None ->
-         Logging.Log.debug (Printf.sprintf "RT 2.1: NONE %i" (List.length acc));
+         UnifLog.trace ~__FUNCTION__ "constructor -> None. (cont.)";
          (* retrieve ~debug constructor_index acc act tgt (lts_enc, tl) *)
          return acc
        | Some constructor ->
-         let act, dest, tree = constructor in
+         UnifLog.trace ~__FUNCTION__ "constructor -> Some. (cont.)";
+         let act, goto, tree = constructor in
          let acc = constructor :: acc in
-         Logging.Log.debug (Printf.sprintf "RT 2.2: SOME %i" (List.length acc));
-         Logging.Log.debug
-           (Printf.sprintf
-              "RT 2.3:\nact: %s\ndest: %s\ntree: %s"
-              (econstr_to_string act)
-              (econstr_to_string dest)
-              (Mebi_constr.Tree.to_string tree));
+         let* () = debug_econstr ~__FUNCTION__ "act" act in
+         let* () = debug_econstr ~__FUNCTION__ "goto" goto in
+         UnifLog.thing ~__FUNCTION__ Debug "tree" tree (Args Tree.to_string);
          (* retrieve ~debug constructor_index acc act tgt (lts_enc, tl) *)
          return acc)
   ;;
