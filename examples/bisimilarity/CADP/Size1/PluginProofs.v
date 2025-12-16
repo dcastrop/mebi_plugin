@@ -7,6 +7,7 @@ Require Operators_Properties.
 
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.CADP.
+Require Import MEBI.Examples.CADP_Glued.
 
 Require Import MEBI.Examples.bisimilarity.CADP.Size1.Terms.
 
@@ -24,7 +25,7 @@ MeBi Set Weak Option label.
 MeBi Set FailIfIncomplete True.
 MeBi Set FailIfNotBisim True.
 (* MeBi See All.  *)
-MeBi Set ShowAny False.
+(* MeBi Set ShowAny False. *)
 
 Require Import Logic.
 

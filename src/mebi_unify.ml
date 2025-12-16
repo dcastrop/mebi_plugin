@@ -1,4 +1,4 @@
-open Mebi_debug
+(* open Mebi_debug *)
 open Mebi_wrapper
 open Mebi_wrapper.Syntax
 open Mebi_unification
@@ -10,12 +10,9 @@ module UnifLog : Logger.LOGGER_TYPE =
       let prefix : string option = None
 
       let is_level_enabled : Logger.level -> bool =
-        Logger.level_fun_preset_debug ~trace:false ()
+        Logger.make_level_fun ~debug:false ()
       ;;
     end)
-
-let show_unification_debug : bool = false
-let show_extractargs_debug : bool = false
 
 (****************************************************************************)
 
@@ -36,8 +33,8 @@ let constr_to_problem args : Mebi_constr.t -> Problem.t =
   function
   | act, rhs, tree ->
     let act : Pair.t = { a = args.act; b = act } in
-    let dest : Pair.t = { a = args.rhs; b = rhs } in
-    { act; dest; tree }
+    let goto : Pair.t = { a = args.rhs; b = rhs } in
+    { act; goto; tree }
 ;;
 
 let map_problems args (constructors : Constructors.t) : Problems.t mm =
@@ -62,18 +59,12 @@ let cross_product (acc : Problems.t list) ({ sigma; to_unify } : Problems.t)
     acc
 ;;
 
-let try_unify_constructor_arg
-      ?(debug : bool = show_unification_debug)
-      (a : EConstr.t)
-      (b : EConstr.t)
-  : bool mm
-  =
+let try_unify_constructor_arg (a : EConstr.t) (b : EConstr.t) : bool mm =
   UnifLog.trace __FUNCTION__;
-  state (fun env sigma -> Pair.unify ~debug env sigma (Pair.normal a b))
+  state (fun env sigma -> Pair.unify env sigma (Pair.normal a b))
 ;;
 
 let try_unify_constructor_args
-      ?(debug : bool = show_unification_debug)
       (lhs : EConstr.t)
       (act : EConstr.t)
       (args : constructor_args)
@@ -127,7 +118,7 @@ let rec mk_ctx_substl (acc : EConstr.Vars.substl)
     mk_ctx_substl (vt :: acc) ts
 ;;
 
-let debug_extract_args name : constructor_args -> unit mm =
+(* let debug_extract_args name : constructor_args -> unit mm =
   UnifLog.trace __FUNCTION__;
   function
   | { lhs; act; rhs } ->
@@ -140,7 +131,7 @@ let debug_extract_args name : constructor_args -> unit mm =
         let () = Debug.Scope.return ~infix:"extract args" ~info:(Some m) () in
         sigma, ())
       else sigma, ())
-;;
+;; *)
 
 (** [extract_args ?substl term] returns an [EConstr.t] triple of arguments of an inductively defined LTS, e.g., [term -> option action -> term -> Prop].
     @param ?substl
@@ -159,7 +150,7 @@ let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
       let args = EConstr.of_constr_array args in
       let args = Array.map (EConstr.Vars.substl substl) args in
       let args = constructor_args args in
-      let* () = debug_extract_args _name args in
+      (* let* () = debug_extract_args _name args in *)
       return args)
     else (* TODO: err *) invalid_lts_args_length (Array.length args)
   | _ -> (* TODO: err *) invalid_lts_term_kind term
@@ -199,9 +190,9 @@ let rec check_valid_constructors
   =
   UnifLog.trace __FUNCTION__;
   let* from_term : EConstr.t = Mebi_utils.econstr_normalize from_term in
-  let* () = debug_validconstrs_start from_term in
+  (* let* () = debug_validconstrs_start from_term in *)
   let iter_body (i : int) (constructors : Constructors.t) =
-    let* () = debug_validconstrs_iter_start i constructors in
+    (* let* () = debug_validconstrs_iter_start i constructors in *)
     (* NOTE: extract args for constructor *)
     let (ctx, tm) : Constr.rel_context * Constr.t = transitions.(i) in
     let decls : Rocq_utils.econstr_decls = List.map EConstr.of_rel_decl ctx in
@@ -225,15 +216,15 @@ let rec check_valid_constructors
       in
       UnifLog.debug ~__FUNCTION__ "CVC constructors:";
       (* ! NOTE: here we obtain the successfully unified and distinct action and destination -- BUT as this is returned, we see that it is actually another evar and this then unifies incorrectly. *)
-      let* () = debug_constructors_mm constructors in
-      let* () = debug_validconstrs_iter_close i constructors in
+      (* let* () = debug_constructors_mm constructors in *)
+      (* let* () = debug_validconstrs_iter_close i constructors in *)
       return constructors)
     else
-      let* () = debug_validconstrs_iter_close i constructors in
+      (* let* () = debug_validconstrs_iter_close i constructors in *)
       return constructors
   in
   let* constructors = iterate 0 (Array.length transitions - 1) [] iter_body in
-  let* () = debug_validconstrs_close from_term constructors in
+  (* let* () = debug_validconstrs_close from_term constructors in *)
   return constructors
 
 (** *)
@@ -247,9 +238,9 @@ and explore_valid_constructor
   : Constructors.t mm
   =
   UnifLog.trace __FUNCTION__;
-  let* () =
+  (* let* () =
     debug_validconstrs_iter_success_start from_term (Some args.act) args
-  in
+  in *)
   (* NOTE: unpack and normalize [act] and [tgt] from [args] *)
   let tgt : EConstr.t = EConstr.Vars.substl substl args.rhs in
   let* tgt : EConstr.t = Mebi_utils.econstr_normalize tgt in
@@ -270,7 +261,7 @@ and explore_valid_constructor
       constructors
       next_constructor_problems
   in
-  let* () = debug_validconstrs_iter_success_close from_term (Some act) args in
+  (* let* () = debug_validconstrs_iter_success_close from_term (Some act) args in *)
   return constructors
 
 (* Should return a list of unification problems *)
@@ -284,7 +275,7 @@ and check_updated_ctx
   UnifLog.trace __FUNCTION__;
   function
   | [], [] ->
-    let* () = debug_updtcontext_return () in
+    (* let* () = debug_updtcontext_return () in *)
     return (Some (lts_enc, acc))
   | _hsubstl :: substl, t :: tl ->
     (* let* () = debug_updtcontext_start () in *)
@@ -316,9 +307,9 @@ and check_updated_ctx
              (* ! NOTE: *)
              (* let* () = debug_constructors_mm next_constructors in *)
              let* problems : Problems.t = map_problems args next_constructors in
-             let* () = debug_problems_mm problems in
+             (* let* () = debug_problems_mm problems in *)
              let acc : Problems.t list = cross_product acc problems in
-             let* () = debug_problems_list_mm acc in
+             (* let* () = debug_problems_list_mm acc in *)
              let* acc = check_updated_ctx lts_enc acc indmap (substl, tl) in
              return acc))
      | _ ->
@@ -340,30 +331,29 @@ and check_for_next_constructors
   UnifLog.trace __FUNCTION__;
   function
   | None ->
-    let* () = debug_nextconstrs_return () in
+    (* let* () = debug_nextconstrs_return () in *)
     return constructors
   | Some (next_lts_enc, next_problems) ->
-    let* () = debug_nextconstrs_start () in
+    (* let* () = debug_nextconstrs_start () in *)
     if Problems.list_is_empty next_problems
     then (
       UnifLog.debug ~__FUNCTION__ "CNC axiom";
       let* constructors =
         axiom_constructor outer_act tgt_term (next_lts_enc, i) constructors
       in
-      let* () = debug_nextconstrs_close next_problems None constructors in
+      (* let* () = debug_nextconstrs_close next_problems None constructors in *)
       return constructors)
     else (
       UnifLog.debug ~__FUNCTION__ "CNC premises";
       let* constructors : Mebi_constr.t list =
         Constructors.retrieve
-          ~debug:true
           i
           constructors
           outer_act
           tgt_term
           (next_lts_enc, next_problems)
       in
-      let* () = debug_nextconstrs_close next_problems None constructors in
+      (* let* () = debug_nextconstrs_close next_problems None constructors in *)
       return constructors)
 ;;
 
@@ -382,6 +372,6 @@ let collect_valid_constructors
     check_valid_constructors transitions indmap from_term fresh_evar lts_enc
   in
   (* .Log.notice "\n=/==/=/=/==/==="; *)
-  let* () = debug_constructors_mm constructors in
+  (* let* () = debug_constructors_mm constructors in *)
   return constructors
 ;;

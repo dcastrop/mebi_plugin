@@ -47,8 +47,8 @@ module type GraphB = sig
   val build_graph
     :  Libnames.qualid
     -> Constrexpr.constr_expr
-    -> Names.GlobRef.t list
     -> int * Params.WeakEnc.t option
+    -> Names.GlobRef.t list
     -> lts_graph mm
 
   (* val to_lts
@@ -80,7 +80,7 @@ module MkGraph
         let prefix : string option = None
 
         let is_level_enabled : Logger.level -> bool =
-          Logger.level_fun_preset_debug ~trace:false ()
+          Logger.make_level_fun ~debug:false ()
         ;;
       end)
 
@@ -371,8 +371,8 @@ module MkGraph
   let build_graph
         (primary_lts : Libnames.qualid)
         (tref : Constrexpr.constr_expr)
-        (grefs : Names.GlobRef.t list)
         ((bound, weak_type) : int * Params.WeakEnc.t option)
+        (grefs : Names.GlobRef.t list)
     : lts_graph mm
     =
     GraphLog.trace __FUNCTION__;
@@ -648,83 +648,98 @@ module Log : Logger.LOGGER_TYPE =
       let prefix : string option = None
 
       let is_level_enabled : Logger.level -> bool =
-        Logger.level_fun_preset_debug ~trace:false ()
+        Logger.make_level_fun ~debug:false ()
       ;;
     end)
 
 (** [make_graph_builder] is ... *)
 let make_graph_builder =
   Log.trace __FUNCTION__;
+  (* NOTE: hashtabl of terms to (edges) or (cindef) *)
   let* h = make_transition_tbl in
-  (* hashtabl of terms to (edges) or (cindef) *)
+  (* NOTE: set of states (econstr term) *)
   let* s = make_state_set in
-  (* set of states (econstr term) *)
+  (* NOTE: hashtabl mapping term type or cindef *)
   let* d = make_state_tree_pair_set in
-  (* hashtabl mapping term type or cindef *)
   let module G : GraphB = MkGraph ((val h)) ((val s)) ((val d)) in
   return (module G : GraphB)
 ;;
 
-let build_lts_graph
+(** expect exactly one [Info.mebi_info] and it should be complete *)
+let is_lts_complete ({ info; _ } : Lts.t) : bool =
+  Option.cata
+    (fun (xs : Info.mebi_info list) ->
+      match xs with
+      | [] -> false
+      | { is_complete; _ } :: [] -> is_complete
+      | _ :: _ -> false)
+    false
+    info.mebi_info
+;;
+
+(** *)
+let fail_if_incomplete (x : Lts.t) : unit mm =
+  Log.trace __FUNCTION__;
+  if !Params.the_fail_if_incomplete && Bool.not (is_lts_complete x)
+  then params_fail_if_incomplete ()
+  else return ()
+;;
+
+(** *)
+let build_lts
       (primary_lts : Libnames.qualid)
       (t : Constrexpr.constr_expr)
-      (params : int * Params.WeakEnc.t option)
       (refs : Libnames.qualid list)
+      (params : int * Params.WeakEnc.t option)
   : Lts.t mm
   =
   Log.trace __FUNCTION__;
   let* graphM : (module GraphB) = make_graph_builder in
   let module G = (val graphM) in
   let* graph_lts =
-    G.build_graph
-      primary_lts
-      t
-      (Mebi_utils.ref_list_to_glob_list (primary_lts :: refs))
-      params
+    Mebi_utils.ref_list_to_glob_list (primary_lts :: refs)
+    |> G.build_graph primary_lts t params
   in
+  Log.trace ~__FUNCTION__ "built lts graph";
   let* the_lts = G.decoq_lts ~cache_decoding:true graph_lts params in
-  (* Log.debug (Printf.sprintf "build_lts_graph, finished:\n%s" (Lts.pstr the_lts)); *)
-  if
-    !Params.the_fail_if_incomplete
-    && Bool.not (Queue.is_empty graph_lts.to_visit)
-  then params_fail_if_incomplete ()
-  else return the_lts
+  Log.trace ~__FUNCTION__ "converted lts graph to lts model";
+  let* () = fail_if_incomplete the_lts in
+  return the_lts
 ;;
 
+(** *)
 let build_fsm
       ?(saturate : bool = false)
       ?(minimize : bool = false)
       (primary_lts : Libnames.qualid)
       (t : Constrexpr.constr_expr)
-      (params : int * Params.WeakEnc.t option)
       (refs : Libnames.qualid list)
+      (params : int * Params.WeakEnc.t option)
   : Fsm.t mm
   =
   Log.trace __FUNCTION__;
-  let* the_lts =
-    build_lts_graph primary_lts t (Params.get_fst_params ()) refs
+  (* NOTE: build lts *)
+  let* the_lts = build_lts primary_lts t refs (Params.get_fst_params ()) in
+  Log.trace ~__FUNCTION__ "obtained lts model";
+  Log.thing ~__FUNCTION__ Info "lts" the_lts (Args Lts.to_string);
+  (* NOTE: convert to fsm *)
+  let the_fsm : Fsm.t = Fsm.of_model (Lts.to_model the_lts) in
+  Log.trace ~__FUNCTION__ "converted lts to fsm";
+  Log.thing ~__FUNCTION__ Info "fsm" the_fsm (Args Fsm.to_string);
+  (* NOTE: debug messages *)
+  let b : 'a Logger.to_string = Of Utils.Strfy.bool in
+  Log.thing ~__FUNCTION__ Debug "weakmode" !Params.the_weak_mode b;
+  Log.thing ~__FUNCTION__ Debug "minimize" minimize b;
+  Log.thing ~__FUNCTION__ Debug "saturate" saturate b;
+  (* NOTE: return fsm (and do any further operations) *)
+  let fsm_to_return : Fsm.t =
+    if minimize
+    then Algorithms.Minimize.run ~weak:!Params.the_weak_mode the_fsm |> fst
+    else if saturate
+    then Saturate.fsm the_fsm
+    else the_fsm
   in
-  Log.info ~__FUNCTION__ (Printf.sprintf "lts:\n%s\n" (Lts.to_string the_lts));
-  let the_fsm = Fsm.of_model (Lts.to_model the_lts) in
-  Log.result ~__FUNCTION__ (Printf.sprintf "fsm:\n%s\n" (Fsm.to_string the_fsm));
-  Log.debug "post fsm";
-  Log.debug
-    (Printf.sprintf "%s, weakmode: %b" __FUNCTION__ !Params.the_weak_mode);
-  Log.debug (Printf.sprintf "%s, minimize: %b" __FUNCTION__ minimize);
-  Log.debug (Printf.sprintf "%s, saturate: %b" __FUNCTION__ saturate);
-  if minimize
-  then (
-    let the_minimized_fsm, _bisim_states =
-      Algorithms.Minimize.run ~weak:!Params.the_weak_mode the_fsm
-    in
-    Log.info
-      (Printf.sprintf
-         "command.build_fsm, minimized & bisim states: %s\n"
-         (Algorithms.Minimize.to_string (the_minimized_fsm, _bisim_states)));
-    return the_minimized_fsm)
-  else if saturate
-  then return (Saturate.fsm the_fsm)
-  else return the_fsm
+  return fsm_to_return
 ;;
 
 (**********************)
@@ -747,133 +762,136 @@ type command_kind =
   | CheckBisimilarity of (coq_model * coq_model)
   | Info of unit
 
-let make_model args refs =
+let make_model refs
+  : model_kind * (Constrexpr.constr_expr * Libnames.qualid) -> unit mm
+  =
   Log.trace __FUNCTION__;
-  let* result_str : string * string =
-    match args with
-    | LTS, (x, primary_lts) ->
-      let* the_lts : Lts.t =
-        build_lts_graph primary_lts x (Params.get_fst_params ()) refs
-      in
-      return ("LTS", Lts.to_string the_lts)
-    | FSM, (x, primary_lts) ->
-      let* the_fsm : Fsm.t =
-        build_fsm primary_lts x (Params.get_fst_params ()) refs
-      in
-      return ("FSM", Fsm.to_string the_fsm)
-  in
-  Log.result
-    (Printf.sprintf
-       "command.make_model, finished %s:\n%s\n"
-       (fst result_str)
-       (snd result_str));
-  return ()
+  function
+  | LTS, (x, primary_lts) ->
+    let* the_lts : Lts.t =
+      Params.get_fst_params () |> build_lts primary_lts x refs
+    in
+    Log.thing ~__FUNCTION__ Notice "lts" the_lts (Of Lts.to_string);
+    return ()
+  | FSM, (x, primary_lts) ->
+    let* the_fsm : Fsm.t =
+      Params.get_fst_params () |> build_fsm primary_lts x refs
+    in
+    Log.thing ~__FUNCTION__ Notice "fsm" the_fsm (Of Fsm.to_string);
+    return ()
 ;;
 
 let only_in_weak_mode (f : 'a mm) : unit mm =
   Log.trace __FUNCTION__;
-  match Params.fst_weak_type () with
-  | None ->
-    if !Params.the_weak_mode = false
-    then Mebi_help.show_instructions_to_enable_weak ();
-    Mebi_help.show_instructions_to_set_weak ();
-    Log.warning "Aborting command.\n";
+  match !Params.the_weak_mode, Params.fst_weak_type () with
+  | true, Some _ ->
+    Log.debug ~__FUNCTION__ "weak mode, has been set. (running.)";
+    let* _ = f in
     return ()
-  | Some _ ->
-    if !Params.the_weak_mode = false
-    then (
-      Mebi_help.show_instructions_to_enable_weak ();
-      Log.warning "Aborting command.\n";
-      return ())
-    else
-      let* _ = f in
-      return ()
+  | true, None ->
+    Log.debug ~__FUNCTION__ "weak mode, not set";
+    Mebi_help.show_instructions_to_set_weak ();
+    return ()
+  | false, Some _ ->
+    Log.debug ~__FUNCTION__ "not in weak mode, (but has been set)";
+    Log.notice ~__FUNCTION__ "Aborting command. (Not in weak mode)\n";
+    Mebi_help.show_instructions_to_enable_weak ();
+    return ()
+  | false, None ->
+    Log.debug ~__FUNCTION__ "not in weak mode (weak also not set)";
+    Log.notice ~__FUNCTION__ "Aborting command. (Not in weak mode)\n";
+    Mebi_help.show_instructions_to_enable_weak ();
+    Mebi_help.show_instructions_to_set_weak ();
+    return ()
 ;;
 
 let saturate_model ((x, primary_lts) : coq_model) refs : unit mm =
   Log.trace __FUNCTION__;
   only_in_weak_mode
-    (let* the_saturated_fsm =
-       build_fsm ~saturate:true primary_lts x (Params.get_fst_params ()) refs
+    (let* the_fsm =
+       Params.get_fst_params () |> build_fsm ~saturate:true primary_lts x refs
      in
-     Log.result
-       (Printf.sprintf
-          "command.saturate_model, finished: %s\n"
-          (Fsm.to_string the_saturated_fsm));
+     Log.trace ~__FUNCTION__ "obtained saturated fsm";
+     Log.notice "Successfully saturated FSM. (To see enable Info display.)";
+     Log.thing ~__FUNCTION__ Info "saturated fsm" the_fsm (Args Fsm.to_string);
      return ())
 ;;
 
 let minimize_model ((x, primary_lts) : coq_model) refs : unit mm =
   Log.trace __FUNCTION__;
   only_in_weak_mode
-    (let* the_minimized_fsm =
-       build_fsm ~minimize:true primary_lts x (Params.get_fst_params ()) refs
+    (let* the_fsm =
+       Params.get_fst_params () |> build_fsm ~minimize:true primary_lts x refs
      in
-     Log.result
-       (Printf.sprintf
-          "command.minimize_model, finished: %s\n"
-          (Fsm.to_string the_minimized_fsm));
+     Log.trace ~__FUNCTION__ "obtained minimized fsm";
+     Log.notice "Successfully minimized FSM.";
+     Log.thing ~__FUNCTION__ Notice "minimized fsm" the_fsm (Args Fsm.to_string);
      return ())
 ;;
 
 let merge_models ((x, a), (y, b)) refs : unit mm =
   Log.trace __FUNCTION__;
-  let* the_fsm_1 = build_fsm a x (Params.get_fst_params ()) refs in
-  let* the_fsm_2 = build_fsm b y (Params.get_fst_params ()) refs in
-  let weak : bool = !Params.the_weak_mode in
+  (* NOTE: construct both fsm *)
+  let* the_fsm_1 = build_fsm a x refs (Params.get_fst_params ()) in
+  let* the_fsm_2 = build_fsm b y refs (Params.get_snd_params ()) in
+  Log.trace ~__FUNCTION__ "built both fsms";
+  (* NOTE: if weak-mode then pre-saturate the fsms *)
   let (the_fsm_1, the_fsm_2) : Fsm.pair =
-    if weak
-    then (
-      let the_fsm_1 = Saturate.fsm the_fsm_1 in
-      let the_fsm_2 = Saturate.fsm the_fsm_2 in
-      the_fsm_1, the_fsm_2)
+    if !Params.the_weak_mode
+    then Saturate.fsm the_fsm_1, Saturate.fsm the_fsm_2
     else the_fsm_1, the_fsm_2
   in
-  let merged_fsm = Fsm.merge the_fsm_1 the_fsm_2 in
-  Log.result
-    (Printf.sprintf
-       "command.run, MergeModels, finished: %s\n"
-       (Fsm.to_string merged_fsm));
-  Log.info
-    (Printf.sprintf
-       "command.run, MergeModels:\nFSM 1: %s\n\nFSM 2: %s\n"
-       (Fsm.to_string the_fsm_1)
-       (Fsm.to_string the_fsm_2));
+  Log.trace ~__FUNCTION__ "about to merge (pre-saturated fsms if in weak-mode)";
+  let the_fsm : Fsm.t = Fsm.merge the_fsm_1 the_fsm_2 in
+  Log.trace ~__FUNCTION__ "merged fsms";
+  Log.notice "Successfully merged FSMs. (For details enable Info display.)";
+  Log.thing ~__FUNCTION__ Notice "merged fsm" the_fsm (Args Fsm.to_string);
+  Log.thing ~__FUNCTION__ Info "fst fsm" the_fsm_1 (Args Fsm.to_string);
+  Log.thing ~__FUNCTION__ Info "snd fsm" the_fsm_2 (Args Fsm.to_string);
   return ()
+;;
+
+(** *)
+let fail_if_not_bisim (x : bool) : unit mm =
+  Log.trace __FUNCTION__;
+  if !Params.the_fail_if_not_bisim && x
+  then return ()
+  else params_fail_if_not_bisim ()
 ;;
 
 let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
   Log.trace __FUNCTION__;
-  let* the_fsm_1 = build_fsm a x (Params.get_fst_params ()) refs in
-  let* the_fsm_2 = build_fsm b y (Params.get_fst_params ()) refs in
-  Log.trace "command.check_bisimilarity B";
-  let the_bisimilar =
-    Algorithms.Bisimilar.run ~weak:!Params.the_weak_mode (the_fsm_1, the_fsm_2)
+  let* the_fsm_1 = build_fsm a x refs (Params.get_fst_params ()) in
+  let* the_fsm_2 = build_fsm b y refs (Params.get_snd_params ()) in
+  Log.trace ~__FUNCTION__ "built both fsms";
+  Log.thing ~__FUNCTION__ Debug "init fst fsm" the_fsm_1 (Args Fsm.to_string);
+  Log.thing ~__FUNCTION__ Debug "init snd fsm" the_fsm_2 (Args Fsm.to_string);
+  let open Algorithms in
+  let the_result : Bisimilar.result =
+    Bisimilar.run ~weak:!Params.the_weak_mode (the_fsm_1, the_fsm_2)
   in
-  Algorithms.Bisimilar.set_the_result the_bisimilar;
-  Log.result
-    (Printf.sprintf
-       "command.run, CheckBisimilarity, finished:\n%s\n"
-       (Algorithms.Bisimilar.to_string the_bisimilar));
-  Log.info
-    (Printf.sprintf
-       "command.run, CheckBisimilarity, saturated:\nFSM 1:\n%s\n\nFSM 2:\n%s\n"
-       (Fsm.to_string the_bisimilar.the_fsm_1.saturated)
-       (Fsm.to_string the_bisimilar.the_fsm_2.saturated));
-  if
-    !Params.the_fail_if_not_bisim
-    && Algorithms.Bisimilar.result_to_bool the_bisimilar
-  then return ()
-  else params_fail_if_not_bisim ()
+  Log.trace ~__FUNCTION__ "finished checking bisimilarity";
+  (* NOTE: cache result -- used in [Mebi_proof] if called from [proof_intro] *)
+  Bisimilar.set_the_result the_result;
+  (* NOTE: print feedback to user *)
+  let bisimilar : bool = Bisimilar.result_to_bool the_result in
+  Log.thing Notice "Bisimilar" bisimilar (Args Utils.Strfy.bool);
+  Log.thing Info "Details" the_result (Of Bisimilar.to_string);
+  (* NOTE: debug messages *)
+  let s1 : Fsm.t = the_result.the_fsm_1.saturated in
+  Log.thing Debug "(saturated) FSM 1" s1 (Args Fsm.to_string);
+  let s2 : Fsm.t = the_result.the_fsm_2.saturated in
+  Log.thing Debug "(saturated) FSM 2" s2 (Args Fsm.to_string);
+  (* NOTE: check if bisimilar before returning *)
+  let* () = fail_if_not_bisim bisimilar in
+  return ()
 ;;
 
 let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
   Log.trace __FUNCTION__;
   let* _ = Params.obtain_weak_kinds_from_args () in
-  (* if !Params.the_weak_mode = true then *)
-  (* let* _ = Mebi_wrapper.load_none_term () in *)
   match k with
-  | MakeModel args -> make_model args refs
+  | MakeModel args -> make_model refs args
   | SaturateModel args -> saturate_model args refs
   | MergeModels args -> merge_models args refs
   | MinimizeModel args -> minimize_model args refs
@@ -898,16 +916,7 @@ let proof_intro
   Params.set_fail_if_incomplete true;
   Params.set_fail_if_not_bisim true;
   let* _ = run (CheckBisimilarity ((x, a), (y, b))) refs in
-  Log.debug
-    (Printf.sprintf
-       "command.proof_intro, the_fsm_1: (saturated)\n%s"
-       (Fsm.to_string
-          (Algorithms.Bisimilar.get_the_result ()).the_fsm_1.saturated));
-  Log.debug
-    (Printf.sprintf
-       "command.proof_intro, the_fsm_2: (saturated)\n%s"
-       (Fsm.to_string
-          (Algorithms.Bisimilar.get_the_result ()).the_fsm_2.saturated));
+  Log.trace ~__FUNCTION__ "finished checking bisimilarity, beginning proof";
   return
     (Mebi_tactics.update_proof_by_tactic
        pstate

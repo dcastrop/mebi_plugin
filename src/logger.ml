@@ -46,7 +46,13 @@ module Output = struct
 
   module type S = sig
     val output_type_as_string : string
-    val get_output_fun : ?prefix:string option -> level -> string -> unit
+
+    val get_output_fun
+      :  ?__FUNCTION__:string
+      -> ?prefix:string option
+      -> level
+      -> string
+      -> unit
   end
 
   module Make (X : S) : OUTPUT_TYPE = struct
@@ -61,27 +67,40 @@ module Output = struct
           (y : string)
       : unit
       =
-      let prefix : string option =
-        match __FUNCTION__ with
-        | "" -> prefix
-        | z ->
-          Some (Option.cata (fun p -> Printf.sprintf "%s, %s" z p) z prefix)
-      in
-      if override || f x then get_output_fun ~prefix x y
+      if override || f x then get_output_fun ~__FUNCTION__ ~prefix x y
     ;;
   end
 
   module Rocq : OUTPUT_TYPE = Make (struct
       let output_type_as_string : string = "Rocq"
 
-      let get_output_fun ?(prefix : string option = None)
+      let get_output_fun
+            ?(__FUNCTION__ : string = "")
+            ?(prefix : string option = None)
         : level -> string -> unit
         =
-        let f (x : ?loc:Loc.t -> Pp.t -> unit) : string -> unit =
+        let open Pp in
+        let f (g : ?loc:Loc.t -> Pp.t -> unit) : string -> unit =
           fun (y : string) ->
-          Option.cata (fun z -> Printf.sprintf "%s: %s" z y) y prefix
-          |> Pp.str
-          |> x
+          let a : Pp.t =
+            (match __FUNCTION__ with "" -> mt () | z -> str z ++ str ": ")
+            |> v 0
+          in
+          let b : Pp.t =
+            Option.cata (fun (prefix : string) -> str prefix) (mt ()) prefix
+            |> v 0
+          in
+          let c : Pp.t = str y |> v 0 in
+          (* g (seq [ v 0 (seq [ a; b ]); c ] |> hv 0);
+             g (seq [ hv 0 (seq [ a; b ]); c ] |> v 0);
+             g (seq [ v 0 (seq [ a; ws 5; b ]); ws 5; str y |> v 0 ] |> v 0);
+             g (seq [ v 0 (seq [ a; ws 5; b ]); ws 5; str y |> v 0 ] |> h);
+             g (seq [ a; ws 5; b; ws 5; str y |> v 0 ] |> h);
+             g (seq [ mt (); a; ws 5; b; ws 5; str y |> v 0; fnl () ] |> v 0);
+             g
+             (seq [ mt (); a; ws 5; b; seq [ ws 5; str y |> v 0 ]; fnl () ]
+             |> v 0) *)
+          g (seq [ v 0 (seq [ a; b ]); ws 0; c ] |> hv 0)
         in
         function
         | Debug -> f Feedback.msg_debug
@@ -95,12 +114,16 @@ module Output = struct
   module OCaml : OUTPUT_TYPE = Make (struct
       let output_type_as_string : string = "OCaml"
 
-      let get_output_fun ?(prefix : string option = None)
+      let get_output_fun
+            ?(__FUNCTION__ : string = "")
+            ?(prefix : string option = None)
         : level -> string -> unit
         =
         let f (x : string) : string -> unit =
-          Option.cata (fun y -> Printf.sprintf "%s: %s" y x) x prefix
-          |> Printf.printf "[%s] %s\n"
+          Printf.printf
+            "%s [%s] %s\n"
+            (match __FUNCTION__ with "" -> "" | z -> Printf.sprintf "%s: " z)
+            (Option.cata (fun y -> Printf.sprintf "%s: %s" y x) x prefix)
         in
         function
         | Debug -> f "Debug"
@@ -172,6 +195,7 @@ module Make (O : Output.OUTPUT_TYPE) (X : S) : LOGGER_TYPE = struct
 
   let do_feedback_output
         ?(override : bool = false)
+        ?(prefix : string option = None)
         ?(__FUNCTION__ : string = "")
     : level -> string -> unit
     =
@@ -227,9 +251,10 @@ module Make (O : Output.OUTPUT_TYPE) (X : S) : LOGGER_TYPE = struct
     =
     let f : 'a -> string = match f with Args f -> f ~args | Of f -> f in
     do_feedback_output
+      ~prefix:(Some (Printf.sprintf "%s: " prefix))
       ~__FUNCTION__
       level
-      (Printf.sprintf "%s%s" (Utils.prefix prefix) (f x))
+      (f x)
   ;;
 
   let option
