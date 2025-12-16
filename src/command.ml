@@ -499,10 +499,8 @@ module MkGraph
     =
     if D.is_empty dests
     then (
-      Logging.Log.debug
-        (Printf.sprintf
-           "decoq_destinations, empty from: %s"
-           (State.to_string from));
+      Args State.to_string
+      |> GraphLog.thing ~__FUNCTION__ Debug "no destinations from" from;
       return Transitions.empty)
     else (
       let raw_dests = D.to_list dests in
@@ -527,8 +525,8 @@ module MkGraph
     =
     if Int.equal 0 (Hashtbl.length actions)
     then (
-      Logging.Log.debug
-        (Printf.sprintf "decoq_actions, empty from: %s" (State.to_string from));
+      Args State.to_string
+      |> GraphLog.thing ~__FUNCTION__ Debug "no actions from" from;
       return (Alphabet.empty, Transitions.empty))
     else (
       let raw_actions = List.of_seq (Hashtbl.to_seq actions) in
@@ -648,7 +646,7 @@ module Log : Logger.LOGGER_TYPE =
       let prefix : string option = None
 
       let is_level_enabled : Logger.level -> bool =
-        Logger.make_level_fun ~debug:false ()
+        Logger.make_level_fun ~debug:true ()
       ;;
     end)
 
@@ -681,7 +679,9 @@ let is_lts_complete ({ info; _ } : Lts.t) : bool =
 let fail_if_incomplete (x : Lts.t) : unit mm =
   Log.trace __FUNCTION__;
   if !Params.the_fail_if_incomplete && Bool.not (is_lts_complete x)
-  then params_fail_if_incomplete ()
+  then (
+    Log.thing Notice "Lts is Incomplete\n" x (Args Lts.to_string);
+    params_fail_if_incomplete ())
   else return ()
 ;;
 

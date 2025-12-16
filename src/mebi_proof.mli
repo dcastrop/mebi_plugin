@@ -4,8 +4,6 @@ val econstr_to_string : Proofview.Goal.t -> EConstr.t -> string
 val hyp_to_string : Proofview.Goal.t -> Rocq_utils.hyp -> string
 val hyps_to_string : Proofview.Goal.t -> string
 val concl_to_string : Proofview.Goal.t -> string
-val log_trace_concl : Proofview.Goal.t -> string -> unit
-val log_trace_hyps : Proofview.Goal.t -> string -> unit
 
 type tactic =
   { msg : string option

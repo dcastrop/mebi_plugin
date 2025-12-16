@@ -1,12 +1,28 @@
 open Model
 
+module Log : Logger.LOGGER_TYPE =
+  Logger.Make
+    (Logger.Output.Rocq)
+    (struct
+      let prefix : string option = None
+
+      let is_level_enabled : Logger.level -> bool =
+        Logger.make_level_fun ~debug:true ()
+      ;;
+    end)
+
+let prepare_fsm (weak : bool) (fsm : Fsm.t) : Fsm.t =
+  Log.trace __FUNCTION__;
+  if weak then Saturate.fsm fsm else fsm
+;;
+
 module Minimize = struct
   type result = Fsm.t * Partition.t
 
   let add_to_block_option (s : State.t) (block : States.t option)
     : States.t option
     =
-    Logging.Log.trace "Algorithms.Minimize.add_to_block_option";
+    Log.trace __FUNCTION__;
     Some
       (match block with
        | None -> States.add s States.empty
@@ -20,7 +36,7 @@ module Minimize = struct
         (pi : Partition.t)
     : States.t * States.t option
     =
-    Logging.Log.trace "Algorithms.Minimize.split_block";
+    Log.trace __FUNCTION__;
     assert (Bool.not (States.is_empty block));
     let edges_of_a : States.t Actions.t Edges.t =
       Model.get_edges_labelled l edges
@@ -53,6 +69,19 @@ module Minimize = struct
       (States.empty, None)
   ;;
 
+  let _handle_split_block (b : States.t ref) (pi : Partition.t ref)
+    : States.t * States.t option -> unit
+    =
+    Log.trace __FUNCTION__;
+    function
+    | b1, None -> assert (Int.equal (States.cardinal b1) (States.cardinal !b))
+    | b1, Some b2 ->
+      pi := Partition.remove !b !pi;
+      pi := Partition.add b2 (Partition.add b1 !pi);
+      (* TODO: is find necessary? just use [b1] ? *)
+      b := Partition.find b1 !pi
+  ;;
+
   let iterate
         (alphabet : Alphabet.t)
         (edges : States.t Actions.t Edges.t)
@@ -61,10 +90,10 @@ module Minimize = struct
         (weak : bool)
     : unit
     =
-    Logging.Log.trace "Algorithms.Minimize.iterate";
+    Log.trace __FUNCTION__;
     Partition.iter
       (fun (b : States.t) ->
-        let b = ref b in
+        let b : States.t ref = ref b in
         Alphabet.iter
           (fun (l : Label.t) ->
             match split_block !b l edges !pi with
@@ -81,26 +110,30 @@ module Minimize = struct
   ;;
 
   let run ?(weak : bool = false) (the_fsm : Fsm.t) : result =
-    Logging.Log.debug (Printf.sprintf "%s, weak: %b" __FUNCTION__ weak);
-    let the_fsm : Fsm.t = if weak then Saturate.fsm the_fsm else the_fsm in
-    match the_fsm with
-    | { alphabet; states; edges; _ } ->
-      let pi = ref (Partition.of_list [ states ]) in
-      let changed = ref true in
-      while !changed do
-        (* NOTE: the main loop *)
-        changed := false;
-        iterate alphabet edges pi changed weak
-      done;
-      the_fsm, !pi
+    Log.trace __FUNCTION__;
+    Log.thing ~__FUNCTION__ Debug "weak" weak (Args Utils.Strfy.bool);
+    (* NOTE: pre-saturated if weak mode *)
+    let the_fsm : Fsm.t = prepare_fsm weak the_fsm in
+    Log.trace ~__FUNCTION__ "finished preparing fsms (saturated if weak)";
+    let { alphabet; states; edges; _ } : Fsm.t = the_fsm in
+    let pi : Partition.t ref = ref (Partition.of_list [ states ]) in
+    (* NOTE: main loop *)
+    Log.trace ~__FUNCTION__ "entering main loop";
+    let changed : bool ref = ref true in
+    while !changed do
+      changed := false;
+      iterate alphabet edges pi changed weak
+    done;
+    Log.trace ~__FUNCTION__ "exited main loop";
+    the_fsm, !pi
   ;;
 
-  let to_string : result -> string = function
-    | the_fsm, the_partition ->
-      Printf.sprintf
-        "\nMinimized FSM: %s\nMinimized Partition: %s"
-        (Fsm.to_string the_fsm)
-        (Model.partition_to_string the_partition)
+  let to_string ((the_fsm, the_partition) : result) : string =
+    Log.trace __FUNCTION__;
+    Printf.sprintf
+      "\nMinimized FSM: %s\nMinimized Partition: %s"
+      (Fsm.to_string the_fsm)
+      (Model.partition_to_string the_partition)
   ;;
 end
 
@@ -118,15 +151,20 @@ module Bisimilar = struct
     ; saturated : Fsm.t
     }
 
-  let the_cached_result : result option ref = ref None
+  let the_cached_result : result option ref =
+    Log.trace __FUNCTION__;
+    ref None
+  ;;
 
   let set_the_result (new_result : result) : unit =
+    Log.trace __FUNCTION__;
     the_cached_result := Some new_result
   ;;
 
   exception MeBi_Bisim_ResultNotCached of unit
 
   let get_the_result () : result =
+    Log.trace __FUNCTION__;
     match !the_cached_result with
     | None -> raise (MeBi_Bisim_ResultNotCached ())
     | Some result -> result
@@ -140,6 +178,7 @@ module Bisimilar = struct
         (the_fsm_2 : Fsm.t)
     : bool
     =
+    Log.trace __FUNCTION__;
     let ref_1, ref_2 = ref false, ref false in
     States.iter
       (fun (s : State.t) ->
@@ -157,6 +196,7 @@ module Bisimilar = struct
   let split_bisimilar (pi : Partition.t) (the_fsm_1 : Fsm.t) (the_fsm_2 : Fsm.t)
     : Partition.t * Partition.t
     =
+    Log.trace __FUNCTION__;
     Partition.fold
       (fun (block : States.t)
         ((bisim_states, non_bisim_states) : Partition.t * Partition.t) ->
@@ -168,18 +208,19 @@ module Bisimilar = struct
       (Partition.empty, Partition.empty)
   ;;
 
-  let saturate_fsm ?(weak : bool = false) (fsm : Fsm.t) : Fsm.t =
-    if weak then Saturate.fsm fsm else fsm
-  ;;
-
   let run ?(weak : bool = false) (the_fsm_pair : Fsm.pair) : result =
-    let the_sat_1 : Fsm.t = saturate_fsm ~weak (fst the_fsm_pair) in
-    let the_sat_2 : Fsm.t = saturate_fsm ~weak (snd the_fsm_pair) in
+    Log.trace __FUNCTION__;
+    let the_sat_1 : Fsm.t = prepare_fsm weak (fst the_fsm_pair) in
+    let the_sat_2 : Fsm.t = prepare_fsm weak (snd the_fsm_pair) in
+    Log.trace ~__FUNCTION__ "finished preparing fsms (saturated if weak)";
     let merged_fsm : Fsm.t = Fsm.merge the_sat_1 the_sat_2 in
+    Log.trace ~__FUNCTION__ "finished merging fsms";
     let pi : Partition.t = snd (Minimize.run merged_fsm) in
+    Log.trace ~__FUNCTION__ "finished minimizing (checking for bisimilarity)";
     let (bisim_states, non_bisim_states) : Partition.t * Partition.t =
       split_bisimilar pi (fst the_fsm_pair) (snd the_fsm_pair)
     in
+    Log.trace ~__FUNCTION__ "finished resolving bisimilarity result";
     { the_fsm_1 = { original = fst the_fsm_pair; saturated = the_sat_1 }
     ; the_fsm_2 = { original = snd the_fsm_pair; saturated = the_sat_2 }
     ; merged_fsm
@@ -189,10 +230,12 @@ module Bisimilar = struct
   ;;
 
   let result_to_bool (r : result) : bool =
+    Log.trace __FUNCTION__;
     Model.Partition.is_empty r.non_bisim_states
   ;;
 
   let to_string (r : result) : string =
+    Log.trace __FUNCTION__;
     Printf.sprintf
       "Bisimilar:\n%b\nBisimilar states:\n%s\nNon-bisimilar states:\n%s\n"
       (Partition.is_empty r.non_bisim_states)
