@@ -1,5 +1,13 @@
-open Logging
-(* open Mebi_setup *)
+module Log : Logger.LOGGER_TYPE =
+  Logger.Make
+    (Logger.Output.Rocq)
+    (struct
+      let prefix : string option = None
+
+      let is_level_enabled : Logger.level -> bool =
+        Logger.make_level_fun ~debug:false ()
+      ;;
+    end)
 
 (********************************************)
 (****** ENCODINGS ***************************)
@@ -55,57 +63,59 @@ module Make (Enc : S) : ENCODING_TYPE = struct
   let counter : t ref = cache
 
   let get_next () : t =
-    let x = !counter in
+    Log.trace __FUNCTION__;
+    let x : t = !counter in
     counter := next !counter;
     x
   ;;
 
-  let reset () = cache := init
+  let reset () =
+    Log.trace __FUNCTION__;
+    cache := init
+  ;;
 
   module B : Hashtbl.S with type key = t = Hashtbl.Make (struct
       include Enc
     end)
 
   let encode (fwd : t F.t) (bck : EConstr.t B.t) (k : EConstr.t) : t =
-    Log.trace "Mebi_wrapper.IntEncoding.encode";
+    Log.trace __FUNCTION__;
     match F.find_opt fwd k with
     | None ->
-      (* map to next encoding and return *)
+      (* NOTE: map to next encoding and return *)
       let next_enc : t = get_next () in
       F.add fwd k next_enc;
       B.add bck next_enc k;
-      Log.debug
-        (Printf.sprintf
-           "Mebi_wrapper.IntEncoding.encode, new encoding: %s"
-           (to_string next_enc));
+      Log.thing ~__FUNCTION__ Debug "new enc" next_enc (Of to_string);
       next_enc
     | Some enc ->
-      Log.debug
-        (Printf.sprintf
-           "Mebi_wrapper.IntEncoding.encode -- already encoded as (%s)"
-           (to_string enc));
+      Log.thing ~__FUNCTION__ Debug "found enc" enc (Of to_string);
       enc
   ;;
 
   exception InvalidDecodeKey of (t * EConstr.t B.t)
 
   let decode_opt (bck : EConstr.t B.t) (k : t) : EConstr.t option =
+    Log.trace __FUNCTION__;
     B.find_opt bck k
   ;;
 
   let decode (bck : EConstr.t B.t) (k : t) : EConstr.t =
+    Log.trace __FUNCTION__;
     match B.find_opt bck k with
     | None -> raise (InvalidDecodeKey (k, bck))
     | Some enc -> enc
   ;;
 
   let fwd_to_list : t F.t -> (EConstr.t * t) list =
+    Log.trace __FUNCTION__;
     fun (x : t F.t) ->
-    List.sort (fun (_, a) (_, b) -> compare a b) (List.of_seq (F.to_seq x))
+      List.sort (fun (_, a) (_, b) -> compare a b) (List.of_seq (F.to_seq x))
   ;;
 
   let bck_to_list : EConstr.t B.t -> (t * EConstr.t) list =
+    Log.trace __FUNCTION__;
     fun (x : EConstr.t B.t) ->
-    List.sort (fun (a, _) (b, _) -> compare a b) (List.of_seq (B.to_seq x))
+      List.sort (fun (a, _) (b, _) -> compare a b) (List.of_seq (B.to_seq x))
   ;;
 end

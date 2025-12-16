@@ -1,6 +1,15 @@
-open Logging
+let enable_logging : bool ref = ref false
 
-let enable_logging : bool ref = ref true
+module Log : Logger.LOGGER_TYPE =
+  Logger.Make
+    (Logger.Output.Rocq)
+    (struct
+      let prefix : string option = None
+
+      let is_level_enabled : Logger.level -> bool =
+        Logger.make_level_fun ~debug:!enable_logging ()
+      ;;
+    end)
 
 type unif_problem =
   { termL : EConstr.t
@@ -19,14 +28,15 @@ type coq_context =
 let the_coq_env_opt : Environ.env ref option ref = ref None
 
 let new_coq_env () : Environ.env ref =
-  if !enable_logging
-  then Log.debug "mebi_setup.new_coq_env: Created new coq env.";
+  Log.trace __FUNCTION__;
+  if !enable_logging then Log.trace ~__FUNCTION__ "Created new coq env.";
   let env : Environ.env ref = ref (Global.env ()) in
   the_coq_env_opt := Some env;
   env
 ;;
 
 let the_coq_env ?(fresh : bool = false) () : Environ.env ref =
+  Log.trace __FUNCTION__;
   match !the_coq_env_opt with
   | None -> new_coq_env ()
   | Some env -> if fresh then new_coq_env () else env
@@ -36,14 +46,15 @@ let the_coq_env ?(fresh : bool = false) () : Environ.env ref =
 let the_coq_ctx_opt : Evd.evar_map ref option ref = ref None
 
 let new_coq_ctx ?(fresh : bool = false) () : Evd.evar_map ref =
-  if !enable_logging
-  then Log.debug "mebi_setup.new_coq_ctx: Created new coq ctx.";
-  let ctx = ref (Evd.from_env !(the_coq_env ~fresh ())) in
+  Log.trace __FUNCTION__;
+  if !enable_logging then Log.trace ~__FUNCTION__ "Created new coq ctx.";
+  let ctx : Evd.evar_map ref = ref (Evd.from_env !(the_coq_env ~fresh ())) in
   the_coq_ctx_opt := Some ctx;
   ctx
 ;;
 
 let the_coq_ctx ?(fresh : bool = false) () : Evd.evar_map ref =
+  Log.trace __FUNCTION__;
   match !the_coq_ctx_opt with
   | None -> new_coq_ctx ~fresh ()
   | Some ctx -> if fresh then new_coq_ctx ~fresh () else ctx

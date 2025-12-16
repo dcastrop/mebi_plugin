@@ -10,7 +10,7 @@ module Log : Logger.LOGGER_TYPE =
       let prefix : string option = None
 
       let is_level_enabled : Logger.level -> bool =
-        Logger.make_level_fun ~debug:true ()
+        Logger.make_level_fun ~debug:true ~info:true ()
       ;;
     end)
 
