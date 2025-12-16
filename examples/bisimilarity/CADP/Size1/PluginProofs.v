@@ -15,11 +15,11 @@ MeBi Divider "Examples.Bisimilarity.CADP.Size1.PluginProofs".
 MeBi Reset All.
 MeBi Set ShowAny      True.
 MeBi Set ShowNotices  True.
-(* MeBi Set ShowDebug    True. *)
-(* MeBi Set ShowDetails  True. *)
+MeBi Set ShowDebug    True.
+MeBi Set ShowDetails  True.
 MeBi Set ShowResults  True.
 MeBi Set ShowWarnings True.
-(* MeBi Set Bound 100. *)
+MeBi Set Bound 400.
 MeBi Set WeakMode     True.
 MeBi Set Weak Option label.
 MeBi Set FailIfIncomplete True.

@@ -24,7 +24,7 @@ Example r : term := tseq (tpar (tact (recv A) tend)
                          (tfix (tseq (tpar (tact (send A) tend) 
                                            (tact (recv A) tend)) trec)).
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test1.Terms".
+MeBi Divider "Examples.Bisimilarity.Proc.Test3.Terms".
 MeBi Reset All.
 MeBi Set ShowAny      True.
 MeBi Set ShowNotices  True.
@@ -48,39 +48,21 @@ MeBi FSM q Using termLTS. MeBi Saturate q Using termLTS.
 MeBi FSM r Using termLTS. MeBi Saturate r Using termLTS.
 
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test2.Bisim.pq".
+MeBi Divider "Examples.Bisimilarity.Proc.Test3.Bisim.pq".
 
 MeBi Bisim p With termLTS And q With termLTS Using termLTS.
 MeBi Bisim q With termLTS And p With termLTS Using termLTS.
 
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test2.Bisim.qr".
+MeBi Divider "Examples.Bisimilarity.Proc.Test3.Bisim.qr".
 
 MeBi Bisim q With termLTS And r With termLTS Using termLTS.
 MeBi Bisim r With termLTS And q With termLTS Using termLTS.
 
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test2.Bisim.pr".
+MeBi Divider "Examples.Bisimilarity.Proc.Test3.Bisim.pr".
 
 MeBi Bisim p With termLTS And r With termLTS Using termLTS.
 MeBi Bisim r With termLTS And p With termLTS Using termLTS.
 
 
-
-
-(* MeBi Set ShowAny True. *)
-
-
-
-(* MeBi Divider "Testing". *)
-
-(* Example e1 : term := (tseq (tseq (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) tend) tend). *)
-(* Example e1 : term := (tseq (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) tend). *)
-(* Example e1 : term := (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend). *)
-
-(* MeBi FSM e1 Using termLTS.  *)
-(* MeBi Saturate e1 Using termLTS. *)
-
-
-(* MeBi FSM p Using termLTS. *)
-(* MeBi FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) Using termLTS. *)
