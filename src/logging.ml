@@ -51,27 +51,37 @@ let the_params : params ref =
 ;;
 
 (** *)
-let enable_output () : unit = !the_params.options.output_enabled <- true
+let enable_output () : unit =
+  !the_params.options.output_enabled <- true;
+  Logger.enable_output ()
+;;
 
-let disable_output () : unit = !the_params.options.output_enabled <- false
+let disable_output () : unit =
+  !the_params.options.output_enabled <- false;
+  Logger.disable_output ()
+;;
 
 (** *)
 let set_output_mode (m : output_mode) : unit = !the_params.mode <- m
 
 let set_output_enabled (b : bool) : unit =
-  !the_params.options.output_enabled <- b
+  !the_params.options.output_enabled <- b;
+  Logger.set_output_enabled b
 ;;
 
 let set_show_notice (b : bool) : unit =
-  !the_params.options.show_notice_enabled <- b
+  !the_params.options.show_notice_enabled <- b;
+  Logger.set_notice b
 ;;
 
 let set_show_debug (b : bool) : unit =
-  !the_params.options.show_debug_enabled <- b
+  !the_params.options.show_debug_enabled <- b;
+  Logger.set_debug b
 ;;
 
 let set_show_details (b : bool) : unit =
-  !the_params.options.show_details_enabled <- b
+  !the_params.options.show_details_enabled <- b;
+  Logger.set_info b
 ;;
 
 let set_show_result (b : bool) : unit =
@@ -79,24 +89,29 @@ let set_show_result (b : bool) : unit =
 ;;
 
 let set_show_warning (b : bool) : unit =
-  !the_params.options.show_warning_enabled <- b
+  !the_params.options.show_warning_enabled <- b;
+  Logger.set_warning b
 ;;
 
 (* *)
 let reset_output_enabled () : unit =
-  !the_params.options.output_enabled <- default_output_enabled
+  !the_params.options.output_enabled <- default_output_enabled;
+  Logger.reset_output_enabled ()
 ;;
 
 let reset_show_notice_enabled () : unit =
-  !the_params.options.show_notice_enabled <- default_show_notice_enabled
+  !the_params.options.show_notice_enabled <- default_show_notice_enabled;
+  Logger.reset_notice ()
 ;;
 
 let reset_show_debug_enabled () : unit =
-  !the_params.options.show_debug_enabled <- default_show_debug_enabled
+  !the_params.options.show_debug_enabled <- default_show_debug_enabled;
+  Logger.reset_debug ()
 ;;
 
 let reset_show_details_enabled () : unit =
-  !the_params.options.show_details_enabled <- default_show_details_enabled
+  !the_params.options.show_details_enabled <- default_show_details_enabled;
+  Logger.reset_info ()
 ;;
 
 let reset_show_result_enabled () : unit =
@@ -104,7 +119,8 @@ let reset_show_result_enabled () : unit =
 ;;
 
 let reset_show_warning_enabled () : unit =
-  !the_params.options.show_warning_enabled <- default_show_warning_enabled
+  !the_params.options.show_warning_enabled <- default_show_warning_enabled;
+  Logger.reset_warning ()
 ;;
 
 let is_output_enabled () : bool = !the_params.options.output_enabled
