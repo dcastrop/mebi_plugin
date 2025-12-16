@@ -1270,13 +1270,13 @@ let make_state_tree_pair_set (st : wrapper ref)
   fun (st : wrapper ref) ->
   if Int.equal 0 (F.length !st.fwd_enc)
   then (
-    Logging.Log.debug "mebi_wrapper.debug_encoding, fwd encoding is empty";
+    Log.debug "mebi_wrapper.debug_encoding, fwd encoding is empty";
     if Int.equal 0 (B.length !st.bck_enc)
-    then Logging.Log.debug "mebi_wrapper.debug_encoding, bck encoding is empty"
+    then Log.debug "mebi_wrapper.debug_encoding, bck encoding is empty"
     else
       B.iter
         (fun (enc : Enc.t) (t : EConstr.t) ->
-          Logging.Log.debug
+          Log.debug
             (Printf.sprintf
                "(%s) => %s "
                (Enc.to_string enc)
@@ -1285,7 +1285,7 @@ let make_state_tree_pair_set (st : wrapper ref)
   else
     F.iter
       (fun (t : EConstr.t) (enc : Enc.t) ->
-        Logging.Log.debug
+        Log.debug
           (Printf.sprintf
              "(%s) => %s "
              (Enc.to_string enc)

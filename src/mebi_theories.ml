@@ -1,12 +1,13 @@
-open Logging
+module Log : Logger.LOGGER_TYPE =
+  Logger.Make
+    (Logger.Output.Rocq)
+    (struct
+      let prefix : string option = None
 
-(* the prefix *)
-let trace_enabled : bool = true
-let log_trace (x : string) : unit = if trace_enabled then Log.trace x else ()
-
-let log_tracex (xs : string list) : unit =
-  log_trace (Utils.Strfy.list Utils.Strfy.string xs)
-;;
+      let is_level_enabled : Logger.level -> bool =
+        Logger.make_level_fun ~debug:false ()
+      ;;
+    end)
 
 (*****************************************************************************)
 
@@ -36,7 +37,7 @@ let find_reference = Coqlib.find_reference [@ocaml.warning "-3"]
    and proofs.  This pattern extends all the way to the definition of function
    c_U *)
 let collect_bisimilarity_theories () : EConstr.t list =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   match !constants with
   | [] ->
     Log.debug "mebi_theories.collect_bisimilarity_theories, mapping constants";
@@ -102,7 +103,7 @@ let rec indexed_c : int * EConstr.t list -> EConstr.t option = function
 ;;
 
 let c_LTS () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (0, cs) with
   | None ->
@@ -112,7 +113,7 @@ let c_LTS () : EConstr.t =
 ;;
 
 let c_tau () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (1, cs) with
   | None ->
@@ -122,7 +123,7 @@ let c_tau () : EConstr.t =
 ;;
 
 let c_silent () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (2, cs) with
   | None ->
@@ -133,7 +134,7 @@ let c_silent () : EConstr.t =
 ;;
 
 let c_silent1 () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (3, cs) with
   | None ->
@@ -144,7 +145,7 @@ let c_silent1 () : EConstr.t =
 ;;
 
 let c_weak () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (4, cs) with
   | None ->
@@ -155,7 +156,7 @@ let c_weak () : EConstr.t =
 ;;
 
 let c_wk_some () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (5, cs) with
   | None ->
@@ -166,7 +167,7 @@ let c_wk_some () : EConstr.t =
 ;;
 
 let c_wk_none () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (6, cs) with
   | None ->
@@ -177,7 +178,7 @@ let c_wk_none () : EConstr.t =
 ;;
 
 let c_simF () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (7, cs) with
   | None ->
@@ -188,7 +189,7 @@ let c_simF () : EConstr.t =
 ;;
 
 let c_Pack_sim () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (8, cs) with
   | None ->
@@ -199,7 +200,7 @@ let c_Pack_sim () : EConstr.t =
 ;;
 
 let c_sim_weak () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (9, cs) with
   | None ->
@@ -210,7 +211,7 @@ let c_sim_weak () : EConstr.t =
 ;;
 
 let c_weak_sim () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (10, cs) with
   | None ->
@@ -221,7 +222,7 @@ let c_weak_sim () : EConstr.t =
 ;;
 
 let c_In_sim () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (11, cs) with
   | None ->
@@ -232,7 +233,7 @@ let c_In_sim () : EConstr.t =
 ;;
 
 let c_out_sim () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (12, cs) with
   | None ->
@@ -243,7 +244,7 @@ let c_out_sim () : EConstr.t =
 ;;
 
 let c_weak_bisim () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (13, cs) with
   | None ->
@@ -254,7 +255,7 @@ let c_weak_bisim () : EConstr.t =
 ;;
 
 let c_relations () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (14, cs) with
   | None ->
@@ -265,7 +266,7 @@ let c_relations () : EConstr.t =
 ;;
 
 let c_clos_refl_trans_1n () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (15, cs) with
   | None ->
@@ -276,7 +277,7 @@ let c_clos_refl_trans_1n () : EConstr.t =
 ;;
 
 let c_rt1n_refl () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (16, cs) with
   | None ->
@@ -287,7 +288,7 @@ let c_rt1n_refl () : EConstr.t =
 ;;
 
 let c_rt1n_trans () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (17, cs) with
   | None ->
@@ -298,7 +299,7 @@ let c_rt1n_trans () : EConstr.t =
 ;;
 
 let c_clos_trans_1n () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (18, cs) with
   | None ->
@@ -309,7 +310,7 @@ let c_clos_trans_1n () : EConstr.t =
 ;;
 
 let c_option () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (19, cs) with
   | None ->
@@ -319,7 +320,7 @@ let c_option () : EConstr.t =
 ;;
 
 let c_None () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (20, cs) with
   | None ->
@@ -330,7 +331,7 @@ let c_None () : EConstr.t =
 ;;
 
 let c_Some () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (21, cs) with
   | None ->
@@ -341,7 +342,7 @@ let c_Some () : EConstr.t =
 ;;
 
 let c_ex () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (22, cs) with
   | None ->
@@ -350,7 +351,7 @@ let c_ex () : EConstr.t =
 ;;
 
 let c_ex_intro () : EConstr.t =
-  log_trace __FUNCTION__;
+  Log.trace __FUNCTION__;
   let cs = collect_bisimilarity_theories () in
   match indexed_c (23, cs) with
   | None ->
@@ -380,14 +381,15 @@ let get_hyp_names (gl : Proofview.Goal.t) : Names.Id.Set.t =
 ;;
 
 let next_name_of (names : Names.Id.Set.t) : Names.Id.t -> Names.Id.t =
+  Log.trace __FUNCTION__;
   fun x ->
-  log_tracex [ __FUNCTION__; Names.Id.to_string x ];
-  Namegen.next_ident_away x names
+    Log.thing ~__FUNCTION__ Debug "next name" x (Of Names.Id.to_string);
+    Namegen.next_ident_away x names
 ;;
 
 let new_name_of_string (gl : Proofview.Goal.t) : string -> Names.Id.t =
   fun x ->
-  log_tracex [ __FUNCTION__; x ];
+  Log.thing ~__FUNCTION__ Debug "of name" x (Args Utils.Strfy.string);
   next_name_of (get_hyp_names gl) (Names.Id.of_string x)
 ;;
 

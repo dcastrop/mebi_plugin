@@ -80,7 +80,8 @@ module MkGraph
         let prefix : string option = None
 
         let is_level_enabled : Logger.level -> bool =
-          Logger.make_level_fun ~debug:false ()
+          (* Logger.make_level_fun ~debug:true ~info:true () *)
+          Logger.make_level_fun ~debug:false ~info:true ()
         ;;
       end)
 
@@ -256,7 +257,7 @@ module MkGraph
     : S.t mm
     =
     GraphLog.trace __FUNCTION__;
-    GraphLog.thing ~__FUNCTION__ Debug "from" from (Of Enc.to_string);
+    GraphLog.thing ~__FUNCTION__ Info "from" from (Of Enc.to_string);
     let iter_body (i : int) (new_states : S.t) =
       let (act, tgt, int_tree) : Mebi_constr.t = List.nth ctors i in
       let* tgt_enc : Enc.t = encode tgt in
@@ -646,7 +647,7 @@ module Log : Logger.LOGGER_TYPE =
       let prefix : string option = None
 
       let is_level_enabled : Logger.level -> bool =
-        Logger.make_level_fun ~debug:true ()
+        Logger.make_level_fun ~debug:true ~info:true ()
       ;;
     end)
 
@@ -676,11 +677,12 @@ let is_lts_complete ({ info; _ } : Lts.t) : bool =
 ;;
 
 (** *)
-let fail_if_incomplete (x : Lts.t) : unit mm =
+let fail_if_incomplete (x : Lts.t) (bound : int) : unit mm =
   Log.trace __FUNCTION__;
   if !Params.the_fail_if_incomplete && Bool.not (is_lts_complete x)
   then (
-    Log.thing Notice "Lts is Incomplete\n" x (Args Lts.to_string);
+    Log.thing Notice "Incomplete Lts\n" x (Args Lts.to_string);
+    Log.thing Notice "Lts is Incomplete with bound" bound (Args Utils.Strfy.int);
     params_fail_if_incomplete ())
   else return ()
 ;;
@@ -703,7 +705,7 @@ let build_lts
   Log.trace ~__FUNCTION__ "built lts graph";
   let* the_lts = G.decoq_lts ~cache_decoding:true graph_lts params in
   Log.trace ~__FUNCTION__ "converted lts graph to lts model";
-  let* () = fail_if_incomplete the_lts in
+  let* () = fail_if_incomplete the_lts (fst params) in
   return the_lts
 ;;
 
@@ -719,7 +721,7 @@ let build_fsm
   =
   Log.trace __FUNCTION__;
   (* NOTE: build lts *)
-  let* the_lts = build_lts primary_lts t refs (Params.get_fst_params ()) in
+  let* the_lts = build_lts primary_lts t refs params in
   Log.trace ~__FUNCTION__ "obtained lts model";
   Log.thing ~__FUNCTION__ Info "lts" the_lts (Args Lts.to_string);
   (* NOTE: convert to fsm *)
