@@ -12,241 +12,16 @@ open Stdarg
 (* open Pp *)
 }
 
-(* https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto0/src/g_tuto0.mlg *)
-(* https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto1/src/g_tuto1.mlg *)
-(* https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto2/src/g_tuto2.mlg *)
-
-(* https://github.com/rocq-prover/rocq/blob/master/dev/doc/parsing.md *)
-
-(* https://github.com/ybertot/plugin_tutorials/blob/master/tuto1/src/g_tuto1.mlg *)
-
-(* TACTIC EXTEND MeBi_unfold
-| [ "MeBi_unfold" reference(i) ] -> { Tactics.unfold_body i }
-(* | [ "MeBi_unfold" ident(i) ident(j) ] -> { Proofview.tclTHEN (Tactics.unfold_body i)(Tactics.unfold_body j) } *)
-(* | [ "MeBi_unfold" ] -> { Tactics.unfold_body (Names.Id.of_string_soft "TheH") } *)
-END *)
-
-(* TACTIC EXTEND MeBi_intro
-| [ "MeBi_intro" ident(i) ] -> { Tactics.introduction i }
-| [ "MeBi_intro" ] -> { Tactics.introduction (Names.Id.of_string_soft "TheH") }
-END *)
-
-(* VERNAC COMMAND EXTEND MeBi_Proof CLASSIFIED AS QUERY
-| ![ proof ]["MeBi_Proof"] -> 
-  { fun ~pstate ->
-
-  }
-END *)
-
-(* VERNAC COMMAND EXTEND MeBi_Debug CLASSIFIED AS QUERY
-| [ "MeBi_Debug" "ProofNames" ] ->
-  { Mebi_wrapper.run ~keep_encoding:true ~fresh:false (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBi_Debug:ProofNames: BEGIN";
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.show_names () in
-      Logging.Log.debug "MeBi_Debug:ProofNames: END";
-      Mebi_wrapper.return ()
-    ) 
-  }
-| [ "MeBi_Debug" "ThisProof" ] ->
-  { Mebi_wrapper.run ~keep_encoding:true ~fresh:false (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBi_Debug:ThisProof: BEGIN";
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.show_proof () in
-      let* _ = Mebi_wrapper.show_proof_data () in 
-      Logging.Log.debug "MeBi_Debug:ThisProof: END";
-      Mebi_wrapper.return ()
-    ) 
-  }
-END *)
-
-(* NOTE: vernac states: 
-https://data.code.gouv.fr/hosts/GitHub/repositories/coq%2Fplatform?sha=V8.17.0&path=coqpp%2Fcoqpp_main.ml 
-
-let understand_state = function
-  | "close_proof" -> "vtcloseproof", false
-  | "open_proof" -> "vtopenproof", true
-  | "proof" -> "vtmodifyproof", false
-  | "proof_opt_query" -> "vtreadproofopt", false
-  | "proof_query" -> "vtreadproof", false
-  | "read_program" -> "vtreadprogram", false
-  | "program" -> "vtmodifyprogram", false
-  | "declare_program" -> "vtdeclareprogram", false
-  | "program_interactive" -> "vtopenproofprogram", false
-  | s -> fatal ("unsupported state specifier: " ^ s) 
-*)
-
-(* NOTE: ![proof] is modify state: https://rocq-prover.org/doc/V8.20.0/api/coq-core/Vernactypes/index.html#val-vtmodifyproof  *)
-(* VERNAC COMMAND EXTEND MeBi_cofix CLASSIFIED AS QUERY
-| ![ proof ]["MeBi_cofix"] -> 
-   { fun ~pstate -> 
-      let p = Mebi_wrapper.run ~keep_proof:true (
-        let open Mebi_wrapper.Syntax in
-        let* _ = Mebi_wrapper.show_names () in 
-        let* n = Mebi_wrapper.new_name_of_string "TestCofix" in
-        let* _ = Mebi_wrapper.show_names () in 
-        let (p, _b) = Declare.Proof.by (Tactics.cofix (n)) pstate in 
-        Mebi_wrapper.return p ) in 
-      Logging.Log.override "vernac, check names:";
-      let _ = Mebi_wrapper.run ~keep_proof:true (
-        let open Mebi_wrapper.Syntax in
-        let* _ = Mebi_wrapper.show_names () in 
-        Mebi_wrapper.return ()) in
-      p
-   }
-END *)
+(* *)
 VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
-(* |![ proof ] 
-  [ "MeBiSim" "TODO" ] ->
-  { fun ~pstate -> 
-    Mebi_wrapper.run ~new_proof:false ~proof:(Some pstate) (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBiSim:TODO BEGIN";
-      (*  *)
-      (* let open Mebi_wrapper.Syntax in  *)
-      (*  *)
-      Logging.Log.debug "MeBiSim:TODO END";
-      Mebi_wrapper.get_proof ()
-    )
-  } *)
-(*  *)
-(* |![ proof ] 
-  [ "MeBiSim" "FocusTest" ] ->
-  { fun ~pstate -> 
-    Mebi_wrapper.run ~keep_encoding:true ~fresh:false ~new_proof:false ~proof:(Some pstate) (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBiSim:FocusTest BEGIN";
-      (* NOTE: tests *)
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
-        [ Mebi_tactics.goal_test () 
-        ] in 
-      let* _ = Mebi_wrapper.show_proof_data () in 
-      let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
-        [ Mebi_tactics.update_goals () 
-        ] in 
-      Logging.Log.debug (Printf.sprintf "MeBiSim:FocusTest, goals:\n%s" (Mebi_tactics.pstr_the_goals ()));
-      Logging.Log.debug "MeBiSim:FocusTest END";
-      Mebi_wrapper.get_proof ()
-    )
-  } *)
-(*  *)
-(* |![ proof ] 
-  [ "MeBiSim" "WeakNone" ] ->
-  { fun ~pstate -> 
-    Mebi_wrapper.run ~keep_encoding:true ~fresh:false ~new_proof:false ~proof:(Some pstate) (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBiSim:WeakNone BEGIN";
-      (* NOTE: do as many weak actions as possible  *)
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.update_proof_by_tactic 
-        (Mebi_tactics.apply (Mebi_theories.c_wk_none ())) in
-      let* _ = Mebi_wrapper.update_proof_by_tactic_mm 
-        (Mebi_tactics.unfold_econstr (Mebi_theories.c_silent ())) in
-      let* _ = Mebi_wrapper.update_proof_by_tactic 
-        (Mebi_tactics.eapply (Mebi_theories.c_rt1n_trans ())) in
-      let* _ = Mebi_wrapper.update_proof_by_tactic_mm 
-        (Mebi_tactics.unfold_econstr (Mebi_theories.c_tau ()))
-        (* TODO: figure out how to actually get the term in the goal *)
-      in 
-      (* let* _ = Mebi_wrapper.show_proof_data () in  *)
-      Logging.Log.debug "MeBiSim:WeakNone END";
-      Mebi_wrapper.get_proof ()
-    )
-  }
-|![ proof ] 
-  [ "MeBiSim" "WeakSome" ] ->
-  { fun ~pstate -> 
-    Mebi_wrapper.run ~keep_encoding:true ~fresh:false ~new_proof:false ~proof:(Some pstate) (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBiSim:WeakSome BEGIN";
-      (* TODO: do strong action *)
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.update_proof_by_tactic
-        (Mebi_tactics.apply (Mebi_theories.c_wk_some ()))
-      in 
-      (*  *)
-      Logging.Log.debug "MeBiSim:WeakSome END";
-      Mebi_wrapper.get_proof ()
-    )
-  } *)
-(*  *)
-(* |![ proof ] 
-  [ "MeBiSim" "Inv" ] ->
-  (* TODO: maybe this stuff could be in coq anyway, and used by [mebi_theories] *)
-  { fun ~pstate -> 
-    Mebi_wrapper.run ~keep_encoding:true ~fresh:false ~new_proof:false ~proof:(Some pstate) (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBiSim:TODO BEGIN";
-      (*  *)
-      Logging.Log.debug "MeBiSim:TODO END";
-      Mebi_wrapper.get_proof ()
-    )
-  }
-(*  *)
-|![ proof ] 
-  [ "MeBiSim" "Intros" ] ->
-  { fun ~pstate -> 
-    Mebi_wrapper.run ~keep_encoding:true ~fresh:false ~new_proof:false ~proof:(Some pstate) (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBiSim:Intros BEGIN";
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.update_proof_by_tactics_mm 
-        [ Mebi_tactics.intro_of_string ~track:false "m1"
-        ; Mebi_tactics.intro_of_string ~track:false "act_1"
-        ; Mebi_tactics.intro_of_string "H"
-        ] in 
-      Logging.Log.debug "MeBiSim:Intros END";
-      Mebi_wrapper.get_proof ()
-    )
-   }
-|![ proof ] 
-  [ "MeBiSim" "Cofix" ] ->
-  { fun ~pstate -> 
-    Mebi_wrapper.run ~keep_encoding:true ~fresh:false ~new_proof:false ~proof:(Some pstate) (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBiSim:Cofix BEGIN";
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.update_proof_by_tactic_mm 
-        ( Mebi_tactics.cofix ()) in
-        let* _ = Mebi_wrapper.update_proof_by_tactics
-        [ Mebi_tactics.apply (Mebi_theories.c_In_sim ())
-        ; Mebi_tactics.apply (Mebi_theories.c_Pack_sim ()) 
-        ] in 
-      Logging.Log.debug "MeBiSim:Cofix END";
-      Mebi_wrapper.get_proof ()
-    )
-   } *)
-(* |![ proof ] 
-  [ "MeBiSim" "Begin" constr(x) constr(y) ] -> 
-  { fun ~pstate -> 
-    Mebi_wrapper.run ~keep_encoding:true ~new_proof:true ~proof:(Some pstate) (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBiSim:Begin BEGIN";
-      let open Mebi_wrapper.Syntax in 
-      let* t = Mebi_tactics.unfold_constrexpr_list [x; y] in 
-      let* _ = Mebi_wrapper.update_proof_by_tactic t in 
-      Logging.Log.debug "MeBiSim:Begin END";
-      Mebi_wrapper.get_proof ()
-    )
-  } *)
 
 |![ proof ] 
   [ "MeBiSim" "Solve" int(upper_bound) ] ->
-  { fun ~pstate -> 
-    if Logging.is_debug_enabled () then Logging.Log.override "\n";
-    Mebi_proof.solve upper_bound pstate
-  }
+  { fun ~pstate -> Mebi_proof.solve upper_bound pstate }
 
-(*  *)
 |![ proof ] 
   [ "MeBiSim" "Step" ] ->
-  { fun ~pstate -> 
-    if Logging.is_debug_enabled () then Logging.Log.override "\n";
-    Mebi_tactics.update_proof_by_tactic pstate (Mebi_proof.step ())
-  }
+  { fun ~pstate -> Mebi_tactics.update_proof_by_tactic pstate (Mebi_proof.step ()) }
 
 |![ proof ] 
   [ "MeBiSim" "Begin" reference(a) constr(x)  
@@ -254,61 +29,131 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
                 "Using" reference_list(rs) ] -> 
   { fun ~pstate -> 
     Mebi_wrapper.run ~keep_encoding:false ~fresh:true (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      (* Logging.Log.debug "MeBiSim: BEGIN"; *)
-      (* let t = Command.proof_intro (x, a) (y, b) rs in  *)
-      (* let open Mebi_wrapper.Syntax in  *)
-      (* let* _ = Mebi_wrapper.show_fwd_map () in *)
-      (* let* _ = Mebi_wrapper.show_bck_map () in *)
-      (* Logging.Log.debug "MeBiSim: END"; *)
-      (* t *)
       Command.proof_intro pstate (x, a) (y, b) rs
     ) 
   }
+
 |![ proof ] 
   [ "MeBiSim" "Begin" reference(a) constr(x)  
                 "And" reference(b) constr(y) ] -> 
   { fun ~pstate -> 
     Mebi_wrapper.run ~keep_encoding:false ~fresh:true (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      (* Logging.Log.debug "MeBiSim: BEGIN"; *)
-      (* let t = Command.proof_intro (x, a) (y, b) [] in  *)
-      (* let open Mebi_wrapper.Syntax in  *)
-      (* let* _ = Mebi_wrapper.show_fwd_map () in *)
-      (* let* _ = Mebi_wrapper.show_bck_map () in *)
-      (* Logging.Log.debug "MeBiSim: END"; *)
-      (* t *)
       Command.proof_intro pstate (x, a) (y, b) []
     ) 
   }
 
-
-
-
-(* |![ proof ] 
-  [ "MeBiSim" "Begin" 
-    constr(x) (* "With" reference(a) "And" *)
-    constr(y) (* "With" reference(b) "Using" reference_list(rs) *) ] -> 
-  { fun ~pstate -> 
-    Mebi_wrapper.run ~proof:(Some pstate) (
-      if Logging.is_debug_enabled () then Logging.Log.override "\n";
-      Logging.Log.debug "MeBiSim:Begin BEGIN";
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.update_proof_by_tactics_mm [
-        Mebi_tactics.unfold_constrexpr_list [x; y]
-      ; Mebi_tactics.cofix ()
-      ; Mebi_tactics.apply_mm Mebi_theories.In_sim ()
-      ; Mebi_tactics.apply_mm Mebi_theories.Pack_sim ()
-      (* ; Mebi_tactics.intros_all () *)
-      ; Mebi_tactics.intro "m1"
-      ; Mebi_tactics.intro "a0_1"
-      ; Mebi_tactics.intro "Hm0_1"
-      ] in 
-      Logging.Log.debug "MeBiSim:Begin END";
-      Mebi_wrapper.get_proof ()
-    )
-  } *)
 END
+
+VERNAC COMMAND EXTEND MeBi_LTS CLASSIFIED AS QUERY
+| ["MeBi" "LTS" constr(x) "Using" reference(r)] -> 
+  {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) [])}
+  
+| ["MeBi" "LTS" constr(x) "Using" reference(r) reference_list(rs)] -> 
+  {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) rs)}
+END 
+
+VERNAC COMMAND EXTEND MeBi_FSM CLASSIFIED AS QUERY
+| ["MeBi" "FSM" constr(x) "Using" reference(r)] -> 
+  {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.FSM, (x, r))) [])}
+
+| ["MeBi" "FSM" constr(x) "Using" reference(r) reference_list(rs)] -> 
+  {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.FSM, (x, r))) rs)}
+END 
+
+VERNAC COMMAND EXTEND MeBi_Saturate CLASSIFIED AS QUERY
+| ["MeBi" "Saturate" constr(x) "Using" reference(r)] -> 
+  {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) [])}
+
+| ["MeBi" "Saturate" constr(x) "Using" reference(r) reference_list(rs)] -> 
+  {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) rs)}
+END 
+
+VERNAC COMMAND EXTEND MeBi_Minimize CLASSIFIED AS QUERY
+| ["MeBi" "Minimize" constr(x) "Using" reference(r)] -> 
+  {Mebi_wrapper.run (Command.run (Command.MinimizeModel (x, r)) [])}
+  
+| ["MeBi" "Minimize" constr(x) "Using" reference(r) reference_list(rs)] -> 
+  {Mebi_wrapper.run (Command.run (Command.MinimizeModel (x, r)) rs)}
+END 
+
+VERNAC COMMAND EXTEND MeBi_Merge CLASSIFIED AS QUERY
+| ["MeBi" "Merge" constr(x) "With" reference(a) 
+            "And" constr(y) "With" reference(b)] -> 
+  {Mebi_wrapper.run (Command.run (Command.MergeModels ((x, a), (y, b))) [])}
+
+| ["MeBi" "Merge" constr(x) "With" reference(a) 
+            "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
+  {Mebi_wrapper.run (Command.run (Command.MergeModels ((x, a), (y, b))) rs)}
+END 
+
+VERNAC COMMAND EXTEND MeBi_Bisim CLASSIFIED AS QUERY
+| ["MeBi" "Bisim" constr(x) "With" reference(a) 
+            "And" constr(y) "With" reference(b)] -> 
+  {Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) [])}
+
+| ["MeBi" "Bisim" constr(x) "With" reference(a) 
+            "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
+  {Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) rs)}
+END 
+
+VERNAC COMMAND EXTEND MeBi_Divider CLASSIFIED AS QUERY
+(* for outputting messages -- useful for sifting through compiler output *)
+| ["MeBi" "Message" string(x)] -> {Logger.Default.show x}
+| ["MeBi" "Debug"   string(x)] -> {Logger.Default.debug x}
+| ["MeBi" "Divider"          ] -> {Logger.Default.show "\n- - - - - - - - - - - - - - - -"}
+| ["MeBi" string(x) "Divider"] -> {Logger.Default.show (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -" x)}
+| ["MeBi" "Divider" string(x)] -> {Logger.Default.show (Printf.sprintf "\n- - - - - - - - - - - - - - - -\n%s" x)}
+| ["MeBi" string(x) "Divider" string(y)] -> 
+  {Logger.Default.show (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n%s" x y)}
+END 
+
+
+VERNAC COMMAND EXTEND MeBi_Config_Bounds CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Bound" int(x)] -> {Mebi_api.set_bound x}
+| ["MeBi" "Config" "Bound" int(x) "On" "States"] -> {Mebi_api.set_bounds x Mebi_api.States}
+| ["MeBi" "Config" "Bound" int(x) "On" "Transitions"] -> {Mebi_api.set_bounds x Mebi_api.Transitions}
+(* TODO: add reset *)
+END 
+
+VERNAC COMMAND EXTEND MeBi_Config_Weak CLASSIFIED AS QUERY
+| ["MeBi" "Config" "WeakMode" "Enable"] -> {Mebi_api.set_weak_mode_enabled true}
+| ["MeBi" "Config" "WeakMode" "Disable"] -> {Mebi_api.set_weak_mode_enabled false}
+
+(* set the weak transitions -- bisim will use for both terms unless specified *)
+| ["MeBi" "Config" "Weak" "As" "Option" constr(x)] -> {Mebi_api.set_weak_arg1 (Mebi_api.OptionConstr x)}
+| ["MeBi" "Config" "Weak" "As" constr(x) "Of" reference(y)] -> {Mebi_api.set_weak_arg1 (Mebi_api.CustomConstr (x, y))}
+
+(* same as above *)
+| ["MeBi" "Config" "Weak1" "As" "Option" constr(x)] -> {Mebi_api.set_weak_arg1 (Mebi_api.OptionConstr x)}
+| ["MeBi" "Config" "Weak1" "As" constr(x) "Of" reference(y)] -> {Mebi_api.set_weak_arg1 (Mebi_api.CustomConstr (x, y))}
+
+(* for second lts *)
+| ["MeBi" "Config" "Weak2" "As" "Option" constr(x)] -> {Mebi_api.set_weak_arg2 (Mebi_api.OptionConstr x)}
+| ["MeBi" "Config" "Weak2" "As" constr(x) "Of" reference(y)] -> {Mebi_api.set_weak_arg2 (Mebi_api.CustomConstr (x, y))}
+(* TODO: add reset *)
+END 
+
+VERNAC COMMAND EXTEND MeBi_Config_Fail CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Fail" "If" "Incomplete" "True" ] -> {Mebi_api.set_fail_ifincomplete true}
+| ["MeBi" "Config" "Fail" "If" "Incomplete" "False"] -> {Mebi_api.set_fail_ifincomplete false}
+
+| ["MeBi" "Config" "Fail" "If" "NotBisim" "True" ] -> {Mebi_api.set_fail_ifnotbisim true}
+| ["MeBi" "Config" "Fail" "If" "NotBisim" "False"] -> {Mebi_api.set_fail_ifnotbisim false}
+(* TODO: add reset *)
+END 
+
+VERNAC COMMAND EXTEND MeBi_Config_Debug CLASSIFIED AS QUERY
+
+(* TODO: add reset *)
+END 
+
+(* 
+VERNAC COMMAND EXTEND MeBi_ CLASSIFIED AS QUERY
+
+
+END 
+*)
+
 
 (* VERNAC COMMAND EXTEND MeBi_BeginProof CLASSIFIED AS QUERY
 |  ![ proof_query ] 
@@ -596,11 +441,11 @@ VERNAC COMMAND EXTEND MeBiRun CLASSIFIED AS QUERY
 | ["MeBi" "Info"] -> {Mebi_wrapper.run (Command.run (Command.Info ()) [])}
 
 (* for outputting messages -- useful for sifting through compiler output *)
-| ["MeBi" "Message" string(x)] -> {Logging.Log.override x}
-| ["MeBi" "Debug"   string(x)] -> {Logging.Log.debug x}
-| ["MeBi" "Divider"          ] -> {Logging.Log.override "\n- - - - - - - - - - - - - - - -"}
-| ["MeBi" string(x) "Divider"] -> {Logging.Log.override (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -" x)}
-| ["MeBi" "Divider" string(x)] -> {Logging.Log.override (Printf.sprintf "\n- - - - - - - - - - - - - - - -\n%s" x)}
+| ["MeBi" "Message" string(x)] -> {Logger.Default.show x}
+| ["MeBi" "Debug"   string(x)] -> {Logger.Default.debug x}
+| ["MeBi" "Divider"          ] -> {Logger.Default.show "\n- - - - - - - - - - - - - - - -"}
+| ["MeBi" string(x) "Divider"] -> {Logger.Default.show (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -" x)}
+| ["MeBi" "Divider" string(x)] -> {Logger.Default.show (Printf.sprintf "\n- - - - - - - - - - - - - - - -\n%s" x)}
 | ["MeBi" string(x) "Divider" string(y)] -> 
-  {Logging.Log.override (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n%s" x y)}
+  {Logger.Default.show (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n%s" x y)}
 END

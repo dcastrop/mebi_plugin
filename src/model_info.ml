@@ -7,8 +7,17 @@ type t =
 and mebi_info =
   { is_complete : bool
   ; is_merged : bool
-  ; bound : int
+  ; bounds : bound_config
   }
+
+and bound_config =
+  { bound : int
+  ; bound_for : boundable
+  }
+
+and boundable =
+  | States
+  | Transitions
 
 and rocq_info =
   { enc : Mebi_setup.Enc.t
@@ -23,10 +32,21 @@ let mebi_info_to_string ?(args : style_args = style_args ()) (x : mebi_info)
   =
   let is_complete : string = bool ~args x.is_complete in
   let is_merged : string = bool ~args x.is_merged in
-  let bound : string = int ~args x.bound in
+  let bound : string = int ~args x.bounds.bound in
+  let bound_for : string =
+    string
+      ~args
+      (match x.bounds.bound_for with
+       | States -> "States"
+       | Transitions -> "Transitions")
+  in
   record
     ~args
-    [ "is_complete", is_complete; "is_merged", is_merged; "bound", bound ]
+    [ "is_complete", is_complete
+    ; "is_merged", is_merged
+    ; "bound", bound
+    ; "bound_for", bound_for
+    ]
 ;;
 
 let mebi_info_list_option_to_string ?(args : style_args = style_args ())

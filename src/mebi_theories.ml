@@ -1,15 +1,9 @@
-module Log : Logger.LOGGER_TYPE =
-  Logger.Make
-    (Logger.Output.Rocq)
-    (struct
-      let prefix : string option = None
+(***********************************************************************)
+module Log : Logger.LOGGER_TYPE = Logger.Default
 
-      let is_level_enabled : Logger.level -> bool =
-        Logger.make_level_fun ~debug:false ()
-      ;;
-    end)
-
-(*****************************************************************************)
+let () = Log.Config.configure_output Debug false
+let () = Log.Config.configure_output Trace false
+(***********************************************************************)
 
 let rec tactics : unit Proofview.tactic list -> unit Proofview.tactic = function
   | [] -> Proofview.tclUNIT ()

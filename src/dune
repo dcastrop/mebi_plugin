@@ -21,14 +21,16 @@
   )
  (modules
   utils
+  output_kind
+  output_mode
+  output_config
   logger
   rocq_utils
   rocq_convert
-  logging
-  debug
+  ; logging
+  ; debug
   mebi_enc
   mebi_setup
-  ; strfy
   mebi_constr
   mebi_theories
   model_info
@@ -40,8 +42,7 @@
   model_action
   model_edge
   model
-  ; lts
-  ; fsm
+  saturate_model
   algorithms
   mebi_tactics
   mebi_wrapper
@@ -49,13 +50,13 @@
   mebi_utils
   mebi_hypothesis
   mebi_proof
-  ; mebi_bisim
-  rocq_debug
-  params
-  ; dump_to_file
+  ; rocq_debug
+  ; params
+  mebi_weak
+  mebi_api
   mebi_help
   mebi_unification
-  mebi_debug
+  ; mebi_debug
   mebi_unify
   command
   ; examples
