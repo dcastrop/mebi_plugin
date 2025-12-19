@@ -1,5 +1,3 @@
-val enable_logging : bool ref
-
 type unif_problem =
   { termL : Evd.econstr
   ; termR : Evd.econstr

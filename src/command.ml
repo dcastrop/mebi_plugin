@@ -19,7 +19,7 @@ module type GraphB = sig
     ; transitions : constr_transitions H.t
       (* ; ind_defs : (Enc.t * Mebi_ind.t) list *)
     ; ind_defs : Mebi_ind.t B.t
-    ; weak : Params.WeakEnc.t option
+    ; weak : Mebi_weak.t option
     }
 
   val insert_constr_transition
@@ -41,26 +41,28 @@ module type GraphB = sig
     :  Mebi_ind.t
     -> Mebi_ind.t B.t
     -> lts_graph
-    -> int * Params.WeakEnc.t option
+    -> int * (lts_graph -> int -> bool)
     -> lts_graph mm
 
   val build_graph
     :  Libnames.qualid
     -> Constrexpr.constr_expr
-    -> int * Params.WeakEnc.t option
+    -> Mebi_api.bound_config
+    -> Mebi_api.weak_enc option
     -> Names.GlobRef.t list
     -> lts_graph mm
 
   (* val to_lts
      :  ?cache:bool
      -> lts_graph
-     -> int * Params.WeakEnc.t option
+     -> int * Mebi_weak.t option
      -> Model.Lts.t mm *)
 
   val decoq_lts
     :  ?cache_decoding:bool
     -> lts_graph (* -> cindef * cindef B.t *)
-    -> int * Params.WeakEnc.t option
+    -> Mebi_api.bound_config
+    -> Mebi_api.weak_enc option
     -> Lts.t mm
 end
 
@@ -71,28 +73,20 @@ module MkGraph
     (N : Set.S with type elt = Enc.t)
     (P : Set.S with type elt = Enc.t * Tree.t) : GraphB = struct
   (***********************************************************************)
+  module GLog : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
-  (** custom logging for graph builder *)
-  module GraphLog : Logger.LOGGER_TYPE =
-    Logger.Make
-      (Logger.Output.Rocq)
-      (struct
-        let prefix : string option = None
-
-        let is_level_enabled : Logger.level -> bool =
-          (* Logger.make_level_fun ~debug:true ~info:true () *)
-          Logger.make_level_fun ~debug:false ~info:true ()
-        ;;
-      end)
+  let () = GLog.Config.configure_output Debug false
+  let () = GLog.Config.configure_output Trace false
+  (***********************************************************************)
 
   let debug_enc ?(__FUNCTION__ : string = "") (p : string) (x : Enc.t) : unit =
-    GraphLog.thing ~__FUNCTION__ Debug p x (Of Enc.to_string)
+    GLog.thing ~__FUNCTION__ Debug p x (Of Enc.to_string)
   ;;
 
   let debug_econstr ?(__FUNCTION__ : string = "") (p : string) (x : EConstr.t)
     : unit
     =
-    GraphLog.thing ~__FUNCTION__ Debug p x (Of econstr_to_string)
+    GLog.thing ~__FUNCTION__ Debug p x (Of econstr_to_string)
   ;;
 
   let debug_dec
@@ -129,7 +123,7 @@ module MkGraph
         (xs : constr_transitions)
     : string
     =
-    GraphLog.trace __FUNCTION__;
+    GLog.trace __FUNCTION__;
     let open Utils.Strfy in
     list
       ~args:{ args with name = Some "constr_transitions" }
@@ -152,7 +146,7 @@ module MkGraph
         (xs : constr_transitions M.t)
     : string
     =
-    GraphLog.trace __FUNCTION__;
+    GLog.trace __FUNCTION__;
     let open Utils.Strfy in
     list
       ~args:{ args with name = Some "transitions" }
@@ -173,7 +167,7 @@ module MkGraph
     ; states : S.t
     ; transitions : constr_transitions H.t
     ; ind_defs : Mebi_ind.t B.t
-    ; weak : Params.WeakEnc.t option
+    ; weak : Mebi_weak.t option
     }
 
   (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Tree.t)] in a given [constr_transitions].
@@ -185,7 +179,7 @@ module MkGraph
         (c : Tree.t)
     : unit
     =
-    GraphLog.trace __FUNCTION__;
+    GLog.trace __FUNCTION__;
     match Hashtbl.find_opt constrs a with
     | None -> Hashtbl.add constrs a (D.singleton (d, c))
     | Some ds -> Hashtbl.replace constrs a (D.add (d, c) ds)
@@ -199,7 +193,7 @@ module MkGraph
         (c : Tree.t)
     : unit
     =
-    GraphLog.trace __FUNCTION__;
+    GLog.trace __FUNCTION__;
     H.add
       g.transitions
       t
@@ -214,16 +208,16 @@ module MkGraph
         (constructors : Tree.t)
     : unit
     =
-    GraphLog.trace __FUNCTION__;
+    GLog.trace __FUNCTION__;
     match H.find_opt g.transitions from with
     | None -> add_new_term_constr_transition g from action goto constructors
     | Some actions -> insert_constr_transition actions action goto constructors
   ;;
 
-  let is_silent_transition (weak : Params.WeakEnc.t option) (act : EConstr.t)
+  let is_silent_transition (weak : Mebi_weak.t option) (act : EConstr.t)
     : bool option mm
     =
-    GraphLog.trace __FUNCTION__;
+    GLog.trace __FUNCTION__;
     match weak with
     | None -> return None
     | Some weak_kind ->
@@ -231,17 +225,17 @@ module MkGraph
       let* ty : EConstr.t = Mebi_utils.type_of_econstr act in
       let* ty_enc : Enc.t = encode ty in
       debug_econstr ~__FUNCTION__ "ty act" ty;
-      let open Params.WeakEnc in
+      let open Mebi_weak in
       (match weak_kind with
-       | OptionConstr label_enc ->
-         GraphLog.trace ~__FUNCTION__ "OptionConstr (label_enc)";
+       | Option label_enc ->
+         GLog.trace ~__FUNCTION__ "OptionConstr (label_enc)";
          let* label_decoding : EConstr.t = decode label_enc in
          debug_dec ~__FUNCTION__ "label" label_enc label_decoding;
          (* NOTE: all non-silent actions should be of this type *)
          let* b = Mebi_utils.is_none_term act in
          return (Some b)
-       | CustomConstr (tau_enc, label_enc) ->
-         GraphLog.trace ~__FUNCTION__ "CustomConstr (tau_enc, label_enc)";
+       | Custom (tau_enc, label_enc) ->
+         GLog.trace ~__FUNCTION__ "CustomConstr (tau_enc, label_enc)";
          let* tau_decoding : EConstr.t = decode tau_enc in
          debug_dec ~__FUNCTION__ "tau" tau_enc tau_decoding;
          let* label_decoding : EConstr.t = decode label_enc in
@@ -249,20 +243,16 @@ module MkGraph
          return (Some (Enc.equal tau_enc act_enc)))
   ;;
 
-  let get_new_states
-        ?(weak_type : Params.WeakEnc.t option = None)
-        (from : Enc.t)
-        (g : lts_graph)
-        (ctors : Mebi_constr.t list)
+  let get_new_states (from : Enc.t) (g : lts_graph) (ctors : Mebi_constr.t list)
     : S.t mm
     =
-    GraphLog.trace __FUNCTION__;
-    GraphLog.thing ~__FUNCTION__ Info "from" from (Of Enc.to_string);
+    GLog.trace __FUNCTION__;
+    GLog.thing ~__FUNCTION__ Info "from" from (Of Enc.to_string);
     let iter_body (i : int) (new_states : S.t) =
       let (act, tgt, int_tree) : Mebi_constr.t = List.nth ctors i in
       let* tgt_enc : Enc.t = encode tgt in
       let* act_enc : Enc.t = encode act in
-      let* is_silent : bool option = is_silent_transition weak_type act in
+      let* is_silent : bool option = is_silent_transition g.weak act in
       let label : Label.t = { enc = act_enc; is_silent; pp = None } in
       let constructor_trees : Tree.t list = [ int_tree ] in
       let to_add : Action.t = Action.create label ~constructor_trees () in
@@ -283,7 +273,7 @@ module MkGraph
         (lts_ind_def_map : Mebi_ind.t B.t)
     : Mebi_constr.t list mm
     =
-    GraphLog.trace __FUNCTION__;
+    GLog.trace __FUNCTION__;
     let* from_term : EConstr.t = decode from in
     let* label_type : EConstr.t = Mebi_ind.get_lts_label_type primary in
     let* ind_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
@@ -306,14 +296,12 @@ module MkGraph
             (the_primary_lts : Mebi_ind.t)
             (lts_ind_def_map : Mebi_ind.t B.t)
             (g : lts_graph)
-            ((bound, weak_type) : int * Params.WeakEnc.t option)
+            ((bound, fstop) : int * (lts_graph -> int -> bool))
     : lts_graph mm
     =
-    GraphLog.trace __FUNCTION__;
-    if Queue.is_empty g.to_visit
-    then return g (* NOTE: finished if no more to visit*)
-    else if S.cardinal g.states > bound
-    then return g (* NOTE: exit if bound reached *)
+    GLog.trace __FUNCTION__;
+    if Queue.is_empty g.to_visit || fstop g bound
+    then return g
     else (
       let encoded_t : Enc.t = Queue.pop g.to_visit in
       let* new_constrs : Mebi_constr.t list =
@@ -321,10 +309,10 @@ module MkGraph
       in
       let* new_states : S.t =
         (* NOTE: also updates [g.to_visit ]*)
-        get_new_states ~weak_type encoded_t g new_constrs
+        get_new_states encoded_t g new_constrs
       in
       let g : lts_graph = { g with states = S.union g.states new_states } in
-      build_lts_graph the_primary_lts lts_ind_def_map g (bound, weak_type))
+      build_lts_graph the_primary_lts lts_ind_def_map g (bound, fstop))
   ;;
 
   (** @return
@@ -333,7 +321,7 @@ module MkGraph
   let build_lts_ind_def_map (grefs : Names.GlobRef.t list)
     : (Enc.t * Mebi_ind.t B.t) mm
     =
-    GraphLog.trace __FUNCTION__;
+    GLog.trace __FUNCTION__;
     let num_grefs : int = List.length grefs in
     let iter_body
           (i : int)
@@ -372,11 +360,12 @@ module MkGraph
   let build_graph
         (primary_lts : Libnames.qualid)
         (tref : Constrexpr.constr_expr)
-        ((bound, weak_type) : int * Params.WeakEnc.t option)
+        ({ bound; bound_for } : Mebi_api.bound_config)
+        (weak_type : Mebi_api.weak_enc option)
         (grefs : Names.GlobRef.t list)
     : lts_graph mm
     =
-    GraphLog.trace __FUNCTION__;
+    GLog.trace __FUNCTION__;
     (* NOTE: normalize the initial term *)
     let* t : EConstr.t = Mebi_utils.constrexpr_to_econstr tref in
     let* t : EConstr.t = Mebi_utils.econstr_normalize t in
@@ -394,6 +383,12 @@ module MkGraph
     let* initial_enc = encode initial_trm in
     let to_visit : S.elt Queue.t = Queue.create () in
     let* _ = return (Queue.push initial_enc to_visit) in
+    let fstop : lts_graph -> int -> bool =
+      match bound_for with
+      | States -> fun (g : lts_graph) (n : int) -> S.cardinal g.states > n
+      | Transitions ->
+        fun (g : lts_graph) (n : int) -> H.length g.transitions > n
+    in
     let* g : lts_graph =
       build_lts_graph
         the_primary_lts
@@ -406,7 +401,7 @@ module MkGraph
         ; ind_defs = lts_ind_def_map
         ; weak = weak_type
         }
-        (bound, weak_type)
+        (bound, fstop)
     in
     (* NOTE: terminals are states with no out-going transitions *)
     let terminals : S.t =
@@ -421,10 +416,10 @@ module MkGraph
         ?(cache : bool = false)
         ({ to_visit; init; terminals; states; transitions; ind_defs; weak } :
           lts_graph)
-        ((bound, weak_type) : int * Params.WeakEnc.t option)
+        ((bound, weak_type) : int * Mebi_weak.t option)
     : Model.Lts.t mm
     =
-    GraphLog.trace __FUNCTION__;
+    GLog.trace __FUNCTION__;
     let enc_pp (x : Enc.t) : string option mm =
       if cache
       then
@@ -449,7 +444,7 @@ module MkGraph
   let decoq_enc ?(cache_decoding : bool = false) (enc : Enc.t)
     : string option mm
     =
-    GraphLog.trace __FUNCTION__;
+    GLog.trace __FUNCTION__;
     if cache_decoding
     then
       let* s_decoding = decode enc in
@@ -501,7 +496,7 @@ module MkGraph
     if D.is_empty dests
     then (
       Args State.to_string
-      |> GraphLog.thing ~__FUNCTION__ Debug "no destinations from" from;
+      |> GLog.thing ~__FUNCTION__ Debug "no destinations from" from;
       return Transitions.empty)
     else (
       let raw_dests = D.to_list dests in
@@ -527,7 +522,7 @@ module MkGraph
     if Int.equal 0 (Hashtbl.length actions)
     then (
       Args State.to_string
-      |> GraphLog.thing ~__FUNCTION__ Debug "no actions from" from;
+      |> GLog.thing ~__FUNCTION__ Debug "no actions from" from;
       return (Alphabet.empty, Transitions.empty))
     else (
       let raw_actions = List.of_seq (Hashtbl.to_seq actions) in
@@ -601,17 +596,18 @@ module MkGraph
       []
   ;;
 
-  let decoq_weak_enc (w : Params.WeakEnc.t option) : string list mm =
+  let decoq_weak_enc (w : Mebi_weak.t option) : string list mm =
     return [ "TODO: decoq_weak_enc" ]
   ;;
 
   let decoq_lts
         ?(cache_decoding : bool = false)
         (g : lts_graph)
-        ((bound, weak_type) : int * Params.WeakEnc.t option)
+        (bounds : Mebi_api.bound_config)
+        (weak_params : Mebi_api.weak_enc option)
     : Lts.t mm
     =
-    GraphLog.debug __FUNCTION__;
+    GLog.debug __FUNCTION__;
     let* init : State.t option = decoq_state_opt ~cache_decoding g.init in
     let* states : States.t = decoq_states ~cache_decoding g.states in
     let* terminals = decoq_states ~cache_decoding g.terminals in
@@ -625,7 +621,7 @@ module MkGraph
           Some
             [ { is_complete = Queue.is_empty g.to_visit
               ; is_merged = false
-              ; bound
+              ; bounds
               }
             ]
       ; rocq_info = Some ind_defs
@@ -639,17 +635,12 @@ module MkGraph
 end
 
 (***********************************************************************)
+module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
-module Log : Logger.LOGGER_TYPE =
-  Logger.Make
-    (Logger.Output.Rocq)
-    (struct
-      let prefix : string option = None
-
-      let is_level_enabled : Logger.level -> bool =
-        Logger.make_level_fun ~debug:true ~info:true ()
-      ;;
-    end)
+let () = Log.Config.configure_output Info false
+let () = Log.Config.configure_output Debug false
+let () = Log.Config.configure_output Trace false
+(***********************************************************************)
 
 (** [make_graph_builder] is ... *)
 let make_graph_builder =
@@ -677,9 +668,13 @@ let is_lts_complete ({ info; _ } : Lts.t) : bool =
 ;;
 
 (** *)
-let fail_if_incomplete (x : Lts.t) (bound : int) : unit mm =
+let fail_if_incomplete
+      (x : Lts.t)
+      ({ bound; bound_for } : Mebi_api.bound_config)
+  : unit mm
+  =
   Log.trace __FUNCTION__;
-  if !Params.the_fail_if_incomplete && Bool.not (is_lts_complete x)
+  if Mebi_api.fail_if_incomplete () && Bool.not (is_lts_complete x)
   then (
     Log.thing Notice "Incomplete Lts\n" x (Args Lts.to_string);
     Log.thing Notice "Lts is Incomplete with bound" bound (Args Utils.Strfy.int);
@@ -692,7 +687,8 @@ let build_lts
       (primary_lts : Libnames.qualid)
       (t : Constrexpr.constr_expr)
       (refs : Libnames.qualid list)
-      (params : int * Params.WeakEnc.t option)
+      (bounds : Mebi_api.bound_config)
+      (weak_params : Mebi_api.weak_enc option)
   : Lts.t mm
   =
   Log.trace __FUNCTION__;
@@ -700,12 +696,14 @@ let build_lts
   let module G = (val graphM) in
   let* graph_lts =
     Mebi_utils.ref_list_to_glob_list (primary_lts :: refs)
-    |> G.build_graph primary_lts t params
+    |> G.build_graph primary_lts t bounds weak_params
   in
   Log.trace ~__FUNCTION__ "built lts graph";
-  let* the_lts = G.decoq_lts ~cache_decoding:true graph_lts params in
+  let* the_lts =
+    G.decoq_lts ~cache_decoding:true graph_lts bounds weak_params
+  in
   Log.trace ~__FUNCTION__ "converted lts graph to lts model";
-  let* () = fail_if_incomplete the_lts (fst params) in
+  let* () = fail_if_incomplete the_lts bounds in
   return the_lts
 ;;
 
@@ -716,12 +714,13 @@ let build_fsm
       (primary_lts : Libnames.qualid)
       (t : Constrexpr.constr_expr)
       (refs : Libnames.qualid list)
-      (params : int * Params.WeakEnc.t option)
+      (bounds : Mebi_api.bound_config)
+      (weak : Mebi_api.weak_enc option)
   : Fsm.t mm
   =
   Log.trace __FUNCTION__;
   (* NOTE: build lts *)
-  let* the_lts = build_lts primary_lts t refs params in
+  let* the_lts = build_lts primary_lts t refs bounds weak in
   Log.trace ~__FUNCTION__ "obtained lts model";
   Log.thing ~__FUNCTION__ Info "lts" the_lts (Args Lts.to_string);
   (* NOTE: convert to fsm *)
@@ -729,16 +728,17 @@ let build_fsm
   Log.trace ~__FUNCTION__ "converted lts to fsm";
   Log.thing ~__FUNCTION__ Info "fsm" the_fsm (Args Fsm.to_string);
   (* NOTE: debug messages *)
+  let weak : bool = Mebi_api.is_in_weak_mode () in
   let b : 'a Logger.to_string = Of Utils.Strfy.bool in
-  Log.thing ~__FUNCTION__ Debug "weakmode" !Params.the_weak_mode b;
+  Log.thing ~__FUNCTION__ Debug "weakmode" weak b;
   Log.thing ~__FUNCTION__ Debug "minimize" minimize b;
   Log.thing ~__FUNCTION__ Debug "saturate" saturate b;
   (* NOTE: return fsm (and do any further operations) *)
   let fsm_to_return : Fsm.t =
     if minimize
-    then Algorithms.Minimize.run ~weak:!Params.the_weak_mode the_fsm |> fst
+    then Algorithms.Minimize.run ~weak the_fsm |> fst
     else if saturate
-    then Saturate.fsm the_fsm
+    then Saturate_model.fsm the_fsm
     else the_fsm
   in
   return fsm_to_return
@@ -770,14 +770,16 @@ let make_model refs
   Log.trace __FUNCTION__;
   function
   | LTS, (x, primary_lts) ->
+    let bounds : Mebi_api.bound_config = Mebi_api.get_bounds () in
     let* the_lts : Lts.t =
-      Params.get_fst_params () |> build_lts primary_lts x refs
+      Mebi_api.get_weak_enc1 () |> build_lts primary_lts x refs bounds
     in
     Log.thing ~__FUNCTION__ Notice "lts" the_lts (Of Lts.to_string);
     return ()
   | FSM, (x, primary_lts) ->
+    let bounds : Mebi_api.bound_config = Mebi_api.get_bounds () in
     let* the_fsm : Fsm.t =
-      Params.get_fst_params () |> build_fsm primary_lts x refs
+      Mebi_api.get_weak_enc1 () |> build_fsm primary_lts x refs bounds
     in
     Log.thing ~__FUNCTION__ Notice "fsm" the_fsm (Of Fsm.to_string);
     return ()
@@ -785,21 +787,23 @@ let make_model refs
 
 let only_in_weak_mode (f : 'a mm) : unit mm =
   Log.trace __FUNCTION__;
-  match !Params.the_weak_mode, Params.fst_weak_type () with
-  | true, Some _ ->
+  let weak : bool = Mebi_api.is_in_weak_mode () in
+  let weak_args : bool = Mebi_api.has_weak_args () in
+  match weak, weak_args with
+  | true, true ->
     Log.debug ~__FUNCTION__ "weak mode, has been set. (running.)";
     let* _ = f in
     return ()
-  | true, None ->
+  | true, false ->
     Log.debug ~__FUNCTION__ "weak mode, not set";
     Mebi_help.show_instructions_to_set_weak ();
     return ()
-  | false, Some _ ->
+  | false, true ->
     Log.debug ~__FUNCTION__ "not in weak mode, (but has been set)";
     Log.notice ~__FUNCTION__ "Aborting command. (Not in weak mode)\n";
     Mebi_help.show_instructions_to_enable_weak ();
     return ()
-  | false, None ->
+  | false, false ->
     Log.debug ~__FUNCTION__ "not in weak mode (weak also not set)";
     Log.notice ~__FUNCTION__ "Aborting command. (Not in weak mode)\n";
     Mebi_help.show_instructions_to_enable_weak ();
@@ -810,8 +814,10 @@ let only_in_weak_mode (f : 'a mm) : unit mm =
 let saturate_model ((x, primary_lts) : coq_model) refs : unit mm =
   Log.trace __FUNCTION__;
   only_in_weak_mode
-    (let* the_fsm =
-       Params.get_fst_params () |> build_fsm ~saturate:true primary_lts x refs
+    (let bounds : Mebi_api.bound_config = Mebi_api.get_bounds () in
+     let* the_fsm =
+       Mebi_api.get_weak_enc1 ()
+       |> build_fsm ~minimize:true primary_lts x refs bounds
      in
      Log.trace ~__FUNCTION__ "obtained saturated fsm";
      Log.notice "Successfully saturated FSM. (To see enable Info display.)";
@@ -822,8 +828,10 @@ let saturate_model ((x, primary_lts) : coq_model) refs : unit mm =
 let minimize_model ((x, primary_lts) : coq_model) refs : unit mm =
   Log.trace __FUNCTION__;
   only_in_weak_mode
-    (let* the_fsm =
-       Params.get_fst_params () |> build_fsm ~minimize:true primary_lts x refs
+    (let bounds : Mebi_api.bound_config = Mebi_api.get_bounds () in
+     let* the_fsm =
+       Mebi_api.get_weak_enc1 ()
+       |> build_fsm ~minimize:true primary_lts x refs bounds
      in
      Log.trace ~__FUNCTION__ "obtained minimized fsm";
      Log.notice "Successfully minimized FSM.";
@@ -834,13 +842,14 @@ let minimize_model ((x, primary_lts) : coq_model) refs : unit mm =
 let merge_models ((x, a), (y, b)) refs : unit mm =
   Log.trace __FUNCTION__;
   (* NOTE: construct both fsm *)
-  let* the_fsm_1 = build_fsm a x refs (Params.get_fst_params ()) in
-  let* the_fsm_2 = build_fsm b y refs (Params.get_snd_params ()) in
+  let bounds : Mebi_api.bound_config = Mebi_api.get_bounds () in
+  let* the_fsm_1 = build_fsm a x refs bounds (Mebi_api.get_weak_enc1 ()) in
+  let* the_fsm_2 = build_fsm b y refs bounds (Mebi_api.get_weak_enc2 ()) in
   Log.trace ~__FUNCTION__ "built both fsms";
   (* NOTE: if weak-mode then pre-saturate the fsms *)
   let (the_fsm_1, the_fsm_2) : Fsm.pair =
-    if !Params.the_weak_mode
-    then Saturate.fsm the_fsm_1, Saturate.fsm the_fsm_2
+    if Mebi_api.is_in_weak_mode ()
+    then Saturate_model.fsm the_fsm_1, Saturate_model.fsm the_fsm_2
     else the_fsm_1, the_fsm_2
   in
   Log.trace ~__FUNCTION__ "about to merge (pre-saturated fsms if in weak-mode)";
@@ -856,21 +865,24 @@ let merge_models ((x, a), (y, b)) refs : unit mm =
 (** *)
 let fail_if_not_bisim (x : bool) : unit mm =
   Log.trace __FUNCTION__;
-  if !Params.the_fail_if_not_bisim && x
+  if Mebi_api.fail_if_not_bisim () && x
   then return ()
   else params_fail_if_not_bisim ()
 ;;
 
 let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
   Log.trace __FUNCTION__;
-  let* the_fsm_1 = build_fsm a x refs (Params.get_fst_params ()) in
-  let* the_fsm_2 = build_fsm b y refs (Params.get_snd_params ()) in
+  (* NOTE: construct both fsm *)
+  let bounds : Mebi_api.bound_config = Mebi_api.get_bounds () in
+  let* the_fsm_1 = build_fsm a x refs bounds (Mebi_api.get_weak_enc1 ()) in
+  let* the_fsm_2 = build_fsm b y refs bounds (Mebi_api.get_weak_enc2 ()) in
   Log.trace ~__FUNCTION__ "built both fsms";
   Log.thing ~__FUNCTION__ Debug "init fst fsm" the_fsm_1 (Args Fsm.to_string);
   Log.thing ~__FUNCTION__ Debug "init snd fsm" the_fsm_2 (Args Fsm.to_string);
   let open Algorithms in
+  let weak : bool = Mebi_api.is_in_weak_mode () in
   let the_result : Bisimilar.result =
-    Bisimilar.run ~weak:!Params.the_weak_mode (the_fsm_1, the_fsm_2)
+    Bisimilar.run ~weak (the_fsm_1, the_fsm_2)
   in
   Log.trace ~__FUNCTION__ "finished checking bisimilarity";
   (* NOTE: cache result -- used in [Mebi_proof] if called from [proof_intro] *)
@@ -891,7 +903,7 @@ let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
 
 let run (k : command_kind) (refs : Libnames.qualid list) : 'a mm =
   Log.trace __FUNCTION__;
-  let* _ = Params.obtain_weak_kinds_from_args () in
+  let* _ = Mebi_api.load_weak_args () in
   match k with
   | MakeModel args -> make_model refs args
   | SaturateModel args -> saturate_model args refs
@@ -915,8 +927,8 @@ let proof_intro
   =
   Log.trace __FUNCTION__;
   Mebi_proof.reset_the_proof_state ();
-  Params.set_fail_if_incomplete true;
-  Params.set_fail_if_not_bisim true;
+  Mebi_api.set_fail_ifincomplete true;
+  Mebi_api.set_fail_ifnotbisim true;
   let* _ = run (CheckBisimilarity ((x, a), (y, b))) refs in
   Log.trace ~__FUNCTION__ "finished checking bisimilarity, beginning proof";
   return
