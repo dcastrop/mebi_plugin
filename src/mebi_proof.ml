@@ -4,29 +4,9 @@ open Model
 (* open Debug *)
 module Hyp = Mebi_hypothesis
 
-(***********************************************************************)
-module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
-
-let () = Log.Config.configure_output Debug false
-let () = Log.Config.configure_output Trace false
-(***********************************************************************)
-
 let econstr_to_string (gl : Proofview.Goal.t) : EConstr.t -> string =
   Rocq_utils.Strfy.econstr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl)
 ;;
-
-let feconstr (gl : Proofview.Goal.t) : EConstr.t Logger.to_string =
-  Of (econstr_to_string gl)
-;;
-
-let fstate : State.t Logger.to_string = Args State.to_string
-let fstates : States.t Logger.to_string = Args Model.states_to_string
-let fpi : Partition.t Logger.to_string = Args Model.partition_to_string
-let flabel : Label.t Logger.to_string = Args Label.to_string
-let falphabet : Alphabet.t Logger.to_string = Args Model.alphabet_to_string
-(* let faction : Action.t Logger.to_string = Args Action.to_string *)
-
-(***********************************************************************)
 
 let hyp_to_string (gl : Proofview.Goal.t) : Rocq_utils.hyp -> string =
   Rocq_utils.Strfy.hyp (Proofview.Goal.env gl) (Proofview.Goal.sigma gl)
@@ -46,6 +26,32 @@ let hyps_to_string (gl : Proofview.Goal.t) : string =
 let concl_to_string (gl : Proofview.Goal.t) : string =
   econstr_to_string gl (Proofview.Goal.concl gl)
 ;;
+
+(***********************************************************************)
+module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+
+let () = Log.Config.configure_output Debug true
+let () = Log.Config.configure_output Trace true
+(***********************************************************************)
+
+(* let fstr : string Logger.to_string = Args Utils.Strfy.string *)
+
+let feconstr (gl : Proofview.Goal.t) : EConstr.t Logger.to_string =
+  Of (econstr_to_string gl)
+;;
+
+let fhyp (gl : Proofview.Goal.t) : Rocq_utils.hyp Logger.to_string =
+  Of (hyp_to_string gl)
+;;
+
+let fstate : State.t Logger.to_string = Args State.to_string
+let fstates : States.t Logger.to_string = Args Model.states_to_string
+let fpi : Partition.t Logger.to_string = Args Model.partition_to_string
+let flabel : Label.t Logger.to_string = Args Label.to_string
+let falphabet : Alphabet.t Logger.to_string = Args Model.alphabet_to_string
+(* let faction : Action.t Logger.to_string = Args Action.to_string *)
+
+(***********************************************************************)
 
 (***********************************************************************)
 (*** Proof State *******************************************************)
@@ -894,13 +900,7 @@ exception
   Mebi_proof_CouldNotFindHypTransition of
     (Evd.evar_map * Fsm.t * Rocq_utils.hyp list)
 
-let get_hyp_transition
-      (* (sigma : Evd.evar_map) *)
-        (gl : Proofview.Goal.t)
-      (fsm : Fsm.t)
-      (hyps : Rocq_utils.hyp list)
-  : Transition_opt.t
-  =
+let get_hyp_transition (gl : Proofview.Goal.t) (fsm : Fsm.t) : Transition_opt.t =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   (* NOTE: returns [Some t] if [x:hyp] can be made into a [Transition_opt.t] *)
@@ -910,17 +910,22 @@ let get_hyp_transition
       let ty, tys = Rocq_utils.hyp_to_atomic sigma x in
       Some (get_transition ~need_action:false sigma tys.(0) tys.(1) tys.(2) fsm)
     with
-    | Mebi_proof_CouldNotDecodeTransitionState (sigma, ty, fsm) -> None
-    | Mebi_proof_CouldNotDecodeTransitionLabel (sigma, ty, fsm) -> None
+    | Mebi_proof_CouldNotDecodeTransitionState (sigma, ty, fsm) ->
+      Log.thing ~__FUNCTION__ Debug "Could not decode State" ty (feconstr gl);
+      None
+    | Mebi_proof_CouldNotDecodeTransitionLabel (sigma, ty, fsm) ->
+      Log.thing ~__FUNCTION__ Debug "Could not decode Label" ty (feconstr gl);
+      None
   in
   match List.filter_map f (Proofview.Goal.hyps gl) with
-  | [] -> raise (Mebi_proof_CouldNotFindHypTransition (sigma, fsm, hyps))
+  | [] ->
+    raise
+      (Mebi_proof_CouldNotFindHypTransition (sigma, fsm, Proofview.Goal.hyps gl))
   | h :: [] -> h
   | h :: _tl ->
-    Log.debug
-      (Printf.sprintf
-         "Mebi_proof.get_hyp_lts_transition, multiple transitions found (%i)"
-         (List.length (h :: _tl)));
+    let len : int = List.length (h :: _tl) in
+    Args Utils.Strfy.int
+    |> Log.thing ~__FUNCTION__ Debug "multiple transitions found" len;
     h
 ;;
 
@@ -929,7 +934,7 @@ exception Mebi_proof_ExpectedMTransition_Some of unit
 let get_mtransition (gl : Proofview.Goal.t) : Transition.t =
   Log.trace __FUNCTION__;
   let { from; label; goto; annotation; constructor_trees } : Transition_opt.t =
-    get_hyp_transition gl (mfsm ()) (Proofview.Goal.hyps gl)
+    get_hyp_transition gl (mfsm ~saturated:false ())
   in
   match goto with
   | Some goto -> { from; label; goto; annotation; constructor_trees }
@@ -1028,29 +1033,42 @@ module Invertible = struct
     | Full
     | Layer
 
-  let of_hty (sigma : Evd.evar_map) ((ty, tys) : Rocq_utils.kind_pair) : k =
+  let of_hty (gl : Proofview.Goal.t) ((ty, tys) : Rocq_utils.kind_pair) : k =
+    Log.trace __FUNCTION__;
+    let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
     try
       if Mebi_theories.is_var sigma tys.(2)
-      then Full
+      then (
+        Log.trace ~__FUNCTION__ "Full";
+        Full)
       else if Mebi_theories.is_var sigma tys.(1)
-      then Layer
-      else raise (Hyp.Mebi_proof_Hypothesis_HTy (sigma, (ty, tys)))
+      then (
+        Log.trace ~__FUNCTION__ "Layer";
+        Layer)
+      else (
+        Log.trace ~__FUNCTION__ "(else)";
+        raise (Hyp.Mebi_proof_Hypothesis_HTy (sigma, (ty, tys))))
     with
     | Invalid_argument _ ->
+      Log.trace ~__FUNCTION__ "Invalid_argument";
       raise (Hyp.Mebi_proof_Hypothesis_HTy (sigma, (ty, tys)))
   ;;
 
-  let opt_of_hty (sigma : Evd.evar_map) (p : Rocq_utils.kind_pair) : k option =
-    try Some (of_hty sigma p) with Hyp.Mebi_proof_Hypothesis_HTy _ -> None
+  let opt_of_hty (gl : Proofview.Goal.t) (p : Rocq_utils.kind_pair) : k option =
+    Log.trace __FUNCTION__;
+    try Some (of_hty gl p) with Hyp.Mebi_proof_Hypothesis_HTy _ -> None
   ;;
 
-  let hty_is_a (sigma : Evd.evar_map) (p : Rocq_utils.kind_pair) : bool =
-    Option.has_some (opt_of_hty sigma p)
+  let hty_is_a (gl : Proofview.Goal.t) (p : Rocq_utils.kind_pair) : bool =
+    Log.trace __FUNCTION__;
+    Option.has_some (opt_of_hty gl p)
   ;;
 
-  let of_hyp (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : t =
+  let of_hyp (gl : Proofview.Goal.t) (h : Rocq_utils.hyp) : t =
+    Log.trace __FUNCTION__;
+    let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
     try
-      { kind = of_hty sigma (Rocq_utils.hyp_to_atomic sigma h)
+      { kind = of_hty gl (Rocq_utils.hyp_to_atomic sigma h)
       ; tactic = do_inversion h
       }
     with
@@ -1058,12 +1076,15 @@ module Invertible = struct
       raise (Hyp.Mebi_proof_Hypothesis_Hyp (sigma, h, p))
   ;;
 
-  let opt_of_hyp (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : t option =
-    try Some (of_hyp sigma h) with Hyp.Mebi_proof_Hypothesis_Hyp _ -> None
+  let opt_of_hyp (gl : Proofview.Goal.t) (h : Rocq_utils.hyp) : t option =
+    Log.trace __FUNCTION__;
+    try Some (of_hyp gl h) with Hyp.Mebi_proof_Hypothesis_Hyp _ -> None
   ;;
 
-  let hyp_is_a (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : bool =
-    Option.has_some (opt_of_hyp sigma h)
+  let hyp_is_a (gl : Proofview.Goal.t) (h : Rocq_utils.hyp) : bool =
+    Log.trace __FUNCTION__;
+    Log.thing ~__FUNCTION__ Debug "hyp" h (fhyp gl);
+    Option.has_some (opt_of_hyp gl h)
   ;;
 end
 
@@ -1090,13 +1111,14 @@ module TransOpt : Hyp.HYP_TYPE = Hyp.Make (struct
     - full invert
     - layer invert
     - transition *)
-let hyp_is_something (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : bool =
+let hyp_is_something (gl : Proofview.Goal.t) (h : Rocq_utils.hyp) : bool =
   Log.trace __FUNCTION__;
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   try
     let p : Rocq_utils.kind_pair = Rocq_utils.hyp_to_atomic sigma h in
     if Cofix.hty_is_a sigma p
     then true
-    else if Invertible.hty_is_a sigma p
+    else if Invertible.hty_is_a gl p
     then true
     else if TransOpt.hty_is_a sigma p
     then true
@@ -1107,10 +1129,9 @@ let hyp_is_something (sigma : Evd.evar_map) (h : Rocq_utils.hyp) : bool =
 
 (** is [true] if none of the hyps appear to be mid-way through a proof. *)
 let hyps_is_essentially_empty (gl : Proofview.Goal.t) : bool =
-  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   Bool.not
     (List.for_all
-       (fun (h : Rocq_utils.hyp) -> hyp_is_something sigma h)
+       (fun (h : Rocq_utils.hyp) -> hyp_is_something gl h)
        (Proofview.Goal.hyps gl))
 ;;
 
@@ -1206,18 +1227,17 @@ let get_nstate (sigma : Evd.evar_map) (conj : concl_conj) : State.t =
 
 (***********************************************************************)
 
-let hyp_is_invertible (sigma : Evd.evar_map) : Rocq_utils.hyp -> bool =
+let hyp_is_invertible (gl : Proofview.Goal.t) : Rocq_utils.hyp -> bool =
   fun (x : Rocq_utils.hyp) ->
-  try Invertible.hyp_is_a sigma x with
-  | Hyp.Mebi_proof_Hypothesis_Hyp _ -> false
+  try Invertible.hyp_is_a gl x with Hyp.Mebi_proof_Hypothesis_Hyp _ -> false
 ;;
 
-let hyps_get_invertibles (sigma : Evd.evar_map)
-  : Rocq_utils.hyp list -> Invertible.t list
-  =
-  List.filter_map (fun (x : Rocq_utils.hyp) ->
-    try Some (Invertible.of_hyp sigma x) with
-    | Hyp.Mebi_proof_Hypothesis_Hyp _ -> None)
+let hyps_get_invertibles (gl : Proofview.Goal.t) : Invertible.t list =
+  List.filter_map
+    (fun (x : Rocq_utils.hyp) ->
+      try Some (Invertible.of_hyp gl x) with
+      | Hyp.Mebi_proof_Hypothesis_Hyp _ -> None)
+    (Proofview.Goal.hyps gl)
 ;;
 
 let hyps_get_invertible (invertibles : Invertible.t list) : Invertible.t =
@@ -1231,9 +1251,7 @@ let hyps_get_invertible (invertibles : Invertible.t list) : Invertible.t =
 ;;
 
 let do_hyp_inversion (gl : Proofview.Goal.t) : tactic =
-  (hyps_get_invertibles (Proofview.Goal.sigma gl) (Proofview.Goal.hyps gl)
-   |> hyps_get_invertible)
-    .tactic
+  (hyps_get_invertibles gl |> hyps_get_invertible).tactic
 ;;
 
 (* let find_action_labelled (label:Label.t) (from:State.t) (fsm:Fsm.t) : Action.t =
@@ -1445,9 +1463,9 @@ let hyps_has_cofix (sigma : Evd.evar_map) (concl : EConstr.t)
     Mebi_setup.Eq.econstr sigma concl (Context.Named.Declaration.get_type h))
 ;;
 
-let hyps_has_invertible (sigma : Evd.evar_map) : Rocq_utils.hyp list -> bool =
+let hyps_has_invertible (gl : Proofview.Goal.t) : bool =
   Log.trace __FUNCTION__;
-  List.exists (hyp_is_invertible sigma)
+  List.exists (hyp_is_invertible gl) (Proofview.Goal.hyps gl)
 ;;
 
 (***********************************************************************)
@@ -1500,7 +1518,7 @@ and handle_new_weak_sim (gl : Proofview.Goal.t) : tactic =
 and handle_new_cofix (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   try
-    if hyps_has_invertible (Proofview.Goal.sigma gl) (Proofview.Goal.hyps gl)
+    if hyps_has_invertible gl
     then do_hyp_inversion gl
     else do_eexists_transition gl
   with
