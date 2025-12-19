@@ -1,4 +1,9 @@
-open Logging
+(***********************************************************************)
+module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+
+let () = Log.Config.configure_output Debug false
+let () = Log.Config.configure_output Trace false
+(***********************************************************************)
 
 type help_set_kind =
   | General of unit
@@ -103,7 +108,7 @@ let show_help_set_bound () : unit =
         a coq term, where \"n\" is an natural integer number.\n\n\
         Use command \"MeBi Set Bound Default\" to reset this to the default, \
         which is: %i"
-       Params.default_bound)
+       (Mebi_api.default_bound_config ()).bound)
 ;;
 
 let show_help_set_fail_if_incomplete () : unit =

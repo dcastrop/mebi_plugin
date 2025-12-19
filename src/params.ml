@@ -1,4 +1,11 @@
-open Logging
+(* open Logging *)
+
+(***********************************************************************)
+module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+
+let () = Log.Config.configure_output Debug false
+let () = Log.Config.configure_output Trace false
+(***********************************************************************)
 
 (**********************)
 (** Bounds ************)

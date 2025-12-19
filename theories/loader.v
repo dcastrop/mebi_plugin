@@ -9,7 +9,7 @@ Declare ML Module "coq-mebi.mebi".
 (* Print existT. *)
 
 MeBi Divider "Loading MeBi Plugin".
-MeBi Reset All.
+MeBi Config Reset.
 MeBi Divider.
 
 (* Inductive printout_mode : Set :=

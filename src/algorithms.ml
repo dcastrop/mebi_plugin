@@ -1,19 +1,15 @@
 open Model
 
-module Log : Logger.LOGGER_TYPE =
-  Logger.Make
-    (Logger.Output.Rocq)
-    (struct
-      let prefix : string option = None
+(***********************************************************************)
+module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
-      let is_level_enabled : Logger.level -> bool =
-        Logger.make_level_fun ~debug:true ()
-      ;;
-    end)
+let () = Log.Config.configure_output Debug false
+let () = Log.Config.configure_output Trace false
+(***********************************************************************)
 
 let prepare_fsm (weak : bool) (fsm : Fsm.t) : Fsm.t =
   Log.trace __FUNCTION__;
-  if weak then Saturate.fsm fsm else fsm
+  if weak then Saturate_model.fsm fsm else fsm
 ;;
 
 module Minimize = struct

@@ -9,8 +9,6 @@ module Edge = Model_edge
 module Enc = Mebi_setup.Enc
 module Tree = Mebi_constr.Tree
 
-val trace_enabled : bool
-val log_trace : string -> unit
 val nest : Utils.Strfy.style_args -> Utils.Strfy.style_args
 
 type style_args = Utils.Strfy.style_args
@@ -462,8 +460,4 @@ module Fsm : sig
   val origin_of_state_opt : State.t -> t -> t -> int option
   val origin_of_state : State.t -> t -> t -> int
   val to_string : ?args:style_args -> t -> string
-end
-
-module Saturate : sig
-  val fsm : Fsm.t -> Fsm.t
 end
