@@ -2,7 +2,7 @@
 module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
 let () = Log.Config.configure_output Debug false
-let () = Log.Config.configure_output Trace false
+let () = Log.Config.configure_output Trace true
 (***********************************************************************)
 
 (**********************************)
@@ -88,35 +88,53 @@ let eapply ?(gl : Proofview.Goal.t option) (c : EConstr.t)
 
 (****************************************************************************)
 
-let unfold_econstr (gl : Proofview.Goal.t) : EConstr.t -> unit Proofview.tactic
-  = function
-  | x ->
-    let sigma = Proofview.Goal.sigma gl in
-    let y = Rocq_convert.econstr_to_constr sigma x in
-    (match Constr.kind y with
-     | Const (c, _) ->
-       Log.debug "mebi_tactics.unfold_econstr, const";
-       Tactics.unfold_constr (Names.GlobRef.ConstRef c)
-     | _ ->
-       Log.warning "mebi_tactics.unfold_econstr -- not Constr!";
-       Proofview.tclUNIT ())
+let unfold_in_hyp (gl : Proofview.Goal.t) (x : EConstr.t) (y : Rocq_utils.hyp)
+  : unit Proofview.tactic
+  =
+  Log.trace __FUNCTION__;
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+  let x : Constr.t = Rocq_convert.econstr_to_constr sigma x in
+  match Constr.kind x with
+  | Const (c, _) ->
+    Log.trace ~__FUNCTION__ "Const";
+    Tactics.unfold_in_hyp
+      [ Locus.AllOccurrences, Evaluable.EvalConstRef c ]
+      (Context.Named.Declaration.get_id y, Locus.InHyp)
+  | _ ->
+    Log.trace ~__FUNCTION__ "_ (not Const)";
+    Proofview.tclUNIT ()
 ;;
 
-let unfold_constrexpr (gl : Proofview.Goal.t)
-  : Constrexpr.constr_expr -> unit Proofview.tactic
-  = function
-  | x ->
-    let env = Proofview.Goal.env gl in
-    let sigma = Proofview.Goal.sigma gl in
-    let sigma, y = Rocq_convert.constrexpr_to_econstr env sigma x in
-    let z = Rocq_convert.econstr_to_constr sigma y in
-    (match Constr.kind z with
-     | Const (c, _) ->
-       Log.debug "mebi_tactics.unfold_constrexpr, const";
-       Tactics.unfold_constr (Names.GlobRef.ConstRef c)
-     | _ ->
-       Log.warning "mebi_tactics.unfold_constrexpr -- not Constr!";
-       Proofview.tclUNIT ())
+let unfold_econstr (gl : Proofview.Goal.t) (x : EConstr.t)
+  : unit Proofview.tactic
+  =
+  Log.trace __FUNCTION__;
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+  let x : Constr.t = Rocq_convert.econstr_to_constr sigma x in
+  match Constr.kind x with
+  | Const (c, _) ->
+    Log.trace ~__FUNCTION__ "Const";
+    Tactics.unfold_constr (Names.GlobRef.ConstRef c)
+  | _ ->
+    Log.trace ~__FUNCTION__ "_ (not Const)";
+    Proofview.tclUNIT ()
+;;
+
+let unfold_constrexpr (gl : Proofview.Goal.t) (x : Constrexpr.constr_expr)
+  : unit Proofview.tactic
+  =
+  Log.trace __FUNCTION__;
+  let env : Environ.env = Proofview.Goal.env gl in
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+  let sigma, y = Rocq_convert.constrexpr_to_econstr env sigma x in
+  let z = Rocq_convert.econstr_to_constr sigma y in
+  match Constr.kind z with
+  | Const (c, _) ->
+    Log.trace ~__FUNCTION__ "Const";
+    Tactics.unfold_constr (Names.GlobRef.ConstRef c)
+  | _ ->
+    Log.trace ~__FUNCTION__ "_ (not Const)";
+    Proofview.tclUNIT ()
 ;;
 
 let rec unfold_constrexpr_list (gl : Proofview.Goal.t)

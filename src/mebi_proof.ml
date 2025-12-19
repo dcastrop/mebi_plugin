@@ -44,12 +44,12 @@ let fhyp (gl : Proofview.Goal.t) : Rocq_utils.hyp Logger.to_string =
   Of (hyp_to_string gl)
 ;;
 
-let fekind (gl : Proofview.Goal.t) : EConstr.t Logger.to_string =
-  Of
-    (Rocq_utils.Strfy.econstr_kind
-       (Proofview.Goal.env gl)
-       (Proofview.Goal.sigma gl))
-;;
+(* let fekind (gl : Proofview.Goal.t) : EConstr.t Logger.to_string =
+   Of
+   (Rocq_utils.Strfy.econstr_kind
+   (Proofview.Goal.env gl)
+   (Proofview.Goal.sigma gl))
+   ;; *)
 
 let fstate : State.t Logger.to_string = Args State.to_string
 let fstates : States.t Logger.to_string = Args Model.states_to_string
@@ -59,6 +59,14 @@ let falphabet : Alphabet.t Logger.to_string = Args Model.alphabet_to_string
 (* let faction : Action.t Logger.to_string = Args Action.to_string *)
 
 (***********************************************************************)
+
+let econstr_eq (gl : Proofview.Goal.t) : EConstr.t -> EConstr.t -> bool =
+  Mebi_setup.Eq.econstr (Proofview.Goal.sigma gl)
+;;
+
+let econstr_eq_concl (gl : Proofview.Goal.t) : EConstr.t -> bool =
+  econstr_eq gl (Proofview.Goal.concl gl)
+;;
 
 (***********************************************************************)
 (*** Proof State *******************************************************)
@@ -513,6 +521,24 @@ let do_eapply_wk_some (gl : Proofview.Goal.t) : tactic =
   tactic
     ~msg:"eapply wk_some"
     (Mebi_tactics.eapply ~gl (Mebi_theories.c_wk_some ()))
+;;
+
+let do_unfold (gl : Proofview.Goal.t) (x : EConstr.t) : tactic =
+  tactic (Mebi_tactics.unfold_econstr gl x)
+;;
+
+let do_unfold_in_hyp
+      (gl : Proofview.Goal.t)
+      (x : EConstr.t)
+      (h : Rocq_utils.hyp)
+  : tactic
+  =
+  tactic_chain
+    [ tactic
+        ~msg:(Printf.sprintf "unfold %s" (econstr_to_string gl x))
+        (Mebi_tactics.unfold_in_hyp gl x h)
+    ; do_unfold gl x
+    ]
 ;;
 
 exception Mebi_proof_NoActionFound of (State.t * Label.t * State.t * Fsm.t)
@@ -1041,12 +1067,18 @@ module Invertible = struct
     | Layer
     | ToUnfold of EConstr.t
 
+  let to_string : t -> string = function
+    | { kind = Full; _ } -> "Full"
+    | { kind = Layer; _ } -> "Layer"
+    | { kind = ToUnfold _; _ } -> "ToUnfold"
+  ;;
+
   let of_hty (gl : Proofview.Goal.t) ((ty, tys) : Rocq_utils.kind_pair) : k =
     Log.trace __FUNCTION__;
-    Log.thing ~__FUNCTION__ Debug "ty" ty (feconstr gl);
-    Log.thing ~__FUNCTION__ Debug "ty (kind)" ty (fekind gl);
-    Log.things ~__FUNCTION__ Debug "tys" (Array.to_list tys) (feconstr gl);
-    Log.things ~__FUNCTION__ Debug "tys (kind)" (Array.to_list tys) (fekind gl);
+    (* Log.thing ~__FUNCTION__ Debug "ty" ty (feconstr gl); *)
+    (* Log.thing ~__FUNCTION__ Debug "ty (kind)" ty (fekind gl); *)
+    (* Log.things ~__FUNCTION__ Debug "tys" (Array.to_list tys) (feconstr gl); *)
+    (* Log.things ~__FUNCTION__ Debug "tys (kind)" (Array.to_list tys) (fekind gl); *)
     let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
     try
       if Mebi_theories.is_constr sigma tys.(0)
@@ -1088,21 +1120,16 @@ module Invertible = struct
     Log.trace __FUNCTION__;
     let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
     try
-      let kind = of_hty gl (Rocq_utils.hyp_to_atomic sigma h) in
+      let kind : k = of_hty gl (Rocq_utils.hyp_to_atomic sigma h) in
       { kind
       ; tactic =
           (match kind with
-           | ToUnfold x ->
-             tactic
-               (Rocq_convert.econstr_to_constrexpr
-                  (Proofview.Goal.env gl)
-                  sigma
-                  x
-                |> Mebi_tactics.unfold_constrexpr gl)
+           | ToUnfold x -> do_unfold_in_hyp gl x h
            | _ -> do_inversion h)
       }
     with
     | Hyp.Mebi_proof_Hypothesis_HTy (sigma, p) ->
+      Log.trace ~__FUNCTION__ "Exception: Mebi_proof_Hypothesis_HTy";
       raise (Hyp.Mebi_proof_Hypothesis_Hyp (sigma, h, p))
   ;;
 
@@ -1257,12 +1284,27 @@ let get_nstate (sigma : Evd.evar_map) (conj : concl_conj) : State.t =
 
 (***********************************************************************)
 
+let hyps_has_cofix (gl : Proofview.Goal.t) : bool =
+  Log.trace __FUNCTION__;
+  List.exists
+    (fun (h : Rocq_utils.hyp) ->
+      econstr_eq_concl gl (Context.Named.Declaration.get_type h))
+    (Proofview.Goal.hyps gl)
+;;
+
 let hyp_is_invertible (gl : Proofview.Goal.t) : Rocq_utils.hyp -> bool =
+  Log.trace __FUNCTION__;
   fun (x : Rocq_utils.hyp) ->
-  try Invertible.hyp_is_a gl x with Hyp.Mebi_proof_Hypothesis_Hyp _ -> false
+    try Invertible.hyp_is_a gl x with Hyp.Mebi_proof_Hypothesis_Hyp _ -> false
+;;
+
+let hyps_has_invertible (gl : Proofview.Goal.t) : bool =
+  Log.trace __FUNCTION__;
+  List.exists (hyp_is_invertible gl) (Proofview.Goal.hyps gl)
 ;;
 
 let hyps_get_invertibles (gl : Proofview.Goal.t) : Invertible.t list =
+  Log.trace __FUNCTION__;
   List.filter_map
     (fun (x : Rocq_utils.hyp) ->
       try Some (Invertible.of_hyp gl x) with
@@ -1270,18 +1312,85 @@ let hyps_get_invertibles (gl : Proofview.Goal.t) : Invertible.t list =
     (Proofview.Goal.hyps gl)
 ;;
 
-let hyps_get_invertible (invertibles : Invertible.t list) : Invertible.t =
-  let fully_invertibles : Invertible.t list =
-    List.filter
-      (function ({ kind = Full; _ } : Invertible.t) -> true | _ -> false)
-      invertibles
+let hyps_invertibles_get_full (xs : Invertible.t list) : Invertible.t option =
+  let f = function ({ kind = Full; _ } : Invertible.t) -> true | _ -> false in
+  match List.filter f xs with [] -> None | h :: _ -> Some h
+;;
+
+let hyps_invertibles_get_layer (xs : Invertible.t list) : Invertible.t option =
+  let f = function
+    | ({ kind = Layer; _ } : Invertible.t) -> true
+    | _ -> false
   in
-  List.hd
-    (if List.is_empty fully_invertibles then invertibles else fully_invertibles)
+  match List.filter f xs with [] -> None | h :: _ -> Some h
+;;
+
+let hyps_invertibles_get_tounfold (xs : Invertible.t list) : Invertible.t option
+  =
+  let f = function
+    | ({ kind = ToUnfold _; _ } : Invertible.t) -> true
+    | _ -> false
+  in
+  match List.filter f xs with [] -> None | h :: _ -> Some h
+;;
+
+exception Mebi_proof_NoInvertibleHyps of Invertible.t list
+
+let hyps_get_invertible (gl : Proofview.Goal.t) : Invertible.t =
+  Log.trace __FUNCTION__;
+  let invertibles : Invertible.t list = hyps_get_invertibles gl in
+  let f : Invertible.t Logger.to_string = Of Invertible.to_string in
+  Log.things ~__FUNCTION__ Debug "invertibles" invertibles f;
+  match hyps_invertibles_get_tounfold invertibles with
+  | Some x -> x
+  | None ->
+    (match hyps_invertibles_get_full invertibles with
+     | Some x -> x
+     | None ->
+       (match hyps_invertibles_get_layer invertibles with
+        | Some x -> x
+        | None -> raise (Mebi_proof_NoInvertibleHyps invertibles)))
 ;;
 
 let do_hyp_inversion (gl : Proofview.Goal.t) : tactic =
-  (hyps_get_invertibles gl |> hyps_get_invertible).tactic
+  Log.trace __FUNCTION__;
+  (hyps_get_invertible gl).tactic
+;;
+
+exception Mebi_proof_NothingToUnfold of unit
+
+let _do_unfold_concl (gl : Proofview.Goal.t) : tactic =
+  Log.trace __FUNCTION__;
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+  let the_concl : EConstr.t = Proofview.Goal.concl gl in
+  let rec loop (x : EConstr.t) : tactic option =
+    if Mebi_theories.is_constr sigma x
+    then Some (do_unfold gl x)
+    else
+      Rocq_utils.econstr_to_atomic sigma x
+      |> snd
+      |> Array.fold_left
+           (fun (acc : tactic option) (y : EConstr.t) ->
+             match acc with None -> loop y | Some acc -> Some acc)
+           None
+  in
+  match loop the_concl with
+  | None -> raise (Mebi_proof_NothingToUnfold ())
+  | Some x -> x
+;;
+
+let _can_unfold_concl (gl : Proofview.Goal.t) : bool =
+  Log.trace __FUNCTION__;
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+  let the_concl : EConstr.t = Proofview.Goal.concl gl in
+  let rec loop (x : EConstr.t) : bool =
+    if Mebi_theories.is_constr sigma x
+    then true
+    else if Mebi_theories.is_var sigma x
+    then false
+    else Rocq_utils.econstr_to_atomic sigma x |> snd |> Array.exists loop
+  in
+  loop the_concl
 ;;
 
 (* let find_action_labelled (label:Label.t) (from:State.t) (fsm:Fsm.t) : Action.t =
@@ -1484,21 +1593,6 @@ let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
 ;;
 
 (***********************************************************************)
-
-let hyps_has_cofix (sigma : Evd.evar_map) (concl : EConstr.t)
-  : Rocq_utils.hyp list -> bool
-  =
-  Log.trace __FUNCTION__;
-  List.exists (fun (h : Rocq_utils.hyp) ->
-    Mebi_setup.Eq.econstr sigma concl (Context.Named.Declaration.get_type h))
-;;
-
-let hyps_has_invertible (gl : Proofview.Goal.t) : bool =
-  Log.trace __FUNCTION__;
-  List.exists (hyp_is_invertible gl) (Proofview.Goal.hyps gl)
-;;
-
-(***********************************************************************)
 (*** Handle Proof States ***********************************************)
 (***********************************************************************)
 
@@ -1531,7 +1625,11 @@ and handle_new_weak_sim (gl : Proofview.Goal.t) : tactic =
   if typ_is_weak_sim sigma concltyp
   then (
     Log.trace ~__FUNCTION__ "(concl is weak sim)";
-    if hyps_has_cofix sigma the_concl (Proofview.Goal.hyps gl)
+    (* TODO: *)
+    (*if can_unfold_concl gl
+      then do_unfold_concl gl
+      else*)
+    if hyps_has_cofix gl
     then do_solve_cofix gl
     else (
       set_the_proof_state ~__FUNCTION__ NewCofix;
@@ -1697,12 +1795,11 @@ and handle_proof_state (gl : Proofview.Goal.t) : tactic =
 and detect_proof_state (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  let the_concl : EConstr.t = Proofview.Goal.concl gl in
-  let the_hyps : Rocq_utils.hyp list = Proofview.Goal.hyps gl in
-  let concltyp : Rocq_utils.kind_pair =
-    Rocq_utils.econstr_to_atomic sigma the_concl
-  in
-  if typ_is_weak_sim sigma concltyp && hyps_has_cofix sigma the_concl the_hyps
+  if
+    Proofview.Goal.concl gl
+    |> Rocq_utils.econstr_to_atomic sigma
+    |> typ_is_weak_sim sigma
+    && hyps_has_cofix gl
   then do_solve_cofix gl
   else (
     (* do_nothing () *)
