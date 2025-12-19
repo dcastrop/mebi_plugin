@@ -36,7 +36,15 @@ Require Import Logic.
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.pq".
 Example wsim_pq : weak_sim compLTS compLTS p q. 
 Proof. MeBiSim Begin compLTS p And compLTS q Using compLTS termLTS. 
-  MeBiSim Solve 470.
+  (* MeBiSim Solve 470. *)
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  (* unfold s1 in *. *)
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
 Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.qp".

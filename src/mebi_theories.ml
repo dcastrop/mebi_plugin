@@ -368,6 +368,10 @@ let is_var sigma (x : EConstr.t) : bool =
   EConstr.isRef sigma x && EConstr.isVar sigma x
 ;;
 
+let is_constr sigma (x : EConstr.t) : bool =
+  EConstr.isRef sigma x && EConstr.isConst sigma x
+;;
+
 (******)
 
 let get_hyp_names (gl : Proofview.Goal.t) : Names.Id.Set.t =

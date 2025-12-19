@@ -44,6 +44,13 @@ let fhyp (gl : Proofview.Goal.t) : Rocq_utils.hyp Logger.to_string =
   Of (hyp_to_string gl)
 ;;
 
+let fekind (gl : Proofview.Goal.t) : EConstr.t Logger.to_string =
+  Of
+    (Rocq_utils.Strfy.econstr_kind
+       (Proofview.Goal.env gl)
+       (Proofview.Goal.sigma gl))
+;;
+
 let fstate : State.t Logger.to_string = Args State.to_string
 let fstates : States.t Logger.to_string = Args Model.states_to_string
 let fpi : Partition.t Logger.to_string = Args Model.partition_to_string
@@ -1032,12 +1039,25 @@ module Invertible = struct
   and k =
     | Full
     | Layer
+    | ToUnfold of EConstr.t
 
   let of_hty (gl : Proofview.Goal.t) ((ty, tys) : Rocq_utils.kind_pair) : k =
     Log.trace __FUNCTION__;
+    Log.thing ~__FUNCTION__ Debug "ty" ty (feconstr gl);
+    Log.thing ~__FUNCTION__ Debug "ty (kind)" ty (fekind gl);
+    Log.things ~__FUNCTION__ Debug "tys" (Array.to_list tys) (feconstr gl);
+    Log.things ~__FUNCTION__ Debug "tys (kind)" (Array.to_list tys) (fekind gl);
     let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
     try
-      if Mebi_theories.is_var sigma tys.(2)
+      if Mebi_theories.is_constr sigma tys.(0)
+      then (
+        Log.trace ~__FUNCTION__ "ToUnfold (0)";
+        ToUnfold tys.(0))
+      else if Mebi_theories.is_constr sigma tys.(2)
+      then (
+        Log.trace ~__FUNCTION__ "ToUnfold (2)";
+        ToUnfold tys.(2))
+      else if Mebi_theories.is_var sigma tys.(2)
       then (
         Log.trace ~__FUNCTION__ "Full";
         Full)
@@ -1068,8 +1088,18 @@ module Invertible = struct
     Log.trace __FUNCTION__;
     let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
     try
-      { kind = of_hty gl (Rocq_utils.hyp_to_atomic sigma h)
-      ; tactic = do_inversion h
+      let kind = of_hty gl (Rocq_utils.hyp_to_atomic sigma h) in
+      { kind
+      ; tactic =
+          (match kind with
+           | ToUnfold x ->
+             tactic
+               (Rocq_convert.econstr_to_constrexpr
+                  (Proofview.Goal.env gl)
+                  sigma
+                  x
+                |> Mebi_tactics.unfold_constrexpr gl)
+           | _ -> do_inversion h)
       }
     with
     | Hyp.Mebi_proof_Hypothesis_HTy (sigma, p) ->
