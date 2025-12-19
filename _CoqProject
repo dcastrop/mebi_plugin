@@ -73,10 +73,6 @@ src/output_config.ml
 src/output_config.mli
 src/logger.ml
 src/logger.mli
-# src/logging.ml
-# src/logging.mli
-# src/debug.ml
-# src/debug.mli
 
 src/rocq_utils.ml
 src/rocq_utils.mli
@@ -115,8 +111,6 @@ src/saturate_model.mli
 src/algorithms.ml
 src/algorithms.mli
 
-# src/strfy.ml
-# src/strfy.mli
 src/mebi_tactics.ml
 src/mebi_tactics.mli
 
@@ -130,13 +124,6 @@ src/mebi_hypothesis.ml
 src/mebi_hypothesis.mli
 src/mebi_proof.ml
 src/mebi_proof.mli
-# src/mebi_bisim.ml
-# src/mebi_bisim.mli
-
-# src/rocq_debug.ml
-# src/rocq_debug.mli
-# src/params.ml
-# src/params.mli
 
 # src/dump_to_file.ml
 # src/dump_to_file.mli
@@ -150,8 +137,6 @@ src/mebi_help.mli
 
 src/mebi_unification.ml
 src/mebi_unification.mli
-# src/mebi_debug.ml
-# src/mebi_debug.mli
 src/mebi_unify.ml
 src/mebi_unify.mli
 src/command.ml
