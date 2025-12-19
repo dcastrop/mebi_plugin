@@ -1,3 +1,7 @@
+let econstr_to_constrexpr env sigma : EConstr.t -> Constrexpr.constr_expr =
+  Constrextern.extern_constr env sigma
+;;
+
 let constrexpr_to_econstr env sigma
   : Constrexpr.constr_expr -> Evd.evar_map * EConstr.t
   =
