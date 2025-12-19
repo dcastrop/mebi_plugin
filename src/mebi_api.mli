@@ -36,7 +36,6 @@ val default_fail_config : unit -> fail_config
 
 type debug_config =
   { dump_to_json : bool
-  ; trace : bool
   ; debug : bool
   }
 
@@ -47,10 +46,17 @@ type t =
   ; weak_mode : weak_config
   ; fail_if : fail_config
   ; debug : debug_config
+  ; output : Output_config.t
   }
 
 val default_config : unit -> t
 val the_config : t ref
+val reset_config : unit -> unit
+val reset_bounds : unit -> unit
+val reset_weak_mode : unit -> unit
+val reset_fail_if : unit -> unit
+val reset_debug : unit -> unit
+val reset_output : unit -> unit
 val set_bound : int -> unit
 val set_bound_for : boundable -> unit
 val set_bounds : int -> boundable -> unit
@@ -77,6 +83,14 @@ val set_fail_if : bool -> bool -> unit
 val fail_if_incomplete : unit -> bool
 val fail_if_not_bisim : unit -> bool
 val set_dump_to_json : bool -> unit
-val set_trace : bool -> unit
 val set_debug : bool -> unit
-val set_debug_config : bool -> bool -> bool -> unit
+val set_debug_config : bool -> bool -> unit
+val set_output_enabled : bool -> unit
+val set_output_level : Feedback.level -> bool -> unit
+val set_output_special : Output_kind.special -> bool -> unit
+
+val set_output_config
+  :  bool
+  -> Feedback.level * bool
+  -> Output_kind.special * bool
+  -> unit

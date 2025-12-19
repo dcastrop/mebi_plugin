@@ -3,79 +3,80 @@ Require Import MEBI.loader.
 (** testing getters & setters *)
 MeBi Divider "Theories.Test.BasicCommands".
 Module BasicCommands.
-  MeBi Set Bound 1000. MeBi See Bound.
-  MeBi Reset Bound.    MeBi See Bound.
+  MeBi Config Bound 1000. 
+  MeBi Config Reset Bound.
 
-  MeBi Set Bound 9 33. MeBi See Bound.
-  MeBi Reset Bound.    MeBi See Bound.
+  MeBi Config Fail If Incomplete True. 
+  MeBi Config Fail If Incomplete False. 
 
-  MeBi Set FailIfIncomplete True. MeBi See FailIfIncomplete.
-  MeBi Set FailIfIncomplete False. MeBi See FailIfIncomplete.
+  MeBi Config Fail If NotBisim True. 
+  MeBi Config Fail If NotBisim False. 
 
-  MeBi Set FailIfNotBisim True. MeBi See FailIfNotBisim.
-  MeBi Set FailIfNotBisim False. MeBi See FailIfNotBisim.
+  MeBi Config Output Enable.  
+  MeBi Config Output Disable. 
 
-  MeBi Set DumpToFile True.  MeBi See DumpToFile.
-  MeBi Set DumpToFile False. MeBi See DumpToFile.
-
-  MeBi Set ShowAny True.  MeBi See ShowAny.
-  MeBi Set ShowAny False. MeBi See ShowAny.
-
-  MeBi Set ShowNotices True.  MeBi See ShowNotice.
-  MeBi Set ShowNotices False. MeBi See ShowNotice.
-
-  MeBi Set ShowDebug True.  MeBi See ShowDebug.
-  MeBi Set ShowDebug False. MeBi See ShowDebug.
-
-  MeBi Set ShowDetails True.  MeBi See ShowDetails.
-  MeBi Set ShowDetails False. MeBi See ShowDetails.
-
-  MeBi Set ShowResults True.  MeBi See ShowResults.
-  MeBi Set ShowResults False. MeBi See ShowResults.
-
-  MeBi Set ShowWarnings True.  MeBi See ShowWarning.
-  MeBi Set ShowWarnings False. MeBi See ShowWarning.
-
-  MeBi Set WeakMode True.  MeBi See WeakMode.
-  MeBi Set WeakMode False. MeBi See WeakMode.
+  MeBi Config Output Debug Enable.  
+  MeBi Config Output Debug Disable. 
   
-  MeBi Set Weak Option nat. 
-  MeBi See Weak.
+  MeBi Config Output Info Enable.  
+  MeBi Config Output Info Disable. 
+
+  MeBi Config Output Notice Enable.  
+  MeBi Config Output Notice Disable. 
+  
+  MeBi Config Output Warning Enable. 
+  MeBi Config Output Warning Disable. 
+
+  MeBi Config Output Error Enable. 
+  MeBi Config Output Error Disable. 
+
+  MeBi Config Output Trace Enable.  
+  MeBi Config Output Trace Disable. 
+
+  MeBi Config Output Results Enable.  
+  MeBi Config Output Results Disable. 
+
+  MeBi Config Output Show Enable.  
+  MeBi Config Output Show Disable. 
+
+  MeBi Config WeakMode Enable.  
+  MeBi Config WeakMode Disable. 
+  
+  MeBi Config Weak As Option nat. 
+  
 
   Example z := 0.
-  MeBi Set Weak z Of nat. 
-  MeBi See Weak.
+  MeBi Config Weak As z Of nat. 
+  
 
   Inductive s_label : Set :=
   | TAU : s_label 
   | LABEL1 : nat -> s_label
   .
-  MeBi Set Weak TAU Of s_label. 
-  MeBi See Weak.
+  MeBi Config Weak As TAU Of s_label. 
+  
 
   Inductive t_label : Type :=
   | SILENT : t_label 
   | LABEL2 : bool -> t_label
   .
-  MeBi Set Weak SILENT Of t_label. 
-  MeBi See Weak.
-
-  MeBi See All.
+  MeBi Config Weak As SILENT Of t_label. 
+  
 End BasicCommands.
 
-MeBi Reset All.
-(* MeBi Set ShowAny      True. *)
-(* MeBi Set ShowNotices  True. *)
-(* MeBi Set ShowDebug    True. *)
-(* MeBi Set ShowDetails  True. *)
-(* MeBi Set ShowResults  True. *)
-(* MeBi Set ShowWarnings True. *)
-(* MeBi Set Bound 100. *)
-(* MeBi Set WeakMode     True. *)
-(* MeBi Set Weak Option _. *)
+MeBi Config Reset.
+(* MeBi Config Output Enable. *)
+(* MeBi Config Output Notice Enable. *)
+(* MeBi Config Output Debug Enable. *)
+(* MeBi Config Output Info Enable. *)
+(* MeBi Config Output Results Enable. *)
+(* MeBi Config Output Warning Enable. *)
+(* MeBi Config Bound 100. *)
+(* MeBi Config WeakMode Enable. *)
+(* MeBi Config Weak As Option _. *)
 (* MeBi See All.  *)
-MeBi Set ShowAny False.
-(* MeBi Set ShowAny True. MeBi Set ShowDebug True. MeBi Set ShowDetails True. *)
+MeBi Config Output Enable.
+(* MeBi Config Output Enable True. MeBi Set ShowDebug True. MeBi Set ShowDetails True. *)
 
 MeBi Divider "Theories.Test.GeneralTests".
 Inductive i := C0 (i : nat) | C1 (b : bool) (j : nat) | C2 (x : nat).
@@ -129,7 +130,7 @@ Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
   .
 
 (* below cannot be finitely represented  *)
-MeBi Set FailIfIncomplete True.
+MeBi Config Fail If Incomplete True.
 Fail MeBi LTS 0 Using nonTerminatingTestLTS.
 Fail MeBi LTS (S 0) Using nonTerminatingTestLTS.
 Fail MeBi LTS (S (S 0)) Using nonTerminatingTestLTS.
@@ -202,8 +203,8 @@ Module Test2.
 End Test2.
 
 MeBi Divider "Theories.Test.BisimTest1".
-MeBi Set FailIfNotBisim True.
-MeBi Set WeakMode False.
+MeBi Config Fail If Incomplete True.
+MeBi Config WeakMode Disable.
 Module BisimTest1.
   Inductive action : Set := | TheAction1 | TheAction2.
 
@@ -326,7 +327,7 @@ Module BisimTest1.
 End BisimTest1.
 
 MeBi Divider "Theories.Test.BisimTest2".
-MeBi Set FailIfNotBisim True.
+MeBi Config Fail If Incomplete True.
 Module BisimTest2.
   Inductive action : Set := | TAU | TheAction1 | TheAction2.
 
@@ -355,14 +356,14 @@ Module BisimTest2.
 
   | do_fix : forall t, termLTS (tfix t) TAU (subst (tfix t) t).
 
-  MeBi Set WeakMode False.
+  MeBi Config WeakMode Disable.
 
   Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
   MeBi FSM exa1 Using termLTS.
   MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
 
-  MeBi Set WeakMode True.
-  MeBi Set Weak TAU Of action.
+  MeBi Config WeakMode Enable.
+  MeBi Config Weak As TAU Of action.
 
   MeBi FSM exa1 Using termLTS.
   MeBi Saturate exa1 Using termLTS.
@@ -391,7 +392,7 @@ Module BisimTest2.
 End BisimTest2.
 
 MeBi Divider "Theories.Test.BisimTest3".
-MeBi Set FailIfNotBisim True. 
+MeBi Config Fail If Incomplete True. 
 Module BisimTest3.
   Inductive action : Set := | TheAction1 | TheAction2.
 
@@ -420,14 +421,14 @@ Module BisimTest3.
 
   | do_fix : forall t, termLTS (tfix t) None (subst (tfix t) t).
 
-  MeBi Set WeakMode False.
+  MeBi Config WeakMode Disable.
 
   Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
   MeBi FSM exa1 Using termLTS.
   MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
 
-  MeBi Set WeakMode True.
-  MeBi Set Weak Option action.
+  MeBi Config WeakMode Enable.
+  MeBi Config Weak As Option action.
 
   MeBi FSM exa1 Using termLTS.
   MeBi Saturate exa1 Using termLTS.
@@ -458,7 +459,7 @@ End BisimTest3.
 (* MeBi Divider "Theories.Test.ProofTest".
 Module ProofTest.
 
-  MeBi Reset All.
+  MeBi Config Reset.
   MeBi Set ShowDebug True.
   MeBi Set ShowDetails True.
 

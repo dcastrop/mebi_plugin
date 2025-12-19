@@ -10,7 +10,7 @@ module Enc = Mebi_setup.Enc
 module Tree = Mebi_constr.Tree
 
 (***********************************************************************)
-module Log : Logger.LOGGER_TYPE = Logger.Default
+module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
 let () = Log.Config.configure_output Debug false
 let () = Log.Config.configure_output Trace false

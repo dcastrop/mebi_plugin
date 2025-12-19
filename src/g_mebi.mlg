@@ -96,6 +96,86 @@ VERNAC COMMAND EXTEND MeBi_Bisim CLASSIFIED AS QUERY
   {Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) rs)}
 END 
 
+VERNAC COMMAND EXTEND MeBi_Config_Reset CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Reset"] -> {Mebi_api.reset_config ()}
+| ["MeBi" "Config" "Reset" "Bound"] -> {Mebi_api.reset_bounds ()}
+| ["MeBi" "Config" "Reset" "WeakMode"] -> {Mebi_api.reset_weak_mode ()}
+| ["MeBi" "Config" "Reset" "FailIf"] -> {Mebi_api.reset_fail_if ()}
+| ["MeBi" "Config" "Reset" "Debug"] -> {Mebi_api.reset_debug ()}
+| ["MeBi" "Config" "Reset" "Output"] -> {Mebi_api.reset_output ()}
+END
+
+VERNAC COMMAND EXTEND MeBi_Config_Bounds CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Bound" int(x)] -> {Mebi_api.set_bound x}
+| ["MeBi" "Config" "Bound" int(x) "On" "States"] -> {Mebi_api.set_bounds x Model_info.States}
+| ["MeBi" "Config" "Bound" int(x) "On" "Transitions"] -> {Mebi_api.set_bounds x Model_info.Transitions}
+END 
+
+VERNAC COMMAND EXTEND MeBi_Config_Weak CLASSIFIED AS QUERY
+| ["MeBi" "Config" "WeakMode" "Enable"] -> {Mebi_api.set_weak_mode_enabled true}
+| ["MeBi" "Config" "WeakMode" "Disable"] -> {Mebi_api.set_weak_mode_enabled false}
+
+(* set the weak transitions -- bisim will use for both terms unless specified *)
+| ["MeBi" "Config" "Weak" "As" "Option" constr(x)] -> {Mebi_api.set_weak_arg1 (Some (Mebi_api.Option x))}
+| ["MeBi" "Config" "Weak" "As" constr(x) "Of" reference(y)] -> {Mebi_api.set_weak_arg1 (Some (Mebi_api.Custom (x, y)))}
+
+(* same as above *)
+| ["MeBi" "Config" "Weak1" "As" "Option" constr(x)] -> {Mebi_api.set_weak_arg1 (Some (Mebi_api.Option x))}
+| ["MeBi" "Config" "Weak1" "As" constr(x) "Of" reference(y)] -> {Mebi_api.set_weak_arg1 (Some (Mebi_api.Custom (x, y)))}
+
+(* for second lts *)
+| ["MeBi" "Config" "Weak2" "As" "Option" constr(x)] -> {Mebi_api.set_weak_arg2 (Some (Mebi_api.Option x))}
+| ["MeBi" "Config" "Weak2" "As" constr(x) "Of" reference(y)] -> {Mebi_api.set_weak_arg2 (Some (Mebi_api.Custom (x, y)))}
+END 
+
+VERNAC COMMAND EXTEND MeBi_Config_Fail CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Fail" "If" "Incomplete" "True" ] -> {Mebi_api.set_fail_ifincomplete true}
+| ["MeBi" "Config" "Fail" "If" "Incomplete" "False"] -> {Mebi_api.set_fail_ifincomplete false}
+
+| ["MeBi" "Config" "Fail" "If" "NotBisim" "True" ] -> {Mebi_api.set_fail_ifnotbisim true}
+| ["MeBi" "Config" "Fail" "If" "NotBisim" "False"] -> {Mebi_api.set_fail_ifnotbisim false}
+END 
+
+VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Output" "Enable"] -> {Mebi_api.set_output_enabled true}
+| ["MeBi" "Config" "Output" "Disable"] -> {Mebi_api.set_output_enabled false}
+
+| ["MeBi" "Config" "Output" "Debug" "Enable"] -> {Mebi_api.set_output_level Debug true}
+| ["MeBi" "Config" "Output" "Debug" "Disable"] -> {Mebi_api.set_output_level Debug false}
+
+| ["MeBi" "Config" "Output" "Info" "Enable"] -> {Mebi_api.set_output_level Info true}
+| ["MeBi" "Config" "Output" "Info" "Disable"] -> {Mebi_api.set_output_level Info false}
+
+| ["MeBi" "Config" "Output" "Notice" "Enable"] -> {Mebi_api.set_output_level Notice true}
+| ["MeBi" "Config" "Output" "Notice" "Disable"] -> {Mebi_api.set_output_level Notice false}
+
+| ["MeBi" "Config" "Output" "Warning" "Enable"] -> {Mebi_api.set_output_level Warning true}
+| ["MeBi" "Config" "Output" "Warning" "Disable"] -> {Mebi_api.set_output_level Warning false}
+
+| ["MeBi" "Config" "Output" "Error" "Enable"] -> {Mebi_api.set_output_level Error true}
+| ["MeBi" "Config" "Output" "Error" "Disable"] -> {Mebi_api.set_output_level Error false}
+
+| ["MeBi" "Config" "Output" "Trace" "Enable"] -> {Mebi_api.set_output_special Trace true}
+| ["MeBi" "Config" "Output" "Trace" "Disable"] -> {Mebi_api.set_output_special Trace false}
+
+| ["MeBi" "Config" "Output" "Results" "Enable"] -> {Mebi_api.set_output_special Result true}
+| ["MeBi" "Config" "Output" "Results" "Disable"] -> {Mebi_api.set_output_special Result false}
+
+| ["MeBi" "Config" "Output" "Show" "Enable"] -> {Mebi_api.set_output_special Show true}
+| ["MeBi" "Config" "Output" "Show" "Disable"] -> {Mebi_api.set_output_special Show false}
+END 
+
+VERNAC COMMAND EXTEND MeBi_Help CLASSIFIED AS QUERY
+(* TODO: *)
+| ["MeBi" "Help"] -> {Logger.Default.show "TODO: Update Mebi_help"}
+END 
+(* 
+VERNAC COMMAND EXTEND MeBi_ CLASSIFIED AS QUERY
+
+
+END 
+*)
+
 VERNAC COMMAND EXTEND MeBi_Divider CLASSIFIED AS QUERY
 (* for outputting messages -- useful for sifting through compiler output *)
 | ["MeBi" "Message" string(x)] -> {Logger.Default.show x}
@@ -106,53 +186,6 @@ VERNAC COMMAND EXTEND MeBi_Divider CLASSIFIED AS QUERY
 | ["MeBi" string(x) "Divider" string(y)] -> 
   {Logger.Default.show (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n%s" x y)}
 END 
-
-
-VERNAC COMMAND EXTEND MeBi_Config_Bounds CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Bound" int(x)] -> {Mebi_api.set_bound x}
-| ["MeBi" "Config" "Bound" int(x) "On" "States"] -> {Mebi_api.set_bounds x Mebi_api.States}
-| ["MeBi" "Config" "Bound" int(x) "On" "Transitions"] -> {Mebi_api.set_bounds x Mebi_api.Transitions}
-(* TODO: add reset *)
-END 
-
-VERNAC COMMAND EXTEND MeBi_Config_Weak CLASSIFIED AS QUERY
-| ["MeBi" "Config" "WeakMode" "Enable"] -> {Mebi_api.set_weak_mode_enabled true}
-| ["MeBi" "Config" "WeakMode" "Disable"] -> {Mebi_api.set_weak_mode_enabled false}
-
-(* set the weak transitions -- bisim will use for both terms unless specified *)
-| ["MeBi" "Config" "Weak" "As" "Option" constr(x)] -> {Mebi_api.set_weak_arg1 (Mebi_api.OptionConstr x)}
-| ["MeBi" "Config" "Weak" "As" constr(x) "Of" reference(y)] -> {Mebi_api.set_weak_arg1 (Mebi_api.CustomConstr (x, y))}
-
-(* same as above *)
-| ["MeBi" "Config" "Weak1" "As" "Option" constr(x)] -> {Mebi_api.set_weak_arg1 (Mebi_api.OptionConstr x)}
-| ["MeBi" "Config" "Weak1" "As" constr(x) "Of" reference(y)] -> {Mebi_api.set_weak_arg1 (Mebi_api.CustomConstr (x, y))}
-
-(* for second lts *)
-| ["MeBi" "Config" "Weak2" "As" "Option" constr(x)] -> {Mebi_api.set_weak_arg2 (Mebi_api.OptionConstr x)}
-| ["MeBi" "Config" "Weak2" "As" constr(x) "Of" reference(y)] -> {Mebi_api.set_weak_arg2 (Mebi_api.CustomConstr (x, y))}
-(* TODO: add reset *)
-END 
-
-VERNAC COMMAND EXTEND MeBi_Config_Fail CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Fail" "If" "Incomplete" "True" ] -> {Mebi_api.set_fail_ifincomplete true}
-| ["MeBi" "Config" "Fail" "If" "Incomplete" "False"] -> {Mebi_api.set_fail_ifincomplete false}
-
-| ["MeBi" "Config" "Fail" "If" "NotBisim" "True" ] -> {Mebi_api.set_fail_ifnotbisim true}
-| ["MeBi" "Config" "Fail" "If" "NotBisim" "False"] -> {Mebi_api.set_fail_ifnotbisim false}
-(* TODO: add reset *)
-END 
-
-VERNAC COMMAND EXTEND MeBi_Config_Debug CLASSIFIED AS QUERY
-
-(* TODO: add reset *)
-END 
-
-(* 
-VERNAC COMMAND EXTEND MeBi_ CLASSIFIED AS QUERY
-
-
-END 
-*)
 
 
 (* VERNAC COMMAND EXTEND MeBi_BeginProof CLASSIFIED AS QUERY
@@ -298,7 +331,7 @@ END *)
 (* | [ "pack" "hypothesis" ident(i) ] ->{ Tuto_tactic.pack_tactic i } *)
 END *)
 
-VERNAC COMMAND EXTEND MeBiRun CLASSIFIED AS QUERY
+(* VERNAC COMMAND EXTEND MeBiRun CLASSIFIED AS QUERY
 
 (* set plugin params *)
 | ["MeBi" "Set" "Bound" int(b)       ] -> {Params.set_bounds (b, None)}
@@ -335,16 +368,16 @@ VERNAC COMMAND EXTEND MeBiRun CLASSIFIED AS QUERY
 | ["MeBi" "Set" "WeakMode"    "False"] -> {Params.set_weak_mode false}
 
 (* set the weak transitions -- bisim will use for both terms unless specified *)
-| ["MeBi" "Set" "Weak" "Option" constr(x)   ] -> {Params.set_weak_types_args (Params.WeakArgs.OptionConstr x, None)}
-| ["MeBi" "Set" "Weak" constr(x)    "Of" reference(y)] -> {Params.set_weak_types_args (Params.WeakArgs.CustomConstr (x, y), None)}
+| ["MeBi" "Set" "Weak" "Option" constr(x)   ] -> {Params.set_weak_types_args (Params.WeakArgs.Option x, None)}
+| ["MeBi" "Set" "Weak" constr(x)    "Of" reference(y)] -> {Params.set_weak_types_args (Params.WeakArgs.Custom (x, y), None)}
 
 (* specify weak transition for first lts *)
-| ["MeBi" "Set" "Weak1" "Option" constr(x)   ] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.OptionConstr x); Logging.Log.notice "Set Weak1 param."}
-| ["MeBi" "Set" "Weak1" constr(x)    "Of" reference(y)] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.CustomConstr (x, y)); Logging.Log.notice "Set Weak1 param."}
+| ["MeBi" "Set" "Weak1" "Option" constr(x)   ] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.Option x); Logging.Log.notice "Set Weak1 param."}
+| ["MeBi" "Set" "Weak1" constr(x)    "Of" reference(y)] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.Custom (x, y)); Logging.Log.notice "Set Weak1 param."}
 
 (* specify weak transition for second lts *)
-| ["MeBi" "Set" "Weak2" "Option" constr(x)   ] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.OptionConstr x); Logging.Log.notice "Set Weak2 param."}
-| ["MeBi" "Set" "Weak2" constr(x)    "Of" reference(y)] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.CustomConstr (x, y)); Logging.Log.notice "Set Weak2 param."}
+| ["MeBi" "Set" "Weak2" "Option" constr(x)   ] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.Option x); Logging.Log.notice "Set Weak2 param."}
+| ["MeBi" "Set" "Weak2" constr(x)    "Of" reference(y)] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.Custom (x, y)); Logging.Log.notice "Set Weak2 param."}
 
 (* reset plugin params *)
 | ["MeBi" "Reset" "Bound"      ] -> {Params.reset_bounds ()}
@@ -448,4 +481,4 @@ VERNAC COMMAND EXTEND MeBiRun CLASSIFIED AS QUERY
 | ["MeBi" "Divider" string(x)] -> {Logger.Default.show (Printf.sprintf "\n- - - - - - - - - - - - - - - -\n%s" x)}
 | ["MeBi" string(x) "Divider" string(y)] -> 
   {Logger.Default.show (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n%s" x y)}
-END
+END *)

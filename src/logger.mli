@@ -55,10 +55,10 @@ end
 
 module type S = sig
   val prefix : string option
-  val default : unit -> Output_config.t
   val level : Feedback.level -> bool
   val special : Output_kind.special -> bool
 end
 
 module Make : (_ : Output_mode.OUTPUT_MODE) (_ : S) -> LOGGER_TYPE
+module MkDefault : () -> LOGGER_TYPE
 module Default : LOGGER_TYPE

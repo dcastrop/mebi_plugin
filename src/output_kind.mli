@@ -21,7 +21,7 @@ and special =
 
 val kind : t -> k
 
-val default_level
+val default_level_fun
   :  ?debug:bool
   -> ?info:bool
   -> ?notice:bool
@@ -30,12 +30,25 @@ val default_level
   -> level
   -> bool
 
-val default_special
+val default_level
+  : (?debug:bool
+     -> ?info:bool
+     -> ?notice:bool
+     -> ?warning:bool
+     -> ?error:bool
+     -> level
+     -> bool)
+      ref
+
+val default_special_fun
   :  ?trace:bool
   -> ?result:bool
   -> ?show:bool
   -> special
   -> bool
+
+val default_special
+  : (?trace:bool -> ?result:bool -> ?show:bool -> special -> bool) ref
 
 module type OUTPUT_KIND = sig
   type t

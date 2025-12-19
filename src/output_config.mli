@@ -1,4 +1,20 @@
-type t = { mutable enabled : bool }
+type t =
+  { mutable enabled : bool
+  ; level_defaults :
+      (?debug:bool
+       -> ?info:bool
+       -> ?notice:bool
+       -> ?warning:bool
+       -> ?error:bool
+       -> Output_kind.level
+       -> bool)
+        ref
+  ; special_defaults :
+      (?trace:bool -> ?result:bool -> ?show:bool -> Output_kind.special -> bool)
+        ref
+  }
+
+val default : unit -> t
 
 module type OUTPUT_CONFIG = sig
   val get : t ref
@@ -21,7 +37,6 @@ module type OUTPUT_CONFIG = sig
 end
 
 module type S = sig
-  val default : unit -> t
   val level : Feedback.level -> bool
   val special : Output_kind.special -> bool
 end
