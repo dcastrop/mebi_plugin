@@ -196,7 +196,9 @@ let is_in_weak_mode () : bool = !the_config.weak_mode.enabled
 
 (** NOTE: we will never just have [arg2], so suffice to just check [arg1] *)
 let has_weak_args () : bool =
-  match !the_config.weak_mode.args with Some { arg1 = Some _; _ } | _ -> false
+  match !the_config.weak_mode.args with
+  | Some { arg1 = Some _; _ } -> true
+  | _ -> false
 ;;
 
 let load_weak_arg : weak_arg -> Mebi_weak.t Mebi_wrapper.mm =

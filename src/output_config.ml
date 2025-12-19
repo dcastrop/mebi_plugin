@@ -82,14 +82,18 @@ module Make (Mode : Output_mode.OUTPUT_MODE) (D : S) : OUTPUT_CONFIG = struct
 
   let is_level_enabled ?(override : bool = false) : Output_kind.level -> bool =
     fun (x : Output_kind.level) ->
-    override || (!get.enabled && Level.is_enabled x)
+    override
+    || (!get.enabled && !((default ()).level_defaults) x && Level.is_enabled x)
   ;;
 
   let is_special_enabled ?(override : bool = false)
     : Output_kind.special -> bool
     =
     fun (x : Output_kind.special) ->
-    override || (!get.enabled && Special.is_enabled x)
+    override
+    || (!get.enabled
+        && !((default ()).special_defaults) x
+        && Special.is_enabled x)
   ;;
 
   let do_output

@@ -43,19 +43,19 @@ MeBi FSM q Using termLTS. MeBi Saturate q Using termLTS.
 MeBi FSM r Using termLTS. MeBi Saturate r Using termLTS.
 
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test2.Bisim.pq".
-
+MeBi Divider "Examples.Bisimilarity.Proc.Test2.Terms.Bisim.pq".
 MeBi Bisim p With termLTS And q With termLTS Using termLTS.
+MeBi Divider "Examples.Bisimilarity.Proc.Test2.Terms.Bisim.qp".
 MeBi Bisim q With termLTS And p With termLTS Using termLTS.
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test2.Bisim.qr".
 
+MeBi Divider "Examples.Bisimilarity.Proc.Test2.Terms.Bisim.qr".
 MeBi Bisim q With termLTS And r With termLTS Using termLTS.
+MeBi Divider "Examples.Bisimilarity.Proc.Test2.Terms.Bisim.rq".
 MeBi Bisim r With termLTS And q With termLTS Using termLTS.
 
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test2.Bisim.pr".
-
+MeBi Divider "Examples.Bisimilarity.Proc.Test2.Terms.Bisim.pr".
 MeBi Bisim p With termLTS And r With termLTS Using termLTS.
+MeBi Divider "Examples.Bisimilarity.Proc.Test2.Terms.Bisim.rp".
 MeBi Bisim r With termLTS And p With termLTS Using termLTS.
-
