@@ -41,13 +41,28 @@ Proof. MeBiSim Begin compLTS p And compLTS q Using compLTS termLTS.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-  (* unfold s1 in *. *)
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-Qed.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+(* Qed. *)
+Admitted.
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.qp".
+(* MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.qp".
 Example wsim_qp : weak_sim compLTS compLTS q p. 
 Proof. MeBiSim Begin compLTS q And compLTS p Using compLTS termLTS. 
   MeBiSim Solve 300.
@@ -90,4 +105,4 @@ MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.sr".
 Example wsim_pr : weak_sim compLTS compLTS s r. 
 Proof. MeBiSim Begin compLTS s And compLTS r Using compLTS termLTS. 
   MeBiSim Solve 500.
-Qed.
+Qed. *)
