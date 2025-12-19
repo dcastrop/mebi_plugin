@@ -2,6 +2,14 @@ type 'a to_string =
   | Args of (?args:Utils.Strfy.style_args -> 'a -> string)
   | Of of ('a -> string)
 
+let f_to_string
+      ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+      (f : 'a to_string)
+  : 'a -> string
+  =
+  match f with Args f -> f ~args | Of f -> f
+;;
+
 module type LOGGER_TYPE = sig
   module Config : Output_config.OUTPUT_CONFIG
 
@@ -127,12 +135,11 @@ module Make (Mode : Output_mode.OUTPUT_MODE) (X : S) : LOGGER_TYPE = struct
         (f : 'a to_string)
     : unit
     =
-    let f : 'a -> string = match f with Args f -> f ~args | Of f -> f in
     do_output
       ~prefix:(Some (Printf.sprintf "%s: " prefix))
       ~__FUNCTION__
       k
-      (f x)
+      (f_to_string f x)
   ;;
 
   let things

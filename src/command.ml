@@ -73,10 +73,69 @@ module MkGraph
     (N : Set.S with type elt = Enc.t)
     (P : Set.S with type elt = Enc.t * Tree.t) : GraphB = struct
   (***********************************************************************)
+
+  (** [H] is the hashtbl of outgoing transitions, from some [EConstr.t] and also
+      is used for mapping term types to [cindef]. *)
+  module H : Hashtbl.S with type key = Enc.t = M
+
+  (** [S] is the set of states, of [EConstr.t]. *)
+  module S : Set.S with type elt = Enc.t = N
+
+  (** [D] is the set of destination tuples, each comprised of a term [EConstr.t]
+      and the corresponding [Tree.t]. *)
+  module D : Set.S with type elt = Enc.t * Tree.t = P
+
+  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Tree.t].
+  *)
+  type constr_transitions = (Action.t, D.t) Hashtbl.t
+
+  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Tree.t].
+  *)
+  type lts_graph =
+    { to_visit : Enc.t Queue.t
+    ; init : Enc.t
+    ; terminals : S.t
+    ; states : S.t
+    ; transitions : constr_transitions H.t
+    ; ind_defs : Mebi_ind.t B.t
+    ; weak : Mebi_weak.t option
+    }
+
+  (***********************************************************************)
   module GLog : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
   let () = GLog.Config.configure_output Debug false
   let () = GLog.Config.configure_output Trace false
+  let () = GLog.Config.configure_output Info true
+
+  let status_update
+        (from : Enc.t)
+        ({ to_visit; states; transitions; _ } : lts_graph)
+        (bound : int)
+    : unit
+    =
+    let bound : int = String.length (Utils.Strfy.int bound) in
+    let f (n : string) : string =
+      let to_fill : int = bound - String.length n in
+      (if to_fill <= 0
+       then n
+       else Printf.sprintf "%s%s" (String.make to_fill ' ') n)
+      |> Logger.f_to_string (Args Utils.Strfy.string)
+    in
+    let g (n : int) : string = f (Utils.Strfy.int n) in
+    let from : string = f (Enc.to_string from) in
+    let to_visit : string = g (Queue.length to_visit) in
+    let states : string = g (S.cardinal states) in
+    let transitions : string = g (H.length transitions) in
+    Printf.sprintf
+      "visiting: %s | num to visit: %s | num states/transitions: %s / %s"
+      from
+      to_visit
+      states
+      transitions
+    |> GLog.info
+  ;;
+
   (***********************************************************************)
 
   let debug_enc ?(__FUNCTION__ : string = "") (p : string) (x : Enc.t) : unit =
@@ -102,73 +161,6 @@ module MkGraph
   ;;
 
   (***********************************************************************)
-
-  (** [H] is the hashtbl of outgoing transitions, from some [EConstr.t] and also
-      is used for mapping term types to [cindef]. *)
-  module H : Hashtbl.S with type key = Enc.t = M
-
-  (** [S] is the set of states, of [EConstr.t]. *)
-  module S : Set.S with type elt = Enc.t = N
-
-  (** [D] is the set of destination tuples, each comprised of a term [EConstr.t]
-      and the corresponding [Tree.t]. *)
-  module D : Set.S with type elt = Enc.t * Tree.t = P
-
-  (** [constr_transitions] is a hashtbl mapping [action]s to terms of [EConstr.t] and [Tree.t].
-  *)
-  type constr_transitions = (Action.t, D.t) Hashtbl.t
-
-  let constr_transitions_to_string
-        ?(args : style_args = Utils.Strfy.style_args ())
-        (xs : constr_transitions)
-    : string
-    =
-    GLog.trace __FUNCTION__;
-    let open Utils.Strfy in
-    list
-      ~args:{ args with name = Some "constr_transitions" }
-      (tuple
-         Action.to_string
-         (fun
-             ?(args : style_args = record_args ()) (destination_tuples : D.t) ->
-         list
-           (tuple
-              (fun ?(args : style_args = record_args ()) x -> Enc.to_string x)
-              Tree.to_string)
-           (D.to_list destination_tuples)))
-      (List.combine
-         (Hashtbl.to_seq_keys xs |> List.of_seq)
-         (Hashtbl.to_seq_values xs |> List.of_seq))
-  ;;
-
-  let _transitions_to_string
-        ?(args : style_args = Utils.Strfy.style_args ())
-        (xs : constr_transitions M.t)
-    : string
-    =
-    GLog.trace __FUNCTION__;
-    let open Utils.Strfy in
-    list
-      ~args:{ args with name = Some "transitions" }
-      (tuple
-         (fun ?(args : style_args = record_args ()) x -> Enc.to_string x)
-         constr_transitions_to_string)
-      (List.combine
-         (M.to_seq_keys xs |> List.of_seq)
-         (M.to_seq_values xs |> List.of_seq))
-  ;;
-
-  (** [lts_graph] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Tree.t].
-  *)
-  type lts_graph =
-    { to_visit : Enc.t Queue.t
-    ; init : Enc.t
-    ; terminals : S.t
-    ; states : S.t
-    ; transitions : constr_transitions H.t
-    ; ind_defs : Mebi_ind.t B.t
-    ; weak : Mebi_weak.t option
-    }
 
   (** [insert_constr_transition] handles adding the mapping of action [a] to tuple [(term * Tree.t)] in a given [constr_transitions].
   *)
@@ -247,7 +239,7 @@ module MkGraph
     : S.t mm
     =
     GLog.trace __FUNCTION__;
-    GLog.thing ~__FUNCTION__ Info "from" from (Of Enc.to_string);
+    GLog.thing ~__FUNCTION__ Debug "from" from (Of Enc.to_string);
     let iter_body (i : int) (new_states : S.t) =
       let (act, tgt, int_tree) : Mebi_constr.t = List.nth ctors i in
       let* tgt_enc : Enc.t = encode tgt in
@@ -303,13 +295,14 @@ module MkGraph
     if Queue.is_empty g.to_visit || fstop g bound
     then return g
     else (
-      let encoded_t : Enc.t = Queue.pop g.to_visit in
+      let enc_to_visit : Enc.t = Queue.pop g.to_visit in
+      status_update enc_to_visit g bound;
       let* new_constrs : Mebi_constr.t list =
-        get_new_constrs encoded_t the_primary_lts lts_ind_def_map
+        get_new_constrs enc_to_visit the_primary_lts lts_ind_def_map
       in
       let* new_states : S.t =
         (* NOTE: also updates [g.to_visit ]*)
-        get_new_states encoded_t g new_constrs
+        get_new_states enc_to_visit g new_constrs
       in
       let g : lts_graph = { g with states = S.union g.states new_states } in
       build_lts_graph the_primary_lts lts_ind_def_map g (bound, fstop))

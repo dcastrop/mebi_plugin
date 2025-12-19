@@ -38,38 +38,39 @@ let show_instructions_to_toggle_weak (weak_mode : bool) : unit =
     (if weak_mode
      then
        "Checking for Weak Bisimilarity.\n\
-        To check for Strong Bisimilarity use the command \"MeBi Set WeakMode \
-        False\""
+        To check for Strong Bisimilarity use the command \"MeBi Config \
+        WeakMode Disable\""
      else
        "Checking for Strong Bisimilarity (since weak mode is disabled)\n\
-        To Check for Weak Bisimilarity use the command \"MeBi Set WeakMode \
-        True\"")
+        To Check for Weak Bisimilarity use the command \"MeBi Config WeakMode \
+        Enable\"")
 ;;
 
 let show_instructions_to_enable_weak () : unit =
   Log.notice
     "Weak mode is not currently enabled.\n\
-     Use the command \"MeBi Set WeakMode True\" to enable it (and \"MeBi Set \
-     WeakMode False\" to disable it).\n"
+     Use the command \"MeBi Config WeakMode Enable\" to enable it (and \"MeBi \
+     Config WeakMode Disable\" to disable it).\n"
 ;;
 
 let show_instructions_to_set_weak () : unit =
   Log.notice
     "Cannot saturate without any silent actions.\n\
-     Use the command \"MeBi Set Weak ...\" to specify how you are encoding \
+     Use the command \"MeBi Config Weak ...\" to specify how you are encoding \
      silent transitions.\n\
      For example:\n\
-    \  1) \"MeBi Set Weak Option nat\" is for labels of type \"option nat\", \
-     where silent actions are \"None\" and visible actions are \"Some _\"\n\
-    \  2) \"MeBi Set Weak TAU of ACTION\" is for labels of inductive type \
-     \"ACTION\" that has some constructor \"TAU\"\n"
+    \  1) \"MeBi Config Weak As Option nat\" is for labels of type \"option \
+     nat\", where silent actions are \"None\" and visible actions are \"Some \
+     _\"\n\
+    \  2) \"MeBi Config Weak As TAU of ACTION\" is for labels of inductive \
+     type \"ACTION\" that has some constructor \"TAU\"\n"
 ;;
 
 let show_help_basic () : unit =
   Log.notice
     "All commands for this plugin begin with \"MeBi\" and are followed one of \
      the following:\n\
-     Set, Check, LTS, FSM, Saturate, Minimize, Bisim.\n\n\
+     Config, LTS, FSM, Saturate, Minimize, Bisim, ....\n\n\
      Use the command \"MeBi Help x\" for more information\n\
      (where x is one of the terms above)\n"
 ;;
