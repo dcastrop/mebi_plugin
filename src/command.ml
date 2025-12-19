@@ -73,7 +73,7 @@ module MkGraph
     (N : Set.S with type elt = Enc.t)
     (P : Set.S with type elt = Enc.t * Tree.t) : GraphB = struct
   (***********************************************************************)
-  module GLog : Logger.LOGGER_TYPE = Logger.Default
+  module GLog : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
   let () = GLog.Config.configure_output Debug false
   let () = GLog.Config.configure_output Trace false
@@ -635,8 +635,9 @@ module MkGraph
 end
 
 (***********************************************************************)
-module Log : Logger.LOGGER_TYPE = Logger.Default
+module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
+let () = Log.Config.configure_output Info false
 let () = Log.Config.configure_output Debug false
 let () = Log.Config.configure_output Trace false
 (***********************************************************************)

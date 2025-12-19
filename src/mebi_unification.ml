@@ -6,10 +6,11 @@ open Mebi_wrapper.Syntax
 module Tree = Mebi_constr.Tree
 
 (***********************************************************************)
-module Log : Logger.LOGGER_TYPE = Logger.Default
+module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
 let () = Log.Config.configure_output Debug false
 let () = Log.Config.configure_output Trace false
+let () = Log.Config.configure_output Error false
 (***********************************************************************)
 
 let debug_econstr

@@ -1,4 +1,25 @@
-type t = { mutable enabled : bool }
+type t =
+  { mutable enabled : bool
+  ; level_defaults :
+      (?debug:bool
+       -> ?info:bool
+       -> ?notice:bool
+       -> ?warning:bool
+       -> ?error:bool
+       -> Output_kind.level
+       -> bool)
+        ref
+  ; special_defaults :
+      (?trace:bool -> ?result:bool -> ?show:bool -> Output_kind.special -> bool)
+        ref
+  }
+
+let default () : t =
+  { enabled = true
+  ; level_defaults = Output_kind.default_level
+  ; special_defaults = Output_kind.default_special
+  }
+;;
 
 module type OUTPUT_CONFIG = sig
   val get : t ref
@@ -21,7 +42,6 @@ module type OUTPUT_CONFIG = sig
 end
 
 module type S = sig
-  val default : unit -> t
   val level : Output_kind.level -> bool
   val special : Output_kind.special -> bool
 end
@@ -47,7 +67,6 @@ module Make (Mode : Output_mode.OUTPUT_MODE) (D : S) : OUTPUT_CONFIG = struct
       let defaults : t -> bool = D.special
     end)
 
-  let default () : t = D.default ()
   let get : t ref = ref (default ())
   let reset () : unit = get := default ()
   let enable_output () : unit = !get.enabled <- true

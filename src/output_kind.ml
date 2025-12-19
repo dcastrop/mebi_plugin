@@ -34,7 +34,7 @@ let kind : t -> k = function
 
 (***********************************************************************)
 
-let default_level
+let default_level_fun
       ?(debug : bool = false)
       ?(info : bool = false)
       ?(notice : bool = true)
@@ -49,7 +49,20 @@ let default_level
   | Error -> error
 ;;
 
-let default_special
+let default_level
+  : (?debug:bool
+     -> ?info:bool
+     -> ?notice:bool
+     -> ?warning:bool
+     -> ?error:bool
+     -> level
+     -> bool)
+      ref
+  =
+  ref default_level_fun
+;;
+
+let default_special_fun
       ?(trace : bool = true)
       ?(result : bool = true)
       ?(show : bool = true)
@@ -58,6 +71,12 @@ let default_special
   | Trace -> trace
   | Result -> result
   | Show -> show
+;;
+
+let default_special
+  : (?trace:bool -> ?result:bool -> ?show:bool -> special -> bool) ref
+  =
+  ref default_special_fun
 ;;
 
 (***********************************************************************)

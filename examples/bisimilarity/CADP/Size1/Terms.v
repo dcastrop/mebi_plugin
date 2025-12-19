@@ -12,20 +12,20 @@ Import Protocol.
 Require Import MEBI.Examples.CADP_Glued.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.Terms".
-MeBi Reset All.
-MeBi Set ShowAny      True.
-MeBi Set ShowNotices  True.
-(* MeBi Set ShowDebug    True. *)
-(* MeBi Set ShowDetails  True. *)
-MeBi Set ShowResults  True.
-MeBi Set ShowWarnings True.
-MeBi Set Bound 1000.
-MeBi Set WeakMode     True.
-MeBi Set Weak Option label.
-MeBi Set FailIfIncomplete True.
-MeBi Set FailIfNotBisim True.
+MeBi Config Reset.
+MeBi Config Output Enable.
+MeBi Config Output Notice Enable.
+(* MeBi Config Output Debug Enable. *)
+(* MeBi Config Output Info Enable. *)
+MeBi Config Output Results Enable.
+MeBi Config Output Warning Enable.
+MeBi Config Bound 1000.
+MeBi Config WeakMode Enable.
+MeBi Config Weak As Option label.
+MeBi Config Fail If Incomplete True.
+MeBi Config Fail If NotBisim True.
 (* MeBi See All.  *)
-(* MeBi Set ShowAny False. *)
+(* MeBi Config Output Disable. *)
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.Terms.p1".
 Example p1 : tm * env := (P, Env.initial 1).

@@ -97,7 +97,7 @@ module Rocq : OUTPUT_MODE = Make (struct
       | Info -> f Feedback.msg_info
       | Notice -> f Feedback.msg_notice
       | Warning -> f Feedback.msg_warning
-      | Error -> f Feedback.msg_warning
+      | Error -> f Feedback.msg_debug
     ;;
 
     let special_output_fun

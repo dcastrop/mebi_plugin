@@ -60,7 +60,6 @@ end
 
 module type S = sig
   val prefix : string option
-  val default : unit -> Output_config.t
   val level : Feedback.level -> bool
   val special : Output_kind.special -> bool
 end
@@ -70,7 +69,6 @@ module Make (Mode : Output_mode.OUTPUT_MODE) (X : S) : LOGGER_TYPE = struct
     Output_config.Make
       (Mode)
       (struct
-        let default () : Output_config.t = X.default ()
         let level : Output_kind.level -> bool = X.level
         let special : Output_kind.special -> bool = X.special
       end)
@@ -192,15 +190,16 @@ end
 
 (***********************************************************************)
 
-module Default : LOGGER_TYPE =
+module MkDefault () : LOGGER_TYPE =
   Make
     (Output_mode.Default)
     (struct
       let prefix : string option = None
-      let default () : Output_config.t = { enabled = true }
-      let level : Output_kind.level -> bool = Output_kind.default_level
-      let special : Output_kind.special -> bool = Output_kind.default_special
+      let level : Output_kind.level -> bool = !Output_kind.default_level
+      let special : Output_kind.special -> bool = !Output_kind.default_special
     end)
+
+module Default : LOGGER_TYPE = MkDefault ()
 
 (* let make
    ?(prefix : string option = None)
