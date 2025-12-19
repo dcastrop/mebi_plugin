@@ -10,12 +10,18 @@ Require Import MEBI.Examples.Proc.
 
 Import Layered.
 
-Example a1 : term := tfix (tseq (tact (send A) tend) trec).
-Example a2 : term := tfix (tseq (tact (recv A) tend) trec).
+Example s1 : term := tfix (tseq (tact (send A) tend) trec).
+Example s2 : term := tfix (tseq (tact (send A) tend) 
+                                (tseq (tact (send A) tend) trec)).
 
-Example p : comp := cpar (cprc a1) (cprc a2). 
-Example q : comp := cpar (cpar (cprc a1) (cprc a2)) (cpar (cprc a1) (cprc a2)). 
-Example r : comp := cpar (cpar (cprc a2) (cprc a1)) (cpar (cprc a2) (cprc a1)). 
+Example r1 : term := tfix (tseq (tact (recv A) tend) trec).
+Example r2 : term := tfix (tseq (tact (recv A) tend) 
+                                (tseq (tact (recv A) tend) trec)).
+
+Example p : comp := cpar (cprc s1) (cprc r1). 
+Example q : comp := cpar (cprc s2) (cprc r2). 
+Example r : comp := cpar (cprc s1) (cprc r2). 
+Example s : comp := cpar (cprc s2) (cprc r1). 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.Terms".
 MeBi Config Reset.
@@ -36,14 +42,13 @@ MeBi Config Fail If NotBisim True.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.Terms".
 
-MeBi FSM p Using compLTS termLTS. 
-MeBi Saturate p Using compLTS termLTS.
+MeBi FSM p Using compLTS termLTS. MeBi Saturate p Using compLTS termLTS.
 
-MeBi FSM q Using compLTS termLTS. 
-MeBi Saturate q Using compLTS termLTS.
+MeBi FSM q Using compLTS termLTS. MeBi Saturate q Using compLTS termLTS.
 
-MeBi FSM r Using compLTS termLTS. 
-MeBi Saturate r Using compLTS termLTS.
+MeBi FSM r Using compLTS termLTS. MeBi Saturate r Using compLTS termLTS.
+
+MeBi FSM s Using compLTS termLTS. MeBi Saturate s Using compLTS termLTS.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.Bisim.pq".
@@ -62,5 +67,11 @@ MeBi Divider "Examples.Bisimilarity.Proc.Test3.Bisim.pr".
 
 MeBi Bisim p With compLTS And r With compLTS Using compLTS termLTS.
 MeBi Bisim r With compLTS And p With compLTS Using compLTS termLTS.
+
+
+MeBi Divider "Examples.Bisimilarity.Proc.Test3.Bisim.rs".
+
+MeBi Bisim r With compLTS And s With compLTS Using compLTS termLTS.
+MeBi Bisim s With compLTS And r With compLTS Using compLTS termLTS.
 
 

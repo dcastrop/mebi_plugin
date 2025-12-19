@@ -2,6 +2,8 @@ type 'a to_string =
   | Args of (?args:Utils.Strfy.style_args -> 'a -> string)
   | Of of ('a -> string)
 
+val f_to_string : ?args:Utils.Strfy.style_args -> 'a to_string -> 'a -> string
+
 module type LOGGER_TYPE = sig
   module Config : Output_config.OUTPUT_CONFIG
 
