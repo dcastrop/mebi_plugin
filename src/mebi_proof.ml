@@ -1366,13 +1366,16 @@ let _do_unfold_concl (gl : Proofview.Goal.t) : tactic =
   let rec loop (x : EConstr.t) : tactic option =
     if Mebi_theories.is_constr sigma x
     then Some (do_unfold gl x)
-    else
-      Rocq_utils.econstr_to_atomic sigma x
-      |> snd
-      |> Array.fold_left
-           (fun (acc : tactic option) (y : EConstr.t) ->
-             match acc with None -> loop y | Some acc -> Some acc)
-           None
+    else (
+      try
+        Rocq_utils.econstr_to_atomic sigma x
+        |> snd
+        |> Array.fold_left
+             (fun (acc : tactic option) (y : EConstr.t) ->
+               match acc with None -> loop y | Some acc -> Some acc)
+             None
+      with
+      | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> None)
   in
   match loop the_concl with
   | None -> raise (Mebi_proof_NothingToUnfold ())
@@ -1388,7 +1391,9 @@ let _can_unfold_concl (gl : Proofview.Goal.t) : bool =
     then true
     else if Mebi_theories.is_var sigma x
     then false
-    else Rocq_utils.econstr_to_atomic sigma x |> snd |> Array.exists loop
+    else (
+      try Rocq_utils.econstr_to_atomic sigma x |> snd |> Array.exists loop with
+      | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> false)
   in
   loop the_concl
 ;;
@@ -1626,10 +1631,11 @@ and handle_new_weak_sim (gl : Proofview.Goal.t) : tactic =
   then (
     Log.trace ~__FUNCTION__ "(concl is weak sim)";
     (* TODO: *)
-    (*if can_unfold_concl gl
-      then do_unfold_concl gl
-      else*)
-    if hyps_has_cofix gl
+    if _can_unfold_concl gl
+    then (
+      try _do_unfold_concl gl with
+      | Mebi_proof_NothingToUnfold _ -> raise (Mebi_proof_NewWeakSim ()))
+    else if hyps_has_cofix gl
     then do_solve_cofix gl
     else (
       set_the_proof_state ~__FUNCTION__ NewCofix;
@@ -1812,6 +1818,7 @@ and detect_proof_state (gl : Proofview.Goal.t) : tactic =
 (***********************************************************************)
 
 let step () : unit Proofview.tactic =
+  Log.debug "\n- - - - - - - - - -\n";
   Log.trace __FUNCTION__;
   Mebi_theories.tactics
     [ Proofview.Goal.enter (fun gl ->
@@ -1833,6 +1840,12 @@ let solve (upper_bound : int) (pstate : Declare.Proof.t) : Declare.Proof.t =
         (Printf.sprintf "Unsolved after (%i) iterations." (upper_bound - n - 1));
       0, pstate
     | false, _ ->
+      Log.thing
+        ~__FUNCTION__
+        Notice
+        "iter"
+        (upper_bound - n)
+        (Of Utils.Strfy.int);
       let pstate = Mebi_tactics.update_proof_by_tactic pstate (step ()) in
       iter_body (n - 1) pstate
   in

@@ -6,10 +6,17 @@ exception
   Rocq_utils_EConstrIsNot_Atomic of
     (Evd.evar_map * EConstr.t * EConstr.kind_of_type)
 
+exception Rocq_utils_EConstrIsNotA_Type of (Evd.evar_map * EConstr.t * string)
+
 let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t) : kind_pair =
-  match EConstr.kind_of_type sigma x with
-  | AtomicType (ty, tys) -> ty, tys
-  | k -> raise (Rocq_utils_EConstrIsNot_Atomic (sigma, x, k))
+  try
+    match EConstr.kind_of_type sigma x with
+    | AtomicType (ty, tys) -> ty, tys
+    | k -> raise (Rocq_utils_EConstrIsNot_Atomic (sigma, x, k))
+  with
+  | Failure e ->
+    (* Logger.Default.debug ~__FUNCTION__ e; *)
+    raise (Rocq_utils_EConstrIsNotA_Type (sigma, x, e))
 ;;
 
 (*****************************************************************************)
