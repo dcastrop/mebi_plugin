@@ -4,6 +4,8 @@ exception
   Rocq_utils_EConstrIsNot_Atomic of
     (Evd.evar_map * Evd.econstr * EConstr.kind_of_type)
 
+exception Rocq_utils_EConstrIsNotA_Type of (Evd.evar_map * Evd.econstr * string)
+
 val econstr_to_atomic : Evd.evar_map -> Evd.econstr -> kind_pair
 
 type constr_kind =
