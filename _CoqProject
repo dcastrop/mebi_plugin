@@ -32,7 +32,7 @@ examples/bisimilarity/Proc/Test2/PluginProofs.v ### Success
 
 ### Proc.Layered
 examples/bisimilarity/Proc/Test3/Terms.v ### Success
-# examples/bisimilarity/Proc/Test3/PluginProofs.v ### TODO: layered hyps trans
+examples/bisimilarity/Proc/Test3/PluginProofs.v ### TODO: proof explosion
 
 # examples/bisimilarity/Proc/Test4/Terms.v ###
 # examples/bisimilarity/Proc/Test4/PluginProofs.v ###
