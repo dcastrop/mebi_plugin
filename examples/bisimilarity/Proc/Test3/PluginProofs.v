@@ -31,12 +31,67 @@ MeBi Config Fail If NotBisim True.
 
 Require Import Logic.
 
+MeBi Config Output Debug Disable.
+MeBi Config Output Trace Disable.
+MeBi Config Output Info Disable.
+
+Example s0 : term := (tact (send A) tend).
+Example r0 : term := (tact (recv A) tend).
+Example p0 : comp := cpar (cprc s0) (cprc r0). 
+
+(* MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.p0".
+Example wsim_p0 : weak_sim compLTS compLTS p0 p0. 
+Proof. MeBiSim Begin compLTS p0 And compLTS p0 Using compLTS termLTS. 
+  MeBiSim Solve 300.
+Qed. *)
+
+Example s0l : term := tfix (tseq (tact (send A) tend) trec).
+Example r0l : term := tfix (tseq (tact (recv A) tend) trec).
+Example p0l : comp := cpar (cprc s0l) (cprc r0l). 
+
+(* MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.p0l".
+Example wsim_p0l : weak_sim compLTS compLTS p0l p0l. 
+Proof. MeBiSim Begin compLTS p0l And compLTS p0l Using compLTS termLTS. 
+  MeBiSim Solve 4000.
+  (* MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step.
+  MeBiSim Step. *)
+Admitted. *)
 
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.pq".
+(* MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.pq".
 Example wsim_pq : weak_sim compLTS compLTS p q. 
 Proof. MeBiSim Begin compLTS p And compLTS q Using compLTS termLTS. 
+  (* MeBiSim Solve 5000. *)
   (* MeBiSim Solve 470. *)
+  (* MeBiSim Solve 100. *)
+  MeBiSim Solve 50.
+  MeBiSim Solve 50.
+  MeBiSim Solve 50.
+  MeBiSim Solve 50.
+  MeBiSim Solve 50.
+  MeBiSim Solve 50.
+  (* MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
@@ -57,10 +112,9 @@ Proof. MeBiSim Begin compLTS p And compLTS q Using compLTS termLTS.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
+  MeBiSim Step. *)
 (* Qed. *)
-Admitted.
+Admitted. *)
 
 (* MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.qp".
 Example wsim_qp : weak_sim compLTS compLTS q p. 
