@@ -7,7 +7,6 @@ Require Operators_Properties.
 
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.Proc.
-
 Import Layered.
 
 Require Import MEBI.Examples.bisimilarity.Proc.Test3.Terms.
@@ -52,7 +51,20 @@ Example p0l : comp := cpar (cprc s0l) (cprc r0l).
 (* MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.p0l".
 Example wsim_p0l : weak_sim compLTS compLTS p0l p0l. 
 Proof. MeBiSim Begin compLTS p0l And compLTS p0l Using compLTS termLTS. 
-  MeBiSim Solve 4000.
+  MeBiSim Solve 500.
+  MeBiSim Solve 500.
+  MeBiSim Solve 500.
+  MeBiSim Solve 500.
+  MeBiSim Solve 500.
+  MeBiSim Solve 500.
+  MeBiSim Solve 500.
+  MeBiSim Solve 500.
+  MeBiSim Solve 500.
+  MeBiSim Solve 500.
+  MeBiSim Solve 500.
+  MeBiSim Solve 500.
+  MeBiSim Solve 500.
+  MeBiSim Solve 500.
   (* MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.

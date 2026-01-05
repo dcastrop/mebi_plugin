@@ -19,33 +19,37 @@ theories/Bisimilarity.v ###
 examples/Proc.v ###
 
 ### Proc.Flat.Simple 
-examples/bisimilarity/Proc/Test1/Terms.v ### Success
+examples/bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
+examples/bisimilarity/Proc/Test1/TermTests.v ### Success
 examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test1/ManualProofs.v
 # examples/bisimilarity/Proc/Test1/LtacProofs.v
 
 ### Proc.Flat.Complex 
-examples/bisimilarity/Proc/Test2/Terms.v ### Success
+examples/bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
+examples/bisimilarity/Proc/Test2/TermTests.v ### Success
 examples/bisimilarity/Proc/Test2/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test2/ManualProofs.v
 # examples/bisimilarity/Proc/Test2/LtacProofs.v
 
 ### Proc.Layered
-examples/bisimilarity/Proc/Test3/Terms.v ### Success
-examples/bisimilarity/Proc/Test3/PluginProofs.v ### TODO: proof explosion
+examples/bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
+examples/bisimilarity/Proc/Test3/TermTests.v ### Success
+# examples/bisimilarity/Proc/Test3/PluginProofs.v ### TODO: proof explosion
 
-# examples/bisimilarity/Proc/Test4/Terms.v ###
-# examples/bisimilarity/Proc/Test4/PluginProofs.v ###
+examples/bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
+examples/bisimilarity/Proc/Test4/TermTests.v ### 
+# examples/bisimilarity/Proc/Test4/PluginProofs.v ### TODO: proof explosion
 
 ### CADP
-# examples/CADP.v ###
-# examples/CADP_Glued.v ###
+# examples/CADP.v ### REQUIRED FOR BELOW
+# examples/CADP_Glued.v ### REQUIRED FOR BELOW
 
-# TODO: finish testing proc.layered (test 3)
-# examples/bisimilarity/CADP/Size1/Terms.v ###
+# TODO: finish testing proc.layered (proc.test 3)
+# examples/bisimilarity/CADP/Size1/TermTests.v ### Success
 # examples/bisimilarity/CADP/Size1/PluginProofs.v ###
 
-# examples/bisimilarity/CADP/Size2/Terms.v ###
+# examples/bisimilarity/CADP/Size2/TermTests.v ###
 # examples/bisimilarity/CADP/Size2/PluginProofs.v ###
 
 
