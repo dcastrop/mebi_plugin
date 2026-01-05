@@ -63,7 +63,7 @@ let default_level
 ;;
 
 let default_special_fun
-      ?(trace : bool = true)
+      ?(trace : bool = false)
       ?(result : bool = true)
       ?(show : bool = true)
   : special -> bool
