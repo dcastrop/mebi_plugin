@@ -669,8 +669,8 @@ let fail_if_incomplete
   Log.trace __FUNCTION__;
   if Mebi_api.fail_if_incomplete () && Bool.not (is_lts_complete x)
   then (
-    Log.thing Notice "Incomplete Lts\n" x (Args Lts.to_string);
-    Log.thing Notice "Lts is Incomplete with bound" bound (Args Utils.Strfy.int);
+    Log.thing Notice "Incomplete LTS\n" x (Args Lts.to_string);
+    Log.thing Notice "LTS is incomplete with bound" bound (Args Utils.Strfy.int);
     params_fail_if_incomplete ())
   else return ()
 ;;
@@ -714,12 +714,12 @@ let build_fsm
   Log.trace __FUNCTION__;
   (* NOTE: build lts *)
   let* the_lts = build_lts primary_lts t refs bounds weak in
-  Log.trace ~__FUNCTION__ "obtained lts model";
-  Log.thing ~__FUNCTION__ Info "lts" the_lts (Args Lts.to_string);
+  Log.trace ~__FUNCTION__ "obtained LTS model";
+  Log.thing ~__FUNCTION__ Info "LTS" the_lts (Args Lts.to_string);
   (* NOTE: convert to fsm *)
   let the_fsm : Fsm.t = Fsm.of_model (Lts.to_model the_lts) in
-  Log.trace ~__FUNCTION__ "converted lts to fsm";
-  Log.thing ~__FUNCTION__ Info "fsm" the_fsm (Args Fsm.to_string);
+  Log.trace ~__FUNCTION__ "converted LTS to FSM";
+  Log.thing ~__FUNCTION__ Info "FSM" the_fsm (Args Fsm.to_string);
   (* NOTE: debug messages *)
   let weak : bool = Mebi_api.is_in_weak_mode () in
   let b : 'a Logger.to_string = Of Utils.Strfy.bool in
@@ -767,14 +767,14 @@ let make_model refs
     let* the_lts : Lts.t =
       Mebi_api.get_weak_enc1 () |> build_lts primary_lts x refs bounds
     in
-    Log.thing ~__FUNCTION__ Notice "lts" the_lts (Of Lts.to_string);
+    Log.thing ~__FUNCTION__ Notice "LTS" the_lts (Of Lts.to_string);
     return ()
   | FSM, (x, primary_lts) ->
     let bounds : Mebi_api.bound_config = Mebi_api.get_bounds () in
     let* the_fsm : Fsm.t =
       Mebi_api.get_weak_enc1 () |> build_fsm primary_lts x refs bounds
     in
-    Log.thing ~__FUNCTION__ Notice "fsm" the_fsm (Of Fsm.to_string);
+    Log.thing ~__FUNCTION__ Notice "FSM" the_fsm (Of Fsm.to_string);
     return ()
 ;;
 
@@ -812,9 +812,9 @@ let saturate_model ((x, primary_lts) : coq_model) refs : unit mm =
        Mebi_api.get_weak_enc1 ()
        |> build_fsm ~minimize:true primary_lts x refs bounds
      in
-     Log.trace ~__FUNCTION__ "obtained saturated fsm";
+     Log.trace ~__FUNCTION__ "obtained saturated FSM";
      Log.notice "Successfully saturated FSM. (Enable Info Output for details.)";
-     Log.thing ~__FUNCTION__ Info "saturated fsm" the_fsm (Args Fsm.to_string);
+     Log.thing ~__FUNCTION__ Info "saturated FSM" the_fsm (Args Fsm.to_string);
      return ())
 ;;
 
@@ -826,9 +826,9 @@ let minimize_model ((x, primary_lts) : coq_model) refs : unit mm =
        Mebi_api.get_weak_enc1 ()
        |> build_fsm ~minimize:true primary_lts x refs bounds
      in
-     Log.trace ~__FUNCTION__ "obtained minimized fsm";
+     Log.trace ~__FUNCTION__ "obtained minimized FSM";
      Log.notice "Successfully minimized FSM.";
-     Log.thing ~__FUNCTION__ Notice "minimized fsm" the_fsm (Args Fsm.to_string);
+     Log.thing ~__FUNCTION__ Notice "minimized FSM" the_fsm (Args Fsm.to_string);
      return ())
 ;;
 
@@ -840,17 +840,17 @@ let merge_models ((x, a), (y, b)) refs : unit mm =
   let* the_fsm_1 = build_fsm a x refs bounds (Mebi_api.get_weak_enc1 ()) in
   Log.info "Building Second FSM";
   let* the_fsm_2 = build_fsm b y refs bounds (Mebi_api.get_weak_enc2 ()) in
-  Log.trace ~__FUNCTION__ "built both fsms";
-  (* NOTE: if weak-mode then pre-saturate the fsms *)
+  Log.trace ~__FUNCTION__ "built both FSMs";
+  (* NOTE: if weak-mode then pre-saturate the FSMs *)
   let (the_fsm_1, the_fsm_2) : Fsm.pair =
     if Mebi_api.is_in_weak_mode ()
     then Saturate_model.fsm the_fsm_1, Saturate_model.fsm the_fsm_2
     else the_fsm_1, the_fsm_2
   in
-  Log.trace ~__FUNCTION__ "about to merge (pre-saturated fsms if in weak-mode)";
+  Log.trace ~__FUNCTION__ "about to merge (pre-saturated FSMs if in weak-mode)";
   Log.info "Merging FSMs";
   let the_fsm : Fsm.t = Fsm.merge the_fsm_1 the_fsm_2 in
-  Log.trace ~__FUNCTION__ "merged fsms";
+  Log.trace ~__FUNCTION__ "merged FSMs";
   Log.notice "Successfully merged FSMs. (Enable Info Output for details.)";
   Log.thing ~__FUNCTION__ Notice "Merged FSM" the_fsm (Args Fsm.to_string);
   Log.thing ~__FUNCTION__ Info "First FSM" the_fsm_1 (Args Fsm.to_string);
@@ -874,9 +874,9 @@ let check_bisimilarity ((x, a), (y, b)) refs : unit mm =
   let* the_fsm_1 = build_fsm a x refs bounds (Mebi_api.get_weak_enc1 ()) in
   Log.info "Building Second FSM";
   let* the_fsm_2 = build_fsm b y refs bounds (Mebi_api.get_weak_enc2 ()) in
-  Log.trace ~__FUNCTION__ "built both fsms";
-  Log.thing ~__FUNCTION__ Debug "init fst fsm" the_fsm_1 (Args Fsm.to_string);
-  Log.thing ~__FUNCTION__ Debug "init snd fsm" the_fsm_2 (Args Fsm.to_string);
+  Log.trace ~__FUNCTION__ "built both FSMs";
+  Log.thing ~__FUNCTION__ Debug "init fst FSM" the_fsm_1 (Args Fsm.to_string);
+  Log.thing ~__FUNCTION__ Debug "init snd FSM" the_fsm_2 (Args Fsm.to_string);
   let open Algorithms in
   let weak : bool = Mebi_api.is_in_weak_mode () in
   Log.info "Checking Bisimilarity";
