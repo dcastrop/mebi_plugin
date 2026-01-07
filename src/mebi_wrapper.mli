@@ -23,6 +23,7 @@ type 'a in_context =
 type 'a mm = wrapper ref -> 'a in_context
 
 val run : ?keep_encoding:bool -> ?fresh:bool -> 'a mm -> 'a
+val runkeep : 'a mm -> 'a
 val return : 'a -> 'a mm
 val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
 val map : ('a -> 'b) -> 'a mm -> 'b mm
@@ -243,3 +244,5 @@ val make_state_set
 val make_state_tree_pair_set
   :  wrapper ref
   -> (module Set.S with type elt = Enc.t * Mebi_constr.Tree.t) in_context
+
+val debug_enc : unit -> unit mm
