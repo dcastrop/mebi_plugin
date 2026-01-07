@@ -61,14 +61,14 @@ let the_coq_ctx ?(fresh : bool = false) () : Evd.evar_map ref =
 module FwdMap : Hashtbl.S with type key = EConstr.t = Hashtbl.Make (struct
     type t = EConstr.t
 
-    let equal t1 t2 = EConstr.eq_constr !(the_coq_ctx ()) t1 t2
+    let equal (x : t) (y : t) : bool = EConstr.eq_constr !(the_coq_ctx ()) x y
 
-    let hash t =
+    let hash (x : t) : int =
       Constr.hash
         (EConstr.to_constr
            ?abort_on_undefined_evars:(Some false)
            !(the_coq_ctx ())
-           t)
+           x)
     ;;
   end)
 
