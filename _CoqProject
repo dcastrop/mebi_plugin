@@ -10,50 +10,54 @@ theories/Test.v ###
 
 theories/Bisimilarity.v ###
 
-################
+###############################################################################
+###############################################################################
 ### Coq Examples 
 ################
 ### NOTE: compilation to take far longer if manual/ltac proofs included
 
+###############################################################################
 ### Proc
-examples/Proc.v ###
+examples/Proc.v ### REQUIRED FOR BELOW
 
 ### Proc.Flat.Simple 
 examples/bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
-examples/bisimilarity/Proc/Test1/TermTests.v ### Success
-examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
+# examples/bisimilarity/Proc/Test1/TermTests.v ### Success
+# examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test1/ManualProofs.v
 # examples/bisimilarity/Proc/Test1/LtacProofs.v
 
 ### Proc.Flat.Complex 
 examples/bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
-examples/bisimilarity/Proc/Test2/TermTests.v ### Success
-examples/bisimilarity/Proc/Test2/PluginProofs.v ### Success
+# examples/bisimilarity/Proc/Test2/TermTests.v ### Success
+# examples/bisimilarity/Proc/Test2/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test2/ManualProofs.v
 # examples/bisimilarity/Proc/Test2/LtacProofs.v
 
 ### Proc.Layered
-examples/bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
-examples/bisimilarity/Proc/Test3/TermTests.v ### Success
+# examples/bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
+# examples/bisimilarity/Proc/Test3/TermTests.v ### Success
 # examples/bisimilarity/Proc/Test3/PluginProofs.v ### TODO: proof explosion
 
-examples/bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
-examples/bisimilarity/Proc/Test4/TermTests.v ### 
+# examples/bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
+# examples/bisimilarity/Proc/Test4/TermTests.v ### Success
 # examples/bisimilarity/Proc/Test4/PluginProofs.v ### TODO: proof explosion
 
+###############################################################################
 ### CADP
-# examples/CADP.v ### REQUIRED FOR BELOW
-# examples/CADP_Glued.v ### REQUIRED FOR BELOW
+examples/CADP.v ### REQUIRED FOR BELOW
+examples/CADP_Glued.v ### REQUIRED FOR BELOW
 
-# TODO: finish testing proc.layered (proc.test 3)
+examples/bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
 # examples/bisimilarity/CADP/Size1/TermTests.v ### Success
-# examples/bisimilarity/CADP/Size1/PluginProofs.v ###
+# examples/bisimilarity/CADP/Size1/PluginProofs.v ### WIP: issue with unifying on constructors ONLY IN PROOF -- the graph unification is fine
 
-# examples/bisimilarity/CADP/Size2/TermTests.v ###
+# TODO: 
+# examples/bisimilarity/CADP/Size2/Terms.v ###
 # examples/bisimilarity/CADP/Size2/PluginProofs.v ###
 
 
-
+# TODO: 
 ### CADP properties
 # examples/properties/mutual_exclusion.v
 # examples/properties/no_starvation.v
@@ -64,7 +68,8 @@ examples/bisimilarity/Proc/Test4/TermTests.v ###
 ### Other (nat streams)
 # examples/bisimilarity/nat_streams.v
 
-################
+###############################################################################
+###############################################################################
 ### OCaml Plugin
 ################
 src/utils.ml
