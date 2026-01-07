@@ -96,8 +96,7 @@ let list_of_constr_kinds : Constr.t -> (string * bool) list =
   ]
 ;;
 
-let list_of_econstr_kinds sigma : EConstr.t -> (string * bool) list =
-  fun (x : EConstr.t) ->
+let list_of_econstr_kinds sigma (x : EConstr.t) : (string * bool) list =
   [ "App", EConstr.isApp sigma x
   ; "Arity", EConstr.isArity sigma x
   ; "Case", EConstr.isCase sigma x
@@ -115,9 +114,58 @@ let list_of_econstr_kinds sigma : EConstr.t -> (string * bool) list =
   ; "Proj", EConstr.isProj sigma x
   ; "Rel", EConstr.isRel sigma x
   ; "Ref", EConstr.isRef sigma x
-  ; "Sort", EConstr.isSort sigma x (* ; "Type", EConstr.isType sigma x *)
+  ; "Sort", EConstr.isSort sigma x
+  ; "Type", EConstr.isType sigma x
   ; "Var", EConstr.isVar sigma x
   ]
+;;
+
+let list_of_econstr_kinds_of_type sigma (x : EConstr.t) : (string * bool) list =
+  [ ( "SortType"
+    , try
+        match EConstr.kind_of_type sigma x with
+        | SortType _ -> true
+        | _ -> false
+      with
+      | Failure _ -> false )
+  ; ( "CastType"
+    , try
+        match EConstr.kind_of_type sigma x with
+        | CastType _ -> true
+        | _ -> false
+      with
+      | Failure _ -> false )
+  ; ( "ProdType"
+    , try
+        match EConstr.kind_of_type sigma x with
+        | ProdType _ -> true
+        | _ -> false
+      with
+      | Failure _ -> false )
+  ; ( "LetInType"
+    , try
+        match EConstr.kind_of_type sigma x with
+        | LetInType _ -> true
+        | _ -> false
+      with
+      | Failure _ -> false )
+  ; ( "AtomicType "
+    , try
+        match EConstr.kind_of_type sigma x with
+        | AtomicType _ -> true
+        | _ -> false
+      with
+      | Failure _ -> false )
+  ]
+;;
+
+let list_of_kinds
+      sigma
+      (f : Evd.evar_map -> 'a -> (string * bool) list)
+      (x : 'a)
+  : string list
+  =
+  List.filter_map (function y, true -> Some y | _, false -> None) (f sigma x)
 ;;
 
 (*****************************************************************************)
