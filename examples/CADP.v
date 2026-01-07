@@ -743,6 +743,10 @@ Inductive step : (tm * env) -> option label -> (tm * env) -> Prop :=
 
 where "t '--<{' a '}>-->' t'" := (step t a t').
 
+(* Compute (get_action (WRITE_NEXT THE_PID NIL) (0, {| var_predecessor := None; var_locked := false; var_next := None; var_swap := false |}, None, ({| mem_next := None; mem_locked := false; qnodes := {| next := None; locked := false |} :: nil |}, None))). *)
+
+(* Compute (do_act (WRITE_NEXT THE_PID NIL) (0, {| var_predecessor := None; var_locked := false; var_next := None; var_swap := false |}, None, ({| mem_next := None; mem_locked := false; qnodes := {| next := None; locked := false |} :: nil |}, None))). *)
+
 (*************************************************************************)
 (**** Semantics (System lts) *********************************************)
 (*************************************************************************)
