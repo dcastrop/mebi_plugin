@@ -224,7 +224,7 @@ module MkGraph
          let* label_decoding : EConstr.t = decode label_enc in
          debug_dec ~__FUNCTION__ "label" label_enc label_decoding;
          (* NOTE: all non-silent actions should be of this type *)
-         let* b = Mebi_utils.is_none_term act in
+         let* b : bool = Mebi_utils.is_none_term act in
          return (Some b)
        | Custom (tau_enc, label_enc) ->
          GLog.trace ~__FUNCTION__ "CustomConstr (tau_enc, label_enc)";
@@ -301,7 +301,7 @@ module MkGraph
         get_new_constrs enc_to_visit the_primary_lts lts_ind_def_map
       in
       let* new_states : S.t =
-        (* NOTE: also updates [g.to_visit ]*)
+        (* NOTE: also updates [g.to_visit] *)
         get_new_states enc_to_visit g new_constrs
       in
       let g : lts_graph = { g with states = S.union g.states new_states } in
@@ -561,12 +561,12 @@ module MkGraph
   let decoq_lts_ind_def_map (lts_ind_def_map : Mebi_ind.t B.t)
     : Info.rocq_info list
     =
-    let x = ref 0 in
-    let xpp () =
-      let y = !x in
-      x := y + 1;
-      y
-    in
+    (* let x = ref 0 in
+       let xpp () =
+       let y = !x in
+       x := y + 1;
+       y
+       in *)
     B.fold
       (fun (lts_enc : Enc.t)
         (the_ind_def : Mebi_ind.t)
@@ -574,7 +574,7 @@ module MkGraph
         match the_ind_def.kind with
         | LTS the_lts_ind_def ->
           let lts_name = econstr_to_string the_ind_def.info.name in
-          let lts_name = Printf.sprintf "%s_%i" lts_name (xpp ()) in
+          (* let lts_name = Printf.sprintf "%s_%i" lts_name (xpp ()) in *)
           let lts_constrs =
             Array.fold_left
               (fun (acc : string list) (name : Names.Id.t) ->
@@ -930,6 +930,30 @@ let proof_intro
   Mebi_api.set_fail_ifnotbisim true;
   let* _ = run (CheckBisimilarity ((x, a), (y, b))) refs in
   Log.trace ~__FUNCTION__ "finished checking bisimilarity, beginning proof";
+  Log.thing
+    ~__FUNCTION__
+    Show
+    "fsm.1 (original)"
+    (Algorithms.Bisimilar.get_the_result ()).the_fsm_1.original
+    (Args Model.Fsm.to_string);
+  Log.thing
+    ~__FUNCTION__
+    Show
+    "fsm.1 (saturated)"
+    (Algorithms.Bisimilar.get_the_result ()).the_fsm_1.saturated
+    (Args Model.Fsm.to_string);
+  Log.thing
+    ~__FUNCTION__
+    Show
+    "fsm.2 (original)"
+    (Algorithms.Bisimilar.get_the_result ()).the_fsm_2.original
+    (Args Model.Fsm.to_string);
+  Log.thing
+    ~__FUNCTION__
+    Show
+    "fsm.2 (saturated)"
+    (Algorithms.Bisimilar.get_the_result ()).the_fsm_2.saturated
+    (Args Model.Fsm.to_string);
   return
     (Mebi_tactics.update_proof_by_tactic
        pstate
