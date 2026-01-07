@@ -47,6 +47,17 @@ type econstr_decls = econstr_decl list
 val list_of_constr_kinds : Constr.t -> (string * bool) list
 val list_of_econstr_kinds : Evd.evar_map -> Evd.econstr -> (string * bool) list
 
+val list_of_econstr_kinds_of_type
+  :  Evd.evar_map
+  -> Evd.econstr
+  -> (string * bool) list
+
+val list_of_kinds
+  :  Evd.evar_map
+  -> (Evd.evar_map -> 'a -> (string * bool) list)
+  -> 'a
+  -> string list
+
 val type_of_econstr_rel
   :  ?substl:Evd.econstr list
   -> EConstr.rel_declaration
