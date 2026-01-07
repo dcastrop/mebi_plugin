@@ -103,15 +103,13 @@ module Make (Enc : S) : ENCODING_TYPE = struct
     | Some enc -> enc
   ;;
 
-  let fwd_to_list : t F.t -> (EConstr.t * t) list =
+  let fwd_to_list (x : t F.t) : (EConstr.t * t) list =
     Log.trace __FUNCTION__;
-    fun (x : t F.t) ->
-      List.sort (fun (_, a) (_, b) -> compare a b) (List.of_seq (F.to_seq x))
+    List.sort (fun (_, a) (_, b) -> compare a b) (List.of_seq (F.to_seq x))
   ;;
 
-  let bck_to_list : EConstr.t B.t -> (t * EConstr.t) list =
+  let bck_to_list (x : EConstr.t B.t) : (t * EConstr.t) list =
     Log.trace __FUNCTION__;
-    fun (x : EConstr.t B.t) ->
-      List.sort (fun (a, _) (b, _) -> compare a b) (List.of_seq (B.to_seq x))
+    List.sort (fun (a, _) (b, _) -> compare a b) (List.of_seq (B.to_seq x))
   ;;
 end
