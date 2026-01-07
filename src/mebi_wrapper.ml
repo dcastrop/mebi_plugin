@@ -1,10 +1,17 @@
+(***********************************************************************)
+module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+
+let () = Log.Config.configure_output Debug true
+let () = Log.Config.configure_output Trace false
+(***********************************************************************)
+
 open Mebi_setup
 module Enc = Mebi_setup.Enc
 module F = Enc.F
 module B = Enc.B
 
-type fwdmap = Enc.t F.t
-type bckmap = EConstr.t B.t
+type fwdmap = B.key F.t
+type bckmap = F.key B.t
 
 (********************************************)
 (****** WRAPPER & CONTEXT *******************)
@@ -62,6 +69,8 @@ let run
   the_enc_maps_cache := Some (ref (!(a.state).fwd_enc, !(a.state).bck_enc));
   a.value
 ;;
+
+let runkeep (x : 'a mm) : 'a = run ~keep_encoding:true ~fresh:false x
 
 let return (x : 'a) : 'a mm =
   fun (st : wrapper ref) -> { state = st; value = x }
@@ -214,6 +223,32 @@ let enc_to_string ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
   : Enc.t -> string
   =
   Enc.to_string
+;;
+
+(********************************************)
+(****** DEBUG *******************************)
+(********************************************)
+
+let debug_enc () : unit mm =
+  fun (st : wrapper ref) ->
+  let fstr = Utils.Strfy.string in
+  let feconstr : EConstr.t -> string = econstr_to_string in
+  let fenc : Enc.t -> string = Enc.to_string in
+  let fpair ((x, y) : EConstr.t * Enc.t) : string =
+    Utils.Strfy.tuple
+      fstr
+      fstr
+      ( Utils.Strfy.keyval (fun ?args -> feconstr) ("econstr", x)
+      , Utils.Strfy.keyval (fun ?args -> fenc) ("enc", y) )
+  in
+  let f (prefix : string) (x : EConstr.t) (y : Enc.t) : unit =
+    Logger.Default.thing ~__FUNCTION__ Debug prefix (x, y) (Of fpair);
+    ()
+  in
+  F.iter (f "fwdenc") !st.fwd_enc;
+  (* let g (prefix : string) (y : Enc.t) (x : EConstr.t) : unit = f prefix x y in *)
+  (* B.iter (g "bckenc") !st.bck_enc; *)
+  { state = st; value = () }
 ;;
 
 (********************************************)
@@ -1261,10 +1296,6 @@ let make_state_tree_pair_set (st : wrapper ref)
   ; value = (module PairSet : Set.S with type elt = Enc.t * Mebi_constr.Tree.t)
   }
 ;;
-
-(********************************************)
-(****** DEBUG *******************************)
-(********************************************)
 
 (* let debug_encoding () : unit mm =
   fun (st : wrapper ref) ->
