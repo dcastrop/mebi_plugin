@@ -128,6 +128,21 @@ let find_label_of_enc (x : Enc.t) (alphabet : Alphabet.t) : Label.t =
   | Not_found -> raise (Model_Alphabet_LabelOfEncNotFound (x, alphabet))
 ;;
 
+let decode_label_opt (x : Enc.t) (labels : Alphabet.t) : Label.t option =
+  Log.trace __FUNCTION__;
+  try Some (find_label_of_enc x labels) with
+  | Model_Alphabet_LabelOfEncNotFound (x, alphabet) -> None
+;;
+
+exception Model_CannotDecodeLabel of (Enc.t * Alphabet.t)
+
+let decode_label (x : Enc.t) (labels : Alphabet.t) : Label.t =
+  Log.trace __FUNCTION__;
+  match decode_label_opt x labels with
+  | None -> raise (Model_CannotDecodeLabel (x, labels))
+  | Some label -> label
+;;
+
 let silent_label_opt (alphabet : Alphabet.t) : Label.t option =
   Log.trace "Model.silent_label_opt";
   Alphabet.to_list alphabet

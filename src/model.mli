@@ -192,6 +192,11 @@ val alphabet_to_string : ?args:style_args -> Alphabet.t -> string
 exception Model_Alphabet_LabelOfEncNotFound of (Enc.t * Alphabet.t)
 
 val find_label_of_enc : Enc.t -> Alphabet.t -> Label.t
+val decode_label_opt : Enc.t -> Alphabet.t -> Label.t option
+
+exception Model_CannotDecodeLabel of (Enc.t * Alphabet.t)
+
+val decode_label : Enc.t -> Alphabet.t -> Label.t
 val silent_label_opt : Alphabet.t -> Label.t option
 
 exception Model_Alphabet_SilentLabelNotFound of Alphabet.t

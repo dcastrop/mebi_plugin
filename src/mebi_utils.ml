@@ -196,6 +196,18 @@ let is_none_term (x : EConstr.t) : bool mm =
     sigma, Mebi_theories.is_constant sigma x Mebi_theories.c_None)
 ;;
 
+let get_none_enc_opt () : Enc.t option mm =
+  let open Mebi_wrapper.Syntax in
+  let* fm = get_fwd_enc in
+  let rec find_none : (EConstr.t * Enc.t) list -> Enc.t option mm = function
+    | [] -> return None
+    | (x, y) :: tl ->
+      let* is_none : bool = is_none_term x in
+      if is_none then return (Some y) else find_none tl
+  in
+  F.to_seq fm |> List.of_seq |> find_none
+;;
+
 (*********************************************************)
 
 let encode_econstr (x : EConstr.t) : Enc.t mm = encode x
