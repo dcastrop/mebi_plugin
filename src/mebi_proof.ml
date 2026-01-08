@@ -207,6 +207,9 @@ module PState = struct
   ;;
 end
 
+(* TODO: make this part of a functor, so we always have a starting state, etc.*)
+(* TODO: also, this is where we can "pre-process" the different constructors, checking if they need to be applied with "explicit bindings" -- unless we stash this in the Mebi_info *)
+
 let default_proof_state : PState.t = PState.NewProof
 let the_proof_state : PState.t ref = ref default_proof_state
 
