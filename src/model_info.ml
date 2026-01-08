@@ -21,8 +21,14 @@ and boundable =
 
 and rocq_info =
   { enc : Mebi_setup.Enc.t
-  ; pp : string
-  ; constructor_names : string list
+  ; pp : string (* ; constructor_names : string list *)
+  ; constructors : rocq_constructor list
+  }
+
+and rocq_constructor =
+  { index : int
+  ; name : string
+  ; bindings : EConstr.t Tactypes.bindings
   }
 
 open Utils.Strfy
@@ -56,12 +62,33 @@ let mebi_info_list_option_to_string ?(args : style_args = style_args ())
   | Some alist -> list mebi_info_to_string alist
 ;;
 
+let rocq_constructor_bindings_to_string ?(args : style_args = style_args ())
+  : EConstr.t Tactypes.bindings -> string
+  = function
+  | NoBindings -> "NoBindings"
+  | ExplicitBindings xs -> "TODO: ExplicitBindings (...)"
+  | ImplicitBindings xs -> "TODO: ImplicitBindings (...)"
+;;
+
+let rocq_constructor_to_string
+      ?(args : style_args = style_args ())
+      (x : rocq_constructor)
+  : string
+  =
+  let index : string = int x.index in
+  let name : string = x.name in
+  let bindings : string = rocq_constructor_bindings_to_string x.bindings in
+  record ~args [ "index", index; "name", name; "bindings", bindings ]
+;;
+
 let rocq_info_to_string ?(args : style_args = style_args ()) (x : rocq_info)
   : string
   =
   let enc : string = Mebi_setup.Enc.to_string x.enc in
   let pp : string = x.pp in
-  let constructor_names : string = list string x.constructor_names in
+  let constructor_names : string =
+    list rocq_constructor_to_string x.constructors
+  in
   record ~args [ "enc", enc; "pp", pp; "constructor names", constructor_names ]
 ;;
 

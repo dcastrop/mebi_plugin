@@ -22,7 +22,13 @@ and boundable =
 and rocq_info =
   { enc : Mebi_setup.Enc.t
   ; pp : string
-  ; constructor_names : string list
+  ; constructors : rocq_constructor list
+  }
+
+and rocq_constructor =
+  { index : int
+  ; name : string
+  ; bindings : EConstr.t Tactypes.bindings
   }
 
 val mebi_info_to_string : ?args:Utils.Strfy.style_args -> mebi_info -> string
@@ -30,6 +36,16 @@ val mebi_info_to_string : ?args:Utils.Strfy.style_args -> mebi_info -> string
 val mebi_info_list_option_to_string
   :  ?args:Utils.Strfy.style_args
   -> mebi_info list option
+  -> string
+
+val rocq_constructor_bindings_to_string
+  :  ?args:Utils.Strfy.style_args
+  -> EConstr.t Tactypes.bindings
+  -> string
+
+val rocq_constructor_to_string
+  :  ?args:Utils.Strfy.style_args
+  -> rocq_constructor
   -> string
 
 val rocq_info_to_string : ?args:Utils.Strfy.style_args -> rocq_info -> string

@@ -561,29 +561,31 @@ module MkGraph
   let decoq_lts_ind_def_map (lts_ind_def_map : Mebi_ind.t B.t)
     : Info.rocq_info list
     =
-    (* let x = ref 0 in
-       let xpp () =
-       let y = !x in
-       x := y + 1;
-       y
-       in *)
     B.fold
       (fun (lts_enc : Enc.t)
         (the_ind_def : Mebi_ind.t)
         (acc : Info.rocq_info list) ->
         match the_ind_def.kind with
         | LTS the_lts_ind_def ->
-          let lts_name = econstr_to_string the_ind_def.info.name in
-          (* let lts_name = Printf.sprintf "%s_%i" lts_name (xpp ()) in *)
-          let lts_constrs =
+          let lts_name : string = econstr_to_string the_ind_def.info.name in
+          let lts_constrs : Model_info.rocq_constructor list =
+            let (get_constructor_index, _), _ =
+              Utils.new_int_counter ~start:0 ()
+            in
             Array.fold_left
-              (fun (acc : string list) (name : Names.Id.t) ->
-                Names.Id.to_string name :: acc)
+              (fun (acc : Model_info.rocq_constructor list)
+                (name : Names.Id.t) ->
+                let index : int = get_constructor_index () in
+                let name : string = Names.Id.to_string name in
+                let bindings : EConstr.t Tactypes.bindings =
+                  (* TODO: check if constructor will require ExplicitBindings *)
+                  NoBindings
+                in
+                { index; name; bindings } :: acc)
               []
               the_ind_def.info.constr_names
           in
-          { enc = lts_enc; pp = lts_name; constructor_names = lts_constrs }
-          :: acc
+          { enc = lts_enc; pp = lts_name; constructors = lts_constrs } :: acc
         | _ -> acc)
       lts_ind_def_map
       []
