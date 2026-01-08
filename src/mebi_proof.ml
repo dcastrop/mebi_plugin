@@ -706,12 +706,42 @@ let do_constructor_transition
    else raise (Mebi_proof_StatesNotBisimilar (mfrom, ngoto, the_bisim_states ()))
    ;; *)
 
+exception Mebi_proof_CannotGetConstructorInfo_None of unit
+exception Mebi_proof_CannotFindConstructorInfo_OfLTS of Enc.t
+exception Mebi_proof_CannotFindConstructorInfo_OfIndex of int
+
+let get_constructor_bindings ((lts_enc, constructor_index) : Tree.node)
+  : EConstr.t Tactypes.bindings
+  =
+  (* NOTE: assuming this is for nfsm *)
+  match (nfsm ()).info.rocq_info with
+  | None -> raise (Mebi_proof_CannotGetConstructorInfo_None ())
+  | Some info ->
+    (match
+       List.find_opt
+         (fun ({ enc; _ } : Info.rocq_info) -> Enc.equal enc lts_enc)
+         info
+     with
+     | None -> raise (Mebi_proof_CannotFindConstructorInfo_OfLTS lts_enc)
+     | Some x ->
+       (match
+          List.find_opt
+            (fun ({ index; _ } : Info.rocq_constructor) ->
+              Int.equal index constructor_index)
+            x.constructors
+        with
+        | None ->
+          raise (Mebi_proof_CannotFindConstructorInfo_OfIndex constructor_index)
+        | Some x -> x.bindings))
+;;
+
 let get_constructor_tactic ((enc, index) : Tree.node) : tactic =
   Log.trace __FUNCTION__;
-  let index : int = index + 1 in
   tactic
-    ~msg:(Printf.sprintf "constructor %i" index)
-    (Tactics.one_constructor index Tactypes.NoBindings)
+    ~msg:(Printf.sprintf "constructor %i" (index + 1))
+    (Tactics.one_constructor
+       (index + 1)
+       (get_constructor_bindings (enc, index)))
 ;;
 
 let do_build_constructor_tactics
