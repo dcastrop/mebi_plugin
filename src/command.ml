@@ -569,6 +569,7 @@ module MkGraph
         | LTS the_lts_ind_def ->
           let lts_name : string = econstr_to_string the_ind_def.info.name in
           let lts_constrs : Model_info.rocq_constructor list =
+            (* NOTE: constructor tactic index starts from 1 -- ignore 0 below *)
             let (get_constructor_index, _), _ =
               Utils.new_int_counter ~start:0 ()
             in
