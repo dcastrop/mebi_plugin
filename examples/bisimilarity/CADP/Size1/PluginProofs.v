@@ -54,17 +54,16 @@ Proof. MeBiSim Begin bigstep c1 And lts c1 Using step.
   MeBiSim Step.
   MeBiSim Step.
 
-  simpl.
-  eapply rt1n_trans.
-  constructor 1.
-  (* eauto with rel_db. *)
-  constructor 3.
-  constructor 3.
-
+  (* simpl. *)
+  (* eapply rt1n_trans. *)
+  (* constructor 1. *)
+  (* constructor 3. *)
+  (* constructor 3. *)
 
   (* TODO: issue is that the rocq-LTS inductive definition uses functions on the labels and destination state -- and we cannot unify on these ? *)
-  eapply STEP_ACT.
-  constructor 1.
+  (* eapply STEP_ACT. *)
+  (* constructor 1 with (a:=(WRITE_NEXT THE_PID NIL)) (e:=(0, {| var_predecessor := None; var_locked := false; var_next := None; var_swap := false |}, None, ({| mem_next := None; mem_locked := false; qnodes := {| next := None; locked := false |} :: nil |}, None))). *)
+  (* simpl. *)
 
   MeBiSim Step.
   MeBiSim Step.
