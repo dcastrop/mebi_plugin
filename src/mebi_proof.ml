@@ -75,6 +75,33 @@ let econstr_eq_concl (gl : Proofview.Goal.t) : EConstr.t -> bool =
 ;;
 
 (***********************************************************************)
+
+let acc_econstrs (gl : Proofview.Goal.t) (acc : EConstr.t list) (x : EConstr.t)
+  : EConstr.t list
+  =
+  match List.find_opt (econstr_eq gl x) acc with
+  | Some _ -> acc
+  | None -> x :: acc
+;;
+
+let merge_econstr_lists (gl : Proofview.Goal.t)
+  : EConstr.t list -> EConstr.t list -> EConstr.t list
+  =
+  List.fold_left (acc_econstrs gl)
+;;
+
+let acc_econstr_to_unfold
+      (gl : Proofview.Goal.t)
+      (acc : EConstr.t list)
+      (x : EConstr.t)
+  : EConstr.t list
+  =
+  if Mebi_theories.is_constr (Proofview.Goal.sigma gl) x
+  then acc_econstrs gl acc x
+  else acc
+;;
+
+(***********************************************************************)
 (*** Proof State *******************************************************)
 (***********************************************************************)
 
@@ -530,21 +557,43 @@ let do_eapply_wk_some (gl : Proofview.Goal.t) : tactic =
 ;;
 
 let do_unfold (gl : Proofview.Goal.t) (x : EConstr.t) : tactic =
-  tactic (Mebi_tactics.unfold_econstr gl x)
+  tactic
+    ~msg:(Printf.sprintf "unfold %s" (econstr_to_string gl x))
+    (Mebi_tactics.unfold_econstr gl x)
+;;
+
+exception Mebi_proof_NothingToUnfold of unit
+
+let chain_do_unfold (gl : Proofview.Goal.t) : EConstr.t list -> tactic
+  = function
+  | [] -> raise (Mebi_proof_NothingToUnfold ())
+  | x :: xs ->
+    List.fold_left
+      (fun (acc : tactic) (x : EConstr.t) ->
+        tactic_chain [ acc; do_unfold gl x ])
+      (do_unfold gl x)
+      xs
 ;;
 
 let do_unfold_in_hyp
       (gl : Proofview.Goal.t)
-      (x : EConstr.t)
       (h : Rocq_utils.hyp)
+      (x : EConstr.t)
   : tactic
   =
-  tactic_chain
-    [ tactic
-        ~msg:(Printf.sprintf "unfold %s" (econstr_to_string gl x))
-        (Mebi_tactics.unfold_in_hyp gl x h)
-    ; do_unfold gl x
-    ]
+  tactic_chain [ tactic (Mebi_tactics.unfold_in_hyp gl x h); do_unfold gl x ]
+;;
+
+let chain_do_unfold_in_hyp (gl : Proofview.Goal.t) (h : Rocq_utils.hyp)
+  : EConstr.t list -> tactic
+  = function
+  | [] -> raise (Mebi_proof_NothingToUnfold ())
+  | x :: xs ->
+    List.fold_left
+      (fun (acc : tactic) (x : EConstr.t) ->
+        tactic_chain [ acc; do_unfold_in_hyp gl h x ])
+      (do_unfold_in_hyp gl h x)
+      xs
 ;;
 
 exception Mebi_proof_NoActionFound of (State.t * Label.t * State.t * Fsm.t)
@@ -1080,64 +1129,45 @@ let _get_concl_ntransition
 
 (***********************************************************************)
 
-exception Mebi_proof_NothingToUnfold of unit
-
-let get_econstrs_to_unfold (gl : Proofview.Goal.t) (x : EConstr.t) : EConstr.t =
+let get_econstrs_to_unfold (gl : Proofview.Goal.t) (x : EConstr.t)
+  : EConstr.t list
+  =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  let rec loop (x : EConstr.t) : EConstr.t option =
-    if Mebi_theories.is_constr sigma x
-    then (
-      Log.thing ~__FUNCTION__ Debug "unfold x" x (feconstr gl);
-      Some x)
-    else (
-      try
-        let ty, tys = Rocq_utils.econstr_to_atomic sigma x in
-        if Mebi_theories.is_constr sigma ty
-        then (
-          Log.thing ~__FUNCTION__ Debug "unfold ty" ty (feconstr gl);
-          Some ty)
-        else
-          Array.fold_left
-            (fun (acc : EConstr.t option) (y : EConstr.t) ->
-              match acc with None -> loop y | Some acc -> Some acc)
-            None
-            tys
-      with
-      | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> None)
+  let rec loop (acc : EConstr.t list) (x : EConstr.t) : EConstr.t list =
+    let acc : EConstr.t list = acc_econstr_to_unfold gl acc x in
+    try
+      let ty, tys = Rocq_utils.econstr_to_atomic sigma x in
+      let acc : EConstr.t list = acc_econstr_to_unfold gl acc ty in
+      Array.fold_left
+        (fun (acc : EConstr.t list) (y : EConstr.t) -> loop acc y)
+        acc
+        tys
+    with
+    | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> acc
   in
-  match loop x with
-  | None -> raise (Mebi_proof_NothingToUnfold ())
-  | Some x -> x
+  loop [] x
 ;;
 
 let do_any_unfold_concl (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   let the_concl : EConstr.t = Proofview.Goal.concl gl in
-  get_econstrs_to_unfold gl the_concl |> do_unfold gl
+  get_econstrs_to_unfold gl the_concl |> chain_do_unfold gl
 ;;
 
 let do_any_unfold_hyp_pair
       (gl : Proofview.Goal.t)
       ((ty, tys) : Rocq_utils.kind_pair)
-  : EConstr.t
+  : EConstr.t list
   =
   Log.trace __FUNCTION__;
   try get_econstrs_to_unfold gl ty with
   | Mebi_proof_NothingToUnfold () ->
-    (match
-       Array.fold_left
-         (fun (acc : EConstr.t option) (x : EConstr.t) ->
-           match acc with
-           | Some y -> Some y
-           | None ->
-             (try Some (get_econstrs_to_unfold gl x) with
-              | Mebi_proof_NothingToUnfold () -> None))
-         None
-         tys
-     with
-     | None -> raise (Mebi_proof_NothingToUnfold ())
-     | Some x -> x)
+    Array.fold_left
+      (fun (acc : EConstr.t list) (x : EConstr.t) ->
+        get_econstrs_to_unfold gl x |> merge_econstr_lists gl acc)
+      []
+      tys
 ;;
 
 (* Array.exists (check_if_can_unfold gl) tys *)
@@ -1320,7 +1350,7 @@ module Invertible = struct
   and k =
     | Full
     | Layer
-    | ToUnfold of EConstr.t
+    | ToUnfold of EConstr.t list
 
   let to_string : t -> string = function
     | { kind = Full; _ } -> "Full"
@@ -1391,7 +1421,7 @@ module Invertible = struct
       { kind
       ; tactic =
           (match kind with
-           | ToUnfold x -> do_unfold_in_hyp gl x h
+           | ToUnfold x -> chain_do_unfold_in_hyp gl h x
            | _ -> do_inversion h)
       }
     with
