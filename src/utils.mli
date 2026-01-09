@@ -1,5 +1,5 @@
 val swap : 'a * 'b -> 'b * 'a
-val split_at : int -> 'a list -> 'a list -> 'a list * 'a list
+val split_at : int -> 'a list -> 'a list
 val compare_chain : int list -> int
 val strip_snd : ('a * 'a) list -> 'a list
 val is_unit_option : unit option -> bool

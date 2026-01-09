@@ -1,11 +1,14 @@
+(** [swap (a, b)] is just [(b, a)]. *)
 let swap : 'a * 'b -> 'b * 'a = fun (a, b) -> b, a
 
-(** [split_at i l acc] is a tuple containing two lists [(l', acc)] split from list [l] at index [i].
-*)
-let rec split_at i l acc =
-  if i <= 0
-  then l, acc
-  else (match l with [] -> acc, [] | h :: t -> split_at (i - 1) t (h :: acc))
+(** [split_at i l] is the [i]-th tail of list [l]. *)
+let split_at (i : int) (l : 'a list) : 'a list =
+  let rec split_at (i : int) (l : 'a list) (acc : 'a list) : 'a list =
+    if i <= 0
+    then acc
+    else (match l with [] -> acc | h :: t -> split_at (i - 1) t (h :: acc))
+  in
+  split_at i l []
 ;;
 
 (** for chaining comparisons together *)
