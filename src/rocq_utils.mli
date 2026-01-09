@@ -58,6 +58,14 @@ val list_of_kinds
   -> 'a
   -> string list
 
+val get_decl_type_of_constr : Constr.rel_declaration -> Evd.econstr
+val get_decl_type_of_econstr : EConstr.rel_declaration -> Evd.econstr
+
+val get_ind_ty
+  :  Names.inductive
+  -> Declarations.mutual_inductive_body
+  -> Evd.econstr
+
 val type_of_econstr_rel
   :  ?substl:Evd.econstr list
   -> EConstr.rel_declaration
