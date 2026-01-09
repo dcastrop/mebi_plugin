@@ -175,7 +175,7 @@ let axiom_constructor
 
 (** Checks possible transitions for this term: *)
 let rec check_valid_constructors
-          (transitions : (Constr.rel_context * Constr.types) array)
+          (constructors : Mebi_ind.lts_constructor array)
           (indmap : Mebi_ind.t F.t)
           (from_term : EConstr.t)
           (act_term : EConstr.t)
@@ -185,10 +185,12 @@ let rec check_valid_constructors
   Log.trace __FUNCTION__;
   let* from_term : EConstr.t = Mebi_utils.econstr_normalize from_term in
   (* let* () = debug_validconstrs_start from_term in *)
-  let iter_body (i : int) (constructors : Constructors.t) =
+  let iter_body (i : int) (acc : Constructors.t) : Constructors.t mm =
     (* let* () = debug_validconstrs_iter_start i constructors in *)
     (* NOTE: extract args for constructor *)
-    let (ctx, tm) : Constr.rel_context * Constr.t = transitions.(i) in
+    let { constructor = ctx, tm; _ } : Mebi_ind.lts_constructor =
+      constructors.(i)
+    in
     let decls : Rocq_utils.econstr_decls = List.map EConstr.of_rel_decl ctx in
     let* substl = mk_ctx_substl [] (List.rev decls) in
     let* args : constructor_args = extract_args ~substl tm in
@@ -199,25 +201,25 @@ let rec check_valid_constructors
     then (
       (* NOTE: replace [act] with the fresh [act_term] *)
       let fresh_args : constructor_args = { args with act = act_term } in
-      let* constructors : Constructors.t =
+      let* acc : Constructors.t =
         explore_valid_constructor
           indmap
           from_term
           lts_enc
           fresh_args
-          (i, constructors)
+          (i, acc)
           (substl, decls)
       in
       Log.debug ~__FUNCTION__ "CVC constructors:";
       (* ! NOTE: here we obtain the successfully unified and distinct action and destination -- BUT as this is returned, we see that it is actually another evar and this then unifies incorrectly. *)
       (* let* () = debug_constructors_mm constructors in *)
       (* let* () = debug_validconstrs_iter_close i constructors in *)
-      return constructors)
+      return acc)
     else
       (* let* () = debug_validconstrs_iter_close i constructors in *)
-      return constructors
+      return acc
   in
-  let* constructors = iterate 0 (Array.length transitions - 1) [] iter_body in
+  let* constructors = iterate 0 (Array.length constructors - 1) [] iter_body in
   (* let* () = debug_validconstrs_close from_term constructors in *)
   return constructors
 
@@ -288,7 +290,9 @@ and check_updated_ctx
           let$+ lhs env sigma = Reductionops.nf_evar sigma args.lhs in
           let$+ act env sigma = Reductionops.nf_evar sigma args.act in
           let args = { args with lhs; act } in
-          let* next_lts = Mebi_ind.get_constr_transitions c in
+          let next_lts : Mebi_ind.lts_constructor array =
+            Mebi_ind.get_lts_constructor_types c
+          in
           let* next_constructors : Constructors.t =
             check_valid_constructors next_lts indmap lhs act c.enc
           in
@@ -352,7 +356,7 @@ and check_for_next_constructors
 ;;
 
 let collect_valid_constructors
-      (transitions : (Constr.rel_context * Constr.types) array)
+      (constructors : Mebi_ind.lts_constructor array)
       (indmap : Mebi_ind.t F.t)
       (from_term : EConstr.t)
       (label_type : EConstr.t)
@@ -363,7 +367,7 @@ let collect_valid_constructors
   Log.thing ~__FUNCTION__ Debug "from" from_term (Of econstr_to_string);
   let* fresh_evar = get_fresh_evar (Rocq_utils.OfType label_type) in
   let* constructors : Constructors.t =
-    check_valid_constructors transitions indmap from_term fresh_evar lts_enc
+    check_valid_constructors constructors indmap from_term fresh_evar lts_enc
   in
   (* .Log.notice "\n=/==/=/=/==/==="; *)
   (* let* () = debug_constructors_mm constructors in *)
