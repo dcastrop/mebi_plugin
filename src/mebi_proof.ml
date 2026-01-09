@@ -713,6 +713,9 @@ exception Mebi_proof_CannotFindConstructorInfo_OfIndex of int
 let get_constructor_bindings ((lts_enc, constructor_index) : Tree.node)
   : EConstr.t Tactypes.bindings
   =
+  Log.trace __FUNCTION__;
+  (* NOTE: constructors index from 1 *)
+  let constructor_index : int = constructor_index + 1 in
   (* NOTE: assuming this is for nfsm *)
   match (nfsm ()).info.rocq_info with
   | None -> raise (Mebi_proof_CannotGetConstructorInfo_None ())
@@ -731,6 +734,13 @@ let get_constructor_bindings ((lts_enc, constructor_index) : Tree.node)
             x.constructors
         with
         | None ->
+          Log.thing
+            ~__FUNCTION__
+            Warning
+            "constructor index"
+            constructor_index
+            (Args Utils.Strfy.int);
+          Log.thing ~__FUNCTION__ Warning "nfsm" (nfsm ()) (Args Fsm.to_string);
           raise (Mebi_proof_CannotFindConstructorInfo_OfIndex constructor_index)
         | Some x -> x.bindings))
 ;;
