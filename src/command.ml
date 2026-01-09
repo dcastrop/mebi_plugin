@@ -267,9 +267,11 @@ module MkGraph
     =
     GLog.trace __FUNCTION__;
     let* from_term : EConstr.t = decode from in
-    let* label_type : EConstr.t = Mebi_ind.get_lts_label_type primary in
+    let label_type : EConstr.t = Mebi_ind.get_lts_label_type primary in
     let* ind_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
-    let* primary_constr_transitions = Mebi_ind.get_constr_transitions primary in
+    let primary_constr_transitions =
+      Mebi_ind.get_lts_constructor_types primary
+    in
     let lts_enc : Enc.t = primary.enc in
     Mebi_unify.collect_valid_constructors
       primary_constr_transitions
@@ -337,12 +339,12 @@ module MkGraph
         (lts_ind_def_map : Mebi_ind.t B.t)
     : Mebi_ind.t mm
     =
-    let open Mebi_utils in
     (* encode the primary lts *)
     let* primary_lts_ind_def : Mebi_ind.t =
-      get_ind_lts primary_lts_enc (ref_to_glob primary_lts)
+      Mebi_utils.ref_to_glob primary_lts
+      |> Mebi_utils.get_ind_lts primary_lts_enc
     in
-    let* the_primary_enc : Enc.t = encode primary_lts_ind_def.info.name in
+    let* the_primary_enc : Enc.t = encode primary_lts_ind_def.ind in
     return (B.find lts_ind_def_map the_primary_enc)
   ;;
 
@@ -370,7 +372,7 @@ module MkGraph
       get_primary_lts primary_lts the_primary_lts_enc lts_ind_def_map
     in
     (* NOTE: update environment by typechecking *)
-    let* primary_trm_type = Mebi_ind.get_lts_trm_type the_primary_lts in
+    let primary_trm_type = Mebi_ind.get_lts_term_type the_primary_lts in
     let$* _unit env sigma = Typing.check env sigma t primary_trm_type in
     let$ initial_trm env sigma = sigma, Reductionops.nf_all env sigma t in
     let* initial_enc = encode initial_trm in
@@ -567,7 +569,7 @@ module MkGraph
         (acc : Info.rocq_info list) ->
         match the_ind_def.kind with
         | LTS the_lts_ind_def ->
-          let lts_name : string = econstr_to_string the_ind_def.info.name in
+          let lts_name : string = econstr_to_string the_ind_def.ind in
           let lts_constrs : Model_info.rocq_constructor list =
             (* NOTE: constructor tactic index starts from 1 -- ignore 0 below *)
             let (get_constructor_index, _), _ =
@@ -579,12 +581,16 @@ module MkGraph
                 let index : int = get_constructor_index () in
                 let name : string = Names.Id.to_string name in
                 let bindings : EConstr.t Tactypes.bindings =
-                  (* TODO: check if constructor will require ExplicitBindings *)
+                  (* TODO:
+                     - check if constructor will require ExplicitBindings
+                     - extend [Mebi_ind.rocq_constructor] as necessary to store the information necessary for [Mebi_proof.get_constructor_bindings]
+                     - [bindings : EConstr.t Tactypes.bindings] may need to change, as i expect that we will need to construct this in [Mebi_proof.get_constructor_bindings] for each term -- i'm unsure how we will do the necessary "pattern-matching" kind of thing on arbitrary indlts
+                  *)
                   NoBindings
                 in
                 { index; name; bindings } :: acc)
               []
-              the_ind_def.info.constr_names
+              (Mebi_ind.get_lts_constructor_names the_ind_def)
           in
           { enc = lts_enc; pp = lts_name; constructors = lts_constrs } :: acc
         | _ -> acc)
@@ -633,9 +639,10 @@ end
 (***********************************************************************)
 module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
-let () = Log.Config.configure_output Info false
-let () = Log.Config.configure_output Debug false
-let () = Log.Config.configure_output Trace false
+let () = Log.Config.enable_output ()
+let () = Log.Config.configure_output Info true
+let () = Log.Config.configure_output Debug true
+let () = Log.Config.configure_output Trace true
 (***********************************************************************)
 
 (** [make_graph_builder] is ... *)
@@ -653,6 +660,7 @@ let make_graph_builder =
 
 (** expect exactly one [Info.mebi_info] and it should be complete *)
 let is_lts_complete ({ info; _ } : Lts.t) : bool =
+  Log.trace __FUNCTION__;
   Option.cata
     (fun (xs : Info.mebi_info list) ->
       match xs with
