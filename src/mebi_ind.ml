@@ -1,22 +1,22 @@
-type lts =
-  { trm_type : EConstr.t
-  ; lbl_type : EConstr.t
-  ; constr_transitions : Rocq_utils.ind_constrs
-  }
-
-type kind =
-  | Type of EConstr.t option
-  | LTS of lts
-
-type info =
-  { name : EConstr.t
-  ; constr_names : Names.Id.t array
-  }
-
 type t =
   { enc : Mebi_setup.Enc.t
   ; info : info
   ; kind : kind
+  }
+
+and info =
+  { name : EConstr.t
+  ; constr_names : Names.Id.t array
+  }
+
+and kind =
+  | Type of EConstr.t option
+  | LTS of lts
+
+and lts =
+  { trm_type : EConstr.t
+  ; lbl_type : EConstr.t
+  ; constr_transitions : Rocq_utils.ind_constrs
   }
 
 open Mebi_wrapper
