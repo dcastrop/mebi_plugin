@@ -1,8 +1,10 @@
 (***********************************************************************)
 module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
-let () = Log.Config.configure_output Debug false
-let () = Log.Config.configure_output Trace false
+let () = Log.Config.enable_output ()
+let () = Log.Config.configure_output Info true
+let () = Log.Config.configure_output Debug true
+let () = Log.Config.configure_output Trace true
 (***********************************************************************)
 
 type bound_config = Model_info.bound_config
@@ -107,15 +109,18 @@ let reset_output () : unit =
 (***********************************************************************)
 
 let set_bound (bound : int) : unit =
+  Log.trace __FUNCTION__;
   the_config := { !the_config with bounds = { !the_config.bounds with bound } }
 ;;
 
 let set_bound_for (bound_for : boundable) : unit =
+  Log.trace __FUNCTION__;
   the_config
   := { !the_config with bounds = { !the_config.bounds with bound_for } }
 ;;
 
 let set_bounds (bound : int) (bound_for : boundable) : unit =
+  Log.trace __FUNCTION__;
   the_config := { !the_config with bounds = { bound; bound_for } }
 ;;
 
@@ -124,16 +129,19 @@ let get_bounds () : bound_config = !the_config.bounds
 (***********************************************************************)
 
 let set_weak_mode_enabled (enabled : bool) : unit =
+  Log.trace __FUNCTION__;
   the_config
   := { !the_config with weak_mode = { !the_config.weak_mode with enabled } }
 ;;
 
 let set_weak_args (args : weak_args option) : unit =
+  Log.trace __FUNCTION__;
   the_config
   := { !the_config with weak_mode = { !the_config.weak_mode with args } }
 ;;
 
 let set_weak_arg1 (arg1 : weak_arg option) : unit =
+  Log.trace __FUNCTION__;
   the_config
   := { !the_config with
        weak_mode =
@@ -147,6 +155,7 @@ let set_weak_arg1 (arg1 : weak_arg option) : unit =
 ;;
 
 let set_weak_arg2 (arg2 : weak_arg option) : unit =
+  Log.trace __FUNCTION__;
   the_config
   := { !the_config with
        weak_mode =
@@ -160,23 +169,28 @@ let set_weak_arg2 (arg2 : weak_arg option) : unit =
 ;;
 
 let get_weak_arg1 () : weak_arg option =
+  Log.trace __FUNCTION__;
   match !the_config.weak_mode.args with None -> None | Some args -> args.arg1
 ;;
 
 let get_weak_arg2 () : weak_arg option =
+  Log.trace __FUNCTION__;
   match !the_config.weak_mode.args with None -> None | Some args -> args.arg2
 ;;
 
 let set_weak_encs (encs : weak_encs option) : unit =
+  Log.trace __FUNCTION__;
   the_config
   := { !the_config with weak_mode = { !the_config.weak_mode with encs } }
 ;;
 
 let get_weak_enc1 () : weak_enc option =
+  Log.trace __FUNCTION__;
   match !the_config.weak_mode.encs with None -> None | Some encs -> encs.enc1
 ;;
 
 let get_weak_enc2 () : weak_enc option =
+  Log.trace __FUNCTION__;
   match !the_config.weak_mode.encs with
   | None -> None
   | Some encs ->
@@ -189,13 +203,18 @@ let set_weak_mode
       (encs : weak_encs option)
   : unit
   =
+  Log.trace __FUNCTION__;
   the_config := { !the_config with weak_mode = { enabled; args; encs } }
 ;;
 
-let is_in_weak_mode () : bool = !the_config.weak_mode.enabled
+let is_in_weak_mode () : bool =
+  Log.trace __FUNCTION__;
+  !the_config.weak_mode.enabled
+;;
 
 (** NOTE: we will never just have [arg2], so suffice to just check [arg1] *)
 let has_weak_args () : bool =
+  Log.trace __FUNCTION__;
   match !the_config.weak_mode.args with
   | Some { arg1 = Some _; _ } -> true
   | _ -> false
@@ -261,16 +280,19 @@ let load_weak_args () : unit Mebi_wrapper.mm =
 (***********************************************************************)
 
 let set_fail_ifincomplete (incomplete : bool) : unit =
+  Log.trace __FUNCTION__;
   the_config
   := { !the_config with fail_if = { !the_config.fail_if with incomplete } }
 ;;
 
 let set_fail_ifnotbisim (not_bisim : bool) : unit =
+  Log.trace __FUNCTION__;
   the_config
   := { !the_config with fail_if = { !the_config.fail_if with not_bisim } }
 ;;
 
 let set_fail_if (incomplete : bool) (not_bisim : bool) : unit =
+  Log.trace __FUNCTION__;
   the_config := { !the_config with fail_if = { incomplete; not_bisim } }
 ;;
 
@@ -280,26 +302,31 @@ let fail_if_not_bisim () : bool = !the_config.fail_if.not_bisim
 (***********************************************************************)
 
 let set_dump_to_json (dump_to_json : bool) : unit =
+  Log.trace __FUNCTION__;
   the_config
   := { !the_config with debug = { !the_config.debug with dump_to_json } }
 ;;
 
 let set_debug (debug : bool) : unit =
+  Log.trace __FUNCTION__;
   the_config := { !the_config with debug = { !the_config.debug with debug } }
 ;;
 
 let set_debug_config (dump_to_json : bool) (debug : bool) : unit =
+  Log.trace __FUNCTION__;
   the_config := { !the_config with debug = { dump_to_json; debug } }
 ;;
 
 (***********************************************************************)
 
 let set_output_enabled (enabled : bool) : unit =
+  Log.trace __FUNCTION__;
   the_config
   := { !the_config with output = { !the_config.output with enabled } }
 ;;
 
 let set_output_level (x : Output_kind.level) (y : bool) : unit =
+  Log.trace __FUNCTION__;
   let f = !Output_kind.default_level in
   let debug, info, notice, warning, error =
     f Debug, f Info, f Notice, f Warning, f Error
@@ -330,6 +357,7 @@ let set_output_level (x : Output_kind.level) (y : bool) : unit =
 ;;
 
 let set_output_special (x : Output_kind.special) (y : bool) : unit =
+  Log.trace __FUNCTION__;
   let f = !Output_kind.default_special in
   let trace, result, show = f Trace, f Result, f Show in
   let trace, result, show =
@@ -357,6 +385,7 @@ let set_output_config
       ((x, y) : Output_kind.special * bool)
   : unit
   =
+  Log.trace __FUNCTION__;
   set_output_enabled enabled;
   set_output_level a b;
   set_output_special x y
