@@ -170,12 +170,31 @@ let list_of_kinds
 
 (*****************************************************************************)
 
+let get_decl_type_of_constr (x : Constr.rel_declaration) : EConstr.t =
+  Context.Rel.Declaration.get_type x |> EConstr.of_constr
+;;
+
+let get_decl_type_of_econstr (x : EConstr.rel_declaration) : EConstr.t =
+  Context.Rel.Declaration.get_type x
+;;
+
+(** [get_ind_ty ind mib] *)
+let get_ind_ty
+      (ind : Names.inductive)
+      (mib : Declarations.mutual_inductive_body)
+  : EConstr.t
+  =
+  EConstr.mkIndU (ind, EConstr.EInstance.make mib.mind_univ_hyps)
+;;
+
+(*****************************************************************************)
+
 let type_of_econstr_rel
       ?(substl : EConstr.t list option)
       (t : EConstr.rel_declaration)
   : EConstr.t
   =
-  let ty : EConstr.t = Context.Rel.Declaration.get_type t in
+  let ty : EConstr.t = get_decl_type_of_econstr t in
   match substl with None -> ty | Some substl -> EConstr.Vars.substl substl ty
 ;;
 

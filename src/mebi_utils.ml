@@ -44,6 +44,24 @@ let assert_mip_arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
   | TemplateArity t -> invalid_sort_lts (Sorts.family t.template_level)
 ;;
 
+(** [get_lts_ind_mind gref]
+    @raise invalid_ref_lts if [gref] is not a reference to an inductive type. *)
+let get_lts_ind_mind (gref : Names.GlobRef.t)
+  : (Names.inductive * Declarations.mind_specif) mm
+  =
+  Log.trace __FUNCTION__;
+  let open Names.GlobRef in
+  match gref with
+  | IndRef ind ->
+    let* env = get_env in
+    let mib, mip = Inductive.lookup_mind_specif env ind in
+    let* _ = assert_mip_arity_is_prop mip in
+    return (ind, (mib, mip))
+  | _ ->
+    Log.warning ~__FUNCTION__ "invalid gref (not IndRef)";
+    invalid_ref_lts gref
+;;
+
 (** [get_lts_labels_and_terms mib mip] is the mapping of terms (states) and labels (outgoing edges) from [mip].
 
     @raise invalid_arity
@@ -58,9 +76,7 @@ let get_lts_labels_and_terms
   let open Declarations in
   (* get the type of [mip] from [mib]. *)
   let typ = Inductive.type_of_inductive (UVars.in_punivs (mib, mip)) in
-  let i_ctx = mip.mind_arity_ctxt in
-  let _, i_idx = Utils.split_at mip.mind_nrealdecls i_ctx [] in
-  match i_idx with
+  match mip.mind_arity_ctxt |> Utils.split_at mip.mind_nrealdecls with
   | [ t1; a; t2 ] ->
     let open Context.Rel in
     if Declaration.equal Sorts.relevance_equal Constr.equal t1 t2
@@ -69,69 +85,38 @@ let get_lts_labels_and_terms
   | _ -> invalid_arity typ
 ;;
 
-let get_ind_info (gref : Names.GlobRef.t) : Mebi_ind.info mm =
-  Log.trace __FUNCTION__;
-  let open Names.GlobRef in
-  match gref with
-  | IndRef i ->
-    let* env = get_env in
-    let mib, mip = Inductive.lookup_mind_specif env i in
-    let* _ = assert_mip_arity_is_type mip in
-    let univ = mib.mind_univ_hyps in
-    let type_term = EConstr.mkIndU (i, EConstr.EInstance.make univ) in
-    let open Mebi_ind in
-    return { name = type_term; constr_names = mip.mind_consnames }
-  | _ ->
-    Log.warning ~__FUNCTION__ "invalid gref (not IndRef)";
-    invalid_ref_type gref
-;;
-
+(** [get_lts_ind_ty gref] *)
 let get_name_of_lts (gref : Names.GlobRef.t) : EConstr.t mm =
   Log.trace __FUNCTION__;
-  let open Names.GlobRef in
-  match gref with
-  | IndRef ind ->
-    let* env = get_env in
-    let mib, mip = Inductive.lookup_mind_specif env ind in
-    let* _ = assert_mip_arity_is_prop mip in
-    let* lbl, term = get_lts_labels_and_terms mib mip in
-    let univ = mib.mind_univ_hyps in
-    (* lts of inductive type *)
-    return (EConstr.mkIndU (ind, EConstr.EInstance.make univ))
-  | _ ->
-    Log.warning ~__FUNCTION__ "invalid gref (not IndRef)";
-    invalid_ref_lts gref
+  let* ind, (mib, mip) = get_lts_ind_mind gref in
+  return (Rocq_utils.get_ind_ty ind mib)
 ;;
 
-(** @raise invalid_ref_lts if [gref] is not a reference to an inductive type. *)
+let get_ind_info (gref : Names.GlobRef.t) : Mebi_ind.info mm =
+  Log.trace __FUNCTION__;
+  let* ind, (mib, mip) = get_lts_ind_mind gref in
+  let type_term = Rocq_utils.get_ind_ty ind mib in
+  let open Mebi_ind in
+  return { name = type_term; constr_names = mip.mind_consnames }
+;;
+
+(**  *)
 let get_ind_lts (i : Enc.t) (gref : Names.GlobRef.t) : Mebi_ind.t mm =
   Log.trace __FUNCTION__;
-  let open Names.GlobRef in
-  match gref with
-  | IndRef ind ->
-    let* env = get_env in
-    let mib, mip = Inductive.lookup_mind_specif env ind in
-    let* _ = assert_mip_arity_is_prop mip in
-    let* lbl, term = get_lts_labels_and_terms mib mip in
-    let univ = mib.mind_univ_hyps in
-    (* lts of inductive type *)
-    let lts_term = EConstr.mkIndU (ind, EConstr.EInstance.make univ) in
-    let open Mebi_ind in
-    return
-      { enc = i
-      ; info = { name = lts_term; constr_names = mip.mind_consnames }
-      ; kind =
-          LTS
-            { trm_type =
-                EConstr.of_constr (Context.Rel.Declaration.get_type term)
-            ; lbl_type =
-                EConstr.of_constr (Context.Rel.Declaration.get_type lbl)
-            ; constr_transitions = mip.mind_nf_lc
-            }
-      }
-  | _ ->
-    Log.warning ~__FUNCTION__ "invalid gref (not IndRef)";
-    invalid_ref_lts gref
+  let* ind, (mib, mip) = get_lts_ind_mind gref in
+  let* lbl, term = get_lts_labels_and_terms mib mip in
+  let lts_term : EConstr.t = Rocq_utils.get_ind_ty ind mib in
+  let open Mebi_ind in
+  return
+    { enc = i
+    ; info = { name = lts_term; constr_names = mip.mind_consnames }
+    ; kind =
+        LTS
+          { trm_type = Rocq_utils.get_decl_type_of_constr term
+          ; lbl_type = Rocq_utils.get_decl_type_of_constr lbl
+          ; constr_transitions = mip.mind_nf_lc
+          }
+    }
 ;;
 
 (*********************************************************)
