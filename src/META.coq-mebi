@@ -2,7 +2,7 @@ package "mebi" (
     directory = "."
     version = "dev"
     description = "A mebi plugin"
-    requires = "coq-core.plugins.ltac"
+    requires = "rocq-runtime.plugins.ltac"
     archive(byte) = "mebi_plugin.cma"
     archive(native) = "mebi_plugin.cmxa"
     plugin(byte) = "mebi_plugin.cma"

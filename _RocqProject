@@ -1,4 +1,4 @@
-src/META.coq-mebi
+src/META.rocq-mebi
 -R theories/ MEBI
 -R examples/ MEBI.Examples
 -I src/

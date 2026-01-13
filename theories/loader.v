@@ -1,6 +1,6 @@
 Set Debug "backtrace".
 From MEBI Require Export Bisimilarity.
-Declare ML Module "coq-mebi.mebi".
+Declare ML Module "rocq-mebi.mebi".
 
 (* Print Registered. *)
 (* Print ex. *)

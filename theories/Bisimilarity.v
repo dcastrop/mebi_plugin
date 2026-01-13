@@ -1,6 +1,7 @@
 (* https://rocq-prover.org/doc/v8.9/stdlib/Coq.Relations.Relation_Operators.html *)
-From Stdlib Require Import Relation_Definitions.
-From Stdlib Require Import Relation_Operators.
+From Corelib Require Import Relations.Relation_Definitions.
+From Stdlib Require Import Relations.Relation_Operators.
+
 
 Set Primitive Projections.
 

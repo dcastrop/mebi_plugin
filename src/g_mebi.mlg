@@ -1,16 +1,12 @@
-DECLARE PLUGIN "coq-mebi.mebi"
-
 {
-(* If we forget this line and include our own tactic definition using
-  TACTIC EXTEND, as below, then we get the strange error message
-  no implementation available for Tacentries, only when compiling
-  theories/Loader.v *)
-(* open Ltac_plugin *)
+open Ltac_plugin
 
 (* This one is necessary, to avoid message about missing wit_string *)
 open Stdarg
 (* open Pp *)
 }
+
+DECLARE PLUGIN "rocq-mebi.mebi"
 
 (* *)
 VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY

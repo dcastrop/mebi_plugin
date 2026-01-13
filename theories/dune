@@ -1,12 +1,17 @@
+; FIXME: for updating to rocq-9.1
+; (rocq.theory
+
 (coq.theory
  (name MEBI) ; -R flag           ; This will determine the top-level Coq
              ; module of your theory, modules will
              ; be MyPlugin.A, etc., when seen from the
              ; outside.
  (synopsis "MEBI Plugin (theories)")
- (package coq-mebi) ; Adding this line will make your
-                    ; library installable in the opam package
- (plugins coq-mebi.mebi coq-core.plugins.ltac))
+ (package rocq-mebi) ; Adding this line will make your
+                     ; library installable in the opam package
+ (plugins rocq-mebi.mebi)
+ (theories Stdlib) ; https://rocq-prover.zulipchat.com/#narrow/channel/240550-Dune-devs-.26-users/topic/.E2.9C.94.20Moving.20a.20project.20from.20Coq.208.2E20.20to.20Rocq.209.2E0/with/525026077 
+ )
 
 ; Here you should declare all
 ; OCaml plugin dependencies
