@@ -277,8 +277,8 @@ module type ERROR_TYPE = sig
     | ParamsFailIfNotBisim of unit
     | InvalidLTSArgsLength of int
     | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
-    | InvalidLTSSort of Sorts.family
-    | InvalidTypeSort of Sorts.family
+    | InvalidLTSSort of Sorts.t
+    | InvalidTypeSort of Sorts.t
     | InvalidArity of Environ.env * Evd.evar_map * Constr.types
     | InvalidRefLTS of Names.GlobRef.t
     | InvalidRefType of Names.GlobRef.t
@@ -341,8 +341,8 @@ module type ERROR_TYPE = sig
   val params_fail_if_not_bisim : unit -> exn
   val invalid_lts_args_length : int -> exn
   val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
-  val invalid_sort_lts : Sorts.family -> exn
-  val invalid_sort_type : Sorts.family -> exn
+  val invalid_sort_lts : Sorts.t -> exn
+  val invalid_sort_type : Sorts.t -> exn
   val invalid_arity : Environ.env -> Evd.evar_map -> Constr.types -> exn
   val invalid_ref_lts : Names.GlobRef.t -> exn
   val invalid_ref_type : Names.GlobRef.t -> exn
@@ -398,8 +398,8 @@ module Error : ERROR_TYPE = struct
     | ParamsFailIfNotBisim of unit
     | InvalidLTSArgsLength of int
     | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
-    | InvalidLTSSort of Sorts.family
-    | InvalidTypeSort of Sorts.family
+    | InvalidLTSSort of Sorts.t
+    | InvalidTypeSort of Sorts.t
     | InvalidArity of Environ.env * Evd.evar_map * Constr.types
     | InvalidRefLTS of Names.GlobRef.t
     | InvalidRefType of Names.GlobRef.t
@@ -607,10 +607,9 @@ module Error : ERROR_TYPE = struct
               "ctx_tys: %s."
               (list (mebi_to_string econstr_rel_decl) y))
     | InvalidLTSSort f ->
-      Pp.str "Invalid LTS Sort: expecting Prop, got " ++ Sorts.pr_sort_family f
+      Pp.str "Invalid LTS Sort: expecting Prop, got " ++ Sorts.raw_pr f
     | InvalidTypeSort f ->
-      Pp.str "Invalid Type Sort: expecting Type or Set, got "
-      ++ Sorts.pr_sort_family f
+      Pp.str "Invalid Type Sort: expecting Type or Set, got " ++ Sorts.raw_pr f
     | InvalidArity (env, sigma, t) ->
       Pp.str "Invalid arity for LTS: "
       ++ Pp.str (constr env sigma t)
@@ -757,12 +756,12 @@ let invalid_arity (x : Constr.types) : 'a mm =
 ;;
 
 (** Error when input LTS has the wrong sort *)
-let invalid_sort_lts (x : Sorts.family) : 'a mm =
+let invalid_sort_lts (x : Sorts.t) : 'a mm =
   fun (st : wrapper ref) -> raise (Error.invalid_sort_lts x)
 ;;
 
 (** Error when input Type has the wrong sort *)
-let invalid_sort_type (x : Sorts.family) : 'a mm =
+let invalid_sort_type (x : Sorts.t) : 'a mm =
   fun (st : wrapper ref) -> raise (Error.invalid_sort_type x)
 ;;
 

@@ -43,13 +43,14 @@ let get_lts_ind_mind (gref : Names.GlobRef.t)
 let assert_mip_arity_is_type (mip : Declarations.one_inductive_body) : unit mm =
   Log.trace __FUNCTION__;
   let open Declarations in
-  match mip.mind_arity with
-  | RegularArity s ->
-    (match s.mind_sort with
-     | Type _ -> return ()
-     | Set -> return ()
-     | _ -> invalid_sort_type (Sorts.family s.mind_sort))
-  | TemplateArity t -> invalid_sort_type (Sorts.family t.template_level)
+  (* match mip.mind_arity with *)
+  (* FIXME: how to check for templatearity? *)
+  (* | TemplateArity t -> invalid_sort_type (Sorts.t t.template_level) *)
+  (* | RegularArity s -> *)
+  match mip.mind_sort with
+  | Type _ -> return ()
+  | Set -> return ()
+  | _ -> invalid_sort_type mip.mind_sort
 ;;
 
 let get_lts_ind_type_mind (gref : Names.GlobRef.t)
@@ -64,12 +65,13 @@ let get_lts_ind_type_mind (gref : Names.GlobRef.t)
 let assert_mip_arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
   Log.trace __FUNCTION__;
   let open Declarations in
-  match mip.mind_arity with
-  | RegularArity s ->
-    if not (Sorts.is_prop s.mind_sort)
-    then invalid_sort_lts (Sorts.family s.mind_sort)
-    else return ()
-  | TemplateArity t -> invalid_sort_lts (Sorts.family t.template_level)
+  (* match mip.mind_sort  with *)
+  (* FIXME: how to check for templatearity? *)
+  (* | TemplateArity t -> invalid_sort_lts (Sorts.t t.template_level) *)
+  (* | RegularArity s -> *)
+  if not (Sorts.is_prop mip.mind_sort)
+  then invalid_sort_lts mip.mind_sort
+  else return ()
 ;;
 
 let get_lts_ind_prop_mind (gref : Names.GlobRef.t)
