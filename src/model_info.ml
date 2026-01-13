@@ -28,8 +28,12 @@ and rocq_info =
 and rocq_constructor =
   { index : int
   ; name : string
-  ; bindings : EConstr.t Tactypes.bindings
+  ; bindings : rocq_constructor_bindings
   }
+
+and rocq_constructor_bindings =
+  | No_Bindings
+  | Use_Bindings of unit
 
 open Utils.Strfy
 
@@ -63,11 +67,10 @@ let mebi_info_list_option_to_string ?(args : style_args = style_args ())
 ;;
 
 let rocq_constructor_bindings_to_string ?(args : style_args = style_args ())
-  : EConstr.t Tactypes.bindings -> string
+  : rocq_constructor_bindings -> string
   = function
-  | NoBindings -> "NoBindings"
-  | ExplicitBindings xs -> "TODO: ExplicitBindings (...)"
-  | ImplicitBindings xs -> "TODO: ImplicitBindings (...)"
+  | No_Bindings -> "NoBindings"
+  | Use_Bindings xs -> "TODO: Use_Bindings (...)"
 ;;
 
 let rocq_constructor_to_string

@@ -28,6 +28,8 @@ val c_Some : unit -> Evd.econstr
 val c_ex : unit -> Evd.econstr
 val c_ex_intro : unit -> Evd.econstr
 val is_constant : Evd.evar_map -> Evd.econstr -> (unit -> Evd.econstr) -> bool
+val is_app : Evd.evar_map -> Evd.econstr -> bool
+val is_theory : Evd.evar_map -> Evd.econstr -> bool
 val is_var : Evd.evar_map -> Evd.econstr -> bool
 val is_constr : Evd.evar_map -> Evd.econstr -> bool
 val is_type : Evd.evar_map -> Evd.econstr -> bool

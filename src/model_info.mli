@@ -28,8 +28,12 @@ and rocq_info =
 and rocq_constructor =
   { index : int
   ; name : string
-  ; bindings : EConstr.t Tactypes.bindings
+  ; bindings : rocq_constructor_bindings
   }
+
+and rocq_constructor_bindings =
+  | No_Bindings
+  | Use_Bindings of unit
 
 val mebi_info_to_string : ?args:Utils.Strfy.style_args -> mebi_info -> string
 
@@ -40,7 +44,7 @@ val mebi_info_list_option_to_string
 
 val rocq_constructor_bindings_to_string
   :  ?args:Utils.Strfy.style_args
-  -> EConstr.t Tactypes.bindings
+  -> rocq_constructor_bindings
   -> string
 
 val rocq_constructor_to_string

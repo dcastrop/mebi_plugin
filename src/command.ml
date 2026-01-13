@@ -580,13 +580,13 @@ module MkGraph
                 (name : Names.Id.t) ->
                 let index : int = get_constructor_index () in
                 let name : string = Names.Id.to_string name in
-                let bindings : EConstr.t Tactypes.bindings =
+                let bindings : Info.rocq_constructor_bindings =
                   (* TODO:
                      - check if constructor will require ExplicitBindings
                      - extend [Mebi_ind.rocq_constructor] as necessary to store the information necessary for [Mebi_proof.get_constructor_bindings]
                      - [bindings : EConstr.t Tactypes.bindings] may need to change, as i expect that we will need to construct this in [Mebi_proof.get_constructor_bindings] for each term -- i'm unsure how we will do the necessary "pattern-matching" kind of thing on arbitrary indlts
                   *)
-                  NoBindings
+                  No_Bindings
                 in
                 { index; name; bindings } :: acc)
               []
