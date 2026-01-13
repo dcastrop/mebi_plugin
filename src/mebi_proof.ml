@@ -468,7 +468,7 @@ let get_all_non_cofix (gl : Proofview.Goal.t) : Names.Id.Set.t =
 let clear_old_hyps (gl : Proofview.Goal.t) : tactic =
   tactic
     ~msg:"(clear_old_hyps)"
-    (Tactics.clear (Names.Id.Set.to_list (get_all_non_cofix gl)))
+    (Tactics.clear (Names.Id.Set.to_seq (get_all_non_cofix gl) |> List.of_seq))
 ;;
 
 let do_cofix (gl : Proofview.Goal.t) : tactic =

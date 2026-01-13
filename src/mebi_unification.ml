@@ -116,7 +116,7 @@ module Pair = struct
     Log.trace __FUNCTION__;
     let open Pretype_errors in
     try
-      let sigma = Unification.w_unify env sigma Conversion.CUMUL a b in
+      let _ , sigma = Unification.w_unify env sigma Conversion.CUMUL a b in
       sigma, true
     with
     | PretypeError (_, _, CannotUnify (c, d, _e)) ->
