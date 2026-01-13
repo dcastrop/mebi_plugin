@@ -83,6 +83,8 @@ let collect_bisimilarity_theories () : EConstr.t list =
         ; find_reference "MEBI" [ "Coq"; "Init"; "Datatypes" ] "Some"
         ; find_reference "MEBI" [ "Coq"; "Init"; "Logic" ] "ex"
         ; find_reference "MEBI" [ "Coq"; "Init"; "Logic" ] "ex_intro"
+        ; find_reference "MEBI" [ "Coq"; "Init"; "Datatypes" ] "prod"
+        ; find_reference "MEBI" [ "Coq"; "Init"; "Datatypes" ] "pair"
         ]
     in
     constants := new_constants;
@@ -363,6 +365,14 @@ let is_constant sigma (x : EConstr.t) (c : unit -> EConstr.t) : bool =
 ;;
 
 (*****************************************************************************)
+
+let is_app sigma (x : EConstr.t) : bool = EConstr.isApp sigma x
+
+let is_theory sigma (x : EConstr.t) : bool =
+  let cs = collect_bisimilarity_theories () in
+  let fx = Mebi_setup.Eq.econstr sigma x in
+  List.exists fx cs
+;;
 
 let is_var sigma (x : EConstr.t) : bool =
   EConstr.isRef sigma x && EConstr.isVar sigma x
