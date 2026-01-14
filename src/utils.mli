@@ -1,6 +1,7 @@
 val swap : 'a * 'b -> 'b * 'a
 val split_at : int -> 'a list -> 'a list
 val compare_chain : int list -> int
+val try_seq_opt : 'a -> ('a -> 'b option) list -> 'b option
 val strip_snd : ('a * 'a) list -> 'a list
 val is_unit_option : unit option -> bool
 val bool_opt_to_string : string -> bool option -> string

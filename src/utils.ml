@@ -18,6 +18,13 @@ let rec compare_chain : int list -> int = function
   | n :: _ -> n
 ;;
 
+(** [try_seq_opt x fs] returns the first [f x] that returns [Some y], else [None].
+*)
+let rec try_seq_opt (x : 'a) : ('a -> 'b option) list -> 'b option = function
+  | [] -> None
+  | f :: tl -> (match f x with None -> try_seq_opt x tl | y -> y)
+;;
+
 (** [strip_snd l] is the list of rhs elements in a list of tuples [l] (typically a [constr]).
 *)
 let rec strip_snd (l : ('a * 'a) list) : 'a list =
