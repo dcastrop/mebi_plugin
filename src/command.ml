@@ -111,6 +111,21 @@ module MkGraph
   (***********************************************************************)
 
   let fname : Names.Id.t Utils.Strfy.to_string = Of Names.Id.to_string
+
+  let f_ind_constr : Rocq_utils.ind_constr Utils.Strfy.to_string =
+    Of
+      (Mebi_wrapper.runkeep
+         (Mebi_wrapper.state (fun env sigma ->
+            sigma, Rocq_utils.Strfy.ind_constr env sigma)))
+  ;;
+
+  let _f_ind_constrs : Rocq_utils.ind_constrs Utils.Strfy.to_string =
+    Of
+      (Mebi_wrapper.runkeep
+         (Mebi_wrapper.state (fun env sigma ->
+            sigma, Rocq_utils.Strfy.ind_constrs env sigma)))
+  ;;
+
   let fenc : Enc.t Utils.Strfy.to_string = Of Enc.to_string
 
   let _feconstr : EConstr.t Utils.Strfy.to_string =
@@ -612,15 +627,25 @@ module MkGraph
               (fun (acc : Info.rocq_constructor list)
                 (* (name : Names.Id.t) *)
                   ({ name; constructor } : Mebi_ind.lts_constructor) ->
-                GLog.thing ~__FUNCTION__ Trace "constructor name" name fname;
+                GLog.thing ~__FUNCTION__ Trace "name" name fname;
+                GLog.thing
+                  ~__FUNCTION__
+                  Trace
+                  "constructor"
+                  constructor
+                  f_ind_constr;
+                (* TODO:
+                   - check if any of the [constructor]-triple are some function. for each that are dynamically create function that will:
+                   - take a given action ([from;labe;goto] of [EConstr.t])
+                   - return a list of functions that will automatically extract the bindings in order to apply a given constructor.
+                   - generate [Mebi_unification.Problem] for each function argument (e.g., [get_action _UNBOUND_REL_2 _UNBOUND_REL_1])
+                   - automatically extract the necessary components from a more complete term (e.g., [ACT _UNBOUND_REL_2, _UNBOUND_REL_1])
+                   - later, in [Mebi_proof] we can then just call this function when applying the bindings.
+                   - if there are no functions, then we can use [No_Bindings]
+                *)
                 let index : int = get_constructor_index () in
                 let name : string = Names.Id.to_string name in
                 let bindings : Info.rocq_constructor_bindings =
-                  (* TODO:
-                     - check if constructor will require ExplicitBindings
-                     - extend [Mebi_ind.rocq_constructor] as necessary to store the information necessary for [Mebi_proof.get_constructor_bindings]
-                     - [bindings : EConstr.t Tactypes.bindings] may need to change, as i expect that we will need to construct this in [Mebi_proof.get_constructor_bindings] for each term -- i'm unsure how we will do the necessary "pattern-matching" kind of thing on arbitrary indlts
-                  *)
                   No_Bindings
                   (* Use_Bindings (fun ({from;label;goto}:Info.binding_args) ->
                     
