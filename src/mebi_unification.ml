@@ -20,12 +20,7 @@ let debug_econstr
   : unit mm
   =
   state (fun env sigma ->
-    Log.thing
-      ~__FUNCTION__
-      Debug
-      prefix
-      x
-      (Args (Rocq_utils.Strfy.econstr env sigma));
+    Log.thing ~__FUNCTION__ Debug prefix x (Rocq_utils.Strfy.feconstr env sigma);
     sigma, ())
 ;;
 
@@ -53,11 +48,12 @@ module Pair = struct
     : string
     =
     Log.trace __FUNCTION__;
-    let f = Rocq_utils.Strfy.econstr env sigma in
-    let g = Utils.Strfy.tuple ~args Utils.Strfy.string f in
+    let fstring : string Utils.Strfy.to_string = Of Utils.Strfy.string in
+    let feconstr = Rocq_utils.Strfy.feconstr env sigma in
+    let g = Utils.Strfy.tuple ~args fstring feconstr in
     let a : string = g ("a", a) in
     let b : string = g ("b", b) in
-    Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string (a, b)
+    Utils.Strfy.tuple ~args fstring fstring (a, b)
   ;;
 
   let fresh env sigma (a : EConstr.t) (b : EConstr.t) : Evd.evar_map * t =
@@ -76,40 +72,18 @@ module Pair = struct
     if EConstr.isEvar sigma a then fresh env sigma a b else sigma, normal a b
   ;;
 
-  let debug_unify
-        env
-        sigma
-        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-        a
-        b
-    =
+  let debug_unify env sigma a b =
     Log.trace __FUNCTION__;
-    let f = Rocq_utils.Strfy.econstr env sigma in
-    let g = Utils.Strfy.tuple ~args Utils.Strfy.string f in
-    let a : string = g ("a", a) in
-    let b : string = g ("b", b) in
-    Of (Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string)
-    |> Log.thing ~__FUNCTION__ Debug "unified" (a, b)
+    Log.thing Debug "unified" { a; b } (Args (to_string env sigma))
   ;;
 
-  let debug_unifyerr
-        env
-        sigma
-        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-        a
-        b
-        c
-        d
-    =
+  let debug_unifyerr env sigma a b c d =
     Log.trace __FUNCTION__;
+    Log.thing Debug "tried to unify" { a; b } (Args (to_string env sigma));
     let f = Rocq_utils.Strfy.econstr env sigma in
-    let g = Utils.Strfy.tuple ~args Utils.Strfy.string f in
-    let a : string = g ("a", a) in
-    let b : string = g ("b", b) in
-    Of (Utils.Strfy.tuple ~args Utils.Strfy.string Utils.Strfy.string)
-    |> Log.thing ~__FUNCTION__ Error "tried to unify" (a, b);
-    Printf.sprintf "cannot unify \"%s\" with \"%s\"" (f c) (f d)
-    |> Log.error ~__FUNCTION__
+    Log.error
+      ~__FUNCTION__
+      (Printf.sprintf "cannot unify \"%s\" with \"%s\"" (f c) (f d))
   ;;
 
   let w_unify env sigma (a : EConstr.t) (b : EConstr.t) : Evd.evar_map * bool =
@@ -224,7 +198,7 @@ module Problems = struct
           style = Some (list_style ())
         ; name = Some "unification problems"
         }
-      (Problem.to_string env sigma)
+      (Args (Problem.to_string env sigma))
       to_unify
   ;;
 
@@ -241,7 +215,7 @@ module Problems = struct
           style = Some (list_style ())
         ; name = Some "unification problems list"
         }
-      (to_string env)
+      (Args (to_string env))
   ;;
 
   let rec unify_list_opt : Problem.t list -> Mebi_constr.Tree.t list option mm =
@@ -314,7 +288,7 @@ module Constructors = struct
     : t -> string
     =
     Log.trace __FUNCTION__;
-    Utils.Strfy.list ~args (Mebi_constr.to_string env sigma)
+    Utils.Strfy.list ~args (Args (Mebi_constr.to_string env sigma))
   ;;
 
   let rec retrieve

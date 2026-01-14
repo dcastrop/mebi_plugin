@@ -33,7 +33,13 @@ and rocq_constructor =
 
 and rocq_constructor_bindings =
   | No_Bindings
-  | Use_Bindings of unit
+  | Use_Bindings of (binding_args -> EConstr.t Tactypes.explicit_bindings)
+
+and binding_args =
+  { from : Model_state.t
+  ; label : Model_label.t
+  ; goto : Model_state.t
+  }
 
 open Utils.Strfy
 
@@ -63,7 +69,7 @@ let mebi_info_list_option_to_string ?(args : style_args = style_args ())
   : mebi_info list option -> string
   = function
   | None -> "None"
-  | Some alist -> list mebi_info_to_string alist
+  | Some alist -> list (Args mebi_info_to_string) alist
 ;;
 
 let rocq_constructor_bindings_to_string ?(args : style_args = style_args ())
@@ -90,7 +96,7 @@ let rocq_info_to_string ?(args : style_args = style_args ()) (x : rocq_info)
   let enc : string = Mebi_setup.Enc.to_string x.enc in
   let pp : string = x.pp in
   let constructor_names : string =
-    list rocq_constructor_to_string x.constructors
+    list (Args rocq_constructor_to_string) x.constructors
   in
   record ~args [ "enc", enc; "pp", pp; "constructor names", constructor_names ]
 ;;
@@ -99,7 +105,7 @@ let rocq_info_list_option_to_string ?(args : style_args = style_args ())
   : rocq_info list option -> string
   = function
   | None -> "None"
-  | Some alist -> list rocq_info_to_string alist
+  | Some alist -> list (Args rocq_info_to_string) alist
 ;;
 
 let to_string ?(args : style_args = record_args ()) (x : t) : string =
@@ -107,7 +113,7 @@ let to_string ?(args : style_args = record_args ()) (x : t) : string =
   let rocq_info : string = rocq_info_list_option_to_string x.rocq_info in
   let weak_info : string =
     Option.cata
-      (list ~args:{ args with name = Some "Weak Info" } string)
+      (list ~args:{ args with name = Some "Weak Info" } (Args string))
       "None"
       x.weak_info
   in

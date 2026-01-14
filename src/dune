@@ -33,9 +33,9 @@
   mebi_setup
   mebi_constr
   mebi_theories
-  model_info
   model_state
   model_label
+  model_info
   model_note
   model_transition
   model_transition_opt

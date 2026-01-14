@@ -88,12 +88,7 @@ module Strfy : sig
     -> Evar.t
     -> string
 
-  val constr
-    :  Environ.env
-    -> Evd.evar_map
-    -> ?args:Utils.Strfy.style_args
-    -> Constr.t
-    -> string
+  val constr : Environ.env -> Evd.evar_map -> Constr.t -> string
 
   val constr_opt
     :  Environ.env
@@ -112,9 +107,11 @@ module Strfy : sig
   val constr_rel_context
     :  Environ.env
     -> Evd.evar_map
-    -> ?args:Utils.Strfy.style_args
     -> Constr.rel_context
     -> string
+
+  val ind_constr : Environ.env -> Evd.evar_map -> ind_constr -> string
+  val ind_constrs : Environ.env -> Evd.evar_map -> ind_constrs -> string
 
   val constr_kind
     :  Environ.env
@@ -123,19 +120,14 @@ module Strfy : sig
     -> Constr.t
     -> string
 
-  val econstr
-    :  Environ.env
-    -> Evd.evar_map
-    -> ?args:Utils.Strfy.style_args
-    -> Evd.econstr
-    -> string
+  val econstr : Environ.env -> Evd.evar_map -> Evd.econstr -> string
 
-  val econstr_rel_decl
+  val feconstr
     :  Environ.env
     -> Evd.evar_map
-    -> ?args:Utils.Strfy.style_args
-    -> econstr_decl
-    -> string
+    -> Evd.econstr Utils.Strfy.to_string
+
+  val econstr_rel_decl : Environ.env -> Evd.evar_map -> econstr_decl -> string
 
   val econstr_type
     :  Environ.env

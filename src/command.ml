@@ -108,6 +108,30 @@ module MkGraph
   let () = GLog.Config.configure_output Trace false
   let () = GLog.Config.configure_output Info false
 
+  (***********************************************************************)
+
+  let fname : Names.Id.t Utils.Strfy.to_string = Of Names.Id.to_string
+  let fenc : Enc.t Utils.Strfy.to_string = Of Enc.to_string
+
+  let _feconstr : EConstr.t Utils.Strfy.to_string =
+    Of Mebi_wrapper.econstr_to_string
+  ;;
+
+  let fdecode : Enc.t Utils.Strfy.to_string =
+    Of
+      (fun (x : Enc.t) ->
+        Mebi_wrapper.runkeep (Mebi_wrapper.decode x)
+        |> Mebi_wrapper.econstr_to_string)
+  ;;
+
+  let _fencode : EConstr.t Utils.Strfy.to_string =
+    Of
+      (fun (x : EConstr.t) ->
+        Mebi_wrapper.runkeep (Mebi_wrapper.encode x) |> Enc.to_string)
+  ;;
+
+  (***********************************************************************)
+
   let status_update
         (from : Enc.t)
         ({ to_visit; states; transitions; _ } : lts_graph)
@@ -120,7 +144,7 @@ module MkGraph
       (if to_fill <= 0
        then n
        else Printf.sprintf "%s%s" (String.make to_fill ' ') n)
-      |> Logger.f_to_string (Args Utils.Strfy.string)
+      |> Utils.Strfy.f_to_string (Utils.Strfy.Args Utils.Strfy.string)
     in
     let g (n : int) : string = f (Utils.Strfy.int n) in
     let from : string = f (Enc.to_string from) in
@@ -563,21 +587,32 @@ module MkGraph
   let decoq_lts_ind_def_map (lts_ind_def_map : Mebi_ind.t B.t)
     : Info.rocq_info list
     =
+    GLog.Config.configure_output Debug true;
+    GLog.Config.configure_output Trace true;
+    GLog.trace __FUNCTION__;
     B.fold
       (fun (lts_enc : Enc.t)
         (the_ind_def : Mebi_ind.t)
         (acc : Info.rocq_info list) ->
+        GLog.thing ~__FUNCTION__ Trace "lts_enc" lts_enc fenc;
+        (* GLog.thing ~__FUNCTION__ Trace "def_enc" the_ind_def.enc fenc; *)
+        (* GLog.thing ~__FUNCTION__ Trace "ind_enc" the_ind_def.ind fencode; *)
+        GLog.thing ~__FUNCTION__ Trace "lts_dec" lts_enc fdecode;
+        (* GLog.thing ~__FUNCTION__ Trace "def_dec" the_ind_def.enc fdecode; *)
+        (* GLog.thing ~__FUNCTION__ Trace "ind_dec" the_ind_def.ind feconstr; *)
         match the_ind_def.kind with
         | LTS the_lts_ind_def ->
           let lts_name : string = econstr_to_string the_ind_def.ind in
-          let lts_constrs : Model_info.rocq_constructor list =
+          let lts_constrs : Info.rocq_constructor list =
             (* NOTE: constructor tactic index starts from 1 -- ignore 0 below *)
             let (get_constructor_index, _), _ =
               Utils.new_int_counter ~start:0 ()
             in
             Array.fold_left
-              (fun (acc : Model_info.rocq_constructor list)
-                (name : Names.Id.t) ->
+              (fun (acc : Info.rocq_constructor list)
+                (* (name : Names.Id.t) *)
+                  ({ name; constructor } : Mebi_ind.lts_constructor) ->
+                GLog.thing ~__FUNCTION__ Trace "constructor name" name fname;
                 let index : int = get_constructor_index () in
                 let name : string = Names.Id.to_string name in
                 let bindings : Info.rocq_constructor_bindings =
@@ -587,10 +622,15 @@ module MkGraph
                      - [bindings : EConstr.t Tactypes.bindings] may need to change, as i expect that we will need to construct this in [Mebi_proof.get_constructor_bindings] for each term -- i'm unsure how we will do the necessary "pattern-matching" kind of thing on arbitrary indlts
                   *)
                   No_Bindings
+                  (* Use_Bindings (fun ({from;label;goto}:Info.binding_args) ->
+                    
+                    ) *)
                 in
                 { index; name; bindings } :: acc)
               []
-              (Mebi_ind.get_lts_constructor_names the_ind_def)
+              ((* Mebi_ind.get_lts_constructor_names *)
+               Mebi_ind.get_lts_constructor_types
+                 the_ind_def)
           in
           { enc = lts_enc; pp = lts_name; constructors = lts_constrs } :: acc
         | _ -> acc)
@@ -733,7 +773,7 @@ let build_fsm
   Log.thing ~__FUNCTION__ Info "FSM" the_fsm (Args Fsm.to_string);
   (* NOTE: debug messages *)
   let weak : bool = Mebi_api.is_in_weak_mode () in
-  let b : 'a Logger.to_string = Of Utils.Strfy.bool in
+  let b : 'a Utils.Strfy.to_string = Of Utils.Strfy.bool in
   Log.thing ~__FUNCTION__ Debug "weakmode" weak b;
   Log.thing ~__FUNCTION__ Debug "minimize" minimize b;
   Log.thing ~__FUNCTION__ Debug "saturate" saturate b;
