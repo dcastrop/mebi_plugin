@@ -17,11 +17,11 @@ let rec tactics : unit Proofview.tactic list -> unit Proofview.tactic = function
 
 let constants : EConstr.t list ref = ref ([] : EConstr.t list)
 
-let find_reference _pre (path : string list) (id : string) : Names.GlobRef.t =
+(* let find_reference (path : string list) (id : string) : Names.GlobRef.t =
    let path = Names.DirPath.make (List.rev_map Names.Id.of_string path) in
    let fp = Libnames.make_path path (Names.Id.of_string id) in
-   Nametab.global_of_path fp
-(* let find_reference = Coqlib.find_reference [@ocaml.warning "-3"] *)
+   Nametab.global_of_path fp*)
+let find_reference = Coqlib.find_reference [@ocaml.warning "-3"]
 
 (****************************************************************************)
 
