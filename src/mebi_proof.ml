@@ -34,20 +34,20 @@ let () = Log.Config.configure_output Debug true
 let () = Log.Config.configure_output Trace true
 (***********************************************************************)
 
-(* let fstr : string Logger.to_string = Args Utils.Strfy.string *)
+(* let fstr : string Utils.Strfy.to_string = Args Utils.Strfy.string *)
 
-let feconstr (gl : Proofview.Goal.t) : EConstr.t Logger.to_string =
+let feconstr (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
   Of (econstr_to_string gl)
 ;;
 
-let _feconstrkinds (gl : Proofview.Goal.t) : EConstr.t Logger.to_string =
+let _feconstrkinds (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
   Of
     (Rocq_utils.Strfy.econstr_kind
        (Proofview.Goal.env gl)
        (Proofview.Goal.sigma gl))
 ;;
 
-(* let fisty (gl : Proofview.Goal.t) : EConstr.t Logger.to_string =
+(* let fisty (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
    Of
    (fun (x : EConstr.t) ->
    Utils.Strfy.bool
@@ -55,35 +55,33 @@ let _feconstrkinds (gl : Proofview.Goal.t) : EConstr.t Logger.to_string =
    (EConstr.isType (Proofview.Goal.sigma gl) x))
    ;; *)
 
-(* let fistheory (gl : Proofview.Goal.t) : EConstr.t Logger.to_string =
+(* let fistheory (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
    Of
    (fun (x : EConstr.t) ->
    Utils.Strfy.bool (Mebi_theories.is_theory (Proofview.Goal.sigma gl) x))
    ;; *)
 
-let feconstrarr (gl : Proofview.Goal.t) : EConstr.t array Logger.to_string =
-  Of
-    (Utils.Strfy.array (fun ?args : (EConstr.t -> string) ->
-       econstr_to_string gl))
+let feconstrarr (gl : Proofview.Goal.t) : EConstr.t array Utils.Strfy.to_string =
+  Of (Utils.Strfy.array (Of (econstr_to_string gl)))
 ;;
 
-let fhyp (gl : Proofview.Goal.t) : Rocq_utils.hyp Logger.to_string =
+let fhyp (gl : Proofview.Goal.t) : Rocq_utils.hyp Utils.Strfy.to_string =
   Of (hyp_to_string gl)
 ;;
 
-let _fekind (gl : Proofview.Goal.t) : EConstr.t Logger.to_string =
+let _fekind (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
   Of
     (Rocq_utils.Strfy.econstr_kind
        (Proofview.Goal.env gl)
        (Proofview.Goal.sigma gl))
 ;;
 
-let fstate : State.t Logger.to_string = Args State.to_string
-let fstates : States.t Logger.to_string = Args Model.states_to_string
-let fpi : Partition.t Logger.to_string = Args Model.partition_to_string
-let flabel : Label.t Logger.to_string = Args Label.to_string
-let falphabet : Alphabet.t Logger.to_string = Args Model.alphabet_to_string
-(* let faction : Action.t Logger.to_string = Args Action.to_string *)
+let fstate : State.t Utils.Strfy.to_string = Args State.to_string
+let fstates : States.t Utils.Strfy.to_string = Args Model.states_to_string
+let fpi : Partition.t Utils.Strfy.to_string = Args Model.partition_to_string
+let flabel : Label.t Utils.Strfy.to_string = Args Label.to_string
+let falphabet : Alphabet.t Utils.Strfy.to_string = Args Model.alphabet_to_string
+(* let faction : Action.t Utils.Strfy.to_string = Args Action.to_string *)
 
 (***********************************************************************)
 
@@ -246,10 +244,7 @@ let reset_the_proof_state () : unit =
 let the_old_proof_states_to_string ?(short : bool = true) () : string =
   Log.trace __FUNCTION__;
   let open Utils.Strfy in
-  list
-    (list (fun ?(args : style_args = style_args ()) p ->
-       PState.to_string ~short p))
-    !the_old_proof_states
+  list (Args (list (Of (PState.to_string ~short)))) !the_old_proof_states
 ;;
 
 let update_old_proof_states (x : PState.t) : unit =
@@ -737,7 +732,7 @@ let make_constructor_bindings
   Log.trace __FUNCTION__;
   function
   | Info.No_Bindings -> NoBindings
-  | Info.Use_Bindings () -> ExplicitBindings []
+  | Info.Use_Bindings f -> ExplicitBindings []
 ;;
 
 let get_constructor_bindings ((lts_enc, constructor_index) : Tree.node)
@@ -769,7 +764,11 @@ let get_constructor_bindings ((lts_enc, constructor_index) : Tree.node)
         | Some x -> make_constructor_bindings x.bindings))
 ;;
 
-let get_constructor_tactic ((enc, index) : Tree.node) : tactic =
+let get_constructor_tactic
+      (* (x:Info.binding_args) *)
+        ((enc, index) : Tree.node)
+  : tactic
+  =
   Log.trace __FUNCTION__;
   (* NOTE: constructors index from 1 *)
   let index : int = index + 1 in
@@ -790,15 +789,6 @@ let do_build_constructor_tactics
   Log.thing ~__FUNCTION__ Debug "goto" goto (Args State.to_string);
   Log.thing ~__FUNCTION__ Debug "using" using (Args Tree.list_to_string);
   Log.option ~__FUNCTION__ Debug "next" next (Args Note.annotation_to_string);
-  (* let action : Action.t =
-    (* let goto : State.t =
-      Option.cata
-        (fun ({ this = { from = goto; _ }; _ } : Note.annotation) -> goto)
-        goto 
-        next
-    in *)
-    get_action_to from via goto (nfsm ~saturated:false ())
-  in *)
   let constructor : Tree.node list = Tree.min using in
   let tactics : tactic list = List.map get_constructor_tactic constructor in
   set_the_proof_state
@@ -806,54 +796,6 @@ let do_build_constructor_tactics
     (ApplyConstructors { annotation = next; tactics = Some tactics; goto });
   do_rt1n_via gl via
 ;;
-
-(* let sss = function
-  | { this = { from; via }; next } ->
-    Log.thing ~__FUNCTION__ Debug ("from") from (Args State.to_string);
-    Log.thing ~__FUNCTION__ Debug ("via") via (Args Label.to_string);
-    Log.option ~__FUNCTION__ Debug ("next") next (Args Note.annotation_to_string);
-    let constructors : Tree.node list =
-      get_annotation_constructor { this = { from; via }; next }
-    in
-    (* Log.option ~__FUNCTION__ Debug ("constructors") constructors (Args Tree.list_to_string ); *)
-    let tactics : tactic list = List.map get_constructor_tactic constructors in
-    Log.option ~__FUNCTION__ Debug ("next annotation") next (Args Note.annotation_to_string);
-    set_the_proof_state
-      __FUNCTION__
-      (ApplyConstructors { annotation = next; tactics = Some tactics; goto });
-    do_rt1n_via gl via
-;; *)
-
-(* exception Mebi_proof_TacticsNotEmpty of tactic list option *)
-
-(* let handle_maybe_empty_tactics
-   (gl : Proofview.Goal.t)
-   (annotation : Note.annotation)
-   : tactic list option -> tactic
-   = function
-   | None ->
-   log_tracex [ __FUNCTION__; "tactics None" ];
-   do_build_constructor_tactics gl annotation
-   | Some [] ->
-   log_tracex [ __FUNCTION__; "tactics Some []" ];
-   tactic_chain [ do_simplify gl; do_build_constructor_tactics gl annotation ]
-   | non_empty_tactics -> raise (Mebi_proof_TacticsNotEmpty non_empty_tactics)
-   ;; *)
-
-(* let do_constructor_tactic (gl : Proofview.Goal.t) (annotation : Note.annotation option)
-  : tactic list option -> tactic
-  =
-  Log.trace __FUNCTION__;
-  function
-  | Some (h :: tl) ->
-    log_tracex [ __FUNCTION__; "tactics Some (h::t)" ];
-    set_the_proof_state
-      __FUNCTION__
-      (ApplyConstructors { annotation; tactics = Some tl });
-    h
-  | maybe_empty_tactics ->
-    handle_maybe_empty_tactics gl annotation maybe_empty_tactics
-;; *)
 
 (***********************************************************************)
 
@@ -1015,7 +957,7 @@ let try_find_label (gl : Proofview.Goal.t) (x : EConstr.t) (labels : Alphabet.t)
     Debug
     "decoded x"
     y
-    (Of (Utils.Strfy.option (fun ?args -> Enc.to_string)));
+    (Of (Utils.Strfy.option (Of Enc.to_string)));
   (* Mebi_wrapper.runkeep (Mebi_wrapper.debug_enc ()); *)
   Option.map (fun (z : Enc.t) -> decode_label z labels) y
 ;;
@@ -1669,7 +1611,7 @@ exception Mebi_proof_NoInvertibleHyps of Invertible.t list
 let hyps_get_invertible (gl : Proofview.Goal.t) : Invertible.t =
   Log.trace __FUNCTION__;
   let invertibles : Invertible.t list = hyps_get_invertibles gl in
-  let f : Invertible.t Logger.to_string = Of Invertible.to_string in
+  let f : Invertible.t Utils.Strfy.to_string = Of Invertible.to_string in
   Log.things ~__FUNCTION__ Debug "invertibles" invertibles f;
   match hyps_invertibles_get_tounfold invertibles with
   | Some x -> x

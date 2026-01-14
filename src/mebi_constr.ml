@@ -89,7 +89,7 @@ module Tree = struct
     : string
     =
     let open Utils.Strfy in
-    list ~args:{ args with name = Some "Constructor Trees" } to_string x
+    list ~args:{ args with name = Some "Constructor Trees" } (Of to_string) x
   ;;
 end
 
@@ -106,9 +106,8 @@ let to_string
       ((action, destination, tree) : t)
   : string
   =
-  let open Utils.Strfy in
   let open Rocq_utils.Strfy in
-  let action : string = econstr env sigma ~args:(nest args) action in
+  let action : string = econstr env sigma action in
   let destination : string = econstr env sigma destination in
   let tree : string = Tree.to_string tree in
   Utils.Strfy.record

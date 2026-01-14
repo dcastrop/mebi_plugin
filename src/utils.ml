@@ -251,6 +251,16 @@ module Strfy = struct
     }
   ;;
 
+  type 'a to_string =
+    | Args of (?args:style_args -> 'a -> string)
+    | Of of ('a -> string)
+
+  let f_to_string ?(args : style_args = style_args ()) (f : 'a to_string)
+    : 'a -> string
+    =
+    match f with Args f -> f ~args | Of f -> f
+  ;;
+
   let record_args () : style_args =
     style_args ~style:(Some (record_style ())) ()
   ;;
@@ -336,76 +346,75 @@ module Strfy = struct
     fun (x : bool) -> Printf.sprintf "%b" x
   ;;
 
-  let option
-        (f : ?args:style_args -> 'a -> string)
-        ?(args : style_args = style_args ())
+  let option (f : 'a to_string) ?(args : style_args = style_args ())
     : 'a option -> string
     = function
     | None -> "None"
-    | Some x -> Printf.sprintf "Some %s" (f ~args x)
+    | Some x -> Printf.sprintf "Some %s" (f_to_string ~args f x)
   ;;
 
   let tuple
-        (f : ?args:style_args -> 'a -> string)
-        (g : ?args:style_args -> 'b -> string)
-        ?(args : style_args =
-          style_args ~style:(Some (collection_style Tuple)) ())
+        (f : 'a to_string)
+        (g : 'b to_string)
+        ?(args : style_args = style_args ())
     : 'a * 'b -> string
     =
     fun ((a, b) : 'a * 'b) ->
-    let astr : string = f ~args:(nest args) a in
-    let bstr : string = g ~args:(nest args) b in
-    wrap args [ astr; bstr ]
+    let astr : string = f_to_string ~args:(nest args) f a in
+    let bstr : string = f_to_string ~args:(nest args) g b in
+    wrap { args with style = Some (collection_style Tuple) } [ astr; bstr ]
   ;;
 
   let inline_tuple
-        (f : ?args:style_args -> 'a -> string)
-        (g : ?args:style_args -> 'b -> string)
-        ?(args : style_args =
-          style_args ~style:(Some (inline_tuple_style ())) ())
+        (f : 'a to_string)
+        (g : 'b to_string)
+        ?(args : style_args = style_args ())
     : 'a * 'b -> string
     =
-    tuple f g ~args
+    tuple f g ~args:{ args with style = Some (inline_tuple_style ()) }
   ;;
 
-  let keyval
-        (f : ?args:style_args -> 'a -> string)
-        ?(args : style_args = style_args ())
+  let keyval (f : 'a to_string) ?(args : style_args = style_args ())
     : string * 'a -> string
     =
-    let args : style_args =
-      { args with style = Some (keyval_style ()); name = None }
-    in
-    tuple ~args string f
+    tuple
+      ~args:{ args with style = Some (keyval_style ()); name = None }
+      (Args string)
+      f
   ;;
 
   let list
-        (f : ?args:style_args -> 'a -> string)
-        ?(args : style_args =
-          style_args ~style:(Some (collection_style List)) ())
+        (f : 'a to_string)
+        ?(args : style_args = style_args ())
         (alist : 'a list)
     : string
     =
-    wrap args (List.map (fun a -> f ~args a) alist)
+    wrap
+      { args with style = Some (collection_style List) }
+      (List.map (fun a -> f_to_string ~args f a) alist)
   ;;
 
   let array
-        (f : ?args:style_args -> 'a -> string)
-        ?(args : style_args =
-          style_args ~style:(Some (collection_style List)) ())
+        (f : 'a to_string)
+        ?(args : style_args = style_args ())
         (arr : 'a array)
     : string
     =
-    list ~args f (Array.to_list arr)
+    list
+      ~args:{ args with style = Some (collection_style List) }
+      f
+      (Array.to_list arr)
   ;;
 
   let record
-        ?(args : style_args =
-          style_args ~style:(Some (collection_style Record)) ())
+        ?(args : style_args = style_args ())
         (alist : (string * string) list)
     : string
     =
-    list ~args (keyval string) alist
+    list
+      ~args:{ args with style = Some (collection_style Record) }
+      (Args (keyval (Args string)))
+      alist
   ;;
 
   (* new line sep *)

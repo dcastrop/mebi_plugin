@@ -40,7 +40,7 @@ let states_to_string
     Utils.Strfy.nest
       { args with style = Some (collection_style List); newline = true }
   in
-  States.to_list x |> Utils.Strfy.list ~args State.to_string
+  States.to_list x |> Utils.Strfy.list ~args (Args State.to_string)
 ;;
 
 (** same as [states_to_string] except with name "Destinations" *)
@@ -81,7 +81,7 @@ let partition_to_string ?(args : style_args = style_args ()) (x : Partition.t)
       ; newline = true
       }
   in
-  Partition.to_list x |> Utils.Strfy.list ~args states_to_string
+  Partition.to_list x |> Utils.Strfy.list ~args (Args states_to_string)
 ;;
 
 exception Model_Bisim_State_NotFound of (State.t * Partition.t)
@@ -114,7 +114,7 @@ let alphabet_to_string ?(args : style_args = style_args ()) (x : Alphabet.t)
       ; newline = true
       }
   in
-  Alphabet.to_list x |> Utils.Strfy.list ~args Label.to_string
+  Alphabet.to_list x |> Utils.Strfy.list ~args (Args Label.to_string)
 ;;
 
 exception Model_Alphabet_LabelOfEncNotFound of (Enc.t * Alphabet.t)
@@ -175,7 +175,7 @@ let transitions_to_string
   let args : style_args =
     { args with style = Some (collection_style List); newline = true }
   in
-  Transitions.to_list x |> Utils.Strfy.list ~args Transition.to_string
+  Transitions.to_list x |> Utils.Strfy.list ~args (Args Transition.to_string)
 ;;
 
 (***********************************************************************)
@@ -210,7 +210,7 @@ let actions_to_string
       x
       []
   in
-  list ~args string xs
+  list ~args (Args string) xs
 ;;
 
 let action_labels_to_string
@@ -237,7 +237,7 @@ let action_labels_to_string
       x
       []
   in
-  list ~args string xs
+  list ~args (Args string) xs
 ;;
 
 exception Model_Action_HasNoAnnotations of Action.t
@@ -757,7 +757,9 @@ module Lts = struct
     let module Strfy = Utils.Strfy in
     function
     | { init; terminals; alphabet; states; transitions; info } ->
-      let init : string = Strfy.option ~args:(nest args) State.to_string init in
+      let init : string =
+        Strfy.option ~args:(nest args) (Args State.to_string) init
+      in
       let terminals : string = states_to_string ~args:(nest args) terminals in
       let alphabet : string = alphabet_to_string ~args:(nest args) alphabet in
       let states : string = states_to_string ~args:(nest args) states in
@@ -845,7 +847,9 @@ module Fsm = struct
     let module Strfy = Utils.Strfy in
     function
     | { init; terminals; alphabet; states; edges; info } ->
-      let init : string = Strfy.option ~args:(nest args) State.to_string init in
+      let init : string =
+        Strfy.option ~args:(nest args) (Args State.to_string) init
+      in
       let terminals : string = states_to_string ~args:(nest args) terminals in
       let alphabet : string = alphabet_to_string ~args:(nest args) alphabet in
       let states : string = states_to_string ~args:(nest args) states in

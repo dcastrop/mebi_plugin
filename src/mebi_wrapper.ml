@@ -192,15 +192,8 @@ end
 (****** COQ TERM TO STRING ********)
 (**********************************)
 
-let mebi_to_string
-      (f :
-        Environ.env
-        -> Evd.evar_map
-        -> ?args:Utils.Strfy.style_args
-        -> 'a
-        -> string)
-      ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-  : 'a -> string
+let mebi_to_string (f : Environ.env -> Evd.evar_map -> 'a -> string)
+  : 'a Utils.Strfy.to_string
   =
   run
     ~keep_encoding:true
@@ -208,22 +201,18 @@ let mebi_to_string
     (let open Syntax in
      let* env = get_env in
      let* sigma = get_sigma in
-     return (f env sigma))
+     return (Utils.Strfy.Of (f env sigma)))
 ;;
 
 let constr_to_string (x : Constr.t) : string =
-  (mebi_to_string Rocq_utils.Strfy.constr) x
+  Utils.Strfy.f_to_string (mebi_to_string Rocq_utils.Strfy.constr) x
 ;;
 
 let econstr_to_string (x : EConstr.t) : string =
-  (mebi_to_string Rocq_utils.Strfy.econstr) x
+  Utils.Strfy.f_to_string (mebi_to_string Rocq_utils.Strfy.econstr) x
 ;;
 
-let enc_to_string ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-  : Enc.t -> string
-  =
-  Enc.to_string
-;;
+let enc_to_string : Enc.t -> string = Enc.to_string
 
 (********************************************)
 (****** DEBUG *******************************)
@@ -231,15 +220,17 @@ let enc_to_string ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
 
 let debug_enc () : unit mm =
   fun (st : wrapper ref) ->
-  let fstr = Utils.Strfy.string in
-  let feconstr : EConstr.t -> string = econstr_to_string in
-  let fenc : Enc.t -> string = Enc.to_string in
+  let fstr = Utils.Strfy.Args Utils.Strfy.string in
+  let feconstr : EConstr.t Utils.Strfy.to_string =
+    Utils.Strfy.Of econstr_to_string
+  in
+  let fenc : Enc.t Utils.Strfy.to_string = Utils.Strfy.Of Enc.to_string in
   let fpair ((x, y) : EConstr.t * Enc.t) : string =
     Utils.Strfy.tuple
       fstr
       fstr
-      ( Utils.Strfy.keyval (fun ?args -> feconstr) ("econstr", x)
-      , Utils.Strfy.keyval (fun ?args -> fenc) ("enc", y) )
+      ( Utils.Strfy.keyval feconstr ("econstr", x)
+      , Utils.Strfy.keyval fenc ("enc", y) )
   in
   let f (prefix : string) (x : EConstr.t) (y : Enc.t) : unit =
     Logger.Default.thing ~__FUNCTION__ Debug prefix (x, y) (Of fpair);
@@ -531,7 +522,10 @@ module Error : ERROR_TYPE = struct
            "Unknown encode key: %s\nEncode map: %s"
            (econstr !coq_ref.coq_env !coq_ref.coq_ctx x)
            (list
-              (tuple (econstr !coq_ref.coq_env !coq_ref.coq_ctx) enc_to_string)
+              (Args
+                 (tuple
+                    (Of (econstr !coq_ref.coq_env !coq_ref.coq_ctx))
+                    (Of enc_to_string)))
               (List.of_seq (F.to_seq fwd_map))))
     | UnknownDecodeKey (coq_ref, bck_map, x) ->
       Pp.str
@@ -539,7 +533,10 @@ module Error : ERROR_TYPE = struct
            "Unknown decode key: %s\nDecode map: %s"
            (Enc.to_string x)
            (list
-              (tuple enc_to_string (econstr !coq_ref.coq_env !coq_ref.coq_ctx))
+              (Args
+                 (tuple
+                    (Of enc_to_string)
+                    (Of (econstr !coq_ref.coq_env !coq_ref.coq_ctx))))
               (List.of_seq (B.to_seq bck_map))))
     | NoBisimResult () -> Pp.str "No cached bisimilarity result found."
     (* | ProofvIsNone () -> str "Tried to access contents of proofv which is None." *)
@@ -600,7 +597,7 @@ module Error : ERROR_TYPE = struct
         "Invalid Args to check_updated_ctx. Should both be empty, or both have \
          some."
       ++ strbrk "\n"
-      ++ Pp.str (Printf.sprintf "substls: %s." (list (econstr env sigma) x))
+      ++ Pp.str (Printf.sprintf "substls: %s." (list (feconstr env sigma) x))
       ++ strbrk "\n"
       ++ Pp.str
            (Printf.sprintf
@@ -629,7 +626,8 @@ module Error : ERROR_TYPE = struct
       ++ Pp.str "Type: "
       ++ Pp.str (econstr env sigma ty)
       ++ strbrk "\n\n"
-      ++ Pp.str (Printf.sprintf "Keys: %s" (list (econstr env sigma) trkeys))
+      ++ Pp.str
+           (Printf.sprintf "Keys: %s" (list (Of (econstr env sigma)) trkeys))
       ++ strbrk "\n\n"
       ++ Pp.str
            (Printf.sprintf
@@ -652,7 +650,10 @@ module Error : ERROR_TYPE = struct
       ++ strbrk "\n\n"
       ++ Pp.str "constructor names: "
       ++ Pp.str
-           (list ~args:(style_args ~name:"Names" ()) (econstr env sigma) names)
+           (list
+              ~args:(style_args ~name:"Names" ())
+              (Of (econstr env sigma))
+              names)
   ;;
 
   (* | UnknownDecodeKey (env, sigma, k, bckmap) ->

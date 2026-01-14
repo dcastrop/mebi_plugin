@@ -33,7 +33,13 @@ and rocq_constructor =
 
 and rocq_constructor_bindings =
   | No_Bindings
-  | Use_Bindings of unit
+  | Use_Bindings of (binding_args -> Evd.econstr Tactypes.explicit_bindings)
+
+and binding_args =
+  { from : Model_state.t
+  ; label : Model_label.t
+  ; goto : Model_state.t
+  }
 
 val mebi_info_to_string : ?args:Utils.Strfy.style_args -> mebi_info -> string
 

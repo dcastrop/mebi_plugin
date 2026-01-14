@@ -1,15 +1,3 @@
-type 'a to_string =
-  | Args of (?args:Utils.Strfy.style_args -> 'a -> string)
-  | Of of ('a -> string)
-
-let f_to_string
-      ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-      (f : 'a to_string)
-  : 'a -> string
-  =
-  match f with Args f -> f ~args | Of f -> f
-;;
-
 module type LOGGER_TYPE = sig
   module Config : Output_config.OUTPUT_CONFIG
 
@@ -35,7 +23,7 @@ module type LOGGER_TYPE = sig
     -> Output_kind.t
     -> string
     -> 'a
-    -> 'a to_string
+    -> 'a Utils.Strfy.to_string
     -> unit
 
   val things
@@ -44,7 +32,7 @@ module type LOGGER_TYPE = sig
     -> Output_kind.t
     -> string
     -> 'a list
-    -> 'a to_string
+    -> 'a Utils.Strfy.to_string
     -> unit
 
   val option
@@ -53,7 +41,7 @@ module type LOGGER_TYPE = sig
     -> Output_kind.t
     -> string
     -> 'a option
-    -> 'a to_string
+    -> 'a Utils.Strfy.to_string
     -> unit
 
   val options
@@ -62,7 +50,7 @@ module type LOGGER_TYPE = sig
     -> Output_kind.t
     -> string
     -> 'a list option
-    -> 'a to_string
+    -> 'a Utils.Strfy.to_string
     -> unit
 end
 
@@ -132,14 +120,14 @@ module Make (Mode : Output_mode.OUTPUT_MODE) (X : S) : LOGGER_TYPE = struct
         (k : Output_kind.t)
         (prefix : string)
         (x : 'a)
-        (f : 'a to_string)
+        (f : 'a Utils.Strfy.to_string)
     : unit
     =
     do_output
       ~prefix:(Some (Printf.sprintf "%s: " prefix))
       ~__FUNCTION__
       k
-      (f_to_string f x)
+      (Utils.Strfy.f_to_string f x)
   ;;
 
   let things
@@ -148,7 +136,7 @@ module Make (Mode : Output_mode.OUTPUT_MODE) (X : S) : LOGGER_TYPE = struct
         (k : Output_kind.t)
         (prefix : string)
         (xs : 'a list)
-        (f : 'a to_string)
+        (f : 'a Utils.Strfy.to_string)
     : unit
     =
     (* NOTE: start and end *)
@@ -172,7 +160,7 @@ module Make (Mode : Output_mode.OUTPUT_MODE) (X : S) : LOGGER_TYPE = struct
         (k : Output_kind.t)
         (prefix : string)
         (x : 'a option)
-        (f : 'a to_string)
+        (f : 'a Utils.Strfy.to_string)
     : unit
     =
     match x with
@@ -186,7 +174,7 @@ module Make (Mode : Output_mode.OUTPUT_MODE) (X : S) : LOGGER_TYPE = struct
         (k : Output_kind.t)
         (prefix : string)
         (xs : 'a list option)
-        (f : 'a to_string)
+        (f : 'a Utils.Strfy.to_string)
     : unit
     =
     match xs with

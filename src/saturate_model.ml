@@ -7,10 +7,10 @@ let () = Log.Config.configure_output Debug false
 let () = Log.Config.configure_output Trace false
 (***********************************************************************)
 
-let fstate : State.t Logger.to_string = Args State.to_string
-let fenc : Enc.t Logger.to_string = Of Enc.to_string
+let fstate : State.t Utils.Strfy.to_string = Args State.to_string
+let fenc : Enc.t Utils.Strfy.to_string = Of Enc.to_string
 
-let fannotation : Note.annotation Logger.to_string =
+let fannotation : Note.annotation Utils.Strfy.to_string =
   Args Note.annotation_to_string
 ;;
 

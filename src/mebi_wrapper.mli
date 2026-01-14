@@ -62,18 +62,12 @@ end
 module Syntax : MEBI_MONAD_SYNTAX
 
 val mebi_to_string
-  :  (Environ.env
-      -> Evd.evar_map
-      -> ?args:Utils.Strfy.style_args
-      -> 'a
-      -> string)
-  -> ?args:Utils.Strfy.style_args
-  -> 'a
-  -> string
+  :  (Environ.env -> Evd.evar_map -> 'a -> string)
+  -> 'a Utils.Strfy.to_string
 
 val constr_to_string : Constr.t -> string
 val econstr_to_string : Evd.econstr -> string
-val enc_to_string : ?args:Utils.Strfy.style_args -> Enc.t -> string
+val enc_to_string : Enc.t -> string
 
 module type ERROR_TYPE = sig
   type mebi_error =
