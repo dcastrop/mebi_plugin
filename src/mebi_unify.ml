@@ -249,13 +249,7 @@ and explore_valid_constructor
     check_updated_ctx lts_enc [ empty_problems ] indmap (substl, decls)
   in
   let* constructors =
-    check_for_next_constructors
-      i
-      indmap
-      act
-      tgt
-      constructors
-      next_constructor_problems
+    check_for_next_constructors i act tgt constructors next_constructor_problems
   in
   (* let* () = debug_validconstrs_iter_success_close from_term (Some act) args in *)
   return constructors
@@ -320,7 +314,6 @@ and check_updated_ctx
 
 and check_for_next_constructors
       (i : int)
-      (indmap : Mebi_ind.t F.t)
       (outer_act : EConstr.t)
       (tgt_term : EConstr.t)
       (constructors : Constructors.t)
