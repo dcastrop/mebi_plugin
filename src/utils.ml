@@ -356,13 +356,14 @@ module Strfy = struct
   let tuple
         (f : 'a to_string)
         (g : 'b to_string)
-        ?(args : style_args = style_args ())
+        ?(args : style_args =
+          style_args ~style:(Some (collection_style Tuple)) ())
     : 'a * 'b -> string
     =
     fun ((a, b) : 'a * 'b) ->
     let astr : string = f_to_string ~args:(nest args) f a in
     let bstr : string = f_to_string ~args:(nest args) g b in
-    wrap { args with style = Some (collection_style Tuple) } [ astr; bstr ]
+    wrap args [ astr; bstr ]
   ;;
 
   let inline_tuple
@@ -379,19 +380,18 @@ module Strfy = struct
     =
     tuple
       ~args:{ args with style = Some (keyval_style ()); name = None }
-      (Args string)
+      (Of (string ~args))
       f
   ;;
 
   let list
         (f : 'a to_string)
-        ?(args : style_args = style_args ())
+        ?(args : style_args =
+          style_args ~style:(Some (collection_style List)) ())
         (alist : 'a list)
     : string
     =
-    wrap
-      { args with style = Some (collection_style List) }
-      (List.map (fun a -> f_to_string ~args f a) alist)
+    wrap args (List.map (fun a -> f_to_string ~args f a) alist)
   ;;
 
   let array
@@ -400,10 +400,7 @@ module Strfy = struct
         (arr : 'a array)
     : string
     =
-    list
-      ~args:{ args with style = Some (collection_style List) }
-      f
-      (Array.to_list arr)
+    list ~args f (Array.to_list arr)
   ;;
 
   let record
@@ -413,7 +410,7 @@ module Strfy = struct
     =
     list
       ~args:{ args with style = Some (collection_style Record) }
-      (Args (keyval (Args string)))
+      (Args (keyval (Of (string ~args))))
       alist
   ;;
 
