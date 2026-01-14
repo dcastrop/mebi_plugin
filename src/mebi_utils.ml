@@ -187,21 +187,43 @@ let new_evar_of (x : EConstr.t) : EConstr.t mm =
   state (fun env sigma -> Evarutil.new_evar env sigma x)
 ;;
 
-let is_none_term (x : EConstr.t) : bool mm =
-  state (fun env sigma ->
-    sigma, Mebi_theories.is_constant sigma x Mebi_theories.c_None)
+let is_theory_term (c : unit -> EConstr.t) (x : EConstr.t) : bool mm =
+  state (fun env sigma -> sigma, Mebi_theories.is_constant sigma x c)
 ;;
 
-let get_none_enc_opt () : Enc.t option mm =
+let is_none_term : EConstr.t -> bool mm = is_theory_term Mebi_theories.c_None
+let is_some_term : EConstr.t -> bool mm = is_theory_term Mebi_theories.c_Some
+
+let get_theory_term_enc_opt (f : EConstr.t -> bool mm) : Enc.t option mm =
   let open Mebi_wrapper.Syntax in
   let* fm = get_fwd_enc in
-  let rec find_none : (EConstr.t * Enc.t) list -> Enc.t option mm = function
+  let rec find_theory_enc_opt : (EConstr.t * Enc.t) list -> Enc.t option mm =
+    function
     | [] -> return None
     | (x, y) :: tl ->
-      let* is_none : bool = is_none_term x in
-      if is_none then return (Some y) else find_none tl
+      let* is_match : bool = f x in
+      if is_match then return (Some y) else find_theory_enc_opt tl
   in
-  F.to_seq fm |> List.of_seq |> find_none
+  F.to_seq fm |> List.of_seq |> find_theory_enc_opt
+;;
+
+let get_none_enc_opt () : Enc.t option mm = get_theory_term_enc_opt is_none_term
+let get_some_enc_opt () : Enc.t option mm = get_theory_term_enc_opt is_some_term
+
+let try_get_theory_term_enc (f : EConstr.t -> bool mm) (x : EConstr.t)
+  : Enc.t option
+  =
+  if Mebi_wrapper.runkeep (f x)
+  then Mebi_wrapper.runkeep (get_theory_term_enc_opt f)
+  else None
+;;
+
+let try_get_none_enc_opt : EConstr.t -> Enc.t option =
+  try_get_theory_term_enc is_none_term
+;;
+
+let try_get_some_enc_opt : EConstr.t -> Enc.t option =
+  try_get_theory_term_enc is_some_term
 ;;
 
 (*********************************************************)
