@@ -988,6 +988,7 @@ let find_state (gl : Proofview.Goal.t) (x : EConstr.t) (states : States.t)
     | None -> raise (Mebi_proof_CouldNotDecodeState (x, states))
   with
   | Model_CannotDecodeState (enc, states) ->
+    Log.trace ~__FUNCTION__ "Exception: Model_CannotDecodeState";
     raise (Mebi_proof_CouldNotDecodeState (x, states))
 ;;
 
@@ -999,23 +1000,24 @@ let try_find_label (gl : Proofview.Goal.t) (x : EConstr.t) (labels : Alphabet.t)
   : Label.t option
   =
   Log.trace __FUNCTION__;
+  Log.thing ~__FUNCTION__ Debug "To Find" x (feconstr gl);
   Log.thing ~__FUNCTION__ Debug "Labels" labels (Args alphabet_to_string);
-  let x =
-    match try_decode gl x with
-    | Some x -> Some x
-    | None ->
-      if Mebi_wrapper.runkeep (Mebi_utils.is_none_term x)
-      then Mebi_wrapper.runkeep (Mebi_utils.get_none_enc_opt ())
-      else None
+  let y : Enc.t option =
+    Utils.try_seq_opt
+      x
+      [ try_decode gl
+      ; Mebi_utils.try_get_none_enc_opt
+      ; Mebi_utils.try_get_some_enc_opt
+      ]
   in
   Log.thing
     ~__FUNCTION__
     Debug
     "decoded x"
-    x
+    y
     (Of (Utils.Strfy.option (fun ?args -> Enc.to_string)));
   (* Mebi_wrapper.runkeep (Mebi_wrapper.debug_enc ()); *)
-  Option.map (fun (y : Enc.t) -> decode_label y labels) x
+  Option.map (fun (z : Enc.t) -> decode_label z labels) y
 ;;
 
 let find_label (gl : Proofview.Goal.t) (x : EConstr.t) (labels : Alphabet.t)
@@ -1028,6 +1030,7 @@ let find_label (gl : Proofview.Goal.t) (x : EConstr.t) (labels : Alphabet.t)
     | None -> raise (Mebi_proof_CouldNotDecodeLabel (x, labels))
   with
   | Model_CannotDecodeLabel (enc, labels) ->
+    Log.trace ~__FUNCTION__ "Exception: Model_CannotDecodeLabel";
     raise (Mebi_proof_CouldNotDecodeLabel (x, labels))
 ;;
 
@@ -1088,9 +1091,11 @@ let get_transition
       Transition_opt.create from label goto ~annotation ~constructor_trees ()
   with
   | Mebi_proof_CouldNotDecodeState (ty, states) ->
+    Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CouldNotDecodeState";
     Log.thing ~__FUNCTION__ Debug "Could not decode State" ty (feconstr gl);
     raise (Mebi_proof_CouldNotDecodeTransitionState (ty, fsm))
   | Mebi_proof_CouldNotDecodeLabel (ty, alphabet) ->
+    Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CouldNotDecodeLabel";
     Log.thing ~__FUNCTION__ Debug "Could not decode Label" ty (feconstr gl);
     raise (Mebi_proof_CouldNotDecodeTransitionLabel (ty, fsm))
 ;;
@@ -1132,12 +1137,19 @@ let get_hyp_transition (gl : Proofview.Goal.t) (fsm : Fsm.t) : Transition_opt.t 
       else None
     with
     | Mebi_proof_CannotDecodeNeededTerm y ->
+      Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CannotDecodeNeededTerm";
       Log.thing ~__FUNCTION__ Debug "Could not decode needed" y (feconstr gl);
       raise (Mebi_proof_CheckTermCanBeUnfolded (x, y))
     | Mebi_proof_CouldNotDecodeTransitionState (ty, fsm) ->
+      Log.trace
+        ~__FUNCTION__
+        "Exception: Mebi_proof_CouldNotDecodeTransitionState";
       Log.thing ~__FUNCTION__ Debug "Could not decode State" ty (feconstr gl);
       None
     | Mebi_proof_CouldNotDecodeTransitionLabel (ty, fsm) ->
+      Log.trace
+        ~__FUNCTION__
+        "Exception: Mebi_proof_CouldNotDecodeTransitionLabel";
       Log.thing ~__FUNCTION__ Debug "Could not decode Label" ty (feconstr gl);
       None
   in
