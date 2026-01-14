@@ -35,12 +35,12 @@ Example wsim_bigstep_lts : weak_sim bigstep lts c1 c1.
 Proof. MeBiSim Begin bigstep c1 And lts c1 Using step.
   (* MeBiSim Step. *)
   (* simpl.  *)
-  (* MeBiSim Solve 10.
   MeBiSim Solve 10.
   MeBiSim Solve 10.
   MeBiSim Solve 10.
   MeBiSim Solve 10.
-  MeBiSim Solve 10. *)
+  (* MeBiSim Solve 10. *)
+  (* MeBiSim Solve 10. *)
 
   MeBiSim Step.
   MeBiSim Step.
@@ -50,7 +50,7 @@ Proof. MeBiSim Begin bigstep c1 And lts c1 Using step.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-  (* MeBiSim Step. *)
+  MeBiSim Step.
   (* MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step. *)
@@ -66,7 +66,7 @@ Proof. MeBiSim Begin bigstep c1 And lts c1 Using step.
   (* constructor 1 with (a:=(WRITE_NEXT THE_PID NIL)) (e:=(0, {| var_predecessor := None; var_locked := false; var_next := None; var_swap := false |}, None, ({| mem_next := None; mem_locked := false; qnodes := {| next := None; locked := false |} :: nil |}, None))). *)
   (* simpl. *)
 
-  MeBiSim Step.
+  (* MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
@@ -93,7 +93,7 @@ Proof. MeBiSim Begin bigstep c1 And lts c1 Using step.
   MeBiSim Solve 10.
   MeBiSim Solve 10.
   MeBiSim Solve 10.
-  MeBiSim Solve 10.
+  MeBiSim Solve 10. *)
   (* MeBiSim Solve 20. *)
   (* simpl in *.
   (* unfold * in * *)
