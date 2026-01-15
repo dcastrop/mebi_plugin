@@ -132,6 +132,16 @@ module MkGraph
     Of Mebi_wrapper.econstr_to_string
   ;;
 
+  let fconstr : Constr.t Utils.Strfy.to_string =
+    Of Mebi_wrapper.constr_to_string
+  ;;
+
+  let fconstrkind : Constr.t Utils.Strfy.to_string =
+    Mebi_wrapper.runkeep
+      (Mebi_wrapper.state (fun env sigma ->
+         sigma, Utils.Strfy.Args (Rocq_utils.Strfy.constr_kind env sigma)))
+  ;;
+
   let fdecode : Enc.t Utils.Strfy.to_string =
     Of
       (fun (x : Enc.t) ->
@@ -627,6 +637,7 @@ module MkGraph
               (fun (acc : Info.rocq_constructor list)
                 (* (name : Names.Id.t) *)
                   ({ name; constructor } : Mebi_ind.lts_constructor) ->
+                GLog.debug ~__FUNCTION__ "= = = = = = = = =\n";
                 GLog.thing ~__FUNCTION__ Trace "name" name fname;
                 GLog.thing
                   ~__FUNCTION__
@@ -646,6 +657,25 @@ module MkGraph
                 let index : int = get_constructor_index () in
                 let name : string = Names.Id.to_string name in
                 let bindings : Info.rocq_constructor_bindings =
+                  let (_rel, c) : Rocq_utils.ind_constr = constructor in
+                  GLog.thing ~__FUNCTION__ Debug "constr" c fconstr;
+                  GLog.thing ~__FUNCTION__ Debug "kinds" c fconstrkind;
+                  let ty, tys = Rocq_utils.constr_to_app c in
+                  GLog.things Debug "tys" (Array.to_list tys) fconstr;
+                  let from, label, goto = tys.(0), tys.(1), tys.(2) in
+                  (* let fromty, fromtys = Rocq_utils.constr_to_app from in *)
+                  GLog.thing Debug "from" from fconstr;
+                  GLog.thing Debug "from kind" from fconstrkind;
+                  (* GLog.thing Debug "fromty kind" fromty fconstrkind; *)
+                  (* let labelty, labeltys = Rocq_utils.constr_to_app label in *)
+                  GLog.thing Debug "label" label fconstr;
+                  GLog.thing Debug "label kind" label fconstrkind;
+                  (* GLog.thing Debug "labelty kind" labelty fconstrkind; *)
+                  (* let gototy, gototys = Rocq_utils.constr_to_app goto in *)
+                  GLog.thing Debug "goto" goto fconstr;
+                  GLog.thing Debug "goto kind" goto fconstrkind;
+                  (* GLog.thing Debug "gototy kind" gototy fconstrkind; *)
+                  (* *)
                   No_Bindings
                   (* Use_Bindings (fun ({from;label;goto}:Info.binding_args) ->
                     
