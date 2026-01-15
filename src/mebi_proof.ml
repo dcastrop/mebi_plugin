@@ -452,7 +452,7 @@ let _do_nothing () : tactic =
   raise (Mebi_proof_FailIfNothing ())
 ;;
 
-exception Mebi_proof_TyDoesNotMatchTheories of Rocq_utils.kind_pair
+exception Mebi_proof_TyDoesNotMatchTheories of EConstr.t Rocq_utils.kind_pair
 
 let get_all_non_cofix (gl : Proofview.Goal.t) : Names.Id.Set.t =
   Names.Id.Set.filter
@@ -813,7 +813,9 @@ let try_decode (gl : Proofview.Goal.t) (x : EConstr.t) : Enc.t option =
       raise (Mebi_proof_CouldNotDecodeEConstr x))
 ;;
 
-let typ_is_exists (gl : Proofview.Goal.t) ((ty, _) : Rocq_utils.kind_pair)
+let typ_is_exists
+      (gl : Proofview.Goal.t)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -821,7 +823,9 @@ let typ_is_exists (gl : Proofview.Goal.t) ((ty, _) : Rocq_utils.kind_pair)
   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_ex ())
 ;;
 
-let typ_is_weak_sim (gl : Proofview.Goal.t) ((ty, _) : Rocq_utils.kind_pair)
+let typ_is_weak_sim
+      (gl : Proofview.Goal.t)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -831,7 +835,7 @@ let typ_is_weak_sim (gl : Proofview.Goal.t) ((ty, _) : Rocq_utils.kind_pair)
 
 let typ_is_weak_transition
       (gl : Proofview.Goal.t)
-      ((ty, _) : Rocq_utils.kind_pair)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -841,7 +845,7 @@ let typ_is_weak_transition
 
 let typ_is_silent_transition
       (gl : Proofview.Goal.t)
-      ((ty, _) : Rocq_utils.kind_pair)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -851,7 +855,7 @@ let typ_is_silent_transition
 
 let typ_is_silent1_transition
       (gl : Proofview.Goal.t)
-      ((ty, _) : Rocq_utils.kind_pair)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -861,7 +865,7 @@ let typ_is_silent1_transition
 
 let typ_is_lts_transition
       (gl : Proofview.Goal.t)
-      ((ty, _) : Rocq_utils.kind_pair)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -871,7 +875,7 @@ let typ_is_lts_transition
 
 let typ_is_fsm_constructor
       (gl : Proofview.Goal.t)
-      ((ty, _) : Rocq_utils.kind_pair)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : Fsm.t -> bool
   =
   Log.trace __FUNCTION__;
@@ -1045,7 +1049,7 @@ let get_transition
 let get_lts_transition
       (gl : Proofview.Goal.t)
       (fsm : Fsm.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : Transition_opt.t
   =
   Log.trace __FUNCTION__;
@@ -1124,7 +1128,7 @@ let get_mtransition (gl : Proofview.Goal.t) : Transition.t =
 let get_weak_transition
       (gl : Proofview.Goal.t)
       (fsm : Fsm.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : Transition_opt.t
   =
   Log.trace __FUNCTION__;
@@ -1144,7 +1148,7 @@ let get_weak_ntransition (gl : Proofview.Goal.t) (wk_trans : EConstr.t)
 let _get_silent_transition
       (gl : Proofview.Goal.t)
       (fsm : Fsm.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : Transition_opt.t
   =
   Log.trace __FUNCTION__;
@@ -1156,7 +1160,7 @@ let _get_silent_transition
 let _get_silent1_transition
       (gl : Proofview.Goal.t)
       (fsm : Fsm.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : Transition_opt.t
   =
   Log.trace __FUNCTION__;
@@ -1167,7 +1171,7 @@ let _get_silent1_transition
 
 let _get_concl_ntransition
       (gl : Proofview.Goal.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : Transition_opt.t
   =
   Log.trace __FUNCTION__;
@@ -1211,7 +1215,7 @@ let do_any_unfold_concl (gl : Proofview.Goal.t) : tactic =
 
 let do_any_unfold_hyp_pair
       (gl : Proofview.Goal.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : EConstr.t list
   =
   Log.trace __FUNCTION__;
@@ -1277,7 +1281,7 @@ let can_unfold_concl (gl : Proofview.Goal.t) : bool =
 
 let can_unfold_hyp_pair
       (gl : Proofview.Goal.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -1307,7 +1311,11 @@ module Cofix_HTy : Hyp.HTY_S = struct
     ; _n : State.t
     }
 
-  let of_hty (gl : Proofview.Goal.t) ((ty, tys) : Rocq_utils.kind_pair) : t =
+  let of_hty
+        (gl : Proofview.Goal.t)
+        ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
+    : t
+    =
     let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
     if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
     then (
@@ -1337,7 +1345,11 @@ module Invertible = struct
     | { kind = ToUnfold _; _ } -> "ToUnfold"
   ;;
 
-  let of_hty (gl : Proofview.Goal.t) ((ty, tys) : Rocq_utils.kind_pair) : k =
+  let of_hty
+        (gl : Proofview.Goal.t)
+        ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
+    : k
+    =
     Log.trace __FUNCTION__;
     let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
     try
@@ -1368,12 +1380,16 @@ module Invertible = struct
       raise (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys))
   ;;
 
-  let opt_of_hty (gl : Proofview.Goal.t) (p : Rocq_utils.kind_pair) : k option =
+  let opt_of_hty (gl : Proofview.Goal.t) (p : EConstr.t Rocq_utils.kind_pair)
+    : k option
+    =
     Log.trace __FUNCTION__;
     try Some (of_hty gl p) with Hyp.Mebi_proof_Hypothesis_HTy _ -> None
   ;;
 
-  let hty_is_a (gl : Proofview.Goal.t) (p : Rocq_utils.kind_pair) : bool =
+  let hty_is_a (gl : Proofview.Goal.t) (p : EConstr.t Rocq_utils.kind_pair)
+    : bool
+    =
     Log.trace __FUNCTION__;
     Option.has_some (opt_of_hty gl p)
   ;;
@@ -1415,7 +1431,11 @@ end
 module TransOpt : Hyp.HYP_TYPE = Hyp.Make (struct
     type t = Transition_opt.t
 
-    let of_hty (gl : Proofview.Goal.t) ((ty, tys) : Rocq_utils.kind_pair) : t =
+    let of_hty
+          (gl : Proofview.Goal.t)
+          ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
+      : t
+      =
       try get_lts_transition gl (mfsm ()) (ty, tys) with
       | Mebi_proof_CouldNotDecodeTransitionState (x, fsm) ->
         raise (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys))
@@ -1439,7 +1459,7 @@ let hyp_is_something (gl : Proofview.Goal.t) (h : Rocq_utils.hyp) : bool =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   try
-    let p : Rocq_utils.kind_pair = Rocq_utils.hyp_to_atomic sigma h in
+    let p : EConstr.t Rocq_utils.kind_pair = Rocq_utils.hyp_to_atomic sigma h in
     if Cofix.hty_is_a gl p
     then true
     else if Invertible.hty_is_a gl p
@@ -1486,7 +1506,8 @@ type concl_conj =
   ; wk_sim : EConstr.t
   }
 
-exception Mebi_proof_ConclIsNot_Conj of (Evd.evar_map * Rocq_utils.kind_pair)
+exception
+  Mebi_proof_ConclIsNot_Conj of (Evd.evar_map * EConstr.t Rocq_utils.kind_pair)
 
 let concl_wk_sim (gl : Proofview.Goal.t) : concl_conj =
   Log.trace __FUNCTION__;
@@ -1509,9 +1530,11 @@ type wk_sim_state =
 
 let wk_sim_state (gl : Proofview.Goal.t) : wk_sim_state -> EConstr.t =
   Log.trace __FUNCTION__;
-  let f (c : Proofview.Goal.t -> Rocq_utils.kind_pair -> bool) wk =
+  let f (c : Proofview.Goal.t -> EConstr.t Rocq_utils.kind_pair -> bool) wk =
     let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-    let x : Rocq_utils.kind_pair = Rocq_utils.econstr_to_atomic sigma wk in
+    let x : EConstr.t Rocq_utils.kind_pair =
+      Rocq_utils.econstr_to_atomic sigma wk
+    in
     if c gl x then snd x else raise (Mebi_proof_CouldNotGetWkSimState ())
   in
   function
@@ -1861,7 +1884,7 @@ and handle_new_weak_sim (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   let the_concl : EConstr.t = Proofview.Goal.concl gl in
-  let concltyp : Rocq_utils.kind_pair =
+  let concltyp : EConstr.t Rocq_utils.kind_pair =
     Rocq_utils.econstr_to_atomic sigma the_concl
   in
   (* NOTE: [auto] when concl is [weak_sim] and hyp has corresponding [cofix] *)

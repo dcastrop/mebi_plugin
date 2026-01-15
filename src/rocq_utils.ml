@@ -1,6 +1,6 @@
 (** [kind_pair] are the arguments of [AtomicType (ty, tys)] returned by e.g., [EConstr.kind_of_type]
 *)
-type kind_pair = EConstr.t * EConstr.t array
+type 'a kind_pair = 'a * 'a array
 
 exception
   Rocq_utils_EConstrIsNot_Atomic of
@@ -8,7 +8,9 @@ exception
 
 exception Rocq_utils_EConstrIsNotA_Type of (Evd.evar_map * EConstr.t * string)
 
-let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t) : kind_pair =
+let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t)
+  : EConstr.t kind_pair
+  =
   try
     match EConstr.kind_of_type sigma x with
     | AtomicType (ty, tys) -> ty, tys
@@ -22,6 +24,24 @@ let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t) : kind_pair =
 (*****************************************************************************)
 
 type constr_kind =
+  ( Constr.t
+    , Constr.types
+    , Sorts.t
+    , UVars.Instance.t
+    , Sorts.relevance )
+    Constr.kind_of_term
+
+exception Rocq_utils_ConstrIsNot_App of (Constr.t * constr_kind)
+
+let constr_to_app (x : Constr.t) : Constr.t kind_pair =
+  match Constr.kind x with
+  | App (ty, tys) -> ty, tys
+  | k -> raise (Rocq_utils_ConstrIsNot_App (x, k))
+;;
+
+(*****************************************************************************)
+
+type econstr_kind =
   ( EConstr.t
     , EConstr.t
     , Evd.esorts
@@ -30,9 +50,9 @@ type constr_kind =
     Constr.kind_of_term
 
 exception
-  Rocq_utils_EConstrIsNot_App of (Evd.evar_map * EConstr.t * constr_kind)
+  Rocq_utils_EConstrIsNot_App of (Evd.evar_map * EConstr.t * econstr_kind)
 
-let econstr_to_app (sigma : Evd.evar_map) (x : EConstr.t) : kind_pair =
+let econstr_to_app (sigma : Evd.evar_map) (x : EConstr.t) : EConstr.t kind_pair =
   match EConstr.kind sigma x with
   | App (ty, tys) -> ty, tys
   | k -> raise (Rocq_utils_EConstrIsNot_App (sigma, x, k))
@@ -44,7 +64,7 @@ type lambda_triple =
   (Names.Name.t, Evd.erelevance) Context.pbinder_annot * EConstr.t * EConstr.t
 
 exception
-  Rocq_utils_EConstrIsNot_Lambda of (Evd.evar_map * EConstr.t * constr_kind)
+  Rocq_utils_EConstrIsNot_Lambda of (Evd.evar_map * EConstr.t * econstr_kind)
 
 let econstr_to_lambda (sigma : Evd.evar_map) (x : EConstr.t) : lambda_triple =
   match EConstr.kind sigma x with
@@ -59,7 +79,7 @@ type hyp = (EConstr.t, EConstr.t, Evd.erelevance) Context.Named.Declaration.pt
 exception
   Rocq_utils_HypIsNot_Atomic of (Evd.evar_map * hyp * EConstr.kind_of_type)
 
-let hyp_to_atomic (sigma : Evd.evar_map) (h : hyp) : kind_pair =
+let hyp_to_atomic (sigma : Evd.evar_map) (h : hyp) : EConstr.t kind_pair =
   let h_ty : EConstr.t = Context.Named.Declaration.get_type h in
   try econstr_to_atomic sigma h_ty with
   | Rocq_utils_EConstrIsNot_Atomic (sigma, h_ty, k) ->
@@ -70,8 +90,12 @@ let hyp_to_atomic (sigma : Evd.evar_map) (h : hyp) : kind_pair =
 
 type ind_constr = Constr.rel_context * Constr.t
 type ind_constrs = ind_constr array
+type constr_decl = Constr.rel_declaration
 type econstr_decl = EConstr.rel_declaration
-type econstr_decls = econstr_decl list
+
+let get_econstr_decls (ctx : Constr.rel_context) : econstr_decl list =
+  List.map EConstr.of_rel_decl ctx
+;;
 
 let list_of_constr_kinds : Constr.t -> (string * bool) list =
   fun (x : Constr.t) ->
@@ -170,11 +194,11 @@ let list_of_kinds
 
 (*****************************************************************************)
 
-let get_decl_type_of_constr (x : Constr.rel_declaration) : EConstr.t =
+let get_decl_type_of_constr (x : constr_decl) : EConstr.t =
   Context.Rel.Declaration.get_type x |> EConstr.of_constr
 ;;
 
-let get_decl_type_of_econstr (x : EConstr.rel_declaration) : EConstr.t =
+let get_decl_type_of_econstr (x : econstr_decl) : EConstr.t =
   Context.Rel.Declaration.get_type x
 ;;
 
@@ -189,9 +213,7 @@ let get_ind_ty
 
 (*****************************************************************************)
 
-let type_of_econstr_rel
-      ?(substl : EConstr.t list option)
-      (t : EConstr.rel_declaration)
+let type_of_econstr_rel ?(substl : EConstr.t list option) (t : econstr_decl)
   : EConstr.t
   =
   let ty : EConstr.t = get_decl_type_of_econstr t in
@@ -239,7 +261,7 @@ module Strfy = struct
         env
         sigma
         ?(args : style_args = style_args ())
-        (x : Constr.rel_declaration)
+        (x : constr_decl)
     : string
     =
     pp (Printer.pr_rel_decl env sigma x)
@@ -294,7 +316,7 @@ module Strfy = struct
 
   (*****************************************************************************)
 
-  let econstr_rel_decl env sigma (x : EConstr.rel_declaration) : string =
+  let econstr_rel_decl env sigma (x : econstr_decl) : string =
     pp (Printer.pr_erel_decl env sigma x)
   ;;
 

@@ -1,33 +1,42 @@
 (** We abstract into modules [Cofix], [Invertible] and [TransOpt] the hypothesis relevant to us.
 *)
 
-exception Mebi_proof_Hypothesis_Hyp of (Rocq_utils.hyp * Rocq_utils.kind_pair)
-exception Mebi_proof_Hypothesis_HTy of Rocq_utils.kind_pair
+exception
+  Mebi_proof_Hypothesis_Hyp of (Rocq_utils.hyp * EConstr.t Rocq_utils.kind_pair)
+
+exception Mebi_proof_Hypothesis_HTy of EConstr.t Rocq_utils.kind_pair
 
 module type HTY_TYPE = sig
   type t
 
-  val of_hty : Proofview.Goal.t -> Rocq_utils.kind_pair -> t
-  val opt_of_hty : Proofview.Goal.t -> Rocq_utils.kind_pair -> t option
-  val hty_is_a : Proofview.Goal.t -> Rocq_utils.kind_pair -> bool
+  val of_hty : Proofview.Goal.t -> EConstr.t Rocq_utils.kind_pair -> t
+
+  val opt_of_hty
+    :  Proofview.Goal.t
+    -> EConstr.t Rocq_utils.kind_pair
+    -> t option
+
+  val hty_is_a : Proofview.Goal.t -> EConstr.t Rocq_utils.kind_pair -> bool
 end
 
 module type HTY_S = sig
   type t
 
-  val of_hty : Proofview.Goal.t -> Rocq_utils.kind_pair -> t
+  val of_hty : Proofview.Goal.t -> EConstr.t Rocq_utils.kind_pair -> t
 end
 
 module MakeHTy (HTy : HTY_S) : HTY_TYPE = struct
   include HTy
 
-  let opt_of_hty (gl : Proofview.Goal.t) (p : Rocq_utils.kind_pair)
+  let opt_of_hty (gl : Proofview.Goal.t) (p : EConstr.t Rocq_utils.kind_pair)
     : HTy.t option
     =
     try Some (of_hty gl p) with Mebi_proof_Hypothesis_HTy _ -> None
   ;;
 
-  let hty_is_a (gl : Proofview.Goal.t) (p : Rocq_utils.kind_pair) : bool =
+  let hty_is_a (gl : Proofview.Goal.t) (p : EConstr.t Rocq_utils.kind_pair)
+    : bool
+    =
     Option.has_some (opt_of_hty gl p)
   ;;
 end
@@ -37,7 +46,7 @@ module type HYP_TYPE = sig
 
   (* val of_hty : Evd.evar_map -> Rocq_utils.kind_pair -> t *)
   (* val opt_of_hty : Evd.evar_map -> Rocq_utils.kind_pair -> t option *)
-  val hty_is_a : Proofview.Goal.t -> Rocq_utils.kind_pair -> bool
+  val hty_is_a : Proofview.Goal.t -> EConstr.t Rocq_utils.kind_pair -> bool
   val of_hyp : Proofview.Goal.t -> Rocq_utils.hyp -> t
   val opt_of_hyp : Proofview.Goal.t -> Rocq_utils.hyp -> t option
   val hyp_is_a : Proofview.Goal.t -> Rocq_utils.hyp -> bool
@@ -54,7 +63,7 @@ end
 module MakeHyp (Hyp : HYP_S) : HYP_TYPE = struct
   type t = Hyp.t
 
-  let hty_is_a : Proofview.Goal.t -> Rocq_utils.kind_pair -> bool =
+  let hty_is_a : Proofview.Goal.t -> EConstr.t Rocq_utils.kind_pair -> bool =
     Hyp.HTy.hty_is_a
   ;;
 

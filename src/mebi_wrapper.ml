@@ -2,7 +2,7 @@
 module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
 let () = Log.Config.configure_output Debug true
-let () = Log.Config.configure_output Trace false
+let () = Log.Config.configure_output Trace true
 (***********************************************************************)
 
 open Mebi_setup
@@ -61,6 +61,7 @@ let run
         (x : 'a mm)
   : 'a
   =
+  Log.trace __FUNCTION__;
   let coq_ctx : Evd.evar_map = !(the_coq_ctx ~fresh ()) in
   let coq_env : Environ.env = !(the_coq_env ()) in
   let coq_ref : coq_context ref = ref { coq_env; coq_ctx } in
@@ -70,7 +71,10 @@ let run
   a.value
 ;;
 
-let runkeep (x : 'a mm) : 'a = run ~keep_encoding:true ~fresh:false x
+let runkeep (x : 'a mm) : 'a =
+  Log.trace __FUNCTION__;
+  run ~keep_encoding:true ~fresh:false x
+;;
 
 let return (x : 'a) : 'a mm =
   fun (st : wrapper ref) -> { state = st; value = x }
@@ -195,6 +199,7 @@ end
 let mebi_to_string (f : Environ.env -> Evd.evar_map -> 'a -> string)
   : 'a Utils.Strfy.to_string
   =
+  Log.trace __FUNCTION__;
   run
     ~keep_encoding:true
     ~fresh:false

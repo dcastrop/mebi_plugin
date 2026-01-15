@@ -6,8 +6,8 @@ open Mebi_unification
 (***********************************************************************)
 module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
-let () = Log.Config.configure_output Debug false
-let () = Log.Config.configure_output Trace false
+let () = Log.Config.configure_output Debug true
+let () = Log.Config.configure_output Trace true
 (***********************************************************************)
 
 exception ConstructorArgsExpectsArraySize3 of unit
@@ -68,48 +68,6 @@ let try_unify_constructor_args
   let f = try_unify_constructor_arg in
   let* lhs_unifies : bool = f args.lhs lhs in
   if lhs_unifies then f args.act act else return false
-;;
-
-let subst_of_decl (substl : EConstr.Vars.substl) x : EConstr.t mm =
-  Log.trace __FUNCTION__;
-  let ty : EConstr.t = Context.Rel.Declaration.get_type x in
-  let$+ subst _ _ = EConstr.Vars.substl substl ty in
-  return subst
-;;
-
-(** [mk_ctx_subst ?substl x] returns a new [evar] made from the type of [x], using any [substl] provided.
-    @param ?substl
-      is a list of substitutions, (* TODO: provided so that collisions don't occur? *)
-    @param x
-      corresponds to a (* TODO: universally? *) quantified term of a constructor.
-    @return a new [evar] for [x]. *)
-let mk_ctx_subst
-      (substl : EConstr.Vars.substl)
-      (x : ('a, EConstr.t, 'b) Context.Rel.Declaration.pt)
-  : EConstr.t mm
-  =
-  Log.trace __FUNCTION__;
-  let* subst = subst_of_decl substl x in
-  let$ vt env sigma = Evarutil.new_evar env sigma subst in
-  return vt
-;;
-
-(** [mk_ctx_substl acc ts] makes an [evar] for each term declaration in [ts].
-    @param acc
-      contains the substitutions accumulated so far, and is returned once [ts=[]]
-    @param ts
-      is an [EConstr.rel_declaration list] (obtained from the context of a constructor).
-    @return [acc] of [evars] once [ts] is empty. *)
-let rec mk_ctx_substl (acc : EConstr.Vars.substl)
-  :  ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list
-  -> EConstr.Vars.substl mm
-  =
-  Log.trace __FUNCTION__;
-  function
-  | [] -> return acc
-  | t :: ts ->
-    let* vt = mk_ctx_subst acc t in
-    mk_ctx_substl (vt :: acc) ts
 ;;
 
 (* let debug_extract_args name : constructor_args -> unit mm =
@@ -191,8 +149,10 @@ let rec check_valid_constructors
     let { constructor = ctx, tm; _ } : Mebi_ind.lts_constructor =
       constructors.(i)
     in
-    let decls : Rocq_utils.econstr_decls = List.map EConstr.of_rel_decl ctx in
-    let* substl = mk_ctx_substl [] (List.rev decls) in
+    let decls : Rocq_utils.econstr_decl list =
+      Rocq_utils.get_econstr_decls ctx
+    in
+    let* substl = Mebi_utils.mk_ctx_substl [] (List.rev decls) in
     let* args : constructor_args = extract_args ~substl tm in
     (* NOTE: make fresh [act_term] to avoid conflicts with sibling constructors *)
     let* act_term : EConstr.t = get_fresh_evar (TypeOf act_term) in
