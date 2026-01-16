@@ -22,7 +22,8 @@ and kind =
 
 and lts =
   { term_type : EConstr.t
-  ; label_type : EConstr.t (* ; constr_transitions : Rocq_utils.ind_constrs *)
+  ; label_type :
+      EConstr.t (* ; constr_transitions : Rocq_utils.ind_constr array *)
   ; constructor_types : lts_constructor array
   }
 

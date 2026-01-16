@@ -3,7 +3,11 @@ module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
 let () = Log.Config.enable_output ()
 let () = Log.Config.configure_output Debug true
-let () = Log.Config.configure_output Trace true
+let () = Log.Config.configure_output Trace false
+(***********************************************************************)
+
+type econstr_decl = Rocq_utils.econstr_decl
+
 (***********************************************************************)
 
 let ref_to_glob (r : Libnames.qualid) : Names.GlobRef.t = Nametab.global r
@@ -24,43 +28,69 @@ open Mebi_wrapper
 
 (* TODO: *)
 (* FIXME: one of these causes Anomaly where env is referenced too early? *)
-(* module Strfy = struct
-   let fname : Names.Id.t Utils.Strfy.to_string = Of Names.Id.to_string
-   let fenc : Enc.t Utils.Strfy.to_string = Of Enc.to_string
-   let fconstr : Constr.t Utils.Strfy.to_string = Of constr_to_string
-   let feconstr : EConstr.t Utils.Strfy.to_string = Of econstr_to_string
+module Strfy = struct
+  (******************)
+  let fname : Names.Id.t Utils.Strfy.to_string = Of Names.Id.to_string
+  let fenc : Enc.t Utils.Strfy.to_string = Of Enc.to_string
 
-   let f_ind_constr : Rocq_utils.ind_constr Utils.Strfy.to_string =
-   (* mebi_to_string Rocq_utils.Strfy.ind_constr *)
-   let open Rocq_utils.Strfy in
-   Of (runkeep (state (fun env sigma -> sigma, ind_constr env sigma)))
-   ;;
+  (******************)
+  let constr (x : Constr.t) : string = Mebi_wrapper.constr_to_string x
+  let fconstr : Constr.t Utils.Strfy.to_string = Of constr
 
-   let f_ind_constrs : Rocq_utils.ind_constrs Utils.Strfy.to_string =
-   (* mebi_to_string Rocq_utils.Strfy.ind_constrs *)
-   let open Rocq_utils.Strfy in
-   Of (runkeep (state (fun env sigma -> sigma, ind_constrs env sigma)))
-   ;;
+  (******************)
+  let econstr (x : EConstr.t) : string = Mebi_wrapper.econstr_to_string x
+  let feconstr : EConstr.t Utils.Strfy.to_string = Of econstr
 
-   let fconstrkind : Constr.t Utils.Strfy.to_string =
-   let open Rocq_utils.Strfy in
-   Args (runkeep (state (fun env sigma -> sigma, constr_kind env sigma)))
-   ;;
+  (******************)
+  let ind_constr (x : Rocq_utils.ind_constr) : string =
+    runkeep
+      (state (fun env sigma -> sigma, Rocq_utils.Strfy.ind_constr env sigma x))
+  ;;
 
-   let fencode : EConstr.t Utils.Strfy.to_string =
-   Of (fun (x : EConstr.t) -> runkeep (encode x) |> Enc.to_string)
-   ;;
+  let f_ind_constr : Rocq_utils.ind_constr Utils.Strfy.to_string = Of ind_constr
 
-   let fdecode : Enc.t Utils.Strfy.to_string =
-   Of (fun (x : Enc.t) -> runkeep (decode x) |> econstr_to_string)
-   ;;
+  (******************)
+  let ind_constrs (x : Rocq_utils.ind_constr array) : string =
+    runkeep
+      (state (fun env sigma -> sigma, Rocq_utils.Strfy.ind_constrs env sigma x))
+  ;;
 
-   let econstr_rel_decl : Rocq_utils.econstr_decl Utils.Strfy.to_string =
-   (* mebi_to_string Rocq_utils.Strfy.econstr_rel_decl *)
-   let open Rocq_utils.Strfy in
-   Of (runkeep (state (fun env sigma -> sigma, econstr_rel_decl env sigma)))
-   ;;
-   end *)
+  let f_ind_constrs : Rocq_utils.ind_constr array Utils.Strfy.to_string =
+    Of ind_constrs
+  ;;
+
+  (******************)
+  let constrkind
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+        (x : Constr.t)
+    : string
+    =
+    runkeep
+      (state (fun env sigma ->
+         sigma, Rocq_utils.Strfy.constr_kind env sigma ~args x))
+  ;;
+
+  let fconstrkind : Constr.t Utils.Strfy.to_string = Args constrkind
+
+  (******************)
+  let encode (x : EConstr.t) : string = runkeep (encode x) |> Enc.to_string
+  let fencode : EConstr.t Utils.Strfy.to_string = Of encode
+
+  (******************)
+  let decode (x : Enc.t) : string = runkeep (Mebi_wrapper.decode x) |> econstr
+  let fdecode : Enc.t Utils.Strfy.to_string = Of decode
+
+  (******************)
+  let econstr_rel_decl (x : Rocq_utils.econstr_decl) : string =
+    runkeep
+      (state (fun env sigma ->
+         sigma, Rocq_utils.Strfy.econstr_rel_decl env sigma x))
+  ;;
+
+  let feconstr_rel_decl : Rocq_utils.econstr_decl Utils.Strfy.to_string =
+    Of econstr_rel_decl
+  ;;
+end
 
 (***********************************************************************)
 
@@ -288,6 +318,13 @@ let encode_ref (x : Libnames.qualid) : Enc.t mm =
 
 (*********************************************************)
 
+let get_fresh_evar (original : Rocq_utils.evar_source) : EConstr.t mm =
+  Log.trace __FUNCTION__;
+  state (fun env sigma -> Rocq_utils.get_next env sigma original)
+;;
+
+(*********************************************************)
+
 let subst_of_decl (substl : EConstr.Vars.substl) x : EConstr.t mm =
   Log.trace __FUNCTION__;
   let ty : EConstr.t = Context.Rel.Declaration.get_type x in
@@ -328,6 +365,46 @@ let rec mk_ctx_substl (acc : EConstr.Vars.substl)
   | t :: ts ->
     let* vt : EConstr.t = mk_ctx_subst acc t in
     mk_ctx_substl (vt :: acc) ts
+;;
+
+(***********************************************************************)
+
+exception ConstructorArgsExpectsArraySize3 of unit
+
+type constructor_args =
+  { lhs : EConstr.t
+  ; act : EConstr.t
+  ; rhs : EConstr.t
+  }
+
+let constructor_args (args : EConstr.t array) : constructor_args =
+  Log.trace __FUNCTION__;
+  if Int.equal (Array.length args) 3
+  then { lhs = args.(0); act = args.(1); rhs = args.(2) }
+  else raise (*TODO:err*) (ConstructorArgsExpectsArraySize3 ())
+;;
+
+(** [extract_args ?substl term] returns an [EConstr.t] triple of arguments of an inductively defined LTS, e.g., [term -> option action -> term -> Prop].
+    @param ?substl
+      is a list of substitutions applied to the terms prior to being returned.
+    @param term
+      must be of [Constr.kind] [App(fn, args)] (i.e., the application of some inductively defined LTS, e.g., [termLTS (tpar (tact (Send A) tend) (tact (Recv A) tend)) (Some A) (tpar tend tend)]).
+    @return a triple of [lhs_term, action, rhs_term]. *)
+let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
+  : constructor_args mm
+  =
+  Log.trace __FUNCTION__;
+  match Constr.kind term with
+  | App (_name, args) ->
+    if Array.length args == 3
+    then (
+      let args = EConstr.of_constr_array args in
+      let args = Array.map (EConstr.Vars.substl substl) args in
+      let args = constructor_args args in
+      (* let* () = debug_extract_args _name args in *)
+      return args)
+    else (* TODO: err *) invalid_lts_args_length (Array.length args)
+  | _ -> (* TODO: err *) invalid_lts_term_kind term
 ;;
 
 (***********************************************************************)
@@ -460,6 +537,7 @@ let unpack_constr_args ((_, tys) : Constr.t Rocq_utils.kind_pair)
 let resolve_bindings (bs : EConstr.t Tactypes.explicit_bindings option list)
   : EConstr.t Tactypes.explicit_bindings
   =
+  Log.trace __FUNCTION__;
   let rec resolve_bindings
     :  EConstr.t Tactypes.explicit_bindings option list
     -> EConstr.t Tactypes.explicit_bindings
@@ -493,18 +571,203 @@ let resolve_bindings (bs : EConstr.t Tactypes.explicit_bindings option list)
        []
 ;;
 
+let pair_map_to_string =
+  fun (k : EConstr.t) (v : Names.Name.t) ->
+  Printf.sprintf
+    "pairmap: %s => %s"
+    (econstr_to_string k)
+    (Rocq_utils.Strfy.pp (Names.Name.print v))
+  |> Log.debug ~__FUNCTION__
+;;
+
+(* module E : Hashtbl.S with type key = EConstr.t = Hashtbl.Make (struct
+   type t = EConstr.t
+
+   let equal (x : t) (y : t) : bool = EConstr.eq_constr !(the_coq_ctx ()) x y
+
+   let hash (x : t) : int =
+   Constr.hash
+   (EConstr.to_constr
+   ?abort_on_undefined_evars:(Some false)
+   !(the_coq_ctx ())
+   x)
+   ;;
+   end) *)
+
+(** returns tuple list of [(binding_name * evar)] -- TODO: map these to the [_UNBOUND_REL_X] and
+*)
+let map_decl_evar_pairs (xs : econstr_decl list) (ys : EConstr.Vars.substl)
+  : (EConstr.t * Names.Name.t) list
+  =
+  Log.trace __FUNCTION__;
+  Log.debug ~__FUNCTION__ "C1";
+  let ss = List.combine ys (List.map Context.Rel.Declaration.get_name xs) in
+  (* Log.debug ~__FUNCTION__ "C2";
+     List.iter (fun (x, y) -> pair_map_to_string x y) ss;
+     Log.debug ~__FUNCTION__ "C2.1";
+     (* let fm : Names.Name.t F.t = F.create 0 in *)
+     let fm : Names.Name.t E.t = E.create 0 in
+     (* let fm : (EConstr.t, Names.Name.t) Hashtbl.t = Hashtbl.create 0 in *)
+     Log.debug ~__FUNCTION__ "C3";
+     List.iter
+     (fun (k, v) ->
+     Log.thing ~__FUNCTION__ Debug "key" k Strfy.feconstr;
+     Log.thing
+     ~__FUNCTION__
+     Debug
+     "value"
+     v
+     (Utils.Strfy.Of (fun v -> Rocq_utils.Strfy.pp (Names.Name.print v)));
+     Log.debug ~__FUNCTION__ "C3.1";
+     if E.mem fm k
+     then Log.thing ~__FUNCTION__ Warning "duplicate key" k Strfy.feconstr;
+     Log.debug ~__FUNCTION__ "C3.2";
+     E.add fm k v;
+     Log.debug ~__FUNCTION__ "C3.3")
+     ss;
+     Log.debug ~__FUNCTION__ "C4";
+     (* let fmss = Hashtbl.to_seq fm in *)
+     Log.debug ~__FUNCTION__ "C5";
+     (* let fm = E.of_seq fmss in *)
+     Log.debug ~__FUNCTION__ "C6";
+     fm *)
+  ss
+;;
+
+(* ss |> List.to_seq |> F.of_seq *)
+
+module C : Hashtbl.S with type key = Constr.t = Hashtbl.Make (struct
+    type t = Constr.t
+
+    let equal : t -> t -> bool = Constr.equal
+    let hash : t -> int = Constr.hash
+  end)
+
+type binding_extractor = Names.Name.t * binding_instructions
+
+and binding_instructions =
+  | Undefined
+  | Done
+  | Arg of (int * binding_instructions)
+
+exception Mebi_utils_CannotAddAfterDone of unit
+
+let rec add_instruction (x : binding_instructions)
+  : binding_instructions -> binding_instructions
+  =
+  Log.trace __FUNCTION__;
+  function
+  | Arg (i, y) -> Arg (i, add_instruction x y)
+  | Undefined -> x
+  | Done -> raise (Mebi_utils_CannotAddAfterDone ())
+;;
+
+exception Mebi_utils_CannotFindBindingName of EConstr.t
+(*
+   let find_name (name_map : Names.Name.t E.t) (x : EConstr.t) : Names.Name.t =
+   Log.trace __FUNCTION__;
+   match E.find_opt name_map x with
+   | Some x -> x
+   | None -> raise (Mebi_utils_CannotFindBindingName x)
+   ;; *)
+
+let find_name (name_map : (EConstr.t * Names.Name.t) list) (x : EConstr.t)
+  : Names.Name.t
+  =
+  Log.trace __FUNCTION__;
+  let econstr_eq (x : EConstr.t) (y : EConstr.t) = runkeep (econstr_eq x y) in
+  match List.filter (fun (y, _) -> econstr_eq x y) name_map with
+  | [] -> raise (Mebi_utils_CannotFindBindingName x)
+  | (_, v) :: _ -> v
+;;
+
+let _a
+      (x : EConstr.t)
+      (y : Constr.t)
+      (name_map : (EConstr.t * Names.Name.t) list)
+        (* (name_map : Names.Name.t E.t) *)
+  : (Constr.t * binding_extractor) list
+  =
+  Log.trace __FUNCTION__;
+  let econstr_kind (x : EConstr.t) = runkeep (econstr_kind x) in
+  let econstr_eq (x : EConstr.t) (y : EConstr.t) = runkeep (econstr_eq x y) in
+  let rec f
+            (acc : (Constr.t * binding_extractor) list)
+            (b : binding_instructions)
+            ((x, y) : EConstr.t * Constr.t)
+    : (Constr.t * binding_extractor) list
+    =
+    Log.trace __FUNCTION__;
+    match econstr_kind x, Constr.kind y with
+    | App (xty, xtys), App (yty, ytys) ->
+      if Bool.not (econstr_eq xty (EConstr.of_constr yty))
+      then (
+        Printf.sprintf
+          "xty new yty: %s =/= %s"
+          (econstr_to_string xty)
+          (constr_to_string yty)
+        |> Log.debug ~__FUNCTION__;
+        acc)
+      else (
+        (* NOTE: set to [-1] so that it is [0] on first use. *)
+        let (tysindex, _), _ = Utils.new_int_counter ~start:(-1) () in
+        Array.fold_left
+          (fun (acc2 : (Constr.t * binding_extractor) list)
+            (xy : EConstr.t * Constr.t) ->
+            List.concat
+              [ f acc (add_instruction (Arg (tysindex (), Undefined)) b) xy
+              ; acc2
+              ])
+          []
+          (Array.combine xtys ytys))
+    | _, Rel _ -> (y, (find_name name_map x, Done)) :: acc
+    | _, _ -> acc
+  in
+  f [] Undefined (x, y)
+;;
+
+let bs_to_string prefix =
+  fun ((k, (name, _instructions)) : Constr.t * binding_extractor) ->
+  Printf.sprintf
+    "%s: %s => %s"
+    prefix
+    (constr_to_string k)
+    (Rocq_utils.Strfy.pp (Names.Name.print name))
+  |> Log.debug ~__FUNCTION__
+;;
+
 let extract_bindings ((ctx, c) : Rocq_utils.ind_constr)
   : Model_info.rocq_constructor_bindings
   =
+  Log.trace __FUNCTION__;
   try
-    (* let decls : Rocq_utils.econstr_decl list =
-      Rocq_utils.get_econstr_decls ctx
-    in *)
-    (* Log.things ~__FUNCTION__ Debug "decls" decls Strfy.econstr_rel_decl; *)
-    (* let from, label, goto = get_constr_app c |> unpack_constr_args in *)
-    (* Log.thing ~__FUNCTION__ Debug "from" from Strfy.fconstr; *)
-    (* Log.thing ~__FUNCTION__ Debug "label" label Strfy.fconstr; *)
-    (* Log.thing ~__FUNCTION__ Debug "goto" goto Strfy.fconstr; *)
+    Log.debug ~__FUNCTION__ "A";
+    let decls : econstr_decl list = Rocq_utils.get_econstr_decls ctx in
+    Log.debug ~__FUNCTION__ "B";
+    let substl = runkeep (mk_ctx_substl [] (List.rev decls)) in
+    Log.things ~__FUNCTION__ Debug "decls" decls Strfy.feconstr_rel_decl;
+    Log.things ~__FUNCTION__ Debug "substl" substl Strfy.feconstr;
+    Log.debug ~__FUNCTION__ "C";
+    let pair_map = map_decl_evar_pairs decls substl in
+    Log.debug ~__FUNCTION__ "D";
+    List.iter (fun (x, y) -> pair_map_to_string x y) pair_map;
+    Log.debug ~__FUNCTION__ "E";
+    let args : constructor_args = runkeep (extract_args ~substl c) in
+    let from, label, goto = get_constr_app c |> unpack_constr_args in
+    Log.debug ~__FUNCTION__ "F";
+    let from_bs = _a args.lhs from pair_map in
+    List.iter (bs_to_string "from") from_bs;
+    Log.debug ~__FUNCTION__ "G";
+    let label_bs = _a args.act label pair_map in
+    List.iter (bs_to_string "label") label_bs;
+    Log.debug ~__FUNCTION__ "H";
+    let goto_bs = _a args.rhs goto pair_map in
+    List.iter (bs_to_string "goto") goto_bs;
+    Log.debug ~__FUNCTION__ "I";
+    let _ =
+      List.flatten [ from_bs; label_bs; goto_bs ] |> List.to_seq |> C.of_seq
+    in
+    Log.debug ~__FUNCTION__ "J";
     (* *)
     let fromopt : EConstr.t Tactypes.explicit_bindings option = None in
     let labelopt : EConstr.t Tactypes.explicit_bindings option = None in

@@ -119,7 +119,7 @@ module MkGraph
             sigma, Rocq_utils.Strfy.ind_constr env sigma)))
   ;;
 
-  let _f_ind_constrs : Rocq_utils.ind_constrs Utils.Strfy.to_string =
+  let _f_ind_constrs : Rocq_utils.ind_constr array Utils.Strfy.to_string =
     Of
       (Mebi_wrapper.runkeep
          (Mebi_wrapper.state (fun env sigma ->
@@ -676,6 +676,9 @@ module MkGraph
                   GLog.thing Debug "goto kind" goto fconstrkind;
                   (* GLog.thing Debug "gototy kind" gototy fconstrkind; *)
                   (* *)
+                  GLog.debug ~__FUNCTION__ "A";
+                  let _ = Mebi_utils.extract_bindings (_rel, c) in
+                  GLog.debug ~__FUNCTION__ "B";
                   No_Bindings
                   (* Use_Bindings (fun ({from;label;goto}:Info.binding_args) ->
                     
