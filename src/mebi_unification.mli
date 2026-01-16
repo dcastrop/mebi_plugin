@@ -3,19 +3,13 @@ module Tree = Mebi_constr.Tree
 val debug_econstr
   :  ?__FUNCTION__:string
   -> string
-  -> EConstr.t
+  -> Evd.econstr
   -> unit Mebi_wrapper.mm
-
-type constructor_args =
-  { lhs : EConstr.t
-  ; act : EConstr.t
-  ; rhs : EConstr.t
-  }
 
 module Pair : sig
   type t =
-    { a : EConstr.t
-    ; b : EConstr.t
+    { a : Evd.econstr
+    ; b : Evd.econstr
     }
 
   val to_string
@@ -28,31 +22,31 @@ module Pair : sig
   val fresh
     :  Environ.env
     -> Evd.evar_map
-    -> EConstr.t
-    -> EConstr.t
+    -> Evd.econstr
+    -> Evd.econstr
     -> Evd.evar_map * t
 
-  val normal : EConstr.t -> EConstr.t -> t
+  val normal : Evd.econstr -> Evd.econstr -> t
 
   val make
     :  Environ.env
     -> Evd.evar_map
-    -> EConstr.t
-    -> EConstr.t
+    -> Evd.econstr
+    -> Evd.econstr
     -> Evd.evar_map * t
 
   val debug_unify
     :  Environ.env
     -> Evd.evar_map
-    -> EConstr.t
-    -> EConstr.t
+    -> Evd.econstr
+    -> Evd.econstr
     -> unit
 
   val debug_unifyerr
     :  Environ.env
     -> Evd.evar_map
-    -> EConstr.t
-    -> EConstr.t
+    -> Evd.econstr
+    -> Evd.econstr
     -> Evd.econstr
     -> Evd.econstr
     -> unit
@@ -60,8 +54,8 @@ module Pair : sig
   val w_unify
     :  Environ.env
     -> Evd.evar_map
-    -> EConstr.t
-    -> EConstr.t
+    -> Evd.econstr
+    -> Evd.econstr
     -> Evd.evar_map * bool
 
   val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
@@ -111,10 +105,10 @@ module Problems : sig
   val unify_list_opt : Problem.t list -> Tree.t list option Mebi_wrapper.mm
 
   val sandbox_unify_all_opt
-    :  EConstr.t
-    -> EConstr.t
+    :  Evd.econstr
+    -> Evd.econstr
     -> t
-    -> (EConstr.t * EConstr.t * Tree.t list) option Mebi_wrapper.mm
+    -> (Evd.econstr * Evd.econstr * Tree.t list) option Mebi_wrapper.mm
 end
 
 module Constructors : sig
@@ -130,8 +124,8 @@ module Constructors : sig
   val retrieve
     :  int
     -> t
-    -> EConstr.t
-    -> EConstr.t
+    -> Evd.econstr
+    -> Evd.econstr
     -> Mebi_setup.Enc.t * Problems.t list
     -> t Mebi_wrapper.mm
 end

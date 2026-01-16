@@ -89,7 +89,6 @@ let hyp_to_atomic (sigma : Evd.evar_map) (h : hyp) : EConstr.t kind_pair =
 (*****************************************************************************)
 
 type ind_constr = Constr.rel_context * Constr.t
-type ind_constrs = ind_constr array
 type constr_decl = Constr.rel_declaration
 type econstr_decl = EConstr.rel_declaration
 
@@ -279,7 +278,7 @@ module Strfy = struct
     Utils.Strfy.record [ "constr", y; "rel context", x ]
   ;;
 
-  let ind_constrs env sigma (xs : ind_constrs) : string =
+  let ind_constrs env sigma (xs : ind_constr array) : string =
     Utils.Strfy.array (Of (ind_constr env sigma)) xs
   ;;
 

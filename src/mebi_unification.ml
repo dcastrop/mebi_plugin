@@ -26,12 +26,6 @@ let debug_econstr
 
 (***********************************************************************)
 
-type constructor_args =
-  { lhs : EConstr.t
-  ; act : EConstr.t
-  ; rhs : EConstr.t
-  }
-
 module Pair = struct
   (** [fst] is a term (e.g., destination) that we want to check unifies with [snd] (which we have already reached).
   @see Mebi_setup.unif_problem where [type unif_problem = {termL:EConstr.t;termR:EConstr.t}] *)
