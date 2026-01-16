@@ -648,7 +648,23 @@ type binding_extractor = Names.Name.t * binding_instructions
 and binding_instructions =
   | Undefined
   | Done
-  | Arg of (int * binding_instructions)
+  | Arg of
+      { root : Constr.t
+      ; index : int
+      ; cont : binding_instructions
+      }
+
+let rec binding_instructions_to_string : binding_instructions -> string =
+  function
+  | Undefined -> "Undefined"
+  | Done -> "Done"
+  | Arg { root; index; cont } ->
+    Printf.sprintf
+      "Arg { root: %s; index: %i; cont: %s}"
+      (Strfy.constr root)
+      index
+      (binding_instructions_to_string cont)
+;;
 
 exception Mebi_utils_CannotAddAfterDone of unit
 
@@ -657,7 +673,8 @@ let rec add_instruction (x : binding_instructions)
   =
   Log.trace __FUNCTION__;
   function
-  | Arg (i, y) -> Arg (i, add_instruction x y)
+  | Arg { root; index; cont } ->
+    Arg { root; index; cont = add_instruction x cont }
   | Undefined -> x
   | Done -> raise (Mebi_utils_CannotAddAfterDone ())
 ;;
@@ -685,54 +702,49 @@ let _a
       (x : EConstr.t)
       (y : Constr.t)
       (name_map : (EConstr.t * Names.Name.t) list)
-        (* (name_map : Names.Name.t E.t) *)
-  : (Constr.t * binding_extractor) list
+  : binding_extractor C.t
   =
-  Log.trace __FUNCTION__;
+  Log.debug __FUNCTION__;
   let econstr_kind (x : EConstr.t) = runkeep (econstr_kind x) in
   let econstr_eq (x : EConstr.t) (y : EConstr.t) = runkeep (econstr_eq x y) in
+  let cmap : binding_extractor C.t = C.create 0 in
   let rec f
             (acc : (Constr.t * binding_extractor) list)
             (b : binding_instructions)
             ((x, y) : EConstr.t * Constr.t)
-    : (Constr.t * binding_extractor) list
+    : unit
     =
-    Log.trace __FUNCTION__;
+    Log.debug __FUNCTION__;
     match econstr_kind x, Constr.kind y with
     | App (xty, xtys), App (yty, ytys) ->
-      if Bool.not (econstr_eq xty (EConstr.of_constr yty))
+      if econstr_eq xty (EConstr.of_constr yty)
       then (
-        Printf.sprintf
-          "xty new yty: %s =/= %s"
-          (econstr_to_string xty)
-          (constr_to_string yty)
-        |> Log.debug ~__FUNCTION__;
-        acc)
-      else (
         (* NOTE: set to [-1] so that it is [0] on first use. *)
         let (tysindex, _), _ = Utils.new_int_counter ~start:(-1) () in
-        Array.fold_left
-          (fun (acc2 : (Constr.t * binding_extractor) list)
-            (xy : EConstr.t * Constr.t) ->
-            List.concat
-              [ f acc (add_instruction (Arg (tysindex (), Undefined)) b) xy
-              ; acc2
-              ])
-          []
+        Array.iter
+          (fun (xy : EConstr.t * Constr.t) ->
+            let b' =
+              add_instruction
+                (Arg { root = yty; index = tysindex (); cont = Undefined })
+                b
+            in
+            f acc b' xy)
           (Array.combine xtys ytys))
-    | _, Rel _ -> (y, (find_name name_map x, Done)) :: acc
-    | _, _ -> acc
+    | _, Rel _ -> C.replace cmap y (find_name name_map x, add_instruction Done b)
+    | _, _ -> ()
   in
-  f [] Undefined (x, y)
+  f [] Undefined (x, y);
+  cmap
 ;;
 
 let bs_to_string prefix =
-  fun ((k, (name, _instructions)) : Constr.t * binding_extractor) ->
+  fun ((k, (name, instructions)) : Constr.t * binding_extractor) ->
   Printf.sprintf
-    "%s: %s => %s"
+    "%s: %s => %s | %s"
     prefix
     (constr_to_string k)
     (Rocq_utils.Strfy.pp (Names.Name.print name))
+    (binding_instructions_to_string instructions)
   |> Log.debug ~__FUNCTION__
 ;;
 
@@ -756,18 +768,16 @@ let extract_bindings ((ctx, c) : Rocq_utils.ind_constr)
     let from, label, goto = get_constr_app c |> unpack_constr_args in
     Log.debug ~__FUNCTION__ "F";
     let from_bs = _a args.lhs from pair_map in
-    List.iter (bs_to_string "from") from_bs;
+    C.iter (fun k v -> bs_to_string "from" (k, v)) from_bs;
     Log.debug ~__FUNCTION__ "G";
     let label_bs = _a args.act label pair_map in
-    List.iter (bs_to_string "label") label_bs;
+    C.iter (fun k v -> bs_to_string "label" (k, v)) label_bs;
     Log.debug ~__FUNCTION__ "H";
     let goto_bs = _a args.rhs goto pair_map in
-    List.iter (bs_to_string "goto") goto_bs;
+    C.iter (fun k v -> bs_to_string "goto" (k, v)) goto_bs;
     Log.debug ~__FUNCTION__ "I";
-    let _ =
-      List.flatten [ from_bs; label_bs; goto_bs ] |> List.to_seq |> C.of_seq
-    in
-    Log.debug ~__FUNCTION__ "J";
+    (* TODO: if each of these maps are empty, then [No_Bindings] else store these in [Use_Bindings] (but update this to use the maps.) *)
+    (* TODO: investigate overriding these maps and only using them if any of the "roots" is a function we don't recognise, e.g., from [Mebi_theories] *)
     (* *)
     let fromopt : EConstr.t Tactypes.explicit_bindings option = None in
     let labelopt : EConstr.t Tactypes.explicit_bindings option = None in
