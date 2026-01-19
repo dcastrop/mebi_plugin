@@ -950,8 +950,29 @@ let extract_bindings ((ctx, c) : Rocq_utils.ind_constr)
       make_cmaps pair_map (args.lhs, from) (args.act, label) (args.rhs, goto)
     in
     if use_no_bindings cmaps
-    then No_Bindings
-    else Use_Bindings (make_binding_fun cmaps)
+    then (
+      Log.thing ~__FUNCTION__ Debug "No_Bindings" c Strfy.fconstr;
+      No_Bindings)
+    else (
+      Log.thing ~__FUNCTION__ Debug "Use_Bindings" c Strfy.fconstr;
+      Use_Bindings (make_binding_fun cmaps))
   with
   | Model_info_CouldNotExtractBindings () -> No_Bindings
+;;
+
+let ind_to_rocq_constructors (x : Mebi_ind.t) : Model_info.rocq_constructor list
+  =
+  (* NOTE: constructor tactic index starts from 1 -- ignore 0 below *)
+  let (get_constructor_index, _), _ = Utils.new_int_counter ~start:0 () in
+  Array.fold_left
+    (fun (acc : Model_info.rocq_constructor list)
+      ({ name; constructor } : Mebi_ind.lts_constructor) ->
+      let index : int = get_constructor_index () in
+      let name : string = Names.Id.to_string name in
+      let bindings : Model_info.rocq_constructor_bindings =
+        extract_bindings constructor
+      in
+      { index; name; bindings } :: acc)
+    []
+    (Mebi_ind.get_lts_constructor_types x)
 ;;

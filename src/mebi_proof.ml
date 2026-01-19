@@ -727,16 +727,22 @@ exception Mebi_proof_CannotFindConstructorInfo_OfLTS of Enc.t
 exception Mebi_proof_CannotFindConstructorInfo_OfIndex of int
 
 let make_constructor_bindings
-  : Info.rocq_constructor_bindings -> EConstr.t Tactypes.bindings
+  :  Info.rocq_constructor_bindings
+  -> Info.binding_args
+  -> EConstr.t Tactypes.bindings
   =
   Log.trace __FUNCTION__;
   function
-  | Info.No_Bindings -> NoBindings
-  | Info.Use_Bindings f -> ExplicitBindings []
+  | Info.No_Bindings ->
+    Log.trace ~__FUNCTION__ "No_Bindings";
+    fun _ -> NoBindings
+  | Info.Use_Bindings f ->
+    Log.trace ~__FUNCTION__ "Use_Bindings";
+    fun (x : Info.binding_args) -> ExplicitBindings (f x)
 ;;
 
 let get_constructor_bindings ((lts_enc, constructor_index) : Tree.node)
-  : EConstr.t Tactypes.bindings
+  : Info.binding_args -> EConstr.t Tactypes.bindings
   =
   Log.trace __FUNCTION__;
   (* NOTE: assuming this is for nfsm *)
@@ -761,12 +767,17 @@ let get_constructor_bindings ((lts_enc, constructor_index) : Tree.node)
             (Args Utils.Strfy.int);
           Log.thing ~__FUNCTION__ Warning "nfsm" (nfsm ()) (Args Fsm.to_string);
           raise (Mebi_proof_CannotFindConstructorInfo_OfIndex constructor_index)
-        | Some x -> make_constructor_bindings x.bindings))
+        | Some x ->
+          Log.thing
+            ~__FUNCTION__
+            Debug
+            "constructor"
+            x
+            (Of Info.rocq_constructor_to_string);
+          make_constructor_bindings x.bindings))
 ;;
 
-let get_constructor_tactic
-      (* (x:Info.binding_args) *)
-        ((enc, index) : Tree.node)
+let get_constructor_tactic (args : Info.binding_args) ((enc, index) : Tree.node)
   : tactic
   =
   Log.trace __FUNCTION__;
@@ -774,7 +785,7 @@ let get_constructor_tactic
   let index : int = index + 1 in
   tactic
     ~msg:(Printf.sprintf "constructor %i" index)
-    (Tactics.one_constructor index (get_constructor_bindings (enc, index)))
+    (Tactics.one_constructor index (get_constructor_bindings (enc, index) args))
 ;;
 
 let do_build_constructor_tactics
@@ -790,7 +801,9 @@ let do_build_constructor_tactics
   Log.thing ~__FUNCTION__ Debug "using" using (Args Tree.list_to_string);
   Log.option ~__FUNCTION__ Debug "next" next (Args Note.annotation_to_string);
   let constructor : Tree.node list = Tree.min using in
-  let tactics : tactic list = List.map get_constructor_tactic constructor in
+  let tactics : tactic list =
+    List.map (get_constructor_tactic { from; label = via; goto }) constructor
+  in
   set_the_proof_state
     ~__FUNCTION__
     (ApplyConstructors { annotation = next; tactics = Some tactics; goto });
