@@ -40,6 +40,10 @@ let feconstr (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
   Of (econstr_to_string gl)
 ;;
 
+let fconstr (gl : Proofview.Goal.t) : Constr.t Utils.Strfy.to_string =
+  Of (Rocq_utils.Strfy.constr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl))
+;;
+
 let _feconstrkinds (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
   Of
     (Rocq_utils.Strfy.econstr_kind
@@ -121,6 +125,28 @@ let acc_econstr_to_unfold
 ;;
 
 (***********************************************************************)
+(*** Bisimilarity Result ***********************************************)
+(***********************************************************************)
+
+let the_result () : Algorithms.Bisimilar.result =
+  Algorithms.Bisimilar.get_the_result ()
+;;
+
+let mfsm ?(saturated : bool = false) () : Fsm.t =
+  if saturated
+  then (the_result ()).the_fsm_1.saturated
+  else (the_result ()).the_fsm_1.original
+;;
+
+let nfsm ?(saturated : bool = false) () : Fsm.t =
+  if saturated
+  then (the_result ()).the_fsm_2.saturated
+  else (the_result ()).the_fsm_2.original
+;;
+
+let the_bisim_states () : Partition.t = (the_result ()).bisim_states
+
+(***********************************************************************)
 (*** Proof State *******************************************************)
 (***********************************************************************)
 
@@ -152,6 +178,127 @@ let tactic_chain : tactic list -> tactic =
       tl
 ;;
 
+module ApplicableConstructors = struct
+  type t =
+    { tactics : tactics_to_apply option
+    ; annotation : Note.annotation option
+    ; goto : State.t
+    }
+
+  and tactics_to_apply =
+    (* { this : tactic
+    ; next : Tree.node list
+    } *)
+    tactic list
+
+  exception Mebi_proof_CannotGetConstructorInfo_None of unit
+  exception Mebi_proof_CannotFindConstructorInfo_OfLTS of Enc.t
+  exception Mebi_proof_CannotFindConstructorInfo_OfIndex of int
+
+  let make_constructor_bindings
+    :  Info.rocq_constructor_bindings
+    -> Info.binding_args
+    -> EConstr.t Tactypes.bindings
+    =
+    Log.trace __FUNCTION__;
+    function
+    | Info.No_Bindings ->
+      Log.trace ~__FUNCTION__ "No_Bindings";
+      fun _ -> NoBindings
+    | Info.Use_Bindings f ->
+      Log.trace ~__FUNCTION__ "Use_Bindings";
+      fun (x : Info.binding_args) -> ExplicitBindings (f x)
+  ;;
+
+  let get_constructor_bindings ((lts_enc, constructor_index) : Tree.node)
+    : Info.binding_args -> EConstr.t Tactypes.bindings
+    =
+    Log.trace __FUNCTION__;
+    (* NOTE: assuming this is for nfsm *)
+    match (nfsm ()).info.rocq_info with
+    | None -> raise (Mebi_proof_CannotGetConstructorInfo_None ())
+    | Some info ->
+      let finfo = fun ({ enc; _ } : Info.rocq_info) -> Enc.equal enc lts_enc in
+      (match List.find_opt finfo info with
+       | None -> raise (Mebi_proof_CannotFindConstructorInfo_OfLTS lts_enc)
+       | Some x ->
+         let fconstructor =
+           fun ({ index; _ } : Info.rocq_constructor) ->
+           Int.equal index constructor_index
+         in
+         (match List.find_opt fconstructor x.constructors with
+          | None ->
+            Log.thing
+              ~__FUNCTION__
+              Warning
+              "index"
+              constructor_index
+              (Args Utils.Strfy.int);
+            Log.thing
+              ~__FUNCTION__
+              Warning
+              "nfsm"
+              (nfsm ())
+              (Args Fsm.to_string);
+            raise
+              (Mebi_proof_CannotFindConstructorInfo_OfIndex constructor_index)
+          | Some x ->
+            Log.thing
+              ~__FUNCTION__
+              Debug
+              "constructor"
+              x
+              (Of Info.rocq_constructor_to_string);
+            make_constructor_bindings x.bindings))
+  ;;
+
+  let get_constructor_tactic
+        (args : Info.binding_args)
+        ((enc, index) : Tree.node)
+    : tactic
+    =
+    Log.trace __FUNCTION__;
+    (* NOTE: constructors index from 1 *)
+    let index : int = index + 1 in
+    tactic
+      ~msg:(Printf.sprintf "constructor %i" index)
+      (Tactics.one_constructor
+         index
+         (get_constructor_bindings (enc, index) args))
+  ;;
+
+  let create (args : Info.binding_args) (annotation : Note.annotation option)
+    : Tree.node list -> t
+    = function
+    | [] -> { tactics = None; annotation; goto = args.goto }
+    | h :: tl ->
+      { tactics =
+          (* TODO: update the below so that each take into account the resulting term of each transition *)
+          Some (List.map (get_constructor_tactic args) (h :: tl))
+          (* Some { this = get_constructor_tactic args h; next = tl } *)
+      ; annotation
+      ; goto = args.goto
+      }
+  ;;
+
+  let update_next (args : Info.binding_args) : t -> t = function
+    | { tactics = None; annotation; goto } ->
+      { tactics = None; annotation; goto }
+      (* | { tactics = Some { next = []; _ }; annotation; goto } -> *)
+      (* { tactics = None; annotation; goto } *)
+      (* | { tactics = Some { next = h :: tl; _ }; annotation; goto } -> *)
+      (* { tactics = Some { this = get_constructor_tactic args h; next = tl }
+      ; annotation
+      ; goto
+      } *)
+      (* TODO: update similar to [create] (above) *)
+    | { tactics = Some []; annotation; goto } ->
+      { tactics = None; annotation; goto }
+    | { tactics = Some (h :: tl); annotation; goto } ->
+      { tactics = Some tl; annotation; goto }
+  ;;
+end
+
 module PState = struct
   type t =
     | NewProof
@@ -159,19 +306,13 @@ module PState = struct
     | NewCofix
     | DoRefl
     | GoalTransition of transitions
-    | ApplyConstructors of applicable_constructors
+    | ApplyConstructors of ApplicableConstructors.t
     | DetectState
 
   (* TODO: maybe revert to just [mtrans:Transition.t]*)
   and transitions =
     { mtrans : Transition.t
     ; ntrans : Transition_opt.t
-    }
-
-  and applicable_constructors =
-    { annotation : Note.annotation option
-    ; tactics : tactic list option
-    ; goto : State.t
     }
 
   (* and tactic_to_apply = unit -> unit Proofview.tactic *)
@@ -207,7 +348,8 @@ module PState = struct
              ":\nGoto: %s\nAnnotation: %s\nTactics: %s"
              (State.to_string goto)
              (Option.cata Note.annotation_to_string "None" annotation)
-             (Option.cata
+             "TODO: ..."
+           (* (Option.cata
                 (fun xs ->
                   Printf.sprintf
                     "%s (Tactics: %i)"
@@ -221,7 +363,7 @@ module PState = struct
                        xs)
                     (List.length xs))
                 "None"
-                tactics))
+                tactics) *))
     | DetectState -> "DetectState"
   ;;
 end
@@ -292,28 +434,6 @@ let get_tactic ?(short : bool = true) ?(state : bool = true)
     Log.notice (Printf.sprintf "%s." msg);
     x
 ;;
-
-(***********************************************************************)
-(*** Bisimilarity Result ***********************************************)
-(***********************************************************************)
-
-let the_result () : Algorithms.Bisimilar.result =
-  Algorithms.Bisimilar.get_the_result ()
-;;
-
-let mfsm ?(saturated : bool = false) () : Fsm.t =
-  if saturated
-  then (the_result ()).the_fsm_1.saturated
-  else (the_result ()).the_fsm_1.original
-;;
-
-let nfsm ?(saturated : bool = false) () : Fsm.t =
-  if saturated
-  then (the_result ()).the_fsm_2.saturated
-  else (the_result ()).the_fsm_2.original
-;;
-
-let the_bisim_states () : Partition.t = (the_result ()).bisim_states
 
 (***********************************************************************)
 (*** Warning Messages **************************************************)
@@ -722,72 +842,6 @@ let do_constructor_transition
    else raise (Mebi_proof_StatesNotBisimilar (mfrom, ngoto, the_bisim_states ()))
    ;; *)
 
-exception Mebi_proof_CannotGetConstructorInfo_None of unit
-exception Mebi_proof_CannotFindConstructorInfo_OfLTS of Enc.t
-exception Mebi_proof_CannotFindConstructorInfo_OfIndex of int
-
-let make_constructor_bindings
-  :  Info.rocq_constructor_bindings
-  -> Info.binding_args
-  -> EConstr.t Tactypes.bindings
-  =
-  Log.trace __FUNCTION__;
-  function
-  | Info.No_Bindings ->
-    Log.trace ~__FUNCTION__ "No_Bindings";
-    fun _ -> NoBindings
-  | Info.Use_Bindings f ->
-    Log.trace ~__FUNCTION__ "Use_Bindings";
-    fun (x : Info.binding_args) -> ExplicitBindings (f x)
-;;
-
-let get_constructor_bindings ((lts_enc, constructor_index) : Tree.node)
-  : Info.binding_args -> EConstr.t Tactypes.bindings
-  =
-  Log.trace __FUNCTION__;
-  (* NOTE: assuming this is for nfsm *)
-  match (nfsm ()).info.rocq_info with
-  | None -> raise (Mebi_proof_CannotGetConstructorInfo_None ())
-  | Some info ->
-    let finfo = fun ({ enc; _ } : Info.rocq_info) -> Enc.equal enc lts_enc in
-    (match List.find_opt finfo info with
-     | None -> raise (Mebi_proof_CannotFindConstructorInfo_OfLTS lts_enc)
-     | Some x ->
-       let fconstructor =
-         fun ({ index; _ } : Info.rocq_constructor) ->
-         Int.equal index constructor_index
-       in
-       (match List.find_opt fconstructor x.constructors with
-        | None ->
-          Log.thing
-            ~__FUNCTION__
-            Warning
-            "index"
-            constructor_index
-            (Args Utils.Strfy.int);
-          Log.thing ~__FUNCTION__ Warning "nfsm" (nfsm ()) (Args Fsm.to_string);
-          raise (Mebi_proof_CannotFindConstructorInfo_OfIndex constructor_index)
-        | Some x ->
-          Log.thing
-            ~__FUNCTION__
-            Debug
-            "constructor"
-            x
-            (Of Info.rocq_constructor_to_string);
-          make_constructor_bindings x.bindings))
-;;
-
-let get_constructor_tactic (args : Info.binding_args) ((enc, index) : Tree.node)
-  : tactic
-  =
-  Log.trace __FUNCTION__;
-  (* NOTE: constructors index from 1 *)
-  let index : int = index + 1 in
-  tactic
-    ~msg:(Printf.sprintf "constructor %i" index)
-    (Tactics.one_constructor index (get_constructor_bindings (enc, index) args))
-;;
-
 let do_build_constructor_tactics
       (gl : Proofview.Goal.t)
       (destination : State.t)
@@ -801,12 +855,43 @@ let do_build_constructor_tactics
   Log.thing ~__FUNCTION__ Debug "using" using (Args Tree.list_to_string);
   Log.option ~__FUNCTION__ Debug "next" next (Args Note.annotation_to_string);
   let constructor : Tree.node list = Tree.min using in
-  let tactics : tactic list =
-    List.map (get_constructor_tactic { from; label = via; goto }) constructor
+  set_the_proof_state
+    ~__FUNCTION__
+    (ApplyConstructors
+       (ApplicableConstructors.create
+          { from; label = via; goto }
+          next
+          constructor));
+  (* match ApplicableConstructors.try_get_next { from; label = via; goto } with *)
+  (* | None -> *)
+  (* let tactics : tactic list =
+    try
+      List.map (get_constructor_tactic { from; label = via; goto }) constructor
+    with
+    | Mebi_utils.Mebi_utils_BindingInstruction_NEQ (x, y) ->
+      Log.warning ~__FUNCTION__ "Mebi_utils_BindingInstruction_NEQ";
+      Log.thing ~__FUNCTION__ Debug "x" x (feconstr gl);
+      Log.thing ~__FUNCTION__ Debug "y" y (fconstr gl);
+      raise (Mebi_utils.Mebi_utils_BindingInstruction_NEQ (x, y))
+    | Mebi_utils.Mebi_utils_BindingInstruction_NotApp x ->
+      Log.warning ~__FUNCTION__ "Mebi_utils_BindingInstruction_NotApp";
+      Log.thing ~__FUNCTION__ Debug "x" x (feconstr gl);
+      raise (Mebi_utils.Mebi_utils_BindingInstruction_NotApp x)
+    | Mebi_utils.Mebi_utils_BindingInstruction_Undefined (x, y) ->
+      Log.warning ~__FUNCTION__ "Mebi_utils_BindingInstruction_Undefined";
+      Log.thing ~__FUNCTION__ Debug "x" x (feconstr gl);
+      Log.thing ~__FUNCTION__ Debug "y" y (feconstr gl);
+      raise (Mebi_utils.Mebi_utils_BindingInstruction_Undefined (x, y))
+    | Mebi_utils.Mebi_utils_BindingInstruction_IndexOutOfBounds (x, i) ->
+      Log.warning ~__FUNCTION__ "Mebi_utils_BindingInstruction_IndexOutOfBounds";
+      Log.thing ~__FUNCTION__ Debug "x" x (feconstr gl);
+      Log.thing ~__FUNCTION__ Debug "y" i (Args Utils.Strfy.int);
+      raise (Mebi_utils.Mebi_utils_BindingInstruction_IndexOutOfBounds (x, i))
   in
   set_the_proof_state
     ~__FUNCTION__
-    (ApplyConstructors { annotation = next; tactics = Some tactics; goto });
+    (* TODO: cannot store entire constructor tactics at once, need to "inch worm" along *)
+    (ApplyConstructors { annotation = next; tactics = Some tactics; goto }); *)
   do_rt1n_via gl via
 ;;
 
@@ -2067,12 +2152,14 @@ and handle_goal_transition
     raise (Mebi_proof_GoalTransition ())
 
 and handle_apply_constructors (gl : Proofview.Goal.t)
-  : PState.applicable_constructors -> tactic
+  : ApplicableConstructors.t -> tactic
   =
   Log.trace __FUNCTION__;
   Log.thing ~__FUNCTION__ Debug "concl" gl (Of concl_to_string);
   function
+  (* | { annotation; tactics = Some { this; next }; goto } -> *)
   | { annotation; tactics = Some (h :: tl); goto } ->
+    (* TODO: need to update [get_constructor_tactic] so that *)
     Log.trace ~__FUNCTION__ "apply tactic";
     set_the_proof_state
       ~__FUNCTION__
