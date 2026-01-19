@@ -534,44 +534,44 @@ let unpack_constr_args ((_, tys) : Constr.t Rocq_utils.kind_pair)
    fun _ -> []
    ;; *)
 
-let resolve_bindings (bs : EConstr.t Tactypes.explicit_bindings option list)
-  : EConstr.t Tactypes.explicit_bindings
-  =
-  Log.trace __FUNCTION__;
-  let rec resolve_bindings
-    :  EConstr.t Tactypes.explicit_bindings option list
-    -> EConstr.t Tactypes.explicit_bindings
-    = function
-    | [] -> []
-    | None :: tl -> resolve_bindings tl
-    | Some h :: tl -> List.concat [ h; resolve_bindings tl ]
-  in
-  (* NOTE: ensure no duplicate bindings *)
-  resolve_bindings bs
-  |> List.fold_left
-       (fun (acc : EConstr.t Tactypes.explicit_bindings)
-         (b : (Tactypes.quantified_hypothesis * EConstr.t) CAst.t) ->
-         if
-           List.exists
-             (fun (b' : (Tactypes.quantified_hypothesis * EConstr.t) CAst.t) ->
-               (* NOTE: we cannot access content of [CAst] *)
-               CAst.eq
-                 (* NOTE: we only check the [snd] ([EConstr.t]) as we assume that the exact same term would be used under the same decl from some [rel_context]. *)
-                 (fun ((_, x) : Tactypes.quantified_hypothesis * EConstr.t)
-                   ((_, y) : Tactypes.quantified_hypothesis * EConstr.t)
-                   : bool ->
-                   Mebi_wrapper.runkeep
-                     (Mebi_wrapper.state (fun env sigma ->
-                        sigma, Eq.econstr sigma x y)))
-                 b
-                 b')
-             acc
-         then acc
-         else b :: acc)
-       []
-;;
+(* let resolve_bindings (bs : EConstr.t Tactypes.explicit_bindings option list)
+   : EConstr.t Tactypes.explicit_bindings
+   =
+   Log.trace __FUNCTION__;
+   let rec resolve_bindings
+   :  EConstr.t Tactypes.explicit_bindings option list
+   -> EConstr.t Tactypes.explicit_bindings
+   = function
+   | [] -> []
+   | None :: tl -> resolve_bindings tl
+   | Some h :: tl -> List.concat [ h; resolve_bindings tl ]
+   in
+   (* NOTE: ensure no duplicate bindings *)
+   resolve_bindings bs
+   |> List.fold_left
+   (fun (acc : EConstr.t Tactypes.explicit_bindings)
+   (b : (Tactypes.quantified_hypothesis * EConstr.t) CAst.t) ->
+   if
+   List.exists
+   (fun (b' : (Tactypes.quantified_hypothesis * EConstr.t) CAst.t) ->
+   (* NOTE: we cannot access content of [CAst] *)
+   CAst.eq
+   (* NOTE: we only check the [snd] ([EConstr.t]) as we assume that the exact same term would be used under the same decl from some [rel_context]. *)
+   (fun ((_, x) : Tactypes.quantified_hypothesis * EConstr.t)
+   ((_, y) : Tactypes.quantified_hypothesis * EConstr.t)
+   : bool ->
+   Mebi_wrapper.runkeep
+   (Mebi_wrapper.state (fun env sigma ->
+   sigma, Eq.econstr sigma x y)))
+   b
+   b')
+   acc
+   then acc
+   else b :: acc)
+   []
+   ;; *)
 
-let pair_map_to_string =
+let _pair_map_to_string =
   fun (k : EConstr.t) (v : Names.Name.t) ->
   Printf.sprintf
     "pairmap: %s => %s"
@@ -679,6 +679,14 @@ let rec add_instruction (x : binding_instructions)
   | Done -> raise (Mebi_utils_CannotAddAfterDone ())
 ;;
 
+let rec instruction_length : binding_instructions -> int =
+  Log.trace __FUNCTION__;
+  function
+  | Undefined -> 0
+  | Done -> 1
+  | Arg { cont; _ } -> 1 + instruction_length cont
+;;
+
 exception Mebi_utils_CannotFindBindingName of EConstr.t
 (*
    let find_name (name_map : Names.Name.t E.t) (x : EConstr.t) : Names.Name.t =
@@ -698,7 +706,21 @@ let find_name (name_map : (EConstr.t * Names.Name.t) list) (x : EConstr.t)
   | (_, v) :: _ -> v
 ;;
 
-let _a
+let replace_if_shorter
+      (cmap : binding_extractor C.t)
+      (k : Constr.t)
+      ((vn, vi) : binding_extractor)
+  : unit
+  =
+  match C.find_opt cmap k with
+  | None -> C.add cmap k (vn, vi)
+  | Some (un, ui) ->
+    (match Int.compare (instruction_length vi) (instruction_length ui) with
+     | -1 -> C.replace cmap k (vn, vi)
+     | _ -> ())
+;;
+
+let extract_constructor_binding
       (x : EConstr.t)
       (y : Constr.t)
       (name_map : (EConstr.t * Names.Name.t) list)
@@ -706,7 +728,9 @@ let _a
   =
   Log.debug __FUNCTION__;
   let econstr_kind (x : EConstr.t) = runkeep (econstr_kind x) in
-  let econstr_eq (x : EConstr.t) (y : EConstr.t) = runkeep (econstr_eq x y) in
+  let e_constr_eq (x : EConstr.t) (y : Constr.t) =
+    runkeep (EConstr.of_constr y |> econstr_eq x)
+  in
   let cmap : binding_extractor C.t = C.create 0 in
   let rec f
             (acc : (Constr.t * binding_extractor) list)
@@ -717,7 +741,7 @@ let _a
     Log.debug __FUNCTION__;
     match econstr_kind x, Constr.kind y with
     | App (xty, xtys), App (yty, ytys) ->
-      if econstr_eq xty (EConstr.of_constr yty)
+      if e_constr_eq xty yty
       then (
         (* NOTE: set to [-1] so that it is [0] on first use. *)
         let (tysindex, _), _ = Utils.new_int_counter ~start:(-1) () in
@@ -730,11 +754,169 @@ let _a
             in
             f acc b' xy)
           (Array.combine xtys ytys))
-    | _, Rel _ -> C.replace cmap y (find_name name_map x, add_instruction Done b)
+    | _, Rel _ ->
+      replace_if_shorter cmap y (find_name name_map x, add_instruction Done b)
     | _, _ -> ()
   in
   f [] Undefined (x, y);
   cmap
+;;
+
+(* exception Mebi_utils_ConstructorBindingNotNeeded of unit *)
+
+exception
+  Mebi_utils_NoConstructorInstructionsExtracted of
+    (EConstr.t * Constr.t * (EConstr.t * Names.Name.t) list)
+
+type rocq_one_constructor_bindings =
+  | One_No_Bindings
+  | One_Use_Bindings of binding_extractor C.t
+
+(* let merge_cmaps (a : binding_extractor C.t) : binding_extractor C.t -> unit =
+   C.iter (fun k v ->
+   match C.find_opt a k with
+   | None -> C.add a k v
+   | Some u -> replace_if_shorter a k u)
+   ;; *)
+
+(* let merge_cmap_list (cmap : binding_extractor C.t)
+   : binding_extractor C.t list -> unit
+   =
+   List.iter (merge_cmaps cmap)
+   ;; *)
+
+(* let use_no_bindings (xs : rocq_one_constructor_bindings list) : bool =
+   let rec f : rocq_one_constructor_bindings list -> binding_extractor C.t list =
+   function
+   | [] -> []
+   | One_No_Bindings :: tl -> f tl
+   | One_Use_Bindings ys :: tl -> ys :: f tl
+   in
+   List.is_empty (f xs)
+   ;; *)
+
+let extract_binding
+      (x : EConstr.t)
+      (y : Constr.t)
+      (name_map : (EConstr.t * Names.Name.t) list)
+  : rocq_one_constructor_bindings
+  =
+  Log.debug __FUNCTION__;
+  let cmap = extract_constructor_binding x y name_map in
+  match C.to_seq_values cmap |> List.of_seq with
+  | [] -> raise (Mebi_utils_NoConstructorInstructionsExtracted (x, y, name_map))
+  | [ (_, Done) ] -> One_No_Bindings
+  | _ -> One_Use_Bindings cmap
+;;
+
+exception Mebi_utils_BindingInstruction_NotApp of EConstr.t
+exception Mebi_utils_BindingInstruction_Undefined of EConstr.t * EConstr.t
+exception Mebi_utils_BindingInstruction_IndexOutOfBounds of EConstr.t * int
+exception Mebi_utils_BindingInstruction_NEQ of EConstr.t * Constr.t
+
+type binding_cmaps =
+  { from : binding_extractor C.t option
+  ; label : binding_extractor C.t option
+  ; goto : binding_extractor C.t option
+  }
+
+let use_no_bindings : binding_cmaps -> bool = function
+  | { from = None; label = None; goto = None } -> true
+  | _ -> false
+;;
+
+let make_cmaps
+      (name_map : (EConstr.t * Names.Name.t) list)
+      (from : EConstr.t * Constr.t)
+      (label : EConstr.t * Constr.t)
+      (goto : EConstr.t * Constr.t)
+  : binding_cmaps
+  =
+  Log.trace __FUNCTION__;
+  let f : rocq_one_constructor_bindings -> binding_extractor C.t option =
+    function
+    | One_No_Bindings -> None
+    | One_Use_Bindings xmap -> Some xmap
+  in
+  let g ((a, b) : EConstr.t * Constr.t) : binding_extractor C.t option =
+    try f (extract_binding a b name_map) with
+    | Mebi_utils_NoConstructorInstructionsExtracted (x, y, name_map) -> None
+  in
+  { from = g from; label = g label; goto = g goto }
+;;
+
+(* let make_cmaps'
+      (from : rocq_one_constructor_bindings)
+      (label : rocq_one_constructor_bindings)
+      (goto : rocq_one_constructor_bindings)
+  : binding_cmaps
+  =
+  Log.trace __FUNCTION__;
+  let f : rocq_one_constructor_bindings -> binding_extractor C.t option =
+    function
+    | One_No_Bindings -> None
+    | One_Use_Bindings xmap -> Some xmap
+  in
+  { from = f from; label = f label; goto = f goto }
+;; *)
+
+let make_binding_fun (cmaps : binding_cmaps)
+  : Model_info.binding_args -> EConstr.t Tactypes.explicit_bindings
+  =
+  Log.trace __FUNCTION__;
+  let econstr_kind (x : EConstr.t) = runkeep (econstr_kind x) in
+  let e_constr_eq (x : EConstr.t) (y : Constr.t) =
+    runkeep (EConstr.of_constr y |> econstr_eq x)
+  in
+  (* NOTE: function to obtain the [Name] *)
+  let f : Names.Name.t -> Tactypes.quantified_hypothesis = function
+    | Names.Name.Anonymous -> Tactypes.AnonHyp (* FIXME: *) 0
+    | Names.Name.Name v -> Tactypes.NamedHyp (CAst.make v)
+  in
+  (* NOTE: function to obtain the actual part of the state/label *)
+  let rec g (x : EConstr.t) : binding_instructions -> EConstr.t = function
+    | Undefined -> raise (Mebi_utils_BindingInstruction_Undefined (x, x))
+    | Done -> x
+    | Arg { root; index; cont } ->
+      (try
+         match econstr_kind x with
+         | App (xty, xtys) ->
+           if e_constr_eq xty root
+           then (
+             try g xtys.(index) cont with
+             | Invalid_argument _ ->
+               raise (Mebi_utils_BindingInstruction_IndexOutOfBounds (x, index)))
+           else raise (Mebi_utils_BindingInstruction_NEQ (xty, root))
+         | _ -> raise (Mebi_utils_BindingInstruction_NotApp x)
+       with
+       | Mebi_utils_BindingInstruction_Undefined (_, y) ->
+         raise (Mebi_utils_BindingInstruction_Undefined (x, y)))
+  in
+  let h (x : EConstr.t)
+    : binding_extractor C.t option -> EConstr.t Tactypes.explicit_bindings
+    = function
+    | None -> []
+    | Some xmap ->
+      C.fold
+        (fun (k : Constr.t)
+          ((name, instructions) : Names.Name.t * binding_instructions)
+          (acc : EConstr.t Tactypes.explicit_bindings) ->
+          CAst.make (f name, g x instructions) :: acc)
+        xmap
+        []
+  in
+  (* NOTE: make the function to be used later *)
+  fun ({ from; label; goto } : Model_info.binding_args)
+    : EConstr.t Tactypes.explicit_bindings ->
+    let from : EConstr.t = runkeep (decode from.enc) in
+    let label : EConstr.t = runkeep (decode label.enc) in
+    let goto : EConstr.t = runkeep (decode goto.enc) in
+    [ from, cmaps.from; label, cmaps.label; goto, cmaps.goto ]
+    |> List.fold_left
+         (fun (acc : EConstr.t Tactypes.explicit_bindings)
+           ((x, xmap) : EConstr.t * binding_extractor C.t option) ->
+           List.flatten [ h x xmap; acc ])
+         []
 ;;
 
 let bs_to_string prefix =
@@ -753,38 +935,23 @@ let extract_bindings ((ctx, c) : Rocq_utils.ind_constr)
   =
   Log.trace __FUNCTION__;
   try
-    Log.debug ~__FUNCTION__ "A";
     let decls : econstr_decl list = Rocq_utils.get_econstr_decls ctx in
-    Log.debug ~__FUNCTION__ "B";
     let substl = runkeep (mk_ctx_substl [] (List.rev decls)) in
-    Log.things ~__FUNCTION__ Debug "decls" decls Strfy.feconstr_rel_decl;
-    Log.things ~__FUNCTION__ Debug "substl" substl Strfy.feconstr;
-    Log.debug ~__FUNCTION__ "C";
+    (* Log.things ~__FUNCTION__ Debug "decls" decls Strfy.feconstr_rel_decl; *)
+    (* Log.things ~__FUNCTION__ Debug "substl" substl Strfy.feconstr; *)
     let pair_map = map_decl_evar_pairs decls substl in
-    Log.debug ~__FUNCTION__ "D";
-    List.iter (fun (x, y) -> pair_map_to_string x y) pair_map;
-    Log.debug ~__FUNCTION__ "E";
+    (* List.iter (fun (x, y) -> pair_map_to_string x y) pair_map; *)
     let args : constructor_args = runkeep (extract_args ~substl c) in
     let from, label, goto = get_constr_app c |> unpack_constr_args in
-    Log.debug ~__FUNCTION__ "F";
-    let from_bs = _a args.lhs from pair_map in
-    C.iter (fun k v -> bs_to_string "from" (k, v)) from_bs;
-    Log.debug ~__FUNCTION__ "G";
-    let label_bs = _a args.act label pair_map in
-    C.iter (fun k v -> bs_to_string "label" (k, v)) label_bs;
-    Log.debug ~__FUNCTION__ "H";
-    let goto_bs = _a args.rhs goto pair_map in
-    C.iter (fun k v -> bs_to_string "goto" (k, v)) goto_bs;
-    Log.debug ~__FUNCTION__ "I";
-    (* TODO: if each of these maps are empty, then [No_Bindings] else store these in [Use_Bindings] (but update this to use the maps.) *)
-    (* TODO: investigate overriding these maps and only using them if any of the "roots" is a function we don't recognise, e.g., from [Mebi_theories] *)
-    (* *)
-    let fromopt : EConstr.t Tactypes.explicit_bindings option = None in
-    let labelopt : EConstr.t Tactypes.explicit_bindings option = None in
-    let gotoopt : EConstr.t Tactypes.explicit_bindings option = None in
-    match resolve_bindings [ fromopt; labelopt; gotoopt ] with
-    | [] -> No_Bindings
-    | bs -> Use_Bindings (fun _ -> bs)
+    (* let from = extract_binding args.lhs from pair_map in *)
+    (* let label = extract_binding args.act label pair_map in *)
+    (* let goto = extract_binding args.rhs goto pair_map in *)
+    let cmaps : binding_cmaps =
+      make_cmaps pair_map (args.lhs, from) (args.act, label) (args.rhs, goto)
+    in
+    if use_no_bindings cmaps
+    then No_Bindings
+    else Use_Bindings (make_binding_fun cmaps)
   with
   | Model_info_CouldNotExtractBindings () -> No_Bindings
 ;;
