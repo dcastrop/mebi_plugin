@@ -33,7 +33,7 @@ Require Import Logic.
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.PluginProofs.bigstep_lts".
 Example wsim_bigstep_lts : weak_sim bigstep lts c1 c1. 
 Proof. MeBiSim Begin bigstep c1 And lts c1 Using step.
-  (* MeBiSim Solve 10.
+  MeBiSim Solve 10.
   MeBiSim Solve 10.
   MeBiSim Solve 10.
   MeBiSim Solve 10.
@@ -46,7 +46,7 @@ Proof. MeBiSim Begin bigstep c1 And lts c1 Using step.
   MeBiSim Step.
   MeBiSim Step.
   MeBiSim Step.
-  MeBiSim Step. *)
+  MeBiSim Step.
 
 
 
