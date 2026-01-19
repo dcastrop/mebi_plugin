@@ -314,3 +314,6 @@ val bs_to_string :
 
 val extract_bindings :
   Rocq_utils.ind_constr -> Model_info.rocq_constructor_bindings
+
+val ind_to_rocq_constructors :
+  Mebi_ind.t -> Model_info.rocq_constructor list
