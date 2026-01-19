@@ -185,6 +185,7 @@ module ApplicableConstructors = struct
     ; goto : State.t
     }
 
+  (* TODO: inchworm *)
   and tactics_to_apply =
     (* { this : tactic
     ; next : Tree.node list
@@ -2156,6 +2157,7 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
   =
   Log.trace __FUNCTION__;
   Log.thing ~__FUNCTION__ Debug "concl" gl (Of concl_to_string);
+  (* TODO: inchworm *)
   function
   (* | { annotation; tactics = Some { this; next }; goto } -> *)
   | { annotation; tactics = Some (h :: tl); goto } ->
