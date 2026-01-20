@@ -28,18 +28,38 @@ and rocq_info =
 and rocq_constructor =
   { index : int
   ; name : string
-  ; bindings : rocq_constructor_bindings
+  ; bindings : Rocq_bindings.t
   }
 
-and rocq_constructor_bindings =
+(* and rocq_constructor_bindings =
   | No_Bindings
-  | Use_Bindings of (binding_args -> EConstr.t Tactypes.explicit_bindings)
+  | Use_Bindings of
+      (binding_cmaps * (binding_args -> EConstr.t Tactypes.explicit_bindings))
+
+and binding_cmaps =
+  { cfrom : constructor_map option
+  ; clabel : constructor_map option
+  ; cgoto : constructor_map option
+  }
+
+and constructor_map = binding_extractor Rocq_utils.C.t
 
 and binding_args =
   { from : Model_state.t
   ; label : Model_label.t
   ; goto : Model_state.t
   }
+
+and binding_extractor = Names.Name.t * binding_instructions
+
+and binding_instructions =
+  | Undefined
+  | Done
+  | Arg of
+      { root : Constr.t
+      ; index : int
+      ; cont : binding_instructions
+      } *)
 
 open Utils.Strfy
 
@@ -73,7 +93,7 @@ let mebi_info_list_option_to_string ?(args : style_args = style_args ())
 ;;
 
 let rocq_constructor_bindings_to_string ?(args : style_args = style_args ())
-  : rocq_constructor_bindings -> string
+  : Rocq_bindings.t -> string
   = function
   | No_Bindings -> "NoBindings"
   | Use_Bindings xs -> "TODO: Use_Bindings (...)"

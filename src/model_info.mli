@@ -1,68 +1,50 @@
-type t =
-  { mebi_info : mebi_info list option
-  ; rocq_info : rocq_info list option
-  ; weak_info : string list option
-  }
+type t = {
+  mebi_info : mebi_info list option;
+  rocq_info : rocq_info list option;
+  weak_info : string list option;
+}
 
-and mebi_info =
-  { is_complete : bool
-  ; is_merged : bool
-  ; bounds : bound_config
-  }
+and mebi_info = {
+  is_complete : bool;
+  is_merged : bool;
+  bounds : bound_config;
+}
 
-and bound_config =
-  { bound : int
-  ; bound_for : boundable
-  }
+and bound_config = { bound : int; bound_for : boundable }
+and boundable = States | Transitions
 
-and boundable =
-  | States
-  | Transitions
+and rocq_info = {
+  enc : Mebi_setup.Enc.t;
+  pp : string;
+  constructors : rocq_constructor list;
+}
 
-and rocq_info =
-  { enc : Mebi_setup.Enc.t
-  ; pp : string
-  ; constructors : rocq_constructor list
-  }
+and rocq_constructor = {
+  index : int;
+  name : string;
+  bindings : Rocq_bindings.t;
+}
 
-and rocq_constructor =
-  { index : int
-  ; name : string
-  ; bindings : rocq_constructor_bindings
-  }
+val mebi_info_to_string :
+  ?args:Utils.Strfy.style_args -> mebi_info -> string
 
-and rocq_constructor_bindings =
-  | No_Bindings
-  | Use_Bindings of (binding_args -> Evd.econstr Tactypes.explicit_bindings)
+val mebi_info_list_option_to_string :
+  ?args:Utils.Strfy.style_args ->
+  mebi_info list option ->
+  string
 
-and binding_args =
-  { from : Model_state.t
-  ; label : Model_label.t
-  ; goto : Model_state.t
-  }
+val rocq_constructor_bindings_to_string :
+  ?args:Utils.Strfy.style_args -> Rocq_bindings.t -> string
 
-val mebi_info_to_string : ?args:Utils.Strfy.style_args -> mebi_info -> string
+val rocq_constructor_to_string :
+  ?args:Utils.Strfy.style_args -> rocq_constructor -> string
 
-val mebi_info_list_option_to_string
-  :  ?args:Utils.Strfy.style_args
-  -> mebi_info list option
-  -> string
+val rocq_info_to_string :
+  ?args:Utils.Strfy.style_args -> rocq_info -> string
 
-val rocq_constructor_bindings_to_string
-  :  ?args:Utils.Strfy.style_args
-  -> rocq_constructor_bindings
-  -> string
-
-val rocq_constructor_to_string
-  :  ?args:Utils.Strfy.style_args
-  -> rocq_constructor
-  -> string
-
-val rocq_info_to_string : ?args:Utils.Strfy.style_args -> rocq_info -> string
-
-val rocq_info_list_option_to_string
-  :  ?args:Utils.Strfy.style_args
-  -> rocq_info list option
-  -> string
+val rocq_info_list_option_to_string :
+  ?args:Utils.Strfy.style_args ->
+  rocq_info list option ->
+  string
 
 val to_string : ?args:Utils.Strfy.style_args -> t -> string

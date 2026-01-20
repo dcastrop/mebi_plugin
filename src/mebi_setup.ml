@@ -9,6 +9,7 @@ type unif_problem =
   { termL : EConstr.t
   ; termR : EConstr.t
   }
+
 (********************************************)
 (****** COQ ENVIRONMENT/CONTEXT *************)
 (********************************************)
