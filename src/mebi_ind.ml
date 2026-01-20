@@ -92,3 +92,54 @@ let mip_to_lts_constructors (mip : Declarations.one_inductive_body)
   with
   | Invalid_argument _ -> raise (Mebi_Utils_mip_InconsistentNumConstructors mip)
 ;;
+
+(* (** [get_lts_labels_and_terms mib mip] is the mapping of terms (states) and labels (outgoing edges) from [mip].
+
+    @raise invalid_arity
+      if lts terms and labels cannot be obtained from [mip]. [mib] is only used in case of error.
+*)
+let get_lts_labels_and_terms
+      (mib : Declarations.mutual_inductive_body)
+      (mip : Declarations.one_inductive_body)
+  : (Constr.rel_declaration * Constr.rel_declaration) Mebi_wrapper.mm
+  =
+  Log.trace __FUNCTION__;
+  let open Declarations in
+  (* get the type of [mip] from [mib]. *)
+  let typ = Inductive.type_of_inductive (UVars.in_punivs (mib, mip)) in
+  match mip.mind_arity_ctxt |> Utils.split_at mip.mind_nrealdecls with
+  | [ t1; a; t2 ] ->
+    let open Context.Rel in
+    if Declaration.equal Sorts.relevance_equal Constr.equal t1 t2
+    then Mebi_wrapper.return (a, t1)
+    else Mebi_wrapper.invalid_arity typ
+  | _ -> Mebi_wrapper.invalid_arity typ
+;;
+
+(** [get_lts_ind_ty gref] *)
+let get_name_of_lts (gref : Names.GlobRef.t) : EConstr.t Mebi_wrapper.mm =
+  Log.trace __FUNCTION__;
+  let open Mebi_wrapper.Syntax in
+  let* ind, (mib, mip) = get_lts_ind_prop_mind gref in
+  Rocq_utils.get_ind_ty ind mib |> return
+;;
+
+(**  *)
+let get_ind_lts (i : Mebi_wrapper.Enc.t) (gref : Names.GlobRef.t) : Mebi_ind.t Mebi_wrapper.mm =
+  Log.trace __FUNCTION__;
+  let open Mebi_wrapper.Syntax in
+  let* ind, (mib, mip) = get_lts_ind_prop_mind gref in
+  let* lbl, term = get_lts_labels_and_terms mib mip in
+  let lts_term : EConstr.t = Rocq_utils.get_ind_ty ind mib in
+  
+  Mebi_wrapper.return
+    { enc = i
+    ; ind = lts_term
+    ; kind =
+        LTS
+          { term_type = Rocq_utils.get_decl_type_of_constr term
+          ; label_type = Rocq_utils.get_decl_type_of_constr lbl
+          ; constructor_types = Mebi_ind.mip_to_lts_constructors mip
+          }
+    }
+;; *)

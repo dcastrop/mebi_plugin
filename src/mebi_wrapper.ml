@@ -878,14 +878,14 @@ let get_decoding (x : Enc.t) : EConstr.t =
   run ~keep_encoding:true ~fresh:false (decoding x)
 ;;
 
-let decoding_opt (x : Enc.t) : EConstr.t option mm =
+let decode_opt (x : Enc.t) : EConstr.t option mm =
   fun (st : wrapper ref) ->
   let d_opt : EConstr.t option = B.find_opt !st.bck_enc x in
   { state = st; value = d_opt }
 ;;
 
-let get_decoding_opt (x : Enc.t) : EConstr.t option =
-  run ~keep_encoding:true ~fresh:false (decoding_opt x)
+let get_decode_opt (x : Enc.t) : EConstr.t option =
+  run ~keep_encoding:true ~fresh:false (decode_opt x)
 ;;
 
 (**********************************)

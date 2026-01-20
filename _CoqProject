@@ -87,6 +87,8 @@ src/rocq_utils.ml
 src/rocq_utils.mli
 src/rocq_convert.ml
 src/rocq_convert.mli
+src/rocq_bindings.ml
+src/rocq_bindings.mli
 
 src/mebi_enc.ml
 src/mebi_enc.mli
@@ -129,6 +131,8 @@ src/mebi_ind.ml
 src/mebi_ind.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
+src/mebi_bindings.ml
+src/mebi_bindings.mli
 src/mebi_hypothesis.ml
 src/mebi_hypothesis.mli
 src/mebi_proof.ml
