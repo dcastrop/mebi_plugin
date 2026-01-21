@@ -1,4 +1,9 @@
 (***********************************************************************)
+module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+
+let () = Log.Config.configure_output Debug true
+let () = Log.Config.configure_output Trace true
+(***********************************************************************)
 
 (* NOTE: used locally -- DO NOT EXPORT *)
 module C = Rocq_utils.C
@@ -24,9 +29,11 @@ exception Mebi_bindings_CannotFindBindingName of EConstr.t
 let find_name (name_pairs : (EConstr.t * Names.Name.t) list) (x : EConstr.t)
   : Names.Name.t mm
   =
+  Log.trace __FUNCTION__;
   let open Mebi_wrapper.Syntax in
-  let filter (i : int) : Names.Name.t option -> Names.Name.t option mm
-    = function
+  let filter (i : int) : Names.Name.t option -> Names.Name.t option mm =
+    Log.trace __FUNCTION__;
+    function
     | None ->
       let ((y, z) : EConstr.t * Names.Name.t) = List.nth name_pairs i in
       let* is_eq : bool = Mebi_utils.econstr_eq x y in
@@ -47,6 +54,7 @@ let extract_binding_map
       (y : Constr.t)
   : map mm
   =
+  Log.trace __FUNCTION__;
   let open Mebi_wrapper.Syntax in
   let cmap : map = C.create 0 in
   let rec f
@@ -55,6 +63,7 @@ let extract_binding_map
             ((x, y) : EConstr.t * Constr.t)
     : unit mm
     =
+    Log.trace __FUNCTION__;
     let* xkind = Mebi_utils.econstr_kind x in
     match xkind, Constr.kind y with
     | App (xty, xtys), App (yty, ytys) ->
@@ -65,6 +74,7 @@ let extract_binding_map
         let (tysindex, _), _ = Utils.new_int_counter ~start:(-1) () in
         let xytys = Array.combine xtys ytys in
         let iter (i : int) (_ : unit) : unit mm =
+          Log.trace __FUNCTION__;
           let (xy : EConstr.t * Constr.t) = xytys.(i) in
           let b' =
             add_instruction
@@ -90,6 +100,7 @@ let make_map
       ((evar, rel) : EConstr.t * Constr.t)
   : map option mm
   =
+  Log.trace __FUNCTION__;
   let open Mebi_wrapper.Syntax in
   let* cmap = extract_binding_map name_pairs evar rel in
   match C.to_seq_values cmap |> List.of_seq with
@@ -101,6 +112,7 @@ let make_map
 (***********************************************************************)
 
 let use_no_bindings (xs : map option list) : bool =
+  Log.trace __FUNCTION__;
   List.filter (function None -> false | _ -> true) xs |> List.is_empty
 ;;
 
@@ -113,6 +125,7 @@ let extract
       (goto : EConstr.t * Constr.t)
   : t mm
   =
+  Log.trace __FUNCTION__;
   let open Mebi_wrapper.Syntax in
   let make_map : EConstr.t * Constr.t -> map option mm = make_map name_pairs in
   let* from : map option = make_map from in
@@ -126,6 +139,7 @@ let extract
 ;;
 
 let extract_info (x : Mebi_ind.t) : Model_info.rocq_constructor list mm =
+  Log.trace __FUNCTION__;
   let open Mebi_wrapper.Syntax in
   (* NOTE: constructor tactic index starts from 1 -- ignore 0 below *)
   let (get_constructor_index, _), _ = Utils.new_int_counter ~start:0 () in
@@ -133,6 +147,7 @@ let extract_info (x : Mebi_ind.t) : Model_info.rocq_constructor list mm =
     Mebi_ind.get_lts_constructor_types x
   in
   let fold (i : int) (acc : Model_info.rocq_constructor list) =
+    Log.trace __FUNCTION__;
     let ({ name; constructor = ctx, c } : Mebi_ind.lts_constructor) = tys.(i) in
     let index : int = get_constructor_index () in
     let name : string = Names.Id.to_string name in
@@ -159,6 +174,7 @@ let extract_info (x : Mebi_ind.t) : Model_info.rocq_constructor list mm =
 (***********************************************************************)
 
 let get_quantified_hyp : Names.Name.t -> Tactypes.quantified_hypothesis =
+  Log.trace __FUNCTION__;
   function
   | Names.Name.Anonymous -> Tactypes.AnonHyp (* FIXME: *) 0
   | Names.Name.Name v -> Tactypes.NamedHyp (CAst.make v)
@@ -169,8 +185,9 @@ exception Mebi_bindings_BindingInstruction_Undefined of EConstr.t * EConstr.t
 exception Mebi_bindings_BindingInstruction_IndexOutOfBounds of EConstr.t * int
 exception Mebi_bindings_BindingInstruction_NEQ of EConstr.t * Constr.t
 
-let rec get_bound_term (x : EConstr.t) : Instructions.t -> EConstr.t mm
-  = function
+let rec get_bound_term (x : EConstr.t) : Instructions.t -> EConstr.t mm =
+  Log.trace __FUNCTION__;
+  function
   | Undefined -> raise (Mebi_bindings_BindingInstruction_Undefined (x, x))
   | Done -> return x
   | Arg { root; index; cont } ->
@@ -179,6 +196,9 @@ let rec get_bound_term (x : EConstr.t) : Instructions.t -> EConstr.t mm
        let* xkind = Mebi_utils.econstr_kind x in
        match xkind with
        | App (xty, xtys) ->
+         Log.thing ~__FUNCTION__ Debug "x" x (Of Mebi_utils.Strfy.econstr);
+         Log.thing ~__FUNCTION__ Debug "xty" xty (Of Mebi_utils.Strfy.econstr);
+         Log.thing ~__FUNCTION__ Debug "root" root (Of Mebi_utils.Strfy.constr);
          let* xeq : bool = Mebi_utils.econstr_eq xty (EConstr.of_constr root) in
          if xeq
          then (
@@ -195,12 +215,15 @@ let rec get_bound_term (x : EConstr.t) : Instructions.t -> EConstr.t mm
 
 let get_explicit_bindings
   : EConstr.t * map option -> EConstr.t Tactypes.explicit_bindings mm
-  = function
+  =
+  Log.trace __FUNCTION__;
+  function
   | _, None -> return []
   | x, Some xmap ->
     let open Mebi_wrapper.Syntax in
     let keyvals = C.to_seq xmap |> Array.of_seq in
     let fold (i : int) (acc : EConstr.t Tactypes.explicit_bindings) =
+      Log.trace __FUNCTION__;
       let rel, (name, inst) = keyvals.(i) in
       let q = get_quantified_hyp name in
       let* bs = get_bound_term x inst in
@@ -214,7 +237,9 @@ let get
       (the_action : EConstr.t option)
       (the_goto : EConstr.t option)
   : t -> EConstr.t Tactypes.bindings mm
-  = function
+  =
+  Log.trace __FUNCTION__;
+  function
   | No_Bindings -> return Tactypes.NoBindings
   | Use_Bindings { from; action; goto } ->
     let open Mebi_wrapper.Syntax in
@@ -228,6 +253,7 @@ let get
       acc_some (acc_some [ the_from, from ] action the_action) goto the_goto
     in
     let map (i : int) (acc : EConstr.t Tactypes.explicit_bindings) =
+      Log.trace __FUNCTION__;
       let* bindings = List.nth to_iter i |> get_explicit_bindings in
       return (List.flatten [ bindings; acc ])
     in
