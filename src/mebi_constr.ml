@@ -1,9 +1,22 @@
 open Mebi_setup
 
 module Tree = struct
+  module Node = struct
+    type t = Mebi_setup.Enc.t * int
+
+    let to_string
+          ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+          ((enc, index) : t)
+      : string
+      =
+      Utils.Strfy.record
+        ~args
+        [ "enc", Mebi_setup.Enc.to_string enc; "index", Utils.Strfy.int index ]
+    ;;
+  end
+
   type 'a tree = Node of 'a * 'a tree list
-  type node = Mebi_setup.Enc.t * int
-  type t = node tree
+  type t = Node.t tree
 
   (** [add x y] inserts [x] to be a new leaf of [y], mutually recursive with [add_list x ys] (where [ys] is a list of [t]).
   *)
@@ -33,7 +46,7 @@ module Tree = struct
 
   (** converts a given tree into a flattened list with the minimal number of constructors to apply
   *)
-  let rec minimize : t -> node list = function
+  let rec minimize : t -> Node.t list = function
     | Node ((enc, index), []) -> [ enc, index ]
     | Node ((enc, index), h :: tl) ->
       (enc, index)
@@ -48,7 +61,7 @@ module Tree = struct
 
   exception Mebi_constr_Tree_EmptyList of unit
 
-  let min : t list -> node list = function
+  let min : t list -> Node.t list = function
     | [] -> raise (Mebi_constr_Tree_EmptyList ())
     | h :: tl ->
       List.map minimize tl
@@ -60,36 +73,25 @@ module Tree = struct
            (minimize h)
   ;;
 
-  let to_string ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-    : t -> string
+  let rec to_string
+            ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+            (Node (node, nodes) : t)
+    : string
     =
-    let rec to_string (x : t) : string =
-      match x with
-      | Node (lhs_int, rhs_int_tree_list) ->
-        Printf.sprintf
-          "(%s:%i) [%s]"
-          (Enc.to_string (fst lhs_int))
-          (snd lhs_int)
-          (match List.length rhs_int_tree_list with
-           | 0 -> ""
-           | 1 -> to_string (List.hd rhs_int_tree_list)
-           | _ ->
-             List.fold_left
-               (fun (acc : string) (rhs_int_tree : t) ->
-                 Printf.sprintf "%s, %s" acc (to_string rhs_int_tree))
-               (to_string (List.hd rhs_int_tree_list))
-               (List.tl rhs_int_tree_list))
-    in
-    to_string
+    Utils.Strfy.tuple
+      ~args
+      (Args Node.to_string)
+      (Args (Utils.Strfy.list (Args to_string)))
+      (node, nodes)
   ;;
 
   let list_to_string
         ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-        (x : t list)
-    : string
+    : t list -> string
     =
-    let open Utils.Strfy in
-    list ~args:{ args with name = Some "Constructor Trees" } (Of to_string) x
+    Utils.Strfy.list
+      ~args:{ args with name = Some "Constructor Trees" }
+      (Args to_string)
   ;;
 end
 

@@ -3,7 +3,11 @@ module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
 let () = Log.Config.enable_output ()
 let () = Log.Config.configure_output Debug true
-let () = Log.Config.configure_output Trace true
+let () = Log.Config.configure_output Trace false
+(***********************************************************************)
+
+type econstr_decl = Rocq_utils.econstr_decl
+
 (***********************************************************************)
 
 let ref_to_glob (r : Libnames.qualid) : Names.GlobRef.t = Nametab.global r
@@ -21,6 +25,92 @@ let ref_list_to_glob_list (l : Libnames.qualid list) : Names.GlobRef.t list =
 
 open Mebi_setup
 open Mebi_wrapper
+
+(* TODO: move from [Mebi_wrapper] *)
+(* module Eq = struct end *)
+
+(* TODO: *)
+(* FIXME: one of these causes Anomaly where env is referenced too early? *)
+module Strfy = struct
+  (******************)
+  let fname : Names.Id.t Utils.Strfy.to_string = Of Names.Id.to_string
+  let fenc : Enc.t Utils.Strfy.to_string = Of Enc.to_string
+
+  (******************)
+  let constr (x : Constr.t) : string = Mebi_wrapper.constr_to_string x
+  let fconstr : Constr.t Utils.Strfy.to_string = Of constr
+
+  (******************)
+  let econstr (x : EConstr.t) : string = Mebi_wrapper.econstr_to_string x
+  let feconstr : EConstr.t Utils.Strfy.to_string = Of econstr
+
+  (******************)
+  let ind_constr (x : Rocq_utils.ind_constr) : string =
+    runkeep
+      (state (fun env sigma -> sigma, Rocq_utils.Strfy.ind_constr env sigma x))
+  ;;
+
+  let f_ind_constr : Rocq_utils.ind_constr Utils.Strfy.to_string = Of ind_constr
+
+  (******************)
+  let ind_constrs (x : Rocq_utils.ind_constr array) : string =
+    runkeep
+      (state (fun env sigma -> sigma, Rocq_utils.Strfy.ind_constrs env sigma x))
+  ;;
+
+  let f_ind_constrs : Rocq_utils.ind_constr array Utils.Strfy.to_string =
+    Of ind_constrs
+  ;;
+
+  (******************)
+  let constrkind
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+        (x : Constr.t)
+    : string
+    =
+    runkeep
+      (state (fun env sigma ->
+         sigma, Rocq_utils.Strfy.constr_kind env sigma ~args x))
+  ;;
+
+  let fconstrkind : Constr.t Utils.Strfy.to_string = Args constrkind
+
+  (******************)
+  let encode (x : EConstr.t) : string = runkeep (encode x) |> Enc.to_string
+  let fencode : EConstr.t Utils.Strfy.to_string = Of encode
+
+  (******************)
+  let decode (x : Enc.t) : string = runkeep (Mebi_wrapper.decode x) |> econstr
+  let fdecode : Enc.t Utils.Strfy.to_string = Of decode
+
+  (******************)
+  let econstr_rel_decl (x : Rocq_utils.econstr_decl) : string =
+    runkeep
+      (state (fun env sigma ->
+         sigma, Rocq_utils.Strfy.econstr_rel_decl env sigma x))
+  ;;
+
+  let feconstr_rel_decl : Rocq_utils.econstr_decl Utils.Strfy.to_string =
+    Of econstr_rel_decl
+  ;;
+
+  let rocq_constructor_to_string
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+        (x : Model_info.rocq_constructor)
+    : string
+    =
+    runkeep
+      (state (fun env sigma ->
+         ( sigma
+         , Model_info.rocq_constructor_to_string
+             ~args
+             ~envsigma:(Some (env, sigma))
+             x )))
+  ;;
+end
+
+(***********************************************************************)
+
 open Mebi_wrapper.Syntax
 
 (** [get_lts_ind_mind gref]
@@ -141,7 +231,7 @@ let econstr_normalize (x : EConstr.t) : EConstr.t mm =
   return t
 ;;
 
-let econstr_kind (x : EConstr.t) : Rocq_utils.constr_kind mm =
+let econstr_kind (x : EConstr.t) : Rocq_utils.econstr_kind mm =
   state (fun env sigma -> sigma, EConstr.kind sigma x)
 ;;
 
@@ -242,3 +332,218 @@ let encode_ref (x : Libnames.qualid) : Enc.t mm =
   let x : EConstr.t = Rocq_utils.get_ind_ty ind mib in
   encode_econstr x
 ;;
+
+(*********************************************************)
+
+let get_fresh_evar (original : Rocq_utils.evar_source) : EConstr.t mm =
+  Log.trace __FUNCTION__;
+  state (fun env sigma -> Rocq_utils.get_fresh_evar env sigma original)
+;;
+
+(*********************************************************)
+
+let mk_ctx_substl
+      (acc : EConstr.Vars.substl)
+      (xs : ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list)
+  : EConstr.Vars.substl mm
+  =
+  Log.trace __FUNCTION__;
+  state (fun env sigma -> Rocq_utils.mk_ctx_substl env sigma acc xs)
+;;
+
+(***********************************************************************)
+
+(** [extract_args ?substl term] returns an [EConstr.t] triple of arguments of an inductively defined LTS, e.g., [term -> option action -> term -> Prop].
+    @param ?substl
+      is a list of substitutions applied to the terms prior to being returned.
+    @param term
+      must be of [Constr.kind] [App(fn, args)] (i.e., the application of some inductively defined LTS, e.g., [termLTS (tpar (tact (Send A) tend) (tact (Recv A) tend)) (Some A) (tpar tend tend)]).
+    @return a triple of [lhs_term, action, rhs_term]. *)
+let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
+  : Rocq_utils.constructor_args mm
+  =
+  Log.trace __FUNCTION__;
+  try return (Rocq_utils.extract_args ~substl term) with
+  | Rocq_utils.Rocq_utils_InvalidLtsArgLength x ->
+    (* TODO: err *) invalid_lts_args_length x
+  | Rocq_utils.Rocq_utils_InvalidLtsTermKind x -> invalid_lts_term_kind term
+;;
+
+(***********************************************************************)
+
+(* exception Model_info_CouldNotExtractBinding of unit *)
+
+(* let try_extract_binding (x:Constr.t) : (Tactypes.quantified_hypothesis * EConstr.t ) CAst.t =
+
+   ;; *)
+
+(* exception Model_info_CouldNotExtractBindings of unit *)
+
+(** [try_extract_bindings]
+    @raise Model_info_CouldNotExtractBindings
+      if there are no bindings to extract *)
+(* let try_extract_bindings ((_rel, c) : Rocq_utils.ind_constr)
+  : Model_info.binding_args -> EConstr.t Tactypes.explicit_bindings
+  =
+  try
+    let ty, tys = Rocq_utils.constr_to_app c in
+    let extract_bindings (x : Constr.t) : EConstr.t Tactypes.explicit_bindings =
+      Log.thing ~__FUNCTION__ Debug "x" x fconstr;
+      match Constr.kind x with
+      | Constr.Rel _ -> raise (Model_info_CouldNotExtractBinding ())
+      | Constr.App (ty, tys) ->
+        Log.thing ~__FUNCTION__ Debug "app.ty" ty fconstr;
+        (match Constr.kind ty with Constr.App (_, _) -> (
+          
+
+
+        
+        ) | _ -> raise (Model_info_CouldNotExtractBinding ()))
+      | _ -> raise (Model_info_CouldNotExtractBinding ())
+    in
+    let cfrom, clabel, cgoto = tys.(0), tys.(1), tys.(2) in
+    let state_bindings (x : Constr.t)
+      : Model_state.t -> EConstr.t Tactypes.explicit_bindings
+      =
+      try extract_bindings x with
+      | Model_info_CouldNotExtractBinding () -> fun _ -> []
+    in
+    let label_bindings (x : Constr.t)
+      : Model_label.t -> EConstr.t Tactypes.explicit_bindings
+      =
+      try extract_bindings x with
+      | Model_info_CouldNotExtractBinding () -> fun _ -> []
+    in
+    let to_return ({ from; label; goto } : Model_info.binding_args)
+      : EConstr.t Tactypes.explicit_bindings
+      =
+      match 
+      List.flatten 
+        [ state_bindings cfrom from
+        ; label_bindings clabel label
+        ; state_bindings cgoto goto
+        ]
+  with 
+    | [] -> raise (Model_info_CouldNotExtractBindings ())
+    | xs -> fun ({ from; label; goto } : Model_info.binding_args) -> xs
+    in
+    match to_return with
+    | [] -> raise (Model_info_CouldNotExtractBindings ())
+    | xs -> fun ({ from; label; goto } : Model_info.binding_args) -> to_return
+  with
+  (* NOTE: in case [tys.(_)] is out of bounds. *)
+  | Not_found -> raise (Model_info_CouldNotExtractBindings ())
+  | Rocq_utils.Rocq_utils_ConstrIsNot_App _ ->
+    raise (Model_info_CouldNotExtractBindings ())
+;; *)
+
+(* let get_constr_app (x : Constr.t) : Constr.t Rocq_utils.kind_pair =
+   try Rocq_utils.constr_to_app x with
+   | Rocq_utils.Rocq_utils_ConstrIsNot_App _ ->
+   raise (Model_info_CouldNotExtractBindings ())
+   ;; *)
+
+(* let mkfun_map_bindings (x:Constr.t) :(Names.lident * EConstr.t) -> EConstr.t option =
+   let m  : Constr.t F.t = F.create 0 in
+   let rec foo (x:Constr.t) : unit =
+
+   match Constr.kind x with
+   | Rel _ ->
+   | App (ty,tys) -> (
+
+   )
+   | _ -> (* TODO: *) ()
+   (* and bar (xs:Constr.t array) : EConstr.t -> EConstr.t option =
+   Array.fold_left (fun acc x ->
+   match foo x with | None -> acc | Some x -> x ::
+   ) *)
+
+   in
+   (* foo x *)
+   fun _ -> None
+
+   ;; *)
+
+(** [try_extract_bindings]
+    @raise Model_info_CouldNotExtractBindings
+      if there are no bindings to extract *)
+(* let try_extract_bindings ((ctx, c) : Rocq_utils.ind_constr)
+   : Model_info.binding_args -> EConstr.t Tactypes.explicit_bindings
+   =
+   let decls : Rocq_utils.econstr_decls = Rocq_utils.get_econstr_decls ctx in
+   let from, label, goto = get_constr_app c |> unpack_constr_args in
+   let extract_bindings (x : Constr.t) (y : Constr.t) (z : Constr.t)
+   : EConstr.t Tactypes.explicit_bindings
+   =
+   Log.thing ~__FUNCTION__ Debug "x" x fconstr;
+   match Constr.kind x with
+   | Constr.Rel _ -> raise (Model_info_CouldNotExtractBinding ())
+   | Constr.App (ty, tys) ->
+   Log.thing ~__FUNCTION__ Debug "app.ty" ty fconstr;
+   (match Constr.kind ty with
+   | Constr.App (_, _) -> []
+   | _ -> raise (Model_info_CouldNotExtractBinding ()))
+   | _ -> raise (Model_info_CouldNotExtractBinding ())
+   in
+   fun _ -> []
+   ;; *)
+
+(* let resolve_bindings (bs : EConstr.t Tactypes.explicit_bindings option list)
+   : EConstr.t Tactypes.explicit_bindings
+   =
+   Log.trace __FUNCTION__;
+   let rec resolve_bindings
+   :  EConstr.t Tactypes.explicit_bindings option list
+   -> EConstr.t Tactypes.explicit_bindings
+   = function
+   | [] -> []
+   | None :: tl -> resolve_bindings tl
+   | Some h :: tl -> List.concat [ h; resolve_bindings tl ]
+   in
+   (* NOTE: ensure no duplicate bindings *)
+   resolve_bindings bs
+   |> List.fold_left
+   (fun (acc : EConstr.t Tactypes.explicit_bindings)
+   (b : (Tactypes.quantified_hypothesis * EConstr.t) CAst.t) ->
+   if
+   List.exists
+   (fun (b' : (Tactypes.quantified_hypothesis * EConstr.t) CAst.t) ->
+   (* NOTE: we cannot access content of [CAst] *)
+   CAst.eq
+   (* NOTE: we only check the [snd] ([EConstr.t]) as we assume that the exact same term would be used under the same decl from some [rel_context]. *)
+   (fun ((_, x) : Tactypes.quantified_hypothesis * EConstr.t)
+   ((_, y) : Tactypes.quantified_hypothesis * EConstr.t)
+   : bool ->
+   Mebi_wrapper.runkeep
+   (Mebi_wrapper.state (fun env sigma ->
+   sigma, Eq.econstr sigma x y)))
+   b
+   b')
+   acc
+   then acc
+   else b :: acc)
+   []
+   ;; *)
+
+let _pair_map_to_string =
+  fun (k : EConstr.t) (v : Names.Name.t) ->
+  Printf.sprintf
+    "pairmap: %s => %s"
+    (econstr_to_string k)
+    (Rocq_utils.Strfy.pp (Names.Name.print v))
+  |> Log.debug ~__FUNCTION__
+;;
+
+(* module E : Hashtbl.S with type key = EConstr.t = Hashtbl.Make (struct
+   type t = EConstr.t
+
+   let equal (x : t) (y : t) : bool = EConstr.eq_constr !(the_coq_ctx ()) x y
+
+   let hash (x : t) : int =
+   Constr.hash
+   (EConstr.to_constr
+   ?abort_on_undefined_evars:(Some false)
+   !(the_coq_ctx ())
+   x)
+   ;;
+   end) *)

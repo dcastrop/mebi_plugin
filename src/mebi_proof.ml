@@ -28,6 +28,26 @@ let concl_to_string (gl : Proofview.Goal.t) : string =
 ;;
 
 (***********************************************************************)
+
+let concl_to_atomic (gl : Proofview.Goal.t) : EConstr.t Rocq_utils.kind_pair =
+  Rocq_utils.econstr_to_atomic
+    (Proofview.Goal.sigma gl)
+    (Proofview.Goal.concl gl)
+;;
+
+exception Mebi_proof_TheoryNoneNotEncoded of unit
+
+let get_theory_none_enc () : Enc.t =
+  match runkeep (Mebi_utils.get_none_enc_opt ()) with
+  | None -> raise (Mebi_proof_TheoryNoneNotEncoded ())
+  | Some x -> x
+;;
+
+let _get_theory_none_dec () : EConstr.t =
+  runkeep (decode (get_theory_none_enc ()))
+;;
+
+(***********************************************************************)
 module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
 let () = Log.Config.configure_output Debug true
@@ -38,6 +58,16 @@ let () = Log.Config.configure_output Trace true
 
 let feconstr (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
   Of (econstr_to_string gl)
+;;
+
+let feconstr_opt (gl : Proofview.Goal.t)
+  : EConstr.t option Utils.Strfy.to_string
+  =
+  Of (Utils.Strfy.option (feconstr gl))
+;;
+
+let _fconstr (gl : Proofview.Goal.t) : Constr.t Utils.Strfy.to_string =
+  Of (Rocq_utils.Strfy.constr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl))
 ;;
 
 let _feconstrkinds (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
@@ -121,6 +151,28 @@ let acc_econstr_to_unfold
 ;;
 
 (***********************************************************************)
+(*** Bisimilarity Result ***********************************************)
+(***********************************************************************)
+
+let the_result () : Algorithms.Bisimilar.result =
+  Algorithms.Bisimilar.get_the_result ()
+;;
+
+let mfsm ?(saturated : bool = false) () : Fsm.t =
+  if saturated
+  then (the_result ()).the_fsm_1.saturated
+  else (the_result ()).the_fsm_1.original
+;;
+
+let nfsm ?(saturated : bool = false) () : Fsm.t =
+  if saturated
+  then (the_result ()).the_fsm_2.saturated
+  else (the_result ()).the_fsm_2.original
+;;
+
+let the_bisim_states () : Partition.t = (the_result ()).bisim_states
+
+(***********************************************************************)
 (*** Proof State *******************************************************)
 (***********************************************************************)
 
@@ -134,23 +186,151 @@ let tactic ?(msg : string option) (x : unit Proofview.tactic) : tactic =
   { msg; x }
 ;;
 
-let tactic_chain : tactic list -> tactic =
+exception Mebi_proof_ChainEmptyTactics of unit
+
+let tactic_chain ?(nonempty : bool = false) : tactic list -> tactic =
   Log.trace __FUNCTION__;
+  let f : string option * string option -> string option = function
+    | None, None -> None
+    | Some xmsg, None -> Some xmsg
+    | None, Some ymsg -> Some ymsg
+    | Some xmsg, Some ymsg -> Some (Printf.sprintf "%s; %s" xmsg ymsg)
+  in
+  let g =
+    List.fold_left (fun { msg = xmsg; x } { msg = ymsg; x = y } ->
+      { msg = f (xmsg, ymsg); x = Mebi_theories.tactics [ x; y ] })
+  in
   function
-  | [] -> tactic (Proofview.tclUNIT ())
-  | h :: tl ->
-    let f : string option * string option -> string option = function
-      | None, None -> None
-      | Some xmsg, None -> Some xmsg
-      | None, Some ymsg -> Some ymsg
-      | Some xmsg, Some ymsg -> Some (Printf.sprintf "%s; %s" xmsg ymsg)
-    in
-    List.fold_left
-      (fun { msg = xmsg; x } { msg = ymsg; x = y } ->
-        { msg = f (xmsg, ymsg); x = Mebi_theories.tactics [ x; y ] })
-      h
-      tl
+  | [] ->
+    if nonempty
+    then raise (Mebi_proof_ChainEmptyTactics ())
+    else tactic (Proofview.tclUNIT ())
+  | h :: [] -> g h []
+  | h :: tl -> g h tl
 ;;
+
+module ApplicableConstructors = struct
+  type t =
+    { current : Tree.Node.t list
+    ; annotation : Note.annotation option
+    ; destination : State.t
+    }
+
+  let to_string ({ current; annotation; destination } : t) : string =
+    let current : string =
+      Utils.Strfy.list (Args Tree.Node.to_string) current
+    in
+    let annotation : string =
+      Utils.Strfy.option (Args Note.annotation_to_string) annotation
+    in
+    let destination : string = State.to_string destination in
+    Utils.Strfy.record
+      [ "current", current
+      ; "annotation", annotation
+      ; "destination", destination
+      ]
+  ;;
+
+  (* TODO: inchworm *)
+  (* and tactics_to_apply =
+    { this : tactic
+    ; next : Tree.Node.t list
+    } *)
+
+  exception Mebi_proof_CannotGetConstructorInfo_None of unit
+  exception Mebi_proof_CannotFindConstructorInfo_OfLTS of Enc.t
+  exception Mebi_proof_CannotFindConstructorInfo_OfIndex of int
+
+  type constructor_binding_args =
+    | Raw of EConstr.t constructor_binding_triple
+    | Enc of Enc.t constructor_binding_triple
+
+  and 'a constructor_binding_triple = 'a * 'a option * 'a option
+
+  let make_constructor_bindings
+        (gl : Proofview.Goal.t)
+        (bindings : Mebi_bindings.t)
+    : constructor_binding_args -> EConstr.t Tactypes.bindings
+    =
+    Log.trace __FUNCTION__;
+    let env = Proofview.Goal.env gl in
+    let sigma = Proofview.Goal.sigma gl in
+    let f ((x, y, z) : EConstr.t * EConstr.t option * EConstr.t option)
+      : EConstr.t Tactypes.bindings
+      =
+      Log.thing ~__FUNCTION__ Debug "x" x (feconstr gl);
+      Log.thing ~__FUNCTION__ Debug "y" y (feconstr_opt gl);
+      Log.thing ~__FUNCTION__ Debug "z" z (feconstr_opt gl);
+      Mebi_bindings.get env sigma x y z bindings
+    in
+    function
+    | Raw args ->
+      Log.trace ~__FUNCTION__ "Raw args";
+      f args
+    | Enc (the_from, the_action, the_goto) ->
+      Log.trace ~__FUNCTION__ "Enc args";
+      let the_from : EConstr.t = runkeep (decode the_from) in
+      let fopt =
+        fun (xopt : Enc.t option) ->
+        Option.cata
+          (fun (x : Enc.t) -> runkeep (Mebi_wrapper.decode_opt x))
+          None
+          xopt
+      in
+      let the_action : EConstr.t option = fopt the_action in
+      let the_goto : EConstr.t option = fopt the_goto in
+      f (the_from, the_action, the_goto)
+  ;;
+
+  let get_constructor_bindings
+        (gl : Proofview.Goal.t)
+        ((lts_enc, constructor_index) : Tree.Node.t)
+    : constructor_binding_args -> EConstr.t Tactypes.bindings
+    =
+    Log.trace __FUNCTION__;
+    (* NOTE: assuming this is for nfsm *)
+    match (nfsm ()).info.rocq_info with
+    | None -> raise (Mebi_proof_CannotGetConstructorInfo_None ())
+    | Some info ->
+      let finfo = fun ({ enc; _ } : Info.rocq_info) -> Enc.equal enc lts_enc in
+      (match List.find_opt finfo info with
+       | None -> raise (Mebi_proof_CannotFindConstructorInfo_OfLTS lts_enc)
+       | Some x ->
+         let fconstructor =
+           fun ({ index; _ } : Info.rocq_constructor) ->
+           Int.equal index constructor_index
+         in
+         (match List.find_opt fconstructor x.constructors with
+          | None ->
+            raise
+              (Mebi_proof_CannotFindConstructorInfo_OfIndex constructor_index)
+          | Some x ->
+            Log.thing
+              ~__FUNCTION__
+              Debug
+              "constructor"
+              x
+              (Args Mebi_utils.Strfy.rocq_constructor_to_string);
+            make_constructor_bindings gl x.bindings))
+  ;;
+
+  let get_constructor_tactic
+        (gl : Proofview.Goal.t)
+        ((enc, index) : Tree.Node.t)
+    : constructor_binding_args option -> tactic
+    =
+    Log.trace __FUNCTION__;
+    (* NOTE: constructors index from 1 *)
+    let index : int = index + 1 in
+    let msg : string = Printf.sprintf "constructor %i" index in
+    let f (xs : EConstr.t Tactypes.bindings) : tactic =
+      tactic ~msg (Tactics.one_constructor index xs)
+    in
+    function
+    | None -> f NoBindings
+    | Some args -> f (get_constructor_bindings gl (enc, index) args)
+  ;;
+end
 
 module PState = struct
   type t =
@@ -159,19 +339,13 @@ module PState = struct
     | NewCofix
     | DoRefl
     | GoalTransition of transitions
-    | ApplyConstructors of applicable_constructors
+    | ApplyConstructors of ApplicableConstructors.t
     | DetectState
 
   (* TODO: maybe revert to just [mtrans:Transition.t]*)
   and transitions =
     { mtrans : Transition.t
     ; ntrans : Transition_opt.t
-    }
-
-  and applicable_constructors =
-    { annotation : Note.annotation option
-    ; tactics : tactic list option
-    ; goto : State.t
     }
 
   (* and tactic_to_apply = unit -> unit Proofview.tactic *)
@@ -197,31 +371,10 @@ module PState = struct
              ":\nmtrans: %s\n\nntrans: %s\n"
              (Transition.to_string mtrans)
              (Transition_opt.to_string ntrans))
-    | ApplyConstructors { annotation; tactics; goto } ->
+    | ApplyConstructors x ->
       Printf.sprintf
         "ApplyConstructors%s"
-        (if short
-         then ""
-         else
-           Printf.sprintf
-             ":\nGoto: %s\nAnnotation: %s\nTactics: %s"
-             (State.to_string goto)
-             (Option.cata Note.annotation_to_string "None" annotation)
-             (Option.cata
-                (fun xs ->
-                  Printf.sprintf
-                    "%s (Tactics: %i)"
-                    (List.fold_left
-                       (fun acc { msg; _ } ->
-                         Printf.sprintf
-                           "%s; %s"
-                           acc
-                           (Option.cata (fun y -> y) "None" msg))
-                       ""
-                       xs)
-                    (List.length xs))
-                "None"
-                tactics))
+        (if short then "" else ApplicableConstructors.to_string x)
     | DetectState -> "DetectState"
   ;;
 end
@@ -292,28 +445,6 @@ let get_tactic ?(short : bool = true) ?(state : bool = true)
     Log.notice (Printf.sprintf "%s." msg);
     x
 ;;
-
-(***********************************************************************)
-(*** Bisimilarity Result ***********************************************)
-(***********************************************************************)
-
-let the_result () : Algorithms.Bisimilar.result =
-  Algorithms.Bisimilar.get_the_result ()
-;;
-
-let mfsm ?(saturated : bool = false) () : Fsm.t =
-  if saturated
-  then (the_result ()).the_fsm_1.saturated
-  else (the_result ()).the_fsm_1.original
-;;
-
-let nfsm ?(saturated : bool = false) () : Fsm.t =
-  if saturated
-  then (the_result ()).the_fsm_2.saturated
-  else (the_result ()).the_fsm_2.original
-;;
-
-let the_bisim_states () : Partition.t = (the_result ()).bisim_states
 
 (***********************************************************************)
 (*** Warning Messages **************************************************)
@@ -417,7 +548,7 @@ let get_actions
    ;;
 
    let _get_annotation_constructor (nfrom : State.t) (nlabel : Label.t)
-   : Tree.node list
+   : Tree.Node.t list
    =
    Log.trace __FUNCTION__;
    get_naction ~annotated:true nfrom nlabel (nfsm ~saturated:false ())
@@ -426,7 +557,7 @@ let get_actions
 
 (* let get_annotation_constructor
       ({ this = { from; via }; next } : Note.annotation)
-  : Tree.node list
+  : Tree.Node.t list
   =
   Log.trace __FUNCTION__;
   (* get_naction ~annotated:true nfrom nlabel (nfsm ~saturated:false ())
@@ -452,7 +583,7 @@ let _do_nothing () : tactic =
   raise (Mebi_proof_FailIfNothing ())
 ;;
 
-exception Mebi_proof_TyDoesNotMatchTheories of Rocq_utils.kind_pair
+exception Mebi_proof_TyDoesNotMatchTheories of EConstr.t Rocq_utils.kind_pair
 
 let get_all_non_cofix (gl : Proofview.Goal.t) : Names.Id.Set.t =
   Names.Id.Set.filter
@@ -575,6 +706,7 @@ let do_eapply_wk_some (gl : Proofview.Goal.t) : tactic =
 ;;
 
 let do_unfold (gl : Proofview.Goal.t) (x : EConstr.t) : tactic =
+  Log.trace __FUNCTION__;
   tactic
     ~msg:(Printf.sprintf "unfold %s" (econstr_to_string gl x))
     (Mebi_tactics.unfold_econstr gl x)
@@ -582,8 +714,9 @@ let do_unfold (gl : Proofview.Goal.t) (x : EConstr.t) : tactic =
 
 exception Mebi_proof_NothingToUnfold of unit
 
-let chain_do_unfold (gl : Proofview.Goal.t) : EConstr.t list -> tactic
-  = function
+let chain_do_unfold (gl : Proofview.Goal.t) : EConstr.t list -> tactic =
+  Log.trace __FUNCTION__;
+  function
   | [] -> raise (Mebi_proof_NothingToUnfold ())
   | x :: xs ->
     List.fold_left
@@ -599,12 +732,15 @@ let do_unfold_in_hyp
       (x : EConstr.t)
   : tactic
   =
+  Log.trace __FUNCTION__;
   tactic_chain [ tactic (Mebi_tactics.unfold_in_hyp gl x h); do_unfold gl x ]
 ;;
 
 let chain_do_unfold_in_hyp (gl : Proofview.Goal.t) (h : Rocq_utils.hyp)
   : EConstr.t list -> tactic
-  = function
+  =
+  Log.trace __FUNCTION__;
+  function
   | [] -> raise (Mebi_proof_NothingToUnfold ())
   | x :: [] -> do_unfold_in_hyp gl h x
   | x :: xs ->
@@ -682,7 +818,8 @@ let do_constructor_transition
     (Args Note.annotation_to_string);
   set_the_proof_state
     ~__FUNCTION__
-    (ApplyConstructors { annotation = Some annotation; tactics = None; goto });
+    (ApplyConstructors
+       { annotation = Some annotation; current = []; destination = goto });
   tactic_chain
     [ (if Label.is_silent nlabel
        then do_apply_wk_none gl
@@ -722,62 +859,17 @@ let do_constructor_transition
    else raise (Mebi_proof_StatesNotBisimilar (mfrom, ngoto, the_bisim_states ()))
    ;; *)
 
-exception Mebi_proof_CannotGetConstructorInfo_None of unit
-exception Mebi_proof_CannotFindConstructorInfo_OfLTS of Enc.t
-exception Mebi_proof_CannotFindConstructorInfo_OfIndex of int
+(* let do_build_constructor_tactics'
+      (gl : Proofview.Goal.t) : 
+      ApplicableConstructors.t -> tactic =
+      function |
+      {tactics=None;_}
+      {tactics=Some {this;next};_}
 
-let make_constructor_bindings
-  : Info.rocq_constructor_bindings -> EConstr.t Tactypes.bindings
-  =
-  Log.trace __FUNCTION__;
-  function
-  | Info.No_Bindings -> NoBindings
-  | Info.Use_Bindings f -> ExplicitBindings []
-;;
 
-let get_constructor_bindings ((lts_enc, constructor_index) : Tree.node)
-  : EConstr.t Tactypes.bindings
-  =
-  Log.trace __FUNCTION__;
-  (* NOTE: assuming this is for nfsm *)
-  match (nfsm ()).info.rocq_info with
-  | None -> raise (Mebi_proof_CannotGetConstructorInfo_None ())
-  | Some info ->
-    let finfo = fun ({ enc; _ } : Info.rocq_info) -> Enc.equal enc lts_enc in
-    (match List.find_opt finfo info with
-     | None -> raise (Mebi_proof_CannotFindConstructorInfo_OfLTS lts_enc)
-     | Some x ->
-       let fconstructor =
-         fun ({ index; _ } : Info.rocq_constructor) ->
-         Int.equal index constructor_index
-       in
-       (match List.find_opt fconstructor x.constructors with
-        | None ->
-          Log.thing
-            ~__FUNCTION__
-            Warning
-            "index"
-            constructor_index
-            (Args Utils.Strfy.int);
-          Log.thing ~__FUNCTION__ Warning "nfsm" (nfsm ()) (Args Fsm.to_string);
-          raise (Mebi_proof_CannotFindConstructorInfo_OfIndex constructor_index)
-        | Some x -> make_constructor_bindings x.bindings))
-;;
+  ;; *)
 
-let get_constructor_tactic
-      (* (x:Info.binding_args) *)
-        ((enc, index) : Tree.node)
-  : tactic
-  =
-  Log.trace __FUNCTION__;
-  (* NOTE: constructors index from 1 *)
-  let index : int = index + 1 in
-  tactic
-    ~msg:(Printf.sprintf "constructor %i" index)
-    (Tactics.one_constructor index (get_constructor_bindings (enc, index)))
-;;
-
-let do_build_constructor_tactics
+(* let do_build_constructor_tactics
       (gl : Proofview.Goal.t)
       (destination : State.t)
       ({ this = { from; via; using; goto }; next } : Note.annotation)
@@ -789,13 +881,46 @@ let do_build_constructor_tactics
   Log.thing ~__FUNCTION__ Debug "goto" goto (Args State.to_string);
   Log.thing ~__FUNCTION__ Debug "using" using (Args Tree.list_to_string);
   Log.option ~__FUNCTION__ Debug "next" next (Args Note.annotation_to_string);
-  let constructor : Tree.node list = Tree.min using in
-  let tactics : tactic list = List.map get_constructor_tactic constructor in
+  let constructor : Tree.Node.t list = Tree.min using in
   set_the_proof_state
     ~__FUNCTION__
-    (ApplyConstructors { annotation = next; tactics = Some tactics; goto });
+    (ApplyConstructors
+       (ApplicableConstructors.create
+          { from; label = via; goto }
+          next
+          constructor));
+  (* match ApplicableConstructors.try_get_next { from; label = via; goto } with *)
+  (* | None -> *)
+  (* let tactics : tactic list =
+    try
+      List.map (get_constructor_tactic { from; label = via; goto }) constructor
+    with
+    | Mebi_utils.Mebi_utils_BindingInstruction_NEQ (x, y) ->
+      Log.warning ~__FUNCTION__ "Mebi_utils_BindingInstruction_NEQ";
+      Log.thing ~__FUNCTION__ Debug "x" x (feconstr gl);
+      Log.thing ~__FUNCTION__ Debug "y" y (fconstr gl);
+      raise (Mebi_utils.Mebi_utils_BindingInstruction_NEQ (x, y))
+    | Mebi_utils.Mebi_utils_BindingInstruction_NotApp x ->
+      Log.warning ~__FUNCTION__ "Mebi_utils_BindingInstruction_NotApp";
+      Log.thing ~__FUNCTION__ Debug "x" x (feconstr gl);
+      raise (Mebi_utils.Mebi_utils_BindingInstruction_NotApp x)
+    | Mebi_utils.Mebi_utils_BindingInstruction_Undefined (x, y) ->
+      Log.warning ~__FUNCTION__ "Mebi_utils_BindingInstruction_Undefined";
+      Log.thing ~__FUNCTION__ Debug "x" x (feconstr gl);
+      Log.thing ~__FUNCTION__ Debug "y" y (feconstr gl);
+      raise (Mebi_utils.Mebi_utils_BindingInstruction_Undefined (x, y))
+    | Mebi_utils.Mebi_utils_BindingInstruction_IndexOutOfBounds (x, i) ->
+      Log.warning ~__FUNCTION__ "Mebi_utils_BindingInstruction_IndexOutOfBounds";
+      Log.thing ~__FUNCTION__ Debug "x" x (feconstr gl);
+      Log.thing ~__FUNCTION__ Debug "y" i (Args Utils.Strfy.int);
+      raise (Mebi_utils.Mebi_utils_BindingInstruction_IndexOutOfBounds (x, i))
+  in
+  set_the_proof_state
+    ~__FUNCTION__
+    (* TODO: cannot store entire constructor tactics at once, need to "inch worm" along *)
+    (ApplyConstructors { annotation = next; tactics = Some tactics; goto }); *)
   do_rt1n_via gl via
-;;
+;; *)
 
 (***********************************************************************)
 
@@ -813,7 +938,9 @@ let try_decode (gl : Proofview.Goal.t) (x : EConstr.t) : Enc.t option =
       raise (Mebi_proof_CouldNotDecodeEConstr x))
 ;;
 
-let typ_is_exists (gl : Proofview.Goal.t) ((ty, _) : Rocq_utils.kind_pair)
+let typ_is_exists
+      (gl : Proofview.Goal.t)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -821,7 +948,9 @@ let typ_is_exists (gl : Proofview.Goal.t) ((ty, _) : Rocq_utils.kind_pair)
   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_ex ())
 ;;
 
-let typ_is_weak_sim (gl : Proofview.Goal.t) ((ty, _) : Rocq_utils.kind_pair)
+let typ_is_weak_sim
+      (gl : Proofview.Goal.t)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -831,7 +960,7 @@ let typ_is_weak_sim (gl : Proofview.Goal.t) ((ty, _) : Rocq_utils.kind_pair)
 
 let typ_is_weak_transition
       (gl : Proofview.Goal.t)
-      ((ty, _) : Rocq_utils.kind_pair)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -839,9 +968,19 @@ let typ_is_weak_transition
   Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak ())
 ;;
 
+let typ_is_tau
+      (gl : Proofview.Goal.t)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
+  : bool
+  =
+  Log.trace __FUNCTION__;
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+  Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_tau ())
+;;
+
 let typ_is_silent_transition
       (gl : Proofview.Goal.t)
-      ((ty, _) : Rocq_utils.kind_pair)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -851,7 +990,7 @@ let typ_is_silent_transition
 
 let typ_is_silent1_transition
       (gl : Proofview.Goal.t)
-      ((ty, _) : Rocq_utils.kind_pair)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -861,7 +1000,7 @@ let typ_is_silent1_transition
 
 let typ_is_lts_transition
       (gl : Proofview.Goal.t)
-      ((ty, _) : Rocq_utils.kind_pair)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -871,7 +1010,7 @@ let typ_is_lts_transition
 
 let typ_is_fsm_constructor
       (gl : Proofview.Goal.t)
-      ((ty, _) : Rocq_utils.kind_pair)
+      ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : Fsm.t -> bool
   =
   Log.trace __FUNCTION__;
@@ -1045,7 +1184,7 @@ let get_transition
 let get_lts_transition
       (gl : Proofview.Goal.t)
       (fsm : Fsm.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : Transition_opt.t
   =
   Log.trace __FUNCTION__;
@@ -1124,7 +1263,7 @@ let get_mtransition (gl : Proofview.Goal.t) : Transition.t =
 let get_weak_transition
       (gl : Proofview.Goal.t)
       (fsm : Fsm.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : Transition_opt.t
   =
   Log.trace __FUNCTION__;
@@ -1144,7 +1283,7 @@ let get_weak_ntransition (gl : Proofview.Goal.t) (wk_trans : EConstr.t)
 let _get_silent_transition
       (gl : Proofview.Goal.t)
       (fsm : Fsm.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : Transition_opt.t
   =
   Log.trace __FUNCTION__;
@@ -1156,7 +1295,7 @@ let _get_silent_transition
 let _get_silent1_transition
       (gl : Proofview.Goal.t)
       (fsm : Fsm.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : Transition_opt.t
   =
   Log.trace __FUNCTION__;
@@ -1165,9 +1304,21 @@ let _get_silent1_transition
   else raise (Mebi_proof_TyDoesNotMatchTheories (ty, tys))
 ;;
 
+(* let get_tau_transition
+   (gl : Proofview.Goal.t)
+   (fsm : Fsm.t)
+   ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
+   : Transition_opt.t
+   =
+   Log.trace __FUNCTION__;
+   if typ_is_tau_transition gl (ty, tys)
+   then get_transition gl tys.(0) tys.(1) tys.(2) fsm
+   else raise (Mebi_proof_TyDoesNotMatchTheories (ty, tys))
+   ;; *)
+
 let _get_concl_ntransition
       (gl : Proofview.Goal.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : Transition_opt.t
   =
   Log.trace __FUNCTION__;
@@ -1203,15 +1354,21 @@ let get_econstrs_to_unfold (gl : Proofview.Goal.t) (x : EConstr.t)
   loop [] x
 ;;
 
-let do_any_unfold_concl (gl : Proofview.Goal.t) : tactic =
+let do_any_unfold_concl ?(enforce : bool = false) (gl : Proofview.Goal.t)
+  : tactic
+  =
   Log.trace __FUNCTION__;
   let the_concl : EConstr.t = Proofview.Goal.concl gl in
-  get_econstrs_to_unfold gl the_concl |> chain_do_unfold gl
+  try get_econstrs_to_unfold gl the_concl |> chain_do_unfold gl with
+  | Mebi_proof_NothingToUnfold x ->
+    if enforce
+    then raise (Mebi_proof_NothingToUnfold x)
+    else tactic (Proofview.tclUNIT ())
 ;;
 
 let do_any_unfold_hyp_pair
       (gl : Proofview.Goal.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : EConstr.t list
   =
   Log.trace __FUNCTION__;
@@ -1268,7 +1425,7 @@ let check_if_can_unfold (gl : Proofview.Goal.t) : EConstr.t -> bool =
   loop
 ;;
 
-let can_unfold_concl (gl : Proofview.Goal.t) : bool =
+let _can_unfold_concl (gl : Proofview.Goal.t) : bool =
   Log.trace __FUNCTION__;
   let the_concl : EConstr.t = Proofview.Goal.concl gl in
   Log.thing ~__FUNCTION__ Debug "concl" the_concl (feconstr gl);
@@ -1277,7 +1434,7 @@ let can_unfold_concl (gl : Proofview.Goal.t) : bool =
 
 let can_unfold_hyp_pair
       (gl : Proofview.Goal.t)
-      ((ty, tys) : Rocq_utils.kind_pair)
+      ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
   : bool
   =
   Log.trace __FUNCTION__;
@@ -1307,7 +1464,11 @@ module Cofix_HTy : Hyp.HTY_S = struct
     ; _n : State.t
     }
 
-  let of_hty (gl : Proofview.Goal.t) ((ty, tys) : Rocq_utils.kind_pair) : t =
+  let of_hty
+        (gl : Proofview.Goal.t)
+        ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
+    : t
+    =
     let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
     if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
     then (
@@ -1337,7 +1498,11 @@ module Invertible = struct
     | { kind = ToUnfold _; _ } -> "ToUnfold"
   ;;
 
-  let of_hty (gl : Proofview.Goal.t) ((ty, tys) : Rocq_utils.kind_pair) : k =
+  let of_hty
+        (gl : Proofview.Goal.t)
+        ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
+    : k
+    =
     Log.trace __FUNCTION__;
     let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
     try
@@ -1368,12 +1533,16 @@ module Invertible = struct
       raise (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys))
   ;;
 
-  let opt_of_hty (gl : Proofview.Goal.t) (p : Rocq_utils.kind_pair) : k option =
+  let opt_of_hty (gl : Proofview.Goal.t) (p : EConstr.t Rocq_utils.kind_pair)
+    : k option
+    =
     Log.trace __FUNCTION__;
     try Some (of_hty gl p) with Hyp.Mebi_proof_Hypothesis_HTy _ -> None
   ;;
 
-  let hty_is_a (gl : Proofview.Goal.t) (p : Rocq_utils.kind_pair) : bool =
+  let hty_is_a (gl : Proofview.Goal.t) (p : EConstr.t Rocq_utils.kind_pair)
+    : bool
+    =
     Log.trace __FUNCTION__;
     Option.has_some (opt_of_hty gl p)
   ;;
@@ -1415,7 +1584,11 @@ end
 module TransOpt : Hyp.HYP_TYPE = Hyp.Make (struct
     type t = Transition_opt.t
 
-    let of_hty (gl : Proofview.Goal.t) ((ty, tys) : Rocq_utils.kind_pair) : t =
+    let of_hty
+          (gl : Proofview.Goal.t)
+          ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
+      : t
+      =
       try get_lts_transition gl (mfsm ()) (ty, tys) with
       | Mebi_proof_CouldNotDecodeTransitionState (x, fsm) ->
         raise (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys))
@@ -1439,7 +1612,7 @@ let hyp_is_something (gl : Proofview.Goal.t) (h : Rocq_utils.hyp) : bool =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   try
-    let p : Rocq_utils.kind_pair = Rocq_utils.hyp_to_atomic sigma h in
+    let p : EConstr.t Rocq_utils.kind_pair = Rocq_utils.hyp_to_atomic sigma h in
     if Cofix.hty_is_a gl p
     then true
     else if Invertible.hty_is_a gl p
@@ -1486,7 +1659,8 @@ type concl_conj =
   ; wk_sim : EConstr.t
   }
 
-exception Mebi_proof_ConclIsNot_Conj of (Evd.evar_map * Rocq_utils.kind_pair)
+exception
+  Mebi_proof_ConclIsNot_Conj of (Evd.evar_map * EConstr.t Rocq_utils.kind_pair)
 
 let concl_wk_sim (gl : Proofview.Goal.t) : concl_conj =
   Log.trace __FUNCTION__;
@@ -1509,9 +1683,11 @@ type wk_sim_state =
 
 let wk_sim_state (gl : Proofview.Goal.t) : wk_sim_state -> EConstr.t =
   Log.trace __FUNCTION__;
-  let f (c : Proofview.Goal.t -> Rocq_utils.kind_pair -> bool) wk =
+  let f (c : Proofview.Goal.t -> EConstr.t Rocq_utils.kind_pair -> bool) wk =
     let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-    let x : Rocq_utils.kind_pair = Rocq_utils.econstr_to_atomic sigma wk in
+    let x : EConstr.t Rocq_utils.kind_pair =
+      Rocq_utils.econstr_to_atomic sigma wk
+    in
     if c gl x then snd x else raise (Mebi_proof_CouldNotGetWkSimState ())
   in
   function
@@ -1861,7 +2037,7 @@ and handle_new_weak_sim (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   let the_concl : EConstr.t = Proofview.Goal.concl gl in
-  let concltyp : Rocq_utils.kind_pair =
+  let concltyp : EConstr.t Rocq_utils.kind_pair =
     Rocq_utils.econstr_to_atomic sigma the_concl
   in
   (* NOTE: [auto] when concl is [weak_sim] and hyp has corresponding [cofix] *)
@@ -1869,15 +2045,13 @@ and handle_new_weak_sim (gl : Proofview.Goal.t) : tactic =
   then (
     Log.trace ~__FUNCTION__ "(concl is weak sim)";
     (* TODO: just try to invert and then catch error if nothing to invert *)
-    if can_unfold_concl gl
-    then (
-      try do_any_unfold_concl gl with
-      | Mebi_proof_NothingToUnfold _ -> raise (Mebi_proof_NewWeakSim ()))
-    else if hyps_has_cofix gl
-    then do_solve_cofix gl
-    else (
-      set_the_proof_state ~__FUNCTION__ NewCofix;
-      do_new_cofix gl))
+    try do_any_unfold_concl ~enforce:true gl with
+    | Mebi_proof_NothingToUnfold _ ->
+      if hyps_has_cofix gl
+      then do_solve_cofix gl
+      else (
+        set_the_proof_state ~__FUNCTION__ NewCofix;
+        do_new_cofix gl))
   else if typ_is_exists gl concltyp
   then (
     Log.trace ~__FUNCTION__ "(concl is exists)";
@@ -2031,29 +2205,118 @@ and handle_goal_transition
     raise (Mebi_proof_GoalTransition ())
 
 and handle_apply_constructors (gl : Proofview.Goal.t)
-  : PState.applicable_constructors -> tactic
+  : ApplicableConstructors.t -> tactic
   =
   Log.trace __FUNCTION__;
   Log.thing ~__FUNCTION__ Debug "concl" gl (Of concl_to_string);
+  (* TODO: inchworm *)
   function
-  | { annotation; tactics = Some (h :: tl); goto } ->
+  | { current = h :: tl; annotation; destination } ->
+    Log.trace ~__FUNCTION__ "applying current h";
+    set_the_proof_state
+      ~__FUNCTION__
+      (ApplyConstructors { current = tl; annotation; destination });
+    (* TODO: obtain [{from;label;goto}] terms from concl *)
+    Log.debug ~__FUNCTION__ "TODO: obtain [{from;label;goto}] terms from concl";
+    let conclpair = concl_to_atomic gl in
+    let f args =
+      tactic_chain
+        [ ApplicableConstructors.get_constructor_tactic gl h args
+        ; do_any_unfold_concl ~enforce:false gl
+        ]
+    in
+    let fsm = nfsm () in
+    if typ_is_tau gl conclpair
+    then (
+      Log.trace ~__FUNCTION__ "applying current h => is tau";
+      let ty, tys = conclpair in
+      Log.thing ~__FUNCTION__ Debug "conclpair ty" ty (feconstr gl);
+      Log.things
+        ~__FUNCTION__
+        Debug
+        "conclpair tys"
+        (Array.to_list tys)
+        (feconstr gl);
+      try
+        (* NOTE: index (3) since [tau lts x] => [tau (term * label) x] *)
+        let from : Enc.t = (find_state gl tys.(3) fsm.states).enc in
+        let label : Enc.t option = Some (get_theory_none_enc ()) in
+        let goto : Enc.t option = None in
+        (* TODO: get the info from the fsm, then use the cmaps to get the bindings *)
+        (* FIXME: all of this needs to be optimized/streamlined*)
+        f (Some (Enc (from, label, goto)))
+      with
+      | Mebi_proof_CouldNotDecodeState (ty, states) ->
+        Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CouldNotDecodeState";
+        Log.thing ~__FUNCTION__ Debug "Could not decode State" ty (feconstr gl);
+        raise (Mebi_proof_CouldNotDecodeTransitionState (ty, fsm))
+      | Mebi_proof_CouldNotDecodeLabel (ty, alphabet) ->
+        Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CouldNotDecodeLabel";
+        Log.thing ~__FUNCTION__ Debug "Could not decode Label" ty (feconstr gl);
+        raise (Mebi_proof_CouldNotDecodeTransitionLabel (ty, fsm)))
+    else (
+      (* Log.debug ~__FUNCTION__ "ERR: concl not tau?"; *)
+      (* _do_nothing () *)
+      (* TODO: check if this only occurs *after* some top-level constructor (i.e., once we have already "filled in" any of the bindings) *)
+      Log.trace ~__FUNCTION__ "applying current h => is lts transition";
+      let ty, tys = conclpair in
+      Log.thing ~__FUNCTION__ Debug "conclpair ty" ty (feconstr gl);
+      Log.things
+        ~__FUNCTION__
+        Debug
+        "conclpair tys"
+        (Array.to_list tys)
+        (feconstr gl);
+      (* f None *)
+      (* f (Some (Raw (tys.(0), Some tys.(1), None))) *)
+      f (Some (Raw (tys.(0), None, None))))
+  | { current = []; annotation = None; destination } ->
+    Log.trace ~__FUNCTION__ "finished applying constructors";
+    set_the_proof_state ~__FUNCTION__ NewWeakSim;
+    tactic_chain [ do_simplify gl; do_eapply_rt1n_refl gl; do_simplify gl ]
+  | { current = []
+    ; annotation = Some { this = { from; via; using; goto }; next }
+    ; destination
+    } ->
+    Log.trace ~__FUNCTION__ "updating current";
+    set_the_proof_state
+      ~__FUNCTION__
+      (ApplyConstructors
+         { current = Tree.min using; annotation = next; destination });
+    tactic_chain [ do_any_unfold_concl ~enforce:false gl; do_rt1n_via gl via ]
+(* let constructor,annotation : Note.annotation option =
+      match annotation with
+      | { this={ from; via; using; goto }; next = None } -> None
+      | { this; next = Some next } -> Some next
+    in *)
+
+(* and handle_apply_constructors' (gl : Proofview.Goal.t)
+  : ApplicableConstructors.t -> tactic
+  =
+  Log.trace __FUNCTION__;
+  Log.thing ~__FUNCTION__ Debug "concl" gl (Of concl_to_string);
+  (* TODO: inchworm *)
+  function
+  | { annotation; tactics = Some { this; next }; goto } ->
+    (* | { annotation; tactics = Some (h :: tl); goto } -> *)
+    (* TODO: need to update [get_constructor_tactic] so that *)
     Log.trace ~__FUNCTION__ "apply tactic";
     set_the_proof_state
       ~__FUNCTION__
       (ApplyConstructors { annotation; tactics = Some tl; goto });
-    tactic_chain [ h; do_simplify gl ]
+    tactic_chain [ this; do_simplify gl ]
   | { annotation = Some annotation; tactics; goto } ->
     Log.trace ~__FUNCTION__ "make new tactics";
     do_build_constructor_tactics gl goto annotation
   | { annotation = None; tactics; goto } ->
     Log.trace ~__FUNCTION__ "finished applying constructors";
     set_the_proof_state ~__FUNCTION__ NewWeakSim;
-    tactic_chain [ do_simplify gl; do_eapply_rt1n_refl gl; do_simplify gl ]
+    tactic_chain [ do_simplify gl; do_eapply_rt1n_refl gl; do_simplify gl ] *)
 
 and handle_proof_state (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
-  Log.thing ~__FUNCTION__ Debug "hyps" gl (Of hyps_to_string);
-  Log.thing ~__FUNCTION__ Debug "concl" gl (Of concl_to_string);
+  (* Log.thing ~__FUNCTION__ Debug "hyps" gl (Of hyps_to_string); *)
+  (* Log.thing ~__FUNCTION__ Debug "concl" gl (Of concl_to_string); *)
   try
     match !the_proof_state with
     | NewProof -> handle_new_proof gl
@@ -2094,7 +2357,7 @@ let step () : unit Proofview.tactic =
   Log.trace __FUNCTION__;
   Mebi_theories.tactics
     [ Proofview.Goal.enter (fun gl ->
-        get_tactic ~short:false (handle_proof_state gl))
+        get_tactic ~short:false ~state:false (handle_proof_state gl))
     ; Mebi_tactics.simplify_and_subst_all ()
     ]
 ;;

@@ -27,6 +27,7 @@
   logger
   rocq_utils
   rocq_convert
+  rocq_bindings
   ; logging
   ; debug
   mebi_enc
@@ -48,6 +49,7 @@
   mebi_wrapper
   mebi_ind
   mebi_utils
+  mebi_bindings
   mebi_hypothesis
   mebi_proof
   ; rocq_debug

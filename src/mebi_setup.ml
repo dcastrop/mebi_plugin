@@ -9,6 +9,7 @@ type unif_problem =
   { termL : EConstr.t
   ; termR : EConstr.t
   }
+
 (********************************************)
 (****** COQ ENVIRONMENT/CONTEXT *************)
 (********************************************)
@@ -59,11 +60,21 @@ let the_coq_ctx ?(fresh : bool = false) () : Evd.evar_map ref =
 (********************************************)
 
 module FwdMap : Hashtbl.S with type key = EConstr.t = Hashtbl.Make (struct
+    (* module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+
+       let () = Log.Config.enable_output ()
+       let () = Log.Config.configure_output Debug true
+       let () = Log.Config.configure_output Trace true *)
+
     type t = EConstr.t
 
-    let equal (x : t) (y : t) : bool = EConstr.eq_constr !(the_coq_ctx ()) x y
+    let equal (x : t) (y : t) : bool =
+      (* Log.trace __FUNCTION__; *)
+      EConstr.eq_constr !(the_coq_ctx ()) x y
+    ;;
 
     let hash (x : t) : int =
+      (* Log.trace __FUNCTION__; *)
       Constr.hash
         (EConstr.to_constr
            ?abort_on_undefined_evars:(Some false)

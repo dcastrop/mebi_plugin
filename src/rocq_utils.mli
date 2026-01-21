@@ -1,4 +1,32 @@
-type kind_pair = Evd.econstr * Evd.econstr array
+module C : sig
+  type key = Constr.t
+  type !'a t
+
+  val create : int -> 'a t
+  val clear : 'a t -> unit
+  val reset : 'a t -> unit
+  val copy : 'a t -> 'a t
+  val add : 'a t -> key -> 'a -> unit
+  val remove : 'a t -> key -> unit
+  val find : 'a t -> key -> 'a
+  val find_opt : 'a t -> key -> 'a option
+  val find_all : 'a t -> key -> 'a list
+  val replace : 'a t -> key -> 'a -> unit
+  val mem : 'a t -> key -> bool
+  val iter : (key -> 'a -> unit) -> 'a t -> unit
+  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+  val length : 'a t -> int
+  val stats : 'a t -> Hashtbl.statistics
+  val to_seq : 'a t -> (key * 'a) Seq.t
+  val to_seq_keys : 'a t -> key Seq.t
+  val to_seq_values : 'a t -> 'a Seq.t
+  val add_seq : 'a t -> (key * 'a) Seq.t -> unit
+  val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
+  val of_seq : (key * 'a) Seq.t -> 'a t
+end
+
+type 'a kind_pair = 'a * 'a array
 
 exception
   Rocq_utils_EConstrIsNot_Atomic of
@@ -6,9 +34,21 @@ exception
 
 exception Rocq_utils_EConstrIsNotA_Type of (Evd.evar_map * Evd.econstr * string)
 
-val econstr_to_atomic : Evd.evar_map -> Evd.econstr -> kind_pair
+val econstr_to_atomic : Evd.evar_map -> Evd.econstr -> Evd.econstr kind_pair
 
 type constr_kind =
+  ( Constr.t
+    , Constr.t
+    , Sorts.t
+    , UVars.Instance.t
+    , Sorts.relevance )
+    Constr.kind_of_term
+
+exception Rocq_utils_ConstrIsNot_App of (Constr.t * constr_kind)
+
+val constr_to_app : Constr.t -> Constr.t kind_pair
+
+type econstr_kind =
   ( Evd.econstr
     , Evd.econstr
     , Evd.esorts
@@ -17,9 +57,9 @@ type constr_kind =
     Constr.kind_of_term
 
 exception
-  Rocq_utils_EConstrIsNot_App of (Evd.evar_map * Evd.econstr * constr_kind)
+  Rocq_utils_EConstrIsNot_App of (Evd.evar_map * Evd.econstr * econstr_kind)
 
-val econstr_to_app : Evd.evar_map -> Evd.econstr -> kind_pair
+val econstr_to_app : Evd.evar_map -> Evd.econstr -> Evd.econstr kind_pair
 
 type lambda_triple =
   (Names.Name.t, Evd.erelevance) Context.pbinder_annot
@@ -27,7 +67,7 @@ type lambda_triple =
   * Evd.econstr
 
 exception
-  Rocq_utils_EConstrIsNot_Lambda of (Evd.evar_map * Evd.econstr * constr_kind)
+  Rocq_utils_EConstrIsNot_Lambda of (Evd.evar_map * Evd.econstr * econstr_kind)
 
 val econstr_to_lambda : Evd.evar_map -> Evd.econstr -> lambda_triple
 
@@ -37,13 +77,13 @@ type hyp =
 exception
   Rocq_utils_HypIsNot_Atomic of (Evd.evar_map * hyp * EConstr.kind_of_type)
 
-val hyp_to_atomic : Evd.evar_map -> hyp -> kind_pair
+val hyp_to_atomic : Evd.evar_map -> hyp -> Evd.econstr kind_pair
 
 type ind_constr = Constr.rel_context * Constr.t
-type ind_constrs = ind_constr array
+type constr_decl = Constr.rel_declaration
 type econstr_decl = EConstr.rel_declaration
-type econstr_decls = econstr_decl list
 
+val get_econstr_decls : Constr.rel_context -> econstr_decl list
 val list_of_constr_kinds : Constr.t -> (string * bool) list
 val list_of_econstr_kinds : Evd.evar_map -> Evd.econstr -> (string * bool) list
 
@@ -58,8 +98,8 @@ val list_of_kinds
   -> 'a
   -> string list
 
-val get_decl_type_of_constr : Constr.rel_declaration -> Evd.econstr
-val get_decl_type_of_econstr : EConstr.rel_declaration -> Evd.econstr
+val get_decl_type_of_constr : constr_decl -> Evd.econstr
+val get_decl_type_of_econstr : econstr_decl -> Evd.econstr
 
 val get_ind_ty
   :  Names.inductive
@@ -68,7 +108,7 @@ val get_ind_ty
 
 val type_of_econstr_rel
   :  ?substl:Evd.econstr list
-  -> EConstr.rel_declaration
+  -> econstr_decl
   -> Evd.econstr
 
 val type_of_econstr
@@ -101,7 +141,7 @@ module Strfy : sig
     :  Environ.env
     -> Evd.evar_map
     -> ?args:Utils.Strfy.style_args
-    -> Constr.rel_declaration
+    -> constr_decl
     -> string
 
   val constr_rel_context
@@ -111,7 +151,7 @@ module Strfy : sig
     -> string
 
   val ind_constr : Environ.env -> Evd.evar_map -> ind_constr -> string
-  val ind_constrs : Environ.env -> Evd.evar_map -> ind_constrs -> string
+  val ind_constrs : Environ.env -> Evd.evar_map -> ind_constr array -> string
 
   val constr_kind
     :  Environ.env
@@ -204,3 +244,52 @@ val get_next
   -> Evd.evar_map
   -> evar_source
   -> Evd.evar_map * Evd.econstr
+
+val get_fresh_evar
+  :  Environ.env
+  -> Evd.evar_map
+  -> evar_source
+  -> Evd.evar_map * Evd.econstr
+
+val subst_of_decl
+  :  EConstr.Vars.substl
+  -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt
+  -> Evd.econstr
+
+val mk_ctx_subst
+  :  Environ.env
+  -> Evd.evar_map
+  -> EConstr.Vars.substl
+  -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt
+  -> Evd.evar_map * Evd.econstr
+
+val mk_ctx_substl
+  :  Environ.env
+  -> Evd.evar_map
+  -> EConstr.Vars.substl
+  -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list
+  -> Evd.evar_map * EConstr.Vars.substl
+
+val map_decl_evar_pairs
+  :  econstr_decl list
+  -> EConstr.Vars.substl
+  -> (Evd.econstr * Names.Name.t) list
+
+exception ConstructorArgsExpectsArraySize3 of unit
+
+type constructor_args =
+  { lhs : Evd.econstr
+  ; act : Evd.econstr
+  ; rhs : Evd.econstr
+  }
+
+val constructor_args : Evd.econstr array -> constructor_args
+
+exception Rocq_utils_InvalidLtsArgLength of int
+exception Rocq_utils_InvalidLtsTermKind of Constr.t
+
+val extract_args : ?substl:EConstr.Vars.substl -> Constr.t -> constructor_args
+
+exception Rocq_utils_CouldNotExtractBinding of unit
+
+val unpack_constr_args : Constr.t kind_pair -> Constr.t * Constr.t * Constr.t
