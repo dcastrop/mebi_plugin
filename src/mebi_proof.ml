@@ -2262,7 +2262,11 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
       ~__FUNCTION__
       (ApplyConstructors
          { current = Tree.min using; annotation = next; destination });
-    do_rt1n_via gl via
+    tactic_chain
+      [ get_econstrs_to_unfold gl (Proofview.Goal.concl gl)
+        |> chain_do_unfold gl
+      ; do_rt1n_via gl via
+      ]
 (* let constructor,annotation : Note.annotation option =
       match annotation with
       | { this={ from; via; using; goto }; next = None } -> None
