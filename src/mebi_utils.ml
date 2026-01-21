@@ -337,69 +337,21 @@ let encode_ref (x : Libnames.qualid) : Enc.t mm =
 
 let get_fresh_evar (original : Rocq_utils.evar_source) : EConstr.t mm =
   Log.trace __FUNCTION__;
-  state (fun env sigma -> Rocq_utils.get_next env sigma original)
+  state (fun env sigma -> Rocq_utils.get_fresh_evar env sigma original)
 ;;
 
 (*********************************************************)
 
-let subst_of_decl (substl : EConstr.Vars.substl) x : EConstr.t mm =
-  Log.trace __FUNCTION__;
-  let ty : EConstr.t = Context.Rel.Declaration.get_type x in
-  let$+ subst _ _ = EConstr.Vars.substl substl ty in
-  return subst
-;;
-
-(** [mk_ctx_subst ?substl x] returns a new [evar] made from the type of [x], using any [substl] provided.
-    @param ?substl
-      is a list of substitutions, (* TODO: provided so that collisions don't occur? *)
-    @param x
-      corresponds to a (* TODO: universally? *) quantified term of a constructor.
-    @return a new [evar] for [x]. *)
-let mk_ctx_subst
-      (substl : EConstr.Vars.substl)
-      (x : ('a, EConstr.t, 'b) Context.Rel.Declaration.pt)
-  : EConstr.t mm
+let mk_ctx_substl
+      (acc : EConstr.Vars.substl)
+      (xs : ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list)
+  : EConstr.Vars.substl mm
   =
   Log.trace __FUNCTION__;
-  let* subst : EConstr.t = subst_of_decl substl x in
-  let$ vt env sigma = Evarutil.new_evar env sigma subst in
-  return vt
-;;
-
-(** [mk_ctx_substl acc ts] makes an [evar] for each term declaration in [ts].
-    @param acc
-      contains the substitutions accumulated so far, and is returned once [ts=[]]
-    @param ts
-      is an [EConstr.rel_declaration list] (obtained from the context of a constructor).
-    @return [acc] of [evars] once [ts] is empty. *)
-let rec mk_ctx_substl (acc : EConstr.Vars.substl)
-  :  ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list
-  -> EConstr.Vars.substl mm
-  =
-  Log.trace __FUNCTION__;
-  function
-  | [] -> return acc
-  | t :: ts ->
-    let* vt : EConstr.t = mk_ctx_subst acc t in
-    mk_ctx_substl (vt :: acc) ts
+  state (fun env sigma -> Rocq_utils.mk_ctx_substl env sigma acc xs)
 ;;
 
 (***********************************************************************)
-
-exception ConstructorArgsExpectsArraySize3 of unit
-
-type constructor_args =
-  { lhs : EConstr.t
-  ; act : EConstr.t
-  ; rhs : EConstr.t
-  }
-
-let constructor_args (args : EConstr.t array) : constructor_args =
-  Log.trace __FUNCTION__;
-  if Int.equal (Array.length args) 3
-  then { lhs = args.(0); act = args.(1); rhs = args.(2) }
-  else raise (*TODO:err*) (ConstructorArgsExpectsArraySize3 ())
-;;
 
 (** [extract_args ?substl term] returns an [EConstr.t] triple of arguments of an inductively defined LTS, e.g., [term -> option action -> term -> Prop].
     @param ?substl
@@ -408,31 +360,24 @@ let constructor_args (args : EConstr.t array) : constructor_args =
       must be of [Constr.kind] [App(fn, args)] (i.e., the application of some inductively defined LTS, e.g., [termLTS (tpar (tact (Send A) tend) (tact (Recv A) tend)) (Some A) (tpar tend tend)]).
     @return a triple of [lhs_term, action, rhs_term]. *)
 let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
-  : constructor_args mm
+  : Rocq_utils.constructor_args mm
   =
   Log.trace __FUNCTION__;
-  match Constr.kind term with
-  | App (_name, args) ->
-    if Array.length args == 3
-    then (
-      let args = EConstr.of_constr_array args in
-      let args = Array.map (EConstr.Vars.substl substl) args in
-      let args = constructor_args args in
-      (* let* () = debug_extract_args _name args in *)
-      return args)
-    else (* TODO: err *) invalid_lts_args_length (Array.length args)
-  | _ -> (* TODO: err *) invalid_lts_term_kind term
+  try return (Rocq_utils.extract_args ~substl term) with
+  | Rocq_utils.Rocq_utils_InvalidLtsArgLength x ->
+    (* TODO: err *) invalid_lts_args_length x
+  | Rocq_utils.Rocq_utils_InvalidLtsTermKind x -> invalid_lts_term_kind term
 ;;
 
 (***********************************************************************)
 
-exception Model_info_CouldNotExtractBinding of unit
+(* exception Model_info_CouldNotExtractBinding of unit *)
 
 (* let try_extract_binding (x:Constr.t) : (Tactypes.quantified_hypothesis * EConstr.t ) CAst.t =
 
    ;; *)
 
-exception Model_info_CouldNotExtractBindings of unit
+(* exception Model_info_CouldNotExtractBindings of unit *)
 
 (** [try_extract_bindings]
     @raise Model_info_CouldNotExtractBindings
@@ -473,7 +418,7 @@ exception Model_info_CouldNotExtractBindings of unit
       : EConstr.t Tactypes.explicit_bindings
       =
       match 
-      List.flatten
+      List.flatten 
         [ state_bindings cfrom from
         ; label_bindings clabel label
         ; state_bindings cgoto goto
@@ -492,19 +437,11 @@ exception Model_info_CouldNotExtractBindings of unit
     raise (Model_info_CouldNotExtractBindings ())
 ;; *)
 
-let get_constr_app (x : Constr.t) : Constr.t Rocq_utils.kind_pair =
-  try Rocq_utils.constr_to_app x with
-  | Rocq_utils.Rocq_utils_ConstrIsNot_App _ ->
-    raise (Model_info_CouldNotExtractBindings ())
-;;
-
-let unpack_constr_args ((_, tys) : Constr.t Rocq_utils.kind_pair)
-  : Constr.t * Constr.t * Constr.t
-  =
-  try tys.(0), tys.(1), tys.(2) with
-  (* NOTE: in case [tys.(_)] is out of bounds. *)
-  | Not_found -> raise (Model_info_CouldNotExtractBindings ())
-;;
+(* let get_constr_app (x : Constr.t) : Constr.t Rocq_utils.kind_pair =
+   try Rocq_utils.constr_to_app x with
+   | Rocq_utils.Rocq_utils_ConstrIsNot_App _ ->
+   raise (Model_info_CouldNotExtractBindings ())
+   ;; *)
 
 (* let mkfun_map_bindings (x:Constr.t) :(Names.lident * EConstr.t) -> EConstr.t option =
    let m  : Constr.t F.t = F.create 0 in
@@ -610,43 +547,3 @@ let _pair_map_to_string =
    x)
    ;;
    end) *)
-
-(** returns tuple list of [(binding_name * evar)] -- TODO: map these to the [_UNBOUND_REL_X] and
-*)
-let map_decl_evar_pairs (xs : econstr_decl list) (ys : EConstr.Vars.substl)
-  : (EConstr.t * Names.Name.t) list
-  =
-  Log.trace __FUNCTION__;
-  Log.debug ~__FUNCTION__ "C1";
-  let ss = List.combine ys (List.map Context.Rel.Declaration.get_name xs) in
-  (* Log.debug ~__FUNCTION__ "C2";
-     List.iter (fun (x, y) -> pair_map_to_string x y) ss;
-     Log.debug ~__FUNCTION__ "C2.1";
-     (* let fm : Names.Name.t F.t = F.create 0 in *)
-     let fm : Names.Name.t E.t = E.create 0 in
-     (* let fm : (EConstr.t, Names.Name.t) Hashtbl.t = Hashtbl.create 0 in *)
-     Log.debug ~__FUNCTION__ "C3";
-     List.iter
-     (fun (k, v) ->
-     Log.thing ~__FUNCTION__ Debug "key" k Strfy.feconstr;
-     Log.thing
-     ~__FUNCTION__
-     Debug
-     "value"
-     v
-     (Utils.Strfy.Of (fun v -> Rocq_utils.Strfy.pp (Names.Name.print v)));
-     Log.debug ~__FUNCTION__ "C3.1";
-     if E.mem fm k
-     then Log.thing ~__FUNCTION__ Warning "duplicate key" k Strfy.feconstr;
-     Log.debug ~__FUNCTION__ "C3.2";
-     E.add fm k v;
-     Log.debug ~__FUNCTION__ "C3.3")
-     ss;
-     Log.debug ~__FUNCTION__ "C4";
-     (* let fmss = Hashtbl.to_seq fm in *)
-     Log.debug ~__FUNCTION__ "C5";
-     (* let fm = E.of_seq fmss in *)
-     Log.debug ~__FUNCTION__ "C6";
-     fm *)
-  ss
-;;

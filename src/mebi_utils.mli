@@ -113,48 +113,14 @@ val encode_constrexpr
 val encode_ref : Libnames.qualid -> Mebi_setup.Enc.t Mebi_wrapper.mm
 val get_fresh_evar : Rocq_utils.evar_source -> Evd.econstr Mebi_wrapper.mm
 
-val subst_of_decl
-  :  EConstr.Vars.substl
-  -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt
-  -> Evd.econstr Mebi_wrapper.mm
-
-val mk_ctx_subst
-  :  EConstr.Vars.substl
-  -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt
-  -> Evd.econstr Mebi_wrapper.mm
-
 val mk_ctx_substl
   :  EConstr.Vars.substl
   -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list
   -> EConstr.Vars.substl Mebi_wrapper.mm
 
-exception ConstructorArgsExpectsArraySize3 of unit
-
-type constructor_args =
-  { lhs : Evd.econstr
-  ; act : Evd.econstr
-  ; rhs : Evd.econstr
-  }
-
-val constructor_args : Evd.econstr array -> constructor_args
-
 val extract_args
   :  ?substl:EConstr.Vars.substl
   -> Constr.t
-  -> constructor_args Mebi_wrapper.mm
-
-exception Model_info_CouldNotExtractBinding of unit
-exception Model_info_CouldNotExtractBindings of unit
-
-val get_constr_app : Constr.t -> Constr.t Rocq_utils.kind_pair
-
-val unpack_constr_args
-  :  Constr.t Rocq_utils.kind_pair
-  -> Constr.t * Constr.t * Constr.t
+  -> Rocq_utils.constructor_args Mebi_wrapper.mm
 
 val _pair_map_to_string : Evd.econstr -> Names.Name.t -> unit
-
-val map_decl_evar_pairs
-  :  econstr_decl list
-  -> EConstr.Vars.substl
-  -> (Evd.econstr * Names.Name.t) list
