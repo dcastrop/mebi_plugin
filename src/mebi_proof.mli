@@ -10,6 +10,20 @@ type tactic =
   ; x : unit Proofview.tactic
   }
 
+module ApplicableConstructors : sig
+  type t =
+    { current : Model.Tree.Node.t list
+    ; annotation : Model.Note.annotation option
+    ; destination : Model.State.t
+    }
+
+  val to_string : t -> string
+
+  exception Mebi_proof_CannotGetConstructorInfo_None of unit
+  exception Mebi_proof_CannotFindConstructorInfo_OfLTS of Model.Enc.t
+  exception Mebi_proof_CannotFindConstructorInfo_OfIndex of int
+end
+
 module PState : sig
   type t =
     | NewProof
@@ -17,7 +31,7 @@ module PState : sig
     | NewCofix
     | DoRefl
     | GoalTransition of transitions
-    | ApplyConstructors of applicable_constructors
+    | ApplyConstructors of ApplicableConstructors.t
     | DetectState
 
   and transitions =
@@ -25,11 +39,11 @@ module PState : sig
     ; ntrans : Model_transition_opt.t
     }
 
-  and applicable_constructors =
+  (* and applicable_constructors =
     { annotation : Model_note.annotation option
     ; tactics : tactic list option
     ; goto : Model_state.t
-    }
+    } *)
 
   (* and tactic_to_apply = unit -> unit Proofview.tactic *)
 

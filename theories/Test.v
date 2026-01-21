@@ -65,12 +65,12 @@ Module BasicCommands.
 End BasicCommands.
 
 MeBi Config Reset.
-(* MeBi Config Output Enable. *)
-(* MeBi Config Output Notice Enable. *)
-(* MeBi Config Output Debug Enable. *)
-(* MeBi Config Output Info Enable. *)
-(* MeBi Config Output Results Enable. *)
-(* MeBi Config Output Warning Enable. *)
+MeBi Config Output Enable.
+MeBi Config Output Notice Enable.
+MeBi Config Output Debug Enable.
+MeBi Config Output Info Enable.
+MeBi Config Output Results Enable.
+MeBi Config Output Warning Enable.
 (* MeBi Config Bound 100. *)
 (* MeBi Config WeakMode Enable. *)
 (* MeBi Config Weak As Option _. *)

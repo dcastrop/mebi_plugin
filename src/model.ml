@@ -12,8 +12,8 @@ module Tree = Mebi_constr.Tree
 (***********************************************************************)
 module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
-let () = Log.Config.configure_output Debug false
-let () = Log.Config.configure_output Trace false
+let () = Log.Config.configure_output Debug true
+let () = Log.Config.configure_output Trace true
 (***********************************************************************)
 
 let nest = Utils.Strfy.nest
@@ -292,7 +292,7 @@ exception Model_Action_HasNoAnnotations of Action.t
 
 (* exception Model_Action_HasNoConstructors of Action.t
 
-   let get_shortest_constructor (x : Action.t) : Tree.node list =
+   let get_shortest_constructor (x : Action.t) : Tree.Node.t list =
    Log.trace "Model.get_shortest_constructor";
    match x.constructor_trees with
    | [] -> raise (Model_Action_HasNoConstructors x)

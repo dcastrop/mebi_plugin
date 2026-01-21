@@ -216,8 +216,8 @@ val decode : Enc.t -> Evd.econstr mm
 val decoding : Enc.t -> Evd.econstr mm
 val has_decoding : Enc.t -> bool
 val get_decoding : Enc.t -> Evd.econstr
-val decoding_opt : Enc.t -> Evd.econstr option mm
-val get_decoding_opt : Enc.t -> Evd.econstr option
+val decode_opt : Enc.t -> Evd.econstr option mm
+val get_decode_opt : Enc.t -> Evd.econstr option
 val encode_map : 'a F.t -> 'a B.t mm
 val decode_map : 'a B.t -> 'a F.t mm
 

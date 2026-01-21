@@ -1,5 +1,33 @@
+type econstr_decl = EConstr.rel_declaration
+
 val ref_to_glob : Libnames.qualid -> Names.GlobRef.t
 val ref_list_to_glob_list : Libnames.qualid list -> Names.GlobRef.t list
+
+module Strfy : sig
+  val fname : Names.variable Utils.Strfy.to_string
+  val fenc : Mebi_setup.Enc.t Utils.Strfy.to_string
+  val constr : Constr.t -> string
+  val fconstr : Constr.t Utils.Strfy.to_string
+  val econstr : Evd.econstr -> string
+  val feconstr : Evd.econstr Utils.Strfy.to_string
+  val ind_constr : Rocq_utils.ind_constr -> string
+  val f_ind_constr : Rocq_utils.ind_constr Utils.Strfy.to_string
+  val ind_constrs : Rocq_utils.ind_constr array -> string
+  val f_ind_constrs : Rocq_utils.ind_constr array Utils.Strfy.to_string
+  val constrkind : ?args:Utils.Strfy.style_args -> Constr.t -> string
+  val fconstrkind : Constr.t Utils.Strfy.to_string
+  val encode : Evd.econstr -> string
+  val fencode : Evd.econstr Utils.Strfy.to_string
+  val decode : Mebi_setup.Enc.t -> string
+  val fdecode : Mebi_setup.Enc.t Utils.Strfy.to_string
+  val econstr_rel_decl : econstr_decl -> string
+  val feconstr_rel_decl : econstr_decl Utils.Strfy.to_string
+
+  val rocq_constructor_to_string
+    :  ?args:Utils.Strfy.style_args
+    -> Model_info.rocq_constructor
+    -> string
+end
 
 val get_lts_ind_mind
   :  Names.GlobRef.t
@@ -35,7 +63,7 @@ val get_ind_lts
 
 val econstr_eq : Evd.econstr -> Evd.econstr -> bool Mebi_wrapper.mm
 val econstr_normalize : Evd.econstr -> Evd.econstr Mebi_wrapper.mm
-val econstr_kind : Evd.econstr -> Rocq_utils.constr_kind Mebi_wrapper.mm
+val econstr_kind : Evd.econstr -> Rocq_utils.econstr_kind Mebi_wrapper.mm
 val econstr_is_evar : Evd.econstr -> bool Mebi_wrapper.mm
 
 val econstr_to_constr
@@ -83,3 +111,16 @@ val encode_constrexpr
   -> Mebi_setup.Enc.t Mebi_wrapper.mm
 
 val encode_ref : Libnames.qualid -> Mebi_setup.Enc.t Mebi_wrapper.mm
+val get_fresh_evar : Rocq_utils.evar_source -> Evd.econstr Mebi_wrapper.mm
+
+val mk_ctx_substl
+  :  EConstr.Vars.substl
+  -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list
+  -> EConstr.Vars.substl Mebi_wrapper.mm
+
+val extract_args
+  :  ?substl:EConstr.Vars.substl
+  -> Constr.t
+  -> Rocq_utils.constructor_args Mebi_wrapper.mm
+
+val _pair_map_to_string : Evd.econstr -> Names.Name.t -> unit

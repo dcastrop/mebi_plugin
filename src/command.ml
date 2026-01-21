@@ -110,29 +110,39 @@ module MkGraph
 
   (***********************************************************************)
 
-  let fname : Names.Id.t Utils.Strfy.to_string = Of Names.Id.to_string
+  let _fname : Names.Id.t Utils.Strfy.to_string = Of Names.Id.to_string
 
-  let f_ind_constr : Rocq_utils.ind_constr Utils.Strfy.to_string =
+  let _f_ind_constr : Rocq_utils.ind_constr Utils.Strfy.to_string =
     Of
       (Mebi_wrapper.runkeep
          (Mebi_wrapper.state (fun env sigma ->
             sigma, Rocq_utils.Strfy.ind_constr env sigma)))
   ;;
 
-  let _f_ind_constrs : Rocq_utils.ind_constrs Utils.Strfy.to_string =
+  let _f_ind_constrs : Rocq_utils.ind_constr array Utils.Strfy.to_string =
     Of
       (Mebi_wrapper.runkeep
          (Mebi_wrapper.state (fun env sigma ->
             sigma, Rocq_utils.Strfy.ind_constrs env sigma)))
   ;;
 
-  let fenc : Enc.t Utils.Strfy.to_string = Of Enc.to_string
+  let _fenc : Enc.t Utils.Strfy.to_string = Of Enc.to_string
 
   let _feconstr : EConstr.t Utils.Strfy.to_string =
     Of Mebi_wrapper.econstr_to_string
   ;;
 
-  let fdecode : Enc.t Utils.Strfy.to_string =
+  let _fconstr : Constr.t Utils.Strfy.to_string =
+    Of Mebi_wrapper.constr_to_string
+  ;;
+
+  let _fconstrkind : Constr.t Utils.Strfy.to_string =
+    Mebi_wrapper.runkeep
+      (Mebi_wrapper.state (fun env sigma ->
+         sigma, Utils.Strfy.Args (Rocq_utils.Strfy.constr_kind env sigma)))
+  ;;
+
+  let _fdecode : Enc.t Utils.Strfy.to_string =
     Of
       (fun (x : Enc.t) ->
         Mebi_wrapper.runkeep (Mebi_wrapper.decode x)
@@ -606,58 +616,18 @@ module MkGraph
     GLog.Config.configure_output Trace true;
     GLog.trace __FUNCTION__;
     B.fold
-      (fun (lts_enc : Enc.t)
+      (fun (enc : Enc.t)
         (the_ind_def : Mebi_ind.t)
         (acc : Info.rocq_info list) ->
-        GLog.thing ~__FUNCTION__ Trace "lts_enc" lts_enc fenc;
-        (* GLog.thing ~__FUNCTION__ Trace "def_enc" the_ind_def.enc fenc; *)
-        (* GLog.thing ~__FUNCTION__ Trace "ind_enc" the_ind_def.ind fencode; *)
-        GLog.thing ~__FUNCTION__ Trace "lts_dec" lts_enc fdecode;
-        (* GLog.thing ~__FUNCTION__ Trace "def_dec" the_ind_def.enc fdecode; *)
-        (* GLog.thing ~__FUNCTION__ Trace "ind_dec" the_ind_def.ind feconstr; *)
         match the_ind_def.kind with
         | LTS the_lts_ind_def ->
-          let lts_name : string = econstr_to_string the_ind_def.ind in
-          let lts_constrs : Info.rocq_constructor list =
-            (* NOTE: constructor tactic index starts from 1 -- ignore 0 below *)
-            let (get_constructor_index, _), _ =
-              Utils.new_int_counter ~start:0 ()
-            in
-            Array.fold_left
-              (fun (acc : Info.rocq_constructor list)
-                (* (name : Names.Id.t) *)
-                  ({ name; constructor } : Mebi_ind.lts_constructor) ->
-                GLog.thing ~__FUNCTION__ Trace "name" name fname;
-                GLog.thing
-                  ~__FUNCTION__
-                  Trace
-                  "constructor"
-                  constructor
-                  f_ind_constr;
-                (* TODO:
-                   - check if any of the [constructor]-triple are some function. for each that are dynamically create function that will:
-                   - take a given action ([from;labe;goto] of [EConstr.t])
-                   - return a list of functions that will automatically extract the bindings in order to apply a given constructor.
-                   - generate [Mebi_unification.Problem] for each function argument (e.g., [get_action _UNBOUND_REL_2 _UNBOUND_REL_1])
-                   - automatically extract the necessary components from a more complete term (e.g., [ACT _UNBOUND_REL_2, _UNBOUND_REL_1])
-                   - later, in [Mebi_proof] we can then just call this function when applying the bindings.
-                   - if there are no functions, then we can use [No_Bindings]
-                *)
-                let index : int = get_constructor_index () in
-                let name : string = Names.Id.to_string name in
-                let bindings : Info.rocq_constructor_bindings =
-                  No_Bindings
-                  (* Use_Bindings (fun ({from;label;goto}:Info.binding_args) ->
-                    
-                    ) *)
-                in
-                { index; name; bindings } :: acc)
-              []
-              ((* Mebi_ind.get_lts_constructor_names *)
-               Mebi_ind.get_lts_constructor_types
-                 the_ind_def)
+          let pp : string = econstr_to_string the_ind_def.ind in
+          let constructors : Info.rocq_constructor list =
+            Mebi_wrapper.runkeep
+              (Mebi_wrapper.state (fun env sigma ->
+                 Mebi_bindings.extract_info env sigma the_ind_def))
           in
-          { enc = lts_enc; pp = lts_name; constructors = lts_constrs } :: acc
+          { enc; pp; constructors } :: acc
         | _ -> acc)
       lts_ind_def_map
       []

@@ -28,17 +28,7 @@ and rocq_info =
 and rocq_constructor =
   { index : int
   ; name : string
-  ; bindings : rocq_constructor_bindings
-  }
-
-and rocq_constructor_bindings =
-  | No_Bindings
-  | Use_Bindings of (binding_args -> Evd.econstr Tactypes.explicit_bindings)
-
-and binding_args =
-  { from : Model_state.t
-  ; label : Model_label.t
-  ; goto : Model_state.t
+  ; bindings : Rocq_bindings.t
   }
 
 val mebi_info_to_string : ?args:Utils.Strfy.style_args -> mebi_info -> string
@@ -48,20 +38,21 @@ val mebi_info_list_option_to_string
   -> mebi_info list option
   -> string
 
-val rocq_constructor_bindings_to_string
-  :  ?args:Utils.Strfy.style_args
-  -> rocq_constructor_bindings
-  -> string
-
 val rocq_constructor_to_string
   :  ?args:Utils.Strfy.style_args
+  -> ?envsigma:(Environ.env * Evd.evar_map) option
   -> rocq_constructor
   -> string
 
-val rocq_info_to_string : ?args:Utils.Strfy.style_args -> rocq_info -> string
+val rocq_info_to_string
+  :  ?args:Utils.Strfy.style_args
+  -> ?envsigma:(Environ.env * Evd.evar_map) option
+  -> rocq_info
+  -> string
 
 val rocq_info_list_option_to_string
   :  ?args:Utils.Strfy.style_args
+  -> ?envsigma:(Environ.env * Evd.evar_map) option
   -> rocq_info list option
   -> string
 
