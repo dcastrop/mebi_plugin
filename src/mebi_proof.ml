@@ -60,6 +60,12 @@ let feconstr (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
   Of (econstr_to_string gl)
 ;;
 
+let feconstr_opt (gl : Proofview.Goal.t)
+  : EConstr.t option Utils.Strfy.to_string
+  =
+  Of (Utils.Strfy.option (feconstr gl))
+;;
+
 let _fconstr (gl : Proofview.Goal.t) : Constr.t Utils.Strfy.to_string =
   Of (Rocq_utils.Strfy.constr (Proofview.Goal.env gl) (Proofview.Goal.sigma gl))
 ;;
@@ -200,49 +206,79 @@ let tactic_chain : tactic list -> tactic =
 
 module ApplicableConstructors = struct
   type t =
-    { current : Tree.node list
+    { current : Tree.Node.t list
     ; annotation : Note.annotation option
     ; destination : State.t
     }
 
+  let to_string ({ current; annotation; destination } : t) : string =
+    let current : string =
+      Utils.Strfy.list (Args Tree.Node.to_string) current
+    in
+    let annotation : string =
+      Utils.Strfy.option (Args Note.annotation_to_string) annotation
+    in
+    let destination : string = State.to_string destination in
+    Utils.Strfy.record
+      [ "current", current
+      ; "annotation", annotation
+      ; "destination", destination
+      ]
+  ;;
+
   (* TODO: inchworm *)
   (* and tactics_to_apply =
     { this : tactic
-    ; next : Tree.node list
+    ; next : Tree.Node.t list
     } *)
 
   exception Mebi_proof_CannotGetConstructorInfo_None of unit
   exception Mebi_proof_CannotFindConstructorInfo_OfLTS of Enc.t
   exception Mebi_proof_CannotFindConstructorInfo_OfIndex of int
 
+  type constructor_binding_args =
+    | Raw of EConstr.t constructor_binding_triple
+    | Enc of Enc.t constructor_binding_triple
+
+  and 'a constructor_binding_triple = 'a * 'a option * 'a option
+
   let make_constructor_bindings
-        (the_from : Enc.t)
-        (the_action : Enc.t option)
-        (the_goto : Enc.t option)
+        (gl : Proofview.Goal.t)
         (bindings : Mebi_bindings.t)
-    : EConstr.t Tactypes.bindings
+    : constructor_binding_args -> EConstr.t Tactypes.bindings
     =
     Log.trace __FUNCTION__;
-    let the_from : EConstr.t = runkeep (decode the_from) in
-    let fopt =
-      fun (xopt : Enc.t option) ->
-      Option.cata
-        (fun (x : Enc.t) -> runkeep (Mebi_wrapper.decode_opt x))
-        None
-        xopt
+    let f ((x, y, z) : EConstr.t * EConstr.t option * EConstr.t option)
+      : EConstr.t Tactypes.bindings
+      =
+      Log.thing ~__FUNCTION__ Debug "x" x (feconstr gl);
+      Log.thing ~__FUNCTION__ Debug "y" y (feconstr_opt gl);
+      Log.thing ~__FUNCTION__ Debug "z" z (feconstr_opt gl);
+      runkeep (Mebi_bindings.get x y z bindings)
     in
-    let the_action : EConstr.t option = fopt the_action in
-    let the_goto : EConstr.t option = fopt the_goto in
-    runkeep (Mebi_bindings.get the_from the_action the_goto bindings)
+    function
+    | Raw args ->
+      Log.trace ~__FUNCTION__ "Raw args";
+      f args
+    | Enc (the_from, the_action, the_goto) ->
+      Log.trace ~__FUNCTION__ "Enc args";
+      let the_from : EConstr.t = runkeep (decode the_from) in
+      let fopt =
+        fun (xopt : Enc.t option) ->
+        Option.cata
+          (fun (x : Enc.t) -> runkeep (Mebi_wrapper.decode_opt x))
+          None
+          xopt
+      in
+      let the_action : EConstr.t option = fopt the_action in
+      let the_goto : EConstr.t option = fopt the_goto in
+      f (the_from, the_action, the_goto)
   ;;
 
   let get_constructor_bindings
-        ((lts_enc, constructor_index) : Tree.node)
-        (* (bindings : Mebi_bindings.t) *)
-          (the_from : Enc.t)
-        (the_action : Enc.t option)
-        (the_goto : Enc.t option)
-    : EConstr.t Tactypes.bindings
+        (gl : Proofview.Goal.t)
+        ((lts_enc, constructor_index) : Tree.Node.t)
+    : constructor_binding_args -> EConstr.t Tactypes.bindings
     =
     Log.trace __FUNCTION__;
     (* NOTE: assuming this is for nfsm *)
@@ -259,18 +295,6 @@ module ApplicableConstructors = struct
          in
          (match List.find_opt fconstructor x.constructors with
           | None ->
-            Log.thing
-              ~__FUNCTION__
-              Warning
-              "index"
-              constructor_index
-              (Args Utils.Strfy.int);
-            Log.thing
-              ~__FUNCTION__
-              Warning
-              "nfsm"
-              (nfsm ())
-              (Args Fsm.to_string);
             raise
               (Mebi_proof_CannotFindConstructorInfo_OfIndex constructor_index)
           | Some x ->
@@ -279,55 +303,26 @@ module ApplicableConstructors = struct
               Debug
               "constructor"
               x
-              (Of Info.rocq_constructor_to_string);
-            make_constructor_bindings the_from the_action the_goto x.bindings))
+              (Args Mebi_utils.Strfy.rocq_constructor_to_string);
+            make_constructor_bindings gl x.bindings))
   ;;
 
   let get_constructor_tactic
-        (the_from : Enc.t)
-        (the_action : Enc.t option)
-        (the_goto : Enc.t option)
-        ((enc, index) : Tree.node)
-    : tactic
+        (gl : Proofview.Goal.t)
+        ((enc, index) : Tree.Node.t)
+    : constructor_binding_args option -> tactic
     =
     Log.trace __FUNCTION__;
     (* NOTE: constructors index from 1 *)
     let index : int = index + 1 in
-    tactic
-      ~msg:(Printf.sprintf "constructor %i" index)
-      (Tactics.one_constructor
-         index
-         (get_constructor_bindings (enc, index) the_from the_action the_goto))
+    let msg : string = Printf.sprintf "constructor %i" index in
+    let f (xs : EConstr.t Tactypes.bindings) : tactic =
+      tactic ~msg (Tactics.one_constructor index xs)
+    in
+    function
+    | None -> f NoBindings
+    | Some args -> f (get_constructor_bindings gl (enc, index) args)
   ;;
-
-  (* let create (args : Info.binding_args) (annotation : Note.annotation option)
-     :t
-    = function
-    | [] -> { current = []; annotation; destination = args.goto }
-    | h :: tl ->
-      { current =
-          (* TODO: update the below so that each take into account the resulting term of each transition *)
-          (* Some (List.map (get_constructor_tactic args) (h :: tl)) *)
-          Some { this = get_constructor_tactic args h; next = tl }
-      ; annotation
-      ; destination = args.goto
-      } *)
-  (* let update_next (args : Info.binding_args) : t -> t = function
-    | { tactics = None; annotation; goto } ->
-      { tactics = None; annotation; goto }
-    | { tactics = Some { next = []; _ }; annotation; goto } ->
-      { tactics = None; annotation; goto }
-    | { tactics = Some { next = h :: tl; _ }; annotation; goto } ->
-      { tactics = Some { this = get_constructor_tactic args h; next = tl }
-      ; annotation
-      ; goto
-      } *)
-
-  (* TODO: update similar to [create] (above) *)
-  (* | { tactics = Some []; annotation; goto } ->
-      { tactics = None; annotation; goto }
-    | { tactics = Some (h :: tl); annotation; goto } ->
-      { tactics = Some tl; annotation; goto } *)
 end
 
 module PState = struct
@@ -369,32 +364,10 @@ module PState = struct
              ":\nmtrans: %s\n\nntrans: %s\n"
              (Transition.to_string mtrans)
              (Transition_opt.to_string ntrans))
-    | ApplyConstructors { annotation; current; destination } ->
+    | ApplyConstructors x ->
       Printf.sprintf
         "ApplyConstructors%s"
-        (if short
-         then ""
-         else
-           Printf.sprintf
-             ":\nDestination: %s\nAnnotation: %s\nCurrent: %s"
-             (State.to_string destination)
-             (Option.cata Note.annotation_to_string "None" annotation)
-             "TODO: ..."
-           (* (Option.cata
-                (fun xs ->
-                  Printf.sprintf
-                    "%s (Tactics: %i)"
-                    (List.fold_left
-                       (fun acc { msg; _ } ->
-                         Printf.sprintf
-                           "%s; %s"
-                           acc
-                           (Option.cata (fun y -> y) "None" msg))
-                       ""
-                       xs)
-                    (List.length xs))
-                "None"
-                tactics) *))
+        (if short then "" else ApplicableConstructors.to_string x)
     | DetectState -> "DetectState"
   ;;
 end
@@ -568,7 +541,7 @@ let get_actions
    ;;
 
    let _get_annotation_constructor (nfrom : State.t) (nlabel : Label.t)
-   : Tree.node list
+   : Tree.Node.t list
    =
    Log.trace __FUNCTION__;
    get_naction ~annotated:true nfrom nlabel (nfsm ~saturated:false ())
@@ -577,7 +550,7 @@ let get_actions
 
 (* let get_annotation_constructor
       ({ this = { from; via }; next } : Note.annotation)
-  : Tree.node list
+  : Tree.Node.t list
   =
   Log.trace __FUNCTION__;
   (* get_naction ~annotated:true nfrom nlabel (nfsm ~saturated:false ())
@@ -896,7 +869,7 @@ let do_constructor_transition
   Log.thing ~__FUNCTION__ Debug "goto" goto (Args State.to_string);
   Log.thing ~__FUNCTION__ Debug "using" using (Args Tree.list_to_string);
   Log.option ~__FUNCTION__ Debug "next" next (Args Note.annotation_to_string);
-  let constructor : Tree.node list = Tree.min using in
+  let constructor : Tree.Node.t list = Tree.min using in
   set_the_proof_state
     ~__FUNCTION__
     (ApplyConstructors
@@ -2223,25 +2196,34 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
   (* TODO: inchworm *)
   function
   | { current = h :: tl; annotation; destination } ->
+    Log.trace ~__FUNCTION__ "applying current h";
     set_the_proof_state
       ~__FUNCTION__
       (ApplyConstructors { current = tl; annotation; destination });
     (* TODO: obtain [{from;label;goto}] terms from concl *)
     Log.debug ~__FUNCTION__ "TODO: obtain [{from;label;goto}] terms from concl";
     let conclpair = concl_to_atomic gl in
+    let f = ApplicableConstructors.get_constructor_tactic gl h in
+    let fsm = nfsm () in
     if typ_is_tau gl conclpair
     then (
-      let fsm = nfsm () in
+      Log.trace ~__FUNCTION__ "applying current h => is tau";
       let ty, tys = conclpair in
+      Log.thing ~__FUNCTION__ Debug "conclpair ty" ty (feconstr gl);
+      Log.things
+        ~__FUNCTION__
+        Debug
+        "conclpair tys"
+        (Array.to_list tys)
+        (feconstr gl);
       try
-        let from : Enc.t = (find_state gl tys.(1) fsm.states).enc in
+        (* NOTE: index (3) since [tau lts x] => [tau (term * label) x] *)
+        let from : Enc.t = (find_state gl tys.(3) fsm.states).enc in
         let label : Enc.t option = Some (get_theory_none_enc ()) in
         let goto : Enc.t option = None in
         (* TODO: get the info from the fsm, then use the cmaps to get the bindings *)
         (* FIXME: all of this needs to be optimized/streamlined*)
-        (* () *)
-        (ApplicableConstructors.get_constructor_tactic from label goto) h
-        (* from label : *)
+        f (Some (Enc (from, label, goto)))
       with
       | Mebi_proof_CouldNotDecodeState (ty, states) ->
         Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CouldNotDecodeState";
@@ -2252,8 +2234,21 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
         Log.thing ~__FUNCTION__ Debug "Could not decode Label" ty (feconstr gl);
         raise (Mebi_proof_CouldNotDecodeTransitionLabel (ty, fsm)))
     else (
-      Log.debug ~__FUNCTION__ "ERR: concl not tau?";
-      _do_nothing ())
+      (* Log.debug ~__FUNCTION__ "ERR: concl not tau?"; *)
+      (* _do_nothing () *)
+      (* TODO: check if this only occurs *after* some top-level constructor (i.e., once we have already "filled in" any of the bindings) *)
+      Log.trace ~__FUNCTION__ "applying current h => is lts transition";
+      let ty, tys = conclpair in
+      Log.thing ~__FUNCTION__ Debug "conclpair ty" ty (feconstr gl);
+      Log.things
+        ~__FUNCTION__
+        Debug
+        "conclpair tys"
+        (Array.to_list tys)
+        (feconstr gl);
+      (* f None *)
+      (* f (Some (Raw (tys.(0), Some tys.(1), None))) *)
+      f (Some (Raw (tys.(0), None, None))))
   | { current = []; annotation = None; destination } ->
     Log.trace ~__FUNCTION__ "finished applying constructors";
     set_the_proof_state ~__FUNCTION__ NewWeakSim;
@@ -2262,11 +2257,11 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
     ; annotation = Some { this = { from; via; using; goto }; next }
     ; destination
     } ->
-    Log.trace ~__FUNCTION__ "updated current";
+    Log.trace ~__FUNCTION__ "updating current";
     set_the_proof_state
       ~__FUNCTION__
       (ApplyConstructors
-         { current = Tree.min using; annotation = None; destination });
+         { current = Tree.min using; annotation = next; destination });
     do_rt1n_via gl via
 (* let constructor,annotation : Note.annotation option =
       match annotation with
@@ -2299,8 +2294,8 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
 
 and handle_proof_state (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
-  Log.thing ~__FUNCTION__ Debug "hyps" gl (Of hyps_to_string);
-  Log.thing ~__FUNCTION__ Debug "concl" gl (Of concl_to_string);
+  (* Log.thing ~__FUNCTION__ Debug "hyps" gl (Of hyps_to_string); *)
+  (* Log.thing ~__FUNCTION__ Debug "concl" gl (Of concl_to_string); *)
   try
     match !the_proof_state with
     | NewProof -> handle_new_proof gl

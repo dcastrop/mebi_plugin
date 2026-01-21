@@ -30,8 +30,8 @@ let extract_args
 (***********************************************************************)
 module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
-let () = Log.Config.configure_output Debug true
-let () = Log.Config.configure_output Trace true
+let () = Log.Config.configure_output Debug false
+let () = Log.Config.configure_output Trace false
 (***********************************************************************)
 
 (** creates unification problems between the rhs of the current constructor and the lhs of the next, along with the actions of both.

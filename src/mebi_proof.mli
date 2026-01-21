@@ -12,18 +12,16 @@ type tactic =
 
 module ApplicableConstructors : sig
   type t =
-    { current : Model.Tree.node list
+    { current : Model.Tree.Node.t list
     ; annotation : Model.Note.annotation option
     ; destination : Model.State.t
     }
 
+  val to_string : t -> string
+
   exception Mebi_proof_CannotGetConstructorInfo_None of unit
-
-  exception
-    Mebi_proof_CannotFindConstructorInfo_OfLTS of Model.Enc.t
-
+  exception Mebi_proof_CannotFindConstructorInfo_OfLTS of Model.Enc.t
   exception Mebi_proof_CannotFindConstructorInfo_OfIndex of int
-
 end
 
 module PState : sig
@@ -56,5 +54,3 @@ end
 val reset_the_proof_state : unit -> unit
 val step : unit -> unit Proofview.tactic
 val solve : int -> Declare.Proof.t -> Declare.Proof.t
-
-

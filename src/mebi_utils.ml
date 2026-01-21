@@ -93,6 +93,20 @@ module Strfy = struct
   let feconstr_rel_decl : Rocq_utils.econstr_decl Utils.Strfy.to_string =
     Of econstr_rel_decl
   ;;
+
+  let rocq_constructor_to_string
+        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
+        (x : Model_info.rocq_constructor)
+    : string
+    =
+    runkeep
+      (state (fun env sigma ->
+         ( sigma
+         , Model_info.rocq_constructor_to_string
+             ~args
+             ~envsigma:(Some (env, sigma))
+             x )))
+  ;;
 end
 
 (***********************************************************************)
