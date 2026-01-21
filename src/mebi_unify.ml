@@ -3,10 +3,10 @@ open Mebi_wrapper
 open Mebi_wrapper.Syntax
 open Mebi_unification
 
-type constructor_args = Mebi_utils.constructor_args
+type constructor_args = Rocq_utils.constructor_args
 
 let constructor_args : EConstr.t array -> constructor_args =
-  Mebi_utils.constructor_args
+  Rocq_utils.constructor_args
 ;;
 
 let get_fresh_evar : Rocq_utils.evar_source -> EConstr.t mm =

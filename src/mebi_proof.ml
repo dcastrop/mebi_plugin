@@ -186,22 +186,27 @@ let tactic ?(msg : string option) (x : unit Proofview.tactic) : tactic =
   { msg; x }
 ;;
 
-let tactic_chain : tactic list -> tactic =
+exception Mebi_proof_ChainEmptyTactics of unit
+
+let tactic_chain ?(nonempty : bool = false) : tactic list -> tactic =
   Log.trace __FUNCTION__;
+  let f : string option * string option -> string option = function
+    | None, None -> None
+    | Some xmsg, None -> Some xmsg
+    | None, Some ymsg -> Some ymsg
+    | Some xmsg, Some ymsg -> Some (Printf.sprintf "%s; %s" xmsg ymsg)
+  in
+  let g =
+    List.fold_left (fun { msg = xmsg; x } { msg = ymsg; x = y } ->
+      { msg = f (xmsg, ymsg); x = Mebi_theories.tactics [ x; y ] })
+  in
   function
-  | [] -> tactic (Proofview.tclUNIT ())
-  | h :: tl ->
-    let f : string option * string option -> string option = function
-      | None, None -> None
-      | Some xmsg, None -> Some xmsg
-      | None, Some ymsg -> Some ymsg
-      | Some xmsg, Some ymsg -> Some (Printf.sprintf "%s; %s" xmsg ymsg)
-    in
-    List.fold_left
-      (fun { msg = xmsg; x } { msg = ymsg; x = y } ->
-        { msg = f (xmsg, ymsg); x = Mebi_theories.tactics [ x; y ] })
-      h
-      tl
+  | [] ->
+    if nonempty
+    then raise (Mebi_proof_ChainEmptyTactics ())
+    else tactic (Proofview.tclUNIT ())
+  | h :: [] -> g h []
+  | h :: tl -> g h tl
 ;;
 
 module ApplicableConstructors = struct
@@ -248,13 +253,15 @@ module ApplicableConstructors = struct
     : constructor_binding_args -> EConstr.t Tactypes.bindings
     =
     Log.trace __FUNCTION__;
+    let env = Proofview.Goal.env gl in
+    let sigma = Proofview.Goal.sigma gl in
     let f ((x, y, z) : EConstr.t * EConstr.t option * EConstr.t option)
       : EConstr.t Tactypes.bindings
       =
       Log.thing ~__FUNCTION__ Debug "x" x (feconstr gl);
       Log.thing ~__FUNCTION__ Debug "y" y (feconstr_opt gl);
       Log.thing ~__FUNCTION__ Debug "z" z (feconstr_opt gl);
-      runkeep (Mebi_bindings.get x y z bindings)
+      Mebi_bindings.get env sigma x y z bindings
     in
     function
     | Raw args ->
@@ -699,6 +706,7 @@ let do_eapply_wk_some (gl : Proofview.Goal.t) : tactic =
 ;;
 
 let do_unfold (gl : Proofview.Goal.t) (x : EConstr.t) : tactic =
+  Log.trace __FUNCTION__;
   tactic
     ~msg:(Printf.sprintf "unfold %s" (econstr_to_string gl x))
     (Mebi_tactics.unfold_econstr gl x)
@@ -706,8 +714,9 @@ let do_unfold (gl : Proofview.Goal.t) (x : EConstr.t) : tactic =
 
 exception Mebi_proof_NothingToUnfold of unit
 
-let chain_do_unfold (gl : Proofview.Goal.t) : EConstr.t list -> tactic
-  = function
+let chain_do_unfold (gl : Proofview.Goal.t) : EConstr.t list -> tactic =
+  Log.trace __FUNCTION__;
+  function
   | [] -> raise (Mebi_proof_NothingToUnfold ())
   | x :: xs ->
     List.fold_left
@@ -723,12 +732,15 @@ let do_unfold_in_hyp
       (x : EConstr.t)
   : tactic
   =
+  Log.trace __FUNCTION__;
   tactic_chain [ tactic (Mebi_tactics.unfold_in_hyp gl x h); do_unfold gl x ]
 ;;
 
 let chain_do_unfold_in_hyp (gl : Proofview.Goal.t) (h : Rocq_utils.hyp)
   : EConstr.t list -> tactic
-  = function
+  =
+  Log.trace __FUNCTION__;
+  function
   | [] -> raise (Mebi_proof_NothingToUnfold ())
   | x :: [] -> do_unfold_in_hyp gl h x
   | x :: xs ->
@@ -1342,10 +1354,16 @@ let get_econstrs_to_unfold (gl : Proofview.Goal.t) (x : EConstr.t)
   loop [] x
 ;;
 
-let do_any_unfold_concl (gl : Proofview.Goal.t) : tactic =
+let do_any_unfold_concl ?(enforce : bool = false) (gl : Proofview.Goal.t)
+  : tactic
+  =
   Log.trace __FUNCTION__;
   let the_concl : EConstr.t = Proofview.Goal.concl gl in
-  get_econstrs_to_unfold gl the_concl |> chain_do_unfold gl
+  try get_econstrs_to_unfold gl the_concl |> chain_do_unfold gl with
+  | Mebi_proof_NothingToUnfold x ->
+    if enforce
+    then raise (Mebi_proof_NothingToUnfold x)
+    else tactic (Proofview.tclUNIT ())
 ;;
 
 let do_any_unfold_hyp_pair
@@ -1407,7 +1425,7 @@ let check_if_can_unfold (gl : Proofview.Goal.t) : EConstr.t -> bool =
   loop
 ;;
 
-let can_unfold_concl (gl : Proofview.Goal.t) : bool =
+let _can_unfold_concl (gl : Proofview.Goal.t) : bool =
   Log.trace __FUNCTION__;
   let the_concl : EConstr.t = Proofview.Goal.concl gl in
   Log.thing ~__FUNCTION__ Debug "concl" the_concl (feconstr gl);
@@ -2027,15 +2045,13 @@ and handle_new_weak_sim (gl : Proofview.Goal.t) : tactic =
   then (
     Log.trace ~__FUNCTION__ "(concl is weak sim)";
     (* TODO: just try to invert and then catch error if nothing to invert *)
-    if can_unfold_concl gl
-    then (
-      try do_any_unfold_concl gl with
-      | Mebi_proof_NothingToUnfold _ -> raise (Mebi_proof_NewWeakSim ()))
-    else if hyps_has_cofix gl
-    then do_solve_cofix gl
-    else (
-      set_the_proof_state ~__FUNCTION__ NewCofix;
-      do_new_cofix gl))
+    try do_any_unfold_concl ~enforce:true gl with
+    | Mebi_proof_NothingToUnfold _ ->
+      if hyps_has_cofix gl
+      then do_solve_cofix gl
+      else (
+        set_the_proof_state ~__FUNCTION__ NewCofix;
+        do_new_cofix gl))
   else if typ_is_exists gl concltyp
   then (
     Log.trace ~__FUNCTION__ "(concl is exists)";
@@ -2203,7 +2219,12 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
     (* TODO: obtain [{from;label;goto}] terms from concl *)
     Log.debug ~__FUNCTION__ "TODO: obtain [{from;label;goto}] terms from concl";
     let conclpair = concl_to_atomic gl in
-    let f = ApplicableConstructors.get_constructor_tactic gl h in
+    let f args =
+      tactic_chain
+        [ ApplicableConstructors.get_constructor_tactic gl h args
+        ; do_any_unfold_concl ~enforce:false gl
+        ]
+    in
     let fsm = nfsm () in
     if typ_is_tau gl conclpair
     then (
@@ -2262,11 +2283,7 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
       ~__FUNCTION__
       (ApplyConstructors
          { current = Tree.min using; annotation = next; destination });
-    tactic_chain
-      [ get_econstrs_to_unfold gl (Proofview.Goal.concl gl)
-        |> chain_do_unfold gl
-      ; do_rt1n_via gl via
-      ]
+    tactic_chain [ do_any_unfold_concl ~enforce:false gl; do_rt1n_via gl via ]
 (* let constructor,annotation : Note.annotation option =
       match annotation with
       | { this={ from; via; using; goto }; next = None } -> None
@@ -2340,7 +2357,7 @@ let step () : unit Proofview.tactic =
   Log.trace __FUNCTION__;
   Mebi_theories.tactics
     [ Proofview.Goal.enter (fun gl ->
-        get_tactic ~short:false (handle_proof_state gl))
+        get_tactic ~short:false ~state:false (handle_proof_state gl))
     ; Mebi_tactics.simplify_and_subst_all ()
     ]
 ;;

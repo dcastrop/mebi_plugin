@@ -50,7 +50,7 @@ examples/CADP_Glued.v ### REQUIRED FOR BELOW
 
 examples/bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
 # examples/bisimilarity/CADP/Size1/TermTests.v ### Success
-examples/bisimilarity/CADP/Size1/PluginProofs.v ### WIP: working on explicit constructor bindings
+examples/bisimilarity/CADP/Size1/PluginProofs.v ### WIP: debugging
 
 # TODO: 
 # examples/bisimilarity/CADP/Size2/Terms.v ###

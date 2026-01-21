@@ -495,3 +495,114 @@ let get_next (env : Environ.env) (sigma : Evd.evar_map)
     get_next_evar env sigma type_of_a_term
   | OfType a_type -> get_next_evar env sigma a_type
 ;;
+
+let get_fresh_evar
+      (env : Environ.env)
+      (sigma : Evd.evar_map)
+      (original : evar_source)
+  : Evd.evar_map * EConstr.t
+  =
+  get_next env sigma original
+;;
+
+(*********************************************************)
+
+let subst_of_decl (substl : EConstr.Vars.substl) x : EConstr.t =
+  let ty : EConstr.t = Context.Rel.Declaration.get_type x in
+  EConstr.Vars.substl substl ty
+;;
+
+(** [mk_ctx_subst ?substl x] returns a new [evar] made from the type of [x], using any [substl] provided.
+    @param ?substl
+      is a list of substitutions, (* TODO: provided so that collisions don't occur? *)
+    @param x
+      corresponds to a (* TODO: universally? *) quantified term of a constructor.
+    @return a new [evar] for [x]. *)
+let mk_ctx_subst
+      (env : Environ.env)
+      (sigma : Evd.evar_map)
+      (substl : EConstr.Vars.substl)
+      (x : ('a, EConstr.t, 'b) Context.Rel.Declaration.pt)
+  : Evd.evar_map * EConstr.t
+  =
+  let subst : EConstr.t = subst_of_decl substl x in
+  Evarutil.new_evar env sigma subst
+;;
+
+(** [mk_ctx_substl acc ts] makes an [evar] for each term declaration in [ts].
+    @param acc
+      contains the substitutions accumulated so far, and is returned once [ts=[]]
+    @param ts
+      is an [EConstr.rel_declaration list] (obtained from the context of a constructor).
+    @return [acc] of [evars] once [ts] is empty. *)
+let rec mk_ctx_substl
+          (env : Environ.env)
+          (sigma : Evd.evar_map)
+          (acc : EConstr.Vars.substl)
+  :  ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list
+  -> Evd.evar_map * EConstr.Vars.substl
+  = function
+  | [] -> sigma, acc
+  | t :: ts ->
+    let sigma, vt = mk_ctx_subst env sigma acc t in
+    mk_ctx_substl env sigma (vt :: acc) ts
+;;
+
+(** returns tuple list of [(binding_name * evar)] -- TODO: map these to the [_UNBOUND_REL_X] and
+*)
+let map_decl_evar_pairs (xs : econstr_decl list) (ys : EConstr.Vars.substl)
+  : (EConstr.t * Names.Name.t) list
+  =
+  List.combine ys (List.map Context.Rel.Declaration.get_name xs)
+;;
+
+(***********************************************************************)
+
+exception ConstructorArgsExpectsArraySize3 of unit
+
+type constructor_args =
+  { lhs : EConstr.t
+  ; act : EConstr.t
+  ; rhs : EConstr.t
+  }
+
+let constructor_args (args : EConstr.t array) : constructor_args =
+  if Int.equal (Array.length args) 3
+  then { lhs = args.(0); act = args.(1); rhs = args.(2) }
+  else raise (*TODO:err*) (ConstructorArgsExpectsArraySize3 ())
+;;
+
+exception Rocq_utils_InvalidLtsArgLength of int
+exception Rocq_utils_InvalidLtsTermKind of Constr.t
+
+(** [extract_args ?substl term] returns an [EConstr.t] triple of arguments of an inductively defined LTS, e.g., [term -> option action -> term -> Prop].
+    @param ?substl
+      is a list of substitutions applied to the terms prior to being returned.
+    @param term
+      must be of [Constr.kind] [App(fn, args)] (i.e., the application of some inductively defined LTS, e.g., [termLTS (tpar (tact (Send A) tend) (tact (Recv A) tend)) (Some A) (tpar tend tend)]).
+    @return a triple of [lhs_term, action, rhs_term]. *)
+let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
+  : constructor_args
+  =
+  match Constr.kind term with
+  | App (_name, args) ->
+    if Array.length args == 3
+    then (
+      let args = EConstr.of_constr_array args in
+      let args = Array.map (EConstr.Vars.substl substl) args in
+      let args = constructor_args args in
+      (* let* () = debug_extract_args _name args in *)
+      args)
+    else raise (Rocq_utils_InvalidLtsArgLength (Array.length args))
+  | _ -> raise (Rocq_utils_InvalidLtsTermKind term)
+;;
+
+exception Rocq_utils_CouldNotExtractBinding of unit
+
+let unpack_constr_args ((_, tys) : Constr.t kind_pair)
+  : Constr.t * Constr.t * Constr.t
+  =
+  try tys.(0), tys.(1), tys.(2) with
+  (* NOTE: in case [tys.(_)] is out of bounds. *)
+  | Not_found -> raise (Rocq_utils_CouldNotExtractBinding ())
+;;

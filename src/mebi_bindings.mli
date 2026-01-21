@@ -1,79 +1,85 @@
-
 type t = Rocq_bindings.t
 and map = Rocq_bindings.map
 and extractor_binding = Rocq_bindings.extractor_binding
 
 module Instructions = Rocq_bindings.Instructions
 
-val update_map :
-  Rocq_bindings.map ->
-  Constr.t ->
-  Rocq_bindings.extractor_binding ->
-  unit
+val update_map
+  :  Rocq_bindings.map
+  -> Constr.t
+  -> Rocq_bindings.extractor_binding
+  -> unit
 
-val add_instruction :
-  Rocq_bindings.Instructions.t ->
-  Rocq_bindings.Instructions.t ->
-  Rocq_bindings.Instructions.t
+val add_instruction
+  :  Rocq_bindings.Instructions.t
+  -> Rocq_bindings.Instructions.t
+  -> Rocq_bindings.Instructions.t
 
-exception Mebi_bindings_CannotFindBindingName of Evd.econstr
+exception Mebi_bindings_CannotFindBindingName of EConstr.t
 
-val find_name :
-  (Evd.econstr * Names.Name.t) list ->
-  Evd.econstr ->
-  Names.Name.t Mebi_wrapper.mm
+val find_name
+  :  Evd.evar_map
+  -> (EConstr.t * Names.Name.t) list
+  -> EConstr.t
+  -> Names.Name.t
 
-val extract_binding_map :
-  (Evd.econstr * Names.Name.t) list ->
-  Evd.econstr ->
-  Constr.t ->
-  map Mebi_wrapper.mm
+val extract_binding_map
+  :  Environ.env
+  -> Evd.evar_map
+  -> (EConstr.t * Names.Name.t) list
+  -> EConstr.t
+  -> Constr.t
+  -> map
 
-val make_map :
-  (Evd.econstr * Names.Name.t) list ->
-  Evd.econstr * Constr.t ->
-  map option Mebi_wrapper.mm
+val make_map
+  :  Environ.env
+  -> Evd.evar_map
+  -> (EConstr.t * Names.Name.t) list
+  -> EConstr.t * Constr.t
+  -> map option
 
 val use_no_bindings : map option list -> bool
 
-val extract :
-  (Evd.econstr * Names.Name.t) list ->
-  Evd.econstr * Constr.t ->
-  Evd.econstr * Constr.t ->
-  Evd.econstr * Constr.t ->
-  t Mebi_wrapper.mm
+val extract
+  :  Environ.env
+  -> Evd.evar_map
+  -> (EConstr.t * Names.Name.t) list
+  -> EConstr.t * Constr.t
+  -> EConstr.t * Constr.t
+  -> EConstr.t * Constr.t
+  -> t
 
-val extract_info :
-  Mebi_ind.t -> Model_info.rocq_constructor list Mebi_wrapper.mm
+val extract_info
+  :  Environ.env
+  -> Evd.evar_map
+  -> Mebi_ind.t
+  -> Evd.evar_map * Model_info.rocq_constructor list
 
-val get_quantified_hyp :
-  Names.Name.t -> Tactypes.quantified_hypothesis
+val get_quantified_hyp : Names.Name.t -> Tactypes.quantified_hypothesis
 
-exception
-  Mebi_bindings_BindingInstruction_NotApp of Evd.econstr
+exception Mebi_bindings_BindingInstruction_NotApp of EConstr.t
+exception Mebi_bindings_BindingInstruction_Undefined of EConstr.t * EConstr.t
+exception Mebi_bindings_BindingInstruction_IndexOutOfBounds of EConstr.t * int
+exception Mebi_bindings_BindingInstruction_NEQ of EConstr.t * Constr.t
 
-exception
-  Mebi_bindings_BindingInstruction_Undefined of
-    Evd.econstr * Evd.econstr
+val get_bound_term
+  :  Environ.env
+  -> Evd.evar_map
+  -> EConstr.t
+  -> Instructions.t
+  -> EConstr.t
 
-exception
-  Mebi_bindings_BindingInstruction_IndexOutOfBounds of
-    Evd.econstr * int
+val get_explicit_bindings
+  :  Environ.env
+  -> Evd.evar_map
+  -> EConstr.t * map option
+  -> EConstr.t Tactypes.explicit_bindings
 
-exception
-  Mebi_bindings_BindingInstruction_NEQ of
-    Evd.econstr * Constr.t
-
-val get_bound_term :
-  Evd.econstr -> Instructions.t -> Evd.econstr Mebi_wrapper.mm
-
-val get_explicit_bindings :
-  Evd.econstr * map option ->
-  Evd.econstr Tactypes.explicit_bindings Mebi_wrapper.mm
-
-val get :
-  Evd.econstr ->
-  Evd.econstr option ->
-  Evd.econstr option ->
-  t ->
-  Evd.econstr Tactypes.bindings Mebi_wrapper.mm
+val get
+  :  Environ.env
+  -> Evd.evar_map
+  -> EConstr.t
+  -> EConstr.t option
+  -> EConstr.t option
+  -> t
+  -> EConstr.t Tactypes.bindings

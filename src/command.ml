@@ -623,7 +623,9 @@ module MkGraph
         | LTS the_lts_ind_def ->
           let pp : string = econstr_to_string the_ind_def.ind in
           let constructors : Info.rocq_constructor list =
-            Mebi_wrapper.runkeep (Mebi_bindings.extract_info the_ind_def)
+            Mebi_wrapper.runkeep
+              (Mebi_wrapper.state (fun env sigma ->
+                 Mebi_bindings.extract_info env sigma the_ind_def))
           in
           { enc; pp; constructors } :: acc
         | _ -> acc)
