@@ -35,37 +35,37 @@ Require Import Logic.
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.pq".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof. MeBiSim Begin termLTS p And termLTS q Using termLTS. 
-  MeBiSim Solve 470. (* 465 *)
+  MeBiSim Solve 2000. (* 465 *)
 Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.qp".
 Example wsim_qp : weak_sim termLTS termLTS q p. 
 Proof. MeBiSim Begin termLTS q And termLTS p Using termLTS. 
-  MeBiSim Solve 300. (* 297 *)
+  MeBiSim Solve 2000. (* 297 *)
 Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.qr".
 Example wsim_qr : weak_sim termLTS termLTS q r. 
 Proof. MeBiSim Begin termLTS q And termLTS r Using termLTS. 
-  MeBiSim Solve 330. (* 322 *)
+  MeBiSim Solve 2000. (* 322 *)
 Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.rq".
 Example wsim_rq : weak_sim termLTS termLTS r q. 
 Proof. MeBiSim Begin termLTS r And termLTS q Using termLTS. 
-  MeBiSim Solve 200. (* 195 *)
+  MeBiSim Solve 2000. (* 195 *)
 Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.pr".
 Example wsim_pr : weak_sim termLTS termLTS p r. 
 Proof. MeBiSim Begin termLTS p And termLTS r Using termLTS. 
-  MeBiSim Solve 500. (* 497 *)
+  MeBiSim Solve 2000. (* 497 *)
 Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.rp".
 Example wsim_rp : weak_sim termLTS termLTS r p. 
 Proof. MeBiSim Begin termLTS r And termLTS p Using termLTS. 
-  MeBiSim Solve 200. (* 191 *)
+  MeBiSim Solve 2000. (* 191 *)
 Qed.

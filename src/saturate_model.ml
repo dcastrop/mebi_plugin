@@ -7,19 +7,57 @@ let () = Log.Config.configure_output Debug false
 let () = Log.Config.configure_output Trace false
 (***********************************************************************)
 
+type data =
+  { mutable named : Action.t option
+  ; mutable notes : wip list
+  ; mutable visited : States.t
+  ; old_edges : States.t Actions.t Edges.t
+  }
+
+and actionpair = Action.t * States.t
+
+and wip =
+  { from : State.t
+  ; via : Label.t
+  ; tree : Tree.t list
+  }
+
+let actionpair_to_string ((a, b) : actionpair) : string =
+  Utils.Strfy.record
+    [ "action", Action.to_string a; "destinations", Model.states_to_string b ]
+;;
+
+module ActionPairs = Set.Make (struct
+    type t = actionpair
+
+    (* let equal ((a, x) : t) ((b, y) : t) : bool =
+       Action.equal a b && States.equal x y
+       ;; *)
+
+    let compare ((a, x) : t) ((b, y) : t) : int =
+      Utils.compare_chain [ Action.compare a b; States.compare x y ]
+    ;;
+  end)
+
+(***********************************************************************)
+
 let fstate : State.t Utils.Strfy.to_string = Args State.to_string
 let fenc : Enc.t Utils.Strfy.to_string = Of Enc.to_string
 
-let fannotation : Note.annotation Utils.Strfy.to_string =
+let _fannotation : Note.annotation Utils.Strfy.to_string =
   Args Note.annotation_to_string
+;;
+
+let _fannotations : Note.Annotations.t Utils.Strfy.to_string =
+  Args Note.annotations_to_string
 ;;
 
 (***********************************************************************)
 
 (** [merge_saturated_tuples a b] merges elements of [b] into [a], either by updating an element in [a] with additional annotation for a saturation tuple that describes the same action-destination, or in the case that the saturation tuple is not described within [a] by inserting it within [a].
 *)
-let rec merge_saturated_tuples (a : (Action.t * States.t) list)
-  : (Action.t * States.t) list -> (Action.t * States.t) list
+let rec merge_saturated_tuples (a : actionpair list)
+  : actionpair list -> actionpair list
   =
   Log.trace __FUNCTION__;
   function
@@ -35,9 +73,9 @@ let rec merge_saturated_tuples (a : (Action.t * States.t) list)
 (** [try_update_saturated_tuple x a] returns [None, a] when [x] cannot be used to update a pre-existing tuple in [a], and [Some z, a'] where [z] is the updated tuple in [a] which has been removed in [a'].
 *)
 and try_update_saturated_tuple
-      ((xaction, xdestinations) : Action.t * States.t)
-      (a : (Action.t * States.t) list)
-  : (Action.t * States.t) option * (Action.t * States.t) list
+      ((xaction, xdestinations) : actionpair)
+      (a : actionpair list)
+  : actionpair option * actionpair list
   =
   Log.trace __FUNCTION__;
   let f
@@ -75,22 +113,6 @@ and try_update_saturated_tuple
     (None, [])
     a
 ;;
-
-type data =
-  { mutable named : Action.t option
-  ; mutable notes : wip list
-  ; mutable visited : States.t
-  ; old_edges : States.t Actions.t Edges.t
-  }
-
-and actionpair = Action.t * States.t
-and actionpairs = actionpair list
-
-and wip =
-  { from : State.t
-  ; via : Label.t
-  ; tree : Tree.t list
-  }
 
 let _debug_wips ?(__FUNCTION__ : string = "") (xs : wip list) : unit =
   let f : Enc.t -> string = Mebi_setup.Enc.to_string in
@@ -143,7 +165,7 @@ let _update_named (x : Action.t) (d : data) : data =
 ;;
 
 (** returns a copy of [d] with the updated name *)
-let _update_named' (x : Action.t) (d : data) : data =
+let update_named (x : Action.t) (d : data) : data =
   { d with named = f_update_named x d }
 ;;
 
@@ -175,7 +197,7 @@ let _update_visited (x : State.t) (d : data) : data =
 ;;
 
 (** returns a copy of [d] with the updated visited *)
-let _update_visited' (x : State.t) (d : data) : data =
+let update_visited (x : State.t) (d : data) : data =
   { d with visited = f_update_visited x d }
 ;;
 
@@ -232,23 +254,109 @@ let validate_wips (xs : wip list) : unit =
     raise (Model_Saturate_WIP_HadMultipleNamedActions xs)
 ;;
 
+(** returns all of the possible actions after the named action *)
+let extrapolate_annotations (x : Note.annotation) : Note.Annotations.t =
+  Log.trace __FUNCTION__;
+  Log.thing ~__FUNCTION__ Debug "x" x _fannotation;
+  (* NOTE: skip pre-named action *)
+  let rec skip ({ this; next } : Note.annotation) : Note.Annotations.t =
+    let xs =
+      Option.cata
+        (if Label.is_silent this.via then skip else get)
+        Note.Annotations.empty
+        next
+      |> Note.Annotations.map (fun (y : Note.annotation) ->
+        { this; next = Some y })
+    in
+    (* NOTE: don't forget to add this action if named *)
+    if Label.is_silent this.via
+    then xs
+    else Note.Annotations.add { this; next = None } xs
+  (* NOTE: get every annotation from named action onwards *)
+  and get : Note.annotation -> Note.Annotations.t = function
+    | { this; next = None } -> Note.Annotations.singleton { this; next = None }
+    | { this; next = Some next } ->
+      get next
+      |> Note.Annotations.map (fun (y : Note.annotation) ->
+        { this; next = Some y })
+      |> Note.Annotations.add { this; next = None }
+  in
+  let xs = Note.Annotations.add x (skip x) in
+  Log.things ~__FUNCTION__ Debug "xs" (Note.Annotations.to_list xs) _fannotation;
+  xs
+;;
+
 (** [stop] *)
-let stop (d : data) (goto : State.t) (acc : actionpairs) : actionpairs =
+let stop (d : data) (goto : State.t) (acc : ActionPairs.t) : ActionPairs.t =
   Log.trace __FUNCTION__;
   match d.named with
   | None -> acc
   | Some named ->
-    validate_wips d.notes;
+    let () = validate_wips d.notes in
     _debug_notes d;
-    let annotation = Some (wip_to_annotation goto d.notes) in
-    Log.option ~__FUNCTION__ Debug "annotation" annotation fannotation;
-    let x : Action.t = Action.create named.label ~annotation () in
-    (x, States.singleton goto) :: acc
+    let x = wip_to_annotation goto d.notes in
+    Log.thing ~__FUNCTION__ Debug "goto" goto fstate;
+    Log.thing
+      ~__FUNCTION__
+      Debug
+      "x"
+      ( Action.create named.label ~annotation:(Some x) ()
+      , States.singleton (Note.last x).goto )
+      (Of actionpair_to_string);
+    let zs =
+      x
+      (* wip_to_annotation goto d.notes *)
+      |> extrapolate_annotations
+      |> Note.Annotations.to_list
+    in
+    Log.things ~__FUNCTION__ Debug "zs" zs (Of Note.annotation_to_string);
+    let ys =
+      zs
+      |> List.map (fun (x : Note.annotation) : actionpair ->
+        let y : Action.t = Action.create named.label ~annotation:(Some x) () in
+        y, States.singleton (Note.last x).goto)
+    in
+    Log.things ~__FUNCTION__ Debug "ys" ys (Of actionpair_to_string);
+    let xs =
+      ys
+      |> List.fold_left
+           (fun (acc : ActionPairs.t) ((a, s) : actionpair) ->
+             (* NOTE: merge destinations of equal actions *)
+             let matching =
+               ActionPairs.filter
+                 (fun ((b, t) : actionpair) -> Action.equal a b)
+                 acc
+             in
+             if ActionPairs.is_empty matching
+             then ActionPairs.add (a, s) acc
+             else (
+               (* NOTE: update states of each matching *)
+               let acc = ActionPairs.diff acc matching in
+               matching
+               |> ActionPairs.to_list
+               |> List.map (fun (_, t) -> a, States.union s t)
+               |> ActionPairs.of_list
+               |> ActionPairs.union acc))
+           acc
+    in
+    Log.things
+      ~__FUNCTION__
+      Debug
+      "xs"
+      (ActionPairs.to_list xs)
+      (Of actionpair_to_string);
+    xs
 ;;
+
+(* let annotation = Some (wip_to_annotation goto d.notes) in *)
+(* Log.option ~__FUNCTION__ Debug "annotation" annotation fannotation; *)
+(* let x : Action.t = Action.create named.label ~annotation () in *)
+(* (x, States.singleton goto) :: acc *)
 
 (** [check_from] explores the outgoing actions of state [from], which is some destination of another action.
 *)
-let rec check_from (d : data) (from : State.t) (acc : actionpairs) : actionpairs
+let rec check_from (d : data) (from : State.t) (acc : ActionPairs.t)
+  : ActionPairs.t
   =
   Log.trace __FUNCTION__;
   Log.thing ~__FUNCTION__ Debug "from" from.enc fenc;
@@ -257,7 +365,7 @@ let rec check_from (d : data) (from : State.t) (acc : actionpairs) : actionpairs
     Log.thing ~__FUNCTION__ Debug "already visited" from.enc fenc;
     stop d from acc)
   else (
-    let d : data = _update_visited' from d in
+    let d : data = update_visited from d in
     _debug_data d;
     match get_old_actions from d with
     | None ->
@@ -268,7 +376,7 @@ let rec check_from (d : data) (from : State.t) (acc : actionpairs) : actionpairs
       check_actions d from old_actions acc)
 
 and check_actions (d : data) (from : State.t) (xs : States.t Actions.t)
-  : actionpairs -> actionpairs
+  : ActionPairs.t -> ActionPairs.t
   =
   Log.trace __FUNCTION__;
   Log.thing ~__FUNCTION__ Debug "from" from.enc fenc;
@@ -278,7 +386,7 @@ and check_actions (d : data) (from : State.t) (xs : States.t Actions.t)
     Log.things ~__FUNCTION__ Debug "actions" xsl factionenc
   in *)
   Actions.fold
-    (fun (x : Action.t) (ys : States.t) (acc : actionpairs) ->
+    (fun (x : Action.t) (ys : States.t) (acc : ActionPairs.t) ->
       if skip_action x d
       then (
         Log.thing ~__FUNCTION__ Debug "skipping" x.label.enc fenc;
@@ -286,16 +394,16 @@ and check_actions (d : data) (from : State.t) (xs : States.t Actions.t)
       else (
         Log.thing ~__FUNCTION__ Debug "continuing" x.label.enc fenc;
         let d : data (* NOTE: copy [d] *) = _update_notes' from x d in
-        let d : data = _update_named' x d in
+        let d : data = update_named x d in
         check_destinations d from ys acc))
     xs
 
 and check_destinations (d : data) (from : State.t) (xs : States.t)
-  : actionpairs -> actionpairs
+  : ActionPairs.t -> ActionPairs.t
   =
   Log.trace __FUNCTION__;
   States.fold
-    (fun (x : State.t) (acc : actionpairs) ->
+    (fun (x : State.t) (acc : ActionPairs.t) ->
       Log.thing ~__FUNCTION__ Debug "from" from.enc fenc;
       check_from d x acc)
     xs
@@ -307,12 +415,16 @@ and check_destinations (d : data) (from : State.t) (xs : States.t)
       is the set of destination [States.t] reachable from state [from] via actions that have already been recorded in [d.notes] as a [wip].
 *)
 let edge_action_destinations (d : data) (from : State.t) (ys : States.t)
-  : actionpairs
+  : ActionPairs.t
   =
   Log.trace __FUNCTION__;
   Log.thing ~__FUNCTION__ Debug "from" from fstate;
   _debug_data d;
-  States.fold (fun (y : State.t) (acc : actionpairs) -> check_from d y []) ys []
+  States.fold
+    (fun (y : State.t) (acc : ActionPairs.t) ->
+      check_from d y ActionPairs.empty)
+    ys
+    ActionPairs.empty
 ;;
 
 (** [edge_actions] returns a list of saturated actions tupled with their respective destinations, obtained from [edge_action_destinations] which explores the reflexive-transitive closure
@@ -321,17 +433,20 @@ let edge_actions
       (from : State.t)
       (old_actions : States.t Actions.t)
       (old_edges : States.t Actions.t Edges.t)
-  : actionpairs
+  : ActionPairs.t
   =
   Log.trace __FUNCTION__;
   Actions.fold
-    (fun (x : Action.t) (ys : States.t) (acc : actionpairs) ->
+    (fun (x : Action.t) (ys : States.t) (acc : actionpair list) ->
       let d : data =
-        initial_data old_edges |> _update_named' x |> _update_notes' from x
+        initial_data old_edges |> update_named x |> _update_notes' from x
       in
-      edge_action_destinations d from ys |> merge_saturated_tuples acc)
+      edge_action_destinations d from ys
+      |> ActionPairs.to_list
+      |> merge_saturated_tuples acc)
     old_actions
     []
+  |> ActionPairs.of_list
 ;;
 
 (** [edge] updates [new_actions] with actions saturated by [edge_actions]
@@ -345,8 +460,9 @@ let edge
   =
   Log.trace __FUNCTION__;
   edge_actions from old_actions old_edges
-  |> List.iter (fun ((saturated_action, destinations) : Action.t * States.t) ->
-    update_action new_actions saturated_action destinations)
+  |> ActionPairs.iter
+       (fun ((saturated_action, destinations) : Action.t * States.t) ->
+       update_action new_actions saturated_action destinations)
 ;;
 
 (** [] *)
