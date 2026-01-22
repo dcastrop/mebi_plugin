@@ -1,19 +1,19 @@
-type t =
-  { from : Model_state.t
-  ; label : Model_label.t
-  ; goto : Model_state.t option
-  ; annotation : Model_note.annotation option
-  ; constructor_trees : Mebi_constr.Tree.t list
-  }
+type t = {
+  from : Model_state.t;
+  label : Model_label.t option;
+  goto : Model_state.t option;
+  annotation : Model_note.annotation option;
+  constructor_trees : Mebi_constr.Tree.t list;
+}
 
-val create
-  :  Model_state.t
-  -> Model_label.t
-  -> Model_state.t option
-  -> ?annotation:Model_note.annotation option
-  -> ?constructor_trees:Mebi_constr.Tree.t list
-  -> unit
-  -> t
+val create :
+  Model_state.t ->
+  Model_label.t option ->
+  Model_state.t option ->
+  ?annotation:Model_note.annotation option ->
+  ?constructor_trees:Mebi_constr.Tree.t list ->
+  unit ->
+  t
 
 val equal : t -> t -> bool
 val compare : t -> t -> int

@@ -510,12 +510,17 @@ let get_reachable_blocks_opt
 (*** Transition_opt -> Transition **************************************)
 (***********************************************************************)
 
-exception Model_TransitionOptGotoNone of Transition_opt.t
+exception Model_CannotConvertTransitionOpt_To_Transition of Transition_opt.t
 
 let transition_opt_to_transition : Transition_opt.t -> Transition.t = function
-  | { from; label; goto = Some goto; annotation; constructor_trees } ->
+  | { from
+    ; label = Some label
+    ; goto = Some goto
+    ; annotation
+    ; constructor_trees
+    } ->
     Transition.create from label goto ~annotation ~constructor_trees ()
-  | x -> raise (Model_TransitionOptGotoNone x)
+  | x -> raise (Model_CannotConvertTransitionOpt_To_Transition x)
 ;;
 
 (***********************************************************************)
@@ -527,9 +532,12 @@ let transition_to_action : Transition.t -> Action.t = function
     Action.create label ~annotation ~constructor_trees ()
 ;;
 
+exception Model_CannotConvertTransitionOpt_To_Action of Transition_opt.t
+
 let transition_opt_to_action : Transition_opt.t -> Action.t = function
-  | { from; label; goto; annotation; constructor_trees } ->
+  | { from; label = Some label; goto; annotation; constructor_trees } ->
     Action.create label ~annotation ~constructor_trees ()
+  | x -> raise (Model_CannotConvertTransitionOpt_To_Action x)
 ;;
 
 (***********************************************************************)

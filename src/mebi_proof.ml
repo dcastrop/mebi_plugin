@@ -50,8 +50,8 @@ let _get_theory_none_dec () : EConstr.t =
 (***********************************************************************)
 module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
-let () = Log.Config.configure_output Debug true
-let () = Log.Config.configure_output Trace true
+let () = Log.Config.configure_output Debug false
+let () = Log.Config.configure_output Trace false
 (***********************************************************************)
 
 (* let fstr : string Utils.Strfy.to_string = Args Utils.Strfy.string *)
@@ -91,7 +91,8 @@ let _feconstrkinds (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
    Utils.Strfy.bool (Mebi_theories.is_theory (Proofview.Goal.sigma gl) x))
    ;; *)
 
-let feconstrarr (gl : Proofview.Goal.t) : EConstr.t array Utils.Strfy.to_string =
+let _feconstrarr (gl : Proofview.Goal.t) : EConstr.t array Utils.Strfy.to_string
+  =
   Of (Utils.Strfy.array (Of (econstr_to_string gl)))
 ;;
 
@@ -109,9 +110,95 @@ let _fekind (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
 let fstate : State.t Utils.Strfy.to_string = Args State.to_string
 let fstates : States.t Utils.Strfy.to_string = Args Model.states_to_string
 let fpi : Partition.t Utils.Strfy.to_string = Args Model.partition_to_string
-let flabel : Label.t Utils.Strfy.to_string = Args Label.to_string
+
+(* let flabel : Label.t Utils.Strfy.to_string = Args Label.to_string *)
 let falphabet : Alphabet.t Utils.Strfy.to_string = Args Model.alphabet_to_string
 (* let faction : Action.t Utils.Strfy.to_string = Args Action.to_string *)
+
+(***********************************************************************)
+
+let log_econstr
+      ?(__FUNCTION__ : string = "")
+      (s : string)
+      (x : EConstr.t)
+      (gl : Proofview.Goal.t)
+  : unit
+  =
+  Log.thing ~__FUNCTION__ Debug s x (feconstr gl)
+;;
+
+let log_concl ?(__FUNCTION__ : string = "") (s : string) (gl : Proofview.Goal.t)
+  : unit
+  =
+  Log.thing
+    ~__FUNCTION__
+    Debug
+    s
+    (Proofview.Goal.concl gl)
+    (Of (econstr_to_string gl))
+;;
+
+let log_hyps
+      ?(__FUNCTION__ : string = "")
+      (s : string)
+      (hyps : Rocq_utils.hyp list)
+      (gl : Proofview.Goal.t)
+  : unit
+  =
+  Log.things ~__FUNCTION__ Debug s hyps (Of (hyp_to_string gl))
+;;
+
+let _log_fsm ?(__FUNCTION__ : string = "") (s : string) (x : Fsm.t) : unit =
+  Log.thing ~__FUNCTION__ Debug s x (Args Model.Fsm.to_string)
+;;
+
+let _log_states ?(__FUNCTION__ : string = "") (s : string) (x : States.t) : unit
+  =
+  Log.thing ~__FUNCTION__ Debug s x (Args Model.states_to_string)
+;;
+
+let _log_alphabet ?(__FUNCTION__ : string = "") (s : string) (x : Alphabet.t)
+  : unit
+  =
+  Log.thing ~__FUNCTION__ Debug s x (Args Model.alphabet_to_string)
+;;
+
+let log_label ?(__FUNCTION__ : string = "") (s : string) (x : Label.t) : unit =
+  Log.thing ~__FUNCTION__ Debug s x (Args Label.to_string)
+;;
+
+let log_label_opt
+      ?(__FUNCTION__ : string = "")
+      (s : string)
+      (x : Label.t option)
+  : unit
+  =
+  Log.option ~__FUNCTION__ Debug s x (Args Label.to_string)
+;;
+
+let _log_action ?(__FUNCTION__ : string = "") (s : string) (x : Action.t) : unit
+  =
+  Log.thing ~__FUNCTION__ Debug s x (Args Action.to_string)
+;;
+
+let _log_state ?(__FUNCTION__ : string = "") (s : string) (x : State.t) : unit =
+  Log.thing ~__FUNCTION__ Debug s x (Args State.to_string)
+;;
+
+let log_transition ?(__FUNCTION__ : string = "") (s : string) (x : Transition.t)
+  : unit
+  =
+  Log.thing ~__FUNCTION__ Debug s x (Args Transition.to_string)
+;;
+
+let log_transition_opt
+      ?(__FUNCTION__ : string = "")
+      (s : string)
+      (x : Transition_opt.t)
+  : unit
+  =
+  Log.thing ~__FUNCTION__ Debug s x (Args Transition_opt.to_string)
+;;
 
 (***********************************************************************)
 
@@ -763,17 +850,11 @@ let get_action_to
   =
   Log.trace __FUNCTION__;
   let actionsfrom : States.t Actions.t = Edges.find fsm.edges from in
-  let actions = get_actions ~annotated from via fsm in
-  Log.things ~__FUNCTION__ Debug "actions" actions (Args Action.to_string);
-  Log.thing
-    ~__FUNCTION__
-    Debug
-    "all actions"
-    (Edges.find fsm.edges from)
-    (Args Model.actions_to_string);
+  let actions : Action.t list = get_actions ~annotated from via fsm in
   Log.thing ~__FUNCTION__ Debug "from" from (Args State.to_string);
   Log.thing ~__FUNCTION__ Debug "label" via (Args Label.to_string);
   Log.thing ~__FUNCTION__ Debug "goto" goto (Args State.to_string);
+  Log.things ~__FUNCTION__ Debug "actions" actions (Args Action.to_string);
   match
     List.find_opt
       (fun (x : Action.t) ->
@@ -933,7 +1014,7 @@ let do_constructor_transition
 exception Mebi_proof_CouldNotDecodeEConstr of EConstr.t
 
 let try_decode (gl : Proofview.Goal.t) (x : EConstr.t) : Enc.t option =
-  Log.trace __FUNCTION__;
+  (* Log.trace __FUNCTION__; *)
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   if EConstr.isRel sigma x
   then None
@@ -1019,7 +1100,7 @@ let typ_is_fsm_constructor
       ((ty, _) : EConstr.t Rocq_utils.kind_pair)
   : Fsm.t -> bool
   =
-  Log.trace __FUNCTION__;
+  (* Log.trace __FUNCTION__; *)
   (* Log.thing ~__FUNCTION__ Debug "ty" ty (feconstr gl); *)
   function
   | { info = { rocq_info = None; _ }; _ } -> false
@@ -1047,15 +1128,9 @@ let try_find_state
   : State.t option
   =
   Log.trace __FUNCTION__;
-  (* Option.map
-     (fun (y : Enc.t) ->
-     Log.thing ~__FUNCTION__ Debug "enc" y (Of Enc.to_string);
-     decode_state y states)
-     (try_decode sigma x) *)
   match try_decode gl x with
   | None ->
     Log.debug ~__FUNCTION__ "None";
-    (* Log.thing ~__FUNCTION__ Debug "kinds" x (_fekind gl); *)
     (* NOTE: this allows us to catch some terms that need to be unfolded *)
     if needed then raise (Mebi_proof_CannotDecodeNeededTerm x) else None
   | Some x ->
@@ -1083,7 +1158,11 @@ let find_state (gl : Proofview.Goal.t) (x : EConstr.t) (states : States.t)
 
 exception Mebi_proof_CouldNotDecodeLabel of (EConstr.t * Alphabet.t)
 
-let try_find_label (gl : Proofview.Goal.t) (x : EConstr.t) (labels : Alphabet.t)
+let try_find_label
+      ?(needed : bool = false)
+      (gl : Proofview.Goal.t)
+      (x : EConstr.t)
+      (labels : Alphabet.t)
   : Label.t option
   =
   Log.trace __FUNCTION__;
@@ -1097,17 +1176,12 @@ let try_find_label (gl : Proofview.Goal.t) (x : EConstr.t) (labels : Alphabet.t)
       ; Mebi_utils.try_get_some_enc_opt
       ]
   in
-  Log.thing
-    ~__FUNCTION__
-    Debug
-    "decoded x"
-    y
-    (Of (Utils.Strfy.option (Of Enc.to_string)));
-  (* Mebi_wrapper.runkeep (Mebi_wrapper.debug_enc ()); *)
-  Option.map (fun (z : Enc.t) -> decode_label z labels) y
+  match Option.map (fun (z : Enc.t) -> decode_label z labels) y with
+  | None -> if needed then raise (Mebi_proof_CannotDecodeNeededTerm x) else None
+  | z -> z
 ;;
 
-let find_label (gl : Proofview.Goal.t) (x : EConstr.t) (labels : Alphabet.t)
+let _find_label (gl : Proofview.Goal.t) (x : EConstr.t) (labels : Alphabet.t)
   : Label.t
   =
   Log.trace __FUNCTION__;
@@ -1128,7 +1202,7 @@ exception Mebi_proof_CouldNotDecodeTransitionLabel of (EConstr.t * Fsm.t)
 
 exception
   Mebi_proof_CouldNotObtainAction of
-    (State.t * Label.t * State.t option * Fsm.t)
+    (State.t * Label.t option * State.t option * Fsm.t)
 
 let get_transition
       ?(need_action : bool = true)
@@ -1144,26 +1218,18 @@ let get_transition
   try
     let from : State.t = find_state gl fromty fsm.states in
     Log.thing ~__FUNCTION__ Debug "From" from (Args State.to_string);
-    Log.thing
-      ~__FUNCTION__
-      Debug
-      "Alphabet"
-      fsm.alphabet
-      (Args alphabet_to_string);
-    let label : Label.t = find_label gl labelty fsm.alphabet in
-    Log.thing ~__FUNCTION__ Debug "Label" label (Args Label.to_string);
+    (* log_alphabet ~__FUNCTION__ "Alphabet" fsm.alphabet; *)
     Log.thing ~__FUNCTION__ Debug "Gototy" gototy (feconstr gl);
     let goto : State.t option =
       try_find_state ~needed:need_goto gl gototy fsm.states
     in
+    let label : Label.t option =
+      try_find_label ~needed:need_action gl labelty fsm.alphabet
+    in
+    (* Log.thing ~__FUNCTION__ Debug "Label" label (Args Label.to_string); *)
     Log.option ~__FUNCTION__ Debug "Goto" goto (Args State.to_string);
-    let actions : States.t Actions.t = Edges.find fsm.edges from in
-    Log.thing
-      ~__FUNCTION__
-      Debug
-      "Actions"
-      actions
-      (Args action_labels_to_string);
+    (* let actions : States.t Actions.t = Edges.find fsm.edges from in *)
+    (* log_actions ~__FUNCTION__ "Actions" actions; *)
     match goto with
     | None ->
       Log.trace ~__FUNCTION__ "goto:None";
@@ -1172,10 +1238,24 @@ let get_transition
       else Transition_opt.create from label goto ()
     | Some the_goto ->
       Log.trace ~__FUNCTION__ "goto:Some";
-      let { annotation; constructor_trees; _ } : Action.t =
-        get_action_to ~annotated:true from label the_goto fsm
-      in
-      Transition_opt.create from label goto ~annotation ~constructor_trees ()
+      (match label with
+       | None ->
+         Log.trace ~__FUNCTION__ "label:None";
+         if need_action
+         then raise (Mebi_proof_CouldNotObtainAction (from, label, goto, fsm))
+         else Transition_opt.create from label goto ()
+       | Some label ->
+         Log.trace ~__FUNCTION__ "label:Some";
+         let { annotation; constructor_trees; _ } : Action.t =
+           get_action_to ~annotated:true from label the_goto fsm
+         in
+         Transition_opt.create
+           from
+           (Some label)
+           goto
+           ~annotation
+           ~constructor_trees
+           ())
   with
   | Mebi_proof_CouldNotDecodeState (ty, states) ->
     Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CouldNotDecodeState";
@@ -1206,12 +1286,14 @@ let get_hyp_transition (gl : Proofview.Goal.t) (fsm : Fsm.t) : Transition_opt.t 
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
   (* NOTE: returns [Some t] if [x:hyp] can be made into a [Transition_opt.t] *)
   let f (x : Rocq_utils.hyp) : Transition_opt.t option =
+    Log.trace __FUNCTION__;
     try
       let ty, tys = Rocq_utils.hyp_to_atomic sigma x in
+      Log.thing ~__FUNCTION__ Debug "ty" ty (feconstr gl);
+      Log.things ~__FUNCTION__ Debug "tys" (Array.to_list tys) (feconstr gl);
       if typ_is_fsm_constructor gl (ty, tys) fsm
       then (
-        Log.thing ~__FUNCTION__ Debug "ty" ty (feconstr gl);
-        Log.thing ~__FUNCTION__ Debug "tys" tys (feconstrarr gl);
+        Log.trace ~__FUNCTION__ "is fsm constructor => TRUE";
         Some
           (get_transition
              ~need_action:false
@@ -1221,7 +1303,9 @@ let get_hyp_transition (gl : Proofview.Goal.t) (fsm : Fsm.t) : Transition_opt.t 
              tys.(1)
              tys.(2)
              fsm))
-      else None
+      else (
+        Log.trace ~__FUNCTION__ "is fsm constructor => false";
+        None)
     with
     | Mebi_proof_CannotDecodeNeededTerm y ->
       Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CannotDecodeNeededTerm";
@@ -1251,7 +1335,8 @@ let get_hyp_transition (gl : Proofview.Goal.t) (fsm : Fsm.t) : Transition_opt.t 
     h
 ;;
 
-exception Mebi_proof_ExpectedMTransition_Some of Transition_opt.t
+exception Mebi_proof_ExpectedMTransition_Some_Label of Transition_opt.t
+exception Mebi_proof_ExpectedMTransition_Some_Goto of Transition_opt.t
 
 let get_mtransition (gl : Proofview.Goal.t) : Transition.t =
   Log.trace __FUNCTION__;
@@ -1261,9 +1346,19 @@ let get_mtransition (gl : Proofview.Goal.t) : Transition.t =
   let { from; label; goto; annotation; constructor_trees } : Transition_opt.t =
     mtrans_opt
   in
-  match goto with
-  | Some goto -> { from; label; goto; annotation; constructor_trees }
-  | None -> raise (Mebi_proof_ExpectedMTransition_Some mtrans_opt)
+  let label =
+    Option.cata
+      (fun x -> x)
+      (raise (Mebi_proof_ExpectedMTransition_Some_Label mtrans_opt))
+      label
+  in
+  let goto =
+    Option.cata
+      (fun x -> x)
+      (raise (Mebi_proof_ExpectedMTransition_Some_Goto mtrans_opt))
+      goto
+  in
+  { from; label; goto; annotation; constructor_trees }
 ;;
 
 let get_weak_transition
@@ -1748,7 +1843,7 @@ let hyp_is_invertible (gl : Proofview.Goal.t) : Rocq_utils.hyp -> bool =
     try Invertible.hyp_is_a gl x with Hyp.Mebi_proof_Hypothesis_Hyp _ -> false
 ;;
 
-let hyps_has_invertible (gl : Proofview.Goal.t) : bool =
+let _hyps_has_invertible (gl : Proofview.Goal.t) : bool =
   Log.trace __FUNCTION__;
   (* List.exists (hyp_is_invertible gl) (Proofview.Goal.hyps gl) *)
   List.fold_left
@@ -1821,6 +1916,7 @@ let is_action_saturated : Action.t -> bool = function
 
 exception Mebi_proof_NGotoNotInFsm of unit
 exception Mebi_proof_NGoto_AlreadySome of State.t
+exception Mebi_proof_NLabel_IsNone of unit
 
 let try_get_ngoto ?(saturated : bool = false) (mgoto : State.t)
   : Transition_opt.t -> State.t
@@ -1828,7 +1924,8 @@ let try_get_ngoto ?(saturated : bool = false) (mgoto : State.t)
   Log.trace __FUNCTION__;
   (* *)
   function
-  | { from = nfrom; label = nlabel; goto = None; _ } ->
+  | { label = None; _ } -> raise (Mebi_proof_NLabel_IsNone ())
+  | { from = nfrom; label = Some nlabel; goto = None; _ } ->
     (* Log.thing ~__FUNCTION__ Debug ("mgoto") mgoto (Args State.to_string); *)
     (* Log.thing ~__FUNCTION__ Debug ("nfrom") nfrom (Args State.to_string); *)
     (* Log.thing ~__FUNCTION__ Debug ("nlabel") nlabel (Args Label.to_string); *)
@@ -1898,15 +1995,20 @@ let assert_states_consistent (mstate : State.t) : State.t -> unit = function
 
 exception Mebi_proof_ExIntro_Transitions of (Transition.t * Transition_opt.t)
 exception Mebi_proof_ExIntro_NEqLabel of (Transition.t * Transition_opt.t)
+exception Mebi_proof_ExIntro_NLabelIsNone of (Transition.t * Transition_opt.t)
 
-let assert_transition_opt_labels_eq
-      (mtransition : Transition.t)
-      (ntransition : Transition_opt.t)
+let assert_transition_opt_labels_eq (m : Transition.t) (n : Transition_opt.t)
   : unit
   =
-  if Label.equal mtransition.label ntransition.label
+  let nlabel =
+    Option.cata
+      (fun x -> x)
+      (raise (Mebi_proof_ExIntro_NLabelIsNone (m, n)))
+      n.label
+  in
+  if Label.equal m.label nlabel
   then ()
-  else raise (Mebi_proof_ExIntro_NEqLabel (mtransition, ntransition))
+  else raise (Mebi_proof_ExIntro_NEqLabel (m, n))
 ;;
 
 exception Mebi_proof_ExIntro_NotBisimilar of (State.t * State.t)
@@ -1959,61 +2061,41 @@ exception Mebi_proof_ConclIsNot_Exists of unit
 let do_eexists_transition (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   try
+    (* NOTE: there must be a Hyp for the current m transition *)
     let mtransition : Transition.t = get_mtransition gl in
-    Log.thing
-      ~__FUNCTION__
-      Debug
-      "mtransition"
-      mtransition
-      (Args Transition.to_string);
+    log_transition ~__FUNCTION__ "mtransition" mtransition;
     match can_do_nrefl gl mtransition with
     | None -> do_nsome gl mtransition
     | Some nstate -> do_nnone gl nstate
   with
-  | Mebi_proof_ExpectedMTransition_Some mtrans_opt ->
-    Log.thing
-      ~__FUNCTION__
-      Debug
-      "mtrans_opt"
-      mtrans_opt
-      (Of Transition_opt.to_string);
-    raise (Mebi_proof_ExpectedMTransition_Some mtrans_opt)
+  | Mebi_proof_ExpectedMTransition_Some_Label mtrans_opt ->
+    Log.trace ~__FUNCTION__ "Mebi_proof_ExpectedMTransition_Some_Label";
+    log_transition_opt ~__FUNCTION__ "mtrans_opt" mtrans_opt;
+    raise (Mebi_proof_ExpectedMTransition_Some_Label mtrans_opt)
+  | Mebi_proof_ExpectedMTransition_Some_Goto mtrans_opt ->
+    Log.trace ~__FUNCTION__ "Mebi_proof_ExpectedMTransition_Some_Goto";
+    log_transition_opt ~__FUNCTION__ "mtrans_opt" mtrans_opt;
+    raise (Mebi_proof_ExpectedMTransition_Some_Goto mtrans_opt)
   | Mebi_proof_StatesNotBisimilar (mstate, nstate, bisim_states) ->
+    Log.trace ~__FUNCTION__ "Mebi_proof_StatesNotBisimilar";
     Log.thing ~__FUNCTION__ Debug "bisim-states" (the_bisim_states ()) fpi;
     raise (Mebi_proof_ExIntro_NotBisimilar (mstate, nstate))
   | Mebi_proof_TransitionOptStatesNotBisimilar (mstate, nstate, bisim_states) ->
+    Log.trace ~__FUNCTION__ "Mebi_proof_TransitionOptStatesNotBisimilar";
     raise (Mebi_proof_ExIntro_NotBisimilar (mstate, nstate))
   | Mebi_proof_CouldNotGetWkSimStateM conj ->
-    Log.debug
-      (Printf.sprintf
-         "Mebi_proof.concl_get_eexists Mebi_proof_CouldNotGetWkSimStateM");
-    Log.thing
-      ~__FUNCTION__
-      Debug
-      "wk_sim"
-      conj.wk_sim
-      (Of (econstr_to_string gl));
+    Log.trace ~__FUNCTION__ "Mebi_proof_CouldNotGetWkSimStateM";
+    log_econstr ~__FUNCTION__ "wk_sim" conj.wk_sim gl;
     raise (Mebi_proof_ConclIsNot_Exists ())
   | Mebi_proof_CouldNotGetWkSimStateN conj ->
-    Log.debug
-      (Printf.sprintf
-         "Mebi_proof.concl_get_eexists Mebi_proof_CouldNotGetWkSimStateN");
-    Log.thing
-      ~__FUNCTION__
-      Debug
-      "wk_trans"
-      conj.wk_trans
-      (Of (econstr_to_string gl));
+    Log.trace ~__FUNCTION__ "Mebi_proof_CouldNotGetWkSimStateN";
+    log_econstr ~__FUNCTION__ "wk_trans" conj.wk_trans gl;
     raise (Mebi_proof_ConclIsNot_Exists ())
   | Rocq_utils.Rocq_utils_EConstrIsNot_Atomic (sigma, x, k) ->
-    Log.debug
-      (Printf.sprintf
-         "Mebi_proof.concl_get_eexists Rocq_utils_EConstrIsNot_Atomic");
+    Log.trace ~__FUNCTION__ "Rocq_utils_EConstrIsNot_Atomic";
     raise (Mebi_proof_ConclIsNot_Exists ())
   | Mebi_proof_TyDoesNotMatchTheories (ty, tys) ->
-    Log.debug
-      (Printf.sprintf
-         "Mebi_proof.concl_get_eexists Mebi_proof_TyDoesNotMatchTheories");
+    Log.trace ~__FUNCTION__ "Mebi_proof_TyDoesNotMatchTheories";
     raise (Mebi_proof_ConclIsNot_Exists ())
 ;;
 
@@ -2036,7 +2118,7 @@ let rec handle_new_proof (gl : Proofview.Goal.t) : tactic =
     set_the_proof_state ~__FUNCTION__ NewWeakSim;
     handle_proof_state gl)
   else (
-    Log.warning "New Proof: Expected Hypothesis to be empty";
+    Log.warning ~__FUNCTION__ "Expected Hypothesis to be empty";
     raise (Mebi_proof_NewProof ()))
 
 and handle_new_weak_sim (gl : Proofview.Goal.t) : tactic =
@@ -2069,88 +2151,47 @@ and handle_new_weak_sim (gl : Proofview.Goal.t) : tactic =
 
 and handle_new_cofix (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
-  try
-    (* TODO: just try to invert and then catch error if nothing to invert *)
-    if hyps_has_invertible gl
-    then do_hyp_inversion gl
-    else do_eexists_transition gl
-  with
-  (* NOTE: exception handling: *)
-  | Mebi_proof_CheckTermCanBeUnfolded (h, x) ->
-    Log.thing ~__FUNCTION__ Debug "trying to unfold" x (feconstr gl);
-    (try get_econstrs_to_unfold gl x |> chain_do_unfold_in_hyp gl h with
-     | Mebi_proof_NothingToUnfold () ->
-       Log.thing
-         ~__FUNCTION__
-         Warning
-         "Could not handle (or unfold) term"
-         x
-         (feconstr gl);
-       raise (Mebi_proof_NewCofix ())
+  try do_hyp_inversion gl with
+  | Mebi_proof_NoInvertibleHyps hyps ->
+    (try do_eexists_transition gl with
+     | Mebi_proof_CheckTermCanBeUnfolded (h, x) ->
+       Log.trace ~__FUNCTION__ "Mebi_proof_CheckTermCanBeUnfolded";
+       log_econstr ~__FUNCTION__ "trying to unfold" x gl;
+       (try get_econstrs_to_unfold gl x |> chain_do_unfold_in_hyp gl h with
+        | Mebi_proof_NothingToUnfold () ->
+          Log.trace ~__FUNCTION__ "Mebi_proof_NothingToUnfold";
+          log_econstr ~__FUNCTION__ "Could not handle (or unfold) term" x gl;
+          raise (Mebi_proof_NewCofix ()))
      | Mebi_proof_CouldNotFindHypTransition (fsm, hyps) ->
-       Log.thing
-         ~__FUNCTION__
-         Warning
-         "Could not find any transitions in Hyps"
-         (hyps_to_string gl)
-         (Args Utils.Strfy.string);
-       Log.thing
-         ~__FUNCTION__
-         Warning
-         "(the fsm)"
-         fsm
-         (Args Model.Fsm.to_string);
+       Log.trace ~__FUNCTION__ "Mebi_proof_CouldNotFindHypTransition";
+       log_hyps ~__FUNCTION__ "Could not find any transitions in Hyps" hyps gl;
+       (* log_fsm ~__FUNCTION__ "(the fsm)" fsm; *)
        raise (Mebi_proof_NewCofix ())
      | Mebi_proof_CouldNotObtainAction (from, label, goto, fsm) ->
-       Log.warning "Mebi_proof_CouldNotObtainAction";
+       Log.trace ~__FUNCTION__ "Mebi_proof_CouldNotObtainAction";
        raise (Mebi_proof_NewCofix ())
      | Mebi_proof_CouldNotDecodeTransitionState (x, fsm) ->
-       Log.thing
-         ~__FUNCTION__
-         Warning
-         "Could not decode transition state"
-         (econstr_to_string gl x)
-         (Args Utils.Strfy.string);
-       Log.thing
-         ~__FUNCTION__
-         Debug
-         "fsm.states"
-         fsm.states
-         (Args Model.states_to_string);
+       Log.trace ~__FUNCTION__ "Mebi_proof_CouldNotDecodeTransitionState";
+       log_econstr ~__FUNCTION__ "Could not decode transition state" x gl;
+       (* log_states ~__FUNCTION__ "fsm.states" fsm.states; *)
        raise (Mebi_proof_NewCofix ())
      | Mebi_proof_CouldNotDecodeTransitionLabel (x, fsm) ->
-       Log.thing
-         ~__FUNCTION__
-         Warning
-         "Could not decode transition label"
-         (econstr_to_string gl x)
-         (Args Utils.Strfy.string);
-       Log.thing
-         Debug
-         "fsm.alphabet"
-         fsm.alphabet
-         (Args Model.alphabet_to_string);
+       Log.trace ~__FUNCTION__ "Mebi_proof_CouldNotDecodeTransitionLabel";
+       log_econstr ~__FUNCTION__ "Could not decode transition label" x gl;
+       (* log_alphabet ~__FUNCTION__ "fsm.alphabet" fsm.alphabet; *)
        raise (Mebi_proof_NewCofix ())
-     | Mebi_proof_ConclIsNot_Exists () -> raise (Mebi_proof_NewCofix ())
+     | Mebi_proof_ConclIsNot_Exists () ->
+       Log.trace ~__FUNCTION__ "Mebi_proof_ConclIsNot_Exists";
+       raise (Mebi_proof_NewCofix ())
      | Mebi_proof_ExIntro_NEqStateM (mstate, mfrom) ->
-       Log.warning "Mebi_proof_ExIntro_NEqStateM";
+       Log.trace ~__FUNCTION__ "Mebi_proof_ExIntro_NEqStateM";
        Log.thing ~__FUNCTION__ Debug "mstate" mstate (Args State.to_string);
        Log.option ~__FUNCTION__ Debug "mfrom" mfrom (Args State.to_string);
        raise (Mebi_proof_NewCofix ())
      | Mebi_proof_ExIntro_NEqLabel (mtrans, ntrans) ->
-       Log.warning "Mebi_proof_ExIntro_NEqLabel";
-       Log.thing
-         ~__FUNCTION__
-         Debug
-         "mtrans"
-         mtrans.label
-         (Args Label.to_string);
-       Log.thing
-         ~__FUNCTION__
-         Debug
-         "ntrans"
-         ntrans.label
-         (Args Label.to_string);
+       Log.trace ~__FUNCTION__ "Mebi_proof_ExIntro_NEqLabel";
+       log_label ~__FUNCTION__ "mtrans.label" mtrans.label;
+       log_label_opt ~__FUNCTION__ "ntrans.label" ntrans.label;
        raise (Mebi_proof_NewCofix ()))
 
 and handle_dorefl (gl : Proofview.Goal.t) : tactic =
@@ -2166,46 +2207,57 @@ and handle_goal_transition
   =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  Log.thing ~__FUNCTION__ Debug "mtrans" mtrans (Args Transition.to_string);
-  Log.thing ~__FUNCTION__ Debug "ntrans" ntrans (Args Transition_opt.to_string);
-  Log.thing
-    ~__FUNCTION__
-    Debug
-    "concl"
-    (Proofview.Goal.concl gl)
-    (Of (econstr_to_string gl));
+  log_transition ~__FUNCTION__ "mtrans" mtrans;
+  log_transition_opt ~__FUNCTION__ "ntrans" ntrans;
+  log_concl ~__FUNCTION__ "concl" gl;
   try
     let { from = nfrom; label = nlabel; goto = ngoto; _ } : Transition_opt.t =
       Proofview.Goal.concl gl
       |> Rocq_utils.econstr_to_atomic sigma
       |> get_weak_transition gl (nfsm ~saturated:true ())
     in
-    match ngoto with
-    | Some ngoto ->
-      assert_states_bisimilar mtrans.goto ngoto;
-      Log.thing ~__FUNCTION__ Debug "mgoto" mtrans.goto fstate;
-      Log.thing ~__FUNCTION__ Debug "ngoto" ngoto fstate;
-      Log.thing ~__FUNCTION__ Debug "nlabel" nlabel flabel;
-      do_constructor_transition gl nfrom nlabel ngoto
-    | _ -> raise (Mebi_proof_GoalTransition ())
+    let nlabel =
+      Option.cata
+        (fun x -> x)
+        (Log.trace ~__FUNCTION__ "Exception: nlabel is None";
+         raise (Mebi_proof_GoalTransition ()))
+        nlabel
+    in
+    let ngoto =
+      Option.cata
+        (fun x ->
+          assert_states_bisimilar mtrans.goto x;
+          x)
+        (Log.trace ~__FUNCTION__ "Exception: ngoto is None";
+         raise (Mebi_proof_GoalTransition ()))
+        ngoto
+    in
+    Log.thing ~__FUNCTION__ Debug "mgoto" mtrans.goto fstate;
+    Log.thing ~__FUNCTION__ Debug "ngoto" ngoto fstate;
+    log_label ~__FUNCTION__ "ntrans.label" nlabel;
+    do_constructor_transition gl nfrom nlabel ngoto
   with
   | Mebi_proof_CouldNotDecodeTransitionState (x, fsm) ->
+    Log.trace ~__FUNCTION__ "Mebi_proof_CouldNotDecodeTransitionState";
     Log.thing ~__FUNCTION__ Debug "transition state" x (feconstr gl);
     Log.thing ~__FUNCTION__ Debug "states" fsm.states fstates;
     raise (Mebi_proof_GoalTransition ())
   | Mebi_proof_CouldNotObtainAction (from, label, goto, fsm) ->
-    Log.warning "Mebi_proof_CouldNotObtainAction";
+    Log.trace ~__FUNCTION__ "Mebi_proof_CouldNotObtainAction";
     raise (Mebi_proof_GoalTransition ())
   | Mebi_proof_CouldNotDecodeTransitionLabel (x, fsm) ->
+    Log.trace ~__FUNCTION__ "Mebi_proof_CouldNotDecodeTransitionLabel";
     Log.thing ~__FUNCTION__ Debug "transition label" x (feconstr gl);
     Log.thing ~__FUNCTION__ Debug "alphabet" fsm.alphabet falphabet;
     raise (Mebi_proof_GoalTransition ())
   | Mebi_proof_StatesNotBisimilar (mstate, nstate, pi) ->
+    Log.trace ~__FUNCTION__ "Mebi_proof_StatesNotBisimilar";
     Log.thing ~__FUNCTION__ Debug "non-bisimilar" (the_bisim_states ()) fpi;
     Log.thing ~__FUNCTION__ Debug "mfrom" mstate fstate;
     Log.thing ~__FUNCTION__ Debug "ngoto" nstate fstate;
     raise (Mebi_proof_GoalTransition ())
   | Mebi_proof_TyDoesNotMatchTheories (ty, tys) ->
+    Log.trace ~__FUNCTION__ "Mebi_proof_TyDoesNotMatchTheories";
     Log.thing ~__FUNCTION__ Debug "ty" ty (feconstr gl);
     Log.things ~__FUNCTION__ Debug "args" (Array.to_list tys) (feconstr gl);
     raise (Mebi_proof_GoalTransition ())
