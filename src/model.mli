@@ -13,18 +13,17 @@ val nest : Utils.Strfy.style_args -> Utils.Strfy.style_args
 
 type style_args = Utils.Strfy.style_args
 
-val style_args
-  :  ?indent:int
-  -> ?newline:bool
-  -> ?nested:bool
-  -> ?name:string
-  -> ?style:Utils.Strfy.collection_style option
-  -> unit
-  -> Utils.Strfy.style_args
+val style_args :
+  ?indent:int ->
+  ?newline:bool ->
+  ?nested:bool ->
+  ?name:string ->
+  ?style:Utils.Strfy.collection_style option ->
+  unit ->
+  Utils.Strfy.style_args
 
-val collection_style
-  :  Utils.Strfy.collection_kind
-  -> Utils.Strfy.collection_style
+val collection_style :
+  Utils.Strfy.collection_kind -> Utils.Strfy.collection_style
 
 module States : sig
   type elt = State.t
@@ -76,7 +75,10 @@ module States : sig
 end
 
 val states_to_string : ?args:style_args -> States.t -> string
-val destinations_to_string : ?args:style_args -> States.t -> string
+
+val destinations_to_string :
+  ?args:style_args -> States.t -> string
+
 val decode_state_opt : Enc.t -> States.t -> State.t option
 
 exception Model_CannotDecodeState of (Enc.t * States.t)
@@ -132,7 +134,8 @@ module Partition : sig
   val of_seq : elt Seq.t -> t
 end
 
-val partition_to_string : ?args:style_args -> Partition.t -> string
+val partition_to_string :
+  ?args:style_args -> Partition.t -> string
 
 exception Model_Bisim_State_NotFound of (State.t * Partition.t)
 
@@ -187,9 +190,11 @@ module Alphabet : sig
   val of_seq : elt Seq.t -> t
 end
 
-val alphabet_to_string : ?args:style_args -> Alphabet.t -> string
+val alphabet_to_string :
+  ?args:style_args -> Alphabet.t -> string
 
-exception Model_Alphabet_LabelOfEncNotFound of (Enc.t * Alphabet.t)
+exception
+  Model_Alphabet_LabelOfEncNotFound of (Enc.t * Alphabet.t)
 
 val find_label_of_enc : Enc.t -> Alphabet.t -> Label.t
 val decode_label_opt : Enc.t -> Alphabet.t -> Label.t option
@@ -252,7 +257,8 @@ module Transitions : sig
   val of_seq : elt Seq.t -> t
 end
 
-val transitions_to_string : ?args:style_args -> Transitions.t -> string
+val transitions_to_string :
+  ?args:style_args -> Transitions.t -> string
 
 module Actions : sig
   type key = Action.t
@@ -270,8 +276,13 @@ module Actions : sig
   val replace : 'a t -> key -> 'a -> unit
   val mem : 'a t -> key -> bool
   val iter : (key -> 'a -> unit) -> 'a t -> unit
-  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+  val filter_map_inplace :
+    (key -> 'a -> 'a option) -> 'a t -> unit
+
+  val fold :
+    (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
   val length : 'a t -> int
   val stats : 'a t -> Hashtbl.statistics
   val to_seq : 'a t -> (key * 'a) Seq.t
@@ -282,33 +293,44 @@ module Actions : sig
   val of_seq : (key * 'a) Seq.t -> 'a t
 end
 
-val actions_to_string : ?args:style_args -> States.t Actions.t -> string
-val action_labels_to_string : ?args:style_args -> States.t Actions.t -> string
+val actions_to_string :
+  ?args:style_args -> States.t Actions.t -> string
+
+val action_labels_to_string :
+  ?args:style_args -> States.t Actions.t -> string
 
 exception Model_Action_HasNoAnnotations of Action.t
-exception Model_Action_HasSilentLabel_ButIsSaturated of Action.t
+
+exception
+  Model_Action_HasSilentLabel_ButIsSaturated of Action.t
 
 val is_action_annotated : Action.t -> bool
 val is_action_silent : Action.t -> bool
 
-exception Model_NoActionLabelled of (bool * Label.t * States.t Actions.t)
+exception
+  Model_NoActionLabelled of
+    (bool * Label.t * States.t Actions.t)
 
-val get_actions_labelled
-  :  ?annotated:bool
-  -> Label.t
-  -> States.t Actions.t
-  -> Action.t list
+val get_actions_labelled :
+  ?annotated:bool ->
+  Label.t ->
+  States.t Actions.t ->
+  Action.t list
 
 val get_action_destinations : States.t Actions.t -> States.t
-val get_reachable_partition : Partition.t -> States.t Actions.t -> Partition.t
 
-val get_reachable_partition_opt
-  :  Partition.t
-  -> States.t Actions.t
-  -> Partition.t option
+val get_reachable_partition :
+  Partition.t -> States.t Actions.t -> Partition.t
 
-val update_destinations : States.t Actions.t -> Action.t -> States.t -> States.t
-val update_action : States.t Actions.t -> Action.t -> States.t -> unit
+val get_reachable_partition_opt :
+  Partition.t -> States.t Actions.t -> Partition.t option
+
+val update_destinations :
+  States.t Actions.t -> Action.t -> States.t -> States.t
+
+val update_action :
+  States.t Actions.t -> Action.t -> States.t -> unit
+
 val alphabet_of_actions : States.t Actions.t -> Alphabet.t
 
 module Edges : sig
@@ -327,8 +349,13 @@ module Edges : sig
   val replace : 'a t -> key -> 'a -> unit
   val mem : 'a t -> key -> bool
   val iter : (key -> 'a -> unit) -> 'a t -> unit
-  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+  val filter_map_inplace :
+    (key -> 'a -> 'a option) -> 'a t -> unit
+
+  val fold :
+    (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
   val length : 'a t -> int
   val stats : 'a t -> Hashtbl.statistics
   val to_seq : 'a t -> (key * 'a) Seq.t
@@ -339,77 +366,102 @@ module Edges : sig
   val of_seq : (key * 'a) Seq.t -> 'a t
 end
 
-val update_edge
-  :  States.t Actions.t Edges.t
-  -> State.t
-  -> Action.t
-  -> States.t
-  -> unit
+val update_edge :
+  States.t Actions.t Edges.t ->
+  State.t ->
+  Action.t ->
+  States.t ->
+  unit
 
 val add_edge : States.t Actions.t Edges.t -> Edge.t -> unit
-val add_edges : States.t Actions.t Edges.t -> Edge.t list -> unit
+
+val add_edges :
+  States.t Actions.t Edges.t -> Edge.t list -> unit
 
 exception
   Model_NoActionLabelledFrom of
     (bool * State.t * Label.t * States.t Actions.t Edges.t)
 
-val get_actions_labelled_from
-  :  ?annotated:bool
-  -> State.t
-  -> Label.t
-  -> States.t Actions.t Edges.t
-  -> Action.t list
+val get_actions_labelled_from :
+  ?annotated:bool ->
+  State.t ->
+  Label.t ->
+  States.t Actions.t Edges.t ->
+  Action.t list
 
-val get_edges_labelled
-  :  Label.t
-  -> States.t Actions.t Edges.t
-  -> States.t Actions.t Edges.t
+val get_edges_labelled :
+  Label.t ->
+  States.t Actions.t Edges.t ->
+  States.t Actions.t Edges.t
 
-val get_reachable_blocks_opt
-  :  Partition.t
-  -> States.t Actions.t Edges.t
-  -> State.t
-  -> Partition.t option
+val get_reachable_blocks_opt :
+  Partition.t ->
+  States.t Actions.t Edges.t ->
+  State.t ->
+  Partition.t option
 
-exception Model_TransitionOptGotoNone of Transition_opt.t
+exception
+  Model_CannotConvertTransitionOpt_To_Transition of
+    Transition_opt.t
 
-val transition_opt_to_transition : Transition_opt.t -> Transition.t
+val transition_opt_to_transition :
+  Transition_opt.t -> Transition.t
+
 val transition_to_action : Transition.t -> Action.t
+
+exception
+  Model_CannotConvertTransitionOpt_To_Action of
+    Transition_opt.t
+
 val transition_opt_to_action : Transition_opt.t -> Action.t
 val transition_to_edge : Transition.t -> Edge.t
 val edge_to_transition : Edge.t -> Transition.t
 
-val action_destinations_to_transitions
-  :  State.t
-  -> Action.t
-  -> States.t
-  -> Transitions.t
-  -> Transitions.t
+val action_destinations_to_transitions :
+  State.t ->
+  Action.t ->
+  States.t ->
+  Transitions.t ->
+  Transitions.t
 
-val actions_to_transitions
-  :  State.t
-  -> States.t Actions.t
-  -> Transitions.t
-  -> Transitions.t
+val actions_to_transitions :
+  State.t ->
+  States.t Actions.t ->
+  Transitions.t ->
+  Transitions.t
 
-val edges_to_transitions : States.t Actions.t Edges.t -> Transitions.t
-val transitions_to_edges : Transitions.t -> States.t Actions.t Edges.t
-val edges_to_string : ?args:style_args -> States.t Actions.t Edges.t -> string
+val edges_to_transitions :
+  States.t Actions.t Edges.t -> Transitions.t
+
+val transitions_to_edges :
+  Transitions.t -> States.t Actions.t Edges.t
+
+val edges_to_string :
+  ?args:style_args -> States.t Actions.t Edges.t -> string
 
 module Merge : sig
-  val info_field : 'a list option -> 'a list option -> 'a list option
+  val info_field :
+    'a list option -> 'a list option -> 'a list option
+
   val info : Info.t -> Info.t -> Info.t
 
-  exception Model_Merge_action_DifferentLabels of (Action.t * Action.t)
+  exception
+    Model_Merge_action_DifferentLabels of (Action.t * Action.t)
 
-  val constructor_trees : Tree.t list -> Tree.t list -> Tree.t list
+  val constructor_trees :
+    Tree.t list -> Tree.t list -> Tree.t list
+
   val action : Action.t -> Action.t -> Action.t
-  val actions : States.t Actions.t -> States.t Actions.t -> States.t Actions.t
 
-  val edges
-    :  States.t Actions.t Edges.t
-    -> States.t Actions.t Edges.t
-    -> States.t Actions.t Edges.t
+  val actions :
+    States.t Actions.t ->
+    States.t Actions.t ->
+    States.t Actions.t
+
+  val edges :
+    States.t Actions.t Edges.t ->
+    States.t Actions.t Edges.t ->
+    States.t Actions.t Edges.t
 end
 
 type kind =
@@ -429,14 +481,14 @@ type kind =
       * Info.t)
 
 module Lts : sig
-  type t =
-    { init : State.t option
-    ; terminals : States.t
-    ; alphabet : Alphabet.t
-    ; states : States.t
-    ; transitions : Transitions.t
-    ; info : Info.t
-    }
+  type t = {
+    init : State.t option;
+    terminals : States.t;
+    alphabet : Alphabet.t;
+    states : States.t;
+    transitions : Transitions.t;
+    info : Info.t;
+  }
 
   val to_model : t -> kind
   val of_model : kind -> t
@@ -444,14 +496,14 @@ module Lts : sig
 end
 
 module Fsm : sig
-  type t =
-    { init : State.t option
-    ; terminals : States.t
-    ; alphabet : Alphabet.t
-    ; states : States.t
-    ; edges : States.t Actions.t Edges.t
-    ; info : Info.t
-    }
+  type t = {
+    init : State.t option;
+    terminals : States.t;
+    alphabet : Alphabet.t;
+    states : States.t;
+    edges : States.t Actions.t Edges.t;
+    info : Info.t;
+  }
 
   and pair = t * t
 

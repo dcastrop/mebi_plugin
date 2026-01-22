@@ -1,14 +1,17 @@
 type t =
   { from : Model_state.t
-  ; label : Model_label.t
-  ; goto : Model_state.t option
+  ; label : Model_label.t option (*label_opt*)
+  ; goto : Model_state.t option (*state_opt*)
   ; annotation : Model_note.annotation option
   ; constructor_trees : Mebi_constr.Tree.t list
   }
 
+(* and label_opt = NoLabel | SomeLabel of Model_label.t *)
+(* and state_opt = NoState | SomeState of Model_state.t *)
+
 let create
       (from : Model_state.t)
-      (label : Model_label.t)
+      (label : Model_label.t option)
       (goto : Model_state.t option)
       ?(annotation : Model_note.annotation option = None)
       ?(constructor_trees : Mebi_constr.Tree.t list option)
@@ -18,12 +21,13 @@ let create
   let constructor_trees : Mebi_constr.Tree.t list =
     Option.cata (fun x -> x) [] constructor_trees
   in
+  (* let label *)
   { from; label; goto; annotation; constructor_trees }
 ;;
 
 let equal (a : t) (b : t) : bool =
   Model_state.equal a.from b.from
-  && Model_label.equal a.label b.label
+  && Option.equal Model_label.equal a.label b.label
   && Option.equal Model_state.equal a.goto b.goto
   && Option.equal Model_note.annotation_equal a.annotation b.annotation
   && (List.equal Mebi_constr.Tree.equal) a.constructor_trees b.constructor_trees
@@ -32,7 +36,7 @@ let equal (a : t) (b : t) : bool =
 let compare (a : t) (b : t) : int =
   Utils.compare_chain
     [ Model_state.compare a.from b.from
-    ; Model_label.compare a.label b.label
+    ; Option.compare Model_label.compare a.label b.label
     ; Option.compare Model_state.compare a.goto b.goto
     ; Option.compare Model_note.annotation_compare a.annotation b.annotation
     ; (List.compare Mebi_constr.Tree.compare)
@@ -51,12 +55,11 @@ open Utils.Strfy
 
 let to_string ?(args : style_args = record_args ()) (x : t) : string =
   let from : string = Model_state.to_string ~args:(nest args) x.from in
-  let label : string = Model_label.to_string ~args:(nest args) x.label in
+  let label : string =
+    Option.cata (Model_label.to_string ~args:(nest args)) "None" x.label
+  in
   let goto : string =
-    Option.cata
-      (fun x -> Model_state.to_string ~args:(nest args) x)
-      "None"
-      x.goto
+    Option.cata (Model_state.to_string ~args:(nest args)) "None" x.goto
   in
   let constructor_trees : string =
     Mebi_constr.Tree.list_to_string ~args:(nest args) x.constructor_trees

@@ -5,8 +5,8 @@ src/META.coq-mebi
 -arg "-w all"
 
 theories/loader.v ###
-theories/DevTest.v ###
-theories/Test.v ###
+# theories/DevTest.v ###
+# theories/Test.v ###
 
 theories/Bisimilarity.v ###
 
@@ -18,18 +18,18 @@ theories/Bisimilarity.v ###
 
 ###############################################################################
 ### Proc
-examples/Proc.v ### REQUIRED FOR BELOW
+# examples/Proc.v ### REQUIRED FOR BELOW
 
 ### Proc.Flat.Simple 
-examples/bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
-examples/bisimilarity/Proc/Test1/TermTests.v ### Success
+# examples/bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
+# examples/bisimilarity/Proc/Test1/TermTests.v ### Success
 # examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test1/ManualProofs.v
 # examples/bisimilarity/Proc/Test1/LtacProofs.v
 
 ### Proc.Flat.Complex 
-examples/bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
-examples/bisimilarity/Proc/Test2/TermTests.v ### Success
+# examples/bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
+# examples/bisimilarity/Proc/Test2/TermTests.v ### Success
 # examples/bisimilarity/Proc/Test2/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test2/ManualProofs.v
 # examples/bisimilarity/Proc/Test2/LtacProofs.v
@@ -49,8 +49,8 @@ examples/CADP.v ### REQUIRED FOR BELOW
 examples/CADP_Glued.v ### REQUIRED FOR BELOW
 
 examples/bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
-examples/bisimilarity/CADP/Size1/TermTests.v ### Success
-# examples/bisimilarity/CADP/Size1/PluginProofs.v ### WIP: debugging
+# examples/bisimilarity/CADP/Size1/TermTests.v ### Success
+examples/bisimilarity/CADP/Size1/PluginProofs.v ### WIP: debugging
 
 # TODO: 
 # examples/bisimilarity/CADP/Size2/Terms.v ###
