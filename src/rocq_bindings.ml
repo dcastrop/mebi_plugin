@@ -1,8 +1,8 @@
 (***********************************************************************)
 module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
-let () = Log.Config.configure_output Debug true
-let () = Log.Config.configure_output Trace true
+let () = Log.Config.configure_output Debug false
+let () = Log.Config.configure_output Trace false
 (***********************************************************************)
 
 module C : Hashtbl.S with type key = Constr.t = Hashtbl.Make (struct
