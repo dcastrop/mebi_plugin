@@ -5,8 +5,9 @@ Output_config
 Logger
 Rocq_utils
 Rocq_convert
+Rocq_ind
+Rocq_enc
 Rocq_bindings
-Mebi_enc
 Mebi_setup
 Mebi_constr
 Mebi_theories
@@ -23,9 +24,7 @@ Saturate_model
 Algorithms
 Mebi_tactics
 Mebi_wrapper
-Mebi_ind
 Mebi_utils
-Mebi_bindings
 Mebi_hypothesis
 Mebi_proof
 Mebi_weak

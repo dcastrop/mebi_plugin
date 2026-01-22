@@ -1,6 +1,6 @@
 val collect_valid_constructors
-  :  Mebi_ind.lts_constructor array
-  -> Mebi_ind.t Mebi_wrapper.F.t
+  :   Rocq_ind.LTS.constructor array
+  -> Mebi_setup.Enc.t Rocq_ind.t Mebi_wrapper.F.t
   -> Evd.econstr
   -> Evd.econstr
   -> Mebi_setup.Enc.t

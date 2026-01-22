@@ -1,12 +1,3 @@
-module C : Hashtbl.S with type key = Constr.t = Hashtbl.Make (struct
-    type t = Constr.t
-
-    let equal : t -> t -> bool = Constr.equal
-    let hash : t -> int = Constr.hash
-  end)
-
-(*****************************************************************************)
-
 (** [kind_pair] are the arguments of [AtomicType (ty, tys)] returned by e.g., [EConstr.kind_of_type]
 *)
 type 'a kind_pair = 'a * 'a array

@@ -22,13 +22,7 @@ and boundable =
 and rocq_info =
   { enc : Mebi_setup.Enc.t
   ; pp : string (* ; constructor_names : string list *)
-  ; constructors : rocq_constructor list
-  }
-
-and rocq_constructor =
-  { index : int
-  ; name : string
-  ; bindings : Rocq_bindings.t
+  ; constructors : Rocq_bindings.constructor list
   }
 
 (* and rocq_constructor_bindings =
@@ -92,18 +86,6 @@ let mebi_info_list_option_to_string ?(args : style_args = style_args ())
   | Some alist -> list (Args mebi_info_to_string) alist
 ;;
 
-let rocq_constructor_to_string
-      ?(args : style_args = style_args ())
-      ?(envsigma : (Environ.env * Evd.evar_map) option = None)
-      (x : rocq_constructor)
-  : string
-  =
-  let index : string = int x.index in
-  let name : string = x.name in
-  let bindings : string = Rocq_bindings.to_string ~envsigma x.bindings in
-  record ~args [ "index", index; "name", name; "bindings", bindings ]
-;;
-
 let rocq_info_to_string
       ?(args : style_args = style_args ())
       ?(envsigma : (Environ.env * Evd.evar_map) option = None)
@@ -113,7 +95,7 @@ let rocq_info_to_string
   let enc : string = Mebi_setup.Enc.to_string x.enc in
   let pp : string = x.pp in
   let constructor_names : string =
-    list (Args (rocq_constructor_to_string ~envsigma)) x.constructors
+    list (Args (Rocq_bindings.constructor_to_string ~envsigma)) x.constructors
   in
   record ~args [ "enc", enc; "pp", pp; "constructor names", constructor_names ]
 ;;

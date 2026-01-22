@@ -21,16 +21,16 @@ theories/Bisimilarity.v ###
 examples/Proc.v ### REQUIRED FOR BELOW
 
 ### Proc.Flat.Simple 
-# examples/bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
+examples/bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
 # examples/bisimilarity/Proc/Test1/TermTests.v ### Success
-# examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
+examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test1/ManualProofs.v
 # examples/bisimilarity/Proc/Test1/LtacProofs.v
 
 ### Proc.Flat.Complex 
-# examples/bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
+examples/bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
 # examples/bisimilarity/Proc/Test2/TermTests.v ### Success
-# examples/bisimilarity/Proc/Test2/PluginProofs.v ### Success
+examples/bisimilarity/Proc/Test2/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test2/ManualProofs.v
 # examples/bisimilarity/Proc/Test2/LtacProofs.v
 
@@ -87,11 +87,13 @@ src/rocq_utils.ml
 src/rocq_utils.mli
 src/rocq_convert.ml
 src/rocq_convert.mli
+src/rocq_enc.ml
+src/rocq_enc.mli
+src/rocq_ind.ml
+src/rocq_ind.mli
 src/rocq_bindings.ml
 src/rocq_bindings.mli
 
-src/mebi_enc.ml
-src/mebi_enc.mli
 src/mebi_setup.ml
 src/mebi_setup.mli
 src/mebi_constr.ml
@@ -127,12 +129,8 @@ src/mebi_tactics.mli
 
 src/mebi_wrapper.ml
 src/mebi_wrapper.mli
-src/mebi_ind.ml
-src/mebi_ind.mli
 src/mebi_utils.ml
 src/mebi_utils.mli
-src/mebi_bindings.ml
-src/mebi_bindings.mli
 src/mebi_hypothesis.ml
 src/mebi_hypothesis.mli
 src/mebi_proof.ml

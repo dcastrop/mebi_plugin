@@ -9,6 +9,8 @@ let () = Log.Config.configure_output Trace false
 (****** ENCODINGS ***************************)
 (********************************************)
 
+module type S_F = Hashtbl.S with type key = EConstr.t
+
 module type ENCODING_TYPE = sig
   module F : Hashtbl.S with type key = EConstr.t
 
@@ -40,7 +42,7 @@ module type ENCODING_TYPE = sig
 end
 
 module type S = sig
-  module F : Hashtbl.S with type key = EConstr.t
+  module F : S_F
 
   type t
 
@@ -112,4 +114,19 @@ module Make (Enc : S) : ENCODING_TYPE = struct
     Log.trace __FUNCTION__;
     List.sort (fun (a, _) (b, _) -> compare a b) (List.of_seq (B.to_seq x))
   ;;
+end
+
+(********************************************)
+(****** ENCODINGS ***************************)
+(********************************************)
+
+module IntEncoding (FwdMap : S_F) : S = struct
+  include Int
+  module F = FwdMap
+
+  type t = int
+
+  let init : t = 0
+  let next : t -> t = fun x -> x + 1
+  let to_string : t -> string = Printf.sprintf "%i"
 end
