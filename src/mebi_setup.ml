@@ -59,7 +59,7 @@ let the_coq_ctx ?(fresh : bool = false) () : Evd.evar_map ref =
 (****** FORWARD ENCODING MAP ****************)
 (********************************************)
 
-module FwdMap : Hashtbl.S with type key = EConstr.t = Hashtbl.Make (struct
+module FwdMap : Rocq_enc.S_F = Hashtbl.Make (struct
     (* module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
        let () = Log.Config.enable_output ()
@@ -83,22 +83,7 @@ module FwdMap : Hashtbl.S with type key = EConstr.t = Hashtbl.Make (struct
     ;;
   end)
 
-(********************************************)
-(****** ENCODINGS ***************************)
-(********************************************)
-
-module IntEncoding : Mebi_enc.S = struct
-  include Int
-  module F = FwdMap
-
-  type t = int
-
-  let init : t = 0
-  let next : t -> t = fun x -> x + 1
-  let to_string : t -> string = Printf.sprintf "%i"
-end
-
-module Enc = Mebi_enc.Make (IntEncoding)
+module Enc = Rocq_enc.Make (Rocq_enc.IntEncoding (FwdMap))
 
 (********************************************)
 (****** Equalities **************************)

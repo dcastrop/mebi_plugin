@@ -125,8 +125,8 @@ let axiom_constructor
 
 (** Checks possible transitions for this term: *)
 let rec check_valid_constructors
-          (constructors : Mebi_ind.lts_constructor array)
-          (indmap : Mebi_ind.t F.t)
+          (constructors : Rocq_ind.LTS.constructor array)
+          (indmap : Enc.t Rocq_ind.t F.t)
           (from_term : EConstr.t)
           (act_term : EConstr.t)
           (lts_enc : Enc.t)
@@ -138,7 +138,7 @@ let rec check_valid_constructors
   let iter_body (i : int) (acc : Constructors.t) : Constructors.t mm =
     (* let* () = debug_validconstrs_iter_start i constructors in *)
     (* NOTE: extract args for constructor *)
-    let { constructor = ctx, tm; _ } : Mebi_ind.lts_constructor =
+    let { constructor = ctx, tm; _ } : Rocq_ind.LTS.constructor =
       constructors.(i)
     in
     let decls : Rocq_utils.econstr_decl list =
@@ -177,7 +177,7 @@ let rec check_valid_constructors
 
 (** *)
 and explore_valid_constructor
-      (indmap : Mebi_ind.t F.t)
+      (indmap : Enc.t Rocq_ind.t F.t)
       (from_term : EConstr.t)
       (lts_enc : Enc.t)
       (args : constructor_args)
@@ -210,7 +210,7 @@ and explore_valid_constructor
 and check_updated_ctx
       (lts_enc : Enc.t)
       (acc : Problems.t list)
-      (indmap : Mebi_ind.t F.t)
+      (indmap : Enc.t Rocq_ind.t F.t)
   :  EConstr.Vars.substl * EConstr.rel_declaration list
   -> (Enc.t * Problems.t list) option mm
   =
@@ -236,8 +236,8 @@ and check_updated_ctx
           let$+ lhs env sigma = Reductionops.nf_evar sigma args.lhs in
           let$+ act env sigma = Reductionops.nf_evar sigma args.act in
           let args = { args with lhs; act } in
-          let next_lts : Mebi_ind.lts_constructor array =
-            Mebi_ind.get_lts_constructor_types c
+          let next_lts : Rocq_ind.LTS.constructor array =
+            Rocq_ind.get_lts_constructor_types c
           in
           let* next_constructors : Constructors.t =
             check_valid_constructors next_lts indmap lhs act c.enc
@@ -301,8 +301,8 @@ and check_for_next_constructors
 ;;
 
 let collect_valid_constructors
-      (constructors : Mebi_ind.lts_constructor array)
-      (indmap : Mebi_ind.t F.t)
+      (constructors : Rocq_ind.LTS.constructor array)
+      (indmap : Enc.t Rocq_ind.t F.t)
       (from_term : EConstr.t)
       (label_type : EConstr.t)
       (lts_enc : Enc.t)

@@ -249,7 +249,7 @@ module ApplicableConstructors = struct
 
   let make_constructor_bindings
         (gl : Proofview.Goal.t)
-        (bindings : Mebi_bindings.t)
+        (bindings : Rocq_bindings.t)
     : constructor_binding_args -> EConstr.t Tactypes.bindings
     =
     Log.trace __FUNCTION__;
@@ -261,7 +261,7 @@ module ApplicableConstructors = struct
       Log.thing ~__FUNCTION__ Debug "x" x (feconstr gl);
       Log.thing ~__FUNCTION__ Debug "y" y (feconstr_opt gl);
       Log.thing ~__FUNCTION__ Debug "z" z (feconstr_opt gl);
-      Mebi_bindings.get env sigma x y z bindings
+      Rocq_bindings.get env sigma x y z bindings
     in
     function
     | Raw args ->
@@ -297,7 +297,7 @@ module ApplicableConstructors = struct
        | None -> raise (Mebi_proof_CannotFindConstructorInfo_OfLTS lts_enc)
        | Some x ->
          let fconstructor =
-           fun ({ index; _ } : Info.rocq_constructor) ->
+           fun ({ index; _ } : Rocq_bindings.constructor) ->
            Int.equal index constructor_index
          in
          (match List.find_opt fconstructor x.constructors with

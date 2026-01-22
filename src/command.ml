@@ -17,8 +17,7 @@ module type GraphB = sig
     ; terminals : S.t
     ; states : S.t
     ; transitions : constr_transitions H.t
-      (* ; ind_defs : (Enc.t * Mebi_ind.t) list *)
-    ; ind_defs : Mebi_ind.t B.t
+    ; ind_defs : Enc.t Rocq_ind.t B.t
     ; weak : Mebi_weak.t option
     }
 
@@ -38,8 +37,8 @@ module type GraphB = sig
     -> unit
 
   val build_lts_graph
-    :  Mebi_ind.t
-    -> Mebi_ind.t B.t
+    :  Enc.t Rocq_ind.t
+    -> Enc.t Rocq_ind.t B.t
     -> lts_graph
     -> int * (lts_graph -> int -> bool)
     -> lts_graph mm
@@ -97,7 +96,7 @@ module MkGraph
     ; terminals : S.t
     ; states : S.t
     ; transitions : constr_transitions H.t
-    ; ind_defs : Mebi_ind.t B.t
+    ; ind_defs : Enc.t Rocq_ind.t B.t
     ; weak : Mebi_weak.t option
     }
 
@@ -310,16 +309,16 @@ module MkGraph
 
   let get_new_constrs
         (from : Enc.t)
-        (primary : Mebi_ind.t)
-        (lts_ind_def_map : Mebi_ind.t B.t)
+        (primary : Enc.t Rocq_ind.t)
+        (lts_ind_def_map : Enc.t Rocq_ind.t B.t)
     : Mebi_constr.t list mm
     =
     GLog.trace __FUNCTION__;
     let* from_term : EConstr.t = decode from in
-    let label_type : EConstr.t = Mebi_ind.get_lts_label_type primary in
-    let* ind_map : Mebi_ind.t F.t = decode_map lts_ind_def_map in
+    let label_type : EConstr.t = Rocq_ind.get_lts_label_type primary in
+    let* ind_map : Enc.t Rocq_ind.t F.t = decode_map lts_ind_def_map in
     let primary_constr_transitions =
-      Mebi_ind.get_lts_constructor_types primary
+      Rocq_ind.get_lts_constructor_types primary
     in
     let lts_enc : Enc.t = primary.enc in
     Mebi_unify.collect_valid_constructors
@@ -336,8 +335,8 @@ module MkGraph
       @param bound is the number of states to explore until.
       @return an [lts_graph] with a maximum of [bound] many states. *)
   let rec build_lts_graph
-            (the_primary_lts : Mebi_ind.t)
-            (lts_ind_def_map : Mebi_ind.t B.t)
+            (the_primary_lts : Enc.t Rocq_ind.t)
+            (lts_ind_def_map : Enc.t Rocq_ind.t B.t)
             (g : lts_graph)
             ((bound, fstop) : int * (lts_graph -> int -> bool))
     : lts_graph mm
@@ -363,19 +362,21 @@ module MkGraph
         the key for the primary lts and hashtable mapping the name of the coq definition to the rlts.
   *)
   let build_lts_ind_def_map (grefs : Names.GlobRef.t list)
-    : (Enc.t * Mebi_ind.t B.t) mm
+    : (Enc.t * Enc.t Rocq_ind.t B.t) mm
     =
     GLog.trace __FUNCTION__;
     let num_grefs : int = List.length grefs in
     let iter_body
           (i : int)
-          ((_primary_lts_enc, acc_map) : Enc.t * Mebi_ind.t B.t)
+          ((_primary_lts_enc, acc_map) : Enc.t * Enc.t Rocq_ind.t B.t)
       =
       let gref : Names.GlobRef.t = List.nth grefs i in
       let* lts_name : EConstr.t = Mebi_utils.get_name_of_lts gref in
       (* add name of inductive prop *)
       let* lts_enc : Enc.t = encode lts_name in
-      let* lts_ind_def : Mebi_ind.t = Mebi_utils.get_ind_lts lts_enc gref in
+      let* lts_ind_def : Enc.t Rocq_ind.t =
+        Mebi_utils.get_ind_lts lts_enc gref
+      in
       if Bool.not (B.mem acc_map lts_enc) then B.add acc_map lts_enc lts_ind_def;
       return (lts_enc, acc_map)
     in
@@ -385,11 +386,11 @@ module MkGraph
   let get_primary_lts
         (primary_lts : Libnames.qualid)
         (primary_lts_enc : Enc.t)
-        (lts_ind_def_map : Mebi_ind.t B.t)
-    : Mebi_ind.t mm
+        (lts_ind_def_map : Enc.t Rocq_ind.t B.t)
+    : Enc.t Rocq_ind.t mm
     =
     (* encode the primary lts *)
-    let* primary_lts_ind_def : Mebi_ind.t =
+    let* primary_lts_ind_def : Enc.t Rocq_ind.t =
       Mebi_utils.ref_to_glob primary_lts
       |> Mebi_utils.get_ind_lts primary_lts_enc
     in
@@ -414,14 +415,14 @@ module MkGraph
     let* t : EConstr.t = Mebi_utils.constrexpr_to_econstr tref in
     let* t : EConstr.t = Mebi_utils.econstr_normalize t in
     (* NOTE: encode lts inductive definitions *)
-    let* (the_primary_lts_enc, lts_ind_def_map) : Enc.t * Mebi_ind.t B.t =
+    let* (the_primary_lts_enc, lts_ind_def_map) : Enc.t * Enc.t Rocq_ind.t B.t =
       build_lts_ind_def_map grefs
     in
     let* the_primary_lts =
       get_primary_lts primary_lts the_primary_lts_enc lts_ind_def_map
     in
     (* NOTE: update environment by typechecking *)
-    let primary_trm_type = Mebi_ind.get_lts_term_type the_primary_lts in
+    let primary_trm_type = Rocq_ind.get_lts_term_type the_primary_lts in
     let$* _unit env sigma = Typing.check env sigma t primary_trm_type in
     let$ initial_trm env sigma = sigma, Reductionops.nf_all env sigma t in
     let* initial_enc = encode initial_trm in
@@ -609,7 +610,7 @@ module MkGraph
         iter_from)
   ;;
 
-  let decoq_lts_ind_def_map (lts_ind_def_map : Mebi_ind.t B.t)
+  let decoq_lts_ind_def_map (lts_ind_def_map : Enc.t Rocq_ind.t B.t)
     : Info.rocq_info list
     =
     GLog.Config.configure_output Debug true;
@@ -617,15 +618,15 @@ module MkGraph
     GLog.trace __FUNCTION__;
     B.fold
       (fun (enc : Enc.t)
-        (the_ind_def : Mebi_ind.t)
+        (the_ind_def : Enc.t Rocq_ind.t)
         (acc : Info.rocq_info list) ->
         match the_ind_def.kind with
         | LTS the_lts_ind_def ->
           let pp : string = econstr_to_string the_ind_def.ind in
-          let constructors : Info.rocq_constructor list =
+          let constructors : Rocq_bindings.constructor list =
             Mebi_wrapper.runkeep
               (Mebi_wrapper.state (fun env sigma ->
-                 Mebi_bindings.extract_info env sigma the_ind_def))
+                 Rocq_bindings.extract_info env sigma the_ind_def))
           in
           { enc; pp; constructors } :: acc
         | _ -> acc)
