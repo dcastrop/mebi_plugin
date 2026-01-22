@@ -76,7 +76,6 @@ MeBi Config Output Warning Enable.
 (* MeBi Config Weak As Option _. *)
 (* MeBi See All.  *)
 MeBi Config Output Enable.
-(* MeBi Config Output Enable True. MeBi Set ShowDebug True. MeBi Set ShowDetails True. *)
 
 MeBi Divider "Theories.Test.GeneralTests".
 Inductive i := C0 (i : nat) | C1 (b : bool) (j : nat) | C2 (x : nat).

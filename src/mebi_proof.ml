@@ -765,6 +765,12 @@ let get_action_to
   let actionsfrom : States.t Actions.t = Edges.find fsm.edges from in
   let actions = get_actions ~annotated from via fsm in
   Log.things ~__FUNCTION__ Debug "actions" actions (Args Action.to_string);
+  Log.thing
+    ~__FUNCTION__
+    Debug
+    "all actions"
+    (Edges.find fsm.edges from)
+    (Args Model.actions_to_string);
   Log.thing ~__FUNCTION__ Debug "from" from (Args State.to_string);
   Log.thing ~__FUNCTION__ Debug "label" via (Args Label.to_string);
   Log.thing ~__FUNCTION__ Debug "goto" goto (Args State.to_string);
@@ -2357,7 +2363,7 @@ let step () : unit Proofview.tactic =
   Log.trace __FUNCTION__;
   Mebi_theories.tactics
     [ Proofview.Goal.enter (fun gl ->
-        get_tactic ~short:false ~state:false (handle_proof_state gl))
+        get_tactic ~short:false ~state:true (handle_proof_state gl))
     ; Mebi_tactics.simplify_and_subst_all ()
     ]
 ;;

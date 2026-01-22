@@ -114,6 +114,12 @@ let rec drop_last : annotation -> annotation = function
 (*** Annotations *******************************************************)
 (***********************************************************************)
 
+module Annotations = Set.Make (struct
+    type t = annotation
+
+    let compare = annotation_compare
+  end)
+
 (* type annotations = annotation list
 
    let annotations_equal (a : annotations) (b : annotations) : bool =
@@ -171,6 +177,17 @@ let annotation_to_string ?(args : style_args = style_args ()) (x : annotation)
     ~args:{ args with name = Some "Annotation" }
     (Of string)
     (annotation_to_string ~args x)
+;;
+
+let annotations_to_string
+      ?(args : style_args = style_args ())
+      (x : Annotations.t)
+  : string
+  =
+  list
+    ~args:{ args with name = Some "Annotations" }
+    (Args annotation_to_string)
+    (Annotations.to_list x)
 ;;
 
 (* let annotations_to_string ?(args : style_args = style_args ()) (x : annotations)
