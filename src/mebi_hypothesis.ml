@@ -25,7 +25,7 @@ module type HTY_S = sig
   val of_hty : Proofview.Goal.t -> EConstr.t Rocq_utils.kind_pair -> t
 end
 
-module MakeHTy (HTy : HTY_S) : HTY_TYPE = struct
+module MakeHTy (HTy : HTY_S) : HTY_TYPE with type t = HTy.t = struct
   include HTy
 
   let opt_of_hty (gl : Proofview.Goal.t) (p : EConstr.t Rocq_utils.kind_pair)
@@ -60,7 +60,7 @@ module type HYP_S = sig
   val of_hyp : Proofview.Goal.t -> Rocq_utils.hyp -> t
 end
 
-module MakeHyp (Hyp : HYP_S) : HYP_TYPE = struct
+module MakeHyp (Hyp : HYP_S) : HYP_TYPE with type t = Hyp.t = struct
   type t = Hyp.t
 
   let hty_is_a : Proofview.Goal.t -> EConstr.t Rocq_utils.kind_pair -> bool =
@@ -78,8 +78,8 @@ module MakeHyp (Hyp : HYP_S) : HYP_TYPE = struct
   ;;
 end
 
-module Make (HTy : HTY_S) : HYP_TYPE = MakeHyp (struct
-    module HTy : HTY_TYPE = MakeHTy (HTy)
+module Make (HTy : HTY_S) : HYP_TYPE with type t = HTy.t = MakeHyp (struct
+    module HTy : HTY_TYPE with type t = HTy.t = MakeHTy (HTy)
 
     type t = HTy.t
 

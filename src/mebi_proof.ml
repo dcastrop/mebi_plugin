@@ -7,12 +7,15 @@ module Hyp = Mebi_hypothesis
 (***********************************************************************)
 module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
-let () = Log.Config.configure_output Debug false
-let () = Log.Config.configure_output Trace false
+let _show_output = true
+let () = Log.Config.configure_output Debug _show_output
+let () = Log.Config.configure_output Trace _show_output
 (***********************************************************************)
 
-let raise ?(__FUNCTION__ : string = "") (x : exn) : 'a =
-  Log.trace ~__FUNCTION__ (Printf.sprintf "Raise: %s" (Printexc.to_string x));
+let raise ?(__FUNCTION__ : string = "") ?(silent : bool = false) (x : exn) : 'a =
+  if Bool.not silent
+  then
+    Log.trace ~__FUNCTION__ (Printf.sprintf "Raise: %s" (Printexc.to_string x));
   raise x
 ;;
 
@@ -88,6 +91,13 @@ let _fconstr (gl : Proofview.Goal.t) : Constr.t Utils.Strfy.to_string =
 let _feconstrkinds (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
   Of
     (Rocq_utils.Strfy.econstr_kind
+       (Proofview.Goal.env gl)
+       (Proofview.Goal.sigma gl))
+;;
+
+let _fconstrkinds (gl : Proofview.Goal.t) : Constr.t Utils.Strfy.to_string =
+  Of
+    (Rocq_utils.Strfy.constr_kind
        (Proofview.Goal.env gl)
        (Proofview.Goal.sigma gl))
 ;;
@@ -439,7 +449,19 @@ end
 
 module PState = struct
   type t =
+    { state : state
+    ; cache : cache ref
+    }
+
+  and cache =
+    { inverted_hyps : EConstr.t list
+    ; unfolded_terms : EConstr.t list
+    }
+
+  and state =
     | NewProof
+    | DoUnfold of (state * unfold_kind)
+    | DoInversion of state
     | NewWeakSim
     | NewCofix
     | DoRefl
@@ -447,11 +469,23 @@ module PState = struct
     | ApplyConstructors of ApplicableConstructors.t
     | DetectState
 
+  and unfold_kind =
+    | Any
+    | CheckHyps
+    | Just of EConstr.t
+    | InHyps of (Rocq_utils.hyp * EConstr.t) list
+
   (* TODO: maybe revert to just [mtrans:Transition.t]*)
   and transitions =
     { mtrans : Transition.t
     ; ntrans : Transition_opt.t
     }
+
+  let default () : t =
+    { state = NewProof
+    ; cache = ref { inverted_hyps = []; unfolded_terms = [] }
+    }
+  ;;
 
   (* and tactic_to_apply = unit -> unit Proofview.tactic *)
 
@@ -461,8 +495,23 @@ module PState = struct
     | Some (_ :: _) -> false
   ;;
 
-  let to_string ?(short : bool = true) : t -> string = function
+  let unfold_kind_to_string ?(short : bool = true) : unfold_kind -> string
+    = function
+    | Any -> "Any"
+    | CheckHyps -> "CheckHyps"
+    | Just _ -> "Just (_)"
+    | InHyps xs -> Printf.sprintf "InHyps (...%i)" (List.length xs)
+  ;;
+
+  let rec state_to_string ?(short : bool = true) : state -> string = function
     | NewProof -> "NewProof"
+    | DoUnfold (x, y) ->
+      Printf.sprintf
+        "DoUnfold (%s, %s)"
+        (state_to_string ~short:true x)
+        (unfold_kind_to_string y)
+    | DoInversion x ->
+      Printf.sprintf "DoInversion (%s)" (state_to_string ~short:true x)
     | NewWeakSim -> "NewWeakSim"
     | NewCofix -> "NewCofix"
     | DoRefl -> "DoRefl"
@@ -482,12 +531,18 @@ module PState = struct
         (if short then "" else ApplicableConstructors.to_string x)
     | DetectState -> "DetectState"
   ;;
+
+  let to_string ?(short : bool = true) ({ state; cache } : t) : string =
+    (* let cache:string = if short then "" else "TODO" in *)
+    let state : string = state_to_string ~short state in
+    Utils.Strfy.record [ "state", state ]
+  ;;
 end
 
 (* TODO: make this part of a functor, so we always have a starting state, etc.*)
 (* TODO: also, this is where we can "pre-process" the different constructors, checking if they need to be applied with "explicit bindings" -- unless we stash this in the Mebi_info *)
 
-let default_proof_state : PState.t = PState.NewProof
+let default_proof_state : PState.t = PState.default ()
 let the_proof_state : PState.t ref = ref default_proof_state
 
 (** used to keep track of all the proof states grouped by step *)
@@ -516,15 +571,81 @@ let update_old_proof_states (x : PState.t) : unit =
 let set_the_proof_state
       ?(short : bool = true)
       ?(__FUNCTION__ : string = "")
-      (x : PState.t)
+      (x : PState.state)
   : unit
   =
-  let f = PState.to_string ~short:true in
-  let s : string = Printf.sprintf "(%s) -> (%s)" (f !the_proof_state) (f x) in
-  Log.thing ~__FUNCTION__ Debug "new state" x (Of (PState.to_string ~short));
+  let f = PState.state_to_string ~short:true in
+  let s : string =
+    Printf.sprintf "(%s) -> (%s)" (f !the_proof_state.state) (f x)
+  in
+  Log.thing
+    ~__FUNCTION__
+    Debug
+    "new state"
+    x
+    (Of (PState.state_to_string ~short));
   Log.thing ~__FUNCTION__ Debug "change" s (Args Utils.Strfy.string);
   update_old_proof_states !the_proof_state;
-  the_proof_state := x
+  the_proof_state := { !the_proof_state with state = x }
+;;
+
+exception Mebi_proof_HypAlreadyInverted of Rocq_utils.hyp
+
+(** also updates PState.t.cache *)
+let assert_hyp_not_already_inverted (gl : Proofview.Goal.t) (h : Rocq_utils.hyp)
+  : unit
+  =
+  Log.trace __FUNCTION__;
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+  let inverted_hyps : EConstr.t list =
+    !(!the_proof_state.cache).inverted_hyps
+  in
+  let x : EConstr.types = Context.Named.Declaration.get_type h in
+  if List.exists (EConstr.eq_constr sigma x) inverted_hyps
+  then raise ~__FUNCTION__ (Mebi_proof_HypAlreadyInverted h)
+  else
+    !the_proof_state.cache
+    := { !(!the_proof_state.cache) with inverted_hyps = x :: inverted_hyps }
+;;
+
+exception Mebi_proof_TermAlreadyUnfolded of EConstr.t
+
+(** also updates PState.t.cache *)
+let assert_term_not_already_unfolded
+      ?(add : bool = false)
+      (gl : Proofview.Goal.t)
+      (x : EConstr.t)
+  : unit
+  =
+  Log.trace __FUNCTION__;
+  let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+  let unfolded_terms : EConstr.t list =
+    !(!the_proof_state.cache).unfolded_terms
+  in
+  if List.exists (EConstr.eq_constr sigma x) unfolded_terms
+  then raise ~__FUNCTION__ (Mebi_proof_TermAlreadyUnfolded x)
+  else if add
+  then
+    !the_proof_state.cache
+    := { !(!the_proof_state.cache) with unfolded_terms = x :: unfolded_terms }
+;;
+
+let only_terms_not_already_unfolded
+      (gl : Proofview.Goal.t)
+      (xs : EConstr.t list)
+  : EConstr.t list
+  =
+  Log.trace __FUNCTION__;
+  List.filter_map
+    (fun x ->
+      try
+        assert_term_not_already_unfolded ~add:false gl x;
+        Some x
+      with
+      | Mebi_proof_TermAlreadyUnfolded _ ->
+        Log.trace ~__FUNCTION__ "Exception: Mebi_proof_TermAlreadyUnfolded";
+        None)
+    xs
 ;;
 
 let _debug_proof_state ?(short : bool = true) () : unit =
@@ -727,7 +848,7 @@ let do_inversion (gl : Proofview.Goal.t) (h : Rocq_utils.hyp) : tactic =
     Printf.sprintf
       "(inversion %s: %s)"
       (Rocq_utils.Strfy.hyp_name h)
-      (Rocq_utils.Strfy.hyp_value
+      (Rocq_utils.Strfy.hyp_type
          (Proofview.Goal.env gl)
          (Proofview.Goal.sigma gl)
          h)
@@ -822,12 +943,24 @@ let chain_do_unfold (gl : Proofview.Goal.t) : EConstr.t list -> tactic =
   Log.trace __FUNCTION__;
   function
   | [] -> raise ~__FUNCTION__ (Mebi_proof_NothingToUnfold ())
-  | x :: xs ->
-    List.fold_left
-      (fun (acc : tactic) (x : EConstr.t) ->
-        tactic_chain [ acc; do_unfold gl x ])
-      (do_unfold gl x)
-      xs
+  | xs ->
+    (match
+       List.filter_map
+         (fun x ->
+           try
+             assert_term_not_already_unfolded gl x;
+             Some x
+           with
+           | Mebi_proof_TermAlreadyUnfolded _ -> None)
+         xs
+     with
+     | [] -> raise ~__FUNCTION__ (Mebi_proof_NothingToUnfold ())
+     | x :: xs ->
+       List.fold_left
+         (fun (acc : tactic) (x : EConstr.t) ->
+           tactic_chain [ acc; do_unfold gl x ])
+         (do_unfold gl x)
+         xs)
 ;;
 
 let do_unfold_in_hyp
@@ -1152,7 +1285,6 @@ let typ_is_fsm_constructor
 (***********************************************************************)
 
 exception Mebi_proof_CannotDecodeNeededTerm of EConstr.t
-exception Mebi_proof_CheckTermCanBeUnfolded of (Rocq_utils.hyp * EConstr.t)
 
 let try_find_state
       ?(needed : bool = false)
@@ -1325,6 +1457,10 @@ let get_lts_transition
 ;;
 
 exception Mebi_proof_CouldNotFindHypTransition of (Fsm.t * Rocq_utils.hyp list)
+exception Mebi_proof_MaybeTermCanBeUnfolded of (Rocq_utils.hyp * EConstr.t)
+
+exception
+  Mebi_proof_CheckTermsCanBeUnfolded of (Rocq_utils.hyp * EConstr.t) list
 
 let get_hyp_transition
       ?(need_action : bool = true)
@@ -1361,7 +1497,7 @@ let get_hyp_transition
     | Mebi_proof_CannotDecodeNeededTerm y ->
       Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CannotDecodeNeededTerm";
       Log.thing ~__FUNCTION__ Debug "Could not decode needed" y (feconstr gl);
-      raise ~__FUNCTION__ (Mebi_proof_CheckTermCanBeUnfolded (x, y))
+      raise ~__FUNCTION__ (Mebi_proof_MaybeTermCanBeUnfolded (x, y))
     | Mebi_proof_CouldNotDecodeTransitionState (ty, fsm) ->
       Log.trace
         ~__FUNCTION__
@@ -1375,11 +1511,24 @@ let get_hyp_transition
       Log.thing ~__FUNCTION__ Debug "Could not decode Label" ty (feconstr gl);
       None
   in
-  match List.filter_map f (Proofview.Goal.hyps gl) with
+  let maybe_need_to_unfold : (Rocq_utils.hyp * EConstr.t) list ref = ref [] in
+  let g (x : Rocq_utils.hyp) : Transition_opt.t option =
+    try f x with
+    | Mebi_proof_MaybeTermCanBeUnfolded (x, y) ->
+      maybe_need_to_unfold := (x, y) :: !maybe_need_to_unfold;
+      None
+  in
+  match List.filter_map g (Proofview.Goal.hyps gl) with
   | [] ->
-    raise
-      ~__FUNCTION__
-      (Mebi_proof_CouldNotFindHypTransition (fsm, Proofview.Goal.hyps gl))
+    if List.is_empty !maybe_need_to_unfold
+    then
+      raise
+        ~__FUNCTION__
+        (Mebi_proof_CouldNotFindHypTransition (fsm, Proofview.Goal.hyps gl))
+    else
+      raise
+        ~__FUNCTION__
+        (Mebi_proof_CheckTermsCanBeUnfolded !maybe_need_to_unfold)
   | h :: [] -> h
   | h :: _tl ->
     let len : int = List.length (h :: _tl) in
@@ -1514,8 +1663,81 @@ let do_any_unfold_concl ?(enforce : bool = false) (gl : Proofview.Goal.t)
   =
   Log.trace __FUNCTION__;
   let the_concl : EConstr.t = Proofview.Goal.concl gl in
-  try get_econstrs_to_unfold gl the_concl |> chain_do_unfold gl with
+  try
+    let xs = get_econstrs_to_unfold gl the_concl in
+    (* Log.things ~__FUNCTION__ Debug "to unfold" xs (feconstr gl); *)
+    List.iter
+      (fun (x : EConstr.t) ->
+        Log.debug "\n/ / / /\n";
+        (* TODO:
+
+        - function that recursively inspects a given term (like below), until it reaches either a ((Lambda) with (Prod)) or ((App) with (Ind, Ref))
+
+        - we DO NOT unfold those that have kind  ((App) with (Sort) -- (isType))
+
+
+        -----
+
+        - At beginning, add types to do with LTS (obtainable from model info) to the [PState.cache.terms_to_ignore] 
+        - Add [unfold_kind] AnyFuncions which will search for those with the kind (Lambda) 
+        - Add [unfold_kind] AnyTerms which will 
+        
+        -----------------------------------
+
+        - Stop "caching" unfolded terms -- as these may need to be unfolded again!!!
+        
+        - Only "cache" [terms_to_ignore] 
+
+        TODO: find more robust way of determining if a variable-term is used (as currently this appears as any other term)
+
+        *)
+        (* Log.thing ~__FUNCTION__ Debug "to unfold" x (feconstr gl); *)
+        (* Log.thing ~__FUNCTION__ Debug "kinds" x (_feconstrkinds gl); *)
+        let sigma = Proofview.Goal.sigma gl in
+        let fconstref = Utils.Strfy.Of Rocq_utils.Strfy.global in
+        let g, i = EConstr.destRef sigma x in
+        (match g with
+         | ConstRef x ->
+           Log.thing ~__FUNCTION__ Debug "ConstRef" g fconstref;
+           let lookup = Global.lookup_constant x in
+           (let body = lookup.const_body in
+            match body with
+            | Undef x -> Log.thing ~__FUNCTION__ Debug "Undef" g fconstref
+            | Def x ->
+              (* Log.thing ~__FUNCTION__ Debug "Def" x (_fconstr gl); *)
+              Log.thing ~__FUNCTION__ Debug "Def, kinds" x (_fconstrkinds gl)
+            | OpaqueDef x ->
+              Log.thing ~__FUNCTION__ Debug "OpaqueDef" g fconstref
+            | Primitive x ->
+              Log.thing ~__FUNCTION__ Debug "Primitive" g fconstref
+            | Symbol x -> Log.thing ~__FUNCTION__ Debug "Symbol" g fconstref);
+           (* (let relevance = lookup.const_relevance in
+              match relevance with
+              | Relevant -> Log.debug ~__FUNCTION__ "Relevant"
+              | Irrelevant -> Log.debug ~__FUNCTION__ "Irrelevant"
+              | RelevanceVar x ->
+              Log.thing
+              ~__FUNCTION__
+              Debug
+              "RelevanceVar"
+              x
+              (Of Sorts.QVar.to_string)); *)
+           let s = lookup.const_type in
+           Log.thing ~__FUNCTION__ Debug "type" s (_fconstr gl);
+           Log.thing
+             ~__FUNCTION__
+             Debug
+             "isType"
+             (Constr.is_Type s)
+             (Args Utils.Strfy.bool);
+           Log.thing ~__FUNCTION__ Debug "type, kinds" s (_fconstrkinds gl)
+         | _ -> ());
+        ())
+      xs;
+    xs |> chain_do_unfold gl
+  with
   | Mebi_proof_NothingToUnfold x ->
+    Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NothingToUnfold";
     if enforce
     then raise ~__FUNCTION__ (Mebi_proof_NothingToUnfold x)
     else tactic (Proofview.tclUNIT ())
@@ -1636,60 +1858,62 @@ end
 
 module Cofix : Hyp.HYP_TYPE = Hyp.Make (Cofix_HTy)
 
-module Invertible = struct
-  type t =
-    { kind : k
-    ; tactic : tactic
-    }
-
-  and k =
-    | Full
-    | Layer
-    | ToUnfold of EConstr.t list
-
-  let to_string : t -> string = function
-    | { kind = Full; _ } -> "Full"
-    | { kind = Layer; _ } -> "Layer"
-    | { kind = ToUnfold _; _ } -> "ToUnfold"
-  ;;
+module Unfoldable_HTy : Hyp.HTY_S with type t = EConstr.t list = struct
+  type t = EConstr.t list
 
   let of_hty
         (gl : Proofview.Goal.t)
         ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
-    : k
+    : t
     =
     Log.trace __FUNCTION__;
-    let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
     try
       (* TODO: just try to invert and then catch error if nothing to invert *)
       if can_unfold_hyp_pair gl (ty, tys)
-      then (
-        Log.thing ~__FUNCTION__ Debug "ToUnfold (inhyp)" ty (feconstr gl);
-        ToUnfold (do_any_unfold_hyp_pair gl (ty, tys)))
-      else if Mebi_theories.is_var sigma tys.(2)
-      then (
-        Log.thing ~__FUNCTION__ Debug "Full" tys.(2) (feconstr gl);
-        Full)
-      else if Mebi_theories.is_var sigma tys.(1)
-      then (
-        Log.thing ~__FUNCTION__ Debug "Layer" tys.(1) (feconstr gl);
-        Layer)
-      else (
-        Log.thing ~__FUNCTION__ Debug "(else)" ty (feconstr gl);
-        raise ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys)))
+      then
+        do_any_unfold_hyp_pair gl (ty, tys)
+        |> only_terms_not_already_unfolded gl
+      else raise ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys))
     with
-    | Invalid_argument _ ->
-      (* NOTE: handles "Index out of bounds" for accessing [tys] array above. *)
-      Log.trace ~__FUNCTION__ "Exception: Invalid_argument";
-      raise ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys))
     | Mebi_proof_NothingToUnfold () ->
       (* NOTE: *)
       Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NothingToUnfold";
       raise ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys))
   ;;
+end
+
+module Unfoldable : Hyp.HYP_TYPE with type t = EConstr.t list =
+  Hyp.Make (Unfoldable_HTy)
+
+(* module Unfoldable = struct
+  type t = EConstr.t list
+
+  let of_hty
+        (gl : Proofview.Goal.t)
+        ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
+    : t
+    =
+    Log.trace __FUNCTION__;
+    try
+      (* TODO: just try to invert and then catch error if nothing to invert *)
+      if can_unfold_hyp_pair gl (ty, tys)
+      then
+        do_any_unfold_hyp_pair gl (ty, tys)
+        |> only_terms_not_already_unfolded gl
+      else raise ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys))
+    with
+    | Mebi_proof_NothingToUnfold () ->
+      (* NOTE: *)
+      Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NothingToUnfold";
+      raise ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys))
+  ;;
+  (* | Mebi_proof_NothingToUnfold () ->
+     (* NOTE: *)
+     Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NothingToUnfold";
+     raise ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys)) *)
 
   let opt_of_hty (gl : Proofview.Goal.t) (p : EConstr.t Rocq_utils.kind_pair)
-    : k option
+    : t option
     =
     Log.trace __FUNCTION__;
     try Some (of_hty gl p) with Hyp.Mebi_proof_Hypothesis_HTy _ -> None
@@ -1710,19 +1934,143 @@ module Invertible = struct
     Log.things ~__FUNCTION__ Debug "tys" (snd p |> Array.to_list) (feconstr gl);
     try
       let kind : k = of_hty gl p in
-      match kind with
+      (* match kind with
       | ToUnfold xs ->
-        Log.things ~__FUNCTION__ Debug "ToUnfold" xs (feconstr gl);
-        { kind; tactic = chain_do_unfold_in_hyp gl h xs }
-      | _ -> { kind; tactic = do_inversion gl h }
+        (match only_terms_not_already_unfolded gl xs with
+         | [] -> raise ~__FUNCTION__ (Mebi_proof_NothingToUnfold ())
+         | xs ->
+           Log.things ~__FUNCTION__ Debug "ToUnfold" xs (feconstr gl);
+           { kind; tactic = chain_do_unfold_in_hyp gl h xs })
+      | _ -> *)
+      assert_hyp_not_already_inverted gl h;
+      { kind; tactic = do_inversion gl h }
     with
+    | Mebi_proof_HypAlreadyInverted x ->
+      Log.trace ~__FUNCTION__ "Exception: Mebi_proof_HypAlreadyInverted";
+      raise ~__FUNCTION__ (Mebi_proof_HypAlreadyInverted x)
     | Hyp.Mebi_proof_Hypothesis_HTy p ->
       Log.trace ~__FUNCTION__ "Exception: Mebi_proof_Hypothesis_HTy";
       raise ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_Hyp (h, p))
-    | Mebi_proof_NothingToUnfold () ->
-      Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NothingToUnfold";
-      raise ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_Hyp (h, p))
   ;;
+
+  (* | Mebi_proof_NothingToUnfold () ->
+     Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NothingToUnfold";
+     raise ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_Hyp (h, p)) *)
+
+  let opt_of_hyp (gl : Proofview.Goal.t) (h : Rocq_utils.hyp) : t option =
+    Log.trace __FUNCTION__;
+    try Some (of_hyp gl h) with Hyp.Mebi_proof_Hypothesis_Hyp _ -> None
+  ;;
+
+  let hyp_is_a (gl : Proofview.Goal.t) (h : Rocq_utils.hyp) : bool =
+    Log.trace __FUNCTION__;
+    Log.thing ~__FUNCTION__ Debug "hyp" h (fhyp gl);
+    Option.has_some (opt_of_hyp gl h)
+  ;;
+end *)
+
+module Invertible = struct
+  type t =
+    { kind : k
+    ; tactic : tactic
+    }
+
+  and k =
+    | Full
+    | Layer
+  (* | ToUnfold of EConstr.t list *)
+
+  let to_string : t -> string = function
+    | { kind = Full; _ } -> "Full"
+    | { kind = Layer; _ } -> "Layer"
+  ;;
+
+  (* | { kind = ToUnfold _; _ } -> "ToUnfold" *)
+
+  let of_hty
+        (gl : Proofview.Goal.t)
+        ((ty, tys) : EConstr.t Rocq_utils.kind_pair)
+    : k
+    =
+    Log.trace __FUNCTION__;
+    let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+    try
+      (* TODO: just try to invert and then catch error if nothing to invert *)
+      (* if can_unfold_hyp_pair gl (ty, tys)
+      then (
+        Log.thing ~__FUNCTION__ Debug "ToUnfold (inhyp)" ty (feconstr gl);
+        ToUnfold (do_any_unfold_hyp_pair gl (ty, tys)))
+      else *)
+      if Mebi_theories.is_var sigma tys.(2)
+      then
+        (* Log.thing ~__FUNCTION__ Debug "Full" tys.(2) (feconstr gl); *)
+        Full
+      else if Mebi_theories.is_var sigma tys.(1)
+      then
+        (* Log.thing ~__FUNCTION__ Debug "Layer" tys.(1) (feconstr gl); *)
+        Layer
+      else
+        (* Log.thing ~__FUNCTION__ Debug "(else)" ty (feconstr gl); *)
+        raise
+          ~silent:true
+          ~__FUNCTION__
+          (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys))
+    with
+    | Invalid_argument _ ->
+      (* NOTE: handles "Index out of bounds" for accessing [tys] array above. *)
+      (* Log.trace ~__FUNCTION__ "Exception: Invalid_argument"; *)
+      raise ~silent:true ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys))
+  ;;
+
+  (* | Mebi_proof_NothingToUnfold () ->
+     (* NOTE: *)
+     Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NothingToUnfold";
+     raise ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_HTy (ty, tys)) *)
+
+  let opt_of_hty (gl : Proofview.Goal.t) (p : EConstr.t Rocq_utils.kind_pair)
+    : k option
+    =
+    Log.trace __FUNCTION__;
+    try Some (of_hty gl p) with Hyp.Mebi_proof_Hypothesis_HTy _ -> None
+  ;;
+
+  let hty_is_a (gl : Proofview.Goal.t) (p : EConstr.t Rocq_utils.kind_pair)
+    : bool
+    =
+    Log.trace __FUNCTION__;
+    Option.has_some (opt_of_hty gl p)
+  ;;
+
+  let of_hyp (gl : Proofview.Goal.t) (h : Rocq_utils.hyp) : t =
+    Log.trace __FUNCTION__;
+    let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
+    (* Log.thing ~__FUNCTION__ Debug "hyp" h (fhyp gl); *)
+    let p = Rocq_utils.hyp_to_atomic sigma h in
+    (* Log.things ~__FUNCTION__ Debug "tys" (snd p |> Array.to_list) (feconstr gl); *)
+    try
+      let kind : k = of_hty gl p in
+      (* match kind with
+      | ToUnfold xs ->
+        (match only_terms_not_already_unfolded gl xs with
+         | [] -> raise ~__FUNCTION__ (Mebi_proof_NothingToUnfold ())
+         | xs ->
+           Log.things ~__FUNCTION__ Debug "ToUnfold" xs (feconstr gl);
+           { kind; tactic = chain_do_unfold_in_hyp gl h xs })
+      | _ -> *)
+      assert_hyp_not_already_inverted gl h;
+      { kind; tactic = do_inversion gl h }
+    with
+    | Mebi_proof_HypAlreadyInverted x ->
+      (* Log.trace ~__FUNCTION__ "Exception: Mebi_proof_HypAlreadyInverted"; *)
+      raise ~__FUNCTION__ (Mebi_proof_HypAlreadyInverted x)
+    | Hyp.Mebi_proof_Hypothesis_HTy p ->
+      (* Log.trace ~__FUNCTION__ "Exception: Mebi_proof_Hypothesis_HTy"; *)
+      raise ~silent:true ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_Hyp (h, p))
+  ;;
+
+  (* | Mebi_proof_NothingToUnfold () ->
+     Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NothingToUnfold";
+     raise ~__FUNCTION__ (Hyp.Mebi_proof_Hypothesis_Hyp (h, p)) *)
 
   let opt_of_hyp (gl : Proofview.Goal.t) (h : Rocq_utils.hyp) : t option =
     Log.trace __FUNCTION__;
@@ -1896,7 +2244,9 @@ let hyps_has_cofix (gl : Proofview.Goal.t) : bool =
 let hyp_is_invertible (gl : Proofview.Goal.t) : Rocq_utils.hyp -> bool =
   Log.trace __FUNCTION__;
   fun (x : Rocq_utils.hyp) ->
-    try Invertible.hyp_is_a gl x with Hyp.Mebi_proof_Hypothesis_Hyp _ -> false
+    try Invertible.hyp_is_a gl x with
+    | Hyp.Mebi_proof_Hypothesis_Hyp _ -> false
+    | Mebi_proof_HypAlreadyInverted _ -> false
 ;;
 
 let _hyps_has_invertible (gl : Proofview.Goal.t) : bool =
@@ -1913,7 +2263,8 @@ let hyps_get_invertibles (gl : Proofview.Goal.t) : Invertible.t list =
   List.filter_map
     (fun (x : Rocq_utils.hyp) ->
       try Some (Invertible.of_hyp gl x) with
-      | Hyp.Mebi_proof_Hypothesis_Hyp _ -> None)
+      | Hyp.Mebi_proof_Hypothesis_Hyp _ -> None
+      | Mebi_proof_HypAlreadyInverted _ -> None)
     (Proofview.Goal.hyps gl)
 ;;
 
@@ -1930,14 +2281,14 @@ let hyps_invertibles_get_layer (xs : Invertible.t list) : Invertible.t option =
   match List.filter f xs with [] -> None | h :: _ -> Some h
 ;;
 
-let hyps_invertibles_get_tounfold (xs : Invertible.t list) : Invertible.t option
+(* let hyps_invertibles_get_tounfold (xs : Invertible.t list) : Invertible.t option
   =
   let f = function
     | ({ kind = ToUnfold _; _ } : Invertible.t) -> true
     | _ -> false
   in
   match List.filter f xs with [] -> None | h :: _ -> Some h
-;;
+;; *)
 
 exception Mebi_proof_NoInvertibleHyps of Invertible.t list
 
@@ -1946,20 +2297,53 @@ let hyps_get_invertible (gl : Proofview.Goal.t) : Invertible.t =
   let invertibles : Invertible.t list = hyps_get_invertibles gl in
   let f : Invertible.t Utils.Strfy.to_string = Of Invertible.to_string in
   Log.things ~__FUNCTION__ Debug "invertibles" invertibles f;
-  match hyps_invertibles_get_tounfold invertibles with
+  (* match hyps_invertibles_get_tounfold invertibles with
+     | Some x -> x
+     | None -> *)
+  match hyps_invertibles_get_full invertibles with
   | Some x -> x
   | None ->
-    (match hyps_invertibles_get_full invertibles with
+    (match hyps_invertibles_get_layer invertibles with
      | Some x -> x
-     | None ->
-       (match hyps_invertibles_get_layer invertibles with
-        | Some x -> x
-        | None -> raise ~__FUNCTION__ (Mebi_proof_NoInvertibleHyps invertibles)))
+     | None -> raise ~__FUNCTION__ (Mebi_proof_NoInvertibleHyps invertibles))
 ;;
 
 let do_hyp_inversion (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   (hyps_get_invertible gl).tactic
+;;
+
+let hyps_get_unfoldables (gl : Proofview.Goal.t)
+  : (Rocq_utils.hyp * Unfoldable.t) list
+  =
+  Log.trace __FUNCTION__;
+  List.filter_map
+    (fun (x : Rocq_utils.hyp) ->
+      try Some (x, Unfoldable.of_hyp gl x) with
+      | Hyp.Mebi_proof_Hypothesis_Hyp _ -> None
+      | Mebi_proof_NothingToUnfold _ -> None)
+    (Proofview.Goal.hyps gl)
+;;
+
+let hyps_get_unfoldable (gl : Proofview.Goal.t)
+  : (Rocq_utils.hyp * EConstr.t) list
+  =
+  Log.trace __FUNCTION__;
+  let unfoldables : (Rocq_utils.hyp * Unfoldable.t) list =
+    hyps_get_unfoldables gl
+  in
+  let rec f
+    :  (Rocq_utils.hyp * Unfoldable.t) list
+    -> (Rocq_utils.hyp * EConstr.t) list list
+    = function
+    | [] -> []
+    | (h, xs) :: tl -> g h xs :: f tl
+  and g (h : Rocq_utils.hyp) : Unfoldable.t -> (Rocq_utils.hyp * EConstr.t) list
+    = function
+    | [] -> []
+    | x :: tl -> (h, x) :: g h tl
+  in
+  List.flatten (f unfoldables)
 ;;
 
 (* let find_action_labelled (label:Label.t) (from:State.t) (fsm:Fsm.t) : Action.t =
@@ -2177,11 +2561,68 @@ let rec handle_new_proof (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   if hyps_is_empty gl
   then (
-    set_the_proof_state ~__FUNCTION__ NewWeakSim;
+    set_the_proof_state ~__FUNCTION__ (DoUnfold (DoInversion NewWeakSim, Any));
     handle_proof_state gl)
   else (
     Log.warning ~__FUNCTION__ "Expected Hypothesis to be empty";
     raise ~__FUNCTION__ (Mebi_proof_NewProof ()))
+
+and handle_unfold (gl : Proofview.Goal.t) (return_state : PState.state)
+  : PState.unfold_kind -> tactic
+  =
+  Log.trace __FUNCTION__;
+  function
+  | Just x ->
+    Log.trace ~__FUNCTION__ "Just";
+    let r = do_unfold gl x in
+    set_the_proof_state ~__FUNCTION__ return_state;
+    r
+  | Any ->
+    Log.trace ~__FUNCTION__ "Any";
+    (try do_any_unfold_concl ~enforce:true gl with
+     | Mebi_proof_NothingToUnfold _ ->
+       Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NothingToUnfold (concl)";
+       (* NOTE: only move on once nothing else can be unfolded -- requires waiting for next iter*)
+       set_the_proof_state ~__FUNCTION__ (DoUnfold (return_state, CheckHyps));
+       _do_nothing () (* handle_proof_state gl *))
+  (* _do_nothing () *)
+  | CheckHyps ->
+    Log.trace ~__FUNCTION__ "CheckHyps";
+    let next_state : PState.state =
+      match hyps_get_unfoldable gl with
+      | [] -> return_state
+      | xs -> DoUnfold (return_state, InHyps xs)
+    in
+    set_the_proof_state ~__FUNCTION__ next_state;
+    handle_proof_state gl
+  | InHyps [] ->
+    Log.trace ~__FUNCTION__ "InHyps (empty)";
+    set_the_proof_state ~__FUNCTION__ return_state;
+    handle_proof_state gl
+  | InHyps ((h, x) :: tl) ->
+    Log.trace ~__FUNCTION__ "InHyps";
+    log_econstr ~__FUNCTION__ "trying to unfold" x gl;
+    (try get_econstrs_to_unfold gl x |> chain_do_unfold_in_hyp gl h with
+     | Mebi_proof_NothingToUnfold () ->
+       Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NothingToUnfold";
+       log_econstr ~__FUNCTION__ "Could not handle (or unfold) term" x gl;
+       if List.is_empty tl
+       then set_the_proof_state ~__FUNCTION__ return_state
+       else
+         set_the_proof_state ~__FUNCTION__ (DoUnfold (return_state, InHyps tl));
+       (* raise ~__FUNCTION__ (Mebi_proof_NewCofix ()) *)
+       handle_proof_state gl)
+
+and handle_inversion (gl : Proofview.Goal.t) (return_state : PState.state)
+  : tactic
+  =
+  Log.trace __FUNCTION__;
+  try do_hyp_inversion gl with
+  | Mebi_proof_NoInvertibleHyps hyps ->
+    (* NOTE: continue to [return_state] *)
+    Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NoInvertibleHyps";
+    set_the_proof_state ~__FUNCTION__ return_state;
+    handle_proof_state gl
 
 and handle_new_weak_sim (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
@@ -2195,70 +2636,76 @@ and handle_new_weak_sim (gl : Proofview.Goal.t) : tactic =
   then (
     Log.trace ~__FUNCTION__ "(concl is weak sim)";
     (* TODO: just try to invert and then catch error if nothing to invert *)
-    try do_any_unfold_concl ~enforce:true gl with
+    (* try do_any_unfold_concl ~enforce:true gl with
     | Mebi_proof_NothingToUnfold _ ->
-      if hyps_has_cofix gl
-      then do_solve_cofix gl
-      else (
-        set_the_proof_state ~__FUNCTION__ NewCofix;
-        do_new_cofix gl))
+      Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NothingToUnfold"; *)
+    if hyps_has_cofix gl
+    then do_solve_cofix gl
+    else (
+      set_the_proof_state
+        ~__FUNCTION__
+        (DoInversion (DoUnfold (NewCofix, CheckHyps)));
+      do_new_cofix gl))
   else if typ_is_exists gl concltyp
   then (
     Log.trace ~__FUNCTION__ "(concl is exists)";
-    set_the_proof_state ~__FUNCTION__ NewCofix;
+    set_the_proof_state
+      ~__FUNCTION__
+      (DoInversion (DoUnfold (NewCofix, CheckHyps)));
     handle_proof_state gl)
   else (
     warn_handle_new_weak_sim gl;
     raise ~__FUNCTION__ (Mebi_proof_NewWeakSim ()))
 
+(* try do_hyp_inversion gl with
+   | Mebi_proof_NoInvertibleHyps hyps ->
+   (* NOTE: continue to [return_state] *)
+   Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NoInvertibleHyps";
+   set_the_proof_state ~__FUNCTION__ return_state;
+   handle_proof_state gl *)
+
 and handle_new_cofix (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
-  try do_hyp_inversion gl with
-  | Mebi_proof_NoInvertibleHyps hyps ->
-    (try do_eexists_transition gl with
-     | Mebi_proof_CheckTermCanBeUnfolded (h, x) ->
-       Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CheckTermCanBeUnfolded";
-       log_econstr ~__FUNCTION__ "trying to unfold" x gl;
-       (try get_econstrs_to_unfold gl x |> chain_do_unfold_in_hyp gl h with
-        | Mebi_proof_NothingToUnfold () ->
-          Log.trace ~__FUNCTION__ "Exception: Mebi_proof_NothingToUnfold";
-          log_econstr ~__FUNCTION__ "Could not handle (or unfold) term" x gl;
-          raise ~__FUNCTION__ (Mebi_proof_NewCofix ()))
-     | Mebi_proof_CouldNotFindHypTransition (fsm, hyps) ->
-       Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CouldNotFindHypTransition";
-       log_hyps ~__FUNCTION__ "Could not find any transitions in Hyps" hyps gl;
-       (* log_fsm ~__FUNCTION__ "(the fsm)" fsm; *)
-       raise ~__FUNCTION__ (Mebi_proof_NewCofix ())
-     | Mebi_proof_CouldNotObtainAction (from, label, goto, fsm) ->
-       Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CouldNotObtainAction";
-       raise ~__FUNCTION__ (Mebi_proof_NewCofix ())
-     | Mebi_proof_CouldNotDecodeTransitionState (x, fsm) ->
-       Log.trace
-         ~__FUNCTION__
-         "Exception: Mebi_proof_CouldNotDecodeTransitionState";
-       log_econstr ~__FUNCTION__ "Could not decode transition state" x gl;
-       (* log_states ~__FUNCTION__ "fsm.states" fsm.states; *)
-       raise ~__FUNCTION__ (Mebi_proof_NewCofix ())
-     | Mebi_proof_CouldNotDecodeTransitionLabel (x, fsm) ->
-       Log.trace
-         ~__FUNCTION__
-         "Exception: Mebi_proof_CouldNotDecodeTransitionLabel";
-       log_econstr ~__FUNCTION__ "Could not decode transition label" x gl;
-       (* log_alphabet ~__FUNCTION__ "fsm.alphabet" fsm.alphabet; *)
-       raise ~__FUNCTION__ (Mebi_proof_NewCofix ())
-     | Mebi_proof_ConclIsNot_Exists () ->
-       Log.trace ~__FUNCTION__ "Exception: Mebi_proof_ConclIsNot_Exists";
-       raise ~__FUNCTION__ (Mebi_proof_NewCofix ())
-     | Mebi_proof_ExIntro_NEqStateM (mstate, mfrom) ->
-       Log.trace ~__FUNCTION__ "Exception: Mebi_proof_ExIntro_NEqStateM";
-       Log.thing ~__FUNCTION__ Debug "mstate" mstate (Args State.to_string);
-       Log.option ~__FUNCTION__ Debug "mfrom" mfrom (Args State.to_string);
-       raise ~__FUNCTION__ (Mebi_proof_NewCofix ())
-     | Mebi_proof_ExIntro_NEqLabel (mtrans, ntrans) ->
-       Log.trace ~__FUNCTION__ "Exception: Mebi_proof_ExIntro_NEqLabel";
-       log_label ~__FUNCTION__ "mtrans.label" mtrans.label;
-       log_label_opt ~__FUNCTION__ "ntrans.label" ntrans.label;
-       raise ~__FUNCTION__ (Mebi_proof_NewCofix ()))
+  try do_eexists_transition gl with
+  | Mebi_proof_CheckTermsCanBeUnfolded xs ->
+    Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CheckTermsCanBeUnfolded";
+    set_the_proof_state ~__FUNCTION__ (DoUnfold (NewCofix, InHyps xs));
+    handle_proof_state gl
+  | Mebi_proof_CouldNotFindHypTransition (fsm, hyps) ->
+    Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CouldNotFindHypTransition";
+    log_hyps ~__FUNCTION__ "Could not find any transitions in Hyps" hyps gl;
+    (* log_fsm ~__FUNCTION__ "(the fsm)" fsm; *)
+    raise ~__FUNCTION__ (Mebi_proof_NewCofix ())
+  | Mebi_proof_CouldNotObtainAction (from, label, goto, fsm) ->
+    Log.trace ~__FUNCTION__ "Exception: Mebi_proof_CouldNotObtainAction";
+    raise ~__FUNCTION__ (Mebi_proof_NewCofix ())
+  | Mebi_proof_CouldNotDecodeTransitionState (x, fsm) ->
+    Log.trace
+      ~__FUNCTION__
+      "Exception: Mebi_proof_CouldNotDecodeTransitionState";
+    log_econstr ~__FUNCTION__ "Could not decode transition state" x gl;
+    (* log_states ~__FUNCTION__ "fsm.states" fsm.states; *)
+    raise ~__FUNCTION__ (Mebi_proof_NewCofix ())
+  | Mebi_proof_CouldNotDecodeTransitionLabel (x, fsm) ->
+    Log.trace
+      ~__FUNCTION__
+      "Exception: Mebi_proof_CouldNotDecodeTransitionLabel";
+    log_econstr ~__FUNCTION__ "Could not decode transition label" x gl;
+    (* log_alphabet ~__FUNCTION__ "fsm.alphabet" fsm.alphabet; *)
+    raise ~__FUNCTION__ (Mebi_proof_NewCofix ())
+  | Mebi_proof_ConclIsNot_Exists () ->
+    Log.trace ~__FUNCTION__ "Exception: Mebi_proof_ConclIsNot_Exists";
+    raise ~__FUNCTION__ (Mebi_proof_NewCofix ())
+  | Mebi_proof_ExIntro_NEqStateM (mstate, mfrom) ->
+    Log.trace ~__FUNCTION__ "Exception: Mebi_proof_ExIntro_NEqStateM";
+    Log.thing ~__FUNCTION__ Debug "mstate" mstate (Args State.to_string);
+    Log.option ~__FUNCTION__ Debug "mfrom" mfrom (Args State.to_string);
+    raise ~__FUNCTION__ (Mebi_proof_NewCofix ())
+  | Mebi_proof_ExIntro_NEqLabel (mtrans, ntrans) ->
+    Log.trace ~__FUNCTION__ "Exception: Mebi_proof_ExIntro_NEqLabel";
+    log_label ~__FUNCTION__ "mtrans.label" mtrans.label;
+    log_label_opt ~__FUNCTION__ "ntrans.label" ntrans.label;
+    raise ~__FUNCTION__ (Mebi_proof_NewCofix ())
 
 and handle_dorefl (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
@@ -2433,12 +2880,13 @@ and handle_apply_constructors (gl : Proofview.Goal.t)
     tactic_chain [ do_simplify gl; do_eapply_rt1n_refl gl; do_simplify gl ] *)
 
 and handle_proof_state (gl : Proofview.Goal.t) : tactic =
+  Log.debug "\n- - - - - - - - - -\n";
   Log.trace __FUNCTION__;
-  (* Log.thing ~__FUNCTION__ Debug "hyps" gl (Of hyps_to_string); *)
-  (* Log.thing ~__FUNCTION__ Debug "concl" gl (Of concl_to_string); *)
   try
-    match !the_proof_state with
+    match !the_proof_state.state with
     | NewProof -> handle_new_proof gl
+    | DoUnfold (x, y) -> handle_unfold gl x y
+    | DoInversion t -> handle_inversion gl t
     | NewWeakSim -> handle_new_weak_sim gl
     | NewCofix -> handle_new_cofix gl
     | DoRefl -> handle_dorefl gl
@@ -2472,10 +2920,12 @@ and detect_proof_state (gl : Proofview.Goal.t) : tactic =
 (***********************************************************************)
 
 let step () : unit Proofview.tactic =
-  Log.debug "\n- - - - - - - - - -\n";
+  Log.debug "\n-=-=-=-=-=-=-=-=-=-\n";
   Log.trace __FUNCTION__;
   Mebi_theories.tactics
     [ Proofview.Goal.enter (fun gl ->
+        Log.thing ~__FUNCTION__ Debug "hyps" gl (Of hyps_to_string);
+        Log.thing ~__FUNCTION__ Debug "concl" gl (Of concl_to_string);
         get_tactic ~short:false ~state:true (handle_proof_state gl))
     ; Mebi_tactics.simplify_and_subst_all ()
     ]
