@@ -58,6 +58,16 @@ let econstr_to_app (sigma : Evd.evar_map) (x : EConstr.t) : EConstr.t kind_pair 
   | k -> raise (Rocq_utils_EConstrIsNot_App (sigma, x, k))
 ;;
 
+(* let econstr_to_ref (sigma : Evd.evar_map) (x : EConstr.t)
+   : Names.GlobRef.t * EConstr.EInstance.t
+   =
+   EConstr.destRef sigma x
+   ;; *)
+
+(* match EConstr.kind sigma x with
+   | Ref (ty, tys) -> ty, tys
+   | k -> raise (Rocq_utils_EConstrIsNot_App (sigma, x, k)) *)
+
 (*****************************************************************************)
 
 type lambda_triple =
@@ -139,7 +149,7 @@ let list_of_econstr_kinds sigma (x : EConstr.t) : (string * bool) list =
   ; "Ref", EConstr.isRef sigma x
   ; "Sort", EConstr.isSort sigma x
   ; "Type", EConstr.isType sigma x
-  ; "Var", EConstr.isVar sigma x
+  ; "Var", EConstr.isVar sigma x (* ; "Var", EConstr.is_lib_ref env sigma x *)
   ]
 ;;
 
@@ -235,6 +245,12 @@ module Strfy = struct
     =
     let s = Pp.string_of_ppcmds x in
     if clean then Utils.clean_string s else s
+  ;;
+
+  let name_id : Names.Id.t -> string = Names.Id.to_string
+
+  let global : Names.GlobRef.t -> string =
+    fun (x : Names.GlobRef.t) -> pp (Printer.pr_global x)
   ;;
 
   let evar ?(args : style_args = style_args ()) : Evar.t -> string =
@@ -383,12 +399,6 @@ module Strfy = struct
     Utils.Strfy.record [ "econstr", x; "kinds", k ]
   ;;
 
-  let name_id : Names.Id.t -> string = Names.Id.to_string
-
-  let global : Names.GlobRef.t -> string =
-    fun (x : Names.GlobRef.t) -> pp (Printer.pr_global x)
-  ;;
-
   let concl env sigma ?(args : style_args = style_args ())
     : EConstr.constr -> string
     =
@@ -408,6 +418,10 @@ module Strfy = struct
     Utils.Strfy.option
       (Utils.Strfy.Of (econstr env sigma))
       (Context.Named.Declaration.get_value x)
+  ;;
+
+  let hyp_type env sigma (x : hyp) : string =
+    econstr env sigma (Context.Named.Declaration.get_type x)
   ;;
 
   let hyp env sigma ?(args : style_args = style_args ()) (x : hyp) : string =

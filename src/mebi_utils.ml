@@ -119,9 +119,8 @@ let get_lts_ind_mind (gref : Names.GlobRef.t)
   : (Names.inductive * Declarations.mind_specif) mm
   =
   Log.trace __FUNCTION__;
-  let open Names.GlobRef in
   match gref with
-  | IndRef ind ->
+  | Names.GlobRef.IndRef ind ->
     let* env = get_env in
     let mib, mip = Inductive.lookup_mind_specif env ind in
     return (ind, (mib, mip))
@@ -132,14 +131,14 @@ let get_lts_ind_mind (gref : Names.GlobRef.t)
 
 let assert_mip_arity_is_type (mip : Declarations.one_inductive_body) : unit mm =
   Log.trace __FUNCTION__;
-  let open Declarations in
   match mip.mind_arity with
-  | RegularArity s ->
+  | Declarations.RegularArity s ->
     (match s.mind_sort with
      | Type _ -> return ()
      | Set -> return ()
      | _ -> invalid_sort_type (Sorts.family s.mind_sort))
-  | TemplateArity t -> invalid_sort_type (Sorts.family t.template_level)
+  | Declarations.TemplateArity t ->
+    invalid_sort_type (Sorts.family t.template_level)
 ;;
 
 let get_lts_ind_type_mind (gref : Names.GlobRef.t)
@@ -153,13 +152,13 @@ let get_lts_ind_type_mind (gref : Names.GlobRef.t)
 
 let assert_mip_arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
   Log.trace __FUNCTION__;
-  let open Declarations in
   match mip.mind_arity with
-  | RegularArity s ->
+  | Declarations.RegularArity s ->
     if not (Sorts.is_prop s.mind_sort)
     then invalid_sort_lts (Sorts.family s.mind_sort)
     else return ()
-  | TemplateArity t -> invalid_sort_lts (Sorts.family t.template_level)
+  | Declarations.TemplateArity t ->
+    invalid_sort_lts (Sorts.family t.template_level)
 ;;
 
 let get_lts_ind_prop_mind (gref : Names.GlobRef.t)

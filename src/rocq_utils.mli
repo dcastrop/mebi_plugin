@@ -175,6 +175,7 @@ module Strfy : sig
   val erel : 'a -> Evd.evar_map -> Evd.erelevance -> string
   val hyp_name : hyp -> string
   val hyp_value : Environ.env -> Evd.evar_map -> hyp -> string
+  val hyp_type : Environ.env -> Evd.evar_map -> hyp -> string
 
   val hyp
     :  Environ.env

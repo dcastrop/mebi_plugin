@@ -208,6 +208,8 @@ module Bisimilar = struct
     Log.trace __FUNCTION__;
     let the_sat_1 : Fsm.t = prepare_fsm weak (fst the_fsm_pair) in
     let the_sat_2 : Fsm.t = prepare_fsm weak (snd the_fsm_pair) in
+    (* let the_sat_1 : Fsm.t = Minimize.run ~weak (fst the_fsm_pair) |> fst in *)
+    (* let the_sat_2 : Fsm.t = Minimize.run ~weak (snd the_fsm_pair) |> fst in *)
     Log.trace ~__FUNCTION__ "finished preparing fsms (saturated if weak)";
     let merged_fsm : Fsm.t = Fsm.merge the_sat_1 the_sat_2 in
     Log.trace ~__FUNCTION__ "finished merging fsms";

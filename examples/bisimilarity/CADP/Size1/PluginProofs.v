@@ -30,10 +30,10 @@ MeBi Config Fail If NotBisim True.
 Require Import Logic.
 
 
-MeBi Divider "Examples.Bisimilarity.CADP.Size1.PluginProofs.bigstep_lts".
-(* Example wsim_bigstep_lts : weak_sim bigstep lts c1 c1. 
+(* MeBi Divider "Examples.Bisimilarity.CADP.Size1.PluginProofs.bigstep_lts".
+Example wsim_bigstep_lts : weak_sim bigstep lts c1 c1. 
 Proof. MeBiSim Begin bigstep c1 And lts c1 Using step.
-  MeBiSim Solve 300.
+  MeBiSim Solve 300. (* 300 *)
 Qed. *)
 
 (* MeBi FSM c1 Using lts step. *)
@@ -44,6 +44,8 @@ MeBi Divider "Examples.Bisimilarity.CADP.Size1.PluginProofs.lts_bigstep".
 Example wsim_lts_bigstep : weak_sim lts bigstep c1 c1. 
 Proof. MeBiSim Begin lts c1 And bigstep c1 Using step. 
   (* MeBiSim Solve 2000. *)
+  MeBiSim Solve 15.
+  (* MeBiSim Solve 8. *)
   (* MeBiSim Solve 10.
   MeBiSim Solve 10.
   MeBiSim Solve 10.
