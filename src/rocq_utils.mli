@@ -1,5 +1,3 @@
-
-
 type 'a kind_pair = 'a * 'a array
 
 exception
@@ -164,8 +162,8 @@ module Strfy : sig
     -> Evd.econstr
     -> string
 
-  val name_id : ?args:Utils.Strfy.style_args -> Names.variable -> string
-  val global : ?args:Utils.Strfy.style_args -> Names.GlobRef.t -> string
+  val name_id : Names.variable -> string
+  val global : Names.GlobRef.t -> string
 
   val concl
     :  Environ.env
@@ -174,12 +172,9 @@ module Strfy : sig
     -> Evd.econstr
     -> string
 
-  val erel
-    :  'a
-    -> Evd.evar_map
-    -> ?args:Utils.Strfy.style_args
-    -> Evd.erelevance
-    -> string
+  val erel : 'a -> Evd.evar_map -> Evd.erelevance -> string
+  val hyp_name : hyp -> string
+  val hyp_value : Environ.env -> Evd.evar_map -> hyp -> string
 
   val hyp
     :  Environ.env

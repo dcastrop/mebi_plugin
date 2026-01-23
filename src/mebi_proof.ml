@@ -723,7 +723,13 @@ let do_new_cofix (gl : Proofview.Goal.t) : tactic =
 ;;
 
 let do_inversion (h : Rocq_utils.hyp) : tactic =
-  tactic ~msg:"(do_inversion)" (Mebi_tactics.do_inversion h)
+  let msg : string =
+    Printf.sprintf
+      "(inversion %s: %s)"
+      (Rocq_utils.Strfy.hyp_name h)
+      (Rocq_utils.Strfy.hyp_value h)
+  in
+  tactic ~msg (Mebi_tactics.do_inversion h)
 ;;
 
 let do_simplify (gl : Proofview.Goal.t) : tactic =
