@@ -722,12 +722,15 @@ let do_new_cofix (gl : Proofview.Goal.t) : tactic =
     ]
 ;;
 
-let do_inversion (h : Rocq_utils.hyp) : tactic =
+let do_inversion (gl : Proofview.Goal.t) (h : Rocq_utils.hyp) : tactic =
   let msg : string =
     Printf.sprintf
       "(inversion %s: %s)"
       (Rocq_utils.Strfy.hyp_name h)
-      (Rocq_utils.Strfy.hyp_value h)
+      (Rocq_utils.Strfy.hyp_value
+         (Proofview.Goal.env gl)
+         (Proofview.Goal.sigma gl)
+         h)
   in
   tactic ~msg (Mebi_tactics.do_inversion h)
 ;;
@@ -1711,7 +1714,7 @@ module Invertible = struct
       | ToUnfold xs ->
         Log.things ~__FUNCTION__ Debug "ToUnfold" xs (feconstr gl);
         { kind; tactic = chain_do_unfold_in_hyp gl h xs }
-      | _ -> { kind; tactic = do_inversion h }
+      | _ -> { kind; tactic = do_inversion gl h }
     with
     | Hyp.Mebi_proof_Hypothesis_HTy p ->
       Log.trace ~__FUNCTION__ "Exception: Mebi_proof_Hypothesis_HTy";
