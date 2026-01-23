@@ -383,11 +383,9 @@ module Strfy = struct
     Utils.Strfy.record [ "econstr", x; "kinds", k ]
   ;;
 
-  let name_id ?(args : style_args = style_args ()) : Names.Id.t -> string =
-    Names.Id.to_string
-  ;;
+  let name_id : Names.Id.t -> string = Names.Id.to_string
 
-  let global ?(args : style_args = style_args ()) : Names.GlobRef.t -> string =
+  let global : Names.GlobRef.t -> string =
     fun (x : Names.GlobRef.t) -> pp (Printer.pr_global x)
   ;;
 
@@ -397,19 +395,25 @@ module Strfy = struct
     econstr_types ~args:(nest args) env sigma
   ;;
 
-  let erel _env sigma ?(args : style_args = style_args ())
-    : EConstr.ERelevance.t -> string
-    =
+  let erel _env sigma : EConstr.ERelevance.t -> string =
     fun (x : EConstr.ERelevance.t) ->
     if EConstr.ERelevance.is_irrelevant sigma x
     then "irrelevant"
     else "relevant"
   ;;
 
+  let hyp_name (x : hyp) : string = name_id (Context.Named.Declaration.get_id x)
+
+  let hyp_value env sigma (x : hyp) : string =
+    Utils.Strfy.option
+      (Utils.Strfy.Of (econstr env sigma))
+      (Context.Named.Declaration.get_value x)
+  ;;
+
   let hyp env sigma ?(args : style_args = style_args ()) (x : hyp) : string =
-    let name : string = name_id ~args (Context.Named.Declaration.get_id x) in
+    let name : string = hyp_name x in
     let rel : string =
-      erel env sigma ~args (Context.Named.Declaration.get_relevance x)
+      erel env sigma (Context.Named.Declaration.get_relevance x)
     in
     let tys : string =
       econstr_types
