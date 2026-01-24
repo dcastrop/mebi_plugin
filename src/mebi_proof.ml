@@ -113,7 +113,7 @@ let _fconstrkinds (gl : Proofview.Goal.t) : Constr.t Utils.Strfy.to_string =
 (* let fistheory (gl : Proofview.Goal.t) : EConstr.t Utils.Strfy.to_string =
    Of
    (fun (x : EConstr.t) ->
-   Utils.Strfy.bool (Mebi_theories.is_theory (Proofview.Goal.sigma gl) x))
+   Utils.Strfy.bool (Theoriesis_theory (Proofview.Goal.sigma gl) x))
    ;; *)
 
 let _feconstrarr (gl : Proofview.Goal.t) : EConstr.t array Utils.Strfy.to_string
@@ -257,7 +257,7 @@ let acc_econstr_to_unfold
       (x : EConstr.t)
   : EConstr.t list
   =
-  if Mebi_theories.is_constr (Proofview.Goal.sigma gl) x
+  if Theoriesis_constr (Proofview.Goal.sigma gl) x
   then acc_econstrs gl acc x
   else acc
 ;;
@@ -310,7 +310,7 @@ let tactic_chain ?(nonempty : bool = false) : tactic list -> tactic =
   in
   let g =
     List.fold_left (fun { msg = xmsg; x } { msg = ymsg; x = y } ->
-      { msg = f (xmsg, ymsg); x = Mebi_theories.tactics [ x; y ] })
+      { msg = f (xmsg, ymsg); x = Theoriestactics [ x; y ] })
   in
   function
   | [] ->
@@ -803,7 +803,7 @@ exception Mebi_proof_TyDoesNotMatchTheories of EConstr.t Rocq_utils.kind_pair
 
 let get_all_non_cofix (gl : Proofview.Goal.t) : Names.Id.Set.t =
   Names.Id.Set.filter
-    (fun (x : Names.Id.t) -> Bool.not (Mebi_theories.is_cofix x))
+    (fun (x : Names.Id.t) -> Bool.not (Theoriesis_cofix x))
     (Context.Named.to_vars (Proofview.Goal.hyps gl))
 ;;
 
@@ -820,13 +820,13 @@ let do_cofix (gl : Proofview.Goal.t) : tactic =
 let do_apply_In_sim (gl : Proofview.Goal.t) : tactic =
   tactic
     ~msg:"apply In_sim"
-    (Mebi_tactics.apply ~gl (Mebi_theories.c_In_sim ()))
+    (Mebi_tactics.apply ~gl (Theoriesc_In_sim ()))
 ;;
 
 let do_apply_Pack_sim (gl : Proofview.Goal.t) : tactic =
   tactic
     ~msg:"apply Pack_sim"
-    (Mebi_tactics.apply ~gl (Mebi_theories.c_Pack_sim ()))
+    (Mebi_tactics.apply ~gl (Theoriesc_Pack_sim ()))
 ;;
 
 let do_intros_all () : tactic =
@@ -864,32 +864,32 @@ let do_apply_rt1n_refl (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   tactic
     ~msg:"apply rt1n_refl"
-    (Mebi_theories.tactics
-       [ Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_refl ()) ])
+    (Theoriestactics
+       [ Mebi_tactics.apply ~gl (Theoriesc_rt1n_refl ()) ])
 ;;
 
 let do_eapply_rt1n_refl (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   tactic
     ~msg:"eapply rt1n_refl"
-    (Mebi_theories.tactics
-       [ Mebi_tactics.eapply ~gl (Mebi_theories.c_rt1n_refl ()) ])
+    (Theoriestactics
+       [ Mebi_tactics.eapply ~gl (Theoriesc_rt1n_refl ()) ])
 ;;
 
 let _do_apply_rt1n_trans (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   tactic
     ~msg:"apply rt1n_trans"
-    (Mebi_theories.tactics
-       [ Mebi_tactics.apply ~gl (Mebi_theories.c_rt1n_trans ()) ])
+    (Theoriestactics
+       [ Mebi_tactics.apply ~gl (Theoriesc_rt1n_trans ()) ])
 ;;
 
 let do_eapply_rt1n_trans (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   tactic
     ~msg:"eapply rt1n_trans"
-    (Mebi_theories.tactics
-       [ Mebi_tactics.eapply ~gl (Mebi_theories.c_rt1n_trans ()) ])
+    (Theoriestactics
+       [ Mebi_tactics.eapply ~gl (Theoriesc_rt1n_trans ()) ])
 ;;
 
 let do_rt1n_via (gl : Proofview.Goal.t) (via : Label.t) : tactic =
@@ -913,21 +913,21 @@ let do_apply_wk_none (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   tactic
     ~msg:"apply wk_none"
-    (Mebi_tactics.apply ~gl (Mebi_theories.c_wk_none ()))
+    (Mebi_tactics.apply ~gl (Theoriesc_wk_none ()))
 ;;
 
 let do_unfold_silent (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   tactic
     ~msg:"unfold silent"
-    (Mebi_tactics.unfold_econstr gl (Mebi_theories.c_silent ()))
+    (Mebi_tactics.unfold_econstr gl (Theoriesc_silent ()))
 ;;
 
 let do_eapply_wk_some (gl : Proofview.Goal.t) : tactic =
   Log.trace __FUNCTION__;
   tactic
     ~msg:"eapply wk_some"
-    (Mebi_tactics.eapply ~gl (Mebi_theories.c_wk_some ()))
+    (Mebi_tactics.eapply ~gl (Theoriesc_wk_some ()))
 ;;
 
 let do_unfold (gl : Proofview.Goal.t) (x : EConstr.t) : tactic =
@@ -1199,7 +1199,7 @@ let typ_is_exists
   =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_ex ())
+  Mebi_setup.Eq.econstr sigma ty (Theoriesc_ex ())
 ;;
 
 let typ_is_weak_sim
@@ -1209,7 +1209,7 @@ let typ_is_weak_sim
   =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
+  Mebi_setup.Eq.econstr sigma ty (Theoriesc_weak_sim ())
 ;;
 
 let typ_is_weak_transition
@@ -1219,7 +1219,7 @@ let typ_is_weak_transition
   =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak ())
+  Mebi_setup.Eq.econstr sigma ty (Theoriesc_weak ())
 ;;
 
 let typ_is_tau
@@ -1229,7 +1229,7 @@ let typ_is_tau
   =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_tau ())
+  Mebi_setup.Eq.econstr sigma ty (Theoriesc_tau ())
 ;;
 
 let typ_is_silent_transition
@@ -1239,7 +1239,7 @@ let typ_is_silent_transition
   =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_silent ())
+  Mebi_setup.Eq.econstr sigma ty (Theoriesc_silent ())
 ;;
 
 let typ_is_silent1_transition
@@ -1249,7 +1249,7 @@ let typ_is_silent1_transition
   =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_silent1 ())
+  Mebi_setup.Eq.econstr sigma ty (Theoriesc_silent1 ())
 ;;
 
 let typ_is_lts_transition
@@ -1259,7 +1259,7 @@ let typ_is_lts_transition
   =
   Log.trace __FUNCTION__;
   let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-  Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_LTS ())
+  Mebi_setup.Eq.econstr sigma ty (Theoriesc_LTS ())
 ;;
 
 let typ_is_fsm_constructor
@@ -1273,7 +1273,7 @@ let typ_is_fsm_constructor
   | { info = { rocq_info = None; _ }; _ } -> false
   | { info = { rocq_info = Some xs; _ }; _ } ->
     (* Log.thing ~__FUNCTION__ Debug "tykind" ty (fekind gl); *)
-    if Mebi_theories.is_theory (Proofview.Goal.sigma gl) ty
+    if Theoriesis_theory (Proofview.Goal.sigma gl) ty
     then false
     else (
       match try_decode gl ty with
@@ -1768,11 +1768,11 @@ let check_if_can_unfold (gl : Proofview.Goal.t) : EConstr.t -> bool =
     (* Log.thing ~__FUNCTION__ Debug "(is_ty)" x (fisty gl); *)
     (* Log.thing ~__FUNCTION__ Debug "(is_theory)" x (fistheory gl); *)
     (* Log.thing ~__FUNCTION__ Debug "(kinds)" x (feconstrkinds gl); *)
-    if Mebi_theories.is_constr sigma x
+    if Theoriesis_constr sigma x
     then
       (* Log.thing ~__FUNCTION__ Debug "(is_constr)" x (feconstr gl); *)
       true
-    else if Mebi_theories.is_var sigma x
+    else if Theoriesis_var sigma x
     then
       (* Log.thing ~__FUNCTION__ Debug "(is_var)" x (feconstr gl); *)
       false
@@ -1790,7 +1790,7 @@ let check_if_can_unfold (gl : Proofview.Goal.t) : EConstr.t -> bool =
           (feconstr gl); *)
         Array.fold_left
           (fun (acc : bool) (x : EConstr.t) -> acc || loop x)
-          (if Mebi_theories.is_app sigma x && Mebi_theories.is_constr sigma ty
+          (if Theoriesis_app sigma x && Theoriesis_constr sigma ty
            then true
            else false)
           tys
@@ -1847,7 +1847,7 @@ module Cofix_HTy : Hyp.HTY_S = struct
     : t
     =
     let sigma : Evd.evar_map = Proofview.Goal.sigma gl in
-    if Mebi_setup.Eq.econstr sigma ty (Mebi_theories.c_weak_sim ())
+    if Mebi_setup.Eq.econstr sigma ty (Theoriesc_weak_sim ())
     then (
       let _m : State.t = decode_state (get_encoding tys.(5)) (mfsm ()).states in
       let _n : State.t = decode_state (get_encoding tys.(6)) (nfsm ()).states in
@@ -2001,11 +2001,11 @@ module Invertible = struct
         Log.thing ~__FUNCTION__ Debug "ToUnfold (inhyp)" ty (feconstr gl);
         ToUnfold (do_any_unfold_hyp_pair gl (ty, tys)))
       else *)
-      if Mebi_theories.is_var sigma tys.(2)
+      if Theoriesis_var sigma tys.(2)
       then
         (* Log.thing ~__FUNCTION__ Debug "Full" tys.(2) (feconstr gl); *)
         Full
-      else if Mebi_theories.is_var sigma tys.(1)
+      else if Theoriesis_var sigma tys.(1)
       then
         (* Log.thing ~__FUNCTION__ Debug "Layer" tys.(1) (feconstr gl); *)
         Layer
@@ -2409,7 +2409,7 @@ let do_ex_intro (gl : Proofview.Goal.t) (ngoto : State.t) : tactic =
   let ngoto_bindings = Tactypes.ImplicitBindings [ ngoto ] in
   tactic
     ~msg:(Printf.sprintf "(exists %s)" (econstr_to_string gl ngoto))
-    (Mebi_theories.tactics
+    (Theoriestactics
        [ Tactics.constructor_tac true None 1 ngoto_bindings
        ; Tactics.split Tactypes.NoBindings
        ])
@@ -2922,7 +2922,7 @@ and detect_proof_state (gl : Proofview.Goal.t) : tactic =
 let step () : unit Proofview.tactic =
   Log.debug "\n-=-=-=-=-=-=-=-=-=-\n";
   Log.trace __FUNCTION__;
-  Mebi_theories.tactics
+  Theoriestactics
     [ Proofview.Goal.enter (fun gl ->
         Log.thing ~__FUNCTION__ Debug "hyps" gl (Of hyps_to_string);
         Log.thing ~__FUNCTION__ Debug "concl" gl (Of concl_to_string);

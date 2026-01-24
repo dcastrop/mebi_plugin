@@ -1,4 +1,4 @@
-module Enc = Mebi_setup.Enc
+(* module Enc = Mebi_setup.Enc
 module F = Enc.F
 module B = Enc.B
 
@@ -239,4 +239,6 @@ val make_state_tree_pair_set
   :  wrapper ref
   -> (module Set.S with type elt = Enc.t * Mebi_constr.Tree.t) in_context
 
-val debug_enc : unit -> unit mm
+val debug_enc : unit -> unit mm *)
+
+(* module M : Rocq_monad.TYPE *)

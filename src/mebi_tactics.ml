@@ -39,7 +39,7 @@ let simplify_all ?(gl : Proofview.Goal.t option) () : unit Proofview.tactic =
     fun gl ->
     List.fold_left
       (fun acc (h : Rocq_utils.hyp) ->
-        Mebi_theories.tactics
+        Theoriestactics
           [ acc
           ; Tactics.simpl_in_hyp
               (Context.Named.Declaration.get_id h, Locus.InHyp)
@@ -54,8 +54,8 @@ let simplify_and_subst_all ?(gl : Proofview.Goal.t option) ()
   : unit Proofview.tactic
   =
   match gl with
-  | None -> Mebi_theories.tactics [ simplify_all (); subst_all () ]
-  | Some gl -> Mebi_theories.tactics [ simplify_all ~gl (); subst_all () ]
+  | None -> Theoriestactics [ simplify_all (); subst_all () ]
+  | Some gl -> Theoriestactics [ simplify_all ~gl (); subst_all () ]
 ;;
 
 let the_goals : (int, Proofview.Goal.t) Hashtbl.t ref = ref (Hashtbl.create 0)
@@ -143,17 +143,17 @@ let rec unfold_constrexpr_list (gl : Proofview.Goal.t)
   | [] -> Proofview.tclUNIT ()
   | h :: [] -> unfold_constrexpr gl h
   | h :: t ->
-    Mebi_theories.tactics
+    Theoriestactics
       [ unfold_constrexpr gl h; unfold_constrexpr_list gl t ]
 ;;
 
 let cofix (gl : Proofview.Goal.t) : unit Proofview.tactic =
-  Tactics.cofix (Mebi_theories.new_cofix_name gl)
+  Tactics.cofix (Theoriesnew_cofix_name gl)
 ;;
 
 let intros_all () : unit Proofview.tactic = Tactics.intros
 
 let intro_of_string (gl : Proofview.Goal.t) (s : string) : unit Proofview.tactic
   =
-  Tactics.introduction (Mebi_theories.new_name_of_string gl s)
+  Tactics.introduction (Theoriesnew_name_of_string gl s)
 ;;

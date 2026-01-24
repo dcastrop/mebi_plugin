@@ -277,11 +277,11 @@ let new_evar_of (x : EConstr.t) : EConstr.t mm =
 ;;
 
 let is_theory_term (c : unit -> EConstr.t) (x : EConstr.t) : bool mm =
-  state (fun env sigma -> sigma, Mebi_theories.is_constant sigma x c)
+  state (fun env sigma -> sigma, Theoriesis_constant sigma x c)
 ;;
 
-let is_none_term : EConstr.t -> bool mm = is_theory_term Mebi_theories.c_None
-let is_some_term : EConstr.t -> bool mm = is_theory_term Mebi_theories.c_Some
+let is_none_term : EConstr.t -> bool mm = is_theory_term Theoriesc_None
+let is_some_term : EConstr.t -> bool mm = is_theory_term Theoriesc_Some
 
 let get_theory_term_enc_opt (f : EConstr.t -> bool mm) : Enc.t option mm =
   let open Mebi_wrapper.Syntax in
