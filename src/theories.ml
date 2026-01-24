@@ -39,7 +39,6 @@ let collect_bisimilarity_theories () : EConstr.t list =
     let new_constants : EConstr.t list =
       List.map
         (fun (x : Names.GlobRef.t) ->
-          (* Mebi_wrapper.globref_to_econstr x *)
           EConstr.of_constr
             (UnivGen.constr_of_monomorphic_global (Global.env ()) x))
         [ find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "LTS"
@@ -359,8 +358,7 @@ let c_ex_intro () : EConstr.t =
 
 let is_constant sigma (x : EConstr.t) (c : unit -> EConstr.t) : bool =
   match Constr.kind (Rocq_convert.econstr_to_constr sigma x) with
-  | App (x, _) ->
-    Mebi_setup.Eq.constr x (Rocq_convert.econstr_to_constr sigma (c ()))
+  | App (x, _) -> Constr.equal x (Rocq_convert.econstr_to_constr sigma (c ()))
   | _ -> false
 ;;
 
@@ -370,7 +368,7 @@ let is_app sigma (x : EConstr.t) : bool = EConstr.isApp sigma x
 
 let is_theory sigma (x : EConstr.t) : bool =
   let cs = collect_bisimilarity_theories () in
-  let fx = Mebi_setup.Eq.econstr sigma x in
+  let fx = EConstr.eq_constr sigma x in
   List.exists fx cs
 ;;
 
@@ -421,101 +419,3 @@ let get_proof_from_pstate : Declare.Proof.t -> Proof.t = Declare.Proof.get
 let get_partial_proof : Proof.t -> EConstr.t list = Proof.partial_proof
 
 (*****************************************************************************)
-
-(* The following tactic is meant to pack an hypothesis when no other
-   data is already packed.
-
-   The main difficulty in defining this tactic is to understand how to
-   construct the input expected by apply_in. *)
-(* let _package (i : Names.Id.t) : unit Proofview.tactic =
-  Proofview.Goal.enter (fun gl ->
-    Tactics.apply_in
-      true
-      false
-      i
-      [ (* this means that the applied theorem is not to be cleared. *)
-        (* None, (CAst.make (c_M (), *)
-        (* we don't specialize the theorem with extra values. *)
-        (* Tactypes.NoBindings)) *) ]
-      (* we don't destruct the result according to any intro_pattern *)
-      None)
-;; *)
-
-(* 
-let proof_test () : unit Proofview.tactic mm =
-  fun (st : wrapper ref) ->
-  Log.debug "mebi_wrapper.proof_test";
-  let _h_hyps_id = Names.Id.of_string "TestPacked" in
-  (* *)
-  { state = st
-  ; value =
-      Proofview.Goal.enter (fun gl ->
-        let _hyps = Environ.named_context_val (Proofview.Goal.env gl) in
-        Proofview.tclUNIT ())
-      (* let x = Proofview.Goal.goal gl in
-
-         if Termops.mem_named_context_val h_hyps_id hyps then
-         Proofview.tclTHEN (repackage i h_hyps_id)
-         (Proofview.tclTHEN (Tactics.clear [h_hyps_id; i])
-         (Tactics.introduction h_hyps_id))
-         else
-         Proofview.tclTHEN (package i)
-         (Proofview.tclTHEN (Tactics.rename_hyp [i, h_hyps_id])
-         (Tactics.move_hyp h_hyps_id Logic.MoveLast)) *)
-  }
-;; *)
-(* let coq_st = !st.coq_ref in
-  (* *)
-  let ((_en, pv) : Proofview.entry * Proofview.proofview) =
-    Proofview.init !coq_st.coq_ctx []
-    (* [!coq_st.coq_env, _] *)
-  in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.proof_test: is finished => %b"
-       (Proofview.finished pv));
-  (* *)
-  let rel_ctx : EConstr.rel_context = EConstr.rel_context !coq_st.coq_env in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.proof_test: rel_ctx => \"%s\""
-       (Strfy.pp
-          (Printer.pr_rel_context
-             !coq_st.coq_env
-             !coq_st.coq_ctx
-             (EConstr.to_rel_context !coq_st.coq_ctx rel_ctx))));
-  (* *)
-  let named_ctx : EConstr.named_context =
-    EConstr.named_context !coq_st.coq_env
-  in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.proof_test: named_ctx => \"%s\""
-       (Strfy.pp
-          (Printer.pr_named_context
-             !coq_st.coq_env
-             !coq_st.coq_ctx
-             (EConstr.to_named_context !coq_st.coq_ctx named_ctx))));
-  (* *)
-  { state = st; value = (Proofview.Goal.enter begin fun gl ->
-    let hyps = Environ.named_context_val (Proofview.Goal.env gl) in
-    
-  end
-    ) } *)
-(*  *)
-(* Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.proof_test: default_goal => %s"
-       (Strfy.pp
-          (Goal_select.pr_goal_selector
-             (Goal_select.get_default_goal_selector ())))); *)
-(*  *)
-(* let p : Proof.t =
-     Proof.start
-     ~name:(Names.Id.of_string "test_proof")
-     ~poly:false
-     !coq_st.coq_ctx
-     []
-     in
-     Log.debug
-     (Printf.sprintf "mebi_wrapper.proof_test: is done => %b" (Proof.is_done p)); *)

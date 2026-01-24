@@ -87,8 +87,13 @@ src/rocq_utils.ml
 src/rocq_utils.mli
 src/rocq_convert.ml
 src/rocq_convert.mli
+src/theories.ml
+src/theories.mli
+
 src/rocq_enc.ml
 src/rocq_enc.mli
+src/rocq_monad.ml
+src/rocq_monad.mli
 src/rocq_ind.ml
 src/rocq_ind.mli
 src/rocq_bindings.ml
@@ -98,8 +103,6 @@ src/mebi_setup.ml
 src/mebi_setup.mli
 src/mebi_constr.ml
 src/mebi_constr.mli
-src/mebi_theories.ml
-src/mebi_theories.mli
 
 src/model_state.ml
 src/model_state.mli
@@ -135,6 +138,8 @@ src/mebi_hypothesis.ml
 src/mebi_hypothesis.mli
 src/mebi_proof.ml
 src/mebi_proof.mli
+src/proof_solver.ml
+src/proof_solver.mli
 
 # src/dump_to_file.ml
 # src/dump_to_file.mli

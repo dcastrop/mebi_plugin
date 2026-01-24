@@ -98,6 +98,20 @@ let hyp_to_atomic (sigma : Evd.evar_map) (h : hyp) : EConstr.t kind_pair =
 
 (*****************************************************************************)
 
+(* type unfoldable_kind = | Term  | Fun
+
+   module
+
+   let rec get_unfoldable_econstrs (sigma : Evd.evar_map) (x:EConstr.t) : unfoldable_econstr list =
+   try let ty,tys = in
+   with
+   |
+   Rocq_utils_EConstrIsNotA_Type _ -> []
+
+   ;; *)
+
+(*****************************************************************************)
+
 type ind_constr = Constr.rel_context * Constr.t
 type constr_decl = Constr.rel_declaration
 type econstr_decl = EConstr.rel_declaration

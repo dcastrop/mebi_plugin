@@ -27,14 +27,15 @@
   logger
   rocq_utils
   rocq_convert
+  theories
   rocq_enc
+  rocq_monad
   rocq_ind
   rocq_bindings
   ; logging
   ; debug
   mebi_setup
-  mebi_constr
-  mebi_theories
+  ; mebi_constr
   model_state
   model_label
   model_info
@@ -51,6 +52,7 @@
   mebi_utils
   mebi_hypothesis
   mebi_proof
+  proof_solver
   ; rocq_debug
   ; params
   mebi_weak
