@@ -32,12 +32,13 @@
   rocq_enc
   rocq_context
   encoding
+  enc_tree
   term
   bi_encoding
   rocq_monad
   rocq_unification
   rocq_bindings
-  ; model
+  model
   ; mebi_unification
   ;  rocq_ind
   ;  rocq_bindings
