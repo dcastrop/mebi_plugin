@@ -1,5 +1,7 @@
 module type S = sig
   module Enc : Encoding.SEncoding
+  module Tree : Enc_tree.S with type Enc.t = Enc.t
+  module Trees : Set.S with type elt = Tree.t
 
   (* *)
   module type SState = sig
@@ -57,7 +59,7 @@ module type S = sig
     type t =
       { from : State.t
       ; label : Label.t
-      ; using : CTrees.t
+      ; using : Trees.t
       ; goto : State.t
       }
 
@@ -101,7 +103,7 @@ module type S = sig
       ; goto : State.t
       ; label : Label.t
       ; annotation : Annotation.t option
-      ; constructor_trees : CTrees.t
+      ; constructor_trees : Trees.t
       }
 
     val equal : t -> t -> bool
@@ -111,6 +113,18 @@ module type S = sig
     val to_string : t -> string
   end
 
+  (* *)
+  module type SAnnotations = sig
+    module S : Set.S with type elt = Annotation.t
+
+    type t = S.t
+
+    val to_string : t -> string
+  end
+
+  module Annotations : SAnnotations
+
+  (* *)
   module Transition : STransition
 
   module type STransitions = sig
@@ -128,7 +142,7 @@ module type S = sig
     type t =
       { label : Label.t
       ; annotation : Annotation.t option
-      ; constructor_trees : CTrees.t
+      ; constructor_trees : Trees.t
       }
 
     val wk_equal : t -> t -> bool
@@ -261,10 +275,36 @@ module type S = sig
   end
 
   module LTS : SLTS
+
+  (* *)
+  module type SFSM = sig
+    type t =
+      { init : State.t option
+      ; terminals : States.t
+      ; alphabet : Labels.t
+      ; states : States.t
+      ; edges : EdgeMap.t
+      ; info : Info.t
+      }
+
+    val to_string : t -> string
+  end
+
+  module FSM : SFSM
+
+  (* *)
+  module type SConvert = sig
+    val transitions_to_edgemap : Transitions.t -> EdgeMap.t
+    val lts_to_fsm : LTS.t -> FSM.t
+  end
+
+  module Convert : SConvert
 end
 
-module Make (T : Term.TYPE) : TYPE = struct
-  module T : Term.TYPE = T
+module Make (E : Encoding.SEncoding) : S with module Enc = E = struct
+  module Enc : Encoding.SEncoding with type t = E.t = E
+  module Tree : Enc_tree.S with type Enc.t = E.t = Enc_tree.Make (E)
+  module Trees : Set.S with type elt = Tree.t = Set.Make (Tree)
 
   (* *)
   module type SState = sig
@@ -377,15 +417,15 @@ module Make (T : Term.TYPE) : TYPE = struct
   end
 
   (* *)
-  module CTree : Constructor.Tree.TYPE = Constructor.Tree.Make (T)
-  module CTrees : Set.S with type elt = CTree.t = Set.Make (CTree)
+  (* module Tree : Constructor.Tree.TYPE = Constructor.Tree.Make (T) *)
+  (* module Trees : Set.S with type elt = Tree.t = Set.Make (Tree) *)
 
   (* *)
   module type SNote = sig
     type t =
       { from : State.t
       ; label : Label.t
-      ; using : CTrees.t
+      ; using : Trees.t
       ; goto : State.t
       }
 
@@ -399,7 +439,7 @@ module Make (T : Term.TYPE) : TYPE = struct
     type t =
       { from : State.t
       ; label : Label.t
-      ; using : CTrees.t
+      ; using : Trees.t
       ; goto : State.t
       }
 
@@ -407,7 +447,7 @@ module Make (T : Term.TYPE) : TYPE = struct
       State.equal a.from b.from
       && State.equal a.goto b.goto
       && Label.equal a.label b.label
-      && CTrees.equal a.using b.using
+      && Trees.equal a.using b.using
     ;;
 
     let compare (a : t) (b : t) : int =
@@ -415,7 +455,7 @@ module Make (T : Term.TYPE) : TYPE = struct
         [ State.compare a.from b.from
         ; State.compare a.goto b.goto
         ; Label.compare a.label b.label
-        ; CTrees.compare a.using b.using
+        ; Trees.compare a.using b.using
         ]
     ;;
 
@@ -557,7 +597,7 @@ module Make (T : Term.TYPE) : TYPE = struct
       ; goto : State.t
       ; label : Label.t
       ; annotation : Annotation.t option
-      ; constructor_trees : CTrees.t
+      ; constructor_trees : Trees.t
       }
 
     val equal : t -> t -> bool
@@ -573,7 +613,7 @@ module Make (T : Term.TYPE) : TYPE = struct
       ; goto : State.t
       ; label : Label.t
       ; annotation : Annotation.t option
-      ; constructor_trees : CTrees.t
+      ; constructor_trees : Trees.t
       }
 
     let equal (a : t) (b : t) : bool =
@@ -581,7 +621,7 @@ module Make (T : Term.TYPE) : TYPE = struct
       && State.equal a.goto b.goto
       && Label.equal a.label b.label
       && Option.equal Annotation.equal a.annotation b.annotation
-      && CTrees.equal a.constructor_trees b.constructor_trees
+      && Trees.equal a.constructor_trees b.constructor_trees
     ;;
 
     let compare (a : t) (b : t) : int =
@@ -590,7 +630,7 @@ module Make (T : Term.TYPE) : TYPE = struct
         ; State.compare a.goto b.goto
         ; Label.compare a.label b.label
         ; Option.compare Annotation.compare a.annotation b.annotation
-        ; CTrees.compare a.constructor_trees b.constructor_trees
+        ; Trees.compare a.constructor_trees b.constructor_trees
         ]
     ;;
 
@@ -610,8 +650,8 @@ module Make (T : Term.TYPE) : TYPE = struct
           , Utils.Strfy.option (Of Annotation.to_string) x.annotation )
         ; ( "constructor_trees"
           , Utils.Strfy.list
-              (Of CTree.to_string)
-              (CTrees.to_list x.constructor_trees) )
+              (Of Tree.to_string)
+              (Trees.to_list x.constructor_trees) )
         ]
     ;;
   end
@@ -642,7 +682,7 @@ module Make (T : Term.TYPE) : TYPE = struct
     type t =
       { label : Label.t
       ; annotation : Annotation.t option
-      ; constructor_trees : CTrees.t
+      ; constructor_trees : Trees.t
       }
 
     val wk_equal : t -> t -> bool
@@ -658,7 +698,7 @@ module Make (T : Term.TYPE) : TYPE = struct
     type t =
       { label : Label.t
       ; annotation : Annotation.t option
-      ; constructor_trees : CTrees.t
+      ; constructor_trees : Trees.t
       }
 
     let wk_equal (a : t) (b : t) : bool = Label.equal a.label b.label
@@ -666,14 +706,14 @@ module Make (T : Term.TYPE) : TYPE = struct
     let equal (a : t) (b : t) : bool =
       Label.equal a.label b.label
       && Option.equal Annotation.equal a.annotation b.annotation
-      && CTrees.equal a.constructor_trees b.constructor_trees
+      && Trees.equal a.constructor_trees b.constructor_trees
     ;;
 
     let compare (a : t) (b : t) : int =
       Utils.compare_chain
         [ Label.compare a.label b.label
         ; Option.compare Annotation.compare a.annotation b.annotation
-        ; CTrees.compare a.constructor_trees b.constructor_trees
+        ; Trees.compare a.constructor_trees b.constructor_trees
         ]
     ;;
 
@@ -692,8 +732,8 @@ module Make (T : Term.TYPE) : TYPE = struct
           , Utils.Strfy.option (Of Annotation.to_string) x.annotation )
         ; ( "constructor_trees"
           , Utils.Strfy.list
-              (Of CTree.to_string)
-              (CTrees.to_list x.constructor_trees) )
+              (Of Tree.to_string)
+              (Trees.to_list x.constructor_trees) )
         ]
     ;;
   end
@@ -1064,6 +1104,8 @@ module Make (T : Term.TYPE) : TYPE = struct
       ; edges : EdgeMap.t
       ; info : Info.t
       }
+
+    val to_string : t -> string
   end
 
   module FSM : SFSM = struct

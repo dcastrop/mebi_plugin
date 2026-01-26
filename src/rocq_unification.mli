@@ -3,8 +3,8 @@ module type S = sig
 
   module type SPair = sig
     type t =
-      { to_check : Evd.econstr
-      ; acc : Evd.econstr
+      { to_check : EConstr.t
+      ; acc : EConstr.t
       }
 
     val to_string : Environ.env -> Evd.evar_map -> t -> string
@@ -12,8 +12,8 @@ module type S = sig
     val make
       :  Environ.env
       -> Evd.evar_map
-      -> Evd.econstr
-      -> Evd.econstr
+      -> EConstr.t
+      -> EConstr.t
       -> Evd.evar_map * t
 
     val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
@@ -64,7 +64,7 @@ module type S = sig
       -> t
       -> Evd.econstr
       -> Evd.econstr
-      -> M.Enc.t * Problems.t list
+      -> M.B.key * Problems.t list
       -> t M.mm
   end
 
