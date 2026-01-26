@@ -240,7 +240,6 @@ module Problems = struct
         (act : EConstr.t)
         (goto : EConstr.t)
         ({ sigma = psigma; to_unify } : t)
-    : (EConstr.t * EConstr.t * Mebi_constr.Tree.t list) option mm
     =
     Log.trace __FUNCTION__;
     let* () = debug_econstr ~__FUNCTION__ "act" act in
