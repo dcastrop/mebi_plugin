@@ -28,45 +28,53 @@
   rocq_utils
   rocq_convert
   theories
-  rocq_enc
-  rocq_monad
   rocq_ind
-  rocq_bindings
-  ; logging
-  ; debug
-  mebi_setup
-  ; mebi_constr
-  model_state
-  model_label
-  model_info
-  model_note
-  model_transition
-  model_transition_opt
-  model_action
-  model_edge
-  model
-  saturate_model
-  algorithms
-  mebi_tactics
-  mebi_wrapper
-  mebi_utils
-  mebi_hypothesis
-  mebi_proof
-  proof_solver
-  ; rocq_debug
-  ; params
-  mebi_weak
-  mebi_api
-  mebi_help
-  mebi_unification
-  ; mebi_debug
-  mebi_unify
-  command
-  ; examples
-  g_mebi))
+  rocq_enc
+  rocq_context
+  encoding
+  term
+  bi_encoding
+  rocq_monad
+  rocq_unification
+  ; mebi_unification
+  ;  rocq_ind
+  ;  rocq_bindings
+  ;  ; logging
+  ;  ; debug
+  ;  mebi_setup
+  ;  ; mebi_constr
+  ;  model_state
+  ;  model_label
+  ;  model_info
+  ;  model_note
+  ;  model_transition
+  ;  model_transition_opt
+  ;  model_action
+  ;  model_edge
+  ;  model
+  ;  saturate_model
+  ;  algorithms
+  ;  mebi_tactics
+  ;  mebi_wrapper
+  ;  mebi_utils
+  ;  mebi_hypothesis
+  ;  mebi_proof
+  ;  proof_solver
+  ;  ; rocq_debug
+  ;  ; params
+  ;  mebi_weak
+  ;  mebi_api
+  ;  mebi_help
+  ;  mebi_unification
+  ;  ; mebi_debug
+  ;  mebi_unify
+  ;  command
+  ;  ; examples
+  ;  g_mebi
+  ))
 
-(coq.pp ; This will let Dune know about Coq's .mlg grammar files.
- (modules g_mebi))
+;(coq.pp ; This will let Dune know about Coq's .mlg grammar files.
+; (modules g_mebi))
 
 ; (library
 ;  (name mebi_fsm)
