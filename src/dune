@@ -36,6 +36,8 @@
   bi_encoding
   rocq_monad
   rocq_unification
+  rocq_bindings
+  ; model
   ; mebi_unification
   ;  rocq_ind
   ;  rocq_bindings
