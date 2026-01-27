@@ -29,6 +29,8 @@
   rocq_convert
   theories
   rocq_ind
+  ; ; ; ; ; above be resources
+  ; ; ; ; ; below be functors
   rocq_enc
   rocq_context
   encoding
@@ -39,6 +41,21 @@
   rocq_unification
   rocq_bindings
   model
+  wrapper ; 
+  ; ; ; ; ; above be functors
+  ; ; ; ; ; below be algorithms
+  saturate
+  ; minimize
+  ; bisimilar
+  ; rocq_tactics
+  ; proof_solver
+  ; ; ; ; ; below be application
+  ; mebi_api ; stores modules created by loader, used by commands
+  ; command ; plugin i/o
+  ; ; ; ; ;
+  ; ; ; ; ;
+  ; ; ; ; ;
+  ; ; ; ; ;
   ; mebi_unification
   ;  rocq_ind
   ;  rocq_bindings
