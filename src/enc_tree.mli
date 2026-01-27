@@ -26,7 +26,9 @@ module type S = sig
 
   val min : t list -> TreeNode.t list
   val to_string : t -> string
-  val list_to_string : ?args:Utils.Strfy.style_args -> t list -> string
+
+  val list_to_string :
+    ?args:Utils.Strfy.style_args -> t list -> string
 end
 
 module Make : (E : Encoding.SEncoding) -> sig
@@ -69,5 +71,7 @@ module Make : (E : Encoding.SEncoding) -> sig
 
   val min : t list -> TreeNode.t list
   val to_string : t -> string
-  val list_to_string : ?args:Utils.Strfy.style_args -> t list -> string
+
+  val list_to_string :
+    ?args:Utils.Strfy.style_args -> t list -> string
 end

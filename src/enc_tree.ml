@@ -9,7 +9,6 @@ module type S = sig
 
   module TreeNode : STreeNode with type t = Enc.t * int
 
-  (* module type STree = sig *)
   type 'a tree = Node of 'a * 'a tree list
   type t = TreeNode.t tree
 
@@ -24,12 +23,11 @@ module type S = sig
   val min : t list -> TreeNode.t list
   val to_string : t -> string
   val list_to_string : ?args:Utils.Strfy.style_args -> t list -> string
-  (* end
-
-     module Tree : STree *)
 end
 
-module Make (E : Encoding.SEncoding) : S with type Enc.t = E.t = struct
+module Make (E : Encoding.SEncoding) :
+  S with module Enc = E and type Enc.t = E.t and type TreeNode.t = E.t * int =
+struct
   module Enc : Encoding.SEncoding with type t = E.t = E
 
   module type STreeNode = sig
@@ -46,6 +44,23 @@ module Make (E : Encoding.SEncoding) : S with type Enc.t = E.t = struct
         [ "enc", Enc.to_string enc; "index", Utils.Strfy.int index ]
     ;;
   end
+
+  (* module TreeNode : STreeNode with type t = Enc.t * int = MakeTreeNode (Enc) *)
+
+  (* module type STreeNode = sig
+     type t = Enc.t * int
+
+     val to_string : t -> string
+     end
+
+     module TreeNode : STreeNode with type t = Enc.t * int = struct
+     type t = Enc.t * int
+
+     let to_string ((enc, index) : t) : string =
+     Utils.Strfy.record
+     [ "enc", Enc.to_string enc; "index", Utils.Strfy.int index ]
+     ;;
+     end *)
 
   (* module type STree = sig
      type 'a tree = Node of 'a * 'a tree list

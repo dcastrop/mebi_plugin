@@ -9,6 +9,9 @@ module type SRocq_monad = sig
   module Context : Rocq_context.SRocq_context
   module BiEnc : Bi_encoding.S
 
+  (* module Enc : Encoding.SEncoding with type t = BiEnc.Enc.t *)
+  (* module BiEnc : Bi_encoding.S with module Enc = Enc *)
+
   (* module Constructor : Rocq_constructor.S *)
   module FwdMap : Hashtbl.S with type key = EConstr.t
   module BckMap : Hashtbl.S with type key = BiEnc.Enc.t
@@ -126,14 +129,20 @@ module type SRocq_monad = sig
 end
 
 module Make (Ctx : Rocq_context.SRocq_context) (E : Encoding.SEncoding) :
-  SRocq_monad with module BiEnc.Enc = E = struct
+  SRocq_monad
+  with module BiEnc.Enc = E
+   and type BiEnc.Enc.t = E.t
+   and module Tree.Enc = E
+   and type Tree.Enc.t = E.t
+   and type Tree.TreeNode.t = E.t * int = struct
   module Context : Rocq_context.SRocq_context = Ctx
+  module BiEnc : Bi_encoding.S with module Enc = E = Bi_encoding.Make (Ctx) (E)
 
-  module BiEnc : Bi_encoding.S with type Enc.t = E.t =
-    Bi_encoding.Make (Ctx) (E)
+  module Enc : Encoding.SEncoding with type t = E.t and type t = BiEnc.Enc.t =
+    BiEnc.Enc
 
   module FwdMap : Hashtbl.S with type key = EConstr.t = BiEnc.FwdMap
-  module BckMap : Hashtbl.S with type key = BiEnc.Enc.t = BiEnc.BckMap
+  module BckMap : Hashtbl.S with type key = Enc.t = BiEnc.BckMap
 
   type fwdmap = BiEnc.fwdmap
   type bckmap = BiEnc.bckmap
@@ -490,7 +499,7 @@ module Utils = struct
   module type S = sig
     module M : SRocq_monad
     module Enc : Encoding.SEncoding with type t = M.BiEnc.Enc.t
-    module BiEnc : Bi_encoding.S with module Enc = Enc
+    module BiEnc : Bi_encoding.S with module Enc = Enc and type Enc.t = Enc.t
     module F : Hashtbl.S with type key = EConstr.t
     module B : Hashtbl.S with type key = M.BiEnc.Enc.t
     module Syntax : M.SYNTAX
@@ -593,13 +602,32 @@ module Utils = struct
       -> Rocq_utils.constructor_args mm
   end
 
-  module Make (M : SRocq_monad) : S = struct
-    module M : SRocq_monad = M
-    module BiEnc = M.BiEnc
-    module Enc = BiEnc.Enc
+  module Make (Ctx : Rocq_context.SRocq_context) (E : Encoding.SEncoding) :
+    S
+    with module M.BiEnc.Enc = E
+     and type M.BiEnc.Enc.t = E.t
+     and module M.Tree.Enc = E
+     and type M.Tree.Enc.t = E.t
+     and type M.Tree.TreeNode.t = E.t * int = struct
+    module M :
+      SRocq_monad with module BiEnc.Enc = E and type BiEnc.Enc.t = E.t =
+      Make (Ctx) (E)
+
+    module Enc : Encoding.SEncoding with type t = E.t = M.BiEnc.Enc
+
+    module BiEnc : Bi_encoding.S with module Enc = E and type Enc.t = E.t =
+      M.BiEnc
+
     module F : Hashtbl.S with type key = EConstr.t = M.BiEnc.FwdMap
     module B : Hashtbl.S with type key = Enc.t = M.BiEnc.BckMap
-    module Tree : Enc_tree.S with type Enc.t = BiEnc.Enc.t = M.Tree
+
+    module Tree :
+      Enc_tree.S
+      with module Enc = BiEnc.Enc
+       and type Enc.t = BiEnc.Enc.t
+       and type TreeNode.t = Enc.t * int =
+      M.Tree
+
     module Constructor = M.Constructor
     module Syntax : M.SYNTAX = M.Syntax
 

@@ -1,6 +1,14 @@
 module type S = sig
-  module Enc : Encoding.SEncoding
-  module Tree : Enc_tree.S with type Enc.t = Enc.t
+  (* module Enc : Encoding.SEncoding
+
+     module Tree :
+     Enc_tree.S
+     with module Enc = Enc
+     and type Enc.t = Enc.t
+     and type TreeNode.t = Enc.t * int *)
+
+  module Tree : Enc_tree.S
+  module Enc : Encoding.SEncoding with type t = Tree.Enc.t
   module Trees : Set.S with type elt = Tree.t
 
   (* *)
@@ -221,7 +229,7 @@ module type S = sig
   module EdgeMap : SEdgeMap
 
   (* *)
-  module type SParitition = sig
+  module type SPartition = sig
     module S : Set.S with type elt = States.t
 
     type t = S.t
@@ -230,7 +238,7 @@ module type S = sig
     val to_string : t -> string
   end
 
-  module Paritition : SParitition
+  module Partition : SPartition
 
   (* *)
   module type SInfo = sig
@@ -299,11 +307,34 @@ module type S = sig
   end
 
   module Convert : SConvert
+
+  (* *)
+  (* module type SMerge = sig
+    val trees : Tree.t list -> Tree.t list -> Tree.t list
+  end
+
+  module Merge : SMerge *)
 end
 
-module Make (E : Encoding.SEncoding) : S with module Enc = E = struct
-  module Enc : Encoding.SEncoding with type t = E.t = E
-  module Tree : Enc_tree.S with type Enc.t = E.t = Enc_tree.Make (E)
+module Make (E : Encoding.SEncoding) :
+  S
+  with module Tree.Enc = E
+   and type Tree.Enc.t = E.t
+   and module Enc = E
+   and type Enc.t = E.t = struct
+  (* with module Enc = E
+     and type Enc.t = E.t
+     and module Tree.Enc = E
+     and type Tree.Enc.t = E.t = struct *)
+
+  module Tree :
+    Enc_tree.S
+    with module Enc = E
+     and type Enc.t = E.t
+     and type TreeNode.t = E.t * int =
+    Enc_tree.Make (E)
+
+  module Enc : Encoding.SEncoding with type t = E.t and type t = Tree.Enc.t = E
   module Trees : Set.S with type elt = Tree.t = Set.Make (Tree)
 
   (* *)
@@ -945,7 +976,7 @@ module Make (E : Encoding.SEncoding) : S with module Enc = E = struct
   end
 
   (* *)
-  module type SParitition = sig
+  module type SPartition = sig
     module S : Set.S with type elt = States.t
 
     type t = S.t
@@ -954,7 +985,7 @@ module Make (E : Encoding.SEncoding) : S with module Enc = E = struct
     val to_string : t -> string
   end
 
-  module Paritition : SParitition = struct
+  module Partition : SPartition = struct
     module S : Set.S with type elt = States.t = Set.Make (States.S)
 
     type t = S.t
@@ -970,7 +1001,7 @@ module Make (E : Encoding.SEncoding) : S with module Enc = E = struct
     let to_string (xs : t) : string =
       S.to_list xs
       |> Utils.Strfy.list
-           ~args:{ (Utils.Strfy.style_args ()) with name = Some "Paritition" }
+           ~args:{ (Utils.Strfy.style_args ()) with name = Some "Partition" }
            (Of States.to_string)
     ;;
   end
@@ -1163,4 +1194,19 @@ module Make (E : Encoding.SEncoding) : S with module Enc = E = struct
       }
     ;;
   end
+
+  (* *)
+  (* module type SMerge = sig
+    val trees : Tree.t list -> Tree.t list -> Tree.t list
+  end
+
+  module Merge : SMerge = struct
+    let trees (xs : Tree.t list) (ys : Tree.t list) : Tree.t list =
+      List.fold_left
+        (fun (acc : Tree.t list) (y : Tree.t) ->
+          if List.mem y acc then acc else y :: acc)
+        xs
+        ys
+    ;;
+  end *)
 end

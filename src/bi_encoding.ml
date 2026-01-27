@@ -33,7 +33,7 @@ module type S = sig
 end
 
 module Make (Ctx : Rocq_context.SRocq_context) (E : Encoding.SEncoding) :
-  S with module Enc = E = struct
+  S with module Enc = E and type Enc.t = E.t = struct
   module Enc : Encoding.SEncoding with type t = E.t = E
 
   module FwdMap : Hashtbl.S with type key = EConstr.t =

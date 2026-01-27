@@ -1,47 +1,18 @@
 module type S = sig
-  module Enc : Encoding.SEncoding
+  module Tree : Enc_tree.S
 
-  module Tree : sig
-    module Enc : sig
-      type t = Enc.t
+  module Enc : sig
+    type t = Tree.Enc.t
 
-      val init : t
-      val next : t -> t
-      val equal : t -> t -> bool
-      val compare : t -> t -> int
-      val hash : t -> int
-      val to_string : t -> string
-      val counter : t ref
-      val reset : unit -> unit
-      val incr : unit -> t
-    end
-
-    module type STreeNode = sig
-      type t = Enc.t * int
-
-      val to_string : t -> string
-    end
-
-    module TreeNode : sig
-      type t = Enc.t * int
-
-      val to_string : t -> string
-    end
-
-    type 'a tree = Node of 'a * 'a tree list
-    type t = TreeNode.t tree
-
-    val add : t -> t -> t
-    val add_list : t -> t list -> t list
+    val init : t
+    val next : t -> t
     val equal : t -> t -> bool
     val compare : t -> t -> int
-    val minimize : t -> TreeNode.t list
-
-    exception CannotMinimizeEmptyList of unit
-
-    val min : t list -> TreeNode.t list
+    val hash : t -> int
     val to_string : t -> string
-    val list_to_string : ?args:Utils.Strfy.style_args -> t list -> string
+    val counter : t ref
+    val reset : unit -> unit
+    val incr : unit -> t
   end
 
   module Trees : sig
@@ -94,10 +65,7 @@ module type S = sig
   end
 
   module type SState = sig
-    type t =
-      { term : Enc.t
-      ; pp : string option
-      }
+    type t = { term : Enc.t; pp : string option }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -165,10 +133,7 @@ module type S = sig
   module States : SStates
 
   module type SLabel = sig
-    type t =
-      { term : Enc.t
-      ; is_silent : bool option
-      }
+    type t = { term : Enc.t; is_silent : bool option }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -237,12 +202,12 @@ module type S = sig
   module Labels : SLabels
 
   module type SNote = sig
-    type t =
-      { from : State.t
-      ; label : Label.t
-      ; using : Trees.t
-      ; goto : State.t
-      }
+    type t = {
+      from : State.t;
+      label : Label.t;
+      using : Trees.t;
+      goto : State.t;
+    }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -253,10 +218,7 @@ module type S = sig
   module Note : SNote
 
   module type SAnnotation = sig
-    type t =
-      { this : Note.t
-      ; next : t option
-      }
+    type t = { this : Note.t; next : t option }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -277,13 +239,13 @@ module type S = sig
   module Annotation : SAnnotation
 
   module type STransition = sig
-    type t =
-      { from : State.t
-      ; goto : State.t
-      ; label : Label.t
-      ; annotation : Annotation.t option
-      ; constructor_trees : Trees.t
-      }
+    type t = {
+      from : State.t;
+      goto : State.t;
+      label : Label.t;
+      annotation : Annotation.t option;
+      constructor_trees : Trees.t;
+    }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -408,11 +370,11 @@ module type S = sig
   module Transitions : STransitions
 
   module type SAction = sig
-    type t =
-      { label : Label.t
-      ; annotation : Annotation.t option
-      ; constructor_trees : Trees.t
-      }
+    type t = {
+      label : Label.t;
+      annotation : Annotation.t option;
+      constructor_trees : Trees.t;
+    }
 
     val wk_equal : t -> t -> bool
     val equal : t -> t -> bool
@@ -500,8 +462,13 @@ module type S = sig
       val replace : 'a t -> key -> 'a -> unit
       val mem : 'a t -> key -> bool
       val iter : (key -> 'a -> unit) -> 'a t -> unit
-      val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-      val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+      val filter_map_inplace :
+        (key -> 'a -> 'a option) -> 'a t -> unit
+
+      val fold :
+        (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
       val length : 'a t -> int
       val stats : 'a t -> Hashtbl.statistics
       val to_seq : 'a t -> (key * 'a) Seq.t
@@ -522,11 +489,11 @@ module type S = sig
   module ActionMap : SActionMap
 
   module type SEdge = sig
-    type t =
-      { from : State.t
-      ; goto : State.t
-      ; action : Action.t
-      }
+    type t = {
+      from : State.t;
+      goto : State.t;
+      action : Action.t;
+    }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -611,8 +578,13 @@ module type S = sig
       val replace : 'a t -> key -> 'a -> unit
       val mem : 'a t -> key -> bool
       val iter : (key -> 'a -> unit) -> 'a t -> unit
-      val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-      val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+      val filter_map_inplace :
+        (key -> 'a -> 'a option) -> 'a t -> unit
+
+      val fold :
+        (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
       val length : 'a t -> int
       val stats : 'a t -> Hashtbl.statistics
       val to_seq : 'a t -> (key * 'a) Seq.t
@@ -634,7 +606,7 @@ module type S = sig
 
   module EdgeMap : SEdgeMap
 
-  module type SParitition = sig
+  module type SPartition = sig
     module S : sig
       type elt = States.t
       type t
@@ -690,29 +662,24 @@ module type S = sig
     val to_string : t -> string
   end
 
-  module Paritition : SParitition
+  module Partition : SPartition
 
   module type SInfo = sig
-    type t =
-      { meta : meta option
-      ; weak_labels : Labels.t
-      }
+    type t = { meta : meta option; weak_labels : Labels.t }
 
-    and meta =
-      { is_complete : bool
-      ; is_merged : bool
-      ; bounds : bounds
-      ; lts : lts list
-      }
+    and meta = {
+      is_complete : bool;
+      is_merged : bool;
+      bounds : bounds;
+      lts : lts list;
+    }
 
-    and bounds =
-      | States of int
-      | Transitions of int
+    and bounds = States of int | Transitions of int
 
-    and lts =
-      { enc : Enc.t
-      ; constructors : Rocq_bindings.constructor list
-      }
+    and lts = {
+      enc : Enc.t;
+      constructors : Rocq_bindings.constructor list;
+    }
 
     val to_string : t -> string
   end
@@ -720,14 +687,14 @@ module type S = sig
   module Info : SInfo
 
   module type SLTS = sig
-    type t =
-      { init : State.t option
-      ; terminals : States.t
-      ; alphabet : Labels.t
-      ; states : States.t
-      ; transitions : Transitions.t
-      ; info : Info.t
-      }
+    type t = {
+      init : State.t option;
+      terminals : States.t;
+      alphabet : Labels.t;
+      states : States.t;
+      transitions : Transitions.t;
+      info : Info.t;
+    }
 
     val to_string : t -> string
   end
@@ -735,14 +702,14 @@ module type S = sig
   module LTS : SLTS
 
   module type SFSM = sig
-    type t =
-      { init : State.t option
-      ; terminals : States.t
-      ; alphabet : Labels.t
-      ; states : States.t
-      ; edges : EdgeMap.t
-      ; info : Info.t
-      }
+    type t = {
+      init : State.t option;
+      terminals : States.t;
+      alphabet : Labels.t;
+      states : States.t;
+      edges : EdgeMap.t;
+      info : Info.t;
+    }
 
     val to_string : t -> string
   end
@@ -758,20 +725,6 @@ module type S = sig
 end
 
 module Make : (E : Encoding.SEncoding) -> sig
-  module Enc : sig
-    type t = E.t
-
-    val init : t
-    val next : t -> t
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val hash : t -> int
-    val to_string : t -> string
-    val counter : t ref
-    val reset : unit -> unit
-    val incr : unit -> t
-  end
-
   module Tree : sig
     module Enc : sig
       type t = E.t
@@ -812,7 +765,23 @@ module Make : (E : Encoding.SEncoding) -> sig
 
     val min : t list -> TreeNode.t list
     val to_string : t -> string
-    val list_to_string : ?args:Utils.Strfy.style_args -> t list -> string
+
+    val list_to_string :
+      ?args:Utils.Strfy.style_args -> t list -> string
+  end
+
+  module Enc : sig
+    type t = E.t
+
+    val init : t
+    val next : t -> t
+    val equal : t -> t -> bool
+    val compare : t -> t -> int
+    val hash : t -> int
+    val to_string : t -> string
+    val counter : t ref
+    val reset : unit -> unit
+    val incr : unit -> t
   end
 
   module Trees : sig
@@ -865,10 +834,7 @@ module Make : (E : Encoding.SEncoding) -> sig
   end
 
   module type SState = sig
-    type t =
-      { term : E.t
-      ; pp : string option
-      }
+    type t = { term : E.t; pp : string option }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -936,10 +902,7 @@ module Make : (E : Encoding.SEncoding) -> sig
   module States : SStates
 
   module type SLabel = sig
-    type t =
-      { term : E.t
-      ; is_silent : bool option
-      }
+    type t = { term : E.t; is_silent : bool option }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -1008,12 +971,12 @@ module Make : (E : Encoding.SEncoding) -> sig
   module Labels : SLabels
 
   module type SNote = sig
-    type t =
-      { from : State.t
-      ; label : Label.t
-      ; using : Trees.t
-      ; goto : State.t
-      }
+    type t = {
+      from : State.t;
+      label : Label.t;
+      using : Trees.t;
+      goto : State.t;
+    }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -1024,10 +987,7 @@ module Make : (E : Encoding.SEncoding) -> sig
   module Note : SNote
 
   module type SAnnotation = sig
-    type t =
-      { this : Note.t
-      ; next : t option
-      }
+    type t = { this : Note.t; next : t option }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -1048,13 +1008,13 @@ module Make : (E : Encoding.SEncoding) -> sig
   module Annotation : SAnnotation
 
   module type STransition = sig
-    type t =
-      { from : State.t
-      ; goto : State.t
-      ; label : Label.t
-      ; annotation : Annotation.t option
-      ; constructor_trees : Trees.t
-      }
+    type t = {
+      from : State.t;
+      goto : State.t;
+      label : Label.t;
+      annotation : Annotation.t option;
+      constructor_trees : Trees.t;
+    }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -1179,11 +1139,11 @@ module Make : (E : Encoding.SEncoding) -> sig
   module Transitions : STransitions
 
   module type SAction = sig
-    type t =
-      { label : Label.t
-      ; annotation : Annotation.t option
-      ; constructor_trees : Trees.t
-      }
+    type t = {
+      label : Label.t;
+      annotation : Annotation.t option;
+      constructor_trees : Trees.t;
+    }
 
     val wk_equal : t -> t -> bool
     val equal : t -> t -> bool
@@ -1271,8 +1231,13 @@ module Make : (E : Encoding.SEncoding) -> sig
       val replace : 'a t -> key -> 'a -> unit
       val mem : 'a t -> key -> bool
       val iter : (key -> 'a -> unit) -> 'a t -> unit
-      val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-      val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+      val filter_map_inplace :
+        (key -> 'a -> 'a option) -> 'a t -> unit
+
+      val fold :
+        (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
       val length : 'a t -> int
       val stats : 'a t -> Hashtbl.statistics
       val to_seq : 'a t -> (key * 'a) Seq.t
@@ -1293,11 +1258,11 @@ module Make : (E : Encoding.SEncoding) -> sig
   module ActionMap : SActionMap
 
   module type SEdge = sig
-    type t =
-      { from : State.t
-      ; goto : State.t
-      ; action : Action.t
-      }
+    type t = {
+      from : State.t;
+      goto : State.t;
+      action : Action.t;
+    }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -1382,8 +1347,13 @@ module Make : (E : Encoding.SEncoding) -> sig
       val replace : 'a t -> key -> 'a -> unit
       val mem : 'a t -> key -> bool
       val iter : (key -> 'a -> unit) -> 'a t -> unit
-      val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-      val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+      val filter_map_inplace :
+        (key -> 'a -> 'a option) -> 'a t -> unit
+
+      val fold :
+        (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
       val length : 'a t -> int
       val stats : 'a t -> Hashtbl.statistics
       val to_seq : 'a t -> (key * 'a) Seq.t
@@ -1405,7 +1375,7 @@ module Make : (E : Encoding.SEncoding) -> sig
 
   module EdgeMap : SEdgeMap
 
-  module type SParitition = sig
+  module type SPartition = sig
     module S : sig
       type elt = States.t
       type t
@@ -1461,29 +1431,24 @@ module Make : (E : Encoding.SEncoding) -> sig
     val to_string : t -> string
   end
 
-  module Paritition : SParitition
+  module Partition : SPartition
 
   module type SInfo = sig
-    type t =
-      { meta : meta option
-      ; weak_labels : Labels.t
-      }
+    type t = { meta : meta option; weak_labels : Labels.t }
 
-    and meta =
-      { is_complete : bool
-      ; is_merged : bool
-      ; bounds : bounds
-      ; lts : lts list
-      }
+    and meta = {
+      is_complete : bool;
+      is_merged : bool;
+      bounds : bounds;
+      lts : lts list;
+    }
 
-    and bounds =
-      | States of int
-      | Transitions of int
+    and bounds = States of int | Transitions of int
 
-    and lts =
-      { enc : E.t
-      ; constructors : Rocq_bindings.constructor list
-      }
+    and lts = {
+      enc : E.t;
+      constructors : Rocq_bindings.constructor list;
+    }
 
     val to_string : t -> string
   end
@@ -1491,14 +1456,14 @@ module Make : (E : Encoding.SEncoding) -> sig
   module Info : SInfo
 
   module type SLTS = sig
-    type t =
-      { init : State.t option
-      ; terminals : States.t
-      ; alphabet : Labels.t
-      ; states : States.t
-      ; transitions : Transitions.t
-      ; info : Info.t
-      }
+    type t = {
+      init : State.t option;
+      terminals : States.t;
+      alphabet : Labels.t;
+      states : States.t;
+      transitions : Transitions.t;
+      info : Info.t;
+    }
 
     val to_string : t -> string
   end
@@ -1506,14 +1471,14 @@ module Make : (E : Encoding.SEncoding) -> sig
   module LTS : SLTS
 
   module type SFSM = sig
-    type t =
-      { init : State.t option
-      ; terminals : States.t
-      ; alphabet : Labels.t
-      ; states : States.t
-      ; edges : EdgeMap.t
-      ; info : Info.t
-      }
+    type t = {
+      init : State.t option;
+      terminals : States.t;
+      alphabet : Labels.t;
+      states : States.t;
+      edges : EdgeMap.t;
+      info : Info.t;
+    }
 
     val to_string : t -> string
   end
