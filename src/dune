@@ -50,7 +50,7 @@
   ; rocq_tactics
   ; proof_solver
   ; ; ; ; ; below be application
-  ; mebi_api ; stores modules created by loader, used by commands
+  ; mebi_api ; stores modules created by [loader.v], used by commands
   ; command ; plugin i/o
   ; ; ; ; ;
   ; ; ; ; ;
