@@ -45,8 +45,8 @@
   ; ; ; ; ; above be functors
   ; ; ; ; ; below be algorithms
   saturate
-  ; minimize
-  ; bisimilar
+  minimize
+  bisimilar
   ; rocq_tactics
   ; proof_solver
   ; ; ; ; ; below be application
