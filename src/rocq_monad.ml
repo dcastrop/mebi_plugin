@@ -1,11 +1,11 @@
 (***********************************************************************)
-module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+(* module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
 
 let () = Log.Config.configure_output Debug false
-let () = Log.Config.configure_output Trace false
+let () = Log.Config.configure_output Trace false *)
 (***********************************************************************)
 
-module type SRocq_monad = sig
+(* module type SRocq_monad = sig
   module Context : Rocq_context.SRocq_context
   module BiEnc : Bi_encoding.S
 
@@ -126,39 +126,52 @@ module type SRocq_monad = sig
 
   val make_state_tree_pair_set
     : (module Set.S with type elt = BiEnc.Enc.t * Constructor.Tree.t)
-end
+end *)
 
-module Make (Ctx : Rocq_context.SRocq_context) (E : Encoding.SEncoding) :
-  SRocq_monad
-  with module BiEnc.Enc = E
-   and type BiEnc.Enc.t = E.t
-   and module Tree.Enc = E
-   and type Tree.Enc.t = E.t
-   and type Tree.TreeNode.t = E.t * int = struct
-  module Context : Rocq_context.SRocq_context = Ctx
-  module BiEnc : Bi_encoding.S with module Enc = E = Bi_encoding.Make (Ctx) (E)
+module Make
+    (Ctx : Rocq_context.SRocq_context)
+    (Enc : Encoding.SEncoding)
+     (* : *)
+     (* SRocq_monad *)
+     (* with module BiEnc.Enc = E *)
+     (* and type BiEnc.Enc.t = E.t *)
+     (* and module Tree.Enc = E *)
+     (* and type Tree.Enc.t = E.t *)
+     (* and type Tree.TreeNode.t = E.t * int  *) =
+struct
+  module Ctx : Rocq_context.SRocq_context = Ctx
+  module Enc : Encoding.SEncoding = Enc
 
-  module Enc : Encoding.SEncoding with type t = E.t and type t = BiEnc.Enc.t =
-    BiEnc.Enc
+  (* module *)
+  (* BiEnc *)
+  (* : Bi_encoding.S *)
+  (* with module Enc = Enc and type Enc.t = Enc.t *)
+  (* = *)
+  include Bi_encoding.Make (Ctx) (Enc)
 
-  module FwdMap : Hashtbl.S with type key = EConstr.t = BiEnc.FwdMap
-  module BckMap : Hashtbl.S with type key = Enc.t = BiEnc.BckMap
+  (* module
+     Enc
+     (* : Encoding.SEncoding with type t = Enc.t and type t = BiEnc.Enc.t *) =
+     BiEnc.Enc *)
 
-  type fwdmap = BiEnc.fwdmap
-  type bckmap = BiEnc.bckmap
-  type maps = BiEnc.maps
+  (* module F = BiEnc.FwdMap *)
+  (* module B = BiEnc.BckMap *)
 
-  let encode : EConstr.t -> BiEnc.Enc.t = BiEnc.encode
-  let encoded : EConstr.t -> bool = BiEnc.encoded
-  let decode : BiEnc.Enc.t -> EConstr.t = BiEnc.decode
-  let decode_opt : BiEnc.Enc.t -> EConstr.t option = BiEnc.decode_opt
-  let bienc_to_list : unit -> (BiEnc.Enc.t * EConstr.t) list = BiEnc.to_list
+  (* type fwdmap = BiEnc.fwdmap *)
+  (* type bckmap = BiEnc.bckmap *)
+  (* type maps = BiEnc.maps *)
+
+  (* let encode : EConstr.t -> Enc.t = BiEnc.encode *)
+  (* let encoded : EConstr.t -> bool = BiEnc.encoded *)
+  (* let decode : Enc.t -> EConstr.t = BiEnc.decode *)
+  (* let decode_opt : Enc.t -> EConstr.t option = BiEnc.decode_opt *)
+  let bienc_to_list : unit -> (Enc.t * EConstr.t) list = to_list
 
   type 'a mm = wrapper ref -> 'a in_wrapper
 
   and wrapper =
     { ctx : Rocq_context.t ref
-    ; maps : BiEnc.maps ref
+    ; maps : maps ref
     }
 
   and 'a in_wrapper =
@@ -168,10 +181,8 @@ module Make (Ctx : Rocq_context.SRocq_context) (E : Encoding.SEncoding) :
 
   (* *)
   let run ?(reset_encoding : bool = false) (x : 'a mm) : 'a =
-    BiEnc.reset ();
-    let a : 'a in_wrapper =
-      x (ref { ctx = Ctx.get (); maps = BiEnc.the_maps () })
-    in
+    reset ();
+    let a : 'a in_wrapper = x (ref { ctx = Ctx.get (); maps = the_maps () }) in
     a.value
   ;;
 
@@ -288,15 +299,15 @@ module Make (Ctx : Rocq_context.SRocq_context) (E : Encoding.SEncoding) :
   ;;
 
   (* *)
-  let get_maps (st : wrapper ref) : BiEnc.maps in_wrapper =
+  let get_maps (st : wrapper ref) : maps in_wrapper =
     { state = st; value = !(!st.maps) }
   ;;
 
-  let get_fwdmap (st : wrapper ref) : fwdmap in_wrapper =
+  let get_fwdmap (st : wrapper ref) : Enc.t F.t in_wrapper =
     { state = st; value = !(!st.maps).fwd }
   ;;
 
-  let get_bckmap (st : wrapper ref) : bckmap in_wrapper =
+  let get_bckmap (st : wrapper ref) : EConstr.t B.t in_wrapper =
     { state = st; value = !(!st.maps).bck }
   ;;
 
@@ -421,8 +432,8 @@ module Make (Ctx : Rocq_context.SRocq_context) (E : Encoding.SEncoding) :
     ;;
   end *)
 
-  module Tree : Enc_tree.S with type Enc.t = BiEnc.Enc.t =
-    Enc_tree.Make (BiEnc.Enc)
+  module Tree (* : Enc_tree.S with type Enc.t = BiEnc.Enc.t *) =
+    Enc_tree.Make (Enc)
 
   (* module type SConstructor = sig *)
   (* module type STreeNode = sig
@@ -450,16 +461,17 @@ module Make (Ctx : Rocq_context.SRocq_context) (E : Encoding.SEncoding) :
      val list_to_string : ?args:Utils.Strfy.style_args -> t list -> string
      end *)
 
-  module type SConstructor = sig
-    module Tree : Enc_tree.S with type Enc.t = BiEnc.Enc.t
+  (* module type SConstructor = sig
+     (* module Tree : Enc_tree.S with type Enc.t = BiEnc.Enc.t *)
 
-    type t = EConstr.t * EConstr.t * Tree.t
+     type t = EConstr.t * EConstr.t * Tree.t
 
-    val to_string : Environ.env -> Evd.evar_map -> t -> string
-  end
+     val to_string : Environ.env -> Evd.evar_map -> t -> string
+     end *)
 
-  module Constructor : SConstructor with type Tree.Enc.t = BiEnc.Enc.t = struct
-    module Tree : Enc_tree.S with type Enc.t = BiEnc.Enc.t = Tree
+  module Constructor (* : SConstructor with type Tree.Enc.t = BiEnc.Enc.t *) =
+  struct
+    (* module Tree : Enc_tree.S with type Enc.t = BiEnc.Enc.t = Tree *)
 
     type t = EConstr.t * EConstr.t * Tree.t
 
@@ -477,17 +489,13 @@ module Make (Ctx : Rocq_context.SRocq_context) (E : Encoding.SEncoding) :
     ;;
   end
 
-  let make_state_tree_pair_set
-    : (module Set.S with type elt = BiEnc.Enc.t * Constructor.Tree.t)
-    =
+  let make_state_tree_pair_set : (module Set.S with type elt = Enc.t * Tree.t) =
     (module Set.Make (struct
-         type t = BiEnc.Enc.t * Constructor.Tree.t
+         type t = Enc.t * Tree.t
 
          let compare t1 t2 =
            Utils.compare_chain
-             [ BiEnc.Enc.compare (fst t1) (fst t2)
-             ; Constructor.Tree.compare (snd t1) (snd t2)
-             ]
+             [ Enc.compare (fst t1) (fst t2); Tree.compare (snd t1) (snd t2) ]
          ;;
        end))
   ;;
@@ -495,354 +503,368 @@ end
 
 (***********************************************************************)
 
-module Utils = struct
-  module type S = sig
-    module M : SRocq_monad
-    module Enc : Encoding.SEncoding with type t = M.BiEnc.Enc.t
-    module BiEnc : Bi_encoding.S with module Enc = Enc and type Enc.t = Enc.t
-    module F : Hashtbl.S with type key = EConstr.t
-    module B : Hashtbl.S with type key = M.BiEnc.Enc.t
-    module Syntax : M.SYNTAX
-    module Tree : Enc_tree.S with type Enc.t = BiEnc.Enc.t
-    module Constructor : M.SConstructor with type Tree.Enc.t = Enc.t
+(* module Utils = struct
+   (* module type S = sig
+   module M : SRocq_monad
+   module Enc : Encoding.SEncoding with type t = M.BiEnc.Enc.t
+   module BiEnc : Bi_encoding.S with module Enc = Enc and type Enc.t = Enc.t
+   module F : Hashtbl.S with type key = EConstr.t
+   module B : Hashtbl.S with type key = M.BiEnc.Enc.t
+   module Syntax : M.SYNTAX
+   module Tree : Enc_tree.S with type Enc.t = BiEnc.Enc.t
+   module Constructor : M.SConstructor with type Tree.Enc.t = Enc.t
 
-    type 'a mm = 'a M.mm
-    type 'a in_wrapper = 'a M.in_wrapper
-    type wrapper = M.wrapper
+   type 'a mm = 'a M.mm
+   type 'a in_wrapper = 'a M.in_wrapper
+   type wrapper = M.wrapper
 
-    val env : unit -> Environ.env mm
-    val sigma : unit -> Evd.evar_map mm
-    val run : ?reset_encoding:bool -> 'a mm -> 'a
-    val return : 'a -> 'a mm
-    val iterate : int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
+   val env : unit -> Environ.env mm
+   val sigma : unit -> Evd.evar_map mm
+   val run : ?reset_encoding:bool -> 'a mm -> 'a
+   val return : 'a -> 'a mm
+   val iterate : int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
 
-    val state
-      :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-      -> wrapper ref
-      -> 'a in_wrapper
+   val state
+   :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+   -> wrapper ref
+   -> 'a in_wrapper
 
-    val sandbox : ?sigma:Evd.evar_map -> 'a mm -> wrapper ref -> 'a in_wrapper
-    val fresh_evar : Rocq_utils.evar_source -> EConstr.t mm
-    val econstr_eq : EConstr.t -> EConstr.t -> bool mm
-    val econstr_normalize : EConstr.t -> EConstr.t mm
-    val econstr_is_evar : EConstr.t -> bool mm
+   val sandbox : ?sigma:Evd.evar_map -> 'a mm -> wrapper ref -> 'a in_wrapper
+   val fresh_evar : Rocq_utils.evar_source -> EConstr.t mm
+   val econstr_eq : EConstr.t -> EConstr.t -> bool mm
+   val econstr_normalize : EConstr.t -> EConstr.t mm
+   val econstr_is_evar : EConstr.t -> bool mm
 
-    val econstr_to_constr
-      :  ?abort_on_undefined_evars:bool
-      -> EConstr.t
-      -> Constr.t mm
+   val econstr_to_constr
+   :  ?abort_on_undefined_evars:bool
+   -> EConstr.t
+   -> Constr.t mm
 
-    val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
-    val econstr_kind : EConstr.t -> Rocq_utils.econstr_kind mm
+   val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
+   val econstr_kind : EConstr.t -> Rocq_utils.econstr_kind mm
 
-    module type SStrfy = sig
-      val mm : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
-      val econstr : EConstr.t -> string
-      val econstr_rel_decl : EConstr.rel_declaration -> string
-    end
+   module type SStrfy = sig
+   val mm : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
+   val econstr : EConstr.t -> string
+   val econstr_rel_decl : EConstr.rel_declaration -> string
+   end
 
-    module Strfy : SStrfy
+   module Strfy : SStrfy
 
-    module type SErrors = sig
-      type t =
-        (* NOTE: *)
-        | Invalid_Sort_LTS of Sorts.family
-        | Invalid_Sort_Type of Sorts.family
-        (* NOTE: *)
-        | InvalidCheckUpdatedCtx of
-            (Environ.env
-            * Evd.evar_map
-            * EConstr.t list
-            * EConstr.rel_declaration list)
-          (* NOTE: *)
-        | InvalidLTSArgsLength of int
-        | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
+   module type SErrors = sig
+   type t =
+   (* NOTE: *)
+   | Invalid_Sort_LTS of Sorts.family
+   | Invalid_Sort_Type of Sorts.family
+   (* NOTE: *)
+   | InvalidCheckUpdatedCtx of
+   (Environ.env
+   * Evd.evar_map
+   * EConstr.t list
+   * EConstr.rel_declaration list)
+   (* NOTE: *)
+   | InvalidLTSArgsLength of int
+   | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
 
-      exception MEBI_exn of t
+   exception MEBI_exn of t
 
-      (* NOTE: *)
-      val invalid_sort_lts : Sorts.family -> exn
-      val invalid_sort_type : Sorts.family -> exn
+   (* NOTE: *)
+   val invalid_sort_lts : Sorts.family -> exn
+   val invalid_sort_type : Sorts.family -> exn
 
-      (* NOTE: *)
-      val invalid_check_updated_ctx
-        :  Environ.env
-        -> Evd.evar_map
-        -> EConstr.t list
-        -> EConstr.rel_declaration list
-        -> exn
+   (* NOTE: *)
+   val invalid_check_updated_ctx
+   :  Environ.env
+   -> Evd.evar_map
+   -> EConstr.t list
+   -> EConstr.rel_declaration list
+   -> exn
 
-      (* NOTE: *)
-      val invalid_lts_args_length : int -> exn
-      val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
-    end
+   (* NOTE: *)
+   val invalid_lts_args_length : int -> exn
+   val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
+   end
 
-    module Errors : SErrors
+   module Errors : SErrors
 
-    module type SErr = sig
-      val invalid_check_updated_ctx
-        :  EConstr.t list
-        -> EConstr.rel_declaration list
-        -> 'a mm
+   module type SErr = sig
+   val invalid_check_updated_ctx
+   :  EConstr.t list
+   -> EConstr.rel_declaration list
+   -> 'a mm
 
-      val invalid_lts_args_length : int -> 'a
-      val invalid_lts_term_kind : Constr.t -> 'a mm
-    end
+   val invalid_lts_args_length : int -> 'a
+   val invalid_lts_term_kind : Constr.t -> 'a mm
+   end
 
-    module Err : SErr
+   module Err : SErr
 
-    val mk_ctx_substl
-      :  EConstr.Vars.substl
-      -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list
-      -> EConstr.Vars.substl mm
+   val mk_ctx_substl
+   :  EConstr.Vars.substl
+   -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list
+   -> EConstr.Vars.substl mm
 
-    val extract_args
-      :  ?substl:EConstr.Vars.substl
-      -> Constr.t
-      -> Rocq_utils.constructor_args mm
-  end
+   val extract_args
+   :  ?substl:EConstr.Vars.substl
+   -> Constr.t
+   -> Rocq_utils.constructor_args mm
+   end *)
 
-  module Make (Ctx : Rocq_context.SRocq_context) (E : Encoding.SEncoding) :
-    S
-    with module M.BiEnc.Enc = E
-     and type M.BiEnc.Enc.t = E.t
-     and module M.Tree.Enc = E
-     and type M.Tree.Enc.t = E.t
-     and type M.Tree.TreeNode.t = E.t * int = struct
-    module M :
-      SRocq_monad with module BiEnc.Enc = E and type BiEnc.Enc.t = E.t =
-      Make (Ctx) (E)
+   module Make
+   (C : Rocq_context.SRocq_context)
+   (E : Encoding.SEncoding)
+   (* :
+   S
+   with module M.BiEnc.Enc = E
+   and type M.BiEnc.Enc.t = E.t
+   and module M.Tree.Enc = E
+   and type M.Tree.Enc.t = E.t
+   and type M.Tree.TreeNode.t = E.t * int *) =
+   struct
+   (* module
+   M
+   (* : *)
+   (* SRocq_monad with module BiEnc.Enc = E and type BiEnc.Enc.t = E.t *) =
+   Make (C) (E) *)
 
-    module Enc : Encoding.SEncoding with type t = E.t = M.BiEnc.Enc
+   include Make (C) (E)
+   (* module Enc : Encoding.SEncoding with type t = Enc.t = Enc *)
+   (* M.Enc *)
 
-    module BiEnc : Bi_encoding.S with module Enc = E and type Enc.t = E.t =
-      M.BiEnc
+   (* module
+   BiEnc
+   (* : Bi_encoding.S *)
+   (* with module Enc = Enc and type Enc.t = Enc.t *) =
+   M.BiEnc *)
 
-    module F : Hashtbl.S with type key = EConstr.t = M.BiEnc.FwdMap
-    module B : Hashtbl.S with type key = Enc.t = M.BiEnc.BckMap
+   (* module F : Hashtbl.S with type key = EConstr.t = M.BiEnc.FwdMap *)
+   (* module B : Hashtbl.S with type key = Enc.t = M.BiEnc.BckMap *)
 
-    module Tree :
-      Enc_tree.S
-      with module Enc = BiEnc.Enc
-       and type Enc.t = BiEnc.Enc.t
-       and type TreeNode.t = Enc.t * int =
-      M.Tree
+   (* module
+   Tree
+   (* :
+   Enc_tree.S
+   with module Enc = BiEnc.Enc
+   and type Enc.t = BiEnc.Enc.t
+   and type TreeNode.t = Enc.t * int *) =
+   M.Tree *)
 
-    module Constructor = M.Constructor
-    module Syntax : M.SYNTAX = M.Syntax
+   (* module Constructor = M.Constructor *)
+   (* module Syntax : M.SYNTAX = M.Syntax *)
 
-    type 'a mm = 'a M.mm
-    type 'a in_wrapper = 'a M.in_wrapper
-    type wrapper = M.wrapper
+   (* type 'a mm = 'a M.mm *)
+   (* type 'a in_wrapper = 'a M.in_wrapper *)
+   (* type wrapper = M.wrapper *)
 
-    let env () : Environ.env mm = M.get_env
-    let sigma () : Evd.evar_map mm = M.get_sigma
-    let run = M.run
-    let return = M.return
-    let iterate = M.iterate
-    let state = M.state
-    let sandbox = M.sandbox
+   (* let env () : Environ.env mm = M.get_env
+   let sigma () : Evd.evar_map mm = M.get_sigma
+   let run = M.run
+   let return = M.return
+   let iterate = M.iterate
+   let state = M.state
+   let sandbox = M.sandbox *)
 
-    let fresh_evar (x : Rocq_utils.evar_source) : EConstr.t mm =
-      state (fun env sigma -> Rocq_utils.get_next env sigma x)
-    ;;
+   let fresh_evar (x : Rocq_utils.evar_source) : EConstr.t mm =
+   state (fun env sigma -> Rocq_utils.get_next env sigma x)
+   ;;
 
-    let econstr_eq a b : bool mm =
-      state (fun env sigma -> sigma, EConstr.eq_constr sigma a b)
-    ;;
+   let econstr_eq a b : bool mm =
+   state (fun env sigma -> sigma, EConstr.eq_constr sigma a b)
+   ;;
 
-    let econstr_normalize (x : EConstr.t) : EConstr.t mm =
-      let open Syntax in
-      let$+ t env sigma = Reductionops.nf_all env sigma x in
-      return t
-    ;;
+   let econstr_normalize (x : EConstr.t) : EConstr.t mm =
+   let open Syntax in
+   let$+ t env sigma = Reductionops.nf_all env sigma x in
+   return t
+   ;;
 
-    let econstr_kind (x : EConstr.t) : Rocq_utils.econstr_kind mm =
-      state (fun env sigma -> sigma, EConstr.kind sigma x)
-    ;;
+   let econstr_kind (x : EConstr.t) : Rocq_utils.econstr_kind mm =
+   state (fun env sigma -> sigma, EConstr.kind sigma x)
+   ;;
 
-    let econstr_is_evar (x : EConstr.t) : bool mm =
-      state (fun env sigma -> sigma, EConstr.isEvar sigma x)
-    ;;
+   let econstr_is_evar (x : EConstr.t) : bool mm =
+   state (fun env sigma -> sigma, EConstr.isEvar sigma x)
+   ;;
 
-    let econstr_to_constr
-          ?(abort_on_undefined_evars : bool = false)
-          (x : EConstr.t)
-      : Constr.t mm
-      =
-      state (fun env sigma -> sigma, Rocq_convert.econstr_to_constr sigma x)
-    ;;
+   let econstr_to_constr
+   ?(abort_on_undefined_evars : bool = false)
+   (x : EConstr.t)
+   : Constr.t mm
+   =
+   state (fun env sigma -> sigma, Rocq_convert.econstr_to_constr sigma x)
+   ;;
 
-    let econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
-      state (fun env sigma -> sigma, Rocq_convert.econstr_to_constr_opt sigma x)
-    ;;
+   let econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
+   state (fun env sigma -> sigma, Rocq_convert.econstr_to_constr_opt sigma x)
+   ;;
 
-    module type SStrfy = sig
-      val mm : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
-      val econstr : EConstr.t -> string
-      val econstr_rel_decl : EConstr.rel_declaration -> string
-    end
+   module type SStrfy = sig
+   val mm : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
+   val econstr : EConstr.t -> string
+   val econstr_rel_decl : EConstr.rel_declaration -> string
+   end
 
-    module Strfy : SStrfy = struct
-      let mm = M.fstring
-      let econstr : EConstr.t -> string = mm Rocq_utils.Strfy.econstr
+   module Strfy : SStrfy = struct
+   let mm = fstring
+   let econstr : EConstr.t -> string = mm Rocq_utils.Strfy.econstr
 
-      let econstr_rel_decl : EConstr.rel_declaration -> string =
-        mm Rocq_utils.Strfy.econstr_rel_decl
-      ;;
-    end
+   let econstr_rel_decl : EConstr.rel_declaration -> string =
+   mm Rocq_utils.Strfy.econstr_rel_decl
+   ;;
+   end
 
-    module type SErrors = sig
-      type t =
-        (* NOTE: *)
-        | Invalid_Sort_LTS of Sorts.family
-        | Invalid_Sort_Type of Sorts.family
-        (* NOTE: *)
-        | InvalidCheckUpdatedCtx of
-            (Environ.env
-            * Evd.evar_map
-            * EConstr.t list
-            * EConstr.rel_declaration list)
-          (* NOTE: *)
-        | InvalidLTSArgsLength of int
-        | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
+   module type SErrors = sig
+   type t =
+   (* NOTE: *)
+   | Invalid_Sort_LTS of Sorts.family
+   | Invalid_Sort_Type of Sorts.family
+   (* NOTE: *)
+   | InvalidCheckUpdatedCtx of
+   (Environ.env
+   * Evd.evar_map
+   * EConstr.t list
+   * EConstr.rel_declaration list)
+   (* NOTE: *)
+   | InvalidLTSArgsLength of int
+   | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
 
-      exception MEBI_exn of t
+   exception MEBI_exn of t
 
-      (* NOTE: *)
-      val invalid_sort_lts : Sorts.family -> exn
-      val invalid_sort_type : Sorts.family -> exn
+   (* NOTE: *)
+   val invalid_sort_lts : Sorts.family -> exn
+   val invalid_sort_type : Sorts.family -> exn
 
-      (* NOTE: *)
-      val invalid_check_updated_ctx
-        :  Environ.env
-        -> Evd.evar_map
-        -> EConstr.t list
-        -> EConstr.rel_declaration list
-        -> exn
+   (* NOTE: *)
+   val invalid_check_updated_ctx
+   :  Environ.env
+   -> Evd.evar_map
+   -> EConstr.t list
+   -> EConstr.rel_declaration list
+   -> exn
 
-      (* NOTE: *)
-      val invalid_lts_args_length : int -> exn
-      val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
-    end
+   (* NOTE: *)
+   val invalid_lts_args_length : int -> exn
+   val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
+   end
 
-    module Errors : SErrors = struct
-      type t =
-        (* NOTE: *)
-        | Invalid_Sort_LTS of Sorts.family
-        | Invalid_Sort_Type of Sorts.family
-        (* NOTE: *)
-        | InvalidCheckUpdatedCtx of
-            (Environ.env
-            * Evd.evar_map
-            * EConstr.t list
-            * EConstr.rel_declaration list)
-          (* NOTE: *)
-        | InvalidLTSArgsLength of int
-        | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
+   module Errors : SErrors = struct
+   type t =
+   (* NOTE: *)
+   | Invalid_Sort_LTS of Sorts.family
+   | Invalid_Sort_Type of Sorts.family
+   (* NOTE: *)
+   | InvalidCheckUpdatedCtx of
+   (Environ.env
+   * Evd.evar_map
+   * EConstr.t list
+   * EConstr.rel_declaration list)
+   (* NOTE: *)
+   | InvalidLTSArgsLength of int
+   | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
 
-      exception MEBI_exn of t
+   exception MEBI_exn of t
 
-      let invalid_sort_lts x = MEBI_exn (Invalid_Sort_LTS x)
-      let invalid_sort_type x = MEBI_exn (Invalid_Sort_Type x)
+   let invalid_sort_lts x = MEBI_exn (Invalid_Sort_LTS x)
+   let invalid_sort_type x = MEBI_exn (Invalid_Sort_Type x)
 
-      let invalid_check_updated_ctx env sigma x y =
-        MEBI_exn (InvalidCheckUpdatedCtx (env, sigma, x, y))
-      ;;
+   let invalid_check_updated_ctx env sigma x y =
+   MEBI_exn (InvalidCheckUpdatedCtx (env, sigma, x, y))
+   ;;
 
-      (** Assert args length == 3 in [Command.extract_args]. *)
-      let invalid_lts_args_length i = MEBI_exn (InvalidLTSArgsLength i)
+   (** Assert args length == 3 in [Command.extract_args]. *)
+   let invalid_lts_args_length i = MEBI_exn (InvalidLTSArgsLength i)
 
-      (** Assert Constr.kind tm is App _ in [Command.extract_args]. *)
-      let invalid_lts_term_kind env sigma x =
-        MEBI_exn (InvalidLTSTermKind (env, sigma, x))
-      ;;
+   (** Assert Constr.kind tm is App _ in [Command.extract_args]. *)
+   let invalid_lts_term_kind env sigma x =
+   MEBI_exn (InvalidLTSTermKind (env, sigma, x))
+   ;;
 
-      let mebi_handler : t -> string = function
-        (* NOTE: *)
-        | Invalid_Sort_LTS x -> "Invalid_Sort_LTS"
-        | Invalid_Sort_Type x -> "Invalid_Sort_Type"
-        (* NOTE: *)
-        | InvalidCheckUpdatedCtx (env, sigma, x, y) ->
-          Printf.sprintf
-            "Invalid Args to check_updated_ctx. Should both be empty, or both \
-             have some.\n\
-             substls: %s.\n\
-             ctx_tys: %s."
-            (Utils.Strfy.list (Of Strfy.econstr) x)
-            (Utils.Strfy.list (Of Strfy.econstr_rel_decl) y)
-          (* NOTE: *)
-        | InvalidLTSArgsLength i ->
-          Printf.sprintf "assertion: Array.length args == 3 failed. Got %i" i
-        | InvalidLTSTermKind (env, sigma, tm) ->
-          Printf.sprintf
-            "assertion: Constr.kind tm matches App _ failed. Got %s which \
-             matches with: %s"
-            (Rocq_utils.Strfy.constr env sigma tm)
-            (Rocq_utils.Strfy.constr_kind env sigma tm)
-      ;;
+   let mebi_handler : t -> string = function
+   (* NOTE: *)
+   | Invalid_Sort_LTS x -> "Invalid_Sort_LTS"
+   | Invalid_Sort_Type x -> "Invalid_Sort_Type"
+   (* NOTE: *)
+   | InvalidCheckUpdatedCtx (env, sigma, x, y) ->
+   Printf.sprintf
+   "Invalid Args to check_updated_ctx. Should both be empty, or both \
+   have some.\n\
+   substls: %s.\n\
+   ctx_tys: %s."
+   (Utils.Strfy.list (Of Strfy.econstr) x)
+   (Utils.Strfy.list (Of Strfy.econstr_rel_decl) y)
+   (* NOTE: *)
+   | InvalidLTSArgsLength i ->
+   Printf.sprintf "assertion: Array.length args == 3 failed. Got %i" i
+   | InvalidLTSTermKind (env, sigma, tm) ->
+   Printf.sprintf
+   "assertion: Constr.kind tm matches App _ failed. Got %s which \
+   matches with: %s"
+   (Rocq_utils.Strfy.constr env sigma tm)
+   (Rocq_utils.Strfy.constr_kind env sigma tm)
+   ;;
 
-      let _ =
-        CErrors.register_handler (fun e ->
-          match e with
-          | MEBI_exn e -> Some (Pp.str (mebi_handler e))
-          | _ -> None)
-      ;;
-    end
+   let _ =
+   CErrors.register_handler (fun e ->
+   match e with
+   | MEBI_exn e -> Some (Pp.str (mebi_handler e))
+   | _ -> None)
+   ;;
+   end
 
-    module type SErr = sig
-      val invalid_check_updated_ctx
-        :  EConstr.t list
-        -> EConstr.rel_declaration list
-        -> 'a mm
+   module type SErr = sig
+   val invalid_check_updated_ctx
+   :  EConstr.t list
+   -> EConstr.rel_declaration list
+   -> 'a mm
 
-      val invalid_lts_args_length : int -> 'a
-      val invalid_lts_term_kind : Constr.t -> 'a mm
-    end
+   val invalid_lts_args_length : int -> 'a
+   val invalid_lts_term_kind : Constr.t -> 'a mm
+   end
 
-    module Err : SErr = struct
-      let invalid_check_updated_ctx
-            (substl : EConstr.t list)
-            (ctxl : EConstr.rel_declaration list)
-        : 'a mm
-        =
-        M.state (fun env sigma ->
-          raise (Errors.invalid_check_updated_ctx env sigma substl ctxl))
-      ;;
+   module Err : SErr = struct
+   let invalid_check_updated_ctx
+   (substl : EConstr.t list)
+   (ctxl : EConstr.rel_declaration list)
+   : 'a mm
+   =
+   state (fun env sigma ->
+   raise (Errors.invalid_check_updated_ctx env sigma substl ctxl))
+   ;;
 
-      let invalid_lts_args_length (x : int) : 'a =
-        raise (Errors.invalid_lts_args_length x)
-      ;;
+   let invalid_lts_args_length (x : int) : 'a =
+   raise (Errors.invalid_lts_args_length x)
+   ;;
 
-      let invalid_lts_term_kind (x : Constr.t) : 'a =
-        M.state (fun env sigma ->
-          raise (Errors.invalid_lts_term_kind env sigma x))
-      ;;
-    end
+   let invalid_lts_term_kind (x : Constr.t) : 'a =
+   state (fun env sigma ->
+   raise (Errors.invalid_lts_term_kind env sigma x))
+   ;;
+   end
 
-    let mk_ctx_substl
-          (acc : EConstr.Vars.substl)
-          (xs : ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list)
-      : EConstr.Vars.substl mm
-      =
-      state (fun env sigma -> Rocq_utils.mk_ctx_substl env sigma acc xs)
-    ;;
+   let mk_ctx_substl
+   (acc : EConstr.Vars.substl)
+   (xs : ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list)
+   : EConstr.Vars.substl mm
+   =
+   state (fun env sigma -> Rocq_utils.mk_ctx_substl env sigma acc xs)
+   ;;
 
-    (** [extract_args ?substl term] returns an [EConstr.t] triple of arguments of an inductively defined LTS, e.g., [term -> option action -> term -> Prop].
-        @param ?substl
-          is a list of substitutions applied to the terms prior to being returned.
-        @param term
-          must be of [Constr.kind] [App(fn, args)] (i.e., the application of some inductively defined LTS, e.g., [termLTS (tpar (tact (Send A) tend) (tact (Recv A) tend)) (Some A) (tpar tend tend)]).
-        @return a triple of [lhs_term, action, rhs_term]. *)
-    let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
-      : Rocq_utils.constructor_args mm
-      =
-      Log.trace __FUNCTION__;
-      try return (Rocq_utils.extract_args ~substl term) with
-      | Rocq_utils.Rocq_utils_InvalidLtsArgLength x ->
-        (* TODO: err *) Err.invalid_lts_args_length x
-      | Rocq_utils.Rocq_utils_InvalidLtsTermKind x ->
-        Err.invalid_lts_term_kind term
-    ;;
-  end
-end
+   (** [extract_args ?substl term] returns an [EConstr.t] triple of arguments of an inductively defined LTS, e.g., [term -> option action -> term -> Prop].
+   @param ?substl
+     is a list of substitutions applied to the terms prior to being returned.
+   @param term
+     must be of [Constr.kind] [App(fn, args)] (i.e., the application of some inductively defined LTS, e.g., [termLTS (tpar (tact (Send A) tend) (tact (Recv A) tend)) (Some A) (tpar tend tend)]).
+   @return
+     a triple of [lhs_term, action, rhs_term]. *)
+     let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
+     : Rocq_utils.constructor_args mm
+     =
+     Log.trace __FUNCTION__;
+     try return (Rocq_utils.extract_args ~substl term) with
+     | Rocq_utils.Rocq_utils_InvalidLtsArgLength x ->
+     (* TODO: err *) Err.invalid_lts_args_length x
+     | Rocq_utils.Rocq_utils_InvalidLtsTermKind x ->
+     Err.invalid_lts_term_kind term
+     ;;
+     end
+     end *)

@@ -1,4 +1,4 @@
-module type S = sig
+(* module type S = sig
   module Enc : Encoding.SEncoding
   module FwdMap : Hashtbl.S with type key = EConstr.t
   module BckMap : Hashtbl.S with type key = Enc.t
@@ -30,39 +30,38 @@ module type S = sig
 
   val make_hashtbl : (module Hashtbl.S with type key = Enc.t)
   val make_set : (module Set.S with type elt = Enc.t)
-end
+end *)
 
-module Make (Ctx : Rocq_context.SRocq_context) (E : Encoding.SEncoding) :
-  S with module Enc = E and type Enc.t = E.t = struct
-  module Enc : Encoding.SEncoding with type t = E.t = E
+module Make
+    (Ctx : Rocq_context.SRocq_context)
+    (Enc : Encoding.SEncoding)
+     (* :
+        S with module Enc = E and type Enc.t = E.t *) =
+struct
+  (* module Enc : Encoding.SEncoding with type t = E.t = E *)
 
-  module FwdMap : Hashtbl.S with type key = EConstr.t =
+  module F : Hashtbl.S with type key = EConstr.t =
     Rocq_context.MakeEConstrMap (Ctx)
 
-  module BckMap : Hashtbl.S with type key = Enc.t = Hashtbl.Make (Enc)
-
-  type fwdmap = Enc.t FwdMap.t
-  type bckmap = EConstr.t BckMap.t
+  module B : Hashtbl.S with type key = Enc.t = Hashtbl.Make (Enc)
 
   type maps =
-    { fwd : fwdmap
-    ; bck : bckmap
+    { fwd : Enc.t F.t
+    ; bck : EConstr.t B.t
     }
 
-  let the_maps () : maps ref =
-    ref { fwd = FwdMap.create 0; bck = BckMap.create 0 }
-  ;;
+  let the_maps () : maps ref = ref { fwd = F.create 0; bck = B.create 0 }
 
   let reset () : unit =
     Enc.reset ();
-    the_maps () := { fwd = FwdMap.create 0; bck = BckMap.create 0 }
+    the_maps () := { fwd = F.create 0; bck = B.create 0 }
   ;;
 
-  let fwdmap () : Enc.t FwdMap.t = !(the_maps ()).fwd
-  let bckmap () : EConstr.t BckMap.t = !(the_maps ()).bck
+  let fwdmap () : Enc.t F.t = !(the_maps ()).fwd
+  let bckmap () : EConstr.t B.t = !(the_maps ()).bck
 
-  module F = FwdMap
-  module B = BckMap
+  (* module F = FwdMap
+     module B = BckMap *)
 
   (* *)
   let get_encoding : EConstr.t -> Enc.t = F.find (fwdmap ())

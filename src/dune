@@ -37,60 +37,61 @@
   enc_tree
   term
   bi_encoding
-  rocq_monad
   rocq_unification
+  rocq_monad
+  rocq_monad_utils
   rocq_bindings
   model
   wrapper ; 
-  ; ; ; ; ; above be functors
-  ; ; ; ; ; below be algorithms
-  saturate
-  minimize
-  bisimilar
-  ; rocq_tactics
-  ; proof_solver
-  ; ; ; ; ; below be application
-  ; mebi_api ; stores modules created by [loader.v], used by commands
-  ; command ; plugin i/o
-  ; ; ; ; ;
-  ; ; ; ; ;
-  ; ; ; ; ;
-  ; ; ; ; ;
-  ; mebi_unification
-  ;  rocq_ind
-  ;  rocq_bindings
-  ;  ; logging
-  ;  ; debug
-  ;  mebi_setup
-  ;  ; mebi_constr
-  ;  model_state
-  ;  model_label
-  ;  model_info
-  ;  model_note
-  ;  model_transition
-  ;  model_transition_opt
-  ;  model_action
-  ;  model_edge
-  ;  model
-  ;  saturate_model
-  ;  algorithms
-  ;  mebi_tactics
-  ;  mebi_wrapper
-  ;  mebi_utils
-  ;  mebi_hypothesis
-  ;  mebi_proof
-  ;  proof_solver
-  ;  ; rocq_debug
-  ;  ; params
-  ;  mebi_weak
-  ;  mebi_api
-  ;  mebi_help
-  ;  mebi_unification
-  ;  ; mebi_debug
-  ;  mebi_unify
-  ;  command
-  ;  ; examples
-  ;  g_mebi
+          ; ; ; ; ; above be functors
+          ; ; ; ; ; below be algorithms
+          ; saturate
+          ; minimize
+          ; bisimilar
+          ; rocq_tactics
+          ; proof_solver
+          ; ; ; ; ; below be application
+          ; mebi_api ; stores modules created by [loader.v], used by commands
+          ; command ; plugin i/o
+          ; ; ; ; ;
+          ; ; ; ; ;
+          ; ; ; ; ;
+          ; ; ; ; ;
+          ; mebi_unification
+          ;  rocq_ind
+          ;  rocq_bindings
+          ;  ; logging
+          ;  ; debug
+          ;  mebi_setup
+          ;  ; mebi_constr
+          ;  model_state
+          ;  model_label
+          ;  model_info
+          ;  model_note
+          ;  model_transition
+          ;  model_transition_opt
+          ;  model_action
+          ;  model_edge
+          ;  model
+          ;  saturate_model
+          ;  algorithms
+          ;  mebi_tactics
+          ;  mebi_wrapper
+          ;  mebi_utils
+          ;  mebi_hypothesis
+          ;  mebi_proof
+          ;  proof_solver
+          ;  ; rocq_debug
+          ;  ; params
+          ;  mebi_weak
+          ;  mebi_api
+          ;  mebi_help
+          ;  mebi_unification
+          ;  ; mebi_debug
+          ;  mebi_unify
+          ;  command
+          ;  ; examples
+          ;  g_mebi
   ))
 
 ;(coq.pp ; This will let Dune know about Coq's .mlg grammar files.

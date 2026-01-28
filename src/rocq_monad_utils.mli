@@ -1,6 +1,24 @@
-module Make : (_ : Rocq_context.SRocq_context) (_ : Encoding.SEncoding) -> sig
-  module Ctx : Rocq_context.SRocq_context
-  module Enc : Encoding.SEncoding
+module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
+  module Ctx : sig
+    val get : unit -> Rocq_context.t ref
+    val env : unit -> Environ.env ref
+    val sigma : unit -> Evd.evar_map ref
+    val update : Environ.env ref -> Evd.evar_map ref -> unit
+  end
+
+  module Enc : sig
+    type t = Rocq_monad.Make(C)(E).Enc.t
+
+    val init : t
+    val next : t -> t
+    val equal : t -> t -> bool
+    val compare : t -> t -> int
+    val hash : t -> int
+    val to_string : t -> string
+    val counter : t ref
+    val reset : unit -> unit
+    val incr : unit -> t
+  end
 
   module F : sig
     type key = Evd.econstr
@@ -59,7 +77,7 @@ module Make : (_ : Rocq_context.SRocq_context) (_ : Encoding.SEncoding) -> sig
   end
 
   type maps = Bi_encoding.Make(Ctx)(Enc).maps =
-    { fwd : Enc.t F.t
+    { fwd : B.key F.t
     ; bck : Evd.econstr B.t
     }
 
@@ -81,7 +99,7 @@ module Make : (_ : Rocq_context.SRocq_context) (_ : Encoding.SEncoding) -> sig
   val to_list : unit -> (Enc.t * Evd.econstr) list
   val make_hashtbl : (module Hashtbl.S with type key = Enc.t)
   val make_set : (module Set.S with type elt = Enc.t)
-  val bienc_to_list : unit -> (Enc.t * EConstr.t) list
+  val bienc_to_list : unit -> (Enc.t * Evd.econstr) list
 
   type 'a mm = wrapper ref -> 'a in_wrapper
 
@@ -131,14 +149,34 @@ module Make : (_ : Rocq_context.SRocq_context) (_ : Encoding.SEncoding) -> sig
     val ( and+ ) : 'a mm -> 'b mm -> ('a * 'b) mm
   end
 
-  module Syntax : SYNTAX
+  module Syntax : sig
+    val ( let+ ) : 'a mm -> ('a -> 'b) -> 'b mm
+    val ( let* ) : 'a mm -> ('a -> 'b mm) -> 'b mm
+
+    val ( let$ )
+      :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+      -> ('a -> 'b mm)
+      -> 'b mm
+
+    val ( let$* )
+      :  (Environ.env -> Evd.evar_map -> Evd.evar_map)
+      -> (unit -> 'b mm)
+      -> 'b mm
+
+    val ( let$+ )
+      :  (Environ.env -> Evd.evar_map -> 'a)
+      -> ('a -> 'b mm)
+      -> 'b mm
+
+    val ( and+ ) : 'a mm -> 'b mm -> ('a * 'b) mm
+  end
 
   val get_ctx : wrapper ref -> Rocq_context.t in_wrapper
   val get_env : wrapper ref -> Environ.env in_wrapper
   val get_sigma : wrapper ref -> Evd.evar_map in_wrapper
   val get_maps : wrapper ref -> maps in_wrapper
   val get_fwdmap : wrapper ref -> Enc.t F.t in_wrapper
-  val get_bckmap : wrapper ref -> EConstr.t B.t in_wrapper
+  val get_bckmap : wrapper ref -> Evd.econstr B.t in_wrapper
   val fstring : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
 
   module Tree : sig
@@ -171,10 +209,79 @@ module Make : (_ : Rocq_context.SRocq_context) (_ : Encoding.SEncoding) -> sig
   end
 
   module Constructor : sig
-    type t = EConstr.t * EConstr.t * Tree.t
+    type t = Evd.econstr * Evd.econstr * Tree.t
 
     val to_string : Environ.env -> Evd.evar_map -> t -> string
   end
 
   val make_state_tree_pair_set : (module Set.S with type elt = Enc.t * Tree.t)
+  val fresh_evar : Rocq_utils.evar_source -> Evd.econstr mm
+  val econstr_eq : Evd.econstr -> Evd.econstr -> bool mm
+  val econstr_normalize : Evd.econstr -> Evd.econstr mm
+  val econstr_kind : Evd.econstr -> Rocq_utils.econstr_kind mm
+  val econstr_is_evar : Evd.econstr -> bool mm
+
+  val econstr_to_constr
+    :  ?abort_on_undefined_evars:bool
+    -> Evd.econstr
+    -> Constr.t mm
+
+  val econstr_to_constr_opt : Evd.econstr -> Constr.t option mm
+
+  module Strfy : sig
+    val econstr : Evd.econstr -> string
+    val econstr_rel_decl : EConstr.rel_declaration -> string
+  end
+
+  module type SErrors = sig
+    type t =
+      | Invalid_Sort_LTS of Sorts.family
+      | Invalid_Sort_Type of Sorts.family
+      | InvalidCheckUpdatedCtx of
+          (Environ.env
+          * Evd.evar_map
+          * Evd.econstr list
+          * EConstr.rel_declaration list)
+      | InvalidLTSArgsLength of int
+      | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
+
+    exception MEBI_exn of t
+
+    val invalid_sort_lts : Sorts.family -> exn
+    val invalid_sort_type : Sorts.family -> exn
+
+    val invalid_check_updated_ctx
+      :  Environ.env
+      -> Evd.evar_map
+      -> Evd.econstr list
+      -> EConstr.rel_declaration list
+      -> exn
+
+    val invalid_lts_args_length : int -> exn
+    val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
+  end
+
+  module Errors : SErrors
+
+  module type SErr = sig
+    val invalid_check_updated_ctx
+      :  Evd.econstr list
+      -> EConstr.rel_declaration list
+      -> 'a mm
+
+    val invalid_lts_args_length : int -> 'a
+    val invalid_lts_term_kind : Constr.t -> 'a mm
+  end
+
+  module Err : SErr
+
+  val mk_ctx_substl
+    :  EConstr.Vars.substl
+    -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list
+    -> EConstr.Vars.substl mm
+
+  val extract_args
+    :  ?substl:EConstr.Vars.substl
+    -> Constr.t
+    -> Rocq_utils.constructor_args mm
 end
