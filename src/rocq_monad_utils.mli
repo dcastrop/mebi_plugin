@@ -77,7 +77,7 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
   end
 
   type maps = Bi_encoding.Make(Ctx)(Enc).maps =
-    { fwd : B.key F.t
+    { fwd : Enc.t F.t
     ; bck : Evd.econstr B.t
     }
 
@@ -284,4 +284,141 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
     :  ?substl:EConstr.Vars.substl
     -> Constr.t
     -> Rocq_utils.constructor_args mm
+
+  module Unification : sig
+    module type SPair = sig
+      type t =
+        { to_check : Evd.econstr
+        ; acc : Evd.econstr
+        }
+
+      val to_string : Environ.env -> Evd.evar_map -> t -> string
+
+      val make
+        :  Environ.env
+        -> Evd.evar_map
+        -> Evd.econstr
+        -> Evd.econstr
+        -> Evd.evar_map * t
+
+      val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
+    end
+
+    module Pair : SPair
+
+    module type SProblem = sig
+      type t =
+        { act : Pair.t
+        ; goto : Pair.t
+        ; tree : Tree.t
+        }
+
+      val to_string : Environ.env -> Evd.evar_map -> t -> string
+      val unify_opt : t -> Tree.t option mm
+    end
+
+    module Problem : SProblem
+
+    module type SProblems = sig
+      type t =
+        { sigma : Evd.evar_map
+        ; to_unify : Problem.t list
+        }
+
+      val empty : unit -> t mm
+      val list_is_empty : t list -> bool
+      val to_string : Environ.env -> t -> string
+      val list_to_string : Environ.env -> t list -> string
+
+      val sandbox_unify_all_opt
+        :  Evd.econstr
+        -> Evd.econstr
+        -> t
+        -> (Evd.econstr * Evd.econstr * Tree.t list) option mm
+    end
+
+    module Problems : SProblems
+
+    module type SConstructors = sig
+      type t = Constructor.t list
+
+      val to_string : Environ.env -> Evd.evar_map -> t -> string
+
+      val retrieve
+        :  int
+        -> t
+        -> Evd.econstr
+        -> Evd.econstr
+        -> Enc.t * Problems.t list
+        -> t mm
+    end
+
+    module Constructors : SConstructors
+
+    val constr_to_problem
+      :  Rocq_utils.constructor_args
+      -> Constructor.t
+      -> Problem.t
+
+    val map_problems
+      :  Rocq_utils.constructor_args
+      -> Constructors.t
+      -> Problems.t mm
+
+    val cross_product : Problems.t list -> Problems.t -> Problems.t list
+    val does_constructor_unify : Evd.econstr -> Evd.econstr -> bool mm
+
+    val check_constructor_args_unify
+      :  Evd.econstr
+      -> Evd.econstr
+      -> Rocq_utils.constructor_args
+      -> bool mm
+
+    val axiom_constructor
+      :  Evd.econstr
+      -> Evd.econstr
+      -> Enc.t * int
+      -> Constructors.t
+      -> Constructors.t mm
+
+    val check_valid_constructors
+      :  Rocq_ind.LTS.constructor array
+      -> Enc.t Rocq_ind.t F.t
+      -> Evd.econstr
+      -> Evd.econstr
+      -> Enc.t
+      -> Constructors.t mm
+
+    val explore_valid_constructor
+      :  Enc.t Rocq_ind.t F.t
+      -> Evd.econstr
+      -> Enc.t
+      -> Rocq_utils.constructor_args
+      -> int * Constructors.t
+      -> EConstr.Vars.substl * EConstr.rel_declaration list
+      -> Constructors.t mm
+
+    val check_updated_ctx
+      :  Enc.t
+      -> Problems.t list
+      -> Enc.t Rocq_ind.t F.t
+      -> EConstr.Vars.substl * EConstr.rel_declaration list
+      -> (Enc.t * Problems.t list) option mm
+
+    val check_for_next_constructors
+      :  int
+      -> Evd.econstr
+      -> Evd.econstr
+      -> Constructors.t
+      -> (Enc.t * Problems.t list) option
+      -> Constructors.t mm
+
+    val collect_valid_constructors
+      :  Rocq_ind.LTS.constructor array
+      -> Enc.t Rocq_ind.t F.t
+      -> Evd.econstr
+      -> Evd.econstr
+      -> Enc.t
+      -> Constructors.t mm
+  end
 end
