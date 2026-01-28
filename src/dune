@@ -37,7 +37,6 @@
   enc_tree
   term
   bi_encoding
-  rocq_unification
   rocq_monad
   rocq_monad_utils
   rocq_bindings

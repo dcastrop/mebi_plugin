@@ -1,366 +1,8 @@
-(* module type S = sig
-  (* module Enc : Encoding.SEncoding
-
-     module Tree :
-     Enc_tree.S
-     with module Enc = Enc
-     and type Enc.t = Enc.t
-     and type TreeNode.t = Enc.t * int *)
-
-  (* module Tree : Enc_tree.S *)
-  (* module Enc : Encoding.SEncoding with type t = Tree.Enc.t *)
-
-  include module type of Enc : Encoding.SEncoding
-
-  module Tree :
-    Enc_tree.S
-    with module Enc = Enc
-     and type Enc.t = Enc.t
-     and type TreeNode.t = Enc.t * int
-
-  module Trees : Set.S with type elt = Tree.t
-
-  (* *)
-  module type SState = sig
-    type t =
-      { term : Enc.t
-      ; pp : string option
-      }
-
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val hash : t -> int
-    val to_string : t -> string
-  end
-
-  module State : SState
-
-  module type SStates = sig
-    module S : Set.S with type elt = State.t
-    include module type of S
-
-    val add_to_opt : elt -> t option -> t
-    val to_string : t -> string
-  end
-
-  module States : SStates
-
-  (* *)
-  module type SLabel = sig
-    type t =
-      { term : Enc.t
-      ; is_silent : bool option
-      }
-
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val hash : t -> int
-    val to_string : t -> string
-    val is_silent : t -> bool
-  end
-
-  module Label : SLabel
-
-  module type SLabels = sig
-    module S : Set.S with type elt = Label.t
-    include module type of S
-
-    val to_string : t -> string
-  end
-
-  module Labels : SLabels with type elt = Label.t
-
-  (* *)
-  module type SNote = sig
-    type t =
-      { from : State.t
-      ; label : Label.t
-      ; using : Trees.t
-      ; goto : State.t
-      }
-
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val to_string : t -> string
-    val is_silent : t -> bool
-  end
-
-  module Note : SNote
-
-  (* *)
-  module type SAnnotation = sig
-    type t =
-      { this : Note.t
-      ; next : t option
-      }
-
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val to_string : t -> string
-    val is_empty : t -> bool
-    val length : t -> int
-    val shorter : t -> t -> t
-    val exists : Note.t -> t -> bool
-    val exists_label : Label.t -> t -> bool
-    val append : Note.t -> t -> t
-    val last : t -> Note.t
-
-    exception CannotDropLastOfSingleton of t
-
-    val drop_last : t -> t
-  end
-
-  module Annotation : SAnnotation
-
-  (* *)
-  module type STransition = sig
-    type t =
-      { from : State.t
-      ; goto : State.t
-      ; label : Label.t
-      ; annotation : Annotation.t option
-      ; constructor_trees : Trees.t
-      }
-
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val is_silent : t -> bool
-    val annotation_is_empty : t -> bool
-    val to_string : t -> string
-  end
-
-  (* *)
-  module type SAnnotations = sig
-    module S : Set.S with type elt = Annotation.t
-    include module type of S
-
-    val to_string : t -> string
-  end
-
-  module Annotations : SAnnotations with type elt = Annotation.t
-
-  (* *)
-  module Transition : STransition
-
-  module type STransitions = sig
-    module S : Set.S with type elt = Transition.t
-    include module type of S
-
-    val to_string : t -> string
-  end
-
-  module Transitions : STransitions with type elt = Transition.t
-
-  (* *)
-  module type SAction = sig
-    type t =
-      { label : Label.t
-      ; annotation : Annotation.t option
-      ; constructor_trees : Trees.t
-      }
-
-    val wk_equal : t -> t -> bool
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val hash : t -> int
-    val is_silent : t -> bool
-    val annotation_is_empty : t -> bool
-    val to_string : t -> string
-  end
-
-  module Action : SAction
-
-  module type SActions = sig
-    module S : Set.S with type elt = Action.t
-    include module type of S
-
-    val labelled : t -> Label.t -> t
-    val to_string : t -> string
-  end
-
-  module Actions : SActions with type elt = Action.t
-
-  module type SActionMap = sig
-    module M : Hashtbl.S with type key = Action.t
-    include module type of M
-
-    type t' = States.t t
-
-    val update : t' -> Action.t -> States.t -> unit
-    val get_destinations : t' -> States.t
-    val to_string : t' -> string
-  end
-
-  module ActionMap : SActionMap with type key = Action.t
-
-  (* *)
-  module type SEdge = sig
-    type t =
-      { from : State.t
-      ; goto : State.t
-      ; action : Action.t
-      }
-
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val is_silent : t -> bool
-    val to_string : t -> string
-  end
-
-  module Edge : SEdge
-
-  module type SEdges = sig
-    module S : Set.S with type elt = Edge.t
-    include module type of S
-
-    val labelled : t -> Label.t -> t
-    val to_string : t -> string
-  end
-
-  module Edges : SEdges with type elt = Edge.t
-
-  module type SEdgeMap = sig
-    module M : Hashtbl.S with type key = State.t
-    include module type of M
-
-    type t' = ActionMap.t' t
-
-    val update : t' -> State.t -> Action.t -> States.t -> unit
-    val get_destinations : t' -> State.t -> States.t
-    val get_actions : t' -> State.t -> Actions.t
-    val get_edges : t' -> State.t -> Edges.t
-    val to_string : t' -> string
-  end
-
-  module EdgeMap : SEdgeMap with type key = State.t
-
-  (* *)
-  module type SPartition = sig
-    module S : Set.S with type elt = States.t
-    include module type of S
-
-    val get_reachable : t -> State.t -> EdgeMap.t' -> t
-    val to_string : t -> string
-  end
-
-  module Partition : SPartition
-
-  (* *)
-  module type SInfo = sig
-    type t =
-      { meta : meta option
-      ; weak_labels : Labels.t
-      }
-
-    and meta =
-      { is_complete : bool
-      ; is_merged : bool
-      ; bounds : bounds
-      ; lts : lts list
-      }
-
-    and bounds =
-      | States of int
-      | Transitions of int
-
-    and lts =
-      { enc : Enc.t
-      ; constructors : Rocq_bindings.constructor list
-      }
-
-    val to_string : t -> string
-  end
-
-  module Info : SInfo
-
-  (* *)
-  module type SLTS = sig
-    type t =
-      { init : State.t option
-      ; terminals : States.t
-      ; alphabet : Labels.t
-      ; states : States.t
-      ; transitions : Transitions.t
-      ; info : Info.t
-      }
-
-    val to_string : t -> string
-  end
-
-  module LTS : SLTS
-
-  (* *)
-  module type SFSM = sig
-    type t =
-      { init : State.t option
-      ; terminals : States.t
-      ; alphabet : Labels.t
-      ; states : States.t
-      ; edges : EdgeMap.t'
-      ; info : Info.t
-      }
-
-    val to_string : t -> string
-  end
-
-  module FSM : SFSM
-
-  (* *)
-  module type SConvert = sig
-    val transitions_to_edgemap : Transitions.t -> EdgeMap.t'
-    val lts_to_fsm : LTS.t -> FSM.t
-  end
-
-  module Convert : SConvert
-
-  (* *)
-  (* module type SMerge = sig
-    val trees : Tree.t list -> Tree.t list -> Tree.t list
-  end
-
-  module Merge : SMerge *)
-end *)
-
-module Make
-    (Enc : Encoding.SEncoding)
-     (* : S *)
-     (* with  *)
-     (* module Tree.Enc = E *)
-     (* and type Tree.Enc.t = E.t *)
-     (* and module Enc = E *)
-     (* and type Enc.t = E.t  *) =
-struct
-  (* with module Enc = E
-     and type Enc.t = E.t
-     and module Tree.Enc = E
-     and type Tree.Enc.t = E.t = struct *)
-
-  (* module Enc : Encoding.SEncoding with type t = E.t = E *)
-
-  (* module Tree :
-     Enc_tree.S
-     with module Enc = Enc
-     and type Enc.t = Enc.t
-     and type TreeNode.t = Enc.t * int = *)
+module Make (Enc : Encoding.SEncoding) = struct
   module Tree = Enc_tree.Make (Enc)
-
-  (* module Enc : Encoding.SEncoding with type t = E.t and type t = Tree.Enc.t = E *)
   module Trees : Set.S with type elt = Tree.t = Set.Make (Tree)
 
-  (* *)
-  (* module type SState = sig
-    type t =
-      { term : Enc.t
-      ; pp : string option
-      }
-
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val hash : t -> int
-    val to_string : t -> string
-  end *)
-
-  module State (* : SState *) = struct
+  module State = struct
     type t =
       { term : Enc.t
       ; pp : string option
@@ -379,15 +21,7 @@ struct
     ;;
   end
 
-  (* module type SStates = sig
-     module S : Set.S with type elt = State.t
-     include module type of S
-
-     val add_to_opt : elt -> t option -> t
-     val to_string : t -> string
-     end *)
-
-  module States (* : SStates *) = struct
+  module States = struct
     module S : Set.S with type elt = State.t = Set.Make (State)
     include S
 
@@ -421,21 +55,7 @@ struct
     ;;
   end
 
-  (* *)
-  (* module type SLabel = sig
-    type t =
-      { term : Enc.t
-      ; is_silent : bool option
-      }
-
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val hash : t -> int
-    val to_string : t -> string
-    val is_silent : t -> bool
-  end *)
-
-  module Label (* : SLabel *) = struct
+  module Label = struct
     type t =
       { term : Enc.t
       ; is_silent : bool option
@@ -457,14 +77,7 @@ struct
     let is_silent (x : t) : bool = Option.default false x.is_silent
   end
 
-  (* module type SLabels = sig
-     module S : Set.S with type elt = Label.t
-     include module type of S
-
-     val to_string : t -> string
-     end *)
-
-  module Labels (* : SLabels with type elt = Label.t *) = struct
+  module Labels = struct
     module S : Set.S with type elt = Label.t = Set.Make (Label)
     include S
 
@@ -476,22 +89,7 @@ struct
     ;;
   end
 
-  (* *)
-  (* module type SNote = sig
-    type t =
-      { from : State.t
-      ; label : Label.t
-      ; using : Trees.t
-      ; goto : State.t
-      }
-
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val to_string : t -> string
-    val is_silent : t -> bool
-  end *)
-
-  module Note (* : SNote *) = struct
+  module Note = struct
     type t =
       { from : State.t
       ; label : Label.t
@@ -528,30 +126,7 @@ struct
     let is_silent (x : t) : bool = Label.is_silent x.label
   end
 
-  (* *)
-  (* module type SAnnotation = sig
-    type t =
-      { this : Note.t
-      ; next : t option
-      }
-
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val to_string : t -> string
-    val is_empty : t -> bool
-    val length : t -> int
-    val shorter : t -> t -> t
-    val exists : Note.t -> t -> bool
-    val exists_label : Label.t -> t -> bool
-    val append : Note.t -> t -> t
-    val last : t -> Note.t
-
-    exception CannotDropLastOfSingleton of t
-
-    val drop_last : t -> t
-  end *)
-
-  module Annotation (* : SAnnotation *) = struct
+  module Annotation = struct
     type t =
       { this : Note.t
       ; next : t option
@@ -618,14 +193,7 @@ struct
     ;;
   end
 
-  (* module type SAnnotations = sig
-     module S : Set.S with type elt = Annotation.t
-     include module type of S
-
-     val to_string : t -> string
-     end *)
-
-  module Annotations (* : SAnnotations with type elt = Annotation.t *) = struct
+  module Annotations = struct
     module S : Set.S with type elt = Annotation.t = Set.Make (Annotation)
     include S
 
@@ -637,24 +205,7 @@ struct
     ;;
   end
 
-  (* *)
-  (* module type STransition = sig
-    type t =
-      { from : State.t
-      ; goto : State.t
-      ; label : Label.t
-      ; annotation : Annotation.t option
-      ; constructor_trees : Trees.t
-      }
-
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val is_silent : t -> bool
-    val annotation_is_empty : t -> bool
-    val to_string : t -> string
-  end *)
-
-  module Transition (* : STransition *) = struct
+  module Transition = struct
     type t =
       { from : State.t
       ; goto : State.t
@@ -703,14 +254,7 @@ struct
     ;;
   end
 
-  (* module type STransitions = sig
-     module S : Set.S with type elt = Transition.t
-     include module type of S
-
-     val to_string : t -> string
-     end *)
-
-  module Transitions (* : STransitions with type elt = Transition.t *) = struct
+  module Transitions = struct
     module S : Set.S with type elt = Transition.t = Set.Make (Transition)
     include S
 
@@ -722,24 +266,7 @@ struct
     ;;
   end
 
-  (* *)
-  (* module type SAction = sig
-    type t =
-      { label : Label.t
-      ; annotation : Annotation.t option
-      ; constructor_trees : Trees.t
-      }
-
-    val wk_equal : t -> t -> bool
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val hash : t -> int
-    val is_silent : t -> bool
-    val annotation_is_empty : t -> bool
-    val to_string : t -> string
-  end *)
-
-  module Action (* : SAction *) = struct
+  module Action = struct
     type t =
       { label : Label.t
       ; annotation : Annotation.t option
@@ -782,14 +309,6 @@ struct
         ]
     ;;
   end
-
-  (* module type SActions = sig
-     module S : Set.S with type elt = Action.t
-     include module type of S
-
-     val labelled : t -> Label.t -> t
-     val to_string : t -> string
-     end *)
 
   module ActionPair = struct
     type t = Action.t * States.t
@@ -866,7 +385,7 @@ struct
     ;;
   end
 
-  module Actions (* : SActions with type elt = Action.t *) = struct
+  module Actions = struct
     module S : Set.S with type elt = Action.t = Set.Make (Action)
     include S
 
@@ -882,18 +401,7 @@ struct
     ;;
   end
 
-  (* module type SActionMap = sig
-     module M : Hashtbl.S with type key = Action.t
-     include module type of M
-
-     type t' = States.t t
-
-     val update : t' -> Action.t -> States.t -> unit
-     val get_destinations : t' -> States.t
-     val to_string : t' -> string
-     end *)
-
-  module ActionMap (* : SActionMap with type key = Action.t *) = struct
+  module ActionMap = struct
     module M : Hashtbl.S with type key = Action.t = Hashtbl.Make (Action)
     include M
 
@@ -956,21 +464,7 @@ struct
     ;;
   end
 
-  (* *)
-  (* module type SEdge = sig
-    type t =
-      { from : State.t
-      ; goto : State.t
-      ; action : Action.t
-      }
-
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val is_silent : t -> bool
-    val to_string : t -> string
-  end *)
-
-  module Edge (* : SEdge *) = struct
+  module Edge = struct
     type t =
       { from : State.t
       ; goto : State.t
@@ -1002,15 +496,7 @@ struct
     ;;
   end
 
-  (* module type SEdges = sig
-     module S : Set.S with type elt = Edge.t
-     include module type of S
-
-     val labelled : t -> Label.t -> t
-     val to_string : t -> string
-     end *)
-
-  module Edges (* : SEdges with type elt = Edge.t *) = struct
+  module Edges = struct
     module S : Set.S with type elt = Edge.t = Set.Make (Edge)
     include S
 
@@ -1026,20 +512,7 @@ struct
     ;;
   end
 
-  (* module type SEdgeMap = sig
-     module M : Hashtbl.S with type key = State.t
-     include module type of M
-
-     type t' = ActionMap.t' t
-
-     val update : t' -> State.t -> Action.t -> States.t -> unit
-     val get_destinations : t' -> State.t -> States.t
-     val get_actions : t' -> State.t -> Actions.t
-     val get_edges : t' -> State.t -> Edges.t
-     val to_string : t' -> string
-     end *)
-
-  module EdgeMap (* : SEdgeMap with type key = State.t *) = struct
+  module EdgeMap = struct
     module M : Hashtbl.S with type key = State.t = Hashtbl.Make (State)
     include M
 
@@ -1140,16 +613,7 @@ struct
     ;;
   end
 
-  (* *)
-  (* module type SPartition = sig
-    module S : Set.S with type elt = States.t
-    include module type of S
-
-    val get_reachable : t -> State.t -> EdgeMap.t' -> t
-    val to_string : t -> string
-  end *)
-
-  module Partition (* : SPartition *) = struct
+  module Partition = struct
     module S : Set.S with type elt = States.t = Set.Make (States)
     include S
 
@@ -1169,33 +633,7 @@ struct
     ;;
   end
 
-  (* *)
-  (* module type SInfo = sig
-    type t =
-      { meta : meta option
-      ; weak_labels : Labels.t
-      }
-
-    and meta =
-      { is_complete : bool
-      ; is_merged : bool
-      ; bounds : bounds
-      ; lts : lts list
-      }
-
-    and bounds =
-      | States of int
-      | Transitions of int
-
-    and lts =
-      { enc : Enc.t
-      ; constructors : Rocq_bindings.constructor list
-      }
-
-    val to_string : t -> string
-  end *)
-
-  module Info (* : SInfo *) = struct
+  module Info = struct
     type t =
       { meta : meta option
       ; weak_labels : Labels.t
@@ -1281,21 +719,7 @@ struct
     ;;
   end
 
-  (* *)
-  (* module type SLTS = sig
-    type t =
-      { init : State.t option
-      ; terminals : States.t
-      ; alphabet : Labels.t
-      ; states : States.t
-      ; transitions : Transitions.t
-      ; info : Info.t
-      }
-
-    val to_string : t -> string
-  end *)
-
-  module LTS (* : SLTS *) = struct
+  module LTS = struct
     type t =
       { init : State.t option
       ; terminals : States.t
@@ -1317,21 +741,7 @@ struct
     ;;
   end
 
-  (* *)
-  (* module type SFSM = sig
-    type t =
-      { init : State.t option
-      ; terminals : States.t
-      ; alphabet : Labels.t
-      ; states : States.t
-      ; edges : EdgeMap.t'
-      ; info : Info.t
-      }
-
-    val to_string : t -> string
-  end *)
-
-  module FSM (* : SFSM *) = struct
+  module FSM = struct
     type t =
       { init : State.t option
       ; terminals : States.t
@@ -1363,15 +773,7 @@ struct
     ;;
   end
 
-  (* *)
-  (* module type SConvert = sig
-    val transitions_to_edgemap : Transitions.t -> EdgeMap.t'
-    val lts_to_fsm : LTS.t -> FSM.t
-  end *)
-
-  module Convert (* : SConvert *) = struct
-    (* let transitions_to_edges (xs:Transitions.t) : Edges.t = () *)
-
+  module Convert = struct
     let transitions_to_edgemap (xs : Transitions.t) : EdgeMap.t' =
       let edges : EdgeMap.t' = EdgeMap.create 0 in
       Transitions.iter
@@ -1396,21 +798,6 @@ struct
       }
     ;;
   end
-
-  (* *)
-  (* module type SMerge = sig
-    val trees : Tree.t list -> Tree.t list -> Tree.t list
-  end
-
-  module Merge : SMerge = struct
-    let trees (xs : Tree.t list) (ys : Tree.t list) : Tree.t list =
-      List.fold_left
-        (fun (acc : Tree.t list) (y : Tree.t) ->
-          if List.mem y acc then acc else y :: acc)
-        xs
-        ys
-    ;;
-  end *)
 
   module Saturate = struct
     type data =

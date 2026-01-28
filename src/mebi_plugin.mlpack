@@ -13,7 +13,6 @@ Encoding
 Enc_tree
 Term
 Bi_encoding
-Rocq_unification
 Rocq_monad
 Rocq_monad_utils
 Rocq_bindings
