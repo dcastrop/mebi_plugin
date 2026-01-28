@@ -1,9 +1,9 @@
-module type S = sig
+(* module type S = sig
   module M : Rocq_monad.Utils.S
 
   module type SPair = sig
     type t =
-      { to_check : EConstr.t
+      { to_check : EConstr.t 
       ; acc : EConstr.t
       }
 
@@ -25,11 +25,11 @@ module type S = sig
     type t =
       { act : Pair.t
       ; goto : Pair.t
-      ; tree : M.Constructor.Tree.t
+      ; tree : Tree.t
       }
 
     val to_string : Environ.env -> Evd.evar_map -> t -> string
-    val unify_opt : t -> M.Constructor.Tree.t option M.mm
+    val unify_opt : t -> Tree.t option mm
   end
 
   module Problem : SProblem
@@ -40,7 +40,7 @@ module type S = sig
       ; to_unify : Problem.t list
       }
 
-    val empty : unit -> t M.mm
+    val empty : unit -> t mm
     val list_is_empty : t list -> bool
     val to_string : Environ.env -> t -> string
     val list_to_string : Environ.env -> t list -> string
@@ -49,13 +49,13 @@ module type S = sig
       :  Evd.econstr
       -> Evd.econstr
       -> t
-      -> (Evd.econstr * Evd.econstr * M.Constructor.Tree.t list) option M.mm
+      -> (Evd.econstr * Evd.econstr * Tree.t list) option mm
   end
 
   module Problems : SProblems
 
   module type SConstructors = sig
-    type t = M.Constructor.t list
+    type t = Constructor.t list
 
     val to_string : Environ.env -> Evd.evar_map -> t -> string
 
@@ -64,29 +64,153 @@ module type S = sig
       -> t
       -> Evd.econstr
       -> Evd.econstr
-      -> M.Enc.t * Problems.t list
-      -> t M.mm
+      -> Enc.t * Problems.t list
+      -> t mm
   end
 
   module Constructors : SConstructors
 
   val collect_valid_constructors
     :  Rocq_ind.LTS.constructor array
-    -> M.Enc.t Rocq_ind.t M.F.t
+    -> Enc.t Rocq_ind.t F.t
     -> Evd.econstr
     -> Evd.econstr
-    -> M.Enc.t
-    -> Constructors.t M.mm
+    -> Enc.t
+    -> Constructors.t mm
+end *)
+
+module type S = sig
+  module Enc : Encoding.SEncoding
+  module F : Hashtbl.S with type key = EConstr.t
+  module B : Hashtbl.S with type key = Enc.t
+
+  type maps =
+    { fwd : Enc.t F.t
+    ; bck : EConstr.t B.t
+    }
+
+  val the_maps : unit -> maps ref
+
+  type 'a mm = wrapper ref -> 'a in_wrapper
+
+  and wrapper =
+    { ctx : Rocq_context.t ref
+    ; maps : maps ref
+    }
+
+  and 'a in_wrapper =
+    { state : wrapper ref
+    ; value : 'a
+    }
+
+  val get_env : wrapper ref -> Environ.env in_wrapper
+  val get_sigma : wrapper ref -> Evd.evar_map in_wrapper
+  val return : 'a -> 'a mm
+  val iterate : int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
+
+  val state
+    :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+    -> wrapper ref
+    -> 'a in_wrapper
+
+  val sandbox : ?sigma:Evd.evar_map -> 'a mm -> wrapper ref -> 'a in_wrapper
+  val econstr_is_evar : Evd.econstr -> bool mm
+  val econstr_normalize : Evd.econstr -> EConstr.t mm
+
+  val mk_ctx_substl
+    :  EConstr.Vars.substl
+    -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list
+    -> EConstr.Vars.substl mm
+
+  val extract_args
+    :  ?substl:EConstr.Vars.substl
+    -> Constr.t
+    -> Rocq_utils.constructor_args mm
+
+  val fresh_evar : Rocq_utils.evar_source -> Evd.econstr mm
+
+  module Syntax : sig
+    val ( let+ ) : 'a mm -> ('a -> 'b) -> 'b mm
+    val ( let* ) : 'a mm -> ('a -> 'b mm) -> 'b mm
+
+    val ( let$ )
+      :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
+      -> ('a -> 'b mm)
+      -> 'b mm
+
+    val ( let$* )
+      :  (Environ.env -> Evd.evar_map -> Evd.evar_map)
+      -> (unit -> 'b mm)
+      -> 'b mm
+
+    val ( let$+ )
+      :  (Environ.env -> Evd.evar_map -> 'a)
+      -> ('a -> 'b mm)
+      -> 'b mm
+
+    val ( and+ ) : 'a mm -> 'b mm -> ('a * 'b) mm
+  end
+
+  module Tree : sig
+    module type STreeNode = sig
+      type t = Enc.t * int
+
+      val to_string : t -> string
+    end
+
+    module TreeNode : sig
+      type t = Enc.t * int
+
+      val to_string : t -> string
+    end
+
+    type 'a tree = 'a Enc_tree.Make(Enc).tree = Node of 'a * 'a tree list
+    type t = TreeNode.t tree
+
+    val add : t -> t -> t
+    val add_list : t -> t list -> t list
+    val equal : t -> t -> bool
+    val compare : t -> t -> int
+    val minimize : t -> TreeNode.t list
+
+    exception CannotMinimizeEmptyList of unit
+
+    val min : t list -> TreeNode.t list
+    val to_string : t -> string
+    val list_to_string : ?args:Utils.Strfy.style_args -> t list -> string
+  end
+
+  module Constructor : sig
+    type t = Evd.econstr * Evd.econstr * Tree.t
+
+    val to_string : Environ.env -> Evd.evar_map -> t -> string
+  end
+
+  module Strfy : sig
+    val econstr : EConstr.t -> string
+    val econstr_rel_decl : EConstr.rel_declaration -> string
+  end
+
+  module Err : sig
+    val invalid_check_updated_ctx
+      :  Evd.econstr list
+      -> EConstr.rel_declaration list
+      -> 'a mm
+  end
 end
 
-module Make (M : Rocq_monad.Utils.S) : S = struct
-  module M : Rocq_monad.Utils.S = M
-  module F = M.F
-  module B = M.B
-  module Enc = M.Enc
-  module Constructor = M.Constructor
+module Make (M : S) (* : S *) = struct
+  (* module M : module type of Rocq_monad_utils.Make *)
+  (* : Rocq_monad.Utils.S  *)
+  (* = M *)
+  (* module F = F *)
+  (* module B = B *)
+  (* module Enc = Enc *)
+  (* module Constructor = Constructor *)
 
-  type 'a mm = 'a M.mm
+  (* type 'a mm = 'a mm *)
+
+  include M
 
   module type SPair = sig
     type t =
@@ -121,7 +245,7 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
       : string
       =
       Utils.Strfy.record
-        [ "to_check", M.Strfy.econstr to_check; "b", M.Strfy.econstr acc ]
+        [ "to_check", Strfy.econstr to_check; "b", Strfy.econstr acc ]
     ;;
 
     let fresh (env : Environ.env) (sigma : Evd.evar_map) ({ to_check; acc } : t)
@@ -162,11 +286,11 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
     type t =
       { act : Pair.t
       ; goto : Pair.t
-      ; tree : M.Constructor.Tree.t
+      ; tree : Tree.t
       }
 
     val to_string : Environ.env -> Evd.evar_map -> t -> string
-    val unify_opt : t -> M.Constructor.Tree.t option mm
+    val unify_opt : t -> Tree.t option mm
   end
 
   module Problem : SProblem = struct
@@ -175,7 +299,7 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
     type t =
       { act : Pair.t
       ; goto : Pair.t
-      ; tree : M.Constructor.Tree.t
+      ; tree : Tree.t
       }
 
     let to_string
@@ -187,21 +311,21 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
       Utils.Strfy.record
         [ "act", Pair.to_string env sigma act
         ; "goto", Pair.to_string env sigma goto
-        ; "tree", M.Constructor.Tree.to_string tree
+        ; "tree", Tree.to_string tree
         ]
     ;;
 
     let unify_pair_opt (pair : Pair.t) : bool mm =
-      M.state (fun env sigma -> Pair.unify env sigma pair)
+      state (fun env sigma -> Pair.unify env sigma pair)
     ;;
 
-    let unify_opt ({ act; goto; tree } : t) : M.Constructor.Tree.t option mm =
-      let open M.Syntax in
+    let unify_opt ({ act; goto; tree } : t) : Tree.t option mm =
+      let open Syntax in
       let* unified_act_opt = unify_pair_opt act in
       let* unified_goto_opt = unify_pair_opt goto in
       match unified_act_opt, unified_goto_opt with
-      | true, true -> M.return (Some tree)
-      | _, _ -> M.return None
+      | true, true -> return (Some tree)
+      | _, _ -> return None
     ;;
   end
 
@@ -211,7 +335,7 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
       ; to_unify : Problem.t list
       }
 
-    val empty : unit -> t M.mm
+    val empty : unit -> t mm
     val list_is_empty : t list -> bool
     val to_string : Environ.env -> t -> string
     val list_to_string : Environ.env -> t list -> string
@@ -220,7 +344,7 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
       :  Evd.econstr
       -> Evd.econstr
       -> t
-      -> (Evd.econstr * Evd.econstr * M.Constructor.Tree.t list) option M.mm
+      -> (Evd.econstr * Evd.econstr * Tree.t list) option mm
   end
 
   module Problems : SProblems = struct
@@ -230,9 +354,9 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
       }
 
     let empty () : t mm =
-      let open M.Syntax in
-      let* sigma = M.sigma () in
-      M.return { sigma; to_unify = [] }
+      let open Syntax in
+      let* sigma = get_sigma in
+      return { sigma; to_unify = [] }
     ;;
 
     let is_empty : t -> bool = function
@@ -267,43 +391,41 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
         (Of (to_string env))
     ;;
 
-    let rec unify_list_opt
-      : Problem.t list -> M.Constructor.Tree.t list option mm
-      =
-      let open M.Syntax in
+    let rec unify_list_opt : Problem.t list -> Tree.t list option mm =
+      let open Syntax in
       function
-      | [] -> M.return (Some [])
+      | [] -> return (Some [])
       | h :: tl ->
         let* success_opt = Problem.unify_opt h in
         (match success_opt with
-         | None -> M.return None
+         | None -> return None
          | Some constructor_tree ->
            let* unified_opt = unify_list_opt tl in
            (match unified_opt with
-            | None -> M.return None
-            | Some acc -> M.return (Some (constructor_tree :: acc))))
+            | None -> return None
+            | Some acc -> return (Some (constructor_tree :: acc))))
     ;;
 
     let sandbox_unify_all_opt
           (act : EConstr.t)
           (goto : EConstr.t)
           ({ sigma; to_unify } : t)
-      : (EConstr.t * EConstr.t * M.Constructor.Tree.t list) option mm
+      : (EConstr.t * EConstr.t * Tree.t list) option mm
       =
-      let open M.Syntax in
-      M.sandbox
+      let open Syntax in
+      sandbox
         ~sigma
         (let* unified_opt = unify_list_opt to_unify in
          match unified_opt with
-         | None -> M.return None
+         | None -> return None
          | Some constructor_trees ->
            let$+ act env sigma = Reductionops.nf_all env sigma act in
            let$+ goto env sigma = Reductionops.nf_all env sigma goto in
            let$+ is_act_undefined _ sigma = EConstr.isEvar sigma act in
            let$+ is_goto_undefined _ sigma = EConstr.isEvar sigma goto in
            if is_act_undefined && is_goto_undefined
-           then M.return None
-           else M.return (Some (act, goto, constructor_trees)))
+           then return None
+           else return (Some (act, goto, constructor_trees)))
     ;;
   end
 
@@ -335,27 +457,26 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
               (tgt : EConstr.t)
       : Enc.t * Problems.t list -> t mm
       =
-      let open M.Syntax in
+      let open Syntax in
       function
-      | _, [] -> M.return acc
+      | _, [] -> return acc
       | lts_enc, problems :: tl ->
         let* acc = retrieve constructor_index acc act tgt (lts_enc, tl) in
         let* constructor_opt : Constructor.t option =
-          M.sandbox
+          sandbox
             (let* success = Problems.sandbox_unify_all_opt act tgt problems in
              match success with
-             | None -> M.return None
+             | None -> return None
              | Some (act, goto, constructor_trees) ->
-               let tree : M.Constructor.Tree.t =
-                 M.Constructor.Tree.Node
-                   ((lts_enc, constructor_index), constructor_trees)
+               let tree : Tree.t =
+                 Tree.Node ((lts_enc, constructor_index), constructor_trees)
                in
                let constructor : Constructor.t = act, goto, tree in
-               M.return (Some constructor))
+               return (Some constructor))
         in
         (match constructor_opt with
-         | None -> M.return acc
-         | Some constructor -> M.return (constructor :: acc))
+         | None -> return acc
+         | Some constructor -> return (constructor :: acc))
     ;;
   end
 
@@ -363,7 +484,7 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
       (* NOTE: this is only relevant when deciding whether to explore a given constructor from a premise of another *)
   *)
   let constr_to_problem (args : Rocq_utils.constructor_args)
-    : M.Constructor.t -> Problem.t
+    : Constructor.t -> Problem.t
     = function
     | act, rhs, tree ->
       let act : Pair.t = { to_check = args.act; acc = act } in
@@ -371,14 +492,14 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
       { act; goto; tree }
   ;;
 
-  let map_problems args (constructors : Constructors.t) : Problems.t M.mm =
-    let open M.Syntax in
-    let* sigma = M.sigma () in
+  let map_problems args (constructors : Constructors.t) : Problems.t mm =
+    let open Syntax in
+    let* sigma = get_sigma in
     let to_unify : Problem.t list =
       List.map (constr_to_problem args) constructors
     in
     let p : Problems.t = { sigma; to_unify } in
-    M.return p
+    return p
   ;;
 
   let cross_product (acc : Problems.t list) ({ sigma; to_unify } : Problems.t)
@@ -394,10 +515,8 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
 
   (*********************************************************)
 
-  let does_constructor_unify (to_check : EConstr.t) (acc : EConstr.t)
-    : bool M.mm
-    =
-    M.state (fun env sigma -> Pair.unify env sigma { to_check; acc })
+  let does_constructor_unify (to_check : EConstr.t) (acc : EConstr.t) : bool mm =
+    state (fun env sigma -> Pair.unify env sigma { to_check; acc })
   ;;
 
   let check_constructor_args_unify
@@ -406,10 +525,10 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
         (args : Rocq_utils.constructor_args)
     : bool mm
     =
-    let open M.Syntax in
+    let open Syntax in
     let f = does_constructor_unify in
     let* lhs_unifies : bool = f args.lhs lhs in
-    if lhs_unifies then f args.act act else M.return false
+    if lhs_unifies then f args.act act else return false
   ;;
 
   let axiom_constructor
@@ -419,16 +538,14 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
         (constructors : Constructors.t)
     : Constructors.t mm
     =
-    let open M.Syntax in
-    let* is_evar : bool = M.econstr_is_evar tgt in
+    let open Syntax in
+    let* is_evar : bool = econstr_is_evar tgt in
     if is_evar
-    then M.return constructors
+    then return constructors
     else (
-      let tree : M.Constructor.Tree.t =
-        M.Constructor.Tree.Node (constructor_index, [])
-      in
-      let axiom : M.Constructor.t = act, tgt, tree in
-      M.return (axiom :: constructors))
+      let tree : Tree.t = Tree.Node (constructor_index, []) in
+      let axiom : Constructor.t = act, tgt, tree in
+      return (axiom :: constructors))
   ;;
 
   (** Checks possible transitions for this term: *)
@@ -440,8 +557,8 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
             (lts_enc : Enc.t)
     : Constructors.t mm
     =
-    let open M.Syntax in
-    let* from_term : EConstr.t = M.econstr_normalize from_term in
+    let open Syntax in
+    let* from_term : EConstr.t = econstr_normalize from_term in
     (* let* () = debug_validconstrs_start from_term in *)
     let iter_body (i : int) (acc : Constructors.t) : Constructors.t mm =
       (* let* () = debug_validconstrs_iter_start i constructors in *)
@@ -452,10 +569,10 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
       let decls : Rocq_utils.econstr_decl list =
         Rocq_utils.get_econstr_decls ctx
       in
-      let* substl = M.mk_ctx_substl [] (List.rev decls) in
-      let* args : Rocq_utils.constructor_args = M.extract_args ~substl tm in
+      let* substl = mk_ctx_substl [] (List.rev decls) in
+      let* args : Rocq_utils.constructor_args = extract_args ~substl tm in
       (* NOTE: make fresh [act_term] to avoid conflicts with sibling constructors *)
-      let* act_term : EConstr.t = M.fresh_evar (TypeOf act_term) in
+      let* act_term : EConstr.t = fresh_evar (TypeOf act_term) in
       let* success = check_constructor_args_unify from_term act_term args in
       if success
       then (
@@ -472,13 +589,13 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
           (substl, decls))
       else
         (* let* () = debug_validconstrs_iter_close i constructors in *)
-        M.return acc
+        return acc
     in
     let* constructors =
-      M.iterate 0 (Array.length constructors - 1) [] iter_body
+      iterate 0 (Array.length constructors - 1) [] iter_body
     in
     (* let* () = debug_validconstrs_close from_term constructors in *)
-    M.return constructors
+    return constructors
 
   (** *)
   and explore_valid_constructor
@@ -490,11 +607,11 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
         ((substl, decls) : EConstr.Vars.substl * EConstr.rel_declaration list)
     : Constructors.t mm
     =
-    let open M.Syntax in
+    let open Syntax in
     (* NOTE: unpack and normalize [act] and [tgt] from [args] *)
     let tgt : EConstr.t = EConstr.Vars.substl substl args.rhs in
-    let* tgt : EConstr.t = M.econstr_normalize tgt in
-    let* act : EConstr.t = M.econstr_normalize args.act in
+    let* tgt : EConstr.t = econstr_normalize tgt in
+    let* act : EConstr.t = econstr_normalize args.act in
     (* TODO: make fresh sigma from fresh act+tgt, and use that from this point onwards. then, during cross-product, make sure that it is used over the parents sigma stored within the unification problems during ctx *)
     (* let* constructors =
     sandbox *)
@@ -512,13 +629,13 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
     :  EConstr.Vars.substl * EConstr.rel_declaration list
     -> (Enc.t * Problems.t list) option mm
     = function
-    | [], [] -> M.return (Some (lts_enc, acc))
+    | [], [] -> return (Some (lts_enc, acc))
     | _hsubstl :: substl, t :: tl ->
-      let open M.Syntax in
+      let open Syntax in
       let ty_t : EConstr.t = Context.Rel.Declaration.get_type t in
       let$+ upd_t env sigma = EConstr.Vars.substl substl ty_t in
-      let* env = M.env () in
-      let* sigma = M.sigma () in
+      let* env = get_env in
+      let* sigma = get_sigma in
       (match EConstr.kind sigma upd_t with
        | App (name, args) ->
          (match F.find_opt indmap name with
@@ -539,7 +656,7 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
               check_valid_constructors next_lts indmap lhs act c.enc
             in
             (match next_constructors with
-             | [] -> M.return None
+             | [] -> return None
              | next_constructors ->
                let* problems : Problems.t =
                  map_problems args next_constructors
@@ -547,7 +664,7 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
                let acc : Problems.t list = cross_product acc problems in
                check_updated_ctx lts_enc acc indmap (substl, tl)))
        | _ -> check_updated_ctx lts_enc acc indmap (substl, tl))
-    | _substl, _ctxl -> M.Err.invalid_check_updated_ctx _substl _ctxl
+    | _substl, _ctxl -> Err.invalid_check_updated_ctx _substl _ctxl
   (* ! Impossible ! *)
   (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
 
@@ -558,7 +675,7 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
         (constructors : Constructors.t)
     : (Enc.t * Problems.t list) option -> Constructors.t mm
     = function
-    | None -> M.return constructors
+    | None -> return constructors
     | Some (next_lts_enc, next_problems) ->
       if Problems.list_is_empty next_problems
       then axiom_constructor outer_act tgt_term (next_lts_enc, i) constructors
@@ -579,11 +696,11 @@ module Make (M : Rocq_monad.Utils.S) : S = struct
         (lts_enc : Enc.t)
     : Constructors.t mm
     =
-    let open M.Syntax in
-    let* fresh_evar = M.fresh_evar (OfType label_type) in
+    let open Syntax in
+    let* fresh_evar = fresh_evar (OfType label_type) in
     let* constructors : Constructors.t =
       check_valid_constructors constructors indmap from_term fresh_evar lts_enc
     in
-    M.return constructors
+    return constructors
   ;;
 end

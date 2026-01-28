@@ -1,34 +1,36 @@
-module type S = sig
-  module Enc : Encoding.SEncoding
+(* module type S = sig
+   module Enc : Encoding.SEncoding
 
-  module type STreeNode = sig
-    type t = Enc.t * int
+   module type STreeNode = sig
+   type t = Enc.t * int
 
-    val to_string : t -> string
-  end
+   val to_string : t -> string
+   end
 
-  module TreeNode : STreeNode with type t = Enc.t * int
+   module TreeNode : STreeNode with type t = Enc.t * int
 
-  type 'a tree = Node of 'a * 'a tree list
-  type t = TreeNode.t tree
+   type 'a tree = Node of 'a * 'a tree list
+   type t = TreeNode.t tree
 
-  val add : t -> t -> t
-  val add_list : t -> t list -> t list
-  val equal : t -> t -> bool
-  val compare : t -> t -> int
-  val minimize : t -> TreeNode.t list
+   val add : t -> t -> t
+   val add_list : t -> t list -> t list
+   val equal : t -> t -> bool
+   val compare : t -> t -> int
+   val minimize : t -> TreeNode.t list
 
-  exception CannotMinimizeEmptyList of unit
+   exception CannotMinimizeEmptyList of unit
 
-  val min : t list -> TreeNode.t list
-  val to_string : t -> string
-  val list_to_string : ?args:Utils.Strfy.style_args -> t list -> string
-end
+   val min : t list -> TreeNode.t list
+   val to_string : t -> string
+   val list_to_string : ?args:Utils.Strfy.style_args -> t list -> string
+   end *)
 
-module Make (E : Encoding.SEncoding) :
-  S with module Enc = E and type Enc.t = E.t and type TreeNode.t = E.t * int =
+module Make
+    (Enc : Encoding.SEncoding)
+     (* : *)
+     (* S with module Enc = E and type Enc.t = E.t and type TreeNode.t = E.t * int *) =
 struct
-  module Enc : Encoding.SEncoding with type t = E.t = E
+  (* module Enc : Encoding.SEncoding with type t = Enc.t = Enc *)
 
   module type STreeNode = sig
     type t = Enc.t * int

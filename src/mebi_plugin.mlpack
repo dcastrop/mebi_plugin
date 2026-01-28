@@ -13,11 +13,9 @@ Encoding
 Enc_tree
 Term
 Bi_encoding
-Rocq_monad
 Rocq_unification
+Rocq_monad
+Rocq_monad_utils
 Rocq_bindings
 Model
 Wrapper
-Saturate
-Minimize
-Bisimilar

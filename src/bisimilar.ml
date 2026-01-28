@@ -5,8 +5,8 @@ module type S = sig
     { the_fsm_1 : fsm_pair
     ; the_fsm_2 : fsm_pair
     ; merged_fsm : Model.FSM.t
-    ; bisim_states : Model.Partition.S.t
-    ; non_bisim_states : Model.Partition.S.t
+    ; bisim_states : Model.Partition.t
+    ; non_bisim_states : Model.Partition.t
     }
 
   and fsm_pair =
@@ -39,8 +39,8 @@ module Make (M : Model.S) : S = struct
     { the_fsm_1 : fsm_pair
     ; the_fsm_2 : fsm_pair
     ; merged_fsm : Model.FSM.t
-    ; bisim_states : Model.Partition.S.t
-    ; non_bisim_states : Model.Partition.S.t
+    ; bisim_states : Model.Partition.t
+    ; non_bisim_states : Model.Partition.t
     }
 
   and fsm_pair =
