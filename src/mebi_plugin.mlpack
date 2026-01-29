@@ -3,9 +3,8 @@ Output_kind
 Output_mode
 Output_config
 Logger
-Rocq_utils
-Rocq_convert
 Theories
+Rocq_utils
 Rocq_ind
 Rocq_enc
 Rocq_context
