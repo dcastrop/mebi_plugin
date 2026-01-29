@@ -5,11 +5,11 @@ let () = Log.Config.configure_output Debug false
 let () = Log.Config.configure_output Trace false
 (***********************************************************************)
 
-let rec tactics : unit Proofview.tactic list -> unit Proofview.tactic = function
-  | [] -> Proofview.tclUNIT ()
-  | h :: [] -> h
-  | h :: t -> Proofview.tclTHEN h (tactics t)
-;;
+(* let rec tactics : unit Proofview.tactic list -> unit Proofview.tactic = function
+   | [] -> Proofview.tclUNIT ()
+   | h :: [] -> h
+   | h :: t -> Proofview.tclTHEN h (tactics t)
+   ;; *)
 
 (*****************************************************************************)
 
@@ -356,62 +356,9 @@ let c_ex_intro () : EConstr.t =
   | Some c -> c
 ;;
 
-let is_constant sigma (x : EConstr.t) (c : unit -> EConstr.t) : bool =
-  match Constr.kind (Rocq_convert.econstr_to_constr sigma x) with
-  | App (x, _) -> Constr.equal x (Rocq_convert.econstr_to_constr sigma (c ()))
-  | _ -> false
-;;
-
 (*****************************************************************************)
 
-let is_app sigma (x : EConstr.t) : bool = EConstr.isApp sigma x
-
-let is_theory sigma (x : EConstr.t) : bool =
-  let cs = collect_bisimilarity_theories () in
-  let fx = EConstr.eq_constr sigma x in
-  List.exists fx cs
-;;
-
-let is_var sigma (x : EConstr.t) : bool =
-  EConstr.isRef sigma x && EConstr.isVar sigma x
-;;
-
-let is_constr sigma (x : EConstr.t) : bool =
-  EConstr.isRef sigma x && EConstr.isConst sigma x
-;;
-
-let is_type sigma (x : EConstr.t) : bool =
-  EConstr.isType sigma x && EConstr.isConst sigma x
-;;
-
 (******)
-
-let get_hyp_names (gl : Proofview.Goal.t) : Names.Id.Set.t =
-  Context.Named.to_vars (Proofview.Goal.hyps gl)
-;;
-
-let next_name_of (names : Names.Id.Set.t) : Names.Id.t -> Names.Id.t =
-  Log.trace __FUNCTION__;
-  fun x ->
-    Log.thing ~__FUNCTION__ Debug "next name" x (Of Names.Id.to_string);
-    Namegen.next_ident_away x names
-;;
-
-let new_name_of_string (gl : Proofview.Goal.t) : string -> Names.Id.t =
-  fun x ->
-  Log.thing ~__FUNCTION__ Debug "of name" x (Args Utils.Strfy.string);
-  next_name_of (get_hyp_names gl) (Names.Id.of_string x)
-;;
-
-let is_cofix (x : Names.Id.t) : bool =
-  Names.Id.equal (Nameops.root_of_id x) (Names.Id.of_string "Cofix")
-;;
-
-let new_cofix_name (gl : Proofview.Goal.t) : Names.Id.t =
-  new_name_of_string gl "Cofix0"
-;;
-
-let new_H_name (gl : Proofview.Goal.t) : Names.Id.t = new_name_of_string gl "H0"
 
 (*****************************************************************************)
 

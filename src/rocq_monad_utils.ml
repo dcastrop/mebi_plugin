@@ -28,11 +28,27 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
         (x : EConstr.t)
     : Constr.t mm
     =
-    state (fun env sigma -> sigma, Rocq_convert.econstr_to_constr sigma x)
+    state (fun env sigma -> sigma, Rocq_utils.econstr_to_constr sigma x)
   ;;
 
   let econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
-    state (fun env sigma -> sigma, Rocq_convert.econstr_to_constr_opt sigma x)
+    state (fun env sigma -> sigma, Rocq_utils.econstr_to_constr_opt sigma x)
+  ;;
+
+  let constrexpr_to_econstr (x : Constrexpr.constr_expr) : EConstr.t mm =
+    state (fun env sigma -> Rocq_utils.constrexpr_to_econstr env sigma x)
+  ;;
+
+  let exists_eq (x : EConstr.t) (ys : 'a list) (decoder : 'a -> EConstr.t)
+    : bool mm
+    =
+    let open Syntax in
+    let f (i : int) (a : bool) =
+      let y : EConstr.t = List.nth ys i |> decoder in
+      let* b : bool = econstr_eq x y in
+      (a || b) |> return
+    in
+    iterate 0 (List.length ys - 1) false f
   ;;
 
   module Strfy = struct
@@ -40,6 +56,13 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
 
     let econstr_rel_decl : EConstr.rel_declaration -> string =
       fstring Rocq_utils.Strfy.econstr_rel_decl
+    ;;
+
+    let hyp_name : Rocq_utils.hyp -> string = Rocq_utils.Strfy.hyp_name
+    let hyp_type : Rocq_utils.hyp -> string = fstring Rocq_utils.Strfy.hyp_type
+
+    let hyp_value : Rocq_utils.hyp -> string =
+      fstring Rocq_utils.Strfy.hyp_value
     ;;
   end
 

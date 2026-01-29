@@ -8,6 +8,9 @@ exception
 
 exception Rocq_utils_EConstrIsNotA_Type of (Evd.evar_map * EConstr.t * string)
 
+(** [econstr_to_atomic sigma x]
+    @raise Rocq_utils_EConstrIsNotA_Type
+      if [EConstr.kind_of_type sigma x] is not [AtomicType (ty, tys)]. *)
 let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t)
   : EConstr.t kind_pair
   =
@@ -629,3 +632,53 @@ let unpack_constr_args ((_, tys) : Constr.t kind_pair)
   (* NOTE: in case [tys.(_)] is out of bounds. *)
   | Not_found -> raise (Rocq_utils_CouldNotExtractBinding ())
 ;;
+
+let econstr_to_constrexpr env sigma : EConstr.t -> Constrexpr.constr_expr =
+  Constrextern.extern_constr env sigma
+;;
+
+let constrexpr_to_econstr env sigma
+  : Constrexpr.constr_expr -> Evd.evar_map * EConstr.t
+  =
+  Constrintern.interp_constr_evars env sigma
+;;
+
+let econstr_to_constr ?(abort_on_undefined_evars : bool = false) sigma
+  : EConstr.t -> Constr.t
+  =
+  EConstr.to_constr ~abort_on_undefined_evars sigma
+;;
+
+let econstr_to_constr_opt sigma : EConstr.t -> Constr.t option =
+  EConstr.to_constr_opt sigma
+;;
+
+let globref_to_econstr env : Names.GlobRef.t -> EConstr.t =
+  fun x -> EConstr.of_constr (UnivGen.constr_of_monomorphic_global env x)
+;;
+
+let is_constant sigma (x : EConstr.t) (c : unit -> EConstr.t) : bool =
+  match Constr.kind (econstr_to_constr sigma x) with
+  | App (x, _) -> Constr.equal x (econstr_to_constr sigma (c ()))
+  | _ -> false
+;;
+
+let is_theory sigma (x : EConstr.t) : bool =
+  let cs = Theories.collect_bisimilarity_theories () in
+  let fx = EConstr.eq_constr sigma x in
+  List.exists fx cs
+;;
+
+(* let is_app sigma (x : EConstr.t) : bool = EConstr.isApp sigma x *)
+
+(* let is_var sigma (x : EConstr.t) : bool =
+   EConstr.isRef sigma x && EConstr.isVar sigma x
+   ;; *)
+
+(* let is_constr sigma (x : EConstr.t) : bool =
+   EConstr.isRef sigma x && EConstr.isConst sigma x
+   ;; *)
+
+(* let is_type sigma (x : EConstr.t) : bool =
+   EConstr.isType sigma x && EConstr.isConst sigma x
+   ;; *)

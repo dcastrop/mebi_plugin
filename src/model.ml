@@ -62,7 +62,29 @@ module Make (Enc : Encoding.SEncoding) = struct
       }
 
     let equal (a : t) (b : t) : bool = Enc.equal a.term b.term
-    let compare (a : t) (b : t) : int = Enc.compare a.term b.term
+
+    (* exception Label_EqualEnc_Different_Silent of (t * t) *)
+    (* let equal (a : t) (b : t) : bool =
+      if Enc.equal a.term b.term
+      then
+        if Option.equal Bool.equal a.is_silent b.is_silent
+        then raise (Label_EqualEnc_Different_Silent (a, b))
+        else true
+      else false
+    ;; *)
+
+    (** [compare a b] first compares the [term] of each, and if [0] then only compares the contents of [is_silent] if both are [Some _]. This allows us to [find] a label using only the [term] if we do not know if [is_silent] (which is acceptable since in the full model either all [Labels] are [None] or [Some _], and a comparison such as this would only be in the case where we are trying to find a label by [term]).
+    *)
+    let compare (a : t) (b : t) : int =
+      Utils.compare_chain
+        [ Enc.compare a.term b.term
+        ; Option.cata
+            (fun (a : bool) -> Option.cata (Bool.compare a) 0 b.is_silent)
+            0
+            a.is_silent
+        ]
+    ;;
+
     let hash (x : t) : int = Enc.hash x.term
 
     (* *)
