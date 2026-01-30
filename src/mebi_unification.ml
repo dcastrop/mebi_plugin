@@ -6,7 +6,7 @@ open Mebi_wrapper.Syntax
 module Tree = Mebi_constr.Tree
 
 (***********************************************************************)
-module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+module Log : Logger.SLogger = Logger.MkDefault ()
 
 let () = Log.Config.configure_output Debug false
 let () = Log.Config.configure_output Trace false

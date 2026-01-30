@@ -1,25 +1,34 @@
-module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
-  include Rocq_monad.Make (C) (E)
+module Make
+    (Log : Logger.SLogger)
+    (C : Rocq_context.SRocq_context)
+    (E : Encoding.SEncoding) =
+struct
+  include Rocq_monad.Make (Log) (C) (E)
 
   let fresh_evar (x : Rocq_utils.evar_source) : EConstr.t mm =
+    Log.trace __FUNCTION__;
     state (fun env sigma -> Rocq_utils.get_next env sigma x)
   ;;
 
   let econstr_eq a b : bool mm =
+    Log.trace __FUNCTION__;
     state (fun env sigma -> sigma, EConstr.eq_constr sigma a b)
   ;;
 
   let econstr_normalize (x : EConstr.t) : EConstr.t mm =
+    Log.trace __FUNCTION__;
     let open Syntax in
     let$+ t env sigma = Reductionops.nf_all env sigma x in
     return t
   ;;
 
   let econstr_kind (x : EConstr.t) : Rocq_utils.econstr_kind mm =
+    Log.trace __FUNCTION__;
     state (fun env sigma -> sigma, EConstr.kind sigma x)
   ;;
 
   let econstr_is_evar (x : EConstr.t) : bool mm =
+    Log.trace __FUNCTION__;
     state (fun env sigma -> sigma, EConstr.isEvar sigma x)
   ;;
 
@@ -30,14 +39,17 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
         (x : EConstr.t)
     : Constr.t mm
     =
+    Log.trace __FUNCTION__;
     state (fun env sigma -> sigma, Rocq_utils.econstr_to_constr sigma x)
   ;;
 
   let econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
+    Log.trace __FUNCTION__;
     state (fun env sigma -> sigma, Rocq_utils.econstr_to_constr_opt sigma x)
   ;;
 
   let constrexpr_to_econstr (x : Constrexpr.constr_expr) : EConstr.t mm =
+    Log.trace __FUNCTION__;
     state (fun env sigma -> Rocq_utils.constrexpr_to_econstr env sigma x)
   ;;
 
@@ -46,6 +58,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
   let exists_eq (x : EConstr.t) (ys : 'a list) (decoder : 'a -> EConstr.t)
     : bool mm
     =
+    Log.trace __FUNCTION__;
     let open Syntax in
     let f (i : int) (a : bool) =
       let y : EConstr.t = List.nth ys i |> decoder in
@@ -58,12 +71,14 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
   (*********************************************************)
 
   let type_of_econstr (x : EConstr.t) : EConstr.t mm =
+    Log.trace __FUNCTION__;
     let open Syntax in
     let* t : EConstr.t = econstr_normalize x in
     state (fun env sigma -> Typing.type_of env sigma t)
   ;;
 
   let type_of_constrexpr (x : Constrexpr.constr_expr) : EConstr.t mm =
+    Log.trace __FUNCTION__;
     let open Syntax in
     let* t : EConstr.t = constrexpr_to_econstr x in
     type_of_econstr t

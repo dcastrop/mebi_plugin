@@ -1,4 +1,4 @@
-module Make (Enc : Encoding.SEncoding) = struct
+module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
   module Tree = Enc_tree.Make (Enc)
   module Trees : Set.S with type elt = Tree.t = Set.Make (Tree)
 
@@ -817,6 +817,7 @@ module Make (Enc : Encoding.SEncoding) = struct
 
   module Convert = struct
     let transitions_to_edgemap (xs : Transitions.t) : EdgeMap.t' =
+      Log.trace __FUNCTION__;
       let edges : EdgeMap.t' = EdgeMap.create 0 in
       Transitions.iter
         (fun ({ from; goto; label; annotation; constructor_tree } :
@@ -835,6 +836,7 @@ module Make (Enc : Encoding.SEncoding) = struct
     ;;
 
     let lts_to_fsm (x : LTS.t) : FSM.t =
+      Log.trace __FUNCTION__;
       { init = x.init
       ; terminals = x.terminals
       ; alphabet = x.alphabet
@@ -1109,6 +1111,7 @@ module Make (Enc : Encoding.SEncoding) = struct
     ;;
 
     let fsm ?(only_if_weak : bool option = None) (x : FSM.t) : FSM.t =
+      Log.trace __FUNCTION__;
       match only_if_weak with
       | Some false -> x
       | _ -> { x with edges = edges x.alphabet x.states (EdgeMap.copy x.edges) }
@@ -1202,6 +1205,7 @@ module Make (Enc : Encoding.SEncoding) = struct
     ;;
 
     let fsm ?(weak : bool = false) (fsm : FSM.t) : t =
+      Log.trace __FUNCTION__;
       { fsm
       ; pi = Saturate.fsm ~only_if_weak:(Some weak) fsm |> partition_states
       }
@@ -1255,6 +1259,7 @@ module Make (Enc : Encoding.SEncoding) = struct
     ;;
 
     let fsm ?(weak : bool = false) (a : FSM.t) (b : FSM.t) : t =
+      Log.trace __FUNCTION__;
       let fsm_a : fsm_pair = fsm_pair ~weak a in
       let fsm_b : fsm_pair = fsm_pair ~weak b in
       let merged : FSM.t = FSM.merge fsm_a.saturated fsm_b.saturated in

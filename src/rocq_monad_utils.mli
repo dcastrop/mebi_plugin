@@ -1,4 +1,7 @@
-module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
+module Make : (Log : Logger.SLogger)
+  (C : Rocq_context.SRocq_context)
+  (E : Encoding.SEncoding)
+  -> sig
   module Ctx : sig
     val get : unit -> Rocq_context.t ref
     val env : unit -> Environ.env ref
@@ -7,7 +10,7 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
   end
 
   module Enc : sig
-    type t = Rocq_monad.Make(C)(E).Enc.t
+    type t = Rocq_monad.Make(Log)(C)(E).Enc.t
 
     val init : t
     val next : t -> t
@@ -22,7 +25,9 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
 
   module F : sig
     type key = Evd.econstr
-    type 'a t = 'a Bi_encoding.Make(Ctx)(Enc).F.t
+
+    type 'a t =
+      'a Bi_encoding.Make(Log)(Ctx)(Enc).F.t
 
     val create : int -> 'a t
     val clear : 'a t -> unit
@@ -36,8 +41,13 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
     val replace : 'a t -> key -> 'a -> unit
     val mem : 'a t -> key -> bool
     val iter : (key -> 'a -> unit) -> 'a t -> unit
-    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+    val filter_map_inplace :
+      (key -> 'a -> 'a option) -> 'a t -> unit
+
+    val fold :
+      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
     val length : 'a t -> int
     val stats : 'a t -> Hashtbl.statistics
     val to_seq : 'a t -> (key * 'a) Seq.t
@@ -50,7 +60,9 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
 
   module B : sig
     type key = Enc.t
-    type 'a t = 'a Bi_encoding.Make(Ctx)(Enc).B.t
+
+    type 'a t =
+      'a Bi_encoding.Make(Log)(Ctx)(Enc).B.t
 
     val create : int -> 'a t
     val clear : 'a t -> unit
@@ -64,8 +76,13 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
     val replace : 'a t -> key -> 'a -> unit
     val mem : 'a t -> key -> bool
     val iter : (key -> 'a -> unit) -> 'a t -> unit
-    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+    val filter_map_inplace :
+      (key -> 'a -> 'a option) -> 'a t -> unit
+
+    val fold :
+      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
     val length : 'a t -> int
     val stats : 'a t -> Hashtbl.statistics
     val to_seq : 'a t -> (key * 'a) Seq.t
@@ -76,10 +93,11 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
     val of_seq : (key * 'a) Seq.t -> 'a t
   end
 
-  type maps = Bi_encoding.Make(Ctx)(Enc).maps =
-    { fwd : Enc.t F.t
-    ; bck : Evd.econstr B.t
-    }
+  type maps =
+        Bi_encoding.Make(Log)(Ctx)(Enc).maps = {
+    fwd : Enc.t F.t;
+    bck : Evd.econstr B.t;
+  }
 
   val the_maps : unit -> maps ref
   val reset : unit -> unit
@@ -103,48 +121,54 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
 
   type 'a mm = wrapper ref -> 'a in_wrapper
 
-  and wrapper =
-    { ctx : Rocq_context.t ref
-    ; maps : maps ref
-    }
+  and wrapper = {
+    ctx : Rocq_context.t ref;
+    maps : maps ref;
+  }
 
-  and 'a in_wrapper =
-    { state : wrapper ref
-    ; value : 'a
-    }
+  and 'a in_wrapper = {
+    state : wrapper ref;
+    value : 'a;
+  }
 
   val run : ?reset_encoding:bool -> 'a mm -> 'a
   val return : 'a -> 'a mm
   val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
   val map : ('a -> 'b) -> 'a mm -> 'b mm
   val product : 'a mm -> 'b mm -> ('a * 'b) mm
-  val iterate : int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
 
-  val state
-    :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-    -> wrapper ref
-    -> 'a in_wrapper
+  val iterate :
+    int -> int -> 'a -> (int -> 'a -> 'a mm) -> 'a mm
 
-  val sandbox : ?sigma:Evd.evar_map -> 'a mm -> wrapper ref -> 'a in_wrapper
+  val state :
+    (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) ->
+    wrapper ref ->
+    'a in_wrapper
+
+  val sandbox :
+    ?sigma:Evd.evar_map ->
+    'a mm ->
+    wrapper ref ->
+    'a in_wrapper
 
   module type SYNTAX = sig
     val ( let+ ) : 'a mm -> ('a -> 'b) -> 'b mm
     val ( let* ) : 'a mm -> ('a -> 'b mm) -> 'b mm
 
-    val ( let$ )
-      :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-      -> ('a -> 'b mm)
-      -> 'b mm
+    val ( let$ ) :
+      (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) ->
+      ('a -> 'b mm) ->
+      'b mm
 
-    val ( let$* )
-      :  (Environ.env -> Evd.evar_map -> Evd.evar_map)
-      -> (unit -> 'b mm)
-      -> 'b mm
+    val ( let$* ) :
+      (Environ.env -> Evd.evar_map -> Evd.evar_map) ->
+      (unit -> 'b mm) ->
+      'b mm
 
-    val ( let$+ )
-      :  (Environ.env -> Evd.evar_map -> 'a)
-      -> ('a -> 'b mm)
-      -> 'b mm
+    val ( let$+ ) :
+      (Environ.env -> Evd.evar_map -> 'a) ->
+      ('a -> 'b mm) ->
+      'b mm
 
     val ( and+ ) : 'a mm -> 'b mm -> ('a * 'b) mm
   end
@@ -153,20 +177,20 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
     val ( let+ ) : 'a mm -> ('a -> 'b) -> 'b mm
     val ( let* ) : 'a mm -> ('a -> 'b mm) -> 'b mm
 
-    val ( let$ )
-      :  (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a)
-      -> ('a -> 'b mm)
-      -> 'b mm
+    val ( let$ ) :
+      (Environ.env -> Evd.evar_map -> Evd.evar_map * 'a) ->
+      ('a -> 'b mm) ->
+      'b mm
 
-    val ( let$* )
-      :  (Environ.env -> Evd.evar_map -> Evd.evar_map)
-      -> (unit -> 'b mm)
-      -> 'b mm
+    val ( let$* ) :
+      (Environ.env -> Evd.evar_map -> Evd.evar_map) ->
+      (unit -> 'b mm) ->
+      'b mm
 
-    val ( let$+ )
-      :  (Environ.env -> Evd.evar_map -> 'a)
-      -> ('a -> 'b mm)
-      -> 'b mm
+    val ( let$+ ) :
+      (Environ.env -> Evd.evar_map -> 'a) ->
+      ('a -> 'b mm) ->
+      'b mm
 
     val ( and+ ) : 'a mm -> 'b mm -> ('a * 'b) mm
   end
@@ -177,7 +201,11 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
   val get_maps : wrapper ref -> maps in_wrapper
   val get_fwdmap : wrapper ref -> Enc.t F.t in_wrapper
   val get_bckmap : wrapper ref -> Evd.econstr B.t in_wrapper
-  val fstring : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
+
+  val fstring :
+    (Environ.env -> Evd.evar_map -> 'a -> string) ->
+    'a ->
+    string
 
   module Tree : sig
     module type STreeNode = sig
@@ -192,7 +220,9 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
       val to_string : t -> string
     end
 
-    type 'a tree = 'a Enc_tree.Make(Enc).tree = Node of 'a * 'a tree list
+    type 'a tree = 'a Enc_tree.Make(Enc).tree =
+      | Node of 'a * 'a tree list
+
     type t = TreeNode.t tree
 
     val add : t -> t -> t
@@ -205,7 +235,9 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
 
     val min : t list -> TreeNode.t list
     val to_string : t -> string
-    val list_to_string : ?args:Utils.Strfy.style_args -> t list -> string
+
+    val list_to_string :
+      ?args:Utils.Strfy.style_args -> t list -> string
   end
 
   module Constructor : sig
@@ -214,23 +246,32 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
     val to_string : Environ.env -> Evd.evar_map -> t -> string
   end
 
-  val make_state_tree_pair_set : (module Set.S with type elt = Enc.t * Tree.t)
+  val make_state_tree_pair_set :
+    (module Set.S with type elt = Enc.t * Tree.t)
+
   val fresh_evar : Rocq_utils.evar_source -> Evd.econstr mm
   val econstr_eq : Evd.econstr -> Evd.econstr -> bool mm
   val econstr_normalize : Evd.econstr -> Evd.econstr mm
   val econstr_kind : Evd.econstr -> Rocq_utils.econstr_kind mm
   val econstr_is_evar : Evd.econstr -> bool mm
 
-  val econstr_to_constr
-    :  ?abort_on_undefined_evars:bool
-    -> Evd.econstr
-    -> Constr.t mm
+  val econstr_to_constr :
+    ?abort_on_undefined_evars:bool ->
+    Evd.econstr ->
+    Constr.t mm
 
   val econstr_to_constr_opt : Evd.econstr -> Constr.t option mm
-  val constrexpr_to_econstr : Constrexpr.constr_expr -> Evd.econstr mm
-  val exists_eq : Evd.econstr -> 'a list -> ('a -> Evd.econstr) -> bool mm
+
+  val constrexpr_to_econstr :
+    Constrexpr.constr_expr -> Evd.econstr mm
+
+  val exists_eq :
+    Evd.econstr -> 'a list -> ('a -> Evd.econstr) -> bool mm
+
   val type_of_econstr : Evd.econstr -> Evd.econstr mm
-  val type_of_constrexpr : Constrexpr.constr_expr -> Evd.econstr mm
+
+  val type_of_constrexpr :
+    Constrexpr.constr_expr -> Evd.econstr mm
 
   module Strfy : sig
     val econstr : Evd.econstr -> string
@@ -246,14 +287,16 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
       | Invalid_Sort_Type of Sorts.family
       | Invalid_Ref_LTS of Names.GlobRef.t
       | Invalid_Ref_Type of Names.GlobRef.t
-      | Invalid_Arity of (Environ.env * Evd.evar_map * Constr.t)
+      | Invalid_Arity of
+          (Environ.env * Evd.evar_map * Constr.t)
       | InvalidCheckUpdatedCtx of
           (Environ.env
           * Evd.evar_map
           * Evd.econstr list
           * EConstr.rel_declaration list)
       | InvalidLTSArgsLength of int
-      | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
+      | InvalidLTSTermKind of
+          Environ.env * Evd.evar_map * Constr.t
 
     exception MEBI_exn of t
 
@@ -261,17 +304,21 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
     val invalid_sort_type : Sorts.family -> exn
     val invalid_ref_lts : Names.GlobRef.t -> exn
     val invalid_ref_type : Names.GlobRef.t -> exn
-    val invalid_arity : Environ.env -> Evd.evar_map -> Constr.t -> exn
 
-    val invalid_check_updated_ctx
-      :  Environ.env
-      -> Evd.evar_map
-      -> Evd.econstr list
-      -> EConstr.rel_declaration list
-      -> exn
+    val invalid_arity :
+      Environ.env -> Evd.evar_map -> Constr.t -> exn
+
+    val invalid_check_updated_ctx :
+      Environ.env ->
+      Evd.evar_map ->
+      Evd.econstr list ->
+      EConstr.rel_declaration list ->
+      exn
 
     val invalid_lts_args_length : int -> exn
-    val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
+
+    val invalid_lts_term_kind :
+      Environ.env -> Evd.evar_map -> Constr.t -> exn
   end
 
   module Errors : SErrors
@@ -283,10 +330,8 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
     val invalid_ref_type : Names.GlobRef.t -> 'a
     val invalid_arity : Constr.t -> 'a mm
 
-    val invalid_check_updated_ctx
-      :  Evd.econstr list
-      -> EConstr.rel_declaration list
-      -> 'a mm
+    val invalid_check_updated_ctx :
+      Evd.econstr list -> EConstr.rel_declaration list -> 'a mm
 
     val invalid_lts_args_length : int -> 'a
     val invalid_lts_term_kind : Constr.t -> 'a mm
@@ -297,91 +342,88 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
   module Ind : sig
     val lookup : Names.inductive -> Declarations.mind_specif mm
 
-    val assert_mip_arity_is_type_or_set
-      :  Declarations.inductive_arity
-      -> unit mm
+    val assert_mip_arity_is_type_or_set :
+      Declarations.inductive_arity -> unit mm
 
-    val assert_mip_arity_is_prop : Declarations.inductive_arity -> unit mm
+    val assert_mip_arity_is_prop :
+      Declarations.inductive_arity -> unit mm
 
-    val lts_mind
-      :  Names.GlobRef.t
-      -> (Names.inductive * Declarations.mind_specif) mm
+    val lts_mind :
+      Names.GlobRef.t ->
+      (Names.inductive * Declarations.mind_specif) mm
 
-    val lts_type_mind
-      :  Names.GlobRef.t
-      -> (Names.inductive * Declarations.mind_specif) mm
+    val lts_type_mind :
+      Names.GlobRef.t ->
+      (Names.inductive * Declarations.mind_specif) mm
 
-    val lts_prop_mind
-      :  Names.GlobRef.t
-      -> (Names.inductive * Declarations.mind_specif) mm
+    val lts_prop_mind :
+      Names.GlobRef.t ->
+      (Names.inductive * Declarations.mind_specif) mm
 
-    val lts_labels_and_terms
-      :  Declarations.mind_specif
-      -> (Constr.rel_declaration * Constr.rel_declaration) mm
+    val lts_labels_and_terms :
+      Declarations.mind_specif ->
+      (Constr.rel_declaration * Constr.rel_declaration) mm
 
     val lts : Names.GlobRef.t -> Enc.t Rocq_ind.t mm
   end
 
-  val mk_ctx_substl
-    :  EConstr.Vars.substl
-    -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list
-    -> EConstr.Vars.substl mm
+  val mk_ctx_substl :
+    EConstr.Vars.substl ->
+    ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list ->
+    EConstr.Vars.substl mm
 
-  val extract_args
-    :  ?substl:EConstr.Vars.substl
-    -> Constr.t
-    -> Rocq_utils.constructor_args mm
+  val extract_args :
+    ?substl:EConstr.Vars.substl ->
+    Constr.t ->
+    Rocq_utils.constructor_args mm
 
   module Unification : sig
     module type SPair = sig
-      type t =
-        { to_check : Evd.econstr
-        ; acc : Evd.econstr
-        }
+      type t = { to_check : Evd.econstr; acc : Evd.econstr }
 
-      val to_string : Environ.env -> Evd.evar_map -> t -> string
+      val to_string :
+        Environ.env -> Evd.evar_map -> t -> string
 
-      val make
-        :  Environ.env
-        -> Evd.evar_map
-        -> Evd.econstr
-        -> Evd.econstr
-        -> Evd.evar_map * t
+      val make :
+        Environ.env ->
+        Evd.evar_map ->
+        Evd.econstr ->
+        Evd.econstr ->
+        Evd.evar_map * t
 
-      val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
+      val unify :
+        Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
     end
 
     module Pair : SPair
 
     module type SProblem = sig
-      type t =
-        { act : Pair.t
-        ; goto : Pair.t
-        ; tree : Tree.t
-        }
+      type t = { act : Pair.t; goto : Pair.t; tree : Tree.t }
 
-      val to_string : Environ.env -> Evd.evar_map -> t -> string
+      val to_string :
+        Environ.env -> Evd.evar_map -> t -> string
+
       val unify_opt : t -> Tree.t option mm
     end
 
     module Problem : SProblem
 
     module type SProblems = sig
-      type t =
-        { sigma : Evd.evar_map
-        ; to_unify : Problem.t list
-        }
+      type t = {
+        sigma : Evd.evar_map;
+        to_unify : Problem.t list;
+      }
 
       val empty : unit -> t mm
       val list_is_empty : t list -> bool
       val to_string : Environ.env -> t -> string
       val list_to_string : Environ.env -> t list -> string
 
-      val sandbox_unify_all_opt
-        :  Evd.econstr
-        -> Evd.econstr
-        -> t
-        -> (Evd.econstr * Evd.econstr * Tree.t list) option mm
+      val sandbox_unify_all_opt :
+        Evd.econstr ->
+        Evd.econstr ->
+        t ->
+        (Evd.econstr * Evd.econstr * Tree.t list) option mm
     end
 
     module Problems : SProblems
@@ -389,83 +431,85 @@ module Make : (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) -> sig
     module type SConstructors = sig
       type t = Constructor.t list
 
-      val to_string : Environ.env -> Evd.evar_map -> t -> string
+      val to_string :
+        Environ.env -> Evd.evar_map -> t -> string
 
-      val retrieve
-        :  int
-        -> t
-        -> Evd.econstr
-        -> Evd.econstr
-        -> Enc.t * Problems.t list
-        -> t mm
+      val retrieve :
+        int ->
+        t ->
+        Evd.econstr ->
+        Evd.econstr ->
+        Enc.t * Problems.t list ->
+        t mm
     end
 
     module Constructors : SConstructors
 
-    val constr_to_problem
-      :  Rocq_utils.constructor_args
-      -> Constructor.t
-      -> Problem.t
+    val constr_to_problem :
+      Rocq_utils.constructor_args -> Constructor.t -> Problem.t
 
-    val map_problems
-      :  Rocq_utils.constructor_args
-      -> Constructors.t
-      -> Problems.t mm
+    val map_problems :
+      Rocq_utils.constructor_args ->
+      Constructors.t ->
+      Problems.t mm
 
-    val cross_product : Problems.t list -> Problems.t -> Problems.t list
-    val does_constructor_unify : Evd.econstr -> Evd.econstr -> bool mm
+    val cross_product :
+      Problems.t list -> Problems.t -> Problems.t list
 
-    val check_constructor_args_unify
-      :  Evd.econstr
-      -> Evd.econstr
-      -> Rocq_utils.constructor_args
-      -> bool mm
+    val does_constructor_unify :
+      Evd.econstr -> Evd.econstr -> bool mm
 
-    val axiom_constructor
-      :  Evd.econstr
-      -> Evd.econstr
-      -> Enc.t * int
-      -> Constructors.t
-      -> Constructors.t mm
+    val check_constructor_args_unify :
+      Evd.econstr ->
+      Evd.econstr ->
+      Rocq_utils.constructor_args ->
+      bool mm
 
-    val check_valid_constructors
-      :  Rocq_ind.LTS.constructor array
-      -> Enc.t Rocq_ind.t F.t
-      -> Evd.econstr
-      -> Evd.econstr
-      -> Enc.t
-      -> Constructors.t mm
+    val axiom_constructor :
+      Evd.econstr ->
+      Evd.econstr ->
+      Enc.t * int ->
+      Constructors.t ->
+      Constructors.t mm
 
-    val explore_valid_constructor
-      :  Enc.t Rocq_ind.t F.t
-      -> Evd.econstr
-      -> Enc.t
-      -> Rocq_utils.constructor_args
-      -> int * Constructors.t
-      -> EConstr.Vars.substl * EConstr.rel_declaration list
-      -> Constructors.t mm
+    val check_valid_constructors :
+      Rocq_ind.LTS.constructor array ->
+      Enc.t Rocq_ind.t F.t ->
+      Evd.econstr ->
+      Evd.econstr ->
+      Enc.t ->
+      Constructors.t mm
 
-    val check_updated_ctx
-      :  Enc.t
-      -> Problems.t list
-      -> Enc.t Rocq_ind.t F.t
-      -> EConstr.Vars.substl * EConstr.rel_declaration list
-      -> (Enc.t * Problems.t list) option mm
+    val explore_valid_constructor :
+      Enc.t Rocq_ind.t F.t ->
+      Evd.econstr ->
+      Enc.t ->
+      Rocq_utils.constructor_args ->
+      int * Constructors.t ->
+      EConstr.Vars.substl * EConstr.rel_declaration list ->
+      Constructors.t mm
 
-    val check_for_next_constructors
-      :  int
-      -> Evd.econstr
-      -> Evd.econstr
-      -> Constructors.t
-      -> (Enc.t * Problems.t list) option
-      -> Constructors.t mm
+    val check_updated_ctx :
+      Enc.t ->
+      Problems.t list ->
+      Enc.t Rocq_ind.t F.t ->
+      EConstr.Vars.substl * EConstr.rel_declaration list ->
+      (Enc.t * Problems.t list) option mm
 
-    val collect_valid_constructors
-      :  Rocq_ind.LTS.constructor array
-      -> Enc.t Rocq_ind.t F.t
-      -> Evd.econstr
-      -> Evd.econstr
-      -> Enc.t
-      -> Constructors.t mm
+    val check_for_next_constructors :
+      int ->
+      Evd.econstr ->
+      Evd.econstr ->
+      Constructors.t ->
+      (Enc.t * Problems.t list) option ->
+      Constructors.t mm
+
+    val collect_valid_constructors :
+      Rocq_ind.LTS.constructor array ->
+      Enc.t Rocq_ind.t F.t ->
+      Evd.econstr ->
+      Evd.econstr ->
+      Enc.t ->
+      Constructors.t mm
   end
 end
