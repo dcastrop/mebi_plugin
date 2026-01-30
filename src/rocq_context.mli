@@ -1,27 +1,27 @@
+type t = { env : Environ.env; sigma : Evd.evar_map }
 
-  type t =
-    { env : Environ.env
-    ; sigma : Evd.evar_map
-    }
+module type SRocq_context = sig
+  val get : unit -> t ref
+  val env : unit -> Environ.env ref
+  val sigma : unit -> Evd.evar_map ref
+  val update : Environ.env ref -> Evd.evar_map ref -> unit
+end
 
-  module type SRocq_context = sig
-    val get : unit -> t ref
-    val env : unit -> Environ.env ref
-    val sigma : unit -> Evd.evar_map ref
-    val update : Environ.env ref -> Evd.evar_map ref -> unit
-  end
+module type S = sig
+  val env : unit -> Environ.env ref
+  val sigma : unit -> Evd.evar_map ref
+end
 
-  module type S = sig
-    val env : unit -> Environ.env ref
-    val sigma : unit -> Evd.evar_map ref
-  end
+module Make : (_ : S) -> SRocq_context
+module Default : SRocq_context
 
-  module Make : (_ : S) -> SRocq_context
-  module Default : SRocq_context
-
+module MakeFromGoal : (_ : sig
+                         val gl : Proofview.Goal.t ref
+                       end)
+  -> SRocq_context
 
 module MakeEConstrMap : (_ : SRocq_context) -> sig
-  type key = EConstr.t
+  type key = Evd.econstr
   type !'a t
 
   val create : int -> 'a t
@@ -36,8 +36,13 @@ module MakeEConstrMap : (_ : SRocq_context) -> sig
   val replace : 'a t -> key -> 'a -> unit
   val mem : 'a t -> key -> bool
   val iter : (key -> 'a -> unit) -> 'a t -> unit
-  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+  val filter_map_inplace :
+    (key -> 'a -> 'a option) -> 'a t -> unit
+
+  val fold :
+    (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
   val length : 'a t -> int
   val stats : 'a t -> Hashtbl.statistics
   val to_seq : 'a t -> (key * 'a) Seq.t

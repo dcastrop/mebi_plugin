@@ -5,8 +5,14 @@ end
 module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
   include X
 
-  module W =
-    Wrapper.Make
+  (** [module W] is for running the main part of the algorithm (pre-proof). *)
+  module W = Wrapper.Make (Rocq_context.Default) (E)
+
+  include W
+
+  (** [module P] is a monad that contains the proof environment and context. *)
+  module P =
+    Rocq_monad_utils.Make
       (Rocq_context.Make (struct
         let env : unit -> Environ.env ref =
           fun () -> ref (Proofview.Goal.env !gl)
@@ -16,9 +22,7 @@ module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
           fun () -> ref (Proofview.Goal.sigma !gl)
         ;;
       end))
-      (E)
-
-  include W
+      (M.Enc)
 
   let get_concl () : EConstr.t = Proofview.Goal.concl !gl
   let get_hyps () : Rocq_utils.hyp list = Proofview.Goal.hyps !gl
@@ -81,94 +85,94 @@ module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
 
   (** tactics *)
   module Tacs = struct
-    let inversion (x : Rocq_utils.hyp) : Tactic.t M.mm =
+    let inversion (x : Rocq_utils.hyp) : Tactic.t P.mm =
       Inv.inv_tac (Context.Named.Declaration.get_id x)
       |> Tactic.tactic
            ~msg:
              (Printf.sprintf
                 "inversion %s"
-                (M.Strfy.hyp_name x) (* (M.Strfy.hyp_type x) *))
-      |> M.return
+                (P.Strfy.hyp_name x) (* (P.Strfy.hyp_type x) *))
+      |> P.return
     ;;
 
-    let subst_all () : Tactic.t M.mm =
+    let subst_all () : Tactic.t P.mm =
       Equality.subst_all ()
       |> Tactic.tactic ~msg:(Printf.sprintf "(subst all)")
-      |> M.return
+      |> P.return
     ;;
 
-    let simplify_concl () : Tactic.t M.mm =
-      Tactics.simpl_in_concl |> Tactic.tactic ~msg:"simpl" |> M.return
+    let simplify_concl () : Tactic.t P.mm =
+      Tactics.simpl_in_concl |> Tactic.tactic ~msg:"simpl" |> P.return
     ;;
 
-    let simplify_hyp (x : Rocq_utils.hyp) : Tactic.t M.mm =
+    let simplify_hyp (x : Rocq_utils.hyp) : Tactic.t P.mm =
       Tactics.simpl_in_hyp (Context.Named.Declaration.get_id x, Locus.InHyp)
-      |> Tactic.tactic ~msg:(Printf.sprintf "simpl in %s" (M.Strfy.hyp_name x))
-      |> M.return
+      |> Tactic.tactic ~msg:(Printf.sprintf "simpl in %s" (P.Strfy.hyp_name x))
+      |> P.return
     ;;
 
-    let simplify_hyps () : Tactic.t M.mm =
+    let simplify_hyps () : Tactic.t P.mm =
       match Proofview.Goal.hyps !gl with
-      | [] -> Tactic.empty () |> M.return
+      | [] -> Tactic.empty () |> P.return
       | x :: [] -> simplify_hyp x
       | x :: xs ->
-        let open M.Syntax in
+        let open P.Syntax in
         let* x : Tactic.t = simplify_hyp x in
-        let f (i : int) (x : Tactic.t) : Tactic.t M.mm =
+        let f (i : int) (x : Tactic.t) : Tactic.t P.mm =
           let y : Rocq_utils.hyp = List.nth xs i in
           let* y : Tactic.t = simplify_hyp y in
-          Tactic.seq x y |> M.return
+          Tactic.seq x y |> P.return
         in
-        M.iterate 0 (List.length xs - 1) x f
+        P.iterate 0 (List.length xs - 1) x f
     ;;
 
-    let simplify_all () : Tactic.t M.mm =
-      let open M.Syntax in
+    let simplify_all () : Tactic.t P.mm =
+      let open P.Syntax in
       let* concl : Tactic.t = simplify_concl () in
       let* hyps : Tactic.t = simplify_hyps () in
-      Tactic.seq concl hyps |> M.return
+      Tactic.seq concl hyps |> P.return
     ;;
 
-    let simplify_and_subst_all () : Tactic.t M.mm =
-      let open M.Syntax in
+    let simplify_and_subst_all () : Tactic.t P.mm =
+      let open P.Syntax in
       let* simpls : Tactic.t = simplify_all () in
       let* substs : Tactic.t = subst_all () in
-      Tactic.seq simpls substs |> M.return
+      Tactic.seq simpls substs |> P.return
     ;;
 
-    let cofix () : Tactic.t M.mm =
+    let cofix () : Tactic.t P.mm =
       let name : Names.Id.t = new_cofix_name () in
       Tactics.cofix name
       |> Tactic.tactic
            ~msg:(Printf.sprintf "cofix %s" (Names.Id.to_string name))
-      |> M.return
+      |> P.return
     ;;
 
-    let intros_all () : Tactic.t M.mm =
-      Tactics.intros |> Tactic.tactic ~msg:"intros" |> M.return
+    let intros_all () : Tactic.t P.mm =
+      Tactics.intros |> Tactic.tactic ~msg:"intros" |> P.return
     ;;
 
     (** [intro_as x] applies the introduction tactic using the (next non-conficting) name [x].
     *)
-    let intro_as (x : string) : Tactic.t M.mm =
+    let intro_as (x : string) : Tactic.t P.mm =
       let name : Names.Id.t = new_name_of_string x in
       Tactics.introduction name
       |> Tactic.tactic
            ~msg:(Printf.sprintf "intro %s" (Names.Id.to_string name))
-      |> M.return
+      |> P.return
     ;;
 
     (* *)
-    let apply (x : EConstr.t) : Tactic.t M.mm =
+    let apply (x : EConstr.t) : Tactic.t P.mm =
       Tactics.apply x
-      |> Tactic.tactic ~msg:(Printf.sprintf "apply %s" (M.Strfy.econstr x))
-      |> M.return
+      |> Tactic.tactic ~msg:(Printf.sprintf "apply %s" (P.Strfy.econstr x))
+      |> P.return
     ;;
 
-    let eapply (x : EConstr.t) : Tactic.t M.mm =
+    let eapply (x : EConstr.t) : Tactic.t P.mm =
       Tactics.eapply x
-      |> Tactic.tactic ~msg:(Printf.sprintf "eapply %s" (M.Strfy.econstr x))
-      |> M.return
+      |> Tactic.tactic ~msg:(Printf.sprintf "eapply %s" (P.Strfy.econstr x))
+      |> P.return
     ;;
 
     (* *)
@@ -178,7 +182,7 @@ module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
         @raise CannotUnfoldConstr
           of [x] if [Constr.kind x] is not [Const (_, _)]. *)
     let unfold_constr ?(in_hyp : Rocq_utils.hyp option) (x : Constr.t)
-      : Tactic.t M.mm
+      : Tactic.t P.mm
       =
       let f (name : Names.Constant.t) : unit Proofview.tactic =
         Option.cata
@@ -194,15 +198,15 @@ module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
         f name
         |> Tactic.tactic
              ~msg:(Printf.sprintf "unfold %s" (Names.Constant.to_string name))
-        |> M.return
+        |> P.return
       | _ -> raise (CannotUnfoldConstr x)
     ;;
 
     let unfold_econstr ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
-      : Tactic.t M.mm
+      : Tactic.t P.mm
       =
-      let open M.Syntax in
-      let* y : Constr.t = M.econstr_to_constr x in
+      let open P.Syntax in
+      let* y : Constr.t = P.econstr_to_constr x in
       (* NOTE: below helps keep this function cleaner to use. i.e., [unfold_econstr ~in_hyp:x] rather than [~in_hyp:(Some x)] *)
       Option.cata
         (fun in_hyp -> unfold_constr ~in_hyp y)
@@ -213,10 +217,10 @@ module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
     let unfold_constrexpr
           ?(in_hyp : Rocq_utils.hyp option)
           (x : Constrexpr.constr_expr)
-      : Tactic.t M.mm
+      : Tactic.t P.mm
       =
-      let open M.Syntax in
-      let* y : EConstr.t = M.constrexpr_to_econstr x in
+      let open P.Syntax in
+      let* y : EConstr.t = P.constrexpr_to_econstr x in
       (* NOTE: below helps keep this function cleaner to use. i.e., [unfold_constrexpr ~in_hyp:x] rather than [~in_hyp:(Some x)] *)
       Option.cata
         (fun in_hyp -> unfold_econstr ~in_hyp y)
@@ -225,6 +229,7 @@ module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
     ;;
   end
 
+  (** [module Decode] handles obtaining [EConstr.t] from [module M]. *)
   module Decode = struct
     let enc (x : M.Enc.t) : EConstr.t = M.decode x
 
@@ -252,81 +257,81 @@ module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
   end
 
   module Theory = struct
-    let apply_Pack_sim () : Tactic.t M.mm = Tacs.apply (Theories.c_Pack_sim ())
-    let apply_In_sim () : Tactic.t M.mm = Tacs.apply (Theories.c_In_sim ())
-    let apply_wk_some () : Tactic.t M.mm = Tacs.apply (Theories.c_wk_some ())
-    let apply_wk_none () : Tactic.t M.mm = Tacs.apply (Theories.c_wk_none ())
+    let apply_Pack_sim () : Tactic.t P.mm = Tacs.apply (Theories.c_Pack_sim ())
+    let apply_In_sim () : Tactic.t P.mm = Tacs.apply (Theories.c_In_sim ())
+    let apply_wk_some () : Tactic.t P.mm = Tacs.apply (Theories.c_wk_some ())
+    let apply_wk_none () : Tactic.t P.mm = Tacs.apply (Theories.c_wk_none ())
 
-    let apply_rt1n_refl () : Tactic.t M.mm =
+    let apply_rt1n_refl () : Tactic.t P.mm =
       Tacs.apply (Theories.c_rt1n_refl ())
     ;;
 
-    let apply_rt1n_trans () : Tactic.t M.mm =
+    let apply_rt1n_trans () : Tactic.t P.mm =
       Tacs.apply (Theories.c_rt1n_trans ())
     ;;
 
-    let eapply_rt1n_refl () : Tactic.t M.mm =
+    let eapply_rt1n_refl () : Tactic.t P.mm =
       Tacs.eapply (Theories.c_rt1n_refl ())
     ;;
 
-    let eapply_rt1n_trans () : Tactic.t M.mm =
+    let eapply_rt1n_trans () : Tactic.t P.mm =
       Tacs.eapply (Theories.c_rt1n_trans ())
     ;;
 
-    let unfold_silent () : Tactic.t M.mm =
+    let unfold_silent () : Tactic.t P.mm =
       Tacs.unfold_econstr (Theories.c_silent ())
     ;;
 
-    let unfold_silent1 () : Tactic.t M.mm =
+    let unfold_silent1 () : Tactic.t P.mm =
       Tacs.unfold_econstr (Theories.c_silent1 ())
     ;;
 
     (** [is_theory x y] checks if term [x] is equal to theory term [y], catching the exception thrown when [EConstr.kind_of_type x] is not [AtomicType (ty, tys)].
     *)
-    let is_theory (x : EConstr.t) (y : EConstr.t) : bool M.mm =
+    let is_theory (x : EConstr.t) (y : EConstr.t) : bool P.mm =
       try
-        let open M.Syntax in
-        let* sigma = M.get_sigma in
-        Rocq_utils.econstr_to_atomic sigma x |> fst |> M.econstr_eq y
+        let open P.Syntax in
+        let* sigma = P.get_sigma in
+        Rocq_utils.econstr_to_atomic sigma x |> fst |> P.econstr_eq y
       with
-      | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> M.return false
+      | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> P.return false
     ;;
 
     (** exists *)
-    let is_exists (x : EConstr.t) : bool M.mm = is_theory x (Theories.c_ex ())
+    let is_exists (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_ex ())
 
     (** weak simulation*)
-    let is_weak_sim (x : EConstr.t) : bool M.mm =
+    let is_weak_sim (x : EConstr.t) : bool P.mm =
       is_theory x (Theories.c_weak_sim ())
     ;;
 
     (** weak transition *)
-    let is_weak (x : EConstr.t) : bool M.mm = is_theory x (Theories.c_weak ())
+    let is_weak (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_weak ())
 
-    let is_tau (x : EConstr.t) : bool M.mm = is_theory x (Theories.c_tau ())
+    let is_tau (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_tau ())
 
-    let is_silent (x : EConstr.t) : bool M.mm =
+    let is_silent (x : EConstr.t) : bool P.mm =
       is_theory x (Theories.c_silent ())
     ;;
 
-    let is_silent1 (x : EConstr.t) : bool M.mm =
+    let is_silent1 (x : EConstr.t) : bool P.mm =
       is_theory x (Theories.c_silent1 ())
     ;;
 
-    let is_LTS (x : EConstr.t) : bool M.mm = is_theory x (Theories.c_LTS ())
-    let is_None (x : EConstr.t) : bool M.mm = is_theory x (Theories.c_None ())
-    let is_Some (x : EConstr.t) : bool M.mm = is_theory x (Theories.c_Some ())
-    (* let is_ (x : EConstr.t) : bool M.mm = is_theory x (Theories.c_ ()) *)
+    let is_LTS (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_LTS ())
+    let is_None (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_None ())
+    let is_Some (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_Some ())
+    (* let is_ (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_ ()) *)
 
     (** *)
-    let get_theory_enc (f : EConstr.t -> bool M.mm) : M.Enc.t M.mm =
+    let get_theory_enc (f : EConstr.t -> bool P.mm) : M.Enc.t M.mm =
       let open M.Syntax in
       let* fm = M.get_fwdmap in
       let rec find_theory : (EConstr.t * M.Enc.t) list -> M.Enc.t M.mm =
         function
         | [] -> raise Not_found
         | (x, y) :: tl ->
-          let* is_match : bool = f x in
+          let is_match : bool = P.run (f x) in
           if is_match then M.return y else find_theory tl
       in
       M.F.to_seq fm |> List.of_seq |> find_theory
@@ -349,11 +354,10 @@ module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
     exception NotEqTheory of unit
 
     (** *)
-    let get_theory_enc_if_eq (x : EConstr.t) (f : EConstr.t -> bool M.mm)
+    let get_theory_enc_if_eq (x : EConstr.t) (f : EConstr.t -> bool P.mm)
       : M.Enc.t M.mm
       =
-      let open M.Syntax in
-      let* is_eq : bool = f x in
+      let is_eq : bool = P.run (f x) in
       try if is_eq then get_theory_enc f else raise Not_found with
       | Not_found -> raise (NotEqTheory ())
     ;;

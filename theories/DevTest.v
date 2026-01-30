@@ -88,25 +88,29 @@ Inductive termLTS_tc : term -> Prop :=
 | termLTS_ns : forall t, termLTS_tc t
 .
 
-MeBi Config Output Enable.
+(* MeBi Config Output Enable.
 MeBi Config Output Notice Enable.
 MeBi Config Output Info Enable.
 MeBi Config Output Results Enable.
 MeBi Config Output Debug Enable.
 MeBi Config WeakMode Enable.
 
-MeBi Config Weak As Option label.
+MeBi Config Weak As Option label. *)
 
-(* MeBi Divider "Theories.DevTest.0".
-MeBi FSM (tend) Using termLTS. *)
+MeBi Divider "Theories.DevTest.0".
+MeBi LTS (tend) Using termLTS.
+(* MeBi FSM (tend) Using termLTS. *)
 
-(* MeBi Divider "Theories.DevTest.0.1". *)
+MeBi Divider "Theories.DevTest.0.1".
+MeBi LTS (tseq tend tend) Using termLTS.
 (* MeBi FSM (tseq tend tend) Using termLTS. *)
 
-(* MeBi Divider "Theories.DevTest.0.2". *)
+MeBi Divider "Theories.DevTest.0.2".
+MeBi LTS (tpar tend tend) Using termLTS.
 (* MeBi FSM (tpar tend tend) Using termLTS. *)
 
 (* MeBi Divider "Theories.DevTest.0.3". *)
+MeBi LTS (tseq (tpar tend tend) tend) Using termLTS.
 (* MeBi FSM (tseq (tpar tend tend) tend) Using termLTS. *)
 (* NOTE:        (tseq (tpar tend tend) tend)
   [ 1 -> [ 3 => (tseq tend tend)
@@ -251,7 +255,7 @@ Example q : term := tfix (tseq (tpar (tact (recv A) tend)
 
 End TestA.
 
-Module TestB.
+(* Module TestB.
   MeBi Config WeakMode Disable. 
 (* MeBi Config Output Enable True. MeBi Set ShowDebug True. MeBi Set ShowDetails True. *)
 
@@ -298,4 +302,4 @@ MeBi Divider "Theories.DevTest.TestB.Bisim".
          And (tpar TheAction2 TheAction1 tend) With termLTS
          Using termLTS. *)
 
-End TestB.
+End TestB. *)

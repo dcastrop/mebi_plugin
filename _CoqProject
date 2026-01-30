@@ -5,7 +5,7 @@ src/META.coq-mebi
 -arg "-w all"
 
 theories/loader.v ###
-# theories/DevTest.v ###
+theories/DevTest.v ###
 # theories/Test.v ###
 
 theories/Bisimilarity.v ###
@@ -83,80 +83,112 @@ src/output_config.mli
 src/logger.ml
 src/logger.mli
 
-src/rocq_utils.ml
-src/rocq_utils.mli
-src/rocq_convert.ml
-src/rocq_convert.mli
 src/theories.ml
 src/theories.mli
-
-src/rocq_enc.ml
-src/rocq_enc.mli
-src/rocq_monad.ml
-src/rocq_monad.mli
+src/rocq_utils.ml
+src/rocq_utils.mli
 src/rocq_ind.ml
 src/rocq_ind.mli
+src/rocq_enc.ml
+src/rocq_enc.mli
+src/rocq_context.ml
+src/rocq_context.mli
+src/encoding.ml
+src/encoding.mli
+src/enc_tree.ml
+src/enc_tree.mli
+src/bi_encoding.ml
+src/bi_encoding.mli
+src/rocq_monad.ml
+src/rocq_monad.mli
+src/rocq_monad_utils.ml
+src/rocq_monad_utils.mli
 src/rocq_bindings.ml
 src/rocq_bindings.mli
-
-src/mebi_setup.ml
-src/mebi_setup.mli
-src/mebi_constr.ml
-src/mebi_constr.mli
-
-src/model_state.ml
-src/model_state.mli
-src/model_label.ml
-src/model_label.mli
-src/model_info.ml
-src/model_info.mli
-src/model_note.ml
-src/model_note.mli
-src/model_transition.ml
-src/model_transition.mli
-src/model_transition_opt.ml
-src/model_transition_opt.mli
-src/model_action.ml
-src/model_action.mli
-src/model_edge.ml
-src/model_edge.mli
 src/model.ml
 src/model.mli
-src/saturate_model.ml
-src/saturate_model.mli
-src/algorithms.ml
-src/algorithms.mli
+src/wrapper.ml
+src/wrapper.mli
+src/api.ml
+src/api.mli
 
-src/mebi_tactics.ml
-src/mebi_tactics.mli
+# src/.ml
+# src/.mli
 
-src/mebi_wrapper.ml
-src/mebi_wrapper.mli
-src/mebi_utils.ml
-src/mebi_utils.mli
-src/mebi_hypothesis.ml
-src/mebi_hypothesis.mli
-src/mebi_proof.ml
-src/mebi_proof.mli
-src/proof_solver.ml
-src/proof_solver.mli
+# src/rocq_utils.ml
+# src/rocq_utils.mli
+# src/rocq_convert.ml
+# src/rocq_convert.mli
+# src/theories.ml
+# src/theories.mli
 
-# src/dump_to_file.ml
-# src/dump_to_file.mli
+# src/rocq_enc.ml
+# src/rocq_enc.mli
+# src/rocq_monad.ml
+# src/rocq_monad.mli
+# src/rocq_ind.ml
+# src/rocq_ind.mli
+# src/rocq_bindings.ml
+# src/rocq_bindings.mli
 
-src/mebi_weak.ml
-src/mebi_weak.mli
-src/mebi_api.ml
-src/mebi_api.mli
-src/mebi_help.ml
-src/mebi_help.mli
+# src/mebi_setup.ml
+# src/mebi_setup.mli
+# src/mebi_constr.ml
+# src/mebi_constr.mli
 
-src/mebi_unification.ml
-src/mebi_unification.mli
-src/mebi_unify.ml
-src/mebi_unify.mli
-src/command.ml
-src/command.mli
+# src/model_state.ml
+# src/model_state.mli
+# src/model_label.ml
+# src/model_label.mli
+# src/model_info.ml
+# src/model_info.mli
+# src/model_note.ml
+# src/model_note.mli
+# src/model_transition.ml
+# src/model_transition.mli
+# src/model_transition_opt.ml
+# src/model_transition_opt.mli
+# src/model_action.ml
+# src/model_action.mli
+# src/model_edge.ml
+# src/model_edge.mli
+# src/model.ml
+# src/model.mli
+# src/saturate_model.ml
+# src/saturate_model.mli
+# src/algorithms.ml
+# src/algorithms.mli
+
+# src/mebi_tactics.ml
+# src/mebi_tactics.mli
+
+# src/mebi_wrapper.ml
+# src/mebi_wrapper.mli
+# src/mebi_utils.ml
+# src/mebi_utils.mli
+# src/mebi_hypothesis.ml
+# src/mebi_hypothesis.mli
+# src/mebi_proof.ml
+# src/mebi_proof.mli
+# src/proof_solver.ml
+# src/proof_solver.mli
+
+# # src/dump_to_file.ml
+# # src/dump_to_file.mli
+
+# src/mebi_weak.ml
+# src/mebi_weak.mli
+# src/mebi_api.ml
+# src/mebi_api.mli
+# src/mebi_help.ml
+# src/mebi_help.mli
+
+# src/mebi_unification.ml
+# src/mebi_unification.mli
+# src/mebi_unify.ml
+# src/mebi_unify.mli
+# src/command.ml
+# src/command.mli
 
 # src/examples.ml
 # src/examples.mli

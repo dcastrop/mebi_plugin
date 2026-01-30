@@ -23,6 +23,8 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     state (fun env sigma -> sigma, EConstr.isEvar sigma x)
   ;;
 
+  (*********************************************************)
+
   let econstr_to_constr
         ?(abort_on_undefined_evars : bool = false)
         (x : EConstr.t)
@@ -39,6 +41,8 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     state (fun env sigma -> Rocq_utils.constrexpr_to_econstr env sigma x)
   ;;
 
+  (*********************************************************)
+
   let exists_eq (x : EConstr.t) (ys : 'a list) (decoder : 'a -> EConstr.t)
     : bool mm
     =
@@ -50,6 +54,22 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     in
     iterate 0 (List.length ys - 1) false f
   ;;
+
+  (*********************************************************)
+
+  let type_of_econstr (x : EConstr.t) : EConstr.t mm =
+    let open Syntax in
+    let* t : EConstr.t = econstr_normalize x in
+    state (fun env sigma -> Typing.type_of env sigma t)
+  ;;
+
+  let type_of_constrexpr (x : Constrexpr.constr_expr) : EConstr.t mm =
+    let open Syntax in
+    let* t : EConstr.t = constrexpr_to_econstr x in
+    type_of_econstr t
+  ;;
+
+  (*********************************************************)
 
   module Strfy = struct
     let econstr : EConstr.t -> string = fstring Rocq_utils.Strfy.econstr
@@ -72,6 +92,11 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       | Invalid_Sort_LTS of Sorts.family
       | Invalid_Sort_Type of Sorts.family
       (* NOTE: *)
+      | Invalid_Ref_LTS of Names.GlobRef.t
+      | Invalid_Ref_Type of Names.GlobRef.t
+      (* NOTE: *)
+      | Invalid_Arity of (Environ.env * Evd.evar_map * Constr.types)
+      (* NOTE: *)
       | InvalidCheckUpdatedCtx of
           (Environ.env
           * Evd.evar_map
@@ -86,6 +111,13 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     (* NOTE: *)
     val invalid_sort_lts : Sorts.family -> exn
     val invalid_sort_type : Sorts.family -> exn
+
+    (* NOTE: *)
+    val invalid_ref_lts : Names.GlobRef.t -> exn
+    val invalid_ref_type : Names.GlobRef.t -> exn
+
+    (* NOTE: *)
+    val invalid_arity : Environ.env -> Evd.evar_map -> Constr.types -> exn
 
     (* NOTE: *)
     val invalid_check_updated_ctx
@@ -106,6 +138,11 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       | Invalid_Sort_LTS of Sorts.family
       | Invalid_Sort_Type of Sorts.family
       (* NOTE: *)
+      | Invalid_Ref_LTS of Names.GlobRef.t
+      | Invalid_Ref_Type of Names.GlobRef.t
+      (* NOTE: *)
+      | Invalid_Arity of (Environ.env * Evd.evar_map * Constr.types)
+      (* NOTE: *)
       | InvalidCheckUpdatedCtx of
           (Environ.env
           * Evd.evar_map
@@ -119,6 +156,16 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
 
     let invalid_sort_lts x = MEBI_exn (Invalid_Sort_LTS x)
     let invalid_sort_type x = MEBI_exn (Invalid_Sort_Type x)
+
+    let invalid_ref_lts (x : Names.GlobRef.t) : 'a =
+      MEBI_exn (Invalid_Ref_LTS x)
+    ;;
+
+    let invalid_ref_type (x : Names.GlobRef.t) : 'a =
+      MEBI_exn (Invalid_Ref_Type x)
+    ;;
+
+    let invalid_arity env sigma x = MEBI_exn (Invalid_Arity (env, sigma, x))
 
     let invalid_check_updated_ctx env sigma x y =
       MEBI_exn (InvalidCheckUpdatedCtx (env, sigma, x, y))
@@ -136,6 +183,12 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       (* NOTE: *)
       | Invalid_Sort_LTS x -> "Invalid_Sort_LTS"
       | Invalid_Sort_Type x -> "Invalid_Sort_Type"
+      (* NOTE: *)
+      | Invalid_Ref_LTS x -> "Invalid_Ref_LTS"
+      | Invalid_Ref_Type x -> "Invalid_Ref_Type"
+      (* NOTE: *)
+      | Invalid_Arity (env, sigma, x) ->
+        Printf.sprintf "Invalid_Arity: %s" (Rocq_utils.Strfy.constr env sigma x)
       (* NOTE: *)
       | InvalidCheckUpdatedCtx (env, sigma, x, y) ->
         Printf.sprintf
@@ -163,16 +216,49 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
   end
 
   module type SErr = sig
+    (* NOTE: *)
+    val invalid_sort_lts : Sorts.family -> 'a
+    val invalid_sort_type : Sorts.family -> 'a
+
+    (* NOTE: *)
+    val invalid_ref_lts : Names.GlobRef.t -> 'a
+    val invalid_ref_type : Names.GlobRef.t -> 'a
+
+    (* NOTE: *)
+    val invalid_arity : Constr.types -> 'a mm
+
+    (* NOTE: *)
     val invalid_check_updated_ctx
       :  EConstr.t list
       -> EConstr.rel_declaration list
       -> 'a mm
 
+    (* NOTE: *)
     val invalid_lts_args_length : int -> 'a
     val invalid_lts_term_kind : Constr.t -> 'a mm
   end
 
   module Err : SErr = struct
+    let invalid_sort_lts (x : Sorts.family) : 'a =
+      raise (Errors.invalid_sort_lts x)
+    ;;
+
+    let invalid_sort_type (x : Sorts.family) : 'a =
+      raise (Errors.invalid_sort_type x)
+    ;;
+
+    let invalid_ref_lts (x : Names.GlobRef.t) : 'a =
+      raise (Errors.invalid_ref_lts x)
+    ;;
+
+    let invalid_ref_type (x : Names.GlobRef.t) : 'a =
+      raise (Errors.invalid_ref_type x)
+    ;;
+
+    let invalid_arity (x : Constr.types) : 'a mm =
+      state (fun env sigma -> raise (Errors.invalid_arity env sigma x))
+    ;;
+
     let invalid_check_updated_ctx
           (substl : EConstr.t list)
           (ctxl : EConstr.rel_declaration list)
@@ -190,6 +276,114 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       state (fun env sigma -> raise (Errors.invalid_lts_term_kind env sigma x))
     ;;
   end
+
+  (*********************************************************)
+
+  module Ind = struct
+    (** [lookup x] is a wrapper for [Inductive.lookup_mind_specif] *)
+    let lookup (x : Names.inductive) : Declarations.mind_specif mm =
+      let open Syntax in
+      let* env = get_env in
+      Inductive.lookup_mind_specif env x |> return
+    ;;
+
+    (** []
+        @raise Errors.Invalid_Sort_Type if [x.mind_sort] is not [Type] or [Set]
+    *)
+    let assert_mip_arity_is_type_or_set
+      : Declarations.inductive_arity -> unit mm
+      = function
+      | Declarations.RegularArity x ->
+        (match x.mind_sort with
+         | Type _ -> return ()
+         | Set -> return ()
+         | _ -> Err.invalid_sort_type (Sorts.family x.mind_sort))
+      | Declarations.TemplateArity y ->
+        Err.invalid_sort_type (Sorts.family y.template_level)
+    ;;
+
+    (** []
+        @raise Errors.Invalid_Sort_LTS if [x.mind_sort] is not [Prop] *)
+    let assert_mip_arity_is_prop : Declarations.inductive_arity -> unit mm =
+      function
+      | Declarations.RegularArity x ->
+        (match x.mind_sort with
+         | Prop -> return ()
+         | _ -> Err.invalid_sort_lts (Sorts.family x.mind_sort))
+      | Declarations.TemplateArity y ->
+        Err.invalid_sort_lts (Sorts.family y.template_level)
+    ;;
+
+    (** []
+        @raise Errors.Invalid_Ref_LTS if [x] is not [Names.GlobRef.IndRef] *)
+    let lts_mind
+      : Names.GlobRef.t -> (Names.inductive * Declarations.mind_specif) mm
+      = function
+      | Names.GlobRef.IndRef ind ->
+        let open Syntax in
+        let* (mib, mip) : Declarations.mind_specif = lookup ind in
+        (ind, (mib, mip)) |> return
+      | x -> Err.invalid_ref_lts x
+    ;;
+
+    (** [] *)
+    let lts_type_mind (x : Names.GlobRef.t)
+      : (Names.inductive * Declarations.mind_specif) mm
+      =
+      let open Syntax in
+      let* ind, (mib, mip) = lts_mind x in
+      let* () = assert_mip_arity_is_type_or_set mip.mind_arity in
+      (ind, (mib, mip)) |> return
+    ;;
+
+    (** [] *)
+    let lts_prop_mind (x : Names.GlobRef.t)
+      : (Names.inductive * Declarations.mind_specif) mm
+      =
+      let open Syntax in
+      let* ind, (mib, mip) = lts_mind x in
+      let* () = assert_mip_arity_is_prop mip.mind_arity in
+      (ind, (mib, mip)) |> return
+    ;;
+
+    (** []
+        @raise Errors.Invalid_Arity if ... *)
+    let lts_labels_and_terms ((mib, mip) : Declarations.mind_specif)
+      : (Constr.rel_declaration * Constr.rel_declaration) mm
+      =
+      (* get the type of [mip] from [mib]. *)
+      let typ = Inductive.type_of_inductive (UVars.in_punivs (mib, mip)) in
+      match mip.mind_arity_ctxt |> Utils.split_at mip.mind_nrealdecls with
+      | [ t1; a; t2 ] ->
+        let open Context.Rel in
+        if Declaration.equal Sorts.relevance_equal Constr.equal t1 t2
+        then return (a, t1)
+        else Err.invalid_arity typ
+      | _ -> Err.invalid_arity typ
+    ;;
+
+    (** [] *)
+    let lts (x : Names.GlobRef.t) : Enc.t Rocq_ind.t mm =
+      let open Syntax in
+      let* ind, (mib, mip) = lts_prop_mind x in
+      let* label, term = lts_labels_and_terms (mib, mip) in
+      let name : EConstr.t = Rocq_utils.get_ind_ty ind mib in
+      let enc : Enc.t = encode name in
+      let open Rocq_ind in
+      { enc
+      ; ind = name
+      ; kind =
+          Rocq_ind.LTS
+            { term_type = Rocq_utils.get_decl_type_of_constr term
+            ; label_type = Rocq_utils.get_decl_type_of_constr label
+            ; constructor_types = Rocq_ind.mip_to_lts_constructors mip
+            }
+      }
+      |> return
+    ;;
+  end
+
+  (*********************************************************)
 
   let mk_ctx_substl
         (acc : EConstr.Vars.substl)

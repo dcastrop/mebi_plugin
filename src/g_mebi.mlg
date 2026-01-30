@@ -12,8 +12,13 @@ open Stdarg
 (* open Pp *)
 }
 
-(* *)
-VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
+(* API *)
+(* VERNAC COMMAND EXTEND MeBi_API CLASSIFIED AS QUERY
+| [ "MeBi" "API" "Initialize" ] ->
+END *)
+
+(* ProofSolver *)
+(* VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
 
 |![ proof ] 
   [ "MeBiSim" "Solve" int(upper_bound) ] ->
@@ -42,41 +47,51 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
     ) 
   }
 
-END
+END *)
 
 VERNAC COMMAND EXTEND MeBi_LTS CLASSIFIED AS QUERY
 | ["MeBi" "LTS" constr(x) "Using" reference(r)] -> 
-  {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) [])}
+  (* {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) [])} *)
+  {
+    let module W = Wrapper.Make ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    W.Command.run [] None (W.Model.Info.States 10) (W.Command.MakeLTS (x, r))
+    |> W.M.run
+  }
   
 | ["MeBi" "LTS" constr(x) "Using" reference(r) reference_list(rs)] -> 
-  {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) rs)}
+  (* {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) rs)} *)
+  {
+    let module W = Wrapper.Make ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    W.Command.run rs None (W.Model.Info.States 10) (W.Command.MakeLTS (x, r))
+    |> W.M.run
+  }
 END 
 
-VERNAC COMMAND EXTEND MeBi_FSM CLASSIFIED AS QUERY
+(* VERNAC COMMAND EXTEND MeBi_FSM CLASSIFIED AS QUERY
 | ["MeBi" "FSM" constr(x) "Using" reference(r)] -> 
   {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.FSM, (x, r))) [])}
 
 | ["MeBi" "FSM" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.FSM, (x, r))) rs)}
-END 
+END  *)
 
-VERNAC COMMAND EXTEND MeBi_Saturate CLASSIFIED AS QUERY
+(* VERNAC COMMAND EXTEND MeBi_Saturate CLASSIFIED AS QUERY
 | ["MeBi" "Saturate" constr(x) "Using" reference(r)] -> 
   {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) [])}
 
 | ["MeBi" "Saturate" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) rs)}
-END 
+END  *)
 
-VERNAC COMMAND EXTEND MeBi_Minimize CLASSIFIED AS QUERY
+(* VERNAC COMMAND EXTEND MeBi_Minimize CLASSIFIED AS QUERY
 | ["MeBi" "Minimize" constr(x) "Using" reference(r)] -> 
   {Mebi_wrapper.run (Command.run (Command.MinimizeModel (x, r)) [])}
   
 | ["MeBi" "Minimize" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {Mebi_wrapper.run (Command.run (Command.MinimizeModel (x, r)) rs)}
-END 
+END  *)
 
-VERNAC COMMAND EXTEND MeBi_Merge CLASSIFIED AS QUERY
+(* VERNAC COMMAND EXTEND MeBi_Merge CLASSIFIED AS QUERY
 | ["MeBi" "Merge" constr(x) "With" reference(a) 
             "And" constr(y) "With" reference(b)] -> 
   {Mebi_wrapper.run (Command.run (Command.MergeModels ((x, a), (y, b))) [])}
@@ -84,9 +99,9 @@ VERNAC COMMAND EXTEND MeBi_Merge CLASSIFIED AS QUERY
 | ["MeBi" "Merge" constr(x) "With" reference(a) 
             "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
   {Mebi_wrapper.run (Command.run (Command.MergeModels ((x, a), (y, b))) rs)}
-END 
+END  *)
 
-VERNAC COMMAND EXTEND MeBi_Bisim CLASSIFIED AS QUERY
+(* VERNAC COMMAND EXTEND MeBi_Bisim CLASSIFIED AS QUERY
 | ["MeBi" "Bisim" constr(x) "With" reference(a) 
             "And" constr(y) "With" reference(b)] -> 
   {Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) [])}
@@ -94,24 +109,24 @@ VERNAC COMMAND EXTEND MeBi_Bisim CLASSIFIED AS QUERY
 | ["MeBi" "Bisim" constr(x) "With" reference(a) 
             "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
   {Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) rs)}
-END 
+END  *)
 
-VERNAC COMMAND EXTEND MeBi_Config_Reset CLASSIFIED AS QUERY
+(* VERNAC COMMAND EXTEND MeBi_Config_Reset CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Reset"] -> {Mebi_api.reset_config ()}
 | ["MeBi" "Config" "Reset" "Bound"] -> {Mebi_api.reset_bounds ()}
 | ["MeBi" "Config" "Reset" "WeakMode"] -> {Mebi_api.reset_weak_mode ()}
 | ["MeBi" "Config" "Reset" "FailIf"] -> {Mebi_api.reset_fail_if ()}
 | ["MeBi" "Config" "Reset" "Debug"] -> {Mebi_api.reset_debug ()}
 | ["MeBi" "Config" "Reset" "Output"] -> {Mebi_api.reset_output ()}
-END
+END *)
 
-VERNAC COMMAND EXTEND MeBi_Config_Bounds CLASSIFIED AS QUERY
+(* VERNAC COMMAND EXTEND MeBi_Config_Bounds CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Bound" int(x)] -> {Mebi_api.set_bound x}
 | ["MeBi" "Config" "Bound" int(x) "On" "States"] -> {Mebi_api.set_bounds x Model_info.States}
 | ["MeBi" "Config" "Bound" int(x) "On" "Transitions"] -> {Mebi_api.set_bounds x Model_info.Transitions}
-END 
+END  *)
 
-VERNAC COMMAND EXTEND MeBi_Config_Weak CLASSIFIED AS QUERY
+(* VERNAC COMMAND EXTEND MeBi_Config_Weak CLASSIFIED AS QUERY
 | ["MeBi" "Config" "WeakMode" "Enable"] -> {Mebi_api.set_weak_mode_enabled true}
 | ["MeBi" "Config" "WeakMode" "Disable"] -> {Mebi_api.set_weak_mode_enabled false}
 
@@ -126,17 +141,17 @@ VERNAC COMMAND EXTEND MeBi_Config_Weak CLASSIFIED AS QUERY
 (* for second lts *)
 | ["MeBi" "Config" "Weak2" "As" "Option" constr(x)] -> {Mebi_api.set_weak_arg2 (Some (Mebi_api.Option x))}
 | ["MeBi" "Config" "Weak2" "As" constr(x) "Of" reference(y)] -> {Mebi_api.set_weak_arg2 (Some (Mebi_api.Custom (x, y)))}
-END 
+END  *)
 
-VERNAC COMMAND EXTEND MeBi_Config_Fail CLASSIFIED AS QUERY
+(* VERNAC COMMAND EXTEND MeBi_Config_Fail CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Fail" "If" "Incomplete" "True" ] -> {Mebi_api.set_fail_ifincomplete true}
 | ["MeBi" "Config" "Fail" "If" "Incomplete" "False"] -> {Mebi_api.set_fail_ifincomplete false}
 
 | ["MeBi" "Config" "Fail" "If" "NotBisim" "True" ] -> {Mebi_api.set_fail_ifnotbisim true}
 | ["MeBi" "Config" "Fail" "If" "NotBisim" "False"] -> {Mebi_api.set_fail_ifnotbisim false}
-END 
+END  *)
 
-VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
+(* VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Output" "Enable"] -> {Mebi_api.set_output_enabled true}
 | ["MeBi" "Config" "Output" "Disable"] -> {Mebi_api.set_output_enabled false}
 
@@ -163,7 +178,7 @@ VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
 
 | ["MeBi" "Config" "Output" "Show" "Enable"] -> {Mebi_api.set_output_special Show true}
 | ["MeBi" "Config" "Output" "Show" "Disable"] -> {Mebi_api.set_output_special Show false}
-END 
+END  *)
 
 VERNAC COMMAND EXTEND MeBi_Help CLASSIFIED AS QUERY
 (* TODO: *)
@@ -186,6 +201,33 @@ VERNAC COMMAND EXTEND MeBi_Divider CLASSIFIED AS QUERY
 | ["MeBi" string(x) "Divider" string(y)] -> 
   {Logger.Default.show (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n%s" x y)}
 END 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 (* VERNAC COMMAND EXTEND MeBi_BeginProof CLASSIFIED AS QUERY

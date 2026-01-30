@@ -197,6 +197,7 @@ module Make : (Enc : Encoding.SEncoding) -> sig
   module Label : sig
     type t =
       { term : Enc.t
+      ; pp : string option
       ; is_silent : bool option
       }
 
@@ -447,7 +448,7 @@ module Make : (Enc : Encoding.SEncoding) -> sig
       ; goto : State.t
       ; label : Label.t
       ; annotation : Annotation.t option
-      ; constructor_trees : Trees.t
+      ; constructor_tree : Tree.t
       }
 
     val equal : t -> t -> bool
@@ -553,6 +554,7 @@ module Make : (Enc : Encoding.SEncoding) -> sig
     val to_rev_seq : t -> elt Seq.t
     val add_seq : elt Seq.t -> t -> t
     val of_seq : elt Seq.t -> t
+    val labels : t -> Labels.t
     val to_string : t -> string
   end
 
