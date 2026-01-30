@@ -1,8 +1,11 @@
-module Make (Ctx : Rocq_context.SRocq_context) (Enc : Encoding.SEncoding) =
+module Make
+    (Log : Logger.SLogger)
+    (Ctx : Rocq_context.SRocq_context)
+    (Enc : Encoding.SEncoding) =
 struct
   module Ctx : Rocq_context.SRocq_context = Ctx
   module Enc : Encoding.SEncoding = Enc
-  include Bi_encoding.Make (Ctx) (Enc)
+  include Bi_encoding.Make (Log) (Ctx) (Enc)
 
   let bienc_to_list : unit -> (Enc.t * EConstr.t) list = to_list
 
@@ -179,6 +182,7 @@ struct
   end
 
   let make_state_tree_pair_set : (module Set.S with type elt = Enc.t * Tree.t) =
+    Log.trace __FUNCTION__;
     (module Set.Make (struct
          type t = Enc.t * Tree.t
 

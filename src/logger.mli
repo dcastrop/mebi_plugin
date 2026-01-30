@@ -1,4 +1,4 @@
-module type LOGGER_TYPE = sig
+module type SLogger = sig
   module Config : Output_config.OUTPUT_CONFIG
 
   val enabled : bool ref
@@ -55,6 +55,6 @@ module type S = sig
   val special : Output_kind.special -> bool
 end
 
-module Make : (_ : Output_mode.OUTPUT_MODE) (_ : S) -> LOGGER_TYPE
-module MkDefault : () -> LOGGER_TYPE
-module Default : LOGGER_TYPE
+module Make : (_ : Output_mode.OUTPUT_MODE) (_ : S) -> SLogger
+module MkDefault : () -> SLogger
+module Default : SLogger

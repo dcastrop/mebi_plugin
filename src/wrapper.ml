@@ -1,6 +1,10 @@
-module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
-  module M = Rocq_monad_utils.Make (C) (E)
-  module Model = Model.Make (M.Enc)
+module Make
+    (Log : Logger.SLogger)
+    (C : Rocq_context.SRocq_context)
+    (E : Encoding.SEncoding) =
+struct
+  module M = Rocq_monad_utils.Make (Log) (C) (E)
+  module Model = Model.Make (Log) (M.Enc)
 
   (** *)
   module IsTheory = struct
@@ -43,6 +47,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
 
     (** *)
     let get_theory_enc (f : EConstr.t -> bool M.mm) : M.Enc.t M.mm =
+      Log.trace __FUNCTION__;
       let open M.Syntax in
       let* fm = M.get_fwdmap in
       let rec find_theory : (EConstr.t * M.Enc.t) list -> M.Enc.t M.mm =
@@ -58,6 +63,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     exception NoEncodingFoundFor_TheoriesNone of unit
 
     let get_None_enc () : M.Enc.t M.mm =
+      Log.trace __FUNCTION__;
       try get_theory_enc is_None with
       | Not_found -> raise (NoEncodingFoundFor_TheoriesNone ())
     ;;
@@ -65,6 +71,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     exception NoEncodingFoundFor_TheoriesSome of unit
 
     let get_Some_enc () : M.Enc.t M.mm =
+      Log.trace __FUNCTION__;
       try get_theory_enc is_Some with
       | Not_found -> raise (NoEncodingFoundFor_TheoriesSome ())
     ;;
@@ -75,16 +82,19 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     let get_theory_enc_if_eq (x : EConstr.t) (f : EConstr.t -> bool M.mm)
       : M.Enc.t M.mm
       =
+      Log.trace __FUNCTION__;
       let is_eq : bool = M.run (f x) in
       try if is_eq then get_theory_enc f else raise Not_found with
       | Not_found -> raise (NotEqTheory ())
     ;;
 
     let get_None_enc_if_eq (x : EConstr.t) : M.Enc.t M.mm =
+      Log.trace __FUNCTION__;
       get_theory_enc_if_eq x is_None
     ;;
 
     let get_Some_enc_if_eq (x : EConstr.t) : M.Enc.t M.mm =
+      Log.trace __FUNCTION__;
       get_theory_enc_if_eq x is_Some
     ;;
   end
@@ -95,6 +105,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       | Custom of M.Enc.t * M.Enc.t
 
     let eq x y : bool =
+      Log.trace __FUNCTION__;
       match x, y with
       | Option x, Option y -> M.Enc.equal x y
       | Custom (x1, x2), Custom (y1, y2) ->
@@ -102,7 +113,9 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       | _, _ -> false
     ;;
 
-    let to_string : t -> string M.mm = function
+    let to_string : t -> string M.mm =
+      Log.trace __FUNCTION__;
+      function
       | Option label_enc ->
         let label_dec : EConstr.t = M.decode label_enc in
         let label_enc : string = M.Enc.to_string label_enc in
@@ -142,7 +155,10 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       module V2 : Set.S with type elt = M.Enc.t = V0
       include V2
 
-      let to_string (xs : t) : string = "TODO: Graph.V.to_string"
+      let to_string (xs : t) : string =
+        Log.trace __FUNCTION__;
+        "TODO: Graph.V.to_string"
+      ;;
     end
 
     (** [module D] is similar to [module S], but each "destination state" is paired with a constructor tree detailing which constructors to take to reach it, which in the context of [module A] and [module T] later illustrates how to get from one state to another via certain constructors.
@@ -151,7 +167,10 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       module D2 : Set.S with type elt = M.Enc.t * M.Tree.t = D0
       include D2
 
-      let to_string (xs : t) : string = "TODO: Graph.D.to_string"
+      let to_string (xs : t) : string =
+        Log.trace __FUNCTION__;
+        "TODO: Graph.D.to_string"
+      ;;
     end
 
     (** [module A] is a [Graph] alternative to [module Model.ActionMap] *)
@@ -163,9 +182,13 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
 
       type t' = D.t t
 
-      let size (xs : t') : int = fold (fun k v n -> D.cardinal v + n) xs 0
+      let size (xs : t') : int =
+        Log.trace __FUNCTION__;
+        fold (fun k v n -> D.cardinal v + n) xs 0
+      ;;
 
       let update (x : t') (action : Model.Action.t) (states : D.t) : unit =
+        Log.trace __FUNCTION__;
         if D.is_empty states
         then ()
         else (
@@ -175,6 +198,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       ;;
 
       let to_string (xs : t') : string =
+        Log.trace __FUNCTION__;
         to_seq xs
         |> List.of_seq
         |> Utils.Strfy.list
@@ -202,15 +226,20 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
             (destinations : D.t)
         : unit
         =
+        Log.trace __FUNCTION__;
         match find_opt x from with
         | None ->
           [ action, destinations ] |> List.to_seq |> A.of_seq |> add x from
         | Some actions -> A.update actions action destinations
       ;;
 
-      let size (xs : t') : int = fold (fun k v n -> A.size v + n) xs 0
+      let size (xs : t') : int =
+        Log.trace __FUNCTION__;
+        fold (fun k v n -> A.size v + n) xs 0
+      ;;
 
       let to_string (xs : t') : string =
+        Log.trace __FUNCTION__;
         to_seq xs
         |> List.of_seq
         |> Utils.Strfy.list
@@ -241,6 +270,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
         @param rocq_defs is a map of rocq inductive definitions of the LTS.
         @param weak is the optional weak arguments. *)
     let empty (init : M.Enc.t) (ind_defs : M.Enc.t Rocq_ind.t M.B.t) : t =
+      Log.trace __FUNCTION__;
       { to_visit = Queue.create ()
       ; init
       ; states = V.empty
@@ -253,7 +283,9 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     (*********************************************************)
 
     let is_silent_transition (x : EConstr.t) : Weak.t option -> bool option M.mm
-      = function
+      =
+      Log.trace __FUNCTION__;
+      function
       | None -> M.return None
       | Some (Option label_enc) ->
         (* let label_decoding : EConstr.t = M.decode label_enc in *)
@@ -283,15 +315,20 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     end
 
     module Make (Y : Y_Args) = struct
-      let next_to_visit () : M.Enc.t = Queue.pop !Y.g.to_visit
+      let next_to_visit () : M.Enc.t =
+        Log.trace __FUNCTION__;
+        Queue.pop !Y.g.to_visit
+      ;;
 
       let update_to_visit (xs : V.t) : unit =
+        Log.trace __FUNCTION__;
         Y.g := { !Y.g with states = V.union !Y.g.states xs }
       ;;
 
       let get_new_states (from : M.Enc.t) (ctors : M.Constructor.t list)
         : V.t M.mm
         =
+        Log.trace __FUNCTION__;
         let iter_body (i : int) (new_states : V.t) =
           let (act, tgt, int_tree) : M.Constructor.t = List.nth ctors i in
           let tgt_enc : M.Enc.t = M.encode tgt in
@@ -320,6 +357,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       ;;
 
       let get_new_constrs (from : M.Enc.t) : M.Constructor.t list M.mm =
+        Log.trace __FUNCTION__;
         let from_term : EConstr.t = M.decode from in
         let label_type : EConstr.t =
           Rocq_ind.get_lts_label_type Y.primary_lts
@@ -336,9 +374,9 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
           Y.primary_lts.enc
       ;;
 
-      (* TODO: move [primary_lts] to module ref? *)
       (** *)
       let rec build () : bool M.mm =
+        Log.trace __FUNCTION__;
         if Y.stop ()
         then Queue.is_empty !Y.g.to_visit |> M.return
         else (
@@ -357,16 +395,22 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
 
     module Extract (Z : Z_Args) = struct
       let pp (x : M.Enc.t) : string option =
+        Log.trace __FUNCTION__;
         if Z.pp then Some (M.decode x |> M.Strfy.econstr) else None
       ;;
 
-      let state (x : M.Enc.t) : Model.State.t = { term = x; pp = pp x }
+      let state (x : M.Enc.t) : Model.State.t =
+        Log.trace __FUNCTION__;
+        { term = x; pp = pp x }
+      ;;
 
       let states () : Model.States.t =
+        Log.trace __FUNCTION__;
         !Z.g.states |> V.to_list |> List.map state |> Model.States.of_list
       ;;
 
       let terminals () : Model.States.t =
+        Log.trace __FUNCTION__;
         !Z.g.states
         |> V.filter (fun (x : V.elt) -> Bool.not (T.mem !Z.g.transitions x))
         |> V.to_list
@@ -375,6 +419,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       ;;
 
       let transitions () : Model.Transitions.t =
+        Log.trace __FUNCTION__;
         T.fold
           (fun (from : M.Enc.t)
             (vs : A.t')
@@ -399,6 +444,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       ;;
 
       let constructor_info () : Model.Info.lts list M.mm =
+        Log.trace __FUNCTION__;
         let xs = M.B.to_seq Z.ind_defs |> List.of_seq in
         let open M.Syntax in
         let f (i : int) (acc : Model.Info.lts list) =
@@ -416,6 +462,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       ;;
 
       let meta () : Model.Info.meta M.mm =
+        Log.trace __FUNCTION__;
         let open M.Syntax in
         let* lts : Model.Info.lts list = constructor_info () in
         let open Model.Info in
@@ -428,6 +475,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       ;;
 
       let weak_labels (xs : Model.Labels.t) : Model.Labels.t M.mm =
+        Log.trace __FUNCTION__;
         match !Z.g.weak with
         | None -> Model.Labels.empty |> M.return
         | Some weak ->
@@ -449,6 +497,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
       ;;
 
       let lts () : Model.LTS.t M.mm =
+        Log.trace __FUNCTION__;
         let open M.Syntax in
         let transitions : Model.Transitions.t = transitions () in
         let alphabet : Model.Labels.t = Model.Transitions.labels transitions in
@@ -467,7 +516,9 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     end
 
     let build_ind_defs () : M.Enc.t Rocq_ind.t M.B.t M.mm =
+      Log.trace __FUNCTION__;
       let num : int = List.length X.grefs in
+      Log.thing ~__FUNCTION__ Notice "num" num (Of Utils.Strfy.int);
       let ind_defs : M.Enc.t Rocq_ind.t M.B.t = M.B.create num in
       let open M.Syntax in
       let f (i : int) () =
@@ -483,6 +534,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     let find_primary_lts (ind_defs : M.Enc.t Rocq_ind.t M.B.t)
       : M.Enc.t Rocq_ind.t M.mm
       =
+      Log.trace __FUNCTION__;
       let open M.Syntax in
       let* x : M.Enc.t Rocq_ind.t = Nametab.global X.primary_lts |> M.Ind.lts in
       (* NOTE: catch-all sanity check *)
@@ -491,6 +543,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
 
     (** normalize and encode the initial term *)
     let initial_term (init_term : Constrexpr.constr_expr) : M.Enc.t M.mm =
+      Log.trace __FUNCTION__;
       let open M.Syntax in
       let* init_term : EConstr.t = M.constrexpr_to_econstr init_term in
       let* init_term : EConstr.t = M.econstr_normalize init_term in
@@ -499,6 +552,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     ;;
 
     let make_yargs primary_lts ind_defs the_graph : (module Y_Args) =
+      Log.trace __FUNCTION__;
       let module Y = struct
         let primary_lts : M.Enc.t Rocq_ind.t = primary_lts
         let rocq_defs : M.Enc.t Rocq_ind.t M.B.t = ind_defs
@@ -517,6 +571,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     ;;
 
     let make_zargs ind_defs the_graph : (module Z_Args) =
+      Log.trace __FUNCTION__;
       let module Z = struct
         let pp : bool = false
         let ind_defs : M.Enc.t Rocq_ind.t M.B.t = ind_defs
@@ -527,16 +582,32 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
     ;;
 
     let build (init_term : Constrexpr.constr_expr) : Model.LTS.t M.mm =
+      Log.trace __FUNCTION__;
       let open M.Syntax in
       let* init : M.Enc.t = initial_term init_term in
       (* NOTE: encode rocq inductive defs *)
-      let* ind_defs = build_ind_defs () in
+      let* ind_defs : M.Enc.t Rocq_ind.t M.B.t = build_ind_defs () in
+      Log.things
+        ~__FUNCTION__
+        Notice
+        "ind_defs"
+        (M.B.to_seq ind_defs |> List.of_seq)
+        (Of
+           (fun (k, v) : string ->
+             Utils.Strfy.record
+               [ "enc", M.Enc.to_string k
+               ; "enc'", M.Enc.to_string v.enc
+               ; "ind", M.Strfy.econstr v.ind
+               ; ("kind", match v.kind with Type _ -> "Type" | LTS _ -> "LTS")
+               ]));
       let* primary_lts = find_primary_lts ind_defs in
       (* NOTE: build the graph *)
+      Log.trace ~__FUNCTION__ "Build the Graph";
       let the_graph : t ref = ref (empty init ind_defs) in
       let module G = Make ((val make_yargs primary_lts ind_defs the_graph)) in
       let* is_complete : bool = G.build () in
       (* M.return !the_graph *)
+      Log.trace ~__FUNCTION__ "Completed Graph, Extracting LTS";
       let module L = Extract ((val make_zargs ind_defs the_graph)) in
       let* the_lts : Model.LTS.t = L.lts () in
       M.return the_lts
@@ -551,6 +622,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
   end
 
   let make_xargs primary_lts grefs weak bounds : (module X_Args) =
+    Log.trace __FUNCTION__;
     let module X = struct
       let primary_lts : Libnames.qualid = primary_lts
       let grefs = grefs
@@ -569,12 +641,21 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
         (bounds : Model.Info.bounds)
     : Model.LTS.t M.mm
     =
-    let module T_ : Hashtbl.S with type key = M.Enc.t = Hashtbl.Make (M.Enc) in
-    let module V_ : Set.S with type elt = M.Enc.t = Set.Make (M.Enc) in
+    Log.trace __FUNCTION__;
+    let t = M.make_hashtbl in
+    let v = M.make_set in
     let d = M.make_state_tree_pair_set in
-    let grefs : Names.GlobRef.t list = Rocq_utils.libnames_to_globrefs names in
+    Log.thing
+      ~__FUNCTION__
+      Notice
+      "names num"
+      (List.length names)
+      (Of Utils.Strfy.int);
+    let grefs : Names.GlobRef.t list =
+      Rocq_utils.libnames_to_globrefs (primary_lts :: names)
+    in
     let x = make_xargs primary_lts grefs weak bounds in
-    let module G = Graph (T_) (V_) ((val d)) ((val x)) in
+    let module G = Graph ((val t)) ((val v)) ((val d)) ((val x)) in
     G.build init
   ;;
 
@@ -587,6 +668,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
           (bounds : Model.Info.bounds)
       : Model.LTS.t M.mm
       =
+      Log.trace __FUNCTION__;
       extract_lts primary_lts init names weak bounds
     ;;
 
@@ -598,6 +680,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
           (bounds : Model.Info.bounds)
       : Model.FSM.t M.mm
       =
+      Log.trace __FUNCTION__;
       let open M.Syntax in
       let* the_lts = extract_lts primary_lts init names weak bounds in
       Model.Convert.lts_to_fsm the_lts |> M.return
@@ -627,6 +710,7 @@ module Make (C : Rocq_context.SRocq_context) (E : Encoding.SEncoding) = struct
           (bounds : Model.Info.bounds)
       : t -> 'a M.mm
       =
+      Log.trace __FUNCTION__;
       let open M.Syntax in
       function
       | MakeLTS (x, primary_lts) ->

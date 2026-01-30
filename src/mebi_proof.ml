@@ -5,7 +5,7 @@ open Model
 module Hyp = Mebi_hypothesis
 
 (***********************************************************************)
-module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+module Log : Logger.SLogger = Logger.MkDefault ()
 
 let _show_output = true
 let () = Log.Config.configure_output Debug _show_output

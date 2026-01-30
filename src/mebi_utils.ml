@@ -1,5 +1,5 @@
 (***********************************************************************)
-module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+module Log : Logger.SLogger = Logger.MkDefault ()
 
 let () = Log.Config.enable_output ()
 let () = Log.Config.configure_output Debug true

@@ -53,7 +53,7 @@ VERNAC COMMAND EXTEND MeBi_LTS CLASSIFIED AS QUERY
 | ["MeBi" "LTS" constr(x) "Using" reference(r)] -> 
   (* {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) [])} *)
   {
-    let module W = Wrapper.Make ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     W.Command.run [] None (W.Model.Info.States 10) (W.Command.MakeLTS (x, r))
     |> W.M.run
   }
@@ -61,7 +61,7 @@ VERNAC COMMAND EXTEND MeBi_LTS CLASSIFIED AS QUERY
 | ["MeBi" "LTS" constr(x) "Using" reference(r) reference_list(rs)] -> 
   (* {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) rs)} *)
   {
-    let module W = Wrapper.Make ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     W.Command.run rs None (W.Model.Info.States 10) (W.Command.MakeLTS (x, r))
     |> W.M.run
   }

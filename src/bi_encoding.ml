@@ -33,6 +33,7 @@
 end *)
 
 module Make
+    (Log : Logger.SLogger)
     (Ctx : Rocq_context.SRocq_context)
     (Enc : Encoding.SEncoding)
      (* :
@@ -57,18 +58,30 @@ struct
     the_maps () := { fwd = F.create 0; bck = B.create 0 }
   ;;
 
-  let fwdmap () : Enc.t F.t = !(the_maps ()).fwd
-  let bckmap () : EConstr.t B.t = !(the_maps ()).bck
+  let fwdmap () : Enc.t F.t =
+    Log.trace __FUNCTION__;
+    !(the_maps ()).fwd
+  ;;
+
+  let bckmap () : EConstr.t B.t =
+    Log.trace __FUNCTION__;
+    !(the_maps ()).bck
+  ;;
 
   (* module F = FwdMap
      module B = BckMap *)
 
   (* *)
-  let get_encoding : EConstr.t -> Enc.t = F.find (fwdmap ())
+  let get_encoding (x : EConstr.t) : Enc.t =
+    Log.trace __FUNCTION__;
+    F.find (fwdmap ()) x
+  ;;
 
   let encode (x : EConstr.t) : Enc.t =
+    Log.trace __FUNCTION__;
     try get_encoding x with
     | Not_found ->
+      Log.trace ~__FUNCTION__ "Err: Not Found";
       (* NOTE: map to the next encoding and return *)
       let next_enc : Enc.t = Enc.incr () in
       F.add (fwdmap ()) x next_enc;
@@ -76,29 +89,39 @@ struct
       next_enc
   ;;
 
-  let encoded (x : EConstr.t) : bool = F.mem (fwdmap ()) x
+  let encoded (x : EConstr.t) : bool =
+    Log.trace __FUNCTION__;
+    F.mem (fwdmap ()) x
+  ;;
 
   (* *)
-  let get_econstr : Enc.t -> EConstr.t = B.find (bckmap ())
+  let get_econstr : Enc.t -> EConstr.t =
+    Log.trace __FUNCTION__;
+    B.find (bckmap ())
+  ;;
 
   exception CannotDecode of Enc.t
 
   let decode (x : Enc.t) : EConstr.t =
+    Log.trace __FUNCTION__;
     try get_econstr x with Not_found -> raise (CannotDecode x)
   ;;
 
   let decode_opt (x : Enc.t) : EConstr.t option =
+    Log.trace __FUNCTION__;
     try Some (decode x) with CannotDecode _ -> None
   ;;
 
   (* *)
   let decode_map (bmap : 'a B.t) : 'a F.t =
+    Log.trace __FUNCTION__;
     let fmap : 'a F.t = F.create (B.length bmap) in
     B.iter (fun (k : Enc.t) (v : 'a) -> F.add fmap (decode k) v) bmap;
     fmap
   ;;
 
   let encode_map (fmap : 'a F.t) : 'a B.t =
+    Log.trace __FUNCTION__;
     let bmap : 'a B.t = B.create (F.length fmap) in
     F.iter (fun (k : EConstr.t) (v : 'a) -> B.add bmap (encode k) v) fmap;
     bmap
@@ -106,6 +129,7 @@ struct
 
   (* *)
   let to_list () : (Enc.t * EConstr.t) list =
+    Log.trace __FUNCTION__;
     B.to_seq (bckmap ())
     |> List.of_seq
     |> List.sort (fun (a, _) (b, _) -> Enc.compare a b)
@@ -113,12 +137,14 @@ struct
 
   (* *)
   let make_hashtbl : (module Hashtbl.S with type key = Enc.t) =
+    Log.trace __FUNCTION__;
     (module Hashtbl.Make (struct
          include Enc
        end))
   ;;
 
   let make_set : (module Set.S with type elt = Enc.t) =
+    Log.trace __FUNCTION__;
     (module Set.Make (struct
          include Enc
        end))

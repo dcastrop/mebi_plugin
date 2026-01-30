@@ -1,4 +1,6 @@
-module Make : (Enc : Encoding.SEncoding) -> sig
+module Make : (_ : Logger.SLogger)
+  (Enc : Encoding.SEncoding)
+  -> sig
   module Tree : sig
     module type STreeNode = sig
       type t = Enc.t * int
@@ -12,7 +14,9 @@ module Make : (Enc : Encoding.SEncoding) -> sig
       val to_string : t -> string
     end
 
-    type 'a tree = 'a Enc_tree.Make(Enc).tree = Node of 'a * 'a tree list
+    type 'a tree = 'a Enc_tree.Make(Enc).tree =
+      | Node of 'a * 'a tree list
+
     type t = TreeNode.t tree
 
     val add : t -> t -> t
@@ -25,7 +29,9 @@ module Make : (Enc : Encoding.SEncoding) -> sig
 
     val min : t list -> TreeNode.t list
     val to_string : t -> string
-    val list_to_string : ?args:Utils.Strfy.style_args -> t list -> string
+
+    val list_to_string :
+      ?args:Utils.Strfy.style_args -> t list -> string
   end
 
   module Trees : sig
@@ -78,10 +84,7 @@ module Make : (Enc : Encoding.SEncoding) -> sig
   end
 
   module State : sig
-    type t =
-      { term : Enc.t
-      ; pp : string option
-      }
+    type t = { term : Enc.t; pp : string option }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -195,11 +198,11 @@ module Make : (Enc : Encoding.SEncoding) -> sig
   end
 
   module Label : sig
-    type t =
-      { term : Enc.t
-      ; pp : string option
-      ; is_silent : bool option
-      }
+    type t = {
+      term : Enc.t;
+      pp : string option;
+      is_silent : bool option;
+    }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -308,12 +311,12 @@ module Make : (Enc : Encoding.SEncoding) -> sig
   end
 
   module Note : sig
-    type t =
-      { from : State.t
-      ; label : Label.t
-      ; using : Trees.t
-      ; goto : State.t
-      }
+    type t = {
+      from : State.t;
+      label : Label.t;
+      using : Trees.t;
+      goto : State.t;
+    }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -322,10 +325,7 @@ module Make : (Enc : Encoding.SEncoding) -> sig
   end
 
   module Annotation : sig
-    type t =
-      { this : Note.t
-      ; next : t option
-      }
+    type t = { this : Note.t; next : t option }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -443,13 +443,13 @@ module Make : (Enc : Encoding.SEncoding) -> sig
   end
 
   module Transition : sig
-    type t =
-      { from : State.t
-      ; goto : State.t
-      ; label : Label.t
-      ; annotation : Annotation.t option
-      ; constructor_tree : Tree.t
-      }
+    type t = {
+      from : State.t;
+      goto : State.t;
+      label : Label.t;
+      annotation : Annotation.t option;
+      constructor_tree : Tree.t;
+    }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -559,11 +559,11 @@ module Make : (Enc : Encoding.SEncoding) -> sig
   end
 
   module Action : sig
-    type t =
-      { label : Label.t
-      ; annotation : Annotation.t option
-      ; constructor_trees : Trees.t
-      }
+    type t = {
+      label : Label.t;
+      annotation : Annotation.t option;
+      constructor_trees : Trees.t;
+    }
 
     val wk_equal : t -> t -> bool
     val equal : t -> t -> bool
@@ -678,15 +678,15 @@ module Make : (Enc : Encoding.SEncoding) -> sig
     val add_seq : elt Seq.t -> t -> t
     val of_seq : elt Seq.t -> t
 
-    val merge_saturated_tuples
-      :  ActionPair.t list
-      -> ActionPair.t list
-      -> ActionPair.t list
+    val merge_saturated_tuples :
+      ActionPair.t list ->
+      ActionPair.t list ->
+      ActionPair.t list
 
-    val try_update_saturated_tuple
-      :  ActionPair.t
-      -> ActionPair.t list
-      -> ActionPair.t option * ActionPair.t list
+    val try_update_saturated_tuple :
+      ActionPair.t ->
+      ActionPair.t list ->
+      ActionPair.t option * ActionPair.t list
   end
 
   module Actions : sig
@@ -806,8 +806,13 @@ module Make : (Enc : Encoding.SEncoding) -> sig
       val replace : 'a t -> key -> 'a -> unit
       val mem : 'a t -> key -> bool
       val iter : (key -> 'a -> unit) -> 'a t -> unit
-      val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-      val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+      val filter_map_inplace :
+        (key -> 'a -> 'a option) -> 'a t -> unit
+
+      val fold :
+        (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
       val length : 'a t -> int
       val stats : 'a t -> Hashtbl.statistics
       val to_seq : 'a t -> (key * 'a) Seq.t
@@ -833,8 +838,13 @@ module Make : (Enc : Encoding.SEncoding) -> sig
     val replace : 'a t -> key -> 'a -> unit
     val mem : 'a t -> key -> bool
     val iter : (key -> 'a -> unit) -> 'a t -> unit
-    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+    val filter_map_inplace :
+      (key -> 'a -> 'a option) -> 'a t -> unit
+
+    val fold :
+      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
     val length : 'a t -> int
     val stats : 'a t -> Hashtbl.statistics
     val to_seq : 'a t -> (key * 'a) Seq.t
@@ -857,11 +867,11 @@ module Make : (Enc : Encoding.SEncoding) -> sig
   end
 
   module Edge : sig
-    type t =
-      { from : State.t
-      ; goto : State.t
-      ; action : Action.t
-      }
+    type t = {
+      from : State.t;
+      goto : State.t;
+      action : Action.t;
+    }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -986,8 +996,13 @@ module Make : (Enc : Encoding.SEncoding) -> sig
       val replace : 'a t -> key -> 'a -> unit
       val mem : 'a t -> key -> bool
       val iter : (key -> 'a -> unit) -> 'a t -> unit
-      val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-      val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+      val filter_map_inplace :
+        (key -> 'a -> 'a option) -> 'a t -> unit
+
+      val fold :
+        (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
       val length : 'a t -> int
       val stats : 'a t -> Hashtbl.statistics
       val to_seq : 'a t -> (key * 'a) Seq.t
@@ -1013,8 +1028,13 @@ module Make : (Enc : Encoding.SEncoding) -> sig
     val replace : 'a t -> key -> 'a -> unit
     val mem : 'a t -> key -> bool
     val iter : (key -> 'a -> unit) -> 'a t -> unit
-    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
+    val filter_map_inplace :
+      (key -> 'a -> 'a option) -> 'a t -> unit
+
+    val fold :
+      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
+
     val length : 'a t -> int
     val stats : 'a t -> Hashtbl.statistics
     val to_seq : 'a t -> (key * 'a) Seq.t
@@ -1138,53 +1158,48 @@ module Make : (Enc : Encoding.SEncoding) -> sig
   end
 
   module Info : sig
-    type t =
-      { meta : meta option
-      ; weak_labels : Labels.t
-      }
+    type t = { meta : meta option; weak_labels : Labels.t }
 
-    and meta =
-      { is_complete : bool
-      ; is_merged : bool
-      ; bounds : bounds
-      ; lts : lts list
-      }
+    and meta = {
+      is_complete : bool;
+      is_merged : bool;
+      bounds : bounds;
+      lts : lts list;
+    }
 
-    and bounds =
-      | States of int
-      | Transitions of int
+    and bounds = States of int | Transitions of int
 
-    and lts =
-      { enc : Enc.t
-      ; constructors : Rocq_bindings.constructor list
-      }
+    and lts = {
+      enc : Enc.t;
+      constructors : Rocq_bindings.constructor list;
+    }
 
     val merge : t -> t -> t
     val to_string : t -> string
   end
 
   module LTS : sig
-    type t =
-      { init : State.t option
-      ; terminals : Partition.elt
-      ; alphabet : Labels.t
-      ; states : Partition.elt
-      ; transitions : Transitions.t
-      ; info : Info.t
-      }
+    type t = {
+      init : State.t option;
+      terminals : Partition.elt;
+      alphabet : Labels.t;
+      states : Partition.elt;
+      transitions : Transitions.t;
+      info : Info.t;
+    }
 
     val to_string : t -> string
   end
 
   module FSM : sig
-    type t =
-      { init : State.t option
-      ; terminals : Partition.elt
-      ; alphabet : Labels.t
-      ; states : Partition.elt
-      ; edges : EdgeMap.t'
-      ; info : Info.t
-      }
+    type t = {
+      init : State.t option;
+      terminals : Partition.elt;
+      alphabet : Labels.t;
+      states : Partition.elt;
+      edges : EdgeMap.t';
+      info : Info.t;
+    }
 
     val merge : t -> t -> t
     val to_string : t -> string
@@ -1196,18 +1211,18 @@ module Make : (Enc : Encoding.SEncoding) -> sig
   end
 
   module Saturate : sig
-    type data =
-      { named : Action.t option
-      ; notes : wip list
-      ; visited : Partition.elt
-      ; old_edges : EdgeMap.t'
-      }
+    type data = {
+      named : Action.t option;
+      notes : wip list;
+      visited : Partition.elt;
+      old_edges : EdgeMap.t';
+    }
 
-    and wip =
-      { from : State.t
-      ; via : Label.t
-      ; trees : Trees.t
-      }
+    and wip = {
+      from : State.t;
+      via : Label.t;
+      trees : Trees.t;
+    }
 
     val wip : State.t -> Action.t -> wip
     val initial_data : EdgeMap.t' -> data
@@ -1216,53 +1231,67 @@ module Make : (Enc : Encoding.SEncoding) -> sig
     val update_visited : State.t -> data -> data
     val already_visited : State.t -> data -> bool
     val skip_action : Action.t -> data -> bool
-    val get_old_actions : State.t -> data -> ActionMap.t' option
+
+    val get_old_actions :
+      State.t -> data -> ActionMap.t' option
 
     exception Model_Saturate_WIP_IsEmptyList of unit
 
     val wip_to_annotation : State.t -> wip list -> Annotation.t
 
     exception Model_Saturate_WIP_HadNoNamedActions of wip list
-    exception Model_Saturate_WIP_HadMultipleNamedActions of wip list
+
+    exception
+      Model_Saturate_WIP_HadMultipleNamedActions of wip list
 
     val validate_wips : wip list -> unit
     val extrapolate_annotations : Annotation.t -> Annotations.t
-    val stop : data -> State.t -> ActionPairs.t -> ActionPairs.t
-    val check_from : data -> State.t -> ActionPairs.t -> ActionPairs.t
 
-    val check_actions
-      :  data
-      -> State.t
-      -> ActionMap.t'
-      -> ActionPairs.t
-      -> ActionPairs.t
+    val stop :
+      data -> State.t -> ActionPairs.t -> ActionPairs.t
 
-    val check_destinations
-      :  data
-      -> State.t
-      -> Partition.elt
-      -> ActionPairs.t
-      -> ActionPairs.t
+    val check_from :
+      data -> State.t -> ActionPairs.t -> ActionPairs.t
 
-    val edge_action_destinations
-      :  data
-      -> State.t
-      -> Partition.elt
-      -> ActionPairs.t
+    val check_actions :
+      data ->
+      State.t ->
+      ActionMap.t' ->
+      ActionPairs.t ->
+      ActionPairs.t
 
-    val edge_actions : State.t -> ActionMap.t' -> EdgeMap.t' -> ActionPairs.t
-    val edge : ActionMap.t' -> State.t -> ActionMap.t' -> EdgeMap.t' -> unit
-    val edges : Labels.t -> Partition.elt -> EdgeMap.t' -> EdgeMap.t'
+    val check_destinations :
+      data ->
+      State.t ->
+      Partition.elt ->
+      ActionPairs.t ->
+      ActionPairs.t
+
+    val edge_action_destinations :
+      data -> State.t -> Partition.elt -> ActionPairs.t
+
+    val edge_actions :
+      State.t -> ActionMap.t' -> EdgeMap.t' -> ActionPairs.t
+
+    val edge :
+      ActionMap.t' ->
+      State.t ->
+      ActionMap.t' ->
+      EdgeMap.t' ->
+      unit
+
+    val edges :
+      Labels.t -> Partition.elt -> EdgeMap.t' -> EdgeMap.t'
+
     val fsm : ?only_if_weak:bool option -> FSM.t -> FSM.t
   end
 
   module Minimize : sig
-    type t =
-      { fsm : FSM.t
-      ; pi : Partition.t
-      }
+    type t = { fsm : FSM.t; pi : Partition.t }
 
-    exception Split_OnlyReturnedOneBlock_ButNeqBlock of (States.t * States.t)
+    exception
+      Split_OnlyReturnedOneBlock_ButNeqBlock of
+        (States.t * States.t)
 
     val ensure_equal : States.t -> States.t -> unit
 
@@ -1270,50 +1299,47 @@ module Make : (Enc : Encoding.SEncoding) -> sig
 
     val ensure_nonempty : States.t -> unit
 
-    val split_block
-      :  Partition.t
-      -> State.t
-      -> EdgeMap.t'
-      -> States.t
-      -> States.t * States.t option
+    val split_block :
+      Partition.t ->
+      State.t ->
+      EdgeMap.t' ->
+      States.t ->
+      States.t * States.t option
 
-    val for_each_label
-      :  Partition.t ref
-      -> bool ref
-      -> EdgeMap.t'
-      -> States.t ref
-      -> Label.t
-      -> unit
+    val for_each_label :
+      Partition.t ref ->
+      bool ref ->
+      EdgeMap.t' ->
+      States.t ref ->
+      Label.t ->
+      unit
 
-    val for_each_block
-      :  Partition.t ref
-      -> bool ref
-      -> Labels.t
-      -> EdgeMap.t'
-      -> States.t
-      -> unit
+    val for_each_block :
+      Partition.t ref ->
+      bool ref ->
+      Labels.t ->
+      EdgeMap.t' ->
+      States.t ->
+      unit
 
     val partition_states : FSM.t -> Partition.t
     val fsm : ?weak:bool -> FSM.t -> t
   end
 
   module Bisimilar : sig
-    type t =
-      { fsm_a : fsm_pair
-      ; fsm_b : fsm_pair
-      ; merged : FSM.t
-      ; result : result
-      }
+    type t = {
+      fsm_a : fsm_pair;
+      fsm_b : fsm_pair;
+      merged : FSM.t;
+      result : result;
+    }
 
-    and result =
-      { bisim_states : Partition.t
-      ; non_bisim_states : Partition.t
-      }
+    and result = {
+      bisim_states : Partition.t;
+      non_bisim_states : Partition.t;
+    }
 
-    and fsm_pair =
-      { original : FSM.t
-      ; saturated : FSM.t
-      }
+    and fsm_pair = { original : FSM.t; saturated : FSM.t }
 
     val fsm_pair : ?weak:bool -> FSM.t -> fsm_pair
     val the_cached_result : t option ref
