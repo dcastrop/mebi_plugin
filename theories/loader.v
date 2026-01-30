@@ -2,6 +2,8 @@ Set Debug "backtrace".
 From MEBI Require Export Bisimilarity.
 Declare ML Module "coq-mebi.mebi".
 
+(* MeBi API Initialize. *)
+
 (* Print Registered. *)
 (* Print ex. *)
 (* Print ex_intro. *)
@@ -9,7 +11,7 @@ Declare ML Module "coq-mebi.mebi".
 (* Print existT. *)
 
 MeBi Divider "Loading MeBi Plugin".
-MeBi Config Reset.
+(* MeBi Config Reset. *)
 MeBi Divider.
 
 (* Inductive printout_mode : Set :=

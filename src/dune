@@ -35,17 +35,18 @@
   rocq_context
   encoding
   enc_tree
-  term
+  ; term
   bi_encoding
   rocq_monad
   rocq_monad_utils
   rocq_bindings
   model
   wrapper 
-  proof_solver
+  ; proof_solver
           ; ; ; ; ; below be application
-          ; api ; stores modules created by [loader.v], used by commands
+          api ; stores modules created by [loader.v], used by commands
           ; command ; plugin i/o
+          g_mebi
           ; ; ; ; ;
           ; ; ; ; ;
           ; ; ; ; ;
@@ -87,8 +88,8 @@
           ;  g_mebi
   ))
 
-;(coq.pp ; This will let Dune know about Coq's .mlg grammar files.
-; (modules g_mebi))
+(coq.pp ; This will let Dune know about Coq's .mlg grammar files.
+  (modules g_mebi))
 
 ; (library
 ;  (name mebi_fsm)

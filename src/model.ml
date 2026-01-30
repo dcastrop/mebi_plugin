@@ -58,6 +58,7 @@ module Make (Enc : Encoding.SEncoding) = struct
   module Label = struct
     type t =
       { term : Enc.t
+      ; pp : string option
       ; is_silent : bool option
       }
 
@@ -91,6 +92,7 @@ module Make (Enc : Encoding.SEncoding) = struct
     let to_string (x : t) : string =
       Utils.Strfy.record
         [ "term", Enc.to_string x.term
+        ; "pp", Utils.Strfy.option (Args Utils.Strfy.string) x.pp
         ; "is_silent", Utils.Strfy.option (Args Utils.Strfy.bool) x.is_silent
         ]
     ;;
@@ -233,7 +235,7 @@ module Make (Enc : Encoding.SEncoding) = struct
       ; goto : State.t
       ; label : Label.t
       ; annotation : Annotation.t option
-      ; constructor_trees : Trees.t
+      ; constructor_tree : Tree.t
       }
 
     let equal (a : t) (b : t) : bool =
@@ -241,7 +243,7 @@ module Make (Enc : Encoding.SEncoding) = struct
       && State.equal a.goto b.goto
       && Label.equal a.label b.label
       && Option.equal Annotation.equal a.annotation b.annotation
-      && Trees.equal a.constructor_trees b.constructor_trees
+      && Tree.equal a.constructor_tree b.constructor_tree
     ;;
 
     let compare (a : t) (b : t) : int =
@@ -250,7 +252,7 @@ module Make (Enc : Encoding.SEncoding) = struct
         ; State.compare a.goto b.goto
         ; Label.compare a.label b.label
         ; Option.compare Annotation.compare a.annotation b.annotation
-        ; Trees.compare a.constructor_trees b.constructor_trees
+        ; Tree.compare a.constructor_tree b.constructor_tree
         ]
     ;;
 
@@ -268,10 +270,7 @@ module Make (Enc : Encoding.SEncoding) = struct
         ; "label", Label.to_string x.label
         ; ( "annotation"
           , Utils.Strfy.option (Of Annotation.to_string) x.annotation )
-        ; ( "constructor_trees"
-          , Utils.Strfy.list
-              (Of Tree.to_string)
-              (Trees.to_list x.constructor_trees) )
+        ; "constructor_tree", Tree.to_string x.constructor_tree
         ]
     ;;
   end
@@ -279,6 +278,13 @@ module Make (Enc : Encoding.SEncoding) = struct
   module Transitions = struct
     module S : Set.S with type elt = Transition.t = Set.Make (Transition)
     include S
+
+    let labels (xs : t) : Labels.t =
+      fold
+        (fun ({ label; _ } : elt) : (Labels.t -> Labels.t) -> Labels.add label)
+        xs
+        Labels.empty
+    ;;
 
     let to_string (xs : t) : string =
       S.to_list xs
@@ -429,13 +435,28 @@ module Make (Enc : Encoding.SEncoding) = struct
 
     type t' = States.t t
 
+    (** [update] ... if the action is already present, then along with merging the destination states, we also merge the constructor trees.
+    *)
     let update (x : t') (action : Action.t) (states : States.t) : unit =
       if States.is_empty states
       then ()
       else (
         match find_opt x action with
         | None -> add x action states
-        | Some old_states -> replace x action (States.union old_states states))
+        | Some old_states ->
+          (* NOTE: also find the existing key to merge the [constructor_trees] *)
+          let action : Action.t =
+            to_seq_keys x
+            |> Seq.filter (Action.equal action)
+            |> Seq.fold_left
+                 (fun (action : Action.t) (y : Action.t) ->
+                   { action with
+                     constructor_trees =
+                       Trees.union action.constructor_trees y.constructor_trees
+                   })
+                 action
+          in
+          replace x action (States.union old_states states))
     ;;
 
     (** [get_destinations x f e] merges the values of [x] using [f], where [e] is some initial (i.e., "empty") collection of ['a].
@@ -549,9 +570,8 @@ module Make (Enc : Encoding.SEncoding) = struct
       =
       match find_opt x from with
       | None ->
-        [ action, destinations ]
-        |> List.to_seq
-        |> ActionMap.of_seq
+        ActionPairs.singleton (action, destinations)
+        |> ActionMap.of_actionpairs
         |> add x from
       | Some actions -> ActionMap.update actions action destinations
     ;;
@@ -799,12 +819,16 @@ module Make (Enc : Encoding.SEncoding) = struct
     let transitions_to_edgemap (xs : Transitions.t) : EdgeMap.t' =
       let edges : EdgeMap.t' = EdgeMap.create 0 in
       Transitions.iter
-        (fun ({ from; goto; label; annotation; constructor_trees } :
+        (fun ({ from; goto; label; annotation; constructor_tree } :
                Transition.t) ->
+          (* NOTE: [ActionMap.update] handles merging of [constructor_trees] for [actions] with matching [labels] *)
           EdgeMap.update
             edges
             from
-            { label; annotation; constructor_trees }
+            { label
+            ; annotation
+            ; constructor_trees = Trees.singleton constructor_tree
+            }
             (States.singleton goto))
         xs;
       edges

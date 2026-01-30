@@ -10,10 +10,11 @@ Rocq_enc
 Rocq_context
 Encoding
 Enc_tree
-Term
 Bi_encoding
 Rocq_monad
 Rocq_monad_utils
 Rocq_bindings
 Model
 Wrapper
+Api
+G_mebi

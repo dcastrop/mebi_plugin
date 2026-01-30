@@ -682,3 +682,7 @@ let is_theory sigma (x : EConstr.t) : bool =
 (* let is_type sigma (x : EConstr.t) : bool =
    EConstr.isType sigma x && EConstr.isConst sigma x
    ;; *)
+
+let libnames_to_globrefs (xs : Libnames.qualid list) : Names.GlobRef.t list =
+  List.map Nametab.global xs
+;;
