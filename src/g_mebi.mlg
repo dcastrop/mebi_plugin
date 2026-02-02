@@ -49,21 +49,173 @@ END *)
 
 END *)
 
-VERNAC COMMAND EXTEND MeBi_LTS CLASSIFIED AS QUERY
-| ["MeBi" "LTS" constr(x) "Using" reference(r)] -> 
-  (* {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) [])} *)
+(* ProofSolver *)
+(* TODO: use Proof_solver and Proof_solver.W *)
+VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
+(* |![ proof ] 
+  [ "MeBiSim" "Solve" int(upper_bound) ] ->
+  { fun ~pstate -> Mebi_proof.solve upper_bound pstate } *)
+
+(* |![ proof ] 
+  [ "MeBiSim" "Step" ] ->
+  { fun ~pstate -> Mebi_tactics.update_proof_by_tactic pstate (Mebi_proof.step ()) } *)
+
+|![ proof ] 
+  [ "MeBiSim" "Begin" reference(a) constr(x)  
+                "And" reference(b) constr(y) ] -> 
+  { fun ~pstate -> 
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
+    W.Command.run [] None (W.Model.Info.States 10) (W.Command.CheckBisim {a=(x, a); b=(y, b)})
+    |> W.M.run ~reset_encoding:true
+    in 
+    (* TODO: store the result *)
+    pstate
+  }
+
+|![ proof ] 
+  [ "MeBiSim" "Begin" reference(a) constr(x)  
+                "And" reference(b) constr(y)
+                "Using" reference_list(rs) ] -> 
+  { fun ~pstate -> 
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
+    W.Command.run rs None (W.Model.Info.States 10) (W.Command.CheckBisim {a=(x, a); b=(y, b)})
+    |> W.M.run ~reset_encoding:true
+    in 
+    (* TODO: store the result *)
+    pstate
+  }
+END
+
+(* Bisimilarity *)
+VERNAC COMMAND EXTEND MeBi_Bisim CLASSIFIED AS QUERY
+| ["MeBi" "Bisim" constr(x) "With" reference(a) 
+            "And" constr(y) "With" reference(b)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
+    W.Command.run [] None (W.Model.Info.States 10) (W.Command.CheckBisim {a=(x, a); b=(y, b)})
+    |> W.M.run ~reset_encoding:true
+    in ()
+  }
+
+| ["MeBi" "Bisim" constr(x) "With" reference(a) 
+            "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
+  {
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
+    W.Command.run rs None (W.Model.Info.States 10) (W.Command.CheckBisim {a=(x, a); b=(y, b)})
+    |> W.M.run ~reset_encoding:true
+    in ()
+  }
+END 
+
+
+(* Merge *)
+VERNAC COMMAND EXTEND MeBi_Merge CLASSIFIED AS QUERY
+| ["MeBi" "Bisim" constr(x) "With" reference(a) 
+            "And" constr(y) "With" reference(b)] -> 
+  {
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
+    W.Command.run [] None (W.Model.Info.States 10) (W.Command.Merge {a=(x, a); b=(y, b)})
+    |> W.M.run ~reset_encoding:true
+    in ()
+  }
+
+| ["MeBi" "Bisim" constr(x) "With" reference(a) 
+            "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
+  {
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
+    W.Command.run rs None (W.Model.Info.States 10) (W.Command.Merge {a=(x, a); b=(y, b)})
+    |> W.M.run ~reset_encoding:true
+    in ()
+  }
+END 
+
+(* Minimize *)
+VERNAC COMMAND EXTEND MeBi_Minimize CLASSIFIED AS QUERY
+| ["MeBi" "Minimize" constr(x) "Using" reference(r)] -> 
+  {
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
+    W.Command.run [] None (W.Model.Info.States 10) (W.Command.Minimize (x, r))
+    |> W.M.run ~reset_encoding:true
+    in ()
+  }
+  
+| ["MeBi" "Minimize" constr(x) "Using" reference(r) reference_list(rs)] -> 
+  {
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
+    W.Command.run rs None (W.Model.Info.States 10) (W.Command.Minimize (x, r))
+    |> W.M.run ~reset_encoding:true 
+    in ()
+  }
+END 
+
+(* Saturate *)
+VERNAC COMMAND EXTEND MeBi_Saturate CLASSIFIED AS QUERY
+| ["MeBi" "Saturate" constr(x) "Using" reference(r)] -> 
+  {
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
+    W.Command.run [] None (W.Model.Info.States 10) (W.Command.Saturate (x, r))
+    |> W.M.run ~reset_encoding:true
+    in ()
+  }
+  
+| ["MeBi" "Saturate" constr(x) "Using" reference(r) reference_list(rs)] -> 
+  {
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
+    W.Command.run rs None (W.Model.Info.States 10) (W.Command.Saturate (x, r))
+    |> W.M.run ~reset_encoding:true 
+    in ()
+  }
+END 
+
+(* FSM *)
+VERNAC COMMAND EXTEND MeBi_FSM CLASSIFIED AS QUERY
+| ["MeBi" "FSM" constr(x) "Using" reference(r)] -> 
+  {
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
+    W.Command.run [] None (W.Model.Info.States 10) (W.Command.MakeFSM (x, r))
+    |> W.M.run ~reset_encoding:true
+    in ()
+  }
+  
+| ["MeBi" "FSM" constr(x) "Using" reference(r) reference_list(rs)] -> 
+  {
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
+    W.Command.run rs None (W.Model.Info.States 10) (W.Command.MakeFSM (x, r))
+    |> W.M.run ~reset_encoding:true 
+    in ()
+  }
+END 
+
+(* LTS *)
+VERNAC COMMAND EXTEND MeBi_LTS CLASSIFIED AS QUERY
+| ["MeBi" "LTS" constr(x) "Using" reference(r)] -> 
+  {
+    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
     W.Command.run [] None (W.Model.Info.States 10) (W.Command.MakeLTS (x, r))
-    |> W.M.run
+    |> W.M.run ~reset_encoding:true 
+    in ()
   }
   
 | ["MeBi" "LTS" constr(x) "Using" reference(r) reference_list(rs)] -> 
-  (* {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) rs)} *)
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
+    let _ = 
     W.Command.run rs None (W.Model.Info.States 10) (W.Command.MakeLTS (x, r))
-    |> W.M.run
+    |> W.M.run ~reset_encoding:true
+    in ()
   }
 END 
 

@@ -75,19 +75,29 @@ module Make : (Log : Logger.SLogger)
     val of_seq : (key * 'a) Seq.t -> 'a t
   end
 
-  type maps =
+  type maps = 
         Bi_encoding.Make(Log)(Ctx)(Enc).maps = {
     fwd : Enc.t F.t;
     bck : Evd.econstr B.t;
   }
 
-  val the_maps : unit -> maps ref
+  val the_maps : maps ref option ref
   val reset : unit -> unit
+
+  exception MapsNotInitialised of unit
+
+  val get_the_maps : unit -> maps ref
   val fwdmap : unit -> Enc.t F.t
   val bckmap : unit -> Evd.econstr B.t
+
+  exception EncodingNotFound of Evd.econstr
+
   val get_encoding : Evd.econstr -> Enc.t
   val encode : Evd.econstr -> Enc.t
   val encoded : Evd.econstr -> bool
+
+  exception DecodingNotFound of Enc.t
+
   val get_econstr : Enc.t -> Evd.econstr
 
   exception CannotDecode of Enc.t
@@ -97,9 +107,7 @@ module Make : (Log : Logger.SLogger)
   val decode_map : 'a B.t -> 'a F.t
   val encode_map : 'a F.t -> 'a B.t
   val to_list : unit -> (Enc.t * Evd.econstr) list
-  val make_hashtbl : (module Hashtbl.S with type key = Enc.t)
-  val make_set : (module Set.S with type elt = Enc.t)
-  val bienc_to_list : unit -> (Enc.t * Evd.econstr) list
+  val bienc_to_list : unit -> (Enc.t * EConstr.t) list
 
   type 'a mm = wrapper ref -> 'a in_wrapper
   and wrapper = { ctx : Rocq_context.t ref; maps : maps ref }
@@ -154,7 +162,7 @@ module Make : (Log : Logger.SLogger)
   val get_sigma : wrapper ref -> Evd.evar_map in_wrapper
   val get_maps : wrapper ref -> maps in_wrapper
   val get_fwdmap : wrapper ref -> Enc.t F.t in_wrapper
-  val get_bckmap : wrapper ref -> Evd.econstr B.t in_wrapper
+  val get_bckmap : wrapper ref -> EConstr.t B.t in_wrapper
 
   val fstring :
     (Environ.env -> Evd.evar_map -> 'a -> string) ->
@@ -195,11 +203,13 @@ module Make : (Log : Logger.SLogger)
   end
 
   module Constructor : sig
-    type t = Evd.econstr * Evd.econstr * Tree.t
+    type t = EConstr.t * EConstr.t * Tree.t
 
     val to_string : Environ.env -> Evd.evar_map -> t -> string
   end
 
-  val make_state_tree_pair_set :
+  val make_state_tree_pair_set : unit ->
     (module Set.S with type elt = Enc.t * Tree.t)
+  val make_hashtbl : unit -> (module Hashtbl.S with type key = Enc.t)
+  val make_set : unit -> (module Set.S with type elt = Enc.t)
 end

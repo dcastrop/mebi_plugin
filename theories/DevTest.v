@@ -99,19 +99,19 @@ MeBi Config Weak As Option label. *)
 
 MeBi Divider "Theories.DevTest.0".
 MeBi LTS (tend) Using termLTS.
-(* MeBi FSM (tend) Using termLTS. *)
+MeBi FSM (tend) Using termLTS.
 
 MeBi Divider "Theories.DevTest.0.1".
 MeBi LTS (tseq tend tend) Using termLTS.
-(* MeBi FSM (tseq tend tend) Using termLTS. *)
+MeBi FSM (tseq tend tend) Using termLTS.
 
 MeBi Divider "Theories.DevTest.0.2".
 MeBi LTS (tpar tend tend) Using termLTS.
-(* MeBi FSM (tpar tend tend) Using termLTS. *)
+MeBi FSM (tpar tend tend) Using termLTS.
 
-(* MeBi Divider "Theories.DevTest.0.3". *)
+MeBi Divider "Theories.DevTest.0.3".
 MeBi LTS (tseq (tpar tend tend) tend) Using termLTS.
-(* MeBi FSM (tseq (tpar tend tend) tend) Using termLTS. *)
+MeBi FSM (tseq (tpar tend tend) tend) Using termLTS.
 (* NOTE:        (tseq (tpar tend tend) tend)
   [ 1 -> [ 3 => (tseq tend tend)
          ; 5 => (tseq (tpar tend tend) tend)
@@ -236,10 +236,10 @@ MeBi LTS (tseq (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (
 (* MeBi LTS 
 (tfix (tseq (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) trec)) 
 Using termLTS3. *)
-(* 
+
 MeBi Saturate 
 (tfix (tseq (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) trec)) 
-Using termLTS3. *)
+Using termLTS3.
 
 
 (* testing merging *)
@@ -255,8 +255,8 @@ Example q : term := tfix (tseq (tpar (tact (recv A) tend)
 
 End TestA.
 
-(* Module TestB.
-  MeBi Config WeakMode Disable. 
+Module TestB.
+  (* MeBi Config WeakMode Disable.  *)
 (* MeBi Config Output Enable True. MeBi Set ShowDebug True. MeBi Set ShowDetails True. *)
 
 (* debugging test.v *)
@@ -292,14 +292,14 @@ End TestA.
 
 
 MeBi Divider "Theories.DevTest.TestB.FSM1".
-(* MeBi FSM (tpar TheAction1 TheAction2 tend) Using termLTS. *)
+MeBi FSM (tpar TheAction1 TheAction2 tend) Using termLTS.
 
 MeBi Divider "Theories.DevTest.TestB.FSM2".
-(* MeBi FSM (tpar TheAction2 TheAction1 tend) Using termLTS. *)
+MeBi FSM (tpar TheAction2 TheAction1 tend) Using termLTS.
 
 MeBi Divider "Theories.DevTest.TestB.Bisim".
-  (* MeBi Bisim (tpar TheAction1 TheAction2 tend) With termLTS
+  MeBi Bisim (tpar TheAction1 TheAction2 tend) With termLTS
          And (tpar TheAction2 TheAction1 tend) With termLTS
-         Using termLTS. *)
+         Using termLTS.
 
-End TestB. *)
+End TestB.

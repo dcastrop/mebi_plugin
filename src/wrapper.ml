@@ -7,6 +7,12 @@ struct
   module Model = Model.Make (Log) (M.Enc)
 
   (** *)
+  (* module Strfy = struct
+     let lts (x:Model.LTS.t) : string =
+
+     end *)
+
+  (** *)
   module IsTheory = struct
     (** [is_theory x y] checks if term [x] is equal to theory term [y], catching the exception thrown when [EConstr.kind_of_type x] is not [AtomicType (ty, tys)].
     *)
@@ -523,8 +529,20 @@ struct
       let open M.Syntax in
       let f (i : int) () =
         let gref : Names.GlobRef.t = List.nth X.grefs i in
+        (* NOTE: [M.Ind.lts] encodes [x.ind] into the bi-enc maps. *)
         let* x : M.Enc.t Rocq_ind.t = M.Ind.lts gref in
+        Log.thing
+          ~__FUNCTION__
+          Debug
+          "x"
+          x
+          (Of (M.Strfy.rocq_ind M.Enc.to_string));
+        (* NOTE: [ind_defs] is a separate map, so add again using same enc. *)
         M.B.replace ind_defs x.enc x;
+        let x_enc : M.Enc.t = M.encode x.ind in
+        Log.thing ~__FUNCTION__ Debug "x_enc" x_enc (Of M.Enc.to_string);
+        let x_dec : EConstr.t = M.decode x.enc in
+        Log.thing ~__FUNCTION__ Debug "x_dec" x_dec (Of M.Strfy.econstr);
         M.return ()
       in
       let* () = M.iterate 0 (num - 1) () f in
@@ -537,6 +555,12 @@ struct
       Log.trace __FUNCTION__;
       let open M.Syntax in
       let* x : M.Enc.t Rocq_ind.t = Nametab.global X.primary_lts |> M.Ind.lts in
+      Log.thing
+        ~__FUNCTION__
+        Debug
+        "primary lts"
+        x
+        (Of (M.Strfy.rocq_ind M.Enc.to_string));
       (* NOTE: catch-all sanity check *)
       M.encode x.ind |> M.B.find ind_defs |> M.return
     ;;
@@ -593,13 +617,9 @@ struct
         "ind_defs"
         (M.B.to_seq ind_defs |> List.of_seq)
         (Of
-           (fun (k, v) : string ->
-             Utils.Strfy.record
-               [ "enc", M.Enc.to_string k
-               ; "enc'", M.Enc.to_string v.enc
-               ; "ind", M.Strfy.econstr v.ind
-               ; ("kind", match v.kind with Type _ -> "Type" | LTS _ -> "LTS")
-               ]));
+           (Utils.Strfy.tuple
+              (Of M.Enc.to_string)
+              (Of (M.Strfy.rocq_ind M.Enc.to_string))));
       let* primary_lts = find_primary_lts ind_defs in
       (* NOTE: build the graph *)
       Log.trace ~__FUNCTION__ "Build the Graph";
@@ -625,7 +645,7 @@ struct
     Log.trace __FUNCTION__;
     let module X = struct
       let primary_lts : Libnames.qualid = primary_lts
-      let grefs = grefs
+      let grefs : Names.GlobRef.t list = Nametab.global primary_lts :: grefs
       let weak = weak
       let bounds = bounds
     end
@@ -642,18 +662,16 @@ struct
     : Model.LTS.t M.mm
     =
     Log.trace __FUNCTION__;
-    let t = M.make_hashtbl in
-    let v = M.make_set in
-    let d = M.make_state_tree_pair_set in
+    let t = M.make_hashtbl () in
+    let v = M.make_set () in
+    let d = M.make_state_tree_pair_set () in
     Log.thing
       ~__FUNCTION__
       Notice
       "names num"
       (List.length names)
       (Of Utils.Strfy.int);
-    let grefs : Names.GlobRef.t list =
-      Rocq_utils.libnames_to_globrefs (primary_lts :: names)
-    in
+    let grefs : Names.GlobRef.t list = Rocq_utils.libnames_to_globrefs names in
     let x = make_xargs primary_lts grefs weak bounds in
     let module G = Graph ((val t)) ((val v)) ((val d)) ((val x)) in
     G.build init
@@ -689,11 +707,10 @@ struct
     type t =
       | MakeLTS of rocq_args
       | MakeFSM of rocq_args
-
-    (* | Saturate of rocq_args *)
-    (* | Merge of rocq_pair *)
-    (* | Minimize of rocq_args *)
-    (* | CheckBisim of rocq_pair *)
+      | Saturate of rocq_args
+      | Minimize of rocq_args
+      | Merge of rocq_pair
+      | CheckBisim of rocq_pair
 
     (* | Info of unit  *)
     (* | Help of ...  *)
@@ -708,21 +725,47 @@ struct
           (refs : Libnames.qualid list)
           (weak : Weak.t option)
           (bounds : Model.Info.bounds)
-      : t -> 'a M.mm
+      : t -> Model.Bisimilar.t option M.mm
       =
       Log.trace __FUNCTION__;
       let open M.Syntax in
       function
       | MakeLTS (x, primary_lts) ->
         let* the_lts = build_lts primary_lts x refs weak bounds in
-        M.return ()
+        Log.thing Notice "the lts" the_lts (Of Model.LTS.to_string);
+        M.return None
       | MakeFSM (x, primary_lts) ->
         let* the_fsm = build_fsm primary_lts x refs weak bounds in
-        M.return ()
+        Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
+        M.return None
+      | Saturate (x, primary_lts) ->
+        let* the_fsm = build_fsm primary_lts x refs weak bounds in
+        Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
+        let the_fsm = Model.Saturate.fsm the_fsm in
+        Log.thing Notice "the saturated fsm" the_fsm (Of Model.FSM.to_string);
+        M.return None
+      | Minimize (x, primary_lts) ->
+        let* the_fsm = build_fsm primary_lts x refs weak bounds in
+        Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
+        let { fsm; pi } : Model.Minimize.t = Model.Minimize.fsm the_fsm in
+        Log.thing Notice "the minimized fsm" fsm (Of Model.FSM.to_string);
+        M.return None
+      | Merge { a; b } ->
+        let* the_fsm_a = build_fsm (snd a) (fst a) refs weak bounds in
+        Log.thing Notice "the fsm (A)" the_fsm_a (Of Model.FSM.to_string);
+        let* the_fsm_b = build_fsm (snd b) (fst b) refs weak bounds in
+        Log.thing Notice "the fsm (B)" the_fsm_b (Of Model.FSM.to_string);
+        let the_fsm = Model.FSM.merge the_fsm_a the_fsm_b in
+        Log.thing Notice "the merged fsm" the_fsm (Of Model.FSM.to_string);
+        M.return None
+      | CheckBisim { a; b } ->
+        let* the_fsm_a = build_fsm (snd a) (fst a) refs weak bounds in
+        Log.thing Notice "the fsm (A)" the_fsm_a (Of Model.FSM.to_string);
+        let* the_fsm_b = build_fsm (snd b) (fst b) refs weak bounds in
+        Log.thing Notice "the fsm (B)" the_fsm_b (Of Model.FSM.to_string);
+        let result = Model.Bisimilar.fsm the_fsm_a the_fsm_b in
+        (* Log.thing Notice "the merged fsm" the_fsm (Of Model.FSM.to_string); *)
+        M.return (Some result)
     ;;
-    (* | Saturate args -> () *)
-    (* | Merge args -> () *)
-    (* | Minimize args -> () *)
-    (* | CheckBisim args -> () *)
   end
 end

@@ -23,8 +23,11 @@ struct
 
   (* *)
   let run ?(reset_encoding : bool = false) (x : 'a mm) : 'a =
-    reset ();
-    let a : 'a in_wrapper = x (ref { ctx = Ctx.get (); maps = the_maps () }) in
+    Log.trace __FUNCTION__;
+    if reset_encoding then reset () else initialize ();
+    let a : 'a in_wrapper =
+      x (ref { ctx = Ctx.get (); maps = get_the_maps () })
+    in
     a.value
   ;;
 
@@ -181,7 +184,9 @@ struct
     ;;
   end
 
-  let make_state_tree_pair_set : (module Set.S with type elt = Enc.t * Tree.t) =
+  let make_state_tree_pair_set ()
+    : (module Set.S with type elt = Enc.t * Tree.t)
+    =
     Log.trace __FUNCTION__;
     (module Set.Make (struct
          type t = Enc.t * Tree.t
@@ -190,6 +195,21 @@ struct
            Utils.compare_chain
              [ Enc.compare (fst t1) (fst t2); Tree.compare (snd t1) (snd t2) ]
          ;;
+       end))
+  ;;
+
+  (* *)
+  let make_hashtbl () : (module Hashtbl.S with type key = Enc.t) =
+    Log.trace __FUNCTION__;
+    (module Hashtbl.Make (struct
+         include Enc
+       end))
+  ;;
+
+  let make_set () : (module Set.S with type elt = Enc.t) =
+    Log.trace __FUNCTION__;
+    (module Set.Make (struct
+         include Enc
        end))
   ;;
 end

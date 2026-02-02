@@ -99,13 +99,23 @@ module Make : (Log : Logger.SLogger)
     bck : Evd.econstr B.t;
   }
 
-  val the_maps : unit -> maps ref
+  val the_maps : maps ref option ref
   val reset : unit -> unit
+
+  exception MapsNotInitialised of unit
+
+  val get_the_maps : unit -> maps ref
   val fwdmap : unit -> Enc.t F.t
   val bckmap : unit -> Evd.econstr B.t
+
+  exception EncodingNotFound of Evd.econstr
+
   val get_encoding : Evd.econstr -> Enc.t
   val encode : Evd.econstr -> Enc.t
   val encoded : Evd.econstr -> bool
+
+  exception DecodingNotFound of Enc.t
+
   val get_econstr : Enc.t -> Evd.econstr
 
   exception CannotDecode of Enc.t
@@ -115,8 +125,6 @@ module Make : (Log : Logger.SLogger)
   val decode_map : 'a B.t -> 'a F.t
   val encode_map : 'a F.t -> 'a B.t
   val to_list : unit -> (Enc.t * Evd.econstr) list
-  val make_hashtbl : (module Hashtbl.S with type key = Enc.t)
-  val make_set : (module Set.S with type elt = Enc.t)
   val bienc_to_list : unit -> (Enc.t * Evd.econstr) list
 
   type 'a mm = wrapper ref -> 'a in_wrapper
@@ -246,8 +254,10 @@ module Make : (Log : Logger.SLogger)
     val to_string : Environ.env -> Evd.evar_map -> t -> string
   end
 
-  val make_state_tree_pair_set :
+  val make_state_tree_pair_set : unit -> 
     (module Set.S with type elt = Enc.t * Tree.t)
+  val make_hashtbl : unit -> (module Hashtbl.S with type key = Enc.t)
+  val make_set : unit -> (module Set.S with type elt = Enc.t)
 
   val fresh_evar : Rocq_utils.evar_source -> Evd.econstr mm
   val econstr_eq : Evd.econstr -> Evd.econstr -> bool mm
@@ -279,6 +289,7 @@ module Make : (Log : Logger.SLogger)
     val hyp_name : Rocq_utils.hyp -> string
     val hyp_type : Rocq_utils.hyp -> string
     val hyp_value : Rocq_utils.hyp -> string
+    val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string
   end
 
   module type SErrors = sig
