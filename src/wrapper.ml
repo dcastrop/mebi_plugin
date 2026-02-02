@@ -7,12 +7,6 @@ struct
   module Model = Model.Make (Log) (M.Enc)
 
   (** *)
-  (* module Strfy = struct
-     let lts (x:Model.LTS.t) : string =
-
-     end *)
-
-  (** *)
   module IsTheory = struct
     (** [is_theory x y] checks if term [x] is equal to theory term [y], catching the exception thrown when [EConstr.kind_of_type x] is not [AtomicType (ty, tys)].
     *)
@@ -139,6 +133,89 @@ struct
           Printf.sprintf "- label (%s) -> %s" label_enc label_dec
         in
         Printf.sprintf "Custom\n%s\n%s" a b |> M.return
+    ;;
+  end
+
+  (** Config *)
+  module Config = struct
+    let load_weak_arg : Api.weak_arg -> Weak.t M.mm =
+      let open M.Syntax in
+      function
+      | Api.Option label_tref ->
+        let* label : EConstr.t = M.constrexpr_to_econstr label_tref in
+        let label_enc : M.Enc.t = M.encode label in
+        (* NOTE: sanity check we can decode these *)
+        let _ : EConstr.t = M.decode label_enc in
+        Weak.Option label_enc |> M.return
+      | Api.Custom (tau_tref, label_ref) ->
+        let* tau : EConstr.t = M.constrexpr_to_econstr tau_tref in
+        let tau_enc : M.Enc.t = M.encode tau in
+        let* ind, (mib, mip) =
+          Nametab.global label_ref |> M.Ind.lts_type_mind
+        in
+        let label : EConstr.t = Rocq_utils.get_ind_ty ind mib in
+        let label_enc : M.Enc.t = M.encode label in
+        (* NOTE: sanity check we can decode these *)
+        let _ : EConstr.t = M.decode tau_enc in
+        let _ : EConstr.t = M.decode label_enc in
+        Weak.Custom (tau_enc, label_enc) |> M.return
+    ;;
+
+    let load_weak_arg_opt : Api.weak_arg option -> Weak.t option M.mm = function
+      | None -> M.return None
+      | Some x ->
+        let open M.Syntax in
+        let* y = load_weak_arg x in
+        M.return (Some y)
+    ;;
+
+    type weak_args =
+      { a : Weak.t option
+      ; b : Weak.t option
+      }
+
+    let the_weak_args : weak_args ref option ref = ref None
+    let reset_the_weak_args () : unit = the_weak_args := None
+
+    let load_weak_args () : unit M.mm =
+      let open M.Syntax in
+      match !Api.the_weak_args with
+      | None ->
+        the_weak_args := None;
+        M.return ()
+      | Some x ->
+        let* a = load_weak_arg_opt !x.a in
+        let* b = load_weak_arg_opt !x.b in
+        the_weak_args := Some (ref { a; b });
+        M.return ()
+    ;;
+
+    let get_the_weak_args : weak_args option =
+      match !the_weak_args with None -> None | Some x -> Some !x
+    ;;
+
+    let get_the_weak_arg1 () : Weak.t option =
+      match get_the_weak_args with None -> None | Some x -> x.a
+    ;;
+
+    let get_the_weak_arg2 () : Weak.t option =
+      match get_the_weak_args with None -> None | Some x -> x.b
+    ;;
+
+    (***********************************************************************)
+
+    let api_bounds_to_model_bounds : Api.bounds_args -> Model.Info.bounds =
+      function
+      | Api.States x -> Model.Info.States x
+      | Api.Transitions x -> Model.Info.Transitions x
+    ;;
+
+    let the_bounds_args : Model.Info.bounds ref =
+      ref (Api.default_bounds |> api_bounds_to_model_bounds)
+    ;;
+
+    let load_the_bounds_args () : unit =
+      the_bounds_args := api_bounds_to_model_bounds !Api.the_bounds_args
     ;;
   end
 
@@ -641,16 +718,33 @@ struct
        M.return the_lts *)
   end
 
-  let make_xargs primary_lts grefs weak bounds : (module X_Args) =
+  let make_xargs primary_lts grefs weak : (module X_Args) =
     Log.trace __FUNCTION__;
     let module X = struct
       let primary_lts : Libnames.qualid = primary_lts
       let grefs : Names.GlobRef.t list = Nametab.global primary_lts :: grefs
-      let weak = weak
-      let bounds = bounds
+      let weak : Weak.t option = weak
+      let bounds : Model.Info.bounds = !Config.the_bounds_args
     end
     in
     (module X : X_Args)
+  ;;
+
+  exception EmptyLTS of Model.LTS.t
+
+  let fail_if_empty (x : Model.LTS.t) : unit =
+    if Model.States.is_empty x.states && !Api.the_fail_flags.empty
+    then raise (EmptyLTS x)
+    else ()
+  ;;
+
+  exception IncompleteLTS of Model.LTS.t
+
+  let fail_if_incomplete (x : Model.LTS.t) : unit =
+    match x with
+    | { info = { meta = Some { is_complete = false; _ }; _ }; _ } ->
+      if !Api.the_fail_flags.incomplete then raise (IncompleteLTS x) else ()
+    | _ -> ()
   ;;
 
   let extract_lts
@@ -658,7 +752,6 @@ struct
         (init : Constrexpr.constr_expr)
         (names : Libnames.qualid list)
         (weak : Weak.t option)
-        (bounds : Model.Info.bounds)
     : Model.LTS.t M.mm
     =
     Log.trace __FUNCTION__;
@@ -672,9 +765,13 @@ struct
       (List.length names)
       (Of Utils.Strfy.int);
     let grefs : Names.GlobRef.t list = Rocq_utils.libnames_to_globrefs names in
-    let x = make_xargs primary_lts grefs weak bounds in
+    let x = make_xargs primary_lts grefs weak in
     let module G = Graph ((val t)) ((val v)) ((val d)) ((val x)) in
-    G.build init
+    let open M.Syntax in
+    let* the_lts = G.build init in
+    fail_if_empty the_lts;
+    fail_if_incomplete the_lts;
+    M.return the_lts
   ;;
 
   module Command = struct
@@ -683,11 +780,12 @@ struct
           (init : Constrexpr.constr_expr)
           (names : Libnames.qualid list)
           (weak : Weak.t option)
-          (bounds : Model.Info.bounds)
       : Model.LTS.t M.mm
       =
       Log.trace __FUNCTION__;
-      extract_lts primary_lts init names weak bounds
+      let open M.Syntax in
+      let* () = Config.load_weak_args () in
+      extract_lts primary_lts init names weak
     ;;
 
     let build_fsm
@@ -695,12 +793,11 @@ struct
           (init : Constrexpr.constr_expr)
           (names : Libnames.qualid list)
           (weak : Weak.t option)
-          (bounds : Model.Info.bounds)
       : Model.FSM.t M.mm
       =
       Log.trace __FUNCTION__;
       let open M.Syntax in
-      let* the_lts = extract_lts primary_lts init names weak bounds in
+      let* the_lts = extract_lts primary_lts init names weak in
       Model.Convert.lts_to_fsm the_lts |> M.return
     ;;
 
@@ -721,47 +818,51 @@ struct
       ; b : rocq_args
       }
 
-    let run
-          (refs : Libnames.qualid list)
-          (weak : Weak.t option)
-          (bounds : Model.Info.bounds)
-      : t -> Model.Bisimilar.t option M.mm
-      =
+    let run (refs : Libnames.qualid list) : t -> Model.Bisimilar.t option M.mm =
       Log.trace __FUNCTION__;
       let open M.Syntax in
+      Config.load_the_bounds_args ();
       function
       | MakeLTS (x, primary_lts) ->
-        let* the_lts = build_lts primary_lts x refs weak bounds in
+        let weak : Weak.t option = Config.get_the_weak_arg1 () in
+        let* the_lts = build_lts primary_lts x refs weak in
         Log.thing Notice "the lts" the_lts (Of Model.LTS.to_string);
         M.return None
       | MakeFSM (x, primary_lts) ->
-        let* the_fsm = build_fsm primary_lts x refs weak bounds in
+        let weak : Weak.t option = Config.get_the_weak_arg1 () in
+        let* the_fsm = build_fsm primary_lts x refs weak in
         Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
         M.return None
       | Saturate (x, primary_lts) ->
-        let* the_fsm = build_fsm primary_lts x refs weak bounds in
+        let weak : Weak.t option = Config.get_the_weak_arg1 () in
+        let* the_fsm = build_fsm primary_lts x refs weak in
         Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
         let the_fsm = Model.Saturate.fsm the_fsm in
         Log.thing Notice "the saturated fsm" the_fsm (Of Model.FSM.to_string);
         M.return None
       | Minimize (x, primary_lts) ->
-        let* the_fsm = build_fsm primary_lts x refs weak bounds in
+        let weak : Weak.t option = Config.get_the_weak_arg1 () in
+        let* the_fsm = build_fsm primary_lts x refs weak in
         Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
         let { fsm; pi } : Model.Minimize.t = Model.Minimize.fsm the_fsm in
         Log.thing Notice "the minimized fsm" fsm (Of Model.FSM.to_string);
         M.return None
       | Merge { a; b } ->
-        let* the_fsm_a = build_fsm (snd a) (fst a) refs weak bounds in
+        let weak1 : Weak.t option = Config.get_the_weak_arg1 () in
+        let* the_fsm_a = build_fsm (snd a) (fst a) refs weak1 in
         Log.thing Notice "the fsm (A)" the_fsm_a (Of Model.FSM.to_string);
-        let* the_fsm_b = build_fsm (snd b) (fst b) refs weak bounds in
+        let weak2 : Weak.t option = Config.get_the_weak_arg2 () in
+        let* the_fsm_b = build_fsm (snd b) (fst b) refs weak2 in
         Log.thing Notice "the fsm (B)" the_fsm_b (Of Model.FSM.to_string);
         let the_fsm = Model.FSM.merge the_fsm_a the_fsm_b in
         Log.thing Notice "the merged fsm" the_fsm (Of Model.FSM.to_string);
         M.return None
       | CheckBisim { a; b } ->
-        let* the_fsm_a = build_fsm (snd a) (fst a) refs weak bounds in
+        let weak1 : Weak.t option = Config.get_the_weak_arg1 () in
+        let* the_fsm_a = build_fsm (snd a) (fst a) refs weak1 in
         Log.thing Notice "the fsm (A)" the_fsm_a (Of Model.FSM.to_string);
-        let* the_fsm_b = build_fsm (snd b) (fst b) refs weak bounds in
+        let weak2 : Weak.t option = Config.get_the_weak_arg2 () in
+        let* the_fsm_b = build_fsm (snd b) (fst b) refs weak2 in
         Log.thing Notice "the fsm (B)" the_fsm_b (Of Model.FSM.to_string);
         let result = Model.Bisimilar.fsm the_fsm_a the_fsm_b in
         (* Log.thing Notice "the merged fsm" the_fsm (Of Model.FSM.to_string); *)

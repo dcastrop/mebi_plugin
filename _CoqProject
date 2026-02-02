@@ -6,7 +6,7 @@ src/META.coq-mebi
 
 theories/loader.v ###
 theories/DevTest.v ###
-# theories/Test.v ###
+theories/Test.v ###
 
 theories/Bisimilarity.v ###
 

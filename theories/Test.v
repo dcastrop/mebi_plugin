@@ -46,21 +46,24 @@ Module BasicCommands.
   
 
   Example z := 0.
-  (* MeBi Config Weak As z Of nat.  *)
+  MeBi Config Weak As z Of nat. 
+  MeBi Reset Weak Config.
   
 
   Inductive s_label : Set :=
   | TAU : s_label 
   | LABEL1 : nat -> s_label
   .
-  (* MeBi Config Weak As TAU Of s_label.  *)
+  MeBi Config Weak As TAU Of s_label. 
+  MeBi Reset Weak Config.
   
 
   Inductive t_label : Type :=
   | SILENT : t_label 
   | LABEL2 : bool -> t_label
   .
-  (* MeBi Config Weak As SILENT Of t_label.  *)
+  MeBi Config Weak As SILENT Of t_label. 
+  MeBi Reset Weak Config.
   
 End BasicCommands.
 
@@ -110,6 +113,7 @@ Inductive testLTS : nat -> bool -> nat -> Prop :=
 
 Definition one := 1.
 
+(* TODO: how does this fail in the old version? here just produces empty lts *)
 Fail MeBi LTS false Using testLTS.
 
 MeBi LTS 0 Using testLTS.
@@ -315,9 +319,9 @@ Module BisimTest1.
          Using termLTS.
 
   (* saturate *)
-  (* MeBi Saturate 
+  MeBi Saturate 
     (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))) 
-    Using termLTS. *)
+    Using termLTS.
 
   (* minimize *)
   MeBi Minimize 
@@ -362,7 +366,8 @@ Module BisimTest2.
   MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
 
   (* MeBi Config WeakMode Enable. *)
-  (* MeBi Config Weak As TAU Of action. *)
+  MeBi Reset Weak Config.
+  MeBi Config Weak As TAU Of action.
 
   MeBi FSM exa1 Using termLTS.
   MeBi Saturate exa1 Using termLTS.
@@ -420,14 +425,16 @@ Module BisimTest3.
 
   | do_fix : forall t, termLTS (tfix t) None (subst (tfix t) t).
 
-  MeBi Config WeakMode Disable.
+  MeBi Reset Weak Config.
+  (* MeBi Config WeakMode Disable. *)
 
   Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
   MeBi FSM exa1 Using termLTS.
   MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
 
   (* MeBi Config WeakMode Enable. *)
-  (* MeBi Config Weak As Option action. *)
+  MeBi Reset Weak Config.
+  MeBi Config Weak As Option action.
 
   MeBi FSM exa1 Using termLTS.
   MeBi Saturate exa1 Using termLTS.
