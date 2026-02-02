@@ -774,11 +774,11 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let to_string (x : t) : string =
       Utils.Strfy.record
         [ "init", Utils.Strfy.option (Of State.to_string) x.init
+        ; "info", Info.to_string x.info
         ; "terminals", States.to_string x.terminals
         ; "alphabet", Labels.to_string x.alphabet
         ; "states", States.to_string x.states
         ; "transitions", Transitions.to_string x.transitions
-        ; "info", Info.to_string x.info
         ]
     ;;
   end
@@ -806,11 +806,11 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let to_string (x : t) : string =
       Utils.Strfy.record
         [ "init", Utils.Strfy.option (Of State.to_string) x.init
+        ; "info", Info.to_string x.info
         ; "terminals", States.to_string x.terminals
         ; "alphabet", Labels.to_string x.alphabet
         ; "states", States.to_string x.states
         ; "edges", EdgeMap.to_string x.edges
-        ; "info", Info.to_string x.info
         ]
     ;;
   end

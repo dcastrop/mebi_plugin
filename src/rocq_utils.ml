@@ -1,3 +1,11 @@
+(***********************************************************************)
+module Log : Logger.SLogger = Logger.MkDefault ()
+
+let () = Log.Config.enable_output ()
+let () = Log.Config.configure_output Debug true
+let () = Log.Config.configure_output Trace true
+(***********************************************************************)
+
 (** [kind_pair] are the arguments of [AtomicType (ty, tys)] returned by e.g., [EConstr.kind_of_type]
 *)
 type 'a kind_pair = 'a * 'a array
@@ -221,10 +229,12 @@ let list_of_kinds
 (*****************************************************************************)
 
 let get_decl_type_of_constr (x : constr_decl) : EConstr.t =
+  Log.trace __FUNCTION__;
   Context.Rel.Declaration.get_type x |> EConstr.of_constr
 ;;
 
 let get_decl_type_of_econstr (x : econstr_decl) : EConstr.t =
+  Log.trace __FUNCTION__;
   Context.Rel.Declaration.get_type x
 ;;
 
@@ -234,6 +244,7 @@ let get_ind_ty
       (mib : Declarations.mutual_inductive_body)
   : EConstr.t
   =
+  Log.trace __FUNCTION__;
   EConstr.mkIndU (ind, EConstr.EInstance.make mib.mind_univ_hyps)
 ;;
 

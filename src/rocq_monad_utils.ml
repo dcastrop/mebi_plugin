@@ -99,6 +99,10 @@ struct
     let hyp_value : Rocq_utils.hyp -> string =
       fstring Rocq_utils.Strfy.hyp_value
     ;;
+
+    let rocq_ind (f : 'a -> string) : 'a Rocq_ind.t -> string =
+      fstring (Rocq_ind.to_string f)
+    ;;
   end
 
   module type SErrors = sig
@@ -297,6 +301,7 @@ struct
   module Ind = struct
     (** [lookup x] is a wrapper for [Inductive.lookup_mind_specif] *)
     let lookup (x : Names.inductive) : Declarations.mind_specif mm =
+      Log.trace __FUNCTION__;
       let open Syntax in
       let* env = get_env in
       Inductive.lookup_mind_specif env x |> return
@@ -307,7 +312,9 @@ struct
     *)
     let assert_mip_arity_is_type_or_set
       : Declarations.inductive_arity -> unit mm
-      = function
+      =
+      Log.trace __FUNCTION__;
+      function
       | Declarations.RegularArity x ->
         (match x.mind_sort with
          | Type _ -> return ()
@@ -320,6 +327,7 @@ struct
     (** []
         @raise Errors.Invalid_Sort_LTS if [x.mind_sort] is not [Prop] *)
     let assert_mip_arity_is_prop : Declarations.inductive_arity -> unit mm =
+      Log.trace __FUNCTION__;
       function
       | Declarations.RegularArity x ->
         (match x.mind_sort with
@@ -333,7 +341,9 @@ struct
         @raise Errors.Invalid_Ref_LTS if [x] is not [Names.GlobRef.IndRef] *)
     let lts_mind
       : Names.GlobRef.t -> (Names.inductive * Declarations.mind_specif) mm
-      = function
+      =
+      Log.trace __FUNCTION__;
+      function
       | Names.GlobRef.IndRef ind ->
         let open Syntax in
         let* (mib, mip) : Declarations.mind_specif = lookup ind in
@@ -345,6 +355,7 @@ struct
     let lts_type_mind (x : Names.GlobRef.t)
       : (Names.inductive * Declarations.mind_specif) mm
       =
+      Log.trace __FUNCTION__;
       let open Syntax in
       let* ind, (mib, mip) = lts_mind x in
       let* () = assert_mip_arity_is_type_or_set mip.mind_arity in
@@ -355,6 +366,7 @@ struct
     let lts_prop_mind (x : Names.GlobRef.t)
       : (Names.inductive * Declarations.mind_specif) mm
       =
+      Log.trace __FUNCTION__;
       let open Syntax in
       let* ind, (mib, mip) = lts_mind x in
       let* () = assert_mip_arity_is_prop mip.mind_arity in
@@ -366,6 +378,7 @@ struct
     let lts_labels_and_terms ((mib, mip) : Declarations.mind_specif)
       : (Constr.rel_declaration * Constr.rel_declaration) mm
       =
+      Log.trace __FUNCTION__;
       (* get the type of [mip] from [mib]. *)
       let typ = Inductive.type_of_inductive (UVars.in_punivs (mib, mip)) in
       match mip.mind_arity_ctxt |> Utils.split_at mip.mind_nrealdecls with
@@ -379,6 +392,7 @@ struct
 
     (** [] *)
     let lts (x : Names.GlobRef.t) : Enc.t Rocq_ind.t mm =
+      Log.trace __FUNCTION__;
       let open Syntax in
       let* ind, (mib, mip) = lts_prop_mind x in
       let* label, term = lts_labels_and_terms (mib, mip) in
