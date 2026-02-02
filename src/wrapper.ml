@@ -730,6 +730,7 @@ struct
     (module X : X_Args)
   ;;
 
+  (* TODO: add exception to monad! *)
   exception EmptyLTS of Model.LTS.t
 
   let fail_if_empty (x : Model.LTS.t) : unit =
@@ -738,6 +739,7 @@ struct
     else ()
   ;;
 
+  (* TODO: add exception to monad! *)
   exception IncompleteLTS of Model.LTS.t
 
   let fail_if_incomplete (x : Model.LTS.t) : unit =

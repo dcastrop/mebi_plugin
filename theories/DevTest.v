@@ -98,8 +98,8 @@ MeBi Config WeakMode Enable.
 MeBi Config Weak As Option label. *)
 
 MeBi Divider "Theories.DevTest.0".
-MeBi LTS (tend) Using termLTS.
-MeBi FSM (tend) Using termLTS.
+Fail MeBi LTS (tend) Using termLTS.
+Fail MeBi FSM (tend) Using termLTS.
 
 MeBi Divider "Theories.DevTest.0.1".
 MeBi LTS (tseq tend tend) Using termLTS.
