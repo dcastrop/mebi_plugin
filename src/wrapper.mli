@@ -2096,6 +2096,22 @@ module Make : (Log : Logger.SLogger)
     val to_string : t -> string M.mm
   end
 
+  module Config : sig
+    val load_weak_arg : Api.weak_arg -> Weak.t M.mm
+
+    val load_weak_arg_opt :
+      Api.weak_arg option -> Weak.t option M.mm
+
+    type weak_args = { a : Weak.t option; b : Weak.t option }
+
+    val the_weak_args : weak_args ref option ref
+    val reset_the_weak_args : unit -> unit
+    val load_weak_args : unit -> unit M.mm
+    val get_the_weak_args : weak_args option
+    val get_the_weak_arg1 : unit -> Weak.t option
+    val get_the_weak_arg2 : unit -> Weak.t option
+  end
+
   module type X_Args = sig
     val primary_lts : Libnames.qualid
     val grefs : Names.GlobRef.t list
@@ -2658,7 +2674,7 @@ module Make : (Log : Logger.SLogger)
     Libnames.qualid ->
     Names.GlobRef.t list ->
     Weak.t option ->
-    Model.Info.bounds ->
+    
     (module X_Args)
 
   val extract_lts :
@@ -2666,7 +2682,7 @@ module Make : (Log : Logger.SLogger)
     Constrexpr.constr_expr ->
     Libnames.qualid list ->
     Weak.t option ->
-    Model.Info.bounds ->
+    
     Model.LTS.t M.mm
 
   module Command : sig
@@ -2675,7 +2691,7 @@ module Make : (Log : Logger.SLogger)
       Constrexpr.constr_expr ->
       Libnames.qualid list ->
       Weak.t option ->
-      Model.Info.bounds ->
+      
       Model.LTS.t M.mm
 
     val build_fsm :
@@ -2683,7 +2699,7 @@ module Make : (Log : Logger.SLogger)
       Constrexpr.constr_expr ->
       Libnames.qualid list ->
       Weak.t option ->
-      Model.Info.bounds ->
+      
       Model.FSM.t M.mm
 
     type t =
@@ -2699,8 +2715,7 @@ module Make : (Log : Logger.SLogger)
 
     val run :
       Libnames.qualid list ->
-      Weak.t option ->
-      Model.Info.bounds ->
+      
       t ->
       Model.Bisimilar.t option M.mm
   end

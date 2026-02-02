@@ -41,10 +41,10 @@
   rocq_monad_utils
   rocq_bindings
   model
+  api ; stores modules created by [loader.v], used by commands
   wrapper 
   ; proof_solver
           ; ; ; ; ; below be application
-          api ; stores modules created by [loader.v], used by commands
           ; command ; plugin i/o
           g_mebi
           ; ; ; ; ;

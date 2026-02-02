@@ -66,7 +66,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
   { fun ~pstate -> 
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run [] None (W.Model.Info.States 10) (W.Command.CheckBisim {a=(x, a); b=(y, b)})
+    W.Command.run [] (W.Command.CheckBisim {a=(x, a); b=(y, b)})
     |> W.M.run ~reset_encoding:true
     in 
     (* TODO: store the result *)
@@ -80,7 +80,7 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
   { fun ~pstate -> 
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run rs None (W.Model.Info.States 10) (W.Command.CheckBisim {a=(x, a); b=(y, b)})
+    W.Command.run rs (W.Command.CheckBisim {a=(x, a); b=(y, b)})
     |> W.M.run ~reset_encoding:true
     in 
     (* TODO: store the result *)
@@ -95,7 +95,7 @@ VERNAC COMMAND EXTEND MeBi_Bisim CLASSIFIED AS QUERY
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run [] None (W.Model.Info.States 10) (W.Command.CheckBisim {a=(x, a); b=(y, b)})
+    W.Command.run [] (W.Command.CheckBisim {a=(x, a); b=(y, b)})
     |> W.M.run ~reset_encoding:true
     in ()
   }
@@ -105,7 +105,7 @@ VERNAC COMMAND EXTEND MeBi_Bisim CLASSIFIED AS QUERY
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run rs None (W.Model.Info.States 10) (W.Command.CheckBisim {a=(x, a); b=(y, b)})
+    W.Command.run rs (W.Command.CheckBisim {a=(x, a); b=(y, b)})
     |> W.M.run ~reset_encoding:true
     in ()
   }
@@ -119,7 +119,7 @@ VERNAC COMMAND EXTEND MeBi_Merge CLASSIFIED AS QUERY
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run [] None (W.Model.Info.States 10) (W.Command.Merge {a=(x, a); b=(y, b)})
+    W.Command.run [] (W.Command.Merge {a=(x, a); b=(y, b)})
     |> W.M.run ~reset_encoding:true
     in ()
   }
@@ -129,7 +129,7 @@ VERNAC COMMAND EXTEND MeBi_Merge CLASSIFIED AS QUERY
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run rs None (W.Model.Info.States 10) (W.Command.Merge {a=(x, a); b=(y, b)})
+    W.Command.run rs (W.Command.Merge {a=(x, a); b=(y, b)})
     |> W.M.run ~reset_encoding:true
     in ()
   }
@@ -141,7 +141,7 @@ VERNAC COMMAND EXTEND MeBi_Minimize CLASSIFIED AS QUERY
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run [] None (W.Model.Info.States 10) (W.Command.Minimize (x, r))
+    W.Command.run [] (W.Command.Minimize (x, r))
     |> W.M.run ~reset_encoding:true
     in ()
   }
@@ -150,7 +150,7 @@ VERNAC COMMAND EXTEND MeBi_Minimize CLASSIFIED AS QUERY
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run rs None (W.Model.Info.States 10) (W.Command.Minimize (x, r))
+    W.Command.run rs (W.Command.Minimize (x, r))
     |> W.M.run ~reset_encoding:true 
     in ()
   }
@@ -162,7 +162,7 @@ VERNAC COMMAND EXTEND MeBi_Saturate CLASSIFIED AS QUERY
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run [] None (W.Model.Info.States 10) (W.Command.Saturate (x, r))
+    W.Command.run [] (W.Command.Saturate (x, r))
     |> W.M.run ~reset_encoding:true
     in ()
   }
@@ -171,7 +171,7 @@ VERNAC COMMAND EXTEND MeBi_Saturate CLASSIFIED AS QUERY
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run rs None (W.Model.Info.States 10) (W.Command.Saturate (x, r))
+    W.Command.run rs (W.Command.Saturate (x, r))
     |> W.M.run ~reset_encoding:true 
     in ()
   }
@@ -183,7 +183,7 @@ VERNAC COMMAND EXTEND MeBi_FSM CLASSIFIED AS QUERY
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run [] None (W.Model.Info.States 10) (W.Command.MakeFSM (x, r))
+    W.Command.run [] (W.Command.MakeFSM (x, r))
     |> W.M.run ~reset_encoding:true
     in ()
   }
@@ -192,7 +192,7 @@ VERNAC COMMAND EXTEND MeBi_FSM CLASSIFIED AS QUERY
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run rs None (W.Model.Info.States 10) (W.Command.MakeFSM (x, r))
+    W.Command.run rs (W.Command.MakeFSM (x, r))
     |> W.M.run ~reset_encoding:true 
     in ()
   }
@@ -204,7 +204,7 @@ VERNAC COMMAND EXTEND MeBi_LTS CLASSIFIED AS QUERY
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run [] None (W.Model.Info.States 10) (W.Command.MakeLTS (x, r))
+    W.Command.run [] (W.Command.MakeLTS (x, r))
     |> W.M.run ~reset_encoding:true 
     in ()
   }
@@ -213,11 +213,54 @@ VERNAC COMMAND EXTEND MeBi_LTS CLASSIFIED AS QUERY
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
-    W.Command.run rs None (W.Model.Info.States 10) (W.Command.MakeLTS (x, r))
+    W.Command.run rs (W.Command.MakeLTS (x, r))
     |> W.M.run ~reset_encoding:true
     in ()
   }
 END 
+
+VERNAC COMMAND EXTEND MeBi_Reset CLASSIFIED AS QUERY
+| ["MeBi" "Reset" "Weak" "Config"] -> 
+  {
+    Api.reset_weak_args ()
+  }
+END
+
+(* Config -- weak_args for both *)
+VERNAC COMMAND EXTEND MeBi_Config_Weak_Both CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Weak" "As" "Option" constr(x)] -> 
+  {
+    Api.set_the_weak_args (Some (Api.Option x)) None
+  }
+| ["MeBi" "Config" "Weak" "As" constr(x) "Of" reference(y)] -> 
+  {
+    Api.set_the_weak_args (Some (Api.Custom (x,y))) None
+  }
+END
+
+(* Config -- weak_args for first *)
+VERNAC COMMAND EXTEND MeBi_Config_Weak_First CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Weak1" "As" "Option" constr(x)] -> 
+  {
+    Api.set_the_weak_arg1 (Api.Option x) 
+  }
+| ["MeBi" "Config" "Weak1" "As" constr(x) "Of" reference(y)] -> 
+  {
+    Api.set_the_weak_arg1 (Api.Custom (x,y)) 
+  }
+END
+
+(* Config -- weak_args for second *)
+VERNAC COMMAND EXTEND MeBi_Config_Weak_Second CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Weak2" "As" "Option" constr(x)] -> 
+  {
+    Api.set_the_weak_arg2 (Api.Option x) 
+  }
+| ["MeBi" "Config" "Weak2" "As" constr(x) "Of" reference(y)] -> 
+  {
+    Api.set_the_weak_arg2 (Api.Custom (x,y)) 
+  }
+END
 
 (* VERNAC COMMAND EXTEND MeBi_FSM CLASSIFIED AS QUERY
 | ["MeBi" "FSM" constr(x) "Using" reference(r)] -> 
