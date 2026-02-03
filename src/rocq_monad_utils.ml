@@ -6,29 +6,29 @@ struct
   include Rocq_monad.Make (Log) (C) (E)
 
   let fresh_evar (x : Rocq_utils.evar_source) : EConstr.t mm =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     state (fun env sigma -> Rocq_utils.get_next env sigma x)
   ;;
 
   let econstr_eq a b : bool mm =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     state (fun env sigma -> sigma, EConstr.eq_constr sigma a b)
   ;;
 
   let econstr_normalize (x : EConstr.t) : EConstr.t mm =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     let open Syntax in
     let$+ t env sigma = Reductionops.nf_all env sigma x in
     return t
   ;;
 
   let econstr_kind (x : EConstr.t) : Rocq_utils.econstr_kind mm =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     state (fun env sigma -> sigma, EConstr.kind sigma x)
   ;;
 
   let econstr_is_evar (x : EConstr.t) : bool mm =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     state (fun env sigma -> sigma, EConstr.isEvar sigma x)
   ;;
 
@@ -39,17 +39,17 @@ struct
         (x : EConstr.t)
     : Constr.t mm
     =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     state (fun env sigma -> sigma, Rocq_utils.econstr_to_constr sigma x)
   ;;
 
   let econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     state (fun env sigma -> sigma, Rocq_utils.econstr_to_constr_opt sigma x)
   ;;
 
   let constrexpr_to_econstr (x : Constrexpr.constr_expr) : EConstr.t mm =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     state (fun env sigma -> Rocq_utils.constrexpr_to_econstr env sigma x)
   ;;
 
@@ -58,7 +58,7 @@ struct
   let exists_eq (x : EConstr.t) (ys : 'a list) (decoder : 'a -> EConstr.t)
     : bool mm
     =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     let open Syntax in
     let f (i : int) (a : bool) =
       let y : EConstr.t = List.nth ys i |> decoder in
@@ -71,14 +71,14 @@ struct
   (*********************************************************)
 
   let type_of_econstr (x : EConstr.t) : EConstr.t mm =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     let open Syntax in
     let* t : EConstr.t = econstr_normalize x in
     state (fun env sigma -> Typing.type_of env sigma t)
   ;;
 
   let type_of_constrexpr (x : Constrexpr.constr_expr) : EConstr.t mm =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     let open Syntax in
     let* t : EConstr.t = constrexpr_to_econstr x in
     type_of_econstr t
@@ -108,6 +108,12 @@ struct
   module type SErrors = sig
     type t =
       (* NOTE: *)
+      | LTS_Empty
+      | LTS_Incomplete
+      | Not_Bisimilar
+      (* NOTE: *)
+      | Invalid_Ind_Kind of Rocq_ind.kind
+      (* NOTE: *)
       | Invalid_Sort_LTS of Sorts.family
       | Invalid_Sort_Type of Sorts.family
       (* NOTE: *)
@@ -126,6 +132,14 @@ struct
       | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
 
     exception MEBI_exn of t
+
+    (* NOTE: *)
+    val lts_empty : unit -> exn
+    val lts_incomplete : unit -> exn
+    val not_bisimilar : unit -> exn
+
+    (* NOTE: *)
+    val invalid_ind_kind : Rocq_ind.kind -> exn
 
     (* NOTE: *)
     val invalid_sort_lts : Sorts.family -> exn
@@ -154,6 +168,12 @@ struct
   module Errors : SErrors = struct
     type t =
       (* NOTE: *)
+      | LTS_Empty
+      | LTS_Incomplete
+      | Not_Bisimilar
+      (* NOTE: *)
+      | Invalid_Ind_Kind of Rocq_ind.kind
+      (* NOTE: *)
       | Invalid_Sort_LTS of Sorts.family
       | Invalid_Sort_Type of Sorts.family
       (* NOTE: *)
@@ -173,6 +193,10 @@ struct
 
     exception MEBI_exn of t
 
+    let lts_empty () = MEBI_exn LTS_Empty
+    let lts_incomplete () = MEBI_exn LTS_Incomplete
+    let not_bisimilar () = MEBI_exn Not_Bisimilar
+    let invalid_ind_kind (x : Rocq_ind.kind) = MEBI_exn (Invalid_Ind_Kind x)
     let invalid_sort_lts x = MEBI_exn (Invalid_Sort_LTS x)
     let invalid_sort_type x = MEBI_exn (Invalid_Sort_Type x)
 
@@ -199,6 +223,15 @@ struct
     ;;
 
     let mebi_handler : t -> string = function
+      (* NOTE: *)
+      | LTS_Empty -> "LTS_Empty"
+      | LTS_Incomplete -> "LTS_Incomplete"
+      | Not_Bisimilar -> "Not_Bisimilar"
+      (* NOTE: *)
+      | Invalid_Ind_Kind (Rocq_ind.LTS _) ->
+        "Invalid_Ind_Kind (LTS, expected Type)"
+      | Invalid_Ind_Kind (Rocq_ind.Type _) ->
+        "Invalid_Ind_Kind (Type, expected LTS)"
       (* NOTE: *)
       | Invalid_Sort_LTS x -> "Invalid_Sort_LTS"
       | Invalid_Sort_Type x -> "Invalid_Sort_Type"
@@ -236,6 +269,14 @@ struct
 
   module type SErr = sig
     (* NOTE: *)
+    val lts_empty : unit -> 'a
+    val lts_incomplete : unit -> 'a
+    val not_bisimilar : unit -> 'a
+
+    (* NOTE: *)
+    val invalid_ind_kind : Rocq_ind.kind -> 'a
+
+    (* NOTE: *)
     val invalid_sort_lts : Sorts.family -> 'a
     val invalid_sort_type : Sorts.family -> 'a
 
@@ -258,6 +299,15 @@ struct
   end
 
   module Err : SErr = struct
+    let lts_empty () = raise (Errors.lts_empty ())
+    let lts_incomplete () = raise (Errors.lts_incomplete ())
+    let not_bisimilar () = raise (Errors.not_bisimilar ())
+
+    (* NOTE: *)
+    let invalid_ind_kind (x : Rocq_ind.kind) : 'a =
+      raise (Errors.invalid_ind_kind x)
+    ;;
+
     let invalid_sort_lts (x : Sorts.family) : 'a =
       raise (Errors.invalid_sort_lts x)
     ;;
@@ -299,9 +349,34 @@ struct
   (*********************************************************)
 
   module Ind = struct
+    type t = Enc.t Rocq_ind.t
+
+    let get_lts (x : t) : Rocq_ind.LTS.t =
+      (* Log.trace __FUNCTION__; *)
+      try Rocq_ind.get_lts x with
+      | Rocq_ind.Rocq_ind_UnexpectedKind x ->
+        Log.debug ~__FUNCTION__ "UnexpectedKind";
+        Err.invalid_ind_kind x
+    ;;
+
+    let get_lts_term_type (x : t) : EConstr.t = (get_lts x).term_type
+    let get_lts_label_type (x : t) : EConstr.t = (get_lts x).label_type
+
+    let get_lts_constructor_types (x : t) : Rocq_ind.LTS.constructor array =
+      (get_lts x).constructor_types
+    ;;
+
+    let to_string (env : Environ.env) (sigma : Evd.evar_map) (x : t) : string =
+      Utils.Strfy.record
+        [ "enc", Enc.to_string x.enc
+        ; "ind", Rocq_utils.Strfy.econstr env sigma x.ind
+        ; ("kind", match x.kind with Type _ -> "Type" | LTS _ -> "LTS")
+        ]
+    ;;
+
     (** [lookup x] is a wrapper for [Inductive.lookup_mind_specif] *)
     let lookup (x : Names.inductive) : Declarations.mind_specif mm =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       let open Syntax in
       let* env = get_env in
       Inductive.lookup_mind_specif env x |> return
@@ -313,7 +388,7 @@ struct
     let assert_mip_arity_is_type_or_set
       : Declarations.inductive_arity -> unit mm
       =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       function
       | Declarations.RegularArity x ->
         (match x.mind_sort with
@@ -327,7 +402,7 @@ struct
     (** []
         @raise Errors.Invalid_Sort_LTS if [x.mind_sort] is not [Prop] *)
     let assert_mip_arity_is_prop : Declarations.inductive_arity -> unit mm =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       function
       | Declarations.RegularArity x ->
         (match x.mind_sort with
@@ -342,7 +417,7 @@ struct
     let lts_mind
       : Names.GlobRef.t -> (Names.inductive * Declarations.mind_specif) mm
       =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       function
       | Names.GlobRef.IndRef ind ->
         let open Syntax in
@@ -355,7 +430,7 @@ struct
     let lts_type_mind (x : Names.GlobRef.t)
       : (Names.inductive * Declarations.mind_specif) mm
       =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       let open Syntax in
       let* ind, (mib, mip) = lts_mind x in
       let* () = assert_mip_arity_is_type_or_set mip.mind_arity in
@@ -366,7 +441,7 @@ struct
     let lts_prop_mind (x : Names.GlobRef.t)
       : (Names.inductive * Declarations.mind_specif) mm
       =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       let open Syntax in
       let* ind, (mib, mip) = lts_mind x in
       let* () = assert_mip_arity_is_prop mip.mind_arity in
@@ -378,7 +453,7 @@ struct
     let lts_labels_and_terms ((mib, mip) : Declarations.mind_specif)
       : (Constr.rel_declaration * Constr.rel_declaration) mm
       =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       (* get the type of [mip] from [mib]. *)
       let typ = Inductive.type_of_inductive (UVars.in_punivs (mib, mip)) in
       match mip.mind_arity_ctxt |> Utils.split_at mip.mind_nrealdecls with
@@ -391,8 +466,8 @@ struct
     ;;
 
     (** [] *)
-    let lts (x : Names.GlobRef.t) : Enc.t Rocq_ind.t mm =
-      Log.trace __FUNCTION__;
+    let lts (x : Names.GlobRef.t) : t mm =
+      (* Log.trace __FUNCTION__; *)
       let open Syntax in
       let* ind, (mib, mip) = lts_prop_mind x in
       let* label, term = lts_labels_and_terms (mib, mip) in
@@ -402,7 +477,7 @@ struct
       { enc
       ; ind = name
       ; kind =
-          Rocq_ind.LTS
+          LTS
             { term_type = Rocq_utils.get_decl_type_of_constr term
             ; label_type = Rocq_utils.get_decl_type_of_constr label
             ; constructor_types = Rocq_ind.mip_to_lts_constructors mip
@@ -787,7 +862,7 @@ struct
     (** Checks possible transitions for this term: *)
     let rec check_valid_constructors
               (constructors : Rocq_ind.LTS.constructor array)
-              (indmap : Enc.t Rocq_ind.t F.t)
+              (indmap : Ind.t F.t)
               (from_term : EConstr.t)
               (act_term : EConstr.t)
               (lts_enc : Enc.t)
@@ -835,7 +910,7 @@ struct
 
     (** *)
     and explore_valid_constructor
-          (indmap : Enc.t Rocq_ind.t F.t)
+          (indmap : Ind.t F.t)
           (from_term : EConstr.t)
           (lts_enc : Enc.t)
           (args : Rocq_utils.constructor_args)
@@ -866,7 +941,7 @@ struct
     and check_updated_ctx
           (lts_enc : Enc.t)
           (acc : Problems.t list)
-          (indmap : Enc.t Rocq_ind.t F.t)
+          (indmap : Ind.t F.t)
       :  EConstr.Vars.substl * EConstr.rel_declaration list
       -> (Enc.t * Problems.t list) option mm
       = function
@@ -891,7 +966,7 @@ struct
               let$+ act env sigma = Reductionops.nf_evar sigma args.act in
               let args = { args with lhs; act } in
               let next_lts : Rocq_ind.LTS.constructor array =
-                Rocq_ind.get_lts_constructor_types c
+                Ind.get_lts_constructor_types c
               in
               let* next_constructors : Constructors.t =
                 check_valid_constructors next_lts indmap lhs act c.enc
@@ -931,7 +1006,7 @@ struct
 
     let collect_valid_constructors
           (constructors : Rocq_ind.LTS.constructor array)
-          (indmap : Enc.t Rocq_ind.t F.t)
+          (indmap : Ind.t F.t)
           (from_term : EConstr.t)
           (label_type : EConstr.t)
           (lts_enc : Enc.t)

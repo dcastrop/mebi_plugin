@@ -254,11 +254,13 @@ module Make : (Log : Logger.SLogger)
     val to_string : Environ.env -> Evd.evar_map -> t -> string
   end
 
-  val make_state_tree_pair_set : unit -> 
-    (module Set.S with type elt = Enc.t * Tree.t)
-  val make_hashtbl : unit -> (module Hashtbl.S with type key = Enc.t)
-  val make_set : unit -> (module Set.S with type elt = Enc.t)
+  val make_state_tree_pair_set :
+    unit -> (module Set.S with type elt = Enc.t * Tree.t)
 
+  val make_hashtbl :
+    unit -> (module Hashtbl.S with type key = Enc.t)
+
+  val make_set : unit -> (module Set.S with type elt = Enc.t)
   val fresh_evar : Rocq_utils.evar_source -> Evd.econstr mm
   val econstr_eq : Evd.econstr -> Evd.econstr -> bool mm
   val econstr_normalize : Evd.econstr -> Evd.econstr mm
@@ -294,6 +296,10 @@ module Make : (Log : Logger.SLogger)
 
   module type SErrors = sig
     type t =
+      | LTS_Empty
+      | LTS_Incomplete
+      | Not_Bisimilar
+      | Invalid_Ind_Kind of Rocq_ind.kind
       | Invalid_Sort_LTS of Sorts.family
       | Invalid_Sort_Type of Sorts.family
       | Invalid_Ref_LTS of Names.GlobRef.t
@@ -311,6 +317,10 @@ module Make : (Log : Logger.SLogger)
 
     exception MEBI_exn of t
 
+    val lts_empty : unit -> exn
+    val lts_incomplete : unit -> exn
+    val not_bisimilar : unit -> exn
+    val invalid_ind_kind : Rocq_ind.kind -> exn
     val invalid_sort_lts : Sorts.family -> exn
     val invalid_sort_type : Sorts.family -> exn
     val invalid_ref_lts : Names.GlobRef.t -> exn
@@ -335,6 +345,10 @@ module Make : (Log : Logger.SLogger)
   module Errors : SErrors
 
   module type SErr = sig
+    val lts_empty : unit -> 'a
+    val lts_incomplete : unit -> 'a
+    val not_bisimilar : unit -> 'a
+    val invalid_ind_kind : Rocq_ind.kind -> 'a
     val invalid_sort_lts : Sorts.family -> 'a
     val invalid_sort_type : Sorts.family -> 'a
     val invalid_ref_lts : Names.GlobRef.t -> 'a
@@ -351,6 +365,16 @@ module Make : (Log : Logger.SLogger)
   module Err : SErr
 
   module Ind : sig
+    type t = Enc.t Rocq_ind.t
+
+    val get_lts : t -> Rocq_ind.LTS.t
+    val get_lts_term_type : t -> Evd.econstr
+    val get_lts_label_type : t -> Evd.econstr
+
+    val get_lts_constructor_types :
+      t -> Rocq_ind.LTS.constructor array
+
+    val to_string : Environ.env -> Evd.evar_map -> t -> string
     val lookup : Names.inductive -> Declarations.mind_specif mm
 
     val assert_mip_arity_is_type_or_set :
@@ -375,7 +399,7 @@ module Make : (Log : Logger.SLogger)
       Declarations.mind_specif ->
       (Constr.rel_declaration * Constr.rel_declaration) mm
 
-    val lts : Names.GlobRef.t -> Enc.t Rocq_ind.t mm
+    val lts : Names.GlobRef.t -> t mm
   end
 
   val mk_ctx_substl :
@@ -485,14 +509,14 @@ module Make : (Log : Logger.SLogger)
 
     val check_valid_constructors :
       Rocq_ind.LTS.constructor array ->
-      Enc.t Rocq_ind.t F.t ->
+      Ind.t F.t ->
       Evd.econstr ->
       Evd.econstr ->
       Enc.t ->
       Constructors.t mm
 
     val explore_valid_constructor :
-      Enc.t Rocq_ind.t F.t ->
+      Ind.t F.t ->
       Evd.econstr ->
       Enc.t ->
       Rocq_utils.constructor_args ->
@@ -503,7 +527,7 @@ module Make : (Log : Logger.SLogger)
     val check_updated_ctx :
       Enc.t ->
       Problems.t list ->
-      Enc.t Rocq_ind.t F.t ->
+      Ind.t F.t ->
       EConstr.Vars.substl * EConstr.rel_declaration list ->
       (Enc.t * Problems.t list) option mm
 
@@ -517,7 +541,7 @@ module Make : (Log : Logger.SLogger)
 
     val collect_valid_constructors :
       Rocq_ind.LTS.constructor array ->
-      Enc.t Rocq_ind.t F.t ->
+      Ind.t F.t ->
       Evd.econstr ->
       Evd.econstr ->
       Enc.t ->

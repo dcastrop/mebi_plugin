@@ -302,6 +302,10 @@ module Make : (Log : Logger.SLogger)
 
     module type SErrors = sig
       type t =
+        | LTS_Empty
+        | LTS_Incomplete
+        | Not_Bisimilar
+        | Invalid_Ind_Kind of Rocq_ind.kind
         | Invalid_Sort_LTS of Sorts.family
         | Invalid_Sort_Type of Sorts.family
         | Invalid_Ref_LTS of Names.GlobRef.t
@@ -319,6 +323,10 @@ module Make : (Log : Logger.SLogger)
 
       exception MEBI_exn of t
 
+      val lts_empty : unit -> exn
+      val lts_incomplete : unit -> exn
+      val not_bisimilar : unit -> exn
+      val invalid_ind_kind : Rocq_ind.kind -> exn
       val invalid_sort_lts : Sorts.family -> exn
       val invalid_sort_type : Sorts.family -> exn
       val invalid_ref_lts : Names.GlobRef.t -> exn
@@ -344,6 +352,10 @@ module Make : (Log : Logger.SLogger)
       type t =
             Rocq_monad_utils.Make(Log)(C)(E).Errors
             .t =
+        | LTS_Empty
+        | LTS_Incomplete
+        | Not_Bisimilar
+        | Invalid_Ind_Kind of Rocq_ind.kind
         | Invalid_Sort_LTS of Sorts.family
         | Invalid_Sort_Type of Sorts.family
         | Invalid_Ref_LTS of Names.GlobRef.t
@@ -361,6 +373,10 @@ module Make : (Log : Logger.SLogger)
 
       exception MEBI_exn of t
 
+      val lts_empty : unit -> exn
+      val lts_incomplete : unit -> exn
+      val not_bisimilar : unit -> exn
+      val invalid_ind_kind : Rocq_ind.kind -> exn
       val invalid_sort_lts : Sorts.family -> exn
       val invalid_sort_type : Sorts.family -> exn
       val invalid_ref_lts : Names.GlobRef.t -> exn
@@ -383,6 +399,10 @@ module Make : (Log : Logger.SLogger)
     end
 
     module type SErr = sig
+      val lts_empty : unit -> 'a
+      val lts_incomplete : unit -> 'a
+      val not_bisimilar : unit -> 'a
+      val invalid_ind_kind : Rocq_ind.kind -> 'a
       val invalid_sort_lts : Sorts.family -> 'a
       val invalid_sort_type : Sorts.family -> 'a
       val invalid_ref_lts : Names.GlobRef.t -> 'a
@@ -399,6 +419,10 @@ module Make : (Log : Logger.SLogger)
     end
 
     module Err : sig
+      val lts_empty : unit -> 'a
+      val lts_incomplete : unit -> 'a
+      val not_bisimilar : unit -> 'a
+      val invalid_ind_kind : Rocq_ind.kind -> 'a
       val invalid_sort_lts : Sorts.family -> 'a
       val invalid_sort_type : Sorts.family -> 'a
       val invalid_ref_lts : Names.GlobRef.t -> 'a
@@ -415,6 +439,18 @@ module Make : (Log : Logger.SLogger)
     end
 
     module Ind : sig
+      type t = Enc.t Rocq_ind.t
+
+      val get_lts : t -> Rocq_ind.LTS.t
+      val get_lts_term_type : t -> Evd.econstr
+      val get_lts_label_type : t -> Evd.econstr
+
+      val get_lts_constructor_types :
+        t -> Rocq_ind.LTS.constructor array
+
+      val to_string :
+        Environ.env -> Evd.evar_map -> t -> string
+
       val lookup :
         Names.inductive -> Declarations.mind_specif mm
 
@@ -440,7 +476,7 @@ module Make : (Log : Logger.SLogger)
         Declarations.mind_specif ->
         (Constr.rel_declaration * Constr.rel_declaration) mm
 
-      val lts : Names.GlobRef.t -> Enc.t Rocq_ind.t mm
+      val lts : Names.GlobRef.t -> t mm
     end
 
     val mk_ctx_substl :
@@ -620,14 +656,14 @@ module Make : (Log : Logger.SLogger)
 
       val check_valid_constructors :
         Rocq_ind.LTS.constructor array ->
-        Enc.t Rocq_ind.t F.t ->
+        Ind.t F.t ->
         Evd.econstr ->
         Evd.econstr ->
         Enc.t ->
         Constructors.t mm
 
       val explore_valid_constructor :
-        Enc.t Rocq_ind.t F.t ->
+        Ind.t F.t ->
         Evd.econstr ->
         Enc.t ->
         Rocq_utils.constructor_args ->
@@ -638,7 +674,7 @@ module Make : (Log : Logger.SLogger)
       val check_updated_ctx :
         Enc.t ->
         Problems.t list ->
-        Enc.t Rocq_ind.t F.t ->
+        Ind.t F.t ->
         EConstr.Vars.substl * EConstr.rel_declaration list ->
         (Enc.t * Problems.t list) option mm
 
@@ -652,7 +688,7 @@ module Make : (Log : Logger.SLogger)
 
       val collect_valid_constructors :
         Rocq_ind.LTS.constructor array ->
-        Enc.t Rocq_ind.t F.t ->
+        Ind.t F.t ->
         Evd.econstr ->
         Evd.econstr ->
         Enc.t ->
@@ -2046,6 +2082,7 @@ module Make : (Log : Logger.SLogger)
       }
 
       val fsm_pair : ?weak:bool -> FSM.t -> fsm_pair
+      val are_bisimilar : result -> bool
       val the_cached_result : t option ref
       val set_the_result : t -> unit
 
@@ -2110,6 +2147,12 @@ module Make : (Log : Logger.SLogger)
     val get_the_weak_args : weak_args option
     val get_the_weak_arg1 : unit -> Weak.t option
     val get_the_weak_arg2 : unit -> Weak.t option
+
+    val api_bounds_to_model_bounds :
+      Api.bounds_args -> Model.Info.bounds
+
+    val the_bounds_args : Model.Info.bounds ref
+    val load_the_bounds_args : unit -> unit
   end
 
   module type X_Args = sig
@@ -2606,37 +2649,34 @@ module Make : (Log : Logger.SLogger)
       init : V.elt;
       states : V.t;
       transitions : T.t';
-      ind_defs : V.elt Rocq_ind.t M.B.t;
+      ind_defs : M.Ind.t M.B.t;
       weak : Weak.t option;
     }
 
-    val empty : V0.elt -> V0.elt Rocq_ind.t M.B.t -> t
+    val empty : V0.elt -> M.Ind.t M.B.t -> t
 
     val is_silent_transition :
       Evd.econstr -> Weak.t option -> bool option M.mm
 
     module type Y_Args = sig
-      val primary_lts : V.elt Rocq_ind.t
-      val rocq_defs : V.elt Rocq_ind.t M.B.t
-      val stop : unit -> bool
-      val g : t ref
+      val primary_lts : M.Ind.t
+      val rocq_defs : M.Ind.t M.B.t
+      val stop : t -> bool
     end
 
     module type Z_Args = sig
       val pp : bool
       val g : t ref
-      val ind_defs : V.elt Rocq_ind.t M.B.t
+      val ind_defs : M.Ind.t M.B.t
     end
 
     module Make : (_ : Y_Args) -> sig
-      val next_to_visit : unit -> V.elt
-      val update_to_visit : V.t -> unit
-
-      val get_new_states :
-        V.elt -> M.Constructor.t list -> V.t M.mm
-
-      val get_new_constrs : V.elt -> M.Constructor.t list M.mm
-      val build : unit -> bool M.mm
+      val next_to_visit : t -> T.key
+      val update_to_visit : t -> T.key -> unit
+      val update_states : t -> V.t -> t
+      val get_new_constrs : T.key -> M.Constructor.t list M.mm
+      val get_new_states : t -> T.key -> V.t M.mm
+      val build : t -> t M.mm
     end
 
     module Extract : (_ : Z_Args) -> sig
@@ -2651,22 +2691,14 @@ module Make : (Log : Logger.SLogger)
       val lts : unit -> Model.LTS.t M.mm
     end
 
-    val build_ind_defs : unit -> V0.elt Rocq_ind.t M.B.t M.mm
-
-    val find_primary_lts :
-      V0.elt Rocq_ind.t M.B.t -> V0.elt Rocq_ind.t M.mm
-
+    val build_ind_defs : unit -> M.Ind.t M.B.t M.mm
+    val find_primary_lts : M.Ind.t M.B.t -> M.Ind.t M.mm
     val initial_term : Constrexpr.constr_expr -> V0.elt M.mm
 
     val make_yargs :
-      V0.elt Rocq_ind.t ->
-      V0.elt Rocq_ind.t M.B.t ->
-      t ref ->
-      (module Y_Args)
+      M.Ind.t -> M.Ind.t M.B.t -> 'a -> (module Y_Args)
 
-    val make_zargs :
-      V0.elt Rocq_ind.t M.B.t -> t ref -> (module Z_Args)
-
+    val make_zargs : M.Ind.t M.B.t -> t ref -> (module Z_Args)
     val build : Constrexpr.constr_expr -> Model.LTS.t M.mm
   end
 
@@ -2674,15 +2706,17 @@ module Make : (Log : Logger.SLogger)
     Libnames.qualid ->
     Names.GlobRef.t list ->
     Weak.t option ->
-    
     (module X_Args)
+
+  val fail_if_empty : Model.LTS.t -> unit
+  val fail_if_incomplete : Model.LTS.t -> unit
+  val fail_if_not_bisim : Model.Bisimilar.result -> unit
 
   val extract_lts :
     Libnames.qualid ->
     Constrexpr.constr_expr ->
     Libnames.qualid list ->
     Weak.t option ->
-    
     Model.LTS.t M.mm
 
   module Command : sig
@@ -2691,7 +2725,6 @@ module Make : (Log : Logger.SLogger)
       Constrexpr.constr_expr ->
       Libnames.qualid list ->
       Weak.t option ->
-      
       Model.LTS.t M.mm
 
     val build_fsm :
@@ -2699,7 +2732,6 @@ module Make : (Log : Logger.SLogger)
       Constrexpr.constr_expr ->
       Libnames.qualid list ->
       Weak.t option ->
-      
       Model.FSM.t M.mm
 
     type t =
@@ -2715,7 +2747,6 @@ module Make : (Log : Logger.SLogger)
 
     val run :
       Libnames.qualid list ->
-      
       t ->
       Model.Bisimilar.t option M.mm
   end
