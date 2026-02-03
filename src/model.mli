@@ -1342,6 +1342,7 @@ module Make : (_ : Logger.SLogger)
     and fsm_pair = { original : FSM.t; saturated : FSM.t }
 
     val fsm_pair : ?weak:bool -> FSM.t -> fsm_pair
+    val are_bisimilar : result -> bool
     val the_cached_result : t option ref
     val set_the_result : t -> unit
 

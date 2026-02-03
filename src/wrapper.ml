@@ -47,7 +47,7 @@ struct
 
     (** *)
     let get_theory_enc (f : EConstr.t -> bool M.mm) : M.Enc.t M.mm =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       let open M.Syntax in
       let* fm = M.get_fwdmap in
       let rec find_theory : (EConstr.t * M.Enc.t) list -> M.Enc.t M.mm =
@@ -63,7 +63,7 @@ struct
     exception NoEncodingFoundFor_TheoriesNone of unit
 
     let get_None_enc () : M.Enc.t M.mm =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       try get_theory_enc is_None with
       | Not_found -> raise (NoEncodingFoundFor_TheoriesNone ())
     ;;
@@ -71,7 +71,7 @@ struct
     exception NoEncodingFoundFor_TheoriesSome of unit
 
     let get_Some_enc () : M.Enc.t M.mm =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       try get_theory_enc is_Some with
       | Not_found -> raise (NoEncodingFoundFor_TheoriesSome ())
     ;;
@@ -82,19 +82,19 @@ struct
     let get_theory_enc_if_eq (x : EConstr.t) (f : EConstr.t -> bool M.mm)
       : M.Enc.t M.mm
       =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       let is_eq : bool = M.run (f x) in
       try if is_eq then get_theory_enc f else raise Not_found with
       | Not_found -> raise (NotEqTheory ())
     ;;
 
     let get_None_enc_if_eq (x : EConstr.t) : M.Enc.t M.mm =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       get_theory_enc_if_eq x is_None
     ;;
 
     let get_Some_enc_if_eq (x : EConstr.t) : M.Enc.t M.mm =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       get_theory_enc_if_eq x is_Some
     ;;
   end
@@ -105,7 +105,7 @@ struct
       | Custom of M.Enc.t * M.Enc.t
 
     let eq x y : bool =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       match x, y with
       | Option x, Option y -> M.Enc.equal x y
       | Custom (x1, x2), Custom (y1, y2) ->
@@ -114,7 +114,7 @@ struct
     ;;
 
     let to_string : t -> string M.mm =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       function
       | Option label_enc ->
         let label_dec : EConstr.t = M.decode label_enc in
@@ -239,7 +239,7 @@ struct
       include V2
 
       let to_string (xs : t) : string =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         "TODO: Graph.V.to_string"
       ;;
     end
@@ -251,7 +251,7 @@ struct
       include D2
 
       let to_string (xs : t) : string =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         "TODO: Graph.D.to_string"
       ;;
     end
@@ -266,12 +266,12 @@ struct
       type t' = D.t t
 
       let size (xs : t') : int =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         fold (fun k v n -> D.cardinal v + n) xs 0
       ;;
 
       let update (x : t') (action : Model.Action.t) (states : D.t) : unit =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         if D.is_empty states
         then ()
         else (
@@ -281,7 +281,7 @@ struct
       ;;
 
       let to_string (xs : t') : string =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         to_seq xs
         |> List.of_seq
         |> Utils.Strfy.list
@@ -309,7 +309,7 @@ struct
             (destinations : D.t)
         : unit
         =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         match find_opt x from with
         | None ->
           [ action, destinations ] |> List.to_seq |> A.of_seq |> add x from
@@ -317,12 +317,12 @@ struct
       ;;
 
       let size (xs : t') : int =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         fold (fun k v n -> A.size v + n) xs 0
       ;;
 
       let to_string (xs : t') : string =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         to_seq xs
         |> List.of_seq
         |> Utils.Strfy.list
@@ -344,7 +344,7 @@ struct
       ; init : M.Enc.t
       ; states : V.t
       ; transitions : T.t'
-      ; ind_defs : M.Enc.t Rocq_ind.t M.B.t
+      ; ind_defs : M.Ind.t M.B.t
       ; weak : Weak.t option
       }
 
@@ -352,8 +352,8 @@ struct
         @param init is the initial state.
         @param rocq_defs is a map of rocq inductive definitions of the LTS.
         @param weak is the optional weak arguments. *)
-    let empty (init : M.Enc.t) (ind_defs : M.Enc.t Rocq_ind.t M.B.t) : t =
-      Log.trace __FUNCTION__;
+    let empty (init : M.Enc.t) (ind_defs : M.Ind.t M.B.t) : t =
+      (* Log.trace __FUNCTION__; *)
       { to_visit = Queue.create ()
       ; init
       ; states = V.empty
@@ -367,7 +367,7 @@ struct
 
     let is_silent_transition (x : EConstr.t) : Weak.t option -> bool option M.mm
       =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       function
       | None -> M.return None
       | Some (Option label_enc) ->
@@ -384,70 +384,47 @@ struct
 
     (*********************************************************)
 
+    (* used to make graph *)
     module type Y_Args = sig
-      val primary_lts : M.Enc.t Rocq_ind.t
-      val rocq_defs : M.Enc.t Rocq_ind.t M.B.t
-      val stop : unit -> bool
-      val g : t ref
+      val primary_lts : M.Ind.t
+      val rocq_defs : M.Ind.t M.B.t
+      val stop : t -> bool
+      (* val g : t ref *)
     end
 
+    (* used for extraction *)
     module type Z_Args = sig
       val pp : bool
       val g : t ref
-      val ind_defs : M.Enc.t Rocq_ind.t M.B.t
+      val ind_defs : M.Ind.t M.B.t
     end
 
     module Make (Y : Y_Args) = struct
-      let next_to_visit () : M.Enc.t =
-        Log.trace __FUNCTION__;
-        Queue.pop !Y.g.to_visit
+      let next_to_visit (g : t) : M.Enc.t =
+        (* Log.trace __FUNCTION__; *)
+        (* Queue.pop !Y.g.to_visit *)
+        Queue.pop g.to_visit
       ;;
 
-      let update_to_visit (xs : V.t) : unit =
-        Log.trace __FUNCTION__;
-        Y.g := { !Y.g with states = V.union !Y.g.states xs }
+      let update_to_visit (g : t) (x : M.Enc.t) : unit =
+        (* Log.trace __FUNCTION__; *)
+        (* Queue.push x !Y.g.to_visit *)
+        Queue.push x g.to_visit
       ;;
 
-      let get_new_states (from : M.Enc.t) (ctors : M.Constructor.t list)
-        : V.t M.mm
-        =
-        Log.trace __FUNCTION__;
-        let iter_body (i : int) (new_states : V.t) =
-          let (act, tgt, int_tree) : M.Constructor.t = List.nth ctors i in
-          let tgt_enc : M.Enc.t = M.encode tgt in
-          let act_enc : M.Enc.t = M.encode act in
-          let open M.Syntax in
-          let* is_silent : bool option = is_silent_transition act !Y.g.weak in
-          let label : Model.Label.t =
-            { term = act_enc; pp = None; is_silent }
-          in
-          let constructor_trees : Model.Trees.t =
-            Model.Trees.singleton int_tree
-          in
-          let to_add : Model.Action.t =
-            { label; constructor_trees; annotation = None }
-          in
-          D.singleton (tgt_enc, int_tree)
-          |> T.update !Y.g.transitions from to_add;
-          (* NOTE: if [tgt] has not been explored then add [to_visit] *)
-          if T.mem !Y.g.transitions tgt_enc || V.mem tgt_enc !Y.g.states
-          then ()
-          else Queue.push tgt_enc !Y.g.to_visit;
-          (* NOTE: add [tgt] to [new_states] *)
-          M.return (V.add tgt_enc new_states)
-        in
-        M.iterate 0 (List.length ctors - 1) (V.singleton from) iter_body
+      let update_states (g : t) (xs : V.t) : t =
+        (* Log.trace __FUNCTION__; *)
+        (* Y.g := { !Y.g with states = V.union !Y.g.states xs } *)
+        { g with states = V.union g.states xs }
       ;;
 
       let get_new_constrs (from : M.Enc.t) : M.Constructor.t list M.mm =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         let from_term : EConstr.t = M.decode from in
-        let label_type : EConstr.t =
-          Rocq_ind.get_lts_label_type Y.primary_lts
-        in
-        let ind_map : M.Enc.t Rocq_ind.t M.F.t = M.decode_map Y.rocq_defs in
+        let label_type : EConstr.t = M.Ind.get_lts_label_type Y.primary_lts in
+        let ind_map : M.Ind.t M.F.t = M.decode_map Y.rocq_defs in
         let primary_constr_transitions =
-          Rocq_ind.get_lts_constructor_types Y.primary_lts
+          M.Ind.get_lts_constructor_types Y.primary_lts
         in
         M.Unification.collect_valid_constructors
           primary_constr_transitions
@@ -457,43 +434,91 @@ struct
           Y.primary_lts.enc
       ;;
 
+      let get_new_states (g : t) (from : M.Enc.t) : V.t M.mm =
+        (* Log.trace __FUNCTION__; *)
+        Log.thing ~__FUNCTION__ Debug "from" from (Of M.Enc.to_string);
+        let open M.Syntax in
+        let* new_constrs : M.Constructor.t list = get_new_constrs from in
+        let iter_body (i : int) (new_states : V.t) =
+          let (act, tgt, int_tree) : M.Constructor.t = List.nth new_constrs i in
+          let tgt_enc : M.Enc.t = M.encode tgt in
+          let act_enc : M.Enc.t = M.encode act in
+          let* is_silent : bool option = is_silent_transition act g.weak in
+          let label : Model.Label.t =
+            { term = act_enc; pp = None; is_silent }
+          in
+          let constructor_trees : Model.Trees.t =
+            Model.Trees.singleton int_tree
+          in
+          let to_add : Model.Action.t =
+            { label; constructor_trees; annotation = None }
+          in
+          D.singleton (tgt_enc, int_tree) |> T.update g.transitions from to_add;
+          (* NOTE: if [tgt] has not been explored then add [to_visit] *)
+          if T.mem g.transitions tgt_enc || V.mem tgt_enc g.states
+          then ()
+          else update_to_visit g tgt_enc;
+          (* NOTE: add [tgt] to [new_states] *)
+          M.return (V.add tgt_enc new_states)
+        in
+        M.iterate 0 (List.length new_constrs - 1) (V.singleton from) iter_body
+      ;;
+
       (** *)
-      let rec build () : bool M.mm =
-        Log.trace __FUNCTION__;
-        if Y.stop ()
-        then Queue.is_empty !Y.g.to_visit |> M.return
+      let rec build (g : t) : t M.mm =
+        (* Log.trace __FUNCTION__; *)
+        Log.things
+          ~__FUNCTION__
+          Debug
+          "to visit"
+          (* (!Y.g.to_visit |> Queue.to_seq |> List.of_seq) *)
+          (g.to_visit |> Queue.to_seq |> List.of_seq)
+          (Of
+             (fun (x : M.Enc.t) : string ->
+               Utils.Strfy.record
+                 [ "enc", M.Enc.to_string x
+                 ; "dec", M.decode x |> M.Strfy.econstr
+                 ]));
+        if Y.stop g
+        then (
+          Log.trace ~__FUNCTION__ "stop condition";
+          (* Queue.is_empty !Y.g.to_visit |> M.return) *)
+          M.return g
+          (* else if Queue.is_empty !Y.g.to_visit *))
+        else if Queue.is_empty g.to_visit
+        then (
+          Log.trace ~__FUNCTION__ "no more to visit";
+          M.return g)
         else (
-          let enc_to_visit : M.Enc.t = Queue.pop !Y.g.to_visit in
+          Log.trace ~__FUNCTION__ "continue";
+          let enc_to_visit : M.Enc.t = next_to_visit g in
           (* status_update enc_to_visit g bound; *)
           let open M.Syntax in
-          let* new_constrs : M.Constructor.t list =
-            next_to_visit () |> get_new_constrs
-          in
           (* NOTE: [get_new_states] also updates [g.to_visit] *)
-          let* new_states : V.t = get_new_states enc_to_visit new_constrs in
-          update_to_visit new_states;
-          build ())
+          let* new_states : V.t = get_new_states g enc_to_visit in
+          let g : t = update_states g new_states in
+          build g)
       ;;
     end
 
     module Extract (Z : Z_Args) = struct
       let pp (x : M.Enc.t) : string option =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         if Z.pp then Some (M.decode x |> M.Strfy.econstr) else None
       ;;
 
       let state (x : M.Enc.t) : Model.State.t =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         { term = x; pp = pp x }
       ;;
 
       let states () : Model.States.t =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         !Z.g.states |> V.to_list |> List.map state |> Model.States.of_list
       ;;
 
       let terminals () : Model.States.t =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         !Z.g.states
         |> V.filter (fun (x : V.elt) -> Bool.not (T.mem !Z.g.transitions x))
         |> V.to_list
@@ -502,7 +527,7 @@ struct
       ;;
 
       let transitions () : Model.Transitions.t =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         T.fold
           (fun (from : M.Enc.t)
             (vs : A.t')
@@ -527,11 +552,11 @@ struct
       ;;
 
       let constructor_info () : Model.Info.lts list M.mm =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         let xs = M.B.to_seq Z.ind_defs |> List.of_seq in
         let open M.Syntax in
         let f (i : int) (acc : Model.Info.lts list) =
-          let (enc, v) : M.Enc.t * M.Enc.t Rocq_ind.t = List.nth xs i in
+          let (enc, v) : M.Enc.t * M.Ind.t = List.nth xs i in
           match v.kind with
           | LTS x ->
             let* constructors : Rocq_bindings.constructor list =
@@ -545,7 +570,7 @@ struct
       ;;
 
       let meta () : Model.Info.meta M.mm =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         let open M.Syntax in
         let* lts : Model.Info.lts list = constructor_info () in
         let open Model.Info in
@@ -558,7 +583,7 @@ struct
       ;;
 
       let weak_labels (xs : Model.Labels.t) : Model.Labels.t M.mm =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         match !Z.g.weak with
         | None -> Model.Labels.empty |> M.return
         | Some weak ->
@@ -580,7 +605,7 @@ struct
       ;;
 
       let lts () : Model.LTS.t M.mm =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         let open M.Syntax in
         let transitions : Model.Transitions.t = transitions () in
         let alphabet : Model.Labels.t = Model.Transitions.labels transitions in
@@ -598,16 +623,16 @@ struct
       ;;
     end
 
-    let build_ind_defs () : M.Enc.t Rocq_ind.t M.B.t M.mm =
-      Log.trace __FUNCTION__;
+    let build_ind_defs () : M.Ind.t M.B.t M.mm =
+      (* Log.trace __FUNCTION__; *)
       let num : int = List.length X.grefs in
-      Log.thing ~__FUNCTION__ Notice "num" num (Of Utils.Strfy.int);
-      let ind_defs : M.Enc.t Rocq_ind.t M.B.t = M.B.create num in
+      Log.thing ~__FUNCTION__ Debug "num" num (Of Utils.Strfy.int);
+      let ind_defs : M.Ind.t M.B.t = M.B.create num in
       let open M.Syntax in
       let f (i : int) () =
         let gref : Names.GlobRef.t = List.nth X.grefs i in
         (* NOTE: [M.Ind.lts] encodes [x.ind] into the bi-enc maps. *)
-        let* x : M.Enc.t Rocq_ind.t = M.Ind.lts gref in
+        let* x : M.Ind.t = M.Ind.lts gref in
         Log.thing
           ~__FUNCTION__
           Debug
@@ -626,12 +651,10 @@ struct
       ind_defs |> M.return
     ;;
 
-    let find_primary_lts (ind_defs : M.Enc.t Rocq_ind.t M.B.t)
-      : M.Enc.t Rocq_ind.t M.mm
-      =
-      Log.trace __FUNCTION__;
+    let find_primary_lts (ind_defs : M.Ind.t M.B.t) : M.Ind.t M.mm =
+      (* Log.trace __FUNCTION__; *)
       let open M.Syntax in
-      let* x : M.Enc.t Rocq_ind.t = Nametab.global X.primary_lts |> M.Ind.lts in
+      let* x : M.Ind.t = Nametab.global X.primary_lts |> M.Ind.lts in
       Log.thing
         ~__FUNCTION__
         Debug
@@ -644,7 +667,7 @@ struct
 
     (** normalize and encode the initial term *)
     let initial_term (init_term : Constrexpr.constr_expr) : M.Enc.t M.mm =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       let open M.Syntax in
       let* init_term : EConstr.t = M.constrexpr_to_econstr init_term in
       let* init_term : EConstr.t = M.econstr_normalize init_term in
@@ -653,18 +676,16 @@ struct
     ;;
 
     let make_yargs primary_lts ind_defs the_graph : (module Y_Args) =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       let module Y = struct
-        let primary_lts : M.Enc.t Rocq_ind.t = primary_lts
-        let rocq_defs : M.Enc.t Rocq_ind.t M.B.t = ind_defs
-        let g : t ref = the_graph
+        let primary_lts : M.Ind.t = primary_lts
+        let rocq_defs : M.Ind.t M.B.t = ind_defs
 
-        let stop : unit -> bool =
+        let stop (g : t) : bool =
+          (* Log.trace __FUNCTION__; *)
           match X.bounds with
-          | States n ->
-            fun () -> Queue.is_empty !g.to_visit || V.cardinal !g.states > n
-          | Transitions n ->
-            fun () -> Queue.is_empty !g.to_visit || T.size !g.transitions > n
+          | States n -> V.cardinal g.states > n
+          | Transitions n -> T.size g.transitions > n
         ;;
       end
       in
@@ -672,10 +693,10 @@ struct
     ;;
 
     let make_zargs ind_defs the_graph : (module Z_Args) =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       let module Z = struct
-        let pp : bool = false
-        let ind_defs : M.Enc.t Rocq_ind.t M.B.t = ind_defs
+        let pp : bool = true
+        let ind_defs : M.Ind.t M.B.t = ind_defs
         let g : t ref = the_graph
       end
       in
@@ -683,14 +704,14 @@ struct
     ;;
 
     let build (init_term : Constrexpr.constr_expr) : Model.LTS.t M.mm =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       let open M.Syntax in
       let* init : M.Enc.t = initial_term init_term in
       (* NOTE: encode rocq inductive defs *)
-      let* ind_defs : M.Enc.t Rocq_ind.t M.B.t = build_ind_defs () in
+      let* ind_defs : M.Ind.t M.B.t = build_ind_defs () in
       Log.things
         ~__FUNCTION__
-        Notice
+        Debug
         "ind_defs"
         (M.B.to_seq ind_defs |> List.of_seq)
         (Of
@@ -701,11 +722,24 @@ struct
       (* NOTE: build the graph *)
       Log.trace ~__FUNCTION__ "Build the Graph";
       let the_graph : t ref = ref (empty init ind_defs) in
+      Queue.push init !the_graph.to_visit;
+      Log.things
+        ~__FUNCTION__
+        Debug
+        "to visit"
+        (!the_graph.to_visit |> Queue.to_seq |> List.of_seq)
+        (Of M.Enc.to_string);
       let module G = Make ((val make_yargs primary_lts ind_defs the_graph)) in
-      let* is_complete : bool = G.build () in
+      let* the_graph : t = G.build !the_graph in
       (* M.return !the_graph *)
+      Log.thing
+        ~__FUNCTION__
+        Debug
+        "num states (V)"
+        (V.cardinal the_graph.states)
+        (Of Utils.Strfy.int);
       Log.trace ~__FUNCTION__ "Completed Graph, Extracting LTS";
-      let module L = Extract ((val make_zargs ind_defs the_graph)) in
+      let module L = Extract ((val make_zargs ind_defs (ref the_graph))) in
       let* the_lts : Model.LTS.t = L.lts () in
       M.return the_lts
     ;;
@@ -719,7 +753,7 @@ struct
   end
 
   let make_xargs primary_lts grefs weak : (module X_Args) =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     let module X = struct
       let primary_lts : Libnames.qualid = primary_lts
       let grefs : Names.GlobRef.t list = Nametab.global primary_lts :: grefs
@@ -730,23 +764,34 @@ struct
     (module X : X_Args)
   ;;
 
-  (* TODO: add exception to monad! *)
-  exception EmptyLTS of Model.LTS.t
-
   let fail_if_empty (x : Model.LTS.t) : unit =
-    if Model.States.is_empty x.states && !Api.the_fail_flags.empty
-    then raise (EmptyLTS x)
-    else ()
+    if
+      !Api.the_fail_flags.empty
+      && (Int.equal (Model.States.cardinal x.states) 1
+          || Model.States.is_empty x.states)
+      && Model.Transitions.is_empty x.transitions
+    then (
+      Log.trace ~__FUNCTION__ "LTS Empty";
+      M.Err.lts_empty ())
   ;;
 
-  (* TODO: add exception to monad! *)
-  exception IncompleteLTS of Model.LTS.t
-
   let fail_if_incomplete (x : Model.LTS.t) : unit =
-    match x with
-    | { info = { meta = Some { is_complete = false; _ }; _ }; _ } ->
-      if !Api.the_fail_flags.incomplete then raise (IncompleteLTS x) else ()
-    | _ -> ()
+    if !Api.the_fail_flags.incomplete
+    then (
+      match x with
+      | { info = { meta = Some { is_complete = false; _ }; _ }; _ } ->
+        Log.trace ~__FUNCTION__ "LTS Incomplete";
+        M.Err.lts_incomplete ()
+      | _ -> ())
+  ;;
+
+  let fail_if_not_bisim (x : Model.Bisimilar.result) : unit =
+    if !Api.the_fail_flags.incomplete
+    then
+      if Bool.not (Model.Bisimilar.are_bisimilar x)
+      then (
+        Log.trace ~__FUNCTION__ "Not Bisimilar";
+        M.Err.not_bisimilar ())
   ;;
 
   let extract_lts
@@ -756,7 +801,7 @@ struct
         (weak : Weak.t option)
     : Model.LTS.t M.mm
     =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     let t = M.make_hashtbl () in
     let v = M.make_set () in
     let d = M.make_state_tree_pair_set () in
@@ -784,7 +829,7 @@ struct
           (weak : Weak.t option)
       : Model.LTS.t M.mm
       =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       let open M.Syntax in
       let* () = Config.load_weak_args () in
       extract_lts primary_lts init names weak
@@ -797,7 +842,7 @@ struct
           (weak : Weak.t option)
       : Model.FSM.t M.mm
       =
-      Log.trace __FUNCTION__;
+      (* Log.trace __FUNCTION__; *)
       let open M.Syntax in
       let* the_lts = extract_lts primary_lts init names weak in
       Model.Convert.lts_to_fsm the_lts |> M.return
@@ -867,7 +912,18 @@ struct
         let* the_fsm_b = build_fsm (snd b) (fst b) refs weak2 in
         Log.thing Notice "the fsm (B)" the_fsm_b (Of Model.FSM.to_string);
         let result = Model.Bisimilar.fsm the_fsm_a the_fsm_b in
-        (* Log.thing Notice "the merged fsm" the_fsm (Of Model.FSM.to_string); *)
+        fail_if_not_bisim result.result;
+        Log.thing Notice "the merged fsm" result.merged (Of Model.FSM.to_string);
+        Log.thing
+          Notice
+          "bisim states"
+          result.result.bisim_states
+          (Of Model.Partition.to_string);
+        Log.thing
+          Notice
+          "non-bisim states"
+          result.result.non_bisim_states
+          (Of Model.Partition.to_string);
         M.return (Some result)
     ;;
   end

@@ -114,7 +114,7 @@ END
 
 (* Merge *)
 VERNAC COMMAND EXTEND MeBi_Merge CLASSIFIED AS QUERY
-| ["MeBi" "Bisim" constr(x) "With" reference(a) 
+| ["MeBi" "Merge" constr(x) "With" reference(a) 
             "And" constr(y) "With" reference(b)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
@@ -124,7 +124,7 @@ VERNAC COMMAND EXTEND MeBi_Merge CLASSIFIED AS QUERY
     in ()
   }
 
-| ["MeBi" "Bisim" constr(x) "With" reference(a) 
+| ["MeBi" "Merge" constr(x) "With" reference(a) 
             "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in

@@ -48,6 +48,12 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     let to_string (xs : t) : string =
+      (* Log.thing
+         ~__FUNCTION__
+         Debug
+         "num states"
+         (cardinal xs)
+         (Of Utils.Strfy.int); *)
       S.to_list xs
       |> Utils.Strfy.list
            ~args:{ (Utils.Strfy.style_args ()) with name = Some "States" }
@@ -1232,6 +1238,10 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
 
     let fsm_pair ?(weak : bool = false) (original : FSM.t) : fsm_pair =
       { original; saturated = Saturate.fsm ~only_if_weak:(Some weak) original }
+    ;;
+
+    let are_bisimilar ({ non_bisim_states; _ } : result) : bool =
+      Partition.is_empty non_bisim_states
     ;;
 
     let the_cached_result : t option ref = ref None

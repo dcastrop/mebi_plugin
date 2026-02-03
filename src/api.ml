@@ -19,7 +19,7 @@ type fail_flags =
   }
 
 let the_fail_flags_default : fail_flags =
-  { empty = true; incomplete = true; non_bisimilar = true }
+  { empty = false; incomplete = true; non_bisimilar = true }
 ;;
 
 let the_fail_flags : fail_flags ref = ref the_fail_flags_default

@@ -23,7 +23,7 @@ struct
 
   (* *)
   let run ?(reset_encoding : bool = false) (x : 'a mm) : 'a =
-    Log.trace __FUNCTION__;
+    (* Log.trace __FUNCTION__; *)
     if reset_encoding then reset () else initialize ();
     let a : 'a in_wrapper =
       x (ref { ctx = Ctx.get (); maps = get_the_maps () })
