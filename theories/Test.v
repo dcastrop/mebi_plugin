@@ -113,8 +113,7 @@ Inductive testLTS : nat -> bool -> nat -> Prop :=
 
 Definition one := 1.
 
-(* TODO: how does this fail in the old version? here just produces empty lts *)
-(* Fail MeBi LTS false Using testLTS. *)
+Fail MeBi LTS false Using testLTS.
 
 MeBi LTS 0 Using testLTS.
 MeBi LTS (S 0) Using testLTS.
@@ -134,7 +133,6 @@ Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
 
 (* below cannot be finitely represented  *)
 (* MeBi Config Fail If Incomplete True. *)
-(* TODO: investigate why not failing in new version *)
 Fail MeBi LTS 0 Using nonTerminatingTestLTS.
 Fail MeBi LTS (S 0) Using nonTerminatingTestLTS.
 Fail MeBi LTS (S (S 0)) Using nonTerminatingTestLTS.

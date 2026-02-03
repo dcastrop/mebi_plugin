@@ -666,13 +666,12 @@ struct
     ;;
 
     (** normalize and encode the initial term *)
-    let initial_term (init_term : Constrexpr.constr_expr) : M.Enc.t M.mm =
+    let initial_term (init_term : Constrexpr.constr_expr) : EConstr.t M.mm =
       (* Log.trace __FUNCTION__; *)
       let open M.Syntax in
       let* init_term : EConstr.t = M.constrexpr_to_econstr init_term in
       let* init_term : EConstr.t = M.econstr_normalize init_term in
-      let init : M.Enc.t = M.encode init_term in
-      M.return init
+      M.return init_term
     ;;
 
     let make_yargs primary_lts ind_defs the_graph : (module Y_Args) =
@@ -706,7 +705,6 @@ struct
     let build (init_term : Constrexpr.constr_expr) : Model.LTS.t M.mm =
       (* Log.trace __FUNCTION__; *)
       let open M.Syntax in
-      let* init : M.Enc.t = initial_term init_term in
       (* NOTE: encode rocq inductive defs *)
       let* ind_defs : M.Ind.t M.B.t = build_ind_defs () in
       Log.things
@@ -718,7 +716,13 @@ struct
            (Utils.Strfy.tuple
               (Of M.Enc.to_string)
               (Of (M.Strfy.rocq_ind M.Enc.to_string))));
-      let* primary_lts = find_primary_lts ind_defs in
+      let* primary_lts : M.Ind.t = find_primary_lts ind_defs in
+      let* init_term : EConstr.t = initial_term init_term in
+      let$* _unit env sigma =
+        Rocq_ind.get_lts_term_type primary_lts
+        |> Typing.check env sigma init_term
+      in
+      let init : M.Enc.t = M.encode init_term in
       (* NOTE: build the graph *)
       Log.trace ~__FUNCTION__ "Build the Graph";
       let the_graph : t ref = ref (empty init ind_defs) in

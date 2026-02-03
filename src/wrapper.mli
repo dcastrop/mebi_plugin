@@ -2693,7 +2693,9 @@ module Make : (Log : Logger.SLogger)
 
     val build_ind_defs : unit -> M.Ind.t M.B.t M.mm
     val find_primary_lts : M.Ind.t M.B.t -> M.Ind.t M.mm
-    val initial_term : Constrexpr.constr_expr -> V0.elt M.mm
+
+    val initial_term :
+      Constrexpr.constr_expr -> Evd.econstr M.mm
 
     val make_yargs :
       M.Ind.t -> M.Ind.t M.B.t -> 'a -> (module Y_Args)
