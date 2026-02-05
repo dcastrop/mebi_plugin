@@ -703,7 +703,7 @@ struct
     ;;
 
     let build (init_term : Constrexpr.constr_expr) : Model.LTS.t M.mm =
-      (* Log.trace __FUNCTION__; *)
+      Log.trace __FUNCTION__;
       let open M.Syntax in
       (* NOTE: encode rocq inductive defs *)
       let* ind_defs : M.Ind.t M.B.t = build_ind_defs () in
@@ -724,7 +724,7 @@ struct
       in
       let init : M.Enc.t = M.encode init_term in
       (* NOTE: build the graph *)
-      Log.trace ~__FUNCTION__ "Build the Graph";
+      Log.debug ~__FUNCTION__ "Build the Graph";
       let the_graph : t ref = ref (empty init ind_defs) in
       Queue.push init !the_graph.to_visit;
       Log.things
@@ -742,7 +742,7 @@ struct
         "num states (V)"
         (V.cardinal the_graph.states)
         (Of Utils.Strfy.int);
-      Log.trace ~__FUNCTION__ "Completed Graph, Extracting LTS";
+      Log.debug ~__FUNCTION__ "Completed Graph, Extracting LTS";
       let module L = Extract ((val make_zargs ind_defs (ref the_graph))) in
       let* the_lts : Model.LTS.t = L.lts () in
       M.return the_lts
@@ -826,29 +826,34 @@ struct
   ;;
 
   module Command = struct
+    (** [default_weak_arg x] will return [Config.get_the_weak_arg1] in the case that [x] is [None], else returns [x].
+    *)
+    let default_weak_arg : Weak.t option -> Weak.t option = function
+      | None -> Config.get_the_weak_arg1 ()
+      | Some x -> Some x
+    ;;
+
     let build_lts
+          ?(weak : Weak.t option = None)
           (primary_lts : Libnames.qualid)
           (init : Constrexpr.constr_expr)
           (names : Libnames.qualid list)
-          (weak : Weak.t option)
       : Model.LTS.t M.mm
       =
-      (* Log.trace __FUNCTION__; *)
-      let open M.Syntax in
-      let* () = Config.load_weak_args () in
-      extract_lts primary_lts init names weak
+      Log.trace __FUNCTION__;
+      default_weak_arg weak |> extract_lts primary_lts init names
     ;;
 
     let build_fsm
+          ?(weak : Weak.t option = None)
           (primary_lts : Libnames.qualid)
           (init : Constrexpr.constr_expr)
           (names : Libnames.qualid list)
-          (weak : Weak.t option)
       : Model.FSM.t M.mm
       =
-      (* Log.trace __FUNCTION__; *)
+      Log.trace __FUNCTION__;
       let open M.Syntax in
-      let* the_lts = extract_lts primary_lts init names weak in
+      let* the_lts = build_lts ~weak primary_lts init names in
       Model.Convert.lts_to_fsm the_lts |> M.return
     ;;
 
@@ -869,66 +874,94 @@ struct
       ; b : rocq_args
       }
 
-    let run (refs : Libnames.qualid list) : t -> Model.Bisimilar.t option M.mm =
+    let do_make_lts (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
+      Log.trace __FUNCTION__;
+      let open M.Syntax in
+      let* the_lts = build_lts primary_lts x refs in
+      Log.thing Notice "the lts" the_lts (Of Model.LTS.to_string);
+      M.return None
+    ;;
+
+    let do_make_fsm (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
+      Log.trace __FUNCTION__;
+      let open M.Syntax in
+      let* the_fsm = build_fsm primary_lts x refs in
+      Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
+      M.return None
+    ;;
+
+    let do_saturate (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
+      Log.trace __FUNCTION__;
+      let open M.Syntax in
+      let* the_fsm = build_fsm primary_lts x refs in
+      Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
+      let the_fsm = Model.Saturate.fsm the_fsm in
+      Log.thing Notice "the saturated fsm" the_fsm (Of Model.FSM.to_string);
+      M.return None
+    ;;
+
+    let do_minimize (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
+      Log.trace __FUNCTION__;
+      let open M.Syntax in
+      let* the_fsm = build_fsm primary_lts x refs in
+      Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
+      let { fsm; pi } : Model.Minimize.t = Model.Minimize.fsm the_fsm in
+      Log.thing Notice "the minimized fsm" fsm (Of Model.FSM.to_string);
+      M.return None
+    ;;
+
+    let build_fsms
+          ((ax, alts) : rocq_args)
+          ((bx, blts) : rocq_args)
+          (refs : Libnames.qualid list)
+      : (Model.FSM.t * Model.FSM.t) M.mm
+      =
+      Log.trace __FUNCTION__;
+      let open M.Syntax in
+      let* the_fsm_a =
+        build_fsm ~weak:(Config.get_the_weak_arg1 ()) alts ax refs
+      in
+      Log.thing Notice "the fsm (A)" the_fsm_a (Of Model.FSM.to_string);
+      let* the_fsm_b =
+        build_fsm ~weak:(Config.get_the_weak_arg2 ()) blts bx refs
+      in
+      Log.thing Notice "the fsm (B)" the_fsm_b (Of Model.FSM.to_string);
+      M.return (the_fsm_a, the_fsm_b)
+    ;;
+
+    let do_merge { a; b } refs : Model.Bisimilar.t option M.mm =
+      Log.trace __FUNCTION__;
+      let open M.Syntax in
+      let* the_fsm_a, the_fsm_b = build_fsms a b refs in
+      let the_fsm = Model.FSM.merge the_fsm_a the_fsm_b in
+      Log.thing Notice "the merged fsm" the_fsm (Of Model.FSM.to_string);
+      M.return None
+    ;;
+
+    let do_check_bisim { a; b } refs : Model.Bisimilar.t option M.mm =
+      Log.trace __FUNCTION__;
+      let open M.Syntax in
+      let* the_fsm_a, the_fsm_b = build_fsms a b refs in
+      let result = Model.Bisimilar.fsm the_fsm_a the_fsm_b in
+      Log.thing Notice "bisimilar" result (Of Model.Bisimilar.to_string);
+      fail_if_not_bisim result.result;
+      M.return (Some result)
+    ;;
+
+    let run (refs : Libnames.qualid list) (x : t)
+      : Model.Bisimilar.t option M.mm
+      =
       Log.trace __FUNCTION__;
       let open M.Syntax in
       Config.load_the_bounds_args ();
-      function
-      | MakeLTS (x, primary_lts) ->
-        let weak : Weak.t option = Config.get_the_weak_arg1 () in
-        let* the_lts = build_lts primary_lts x refs weak in
-        Log.thing Notice "the lts" the_lts (Of Model.LTS.to_string);
-        M.return None
-      | MakeFSM (x, primary_lts) ->
-        let weak : Weak.t option = Config.get_the_weak_arg1 () in
-        let* the_fsm = build_fsm primary_lts x refs weak in
-        Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
-        M.return None
-      | Saturate (x, primary_lts) ->
-        let weak : Weak.t option = Config.get_the_weak_arg1 () in
-        let* the_fsm = build_fsm primary_lts x refs weak in
-        Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
-        let the_fsm = Model.Saturate.fsm the_fsm in
-        Log.thing Notice "the saturated fsm" the_fsm (Of Model.FSM.to_string);
-        M.return None
-      | Minimize (x, primary_lts) ->
-        let weak : Weak.t option = Config.get_the_weak_arg1 () in
-        let* the_fsm = build_fsm primary_lts x refs weak in
-        Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
-        let { fsm; pi } : Model.Minimize.t = Model.Minimize.fsm the_fsm in
-        Log.thing Notice "the minimized fsm" fsm (Of Model.FSM.to_string);
-        M.return None
-      | Merge { a; b } ->
-        let weak1 : Weak.t option = Config.get_the_weak_arg1 () in
-        let* the_fsm_a = build_fsm (snd a) (fst a) refs weak1 in
-        Log.thing Notice "the fsm (A)" the_fsm_a (Of Model.FSM.to_string);
-        let weak2 : Weak.t option = Config.get_the_weak_arg2 () in
-        let* the_fsm_b = build_fsm (snd b) (fst b) refs weak2 in
-        Log.thing Notice "the fsm (B)" the_fsm_b (Of Model.FSM.to_string);
-        let the_fsm = Model.FSM.merge the_fsm_a the_fsm_b in
-        Log.thing Notice "the merged fsm" the_fsm (Of Model.FSM.to_string);
-        M.return None
-      | CheckBisim { a; b } ->
-        let weak1 : Weak.t option = Config.get_the_weak_arg1 () in
-        let* the_fsm_a = build_fsm (snd a) (fst a) refs weak1 in
-        Log.thing Notice "the fsm (A)" the_fsm_a (Of Model.FSM.to_string);
-        let weak2 : Weak.t option = Config.get_the_weak_arg2 () in
-        let* the_fsm_b = build_fsm (snd b) (fst b) refs weak2 in
-        Log.thing Notice "the fsm (B)" the_fsm_b (Of Model.FSM.to_string);
-        let result = Model.Bisimilar.fsm the_fsm_a the_fsm_b in
-        fail_if_not_bisim result.result;
-        Log.thing Notice "the merged fsm" result.merged (Of Model.FSM.to_string);
-        Log.thing
-          Notice
-          "bisim states"
-          result.result.bisim_states
-          (Of Model.Partition.to_string);
-        Log.thing
-          Notice
-          "non-bisim states"
-          result.result.non_bisim_states
-          (Of Model.Partition.to_string);
-        M.return (Some result)
+      let* () = Config.load_weak_args () in
+      match x with
+      | MakeLTS args -> do_make_lts args refs
+      | MakeFSM args -> do_make_fsm args refs
+      | Saturate args -> do_saturate args refs
+      | Minimize args -> do_minimize args refs
+      | Merge args -> do_merge args refs
+      | CheckBisim args -> do_check_bisim args refs
     ;;
   end
 end

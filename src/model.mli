@@ -1324,6 +1324,7 @@ module Make : (_ : Logger.SLogger)
 
     val partition_states : FSM.t -> Partition.t
     val fsm : ?weak:bool -> FSM.t -> t
+    val to_string : t -> string
   end
 
   module Bisimilar : sig
@@ -1351,5 +1352,8 @@ module Make : (_ : Logger.SLogger)
     val get_the_result : unit -> t
     val split : Partition.t -> States.t -> States.t -> result
     val fsm : ?weak:bool -> FSM.t -> FSM.t -> t
+    val fsm_pair_to_string : fsm_pair -> string
+    val result_to_string : result -> string
+    val to_string : t -> string
   end
 end

@@ -98,8 +98,8 @@ MeBi Config WeakMode Enable.
 MeBi Config Weak As Option label. *)
 
 (* MeBi Divider "Theories.DevTest.0". *)
-(* MeBi LTS (tend) Using termLTS. *)
-(* MeBi FSM (tend) Using termLTS. *)
+MeBi LTS (tend) Using termLTS.
+MeBi FSM (tend) Using termLTS.
 
 MeBi Divider "Theories.DevTest.0.1".
 MeBi LTS (tseq tend tend) Using termLTS.
@@ -179,7 +179,7 @@ Inductive termLTS2 : term -> option label -> term -> Prop :=
 
 
 (* testing for separation *)
-(* MeBi Divider "Theories.DevTest.3". *)
+MeBi Divider "Theories.DevTest.3".
 Inductive termLTS3 : term -> option label -> term -> Prop :=
 (* 0 *)
 | do3_send : 
