@@ -2057,6 +2057,7 @@ module Make : (Log : Logger.SLogger)
 
       val partition_states : FSM.t -> Partition.t
       val fsm : ?weak:bool -> FSM.t -> t
+      val to_string : t -> string
     end
 
     module Bisimilar : sig
@@ -2091,6 +2092,9 @@ module Make : (Log : Logger.SLogger)
       val get_the_result : unit -> t
       val split : Partition.t -> States.t -> States.t -> result
       val fsm : ?weak:bool -> FSM.t -> FSM.t -> t
+      val fsm_pair_to_string : fsm_pair -> string
+      val result_to_string : result -> string
+      val to_string : t -> string
     end
   end
 
@@ -2722,18 +2726,20 @@ module Make : (Log : Logger.SLogger)
     Model.LTS.t M.mm
 
   module Command : sig
+    val default_weak_arg : Weak.t option -> Weak.t option
+
     val build_lts :
+      ?weak:Weak.t option ->
       Libnames.qualid ->
       Constrexpr.constr_expr ->
       Libnames.qualid list ->
-      Weak.t option ->
       Model.LTS.t M.mm
 
     val build_fsm :
+      ?weak:Weak.t option ->
       Libnames.qualid ->
       Constrexpr.constr_expr ->
       Libnames.qualid list ->
-      Weak.t option ->
       Model.FSM.t M.mm
 
     type t =
@@ -2746,6 +2752,12 @@ module Make : (Log : Logger.SLogger)
 
     and rocq_args = Constrexpr.constr_expr * Libnames.qualid
     and rocq_pair = { a : rocq_args; b : rocq_args }
+
+    val build_fsms :
+      rocq_args ->
+      rocq_args ->
+      Libnames.qualid list ->
+      (Model.FSM.t * Model.FSM.t) M.mm
 
     val run :
       Libnames.qualid list ->

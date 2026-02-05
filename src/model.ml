@@ -48,15 +48,13 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     let to_string (xs : t) : string =
-      (* Log.thing
-         ~__FUNCTION__
-         Debug
-         "num states"
-         (cardinal xs)
-         (Of Utils.Strfy.int); *)
       S.to_list xs
       |> Utils.Strfy.list
-           ~args:{ (Utils.Strfy.style_args ()) with name = Some "States" }
+           ~args:
+             (Utils.Strfy.style_args
+                ~style:(Some (Utils.Strfy.collection_style List))
+                ~name:"States"
+                ())
            (Of State.to_string)
     ;;
   end
@@ -69,16 +67,6 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       }
 
     let equal (a : t) (b : t) : bool = Enc.equal a.term b.term
-
-    (* exception Label_EqualEnc_Different_Silent of (t * t) *)
-    (* let equal (a : t) (b : t) : bool =
-      if Enc.equal a.term b.term
-      then
-        if Option.equal Bool.equal a.is_silent b.is_silent
-        then raise (Label_EqualEnc_Different_Silent (a, b))
-        else true
-      else false
-    ;; *)
 
     (** [compare a b] first compares the [term] of each, and if [0] then only compares the contents of [is_silent] if both are [Some _]. This allows us to [find] a label using only the [term] if we do not know if [is_silent] (which is acceptable since in the full model either all [Labels] are [None] or [Some _], and a comparison such as this would only be in the case where we are trying to find a label by [term]).
     *)
@@ -286,6 +274,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     include S
 
     let labels (xs : t) : Labels.t =
+      Log.trace __FUNCTION__;
       fold
         (fun ({ label; _ } : elt) : (Labels.t -> Labels.t) -> Labels.add label)
         xs
@@ -365,7 +354,9 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     *)
     let rec merge_saturated_tuples (a : ActionPair.t list)
       : ActionPair.t list -> ActionPair.t list
-      = function
+      =
+      Log.trace __FUNCTION__;
+      function
       | [] -> a
       | h :: tl ->
         let (a : (Action.t * States.t) list) =
@@ -382,6 +373,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           (a : ActionPair.t list)
       : ActionPair.t option * ActionPair.t list
       =
+      Log.trace __FUNCTION__;
       let f : Annotation.t option * Annotation.t option -> Annotation.t option =
         function
         | None, None -> None
@@ -424,6 +416,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     include S
 
     let labelled (xs : t) (y : Label.t) : t =
+      Log.trace __FUNCTION__;
       S.filter (fun ({ label; _ } : Action.t) -> Label.equal label y) xs
     ;;
 
@@ -444,6 +437,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     (** [update] ... if the action is already present, then along with merging the destination states, we also merge the constructor trees.
     *)
     let update (x : t') (action : Action.t) (states : States.t) : unit =
+      Log.trace __FUNCTION__;
       if States.is_empty states
       then ()
       else (
@@ -468,10 +462,12 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     (** [get_destinations x f e] merges the values of [x] using [f], where [e] is some initial (i.e., "empty") collection of ['a].
     *)
     let get_destinations (x : t') : States.t =
+      Log.trace __FUNCTION__;
       to_seq_values x |> Seq.fold_left States.union States.empty
     ;;
 
     let reduce_by_label (x : t') (label : Label.t) : t' =
+      Log.trace __FUNCTION__;
       let y : t' = copy x in
       filter_map_inplace
         (fun (k : Action.t) (vs : States.t) ->
@@ -483,6 +479,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let to_actions (x : t') : Actions.t = to_seq_keys x |> Actions.of_seq
 
     let to_actionpairs (x : t') : ActionPairs.t =
+      Log.trace __FUNCTION__;
       fold
         (fun (k : Action.t)
           (vs : States.t)
@@ -492,12 +489,14 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     let of_actionpairs (xs : ActionPairs.t) : t' =
+      Log.trace __FUNCTION__;
       let y : t' = create 0 in
       ActionPairs.iter (fun ((k, vs) : ActionPair.t) -> update y k vs) xs;
       y
     ;;
 
     let merge (a : t') (b : t') : t' =
+      Log.trace __FUNCTION__;
       ActionPairs.union (to_actionpairs a) (to_actionpairs b) |> of_actionpairs
     ;;
 
@@ -550,6 +549,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     include S
 
     let labelled (xs : t) (y : Label.t) : t =
+      Log.trace __FUNCTION__;
       filter (fun ({ action; _ } : Edge.t) -> Label.equal action.label y) xs
     ;;
 
@@ -574,6 +574,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           (destinations : States.t)
       : unit
       =
+      Log.trace __FUNCTION__;
       match find_opt x from with
       | None ->
         ActionPairs.singleton (action, destinations)
@@ -583,14 +584,19 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     let get_destinations (x : t') (from : State.t) : States.t =
-      ActionMap.get_destinations (find x from)
+      Log.trace __FUNCTION__;
+      match find_opt x from with
+      | None -> States.empty
+      | Some ys -> ActionMap.get_destinations ys
     ;;
 
     let get_actions (x : t') (from : State.t) : Actions.t =
+      Log.trace __FUNCTION__;
       find x from |> ActionMap.to_seq_keys |> Actions.of_seq
     ;;
 
     let reduce_by_label (x : t') (label : Label.t) : t' =
+      Log.trace __FUNCTION__;
       let y : t' = copy x in
       filter_map_inplace
         (fun (k : State.t) (vs : ActionMap.t') ->
@@ -601,6 +607,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     let get_edges (x : t') (from : State.t) : Edges.t =
+      Log.trace __FUNCTION__;
       ActionMap.fold
         (fun (action : Action.t) (v : States.t) (acc : Edges.t) : Edges.t ->
           States.fold
@@ -613,6 +620,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     let to_edges (x : t') : Edges.t =
+      Log.trace __FUNCTION__;
       fold
         (fun (from : State.t) (vs : ActionMap.t') : (Edges.t -> Edges.t) ->
           ActionMap.to_actionpairs vs
@@ -630,6 +638,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     let of_edges (xs : Edges.t) : t' =
+      Log.trace __FUNCTION__;
       let ys : t' = create 0 in
       Edges.iter
         (fun ({ from; goto; action } : Edge.t) ->
@@ -639,6 +648,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     let merge (a : t') (b : t') : t' =
+      Log.trace __FUNCTION__;
       let c : t' = copy a in
       iter
         (fun (k : State.t) (vs : ActionMap.t') ->
@@ -666,6 +676,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     include S
 
     let get_reachable (x : t) (from : State.t) (edges : EdgeMap.t') : t =
+      Log.trace __FUNCTION__;
       let destinations : States.t = EdgeMap.get_destinations edges from in
       filter
         (fun (y : States.t) ->
@@ -676,7 +687,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let to_string (xs : t) : string =
       to_list xs
       |> Utils.Strfy.list
-           ~args:{ (Utils.Strfy.style_args ()) with name = Some "Partition" }
+           ~args:(Utils.Strfy.style_args ~name:"Partition" ())
            (Of States.to_string)
     ;;
   end
@@ -703,33 +714,10 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       ; constructors : Rocq_bindings.constructor list
       }
 
-    (** [merge a b] updates [a] with additional information from [b] *)
+    (** [merge a b] returns a new [t] with a union of [weak_labels] and [meta=None].
+    *)
     let merge (a : t) (b : t) : t =
-      let meta : meta option =
-        Option.cata
-          (fun (a : meta) : meta option ->
-            Some
-              { a with
-                lts =
-                  Option.cata
-                    (fun (b : meta) : lts list ->
-                      List.fold_left
-                        (fun (acc : lts list) (x : lts) ->
-                          if
-                            List.exists
-                              (fun (y : lts) -> Enc.equal x.enc y.enc)
-                              acc
-                          then acc
-                          else x :: acc)
-                        a.lts
-                        b.lts)
-                    a.lts
-                    b.meta
-              })
-          b.meta
-          a.meta
-      in
-      { meta; weak_labels = Labels.union a.weak_labels b.weak_labels }
+      { meta = None; weak_labels = Labels.union a.weak_labels b.weak_labels }
     ;;
 
     let to_string (x : t) : string =
@@ -879,6 +867,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
 
     (** returns a copy of [d] with the updated name *)
     let update_named (x : Action.t) (d : data) : data =
+      Log.trace __FUNCTION__;
       let f (x : Action.t) (d : data) : Action.t option =
         Option.cata
           (fun y -> Some y)
@@ -890,6 +879,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
 
     (** returns a copy of [d] with the updated notes *)
     let update_notes (from : State.t) (action : Action.t) (d : data) : data =
+      Log.trace __FUNCTION__;
       let f (from : State.t) (action : Action.t) (d : data) : wip list =
         wip from action :: d.notes
       in
@@ -898,6 +888,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
 
     (** returns a copy of [d] with the updated visited *)
     let update_visited (x : State.t) (d : data) : data =
+      Log.trace __FUNCTION__;
       let f (x : State.t) (d : data) : States.t = States.add x d.visited in
       { d with visited = f x d }
     ;;
@@ -911,6 +902,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     let get_old_actions (from : State.t) (d : data) : ActionMap.t' option =
+      Log.trace __FUNCTION__;
       EdgeMap.find_opt d.old_edges from
     ;;
 
@@ -919,6 +911,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     exception Model_Saturate_WIP_IsEmptyList of unit
 
     let wip_to_annotation (goto : State.t) (xs : wip list) : Annotation.t =
+      Log.trace __FUNCTION__;
       let rec f : wip list -> Annotation.t = function
         | [] -> raise (Model_Saturate_WIP_IsEmptyList ())
         | { from; via; trees } :: [] ->
@@ -938,6 +931,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     exception Model_Saturate_WIP_HadMultipleNamedActions of wip list
 
     let validate_wips (xs : wip list) : unit =
+      Log.trace __FUNCTION__;
       match
         List.filter
           (fun ({ via; _ } : wip) -> Label.is_silent via |> Bool.not)
@@ -950,8 +944,10 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
 
     (** returns all of the possible actions after the named action *)
     let extrapolate_annotations (x : Annotation.t) : Annotations.t =
+      Log.trace __FUNCTION__;
       (* NOTE: skip pre-named action *)
       let rec skip ({ this; next } : Annotation.t) : Annotations.t =
+        Log.trace __FUNCTION__;
         let xs =
           Option.cata
             (if Note.is_silent this then skip else get)
@@ -964,7 +960,9 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
         then xs
         else Annotations.add { this; next = None } xs
       (* NOTE: get every annotation from named action onwards *)
-      and get : Annotation.t -> Annotations.t = function
+      and get : Annotation.t -> Annotations.t =
+        Log.trace __FUNCTION__;
+        function
         | { this; next = None } -> Annotations.singleton { this; next = None }
         | { this; next = Some next } ->
           get next
@@ -978,6 +976,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
 
     (** [stop] *)
     let stop (d : data) (goto : State.t) (acc : ActionPairs.t) : ActionPairs.t =
+      Log.trace __FUNCTION__;
       match d.named with
       | None -> acc
       | Some named ->
@@ -1021,6 +1020,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let rec check_from (d : data) (from : State.t) (acc : ActionPairs.t)
       : ActionPairs.t
       =
+      Log.trace __FUNCTION__;
       if already_visited from d
       then stop d from acc
       else (
@@ -1032,6 +1032,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     and check_actions (d : data) (from : State.t) (xs : ActionMap.t')
       : ActionPairs.t -> ActionPairs.t
       =
+      Log.trace __FUNCTION__;
       ActionMap.fold
         (fun (x : Action.t) (ys : States.t) (acc : ActionPairs.t) ->
           if skip_action x d
@@ -1045,6 +1046,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     and check_destinations (d : data) (from : State.t) (xs : States.t)
       : ActionPairs.t -> ActionPairs.t
       =
+      Log.trace __FUNCTION__;
       States.fold (check_from d) xs
     ;;
 
@@ -1058,6 +1060,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let edge_action_destinations (d : data) (from : State.t) (ys : States.t)
       : ActionPairs.t
       =
+      Log.trace __FUNCTION__;
       States.fold
         (fun (y : State.t) (acc : ActionPairs.t) ->
           check_from d y ActionPairs.empty)
@@ -1073,6 +1076,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           (old_edges : EdgeMap.t')
       : ActionPairs.t
       =
+      Log.trace __FUNCTION__;
       ActionMap.fold
         (fun (x : Action.t) (ys : States.t) (acc : ActionPair.t list) ->
           let d : data =
@@ -1095,6 +1099,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           (old_edges : EdgeMap.t')
       : unit
       =
+      Log.trace __FUNCTION__;
       edge_actions from old_actions old_edges
       |> ActionPairs.iter
            (fun ((saturated_action, destinations) : Action.t * States.t) ->
@@ -1105,6 +1110,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let edges (labels : Labels.t) (states : States.t) (old_edges : EdgeMap.t')
       : EdgeMap.t'
       =
+      Log.trace __FUNCTION__;
       let new_edges : EdgeMap.t' = EdgeMap.create 0 in
       EdgeMap.iter
         (fun (from : State.t) (old_actions : ActionMap.t') ->
@@ -1119,7 +1125,9 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let fsm ?(only_if_weak : bool option = None) (x : FSM.t) : FSM.t =
       Log.trace __FUNCTION__;
       match only_if_weak with
-      | Some false -> x
+      | Some false ->
+        Log.debug ~__FUNCTION__ "Not weak, returning unchanged";
+        x
       | _ -> { x with edges = edges x.alphabet x.states (EdgeMap.copy x.edges) }
     ;;
   end
@@ -1133,6 +1141,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     exception Split_OnlyReturnedOneBlock_ButNeqBlock of (States.t * States.t)
 
     let ensure_equal (a : States.t) (b : States.t) : unit =
+      Log.trace __FUNCTION__;
       try assert (States.equal a b) with
       | Assert_failure _ ->
         raise (Split_OnlyReturnedOneBlock_ButNeqBlock (a, b))
@@ -1141,6 +1150,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     exception CannotSplitEmptyBlock of unit
 
     let ensure_nonempty (a : States.t) : unit =
+      Log.trace __FUNCTION__;
       try assert (States.is_empty a |> Bool.not) with
       | Assert_failure _ -> raise (CannotSplitEmptyBlock ())
     ;;
@@ -1152,6 +1162,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           (block : States.t)
       : States.t * States.t option
       =
+      Log.trace __FUNCTION__;
       ensure_nonempty block;
       let reachable_from_s : Partition.t = Partition.get_reachable pi s edges in
       States.fold
@@ -1178,6 +1189,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           (label : Label.t)
       : unit
       =
+      Log.trace __FUNCTION__;
       let edges : EdgeMap.t' = EdgeMap.reduce_by_label edges label in
       (* NOTE: select some state [s] from [block] *)
       let s : State.t = States.min_elt !block in
@@ -1197,10 +1209,12 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           (block : States.t)
       : unit
       =
+      Log.trace __FUNCTION__;
       Labels.iter (for_each_label pi changed edges (ref block)) alphabet
     ;;
 
     let partition_states (fsm : FSM.t) : Partition.t =
+      Log.trace __FUNCTION__;
       let pi : Partition.t ref = ref (Partition.singleton fsm.states) in
       let changed : bool ref = ref true in
       while !changed do
@@ -1215,6 +1229,11 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       { fsm
       ; pi = Saturate.fsm ~only_if_weak:(Some weak) fsm |> partition_states
       }
+    ;;
+
+    let to_string ({ fsm; pi } : t) : string =
+      Utils.Strfy.record
+        [ "fsm", FSM.to_string fsm; "pi", Partition.to_string pi ]
     ;;
   end
 
@@ -1237,10 +1256,12 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       }
 
     let fsm_pair ?(weak : bool = false) (original : FSM.t) : fsm_pair =
+      Log.trace __FUNCTION__;
       { original; saturated = Saturate.fsm ~only_if_weak:(Some weak) original }
     ;;
 
     let are_bisimilar ({ non_bisim_states; _ } : result) : bool =
+      Log.trace __FUNCTION__;
       Partition.is_empty non_bisim_states
     ;;
 
@@ -1250,12 +1271,14 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     exception NoCachedResult of unit
 
     let get_the_result () : t =
+      Log.trace __FUNCTION__;
       match !the_cached_result with
       | None -> raise (NoCachedResult ())
       | Some x -> x
     ;;
 
     let split (pi : Partition.t) (a : States.t) (b : States.t) : result =
+      Log.trace __FUNCTION__;
       let bisim_states, non_bisim_states =
         Partition.fold
           (fun (x : States.t) (bisim_states, non_bisim_states) ->
@@ -1276,6 +1299,29 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       let pi : Partition.t = (Minimize.fsm merged).pi in
       let result = split pi fsm_a.original.states fsm_b.original.states in
       { fsm_a; fsm_b; merged; result }
+    ;;
+
+    let fsm_pair_to_string ({ original; saturated } : fsm_pair) : string =
+      Utils.Strfy.record
+        [ "original", FSM.to_string original
+        ; "saturated", FSM.to_string saturated
+        ]
+    ;;
+
+    let result_to_string ({ bisim_states; non_bisim_states } : result) : string =
+      Utils.Strfy.record
+        [ "bisim_states", Partition.to_string bisim_states
+        ; "non_bisim_states", Partition.to_string non_bisim_states
+        ]
+    ;;
+
+    let to_string ({ fsm_a; fsm_b; merged; result } : t) : string =
+      Utils.Strfy.record
+        [ "fsm_a", fsm_pair_to_string fsm_a
+        ; "fsm_b", fsm_pair_to_string fsm_b
+        ; "merged", FSM.to_string merged
+        ; "result", result_to_string result
+        ]
     ;;
   end
 end
