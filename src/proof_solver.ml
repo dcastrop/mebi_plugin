@@ -1,43 +1,64 @@
-module type S = sig
-  val gl : Proofview.Goal.t ref
-end
-
-module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
-  include X
-
+module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
   (** [module W] is for running the main part of the algorithm (pre-proof). *)
-  module W = Wrapper.Make (Rocq_context.Default) (E)
+  include Wrapper.Make (Log) (Rocq_context.Default) (E)
 
-  include W
+  (***********************************************************************)
+
+  let the_result : Model.Bisimilar.t ref option ref = ref None
+
+  exception NoResultFound of unit
+
+  let get_the_result () : Model.Bisimilar.t =
+    match !the_result with None -> raise (NoResultFound ()) | Some x -> !x
+  ;;
+
+  exception CannotOverrideResult of Model.Bisimilar.t
+
+  let set_the_result (x : Model.Bisimilar.t) : unit =
+    match !the_result with
+    | None -> the_result := Some (ref x)
+    | Some y -> raise (CannotOverrideResult !y)
+  ;;
+
+  (***********************************************************************)
 
   (** [module P] is a monad that contains the proof environment and context. *)
-  module P =
-    Rocq_monad_utils.Make
-      (Rocq_context.Make (struct
-        let env : unit -> Environ.env ref =
-          fun () -> ref (Proofview.Goal.env !gl)
-        ;;
+  module P (X : sig
+      (* val pstate : Declare.Proof.t *)
+      val gl : Proofview.Goal.t ref
+    end) =
+  struct
+    let gl () : Proofview.Goal.t = !X.gl
 
-        let sigma : unit -> Evd.evar_map ref =
-          fun () -> ref (Proofview.Goal.sigma !gl)
-        ;;
-      end))
-      (M.Enc)
+    include
+      Rocq_monad_utils.Make
+        (Log)
+        (Rocq_context.Make (struct
+             let env : unit -> Environ.env ref =
+               fun () -> ref (Proofview.Goal.env (gl ()))
+             ;;
 
-  let get_concl () : EConstr.t = Proofview.Goal.concl !gl
-  let get_hyps () : Rocq_utils.hyp list = Proofview.Goal.hyps !gl
-  let get_hyp_names () : Names.Id.Set.t = Context.Named.to_vars (get_hyps ())
+             let sigma : unit -> Evd.evar_map ref =
+               fun () -> ref (Proofview.Goal.sigma (gl ()))
+             ;;
+           end))
+        (M.Enc)
 
-  let next_name_of (names : Names.Id.Set.t) (x : Names.Id.t) : Names.Id.t =
-    Namegen.next_ident_away x names
-  ;;
+    let get_concl () : EConstr.t = Proofview.Goal.concl (gl ())
+    let get_hyps () : Rocq_utils.hyp list = Proofview.Goal.hyps (gl ())
+    let get_hyp_names () : Names.Id.Set.t = Context.Named.to_vars (get_hyps ())
 
-  let new_name_of_string (x : string) : Names.Id.t =
-    next_name_of (get_hyp_names ()) (Names.Id.of_string x)
-  ;;
+    let next_name_of (names : Names.Id.Set.t) (x : Names.Id.t) : Names.Id.t =
+      Namegen.next_ident_away x names
+    ;;
 
-  let new_cofix_name () : Names.Id.t = new_name_of_string "Cofix0"
-  let new_H_name () : Names.Id.t = new_name_of_string "H0"
+    let new_name_of_string (x : string) : Names.Id.t =
+      next_name_of (get_hyp_names ()) (Names.Id.of_string x)
+    ;;
+
+    let new_cofix_name () : Names.Id.t = new_name_of_string "Cofix0"
+    let new_H_name () : Names.Id.t = new_name_of_string "H0"
+  end
 
   module Tactic = struct
     type t =
@@ -63,6 +84,22 @@ module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
       }
     ;;
 
+    let unpack (x : tactic) : unit Proofview.tactic =
+      let () =
+        match x.msg with
+        | None -> ()
+        | Some (Debug, z) -> Log.debug ~__FUNCTION__ z
+        | Some (Info, z) -> Log.info ~__FUNCTION__ z
+        | Some (Notice, z) -> Log.notice ~__FUNCTION__ z
+        | Some (Warning, z) -> Log.warning ~__FUNCTION__ z
+        | Some (Error, z) -> Log.error ~__FUNCTION__ z
+        | Some (Trace, z) -> Log.trace ~__FUNCTION__ z
+        | Some (Result, z) -> Log.result ~__FUNCTION__ z
+        | Some (Show, z) -> Log.show ~__FUNCTION__ z
+      in
+      x.get
+    ;;
+
     (** [seq a b] appends [b] to the sequence of [a]. *)
     let rec seq : t -> t -> t = function
       | { this; next = None } -> fun (b : t) -> { this; next = Some b }
@@ -80,6 +117,19 @@ module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
       | [] -> if nonempty then raise (EmptyTacticChain ()) else empty ()
       | h :: [] -> h
       | h :: tl -> seq h (chain tl)
+    ;;
+
+    (** [update_proof pstate x] applies tactic(s) [x] and returns the updated [pstate].
+    *)
+    let update_proof (pstate : Declare.Proof.t) (x : t) : Declare.Proof.t =
+      let rec f : t -> unit Proofview.tactic = function
+        | { this; next = None } -> unpack this
+        | { this; next = Some next } -> Proofview.tclTHEN this (f next)
+      in
+      let new_pstate, is_safe_tactic = Declare.Proof.by (f x) pstate in
+      if Bool.not is_safe_tactic
+      then Log.warning ~__FUNCTION__ "unsafe tactic used";
+      new_pstate
     ;;
   end
 
@@ -430,7 +480,7 @@ module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
     let label (x : EConstr.t) (ys : Model.Labels.t) : Model.Label.t M.mm =
       let f (term : M.Enc.t) : Model.Label.t M.mm =
         (* NOTE: [Model.Labels.compare] only cares about [is_silent=Some _] *)
-        Model.Labels.find { term; is_silent = None } ys |> M.return
+        Model.Labels.find { term; is_silent = None; pp = None } ys |> M.return
       in
       try M.get_encoding x |> f with
       | Not_found ->
@@ -593,3 +643,54 @@ module ProofSolver (X : S) (E : Encoding.SEncoding) = struct
   (** hypothesis *)
   module Hyp = struct end
 end
+
+(***********************************************************************)
+
+module type S =
+    module type of Make (Logger.Default) ((val Api.default_encoding ()))
+
+let the_proof_solver : (module S) ref option ref = ref None
+let reset_the_proof_solver () : unit = the_proof_solver := None
+
+exception NoProofSolverFound of unit
+
+let get_the_proof_solver () : (module S) ref =
+  match !the_proof_solver with
+  | None -> raise (NoProofSolverFound ())
+  | Some x -> x
+;;
+
+let new_proof_solver () : (module S) ref =
+  let module M : S = Make (Logger.Default) ((val Api.default_encoding ())) in
+  the_proof_solver := Some (ref (module M : S));
+  get_the_proof_solver ()
+;;
+
+exception BisimilarityResultNotFound of unit
+
+(** [init ] ... *)
+let init
+      (pstate : Declare.Proof.t)
+      (refs : Libnames.qualid list)
+      (a : Constrexpr.constr_expr * Libnames.qualid)
+      (b : Constrexpr.constr_expr * Libnames.qualid)
+  : Declare.Proof.t
+  =
+  let ps : (module S) ref = new_proof_solver () in
+  let module Ps : S = (val !ps) in
+  let r : Ps.Model.Bisimilar.t option =
+    Ps.Command.run refs (Ps.Command.CheckBisim { a; b })
+    |> Ps.M.run ~reset_encoding:true
+  in
+  let () =
+    match r with
+    | None -> raise (BisimilarityResultNotFound ())
+    | Some r -> Ps.set_the_result r
+  in
+  (* TODO: fix Ps.P.mm *)
+  (* Ps.Tacs.unfold_constrexpr (fst a)
+  |> Ps.Tactic.update_proof pstate
+  |> Ps.Tacs.unfold_constrexpr (fst b)
+  |> Ps.Tactic.update_proof pstate *)
+  pstate
+;;
