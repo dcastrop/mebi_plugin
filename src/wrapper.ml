@@ -178,6 +178,7 @@ struct
     let reset_the_weak_args () : unit = the_weak_args := None
 
     let load_weak_args () : unit M.mm =
+      (* Log.trace __FUNCTION__; *)
       let open M.Syntax in
       match !Api.the_weak_args with
       | None ->
@@ -190,17 +191,19 @@ struct
         M.return ()
     ;;
 
-    let get_the_weak_args : weak_args option =
+    let get_the_weak_args () : weak_args option =
       match !the_weak_args with None -> None | Some x -> Some !x
     ;;
 
     let get_the_weak_arg1 () : Weak.t option =
-      match get_the_weak_args with None -> None | Some x -> x.a
+      match get_the_weak_args () with None -> None | Some x -> x.a
     ;;
 
     let get_the_weak_arg2 () : Weak.t option =
-      match get_the_weak_args with None -> None | Some x -> x.b
+      match get_the_weak_args () with None -> None | Some x -> x.b
     ;;
+
+    (* let weak () : bool = Option.has_some !the_weak_args *)
 
     (***********************************************************************)
 
@@ -363,23 +366,49 @@ struct
       }
     ;;
 
+    let _log_to_visit (x : t) : unit =
+      Log.things
+        ~__FUNCTION__
+        Debug
+        "to visit"
+        (x.to_visit |> Queue.to_seq |> List.of_seq)
+        (Of M.Enc.to_string)
+    ;;
+
+    let _log_ind_defs (xs : M.Ind.t M.B.t) : unit =
+      Log.things
+        ~__FUNCTION__
+        Debug
+        "ind_defs"
+        (M.B.to_seq xs |> List.of_seq)
+        (Of
+           (Utils.Strfy.tuple
+              (Of M.Enc.to_string)
+              (Of (M.Strfy.rocq_ind M.Enc.to_string))))
+    ;;
+
     (*********************************************************)
 
     let is_silent_transition (x : EConstr.t) : Weak.t option -> bool option M.mm
       =
-      (* Log.trace __FUNCTION__; *)
+      Log.trace __FUNCTION__;
       function
       | None -> M.return None
       | Some (Option label_enc) ->
         (* let label_decoding : EConstr.t = M.decode label_enc in *)
         let open M.Syntax in
         let* b : bool = IsTheory.is_None x in
+        let b' = if b then "silent" else "not silent" in
+        Log.thing ~__FUNCTION__ Debug b' x (Of M.Strfy.econstr);
         M.return (Some b)
       | Some (Custom (tau_enc, label_enc)) ->
         (* let tau_decoding : EConstr.t = M.decode tau_enc in *)
         (* let label_decoding : EConstr.t = M.decode label_enc in *)
         let act_enc : M.Enc.t = M.encode x in
-        M.return (Some (M.Enc.equal tau_enc act_enc))
+        let b : bool = M.Enc.equal tau_enc act_enc in
+        let b' = if b then "silent" else "not silent" in
+        Log.thing ~__FUNCTION__ Debug b' x (Of M.Strfy.econstr);
+        M.return (Some b)
     ;;
 
     (*********************************************************)
@@ -526,6 +555,10 @@ struct
         |> Model.States.of_list
       ;;
 
+      let label (x : Model.Action.t) : Model.Label.t =
+        { x.label with pp = pp x.label.term }
+      ;;
+
       let transitions () : Model.Transitions.t =
         (* Log.trace __FUNCTION__; *)
         T.fold
@@ -537,7 +570,7 @@ struct
               (fun (action : Model.Action.t)
                 (vs : D.t)
                 : (Model.Transitions.t -> Model.Transitions.t) ->
-                let label : Model.Label.t = action.label in
+                let label : Model.Label.t = label action in
                 D.fold
                   (fun ((goto, constructor_tree) : M.Enc.t * M.Tree.t)
                     : (Model.Transitions.t -> Model.Transitions.t) ->
@@ -707,15 +740,7 @@ struct
       let open M.Syntax in
       (* NOTE: encode rocq inductive defs *)
       let* ind_defs : M.Ind.t M.B.t = build_ind_defs () in
-      Log.things
-        ~__FUNCTION__
-        Debug
-        "ind_defs"
-        (M.B.to_seq ind_defs |> List.of_seq)
-        (Of
-           (Utils.Strfy.tuple
-              (Of M.Enc.to_string)
-              (Of (M.Strfy.rocq_ind M.Enc.to_string))));
+      (* _log_ind_defs ind_defs; *)
       let* primary_lts : M.Ind.t = find_primary_lts ind_defs in
       let* init_term : EConstr.t = initial_term init_term in
       let$* _unit env sigma =
@@ -727,21 +752,10 @@ struct
       Log.debug ~__FUNCTION__ "Build the Graph";
       let the_graph : t ref = ref (empty init ind_defs) in
       Queue.push init !the_graph.to_visit;
-      Log.things
-        ~__FUNCTION__
-        Debug
-        "to visit"
-        (!the_graph.to_visit |> Queue.to_seq |> List.of_seq)
-        (Of M.Enc.to_string);
+      (* _log_to_visit !the_graph; *)
       let module G = Make ((val make_yargs primary_lts ind_defs the_graph)) in
       let* the_graph : t = G.build !the_graph in
       (* M.return !the_graph *)
-      Log.thing
-        ~__FUNCTION__
-        Debug
-        "num states (V)"
-        (V.cardinal the_graph.states)
-        (Of Utils.Strfy.int);
       Log.debug ~__FUNCTION__ "Completed Graph, Extracting LTS";
       let module L = Extract ((val make_zargs ind_defs (ref the_graph))) in
       let* the_lts : Model.LTS.t = L.lts () in
@@ -805,16 +819,10 @@ struct
         (weak : Weak.t option)
     : Model.LTS.t M.mm
     =
-    (* Log.trace __FUNCTION__; *)
+    Log.trace __FUNCTION__;
     let t = M.make_hashtbl () in
     let v = M.make_set () in
     let d = M.make_state_tree_pair_set () in
-    Log.thing
-      ~__FUNCTION__
-      Notice
-      "names num"
-      (List.length names)
-      (Of Utils.Strfy.int);
     let grefs : Names.GlobRef.t list = Rocq_utils.libnames_to_globrefs names in
     let x = make_xargs primary_lts grefs weak in
     let module G = Graph ((val t)) ((val v)) ((val d)) ((val x)) in
@@ -918,13 +926,11 @@ struct
       =
       Log.trace __FUNCTION__;
       let open M.Syntax in
-      let* the_fsm_a =
-        build_fsm ~weak:(Config.get_the_weak_arg1 ()) alts ax refs
-      in
+      let weak1 : Weak.t option = Config.get_the_weak_arg1 () in
+      let* the_fsm_a = build_fsm ~weak:weak1 alts ax refs in
       Log.thing Notice "the fsm (A)" the_fsm_a (Of Model.FSM.to_string);
-      let* the_fsm_b =
-        build_fsm ~weak:(Config.get_the_weak_arg2 ()) blts bx refs
-      in
+      let weak2 : Weak.t option = Config.get_the_weak_arg2 () in
+      let* the_fsm_b = build_fsm ~weak:weak2 blts bx refs in
       Log.thing Notice "the fsm (B)" the_fsm_b (Of Model.FSM.to_string);
       M.return (the_fsm_a, the_fsm_b)
     ;;
