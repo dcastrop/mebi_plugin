@@ -19,6 +19,11 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
         ; "pp", Utils.Strfy.option (Args Utils.Strfy.string) x.pp
         ]
     ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "State") (x : t) : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
+    ;;
   end
 
   module States = struct
@@ -44,9 +49,13 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     (** [has_shared_origin a b c] returns [true] if any of the states in [a] are present in both [b] and [c], otherwise [false].
     *)
     let has_shared_origin (a : t) (b : t) (c : t) : bool =
-      exists (fun (x : State.t) : bool -> Int.equal 0 (origin_of_state x b c)) a
+      let f (i : int) (x : State.t) : bool =
+        match origin_of_state x b c with 0 -> true | j -> Int.equal i j
+      in
+      exists (f (-1)) a && exists (f 1) a
     ;;
 
+    (* *)
     let to_string (xs : t) : string =
       S.to_list xs
       |> Utils.Strfy.list
@@ -56,6 +65,12 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
                 ~name:"States"
                 ())
            (Of State.to_string)
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "States") (x : t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -83,6 +98,9 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let hash (x : t) : int = Enc.hash x.term
 
     (* *)
+    let is_silent (x : t) : bool = Option.default false x.is_silent
+
+    (* *)
     let to_string (x : t) : string =
       Utils.Strfy.record
         [ "term", Enc.to_string x.term
@@ -91,19 +109,31 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
         ]
     ;;
 
-    (* *)
-    let is_silent (x : t) : bool = Option.default false x.is_silent
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "Label") (x : t) : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
+    ;;
   end
 
   module Labels = struct
     module S : Set.S with type elt = Label.t = Set.Make (Label)
     include S
 
+    let non_silent (xs : t) : t =
+      filter (fun (x : Label.t) -> Bool.not (Label.is_silent x)) xs
+    ;;
+
     let to_string (xs : t) : string =
       S.to_list xs
       |> Utils.Strfy.list
            ~args:{ (Utils.Strfy.style_args ()) with name = Some "Labels" }
            (Of Label.to_string)
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "Labels") (x : t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -132,6 +162,9 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     (* *)
+    let is_silent (x : t) : bool = Label.is_silent x.label
+
+    (* *)
     let to_string (x : t) : string =
       Printf.sprintf
         "<State (%s) Goto (%s) Via (%s)>"
@@ -140,8 +173,9 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
         (Label.to_string x.label)
     ;;
 
-    (* *)
-    let is_silent (x : t) : bool = Label.is_silent x.label
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "Note") (x : t) : unit =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
+    ;;
   end
 
   module Annotation = struct
@@ -204,10 +238,17 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       | { this; next = Some next } -> { this; next = Some (drop_last next) }
     ;;
 
+    (* *)
     let rec to_string : t -> string = function
       | { this; next = None } -> Note.to_string this
       | { this; next = Some next } ->
         Printf.sprintf "%s; %s" (Note.to_string this) (to_string next)
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "Annotation") (x : t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -220,6 +261,12 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       |> Utils.Strfy.list
            ~args:{ (Utils.Strfy.style_args ()) with name = Some "Annotations" }
            (Of Annotation.to_string)
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "Annotations") (x : t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -257,6 +304,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       | { annotation = Some annotation; _ } -> Annotation.is_empty annotation
     ;;
 
+    (* *)
     let to_string (x : t) : string =
       Utils.Strfy.record
         [ "from", State.to_string x.from
@@ -266,6 +314,12 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           , Utils.Strfy.option (Of Annotation.to_string) x.annotation )
         ; "constructor_tree", Tree.to_string x.constructor_tree
         ]
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "Transition") (x : t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -281,11 +335,18 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
         Labels.empty
     ;;
 
+    (* *)
     let to_string (xs : t) : string =
       S.to_list xs
       |> Utils.Strfy.list
            ~args:{ (Utils.Strfy.style_args ()) with name = Some "Transitions" }
            (Of Transition.to_string)
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "Transitions") (x : t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -320,6 +381,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       | { annotation = Some annotation; _ } -> Annotation.is_empty annotation
     ;;
 
+    (* *)
     let to_string (x : t) : string =
       Utils.Strfy.record
         [ "label", Label.to_string x.label
@@ -331,18 +393,31 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
               (Trees.to_list x.constructor_trees) )
         ]
     ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "Action") (x : t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
+    ;;
   end
 
   module ActionPair = struct
     type t = Action.t * States.t
 
+    let compare ((a, x) : t) ((b, y) : t) : int =
+      Utils.compare_chain [ Action.compare a b; States.compare x y ]
+    ;;
+
+    (* *)
     let to_string ((a, b) : t) =
       Utils.Strfy.record
         [ "action", Action.to_string a; "destinations", States.to_string b ]
     ;;
 
-    let compare ((a, x) : t) ((b, y) : t) : int =
-      Utils.compare_chain [ Action.compare a b; States.compare x y ]
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "ActionPair") (x : t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -420,11 +495,18 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       S.filter (fun ({ label; _ } : Action.t) -> Label.equal label y) xs
     ;;
 
+    (* *)
     let to_string (xs : t) : string =
       S.to_list xs
       |> Utils.Strfy.list
            ~args:{ (Utils.Strfy.style_args ()) with name = Some "Actions" }
            (Of Action.to_string)
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "Actions") (x : t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -463,7 +545,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     *)
     let get_destinations (x : t') : States.t =
       Log.trace __FUNCTION__;
-      to_seq_values x |> Seq.fold_left States.union States.empty
+      to_seq_values x |> List.of_seq |> List.fold_left States.union States.empty
     ;;
 
     let reduce_by_label (x : t') (label : Label.t) : t' =
@@ -500,6 +582,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       ActionPairs.union (to_actionpairs a) (to_actionpairs b) |> of_actionpairs
     ;;
 
+    (* *)
     let to_string (xs : t') : string =
       to_seq xs
       |> List.of_seq
@@ -508,7 +591,15 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
            (Of
               (fun (k, v) ->
                 Utils.Strfy.record
-                  [ "action", Action.to_string k; "->", States.to_string v ]))
+                  [ "\n#### action", Action.to_string k
+                  ; "->", States.to_string v
+                  ]))
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "ActionMap") (x : t')
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -535,12 +626,17 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
 
     let is_silent (x : t) : bool = Action.is_silent x.action
 
+    (* *)
     let to_string (x : t) : string =
       Utils.Strfy.record
         [ "from", State.to_string x.from
         ; "goto", State.to_string x.from
         ; "action", Action.to_string x.action
         ]
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "Edge") (x : t) : unit =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -553,11 +649,17 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       filter (fun ({ action; _ } : Edge.t) -> Label.equal action.label y) xs
     ;;
 
+    (* *)
     let to_string (xs : t) : string =
       to_list xs
       |> Utils.Strfy.list
            ~args:{ (Utils.Strfy.style_args ()) with name = Some "Edges" }
            (Of Edge.to_string)
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "Edges") (x : t) : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -586,7 +688,9 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let get_destinations (x : t') (from : State.t) : States.t =
       Log.trace __FUNCTION__;
       match find_opt x from with
-      | None -> States.empty
+      | None ->
+        Log.thing ~__FUNCTION__ Debug "has no edges" from (Of State.to_string);
+        States.empty
       | Some ys -> ActionMap.get_destinations ys
     ;;
 
@@ -659,6 +763,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       c
     ;;
 
+    (* *)
     let to_string (xs : t') : string =
       to_seq xs
       |> List.of_seq
@@ -667,7 +772,15 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
            (Of
               (fun (k, v) ->
                 Utils.Strfy.record
-                  [ "from", State.to_string k; "->", ActionMap.to_string v ]))
+                  [ "\n### from", State.to_string k
+                  ; "->", ActionMap.to_string v
+                  ]))
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "EdgeMap") (x : t')
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -678,17 +791,26 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let get_reachable (x : t) (from : State.t) (edges : EdgeMap.t') : t =
       Log.trace __FUNCTION__;
       let destinations : States.t = EdgeMap.get_destinations edges from in
+      (* EdgeMap.log ~__FUNCTION__ ~s:"edges" edges; *)
+      (* States.log ~__FUNCTION__ ~s:"destinations" destinations; *)
       filter
         (fun (y : States.t) ->
           Bool.not (States.is_empty (States.inter y destinations)))
         x
     ;;
 
+    (* *)
     let to_string (xs : t) : string =
       to_list xs
       |> Utils.Strfy.list
            ~args:(Utils.Strfy.style_args ~name:"Partition" ())
            (Of States.to_string)
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "Partition") (x : t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -720,6 +842,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       { meta = None; weak_labels = Labels.union a.weak_labels b.weak_labels }
     ;;
 
+    (* *)
     let to_string (x : t) : string =
       let f
             ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
@@ -752,6 +875,10 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
         [ "meta", Utils.Strfy.option (Args f) x.meta
         ; "weak labels", Labels.to_string x.weak_labels
         ]
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = "Info") (x : t) : unit =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 
@@ -797,14 +924,18 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       { init; terminals; alphabet; states; edges; info }
     ;;
 
+    let is_weak_mode (x : t) : bool =
+      Bool.not (Labels.is_empty x.info.weak_labels)
+    ;;
+
     let to_string (x : t) : string =
       Utils.Strfy.record
         [ "init", Utils.Strfy.option (Of State.to_string) x.init
-        ; "info", Info.to_string x.info
-        ; "terminals", States.to_string x.terminals
-        ; "alphabet", Labels.to_string x.alphabet
-        ; "states", States.to_string x.states
-        ; "edges", EdgeMap.to_string x.edges
+        ; "\n#### info", Info.to_string x.info
+        ; "\n#### terminals", States.to_string x.terminals
+        ; "\n#### alphabet", Labels.to_string x.alphabet
+        ; "\n#### states", States.to_string x.states
+        ; "\n#### edges", EdgeMap.to_string x.edges
         ]
     ;;
   end
@@ -1122,13 +1253,13 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       new_edges
     ;;
 
-    let fsm ?(only_if_weak : bool option = None) (x : FSM.t) : FSM.t =
+    let fsm ?(only_if_weak : bool = true) (x : FSM.t) : FSM.t =
       Log.trace __FUNCTION__;
-      match only_if_weak with
-      | Some false ->
+      if only_if_weak && Bool.not (FSM.is_weak_mode x)
+      then (
         Log.debug ~__FUNCTION__ "Not weak, returning unchanged";
-        x
-      | _ -> { x with edges = edges x.alphabet x.states (EdgeMap.copy x.edges) }
+        x)
+      else { x with edges = edges x.alphabet x.states (EdgeMap.copy x.edges) }
     ;;
   end
 
@@ -1137,15 +1268,6 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       { fsm : FSM.t
       ; pi : Partition.t
       }
-
-    exception Split_OnlyReturnedOneBlock_ButNeqBlock of (States.t * States.t)
-
-    let ensure_equal (a : States.t) (b : States.t) : unit =
-      Log.trace __FUNCTION__;
-      try assert (States.equal a b) with
-      | Assert_failure _ ->
-        raise (Split_OnlyReturnedOneBlock_ButNeqBlock (a, b))
-    ;;
 
     exception CannotSplitEmptyBlock of unit
 
@@ -1165,6 +1287,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       Log.trace __FUNCTION__;
       ensure_nonempty block;
       let reachable_from_s : Partition.t = Partition.get_reachable pi s edges in
+      Partition.log ~__FUNCTION__ ~s:"reachable" reachable_from_s;
       States.fold
         (fun (t : State.t) ((b1, b2) : States.t * States.t option) ->
           if State.equal s t
@@ -1181,6 +1304,15 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
         (States.empty, None)
     ;;
 
+    exception Split_OnlyReturnedOneBlock_ButNeqBlock of (States.t * States.t)
+
+    let ensure_equal (a : States.t) (b : States.t) : unit =
+      Log.trace __FUNCTION__;
+      try assert (States.equal a b) with
+      | Assert_failure _ ->
+        raise (Split_OnlyReturnedOneBlock_ButNeqBlock (a, b))
+    ;;
+
     let for_each_label
           (pi : Partition.t ref)
           (changed : bool ref)
@@ -1190,9 +1322,11 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       : unit
       =
       Log.trace __FUNCTION__;
+      Label.log ~__FUNCTION__ ~s:"split by label" label;
       let edges : EdgeMap.t' = EdgeMap.reduce_by_label edges label in
       (* NOTE: select some state [s] from [block] *)
       let s : State.t = States.min_elt !block in
+      State.log ~__FUNCTION__ ~s:"split from state" s;
       match split_block !pi s edges !block with
       | a, None -> ensure_equal a !block
       | a, Some b ->
@@ -1210,7 +1344,8 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       : unit
       =
       Log.trace __FUNCTION__;
-      Labels.iter (for_each_label pi changed edges (ref block)) alphabet
+      Labels.non_silent alphabet
+      |> Labels.iter (for_each_label pi changed edges (ref block))
     ;;
 
     let partition_states (fsm : FSM.t) : Partition.t =
@@ -1224,11 +1359,9 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       !pi
     ;;
 
-    let fsm ?(weak : bool = false) (fsm : FSM.t) : t =
+    let fsm (fsm : FSM.t) : t =
       Log.trace __FUNCTION__;
-      { fsm
-      ; pi = Saturate.fsm ~only_if_weak:(Some weak) fsm |> partition_states
-      }
+      { fsm; pi = Saturate.fsm ~only_if_weak:true fsm |> partition_states }
     ;;
 
     let to_string ({ fsm; pi } : t) : string =
@@ -1255,9 +1388,9 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       ; saturated : FSM.t
       }
 
-    let fsm_pair ?(weak : bool = false) (original : FSM.t) : fsm_pair =
+    let fsm_pair (original : FSM.t) : fsm_pair =
       Log.trace __FUNCTION__;
-      { original; saturated = Saturate.fsm ~only_if_weak:(Some weak) original }
+      { original; saturated = Saturate.fsm ~only_if_weak:true original }
     ;;
 
     let are_bisimilar ({ non_bisim_states; _ } : result) : bool =
@@ -1291,10 +1424,10 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       { bisim_states; non_bisim_states }
     ;;
 
-    let fsm ?(weak : bool = false) (a : FSM.t) (b : FSM.t) : t =
+    let fsm (a : FSM.t) (b : FSM.t) : t =
       Log.trace __FUNCTION__;
-      let fsm_a : fsm_pair = fsm_pair ~weak a in
-      let fsm_b : fsm_pair = fsm_pair ~weak b in
+      let fsm_a : fsm_pair = fsm_pair a in
+      let fsm_b : fsm_pair = fsm_pair b in
       let merged : FSM.t = FSM.merge fsm_a.saturated fsm_b.saturated in
       let pi : Partition.t = (Minimize.fsm merged).pi in
       let result = split pi fsm_a.original.states fsm_b.original.states in
@@ -1317,10 +1450,10 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
 
     let to_string ({ fsm_a; fsm_b; merged; result } : t) : string =
       Utils.Strfy.record
-        [ "fsm_a", fsm_pair_to_string fsm_a
-        ; "fsm_b", fsm_pair_to_string fsm_b
-        ; "merged", FSM.to_string merged
-        ; "result", result_to_string result
+        [ "######## fsm_a", fsm_pair_to_string fsm_a
+        ; "\n######## fsm_b", fsm_pair_to_string fsm_b
+        ; "\n######## merged", FSM.to_string merged
+        ; "\n######## result", result_to_string result
         ]
     ;;
   end

@@ -90,6 +90,7 @@ module Make : (_ : Logger.SLogger)
     val compare : t -> t -> int
     val hash : t -> int
     val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module States : sig
@@ -195,6 +196,7 @@ module Make : (_ : Logger.SLogger)
     val origin_of_state : State.t -> t -> t -> int
     val has_shared_origin : t -> t -> t -> bool
     val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module Label : sig
@@ -207,8 +209,9 @@ module Make : (_ : Logger.SLogger)
     val equal : t -> t -> bool
     val compare : t -> t -> int
     val hash : t -> int
-    val to_string : t -> string
     val is_silent : t -> bool
+    val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module Labels : sig
@@ -307,7 +310,9 @@ module Make : (_ : Logger.SLogger)
     val to_rev_seq : t -> elt Seq.t
     val add_seq : elt Seq.t -> t -> t
     val of_seq : elt Seq.t -> t
+    val non_silent : t -> t
     val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module Note : sig
@@ -320,8 +325,9 @@ module Make : (_ : Logger.SLogger)
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
-    val to_string : t -> string
     val is_silent : t -> bool
+    val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module Annotation : sig
@@ -341,6 +347,7 @@ module Make : (_ : Logger.SLogger)
 
     val drop_last : t -> t
     val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module Annotations : sig
@@ -440,6 +447,7 @@ module Make : (_ : Logger.SLogger)
     val add_seq : elt Seq.t -> t -> t
     val of_seq : elt Seq.t -> t
     val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module Transition : sig
@@ -456,6 +464,7 @@ module Make : (_ : Logger.SLogger)
     val is_silent : t -> bool
     val annotation_is_empty : t -> bool
     val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module Transitions : sig
@@ -556,6 +565,7 @@ module Make : (_ : Logger.SLogger)
     val of_seq : elt Seq.t -> t
     val labels : t -> Labels.t
     val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module Action : sig
@@ -572,13 +582,15 @@ module Make : (_ : Logger.SLogger)
     val is_silent : t -> bool
     val annotation_is_empty : t -> bool
     val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module ActionPair : sig
     type t = Action.t * States.t
+    val compare : t -> t -> int
 
     val to_string : t -> string
-    val compare : t -> t -> int
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module ActionPairs : sig
@@ -787,6 +799,7 @@ module Make : (_ : Logger.SLogger)
     val of_seq : elt Seq.t -> t
     val labelled : t -> Label.t -> t
     val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module ActionMap : sig
@@ -864,6 +877,7 @@ module Make : (_ : Logger.SLogger)
     val of_actionpairs : ActionPairs.t -> t'
     val merge : t' -> t' -> t'
     val to_string : t' -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
   end
 
   module Edge : sig
@@ -877,6 +891,7 @@ module Make : (_ : Logger.SLogger)
     val compare : t -> t -> int
     val is_silent : t -> bool
     val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module Edges : sig
@@ -977,6 +992,7 @@ module Make : (_ : Logger.SLogger)
     val of_seq : elt Seq.t -> t
     val labelled : t -> Label.t -> t
     val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module EdgeMap : sig
@@ -1055,6 +1071,7 @@ module Make : (_ : Logger.SLogger)
     val of_edges : Edges.t -> t'
     val merge : t' -> t' -> t'
     val to_string : t' -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
   end
 
   module Partition : sig
@@ -1155,6 +1172,7 @@ module Make : (_ : Logger.SLogger)
     val of_seq : elt Seq.t -> t
     val get_reachable : t -> State.t -> EdgeMap.t' -> t
     val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module Info : sig
@@ -1176,6 +1194,7 @@ module Make : (_ : Logger.SLogger)
 
     val merge : t -> t -> t
     val to_string : t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module LTS : sig
@@ -1202,6 +1221,7 @@ module Make : (_ : Logger.SLogger)
     }
 
     val merge : t -> t -> t
+    val is_weak_mode : t -> bool
     val to_string : t -> string
   end
 
@@ -1283,17 +1303,11 @@ module Make : (_ : Logger.SLogger)
     val edges :
       Labels.t -> Partition.elt -> EdgeMap.t' -> EdgeMap.t'
 
-    val fsm : ?only_if_weak:bool option -> FSM.t -> FSM.t
+    val fsm : ?only_if_weak:bool -> FSM.t -> FSM.t
   end
 
   module Minimize : sig
     type t = { fsm : FSM.t; pi : Partition.t }
-
-    exception
-      Split_OnlyReturnedOneBlock_ButNeqBlock of
-        (States.t * States.t)
-
-    val ensure_equal : States.t -> States.t -> unit
 
     exception CannotSplitEmptyBlock of unit
 
@@ -1305,6 +1319,12 @@ module Make : (_ : Logger.SLogger)
       EdgeMap.t' ->
       States.t ->
       States.t * States.t option
+
+    exception
+      Split_OnlyReturnedOneBlock_ButNeqBlock of
+        (States.t * States.t)
+
+    val ensure_equal : States.t -> States.t -> unit
 
     val for_each_label :
       Partition.t ref ->
@@ -1323,7 +1343,7 @@ module Make : (_ : Logger.SLogger)
       unit
 
     val partition_states : FSM.t -> Partition.t
-    val fsm : ?weak:bool -> FSM.t -> t
+    val fsm :  FSM.t -> t
     val to_string : t -> string
   end
 
@@ -1342,7 +1362,7 @@ module Make : (_ : Logger.SLogger)
 
     and fsm_pair = { original : FSM.t; saturated : FSM.t }
 
-    val fsm_pair : ?weak:bool -> FSM.t -> fsm_pair
+    val fsm_pair :  FSM.t -> fsm_pair
     val are_bisimilar : result -> bool
     val the_cached_result : t option ref
     val set_the_result : t -> unit
@@ -1351,7 +1371,7 @@ module Make : (_ : Logger.SLogger)
 
     val get_the_result : unit -> t
     val split : Partition.t -> States.t -> States.t -> result
-    val fsm : ?weak:bool -> FSM.t -> FSM.t -> t
+    val fsm :  FSM.t -> FSM.t -> t
     val fsm_pair_to_string : fsm_pair -> string
     val result_to_string : result -> string
     val to_string : t -> string

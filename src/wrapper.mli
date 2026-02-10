@@ -1925,6 +1925,7 @@ module Make : (Log : Logger.SLogger)
       }
 
       val merge : t -> t -> t
+    val is_weak_mode : t -> bool
       val to_string : t -> string
     end
 
@@ -2012,7 +2013,7 @@ module Make : (Log : Logger.SLogger)
       val edges :
         Labels.t -> Partition.elt -> EdgeMap.t' -> EdgeMap.t'
 
-      val fsm : ?only_if_weak:bool option -> FSM.t -> FSM.t
+      val fsm : ?only_if_weak:bool  -> FSM.t -> FSM.t
     end
 
     module Minimize : sig
@@ -2056,7 +2057,7 @@ module Make : (Log : Logger.SLogger)
         unit
 
       val partition_states : FSM.t -> Partition.t
-      val fsm : ?weak:bool -> FSM.t -> t
+      val fsm :  FSM.t -> t
       val to_string : t -> string
     end
 
@@ -2082,7 +2083,7 @@ module Make : (Log : Logger.SLogger)
         saturated : FSM.t;
       }
 
-      val fsm_pair : ?weak:bool -> FSM.t -> fsm_pair
+      val fsm_pair :  FSM.t -> fsm_pair
       val are_bisimilar : result -> bool
       val the_cached_result : t option ref
       val set_the_result : t -> unit
@@ -2091,7 +2092,7 @@ module Make : (Log : Logger.SLogger)
 
       val get_the_result : unit -> t
       val split : Partition.t -> States.t -> States.t -> result
-      val fsm : ?weak:bool -> FSM.t -> FSM.t -> t
+      val fsm :  FSM.t -> FSM.t -> t
       val fsm_pair_to_string : fsm_pair -> string
       val result_to_string : result -> string
       val to_string : t -> string
@@ -2148,7 +2149,7 @@ module Make : (Log : Logger.SLogger)
     val the_weak_args : weak_args ref option ref
     val reset_the_weak_args : unit -> unit
     val load_weak_args : unit -> unit M.mm
-    val get_the_weak_args : weak_args option
+    val get_the_weak_args : unit -> weak_args option
     val get_the_weak_arg1 : unit -> Weak.t option
     val get_the_weak_arg2 : unit -> Weak.t option
 
@@ -2688,6 +2689,7 @@ module Make : (Log : Logger.SLogger)
       val state : V.elt -> Model.State.t
       val states : unit -> Model.Partition.elt
       val terminals : unit -> Model.Partition.elt
+      val label : Model.Action.t -> Model.Label.t
       val transitions : unit -> Model.Transitions.t
       val constructor_info : unit -> Model.Info.lts list M.mm
       val meta : unit -> Model.Info.meta M.mm

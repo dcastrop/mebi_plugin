@@ -359,13 +359,13 @@ Module BisimTest2.
   | do_fix : forall t, termLTS (tfix t) TAU (subst (tfix t) t).
 
   (* MeBi Config WeakMode Disable. *)
+  MeBi Reset Weak Config.
 
   Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
   MeBi FSM exa1 Using termLTS.
   MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
 
   (* MeBi Config WeakMode Enable. *)
-  MeBi Reset Weak Config.
   MeBi Config Weak As TAU Of action.
 
   MeBi FSM exa1 Using termLTS.
