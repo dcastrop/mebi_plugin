@@ -42,10 +42,9 @@
   rocq_bindings
   model
   api ; stores modules created by [loader.v], used by commands
-  wrapper 
-  ; proof_solver
+  wrapper ; basic plugin commands
+  ; proof_solver ; 
           ; ; ; ; ; below be application
-          ; command ; plugin i/o
           g_mebi
           ; ; ; ; ;
           ; ; ; ; ;
