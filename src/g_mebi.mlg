@@ -63,29 +63,13 @@ VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
 |![ proof ] 
   [ "MeBiSim" "Begin" reference(a) constr(x)  
                 "And" reference(b) constr(y) ] -> 
-  { fun ~pstate -> 
-    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
-    let _ = 
-    W.Command.run [] (W.Command.CheckBisim {a=(x, a); b=(y, b)})
-    |> W.M.run ~reset_encoding:true
-    in 
-    (* TODO: store the result *)
-    pstate
-  }
+  { fun ~pstate -> Proof_solver.init pstate [] (x,a) (y,b) }
 
 |![ proof ] 
   [ "MeBiSim" "Begin" reference(a) constr(x)  
                 "And" reference(b) constr(y)
                 "Using" reference_list(rs) ] -> 
-  { fun ~pstate -> 
-    let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
-    let _ = 
-    W.Command.run rs (W.Command.CheckBisim {a=(x, a); b=(y, b)})
-    |> W.M.run ~reset_encoding:true
-    in 
-    (* TODO: store the result *)
-    pstate
-  }
+  { fun ~pstate -> Proof_solver.init pstate rs (x,a) (y,b) }
 END
 
 (* Bisimilarity *)
