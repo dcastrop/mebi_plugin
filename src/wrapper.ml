@@ -971,3 +971,7 @@ struct
     ;;
   end
 end
+
+module Default () =
+  Make (Logger.Default) ((val Api.default_context ()))
+    ((val Api.default_encoding ()))

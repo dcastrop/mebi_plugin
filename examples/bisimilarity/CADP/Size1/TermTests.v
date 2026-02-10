@@ -13,20 +13,7 @@ Require Import MEBI.Examples.CADP_Glued.
 Require Import MEBI.Examples.bisimilarity.CADP.Size1.Terms.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.TermTests".
-MeBi Config Reset.
-MeBi Config Output Enable.
-MeBi Config Output Notice Enable.
-(* MeBi Config Output Debug Enable. *)
-(* MeBi Config Output Info Enable. *)
-MeBi Config Output Results Enable.
-MeBi Config Output Warning Enable.
-MeBi Config Bound 1000.
-MeBi Config WeakMode Enable.
 MeBi Config Weak As Option label.
-MeBi Config Fail If Incomplete True.
-MeBi Config Fail If NotBisim True.
-(* MeBi See All.  *)
-(* MeBi Config Output Disable. *)
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.TermTests.p1".
 MeBi FSM p1 Using step.

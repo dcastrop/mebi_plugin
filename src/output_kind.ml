@@ -35,9 +35,9 @@ let kind : t -> k = function
 (***********************************************************************)
 
 let default_level_fun
-      ?(debug : bool = true)
+      ?(debug : bool = false)
       ?(info : bool = false)
-      ?(notice : bool = true)
+      ?(notice : bool = false)
       ?(warning : bool = true)
       ?(error : bool = true)
   : level -> bool
@@ -63,8 +63,8 @@ let default_level
 ;;
 
 let default_special_fun
-      ?(trace : bool = true)
-      ?(result : bool = true)
+      ?(trace : bool = false)
+      ?(result : bool = false)
       ?(show : bool = true)
   : special -> bool
   = function
