@@ -23,7 +23,7 @@ examples/Proc.v ### REQUIRED FOR BELOW
 ### Proc.Flat.Simple 
 examples/bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
 # examples/bisimilarity/Proc/Test1/TermTests.v ### Success
-# examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
+examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test1/ManualProofs.v
 # examples/bisimilarity/Proc/Test1/LtacProofs.v
 
