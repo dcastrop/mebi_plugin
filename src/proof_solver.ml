@@ -1,30 +1,263 @@
+exception NothingToDo of unit
+
 module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
-  (** [module W] is for running the main part of the algorithm (pre-proof). *)
-  include Wrapper.Make (Log) (Rocq_context.Default) (E)
+  (** [W] is for running the main part of the algorithm (pre-proof). *)
+  module W = struct
+    include Wrapper.Make (Log) (Rocq_context.Default) (E)
+
+    let the_result : Model.Bisimilar.t ref option ref = ref None
+
+    exception NoResultFound of unit
+
+    let get_the_result () : Model.Bisimilar.t =
+      match !the_result with None -> raise (NoResultFound ()) | Some x -> !x
+    ;;
+
+    exception CannotOverrideResult of Model.Bisimilar.t
+
+    let set_the_result (x : Model.Bisimilar.t) : unit =
+      match !the_result with
+      | None -> the_result := Some (ref x)
+      | Some y -> raise (CannotOverrideResult !y)
+    ;;
+
+    exception BisimilarityResultNotFound of unit
+
+    let check_bisimilarity
+          (refs : Libnames.qualid list)
+          (a : Constrexpr.constr_expr * Libnames.qualid)
+          (b : Constrexpr.constr_expr * Libnames.qualid)
+      : unit
+      =
+      let r : Model.Bisimilar.t option =
+        Command.run refs (Command.CheckBisim { a; b })
+        |> M.run ~reset_encoding:true
+      in
+      match r with
+      | None -> raise (BisimilarityResultNotFound ())
+      | Some r -> set_the_result r
+    ;;
+
+    (** [Decode] handles obtaining [EConstr.t] from [module M]. *)
+    module Decode = struct
+      let enc (x : M.Enc.t) : EConstr.t = M.decode x
+
+      let handle (x : M.Enc.t) (e : exn) : EConstr.t =
+        try enc x with M.CannotDecode _ -> raise e
+      ;;
+
+      exception CouldNotDecode_State of Model.State.t
+
+      let state (x : Model.State.t) : EConstr.t =
+        handle x.term (CouldNotDecode_State x)
+      ;;
+
+      exception CouldNotDecode_Label of Model.Label.t
+
+      let label (x : Model.Label.t) : EConstr.t =
+        handle x.term (CouldNotDecode_Label x)
+      ;;
+
+      exception CouldNotDecode_LTS_Constructor of Model.Info.lts
+
+      let lts_constructor (x : Model.Info.lts) : EConstr.t =
+        handle x.enc (CouldNotDecode_LTS_Constructor x)
+      ;;
+    end
+  end
+
+  let check_bisimilarity
+    :  Libnames.qualid list
+    -> Constrexpr.constr_expr * Libnames.qualid
+    -> Constrexpr.constr_expr * Libnames.qualid
+    -> unit
+    =
+    W.check_bisimilarity
+  ;;
+
+  module M = W.M
+  module Model = W.Model
+  module Decode = W.Decode
 
   (***********************************************************************)
 
-  let the_result : Model.Bisimilar.t ref option ref = ref None
+  module Transition = struct
+    module Opt = struct
+      (** [t] is similar to [Model.Transition.t] {!type:Model.Transition.t} but where [goto] and [label] are optional.
+          @see 'Model.ml' for {!type:Model.Transition.t}. *)
+      type t =
+        { from : W.Model.State.t
+        ; goto : W.Model.State.t option
+        ; label : W.Model.Label.t option
+        ; annotation : W.Model.Annotation.t option
+        ; constructor_tree : W.Model.Tree.t
+        }
+    end
 
-  exception NoResultFound of unit
+    type t =
+      { hyp : W.Model.Transition.t
+      ; goal : Opt.t
+      }
+  end
 
-  let get_the_result () : Model.Bisimilar.t =
-    match !the_result with None -> raise (NoResultFound ()) | Some x -> !x
+  module ApplicableConstructors = struct
+    type t =
+      { current : W.Model.Tree.TreeNode.t list
+      ; annotation : W.Model.Annotation.t option
+      ; destination : W.Model.State.t
+      }
+  end
+
+  (** internal proof state *)
+  module State = struct
+    (** [t] represents the internal state-machine used to solve proofs.
+        (Note: We are required to split some of the states over several steps since we need to update the proof iteratively in order to apply what we need to apply. E.g., it is easier to apply the constructors one after the other, since we require the proof to be updated by the previous appliction in order to apply the next.)
+        - [NewProof] the start state. We unfold any terms that we can before proceeding to [WeakSim].
+        - [WeakSim] either: (i) check if can be solved by cofix in hyps, or (ii) create new cofix. Either stays in [WeakSim] or proceeds to [Cofix], or [Done].
+        - [Cofix] means that the conclusion begins with an [exists a n2] (where [n2] is some state reached from [n] after taking action [a]). We proceed to [GoalTransition] after extracting the transition made by fsm 1 from the hyps (possible requiring inversion beforehand).
+        - [GoalTransition] is where we determine which transition fsm 2 will make in response to the one made by fsm 1 (in the hyps). We instantiate the necessary values for the label [a] and goto state [n2] and select the constructors to apply. Then proceed to [ApplyConstructors].
+        - [ApplyConstructors] is for applying the constructors we know we need to apply in order for fsm 2 to reach a state that is bisimilar to that reached by fsm 1.
+        - [Done] means the proof is finished. *)
+    type t =
+      | NewProof of (Constrexpr.constr_expr * Constrexpr.constr_expr)
+      | WeakSim
+      | Cofix
+      | GoalTransition of Transition.t
+      | ApplyConstructors of ApplicableConstructors.t
+      | Done
+
+    let to_string : t -> string = function
+      | NewProof _ -> "NewProof"
+      | WeakSim -> "WeakSim"
+      | Cofix -> "Cofix"
+      | GoalTransition _ -> "GoalTransition"
+      | ApplyConstructors _ -> "ApplyConstructors"
+      | Done -> "Done"
+    ;;
+  end
+
+  type state =
+    { p : Declare.Proof.t
+    ; x : State.t
+    }
+
+  let the_state : state ref option ref = ref None
+
+  exception NoStateFound of unit
+
+  let get_the_state () : state ref =
+    match !the_state with None -> raise (NoStateFound ()) | Some x -> x
   ;;
 
-  exception CannotOverrideResult of Model.Bisimilar.t
+  let get_pstate () : Declare.Proof.t = !(get_the_state ()).p
+  let get_state () : State.t = !(get_the_state ()).x
 
-  let set_the_result (x : Model.Bisimilar.t) : unit =
-    match !the_result with
-    | None -> the_result := Some (ref x)
-    | Some y -> raise (CannotOverrideResult !y)
+  (** [is_done ()] is true if the state [x] is [Done], else checks if [p] is done (via [Proof.is_done]).
+  *)
+  let is_done () : bool =
+    match !(get_the_state ()) with
+    | { p; x = Done } -> true
+    | { p; x } -> Proof.is_done (Declare.Proof.get p)
   ;;
+
+  let set_the_state (pstate : Declare.Proof.t) (x : State.t) : unit =
+    the_state := Some (ref { p = pstate; x })
+  ;;
+
+  let update_pstate (pstate : Declare.Proof.t) : unit =
+    the_state := Some (ref { !(get_the_state ()) with p = pstate })
+  ;;
+
+  let update_state (state : State.t) : unit =
+    the_state := Some (ref { !(get_the_state ()) with x = state })
+  ;;
+
+  let init
+        (pstate : Declare.Proof.t)
+        (x : Constrexpr.constr_expr * Constrexpr.constr_expr)
+    : unit
+    =
+    set_the_state pstate (NewProof x)
+  ;;
+
+  (* let get_gl () : Proofview.Goal.t = !(get_the_state ()).p *)
+
+  (***********************************************************************)
+
+  module Tactic = struct
+    type t =
+      { this : tactic
+      ; next : t option
+      }
+
+    and tactic =
+      { get : unit Proofview.tactic
+      ; msg : (Output_kind.t * string) option
+      }
+
+    (** [tactic ?msg tactic] *)
+    let tactic
+          ?(level : Output_kind.t = Info)
+          ?(msg : string option)
+          (x : unit Proofview.tactic)
+      : t
+      =
+      { this =
+          { msg = Option.cata (fun m -> Some (level, m)) None msg; get = x }
+      ; next = None
+      }
+    ;;
+
+    let do_nothing () : t =
+      tactic ~level:Debug ~msg:"(skip)" (Proofview.tclUNIT ())
+    ;;
+
+    let unpack (x : tactic) : unit Proofview.tactic =
+      let () =
+        match x.msg with
+        | None -> ()
+        | Some (Debug, z) -> Log.debug ~__FUNCTION__ z
+        | Some (Info, z) -> Log.info ~__FUNCTION__ z
+        | Some (Notice, z) -> Log.notice ~__FUNCTION__ z
+        | Some (Warning, z) -> Log.warning ~__FUNCTION__ z
+        | Some (Error, z) -> Log.error ~__FUNCTION__ z
+        | Some (Trace, z) -> Log.trace ~__FUNCTION__ z
+        | Some (Result, z) -> Log.result ~__FUNCTION__ z
+        | Some (Show, z) -> Log.show ~__FUNCTION__ z
+      in
+      x.get
+    ;;
+
+    let rec unpack_all : t -> unit Proofview.tactic = function
+      | { this; next = None } -> unpack this
+      | { this; next = Some next } ->
+        Proofview.tclTHEN (unpack this) (unpack_all next)
+    ;;
+
+    (** [seq a b] appends [b] to the sequence of [a]. *)
+    let rec seq : t -> t -> t = function
+      | { this; next = None } -> fun (b : t) -> { this; next = Some b }
+      | { this; next = Some next } ->
+        fun (b : t) -> { this; next = Some (seq next b) }
+    ;;
+
+    let empty () : t = tactic (Proofview.tclUNIT ())
+
+    exception EmptyTacticChain of unit
+
+    (** [chain ?nonempty (x::xs)] applies [seq x (chain xs)].
+        @raise EmptyTacticChain if the list is empty and [?nonempty] s true. *)
+    let rec chain ?(nonempty : bool = false) : t list -> t = function
+      | [] -> if nonempty then raise (EmptyTacticChain ()) else empty ()
+      | h :: [] -> h
+      | h :: tl -> seq h (chain tl)
+    ;;
+  end
 
   (***********************************************************************)
 
   (** [module P] is a monad that contains the proof environment and context. *)
   module P (X : sig
-      (* val pstate : Declare.Proof.t *)
       val gl : Proofview.Goal.t ref
     end) =
   struct
@@ -42,7 +275,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
                fun () -> ref (Proofview.Goal.sigma (gl ()))
              ;;
            end))
-        (M.Enc)
+        (W.M.Enc)
 
     let get_concl () : EConstr.t = Proofview.Goal.concl (gl ())
     let get_hyps () : Rocq_utils.hyp list = Proofview.Goal.hyps (gl ())
@@ -59,80 +292,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     let new_cofix_name () : Names.Id.t = new_name_of_string "Cofix0"
     let new_H_name () : Names.Id.t = new_name_of_string "H0"
 
-    module Tactic = struct
-      type t =
-        { this : tactic
-        ; next : t option
-        }
-
-      and tactic =
-        { get : unit Proofview.tactic
-        ; msg : (Output_kind.t * string) option
-        }
-
-      (** [tactic ?msg tactic] *)
-      let tactic
-            ?(level : Output_kind.t = Info)
-            ?(msg : string option)
-            (x : unit Proofview.tactic)
-        : t
-        =
-        { this =
-            { msg = Option.cata (fun m -> Some (level, m)) None msg; get = x }
-        ; next = None
-        }
-      ;;
-
-      let unpack (x : tactic) : unit Proofview.tactic =
-        let () =
-          match x.msg with
-          | None -> ()
-          | Some (Debug, z) -> Log.debug ~__FUNCTION__ z
-          | Some (Info, z) -> Log.info ~__FUNCTION__ z
-          | Some (Notice, z) -> Log.notice ~__FUNCTION__ z
-          | Some (Warning, z) -> Log.warning ~__FUNCTION__ z
-          | Some (Error, z) -> Log.error ~__FUNCTION__ z
-          | Some (Trace, z) -> Log.trace ~__FUNCTION__ z
-          | Some (Result, z) -> Log.result ~__FUNCTION__ z
-          | Some (Show, z) -> Log.show ~__FUNCTION__ z
-        in
-        x.get
-      ;;
-
-      (** [seq a b] appends [b] to the sequence of [a]. *)
-      let rec seq : t -> t -> t = function
-        | { this; next = None } -> fun (b : t) -> { this; next = Some b }
-        | { this; next = Some next } ->
-          fun (b : t) -> { this; next = Some (seq next b) }
-      ;;
-
-      let empty () : t = tactic (Proofview.tclUNIT ())
-
-      exception EmptyTacticChain of unit
-
-      (** [chain ?nonempty (x::xs)] applies [seq x (chain xs)].
-          @raise EmptyTacticChain if the list is empty and [?nonempty] s true.
-      *)
-      let rec chain ?(nonempty : bool = false) : t list -> t = function
-        | [] -> if nonempty then raise (EmptyTacticChain ()) else empty ()
-        | h :: [] -> h
-        | h :: tl -> seq h (chain tl)
-      ;;
-
-      (** [update_proof pstate x] applies tactic(s) [x] and returns the updated [pstate].
-      *)
-      let update_proof (pstate : Declare.Proof.t) (x : t) : Declare.Proof.t =
-        let rec f : t -> unit Proofview.tactic = function
-          | { this; next = None } -> unpack this
-          | { this; next = Some next } ->
-            Proofview.tclTHEN (unpack this) (f next)
-        in
-        let new_pstate, is_safe_tactic = Declare.Proof.by (f x) pstate in
-        if Bool.not is_safe_tactic
-        then Log.warning ~__FUNCTION__ "unsafe tactic used";
-        new_pstate
-      ;;
-    end
+    (***********************************************************************)
 
     (** tactics *)
     module Tacs = struct
@@ -220,11 +380,21 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         |> return
       ;;
 
+      let apply_Pack_sim () : Tactic.t mm = apply (Theories.c_Pack_sim ())
+      let apply_In_sim () : Tactic.t mm = apply (Theories.c_In_sim ())
+      let apply_wk_some () : Tactic.t mm = apply (Theories.c_wk_some ())
+      let apply_wk_none () : Tactic.t mm = apply (Theories.c_wk_none ())
+      let apply_rt1n_refl () : Tactic.t mm = apply (Theories.c_rt1n_refl ())
+      let apply_rt1n_trans () : Tactic.t mm = apply (Theories.c_rt1n_trans ())
+
       let eapply (x : EConstr.t) : Tactic.t mm =
         Tactics.eapply x
         |> Tactic.tactic ~msg:(Printf.sprintf "eapply %s" (Strfy.econstr x))
         |> return
       ;;
+
+      let eapply_rt1n_refl () : Tactic.t mm = eapply (Theories.c_rt1n_refl ())
+      let eapply_rt1n_trans () : Tactic.t mm = eapply (Theories.c_rt1n_trans ())
 
       (* *)
       exception CannotUnfoldConstr of Constr.t
@@ -259,10 +429,9 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         let open Syntax in
         let* y : Constr.t = econstr_to_constr x in
         (* NOTE: below helps keep this function cleaner to use. i.e., [unfold_econstr ~in_hyp:x] rather than [~in_hyp:(Some x)] *)
-        Option.cata
-          (fun in_hyp -> unfold_constr ~in_hyp y)
-          (unfold_constr y)
-          in_hyp
+        match in_hyp with
+        | None -> unfold_constr y
+        | Some in_hyp -> unfold_constr ~in_hyp y
       ;;
 
       let unfold_constrexpr
@@ -273,70 +442,45 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         let open Syntax in
         let* y : EConstr.t = constrexpr_to_econstr x in
         (* NOTE: below helps keep this function cleaner to use. i.e., [unfold_constrexpr ~in_hyp:x] rather than [~in_hyp:(Some x)] *)
-        Option.cata
-          (fun in_hyp -> unfold_econstr ~in_hyp y)
-          (unfold_econstr y)
-          in_hyp
-      ;;
-    end
-
-    (** [module Decode] handles obtaining [EConstr.t] from [module M]. *)
-    module Decode = struct
-      let enc (x : M.Enc.t) : EConstr.t = M.decode x
-
-      let handle (x : M.Enc.t) (e : exn) : EConstr.t =
-        try enc x with M.CannotDecode _ -> raise e
+        match in_hyp with
+        | None -> unfold_econstr y
+        | Some in_hyp -> unfold_econstr ~in_hyp y
       ;;
 
-      exception CouldNotDecode_State of Model.State.t
-
-      let state (x : Model.State.t) : EConstr.t =
-        handle x.term (CouldNotDecode_State x)
+      let unfold_opt_constrexpr_list ?(in_hyp : Rocq_utils.hyp option)
+        : Constrexpr.constr_expr list -> Tactic.t option mm
+        =
+        (* NOTE: optional argument wrapper *)
+        let unfold_constrexpr (x : Constrexpr.constr_expr) : Tactic.t mm =
+          match in_hyp with
+          | None -> unfold_constrexpr x
+          | Some in_hyp -> unfold_constrexpr ~in_hyp x
+        in
+        (* NOTE: iterate and combine tactics *)
+        let open Syntax in
+        let iterate h xs =
+          let f (i : int) (ys : Tactic.t) =
+            let* x = List.nth xs i |> unfold_constrexpr in
+            Tactic.seq h x |> return
+          in
+          iterate 0 (List.length xs - 1) h f
+        in
+        function
+        | [] -> return None
+        | h :: tl ->
+          let* h = unfold_constrexpr h in
+          let* x = iterate h tl in
+          return (Some x)
       ;;
 
-      exception CouldNotDecode_Label of Model.Label.t
+      let unfold_silent () : Tactic.t mm = unfold_econstr (Theories.c_silent ())
 
-      let label (x : Model.Label.t) : EConstr.t =
-        handle x.term (CouldNotDecode_Label x)
-      ;;
-
-      exception CouldNotDecode_LTS_Constructor of Model.Info.lts
-
-      let lts_constructor (x : Model.Info.lts) : EConstr.t =
-        handle x.enc (CouldNotDecode_LTS_Constructor x)
+      let unfold_silent1 () : Tactic.t mm =
+        unfold_econstr (Theories.c_silent1 ())
       ;;
     end
 
     module Theory = struct
-      let apply_Pack_sim () : Tactic.t mm = Tacs.apply (Theories.c_Pack_sim ())
-      let apply_In_sim () : Tactic.t mm = Tacs.apply (Theories.c_In_sim ())
-      let apply_wk_some () : Tactic.t mm = Tacs.apply (Theories.c_wk_some ())
-      let apply_wk_none () : Tactic.t mm = Tacs.apply (Theories.c_wk_none ())
-
-      let apply_rt1n_refl () : Tactic.t mm =
-        Tacs.apply (Theories.c_rt1n_refl ())
-      ;;
-
-      let apply_rt1n_trans () : Tactic.t mm =
-        Tacs.apply (Theories.c_rt1n_trans ())
-      ;;
-
-      let eapply_rt1n_refl () : Tactic.t mm =
-        Tacs.eapply (Theories.c_rt1n_refl ())
-      ;;
-
-      let eapply_rt1n_trans () : Tactic.t mm =
-        Tacs.eapply (Theories.c_rt1n_trans ())
-      ;;
-
-      let unfold_silent () : Tactic.t mm =
-        Tacs.unfold_econstr (Theories.c_silent ())
-      ;;
-
-      let unfold_silent1 () : Tactic.t mm =
-        Tacs.unfold_econstr (Theories.c_silent1 ())
-      ;;
-
       (** [is_theory x y] checks if term [x] is equal to theory term [y], catching the exception thrown when [EConstr.kind_of_type x] is not [AtomicType (ty, tys)].
       *)
       let is_theory (x : EConstr.t) (y : EConstr.t) : bool mm =
@@ -464,6 +608,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       ;;
     end
 
+    (** remodel *)
     module ReModel = struct
       exception CouldNotFind_State of (EConstr.t * Model.States.t)
 
@@ -486,13 +631,13 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         try M.get_encoding x |> f with
         | Not_found ->
           let open M.Syntax in
-          (* NOTE: is it [None] (i.e., a silent action) *)
+          (* NOTE: is it [None]? (i.e., a silent action) *)
           (try
              let* term : M.Enc.t = Theory.get_None_enc_if_eq x in
              f term
            with
            | Theory.NotEqTheory () ->
-             (* NOTE: is it [Some] (i.e., a visible action) *)
+             (* NOTE: is it [Some]? (i.e., a visible action) *)
              (try
                 let* term : M.Enc.t = Theory.get_Some_enc_if_eq x in
                 f term
@@ -500,147 +645,66 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
               | Theory.NotEqTheory () -> raise (CouldNotFind_Label (x, ys))))
       ;;
     end
+
+    (***********************************************************************)
+
+    exception SkipNewProof of unit
+
+    let handle_new_proof
+          ((a, b) : Constrexpr.constr_expr * Constrexpr.constr_expr)
+      : Tactic.t mm
+      =
+      let open Syntax in
+      let* x = Tacs.unfold_opt_constrexpr_list [ a; b ] in
+      match x with None -> raise (SkipNewProof ()) | Some x -> return x
+    ;;
+
+    exception StateNotImplemented of State.t
+
+    let handle_state () : Tactic.t mm =
+      let x = get_state () in
+      Log.thing ~__FUNCTION__ Debug "=>" x (Of State.to_string);
+      match x with
+      | NewProof ab -> handle_new_proof ab
+      | WeakSim -> raise (StateNotImplemented x)
+      | Cofix -> raise (StateNotImplemented x)
+      | GoalTransition { hyp; goal } -> raise (StateNotImplemented x)
+      | ApplyConstructors xs -> raise (StateNotImplemented x)
+      | Done -> raise (NothingToDo ())
+    ;;
+
+    let rec step () : Tactic.t =
+      Log.trace __FUNCTION__;
+      try run (handle_state ()) with
+      | SkipNewProof () ->
+        Log.trace ~__FUNCTION__ "BeginProof:SkipNewProof => WeakSim";
+        update_state WeakSim;
+        step ()
+    ;;
   end
 
-  (** transition *)
-  module Trans = struct
-    module Make (X : sig
-        type state
-        type label
+  (** [get_updated_pstate x] returns the [pstate] updated by tactic [x]. *)
+  let get_updated_pstate (x : unit Proofview.tactic) : Declare.Proof.t =
+    let new_pstate, is_safe_tactic = Declare.Proof.by x (get_pstate ()) in
+    if Bool.not is_safe_tactic
+    then Log.warning ~__FUNCTION__ "unsafe tactic used";
+    new_pstate
+  ;;
 
-        val eq_state : state -> state -> bool M.mm
-        val eq_label : label -> label -> bool M.mm
-      end) =
-    struct
-      type t =
-        | Full of
-            { from : X.state
-            ; label : X.label
-            ; goto : X.state
-            }
-        | Partial of partial
-
-      and partial =
-        | NoGoto of
-            { from : X.state
-            ; label : X.label
-            }
-        | NoLabel of
-            { from : X.state
-            ; goto : X.state
-            }
-        | Just of { from : X.state }
-
-      exception LabelArgNotEqExisting of (X.label * partial)
-      exception GotoArgNotEqExisting of (X.state * partial)
-      exception ArgsFillNothing of unit
-
-      (** [fill ?label ?goto x] handles "filling out" partial transition [x] with either [?label] or [?goto].
-          @raise LabelArgNotEqExisting
-            if [?label=Some _] and not equal [x.label].
-          @raise GotoArgNotEqExisting if [?label=Some _] and not equal [x.goto].
-          @raise ArgsFillNothing if [x] would be unchanged by this function. *)
-      let fill ?(label : X.label option) ?(goto : X.state option) (x : partial)
-        : t M.mm
-        =
-        let open M.Syntax in
-        let none_or_eq (type a) (f : a -> a -> bool M.mm) (e : a -> exn) (y : a)
-          : a option -> unit M.mm
-          = function
-          | None -> M.return ()
-          | Some z ->
-            let* is_eq : bool = f y z in
-            if is_eq then M.return () else raise (e z)
-        in
-        match x with
-        | NoGoto { from; label = label' } ->
-          let* () =
-            none_or_eq
-              X.eq_label
-              (fun a -> LabelArgNotEqExisting (a, x))
-              label'
-              label
-          in
-          (match goto with
-           | None -> raise (ArgsFillNothing ())
-           | Some goto -> Full { from; label = label'; goto } |> M.return)
-        | NoLabel { from; goto = goto' } ->
-          let* () =
-            none_or_eq
-              X.eq_state
-              (fun a -> GotoArgNotEqExisting (a, x))
-              goto'
-              goto
-          in
-          (match label with
-           | None -> raise (ArgsFillNothing ())
-           | Some label -> Full { from; label; goto = goto' } |> M.return)
-        | Just { from } ->
-          (match label, goto with
-           | None, None -> raise (ArgsFillNothing ())
-           | Some label, None -> Partial (NoGoto { from; label }) |> M.return
-           | None, Some goto -> Partial (NoLabel { from; goto }) |> M.return
-           | Some label, Some goto -> Full { from; label; goto } |> M.return)
-      ;;
-    end
-
-    module RocqTrans = Make (struct
-        type t = EConstr.t
-        type state = t
-        type label = t
-
-        let eq = M.econstr_eq
-        let eq_state = eq
-        let eq_label = eq
-      end)
-
-    module EncTrans = Make (struct
-        type t = M.Enc.t
-        type state = t
-        type label = t
-
-        let eq (a : t) (b : t) : bool M.mm = M.Enc.equal a b |> M.return
-        let eq_state = eq
-        let eq_label = eq
-      end)
-
-    module ModelTrans = Make (struct
-        type state = Model.State.t
-        type label = Model.Label.t
-
-        let eq_state (a : state) (b : state) : bool M.mm =
-          Model.State.equal a b |> M.return
-        ;;
-
-        let eq_label (a : label) (b : label) : bool M.mm =
-          Model.Label.equal a b |> M.return
-        ;;
-      end)
-
-    type t =
-      | RocqTransition of RocqTrans.t
-      | EncTransition of EncTrans.t
-      | ModelTransition of ModelTrans.t
-      | Complete of Model.Transition.t
-
-    (** [elevate x] attempts to transform [x] via the order [RocqTransition < EncTransition < ModelTransition < Complete].
-        @raise _
-          if [EncTransition] is not [Full], since a [ModelTransition] would not be able to be obtained.
-    *)
-    (* let elevate : t -> t M.mm = 
-    let f_enc (x:EConstr.t): M.Enc.t M.mm= (M.get_encoding x) |> M.return in  
-    let f_state(x:EConstr.t):Model.State.t M.mm = (ReModel.state x) in  
-    let f_label(x:EConstr.t):Model.Label.t M.mm = (ReModel.label x) in  
-    function
-    | RocqTransition (Full { from; label; goto }) -> (
-      EncTransition (Full {from=f_enc from;label=f_enc label;goto=f_enc goto}) |> M.return
-    )
-    | RocqTransition (Partial (NoLabel { from; goto })) -> ()
-    | RocqTransition (Partial (NoGoto { from; label })) -> ()
-    | RocqTransition (Partial (Just { from })) -> ()
-    | _ -> ()
-  ;; *)
-  end
+  (** [step pstate] enters a fresh module [P] for this specific [pstate], and returns one updated with
+  *)
+  let step (pstate : Declare.Proof.t) : Declare.Proof.t =
+    Log.trace __FUNCTION__;
+    update_pstate pstate;
+    Proofview.Goal.enter (fun gl ->
+      let module P =
+        P (struct
+          let gl = ref gl
+        end)
+      in
+      P.step () |> Tactic.unpack_all)
+    |> get_updated_pstate
+  ;;
 
   (** hypothesis *)
   module Hyp = struct end
@@ -648,8 +712,9 @@ end
 
 (***********************************************************************)
 
-module type S =
-    module type of Make (Logger.Default) ((val Api.default_encoding ()))
+module Log = Logger.Default
+
+module type S = module type of Make (Log) ((val Api.default_encoding ()))
 
 let the_proof_solver : (module S) ref option ref = ref None
 let reset_the_proof_solver () : unit = the_proof_solver := None
@@ -663,10 +728,17 @@ let get_the_proof_solver () : (module S) ref =
 ;;
 
 let new_proof_solver () : (module S) ref =
-  let module M : S = Make (Logger.Default) ((val Api.default_encoding ())) in
+  let module M : S = Make (Log) ((val Api.default_encoding ())) in
   the_proof_solver := Some (ref (module M : S));
   get_the_proof_solver ()
 ;;
+
+let is_done () : bool =
+  let module Ps = (val !(get_the_proof_solver ())) in
+  Ps.is_done ()
+;;
+
+(***********************************************************************)
 
 exception BisimilarityResultNotFound of unit
 
@@ -680,19 +752,33 @@ let init
   =
   let ps : (module S) ref = new_proof_solver () in
   let module Ps : S = (val !ps) in
-  let r : Ps.Model.Bisimilar.t option =
-    Ps.Command.run refs (Ps.Command.CheckBisim { a; b })
-    |> Ps.M.run ~reset_encoding:true
+  Ps.check_bisimilarity refs a b;
+  Ps.init pstate (fst a, fst b);
+  pstate
+;;
+
+(** [step] ... *)
+let step (pstate : Declare.Proof.t) : Declare.Proof.t =
+  let module Ps = (val !(get_the_proof_solver ())) in
+  Ps.step pstate
+;;
+
+(** [solve] ... *)
+let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
+  Log.trace __FUNCTION__;
+  let fint = Utils.Strfy.Of Utils.Strfy.int in
+  let fbool = Utils.Strfy.Of Utils.Strfy.bool in
+  let rec f (n : int) (p : Declare.Proof.t) : int * Declare.Proof.t =
+    match Int.compare n bound with
+    | -1 ->
+      if is_done ()
+      then n, p
+      else (try step p |> f (n + 1) with NothingToDo () -> n, p)
+    | _ ->
+      Log.thing ~__FUNCTION__ Warning "Stopping, exceeded bound" bound fint;
+      n, p
   in
-  let () =
-    match r with
-    | None -> raise (BisimilarityResultNotFound ())
-    | Some r -> Ps.set_the_result r
-  in
-  (* TODO: fix Ps.P.mm *)
-  (* Ps.Tacs.unfold_constrexpr (fst a)
-  |> Ps.Tactic.update_proof pstate
-  |> Ps.Tacs.unfold_constrexpr (fst b)
-  |> Ps.Tactic.update_proof pstate *)
+  let num, pstate = f 0 pstate in
+  Log.thing ~__FUNCTION__ Notice "(Stopped) Solved: " (is_done ()) fbool;
   pstate
 ;;
