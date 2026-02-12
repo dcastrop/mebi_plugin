@@ -58,446 +58,448 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     let new_cofix_name () : Names.Id.t = new_name_of_string "Cofix0"
     let new_H_name () : Names.Id.t = new_name_of_string "H0"
-  end
 
-  module Tactic = struct
-    type t =
-      { this : tactic
-      ; next : t option
-      }
+    module Tactic = struct
+      type t =
+        { this : tactic
+        ; next : t option
+        }
 
-    and tactic =
-      { get : unit Proofview.tactic
-      ; msg : (Output_kind.t * string) option
-      }
+      and tactic =
+        { get : unit Proofview.tactic
+        ; msg : (Output_kind.t * string) option
+        }
 
-    (** [tactic ?msg tactic] *)
-    let tactic
-          ?(level : Output_kind.t = Info)
-          ?(msg : string option)
-          (x : unit Proofview.tactic)
-      : t
-      =
-      { this =
-          { msg = Option.cata (fun m -> Some (level, m)) None msg; get = x }
-      ; next = None
-      }
-    ;;
+      (** [tactic ?msg tactic] *)
+      let tactic
+            ?(level : Output_kind.t = Info)
+            ?(msg : string option)
+            (x : unit Proofview.tactic)
+        : t
+        =
+        { this =
+            { msg = Option.cata (fun m -> Some (level, m)) None msg; get = x }
+        ; next = None
+        }
+      ;;
 
-    let unpack (x : tactic) : unit Proofview.tactic =
-      let () =
-        match x.msg with
-        | None -> ()
-        | Some (Debug, z) -> Log.debug ~__FUNCTION__ z
-        | Some (Info, z) -> Log.info ~__FUNCTION__ z
-        | Some (Notice, z) -> Log.notice ~__FUNCTION__ z
-        | Some (Warning, z) -> Log.warning ~__FUNCTION__ z
-        | Some (Error, z) -> Log.error ~__FUNCTION__ z
-        | Some (Trace, z) -> Log.trace ~__FUNCTION__ z
-        | Some (Result, z) -> Log.result ~__FUNCTION__ z
-        | Some (Show, z) -> Log.show ~__FUNCTION__ z
-      in
-      x.get
-    ;;
-
-    (** [seq a b] appends [b] to the sequence of [a]. *)
-    let rec seq : t -> t -> t = function
-      | { this; next = None } -> fun (b : t) -> { this; next = Some b }
-      | { this; next = Some next } ->
-        fun (b : t) -> { this; next = Some (seq next b) }
-    ;;
-
-    let empty () : t = tactic (Proofview.tclUNIT ())
-
-    exception EmptyTacticChain of unit
-
-    (** [chain ?nonempty (x::xs)] applies [seq x (chain xs)].
-        @raise EmptyTacticChain if the list is empty and [?nonempty] s true. *)
-    let rec chain ?(nonempty : bool = false) : t list -> t = function
-      | [] -> if nonempty then raise (EmptyTacticChain ()) else empty ()
-      | h :: [] -> h
-      | h :: tl -> seq h (chain tl)
-    ;;
-
-    (** [update_proof pstate x] applies tactic(s) [x] and returns the updated [pstate].
-    *)
-    let update_proof (pstate : Declare.Proof.t) (x : t) : Declare.Proof.t =
-      let rec f : t -> unit Proofview.tactic = function
-        | { this; next = None } -> unpack this
-        | { this; next = Some next } -> Proofview.tclTHEN this (f next)
-      in
-      let new_pstate, is_safe_tactic = Declare.Proof.by (f x) pstate in
-      if Bool.not is_safe_tactic
-      then Log.warning ~__FUNCTION__ "unsafe tactic used";
-      new_pstate
-    ;;
-  end
-
-  (** tactics *)
-  module Tacs = struct
-    let inversion (x : Rocq_utils.hyp) : Tactic.t P.mm =
-      Inv.inv_tac (Context.Named.Declaration.get_id x)
-      |> Tactic.tactic
-           ~msg:
-             (Printf.sprintf
-                "inversion %s"
-                (P.Strfy.hyp_name x) (* (P.Strfy.hyp_type x) *))
-      |> P.return
-    ;;
-
-    let subst_all () : Tactic.t P.mm =
-      Equality.subst_all ()
-      |> Tactic.tactic ~msg:(Printf.sprintf "(subst all)")
-      |> P.return
-    ;;
-
-    let simplify_concl () : Tactic.t P.mm =
-      Tactics.simpl_in_concl |> Tactic.tactic ~msg:"simpl" |> P.return
-    ;;
-
-    let simplify_hyp (x : Rocq_utils.hyp) : Tactic.t P.mm =
-      Tactics.simpl_in_hyp (Context.Named.Declaration.get_id x, Locus.InHyp)
-      |> Tactic.tactic ~msg:(Printf.sprintf "simpl in %s" (P.Strfy.hyp_name x))
-      |> P.return
-    ;;
-
-    let simplify_hyps () : Tactic.t P.mm =
-      match Proofview.Goal.hyps !gl with
-      | [] -> Tactic.empty () |> P.return
-      | x :: [] -> simplify_hyp x
-      | x :: xs ->
-        let open P.Syntax in
-        let* x : Tactic.t = simplify_hyp x in
-        let f (i : int) (x : Tactic.t) : Tactic.t P.mm =
-          let y : Rocq_utils.hyp = List.nth xs i in
-          let* y : Tactic.t = simplify_hyp y in
-          Tactic.seq x y |> P.return
+      let unpack (x : tactic) : unit Proofview.tactic =
+        let () =
+          match x.msg with
+          | None -> ()
+          | Some (Debug, z) -> Log.debug ~__FUNCTION__ z
+          | Some (Info, z) -> Log.info ~__FUNCTION__ z
+          | Some (Notice, z) -> Log.notice ~__FUNCTION__ z
+          | Some (Warning, z) -> Log.warning ~__FUNCTION__ z
+          | Some (Error, z) -> Log.error ~__FUNCTION__ z
+          | Some (Trace, z) -> Log.trace ~__FUNCTION__ z
+          | Some (Result, z) -> Log.result ~__FUNCTION__ z
+          | Some (Show, z) -> Log.show ~__FUNCTION__ z
         in
-        P.iterate 0 (List.length xs - 1) x f
-    ;;
+        x.get
+      ;;
 
-    let simplify_all () : Tactic.t P.mm =
-      let open P.Syntax in
-      let* concl : Tactic.t = simplify_concl () in
-      let* hyps : Tactic.t = simplify_hyps () in
-      Tactic.seq concl hyps |> P.return
-    ;;
+      (** [seq a b] appends [b] to the sequence of [a]. *)
+      let rec seq : t -> t -> t = function
+        | { this; next = None } -> fun (b : t) -> { this; next = Some b }
+        | { this; next = Some next } ->
+          fun (b : t) -> { this; next = Some (seq next b) }
+      ;;
 
-    let simplify_and_subst_all () : Tactic.t P.mm =
-      let open P.Syntax in
-      let* simpls : Tactic.t = simplify_all () in
-      let* substs : Tactic.t = subst_all () in
-      Tactic.seq simpls substs |> P.return
-    ;;
+      let empty () : t = tactic (Proofview.tclUNIT ())
 
-    let cofix () : Tactic.t P.mm =
-      let name : Names.Id.t = new_cofix_name () in
-      Tactics.cofix name
-      |> Tactic.tactic
-           ~msg:(Printf.sprintf "cofix %s" (Names.Id.to_string name))
-      |> P.return
-    ;;
+      exception EmptyTacticChain of unit
 
-    let intros_all () : Tactic.t P.mm =
-      Tactics.intros |> Tactic.tactic ~msg:"intros" |> P.return
-    ;;
+      (** [chain ?nonempty (x::xs)] applies [seq x (chain xs)].
+          @raise EmptyTacticChain if the list is empty and [?nonempty] s true.
+      *)
+      let rec chain ?(nonempty : bool = false) : t list -> t = function
+        | [] -> if nonempty then raise (EmptyTacticChain ()) else empty ()
+        | h :: [] -> h
+        | h :: tl -> seq h (chain tl)
+      ;;
 
-    (** [intro_as x] applies the introduction tactic using the (next non-conficting) name [x].
-    *)
-    let intro_as (x : string) : Tactic.t P.mm =
-      let name : Names.Id.t = new_name_of_string x in
-      Tactics.introduction name
-      |> Tactic.tactic
-           ~msg:(Printf.sprintf "intro %s" (Names.Id.to_string name))
-      |> P.return
-    ;;
+      (** [update_proof pstate x] applies tactic(s) [x] and returns the updated [pstate].
+      *)
+      let update_proof (pstate : Declare.Proof.t) (x : t) : Declare.Proof.t =
+        let rec f : t -> unit Proofview.tactic = function
+          | { this; next = None } -> unpack this
+          | { this; next = Some next } ->
+            Proofview.tclTHEN (unpack this) (f next)
+        in
+        let new_pstate, is_safe_tactic = Declare.Proof.by (f x) pstate in
+        if Bool.not is_safe_tactic
+        then Log.warning ~__FUNCTION__ "unsafe tactic used";
+        new_pstate
+      ;;
+    end
 
-    (* *)
-    let apply (x : EConstr.t) : Tactic.t P.mm =
-      Tactics.apply x
-      |> Tactic.tactic ~msg:(Printf.sprintf "apply %s" (P.Strfy.econstr x))
-      |> P.return
-    ;;
-
-    let eapply (x : EConstr.t) : Tactic.t P.mm =
-      Tactics.eapply x
-      |> Tactic.tactic ~msg:(Printf.sprintf "eapply %s" (P.Strfy.econstr x))
-      |> P.return
-    ;;
-
-    (* *)
-    exception CannotUnfoldConstr of Constr.t
-
-    (** [unfold_constr x]
-        @raise CannotUnfoldConstr
-          of [x] if [Constr.kind x] is not [Const (_, _)]. *)
-    let unfold_constr ?(in_hyp : Rocq_utils.hyp option) (x : Constr.t)
-      : Tactic.t P.mm
-      =
-      let f (name : Names.Constant.t) : unit Proofview.tactic =
-        Option.cata
-          (fun (y : Rocq_utils.hyp) ->
-            Tactics.unfold_in_hyp
-              [ Locus.AllOccurrences, Evaluable.EvalConstRef name ]
-              (Context.Named.Declaration.get_id y, Locus.InHyp))
-          (Tactics.unfold_constr (Names.GlobRef.ConstRef name))
-          in_hyp
-      in
-      match Constr.kind x with
-      | Const (name, _) ->
-        f name
+    (** tactics *)
+    module Tacs = struct
+      let inversion (x : Rocq_utils.hyp) : Tactic.t mm =
+        Inv.inv_tac (Context.Named.Declaration.get_id x)
         |> Tactic.tactic
-             ~msg:(Printf.sprintf "unfold %s" (Names.Constant.to_string name))
-        |> P.return
-      | _ -> raise (CannotUnfoldConstr x)
-    ;;
+             ~msg:
+               (Printf.sprintf
+                  "inversion %s"
+                  (Strfy.hyp_name x) (* (Strfy.hyp_type x) *))
+        |> return
+      ;;
 
-    let unfold_econstr ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
-      : Tactic.t P.mm
-      =
-      let open P.Syntax in
-      let* y : Constr.t = P.econstr_to_constr x in
-      (* NOTE: below helps keep this function cleaner to use. i.e., [unfold_econstr ~in_hyp:x] rather than [~in_hyp:(Some x)] *)
-      Option.cata
-        (fun in_hyp -> unfold_constr ~in_hyp y)
-        (unfold_constr y)
-        in_hyp
-    ;;
+      let subst_all () : Tactic.t mm =
+        Equality.subst_all ()
+        |> Tactic.tactic ~msg:(Printf.sprintf "(subst all)")
+        |> return
+      ;;
 
-    let unfold_constrexpr
-          ?(in_hyp : Rocq_utils.hyp option)
-          (x : Constrexpr.constr_expr)
-      : Tactic.t P.mm
-      =
-      let open P.Syntax in
-      let* y : EConstr.t = P.constrexpr_to_econstr x in
-      (* NOTE: below helps keep this function cleaner to use. i.e., [unfold_constrexpr ~in_hyp:x] rather than [~in_hyp:(Some x)] *)
-      Option.cata
-        (fun in_hyp -> unfold_econstr ~in_hyp y)
-        (unfold_econstr y)
-        in_hyp
-    ;;
-  end
+      let simplify_concl () : Tactic.t mm =
+        Tactics.simpl_in_concl |> Tactic.tactic ~msg:"simpl" |> return
+      ;;
 
-  (** [module Decode] handles obtaining [EConstr.t] from [module M]. *)
-  module Decode = struct
-    let enc (x : M.Enc.t) : EConstr.t = M.decode x
+      let simplify_hyp (x : Rocq_utils.hyp) : Tactic.t mm =
+        Tactics.simpl_in_hyp (Context.Named.Declaration.get_id x, Locus.InHyp)
+        |> Tactic.tactic ~msg:(Printf.sprintf "simpl in %s" (Strfy.hyp_name x))
+        |> return
+      ;;
 
-    let handle (x : M.Enc.t) (e : exn) : EConstr.t =
-      try enc x with M.CannotDecode _ -> raise e
-    ;;
+      let simplify_hyps () : Tactic.t mm =
+        match get_hyps () with
+        | [] -> Tactic.empty () |> return
+        | x :: [] -> simplify_hyp x
+        | x :: xs ->
+          let open Syntax in
+          let* x : Tactic.t = simplify_hyp x in
+          let f (i : int) (x : Tactic.t) : Tactic.t mm =
+            let y : Rocq_utils.hyp = List.nth xs i in
+            let* y : Tactic.t = simplify_hyp y in
+            Tactic.seq x y |> return
+          in
+          iterate 0 (List.length xs - 1) x f
+      ;;
 
-    exception CouldNotDecode_State of Model.State.t
+      let simplify_all () : Tactic.t mm =
+        let open Syntax in
+        let* concl : Tactic.t = simplify_concl () in
+        let* hyps : Tactic.t = simplify_hyps () in
+        Tactic.seq concl hyps |> return
+      ;;
 
-    let state (x : Model.State.t) : EConstr.t =
-      handle x.term (CouldNotDecode_State x)
-    ;;
+      let simplify_and_subst_all () : Tactic.t mm =
+        let open Syntax in
+        let* simpls : Tactic.t = simplify_all () in
+        let* substs : Tactic.t = subst_all () in
+        Tactic.seq simpls substs |> return
+      ;;
 
-    exception CouldNotDecode_Label of Model.Label.t
+      let cofix () : Tactic.t mm =
+        let name : Names.Id.t = new_cofix_name () in
+        Tactics.cofix name
+        |> Tactic.tactic
+             ~msg:(Printf.sprintf "cofix %s" (Names.Id.to_string name))
+        |> return
+      ;;
 
-    let label (x : Model.Label.t) : EConstr.t =
-      handle x.term (CouldNotDecode_Label x)
-    ;;
+      let intros_all () : Tactic.t mm =
+        Tactics.intros |> Tactic.tactic ~msg:"intros" |> return
+      ;;
 
-    exception CouldNotDecode_LTS_Constructor of Model.Info.lts
+      (** [intro_as x] applies the introduction tactic using the (next non-conficting) name [x].
+      *)
+      let intro_as (x : string) : Tactic.t mm =
+        let name : Names.Id.t = new_name_of_string x in
+        Tactics.introduction name
+        |> Tactic.tactic
+             ~msg:(Printf.sprintf "intro %s" (Names.Id.to_string name))
+        |> return
+      ;;
 
-    let lts_constructor (x : Model.Info.lts) : EConstr.t =
-      handle x.enc (CouldNotDecode_LTS_Constructor x)
-    ;;
-  end
+      (* *)
+      let apply (x : EConstr.t) : Tactic.t mm =
+        Tactics.apply x
+        |> Tactic.tactic ~msg:(Printf.sprintf "apply %s" (Strfy.econstr x))
+        |> return
+      ;;
 
-  module Theory = struct
-    let apply_Pack_sim () : Tactic.t P.mm = Tacs.apply (Theories.c_Pack_sim ())
-    let apply_In_sim () : Tactic.t P.mm = Tacs.apply (Theories.c_In_sim ())
-    let apply_wk_some () : Tactic.t P.mm = Tacs.apply (Theories.c_wk_some ())
-    let apply_wk_none () : Tactic.t P.mm = Tacs.apply (Theories.c_wk_none ())
+      let eapply (x : EConstr.t) : Tactic.t mm =
+        Tactics.eapply x
+        |> Tactic.tactic ~msg:(Printf.sprintf "eapply %s" (Strfy.econstr x))
+        |> return
+      ;;
 
-    let apply_rt1n_refl () : Tactic.t P.mm =
-      Tacs.apply (Theories.c_rt1n_refl ())
-    ;;
+      (* *)
+      exception CannotUnfoldConstr of Constr.t
 
-    let apply_rt1n_trans () : Tactic.t P.mm =
-      Tacs.apply (Theories.c_rt1n_trans ())
-    ;;
+      (** [unfold_constr x]
+          @raise CannotUnfoldConstr
+            of [x] if [Constr.kind x] is not [Const (_, _)]. *)
+      let unfold_constr ?(in_hyp : Rocq_utils.hyp option) (x : Constr.t)
+        : Tactic.t mm
+        =
+        let f (name : Names.Constant.t) : unit Proofview.tactic =
+          Option.cata
+            (fun (y : Rocq_utils.hyp) ->
+              Tactics.unfold_in_hyp
+                [ Locus.AllOccurrences, Evaluable.EvalConstRef name ]
+                (Context.Named.Declaration.get_id y, Locus.InHyp))
+            (Tactics.unfold_constr (Names.GlobRef.ConstRef name))
+            in_hyp
+        in
+        match Constr.kind x with
+        | Const (name, _) ->
+          f name
+          |> Tactic.tactic
+               ~msg:(Printf.sprintf "unfold %s" (Names.Constant.to_string name))
+          |> return
+        | _ -> raise (CannotUnfoldConstr x)
+      ;;
 
-    let eapply_rt1n_refl () : Tactic.t P.mm =
-      Tacs.eapply (Theories.c_rt1n_refl ())
-    ;;
+      let unfold_econstr ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
+        : Tactic.t mm
+        =
+        let open Syntax in
+        let* y : Constr.t = econstr_to_constr x in
+        (* NOTE: below helps keep this function cleaner to use. i.e., [unfold_econstr ~in_hyp:x] rather than [~in_hyp:(Some x)] *)
+        Option.cata
+          (fun in_hyp -> unfold_constr ~in_hyp y)
+          (unfold_constr y)
+          in_hyp
+      ;;
 
-    let eapply_rt1n_trans () : Tactic.t P.mm =
-      Tacs.eapply (Theories.c_rt1n_trans ())
-    ;;
+      let unfold_constrexpr
+            ?(in_hyp : Rocq_utils.hyp option)
+            (x : Constrexpr.constr_expr)
+        : Tactic.t mm
+        =
+        let open Syntax in
+        let* y : EConstr.t = constrexpr_to_econstr x in
+        (* NOTE: below helps keep this function cleaner to use. i.e., [unfold_constrexpr ~in_hyp:x] rather than [~in_hyp:(Some x)] *)
+        Option.cata
+          (fun in_hyp -> unfold_econstr ~in_hyp y)
+          (unfold_econstr y)
+          in_hyp
+      ;;
+    end
 
-    let unfold_silent () : Tactic.t P.mm =
-      Tacs.unfold_econstr (Theories.c_silent ())
-    ;;
+    (** [module Decode] handles obtaining [EConstr.t] from [module M]. *)
+    module Decode = struct
+      let enc (x : M.Enc.t) : EConstr.t = M.decode x
 
-    let unfold_silent1 () : Tactic.t P.mm =
-      Tacs.unfold_econstr (Theories.c_silent1 ())
-    ;;
+      let handle (x : M.Enc.t) (e : exn) : EConstr.t =
+        try enc x with M.CannotDecode _ -> raise e
+      ;;
 
-    (** [is_theory x y] checks if term [x] is equal to theory term [y], catching the exception thrown when [EConstr.kind_of_type x] is not [AtomicType (ty, tys)].
-    *)
-    let is_theory (x : EConstr.t) (y : EConstr.t) : bool P.mm =
-      try
-        let open P.Syntax in
-        let* sigma = P.get_sigma in
-        Rocq_utils.econstr_to_atomic sigma x |> fst |> P.econstr_eq y
-      with
-      | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> P.return false
-    ;;
+      exception CouldNotDecode_State of Model.State.t
 
-    (** exists *)
-    let is_exists (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_ex ())
+      let state (x : Model.State.t) : EConstr.t =
+        handle x.term (CouldNotDecode_State x)
+      ;;
 
-    (** weak simulation*)
-    let is_weak_sim (x : EConstr.t) : bool P.mm =
-      is_theory x (Theories.c_weak_sim ())
-    ;;
+      exception CouldNotDecode_Label of Model.Label.t
 
-    (** weak transition *)
-    let is_weak (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_weak ())
+      let label (x : Model.Label.t) : EConstr.t =
+        handle x.term (CouldNotDecode_Label x)
+      ;;
 
-    let is_tau (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_tau ())
+      exception CouldNotDecode_LTS_Constructor of Model.Info.lts
 
-    let is_silent (x : EConstr.t) : bool P.mm =
-      is_theory x (Theories.c_silent ())
-    ;;
+      let lts_constructor (x : Model.Info.lts) : EConstr.t =
+        handle x.enc (CouldNotDecode_LTS_Constructor x)
+      ;;
+    end
 
-    let is_silent1 (x : EConstr.t) : bool P.mm =
-      is_theory x (Theories.c_silent1 ())
-    ;;
+    module Theory = struct
+      let apply_Pack_sim () : Tactic.t mm = Tacs.apply (Theories.c_Pack_sim ())
+      let apply_In_sim () : Tactic.t mm = Tacs.apply (Theories.c_In_sim ())
+      let apply_wk_some () : Tactic.t mm = Tacs.apply (Theories.c_wk_some ())
+      let apply_wk_none () : Tactic.t mm = Tacs.apply (Theories.c_wk_none ())
 
-    let is_LTS (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_LTS ())
-    let is_None (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_None ())
-    let is_Some (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_Some ())
-    (* let is_ (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_ ()) *)
+      let apply_rt1n_refl () : Tactic.t mm =
+        Tacs.apply (Theories.c_rt1n_refl ())
+      ;;
 
-    (** *)
-    let get_theory_enc (f : EConstr.t -> bool P.mm) : M.Enc.t M.mm =
-      let open M.Syntax in
-      let* fm = M.get_fwdmap in
-      let rec find_theory : (EConstr.t * M.Enc.t) list -> M.Enc.t M.mm =
-        function
-        | [] -> raise Not_found
-        | (x, y) :: tl ->
-          let is_match : bool = P.run (f x) in
-          if is_match then M.return y else find_theory tl
-      in
-      M.F.to_seq fm |> List.of_seq |> find_theory
-    ;;
+      let apply_rt1n_trans () : Tactic.t mm =
+        Tacs.apply (Theories.c_rt1n_trans ())
+      ;;
 
-    exception NoEncodingFoundFor_TheoriesNone of unit
+      let eapply_rt1n_refl () : Tactic.t mm =
+        Tacs.eapply (Theories.c_rt1n_refl ())
+      ;;
 
-    let get_None_enc () : M.Enc.t M.mm =
-      try get_theory_enc is_None with
-      | Not_found -> raise (NoEncodingFoundFor_TheoriesNone ())
-    ;;
+      let eapply_rt1n_trans () : Tactic.t mm =
+        Tacs.eapply (Theories.c_rt1n_trans ())
+      ;;
 
-    exception NoEncodingFoundFor_TheoriesSome of unit
+      let unfold_silent () : Tactic.t mm =
+        Tacs.unfold_econstr (Theories.c_silent ())
+      ;;
 
-    let get_Some_enc () : M.Enc.t M.mm =
-      try get_theory_enc is_Some with
-      | Not_found -> raise (NoEncodingFoundFor_TheoriesSome ())
-    ;;
+      let unfold_silent1 () : Tactic.t mm =
+        Tacs.unfold_econstr (Theories.c_silent1 ())
+      ;;
 
-    exception NotEqTheory of unit
+      (** [is_theory x y] checks if term [x] is equal to theory term [y], catching the exception thrown when [EConstr.kind_of_type x] is not [AtomicType (ty, tys)].
+      *)
+      let is_theory (x : EConstr.t) (y : EConstr.t) : bool mm =
+        try
+          let open Syntax in
+          let* sigma = get_sigma in
+          Rocq_utils.econstr_to_atomic sigma x |> fst |> econstr_eq y
+        with
+        | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> return false
+      ;;
 
-    (** *)
-    let get_theory_enc_if_eq (x : EConstr.t) (f : EConstr.t -> bool P.mm)
-      : M.Enc.t M.mm
-      =
-      let is_eq : bool = P.run (f x) in
-      try if is_eq then get_theory_enc f else raise Not_found with
-      | Not_found -> raise (NotEqTheory ())
-    ;;
+      (** exists *)
+      let is_exists (x : EConstr.t) : bool mm = is_theory x (Theories.c_ex ())
 
-    let get_None_enc_if_eq (x : EConstr.t) : M.Enc.t M.mm =
-      get_theory_enc_if_eq x is_None
-    ;;
+      (** weak simulation*)
+      let is_weak_sim (x : EConstr.t) : bool mm =
+        is_theory x (Theories.c_weak_sim ())
+      ;;
 
-    let get_Some_enc_if_eq (x : EConstr.t) : M.Enc.t M.mm =
-      get_theory_enc_if_eq x is_Some
-    ;;
+      (** weak transition *)
+      let is_weak (x : EConstr.t) : bool mm = is_theory x (Theories.c_weak ())
 
-    exception FSM_HasNoSilentLabel of Model.FSM.t
+      let is_tau (x : EConstr.t) : bool mm = is_theory x (Theories.c_tau ())
 
-    let is_fsm_silent_label (x : EConstr.t) (m : Model.FSM.t) : bool M.mm =
-      match
-        Model.Labels.filter Model.Label.is_silent m.info.weak_labels
-        |> Model.Labels.to_list
-      with
-      | [] -> raise (FSM_HasNoSilentLabel m)
-      | ys -> M.exists_eq x ys Decode.label
-    ;;
+      let is_silent (x : EConstr.t) : bool mm =
+        is_theory x (Theories.c_silent ())
+      ;;
 
-    exception FSM_HasNoVisibleLabel of Model.FSM.t
+      let is_silent1 (x : EConstr.t) : bool mm =
+        is_theory x (Theories.c_silent1 ())
+      ;;
 
-    (** i.e., not silent label *)
-    let is_fsm_visible_label (x : EConstr.t) (m : Model.FSM.t) : bool M.mm =
-      match
-        Model.Labels.filter
-          (fun y -> Model.Label.is_silent y |> Bool.not)
-          m.info.weak_labels
-        |> Model.Labels.to_list
-      with
-      | [] -> raise (FSM_HasNoVisibleLabel m)
-      | ys -> M.exists_eq x ys Decode.label
-    ;;
+      let is_LTS (x : EConstr.t) : bool mm = is_theory x (Theories.c_LTS ())
+      let is_None (x : EConstr.t) : bool mm = is_theory x (Theories.c_None ())
+      let is_Some (x : EConstr.t) : bool mm = is_theory x (Theories.c_Some ())
+      (* let is_ (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_ ()) *)
 
-    exception FSM_HasNoWeakLabels of Model.FSM.t
-
-    let is_fsm_weak_labels (x : EConstr.t) (m : Model.FSM.t) : bool M.mm =
-      let open M.Syntax in
-      let* is_silent = is_fsm_silent_label x m in
-      if is_silent then M.return true else is_fsm_visible_label x m
-    ;;
-
-    exception FSM_HasNoConstructors of Model.FSM.t
-
-    let is_fsm_constructor (x : EConstr.t) (m : Model.FSM.t) : bool M.mm =
-      match m with
-      | { info = { meta = None; _ }; _ } -> raise (FSM_HasNoConstructors m)
-      | { info = { meta = Some { lts; _ }; _ }; _ } ->
-        M.exists_eq x lts Decode.lts_constructor
-    ;;
-  end
-
-  module ReModel = struct
-    exception CouldNotFind_State of (EConstr.t * Model.States.t)
-
-    let state (x : EConstr.t) (ys : Model.States.t) : Model.State.t M.mm =
-      try
-        let term : M.Enc.t = M.get_encoding x in
-        (* NOTE: [Model.States.compare] only cares about [term]. *)
-        Model.States.find { term; pp = None } ys |> M.return
-      with
-      | Not_found -> raise (CouldNotFind_State (x, ys))
-    ;;
-
-    exception CouldNotFind_Label of (EConstr.t * Model.Labels.t)
-
-    let label (x : EConstr.t) (ys : Model.Labels.t) : Model.Label.t M.mm =
-      let f (term : M.Enc.t) : Model.Label.t M.mm =
-        (* NOTE: [Model.Labels.compare] only cares about [is_silent=Some _] *)
-        Model.Labels.find { term; is_silent = None; pp = None } ys |> M.return
-      in
-      try M.get_encoding x |> f with
-      | Not_found ->
+      (** *)
+      let get_theory_enc (f : EConstr.t -> bool mm) : M.Enc.t M.mm =
         let open M.Syntax in
-        (* NOTE: is it [None] (i.e., a silent action) *)
-        (try
-           let* term : M.Enc.t = Theory.get_None_enc_if_eq x in
-           f term
-         with
-         | Theory.NotEqTheory () ->
-           (* NOTE: is it [Some] (i.e., a visible action) *)
-           (try
-              let* term : M.Enc.t = Theory.get_Some_enc_if_eq x in
-              f term
-            with
-            | Theory.NotEqTheory () -> raise (CouldNotFind_Label (x, ys))))
-    ;;
+        let* fm = M.get_fwdmap in
+        let rec find_theory : (EConstr.t * M.Enc.t) list -> M.Enc.t M.mm =
+          function
+          | [] -> raise Not_found
+          | (x, y) :: tl ->
+            let is_match : bool = run (f x) in
+            if is_match then M.return y else find_theory tl
+        in
+        M.F.to_seq fm |> List.of_seq |> find_theory
+      ;;
+
+      exception NoEncodingFoundFor_TheoriesNone of unit
+
+      let get_None_enc () : M.Enc.t M.mm =
+        try get_theory_enc is_None with
+        | Not_found -> raise (NoEncodingFoundFor_TheoriesNone ())
+      ;;
+
+      exception NoEncodingFoundFor_TheoriesSome of unit
+
+      let get_Some_enc () : M.Enc.t M.mm =
+        try get_theory_enc is_Some with
+        | Not_found -> raise (NoEncodingFoundFor_TheoriesSome ())
+      ;;
+
+      exception NotEqTheory of unit
+
+      (** *)
+      let get_theory_enc_if_eq (x : EConstr.t) (f : EConstr.t -> bool mm)
+        : M.Enc.t M.mm
+        =
+        let is_eq : bool = run (f x) in
+        try if is_eq then get_theory_enc f else raise Not_found with
+        | Not_found -> raise (NotEqTheory ())
+      ;;
+
+      let get_None_enc_if_eq (x : EConstr.t) : M.Enc.t M.mm =
+        get_theory_enc_if_eq x is_None
+      ;;
+
+      let get_Some_enc_if_eq (x : EConstr.t) : M.Enc.t M.mm =
+        get_theory_enc_if_eq x is_Some
+      ;;
+
+      exception FSM_HasNoSilentLabel of Model.FSM.t
+
+      let is_fsm_silent_label (x : EConstr.t) (m : Model.FSM.t) : bool M.mm =
+        match
+          Model.Labels.filter Model.Label.is_silent m.info.weak_labels
+          |> Model.Labels.to_list
+        with
+        | [] -> raise (FSM_HasNoSilentLabel m)
+        | ys -> M.exists_eq x ys Decode.label
+      ;;
+
+      exception FSM_HasNoVisibleLabel of Model.FSM.t
+
+      (** i.e., not silent label *)
+      let is_fsm_visible_label (x : EConstr.t) (m : Model.FSM.t) : bool M.mm =
+        match
+          Model.Labels.filter
+            (fun y -> Model.Label.is_silent y |> Bool.not)
+            m.info.weak_labels
+          |> Model.Labels.to_list
+        with
+        | [] -> raise (FSM_HasNoVisibleLabel m)
+        | ys -> M.exists_eq x ys Decode.label
+      ;;
+
+      exception FSM_HasNoWeakLabels of Model.FSM.t
+
+      let is_fsm_weak_labels (x : EConstr.t) (m : Model.FSM.t) : bool M.mm =
+        let open M.Syntax in
+        let* is_silent = is_fsm_silent_label x m in
+        if is_silent then M.return true else is_fsm_visible_label x m
+      ;;
+
+      exception FSM_HasNoConstructors of Model.FSM.t
+
+      let is_fsm_constructor (x : EConstr.t) (m : Model.FSM.t) : bool M.mm =
+        match m with
+        | { info = { meta = None; _ }; _ } -> raise (FSM_HasNoConstructors m)
+        | { info = { meta = Some { lts; _ }; _ }; _ } ->
+          M.exists_eq x lts Decode.lts_constructor
+      ;;
+    end
+
+    module ReModel = struct
+      exception CouldNotFind_State of (EConstr.t * Model.States.t)
+
+      let state (x : EConstr.t) (ys : Model.States.t) : Model.State.t M.mm =
+        try
+          let term : M.Enc.t = M.get_encoding x in
+          (* NOTE: [Model.States.compare] only cares about [term]. *)
+          Model.States.find { term; pp = None } ys |> M.return
+        with
+        | Not_found -> raise (CouldNotFind_State (x, ys))
+      ;;
+
+      exception CouldNotFind_Label of (EConstr.t * Model.Labels.t)
+
+      let label (x : EConstr.t) (ys : Model.Labels.t) : Model.Label.t M.mm =
+        let f (term : M.Enc.t) : Model.Label.t M.mm =
+          (* NOTE: [Model.Labels.compare] only cares about [is_silent=Some _] *)
+          Model.Labels.find { term; is_silent = None; pp = None } ys |> M.return
+        in
+        try M.get_encoding x |> f with
+        | Not_found ->
+          let open M.Syntax in
+          (* NOTE: is it [None] (i.e., a silent action) *)
+          (try
+             let* term : M.Enc.t = Theory.get_None_enc_if_eq x in
+             f term
+           with
+           | Theory.NotEqTheory () ->
+             (* NOTE: is it [Some] (i.e., a visible action) *)
+             (try
+                let* term : M.Enc.t = Theory.get_Some_enc_if_eq x in
+                f term
+              with
+              | Theory.NotEqTheory () -> raise (CouldNotFind_Label (x, ys))))
+      ;;
+    end
   end
 
   (** transition *)

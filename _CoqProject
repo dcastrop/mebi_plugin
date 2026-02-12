@@ -109,8 +109,8 @@ src/model.ml
 src/model.mli
 src/wrapper.ml
 src/wrapper.mli
-# src/proof_solver.ml
-# src/proof_solver.mli
+src/proof_solver.ml
+src/proof_solver.mli
 src/api.ml
 src/api.mli
 
