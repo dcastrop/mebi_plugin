@@ -656,7 +656,11 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       =
       let open Syntax in
       let* x = Tacs.unfold_opt_constrexpr_list [ a; b ] in
-      match x with None -> raise (SkipNewProof ()) | Some x -> return x
+      match x with
+      | None -> raise (SkipNewProof ())
+      | Some x ->
+        update_state WeakSim;
+        return x
     ;;
 
     exception StateNotImplemented of State.t
@@ -769,6 +773,7 @@ let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
   let fint = Utils.Strfy.Of Utils.Strfy.int in
   let fbool = Utils.Strfy.Of Utils.Strfy.bool in
   let rec f (n : int) (p : Declare.Proof.t) : int * Declare.Proof.t =
+    Log.thing ~__FUNCTION__ Trace "iter" n (Of Utils.Strfy.int);
     match Int.compare n bound with
     | -1 ->
       if is_done ()

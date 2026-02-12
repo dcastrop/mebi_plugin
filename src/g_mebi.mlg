@@ -52,13 +52,13 @@ END *)
 (* ProofSolver *)
 (* TODO: use Proof_solver and Proof_solver.W *)
 VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
-(* |![ proof ] 
-  [ "MeBiSim" "Solve" int(upper_bound) ] ->
-  { fun ~pstate -> Mebi_proof.solve upper_bound pstate } *)
+|![ proof ] 
+  [ "MeBiSim" "Solve" int(bound) ] ->
+  { fun ~pstate -> Proof_solver.solve ~bound pstate }
 
-(* |![ proof ] 
+|![ proof ] 
   [ "MeBiSim" "Step" ] ->
-  { fun ~pstate -> Mebi_tactics.update_proof_by_tactic pstate (Mebi_proof.step ()) } *)
+  { fun ~pstate -> Proof_solver.step pstate }
 
 |![ proof ] 
   [ "MeBiSim" "Begin" reference(a) constr(x)  
