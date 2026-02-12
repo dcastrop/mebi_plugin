@@ -113,15 +113,15 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     (** [t] represents the internal state-machine used to solve proofs.
         (Note: We are required to split some of the states over several steps since we need to update the proof iteratively in order to apply what we need to apply. E.g., it is easier to apply the constructors one after the other, since we require the proof to be updated by the previous appliction in order to apply the next.)
         - [NewProof] the start state. We unfold any terms that we can before proceeding to [WeakSim].
-        - [WeakSim] either: (i) check if can be solved by cofix in hyps, or (ii) create new cofix. Either stays in [WeakSim] or proceeds to [Cofix], or [Done].
-        - [Cofix] means that the conclusion begins with an [exists a n2] (where [n2] is some state reached from [n] after taking action [a]). We proceed to [GoalTransition] after extracting the transition made by fsm 1 from the hyps (possible requiring inversion beforehand).
+        - [WeakSim] either: (i) check if can be solved by cofix in hyps, or (ii) create new cofix. Either stays in [WeakSim] or proceeds to [Exists], or [Done].
+        - [Exists] means that the conclusion begins with an [exists a n2] (where [n2] is some state reached from [n] after taking action [a]). We proceed to [GoalTransition] after extracting the transition made by fsm 1 from the hyps (possible requiring inversion beforehand).
         - [GoalTransition] is where we determine which transition fsm 2 will make in response to the one made by fsm 1 (in the hyps). We instantiate the necessary values for the label [a] and goto state [n2] and select the constructors to apply. Then proceed to [ApplyConstructors].
         - [ApplyConstructors] is for applying the constructors we know we need to apply in order for fsm 2 to reach a state that is bisimilar to that reached by fsm 1.
         - [Done] means the proof is finished. *)
     type t =
       | NewProof of (Constrexpr.constr_expr * Constrexpr.constr_expr)
       | WeakSim
-      | Cofix
+      | Exists
       | GoalTransition of Transition.t
       | ApplyConstructors of ApplicableConstructors.t
       | Done
@@ -129,7 +129,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     let to_string : t -> string = function
       | NewProof _ -> "NewProof"
       | WeakSim -> "WeakSim"
-      | Cofix -> "Cofix"
+      | Exists -> "Exists"
       | GoalTransition _ -> "GoalTransition"
       | ApplyConstructors _ -> "ApplyConstructors"
       | Done -> "Done"
@@ -291,6 +291,14 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     let new_cofix_name () : Names.Id.t = new_name_of_string "Cofix0"
     let new_H_name () : Names.Id.t = new_name_of_string "H0"
+
+    let get_all_non_cofix_hyp_names () : Names.Id.Set.t =
+      Names.Id.Set.filter
+        (fun (x : Names.Id.t) ->
+          Bool.not
+            (Names.Id.equal (Nameops.root_of_id x) (Names.Id.of_string "Cofix")))
+        (get_hyp_names ())
+    ;;
 
     (***********************************************************************)
 
@@ -516,7 +524,6 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let is_LTS (x : EConstr.t) : bool mm = is_theory x (Theories.c_LTS ())
       let is_None (x : EConstr.t) : bool mm = is_theory x (Theories.c_None ())
       let is_Some (x : EConstr.t) : bool mm = is_theory x (Theories.c_Some ())
-      (* let is_ (x : EConstr.t) : bool P.mm = is_theory x (Theories.c_ ()) *)
 
       (** *)
       let get_theory_enc (f : EConstr.t -> bool mm) : M.Enc.t M.mm =
@@ -648,12 +655,61 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     (***********************************************************************)
 
+    (* module Hyp = struct end *)
+
+    (** conclusion *)
+    module Concl = struct
+      exception NotImplemented of unit
+
+      let is_weak_sim () : bool mm = get_concl () |> Theory.is_weak_sim
+      let is_exists () : bool mm = get_concl () |> Theory.is_exists
+    end
+
+    (** hypothesis *)
+    module Hyps = struct
+      exception NotImplemented of unit
+      exception CouldNotSolveExists of unit
+
+      (** [try_solve_cofix ()] returns a tactic to solve the current goal using one of he cofixes in the hyps. @raise CouldNotSolveExists if no such cofix exists. *)
+      let try_solve_cofix () : Tactic.t mm = 
+      Log.trace __FUNCTION__;
+        raise (NotImplemented ())
+
+      let clear_non_cofix () : Tactic.t =
+        Tactic.tactic
+          ~msg:"(Clearing non-cofix Hyps)"
+          (Tactics.clear
+             (Names.Id.Set.to_list (get_all_non_cofix_hyp_names ())))
+      ;;
+    end
+
+    (***********************************************************************)
+
+    (** [handle_new_cofix ()] returns a sequence of tactics to handle the creation of a new cofix in the hyps, followed by the necessary application of constructors and introduction of terms to get started on a new case.
+    *)
+    let handle_new_cofix () : Tactic.t mm =
+      Log.trace __FUNCTION__;
+      let open Syntax in
+      let* cofix : Tactic.t = Tacs.cofix () in
+      let clear : Tactic.t = Hyps.clear_non_cofix () in
+      let* apply_In_sim : Tactic.t = Tacs.apply_In_sim () in
+      let* apply_Pack_sim : Tactic.t = Tacs.apply_Pack_sim () in
+      let* intros_all : Tactic.t = Tacs.intros_all () in
+      Tactic.chain [ cofix; clear; apply_In_sim; apply_Pack_sim; intros_all ]
+      |> return
+    ;;
+
+    (***********************************************************************)
+
+    exception StateNotImplemented of State.t
+    exception StateCouldNothandle of State.t
     exception SkipNewProof of unit
 
     let handle_new_proof
           ((a, b) : Constrexpr.constr_expr * Constrexpr.constr_expr)
       : Tactic.t mm
       =
+      Log.trace __FUNCTION__;
       let open Syntax in
       let* x = Tacs.unfold_opt_constrexpr_list [ a; b ] in
       match x with
@@ -663,17 +719,51 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         return x
     ;;
 
-    exception StateNotImplemented of State.t
+    let handle_weaksim () : Tactic.t mm =
+      Log.trace __FUNCTION__;
+      let open Syntax in
+      let* is_weak_sim : bool = Concl.is_weak_sim () in
+      if is_weak_sim
+      then (
+        try Hyps.try_solve_cofix () with
+        | Hyps.CouldNotSolveExists () -> handle_new_cofix ())
+      else
+        let* is_exists : bool = Concl.is_exists () in
+        if is_exists
+        then (
+      Log.trace ~__FUNCTION__ "is_exists";
+          raise (StateNotImplemented WeakSim))
+        else raise (StateCouldNothandle WeakSim)
+    ;;
+
+    let handle_exists () : Tactic.t mm =
+      Log.trace __FUNCTION__;
+       raise (StateNotImplemented Exists)
+
+    let handle_goal_transition ({ hyp; goal } : Transition.t) : Tactic.t mm =
+      Log.trace __FUNCTION__;
+      raise (StateNotImplemented (GoalTransition { hyp; goal }))
+    ;;
+
+    let handle_apply_constructors
+          ({ current; annotation; destination } : ApplicableConstructors.t)
+      : Tactic.t mm
+      =
+      Log.trace __FUNCTION__;
+      raise
+        (StateNotImplemented
+           (ApplyConstructors { current; annotation; destination }))
+    ;;
 
     let handle_state () : Tactic.t mm =
       let x = get_state () in
       Log.thing ~__FUNCTION__ Debug "=>" x (Of State.to_string);
       match x with
       | NewProof ab -> handle_new_proof ab
-      | WeakSim -> raise (StateNotImplemented x)
-      | Cofix -> raise (StateNotImplemented x)
-      | GoalTransition { hyp; goal } -> raise (StateNotImplemented x)
-      | ApplyConstructors xs -> raise (StateNotImplemented x)
+      | WeakSim -> handle_weaksim ()
+      | Exists -> handle_exists ()
+      | GoalTransition args -> handle_goal_transition args
+      | ApplyConstructors xs -> handle_apply_constructors xs
       | Done -> raise (NothingToDo ())
     ;;
 
@@ -709,9 +799,6 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       P.step () |> Tactic.unpack_all)
     |> get_updated_pstate
   ;;
-
-  (** hypothesis *)
-  module Hyp = struct end
 end
 
 (***********************************************************************)
