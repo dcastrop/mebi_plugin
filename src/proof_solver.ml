@@ -136,6 +136,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     ;;
   end
 
+  (* TODO: rethink if we need to store the proofstate here *)
   type state =
     { p : Declare.Proof.t
     ; x : State.t
@@ -767,6 +768,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       | Done -> raise (NothingToDo ())
     ;;
 
+    (** [step ()] ... *)
     let rec step () : Tactic.t =
       Log.trace __FUNCTION__;
       try run (handle_state ()) with
