@@ -3263,11 +3263,13 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
     val get_concl : unit -> EConstr.t
     val get_hyps : unit -> Rocq_utils.hyp list
+    val get_hyp_name : Rocq_utils.hyp -> Names.Id.t
     val get_hyp_names : unit -> Names.Id.Set.t
     val next_name_of : Names.Id.Set.t -> Names.Id.t -> Names.Id.t
     val new_name_of_string : string -> Names.Id.t
     val new_cofix_name : unit -> Names.Id.t
     val new_H_name : unit -> Names.Id.t
+    val get_all_cofix_hyp_names : unit -> Names.Id.Set.t
     val get_all_non_cofix_hyp_names : unit -> Names.Id.Set.t
 
     module Tacs : sig
@@ -3279,6 +3281,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
       val simplify_all : unit -> Tactic.t mm
       val simplify_and_subst_all : unit -> Tactic.t mm
       val cofix : unit -> Tactic.t mm
+      val trivial : ?msg:string -> unit -> Tactic.t mm
       val intros_all : unit -> Tactic.t mm
       val intro_as : string -> Tactic.t mm
       val apply : EConstr.t -> Tactic.t mm
@@ -3378,9 +3381,9 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
     module Hyps : sig
       exception NotImplemented of unit
-      exception CouldNotSolveExists of unit
 
-      val try_solve_cofix : unit -> Tactic.t mm
+      val get_cofixes : unit -> Rocq_utils.hyp list
+      val can_solve_concl_cofix : unit -> bool mm
       val clear_non_cofix : unit -> Tactic.t
     end
 
@@ -3417,12 +3420,12 @@ val is_done : unit -> bool
 
 exception BisimilarityResultNotFound of unit
 
-val init :
-  Declare.Proof.t ->
-  Libnames.qualid list ->
-  Constrexpr.constr_expr * Libnames.qualid ->
-  Constrexpr.constr_expr * Libnames.qualid ->
-  Declare.Proof.t
+val init
+  :  Declare.Proof.t
+  -> Libnames.qualid list
+  -> Constrexpr.constr_expr * Libnames.qualid
+  -> Constrexpr.constr_expr * Libnames.qualid
+  -> Declare.Proof.t
 
 val step : Declare.Proof.t -> Declare.Proof.t
 val solve : ?bound:int -> Declare.Proof.t -> Declare.Proof.t
