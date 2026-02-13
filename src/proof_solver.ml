@@ -603,6 +603,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         in
         let f (i : int) (acc : Tactic.t list) =
           (* TODO: determine if we can make an unfold tactic for it *)
+          (* NOTE: see whiteboard at work *)
           return acc
         in
         let* ys = iterate 0 (List.length to_check - 1) [] f in
@@ -810,7 +811,6 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         : Model.Transition.t
         =
         (* TODO: export some of this to the [Model.ActionMap] ? *)
-        (* try *)
         let actions = Model.EdgeMap.find edges from in
         let labelled = Model.ActionMap.reduce_by_label actions label in
         if Model.ActionMap.length labelled |> Int.equal 0
