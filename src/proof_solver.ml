@@ -280,6 +280,11 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     let get_concl () : EConstr.t = Proofview.Goal.concl (gl ())
     let get_hyps () : Rocq_utils.hyp list = Proofview.Goal.hyps (gl ())
+
+    let get_hyp_name (x : Rocq_utils.hyp) : Names.Id.t =
+      Context.Named.Declaration.get_id x
+    ;;
+
     let get_hyp_names () : Names.Id.Set.t = Context.Named.to_vars (get_hyps ())
 
     let next_name_of (names : Names.Id.Set.t) (x : Names.Id.t) : Names.Id.t =
@@ -293,12 +298,15 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     let new_cofix_name () : Names.Id.t = new_name_of_string "Cofix0"
     let new_H_name () : Names.Id.t = new_name_of_string "H0"
 
-    let get_all_non_cofix_hyp_names () : Names.Id.Set.t =
+    let get_all_cofix_hyp_names () : Names.Id.Set.t =
       Names.Id.Set.filter
         (fun (x : Names.Id.t) ->
-          Bool.not
-            (Names.Id.equal (Nameops.root_of_id x) (Names.Id.of_string "Cofix")))
+          Names.Id.equal (Nameops.root_of_id x) (Names.Id.of_string "Cofix"))
         (get_hyp_names ())
+    ;;
+
+    let get_all_non_cofix_hyp_names () : Names.Id.Set.t =
+      Names.Id.Set.diff (get_hyp_names ()) (get_all_cofix_hyp_names ())
     ;;
 
     (***********************************************************************)
@@ -365,6 +373,11 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         Tactics.cofix name
         |> Tactic.tactic
              ~msg:(Printf.sprintf "cofix %s" (Names.Id.to_string name))
+        |> return
+      ;;
+
+      let trivial ?(msg : string = "trivial") () : Tactic.t mm =
+        Tactic.tactic ~msg (Auto.gen_trivial ~debug:Hints.Info [] None)
         |> return
       ;;
 
@@ -662,6 +675,20 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     module Concl = struct
       exception NotImplemented of unit
 
+      let eq (x : EConstr.t) : bool mm = get_concl () |> econstr_eq x
+
+      let eq_hyp (x : Rocq_utils.hyp) : bool mm =
+        Context.Named.Declaration.get_type x |> eq
+      ;;
+
+      let rec eq_any_hyps : Rocq_utils.hyp list -> bool mm = function
+        | [] -> return false
+        | h :: tl ->
+          let open Syntax in
+          let* is_eq : bool = eq_hyp h in
+          if is_eq then return true else eq_any_hyps tl
+      ;;
+
       let is_weak_sim () : bool mm = get_concl () |> Theory.is_weak_sim
       let is_exists () : bool mm = get_concl () |> Theory.is_exists
     end
@@ -669,12 +696,19 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     (** hypothesis *)
     module Hyps = struct
       exception NotImplemented of unit
-      exception CouldNotSolveExists of unit
 
-      (** [try_solve_cofix ()] returns a tactic to solve the current goal using one of he cofixes in the hyps. @raise CouldNotSolveExists if no such cofix exists. *)
-      let try_solve_cofix () : Tactic.t mm = 
-      Log.trace __FUNCTION__;
-        raise (NotImplemented ())
+      let get_cofixes () : Rocq_utils.hyp list =
+        let cofix_names : Names.Id.Set.t = get_all_cofix_hyp_names () in
+        get_hyps ()
+        |> List.filter (fun (x : Rocq_utils.hyp) ->
+          Names.Id.Set.mem (get_hyp_name x) cofix_names)
+      ;;
+
+      (** [can_solve_concl_cofix ()] returns true if there is a hyp that can solve the current a tactic to solve the current goal using one of he cofixes in the hyps.
+      *)
+      let can_solve_concl_cofix () : bool mm =
+        get_cofixes () |> Concl.eq_any_hyps
+      ;;
 
       let clear_non_cofix () : Tactic.t =
         Tactic.tactic
@@ -725,21 +759,24 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let open Syntax in
       let* is_weak_sim : bool = Concl.is_weak_sim () in
       if is_weak_sim
-      then (
-        try Hyps.try_solve_cofix () with
-        | Hyps.CouldNotSolveExists () -> handle_new_cofix ())
+      then
+        let* has_hyp_cofix : bool = Hyps.can_solve_concl_cofix () in
+        if has_hyp_cofix
+        then Tacs.trivial ~msg:"trivial (solve cofix)" ()
+        else handle_new_cofix ()
       else
         let* is_exists : bool = Concl.is_exists () in
         if is_exists
         then (
-      Log.trace ~__FUNCTION__ "is_exists";
+          Log.trace ~__FUNCTION__ "is_exists";
           raise (StateNotImplemented WeakSim))
         else raise (StateCouldNothandle WeakSim)
     ;;
 
     let handle_exists () : Tactic.t mm =
       Log.trace __FUNCTION__;
-       raise (StateNotImplemented Exists)
+      raise (StateNotImplemented Exists)
+    ;;
 
     let handle_goal_transition ({ hyp; goal } : Transition.t) : Tactic.t mm =
       Log.trace __FUNCTION__;
