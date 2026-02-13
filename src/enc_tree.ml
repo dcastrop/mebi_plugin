@@ -118,8 +118,9 @@ struct
     | Node ((enc, index), h :: tl) ->
       (enc, index)
       :: (List.fold_left (fun acc x -> minimize x :: acc) [] tl
+          (* NOTE: we only take the shortest one *)
           |> List.fold_left
-               (fun the_min x ->
+               (fun (the_min : TreeNode.t list) x ->
                  match Int.compare (List.length x) (List.length the_min) with
                  | -1 -> x
                  | _ -> the_min)
@@ -133,9 +134,9 @@ struct
     | h :: tl ->
       List.map minimize tl
       |> List.fold_left
-           (fun the_min y ->
-             match Int.compare (List.length y) (List.length the_min) with
-             | -1 -> y
+           (fun the_min x ->
+             match Int.compare (List.length x) (List.length the_min) with
+             | -1 -> x
              | _ -> the_min)
            (minimize h)
   ;;

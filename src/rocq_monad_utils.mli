@@ -290,6 +290,7 @@ module Make : (Log : Logger.SLogger)
     val econstr_rel_decl : EConstr.rel_declaration -> string
     val hyp_name : Rocq_utils.hyp -> string
     val hyp_type : Rocq_utils.hyp -> string
+    val hyp : Rocq_utils.hyp -> string
     val hyp_value : Rocq_utils.hyp -> string
     val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string
   end

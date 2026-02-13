@@ -96,6 +96,10 @@ struct
     let hyp_name : Rocq_utils.hyp -> string = Rocq_utils.Strfy.hyp_name
     let hyp_type : Rocq_utils.hyp -> string = fstring Rocq_utils.Strfy.hyp_type
 
+    let hyp (x : Rocq_utils.hyp) : string =
+      Printf.sprintf "%s: %s" (hyp_name x) (hyp_type x)
+    ;;
+
     let hyp_value : Rocq_utils.hyp -> string =
       fstring Rocq_utils.Strfy.hyp_value
     ;;

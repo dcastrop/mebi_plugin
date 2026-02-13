@@ -258,6 +258,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
         val econstr_rel_decl : EConstr.rel_declaration -> string
         val hyp_name : Rocq_utils.hyp -> string
         val hyp_type : Rocq_utils.hyp -> string
+    val hyp : Rocq_utils.hyp -> string
         val hyp_value : Rocq_utils.hyp -> string
         val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string
       end
@@ -712,6 +713,10 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
         val to_rev_seq : t -> elt Seq.t
         val add_seq : elt Seq.t -> t -> t
         val of_seq : elt Seq.t -> t
+
+        exception EmptyHasNoMin of unit
+
+        val min : t -> elt
       end
 
       module State : sig
@@ -2624,6 +2629,8 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
     exception NoResultFound of unit
 
     val get_the_result : unit -> Model.Bisimilar.t
+    val get_fsm_a : ?saturated:bool -> unit -> Model.FSM.t
+    val get_fsm_b : ?saturated:bool -> unit -> Model.FSM.t
 
     exception CannotOverrideResult of Model.Bisimilar.t
 
@@ -3009,6 +3016,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
       val econstr_rel_decl : EConstr.rel_declaration -> string
       val hyp_name : Rocq_utils.hyp -> string
       val hyp_type : Rocq_utils.hyp -> string
+    val hyp : Rocq_utils.hyp -> string
       val hyp_value : Rocq_utils.hyp -> string
       val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string
     end
@@ -3261,6 +3269,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
         -> Constructors.t mm
     end
 
+    val to_atomic : EConstr.t -> EConstr.t Rocq_utils.kind_pair mm
     val get_concl : unit -> EConstr.t
     val get_hyps : unit -> Rocq_utils.hyp list
     val get_hyp_name : Rocq_utils.hyp -> Names.Id.t
@@ -3363,13 +3372,36 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
     end
 
     module ReModel : sig
-      exception CouldNotFind_State of (EConstr.t * Model.States.t)
+      exception
+        CouldNotFind_State of
+          { x : EConstr.t
+          ; states : Model.States.t
+          }
 
       val state : EConstr.t -> Model.States.t -> Model.States.elt M.mm
 
-      exception CouldNotFind_Label of (EConstr.t * Model.Labels.t)
+      exception
+        CouldNotFind_Label of
+          { x : EConstr.t
+          ; alphabet : Model.Labels.t
+          }
 
       val label : EConstr.t -> Model.Labels.t -> Model.Labels.elt M.mm
+
+      exception
+        CouldNotFind_Transition of
+          { from : Model.State.t
+          ; goto : Model.State.t
+          ; label : Model.Label.t
+          ; edges : Model.EdgeMap.t'
+          }
+
+      val transition
+        :  Model.State.t
+        -> Model.State.t
+        -> Model.Label.t
+        -> Model.EdgeMap.t'
+        -> Model.Transition.t
     end
 
     module Concl : sig
