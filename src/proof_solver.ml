@@ -294,6 +294,16 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
            end))
         (W.M.Enc)
 
+    module EConstrSet = Set.Make (struct
+        type t = EConstr.t
+
+        let compare (a : t) (b : t) : int =
+          let a = encode a in
+          let b = encode b in
+          Enc.compare a b
+        ;;
+      end)
+
     let to_atomic (x : EConstr.t) : EConstr.t Rocq_utils.kind_pair mm =
       let open Syntax in
       let* sigma = get_sigma in
@@ -545,6 +555,60 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
       let unfold_silent1 () : Tactic.t mm =
         unfold_econstr (Theories.c_silent1 ())
+      ;;
+
+      let collect_component_econstrs (sigma : Evd.evar_map) (x : EConstr.t)
+        : EConstrSet.t
+        =
+        Log.trace __FUNCTION__;
+        let is_constr_ref (x : EConstr.t) : bool =
+          EConstr.isRef sigma x && EConstr.isConst sigma x
+        in
+        let acc_constr_ref (x : EConstr.t) (acc : EConstrSet.t) : EConstrSet.t =
+          if is_constr_ref x then EConstrSet.add x acc else acc
+        in
+        let rec f (acc : EConstrSet.t) (x : EConstr.t) : EConstrSet.t =
+          let acc = acc_constr_ref x acc in
+          try
+            let ty, tys = Rocq_utils.econstr_to_atomic sigma x in
+            let acc = acc_constr_ref ty acc in
+            Array.fold_left
+              (fun (acc : EConstrSet.t) (y : EConstr.t) -> f acc y)
+              acc
+              tys
+          with
+          | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> acc
+        in
+        f EConstrSet.empty x
+      ;;
+
+      (* let can_be_unfolded  (sigma : Evd.evar_map) (x:EConstr.t) : bool =
+         let g,i = EConstr.destRef sigma x   in
+         match g with
+         |  ConstRef x -> (
+         let lookup = Global.lookup_constant x in
+         match lookup.const_body with
+         |
+         )
+         | _ -> false
+         ;; *)
+
+      (** [try_unfold_any x] *)
+      let try_unfold_any (x : EConstr.t) : Tactic.t option mm =
+        Log.trace __FUNCTION__;
+        let open Syntax in
+        let* sigma = get_sigma in
+        let to_check =
+          collect_component_econstrs sigma x |> EConstrSet.to_list
+        in
+        let f (i : int) (acc : Tactic.t list) =
+          (* TODO: determine if we can make an unfold tactic for it *)
+          return acc
+        in
+        let* ys = iterate 0 (List.length to_check - 1) [] f in
+        match ys with
+        | [] -> return None
+        | ys -> Some (Tactic.chain ys) |> return
       ;;
     end
 

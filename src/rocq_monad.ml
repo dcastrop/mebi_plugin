@@ -212,4 +212,17 @@ struct
          include Enc
        end))
   ;;
+
+  let make_econstr_set () : (module Set.S with type elt = EConstr.t) =
+    Log.trace __FUNCTION__;
+    (module Set.Make (struct
+         type t = EConstr.t
+
+         let compare (a : t) (b : t) : int =
+           let a = encode a in
+           let b = encode b in
+           Enc.compare a b
+         ;;
+       end))
+  ;;
 end
