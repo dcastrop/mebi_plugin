@@ -13,6 +13,18 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       match !the_result with None -> raise (NoResultFound ()) | Some x -> !x
     ;;
 
+    let get_fsm_a ?(saturated : bool = false) () : Model.FSM.t =
+      if saturated
+      then (get_the_result ()).fsm_a.saturated
+      else (get_the_result ()).fsm_a.original
+    ;;
+
+    let get_fsm_b ?(saturated : bool = false) () : Model.FSM.t =
+      if saturated
+      then (get_the_result ()).fsm_b.saturated
+      else (get_the_result ()).fsm_b.original
+    ;;
+
     exception CannotOverrideResult of Model.Bisimilar.t
 
     let set_the_result (x : Model.Bisimilar.t) : unit =
@@ -114,7 +126,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         (Note: We are required to split some of the states over several steps since we need to update the proof iteratively in order to apply what we need to apply. E.g., it is easier to apply the constructors one after the other, since we require the proof to be updated by the previous appliction in order to apply the next.)
         - [NewProof] the start state. We unfold any terms that we can before proceeding to [WeakSim].
         - [WeakSim] either: (i) check if can be solved by cofix in hyps, or (ii) create new cofix. Either stays in [WeakSim] or proceeds to [Exists], or [Done].
-        - [Exists] means that the conclusion begins with an [exists a n2] (where [n2] is some state reached from [n] after taking action [a]). We proceed to [GoalTransition] after extracting the transition made by fsm 1 from the hyps (possible requiring inversion beforehand).
+        - [Exists] means that the conclusion begins with an [exists a n2] (where [n2] is some state reached from [n] after taking action [a]). Either (i) we stay in [Exists] to invert the hypothesis, or (ii) we proceed to [GoalTransition] after extracting the transition made by fsm 1 from the hyps (possible requiring inversion beforehand), and applying [ex_intro] and [split] tactics to the conclusion.
         - [GoalTransition] is where we determine which transition fsm 2 will make in response to the one made by fsm 1 (in the hyps). We instantiate the necessary values for the label [a] and goto state [n2] and select the constructors to apply. Then proceed to [ApplyConstructors].
         - [ApplyConstructors] is for applying the constructors we know we need to apply in order for fsm 2 to reach a state that is bisimilar to that reached by fsm 1.
         - [Done] means the proof is finished. *)
@@ -152,6 +164,10 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
   let get_pstate () : Declare.Proof.t = !(get_the_state ()).p
   let get_state () : State.t = !(get_the_state ()).x
+
+  let log_state () : unit =
+    Log.thing Debug "proofstate =>" (get_state ()) (Of State.to_string)
+  ;;
 
   (** [is_done ()] is true if the state [x] is [Done], else checks if [p] is done (via [Proof.is_done]).
   *)
@@ -278,8 +294,22 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
            end))
         (W.M.Enc)
 
+    let to_atomic (x : EConstr.t) : EConstr.t Rocq_utils.kind_pair mm =
+      let open Syntax in
+      let* sigma = get_sigma in
+      Rocq_utils.econstr_to_atomic sigma x |> return
+    ;;
+
     let get_concl () : EConstr.t = Proofview.Goal.concl (gl ())
     let get_hyps () : Rocq_utils.hyp list = Proofview.Goal.hyps (gl ())
+
+    let log_concl () : unit =
+      Log.thing Debug "concl" (get_concl ()) (Of Strfy.econstr)
+    ;;
+
+    let log_hyps () : unit =
+      Log.things Debug "hyps" (get_hyps ()) (Of Strfy.hyp)
+    ;;
 
     let get_hyp_name (x : Rocq_utils.hyp) : Names.Id.t =
       Context.Named.Declaration.get_id x
@@ -379,6 +409,22 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let trivial ?(msg : string = "trivial") () : Tactic.t mm =
         Tactic.tactic ~msg (Auto.gen_trivial ~debug:Hints.Info [] None)
         |> return
+      ;;
+
+      let ex_intro (x : Model.State.t) : Tactic.t mm =
+        let bindings = Tactypes.ImplicitBindings [ M.decode x.term ] in
+        Tactic.tactic (Tactics.constructor_tac true None 1 bindings) |> return
+      ;;
+
+      let split () : Tactic.t mm =
+        Tactic.tactic (Tactics.split Tactypes.NoBindings) |> return
+      ;;
+
+      let ex_intro_split (x : Model.State.t) : Tactic.t mm =
+        let open Syntax in
+        let* ex_intro : Tactic.t = ex_intro x in
+        let* split : Tactic.t = split () in
+        Tactic.seq ex_intro split |> return
       ;;
 
       let intros_all () : Tactic.t mm =
@@ -503,13 +549,20 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     end
 
     module Theory = struct
+      (** [is_any_theory x] is [true] if term [x] is equal to any of the terms presented in [Theories].
+      *)
+      let is_any_theory (x : EConstr.t) : bool =
+        Theories.collect_bisimilarity_theories ()
+        |> List.exists (fun (y : EConstr.t) -> run (econstr_eq x y))
+      ;;
+
       (** [is_theory x y] checks if term [x] is equal to theory term [y], catching the exception thrown when [EConstr.kind_of_type x] is not [AtomicType (ty, tys)].
       *)
       let is_theory (x : EConstr.t) (y : EConstr.t) : bool mm =
         try
           let open Syntax in
-          let* sigma = get_sigma in
-          Rocq_utils.econstr_to_atomic sigma x |> fst |> econstr_eq y
+          let* ty, tys = to_atomic x in
+          econstr_eq y ty
         with
         | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> return false
       ;;
@@ -625,13 +678,19 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         match m with
         | { info = { meta = None; _ }; _ } -> raise (FSM_HasNoConstructors m)
         | { info = { meta = Some { lts; _ }; _ }; _ } ->
-          M.exists_eq x lts Decode.lts_constructor
+          if is_any_theory x
+          then M.return false
+          else M.exists_eq x lts Decode.lts_constructor
       ;;
     end
 
     (** remodel *)
     module ReModel = struct
-      exception CouldNotFind_State of (EConstr.t * Model.States.t)
+      exception
+        CouldNotFind_State of
+          { x : EConstr.t
+          ; states : Model.States.t
+          }
 
       let state (x : EConstr.t) (ys : Model.States.t) : Model.State.t M.mm =
         try
@@ -639,10 +698,14 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           (* NOTE: [Model.States.compare] only cares about [term]. *)
           Model.States.find { term; pp = None } ys |> M.return
         with
-        | Not_found -> raise (CouldNotFind_State (x, ys))
+        | Not_found -> raise (CouldNotFind_State { x; states = ys })
       ;;
 
-      exception CouldNotFind_Label of (EConstr.t * Model.Labels.t)
+      exception
+        CouldNotFind_Label of
+          { x : EConstr.t
+          ; alphabet : Model.Labels.t
+          }
 
       let label (x : EConstr.t) (ys : Model.Labels.t) : Model.Label.t M.mm =
         let f (term : M.Enc.t) : Model.Label.t M.mm =
@@ -663,13 +726,131 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
                 let* term : M.Enc.t = Theory.get_Some_enc_if_eq x in
                 f term
               with
-              | Theory.NotEqTheory () -> raise (CouldNotFind_Label (x, ys))))
+              | Theory.NotEqTheory () ->
+                raise (CouldNotFind_Label { x; alphabet = ys })))
+      ;;
+
+      exception
+        CouldNotFind_Transition of
+          { from : Model.State.t
+          ; goto : Model.State.t
+          ; label : Model.Label.t
+          ; edges : Model.EdgeMap.t'
+          }
+
+      let transition
+            (from : Model.State.t)
+            (goto : Model.State.t)
+            (label : Model.Label.t)
+            (edges : Model.EdgeMap.t')
+        : Model.Transition.t
+        =
+        (* TODO: export some of this to the [Model.ActionMap] ? *)
+        (* try *)
+        let actions = Model.EdgeMap.find edges from in
+        let labelled = Model.ActionMap.reduce_by_label actions label in
+        if Model.ActionMap.length labelled |> Int.equal 0
+        then raise (CouldNotFind_Transition { from; goto; label; edges })
+        else (
+          let actionpairs =
+            Model.ActionMap.to_seq labelled
+            |> List.of_seq
+            |> List.filter
+                 (fun
+                     ((action, destinations) : Model.Action.t * Model.States.t)
+                    -> Model.States.mem goto destinations)
+          in
+          match actionpairs with
+          | [] -> raise (CouldNotFind_Transition { from; goto; label; edges })
+          | ({ annotation; constructor_trees; _ }, _) :: [] ->
+            { from
+            ; goto
+            ; label
+            ; annotation
+            ; constructor_tree = Model.Trees.min constructor_trees
+            }
+          | h :: tl ->
+            (* TODO: move this proceed to [Model] and handle this case *)
+            Log.warning ~__FUNCTION__ "Multiple actionpairs found";
+            raise (CouldNotFind_Transition { from; goto; label; edges }))
       ;;
     end
 
     (***********************************************************************)
 
-    (* module Hyp = struct end *)
+    module Hyp = struct
+      exception NotImplemented of unit
+
+      type t = Rocq_utils.hyp
+
+      let to_string (x : t) : string = Strfy.hyp x
+
+      let to_atomic (x : t) : EConstr.t Rocq_utils.kind_pair mm =
+        let open Syntax in
+        let* sigma = get_sigma in
+        Rocq_utils.hyp_to_atomic sigma x |> return
+      ;;
+
+      (** [invertibility x] returns an integer denoting whether [x] need be inverted, with the higher numbers being of more importance to invert and [0] denoting [x] does not need to be inverted.
+      *)
+      let invertibility (x : t) : int mm =
+        let open Syntax in
+        let* _, tys = to_atomic x in
+        let* sigma = get_sigma in
+        (* NOTE: returns true if can be inverted *)
+        let f (x : EConstr.t) : bool =
+          EConstr.isRef sigma x && EConstr.isVar sigma x
+        in
+        (* NOTE: since [2] is the goto-state and [1] is the label, [g] allows us to clearly see which hyp needs to be inverted first. *)
+        let g (i : int) : int =
+          try if f tys.(i) then i else 0 with
+          (* NOTE: handles "Index out of bounds" for accessing [tys] array. *)
+          | Invalid_argument _ -> 0
+        in
+        g 2 + g 1 |> return
+      ;;
+
+      let need_inversion (x : t) : bool mm =
+        let open Syntax in
+        let* n : int = invertibility x in
+        if Int.equal n 0 then return false else return true
+      ;;
+
+      let invert (x : t) : Tactic.t mm = Tacs.inversion x
+
+      exception
+        CouldNotGetTransition of
+          { hyp : t
+          ; fsm : Model.FSM.t
+          }
+
+      (** *)
+      let get_transition (x : t) (m : Model.FSM.t) : Model.Transition.t mm =
+        Log.trace __FUNCTION__;
+        let open Syntax in
+        let* ty, tys = to_atomic x in
+        let is_fsm_constructor : bool =
+          M.run (Theory.is_fsm_constructor ty m)
+        in
+        if is_fsm_constructor
+        then (
+          try
+            let from : Model.State.t = M.run (ReModel.state tys.(0) m.states) in
+            let goto : Model.State.t = M.run (ReModel.state tys.(2) m.states) in
+            let label : Model.Label.t =
+              M.run (ReModel.label tys.(1) m.alphabet)
+            in
+            ReModel.transition from goto label m.edges |> return
+          with
+          | ReModel.CouldNotFind_State _ ->
+            raise (CouldNotGetTransition { hyp = x; fsm = m })
+          | ReModel.CouldNotFind_Label _ ->
+            raise (CouldNotGetTransition { hyp = x; fsm = m })
+          | ReModel.CouldNotFind_Transition _ ->
+            raise (CouldNotGetTransition { hyp = x; fsm = m }))
+        else raise (NotImplemented ())
+      ;;
+    end
 
     (** conclusion *)
     module Concl = struct
@@ -697,8 +878,19 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     module Hyps = struct
       exception NotImplemented of unit
 
+      (** [get_cofixes ()] filters the hyps by name according to [get_all_cofix_hyp_names ()].
+      *)
       let get_cofixes () : Rocq_utils.hyp list =
         let cofix_names : Names.Id.Set.t = get_all_cofix_hyp_names () in
+        get_hyps ()
+        |> List.filter (fun (x : Rocq_utils.hyp) ->
+          Names.Id.Set.mem (get_hyp_name x) cofix_names)
+      ;;
+
+      (** [get_non_cofixes ()] filters the hyps by name according to [get_all_non_cofix_hyp_names ()].
+      *)
+      let get_non_cofixes () : Rocq_utils.hyp list =
+        let cofix_names : Names.Id.Set.t = get_all_non_cofix_hyp_names () in
         get_hyps ()
         |> List.filter (fun (x : Rocq_utils.hyp) ->
           Names.Id.Set.mem (get_hyp_name x) cofix_names)
@@ -710,11 +902,62 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         get_cofixes () |> Concl.eq_any_hyps
       ;;
 
+      (** [clear_non_cofix ()] returns a tactic that will clear all the hyps that are named according to [get_all_non_cofix_hyp_names ()]. This is to be used at the end of a case of the proof has been solved.
+          (* TODO: check if this is necessary -- or could be problematic? *) *)
       let clear_non_cofix () : Tactic.t =
         Tactic.tactic
           ~msg:"(Clearing non-cofix Hyps)"
           (Tactics.clear
              (Names.Id.Set.to_list (get_all_non_cofix_hyp_names ())))
+      ;;
+
+      (** [try_invert_any ()] returns either [None] if no hyps can be inverted (as determined by [Hyp.invertibility]), else a [Tactic.t] that will invert the hypothesis deemed to be the most important to invert. (Only checks non-cofix hyps as by [get_non_cofixes ()].)
+      *)
+      let try_invert_any () : Tactic.t option mm =
+        let hyps = get_non_cofixes () in
+        let open Syntax in
+        let f (i : int) (xopt : (int * Hyp.t) option) : (int * Hyp.t) option mm =
+          let y = List.nth hyps i in
+          let* grade = Hyp.invertibility y in
+          match xopt with
+          | None -> Some (grade, y) |> return
+          | Some (n, x) ->
+            (match Int.compare grade n with
+             | -1 -> Some (n, x) |> return
+             | _ -> Some (grade, y) |> return)
+        in
+        let* to_invert_opt = iterate 0 (List.length hyps - 1) None f in
+        match to_invert_opt with
+        | None -> return None
+        | Some (0, x) -> return None
+        (* NOTE: we only want to invert hyps with non-zero grades. *)
+        | Some (grade, x) ->
+          let* y = Hyp.invert x in
+          return (Some y)
+      ;;
+
+      exception CannotGetTransition of Model.FSM.t
+
+      let get_transition (m : Model.FSM.t) : Model.Transition.t mm =
+        Log.trace __FUNCTION__;
+        let hyps = get_hyps () in
+        let open Syntax in
+        let f (i : int)
+          : Model.Transition.t option -> Model.Transition.t option mm
+          = function
+          | Some x -> return (Some x)
+          | None ->
+            let y = List.nth hyps i in
+            (try
+               let* y : Model.Transition.t = Hyp.get_transition y m in
+               return (Some y)
+             with
+             | Hyp.CouldNotGetTransition _ -> return None)
+        in
+        let* x = iterate 0 (List.length hyps - 1) None f in
+        match x with
+        | None -> raise (CannotGetTransition m)
+        | Some x -> return x
       ;;
     end
 
@@ -739,6 +982,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     exception StateNotImplemented of State.t
     exception StateCouldNothandle of State.t
     exception SkipNewProof of unit
+    exception ExitWeakSim of unit
 
     let handle_new_proof
           ((a, b) : Constrexpr.constr_expr * Constrexpr.constr_expr)
@@ -765,17 +1009,25 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         then Tacs.trivial ~msg:"trivial (solve cofix)" ()
         else handle_new_cofix ()
       else
-        let* is_exists : bool = Concl.is_exists () in
-        if is_exists
-        then (
-          Log.trace ~__FUNCTION__ "is_exists";
-          raise (StateNotImplemented WeakSim))
-        else raise (StateCouldNothandle WeakSim)
+        (* NOTE: try invert any that need to be inverted *)
+        let* invert_opt = Hyps.try_invert_any () in
+        match invert_opt with
+        | None -> raise (ExitWeakSim ())
+        | Some x -> return x
     ;;
 
     let handle_exists () : Tactic.t mm =
       Log.trace __FUNCTION__;
-      raise (StateNotImplemented Exists)
+      let open Syntax in
+      let* is_exists : bool = Concl.is_exists () in
+      if is_exists
+      then (
+        Log.trace ~__FUNCTION__ "is_exists";
+        let* hyp : Model.Transition.t = Hyps.get_transition (W.get_fsm_a ()) in
+        (* TODO: cannot proceed until unfold is also fixed *)
+        (* Tacs.ex_intro_split (); *)
+        raise (StateNotImplemented Exists))
+      else raise (StateCouldNothandle Exists)
     ;;
 
     let handle_goal_transition ({ hyp; goal } : Transition.t) : Tactic.t mm =
@@ -794,9 +1046,10 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     ;;
 
     let handle_state () : Tactic.t mm =
-      let x = get_state () in
-      Log.thing ~__FUNCTION__ Debug "=>" x (Of State.to_string);
-      match x with
+      log_state ();
+      log_hyps ();
+      log_concl ();
+      match get_state () with
       | NewProof ab -> handle_new_proof ab
       | WeakSim -> handle_weaksim ()
       | Exists -> handle_exists ()
@@ -813,6 +1066,19 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         Log.trace ~__FUNCTION__ "BeginProof:SkipNewProof => WeakSim";
         update_state WeakSim;
         step ()
+      | ExitWeakSim () ->
+        Log.trace ~__FUNCTION__ "WeakSim:ExitWeakSim => Exists";
+        update_state Exists;
+        step ()
+      (********************)
+      | M.EncodingNotFound x ->
+        Log.thing Warning "M.EncodingNotFound" x (Of M.Strfy.econstr);
+        Log.thing Warning "(using P)" x (Of Strfy.econstr);
+        raise (M.EncodingNotFound x)
+      | EncodingNotFound x ->
+        Log.thing Warning "(M).EncodingNotFound" x (Of Strfy.econstr);
+        Log.thing Warning "(using M)" x (Of M.Strfy.econstr);
+        raise (M.EncodingNotFound x)
     ;;
   end
 
@@ -835,7 +1101,9 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           let gl = ref gl
         end)
       in
-      P.step () |> Tactic.unpack_all)
+      let x = P.step () in
+      let y = P.run (P.Tacs.simplify_and_subst_all ()) in
+      Tactic.seq x y |> Tactic.unpack_all)
     |> get_updated_pstate
   ;;
 end

@@ -296,6 +296,7 @@ module Make : (Log : Logger.SLogger)
       val econstr_rel_decl : EConstr.rel_declaration -> string
       val hyp_name : Rocq_utils.hyp -> string
       val hyp_type : Rocq_utils.hyp -> string
+      val hyp : Rocq_utils.hyp -> string
       val hyp_value : Rocq_utils.hyp -> string
       val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string
     end
@@ -777,6 +778,9 @@ module Make : (Log : Logger.SLogger)
       val to_rev_seq : t -> elt Seq.t
       val add_seq : elt Seq.t -> t -> t
       val of_seq : elt Seq.t -> t
+  exception EmptyHasNoMin of unit
+
+  val min : t -> elt
     end
 
     module State : sig
@@ -3072,6 +3076,7 @@ module Default : () -> sig
       val econstr_rel_decl : EConstr.rel_declaration -> string
       val hyp_name : Rocq_utils.hyp -> string
       val hyp_type : Rocq_utils.hyp -> string
+      val hyp : Rocq_utils.hyp -> string
       val hyp_value : Rocq_utils.hyp -> string
       val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string
     end

@@ -1,6 +1,30 @@
 module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
   module Tree = Enc_tree.Make (Enc)
-  module Trees : Set.S with type elt = Tree.t = Set.Make (Tree)
+
+  (* module Trees : Set.S with type elt = Tree.t = Set.Make (Tree) *)
+  module Trees = struct
+    include Set.Make (Tree)
+
+    exception EmptyHasNoMin of unit
+
+    (** obtain the tree with the shortest minimized length *)
+    let min (xs : t) : elt =
+      match to_list xs with
+      | [] -> raise (EmptyHasNoMin ())
+      | h :: tl ->
+        List.fold_left
+          (fun (acc : elt) (x : elt) ->
+            match
+              Int.compare
+                (Tree.minimize x |> List.length)
+                (Tree.minimize acc |> List.length)
+            with
+            | -1 -> x
+            | _ -> acc)
+          h
+          tl
+    ;;
+  end
 
   module State = struct
     type t =
