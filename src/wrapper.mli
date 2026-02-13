@@ -263,7 +263,7 @@ module Make : (Log : Logger.SLogger)
       unit -> (module Hashtbl.S with type key = Enc.t)
 
     val make_set : unit -> (module Set.S with type elt = Enc.t)
-  val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t)
+  (* val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t) *)
     val fresh_evar : Rocq_utils.evar_source -> Evd.econstr mm
     val econstr_eq : Evd.econstr -> Evd.econstr -> bool mm
     val econstr_normalize : Evd.econstr -> Evd.econstr mm
@@ -3044,7 +3044,7 @@ module Default : () -> sig
       unit -> (module Hashtbl.S with type key = Enc.t)
 
     val make_set : unit -> (module Set.S with type elt = Enc.t)
-  val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t)
+  (* val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t) *)
     val fresh_evar : Rocq_utils.evar_source -> Evd.econstr mm
     val econstr_eq : Evd.econstr -> Evd.econstr -> bool mm
     val econstr_normalize : Evd.econstr -> Evd.econstr mm
