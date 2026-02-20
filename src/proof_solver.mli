@@ -236,7 +236,8 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
       val make_hashtbl : unit -> (module Hashtbl.S with type key = Enc.t)
       val make_set : unit -> (module Set.S with type elt = Enc.t)
-  (* val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t) *)
+
+      (* val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t) *)
       val fresh_evar : Rocq_utils.evar_source -> Evd.econstr mm
       val econstr_eq : Evd.econstr -> Evd.econstr -> bool mm
       val econstr_normalize : Evd.econstr -> Evd.econstr mm
@@ -255,14 +256,14 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
       val type_of_constrexpr : Constrexpr.constr_expr -> Evd.econstr mm
 
       module Strfy : sig
-    val constr : Constr.t -> string
-    val constr_kind : Constr.t -> string
+        val constr : Constr.t -> string
+        val constr_kind : Constr.t -> string
         val econstr : Evd.econstr -> string
-    val econstr_kind : Evd.econstr -> string
+        val econstr_kind : Evd.econstr -> string
         val econstr_rel_decl : EConstr.rel_declaration -> string
         val hyp_name : Rocq_utils.hyp -> string
         val hyp_type : Rocq_utils.hyp -> string
-    val hyp : Rocq_utils.hyp -> string
+        val hyp : Rocq_utils.hyp -> string
         val hyp_value : Rocq_utils.hyp -> string
         val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string
       end
@@ -2630,7 +2631,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
     val the_result : Model.Bisimilar.t ref option ref
 
-    exception NoResultFound of unit
+    exception NoResultFound
 
     val get_the_result : unit -> Model.Bisimilar.t
     val get_fsm_a : ?saturated:bool -> unit -> Model.FSM.t
@@ -2640,7 +2641,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
     val set_the_result : Model.Bisimilar.t -> unit
 
-    exception BisimilarityResultNotFound of unit
+    exception BisimilarityResultNotFound
 
     val check_bisimilarity
       :  Libnames.qualid list
@@ -2854,7 +2855,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
     val the_maps : maps ref option ref
     val reset : unit -> unit
 
-    exception MapsNotInitialised
+    exception MapsNotInitialised of unit
 
     val get_the_maps : unit -> maps ref
     val fwdmap : unit -> Enc.t F.t
@@ -2979,7 +2980,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
       val compare : t -> t -> int
       val minimize : t -> TreeNode.t list
 
-      exception CannotMinimizeEmptyList
+      exception CannotMinimizeEmptyList of unit
 
       val min : t list -> TreeNode.t list
       val to_string : t -> string
@@ -2998,7 +2999,8 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
     val make_hashtbl : unit -> (module Hashtbl.S with type key = Enc.t)
     val make_set : unit -> (module Set.S with type elt = Enc.t)
-  (* val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t) *)
+
+    (* val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t) *)
     val fresh_evar : Rocq_utils.evar_source -> Evd.econstr mm
     val econstr_eq : Evd.econstr -> Evd.econstr -> bool mm
     val econstr_normalize : Evd.econstr -> Evd.econstr mm
@@ -3017,14 +3019,14 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
     val type_of_constrexpr : Constrexpr.constr_expr -> Evd.econstr mm
 
     module Strfy : sig
-    val constr : Constr.t -> string
-    val constr_kind : Constr.t -> string
+      val constr : Constr.t -> string
+      val constr_kind : Constr.t -> string
       val econstr : Evd.econstr -> string
-    val econstr_kind : Evd.econstr -> string
+      val econstr_kind : Evd.econstr -> string
       val econstr_rel_decl : EConstr.rel_declaration -> string
       val hyp_name : Rocq_utils.hyp -> string
       val hyp_type : Rocq_utils.hyp -> string
-    val hyp : Rocq_utils.hyp -> string
+      val hyp : Rocq_utils.hyp -> string
       val hyp_value : Rocq_utils.hyp -> string
       val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string
     end
