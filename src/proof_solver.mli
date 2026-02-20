@@ -1,4 +1,4 @@
-exception NothingToDo of unit
+exception NothingToDo
 
 module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
   module W : sig
@@ -2720,7 +2720,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
   val the_state : state ref option ref
 
-  exception NoStateFound of unit
+  exception NoStateFound
 
   val get_the_state : unit -> state ref
   val get_pstate : unit -> Declare.Proof.t
@@ -2758,7 +2758,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
     val seq : t -> t -> t
     val empty : unit -> t
 
-    exception EmptyTacticChain of unit
+    exception EmptyTacticChain
 
     val chain : ?nonempty:bool -> t list -> t
   end
@@ -2854,7 +2854,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
     val the_maps : maps ref option ref
     val reset : unit -> unit
 
-    exception MapsNotInitialised of unit
+    exception MapsNotInitialised
 
     val get_the_maps : unit -> maps ref
     val fwdmap : unit -> Enc.t F.t
@@ -2979,7 +2979,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
       val compare : t -> t -> int
       val minimize : t -> TreeNode.t list
 
-      exception CannotMinimizeEmptyList of unit
+      exception CannotMinimizeEmptyList
 
       val min : t list -> TreeNode.t list
       val to_string : t -> string
@@ -3344,15 +3344,15 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
       val is_Some : EConstr.t -> bool mm
       val get_theory_enc : (EConstr.t -> bool mm) -> M.Enc.t M.mm
 
-      exception NoEncodingFoundFor_TheoriesNone of unit
+      exception NoEncodingFoundFor_TheoriesNone
 
       val get_None_enc : unit -> M.Enc.t M.mm
 
-      exception NoEncodingFoundFor_TheoriesSome of unit
+      exception NoEncodingFoundFor_TheoriesSome
 
       val get_Some_enc : unit -> M.Enc.t M.mm
 
-      exception NotEqTheory of unit
+      exception NotEqTheory
 
       val get_theory_enc_if_eq
         :  EConstr.t
@@ -3413,14 +3413,14 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
     end
 
     module Concl : sig
-      exception NotImplemented of unit
+      exception NotImplemented
 
       val is_weak_sim : unit -> bool mm
       val is_exists : unit -> bool mm
     end
 
     module Hyps : sig
-      exception NotImplemented of unit
+      exception NotImplemented
 
       val get_cofixes : unit -> Rocq_utils.hyp list
       val can_solve_concl_cofix : unit -> bool mm
@@ -3431,7 +3431,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
     exception StateNotImplemented of State.t
     exception StateCouldNothandle of State.t
-    exception SkipNewProof of unit
+    exception SkipNewProof
 
     val handle_new_proof
       :  Constrexpr.constr_expr * Constrexpr.constr_expr
@@ -3452,13 +3452,13 @@ end
 (* val the_proof_solver : (module S) ref option ref *)
 val reset_the_proof_solver : unit -> unit
 
-exception NoProofSolverFound of unit
+exception NoProofSolverFound
 
 (* val get_the_proof_solver : unit -> (module S) ref *)
 (* val new_proof_solver : unit -> (module S) ref *)
 val is_done : unit -> bool
 
-exception BisimilarityResultNotFound of unit
+exception BisimilarityResultNotFound
 
 val init
   :  Declare.Proof.t
