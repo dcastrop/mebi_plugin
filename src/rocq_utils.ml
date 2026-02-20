@@ -328,13 +328,15 @@ module Strfy = struct
 
   (*****************************************************************************)
 
-  let constr_kind env sigma ?(args : style_args = style_args ()) (x : Constr.t)
+  let constr_kind env sigma 
+  (* ?(args : style_args = style_args ())  *)
+  (x : Constr.t)
     : string
     =
     let k : string =
       list
         ~args:
-          { args with
+          { (style_args ()) with
             name = Some "Constr_kinds"
           ; style = Some (collection_style Record)
           }
@@ -407,14 +409,14 @@ module Strfy = struct
   let econstr_kind
         env
         sigma
-        ?(args : style_args = style_args ())
-        (x : EConstr.t)
+        (* ?(args : style_args = style_args ()) *)
+          (x : EConstr.t)
     : string
     =
     let k : string =
       list
         ~args:
-          { args with
+          { (style_args ()) with
             name = Some "EConstr_kinds"
           ; style = Some (collection_style Record)
           }
