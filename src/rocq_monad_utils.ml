@@ -87,7 +87,17 @@ struct
   (*********************************************************)
 
   module Strfy = struct
+    let constr : Constr.t -> string = fstring Rocq_utils.Strfy.constr
+    
+    let constr_kind : Constr.t -> string =
+      fstring Rocq_utils.Strfy.constr_kind
+    ;;
+
     let econstr : EConstr.t -> string = fstring Rocq_utils.Strfy.econstr
+
+    let econstr_kind : EConstr.t -> string =
+      fstring Rocq_utils.Strfy.econstr_kind
+    ;;
 
     let econstr_rel_decl : EConstr.rel_declaration -> string =
       fstring Rocq_utils.Strfy.econstr_rel_decl

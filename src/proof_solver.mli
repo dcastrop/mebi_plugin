@@ -255,7 +255,10 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
       val type_of_constrexpr : Constrexpr.constr_expr -> Evd.econstr mm
 
       module Strfy : sig
+    val constr : Constr.t -> string
+    val constr_kind : Constr.t -> string
         val econstr : Evd.econstr -> string
+    val econstr_kind : Evd.econstr -> string
         val econstr_rel_decl : EConstr.rel_declaration -> string
         val hyp_name : Rocq_utils.hyp -> string
         val hyp_type : Rocq_utils.hyp -> string
@@ -3014,7 +3017,10 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
     val type_of_constrexpr : Constrexpr.constr_expr -> Evd.econstr mm
 
     module Strfy : sig
+    val constr : Constr.t -> string
+    val constr_kind : Constr.t -> string
       val econstr : Evd.econstr -> string
+    val econstr_kind : Evd.econstr -> string
       val econstr_rel_decl : EConstr.rel_declaration -> string
       val hyp_name : Rocq_utils.hyp -> string
       val hyp_type : Rocq_utils.hyp -> string
