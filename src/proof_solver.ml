@@ -294,6 +294,8 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
            end))
         (W.M.Enc)
 
+    (** [EConstrSet] is a custom [Set] of [EConstr.t] that allows terms to be compared more efficiently during {b a single proof step only} -- since this is built for each step. {e Though, since each proof step we have a new [env] and [sigma], the same term may be encoded differently across iteration steps, so there isn't necessarily a way for us to compare terms in a proof across iterations anyway. {b ! This needs to be investigated.}}
+    *)
     module EConstrSet = Set.Make (struct
         type t = EConstr.t
 
@@ -303,6 +305,13 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           Enc.compare a b
         ;;
       end)
+
+    (** [UnfoldCache] is a set containing all of the terms that we have detected can be unfolded.
+        (* TODO: not implementing yet as I'm unsure if there will be issues with the env/sigma not being preserved across proof iterations. *)
+    *)
+    (* module UnfoldCache = struct
+       let the_cache : EConstrSet.s
+       end *)
 
     let to_atomic (x : EConstr.t) : EConstr.t Rocq_utils.kind_pair mm =
       let open Syntax in
@@ -477,20 +486,21 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       (* *)
       exception CannotUnfoldConstr of Constr.t
 
-      (** [unfold_constr x]
+      (** [unfold_constr ?in_hyp x] ... {e NOTE: term [x] is always unfolded. If [?in_hyp] is provided then we {b also} unfold [x] [in_hyp].}
           @raise CannotUnfoldConstr
             of [x] if [Constr.kind x] is not [Const (_, _)]. *)
       let unfold_constr ?(in_hyp : Rocq_utils.hyp option) (x : Constr.t)
         : Tactic.t mm
         =
         let f (name : Names.Constant.t) : unit Proofview.tactic =
-          Option.cata
-            (fun (y : Rocq_utils.hyp) ->
-              Tactics.unfold_in_hyp
-                [ Locus.AllOccurrences, Evaluable.EvalConstRef name ]
-                (Context.Named.Declaration.get_id y, Locus.InHyp))
-            (Tactics.unfold_constr (Names.GlobRef.ConstRef name))
-            in_hyp
+          match in_hyp with
+          | None -> Tactics.unfold_constr (Names.GlobRef.ConstRef name)
+          | Some y ->
+            Proofview.tclTHEN
+              (Tactics.unfold_in_hyp
+                 [ Locus.AllOccurrences, Evaluable.EvalConstRef name ]
+                 (Context.Named.Declaration.get_id y, Locus.InHyp))
+              (Tactics.unfold_constr (Names.GlobRef.ConstRef name))
         in
         match Constr.kind x with
         | Const (name, _) ->
@@ -501,15 +511,23 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         | _ -> raise (CannotUnfoldConstr x)
       ;;
 
+      (** [handle_unfold_hyp_opt f ?in_hyp x] helps keep this function cleaner to use. i.e., [unfold_econstr ~in_hyp:x] rather than [~in_hyp:(Some x)].
+      *)
+      let f_unfold_hyp
+            (f : ?in_hyp:Rocq_utils.hyp -> 'a -> Tactic.t mm)
+            ?(in_hyp : Rocq_utils.hyp option = None)
+            (x : 'a)
+        : Tactic.t mm
+        =
+        match in_hyp with None -> f x | Some in_hyp -> f ~in_hyp x
+      ;;
+
       let unfold_econstr ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
         : Tactic.t mm
         =
         let open Syntax in
         let* y : Constr.t = econstr_to_constr x in
-        (* NOTE: below helps keep this function cleaner to use. i.e., [unfold_econstr ~in_hyp:x] rather than [~in_hyp:(Some x)] *)
-        match in_hyp with
-        | None -> unfold_constr y
-        | Some in_hyp -> unfold_constr ~in_hyp y
+        f_unfold_hyp unfold_constr ~in_hyp y
       ;;
 
       let unfold_constrexpr
@@ -519,10 +537,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         =
         let open Syntax in
         let* y : EConstr.t = constrexpr_to_econstr x in
-        (* NOTE: below helps keep this function cleaner to use. i.e., [unfold_constrexpr ~in_hyp:x] rather than [~in_hyp:(Some x)] *)
-        match in_hyp with
-        | None -> unfold_econstr y
-        | Some in_hyp -> unfold_econstr ~in_hyp y
+        f_unfold_hyp unfold_econstr ~in_hyp y
       ;;
 
       let unfold_opt_constrexpr_list ?(in_hyp : Rocq_utils.hyp option)
@@ -582,29 +597,40 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         f EConstrSet.empty x
       ;;
 
-      (* let can_be_unfolded  (sigma : Evd.evar_map) (x:EConstr.t) : bool =
-         let g,i = EConstr.destRef sigma x   in
-         match g with
-         |  ConstRef x -> (
-         let lookup = Global.lookup_constant x in
-         match lookup.const_body with
-         |
-         )
-         | _ -> false
-         ;; *)
+      (** [can_be_unfolded sigma x] returns [true] if [x] refers to either a globally definition that is either a function or a reference (e.g., [Example], [Definition], etc.) that can be unfolded.
+      *)
+      let can_be_unfolded (sigma : Evd.evar_map) (x : EConstr.t) : bool =
+        let g, i = EConstr.destRef sigma x in
+        match g with
+        | ConstRef x ->
+          (match Global.lookup_constant x with
+           | { const_body = Def y; const_type; _ } ->
+             (match Constr.kind y with
+              | Lambda _ -> Constr.isProd const_type
+              | App _ -> Constr.isInd const_type && Constr.isRef const_type
+              | _ -> false)
+           | _ -> false)
+        | _ -> false
+      ;;
 
       (** [try_unfold_any x] *)
-      let try_unfold_any (x : EConstr.t) : Tactic.t option mm =
+      let try_unfold_any ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
+        : Tactic.t option mm
+        =
         Log.trace __FUNCTION__;
         let open Syntax in
         let* sigma = get_sigma in
-        let to_check =
+        (* NOTE: [collect_component_econstrs] ensures no duplicates. *)
+        let to_check : EConstr.t list =
           collect_component_econstrs sigma x |> EConstrSet.to_list
         in
         let f (i : int) (acc : Tactic.t list) =
-          (* TODO: determine if we can make an unfold tactic for it *)
-          (* NOTE: see whiteboard at work *)
-          return acc
+          let x : EConstr.t = List.nth to_check i in
+          if can_be_unfolded sigma x
+          then
+            let* y : Tactic.t = f_unfold_hyp unfold_econstr ~in_hyp x in
+            return (y :: acc)
+          else return acc
         in
         let* ys = iterate 0 (List.length to_check - 1) [] f in
         match ys with
@@ -882,6 +908,33 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
       let invert (x : t) : Tactic.t mm = Tacs.inversion x
 
+      (** [try_unfold_any x] obtains the [Atomic (ty, tys)] of the given hyp [x], and first checks to see if there is anything that can be unfolded in [ty] (via [Tacs.try_unfold_any ~in_hyp:x]) then returns it. Else, if [ty] cannot be unfolded, then we check each of [tys] and return any.
+      *)
+      let try_unfold_any (x : t) : Tactic.t option mm =
+        let open Syntax in
+        let* sigma = get_sigma in
+        try
+          let ty, tys = Rocq_utils.hyp_to_atomic sigma x in
+          let* ty_opt : Tactic.t option = Tacs.try_unfold_any ~in_hyp:x ty in
+          match ty_opt with
+          | Some y -> return (Some y)
+          | None ->
+            (* NOTE: check if any in [tys] can be unfolded *)
+            let f (i : int) (acc : Tactic.t option) : Tactic.t option mm =
+              let y = tys.(i) in
+              let* y : Tactic.t option = Tacs.try_unfold_any ~in_hyp:x y in
+              match y with
+              | None -> return acc
+              | Some y ->
+                (match acc with
+                 | None -> return (Some y)
+                 | Some acc -> return (Some (Tactic.seq acc y)))
+            in
+            iterate 0 (Array.length tys - 1) None f
+        with
+        | Rocq_utils.Rocq_utils_HypIsNot_Atomic _ -> return None
+      ;;
+
       exception
         CouldNotGetTransition of
           { hyp : t
@@ -998,6 +1051,24 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         | Some (grade, x) ->
           let* y = Hyp.invert x in
           return (Some y)
+      ;;
+
+      (** [try_unfold_any ()] returns the optional [Tactic.t] that is a sequence derived from all of the hyps ([xs]) from [Hyp.try_unfold_any x] (where [x] is a hyp in [xs]).
+      *)
+      let try_unfold_any () : Tactic.t option mm =
+        let hyps = get_non_cofixes () in
+        let open Syntax in
+        let f (i : int) (acc : Tactic.t option) : Tactic.t option mm =
+          let x = List.nth hyps i in
+          let* x = Hyp.try_unfold_any x in
+          match x with
+          | None -> return acc
+          | Some x ->
+            (match acc with
+             | None -> return (Some x)
+             | Some acc -> return (Some (Tactic.seq acc x)))
+        in
+        iterate 0 (List.length hyps - 1) None f
       ;;
 
       exception CannotGetTransition of Model.FSM.t
@@ -1132,6 +1203,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         step ()
       | ExitWeakSim () ->
         Log.trace ~__FUNCTION__ "WeakSim:ExitWeakSim => Exists";
+        (* TODO: check if we can unfold any in hyps now *)
         update_state Exists;
         step ()
       (********************)
