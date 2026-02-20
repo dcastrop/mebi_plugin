@@ -597,17 +597,24 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         f EConstrSet.empty x
       ;;
 
-      (** [can_be_unfolded sigma x] returns [true] if [x] refers to either a globally definition that is either a function or a reference (e.g., [Example], [Definition], etc.) that can be unfolded.
+      (** [can_be_unfolded sigma x] returns [true] if [x] can be {e unfolded}, i.e., refers to a definition, e.g., of a definition, fixpoint or example.
       *)
       let can_be_unfolded (sigma : Evd.evar_map) (x : EConstr.t) : bool =
         let g, i = EConstr.destRef sigma x in
         match g with
-        | ConstRef x ->
-          (match Global.lookup_constant x with
-           | { const_body = Def y; const_type; _ } ->
-             (match Constr.kind y with
-              | Lambda _ -> Constr.isProd const_type
-              | App _ -> Constr.isInd const_type && Constr.isRef const_type
+        | ConstRef y ->
+          (match Global.lookup_constant y with
+           | { const_body = Def z; const_type; _ } ->
+             (match Constr.kind z with
+              | Fix _ ->
+                Log.thing ~__FUNCTION__ Debug "is Fix" x (Of Strfy.econstr);
+                Constr.isProd const_type
+              | Lambda _ ->
+                Log.thing ~__FUNCTION__ Debug "is Lambda" x (Of Strfy.econstr);
+                Constr.isProd const_type
+              | App _ ->
+                Log.thing ~__FUNCTION__ Debug "is App" x (Of Strfy.econstr);
+                Constr.isInd const_type && Constr.isRef const_type
               | _ -> false)
            | _ -> false)
         | _ -> false
@@ -624,13 +631,18 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         let to_check : EConstr.t list =
           collect_component_econstrs sigma x |> EConstrSet.to_list
         in
+        Log.thing ~__FUNCTION__ Debug "try_unfold_any" x (Of Strfy.econstr);
+        Log.things ~__FUNCTION__ Debug "to_check" to_check (Of Strfy.econstr);
         let f (i : int) (acc : Tactic.t list) =
           let x : EConstr.t = List.nth to_check i in
           if can_be_unfolded sigma x
-          then
+          then (
+            Log.thing ~__FUNCTION__ Debug "can be unfolded" x (Of Strfy.econstr);
             let* y : Tactic.t = f_unfold_hyp unfold_econstr ~in_hyp x in
-            return (y :: acc)
-          else return acc
+            return (y :: acc))
+          else (
+            Log.thing ~__FUNCTION__ Debug "not unfoldable" x (Of Strfy.econstr);
+            return acc)
         in
         let* ys = iterate 0 (List.length to_check - 1) [] f in
         match ys with
@@ -1147,7 +1159,12 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         (* NOTE: try invert any that need to be inverted *)
         let* invert_opt = Hyps.try_invert_any () in
         match invert_opt with
-        | None -> raise (ExitWeakSim ())
+        | None ->
+          (* NOTE: check if we need to unfold anything in the inverted hyps. *)
+          let* unfold_opt = Hyps.try_unfold_any () in
+          (match unfold_opt with
+           | None -> raise (ExitWeakSim ())
+           | Some x -> return x)
         | Some x -> return x
     ;;
 
@@ -1203,7 +1220,6 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         step ()
       | ExitWeakSim () ->
         Log.trace ~__FUNCTION__ "WeakSim:ExitWeakSim => Exists";
-        (* TODO: check if we can unfold any in hyps now *)
         update_state Exists;
         step ()
       (********************)
