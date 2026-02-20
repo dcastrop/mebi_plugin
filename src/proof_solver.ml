@@ -1,4 +1,4 @@
-exception NothingToDo of unit
+exception NothingToDo 
 
 module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
   (** [W] is for running the main part of the algorithm (pre-proof). *)
@@ -7,10 +7,10 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     let the_result : Model.Bisimilar.t ref option ref = ref None
 
-    exception NoResultFound of unit
+    exception NoResultFound 
 
     let get_the_result () : Model.Bisimilar.t =
-      match !the_result with None -> raise (NoResultFound ()) | Some x -> !x
+      match !the_result with None -> raise (NoResultFound ) | Some x -> !x
     ;;
 
     let get_fsm_a ?(saturated : bool = false) () : Model.FSM.t =
@@ -33,7 +33,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       | Some y -> raise (CannotOverrideResult !y)
     ;;
 
-    exception BisimilarityResultNotFound of unit
+    exception BisimilarityResultNotFound 
 
     let check_bisimilarity
           (refs : Libnames.qualid list)
@@ -46,7 +46,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         |> M.run ~reset_encoding:true
       in
       match r with
-      | None -> raise (BisimilarityResultNotFound ())
+      | None -> raise (BisimilarityResultNotFound )
       | Some r -> set_the_result r
     ;;
 
@@ -156,10 +156,10 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
   let the_state : state ref option ref = ref None
 
-  exception NoStateFound of unit
+  exception NoStateFound 
 
   let get_the_state () : state ref =
-    match !the_state with None -> raise (NoStateFound ()) | Some x -> x
+    match !the_state with None -> raise (NoStateFound ) | Some x -> x
   ;;
 
   let get_pstate () : Declare.Proof.t = !(get_the_state ()).p
@@ -260,12 +260,12 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     let empty () : t = tactic (Proofview.tclUNIT ())
 
-    exception EmptyTacticChain of unit
+    exception EmptyTacticChain 
 
     (** [chain ?nonempty (x::xs)] applies [seq x (chain xs)].
         @raise EmptyTacticChain if the list is empty and [?nonempty] s true. *)
     let rec chain ?(nonempty : bool = false) : t list -> t = function
-      | [] -> if nonempty then raise (EmptyTacticChain ()) else empty ()
+      | [] -> if nonempty then raise (EmptyTacticChain ) else empty ()
       | h :: [] -> h
       | h :: tl -> seq h (chain tl)
     ;;
@@ -317,6 +317,18 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let open Syntax in
       let* sigma = get_sigma in
       Rocq_utils.econstr_to_atomic sigma x |> return
+    ;;
+
+    let to_lambda (x : EConstr.t) : Rocq_utils.lambda_triple mm =
+      let open Syntax in
+      let* sigma = get_sigma in
+      Rocq_utils.econstr_to_lambda sigma x |> return
+    ;;
+
+    let to_app (x : EConstr.t) : EConstr.t Rocq_utils.kind_pair mm =
+      let open Syntax in
+      let* sigma = get_sigma in
+      Rocq_utils.econstr_to_app sigma x |> return
     ;;
 
     let get_concl () : EConstr.t = Proofview.Goal.concl (gl ())
@@ -709,21 +721,21 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         M.F.to_seq fm |> List.of_seq |> find_theory
       ;;
 
-      exception NoEncodingFoundFor_TheoriesNone of unit
+      exception NoEncodingFoundFor_TheoriesNone 
 
       let get_None_enc () : M.Enc.t M.mm =
         try get_theory_enc is_None with
-        | Not_found -> raise (NoEncodingFoundFor_TheoriesNone ())
+        | Not_found -> raise (NoEncodingFoundFor_TheoriesNone )
       ;;
 
-      exception NoEncodingFoundFor_TheoriesSome of unit
+      exception NoEncodingFoundFor_TheoriesSome 
 
       let get_Some_enc () : M.Enc.t M.mm =
         try get_theory_enc is_Some with
-        | Not_found -> raise (NoEncodingFoundFor_TheoriesSome ())
+        | Not_found -> raise (NoEncodingFoundFor_TheoriesSome )
       ;;
 
-      exception NotEqTheory of unit
+      exception NotEqTheory 
 
       (** *)
       let get_theory_enc_if_eq (x : EConstr.t) (f : EConstr.t -> bool mm)
@@ -731,7 +743,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         =
         let is_eq : bool = run (f x) in
         try if is_eq then get_theory_enc f else raise Not_found with
-        | Not_found -> raise (NotEqTheory ())
+        | Not_found -> raise (NotEqTheory )
       ;;
 
       let get_None_enc_if_eq (x : EConstr.t) : M.Enc.t M.mm =
@@ -823,13 +835,13 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
              let* term : M.Enc.t = Theory.get_None_enc_if_eq x in
              f term
            with
-           | Theory.NotEqTheory () ->
+           | Theory.NotEqTheory  ->
              (* NOTE: is it [Some]? (i.e., a visible action) *)
              (try
                 let* term : M.Enc.t = Theory.get_Some_enc_if_eq x in
                 f term
               with
-              | Theory.NotEqTheory () ->
+              | Theory.NotEqTheory ->
                 raise (CouldNotFind_Label { x; alphabet = ys })))
       ;;
 
@@ -881,7 +893,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     (***********************************************************************)
 
     module Hyp = struct
-      exception NotImplemented of unit
+      exception NotImplemented 
 
       type t = Rocq_utils.hyp
 
@@ -977,13 +989,13 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
             raise (CouldNotGetTransition { hyp = x; fsm = m })
           | ReModel.CouldNotFind_Transition _ ->
             raise (CouldNotGetTransition { hyp = x; fsm = m }))
-        else raise (NotImplemented ())
+        else raise (NotImplemented )
       ;;
     end
 
     (** conclusion *)
     module Concl = struct
-      exception NotImplemented of unit
+      exception NotImplemented 
 
       let eq (x : EConstr.t) : bool mm = get_concl () |> econstr_eq x
 
@@ -1001,11 +1013,28 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
       let is_weak_sim () : bool mm = get_concl () |> Theory.is_weak_sim
       let is_exists () : bool mm = get_concl () |> Theory.is_exists
+
+      type conj =
+        { wk_trans : EConstr.t
+        ; wk_sim : EConstr.t
+        }
+
+      exception ConclDoesNotMatchConj
+
+      let get_conj () : conj mm =
+        let open Syntax in
+        let* ty, tys = get_concl () |> to_atomic in
+        let* _, _, x = to_lambda tys.(1) in
+        let* _, app_tys = to_app x in
+        match Array.to_list app_tys with
+        | [ wk_trans; wk_sim ] -> return { wk_trans; wk_sim }
+        | _ -> raise ConclDoesNotMatchConj
+      ;;
     end
 
     (** hypothesis *)
     module Hyps = struct
-      exception NotImplemented of unit
+      exception NotImplemented 
 
       (** [get_cofixes ()] filters the hyps by name according to [get_all_cofix_hyp_names ()].
       *)
@@ -1124,12 +1153,37 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       |> return
     ;;
 
+    (** [handle_silent_transition ()] ... *)
+    let handle_silent_transition () : Tactic.t mm = raise Not_found
+
+    (** [handle_visible_transition hyp] ... introduces *)
+    let handle_visible_transition () : Tactic.t mm = raise Not_found
+
+    (* * [handle_hyp_transition ()] ... *)
+    let handle_hyp_transition () : Tactic.t mm =
+      let open Syntax in
+      let* hyp : Model.Transition.t = Hyps.get_transition (W.get_fsm_a ()) in
+      if Model.Transition.is_silent hyp
+      then (
+        Log.trace ~__FUNCTION__ "is_exists, silent";
+        raise Not_found)
+      else (
+        Log.trace ~__FUNCTION__ "is_exists, trans";
+        (* Tacs.ex_intro_split (); *)
+        raise Not_found)
+    ;;
+
+    (** [handle_ ()] ... *)
+    (* let handle_ () : Tactic.t mm =
+       raise (Not_found)
+       ;; *)
+
     (***********************************************************************)
 
     exception StateNotImplemented of State.t
     exception StateCouldNothandle of State.t
-    exception SkipNewProof of unit
-    exception ExitWeakSim of unit
+    exception SkipNewProof 
+    exception ExitWeakSim 
 
     let handle_new_proof
           ((a, b) : Constrexpr.constr_expr * Constrexpr.constr_expr)
@@ -1139,7 +1193,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let open Syntax in
       let* x = Tacs.unfold_opt_constrexpr_list [ a; b ] in
       match x with
-      | None -> raise (SkipNewProof ())
+      | None -> raise (SkipNewProof )
       | Some x ->
         update_state WeakSim;
         return x
@@ -1163,7 +1217,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           (* NOTE: check if we need to unfold anything in the inverted hyps. *)
           let* unfold_opt = Hyps.try_unfold_any () in
           (match unfold_opt with
-           | None -> raise (ExitWeakSim ())
+           | None -> raise (ExitWeakSim )
            | Some x -> return x)
         | Some x -> return x
     ;;
@@ -1173,12 +1227,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let open Syntax in
       let* is_exists : bool = Concl.is_exists () in
       if is_exists
-      then (
-        Log.trace ~__FUNCTION__ "is_exists";
-        let* hyp : Model.Transition.t = Hyps.get_transition (W.get_fsm_a ()) in
-        (* TODO: cannot proceed until unfold is also fixed *)
-        (* Tacs.ex_intro_split (); *)
-        raise (StateNotImplemented Exists))
+      then handle_hyp_transition ()
       else raise (StateCouldNothandle Exists)
     ;;
 
@@ -1207,18 +1256,18 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       | Exists -> handle_exists ()
       | GoalTransition args -> handle_goal_transition args
       | ApplyConstructors xs -> handle_apply_constructors xs
-      | Done -> raise (NothingToDo ())
+      | Done -> raise (NothingToDo )
     ;;
 
     (** [step ()] ... *)
     let rec step () : Tactic.t =
       Log.trace __FUNCTION__;
       try run (handle_state ()) with
-      | SkipNewProof () ->
+      | SkipNewProof  ->
         Log.trace ~__FUNCTION__ "BeginProof:SkipNewProof => WeakSim";
         update_state WeakSim;
         step ()
-      | ExitWeakSim () ->
+      | ExitWeakSim  ->
         Log.trace ~__FUNCTION__ "WeakSim:ExitWeakSim => Exists";
         update_state Exists;
         step ()
@@ -1269,11 +1318,11 @@ module type S = module type of Make (Log) ((val Api.default_encoding ()))
 let the_proof_solver : (module S) ref option ref = ref None
 let reset_the_proof_solver () : unit = the_proof_solver := None
 
-exception NoProofSolverFound of unit
+exception NoProofSolverFound 
 
 let get_the_proof_solver () : (module S) ref =
   match !the_proof_solver with
-  | None -> raise (NoProofSolverFound ())
+  | None -> raise (NoProofSolverFound )
   | Some x -> x
 ;;
 
@@ -1290,7 +1339,7 @@ let is_done () : bool =
 
 (***********************************************************************)
 
-exception BisimilarityResultNotFound of unit
+exception BisimilarityResultNotFound 
 
 (** [init ] ... *)
 let init
@@ -1324,7 +1373,7 @@ let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
     | -1 ->
       if is_done ()
       then n, p
-      else (try step p |> f (n + 1) with NothingToDo () -> n, p)
+      else (try step p |> f (n + 1) with NothingToDo  -> n, p)
     | _ ->
       Log.thing ~__FUNCTION__ Warning "Stopping, exceeded bound" bound fint;
       n, p
