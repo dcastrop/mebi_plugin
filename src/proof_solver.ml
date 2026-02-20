@@ -1169,6 +1169,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         raise Not_found)
       else (
         Log.trace ~__FUNCTION__ "is_exists, trans";
+        let* conj = Concl.get_conj () in 
         (* Tacs.ex_intro_split (); *)
         raise Not_found)
     ;;
