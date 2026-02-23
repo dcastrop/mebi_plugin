@@ -550,12 +550,11 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let eapply_rt1n_refl () : Tactic.t mm = eapply (Theories.c_rt1n_refl ())
       let eapply_rt1n_trans () : Tactic.t mm = eapply (Theories.c_rt1n_trans ())
 
-      let eapply_rt1n_via (x:Model.Label.t) : Tactic.t mm = 
-        if Model.Label.is_silent x then 
-         eapply_rt1n_refl ()  else (
-           eapply_rt1n_trans () 
-         )
-;;
+      let eapply_rt1n_via (x : Model.Label.t) : Tactic.t mm =
+        if Model.Label.is_silent x
+        then eapply_rt1n_refl ()
+        else eapply_rt1n_trans ()
+      ;;
 
       (* *)
       exception CannotUnfoldConstr of Constr.t
@@ -1081,6 +1080,8 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
             in
             ReModel.transition from goto label m.edges |> return
           with
+          | M.EncodingNotFound _ ->
+            raise (CouldNotGetTransition { hyp = x; fsm = m })
           | ReModel.CouldNotFind_State _ ->
             raise (CouldNotGetTransition { hyp = x; fsm = m })
           | ReModel.CouldNotFind_Label _ ->
@@ -1115,23 +1116,23 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       *)
       let try_unfold_any () : Tactic.t option mm =
         let open Syntax in
-          let* ty, tys = the_concl () |> to_atomic in
-          let* ty_opt : Tactic.t option = Tacs.try_unfold_any ty in
-          match ty_opt with
-          | Some y -> return (Some y)
-          | None ->
-            (* NOTE: check if any in [tys] can be unfolded *)
-            let f (i : int) (acc : Tactic.t option) : Tactic.t option mm =
-              let y = tys.(i) in
-              let* y : Tactic.t option = Tacs.try_unfold_any y in
-              match y with
-              | None -> return acc
-              | Some y ->
-                (match acc with
-                 | None -> return (Some y)
-                 | Some acc -> return (Some (Tactic.seq acc y)))
-            in
-            iterate 0 (Array.length tys - 1) None f
+        let* ty, tys = get_concl () |> to_atomic in
+        let* ty_opt : Tactic.t option = Tacs.try_unfold_any ty in
+        match ty_opt with
+        | Some y -> return (Some y)
+        | None ->
+          (* NOTE: check if any in [tys] can be unfolded *)
+          let f (i : int) (acc : Tactic.t option) : Tactic.t option mm =
+            let y = tys.(i) in
+            let* y : Tactic.t option = Tacs.try_unfold_any y in
+            match y with
+            | None -> return acc
+            | Some y ->
+              (match acc with
+               | None -> return (Some y)
+               | Some acc -> return (Some (Tactic.seq acc y)))
+          in
+          iterate 0 (Array.length tys - 1) None f
       ;;
 
       type conj =
@@ -1261,7 +1262,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           | None ->
             let y = List.nth hyps i in
             (try
-               let* y : Model.Transition.t = Hyp.get_transition y m in
+               let y : Model.Transition.t = Hyp.get_transition y m |> run in
                return (Some y)
              with
              | Hyp.CouldNotGetTransition _ -> return None)
@@ -1402,39 +1403,28 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       Tactic.chain [ simplify; refl; simplify ] |> return
     ;;
 
-    let handle_appconstrs_update_args ({this;next}:Model.Annotation.t) : (
-    Model.Tree.TreeNode.t list option *    Model.Annotation.t option
-
-    )  =
-
-    (
-Some (Model.Trees.min this.using |> Model.Tree.minimize)
-    ,
-      next
-    ) 
-  ;;
-
+    let handle_appconstrs_update_args ({ this; next } : Model.Annotation.t)
+      : Model.Tree.TreeNode.t list option * Model.Annotation.t option
+      =
+      Some (Model.Trees.min this.using |> Model.Tree.minimize), next
+    ;;
 
     (** [handle_appconstrs_update label] ... *)
-    let handle_appconstrs_update (label:Model.Label.t) : Tactic.t mm =
+    let handle_appconstrs_update (label : Model.Label.t) : Tactic.t mm =
       let open Syntax in
-      let* unfold = Concl.try_unfold_any () in 
-      let* rt1n = Concl.eapply_rt1n_via (label) in 
-      Tactic.seq unfold rt1n |> return
+      let* rt1n = Tacs.eapply_rt1n_via label in
+      let* unfold = Concl.try_unfold_any () in
+      match unfold with
+      | None -> return rt1n
+      | Some unfold -> Tactic.seq unfold rt1n |> return
     ;;
 
     (** [handle_appconstrs_apply x] ...
-    (* NOTE: relies on the bindings we extract early on *) *)
+        (* NOTE: relies on the bindings we extract early on *) *)
     let handle_appconstrs_apply (x : Model.Tree.TreeNode.t) : Tactic.t mm =
-        let open Syntax in 
-        let* is_tau = Concl.is_tau () in 
-if is_tau then (
-      raise NotImplemented
-
-) else (
-      raise NotImplemented
-
-)
+      let open Syntax in
+      let* is_tau = Concl.is_tau () in
+      if is_tau then raise NotImplemented else raise NotImplemented
     ;;
 
     (** [handle_ ()] ... *)
@@ -1509,7 +1499,6 @@ if is_tau then (
       : Tactic.t mm
       =
       Log.trace __FUNCTION__;
-      let open Syntax in
       match args with
       | { current = None; label; _ } ->
         (* NOTE: entry-point *)
@@ -1518,16 +1507,14 @@ if is_tau then (
       | { current = Some []; label; destination; _ } ->
         (match args.annotation with
          | None ->
-        (* NOTE: stop *)
+           (* NOTE: stop *)
            update_state WeakSim;
            handle_appconstrs_stop ()
          | Some anno ->
-        (* NOTE: update current, prepare for next transition *)
-           let current, annotation = handle_appconstrs_update_args anno
-           in
-           update_state
-             (ApplyConstructors { args with current; annotation });
-           handle_appconstrs_update (this.label))
+           (* NOTE: update current, prepare for next transition *)
+           let current, annotation = handle_appconstrs_update_args anno in
+           update_state (ApplyConstructors { args with current; annotation });
+           handle_appconstrs_update anno.this.label)
       | { current = Some (h :: tl); _ } ->
         (* NOTE: continue applying constructors *)
         update_state (ApplyConstructors { args with current = Some tl });
