@@ -2704,8 +2704,9 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
   module ApplicableConstructors : sig
     type t =
-      { current : Model.Tree.TreeNode.t list
+      { current : Model.Tree.TreeNode.t list option
       ; annotation : Model.Annotation.t option
+      ; label : Model.Label.t
       ; destination : Model.EdgeMap.key
       }
   end
@@ -2715,7 +2716,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
       | NewProof of (Constrexpr.constr_expr * Constrexpr.constr_expr)
       | WeakSim
       | Exists
-      | GoalTransition of Transition.t
+      (* | GoalTransition of Transition.t *)
       | ApplyConstructors of ApplicableConstructors.t
       | Done
 
@@ -3445,7 +3446,8 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
     val handle_weaksim : unit -> Tactic.t mm
     val handle_exists : unit -> Tactic.t mm
-    val handle_goal_transition : Transition.t -> Tactic.t mm
+
+    (* val handle_goal_transition : Transition.t -> Tactic.t mm *)
     val handle_apply_constructors : ApplicableConstructors.t -> Tactic.t mm
     val handle_state : unit -> Tactic.t mm
     val step : unit -> Tactic.t
