@@ -1,4 +1,5 @@
 exception NothingToDo
+exception NotImplemented
 
 module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
   module W : sig
@@ -1324,6 +1325,11 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
         val to_rev_seq : t -> elt Seq.t
         val add_seq : elt Seq.t -> t -> t
         val of_seq : elt Seq.t -> t
+        val destinations : t -> States.t
+
+        exception IsEmpty
+
+        val shorest_annotation : t -> ActionPair.t
 
         val merge_saturated_tuples
           :  ActionPair.t list
@@ -1494,7 +1500,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
         type t' = States.t t
 
         val update : t' -> Action.t -> States.t -> unit
-        val get_destinations : t' -> States.t
+        val destinations : t' -> States.t
         val reduce_by_label : t' -> Label.t -> t'
         val to_actions : t' -> Actions.t
         val to_actionpairs : t' -> ActionPairs.t
@@ -1674,7 +1680,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
         type t' = ActionMap.t' t
 
         val update : t' -> State.t -> Action.t -> States.t -> unit
-        val get_destinations : t' -> State.t -> States.t
+        val destinations : t' -> State.t -> States.t
         val get_actions : t' -> State.t -> Actions.t
         val reduce_by_label : t' -> Label.t -> t'
         val get_edges : t' -> State.t -> Edges.t
@@ -1780,7 +1786,9 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
         val to_rev_seq : t -> elt Seq.t
         val add_seq : elt Seq.t -> t -> t
         val of_seq : elt Seq.t -> t
-        val get_reachable : t -> State.t -> EdgeMap.t' -> t
+        val get_bisimilar : State.t -> t -> elt
+        val reachable : State.t -> EdgeMap.t' -> t -> t
+        val reachable_by_label : State.t -> Label.t -> EdgeMap.t' -> t -> t
         val to_string : t -> string
       end
 
@@ -2684,7 +2692,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
         ; goto : Model.EdgeMap.key option
         ; label : Model.Label.t option
         ; annotation : Model.Annotation.t option
-        ; constructor_tree : Model.Tree.t
+        ; constructor_tree : Model.Tree.t option
         }
     end
 
@@ -3415,15 +3423,11 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
     end
 
     module Concl : sig
-      exception NotImplemented
-
       val is_weak_sim : unit -> bool mm
       val is_exists : unit -> bool mm
     end
 
     module Hyps : sig
-      exception NotImplemented
-
       val get_cofixes : unit -> Rocq_utils.hyp list
       val can_solve_concl_cofix : unit -> bool mm
       val clear_non_cofix : unit -> Tactic.t
