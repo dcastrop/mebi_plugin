@@ -370,7 +370,7 @@ let get_action_destinations (actions : States.t Actions.t) : States.t =
        States.empty
 ;;
 
-let get_reachable_partition (pi : Partition.t) (actions : States.t Actions.t)
+let reachable_partition (pi : Partition.t) (actions : States.t Actions.t)
   : Partition.t
   =
   let destinations : States.t = get_action_destinations actions in
@@ -379,12 +379,10 @@ let get_reachable_partition (pi : Partition.t) (actions : States.t Actions.t)
     Bool.not (States.is_empty (States.inter block destinations)))
 ;;
 
-let get_reachable_partition_opt
-      (pi : Partition.t)
-      (actions : States.t Actions.t)
+let reachable_partition_opt (pi : Partition.t) (actions : States.t Actions.t)
   : Partition.t option
   =
-  let pi : Partition.t = get_reachable_partition pi actions in
+  let pi : Partition.t = reachable_partition pi actions in
   if Partition.is_empty pi then None else Some pi
 ;;
 
@@ -496,14 +494,14 @@ let get_edges_labelled (x : Label.t) (edges : States.t Actions.t Edges.t)
   edges'
 ;;
 
-let get_reachable_blocks_opt
+let reachable_blocks_opt
       (pi : Partition.t)
       (edges : States.t Actions.t Edges.t)
       (x : State.t)
   =
   match Edges.find_opt edges x with
   | None -> None
-  | Some blocks -> get_reachable_partition_opt pi blocks
+  | Some blocks -> reachable_partition_opt pi blocks
 ;;
 
 (***********************************************************************)

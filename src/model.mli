@@ -1,6 +1,4 @@
-module Make : (_ : Logger.SLogger)
-  (Enc : Encoding.SEncoding)
-  -> sig
+module Make : (_ : Logger.SLogger) (Enc : Encoding.SEncoding) -> sig
   module Tree : sig
     module type STreeNode = sig
       type t = Enc.t * int
@@ -14,9 +12,7 @@ module Make : (_ : Logger.SLogger)
       val to_string : t -> string
     end
 
-    type 'a tree = 'a Enc_tree.Make(Enc).tree =
-      | Node of 'a * 'a tree list
-
+    type 'a tree = 'a Enc_tree.Make(Enc).tree = Node of 'a * 'a tree list
     type t = TreeNode.t tree
 
     val add : t -> t -> t
@@ -29,66 +25,67 @@ module Make : (_ : Logger.SLogger)
 
     val min : t list -> TreeNode.t list
     val to_string : t -> string
-
-    val list_to_string :
-      ?args:Utils.Strfy.style_args -> t list -> string
+    val list_to_string : ?args:Utils.Strfy.style_args -> t list -> string
   end
 
   module Trees : sig
-  type elt = Tree.t
-  type t
+    type elt = Tree.t
+    type t
 
-  val empty : t
-  val add : elt -> t -> t
-  val singleton : elt -> t
-  val remove : elt -> t -> t
-  val union : t -> t -> t
-  val inter : t -> t -> t
-  val disjoint : t -> t -> bool
-  val diff : t -> t -> t
-  val cardinal : t -> int
-  val elements : t -> elt list
-  val min_elt : t -> elt
-  val min_elt_opt : t -> elt option
-  val max_elt : t -> elt
-  val max_elt_opt : t -> elt option
-  val choose : t -> elt
-  val choose_opt : t -> elt option
-  val find : elt -> t -> elt
-  val find_opt : elt -> t -> elt option
-  val find_first : (elt -> bool) -> t -> elt
-  val find_first_opt : (elt -> bool) -> t -> elt option
-  val find_last : (elt -> bool) -> t -> elt
-  val find_last_opt : (elt -> bool) -> t -> elt option
-  val iter : (elt -> unit) -> t -> unit
-  val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
-  val map : (elt -> elt) -> t -> t
-  val filter : (elt -> bool) -> t -> t
-  val filter_map : (elt -> elt option) -> t -> t
-  val partition : (elt -> bool) -> t -> t * t
-  val split : elt -> t -> t * bool * t
-  val is_empty : t -> bool
-  val mem : elt -> t -> bool
-  val equal : t -> t -> bool
-  val compare : t -> t -> int
-  val subset : t -> t -> bool
-  val for_all : (elt -> bool) -> t -> bool
-  val exists : (elt -> bool) -> t -> bool
-  val to_list : t -> elt list
-  val of_list : elt list -> t
-  val to_seq_from : elt -> t -> elt Seq.t
-  val to_seq : t -> elt Seq.t
-  val to_rev_seq : t -> elt Seq.t
-  val add_seq : elt Seq.t -> t -> t
-  val of_seq : elt Seq.t -> t
+    val empty : t
+    val add : elt -> t -> t
+    val singleton : elt -> t
+    val remove : elt -> t -> t
+    val union : t -> t -> t
+    val inter : t -> t -> t
+    val disjoint : t -> t -> bool
+    val diff : t -> t -> t
+    val cardinal : t -> int
+    val elements : t -> elt list
+    val min_elt : t -> elt
+    val min_elt_opt : t -> elt option
+    val max_elt : t -> elt
+    val max_elt_opt : t -> elt option
+    val choose : t -> elt
+    val choose_opt : t -> elt option
+    val find : elt -> t -> elt
+    val find_opt : elt -> t -> elt option
+    val find_first : (elt -> bool) -> t -> elt
+    val find_first_opt : (elt -> bool) -> t -> elt option
+    val find_last : (elt -> bool) -> t -> elt
+    val find_last_opt : (elt -> bool) -> t -> elt option
+    val iter : (elt -> unit) -> t -> unit
+    val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+    val map : (elt -> elt) -> t -> t
+    val filter : (elt -> bool) -> t -> t
+    val filter_map : (elt -> elt option) -> t -> t
+    val partition : (elt -> bool) -> t -> t * t
+    val split : elt -> t -> t * bool * t
+    val is_empty : t -> bool
+    val mem : elt -> t -> bool
+    val equal : t -> t -> bool
+    val compare : t -> t -> int
+    val subset : t -> t -> bool
+    val for_all : (elt -> bool) -> t -> bool
+    val exists : (elt -> bool) -> t -> bool
+    val to_list : t -> elt list
+    val of_list : elt list -> t
+    val to_seq_from : elt -> t -> elt Seq.t
+    val to_seq : t -> elt Seq.t
+    val to_rev_seq : t -> elt Seq.t
+    val add_seq : elt Seq.t -> t -> t
+    val of_seq : elt Seq.t -> t
 
-  exception EmptyHasNoMin of unit
+    exception EmptyHasNoMin of unit
 
-  val min : t -> elt
-end
+    val min : t -> elt
+  end
 
   module State : sig
-    type t = { term : Enc.t; pp : string option }
+    type t =
+      { term : Enc.t
+      ; pp : string option
+      }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -204,11 +201,11 @@ end
   end
 
   module Label : sig
-    type t = {
-      term : Enc.t;
-      pp : string option;
-      is_silent : bool option;
-    }
+    type t =
+      { term : Enc.t
+      ; pp : string option
+      ; is_silent : bool option
+      }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -320,12 +317,12 @@ end
   end
 
   module Note : sig
-    type t = {
-      from : State.t;
-      label : Label.t;
-      using : Trees.t;
-      goto : State.t;
-    }
+    type t =
+      { from : State.t
+      ; label : Label.t
+      ; using : Trees.t
+      ; goto : State.t
+      }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -335,7 +332,10 @@ end
   end
 
   module Annotation : sig
-    type t = { this : Note.t; next : t option }
+    type t =
+      { this : Note.t
+      ; next : t option
+      }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -455,13 +455,13 @@ end
   end
 
   module Transition : sig
-    type t = {
-      from : State.t;
-      goto : State.t;
-      label : Label.t;
-      annotation : Annotation.t option;
-      constructor_tree : Tree.t;
-    }
+    type t =
+      { from : State.t
+      ; goto : State.t
+      ; label : Label.t
+      ; annotation : Annotation.t option
+      ; constructor_tree : Tree.t
+      }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -573,11 +573,11 @@ end
   end
 
   module Action : sig
-    type t = {
-      label : Label.t;
-      annotation : Annotation.t option;
-      constructor_trees : Trees.t;
-    }
+    type t =
+      { label : Label.t
+      ; annotation : Annotation.t option
+      ; constructor_trees : Trees.t
+      }
 
     val wk_equal : t -> t -> bool
     val equal : t -> t -> bool
@@ -591,8 +591,8 @@ end
 
   module ActionPair : sig
     type t = Action.t * States.t
-    val compare : t -> t -> int
 
+    val compare : t -> t -> int
     val to_string : t -> string
     val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
@@ -693,16 +693,21 @@ end
     val to_rev_seq : t -> elt Seq.t
     val add_seq : elt Seq.t -> t -> t
     val of_seq : elt Seq.t -> t
+    val destinations : t -> States.t
 
-    val merge_saturated_tuples :
-      ActionPair.t list ->
-      ActionPair.t list ->
-      ActionPair.t list
+    exception IsEmpty
 
-    val try_update_saturated_tuple :
-      ActionPair.t ->
-      ActionPair.t list ->
-      ActionPair.t option * ActionPair.t list
+    val shorest_annotation : t -> ActionPair.t
+
+    val merge_saturated_tuples
+      :  ActionPair.t list
+      -> ActionPair.t list
+      -> ActionPair.t list
+
+    val try_update_saturated_tuple
+      :  ActionPair.t
+      -> ActionPair.t list
+      -> ActionPair.t option * ActionPair.t list
   end
 
   module Actions : sig
@@ -823,13 +828,8 @@ end
       val replace : 'a t -> key -> 'a -> unit
       val mem : 'a t -> key -> bool
       val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-      val filter_map_inplace :
-        (key -> 'a -> 'a option) -> 'a t -> unit
-
-      val fold :
-        (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+      val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+      val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
       val length : 'a t -> int
       val stats : 'a t -> Hashtbl.statistics
       val to_seq : 'a t -> (key * 'a) Seq.t
@@ -855,13 +855,8 @@ end
     val replace : 'a t -> key -> 'a -> unit
     val mem : 'a t -> key -> bool
     val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-    val filter_map_inplace :
-      (key -> 'a -> 'a option) -> 'a t -> unit
-
-    val fold :
-      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
     val length : 'a t -> int
     val stats : 'a t -> Hashtbl.statistics
     val to_seq : 'a t -> (key * 'a) Seq.t
@@ -874,7 +869,7 @@ end
     type t' = States.t t
 
     val update : t' -> Action.t -> States.t -> unit
-    val get_destinations : t' -> States.t
+    val destinations : t' -> States.t
     val reduce_by_label : t' -> Label.t -> t'
     val to_actions : t' -> Actions.t
     val to_actionpairs : t' -> ActionPairs.t
@@ -885,11 +880,11 @@ end
   end
 
   module Edge : sig
-    type t = {
-      from : State.t;
-      goto : State.t;
-      action : Action.t;
-    }
+    type t =
+      { from : State.t
+      ; goto : State.t
+      ; action : Action.t
+      }
 
     val equal : t -> t -> bool
     val compare : t -> t -> int
@@ -1016,13 +1011,8 @@ end
       val replace : 'a t -> key -> 'a -> unit
       val mem : 'a t -> key -> bool
       val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-      val filter_map_inplace :
-        (key -> 'a -> 'a option) -> 'a t -> unit
-
-      val fold :
-        (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+      val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+      val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
       val length : 'a t -> int
       val stats : 'a t -> Hashtbl.statistics
       val to_seq : 'a t -> (key * 'a) Seq.t
@@ -1048,13 +1038,8 @@ end
     val replace : 'a t -> key -> 'a -> unit
     val mem : 'a t -> key -> bool
     val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-    val filter_map_inplace :
-      (key -> 'a -> 'a option) -> 'a t -> unit
-
-    val fold :
-      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
     val length : 'a t -> int
     val stats : 'a t -> Hashtbl.statistics
     val to_seq : 'a t -> (key * 'a) Seq.t
@@ -1067,7 +1052,7 @@ end
     type t' = ActionMap.t' t
 
     val update : t' -> State.t -> Action.t -> States.t -> unit
-    val get_destinations : t' -> State.t -> States.t
+    val destinations : t' -> State.t -> States.t
     val get_actions : t' -> State.t -> Actions.t
     val reduce_by_label : t' -> Label.t -> t'
     val get_edges : t' -> State.t -> Edges.t
@@ -1174,27 +1159,34 @@ end
     val to_rev_seq : t -> elt Seq.t
     val add_seq : elt Seq.t -> t -> t
     val of_seq : elt Seq.t -> t
-    val get_reachable : t -> State.t -> EdgeMap.t' -> t
+    val get_bisimilar : State.t -> t -> elt
+    val reachable : State.t -> EdgeMap.t' -> t -> t
+    val reachable_by_label : State.t -> Label.t -> EdgeMap.t' -> t -> t
     val to_string : t -> string
     val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module Info : sig
-    type t = { meta : meta option; weak_labels : Labels.t }
+    type t =
+      { meta : meta option
+      ; weak_labels : Labels.t
+      }
 
-    and meta = {
-      is_complete : bool;
-      is_merged : bool;
-      bounds : bounds;
-      lts : lts list;
-    }
+    and meta =
+      { is_complete : bool
+      ; is_merged : bool
+      ; bounds : bounds
+      ; lts : lts list
+      }
 
-    and bounds = States of int | Transitions of int
+    and bounds =
+      | States of int
+      | Transitions of int
 
-    and lts = {
-      enc : Enc.t;
-      constructors : Rocq_bindings.constructor list;
-    }
+    and lts =
+      { enc : Enc.t
+      ; constructors : Rocq_bindings.constructor list
+      }
 
     val merge : t -> t -> t
     val to_string : t -> string
@@ -1202,27 +1194,27 @@ end
   end
 
   module LTS : sig
-    type t = {
-      init : State.t option;
-      terminals : Partition.elt;
-      alphabet : Labels.t;
-      states : Partition.elt;
-      transitions : Transitions.t;
-      info : Info.t;
-    }
+    type t =
+      { init : State.t option
+      ; terminals : Partition.elt
+      ; alphabet : Labels.t
+      ; states : Partition.elt
+      ; transitions : Transitions.t
+      ; info : Info.t
+      }
 
     val to_string : t -> string
   end
 
   module FSM : sig
-    type t = {
-      init : State.t option;
-      terminals : Partition.elt;
-      alphabet : Labels.t;
-      states : Partition.elt;
-      edges : EdgeMap.t';
-      info : Info.t;
-    }
+    type t =
+      { init : State.t option
+      ; terminals : Partition.elt
+      ; alphabet : Labels.t
+      ; states : Partition.elt
+      ; edges : EdgeMap.t'
+      ; info : Info.t
+      }
 
     val merge : t -> t -> t
     val is_weak_mode : t -> bool
@@ -1235,18 +1227,18 @@ end
   end
 
   module Saturate : sig
-    type data = {
-      named : Action.t option;
-      notes : wip list;
-      visited : Partition.elt;
-      old_edges : EdgeMap.t';
-    }
+    type data =
+      { named : Action.t option
+      ; notes : wip list
+      ; visited : Partition.elt
+      ; old_edges : EdgeMap.t'
+      }
 
-    and wip = {
-      from : State.t;
-      via : Label.t;
-      trees : Trees.t;
-    }
+    and wip =
+      { from : State.t
+      ; via : Label.t
+      ; trees : Trees.t
+      }
 
     val wip : State.t -> Action.t -> wip
     val initial_data : EdgeMap.t' -> data
@@ -1255,118 +1247,107 @@ end
     val update_visited : State.t -> data -> data
     val already_visited : State.t -> data -> bool
     val skip_action : Action.t -> data -> bool
-
-    val get_old_actions :
-      State.t -> data -> ActionMap.t' option
+    val get_old_actions : State.t -> data -> ActionMap.t' option
 
     exception Model_Saturate_WIP_IsEmptyList of unit
 
     val wip_to_annotation : State.t -> wip list -> Annotation.t
 
     exception Model_Saturate_WIP_HadNoNamedActions of wip list
-
-    exception
-      Model_Saturate_WIP_HadMultipleNamedActions of wip list
+    exception Model_Saturate_WIP_HadMultipleNamedActions of wip list
 
     val validate_wips : wip list -> unit
     val extrapolate_annotations : Annotation.t -> Annotations.t
+    val stop : data -> State.t -> ActionPairs.t -> ActionPairs.t
+    val check_from : data -> State.t -> ActionPairs.t -> ActionPairs.t
 
-    val stop :
-      data -> State.t -> ActionPairs.t -> ActionPairs.t
+    val check_actions
+      :  data
+      -> State.t
+      -> ActionMap.t'
+      -> ActionPairs.t
+      -> ActionPairs.t
 
-    val check_from :
-      data -> State.t -> ActionPairs.t -> ActionPairs.t
+    val check_destinations
+      :  data
+      -> State.t
+      -> Partition.elt
+      -> ActionPairs.t
+      -> ActionPairs.t
 
-    val check_actions :
-      data ->
-      State.t ->
-      ActionMap.t' ->
-      ActionPairs.t ->
-      ActionPairs.t
+    val edge_action_destinations
+      :  data
+      -> State.t
+      -> Partition.elt
+      -> ActionPairs.t
 
-    val check_destinations :
-      data ->
-      State.t ->
-      Partition.elt ->
-      ActionPairs.t ->
-      ActionPairs.t
-
-    val edge_action_destinations :
-      data -> State.t -> Partition.elt -> ActionPairs.t
-
-    val edge_actions :
-      State.t -> ActionMap.t' -> EdgeMap.t' -> ActionPairs.t
-
-    val edge :
-      ActionMap.t' ->
-      State.t ->
-      ActionMap.t' ->
-      EdgeMap.t' ->
-      unit
-
-    val edges :
-      Labels.t -> Partition.elt -> EdgeMap.t' -> EdgeMap.t'
-
+    val edge_actions : State.t -> ActionMap.t' -> EdgeMap.t' -> ActionPairs.t
+    val edge : ActionMap.t' -> State.t -> ActionMap.t' -> EdgeMap.t' -> unit
+    val edges : Labels.t -> Partition.elt -> EdgeMap.t' -> EdgeMap.t'
     val fsm : ?only_if_weak:bool -> FSM.t -> FSM.t
   end
 
   module Minimize : sig
-    type t = { fsm : FSM.t; pi : Partition.t }
+    type t =
+      { fsm : FSM.t
+      ; pi : Partition.t
+      }
 
     exception CannotSplitEmptyBlock of unit
 
     val ensure_nonempty : States.t -> unit
 
-    val split_block :
-      Partition.t ->
-      State.t ->
-      EdgeMap.t' ->
-      States.t ->
-      States.t * States.t option
+    val split_block
+      :  Partition.t
+      -> State.t
+      -> EdgeMap.t'
+      -> States.t
+      -> States.t * States.t option
 
-    exception
-      Split_OnlyReturnedOneBlock_ButNeqBlock of
-        (States.t * States.t)
+    exception Split_OnlyReturnedOneBlock_ButNeqBlock of (States.t * States.t)
 
     val ensure_equal : States.t -> States.t -> unit
 
-    val for_each_label :
-      Partition.t ref ->
-      bool ref ->
-      EdgeMap.t' ->
-      States.t ref ->
-      Label.t ->
-      unit
+    val for_each_label
+      :  Partition.t ref
+      -> bool ref
+      -> EdgeMap.t'
+      -> States.t ref
+      -> Label.t
+      -> unit
 
-    val for_each_block :
-      Partition.t ref ->
-      bool ref ->
-      Labels.t ->
-      EdgeMap.t' ->
-      States.t ->
-      unit
+    val for_each_block
+      :  Partition.t ref
+      -> bool ref
+      -> Labels.t
+      -> EdgeMap.t'
+      -> States.t
+      -> unit
 
     val partition_states : FSM.t -> Partition.t
-    val fsm :  FSM.t -> t
+    val fsm : FSM.t -> t
     val to_string : t -> string
   end
 
   module Bisimilar : sig
-    type t = {
-      fsm_a : fsm_pair;
-      fsm_b : fsm_pair;
-      merged : FSM.t;
-      result : result;
-    }
+    type t =
+      { fsm_a : fsm_pair
+      ; fsm_b : fsm_pair
+      ; merged : FSM.t
+      ; result : result
+      }
 
-    and result = {
-      bisim_states : Partition.t;
-      non_bisim_states : Partition.t;
-    }
+    and result =
+      { bisim_states : Partition.t
+      ; non_bisim_states : Partition.t
+      }
 
-    and fsm_pair = { original : FSM.t; saturated : FSM.t }
+    and fsm_pair =
+      { original : FSM.t
+      ; saturated : FSM.t
+      }
 
-    val fsm_pair :  FSM.t -> fsm_pair
+    val fsm_pair : FSM.t -> fsm_pair
     val are_bisimilar : result -> bool
     val the_cached_result : t option ref
     val set_the_result : t -> unit
@@ -1375,7 +1356,7 @@ end
 
     val get_the_result : unit -> t
     val split : Partition.t -> States.t -> States.t -> result
-    val fsm :  FSM.t -> FSM.t -> t
+    val fsm : FSM.t -> FSM.t -> t
     val fsm_pair_to_string : fsm_pair -> string
     val result_to_string : result -> string
     val to_string : t -> string

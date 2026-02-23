@@ -252,8 +252,8 @@ module Make : (Log : Logger.SLogger)
     val type_of_constrexpr : Constrexpr.constr_expr -> Evd.econstr mm
 
     module Strfy : sig
-    val constr : Constr.t -> string
-    val constr_kind : Constr.t -> string
+      val constr : Constr.t -> string
+      val constr_kind : Constr.t -> string
       val econstr : Evd.econstr -> string
       val econstr_kind : Evd.econstr -> string
       val econstr_rel_decl : EConstr.rel_declaration -> string
@@ -1307,6 +1307,11 @@ module Make : (Log : Logger.SLogger)
       val to_rev_seq : t -> elt Seq.t
       val add_seq : elt Seq.t -> t -> t
       val of_seq : elt Seq.t -> t
+      val destinations : t -> States.t
+
+      exception IsEmpty
+
+      val shorest_annotation : t -> ActionPair.t
 
       val merge_saturated_tuples
         :  ActionPair.t list
@@ -1477,7 +1482,7 @@ module Make : (Log : Logger.SLogger)
       type t' = States.t t
 
       val update : t' -> Action.t -> States.t -> unit
-      val get_destinations : t' -> States.t
+      val destinations : t' -> States.t
       val reduce_by_label : t' -> Label.t -> t'
       val to_actions : t' -> Actions.t
       val to_actionpairs : t' -> ActionPairs.t
@@ -1657,7 +1662,7 @@ module Make : (Log : Logger.SLogger)
       type t' = ActionMap.t' t
 
       val update : t' -> State.t -> Action.t -> States.t -> unit
-      val get_destinations : t' -> State.t -> States.t
+      val destinations : t' -> State.t -> States.t
       val get_actions : t' -> State.t -> Actions.t
       val reduce_by_label : t' -> Label.t -> t'
       val get_edges : t' -> State.t -> Edges.t
@@ -1763,7 +1768,9 @@ module Make : (Log : Logger.SLogger)
       val to_rev_seq : t -> elt Seq.t
       val add_seq : elt Seq.t -> t -> t
       val of_seq : elt Seq.t -> t
-      val get_reachable : t -> State.t -> EdgeMap.t' -> t
+      val get_bisimilar : State.t -> t -> elt
+      val reachable : State.t -> EdgeMap.t' -> t -> t
+      val reachable_by_label : State.t -> Label.t -> EdgeMap.t' -> t -> t
       val to_string : t -> string
     end
 
@@ -2852,8 +2859,8 @@ module Default : () -> sig
     val type_of_constrexpr : Constrexpr.constr_expr -> Evd.econstr mm
 
     module Strfy : sig
-    val constr : Constr.t -> string
-    val constr_kind : Constr.t -> string
+      val constr : Constr.t -> string
+      val constr_kind : Constr.t -> string
       val econstr : Evd.econstr -> string
       val econstr_kind : Evd.econstr -> string
       val econstr_rel_decl : EConstr.rel_declaration -> string
@@ -3915,6 +3922,11 @@ module Default : () -> sig
       val to_rev_seq : t -> elt Seq.t
       val add_seq : elt Seq.t -> t -> t
       val of_seq : elt Seq.t -> t
+      val destinations : t -> States.t
+
+      exception IsEmpty
+
+      val shorest_annotation : t -> ActionPair.t
 
       val merge_saturated_tuples
         :  ActionPair.t list
@@ -4086,7 +4098,7 @@ module Default : () -> sig
       type t' = States.t t
 
       val update : t' -> Action.t -> States.t -> unit
-      val get_destinations : t' -> States.t
+      val destinations : t' -> States.t
       val reduce_by_label : t' -> Label.t -> t'
       val to_actions : t' -> Actions.t
       val to_actionpairs : t' -> ActionPairs.t
@@ -4269,7 +4281,7 @@ module Default : () -> sig
       type t' = ActionMap.t' t
 
       val update : t' -> State.t -> Action.t -> States.t -> unit
-      val get_destinations : t' -> State.t -> States.t
+      val destinations : t' -> State.t -> States.t
       val get_actions : t' -> State.t -> Actions.t
       val reduce_by_label : t' -> Label.t -> t'
       val get_edges : t' -> State.t -> Edges.t
@@ -4376,7 +4388,9 @@ module Default : () -> sig
       val to_rev_seq : t -> elt Seq.t
       val add_seq : elt Seq.t -> t -> t
       val of_seq : elt Seq.t -> t
-      val get_reachable : t -> State.t -> EdgeMap.t' -> t
+      val get_bisimilar : State.t -> t -> elt
+      val reachable : State.t -> EdgeMap.t' -> t -> t
+      val reachable_by_label : State.t -> Label.t -> EdgeMap.t' -> t -> t
       val to_string : t -> string
       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end

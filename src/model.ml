@@ -405,6 +405,11 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       | { annotation = Some annotation; _ } -> Annotation.is_empty annotation
     ;;
 
+    let annotation_length : t -> int = function
+      | { annotation = None; _ } -> 0
+      | { annotation = Some annotation; _ } -> Annotation.length annotation
+    ;;
+
     (* *)
     let to_string (x : t) : string =
       Utils.Strfy.record
@@ -448,6 +453,34 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
   module ActionPairs = struct
     module S = Set.Make (ActionPair)
     include S
+
+    let destinations (x : t) : States.t =
+      to_list x
+      |> List.fold_left
+           (fun (acc : States.t) ((a, b) : ActionPair.t) -> States.union acc b)
+           States.empty
+    ;;
+
+    exception IsEmpty
+
+    (** returns the action in [x] that has the {e shortest} annotation (where [None] is treated as 0).
+    *)
+    let shorest_annotation (x : t) : ActionPair.t =
+      match to_list x with
+      | [] -> raise IsEmpty
+      | h :: tl ->
+        List.fold_left
+          (fun ((x, xs) : ActionPair.t) ((y, ys) : ActionPair.t) ->
+            match
+              Int.compare
+                (Action.annotation_length x)
+                (Action.annotation_length y)
+            with
+            | 1 -> y, ys
+            | _ -> x, xs)
+          h
+          tl
+    ;;
 
     (** [merge_saturated_tuples a b] merges elements of [b] into [a], either by updating an element in [a] with additional annotation for a saturation tuple that describes the same action-destination, or in the case that the saturation tuple is not described within [a] by inserting it within [a].
     *)
@@ -565,9 +598,9 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           replace x action (States.union old_states states))
     ;;
 
-    (** [get_destinations x f e] merges the values of [x] using [f], where [e] is some initial (i.e., "empty") collection of ['a].
+    (** [destinations x f e] merges the values of [x] using [f], where [e] is some initial (i.e., "empty") collection of ['a].
     *)
-    let get_destinations (x : t') : States.t =
+    let destinations (x : t') : States.t =
       Log.trace __FUNCTION__;
       to_seq_values x |> List.of_seq |> List.fold_left States.union States.empty
     ;;
@@ -709,13 +742,13 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       | Some actions -> ActionMap.update actions action destinations
     ;;
 
-    let get_destinations (x : t') (from : State.t) : States.t =
+    let destinations (x : t') (from : State.t) : States.t =
       Log.trace __FUNCTION__;
       match find_opt x from with
       | None ->
         Log.thing ~__FUNCTION__ Debug "has no edges" from (Of State.to_string);
         States.empty
-      | Some ys -> ActionMap.get_destinations ys
+      | Some ys -> ActionMap.destinations ys
     ;;
 
     let get_actions (x : t') (from : State.t) : Actions.t =
@@ -812,15 +845,32 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     module S : Set.S with type elt = States.t = Set.Make (States)
     include S
 
-    let get_reachable (x : t) (from : State.t) (edges : EdgeMap.t') : t =
+    let get_bisimilar (x : State.t) : t -> States.t =
+      find_first (fun (ys : States.t) -> States.mem x ys)
+    ;;
+
+    let filter_reachable (xs : States.t) : t -> t =
+      filter (fun (y : States.t) ->
+        Bool.not (States.is_empty (States.inter y xs)))
+    ;;
+
+    let reachable (from : State.t) (edges : EdgeMap.t') : t -> t =
       Log.trace __FUNCTION__;
-      let destinations : States.t = EdgeMap.get_destinations edges from in
+      (* let destinations : States.t = EdgeMap.destinations edges from in *)
       (* EdgeMap.log ~__FUNCTION__ ~s:"edges" edges; *)
       (* States.log ~__FUNCTION__ ~s:"destinations" destinations; *)
-      filter
-        (fun (y : States.t) ->
-          Bool.not (States.is_empty (States.inter y destinations)))
-        x
+      filter_reachable (EdgeMap.destinations edges from)
+    ;;
+
+    let reachable_by_label
+          (from : State.t)
+          (label : Label.t)
+          (edges : EdgeMap.t')
+      : t -> t
+      =
+      Log.trace __FUNCTION__;
+      let actions = ActionMap.reduce_by_label (EdgeMap.find edges from) label in
+      filter_reachable (ActionMap.destinations actions)
     ;;
 
     (* *)
@@ -1310,7 +1360,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       =
       Log.trace __FUNCTION__;
       ensure_nonempty block;
-      let reachable_from_s : Partition.t = Partition.get_reachable pi s edges in
+      let reachable_from_s : Partition.t = Partition.reachable s edges pi in
       Partition.log ~__FUNCTION__ ~s:"reachable" reachable_from_s;
       States.fold
         (fun (t : State.t) ((b1, b2) : States.t * States.t option) ->
@@ -1318,7 +1368,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           then States.add s b1, b2
           else (
             let reachable_from_t : Partition.t =
-              Partition.get_reachable pi t edges
+              Partition.reachable t edges pi
             in
             (* NOTE: split if [s] and [t] can reach different blocks *)
             if Partition.equal reachable_from_s reachable_from_t

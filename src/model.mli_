@@ -319,10 +319,10 @@ val get_actions_labelled :
 
 val get_action_destinations : States.t Actions.t -> States.t
 
-val get_reachable_partition :
+val reachable_partition :
   Partition.t -> States.t Actions.t -> Partition.t
 
-val get_reachable_partition_opt :
+val reachable_partition_opt :
   Partition.t -> States.t Actions.t -> Partition.t option
 
 val update_destinations :
@@ -394,7 +394,7 @@ val get_edges_labelled :
   States.t Actions.t Edges.t ->
   States.t Actions.t Edges.t
 
-val get_reachable_blocks_opt :
+val reachable_blocks_opt :
   Partition.t ->
   States.t Actions.t Edges.t ->
   State.t ->

@@ -1,4 +1,5 @@
-exception NothingToDo 
+exception NothingToDo
+exception NotImplemented
 
 module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
   (** [W] is for running the main part of the algorithm (pre-proof). *)
@@ -7,10 +8,10 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     let the_result : Model.Bisimilar.t ref option ref = ref None
 
-    exception NoResultFound 
+    exception NoResultFound
 
     let get_the_result () : Model.Bisimilar.t =
-      match !the_result with None -> raise (NoResultFound ) | Some x -> !x
+      match !the_result with None -> raise NoResultFound | Some x -> !x
     ;;
 
     let get_fsm_a ?(saturated : bool = false) () : Model.FSM.t =
@@ -25,6 +26,42 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       else (get_the_result ()).fsm_b.original
     ;;
 
+    let get_bisimilar_partition () : Model.Partition.t =
+      (get_the_result ()).result.bisim_states
+    ;;
+
+    let get_bisimilar_states
+          ?(pi : Model.Partition.t = get_bisimilar_partition ())
+          (x : Model.State.t)
+      : Model.States.t
+      =
+      try pi |> Model.Partition.get_bisimilar x with
+      | Not_found -> Model.States.empty
+    ;;
+
+    let are_states_bisimilar (x : Model.State.t) (y : Model.State.t) : bool =
+      get_bisimilar_states x |> Model.States.mem y
+    ;;
+
+    (** [get_candidates from goto edges] returns the set of states reachable from state [from] that are bisimilar with state [goto].
+        @param from is a state of fsm "b".
+        @param label is the label of the action taken by fsm "b".
+        @param edges is the [Model.EdgeMap.t'] of fsm "b".
+        @param goto is a state of fsm "a". *)
+    let get_candidates
+          (from : Model.State.t)
+          (label : Model.Label.t)
+          (edges : Model.EdgeMap.t')
+          (goto : Model.State.t)
+      : Model.States.t
+      =
+      let reachable : Model.Partition.t =
+        get_bisimilar_partition ()
+        |> Model.Partition.reachable_by_label from label edges
+      in
+      get_bisimilar_states ~pi:reachable goto
+    ;;
+
     exception CannotOverrideResult of Model.Bisimilar.t
 
     let set_the_result (x : Model.Bisimilar.t) : unit =
@@ -33,7 +70,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       | Some y -> raise (CannotOverrideResult !y)
     ;;
 
-    exception BisimilarityResultNotFound 
+    exception BisimilarityResultNotFound
 
     let check_bisimilarity
           (refs : Libnames.qualid list)
@@ -46,7 +83,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         |> M.run ~reset_encoding:true
       in
       match r with
-      | None -> raise (BisimilarityResultNotFound )
+      | None -> raise BisimilarityResultNotFound
       | Some r -> set_the_result r
     ;;
 
@@ -98,26 +135,45 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       (** [t] is similar to [Model.Transition.t] {!type:Model.Transition.t} but where [goto] and [label] are optional.
           @see 'Model.ml' for {!type:Model.Transition.t}. *)
       type t =
-        { from : W.Model.State.t
-        ; goto : W.Model.State.t option
-        ; label : W.Model.Label.t option
-        ; annotation : W.Model.Annotation.t option
-        ; constructor_tree : W.Model.Tree.t
+        { from : Model.State.t
+        ; goto : Model.State.t option
+        ; label : Model.Label.t option
+        ; annotation : Model.Annotation.t option
+        ; constructor_tree : Model.Tree.t option
         }
+
+      let from (from : Model.State.t) : t =
+        { from
+        ; goto = None
+        ; label = None
+        ; annotation = None
+        ; constructor_tree = None
+        }
+      ;;
     end
 
     type t =
-      { hyp : W.Model.Transition.t
+      { hyp : Model.Transition.t
       ; goal : Opt.t
       }
   end
 
   module ApplicableConstructors = struct
+    (** @param current
+          is an option type so that we can make sure we do the necessary tactics the first time we enter this state.
+        @param annotation
+          is an option type since [None] represents the end of the annotation.
+    *)
     type t =
-      { current : W.Model.Tree.TreeNode.t list
-      ; annotation : W.Model.Annotation.t option
-      ; destination : W.Model.State.t
+      { current : Model.Tree.TreeNode.t list option
+      ; annotation : Model.Annotation.t option
+      ; label : Model.Label.t
+      ; destination : Model.State.t
       }
+
+    let init ({ goto; label; annotation; _ } : Model.Transition.t) : t =
+      { current = None; annotation; label; destination = goto }
+    ;;
   end
 
   (** internal proof state *)
@@ -125,16 +181,15 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     (** [t] represents the internal state-machine used to solve proofs.
         (Note: We are required to split some of the states over several steps since we need to update the proof iteratively in order to apply what we need to apply. E.g., it is easier to apply the constructors one after the other, since we require the proof to be updated by the previous appliction in order to apply the next.)
         - [NewProof] the start state. We unfold any terms that we can before proceeding to [WeakSim].
-        - [WeakSim] either: (i) check if can be solved by cofix in hyps, or (ii) create new cofix. Either stays in [WeakSim] or proceeds to [Exists], or [Done].
-        - [Exists] means that the conclusion begins with an [exists a n2] (where [n2] is some state reached from [n] after taking action [a]). Either (i) we stay in [Exists] to invert the hypothesis, or (ii) we proceed to [GoalTransition] after extracting the transition made by fsm 1 from the hyps (possible requiring inversion beforehand), and applying [ex_intro] and [split] tactics to the conclusion.
-        - [GoalTransition] is where we determine which transition fsm 2 will make in response to the one made by fsm 1 (in the hyps). We instantiate the necessary values for the label [a] and goto state [n2] and select the constructors to apply. Then proceed to [ApplyConstructors].
-        - [ApplyConstructors] is for applying the constructors we know we need to apply in order for fsm 2 to reach a state that is bisimilar to that reached by fsm 1.
+        - [WeakSim] either: (i) check if can be solved by cofix in hyps, or (ii) create new cofix. Either stays in [WeakSim] (to invert or unfold the hyps) or proceeds to [Exists], or [Done].
+        - [Exists] means that the conclusion begins with an [exists a n2] (where [n2] is some state reached from [n] after taking action [a]). We: (1) extract the transition made by fsm "a" from the hyps (possible requiring inversion beforehand), (2) determine which transition fsm "b" will make in response to the one made by fsm "a" (in the hyps), and (3) apply [ex_intro] and [split] tactics to the conclusion (since we now know what to instantiate state [n2] with). If We may re-enter [Exists] if we make "b" do a reflexive transition, in which case we apply the necessary constructors to finish the case and proceed to [WeakSim], else we proceed to [ApplyConstructors].
+        - [ApplyConstructors] is for applying the constructors we know we need to apply in order for fsm "b" to reach a state that is bisimilar to that reached by fsm "a".
         - [Done] means the proof is finished. *)
     type t =
       | NewProof of (Constrexpr.constr_expr * Constrexpr.constr_expr)
       | WeakSim
       | Exists
-      | GoalTransition of Transition.t
+      (* | GoalTransition of Transition.t *)
       | ApplyConstructors of ApplicableConstructors.t
       | Done
 
@@ -142,7 +197,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       | NewProof _ -> "NewProof"
       | WeakSim -> "WeakSim"
       | Exists -> "Exists"
-      | GoalTransition _ -> "GoalTransition"
+      (* | GoalTransition _ -> "GoalTransition" *)
       | ApplyConstructors _ -> "ApplyConstructors"
       | Done -> "Done"
     ;;
@@ -156,10 +211,10 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
   let the_state : state ref option ref = ref None
 
-  exception NoStateFound 
+  exception NoStateFound
 
   let get_the_state () : state ref =
-    match !the_state with None -> raise (NoStateFound ) | Some x -> x
+    match !the_state with None -> raise NoStateFound | Some x -> x
   ;;
 
   let get_pstate () : Declare.Proof.t = !(get_the_state ()).p
@@ -260,12 +315,12 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     let empty () : t = tactic (Proofview.tclUNIT ())
 
-    exception EmptyTacticChain 
+    exception EmptyTacticChain
 
     (** [chain ?nonempty (x::xs)] applies [seq x (chain xs)].
         @raise EmptyTacticChain if the list is empty and [?nonempty] s true. *)
     let rec chain ?(nonempty : bool = false) : t list -> t = function
-      | [] -> if nonempty then raise (EmptyTacticChain ) else empty ()
+      | [] -> if nonempty then raise EmptyTacticChain else empty ()
       | h :: [] -> h
       | h :: tl -> seq h (chain tl)
     ;;
@@ -495,6 +550,13 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let eapply_rt1n_refl () : Tactic.t mm = eapply (Theories.c_rt1n_refl ())
       let eapply_rt1n_trans () : Tactic.t mm = eapply (Theories.c_rt1n_trans ())
 
+      let eapply_rt1n_via (x:Model.Label.t) : Tactic.t mm = 
+        if Model.Label.is_silent x then 
+         eapply_rt1n_refl ()  else (
+           eapply_rt1n_trans () 
+         )
+;;
+
       (* *)
       exception CannotUnfoldConstr of Constr.t
 
@@ -584,6 +646,16 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         unfold_econstr (Theories.c_silent1 ())
       ;;
 
+      (* *)
+      let do_refl () : Tactic.t mm =
+        let open Syntax in
+        let* wk_none = apply_wk_none () in
+        let* unfold_silent = unfold_silent () in
+        let* rt1n_refl = apply_rt1n_refl () in
+        Tactic.chain [ wk_none; unfold_silent; rt1n_refl ] |> return
+      ;;
+
+      (* *)
       let collect_component_econstrs (sigma : Evd.evar_map) (x : EConstr.t)
         : EConstrSet.t
         =
@@ -707,6 +779,15 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let is_None (x : EConstr.t) : bool mm = is_theory x (Theories.c_None ())
       let is_Some (x : EConstr.t) : bool mm = is_theory x (Theories.c_Some ())
 
+      exception EnsureFail
+
+      (** assert *)
+      let ensure (x : EConstr.t) (f : Evd.econstr -> bool mm) : unit mm =
+        let open Syntax in
+        let* b = f x in
+        if b then return () else raise EnsureFail
+      ;;
+
       (** *)
       let get_theory_enc (f : EConstr.t -> bool mm) : M.Enc.t M.mm =
         let open M.Syntax in
@@ -721,21 +802,21 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         M.F.to_seq fm |> List.of_seq |> find_theory
       ;;
 
-      exception NoEncodingFoundFor_TheoriesNone 
+      exception NoEncodingFoundFor_TheoriesNone
 
       let get_None_enc () : M.Enc.t M.mm =
         try get_theory_enc is_None with
-        | Not_found -> raise (NoEncodingFoundFor_TheoriesNone )
+        | Not_found -> raise NoEncodingFoundFor_TheoriesNone
       ;;
 
-      exception NoEncodingFoundFor_TheoriesSome 
+      exception NoEncodingFoundFor_TheoriesSome
 
       let get_Some_enc () : M.Enc.t M.mm =
         try get_theory_enc is_Some with
-        | Not_found -> raise (NoEncodingFoundFor_TheoriesSome )
+        | Not_found -> raise NoEncodingFoundFor_TheoriesSome
       ;;
 
-      exception NotEqTheory 
+      exception NotEqTheory
 
       (** *)
       let get_theory_enc_if_eq (x : EConstr.t) (f : EConstr.t -> bool mm)
@@ -743,7 +824,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         =
         let is_eq : bool = run (f x) in
         try if is_eq then get_theory_enc f else raise Not_found with
-        | Not_found -> raise (NotEqTheory )
+        | Not_found -> raise NotEqTheory
       ;;
 
       let get_None_enc_if_eq (x : EConstr.t) : M.Enc.t M.mm =
@@ -816,6 +897,17 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         | Not_found -> raise (CouldNotFind_State { x; states = ys })
       ;;
 
+      let state_opt (x : EConstr.t) (ys : Model.States.t)
+        : Model.State.t option M.mm
+        =
+        try
+          let open M.Syntax in
+          let* z = state x ys in
+          M.return (Some z)
+        with
+        | CouldNotFind_State _ -> M.return None
+      ;;
+
       exception
         CouldNotFind_Label of
           { x : EConstr.t
@@ -835,7 +927,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
              let* term : M.Enc.t = Theory.get_None_enc_if_eq x in
              f term
            with
-           | Theory.NotEqTheory  ->
+           | Theory.NotEqTheory ->
              (* NOTE: is it [Some]? (i.e., a visible action) *)
              (try
                 let* term : M.Enc.t = Theory.get_Some_enc_if_eq x in
@@ -843,6 +935,17 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
               with
               | Theory.NotEqTheory ->
                 raise (CouldNotFind_Label { x; alphabet = ys })))
+      ;;
+
+      let label_opt (x : EConstr.t) (ys : Model.Labels.t)
+        : Model.Label.t option M.mm
+        =
+        try
+          let open M.Syntax in
+          let* z = label x ys in
+          M.return (Some z)
+        with
+        | CouldNotFind_Label _ -> M.return None
       ;;
 
       exception
@@ -893,8 +996,6 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     (***********************************************************************)
 
     module Hyp = struct
-      exception NotImplemented 
-
       type t = Rocq_utils.hyp
 
       let to_string (x : t) : string = Strfy.hyp x
@@ -970,10 +1071,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         Log.trace __FUNCTION__;
         let open Syntax in
         let* ty, tys = to_atomic x in
-        let is_fsm_constructor : bool =
-          M.run (Theory.is_fsm_constructor ty m)
-        in
-        if is_fsm_constructor
+        if Theory.is_fsm_constructor ty m |> M.run
         then (
           try
             let from : Model.State.t = M.run (ReModel.state tys.(0) m.states) in
@@ -989,14 +1087,12 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
             raise (CouldNotGetTransition { hyp = x; fsm = m })
           | ReModel.CouldNotFind_Transition _ ->
             raise (CouldNotGetTransition { hyp = x; fsm = m }))
-        else raise (NotImplemented )
+        else raise (CouldNotGetTransition { hyp = x; fsm = m })
       ;;
     end
 
     (** conclusion *)
     module Concl = struct
-      exception NotImplemented 
-
       let eq (x : EConstr.t) : bool mm = get_concl () |> econstr_eq x
 
       let eq_hyp (x : Rocq_utils.hyp) : bool mm =
@@ -1013,29 +1109,69 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
       let is_weak_sim () : bool mm = get_concl () |> Theory.is_weak_sim
       let is_exists () : bool mm = get_concl () |> Theory.is_exists
+      let is_tau () : bool mm = get_concl () |> Theory.is_tau
+
+      (** [try_unfold_any ()] is similar to [Hyp.try_unfold_any _], except that instead of a hypothesis, it uses the conclusion. Uses [Tacs.try_unfold_any].
+      *)
+      let try_unfold_any () : Tactic.t option mm =
+        let open Syntax in
+          let* ty, tys = the_concl () |> to_atomic in
+          let* ty_opt : Tactic.t option = Tacs.try_unfold_any ty in
+          match ty_opt with
+          | Some y -> return (Some y)
+          | None ->
+            (* NOTE: check if any in [tys] can be unfolded *)
+            let f (i : int) (acc : Tactic.t option) : Tactic.t option mm =
+              let y = tys.(i) in
+              let* y : Tactic.t option = Tacs.try_unfold_any y in
+              match y with
+              | None -> return acc
+              | Some y ->
+                (match acc with
+                 | None -> return (Some y)
+                 | Some acc -> return (Some (Tactic.seq acc y)))
+            in
+            iterate 0 (Array.length tys - 1) None f
+      ;;
 
       type conj =
         { wk_trans : EConstr.t
-        ; wk_sim : EConstr.t
+        ; a' : Model.State.t
+        ; b : Model.State.t
         }
+
+      let get_a'_from_wk_sim (wk_sim : EConstr.t) : Model.State.t mm =
+        let open Syntax in
+        let* _, tys = to_atomic wk_sim in
+        (W.get_fsm_a ()).states |> ReModel.state tys.(5) |> M.run |> return
+      ;;
+
+      let get_b_from_wk_trans (wk_trans : EConstr.t) : Model.State.t mm =
+        let open Syntax in
+        let* _, tys = to_atomic wk_trans in
+        (W.get_fsm_b ()).states |> ReModel.state tys.(3) |> M.run |> return
+      ;;
 
       exception ConclDoesNotMatchConj
 
       let get_conj () : conj mm =
         let open Syntax in
         let* ty, tys = get_concl () |> to_atomic in
+        let* () = Theory.ensure ty Theory.is_exists in
         let* _, _, x = to_lambda tys.(1) in
         let* _, app_tys = to_app x in
         match Array.to_list app_tys with
-        | [ wk_trans; wk_sim ] -> return { wk_trans; wk_sim }
+        | [ wk_trans; wk_sim ] ->
+          let* () = Theory.ensure wk_sim Theory.is_weak_sim in
+          let* a' = get_a'_from_wk_sim wk_sim in
+          let* b = get_b_from_wk_trans wk_trans in
+          return { wk_trans; a'; b }
         | _ -> raise ConclDoesNotMatchConj
       ;;
     end
 
     (** hypothesis *)
     module Hyps = struct
-      exception NotImplemented 
-
       (** [get_cofixes ()] filters the hyps by name according to [get_all_cofix_hyp_names ()].
       *)
       let get_cofixes () : Rocq_utils.hyp list =
@@ -1153,38 +1289,164 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       |> return
     ;;
 
-    (** [handle_silent_transition ()] ... *)
-    let handle_silent_transition () : Tactic.t mm = raise Not_found
+    exception MisMatchedStates of (Model.State.t * Model.State.t)
 
-    (** [handle_visible_transition hyp] ... introduces *)
-    let handle_visible_transition () : Tactic.t mm = raise Not_found
+    let ensure_matching_states (x : Model.State.t) (y : Model.State.t) : unit =
+      if Model.State.equal x y then () else raise (MisMatchedStates (x, y))
+    ;;
 
-    (* * [handle_hyp_transition ()] ... *)
+    exception
+      CouldNotGetGoalTransition of
+        { b : Model.State.t
+        ; wk_trans : EConstr.t
+        }
+
+    exception CouldNotFindGotoState
+
+    let try_get_visible_transition
+          ?(saturated : bool = false)
+          (bisimilar : Model.States.t)
+          (tys : EConstr.t array)
+      : Model.Transition.t
+      =
+      let m : Model.FSM.t = W.get_fsm_b ~saturated () in
+      let from : Model.State.t = M.run (ReModel.state tys.(3) m.states) in
+      let label : Model.Label.t = M.run (ReModel.label tys.(5) m.alphabet) in
+      try
+        let ({ annotation; constructor_trees; _ }, destinations)
+          : Model.ActionPair.t
+          =
+          (* NOTE: get actions [from] with [label] *)
+          Model.ActionMap.reduce_by_label
+            (Model.EdgeMap.find m.edges from)
+            label
+          |> Model.ActionMap.to_actionpairs
+          (* NOTE: keep only those that are [bisimilar] *)
+          |> Model.ActionPairs.filter_map (fun ((x, y) : Model.ActionPair.t) ->
+            if Model.States.disjoint bisimilar y
+            then None
+            else Some (x, Model.States.inter bisimilar y))
+          (* NOTE: get the pair with the shortest annotation (less steps to do) *)
+          |> Model.ActionPairs.shorest_annotation
+        in
+        let constructor_tree : Model.Tree.t =
+          Model.Trees.min constructor_trees
+        in
+        let goto : Model.State.t = Model.States.min_elt destinations in
+        { from; goto; label; annotation; constructor_tree }
+      with
+      | Model.ActionPairs.IsEmpty -> raise CouldNotFindGotoState
+    ;;
+
+    (** [handle_visible_transition hyp b wk_trans] ... introduces *)
+    let handle_visible_transition
+          (hyp : Model.Transition.t)
+          (b : Model.State.t)
+          (wk_trans : EConstr.t)
+      : unit mm
+      =
+      let bisimilar : Model.States.t = W.get_bisimilar_states hyp.goto in
+      let open Syntax in
+      let* ty, tys = to_atomic wk_trans in
+      if W.get_fsm_b () |> Theory.is_fsm_constructor ty |> M.run
+      then (
+        let goal : Model.Transition.t =
+          (* NOTE: first try to do single action, if fail then saturated *)
+          try try_get_visible_transition ~saturated:false bisimilar tys with
+          | CouldNotFindGotoState ->
+            (try try_get_visible_transition ~saturated:true bisimilar tys with
+             | CouldNotFindGotoState ->
+               raise (CouldNotGetGoalTransition { b; wk_trans }))
+        in
+        ensure_matching_states goal.from b;
+        update_state (ApplyConstructors (ApplicableConstructors.init goal));
+        return ())
+      else raise (CouldNotGetGoalTransition { b; wk_trans })
+    ;;
+
+    (* * [handle_hyp_transition ()] determines which term to introduce for [exists b'], checking whether we can do this via a silent/tau transition, and sets up the information we will need for the next state. *)
     let handle_hyp_transition () : Tactic.t mm =
       let open Syntax in
       let* hyp : Model.Transition.t = Hyps.get_transition (W.get_fsm_a ()) in
-      if Model.Transition.is_silent hyp
-      then (
-        Log.trace ~__FUNCTION__ "is_exists, silent";
-        raise Not_found)
-      else (
-        Log.trace ~__FUNCTION__ "is_exists, trans";
-        let* conj = Concl.get_conj () in 
-        (* Tacs.ex_intro_split (); *)
-        raise Not_found)
+      let* { wk_trans; a'; b } = Concl.get_conj () in
+      ensure_matching_states hyp.goto a';
+      let* () =
+        if Model.Transition.is_silent hyp && W.are_states_bisimilar a' b
+        then (
+          Log.trace ~__FUNCTION__ "is_exists, silent";
+          return ())
+        else (
+          Log.trace ~__FUNCTION__ "is_exists, trans";
+          handle_visible_transition hyp b wk_trans)
+      in
+      Tacs.ex_intro_split b
+    ;;
+
+    (** [handle_appconstrs_entry_point args] ... *)
+    let handle_appconstrs_entry_point (label : Model.Label.t) : Tactic.t mm =
+      let open Syntax in
+      let* constructor =
+        if Model.Label.is_silent label
+        then Tacs.apply_rt1n_refl ()
+        else Tacs.eapply_rt1n_trans ()
+      in
+      let* unfold_silent = Tacs.unfold_silent () in
+      Tactic.seq constructor unfold_silent |> return
+    ;;
+
+    (** [handle_appconstrs_stop ()] ... *)
+    let handle_appconstrs_stop () : Tactic.t mm =
+      let open Syntax in
+      let* simplify = Tacs.simplify_and_subst_all () in
+      let* refl = Tacs.eapply_rt1n_refl () in
+      Tactic.chain [ simplify; refl; simplify ] |> return
+    ;;
+
+    let handle_appconstrs_update_args ({this;next}:Model.Annotation.t) : (
+    Model.Tree.TreeNode.t list option *    Model.Annotation.t option
+
+    )  =
+
+    (
+Some (Model.Trees.min this.using |> Model.Tree.minimize)
+    ,
+      next
+    ) 
+  ;;
+
+
+    (** [handle_appconstrs_update label] ... *)
+    let handle_appconstrs_update (label:Model.Label.t) : Tactic.t mm =
+      let open Syntax in
+      let* unfold = Concl.try_unfold_any () in 
+      let* rt1n = Concl.eapply_rt1n_via (label) in 
+      Tactic.seq unfold rt1n |> return
+    ;;
+
+    (** [handle_appconstrs_apply x] ...
+    (* NOTE: relies on the bindings we extract early on *) *)
+    let handle_appconstrs_apply (x : Model.Tree.TreeNode.t) : Tactic.t mm =
+        let open Syntax in 
+        let* is_tau = Concl.is_tau () in 
+if is_tau then (
+      raise NotImplemented
+
+) else (
+      raise NotImplemented
+
+)
     ;;
 
     (** [handle_ ()] ... *)
-    (* let handle_ () : Tactic.t mm =
-       raise (Not_found)
-       ;; *)
+    (* let handle_ () : Tactic.t mm = raise NotImplemented *)
 
     (***********************************************************************)
 
     exception StateNotImplemented of State.t
     exception StateCouldNothandle of State.t
-    exception SkipNewProof 
-    exception ExitWeakSim 
+    exception SkipNewProof
+    exception ExitWeakSim
+    exception ProofComplete
 
     let handle_new_proof
           ((a, b) : Constrexpr.constr_expr * Constrexpr.constr_expr)
@@ -1194,7 +1456,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let open Syntax in
       let* x = Tacs.unfold_opt_constrexpr_list [ a; b ] in
       match x with
-      | None -> raise (SkipNewProof )
+      | None -> raise SkipNewProof
       | Some x ->
         update_state WeakSim;
         return x
@@ -1210,6 +1472,8 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         if has_hyp_cofix
         then Tacs.trivial ~msg:"trivial (solve cofix)" ()
         else handle_new_cofix ()
+      else if is_done ()
+      then raise ProofComplete
       else
         (* NOTE: try invert any that need to be inverted *)
         let* invert_opt = Hyps.try_invert_any () in
@@ -1218,7 +1482,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           (* NOTE: check if we need to unfold anything in the inverted hyps. *)
           let* unfold_opt = Hyps.try_unfold_any () in
           (match unfold_opt with
-           | None -> raise (ExitWeakSim )
+           | None -> raise ExitWeakSim
            | Some x -> return x)
         | Some x -> return x
     ;;
@@ -1229,22 +1493,45 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let* is_exists : bool = Concl.is_exists () in
       if is_exists
       then handle_hyp_transition ()
-      else raise (StateCouldNothandle Exists)
+      else (
+        (* NOTE: assume we need to finish handling a silent action. *)
+        Log.trace ~__FUNCTION__ "not exists, do_refl";
+        update_state WeakSim;
+        Tacs.do_refl ())
     ;;
 
-    let handle_goal_transition ({ hyp; goal } : Transition.t) : Tactic.t mm =
+    (* let handle_goal_transition ({ hyp; goal } : Transition.t) : Tactic.t mm =
       Log.trace __FUNCTION__;
       raise (StateNotImplemented (GoalTransition { hyp; goal }))
-    ;;
+    ;; *)
 
-    let handle_apply_constructors
-          ({ current; annotation; destination } : ApplicableConstructors.t)
+    let handle_apply_constructors (args : ApplicableConstructors.t)
       : Tactic.t mm
       =
       Log.trace __FUNCTION__;
-      raise
-        (StateNotImplemented
-           (ApplyConstructors { current; annotation; destination }))
+      let open Syntax in
+      match args with
+      | { current = None; label; _ } ->
+        (* NOTE: entry-point *)
+        update_state (ApplyConstructors { args with current = Some [] });
+        handle_appconstrs_entry_point label
+      | { current = Some []; label; destination; _ } ->
+        (match args.annotation with
+         | None ->
+        (* NOTE: stop *)
+           update_state WeakSim;
+           handle_appconstrs_stop ()
+         | Some anno ->
+        (* NOTE: update current, prepare for next transition *)
+           let current, annotation = handle_appconstrs_update_args anno
+           in
+           update_state
+             (ApplyConstructors { args with current; annotation });
+           handle_appconstrs_update (this.label))
+      | { current = Some (h :: tl); _ } ->
+        (* NOTE: continue applying constructors *)
+        update_state (ApplyConstructors { args with current = Some tl });
+        handle_appconstrs_apply h
     ;;
 
     let handle_state () : Tactic.t mm =
@@ -1255,20 +1542,24 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       | NewProof ab -> handle_new_proof ab
       | WeakSim -> handle_weaksim ()
       | Exists -> handle_exists ()
-      | GoalTransition args -> handle_goal_transition args
+      (* | GoalTransition args -> handle_goal_transition args *)
       | ApplyConstructors xs -> handle_apply_constructors xs
-      | Done -> raise (NothingToDo )
+      | Done -> raise NothingToDo
     ;;
 
     (** [step ()] ... *)
     let rec step () : Tactic.t =
       Log.trace __FUNCTION__;
       try run (handle_state ()) with
-      | SkipNewProof  ->
-        Log.trace ~__FUNCTION__ "BeginProof:SkipNewProof => WeakSim";
+      | ProofComplete ->
+        Log.trace ~__FUNCTION__ "_:ProofComplete => Done";
+        update_state Done;
+        Tactic.tactic ~msg:"Proof Complete" (Proofview.tclUNIT ())
+      | SkipNewProof ->
+        Log.trace ~__FUNCTION__ "NewProof:SkipNewProof => WeakSim";
         update_state WeakSim;
         step ()
-      | ExitWeakSim  ->
+      | ExitWeakSim ->
         Log.trace ~__FUNCTION__ "WeakSim:ExitWeakSim => Exists";
         update_state Exists;
         step ()
@@ -1319,12 +1610,10 @@ module type S = module type of Make (Log) ((val Api.default_encoding ()))
 let the_proof_solver : (module S) ref option ref = ref None
 let reset_the_proof_solver () : unit = the_proof_solver := None
 
-exception NoProofSolverFound 
+exception NoProofSolverFound
 
 let get_the_proof_solver () : (module S) ref =
-  match !the_proof_solver with
-  | None -> raise (NoProofSolverFound )
-  | Some x -> x
+  match !the_proof_solver with None -> raise NoProofSolverFound | Some x -> x
 ;;
 
 let new_proof_solver () : (module S) ref =
@@ -1340,7 +1629,7 @@ let is_done () : bool =
 
 (***********************************************************************)
 
-exception BisimilarityResultNotFound 
+exception BisimilarityResultNotFound
 
 (** [init ] ... *)
 let init
@@ -1374,7 +1663,7 @@ let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
     | -1 ->
       if is_done ()
       then n, p
-      else (try step p |> f (n + 1) with NothingToDo  -> n, p)
+      else (try step p |> f (n + 1) with NothingToDo -> n, p)
     | _ ->
       Log.thing ~__FUNCTION__ Warning "Stopping, exceeded bound" bound fint;
       n, p
