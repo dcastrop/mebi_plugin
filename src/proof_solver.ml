@@ -161,6 +161,12 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     Log.thing ~__FUNCTION__ Debug s x (Of Model.States.to_string)
   ;;
 
+  let _log_label ?(__FUNCTION__ : string = "") (s : string) (x : Model.Label.t)
+    : unit
+    =
+    Log.thing ~__FUNCTION__ Debug s x (Of Model.Label.to_string)
+  ;;
+
   (***********************************************************************)
 
   (* module Transition = struct
@@ -207,7 +213,29 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     let init ({ goto; label; annotation; _ } : Model.Transition.t) : t =
       { current = None; annotation; label; destination = goto }
     ;;
+
+    let to_string (x : t) : string =
+      Utils.Strfy.record
+        [ "label", M.Enc.to_string x.label.term
+        ; "destination", Model.State.to_string x.destination
+        ; ( "current"
+          , Utils.Strfy.option
+              (Of (Utils.Strfy.list (Of Model.Tree.TreeNode.to_string)))
+              x.current )
+        ; ( "annotation"
+          , Utils.Strfy.option (Of Model.Annotation.to_string) x.annotation )
+        ]
+    ;;
   end
+
+  let _log_applicable_constructors
+        ?(__FUNCTION__ : string = "")
+        (s : string)
+        (x : ApplicableConstructors.t)
+    : unit
+    =
+    Log.thing ~__FUNCTION__ Debug s x (Of ApplicableConstructors.to_string)
+  ;;
 
   (** internal proof state *)
   module State = struct
@@ -443,6 +471,15 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       Log.thing ~__FUNCTION__ Debug s x (Of Strfy.econstr)
     ;;
 
+    let log_econstrs
+          ?(__FUNCTION__ : string = "")
+          (s : string)
+          (x : EConstr.t list)
+      : unit
+      =
+      Log.things ~__FUNCTION__ Debug s x (Of Strfy.econstr)
+    ;;
+
     let log_concl () : unit = log_econstr "concl" (get_concl ())
 
     let log_hyps () : unit =
@@ -478,387 +515,6 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     ;;
 
     (***********************************************************************)
-
-    (** tactics *)
-    module Tacs = struct
-      let inversion (x : Rocq_utils.hyp) : Tactic.t mm =
-        Inv.inv_tac (Context.Named.Declaration.get_id x)
-        |> Tactic.tactic
-             ~msg:
-               (Printf.sprintf
-                  "inversion %s"
-                  (Strfy.hyp_name x) (* (Strfy.hyp_type x) *))
-        |> return
-      ;;
-
-      let subst_all () : Tactic.t mm =
-        Equality.subst_all ()
-        |> Tactic.tactic ~msg:(Printf.sprintf "(subst all)")
-        |> return
-      ;;
-
-      (** by specifying [None] it appears to be the same as using [simpl in *].
-      *)
-      let simplify () : Tactic.t mm =
-        Tactics.simpl_option None |> Tactic.tactic ~msg:"simpl" |> return
-      ;;
-
-      let simplify_concl () : Tactic.t mm =
-        Tactics.simpl_in_concl |> Tactic.tactic ~msg:"simpl" |> return
-      ;;
-
-      let simplify_hyp (x : Rocq_utils.hyp) : Tactic.t mm =
-        Tactics.simpl_in_hyp (Context.Named.Declaration.get_id x, Locus.InHyp)
-        |> Tactic.tactic ~msg:(Printf.sprintf "simpl in %s" (Strfy.hyp_name x))
-        |> return
-      ;;
-
-      let simplify_hyps () : Tactic.t mm =
-        match get_hyps () with
-        | [] -> Tactic.empty () |> return
-        | x :: [] -> simplify_hyp x
-        | x :: xs ->
-          let open Syntax in
-          let* x : Tactic.t = simplify_hyp x in
-          let f (i : int) (x : Tactic.t) : Tactic.t mm =
-            let y : Rocq_utils.hyp = List.nth xs i in
-            let* y : Tactic.t = simplify_hyp y in
-            Tactic.seq x y |> return
-          in
-          iterate 0 (List.length xs - 1) x f
-      ;;
-
-      (** not needed, manual/explicit version of [simplfy ()] *)
-      let simplify_all () : Tactic.t mm =
-        let open Syntax in
-        let* concl : Tactic.t = simplify_concl () in
-        let* hyps : Tactic.t = simplify_hyps () in
-        Tactic.seq concl hyps |> return
-      ;;
-
-      let simplify_and_subst_all () : Tactic.t mm =
-        let open Syntax in
-        (* let* simpls : Tactic.t = simplify_all () in *)
-        let* simpls : Tactic.t = simplify () in
-        let* substs : Tactic.t = subst_all () in
-        Tactic.seq simpls substs |> return
-      ;;
-
-      let cofix () : Tactic.t mm =
-        let name : Names.Id.t = new_cofix_name () in
-        Tactics.cofix name
-        |> Tactic.tactic
-             ~msg:(Printf.sprintf "cofix %s" (Names.Id.to_string name))
-        |> return
-      ;;
-
-      let trivial ?(msg : string = "trivial") () : Tactic.t mm =
-        Tactic.tactic ~msg (Auto.gen_trivial ~debug:Hints.Info [] None)
-        |> return
-      ;;
-
-      let ex_intro (x : Model.State.t) : Tactic.t mm =
-        let t : EConstr.t = M.decode x.term in
-        let bindings = Tactypes.ImplicitBindings [ t ] in
-        let msg = Printf.sprintf "exists %s" (M.Strfy.econstr t) in
-        Tactic.tactic ~msg (Tactics.constructor_tac true None 1 bindings)
-        |> return
-      ;;
-
-      let split () : Tactic.t mm =
-        Tactic.tactic (Tactics.split Tactypes.NoBindings) |> return
-      ;;
-
-      let ex_intro_split (x : Model.State.t) : Tactic.t mm =
-        let open Syntax in
-        let* ex_intro : Tactic.t = ex_intro x in
-        let* split : Tactic.t = split () in
-        Tactic.seq ex_intro split |> return
-      ;;
-
-      let intros_all () : Tactic.t mm =
-        Tactics.intros |> Tactic.tactic ~msg:"intros" |> return
-      ;;
-
-      (** [intro_as x] applies the introduction tactic using the (next non-conficting) name [x].
-      *)
-      let intro_as (x : string) : Tactic.t mm =
-        let name : Names.Id.t = new_name_of_string x in
-        Tactics.introduction name
-        |> Tactic.tactic
-             ~msg:(Printf.sprintf "intro %s" (Names.Id.to_string name))
-        |> return
-      ;;
-
-      (* *)
-      let apply (x : EConstr.t) : Tactic.t mm =
-        Tactics.apply x
-        |> Tactic.tactic ~msg:(Printf.sprintf "apply %s" (Strfy.econstr x))
-        |> return
-      ;;
-
-      let apply_Pack_sim () : Tactic.t mm = apply (Theories.c_Pack_sim ())
-      let apply_In_sim () : Tactic.t mm = apply (Theories.c_In_sim ())
-      let apply_wk_none () : Tactic.t mm = apply (Theories.c_wk_none ())
-      let apply_rt1n_refl () : Tactic.t mm = apply (Theories.c_rt1n_refl ())
-      let apply_rt1n_trans () : Tactic.t mm = apply (Theories.c_rt1n_trans ())
-
-      let eapply (x : EConstr.t) : Tactic.t mm =
-        Tactics.eapply x
-        |> Tactic.tactic ~msg:(Printf.sprintf "eapply %s" (Strfy.econstr x))
-        |> return
-      ;;
-
-      let eapply_wk_some () : Tactic.t mm = eapply (Theories.c_wk_some ())
-      let eapply_rt1n_refl () : Tactic.t mm = eapply (Theories.c_rt1n_refl ())
-      let eapply_rt1n_trans () : Tactic.t mm = eapply (Theories.c_rt1n_trans ())
-
-      let eapply_rt1n_via (x : Model.Label.t) : Tactic.t mm =
-        if Model.Label.is_silent x
-        then eapply_rt1n_refl ()
-        else eapply_rt1n_trans ()
-      ;;
-
-      (* *)
-      exception CannotUnfoldConstr of Constr.t
-
-      (** [unfold_constr ?in_hyp x] ... {e NOTE: term [x] is always unfolded. If [?in_hyp] is provided then we {b also} unfold [x] [in_hyp].}
-          @raise CannotUnfoldConstr
-            of [x] if [Constr.kind x] is not [Const (_, _)]. *)
-      let unfold_constr ?(in_hyp : Rocq_utils.hyp option) (x : Constr.t)
-        : Tactic.t mm
-        =
-        let f (name : Names.Constant.t) : unit Proofview.tactic =
-          match in_hyp with
-          | None -> Tactics.unfold_constr (Names.GlobRef.ConstRef name)
-          | Some y ->
-            Proofview.tclTHEN
-              (Tactics.unfold_in_hyp
-                 [ Locus.AllOccurrences, Evaluable.EvalConstRef name ]
-                 (Context.Named.Declaration.get_id y, Locus.InHyp))
-              (Tactics.unfold_constr (Names.GlobRef.ConstRef name))
-        in
-        match Constr.kind x with
-        | Const (name, _) ->
-          f name
-          |> Tactic.tactic
-               ~msg:(Printf.sprintf "unfold %s" (Names.Constant.to_string name))
-          |> return
-        | _ -> raise (CannotUnfoldConstr x)
-      ;;
-
-      (** [handle_unfold_hyp_opt f ?in_hyp x] helps keep this function cleaner to use. i.e., [unfold_econstr ~in_hyp:x] rather than [~in_hyp:(Some x)].
-      *)
-      let f_unfold_hyp
-            (f : ?in_hyp:Rocq_utils.hyp -> 'a -> Tactic.t mm)
-            ?(in_hyp : Rocq_utils.hyp option = None)
-            (x : 'a)
-        : Tactic.t mm
-        =
-        match in_hyp with None -> f x | Some in_hyp -> f ~in_hyp x
-      ;;
-
-      let unfold_econstr ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
-        : Tactic.t mm
-        =
-        let open Syntax in
-        let* y : Constr.t = econstr_to_constr x in
-        f_unfold_hyp unfold_constr ~in_hyp y
-      ;;
-
-      let unfold_constrexpr
-            ?(in_hyp : Rocq_utils.hyp option)
-            (x : Constrexpr.constr_expr)
-        : Tactic.t mm
-        =
-        let open Syntax in
-        let* y : EConstr.t = constrexpr_to_econstr x in
-        f_unfold_hyp unfold_econstr ~in_hyp y
-      ;;
-
-      let unfold_opt_constrexpr_list ?(in_hyp : Rocq_utils.hyp option)
-        : Constrexpr.constr_expr list -> Tactic.t option mm
-        =
-        (* NOTE: optional argument wrapper *)
-        let unfold_constrexpr (x : Constrexpr.constr_expr) : Tactic.t mm =
-          match in_hyp with
-          | None -> unfold_constrexpr x
-          | Some in_hyp -> unfold_constrexpr ~in_hyp x
-        in
-        (* NOTE: iterate and combine tactics *)
-        let open Syntax in
-        let iterate h xs =
-          let f (i : int) (ys : Tactic.t) =
-            let* x = List.nth xs i |> unfold_constrexpr in
-            Tactic.seq h x |> return
-          in
-          iterate 0 (List.length xs - 1) h f
-        in
-        function
-        | [] -> return None
-        | h :: tl ->
-          let* h = unfold_constrexpr h in
-          let* x = iterate h tl in
-          return (Some x)
-      ;;
-
-      let unfold_silent () : Tactic.t mm = unfold_econstr (Theories.c_silent ())
-
-      let unfold_silent1 () : Tactic.t mm =
-        unfold_econstr (Theories.c_silent1 ())
-      ;;
-
-      (* *)
-      let do_refl () : Tactic.t mm =
-        let open Syntax in
-        let* wk_none = apply_wk_none () in
-        let* unfold_silent = unfold_silent () in
-        let* rt1n_refl = apply_rt1n_refl () in
-        Tactic.chain [ wk_none; unfold_silent; rt1n_refl ] |> return
-      ;;
-
-      (* *)
-      let collect_component_econstrs (sigma : Evd.evar_map) (x : EConstr.t)
-        : EConstrSet.t
-        =
-        Log.trace __FUNCTION__;
-        let is_constr_ref (x : EConstr.t) : bool =
-          EConstr.isRef sigma x && EConstr.isConst sigma x
-        in
-        let acc_constr_ref (x : EConstr.t) (acc : EConstrSet.t) : EConstrSet.t =
-          if is_constr_ref x then EConstrSet.add x acc else acc
-        in
-        let rec f (acc : EConstrSet.t) (x : EConstr.t) : EConstrSet.t =
-          let acc = acc_constr_ref x acc in
-          try
-            let ty, tys = Rocq_utils.econstr_to_atomic sigma x in
-            let acc = acc_constr_ref ty acc in
-            Array.fold_left
-              (fun (acc : EConstrSet.t) (y : EConstr.t) -> f acc y)
-              acc
-              tys
-          with
-          | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> acc
-        in
-        f EConstrSet.empty x
-      ;;
-
-      (** [can_be_unfolded sigma x] returns [true] if [x] can be {e unfolded}, i.e., refers to a definition, e.g., of a definition, fixpoint or example.
-      *)
-      let can_be_unfolded (sigma : Evd.evar_map) (x : EConstr.t) : bool =
-        let g, i = EConstr.destRef sigma x in
-        match g with
-        | ConstRef y ->
-          (match Global.lookup_constant y with
-           | { const_body = Def z; const_type; _ } ->
-             (match Constr.kind z with
-              | Fix _ ->
-                Log.thing ~__FUNCTION__ Debug "is Fix" x (Of Strfy.econstr);
-                Constr.isProd const_type
-              | Lambda _ ->
-                Log.thing ~__FUNCTION__ Debug "is Lambda" x (Of Strfy.econstr);
-                Constr.isProd const_type
-              | App _ ->
-                Log.thing ~__FUNCTION__ Debug "is App" x (Of Strfy.econstr);
-                Constr.isInd const_type && Constr.isRef const_type
-              | _ -> false)
-           | _ -> false)
-        | _ -> false
-      ;;
-
-      (** [try_unfold_any x] *)
-      let try_unfold_any ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
-        : Tactic.t option mm
-        =
-        Log.trace __FUNCTION__;
-        let open Syntax in
-        let* sigma = get_sigma in
-        (* NOTE: [collect_component_econstrs] ensures no duplicates. *)
-        let to_check : EConstr.t list =
-          collect_component_econstrs sigma x |> EConstrSet.to_list
-        in
-        Log.thing ~__FUNCTION__ Debug "try_unfold_any" x (Of Strfy.econstr);
-        Log.things ~__FUNCTION__ Debug "to_check" to_check (Of Strfy.econstr);
-        let f (i : int) (acc : Tactic.t list) =
-          let x : EConstr.t = List.nth to_check i in
-          if can_be_unfolded sigma x
-          then (
-            Log.thing ~__FUNCTION__ Debug "can be unfolded" x (Of Strfy.econstr);
-            let* y : Tactic.t = f_unfold_hyp unfold_econstr ~in_hyp x in
-            return (y :: acc))
-          else (
-            Log.thing ~__FUNCTION__ Debug "not unfoldable" x (Of Strfy.econstr);
-            return acc)
-        in
-        let* ys = iterate 0 (List.length to_check - 1) [] f in
-        match ys with
-        | [] -> return None
-        | ys -> Some (Tactic.chain ys) |> return
-      ;;
-
-      (***********************************************************************)
-
-      exception NoConstructorFoundWithEnc of M.Enc.t
-
-      let find_lts (lts_enc : M.Enc.t) : Model.Info.lts list -> Model.Info.lts =
-        List.find (fun ({ enc; _ } : Model.Info.lts) -> M.Enc.equal enc lts_enc)
-      ;;
-
-      let find_constructor (constructor_index : int)
-        : Rocq_bindings.constructor list -> Rocq_bindings.constructor
-        =
-        List.find (fun ({ index; _ } : Rocq_bindings.constructor) ->
-          Int.equal index constructor_index)
-      ;;
-
-      type binding_args =
-        { from : EConstr.t
-        ; goto : EConstr.t option
-        ; label : EConstr.t option
-        }
-
-      let get_constructor_bindings
-            ({ from; goto; label } : binding_args)
-            (bindings : Rocq_bindings.t)
-        : EConstr.t Tactypes.bindings mm
-        =
-        let open Syntax in
-        let* env = get_env in
-        let* sigma = get_sigma in
-        Rocq_bindings.get env sigma from label goto bindings |> return
-      ;;
-
-      (** if we have no way of obtaining the bindings (i.e., not info.meta) then we use no bindings.
-          (* TODO: check if we can optimize this so we use [NoBindings] where possible *)
-      *)
-      let try_get_constructor_bindings
-            ((enc, index) : Model.Tree.TreeNode.t)
-            (args : binding_args)
-        : EConstr.t Tactypes.bindings mm
-        =
-        match (W.get_fsm_b ()).info.meta with
-        | None -> return Tactypes.NoBindings
-        | Some { lts; _ } ->
-          let { constructors; _ } : Model.Info.lts = find_lts enc lts in
-          let { bindings; _ } : Rocq_bindings.constructor =
-            find_constructor index constructors
-          in
-          get_constructor_bindings args bindings
-      ;;
-
-      let apply_constructor
-            ((enc, index) : Model.Tree.TreeNode.t)
-            (args : binding_args)
-        : Tactic.t mm
-        =
-        (* NOTE: constructors index from 1 *)
-        let index : int = index + 1 in
-        let msg : string = Printf.sprintf "constructor %i" index in
-        let open Syntax in
-        let* bindings = try_get_constructor_bindings (enc, index) args in
-        Tactic.tactic ~msg (Tactics.one_constructor index bindings) |> return
-      ;;
-    end
 
     module Theory = struct
       (** [is_any_theory x] is [true] if term [x] is equal to any of the terms presented in [Theories].
@@ -1002,6 +658,399 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           if is_any_theory x
           then M.return false
           else M.exists_eq x lts Decode.lts_constructor
+      ;;
+    end
+
+    (** tactics *)
+    module Tacs = struct
+      let inversion (x : Rocq_utils.hyp) : Tactic.t mm =
+        Inv.inv_tac (Context.Named.Declaration.get_id x)
+        |> Tactic.tactic
+             ~msg:
+               (Printf.sprintf
+                  "inversion %s"
+                  (Strfy.hyp_name x) (* (Strfy.hyp_type x) *))
+        |> return
+      ;;
+
+      let subst_all () : Tactic.t mm =
+        Equality.subst_all ()
+        |> Tactic.tactic ~msg:(Printf.sprintf "(subst all)")
+        |> return
+      ;;
+
+      (** by specifying [None] it appears to be the same as using [simpl in *].
+      *)
+      let simplify () : Tactic.t mm =
+        Tactics.simpl_option None |> Tactic.tactic ~msg:"simpl" |> return
+      ;;
+
+      let simplify_concl () : Tactic.t mm =
+        Tactics.simpl_in_concl |> Tactic.tactic ~msg:"simpl" |> return
+      ;;
+
+      let simplify_hyp (x : Rocq_utils.hyp) : Tactic.t mm =
+        Tactics.simpl_in_hyp (Context.Named.Declaration.get_id x, Locus.InHyp)
+        |> Tactic.tactic ~msg:(Printf.sprintf "simpl in %s" (Strfy.hyp_name x))
+        |> return
+      ;;
+
+      let simplify_hyps () : Tactic.t mm =
+        match get_hyps () with
+        | [] -> Tactic.empty () |> return
+        | x :: [] -> simplify_hyp x
+        | x :: xs ->
+          let open Syntax in
+          let* x : Tactic.t = simplify_hyp x in
+          let f (i : int) (x : Tactic.t) : Tactic.t mm =
+            let y : Rocq_utils.hyp = List.nth xs i in
+            let* y : Tactic.t = simplify_hyp y in
+            Tactic.seq x y |> return
+          in
+          iterate 0 (List.length xs - 1) x f
+      ;;
+
+      (** not needed, manual/explicit version of [simplfy ()] *)
+      let simplify_all () : Tactic.t mm =
+        let open Syntax in
+        let* concl : Tactic.t = simplify_concl () in
+        let* hyps : Tactic.t = simplify_hyps () in
+        Tactic.seq concl hyps |> return
+      ;;
+
+      let simplify_and_subst_all () : Tactic.t mm =
+        let open Syntax in
+        (* let* simpls : Tactic.t = simplify_all () in *)
+        let* simpls : Tactic.t = simplify () in
+        let* substs : Tactic.t = subst_all () in
+        Tactic.seq simpls substs |> return
+      ;;
+
+      let cofix () : Tactic.t mm =
+        let name : Names.Id.t = new_cofix_name () in
+        Tactics.cofix name
+        |> Tactic.tactic
+             ~msg:(Printf.sprintf "cofix %s" (Names.Id.to_string name))
+        |> return
+      ;;
+
+      let trivial ?(msg : string = "trivial") () : Tactic.t mm =
+        Tactic.tactic ~msg (Auto.gen_trivial ~debug:Hints.Info [] None)
+        |> return
+      ;;
+
+      let ex_intro (x : Model.State.t) : Tactic.t mm =
+        let t : EConstr.t = M.decode x.term in
+        let bindings = Tactypes.ImplicitBindings [ t ] in
+        let msg = Printf.sprintf "exists %s" (M.Strfy.econstr t) in
+        Tactic.tactic ~msg (Tactics.constructor_tac true None 1 bindings)
+        |> return
+      ;;
+
+      let split () : Tactic.t mm =
+        Tactic.tactic (Tactics.split Tactypes.NoBindings) |> return
+      ;;
+
+      let ex_intro_split (x : Model.State.t) : Tactic.t mm =
+        let open Syntax in
+        let* ex_intro : Tactic.t = ex_intro x in
+        let* split : Tactic.t = split () in
+        Tactic.seq ex_intro split |> return
+      ;;
+
+      let intros_all () : Tactic.t mm =
+        Tactics.intros |> Tactic.tactic ~msg:"intros" |> return
+      ;;
+
+      (** [intro_as x] applies the introduction tactic using the (next non-conficting) name [x].
+      *)
+      let intro_as (x : string) : Tactic.t mm =
+        let name : Names.Id.t = new_name_of_string x in
+        Tactics.introduction name
+        |> Tactic.tactic
+             ~msg:(Printf.sprintf "intro %s" (Names.Id.to_string name))
+        |> return
+      ;;
+
+      (* *)
+      let apply (x : EConstr.t) : Tactic.t mm =
+        Tactics.apply x
+        |> Tactic.tactic ~msg:(Printf.sprintf "apply %s" (Strfy.econstr x))
+        |> return
+      ;;
+
+      let apply_Pack_sim () : Tactic.t mm = apply (Theories.c_Pack_sim ())
+      let apply_In_sim () : Tactic.t mm = apply (Theories.c_In_sim ())
+      let apply_wk_none () : Tactic.t mm = apply (Theories.c_wk_none ())
+      let apply_rt1n_refl () : Tactic.t mm = apply (Theories.c_rt1n_refl ())
+      let apply_rt1n_trans () : Tactic.t mm = apply (Theories.c_rt1n_trans ())
+
+      let eapply (x : EConstr.t) : Tactic.t mm =
+        Tactics.eapply x
+        |> Tactic.tactic ~msg:(Printf.sprintf "eapply %s" (Strfy.econstr x))
+        |> return
+      ;;
+
+      let eapply_wk_some () : Tactic.t mm = eapply (Theories.c_wk_some ())
+      let eapply_rt1n_refl () : Tactic.t mm = eapply (Theories.c_rt1n_refl ())
+      let eapply_rt1n_trans () : Tactic.t mm = eapply (Theories.c_rt1n_trans ())
+
+      (** {b counter intuitively, this applies a transition if the label is silent.} This is because we use this to determine if we need to unfold the [weak] transition from the [Bisimilarity.v] theory.
+      *)
+      let eapply_rt1n_via (x : Model.Label.t) : Tactic.t mm =
+        if Model.Label.is_silent x
+        then eapply_rt1n_trans ()
+        else eapply_rt1n_refl ()
+      ;;
+
+      (* *)
+      exception CannotUnfoldConstr of Constr.t
+
+      (** [unfold_constr ?in_hyp x] ... {e NOTE: term [x] is always unfolded. If [?in_hyp] is provided then we {b also} unfold [x] [in_hyp].}
+          @raise CannotUnfoldConstr
+            of [x] if [Constr.kind x] is not [Const (_, _)]. *)
+      let unfold_constr ?(in_hyp : Rocq_utils.hyp option) (x : Constr.t)
+        : Tactic.t mm
+        =
+        let f (name : Names.Constant.t) : unit Proofview.tactic =
+          match in_hyp with
+          | None -> Tactics.unfold_constr (Names.GlobRef.ConstRef name)
+          | Some y ->
+            Proofview.tclTHEN
+              (Tactics.unfold_in_hyp
+                 [ Locus.AllOccurrences, Evaluable.EvalConstRef name ]
+                 (Context.Named.Declaration.get_id y, Locus.InHyp))
+              (Tactics.unfold_constr (Names.GlobRef.ConstRef name))
+        in
+        match Constr.kind x with
+        | Const (name, _) ->
+          f name
+          |> Tactic.tactic
+               ~msg:(Printf.sprintf "unfold %s" (Names.Constant.to_string name))
+          |> return
+        | _ -> raise (CannotUnfoldConstr x)
+      ;;
+
+      (** [handle_unfold_hyp_opt f ?in_hyp x] helps keep this function cleaner to use. i.e., [unfold_econstr ~in_hyp:x] rather than [~in_hyp:(Some x)].
+      *)
+      let f_unfold_hyp
+            (f : ?in_hyp:Rocq_utils.hyp -> 'a -> Tactic.t mm)
+            ?(in_hyp : Rocq_utils.hyp option = None)
+            (x : 'a)
+        : Tactic.t mm
+        =
+        match in_hyp with None -> f x | Some in_hyp -> f ~in_hyp x
+      ;;
+
+      let unfold_econstr ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
+        : Tactic.t mm
+        =
+        let open Syntax in
+        let* y : Constr.t = econstr_to_constr x in
+        f_unfold_hyp unfold_constr ~in_hyp y
+      ;;
+
+      let unfold_constrexpr
+            ?(in_hyp : Rocq_utils.hyp option)
+            (x : Constrexpr.constr_expr)
+        : Tactic.t mm
+        =
+        let open Syntax in
+        let* y : EConstr.t = constrexpr_to_econstr x in
+        f_unfold_hyp unfold_econstr ~in_hyp y
+      ;;
+
+      let unfold_opt_constrexpr_list ?(in_hyp : Rocq_utils.hyp option)
+        : Constrexpr.constr_expr list -> Tactic.t option mm
+        =
+        (* NOTE: optional argument wrapper *)
+        let unfold_constrexpr (x : Constrexpr.constr_expr) : Tactic.t mm =
+          match in_hyp with
+          | None -> unfold_constrexpr x
+          | Some in_hyp -> unfold_constrexpr ~in_hyp x
+        in
+        (* NOTE: iterate and combine tactics *)
+        let open Syntax in
+        let iterate h xs =
+          let f (i : int) (ys : Tactic.t) =
+            let* x = List.nth xs i |> unfold_constrexpr in
+            Tactic.seq h x |> return
+          in
+          iterate 0 (List.length xs - 1) h f
+        in
+        function
+        | [] -> return None
+        | h :: tl ->
+          let* h = unfold_constrexpr h in
+          let* x = iterate h tl in
+          return (Some x)
+      ;;
+
+      let unfold_silent () : Tactic.t mm = unfold_econstr (Theories.c_silent ())
+
+      let unfold_silent1 () : Tactic.t mm =
+        unfold_econstr (Theories.c_silent1 ())
+      ;;
+
+      (* *)
+      let do_refl () : Tactic.t mm =
+        let open Syntax in
+        let* wk_none = apply_wk_none () in
+        let* unfold_silent = unfold_silent () in
+        let* rt1n_refl = apply_rt1n_refl () in
+        Tactic.chain [ wk_none; unfold_silent; rt1n_refl ] |> return
+      ;;
+
+      (* *)
+      let collect_component_econstrs (sigma : Evd.evar_map) (x : EConstr.t)
+        : EConstrSet.t
+        =
+        (* Log.trace __FUNCTION__; *)
+        let is_constr_ref (x : EConstr.t) : bool =
+          EConstr.isRef sigma x && EConstr.isConst sigma x
+        in
+        let acc_constr_ref (x : EConstr.t) (acc : EConstrSet.t) : EConstrSet.t =
+          if is_constr_ref x then EConstrSet.add x acc else acc
+        in
+        let rec f (acc : EConstrSet.t) (x : EConstr.t) : EConstrSet.t =
+          let acc = acc_constr_ref x acc in
+          try
+            let ty, tys = Rocq_utils.econstr_to_atomic sigma x in
+            let acc = acc_constr_ref ty acc in
+            Array.fold_left
+              (fun (acc : EConstrSet.t) (y : EConstr.t) -> f acc y)
+              acc
+              tys
+          with
+          | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> acc
+        in
+        f EConstrSet.empty x
+      ;;
+
+      (** [can_be_unfolded sigma x] returns [true] if [x] can be {e unfolded}, i.e., refers to a definition, e.g., of a definition, fixpoint or example.
+      *)
+      let can_be_unfolded (sigma : Evd.evar_map) (x : EConstr.t) : bool =
+        let g, i = EConstr.destRef sigma x in
+        match g with
+        | ConstRef y ->
+          (match Global.lookup_constant y with
+           | { const_body = Def z; const_type; _ } ->
+             (match Constr.kind z with
+              | Fix _ ->
+                (* log_econstr "is Fix" x; *)
+                Constr.isProd const_type
+              | Lambda _ ->
+                (* log_econstr "is Lambda" x; *)
+                Constr.isProd const_type
+              | App _ ->
+                (* log_econstr "is App" x; *)
+                Constr.isInd const_type && Constr.isRef const_type
+              | _ -> false)
+           | _ -> false)
+        | _ -> false
+      ;;
+
+      (** [try_unfold_any x] *)
+      let try_unfold_any ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
+        : Tactic.t option mm
+        =
+        (* Log.trace __FUNCTION__; *)
+        (* log_econstr ~__FUNCTION__ "x" x; *)
+        let open Syntax in
+        let* sigma = get_sigma in
+        (* NOTE: [collect_component_econstrs] ensures no duplicates. *)
+        match collect_component_econstrs sigma x |> EConstrSet.to_list with
+        | [] -> return None
+        | to_check ->
+          (* log_econstrs ~__FUNCTION__ "to_check" to_check; *)
+          let f (i : int) (acc : Tactic.t list) =
+            let x : EConstr.t = List.nth to_check i in
+            if Theory.is_any_theory x
+            then
+              (* log_econstr ~__FUNCTION__ "skip unfold theory" x; *)
+              return acc
+            else if can_be_unfolded sigma x
+            then
+              (* log_econstr ~__FUNCTION__ "can be unfolded" x; *)
+              let* y : Tactic.t = f_unfold_hyp unfold_econstr ~in_hyp x in
+              return (y :: acc)
+            else
+              (* log_econstr ~__FUNCTION__ "not unfoldable" x; *)
+              return acc
+          in
+          let* ys = iterate 0 (List.length to_check - 1) [] f in
+          (match ys with
+           | [] -> return None
+           | ys -> Some (Tactic.chain ys) |> return)
+      ;;
+
+      (***********************************************************************)
+
+      exception NoConstructorFoundWithEnc of M.Enc.t
+
+      let find_lts (lts_enc : M.Enc.t) : Model.Info.lts list -> Model.Info.lts =
+        List.find (fun ({ enc; _ } : Model.Info.lts) -> M.Enc.equal enc lts_enc)
+      ;;
+
+      let find_constructor (constructor_index : int)
+        : Rocq_bindings.constructor list -> Rocq_bindings.constructor
+        =
+        List.find (fun ({ index; _ } : Rocq_bindings.constructor) ->
+          Int.equal index constructor_index)
+      ;;
+
+      type binding_args =
+        { from : EConstr.t
+        ; goto : EConstr.t option
+        ; label : EConstr.t option
+        }
+
+      let get_constructor_bindings
+            ({ from; goto; label } : binding_args)
+            (bindings : Rocq_bindings.t)
+        : EConstr.t Tactypes.bindings mm
+        =
+        let open Syntax in
+        let* env = get_env in
+        let* sigma = get_sigma in
+        Rocq_bindings.get env sigma from label goto bindings |> return
+      ;;
+
+      (** if we have no way of obtaining the bindings (i.e., not info.meta) then we use no bindings.
+          (* TODO: check if we can optimize this so we use [NoBindings] where possible *)
+      *)
+      let try_get_constructor_bindings
+            ((enc, index) : Model.Tree.TreeNode.t)
+            (args : binding_args)
+        : EConstr.t Tactypes.bindings mm
+        =
+        match (W.get_fsm_b ()).info.meta with
+        | None -> return Tactypes.NoBindings
+        | Some { lts; _ } ->
+          let { constructors; _ } : Model.Info.lts = find_lts enc lts in
+          let { bindings; _ } : Rocq_bindings.constructor =
+            find_constructor index constructors
+          in
+          get_constructor_bindings args bindings
+      ;;
+
+      let apply_constructor
+            ((enc, index) : Model.Tree.TreeNode.t)
+            (args : binding_args)
+        : Tactic.t mm
+        =
+        (* NOTE: constructors index from 1 *)
+        let index : int = index + 1 in
+        let msg : string = Printf.sprintf "constructor %i" index in
+        let open Syntax in
+        let* bindings = try_get_constructor_bindings (enc, index) args in
+        Log.thing
+          ~__FUNCTION__
+          Debug
+          "bindings"
+          bindings
+          (Of Strfy.econstr_bindings);
+        Tactic.tactic ~msg (Tactics.one_constructor index bindings) |> return
       ;;
     end
 
@@ -1474,11 +1523,11 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let* ty, tys = to_atomic wk_trans in
       (* NOTE: first try to do single action, if fail then saturated *)
       let goal : Model.Transition.t =
-        try try_get_visible_transition ~saturated:false bisimilar tys with
+        (* try try_get_visible_transition ~saturated:false bisimilar tys with
+           | CouldNotFindGotoState -> *)
+        try try_get_visible_transition ~saturated:true bisimilar tys with
         | CouldNotFindGotoState ->
-          (try try_get_visible_transition ~saturated:true bisimilar tys with
-           | CouldNotFindGotoState ->
-             raise (CouldNotGetGoalTransition { b; wk_trans }))
+          raise (CouldNotGetGoalTransition { b; wk_trans })
       in
       _log_transition ~__FUNCTION__ "goal" goal;
       ensure_matching_states goal.from b;
@@ -1522,7 +1571,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let open Syntax in
       let* simplify = Tacs.simplify_and_subst_all () in
       let* refl = Tacs.eapply_rt1n_refl () in
-      Tactic.chain [ simplify; refl; simplify ] |> return
+      Tactic.seq simplify refl |> return
     ;;
 
     let handle_appconstrs_update_args ({ this; next } : Model.Annotation.t)
@@ -1547,7 +1596,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     let handle_appconstrs_apply (x : Model.Tree.TreeNode.t) : Tactic.t mm =
       Log.trace __FUNCTION__;
       let open Syntax in
-      let* ty, tys = get_concl () |> to_atomic in
+      let* _, tys = get_concl () |> to_atomic in
       let* is_tau = Concl.is_tau () in
       (* NOTE: we can't rely on the terms in [tys] being encoded since they may be from an intermediate layer of the LTS. *)
       (if is_tau
@@ -1629,33 +1678,34 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       : Tactic.t mm
       =
       Log.trace __FUNCTION__;
-      let open Syntax in
+      _log_applicable_constructors "args" args;
+      (* let open Syntax in *)
       (* NOTE: we first check if anything needs to be unfolded before proceeding *)
-      let* unfold_opt = Concl.try_unfold_any () in
+      (* let* unfold_opt = Concl.try_unfold_any () in
       match unfold_opt with
       | Some x -> return x
-      | None ->
-        (* NOTE: if nothing to unfold, keep applying constructors *)
-        (match args with
-         | { current = None; label; _ } ->
-           (* NOTE: entry-point *)
-           update_state (ApplyConstructors { args with current = Some [] });
-           handle_appconstrs_entry_point label
-         | { current = Some []; label; destination; _ } ->
-           (match args.annotation with
-            | None ->
-              (* NOTE: stop *)
-              update_state WeakSim;
-              handle_appconstrs_stop ()
-            | Some anno ->
-              (* NOTE: update current, prepare for next transition *)
-              let current, annotation = handle_appconstrs_update_args anno in
-              update_state (ApplyConstructors { args with current; annotation });
-              handle_appconstrs_update anno.this.label)
-         | { current = Some (h :: tl); _ } ->
-           (* NOTE: continue applying constructors *)
-           update_state (ApplyConstructors { args with current = Some tl });
-           handle_appconstrs_apply h)
+      | None -> *)
+      (* NOTE: if nothing to unfold, keep applying constructors *)
+      match args with
+      | { current = None; label; _ } ->
+        (* NOTE: entry-point *)
+        update_state (ApplyConstructors { args with current = Some [] });
+        handle_appconstrs_entry_point label
+      | { current = Some []; annotation; _ } ->
+        (match annotation with
+         | None ->
+           (* NOTE: stop *)
+           update_state WeakSim;
+           handle_appconstrs_stop ()
+         | Some anno ->
+           (* NOTE: update current, prepare for next transition *)
+           let current, annotation = handle_appconstrs_update_args anno in
+           update_state (ApplyConstructors { args with current; annotation });
+           handle_appconstrs_update anno.this.label)
+      | { current = Some (h :: tl); _ } ->
+        (* NOTE: continue applying constructors *)
+        update_state (ApplyConstructors { args with current = Some tl });
+        handle_appconstrs_apply h
     ;;
 
     let handle_state () : Tactic.t mm =
@@ -1701,10 +1751,17 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
   (** [get_updated_pstate x] returns the [pstate] updated by tactic [x]. *)
   let get_updated_pstate (x : unit Proofview.tactic) : Declare.Proof.t =
+    Log.trace __FUNCTION__;
     let new_pstate, is_safe_tactic = Declare.Proof.by x (get_pstate ()) in
     if Bool.not is_safe_tactic
     then Log.warning ~__FUNCTION__ "unsafe tactic used";
+    Log.notice "\n- - - -\n";
     new_pstate
+  ;;
+
+  let exit_proof () : unit =
+    update_state Done;
+    raise NothingToDo
   ;;
 
   (** [step pstate] enters a fresh module [P] for this specific [pstate], and returns one updated with
@@ -1712,6 +1769,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
   let step (pstate : Declare.Proof.t) : Declare.Proof.t =
     Log.trace __FUNCTION__;
     update_pstate pstate;
+    if Proof.is_done (Declare.Proof.get pstate) then exit_proof ();
     Proofview.Goal.enter (fun gl ->
       let module P =
         P (struct
@@ -1778,23 +1836,36 @@ let step (pstate : Declare.Proof.t) : Declare.Proof.t =
   Ps.step pstate
 ;;
 
+let log_bound (x : int) : unit =
+  Log.thing
+    ~__FUNCTION__
+    Warning
+    "Stopping, exceeded bound"
+    x
+    (Of Utils.Strfy.int)
+;;
+
+let log_stop (x : int) : unit =
+  Log.notice
+    ~__FUNCTION__
+    (Printf.sprintf
+       "(Stopped) %s after %i iterations."
+       (if is_done () then "solved" else "unsolved")
+       x)
+;;
+
 (** [solve] ... *)
 let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
   Log.trace __FUNCTION__;
-  let fint = Utils.Strfy.Of Utils.Strfy.int in
-  let fbool = Utils.Strfy.Of Utils.Strfy.bool in
   let rec f (n : int) (p : Declare.Proof.t) : int * Declare.Proof.t =
     Log.thing ~__FUNCTION__ Trace "iter" n (Of Utils.Strfy.int);
     match Int.compare n bound with
-    | -1 ->
-      if is_done ()
-      then n, p
-      else (try step p |> f (n + 1) with NothingToDo -> n, p)
-    | _ ->
-      Log.thing ~__FUNCTION__ Warning "Stopping, exceeded bound" bound fint;
+    | 1 ->
+      log_bound bound;
       n, p
+    | _ -> (try step p |> f (n + 1) with NothingToDo -> n, p)
   in
   let num, pstate = f 0 pstate in
-  Log.thing ~__FUNCTION__ Notice "(Stopped) Solved: " (is_done ()) fbool;
+  log_stop num;
   pstate
 ;;

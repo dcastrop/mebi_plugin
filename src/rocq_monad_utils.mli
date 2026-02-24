@@ -259,6 +259,7 @@ module Make : (Log : Logger.SLogger)
     val hyp : Rocq_utils.hyp -> string
     val hyp_value : Rocq_utils.hyp -> string
     val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string
+    val econstr_bindings : Evd.econstr Tactypes.bindings -> string
   end
 
   module type SErrors = sig

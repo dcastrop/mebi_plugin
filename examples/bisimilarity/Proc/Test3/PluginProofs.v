@@ -12,27 +12,10 @@ Import Layered.
 Require Import MEBI.Examples.bisimilarity.Proc.Test3.Terms.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs".
-MeBi Config Reset.
-MeBi Config Output Enable.
-MeBi Config Output Debug Enable.
-MeBi Config Output Notice Enable.
-MeBi Config Output Info Enable.
-MeBi Config Output Warning Enable.
-MeBi Config Output Trace Enable.
-MeBi Config Output Results Enable.
-(* MeBi Config Bound 100. *)
-MeBi Config WeakMode Enable.
+
 MeBi Config Weak As Option label.
-MeBi Config Fail If Incomplete True.
-MeBi Config Fail If NotBisim True.
-(* MeBi See All.  *)
-(* MeBi Config Output Disable. *)
 
 Require Import Logic.
-
-MeBi Config Output Debug Disable.
-MeBi Config Output Trace Disable.
-MeBi Config Output Info Disable.
 
 Example s0 : term := (tact (send A) tend).
 Example r0 : term := (tact (recv A) tend).
