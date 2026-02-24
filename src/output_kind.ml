@@ -1,3 +1,6 @@
+let debug : bool = true
+let trace : bool = true
+
 type t =
   | Debug
   | Info
@@ -35,7 +38,7 @@ let kind : t -> k = function
 (***********************************************************************)
 
 let default_level_fun
-      ?(debug : bool = true)
+      ?(debug : bool = debug)
       ?(info : bool = true)
       ?(notice : bool = true)
       ?(warning : bool = true)
@@ -63,7 +66,7 @@ let default_level
 ;;
 
 let default_special_fun
-      ?(trace : bool = true)
+      ?(trace : bool = trace)
       ?(result : bool = true)
       ?(show : bool = true)
   : special -> bool

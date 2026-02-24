@@ -88,11 +88,7 @@ struct
 
   module Strfy = struct
     let constr : Constr.t -> string = fstring Rocq_utils.Strfy.constr
-    
-    let constr_kind : Constr.t -> string =
-      fstring Rocq_utils.Strfy.constr_kind
-    ;;
-
+    let constr_kind : Constr.t -> string = fstring Rocq_utils.Strfy.constr_kind
     let econstr : EConstr.t -> string = fstring Rocq_utils.Strfy.econstr
 
     let econstr_kind : EConstr.t -> string =
@@ -116,6 +112,26 @@ struct
 
     let rocq_ind (f : 'a -> string) : 'a Rocq_ind.t -> string =
       fstring (Rocq_ind.to_string f)
+    ;;
+
+    let econstr_bindings : EConstr.t Tactypes.bindings -> string = function
+      | NoBindings -> "NoBindings"
+      | ImplicitBindings xs ->
+        Utils.Strfy.list (Of econstr) xs
+        |> Printf.sprintf "ImplicitBindings: %s"
+      | ExplicitBindings xs ->
+        Utils.Strfy.list
+          (Of
+             (fun ({ v = x, y; _ } :
+                    (Tactypes.quantified_hypothesis * EConstr.t) CAst.t) ->
+               Printf.sprintf
+                 "%s : %s"
+                 (match x with
+                  | AnonHyp x -> Printf.sprintf "%i" x
+                  | NamedHyp { v; _ } -> Names.Id.to_string v)
+                 (econstr y)))
+          xs
+        |> Printf.sprintf "ExplicitBindings: %s"
     ;;
   end
 
