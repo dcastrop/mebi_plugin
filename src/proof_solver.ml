@@ -163,7 +163,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
   (***********************************************************************)
 
-  module Transition = struct
+  (* module Transition = struct
     module Opt = struct
       (** [t] is similar to [Model.Transition.t] {!type:Model.Transition.t} but where [goto] and [label] are optional.
           @see 'Model.ml' for {!type:Model.Transition.t}. *)
@@ -189,7 +189,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       { hyp : Model.Transition.t
       ; goal : Opt.t
       }
-  end
+  end *)
 
   module ApplicableConstructors = struct
     (** @param current
@@ -794,6 +794,69 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         match ys with
         | [] -> return None
         | ys -> Some (Tactic.chain ys) |> return
+      ;;
+
+      (***********************************************************************)
+
+      exception NoConstructorFoundWithEnc of M.Enc.t
+
+      let find_lts (lts_enc : M.Enc.t) : Model.Info.lts list -> Model.Info.lts =
+        List.find (fun ({ enc; _ } : Model.Info.lts) -> M.Enc.equal enc lts_enc)
+      ;;
+
+      let find_constructor (constructor_index : int)
+        : Rocq_bindings.constructor list -> Rocq_bindings.constructor
+        =
+        List.find (fun ({ index; _ } : Rocq_bindings.constructor) ->
+          Int.equal index constructor_index)
+      ;;
+
+      type binding_args =
+        { from : EConstr.t
+        ; goto : EConstr.t option
+        ; label : EConstr.t option
+        }
+
+      let get_constructor_bindings
+            ({ from; goto; label } : binding_args)
+            (bindings : Rocq_bindings.t)
+        : EConstr.t Tactypes.bindings mm
+        =
+        let open Syntax in
+        let* env = get_env in
+        let* sigma = get_sigma in
+        Rocq_bindings.get env sigma from label goto bindings |> return
+      ;;
+
+      (** if we have no way of obtaining the bindings (i.e., not info.meta) then we use no bindings.
+          (* TODO: check if we can optimize this so we use [NoBindings] where possible *)
+      *)
+      let try_get_constructor_bindings
+            ((enc, index) : Model.Tree.TreeNode.t)
+            (args : binding_args)
+        : EConstr.t Tactypes.bindings mm
+        =
+        match (W.get_fsm_b ()).info.meta with
+        | None -> return Tactypes.NoBindings
+        | Some { lts; _ } ->
+          let { constructors; _ } : Model.Info.lts = find_lts enc lts in
+          let { bindings; _ } : Rocq_bindings.constructor =
+            find_constructor index constructors
+          in
+          get_constructor_bindings args bindings
+      ;;
+
+      let apply_constructor
+            ((enc, index) : Model.Tree.TreeNode.t)
+            (args : binding_args)
+        : Tactic.t mm
+        =
+        (* NOTE: constructors index from 1 *)
+        let index : int = index + 1 in
+        let msg : string = Printf.sprintf "constructor %i" index in
+        let open Syntax in
+        let* bindings = try_get_constructor_bindings (enc, index) args in
+        Tactic.tactic ~msg (Tactics.one_constructor index bindings) |> return
       ;;
     end
 
@@ -1484,8 +1547,14 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     let handle_appconstrs_apply (x : Model.Tree.TreeNode.t) : Tactic.t mm =
       Log.trace __FUNCTION__;
       let open Syntax in
+      let* ty, tys = get_concl () |> to_atomic in
       let* is_tau = Concl.is_tau () in
-      if is_tau then raise NotImplemented else raise NotImplemented
+      (* NOTE: we can't rely on the terms in [tys] being encoded since they may be from an intermediate layer of the LTS. *)
+      (if is_tau
+       then (* NOTE: index (3) since [tau lts x] => [tau (term * label) x] *)
+         { from = tys.(3); goto = None; label = Some (Theories.c_None ()) }
+       else { from = tys.(0); goto = None; label = None })
+      |> Tacs.apply_constructor x
     ;;
 
     (** [handle_ ()] ... *)
@@ -1560,26 +1629,33 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       : Tactic.t mm
       =
       Log.trace __FUNCTION__;
-      match args with
-      | { current = None; label; _ } ->
-        (* NOTE: entry-point *)
-        update_state (ApplyConstructors { args with current = Some [] });
-        handle_appconstrs_entry_point label
-      | { current = Some []; label; destination; _ } ->
-        (match args.annotation with
-         | None ->
-           (* NOTE: stop *)
-           update_state WeakSim;
-           handle_appconstrs_stop ()
-         | Some anno ->
-           (* NOTE: update current, prepare for next transition *)
-           let current, annotation = handle_appconstrs_update_args anno in
-           update_state (ApplyConstructors { args with current; annotation });
-           handle_appconstrs_update anno.this.label)
-      | { current = Some (h :: tl); _ } ->
-        (* NOTE: continue applying constructors *)
-        update_state (ApplyConstructors { args with current = Some tl });
-        handle_appconstrs_apply h
+      let open Syntax in
+      (* NOTE: we first check if anything needs to be unfolded before proceeding *)
+      let* unfold_opt = Concl.try_unfold_any () in
+      match unfold_opt with
+      | Some x -> return x
+      | None ->
+        (* NOTE: if nothing to unfold, keep applying constructors *)
+        (match args with
+         | { current = None; label; _ } ->
+           (* NOTE: entry-point *)
+           update_state (ApplyConstructors { args with current = Some [] });
+           handle_appconstrs_entry_point label
+         | { current = Some []; label; destination; _ } ->
+           (match args.annotation with
+            | None ->
+              (* NOTE: stop *)
+              update_state WeakSim;
+              handle_appconstrs_stop ()
+            | Some anno ->
+              (* NOTE: update current, prepare for next transition *)
+              let current, annotation = handle_appconstrs_update_args anno in
+              update_state (ApplyConstructors { args with current; annotation });
+              handle_appconstrs_update anno.this.label)
+         | { current = Some (h :: tl); _ } ->
+           (* NOTE: continue applying constructors *)
+           update_state (ApplyConstructors { args with current = Some tl });
+           handle_appconstrs_apply h)
     ;;
 
     let handle_state () : Tactic.t mm =
