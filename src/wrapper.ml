@@ -1,3 +1,5 @@
+let cache_pp : bool = false
+
 module Make
     (Log : Logger.SLogger)
     (C : Rocq_context.SRocq_context)
@@ -577,7 +579,12 @@ struct
                     let goto : Model.State.t = state goto in
                     let open Model.Transition in
                     Model.Transitions.add
-                      { from; goto; label; constructor_tree; annotation = None })
+                      { from
+                      ; goto
+                      ; label
+                      ; constructor_tree = Some constructor_tree
+                      ; annotation = None
+                      })
                   vs)
               vs)
           !Z.g.transitions
@@ -727,7 +734,7 @@ struct
     let make_zargs ind_defs the_graph : (module Z_Args) =
       (* Log.trace __FUNCTION__; *)
       let module Z = struct
-        let pp : bool = true
+        let pp : bool = cache_pp
         let ind_defs : M.Ind.t M.B.t = ind_defs
         let g : t ref = the_graph
       end

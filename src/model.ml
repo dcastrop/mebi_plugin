@@ -5,12 +5,12 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
   module Trees = struct
     include Set.Make (Tree)
 
-    exception EmptyHasNoMin of unit
+    exception EmptyHasNoMin
 
     (** obtain the tree with the shortest minimized length *)
     let min (xs : t) : elt =
       match to_list xs with
-      | [] -> raise (EmptyHasNoMin ())
+      | [] -> raise EmptyHasNoMin
       | h :: tl ->
         List.fold_left
           (fun (acc : elt) (x : elt) ->
@@ -23,6 +23,10 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
             | _ -> acc)
           h
           tl
+    ;;
+
+    let min_opt (xs : t) : elt option =
+      try Some (min xs) with EmptyHasNoMin -> None
     ;;
   end
 
@@ -37,11 +41,13 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let hash (x : t) : int = Enc.hash x.term
 
     (* *)
-    let to_string (x : t) : string =
-      Utils.Strfy.record
-        [ "term", Enc.to_string x.term
-        ; "pp", Utils.Strfy.option (Args Utils.Strfy.string) x.pp
-        ]
+    let to_string : t -> string = function
+      | { pp = None; term } -> Enc.to_string term
+      | x ->
+        Utils.Strfy.record
+          [ "term", Enc.to_string x.term
+          ; "pp", Utils.Strfy.option (Args Utils.Strfy.string) x.pp
+          ]
     ;;
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "State") (x : t) : unit
@@ -125,12 +131,18 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let is_silent (x : t) : bool = Option.default false x.is_silent
 
     (* *)
-    let to_string (x : t) : string =
-      Utils.Strfy.record
-        [ "term", Enc.to_string x.term
-        ; "pp", Utils.Strfy.option (Args Utils.Strfy.string) x.pp
-        ; "is_silent", Utils.Strfy.option (Args Utils.Strfy.bool) x.is_silent
-        ]
+    let to_string : t -> string = function
+      | { pp = None; term; is_silent } ->
+        Utils.Strfy.record
+          [ "term", Enc.to_string term
+          ; "is_silent", Utils.Strfy.option (Args Utils.Strfy.bool) is_silent
+          ]
+      | x ->
+        Utils.Strfy.record
+          [ "term", Enc.to_string x.term
+          ; "pp", Utils.Strfy.option (Args Utils.Strfy.string) x.pp
+          ; "is_silent", Utils.Strfy.option (Args Utils.Strfy.bool) x.is_silent
+          ]
     ;;
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "Label") (x : t) : unit
@@ -300,7 +312,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       ; goto : State.t
       ; label : Label.t
       ; annotation : Annotation.t option
-      ; constructor_tree : Tree.t
+      ; constructor_tree : Tree.t option
       }
 
     let equal (a : t) (b : t) : bool =
@@ -308,7 +320,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       && State.equal a.goto b.goto
       && Label.equal a.label b.label
       && Option.equal Annotation.equal a.annotation b.annotation
-      && Tree.equal a.constructor_tree b.constructor_tree
+      && Option.equal Tree.equal a.constructor_tree b.constructor_tree
     ;;
 
     let compare (a : t) (b : t) : int =
@@ -317,7 +329,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
         ; State.compare a.goto b.goto
         ; Label.compare a.label b.label
         ; Option.compare Annotation.compare a.annotation b.annotation
-        ; Tree.compare a.constructor_tree b.constructor_tree
+        ; Option.compare Tree.compare a.constructor_tree b.constructor_tree
         ]
     ;;
 
@@ -336,7 +348,8 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
         ; "label", Label.to_string x.label
         ; ( "annotation"
           , Utils.Strfy.option (Of Annotation.to_string) x.annotation )
-        ; "constructor_tree", Tree.to_string x.constructor_tree
+        ; ( "constructor_tree"
+          , Utils.Strfy.option (Of Tree.to_string) x.constructor_tree )
         ]
     ;;
 
@@ -1027,7 +1040,8 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
             from
             { label
             ; annotation
-            ; constructor_trees = Trees.singleton constructor_tree
+            ; constructor_trees =
+                Option.cata Trees.singleton Trees.empty constructor_tree
             }
             (States.singleton goto))
         xs;
