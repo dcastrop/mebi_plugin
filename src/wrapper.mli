@@ -702,9 +702,10 @@ module Make : (Log : Logger.SLogger)
       val add_seq : elt Seq.t -> t -> t
       val of_seq : elt Seq.t -> t
 
-      exception EmptyHasNoMin of unit
+      exception EmptyHasNoMin
 
       val min : t -> elt
+      val min_opt : t -> elt option
     end
 
     module State : sig
@@ -1078,7 +1079,7 @@ module Make : (Log : Logger.SLogger)
         ; goto : State.t
         ; label : Label.t
         ; annotation : Annotation.t option
-        ; constructor_tree : Tree.t
+        ; constructor_tree : Tree.t option
         }
 
       val equal : t -> t -> bool
@@ -3689,7 +3690,7 @@ module Default : () -> sig
         ; goto : State.t
         ; label : Label.t
         ; annotation : Annotation.t option
-        ; constructor_tree : Tree.t
+        ; constructor_tree : Tree.t option
         }
 
       val equal : t -> t -> bool

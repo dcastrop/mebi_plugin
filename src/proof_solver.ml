@@ -128,6 +128,30 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
   module Model = W.Model
   module Decode = W.Decode
 
+  let log_transition
+        ?(__FUNCTION__ : string = "")
+        (s : string)
+        (x : Model.Transition.t)
+    : unit
+    =
+    Log.thing ~__FUNCTION__ Debug s x (Of Model.Transition.to_string)
+  ;;
+
+  let log_actionpair
+        ?(__FUNCTION__ : string = "")
+        (s : string)
+        (x : Model.ActionPair.t)
+    : unit
+    =
+    Log.thing ~__FUNCTION__ Debug s x (Of Model.ActionPair.to_string)
+  ;;
+
+  let log_states ?(__FUNCTION__ : string = "") (s : string) (x : Model.States.t)
+    : unit
+    =
+    Log.thing ~__FUNCTION__ Debug s x (Of Model.States.to_string)
+  ;;
+
   (***********************************************************************)
 
   module Transition = struct
@@ -280,6 +304,21 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       }
     ;;
 
+    let rec to_string : t -> string =
+      let f : (Output_kind.t * string) option -> string = function
+        | None -> ""
+        | Some (x, y) -> y
+      in
+      let g : tactic -> string = function
+        | { msg = None; _ } -> ""
+        | { msg = Some (x, y); _ } -> Printf.sprintf "%s; " (f (Some (x, y)))
+      in
+      function
+      | { this; next = None } -> Printf.sprintf "%s." (f this.msg)
+      | { this; next = Some next } ->
+        Printf.sprintf "%s%s" (g this) (to_string next)
+    ;;
+
     let do_nothing () : t =
       tactic ~level:Debug ~msg:"(skip)" (Proofview.tclUNIT ())
     ;;
@@ -389,9 +428,13 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     let get_concl () : EConstr.t = Proofview.Goal.concl (gl ())
     let get_hyps () : Rocq_utils.hyp list = Proofview.Goal.hyps (gl ())
 
-    let log_concl () : unit =
-      Log.thing Debug "concl" (get_concl ()) (Of Strfy.econstr)
+    let log_econstr ?(__FUNCTION__ : string = "") (s : string) (x : EConstr.t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of Strfy.econstr)
     ;;
+
+    let log_concl () : unit = log_econstr "concl" (get_concl ())
 
     let log_hyps () : unit =
       Log.things Debug "hyps" (get_hyps ()) (Of Strfy.hyp)
@@ -445,6 +488,12 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         |> return
       ;;
 
+      (** by specifying [None] it appears to be the same as using [simpl in *].
+      *)
+      let simplify () : Tactic.t mm =
+        Tactics.simpl_option None |> Tactic.tactic ~msg:"simpl" |> return
+      ;;
+
       let simplify_concl () : Tactic.t mm =
         Tactics.simpl_in_concl |> Tactic.tactic ~msg:"simpl" |> return
       ;;
@@ -470,6 +519,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           iterate 0 (List.length xs - 1) x f
       ;;
 
+      (** not needed, manual/explicit version of [simplfy ()] *)
       let simplify_all () : Tactic.t mm =
         let open Syntax in
         let* concl : Tactic.t = simplify_concl () in
@@ -479,7 +529,8 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
       let simplify_and_subst_all () : Tactic.t mm =
         let open Syntax in
-        let* simpls : Tactic.t = simplify_all () in
+        (* let* simpls : Tactic.t = simplify_all () in *)
+        let* simpls : Tactic.t = simplify () in
         let* substs : Tactic.t = subst_all () in
         Tactic.seq simpls substs |> return
       ;;
@@ -979,12 +1030,8 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           match actionpairs with
           | [] -> raise (CouldNotFind_Transition { from; goto; label; edges })
           | ({ annotation; constructor_trees; _ }, _) :: [] ->
-            { from
-            ; goto
-            ; label
-            ; annotation
-            ; constructor_tree = Model.Trees.min constructor_trees
-            }
+            let constructor_tree = Model.Trees.min_opt constructor_trees in
+            { from; goto; label; annotation; constructor_tree }
           | h :: tl ->
             (* TODO: move this proceed to [Model] and handle this case *)
             Log.warning ~__FUNCTION__ "Multiple actionpairs found";
@@ -1290,17 +1337,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       |> return
     ;;
 
-    exception MisMatchedStates of (Model.State.t * Model.State.t)
-
-    let ensure_matching_states (x : Model.State.t) (y : Model.State.t) : unit =
-      if Model.State.equal x y then () else raise (MisMatchedStates (x, y))
-    ;;
-
-    exception
-      CouldNotGetGoalTransition of
-        { b : Model.State.t
-        ; wk_trans : EConstr.t
-        }
+    let _s () : unit = ()
 
     exception CouldNotFindGotoState
 
@@ -1314,9 +1351,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let from : Model.State.t = M.run (ReModel.state tys.(3) m.states) in
       let label : Model.Label.t = M.run (ReModel.label tys.(5) m.alphabet) in
       try
-        let ({ annotation; constructor_trees; _ }, destinations)
-          : Model.ActionPair.t
-          =
+        let actionpair : Model.ActionPair.t =
           (* NOTE: get actions [from] with [label] *)
           Model.ActionMap.reduce_by_label
             (Model.EdgeMap.find m.edges from)
@@ -1330,14 +1365,32 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           (* NOTE: get the pair with the shortest annotation (less steps to do) *)
           |> Model.ActionPairs.shorest_annotation
         in
-        let constructor_tree : Model.Tree.t =
-          Model.Trees.min constructor_trees
+        let ({ annotation; constructor_trees; _ }, destinations)
+          : Model.ActionPair.t
+          =
+          actionpair
+        in
+        log_actionpair ~__FUNCTION__ "actionpair" actionpair;
+        let constructor_tree : Model.Tree.t option =
+          Model.Trees.min_opt constructor_trees
         in
         let goto : Model.State.t = Model.States.min_elt destinations in
         { from; goto; label; annotation; constructor_tree }
       with
       | Model.ActionPairs.IsEmpty -> raise CouldNotFindGotoState
     ;;
+
+    exception MisMatchedStates of (Model.State.t * Model.State.t)
+
+    let ensure_matching_states (x : Model.State.t) (y : Model.State.t) : unit =
+      if Model.State.equal x y then () else raise (MisMatchedStates (x, y))
+    ;;
+
+    exception
+      CouldNotGetGoalTransition of
+        { b : Model.State.t
+        ; wk_trans : EConstr.t
+        }
 
     (** [handle_visible_transition hyp b wk_trans] ... introduces *)
     let handle_visible_transition
@@ -1346,29 +1399,32 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           (wk_trans : EConstr.t)
       : unit mm
       =
+      Log.trace __FUNCTION__;
+      (* log_econstr ~__FUNCTION__ "wk_trans" wk_trans; *)
       let bisimilar : Model.States.t = W.get_bisimilar_states hyp.goto in
+      (* log_states ~__FUNCTION__ "bisimilar" bisimilar; *)
       let open Syntax in
       let* ty, tys = to_atomic wk_trans in
-      if W.get_fsm_b () |> Theory.is_fsm_constructor ty |> M.run
-      then (
-        let goal : Model.Transition.t =
-          (* NOTE: first try to do single action, if fail then saturated *)
-          try try_get_visible_transition ~saturated:false bisimilar tys with
-          | CouldNotFindGotoState ->
-            (try try_get_visible_transition ~saturated:true bisimilar tys with
-             | CouldNotFindGotoState ->
-               raise (CouldNotGetGoalTransition { b; wk_trans }))
-        in
-        ensure_matching_states goal.from b;
-        update_state (ApplyConstructors (ApplicableConstructors.init goal));
-        return ())
-      else raise (CouldNotGetGoalTransition { b; wk_trans })
+      (* NOTE: first try to do single action, if fail then saturated *)
+      let goal : Model.Transition.t =
+        try try_get_visible_transition ~saturated:false bisimilar tys with
+        | CouldNotFindGotoState ->
+          (try try_get_visible_transition ~saturated:true bisimilar tys with
+           | CouldNotFindGotoState ->
+             raise (CouldNotGetGoalTransition { b; wk_trans }))
+      in
+      ensure_matching_states goal.from b;
+      update_state (ApplyConstructors (ApplicableConstructors.init goal));
+      log_transition ~__FUNCTION__ "goal" goal;
+      return ()
     ;;
 
     (* * [handle_hyp_transition ()] determines which term to introduce for [exists b'], checking whether we can do this via a silent/tau transition, and sets up the information we will need for the next state. *)
     let handle_hyp_transition () : Tactic.t mm =
+      Log.trace __FUNCTION__;
       let open Syntax in
       let* hyp : Model.Transition.t = Hyps.get_transition (W.get_fsm_a ()) in
+      log_transition ~__FUNCTION__ "hyp" hyp;
       let* { wk_trans; a'; b } = Concl.get_conj () in
       ensure_matching_states hyp.goto a';
       let* () =
@@ -1385,6 +1441,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     (** [handle_appconstrs_entry_point args] ... *)
     let handle_appconstrs_entry_point (label : Model.Label.t) : Tactic.t mm =
+      Log.trace __FUNCTION__;
       let open Syntax in
       let* constructor =
         if Model.Label.is_silent label
@@ -1397,6 +1454,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     (** [handle_appconstrs_stop ()] ... *)
     let handle_appconstrs_stop () : Tactic.t mm =
+      Log.trace __FUNCTION__;
       let open Syntax in
       let* simplify = Tacs.simplify_and_subst_all () in
       let* refl = Tacs.eapply_rt1n_refl () in
@@ -1411,6 +1469,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     (** [handle_appconstrs_update label] ... *)
     let handle_appconstrs_update (label : Model.Label.t) : Tactic.t mm =
+      Log.trace __FUNCTION__;
       let open Syntax in
       let* rt1n = Tacs.eapply_rt1n_via label in
       let* unfold = Concl.try_unfold_any () in
@@ -1422,6 +1481,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     (** [handle_appconstrs_apply x] ...
         (* NOTE: relies on the bindings we extract early on *) *)
     let handle_appconstrs_apply (x : Model.Tree.TreeNode.t) : Tactic.t mm =
+      Log.trace __FUNCTION__;
       let open Syntax in
       let* is_tau = Concl.is_tau () in
       if is_tau then raise NotImplemented else raise NotImplemented
@@ -1583,7 +1643,9 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       in
       let x = P.step () in
       let y = P.run (P.Tacs.simplify_and_subst_all ()) in
-      Tactic.seq x y |> Tactic.unpack_all)
+      let z = Tactic.seq x y in
+      Log.thing ~__FUNCTION__ Debug "tactic" z (Of Tactic.to_string);
+      Tactic.unpack_all z)
     |> get_updated_pstate
   ;;
 end
