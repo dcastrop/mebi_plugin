@@ -3316,11 +3316,11 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
       val apply : EConstr.t -> Tactic.t mm
       val apply_Pack_sim : unit -> Tactic.t mm
       val apply_In_sim : unit -> Tactic.t mm
-      val apply_wk_some : unit -> Tactic.t mm
       val apply_wk_none : unit -> Tactic.t mm
       val apply_rt1n_refl : unit -> Tactic.t mm
       val apply_rt1n_trans : unit -> Tactic.t mm
       val eapply : EConstr.t -> Tactic.t mm
+      val eapply_wk_some : unit -> Tactic.t mm
       val eapply_rt1n_refl : unit -> Tactic.t mm
       val eapply_rt1n_trans : unit -> Tactic.t mm
 
