@@ -206,7 +206,8 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
         "<State (%s) Goto (%s) Via (%s)>"
         (State.to_string x.from)
         (State.to_string x.goto)
-        (Label.to_string x.label)
+        (* (Label.to_string x.label) *)
+        (Enc.to_string x.label.term)
     ;;
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "Note") (x : t) : unit =
@@ -344,7 +345,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let to_string (x : t) : string =
       Utils.Strfy.record
         [ "from", State.to_string x.from
-        ; "goto", State.to_string x.from
+        ; "goto", State.to_string x.goto
         ; "label", Label.to_string x.label
         ; ( "annotation"
           , Utils.Strfy.option (Of Annotation.to_string) x.annotation )
@@ -700,7 +701,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let to_string (x : t) : string =
       Utils.Strfy.record
         [ "from", State.to_string x.from
-        ; "goto", State.to_string x.from
+        ; "goto", State.to_string x.goto
         ; "action", Action.to_string x.action
         ]
     ;;
