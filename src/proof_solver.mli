@@ -2686,7 +2686,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
   module Model = W.Model
   module Decode = W.Decode
 
-  module Transition : sig
+  (* module Transition : sig
     module Opt : sig
       type t =
         { from : Model.EdgeMap.key
@@ -2701,7 +2701,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
       { hyp : Model.Transition.t
       ; goal : Opt.t
       }
-  end
+  end *)
 
   module ApplicableConstructors : sig
     type t =
