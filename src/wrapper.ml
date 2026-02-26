@@ -7,6 +7,8 @@ module Make
 struct
   module M = Rocq_monad_utils.Make (Log) (C) (E)
   module Model = Model.Make (Log) (M.Enc)
+  module LTS = Model.LTS
+  module FSM = Model.FSM
 
   (** *)
   module IsTheory = struct
@@ -644,14 +646,14 @@ struct
           M.iterate 0 (List.length xs - 1) Model.Labels.empty g
       ;;
 
-      let lts () : Model.LTS.t M.mm =
+      let lts () : LTS.t M.mm =
         (* Log.trace __FUNCTION__; *)
         let open M.Syntax in
         let transitions : Model.Transitions.t = transitions () in
         let alphabet : Model.Labels.t = Model.Transitions.labels transitions in
         let* meta : Model.Info.meta = meta () in
         let* weak_labels : Model.Labels.t = weak_labels alphabet in
-        let open Model.LTS in
+        let open LTS in
         { init = Some (state !Z.g.init)
         ; terminals = terminals ()
         ; alphabet
@@ -742,7 +744,7 @@ struct
       (module Z : Z_Args)
     ;;
 
-    let build (init_term : Constrexpr.constr_expr) : Model.LTS.t M.mm =
+    let build (init_term : Constrexpr.constr_expr) : LTS.t M.mm =
       Log.trace __FUNCTION__;
       let open M.Syntax in
       (* NOTE: encode rocq inductive defs *)
@@ -765,15 +767,15 @@ struct
       (* M.return !the_graph *)
       Log.debug ~__FUNCTION__ "Completed Graph, Extracting LTS";
       let module L = Extract ((val make_zargs ind_defs (ref the_graph))) in
-      let* the_lts : Model.LTS.t = L.lts () in
+      let* the_lts : LTS.t = L.lts () in
       M.return the_lts
     ;;
 
-    (* let extract_lts (init_term : Constrexpr.constr_expr) : Model.LTS.t M.mm =
+    (* let extract_lts (init_term : Constrexpr.constr_expr) : LTS.t M.mm =
        let open M.Syntax in
        let* the_graph = build init_term in
        let module L = Extract ((val make_zargs ind_defs the_graph)) in
-       let* the_lts : Model.LTS.t = L.lts () in
+       let* the_lts : LTS.t = L.lts () in
        M.return the_lts *)
   end
 
@@ -789,7 +791,7 @@ struct
     (module X : X_Args)
   ;;
 
-  let fail_if_empty (x : Model.LTS.t) : unit =
+  let fail_if_empty (x : LTS.t) : unit =
     if
       !Api.the_fail_flags.empty
       && (Int.equal (Model.States.cardinal x.states) 1
@@ -800,7 +802,7 @@ struct
       M.Err.lts_empty ())
   ;;
 
-  let fail_if_incomplete (x : Model.LTS.t) : unit =
+  let fail_if_incomplete (x : LTS.t) : unit =
     if !Api.the_fail_flags.incomplete
     then (
       match x with
@@ -824,7 +826,7 @@ struct
         (init : Constrexpr.constr_expr)
         (names : Libnames.qualid list)
         (weak : Weak.t option)
-    : Model.LTS.t M.mm
+    : LTS.t M.mm
     =
     Log.trace __FUNCTION__;
     let t = M.make_hashtbl () in
@@ -853,7 +855,7 @@ struct
           (primary_lts : Libnames.qualid)
           (init : Constrexpr.constr_expr)
           (names : Libnames.qualid list)
-      : Model.LTS.t M.mm
+      : LTS.t M.mm
       =
       Log.trace __FUNCTION__;
       default_weak_arg weak |> extract_lts primary_lts init names
@@ -864,7 +866,7 @@ struct
           (primary_lts : Libnames.qualid)
           (init : Constrexpr.constr_expr)
           (names : Libnames.qualid list)
-      : Model.FSM.t M.mm
+      : FSM.t M.mm
       =
       Log.trace __FUNCTION__;
       let open M.Syntax in
@@ -894,7 +896,7 @@ struct
       let open M.Syntax in
       Log.info "Extracting LTS...";
       let* the_lts = build_lts primary_lts x refs in
-      Log.thing Notice "the lts" the_lts (Of Model.LTS.to_string);
+      Log.thing Result "Finished Extracting LTS" the_lts (Of LTS.to_string);
       M.return None
     ;;
 
@@ -903,29 +905,31 @@ struct
       Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
+      Log.thing Result "Finished Making FSM" the_fsm (Of FSM.to_string);
       M.return None
     ;;
 
     let do_saturate (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
       Log.trace __FUNCTION__;
-      Log.info "Saturating FSM...";
+      Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
+      Log.thing Info "Finished Making FSM" the_fsm (Of FSM.to_string);
+      Log.info "Saturating FSM...";
       let the_fsm = Model.Saturate.fsm the_fsm in
-      Log.thing Notice "the saturated fsm" the_fsm (Of Model.FSM.to_string);
+      Log.thing Result "Finished Saturating FSM" the_fsm (Of FSM.to_string);
       M.return None
     ;;
 
     let do_minimize (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
       Log.trace __FUNCTION__;
-      Log.info "Minimizing FSM...";
+      Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
+      Log.thing Info "Finished Making FSM" the_fsm (Of FSM.to_string);
+      Log.info "Minimizing FSM...";
       let { fsm; pi } : Model.Minimize.t = Model.Minimize.fsm the_fsm in
-      Log.thing Notice "the minimized fsm" fsm (Of Model.FSM.to_string);
+      Log.thing Result "Finished Minimizing FSM" fsm (Of FSM.to_string);
       M.return None
     ;;
 
@@ -933,37 +937,39 @@ struct
           ((ax, alts) : rocq_args)
           ((bx, blts) : rocq_args)
           (refs : Libnames.qualid list)
-      : (Model.FSM.t * Model.FSM.t) M.mm
+      : (FSM.t * FSM.t) M.mm
       =
       Log.trace __FUNCTION__;
       Log.info "Making FSMs...";
       let open M.Syntax in
+      Log.info "Making FSM A...";
       let weak1 : Weak.t option = Config.get_the_weak_arg1 () in
       let* the_fsm_a = build_fsm ~weak:weak1 alts ax refs in
-      Log.thing Notice "the fsm (A)" the_fsm_a (Of Model.FSM.to_string);
+      Log.thing Info "Finished Making FSM A" the_fsm_a (Of FSM.to_string);
+      Log.info "Making FSM B...";
       let weak2 : Weak.t option = Config.get_the_weak_arg2 () in
       let* the_fsm_b = build_fsm ~weak:weak2 blts bx refs in
-      Log.thing Notice "the fsm (B)" the_fsm_b (Of Model.FSM.to_string);
+      Log.thing Info "Finished Making FSM B" the_fsm_a (Of FSM.to_string);
       M.return (the_fsm_a, the_fsm_b)
     ;;
 
     let do_merge { a; b } refs : Model.Bisimilar.t option M.mm =
       Log.trace __FUNCTION__;
-      Log.info "Merging FSMs...";
       let open M.Syntax in
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
-      let the_fsm = Model.FSM.merge the_fsm_a the_fsm_b in
-      Log.thing Notice "the merged fsm" the_fsm (Of Model.FSM.to_string);
+      Log.info "Merging FSMs...";
+      let the_fsm = FSM.merge the_fsm_a the_fsm_b in
+      Log.thing Result "Finished Merging FSMs" the_fsm (Of FSM.to_string);
       M.return None
     ;;
 
     let do_check_bisim { a; b } refs : Model.Bisimilar.t option M.mm =
       Log.trace __FUNCTION__;
-      Log.info "Checking Bisimilarity of FSMs...";
       let open M.Syntax in
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
+      Log.info "Checking Bisimilarity of FSMs...";
       let result = Model.Bisimilar.fsm the_fsm_a the_fsm_b in
-      Log.thing Notice "bisimilar" result (Of Model.Bisimilar.to_string);
+      Log.thing Result "Result" result (Of Model.Bisimilar.to_string);
       fail_if_not_bisim result.result;
       M.return (Some result)
     ;;
