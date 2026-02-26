@@ -892,6 +892,7 @@ struct
     let do_make_lts (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
       Log.trace __FUNCTION__;
       let open M.Syntax in
+      Log.info "Extracting LTS...";
       let* the_lts = build_lts primary_lts x refs in
       Log.thing Notice "the lts" the_lts (Of Model.LTS.to_string);
       M.return None
@@ -899,6 +900,7 @@ struct
 
     let do_make_fsm (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
       Log.trace __FUNCTION__;
+      Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
       Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
@@ -907,6 +909,7 @@ struct
 
     let do_saturate (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
       Log.trace __FUNCTION__;
+      Log.info "Saturating FSM...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
       Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
@@ -917,6 +920,7 @@ struct
 
     let do_minimize (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
       Log.trace __FUNCTION__;
+      Log.info "Minimizing FSM...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
       Log.thing Notice "the fsm" the_fsm (Of Model.FSM.to_string);
@@ -932,6 +936,7 @@ struct
       : (Model.FSM.t * Model.FSM.t) M.mm
       =
       Log.trace __FUNCTION__;
+      Log.info "Making FSMs...";
       let open M.Syntax in
       let weak1 : Weak.t option = Config.get_the_weak_arg1 () in
       let* the_fsm_a = build_fsm ~weak:weak1 alts ax refs in
@@ -944,6 +949,7 @@ struct
 
     let do_merge { a; b } refs : Model.Bisimilar.t option M.mm =
       Log.trace __FUNCTION__;
+      Log.info "Merging FSMs...";
       let open M.Syntax in
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
       let the_fsm = Model.FSM.merge the_fsm_a the_fsm_b in
@@ -953,6 +959,7 @@ struct
 
     let do_check_bisim { a; b } refs : Model.Bisimilar.t option M.mm =
       Log.trace __FUNCTION__;
+      Log.info "Checking Bisimilarity of FSMs...";
       let open M.Syntax in
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
       let result = Model.Bisimilar.fsm the_fsm_a the_fsm_b in
