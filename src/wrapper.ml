@@ -758,14 +758,14 @@ struct
       in
       let init : M.Enc.t = M.encode init_term in
       (* NOTE: build the graph *)
-      Log.debug ~__FUNCTION__ "Build the Graph";
+      Log.info "Building the Graph...";
       let the_graph : t ref = ref (empty init ind_defs) in
       Queue.push init !the_graph.to_visit;
       (* _log_to_visit !the_graph; *)
       let module G = Make ((val make_yargs primary_lts ind_defs the_graph)) in
       let* the_graph : t = G.build !the_graph in
       (* M.return !the_graph *)
-      Log.debug ~__FUNCTION__ "Completed Graph, Extracting LTS";
+      Log.info ~__FUNCTION__ "Completed Graph, Extracting LTS...";
       let module L = Extract ((val make_zargs ind_defs (ref the_graph))) in
       let* the_lts : LTS.t = L.lts () in
       M.return the_lts
