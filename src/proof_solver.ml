@@ -128,6 +128,21 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
   module Model = W.Model
   module Decode = W.Decode
 
+  let _log_biencoding ?(__FUNCTION__ : string = "") () : unit =
+    Log.things
+      ~__FUNCTION__
+      Debug
+      "M.BiEncoding"
+      (* (M.bienc_to_list ()) *)
+      (M.F.to_seq (M.fwdmap ()) |> List.of_seq)
+      (Of
+         (fun (econstr, enc) ->
+           Printf.sprintf
+             "%s :=> %s"
+             (M.Enc.to_string enc)
+             (M.Strfy.econstr econstr)))
+  ;;
+
   let _log_transition
         ?(__FUNCTION__ : string = "")
         (s : string)
@@ -484,6 +499,19 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     let get_concl () : EConstr.t = Proofview.Goal.concl (gl ())
     let get_hyps () : Rocq_utils.hyp list = Proofview.Goal.hyps (gl ())
+
+    let _log_econstr_eq
+          ?(__FUNCTION__ : string = "")
+          (x : EConstr.t)
+          (y : EConstr.t)
+      : unit
+      =
+      (let open Syntax in
+       let* eq : bool = econstr_eq x y in
+       Log.thing ~__FUNCTION__ Debug "eq x y" eq (Of Utils.Strfy.bool);
+       return ())
+      |> run
+    ;;
 
     let _log_constr_kind
           ?(__FUNCTION__ : string = "")
@@ -979,28 +1007,28 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         | ConstRef y ->
           (match Global.lookup_constant y with
            | { const_body = Def z; const_type; _ } ->
-             log_econstr ~__FUNCTION__ "x" x;
-             _log_constr_kind ~__FUNCTION__ "(z kinds, z)" z;
-             _log_constr_kind ~__FUNCTION__ "(kinds, const_type)" const_type;
+             (* log_econstr ~__FUNCTION__ "x" x; *)
+             (* _log_constr_kind ~__FUNCTION__ "(z kinds, z)" z; *)
+             (* _log_constr_kind ~__FUNCTION__ "(kinds, const_type)" const_type; *)
              (match Constr.kind z with
               | Fix _ ->
-                log_econstr ~__FUNCTION__ "is Fix" x;
+                (* log_econstr ~__FUNCTION__ "is Fix" x; *)
                 Constr.isProd const_type
               | Lambda _ ->
-                log_econstr ~__FUNCTION__ "is Lambda" x;
+                (* log_econstr ~__FUNCTION__ "is Lambda" x; *)
                 Constr.isProd const_type
               | App _ ->
-                log_econstr ~__FUNCTION__ "is App" x;
+                (* log_econstr ~__FUNCTION__ "is App" x; *)
                 Constr.isRef const_type
                 && (Constr.isConst const_type || Constr.isInd const_type)
               | Construct _ ->
-                log_econstr ~__FUNCTION__ "is Construct" x;
+                (* log_econstr ~__FUNCTION__ "is Construct" x; *)
                 Constr.isRef z
                 && Constr.isConst const_type
                 && Constr.isRef const_type
               | _ ->
                 (* NOTE: unfold, e.g., [SomeModule.example_1] *)
-                log_econstr ~__FUNCTION__ "(skip)" x;
+                (* log_econstr ~__FUNCTION__ "(skip)" x; *)
                 Constr.isConst z
                 && Constr.isRef z
                 && Constr.isConst const_type
@@ -1014,28 +1042,28 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         : Tactic.t option mm
         =
         (* Log.trace __FUNCTION__; *)
-        log_econstr ~__FUNCTION__ "x" x;
+        (* log_econstr ~__FUNCTION__ "x" x; *)
         let open Syntax in
         let* sigma = get_sigma in
         (* NOTE: [collect_component_econstrs] ensures no duplicates. *)
         match collect_component_econstrs sigma x |> EConstrSet.to_list with
         | [] -> return None
         | to_check ->
-          log_econstrs ~__FUNCTION__ "to_check" to_check;
+          (* log_econstrs ~__FUNCTION__ "to_check" to_check; *)
           let f (i : int) (acc : Tactic.t list) =
             let x : EConstr.t = List.nth to_check i in
             if Theory.is_any_theory x
-            then (
-              log_econstr ~__FUNCTION__ "skip unfold theory" x;
-              return acc)
+            then
+              (* log_econstr ~__FUNCTION__ "skip unfold theory" x; *)
+              return acc
             else if can_be_unfolded sigma x
-            then (
-              log_econstr ~__FUNCTION__ "can be unfolded" x;
+            then
+              (* log_econstr ~__FUNCTION__ "can be unfolded" x; *)
               let* y : Tactic.t = f_unfold_hyp unfold_econstr ~in_hyp x in
-              return (y :: acc))
-            else (
-              log_econstr ~__FUNCTION__ "not unfoldable" x;
-              return acc)
+              return (y :: acc)
+            else
+              (* log_econstr ~__FUNCTION__ "not unfoldable" x; *)
+              return acc
           in
           let* ys = iterate 0 (List.length to_check - 1) [] f in
           (match ys with
@@ -1135,10 +1163,50 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           ; states : Model.States.t
           }
 
+      (** [_get_enc_from_pp x] is a {b Temporary Solution} to an issue I'm having where the [EConstr.eq_constr] function is not working for terms that are clearly the same. I've spent a few hours on this and just want to move on, so here is a small patch.
+      *)
+      let _get_enc_from_pp (x : EConstr.t) : M.Enc.t M.mm =
+        Log.trace __FUNCTION__;
+        try
+          let ys = M.F.to_seq (M.fwdmap ()) |> List.of_seq in
+          let open M.Syntax in
+          let* sigma = M.get_sigma in
+          let* x' : Constr.t = M.econstr_to_constr x in
+          let f (i : int) : M.Enc.t option -> M.Enc.t option M.mm = function
+            | Some z -> M.return (Some z)
+            | None ->
+              let (y, z) : EConstr.t * M.Enc.t = List.nth ys i in
+              if String.equal (M.Strfy.econstr x) (M.Strfy.econstr y)
+              then M.return (Some z)
+              else M.return None
+          in
+          let* z = M.iterate 0 (List.length ys - 1) None f in
+          match z with
+          | None ->
+            Log.trace ~__FUNCTION__ "Err: None";
+            raise (M.EncodingNotFound x)
+          | Some z ->
+            Log.thing ~__FUNCTION__ Warning "enc" z (Of M.Enc.to_string);
+            M.return z
+        with
+        | Not_found ->
+          Log.trace ~__FUNCTION__ "Err: Not_found";
+          raise (M.EncodingNotFound x)
+      ;;
+
       let state (x : EConstr.t) (ys : Model.States.t) : Model.State.t M.mm =
         Log.trace __FUNCTION__;
         try
-          let term : M.Enc.t = M.get_encoding x in
+          Log.thing ~__FUNCTION__ Debug "x" x (Of M.Strfy.econstr);
+          let open M.Syntax in
+          (* FIXME: in CADP example two terms don't eq when they should *)
+          let* term : M.Enc.t =
+            try M.get_encoding x |> M.return with
+            | M.EncodingNotFound _ ->
+              (* NOTE: TEMPORARY FIX -- finds enc by comparing econstrs strings *)
+              _get_enc_from_pp x
+          in
+          Log.thing ~__FUNCTION__ Debug "term" term (Of M.Enc.to_string);
           (* NOTE: [Model.States.compare] only cares about [term]. *)
           Model.States.find { term; pp = None } ys |> M.return
         with
@@ -1329,15 +1397,29 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
             in
             ReModel.transition from goto label m.edges |> return
           with
-          | M.EncodingNotFound _ ->
+          | M.EncodingNotFound z ->
+            Log.trace ~__FUNCTION__ "Err: M.EncodingNotFound";
+            Log.thing Warning "M.EncodingNotFound" z (Of M.Strfy.econstr);
+            (* _log_biencoding ~__FUNCTION__ (); *)
+            (* Log.thing Warning "(using P) EConstr" z (Of Strfy.econstr); *)
+            (* Log.thing
+              Warning
+              "(using P) is encoded"
+              (encoded z)
+              (Of Utils.Strfy.bool); *)
             raise (CouldNotGetTransition { hyp = x; fsm = m })
           | ReModel.CouldNotFind_State _ ->
+            Log.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_State";
             raise (CouldNotGetTransition { hyp = x; fsm = m })
           | ReModel.CouldNotFind_Label _ ->
+            Log.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_Label";
             raise (CouldNotGetTransition { hyp = x; fsm = m })
           | ReModel.CouldNotFind_Transition _ ->
+            Log.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_Transition";
             raise (CouldNotGetTransition { hyp = x; fsm = m }))
-        else raise (CouldNotGetTransition { hyp = x; fsm = m })
+        else (
+          Log.trace ~__FUNCTION__ "(else)";
+          raise (CouldNotGetTransition { hyp = x; fsm = m }))
       ;;
     end
 
@@ -1519,11 +1601,13 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
       let get_transition (m : Model.FSM.t) : Model.Transition.t mm =
         Log.trace __FUNCTION__;
-        let hyps = get_hyps () in
+        let hyps = get_non_cofixes () in
         let open Syntax in
         let f (i : int)
           : Model.Transition.t option -> Model.Transition.t option mm
-          = function
+          =
+          Log.thing ~__FUNCTION__ Trace "i" i (Of Utils.Strfy.int);
+          function
           | Some x -> return (Some x)
           | None ->
             let y = List.nth hyps i in
@@ -1768,13 +1852,16 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         (* NOTE: try invert any that need to be inverted *)
         let* invert_opt = Hyps.try_invert_any () in
         match invert_opt with
+        | Some x -> return x
         | None ->
+          Log.trace ~__FUNCTION__ "no hyps to invert";
           (* NOTE: check if we need to unfold anything in the inverted hyps. *)
           let* unfold_opt = Hyps.try_unfold_any () in
           (match unfold_opt with
-           | None -> raise ExitWeakSim
-           | Some x -> return x)
-        | Some x -> return x
+           | Some x -> return x
+           | None ->
+             Log.trace ~__FUNCTION__ "no terms to unfold";
+             raise ExitWeakSim)
     ;;
 
     let handle_exists (hyp_opt : Model.Transition.t option) : Tactic.t mm =
