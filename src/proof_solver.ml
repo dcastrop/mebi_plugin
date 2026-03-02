@@ -263,7 +263,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         - [Done] means the proof is finished. *)
     type t =
       | NewProof of (Constrexpr.constr_expr * Constrexpr.constr_expr)
-      | WeakSim
+      | WeakSim of Rocq_utils.hyp list ref
       | Exists of Model.Transition.t option
       (* | GoalTransition of Transition.t *)
       | ApplyConstructors of ApplicableConstructors.t
@@ -271,7 +271,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     let to_string : t -> string = function
       | NewProof _ -> "NewProof"
-      | WeakSim -> "WeakSim"
+      | WeakSim _ -> "WeakSim"
       | Exists hyp_opt ->
         Printf.sprintf
           "Exists; hyp_opt: %s"
@@ -983,7 +983,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         : EConstrSet.t
         =
         (* Log.trace __FUNCTION__; *)
-        log_econstr ~__FUNCTION__ "x" x;
+        (* log_econstr ~__FUNCTION__ "x" x; *)
         let is_constr_ref (x : EConstr.t) : bool =
           EConstr.isRef sigma x && EConstr.isConst sigma x
         in
@@ -991,22 +991,22 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           if is_constr_ref x then EConstrSet.add x acc else acc
         in
         let rec f (acc : EConstrSet.t) (y : EConstr.t) : EConstrSet.t =
-          log_econstr ~__FUNCTION__ "y" y;
+          (* log_econstr ~__FUNCTION__ "y" y; *)
           let acc : EConstrSet.t = acc_constr_ref y acc in
           try
             let ty, tys = Rocq_utils.econstr_to_atomic sigma y in
-            log_econstr ~__FUNCTION__ "ty" ty;
-            _log_econstr_kind ~__FUNCTION__ "ty" ty;
+            (* log_econstr ~__FUNCTION__ "ty" ty; *)
+            (* _log_econstr_kind ~__FUNCTION__ "ty" ty; *)
             let acc : EConstrSet.t =
               match EConstr.kind sigma ty with
               | Case (_, _, _, _, _, c, _) ->
-                _log_econstr_kind ~__FUNCTION__ "c" c;
+                (* _log_econstr_kind ~__FUNCTION__ "c" c; *)
                 (match EConstr.kind sigma c with
                  | App (ty, _) -> acc_constr_ref ty acc
                  | _ -> acc)
               | _ -> acc
             in
-            log_econstrs ~__FUNCTION__ "tys" (Array.to_list tys);
+            (* log_econstrs ~__FUNCTION__ "tys" (Array.to_list tys); *)
             let acc : EConstrSet.t = acc_constr_ref ty acc in
             Array.fold_left
               (fun (acc : EConstrSet.t) (z : EConstr.t) -> f acc z)
@@ -1058,7 +1058,8 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         | _ -> false
       ;;
 
-      (** [try_unfold_any x] *)
+      (** [try_unfold_any x]
+          (* TODO: make sure you remove duplicate things to unfold. *) *)
       let try_unfold_any ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
         : Tactic.t option mm
         =
@@ -1360,6 +1361,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       (** [invertibility x] returns an integer denoting whether [x] need be inverted, with the higher numbers being of more importance to invert and [0] denoting [x] does not need to be inverted.
       *)
       let invertibility (x : t) : int mm =
+        Log.trace __FUNCTION__;
         let open Syntax in
         let* _, tys = to_atomic x in
         let* sigma = get_sigma in
@@ -1377,6 +1379,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       ;;
 
       let need_inversion (x : t) : bool mm =
+        Log.trace __FUNCTION__;
         let open Syntax in
         let* n : int = invertibility x in
         if Int.equal n 0 then return false else return true
@@ -1426,18 +1429,18 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         then (
           try
             let from : Model.State.t = M.run (ReModel.state tys.(0) m.states) in
-            _log_state ~__FUNCTION__ "from" from;
+            (* _log_state ~__FUNCTION__ "from" from; *)
             let goto : Model.State.t = M.run (ReModel.state tys.(2) m.states) in
-            _log_state ~__FUNCTION__ "goto" goto;
+            (* _log_state ~__FUNCTION__ "goto" goto; *)
             let label : Model.Label.t =
               M.run (ReModel.label tys.(1) m.alphabet)
             in
-            _log_label ~__FUNCTION__ "label" label;
+            (* _log_label ~__FUNCTION__ "label" label; *)
             ReModel.transition from goto label m.edges |> return
           with
           | M.EncodingNotFound z ->
-            Log.trace ~__FUNCTION__ "Err: M.EncodingNotFound";
-            Log.thing Warning "M.EncodingNotFound" z (Of M.Strfy.econstr);
+            (* Log.trace ~__FUNCTION__ "Err: M.EncodingNotFound"; *)
+            (* Log.thing Warning "M.EncodingNotFound" z (Of M.Strfy.econstr); *)
             (* _log_biencoding ~__FUNCTION__ (); *)
             (* Log.thing Warning "(using P) EConstr" z (Of Strfy.econstr); *)
             (* Log.thing
@@ -1447,17 +1450,17 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
               (Of Utils.Strfy.bool); *)
             raise (CouldNotGetTransition { hyp = x; fsm = m })
           | ReModel.CouldNotFind_State _ ->
-            Log.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_State";
+            (* Log.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_State"; *)
             raise (CouldNotGetTransition { hyp = x; fsm = m })
           | ReModel.CouldNotFind_Label _ ->
-            Log.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_Label";
+            (* Log.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_Label"; *)
             raise (CouldNotGetTransition { hyp = x; fsm = m })
           | ReModel.CouldNotFind_Transition _ ->
-            Log.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_Transition";
+            (* Log.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_Transition"; *)
             raise (CouldNotGetTransition { hyp = x; fsm = m }))
-        else (
-          Log.trace ~__FUNCTION__ "(else)";
-          raise (CouldNotGetTransition { hyp = x; fsm = m }))
+        else
+          (* Log.trace ~__FUNCTION__ "(else)"; *)
+          raise (CouldNotGetTransition { hyp = x; fsm = m })
       ;;
     end
 
@@ -1592,14 +1595,21 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
              (Names.Id.Set.to_list (get_all_non_cofix_hyp_names ())))
       ;;
 
-      (** [try_invert_any ()] returns either [None] if no hyps can be inverted (as determined by [Hyp.invertibility]), else a [Tactic.t] that will invert the hypothesis deemed to be the most important to invert. (Only checks non-cofix hyps as by [get_non_cofixes ()].)
+      (** [try_invert_any inverted_hyps] returns either [None] if no hyps can be inverted (as determined by [Hyp.invertibility]), else a [Tactic.t] that will invert the hypothesis deemed to be the most important to invert. (Only checks non-cofix hyps as by [get_non_cofixes ()].) It skips any hyps in [inverted_hyps], and updates with any hyp that will be inverted.
       *)
-      let try_invert_any () : Tactic.t option mm =
-        let hyps = get_non_cofixes () in
+      let try_invert_any (inverted_hyps : Hyp.t list ref) : Tactic.t option mm =
+        Log.trace __FUNCTION__;
+        let hyps =
+          get_non_cofixes ()
+          |> List.filter (fun x -> List.mem x !inverted_hyps |> Bool.not)
+        in
         let open Syntax in
         let f (i : int) (xopt : (int * Hyp.t) option) : (int * Hyp.t) option mm =
-          let y = List.nth hyps i in
-          let* grade = Hyp.invertibility y in
+          let y : Hyp.t = List.nth hyps i in
+          let* grade : int = Hyp.invertibility y in
+          (* Log.debug
+             ~__FUNCTION__
+             (Printf.sprintf "grade %i : %s" grade (Hyp.to_string y)); *)
           match xopt with
           | None -> Some (grade, y) |> return
           | Some (n, x) ->
@@ -1613,6 +1623,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         | Some (0, x) -> return None
         (* NOTE: we only want to invert hyps with non-zero grades. *)
         | Some (grade, x) ->
+          inverted_hyps := x :: !inverted_hyps;
           let* y = Hyp.invert x in
           return (Some y)
       ;;
@@ -1644,7 +1655,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         let f (i : int)
           : Model.Transition.t option -> Model.Transition.t option mm
           =
-          Log.thing ~__FUNCTION__ Trace "i" i (Of Utils.Strfy.int);
+          (* Log.thing ~__FUNCTION__ Trace "i" i (Of Utils.Strfy.int); *)
           function
           | Some x -> return (Some x)
           | None ->
@@ -1833,6 +1844,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       Log.trace __FUNCTION__;
       let open Syntax in
       let* _, tys = get_concl () |> to_atomic in
+      let tys = Array.map (fun x -> econstr_normalize x |> run) tys in
       let* is_tau = Concl.is_tau () in
       (* NOTE: we can't rely on the terms in [tys] being encoded since they may be from an intermediate layer of the LTS. *)
       (if is_tau
@@ -1863,11 +1875,11 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       match x with
       | None -> raise SkipNewProof
       | Some x ->
-        update_state WeakSim;
+        update_state (WeakSim (ref []));
         return x
     ;;
 
-    let handle_weaksim () : Tactic.t mm =
+    let handle_weaksim (inverted_hyps : Hyp.t list ref) : Tactic.t mm =
       Log.trace __FUNCTION__;
       let open Syntax in
       let* is_weak_sim : bool = Concl.is_weak_sim () in
@@ -1888,7 +1900,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       then raise ProofComplete
       else
         (* NOTE: try invert any that need to be inverted *)
-        let* invert_opt = Hyps.try_invert_any () in
+        let* invert_opt = Hyps.try_invert_any inverted_hyps in
         match invert_opt with
         | Some x -> return x
         | None ->
@@ -1918,7 +1930,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       else (
         (* NOTE: assume we need to finish handling a silent action. *)
         Log.trace ~__FUNCTION__ "not exists, do_refl";
-        update_state WeakSim;
+        update_state (WeakSim (ref []));
         Tacs.do_refl ())
     ;;
 
@@ -1948,7 +1960,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         (match annotation with
          | None ->
            (* NOTE: stop *)
-           update_state WeakSim;
+           update_state (WeakSim (ref []));
            handle_appconstrs_stop ()
          | Some anno ->
            (* NOTE: update current, prepare for next transition *)
@@ -1963,11 +1975,11 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     let handle_state () : Tactic.t mm =
       log_proofstate ();
-      (* log_hyps (); *)
+      log_hyps ();
       log_concl ();
       match get_state () with
       | NewProof ab -> handle_new_proof ab
-      | WeakSim -> handle_weaksim ()
+      | WeakSim inverted_hyps -> handle_weaksim inverted_hyps
       | Exists hyp_opt -> handle_exists hyp_opt
       (* | GoalTransition args -> handle_goal_transition args *)
       | ApplyConstructors xs -> handle_apply_constructors xs
@@ -1984,7 +1996,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         Tactic.tactic ~msg:"Proof Complete" (Proofview.tclUNIT ())
       | SkipNewProof ->
         Log.trace ~__FUNCTION__ "NewProof:SkipNewProof => WeakSim";
-        update_state WeakSim;
+        update_state (WeakSim (ref []));
         step ()
       | ExitWeakSim ->
         Log.trace ~__FUNCTION__ "WeakSim:ExitWeakSim => Exists";
