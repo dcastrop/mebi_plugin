@@ -24,7 +24,7 @@ module Make : (Log : Logger.SLogger)
   end
 
   module F : sig
-    type key = Evd.econstr
+    type key = EConstr.t
     type 'a t = 'a Bi_encoding.Make(Log)(Ctx)(Enc).F.t
 
     val create : int -> 'a t
@@ -81,7 +81,7 @@ module Make : (Log : Logger.SLogger)
 
   type maps = Bi_encoding.Make(Log)(Ctx)(Enc).maps =
     { fwd : Enc.t F.t
-    ; bck : Evd.econstr B.t
+    ; bck : EConstr.t B.t
     }
 
   val the_maps : maps ref option ref
@@ -91,26 +91,26 @@ module Make : (Log : Logger.SLogger)
 
   val get_the_maps : unit -> maps ref
   val fwdmap : unit -> Enc.t F.t
-  val bckmap : unit -> Evd.econstr B.t
+  val bckmap : unit -> EConstr.t B.t
 
-  exception EncodingNotFound of Evd.econstr
+  exception EncodingNotFound of EConstr.t
 
-  val get_encoding : Evd.econstr -> Enc.t
-  val encode : Evd.econstr -> Enc.t
-  val encoded : Evd.econstr -> bool
+  val get_encoding : EConstr.t -> Enc.t
+  val encode : EConstr.t -> Enc.t
+  val encoded : EConstr.t -> bool
 
   exception DecodingNotFound of Enc.t
 
-  val get_econstr : Enc.t -> Evd.econstr
+  val get_econstr : Enc.t -> EConstr.t
 
   exception CannotDecode of Enc.t
 
-  val decode : Enc.t -> Evd.econstr
-  val decode_opt : Enc.t -> Evd.econstr option
+  val decode : Enc.t -> EConstr.t
+  val decode_opt : Enc.t -> EConstr.t option
   val decode_map : 'a B.t -> 'a F.t
   val encode_map : 'a F.t -> 'a B.t
-  val to_list : unit -> (Enc.t * Evd.econstr) list
-  val bienc_to_list : unit -> (Enc.t * Evd.econstr) list
+  val to_list : unit -> (Enc.t * EConstr.t) list
+  val bienc_to_list : unit -> (Enc.t * EConstr.t) list
 
   type 'a mm = wrapper ref -> 'a in_wrapper
 
@@ -187,7 +187,7 @@ module Make : (Log : Logger.SLogger)
   val get_sigma : wrapper ref -> Evd.evar_map in_wrapper
   val get_maps : wrapper ref -> maps in_wrapper
   val get_fwdmap : wrapper ref -> Enc.t F.t in_wrapper
-  val get_bckmap : wrapper ref -> Evd.econstr B.t in_wrapper
+  val get_bckmap : wrapper ref -> EConstr.t B.t in_wrapper
   val fstring : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
 
   module Tree : sig
@@ -220,7 +220,7 @@ module Make : (Log : Logger.SLogger)
   end
 
   module Constructor : sig
-    type t = Evd.econstr * Evd.econstr * Tree.t
+    type t = EConstr.t * EConstr.t * Tree.t
 
     val to_string : Environ.env -> Evd.evar_map -> t -> string
   end
@@ -231,35 +231,35 @@ module Make : (Log : Logger.SLogger)
 
   val make_hashtbl : unit -> (module Hashtbl.S with type key = Enc.t)
   val make_set : unit -> (module Set.S with type elt = Enc.t)
-  val fresh_evar : Rocq_utils.evar_source -> Evd.econstr mm
-  val econstr_eq : Evd.econstr -> Evd.econstr -> bool mm
-  val econstr_normalize : Evd.econstr -> Evd.econstr mm
-  val econstr_kind : Evd.econstr -> Rocq_utils.econstr_kind mm
-  val econstr_is_evar : Evd.econstr -> bool mm
+  val fresh_evar : Rocq_utils.evar_source -> EConstr.t mm
+  val econstr_eq : EConstr.t -> EConstr.t -> bool mm
+  val econstr_normalize : EConstr.t -> EConstr.t mm
+  val econstr_kind : EConstr.t -> Rocq_utils.econstr_kind mm
+  val econstr_is_evar : EConstr.t -> bool mm
 
   val econstr_to_constr
     :  ?abort_on_undefined_evars:bool
-    -> Evd.econstr
+    -> EConstr.t
     -> Constr.t mm
 
-  val econstr_to_constr_opt : Evd.econstr -> Constr.t option mm
-  val constrexpr_to_econstr : Constrexpr.constr_expr -> Evd.econstr mm
-  val exists_eq : Evd.econstr -> 'a list -> ('a -> Evd.econstr) -> bool mm
-  val type_of_econstr : Evd.econstr -> Evd.econstr mm
-  val type_of_constrexpr : Constrexpr.constr_expr -> Evd.econstr mm
+  val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
+  val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
+  val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool mm
+  val type_of_econstr : EConstr.t -> EConstr.t mm
+  val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
 
   module Strfy : sig
     val constr : Constr.t -> string
     val constr_kind : Constr.t -> string
-    val econstr : Evd.econstr -> string
-    val econstr_kind : Evd.econstr -> string
+    val econstr : EConstr.t -> string
+    val econstr_kind : EConstr.t -> string
     val econstr_rel_decl : EConstr.rel_declaration -> string
     val hyp_name : Rocq_utils.hyp -> string
     val hyp_type : Rocq_utils.hyp -> string
     val hyp : Rocq_utils.hyp -> string
     val hyp_value : Rocq_utils.hyp -> string
     val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string
-    val econstr_bindings : Evd.econstr Tactypes.bindings -> string
+    val econstr_bindings : EConstr.t Tactypes.bindings -> string
   end
 
   module type SErrors = sig
@@ -276,7 +276,7 @@ module Make : (Log : Logger.SLogger)
       | InvalidCheckUpdatedCtx of
           (Environ.env
           * Evd.evar_map
-          * Evd.econstr list
+          * EConstr.t list
           * EConstr.rel_declaration list)
       | InvalidLTSArgsLength of int
       | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
@@ -296,7 +296,7 @@ module Make : (Log : Logger.SLogger)
     val invalid_check_updated_ctx
       :  Environ.env
       -> Evd.evar_map
-      -> Evd.econstr list
+      -> EConstr.t list
       -> EConstr.rel_declaration list
       -> exn
 
@@ -318,7 +318,7 @@ module Make : (Log : Logger.SLogger)
     val invalid_arity : Constr.t -> 'a mm
 
     val invalid_check_updated_ctx
-      :  Evd.econstr list
+      :  EConstr.t list
       -> EConstr.rel_declaration list
       -> 'a mm
 
@@ -332,8 +332,8 @@ module Make : (Log : Logger.SLogger)
     type t = Enc.t Rocq_ind.t
 
     val get_lts : t -> Rocq_ind.LTS.t
-    val get_lts_term_type : t -> Evd.econstr
-    val get_lts_label_type : t -> Evd.econstr
+    val get_lts_term_type : t -> EConstr.t
+    val get_lts_label_type : t -> EConstr.t
     val get_lts_constructor_types : t -> Rocq_ind.LTS.constructor array
     val to_string : Environ.env -> Evd.evar_map -> t -> string
     val lookup : Names.inductive -> Declarations.mind_specif mm
@@ -365,7 +365,7 @@ module Make : (Log : Logger.SLogger)
 
   val mk_ctx_substl
     :  EConstr.Vars.substl
-    -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list
+    -> ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list
     -> EConstr.Vars.substl mm
 
   val extract_args
@@ -376,8 +376,8 @@ module Make : (Log : Logger.SLogger)
   module Unification : sig
     module type SPair = sig
       type t =
-        { to_check : Evd.econstr
-        ; acc : Evd.econstr
+        { to_check : EConstr.t
+        ; acc : EConstr.t
         }
 
       val to_string : Environ.env -> Evd.evar_map -> t -> string
@@ -385,8 +385,8 @@ module Make : (Log : Logger.SLogger)
       val make
         :  Environ.env
         -> Evd.evar_map
-        -> Evd.econstr
-        -> Evd.econstr
+        -> EConstr.t
+        -> EConstr.t
         -> Evd.evar_map * t
 
       val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
@@ -419,10 +419,10 @@ module Make : (Log : Logger.SLogger)
       val list_to_string : Environ.env -> t list -> string
 
       val sandbox_unify_all_opt
-        :  Evd.econstr
-        -> Evd.econstr
+        :  EConstr.t
+        -> EConstr.t
         -> t
-        -> (Evd.econstr * Evd.econstr * Tree.t list) option mm
+        -> (EConstr.t * EConstr.t * Tree.t list) option mm
     end
 
     module Problems : SProblems
@@ -435,8 +435,8 @@ module Make : (Log : Logger.SLogger)
       val retrieve
         :  int
         -> t
-        -> Evd.econstr
-        -> Evd.econstr
+        -> EConstr.t
+        -> EConstr.t
         -> Enc.t * Problems.t list
         -> t mm
     end
@@ -454,17 +454,17 @@ module Make : (Log : Logger.SLogger)
       -> Problems.t mm
 
     val cross_product : Problems.t list -> Problems.t -> Problems.t list
-    val does_constructor_unify : Evd.econstr -> Evd.econstr -> bool mm
+    val does_constructor_unify : EConstr.t -> EConstr.t -> bool mm
 
     val check_constructor_args_unify
-      :  Evd.econstr
-      -> Evd.econstr
+      :  EConstr.t
+      -> EConstr.t
       -> Rocq_utils.constructor_args
       -> bool mm
 
     val axiom_constructor
-      :  Evd.econstr
-      -> Evd.econstr
+      :  EConstr.t
+      -> EConstr.t
       -> Enc.t * int
       -> Constructors.t
       -> Constructors.t mm
@@ -472,14 +472,14 @@ module Make : (Log : Logger.SLogger)
     val check_valid_constructors
       :  Rocq_ind.LTS.constructor array
       -> Ind.t F.t
-      -> Evd.econstr
-      -> Evd.econstr
+      -> EConstr.t
+      -> EConstr.t
       -> Enc.t
       -> Constructors.t mm
 
     val explore_valid_constructor
       :  Ind.t F.t
-      -> Evd.econstr
+      -> EConstr.t
       -> Enc.t
       -> Rocq_utils.constructor_args
       -> int * Constructors.t
@@ -495,8 +495,8 @@ module Make : (Log : Logger.SLogger)
 
     val check_for_next_constructors
       :  int
-      -> Evd.econstr
-      -> Evd.econstr
+      -> EConstr.t
+      -> EConstr.t
       -> Constructors.t
       -> (Enc.t * Problems.t list) option
       -> Constructors.t mm
@@ -504,8 +504,8 @@ module Make : (Log : Logger.SLogger)
     val collect_valid_constructors
       :  Rocq_ind.LTS.constructor array
       -> Ind.t F.t
-      -> Evd.econstr
-      -> Evd.econstr
+      -> EConstr.t
+      -> EConstr.t
       -> Enc.t
       -> Constructors.t mm
   end

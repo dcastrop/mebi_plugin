@@ -1,5 +1,5 @@
 module type S_F = sig
-  type key = Evd.econstr
+  type key = EConstr.t
   type !'a t
 
   val create : int -> 'a t
@@ -14,13 +14,8 @@ module type S_F = sig
   val replace : 'a t -> key -> 'a -> unit
   val mem : 'a t -> key -> bool
   val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-  val filter_map_inplace :
-    (key -> 'a -> 'a option) -> 'a t -> unit
-
-  val fold :
-    (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
   val length : 'a t -> int
   val stats : 'a t -> Hashtbl.statistics
   val to_seq : 'a t -> (key * 'a) Seq.t
@@ -33,7 +28,7 @@ end
 
 module type ENCODING_TYPE = sig
   module F : sig
-    type key = Evd.econstr
+    type key = EConstr.t
     type !'a t
 
     val create : int -> 'a t
@@ -48,13 +43,8 @@ module type ENCODING_TYPE = sig
     val replace : 'a t -> key -> 'a -> unit
     val mem : 'a t -> key -> bool
     val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-    val filter_map_inplace :
-      (key -> 'a -> 'a option) -> 'a t -> unit
-
-    val fold :
-      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
     val length : 'a t -> int
     val stats : 'a t -> Hashtbl.statistics
     val to_seq : 'a t -> (key * 'a) Seq.t
@@ -91,13 +81,8 @@ module type ENCODING_TYPE = sig
     val replace : 'a t -> key -> 'a -> unit
     val mem : 'a t -> key -> bool
     val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-    val filter_map_inplace :
-      (key -> 'a -> 'a option) -> 'a t -> unit
-
-    val fold :
-      (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+    val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+    val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
     val length : 'a t -> int
     val stats : 'a t -> Hashtbl.statistics
     val to_seq : 'a t -> (key * 'a) Seq.t
@@ -108,13 +93,13 @@ module type ENCODING_TYPE = sig
     val of_seq : (key * 'a) Seq.t -> 'a t
   end
 
-  exception InvalidDecodeKey of (t * Evd.econstr B.t)
+  exception InvalidDecodeKey of (t * EConstr.t B.t)
 
-  val encode : t F.t -> Evd.econstr B.t -> Evd.econstr -> t
-  val decode_opt : Evd.econstr B.t -> t -> Evd.econstr option
-  val decode : Evd.econstr B.t -> t -> Evd.econstr
-  val fwd_to_list : t F.t -> (Evd.econstr * t) list
-  val bck_to_list : Evd.econstr B.t -> (t * Evd.econstr) list
+  val encode : t F.t -> EConstr.t B.t -> EConstr.t -> t
+  val decode_opt : EConstr.t B.t -> t -> EConstr.t option
+  val decode : EConstr.t B.t -> t -> EConstr.t
+  val fwd_to_list : t F.t -> (EConstr.t * t) list
+  val bck_to_list : EConstr.t B.t -> (t * EConstr.t) list
 end
 
 module type S = sig
@@ -128,7 +113,7 @@ module type S = sig
   val compare : t -> t -> int
   val hash : t -> int
   val to_string : t -> string
-end 
+end
 
 module Make : (_ : S) -> ENCODING_TYPE
 module IntEncoding : (_ : S_F) -> S

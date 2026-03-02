@@ -1,4 +1,7 @@
-type t = { env : Environ.env; sigma : Evd.evar_map }
+type t =
+  { env : Environ.env
+  ; sigma : Evd.evar_map
+  }
 
 module type SRocq_context = sig
   val get : unit -> t ref
@@ -18,10 +21,10 @@ module Default : SRocq_context
 module MakeFromGoal : (_ : sig
                          val gl : Proofview.Goal.t ref
                        end)
-  -> SRocq_context
+    -> SRocq_context
 
 module MakeEConstrMap : (_ : SRocq_context) -> sig
-  type key = Evd.econstr
+  type key = EConstr.t
   type !'a t
 
   val create : int -> 'a t
@@ -36,13 +39,8 @@ module MakeEConstrMap : (_ : SRocq_context) -> sig
   val replace : 'a t -> key -> 'a -> unit
   val mem : 'a t -> key -> bool
   val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-  val filter_map_inplace :
-    (key -> 'a -> 'a option) -> 'a t -> unit
-
-  val fold :
-    (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-
+  val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
+  val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
   val length : 'a t -> int
   val stats : 'a t -> Hashtbl.statistics
   val to_seq : 'a t -> (key * 'a) Seq.t

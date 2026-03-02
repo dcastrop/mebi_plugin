@@ -249,7 +249,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     type t =
       | NewProof of (Constrexpr.constr_expr * Constrexpr.constr_expr)
       | WeakSim
-      | Exists
+      | Exists of Model.Transition.t option
       (* | GoalTransition of Transition.t *)
       | ApplyConstructors of ApplicableConstructors.t
       | Done
@@ -257,9 +257,15 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     let to_string : t -> string = function
       | NewProof _ -> "NewProof"
       | WeakSim -> "WeakSim"
-      | Exists -> "Exists"
+      | Exists hyp_opt ->
+        Printf.sprintf
+          "Exists; hyp_opt: %s"
+          (Utils.Strfy.option (Of Model.Transition.to_string) hyp_opt)
       (* | GoalTransition _ -> "GoalTransition" *)
-      | ApplyConstructors _ -> "ApplyConstructors"
+      | ApplyConstructors args ->
+        Printf.sprintf
+          "ApplyConstructors: %s"
+          (ApplicableConstructors.to_string args)
       | Done -> "Done"
     ;;
   end
@@ -344,10 +350,20 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     let rec to_string : t -> string =
       let f : (Output_kind.t * string) option -> string = function
         | None -> ""
+        (* | Some (Debug, y) -> y *)
+        (* | Some (Info, y) -> y *)
+        (* | Some (Notice, y) -> y *)
+        (* | Some (Warning, y) -> y *)
+        (* | Some (Error, y) -> y *)
+        (* | Some (Trace, y) -> y *)
+        (* | Some (Result, y) -> y *)
+        (* | Some (Show, y) -> y *)
         | Some (x, y) -> y
       in
       let g : tactic -> string = function
         | { msg = None; _ } -> ""
+        (* | { msg = Some (Debug, y); _ } -> "" *)
+        (* | { msg = Some (Trace, y); _ } -> "" *)
         | { msg = Some (x, y); _ } -> Printf.sprintf "%s; " (f (Some (x, y)))
       in
       function
@@ -360,26 +376,30 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       tactic ~level:Debug ~msg:"(skip)" (Proofview.tclUNIT ())
     ;;
 
-    let unpack (x : tactic) : unit Proofview.tactic =
-      let () =
-        match x.msg with
-        | None -> ()
-        | Some (Debug, z) -> Log.debug ~__FUNCTION__ z
-        | Some (Info, z) -> Log.info ~__FUNCTION__ z
-        | Some (Notice, z) -> Log.notice ~__FUNCTION__ z
-        | Some (Warning, z) -> Log.warning ~__FUNCTION__ z
-        | Some (Error, z) -> Log.error ~__FUNCTION__ z
-        | Some (Trace, z) -> Log.trace ~__FUNCTION__ z
-        | Some (Result, z) -> Log.result ~__FUNCTION__ z
-        | Some (Show, z) -> Log.show ~__FUNCTION__ z
-      in
-      x.get
-    ;;
+    (* let unpack (x : tactic) : unit Proofview.tactic =
+       let () =
+       match x.msg with
+       | None -> ()
+       | Some (Debug, z) -> Log.debug ~__FUNCTION__ z
+       | Some (Info, z) -> Log.info ~__FUNCTION__ z
+       | Some (Notice, z) -> Log.notice ~__FUNCTION__ z
+       | Some (Warning, z) -> Log.warning ~__FUNCTION__ z
+       | Some (Error, z) -> Log.error ~__FUNCTION__ z
+       | Some (Trace, z) -> Log.trace ~__FUNCTION__ z
+       | Some (Result, z) -> Log.result ~__FUNCTION__ z
+       | Some (Show, z) -> Log.show ~__FUNCTION__ z
+       in
+       x.get
+       ;; *)
 
-    let rec unpack_all : t -> unit Proofview.tactic = function
-      | { this; next = None } -> unpack this
-      | { this; next = Some next } ->
-        Proofview.tclTHEN (unpack this) (unpack_all next)
+    let unpack (x : t) : unit Proofview.tactic =
+      let rec f : t -> unit Proofview.tactic = function
+        | { this; next = None } -> this.get
+        | { this; next = Some next } -> Proofview.tclTHEN this.get (f next)
+      in
+      let y = f x in
+      Log.notice ~__FUNCTION__ (to_string x);
+      y
     ;;
 
     (** [seq a b] appends [b] to the sequence of [a]. *)
@@ -464,6 +484,24 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     let get_concl () : EConstr.t = Proofview.Goal.concl (gl ())
     let get_hyps () : Rocq_utils.hyp list = Proofview.Goal.hyps (gl ())
+
+    let _log_constr_kind
+          ?(__FUNCTION__ : string = "")
+          (s : string)
+          (x : Constr.t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of Strfy.constr_kind)
+    ;;
+
+    let _log_econstr_kind
+          ?(__FUNCTION__ : string = "")
+          (s : string)
+          (x : EConstr.t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of Strfy.econstr_kind)
+    ;;
 
     let log_econstr ?(__FUNCTION__ : string = "") (s : string) (x : EConstr.t)
       : unit
@@ -563,7 +601,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       exception EnsureFail
 
       (** assert *)
-      let ensure (x : EConstr.t) (f : Evd.econstr -> bool mm) : unit mm =
+      let ensure (x : EConstr.t) (f : EConstr.t -> bool mm) : unit mm =
         let open Syntax in
         let* b = f x in
         if b then return () else raise EnsureFail
@@ -785,6 +823,12 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let apply_rt1n_refl () : Tactic.t mm = apply (Theories.c_rt1n_refl ())
       let apply_rt1n_trans () : Tactic.t mm = apply (Theories.c_rt1n_trans ())
 
+      let apply_weak_sim_refl () : Tactic.t mm =
+        apply (Theories.c_weak_sim_refl ())
+      ;;
+
+      (* let apply_wk_bisim_refl () : Tactic.t mm = apply (Theories.c_wk_bisim_refl ()) *)
+
       let eapply (x : EConstr.t) : Tactic.t mm =
         Tactics.eapply x
         |> Tactic.tactic ~msg:(Printf.sprintf "eapply %s" (Strfy.econstr x))
@@ -935,17 +979,32 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         | ConstRef y ->
           (match Global.lookup_constant y with
            | { const_body = Def z; const_type; _ } ->
+             log_econstr ~__FUNCTION__ "x" x;
+             _log_constr_kind ~__FUNCTION__ "(z kinds, z)" z;
+             _log_constr_kind ~__FUNCTION__ "(kinds, const_type)" const_type;
              (match Constr.kind z with
               | Fix _ ->
-                (* log_econstr "is Fix" x; *)
+                log_econstr ~__FUNCTION__ "is Fix" x;
                 Constr.isProd const_type
               | Lambda _ ->
-                (* log_econstr "is Lambda" x; *)
+                log_econstr ~__FUNCTION__ "is Lambda" x;
                 Constr.isProd const_type
               | App _ ->
-                (* log_econstr "is App" x; *)
-                Constr.isInd const_type && Constr.isRef const_type
-              | _ -> false)
+                log_econstr ~__FUNCTION__ "is App" x;
+                Constr.isRef const_type
+                && (Constr.isConst const_type || Constr.isInd const_type)
+              | Construct _ ->
+                log_econstr ~__FUNCTION__ "is Construct" x;
+                Constr.isRef z
+                && Constr.isConst const_type
+                && Constr.isRef const_type
+              | _ ->
+                (* NOTE: unfold, e.g., [SomeModule.example_1] *)
+                log_econstr ~__FUNCTION__ "(skip)" x;
+                Constr.isConst z
+                && Constr.isRef z
+                && Constr.isConst const_type
+                && Constr.isRef const_type)
            | _ -> false)
         | _ -> false
       ;;
@@ -955,33 +1014,47 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         : Tactic.t option mm
         =
         (* Log.trace __FUNCTION__; *)
-        (* log_econstr ~__FUNCTION__ "x" x; *)
+        log_econstr ~__FUNCTION__ "x" x;
         let open Syntax in
         let* sigma = get_sigma in
         (* NOTE: [collect_component_econstrs] ensures no duplicates. *)
         match collect_component_econstrs sigma x |> EConstrSet.to_list with
         | [] -> return None
         | to_check ->
-          (* log_econstrs ~__FUNCTION__ "to_check" to_check; *)
+          log_econstrs ~__FUNCTION__ "to_check" to_check;
           let f (i : int) (acc : Tactic.t list) =
             let x : EConstr.t = List.nth to_check i in
             if Theory.is_any_theory x
-            then
-              (* log_econstr ~__FUNCTION__ "skip unfold theory" x; *)
-              return acc
+            then (
+              log_econstr ~__FUNCTION__ "skip unfold theory" x;
+              return acc)
             else if can_be_unfolded sigma x
-            then
-              (* log_econstr ~__FUNCTION__ "can be unfolded" x; *)
+            then (
+              log_econstr ~__FUNCTION__ "can be unfolded" x;
               let* y : Tactic.t = f_unfold_hyp unfold_econstr ~in_hyp x in
-              return (y :: acc)
-            else
-              (* log_econstr ~__FUNCTION__ "not unfoldable" x; *)
-              return acc
+              return (y :: acc))
+            else (
+              log_econstr ~__FUNCTION__ "not unfoldable" x;
+              return acc)
           in
           let* ys = iterate 0 (List.length to_check - 1) [] f in
           (match ys with
            | [] -> return None
            | ys -> Some (Tactic.chain ys) |> return)
+      ;;
+
+      let rec try_unfold_any_of : EConstr.t list -> Tactic.t option mm =
+        function
+        | [] -> return None
+        | h :: tl ->
+          let open Syntax in
+          let* h_opt = try_unfold_any h in
+          let* tl_opt = try_unfold_any_of tl in
+          (match h_opt, tl_opt with
+           | Some x, Some y -> Some (Tactic.seq x y) |> return
+           | None, Some y -> return (Some y)
+           | Some x, None -> return (Some x)
+           | None, None -> return None)
       ;;
 
       (***********************************************************************)
@@ -1063,6 +1136,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           }
 
       let state (x : EConstr.t) (ys : Model.States.t) : Model.State.t M.mm =
+        Log.trace __FUNCTION__;
         try
           let term : M.Enc.t = M.get_encoding x in
           (* NOTE: [Model.States.compare] only cares about [term]. *)
@@ -1074,6 +1148,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let state_opt (x : EConstr.t) (ys : Model.States.t)
         : Model.State.t option M.mm
         =
+        Log.trace __FUNCTION__;
         try
           let open M.Syntax in
           let* z = state x ys in
@@ -1089,6 +1164,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           }
 
       let label (x : EConstr.t) (ys : Model.Labels.t) : Model.Label.t M.mm =
+        Log.trace __FUNCTION__;
         let f (term : M.Enc.t) : Model.Label.t M.mm =
           (* NOTE: [Model.Labels.compare] only cares about [is_silent=Some _] *)
           Model.Labels.find { term; is_silent = None; pp = None } ys |> M.return
@@ -1114,6 +1190,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let label_opt (x : EConstr.t) (ys : Model.Labels.t)
         : Model.Label.t option M.mm
         =
+        Log.trace __FUNCTION__;
         try
           let open M.Syntax in
           let* z = label x ys in
@@ -1137,6 +1214,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
             (edges : Model.EdgeMap.t')
         : Model.Transition.t
         =
+        Log.trace __FUNCTION__;
         (* TODO: export some of this to the [Model.ActionMap] ? *)
         let actions = Model.EdgeMap.find edges from in
         let labelled = Model.ActionMap.reduce_by_label actions label in
@@ -1279,6 +1357,12 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           if is_eq then return true else eq_any_hyps tl
       ;;
 
+      let is_weak_refl () : bool mm =
+        let open Syntax in
+        let* ty, tys = get_concl () |> to_atomic in
+        econstr_eq tys.(5) tys.(6)
+      ;;
+
       let is_weak_sim () : bool mm = get_concl () |> Theory.is_weak_sim
       let is_exists () : bool mm = get_concl () |> Theory.is_exists
       let is_tau () : bool mm = get_concl () |> Theory.is_tau
@@ -1306,9 +1390,13 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           iterate 0 (Array.length tys - 1) None f
       ;;
 
-      type conj =
+      type wk_conj =
         { wk_trans : EConstr.t
-        ; a' : Model.State.t
+        ; wk_sim : EConstr.t
+        }
+
+      type conj =
+        { a' : Model.State.t
         ; b : Model.State.t
         }
 
@@ -1326,19 +1414,25 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
       exception ConclDoesNotMatchConj
 
-      let get_conj () : conj mm =
+      let get_wk_conj () : wk_conj mm =
+        Log.trace __FUNCTION__;
         let open Syntax in
         let* ty, tys = get_concl () |> to_atomic in
         let* () = Theory.ensure ty Theory.is_exists in
         let* _, _, x = to_lambda tys.(1) in
         let* _, app_tys = to_app x in
         match Array.to_list app_tys with
-        | [ wk_trans; wk_sim ] ->
-          let* () = Theory.ensure wk_sim Theory.is_weak_sim in
-          let* a' = get_a'_from_wk_sim wk_sim in
-          let* b = get_b_from_wk_trans wk_trans in
-          return { wk_trans; a'; b }
+        | [ wk_trans; wk_sim ] -> return { wk_trans; wk_sim }
         | _ -> raise ConclDoesNotMatchConj
+      ;;
+
+      let get_conj ({ wk_trans; wk_sim } : wk_conj) : conj mm =
+        Log.trace __FUNCTION__;
+        let open Syntax in
+        let* () = Theory.ensure wk_sim Theory.is_weak_sim in
+        let* a' = get_a'_from_wk_sim wk_sim in
+        let* b = get_b_from_wk_trans wk_trans in
+        return { a'; b }
       ;;
     end
 
@@ -1452,13 +1546,17 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     let handle_new_cofix () : Tactic.t mm =
       Log.trace __FUNCTION__;
       let open Syntax in
-      let* cofix : Tactic.t = Tacs.cofix () in
-      let clear : Tactic.t = Hyps.clear_non_cofix () in
-      let* apply_In_sim : Tactic.t = Tacs.apply_In_sim () in
-      let* apply_Pack_sim : Tactic.t = Tacs.apply_Pack_sim () in
-      let* intros_all : Tactic.t = Tacs.intros_all () in
-      Tactic.chain [ cofix; clear; apply_In_sim; apply_Pack_sim; intros_all ]
-      |> return
+      let* unfold_opt = Concl.try_unfold_any () in
+      match unfold_opt with
+      | Some x -> return x
+      | None ->
+        let* cofix : Tactic.t = Tacs.cofix () in
+        let clear : Tactic.t = Hyps.clear_non_cofix () in
+        let* apply_In_sim : Tactic.t = Tacs.apply_In_sim () in
+        let* apply_Pack_sim : Tactic.t = Tacs.apply_Pack_sim () in
+        let* intros_all : Tactic.t = Tacs.intros_all () in
+        Tactic.chain [ cofix; clear; apply_In_sim; apply_Pack_sim; intros_all ]
+        |> return
     ;;
 
     exception CouldNotFindGotoState
@@ -1535,13 +1633,13 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       Tacs.ex_intro_split goal.goto
     ;;
 
-    (* * [handle_hyp_transition ()] determines which term to introduce for [exists b'], checking whether we can do this via a silent/tau transition, and sets up the information we will need for the next state. *)
-    let handle_hyp_transition () : Tactic.t mm =
-      Log.trace __FUNCTION__;
+    let handle_wk_concl
+          (hyp : Model.Transition.t)
+          ({ wk_trans; wk_sim } : Concl.wk_conj)
+      : Tactic.t mm
+      =
       let open Syntax in
-      let* hyp : Model.Transition.t = Hyps.get_transition (W.get_fsm_a ()) in
-      _log_transition ~__FUNCTION__ "hyp" hyp;
-      let* { wk_trans; a'; b } = Concl.get_conj () in
+      let* { a'; b } = Concl.get_conj { wk_trans; wk_sim } in
       ensure_matching_states hyp.goto a';
       if Model.Transition.is_silent hyp && W.are_states_bisimilar a' b
       then (
@@ -1550,6 +1648,21 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       else (
         Log.trace ~__FUNCTION__ "is_exists, trans";
         handle_visible_transition hyp b wk_trans)
+    ;;
+
+    (* * [handle_hyp_transition ()] determines which term to introduce for [exists b'], checking whether we can do this via a silent/tau transition, and sets up the information we will need for the next state. *)
+    let handle_hyp_transition () : Tactic.t mm =
+      Log.trace __FUNCTION__;
+      let open Syntax in
+      let* hyp : Model.Transition.t = Hyps.get_transition (W.get_fsm_a ()) in
+      _log_transition ~__FUNCTION__ "hyp" hyp;
+      update_state (Exists (Some hyp));
+      let* { wk_trans; wk_sim } = Concl.get_wk_conj () in
+      Log.trace ~__FUNCTION__ "wk_trans; wk_sim";
+      let* unfold_opt = Tacs.try_unfold_any_of [ wk_trans; wk_sim ] in
+      match unfold_opt with
+      | Some x -> return x
+      | None -> handle_wk_concl hyp { wk_trans; wk_sim }
     ;;
 
     (** [handle_appconstrs_entry_point args] ... *)
@@ -1637,10 +1750,15 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let* is_weak_sim : bool = Concl.is_weak_sim () in
       if is_weak_sim
       then
-        let* has_hyp_cofix : bool = Hyps.can_solve_concl_cofix () in
-        if has_hyp_cofix
-        then Tacs.trivial ~msg:"trivial (solve cofix)" ()
-        else handle_new_cofix ()
+        (* TODO: add check for eq terms and use [Bisimilarity.weak_sim_refl] *)
+        let* is_weak_refl : bool = Concl.is_weak_refl () in
+        if is_weak_refl
+        then Tacs.apply_weak_sim_refl ()
+        else
+          let* has_hyp_cofix : bool = Hyps.can_solve_concl_cofix () in
+          if has_hyp_cofix
+          then Tacs.trivial ~msg:"trivial (solve cofix)" ()
+          else handle_new_cofix ()
       else if is_done ()
       then raise ProofComplete
       else
@@ -1656,12 +1774,19 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         | Some x -> return x
     ;;
 
-    let handle_exists () : Tactic.t mm =
+    let handle_exists (hyp_opt : Model.Transition.t option) : Tactic.t mm =
       Log.trace __FUNCTION__;
       let open Syntax in
       let* is_exists : bool = Concl.is_exists () in
       if is_exists
-      then handle_hyp_transition ()
+      then (
+        match hyp_opt with
+        | None -> handle_hyp_transition ()
+        | Some hyp ->
+          Log.trace ~__FUNCTION__ "Some hyp";
+          let open Syntax in
+          let* { wk_trans; wk_sim } = Concl.get_wk_conj () in
+          handle_wk_concl hyp { wk_trans; wk_sim })
       else (
         (* NOTE: assume we need to finish handling a silent action. *)
         Log.trace ~__FUNCTION__ "not exists, do_refl";
@@ -1715,7 +1840,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       match get_state () with
       | NewProof ab -> handle_new_proof ab
       | WeakSim -> handle_weaksim ()
-      | Exists -> handle_exists ()
+      | Exists hyp_opt -> handle_exists hyp_opt
       (* | GoalTransition args -> handle_goal_transition args *)
       | ApplyConstructors xs -> handle_apply_constructors xs
       | Done -> raise NothingToDo
@@ -1735,16 +1860,26 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         step ()
       | ExitWeakSim ->
         Log.trace ~__FUNCTION__ "WeakSim:ExitWeakSim => Exists";
-        update_state Exists;
+        update_state (Exists None);
         step ()
       (********************)
       | M.EncodingNotFound x ->
         Log.thing Warning "M.EncodingNotFound" x (Of M.Strfy.econstr);
-        Log.thing Warning "(using P)" x (Of Strfy.econstr);
+        Log.thing Warning "(using P) EConstr" x (Of Strfy.econstr);
+        Log.thing
+          Warning
+          "(using P) is encoded"
+          (encoded x)
+          (Of Utils.Strfy.bool);
         raise (M.EncodingNotFound x)
       | EncodingNotFound x ->
         Log.thing Warning "(M).EncodingNotFound" x (Of Strfy.econstr);
-        Log.thing Warning "(using M)" x (Of M.Strfy.econstr);
+        Log.thing Warning "(using M) EConstr" x (Of M.Strfy.econstr);
+        Log.thing
+          Warning
+          "(using P) is encoded"
+          (M.encoded x)
+          (Of Utils.Strfy.bool);
         raise (M.EncodingNotFound x)
     ;;
   end
@@ -1755,7 +1890,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     let new_pstate, is_safe_tactic = Declare.Proof.by x (get_pstate ()) in
     if Bool.not is_safe_tactic
     then Log.warning ~__FUNCTION__ "unsafe tactic used";
-    Log.notice "\n- - - -\n";
+    (* Log.notice "\n- - - -\n"; *)
     new_pstate
   ;;
 
@@ -1780,7 +1915,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let y = P.run (P.Tacs.simplify_and_subst_all ()) in
       let z = Tactic.seq x y in
       Log.thing ~__FUNCTION__ Debug "tactic" z (Of Tactic.to_string);
-      Tactic.unpack_all z)
+      Tactic.unpack z)
     |> get_updated_pstate
   ;;
 end
@@ -1858,7 +1993,7 @@ let log_stop (x : int) : unit =
 let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
   Log.trace __FUNCTION__;
   let rec f (n : int) (p : Declare.Proof.t) : int * Declare.Proof.t =
-    Log.thing ~__FUNCTION__ Trace "iter" n (Of Utils.Strfy.int);
+    Log.thing ~__FUNCTION__ Debug "iter" n (Of Utils.Strfy.int);
     match Int.compare n bound with
     | 1 ->
       log_bound bound;

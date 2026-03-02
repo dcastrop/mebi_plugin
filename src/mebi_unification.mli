@@ -3,13 +3,13 @@ module Tree = Mebi_constr.Tree
 val debug_econstr
   :  ?__FUNCTION__:string
   -> string
-  -> Evd.econstr
+  -> EConstr.t
   -> unit Mebi_wrapper.mm
 
 module Pair : sig
   type t =
-    { a : Evd.econstr
-    ; b : Evd.econstr
+    { a : EConstr.t
+    ; b : EConstr.t
     }
 
   val to_string
@@ -22,40 +22,40 @@ module Pair : sig
   val fresh
     :  Environ.env
     -> Evd.evar_map
-    -> Evd.econstr
-    -> Evd.econstr
+    -> EConstr.t
+    -> EConstr.t
     -> Evd.evar_map * t
 
-  val normal : Evd.econstr -> Evd.econstr -> t
+  val normal : EConstr.t -> EConstr.t -> t
 
   val make
     :  Environ.env
     -> Evd.evar_map
-    -> Evd.econstr
-    -> Evd.econstr
+    -> EConstr.t
+    -> EConstr.t
     -> Evd.evar_map * t
 
   val debug_unify
     :  Environ.env
     -> Evd.evar_map
-    -> Evd.econstr
-    -> Evd.econstr
+    -> EConstr.t
+    -> EConstr.t
     -> unit
 
   val debug_unifyerr
     :  Environ.env
     -> Evd.evar_map
-    -> Evd.econstr
-    -> Evd.econstr
-    -> Evd.econstr
-    -> Evd.econstr
+    -> EConstr.t
+    -> EConstr.t
+    -> EConstr.t
+    -> EConstr.t
     -> unit
 
   val w_unify
     :  Environ.env
     -> Evd.evar_map
-    -> Evd.econstr
-    -> Evd.econstr
+    -> EConstr.t
+    -> EConstr.t
     -> Evd.evar_map * bool
 
   val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
@@ -105,10 +105,10 @@ module Problems : sig
   val unify_list_opt : Problem.t list -> Tree.t list option Mebi_wrapper.mm
 
   val sandbox_unify_all_opt
-    :  Evd.econstr
-    -> Evd.econstr
+    :  EConstr.t
+    -> EConstr.t
     -> t
-    -> (Evd.econstr * Evd.econstr * Tree.t list) option Mebi_wrapper.mm
+    -> (EConstr.t * EConstr.t * Tree.t list) option Mebi_wrapper.mm
 end
 
 module Constructors : sig
@@ -124,8 +124,8 @@ module Constructors : sig
   val retrieve
     :  int
     -> t
-    -> Evd.econstr
-    -> Evd.econstr
+    -> EConstr.t
+    -> EConstr.t
     -> Mebi_setup.Enc.t * Problems.t list
     -> t Mebi_wrapper.mm
 end

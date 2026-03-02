@@ -30,7 +30,7 @@ module Make : (_ : Logger.SLogger) (Enc : Encoding.SEncoding) -> sig
 
   module Trees : sig
     type elt = Tree.t
-    type t
+    type t = Set.Make(Tree).t
 
     val empty : t
     val add : elt -> t -> t
@@ -453,6 +453,7 @@ module Make : (_ : Logger.SLogger) (Enc : Encoding.SEncoding) -> sig
     val of_seq : elt Seq.t -> t
     val to_string : t -> string
     val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val extrapolate : Annotation.t -> t
   end
 
   module Transition : sig
@@ -586,6 +587,7 @@ module Make : (_ : Logger.SLogger) (Enc : Encoding.SEncoding) -> sig
     val hash : t -> int
     val is_silent : t -> bool
     val annotation_is_empty : t -> bool
+    val annotation_length : t -> int
     val to_string : t -> string
     val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
@@ -596,6 +598,8 @@ module Make : (_ : Logger.SLogger) (Enc : Encoding.SEncoding) -> sig
     val compare : t -> t -> int
     val to_string : t -> string
     val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val try_update : t -> t list -> t option * t list
+    val merge_lists : t list -> t list -> t list
   end
 
   module ActionPairs : sig
@@ -699,16 +703,7 @@ module Make : (_ : Logger.SLogger) (Enc : Encoding.SEncoding) -> sig
     exception IsEmpty
 
     val shorest_annotation : t -> ActionPair.t
-
-    val merge_saturated_tuples
-      :  ActionPair.t list
-      -> ActionPair.t list
-      -> ActionPair.t list
-
-    val try_update_saturated_tuple
-      :  ActionPair.t
-      -> ActionPair.t list
-      -> ActionPair.t option * ActionPair.t list
+    val merge_list : t -> ActionPair.t list -> t
   end
 
   module Actions : sig
@@ -1160,7 +1155,8 @@ module Make : (_ : Logger.SLogger) (Enc : Encoding.SEncoding) -> sig
     val to_rev_seq : t -> elt Seq.t
     val add_seq : elt Seq.t -> t -> t
     val of_seq : elt Seq.t -> t
-    val get_bisimilar : State.t -> t -> elt
+    val get_bisimilar : State.t -> t -> States.t
+    val filter_reachable : States.t -> t -> t
     val reachable : State.t -> EdgeMap.t' -> t -> t
     val reachable_by_label : State.t -> Label.t -> EdgeMap.t' -> t -> t
     val to_string : t -> string
@@ -1228,38 +1224,163 @@ module Make : (_ : Logger.SLogger) (Enc : Encoding.SEncoding) -> sig
   end
 
   module Saturate : sig
+    module Log : Logger.SLogger
+
+    module WIP : sig
+      type t =
+        { from : State.t
+        ; via : Label.t
+        ; trees : Trees.t
+        }
+
+      val is_silent : t -> bool
+      val is_named : t -> bool
+      val equal : t -> t -> bool
+      val compare : t -> t -> int
+      val create : State.t -> Action.t -> t
+
+      exception IsEmptyList
+
+      val list_to_annotation : State.t -> t list -> Annotation.t
+    end
+
+    module Trace : sig
+      module NT : sig end
+
+      type t =
+        { this : WIP.t
+        ; next : next option
+        }
+
+      and next =
+        | Next of t
+        | Goto of State.t
+
+      val create : WIP.t -> t
+      val compare : t -> t -> int
+      val compare_next : next -> next -> int
+
+      exception Invalid
+
+      val has_named : ?validate:bool -> t -> bool
+      val validate : t -> unit
+
+      exception CouldNotFindGoto
+
+      val get_goto : t -> State.t
+
+      exception CouldNotFindNamed
+
+      val get_named : t -> Label.t
+      val get_named_opt : t -> Label.t option
+
+      exception FailAdd_AlreadyNamed
+      exception FailAdd_AlreadyHasGoto
+
+      val add : WIP.t -> t -> t
+
+      exception FailSetGoto_AlreadyHasGoto
+
+      val set_goto : State.t -> t -> t
+
+      exception FailSeq_AlreadyNamed
+      exception FailSeq_AlreadyHasGoto
+
+      val seq : t -> t -> t
+      val seq_opt : t option -> t -> t
+      val get : WIP.t -> t -> t
+      val upto_named : t -> t
+
+      exception GotoNotSet
+
+      val to_annotation : t -> Annotation.t
+    end
+
+    module Traces : sig
+      type elt = Trace.t
+      type t = Set.Make(Trace).t
+
+      val empty : t
+      val add : elt -> t -> t
+      val singleton : elt -> t
+      val remove : elt -> t -> t
+      val union : t -> t -> t
+      val inter : t -> t -> t
+      val disjoint : t -> t -> bool
+      val diff : t -> t -> t
+      val cardinal : t -> int
+      val elements : t -> elt list
+      val min_elt : t -> elt
+      val min_elt_opt : t -> elt option
+      val max_elt : t -> elt
+      val max_elt_opt : t -> elt option
+      val choose : t -> elt
+      val choose_opt : t -> elt option
+      val find : elt -> t -> elt
+      val find_opt : elt -> t -> elt option
+      val find_first : (elt -> bool) -> t -> elt
+      val find_first_opt : (elt -> bool) -> t -> elt option
+      val find_last : (elt -> bool) -> t -> elt
+      val find_last_opt : (elt -> bool) -> t -> elt option
+      val iter : (elt -> unit) -> t -> unit
+      val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+      val map : (elt -> elt) -> t -> t
+      val filter : (elt -> bool) -> t -> t
+      val filter_map : (elt -> elt option) -> t -> t
+      val partition : (elt -> bool) -> t -> t * t
+      val split : elt -> t -> t * bool * t
+      val is_empty : t -> bool
+      val mem : elt -> t -> bool
+      val equal : t -> t -> bool
+      val compare : t -> t -> int
+      val subset : t -> t -> bool
+      val for_all : (elt -> bool) -> t -> bool
+      val exists : (elt -> bool) -> t -> bool
+      val to_list : t -> elt list
+      val of_list : elt list -> t
+      val to_seq_from : elt -> t -> elt Seq.t
+      val to_seq : t -> elt Seq.t
+      val to_rev_seq : t -> elt Seq.t
+      val add_seq : elt Seq.t -> t -> t
+      val of_seq : elt Seq.t -> t
+      val get : WIP.t -> t -> t
+    end
+
     type data =
-      { named : Action.t option
-      ; notes : wip list
-      ; visited : Partition.elt
+      { named : Label.t option
+      ; current : Trace.t option
+      ; visited : States.t
+      ; traces : Traces.t ref
+      ; can_collect_traces : bool ref
       ; old_edges : EdgeMap.t'
       }
 
-    and wip =
-      { from : State.t
-      ; via : Label.t
-      ; trees : Trees.t
-      }
-
-    val wip : State.t -> Action.t -> wip
-    val initial_data : EdgeMap.t' -> data
+    val initial_data : Traces.t ref -> EdgeMap.t' -> data
+    val has_named : data -> bool
+    val update_traces : data -> Trace.t -> unit
     val update_named : Action.t -> data -> data
-    val update_notes : State.t -> Action.t -> data -> data
+    val update_current : WIP.t -> data -> data
     val update_visited : State.t -> data -> data
     val already_visited : State.t -> data -> bool
     val skip_action : Action.t -> data -> bool
     val get_old_actions : State.t -> data -> ActionMap.t' option
-
-    exception Model_Saturate_WIP_IsEmptyList of unit
-
-    val wip_to_annotation : State.t -> wip list -> Annotation.t
-
-    exception Model_Saturate_WIP_HadNoNamedActions of wip list
-    exception Model_Saturate_WIP_HadMultipleNamedActions of wip list
-
-    val validate_wips : wip list -> unit
-    val extrapolate_annotations : Annotation.t -> Annotations.t
+    val update_acc : Trace.t -> Label.t -> ActionPairs.t -> ActionPairs.t
     val stop : data -> State.t -> ActionPairs.t -> ActionPairs.t
+
+    val finish_with_trace
+      :  Trace.t
+      -> data
+      -> Label.t
+      -> ActionPairs.t
+      -> ActionPairs.t
+
+    val finish_with_trace_upto
+      :  Trace.t
+      -> data
+      -> Label.t
+      -> ActionPairs.t
+      -> ActionPairs.t
+
     val check_from : data -> State.t -> ActionPairs.t -> ActionPairs.t
 
     val check_actions
@@ -1269,22 +1390,47 @@ module Make : (_ : Logger.SLogger) (Enc : Encoding.SEncoding) -> sig
       -> ActionPairs.t
       -> ActionPairs.t
 
+    val collect_from_traces
+      :  data
+      -> State.t
+      -> Action.t
+      -> States.t
+      -> ActionPairs.t
+      -> ActionPairs.t
+
+    val continue_check_destinations
+      :  data
+      -> State.t
+      -> Action.t
+      -> States.t
+      -> ActionPairs.t
+      -> ActionPairs.t
+
     val check_destinations
       :  data
       -> State.t
-      -> Partition.elt
+      -> States.t
       -> ActionPairs.t
       -> ActionPairs.t
 
-    val edge_action_destinations
-      :  data
+    val edge_action_destinations : data -> State.t -> States.t -> ActionPairs.t
+
+    val edge_actions
+      :  State.t
+      -> ActionMap.t'
+      -> EdgeMap.t'
+      -> Traces.t ref
+      -> ActionPairs.t
+
+    val edge
+      :  ActionMap.t'
       -> State.t
-      -> Partition.elt
-      -> ActionPairs.t
+      -> ActionMap.t'
+      -> EdgeMap.t'
+      -> Traces.t ref
+      -> unit
 
-    val edge_actions : State.t -> ActionMap.t' -> EdgeMap.t' -> ActionPairs.t
-    val edge : ActionMap.t' -> State.t -> ActionMap.t' -> EdgeMap.t' -> unit
-    val edges : Labels.t -> Partition.elt -> EdgeMap.t' -> EdgeMap.t'
+    val edges : Labels.t -> States.t -> EdgeMap.t' -> EdgeMap.t'
     val fsm : ?only_if_weak:bool -> FSM.t -> FSM.t
   end
 

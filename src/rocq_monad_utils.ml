@@ -680,10 +680,10 @@ struct
       val list_to_string : Environ.env -> t list -> string
 
       val sandbox_unify_all_opt
-        :  Evd.econstr
-        -> Evd.econstr
+        :  EConstr.t
+        -> EConstr.t
         -> t
-        -> (Evd.econstr * Evd.econstr * Tree.t list) option mm
+        -> (EConstr.t * EConstr.t * Tree.t list) option mm
     end
 
     module Problems : SProblems = struct
@@ -776,8 +776,8 @@ struct
       val retrieve
         :  int
         -> t
-        -> Evd.econstr
-        -> Evd.econstr
+        -> EConstr.t
+        -> EConstr.t
         -> Enc.t * Problems.t list
         -> t mm
     end
