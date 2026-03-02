@@ -1103,6 +1103,9 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
   end
 
+  (** [module Saturate ] ...
+      (* TODO: the idea of [Traces] needs to be revisited. It does provide optimizations to examples with a lot of silent actions, where the saturated FSM is considerably larger, but i believe that there are areas where this can still be improved. *)
+  *)
   module Saturate = struct
     module Log = Log
     (* Logger.Make
