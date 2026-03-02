@@ -2878,7 +2878,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
   module State : sig
     type t =
       | NewProof of (Constrexpr.constr_expr * Constrexpr.constr_expr)
-      | WeakSim
+      | WeakSim of Rocq_utils.hyp list ref
       | Exists of Model.Transition.t option
       (* | GoalTransition of Transition.t *)
       | ApplyConstructors of ApplicableConstructors.t
@@ -3608,7 +3608,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
       :  Constrexpr.constr_expr * Constrexpr.constr_expr
       -> Tactic.t mm
 
-    val handle_weaksim : unit -> Tactic.t mm
+    val handle_weaksim : Rocq_utils.hyp list ref -> Tactic.t mm
     val handle_exists : Model.Transition.t option -> Tactic.t mm
 
     (* val handle_goal_transition : Transition.t -> Tactic.t mm *)

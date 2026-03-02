@@ -29,6 +29,7 @@ MeBi Divider "Examples.Bisimilarity.CADP.Size1.PluginProofs.lts_bigstep".
 Example wsim_lts_bigstep : weak_sim lts bigstep c1 c1. 
 Proof. MeBiSim Begin lts c1 And bigstep c1 Using step. 
   (* TODO: inversion seems to be looping again *)
+(* MeBiSim Solve 8. Qed. *)
 MeBiSim Solve 2000. Qed.
 (* 
   (* MeBiSim Solve 15. *)
