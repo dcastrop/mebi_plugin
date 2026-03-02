@@ -305,6 +305,31 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       =
       Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
+
+    (** returns all of the possible actions after the named action *)
+    let extrapolate (x : Annotation.t) : t =
+      Log.trace __FUNCTION__;
+      (* NOTE: skip pre-named action *)
+      let rec skip ({ this; next } : Annotation.t) : t =
+        (* Log.trace __FUNCTION__; *)
+        let xs =
+          Option.cata (if Note.is_silent this then skip else get) empty next
+          |> map (fun (y : Annotation.t) -> { this; next = Some y })
+        in
+        (* NOTE: don't forget to add this action if named *)
+        if Note.is_silent this then xs else add { this; next = None } xs
+      (* NOTE: get every annotation from named action onwards *)
+      and get : Annotation.t -> t =
+        (* Log.trace __FUNCTION__; *)
+        function
+        | { this; next = None } -> singleton { this; next = None }
+        | { this; next = Some next } ->
+          get next
+          |> map (fun (y : Annotation.t) -> { this; next = Some y })
+          |> add { this; next = None }
+      in
+      add x (skip x)
+    ;;
   end
 
   module Transition = struct
@@ -462,62 +487,11 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       =
       Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
-  end
 
-  module ActionPairs = struct
-    module S = Set.Make (ActionPair)
-    include S
-
-    let destinations (x : t) : States.t =
-      to_list x
-      |> List.fold_left
-           (fun (acc : States.t) ((a, b) : ActionPair.t) -> States.union acc b)
-           States.empty
-    ;;
-
-    exception IsEmpty
-
-    (** returns the action in [x] that has the {e shortest} annotation (where [None] is treated as 0).
+    (** [try_update x a] returns [None, a] when [x] cannot be used to update a pre-existing tuple in [a], and [Some z, a'] where [z] is the updated tuple in [a] which has been removed in [a'].
     *)
-    let shorest_annotation (x : t) : ActionPair.t =
-      match to_list x with
-      | [] -> raise IsEmpty
-      | h :: tl ->
-        List.fold_left
-          (fun ((x, xs) : ActionPair.t) ((y, ys) : ActionPair.t) ->
-            match
-              Int.compare
-                (Action.annotation_length x)
-                (Action.annotation_length y)
-            with
-            | 1 -> y, ys
-            | _ -> x, xs)
-          h
-          tl
-    ;;
-
-    (** [merge_saturated_tuples a b] merges elements of [b] into [a], either by updating an element in [a] with additional annotation for a saturation tuple that describes the same action-destination, or in the case that the saturation tuple is not described within [a] by inserting it within [a].
-    *)
-    let rec merge_saturated_tuples (a : ActionPair.t list)
-      : ActionPair.t list -> ActionPair.t list
-      =
-      Log.trace __FUNCTION__;
-      function
-      | [] -> a
-      | h :: tl ->
-        let (a : (Action.t * States.t) list) =
-          match try_update_saturated_tuple h a with
-          | None, a -> h :: a
-          | Some updated, a -> updated :: a
-        in
-        merge_saturated_tuples a tl
-
-    (** [try_update_saturated_tuple x a] returns [None, a] when [x] cannot be used to update a pre-existing tuple in [a], and [Some z, a'] where [z] is the updated tuple in [a] which has been removed in [a'].
-    *)
-    and try_update_saturated_tuple
-          ((xaction, xdestinations) : ActionPair.t)
-          (a : ActionPair.t list)
-      : ActionPair.t option * ActionPair.t list
+    let try_update ((xaction, xdestinations) : t) (a : t list)
+      : t option * t list
       =
       Log.trace __FUNCTION__;
       let f : Annotation.t option * Annotation.t option -> Annotation.t option =
@@ -554,6 +528,74 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
             else None, (yaction, ydestinations) :: acc)
         (None, [])
         a
+    ;;
+
+    (** [merge_lists a b] merges elements of [b] into [a], either by updating an element in [a] with additional annotation for a saturation tuple that describes the same action-destination, or in the case that the saturation tuple is not described within [a] by inserting it within [a].
+    *)
+    let rec merge_lists (a : t list) : t list -> t list =
+      Log.trace __FUNCTION__;
+      function
+      | [] -> a
+      | h :: tl ->
+        let (a : (Action.t * States.t) list) =
+          match try_update h a with
+          | None, a -> h :: a
+          | Some updated, a -> updated :: a
+        in
+        merge_lists a tl
+    ;;
+
+    (* let rec merge_lists (a : t list) : t list -> t list = *)
+  end
+
+  module ActionPairs = struct
+    module S = Set.Make (ActionPair)
+    include S
+
+    let destinations (x : t) : States.t =
+      to_list x
+      |> List.fold_left
+           (fun (acc : States.t) ((a, b) : ActionPair.t) -> States.union acc b)
+           States.empty
+    ;;
+
+    exception IsEmpty
+
+    (** returns the action in [x] that has the {e shortest} annotation (where [None] is treated as 0).
+    *)
+    let shorest_annotation (x : t) : ActionPair.t =
+      match to_list x with
+      | [] -> raise IsEmpty
+      | h :: tl ->
+        List.fold_left
+          (fun ((x, xs) : ActionPair.t) ((y, ys) : ActionPair.t) ->
+            match
+              Int.compare
+                (Action.annotation_length x)
+                (Action.annotation_length y)
+            with
+            | 1 -> y, ys
+            | _ -> x, xs)
+          h
+          tl
+    ;;
+
+    let merge_list : t -> ActionPair.t list -> t =
+      List.fold_left (fun (acc : t) ((a, s) : ActionPair.t) ->
+        (* NOTE: merge destinations of equal actions *)
+        let matching =
+          filter (fun ((b, t) : ActionPair.t) -> Action.equal a b) acc
+        in
+        if is_empty matching
+        then add (a, s) acc
+        else (
+          (* NOTE: update states of each matching *)
+          let acc = diff acc matching in
+          matching
+          |> to_list
+          |> List.map (fun (_, t) -> a, States.union s t)
+          |> of_list
+          |> union acc))
     ;;
   end
 
@@ -1062,25 +1104,328 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
   end
 
   module Saturate = struct
+    module Log = Log
+    (* Logger.Make
+       (Output_mode.Default)
+       (struct
+       let prefix : string option = None
+       let level : Output_kind.level -> bool = !Output_kind.default_level
+
+       let special : Output_kind.special -> bool =
+       Output_kind.default_special_fun ~trace:false
+       ;;
+       end) *)
+
+    (** [module WIP] is a lightweight counterpart of [Note.t] that forms some "work-in-progress" [Annotation.t]. Once we stop saturating an action, we check if we are able to yield a new saturated action and convert the [wip list] to an [Annotation.t].
+    *)
+    module WIP = struct
+      type t =
+        { from : State.t
+        ; via : Label.t
+        ; trees : Trees.t
+        }
+
+      let to_string (x : t) : string =
+        Printf.sprintf
+          "<State (%s) Via (%s)>"
+          (State.to_string x.from)
+          (* (Label.to_string x.label) *)
+          (Enc.to_string x.via.term)
+      ;;
+
+      let is_silent (x : t) : bool = Label.is_silent x.via
+      let is_named (x : t) : bool = is_silent x |> Bool.not
+
+      let equal (a : t) (b : t) : bool =
+        State.equal a.from b.from
+        && Label.equal a.via b.via
+        && Trees.equal a.trees b.trees
+      ;;
+
+      let compare (a : t) (b : t) : int =
+        Utils.compare_chain
+          [ State.compare a.from b.from
+          ; Label.compare a.via b.via
+          ; Trees.compare a.trees b.trees
+          ]
+      ;;
+
+      let create (from : State.t) (action : Action.t) : t =
+        { from; via = action.label; trees = action.constructor_trees }
+      ;;
+
+      exception IsEmptyList
+
+      let list_to_annotation (goto : State.t) (xs : t list) : Annotation.t =
+        Log.trace __FUNCTION__;
+        let rec f : t list -> Annotation.t = function
+          | [] -> raise IsEmptyList
+          | { from; via; trees } :: [] ->
+            { this = { from; label = via; using = trees; goto }; next = None }
+          | { from; via; trees } :: h :: tl ->
+            let { from = goto; via = via2; trees = tree2 } : t = h in
+            { this = { from; label = via; using = trees; goto }
+            ; next = Some (f (h :: tl))
+            }
+        in
+        f (List.rev xs)
+      ;;
+    end
+
+    (** [module Trace] ... we keep track of the total sum of traces we have already checked. This is useful for checking if, from a state and action, we have already explored the rest of this trace and so can just use what we have already learned, e.g., if we are in some "subtrace".
+    *)
+    module Trace = struct
+      module NT = struct end
+
+      type t =
+        { this : WIP.t
+        ; next : next option
+        }
+
+      and next =
+        | Next of t
+        | Goto of State.t
+
+      let rec to_string : t -> string = function
+        | { this; next = None } ->
+          Utils.Strfy.list
+            (Of Utils.Strfy.string)
+            [ WIP.to_string this; "None" ]
+        | { this; next = Some (Next x) } ->
+          Utils.Strfy.list
+            (Of Utils.Strfy.string)
+            [ WIP.to_string this; to_string x ]
+        | { this; next = Some (Goto x) } ->
+          Utils.Strfy.list
+            (Of Utils.Strfy.string)
+            [ WIP.to_string this; State.to_string x ]
+      ;;
+
+      let create (this : WIP.t) : t = { this; next = None }
+
+      let rec compare (a : t) (b : t) : int =
+        Utils.compare_chain
+          [ WIP.compare a.this b.this
+          ; Option.compare compare_next a.next b.next
+          ]
+
+      and compare_next (a : next) (b : next) : int =
+        match a, b with
+        | Next a, Next b -> compare a b
+        | Next a, Goto _ -> -1
+        | Goto a, Goto b -> State.compare a b
+        | Goto a, Next _ -> 1
+      ;;
+
+      exception Invalid
+
+      (** [had_named ?validate x] is [true] if for an element in x has a label that is non-silent.
+          @param ?validate
+            is a optional flag that if [true] continues the search through the [Some next] that follows a named term, and will raise [Invalid] if another named element is found in x.
+          @raise Invalid
+            if more than one named element is found in [x] and [~validate:true].
+      *)
+      let rec has_named ?(validate : bool = false) : t -> bool = function
+        | { this; next = Some (Next x) } ->
+          if WIP.is_named this
+          then (
+            if validate then if has_named x then raise Invalid;
+            true)
+          else has_named ~validate x
+        | { this; next = _ } -> WIP.is_named this
+      ;;
+
+      let validate (x : t) : unit =
+        let _ = has_named ~validate:true x in
+        ()
+      ;;
+
+      exception CouldNotFindGoto
+
+      let rec get_goto : t -> State.t = function
+        | { this; next = Some (Goto x) } -> x
+        | { this; next = Some (Next next) } -> get_goto next
+        | { this; next = None } -> raise CouldNotFindGoto
+      ;;
+
+      exception CouldNotFindNamed
+
+      let rec get_named : t -> Label.t = function
+        | { this; next = Some (Next x) } ->
+          if WIP.is_named this then this.via else get_named x
+        | { this; next = _ } ->
+          if WIP.is_named this then this.via else raise CouldNotFindNamed
+      ;;
+
+      let get_named_opt (x : t) : Label.t option =
+        try Some (get_named x) with CouldNotFindNamed -> None
+      ;;
+
+      exception FailAdd_AlreadyNamed
+      exception FailAdd_AlreadyHasGoto
+
+      let add (x : WIP.t) (ys : t) : t =
+        (* NOTE: cannot have more than one non-silent action *)
+        if WIP.is_named x && has_named ys then raise FailAdd_AlreadyHasGoto;
+        let rec add : t -> t = function
+          | { this; next = None } ->
+            { this; next = Some (Next { this = x; next = None }) }
+          | { this; next = Some (Next y) } ->
+            { this; next = Some (Next (add y)) }
+          | { this; next = Some (Goto _) } -> raise FailAdd_AlreadyHasGoto
+        in
+        add ys
+      ;;
+
+      exception FailSetGoto_AlreadyHasGoto
+
+      let set_goto (x : State.t) (ys : t) : t =
+        let rec set_goto : t -> t = function
+          | { this; next = None } -> { this; next = Some (Goto x) }
+          | { this; next = Some (Next y) } ->
+            { this; next = Some (Next (set_goto y)) }
+          | { this; next = Some (Goto _) } -> raise FailSetGoto_AlreadyHasGoto
+        in
+        set_goto ys
+      ;;
+
+      exception FailSeq_AlreadyNamed
+      exception FailSeq_AlreadyHasGoto
+
+      (** [seq a b] appends [b] to the end of [a]. *)
+      let seq (a : t) (b : t) : t =
+        (* NOTE: cannot have more than one non-silent action *)
+        if has_named a && has_named b then raise FailSeq_AlreadyNamed;
+        let rec seq : t -> t = function
+          | { this; next = None } -> { this; next = Some (Next b) }
+          | { this; next = Some (Next x) } ->
+            { this; next = Some (Next (seq x)) }
+          | { this; next = Some (Goto _) } -> raise FailAdd_AlreadyHasGoto
+        in
+        seq a
+      ;;
+
+      (** [seq_opt a b] is [seq a b] of [Some a] else [b] *)
+      let seq_opt (a : t option) (b : t) : t =
+        match a with None -> b | Some a -> seq a b
+      ;;
+
+      (** [get x ys] ...
+          @raise Not_found if [x] does not match any in [ys]. *)
+      let rec get (x : WIP.t) : t -> t = function
+        | { this; next = Some (Next y) } ->
+          if WIP.equal x this then { this; next = Some (Next y) } else get x y
+        | { this; next } ->
+          if WIP.equal x this then { this; next } else raise Not_found
+      ;;
+
+      (** [upto_named x] ...
+          @raise Not_found if [x] begins with a named label. *)
+      let upto_named (x : t) : t =
+        Log.trace __FUNCTION__;
+        match x with
+        | { this; next } ->
+          if WIP.is_named this
+          then raise Not_found
+          else (
+            let rec f : next option -> next option = function
+              | None -> None
+              | Some (Goto y) -> Some (Goto y)
+              | Some (Next { this; next }) ->
+                if WIP.is_named this
+                then Some (Goto this.from)
+                else Some (Next { this; next = f next })
+            in
+            { this; next = f next })
+      ;;
+
+      exception GotoNotSet
+
+      let rec to_annotation : t -> Annotation.t =
+        Log.trace __FUNCTION__;
+        function
+        | { this = { from; via; trees }; next = None } ->
+          (* { this = { from; label = via; using = trees; goto }; next = None } *)
+          raise GotoNotSet
+        | { this = { from; via; trees }; next = Some (Next x) } ->
+          let next : Annotation.t = to_annotation x in
+          { this = { from; label = via; using = trees; goto = next.this.from }
+          ; next = Some next
+          }
+        | { this = { from; via; trees }; next = Some (Goto goto) } ->
+          { this = { from; label = via; using = trees; goto }; next = None }
+      ;;
+    end
+
+    module Traces = struct
+      include Set.Make (Trace)
+
+      (** [get x ys] returns a subset subtraces [ys] that begin with [x]. This includes elements in [ys] that begin with [x], in addition to the trailing-subtraces that begin with [x] for elements in [ys].
+          @raise Not_found if the set would return empty. *)
+      let get (x : WIP.t) (ys : t) : t =
+        let xs : t =
+          fold
+            (fun (y : Trace.t) (acc : t) ->
+              if WIP.equal x y.this
+              then add y acc
+              else (
+                match y.next with
+                | Some (Next next) ->
+                  (try add (Trace.get x next) acc with Not_found -> acc)
+                | _ -> acc))
+            ys
+            empty
+        in
+        if is_empty xs then raise Not_found else xs
+      ;;
+
+      let to_string (xs : t) : string =
+        to_list xs
+        |> Utils.Strfy.list
+             ~args:{ (Utils.Strfy.style_args ()) with name = Some "Traces" }
+             (Of Trace.to_string)
+      ;;
+
+      (* let update (x : Trace.t) (xs : t) : t =
+         Log.trace __FUNCTION__;
+         let xs = add x xs in
+         xs
+         ;; *)
+    end
+
+    (** [data] ...
+        @param named is ...
+        @param notes is ...
+        @param visited
+          is the set of states encountered so far in this particular saturation.
+        @param traces
+          is the set traces of all saturated actions so-far, which enables us to more optimally explore the state-space with minimal repitition.
+        @param old_edges is ... *)
     type data =
-      { named : Action.t option
-      ; notes : wip list
+      { named : Label.t option
+      ; current : Trace.t option
       ; visited : States.t
+      ; traces : Traces.t ref
+      ; can_collect_traces : bool ref
       ; old_edges : EdgeMap.t'
       }
 
-    and wip =
-      { from : State.t
-      ; via : Label.t
-      ; trees : Trees.t
+    let initial_data (traces : Traces.t ref) (old_edges : EdgeMap.t') : data =
+      { named = None
+      ; (* notes = []; *) current = None
+      ; visited = States.empty
+      ; traces
+      ; can_collect_traces = ref true
+      ; old_edges
       }
-
-    let wip (from : State.t) (action : Action.t) : wip =
-      { from; via = action.label; trees = action.constructor_trees }
     ;;
 
-    let initial_data (old_edges : EdgeMap.t') : data =
-      { named = None; notes = []; visited = States.empty; old_edges }
+    let has_named (d : data) : bool = Option.has_some d.named
+
+    let update_traces (d : data) (x : Trace.t) : unit =
+      Log.trace __FUNCTION__;
+      d.traces := Traces.add x !(d.traces);
+      d.can_collect_traces := true
     ;;
 
     (****************************************************************************)
@@ -1088,22 +1433,26 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     (** returns a copy of [d] with the updated name *)
     let update_named (x : Action.t) (d : data) : data =
       Log.trace __FUNCTION__;
-      let f (x : Action.t) (d : data) : Action.t option =
-        Option.cata
-          (fun y -> Some y)
-          (if Action.is_silent x then None else Some x)
-          d.named
+      let named : Label.t option =
+        match d.named with
+        | None -> if Action.is_silent x then None else Some x.label
+        | Some y -> Some y
       in
-      { d with named = f x d }
+      { d with named }
     ;;
 
     (** returns a copy of [d] with the updated notes *)
-    let update_notes (from : State.t) (action : Action.t) (d : data) : data =
+    (* let update_notes (x : WIP.t) (d : data) : data =
       Log.trace __FUNCTION__;
-      let f (from : State.t) (action : Action.t) (d : data) : wip list =
-        wip from action :: d.notes
-      in
-      { d with notes = f from action d }
+      { d with notes = x :: d.notes }
+    ;; *)
+
+    (** returns a copy of [d] with [x] added to [d.current] *)
+    let update_current (x : WIP.t) (d : data) : data =
+      Log.trace __FUNCTION__;
+      match d.current with
+      | None -> { d with current = Some (Trace.create x) }
+      | Some current -> { d with current = Some (Trace.add x current) }
     ;;
 
     (** returns a copy of [d] with the updated visited *)
@@ -1117,6 +1466,8 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
 
     let already_visited (x : State.t) (d : data) : bool = States.mem x d.visited
 
+    (** [skip_action x d] is [true] if [x] is non-silent and [d.named] is already [Some _].
+    *)
     let skip_action (x : Action.t) (d : data) : bool =
       if Action.is_silent x then false else Option.has_some d.named
     ;;
@@ -1128,112 +1479,79 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
 
     (****************************************************************************)
 
-    exception Model_Saturate_WIP_IsEmptyList of unit
+    (* exception Model_Saturate_WIP_HadNoNamedActions of WIP.t list
+    exception Model_Saturate_WIP_HadMultipleNamedActions of WIP.t list
 
-    let wip_to_annotation (goto : State.t) (xs : wip list) : Annotation.t =
-      Log.trace __FUNCTION__;
-      let rec f : wip list -> Annotation.t = function
-        | [] -> raise (Model_Saturate_WIP_IsEmptyList ())
-        | { from; via; trees } :: [] ->
-          { this = { from; label = via; using = trees; goto }; next = None }
-        | { from; via; trees } :: h :: tl ->
-          let { from = goto; via = via2; trees = tree2 } = h in
-          { this = { from; label = via; using = trees; goto }
-          ; next = Some (f (h :: tl))
-          }
-      in
-      f (List.rev xs)
-    ;;
-
-    (****************************************************************************)
-
-    exception Model_Saturate_WIP_HadNoNamedActions of wip list
-    exception Model_Saturate_WIP_HadMultipleNamedActions of wip list
-
-    let validate_wips (xs : wip list) : unit =
+    let validate_wips (xs : WIP.t list) : unit =
       Log.trace __FUNCTION__;
       match
         List.filter
-          (fun ({ via; _ } : wip) -> Label.is_silent via |> Bool.not)
+          (fun ({ via; _ } : WIP.t) -> Label.is_silent via |> Bool.not)
           xs
       with
       | [] -> raise (Model_Saturate_WIP_HadNoNamedActions xs)
       | _ :: [] -> ()
       | _ :: _ -> raise (Model_Saturate_WIP_HadMultipleNamedActions xs)
-    ;;
-
-    (** returns all of the possible actions after the named action *)
-    let extrapolate_annotations (x : Annotation.t) : Annotations.t =
-      Log.trace __FUNCTION__;
-      (* NOTE: skip pre-named action *)
-      let rec skip ({ this; next } : Annotation.t) : Annotations.t =
-        Log.trace __FUNCTION__;
-        let xs =
-          Option.cata
-            (if Note.is_silent this then skip else get)
-            Annotations.empty
-            next
-          |> Annotations.map (fun (y : Annotation.t) -> { this; next = Some y })
-        in
-        (* NOTE: don't forget to add this action if named *)
-        if Note.is_silent this
-        then xs
-        else Annotations.add { this; next = None } xs
-      (* NOTE: get every annotation from named action onwards *)
-      and get : Annotation.t -> Annotations.t =
-        Log.trace __FUNCTION__;
-        function
-        | { this; next = None } -> Annotations.singleton { this; next = None }
-        | { this; next = Some next } ->
-          get next
-          |> Annotations.map (fun (y : Annotation.t) -> { this; next = Some y })
-          |> Annotations.add { this; next = None }
-      in
-      Annotations.add x (skip x)
-    ;;
+    ;; *)
 
     (****************************************************************************)
+
+    let update_acc (trace : Trace.t) (label : Label.t) (acc : ActionPairs.t) =
+      Log.trace __FUNCTION__;
+      Trace.to_annotation trace
+      |> Annotations.extrapolate
+      |> Annotations.to_list
+      |> List.map (fun (x : Annotation.t) : ActionPair.t ->
+        let y : Action.t =
+          { label; annotation = Some x; constructor_trees = Trees.empty }
+        in
+        y, States.singleton (Annotation.last x).goto)
+      |> ActionPairs.merge_list acc
+    ;;
 
     (** [stop] *)
     let stop (d : data) (goto : State.t) (acc : ActionPairs.t) : ActionPairs.t =
       Log.trace __FUNCTION__;
-      match d.named with
-      | None -> acc
-      | Some named ->
-        let () = validate_wips d.notes in
-        wip_to_annotation goto d.notes
-        |> extrapolate_annotations
-        |> Annotations.to_list
-        |> List.map (fun (x : Annotation.t) : ActionPair.t ->
-          let y : Action.t =
-            { label = named.label
-            ; annotation = Some x
-            ; constructor_trees = Trees.empty
-            }
-          in
-          y, States.singleton (Annotation.last x).goto)
-        |> List.fold_left
-             (fun (acc : ActionPairs.t) ((a, s) : ActionPair.t) ->
-               (* NOTE: merge destinations of equal actions *)
-               let matching =
-                 ActionPairs.filter
-                   (fun ((b, t) : ActionPair.t) -> Action.equal a b)
-                   acc
-               in
-               if ActionPairs.is_empty matching
-               then ActionPairs.add (a, s) acc
-               else (
-                 (* NOTE: update states of each matching *)
-                 let acc = ActionPairs.diff acc matching in
-                 matching
-                 |> ActionPairs.to_list
-                 |> List.map (fun (_, t) -> a, States.union s t)
-                 |> ActionPairs.of_list
-                 |> ActionPairs.union acc))
-             acc
+      match d.current, d.named with
+      | Some current, Some named ->
+        let () = Trace.validate current in
+        let trace : Trace.t = Trace.set_goto goto current in
+        update_traces d trace;
+        update_acc trace named acc
+      (* NOTE: skip and return [acc] otherwise *)
+      | _, _ -> acc
     ;;
 
     (****************************************************************************)
+
+    let finish_with_trace
+          (z : Trace.t)
+          (d : data)
+          (named : Label.t)
+          (acc : ActionPairs.t)
+      : ActionPairs.t
+      =
+      Log.trace __FUNCTION__;
+      let z : Trace.t = Trace.seq_opt d.current z in
+      update_traces d z;
+      update_acc z named acc
+    ;;
+
+    let finish_with_trace_upto
+          (z : Trace.t)
+          (d : data)
+          (named : Label.t)
+          (acc : ActionPairs.t)
+      : ActionPairs.t
+      =
+      Log.trace __FUNCTION__;
+      try
+        let z : Trace.t = Trace.upto_named z in
+        finish_with_trace z d named acc
+      with
+      (* NOTE: stop here as [x] begins with named action. *)
+      | Not_found -> acc
+    ;;
 
     (** [check_from] explores the outgoing actions of state [from], which is some destination of another action.
     *)
@@ -1258,10 +1576,65 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           if skip_action x d
           then stop d from acc
           else (
-            let d : data (* NOTE: copy [d] *) = update_notes from x d in
-            let d : data = update_named x d in
-            check_destinations d from ys acc))
+            try
+              if !(d.can_collect_traces)
+              then collect_from_traces d from x ys acc
+              else raise Not_found
+            with
+            | Not_found ->
+              (* NOTE: continue exploring un-traced state-space *)
+              continue_check_destinations d from x ys acc))
         xs
+
+    and collect_from_traces
+          (d : data)
+          (from : State.t)
+          (x : Action.t)
+          (ys : States.t)
+          (acc : ActionPairs.t)
+      : ActionPairs.t
+      =
+      Log.trace __FUNCTION__;
+      let wip : WIP.t = WIP.create from x in
+      let traces : Traces.t = Traces.get wip !(d.traces) in
+      (* NOTE: add all traces that already have named action (if we don't) -- keep exploring with traces *)
+      Traces.fold
+        (fun (z : Trace.t) (acc : ActionPairs.t) : ActionPairs.t ->
+          (* Log.thing ~__FUNCTION__ Debug "z" z (Of Trace.to_string); *)
+          match d.named, Trace.get_named_opt z with
+          | Some named, None ->
+            Log.trace ~__FUNCTION__ "stop (data)";
+            (* NOTE: stop as named is in some [current]. *)
+            finish_with_trace z d named acc
+          | None, Some named ->
+            Log.trace ~__FUNCTION__ "stop (trace)";
+            (* NOTE: stop since the trace is named (and already explored). *)
+            finish_with_trace z d named acc
+          | None, None ->
+            Log.trace ~__FUNCTION__ "continue (full)";
+            (* NOTE: continue exploring un-traced state-space as the [named] must occur earlier in the trace and has been pruned *)
+            (* NOTE: we can only use the traces once *)
+            d.can_collect_traces := false;
+            continue_check_destinations d from x ys acc
+          | Some named, Some _ ->
+            Log.trace ~__FUNCTION__ "continue (upto)";
+            (* NOTE: we can only continue with the trace up-to the named action *)
+            finish_with_trace_upto z d named acc)
+        traces
+        acc
+
+    and continue_check_destinations
+          (d : data)
+          (from : State.t)
+          (x : Action.t)
+          (ys : States.t)
+      : ActionPairs.t -> ActionPairs.t
+      =
+      Log.trace __FUNCTION__;
+      let wip : WIP.t = WIP.create from x in
+      let d : data (* NOTE: copy [d] *) = update_current wip d in
+      let d : data = update_named x d in
+      check_destinations d from ys
 
     and check_destinations (d : data) (from : State.t) (xs : States.t)
       : ActionPairs.t -> ActionPairs.t
@@ -1283,6 +1656,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       Log.trace __FUNCTION__;
       States.fold
         (fun (y : State.t) (acc : ActionPairs.t) ->
+          Log.thing ~__FUNCTION__ Debug "y" y (Of State.to_string);
           check_from d y ActionPairs.empty)
         ys
         ActionPairs.empty
@@ -1294,17 +1668,21 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           (from : State.t)
           (old_actions : ActionMap.t')
           (old_edges : EdgeMap.t')
+          (traces : Traces.t ref)
       : ActionPairs.t
       =
       Log.trace __FUNCTION__;
       ActionMap.fold
         (fun (x : Action.t) (ys : States.t) (acc : ActionPair.t list) ->
+          Log.thing ~__FUNCTION__ Debug "x" x (Of Action.to_string);
           let d : data =
-            initial_data old_edges |> update_named x |> update_notes from x
+            initial_data traces old_edges
+            |> update_named x
+            |> update_current (WIP.create from x)
           in
           edge_action_destinations d from ys
           |> ActionPairs.to_list
-          |> ActionPairs.merge_saturated_tuples acc)
+          |> ActionPair.merge_lists acc)
         old_actions
         []
       |> ActionPairs.of_list
@@ -1317,10 +1695,11 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           (from : State.t)
           (old_actions : ActionMap.t')
           (old_edges : EdgeMap.t')
+          (traces : Traces.t ref)
       : unit
       =
       Log.trace __FUNCTION__;
-      edge_actions from old_actions old_edges
+      edge_actions from old_actions old_edges traces
       |> ActionPairs.iter
            (fun ((saturated_action, destinations) : Action.t * States.t) ->
            ActionMap.update new_actions saturated_action destinations)
@@ -1332,18 +1711,22 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       =
       Log.trace __FUNCTION__;
       let new_edges : EdgeMap.t' = EdgeMap.create 0 in
+      let traces : Traces.t ref = ref Traces.empty in
       EdgeMap.iter
         (fun (from : State.t) (old_actions : ActionMap.t') ->
+          Log.thing ~__FUNCTION__ Debug "from" from (Of State.to_string);
           (* NOTE: populate [new_actions] with saturated [old_actions] *)
           let new_actions : ActionMap.t' = ActionMap.create 0 in
-          let () = edge new_actions from old_actions old_edges in
+          let () = edge new_actions from old_actions old_edges traces in
           EdgeMap.replace new_edges from new_actions)
         old_edges;
+      Log.thing ~__FUNCTION__ Debug "traces" !traces (Of Traces.to_string);
       new_edges
     ;;
 
     let fsm ?(only_if_weak : bool = true) (x : FSM.t) : FSM.t =
       Log.trace __FUNCTION__;
+      Log.thing ~__FUNCTION__ Debug "x" x (Of FSM.to_string);
       if only_if_weak && Bool.not (FSM.is_weak_mode x)
       then (
         Log.debug ~__FUNCTION__ "Not weak, returning unchanged";

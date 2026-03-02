@@ -25,7 +25,7 @@ module Make : (Log : Logger.SLogger)
     end
 
     module F : sig
-      type key = Evd.econstr
+      type key = EConstr.t
       type 'a t = 'a Bi_encoding.Make(Log)(Ctx)(Enc).F.t
 
       val create : int -> 'a t
@@ -82,7 +82,7 @@ module Make : (Log : Logger.SLogger)
 
     type maps = Bi_encoding.Make(Log)(Ctx)(Enc).maps =
       { fwd : Enc.t F.t
-      ; bck : Evd.econstr B.t
+      ; bck : EConstr.t B.t
       }
 
     val the_maps : maps ref option ref
@@ -92,26 +92,26 @@ module Make : (Log : Logger.SLogger)
 
     val get_the_maps : unit -> maps ref
     val fwdmap : unit -> Enc.t F.t
-    val bckmap : unit -> Evd.econstr B.t
+    val bckmap : unit -> EConstr.t B.t
 
-    exception EncodingNotFound of Evd.econstr
+    exception EncodingNotFound of EConstr.t
 
-    val get_encoding : Evd.econstr -> Enc.t
-    val encode : Evd.econstr -> Enc.t
-    val encoded : Evd.econstr -> bool
+    val get_encoding : EConstr.t -> Enc.t
+    val encode : EConstr.t -> Enc.t
+    val encoded : EConstr.t -> bool
 
     exception DecodingNotFound of Enc.t
 
-    val get_econstr : Enc.t -> Evd.econstr
+    val get_econstr : Enc.t -> EConstr.t
 
     exception CannotDecode of Enc.t
 
-    val decode : Enc.t -> Evd.econstr
-    val decode_opt : Enc.t -> Evd.econstr option
+    val decode : Enc.t -> EConstr.t
+    val decode_opt : Enc.t -> EConstr.t option
     val decode_map : 'a B.t -> 'a F.t
     val encode_map : 'a F.t -> 'a B.t
-    val to_list : unit -> (Enc.t * Evd.econstr) list
-    val bienc_to_list : unit -> (Enc.t * Evd.econstr) list
+    val to_list : unit -> (Enc.t * EConstr.t) list
+    val bienc_to_list : unit -> (Enc.t * EConstr.t) list
 
     type 'a mm = wrapper ref -> 'a in_wrapper
 
@@ -188,7 +188,7 @@ module Make : (Log : Logger.SLogger)
     val get_sigma : wrapper ref -> Evd.evar_map in_wrapper
     val get_maps : wrapper ref -> maps in_wrapper
     val get_fwdmap : wrapper ref -> Enc.t F.t in_wrapper
-    val get_bckmap : wrapper ref -> Evd.econstr B.t in_wrapper
+    val get_bckmap : wrapper ref -> EConstr.t B.t in_wrapper
     val fstring : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
 
     module Tree : sig
@@ -221,7 +221,7 @@ module Make : (Log : Logger.SLogger)
     end
 
     module Constructor : sig
-      type t = Evd.econstr * Evd.econstr * Tree.t
+      type t = EConstr.t * EConstr.t * Tree.t
 
       val to_string : Environ.env -> Evd.evar_map -> t -> string
     end
@@ -234,35 +234,35 @@ module Make : (Log : Logger.SLogger)
     val make_set : unit -> (module Set.S with type elt = Enc.t)
 
     (* val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t) *)
-    val fresh_evar : Rocq_utils.evar_source -> Evd.econstr mm
-    val econstr_eq : Evd.econstr -> Evd.econstr -> bool mm
-    val econstr_normalize : Evd.econstr -> Evd.econstr mm
-    val econstr_kind : Evd.econstr -> Rocq_utils.econstr_kind mm
-    val econstr_is_evar : Evd.econstr -> bool mm
+    val fresh_evar : Rocq_utils.evar_source -> EConstr.t mm
+    val econstr_eq : EConstr.t -> EConstr.t -> bool mm
+    val econstr_normalize : EConstr.t -> EConstr.t mm
+    val econstr_kind : EConstr.t -> Rocq_utils.econstr_kind mm
+    val econstr_is_evar : EConstr.t -> bool mm
 
     val econstr_to_constr
       :  ?abort_on_undefined_evars:bool
-      -> Evd.econstr
+      -> EConstr.t
       -> Constr.t mm
 
-    val econstr_to_constr_opt : Evd.econstr -> Constr.t option mm
-    val constrexpr_to_econstr : Constrexpr.constr_expr -> Evd.econstr mm
-    val exists_eq : Evd.econstr -> 'a list -> ('a -> Evd.econstr) -> bool mm
-    val type_of_econstr : Evd.econstr -> Evd.econstr mm
-    val type_of_constrexpr : Constrexpr.constr_expr -> Evd.econstr mm
+    val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
+    val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
+    val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool mm
+    val type_of_econstr : EConstr.t -> EConstr.t mm
+    val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
 
     module Strfy : sig
       val constr : Constr.t -> string
       val constr_kind : Constr.t -> string
-      val econstr : Evd.econstr -> string
-      val econstr_kind : Evd.econstr -> string
+      val econstr : EConstr.t -> string
+      val econstr_kind : EConstr.t -> string
       val econstr_rel_decl : EConstr.rel_declaration -> string
       val hyp_name : Rocq_utils.hyp -> string
       val hyp_type : Rocq_utils.hyp -> string
       val hyp : Rocq_utils.hyp -> string
       val hyp_value : Rocq_utils.hyp -> string
       val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string
-      val econstr_bindings : Evd.econstr Tactypes.bindings -> string
+      val econstr_bindings : EConstr.t Tactypes.bindings -> string
     end
 
     module type SErrors = sig
@@ -279,7 +279,7 @@ module Make : (Log : Logger.SLogger)
         | InvalidCheckUpdatedCtx of
             (Environ.env
             * Evd.evar_map
-            * Evd.econstr list
+            * EConstr.t list
             * EConstr.rel_declaration list)
         | InvalidLTSArgsLength of int
         | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
@@ -299,7 +299,7 @@ module Make : (Log : Logger.SLogger)
       val invalid_check_updated_ctx
         :  Environ.env
         -> Evd.evar_map
-        -> Evd.econstr list
+        -> EConstr.t list
         -> EConstr.rel_declaration list
         -> exn
 
@@ -321,7 +321,7 @@ module Make : (Log : Logger.SLogger)
         | InvalidCheckUpdatedCtx of
             (Environ.env
             * Evd.evar_map
-            * Evd.econstr list
+            * EConstr.t list
             * EConstr.rel_declaration list)
         | InvalidLTSArgsLength of int
         | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
@@ -341,7 +341,7 @@ module Make : (Log : Logger.SLogger)
       val invalid_check_updated_ctx
         :  Environ.env
         -> Evd.evar_map
-        -> Evd.econstr list
+        -> EConstr.t list
         -> EConstr.rel_declaration list
         -> exn
 
@@ -361,7 +361,7 @@ module Make : (Log : Logger.SLogger)
       val invalid_arity : Constr.t -> 'a mm
 
       val invalid_check_updated_ctx
-        :  Evd.econstr list
+        :  EConstr.t list
         -> EConstr.rel_declaration list
         -> 'a mm
 
@@ -381,7 +381,7 @@ module Make : (Log : Logger.SLogger)
       val invalid_arity : Constr.t -> 'a mm
 
       val invalid_check_updated_ctx
-        :  Evd.econstr list
+        :  EConstr.t list
         -> EConstr.rel_declaration list
         -> 'a mm
 
@@ -393,8 +393,8 @@ module Make : (Log : Logger.SLogger)
       type t = Enc.t Rocq_ind.t
 
       val get_lts : t -> Rocq_ind.LTS.t
-      val get_lts_term_type : t -> Evd.econstr
-      val get_lts_label_type : t -> Evd.econstr
+      val get_lts_term_type : t -> EConstr.t
+      val get_lts_label_type : t -> EConstr.t
       val get_lts_constructor_types : t -> Rocq_ind.LTS.constructor array
       val to_string : Environ.env -> Evd.evar_map -> t -> string
       val lookup : Names.inductive -> Declarations.mind_specif mm
@@ -426,7 +426,7 @@ module Make : (Log : Logger.SLogger)
 
     val mk_ctx_substl
       :  EConstr.Vars.substl
-      -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list
+      -> ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list
       -> EConstr.Vars.substl mm
 
     val extract_args
@@ -437,8 +437,8 @@ module Make : (Log : Logger.SLogger)
     module Unification : sig
       module type SPair = sig
         type t =
-          { to_check : Evd.econstr
-          ; acc : Evd.econstr
+          { to_check : EConstr.t
+          ; acc : EConstr.t
           }
 
         val to_string : Environ.env -> Evd.evar_map -> t -> string
@@ -446,8 +446,8 @@ module Make : (Log : Logger.SLogger)
         val make
           :  Environ.env
           -> Evd.evar_map
-          -> Evd.econstr
-          -> Evd.econstr
+          -> EConstr.t
+          -> EConstr.t
           -> Evd.evar_map * t
 
         val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
@@ -455,8 +455,8 @@ module Make : (Log : Logger.SLogger)
 
       module Pair : sig
         type t = Rocq_monad_utils.Make(Log)(C)(E).Unification.Pair.t =
-          { to_check : Evd.econstr
-          ; acc : Evd.econstr
+          { to_check : EConstr.t
+          ; acc : EConstr.t
           }
 
         val to_string : Environ.env -> Evd.evar_map -> t -> string
@@ -464,8 +464,8 @@ module Make : (Log : Logger.SLogger)
         val make
           :  Environ.env
           -> Evd.evar_map
-          -> Evd.econstr
-          -> Evd.econstr
+          -> EConstr.t
+          -> EConstr.t
           -> Evd.evar_map * t
 
         val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
@@ -505,10 +505,10 @@ module Make : (Log : Logger.SLogger)
         val list_to_string : Environ.env -> t list -> string
 
         val sandbox_unify_all_opt
-          :  Evd.econstr
-          -> Evd.econstr
+          :  EConstr.t
+          -> EConstr.t
           -> t
-          -> (Evd.econstr * Evd.econstr * Tree.t list) option mm
+          -> (EConstr.t * EConstr.t * Tree.t list) option mm
       end
 
       module Problems : sig
@@ -523,10 +523,10 @@ module Make : (Log : Logger.SLogger)
         val list_to_string : Environ.env -> t list -> string
 
         val sandbox_unify_all_opt
-          :  Evd.econstr
-          -> Evd.econstr
+          :  EConstr.t
+          -> EConstr.t
           -> t
-          -> (Evd.econstr * Evd.econstr * Tree.t list) option mm
+          -> (EConstr.t * EConstr.t * Tree.t list) option mm
       end
 
       module type SConstructors = sig
@@ -537,8 +537,8 @@ module Make : (Log : Logger.SLogger)
         val retrieve
           :  int
           -> t
-          -> Evd.econstr
-          -> Evd.econstr
+          -> EConstr.t
+          -> EConstr.t
           -> Enc.t * Problems.t list
           -> t mm
       end
@@ -551,8 +551,8 @@ module Make : (Log : Logger.SLogger)
         val retrieve
           :  int
           -> t
-          -> Evd.econstr
-          -> Evd.econstr
+          -> EConstr.t
+          -> EConstr.t
           -> Enc.t * Problems.t list
           -> t mm
       end
@@ -568,17 +568,17 @@ module Make : (Log : Logger.SLogger)
         -> Problems.t mm
 
       val cross_product : Problems.t list -> Problems.t -> Problems.t list
-      val does_constructor_unify : Evd.econstr -> Evd.econstr -> bool mm
+      val does_constructor_unify : EConstr.t -> EConstr.t -> bool mm
 
       val check_constructor_args_unify
-        :  Evd.econstr
-        -> Evd.econstr
+        :  EConstr.t
+        -> EConstr.t
         -> Rocq_utils.constructor_args
         -> bool mm
 
       val axiom_constructor
-        :  Evd.econstr
-        -> Evd.econstr
+        :  EConstr.t
+        -> EConstr.t
         -> Enc.t * int
         -> Constructors.t
         -> Constructors.t mm
@@ -586,14 +586,14 @@ module Make : (Log : Logger.SLogger)
       val check_valid_constructors
         :  Rocq_ind.LTS.constructor array
         -> Ind.t F.t
-        -> Evd.econstr
-        -> Evd.econstr
+        -> EConstr.t
+        -> EConstr.t
         -> Enc.t
         -> Constructors.t mm
 
       val explore_valid_constructor
         :  Ind.t F.t
-        -> Evd.econstr
+        -> EConstr.t
         -> Enc.t
         -> Rocq_utils.constructor_args
         -> int * Constructors.t
@@ -609,8 +609,8 @@ module Make : (Log : Logger.SLogger)
 
       val check_for_next_constructors
         :  int
-        -> Evd.econstr
-        -> Evd.econstr
+        -> EConstr.t
+        -> EConstr.t
         -> Constructors.t
         -> (Enc.t * Problems.t list) option
         -> Constructors.t mm
@@ -618,8 +618,8 @@ module Make : (Log : Logger.SLogger)
       val collect_valid_constructors
         :  Rocq_ind.LTS.constructor array
         -> Ind.t F.t
-        -> Evd.econstr
-        -> Evd.econstr
+        -> EConstr.t
+        -> EConstr.t
         -> Enc.t
         -> Constructors.t mm
     end
@@ -657,7 +657,7 @@ module Make : (Log : Logger.SLogger)
 
     module Trees : sig
       type elt = Tree.t
-      type t = Model.Make(Log)(M.Enc).Trees.t
+      type t = Set.Make(Tree).t
 
       val empty : t
       val add : elt -> t -> t
@@ -710,7 +710,7 @@ module Make : (Log : Logger.SLogger)
     end
 
     module State : sig
-      type t = Model.Make(Log)(M.Enc).State.t =
+      type t =
         { term : M.Enc.t
         ; pp : string option
         }
@@ -719,12 +719,13 @@ module Make : (Log : Logger.SLogger)
       val compare : t -> t -> int
       val hash : t -> int
       val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module States : sig
       module S : sig
         type elt = State.t
-        type t = Model.Make(Log)(M.Enc).States.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -824,10 +825,11 @@ module Make : (Log : Logger.SLogger)
       val origin_of_state : State.t -> t -> t -> int
       val has_shared_origin : t -> t -> t -> bool
       val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module Label : sig
-      type t = Model.Make(Log)(M.Enc).Label.t =
+      type t =
         { term : M.Enc.t
         ; pp : string option
         ; is_silent : bool option
@@ -836,14 +838,15 @@ module Make : (Log : Logger.SLogger)
       val equal : t -> t -> bool
       val compare : t -> t -> int
       val hash : t -> int
-      val to_string : t -> string
       val is_silent : t -> bool
+      val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module Labels : sig
       module S : sig
         type elt = Label.t
-        type t = Model.Make(Log)(M.Enc).Labels.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -936,11 +939,13 @@ module Make : (Log : Logger.SLogger)
       val to_rev_seq : t -> elt Seq.t
       val add_seq : elt Seq.t -> t -> t
       val of_seq : elt Seq.t -> t
+      val non_silent : t -> t
       val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module Note : sig
-      type t = Model.Make(Log)(M.Enc).Note.t =
+      type t =
         { from : State.t
         ; label : Label.t
         ; using : Trees.t
@@ -949,12 +954,13 @@ module Make : (Log : Logger.SLogger)
 
       val equal : t -> t -> bool
       val compare : t -> t -> int
-      val to_string : t -> string
       val is_silent : t -> bool
+      val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module Annotation : sig
-      type t = Model.Make(Log)(M.Enc).Annotation.t =
+      type t =
         { this : Note.t
         ; next : t option
         }
@@ -973,12 +979,13 @@ module Make : (Log : Logger.SLogger)
 
       val drop_last : t -> t
       val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module Annotations : sig
       module S : sig
         type elt = Annotation.t
-        type t = Model.Make(Log)(M.Enc).Annotations.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -1072,10 +1079,12 @@ module Make : (Log : Logger.SLogger)
       val add_seq : elt Seq.t -> t -> t
       val of_seq : elt Seq.t -> t
       val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+      val extrapolate : Annotation.t -> t
     end
 
     module Transition : sig
-      type t = Model.Make(Log)(M.Enc).Transition.t =
+      type t =
         { from : State.t
         ; goto : State.t
         ; label : Label.t
@@ -1088,12 +1097,13 @@ module Make : (Log : Logger.SLogger)
       val is_silent : t -> bool
       val annotation_is_empty : t -> bool
       val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module Transitions : sig
       module S : sig
         type elt = Transition.t
-        type t = Model.Make(Log)(M.Enc).Transitions.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -1188,10 +1198,11 @@ module Make : (Log : Logger.SLogger)
       val of_seq : elt Seq.t -> t
       val labels : t -> Labels.t
       val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module Action : sig
-      type t = Model.Make(Log)(M.Enc).Action.t =
+      type t =
         { label : Label.t
         ; annotation : Annotation.t option
         ; constructor_trees : Trees.t
@@ -1203,14 +1214,19 @@ module Make : (Log : Logger.SLogger)
       val hash : t -> int
       val is_silent : t -> bool
       val annotation_is_empty : t -> bool
+      val annotation_length : t -> int
       val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module ActionPair : sig
       type t = Action.t * States.t
 
-      val to_string : t -> string
       val compare : t -> t -> int
+      val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+      val try_update : t -> t list -> t option * t list
+      val merge_lists : t list -> t list -> t list
     end
 
     module ActionPairs : sig
@@ -1314,22 +1330,13 @@ module Make : (Log : Logger.SLogger)
       exception IsEmpty
 
       val shorest_annotation : t -> ActionPair.t
-
-      val merge_saturated_tuples
-        :  ActionPair.t list
-        -> ActionPair.t list
-        -> ActionPair.t list
-
-      val try_update_saturated_tuple
-        :  ActionPair.t
-        -> ActionPair.t list
-        -> ActionPair.t option * ActionPair.t list
+      val merge_list : t -> ActionPair.t list -> t
     end
 
     module Actions : sig
       module S : sig
         type elt = Action.t
-        type t = Model.Make(Log)(M.Enc).Actions.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -1424,12 +1431,13 @@ module Make : (Log : Logger.SLogger)
       val of_seq : elt Seq.t -> t
       val labelled : t -> Label.t -> t
       val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module ActionMap : sig
       module M : sig
         type key = Action.t
-        type 'a t = 'a Model.Make(Log)(M.Enc).ActionMap.M.t
+        type !'a t
 
         val create : int -> 'a t
         val clear : 'a t -> unit
@@ -1491,10 +1499,11 @@ module Make : (Log : Logger.SLogger)
       val of_actionpairs : ActionPairs.t -> t'
       val merge : t' -> t' -> t'
       val to_string : t' -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
     end
 
     module Edge : sig
-      type t = Model.Make(Log)(M.Enc).Edge.t =
+      type t =
         { from : State.t
         ; goto : State.t
         ; action : Action.t
@@ -1504,12 +1513,13 @@ module Make : (Log : Logger.SLogger)
       val compare : t -> t -> int
       val is_silent : t -> bool
       val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module Edges : sig
       module S : sig
         type elt = Edge.t
-        type t = Model.Make(Log)(M.Enc).Edges.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -1604,12 +1614,13 @@ module Make : (Log : Logger.SLogger)
       val of_seq : elt Seq.t -> t
       val labelled : t -> Label.t -> t
       val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module EdgeMap : sig
       module M : sig
         type key = State.t
-        type 'a t = 'a Model.Make(Log)(M.Enc).EdgeMap.M.t
+        type !'a t
 
         val create : int -> 'a t
         val clear : 'a t -> unit
@@ -1672,12 +1683,13 @@ module Make : (Log : Logger.SLogger)
       val of_edges : Edges.t -> t'
       val merge : t' -> t' -> t'
       val to_string : t' -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
     end
 
     module Partition : sig
       module S : sig
         type elt = States.t
-        type t = Model.Make(Log)(M.Enc).Partition.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -1770,40 +1782,43 @@ module Make : (Log : Logger.SLogger)
       val to_rev_seq : t -> elt Seq.t
       val add_seq : elt Seq.t -> t -> t
       val of_seq : elt Seq.t -> t
-      val get_bisimilar : State.t -> t -> elt
+      val get_bisimilar : State.t -> t -> States.t
+      val filter_reachable : States.t -> t -> t
       val reachable : State.t -> EdgeMap.t' -> t -> t
       val reachable_by_label : State.t -> Label.t -> EdgeMap.t' -> t -> t
       val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module Info : sig
-      type t = Model.Make(Log)(M.Enc).Info.t =
+      type t =
         { meta : meta option
         ; weak_labels : Labels.t
         }
 
-      and meta = Model.Make(Log)(M.Enc).Info.meta =
+      and meta =
         { is_complete : bool
         ; is_merged : bool
         ; bounds : bounds
         ; lts : lts list
         }
 
-      and bounds = Model.Make(Log)(M.Enc).Info.bounds =
+      and bounds =
         | States of int
         | Transitions of int
 
-      and lts = Model.Make(Log)(M.Enc).Info.lts =
+      and lts =
         { enc : M.Enc.t
         ; constructors : Rocq_bindings.constructor list
         }
 
       val merge : t -> t -> t
       val to_string : t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
 
     module LTS : sig
-      type t = Model.Make(Log)(M.Enc).LTS.t =
+      type t =
         { init : State.t option
         ; terminals : Partition.elt
         ; alphabet : Labels.t
@@ -1816,7 +1831,7 @@ module Make : (Log : Logger.SLogger)
     end
 
     module FSM : sig
-      type t = Model.Make(Log)(M.Enc).FSM.t =
+      type t =
         { init : State.t option
         ; terminals : Partition.elt
         ; alphabet : Labels.t
@@ -1836,38 +1851,163 @@ module Make : (Log : Logger.SLogger)
     end
 
     module Saturate : sig
-      type data = Model.Make(Log)(M.Enc).Saturate.data =
-        { named : Action.t option
-        ; notes : wip list
-        ; visited : Partition.elt
+      module Log : Logger.SLogger
+
+      module WIP : sig
+        type t =
+          { from : State.t
+          ; via : Label.t
+          ; trees : Trees.t
+          }
+
+        val is_silent : t -> bool
+        val is_named : t -> bool
+        val equal : t -> t -> bool
+        val compare : t -> t -> int
+        val create : State.t -> Action.t -> t
+
+        exception IsEmptyList
+
+        val list_to_annotation : State.t -> t list -> Annotation.t
+      end
+
+      module Trace : sig
+        module NT : sig end
+
+        type t =
+          { this : WIP.t
+          ; next : next option
+          }
+
+        and next =
+          | Next of t
+          | Goto of State.t
+
+        val create : WIP.t -> t
+        val compare : t -> t -> int
+        val compare_next : next -> next -> int
+
+        exception Invalid
+
+        val has_named : ?validate:bool -> t -> bool
+        val validate : t -> unit
+
+        exception CouldNotFindGoto
+
+        val get_goto : t -> State.t
+
+        exception CouldNotFindNamed
+
+        val get_named : t -> Label.t
+        val get_named_opt : t -> Label.t option
+
+        exception FailAdd_AlreadyNamed
+        exception FailAdd_AlreadyHasGoto
+
+        val add : WIP.t -> t -> t
+
+        exception FailSetGoto_AlreadyHasGoto
+
+        val set_goto : State.t -> t -> t
+
+        exception FailSeq_AlreadyNamed
+        exception FailSeq_AlreadyHasGoto
+
+        val seq : t -> t -> t
+        val seq_opt : t option -> t -> t
+        val get : WIP.t -> t -> t
+        val upto_named : t -> t
+
+        exception GotoNotSet
+
+        val to_annotation : t -> Annotation.t
+      end
+
+      module Traces : sig
+        type elt = Trace.t
+        type t = Set.Make(Trace).t
+
+        val empty : t
+        val add : elt -> t -> t
+        val singleton : elt -> t
+        val remove : elt -> t -> t
+        val union : t -> t -> t
+        val inter : t -> t -> t
+        val disjoint : t -> t -> bool
+        val diff : t -> t -> t
+        val cardinal : t -> int
+        val elements : t -> elt list
+        val min_elt : t -> elt
+        val min_elt_opt : t -> elt option
+        val max_elt : t -> elt
+        val max_elt_opt : t -> elt option
+        val choose : t -> elt
+        val choose_opt : t -> elt option
+        val find : elt -> t -> elt
+        val find_opt : elt -> t -> elt option
+        val find_first : (elt -> bool) -> t -> elt
+        val find_first_opt : (elt -> bool) -> t -> elt option
+        val find_last : (elt -> bool) -> t -> elt
+        val find_last_opt : (elt -> bool) -> t -> elt option
+        val iter : (elt -> unit) -> t -> unit
+        val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+        val map : (elt -> elt) -> t -> t
+        val filter : (elt -> bool) -> t -> t
+        val filter_map : (elt -> elt option) -> t -> t
+        val partition : (elt -> bool) -> t -> t * t
+        val split : elt -> t -> t * bool * t
+        val is_empty : t -> bool
+        val mem : elt -> t -> bool
+        val equal : t -> t -> bool
+        val compare : t -> t -> int
+        val subset : t -> t -> bool
+        val for_all : (elt -> bool) -> t -> bool
+        val exists : (elt -> bool) -> t -> bool
+        val to_list : t -> elt list
+        val of_list : elt list -> t
+        val to_seq_from : elt -> t -> elt Seq.t
+        val to_seq : t -> elt Seq.t
+        val to_rev_seq : t -> elt Seq.t
+        val add_seq : elt Seq.t -> t -> t
+        val of_seq : elt Seq.t -> t
+        val get : WIP.t -> t -> t
+      end
+
+      type data =
+        { named : Label.t option
+        ; current : Trace.t option
+        ; visited : States.t
+        ; traces : Traces.t ref
+        ; can_collect_traces : bool ref
         ; old_edges : EdgeMap.t'
         }
 
-      and wip = Model.Make(Log)(M.Enc).Saturate.wip =
-        { from : State.t
-        ; via : Label.t
-        ; trees : Trees.t
-        }
-
-      val wip : State.t -> Action.t -> wip
-      val initial_data : EdgeMap.t' -> data
+      val initial_data : Traces.t ref -> EdgeMap.t' -> data
+      val has_named : data -> bool
+      val update_traces : data -> Trace.t -> unit
       val update_named : Action.t -> data -> data
-      val update_notes : State.t -> Action.t -> data -> data
+      val update_current : WIP.t -> data -> data
       val update_visited : State.t -> data -> data
       val already_visited : State.t -> data -> bool
       val skip_action : Action.t -> data -> bool
       val get_old_actions : State.t -> data -> ActionMap.t' option
-
-      exception Model_Saturate_WIP_IsEmptyList of unit
-
-      val wip_to_annotation : State.t -> wip list -> Annotation.t
-
-      exception Model_Saturate_WIP_HadNoNamedActions of wip list
-      exception Model_Saturate_WIP_HadMultipleNamedActions of wip list
-
-      val validate_wips : wip list -> unit
-      val extrapolate_annotations : Annotation.t -> Annotations.t
+      val update_acc : Trace.t -> Label.t -> ActionPairs.t -> ActionPairs.t
       val stop : data -> State.t -> ActionPairs.t -> ActionPairs.t
+
+      val finish_with_trace
+        :  Trace.t
+        -> data
+        -> Label.t
+        -> ActionPairs.t
+        -> ActionPairs.t
+
+      val finish_with_trace_upto
+        :  Trace.t
+        -> data
+        -> Label.t
+        -> ActionPairs.t
+        -> ActionPairs.t
+
       val check_from : data -> State.t -> ActionPairs.t -> ActionPairs.t
 
       val check_actions
@@ -1877,34 +2017,59 @@ module Make : (Log : Logger.SLogger)
         -> ActionPairs.t
         -> ActionPairs.t
 
+      val collect_from_traces
+        :  data
+        -> State.t
+        -> Action.t
+        -> States.t
+        -> ActionPairs.t
+        -> ActionPairs.t
+
+      val continue_check_destinations
+        :  data
+        -> State.t
+        -> Action.t
+        -> States.t
+        -> ActionPairs.t
+        -> ActionPairs.t
+
       val check_destinations
         :  data
         -> State.t
-        -> Partition.elt
+        -> States.t
         -> ActionPairs.t
         -> ActionPairs.t
 
       val edge_action_destinations
         :  data
         -> State.t
-        -> Partition.elt
+        -> States.t
         -> ActionPairs.t
 
-      val edge_actions : State.t -> ActionMap.t' -> EdgeMap.t' -> ActionPairs.t
-      val edge : ActionMap.t' -> State.t -> ActionMap.t' -> EdgeMap.t' -> unit
-      val edges : Labels.t -> Partition.elt -> EdgeMap.t' -> EdgeMap.t'
+      val edge_actions
+        :  State.t
+        -> ActionMap.t'
+        -> EdgeMap.t'
+        -> Traces.t ref
+        -> ActionPairs.t
+
+      val edge
+        :  ActionMap.t'
+        -> State.t
+        -> ActionMap.t'
+        -> EdgeMap.t'
+        -> Traces.t ref
+        -> unit
+
+      val edges : Labels.t -> States.t -> EdgeMap.t' -> EdgeMap.t'
       val fsm : ?only_if_weak:bool -> FSM.t -> FSM.t
     end
 
     module Minimize : sig
-      type t = Model.Make(Log)(M.Enc).Minimize.t =
+      type t =
         { fsm : FSM.t
         ; pi : Partition.t
         }
-
-      exception Split_OnlyReturnedOneBlock_ButNeqBlock of (States.t * States.t)
-
-      val ensure_equal : States.t -> States.t -> unit
 
       exception CannotSplitEmptyBlock of unit
 
@@ -1916,6 +2081,10 @@ module Make : (Log : Logger.SLogger)
         -> EdgeMap.t'
         -> States.t
         -> States.t * States.t option
+
+      exception Split_OnlyReturnedOneBlock_ButNeqBlock of (States.t * States.t)
+
+      val ensure_equal : States.t -> States.t -> unit
 
       val for_each_label
         :  Partition.t ref
@@ -1939,19 +2108,19 @@ module Make : (Log : Logger.SLogger)
     end
 
     module Bisimilar : sig
-      type t = Model.Make(Log)(M.Enc).Bisimilar.t =
+      type t =
         { fsm_a : fsm_pair
         ; fsm_b : fsm_pair
         ; merged : FSM.t
         ; result : result
         }
 
-      and result = Model.Make(Log)(M.Enc).Bisimilar.result =
+      and result =
         { bisim_states : Partition.t
         ; non_bisim_states : Partition.t
         }
 
-      and fsm_pair = Model.Make(Log)(M.Enc).Bisimilar.fsm_pair =
+      and fsm_pair =
         { original : FSM.t
         ; saturated : FSM.t
         }
@@ -1973,17 +2142,17 @@ module Make : (Log : Logger.SLogger)
   end
 
   module IsTheory : sig
-    val is_theory : Evd.econstr -> Evd.econstr -> bool M.mm
-    val is_exists : Evd.econstr -> bool M.mm
-    val is_weak_sim : Evd.econstr -> bool M.mm
-    val is_weak : Evd.econstr -> bool M.mm
-    val is_tau : Evd.econstr -> bool M.mm
-    val is_silent : Evd.econstr -> bool M.mm
-    val is_silent1 : Evd.econstr -> bool M.mm
-    val is_LTS : Evd.econstr -> bool M.mm
-    val is_None : Evd.econstr -> bool M.mm
-    val is_Some : Evd.econstr -> bool M.mm
-    val get_theory_enc : (Evd.econstr -> bool M.mm) -> M.Enc.t M.mm
+    val is_theory : EConstr.t -> EConstr.t -> bool M.mm
+    val is_exists : EConstr.t -> bool M.mm
+    val is_weak_sim : EConstr.t -> bool M.mm
+    val is_weak : EConstr.t -> bool M.mm
+    val is_tau : EConstr.t -> bool M.mm
+    val is_silent : EConstr.t -> bool M.mm
+    val is_silent1 : EConstr.t -> bool M.mm
+    val is_LTS : EConstr.t -> bool M.mm
+    val is_None : EConstr.t -> bool M.mm
+    val is_Some : EConstr.t -> bool M.mm
+    val get_theory_enc : (EConstr.t -> bool M.mm) -> M.Enc.t M.mm
 
     exception NoEncodingFoundFor_TheoriesNone of unit
 
@@ -1996,12 +2165,12 @@ module Make : (Log : Logger.SLogger)
     exception NotEqTheory of unit
 
     val get_theory_enc_if_eq
-      :  Evd.econstr
-      -> (Evd.econstr -> bool M.mm)
+      :  EConstr.t
+      -> (EConstr.t -> bool M.mm)
       -> M.Enc.t M.mm
 
-    val get_None_enc_if_eq : Evd.econstr -> M.Enc.t M.mm
-    val get_Some_enc_if_eq : Evd.econstr -> M.Enc.t M.mm
+    val get_None_enc_if_eq : EConstr.t -> M.Enc.t M.mm
+    val get_Some_enc_if_eq : EConstr.t -> M.Enc.t M.mm
   end
 
   module Weak : sig
@@ -2507,7 +2676,7 @@ module Make : (Log : Logger.SLogger)
       }
 
     val empty : V0.elt -> M.Ind.t M.B.t -> t
-    val is_silent_transition : Evd.econstr -> Weak.t option -> bool option M.mm
+    val is_silent_transition : EConstr.t -> Weak.t option -> bool option M.mm
 
     module type Y_Args = sig
       val primary_lts : M.Ind.t
@@ -2545,7 +2714,7 @@ module Make : (Log : Logger.SLogger)
 
     val build_ind_defs : unit -> M.Ind.t M.B.t M.mm
     val find_primary_lts : M.Ind.t M.B.t -> M.Ind.t M.mm
-    val initial_term : Constrexpr.constr_expr -> Evd.econstr M.mm
+    val initial_term : Constrexpr.constr_expr -> EConstr.t M.mm
     val make_yargs : M.Ind.t -> M.Ind.t M.B.t -> 'a -> (module Y_Args)
     val make_zargs : M.Ind.t M.B.t -> t ref -> (module Z_Args)
     val build : Constrexpr.constr_expr -> Model.LTS.t M.mm
@@ -2634,7 +2803,7 @@ module Default : () -> sig
     end
 
     module F : sig
-      type key = Evd.econstr
+      type key = EConstr.t
       type 'a t = 'a Bi_encoding.Make(Logger.Default)(Ctx)(Enc).F.t
 
       val create : int -> 'a t
@@ -2691,7 +2860,7 @@ module Default : () -> sig
 
     type maps = Bi_encoding.Make(Logger.Default)(Ctx)(Enc).maps =
       { fwd : Enc.t F.t
-      ; bck : Evd.econstr B.t
+      ; bck : EConstr.t B.t
       }
 
     val the_maps : maps ref option ref
@@ -2701,26 +2870,26 @@ module Default : () -> sig
 
     val get_the_maps : unit -> maps ref
     val fwdmap : unit -> Enc.t F.t
-    val bckmap : unit -> Evd.econstr B.t
+    val bckmap : unit -> EConstr.t B.t
 
-    exception EncodingNotFound of Evd.econstr
+    exception EncodingNotFound of EConstr.t
 
-    val get_encoding : Evd.econstr -> Enc.t
-    val encode : Evd.econstr -> Enc.t
-    val encoded : Evd.econstr -> bool
+    val get_encoding : EConstr.t -> Enc.t
+    val encode : EConstr.t -> Enc.t
+    val encoded : EConstr.t -> bool
 
     exception DecodingNotFound of Enc.t
 
-    val get_econstr : Enc.t -> Evd.econstr
+    val get_econstr : Enc.t -> EConstr.t
 
     exception CannotDecode of Enc.t
 
-    val decode : Enc.t -> Evd.econstr
-    val decode_opt : Enc.t -> Evd.econstr option
+    val decode : Enc.t -> EConstr.t
+    val decode_opt : Enc.t -> EConstr.t option
     val decode_map : 'a B.t -> 'a F.t
     val encode_map : 'a F.t -> 'a B.t
-    val to_list : unit -> (Enc.t * Evd.econstr) list
-    val bienc_to_list : unit -> (Enc.t * Evd.econstr) list
+    val to_list : unit -> (Enc.t * EConstr.t) list
+    val bienc_to_list : unit -> (Enc.t * EConstr.t) list
 
     type 'a mm = wrapper ref -> 'a in_wrapper
 
@@ -2797,7 +2966,7 @@ module Default : () -> sig
     val get_sigma : wrapper ref -> Evd.evar_map in_wrapper
     val get_maps : wrapper ref -> maps in_wrapper
     val get_fwdmap : wrapper ref -> Enc.t F.t in_wrapper
-    val get_bckmap : wrapper ref -> Evd.econstr B.t in_wrapper
+    val get_bckmap : wrapper ref -> EConstr.t B.t in_wrapper
     val fstring : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
 
     module Tree : sig
@@ -2830,7 +2999,7 @@ module Default : () -> sig
     end
 
     module Constructor : sig
-      type t = Evd.econstr * Evd.econstr * Tree.t
+      type t = EConstr.t * EConstr.t * Tree.t
 
       val to_string : Environ.env -> Evd.evar_map -> t -> string
     end
@@ -2843,35 +3012,35 @@ module Default : () -> sig
     val make_set : unit -> (module Set.S with type elt = Enc.t)
 
     (* val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t) *)
-    val fresh_evar : Rocq_utils.evar_source -> Evd.econstr mm
-    val econstr_eq : Evd.econstr -> Evd.econstr -> bool mm
-    val econstr_normalize : Evd.econstr -> Evd.econstr mm
-    val econstr_kind : Evd.econstr -> Rocq_utils.econstr_kind mm
-    val econstr_is_evar : Evd.econstr -> bool mm
+    val fresh_evar : Rocq_utils.evar_source -> EConstr.t mm
+    val econstr_eq : EConstr.t -> EConstr.t -> bool mm
+    val econstr_normalize : EConstr.t -> EConstr.t mm
+    val econstr_kind : EConstr.t -> Rocq_utils.econstr_kind mm
+    val econstr_is_evar : EConstr.t -> bool mm
 
     val econstr_to_constr
       :  ?abort_on_undefined_evars:bool
-      -> Evd.econstr
+      -> EConstr.t
       -> Constr.t mm
 
-    val econstr_to_constr_opt : Evd.econstr -> Constr.t option mm
-    val constrexpr_to_econstr : Constrexpr.constr_expr -> Evd.econstr mm
-    val exists_eq : Evd.econstr -> 'a list -> ('a -> Evd.econstr) -> bool mm
-    val type_of_econstr : Evd.econstr -> Evd.econstr mm
-    val type_of_constrexpr : Constrexpr.constr_expr -> Evd.econstr mm
+    val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
+    val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
+    val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool mm
+    val type_of_econstr : EConstr.t -> EConstr.t mm
+    val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
 
     module Strfy : sig
       val constr : Constr.t -> string
       val constr_kind : Constr.t -> string
-      val econstr : Evd.econstr -> string
-      val econstr_kind : Evd.econstr -> string
+      val econstr : EConstr.t -> string
+      val econstr_kind : EConstr.t -> string
       val econstr_rel_decl : EConstr.rel_declaration -> string
       val hyp_name : Rocq_utils.hyp -> string
       val hyp_type : Rocq_utils.hyp -> string
       val hyp : Rocq_utils.hyp -> string
       val hyp_value : Rocq_utils.hyp -> string
       val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string
-      val econstr_bindings : Evd.econstr Tactypes.bindings -> string
+      val econstr_bindings : EConstr.t Tactypes.bindings -> string
     end
 
     module type SErrors = sig
@@ -2888,7 +3057,7 @@ module Default : () -> sig
         | InvalidCheckUpdatedCtx of
             (Environ.env
             * Evd.evar_map
-            * Evd.econstr list
+            * EConstr.t list
             * EConstr.rel_declaration list)
         | InvalidLTSArgsLength of int
         | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
@@ -2908,7 +3077,7 @@ module Default : () -> sig
       val invalid_check_updated_ctx
         :  Environ.env
         -> Evd.evar_map
-        -> Evd.econstr list
+        -> EConstr.t list
         -> EConstr.rel_declaration list
         -> exn
 
@@ -2930,7 +3099,7 @@ module Default : () -> sig
         | InvalidCheckUpdatedCtx of
             (Environ.env
             * Evd.evar_map
-            * Evd.econstr list
+            * EConstr.t list
             * EConstr.rel_declaration list)
         | InvalidLTSArgsLength of int
         | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
@@ -2950,7 +3119,7 @@ module Default : () -> sig
       val invalid_check_updated_ctx
         :  Environ.env
         -> Evd.evar_map
-        -> Evd.econstr list
+        -> EConstr.t list
         -> EConstr.rel_declaration list
         -> exn
 
@@ -2970,7 +3139,7 @@ module Default : () -> sig
       val invalid_arity : Constr.t -> 'a mm
 
       val invalid_check_updated_ctx
-        :  Evd.econstr list
+        :  EConstr.t list
         -> EConstr.rel_declaration list
         -> 'a mm
 
@@ -2990,7 +3159,7 @@ module Default : () -> sig
       val invalid_arity : Constr.t -> 'a mm
 
       val invalid_check_updated_ctx
-        :  Evd.econstr list
+        :  EConstr.t list
         -> EConstr.rel_declaration list
         -> 'a mm
 
@@ -3002,8 +3171,8 @@ module Default : () -> sig
       type t = Enc.t Rocq_ind.t
 
       val get_lts : t -> Rocq_ind.LTS.t
-      val get_lts_term_type : t -> Evd.econstr
-      val get_lts_label_type : t -> Evd.econstr
+      val get_lts_term_type : t -> EConstr.t
+      val get_lts_label_type : t -> EConstr.t
       val get_lts_constructor_types : t -> Rocq_ind.LTS.constructor array
       val to_string : Environ.env -> Evd.evar_map -> t -> string
       val lookup : Names.inductive -> Declarations.mind_specif mm
@@ -3035,7 +3204,7 @@ module Default : () -> sig
 
     val mk_ctx_substl
       :  EConstr.Vars.substl
-      -> ('a, Evd.econstr, 'b) Context.Rel.Declaration.pt list
+      -> ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list
       -> EConstr.Vars.substl mm
 
     val extract_args
@@ -3046,8 +3215,8 @@ module Default : () -> sig
     module Unification : sig
       module type SPair = sig
         type t =
-          { to_check : Evd.econstr
-          ; acc : Evd.econstr
+          { to_check : EConstr.t
+          ; acc : EConstr.t
           }
 
         val to_string : Environ.env -> Evd.evar_map -> t -> string
@@ -3055,8 +3224,8 @@ module Default : () -> sig
         val make
           :  Environ.env
           -> Evd.evar_map
-          -> Evd.econstr
-          -> Evd.econstr
+          -> EConstr.t
+          -> EConstr.t
           -> Evd.evar_map * t
 
         val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
@@ -3064,8 +3233,8 @@ module Default : () -> sig
 
       module Pair : sig
         type t =
-          { to_check : Evd.econstr
-          ; acc : Evd.econstr
+          { to_check : EConstr.t
+          ; acc : EConstr.t
           }
 
         val to_string : Environ.env -> Evd.evar_map -> t -> string
@@ -3073,8 +3242,8 @@ module Default : () -> sig
         val make
           :  Environ.env
           -> Evd.evar_map
-          -> Evd.econstr
-          -> Evd.econstr
+          -> EConstr.t
+          -> EConstr.t
           -> Evd.evar_map * t
 
         val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
@@ -3114,10 +3283,10 @@ module Default : () -> sig
         val list_to_string : Environ.env -> t list -> string
 
         val sandbox_unify_all_opt
-          :  Evd.econstr
-          -> Evd.econstr
+          :  EConstr.t
+          -> EConstr.t
           -> t
-          -> (Evd.econstr * Evd.econstr * Tree.t list) option mm
+          -> (EConstr.t * EConstr.t * Tree.t list) option mm
       end
 
       module Problems : sig
@@ -3132,10 +3301,10 @@ module Default : () -> sig
         val list_to_string : Environ.env -> t list -> string
 
         val sandbox_unify_all_opt
-          :  Evd.econstr
-          -> Evd.econstr
+          :  EConstr.t
+          -> EConstr.t
           -> t
-          -> (Evd.econstr * Evd.econstr * Tree.t list) option mm
+          -> (EConstr.t * EConstr.t * Tree.t list) option mm
       end
 
       module type SConstructors = sig
@@ -3146,8 +3315,8 @@ module Default : () -> sig
         val retrieve
           :  int
           -> t
-          -> Evd.econstr
-          -> Evd.econstr
+          -> EConstr.t
+          -> EConstr.t
           -> Enc.t * Problems.t list
           -> t mm
       end
@@ -3160,8 +3329,8 @@ module Default : () -> sig
         val retrieve
           :  int
           -> t
-          -> Evd.econstr
-          -> Evd.econstr
+          -> EConstr.t
+          -> EConstr.t
           -> Enc.t * Problems.t list
           -> t mm
       end
@@ -3177,17 +3346,17 @@ module Default : () -> sig
         -> Problems.t mm
 
       val cross_product : Problems.t list -> Problems.t -> Problems.t list
-      val does_constructor_unify : Evd.econstr -> Evd.econstr -> bool mm
+      val does_constructor_unify : EConstr.t -> EConstr.t -> bool mm
 
       val check_constructor_args_unify
-        :  Evd.econstr
-        -> Evd.econstr
+        :  EConstr.t
+        -> EConstr.t
         -> Rocq_utils.constructor_args
         -> bool mm
 
       val axiom_constructor
-        :  Evd.econstr
-        -> Evd.econstr
+        :  EConstr.t
+        -> EConstr.t
         -> Enc.t * int
         -> Constructors.t
         -> Constructors.t mm
@@ -3195,14 +3364,14 @@ module Default : () -> sig
       val check_valid_constructors
         :  Rocq_ind.LTS.constructor array
         -> Ind.t F.t
-        -> Evd.econstr
-        -> Evd.econstr
+        -> EConstr.t
+        -> EConstr.t
         -> Enc.t
         -> Constructors.t mm
 
       val explore_valid_constructor
         :  Ind.t F.t
-        -> Evd.econstr
+        -> EConstr.t
         -> Enc.t
         -> Rocq_utils.constructor_args
         -> int * Constructors.t
@@ -3218,8 +3387,8 @@ module Default : () -> sig
 
       val check_for_next_constructors
         :  int
-        -> Evd.econstr
-        -> Evd.econstr
+        -> EConstr.t
+        -> EConstr.t
         -> Constructors.t
         -> (Enc.t * Problems.t list) option
         -> Constructors.t mm
@@ -3227,8 +3396,8 @@ module Default : () -> sig
       val collect_valid_constructors
         :  Rocq_ind.LTS.constructor array
         -> Ind.t F.t
-        -> Evd.econstr
-        -> Evd.econstr
+        -> EConstr.t
+        -> EConstr.t
         -> Enc.t
         -> Constructors.t mm
     end
@@ -3266,7 +3435,7 @@ module Default : () -> sig
 
     module Trees : sig
       type elt = Tree.t
-      type t = Model.Make(Logger.Default)(M.Enc).Trees.t
+      type t = Set.Make(Tree).t
 
       val empty : t
       val add : elt -> t -> t
@@ -3311,10 +3480,15 @@ module Default : () -> sig
       val to_rev_seq : t -> elt Seq.t
       val add_seq : elt Seq.t -> t -> t
       val of_seq : elt Seq.t -> t
+
+      exception EmptyHasNoMin
+
+      val min : t -> elt
+      val min_opt : t -> elt option
     end
 
     module State : sig
-      type t = Model.Make(Logger.Default)(M.Enc).State.t =
+      type t =
         { term : M.Enc.t
         ; pp : string option
         }
@@ -3329,7 +3503,7 @@ module Default : () -> sig
     module States : sig
       module S : sig
         type elt = State.t
-        type t = Model.Make(Logger.Default)(M.Enc).States.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -3433,7 +3607,7 @@ module Default : () -> sig
     end
 
     module Label : sig
-      type t = Model.Make(Logger.Default)(M.Enc).Label.t =
+      type t =
         { term : M.Enc.t
         ; pp : string option
         ; is_silent : bool option
@@ -3450,7 +3624,7 @@ module Default : () -> sig
     module Labels : sig
       module S : sig
         type elt = Label.t
-        type t = Model.Make(Logger.Default)(M.Enc).Labels.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -3549,7 +3723,7 @@ module Default : () -> sig
     end
 
     module Note : sig
-      type t = Model.Make(Logger.Default)(M.Enc).Note.t =
+      type t =
         { from : State.t
         ; label : Label.t
         ; using : Trees.t
@@ -3564,7 +3738,7 @@ module Default : () -> sig
     end
 
     module Annotation : sig
-      type t = Model.Make(Logger.Default)(M.Enc).Annotation.t =
+      type t =
         { this : Note.t
         ; next : t option
         }
@@ -3589,7 +3763,7 @@ module Default : () -> sig
     module Annotations : sig
       module S : sig
         type elt = Annotation.t
-        type t = Model.Make(Logger.Default)(M.Enc).Annotations.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -3684,10 +3858,11 @@ module Default : () -> sig
       val of_seq : elt Seq.t -> t
       val to_string : t -> string
       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+      val extrapolate : Annotation.t -> t
     end
 
     module Transition : sig
-      type t = Model.Make(Logger.Default)(M.Enc).Transition.t =
+      type t =
         { from : State.t
         ; goto : State.t
         ; label : Label.t
@@ -3706,7 +3881,7 @@ module Default : () -> sig
     module Transitions : sig
       module S : sig
         type elt = Transition.t
-        type t = Model.Make(Logger.Default)(M.Enc).Transitions.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -3805,7 +3980,7 @@ module Default : () -> sig
     end
 
     module Action : sig
-      type t = Model.Make(Logger.Default)(M.Enc).Action.t =
+      type t =
         { label : Label.t
         ; annotation : Annotation.t option
         ; constructor_trees : Trees.t
@@ -3817,6 +3992,7 @@ module Default : () -> sig
       val hash : t -> int
       val is_silent : t -> bool
       val annotation_is_empty : t -> bool
+      val annotation_length : t -> int
       val to_string : t -> string
       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     end
@@ -3827,6 +4003,8 @@ module Default : () -> sig
       val compare : t -> t -> int
       val to_string : t -> string
       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+      val try_update : t -> t list -> t option * t list
+      val merge_lists : t list -> t list -> t list
     end
 
     module ActionPairs : sig
@@ -3930,22 +4108,13 @@ module Default : () -> sig
       exception IsEmpty
 
       val shorest_annotation : t -> ActionPair.t
-
-      val merge_saturated_tuples
-        :  ActionPair.t list
-        -> ActionPair.t list
-        -> ActionPair.t list
-
-      val try_update_saturated_tuple
-        :  ActionPair.t
-        -> ActionPair.t list
-        -> ActionPair.t option * ActionPair.t list
+      val merge_list : t -> ActionPair.t list -> t
     end
 
     module Actions : sig
       module S : sig
         type elt = Action.t
-        type t = Model.Make(Logger.Default)(M.Enc).Actions.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -4046,7 +4215,7 @@ module Default : () -> sig
     module ActionMap : sig
       module M : sig
         type key = Action.t
-        type 'a t = 'a Model.Make(Logger.Default)(M.Enc).ActionMap.M.t
+        type !'a t
 
         val create : int -> 'a t
         val clear : 'a t -> unit
@@ -4112,7 +4281,7 @@ module Default : () -> sig
     end
 
     module Edge : sig
-      type t = Model.Make(Logger.Default)(M.Enc).Edge.t =
+      type t =
         { from : State.t
         ; goto : State.t
         ; action : Action.t
@@ -4128,7 +4297,7 @@ module Default : () -> sig
     module Edges : sig
       module S : sig
         type elt = Edge.t
-        type t = Model.Make(Logger.Default)(M.Enc).Edges.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -4229,7 +4398,7 @@ module Default : () -> sig
     module EdgeMap : sig
       module M : sig
         type key = State.t
-        type 'a t = 'a Model.Make(Logger.Default)(M.Enc).EdgeMap.M.t
+        type !'a t
 
         val create : int -> 'a t
         val clear : 'a t -> unit
@@ -4298,7 +4467,7 @@ module Default : () -> sig
     module Partition : sig
       module S : sig
         type elt = States.t
-        type t = Model.Make(Logger.Default)(M.Enc).Partition.S.t
+        type t
 
         val empty : t
         val add : elt -> t -> t
@@ -4391,7 +4560,8 @@ module Default : () -> sig
       val to_rev_seq : t -> elt Seq.t
       val add_seq : elt Seq.t -> t -> t
       val of_seq : elt Seq.t -> t
-      val get_bisimilar : State.t -> t -> elt
+      val get_bisimilar : State.t -> t -> States.t
+      val filter_reachable : States.t -> t -> t
       val reachable : State.t -> EdgeMap.t' -> t -> t
       val reachable_by_label : State.t -> Label.t -> EdgeMap.t' -> t -> t
       val to_string : t -> string
@@ -4399,23 +4569,23 @@ module Default : () -> sig
     end
 
     module Info : sig
-      type t = Model.Make(Logger.Default)(M.Enc).Info.t =
+      type t =
         { meta : meta option
         ; weak_labels : Labels.t
         }
 
-      and meta = Model.Make(Logger.Default)(M.Enc).Info.meta =
+      and meta =
         { is_complete : bool
         ; is_merged : bool
         ; bounds : bounds
         ; lts : lts list
         }
 
-      and bounds = Model.Make(Logger.Default)(M.Enc).Info.bounds =
+      and bounds =
         | States of int
         | Transitions of int
 
-      and lts = Model.Make(Logger.Default)(M.Enc).Info.lts =
+      and lts =
         { enc : M.Enc.t
         ; constructors : Rocq_bindings.constructor list
         }
@@ -4426,7 +4596,7 @@ module Default : () -> sig
     end
 
     module LTS : sig
-      type t = Model.Make(Logger.Default)(M.Enc).LTS.t =
+      type t =
         { init : State.t option
         ; terminals : Partition.elt
         ; alphabet : Labels.t
@@ -4439,7 +4609,7 @@ module Default : () -> sig
     end
 
     module FSM : sig
-      type t = Model.Make(Logger.Default)(M.Enc).FSM.t =
+      type t =
         { init : State.t option
         ; terminals : Partition.elt
         ; alphabet : Labels.t
@@ -4459,38 +4629,163 @@ module Default : () -> sig
     end
 
     module Saturate : sig
-      type data = Model.Make(Logger.Default)(M.Enc).Saturate.data =
-        { named : Action.t option
-        ; notes : wip list
-        ; visited : Partition.elt
+      module Log : Logger.SLogger
+
+      module WIP : sig
+        type t =
+          { from : State.t
+          ; via : Label.t
+          ; trees : Trees.t
+          }
+
+        val is_silent : t -> bool
+        val is_named : t -> bool
+        val equal : t -> t -> bool
+        val compare : t -> t -> int
+        val create : State.t -> Action.t -> t
+
+        exception IsEmptyList
+
+        val list_to_annotation : State.t -> t list -> Annotation.t
+      end
+
+      module Trace : sig
+        module NT : sig end
+
+        type t =
+          { this : WIP.t
+          ; next : next option
+          }
+
+        and next =
+          | Next of t
+          | Goto of State.t
+
+        val create : WIP.t -> t
+        val compare : t -> t -> int
+        val compare_next : next -> next -> int
+
+        exception Invalid
+
+        val has_named : ?validate:bool -> t -> bool
+        val validate : t -> unit
+
+        exception CouldNotFindGoto
+
+        val get_goto : t -> State.t
+
+        exception CouldNotFindNamed
+
+        val get_named : t -> Label.t
+        val get_named_opt : t -> Label.t option
+
+        exception FailAdd_AlreadyNamed
+        exception FailAdd_AlreadyHasGoto
+
+        val add : WIP.t -> t -> t
+
+        exception FailSetGoto_AlreadyHasGoto
+
+        val set_goto : State.t -> t -> t
+
+        exception FailSeq_AlreadyNamed
+        exception FailSeq_AlreadyHasGoto
+
+        val seq : t -> t -> t
+        val seq_opt : t option -> t -> t
+        val get : WIP.t -> t -> t
+        val upto_named : t -> t
+
+        exception GotoNotSet
+
+        val to_annotation : t -> Annotation.t
+      end
+
+      module Traces : sig
+        type elt = Trace.t
+        type t = Set.Make(Trace).t
+
+        val empty : t
+        val add : elt -> t -> t
+        val singleton : elt -> t
+        val remove : elt -> t -> t
+        val union : t -> t -> t
+        val inter : t -> t -> t
+        val disjoint : t -> t -> bool
+        val diff : t -> t -> t
+        val cardinal : t -> int
+        val elements : t -> elt list
+        val min_elt : t -> elt
+        val min_elt_opt : t -> elt option
+        val max_elt : t -> elt
+        val max_elt_opt : t -> elt option
+        val choose : t -> elt
+        val choose_opt : t -> elt option
+        val find : elt -> t -> elt
+        val find_opt : elt -> t -> elt option
+        val find_first : (elt -> bool) -> t -> elt
+        val find_first_opt : (elt -> bool) -> t -> elt option
+        val find_last : (elt -> bool) -> t -> elt
+        val find_last_opt : (elt -> bool) -> t -> elt option
+        val iter : (elt -> unit) -> t -> unit
+        val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
+        val map : (elt -> elt) -> t -> t
+        val filter : (elt -> bool) -> t -> t
+        val filter_map : (elt -> elt option) -> t -> t
+        val partition : (elt -> bool) -> t -> t * t
+        val split : elt -> t -> t * bool * t
+        val is_empty : t -> bool
+        val mem : elt -> t -> bool
+        val equal : t -> t -> bool
+        val compare : t -> t -> int
+        val subset : t -> t -> bool
+        val for_all : (elt -> bool) -> t -> bool
+        val exists : (elt -> bool) -> t -> bool
+        val to_list : t -> elt list
+        val of_list : elt list -> t
+        val to_seq_from : elt -> t -> elt Seq.t
+        val to_seq : t -> elt Seq.t
+        val to_rev_seq : t -> elt Seq.t
+        val add_seq : elt Seq.t -> t -> t
+        val of_seq : elt Seq.t -> t
+        val get : WIP.t -> t -> t
+      end
+
+      type data =
+        { named : Label.t option
+        ; current : Trace.t option
+        ; visited : States.t
+        ; traces : Traces.t ref
+        ; can_collect_traces : bool ref
         ; old_edges : EdgeMap.t'
         }
 
-      and wip = Model.Make(Logger.Default)(M.Enc).Saturate.wip =
-        { from : State.t
-        ; via : Label.t
-        ; trees : Trees.t
-        }
-
-      val wip : State.t -> Action.t -> wip
-      val initial_data : EdgeMap.t' -> data
+      val initial_data : Traces.t ref -> EdgeMap.t' -> data
+      val has_named : data -> bool
+      val update_traces : data -> Trace.t -> unit
       val update_named : Action.t -> data -> data
-      val update_notes : State.t -> Action.t -> data -> data
+      val update_current : WIP.t -> data -> data
       val update_visited : State.t -> data -> data
       val already_visited : State.t -> data -> bool
       val skip_action : Action.t -> data -> bool
       val get_old_actions : State.t -> data -> ActionMap.t' option
-
-      exception Model_Saturate_WIP_IsEmptyList of unit
-
-      val wip_to_annotation : State.t -> wip list -> Annotation.t
-
-      exception Model_Saturate_WIP_HadNoNamedActions of wip list
-      exception Model_Saturate_WIP_HadMultipleNamedActions of wip list
-
-      val validate_wips : wip list -> unit
-      val extrapolate_annotations : Annotation.t -> Annotations.t
+      val update_acc : Trace.t -> Label.t -> ActionPairs.t -> ActionPairs.t
       val stop : data -> State.t -> ActionPairs.t -> ActionPairs.t
+
+      val finish_with_trace
+        :  Trace.t
+        -> data
+        -> Label.t
+        -> ActionPairs.t
+        -> ActionPairs.t
+
+      val finish_with_trace_upto
+        :  Trace.t
+        -> data
+        -> Label.t
+        -> ActionPairs.t
+        -> ActionPairs.t
+
       val check_from : data -> State.t -> ActionPairs.t -> ActionPairs.t
 
       val check_actions
@@ -4500,27 +4795,56 @@ module Default : () -> sig
         -> ActionPairs.t
         -> ActionPairs.t
 
+      val collect_from_traces
+        :  data
+        -> State.t
+        -> Action.t
+        -> States.t
+        -> ActionPairs.t
+        -> ActionPairs.t
+
+      val continue_check_destinations
+        :  data
+        -> State.t
+        -> Action.t
+        -> States.t
+        -> ActionPairs.t
+        -> ActionPairs.t
+
       val check_destinations
         :  data
         -> State.t
-        -> Partition.elt
+        -> States.t
         -> ActionPairs.t
         -> ActionPairs.t
 
       val edge_action_destinations
         :  data
         -> State.t
-        -> Partition.elt
+        -> States.t
         -> ActionPairs.t
 
-      val edge_actions : State.t -> ActionMap.t' -> EdgeMap.t' -> ActionPairs.t
-      val edge : ActionMap.t' -> State.t -> ActionMap.t' -> EdgeMap.t' -> unit
-      val edges : Labels.t -> Partition.elt -> EdgeMap.t' -> EdgeMap.t'
+      val edge_actions
+        :  State.t
+        -> ActionMap.t'
+        -> EdgeMap.t'
+        -> Traces.t ref
+        -> ActionPairs.t
+
+      val edge
+        :  ActionMap.t'
+        -> State.t
+        -> ActionMap.t'
+        -> EdgeMap.t'
+        -> Traces.t ref
+        -> unit
+
+      val edges : Labels.t -> States.t -> EdgeMap.t' -> EdgeMap.t'
       val fsm : ?only_if_weak:bool -> FSM.t -> FSM.t
     end
 
     module Minimize : sig
-      type t = Model.Make(Logger.Default)(M.Enc).Minimize.t =
+      type t =
         { fsm : FSM.t
         ; pi : Partition.t
         }
@@ -4562,19 +4886,19 @@ module Default : () -> sig
     end
 
     module Bisimilar : sig
-      type t = Model.Make(Logger.Default)(M.Enc).Bisimilar.t =
+      type t =
         { fsm_a : fsm_pair
         ; fsm_b : fsm_pair
         ; merged : FSM.t
         ; result : result
         }
 
-      and result = Model.Make(Logger.Default)(M.Enc).Bisimilar.result =
+      and result =
         { bisim_states : Partition.t
         ; non_bisim_states : Partition.t
         }
 
-      and fsm_pair = Model.Make(Logger.Default)(M.Enc).Bisimilar.fsm_pair =
+      and fsm_pair =
         { original : FSM.t
         ; saturated : FSM.t
         }
@@ -4596,17 +4920,17 @@ module Default : () -> sig
   end
 
   module IsTheory : sig
-    val is_theory : Evd.econstr -> Evd.econstr -> bool M.mm
-    val is_exists : Evd.econstr -> bool M.mm
-    val is_weak_sim : Evd.econstr -> bool M.mm
-    val is_weak : Evd.econstr -> bool M.mm
-    val is_tau : Evd.econstr -> bool M.mm
-    val is_silent : Evd.econstr -> bool M.mm
-    val is_silent1 : Evd.econstr -> bool M.mm
-    val is_LTS : Evd.econstr -> bool M.mm
-    val is_None : Evd.econstr -> bool M.mm
-    val is_Some : Evd.econstr -> bool M.mm
-    val get_theory_enc : (Evd.econstr -> bool M.mm) -> M.Enc.t M.mm
+    val is_theory : EConstr.t -> EConstr.t -> bool M.mm
+    val is_exists : EConstr.t -> bool M.mm
+    val is_weak_sim : EConstr.t -> bool M.mm
+    val is_weak : EConstr.t -> bool M.mm
+    val is_tau : EConstr.t -> bool M.mm
+    val is_silent : EConstr.t -> bool M.mm
+    val is_silent1 : EConstr.t -> bool M.mm
+    val is_LTS : EConstr.t -> bool M.mm
+    val is_None : EConstr.t -> bool M.mm
+    val is_Some : EConstr.t -> bool M.mm
+    val get_theory_enc : (EConstr.t -> bool M.mm) -> M.Enc.t M.mm
 
     exception NoEncodingFoundFor_TheoriesNone of unit
 
@@ -4619,12 +4943,12 @@ module Default : () -> sig
     exception NotEqTheory of unit
 
     val get_theory_enc_if_eq
-      :  Evd.econstr
-      -> (Evd.econstr -> bool M.mm)
+      :  EConstr.t
+      -> (EConstr.t -> bool M.mm)
       -> M.Enc.t M.mm
 
-    val get_None_enc_if_eq : Evd.econstr -> M.Enc.t M.mm
-    val get_Some_enc_if_eq : Evd.econstr -> M.Enc.t M.mm
+    val get_None_enc_if_eq : EConstr.t -> M.Enc.t M.mm
+    val get_Some_enc_if_eq : EConstr.t -> M.Enc.t M.mm
   end
 
   module Weak : sig
@@ -5132,7 +5456,7 @@ module Default : () -> sig
     val empty : V0.elt -> M.Ind.t M.B.t -> t
     val _log_to_visit : t -> unit
     val _log_ind_defs : M.Ind.t M.B.t -> unit
-    val is_silent_transition : Evd.econstr -> Weak.t option -> bool option M.mm
+    val is_silent_transition : EConstr.t -> Weak.t option -> bool option M.mm
 
     module type Y_Args = sig
       val primary_lts : M.Ind.t
@@ -5170,7 +5494,7 @@ module Default : () -> sig
 
     val build_ind_defs : unit -> M.Ind.t M.B.t M.mm
     val find_primary_lts : M.Ind.t M.B.t -> M.Ind.t M.mm
-    val initial_term : Constrexpr.constr_expr -> Evd.econstr M.mm
+    val initial_term : Constrexpr.constr_expr -> EConstr.t M.mm
     val make_yargs : M.Ind.t -> M.Ind.t M.B.t -> 'a -> (module Y_Args)
     val make_zargs : M.Ind.t M.B.t -> t ref -> (module Z_Args)
     val build : Constrexpr.constr_expr -> Model.LTS.t M.mm

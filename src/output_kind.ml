@@ -1,5 +1,5 @@
 let debug : bool = true
-let trace : bool = true
+let trace : bool = false
 
 type t =
   | Debug
@@ -39,7 +39,7 @@ let kind : t -> k = function
 
 let default_level_fun
       ?(debug : bool = debug)
-      ?(info : bool = true)
+      ?(info : bool = false)
       ?(notice : bool = true)
       ?(warning : bool = true)
       ?(error : bool = true)

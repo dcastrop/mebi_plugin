@@ -84,6 +84,9 @@ let collect_bisimilarity_theories () : EConstr.t list =
         ; find_reference "MEBI" [ "Coq"; "Init"; "Logic" ] "ex_intro"
         ; find_reference "MEBI" [ "Coq"; "Init"; "Datatypes" ] "prod"
         ; find_reference "MEBI" [ "Coq"; "Init"; "Datatypes" ] "pair"
+          (* NOTE: Lemmas: *)
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "weak_sim_refl"
+        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "wk_bisim_refl"
         ]
     in
     constants := new_constants;
@@ -355,6 +358,50 @@ let c_ex_intro () : EConstr.t =
        Coq.Init.Logic.ex.ex_intro"
   | Some c -> c
 ;;
+
+let c_prod () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (24, cs) with
+  | None -> failwith "could not obtain an internal representation of prod"
+  | Some c -> c
+;;
+
+let c_pair () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (25, cs) with
+  | None -> failwith "could not obtain an internal representation of pair"
+  | Some c -> c
+;;
+
+let c_weak_sim_refl () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (26, cs) with
+  | None ->
+    failwith "could not obtain an internal representation of weak_sim_refl"
+  | Some c -> c
+;;
+
+let c_wk_bisim_refl () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (27, cs) with
+  | None ->
+    failwith "could not obtain an internal representation of wk_bisim_refl"
+  | Some c -> c
+;;
+
+(* let c_ () : EConstr.t =
+   Log.trace __FUNCTION__;
+   let cs = collect_bisimilarity_theories () in
+   match indexed_c (23, cs) with
+   | None ->
+   failwith
+   "could not obtain an internal representation of "
+   | Some c -> c
+   ;; *)
 
 (*****************************************************************************)
 
