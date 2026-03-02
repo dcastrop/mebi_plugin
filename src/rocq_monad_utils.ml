@@ -10,11 +10,6 @@ struct
     state (fun env sigma -> Rocq_utils.get_next env sigma x)
   ;;
 
-  let econstr_eq a b : bool mm =
-    (* Log.trace __FUNCTION__; *)
-    state (fun env sigma -> sigma, EConstr.eq_constr sigma a b)
-  ;;
-
   let econstr_normalize (x : EConstr.t) : EConstr.t mm =
     (* Log.trace __FUNCTION__; *)
     let open Syntax in
@@ -22,9 +17,28 @@ struct
     return t
   ;;
 
+  let econstr_eq a b : bool mm =
+    (* Log.trace __FUNCTION__; *)
+    let open Syntax in
+    let* sigma = get_sigma in
+    let* a : EConstr.t = econstr_normalize a in
+    let* b : EConstr.t = econstr_normalize b in
+    EConstr.eq_constr sigma a b |> return
+  ;;
+
+  let get_encoding (x : EConstr.t) : Enc.t =
+    run
+      (let open Syntax in
+       let* x : EConstr.t = econstr_normalize x in
+       get_encoding x |> return)
+  ;;
+
   let econstr_kind (x : EConstr.t) : Rocq_utils.econstr_kind mm =
     (* Log.trace __FUNCTION__; *)
-    state (fun env sigma -> sigma, EConstr.kind sigma x)
+    let open Syntax in
+    let* sigma = get_sigma in
+    let* x : EConstr.t = econstr_normalize x in
+    EConstr.kind sigma x |> return
   ;;
 
   let econstr_is_evar (x : EConstr.t) : bool mm =
