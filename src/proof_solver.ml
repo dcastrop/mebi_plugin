@@ -1360,7 +1360,8 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let is_weak_refl () : bool mm =
         let open Syntax in
         let* ty, tys = get_concl () |> to_atomic in
-        econstr_eq tys.(5) tys.(6)
+        let* lts_eq : bool = econstr_eq tys.(3) tys.(4) in
+        if lts_eq then econstr_eq tys.(5) tys.(6) else return false
       ;;
 
       let is_weak_sim () : bool mm = get_concl () |> Theory.is_weak_sim
@@ -1749,16 +1750,18 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let open Syntax in
       let* is_weak_sim : bool = Concl.is_weak_sim () in
       if is_weak_sim
-      then
-        (* TODO: add check for eq terms and use [Bisimilarity.weak_sim_refl] *)
+      then (
+        Log.trace ~__FUNCTION__ "is weak sim";
         let* is_weak_refl : bool = Concl.is_weak_refl () in
         if is_weak_refl
-        then Tacs.apply_weak_sim_refl ()
+        then (
+          Log.trace ~__FUNCTION__ "is weak refl";
+          Tacs.apply_weak_sim_refl ())
         else
           let* has_hyp_cofix : bool = Hyps.can_solve_concl_cofix () in
           if has_hyp_cofix
           then Tacs.trivial ~msg:"trivial (solve cofix)" ()
-          else handle_new_cofix ()
+          else handle_new_cofix ())
       else if is_done ()
       then raise ProofComplete
       else
@@ -1914,7 +1917,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let x = P.step () in
       let y = P.run (P.Tacs.simplify_and_subst_all ()) in
       let z = Tactic.seq x y in
-      Log.thing ~__FUNCTION__ Debug "tactic" z (Of Tactic.to_string);
+      (* Log.thing ~__FUNCTdION__ Debug "tactic" z (Of Tactic.to_string); *)
       Tactic.unpack z)
     |> get_updated_pstate
   ;;
