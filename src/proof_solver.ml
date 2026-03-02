@@ -884,18 +884,19 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let unfold_constr ?(in_hyp : Rocq_utils.hyp option) (x : Constr.t)
         : Tactic.t mm
         =
-        let f (name : Names.Constant.t) : unit Proofview.tactic =
-          match in_hyp with
-          | None -> Tactics.unfold_constr (Names.GlobRef.ConstRef name)
-          | Some y ->
-            Proofview.tclTHEN
-              (Tactics.unfold_in_hyp
-                 [ Locus.AllOccurrences, Evaluable.EvalConstRef name ]
-                 (Context.Named.Declaration.get_id y, Locus.InHyp))
-              (Tactics.unfold_constr (Names.GlobRef.ConstRef name))
-        in
+        Log.trace __FUNCTION__;
         match Constr.kind x with
         | Const (name, _) ->
+          let f (name : Names.Constant.t) : unit Proofview.tactic =
+            match in_hyp with
+            | None -> Tactics.unfold_constr (Names.GlobRef.ConstRef name)
+            | Some y ->
+              Proofview.tclTHEN
+                (Tactics.unfold_in_hyp
+                   [ Locus.AllOccurrences, Evaluable.EvalConstRef name ]
+                   (Context.Named.Declaration.get_id y, Locus.InHyp))
+                (Tactics.unfold_constr (Names.GlobRef.ConstRef name))
+          in
           f name
           |> Tactic.tactic
                ~msg:(Printf.sprintf "unfold %s" (Names.Constant.to_string name))
@@ -911,12 +912,14 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
             (x : 'a)
         : Tactic.t mm
         =
+        Log.trace __FUNCTION__;
         match in_hyp with None -> f x | Some in_hyp -> f ~in_hyp x
       ;;
 
       let unfold_econstr ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
         : Tactic.t mm
         =
+        Log.trace __FUNCTION__;
         let open Syntax in
         let* y : Constr.t = econstr_to_constr x in
         f_unfold_hyp unfold_constr ~in_hyp y
@@ -927,6 +930,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
             (x : Constrexpr.constr_expr)
         : Tactic.t mm
         =
+        Log.trace __FUNCTION__;
         let open Syntax in
         let* y : EConstr.t = constrexpr_to_econstr x in
         f_unfold_hyp unfold_econstr ~in_hyp y
@@ -935,6 +939,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       let unfold_opt_constrexpr_list ?(in_hyp : Rocq_utils.hyp option)
         : Constrexpr.constr_expr list -> Tactic.t option mm
         =
+        Log.trace __FUNCTION__;
         (* NOTE: optional argument wrapper *)
         let unfold_constrexpr (x : Constrexpr.constr_expr) : Tactic.t mm =
           match in_hyp with
@@ -978,23 +983,39 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         : EConstrSet.t
         =
         (* Log.trace __FUNCTION__; *)
+        log_econstr ~__FUNCTION__ "x" x;
         let is_constr_ref (x : EConstr.t) : bool =
           EConstr.isRef sigma x && EConstr.isConst sigma x
         in
         let acc_constr_ref (x : EConstr.t) (acc : EConstrSet.t) : EConstrSet.t =
           if is_constr_ref x then EConstrSet.add x acc else acc
         in
-        let rec f (acc : EConstrSet.t) (x : EConstr.t) : EConstrSet.t =
-          let acc = acc_constr_ref x acc in
+        let rec f (acc : EConstrSet.t) (y : EConstr.t) : EConstrSet.t =
+          log_econstr ~__FUNCTION__ "y" y;
+          let acc : EConstrSet.t = acc_constr_ref y acc in
           try
-            let ty, tys = Rocq_utils.econstr_to_atomic sigma x in
-            let acc = acc_constr_ref ty acc in
+            let ty, tys = Rocq_utils.econstr_to_atomic sigma y in
+            log_econstr ~__FUNCTION__ "ty" ty;
+            _log_econstr_kind ~__FUNCTION__ "ty" ty;
+            let acc : EConstrSet.t =
+              match EConstr.kind sigma ty with
+              | Case (_, _, _, _, _, c, _) ->
+                _log_econstr_kind ~__FUNCTION__ "c" c;
+                (match EConstr.kind sigma c with
+                 | App (ty, _) -> acc_constr_ref ty acc
+                 | _ -> acc)
+              | _ -> acc
+            in
+            log_econstrs ~__FUNCTION__ "tys" (Array.to_list tys);
+            let acc : EConstrSet.t = acc_constr_ref ty acc in
             Array.fold_left
-              (fun (acc : EConstrSet.t) (y : EConstr.t) -> f acc y)
+              (fun (acc : EConstrSet.t) (z : EConstr.t) -> f acc z)
               acc
               tys
           with
-          | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> acc
+          | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ ->
+            (* log_econstr ~__FUNCTION__ "Err: Rocq_utils_EConstrIsNotA_Type" x; *)
+            acc
         in
         f EConstrSet.empty x
       ;;
@@ -1165,48 +1186,50 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
       (** [_get_enc_from_pp x] is a {b Temporary Solution} to an issue I'm having where the [EConstr.eq_constr] function is not working for terms that are clearly the same. I've spent a few hours on this and just want to move on, so here is a small patch.
       *)
-      let _get_enc_from_pp (x : EConstr.t) : M.Enc.t M.mm =
-        Log.trace __FUNCTION__;
-        try
-          let ys = M.F.to_seq (M.fwdmap ()) |> List.of_seq in
-          let open M.Syntax in
-          let* sigma = M.get_sigma in
-          let* x' : Constr.t = M.econstr_to_constr x in
-          let f (i : int) : M.Enc.t option -> M.Enc.t option M.mm = function
-            | Some z -> M.return (Some z)
-            | None ->
-              let (y, z) : EConstr.t * M.Enc.t = List.nth ys i in
-              if String.equal (M.Strfy.econstr x) (M.Strfy.econstr y)
-              then M.return (Some z)
-              else M.return None
-          in
-          let* z = M.iterate 0 (List.length ys - 1) None f in
-          match z with
-          | None ->
-            Log.trace ~__FUNCTION__ "Err: None";
-            raise (M.EncodingNotFound x)
-          | Some z ->
-            Log.thing ~__FUNCTION__ Warning "enc" z (Of M.Enc.to_string);
-            M.return z
-        with
-        | Not_found ->
-          Log.trace ~__FUNCTION__ "Err: Not_found";
-          raise (M.EncodingNotFound x)
-      ;;
+      (* let _get_enc_from_pp (x : EConstr.t) : M.Enc.t M.mm =
+         Log.trace __FUNCTION__;
+         try
+         let ys = M.F.to_seq (M.fwdmap ()) |> List.of_seq in
+         let open M.Syntax in
+         let* sigma = M.get_sigma in
+         let* x' : Constr.t = M.econstr_to_constr x in
+         let f (i : int) : M.Enc.t option -> M.Enc.t option M.mm = function
+         | Some z -> M.return (Some z)
+         | None ->
+         let (y, z) : EConstr.t * M.Enc.t = List.nth ys i in
+         if String.equal (M.Strfy.econstr x) (M.Strfy.econstr y)
+         then M.return (Some z)
+         else M.return None
+         in
+         let* z = M.iterate 0 (List.length ys - 1) None f in
+         match z with
+         | None ->
+         Log.trace ~__FUNCTION__ "Err: None";
+         raise (M.EncodingNotFound x)
+         | Some z ->
+         Log.thing ~__FUNCTION__ Warning "enc" z (Of M.Enc.to_string);
+         M.return z
+         with
+         | Not_found ->
+         Log.trace ~__FUNCTION__ "Err: Not_found";
+         raise (M.EncodingNotFound x)
+         ;; *)
 
       let state (x : EConstr.t) (ys : Model.States.t) : Model.State.t M.mm =
         Log.trace __FUNCTION__;
         try
-          Log.thing ~__FUNCTION__ Debug "x" x (Of M.Strfy.econstr);
-          let open M.Syntax in
+          (* Log.thing ~__FUNCTION__ Debug "x" x (Of M.Strfy.econstr); *)
+          (* let open M.Syntax in *)
           (* FIXME: in CADP example two terms don't eq when they should *)
-          let* term : M.Enc.t =
-            try M.get_encoding x |> M.return with
-            | M.EncodingNotFound _ ->
-              (* NOTE: TEMPORARY FIX -- finds enc by comparing econstrs strings *)
-              _get_enc_from_pp x
+          let term : M.Enc.t =
+            (* try *)
+            M.get_encoding x
+            (* |> M.return with *)
+            (* | M.EncodingNotFound _ ->
+               (* NOTE: TEMPORARY FIX -- finds enc by comparing econstrs strings *)
+               _get_enc_from_pp x *)
           in
-          Log.thing ~__FUNCTION__ Debug "term" term (Of M.Enc.to_string);
+          (* Log.thing ~__FUNCTION__ Debug "term" term (Of M.Enc.to_string); *)
           (* NOTE: [Model.States.compare] only cares about [term]. *)
           Model.States.find { term; pp = None } ys |> M.return
         with
@@ -1237,7 +1260,19 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           (* NOTE: [Model.Labels.compare] only cares about [is_silent=Some _] *)
           Model.Labels.find { term; is_silent = None; pp = None } ys |> M.return
         in
-        try M.get_encoding x |> f with
+        try
+          (* let open M.Syntax in *)
+          (* let z =
+            (* try *)
+               M.get_encoding x
+               |> M.return 
+              (* with *)
+            (* | M.EncodingNotFound _ -> *)
+              (* NOTE: TEMPORARY FIX -- finds enc by comparing econstrs strings *)
+              (* _get_enc_from_pp x *)
+          in *)
+          M.get_encoding x |> f
+        with
         | Not_found ->
           let open M.Syntax in
           (* NOTE: is it [None]? (i.e., a silent action) *)
@@ -1391,10 +1426,13 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         then (
           try
             let from : Model.State.t = M.run (ReModel.state tys.(0) m.states) in
+            _log_state ~__FUNCTION__ "from" from;
             let goto : Model.State.t = M.run (ReModel.state tys.(2) m.states) in
+            _log_state ~__FUNCTION__ "goto" goto;
             let label : Model.Label.t =
               M.run (ReModel.label tys.(1) m.alphabet)
             in
+            _log_label ~__FUNCTION__ "label" label;
             ReModel.transition from goto label m.edges |> return
           with
           | M.EncodingNotFound z ->
@@ -1925,7 +1963,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     let handle_state () : Tactic.t mm =
       log_proofstate ();
-      log_hyps ();
+      (* log_hyps (); *)
       log_concl ();
       match get_state () with
       | NewProof ab -> handle_new_proof ab
