@@ -811,7 +811,7 @@ struct
       match x with
       | { info = { meta = Some { is_complete = false; _ }; _ }; _ } ->
         Log.trace ~__FUNCTION__ "LTS Incomplete";
-        M.Err.lts_incomplete ()
+        M.Err.lts_incomplete "TODO..."
       | _ -> ())
   ;;
 

@@ -98,20 +98,20 @@ MeBi Config WeakMode Enable.*)
 MeBi Config Weak As Option label. 
 
 (* MeBi Divider "Theories.DevTest.0". *)
-MeBi LTS (tend) Using termLTS.
-MeBi FSM (tend) Using termLTS.
+MeBi Run LTS (tend) Using termLTS.
+MeBi Run FSM (tend) Using termLTS.
 
 MeBi Divider "Theories.DevTest.0.1".
-MeBi LTS (tseq tend tend) Using termLTS.
-MeBi FSM (tseq tend tend) Using termLTS.
+MeBi Run LTS (tseq tend tend) Using termLTS.
+MeBi Run FSM (tseq tend tend) Using termLTS.
 
 MeBi Divider "Theories.DevTest.0.2".
-MeBi LTS (tpar tend tend) Using termLTS.
-MeBi FSM (tpar tend tend) Using termLTS.
+MeBi Run LTS (tpar tend tend) Using termLTS.
+MeBi Run FSM (tpar tend tend) Using termLTS.
 
 MeBi Divider "Theories.DevTest.0.3".
-MeBi LTS (tseq (tpar tend tend) tend) Using termLTS.
-MeBi FSM (tseq (tpar tend tend) tend) Using termLTS.
+MeBi Run LTS (tseq (tpar tend tend) tend) Using termLTS.
+MeBi Run FSM (tseq (tpar tend tend) tend) Using termLTS.
 (* NOTE:        (tseq (tpar tend tend) tend)
   [ 1 -> [ 3 => (tseq tend tend)
          ; 5 => (tseq (tpar tend tend) tend)
@@ -122,15 +122,15 @@ MeBi FSM (tseq (tpar tend tend) tend) Using termLTS.
   ] *)
 
 (* MeBi Divider "Theories.DevTest.0.4". *)
-MeBi FSM (tseq (tseq (tpar tend tend) (tpar tend tend)) (tpar tend tend)) Using termLTS.
+MeBi Run FSM (tseq (tseq (tpar tend tend) (tpar tend tend)) (tpar tend tend)) Using termLTS.
 
 (* MeBi Divider "Theories.DevTest.1". *)
-MeBi FSM (tpar (tact (send A) tend) (tact (recv A) tend)) Using termLTS.
+MeBi Run FSM (tpar (tact (send A) tend) (tact (recv A) tend)) Using termLTS.
 
 (* MeBi Divider "Theories.DevTest.1.1". *)
-MeBi FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) Using termLTS.
+MeBi Run FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) Using termLTS.
 
-MeBi FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) Using termLTS.
+MeBi Run FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) Using termLTS.
 
 (* testing for propagation *)
 MeBi Divider "Theories.DevTest.2".
@@ -172,8 +172,8 @@ Inductive termLTS2 : term -> option label -> term -> Prop :=
     (* termLTS (tpar (tpar t1 t2) t3) None (tpar t1 (tpar t2 t3)) *)
 .
 
-MeBi LTS (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) Using termLTS2.
-MeBi LTS (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) Using termLTS2.
+MeBi Run LTS (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) Using termLTS2.
+MeBi Run LTS (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) Using termLTS2.
 
 
 
@@ -227,17 +227,17 @@ Inductive termLTS3 : term -> option label -> term -> Prop :=
     (* termLTS (tpar (tpar t1 t2) t3) None (tpar t1 (tpar t2 t3)) *)
 .
 
-(* MeBi LTS (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) tend) Using termLTS3. *)
-(* MeBi LTS (tfix (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) trec)) Using termLTS3. *)
+(* MeBi Run LTS (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) tend) Using termLTS3. *)
+(* MeBi Run LTS (tfix (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) trec)) Using termLTS3. *)
 
 (* MeBi Config Bound 50.
-MeBi LTS (tseq (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) tend) (tfix (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) trec))) Using termLTS3. *)
+MeBi Run LTS (tseq (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) tend) (tfix (tseq (tpar (tact (send A) (tact (recv B) tend)) (tact (send B) (tact (recv A) tend))) trec))) Using termLTS3. *)
 
-(* MeBi LTS 
+(* MeBi Run LTS 
 (tfix (tseq (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) trec)) 
 Using termLTS3. *)
 
-MeBi Saturate 
+MeBi Run Saturate 
 (tfix (tseq (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) trec)) 
 Using termLTS3.
 
@@ -251,11 +251,11 @@ Example q : term := tfix (tseq (tpar (tact (recv A) tend)
                                      (tact (send A) tend)) 
                                (tseq (tpar (tact (send A) tend) 
                                            (tact (recv A) tend)) trec)).
-MeBi Merge p With termLTS And q With termLTS Using termLTS.
+MeBi Run Merge p With termLTS And q With termLTS Using termLTS.
 
 End TestA.
 
-MeBi Reset Weak Config.
+MeBi Config Reset Weak.
 Module TestB.
   (* MeBi Config WeakMode Disable.  *)
 (* MeBi Config Output Enable True. MeBi Set ShowDebug True. MeBi Set ShowDetails True. *)
@@ -293,13 +293,13 @@ Module TestB.
 
 
 MeBi Divider "Theories.DevTest.TestB.FSM1".
-MeBi FSM (tpar TheAction1 TheAction2 tend) Using termLTS.
+MeBi Run FSM (tpar TheAction1 TheAction2 tend) Using termLTS.
 
 MeBi Divider "Theories.DevTest.TestB.FSM2".
-MeBi FSM (tpar TheAction2 TheAction1 tend) Using termLTS.
+MeBi Run FSM (tpar TheAction2 TheAction1 tend) Using termLTS.
 
 MeBi Divider "Theories.DevTest.TestB.Bisim".
-  MeBi Bisim (tpar TheAction1 TheAction2 tend) With termLTS
+  MeBi Run Bisim (tpar TheAction1 TheAction2 tend) With termLTS
          And (tpar TheAction2 TheAction1 tend) With termLTS
          Using termLTS.
 
