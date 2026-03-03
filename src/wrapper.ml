@@ -18,7 +18,10 @@ struct
       try
         let open M.Syntax in
         let* sigma = M.get_sigma in
-        Rocq_utils.econstr_to_atomic sigma x |> fst |> M.econstr_eq y
+        Rocq_utils.econstr_to_atomic sigma x
+        |> fst
+        |> M.econstr_eq y
+        |> M.return
       with
       | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> M.return false
     ;;

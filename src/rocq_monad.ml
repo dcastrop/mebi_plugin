@@ -130,6 +130,15 @@ struct
     let ( and+ ) x y = product x y
   end
 
+  let econstr_normalize (x : EConstr.t) : EConstr.t mm =
+    (* Log.trace __FUNCTION__; *)
+    let open Syntax in
+    let$+ t env sigma = Reductionops.nf_all env sigma x in
+    return t
+  ;;
+
+  let encode (x : EConstr.t) : Enc.t = run (econstr_normalize x) |> encode
+
   (* *)
   let get_ctx (st : wrapper ref) : Rocq_context.t in_wrapper =
     { state = st; value = !(!st.ctx) }
