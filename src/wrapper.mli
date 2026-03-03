@@ -183,6 +183,7 @@ module Make : (Log : Logger.SLogger)
       val ( and+ ) : 'a mm -> 'b mm -> ('a * 'b) mm
     end
 
+    val econstr_normalize : EConstr.t -> EConstr.t mm
     val get_ctx : wrapper ref -> Rocq_context.t in_wrapper
     val get_env : wrapper ref -> Environ.env in_wrapper
     val get_sigma : wrapper ref -> Evd.evar_map in_wrapper
@@ -235,8 +236,8 @@ module Make : (Log : Logger.SLogger)
 
     (* val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t) *)
     val fresh_evar : Rocq_utils.evar_source -> EConstr.t mm
-    val econstr_eq : EConstr.t -> EConstr.t -> bool mm
-    val econstr_normalize : EConstr.t -> EConstr.t mm
+    val econstr_eq : EConstr.t -> EConstr.t -> bool
+    val econstr_compare : EConstr.t -> EConstr.t -> int
     val econstr_kind : EConstr.t -> Rocq_utils.econstr_kind mm
     val econstr_is_evar : EConstr.t -> bool mm
 
@@ -247,7 +248,7 @@ module Make : (Log : Logger.SLogger)
 
     val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
     val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
-    val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool mm
+    val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool
     val type_of_econstr : EConstr.t -> EConstr.t mm
     val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
 
@@ -2961,6 +2962,7 @@ module Default : () -> sig
       val ( and+ ) : 'a mm -> 'b mm -> ('a * 'b) mm
     end
 
+    val econstr_normalize : EConstr.t -> EConstr.t mm
     val get_ctx : wrapper ref -> Rocq_context.t in_wrapper
     val get_env : wrapper ref -> Environ.env in_wrapper
     val get_sigma : wrapper ref -> Evd.evar_map in_wrapper
@@ -3013,8 +3015,8 @@ module Default : () -> sig
 
     (* val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t) *)
     val fresh_evar : Rocq_utils.evar_source -> EConstr.t mm
-    val econstr_eq : EConstr.t -> EConstr.t -> bool mm
-    val econstr_normalize : EConstr.t -> EConstr.t mm
+    val econstr_eq : EConstr.t -> EConstr.t -> bool
+    val econstr_compare : EConstr.t -> EConstr.t -> int
     val econstr_kind : EConstr.t -> Rocq_utils.econstr_kind mm
     val econstr_is_evar : EConstr.t -> bool mm
 
@@ -3025,7 +3027,7 @@ module Default : () -> sig
 
     val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
     val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
-    val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool mm
+    val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool
     val type_of_econstr : EConstr.t -> EConstr.t mm
     val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
 

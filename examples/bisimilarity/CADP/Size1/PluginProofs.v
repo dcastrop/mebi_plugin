@@ -19,56 +19,14 @@ Require Import Logic.
 
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.PluginProofs.bigstep_lts".
-(* Example wsim_bigstep_lts : weak_sim bigstep lts c1 c1. 
+Example wsim_bigstep_lts : weak_sim bigstep lts c1 c1. 
 Proof. MeBiSim Begin bigstep c1 And lts c1 Using step.
-  (* Iteration History: 266 <- 300 <- _ *) 
-  MeBiSim Solve 266. Qed. *)
+  (* Iteration History: 267 <- 300 <- _ <- _ *) 
+  MeBiSim Solve 267. Qed.
 
   
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.PluginProofs.lts_bigstep".
 Example wsim_lts_bigstep : weak_sim lts bigstep c1 c1. 
 Proof. MeBiSim Begin lts c1 And bigstep c1 Using step. 
-  (* TODO: inversion seems to be looping again *)
-(* MeBiSim Solve 8. Qed. *)
-MeBiSim Solve 2000. Qed.
-(* 
-  (* MeBiSim Solve 15. *)
-  (* MeBiSim Solve 8. *)
-  (* MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-  MeBiSim Solve 10.
-
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step.
-  MeBiSim Step. *)
-Admitted. *)
+  (* Iteration History: 395 <- _ <- _ <- _  *) 
+  MeBiSim Solve 395. Qed.

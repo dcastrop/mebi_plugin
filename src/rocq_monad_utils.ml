@@ -10,20 +10,22 @@ struct
     state (fun env sigma -> Rocq_utils.get_next env sigma x)
   ;;
 
-  let econstr_normalize (x : EConstr.t) : EConstr.t mm =
+  let econstr_eq (a : EConstr.t) (b : EConstr.t) : bool =
     (* Log.trace __FUNCTION__; *)
-    let open Syntax in
-    let$+ t env sigma = Reductionops.nf_all env sigma x in
-    return t
-  ;;
-
-  let econstr_eq a b : bool mm =
-    (* Log.trace __FUNCTION__; *)
-    let open Syntax in
+    (* let open Syntax in
     let* sigma = get_sigma in
     let* a : EConstr.t = econstr_normalize a in
     let* b : EConstr.t = econstr_normalize b in
-    EConstr.eq_constr sigma a b |> return
+    EConstr.eq_constr sigma a b |> return *)
+    let a = encode a in
+    let b = encode b in
+    Enc.equal a b
+  ;;
+
+  let econstr_compare (a : EConstr.t) (b : EConstr.t) : int =
+    let a = encode a in
+    let b = encode b in
+    Enc.compare a b
   ;;
 
   let get_encoding (x : EConstr.t) : Enc.t =
@@ -70,16 +72,17 @@ struct
   (*********************************************************)
 
   let exists_eq (x : EConstr.t) (ys : 'a list) (decoder : 'a -> EConstr.t)
-    : bool mm
+    : bool
     =
     (* Log.trace __FUNCTION__; *)
-    let open Syntax in
+    (* let open Syntax in
     let f (i : int) (a : bool) =
       let y : EConstr.t = List.nth ys i |> decoder in
-      let* b : bool = econstr_eq x y in
+      let b : bool = econstr_eq x y in
       (a || b) |> return
-    in
-    iterate 0 (List.length ys - 1) false f
+    in *)
+    (* iterate 0 (List.length ys - 1) false f *)
+    List.exists (fun y -> decoder y |> econstr_eq x) ys
   ;;
 
   (*********************************************************)

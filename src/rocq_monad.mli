@@ -144,6 +144,7 @@ module Make : (Log : Logger.SLogger)
 
   module Syntax : SYNTAX
 
+  val econstr_normalize : EConstr.t -> EConstr.t mm
   val get_ctx : wrapper ref -> Rocq_context.t in_wrapper
   val get_env : wrapper ref -> Environ.env in_wrapper
   val get_sigma : wrapper ref -> Evd.evar_map in_wrapper

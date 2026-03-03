@@ -184,6 +184,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
         val ( and+ ) : 'a mm -> 'b mm -> ('a * 'b) mm
       end
 
+      val econstr_normalize : EConstr.t -> EConstr.t mm
       val get_ctx : wrapper ref -> Rocq_context.t in_wrapper
       val get_env : wrapper ref -> Environ.env in_wrapper
       val get_sigma : wrapper ref -> Evd.evar_map in_wrapper
@@ -240,8 +241,8 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
       (* val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t) *)
       val fresh_evar : Rocq_utils.evar_source -> EConstr.t mm
-      val econstr_eq : EConstr.t -> EConstr.t -> bool mm
-      val econstr_normalize : EConstr.t -> EConstr.t mm
+      val econstr_eq : EConstr.t -> EConstr.t -> bool
+      val econstr_compare : EConstr.t -> EConstr.t -> int
       val econstr_kind : EConstr.t -> Rocq_utils.econstr_kind mm
       val econstr_is_evar : EConstr.t -> bool mm
 
@@ -252,7 +253,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
       val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
       val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
-      val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool mm
+      val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool
       val type_of_econstr : EConstr.t -> EConstr.t mm
       val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
 
@@ -2878,7 +2879,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
   module State : sig
     type t =
       | NewProof of (Constrexpr.constr_expr * Constrexpr.constr_expr)
-      | WeakSim of Rocq_utils.hyp list ref
+      | WeakSim
       | Exists of Model.Transition.t option
       (* | GoalTransition of Transition.t *)
       | ApplyConstructors of ApplicableConstructors.t
@@ -3122,6 +3123,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
       val ( and+ ) : 'a mm -> 'b mm -> ('a * 'b) mm
     end
 
+    val econstr_normalize : EConstr.t -> EConstr.t mm
     val get_ctx : wrapper ref -> Rocq_context.t in_wrapper
     val get_env : wrapper ref -> Environ.env in_wrapper
     val get_sigma : wrapper ref -> Evd.evar_map in_wrapper
@@ -3174,8 +3176,8 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
     (* val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t) *)
     val fresh_evar : Rocq_utils.evar_source -> EConstr.t mm
-    val econstr_eq : EConstr.t -> EConstr.t -> bool mm
-    val econstr_normalize : EConstr.t -> EConstr.t mm
+    val econstr_eq : EConstr.t -> EConstr.t -> bool
+    val econstr_compare : EConstr.t -> EConstr.t -> int
     val econstr_kind : EConstr.t -> Rocq_utils.econstr_kind mm
     val econstr_is_evar : EConstr.t -> bool mm
 
@@ -3186,7 +3188,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
     val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
     val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
-    val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool mm
+    val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool
     val type_of_econstr : EConstr.t -> EConstr.t mm
     val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
 
@@ -3539,19 +3541,19 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
 
       exception FSM_HasNoSilentLabel of Model.FSM.t
 
-      val is_fsm_silent_label : EConstr.t -> Model.FSM.t -> bool M.mm
+      val is_fsm_silent_label : EConstr.t -> Model.FSM.t -> bool
 
       exception FSM_HasNoVisibleLabel of Model.FSM.t
 
-      val is_fsm_visible_label : EConstr.t -> Model.FSM.t -> bool M.mm
+      val is_fsm_visible_label : EConstr.t -> Model.FSM.t -> bool
 
       exception FSM_HasNoWeakLabels of Model.FSM.t
 
-      val is_fsm_weak_labels : EConstr.t -> Model.FSM.t -> bool M.mm
+      val is_fsm_weak_labels : EConstr.t -> Model.FSM.t -> bool
 
       exception FSM_HasNoConstructors of Model.FSM.t
 
-      val is_fsm_constructor : EConstr.t -> Model.FSM.t -> bool M.mm
+      val is_fsm_constructor : EConstr.t -> Model.FSM.t -> bool
     end
 
     module ReModel : sig
@@ -3608,7 +3610,7 @@ module Make : (Log : Logger.SLogger) (E : Encoding.SEncoding) -> sig
       :  Constrexpr.constr_expr * Constrexpr.constr_expr
       -> Tactic.t mm
 
-    val handle_weaksim : Rocq_utils.hyp list ref -> Tactic.t mm
+    val handle_weaksim : unit -> Tactic.t mm
     val handle_exists : Model.Transition.t option -> Tactic.t mm
 
     (* val handle_goal_transition : Transition.t -> Tactic.t mm *)
