@@ -81,52 +81,44 @@ Admitted. *)
 
 (**************************************************)
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.pq".
-(* Example wsim_pq : weak_sim compLTS compLTS p q. 
+Example wsim_pq : weak_sim compLTS compLTS p q. 
 Proof. MeBi Sim Begin compLTS p And compLTS q Using compLTS termLTS. 
-  MeBi Sim Solve 100000. Qed. *)
-  (* MeBi Sim Solve 500000. Qed. *)
+  MeBi Sim Solve 100000. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.qp".
-(* Example wsim_qp : weak_sim compLTS compLTS q p. 
+Example wsim_qp : weak_sim compLTS compLTS q p. 
 Proof. MeBi Sim Begin compLTS q And compLTS p Using compLTS termLTS. 
-  MeBi Sim Solve 100000.
-Qed. *)
+  MeBi Sim Solve 100000. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.qr".
-(* Example wsim_qr : weak_sim compLTS compLTS q r. 
+Example wsim_qr : weak_sim compLTS compLTS q r. 
 Proof. MeBi Sim Begin compLTS q And compLTS r Using compLTS termLTS. 
-  MeBi Sim Solve 100000.
-Qed. *)
+  MeBi Sim Solve 100000. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.rq".
-(* Example wsim_rq : weak_sim compLTS compLTS r q. 
+Example wsim_rq : weak_sim compLTS compLTS r q. 
 Proof. MeBi Sim Begin compLTS r And compLTS q Using compLTS termLTS. 
-  MeBi Sim Solve 100000.
-Qed. *)
+  MeBi Sim Solve 100000. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.pr".
-(* Example wsim_pr : weak_sim compLTS compLTS p r. 
+Example wsim_pr : weak_sim compLTS compLTS p r. 
 Proof. MeBi Sim Begin compLTS p And compLTS r Using compLTS termLTS. 
-  MeBi Sim Solve 100000.
-Qed. *)
+  MeBi Sim Solve 100000. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.rp".
-(* Example wsim_rp : weak_sim compLTS compLTS r p. 
+Example wsim_rp : weak_sim compLTS compLTS r p. 
 Proof. MeBi Sim Begin compLTS r And compLTS p Using compLTS termLTS. 
-  MeBi Sim Solve 100000.
-Qed. *)
+  MeBi Sim Solve 100000. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.rs".
-(* Example wsim_rp : weak_sim compLTS compLTS r s. 
+Example wsim_rp : weak_sim compLTS compLTS r s. 
 Proof. MeBi Sim Begin compLTS r And compLTS s Using compLTS termLTS. 
-  MeBi Sim Solve 100000.
-Qed. *)
+  MeBi Sim Solve 100000. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.sr".
 Example wsim_pr : weak_sim compLTS compLTS s r. 
 Proof. MeBi Sim Begin compLTS s And compLTS r Using compLTS termLTS. 
-  MeBi Sim Solve 100000.
-Qed. 
+  MeBi Sim Solve 100000. Qed. 

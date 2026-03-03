@@ -37,16 +37,28 @@ MeBi Divider "Examples.Bisimilarity.Proc.Test3.TermTests.Bisim.qp".
 MeBi Run Bisim q With compLTS And p With compLTS Using compLTS termLTS.
 
 
+MeBi Divider "Examples.Bisimilarity.Proc.Test3.TermTests.Bisim.pr".
+MeBi Run Bisim p With compLTS And r With compLTS Using compLTS termLTS.
+MeBi Divider "Examples.Bisimilarity.Proc.Test3.TermTests.Bisim.rp".
+MeBi Run Bisim r With compLTS And p With compLTS Using compLTS termLTS.
+
+
+MeBi Divider "Examples.Bisimilarity.Proc.Test3.TermTests.Bisim.ps".
+MeBi Run Bisim p With compLTS And s With compLTS Using compLTS termLTS.
+MeBi Divider "Examples.Bisimilarity.Proc.Test3.TermTests.Bisim.sp".
+MeBi Run Bisim s With compLTS And p With compLTS Using compLTS termLTS. 
+
+
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.TermTests.Bisim.qr".
 MeBi Run Bisim q With compLTS And r With compLTS Using compLTS termLTS.
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.TermTests.Bisim.rq".
 MeBi Run Bisim r With compLTS And q With compLTS Using compLTS termLTS.
 
 
-MeBi Divider "Examples.Bisimilarity.Proc.Test3.TermTests.Bisim.pr".
-MeBi Run Bisim p With compLTS And r With compLTS Using compLTS termLTS.
-MeBi Divider "Examples.Bisimilarity.Proc.Test3.TermTests.Bisim.rp".
-MeBi Run Bisim r With compLTS And p With compLTS Using compLTS termLTS.
+MeBi Divider "Examples.Bisimilarity.Proc.Test3.TermTests.Bisim.qs".
+MeBi Run Bisim q With compLTS And s With compLTS Using compLTS termLTS.
+MeBi Divider "Examples.Bisimilarity.Proc.Test3.TermTests.Bisim.sq".
+MeBi Run Bisim s With compLTS And q With compLTS Using compLTS termLTS.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.TermTests.Bisim.rs".
