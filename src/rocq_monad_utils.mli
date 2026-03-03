@@ -266,7 +266,7 @@ module Make : (Log : Logger.SLogger)
   module type SErrors = sig
     type t =
       | LTS_Empty
-      | LTS_Incomplete
+      | LTS_Incomplete of string
       | Not_Bisimilar
       | Invalid_Ind_Kind of Rocq_ind.kind
       | Invalid_Sort_LTS of Sorts.family
@@ -285,7 +285,7 @@ module Make : (Log : Logger.SLogger)
     exception MEBI_exn of t
 
     val lts_empty : unit -> exn
-    val lts_incomplete : unit -> exn
+    val lts_incomplete : string -> exn
     val not_bisimilar : unit -> exn
     val invalid_ind_kind : Rocq_ind.kind -> exn
     val invalid_sort_lts : Sorts.family -> exn
@@ -309,7 +309,7 @@ module Make : (Log : Logger.SLogger)
 
   module type SErr = sig
     val lts_empty : unit -> 'a
-    val lts_incomplete : unit -> 'a
+    val lts_incomplete : string -> 'a
     val not_bisimilar : unit -> 'a
     val invalid_ind_kind : Rocq_ind.kind -> 'a
     val invalid_sort_lts : Sorts.family -> 'a

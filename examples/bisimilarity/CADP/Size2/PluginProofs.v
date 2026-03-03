@@ -12,32 +12,21 @@ Require Import MEBI.Examples.CADP_Glued.
 Require Import MEBI.Examples.bisimilarity.CADP.Size2.Terms.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.PluginProofs".
-MeBi Config Reset.
-MeBi Config Output Enable.
-MeBi Config Output Notice Enable.
-(* MeBi Config Output Debug Enable. *)
-(* MeBi Config Output Info Enable. *)
-MeBi Config Output Results Enable.
-MeBi Config Output Warning Enable.
-(* MeBi Config Bound 100. *)
-MeBi Config WeakMode Enable.
+
 MeBi Config Weak As Option label.
-MeBi Config Fail If Incomplete True.
-MeBi Config Fail If NotBisim True.
-(* MeBi See All.  *)
-MeBi Config Output Disable.
 
 Require Import Logic.
 
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.PluginProofs.bigstep_lts".
 Example wsim_bigstep_lts : weak_sim bigstep lts c1 c1. 
-Proof. MeBiSim Begin bigstep c1 And lts c1 Using step. 
-  MeBiSim Solve 900.
-Qed.
+Proof. MeBi Sim Begin bigstep c1 And lts c1 Using step.
+  (* Iteration History: _ <- _ <- _ <- _ *) 
+  MeBi Sim Solve 2000. Qed.
 
+  
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.PluginProofs.lts_bigstep".
 Example wsim_lts_bigstep : weak_sim lts bigstep c1 c1. 
-Proof. MeBiSim Begin lts c1 And bigstep c1 Using step. 
-  MeBiSim Solve 900.
-Qed.
+Proof. MeBi Sim Begin lts c1 And bigstep c1 Using step. 
+  (* Iteration History: _ <- _ <- _ <- _  *) 
+  MeBi Sim Solve 2000. Qed.

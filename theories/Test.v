@@ -47,7 +47,7 @@ Module BasicCommands.
 
   Example z := 0.
   MeBi Config Weak As z Of nat. 
-  MeBi Reset Weak Config.
+  MeBi Config Reset Weak.
   
 
   Inductive s_label : Set :=
@@ -55,7 +55,7 @@ Module BasicCommands.
   | LABEL1 : nat -> s_label
   .
   MeBi Config Weak As TAU Of s_label. 
-  MeBi Reset Weak Config.
+  MeBi Config Reset Weak.
   
 
   Inductive t_label : Type :=
@@ -63,7 +63,7 @@ Module BasicCommands.
   | LABEL2 : bool -> t_label
   .
   MeBi Config Weak As SILENT Of t_label. 
-  MeBi Reset Weak Config.
+  MeBi Config Reset Weak.
   
 End BasicCommands.
 
@@ -83,28 +83,28 @@ MeBi Config Output Enable. *)
 MeBi Divider "Theories.Test.GeneralTests".
 Inductive i := C0 (i : nat) | C1 (b : bool) (j : nat) | C2 (x : nat).
 
-Fail MeBi LTS 0 Using i.
-Fail MeBi LTS 0 Using j.
+Fail MeBi Run LTS 0 Using i.
+Fail MeBi Run LTS 0 Using j.
 
 Definition k := 0.
-Fail MeBi LTS 0 Using k.
-Fail MeBi LTS 0 Using nat.
+Fail MeBi Run LTS 0 Using k.
+Fail MeBi Run LTS 0 Using nat.
 
 Definition nnat := nat.
-Fail MeBi LTS 0 Using nnat.
-Fail MeBi LTS 0 Using False.
+Fail MeBi Run LTS 0 Using nnat.
+Fail MeBi Run LTS 0 Using False.
 
 CoInductive co_nat := CoZ | CoS : co_nat -> co_nat.
 
 Inductive test_lts A : co_nat -> nat -> nat -> Prop :=
 | less_lt (x : A) (i : co_nat) (j : nat) : test_lts A (CoS i) 1 j.
 
-Fail MeBi LTS 0 Using test_lts.
+Fail MeBi Run LTS 0 Using test_lts.
 
 Inductive test_mut A : Prop := Mk1 (x : A) (y : test_mut2 A)
 with test_mut2 A : Prop := Mk2 (y : test_mut A).
 
-Fail MeBi LTS 0 Using test_mut2.
+Fail MeBi Run LTS 0 Using test_mut2.
 
 
 Inductive testLTS : nat -> bool -> nat -> Prop :=
@@ -113,17 +113,17 @@ Inductive testLTS : nat -> bool -> nat -> Prop :=
 
 Definition one := 1.
 
-Fail MeBi LTS false Using testLTS.
+Fail MeBi Run LTS false Using testLTS.
 
-MeBi LTS 0 Using testLTS.
-MeBi LTS (S 0) Using testLTS.
-MeBi LTS (S (S 0)) Using testLTS.
-MeBi LTS (S (S (S 0))) Using testLTS.
+MeBi Run LTS 0 Using testLTS.
+MeBi Run LTS (S 0) Using testLTS.
+MeBi Run LTS (S (S 0)) Using testLTS.
+MeBi Run LTS (S (S (S 0))) Using testLTS.
 
-MeBi LTS one Using testLTS.
-MeBi LTS (S one) Using testLTS.
+MeBi Run LTS one Using testLTS.
+MeBi Run LTS (S one) Using testLTS.
 
-MeBi LTS (S one) Using testLTS.
+MeBi Run LTS (S one) Using testLTS.
 
 
 Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
@@ -133,10 +133,10 @@ Inductive nonTerminatingTestLTS : nat -> bool -> nat -> Prop :=
 
 (* below cannot be finitely represented  *)
 (* MeBi Config Fail If Incomplete True. *)
-Fail MeBi LTS 0 Using nonTerminatingTestLTS.
-Fail MeBi LTS (S 0) Using nonTerminatingTestLTS.
-Fail MeBi LTS (S (S 0)) Using nonTerminatingTestLTS.
-Fail MeBi LTS (S (S (S 0))) Using nonTerminatingTestLTS.
+Fail MeBi Run LTS 0 Using nonTerminatingTestLTS.
+Fail MeBi Run LTS (S 0) Using nonTerminatingTestLTS.
+Fail MeBi Run LTS (S (S 0)) Using nonTerminatingTestLTS.
+Fail MeBi Run LTS (S (S (S 0))) Using nonTerminatingTestLTS.
 
 MeBi Divider "Theories.Test.Test1".
 Module Test1.
@@ -163,8 +163,8 @@ Module Test1.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
-  MeBi LTS (tfix (tact TheAction1 tend)) Using termLTS.
-  MeBi LTS (tfix (tact TheAction1 (tact TheAction2 trec))) Using termLTS.
+  MeBi Run LTS (tfix (tact TheAction1 tend)) Using termLTS.
+  MeBi Run LTS (tfix (tact TheAction1 (tact TheAction2 trec))) Using termLTS.
 End Test1.
 
 MeBi Divider "Theories.Test.Test2".
@@ -198,15 +198,15 @@ Module Test2.
       termLTS (subst (tfix t) t) a t' ->
       termLTS (tfix t) a t'.
 
-  MeBi LTS (tfix (tact TheAction1 tend)) Using termLTS.
-  MeBi LTS (tfix (tact TheAction1 (tact TheAction2 trec))) Using termLTS.
-  MeBi LTS (tfix (tpar TheAction1 TheAction2 trec)) Using termLTS.
-  MeBi LTS (tfix (tpar TheAction1 TheAction2 trec)) Using termLTS.
+  MeBi Run LTS (tfix (tact TheAction1 tend)) Using termLTS.
+  MeBi Run LTS (tfix (tact TheAction1 (tact TheAction2 trec))) Using termLTS.
+  MeBi Run LTS (tfix (tpar TheAction1 TheAction2 trec)) Using termLTS.
+  MeBi Run LTS (tfix (tpar TheAction1 TheAction2 trec)) Using termLTS.
 End Test2.
 
 MeBi Divider "Theories.Test.BisimTest1".
 (* MeBi Config Fail If Incomplete True. *)
-MeBi Reset Weak Config.
+MeBi Config Reset Weak.
 Module BisimTest1.
   Inductive action : Set := | TheAction1 | TheAction2.
 
@@ -238,92 +238,92 @@ Module BisimTest1.
       termLTS (tfix t) a t'.
 
   (* true *)
-  MeBi Bisim (tact TheAction1 tend) With termLTS
+  MeBi Run Bisim (tact TheAction1 tend) With termLTS
          And (tact TheAction1 tend) With termLTS
          Using termLTS.
 
   (* true *)
-  MeBi Bisim (tact TheAction2 tend) With termLTS
+  MeBi Run Bisim (tact TheAction2 tend) With termLTS
          And (tact TheAction2 tend) With termLTS
          Using termLTS.
 
   (* false *)
   Fail 
-  MeBi Bisim (tact TheAction1 tend) With termLTS
+  MeBi Run Bisim (tact TheAction1 tend) With termLTS
          And (tact TheAction2 tend) With termLTS
          Using termLTS.
 
   (* false *)
   Fail 
-  MeBi Bisim (tact TheAction2 tend) With termLTS
+  MeBi Run Bisim (tact TheAction2 tend) With termLTS
          And (tact TheAction1 tend) With termLTS
          Using termLTS.
 
   (* true *)
-  MeBi Bisim (tact TheAction1 (tact TheAction2 tend)) With termLTS
+  MeBi Run Bisim (tact TheAction1 (tact TheAction2 tend)) With termLTS
          And (tact TheAction1 (tact TheAction2 tend)) With termLTS
          Using termLTS.
 
   (* true *)
-  MeBi Bisim (tact TheAction2 (tact TheAction1 tend)) With termLTS
+  MeBi Run Bisim (tact TheAction2 (tact TheAction1 tend)) With termLTS
          And (tact TheAction2 (tact TheAction1 tend)) With termLTS
          Using termLTS.
 
   (* false *) 
   Fail 
-  MeBi Bisim (tact TheAction1 (tact TheAction2 tend)) With termLTS
+  MeBi Run Bisim (tact TheAction1 (tact TheAction2 tend)) With termLTS
          And (tact TheAction2 (tact TheAction1 tend)) With termLTS
          Using termLTS.
 
   (* true *)
-  MeBi Bisim (tpar TheAction1 TheAction2 tend) With termLTS
+  MeBi Run Bisim (tpar TheAction1 TheAction2 tend) With termLTS
          And (tpar TheAction1 TheAction2 tend) With termLTS
          Using termLTS.
 
   (* true *)
-  MeBi Bisim (tpar TheAction1 TheAction2 tend) With termLTS
+  MeBi Run Bisim (tpar TheAction1 TheAction2 tend) With termLTS
          And (tpar TheAction2 TheAction1 tend) With termLTS
          Using termLTS.
 
   (* true *)
-  MeBi Bisim (tpar TheAction2 TheAction1 tend) With termLTS
+  MeBi Run Bisim (tpar TheAction2 TheAction1 tend) With termLTS
          And (tpar TheAction1 TheAction2 tend) With termLTS
          Using termLTS.
 
   (* false *)
   Fail 
-  MeBi Bisim (tpar TheAction1 TheAction1 tend) With termLTS
+  MeBi Run Bisim (tpar TheAction1 TheAction1 tend) With termLTS
          And (tact TheAction1 tend) With termLTS
          Using termLTS.
 
   (* false *)
   Fail 
-  MeBi Bisim (tpar TheAction1 TheAction2 tend) With termLTS
+  MeBi Run Bisim (tpar TheAction1 TheAction2 tend) With termLTS
          And (tact TheAction1 tend) With termLTS
          Using termLTS.
 
   (* true *)
-  MeBi Bisim (tfix (tact TheAction1 trec)) With termLTS
+  MeBi Run Bisim (tfix (tact TheAction1 trec)) With termLTS
          And (tfix (tact TheAction1 trec)) With termLTS
          Using termLTS.
 
   (* true *)
-  MeBi Bisim (tfix (tact TheAction1 trec)) With termLTS
+  MeBi Run Bisim (tfix (tact TheAction1 trec)) With termLTS
          And (tact TheAction1 (tfix (tact TheAction1 trec))) With termLTS
          Using termLTS.
 
   (* true *)
-  MeBi Bisim (tfix (tact TheAction1 (tact TheAction2 trec))) With termLTS
+  MeBi Run Bisim (tfix (tact TheAction1 (tact TheAction2 trec))) With termLTS
          And (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))) With termLTS
          Using termLTS.
 
   (* saturate *)
-  MeBi Saturate 
+  MeBi Run Saturate 
     (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))) 
     Using termLTS.
 
   (* minimize *)
-  MeBi Minimize 
+  MeBi Run Minimize 
     (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))) 
     Using termLTS.
 End BisimTest1.
@@ -359,39 +359,39 @@ Module BisimTest2.
   | do_fix : forall t, termLTS (tfix t) TAU (subst (tfix t) t).
 
   (* MeBi Config WeakMode Disable. *)
-  MeBi Reset Weak Config.
+  MeBi Config Reset Weak.
 
   Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
-  MeBi FSM exa1 Using termLTS.
-  MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
+  MeBi Run FSM exa1 Using termLTS.
+  MeBi Run Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
 
   (* MeBi Config WeakMode Enable. *)
   MeBi Config Weak As TAU Of action.
 
-  MeBi FSM exa1 Using termLTS.
-  MeBi Saturate exa1 Using termLTS.
-  MeBi Minimize exa1 Using termLTS.
+  MeBi Run FSM exa1 Using termLTS.
+  MeBi Run Saturate exa1 Using termLTS.
+  MeBi Run Minimize exa1 Using termLTS.
 
-  MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
+  MeBi Run Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
 
   Example exa2 := (tfix (tact TheAction1 (tact TheAction2 trec))).
-  MeBi FSM exa2 Using termLTS.
-  MeBi Saturate exa2 Using termLTS.
-  MeBi Minimize exa2 Using termLTS.
+  MeBi Run FSM exa2 Using termLTS.
+  MeBi Run Saturate exa2 Using termLTS.
+  MeBi Run Minimize exa2 Using termLTS.
   
   Example exa3 := (tact TheAction1 (tfix (tact TheAction2 (tact TheAction1 trec)))).
-  MeBi FSM exa3 Using termLTS.
-  MeBi Saturate exa3 Using termLTS.
-  MeBi Minimize exa3 Using termLTS.
+  MeBi Run FSM exa3 Using termLTS.
+  MeBi Run Saturate exa3 Using termLTS.
+  MeBi Run Minimize exa3 Using termLTS.
   
-  MeBi Bisim exa1 With termLTS And exa2 With termLTS Using termLTS.
-  MeBi Bisim exa1 With termLTS And exa3 With termLTS Using termLTS.
+  MeBi Run Bisim exa1 With termLTS And exa2 With termLTS Using termLTS.
+  MeBi Run Bisim exa1 With termLTS And exa3 With termLTS Using termLTS.
 
-  MeBi Bisim exa2 With termLTS And exa1 With termLTS Using termLTS.
-  MeBi Bisim exa2 With termLTS And exa3 With termLTS Using termLTS.
+  MeBi Run Bisim exa2 With termLTS And exa1 With termLTS Using termLTS.
+  MeBi Run Bisim exa2 With termLTS And exa3 With termLTS Using termLTS.
 
-  MeBi Bisim exa3 With termLTS And exa1 With termLTS Using termLTS.
-  MeBi Bisim exa3 With termLTS And exa2 With termLTS Using termLTS.
+  MeBi Run Bisim exa3 With termLTS And exa1 With termLTS Using termLTS.
+  MeBi Run Bisim exa3 With termLTS And exa2 With termLTS Using termLTS.
 End BisimTest2.
 
 MeBi Divider "Theories.Test.BisimTest3".
@@ -424,41 +424,41 @@ Module BisimTest3.
 
   | do_fix : forall t, termLTS (tfix t) None (subst (tfix t) t).
 
-  MeBi Reset Weak Config.
+  MeBi Config Reset Weak.
   (* MeBi Config WeakMode Disable. *)
 
   Example exa1 := (tact TheAction1 (tact TheAction2 (tfix (tact TheAction1 (tact TheAction2 trec))))).
-  MeBi FSM exa1 Using termLTS.
-  MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
+  MeBi Run FSM exa1 Using termLTS.
+  MeBi Run Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
 
   (* MeBi Config WeakMode Enable. *)
-  MeBi Reset Weak Config.
+  MeBi Config Reset Weak.
   MeBi Config Weak As Option action.
 
-  MeBi FSM exa1 Using termLTS.
-  MeBi Saturate exa1 Using termLTS.
-  MeBi Minimize exa1 Using termLTS.
+  MeBi Run FSM exa1 Using termLTS.
+  MeBi Run Saturate exa1 Using termLTS.
+  MeBi Run Minimize exa1 Using termLTS.
 
-  MeBi Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
+  MeBi Run Bisim exa1 With termLTS And exa1 With termLTS Using termLTS.
 
   Example exa2 := (tfix (tact TheAction1 (tact TheAction2 trec))).
-  MeBi FSM exa2 Using termLTS.
-  MeBi Saturate exa2 Using termLTS.
-  MeBi Minimize exa2 Using termLTS.
+  MeBi Run FSM exa2 Using termLTS.
+  MeBi Run Saturate exa2 Using termLTS.
+  MeBi Run Minimize exa2 Using termLTS.
   
   Example exa3 := (tact TheAction1 (tfix (tact TheAction2 (tact TheAction1 trec)))).
-  MeBi FSM exa3 Using termLTS.
-  MeBi Saturate exa3 Using termLTS.
-  MeBi Minimize exa3 Using termLTS.
+  MeBi Run FSM exa3 Using termLTS.
+  MeBi Run Saturate exa3 Using termLTS.
+  MeBi Run Minimize exa3 Using termLTS.
   
-  MeBi Bisim exa1 With termLTS And exa2 With termLTS Using termLTS.
-  MeBi Bisim exa1 With termLTS And exa3 With termLTS Using termLTS.
+  MeBi Run Bisim exa1 With termLTS And exa2 With termLTS Using termLTS.
+  MeBi Run Bisim exa1 With termLTS And exa3 With termLTS Using termLTS.
 
-  MeBi Bisim exa2 With termLTS And exa1 With termLTS Using termLTS.
-  MeBi Bisim exa2 With termLTS And exa3 With termLTS Using termLTS.
+  MeBi Run Bisim exa2 With termLTS And exa1 With termLTS Using termLTS.
+  MeBi Run Bisim exa2 With termLTS And exa3 With termLTS Using termLTS.
 
-  MeBi Bisim exa3 With termLTS And exa1 With termLTS Using termLTS.
-  MeBi Bisim exa3 With termLTS And exa2 With termLTS Using termLTS.
+  MeBi Run Bisim exa3 With termLTS And exa1 With termLTS Using termLTS.
+  MeBi Run Bisim exa3 With termLTS And exa2 With termLTS Using termLTS.
 End BisimTest3.
 
 (* MeBi Divider "Theories.Test.ProofTest".
@@ -534,10 +534,10 @@ End BisimDef. *)
       termLTS (tfix t) a (tfix t')
   | do_collapse : forall t, termLTS (tfix (tfix t)) Collapse (tfix t).
 
-  MeBi LTS termLTS (tfix (tact TheAction1 tend)).
-  MeBi LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
+  MeBi Run LTS termLTS (tfix (tact TheAction1 tend)).
+  MeBi Run LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
 
-  MeBi LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
+  MeBi Run LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
 End Test3. *)
 
 (* FIXME: The case below is hard to implement. *)
@@ -588,10 +588,10 @@ is inhabited, or we have no way to check if we exhaustively cover all possible c
       termLTS (tfix t) a (tfix t')
   | do_collapse : forall t, termLTS (tfix (tfix t)) Collapse (tfix t).
 
-  MeBi LTS termLTS (tfix (tact TheAction1 tend)).
-  MeBi LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
+  MeBi Run LTS termLTS (tfix (tact TheAction1 tend)).
+  MeBi Run LTS termLTS (tfix (tact TheAction1 (tact TheAction2 trec))).
 
-  MeBi LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
+  MeBi Run LTS termLTS (tfix (tpar TheAction1 TheAction2 trec)).
 End Test4. *)
 
 

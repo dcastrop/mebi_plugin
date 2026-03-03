@@ -20,38 +20,38 @@ Require Import Logic.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.pq".
 Example wsim_pq : weak_sim termLTS termLTS p q. 
-Proof. MeBiSim Begin termLTS p And termLTS q Using termLTS. 
+Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS. 
   (* Iteration History: 446 <- 446 <- 465 <- _ *) 
-  MeBiSim Solve 446. Qed.
+  MeBi Sim Solve 446. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.qp".
 Example wsim_qp : weak_sim termLTS termLTS q p. 
-Proof. MeBiSim Begin termLTS q And termLTS p Using termLTS. 
+Proof. MeBi Sim Begin termLTS q And termLTS p Using termLTS. 
   (* Iteration History: 278 <- 278 <- 297 <- _ *) 
-  MeBiSim Solve 278. Qed.
+  MeBi Sim Solve 278. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.qr".
 Example wsim_qr : weak_sim termLTS termLTS q r. 
-Proof. MeBiSim Begin termLTS q And termLTS r Using termLTS. 
+Proof. MeBi Sim Begin termLTS q And termLTS r Using termLTS. 
   (* Iteration History: 299 <- 299 <- 322 <- _ *) 
-  MeBiSim Solve 299. Qed.
+  MeBi Sim Solve 299. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.rq".
 Example wsim_rq : weak_sim termLTS termLTS r q. 
-Proof. MeBiSim Begin termLTS r And termLTS q Using termLTS. 
+Proof. MeBi Sim Begin termLTS r And termLTS q Using termLTS. 
   (* Iteration History: 194 <- 194 <- 195 <- _ *) 
-  MeBiSim Solve 194. Qed.
+  MeBi Sim Solve 194. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.pr".
 Example wsim_pr : weak_sim termLTS termLTS p r. 
-Proof. MeBiSim Begin termLTS p And termLTS r Using termLTS. 
+Proof. MeBi Sim Begin termLTS p And termLTS r Using termLTS. 
   (* Iteration History: 446 <- 446 <- 497 <- _ *) 
-  MeBiSim Solve 446. Qed.
+  MeBi Sim Solve 446. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs.ProofTest.rp".
 Example wsim_rp : weak_sim termLTS termLTS r p. 
-Proof. MeBiSim Begin termLTS r And termLTS p Using termLTS. 
+Proof. MeBi Sim Begin termLTS r And termLTS p Using termLTS. 
   (* Iteration History: 182 <- 182 <- 191 <- _ *) 
-  MeBiSim Solve 182. Qed.
+  MeBi Sim Solve 182. Qed.

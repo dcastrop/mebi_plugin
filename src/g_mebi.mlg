@@ -12,70 +12,31 @@ open Stdarg
 (* open Pp *)
 }
 
-(* API *)
-(* VERNAC COMMAND EXTEND MeBi_API CLASSIFIED AS QUERY
-| [ "MeBi" "API" "Initialize" ] ->
-END *)
-
-(* ProofSolver *)
-(* VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
-
+(* ProofSolver - sim *)
+(* TODO: automatically handle from bisim. i guess by starting a proof inside? *)
+VERNAC COMMAND EXTEND MeBi_Sim CLASSIFIED AS QUERY
 |![ proof ] 
-  [ "MeBiSim" "Solve" int(upper_bound) ] ->
-  { fun ~pstate -> Mebi_proof.solve upper_bound pstate }
-
-|![ proof ] 
-  [ "MeBiSim" "Step" ] ->
-  { fun ~pstate -> Mebi_tactics.update_proof_by_tactic pstate (Mebi_proof.step ()) }
-
-|![ proof ] 
-  [ "MeBiSim" "Begin" reference(a) constr(x)  
-                "And" reference(b) constr(y)
-                "Using" reference_list(rs) ] -> 
-  { fun ~pstate -> 
-    Mebi_wrapper.run ~keep_encoding:false ~fresh:true (
-      Command.proof_intro pstate (x, a) (y, b) rs
-    ) 
-  }
-
-|![ proof ] 
-  [ "MeBiSim" "Begin" reference(a) constr(x)  
-                "And" reference(b) constr(y) ] -> 
-  { fun ~pstate -> 
-    Mebi_wrapper.run ~keep_encoding:false ~fresh:true (
-      Command.proof_intro pstate (x, a) (y, b) []
-    ) 
-  }
-
-END *)
-
-(* ProofSolver *)
-(* TODO: use Proof_solver and Proof_solver.W *)
-VERNAC COMMAND EXTEND MeBiSim CLASSIFIED AS QUERY
-|![ proof ] 
-  [ "MeBiSim" "Solve" int(bound) ] ->
+  [ "MeBi" "Sim" "Solve" int(bound) ] ->
   { fun ~pstate -> Proof_solver.solve ~bound pstate }
 
 |![ proof ] 
-  [ "MeBiSim" "Step" ] ->
+  [ "MeBi" "Sim" "Step" ] ->
   { fun ~pstate -> Proof_solver.step pstate }
 
 |![ proof ] 
-  [ "MeBiSim" "Begin" reference(a) constr(x)  
-                "And" reference(b) constr(y) ] -> 
+  [ "MeBi" "Sim" "Begin" reference(a) constr(x) "And" reference(b) constr(y) ] -> 
   { fun ~pstate -> Proof_solver.init pstate [] (x,a) (y,b) }
 
 |![ proof ] 
-  [ "MeBiSim" "Begin" reference(a) constr(x)  
-                "And" reference(b) constr(y)
-                "Using" reference_list(rs) ] -> 
+  [ "MeBi" "Sim" "Begin" reference(a) constr(x) "And" reference(b) constr(y)
+                 "Using" reference_list(rs) ] -> 
   { fun ~pstate -> Proof_solver.init pstate rs (x,a) (y,b) }
 END
 
 (* Bisimilarity *)
-VERNAC COMMAND EXTEND MeBi_Bisim CLASSIFIED AS QUERY
-| ["MeBi" "Bisim" constr(x) "With" reference(a) 
-            "And" constr(y) "With" reference(b)] -> 
+VERNAC COMMAND EXTEND MeBi_Run_Bisim CLASSIFIED AS QUERY
+| ["MeBi" "Run" 
+   "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
@@ -84,8 +45,9 @@ VERNAC COMMAND EXTEND MeBi_Bisim CLASSIFIED AS QUERY
     in ()
   }
 
-| ["MeBi" "Bisim" constr(x) "With" reference(a) 
-            "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
+| ["MeBi" "Run" 
+   "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b) 
+   "Using" reference_list(rs)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
@@ -97,9 +59,9 @@ END
 
 
 (* Merge *)
-VERNAC COMMAND EXTEND MeBi_Merge CLASSIFIED AS QUERY
-| ["MeBi" "Merge" constr(x) "With" reference(a) 
-            "And" constr(y) "With" reference(b)] -> 
+VERNAC COMMAND EXTEND MeBi_Run_Merge CLASSIFIED AS QUERY
+| ["MeBi" "Run" 
+   "Merge" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
@@ -108,8 +70,9 @@ VERNAC COMMAND EXTEND MeBi_Merge CLASSIFIED AS QUERY
     in ()
   }
 
-| ["MeBi" "Merge" constr(x) "With" reference(a) 
-            "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
+| ["MeBi" "Run" 
+   "Merge" constr(x) "With" reference(a) "And" constr(y) "With" reference(b) 
+   "Using" reference_list(rs)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
@@ -120,8 +83,8 @@ VERNAC COMMAND EXTEND MeBi_Merge CLASSIFIED AS QUERY
 END 
 
 (* Minimize *)
-VERNAC COMMAND EXTEND MeBi_Minimize CLASSIFIED AS QUERY
-| ["MeBi" "Minimize" constr(x) "Using" reference(r)] -> 
+VERNAC COMMAND EXTEND MeBi_Run_Minimize CLASSIFIED AS QUERY
+| ["MeBi" "Run" "Minimize" constr(x) "Using" reference(r)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
@@ -130,7 +93,7 @@ VERNAC COMMAND EXTEND MeBi_Minimize CLASSIFIED AS QUERY
     in ()
   }
   
-| ["MeBi" "Minimize" constr(x) "Using" reference(r) reference_list(rs)] -> 
+| ["MeBi" "Run" "Minimize" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
@@ -141,8 +104,8 @@ VERNAC COMMAND EXTEND MeBi_Minimize CLASSIFIED AS QUERY
 END 
 
 (* Saturate *)
-VERNAC COMMAND EXTEND MeBi_Saturate CLASSIFIED AS QUERY
-| ["MeBi" "Saturate" constr(x) "Using" reference(r)] -> 
+VERNAC COMMAND EXTEND MeBi_Run_Saturate CLASSIFIED AS QUERY
+| ["MeBi" "Run" "Saturate" constr(x) "Using" reference(r)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
@@ -151,7 +114,7 @@ VERNAC COMMAND EXTEND MeBi_Saturate CLASSIFIED AS QUERY
     in ()
   }
   
-| ["MeBi" "Saturate" constr(x) "Using" reference(r) reference_list(rs)] -> 
+| ["MeBi" "Run" "Saturate" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
@@ -162,8 +125,8 @@ VERNAC COMMAND EXTEND MeBi_Saturate CLASSIFIED AS QUERY
 END 
 
 (* FSM *)
-VERNAC COMMAND EXTEND MeBi_FSM CLASSIFIED AS QUERY
-| ["MeBi" "FSM" constr(x) "Using" reference(r)] -> 
+VERNAC COMMAND EXTEND MeBi_Run_FSM CLASSIFIED AS QUERY
+| ["MeBi" "Run" "FSM" constr(x) "Using" reference(r)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
@@ -172,7 +135,7 @@ VERNAC COMMAND EXTEND MeBi_FSM CLASSIFIED AS QUERY
     in ()
   }
   
-| ["MeBi" "FSM" constr(x) "Using" reference(r) reference_list(rs)] -> 
+| ["MeBi" "Run" "FSM" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
@@ -183,8 +146,8 @@ VERNAC COMMAND EXTEND MeBi_FSM CLASSIFIED AS QUERY
 END 
 
 (* LTS *)
-VERNAC COMMAND EXTEND MeBi_LTS CLASSIFIED AS QUERY
-| ["MeBi" "LTS" constr(x) "Using" reference(r)] -> 
+VERNAC COMMAND EXTEND MeBi_Run_LTS CLASSIFIED AS QUERY
+| ["MeBi" "Run" "LTS" constr(x) "Using" reference(r)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
@@ -193,7 +156,7 @@ VERNAC COMMAND EXTEND MeBi_LTS CLASSIFIED AS QUERY
     in ()
   }
   
-| ["MeBi" "LTS" constr(x) "Using" reference(r) reference_list(rs)] -> 
+| ["MeBi" "Run" "LTS" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
     let module W = Wrapper.Make (Logger.Default) ((val Api.default_context ())) ((val Api.default_encoding ())) in
     let _ = 
@@ -203,172 +166,83 @@ VERNAC COMMAND EXTEND MeBi_LTS CLASSIFIED AS QUERY
   }
 END 
 
-VERNAC COMMAND EXTEND MeBi_Reset CLASSIFIED AS QUERY
-| ["MeBi" "Reset" "Weak" "Config"] -> 
-  {
-    Api.reset_weak_args ()
-  }
+VERNAC COMMAND EXTEND MeBi_Config_Reset CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Reset"]          -> { Api.reset_all              () }
+| ["MeBi" "Config" "Reset" "Bounds"] -> { Api.reset_bounds_args      () }
+| ["MeBi" "Config" "Reset" "Weak"]   -> { Api.reset_weak_args        () }
+| ["MeBi" "Config" "Reset" "FailIf"] -> { Api.reset_the_fail_flags   () }
+| ["MeBi" "Config" "Reset" "Output"] -> { Api.reset_the_logging_args () }
+END
+
+(* Config -- graph bounds *)
+VERNAC COMMAND EXTEND MeBi_Config_Bounds CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Bounds" "As" "Num" "States" int(x)] -> 
+  { Api.set_the_bounds_args (Api.States x) }
+| ["MeBi" "Config" "Bounds" "As" "Num" "Transitions" int(x)] -> 
+  { Api.set_the_bounds_args (Api.Transitions x) }
 END
 
 (* Config -- weak_args for both *)
 VERNAC COMMAND EXTEND MeBi_Config_Weak_Both CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Weak" "As" "Option" constr(x)] -> 
-  {
-    Api.set_the_weak_args (Some (Api.Option x)) None
-  }
+  { Api.set_the_weak_args (Some (Api.Option x)) None }
 | ["MeBi" "Config" "Weak" "As" constr(x) "Of" reference(y)] -> 
-  {
-    Api.set_the_weak_args (Some (Api.Custom (x,y))) None
-  }
+  { Api.set_the_weak_args (Some (Api.Custom (x,y))) None }
 END
 
 (* Config -- weak_args for first *)
 VERNAC COMMAND EXTEND MeBi_Config_Weak_First CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Weak1" "As" "Option" constr(x)] -> 
-  {
-    Api.set_the_weak_arg1 (Api.Option x) 
-  }
+  { Api.set_the_weak_arg1 (Api.Option x) }
 | ["MeBi" "Config" "Weak1" "As" constr(x) "Of" reference(y)] -> 
-  {
-    Api.set_the_weak_arg1 (Api.Custom (x,y)) 
-  }
+  { Api.set_the_weak_arg1 (Api.Custom (x,y)) }
 END
 
 (* Config -- weak_args for second *)
 VERNAC COMMAND EXTEND MeBi_Config_Weak_Second CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Weak2" "As" "Option" constr(x)] -> 
-  {
-    Api.set_the_weak_arg2 (Api.Option x) 
-  }
+  { Api.set_the_weak_arg2 (Api.Option x) }
 | ["MeBi" "Config" "Weak2" "As" constr(x) "Of" reference(y)] -> 
-  {
-    Api.set_the_weak_arg2 (Api.Custom (x,y)) 
-  }
+  { Api.set_the_weak_arg2 (Api.Custom (x,y)) }
 END
 
-(* VERNAC COMMAND EXTEND MeBi_FSM CLASSIFIED AS QUERY
-| ["MeBi" "FSM" constr(x) "Using" reference(r)] -> 
-  {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.FSM, (x, r))) [])}
+(* Config -- fail-if empty flag *)
+VERNAC COMMAND EXTEND MeBi_Config_FailIf_Empty CLASSIFIED AS QUERY
+| ["MeBi" "Config" "FailIf" "Empty" "True"] -> 
+  { Api.set_fail_flag_empty true }
+| ["MeBi" "Config" "FailIf" "Empty" "False"] -> 
+  { Api.set_fail_flag_empty false }
+END
 
-| ["MeBi" "FSM" constr(x) "Using" reference(r) reference_list(rs)] -> 
-  {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.FSM, (x, r))) rs)}
-END  *)
+(* Config -- fail-if incomplete flag *)
+VERNAC COMMAND EXTEND MeBi_Config_FailIf_Incomplete CLASSIFIED AS QUERY
+| ["MeBi" "Config" "FailIf" "Incomplete" "True"] -> 
+  { Api.set_fail_flag_incomplete true }
+| ["MeBi" "Config" "FailIf" "Incomplete" "False"] -> 
+  { Api.set_fail_flag_incomplete false }
+END
 
-(* VERNAC COMMAND EXTEND MeBi_Saturate CLASSIFIED AS QUERY
-| ["MeBi" "Saturate" constr(x) "Using" reference(r)] -> 
-  {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) [])}
+(* Config -- fail-if not-bisimilar flag *)
+VERNAC COMMAND EXTEND MeBi_Config_FailIf_NotBisimilar CLASSIFIED AS QUERY
+| ["MeBi" "Config" "FailIf" "NotBisimilar" "True"] -> 
+  { Api.set_fail_flag_non_bisimilar true }
+| ["MeBi" "Config" "FailIf" "NotBisimilar" "False"] -> 
+  { Api.set_fail_flag_non_bisimilar false }
+END
 
-| ["MeBi" "Saturate" constr(x) "Using" reference(r) reference_list(rs)] -> 
-  {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) rs)}
-END  *)
-
-(* VERNAC COMMAND EXTEND MeBi_Minimize CLASSIFIED AS QUERY
-| ["MeBi" "Minimize" constr(x) "Using" reference(r)] -> 
-  {Mebi_wrapper.run (Command.run (Command.MinimizeModel (x, r)) [])}
-  
-| ["MeBi" "Minimize" constr(x) "Using" reference(r) reference_list(rs)] -> 
-  {Mebi_wrapper.run (Command.run (Command.MinimizeModel (x, r)) rs)}
-END  *)
-
-(* VERNAC COMMAND EXTEND MeBi_Merge CLASSIFIED AS QUERY
-| ["MeBi" "Merge" constr(x) "With" reference(a) 
-            "And" constr(y) "With" reference(b)] -> 
-  {Mebi_wrapper.run (Command.run (Command.MergeModels ((x, a), (y, b))) [])}
-
-| ["MeBi" "Merge" constr(x) "With" reference(a) 
-            "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
-  {Mebi_wrapper.run (Command.run (Command.MergeModels ((x, a), (y, b))) rs)}
-END  *)
-
-(* VERNAC COMMAND EXTEND MeBi_Bisim CLASSIFIED AS QUERY
-| ["MeBi" "Bisim" constr(x) "With" reference(a) 
-            "And" constr(y) "With" reference(b)] -> 
-  {Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) [])}
-
-| ["MeBi" "Bisim" constr(x) "With" reference(a) 
-            "And" constr(y) "With" reference(b) "Using" reference_list(rs)] -> 
-  {Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) rs)}
-END  *)
-
-(* VERNAC COMMAND EXTEND MeBi_Config_Reset CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Reset"] -> {Mebi_api.reset_config ()}
-| ["MeBi" "Config" "Reset" "Bound"] -> {Mebi_api.reset_bounds ()}
-| ["MeBi" "Config" "Reset" "WeakMode"] -> {Mebi_api.reset_weak_mode ()}
-| ["MeBi" "Config" "Reset" "FailIf"] -> {Mebi_api.reset_fail_if ()}
-| ["MeBi" "Config" "Reset" "Debug"] -> {Mebi_api.reset_debug ()}
-| ["MeBi" "Config" "Reset" "Output"] -> {Mebi_api.reset_output ()}
+(* Config -- output *)
+(* VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
+(* TODO: check if we can just use [x] like this, would save a lot of time/space *)
+| ["MeBi" "Config" "Output" x "True"] -> 
+  { Api.set_output_level x true }
+| ["MeBi" "Config" "Output" x "False"] -> 
+  { Api.set_output_level x false }
 END *)
 
-(* VERNAC COMMAND EXTEND MeBi_Config_Bounds CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Bound" int(x)] -> {Mebi_api.set_bound x}
-| ["MeBi" "Config" "Bound" int(x) "On" "States"] -> {Mebi_api.set_bounds x Model_info.States}
-| ["MeBi" "Config" "Bound" int(x) "On" "Transitions"] -> {Mebi_api.set_bounds x Model_info.Transitions}
-END  *)
-
-(* VERNAC COMMAND EXTEND MeBi_Config_Weak CLASSIFIED AS QUERY
-| ["MeBi" "Config" "WeakMode" "Enable"] -> {Mebi_api.set_weak_mode_enabled true}
-| ["MeBi" "Config" "WeakMode" "Disable"] -> {Mebi_api.set_weak_mode_enabled false}
-
-(* set the weak transitions -- bisim will use for both terms unless specified *)
-| ["MeBi" "Config" "Weak" "As" "Option" constr(x)] -> {Mebi_api.set_weak_arg1 (Some (Mebi_api.Option x))}
-| ["MeBi" "Config" "Weak" "As" constr(x) "Of" reference(y)] -> {Mebi_api.set_weak_arg1 (Some (Mebi_api.Custom (x, y)))}
-
-(* same as above *)
-| ["MeBi" "Config" "Weak1" "As" "Option" constr(x)] -> {Mebi_api.set_weak_arg1 (Some (Mebi_api.Option x))}
-| ["MeBi" "Config" "Weak1" "As" constr(x) "Of" reference(y)] -> {Mebi_api.set_weak_arg1 (Some (Mebi_api.Custom (x, y)))}
-
-(* for second lts *)
-| ["MeBi" "Config" "Weak2" "As" "Option" constr(x)] -> {Mebi_api.set_weak_arg2 (Some (Mebi_api.Option x))}
-| ["MeBi" "Config" "Weak2" "As" constr(x) "Of" reference(y)] -> {Mebi_api.set_weak_arg2 (Some (Mebi_api.Custom (x, y)))}
-END  *)
-
-(* VERNAC COMMAND EXTEND MeBi_Config_Fail CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Fail" "If" "Incomplete" "True" ] -> {Mebi_api.set_fail_ifincomplete true}
-| ["MeBi" "Config" "Fail" "If" "Incomplete" "False"] -> {Mebi_api.set_fail_ifincomplete false}
-
-| ["MeBi" "Config" "Fail" "If" "NotBisim" "True" ] -> {Mebi_api.set_fail_ifnotbisim true}
-| ["MeBi" "Config" "Fail" "If" "NotBisim" "False"] -> {Mebi_api.set_fail_ifnotbisim false}
-END  *)
-
-(* VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Output" "Enable"] -> {Mebi_api.set_output_enabled true}
-| ["MeBi" "Config" "Output" "Disable"] -> {Mebi_api.set_output_enabled false}
-
-| ["MeBi" "Config" "Output" "Debug" "Enable"] -> {Mebi_api.set_output_level Debug true}
-| ["MeBi" "Config" "Output" "Debug" "Disable"] -> {Mebi_api.set_output_level Debug false}
-
-| ["MeBi" "Config" "Output" "Info" "Enable"] -> {Mebi_api.set_output_level Info true}
-| ["MeBi" "Config" "Output" "Info" "Disable"] -> {Mebi_api.set_output_level Info false}
-
-| ["MeBi" "Config" "Output" "Notice" "Enable"] -> {Mebi_api.set_output_level Notice true}
-| ["MeBi" "Config" "Output" "Notice" "Disable"] -> {Mebi_api.set_output_level Notice false}
-
-| ["MeBi" "Config" "Output" "Warning" "Enable"] -> {Mebi_api.set_output_level Warning true}
-| ["MeBi" "Config" "Output" "Warning" "Disable"] -> {Mebi_api.set_output_level Warning false}
-
-| ["MeBi" "Config" "Output" "Error" "Enable"] -> {Mebi_api.set_output_level Error true}
-| ["MeBi" "Config" "Output" "Error" "Disable"] -> {Mebi_api.set_output_level Error false}
-
-| ["MeBi" "Config" "Output" "Trace" "Enable"] -> {Mebi_api.set_output_special Trace true}
-| ["MeBi" "Config" "Output" "Trace" "Disable"] -> {Mebi_api.set_output_special Trace false}
-
-| ["MeBi" "Config" "Output" "Results" "Enable"] -> {Mebi_api.set_output_special Result true}
-| ["MeBi" "Config" "Output" "Results" "Disable"] -> {Mebi_api.set_output_special Result false}
-
-| ["MeBi" "Config" "Output" "Show" "Enable"] -> {Mebi_api.set_output_special Show true}
-| ["MeBi" "Config" "Output" "Show" "Disable"] -> {Mebi_api.set_output_special Show false}
-END  *)
-
 VERNAC COMMAND EXTEND MeBi_Help CLASSIFIED AS QUERY
-(* TODO: *)
+(* TODO: update me *)
 | ["MeBi" "Help"] -> {Logger.Default.show "TODO: Update Mebi_help"}
 END 
-(* 
-VERNAC COMMAND EXTEND MeBi_ CLASSIFIED AS QUERY
-
-
-END 
-*)
 
 VERNAC COMMAND EXTEND MeBi_Divider CLASSIFIED AS QUERY
 (* for outputting messages -- useful for sifting through compiler output *)
@@ -380,326 +254,3 @@ VERNAC COMMAND EXTEND MeBi_Divider CLASSIFIED AS QUERY
 | ["MeBi" string(x) "Divider" string(y)] -> 
   {Logger.Default.show (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n%s" x y)}
 END 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-(* VERNAC COMMAND EXTEND MeBi_BeginProof CLASSIFIED AS QUERY
-|  ![ proof_query ] 
-    [ "MeBi_Bisimilarity" constr(x) "With" reference(a) 
-                    "And" constr(y) "With" reference(b) 
-                    "Using" reference_list(rs) ] -> 
-    { fun ~pstate -> Mebi_wrapper.run ~proof:(Some pstate) (
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.show_names () in 
-      Command.run (Command.CheckBisimilarity ((x, a), (y, b))) rs
-      (* let* t = Command.tactic (Command.Bisimilarity (((x, a), (y, b)), rs)) in 
-      let (p, _b) = Declare.Proof.by t pstate in
-      Mebi_wrapper.return p  *)
-      )
-    }
-END *)
-
-(* VERNAC COMMAND EXTEND MeBi_Bisimilarity CLASSIFIED AS QUERY
-| ![ proof ] 
-   [ "MeBi_Bisimilarity" constr(x) "With" reference(a) 
-                   "And" constr(y) "With" reference(b) ] -> 
-   { fun ~pstate -> Mebi_wrapper.run ~keep_proof:false (
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.show_names () in 
-      let* t = Command.tactic (Command.Bisimilarity (((x, a), (y, b)), [])) in 
-      let (p, _b) = Declare.Proof.by t pstate in
-      Mebi_wrapper.return p )
-    }
-
-| ![ proof ] 
-   [ "MeBi_Bisimilarity" constr(x) "With" reference(a) 
-                   "And" constr(y) "With" reference(b) 
-                   "Using" reference_list(rs) ] -> 
-    { fun ~pstate -> Mebi_wrapper.run ~keep_proof:false (
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.show_names () in 
-      let* t = Command.tactic (Command.Bisimilarity (((x, a), (y, b)), rs)) in 
-      let (p, _b) = Declare.Proof.by t pstate in
-      Mebi_wrapper.return p
-    )}
-
-END *)
-
-
-
-(* NOTE: ![proof] is modify state: https://rocq-prover.org/doc/V8.20.0/api/coq-core/Vernactypes/index.html#val-vtmodifyproof  *)
-(* VERNAC COMMAND EXTEND MeBi_cofix CLASSIFIED AS QUERY
-| ![ proof ]["MeBi_cofix"] -> 
-   { fun ~pstate -> 
-      let p = Mebi_wrapper.run ~keep_proof:true (
-        let open Mebi_wrapper.Syntax in
-        let* _ = Mebi_wrapper.show_names () in 
-        let* n = Mebi_wrapper.new_name_of_string "TestCofix" in
-        let* _ = Mebi_wrapper.show_names () in 
-        let (p, _b) = Declare.Proof.by (Tactics.cofix (n)) pstate in 
-        Mebi_wrapper.return p ) in 
-      Logging.Log.override "vernac, check names:";
-      let _ = Mebi_wrapper.run ~keep_proof:true (
-        let open Mebi_wrapper.Syntax in
-        let* _ = Mebi_wrapper.show_names () in 
-        Mebi_wrapper.return ()) in
-      p
-   }
-END *)
-
-(* VERNAC COMMAND EXTEND MeBi_Bisimilarity CLASSIFIED AS QUERY
-| ![ proof ] 
-   [ "MeBi_Bisimilarity" constr(x) "With" reference(a) 
-                   "And" constr(y) "With" reference(b) ] -> 
-   { fun ~pstate -> Mebi_wrapper.run ~keep_proof:false (
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.show_names () in 
-      let* t = Command.tactic (Command.Bisimilarity (((x, a), (y, b)), [])) in 
-      let (p, _b) = Declare.Proof.by t pstate in
-      Mebi_wrapper.return p )
-    }
-
-| ![ proof ] 
-   [ "MeBi_Bisimilarity" constr(x) "With" reference(a) 
-                   "And" constr(y) "With" reference(b) 
-                   "Using" reference_list(rs) ] -> 
-    { fun ~pstate -> Mebi_wrapper.run ~keep_proof:false (
-      let open Mebi_wrapper.Syntax in 
-      let* _ = Mebi_wrapper.show_names () in 
-      let* t = Command.tactic (Command.Bisimilarity (((x, a), (y, b)), rs)) in 
-      let (p, _b) = Declare.Proof.by t pstate in
-      Mebi_wrapper.return p
-    )}
-
-END *)
-
-(*** Exploring proof state ***)
-
-(*
- * This command demonstrates exploring the proof state from within
- * a command.
- *
- * Note that Pfedit.get_current_context gets us the environment
- * and state within a proof, as opposed to the global environment
- * and state. This is important within tactics.
- *)
-(* VERNAC COMMAND EXTEND MeBi_ExploreProof CLASSIFIED AS QUERY
-| ![ proof_query ] [ "MeBi_ExploreProof" ] ->
-  { fun ~pstate ->
-    let sigma, env = Declare.Proof.get_current_context pstate in
-    let pprf = Proof.partial_proof (Declare.Proof.get pstate) in
-    Feedback.msg_notice
-      (Pp.prlist_with_sep Pp.fnl (Printer.pr_econstr_env env sigma) pprf)
-  }
-END *)
-
-(* TACTIC EXTEND MeBi_unfold
-| ["MeBi_unfold" constr(x)] -> {Mebi_wrapper.run (Mebi_tactics.unfold_econstr x)}
-END *)
-
-(* TACTIC EXTEND MeBi_intros
-| ["MeBi_intros"] -> {Mebi_tactics.intros ~all:true () []}
-| ["MeBi_intros" string(s)] -> {Mebi_tactics.intros ~all:true () [(Mebi_tactics.Str s)]}
-| ["MeBi_intros" string_list(s)] -> {Mebi_tactics.intros ~all:true () (List.map (fun (a:string) -> Mebi_tactics.Str a) s)}
-| ["MeBi_intros" ident(i)] -> {Mebi_tactics.intros ~all:true () [(Mebi_tactics.Id i)]}
-END *)
-
-(* TACTIC EXTEND MeBi_intros_only
-| ["MeBi_intros_only"] -> {Mebi_tactics.intros () []}
-| ["MeBi_intros_only" string(s)] -> {Mebi_tactics.intros () [(Mebi_tactics.Str s)]}
-| ["MeBi_intros_only" string_list(s)] -> {Mebi_tactics.intros () (List.map (fun (a:string) -> Mebi_tactics.Str a) s)}
-| ["MeBi_intros_only" ident(i)] -> {Mebi_tactics.intros () [(Mebi_tactics.Id i)]}
-END *)
-
-(* TACTIC EXTEND MeBi_intro
-| ["MeBi_intro"] -> {Mebi_tactics.intro () (Mebi_tactics.Unk ())}
-| ["MeBi_intro" string(s)] -> {Mebi_tactics.intro () (Mebi_tactics.Str s)}
-| ["MeBi_intro" ident(i)] -> {Mebi_tactics.intro () (Mebi_tactics.Id i)}
-END *)
-
-(* TACTIC EXTEND MeBiTactic
-| ["MeBi" "ProofTest0"] -> {Mebi_tactics.intro () (Mebi_tactics.Unk ())}
-| ["MeBi" "ProofTest0" string(s)] -> {Mebi_tactics.intro () (Mebi_tactics.Str s)}
-| ["MeBi" "ProofTest0" ident(i)] -> {Mebi_tactics.intro () (Mebi_tactics.Id i)}
-| ["MeBi" "ProofTest1"] -> {Proofview.tclUNIT ()}
-| ["MeBi" "ProofTest2"] -> {Mebi_wrapper.run (Command.tactic (Command.ProofTest ()) )}
-(* | [ "pack" "hypothesis" ident(i) ] ->{ Tuto_tactic.pack_tactic i } *)
-END *)
-
-(* VERNAC COMMAND EXTEND MeBiRun CLASSIFIED AS QUERY
-
-(* set plugin params *)
-| ["MeBi" "Set" "Bound" int(b)       ] -> {Params.set_bounds (b, None)}
-| ["MeBi" "Set" "Bound" int(b) int(a)] -> {Params.set_bounds (b, Some a)}
-
-| ["MeBi" "Set" "FailIfIncomplete" "True" ] -> {Params.set_fail_if_incomplete true}
-| ["MeBi" "Set" "FailIfIncomplete" "False"] -> {Params.set_fail_if_incomplete false}
-
-| ["MeBi" "Set" "FailIfNotBisim" "True" ] -> {Params.set_fail_if_not_bisim true}
-| ["MeBi" "Set" "FailIfNotBisim" "False"] -> {Params.set_fail_if_not_bisim false}
-
-| ["MeBi" "Set" "DumpToFile"  "True" ] -> {Params.set_dump_to_file true}
-| ["MeBi" "Set" "DumpToFile"  "False"] -> {Params.set_dump_to_file false}
-
-| ["MeBi" "Set" "ShowAny"   "True" ] -> {Params.set_show_any true}
-| ["MeBi" "Set" "ShowAny"   "False"] -> {Params.set_show_any false}
-
-| ["MeBi" "Set" "ShowNotices"   "True" ] -> {Params.set_show_notice true}
-| ["MeBi" "Set" "ShowNotices"   "False"] -> {Params.set_show_notice false}
-
-| ["MeBi" "Set" "ShowDebug"   "True" ] -> {Params.set_show_debug true}
-| ["MeBi" "Set" "ShowDebug"   "False"] -> {Params.set_show_debug false}
-
-| ["MeBi" "Set" "ShowDetails" "True" ] -> {Params.set_show_details true}
-| ["MeBi" "Set" "ShowDetails" "False"] -> {Params.set_show_details false}
-
-| ["MeBi" "Set" "ShowResults"   "True" ] -> {Params.set_show_result true}
-| ["MeBi" "Set" "ShowResults"   "False"] -> {Params.set_show_result false}
-
-| ["MeBi" "Set" "ShowWarnings"   "True" ] -> {Params.set_show_warning true}
-| ["MeBi" "Set" "ShowWarnings"   "False"] -> {Params.set_show_warning false}
-
-| ["MeBi" "Set" "WeakMode"    "True" ] -> {Params.set_weak_mode true}
-| ["MeBi" "Set" "WeakMode"    "False"] -> {Params.set_weak_mode false}
-
-(* set the weak transitions -- bisim will use for both terms unless specified *)
-| ["MeBi" "Set" "Weak" "Option" constr(x)   ] -> {Params.set_weak_types_args (Params.WeakArgs.Option x, None)}
-| ["MeBi" "Set" "Weak" constr(x)    "Of" reference(y)] -> {Params.set_weak_types_args (Params.WeakArgs.Custom (x, y), None)}
-
-(* specify weak transition for first lts *)
-| ["MeBi" "Set" "Weak1" "Option" constr(x)   ] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.Option x); Logging.Log.notice "Set Weak1 param."}
-| ["MeBi" "Set" "Weak1" constr(x)    "Of" reference(y)] -> {Params.set_fst_weak_type_arg (Params.WeakArgs.Custom (x, y)); Logging.Log.notice "Set Weak1 param."}
-
-(* specify weak transition for second lts *)
-| ["MeBi" "Set" "Weak2" "Option" constr(x)   ] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.Option x); Logging.Log.notice "Set Weak2 param."}
-| ["MeBi" "Set" "Weak2" constr(x)    "Of" reference(y)] -> {Params.set_snd_weak_type_arg (Params.WeakArgs.Custom (x, y)); Logging.Log.notice "Set Weak2 param."}
-
-(* reset plugin params *)
-| ["MeBi" "Reset" "Bound"      ] -> {Params.reset_bounds ()}
-| ["MeBi" "Reset" "FailIfIncomplete" ] -> {Params.reset_fail_if_incomplete ()}
-| ["MeBi" "Reset" "FailIfNotBisim" ] -> {Params.reset_fail_if_not_bisim ()}
-| ["MeBi" "Reset" "DumpToFile" ] -> {Params.reset_dump_to_file ()}
-| ["MeBi" "Reset" "ShowAny"  ] -> {Params.reset_show_any ()}
-| ["MeBi" "Reset" "ShowNotice"  ] -> {Params.reset_show_notice ()}
-| ["MeBi" "Reset" "ShowDebug"  ] -> {Params.reset_show_debug ()}
-| ["MeBi" "Reset" "ShowDetails"] -> {Params.reset_show_details ()}
-| ["MeBi" "Reset" "ShowResults"] -> {Params.reset_show_result ()}
-| ["MeBi" "Reset" "ShowWarning"] -> {Params.reset_show_warning ()}
-| ["MeBi" "Reset" "WeakMode"   ] -> {Params.reset_weak_mode ()}
-| ["MeBi" "Reset" "Weak"       ] -> {Params.reset_weak_types ()}
-| ["MeBi" "Reset" "All"        ] -> {Mebi_wrapper.run (Params.reset_all ())}
-
-(* check plugin params *)
-| ["MeBi" "See" "Bound"      ] -> {Params.printout_bounds ()}
-| ["MeBi" "See" "FailIfIncomplete" ] -> {Params.printout_fail_if_incomplete ()}
-| ["MeBi" "See" "FailIfNotBisim" ] -> {Params.printout_fail_if_not_bisim ()}
-| ["MeBi" "See" "DumpToFile" ] -> {Params.printout_dump_to_file ()}
-| ["MeBi" "See" "ShowAny"  ] -> {Params.printout_show_any ()}
-| ["MeBi" "See" "ShowNotice"  ] -> {Params.printout_show_notice ()}
-| ["MeBi" "See" "ShowDebug"  ] -> {Params.printout_show_debug ()}
-| ["MeBi" "See" "ShowDetails"] -> {Params.printout_show_details ()}
-| ["MeBi" "See" "ShowResults"] -> {Params.printout_show_result ()}
-| ["MeBi" "See" "ShowWarning"] -> {Params.printout_show_warning ()}
-| ["MeBi" "See" "WeakMode"   ] -> {Params.printout_weak_mode ()}
-| ["MeBi" "See" "Weak"       ] -> {Mebi_wrapper.run (Params.printout_weak_types ())}
-| ["MeBi" "See" "Weak1"      ] -> {Mebi_wrapper.run (Params.printout_fst_weak_type ())}
-| ["MeBi" "See" "Weak2"      ] -> {Mebi_wrapper.run (Params.printout_snd_weak_type ())}
-| ["MeBi" "See" "All"        ] -> {Mebi_wrapper.run (Params.printout_all ())}
-
-
-| ["MeBi" "LTS" constr(x) "Using" reference(r)] -> {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) [])}
-| ["MeBi" "LTS" constr(x) "Using" reference(r) 
-                            reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.LTS, (x, r))) rs)}
-
-| ["MeBi" "FSM" constr(x) "Using" reference(r)] -> {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.FSM, (x, r))) [])}
-| ["MeBi" "FSM" constr(x) "Using" reference(r) 
-                            reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.MakeModel (Command.FSM, (x, r))) rs)}
-
-| ["MeBi" "Saturate" constr(x) "Using" reference(r)] -> {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) [])}
-| ["MeBi" "Saturate" constr(x) "Using" reference(r) 
-                                 reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.SaturateModel (x, r)) rs)}
-
-| ["MeBi" "Merge" constr(x) "With" reference(a) 
-            "And" constr(y) "With" reference(b)] -> {Mebi_wrapper.run (Command.run (Command.MergeModels ((x, a), (y, b))) [])}
-| ["MeBi" "Merge" constr(x) "With" reference(a) 
-            "And" constr(y) "With" reference(b) 
-                     "Using" reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.MergeModels ((x, a), (y, b))) rs)}
-
-| ["MeBi" "Minimize" constr(x) "Using" reference(r)] -> {Mebi_wrapper.run (Command.run (Command.MinimizeModel (x, r)) [])}
-| ["MeBi" "Minimize" constr(x) "Using" reference(r) 
-                                 reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.MinimizeModel (x, r)) rs)}
-
-| ["MeBi" "Bisim" constr(x) "With" reference(a) 
-            "And" constr(y) "With" reference(b)] -> {Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) [])}
-| ["MeBi" "Bisim" constr(x) "With" reference(a) 
-            "And" constr(y) "With" reference(b) 
-                     "Using" reference_list(rs)] -> {Mebi_wrapper.run (Command.run (Command.CheckBisimilarity ((x, a), (y, b))) rs)}
-
-| ["MeBi" "Help"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Basic ())) [])}
-
-| ["MeBi" "Help" "Set"              ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.General ()))) [])}
-| ["MeBi" "Help" "Set" "Bound"      ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.Bound ()))) [])}
-| ["MeBi" "Help" "Set" "FailIfIncomplete" ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.FailIfIncomplete ()))) [])}
-| ["MeBi" "Help" "Set" "FailIfNotBisim" ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.FailIfNotBisim ()))) [])}
-| ["MeBi" "Help" "Set" "DumpToFile" ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.DumpToFile ()))) [])}
-| ["MeBi" "Help" "Set" "ShowAny"  ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowAny ()))) [])}
-| ["MeBi" "Help" "Set" "ShowNotice"  ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowNotices ()))) [])}
-| ["MeBi" "Help" "Set" "ShowDebug"  ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowDebug ()))) [])}
-| ["MeBi" "Help" "Set" "ShowDetails"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowDetails ()))) [])}
-| ["MeBi" "Help" "Set" "ShowResults"  ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowResults ()))) [])}
-| ["MeBi" "Help" "Set" "ShowWarning"  ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.ShowWarnings ()))) [])}
-| ["MeBi" "Help" "Set" "WeakMode"   ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.WeakMode ()))) [])}
-| ["MeBi" "Help" "Set" "Weak"       ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Set (Mebi_help.Weak ()))) [])}
-
-| ["MeBi" "Help" "Reset"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Reset ())) [])}
-| ["MeBi" "Help" "Check"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.See ())) [])}
-
-| ["MeBi" "Help" "LTS"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.LTS ())) [])}
-| ["MeBi" "Help" "FSM"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.FSM ())) [])}
-
-| ["MeBi" "Help" "Saturate"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Saturate ())) [])}
-| ["MeBi" "Help" "Minimize"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Minimize ())) [])}
-
-| ["MeBi" "Help" "Bisim"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Bisim ())) [])}
-
-| ["MeBi" "Help" "Info"] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Info ())) [])}
-
-| ["MeBi" ] -> {Mebi_wrapper.run (Command.run (Command.Help (Mebi_help.Unrecognized ())) [])}
-
-| ["MeBi" "Info"] -> {Mebi_wrapper.run (Command.run (Command.Info ()) [])}
-
-(* for outputting messages -- useful for sifting through compiler output *)
-| ["MeBi" "Message" string(x)] -> {Logger.Default.show x}
-| ["MeBi" "Debug"   string(x)] -> {Logger.Default.debug x}
-| ["MeBi" "Divider"          ] -> {Logger.Default.show "\n- - - - - - - - - - - - - - - -"}
-| ["MeBi" string(x) "Divider"] -> {Logger.Default.show (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -" x)}
-| ["MeBi" "Divider" string(x)] -> {Logger.Default.show (Printf.sprintf "\n- - - - - - - - - - - - - - - -\n%s" x)}
-| ["MeBi" string(x) "Divider" string(y)] -> 
-  {Logger.Default.show (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n%s" x y)}
-END *)
