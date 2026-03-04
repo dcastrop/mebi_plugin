@@ -96,13 +96,14 @@ Fail MeBi Run LTS 0 Using False.
 
 CoInductive co_nat := CoZ | CoS : co_nat -> co_nat.
 
-Inductive test_lts A : co_nat -> nat -> nat -> Prop :=
+Inductive test_lts (A:Type) : co_nat -> nat -> nat -> Prop :=
 | less_lt (x : A) (i : co_nat) (j : nat) : test_lts A (CoS i) 1 j.
 
 Fail MeBi Run LTS 0 Using test_lts.
 
-Inductive test_mut A : Prop := Mk1 (x : A) (y : test_mut2 A)
-with test_mut2 A : Prop := Mk2 (y : test_mut A).
+(* TODO: [Auto Template Polymorphism] automatically enabled here... *)
+Inductive test_mut (A:Type) : Prop := Mk1 (x : A) (y : test_mut2 A)
+with test_mut2 (A:Type) : Prop := Mk2 (y : test_mut A).
 
 Fail MeBi Run LTS 0 Using test_mut2.
 

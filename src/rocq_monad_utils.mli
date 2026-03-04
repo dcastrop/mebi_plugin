@@ -269,8 +269,8 @@ module Make : (Log : Logger.SLogger)
       | LTS_Incomplete of string
       | Not_Bisimilar
       | Invalid_Ind_Kind of Rocq_ind.kind
-      | Invalid_Sort_LTS of Sorts.family
-      | Invalid_Sort_Type of Sorts.family
+      | Invalid_Sort_LTS of Sorts.Quality.t
+      | Invalid_Sort_Type of Sorts.Quality.t
       | Invalid_Ref_LTS of Names.GlobRef.t
       | Invalid_Ref_Type of Names.GlobRef.t
       | Invalid_Arity of (Environ.env * Evd.evar_map * Constr.t)
@@ -288,8 +288,8 @@ module Make : (Log : Logger.SLogger)
     val lts_incomplete : string -> exn
     val not_bisimilar : unit -> exn
     val invalid_ind_kind : Rocq_ind.kind -> exn
-    val invalid_sort_lts : Sorts.family -> exn
-    val invalid_sort_type : Sorts.family -> exn
+    val invalid_sort_lts : Sorts.Quality.t -> exn
+    val invalid_sort_type : Sorts.Quality.t -> exn
     val invalid_ref_lts : Names.GlobRef.t -> exn
     val invalid_ref_type : Names.GlobRef.t -> exn
     val invalid_arity : Environ.env -> Evd.evar_map -> Constr.t -> exn
@@ -312,8 +312,8 @@ module Make : (Log : Logger.SLogger)
     val lts_incomplete : string -> 'a
     val not_bisimilar : unit -> 'a
     val invalid_ind_kind : Rocq_ind.kind -> 'a
-    val invalid_sort_lts : Sorts.family -> 'a
-    val invalid_sort_type : Sorts.family -> 'a
+    val invalid_sort_lts : Sorts.Quality.t -> 'a
+    val invalid_sort_type : Sorts.Quality.t -> 'a
     val invalid_ref_lts : Names.GlobRef.t -> 'a
     val invalid_ref_type : Names.GlobRef.t -> 'a
     val invalid_arity : Constr.t -> 'a mm
@@ -340,10 +340,10 @@ module Make : (Log : Logger.SLogger)
     val lookup : Names.inductive -> Declarations.mind_specif mm
 
     val assert_mip_arity_is_type_or_set
-      :  Declarations.inductive_arity
+      :  Declarations.one_inductive_body
       -> unit mm
 
-    val assert_mip_arity_is_prop : Declarations.inductive_arity -> unit mm
+    val assert_mip_arity_is_prop : Declarations.one_inductive_body -> unit mm
 
     val lts_mind
       :  Names.GlobRef.t

@@ -37,12 +37,20 @@ let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t)
 type constr_kind =
   ( Constr.t
     , Constr.types
-    , Sorts.t
+    , Sorts.Quality.t
     , UVars.Instance.t
     , Sorts.relevance )
     Constr.kind_of_term
 
-exception Rocq_utils_ConstrIsNot_App of (Constr.t * constr_kind)
+exception
+  Rocq_utils_ConstrIsNot_App of
+    (Constr.t
+    * ( Constr.t
+        , Constr.t
+        , Sorts.t
+        , UVars.Instance.t
+        , Sorts.relevance )
+        Constr.kind_of_term)
 
 let constr_to_app (x : Constr.t) : Constr.t kind_pair =
   match Constr.kind x with
@@ -328,9 +336,11 @@ module Strfy = struct
 
   (*****************************************************************************)
 
-  let constr_kind env sigma 
-  (* ?(args : style_args = style_args ())  *)
-  (x : Constr.t)
+  let constr_kind
+        env
+        sigma
+        (* ?(args : style_args = style_args ()) *)
+          (x : Constr.t)
     : string
     =
     let k : string =

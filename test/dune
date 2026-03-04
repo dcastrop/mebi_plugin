@@ -1,5 +1,5 @@
 (executable
  (name tests)
- (public_name coq-mebi.tests)
+ (public_name rocq-mebi.tests)
  (flags :standard -rectypes -w -27)
- (libraries coq-mebi.mebi))
+ (libraries rocq-mebi.mebi))

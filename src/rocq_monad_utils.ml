@@ -161,8 +161,8 @@ struct
       (* NOTE: *)
       | Invalid_Ind_Kind of Rocq_ind.kind
       (* NOTE: *)
-      | Invalid_Sort_LTS of Sorts.family
-      | Invalid_Sort_Type of Sorts.family
+      | Invalid_Sort_LTS of Sorts.Quality.t
+      | Invalid_Sort_Type of Sorts.Quality.t
       (* NOTE: *)
       | Invalid_Ref_LTS of Names.GlobRef.t
       | Invalid_Ref_Type of Names.GlobRef.t
@@ -189,8 +189,8 @@ struct
     val invalid_ind_kind : Rocq_ind.kind -> exn
 
     (* NOTE: *)
-    val invalid_sort_lts : Sorts.family -> exn
-    val invalid_sort_type : Sorts.family -> exn
+    val invalid_sort_lts : Sorts.Quality.t -> exn
+    val invalid_sort_type : Sorts.Quality.t -> exn
 
     (* NOTE: *)
     val invalid_ref_lts : Names.GlobRef.t -> exn
@@ -221,8 +221,8 @@ struct
       (* NOTE: *)
       | Invalid_Ind_Kind of Rocq_ind.kind
       (* NOTE: *)
-      | Invalid_Sort_LTS of Sorts.family
-      | Invalid_Sort_Type of Sorts.family
+      | Invalid_Sort_LTS of Sorts.Quality.t
+      | Invalid_Sort_Type of Sorts.Quality.t
       (* NOTE: *)
       | Invalid_Ref_LTS of Names.GlobRef.t
       | Invalid_Ref_Type of Names.GlobRef.t
@@ -324,8 +324,8 @@ struct
     val invalid_ind_kind : Rocq_ind.kind -> 'a
 
     (* NOTE: *)
-    val invalid_sort_lts : Sorts.family -> 'a
-    val invalid_sort_type : Sorts.family -> 'a
+    val invalid_sort_lts : Sorts.Quality.t -> 'a
+    val invalid_sort_type : Sorts.Quality.t -> 'a
 
     (* NOTE: *)
     val invalid_ref_lts : Names.GlobRef.t -> 'a
@@ -355,11 +355,11 @@ struct
       raise (Errors.invalid_ind_kind x)
     ;;
 
-    let invalid_sort_lts (x : Sorts.family) : 'a =
+    let invalid_sort_lts (x : Sorts.Quality.t) : 'a =
       raise (Errors.invalid_sort_lts x)
     ;;
 
-    let invalid_sort_type (x : Sorts.family) : 'a =
+    let invalid_sort_type (x : Sorts.Quality.t) : 'a =
       raise (Errors.invalid_sort_type x)
     ;;
 
@@ -432,31 +432,25 @@ struct
     (** []
         @raise Errors.Invalid_Sort_Type if [x.mind_sort] is not [Type] or [Set]
     *)
-    let assert_mip_arity_is_type_or_set
-      : Declarations.inductive_arity -> unit mm
+    let assert_mip_arity_is_type_or_set (mip : Declarations.one_inductive_body)
+      : unit mm
       =
       (* Log.trace __FUNCTION__; *)
-      function
-      | Declarations.RegularArity x ->
-        (match x.mind_sort with
-         | Type _ -> return ()
-         | Set -> return ()
-         | _ -> Err.invalid_sort_type (Sorts.family x.mind_sort))
-      | Declarations.TemplateArity y ->
-        Err.invalid_sort_type (Sorts.family y.template_level)
+      match mip.mind_sort with
+      | Type _ -> return ()
+      | Set -> return ()
+      | _ -> Err.invalid_sort_type (Sorts.quality mip.mind_sort)
     ;;
 
     (** []
         @raise Errors.Invalid_Sort_LTS if [x.mind_sort] is not [Prop] *)
-    let assert_mip_arity_is_prop : Declarations.inductive_arity -> unit mm =
+    let assert_mip_arity_is_prop (mip : Declarations.one_inductive_body)
+      : unit mm
+      =
       (* Log.trace __FUNCTION__; *)
-      function
-      | Declarations.RegularArity x ->
-        (match x.mind_sort with
-         | Prop -> return ()
-         | _ -> Err.invalid_sort_lts (Sorts.family x.mind_sort))
-      | Declarations.TemplateArity y ->
-        Err.invalid_sort_lts (Sorts.family y.template_level)
+      match mip.mind_sort with
+      | Prop -> return ()
+      | _ -> Err.invalid_sort_lts (Sorts.quality mip.mind_sort)
     ;;
 
     (** []
@@ -480,7 +474,7 @@ struct
       (* Log.trace __FUNCTION__; *)
       let open Syntax in
       let* ind, (mib, mip) = lts_mind x in
-      let* () = assert_mip_arity_is_type_or_set mip.mind_arity in
+      let* () = assert_mip_arity_is_type_or_set mip in
       (ind, (mib, mip)) |> return
     ;;
 
@@ -491,7 +485,7 @@ struct
       (* Log.trace __FUNCTION__; *)
       let open Syntax in
       let* ind, (mib, mip) = lts_mind x in
-      let* () = assert_mip_arity_is_prop mip.mind_arity in
+      let* () = assert_mip_arity_is_prop mip in
       (ind, (mib, mip)) |> return
     ;;
 
@@ -628,7 +622,10 @@ struct
         : Evd.evar_map * bool
         =
         try
-          Unification.w_unify env sigma Conversion.CUMUL to_check acc, true
+          let _, sigma =
+            Unification.w_unify env sigma Conversion.CUMUL to_check acc
+          in
+          sigma, true
         with
         | Pretype_errors.PretypeError (_, _, CannotUnify (c, d, _e)) ->
           sigma, false

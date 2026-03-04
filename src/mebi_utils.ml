@@ -136,9 +136,9 @@ let assert_mip_arity_is_type (mip : Declarations.one_inductive_body) : unit mm =
     (match s.mind_sort with
      | Type _ -> return ()
      | Set -> return ()
-     | _ -> invalid_sort_type (Sorts.family s.mind_sort))
+     | _ -> invalid_sort_type (Sorts.quality s.mind_sort))
   | Declarations.TemplateArity t ->
-    invalid_sort_type (Sorts.family t.template_level)
+    invalid_sort_type (Sorts.quality t.template_level)
 ;;
 
 let get_lts_ind_type_mind (gref : Names.GlobRef.t)
@@ -155,10 +155,10 @@ let assert_mip_arity_is_prop (mip : Declarations.one_inductive_body) : unit mm =
   match mip.mind_arity with
   | Declarations.RegularArity s ->
     if not (Sorts.is_prop s.mind_sort)
-    then invalid_sort_lts (Sorts.family s.mind_sort)
+    then invalid_sort_lts (Sorts.quality s.mind_sort)
     else return ()
   | Declarations.TemplateArity t ->
-    invalid_sort_lts (Sorts.family t.template_level)
+    invalid_sort_lts (Sorts.quality t.template_level)
 ;;
 
 let get_lts_ind_prop_mind (gref : Names.GlobRef.t)

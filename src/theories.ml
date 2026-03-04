@@ -17,11 +17,13 @@ let () = Log.Config.configure_output Trace false
 
 let constants : EConstr.t list ref = ref ([] : EConstr.t list)
 
-(* let find_reference (path : string list) (id : string) : Names.GlobRef.t =
-   let path = Names.DirPath.make (List.rev_map Names.Id.of_string path) in
-   let fp = Libnames.make_path path (Names.Id.of_string id) in
-   Nametab.global_of_path fp*)
-let find_reference = Coqlib.find_reference [@ocaml.warning "-3"]
+let find_reference (path : string list) (id : string) : Names.GlobRef.t =
+  let path = Names.DirPath.make (List.rev_map Names.Id.of_string path) in
+  let fp = Libnames.make_path path (Names.Id.of_string id) in
+  Nametab.global_of_path fp
+;;
+
+(* let find_reference = Coqlib.find_reference [@ocaml.warning "-3"] *)
 
 (****************************************************************************)
 
@@ -41,52 +43,47 @@ let collect_bisimilarity_theories () : EConstr.t list =
         (fun (x : Names.GlobRef.t) ->
           EConstr.of_constr
             (UnivGen.constr_of_monomorphic_global (Global.env ()) x))
-        [ find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "LTS"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "tau"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "silent"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "silent1"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "weak"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "wk_some"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "wk_none"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "simF"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "Pack_sim"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "sim_weak"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "weak_sim"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "In_sim"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "out_sim"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "weak_bisim"
+        [ find_reference [ "MEBI"; "Bisimilarity" ] "LTS"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "tau"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "silent"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "silent1"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "weak"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "wk_some"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "wk_none"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "simF"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "Pack_sim"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "sim_weak"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "weak_sim"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "In_sim"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "out_sim"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "weak_bisim"
           (* NOTE: if updating to rocq change "Coq" to "Corelib" *)
           (* NOTE: docs say "Coq" should be "Stdlib" for version prior to rocq, but this doesn't work for me *)
         ; find_reference
-            "MEBI"
-            [ "Coq"; "Relations"; "Relation_Definitions" ]
+            [ "Corelib"; "Relations"; "Relation_Definitions" ]
             "relation"
         ; find_reference
-            "MEBI"
-            [ "Coq"; "Relations"; "Relation_Operators" ]
+            [ "Stdlib"; "Relations"; "Relation_Operators" ]
             "clos_refl_trans_1n"
         ; find_reference
-            "MEBI"
-            [ "Coq"; "Relations"; "Relation_Operators" ]
+            [ "Stdlib"; "Relations"; "Relation_Operators" ]
             "rt1n_refl"
         ; find_reference
-            "MEBI"
-            [ "Coq"; "Relations"; "Relation_Operators" ]
+            [ "Stdlib"; "Relations"; "Relation_Operators" ]
             "rt1n_trans"
         ; find_reference
-            "MEBI"
-            [ "Coq"; "Relations"; "Relation_Operators" ]
+            [ "Stdlib"; "Relations"; "Relation_Operators" ]
             "clos_trans_1n"
-        ; find_reference "MEBI" [ "Coq"; "Init"; "Datatypes" ] "option"
-        ; find_reference "MEBI" [ "Coq"; "Init"; "Datatypes" ] "None"
-        ; find_reference "MEBI" [ "Coq"; "Init"; "Datatypes" ] "Some"
-        ; find_reference "MEBI" [ "Coq"; "Init"; "Logic" ] "ex"
-        ; find_reference "MEBI" [ "Coq"; "Init"; "Logic" ] "ex_intro"
-        ; find_reference "MEBI" [ "Coq"; "Init"; "Datatypes" ] "prod"
-        ; find_reference "MEBI" [ "Coq"; "Init"; "Datatypes" ] "pair"
+        ; find_reference [ "Corelib"; "Init"; "Datatypes" ] "option"
+        ; find_reference [ "Corelib"; "Init"; "Datatypes" ] "None"
+        ; find_reference [ "Corelib"; "Init"; "Datatypes" ] "Some"
+        ; find_reference [ "Corelib"; "Init"; "Logic" ] "ex"
+        ; find_reference [ "Corelib"; "Init"; "Logic" ] "ex_intro"
+        ; find_reference [ "Corelib"; "Init"; "Datatypes" ] "prod"
+        ; find_reference [ "Corelib"; "Init"; "Datatypes" ] "pair"
           (* NOTE: Lemmas: *)
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "weak_sim_refl"
-        ; find_reference "MEBI" [ "MEBI"; "Bisimilarity" ] "wk_bisim_refl"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "weak_sim_refl"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "wk_bisim_refl"
         ]
     in
     constants := new_constants;

@@ -1,5 +1,5 @@
 val constants : EConstr.t list ref
-val find_reference : string -> string list -> string -> Names.GlobRef.t
+val find_reference : string list -> string -> Names.GlobRef.t
 val collect_bisimilarity_theories : unit -> EConstr.t list
 val indexed_c : int * EConstr.t list -> EConstr.t option
 val c_LTS : unit -> EConstr.t
