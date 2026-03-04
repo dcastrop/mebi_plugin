@@ -1,5 +1,5 @@
 (* Require Import MEBI.loader. *)
-Require Coq.Program.Tactics.
+Require Stdlib.Program.Tactics.
 
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.Proc.
@@ -65,13 +65,13 @@ Ltac move_terms_to_hypothesis :=
   end.
 
 (****************************************************************************)
-Require Import Notations.
+From Stdlib Require Import Notations.
 Require Import List.
 Import ListNotations.
   
-Require Import Relation_Definitions.
-Require Import Relation_Operators.
-Require Operators_Properties.
+From Corelib Require Import Relations.Relation_Definitions.
+From Stdlib Require Import Relations.Relation_Operators.
+From Stdlib Require Operators_Properties.
 
 (****************************************************************************)
 Ltac silent_to_clos_rt :=

@@ -1,5 +1,5 @@
 (***********************************************************************)
-module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+module Log : Logger.SLogger = Logger.MkDefault ()
 
 let () = Log.Config.configure_output Debug false
 let () = Log.Config.configure_output Trace false
@@ -197,19 +197,24 @@ let show_help_see () : unit =
      Use command \"MeBi Reset All\" to reset them all.\n"
 ;;
 
-let show_help_lts () : unit = Log.notice "Use the command \"MeBi LTS ...\"\n"
-let show_help_fsm () : unit = Log.notice "Use the command \"MeBi FSM ...\"\n"
+let show_help_lts () : unit =
+  Log.notice "Use the command \"MeBi Run LTS ...\"\n"
+;;
+
+let show_help_fsm () : unit =
+  Log.notice "Use the command \"MeBi Run FSM ...\"\n"
+;;
 
 let show_help_saturate () : unit =
-  Log.notice "Use the command \"MeBi Saturate ...\"\n"
+  Log.notice "Use the command \"MeBi Run Saturate ...\"\n"
 ;;
 
 let show_help_minimize () : unit =
-  Log.notice "Use the command \"MeBi Minimize ...\"\n"
+  Log.notice "Use the command \"MeBi Run Minimize ...\"\n"
 ;;
 
 let show_help_bisim () : unit =
-  Log.notice "Use the command \"MeBi Bisim ...\"\n"
+  Log.notice "Use the command \"MeBi Run Bisim ...\"\n"
 ;;
 
 let show_help_info () : unit =

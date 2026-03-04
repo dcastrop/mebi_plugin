@@ -1,4 +1,4 @@
-(lang dune 3.20)
+(lang dune 3.21)
 
 ;  FIXME: whenevr dune 3.21 and rocq updte ??
 ; (lang dune 3.21)
@@ -8,7 +8,9 @@
 
 ; (lang dune 3.20)
 
-(using coq 0.10)
+; (using coq 0.10)
+
+(using rocq 0.11)
 
 ; https://dune.readthedocs.io/en/stable/rocq.html#rocq-plugin-project
 

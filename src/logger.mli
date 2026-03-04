@@ -1,10 +1,4 @@
-type 'a to_string =
-  | Args of (?args:Utils.Strfy.style_args -> 'a -> string)
-  | Of of ('a -> string)
-
-val f_to_string : ?args:Utils.Strfy.style_args -> 'a to_string -> 'a -> string
-
-module type LOGGER_TYPE = sig
+module type SLogger = sig
   module Config : Output_config.OUTPUT_CONFIG
 
   val enabled : bool ref
@@ -24,7 +18,7 @@ module type LOGGER_TYPE = sig
     -> Output_kind.t
     -> string
     -> 'a
-    -> 'a to_string
+    -> 'a Utils.Strfy.to_string
     -> unit
 
   val things
@@ -33,7 +27,7 @@ module type LOGGER_TYPE = sig
     -> Output_kind.t
     -> string
     -> 'a list
-    -> 'a to_string
+    -> 'a Utils.Strfy.to_string
     -> unit
 
   val option
@@ -42,7 +36,7 @@ module type LOGGER_TYPE = sig
     -> Output_kind.t
     -> string
     -> 'a option
-    -> 'a to_string
+    -> 'a Utils.Strfy.to_string
     -> unit
 
   val options
@@ -51,7 +45,7 @@ module type LOGGER_TYPE = sig
     -> Output_kind.t
     -> string
     -> 'a list option
-    -> 'a to_string
+    -> 'a Utils.Strfy.to_string
     -> unit
 end
 
@@ -61,6 +55,6 @@ module type S = sig
   val special : Output_kind.special -> bool
 end
 
-module Make : (_ : Output_mode.OUTPUT_MODE) (_ : S) -> LOGGER_TYPE
-module MkDefault : () -> LOGGER_TYPE
-module Default : LOGGER_TYPE
+module Make : (_ : Output_mode.OUTPUT_MODE) (_ : S) -> SLogger
+module MkDefault : () -> SLogger
+module Default : SLogger

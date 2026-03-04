@@ -1,11 +1,14 @@
 .merlin
 *.ml*.d
 *.cm[ixt]*
+Makefile.rocq*
+.Makefile.rocq.d
 Makefile.coq*
 .Makefile.coq.d
 *~
 *.[ao]
 .coqdeps.d
+.rocqdeps.d
 *.vo
 *.vos
 *.vok
@@ -24,6 +27,9 @@ _build
 CoqMakeFile*
 CoqMakefile*
 .CoqMakeFile.d
+RocqMakeFile*
+RocqMakefile*
+.RocqMakeFile.d
 
 # ignore vscode settings
 .vscode
