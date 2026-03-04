@@ -1,10 +1,8 @@
-(* Require Import MEBI.loader. *)
-
-Require Export String.
-Require Import PeanoNat.
+From Stdlib Require Export String.
+From Stdlib Require Import PeanoNat.
 Require Import Notations.
-Require Export Bool.
-Require Import List.
+From Stdlib Require Import Bool.
+From Stdlib Require Import Lists.List.
 Import ListNotations.
 
 Fixpoint app {X:Type} (l1 l2 : list X) : list X :=

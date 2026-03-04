@@ -1,5 +1,5 @@
 Require Import MEBI.Bisimilarity.
-Require Coq.Program.Tactics.
+Require Stdlib.Program.Tactics.
 
 Set Primitive Projections.
 

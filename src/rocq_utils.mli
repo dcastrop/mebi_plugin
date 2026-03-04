@@ -11,12 +11,20 @@ val econstr_to_atomic : Evd.evar_map -> EConstr.t -> EConstr.t kind_pair
 type constr_kind =
   ( Constr.t
     , Constr.t
-    , Sorts.t
+    , Sorts.Quality.t
     , UVars.Instance.t
     , Sorts.relevance )
     Constr.kind_of_term
 
-exception Rocq_utils_ConstrIsNot_App of (Constr.t * constr_kind)
+exception
+  Rocq_utils_ConstrIsNot_App of
+    (Constr.t
+    * ( Constr.t
+        , Constr.t
+        , Sorts.t
+        , UVars.Instance.t
+        , Sorts.relevance )
+        Constr.kind_of_term)
 
 val constr_to_app : Constr.t -> Constr.t kind_pair
 

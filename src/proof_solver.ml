@@ -1576,7 +1576,8 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         Tactic.tactic
           ~msg:"(Clearing non-cofix Hyps)"
           (Tactics.clear
-             (Names.Id.Set.to_list (get_all_non_cofix_hyp_names ())))
+             (Names.Id.Set.to_seq (get_all_non_cofix_hyp_names ())
+              |> List.of_seq))
       ;;
 
       (** [try_invert_any inverted_hyps] returns either [None] if no hyps can be inverted (as determined by [Hyp.invertibility]), else a [Tactic.t] that will invert the hypothesis deemed to be the most important to invert. (Only checks non-cofix hyps as by [get_non_cofixes ()].)

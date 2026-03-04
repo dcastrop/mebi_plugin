@@ -1,9 +1,9 @@
 Require Import MEBI.loader.
-Require Coq.Program.Tactics.
+Require Stdlib.Program.Tactics.
 
-Require Import Relation_Definitions.
-Require Import Relation_Operators.
-Require Operators_Properties.
+From Corelib Require Import Relations.Relation_Definitions.
+From Stdlib Require Import Relations.Relation_Operators.
+From Stdlib Require Operators_Properties.
 
 Require Import MEBI.Examples.CADP.
 Import Protocol. 

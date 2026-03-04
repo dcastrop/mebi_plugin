@@ -1,5 +1,5 @@
 Require Import MEBI.loader.
-Require Coq.Program.Tactics.
+Require Stdlib.Program.Tactics.
 
 Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.Proc.
