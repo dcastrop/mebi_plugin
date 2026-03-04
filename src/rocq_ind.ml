@@ -1,5 +1,5 @@
 (***********************************************************************)
-module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+module Log : Logger.SLogger = Logger.MkDefault ()
 
 let () = Log.Config.enable_output ()
 let () = Log.Config.configure_output Debug true
@@ -31,32 +31,57 @@ and kind =
   | Type of EConstr.t option
   | LTS of LTS.t
 
+let to_string
+      (f : 'a -> string)
+      (env : Environ.env)
+      (sigma : Evd.evar_map)
+      (x : 'a t)
+  : string
+  =
+  Utils.Strfy.record
+    [ "enc", f x.enc
+    ; "ind", Rocq_utils.Strfy.econstr env sigma x.ind
+    ; ("kind", match x.kind with Type _ -> "Type" | LTS _ -> "LTS")
+    ]
+;;
+
 (***********************************************************************)
 
 exception Rocq_ind_UnexpectedKind of kind
 
 let get_lts ({ kind; _ } : 'a t) : LTS.t =
+  Log.trace __FUNCTION__;
   match kind with
   | LTS l -> l
   (* | _ -> invalid_cindef_kind () *)
   | x -> raise (Rocq_ind_UnexpectedKind x)
 ;;
 
-let get_lts_term_type (x : 'a t) : EConstr.t = (get_lts x).term_type
-let get_lts_label_type (x : 'a t) : EConstr.t = (get_lts x).label_type
+let get_lts_term_type (x : 'a t) : EConstr.t =
+  Log.trace __FUNCTION__;
+  (get_lts x).term_type
+;;
+
+let get_lts_label_type (x : 'a t) : EConstr.t =
+  Log.trace __FUNCTION__;
+  (get_lts x).label_type
+;;
 
 let get_lts_constructor_types (x : 'a t) : LTS.constructor array =
+  Log.trace __FUNCTION__;
   (get_lts x).constructor_types
 ;;
 
 (***********************************************************************)
 
 let get_lts_constructor_names (x : 'a t) : Names.Id.t array =
+  Log.trace __FUNCTION__;
   get_lts_constructor_types x
   |> Array.map (fun ({ name; _ } : LTS.constructor) -> name)
 ;;
 
 let get_lts_constructors (x : 'a t) : Rocq_utils.ind_constr array =
+  Log.trace __FUNCTION__;
   get_lts_constructor_types x
   |> Array.map (fun ({ constructor; _ } : LTS.constructor) -> constructor)
 ;;

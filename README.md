@@ -56,7 +56,7 @@ E.g.:
 ### Command that declares a relation as a "LTS-generating relation":
 
 ```
-MeBi LTS <ident>.
+MeBi Run LTS <ident>.
 ```
 
 * `<ident>` should be the identifier of a relation with type

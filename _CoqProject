@@ -18,25 +18,25 @@ theories/Bisimilarity.v ###
 
 ###############################################################################
 ### Proc
-# examples/Proc.v ### REQUIRED FOR BELOW
+examples/Proc.v ### REQUIRED FOR BELOW
 
 ### Proc.Flat.Simple 
-# examples/bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
+examples/bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
 # examples/bisimilarity/Proc/Test1/TermTests.v ### Success
 # examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test1/ManualProofs.v
 # examples/bisimilarity/Proc/Test1/LtacProofs.v
 
 ### Proc.Flat.Complex 
-# examples/bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
+examples/bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
 # examples/bisimilarity/Proc/Test2/TermTests.v ### Success
 # examples/bisimilarity/Proc/Test2/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test2/ManualProofs.v
 # examples/bisimilarity/Proc/Test2/LtacProofs.v
 
 ### Proc.Layered
-# examples/bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
-# examples/bisimilarity/Proc/Test3/TermTests.v ### Success
+examples/bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
+# examples/bisimilarity/Proc/Test3/TermTests.v ### RETEST: (takes a long time) Success
 # examples/bisimilarity/Proc/Test3/PluginProofs.v ### TODO: proof explosion
 
 # examples/bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
@@ -50,10 +50,11 @@ examples/CADP_Glued.v ### REQUIRED FOR BELOW
 
 examples/bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
 # examples/bisimilarity/CADP/Size1/TermTests.v ### Success
-examples/bisimilarity/CADP/Size1/PluginProofs.v ### WIP: debugging
+# examples/bisimilarity/CADP/Size1/PluginProofs.v ### Success
 
 # TODO: 
-# examples/bisimilarity/CADP/Size2/Terms.v ###
+examples/bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
+# examples/bisimilarity/CADP/Size2/TermTests.v ### FAIL: Bound 1000 States
 # examples/bisimilarity/CADP/Size2/PluginProofs.v ###
 
 
@@ -83,75 +84,114 @@ src/output_config.mli
 src/logger.ml
 src/logger.mli
 
+src/theories.ml
+src/theories.mli
 src/rocq_utils.ml
 src/rocq_utils.mli
-src/rocq_convert.ml
-src/rocq_convert.mli
-src/rocq_enc.ml
-src/rocq_enc.mli
 src/rocq_ind.ml
 src/rocq_ind.mli
+src/rocq_enc.ml
+src/rocq_enc.mli
+src/rocq_context.ml
+src/rocq_context.mli
+src/encoding.ml
+src/encoding.mli
+src/enc_tree.ml
+src/enc_tree.mli
+src/bi_encoding.ml
+src/bi_encoding.mli
+src/rocq_monad.ml
+src/rocq_monad.mli
+src/rocq_monad_utils.ml
+src/rocq_monad_utils.mli
 src/rocq_bindings.ml
 src/rocq_bindings.mli
-
-src/mebi_setup.ml
-src/mebi_setup.mli
-src/mebi_constr.ml
-src/mebi_constr.mli
-src/mebi_theories.ml
-src/mebi_theories.mli
-
-src/model_state.ml
-src/model_state.mli
-src/model_label.ml
-src/model_label.mli
-src/model_info.ml
-src/model_info.mli
-src/model_note.ml
-src/model_note.mli
-src/model_transition.ml
-src/model_transition.mli
-src/model_transition_opt.ml
-src/model_transition_opt.mli
-src/model_action.ml
-src/model_action.mli
-src/model_edge.ml
-src/model_edge.mli
 src/model.ml
 src/model.mli
-src/saturate_model.ml
-src/saturate_model.mli
-src/algorithms.ml
-src/algorithms.mli
+src/wrapper.ml
+src/wrapper.mli
+src/proof_solver.ml
+src/proof_solver.mli
+src/api.ml
+src/api.mli
 
-src/mebi_tactics.ml
-src/mebi_tactics.mli
+# src/.ml
+# src/.mli
 
-src/mebi_wrapper.ml
-src/mebi_wrapper.mli
-src/mebi_utils.ml
-src/mebi_utils.mli
-src/mebi_hypothesis.ml
-src/mebi_hypothesis.mli
-src/mebi_proof.ml
-src/mebi_proof.mli
+# src/rocq_utils.ml
+# src/rocq_utils.mli
+# src/rocq_convert.ml
+# src/rocq_convert.mli
+# src/theories.ml
+# src/theories.mli
 
-# src/dump_to_file.ml
-# src/dump_to_file.mli
+# src/rocq_enc.ml
+# src/rocq_enc.mli
+# src/rocq_monad.ml
+# src/rocq_monad.mli
+# src/rocq_ind.ml
+# src/rocq_ind.mli
+# src/rocq_bindings.ml
+# src/rocq_bindings.mli
 
-src/mebi_weak.ml
-src/mebi_weak.mli
-src/mebi_api.ml
-src/mebi_api.mli
-src/mebi_help.ml
-src/mebi_help.mli
+# src/mebi_setup.ml
+# src/mebi_setup.mli
+# src/mebi_constr.ml
+# src/mebi_constr.mli
 
-src/mebi_unification.ml
-src/mebi_unification.mli
-src/mebi_unify.ml
-src/mebi_unify.mli
-src/command.ml
-src/command.mli
+# src/model_state.ml
+# src/model_state.mli
+# src/model_label.ml
+# src/model_label.mli
+# src/model_info.ml
+# src/model_info.mli
+# src/model_note.ml
+# src/model_note.mli
+# src/model_transition.ml
+# src/model_transition.mli
+# src/model_transition_opt.ml
+# src/model_transition_opt.mli
+# src/model_action.ml
+# src/model_action.mli
+# src/model_edge.ml
+# src/model_edge.mli
+# src/model.ml
+# src/model.mli
+# src/saturate_model.ml
+# src/saturate_model.mli
+# src/algorithms.ml
+# src/algorithms.mli
+
+# src/mebi_tactics.ml
+# src/mebi_tactics.mli
+
+# src/mebi_wrapper.ml
+# src/mebi_wrapper.mli
+# src/mebi_utils.ml
+# src/mebi_utils.mli
+# src/mebi_hypothesis.ml
+# src/mebi_hypothesis.mli
+# src/mebi_proof.ml
+# src/mebi_proof.mli
+# src/proof_solver.ml
+# src/proof_solver.mli
+
+# # src/dump_to_file.ml
+# # src/dump_to_file.mli
+
+# src/mebi_weak.ml
+# src/mebi_weak.mli
+# src/mebi_api.ml
+# src/mebi_api.mli
+# src/mebi_help.ml
+# src/mebi_help.mli
+
+# src/mebi_unification.ml
+# src/mebi_unification.mli
+# src/mebi_unify.ml
+# src/mebi_unify.mli
+# src/command.ml
+# src/command.mli
 
 # src/examples.ml
 # src/examples.mli

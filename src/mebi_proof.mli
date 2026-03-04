@@ -26,13 +26,31 @@ end
 
 module PState : sig
   type t =
+    { state : state
+    ; cache : cache ref
+    }
+
+  and cache =
+    { inverted_hyps : EConstr.t list
+    ; unfolded_terms : EConstr.t list
+    }
+
+  and state =
     | NewProof
+    | DoUnfold of (state * unfold_kind)
+    | DoInversion of state
     | NewWeakSim
     | NewCofix
     | DoRefl
     | GoalTransition of transitions
     | ApplyConstructors of ApplicableConstructors.t
     | DetectState
+
+  and unfold_kind =
+    | Any
+    | CheckHyps
+    | Just of EConstr.t
+    | InHyps of (Rocq_utils.hyp * EConstr.t) list
 
   and transitions =
     { mtrans : Model_transition.t

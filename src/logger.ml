@@ -1,4 +1,4 @@
-module type LOGGER_TYPE = sig
+module type SLogger = sig
   module Config : Output_config.OUTPUT_CONFIG
 
   val enabled : bool ref
@@ -60,7 +60,7 @@ module type S = sig
   val special : Output_kind.special -> bool
 end
 
-module Make (Mode : Output_mode.OUTPUT_MODE) (X : S) : LOGGER_TYPE = struct
+module Make (Mode : Output_mode.OUTPUT_MODE) (X : S) : SLogger = struct
   module Config : Output_config.OUTPUT_CONFIG =
     Output_config.Make
       (Mode)
@@ -185,7 +185,7 @@ end
 
 (***********************************************************************)
 
-module MkDefault () : LOGGER_TYPE =
+module MkDefault () : SLogger =
   Make
     (Output_mode.Default)
     (struct
@@ -194,7 +194,7 @@ module MkDefault () : LOGGER_TYPE =
       let special : Output_kind.special -> bool = !Output_kind.default_special
     end)
 
-module Default : LOGGER_TYPE = MkDefault ()
+module Default : SLogger = MkDefault ()
 
 (* let make
    ?(prefix : string option = None)
