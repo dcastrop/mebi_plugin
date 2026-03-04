@@ -6,7 +6,7 @@ open Mebi_wrapper.Syntax
 module Tree = Mebi_constr.Tree
 
 (***********************************************************************)
-module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+module Log : Logger.SLogger = Logger.MkDefault ()
 
 let () = Log.Config.configure_output Debug false
 let () = Log.Config.configure_output Trace false
@@ -240,7 +240,6 @@ module Problems = struct
         (act : EConstr.t)
         (goto : EConstr.t)
         ({ sigma = psigma; to_unify } : t)
-    : (EConstr.t * EConstr.t * Mebi_constr.Tree.t list) option mm
     =
     Log.trace __FUNCTION__;
     let* () = debug_econstr ~__FUNCTION__ "act" act in

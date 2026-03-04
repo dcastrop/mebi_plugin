@@ -1,5 +1,5 @@
 (***********************************************************************)
-module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+module Log : Logger.SLogger = Logger.MkDefault ()
 
 let () = Log.Config.configure_output Debug false
 let () = Log.Config.configure_output Trace false
@@ -309,24 +309,24 @@ let rec get_bound_term
     (try
        match EConstr.kind sigma x with
        | App (xty, xtys) ->
-         (* Log.thing
-            ~__FUNCTION__
-            Debug
-            "x"
-            x
-            (Of (Rocq_utils.Strfy.econstr env sigma));
-            Log.thing
-            ~__FUNCTION__
-            Debug
-            "xty"
-            xty
-            (Of (Rocq_utils.Strfy.econstr env sigma));
-            Log.thing
-            ~__FUNCTION__
-            Debug
-            "root"
-            root
-            (Of (Rocq_utils.Strfy.constr env sigma)); *)
+         Log.thing
+           ~__FUNCTION__
+           Debug
+           "x"
+           x
+           (Of (Rocq_utils.Strfy.econstr env sigma));
+         Log.thing
+           ~__FUNCTION__
+           Debug
+           "xty"
+           xty
+           (Of (Rocq_utils.Strfy.econstr env sigma));
+         Log.thing
+           ~__FUNCTION__
+           Debug
+           "root"
+           root
+           (Of (Rocq_utils.Strfy.constr env sigma));
          if EConstr.eq_constr sigma xty (EConstr.of_constr root)
          then (
            try get_bound_term env sigma xtys.(index) cont with
@@ -334,7 +334,14 @@ let rec get_bound_term
              raise
                (Rocq_bindings_BindingInstruction_IndexOutOfBounds (x, index)))
          else raise (Rocq_bindings_BindingInstruction_NEQ (xty, root))
-       | _ -> raise (Rocq_bindings_BindingInstruction_NotApp x)
+       | _ ->
+         Log.thing
+           ~__FUNCTION__
+           Debug
+           "ToErr Rocq_bindings_BindingInstruction_NotApp x"
+           x
+           (Of (Rocq_utils.Strfy.econstr env sigma));
+         raise (Rocq_bindings_BindingInstruction_NotApp x)
      with
      | Rocq_bindings_BindingInstruction_Undefined (_, y) ->
        raise (Rocq_bindings_BindingInstruction_Undefined (x, y)))
