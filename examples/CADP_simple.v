@@ -1,8 +1,8 @@
 Require Import MEBI.loader.
 
 Require Export String.
-Require Import PeanoNat.
-Require Import Notations.
+From Stdlib Require Import PeanoNat.
+From Stdlib Require Import Notations.
 Require Export Bool.
 Require Import List.
 Import ListNotations.

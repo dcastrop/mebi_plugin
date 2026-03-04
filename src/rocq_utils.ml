@@ -1,6 +1,14 @@
+(***********************************************************************)
+module Log : Logger.SLogger = Logger.MkDefault ()
+
+let () = Log.Config.enable_output ()
+let () = Log.Config.configure_output Debug true
+let () = Log.Config.configure_output Trace true
+(***********************************************************************)
+
 (** [kind_pair] are the arguments of [AtomicType (ty, tys)] returned by e.g., [EConstr.kind_of_type]
 *)
-type kind_pair = EConstr.t * EConstr.t array
+type 'a kind_pair = 'a * 'a array
 
 exception
   Rocq_utils_EConstrIsNot_Atomic of
@@ -8,7 +16,12 @@ exception
 
 exception Rocq_utils_EConstrIsNotA_Type of (Evd.evar_map * EConstr.t * string)
 
-let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t) : kind_pair =
+(** [econstr_to_atomic sigma x]
+    @raise Rocq_utils_EConstrIsNotA_Type
+      if [EConstr.kind_of_type sigma x] is not [AtomicType (ty, tys)]. *)
+let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t)
+  : EConstr.t kind_pair
+  =
   try
     match EConstr.kind_of_type sigma x with
     | AtomicType (ty, tys) -> ty, tys
@@ -22,6 +35,32 @@ let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t) : kind_pair =
 (*****************************************************************************)
 
 type constr_kind =
+  ( Constr.t
+    , Constr.types
+    , Sorts.Quality.t
+    , UVars.Instance.t
+    , Sorts.relevance )
+    Constr.kind_of_term
+
+exception
+  Rocq_utils_ConstrIsNot_App of
+    (Constr.t
+    * ( Constr.t
+        , Constr.t
+        , Sorts.t
+        , UVars.Instance.t
+        , Sorts.relevance )
+        Constr.kind_of_term)
+
+let constr_to_app (x : Constr.t) : Constr.t kind_pair =
+  match Constr.kind x with
+  | App (ty, tys) -> ty, tys
+  | k -> raise (Rocq_utils_ConstrIsNot_App (x, k))
+;;
+
+(*****************************************************************************)
+
+type econstr_kind =
   ( EConstr.t
     , EConstr.t
     , Evd.esorts
@@ -30,13 +69,23 @@ type constr_kind =
     Constr.kind_of_term
 
 exception
-  Rocq_utils_EConstrIsNot_App of (Evd.evar_map * EConstr.t * constr_kind)
+  Rocq_utils_EConstrIsNot_App of (Evd.evar_map * EConstr.t * econstr_kind)
 
-let econstr_to_app (sigma : Evd.evar_map) (x : EConstr.t) : kind_pair =
+let econstr_to_app (sigma : Evd.evar_map) (x : EConstr.t) : EConstr.t kind_pair =
   match EConstr.kind sigma x with
   | App (ty, tys) -> ty, tys
   | k -> raise (Rocq_utils_EConstrIsNot_App (sigma, x, k))
 ;;
+
+(* let econstr_to_ref (sigma : Evd.evar_map) (x : EConstr.t)
+   : Names.GlobRef.t * EConstr.EInstance.t
+   =
+   EConstr.destRef sigma x
+   ;; *)
+
+(* match EConstr.kind sigma x with
+   | Ref (ty, tys) -> ty, tys
+   | k -> raise (Rocq_utils_EConstrIsNot_App (sigma, x, k)) *)
 
 (*****************************************************************************)
 
@@ -44,7 +93,7 @@ type lambda_triple =
   (Names.Name.t, Evd.erelevance) Context.pbinder_annot * EConstr.t * EConstr.t
 
 exception
-  Rocq_utils_EConstrIsNot_Lambda of (Evd.evar_map * EConstr.t * constr_kind)
+  Rocq_utils_EConstrIsNot_Lambda of (Evd.evar_map * EConstr.t * econstr_kind)
 
 let econstr_to_lambda (sigma : Evd.evar_map) (x : EConstr.t) : lambda_triple =
   match EConstr.kind sigma x with
@@ -59,7 +108,7 @@ type hyp = (EConstr.t, EConstr.t, Evd.erelevance) Context.Named.Declaration.pt
 exception
   Rocq_utils_HypIsNot_Atomic of (Evd.evar_map * hyp * EConstr.kind_of_type)
 
-let hyp_to_atomic (sigma : Evd.evar_map) (h : hyp) : kind_pair =
+let hyp_to_atomic (sigma : Evd.evar_map) (h : hyp) : EConstr.t kind_pair =
   let h_ty : EConstr.t = Context.Named.Declaration.get_type h in
   try econstr_to_atomic sigma h_ty with
   | Rocq_utils_EConstrIsNot_Atomic (sigma, h_ty, k) ->
@@ -68,10 +117,27 @@ let hyp_to_atomic (sigma : Evd.evar_map) (h : hyp) : kind_pair =
 
 (*****************************************************************************)
 
+(* type unfoldable_kind = | Term  | Fun
+
+   module
+
+   let rec get_unfoldable_econstrs (sigma : Evd.evar_map) (x:EConstr.t) : unfoldable_econstr list =
+   try let ty,tys = in
+   with
+   |
+   Rocq_utils_EConstrIsNotA_Type _ -> []
+
+   ;; *)
+
+(*****************************************************************************)
+
 type ind_constr = Constr.rel_context * Constr.t
-type ind_constrs = ind_constr array
+type constr_decl = Constr.rel_declaration
 type econstr_decl = EConstr.rel_declaration
-type econstr_decls = econstr_decl list
+
+let get_econstr_decls (ctx : Constr.rel_context) : econstr_decl list =
+  List.map EConstr.of_rel_decl ctx
+;;
 
 let list_of_constr_kinds : Constr.t -> (string * bool) list =
   fun (x : Constr.t) ->
@@ -116,7 +182,7 @@ let list_of_econstr_kinds sigma (x : EConstr.t) : (string * bool) list =
   ; "Ref", EConstr.isRef sigma x
   ; "Sort", EConstr.isSort sigma x
   ; "Type", EConstr.isType sigma x
-  ; "Var", EConstr.isVar sigma x
+  ; "Var", EConstr.isVar sigma x (* ; "Var", EConstr.is_lib_ref env sigma x *)
   ]
 ;;
 
@@ -170,11 +236,13 @@ let list_of_kinds
 
 (*****************************************************************************)
 
-let get_decl_type_of_constr (x : Constr.rel_declaration) : EConstr.t =
+let get_decl_type_of_constr (x : constr_decl) : EConstr.t =
+  Log.trace __FUNCTION__;
   Context.Rel.Declaration.get_type x |> EConstr.of_constr
 ;;
 
-let get_decl_type_of_econstr (x : EConstr.rel_declaration) : EConstr.t =
+let get_decl_type_of_econstr (x : econstr_decl) : EConstr.t =
+  Log.trace __FUNCTION__;
   Context.Rel.Declaration.get_type x
 ;;
 
@@ -184,14 +252,13 @@ let get_ind_ty
       (mib : Declarations.mutual_inductive_body)
   : EConstr.t
   =
+  Log.trace __FUNCTION__;
   EConstr.mkIndU (ind, EConstr.EInstance.make mib.mind_univ_hyps)
 ;;
 
 (*****************************************************************************)
 
-let type_of_econstr_rel
-      ?(substl : EConstr.t list option)
-      (t : EConstr.rel_declaration)
+let type_of_econstr_rel ?(substl : EConstr.t list option) (t : econstr_decl)
   : EConstr.t
   =
   let ty : EConstr.t = get_decl_type_of_econstr t in
@@ -216,6 +283,12 @@ module Strfy = struct
     if clean then Utils.clean_string s else s
   ;;
 
+  let name_id : Names.Id.t -> string = Names.Id.to_string
+
+  let global : Names.GlobRef.t -> string =
+    fun (x : Names.GlobRef.t) -> pp (Printer.pr_global x)
+  ;;
+
   let evar ?(args : style_args = style_args ()) : Evar.t -> string =
     fun (x : Evar.t) -> pp (Evar.print x)
   ;;
@@ -225,49 +298,59 @@ module Strfy = struct
     pp (Printer.pr_existential_key env sigma x)
   ;;
 
-  let constr env sigma ?(args : style_args = style_args ()) (x : Constr.t)
-    : string
-    =
+  let constr env sigma (x : Constr.t) : string =
     pp (Printer.pr_constr_env env sigma x)
   ;;
 
   let constr_opt env sigma ?(args : style_args = style_args ())
     : Constr.t option -> string
     =
-    option (constr env sigma)
+    option (Utils.Strfy.Of (constr env sigma))
   ;;
 
   let constr_rel_decl
         env
         sigma
         ?(args : style_args = style_args ())
-        (x : Constr.rel_declaration)
+        (x : constr_decl)
     : string
     =
     pp (Printer.pr_rel_decl env sigma x)
   ;;
 
-  let constr_rel_context
-        env
-        sigma
-        ?(args : style_args = style_args ())
-        (x : Constr.rel_context)
-    : string
-    =
+  let constr_rel_context env sigma (x : Constr.rel_context) : string =
     pp (Printer.pr_rel_context env sigma x)
   ;;
 
-  let constr_kind env sigma ?(args : style_args = style_args ()) (x : Constr.t)
+  (*****************************************************************************)
+
+  let ind_constr enc sigma ((x, y) : ind_constr) : string =
+    let x : string = constr_rel_context enc sigma x in
+    let y : string = constr enc sigma y in
+    Utils.Strfy.record [ "constr", y; "rel context", x ]
+  ;;
+
+  let ind_constrs env sigma (xs : ind_constr array) : string =
+    Utils.Strfy.array (Of (ind_constr env sigma)) xs
+  ;;
+
+  (*****************************************************************************)
+
+  let constr_kind
+        env
+        sigma
+        (* ?(args : style_args = style_args ()) *)
+          (x : Constr.t)
     : string
     =
     let k : string =
       list
         ~args:
-          (style_args
-             ~name:"Constr_kinds"
-             ~style:(Some (collection_style Record))
-             ())
-        string
+          { (style_args ()) with
+            name = Some "Constr_kinds"
+          ; style = Some (collection_style Record)
+          }
+        (Args string)
         (List.filter_map
            (fun (kind, isKind) -> if isKind then Some kind else None)
            (list_of_constr_kinds x))
@@ -276,19 +359,19 @@ module Strfy = struct
     Utils.Strfy.record [ "constr", x; "kinds", k ]
   ;;
 
-  let econstr env sigma ?(args : style_args = style_args ()) (x : EConstr.t)
-    : string
-    =
+  (*****************************************************************************)
+
+  let econstr env sigma (x : EConstr.t) : string =
     pp (Printer.pr_econstr_env env sigma x)
   ;;
 
-  let econstr_rel_decl
-        env
-        sigma
-        ?(args : style_args = style_args ())
-        (x : EConstr.rel_declaration)
-    : string
-    =
+  let feconstr env sigma : EConstr.t Utils.Strfy.to_string =
+    Of (econstr env sigma)
+  ;;
+
+  (*****************************************************************************)
+
+  let econstr_rel_decl env sigma (x : econstr_decl) : string =
     pp (Printer.pr_erel_decl env sigma x)
   ;;
 
@@ -303,7 +386,7 @@ module Strfy = struct
     let tys : string =
       array
         ~args:(style_args ~name ~style:(Some (collection_style Record)) ())
-        (econstr env sigma)
+        (feconstr env sigma)
         tys
     in
     let x : string = econstr env sigma x in
@@ -323,7 +406,7 @@ module Strfy = struct
         "Rocq_utils.Strfy.econstr_types, unimplemented kind_of_type %s for:\n\
         \ %s"
         k
-        (econstr env sigma ~args x)
+        (econstr env sigma x)
     in
     match EConstr.kind_of_type sigma x with
     | AtomicType (ty, tys) -> econstr_type env sigma ~args ("Atomic", x, ty, tys)
@@ -336,18 +419,18 @@ module Strfy = struct
   let econstr_kind
         env
         sigma
-        ?(args : style_args = style_args ())
-        (x : EConstr.t)
+        (* ?(args : style_args = style_args ()) *)
+          (x : EConstr.t)
     : string
     =
     let k : string =
       list
         ~args:
-          (style_args
-             ~name:"EConstr_kinds"
-             ~style:(Some (collection_style Record))
-             ())
-        string
+          { (style_args ()) with
+            name = Some "EConstr_kinds"
+          ; style = Some (collection_style Record)
+          }
+        (Args string)
         (List.filter_map
            (fun (kind, isKind) -> if isKind then Some kind else None)
            (list_of_econstr_kinds sigma x))
@@ -356,33 +439,35 @@ module Strfy = struct
     Utils.Strfy.record [ "econstr", x; "kinds", k ]
   ;;
 
-  let name_id ?(args : style_args = style_args ()) : Names.Id.t -> string =
-    Names.Id.to_string
-  ;;
-
-  let global ?(args : style_args = style_args ()) : Names.GlobRef.t -> string =
-    fun (x : Names.GlobRef.t) -> pp (Printer.pr_global x)
-  ;;
-
   let concl env sigma ?(args : style_args = style_args ())
     : EConstr.constr -> string
     =
     econstr_types ~args:(nest args) env sigma
   ;;
 
-  let erel _env sigma ?(args : style_args = style_args ())
-    : EConstr.ERelevance.t -> string
-    =
+  let erel _env sigma : EConstr.ERelevance.t -> string =
     fun (x : EConstr.ERelevance.t) ->
     if EConstr.ERelevance.is_irrelevant sigma x
     then "irrelevant"
     else "relevant"
   ;;
 
+  let hyp_name (x : hyp) : string = name_id (Context.Named.Declaration.get_id x)
+
+  let hyp_value env sigma (x : hyp) : string =
+    Utils.Strfy.option
+      (Utils.Strfy.Of (econstr env sigma))
+      (Context.Named.Declaration.get_value x)
+  ;;
+
+  let hyp_type env sigma (x : hyp) : string =
+    econstr env sigma (Context.Named.Declaration.get_type x)
+  ;;
+
   let hyp env sigma ?(args : style_args = style_args ()) (x : hyp) : string =
-    let name : string = name_id ~args (Context.Named.Declaration.get_id x) in
+    let name : string = hyp_name x in
     let rel : string =
-      erel env sigma ~args (Context.Named.Declaration.get_relevance x)
+      erel env sigma (Context.Named.Declaration.get_relevance x)
     in
     let tys : string =
       econstr_types
@@ -401,11 +486,11 @@ module Strfy = struct
     let hyps : string =
       list
         ~args:
-          (style_args
-             ~name:"Hypotheses"
-             ~style:(Some (collection_style Record))
-             ())
-        (hyp env sigma)
+          { args with
+            name = Some "Hypotheses"
+          ; style = Some (collection_style Record)
+          }
+        (Args (hyp env sigma))
         (Proofview.Goal.hyps x)
     in
     Utils.Strfy.record [ "concl", concl; "hyps", hyps ]
@@ -458,4 +543,169 @@ let get_next (env : Environ.env) (sigma : Evd.evar_map)
     let sigma, type_of_a_term = type_of_econstr env sigma a_term in
     get_next_evar env sigma type_of_a_term
   | OfType a_type -> get_next_evar env sigma a_type
+;;
+
+let get_fresh_evar
+      (env : Environ.env)
+      (sigma : Evd.evar_map)
+      (original : evar_source)
+  : Evd.evar_map * EConstr.t
+  =
+  get_next env sigma original
+;;
+
+(*********************************************************)
+
+let subst_of_decl (substl : EConstr.Vars.substl) x : EConstr.t =
+  let ty : EConstr.t = Context.Rel.Declaration.get_type x in
+  EConstr.Vars.substl substl ty
+;;
+
+(** [mk_ctx_subst ?substl x] returns a new [evar] made from the type of [x], using any [substl] provided.
+    @param ?substl
+      is a list of substitutions, (* TODO: provided so that collisions don't occur? *)
+    @param x
+      corresponds to a (* TODO: universally? *) quantified term of a constructor.
+    @return a new [evar] for [x]. *)
+let mk_ctx_subst
+      (env : Environ.env)
+      (sigma : Evd.evar_map)
+      (substl : EConstr.Vars.substl)
+      (x : ('a, EConstr.t, 'b) Context.Rel.Declaration.pt)
+  : Evd.evar_map * EConstr.t
+  =
+  let subst : EConstr.t = subst_of_decl substl x in
+  Evarutil.new_evar env sigma subst
+;;
+
+(** [mk_ctx_substl acc ts] makes an [evar] for each term declaration in [ts].
+    @param acc
+      contains the substitutions accumulated so far, and is returned once [ts=[]]
+    @param ts
+      is an [EConstr.rel_declaration list] (obtained from the context of a constructor).
+    @return [acc] of [evars] once [ts] is empty. *)
+let rec mk_ctx_substl
+          (env : Environ.env)
+          (sigma : Evd.evar_map)
+          (acc : EConstr.Vars.substl)
+  :  ('a, EConstr.t, 'b) Context.Rel.Declaration.pt list
+  -> Evd.evar_map * EConstr.Vars.substl
+  = function
+  | [] -> sigma, acc
+  | t :: ts ->
+    let sigma, vt = mk_ctx_subst env sigma acc t in
+    mk_ctx_substl env sigma (vt :: acc) ts
+;;
+
+(** returns tuple list of [(binding_name * evar)] -- TODO: map these to the [_UNBOUND_REL_X] and
+*)
+let map_decl_evar_pairs (xs : econstr_decl list) (ys : EConstr.Vars.substl)
+  : (EConstr.t * Names.Name.t) list
+  =
+  List.combine ys (List.map Context.Rel.Declaration.get_name xs)
+;;
+
+(***********************************************************************)
+
+exception ConstructorArgsExpectsArraySize3 of unit
+
+type constructor_args =
+  { lhs : EConstr.t
+  ; act : EConstr.t
+  ; rhs : EConstr.t
+  }
+
+let constructor_args (args : EConstr.t array) : constructor_args =
+  if Int.equal (Array.length args) 3
+  then { lhs = args.(0); act = args.(1); rhs = args.(2) }
+  else raise (*TODO:err*) (ConstructorArgsExpectsArraySize3 ())
+;;
+
+exception Rocq_utils_InvalidLtsArgLength of int
+exception Rocq_utils_InvalidLtsTermKind of Constr.t
+
+(** [extract_args ?substl term] returns an [EConstr.t] triple of arguments of an inductively defined LTS, e.g., [term -> option action -> term -> Prop].
+    @param ?substl
+      is a list of substitutions applied to the terms prior to being returned.
+    @param term
+      must be of [Constr.kind] [App(fn, args)] (i.e., the application of some inductively defined LTS, e.g., [termLTS (tpar (tact (Send A) tend) (tact (Recv A) tend)) (Some A) (tpar tend tend)]).
+    @return a triple of [lhs_term, action, rhs_term]. *)
+let extract_args ?(substl : EConstr.Vars.substl = []) (term : Constr.t)
+  : constructor_args
+  =
+  match Constr.kind term with
+  | App (_name, args) ->
+    if Array.length args == 3
+    then (
+      let args = EConstr.of_constr_array args in
+      let args = Array.map (EConstr.Vars.substl substl) args in
+      let args = constructor_args args in
+      (* let* () = debug_extract_args _name args in *)
+      args)
+    else raise (Rocq_utils_InvalidLtsArgLength (Array.length args))
+  | _ -> raise (Rocq_utils_InvalidLtsTermKind term)
+;;
+
+exception Rocq_utils_CouldNotExtractBinding of unit
+
+let unpack_constr_args ((_, tys) : Constr.t kind_pair)
+  : Constr.t * Constr.t * Constr.t
+  =
+  try tys.(0), tys.(1), tys.(2) with
+  (* NOTE: in case [tys.(_)] is out of bounds. *)
+  | Not_found -> raise (Rocq_utils_CouldNotExtractBinding ())
+;;
+
+let econstr_to_constrexpr env sigma : EConstr.t -> Constrexpr.constr_expr =
+  Constrextern.extern_constr env sigma
+;;
+
+let constrexpr_to_econstr env sigma
+  : Constrexpr.constr_expr -> Evd.evar_map * EConstr.t
+  =
+  Constrintern.interp_constr_evars env sigma
+;;
+
+let econstr_to_constr ?(abort_on_undefined_evars : bool = false) sigma
+  : EConstr.t -> Constr.t
+  =
+  EConstr.to_constr ~abort_on_undefined_evars sigma
+;;
+
+let econstr_to_constr_opt sigma : EConstr.t -> Constr.t option =
+  EConstr.to_constr_opt sigma
+;;
+
+let globref_to_econstr env : Names.GlobRef.t -> EConstr.t =
+  fun x -> EConstr.of_constr (UnivGen.constr_of_monomorphic_global env x)
+;;
+
+let is_constant sigma (x : EConstr.t) (c : unit -> EConstr.t) : bool =
+  match Constr.kind (econstr_to_constr sigma x) with
+  | App (x, _) -> Constr.equal x (econstr_to_constr sigma (c ()))
+  | _ -> false
+;;
+
+let is_theory sigma (x : EConstr.t) : bool =
+  let cs = Theories.collect_bisimilarity_theories () in
+  let fx = EConstr.eq_constr sigma x in
+  List.exists fx cs
+;;
+
+(* let is_app sigma (x : EConstr.t) : bool = EConstr.isApp sigma x *)
+
+(* let is_var sigma (x : EConstr.t) : bool =
+   EConstr.isRef sigma x && EConstr.isVar sigma x
+   ;; *)
+
+(* let is_constr sigma (x : EConstr.t) : bool =
+   EConstr.isRef sigma x && EConstr.isConst sigma x
+   ;; *)
+
+(* let is_type sigma (x : EConstr.t) : bool =
+   EConstr.isType sigma x && EConstr.isConst sigma x
+   ;; *)
+
+let libnames_to_globrefs (xs : Libnames.qualid list) : Names.GlobRef.t list =
+  List.map Nametab.global xs
 ;;

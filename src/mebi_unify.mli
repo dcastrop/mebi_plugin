@@ -1,7 +1,7 @@
 val collect_valid_constructors
-  :  Mebi_ind.lts_constructor array
-  -> Mebi_ind.t Mebi_wrapper.F.t
-  -> Evd.econstr
-  -> Evd.econstr
+  :  Rocq_ind.LTS.constructor array
+  -> Mebi_setup.Enc.t Rocq_ind.t Mebi_wrapper.F.t
+  -> EConstr.t
+  -> EConstr.t
   -> Mebi_setup.Enc.t
   -> Mebi_unification.Constructors.t Mebi_wrapper.mm

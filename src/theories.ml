@@ -1,0 +1,412 @@
+(***********************************************************************)
+module Log : Logger.SLogger = Logger.MkDefault ()
+
+let () = Log.Config.configure_output Debug false
+let () = Log.Config.configure_output Trace false
+(***********************************************************************)
+
+(* let rec tactics : unit Proofview.tactic list -> unit Proofview.tactic = function
+   | [] -> Proofview.tclUNIT ()
+   | h :: [] -> h
+   | h :: t -> Proofview.tclTHEN h (tactics t)
+   ;; *)
+
+(*****************************************************************************)
+
+(* source: https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto3/src/tuto_tactic.ml *)
+
+let constants : EConstr.t list ref = ref ([] : EConstr.t list)
+
+let find_reference (path : string list) (id : string) : Names.GlobRef.t =
+  let path = Names.DirPath.make (List.rev_map Names.Id.of_string path) in
+  let fp = Libnames.make_path path (Names.Id.of_string id) in
+  Nametab.global_of_path fp
+;;
+
+(* let find_reference = Coqlib.find_reference [@ocaml.warning "-3"] *)
+
+(****************************************************************************)
+
+(****************************************************************************)
+
+(* This is a pattern to collect terms from the Coq memory of valid terms
+   and proofs.  This pattern extends all the way to the definition of function
+   c_U *)
+let collect_bisimilarity_theories () : EConstr.t list =
+  Log.trace __FUNCTION__;
+  match !constants with
+  | [] ->
+    Log.debug "mebi_theories.collect_bisimilarity_theories, mapping constants";
+    (* TODO: why does error "Not_found" occur if line below is removed? *)
+    let new_constants : EConstr.t list =
+      List.map
+        (fun (x : Names.GlobRef.t) ->
+          EConstr.of_constr
+            (UnivGen.constr_of_monomorphic_global (Global.env ()) x))
+        [ find_reference [ "MEBI"; "Bisimilarity" ] "LTS"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "tau"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "silent"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "silent1"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "weak"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "wk_some"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "wk_none"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "simF"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "Pack_sim"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "sim_weak"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "weak_sim"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "In_sim"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "out_sim"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "weak_bisim"
+          (* NOTE: if updating to rocq change "Coq" to "Corelib" *)
+          (* NOTE: docs say "Coq" should be "Stdlib" for version prior to rocq, but this doesn't work for me *)
+        ; find_reference
+            [ "Corelib"; "Relations"; "Relation_Definitions" ]
+            "relation"
+        ; find_reference
+            [ "Stdlib"; "Relations"; "Relation_Operators" ]
+            "clos_refl_trans_1n"
+        ; find_reference
+            [ "Stdlib"; "Relations"; "Relation_Operators" ]
+            "rt1n_refl"
+        ; find_reference
+            [ "Stdlib"; "Relations"; "Relation_Operators" ]
+            "rt1n_trans"
+        ; find_reference
+            [ "Stdlib"; "Relations"; "Relation_Operators" ]
+            "clos_trans_1n"
+        ; find_reference [ "Corelib"; "Init"; "Datatypes" ] "option"
+        ; find_reference [ "Corelib"; "Init"; "Datatypes" ] "None"
+        ; find_reference [ "Corelib"; "Init"; "Datatypes" ] "Some"
+        ; find_reference [ "Corelib"; "Init"; "Logic" ] "ex"
+        ; find_reference [ "Corelib"; "Init"; "Logic" ] "ex_intro"
+        ; find_reference [ "Corelib"; "Init"; "Datatypes" ] "prod"
+        ; find_reference [ "Corelib"; "Init"; "Datatypes" ] "pair"
+          (* NOTE: Lemmas: *)
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "weak_sim_refl"
+        ; find_reference [ "MEBI"; "Bisimilarity" ] "wk_bisim_refl"
+        ]
+    in
+    constants := new_constants;
+    !constants
+  | _ -> !constants
+;;
+
+let rec indexed_c : int * EConstr.t list -> EConstr.t option = function
+  | i, [] -> None
+  | 0, h :: _ -> Some h
+  | i, _ :: t -> indexed_c (i - 1, t)
+;;
+
+let c_LTS () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (0, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of Theories.Bisimilarity.LTS"
+  | Some c -> c
+;;
+
+let c_tau () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (1, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of Theories.Bisimilarity.tau"
+  | Some c -> c
+;;
+
+let c_silent () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (2, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.silent"
+  | Some c -> c
+;;
+
+let c_silent1 () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (3, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.silent1"
+  | Some c -> c
+;;
+
+let c_weak () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (4, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.weak"
+  | Some c -> c
+;;
+
+let c_wk_some () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (5, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.wk_some"
+  | Some c -> c
+;;
+
+let c_wk_none () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (6, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.wk_none"
+  | Some c -> c
+;;
+
+let c_simF () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (7, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.simF"
+  | Some c -> c
+;;
+
+let c_Pack_sim () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (8, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.Pack_sim"
+  | Some c -> c
+;;
+
+let c_sim_weak () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (9, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.sim_weak"
+  | Some c -> c
+;;
+
+let c_weak_sim () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (10, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.weak_sim"
+  | Some c -> c
+;;
+
+let c_In_sim () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (11, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.In_sim"
+  | Some c -> c
+;;
+
+let c_out_sim () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (12, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.out_sim"
+  | Some c -> c
+;;
+
+let c_weak_bisim () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (13, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Theories.Bisimilarity.weak_bisim"
+  | Some c -> c
+;;
+
+let c_relations () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (14, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Relations.Relation_Definitions.relations"
+  | Some c -> c
+;;
+
+let c_clos_refl_trans_1n () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (15, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Relations.Relation_Operators.clos_refl_trans_1n"
+  | Some c -> c
+;;
+
+let c_rt1n_refl () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (16, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Relations.Relation_Operators.c_clos_refl_trans_1n.rt1n_refl"
+  | Some c -> c
+;;
+
+let c_rt1n_trans () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (17, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Relations.Relation_Operators.c_clos_refl_trans_1n.rt1n_trans"
+  | Some c -> c
+;;
+
+let c_clos_trans_1n () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (18, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Relations.Relation_Operators.clos_trans_1n"
+  | Some c -> c
+;;
+
+let c_option () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (19, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of Coq.Init.Datatypes.option"
+  | Some c -> c
+;;
+
+let c_None () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (20, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Coq.Init.Datatypes.option.None"
+  | Some c -> c
+;;
+
+let c_Some () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (21, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Coq.Init.Datatypes.option.Some"
+  | Some c -> c
+;;
+
+let c_ex () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (22, cs) with
+  | None ->
+    failwith "could not obtain an internal representation of Coq.Init.Logic.ex"
+  | Some c -> c
+;;
+
+let c_ex_intro () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (23, cs) with
+  | None ->
+    failwith
+      "could not obtain an internal representation of \
+       Coq.Init.Logic.ex.ex_intro"
+  | Some c -> c
+;;
+
+let c_prod () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (24, cs) with
+  | None -> failwith "could not obtain an internal representation of prod"
+  | Some c -> c
+;;
+
+let c_pair () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (25, cs) with
+  | None -> failwith "could not obtain an internal representation of pair"
+  | Some c -> c
+;;
+
+let c_weak_sim_refl () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (26, cs) with
+  | None ->
+    failwith "could not obtain an internal representation of weak_sim_refl"
+  | Some c -> c
+;;
+
+let c_wk_bisim_refl () : EConstr.t =
+  Log.trace __FUNCTION__;
+  let cs = collect_bisimilarity_theories () in
+  match indexed_c (27, cs) with
+  | None ->
+    failwith "could not obtain an internal representation of wk_bisim_refl"
+  | Some c -> c
+;;
+
+(* let c_ () : EConstr.t =
+   Log.trace __FUNCTION__;
+   let cs = collect_bisimilarity_theories () in
+   match indexed_c (23, cs) with
+   | None ->
+   failwith
+   "could not obtain an internal representation of "
+   | Some c -> c
+   ;; *)
+
+(*****************************************************************************)
+
+(******)
+
+(*****************************************************************************)
+
+let get_proof_from_pstate : Declare.Proof.t -> Proof.t = Declare.Proof.get
+let get_partial_proof : Proof.t -> EConstr.t list = Proof.partial_proof
+
+(*****************************************************************************)

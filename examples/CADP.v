@@ -1,10 +1,8 @@
-(* Require Import MEBI.loader. *)
-
-Require Export String.
-Require Import PeanoNat.
+From Stdlib Require Export String.
+From Stdlib Require Import PeanoNat.
 Require Import Notations.
-Require Export Bool.
-Require Import List.
+From Stdlib Require Import Bool.
+From Stdlib Require Import Lists.List.
 Import ListNotations.
 
 Fixpoint app {X:Type} (l1 l2 : list X) : list X :=
@@ -1089,7 +1087,7 @@ MeBi Dump "g1_FSM_weak" FSM Bounded 5 Of g1 Weak SILENT Of action Using bigstep 
 
 (* MeBi Set ShowDebug True. *)
 (* MeBi Set ShowDetails True. *)
-(* MeBi Bisim g1 With bigstep And g1 With step Using step bigstep lts. *)
+(* MeBi Run Bisim g1 With bigstep And g1 With step Using step bigstep lts. *)
 
 
 

@@ -18,6 +18,13 @@ let rec compare_chain : int list -> int = function
   | n :: _ -> n
 ;;
 
+(** [try_seq_opt x fs] returns the first [f x] that returns [Some y], else [None].
+*)
+let rec try_seq_opt (x : 'a) : ('a -> 'b option) list -> 'b option = function
+  | [] -> None
+  | f :: tl -> (match f x with None -> try_seq_opt x tl | y -> y)
+;;
+
 (** [strip_snd l] is the list of rhs elements in a list of tuples [l] (typically a [constr]).
 *)
 let rec strip_snd (l : ('a * 'a) list) : 'a list =
@@ -244,6 +251,16 @@ module Strfy = struct
     }
   ;;
 
+  type 'a to_string =
+    | Args of (?args:style_args -> 'a -> string)
+    | Of of ('a -> string)
+
+  let f_to_string ?(args : style_args = style_args ()) (f : 'a to_string)
+    : 'a -> string
+    =
+    match f with Args f -> f ~args | Of f -> f
+  ;;
+
   let record_args () : style_args =
     style_args ~style:(Some (record_style ())) ()
   ;;
@@ -329,63 +346,57 @@ module Strfy = struct
     fun (x : bool) -> Printf.sprintf "%b" x
   ;;
 
-  let option
-        (f : ?args:style_args -> 'a -> string)
-        ?(args : style_args = style_args ())
+  let option (f : 'a to_string) ?(args : style_args = style_args ())
     : 'a option -> string
     = function
     | None -> "None"
-    | Some x -> Printf.sprintf "Some %s" (f ~args x)
+    | Some x -> Printf.sprintf "Some %s" (f_to_string ~args f x)
   ;;
 
   let tuple
-        (f : ?args:style_args -> 'a -> string)
-        (g : ?args:style_args -> 'b -> string)
+        (f : 'a to_string)
+        (g : 'b to_string)
         ?(args : style_args =
           style_args ~style:(Some (collection_style Tuple)) ())
     : 'a * 'b -> string
     =
     fun ((a, b) : 'a * 'b) ->
-    let astr : string = f ~args:(nest args) a in
-    let bstr : string = g ~args:(nest args) b in
+    let astr : string = f_to_string ~args:(nest args) f a in
+    let bstr : string = f_to_string ~args:(nest args) g b in
     wrap args [ astr; bstr ]
   ;;
 
   let inline_tuple
-        (f : ?args:style_args -> 'a -> string)
-        (g : ?args:style_args -> 'b -> string)
-        ?(args : style_args =
-          style_args ~style:(Some (inline_tuple_style ())) ())
+        (f : 'a to_string)
+        (g : 'b to_string)
+        ?(args : style_args = style_args ())
     : 'a * 'b -> string
     =
-    tuple f g ~args
+    tuple f g ~args:{ args with style = Some (inline_tuple_style ()) }
   ;;
 
-  let keyval
-        (f : ?args:style_args -> 'a -> string)
-        ?(args : style_args = style_args ())
+  let keyval (f : 'a to_string) ?(args : style_args = style_args ())
     : string * 'a -> string
     =
-    let args : style_args =
-      { args with style = Some (keyval_style ()); name = None }
-    in
-    tuple ~args string f
+    tuple
+      ~args:{ args with style = Some (keyval_style ()); name = None }
+      (Of (string ~args))
+      f
   ;;
 
   let list
-        (f : ?args:style_args -> 'a -> string)
+        (f : 'a to_string)
         ?(args : style_args =
           style_args ~style:(Some (collection_style List)) ())
         (alist : 'a list)
     : string
     =
-    wrap args (List.map (fun a -> f ~args a) alist)
+    wrap args (List.map (fun a -> f_to_string ~args f a) alist)
   ;;
 
   let array
-        (f : ?args:style_args -> 'a -> string)
-        ?(args : style_args =
-          style_args ~style:(Some (collection_style List)) ())
+        (f : 'a to_string)
+        ?(args : style_args = style_args ())
         (arr : 'a array)
     : string
     =
@@ -393,12 +404,14 @@ module Strfy = struct
   ;;
 
   let record
-        ?(args : style_args =
-          style_args ~style:(Some (collection_style Record)) ())
+        ?(args : style_args = style_args ())
         (alist : (string * string) list)
     : string
     =
-    list ~args (keyval string) alist
+    list
+      ~args:{ args with style = Some (collection_style Record) }
+      (Args (keyval (Of (string ~args))))
+      alist
   ;;
 
   (* new line sep *)

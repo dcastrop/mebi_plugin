@@ -1,11 +1,13 @@
 (***********************************************************************)
-module Log : Logger.LOGGER_TYPE = Logger.MkDefault ()
+(* module Log : Logger.SLogger = Logger.MkDefault () *)
 
-let () = Log.Config.configure_output Debug true
-let () = Log.Config.configure_output Trace false
+(* let () = Log.Config.configure_output Debug false *)
+(* let () = Log.Config.configure_output Trace false *)
 (***********************************************************************)
 
-open Mebi_setup
+(* module M : Rocq_monad.TYPE = Rocq_monad.Make () *)
+
+(* open Mebi_setup
 module Enc = Mebi_setup.Enc
 module F = Enc.F
 module B = Enc.B
@@ -61,6 +63,7 @@ let run
         (x : 'a mm)
   : 'a
   =
+  Log.trace __FUNCTION__;
   let coq_ctx : Evd.evar_map = !(the_coq_ctx ~fresh ()) in
   let coq_env : Environ.env = !(the_coq_env ()) in
   let coq_ref : coq_context ref = ref { coq_env; coq_ctx } in
@@ -70,7 +73,10 @@ let run
   a.value
 ;;
 
-let runkeep (x : 'a mm) : 'a = run ~keep_encoding:true ~fresh:false x
+let runkeep (x : 'a mm) : 'a =
+  Log.trace __FUNCTION__;
+  run ~keep_encoding:true ~fresh:false x
+;;
 
 let return (x : 'a) : 'a mm =
   fun (st : wrapper ref) -> { state = st; value = x }
@@ -192,38 +198,28 @@ end
 (****** COQ TERM TO STRING ********)
 (**********************************)
 
-let mebi_to_string
-      (f :
-        Environ.env
-        -> Evd.evar_map
-        -> ?args:Utils.Strfy.style_args
-        -> 'a
-        -> string)
-      ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-  : 'a -> string
+let mebi_to_string (f : Environ.env -> Evd.evar_map -> 'a -> string)
+  : 'a Utils.Strfy.to_string
   =
+  Log.trace __FUNCTION__;
   run
     ~keep_encoding:true
     ~fresh:false
     (let open Syntax in
      let* env = get_env in
      let* sigma = get_sigma in
-     return (f env sigma))
+     return (Utils.Strfy.Of (f env sigma)))
 ;;
 
 let constr_to_string (x : Constr.t) : string =
-  (mebi_to_string Rocq_utils.Strfy.constr) x
+  Utils.Strfy.f_to_string (mebi_to_string Rocq_utils.Strfy.constr) x
 ;;
 
 let econstr_to_string (x : EConstr.t) : string =
-  (mebi_to_string Rocq_utils.Strfy.econstr) x
+  Utils.Strfy.f_to_string (mebi_to_string Rocq_utils.Strfy.econstr) x
 ;;
 
-let enc_to_string ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-  : Enc.t -> string
-  =
-  Enc.to_string
-;;
+let enc_to_string : Enc.t -> string = Enc.to_string
 
 (********************************************)
 (****** DEBUG *******************************)
@@ -231,15 +227,17 @@ let enc_to_string ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
 
 let debug_enc () : unit mm =
   fun (st : wrapper ref) ->
-  let fstr = Utils.Strfy.string in
-  let feconstr : EConstr.t -> string = econstr_to_string in
-  let fenc : Enc.t -> string = Enc.to_string in
+  let fstr = Utils.Strfy.Args Utils.Strfy.string in
+  let feconstr : EConstr.t Utils.Strfy.to_string =
+    Utils.Strfy.Of econstr_to_string
+  in
+  let fenc : Enc.t Utils.Strfy.to_string = Utils.Strfy.Of Enc.to_string in
   let fpair ((x, y) : EConstr.t * Enc.t) : string =
     Utils.Strfy.tuple
       fstr
       fstr
-      ( Utils.Strfy.keyval (fun ?args -> feconstr) ("econstr", x)
-      , Utils.Strfy.keyval (fun ?args -> fenc) ("enc", y) )
+      ( Utils.Strfy.keyval feconstr ("econstr", x)
+      , Utils.Strfy.keyval fenc ("enc", y) )
   in
   let f (prefix : string) (x : EConstr.t) (y : Enc.t) : unit =
     Logger.Default.thing ~__FUNCTION__ Debug prefix (x, y) (Of fpair);
@@ -277,8 +275,8 @@ module type ERROR_TYPE = sig
     | ParamsFailIfNotBisim of unit
     | InvalidLTSArgsLength of int
     | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
-    | InvalidLTSSort of Sorts.t
-    | InvalidTypeSort of Sorts.t
+    | InvalidLTSSort of Sorts.Quality.t
+    | InvalidTypeSort of Sorts.Quality.t
     | InvalidArity of Environ.env * Evd.evar_map * Constr.types
     | InvalidRefLTS of Names.GlobRef.t
     | InvalidRefType of Names.GlobRef.t
@@ -341,8 +339,8 @@ module type ERROR_TYPE = sig
   val params_fail_if_not_bisim : unit -> exn
   val invalid_lts_args_length : int -> exn
   val invalid_lts_term_kind : Environ.env -> Evd.evar_map -> Constr.t -> exn
-  val invalid_sort_lts : Sorts.t -> exn
-  val invalid_sort_type : Sorts.t -> exn
+  val invalid_sort_lts : Sorts.Quality.t -> exn
+  val invalid_sort_type : Sorts.Quality.t -> exn
   val invalid_arity : Environ.env -> Evd.evar_map -> Constr.types -> exn
   val invalid_ref_lts : Names.GlobRef.t -> exn
   val invalid_ref_type : Names.GlobRef.t -> exn
@@ -398,8 +396,8 @@ module Error : ERROR_TYPE = struct
     | ParamsFailIfNotBisim of unit
     | InvalidLTSArgsLength of int
     | InvalidLTSTermKind of Environ.env * Evd.evar_map * Constr.t
-    | InvalidLTSSort of Sorts.t
-    | InvalidTypeSort of Sorts.t
+    | InvalidLTSSort of Sorts.Quality.t
+    | InvalidTypeSort of Sorts.Quality.t
     | InvalidArity of Environ.env * Evd.evar_map * Constr.types
     | InvalidRefLTS of Names.GlobRef.t
     | InvalidRefType of Names.GlobRef.t
@@ -531,7 +529,10 @@ module Error : ERROR_TYPE = struct
            "Unknown encode key: %s\nEncode map: %s"
            (econstr !coq_ref.coq_env !coq_ref.coq_ctx x)
            (list
-              (tuple (econstr !coq_ref.coq_env !coq_ref.coq_ctx) enc_to_string)
+              (Args
+                 (tuple
+                    (Of (econstr !coq_ref.coq_env !coq_ref.coq_ctx))
+                    (Of enc_to_string)))
               (List.of_seq (F.to_seq fwd_map))))
     | UnknownDecodeKey (coq_ref, bck_map, x) ->
       Pp.str
@@ -539,7 +540,10 @@ module Error : ERROR_TYPE = struct
            "Unknown decode key: %s\nDecode map: %s"
            (Enc.to_string x)
            (list
-              (tuple enc_to_string (econstr !coq_ref.coq_env !coq_ref.coq_ctx))
+              (Args
+                 (tuple
+                    (Of enc_to_string)
+                    (Of (econstr !coq_ref.coq_env !coq_ref.coq_ctx))))
               (List.of_seq (B.to_seq bck_map))))
     | NoBisimResult () -> Pp.str "No cached bisimilarity result found."
     (* | ProofvIsNone () -> str "Tried to access contents of proofv which is None." *)
@@ -600,7 +604,7 @@ module Error : ERROR_TYPE = struct
         "Invalid Args to check_updated_ctx. Should both be empty, or both have \
          some."
       ++ strbrk "\n"
-      ++ Pp.str (Printf.sprintf "substls: %s." (list (econstr env sigma) x))
+      ++ Pp.str (Printf.sprintf "substls: %s." (list (feconstr env sigma) x))
       ++ strbrk "\n"
       ++ Pp.str
            (Printf.sprintf
@@ -628,7 +632,8 @@ module Error : ERROR_TYPE = struct
       ++ Pp.str "Type: "
       ++ Pp.str (econstr env sigma ty)
       ++ strbrk "\n\n"
-      ++ Pp.str (Printf.sprintf "Keys: %s" (list (econstr env sigma) trkeys))
+      ++ Pp.str
+           (Printf.sprintf "Keys: %s" (list (Of (econstr env sigma)) trkeys))
       ++ strbrk "\n\n"
       ++ Pp.str
            (Printf.sprintf
@@ -651,7 +656,10 @@ module Error : ERROR_TYPE = struct
       ++ strbrk "\n\n"
       ++ Pp.str "constructor names: "
       ++ Pp.str
-           (list ~args:(style_args ~name:"Names" ()) (econstr env sigma) names)
+           (list
+              ~args:(style_args ~name:"Names" ())
+              (Of (econstr env sigma))
+              names)
   ;;
 
   (* | UnknownDecodeKey (env, sigma, k, bckmap) ->
@@ -756,12 +764,12 @@ let invalid_arity (x : Constr.types) : 'a mm =
 ;;
 
 (** Error when input LTS has the wrong sort *)
-let invalid_sort_lts (x : Sorts.t) : 'a mm =
+let invalid_sort_lts (x : Sorts.quality) : 'a mm =
   fun (st : wrapper ref) -> raise (Error.invalid_sort_lts x)
 ;;
 
 (** Error when input Type has the wrong sort *)
-let invalid_sort_type (x : Sorts.t) : 'a mm =
+let invalid_sort_type (x : Sorts.quality) : 'a mm =
   fun (st : wrapper ref) -> raise (Error.invalid_sort_type x)
 ;;
 
@@ -871,14 +879,14 @@ let get_decoding (x : Enc.t) : EConstr.t =
   run ~keep_encoding:true ~fresh:false (decoding x)
 ;;
 
-let decoding_opt (x : Enc.t) : EConstr.t option mm =
+let decode_opt (x : Enc.t) : EConstr.t option mm =
   fun (st : wrapper ref) ->
   let d_opt : EConstr.t option = B.find_opt !st.bck_enc x in
   { state = st; value = d_opt }
 ;;
 
-let get_decoding_opt (x : Enc.t) : EConstr.t option =
-  run ~keep_encoding:true ~fresh:false (decoding_opt x)
+let get_decode_opt (x : Enc.t) : EConstr.t option =
+  run ~keep_encoding:true ~fresh:false (decode_opt x)
 ;;
 
 (**********************************)
@@ -935,126 +943,6 @@ let decode_constr_tree_lts (tree : Mebi_constr.Tree.t) : decoded_tree mm =
   decode_tree tree
 ;;
 
-(* let rec pstr_decoded_tree
-   ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
-   (t1 : decoded_tree)
-   : string
-   =
-   match t1 with
-   | Mebi_constr.Tree.Node (lhs_int, rhs_int_tree_list) ->
-   Printf.sprintf
-   "(%s:%i) [%s]"
-   (fst lhs_int)
-   (snd lhs_int)
-   (match List.length rhs_int_tree_list with
-   | 0 -> ""
-   | 1 -> pstr_decoded_tree (List.hd rhs_int_tree_list)
-   | _ -> Utils.Strfy.list ~args pstr_decoded_tree rhs_int_tree_list)
-   ;; *)
-
-(**********************************)
-(****** COQ PROOF THEORIES ********)
-(**********************************)
-(* source: https://github.com/rocq-prover/rocq/blob/master/doc/plugin_tutorial/tuto3/src/tuto_tactic.ml *)
-
-(* In the environment of the goal, we can get the type of an assumption
-   directly by a lookup.  The other solution is to call a low-cost retyping
-   function like *)
-(* let get_type_of_hyp (id : Names.Id.t) : EConstr.t mm =
-  let open Syntax in
-  let* env = get_env in
-  match EConstr.lookup_named id env with
-  | Context.Named.Declaration.LocalAssum (_pbinder_annot, ty) ->
-    Log.debug
-      (Printf.sprintf
-         "mebi_wrapper.get_type_of_hyp, LocalAssum: %s"
-         (econstr_to_string ty));
-    return ty
-  | Context.Named.Declaration.LocalDef (_pbinder_annot, _constr, ty) ->
-    Log.debug
-      (Printf.sprintf
-         "mebi_wrapper.get_type_of_hyp, LocalDef: %s := %s"
-         (econstr_to_string ty)
-         (econstr_to_string _constr));
-    return ty
-;; *)
-
-(**********************************)
-(****** COQ PROOF CONTEXT *********)
-(**********************************)
-
-(* let get_proof () : Declare.Proof.t mm =
-   Log.trace "mebi_wrapper.get_proof";
-   let open Syntax in
-   let* proofv : proof_context = get_proofv in
-   match proofv.proof with
-   | None -> proofv_is_none ()
-   | Some proof -> return proof
-   ;; *)
-
-(* let get_proof_env () : Environ.env mm =
-   Log.trace "mebi_wrapper.get_proof_env";
-   let open Syntax in
-   let* proofv : proof_context = get_proofv in
-   match proofv.proof with
-   | None ->
-   Log.warning "mebi_wrapper.get_proof_env, proof is None (using monad env)";
-   get_env
-   | Some proof ->
-   return (snd (Proof.get_proof_context (Declare.Proof.get proof)))
-   ;; *)
-
-(* let get_proof_sigma () : Evd.evar_map mm =
-   Log.trace "mebi_wrapper.get_proof_sigma";
-   let open Syntax in
-   let* proofv : proof_context = get_proofv in
-   match proofv.proof with
-   | None ->
-   Log.warning "mebi_wrapper.get_proof_sigma, proof is None (using monad ctx)";
-   get_sigma
-   | Some proof ->
-   return (fst (Proof.get_proof_context (Declare.Proof.get proof)))
-   ;; *)
-
-(* let get_proof_names () : Names.Id.Set.t mm =
-   Log.trace "mebi_wrapper.get_proof_names";
-   let open Syntax in
-   let* proofv : proof_context = get_proofv in
-   match proofv.names with
-   | None -> return Names.Id.Set.empty
-   | Some names -> return names
-   ;; *)
-
-(* let update_names
-      ?(replace : bool = false)
-      (new_names : Names.Id.Set.t)
-      (st : wrapper ref)
-  : unit in_context
-  =
-  let coq_st = !st.coq_ref in
-  match !coq_st.proofv.names with
-  | None ->
-    Log.warning "mebi_wrapper.update_names, proofv.names is None (create new)";
-    !coq_st.proofv.names <- Some new_names;
-    { state = st; value = () }
-  | Some names ->
-    !coq_st.proofv.names
-    <- Some (if replace then new_names else Names.Id.Set.union names new_names);
-    { state = st; value = () }
-;; *)
-
-(* let add_name (name : Names.Id.t) (st : wrapper ref) : unit in_context =
-  let coq_st = !st.coq_ref in
-  match !coq_st.proofv.names with
-  | None ->
-    Log.warning "mebi_wrapper.add_name, proofv.names is None (create new)";
-    !coq_st.proofv.names <- Some (Names.Id.Set.singleton name);
-    { state = st; value = () }
-  | Some names ->
-    !coq_st.proofv.names <- Some (Names.Id.Set.add name names);
-    { state = st; value = () }
-;; *)
-
 (**********************************)
 (****** DEBUG PRINTOUTS ***********)
 (**********************************)
@@ -1070,183 +958,6 @@ let debug_str (f : Environ.env -> Evd.evar_map -> string) : string mm =
     let x : string = f env sigma in
     sigma, x)
 ;;
-
-(* let show_fwd_map () : unit =
-   run
-   ~keep_encoding:true
-   ~fresh:false
-   (let open Syntax in
-   let* env = get_env in
-   let* sigma = get_sigma in
-   let* fwd_map = get_fwd_enc in
-   Log.debug
-   (Printf.sprintf
-   "mebi_wrapper.show_fwd_map: \n%s"
-   (Utils.Strfy.list
-   ~force_newline:true
-   (Utils.Strfy.tuple
-   ~force_newline:true
-   ~indent:1
-   (fun (x : EConstr.t) ->
-   Utils.Strfy.tuple
-   ~is_keyval:true
-   Utils.Strfy.str
-   (Rocq_utils.Strfy.econstr env sigma)
-   ("econstr", x))
-   (fun (x : Enc.t) ->
-   Utils.Strfy.tuple
-   ~is_keyval:true
-   Utils.Strfy.str
-   Enc.to_string
-   ("encoding", x)))
-   (Enc.fwd_to_list fwd_map)));
-   return ())
-   ;; *)
-
-(* let show_bck_map () : unit =
-   run
-   ~keep_encoding:true
-   ~fresh:false
-   (let open Syntax in
-   let* env = get_env in
-   let* sigma = get_sigma in
-   let* bck_map = get_bck_enc in
-   Log.debug
-   (Printf.sprintf
-   "mebi_wrapper.show_bck_map: \n%s"
-   (Utils.Strfy.list
-   ~force_newline:true
-   (Utils.Strfy.tuple
-   ~force_newline:true
-   ~indent:1
-   (fun (x : Enc.t) ->
-   Utils.Strfy.tuple
-   ~is_keyval:true
-   Utils.Strfy.str
-   Enc.to_string
-   ("encoding", x))
-   (fun (x : EConstr.t) ->
-   Utils.Strfy.tuple
-   ~is_keyval:true
-   Utils.Strfy.str
-   (Rocq_utils.Strfy.econstr env sigma)
-   ("econstr", x)))
-   (Enc.bck_to_list bck_map)));
-   return ())
-   ;; *)
-
-(* let show_proof_data () : unit mm =
-  fun (st : wrapper ref) ->
-  Log.trace "mebi_wrapper.show_proof_data";
-  let coq_st = !st.coq_ref in
-  (match !coq_st.proofv.proof with
-   | None -> Log.debug "mebi_wrapper.show_proof_data, proofv.proof is None"
-   | Some proof ->
-     let goals : Proofview.Goal.t Proofview.tactic list Proofview.tactic =
-       Proofview.Goal.goals
-     in
-     let _goals = goals in
-     let the_proof : Proof.t = Declare.Proof.get proof in
-     let the_data = Proof.data the_proof in
-     let goals_string = Utils.Strfy.list Rocq_utils.Strfy.evar the_data.goals in
-     let all_goals_string =
-       Utils.Strfy.list
-         ~indent:2
-         Strfy.evar
-         (Evar.Set.to_list (Proof.all_goals the_proof))
-     in
-     let _partial_proof : EConstr.constr list =
-       Proof.partial_proof the_proof
-       (* Proofview.partial_proof the_data.entry *)
-     in
-     let _x = econstr_list_to_constr_opt_string _partial_proof in
-     (* let _y = string_mm _x in *)
-     let partial_proof_string =
-       "TODO -- (obtaining string from wrapper causes \"Anomaly Uncaught \
-        exception Not_found\")"
-       (* _y *)
-     in
-     let stack_string =
-       Utils.Strfy.list
-         ~force_newline:true
-         ~indent:1
-         (Utils.Strfy.tuple
-            (Utils.Strfy.list ~force_newline:true ~indent:2 Strfy.evar)
-            (Utils.Strfy.list ~force_newline:true ~indent:2 Strfy.evar))
-         the_data.stack
-       (* Utils.Strfy.list2
-          ~indent:2
-          Strfy.evar
-          Strfy.evar
-          the_data.stack *)
-     in
-     Log.debug
-       (Printf.sprintf
-          "mebi_wrapper.show_proof_data, name: %s\n\
-           - is done: %b\n\
-           - no focused goal: %b\n\
-           - unfocused: %b\n\
-           - goals: %s\n\
-           - all goals: %s\n\
-           - stack: %s\n\
-           - partial proof: %s\n\
-           - pr_proof: %s\n"
-          (Names.Id.to_string the_data.name)
-          (Proof.is_done the_proof)
-          (Proof.no_focused_goal the_proof)
-          (Proof.unfocused the_proof)
-          goals_string
-          all_goals_string
-          stack_string
-          partial_proof_string
-          (Rocq_utils.Strfy.pp (Proof.pr_proof the_proof))));
-  (* *)
-  { state = st; value = () }
-;; *)
-
-(* let show_proof () : unit mm =
-   Log.trace "mebi_wrapper.show_proof";
-   let open Syntax in
-   let* proof = get_proof () in
-   let the_proof : Proof.t = Declare.Proof.get proof in
-   Log.debug
-   (Printf.sprintf
-   "mebi_wrapper.show_proof, Proof.pr_proof: %s"
-   (Rocq_utils.Strfy.pp (Proof.pr_proof the_proof)));
-   return ()
-   ;; *)
-
-(* let show_names () : unit mm =
-   Log.trace "mebi_wrapper.show_names";
-   let open Syntax in
-   let* env = get_proof_env () in
-   let* names = get_proof_names () in
-   Log.debug
-   (Printf.sprintf
-   "mebi_wrapper.show_names: %s"
-   (if Names.Id.Set.is_empty names
-   then "[ ] (empty)"
-   else
-   Printf.sprintf
-   "[%s\n]"
-   (Names.Id.Set.fold
-   (fun (n : Names.Id.t) (acc : string) ->
-   Printf.sprintf
-   "%s\n\t%s : %s"
-   acc
-   (Names.Id.to_string n)
-   (* (Strfy.pp
-   (Names.Id.print n) *)
-   (let lookup_n : EConstr.named_declaration =
-   EConstr.lookup_named n env
-   in
-   match Context.Named.Declaration.get_value lookup_n with
-   | None -> "(No value found)"
-   | Some v -> econstr_to_string v))
-   names
-   "")));
-   return ()
-   ;; *)
 
 (********************************************)
 (****** GRAPH *******************************)
@@ -1294,215 +1005,4 @@ let make_state_tree_pair_set (st : wrapper ref)
   { state = st
   ; value = (module PairSet : Set.S with type elt = Enc.t * Mebi_constr.Tree.t)
   }
-;;
-
-(* let debug_encoding () : unit mm =
-  fun (st : wrapper ref) ->
-  if Int.equal 0 (F.length !st.fwd_enc)
-  then (
-    Log.debug "mebi_wrapper.debug_encoding, fwd encoding is empty";
-    if Int.equal 0 (B.length !st.bck_enc)
-    then Log.debug "mebi_wrapper.debug_encoding, bck encoding is empty"
-    else
-      B.iter
-        (fun (enc : Enc.t) (t : EConstr.t) ->
-          Log.debug
-            (Printf.sprintf
-               "(%s) => %s "
-               (Enc.to_string enc)
-               (econstr_to_string t)))
-        !st.bck_enc)
-  else
-    F.iter
-      (fun (t : EConstr.t) (enc : Enc.t) ->
-        Log.debug
-          (Printf.sprintf
-             "(%s) => %s "
-             (Enc.to_string enc)
-             (econstr_to_string t)))
-      !st.fwd_enc;
-  { state = st; value = () }
-;;
-
-let debug_econstr_kind (t : EConstr.t) : unit mm =
-  fun (st : wrapper ref) ->
-  let coq_st = !st.coq_ref in
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.debug_econstr_kind:\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n"
-       (Printf.sprintf
-          "isRel %s = %b"
-          (econstr_to_string t)
-          (EConstr.isRel !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isVar %s = %b"
-          (econstr_to_string t)
-          (EConstr.isVar !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isInd %s = %b"
-          (econstr_to_string t)
-          (EConstr.isInd !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isRef %s = %b"
-          (econstr_to_string t)
-          (EConstr.isRef !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isEvar %s = %b"
-          (econstr_to_string t)
-          (EConstr.isEvar !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isMeta %s = %b"
-          (econstr_to_string t)
-          (EConstr.isMeta !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isSort %s = %b"
-          (econstr_to_string t)
-          (EConstr.isSort !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isCast %s = %b"
-          (econstr_to_string t)
-          (EConstr.isCast !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isApp %s = %b"
-          (econstr_to_string t)
-          (EConstr.isApp !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isLambda %s = %b"
-          (econstr_to_string t)
-          (EConstr.isLambda !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isLetIn %s = %b"
-          (econstr_to_string t)
-          (EConstr.isLetIn !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isProd %s = %b"
-          (econstr_to_string t)
-          (EConstr.isProd !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isConst %s = %b"
-          (econstr_to_string t)
-          (EConstr.isConst !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isConstruct %s = %b"
-          (econstr_to_string t)
-          (EConstr.isConstruct !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isFix %s = %b"
-          (econstr_to_string t)
-          (EConstr.isFix !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isCoFix %s = %b"
-          (econstr_to_string t)
-          (EConstr.isCoFix !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isCase %s = %b"
-          (econstr_to_string t)
-          (EConstr.isCase !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isProj %s = %b"
-          (econstr_to_string t)
-          (EConstr.isProj !coq_st.coq_ctx t))
-       (Printf.sprintf
-          "isType %s = %b"
-          (econstr_to_string t)
-          (EConstr.isType !coq_st.coq_ctx t)));
-  { state = st; value = () }
-;;
-
-let debug_constr_kind (t : Constr.t) : unit mm =
-  fun (st : wrapper ref) ->
-  Log.debug
-    (Printf.sprintf
-       "mebi_wrapper.debug_constr_kind:\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n\
-       \ - %s\n"
-       (Printf.sprintf "isRel %s = %b" (constr_to_string t) (Constr.isRel t))
-       (Printf.sprintf "isVar %s = %b" (constr_to_string t) (Constr.isVar t))
-       (Printf.sprintf "isInd %s = %b" (constr_to_string t) (Constr.isInd t))
-       (Printf.sprintf "isRef %s = %b" (constr_to_string t) (Constr.isRef t))
-       (Printf.sprintf "isEvar %s = %b" (constr_to_string t) (Constr.isEvar t))
-       (Printf.sprintf "isMeta %s = %b" (constr_to_string t) (Constr.isMeta t))
-       (Printf.sprintf "isSort %s = %b" (constr_to_string t) (Constr.isSort t))
-       (Printf.sprintf "isCast %s = %b" (constr_to_string t) (Constr.isCast t))
-       (Printf.sprintf "isApp %s = %b" (constr_to_string t) (Constr.isApp t))
-       (Printf.sprintf
-          "isLambda %s = %b"
-          (constr_to_string t)
-          (Constr.isLambda t))
-       (Printf.sprintf
-          "isLetIn %s = %b"
-          (constr_to_string t)
-          (Constr.isLetIn t))
-       (Printf.sprintf "isProd %s = %b" (constr_to_string t) (Constr.isProd t))
-       (Printf.sprintf
-          "isConst %s = %b"
-          (constr_to_string t)
-          (Constr.isConst t))
-       (Printf.sprintf
-          "isConstruct %s = %b"
-          (constr_to_string t)
-          (Constr.isConstruct t))
-       (Printf.sprintf "isFix %s = %b" (constr_to_string t) (Constr.isFix t))
-       (Printf.sprintf
-          "isCoFix %s = %b"
-          (constr_to_string t)
-          (Constr.isCoFix t))
-       (Printf.sprintf "isCase %s = %b" (constr_to_string t) (Constr.isCase t))
-       (Printf.sprintf "isProj %s = %b" (constr_to_string t) (Constr.isProj t))
-       (Printf.sprintf
-          "is_Prop %s = %b"
-          (constr_to_string t)
-          (Constr.is_Prop t))
-       (Printf.sprintf
-          "is_Type %s = %b"
-          (constr_to_string t)
-          (Constr.is_Type t))
-       (Printf.sprintf "is_Set %s = %b" (constr_to_string t) (Constr.is_Set t)));
-  { state = st; value = () }
-;;
-
-let debug_econstr_constr_kind (t : EConstr.t) : unit mm =
-  let open Syntax in
-  let* t = econstr_to_constr t in
-  debug_constr_kind t
 ;; *)
-
-(****************************************************************************)

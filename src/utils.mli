@@ -1,6 +1,7 @@
 val swap : 'a * 'b -> 'b * 'a
 val split_at : int -> 'a list -> 'a list
 val compare_chain : int list -> int
+val try_seq_opt : 'a -> ('a -> 'b option) list -> 'b option
 val strip_snd : ('a * 'a) list -> 'a list
 val is_unit_option : unit option -> bool
 val bool_opt_to_string : string -> bool option -> string
@@ -78,6 +79,11 @@ module Strfy : sig
     -> unit
     -> style_args
 
+  type 'a to_string =
+    | Args of (?args:style_args -> 'a -> string)
+    | Of of ('a -> string)
+
+  val f_to_string : ?args:style_args -> 'a to_string -> 'a -> string
   val record_args : unit -> style_args
   val nlindent : int -> string
   val mkindent : int -> bool -> string
@@ -92,44 +98,24 @@ module Strfy : sig
   val string : ?args:style_args -> string -> string
   val int : ?args:style_args -> int -> string
   val bool : ?args:style_args -> bool -> string
-
-  val option
-    :  (?args:style_args -> 'a -> string)
-    -> ?args:style_args
-    -> 'a option
-    -> string
+  val option : 'a to_string -> ?args:style_args -> 'a option -> string
 
   val tuple
-    :  (?args:style_args -> 'a -> string)
-    -> (?args:style_args -> 'b -> string)
+    :  'a to_string
+    -> 'b to_string
     -> ?args:style_args
     -> 'a * 'b
     -> string
 
   val inline_tuple
-    :  (?args:style_args -> 'a -> string)
-    -> (?args:style_args -> 'b -> string)
+    :  'a to_string
+    -> 'b to_string
     -> ?args:style_args
     -> 'a * 'b
     -> string
 
-  val keyval
-    :  (?args:style_args -> 'a -> string)
-    -> ?args:style_args
-    -> string * 'a
-    -> string
-
-  val list
-    :  (?args:style_args -> 'a -> string)
-    -> ?args:style_args
-    -> 'a list
-    -> string
-
-  val array
-    :  (?args:style_args -> 'a -> string)
-    -> ?args:style_args
-    -> 'a array
-    -> string
-
+  val keyval : 'a to_string -> ?args:style_args -> string * 'a -> string
+  val list : 'a to_string -> ?args:style_args -> 'a list -> string
+  val array : 'a to_string -> ?args:style_args -> 'a array -> string
   val record : ?args:style_args -> (string * string) list -> string
 end
