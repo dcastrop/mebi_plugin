@@ -18,6 +18,7 @@
             ; with, your choice here.
   rocq-runtime.vernac ; Needed for vernac extend.
   rocq-runtime.plugins.ltac ; Needed for tactic extend.
+  yojson
   )
  (modules
   utils

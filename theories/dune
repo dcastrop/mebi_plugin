@@ -10,6 +10,7 @@
  (package rocq-mebi) ; Adding this line will make your
                      ; library installable in the opam package
  (plugins rocq-mebi.mebi)
+ (stdlib yes)
  (theories Stdlib) ; https://rocq-prover.zulipchat.com/#narrow/channel/240550-Dune-devs-.26-users/topic/.E2.9C.94.20Moving.20a.20project.20from.20Coq.208.2E20.20to.20Rocq.209.2E0/with/525026077 
  )
 
