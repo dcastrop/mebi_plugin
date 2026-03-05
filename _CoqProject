@@ -83,6 +83,8 @@ src/output_config.ml
 src/output_config.mli
 src/logger.ml
 src/logger.mli
+src/json.ml
+src/json.mli
 
 src/theories.ml
 src/theories.mli
@@ -108,6 +110,8 @@ src/rocq_bindings.ml
 src/rocq_bindings.mli
 src/model_state.ml
 src/model_state.mli
+src/model_label.ml
+src/model_label.mli
 src/model.ml
 src/model.mli
 src/wrapper.ml
