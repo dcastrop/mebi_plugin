@@ -101,7 +101,7 @@ module MkGraph
     }
 
   (***********************************************************************)
-  module GLog : Logger.SLogger = Logger.MkDefault ()
+  module GLog : Logger.S = Logger.MkDefault ()
 
   let () = GLog.Config.configure_output Debug false
   let () = GLog.Config.configure_output Trace false
@@ -673,7 +673,7 @@ module MkGraph
 end
 
 (***********************************************************************)
-module Log : Logger.SLogger = Logger.MkDefault ()
+module Log : Logger.S = Logger.MkDefault ()
 
 let () = Log.Config.enable_output ()
 let () = Log.Config.configure_output Info true

@@ -1,4 +1,4 @@
-module type SLogger = sig
+module type S = sig
   module Config : Output_config.OUTPUT_CONFIG
 
   val enabled : bool ref
@@ -54,13 +54,13 @@ module type SLogger = sig
     -> unit
 end
 
-module type S = sig
-  val prefix : string option
-  val level : Feedback.level -> bool
-  val special : Output_kind.special -> bool
-end
-
-module Make (Mode : Output_mode.OUTPUT_MODE) (X : S) : SLogger = struct
+module Make
+    (Mode : Output_mode.OUTPUT_MODE)
+    (X : sig
+       val prefix : string option
+       val level : Feedback.level -> bool
+       val special : Output_kind.special -> bool
+     end) : S = struct
   module Config : Output_config.OUTPUT_CONFIG =
     Output_config.Make
       (Mode)
@@ -185,7 +185,7 @@ end
 
 (***********************************************************************)
 
-module MkDefault () : SLogger =
+module MkDefault () : S =
   Make
     (Output_mode.Default)
     (struct
@@ -194,36 +194,4 @@ module MkDefault () : SLogger =
       let special : Output_kind.special -> bool = !Output_kind.default_special
     end)
 
-module Default : SLogger = MkDefault ()
-
-(* let make
-   ?(prefix : string option = None)
-   (is_level_enabled : level -> bool)
-   (module O : Output.OUTPUT_TYPE)
-   : (module LOGGER_TYPE)
-   =
-   let module X : LOGGER_TYPE =
-   Make
-   (O)
-   (struct
-   let prefix : string option = prefix
-   let is_level_enabled : level -> bool = is_level_enabled
-   end)
-   in
-   (module X)
-   ;;
-
-   let debug
-   ?(prefix : string option = None)
-   ?(trace : bool = false)
-   (module O : Output.OUTPUT_TYPE)
-   : (module LOGGER_TYPE)
-   =
-   make ~prefix (level_fun_preset_debug ~trace ()) (module O)
-   ;;
-
-   let results ?(prefix : string option = None) (module O : Output.OUTPUT_TYPE)
-   : (module LOGGER_TYPE)
-   =
-   make ~prefix (level_fun_preset_results ()) (module O)
-   ;; *)
+module Default : S = MkDefault ()

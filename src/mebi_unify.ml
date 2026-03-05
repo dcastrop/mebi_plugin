@@ -28,7 +28,7 @@ let extract_args
 ;;
 
 (***********************************************************************)
-module Log : Logger.SLogger = Logger.MkDefault ()
+module Log : Logger.S = Logger.MkDefault ()
 
 let () = Log.Config.configure_output Debug false
 let () = Log.Config.configure_output Trace false

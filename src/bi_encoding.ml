@@ -33,7 +33,7 @@
 end *)
 
 module Make
-    (Log : Logger.SLogger)
+    (Log : Logger.S)
     (Ctx : Rocq_context.SRocq_context)
     (Enc : Encoding.SEncoding)
      (* :

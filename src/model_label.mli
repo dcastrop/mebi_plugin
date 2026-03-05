@@ -1,4 +1,4 @@
-module Make : (Log : Logger.SLogger)
+module Make : (Log : Logger.S)
   (Enc : Encoding.SEncoding)
   -> sig
   module type S = sig
@@ -12,12 +12,9 @@ module Make : (Log : Logger.SLogger)
     val compare : t -> t -> int
     val hash : t -> int
     val is_silent : t -> bool
-
-    type k = t
-
-    val json : ?as_elt:bool -> k -> Yojson.t
-    val to_string : ?pretty:bool -> k -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
+    val json : ?as_elt:bool -> t -> Yojson.t
+    val to_string : ?pretty:bool -> t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module Label : S

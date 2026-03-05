@@ -1,7 +1,7 @@
 let cache_pp : bool = false
 
 module Make
-    (Log : Logger.SLogger)
+    (Log : Logger.S)
     (C : Rocq_context.SRocq_context)
     (E : Encoding.SEncoding) =
 struct
@@ -477,25 +477,22 @@ struct
         let* new_constrs : M.Constructor.t list = get_new_constrs from in
         let iter_body (i : int) (new_states : V.t) =
           let (act, tgt, int_tree) : M.Constructor.t = List.nth new_constrs i in
-          let tgt_enc : M.Enc.t = M.encode tgt in
-          let act_enc : M.Enc.t = M.encode act in
-          let* is_silent : bool option = is_silent_transition act g.weak in
-          let label : Model.Label.t =
-            { term = act_enc; pp = None; is_silent }
-          in
+          let act_dec : EConstr.t = M.decode act in
+          let* is_silent : bool option = is_silent_transition act_dec g.weak in
+          let label : Model.Label.t = { term = act; pp = None; is_silent } in
           let constructor_trees : Model.Trees.t =
             Model.Trees.singleton int_tree
           in
           let to_add : Model.Action.t =
             { label; constructor_trees; annotation = None }
           in
-          D.singleton (tgt_enc, int_tree) |> T.update g.transitions from to_add;
+          D.singleton (tgt, int_tree) |> T.update g.transitions from to_add;
           (* NOTE: if [tgt] has not been explored then add [to_visit] *)
-          if T.mem g.transitions tgt_enc || V.mem tgt_enc g.states
+          if T.mem g.transitions tgt || V.mem tgt g.states
           then ()
-          else update_to_visit g tgt_enc;
+          else update_to_visit g tgt;
           (* NOTE: add [tgt] to [new_states] *)
-          M.return (V.add tgt_enc new_states)
+          M.return (V.add tgt new_states)
         in
         M.iterate 0 (List.length new_constrs - 1) (V.singleton from) iter_body
       ;;

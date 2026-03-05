@@ -1,4 +1,4 @@
-module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
+module Make (Log : Logger.S) (Enc : Encoding.SEncoding) = struct
   module type S = sig
     type t =
       { term : Enc.t
@@ -72,7 +72,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
 
     (* *)
     include
-      Json.List.Make
+      Json.Set.Make
         (Log)
         (struct
           module Set = Set

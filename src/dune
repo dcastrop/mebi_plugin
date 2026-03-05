@@ -37,6 +37,7 @@
   rocq_context
   encoding
   enc_tree
+  enc_constructor_tree
   ; term
   bi_encoding
   rocq_monad
