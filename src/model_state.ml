@@ -42,8 +42,9 @@ module Make (Log : Logger.S) (Enc : Encoding.SEncoding) = struct
   end
 
   module States (State : S) = struct
-    module Set : Set.S with type elt = State.t = Set.Make (State)
-    include Set
+    (* module Set_ : Set.S with type elt = State.t = Set.Make (State) *)
+    (* include Set_ *)
+    include Set.Make (State)
 
     let add_to_opt (x : State.t) (ys : t option) : t =
       add x (Option.default empty ys)
@@ -70,12 +71,11 @@ module Make (Log : Logger.S) (Enc : Encoding.SEncoding) = struct
       exists (f (-1)) a && exists (f 1) a
     ;;
 
-    (* *)
     include
       Json.Set.Make
         (Log)
         (struct
-          module Set = Set
+          module Set = Set.Make (State)
 
           let name = "States"
           let json = State.json

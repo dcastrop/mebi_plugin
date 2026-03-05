@@ -45,6 +45,12 @@
   rocq_bindings
   model_state
   model_label
+  model_annotation
+  model_transition
+  model_action
+  model_actionpair
+  model_edge
+  model_state_partition
   model
   api ; stores modules created by [loader.v], used by commands
   wrapper ; basic plugin commands

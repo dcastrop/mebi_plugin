@@ -1,356 +1,37 @@
 module Make (Log : Logger.S) (Enc : Encoding.SEncoding) = struct
+  (* [module State_] *)
+  module State_ = Model_state.Make (Log) (Enc)
+  module State : State_.S = State_.State
+  module States = State_.States (State)
+
+  (* [module Label_] *)
+  module Label_ = Model_label.Make (Log) (Enc)
+  module Label : Label_.S = Label_.Label
+
+  module Labels : module type of Label_.Labels (Label) with type elt = Label.t =
+  Label_.Labels (Label)
+
+  (* [module Tree_] *)
   module Tree_ = Enc_tree.Make (Log) (Enc)
   module TreeNode = Tree_.Node
   module Tree = Tree_.Tree
   module Trees = Tree_.Trees (Tree)
 
-  (* module Trees : Set.S with type elt = Tree.t = Set.Make (Tree) *)
-  (* module Trees = struct
-    include Set.Make (Tree)
+  (* [module Annotation_] *)
+  module Annotation_ =
+    Model_annotation.Make (Log) (Enc) (State) (Label) (Tree_) (Tree)
 
-    exception EmptyHasNoMin
+  module Note = Annotation_.Note
+  module Annotation : Annotation_.S = Annotation_.Annotation
+  module Annotations = Annotation_.Annotations (Annotation)
 
-    (** obtain the tree with the shortest minimized length *)
-    let min (xs : t) : elt =
-      match to_list xs with
-      | [] -> raise EmptyHasNoMin
-      | h :: tl ->
-        List.fold_left
-          (fun (acc : elt) (x : elt) ->
-            match
-              Int.compare
-                (Tree.minimize x |> List.length)
-                (Tree.minimize acc |> List.length)
-            with
-            | -1 -> x
-            | _ -> acc)
-          h
-          tl
-    ;;
+  (* [module Transition_] *)
+  module Transition_ =
+    Model_transition.Make (Log) (Enc) (State) (Label_) (Labels) (Tree_)
+      (Annotation)
 
-    let min_opt (xs : t) : elt option =
-      try Some (min xs) with EmptyHasNoMin -> None
-    ;;
-
-    let json (x : t) : Yojson.t =
-      `Assoc
-        [ ( "Trees"
-          , `List
-              (fold
-                 (fun (x : Tree.t) (acc : Yojson.t list) ->
-                   (* Tree.json x *)
-                   `String (Tree.to_string x) :: acc)
-                 x
-                 []) )
-        ]
-    ;;
-
-    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
-
-    let _log ?(__FUNCTION__ : string = "") ?(s : string = "Trees") (x : t)
-      : unit
-      =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end *)
-
-  (** [module State_] *)
-  module State_ = Model_state.Make (Log) (Enc)
-
-  module State : State_.S = State_.State
-  module States = State_.States (State)
-
-  (** [module Label_] *)
-  module Label_ = Model_label.Make (Log) (Enc)
-
-  module Label : Label_.S = Label_.Label
-  module Labels = Label_.Labels (Label)
-
-  module Note = struct
-    type t =
-      { from : State.t
-      ; label : Label.t
-      ; using : Trees.t
-      ; goto : State.t
-      }
-
-    let equal (a : t) (b : t) : bool =
-      State.equal a.from b.from
-      && State.equal a.goto b.goto
-      && Label.equal a.label b.label
-      && Trees.equal a.using b.using
-    ;;
-
-    let compare (a : t) (b : t) : int =
-      Utils.compare_chain
-        [ State.compare a.from b.from
-        ; State.compare a.goto b.goto
-        ; Label.compare a.label b.label
-        ; Trees.compare a.using b.using
-        ]
-    ;;
-
-    (* *)
-    let is_silent (x : t) : bool = Label.is_silent x.label
-
-    (* *)
-    (* let to_string (x : t) : string =
-      Printf.sprintf
-        "<State (%s) Goto (%s) Via (%s)>"
-        (State.to_string x.from)
-        (State.to_string x.goto)
-        (* (Label.to_string x.label) *)
-        (Enc.to_string x.label.term)
-    ;; *)
-    let json (x : t) : Yojson.t =
-      `Assoc
-        [ ( "note"
-          , `Assoc
-              [ "from", State.json x.from
-              ; "label", Label.json x.label
-              ; "goto", State.json x.goto
-              ; "using", Trees.json x.using
-              ] )
-        ]
-    ;;
-
-    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = "Note") (x : t) : unit =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end
-
-  module Annotation = struct
-    type t =
-      { this : Note.t
-      ; next : t option
-      }
-
-    let rec equal (a : t) (b : t) : bool =
-      Note.equal a.this b.this && Option.equal equal a.next b.next
-    ;;
-
-    let rec compare (a : t) (b : t) : int =
-      Utils.compare_chain
-        [ Note.compare a.this b.this; Option.compare compare a.next b.next ]
-    ;;
-
-    let is_empty : t -> bool = function
-      | { this; next = None } -> true
-      | _ -> false
-    ;;
-
-    let rec length : t -> int = function
-      | { next = None; _ } -> 1
-      | { next = Some next; _ } -> 1 + length next
-    ;;
-
-    let shorter (a : t) (b : t) : t =
-      match Int.compare (length a) (length b) with -1 -> a | _ -> b
-    ;;
-
-    let rec exists (x : Note.t) : t -> bool = function
-      | { this; next = None } -> Note.equal x this
-      | { this; next = Some next } ->
-        if Note.equal x this then true else exists x next
-    ;;
-
-    let rec exists_label (x : Label.t) : t -> bool = function
-      | { this; next = None } -> Label.equal x this.label
-      | { this; next = Some next } ->
-        if Label.equal x this.label then true else exists_label x next
-    ;;
-
-    let rec append (x : Note.t) : t -> t = function
-      | { this; next = None } -> { this; next = Some { this = x; next = None } }
-      | { this; next = Some next } -> { this; next = Some (append x next) }
-    ;;
-
-    let rec last : t -> Note.t = function
-      | { this; next = None } -> this
-      | { next = Some next; _ } -> last next
-    ;;
-
-    exception CannotDropLastOfSingleton of t
-
-    let rec drop_last : t -> t = function
-      | { this; next = None } ->
-        raise (CannotDropLastOfSingleton { this; next = None })
-      | { this; next = Some { next = None; _ }; _ } -> { this; next = None }
-      | { this; next = Some next } -> { this; next = Some (drop_last next) }
-    ;;
-
-    (* *)
-    let json (x : t) : Yojson.t =
-      let rec unfold : t -> Yojson.t = function
-        | { this; next = None } ->
-          `Assoc [ "this", Note.json this; "next", `String "None" ]
-        | { this; next = Some next } ->
-          `Assoc [ "this", Note.json this; "next", unfold next ]
-      in
-      `Assoc [ "annotation", unfold x ]
-    ;;
-
-    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = "Annotation") (x : t)
-      : unit
-      =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end
-
-  module Annotations = struct
-    module S : Set.S with type elt = Annotation.t = Set.Make (Annotation)
-    include S
-
-    let json (x : t) : Yojson.t =
-      `Assoc
-        [ ( "Annotations"
-          , `List
-              (fold
-                 (fun (x : Annotation.t) (acc : Yojson.t list) ->
-                   Annotation.json x :: acc)
-                 x
-                 []) )
-        ]
-    ;;
-
-    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = "Annotations") (x : t)
-      : unit
-      =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-
-    (** returns all of the possible actions after the named action *)
-    let extrapolate (x : Annotation.t) : t =
-      Log.trace __FUNCTION__;
-      (* NOTE: skip pre-named action *)
-      let rec skip ({ this; next } : Annotation.t) : t =
-        (* Log.trace __FUNCTION__; *)
-        let xs =
-          Option.cata (if Note.is_silent this then skip else get) empty next
-          |> map (fun (y : Annotation.t) -> { this; next = Some y })
-        in
-        (* NOTE: don't forget to add this action if named *)
-        if Note.is_silent this then xs else add { this; next = None } xs
-      (* NOTE: get every annotation from named action onwards *)
-      and get : Annotation.t -> t =
-        (* Log.trace __FUNCTION__; *)
-        function
-        | { this; next = None } -> singleton { this; next = None }
-        | { this; next = Some next } ->
-          get next
-          |> map (fun (y : Annotation.t) -> { this; next = Some y })
-          |> add { this; next = None }
-      in
-      add x (skip x)
-    ;;
-  end
-
-  module Transition = struct
-    type t =
-      { from : State.t
-      ; goto : State.t
-      ; label : Label.t
-      ; annotation : Annotation.t option
-      ; constructor_tree : Tree.t option
-      }
-
-    let equal (a : t) (b : t) : bool =
-      State.equal a.from b.from
-      && State.equal a.goto b.goto
-      && Label.equal a.label b.label
-      && Option.equal Annotation.equal a.annotation b.annotation
-      && Option.equal Tree.equal a.constructor_tree b.constructor_tree
-    ;;
-
-    let compare (a : t) (b : t) : int =
-      Utils.compare_chain
-        [ State.compare a.from b.from
-        ; State.compare a.goto b.goto
-        ; Label.compare a.label b.label
-        ; Option.compare Annotation.compare a.annotation b.annotation
-        ; Option.compare Tree.compare a.constructor_tree b.constructor_tree
-        ]
-    ;;
-
-    let is_silent (x : t) : bool = Label.is_silent x.label
-
-    let annotation_is_empty : t -> bool = function
-      | { annotation = None; _ } -> true
-      | { annotation = Some annotation; _ } -> Annotation.is_empty annotation
-    ;;
-
-    (* *)
-    let json (x : t) : Yojson.t =
-      `Assoc
-        [ ( "transition"
-          , `Assoc
-              [ "from", State.json x.from
-              ; "goto", State.json x.from
-              ; "label", Label.json x.label
-              ; ( "annotation"
-                , match x.annotation with
-                  | None -> `String "None"
-                  | Some x -> Annotation.json x )
-              ; ( "constructor_tree"
-                , (* Tree.json x.constructor_tree *)
-                  (*  Tree.json x *)
-                  match x.constructor_tree with
-                  | None -> `String "None"
-                  | Some x ->
-                    (*  Tree.json x *)
-                    `String (Tree.to_string x) )
-              ] )
-        ]
-    ;;
-
-    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = "Transition") (x : t)
-      : unit
-      =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end
-
-  module Transitions = struct
-    module S : Set.S with type elt = Transition.t = Set.Make (Transition)
-    include S
-
-    let labels (xs : t) : Labels.t =
-      Log.trace __FUNCTION__;
-      fold
-        (fun ({ label; _ } : elt) : (Labels.t -> Labels.t) -> Labels.add label)
-        xs
-        Labels.empty
-    ;;
-
-    (* *)
-    let json (x : t) : Yojson.t =
-      `Assoc
-        [ ( "Transitions"
-          , `List
-              (fold
-                 (fun (x : Transition.t) (acc : Yojson.t list) ->
-                   Transition.json x :: acc)
-                 x
-                 []) )
-        ]
-    ;;
-
-    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = "Transitions") (x : t)
-      : unit
-      =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end
+  module Transition : Transition_.S = Transition_.Transition
+  module Transitions = Transition_.Transitions (Transition)
 
   module Action = struct
     type t =
@@ -1906,4 +1587,4 @@ module Make (Log : Logger.S) (Enc : Encoding.SEncoding) = struct
         ]
     ;;
   end
-end
+  end

@@ -18,6 +18,12 @@ Rocq_monad_utils
 Rocq_bindings
 Model_state
 Model_label
+Model_annotation
+Model_transition
+Model_action
+Model_actionpair
+Model_edge
+Model_state_partition
 Model
 Api
 Wrapper
