@@ -1,63 +1,3 @@
-module type JsonArgs = sig
-  type k
-
-  val name : string
-  val json : k -> Yojson.t
-end
-
-module type JsonKind = sig
-  type k
-
-  val json : ?as_elt:bool -> k -> Yojson.t
-  val to_string : ?pretty:bool -> k -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
-end
-
-module JsonThing (Log : Logger.SLogger) (X : JsonArgs) :
-  JsonKind with type k = X.k = struct
-  (* type t = X.t *)
-  (* include X *)
-  (* module X = X *)
-  type k = X.k
-
-  let json ?(as_elt : bool = false) (x : X.k) : Yojson.t =
-    let y : Yojson.t = X.json x in
-    if as_elt then y else `Assoc [ X.name, y ]
-  ;;
-
-  let to_string ?(pretty : bool = true) (x : X.k) : string =
-    if pretty
-    then json x |> Yojson.pretty_to_string
-    else json x |> Yojson.to_string
-  ;;
-
-  let log ?(__FUNCTION__ : string = "") ?(s : string = X.name) (x : X.k) : unit =
-    Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-  ;;
-end
-
-(* module JsonList (Log : Logger.SLogger) (X : JsonArgs) :
-   JsonKind with type t = X.t = struct
-   type t = X.t
-
-   let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-   let y : Yojson.t = X.json x in
-   `Assoc [ X.name, y ]
-   ;;
-
-   let to_string ?(pretty : bool = true) (x : t) : string =
-   if pretty
-   then json x |> Yojson.pretty_to_string
-   else json x |> Yojson.to_string
-   ;;
-
-   let log ?(__FUNCTION__ : string = "") ?(s : string = X.name) (x : t) : unit =
-   Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-   ;;
-   end *)
-
-(*******************)
-
 module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
   module type S = sig
     type t =
@@ -84,20 +24,61 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let hash (x : t) : int = Enc.hash x.term
 
     include
-      JsonThing
+      Json.Thing.Make
         (Log)
         (struct
           type k = t
 
           let name = "State"
 
-          let json (x : t) : Yojson.t =
+          let json ?as_elt (x : t) : Yojson.t =
             `Assoc
               [ "enc", `String (Enc.to_string x.term)
               ; ( "pp"
                 , `String (Utils.Strfy.option (Args Utils.Strfy.string) x.pp) )
               ]
           ;;
+        end)
+  end
+
+  module States (State : S) = struct
+    module Set : Set.S with type elt = State.t = Set.Make (State)
+    include Set
+
+    let add_to_opt (x : State.t) (ys : t option) : t =
+      add x (Option.default empty ys)
+    ;;
+
+    exception StateHasNoOrigin of (State.t * t * t)
+
+    (** [origin_of_state x a b] returns [-1] if [x] is only in [a], [1] if [x] is only in [b], [0] if [x] is in both [a] and [b], and raises [StateHasNoOrigin] otherwise.
+    *)
+    let origin_of_state (x : State.t) (a : t) (b : t) : int =
+      match mem x a, mem x b with
+      | true, true -> 0
+      | true, false -> -1
+      | false, true -> 1
+      | false, false -> raise (StateHasNoOrigin (x, a, b))
+    ;;
+
+    (** [has_shared_origin a b c] returns [true] if any of the states in [a] are present in both [b] and [c], otherwise [false].
+    *)
+    let has_shared_origin (a : t) (b : t) (c : t) : bool =
+      let f (i : int) (x : State.t) : bool =
+        match origin_of_state x b c with 0 -> true | j -> Int.equal i j
+      in
+      exists (f (-1)) a && exists (f 1) a
+    ;;
+
+    (* *)
+    include
+      Json.List.Make
+        (Log)
+        (struct
+          module Set = Set
+
+          let name = "States"
+          let json = State.json
         end)
   end
 end

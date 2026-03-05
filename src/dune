@@ -26,6 +26,7 @@
   output_mode
   output_config
   logger
+  json
   theories
   rocq_utils
   ; rocq_convert
@@ -42,6 +43,7 @@
   rocq_monad_utils
   rocq_bindings
   model_state
+  model_label
   model
   api ; stores modules created by [loader.v], used by commands
   wrapper ; basic plugin commands

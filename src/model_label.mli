@@ -2,21 +2,29 @@ module Make : (Log : Logger.SLogger)
   (Enc : Encoding.SEncoding)
   -> sig
   module type S = sig
-    type t = { term : Enc.t; pp : string option }
+    type t = {
+      term : Enc.t;
+      pp : string option;
+      is_silent : bool option;
+    }
 
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     val equal : t -> t -> bool
     val compare : t -> t -> int
     val hash : t -> int
+    val is_silent : t -> bool
+
+    type k = t
+
+    val json : ?as_elt:bool -> k -> Yojson.t
+    val to_string : ?pretty:bool -> k -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
   end
 
-  module State : S
+  module Label : S
 
-  module States : (State : S) -> sig
+  module Labels : (Label : S) -> sig
     module Set : sig
-      type elt = State.t
+      type elt = Label.t
       type t
 
       val empty : t
@@ -65,69 +73,64 @@ module Make : (Log : Logger.SLogger)
     end
 
     val empty : Set.t
-    val add : State.t -> Set.t -> Set.t
-    val singleton : State.t -> Set.t
-    val remove : State.t -> Set.t -> Set.t
+    val add : Label.t -> Set.t -> Set.t
+    val singleton : Label.t -> Set.t
+    val remove : Label.t -> Set.t -> Set.t
     val union : Set.t -> Set.t -> Set.t
     val inter : Set.t -> Set.t -> Set.t
     val disjoint : Set.t -> Set.t -> bool
     val diff : Set.t -> Set.t -> Set.t
     val cardinal : Set.t -> int
-    val elements : Set.t -> State.t list
-    val min_elt : Set.t -> State.t
-    val min_elt_opt : Set.t -> State.t option
-    val max_elt : Set.t -> State.t
-    val max_elt_opt : Set.t -> State.t option
-    val choose : Set.t -> State.t
-    val choose_opt : Set.t -> State.t option
-    val find : State.t -> Set.t -> State.t
-    val find_opt : State.t -> Set.t -> State.t option
-    val find_first : (State.t -> bool) -> Set.t -> State.t
+    val elements : Set.t -> Label.t list
+    val min_elt : Set.t -> Label.t
+    val min_elt_opt : Set.t -> Label.t option
+    val max_elt : Set.t -> Label.t
+    val max_elt_opt : Set.t -> Label.t option
+    val choose : Set.t -> Label.t
+    val choose_opt : Set.t -> Label.t option
+    val find : Label.t -> Set.t -> Label.t
+    val find_opt : Label.t -> Set.t -> Label.t option
+    val find_first : (Label.t -> bool) -> Set.t -> Label.t
 
     val find_first_opt :
-      (State.t -> bool) -> Set.t -> State.t option
+      (Label.t -> bool) -> Set.t -> Label.t option
 
-    val find_last : (State.t -> bool) -> Set.t -> State.t
+    val find_last : (Label.t -> bool) -> Set.t -> Label.t
 
     val find_last_opt :
-      (State.t -> bool) -> Set.t -> State.t option
+      (Label.t -> bool) -> Set.t -> Label.t option
 
-    val iter : (State.t -> unit) -> Set.t -> unit
+    val iter : (Label.t -> unit) -> Set.t -> unit
 
     val fold :
-      (State.t -> 'acc -> 'acc) -> Set.t -> 'acc -> 'acc
+      (Label.t -> 'acc -> 'acc) -> Set.t -> 'acc -> 'acc
 
-    val map : (State.t -> State.t) -> Set.t -> Set.t
-    val filter : (State.t -> bool) -> Set.t -> Set.t
+    val map : (Label.t -> Label.t) -> Set.t -> Set.t
+    val filter : (Label.t -> bool) -> Set.t -> Set.t
 
     val filter_map :
-      (State.t -> State.t option) -> Set.t -> Set.t
+      (Label.t -> Label.t option) -> Set.t -> Set.t
 
-    val partition : (State.t -> bool) -> Set.t -> Set.t * Set.t
-    val split : State.t -> Set.t -> Set.t * bool * Set.t
+    val partition : (Label.t -> bool) -> Set.t -> Set.t * Set.t
+    val split : Label.t -> Set.t -> Set.t * bool * Set.t
     val is_empty : Set.t -> bool
-    val mem : State.t -> Set.t -> bool
+    val mem : Label.t -> Set.t -> bool
     val equal : Set.t -> Set.t -> bool
     val compare : Set.t -> Set.t -> int
     val subset : Set.t -> Set.t -> bool
-    val for_all : (State.t -> bool) -> Set.t -> bool
-    val exists : (State.t -> bool) -> Set.t -> bool
-    val to_list : Set.t -> State.t list
-    val of_list : State.t list -> Set.t
-    val to_seq_from : State.t -> Set.t -> State.t Seq.t
-    val to_seq : Set.t -> State.t Seq.t
-    val to_rev_seq : Set.t -> State.t Seq.t
-    val add_seq : State.t Seq.t -> Set.t -> Set.t
-    val of_seq : State.t Seq.t -> Set.t
-    val add_to_opt : State.t -> Set.t option -> Set.t
-
-    exception StateHasNoOrigin of (State.t * Set.t * Set.t)
-
-    val origin_of_state : State.t -> Set.t -> Set.t -> int
-    val has_shared_origin : Set.t -> Set.t -> Set.t -> bool
+    val for_all : (Label.t -> bool) -> Set.t -> bool
+    val exists : (Label.t -> bool) -> Set.t -> bool
+    val to_list : Set.t -> Label.t list
+    val of_list : Label.t list -> Set.t
+    val to_seq_from : Label.t -> Set.t -> Label.t Seq.t
+    val to_seq : Set.t -> Label.t Seq.t
+    val to_rev_seq : Set.t -> Label.t Seq.t
+    val add_seq : Label.t Seq.t -> Set.t -> Set.t
+    val of_seq : Label.t Seq.t -> Set.t
+    val non_silent : Set.t -> Set.t
 
     type t = Set.t
-    type elt = State.t
+    type elt = Label.t
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
