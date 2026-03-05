@@ -64,8 +64,7 @@ module Make (Log : Logger.S) (Enc : Encoding.SEncoding) = struct
   end
 
   module Labels (Label : S) = struct
-    module Set : Set.S with type elt = Label.t = Set.Make (Label)
-    include Set
+    include Set.Make (Label)
 
     let non_silent (xs : t) : t =
       filter (fun (x : Label.t) -> Bool.not (Label.is_silent x)) xs
@@ -76,7 +75,7 @@ module Make (Log : Logger.S) (Enc : Encoding.SEncoding) = struct
       Json.Set.Make
         (Log)
         (struct
-          module Set = Set
+          module Set = Set.Make (Label)
 
           let name = "Labels"
           let json = Label.json
