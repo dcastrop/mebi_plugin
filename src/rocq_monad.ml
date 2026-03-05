@@ -1,5 +1,5 @@
 module Make
-    (Log : Logger.SLogger)
+    (Log : Logger.S)
     (Ctx : Rocq_context.SRocq_context)
     (Enc : Encoding.SEncoding) =
 struct
@@ -172,66 +172,5 @@ struct
        let* env = get_env in
        let* sigma = get_sigma in
        return (f env sigma))
-  ;;
-
-  module Tree = Enc_tree.Make (Enc)
-
-  module Constructor = struct
-    type t = EConstr.t * EConstr.t * Tree.t
-
-    let to_string
-          (env : Environ.env)
-          (sigma : Evd.evar_map)
-          ((action, destination, tree) : t)
-      : string
-      =
-      Utils.Strfy.record
-        [ "action", Rocq_utils.Strfy.econstr env sigma action
-        ; "destination", Rocq_utils.Strfy.econstr env sigma destination
-        ; "tree", Tree.to_string tree
-        ]
-    ;;
-  end
-
-  let make_state_tree_pair_set ()
-    : (module Set.S with type elt = Enc.t * Tree.t)
-    =
-    Log.trace __FUNCTION__;
-    (module Set.Make (struct
-         type t = Enc.t * Tree.t
-
-         let compare t1 t2 =
-           Utils.compare_chain
-             [ Enc.compare (fst t1) (fst t2); Tree.compare (snd t1) (snd t2) ]
-         ;;
-       end))
-  ;;
-
-  (* *)
-  let make_hashtbl () : (module Hashtbl.S with type key = Enc.t) =
-    Log.trace __FUNCTION__;
-    (module Hashtbl.Make (struct
-         include Enc
-       end))
-  ;;
-
-  let make_set () : (module Set.S with type elt = Enc.t) =
-    Log.trace __FUNCTION__;
-    (module Set.Make (struct
-         include Enc
-       end))
-  ;;
-
-  let make_econstr_set () : (module Set.S with type elt = EConstr.t) =
-    Log.trace __FUNCTION__;
-    (module Set.Make (struct
-         type t = EConstr.t
-
-         let compare (a : t) (b : t) : int =
-           let a = encode a in
-           let b = encode b in
-           Enc.compare a b
-         ;;
-       end))
   ;;
 end

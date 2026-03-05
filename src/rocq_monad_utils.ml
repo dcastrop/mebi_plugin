@@ -1,9 +1,11 @@
 module Make
-    (Log : Logger.SLogger)
+    (Log : Logger.S)
     (C : Rocq_context.SRocq_context)
     (E : Encoding.SEncoding) =
 struct
   include Rocq_monad.Make (Log) (C) (E)
+
+  (*************************************888*)
 
   let fresh_evar (x : Rocq_utils.evar_source) : EConstr.t mm =
     (* Log.trace __FUNCTION__; *)
@@ -556,6 +558,33 @@ struct
 
   (*********************************************************)
 
+  module Constructor_ = Enc_constructor_tree.Make (Log) (Enc)
+  module Tree = Constructor_.Tree
+
+  module Constructor = struct
+    include Constructor_.Constructor
+
+    let encode (act : EConstr.t) (goto : EConstr.t) (tree : Tree.t) : t =
+      let act = encode act in
+      let goto = encode goto in
+      act, goto, tree
+    ;;
+  end
+
+  let make_state_tree_pair_set ()
+    : (module Set.S with type elt = Enc.t * Tree.t)
+    =
+    Log.trace __FUNCTION__;
+    (module Set.Make (struct
+         type t = Enc.t * Tree.t
+
+         let compare t1 t2 =
+           Utils.compare_chain
+             [ Enc.compare (fst t1) (fst t2); Tree.compare (snd t1) (snd t2) ]
+         ;;
+       end))
+  ;;
+
   module Unification = struct
     module type SPair = sig
       type t =
@@ -782,26 +811,8 @@ struct
       ;;
     end
 
-    module type SConstructors = sig
-      type t = Constructor.t list
-
-      val to_string : Environ.env -> Evd.evar_map -> t -> string
-
-      val retrieve
-        :  int
-        -> t
-        -> EConstr.t
-        -> EConstr.t
-        -> Enc.t * Problems.t list
-        -> t mm
-    end
-
-    module Constructors : SConstructors = struct
-      type t = Constructor.t list
-
-      let to_string (env : Environ.env) (sigma : Evd.evar_map) : t -> string =
-        Utils.Strfy.list (Of (Constructor.to_string env sigma))
-      ;;
+    module Constructors = struct
+      include Constructor_.Constructors (Constructor)
 
       let rec retrieve
                 (constructor_index : int)
@@ -822,9 +833,9 @@ struct
                | None -> return None
                | Some (act, goto, constructor_trees) ->
                  let tree : Tree.t =
-                   Tree.Node ((lts_enc, constructor_index), constructor_trees)
+                   N ((lts_enc, constructor_index), constructor_trees)
                  in
-                 let constructor : Constructor.t = act, goto, tree in
+                 let constructor = Constructor.encode act goto tree in
                  return (Some constructor))
           in
           (match constructor_opt with
@@ -832,6 +843,42 @@ struct
            | Some constructor -> return (constructor :: acc))
       ;;
     end
+    (* module Constructors = struct
+       type t = Constructor.t list
+
+       let to_string (env : Environ.env) (sigma : Evd.evar_map) : t -> string =
+       Utils.Strfy.list (Of (Constructor.to_string env sigma))
+       ;;
+
+       let rec retrieve
+       (constructor_index : int)
+       (acc : t)
+       (act : EConstr.t)
+       (tgt : EConstr.t)
+       : Enc.t * Problems.t list -> t mm
+       =
+       let open Syntax in
+       function
+       | _, [] -> return acc
+       | lts_enc, problems :: tl ->
+       let* acc = retrieve constructor_index acc act tgt (lts_enc, tl) in
+       let* constructor_opt : Constructor.t option =
+       sandbox
+       (let* success = Problems.sandbox_unify_all_opt act tgt problems in
+       match success with
+       | None -> return None
+       | Some (act, goto, constructor_trees) ->
+       let tree : Tree.t =
+       N ((lts_enc, constructor_index), constructor_trees)
+       in
+       let constructor : Constructor.t = act, goto, tree in
+       return (Some constructor))
+       in
+       (match constructor_opt with
+       | None -> return acc
+       | Some constructor -> return (constructor :: acc))
+       ;;
+       end *)
 
     (** creates unification problems between the rhs of the current constructor and the lhs of the next, along with the actions of both.
         (* NOTE: this is only relevant when deciding whether to explore a given constructor from a premise of another *)
@@ -840,8 +887,8 @@ struct
       : Constructor.t -> Problem.t
       = function
       | act, rhs, tree ->
-        let act : Pair.t = { to_check = args.act; acc = act } in
-        let goto : Pair.t = { to_check = args.rhs; acc = rhs } in
+        let act : Pair.t = { to_check = args.act; acc = decode act } in
+        let goto : Pair.t = { to_check = args.rhs; acc = decode rhs } in
         { act; goto; tree }
     ;;
 
@@ -898,8 +945,8 @@ struct
       if is_evar
       then return constructors
       else (
-        let tree : Tree.t = Tree.Node (constructor_index, []) in
-        let axiom : Constructor.t = act, tgt, tree in
+        let tree : Tree.t = N (constructor_index, []) in
+        let axiom = Constructor.encode act tgt tree in
         return (axiom :: constructors))
     ;;
 
@@ -1069,4 +1116,31 @@ struct
       return constructors
     ;;
   end
+
+  let make_hashtbl () : (module Hashtbl.S with type key = Enc.t) =
+    Log.trace __FUNCTION__;
+    (module Hashtbl.Make (struct
+         include Enc
+       end))
+  ;;
+
+  let make_set () : (module Set.S with type elt = Enc.t) =
+    Log.trace __FUNCTION__;
+    (module Set.Make (struct
+         include Enc
+       end))
+  ;;
+
+  let make_econstr_set () : (module Set.S with type elt = EConstr.t) =
+    Log.trace __FUNCTION__;
+    (module Set.Make (struct
+         type t = EConstr.t
+
+         let compare (a : t) (b : t) : int =
+           let a = encode a in
+           let b = encode b in
+           Enc.compare a b
+         ;;
+       end))
+  ;;
 end

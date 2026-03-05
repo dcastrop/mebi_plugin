@@ -1,8 +1,11 @@
-module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
-  module Tree = Enc_tree.Make (Enc)
+module Make (Log : Logger.S) (Enc : Encoding.SEncoding) = struct
+  module Tree_ = Enc_tree.Make (Log) (Enc)
+  module TreeNode = Tree_.Node
+  module Tree = Tree_.Tree
+  module Trees = Tree_.Trees (Tree)
 
   (* module Trees : Set.S with type elt = Tree.t = Set.Make (Tree) *)
-  module Trees = struct
+  (* module Trees = struct
     include Set.Make (Tree)
 
     exception EmptyHasNoMin
@@ -49,12 +52,17 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       =
       Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
-  end
+  end *)
 
+  (** [module State_] *)
   module State_ = Model_state.Make (Log) (Enc)
+
   module State : State_.S = State_.State
   module States = State_.States (State)
+
+  (** [module Label_] *)
   module Label_ = Model_label.Make (Log) (Enc)
+
   module Label : Label_.S = Label_.Label
   module Labels = Label_.Labels (Label)
 

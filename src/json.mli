@@ -14,9 +14,7 @@ module Thing : sig
     val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
   end
 
-  module Make : (_ : Logger.SLogger)
-    (X : S)
-    -> sig
+  module Make : (Log : Logger.S) (X : S) -> sig
     type k = X.k
 
     val json : ?as_elt:bool -> k -> Yojson.t
@@ -26,6 +24,31 @@ module Thing : sig
 end
 
 module List : sig
+  module type S = sig
+    type t
+
+    val json : ?as_elt:bool -> t -> Yojson.t
+    val name : string
+  end
+
+  module type Type = sig
+    type k
+
+    val json : ?as_elt:bool -> k -> Yojson.t
+    val to_string : ?pretty:bool -> k -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
+  end
+
+  module Make : (Log : Logger.S) (X : S) -> sig
+    type k = X.t list
+
+    val json : ?as_elt:bool -> k -> Yojson.t
+    val to_string : ?pretty:bool -> k -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
+  end
+end
+
+module Set : sig
   module type S = sig
     module Set : Set.S
 
@@ -42,9 +65,7 @@ module List : sig
     val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
-  module Make : (_ : Logger.SLogger)
-    (X : S)
-    -> sig
+  module Make : (Log : Logger.S) (X : S) -> sig
     type t = X.Set.t
     type elt = X.Set.elt
 

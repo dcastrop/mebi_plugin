@@ -1,4 +1,4 @@
-module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
+module Make (Log : Logger.S) (Enc : Encoding.SEncoding) = struct
   module type S = sig
     type t =
       { term : Enc.t
@@ -10,12 +10,9 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     val compare : t -> t -> int
     val hash : t -> int
     val is_silent : t -> bool
-
-    type k = t
-
-    val json : ?as_elt:bool -> k -> Yojson.t
-    val to_string : ?pretty:bool -> k -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
+    val json : ?as_elt:bool -> t -> Yojson.t
+    val to_string : ?pretty:bool -> t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
   module Label : S = struct
@@ -76,7 +73,7 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
 
     (* *)
     include
-      Json.List.Make
+      Json.Set.Make
         (Log)
         (struct
           module Set = Set

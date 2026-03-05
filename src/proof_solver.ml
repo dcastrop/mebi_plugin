@@ -1,7 +1,7 @@
 exception NothingToDo
 exception NotImplemented
 
-module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
+module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
   (** [W] is for running the main part of the algorithm (pre-proof). *)
   module W = struct
     include Wrapper.Make (Log) (Rocq_context.Default) (E)
@@ -219,7 +219,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           is an option type since [None] represents the end of the annotation.
     *)
     type t =
-      { current : Model.Tree.TreeNode.t list option
+      { current : Model.TreeNode.t list option
       ; annotation : Model.Annotation.t option
       ; label : Model.Label.t
       ; destination : Model.State.t
@@ -235,7 +235,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
         ; "destination", Model.State.to_string x.destination
         ; ( "current"
           , Utils.Strfy.option
-              (Of (Utils.Strfy.list (Of Model.Tree.TreeNode.to_string)))
+              (Of (Utils.Strfy.list (Of Model.TreeNode.to_string)))
               x.current )
         ; ( "annotation"
           , Utils.Strfy.option (Of Model.Annotation.to_string) x.annotation )
@@ -1162,7 +1162,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
           (* TODO: check if we can optimize this so we use [NoBindings] where possible *)
       *)
       let try_get_constructor_bindings
-            ((enc, index) : Model.Tree.TreeNode.t)
+            ((enc, index) : Model.TreeNode.t)
             (args : binding_args)
         : EConstr.t Tactypes.bindings mm
         =
@@ -1177,7 +1177,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
       ;;
 
       let apply_constructor
-            ((enc, index) : Model.Tree.TreeNode.t)
+            ((enc, index) : Model.TreeNode.t)
             (args : binding_args)
         : Tactic.t mm
         =
@@ -1812,7 +1812,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
     ;;
 
     let handle_appconstrs_update_args ({ this; next } : Model.Annotation.t)
-      : Model.Tree.TreeNode.t list option * Model.Annotation.t option
+      : Model.TreeNode.t list option * Model.Annotation.t option
       =
       Some (Model.Trees.min this.using |> Model.Tree.minimize), next
     ;;
@@ -1830,7 +1830,7 @@ module Make (Log : Logger.SLogger) (E : Encoding.SEncoding) = struct
 
     (** [handle_appconstrs_apply x] ...
         (* NOTE: relies on the bindings we extract early on *) *)
-    let handle_appconstrs_apply (x : Model.Tree.TreeNode.t) : Tactic.t mm =
+    let handle_appconstrs_apply (x : Model.TreeNode.t) : Tactic.t mm =
       Log.trace __FUNCTION__;
       let open Syntax in
       let* _, tys = get_concl () |> to_atomic in

@@ -1,4 +1,4 @@
-module Make : (_ : Logger.SLogger)
+module Make : (_ : Logger.S)
     (_ : Rocq_context.SRocq_context)
     (Enc : Encoding.SEncoding)
     -> sig
