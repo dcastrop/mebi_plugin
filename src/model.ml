@@ -28,6 +28,27 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let min_opt (xs : t) : elt option =
       try Some (min xs) with EmptyHasNoMin -> None
     ;;
+
+    let json (x : t) : Yojson.t =
+      `Assoc
+        [ ( "Trees"
+          , `List
+              (fold
+                 (fun (x : Tree.t) (acc : Yojson.t list) ->
+                   (* Tree.json x *)
+                   `String (Tree.to_string x) :: acc)
+                 x
+                 []) )
+        ]
+    ;;
+
+    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
+
+    let _log ?(__FUNCTION__ : string = "") ?(s : string = "Trees") (x : t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
+    ;;
   end
 
   module State = struct
@@ -41,14 +62,18 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let hash (x : t) : int = Enc.hash x.term
 
     (* *)
-    let to_string : t -> string = function
-      | { pp = None; term } -> Enc.to_string term
-      | x ->
-        Utils.Strfy.record
-          [ "term", Enc.to_string x.term
-          ; "pp", Utils.Strfy.option (Args Utils.Strfy.string) x.pp
-          ]
+    let json (x : t) : Yojson.t =
+      `Assoc
+        [ ( "state"
+          , `Assoc
+              [ "enc", `String (Enc.to_string x.term)
+              ; ( "pp"
+                , `String (Utils.Strfy.option (Args Utils.Strfy.string) x.pp) )
+              ] )
+        ]
     ;;
+
+    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "State") (x : t) : unit
       =
@@ -86,16 +111,19 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     (* *)
-    let to_string (xs : t) : string =
-      S.to_list xs
-      |> Utils.Strfy.list
-           ~args:
-             (Utils.Strfy.style_args
-                ~style:(Some (Utils.Strfy.collection_style List))
-                ~name:"States"
-                ())
-           (Of State.to_string)
+    let json (x : t) : Yojson.t =
+      `Assoc
+        [ ( "States"
+          , `List
+              (fold
+                 (fun (x : State.t) (acc : Yojson.t list) ->
+                   State.json x :: acc)
+                 x
+                 []) )
+        ]
     ;;
+
+    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "States") (x : t)
       : unit
@@ -131,19 +159,21 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let is_silent (x : t) : bool = Option.default false x.is_silent
 
     (* *)
-    let to_string : t -> string = function
-      | { pp = None; term; is_silent } ->
-        Utils.Strfy.record
-          [ "term", Enc.to_string term
-          ; "is_silent", Utils.Strfy.option (Args Utils.Strfy.bool) is_silent
-          ]
-      | x ->
-        Utils.Strfy.record
-          [ "term", Enc.to_string x.term
-          ; "pp", Utils.Strfy.option (Args Utils.Strfy.string) x.pp
-          ; "is_silent", Utils.Strfy.option (Args Utils.Strfy.bool) x.is_silent
-          ]
+    let json (x : t) : Yojson.t =
+      `Assoc
+        [ ( "label"
+          , `Assoc
+              [ "enc", `String (Enc.to_string x.term)
+              ; ( "pp"
+                , `String (Utils.Strfy.option (Args Utils.Strfy.string) x.pp) )
+              ; ( "is_silent"
+                , `String
+                    (Utils.Strfy.option (Args Utils.Strfy.bool) x.is_silent) )
+              ] )
+        ]
     ;;
+
+    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "Label") (x : t) : unit
       =
@@ -159,12 +189,19 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
       filter (fun (x : Label.t) -> Bool.not (Label.is_silent x)) xs
     ;;
 
-    let to_string (xs : t) : string =
-      S.to_list xs
-      |> Utils.Strfy.list
-           ~args:{ (Utils.Strfy.style_args ()) with name = Some "Labels" }
-           (Of Label.to_string)
+    let json (x : t) : Yojson.t =
+      `Assoc
+        [ ( "Labels"
+          , `List
+              (fold
+                 (fun (x : Label.t) (acc : Yojson.t list) ->
+                   Label.json x :: acc)
+                 x
+                 []) )
+        ]
     ;;
+
+    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "Labels") (x : t)
       : unit
@@ -201,14 +238,27 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     let is_silent (x : t) : bool = Label.is_silent x.label
 
     (* *)
-    let to_string (x : t) : string =
+    (* let to_string (x : t) : string =
       Printf.sprintf
         "<State (%s) Goto (%s) Via (%s)>"
         (State.to_string x.from)
         (State.to_string x.goto)
         (* (Label.to_string x.label) *)
         (Enc.to_string x.label.term)
+    ;; *)
+    let json (x : t) : Yojson.t =
+      `Assoc
+        [ ( "note"
+          , `Assoc
+              [ "from", State.json x.from
+              ; "label", Label.json x.label
+              ; "goto", State.json x.goto
+              ; "using", Trees.json x.using
+              ] )
+        ]
     ;;
+
+    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "Note") (x : t) : unit =
       Log.thing ~__FUNCTION__ Debug s x (Of to_string)
@@ -276,11 +326,17 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     (* *)
-    let rec to_string : t -> string = function
-      | { this; next = None } -> Note.to_string this
-      | { this; next = Some next } ->
-        Printf.sprintf "%s; %s" (Note.to_string this) (to_string next)
+    let json (x : t) : Yojson.t =
+      let rec unfold : t -> Yojson.t = function
+        | { this; next = None } ->
+          `Assoc [ "this", Note.json this; "next", `String "None" ]
+        | { this; next = Some next } ->
+          `Assoc [ "this", Note.json this; "next", unfold next ]
+      in
+      `Assoc [ "annotation", unfold x ]
     ;;
+
+    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "Annotation") (x : t)
       : unit
@@ -293,12 +349,19 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     module S : Set.S with type elt = Annotation.t = Set.Make (Annotation)
     include S
 
-    let to_string (xs : t) : string =
-      S.to_list xs
-      |> Utils.Strfy.list
-           ~args:{ (Utils.Strfy.style_args ()) with name = Some "Annotations" }
-           (Of Annotation.to_string)
+    let json (x : t) : Yojson.t =
+      `Assoc
+        [ ( "Annotations"
+          , `List
+              (fold
+                 (fun (x : Annotation.t) (acc : Yojson.t list) ->
+                   Annotation.json x :: acc)
+                 x
+                 []) )
+        ]
     ;;
+
+    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "Annotations") (x : t)
       : unit
@@ -367,17 +430,30 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     (* *)
-    let to_string (x : t) : string =
-      Utils.Strfy.record
-        [ "from", State.to_string x.from
-        ; "goto", State.to_string x.goto
-        ; "label", Label.to_string x.label
-        ; ( "annotation"
-          , Utils.Strfy.option (Of Annotation.to_string) x.annotation )
-        ; ( "constructor_tree"
-          , Utils.Strfy.option (Of Tree.to_string) x.constructor_tree )
+    let json (x : t) : Yojson.t =
+      `Assoc
+        [ ( "transition"
+          , `Assoc
+              [ "from", State.json x.from
+              ; "goto", State.json x.from
+              ; "label", Label.json x.label
+              ; ( "annotation"
+                , match x.annotation with
+                  | None -> `String "None"
+                  | Some x -> Annotation.json x )
+              ; ( "constructor_tree"
+                , (* Tree.json x.constructor_tree *)
+                  (*  Tree.json x *)
+                  match x.constructor_tree with
+                  | None -> `String "None"
+                  | Some x ->
+                    (*  Tree.json x *)
+                    `String (Tree.to_string x) )
+              ] )
         ]
     ;;
+
+    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "Transition") (x : t)
       : unit
@@ -399,12 +475,19 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     (* *)
-    let to_string (xs : t) : string =
-      S.to_list xs
-      |> Utils.Strfy.list
-           ~args:{ (Utils.Strfy.style_args ()) with name = Some "Transitions" }
-           (Of Transition.to_string)
+    let json (x : t) : Yojson.t =
+      `Assoc
+        [ ( "Transitions"
+          , `List
+              (fold
+                 (fun (x : Transition.t) (acc : Yojson.t list) ->
+                   Transition.json x :: acc)
+                 x
+                 []) )
+        ]
     ;;
+
+    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "Transitions") (x : t)
       : unit
@@ -450,17 +533,24 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     (* *)
-    let to_string (x : t) : string =
-      Utils.Strfy.record
-        [ "label", Label.to_string x.label
-        ; ( "annotation"
-          , Utils.Strfy.option (Of Annotation.to_string) x.annotation )
-        ; ( "constructor_trees"
-          , Utils.Strfy.list
-              (Of Tree.to_string)
-              (Trees.to_list x.constructor_trees) )
+    let json (x : t) : Yojson.t =
+      `Assoc
+        [ ( "action"
+          , `Assoc
+              [ "label", Label.json x.label
+              ; ( "annotation"
+                , match x.annotation with
+                  | None -> `String "None"
+                  | Some x -> Annotation.json x )
+              ; ( "constructor_tree"
+                , (* Tree.json x.constructor_tree *)
+                  (*  Tree.json x *)
+                  Trees.json x.constructor_trees )
+              ] )
         ]
     ;;
+
+    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "Action") (x : t)
       : unit
@@ -477,10 +567,17 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
     ;;
 
     (* *)
-    let to_string ((a, b) : t) =
-      Utils.Strfy.record
-        [ "action", Action.to_string a; "destinations", States.to_string b ]
+    let json (x : t) : Yojson.t =
+      `Assoc
+        [ ( "actionpair"
+          , `Assoc
+              [ "action", Action.json (fst x)
+              ; "destinations", States.json (snd x)
+              ] )
+        ]
     ;;
+
+    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
 
     let log ?(__FUNCTION__ : string = "") ?(s : string = "ActionPair") (x : t)
       : unit
@@ -596,6 +693,27 @@ module Make (Log : Logger.SLogger) (Enc : Encoding.SEncoding) = struct
           |> List.map (fun (_, t) -> a, States.union s t)
           |> of_list
           |> union acc))
+    ;;
+
+    (* *)
+    let json (x : t) : Yojson.t =
+      `Assoc
+        [ ( "ActionPairs"
+          , `List
+              (fold
+                 (fun (x : ActionPair.t) (acc : Yojson.t list) ->
+                   ActionPair.json x :: acc)
+                 x
+                 []) )
+        ]
+    ;;
+
+    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
+
+    let _log ?(__FUNCTION__ : string = "") ?(s : string = "ActionPairs") (x : t)
+      : unit
+      =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
 

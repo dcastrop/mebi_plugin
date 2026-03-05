@@ -8,8 +8,8 @@ endif
 %: Makefile.rocq
 # %: Makefile.coq
 
-Makefile.rocq: _RocqProject
-	$(COQBIN)rocq makefile -f _RocqProject -o Makefile.rocq
+Makefile.rocq: _CoqProject
+	$(COQBIN)rocq makefile -f _CoqProject -o Makefile.rocq
 
 # Makefile.coq: _CoqProject
 # 	$(COQBIN)coq_makefile -f _CoqProject -o Makefile.coq

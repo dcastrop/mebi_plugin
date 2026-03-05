@@ -1,10 +1,12 @@
 .merlin
 *.ml*.d
 *.cm[ixt]*
-Makefile.rocq*
+Makefile.rocq
 .Makefile.rocq.d
-Makefile.coq*
+Makefile.rocq.conf
+Makefile.coq
 .Makefile.coq.d
+Makefile.coq.conf
 *~
 *.[ao]
 .coqdeps.d
@@ -22,6 +24,7 @@ g_*.ml
 # ignore dune stuff
 _build
 *.opam
+dune.lock
 
 # ignore generated make files
 CoqMakeFile*
