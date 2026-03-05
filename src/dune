@@ -41,6 +41,7 @@
   rocq_monad
   rocq_monad_utils
   rocq_bindings
+  model_state
   model
   api ; stores modules created by [loader.v], used by commands
   wrapper ; basic plugin commands

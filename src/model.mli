@@ -91,7 +91,7 @@ module Make : (_ : Logger.SLogger) (Enc : Encoding.SEncoding) -> sig
     val equal : t -> t -> bool
     val compare : t -> t -> int
     val hash : t -> int
-    val to_string : t -> string
+    val to_string : ?pretty:bool -> t -> string
     val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
 
