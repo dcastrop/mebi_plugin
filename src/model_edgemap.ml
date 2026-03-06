@@ -1,4 +1,5 @@
-module Make : (Log : Logger.S)
+module Make
+    (Log : Logger.S)
     (State : sig
        type t
 
@@ -68,6 +69,7 @@ module Make : (Log : Logger.S)
        type t = Action.t * States.t
 
        val compare : t -> t -> int
+       val shorter_annotation : t -> t -> t
        val try_update : t -> t list -> t option * t list
        val merge_lists : t list -> t list -> t list
        val json : ?as_elt:bool -> t -> Yojson.t
@@ -125,32 +127,134 @@ module Make : (Log : Logger.S)
        val json : ?as_elt:bool -> t -> Yojson.t
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-     end)
-    (EdgeMap : sig
-       include Hashtbl.S with type key = State.t
+     end) : sig
+  include Hashtbl.S with type key = State.t
 
-       type t' = ActionMap.t' t
+  type t' = ActionMap.t' t
 
-       val update : t' -> State.t -> Action.t -> States.t -> unit
-       val destinations : t' -> State.t -> States.t
-       val get_actions : t' -> State.t -> Actions.t
-       val reduce_by_label : t' -> Label.t -> t'
-       val get_edges : t' -> State.t -> Edges.t
-       val to_edges : t' -> Edges.t
-       val of_edges : Edges.t -> t'
-       val merge : t' -> t' -> t'
-       val json : ?as_elt:bool -> t' -> Yojson.t
-       val to_string : ?pretty:bool -> t' -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
-     end)
-    -> sig
-  include Set.S with type elt = States.t
+  val update : t' -> State.t -> Action.t -> States.t -> unit
+  val destinations : t' -> State.t -> States.t
+  val get_actions : t' -> State.t -> Actions.t
+  val reduce_by_label : t' -> Label.t -> t'
+  val get_edges : t' -> State.t -> Edges.t
+  val to_edges : t' -> Edges.t
+  val of_edges : Edges.t -> t'
+  val merge : t' -> t' -> t'
+  val json : ?as_elt:bool -> t' -> Yojson.t
+  val to_string : ?pretty:bool -> t' -> string
+  val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
+end = struct
+  module Map_ : Hashtbl.S with type key = State.t = Hashtbl.Make (State)
+  include Map_
 
-  val get_bisimilar : State.t -> t -> States.t
-  val filter_reachable : States.t -> t -> t
-  val reachable : State.t -> EdgeMap.t' -> t -> t
-  val reachable_by_label : State.t -> Label.t -> EdgeMap.t' -> t -> t
-  val json : ?as_elt:bool -> t -> Yojson.t
-  val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+  type t' = ActionMap.t' t
+
+  let update
+        (x : t')
+        (from : State.t)
+        (action : Action.t)
+        (destinations : States.t)
+    : unit
+    =
+    Log.trace __FUNCTION__;
+    match find_opt x from with
+    | None ->
+      ActionPairs.singleton (action, destinations)
+      |> ActionMap.of_actionpairs
+      |> add x from
+    | Some actions -> ActionMap.update actions action destinations
+  ;;
+
+  let destinations (x : t') (from : State.t) : States.t =
+    Log.trace __FUNCTION__;
+    match find_opt x from with
+    | None ->
+      Log.thing ~__FUNCTION__ Debug "has no edges" from (Of State.to_string);
+      States.empty
+    | Some ys -> ActionMap.destinations ys
+  ;;
+
+  let get_actions (x : t') (from : State.t) : Actions.t =
+    Log.trace __FUNCTION__;
+    find x from |> ActionMap.to_seq_keys |> Actions.of_seq
+  ;;
+
+  let reduce_by_label (x : t') (label : Label.t) : t' =
+    Log.trace __FUNCTION__;
+    let y : t' = copy x in
+    filter_map_inplace
+      (fun (k : State.t) (vs : ActionMap.t') ->
+        let vs' : ActionMap.t' = ActionMap.reduce_by_label vs label in
+        if ActionMap.length vs' > 0 then Some vs' else None)
+      y;
+    y
+  ;;
+
+  let get_edges (x : t') (from : State.t) : Edges.t =
+    Log.trace __FUNCTION__;
+    ActionMap.fold
+      (fun (action : Action.t) (v : States.t) (acc : Edges.t) : Edges.t ->
+        States.fold
+          (fun (goto : State.t) (acc : Edges.t) : Edges.t ->
+            Edges.add { from; action; goto } acc)
+          v
+          acc)
+      (find x from)
+      Edges.empty
+  ;;
+
+  let to_edges (x : t') : Edges.t =
+    Log.trace __FUNCTION__;
+    fold
+      (fun (from : State.t) (vs : ActionMap.t') : (Edges.t -> Edges.t) ->
+        ActionMap.to_actionpairs vs
+        |> ActionPairs.fold
+             (fun
+                 ((action, destinations) : ActionPair.t)
+                  : (Edges.t -> Edges.t)
+                ->
+             States.fold
+               (fun (goto : State.t) : (Edges.t -> Edges.t) ->
+                 Edges.add { from; goto; action })
+               destinations))
+      x
+      Edges.empty
+  ;;
+
+  let of_edges (xs : Edges.t) : t' =
+    Log.trace __FUNCTION__;
+    let ys : t' = create 0 in
+    Edges.iter
+      (fun ({ from; goto; action } : Edge.t) ->
+        update ys from action (States.singleton goto))
+      xs;
+    ys
+  ;;
+
+  let merge (a : t') (b : t') : t' =
+    Log.trace __FUNCTION__;
+    let c : t' = copy a in
+    iter
+      (fun (k : State.t) (vs : ActionMap.t') ->
+        match find_opt c k with
+        | Some actions -> ActionMap.merge actions vs |> replace c k
+        | None -> add c k vs)
+      b;
+    c
+  ;;
+
+  include
+    Json.Map.Make
+      (Log)
+      (struct
+        module Map = Map_
+
+        type value = ActionMap.t'
+
+        let name = "EdgeMap"
+        let kname = "From"
+        let vname = "Actions"
+        let kjson = State.json
+        let vjson = ActionMap.json
+      end)
 end

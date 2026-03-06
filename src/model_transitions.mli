@@ -20,6 +20,14 @@ module Make : (Log : Logger.S)
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
      end)
+    (Labels : sig
+       include Set.S with type elt = Label.t
+
+       val non_silent : t -> t
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end)
     (Tree : sig
        module Node : sig
          type t
@@ -83,18 +91,26 @@ module Make : (Log : Logger.S)
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
      end)
-    -> sig
-  type t =
-    { from : State.t
-    ; goto : State.t
-    ; label : Label.t
-    ; tree : Tree.t option
-    ; annotation : Annotation.t option
-    }
+    (Transition : sig
+       type t =
+         { from : State.t
+         ; goto : State.t
+         ; label : Label.t
+         ; tree : Tree.t option
+         ; annotation : Annotation.t option
+         }
 
-  val equal : t -> t -> bool
-  val compare : t -> t -> int
-  val is_silent : t -> bool
+       val equal : t -> t -> bool
+       val compare : t -> t -> int
+       val is_silent : t -> bool
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end)
+    -> sig
+  include Set.S with type elt = Transition.t
+
+  val labels : t -> Labels.t
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
   val log : ?__FUNCTION__:string -> ?s:string -> t -> unit

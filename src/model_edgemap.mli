@@ -68,6 +68,7 @@ module Make : (Log : Logger.S)
        type t = Action.t * States.t
 
        val compare : t -> t -> int
+       val shorter_annotation : t -> t -> t
        val try_update : t -> t list -> t option * t list
        val merge_lists : t list -> t list -> t list
        val json : ?as_elt:bool -> t -> Yojson.t
@@ -126,31 +127,20 @@ module Make : (Log : Logger.S)
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
      end)
-    (EdgeMap : sig
-       include Hashtbl.S with type key = State.t
-
-       type t' = ActionMap.t' t
-
-       val update : t' -> State.t -> Action.t -> States.t -> unit
-       val destinations : t' -> State.t -> States.t
-       val get_actions : t' -> State.t -> Actions.t
-       val reduce_by_label : t' -> Label.t -> t'
-       val get_edges : t' -> State.t -> Edges.t
-       val to_edges : t' -> Edges.t
-       val of_edges : Edges.t -> t'
-       val merge : t' -> t' -> t'
-       val json : ?as_elt:bool -> t' -> Yojson.t
-       val to_string : ?pretty:bool -> t' -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
-     end)
     -> sig
-  include Set.S with type elt = States.t
+  include Hashtbl.S with type key = State.t
 
-  val get_bisimilar : State.t -> t -> States.t
-  val filter_reachable : States.t -> t -> t
-  val reachable : State.t -> EdgeMap.t' -> t -> t
-  val reachable_by_label : State.t -> Label.t -> EdgeMap.t' -> t -> t
-  val json : ?as_elt:bool -> t -> Yojson.t
-  val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+  type t' = ActionMap.t' t
+
+  val update : t' -> State.t -> Action.t -> States.t -> unit
+  val destinations : t' -> State.t -> States.t
+  val get_actions : t' -> State.t -> Actions.t
+  val reduce_by_label : t' -> Label.t -> t'
+  val get_edges : t' -> State.t -> Edges.t
+  val to_edges : t' -> Edges.t
+  val of_edges : Edges.t -> t'
+  val merge : t' -> t' -> t'
+  val json : ?as_elt:bool -> t' -> Yojson.t
+  val to_string : ?pretty:bool -> t' -> string
+  val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
 end

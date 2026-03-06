@@ -1,127 +1,155 @@
 module Make
     (Log : Logger.S)
-    (Enc : Encoding.SEncoding)
-    (State : Model_state.Make(Log)(Enc).S)
-    (Label_ : module type of Model_label.Make (Log) (Enc))
-       (Labels : module type of Label_.Labels (Label_.Label))
-          (Tree_ : module type of Enc_tree.Make (Log) (Enc))
-             (* (Tree : Tree_.S) *)
-              (Annotation :
-                Model_annotation.Make(Log)(Enc)(State)(Label_.Label)(Tree_)
-                  (Tree_.Tree)
-                .S) =
-        struct
-       module Label = Label_.Label
+    (State : sig
+       type t
 
-       (* module Labels = Label_.Labels (Label) *)
-       (* module Tree = Tree_.Tree *)
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+       val equal : t -> t -> bool
+       val compare : t -> t -> int
+       val hash : t -> int
+     end)
+    (Label : sig
+       type t
 
-       module type S = sig
-         type t =
-           { from : State.t
-           ; goto : State.t
-           ; label : Label.t
-           ; annotation : Annotation.t option
-           ; constructor_tree : Tree_.Tree.t option
-           }
+       val equal : t -> t -> bool
+       val compare : t -> t -> int
+       val hash : t -> int
+       val is_silent : t -> bool
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end)
+    (Tree : sig
+       module Node : sig
+         type t
 
-         val equal : t -> t -> bool
          val compare : t -> t -> int
-         val is_silent : t -> bool
-         val annotation_is_empty : t -> bool
+         val equal : t -> t -> bool
          val json : ?as_elt:bool -> t -> Yojson.t
          val to_string : ?pretty:bool -> t -> string
          val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
        end
 
-       module Transition : S = struct
-         type t =
-           { from : State.t
-           ; goto : State.t
-           ; label : Label.t
-           ; annotation : Annotation.t option
-           ; constructor_tree : Tree_.Tree.t option
-           }
+       type 'a tree = N of 'a * 'a tree list
+       type t = Node.t tree
 
-         let equal (a : t) (b : t) : bool =
-           State.equal a.from b.from
-           && State.equal a.goto b.goto
-           && Label.equal a.label b.label
-           && Option.equal Annotation.equal a.annotation b.annotation
-           && Option.equal
-                Tree_.Tree.equal
-                a.constructor_tree
-                b.constructor_tree
-         ;;
+       val add : t -> t -> t
+       val add_list : t -> t list -> t list
+       val equal : t -> t -> bool
+       val compare : t -> t -> int
+       val minimize : t -> Node.t list
 
-         let compare (a : t) (b : t) : int =
-           Utils.compare_chain
-             [ State.compare a.from b.from
-             ; State.compare a.goto b.goto
-             ; Label.compare a.label b.label
-             ; Option.compare Annotation.compare a.annotation b.annotation
-             ; Option.compare
-                 Tree_.Tree.compare
-                 a.constructor_tree
-                 b.constructor_tree
-             ]
-         ;;
+       exception CannotMinimizeEmptyList of unit
 
-         let is_silent (x : t) : bool = Label.is_silent x.label
+       val min : t list -> Node.t list
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end)
+    (Note : sig
+       type t
 
-         let annotation_is_empty : t -> bool = function
-           | { annotation = None; _ } -> true
-           | { annotation = Some annotation; _ } ->
-             Annotation.is_empty annotation
-         ;;
+       val equal : t -> t -> bool
+       val compare : t -> t -> int
+       val is_silent : t -> bool
+       val has_label : Label.t -> t -> bool
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end)
+    (Annotation : sig
+       type t =
+         { this : Note.t
+         ; next : t option
+         }
 
-         (* *)
-         include
-           Json.Thing.Make
-             (Log)
-             (struct
-               type k = t
+       val equal : t -> t -> bool
+       val compare : t -> t -> int
+       val is_empty : t -> bool
+       val opt_is_empty : ?fail_if_none:bool -> t option -> bool
+       val length : t -> int
+       val opt_length : ?fail_if_none:bool -> t option -> int
+       val shorter : t -> t -> t
+       val exists : Note.t -> t -> bool
+       val exists_label : Label.t -> t -> bool
+       val append : Note.t -> t -> t
+       val last : t -> Note.t
 
-               let name = "Transition"
+       exception CannotDropLastOfSingleton of t
 
-               let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-                 `Assoc
-                   [ "from", State.json ~as_elt:true x.from
-                   ; "goto", State.json ~as_elt:true x.goto
-                   ; "label", Label.json ~as_elt:true x.label
-                   ; ( "annotation"
-                     , match x.annotation with
-                       | None -> `String "None"
-                       | Some x -> Annotation.json ~as_elt:true x )
-                   ; ( "constructor_tree"
-                     , match x.constructor_tree with
-                       | None -> `String "None"
-                       | Some x -> Tree_.Tree.json ~as_elt:true x )
-                   ]
-               ;;
-             end)
-       end
+       val drop_last : t -> t
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end) : sig
+  type t =
+    { from : State.t
+    ; goto : State.t
+    ; label : Label.t
+    ; tree : Tree.t option
+    ; annotation : Annotation.t option
+    }
 
-       module Transitions (Transition : S) = struct
-         include Set.Make (Transition)
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val is_silent : t -> bool
+  val json : ?as_elt:bool -> t -> Yojson.t
+  val to_string : ?pretty:bool -> t -> string
+  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+end = struct
+  type t =
+    { from : State.t
+    ; goto : State.t
+    ; label : Label.t
+    ; tree : Tree.t option
+    ; annotation : Annotation.t option
+    }
 
-         let labels (xs : t) : Labels.t =
-           Log.trace __FUNCTION__;
-           fold
-             (fun ({ label; _ } : elt) : (Labels.t -> Labels.t) ->
-               Labels.add label)
-             xs
-             Labels.empty
-         ;;
+  let equal (a : t) (b : t) : bool =
+    State.equal a.from b.from
+    && State.equal a.goto b.goto
+    && Label.equal a.label b.label
+    && Option.equal Annotation.equal a.annotation b.annotation
+    && Option.equal Tree.equal a.tree b.tree
+  ;;
 
-         include
-           Json.Set.Make
-             (Log)
-             (struct
-               module Set = Set.Make (Transition)
+  let compare (a : t) (b : t) : int =
+    Utils.compare_chain
+      [ State.compare a.from b.from
+      ; State.compare a.goto b.goto
+      ; Label.compare a.label b.label
+      ; Option.compare Annotation.compare a.annotation b.annotation
+      ; Option.compare Tree.compare a.tree b.tree
+      ]
+  ;;
 
-               let name = "Transitions"
-               let json = Transition.json
-             end)
-       end
-     end
+  let is_silent (x : t) : bool = Label.is_silent x.label
+
+  (* *)
+  include
+    Json.Thing.Make
+      (Log)
+      (struct
+        type k = t
+
+        let name = "Transition"
+
+        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+          `Assoc
+            [ "from", State.json ~as_elt:true x.from
+            ; "goto", State.json ~as_elt:true x.goto
+            ; "label", Label.json ~as_elt:true x.label
+            ; ( "annotation"
+              , match x.annotation with
+                | None -> `String "None"
+                | Some x -> Annotation.json ~as_elt:true x )
+            ; ( "tree"
+              , match x.tree with
+                | None -> `String "None"
+                | Some x -> Tree.json ~as_elt:true x )
+            ]
+        ;;
+      end)
+end

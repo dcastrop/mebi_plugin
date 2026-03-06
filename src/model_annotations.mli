@@ -1,14 +1,4 @@
 module Make : (Log : Logger.S)
-    (State : sig
-       type t
-
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-       val hash : t -> int
-     end)
     (Label : sig
        type t
 
@@ -16,33 +6,6 @@ module Make : (Log : Logger.S)
        val compare : t -> t -> int
        val hash : t -> int
        val is_silent : t -> bool
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-     end)
-    (Tree : sig
-       module Node : sig
-         type t
-
-         val compare : t -> t -> int
-         val equal : t -> t -> bool
-         val json : ?as_elt:bool -> t -> Yojson.t
-         val to_string : ?pretty:bool -> t -> string
-         val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-       end
-
-       type 'a tree = N of 'a * 'a tree list
-       type t = Node.t tree
-
-       val add : t -> t -> t
-       val add_list : t -> t list -> t list
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-       val minimize : t -> Node.t list
-
-       exception CannotMinimizeEmptyList of unit
-
-       val min : t list -> Node.t list
        val json : ?as_elt:bool -> t -> Yojson.t
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
@@ -67,9 +30,7 @@ module Make : (Log : Logger.S)
        val equal : t -> t -> bool
        val compare : t -> t -> int
        val is_empty : t -> bool
-       val opt_is_empty : ?fail_if_none:bool -> t option -> bool
        val length : t -> int
-       val opt_length : ?fail_if_none:bool -> t option -> int
        val shorter : t -> t -> t
        val exists : Note.t -> t -> bool
        val exists_label : Label.t -> t -> bool
@@ -84,17 +45,9 @@ module Make : (Log : Logger.S)
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
      end)
     -> sig
-  type t =
-    { from : State.t
-    ; goto : State.t
-    ; label : Label.t
-    ; tree : Tree.t option
-    ; annotation : Annotation.t option
-    }
+  include Set.S with type elt = Annotation.t
 
-  val equal : t -> t -> bool
-  val compare : t -> t -> int
-  val is_silent : t -> bool
+  val extrapolate : elt -> t
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
   val log : ?__FUNCTION__:string -> ?s:string -> t -> unit

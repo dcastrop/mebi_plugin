@@ -1,10 +1,10 @@
 module Make
     (Log : Logger.S)
     (Ctx : Rocq_context.SRocq_context)
-    (Enc : Encoding.SEncoding) =
+    (Enc : Encoding.S) =
 struct
   module Ctx : Rocq_context.SRocq_context = Ctx
-  module Enc : Encoding.SEncoding = Enc
+  module Enc : Encoding.S = Enc
   include Bi_encoding.Make (Log) (Ctx) (Enc)
 
   let bienc_to_list : unit -> (Enc.t * EConstr.t) list = to_list

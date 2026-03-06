@@ -1,4 +1,7 @@
-val default_encoding : unit -> (module Encoding.SEncoding)
+val default_encoding
+  :  unit
+  -> (module Encoding.S with type t = Encoding.Int(Logger.Default).t)
+
 val default_context : unit -> (module Rocq_context.SRocq_context)
 
 type fail_flags =

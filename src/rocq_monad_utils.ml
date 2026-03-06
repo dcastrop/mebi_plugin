@@ -1,9 +1,38 @@
 module Make
     (Log : Logger.S)
-    (C : Rocq_context.SRocq_context)
-    (E : Encoding.SEncoding) =
+    (Ctx : Rocq_context.SRocq_context)
+    (Enc : Encoding.S)
+    (Tree : sig
+              module Node : sig
+                  type t = Enc.t * int
+
+                  val compare : t -> t -> int
+                  val equal : t -> t -> bool
+                  val json : ?as_elt:bool -> t -> Yojson.t
+                  val to_string : ?pretty:bool -> t -> string
+                  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+                end
+                with type t = Enc.t * int
+
+              type 'a tree = N of 'a * 'a tree list
+              type t = Node.t tree
+
+              val add : t -> t -> t
+              val add_list : t -> t list -> t list
+              val equal : t -> t -> bool
+              val compare : t -> t -> int
+              val minimize : t -> Node.t list
+
+              exception CannotMinimizeEmptyList of unit
+
+              val min : t list -> Node.t list
+              val json : ?as_elt:bool -> t -> Yojson.t
+              val to_string : ?pretty:bool -> t -> string
+              val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+            end
+            with type Node.t = Enc.t * int) =
 struct
-  include Rocq_monad.Make (Log) (C) (E)
+  include Rocq_monad.Make (Log) (Ctx) (Enc)
 
   (*************************************888*)
 
@@ -558,11 +587,8 @@ struct
 
   (*********************************************************)
 
-  module Constructor_ = Enc_constructor_tree.Make (Log) (Enc)
-  module Tree = Constructor_.Tree
-
   module Constructor = struct
-    include Constructor_.Constructor
+    include Enc_constructor_tree.Make (Log) (Enc) (Tree)
 
     let encode (act : EConstr.t) (goto : EConstr.t) (tree : Tree.t) : t =
       let act = encode act in

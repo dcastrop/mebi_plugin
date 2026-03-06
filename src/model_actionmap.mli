@@ -33,6 +33,14 @@ module Make : (Log : Logger.S)
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
      end)
+    (Labels : sig
+       include Set.S with type elt = Label.t
+
+       val non_silent : t -> t
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end)
     (Tree : sig
        module Node : sig
          type t
@@ -129,14 +137,51 @@ module Make : (Log : Logger.S)
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
      end)
-    -> sig
-  type t = Action.t * States.t
+    (Actions : sig
+       include Set.S with type elt = Action.t
 
-  val compare : t -> t -> int
-  val shorter_annotation : t -> t -> t
-  val try_update : t -> t list -> t option * t list
-  val merge_lists : t list -> t list -> t list
-  val json : ?as_elt:bool -> t -> Yojson.t
-  val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+       val labelled : t -> Label.t -> t
+       val labels : t -> Labels.t
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end)
+    (ActionPair : sig
+       type t = Action.t * States.t
+
+       val compare : t -> t -> int
+       val try_update : t -> t list -> t option * t list
+       val merge_lists : t list -> t list -> t list
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end)
+    (ActionPairs : sig
+       include Set.S with type elt = ActionPair.t
+
+       val destinations : t -> States.t
+
+       exception IsEmpty
+
+       val shortest_annotation : t -> ActionPair.t
+       val merge_list : t -> ActionPair.t list -> t
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end)
+    -> sig
+  include Hashtbl.S with type key = Action.t
+
+  type t' = States.t t
+
+  val update : t' -> Action.t -> States.t -> unit
+  val destinations : t' -> States.t
+  val reduce_by_label : t' -> Label.t -> t'
+  val to_actions : t' -> Actions.t
+  val to_actionpairs : t' -> ActionPairs.t
+  val of_actionpairs : ActionPairs.t -> t'
+  val merge : t' -> t' -> t'
+  val json : ?as_elt:bool -> t' -> Yojson.t
+  val to_string : ?pretty:bool -> t' -> string
+  val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
 end

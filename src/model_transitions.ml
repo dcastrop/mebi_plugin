@@ -1,4 +1,5 @@
-module Make : (Log : Logger.S)
+module Make
+    (Log : Logger.S)
     (State : sig
        type t
 
@@ -16,6 +17,14 @@ module Make : (Log : Logger.S)
        val compare : t -> t -> int
        val hash : t -> int
        val is_silent : t -> bool
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end)
+    (Labels : sig
+       include Set.S with type elt = Label.t
+
+       val non_silent : t -> t
        val json : ?as_elt:bool -> t -> Yojson.t
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
@@ -83,19 +92,48 @@ module Make : (Log : Logger.S)
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
      end)
-    -> sig
-  type t =
-    { from : State.t
-    ; goto : State.t
-    ; label : Label.t
-    ; tree : Tree.t option
-    ; annotation : Annotation.t option
-    }
+    (Transition : sig
+       type t =
+         { from : State.t
+         ; goto : State.t
+         ; label : Label.t
+         ; tree : Tree.t option
+         ; annotation : Annotation.t option
+         }
 
-  val equal : t -> t -> bool
-  val compare : t -> t -> int
-  val is_silent : t -> bool
+       val equal : t -> t -> bool
+       val compare : t -> t -> int
+       val is_silent : t -> bool
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end) : sig
+  include Set.S with type elt = Transition.t
+
+  val labels : t -> Labels.t
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
   val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+end = struct
+  module Set_ : Set.S with type elt = Transition.t = Set.Make (Transition)
+  include Set_
+
+  let labels (xs : t) : Labels.t =
+    Log.trace __FUNCTION__;
+    fold
+      (fun ({ label; _ } : Transition.t) : (Labels.t -> Labels.t) ->
+        Labels.add label)
+      xs
+      Labels.empty
+  ;;
+
+  include
+    Json.Set.Make
+      (Log)
+      (struct
+        module Set = Set_
+
+        let name = "Transitions"
+        let json = Transition.json
+      end)
 end

@@ -1709,7 +1709,7 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
             then None
             else Some (x, Model.States.inter bisimilar y))
           (* NOTE: get the pair with the shortest annotation (less steps to do) *)
-          |> Model.ActionPairs.shorest_annotation
+          |> Model.ActionPairs.shortest_annotation
         in
         let constructor_tree = Model.Trees.min_opt constructor_trees in
         let goto : Model.State.t = Model.States.min_elt destinations in

@@ -1,46 +1,8 @@
-(* module type S = sig
-  module Enc : Encoding.SEncoding
-  module FwdMap : Hashtbl.S with type key = EConstr.t
-  module BckMap : Hashtbl.S with type key = Enc.t
-
-  type fwdmap = Enc.t FwdMap.t
-  type bckmap = EConstr.t BckMap.t
-
-  type maps =
-    { fwd : fwdmap
-    ; bck : bckmap
-    }
-
-  val the_maps : unit -> maps ref
-  val reset : unit -> unit
-
-  (* *)
-  val encode : EConstr.t -> Enc.t
-  val encoded : EConstr.t -> bool
-
-  exception CannotDecode of Enc.t
-
-  val decode : Enc.t -> EConstr.t
-  val decode_opt : Enc.t -> EConstr.t option
-  val encode_map : 'a FwdMap.t -> 'a BckMap.t
-  val decode_map : 'a BckMap.t -> 'a FwdMap.t
-  val to_list : unit -> (Enc.t * EConstr.t) list
-
-  (* *)
-
-  val make_hashtbl : (module Hashtbl.S with type key = Enc.t)
-  val make_set : (module Set.S with type elt = Enc.t)
-end *)
-
 module Make
     (Log : Logger.S)
     (Ctx : Rocq_context.SRocq_context)
-    (Enc : Encoding.SEncoding)
-     (* :
-        S with module Enc = E and type Enc.t = E.t *) =
+    (Enc : Encoding.S) =
 struct
-  (* module Enc : Encoding.SEncoding with type t = E.t = E *)
-
   module F : Hashtbl.S with type key = EConstr.t =
     Rocq_context.MakeEConstrMap (Ctx)
 
@@ -80,14 +42,6 @@ struct
   let bckmap () : EConstr.t B.t =
     (* Log.trace __FUNCTION__; *)
     !(get_the_maps ()).bck
-  ;;
-
-  (* *)
-  let to_list () : (Enc.t * EConstr.t) list =
-    (* Log.trace __FUNCTION__; *)
-    B.to_seq (bckmap ())
-    |> List.of_seq
-    |> List.sort (fun (a, _) (b, _) -> Enc.compare a b)
   ;;
 
   exception EncodingNotFound of EConstr.t
@@ -153,5 +107,13 @@ struct
     let bmap : 'a B.t = B.create (F.length fmap) in
     F.iter (fun (k : EConstr.t) (v : 'a) -> B.add bmap (encode k) v) fmap;
     bmap
+  ;;
+
+  (* *)
+  let to_list () : (Enc.t * EConstr.t) list =
+    (* Log.trace __FUNCTION__; *)
+    B.to_seq (bckmap ())
+    |> List.of_seq
+    |> List.sort (fun (a, _) (b, _) -> Enc.compare a b)
   ;;
 end

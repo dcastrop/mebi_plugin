@@ -1,14 +1,5 @@
-module Make : (Log : Logger.S)
-    (State : sig
-       type t
-
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-       val hash : t -> int
-     end)
+module Make
+    (Log : Logger.S)
     (Label : sig
        type t
 
@@ -16,6 +7,14 @@ module Make : (Log : Logger.S)
        val compare : t -> t -> int
        val hash : t -> int
        val is_silent : t -> bool
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end)
+    (Labels : sig
+       include Set.S with type elt = Label.t
+
+       val non_silent : t -> t
        val json : ?as_elt:bool -> t -> Yojson.t
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
@@ -43,6 +42,17 @@ module Make : (Log : Logger.S)
        exception CannotMinimizeEmptyList of unit
 
        val min : t list -> Node.t list
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end)
+    (Trees : sig
+       include Set.S with type elt = Tree.t
+
+       exception EmptyHasNoMin
+
+       val min : t -> Tree.t
+       val min_opt : t -> Tree.t option
        val json : ?as_elt:bool -> t -> Yojson.t
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
@@ -83,19 +93,55 @@ module Make : (Log : Logger.S)
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
      end)
-    -> sig
-  type t =
-    { from : State.t
-    ; goto : State.t
-    ; label : Label.t
-    ; tree : Tree.t option
-    ; annotation : Annotation.t option
-    }
+    (Action : sig
+       type t =
+         { label : Label.t
+         ; annotation : Annotation.t option
+         ; constructor_trees : Trees.t
+         }
 
-  val equal : t -> t -> bool
-  val compare : t -> t -> int
-  val is_silent : t -> bool
+       val equal : t -> t -> bool
+       val compare : t -> t -> int
+       val hash : t -> int
+       val wk_equal : t -> t -> bool
+       val is_silent : t -> bool
+       val shorter_annotation : t -> t -> t
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+     end) : sig
+  include Set.S with type elt = Action.t
+
+  val labelled : t -> Label.t -> t
+  val labels : t -> Labels.t
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
   val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+end = struct
+  module Set_ : Set.S with type elt = Action.t = Set.Make (Action)
+  include Set_
+
+  let labelled (xs : t) (y : Label.t) : t =
+    Log.trace __FUNCTION__;
+    filter (fun ({ label; _ } : Action.t) -> Label.equal label y) xs
+  ;;
+
+  let labels (xs : t) : Labels.t =
+    Log.trace __FUNCTION__;
+    fold
+      (fun ({ label; _ } : Action.t) : (Labels.t -> Labels.t) ->
+        Labels.add label)
+      xs
+      Labels.empty
+  ;;
+
+  include
+    Json.Set.Make
+      (Log)
+      (struct
+        module Set = Set_
+
+        let name = "Actions"
+        let json = Action.json
+      end)
 end

@@ -1,27 +1,29 @@
-  module type SEncoding = sig
-    type t
+module type S = sig
+  type t
 
-    val init : t
-    val next : t -> t
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val hash : t -> int
-    val to_string : t -> string
-    val counter : t ref
-    val reset : unit -> unit
-    val incr : unit -> t
-  end
+  val init : t
+  val next : t -> t
+  val reset : unit -> unit
+  val incr : unit -> t
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val hash : t -> int
+  val json : ?as_elt:bool -> t -> Yojson.t
+  val to_string : ?pretty:bool -> t -> string
+  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+end
 
-  module type S = sig
-    type t
+module Make : (Log : Logger.S)
+    (X : sig
+       type t
 
-    val init : t
-    val next : t -> t
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val hash : t -> int
-    val to_string : t -> string
-  end
+       val init : t
+       val next : t -> t
+       val equal : t -> t -> bool
+       val compare : t -> t -> int
+       val hash : t -> int
+       val to_string : t -> string
+     end)
+    -> S
 
-  module Make : (_ : S) -> SEncoding
-  module Int : SEncoding
+module Int : (Log : Logger.S) -> S with type t = Int.t

@@ -1,4 +1,5 @@
-module Make : (Log : Logger.S)
+module Make
+    (Log : Logger.S)
     (State : sig
        type t
 
@@ -47,55 +48,73 @@ module Make : (Log : Logger.S)
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
      end)
-    (Note : sig
-       type t
+    (Trees : sig
+       include Set.S with type elt = Tree.t
 
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-       val is_silent : t -> bool
-       val has_label : Label.t -> t -> bool
+       exception EmptyHasNoMin
+
+       val min : t -> Tree.t
+       val min_opt : t -> Tree.t option
        val json : ?as_elt:bool -> t -> Yojson.t
        val to_string : ?pretty:bool -> t -> string
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-     end)
-    (Annotation : sig
-       type t =
-         { this : Note.t
-         ; next : t option
-         }
-
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-       val is_empty : t -> bool
-       val opt_is_empty : ?fail_if_none:bool -> t option -> bool
-       val length : t -> int
-       val opt_length : ?fail_if_none:bool -> t option -> int
-       val shorter : t -> t -> t
-       val exists : Note.t -> t -> bool
-       val exists_label : Label.t -> t -> bool
-       val append : Note.t -> t -> t
-       val last : t -> Note.t
-
-       exception CannotDropLastOfSingleton of t
-
-       val drop_last : t -> t
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-     end)
-    -> sig
+     end) : sig
   type t =
     { from : State.t
-    ; goto : State.t
     ; label : Label.t
-    ; tree : Tree.t option
-    ; annotation : Annotation.t option
+    ; using : Trees.t
+    ; goto : State.t
     }
 
   val equal : t -> t -> bool
   val compare : t -> t -> int
   val is_silent : t -> bool
+  val has_label : Label.t -> t -> bool
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
   val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+end = struct
+  type t =
+    { from : State.t
+    ; label : Label.t
+    ; using : Trees.t
+    ; goto : State.t
+    }
+
+  let equal (a : t) (b : t) : bool =
+    State.equal a.from b.from
+    && State.equal a.goto b.goto
+    && Label.equal a.label b.label
+    && Trees.equal a.using b.using
+  ;;
+
+  let compare (a : t) (b : t) : int =
+    Utils.compare_chain
+      [ State.compare a.from b.from
+      ; State.compare a.goto b.goto
+      ; Label.compare a.label b.label
+      ; Trees.compare a.using b.using
+      ]
+  ;;
+
+  let is_silent (x : t) : bool = Label.is_silent x.label
+  let has_label (x : Label.t) (y : t) : bool = Label.equal x y.label
+
+  include
+    Json.Thing.Make
+      (Log)
+      (struct
+        type k = t
+
+        let name = "Note"
+
+        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+          `Assoc
+            [ "from", State.json ~as_elt:true x.from
+            ; "label", Label.json ~as_elt:true x.label
+            ; "goto", State.json ~as_elt:true x.goto
+            ; "using", Trees.json ~as_elt:true x.using
+            ]
+        ;;
+      end)
 end
