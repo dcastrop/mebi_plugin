@@ -1,5 +1,8 @@
-let default_encoding () : (module Encoding.SEncoding) =
-  (module Encoding.Int : Encoding.SEncoding)
+let default_encoding ()
+  : (module Encoding.S with type t = Encoding.Int(Logger.Default).t)
+  =
+  (module Encoding.Int (Logger.Default) : Encoding.S
+     with type t = Encoding.Int(Logger.Default).t)
 ;;
 
 let default_context () : (module Rocq_context.SRocq_context) =

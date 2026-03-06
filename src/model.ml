@@ -1,603 +1,67 @@
-module Make (Log : Logger.S) (Enc : Encoding.SEncoding) = struct
-  (* [module State_] *)
-  module State_ = Model_state.Make (Log) (Enc)
-  module State : State_.S = State_.State
-  module States = State_.States (State)
+module Make (Log : Logger.S) (Enc : Encoding.S) = struct
+  module State = Model_state.Make (Log) (Enc)
+  module States = Model_states.Make (Log) (State)
+  module Label = Model_label.Make (Log) (Enc)
+  module Labels = Model_labels.Make (Log) (Label)
+  module Tree = Enc_tree.Make (Log) (Enc)
+  module Trees = Enc_trees.Make (Log) (Tree)
+  module Note = Model_annotation_note.Make (Log) (State) (Label) (Tree) (Trees)
+  module Annotation = Model_annotation.Make (Log) (State) (Label) (Note)
+  module Annotations = Model_annotations.Make (Log) (Label) (Note) (Annotation)
 
-  (* [module Label_] *)
-  module Label_ = Model_label.Make (Log) (Enc)
-  module Label : Label_.S = Label_.Label
+  module Transition =
+    Model_transition.Make (Log) (State) (Label) (Tree) (Note) (Annotation)
 
-  module Labels : module type of Label_.Labels (Label) with type elt = Label.t =
-  Label_.Labels (Label)
-
-  (* [module Tree_] *)
-  module Tree_ = Enc_tree.Make (Log) (Enc)
-  module TreeNode = Tree_.Node
-  module Tree = Tree_.Tree
-  module Trees = Tree_.Trees (Tree)
-
-  (* [module Annotation_] *)
-  module Annotation_ =
-    Model_annotation.Make (Log) (Enc) (State) (Label) (Tree_) (Tree)
-
-  module Note = Annotation_.Note
-  module Annotation : Annotation_.S = Annotation_.Annotation
-  module Annotations = Annotation_.Annotations (Annotation)
-
-  (* [module Transition_] *)
-  module Transition_ =
-    Model_transition.Make (Log) (Enc) (State) (Label_) (Labels) (Tree_)
+  module Transitions =
+    Model_transitions.Make (Log) (State) (Label) (Labels) (Tree) (Note)
       (Annotation)
-
-  module Transition : Transition_.S = Transition_.Transition
-  module Transitions = Transition_.Transitions (Transition)
-
-  module Action = struct
-    type t =
-      { label : Label.t
-      ; annotation : Annotation.t option
-      ; constructor_trees : Trees.t
-      }
-
-    let wk_equal (a : t) (b : t) : bool = Label.equal a.label b.label
-
-    let equal (a : t) (b : t) : bool =
-      Label.equal a.label b.label
-      && Option.equal Annotation.equal a.annotation b.annotation
-      && Trees.equal a.constructor_trees b.constructor_trees
-    ;;
-
-    let compare (a : t) (b : t) : int =
-      Utils.compare_chain
-        [ Label.compare a.label b.label
-        ; Option.compare Annotation.compare a.annotation b.annotation
-        ; Trees.compare a.constructor_trees b.constructor_trees
-        ]
-    ;;
-
-    let hash (x : t) : int = Label.hash x.label
-    let is_silent (x : t) : bool = Label.is_silent x.label
-
-    let annotation_is_empty : t -> bool = function
-      | { annotation = None; _ } -> true
-      | { annotation = Some annotation; _ } -> Annotation.is_empty annotation
-    ;;
-
-    let annotation_length : t -> int = function
-      | { annotation = None; _ } -> 0
-      | { annotation = Some annotation; _ } -> Annotation.length annotation
-    ;;
-
-    (* *)
-    let json (x : t) : Yojson.t =
-      `Assoc
-        [ ( "action"
-          , `Assoc
-              [ "label", Label.json x.label
-              ; ( "annotation"
-                , match x.annotation with
-                  | None -> `String "None"
-                  | Some x -> Annotation.json x )
-              ; ( "constructor_tree"
-                , (* Tree.json x.constructor_tree *)
-                  (*  Tree.json x *)
-                  Trees.json x.constructor_trees )
-              ] )
-        ]
-    ;;
-
-    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = "Action") (x : t)
-      : unit
-      =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end
-
-  module ActionPair = struct
-    type t = Action.t * States.t
-
-    let compare ((a, x) : t) ((b, y) : t) : int =
-      Utils.compare_chain [ Action.compare a b; States.compare x y ]
-    ;;
-
-    (* *)
-    let json (x : t) : Yojson.t =
-      `Assoc
-        [ ( "actionpair"
-          , `Assoc
-              [ "action", Action.json (fst x)
-              ; "destinations", States.json (snd x)
-              ] )
-        ]
-    ;;
-
-    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = "ActionPair") (x : t)
-      : unit
-      =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-
-    (** [try_update x a] returns [None, a] when [x] cannot be used to update a pre-existing tuple in [a], and [Some z, a'] where [z] is the updated tuple in [a] which has been removed in [a'].
-    *)
-    let try_update ((xaction, xdestinations) : t) (a : t list)
-      : t option * t list
-      =
-      Log.trace __FUNCTION__;
-      let f : Annotation.t option * Annotation.t option -> Annotation.t option =
-        function
-        | None, None -> None
-        | None, y -> y
-        | x, None -> x
-        | Some x, Some y -> Some (Annotation.shorter x y)
-      in
-      List.fold_left
-        (fun ((updated_opt, acc) :
-               (Action.t * States.t) option * (Action.t * States.t) list)
-          ((yaction, ydestinations) : Action.t * States.t) ->
-          match updated_opt with
-          | Some opt -> Some opt, (yaction, ydestinations) :: acc
-          | None ->
-            if
-              Action.wk_equal xaction yaction
-              && States.equal xdestinations ydestinations
-            then (
-              let annotation : Annotation.t option =
-                f (yaction.annotation, xaction.annotation)
-              in
-              let zaction : Action.t =
-                { label = yaction.label
-                ; annotation
-                ; constructor_trees =
-                    Trees.union
-                      yaction.constructor_trees
-                      xaction.constructor_trees
-                }
-              in
-              Some (zaction, ydestinations), acc)
-            else None, (yaction, ydestinations) :: acc)
-        (None, [])
-        a
-    ;;
-
-    (** [merge_lists a b] merges elements of [b] into [a], either by updating an element in [a] with additional annotation for a saturation tuple that describes the same action-destination, or in the case that the saturation tuple is not described within [a] by inserting it within [a].
-    *)
-    let rec merge_lists (a : t list) : t list -> t list =
-      Log.trace __FUNCTION__;
-      function
-      | [] -> a
-      | h :: tl ->
-        let (a : (Action.t * States.t) list) =
-          match try_update h a with
-          | None, a -> h :: a
-          | Some updated, a -> updated :: a
-        in
-        merge_lists a tl
-    ;;
-
-    (* let rec merge_lists (a : t list) : t list -> t list = *)
-  end
-
-  module ActionPairs = struct
-    module S = Set.Make (ActionPair)
-    include S
-
-    let destinations (x : t) : States.t =
-      to_list x
-      |> List.fold_left
-           (fun (acc : States.t) ((a, b) : ActionPair.t) -> States.union acc b)
-           States.empty
-    ;;
-
-    exception IsEmpty
-
-    (** returns the action in [x] that has the {e shortest} annotation (where [None] is treated as 0).
-    *)
-    let shorest_annotation (x : t) : ActionPair.t =
-      match to_list x with
-      | [] -> raise IsEmpty
-      | h :: tl ->
-        List.fold_left
-          (fun ((x, xs) : ActionPair.t) ((y, ys) : ActionPair.t) ->
-            match
-              Int.compare
-                (Action.annotation_length x)
-                (Action.annotation_length y)
-            with
-            | 1 -> y, ys
-            | _ -> x, xs)
-          h
-          tl
-    ;;
-
-    let merge_list : t -> ActionPair.t list -> t =
-      List.fold_left (fun (acc : t) ((a, s) : ActionPair.t) ->
-        (* NOTE: merge destinations of equal actions *)
-        let matching =
-          filter (fun ((b, t) : ActionPair.t) -> Action.equal a b) acc
-        in
-        if is_empty matching
-        then add (a, s) acc
-        else (
-          (* NOTE: update states of each matching *)
-          let acc = diff acc matching in
-          matching
-          |> to_list
-          |> List.map (fun (_, t) -> a, States.union s t)
-          |> of_list
-          |> union acc))
-    ;;
-
-    (* *)
-    let json (x : t) : Yojson.t =
-      `Assoc
-        [ ( "ActionPairs"
-          , `List
-              (fold
-                 (fun (x : ActionPair.t) (acc : Yojson.t list) ->
-                   ActionPair.json x :: acc)
-                 x
-                 []) )
-        ]
-    ;;
-
-    let to_string (x : t) : string = json x |> Yojson.pretty_to_string
-
-    let _log ?(__FUNCTION__ : string = "") ?(s : string = "ActionPairs") (x : t)
-      : unit
-      =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end
-
-  module Actions = struct
-    module S : Set.S with type elt = Action.t = Set.Make (Action)
-    include S
-
-    let labelled (xs : t) (y : Label.t) : t =
-      Log.trace __FUNCTION__;
-      S.filter (fun ({ label; _ } : Action.t) -> Label.equal label y) xs
-    ;;
-
-    (* *)
-    let to_string (xs : t) : string =
-      S.to_list xs
-      |> Utils.Strfy.list
-           ~args:{ (Utils.Strfy.style_args ()) with name = Some "Actions" }
-           (Of Action.to_string)
-    ;;
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = "Actions") (x : t)
-      : unit
-      =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end
-
-  module ActionMap = struct
-    module M : Hashtbl.S with type key = Action.t = Hashtbl.Make (Action)
-    include M
-
-    type t' = States.t t
-
-    (** [update] ... if the action is already present, then along with merging the destination states, we also merge the constructor trees.
-    *)
-    let update (x : t') (action : Action.t) (states : States.t) : unit =
-      Log.trace __FUNCTION__;
-      if States.is_empty states
-      then ()
-      else (
-        match find_opt x action with
-        | None -> add x action states
-        | Some old_states ->
-          (* NOTE: also find the existing key to merge the [constructor_trees] *)
-          let action : Action.t =
-            to_seq_keys x
-            |> Seq.filter (Action.equal action)
-            |> Seq.fold_left
-                 (fun (action : Action.t) (y : Action.t) ->
-                   { action with
-                     constructor_trees =
-                       Trees.union action.constructor_trees y.constructor_trees
-                   })
-                 action
-          in
-          replace x action (States.union old_states states))
-    ;;
-
-    (** [destinations x f e] merges the values of [x] using [f], where [e] is some initial (i.e., "empty") collection of ['a].
-    *)
-    let destinations (x : t') : States.t =
-      Log.trace __FUNCTION__;
-      to_seq_values x |> List.of_seq |> List.fold_left States.union States.empty
-    ;;
-
-    let reduce_by_label (x : t') (label : Label.t) : t' =
-      Log.trace __FUNCTION__;
-      let y : t' = copy x in
-      filter_map_inplace
-        (fun (k : Action.t) (vs : States.t) ->
-          if Label.equal k.label label then Some vs else None)
-        y;
-      y
-    ;;
-
-    let to_actions (x : t') : Actions.t = to_seq_keys x |> Actions.of_seq
-
-    let to_actionpairs (x : t') : ActionPairs.t =
-      Log.trace __FUNCTION__;
-      fold
-        (fun (k : Action.t)
-          (vs : States.t)
-          : (ActionPairs.t -> ActionPairs.t) -> ActionPairs.add (k, vs))
-        x
-        ActionPairs.empty
-    ;;
-
-    let of_actionpairs (xs : ActionPairs.t) : t' =
-      Log.trace __FUNCTION__;
-      let y : t' = create 0 in
-      ActionPairs.iter (fun ((k, vs) : ActionPair.t) -> update y k vs) xs;
-      y
-    ;;
-
-    let merge (a : t') (b : t') : t' =
-      Log.trace __FUNCTION__;
-      ActionPairs.union (to_actionpairs a) (to_actionpairs b) |> of_actionpairs
-    ;;
-
-    (* *)
-    let to_string (xs : t') : string =
-      to_seq xs
-      |> List.of_seq
-      |> Utils.Strfy.list
-           ~args:{ (Utils.Strfy.style_args ()) with name = Some "Actions" }
-           (Of
-              (fun (k, v) ->
-                Utils.Strfy.record
-                  [ "\n#### action", Action.to_string k
-                  ; "->", States.to_string v
-                  ]))
-    ;;
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = "ActionMap") (x : t')
-      : unit
-      =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end
-
-  module Edge = struct
-    type t =
-      { from : State.t
-      ; goto : State.t
-      ; action : Action.t
-      }
-
-    let equal (a : t) (b : t) : bool =
-      State.equal a.from b.from
-      && State.equal a.goto b.goto
-      && Action.equal a.action b.action
-    ;;
-
-    let compare (a : t) (b : t) : int =
-      Utils.compare_chain
-        [ State.compare a.from b.from
-        ; State.compare a.goto b.goto
-        ; Action.compare a.action b.action
-        ]
-    ;;
-
-    let is_silent (x : t) : bool = Action.is_silent x.action
-
-    (* *)
-    let to_string (x : t) : string =
-      Utils.Strfy.record
-        [ "from", State.to_string x.from
-        ; "goto", State.to_string x.goto
-        ; "action", Action.to_string x.action
-        ]
-    ;;
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = "Edge") (x : t) : unit =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end
-
-  module Edges = struct
-    module S : Set.S with type elt = Edge.t = Set.Make (Edge)
-    include S
-
-    let labelled (xs : t) (y : Label.t) : t =
-      Log.trace __FUNCTION__;
-      filter (fun ({ action; _ } : Edge.t) -> Label.equal action.label y) xs
-    ;;
-
-    (* *)
-    let to_string (xs : t) : string =
-      to_list xs
-      |> Utils.Strfy.list
-           ~args:{ (Utils.Strfy.style_args ()) with name = Some "Edges" }
-           (Of Edge.to_string)
-    ;;
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = "Edges") (x : t) : unit
-      =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end
-
-  module EdgeMap = struct
-    module M : Hashtbl.S with type key = State.t = Hashtbl.Make (State)
-    include M
-
-    type t' = ActionMap.t' t
-
-    let update
-          (x : t')
-          (from : State.t)
-          (action : Action.t)
-          (destinations : States.t)
-      : unit
-      =
-      Log.trace __FUNCTION__;
-      match find_opt x from with
-      | None ->
-        ActionPairs.singleton (action, destinations)
-        |> ActionMap.of_actionpairs
-        |> add x from
-      | Some actions -> ActionMap.update actions action destinations
-    ;;
-
-    let destinations (x : t') (from : State.t) : States.t =
-      Log.trace __FUNCTION__;
-      match find_opt x from with
-      | None ->
-        Log.thing ~__FUNCTION__ Debug "has no edges" from (Of State.to_string);
-        States.empty
-      | Some ys -> ActionMap.destinations ys
-    ;;
-
-    let get_actions (x : t') (from : State.t) : Actions.t =
-      Log.trace __FUNCTION__;
-      find x from |> ActionMap.to_seq_keys |> Actions.of_seq
-    ;;
-
-    let reduce_by_label (x : t') (label : Label.t) : t' =
-      Log.trace __FUNCTION__;
-      let y : t' = copy x in
-      filter_map_inplace
-        (fun (k : State.t) (vs : ActionMap.t') ->
-          let vs' : ActionMap.t' = ActionMap.reduce_by_label vs label in
-          if ActionMap.length vs' > 0 then Some vs' else None)
-        y;
-      y
-    ;;
-
-    let get_edges (x : t') (from : State.t) : Edges.t =
-      Log.trace __FUNCTION__;
-      ActionMap.fold
-        (fun (action : Action.t) (v : States.t) (acc : Edges.t) : Edges.t ->
-          States.fold
-            (fun (goto : State.t) (acc : Edges.t) : Edges.t ->
-              Edges.add { from; action; goto } acc)
-            v
-            acc)
-        (find x from)
-        Edges.empty
-    ;;
-
-    let to_edges (x : t') : Edges.t =
-      Log.trace __FUNCTION__;
-      fold
-        (fun (from : State.t) (vs : ActionMap.t') : (Edges.t -> Edges.t) ->
-          ActionMap.to_actionpairs vs
-          |> ActionPairs.fold
-               (fun
-                   ((action, destinations) : ActionPair.t)
-                    : (Edges.t -> Edges.t)
-                  ->
-               States.fold
-                 (fun (goto : State.t) : (Edges.t -> Edges.t) ->
-                   Edges.add { from; goto; action })
-                 destinations))
-        x
-        Edges.empty
-    ;;
-
-    let of_edges (xs : Edges.t) : t' =
-      Log.trace __FUNCTION__;
-      let ys : t' = create 0 in
-      Edges.iter
-        (fun ({ from; goto; action } : Edge.t) ->
-          update ys from action (States.singleton goto))
-        xs;
-      ys
-    ;;
-
-    let merge (a : t') (b : t') : t' =
-      Log.trace __FUNCTION__;
-      let c : t' = copy a in
-      iter
-        (fun (k : State.t) (vs : ActionMap.t') ->
-          match find_opt c k with
-          | Some actions -> ActionMap.merge actions vs |> replace c k
-          | None -> add c k vs)
-        b;
-      c
-    ;;
-
-    (* *)
-    let to_string (xs : t') : string =
-      to_seq xs
-      |> List.of_seq
-      |> Utils.Strfy.list
-           ~args:{ (Utils.Strfy.style_args ()) with name = Some "Edges" }
-           (Of
-              (fun (k, v) ->
-                Utils.Strfy.record
-                  [ "\n### from", State.to_string k
-                  ; "->", ActionMap.to_string v
-                  ]))
-    ;;
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = "EdgeMap") (x : t')
-      : unit
-      =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end
-
-  module Partition = struct
-    module S : Set.S with type elt = States.t = Set.Make (States)
-    include S
-
-    let get_bisimilar (x : State.t) : t -> States.t =
-      find_first (fun (ys : States.t) -> States.mem x ys)
-    ;;
-
-    let filter_reachable (xs : States.t) : t -> t =
-      filter (fun (y : States.t) ->
-        Bool.not (States.is_empty (States.inter y xs)))
-    ;;
-
-    let reachable (from : State.t) (edges : EdgeMap.t') : t -> t =
-      Log.trace __FUNCTION__;
-      (* let destinations : States.t = EdgeMap.destinations edges from in *)
-      (* EdgeMap.log ~__FUNCTION__ ~s:"edges" edges; *)
-      (* States.log ~__FUNCTION__ ~s:"destinations" destinations; *)
-      filter_reachable (EdgeMap.destinations edges from)
-    ;;
-
-    let reachable_by_label
-          (from : State.t)
-          (label : Label.t)
-          (edges : EdgeMap.t')
-      : t -> t
-      =
-      Log.trace __FUNCTION__;
-      let actions = ActionMap.reduce_by_label (EdgeMap.find edges from) label in
-      filter_reachable (ActionMap.destinations actions)
-    ;;
-
-    (* *)
-    let to_string (xs : t) : string =
-      to_list xs
-      |> Utils.Strfy.list
-           ~args:(Utils.Strfy.style_args ~name:"Partition" ())
-           (Of States.to_string)
-    ;;
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = "Partition") (x : t)
-      : unit
-      =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end
+      (Transition)
+
+  module Action =
+    Model_action.Make (Log) (Label) (Tree) (Trees) (Note) (Annotation)
+
+  module Actions =
+    Model_actions.Make (Log) (Label) (Labels) (Tree) (Trees) (Note) (Annotation)
+      (Action)
+
+  module ActionPair =
+    Model_actionpair.Make (Log) (State) (States) (Label) (Tree) (Trees) (Note)
+      (Annotation)
+      (Action)
+
+  module ActionPairs =
+    Model_actionpairs.Make (Log) (State) (States) (Action) (ActionPair)
+
+  module ActionMap =
+    Model_actionmap.Make (Log) (State) (States) (Label) (Labels) (Tree) (Trees)
+      (Note)
+      (Annotation)
+      (Action)
+      (Actions)
+      (ActionPair)
+      (ActionPairs)
+
+  module Edge = Model_edge.Make (Log) (State) (Label) (Action)
+  module Edges = Model_edges.Make (Log) (State) (Label) (Action) (Edge)
+
+  module EdgeMap =
+    Model_edgemap.Make (Log) (State) (States) (Label) (Labels) (Action)
+      (Actions)
+      (ActionPair)
+      (ActionPairs)
+      (ActionMap)
+      (Edge)
+      (Edges)
+
+  module Partition =
+    Model_state_partition.Make (Log) (State) (States) (Label) (Labels) (Action)
+      (Actions)
+      (ActionPair)
+      (ActionPairs)
+      (ActionMap)
+      (Edge)
+      (Edges)
+      (EdgeMap)
 
   module Info = struct
     type t =
@@ -730,16 +194,14 @@ module Make (Log : Logger.S) (Enc : Encoding.SEncoding) = struct
       Log.trace __FUNCTION__;
       let edges : EdgeMap.t' = EdgeMap.create 0 in
       Transitions.iter
-        (fun ({ from; goto; label; annotation; constructor_tree } :
-               Transition.t) ->
+        (fun ({ from; goto; label; annotation; tree } : Transition.t) ->
           (* NOTE: [ActionMap.update] handles merging of [constructor_trees] for [actions] with matching [labels] *)
           EdgeMap.update
             edges
             from
             { label
             ; annotation
-            ; constructor_trees =
-                Option.cata Trees.singleton Trees.empty constructor_tree
+            ; constructor_trees = Option.cata Trees.singleton Trees.empty tree
             }
             (States.singleton goto))
         xs;
@@ -1587,4 +1049,4 @@ module Make (Log : Logger.S) (Enc : Encoding.SEncoding) = struct
         ]
     ;;
   end
-  end
+end

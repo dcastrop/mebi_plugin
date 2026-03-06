@@ -84,7 +84,46 @@ let update_map (cmap : map) (k : Constr.t) ((name, inst) : extractor_binding)
      | _ -> ())
 ;;
 
-let to_string
+include
+  Json.Thing.Make
+    (Log)
+    (struct
+      type k = t
+
+      let name = "Bindings"
+
+      let json ?as_elt : t -> Yojson.t = function
+        | No_Bindings -> `String "NoBindings"
+        | Use_Bindings { from; action; goto } ->
+          let f : map option -> Yojson.t = function
+            | None -> `List []
+            | Some xs ->
+              `List
+                (C.to_seq xs
+                 |> List.of_seq
+                 |> List.fold_left
+                      (fun acc
+                        ((k, (name, inst)) : Constr.t * extractor_binding) ->
+                        `Assoc
+                          [ "constr", `String "TODO: envsigma for constr"
+                          ; ( "binding"
+                            , `Assoc
+                                [ ( "name"
+                                  , `String
+                                      (Names.Name.print name
+                                       |> Rocq_utils.Strfy.pp) )
+                                ; ( "instructions"
+                                  , `String "TODO: envsigma for instructions" )
+                                ] )
+                          ]
+                        :: acc)
+                      [])
+          in
+          `Assoc [ "from", f from; "action", f action; "goto", f goto ]
+      ;;
+    end)
+(*
+   let to_string
       ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
       ?(envsigma : (Environ.env * Evd.evar_map) option = None)
   : t -> string
@@ -119,7 +158,7 @@ let to_string
     Utils.Strfy.record
       ~args
       [ "from", g from; "action", g action; "goto", g goto ]
-;;
+;; *)
 
 let constructor_to_string
       ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
@@ -129,7 +168,11 @@ let constructor_to_string
   =
   let index : string = Utils.Strfy.int index in
   let name : string = name in
-  let bindings : string = to_string ~envsigma bindings in
+  let bindings : string =
+    to_string
+      (* ~envsigma *)
+      bindings
+  in
   Utils.Strfy.record
     ~args
     [ "index", index; "name", name; "bindings", bindings ]

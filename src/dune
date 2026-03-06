@@ -18,8 +18,7 @@
             ; with, your choice here.
   rocq-runtime.vernac ; Needed for vernac extend.
   rocq-runtime.plugins.ltac ; Needed for tactic extend.
-  yojson
-  )
+  yojson)
  (modules
   utils
   output_kind
@@ -37,20 +36,33 @@
   rocq_context
   encoding
   enc_tree
+  enc_trees
   enc_constructor_tree
+  enc_constructor_trees
   ; term
   bi_encoding
   rocq_monad
   rocq_monad_utils
   rocq_bindings
   model_state
+  model_states
   model_label
+  model_labels
+  model_annotation_note
   model_annotation
+  model_annotations
   model_transition
+  model_transitions
   model_action
+  model_actions
   model_actionpair
+  model_actionpairs
+  model_actionmap
   model_edge
+  model_edges
+  model_edgemap
   model_state_partition
+  model_info
   model
   api ; stores modules created by [loader.v], used by commands
   wrapper ; basic plugin commands
@@ -101,7 +113,7 @@
 ; FIXME: for updating to rocq-9.1
 
 (rocq.pp ; This will let Dune know about Coq's .mlg grammar files.
- ; (coq.pp ; This will let Dune know about Coq's .mlg grammar files.
+         ; (coq.pp ; This will let Dune know about Coq's .mlg grammar files.
  (modules g_mebi))
 
 ; (rule
