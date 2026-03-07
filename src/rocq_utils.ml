@@ -1,5 +1,5 @@
 (***********************************************************************)
-module Log : Logger.SLogger = Logger.MkDefault ()
+module Log : Logger.S = Logger.MkDefault ()
 
 let () = Log.Config.enable_output ()
 let () = Log.Config.configure_output Debug true
@@ -284,6 +284,11 @@ module Strfy = struct
   ;;
 
   let name_id : Names.Id.t -> string = Names.Id.to_string
+
+  let name : Names.Name.t -> string = function
+    | Anonymous -> "Anonymous"
+    | Name x -> name_id x
+  ;;
 
   let global : Names.GlobRef.t -> string =
     fun (x : Names.GlobRef.t) -> pp (Printer.pr_global x)

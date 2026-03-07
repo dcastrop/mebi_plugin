@@ -1,4 +1,4 @@
-module type SLogger = sig
+module type S = sig
   module Config : Output_config.OUTPUT_CONFIG
 
   val enabled : bool ref
@@ -12,49 +12,50 @@ module type SLogger = sig
   val result : ?__FUNCTION__:string -> string -> unit
   val show : ?__FUNCTION__:string -> string -> unit
 
-  val thing
-    :  ?__FUNCTION__:string
-    -> ?args:Utils.Strfy.style_args
-    -> Output_kind.t
-    -> string
-    -> 'a
-    -> 'a Utils.Strfy.to_string
-    -> unit
+  val thing :
+    ?__FUNCTION__:string ->
+    ?args:Utils.Strfy.style_args ->
+    Output_kind.t ->
+    string ->
+    'a ->
+    'a Utils.Strfy.to_string ->
+    unit
 
-  val things
-    :  ?__FUNCTION__:string
-    -> ?args:Utils.Strfy.style_args
-    -> Output_kind.t
-    -> string
-    -> 'a list
-    -> 'a Utils.Strfy.to_string
-    -> unit
+  val things :
+    ?__FUNCTION__:string ->
+    ?args:Utils.Strfy.style_args ->
+    Output_kind.t ->
+    string ->
+    'a list ->
+    'a Utils.Strfy.to_string ->
+    unit
 
-  val option
-    :  ?__FUNCTION__:string
-    -> ?args:Utils.Strfy.style_args
-    -> Output_kind.t
-    -> string
-    -> 'a option
-    -> 'a Utils.Strfy.to_string
-    -> unit
+  val option :
+    ?__FUNCTION__:string ->
+    ?args:Utils.Strfy.style_args ->
+    Output_kind.t ->
+    string ->
+    'a option ->
+    'a Utils.Strfy.to_string ->
+    unit
 
-  val options
-    :  ?__FUNCTION__:string
-    -> ?args:Utils.Strfy.style_args
-    -> Output_kind.t
-    -> string
-    -> 'a list option
-    -> 'a Utils.Strfy.to_string
-    -> unit
+  val options :
+    ?__FUNCTION__:string ->
+    ?args:Utils.Strfy.style_args ->
+    Output_kind.t ->
+    string ->
+    'a list option ->
+    'a Utils.Strfy.to_string ->
+    unit
 end
 
-module type S = sig
-  val prefix : string option
-  val level : Feedback.level -> bool
-  val special : Output_kind.special -> bool
-end
+module Make : (Mode : Output_mode.OUTPUT_MODE)
+  (X : sig
+     val prefix : string option
+     val level : Feedback.level -> bool
+     val special : Output_kind.special -> bool
+   end)
+  -> S
 
-module Make : (_ : Output_mode.OUTPUT_MODE) (_ : S) -> SLogger
-module MkDefault : () -> SLogger
-module Default : SLogger
+module MkDefault : () -> S
+module Default : S

@@ -22,15 +22,15 @@ examples/Proc.v ### REQUIRED FOR BELOW
 
 ### Proc.Flat.Simple 
 examples/bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
-# examples/bisimilarity/Proc/Test1/TermTests.v ### Success
-# examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
+examples/bisimilarity/Proc/Test1/TermTests.v ### Success
+examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test1/ManualProofs.v
 # examples/bisimilarity/Proc/Test1/LtacProofs.v
 
 ### Proc.Flat.Complex 
 examples/bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
-# examples/bisimilarity/Proc/Test2/TermTests.v ### Success
-# examples/bisimilarity/Proc/Test2/PluginProofs.v ### Success
+examples/bisimilarity/Proc/Test2/TermTests.v ### Success
+examples/bisimilarity/Proc/Test2/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test2/ManualProofs.v
 # examples/bisimilarity/Proc/Test2/LtacProofs.v
 
@@ -83,6 +83,8 @@ src/output_config.ml
 src/output_config.mli
 src/logger.ml
 src/logger.mli
+src/json.ml
+src/json.mli
 
 src/theories.ml
 src/theories.mli
@@ -98,16 +100,74 @@ src/encoding.ml
 src/encoding.mli
 src/enc_tree.ml
 src/enc_tree.mli
+src/enc_trees.ml
+src/enc_trees.mli
+src/enc_constructor_tree.ml
+src/enc_constructor_tree.mli
+src/enc_constructor_trees.ml
+src/enc_constructor_trees.mli
 src/bi_encoding.ml
 src/bi_encoding.mli
 src/rocq_monad.ml
 src/rocq_monad.mli
 src/rocq_monad_utils.ml
 src/rocq_monad_utils.mli
-src/rocq_bindings.ml
-src/rocq_bindings.mli
+
+src/model_state.ml
+src/model_state.mli
+src/model_states.ml
+src/model_states.mli
+src/model_label.ml
+src/model_label.mli
+src/model_labels.ml
+src/model_labels.mli
+src/model_annotation_note.ml
+src/model_annotation_note.mli
+src/model_annotation.ml
+src/model_annotation.mli
+src/model_annotations.ml
+src/model_annotations.mli
+src/model_transition.ml
+src/model_transition.mli
+src/model_transitions.ml
+src/model_transitions.mli
+src/model_action.ml
+src/model_action.mli
+src/model_actions.ml
+src/model_actions.mli
+src/model_actionpair.ml
+src/model_actionpair.mli
+src/model_actionpairs.ml
+src/model_actionpairs.mli
+src/model_actionmap.ml
+src/model_actionmap.mli
+src/model_edge.ml
+src/model_edge.mli
+src/model_edges.ml
+src/model_edges.mli
+src/model_edgemap.ml
+src/model_edgemap.mli
+src/model_state_partition.ml
+src/model_state_partition.mli
+src/model_info.ml
+src/model_info.mli
+src/model_wip_annotation.ml
+src/model_wip_annotation.mli
+src/model_wip_trace.ml
+src/model_wip_trace.mli
+src/model_wip_traces.ml
+src/model_wip_traces.mli
+src/algorithm_saturate.ml
+src/algorithm_saturate.mli
+src/algorithm_minimize.ml
+src/algorithm_minimize.mli
+src/algorithm_bisimilarity.ml
+src/algorithm_bisimilarity.mli
+# src/algorithm_similarity.ml
+# src/algorithm_similarity.mli
 src/model.ml
 src/model.mli
+
 src/wrapper.ml
 src/wrapper.mli
 src/proof_solver.ml
