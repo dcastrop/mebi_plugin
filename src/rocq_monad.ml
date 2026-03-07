@@ -1,11 +1,18 @@
-module Make
-    (Log : Logger.SLogger)
-    (Ctx : Rocq_context.SRocq_context)
-    (Enc : Encoding.SEncoding) =
-struct
-  module Ctx : Rocq_context.SRocq_context = Ctx
-  module Enc : Encoding.SEncoding = Enc
+module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
   include Bi_encoding.Make (Log) (Ctx) (Enc)
+
+  (* NOTE: dev override*)
+  module Log =
+    Logger.Make
+      (Output_mode.Default)
+      (struct
+        let prefix : string option = None
+        let level : Output_kind.level -> bool = !Output_kind.default_level
+
+        let special : Output_kind.special -> bool =
+          Output_kind.default_special_fun ~trace:false
+        ;;
+      end)
 
   let bienc_to_list : unit -> (Enc.t * EConstr.t) list = to_list
 
@@ -63,6 +70,7 @@ struct
             (f : int -> 'a -> 'a mm)
     : 'a mm
     =
+    Log.trace __FUNCTION__;
     if index > upper_bound
     then return acc
     else bind (f index acc) (fun acc' -> iterate (index + 1) upper_bound acc' f)
@@ -75,6 +83,7 @@ struct
         (st : wrapper ref)
     : 'a in_wrapper
     =
+    Log.trace __FUNCTION__;
     let sigma, a = f !(!st.ctx).env !(!st.ctx).sigma in
     st := { !st with ctx = ref { !(!st.ctx) with sigma } };
     { state = st; value = a }
@@ -87,6 +96,7 @@ struct
   let sandbox ?(sigma : Evd.evar_map option) (m : 'a mm) (st : wrapper ref)
     : 'a in_wrapper
     =
+    Log.trace __FUNCTION__;
     let st_copy : wrapper = !st in
     let st =
       Option.cata
@@ -172,66 +182,5 @@ struct
        let* env = get_env in
        let* sigma = get_sigma in
        return (f env sigma))
-  ;;
-
-  module Tree = Enc_tree.Make (Enc)
-
-  module Constructor = struct
-    type t = EConstr.t * EConstr.t * Tree.t
-
-    let to_string
-          (env : Environ.env)
-          (sigma : Evd.evar_map)
-          ((action, destination, tree) : t)
-      : string
-      =
-      Utils.Strfy.record
-        [ "action", Rocq_utils.Strfy.econstr env sigma action
-        ; "destination", Rocq_utils.Strfy.econstr env sigma destination
-        ; "tree", Tree.to_string tree
-        ]
-    ;;
-  end
-
-  let make_state_tree_pair_set ()
-    : (module Set.S with type elt = Enc.t * Tree.t)
-    =
-    Log.trace __FUNCTION__;
-    (module Set.Make (struct
-         type t = Enc.t * Tree.t
-
-         let compare t1 t2 =
-           Utils.compare_chain
-             [ Enc.compare (fst t1) (fst t2); Tree.compare (snd t1) (snd t2) ]
-         ;;
-       end))
-  ;;
-
-  (* *)
-  let make_hashtbl () : (module Hashtbl.S with type key = Enc.t) =
-    Log.trace __FUNCTION__;
-    (module Hashtbl.Make (struct
-         include Enc
-       end))
-  ;;
-
-  let make_set () : (module Set.S with type elt = Enc.t) =
-    Log.trace __FUNCTION__;
-    (module Set.Make (struct
-         include Enc
-       end))
-  ;;
-
-  let make_econstr_set () : (module Set.S with type elt = EConstr.t) =
-    Log.trace __FUNCTION__;
-    (module Set.Make (struct
-         type t = EConstr.t
-
-         let compare (a : t) (b : t) : int =
-           let a = encode a in
-           let b = encode b in
-           Enc.compare a b
-         ;;
-       end))
   ;;
 end

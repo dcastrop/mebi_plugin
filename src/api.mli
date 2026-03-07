@@ -1,5 +1,10 @@
-val default_encoding : unit -> (module Encoding.SEncoding)
-val default_context : unit -> (module Rocq_context.SRocq_context)
+module Defaults : sig
+  module Log : module type of Logger.Default
+  module Ctx : module type of Rocq_context.Default
+  module Enc : module type of Encoding.Int (Log)
+  module Tree : module type of Enc_tree.Make (Log) (Enc)
+  module Trees : module type of Enc_trees.Make (Log) (Tree)
+end
 
 type fail_flags =
   { mutable empty : bool
