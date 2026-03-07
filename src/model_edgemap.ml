@@ -4,106 +4,110 @@ module Make
        type t
 
        val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
+
+       (* val to_string : ?pretty:bool -> t -> string *)
        val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
        val equal : t -> t -> bool
-       val compare : t -> t -> int
+
+       (* val compare : t -> t -> int *)
        val hash : t -> int
      end)
     (States : sig
        include Set.S with type elt = State.t
 
-       val add_to_opt : State.t -> t option -> t
+       (* val json : ?as_elt:bool -> t -> Yojson.t *)
+       (* val to_string : ?pretty:bool -> t -> string *)
+       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+       (* val add_to_opt : State.t -> t option -> t *)
 
        exception StateHasNoOrigin of (State.t * t * t)
 
-       val origin_of_state : State.t -> t -> t -> int
-       val has_shared_origin : t -> t -> t -> bool
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+       (* val origin_of_state : State.t -> t -> t -> int *)
+       (* val has_shared_origin : t -> t -> t -> bool *)
      end)
     (Label : sig
        type t
 
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-       val hash : t -> int
-       val is_silent : t -> bool
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+       (* val json : ?as_elt:bool -> t -> Yojson.t *)
+       (* val to_string : ?pretty:bool -> t -> string *)
+       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+       (* val equal : t -> t -> bool *)
+       (* val compare : t -> t -> int *)
+       (* val hash : t -> int *)
+       (* val is_silent : t -> bool *)
      end)
-    (Labels : sig
+    (* (Labels : sig
        include Set.S with type elt = Label.t
 
-       val non_silent : t -> t
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-     end)
-    (Action : sig
+       (* val json : ?as_elt:bool -> t -> Yojson.t *)
+       (* val to_string : ?pretty:bool -> t -> string *)
+       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+       (* val non_silent : t -> t *)
+       end) *)
+     (Action : sig
        type t
 
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-       val hash : t -> int
-       val wk_equal : t -> t -> bool
-       val is_silent : t -> bool
-       val is_labelled : Label.t -> t -> bool
-       val shorter_annotation : t -> t -> t
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+       (* val json : ?as_elt:bool -> t -> Yojson.t *)
+       (* val to_string : ?pretty:bool -> t -> string *)
+       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+       (* val equal : t -> t -> bool *)
+       (* val compare : t -> t -> int *)
+       (* val hash : t -> int *)
+       (* val wk_equal : t -> t -> bool *)
+       (* val is_silent : t -> bool *)
+       (* val is_labelled : Label.t -> t -> bool *)
+       (* val shorter_annotation : t -> t -> t *)
      end)
     (Actions : sig
        include Set.S with type elt = Action.t
 
-       val labelled : t -> Label.t -> t
-       val labels : t -> Labels.t
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+       (* val json : ?as_elt:bool -> t -> Yojson.t *)
+       (* val to_string : ?pretty:bool -> t -> string *)
+       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+       (* val labelled : t -> Label.t -> t *)
+       (* val labels : t -> Labels.t *)
      end)
     (ActionPair : sig
        type t = Action.t * States.t
 
-       val compare : t -> t -> int
-       val shorter_annotation : t -> t -> t
-       val try_update : t -> t list -> t option * t list
-       val merge_lists : t list -> t list -> t list
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+       (* val json : ?as_elt:bool -> t -> Yojson.t *)
+       (* val to_string : ?pretty:bool -> t -> string *)
+       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+       (* val compare : t -> t -> int *)
+       (* val shorter_annotation : t -> t -> t *)
+       (* val try_update : t -> t list -> t option * t list *)
+       (* val merge_lists : t list -> t list -> t list *)
      end)
     (ActionPairs : sig
        include Set.S with type elt = ActionPair.t
 
-       val destinations : t -> States.t
+       (* val json : ?as_elt:bool -> t -> Yojson.t *)
+       (* val to_string : ?pretty:bool -> t -> string *)
+       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+       (* val destinations : t -> States.t *)
 
        exception IsEmpty
 
-       val shortest_annotation : t -> ActionPair.t
-       val merge_list : t -> ActionPair.t list -> t
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+       (* val shortest_annotation : t -> ActionPair.t *)
+       (* val merge_list : t -> ActionPair.t list -> t *)
      end)
     (ActionMap : sig
        include Hashtbl.S with type key = Action.t
 
        type t' = States.t t
 
+       val json : ?as_elt:bool -> t' -> Yojson.t
+
+       (* val to_string : ?pretty:bool -> t' -> string *)
+       (* val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit *)
        val update : t' -> Action.t -> States.t -> unit
        val destinations : t' -> States.t
        val reduce_by_label : t' -> Label.t -> t'
-       val to_actions : t' -> Actions.t
+
+       (* val to_actions : t' -> Actions.t *)
        val to_actionpairs : t' -> ActionPairs.t
        val of_actionpairs : ActionPairs.t -> t'
        val merge : t' -> t' -> t'
-       val json : ?as_elt:bool -> t' -> Yojson.t
-       val to_string : ?pretty:bool -> t' -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
      end)
     (Edge : sig
        type t =
@@ -112,26 +116,29 @@ module Make
          ; action : Action.t
          }
 
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-       val is_silent : t -> bool
-       val is_labelled : Label.t -> t -> bool
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+       (* val json : ?as_elt:bool -> t -> Yojson.t *)
+       (* val to_string : ?pretty:bool -> t -> string *)
+       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+       (* val equal : t -> t -> bool *)
+       (* val compare : t -> t -> int *)
+       (* val is_silent : t -> bool *)
+       (* val is_labelled : Label.t -> t -> bool *)
      end)
     (Edges : sig
        include Set.S with type elt = Edge.t
 
-       val labelled : t -> Label.t -> t
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+       (* val json : ?as_elt:bool -> t -> Yojson.t *)
+       (* val to_string : ?pretty:bool -> t -> string *)
+       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+       (* val labelled : t -> Label.t -> t *)
      end) : sig
   include Hashtbl.S with type key = State.t
 
   type t' = ActionMap.t' t
 
+  val json : ?as_elt:bool -> t' -> Yojson.t
+  val to_string : ?pretty:bool -> t' -> string
+  val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
   val update : t' -> State.t -> Action.t -> States.t -> unit
   val destinations : t' -> State.t -> States.t
   val get_actions : t' -> State.t -> Actions.t
@@ -140,14 +147,26 @@ module Make
   val to_edges : t' -> Edges.t
   val of_edges : Edges.t -> t'
   val merge : t' -> t' -> t'
-  val json : ?as_elt:bool -> t' -> Yojson.t
-  val to_string : ?pretty:bool -> t' -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
 end = struct
   module Map_ : Hashtbl.S with type key = State.t = Hashtbl.Make (State)
   include Map_
 
   type t' = ActionMap.t' t
+
+  include
+    Json.Map.Make
+      (Log)
+      (struct
+        module Map = Map_
+
+        type value = ActionMap.t'
+
+        let name = "EdgeMap"
+        let kname = "From"
+        let vname = "Actions"
+        let kjson = State.json
+        let vjson = ActionMap.json
+      end)
 
   let update
         (x : t')
@@ -169,7 +188,7 @@ end = struct
     Log.trace __FUNCTION__;
     match find_opt x from with
     | None ->
-      Log.thing ~__FUNCTION__ Debug "has no edges" from (Of State.to_string);
+      State.log ~__FUNCTION__ ~s:"has no edges" from;
       States.empty
     | Some ys -> ActionMap.destinations ys
   ;;
@@ -242,19 +261,4 @@ end = struct
       b;
     c
   ;;
-
-  include
-    Json.Map.Make
-      (Log)
-      (struct
-        module Map = Map_
-
-        type value = ActionMap.t'
-
-        let name = "EdgeMap"
-        let kname = "From"
-        let vname = "Actions"
-        let kjson = State.json
-        let vjson = ActionMap.json
-      end)
 end

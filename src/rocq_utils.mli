@@ -94,6 +94,7 @@ val type_of_econstr
 module Strfy : sig
   val pp : ?clean:bool -> ?args:Utils.Strfy.style_args -> Pp.t -> string
   val name_id : Names.variable -> string
+  val name : Names.Name.t -> string
   val global : Names.GlobRef.t -> string
   val evar : ?args:Utils.Strfy.style_args -> Evar.t -> string
 

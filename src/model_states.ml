@@ -4,27 +4,38 @@ module Make
        type t
 
        val json : ?as_elt:bool -> t -> Yojson.t
-       val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-       val equal : t -> t -> bool
+
+       (* val to_string : ?pretty:bool -> t -> string *)
+       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+       (* val equal : t -> t -> bool *)
        val compare : t -> t -> int
-       val hash : t -> int
+       (* val hash : t -> int *)
      end) : sig
     include Set.S with type elt = State.t
 
+    val json : ?as_elt:bool -> t -> Yojson.t
+    val to_string : ?pretty:bool -> t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     val add_to_opt : State.t -> t option -> t
 
     exception StateHasNoOrigin of (State.t * t * t)
 
     val origin_of_state : State.t -> t -> t -> int
     val has_shared_origin : t -> t -> t -> bool
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
   with type elt = State.t = struct
   module Set_ : Set.S with type elt = State.t = Set.Make (State)
   include Set_
+
+  include
+    Json.Set.Make
+      (Log)
+      (struct
+        module Set = Set_
+
+        let name = "States"
+        let json = State.json
+      end)
 
   let add_to_opt (x : State.t) (ys : t option) : t =
     add x (Option.default empty ys)
@@ -50,14 +61,4 @@ module Make
     in
     exists (f (-1)) a && exists (f 1) a
   ;;
-
-  include
-    Json.Set.Make
-      (Log)
-      (struct
-        module Set = Set_
-
-        let name = "States"
-        let json = State.json
-      end)
 end

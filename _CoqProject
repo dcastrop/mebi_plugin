@@ -22,15 +22,15 @@ examples/Proc.v ### REQUIRED FOR BELOW
 
 ### Proc.Flat.Simple 
 examples/bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
-# examples/bisimilarity/Proc/Test1/TermTests.v ### Success
-# examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
+examples/bisimilarity/Proc/Test1/TermTests.v ### Success
+examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test1/ManualProofs.v
 # examples/bisimilarity/Proc/Test1/LtacProofs.v
 
 ### Proc.Flat.Complex 
 examples/bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
-# examples/bisimilarity/Proc/Test2/TermTests.v ### Success
-# examples/bisimilarity/Proc/Test2/PluginProofs.v ### Success
+examples/bisimilarity/Proc/Test2/TermTests.v ### Success
+examples/bisimilarity/Proc/Test2/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test2/ManualProofs.v
 # examples/bisimilarity/Proc/Test2/LtacProofs.v
 
@@ -112,8 +112,6 @@ src/rocq_monad.ml
 src/rocq_monad.mli
 src/rocq_monad_utils.ml
 src/rocq_monad_utils.mli
-src/rocq_bindings.ml
-src/rocq_bindings.mli
 
 src/model_state.ml
 src/model_state.mli
@@ -153,6 +151,20 @@ src/model_state_partition.ml
 src/model_state_partition.mli
 src/model_info.ml
 src/model_info.mli
+src/model_wip_annotation.ml
+src/model_wip_annotation.mli
+src/model_wip_trace.ml
+src/model_wip_trace.mli
+src/model_wip_traces.ml
+src/model_wip_traces.mli
+src/algorithm_saturate.ml
+src/algorithm_saturate.mli
+src/algorithm_minimize.ml
+src/algorithm_minimize.mli
+src/algorithm_bisimilarity.ml
+src/algorithm_bisimilarity.mli
+# src/algorithm_similarity.ml
+# src/algorithm_similarity.mli
 src/model.ml
 src/model.mli
 

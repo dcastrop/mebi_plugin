@@ -1,10 +1,13 @@
 exception NothingToDo
 exception NotImplemented
 
-module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
+module Make (Log : Logger.S) (Enc : Encoding.S) = struct
+  module Tree = Enc_tree.Make (Log) (Enc)
+  module Trees = Enc_trees.Make (Log) (Tree)
+
   (** [W] is for running the main part of the algorithm (pre-proof). *)
   module W = struct
-    include Wrapper.Make (Log) (Rocq_context.Default) (E)
+    include Wrapper.Make (Log) (Rocq_context.Default) (Enc) (Tree) (Trees)
 
     let the_result : Model.Bisimilar.t ref option ref = ref None
 
@@ -89,27 +92,27 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
 
     (** [Decode] handles obtaining [EConstr.t] from [module M]. *)
     module Decode = struct
-      let enc (x : M.Enc.t) : EConstr.t = M.decode x
+      let enc (x : Enc.t) : EConstr.t = M.decode x
 
-      let handle (x : M.Enc.t) (e : exn) : EConstr.t =
+      let handle (x : Enc.t) (e : exn) : EConstr.t =
         try enc x with M.CannotDecode _ -> raise e
       ;;
 
       exception CouldNotDecode_State of Model.State.t
 
       let state (x : Model.State.t) : EConstr.t =
-        handle x.term (CouldNotDecode_State x)
+        handle x.enc (CouldNotDecode_State x)
       ;;
 
       exception CouldNotDecode_Label of Model.Label.t
 
       let label (x : Model.Label.t) : EConstr.t =
-        handle x.term (CouldNotDecode_Label x)
+        handle x.enc (CouldNotDecode_Label x)
       ;;
 
-      exception CouldNotDecode_LTS_Constructor of Model.Info.lts
+      exception CouldNotDecode_LTS_Constructor of Model.Info.Meta.RocqLTS.t
 
-      let lts_constructor (x : Model.Info.lts) : EConstr.t =
+      let lts_constructor (x : Model.Info.Meta.RocqLTS.t) : EConstr.t =
         handle x.enc (CouldNotDecode_LTS_Constructor x)
       ;;
     end
@@ -139,7 +142,7 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
          (fun (econstr, enc) ->
            Printf.sprintf
              "%s :=> %s"
-             (M.Enc.to_string enc)
+             (Enc.to_string enc)
              (M.Strfy.econstr econstr)))
   ;;
 
@@ -193,7 +196,7 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
         ; goto : Model.State.t option
         ; label : Model.Label.t option
         ; annotation : Model.Annotation.t option
-        ; constructor_tree : Model.Tree.t option
+        ; constructor_tree : Tree.t option
         }
 
       let from (from : Model.State.t) : t =
@@ -219,7 +222,7 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
           is an option type since [None] represents the end of the annotation.
     *)
     type t =
-      { current : Model.TreeNode.t list option
+      { current : Tree.Node.t list option
       ; annotation : Model.Annotation.t option
       ; label : Model.Label.t
       ; destination : Model.State.t
@@ -231,11 +234,11 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
 
     let to_string (x : t) : string =
       Utils.Strfy.record
-        [ "label", M.Enc.to_string x.label.term
+        [ "label", Enc.to_string x.label.enc
         ; "destination", Model.State.to_string x.destination
         ; ( "current"
           , Utils.Strfy.option
-              (Of (Utils.Strfy.list (Of Model.TreeNode.to_string)))
+              (Of (Utils.Strfy.list (Of Tree.Node.to_string)))
               x.current )
         ; ( "annotation"
           , Utils.Strfy.option (Of Model.Annotation.to_string) x.annotation )
@@ -458,7 +461,8 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
                fun () -> ref (Proofview.Goal.sigma (gl ()))
              ;;
            end))
-        (W.M.Enc)
+        (Enc)
+        (Tree)
 
     (** [EConstrSet] is a custom [Set] of [EConstr.t] that allows terms to be compared more efficiently during {b a single proof step only} -- since this is built for each step. {e Though, since each proof step we have a new [env] and [sigma], the same term may be encoded differently across iteration steps, so there isn't necessarily a way for us to compare terms in a proof across iterations anyway. {b ! This needs to be investigated.}}
     *)
@@ -522,7 +526,7 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
           (y : EConstr.t)
       : unit
       =
-      let eq : bool = econstr_eq x y in
+      let eq : bool = econstr_eq x y |> run in
       Log.thing ~__FUNCTION__ Debug "eq x y" eq (Of Utils.Strfy.bool)
     ;;
 
@@ -600,7 +604,7 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
       *)
       let is_any_theory (x : EConstr.t) : bool =
         Theories.collect_bisimilarity_theories ()
-        |> List.exists (fun (y : EConstr.t) -> econstr_eq x y)
+        |> List.exists (fun (y : EConstr.t) -> econstr_eq x y |> run)
       ;;
 
       (** [is_theory x y] checks if term [x] is equal to theory term [y], catching the exception thrown when [EConstr.kind_of_type x] is not [AtomicType (ty, tys)].
@@ -609,7 +613,7 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
         try
           let open Syntax in
           let* ty, tys = to_atomic x in
-          econstr_eq y ty |> return
+          econstr_eq y ty
         with
         | Rocq_utils.Rocq_utils_EConstrIsNotA_Type _ -> return false
       ;;
@@ -649,11 +653,10 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
       ;;
 
       (** *)
-      let get_theory_enc (f : EConstr.t -> bool mm) : M.Enc.t M.mm =
+      let get_theory_enc (f : EConstr.t -> bool mm) : Enc.t M.mm =
         let open M.Syntax in
         let* fm = M.get_fwdmap in
-        let rec find_theory : (EConstr.t * M.Enc.t) list -> M.Enc.t M.mm =
-          function
+        let rec find_theory : (EConstr.t * Enc.t) list -> Enc.t M.mm = function
           | [] -> raise Not_found
           | (x, y) :: tl ->
             let is_match : bool = run (f x) in
@@ -664,14 +667,14 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
 
       exception NoEncodingFoundFor_TheoriesNone
 
-      let get_None_enc () : M.Enc.t M.mm =
+      let get_None_enc () : Enc.t M.mm =
         try get_theory_enc is_None with
         | Not_found -> raise NoEncodingFoundFor_TheoriesNone
       ;;
 
       exception NoEncodingFoundFor_TheoriesSome
 
-      let get_Some_enc () : M.Enc.t M.mm =
+      let get_Some_enc () : Enc.t M.mm =
         try get_theory_enc is_Some with
         | Not_found -> raise NoEncodingFoundFor_TheoriesSome
       ;;
@@ -680,18 +683,18 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
 
       (** *)
       let get_theory_enc_if_eq (x : EConstr.t) (f : EConstr.t -> bool mm)
-        : M.Enc.t M.mm
+        : Enc.t M.mm
         =
         let is_eq : bool = run (f x) in
         try if is_eq then get_theory_enc f else raise Not_found with
         | Not_found -> raise NotEqTheory
       ;;
 
-      let get_None_enc_if_eq (x : EConstr.t) : M.Enc.t M.mm =
+      let get_None_enc_if_eq (x : EConstr.t) : Enc.t M.mm =
         get_theory_enc_if_eq x is_None
       ;;
 
-      let get_Some_enc_if_eq (x : EConstr.t) : M.Enc.t M.mm =
+      let get_Some_enc_if_eq (x : EConstr.t) : Enc.t M.mm =
         get_theory_enc_if_eq x is_Some
       ;;
 
@@ -703,7 +706,7 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
           |> Model.Labels.to_list
         with
         | [] -> raise (FSM_HasNoSilentLabel m)
-        | ys -> M.exists_eq x ys Decode.label
+        | ys -> M.exists_eq x ys Decode.label |> M.run
       ;;
 
       exception FSM_HasNoVisibleLabel of Model.FSM.t
@@ -717,7 +720,7 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
           |> Model.Labels.to_list
         with
         | [] -> raise (FSM_HasNoVisibleLabel m)
-        | ys -> M.exists_eq x ys Decode.label
+        | ys -> M.exists_eq x ys Decode.label |> M.run
       ;;
 
       exception FSM_HasNoWeakLabels of Model.FSM.t
@@ -735,7 +738,7 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
         | { info = { meta = Some { lts; _ }; _ }; _ } ->
           if is_any_theory x
           then false
-          else M.exists_eq x lts Decode.lts_constructor
+          else M.exists_eq x lts Decode.lts_constructor |> M.run
       ;;
     end
 
@@ -818,7 +821,7 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
       ;;
 
       let ex_intro (x : Model.State.t) : Tactic.t mm =
-        let t : EConstr.t = M.decode x.term in
+        let t : EConstr.t = M.decode x.enc in
         let bindings = Tactypes.ImplicitBindings [ t ] in
         let msg = Printf.sprintf "exists %s" (M.Strfy.econstr t) in
         Tactic.tactic ~msg (Tactics.constructor_tac true None 1 bindings)
@@ -1128,16 +1131,19 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
 
       (***********************************************************************)
 
-      exception NoConstructorFoundWithEnc of M.Enc.t
+      exception NoConstructorFoundWithEnc of Enc.t
 
-      let find_lts (lts_enc : M.Enc.t) : Model.Info.lts list -> Model.Info.lts =
-        List.find (fun ({ enc; _ } : Model.Info.lts) -> M.Enc.equal enc lts_enc)
+      let find_lts (lts_enc : Enc.t)
+        : Model.Info.Meta.RocqLTS.t list -> Model.Info.Meta.RocqLTS.t
+        =
+        List.find (fun ({ enc; _ } : Model.Info.Meta.RocqLTS.t) ->
+          Enc.equal enc lts_enc)
       ;;
 
       let find_constructor (constructor_index : int)
-        : Rocq_bindings.constructor list -> Rocq_bindings.constructor
+        : M.ConstructorBindings.t list -> M.ConstructorBindings.t
         =
-        List.find (fun ({ index; _ } : Rocq_bindings.constructor) ->
+        List.find (fun ({ index; _ } : M.ConstructorBindings.t) ->
           Int.equal index constructor_index)
       ;;
 
@@ -1149,43 +1155,40 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
 
       let get_constructor_bindings
             ({ from; goto; label } : binding_args)
-            (bindings : Rocq_bindings.t)
-        : EConstr.t Tactypes.bindings mm
+            (bindings : M.Bindings.t)
+        : EConstr.t Tactypes.bindings
         =
-        let open Syntax in
-        let* env = get_env in
-        let* sigma = get_sigma in
-        Rocq_bindings.get env sigma from label goto bindings |> return
+        M.ConstructorBindings.get from label goto bindings |> M.run
       ;;
 
       (** if we have no way of obtaining the bindings (i.e., not info.meta) then we use no bindings.
           (* TODO: check if we can optimize this so we use [NoBindings] where possible *)
       *)
       let try_get_constructor_bindings
-            ((enc, index) : Model.TreeNode.t)
+            ((enc, index) : Tree.Node.t)
             (args : binding_args)
-        : EConstr.t Tactypes.bindings mm
+        : EConstr.t Tactypes.bindings
         =
         match (W.get_fsm_b ()).info.meta with
-        | None -> return Tactypes.NoBindings
+        | None -> Tactypes.NoBindings
         | Some { lts; _ } ->
-          let { constructors; _ } : Model.Info.lts = find_lts enc lts in
-          let { bindings; _ } : Rocq_bindings.constructor =
+          let { constructors; _ } : Model.Info.Meta.RocqLTS.t =
+            find_lts enc lts
+          in
+          let { bindings; _ } : M.ConstructorBindings.t =
             find_constructor index constructors
           in
           get_constructor_bindings args bindings
       ;;
 
-      let apply_constructor
-            ((enc, index) : Model.TreeNode.t)
-            (args : binding_args)
+      let apply_constructor ((enc, index) : Tree.Node.t) (args : binding_args)
         : Tactic.t mm
         =
         (* NOTE: constructors index from 1 *)
         let index : int = index + 1 in
         let msg : string = Printf.sprintf "constructor %i" index in
-        let open Syntax in
-        let* bindings = try_get_constructor_bindings (enc, index) args in
+        (* let open Syntax in *)
+        let bindings = try_get_constructor_bindings (enc, index) args in
         Log.thing
           ~__FUNCTION__
           Debug
@@ -1207,9 +1210,9 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
       let state (x : EConstr.t) (ys : Model.States.t) : Model.State.t M.mm =
         Log.trace __FUNCTION__;
         try
-          let term : M.Enc.t = M.get_encoding x in
+          let enc : Enc.t = M.get_encoding x in
           (* NOTE: [Model.States.compare] only cares about [term]. *)
-          Model.States.find { term; pp = None } ys |> M.return
+          Model.States.find { enc } ys |> M.return
         with
         | M.EncodingNotFound _ ->
           log_econstr ~__FUNCTION__ "Err: M.EncodingNotFound" x;
@@ -1237,9 +1240,9 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
 
       let label (x : EConstr.t) (ys : Model.Labels.t) : Model.Label.t M.mm =
         Log.trace __FUNCTION__;
-        let f (term : M.Enc.t) : Model.Label.t M.mm =
+        let f (enc : Enc.t) : Model.Label.t M.mm =
           (* NOTE: [Model.Labels.compare] only cares about [is_silent=Some _] *)
-          Model.Labels.find { term; is_silent = None; pp = None } ys |> M.return
+          Model.Labels.find { enc; is_silent = None } ys |> M.return
         in
         try M.get_encoding x |> f with
         | M.EncodingNotFound _ ->
@@ -1249,13 +1252,13 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
           let open M.Syntax in
           (* NOTE: is it [None]? (i.e., a silent action) *)
           (try
-             let* term : M.Enc.t = Theory.get_None_enc_if_eq x in
+             let* term : Enc.t = Theory.get_None_enc_if_eq x in
              f term
            with
            | Theory.NotEqTheory ->
              (* NOTE: is it [Some]? (i.e., a visible action) *)
              (try
-                let* term : M.Enc.t = Theory.get_Some_enc_if_eq x in
+                let* term : Enc.t = Theory.get_Some_enc_if_eq x in
                 f term
               with
               | Theory.NotEqTheory ->
@@ -1307,8 +1310,8 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
           match actionpairs with
           | [] -> raise (CouldNotFind_Transition { from; goto; label; edges })
           | ({ annotation; constructor_trees; _ }, _) :: [] ->
-            let constructor_tree = Model.Trees.min_opt constructor_trees in
-            { from; goto; label; annotation; constructor_tree }
+            let tree : Tree.t option = Trees.min_opt constructor_trees in
+            { from; goto; label; annotation; tree }
           | h :: tl ->
             (* TODO: move this proceed to [Model] and handle this case *)
             Log.warning ~__FUNCTION__ "Multiple actionpairs found";
@@ -1405,15 +1408,15 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
           try
             let from : Model.State.t = M.run (ReModel.state tys.(0) m.states) in
             _log_state ~__FUNCTION__ "from" from;
-            log_econstr ~__FUNCTION__ "from" (M.decode from.term);
+            log_econstr ~__FUNCTION__ "from" (M.decode from.enc);
             let goto : Model.State.t = M.run (ReModel.state tys.(2) m.states) in
             _log_state ~__FUNCTION__ "goto" goto;
-            log_econstr ~__FUNCTION__ "goto" (M.decode goto.term);
+            log_econstr ~__FUNCTION__ "goto" (M.decode goto.enc);
             let label : Model.Label.t =
               M.run (ReModel.label tys.(1) m.alphabet)
             in
             _log_label ~__FUNCTION__ "label" label;
-            log_econstr ~__FUNCTION__ "label" (M.decode label.term);
+            log_econstr ~__FUNCTION__ "label" (M.decode label.enc);
             ReModel.transition from goto label m.edges |> return
           with
           (* | M.EncodingNotFound z ->
@@ -1436,7 +1439,7 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
 
     (** conclusion *)
     module Concl = struct
-      let eq (x : EConstr.t) : bool = get_concl () |> econstr_eq x
+      let eq (x : EConstr.t) : bool = get_concl () |> econstr_eq x |> run
 
       let eq_hyp (x : Rocq_utils.hyp) : bool =
         Context.Named.Declaration.get_type x |> eq
@@ -1450,8 +1453,8 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
       let is_weak_refl () : bool mm =
         let open Syntax in
         let* ty, tys = get_concl () |> to_atomic in
-        if econstr_eq tys.(3) tys.(4)
-        then econstr_eq tys.(5) tys.(6) |> return
+        if econstr_eq tys.(3) tys.(4) |> run
+        then econstr_eq tys.(5) tys.(6)
         else return false
       ;;
 
@@ -1711,9 +1714,9 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
           (* NOTE: get the pair with the shortest annotation (less steps to do) *)
           |> Model.ActionPairs.shortest_annotation
         in
-        let constructor_tree = Model.Trees.min_opt constructor_trees in
+        let tree : Tree.t option = Trees.min_opt constructor_trees in
         let goto : Model.State.t = Model.States.min_elt destinations in
-        { from; goto; label; annotation; constructor_tree }
+        { from; goto; label; annotation; tree }
       with
       | Model.ActionPairs.IsEmpty -> raise CouldNotFindGotoState
     ;;
@@ -1812,9 +1815,9 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
     ;;
 
     let handle_appconstrs_update_args ({ this; next } : Model.Annotation.t)
-      : Model.TreeNode.t list option * Model.Annotation.t option
+      : Tree.Node.t list option * Model.Annotation.t option
       =
-      Some (Model.Trees.min this.using |> Model.Tree.minimize), next
+      Some (Trees.min this.using |> Tree.minimize), next
     ;;
 
     (** [handle_appconstrs_update label] ... *)
@@ -1830,7 +1833,7 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
 
     (** [handle_appconstrs_apply x] ...
         (* NOTE: relies on the bindings we extract early on *) *)
-    let handle_appconstrs_apply (x : Model.TreeNode.t) : Tactic.t mm =
+    let handle_appconstrs_apply (x : Tree.Node.t) : Tactic.t mm =
       Log.trace __FUNCTION__;
       let open Syntax in
       let* _, tys = get_concl () |> to_atomic in
@@ -2051,10 +2054,9 @@ module Make (Log : Logger.S) (E : Encoding.SEncoding) = struct
 end
 
 (***********************************************************************)
+module Log = Api.Defaults.Log
 
-module Log = Logger.Default
-
-module type S = module type of Make (Log) ((val Api.default_encoding ()))
+module type S = module type of Make (Log) (Api.Defaults.Enc)
 
 let the_proof_solver : (module S) ref option ref = ref None
 let reset_the_proof_solver () : unit = the_proof_solver := None
@@ -2066,7 +2068,7 @@ let get_the_proof_solver () : (module S) ref =
 ;;
 
 let new_proof_solver () : (module S) ref =
-  let module M : S = Make (Log) ((val Api.default_encoding ())) in
+  let module M : S = Make (Log) (Api.Defaults.Enc) in
   the_proof_solver := Some (ref (module M : S));
   get_the_proof_solver ()
 ;;

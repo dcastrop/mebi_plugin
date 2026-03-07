@@ -1,11 +1,13 @@
 exception NothingToDo
 exception NotImplemented
 
-module Make : (Log : Logger.S) (E : Encoding.SEncoding) -> sig
-   module W : sig
-  include  module type of Wrapper.Make (Log) (Rocq_context.Default) (E)
-   
-   
+module Make : (Log : Logger.S) (Enc : Encoding.S) -> sig
+  module Tree : module type of Enc_tree.Make (Log) (Enc)
+  module Trees : module type of Enc_trees.Make (Log) (Tree)
+
+  module W : sig
+    include module type of
+        Wrapper.Make (Log) (Rocq_context.Default) (Enc) (Tree) (Trees)
 
     val the_result : Model.Bisimilar.t ref option ref
 
@@ -28,8 +30,8 @@ module Make : (Log : Logger.S) (E : Encoding.SEncoding) -> sig
       -> unit
 
     module Decode : sig
-      val enc : M.Enc.t -> EConstr.t
-      val handle : M.Enc.t -> exn -> EConstr.t
+      val enc : Enc.t -> EConstr.t
+      val handle : Enc.t -> exn -> EConstr.t
 
       exception CouldNotDecode_State of Model.States.elt
 
@@ -39,12 +41,11 @@ module Make : (Log : Logger.S) (E : Encoding.SEncoding) -> sig
 
       val label : Model.Labels.elt -> EConstr.t
 
-      exception CouldNotDecode_LTS_Constructor of Model.Info.lts
+      exception CouldNotDecode_LTS_Constructor of Model.Info.Meta.RocqLTS.t
 
-      val lts_constructor : Model.Info.lts -> EConstr.t
+      val lts_constructor : Model.Info.Meta.RocqLTS.t -> EConstr.t
     end
-  end 
-
+  end
 
   val check_bisimilarity
     :  Libnames.qualid list
@@ -56,10 +57,9 @@ module Make : (Log : Logger.S) (E : Encoding.SEncoding) -> sig
   module Model = W.Model
   module Decode = W.Decode
 
- 
   module ApplicableConstructors : sig
     type t =
-      { current : Model.TreeNode.t list option
+      { current : Tree.Node.t list option
       ; annotation : Model.Annotation.t option
       ; label : Model.Label.t
       ; destination : Model.EdgeMap.key
@@ -133,17 +133,20 @@ module Make : (Log : Logger.S) (E : Encoding.SEncoding) -> sig
       -> sig
     val gl : unit -> Proofview.Goal.t
 
-    
-            include module type of Rocq_monad_utils.Make (Log) (Rocq_context.Make (struct
-             let env : unit -> Environ.env ref =
-               fun () -> ref (Proofview.Goal.env (gl ()))
-             ;;
+    include module type of
+        Rocq_monad_utils.Make
+          (Log)
+          (Rocq_context.Make (struct
+               let env : unit -> Environ.env ref =
+                 fun () -> ref (Proofview.Goal.env (gl ()))
+               ;;
 
-             let sigma : unit -> Evd.evar_map ref =
-               fun () -> ref (Proofview.Goal.sigma (gl ()))
-             ;;
-           end))
-        (W.M.Enc)
+               let sigma : unit -> Evd.evar_map ref =
+                 fun () -> ref (Proofview.Goal.sigma (gl ()))
+               ;;
+             end))
+          (Enc)
+          (Tree)
 
     val to_atomic : EConstr.t -> EConstr.t Rocq_utils.kind_pair mm
     val get_concl : unit -> EConstr.t
@@ -210,25 +213,25 @@ module Make : (Log : Logger.S) (E : Encoding.SEncoding) -> sig
       val is_LTS : EConstr.t -> bool mm
       val is_None : EConstr.t -> bool mm
       val is_Some : EConstr.t -> bool mm
-      val get_theory_enc : (EConstr.t -> bool mm) -> M.Enc.t M.mm
+      val get_theory_enc : (EConstr.t -> bool mm) -> Enc.t M.mm
 
       exception NoEncodingFoundFor_TheoriesNone
 
-      val get_None_enc : unit -> M.Enc.t M.mm
+      val get_None_enc : unit -> Enc.t M.mm
 
       exception NoEncodingFoundFor_TheoriesSome
 
-      val get_Some_enc : unit -> M.Enc.t M.mm
+      val get_Some_enc : unit -> Enc.t M.mm
 
       exception NotEqTheory
 
       val get_theory_enc_if_eq
         :  EConstr.t
         -> (EConstr.t -> bool mm)
-        -> M.Enc.t M.mm
+        -> Enc.t M.mm
 
-      val get_None_enc_if_eq : EConstr.t -> M.Enc.t M.mm
-      val get_Some_enc_if_eq : EConstr.t -> M.Enc.t M.mm
+      val get_None_enc_if_eq : EConstr.t -> Enc.t M.mm
+      val get_Some_enc_if_eq : EConstr.t -> Enc.t M.mm
 
       exception FSM_HasNoSilentLabel of Model.FSM.t
 

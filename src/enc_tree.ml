@@ -4,16 +4,19 @@ module Make
     module Node : sig
       type t = Enc.t * int
 
-      val compare : t -> t -> int
-      val equal : t -> t -> bool
       val json : ?as_elt:bool -> t -> Yojson.t
       val to_string : ?pretty:bool -> t -> string
       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+      val compare : t -> t -> int
+      val equal : t -> t -> bool
     end
 
     type 'a tree = N of 'a * 'a tree list
     type t = Node.t tree
 
+    val json : ?as_elt:bool -> t -> Yojson.t
+    val to_string : ?pretty:bool -> t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
     val add : t -> t -> t
     val add_list : t -> t list -> t list
     val equal : t -> t -> bool
@@ -23,20 +26,10 @@ module Make
     exception CannotMinimizeEmptyList of unit
 
     val min : t list -> Node.t list
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   end
   with type Node.t = Enc.t * int = struct
   module Node = struct
     type t = Enc.t * int
-
-    let compare (a : t) (b : t) : int =
-      Utils.compare_chain
-        [ Enc.compare (fst a) (fst b); Int.compare (snd a) (snd b) ]
-    ;;
-
-    let equal (a : t) (b : t) : bool = fst a == fst b && snd b == snd b
 
     include
       Json.Thing.Make
@@ -51,10 +44,33 @@ module Make
               [ "enc", Enc.json ~as_elt:true (fst x); "index", `Int (snd x) ]
           ;;
         end)
+
+    let compare (a : t) (b : t) : int =
+      Utils.compare_chain
+        [ Enc.compare (fst a) (fst b); Int.compare (snd a) (snd b) ]
+    ;;
+
+    let equal (a : t) (b : t) : bool = fst a == fst b && snd b == snd b
   end
 
   type 'a tree = N of 'a * 'a tree list
   type t = Node.t tree
+
+  include
+    Json.Thing.Make
+      (Log)
+      (struct
+        type k = t
+
+        let name = "Tree"
+
+        let rec json ?as_elt (N (x, xl) : t) : Yojson.t =
+          `Assoc
+            [ "node", Node.json ~as_elt:true x
+            ; "cons", `List (List.map (json ~as_elt:true) xl)
+            ]
+        ;;
+      end)
 
   (** [add x y] inserts [x] to be a new leaf of [y], mutually recursive with [add_list x ys] (where [ys] is a list of [t]).
   *)
@@ -105,21 +121,4 @@ module Make
              | _ -> the_min)
            (minimize h)
   ;;
-
-  (* *)
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
-
-        let name = "Tree"
-
-        let rec json ?as_elt (N (x, xl) : t) : Yojson.t =
-          `Assoc
-            [ "node", Node.json ~as_elt:true x
-            ; "cons", `List (List.map (json ~as_elt:true) xl)
-            ]
-        ;;
-      end)
 end

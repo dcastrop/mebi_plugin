@@ -1,8 +1,5 @@
 module Make : (_ : Logger.S) (Enc : Encoding.S) -> sig
-  type t =
-    { term : Enc.t
-    ; pp : string option
-    }
+  type t = { enc : Enc.t }
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
