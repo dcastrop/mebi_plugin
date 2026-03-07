@@ -1,3 +1,10 @@
+let option ?(as_elt : bool = false) (f : ?as_elt:bool -> 'a -> Yojson.t)
+  : 'a option -> Yojson.t
+  = function
+  | None -> `Null
+  | Some x -> f ~as_elt x
+;;
+
 module Thing = struct
   module type S = sig
     type k
@@ -31,6 +38,71 @@ module Thing = struct
     let log ?(__FUNCTION__ : string = "") ?(s : string = X.name) (x : X.k)
       : unit
       =
+      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
+    ;;
+  end
+end
+
+module Map = struct
+  module type S = sig
+    module Map : Hashtbl.S
+
+    type value
+
+    val name : string
+    val kname : string
+    val vname : string
+    val kjson : ?as_elt:bool -> Map.key -> Yojson.t
+    val vjson : ?as_elt:bool -> value -> Yojson.t
+  end
+
+  module type Type = sig
+    type k
+
+    val json : ?as_elt:bool -> k -> Yojson.t
+    val to_string : ?pretty:bool -> k -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
+  end
+
+  module Make (Log : Logger.S) (X : S) : Type with type k = X.value X.Map.t =
+  struct
+    type k = X.value X.Map.t
+
+    (** ... *)
+    let json ?(as_elt : bool = false) (x : k) : Yojson.t =
+      (* let f (i : int) (k : X.Map.key) (v : X.value) : Yojson.t =
+         `Assoc
+         [ ( Printf.sprintf "%i" i , `Assoc [ X.kname, X.kjson ~as_elt:true k ; X.vname, X.vjson ~as_elt:true v ] ) ]
+         in
+         let xs = X.Map.to_seq x |> Array.of_seq in
+         let rec loop (i : int) : Yojson.t list =
+         try
+         let k, v = xs.(i) in
+         f i k v :: loop (i + 1)
+         with
+         | Invalid_argument _ -> []
+         in
+         let y : Yojson.t = `List (loop 0) in *)
+      let y : Yojson.t =
+        `List
+          (X.Map.to_seq x
+           |> List.of_seq
+           |> List.map (fun (k, v) ->
+             `Assoc
+               [ X.kname, X.kjson ~as_elt:true k
+               ; X.vname, X.vjson ~as_elt:true v
+               ]))
+      in
+      if as_elt then y else `Assoc [ X.name, y ]
+    ;;
+
+    let to_string ?(pretty : bool = true) (x : k) : string =
+      if pretty
+      then json x |> Yojson.pretty_to_string
+      else json x |> Yojson.to_string
+    ;;
+
+    let log ?(__FUNCTION__ : string = "") ?(s : string = X.name) (x : k) : unit =
       Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end
@@ -129,66 +201,6 @@ module Set = struct
     let log ?(__FUNCTION__ : string = "") ?(s : string = X.name) (x : X.Set.t)
       : unit
       =
-      Log.thing ~__FUNCTION__ Debug s x (Of to_string)
-    ;;
-  end
-end
-
-module Map = struct
-  module type S = sig
-    module Map : Hashtbl.S
-
-    type value
-
-    val name : string
-    val kname : string
-    val vname : string
-    val kjson : ?as_elt:bool -> Map.key -> Yojson.t
-    val vjson : ?as_elt:bool -> value -> Yojson.t
-  end
-
-  module type Type = sig
-    type k
-
-    val json : ?as_elt:bool -> k -> Yojson.t
-    val to_string : ?pretty:bool -> k -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
-  end
-
-  module Make (Log : Logger.S) (X : S) : Type with type k = X.value X.Map.t =
-  struct
-    type k = X.value X.Map.t
-
-    (** ... *)
-    let json ?(as_elt : bool = false) (x : k) : Yojson.t =
-      let f (i : int) (k : X.Map.key) (v : X.value) : Yojson.t =
-        `Assoc
-          [ ( Printf.sprintf "%i" i
-            , `Assoc
-                [ X.kname, X.kjson ~as_elt:true k
-                ; X.vname, X.vjson ~as_elt:true v
-                ] )
-          ]
-      in
-      let xs = X.Map.to_seq x |> Array.of_seq in
-      let rec loop (i : int) : Yojson.t list =
-        try
-          let k, v = xs.(i) in
-          f i k v :: loop (i + 1)
-        with
-        | Invalid_argument _ -> []
-      in
-      let y : Yojson.t = `List (loop 0) in
-      if as_elt then y else `Assoc [ X.name, y ]
-    ;;
-
-    let to_string ?(pretty : bool = true) (x : k) : string =
-      if pretty
-      then json x |> Yojson.pretty_to_string
-      else json x |> Yojson.to_string
-    ;;
-
-    let log ?(__FUNCTION__ : string = "") ?(s : string = X.name) (x : k) : unit =
       Log.thing ~__FUNCTION__ Debug s x (Of to_string)
     ;;
   end

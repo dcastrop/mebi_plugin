@@ -1,9 +1,4 @@
-module Make : (Log : Logger.S)
-    (Ctx : Rocq_context.SRocq_context)
-    (Enc : Encoding.S)
-    -> sig
-  module Ctx : Rocq_context.SRocq_context
-  module Enc : Encoding.S
+module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
   include module type of Bi_encoding.Make (Log) (Ctx) (Enc)
 
   val bienc_to_list : unit -> (Enc.t * Evd.econstr) list

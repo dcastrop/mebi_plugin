@@ -8,6 +8,4 @@ module type S = sig
 end
 
 module MakeFromEnc : (Enc : Encoding.SEncoding) -> S with type t = Enc.t
-
-module MakeFromEConstr : (_ : Rocq_context.SRocq_context) ->
-  S with type t = EConstr.t
+module MakeFromEConstr : (_ : Rocq_context.S) -> S with type t = EConstr.t

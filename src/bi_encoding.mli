@@ -1,7 +1,4 @@
-module Make : (_ : Logger.S)
-    (_ : Rocq_context.SRocq_context)
-    (Enc : Encoding.S)
-    -> sig
+module Make : (_ : Logger.S) (_ : Rocq_context.S) (Enc : Encoding.S) -> sig
   module F : Hashtbl.S with type key = EConstr.t
   module B : Hashtbl.S with type key = Enc.t
 
@@ -34,6 +31,7 @@ module Make : (_ : Logger.S)
 
   val decode : Enc.t -> EConstr.t
   val decode_opt : Enc.t -> EConstr.t option
+  val opt_decode : Enc.t option -> EConstr.t option
   val decode_map : 'a B.t -> 'a F.t
   val encode_map : 'a F.t -> 'a B.t
   val to_list : unit -> (Enc.t * EConstr.t) list

@@ -1,8 +1,5 @@
 module Make (Log : Logger.S) (Enc : Encoding.S) : sig
-  type t =
-    { term : Enc.t
-    ; pp : string option
-    }
+  type t = { enc : Enc.t }
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
@@ -11,14 +8,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) : sig
   val compare : t -> t -> int
   val hash : t -> int
 end = struct
-  type t =
-    { term : Enc.t
-    ; pp : string option
-    }
-
-  let equal (a : t) (b : t) : bool = Enc.equal a.term b.term
-  let compare (a : t) (b : t) : int = Enc.compare a.term b.term
-  let hash (x : t) : int = Enc.hash x.term
+  type t = { enc : Enc.t }
 
   include
     Json.Thing.Make
@@ -29,10 +19,11 @@ end = struct
         let name = "State"
 
         let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ "enc", Enc.json ~as_elt:true x.term
-            ; "pp", `String (Utils.Strfy.option (Args Utils.Strfy.string) x.pp)
-            ]
+          `Assoc [ "enc", Enc.json ~as_elt:true x.enc ]
         ;;
       end)
+
+  let equal (a : t) (b : t) : bool = Enc.equal a.enc b.enc
+  let compare (a : t) (b : t) : int = Enc.compare a.enc b.enc
+  let hash (x : t) : int = Enc.hash x.enc
 end

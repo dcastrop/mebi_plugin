@@ -1,11 +1,18 @@
-module Make
-    (Log : Logger.S)
-    (Ctx : Rocq_context.SRocq_context)
-    (Enc : Encoding.S) =
-struct
-  module Ctx : Rocq_context.SRocq_context = Ctx
-  module Enc : Encoding.S = Enc
+module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
   include Bi_encoding.Make (Log) (Ctx) (Enc)
+
+  (* NOTE: dev override*)
+  module Log =
+    Logger.Make
+      (Output_mode.Default)
+      (struct
+        let prefix : string option = None
+        let level : Output_kind.level -> bool = !Output_kind.default_level
+
+        let special : Output_kind.special -> bool =
+          Output_kind.default_special_fun ~trace:false
+        ;;
+      end)
 
   let bienc_to_list : unit -> (Enc.t * EConstr.t) list = to_list
 
@@ -63,6 +70,7 @@ struct
             (f : int -> 'a -> 'a mm)
     : 'a mm
     =
+    Log.trace __FUNCTION__;
     if index > upper_bound
     then return acc
     else bind (f index acc) (fun acc' -> iterate (index + 1) upper_bound acc' f)
@@ -75,6 +83,7 @@ struct
         (st : wrapper ref)
     : 'a in_wrapper
     =
+    Log.trace __FUNCTION__;
     let sigma, a = f !(!st.ctx).env !(!st.ctx).sigma in
     st := { !st with ctx = ref { !(!st.ctx) with sigma } };
     { state = st; value = a }
@@ -87,6 +96,7 @@ struct
   let sandbox ?(sigma : Evd.evar_map option) (m : 'a mm) (st : wrapper ref)
     : 'a in_wrapper
     =
+    Log.trace __FUNCTION__;
     let st_copy : wrapper = !st in
     let st =
       Option.cata

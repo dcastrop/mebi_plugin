@@ -43,7 +43,6 @@
   bi_encoding
   rocq_monad
   rocq_monad_utils
-  rocq_bindings
   model_state
   model_states
   model_label
@@ -63,6 +62,13 @@
   model_edgemap
   model_state_partition
   model_info
+  model_wip_annotation
+  model_wip_trace
+  model_wip_traces
+  algorithm_saturate
+  algorithm_minimize
+  algorithm_bisimilarity
+  ; algorithm_similarity
   model
   api ; stores modules created by [loader.v], used by commands
   wrapper ; basic plugin commands

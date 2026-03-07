@@ -16,8 +16,8 @@ module MakeFromEnc (Enc : Encoding.SEncoding) : S with type t = Enc.t = struct
   let to_string (x : t) : string = Enc.to_string x
 end
 
-module MakeFromEConstr (Ctx : Rocq_context.SRocq_context) :
-  S with type t = EConstr.t = struct
+module MakeFromEConstr (Ctx : Rocq_context.S) : S with type t = EConstr.t =
+struct
   type t = EConstr.t
 
   let equal (a : t) (b : t) : bool = EConstr.eq_constr !(Ctx.sigma ()) a b
