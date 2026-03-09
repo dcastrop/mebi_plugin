@@ -243,18 +243,16 @@ module Make
      end) : sig
   module WIP :
       module type of
-        Model_wip_annotation.Make (Log) (State) (Label) (Tree) (Trees) (Note)
+        Wip_annotation.Make (Log) (State) (Label) (Tree) (Trees) (Note)
           (Annotation)
           (Action)
 
   module Trace :
       module type of
-        Model_wip_trace.Make (Log) (State) (Label) (Tree) (Trees) (Note)
-          (Annotation)
+        Wip_trace.Make (Log) (State) (Label) (Tree) (Trees) (Note) (Annotation)
           (WIP)
 
-  module Traces :
-      module type of Model_wip_traces.Make (Log) (State) (WIP) (Trace)
+  module Traces : module type of Wip_traces.Make (Log) (State) (WIP) (Trace)
 
   type data =
     { named : Label.t option
@@ -345,18 +343,16 @@ end = struct
   (** [module WIP] is a lightweight counterpart of [Note.t] that forms some "work-in-progress" [Annotation.t]. Once we stop saturating an action, we check if we are able to yield a new saturated action and convert the [wip list] to an [Annotation.t].
   *)
   module WIP =
-    Model_wip_annotation.Make (Log) (State) (Label) (Tree) (Trees) (Note)
-      (Annotation)
+    Wip_annotation.Make (Log) (State) (Label) (Tree) (Trees) (Note) (Annotation)
       (Action)
 
   (** [module Trace] ... we keep track of the total sum of traces we have already checked. This is useful for checking if, from a state and action, we have already explored the rest of this trace and so can just use what we have already learned, e.g., if we are in some "subtrace".
   *)
   module Trace =
-    Model_wip_trace.Make (Log) (State) (Label) (Tree) (Trees) (Note)
-      (Annotation)
+    Wip_trace.Make (Log) (State) (Label) (Tree) (Trees) (Note) (Annotation)
       (WIP)
 
-  module Traces = Model_wip_traces.Make (Log) (State) (WIP) (Trace)
+  module Traces = Wip_traces.Make (Log) (State) (WIP) (Trace)
 
   (** [data] ...
       @param named is ...

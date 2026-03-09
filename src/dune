@@ -18,8 +18,9 @@
             ; with, your choice here.
             ; rocq-runtime.vernac ; Needed for vernac extend.
             ; rocq-runtime.plugins.ltac ; Needed for tactic extend.
-  rocq-mebi.mebi_lib
-  rocq-mebi.encoding
+  rocq-mebi.mebi_lib.utils
+  rocq-mebi.mebi_lib.encoding
+  rocq-mebi.mebi_lib.model
   yojson)
  (modules
   ;  utils
@@ -47,33 +48,33 @@
   bi_encoding
   rocq_monad
   rocq_monad_utils
-  model_state
-  model_states
-  model_label
-  model_labels
-  model_annotation_note
-  model_annotation
-  model_annotations
-  model_transition
-  model_transitions
-  model_action
-  model_actions
-  model_actionpair
-  model_actionpairs
-  model_actionmap
-  model_edge
-  model_edges
-  model_edgemap
-  model_state_partition
-  model_info
-  model_wip_annotation
-  model_wip_trace
-  model_wip_traces
-  algorithm_saturate
-  algorithm_minimize
-  algorithm_bisimilarity
-  ; algorithm_similarity
-  model
+  ; model_state
+  ; model_states
+  ; model_label
+  ; model_labels
+  ; model_annotation_note
+  ; model_annotation
+  ; model_annotations
+  ; model_transition
+  ; model_transitions
+  ; model_action
+  ; model_actions
+  ; model_actionpair
+  ; model_actionpairs
+  ; model_actionmap
+  ; model_edge
+  ; model_edges
+  ; model_edgemap
+  ; model_state_partition
+  ; model_info
+  ; model_wip_annotation
+  ; model_wip_trace
+  ; model_wip_traces
+  ; algorithm_saturate
+  ; algorithm_minimize
+  ; algorithm_bisimilarity
+  ; ; algorithm_similarity
+  ; model
   api ; stores modules created by [loader.v], used by commands
   wrapper ; basic plugin commands
   proof_solver ; 

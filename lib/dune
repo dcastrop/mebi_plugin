@@ -2,10 +2,7 @@
  (name mebi_lib)
  (public_name rocq-mebi.mebi_lib)
  (libraries
-  rocq-runtime.vernac ; Needed for vernac extend.
-  rocq-runtime.plugins.ltac ; Needed for tactic extend.
-  yojson)
- (modules utils output logger json)
- (wrapped false))
+  (re_export rocq-mebi.mebi_lib.utils)
+  (re_export rocq-mebi.mebi_lib.encoding)))
 
-(include_subdirs no)
+; (include_subdirs unqualified)

@@ -1,0 +1,40 @@
+(library
+ (name model)
+ (public_name rocq-mebi.mebi_lib.model)
+ (libraries
+  rocq-runtime.vernac ; Needed for vernac extend.
+  rocq-runtime.plugins.ltac ; Needed for tactic extend.
+  rocq-mebi.mebi_lib.utils
+  rocq-mebi.mebi_lib.encoding
+  yojson)
+ (modules
+  state
+  states
+  label
+  labels
+  annotation_note
+  annotation
+  annotations
+  transition
+  transitions
+  action
+  actions
+  actionpair
+  actionpairs
+  actionmap
+  edge
+  edges
+  edgemap
+  state_partition
+  info
+  wip_annotation
+  wip_trace
+  wip_traces
+  algorithm_saturate
+  algorithm_minimize
+  algorithm_bisimilarity
+  ; algorithm_similarity
+  model)
+ (wrapped false))
+
+(include_subdirs no)

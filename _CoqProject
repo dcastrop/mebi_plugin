@@ -1,9 +1,11 @@
 src/META.rocq-mebi
 -R theories/ MEBI
 -R examples/ MEBI.Examples
--I src/
 -I lib/
--I src/encoding/
+-I lib/utils/
+-I lib/encoding/
+-I lib/model/
+-I src/
 -arg "-w all"
 
 theories/loader.v ###
@@ -24,8 +26,8 @@ examples/Proc.v ### REQUIRED FOR BELOW
 
 ### Proc.Flat.Simple 
 examples/bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
-examples/bisimilarity/Proc/Test1/TermTests.v ### Success
-examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
+# examples/bisimilarity/Proc/Test1/TermTests.v ### Success
+# examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
 # examples/bisimilarity/Proc/Test1/ManualProofs.v
 # examples/bisimilarity/Proc/Test1/LtacProofs.v
 
@@ -76,22 +78,78 @@ examples/bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
 ### OCaml Plugin
 ################
 
-lib/utils.ml
-lib/utils.mli
-lib/output.ml
-lib/output.mli
+lib/utils/utils.ml
+lib/utils/utils.mli
+lib/utils/output.ml
+lib/utils/output.mli
 # src/output/config.ml
 # src/output/config.mli
 # src/output/kind.ml
 # src/output/kind.mli
 # src/output/mode.ml
 # src/output/mode.mli
-lib/logger.ml
-lib/logger.mli
-lib/json.ml
-lib/json.mli
-src/encoding/encoding.ml
-src/encoding/encoding.mli
+lib/utils/logger.ml
+lib/utils/logger.mli
+lib/utils/json.ml
+lib/utils/json.mli
+lib/encoding/encoding.ml
+lib/encoding/encoding.mli
+
+
+lib/model/state.ml
+lib/model/state.mli
+lib/model/states.ml
+lib/model/states.mli
+lib/model/label.ml
+lib/model/label.mli
+lib/model/labels.ml
+lib/model/labels.mli
+lib/model/annotation_note.ml
+lib/model/annotation_note.mli
+lib/model/annotation.ml
+lib/model/annotation.mli
+lib/model/annotations.ml
+lib/model/annotations.mli
+lib/model/transition.ml
+lib/model/transition.mli
+lib/model/transitions.ml
+lib/model/transitions.mli
+lib/model/action.ml
+lib/model/action.mli
+lib/model/actions.ml
+lib/model/actions.mli
+lib/model/actionpair.ml
+lib/model/actionpair.mli
+lib/model/actionpairs.ml
+lib/model/actionpairs.mli
+lib/model/actionmap.ml
+lib/model/actionmap.mli
+lib/model/edge.ml
+lib/model/edge.mli
+lib/model/edges.ml
+lib/model/edges.mli
+lib/model/edgemap.ml
+lib/model/edgemap.mli
+lib/model/state_partition.ml
+lib/model/state_partition.mli
+lib/model/info.ml
+lib/model/info.mli
+lib/model/wip_annotation.ml
+lib/model/wip_annotation.mli
+lib/model/wip_trace.ml
+lib/model/wip_trace.mli
+lib/model/wip_traces.ml
+lib/model/wip_traces.mli
+lib/model/algorithm_saturate.ml
+lib/model/algorithm_saturate.mli
+lib/model/algorithm_minimize.ml
+lib/model/algorithm_minimize.mli
+lib/model/algorithm_bisimilarity.ml
+lib/model/algorithm_bisimilarity.mli
+# lib/model/algorithm_similarity.ml
+# lib/model/algorithm_similarity.mli
+lib/model/model.ml
+lib/model/model.mli
 
 # src/utils.ml
 # src/utils.mli
@@ -112,8 +170,8 @@ src/rocq_utils.ml
 src/rocq_utils.mli
 src/rocq_ind.ml
 src/rocq_ind.mli
-src/rocq_enc.ml
-src/rocq_enc.mli
+# src/rocq_enc.ml
+# src/rocq_enc.mli
 src/rocq_context.ml
 src/rocq_context.mli
 # src/encoding.ml
@@ -133,60 +191,60 @@ src/rocq_monad.mli
 src/rocq_monad_utils.ml
 src/rocq_monad_utils.mli
 
-src/model_state.ml
-src/model_state.mli
-src/model_states.ml
-src/model_states.mli
-src/model_label.ml
-src/model_label.mli
-src/model_labels.ml
-src/model_labels.mli
-src/model_annotation_note.ml
-src/model_annotation_note.mli
-src/model_annotation.ml
-src/model_annotation.mli
-src/model_annotations.ml
-src/model_annotations.mli
-src/model_transition.ml
-src/model_transition.mli
-src/model_transitions.ml
-src/model_transitions.mli
-src/model_action.ml
-src/model_action.mli
-src/model_actions.ml
-src/model_actions.mli
-src/model_actionpair.ml
-src/model_actionpair.mli
-src/model_actionpairs.ml
-src/model_actionpairs.mli
-src/model_actionmap.ml
-src/model_actionmap.mli
-src/model_edge.ml
-src/model_edge.mli
-src/model_edges.ml
-src/model_edges.mli
-src/model_edgemap.ml
-src/model_edgemap.mli
-src/model_state_partition.ml
-src/model_state_partition.mli
-src/model_info.ml
-src/model_info.mli
-src/model_wip_annotation.ml
-src/model_wip_annotation.mli
-src/model_wip_trace.ml
-src/model_wip_trace.mli
-src/model_wip_traces.ml
-src/model_wip_traces.mli
-src/algorithm_saturate.ml
-src/algorithm_saturate.mli
-src/algorithm_minimize.ml
-src/algorithm_minimize.mli
-src/algorithm_bisimilarity.ml
-src/algorithm_bisimilarity.mli
-# src/algorithm_similarity.ml
-# src/algorithm_similarity.mli
-src/model.ml
-src/model.mli
+# src/model_state.ml
+# src/model_state.mli
+# src/model_states.ml
+# src/model_states.mli
+# src/model_label.ml
+# src/model_label.mli
+# src/model_labels.ml
+# src/model_labels.mli
+# src/model_annotation_note.ml
+# src/model_annotation_note.mli
+# src/model_annotation.ml
+# src/model_annotation.mli
+# src/model_annotations.ml
+# src/model_annotations.mli
+# src/model_transition.ml
+# src/model_transition.mli
+# src/model_transitions.ml
+# src/model_transitions.mli
+# src/model_action.ml
+# src/model_action.mli
+# src/model_actions.ml
+# src/model_actions.mli
+# src/model_actionpair.ml
+# src/model_actionpair.mli
+# src/model_actionpairs.ml
+# src/model_actionpairs.mli
+# src/model_actionmap.ml
+# src/model_actionmap.mli
+# src/model_edge.ml
+# src/model_edge.mli
+# src/model_edges.ml
+# src/model_edges.mli
+# src/model_edgemap.ml
+# src/model_edgemap.mli
+# src/model_state_partition.ml
+# src/model_state_partition.mli
+# src/model_info.ml
+# src/model_info.mli
+# src/model_wip_annotation.ml
+# src/model_wip_annotation.mli
+# src/model_wip_trace.ml
+# src/model_wip_trace.mli
+# src/model_wip_traces.ml
+# src/model_wip_traces.mli
+# src/algorithm_saturate.ml
+# src/algorithm_saturate.mli
+# src/algorithm_minimize.ml
+# src/algorithm_minimize.mli
+# src/algorithm_bisimilarity.ml
+# src/algorithm_bisimilarity.mli
+# # src/algorithm_similarity.ml
+# # src/algorithm_similarity.mli
+# src/model.ml
+# src/model.mli
 
 src/wrapper.ml
 src/wrapper.mli
