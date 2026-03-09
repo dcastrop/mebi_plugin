@@ -2,8 +2,8 @@ src/META.rocq-mebi
 -R theories/ MEBI
 -R examples/ MEBI.Examples
 -I src/
--I src/lib
--I src/encoding
+-I lib/
+-I src/encoding/
 -arg "-w all"
 
 theories/loader.v ###
@@ -76,20 +76,20 @@ examples/bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
 ### OCaml Plugin
 ################
 
-src/lib/utils.ml
-src/lib/utils.mli
-src/lib/output.ml
-src/lib/output.mli
+lib/utils.ml
+lib/utils.mli
+lib/output.ml
+lib/output.mli
 # src/output/config.ml
 # src/output/config.mli
 # src/output/kind.ml
 # src/output/kind.mli
 # src/output/mode.ml
 # src/output/mode.mli
-src/lib/logger.ml
-src/lib/logger.mli
-src/lib/json.ml
-src/lib/json.mli
+lib/logger.ml
+lib/logger.mli
+lib/json.ml
+lib/json.mli
 src/encoding/encoding.ml
 src/encoding/encoding.mli
 
