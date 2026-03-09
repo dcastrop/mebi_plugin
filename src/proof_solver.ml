@@ -349,12 +349,12 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
 
     and tactic =
       { get : unit Proofview.tactic
-      ; msg : (Output_kind.t * string) option
+      ; msg : (Output.Kind.t * string) option
       }
 
     (** [tactic ?msg tactic] *)
     let tactic
-          ?(level : Output_kind.t = Info)
+          ?(level : Output.Kind.t = Info)
           ?(msg : string option)
           (x : unit Proofview.tactic)
       : t
@@ -366,7 +366,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
     ;;
 
     let rec to_string : t -> string =
-      let f : (Output_kind.t * string) option -> string = function
+      let f : (Output.Kind.t * string) option -> string = function
         | None -> ""
         (* | Some (Debug, y) -> y *)
         (* | Some (Info, y) -> y *)

@@ -235,18 +235,15 @@ END
   { Api.set_output_level x false }
 END *)
 
-VERNAC COMMAND EXTEND MeBi_Help CLASSIFIED AS QUERY
+(* VERNAC COMMAND EXTEND MeBi_Help CLASSIFIED AS QUERY
 (* TODO: update me *)
 | ["MeBi" "Help"] -> {Logger.Default.show "TODO: Update Mebi_help"}
-END 
+END  *)
 
 VERNAC COMMAND EXTEND MeBi_Divider CLASSIFIED AS QUERY
 (* for outputting messages -- useful for sifting through compiler output *)
-| ["MeBi" "Message" string(x)] -> {Logger.Default.show x}
-| ["MeBi" "Debug"   string(x)] -> {Logger.Default.debug x}
-| ["MeBi" "Divider"          ] -> {Logger.Default.show "\n- - - - - - - - - - - - - - - -"}
-| ["MeBi" string(x) "Divider"] -> {Logger.Default.show (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -" x)}
-| ["MeBi" "Divider" string(x)] -> {Logger.Default.show (Printf.sprintf "\n- - - - - - - - - - - - - - - -\n%s" x)}
-| ["MeBi" string(x) "Divider" string(y)] -> 
-  {Logger.Default.show (Printf.sprintf "%s\n- - - - - - - - - - - - - - - -\n%s" x y)}
+| ["MeBi" "Message" string(x)] -> {Feedback.msg_info (Pp.str x)}
+| ["MeBi" "Debug"   string(x)] -> {Feedback.msg_debug  (Pp.str x)}
+| ["MeBi" "Divider"          ] -> {Feedback.msg_info (Pp.str "\n- - - - - - - - - - - - - - - -")}
+| ["MeBi" "Divider" string(x)] -> {Feedback.msg_info (Pp.str (Printf.sprintf "\n- - - - - - - - - - - - - - - -\n%s" x))}
 END 

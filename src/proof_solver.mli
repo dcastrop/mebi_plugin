@@ -108,11 +108,11 @@ module Make : (Log : Logger.S) (Enc : Encoding.S) -> sig
 
     and tactic =
       { get : unit Proofview.tactic
-      ; msg : (Output_kind.t * string) option
+      ; msg : (Output.Kind.t * string) option
       }
 
     val tactic
-      :  ?level:Output_kind.t
+      :  ?level:Output.Kind.t
       -> ?msg:string
       -> unit Proofview.tactic
       -> t

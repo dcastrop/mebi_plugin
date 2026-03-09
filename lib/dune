@@ -1,0 +1,13 @@
+; (library
+;  (name mebi_lib)
+;  (public_name rocq-mebi.mebi_lib)
+;  (libraries
+;   (re_export utils)
+;   (re_export output)
+;   (re_export logger)
+;   (re_export json)
+;   (re_export encoding)
+;   ; (re_export model)
+;   ))
+
+(include_subdirs no)

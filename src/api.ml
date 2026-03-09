@@ -112,14 +112,14 @@ let set_the_weak_arg2 (x : weak_arg) : unit =
       ?(warning : bool = true)
       ?(error : bool = true) : level -> bool =
 in
-  Output_kind.default_level := ref (
-     Output_kind.default_level_fun ~debug:x );
+  Output.Kind.default_level := ref (
+     Output.Kind.default_level_fun ~debug:x );
   
 ;; *)
 
 let reset_the_logging_args () : unit =
-  Output_kind.default_level := Output_kind.default_level_fun;
-  Output_kind.default_special := Output_kind.default_special_fun
+  Output.Kind.default_level := Output.Kind.default_level_fun;
+  Output.Kind.default_special := Output.Kind.default_special_fun
 ;;
 
 (***********************************************************************)

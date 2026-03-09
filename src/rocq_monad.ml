@@ -4,13 +4,13 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
   (* NOTE: dev override*)
   module Log =
     Logger.Make
-      (Output_mode.Default)
+      (Output.Mode.Default)
       (struct
         let prefix : string option = None
-        let level : Output_kind.level -> bool = !Output_kind.default_level
+        let level : Output.Kind.level -> bool = !Output.Kind.default_level
 
-        let special : Output_kind.special -> bool =
-          Output_kind.default_special_fun ~trace:false
+        let special : Output.Kind.special -> bool =
+          Output.Kind.default_special_fun ~trace:false
         ;;
       end)
 

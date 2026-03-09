@@ -18,23 +18,27 @@
             ; with, your choice here.
   rocq-runtime.vernac ; Needed for vernac extend.
   rocq-runtime.plugins.ltac ; Needed for tactic extend.
+  rocq-mebi.mebi_lib
+  rocq-mebi.encoding
   yojson)
  (modules
-  utils
-  output_kind
-  output_mode
-  output_config
-  logger
-  json
+  ;  utils
+  ; output_kind
+  ; output_mode
+  ; output_config
+  ; kind
+  ; mode
+  ; config
+  ; logger
+  ; json
+  ; encoding
   theories
   rocq_utils
   ; rocq_convert
   rocq_ind
   ; ; ; ; ; above be resources
   ; ; ; ; ; below be functors
-  rocq_enc
   rocq_context
-  encoding
   enc_tree
   enc_trees
   enc_constructor_tree
@@ -115,6 +119,8 @@
   ;  ; examples
   ;  g_mebi
   ))
+
+(include_subdirs unqualified)
 
 ; FIXME: for updating to rocq-9.1
 
