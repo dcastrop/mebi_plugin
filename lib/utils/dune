@@ -1,0 +1,11 @@
+(library
+ (name utils)
+ (public_name rocq-mebi.mebi_lib.utils)
+ (libraries
+  rocq-runtime.vernac ; Needed for vernac extend.
+  rocq-runtime.plugins.ltac ; Needed for tactic extend.
+  yojson)
+ (modules utils output logger json)
+ (wrapped false))
+
+(include_subdirs no)

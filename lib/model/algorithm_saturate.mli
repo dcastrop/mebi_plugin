@@ -243,18 +243,16 @@ module Make : (Log : Logger.S)
     -> sig
   module WIP :
       module type of
-        Model_wip_annotation.Make (Log) (State) (Label) (Tree) (Trees) (Note)
+        Wip_annotation.Make (Log) (State) (Label) (Tree) (Trees) (Note)
           (Annotation)
           (Action)
 
   module Trace :
       module type of
-        Model_wip_trace.Make (Log) (State) (Label) (Tree) (Trees) (Note)
-          (Annotation)
+        Wip_trace.Make (Log) (State) (Label) (Tree) (Trees) (Note) (Annotation)
           (WIP)
 
-  module Traces :
-      module type of Model_wip_traces.Make (Log) (State) (WIP) (Trace)
+  module Traces : module type of Wip_traces.Make (Log) (State) (WIP) (Trace)
 
   type data =
     { named : Label.t option

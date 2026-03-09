@@ -151,67 +151,59 @@ module Make : (Log : Logger.S)
       -> Evd.econstr Tactypes.bindings mm *)
      end)
     -> sig
-  module State : module type of Model_state.Make (Log) (Enc)
-  module States : module type of Model_states.Make (Log) (State)
-  module Label : module type of Model_label.Make (Log) (Enc)
-  module Labels : module type of Model_labels.Make (Log) (Label)
+  module State : module type of State.Make (Log) (Enc)
+  module States : module type of States.Make (Log) (State)
+  module Label : module type of Label.Make (Log) (Enc)
+  module Labels : module type of Labels.Make (Log) (Label)
 
   module Note :
-      module type of
-        Model_annotation_note.Make (Log) (State) (Label) (Tree) (Trees)
+      module type of Annotation_note.Make (Log) (State) (Label) (Tree) (Trees)
 
-  module Annotation : module type of Model_annotation.Make (Log) (Label) (Note)
-
-  module Annotations :
-      module type of Model_annotations.Make (Log) (Note) (Annotation)
+  module Annotation : module type of Annotation.Make (Log) (Label) (Note)
+  module Annotations : module type of Annotations.Make (Log) (Note) (Annotation)
 
   module Transition :
       module type of
-        Model_transition.Make (Log) (State) (Label) (Tree) (Note) (Annotation)
+        Transition.Make (Log) (State) (Label) (Tree) (Note) (Annotation)
 
   module Transitions :
       module type of
-        Model_transitions.Make (Log) (State) (Label) (Labels) (Tree)
-          (Annotation)
+        Transitions.Make (Log) (State) (Label) (Labels) (Tree) (Annotation)
           (Transition)
 
   module Action :
       module type of
-        Model_action.Make (Log) (Label) (Tree) (Trees) (Note) (Annotation)
+        Action.Make (Log) (Label) (Tree) (Trees) (Note) (Annotation)
 
   module Actions :
       module type of
-        Model_actions.Make (Log) (Label) (Labels) (Tree) (Trees) (Annotation)
-          (Action)
+        Actions.Make (Log) (Label) (Labels) (Tree) (Trees) (Annotation) (Action)
 
   module ActionPair :
       module type of
-        Model_actionpair.Make (Log) (State) (States) (Label) (Tree) (Trees)
-          (Note)
+        Actionpair.Make (Log) (State) (States) (Label) (Tree) (Trees) (Note)
           (Annotation)
           (Action)
 
   module ActionPairs :
       module type of
-        Model_actionpairs.Make (Log) (State) (States) (Action) (ActionPair)
+        Actionpairs.Make (Log) (State) (States) (Action) (ActionPair)
 
   module ActionMap :
       module type of
-        Model_actionmap.Make (Log) (State) (States) (Label) (Tree) (Trees)
+        Actionmap.Make (Log) (State) (States) (Label) (Tree) (Trees)
           (Annotation)
           (Action)
           (Actions)
           (ActionPair)
           (ActionPairs)
 
-  module Edge : module type of Model_edge.Make (Log) (State) (Label) (Action)
-
-  module Edges :
-      module type of Model_edges.Make (Log) (State) (Label) (Action) (Edge)
+  module Edge : module type of Edge.Make (Log) (State) (Label) (Action)
+  module Edges : module type of Edges.Make (Log) (State) (Label) (Action) (Edge)
 
   module EdgeMap :
       module type of
-        Model_edgemap.Make (Log) (State) (States) (Label) (Action) (Actions)
+        Edgemap.Make (Log) (State) (States) (Label) (Action) (Actions)
           (ActionPair)
           (ActionPairs)
           (ActionMap)
@@ -220,14 +212,12 @@ module Make : (Log : Logger.S)
 
   module Partition :
       module type of
-        Model_state_partition.Make (Log) (State) (States) (Label) (Action)
-          (ActionMap)
+        State_partition.Make (Log) (State) (States) (Label) (Action) (ActionMap)
           (EdgeMap)
 
   module Info :
       module type of
-        Model_info.Make (Log) (Enc) (Label) (Labels) (Bindings)
-          (ConstructorBindings)
+        Info.Make (Log) (Enc) (Label) (Labels) (Bindings) (ConstructorBindings)
 
   (* module Info : sig
     type t =

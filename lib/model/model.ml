@@ -154,63 +154,57 @@ module Make
       -> Evd.econstr Tactypes.bindings mm *)
      end) =
 struct
-  module State = Model_state.Make (Log) (Enc)
-  module States = Model_states.Make (Log) (State)
-  module Label = Model_label.Make (Log) (Enc)
-  module Labels = Model_labels.Make (Log) (Label)
-  module Note = Model_annotation_note.Make (Log) (State) (Label) (Tree) (Trees)
-  module Annotation = Model_annotation.Make (Log) (Label) (Note)
-  module Annotations = Model_annotations.Make (Log) (Note) (Annotation)
+  module State = State.Make (Log) (Enc)
+  module States = States.Make (Log) (State)
+  module Label = Label.Make (Log) (Enc)
+  module Labels = Labels.Make (Log) (Label)
+  module Note = Annotation_note.Make (Log) (State) (Label) (Tree) (Trees)
+  module Annotation = Annotation.Make (Log) (Label) (Note)
+  module Annotations = Annotations.Make (Log) (Note) (Annotation)
 
   module Transition =
-    Model_transition.Make (Log) (State) (Label) (Tree) (Note) (Annotation)
+    Transition.Make (Log) (State) (Label) (Tree) (Note) (Annotation)
 
   module Transitions =
-    Model_transitions.Make (Log) (State) (Label) (Labels) (Tree) (Annotation)
+    Transitions.Make (Log) (State) (Label) (Labels) (Tree) (Annotation)
       (Transition)
 
-  module Action =
-    Model_action.Make (Log) (Label) (Tree) (Trees) (Note) (Annotation)
+  module Action = Action.Make (Log) (Label) (Tree) (Trees) (Note) (Annotation)
 
   module Actions =
-    Model_actions.Make (Log) (Label) (Labels) (Tree) (Trees) (Annotation)
-      (Action)
+    Actions.Make (Log) (Label) (Labels) (Tree) (Trees) (Annotation) (Action)
 
   module ActionPair =
-    Model_actionpair.Make (Log) (State) (States) (Label) (Tree) (Trees) (Note)
+    Actionpair.Make (Log) (State) (States) (Label) (Tree) (Trees) (Note)
       (Annotation)
       (Action)
 
   module ActionPairs =
-    Model_actionpairs.Make (Log) (State) (States) (Action) (ActionPair)
+    Actionpairs.Make (Log) (State) (States) (Action) (ActionPair)
 
   module ActionMap =
-    Model_actionmap.Make (Log) (State) (States) (Label) (Tree) (Trees)
-      (Annotation)
+    Actionmap.Make (Log) (State) (States) (Label) (Tree) (Trees) (Annotation)
       (Action)
       (Actions)
       (ActionPair)
       (ActionPairs)
 
-  module Edge = Model_edge.Make (Log) (State) (Label) (Action)
-  module Edges = Model_edges.Make (Log) (State) (Label) (Action) (Edge)
+  module Edge = Edge.Make (Log) (State) (Label) (Action)
+  module Edges = Edges.Make (Log) (State) (Label) (Action) (Edge)
 
   module EdgeMap =
-    Model_edgemap.Make (Log) (State) (States) (Label) (Action) (Actions)
-      (ActionPair)
+    Edgemap.Make (Log) (State) (States) (Label) (Action) (Actions) (ActionPair)
       (ActionPairs)
       (ActionMap)
       (Edge)
       (Edges)
 
   module Partition =
-    Model_state_partition.Make (Log) (State) (States) (Label) (Action)
-      (ActionMap)
+    State_partition.Make (Log) (State) (States) (Label) (Action) (ActionMap)
       (EdgeMap)
 
   module Info =
-    Model_info.Make (Log) (Enc) (Label) (Labels) (Bindings)
-      (ConstructorBindings)
+    Info.Make (Log) (Enc) (Label) (Labels) (Bindings) (ConstructorBindings)
 
   module LTS = struct
     type t =
