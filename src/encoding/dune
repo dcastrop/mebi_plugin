@@ -1,0 +1,8 @@
+(library
+ (name encoding)
+ (public_name rocq-mebi.encoding)
+ (libraries rocq-mebi.mebi_lib yojson)
+ (modules encoding)
+ (wrapped false))
+
+(include_subdirs no)

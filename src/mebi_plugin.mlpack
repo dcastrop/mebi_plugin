@@ -1,15 +1,13 @@
 Utils
-Output_kind
-Output_mode
-Output_config
+Output
 Logger
 Json
+Encoding
 Theories
 Rocq_utils
 Rocq_ind
 Rocq_enc
 Rocq_context
-Encoding
 Enc_tree
 Enc_trees
 Enc_constructor_tree
