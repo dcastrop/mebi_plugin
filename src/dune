@@ -16,8 +16,8 @@
                                     ;  (names ce_get))
  (libraries ; OCaml Libraries we want to link
             ; with, your choice here.
-  rocq-runtime.vernac ; Needed for vernac extend.
-  rocq-runtime.plugins.ltac ; Needed for tactic extend.
+            ; rocq-runtime.vernac ; Needed for vernac extend.
+            ; rocq-runtime.plugins.ltac ; Needed for tactic extend.
   rocq-mebi.mebi_lib
   rocq-mebi.encoding
   yojson)
