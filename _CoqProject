@@ -83,12 +83,6 @@ lib/utils/utils.ml
 lib/utils/utils.mli
 lib/utils/output.ml
 lib/utils/output.mli
-# src/output/config.ml
-# src/output/config.mli
-# src/output/kind.ml
-# src/output/kind.mli
-# src/output/mode.ml
-# src/output/mode.mli
 lib/utils/logger.ml
 lib/utils/logger.mli
 lib/utils/json.ml
@@ -165,39 +159,15 @@ lib/model/algorithms/similarity.mli
 lib/model/model.ml
 lib/model/model.mli
 
-# src/utils.ml
-# src/utils.mli
-# src/output_kind.ml
-# src/output_kind.mli
-# src/output_mode.ml
-# src/output_mode.mli
-# src/output_config.ml
-# src/output_config.mli
-# src/logger.ml
-# src/logger.mli
-# src/json.ml
-# src/json.mli
-
 src/theories.ml
 src/theories.mli
 src/rocq_utils.ml
 src/rocq_utils.mli
 src/rocq_ind.ml
 src/rocq_ind.mli
-# src/rocq_enc.ml
-# src/rocq_enc.mli
 src/rocq_context.ml
 src/rocq_context.mli
-# src/encoding.ml
-# src/encoding.mli
-# src/enc_tree.ml
-# src/enc_tree.mli
-# src/enc_trees.ml
-# src/enc_trees.mli
-# src/enc_constructor_tree.ml
-# src/enc_constructor_tree.mli
-# src/enc_constructor_trees.ml
-# src/enc_constructor_trees.mli
+
 src/bi_encoding.ml
 src/bi_encoding.mli
 src/rocq_monad.ml
@@ -205,145 +175,12 @@ src/rocq_monad.mli
 src/rocq_monad_utils.ml
 src/rocq_monad_utils.mli
 
-# src/model_state.ml
-# src/model_state.mli
-# src/model_states.ml
-# src/model_states.mli
-# src/model_label.ml
-# src/model_label.mli
-# src/model_labels.ml
-# src/model_labels.mli
-# src/model_annotation_note.ml
-# src/model_annotation_note.mli
-# src/model_annotation.ml
-# src/model_annotation.mli
-# src/model_annotations.ml
-# src/model_annotations.mli
-# src/model_transition.ml
-# src/model_transition.mli
-# src/model_transitions.ml
-# src/model_transitions.mli
-# src/model_action.ml
-# src/model_action.mli
-# src/model_actions.ml
-# src/model_actions.mli
-# src/model_actionpair.ml
-# src/model_actionpair.mli
-# src/model_actionpairs.ml
-# src/model_actionpairs.mli
-# src/model_actionmap.ml
-# src/model_actionmap.mli
-# src/model_edge.ml
-# src/model_edge.mli
-# src/model_edges.ml
-# src/model_edges.mli
-# src/model_edgemap.ml
-# src/model_edgemap.mli
-# src/model_state_partition.ml
-# src/model_state_partition.mli
-# src/model_info.ml
-# src/model_info.mli
-# src/model_wip_annotation.ml
-# src/model_wip_annotation.mli
-# src/model_wip_trace.ml
-# src/model_wip_trace.mli
-# src/model_wip_traces.ml
-# src/model_wip_traces.mli
-# src/algorithm_saturate.ml
-# src/algorithm_saturate.mli
-# src/algorithm_minimize.ml
-# src/algorithm_minimize.mli
-# src/algorithm_bisimilarity.ml
-# src/algorithm_bisimilarity.mli
-# # src/algorithm_similarity.ml
-# # src/algorithm_similarity.mli
-# src/model.ml
-# src/model.mli
-
 src/wrapper.ml
 src/wrapper.mli
 src/proof_solver.ml
 src/proof_solver.mli
 src/api.ml
 src/api.mli
-
-# src/.ml
-# src/.mli
-
-# src/rocq_utils.ml
-# src/rocq_utils.mli
-# src/rocq_convert.ml
-# src/rocq_convert.mli
-# src/theories.ml
-# src/theories.mli
-
-# src/rocq_enc.ml
-# src/rocq_enc.mli
-# src/rocq_monad.ml
-# src/rocq_monad.mli
-# src/rocq_ind.ml
-# src/rocq_ind.mli
-# src/rocq_bindings.ml
-# src/rocq_bindings.mli
-
-# src/mebi_setup.ml
-# src/mebi_setup.mli
-# src/mebi_constr.ml
-# src/mebi_constr.mli
-
-# src/model_state.ml
-# src/model_state.mli
-# src/model_label.ml
-# src/model_label.mli
-# src/model_info.ml
-# src/model_info.mli
-# src/model_note.ml
-# src/model_note.mli
-# src/model_transition.ml
-# src/model_transition.mli
-# src/model_transition_opt.ml
-# src/model_transition_opt.mli
-# src/model_action.ml
-# src/model_action.mli
-# src/model_edge.ml
-# src/model_edge.mli
-# src/model.ml
-# src/model.mli
-# src/saturate_model.ml
-# src/saturate_model.mli
-# src/algorithms.ml
-# src/algorithms.mli
-
-# src/mebi_tactics.ml
-# src/mebi_tactics.mli
-
-# src/mebi_wrapper.ml
-# src/mebi_wrapper.mli
-# src/mebi_utils.ml
-# src/mebi_utils.mli
-# src/mebi_hypothesis.ml
-# src/mebi_hypothesis.mli
-# src/mebi_proof.ml
-# src/mebi_proof.mli
-# src/proof_solver.ml
-# src/proof_solver.mli
-
-# # src/dump_to_file.ml
-# # src/dump_to_file.mli
-
-# src/mebi_weak.ml
-# src/mebi_weak.mli
-# src/mebi_api.ml
-# src/mebi_api.mli
-# src/mebi_help.ml
-# src/mebi_help.mli
-
-# src/mebi_unification.ml
-# src/mebi_unification.mli
-# src/mebi_unify.ml
-# src/mebi_unify.mli
-# src/command.ml
-# src/command.mli
 
 # src/examples.ml
 # src/examples.mli
