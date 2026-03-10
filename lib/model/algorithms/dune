@@ -1,0 +1,13 @@
+; (library
+;  (name algorithms)
+;  (public_name rocq-mebi.mebi_lib.model.algorithms)
+;  (libraries rocq-mebi.mebi_lib.model)
+;  (modules
+;   saturate
+;   minimize
+;   bisimilarity
+;   ; similarity
+;   )
+;  (wrapped false))
+
+; (include_subdirs no)

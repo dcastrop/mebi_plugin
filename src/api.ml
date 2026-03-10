@@ -1,9 +1,9 @@
 module Defaults = struct
   module Log : Logger.S = Logger.Default
   module Ctx : Rocq_context.S = Rocq_context.Default
-  module Enc : Encoding.S with type t = Encoding.Int(Log).t = Encoding.Int (Log)
-  module Tree = Enc_tree.Make (Log) (Enc)
-  module Trees = Enc_trees.Make (Log) (Tree)
+  module Enc : Encoding.S with type t = int = Encoding.Int (Log)
+  (* module Tree = Enc_tree.Make (Log) (Enc) *)
+  (* module Trees = Enc_trees.Make (Log) (Tree) *)
 end
 
 (***********************************************************************)

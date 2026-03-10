@@ -1,8 +1,14 @@
 module Make
     (Log : Logger.S)
-    (Enc : Encoding.S) : sig
+    (Base : sig
+       type t
+
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val equal : t -> t -> bool
+       val compare : t -> t -> int
+     end) : sig
     module Node : sig
-      type t = Enc.t * int
+      type t = Base.t * int
 
       val json : ?as_elt:bool -> t -> Yojson.t
       val to_string : ?pretty:bool -> t -> string
@@ -27,9 +33,9 @@ module Make
 
     val min : t list -> Node.t list
   end
-  with type Node.t = Enc.t * int = struct
+  with type Node.t = Base.t * int = struct
   module Node = struct
-    type t = Enc.t * int
+    type t = Base.t * int
 
     include
       Json.Thing.Make
@@ -41,16 +47,18 @@ module Make
 
           let json ?as_elt (x : t) : Yojson.t =
             `Assoc
-              [ "enc", Enc.json ~as_elt:true (fst x); "index", `Int (snd x) ]
+              [ "enc", Base.json ~as_elt:true (fst x); "index", `Int (snd x) ]
           ;;
         end)
 
     let compare (a : t) (b : t) : int =
       Utils.compare_chain
-        [ Enc.compare (fst a) (fst b); Int.compare (snd a) (snd b) ]
+        [ Base.compare (fst a) (fst b); Int.compare (snd a) (snd b) ]
     ;;
 
-    let equal (a : t) (b : t) : bool = fst a == fst b && snd b == snd b
+    let equal (a : t) (b : t) : bool =
+      Base.equal (fst a) (fst b) && Int.equal (snd a) (snd b)
+    ;;
   end
 
   type 'a tree = N of 'a * 'a tree list

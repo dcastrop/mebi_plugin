@@ -1,9 +1,9 @@
 module Defaults : sig
   module Log : module type of Logger.Default
   module Ctx : module type of Rocq_context.Default
-  module Enc : module type of Encoding.Int (Log)
-  module Tree : module type of Enc_tree.Make (Log) (Enc)
-  module Trees : module type of Enc_trees.Make (Log) (Tree)
+  module Enc : Encoding.S with type t = int
+  (* module Tree : module type of Enc_tree.Make (Log) (Enc) *)
+  (* module Trees : module type of Enc_trees.Make (Log) (Tree) *)
 end
 
 type fail_flags =

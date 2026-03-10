@@ -19,8 +19,11 @@
             ; rocq-runtime.vernac ; Needed for vernac extend.
             ; rocq-runtime.plugins.ltac ; Needed for tactic extend.
   rocq-mebi.mebi_lib.utils
-  rocq-mebi.mebi_lib.encoding
+  rocq-mebi.mebi_lib.terms
   rocq-mebi.mebi_lib.model
+  ; rocq-mebi.mebi_lib.model.lts
+  ; rocq-mebi.mebi_lib.model.fsm
+  ; rocq-mebi.mebi_lib.model.algorithms
   yojson)
  (modules
   ;  utils
@@ -40,10 +43,10 @@
   ; ; ; ; ; above be resources
   ; ; ; ; ; below be functors
   rocq_context
-  enc_tree
-  enc_trees
-  enc_constructor_tree
-  enc_constructor_trees
+  ; enc_tree
+  ; enc_trees
+  ; enc_constructor_tree
+  ; enc_constructor_trees
   ; term
   bi_encoding
   rocq_monad

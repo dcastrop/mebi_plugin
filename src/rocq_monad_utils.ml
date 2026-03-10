@@ -2,36 +2,37 @@ module Make
     (Log : Logger.S)
     (Ctx : Rocq_context.S)
     (Enc : Encoding.S)
-    (Tree : sig
-              module Node : sig
-                  type t = Enc.t * int
+     (* (Tree : sig
+        module Node : sig
+        type t = Base.t * int
 
-                  (* val compare : t -> t -> int *)
-                  (* val equal : t -> t -> bool *)
-                  (* val json : ?as_elt:bool -> t -> Yojson.t *)
-                  (* val to_string : ?pretty:bool -> t -> string *)
-                  (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-                end
-                with type t = Enc.t * int
+        (* val compare : t -> t -> int *)
+        (* val equal : t -> t -> bool *)
+        (* val json : ?as_elt:bool -> t -> Yojson.t *)
+        (* val to_string : ?pretty:bool -> t -> string *)
+        (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+        end
+        with type t = Base.t * int
 
-              type 'a tree = N of 'a * 'a tree list
-              type t = Node.t tree
+        type 'a tree = N of 'a * 'a tree list
+        type t = Node.t tree
 
-              (* val add : t -> t -> t *)
-              (* val add_list : t -> t list -> t list *)
-              (* val equal : t -> t -> bool *)
-              val compare : t -> t -> int
-              (* val minimize : t -> Node.t list *)
+        (* val add : t -> t -> t *)
+        (* val add_list : t -> t list -> t list *)
+        (* val equal : t -> t -> bool *)
+        val compare : t -> t -> int
+        (* val minimize : t -> Node.t list *)
 
-              exception CannotMinimizeEmptyList of unit
+        exception CannotMinimizeEmptyList of unit
 
-              (* val min : t list -> Node.t list *)
-              val json : ?as_elt:bool -> t -> Yojson.t
-              (* val to_string : ?pretty:bool -> t -> string *)
-              (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-            end
-            with type Node.t = Enc.t * int) =
+        (* val min : t list -> Node.t list *)
+        val json : ?as_elt:bool -> t -> Yojson.t
+        (* val to_string : ?pretty:bool -> t -> string *)
+        (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+        end
+        with type Node.t = Base.t * int) *) =
 struct
+  (** (* NOTE: provides Enc derived from Base *) *)
   include Rocq_monad.Make (Log) (Ctx) (Enc)
 
   (*************************************888*)
@@ -589,10 +590,14 @@ struct
 
   (*********************************************************)
 
-  module Constructor = struct
-    include Enc_constructor_tree.Make (Log) (Enc) (Tree)
+  module Constructor : sig
+    include module type of Enc.Constructor_tree
 
-    let encode (act : EConstr.t) (goto : EConstr.t) (tree : Tree.t) : t =
+    val encode : Evd.econstr -> Evd.econstr -> Enc.Tree.t -> t
+  end = struct
+    include Enc.Constructor_tree
+
+    let encode (act : EConstr.t) (goto : EConstr.t) (tree : Enc.Tree.t) : t =
       let act = encode act in
       let goto = encode goto in
       act, goto, tree
@@ -600,15 +605,17 @@ struct
   end
 
   let make_state_tree_pair_set ()
-    : (module Set.S with type elt = Enc.t * Tree.t)
+    : (module Set.S with type elt = Enc.t * Enc.Tree.t)
     =
     Log.trace __FUNCTION__;
     (module Set.Make (struct
-         type t = Enc.t * Tree.t
+         type t = Enc.t * Enc.Tree.t
 
          let compare t1 t2 =
            Utils.compare_chain
-             [ Enc.compare (fst t1) (fst t2); Tree.compare (snd t1) (snd t2) ]
+             [ Enc.compare (fst t1) (fst t2)
+             ; Enc.Tree.compare (snd t1) (snd t2)
+             ]
          ;;
        end))
   ;;
@@ -704,11 +711,11 @@ struct
       type t =
         { act : Pair.t
         ; goto : Pair.t
-        ; tree : Tree.t
+        ; tree : Enc.Tree.t
         }
 
       val to_string : Environ.env -> Evd.evar_map -> t -> string
-      val unify_opt : t -> Tree.t option mm
+      val unify_opt : t -> Enc.Tree.t option mm
     end *)
 
     module Problem = struct
@@ -717,7 +724,7 @@ struct
       type t =
         { act : Pair.t
         ; goto : Pair.t
-        ; tree : Tree.t
+        ; tree : Enc.Tree.t
         }
 
       include
@@ -732,7 +739,7 @@ struct
               `Assoc
                 [ "act", Pair.json ~as_elt:true act
                 ; "goto", Pair.json ~as_elt:true act
-                ; "tree", Tree.json ~as_elt:true tree
+                ; "tree", Enc.Tree.json ~as_elt:true tree
                 ]
             ;;
           end)
@@ -741,7 +748,7 @@ struct
         state (fun env sigma -> Pair.unify env sigma pair)
       ;;
 
-      let unify_opt ({ act; goto; tree } : t) : Tree.t option mm =
+      let unify_opt ({ act; goto; tree } : t) : Enc.Tree.t option mm =
         let open Syntax in
         let* unified_act_opt = unify_pair_opt act in
         let* unified_goto_opt = unify_pair_opt goto in
@@ -779,7 +786,7 @@ struct
         :  EConstr.t
         -> EConstr.t
         -> t
-        -> (EConstr.t * EConstr.t * Tree.t list) option mm
+        -> (EConstr.t * EConstr.t * Enc.Tree.t list) option mm
     end *)
 
     module Problems = struct
@@ -815,7 +822,7 @@ struct
         | _ -> false
       ;;
 
-      let rec unify_list_opt : Problem.t list -> Tree.t list option mm =
+      let rec unify_list_opt : Problem.t list -> Enc.Tree.t list option mm =
         let open Syntax in
         function
         | [] -> return (Some [])
@@ -834,7 +841,7 @@ struct
             (act : EConstr.t)
             (goto : EConstr.t)
             ({ sigma; to_unify } : t)
-        : (EConstr.t * EConstr.t * Tree.t list) option mm
+        : (EConstr.t * EConstr.t * Enc.Tree.t list) option mm
         =
         let open Syntax in
         sandbox
@@ -880,7 +887,7 @@ struct
     end
 
     module Constructors = struct
-      include Enc_constructor_trees.Make (Log) (Constructor)
+      include Enc.Constructor_trees
 
       let rec retrieve
                 (constructor_index : int)
@@ -901,7 +908,7 @@ struct
                match success with
                | None -> return None
                | Some (act, goto, constructor_trees) ->
-                 let tree : Tree.t =
+                 let tree : Enc.Tree.t =
                    N ((lts_enc, constructor_index), constructor_trees)
                  in
                  let constructor = Constructor.encode act goto tree in
@@ -936,7 +943,7 @@ struct
         if is_evar
         then return constructors
         else (
-          let tree : Tree.t = N (constructor_index, []) in
+          let tree : Enc.Tree.t = N (constructor_index, []) in
           let axiom = Constructor.encode act tgt tree in
           return (axiom :: constructors))
       ;;

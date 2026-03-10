@@ -1,0 +1,8 @@
+(library
+ (name terms)
+ (public_name rocq-mebi.mebi_lib.terms)
+ (libraries rocq-mebi.mebi_lib.utils yojson)
+ (modules tree trees constructor_tree constructor_trees base_term encoding)
+ (wrapped false))
+
+(include_subdirs no)

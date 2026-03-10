@@ -5,7 +5,8 @@
   rocq-runtime.vernac ; Needed for vernac extend.
   rocq-runtime.plugins.ltac ; Needed for tactic extend.
   rocq-mebi.mebi_lib.utils
-  rocq-mebi.mebi_lib.encoding
+  rocq-mebi.mebi_lib.terms
+  ; rocq-mebi.mebi_lib.model.algorithms
   yojson)
  (modules
   state
@@ -30,11 +31,38 @@
   wip_annotation
   wip_trace
   wip_traces
-  algorithm_saturate
-  algorithm_minimize
-  algorithm_bisimilarity
-  ; algorithm_similarity
+  saturate
+  minimize
+  bisimilarity
+  ; similarity
   model)
  (wrapped false))
 
-(include_subdirs no)
+; (library
+;  (name LTS)
+;  (public_name rocq-mebi.mebi_lib.model.lts)
+;  (libraries
+;   rocq-runtime.vernac ; Needed for vernac extend.
+;   rocq-runtime.plugins.ltac ; Needed for tactic extend.
+;   rocq-mebi.mebi_lib.utils
+;   rocq-mebi.mebi_lib.terms
+;   rocq-mebi.mebi_lib.model
+;   yojson)
+;  (modules LTS)
+;  (wrapped false))
+
+; (library
+;  (name FSM)
+;  (public_name rocq-mebi.mebi_lib.model.fsm)
+;  (libraries
+;   rocq-runtime.vernac ; Needed for vernac extend.
+;   rocq-runtime.plugins.ltac ; Needed for tactic extend.
+;   rocq-mebi.mebi_lib.utils
+;   rocq-mebi.mebi_lib.terms
+;   rocq-mebi.mebi_lib.model
+;   rocq-mebi.mebi_lib.model.lts
+;   yojson)
+;  (modules FSM)
+;  (wrapped false))
+
+(include_subdirs unqualified)

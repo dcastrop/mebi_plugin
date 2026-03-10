@@ -1,8 +1,14 @@
 module Make : (Log : Logger.S)
-    (Enc : Encoding.S)
+    (Base : sig
+       type t
+
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val equal : t -> t -> bool
+       val compare : t -> t -> int
+     end)
     -> sig
     module Node : sig
-      type t = Enc.t * int
+      type t = Base.t * int
 
       val json : ?as_elt:bool -> t -> Yojson.t
       val to_string : ?pretty:bool -> t -> string
@@ -27,4 +33,4 @@ module Make : (Log : Logger.S)
 
     val min : t list -> Node.t list
   end
-  with type Node.t = Enc.t * int
+  with type Node.t = Base.t * int

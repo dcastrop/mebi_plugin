@@ -1,29 +1,19 @@
-module Make
-    (Log : Logger.S)
-    (State : sig
-       type t
+module type S = sig
+  include Set.S
 
-       val json : ?as_elt:bool -> t -> Yojson.t
+  val json : ?as_elt:bool -> t -> Yojson.t
+  val to_string : ?pretty:bool -> t -> string
+  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+  val add_to_opt : elt -> t option -> t
 
-       (* val to_string : ?pretty:bool -> t -> string *)
-       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-       (* val equal : t -> t -> bool *)
-       val compare : t -> t -> int
-       (* val hash : t -> int *)
-     end) : sig
-    include Set.S with type elt = State.t
+  exception StateHasNoOrigin of (elt * t * t)
 
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-    val add_to_opt : State.t -> t option -> t
+  val origin_of_state : elt -> t -> t -> int
+  val has_shared_origin : t -> t -> t -> bool
+end
 
-    exception StateHasNoOrigin of (State.t * t * t)
-
-    val origin_of_state : State.t -> t -> t -> int
-    val has_shared_origin : t -> t -> t -> bool
-  end
-  with type elt = State.t = struct
+module Make (Log : Logger.S) (State : State.S) : S with type elt = State.t =
+struct
   module Set_ : Set.S with type elt = State.t = Set.Make (State)
   include Set_
 

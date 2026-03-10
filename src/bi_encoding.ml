@@ -1,16 +1,16 @@
-module Make (_ : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
-  (* NOTE: dev override*)
-  module Log =
-    Logger.Make
-      (Output.Mode.Default)
-      (struct
-        let prefix : string option = None
-        let level : Output.Kind.level -> bool = !Output.Kind.default_level
+module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
+  (* NOTE: dev override
+     module Log =
+     Logger.Make
+     (Output.Mode.Default)
+     (struct
+     let prefix : string option = None
+     let level : Output.Kind.level -> bool = !Output.Kind.default_level
 
-        let special : Output.Kind.special -> bool =
-          Output.Kind.default_special_fun ~trace:false
-        ;;
-      end)
+     let special : Output.Kind.special -> bool =
+     Output.Kind.default_special_fun ~trace:false
+     ;;
+     end) *)
 
   module F : Hashtbl.S with type key = EConstr.t = Hashtbl.Make (struct
       type t = EConstr.t

@@ -2,18 +2,19 @@ exception NothingToDo
 exception NotImplemented
 
 module Make (Log : Logger.S) (Enc : Encoding.S) = struct
-  module Tree = Enc_tree.Make (Log) (Enc)
-  module Trees = Enc_trees.Make (Log) (Tree)
+  (* module Tree = Enc_tree.Make (Log) (Enc) *)
+  (* module Trees = Enc_trees.Make (Log) (Tree) *)
 
   (** [W] is for running the main part of the algorithm (pre-proof). *)
   module W = struct
-    include Wrapper.Make (Log) (Rocq_context.Default) (Enc) (Tree) (Trees)
+    include Wrapper.Make (Log) (Rocq_context.Default) (Enc)
+    (* (Tree) (Trees) *)
 
-    let the_result : Model.Bisimilar.t ref option ref = ref None
+    let the_result : Model.Bisimilarity.t ref option ref = ref None
 
     exception NoResultFound
 
-    let get_the_result () : Model.Bisimilar.t =
+    let get_the_result () : Model.Bisimilarity.t =
       match !the_result with None -> raise NoResultFound | Some x -> !x
     ;;
 
@@ -65,9 +66,9 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
       get_bisimilar_states ~pi:reachable goto
     ;;
 
-    exception CannotOverrideResult of Model.Bisimilar.t
+    exception CannotOverrideResult of Model.Bisimilarity.t
 
-    let set_the_result (x : Model.Bisimilar.t) : unit =
+    let set_the_result (x : Model.Bisimilarity.t) : unit =
       match !the_result with
       | None -> the_result := Some (ref x)
       | Some y -> raise (CannotOverrideResult !y)
@@ -81,7 +82,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
           (b : Constrexpr.constr_expr * Libnames.qualid)
       : unit
       =
-      let r : Model.Bisimilar.t option =
+      let r : Model.Bisimilarity.t option =
         Command.run refs (Command.CheckBisim { a; b })
         |> M.run ~reset_encoding:true
       in
@@ -89,33 +90,6 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
       | None -> raise BisimilarityResultNotFound
       | Some r -> set_the_result r
     ;;
-
-    (** [Decode] handles obtaining [EConstr.t] from [module M]. *)
-    module Decode = struct
-      let enc (x : Enc.t) : EConstr.t = M.decode x
-
-      let handle (x : Enc.t) (e : exn) : EConstr.t =
-        try enc x with M.CannotDecode _ -> raise e
-      ;;
-
-      exception CouldNotDecode_State of Model.State.t
-
-      let state (x : Model.State.t) : EConstr.t =
-        handle x.enc (CouldNotDecode_State x)
-      ;;
-
-      exception CouldNotDecode_Label of Model.Label.t
-
-      let label (x : Model.Label.t) : EConstr.t =
-        handle x.enc (CouldNotDecode_Label x)
-      ;;
-
-      exception CouldNotDecode_LTS_Constructor of Model.Info.Meta.RocqLTS.t
-
-      let lts_constructor (x : Model.Info.Meta.RocqLTS.t) : EConstr.t =
-        handle x.enc (CouldNotDecode_LTS_Constructor x)
-      ;;
-    end
   end
 
   let check_bisimilarity
@@ -222,7 +196,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
           is an option type since [None] represents the end of the annotation.
     *)
     type t =
-      { current : Tree.Node.t list option
+      { current : Enc.Tree.Node.t list option
       ; annotation : Model.Annotation.t option
       ; label : Model.Label.t
       ; destination : Model.State.t
@@ -238,7 +212,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
         ; "destination", Model.State.to_string x.destination
         ; ( "current"
           , Utils.Strfy.option
-              (Of (Utils.Strfy.list (Of Tree.Node.to_string)))
+              (Of (Utils.Strfy.list (Of Enc.Tree.Node.to_string)))
               x.current )
         ; ( "annotation"
           , Utils.Strfy.option (Of Model.Annotation.to_string) x.annotation )
@@ -462,7 +436,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
              ;;
            end))
         (Enc)
-        (Tree)
+    (* (Tree) *)
 
     (** [EConstrSet] is a custom [Set] of [EConstr.t] that allows terms to be compared more efficiently during {b a single proof step only} -- since this is built for each step. {e Though, since each proof step we have a new [env] and [sigma], the same term may be encoded differently across iteration steps, so there isn't necessarily a way for us to compare terms in a proof across iterations anyway. {b ! This needs to be investigated.}}
     *)
@@ -821,7 +795,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
       ;;
 
       let ex_intro (x : Model.State.t) : Tactic.t mm =
-        let t : EConstr.t = M.decode x.enc in
+        let t : EConstr.t = Decode.state x in
         let bindings = Tactypes.ImplicitBindings [ t ] in
         let msg = Printf.sprintf "exists %s" (M.Strfy.econstr t) in
         Tactic.tactic ~msg (Tactics.constructor_tac true None 1 bindings)
@@ -1165,7 +1139,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
           (* TODO: check if we can optimize this so we use [NoBindings] where possible *)
       *)
       let try_get_constructor_bindings
-            ((enc, index) : Tree.Node.t)
+            ((enc, index) : Enc.Tree.Node.t)
             (args : binding_args)
         : EConstr.t Tactypes.bindings
         =
@@ -1181,7 +1155,9 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
           get_constructor_bindings args bindings
       ;;
 
-      let apply_constructor ((enc, index) : Tree.Node.t) (args : binding_args)
+      let apply_constructor
+            ((enc, index) : Enc.Tree.Node.t)
+            (args : binding_args)
         : Tactic.t mm
         =
         (* NOTE: constructors index from 1 *)
@@ -1212,7 +1188,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
         try
           let enc : Enc.t = M.get_encoding x in
           (* NOTE: [Model.States.compare] only cares about [term]. *)
-          Model.States.find { enc } ys |> M.return
+          Model.States.find enc ys |> M.return
         with
         | M.EncodingNotFound _ ->
           log_econstr ~__FUNCTION__ "Err: M.EncodingNotFound" x;
@@ -1310,7 +1286,9 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
           match actionpairs with
           | [] -> raise (CouldNotFind_Transition { from; goto; label; edges })
           | ({ annotation; constructor_trees; _ }, _) :: [] ->
-            let tree : Tree.t option = Trees.min_opt constructor_trees in
+            let tree : Enc.Tree.t option =
+              Enc.Trees.min_opt constructor_trees
+            in
             { from; goto; label; annotation; tree }
           | h :: tl ->
             (* TODO: move this proceed to [Model] and handle this case *)
@@ -1408,15 +1386,15 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
           try
             let from : Model.State.t = M.run (ReModel.state tys.(0) m.states) in
             _log_state ~__FUNCTION__ "from" from;
-            log_econstr ~__FUNCTION__ "from" (M.decode from.enc);
+            log_econstr ~__FUNCTION__ "from" (Decode.state from);
             let goto : Model.State.t = M.run (ReModel.state tys.(2) m.states) in
             _log_state ~__FUNCTION__ "goto" goto;
-            log_econstr ~__FUNCTION__ "goto" (M.decode goto.enc);
+            log_econstr ~__FUNCTION__ "goto" (Decode.state goto);
             let label : Model.Label.t =
               M.run (ReModel.label tys.(1) m.alphabet)
             in
             _log_label ~__FUNCTION__ "label" label;
-            log_econstr ~__FUNCTION__ "label" (M.decode label.enc);
+            log_econstr ~__FUNCTION__ "label" (Decode.label label);
             ReModel.transition from goto label m.edges |> return
           with
           (* | M.EncodingNotFound z ->
@@ -1714,7 +1692,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
           (* NOTE: get the pair with the shortest annotation (less steps to do) *)
           |> Model.ActionPairs.shortest_annotation
         in
-        let tree : Tree.t option = Trees.min_opt constructor_trees in
+        let tree : Enc.Tree.t option = Enc.Trees.min_opt constructor_trees in
         let goto : Model.State.t = Model.States.min_elt destinations in
         { from; goto; label; annotation; tree }
       with
@@ -1815,9 +1793,9 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
     ;;
 
     let handle_appconstrs_update_args ({ this; next } : Model.Annotation.t)
-      : Tree.Node.t list option * Model.Annotation.t option
+      : Enc.Tree.Node.t list option * Model.Annotation.t option
       =
-      Some (Trees.min this.using |> Tree.minimize), next
+      Some (Enc.Trees.min this.using |> Enc.Tree.minimize), next
     ;;
 
     (** [handle_appconstrs_update label] ... *)
@@ -1833,7 +1811,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
 
     (** [handle_appconstrs_apply x] ...
         (* NOTE: relies on the bindings we extract early on *) *)
-    let handle_appconstrs_apply (x : Tree.Node.t) : Tactic.t mm =
+    let handle_appconstrs_apply (x : Enc.Tree.Node.t) : Tactic.t mm =
       Log.trace __FUNCTION__;
       let open Syntax in
       let* _, tys = get_concl () |> to_atomic in
