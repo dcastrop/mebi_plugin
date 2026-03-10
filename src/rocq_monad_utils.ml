@@ -1,38 +1,27 @@
-module Make
-    (Log : Logger.S)
-    (Ctx : Rocq_context.S)
-    (Enc : Encoding.S)
-     (* (Tree : sig
-        module Node : sig
-        type t = Base.t * int
+module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
+  module Log' = Log
 
-        (* val compare : t -> t -> int *)
-        (* val equal : t -> t -> bool *)
-        (* val json : ?as_elt:bool -> t -> Yojson.t *)
-        (* val to_string : ?pretty:bool -> t -> string *)
-        (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-        end
-        with type t = Base.t * int
+  (** [module Log] is a modified [Log] -- here disables trace & debug printing
+  *)
+  module Log : Logger.S with module Config.Mode = Log.Config.Mode =
+    Logger.ReMake
+      (Log)
+      (struct
+        let level : Output.Kind.level -> bool = function
+          | Debug -> false
+          | Info -> true
+          | Notice -> true
+          | Warning -> true
+          | Error -> true
+        ;;
 
-        type 'a tree = N of 'a * 'a tree list
-        type t = Node.t tree
+        let special : Output.Kind.special -> bool = function
+          | Trace -> false
+          | Result -> true
+          | Show -> true
+        ;;
+      end)
 
-        (* val add : t -> t -> t *)
-        (* val add_list : t -> t list -> t list *)
-        (* val equal : t -> t -> bool *)
-        val compare : t -> t -> int
-        (* val minimize : t -> Node.t list *)
-
-        exception CannotMinimizeEmptyList of unit
-
-        (* val min : t list -> Node.t list *)
-        val json : ?as_elt:bool -> t -> Yojson.t
-        (* val to_string : ?pretty:bool -> t -> string *)
-        (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-        end
-        with type Node.t = Base.t * int) *) =
-struct
-  (** (* NOTE: provides Enc derived from Base *) *)
   include Rocq_monad.Make (Log) (Ctx) (Enc)
 
   (*************************************888*)
@@ -185,6 +174,24 @@ struct
         |> Printf.sprintf "ExplicitBindings: %s"
     ;;
   end
+
+  let log_econstr
+        ?(__FUNCTION__ : string = "")
+        ?(s : string = "EConstr")
+        (x : EConstr.t)
+    : unit
+    =
+    Log'.thing ~__FUNCTION__ Debug s x (Of Strfy.econstr)
+  ;;
+
+  let log_econstrs
+        ?(__FUNCTION__ : string = "")
+        ?(s : string = "EConstrs")
+        (x : EConstr.t list)
+    : unit
+    =
+    Log'.things ~__FUNCTION__ Debug s x (Of Strfy.econstr)
+  ;;
 
   module type SErrors = sig
     type t =
@@ -435,7 +442,7 @@ struct
     let get_lts (x : t) : Rocq_ind.LTS.t =
       (* Log.trace __FUNCTION__; *)
       try Rocq_ind.get_lts x with
-      | Rocq_ind.Rocq_ind_UnexpectedKind x ->
+      | Rocq_ind.UnexpectedKind x ->
         Log.debug ~__FUNCTION__ "UnexpectedKind";
         Err.invalid_ind_kind x
     ;;
@@ -593,13 +600,19 @@ struct
   module Constructor : sig
     include module type of Enc.Constructor_tree
 
-    val encode : Evd.econstr -> Evd.econstr -> Enc.Tree.t -> t
+    val encode : EConstr.t -> EConstr.t -> Enc.Tree.t -> t
   end = struct
     include Enc.Constructor_tree
 
     let encode (act : EConstr.t) (goto : EConstr.t) (tree : Enc.Tree.t) : t =
-      let act = encode act in
-      let goto = encode goto in
+      Log.trace __FUNCTION__;
+      log_econstr ~__FUNCTION__ ~s:">> act" act;
+      let act : Enc.t = encode act in
+      Enc.log ~__FUNCTION__ ~s:">> act" act;
+      log_econstr ~__FUNCTION__ ~s:">> goto" goto;
+      let goto : Enc.t = encode goto in
+      Enc.log ~__FUNCTION__ ~s:">> goto" goto;
+      Enc.Tree.log ~__FUNCTION__ ~s:">> tree" tree;
       act, goto, tree
     ;;
   end
@@ -706,17 +719,6 @@ struct
         state (fun env sigma -> unify env sigma { to_check; acc })
       ;;
     end
-
-    (* module type SProblem = sig
-      type t =
-        { act : Pair.t
-        ; goto : Pair.t
-        ; tree : Enc.Tree.t
-        }
-
-      val to_string : Environ.env -> Evd.evar_map -> t -> string
-      val unify_opt : t -> Enc.Tree.t option mm
-    end *)
 
     module Problem = struct
       (** if [fst] is sucessfully unified then [snd] represents a tree of constructors that lead to that term (from some previously visited term).
@@ -938,13 +940,18 @@ struct
         : t mm
         =
         Log.trace __FUNCTION__;
+        log_econstr ~__FUNCTION__ ~s:"act" act;
+        log_econstr ~__FUNCTION__ ~s:"tgt" tgt;
         let open Syntax in
         let* is_evar : bool = econstr_is_evar tgt in
+        Log.thing ~__FUNCTION__ Trace ">> is_evar" is_evar (Of Utils.Strfy.bool);
         if is_evar
         then return constructors
         else (
           let tree : Enc.Tree.t = N (constructor_index, []) in
-          let axiom = Constructor.encode act tgt tree in
+          Enc.Tree.log ~__FUNCTION__ ~s:">> tree" tree;
+          let axiom : Constructor.t = Constructor.encode act tgt tree in
+          Constructor.log ~__FUNCTION__ ~s:">> axiom" axiom;
           return (axiom :: constructors))
       ;;
     end
@@ -973,8 +980,11 @@ struct
       : Constructors.t mm
       =
       Log.trace __FUNCTION__;
+      log_econstr ~__FUNCTION__ ~s:"from_term" from_term;
+      log_econstr ~__FUNCTION__ ~s:"act_term" act_term;
       let open Syntax in
       let* from_term : EConstr.t = econstr_normalize from_term in
+      log_econstr ~__FUNCTION__ ~s:"from_term (normalized)" from_term;
       (* let* () = debug_validconstrs_start from_term in *)
       let iter_body (i : int) (acc : Constructors.t) : Constructors.t mm =
         (* let* () = debug_validconstrs_iter_start i constructors in *)
@@ -1007,11 +1017,7 @@ struct
           (* let* () = debug_validconstrs_iter_close i constructors in *)
           return acc
       in
-      let* constructors =
-        iterate 0 (Array.length constructors - 1) [] iter_body
-      in
-      (* let* () = debug_validconstrs_close from_term constructors in *)
-      return constructors
+      iterate 0 (Array.length constructors - 1) [] iter_body
 
     (** *)
     and explore_valid_constructor
@@ -1126,15 +1132,7 @@ struct
       Log.trace __FUNCTION__;
       let open Syntax in
       let* fresh_evar = fresh_evar (OfType label_type) in
-      let* constructors : Constructors.t =
-        check_valid_constructors
-          constructors
-          indmap
-          from_term
-          fresh_evar
-          lts_enc
-      in
-      return constructors
+      check_valid_constructors constructors indmap from_term fresh_evar lts_enc
     ;;
   end
 

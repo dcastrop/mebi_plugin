@@ -135,6 +135,8 @@ module Config : sig
   val default : unit -> t
 
   module type S = sig
+    module Mode : Mode.S
+
     val get : t ref
     val reset : unit -> unit
     val enable_output : unit -> unit
@@ -156,10 +158,10 @@ module Config : sig
 
   type x = t
 
-  module Make : (_ : Mode.S)
+  module Make : (M : Mode.S)
       (_ : sig
          val level : Feedback.level -> bool
          val special : Kind.special -> bool
        end)
-      -> S
+      -> S with module Mode = M
 end

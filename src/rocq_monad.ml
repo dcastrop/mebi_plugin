@@ -128,7 +128,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
   end
 
   let econstr_normalize (x : EConstr.t) : EConstr.t mm =
-    (* Log.trace __FUNCTION__; *)
+    Log.trace __FUNCTION__;
     let open Syntax in
     let$+ t env sigma = Reductionops.nf_all env sigma x in
     return t

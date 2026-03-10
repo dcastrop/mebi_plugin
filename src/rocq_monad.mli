@@ -1,7 +1,7 @@
 module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
   include module type of Bi_encoding.Make (Log) (Ctx) (Enc)
 
-  val bienc_to_list : unit -> (Enc.t * Evd.econstr) list
+  val bienc_to_list : unit -> (Enc.t * EConstr.t) list
 
   type 'a mm = wrapper ref -> 'a in_wrapper
 
@@ -53,13 +53,13 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
   module Syntax : SYNTAX
 
-  val econstr_normalize : Evd.econstr -> Evd.econstr mm
-  val encode : Evd.econstr -> Enc.t
+  val econstr_normalize : EConstr.t -> EConstr.t mm
+  val encode : EConstr.t -> Enc.t
   val get_ctx : wrapper ref -> Rocq_context.t in_wrapper
   val get_env : wrapper ref -> Environ.env in_wrapper
   val get_sigma : wrapper ref -> Evd.evar_map in_wrapper
   val get_maps : wrapper ref -> maps in_wrapper
   val get_fwdmap : wrapper ref -> Enc.t F.t in_wrapper
-  val get_bckmap : wrapper ref -> Evd.econstr B.t in_wrapper
+  val get_bckmap : wrapper ref -> EConstr.t B.t in_wrapper
   val fstring : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
 end

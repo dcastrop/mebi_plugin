@@ -164,21 +164,21 @@ module Make : (Log : Logger.S) (Enc : Encoding.S) -> sig
 
       exception CannotUnfoldConstr of Constr.t
 
-      val unfold_constr : ?in_hyp:Rocq_utils.hyp -> Constr.t -> Tactic.t mm
-      val unfold_econstr : ?in_hyp:Rocq_utils.hyp -> EConstr.t -> Tactic.t mm
+      val unfold_constr : ?in_hyp:Rocq_utils.hyp -> Constr.t -> Tactic.t
+      val unfold_econstr : ?in_hyp:Rocq_utils.hyp -> EConstr.t -> Tactic.t
 
       val unfold_constrexpr
         :  ?in_hyp:Rocq_utils.hyp
         -> Constrexpr.constr_expr
-        -> Tactic.t mm
+        -> Tactic.t
 
       val unfold_opt_constrexpr_list
         :  ?in_hyp:Rocq_utils.hyp
         -> Constrexpr.constr_expr list
-        -> Tactic.t option mm
+        -> Tactic.t option
 
-      val unfold_silent : unit -> Tactic.t mm
-      val unfold_silent1 : unit -> Tactic.t mm
+      val unfold_silent : unit -> Tactic.t
+      val unfold_silent1 : unit -> Tactic.t
     end
 
     module Theory : sig

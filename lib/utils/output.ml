@@ -1,5 +1,5 @@
-let debug : bool = false
-let trace : bool = false
+let debug : bool = true
+let trace : bool = true
 
 module Kind = struct
   type t =
@@ -293,6 +293,8 @@ module Config = struct
   ;;
 
   module type S = sig
+    module Mode : Mode.S
+
     val get : t ref
     val reset : unit -> unit
     val enable_output : unit -> unit
@@ -315,25 +317,25 @@ module Config = struct
   type x = t
 
   module Make
-      (Mode : Mode.S)
-      (D : sig
+      (M : Mode.S)
+      (K : sig
          val level : Kind.level -> bool
          val special : Kind.special -> bool
-       end) : S = struct
-    open Kind
+       end) : S with module Mode = M = struct
+    module Mode = M
 
     type t = x
 
     module Level : Kind.S with type t = Kind.level = Kind.Make (struct
         type t = Kind.level
 
-        let defaults : t -> bool = D.level
+        let defaults : t -> bool = K.level
       end)
 
     module Special : Kind.S with type t = Kind.special = Kind.Make (struct
         type t = Kind.special
 
-        let defaults : t -> bool = D.special
+        let defaults : t -> bool = K.special
       end)
 
     let get : t ref = ref (default ())
@@ -342,7 +344,7 @@ module Config = struct
     let disable_output () : unit = !get.enabled <- false
 
     let configure_output (x : Kind.t) : bool -> unit =
-      match kind x with
+      match Kind.kind x with
       | Level x -> Level.configure x
       | Special x -> Special.configure x
     ;;
@@ -370,7 +372,7 @@ module Config = struct
           (x : Kind.t)
       : string -> unit
       =
-      match kind x with
+      match Kind.kind x with
       | Level x ->
         Mode.do_level_output
           ~__FUNCTION__
@@ -400,7 +402,7 @@ module Config = struct
     let show_enabled () : unit = b ~__FUNCTION__ !get.enabled
 
     let show_kind (x : Kind.t) : unit =
-      match kind x with
+      match Kind.kind x with
       | Level x -> b ~__FUNCTION__ (Level.is_enabled x)
       | Special x -> b ~__FUNCTION__ (Special.is_enabled x)
     ;;

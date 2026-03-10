@@ -58,7 +58,7 @@ module Make
     (Mode : Output.Mode.S)
     (X : sig
        val prefix : string option
-       val level : Feedback.level -> bool
+       val level : Output.Kind.level -> bool
        val special : Output.Kind.special -> bool
      end) : S = struct
   module Config : Output.Config.S =
@@ -185,13 +185,41 @@ end
 
 (***********************************************************************)
 
+let default_level : Output.Kind.level -> bool = !Output.Kind.default_level
+let default_special : Output.Kind.special -> bool = !Output.Kind.default_special
+
 module MkDefault () : S =
   Make
     (Output.Mode.Default)
     (struct
       let prefix : string option = None
-      let level : Output.Kind.level -> bool = !Output.Kind.default_level
-      let special : Output.Kind.special -> bool = !Output.Kind.default_special
+      let level : Output.Kind.level -> bool = default_level
+      let special : Output.Kind.special -> bool = default_special
     end)
 
 module Default : S = MkDefault ()
+
+(***********************************************************************)
+
+(** [module ReMake (Old) (New)] returns a new [Logger.S] with updated config.
+    {b Example:}
+    - [module Log = Logger.MkDefault ()]
+    - module Log' = Logger.Remake (Log) (struct
+      let level = Logger.default_level
+      let special : Output.Kind.special -> bool = function
+      | Trace -> false
+      | Result -> true
+      | Show -> true end) *)
+module ReMake
+    (Old : S)
+    (New : sig
+       val level : Feedback.level -> bool
+       val special : Output.Kind.special -> bool
+     end) : S with module Config.Mode = Old.Config.Mode =
+  Make
+    (Old.Config.Mode)
+    (struct
+      let prefix = Old.prefix
+      let level = New.level
+      let special = New.special
+    end)
