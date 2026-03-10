@@ -1,35 +1,35 @@
 module Make : (Log : Logger.S)
     (Ctx : Rocq_context.S)
     (Enc : Encoding.S)
-    (Tree : sig
-              module Node : sig
-                  type t = Enc.t * int
+    (* (Tree : sig
+       module Node : sig
+       type t = Enc.t * int
 
-                  val compare : t -> t -> int
-                  val equal : t -> t -> bool
-                  val json : ?as_elt:bool -> t -> Yojson.t
-                  val to_string : ?pretty:bool -> t -> string
-                  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-                end
-                with type t = Enc.t * int
+       val compare : t -> t -> int
+       val equal : t -> t -> bool
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+       end
+       with type t = Enc.t * int
 
-              type 'a tree = N of 'a * 'a tree list
-              type t = Node.t tree
+       type 'a tree = N of 'a * 'a tree list
+       type t = Node.t tree
 
-              val add : t -> t -> t
-              val add_list : t -> t list -> t list
-              val equal : t -> t -> bool
-              val compare : t -> t -> int
-              val minimize : t -> Node.t list
+       val add : t -> t -> t
+       val add_list : t -> t list -> t list
+       val equal : t -> t -> bool
+       val compare : t -> t -> int
+       val minimize : t -> Node.t list
 
-              exception CannotMinimizeEmptyList of unit
+       exception CannotMinimizeEmptyList of unit
 
-              val min : t list -> Node.t list
-              val json : ?as_elt:bool -> t -> Yojson.t
-              val to_string : ?pretty:bool -> t -> string
-              val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-            end
-            with type Node.t = Enc.t * int)
+       val min : t list -> Node.t list
+       val json : ?as_elt:bool -> t -> Yojson.t
+       val to_string : ?pretty:bool -> t -> string
+       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+       end
+       with type Node.t = Enc.t * int) *)
     -> sig
   include module type of Rocq_monad.Make (Log) (Ctx) (Enc)
 
@@ -177,17 +177,17 @@ module Make : (Log : Logger.S)
     -> Rocq_utils.constructor_args mm
 
   module Constructor : sig
-    type t = Enc.t * Enc.t * Tree.t
+    type t = Enc.t * Enc.t * Enc.Tree.t
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
     val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-    val encode : Evd.econstr -> Evd.econstr -> Tree.t -> t
+    val encode : Evd.econstr -> Evd.econstr -> Enc.Tree.t -> t
   end
 
   val make_state_tree_pair_set
     :  unit
-    -> (module Set.S with type elt = Enc.t * Tree.t)
+    -> (module Set.S with type elt = Enc.t * Enc.Tree.t)
 
   module Unification : sig
     module Pair : sig
@@ -218,7 +218,7 @@ module Make : (Log : Logger.S)
       type t =
         { act : Pair.t
         ; goto : Pair.t
-        ; tree : Tree.t
+        ; tree : Enc.Tree.t
         }
 
       type k = t
@@ -227,7 +227,7 @@ module Make : (Log : Logger.S)
       val to_string : ?pretty:bool -> k -> string
       val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
       val unify_pair_opt : Pair.t -> bool mm
-      val unify_opt : t -> Tree.t option mm
+      val unify_opt : t -> Enc.Tree.t option mm
       val of_constructor : Rocq_utils.constructor_args -> Constructor.t -> t
     end
 
@@ -244,13 +244,13 @@ module Make : (Log : Logger.S)
       val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
       val empty : unit -> t mm
       val is_empty : t -> bool
-      val unify_list_opt : Problem.t list -> Tree.t list option mm
+      val unify_list_opt : Problem.t list -> Enc.Tree.t list option mm
 
       val sandbox_unify_all_opt
         :  Evd.econstr
         -> Evd.econstr
         -> t
-        -> (Evd.econstr * Evd.econstr * Tree.t list) option mm
+        -> (Evd.econstr * Evd.econstr * Enc.Tree.t list) option mm
     end
 
     module ListOfProblems : sig

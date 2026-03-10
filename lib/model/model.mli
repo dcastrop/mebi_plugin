@@ -1,45 +1,5 @@
 module Make : (Log : Logger.S)
-    (Enc : Encoding.S)
-    (Tree : sig
-              module Node : sig
-                  type t = Enc.t * int
-
-                  (* val compare : t -> t -> int *)
-                  (* val equal : t -> t -> bool *)
-                  (* val json : ?as_elt:bool -> t -> Yojson.t *)
-                  (* val to_string : ?pretty:bool -> t -> string *)
-                  (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-                end
-                with type t = Enc.t * int
-
-              type 'a tree = N of 'a * 'a tree list
-              type t = Node.t tree
-
-              (* val add : t -> t -> t *)
-              (* val add_list : t -> t list -> t list *)
-              val equal : t -> t -> bool
-              val compare : t -> t -> int
-              (* val minimize : t -> Node.t list *)
-
-              exception CannotMinimizeEmptyList of unit
-
-              (* val min : t list -> Node.t list *)
-              val json : ?as_elt:bool -> t -> Yojson.t
-              (* val to_string : ?pretty:bool -> t -> string *)
-              (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-            end
-            with type Node.t = Enc.t * int)
-    (Trees : sig
-       include Set.S with type elt = Tree.t
-
-       exception EmptyHasNoMin
-
-       (* val min : t -> Tree.t *)
-       (* val min_opt : t -> Tree.t option *)
-       val json : ?as_elt:bool -> t -> Yojson.t
-       (* val to_string : ?pretty:bool -> t -> string *)
-       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-     end)
+    (Base : Base_term.S)
     (Bindings : sig
        module Instructions : sig
          type t =
@@ -50,15 +10,6 @@ module Make : (Log : Logger.S)
                ; index : int
                ; cont : t
                }
-
-         (* val json : ?as_elt:bool -> t -> Yojson.t *)
-         (* val to_string : ?pretty:bool -> t -> string *)
-         (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-
-         exception Rocq_bindings_CannotAppendDone of unit
-
-         (* val append : t -> t -> t *)
-         (* val length : t -> int *)
        end
 
        module ConstrMap : sig
@@ -66,29 +17,6 @@ module Make : (Log : Logger.S)
 
          type v = Names.Name.t * Instructions.t
          type t' = v t
-
-         (* val json : ?as_elt:bool -> t' -> Yojson.t *)
-         (* val to_string : ?pretty:bool -> t' -> string *)
-         (* val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit *)
-         (* val update : t' -> Constr.t -> v -> unit *)
-
-         exception Rocq_bindings_CannotFindBindingName of Evd.econstr
-
-         (* val find_name
-            :  (Evd.econstr * Names.Name.t) list
-            -> Evd.econstr
-            -> Names.Name.t
-
-            val extract_binding_map
-            :  (Evd.econstr * Names.Name.t) list
-            -> Evd.econstr
-            -> Constr.t
-            -> t' mm
-
-            val make_opt
-            :  (Evd.econstr * Names.Name.t) list
-            -> Evd.econstr * Constr.t
-            -> t' option mm *)
        end
 
        type t =
@@ -98,18 +26,6 @@ module Make : (Log : Logger.S)
              ; action : ConstrMap.t' option
              ; goto : ConstrMap.t' option
              }
-
-       (* val json : ?as_elt:bool -> t -> Yojson.t *)
-       (* val to_string : ?pretty:bool -> t -> string *)
-       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-       (* val use_no_bindings : ConstrMap.t' option list -> bool
-
-    val extract
-      :  (Evd.econstr * Names.Name.t) list
-      -> Evd.econstr * Constr.t
-      -> Evd.econstr * Constr.t
-      -> Evd.econstr * Constr.t
-      -> t mm *)
      end)
     (ConstructorBindings : sig
        type t =
@@ -119,80 +35,43 @@ module Make : (Log : Logger.S)
          }
 
        val json : ?as_elt:bool -> t -> Yojson.t
-       (* val to_string : ?pretty:bool -> t -> string *)
-       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-       (* val extract_info : 'a Rocq_ind.t -> t list mm *)
-       (* val get_quantified_hyp : Names.Name.t -> Tactypes.quantified_hypothesis
-
-    exception Rocq_bindings_BindingInstruction_NotApp of Evd.econstr
-
-    exception
-      Rocq_bindings_BindingInstruction_Undefined of Evd.econstr * Evd.econstr
-
-    exception
-      Rocq_bindings_BindingInstruction_IndexOutOfBounds of Evd.econstr * int
-
-    exception Rocq_bindings_BindingInstruction_NEQ of Evd.econstr * Constr.t
-
-    val get_bound_term
-      :  Evd.econstr
-      -> Bindings.Instructions.t
-      -> Evd.econstr mm
-
-    val get_explicit_bindings
-      :  Evd.econstr * Bindings.ConstrMap.t' option
-      -> Evd.econstr Tactypes.explicit_bindings mm
-
-    val get
-      :  Enc.t
-      -> Enc.t option
-      -> Enc.t option
-      -> Bindings.t
-      -> Evd.econstr Tactypes.bindings mm *)
      end)
     -> sig
-  module State : module type of State.Make (Log) (Enc)
-  module States : module type of States.Make (Log) (State)
-  module Label : module type of Label.Make (Log) (Enc)
-  module Labels : module type of Labels.Make (Log) (Label)
-
-  module Note :
-      module type of Annotation_note.Make (Log) (State) (Label) (Tree) (Trees)
-
+  module State : State.S with type t = Base.t
+  module States : States.S with type elt = State.t
+  module Label : Label.S with type t = Base.t Label.t'
+  module Labels : Labels.S with type elt = Label.t
+  module Note : module type of Annotation_note.Make (Log) (Base) (State) (Label)
   module Annotation : module type of Annotation.Make (Log) (Label) (Note)
   module Annotations : module type of Annotations.Make (Log) (Note) (Annotation)
 
   module Transition :
       module type of
-        Transition.Make (Log) (State) (Label) (Tree) (Note) (Annotation)
+        Transition.Make (Log) (Base) (State) (Label) (Note) (Annotation)
 
   module Transitions :
       module type of
-        Transitions.Make (Log) (State) (Label) (Labels) (Tree) (Annotation)
+        Transitions.Make (Log) (Base) (State) (Label) (Labels) (Annotation)
           (Transition)
 
-  module Action :
-      module type of
-        Action.Make (Log) (Label) (Tree) (Trees) (Note) (Annotation)
+  module Action : module type of Action.Make (Log) (Base) (Label) (Annotation)
 
   module Actions :
       module type of
-        Actions.Make (Log) (Label) (Labels) (Tree) (Trees) (Annotation) (Action)
+        Actions.Make (Log) (Base) (Label) (Labels) (Annotation) (Action)
 
   module ActionPair :
       module type of
-        Actionpair.Make (Log) (State) (States) (Label) (Tree) (Trees) (Note)
-          (Annotation)
+        Actionpair.Make (Log) (Base) (State) (States) (Label) (Annotation)
           (Action)
 
   module ActionPairs :
       module type of
-        Actionpairs.Make (Log) (State) (States) (Action) (ActionPair)
+        Actionpairs.Make (Log) (Base) (State) (States) (Action) (ActionPair)
 
   module ActionMap :
       module type of
-        Actionmap.Make (Log) (State) (States) (Label) (Tree) (Trees)
-          (Annotation)
+        Actionmap.Make (Log) (Base) (State) (States) (Label) (Annotation)
           (Action)
           (Actions)
           (ActionPair)
@@ -203,7 +82,11 @@ module Make : (Log : Logger.S)
 
   module EdgeMap :
       module type of
-        Edgemap.Make (Log) (State) (States) (Label) (Action) (Actions)
+        Edgemap.Make (Log) (Base) (State) (States) (Label) (Annotation)
+          (Transition)
+          (Transitions)
+          (Action)
+          (Actions)
           (ActionPair)
           (ActionPairs)
           (ActionMap)
@@ -217,7 +100,7 @@ module Make : (Log : Logger.S)
 
   module Info :
       module type of
-        Info.Make (Log) (Enc) (Label) (Labels) (Bindings) (ConstructorBindings)
+        Info.Make (Log) (Base) (Label) (Labels) (Bindings) (ConstructorBindings)
 
   (* module Info : sig
     type t =
@@ -274,43 +157,36 @@ module Make : (Log : Logger.S)
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
     val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val of_lts : LTS.t -> t
     val merge : t -> t -> t
     val is_weak_mode : t -> bool
 
-    module Saturate :
-        module type of
-          Algorithm_saturate.Make (Log) (State) (States) (Label) (Labels) (Tree)
-            (Trees)
-            (Note)
-            (Annotation)
-            (Annotations)
-            (Action)
-            (ActionPair)
-            (ActionPairs)
-            (ActionMap)
-            (EdgeMap)
+    (* include module Saturate :
+       module type of
+       Saturate.Make (Log) (Base) (State) (States) (Label) (Labels) (Note)
+       (Annotation)
+       (Annotations)
+       (Action)
+       (ActionPair)
+       (ActionPairs)
+       (ActionMap)
+       (EdgeMap) *)
 
     val saturate : ?only_if_weak:bool -> t -> t
   end
 
-  module Convert : sig
-    val transitions_to_edgemap : Transitions.t -> EdgeMap.t'
-    val lts_to_fsm : LTS.t -> FSM.t
-  end
-
   module Minimize :
       module type of
-        Algorithm_minimize.Make (Log) (State) (States) (Label) (Labels) (Action)
+        Minimize.Make (Log) (Base) (State) (States) (Label) (Labels) (Action)
           (ActionMap)
           (EdgeMap)
           (Partition)
           (Info)
           (FSM)
 
-  module Bisimilar :
+  module Bisimilarity :
       module type of
-        Algorithm_bisimilarity.Make (Log) (State) (States) (Label) (Labels)
-          (Action)
+        Bisimilarity.Make (Log) (State) (States) (Label) (Labels) (Action)
           (ActionMap)
           (EdgeMap)
           (Partition)

@@ -1,55 +1,25 @@
-module Make : (Log : Logger.S)
-    (Ctx : Rocq_context.S)
-    (Enc : Encoding.S)
-    (Tree : sig
-              module Node : sig
-                  type t = Enc.t * int
-
-                  val compare : t -> t -> int
-                  val equal : t -> t -> bool
-                  val json : ?as_elt:bool -> t -> Yojson.t
-                  val to_string : ?pretty:bool -> t -> string
-                  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-                end
-                with type t = Enc.t * int
-
-              type 'a tree = N of 'a * 'a tree list
-              type t = Node.t tree
-
-              val add : t -> t -> t
-              val add_list : t -> t list -> t list
-              val equal : t -> t -> bool
-              val compare : t -> t -> int
-              val minimize : t -> Node.t list
-
-              exception CannotMinimizeEmptyList of unit
-
-              val min : t list -> Node.t list
-              val json : ?as_elt:bool -> t -> Yojson.t
-              val to_string : ?pretty:bool -> t -> string
-              val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-            end
-            with type Node.t = Enc.t * int)
-    (Trees : sig
-       include Set.S with type elt = Tree.t
-
-       exception EmptyHasNoMin
-
-       (* val min : t -> Tree.t *)
-       (* val min_opt : t -> Tree.t option *)
-       val json : ?as_elt:bool -> t -> Yojson.t
-       (* val to_string : ?pretty:bool -> t -> string *)
-       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-     end)
-    -> sig
-  module M : module type of Rocq_monad_utils.Make (Log) (Ctx) (Enc) (Tree)
+module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
+  module M : module type of Rocq_monad_utils.Make (Log) (Ctx) (Enc)
 
   module Model :
-      module type of
-        Model.Make (Log) (Enc) (Tree) (Trees) (M.Bindings)
-          (M.ConstructorBindings)
-  (* module Model.LTS = Model.Model.LTS *)
-  (* module Model.FSM = Model.Model.FSM *)
+      module type of Model.Make (Log) (Enc) (M.Bindings) (M.ConstructorBindings)
+
+  module Decode : sig
+    val enc : Enc.t -> EConstr.t
+    val handle : Enc.t -> exn -> EConstr.t
+
+    exception CouldNotDecode_State of Model.States.elt
+
+    val state : Model.States.elt -> EConstr.t
+
+    exception CouldNotDecode_Label of Model.Labels.elt
+
+    val label : Model.Labels.elt -> EConstr.t
+
+    exception CouldNotDecode_LTS_Constructor of Model.Info.Meta.RocqLTS.t
+
+    val lts_constructor : Model.Info.Meta.RocqLTS.t -> EConstr.t
+  end
 
   module IsTheory : sig
     val is_theory : Evd.econstr -> Evd.econstr -> bool M.mm
@@ -206,7 +176,7 @@ module Make : (Log : Logger.S)
          val of_seq : elt Seq.t -> t
        end)
       (D0 : sig
-         type elt = V0.elt * Tree.t
+         type elt = V0.elt * Enc.Tree.t
          type t
 
          val empty : t
@@ -356,7 +326,7 @@ module Make : (Log : Logger.S)
 
     module D : sig
       module D2 : sig
-        type elt = V.elt * Tree.t
+        type elt = V.elt * Enc.Tree.t
         type t
 
         val empty : t
@@ -404,7 +374,7 @@ module Make : (Log : Logger.S)
         val of_seq : elt Seq.t -> t
       end
 
-      type elt = V.elt * Tree.t
+      type elt = V.elt * Enc.Tree.t
       type t = D2.t
 
       val empty : t
@@ -639,7 +609,7 @@ module Make : (Log : Logger.S)
 
   val fail_if_empty : Model.LTS.t -> unit
   val fail_if_incomplete : Model.LTS.t -> unit
-  val fail_if_not_bisim : Model.Bisimilar.result -> unit
+  val fail_if_not_bisim : Model.Bisimilarity.result -> unit
 
   val extract_lts
     :  Libnames.qualid
@@ -683,22 +653,22 @@ module Make : (Log : Logger.S)
     val do_make_lts
       :  Constrexpr.constr_expr * Libnames.qualid
       -> Libnames.qualid list
-      -> Model.Bisimilar.t option M.mm
+      -> Model.Bisimilarity.t option M.mm
 
     val do_make_fsm
       :  Constrexpr.constr_expr * Libnames.qualid
       -> Libnames.qualid list
-      -> Model.Bisimilar.t option M.mm
+      -> Model.Bisimilarity.t option M.mm
 
     val do_saturate
       :  Constrexpr.constr_expr * Libnames.qualid
       -> Libnames.qualid list
-      -> Model.Bisimilar.t option M.mm
+      -> Model.Bisimilarity.t option M.mm
 
     val do_minimize
       :  Constrexpr.constr_expr * Libnames.qualid
       -> Libnames.qualid list
-      -> Model.Bisimilar.t option M.mm
+      -> Model.Bisimilarity.t option M.mm
 
     val build_fsms
       :  rocq_args
@@ -709,19 +679,16 @@ module Make : (Log : Logger.S)
     val do_merge
       :  rocq_pair
       -> Libnames.qualid list
-      -> Model.Bisimilar.t option M.mm
+      -> Model.Bisimilarity.t option M.mm
 
     val do_check_bisim
       :  rocq_pair
       -> Libnames.qualid list
-      -> Model.Bisimilar.t option M.mm
+      -> Model.Bisimilarity.t option M.mm
 
-    val run : Libnames.qualid list -> t -> Model.Bisimilar.t option M.mm
+    val run : Libnames.qualid list -> t -> Model.Bisimilarity.t option M.mm
   end
 end
 
 module Default : () ->
-    module type of
-      Make (Api.Defaults.Log) (Api.Defaults.Ctx) (Api.Defaults.Enc)
-        (Api.Defaults.Tree)
-        (Api.Defaults.Trees)
+    module type of Make (Api.Defaults.Log) (Api.Defaults.Ctx) (Api.Defaults.Enc)

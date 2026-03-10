@@ -1,19 +1,6 @@
 module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
   include Bi_encoding.Make (Log) (Ctx) (Enc)
 
-  (* NOTE: dev override*)
-  module Log =
-    Logger.Make
-      (Output.Mode.Default)
-      (struct
-        let prefix : string option = None
-        let level : Output.Kind.level -> bool = !Output.Kind.default_level
-
-        let special : Output.Kind.special -> bool =
-          Output.Kind.default_special_fun ~trace:false
-        ;;
-      end)
-
   let bienc_to_list : unit -> (Enc.t * EConstr.t) list = to_list
 
   type 'a mm = wrapper ref -> 'a in_wrapper

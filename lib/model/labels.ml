@@ -1,25 +1,14 @@
-module Make
-    (Log : Logger.S)
-    (Label : sig
-       type t
-
-       val json : ?as_elt:bool -> t -> Yojson.t
-
-       (* val to_string : ?pretty:bool -> t -> string *)
-       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-       (* val equal : t -> t -> bool *)
-       val compare : t -> t -> int
-
-       (* val hash : t -> int *)
-       val is_silent : t -> bool
-     end) : sig
-  include Set.S with type elt = Label.t
+module type S = sig
+  include Set.S
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
   val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
   val non_silent : t -> t
-end = struct
+end
+
+module Make (Log : Logger.S) (Label : Label.S) : S with type elt = Label.t =
+struct
   module Set_ : Set.S with type elt = Label.t = Set.Make (Label)
   include Set_
 

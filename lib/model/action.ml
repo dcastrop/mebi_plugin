@@ -1,95 +1,19 @@
 module Make
     (Log : Logger.S)
-    (Label : sig
-       type t
-
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-       val hash : t -> int
-       val is_silent : t -> bool
-       val json : ?as_elt:bool -> t -> Yojson.t
-       (* val to_string : ?pretty:bool -> t -> string *)
-       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-     end)
-    (Tree : sig
-       module Node : sig
-         type t
-
-         (* val compare : t -> t -> int *)
-         (* val equal : t -> t -> bool *)
-         (* val json : ?as_elt:bool -> t -> Yojson.t *)
-         (* val to_string : ?pretty:bool -> t -> string *)
-         (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-       end
-
-       type 'a tree = N of 'a * 'a tree list
-       type t = Node.t tree
-
-       (* val add : t -> t -> t *)
-       (* val add_list : t -> t list -> t list *)
-       (* val equal : t -> t -> bool *)
-       (* val compare : t -> t -> int *)
-       (* val minimize : t -> Node.t list *)
-
-       exception CannotMinimizeEmptyList of unit
-
-       (* val min : t list -> Node.t list *)
-       (* val json : ?as_elt:bool -> t -> Yojson.t *)
-       (* val to_string : ?pretty:bool -> t -> string *)
-       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-     end)
-    (Trees : sig
-       include Set.S with type elt = Tree.t
-
-       exception EmptyHasNoMin
-
-       (* val min : t -> Tree.t *)
-       (* val min_opt : t -> Tree.t option *)
-       val json : ?as_elt:bool -> t -> Yojson.t
-       (* val to_string : ?pretty:bool -> t -> string *)
-       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-     end)
-    (Note : sig
-       type t
-
-       (* val equal : t -> t -> bool *)
-       (* val compare : t -> t -> int *)
-       (* val is_silent : t -> bool *)
-       (* val has_label : Label.t -> t -> bool *)
-       (* val json : ?as_elt:bool -> t -> Yojson.t *)
-       (* val to_string : ?pretty:bool -> t -> string *)
-       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-     end)
+    (Base : Base_term.S)
+    (Label : Label.S with type t = Base.t Label.t')
     (Annotation : sig
-       type t =
-         { this : Note.t
-         ; next : t option
-         }
+       type t
 
        val equal : t -> t -> bool
        val compare : t -> t -> int
-
-       (* val is_empty : t -> bool *)
-       (* val opt_is_empty : ?fail_if_none:bool -> t option -> bool *)
-       (* val length : t -> int *)
        val opt_length : ?fail_if_none:bool -> t option -> int
-       (* val shorter : t -> t -> t *)
-       (* val exists : Note.t -> t -> bool *)
-       (* val exists_label : Label.t -> t -> bool *)
-       (* val append : Note.t -> t -> t *)
-       (* val last : t -> Note.t *)
-
-       exception CannotDropLastOfSingleton of t
-
-       (* val drop_last : t -> t *)
        val json : ?as_elt:bool -> t -> Yojson.t
-       (* val to_string : ?pretty:bool -> t -> string *)
-       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
      end) : sig
   type t =
     { label : Label.t
     ; annotation : Annotation.t option
-    ; constructor_trees : Trees.t
+    ; constructor_trees : Base.Trees.t
     }
 
   val json : ?as_elt:bool -> t -> Yojson.t
@@ -106,7 +30,7 @@ end = struct
   type t =
     { label : Label.t
     ; annotation : Annotation.t option
-    ; constructor_trees : Trees.t
+    ; constructor_trees : Base.Trees.t
     }
 
   include
@@ -122,7 +46,8 @@ end = struct
             [ "label", Label.json ~as_elt:true x.label
             ; ( "annotation"
               , Json.option ~as_elt:true Annotation.json x.annotation )
-            ; "constructor_trees", Trees.json ~as_elt:true x.constructor_trees
+            ; ( "constructor_trees"
+              , Base.Trees.json ~as_elt:true x.constructor_trees )
             ]
         ;;
       end)
@@ -130,14 +55,14 @@ end = struct
   let equal (a : t) (b : t) : bool =
     Label.equal a.label b.label
     && Option.equal Annotation.equal a.annotation b.annotation
-    && Trees.equal a.constructor_trees b.constructor_trees
+    && Base.Trees.equal a.constructor_trees b.constructor_trees
   ;;
 
   let compare (a : t) (b : t) : int =
     Utils.compare_chain
       [ Label.compare a.label b.label
       ; Option.compare Annotation.compare a.annotation b.annotation
-      ; Trees.compare a.constructor_trees b.constructor_trees
+      ; Base.Trees.compare a.constructor_trees b.constructor_trees
       ]
   ;;
 

@@ -3,8 +3,9 @@ src/META.rocq-mebi
 -R examples/ MEBI.Examples
 -I lib/
 -I lib/utils/
--I lib/encoding/
+-I lib/terms/
 -I lib/model/
+-I lib/model/algorithms/
 -I src/
 -arg "-w all"
 
@@ -92,8 +93,19 @@ lib/utils/logger.ml
 lib/utils/logger.mli
 lib/utils/json.ml
 lib/utils/json.mli
-lib/encoding/encoding.ml
-lib/encoding/encoding.mli
+
+lib/terms/encoding.ml
+lib/terms/encoding.mli
+lib/terms/tree.ml
+lib/terms/tree.mli
+lib/terms/trees.ml
+lib/terms/trees.mli
+lib/terms/base_term.ml
+lib/terms/base_term.mli
+lib/terms/constructor_tree.ml
+lib/terms/constructor_tree.mli
+lib/terms/constructor_trees.ml
+lib/terms/constructor_trees.mli
 
 
 lib/model/state.ml
@@ -140,14 +152,16 @@ lib/model/wip_trace.ml
 lib/model/wip_trace.mli
 lib/model/wip_traces.ml
 lib/model/wip_traces.mli
-lib/model/algorithm_saturate.ml
-lib/model/algorithm_saturate.mli
-lib/model/algorithm_minimize.ml
-lib/model/algorithm_minimize.mli
-lib/model/algorithm_bisimilarity.ml
-lib/model/algorithm_bisimilarity.mli
-# lib/model/algorithm_similarity.ml
-# lib/model/algorithm_similarity.mli
+
+lib/model/algorithms/saturate.ml
+lib/model/algorithms/saturate.mli
+lib/model/algorithms/minimize.ml
+lib/model/algorithms/minimize.mli
+lib/model/algorithms/bisimilarity.ml
+lib/model/algorithms/bisimilarity.mli
+lib/model/algorithms/similarity.ml
+lib/model/algorithms/similarity.mli
+
 lib/model/model.ml
 lib/model/model.mli
 
@@ -176,14 +190,14 @@ src/rocq_context.ml
 src/rocq_context.mli
 # src/encoding.ml
 # src/encoding.mli
-src/enc_tree.ml
-src/enc_tree.mli
-src/enc_trees.ml
-src/enc_trees.mli
-src/enc_constructor_tree.ml
-src/enc_constructor_tree.mli
-src/enc_constructor_trees.ml
-src/enc_constructor_trees.mli
+# src/enc_tree.ml
+# src/enc_tree.mli
+# src/enc_trees.ml
+# src/enc_trees.mli
+# src/enc_constructor_tree.ml
+# src/enc_constructor_tree.mli
+# src/enc_constructor_trees.ml
+# src/enc_constructor_trees.mli
 src/bi_encoding.ml
 src/bi_encoding.mli
 src/rocq_monad.ml

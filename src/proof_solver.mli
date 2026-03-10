@@ -2,24 +2,21 @@ exception NothingToDo
 exception NotImplemented
 
 module Make : (Log : Logger.S) (Enc : Encoding.S) -> sig
-  module Tree : module type of Enc_tree.Make (Log) (Enc)
-  module Trees : module type of Enc_trees.Make (Log) (Tree)
-
   module W : sig
-    include module type of
-        Wrapper.Make (Log) (Rocq_context.Default) (Enc) (Tree) (Trees)
+    include module type of Wrapper.Make (Log) (Rocq_context.Default) (Enc)
+    (* (Enc.Tree) (Enc.Trees) *)
 
-    val the_result : Model.Bisimilar.t ref option ref
+    val the_result : Model.Bisimilarity.t ref option ref
 
     exception NoResultFound
 
-    val get_the_result : unit -> Model.Bisimilar.t
+    val get_the_result : unit -> Model.Bisimilarity.t
     val get_fsm_a : ?saturated:bool -> unit -> Model.FSM.t
     val get_fsm_b : ?saturated:bool -> unit -> Model.FSM.t
 
-    exception CannotOverrideResult of Model.Bisimilar.t
+    exception CannotOverrideResult of Model.Bisimilarity.t
 
-    val set_the_result : Model.Bisimilar.t -> unit
+    val set_the_result : Model.Bisimilarity.t -> unit
 
     exception BisimilarityResultNotFound
 
@@ -28,23 +25,6 @@ module Make : (Log : Logger.S) (Enc : Encoding.S) -> sig
       -> Constrexpr.constr_expr * Libnames.qualid
       -> Constrexpr.constr_expr * Libnames.qualid
       -> unit
-
-    module Decode : sig
-      val enc : Enc.t -> EConstr.t
-      val handle : Enc.t -> exn -> EConstr.t
-
-      exception CouldNotDecode_State of Model.States.elt
-
-      val state : Model.States.elt -> EConstr.t
-
-      exception CouldNotDecode_Label of Model.Labels.elt
-
-      val label : Model.Labels.elt -> EConstr.t
-
-      exception CouldNotDecode_LTS_Constructor of Model.Info.Meta.RocqLTS.t
-
-      val lts_constructor : Model.Info.Meta.RocqLTS.t -> EConstr.t
-    end
   end
 
   val check_bisimilarity
@@ -59,7 +39,7 @@ module Make : (Log : Logger.S) (Enc : Encoding.S) -> sig
 
   module ApplicableConstructors : sig
     type t =
-      { current : Tree.Node.t list option
+      { current : Enc.Tree.Node.t list option
       ; annotation : Model.Annotation.t option
       ; label : Model.Label.t
       ; destination : Model.EdgeMap.key
@@ -146,7 +126,6 @@ module Make : (Log : Logger.S) (Enc : Encoding.S) -> sig
                ;;
              end))
           (Enc)
-          (Tree)
 
     val to_atomic : EConstr.t -> EConstr.t Rocq_utils.kind_pair mm
     val get_concl : unit -> EConstr.t

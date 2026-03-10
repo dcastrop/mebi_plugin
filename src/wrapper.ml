@@ -1,57 +1,39 @@
-module Make
-    (Log : Logger.S)
-    (Ctx : Rocq_context.S)
-    (Enc : Encoding.S)
-    (Tree : sig
-              module Node : sig
-                  type t = Enc.t * int
+module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
+  module M = Rocq_monad_utils.Make (Log) (Ctx) (Enc)
+  (* (Tree) *)
 
-                  val compare : t -> t -> int
-                  val equal : t -> t -> bool
-                  val json : ?as_elt:bool -> t -> Yojson.t
-                  val to_string : ?pretty:bool -> t -> string
-                  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-                end
-                with type t = Enc.t * int
-
-              type 'a tree = N of 'a * 'a tree list
-              type t = Node.t tree
-
-              val add : t -> t -> t
-              val add_list : t -> t list -> t list
-              val equal : t -> t -> bool
-              val compare : t -> t -> int
-              val minimize : t -> Node.t list
-
-              exception CannotMinimizeEmptyList of unit
-
-              val min : t list -> Node.t list
-              val json : ?as_elt:bool -> t -> Yojson.t
-              val to_string : ?pretty:bool -> t -> string
-              val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-            end
-            with type Node.t = Enc.t * int)
-    (Trees : sig
-       include Set.S with type elt = Tree.t
-
-       exception EmptyHasNoMin
-
-       (* val min : t -> Tree.t *)
-       (* val min_opt : t -> Tree.t option *)
-       val json : ?as_elt:bool -> t -> Yojson.t
-       (* val to_string : ?pretty:bool -> t -> string *)
-       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
-     end) =
-struct
-  module M = Rocq_monad_utils.Make (Log) (Ctx) (Enc) (Tree)
   module Bindings = M.Bindings
   module ConstructorBindings = M.ConstructorBindings
-
-  module Model =
-    Model.Make (Log) (Enc) (Tree) (Trees) (Bindings) (ConstructorBindings)
-
+  module Model = Model.Make (Log) (Enc) (Bindings) (ConstructorBindings)
   module LTS = Model.LTS
   module FSM = Model.FSM
+
+  (** [Decode] handles obtaining [EConstr.t] from [module M]. *)
+  module Decode = struct
+    let enc (x : Enc.t) : EConstr.t = M.decode x
+
+    let handle (x : Enc.t) (e : exn) : EConstr.t =
+      try enc x with M.CannotDecode _ -> raise e
+    ;;
+
+    exception CouldNotDecode_State of Model.State.t
+
+    let state (x : Model.State.t) : EConstr.t =
+      handle x (CouldNotDecode_State x)
+    ;;
+
+    exception CouldNotDecode_Label of Model.Label.t
+
+    let label (x : Model.Label.t) : EConstr.t =
+      handle x.enc (CouldNotDecode_Label x)
+    ;;
+
+    exception CouldNotDecode_LTS_Constructor of Model.Info.Meta.RocqLTS.t
+
+    let lts_constructor (x : Model.Info.Meta.RocqLTS.t) : EConstr.t =
+      handle x.enc (CouldNotDecode_LTS_Constructor x)
+    ;;
+  end
 
   (** *)
   module IsTheory = struct
@@ -272,7 +254,7 @@ struct
   module Graph
       (T0 : Hashtbl.S with type key = Enc.t)
       (V0 : Set.S with type elt = Enc.t)
-      (D0 : Set.S with type elt = Enc.t * Tree.t)
+      (D0 : Set.S with type elt = Enc.t * Enc.Tree.t)
       (X : X_Args) =
   struct
     (** [module S] is a [Graph] alternative to [module Model.States] for tracking the visited states.
@@ -290,7 +272,7 @@ struct
     (** [module D] is similar to [module S], but each "destination state" is paired with a constructor tree detailing which constructors to take to reach it, which in the context of [module A] and [module T] later illustrates how to get from one state to another via certain constructors.
     *)
     module D = struct
-      module D2 : Set.S with type elt = Enc.t * Tree.t = D0
+      module D2 : Set.S with type elt = Enc.t * Enc.Tree.t = D0
       include D2
 
       let to_string (xs : t) : string =
@@ -512,7 +494,7 @@ struct
           let act_dec : EConstr.t = M.decode act in
           let* is_silent : bool option = is_silent_transition act_dec g.weak in
           let label : Model.Label.t = { enc = act; is_silent } in
-          let constructor_trees : Trees.t = Trees.singleton int_tree in
+          let constructor_trees : Enc.Trees.t = Enc.Trees.singleton int_tree in
           let to_add : Model.Action.t =
             { label; constructor_trees; annotation = None }
           in
@@ -565,7 +547,7 @@ struct
     end
 
     module Extract (Z : Z_Args) = struct
-      let state (x : Enc.t) : Model.State.t = { enc = x }
+      let state (x : Enc.t) : Model.State.t = x
 
       let states () : Model.States.t =
         Log.trace __FUNCTION__;
@@ -596,10 +578,9 @@ struct
                 : (Model.Transitions.t -> Model.Transitions.t) ->
                 let label : Model.Label.t = label action in
                 D.fold
-                  (fun ((goto, constructor_tree) : Enc.t * Tree.t)
+                  (fun ((goto, constructor_tree) : Enc.t * Enc.Tree.t)
                     : (Model.Transitions.t -> Model.Transitions.t) ->
                     let goto : Model.State.t = state goto in
-                    let open Model.Transition in
                     Model.Transitions.add
                       { from
                       ; goto
@@ -833,10 +814,10 @@ struct
       | _ -> ())
   ;;
 
-  let fail_if_not_bisim (x : Model.Bisimilar.result) : unit =
+  let fail_if_not_bisim (x : Model.Bisimilarity.result) : unit =
     if !Api.the_fail_flags.incomplete
     then
-      if Bool.not (Model.Bisimilar.are_bisimilar x)
+      if Bool.not (Model.Bisimilarity.are_bisimilar x)
       then (
         Log.trace ~__FUNCTION__ "Not Bisimilar";
         M.Err.not_bisimilar ())
@@ -892,7 +873,7 @@ struct
       Log.trace __FUNCTION__;
       let open M.Syntax in
       let* the_lts = build_lts ~weak primary_lts init names in
-      Model.Convert.lts_to_fsm the_lts |> M.return
+      Model.FSM.of_lts the_lts |> M.return
     ;;
 
     type t =
@@ -912,7 +893,7 @@ struct
       ; b : rocq_args
       }
 
-    let do_make_lts (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
+    let do_make_lts (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
       Log.trace __FUNCTION__;
       let open M.Syntax in
       Log.info "Extracting LTS...";
@@ -921,7 +902,7 @@ struct
       M.return None
     ;;
 
-    let do_make_fsm (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
+    let do_make_fsm (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
       Log.trace __FUNCTION__;
       Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
@@ -930,7 +911,7 @@ struct
       M.return None
     ;;
 
-    let do_saturate (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
+    let do_saturate (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
       Log.trace __FUNCTION__;
       Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
@@ -942,7 +923,7 @@ struct
       M.return None
     ;;
 
-    let do_minimize (x, primary_lts) refs : Model.Bisimilar.t option M.mm =
+    let do_minimize (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
       Log.trace __FUNCTION__;
       Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
@@ -974,7 +955,7 @@ struct
       M.return (the_fsm_a, the_fsm_b)
     ;;
 
-    let do_merge { a; b } refs : Model.Bisimilar.t option M.mm =
+    let do_merge { a; b } refs : Model.Bisimilarity.t option M.mm =
       Log.trace __FUNCTION__;
       let open M.Syntax in
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
@@ -984,19 +965,19 @@ struct
       M.return None
     ;;
 
-    let do_check_bisim { a; b } refs : Model.Bisimilar.t option M.mm =
+    let do_check_bisim { a; b } refs : Model.Bisimilarity.t option M.mm =
       Log.trace __FUNCTION__;
       let open M.Syntax in
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
       Log.info "Checking Bisimilarity of FSMs...";
-      let result = Model.Bisimilar.fsm the_fsm_a the_fsm_b in
-      Log.thing Result "Result" result (Of Model.Bisimilar.to_string);
+      let result = Model.Bisimilarity.fsm the_fsm_a the_fsm_b in
+      Log.thing Result "Result" result (Of Model.Bisimilarity.to_string);
       fail_if_not_bisim result.result;
       M.return (Some result)
     ;;
 
     let run (refs : Libnames.qualid list) (x : t)
-      : Model.Bisimilar.t option M.mm
+      : Model.Bisimilarity.t option M.mm
       =
       Log.trace __FUNCTION__;
       let open M.Syntax in
@@ -1015,5 +996,3 @@ end
 
 module Default () =
   Make (Api.Defaults.Log) (Api.Defaults.Ctx) (Api.Defaults.Enc)
-    (Api.Defaults.Tree)
-    (Api.Defaults.Trees)
