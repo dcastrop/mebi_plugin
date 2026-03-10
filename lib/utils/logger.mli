@@ -49,13 +49,23 @@ module type S = sig
     -> unit
 end
 
+val default_level : Output.Kind.level -> bool
+val default_special : Output.Kind.special -> bool
+
 module Make : (Mode : Output.Mode.S)
     (X : sig
        val prefix : string option
-       val level : Feedback.level -> bool
+       val level : Output.Kind.level -> bool
        val special : Output.Kind.special -> bool
      end)
     -> S
 
 module MkDefault : () -> S
 module Default : S
+
+module ReMake : (Old : S)
+    (New : sig
+       val level : Output.Kind.level -> bool
+       val special : Output.Kind.special -> bool
+     end)
+    -> S with module Config.Mode = Old.Config.Mode

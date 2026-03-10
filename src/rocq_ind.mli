@@ -23,7 +23,7 @@ and kind =
 
 val to_string : ('a -> string) -> Environ.env -> Evd.evar_map -> 'a t -> string
 
-exception Rocq_ind_UnexpectedKind of kind
+exception UnexpectedKind of kind
 
 val get_lts : 'a t -> LTS.t
 val get_lts_term_type : 'a t -> EConstr.t
@@ -32,8 +32,7 @@ val get_lts_constructor_types : 'a t -> LTS.constructor array
 val get_lts_constructor_names : 'a t -> Names.variable array
 val get_lts_constructors : 'a t -> Rocq_utils.ind_constr array
 
-exception
-  Rocq_ind_mip_InconsistentNumConstructors of Declarations.one_inductive_body
+exception Mip_InconsistentNumConstructors of Declarations.one_inductive_body
 
 val mip_to_lts_constructors
   :  Declarations.one_inductive_body

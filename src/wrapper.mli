@@ -22,17 +22,17 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
   end
 
   module IsTheory : sig
-    val is_theory : Evd.econstr -> Evd.econstr -> bool M.mm
-    val is_exists : Evd.econstr -> bool M.mm
-    val is_weak_sim : Evd.econstr -> bool M.mm
-    val is_weak : Evd.econstr -> bool M.mm
-    val is_tau : Evd.econstr -> bool M.mm
-    val is_silent : Evd.econstr -> bool M.mm
-    val is_silent1 : Evd.econstr -> bool M.mm
-    val is_LTS : Evd.econstr -> bool M.mm
-    val is_None : Evd.econstr -> bool M.mm
-    val is_Some : Evd.econstr -> bool M.mm
-    val get_theory_enc : (Evd.econstr -> bool M.mm) -> Enc.t M.mm
+    val is_theory : EConstr.t -> EConstr.t -> bool M.mm
+    val is_exists : EConstr.t -> bool M.mm
+    val is_weak_sim : EConstr.t -> bool M.mm
+    val is_weak : EConstr.t -> bool M.mm
+    val is_tau : EConstr.t -> bool M.mm
+    val is_silent : EConstr.t -> bool M.mm
+    val is_silent1 : EConstr.t -> bool M.mm
+    val is_LTS : EConstr.t -> bool M.mm
+    val is_None : EConstr.t -> bool M.mm
+    val is_Some : EConstr.t -> bool M.mm
+    val get_theory_enc : (EConstr.t -> bool M.mm) -> Enc.t M.mm
 
     exception NoEncodingFoundFor_TheoriesNone of unit
 
@@ -45,12 +45,12 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
     exception NotEqTheory of unit
 
     val get_theory_enc_if_eq
-      :  Evd.econstr
-      -> (Evd.econstr -> bool M.mm)
+      :  EConstr.t
+      -> (EConstr.t -> bool M.mm)
       -> Enc.t M.mm
 
-    val get_None_enc_if_eq : Evd.econstr -> Enc.t M.mm
-    val get_Some_enc_if_eq : Evd.econstr -> Enc.t M.mm
+    val get_None_enc_if_eq : EConstr.t -> Enc.t M.mm
+    val get_Some_enc_if_eq : EConstr.t -> Enc.t M.mm
   end
 
   module Weak : sig
@@ -559,7 +559,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
     val empty : V0.elt -> M.Ind.t M.B.t -> t
     val _log_to_visit : t -> unit
     val _log_ind_defs : M.Ind.t M.B.t -> unit
-    val is_silent_transition : Evd.econstr -> Weak.t option -> bool option M.mm
+    val is_silent_transition : EConstr.t -> Weak.t option -> bool option M.mm
 
     module type Y_Args = sig
       val primary_lts : M.Ind.t
@@ -595,7 +595,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
     val build_ind_defs : unit -> M.Ind.t M.B.t M.mm
     val find_primary_lts : M.Ind.t M.B.t -> M.Ind.t M.mm
-    val initial_term : Constrexpr.constr_expr -> Evd.econstr M.mm
+    val initial_term : Constrexpr.constr_expr -> EConstr.t M.mm
     val make_yargs : M.Ind.t -> M.Ind.t M.B.t -> 'a -> (module Y_Args)
     val make_zargs : M.Ind.t M.B.t -> t ref -> (module Z_Args)
     val build : Constrexpr.constr_expr -> Model.LTS.t M.mm
