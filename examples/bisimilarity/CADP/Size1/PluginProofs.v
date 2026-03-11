@@ -48,20 +48,15 @@ Inductive spec_lts : spec_state -> option label -> spec_state -> Prop :=
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.PluginProofs.lts_spec_lts".
 Example wsim_lts_spec_lts : weak_sim lts spec_lts c1 (Free 0). 
 Proof. MeBi Sim Begin lts c1 And spec_lts (Free 0) Using step.
-  (* Iteration History: _ <- _ <- _ <- _ *) 
-  MeBi Sim Solve 1000. Qed.
-  (* MeBi Sim Solve 68.  *)
-  (* constructor 1. *)
-  (* eauto with rel_db. *)
-
-(* Admitted. *)
+  (* Iteration History: 290 <- _ <- _ <- _ *) 
+  MeBi Sim Solve 290. Qed.
 
   
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.PluginProofs.spec_lts_lts".
-(* Example wsim_spec_lts_lts : weak_sim spec_lts lts (Free 0) c1. 
+Example wsim_spec_lts_lts : weak_sim spec_lts lts (Free 0) c1. 
 Proof. MeBi Sim Begin spec_lts (Free 0) And lts c1 Using step. 
   (* Iteration History: 207 <- _ <- _ <- _  *) 
-  MeBi Sim Solve 207. Qed. *)
+  MeBi Sim Solve 207. Qed.
 
 (****************************)
 

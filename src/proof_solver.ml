@@ -190,11 +190,13 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
   end *)
 
   module ApplicableConstructors = struct
+    exception TransitionHasNoConstructorsToApply
+
     (** @param current
           is an option type so that we can make sure we do the necessary tactics the first time we enter this state.
         @param annotation
           is an option type since [None] represents the end of the annotation.
-    *)
+        @raise TransitionHasNoConstructorsToApply if the transition does *)
     type t =
       { current : Enc.Tree.Node.t list option
       ; annotation : Model.Annotation.t option
@@ -202,13 +204,28 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
       ; destination : Model.State.t
       }
 
-    let init ({ goto; label; annotation; _ } : Model.Transition.t) : t =
-      { current = None; annotation; label; destination = goto }
+    let init ({ from; goto; label; tree; annotation } : Model.Transition.t) : t =
+      { current = None
+      ; destination = goto
+      ; label
+      ; annotation =
+          (match annotation, tree with
+           (* NOTE: is a saturated transition *)
+           | Some y, _ -> Some y
+           (* NOTE: is an unsaturated transition, so we use the contructor tree *)
+           | None, Some y ->
+             Some
+               { this = { from; label; goto; using = Enc.Trees.singleton y }
+               ; next = None
+               }
+           (* NOTE: is neither saturated nor has a constructor tree *)
+           | None, None -> raise TransitionHasNoConstructorsToApply)
+      }
     ;;
 
     let to_string (x : t) : string =
       Utils.Strfy.record
-        [ "label", Enc.to_string x.label.enc
+        [ "label", Enc.to_string x.label.base
         ; "destination", Model.State.to_string x.destination
         ; ( "current"
           , Utils.Strfy.option
@@ -1057,8 +1074,8 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
       let find_lts (lts_enc : Enc.t)
         : Model.Info.Meta.RocqLTS.t list -> Model.Info.Meta.RocqLTS.t
         =
-        List.find (fun ({ enc; _ } : Model.Info.Meta.RocqLTS.t) ->
-          Enc.equal enc lts_enc)
+        List.find (fun ({ base; _ } : Model.Info.Meta.RocqLTS.t) ->
+          Enc.equal base lts_enc)
       ;;
 
       let find_constructor (constructor_index : int)
@@ -1134,8 +1151,8 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
         Log.trace __FUNCTION__;
         try
           let enc : Enc.t = M.get_encoding x in
-          (* NOTE: [Model.States.compare] only cares about [term]. *)
-          Model.States.find enc ys |> M.return
+          (* NOTE: [Model.States.compare] only cares about [base]. *)
+          Model.States.find { base = enc } ys |> M.return
         with
         | M.EncodingNotFound _ ->
           log_econstr ~__FUNCTION__ ~s:"Err: M.EncodingNotFound" x;
@@ -1165,7 +1182,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
         Log.trace __FUNCTION__;
         let f (enc : Enc.t) : Model.Label.t M.mm =
           (* NOTE: [Model.Labels.compare] only cares about [is_silent=Some _] *)
-          Model.Labels.find { enc; is_silent = None } ys |> M.return
+          Model.Labels.find { base = enc; is_silent = None } ys |> M.return
         in
         try M.get_encoding x |> f with
         | M.EncodingNotFound _ ->
@@ -1232,10 +1249,8 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
           in
           match actionpairs with
           | [] -> raise (CouldNotFind_Transition { from; goto; label; edges })
-          | ({ annotation; constructor_trees; _ }, _) :: [] ->
-            let tree : Enc.Tree.t option =
-              Enc.Trees.min_opt constructor_trees
-            in
+          | ({ annotation; trees; _ }, _) :: [] ->
+            let tree : Enc.Tree.t option = Enc.Trees.min_opt trees in
             { from; goto; label; annotation; tree }
           | h :: tl ->
             (* TODO: move this proceed to [Model] and handle this case *)
@@ -1623,9 +1638,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
       let from : Model.State.t = M.run (ReModel.state tys.(3) m.states) in
       let label : Model.Label.t = M.run (ReModel.label tys.(5) m.alphabet) in
       try
-        let ({ annotation; constructor_trees; _ }, destinations)
-          : Model.ActionPair.t
-          =
+        let ({ annotation; trees; _ }, destinations) : Model.ActionPair.t =
           (* NOTE: get actions [from] with [label] *)
           Model.ActionMap.reduce_by_label
             (Model.EdgeMap.find m.edges from)
@@ -1639,7 +1652,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
           (* NOTE: get the pair with the shortest annotation (less steps to do) *)
           |> Model.ActionPairs.shortest_annotation
         in
-        let tree : Enc.Tree.t option = Enc.Trees.min_opt constructor_trees in
+        let tree : Enc.Tree.t option = Enc.Trees.min_opt trees in
         let goto : Model.State.t = Model.States.min_elt destinations in
         { from; goto; label; annotation; tree }
       with
@@ -1673,8 +1686,6 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
       let* ty, tys = to_atomic wk_trans in
       (* NOTE: first try to do single action, if fail then saturated *)
       let goal : Model.Transition.t =
-        (* try try_get_visible_transition ~saturated:false bisimilar tys with
-           | CouldNotFindGotoState -> *)
         try try_get_visible_transition ~saturated:true bisimilar tys with
         | CouldNotFindGotoState ->
           raise (CouldNotGetGoalTransition { b; wk_trans })
