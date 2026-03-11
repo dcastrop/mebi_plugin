@@ -17,7 +17,7 @@ module type S = sig
 
     module RocqLTS : sig
       type t =
-        { enc : base
+        { base : base
         ; constructors : constructorbindings list
         }
 
@@ -122,7 +122,7 @@ module Make
 
     module RocqLTS = struct
       type t =
-        { enc : base
+        { base : base
         ; constructors : constructorbindings list
         }
 
@@ -136,7 +136,7 @@ module Make
 
             let json ?(as_elt : bool = false) (x : t) : Yojson.t =
               `Assoc
-                [ "enc", Base.json x.enc
+                [ "base", Base.json x.base
                 ; ( "constructors"
                   , `List
                       (List.map
@@ -179,7 +179,8 @@ module Make
         ; bounds = Merged (a.bounds, b.bounds)
         ; lts =
             List.merge
-              (fun (a : RocqLTS.t) (b : RocqLTS.t) -> Base.compare a.enc b.enc)
+              (fun (a : RocqLTS.t) (b : RocqLTS.t) ->
+                Base.compare a.base b.base)
               a.lts
               b.lts
         }
