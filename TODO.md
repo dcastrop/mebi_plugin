@@ -23,9 +23,10 @@
 - [ ] OCaml examples -- possibly aligned with json-dumped rocq-examples
 
 
-## Optimizations
+## Optimizations & Fixes
 
-- [ ] Optimize Saturation algorithm (`lib/model/algorithms/saturate`) -- takes a long time on larger/multi-layered examples. We use traces to ensure we don't keep re-exploring the same path, but I think we need to go a step further and keep exploring until we have saturated each trace before continuing.
+- [ ] ***Optimize Saturation algorithm*** (`lib/model/algorithms/saturate`) -- takes a long time on larger/multi-layered examples. We use traces to ensure we don't keep re-exploring the same path, but I think we need to go a step further and keep exploring until we have saturated each trace before continuing.
+- [ ] ***Fix duplicate unfolding tactics*** (`src/proof_solver`) -- mechanism for creating unfolding tactic appears to not check for duplicates.
 
 
 ## Reorganisation
