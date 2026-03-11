@@ -1,5 +1,10 @@
 module type S = sig
-  type t
+  type base
+
+  type t =
+    { base : base
+    ; is_silent : bool option
+    }
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
@@ -10,14 +15,14 @@ module type S = sig
   val is_silent : t -> bool
 end
 
-type 'a t' =
-  { enc : 'a
-  ; is_silent : bool option
-  }
-
-module Make (Log : Logger.S) (Base : Base_term.S) : S with type t = Base.t t' =
+module Make (Log : Logger.S) (Base : Base_term.S) : S with type base = Base.t =
 struct
-  type t = Base.t t'
+  type base = Base.t
+
+  type t =
+    { base : base
+    ; is_silent : bool option
+    }
 
   include
     Json.Thing.Make
@@ -29,7 +34,7 @@ struct
 
         let json ?as_elt (x : t) : Yojson.t =
           `Assoc
-            [ "enc", Base.json ~as_elt:true x.enc
+            [ "base", Base.json ~as_elt:true x.base
             ; ( "is_silent"
               , Json.option ~as_elt:true (fun ?as_elt x -> `Bool x) x.is_silent
               )
@@ -37,13 +42,13 @@ struct
         ;;
       end)
 
-  let equal (a : t) (b : t) : bool = Base.equal a.enc b.enc
+  let equal (a : t) (b : t) : bool = Base.equal a.base b.base
 
   (** [compare a b] first compares the [enc] of each, and if [0] then only compares the contents of [is_silent] if both are [Some _]. This allows us to [find] a label using only the [enc] if we do not know if [is_silent] (which is acceptable since in the full model either all [Labels] are [None] or [Some _], and a comparison such as this would only be in the case where we are trying to find a label by [enc]).
   *)
   let compare (a : t) (b : t) : int =
     Utils.compare_chain
-      [ Base.compare a.enc b.enc
+      [ Base.compare a.base b.base
       ; Option.cata
           (fun (a : bool) -> Option.cata (Bool.compare a) 0 b.is_silent)
           0
@@ -51,6 +56,6 @@ struct
       ]
   ;;
 
-  let hash (x : t) : int = Base.hash x.enc
+  let hash (x : t) : int = Base.hash x.base
   let is_silent (x : t) : bool = Option.default false x.is_silent
 end

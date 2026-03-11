@@ -1,5 +1,6 @@
 module type S = sig
-  type t
+  type base
+  type t = { base : base }
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
@@ -9,4 +10,4 @@ module type S = sig
   val hash : t -> int
 end
 
-module Make : (_ : Logger.S) (Base : Base_term.S) -> S with type t = Base.t
+module Make (Log : Logger.S) (Base : Base_term.S) : S with type base = Base.t

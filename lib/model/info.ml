@@ -1,8 +1,60 @@
+module type S = sig
+  type base
+  type constructorbindings
+  type labels
+
+  module Meta : sig
+    module Bounds : sig
+      type t =
+        | States of int
+        | Transitions of int
+        | Merged of t * t
+
+      val json : ?as_elt:bool -> t -> Yojson.t
+      val to_string : ?pretty:bool -> t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    end
+
+    module RocqLTS : sig
+      type t =
+        { enc : base
+        ; constructors : constructorbindings list
+        }
+
+      val json : ?as_elt:bool -> t -> Yojson.t
+      val to_string : ?pretty:bool -> t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    end
+
+    type t =
+      { is_complete : bool
+      ; is_merged : bool
+      ; bounds : Bounds.t
+      ; lts : RocqLTS.t list
+      }
+
+    val json : ?as_elt:bool -> t -> Yojson.t
+    val to_string : ?pretty:bool -> t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val merge : t -> t -> t
+    val merge_opt : t option -> t option -> t option
+  end
+
+  type t =
+    { meta : Meta.t option
+    ; weak_labels : labels
+    }
+
+  val json : ?as_elt:bool -> t -> Yojson.t
+  val to_string : ?pretty:bool -> t -> string
+  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+  val merge : t -> t -> t
+end
+
 module Make
     (Log : Logger.S)
     (Base : Base_term.S)
-    (Label : Label.S with type t = Base.t Label.t')
-    (Labels : Labels.S with type elt = Label.t)
+    (Labels : Labels.S)
     (Bindings : sig
        module Instructions : sig
          type t
@@ -31,52 +83,15 @@ module Make
          }
 
        val json : ?as_elt:bool -> t -> Yojson.t
-     end) : sig
-  module Meta : sig
-    module Bounds : sig
-      type t =
-        | States of int
-        | Transitions of int
-        | Merged of t * t
+     end) :
+  S
+  with type base = Base.t
+   and type constructorbindings = ConstructorBindings.t
+   and type labels = Labels.t = struct
+  type base = Base.t
+  type constructorbindings = ConstructorBindings.t
+  type labels = Labels.t
 
-      val json : ?as_elt:bool -> t -> Yojson.t
-      val to_string : ?pretty:bool -> t -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-    end
-
-    module RocqLTS : sig
-      type t =
-        { enc : Base.t
-        ; constructors : ConstructorBindings.t list
-        }
-
-      val json : ?as_elt:bool -> t -> Yojson.t
-      val to_string : ?pretty:bool -> t -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-    end
-
-    type t =
-      { is_complete : bool
-      ; is_merged : bool
-      ; bounds : Bounds.t
-      ; lts : RocqLTS.t list
-      }
-
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-  end
-
-  type t =
-    { meta : Meta.t option
-    ; weak_labels : Labels.t
-    }
-
-  val json : ?as_elt:bool -> t -> Yojson.t
-  val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-  val merge : t -> t -> t
-end = struct
   module Meta = struct
     module Bounds = struct
       type t =
@@ -107,8 +122,8 @@ end = struct
 
     module RocqLTS = struct
       type t =
-        { enc : Base.t
-        ; constructors : ConstructorBindings.t list
+        { enc : base
+        ; constructors : constructorbindings list
         }
 
       include
@@ -156,11 +171,34 @@ end = struct
               ]
           ;;
         end)
+
+    let merge (a : t) (b : t) : t =
+      let x : t =
+        { is_complete = a.is_complete && b.is_complete
+        ; is_merged = true
+        ; bounds = Merged (a.bounds, b.bounds)
+        ; lts =
+            List.merge
+              (fun (a : RocqLTS.t) (b : RocqLTS.t) -> Base.compare a.enc b.enc)
+              a.lts
+              b.lts
+        }
+      in
+      x
+    ;;
+
+    let merge_opt (a : t option) (b : t option) : t option =
+      match a, b with
+      | None, None -> None
+      | Some a, Some b -> Some (merge a b)
+      | Some a, None -> Some { a with is_merged = true }
+      | None, Some b -> Some { b with is_merged = true }
+    ;;
   end
 
   type t =
     { meta : Meta.t option
-    ; weak_labels : Labels.t
+    ; weak_labels : labels
     }
 
   include
@@ -179,9 +217,11 @@ end = struct
         ;;
       end)
 
-  (** [merge a b] returns a new [t] with a union of [weak_labels] and [meta=None].
+  (** [merge a b] returns a new [t] with a union of [weak_labels] and [meta=(Meta.merge_opt ...)].
   *)
   let merge (a : t) (b : t) : t =
-    { meta = None; weak_labels = Labels.union a.weak_labels b.weak_labels }
+    { meta = Meta.merge_opt a.meta b.meta
+    ; weak_labels = Labels.union a.weak_labels b.weak_labels
+    }
   ;;
 end

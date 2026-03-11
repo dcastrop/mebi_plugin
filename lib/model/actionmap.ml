@@ -1,47 +1,46 @@
-module Make
-    (Log : Logger.S)
-    (Base : Base_term.S)
-    (State : State.S with type t = Base.t)
-    (States : States.S with type elt = State.t)
-    (Label : Label.S with type t = Base.t Label.t')
-    (Annotation : sig
-       type t
-     end)
-    (Action : sig
-       type t =
-         { label : Label.t
-         ; annotation : Annotation.t option
-         ; constructor_trees : Base.Trees.t
-         }
+module type S = sig
+  type label
+  type action
+  type actions
+  type states
+  type actionpairs
 
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val equal : t -> t -> bool
-       val hash : t -> int
-     end)
-    (Actions : sig
-       include Set.S with type elt = Action.t
-     end)
-    (ActionPair : sig
-       type t = Action.t * States.t
-     end)
-    (ActionPairs : sig
-       include Set.S with type elt = ActionPair.t
-     end) : sig
-  include Hashtbl.S with type key = Action.t
+  include Hashtbl.S with type key = action
 
-  type t' = States.t t
+  type t' = states t
 
   val json : ?as_elt:bool -> t' -> Yojson.t
   val to_string : ?pretty:bool -> t' -> string
   val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
-  val update : t' -> Action.t -> States.t -> unit
-  val destinations : t' -> States.t
-  val reduce_by_label : t' -> Label.t -> t'
-  val to_actions : t' -> Actions.t
-  val to_actionpairs : t' -> ActionPairs.t
-  val of_actionpairs : ActionPairs.t -> t'
+  val update : t' -> action -> states -> unit
+  val destinations : t' -> states
+  val reduce_by_label : t' -> label -> t'
+  val to_actions : t' -> actions
+  val to_actionpairs : t' -> actionpairs
+  val of_actionpairs : actionpairs -> t'
   val merge : t' -> t' -> t'
-end = struct
+end
+
+module Make
+    (Log : Logger.S)
+    (Base : Base_term.S)
+    (States : States.S)
+    (Label : Label.S with type base = Base.t)
+    (Action : Action.S with type label = Label.t and type trees = Base.Trees.t)
+    (Actions : Actions.S with type elt = Action.t)
+    (ActionPairs : Actionpairs.S with type elt = Action.t * States.t) :
+  S
+  with type label = Label.t
+   and type action = Action.t
+   and type actions = Actions.t
+   and type states = States.t
+   and type actionpairs = ActionPairs.t = struct
+  type label = Label.t
+  type action = Action.t
+  type actions = Actions.t
+  type states = States.t
+  type actionpairs = ActionPairs.t
+
   module Map_ : Hashtbl.S with type key = Action.t = Hashtbl.Make (Action)
   include Map_
 
@@ -72,18 +71,13 @@ end = struct
       match find_opt x action with
       | None -> add x action states
       | Some old_states ->
-        (* NOTE: also find the existing key to merge the [constructor_trees] *)
+        (* NOTE: also find the existing key to merge the [trees] *)
         let action : Action.t =
           to_seq_keys x
           |> Seq.filter (Action.equal action)
           |> Seq.fold_left
                (fun (action : Action.t) (y : Action.t) ->
-                 { action with
-                   constructor_trees =
-                     Base.Trees.union
-                       action.constructor_trees
-                       y.constructor_trees
-                 })
+                 { action with trees = Base.Trees.union action.trees y.trees })
                action
         in
         replace x action (States.union old_states states))
@@ -120,7 +114,7 @@ end = struct
   let of_actionpairs (xs : ActionPairs.t) : t' =
     Log.trace __FUNCTION__;
     let y : t' = create 0 in
-    ActionPairs.iter (fun ((k, vs) : ActionPair.t) -> update y k vs) xs;
+    ActionPairs.iter (fun ((k, vs) : ActionPairs.elt) -> update y k vs) xs;
     y
   ;;
 

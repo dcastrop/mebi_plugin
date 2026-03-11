@@ -1,7 +1,60 @@
-module Make : (Log : Logger.S)
+module type S = sig
+  type base
+  type constructorbindings
+  type labels
+
+  module Meta : sig
+    module Bounds : sig
+      type t =
+        | States of int
+        | Transitions of int
+        | Merged of t * t
+
+      val json : ?as_elt:bool -> t -> Yojson.t
+      val to_string : ?pretty:bool -> t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    end
+
+    module RocqLTS : sig
+      type t =
+        { enc : base
+        ; constructors : constructorbindings list
+        }
+
+      val json : ?as_elt:bool -> t -> Yojson.t
+      val to_string : ?pretty:bool -> t -> string
+      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    end
+
+    type t =
+      { is_complete : bool
+      ; is_merged : bool
+      ; bounds : Bounds.t
+      ; lts : RocqLTS.t list
+      }
+
+    val json : ?as_elt:bool -> t -> Yojson.t
+    val to_string : ?pretty:bool -> t -> string
+    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val merge : t -> t -> t
+    val merge_opt : t option -> t option -> t option
+  end
+
+  type t =
+    { meta : Meta.t option
+    ; weak_labels : labels
+    }
+
+  val json : ?as_elt:bool -> t -> Yojson.t
+  val to_string : ?pretty:bool -> t -> string
+  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+  val merge : t -> t -> t
+end
+
+module Make
+    (Log : Logger.S)
     (Base : Base_term.S)
-    (Label : Label.S with type t = Base.t Label.t')
-    (Labels : Labels.S with type elt = Label.t)
+    (Labels : Labels.S)
     (Bindings : sig
        module Instructions : sig
          type t
@@ -30,50 +83,8 @@ module Make : (Log : Logger.S)
          }
 
        val json : ?as_elt:bool -> t -> Yojson.t
-     end)
-    -> sig
-  module Meta : sig
-    module Bounds : sig
-      type t =
-        | States of int
-        | Transitions of int
-        | Merged of t * t
-
-      val json : ?as_elt:bool -> t -> Yojson.t
-      val to_string : ?pretty:bool -> t -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-    end
-
-    module RocqLTS : sig
-      type t =
-        { enc : Base.t
-        ; constructors : ConstructorBindings.t list
-        }
-
-      val json : ?as_elt:bool -> t -> Yojson.t
-      val to_string : ?pretty:bool -> t -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-    end
-
-    type t =
-      { is_complete : bool
-      ; is_merged : bool
-      ; bounds : Bounds.t
-      ; lts : RocqLTS.t list
-      }
-
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-  end
-
-  type t =
-    { meta : Meta.t option
-    ; weak_labels : Labels.t
-    }
-
-  val json : ?as_elt:bool -> t -> Yojson.t
-  val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-  val merge : t -> t -> t
-end
+     end) :
+  S
+  with type base = Base.t
+   and type constructorbindings = ConstructorBindings.t
+   and type labels = Labels.t

@@ -1,33 +1,23 @@
-module Make
-    (Log : Logger.S)
-    (Base : Base_term.S)
-    (State : State.S with type t = Base.t)
-    (WIP : sig
-       type t
+module type S = sig
+  type wip
 
-       val equal : t -> t -> bool
-     end)
-    (Trace : sig
-       type t =
-         { this : WIP.t
-         ; next : next option
-         }
-
-       and next =
-         | Next of t
-         | Goto of State.t
-
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val compare : t -> t -> int
-       val get : WIP.t -> t -> t
-     end) : sig
-  include Set.S with type elt = Trace.t
+  include Set.S
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
   val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-  val get : WIP.t -> t -> t
-end = struct
+  val get : wip -> t -> t
+end
+
+module Make
+    (Log : Logger.S)
+    (Base : Base_term.S)
+    (State : State.S with type base = Base.t)
+    (WIP : Wip_annotation.S with type state = State.t)
+    (Trace : Wip_trace.S with type state = State.t and type wip = WIP.t) :
+  S with type elt = Trace.t and type wip = WIP.t = struct
+  type wip = WIP.t
+
   module Set_ : Set.S with type elt = Trace.t = Set.Make (Trace)
   include Set_
 

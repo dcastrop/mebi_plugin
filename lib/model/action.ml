@@ -1,19 +1,12 @@
-module Make
-    (Log : Logger.S)
-    (Base : Base_term.S)
-    (Label : Label.S with type t = Base.t Label.t')
-    (Annotation : sig
-       type t
+module type S = sig
+  type label
+  type annotation
+  type trees
 
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-       val opt_length : ?fail_if_none:bool -> t option -> int
-       val json : ?as_elt:bool -> t -> Yojson.t
-     end) : sig
   type t =
-    { label : Label.t
-    ; annotation : Annotation.t option
-    ; constructor_trees : Base.Trees.t
+    { label : label
+    ; annotation : annotation option
+    ; trees : trees
     }
 
   val json : ?as_elt:bool -> t -> Yojson.t
@@ -24,13 +17,34 @@ module Make
   val hash : t -> int
   val wk_equal : t -> t -> bool
   val is_silent : t -> bool
-  val is_labelled : Label.t -> t -> bool
+  val is_labelled : label -> t -> bool
   val shorter_annotation : t -> t -> t
-end = struct
+end
+
+module Make
+    (Log : Logger.S)
+    (Base : Base_term.S)
+    (Label : Label.S with type base = Base.t)
+    (Annotation : sig
+       type t
+
+       val equal : t -> t -> bool
+       val compare : t -> t -> int
+       val opt_length : ?fail_if_none:bool -> t option -> int
+       val json : ?as_elt:bool -> t -> Yojson.t
+     end) :
+  S
+  with type label = Label.t
+   and type annotation = Annotation.t
+   and type trees = Base.Trees.t = struct
+  type label = Label.t
+  type annotation = Annotation.t
+  type trees = Base.Trees.t
+
   type t =
-    { label : Label.t
-    ; annotation : Annotation.t option
-    ; constructor_trees : Base.Trees.t
+    { label : label
+    ; annotation : annotation option
+    ; trees : trees
     }
 
   include
@@ -46,8 +60,7 @@ end = struct
             [ "label", Label.json ~as_elt:true x.label
             ; ( "annotation"
               , Json.option ~as_elt:true Annotation.json x.annotation )
-            ; ( "constructor_trees"
-              , Base.Trees.json ~as_elt:true x.constructor_trees )
+            ; "trees", Base.Trees.json ~as_elt:true x.trees
             ]
         ;;
       end)
@@ -55,14 +68,14 @@ end = struct
   let equal (a : t) (b : t) : bool =
     Label.equal a.label b.label
     && Option.equal Annotation.equal a.annotation b.annotation
-    && Base.Trees.equal a.constructor_trees b.constructor_trees
+    && Base.Trees.equal a.trees b.trees
   ;;
 
   let compare (a : t) (b : t) : int =
     Utils.compare_chain
       [ Label.compare a.label b.label
       ; Option.compare Annotation.compare a.annotation b.annotation
-      ; Base.Trees.compare a.constructor_trees b.constructor_trees
+      ; Base.Trees.compare a.trees b.trees
       ]
   ;;
 

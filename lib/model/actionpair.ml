@@ -1,27 +1,7 @@
-module Make
-    (Log : Logger.S)
-    (Base : Base_term.S)
-    (State : State.S with type t = Base.t)
-    (States : States.S with type elt = State.t)
-    (Label : Label.S with type t = Base.t Label.t')
-    (Annotation : sig
-       type t
-
-       val opt_length : ?fail_if_none:bool -> t option -> int
-       val shorter : t -> t -> t
-     end)
-    (Action : sig
-       type t =
-         { label : Label.t
-         ; annotation : Annotation.t option
-         ; constructor_trees : Base.Trees.t
-         }
-
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val compare : t -> t -> int
-       val wk_equal : t -> t -> bool
-     end) : sig
-  type t = Action.t * States.t
+module type S = sig
+  type action
+  type states
+  type t = action * states
 
   val compare : t -> t -> int
   val shorter_annotation : t -> t -> t
@@ -30,8 +10,24 @@ module Make
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
   val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-end = struct
-  type t = Action.t * States.t
+end
+
+module Make
+    (Log : Logger.S)
+    (Base : Base_term.S)
+    (States : States.S)
+    (Annotation : Annotation.S)
+    (Action :
+       Action.S
+       with type annotation = Annotation.t
+        and type trees = Base.Trees.t) :
+  S
+  with type action = Action.t
+   and type states = States.t
+   and type t = Action.t * States.t = struct
+  type action = Action.t
+  type states = States.t
+  type t = action * states
 
   let compare ((a, x) : t) ((b, y) : t) : int =
     Utils.compare_chain [ Action.compare a b; States.compare x y ]
@@ -76,10 +72,7 @@ end = struct
             let zaction : Action.t =
               { label = yaction.label
               ; annotation
-              ; constructor_trees =
-                  Base.Trees.union
-                    yaction.constructor_trees
-                    xaction.constructor_trees
+              ; trees = Base.Trees.union yaction.trees xaction.trees
               }
             in
             Some (zaction, ydestinations), acc)

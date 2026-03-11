@@ -1,49 +1,22 @@
-(** [module Trace] ... we keep track of the total sum of traces we have already checked. This is useful for checking if, from a state and action, we have already explored the rest of this trace and so can just use what we have already learned, e.g., if we are in some "subtrace".
-*)
-module Make
-    (Log : Logger.S)
-    (Base : Base_term.S)
-    (State : State.S with type t = Base.t)
-    (Label : Label.S with type t = Base.t Label.t')
-    (Note : sig
-       type t =
-         { from : State.t
-         ; label : Label.t
-         ; using : Base.Trees.t
-         ; goto : State.t
-         }
-     end)
-    (Annotation : sig
-       type t =
-         { this : Note.t
-         ; next : t option
-         }
-     end)
-    (WIP : sig
-       type t =
-         { from : State.t
-         ; via : Label.t
-         ; trees : Base.Trees.t
-         }
+module type S = sig
+  type state
+  type label
+  type annotation
+  type wip
 
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val is_named : t -> bool
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-     end) : sig
   type t =
-    { this : WIP.t
+    { this : wip
     ; next : next option
     }
 
   and next =
     | Next of t
-    | Goto of State.t
+    | Goto of state
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
   val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-  val create : WIP.t -> t
+  val create : wip -> t
   val compare : t -> t -> int
   val compare_next : next -> next -> int
 
@@ -54,36 +27,66 @@ module Make
 
   exception CouldNotFindGoto
 
-  val get_goto : t -> State.t
+  val get_goto : t -> state
 
   exception CouldNotFindNamed
 
-  val get_named : t -> Label.t
-  val get_named_opt : t -> Label.t option
+  val get_named : t -> label
+  val get_named_opt : t -> label option
 
   exception FailAdd_AlreadyNamed
   exception FailAdd_AlreadyHasGoto
 
-  val add : WIP.t -> t -> t
+  val add : wip -> t -> t
 
   exception FailSetGoto_AlreadyHasGoto
 
-  val set_goto : State.t -> t -> t
+  val set_goto : state -> t -> t
 
   exception FailSeq_AlreadyNamed
   exception FailSeq_AlreadyHasGoto
 
   val seq : t -> t -> t
   val seq_opt : t option -> t -> t
-  val get : WIP.t -> t -> t
+  val get : wip -> t -> t
   val upto_named : t -> t
 
   exception GotoNotSet
 
-  val to_annotation : t -> Annotation.t
-end = struct
+  val to_annotation : t -> annotation
+end
+
+(** [module Trace] ... we keep track of the total sum of traces we have already checked. This is useful for checking if, from a state and action, we have already explored the rest of this trace and so can just use what we have already learned, e.g., if we are in some "subtrace".
+*)
+module Make
+    (Log : Logger.S)
+    (Base : Base_term.S)
+    (State : State.S with type base = Base.t)
+    (Label : Label.S with type base = Base.t)
+    (Note :
+       Annotation_note.S
+       with type state = State.t
+        and type label = Label.t
+        and type trees = Base.Trees.t)
+    (Annotation : Annotation.S with type label = Label.t and type note = Note.t)
+    (WIP :
+       Wip_annotation.S
+       with type state = State.t
+        and type label = Label.t
+        and type annotation = Annotation.t
+        and type trees = Base.Trees.t) :
+  S
+  with type state = State.t
+   and type label = Label.t
+   and type annotation = Annotation.t
+   and type wip = WIP.t = struct
+  type state = State.t
+  type label = Label.t
+  type annotation = Annotation.t
+  type wip = WIP.t
+
   type t =
-    { this : WIP.t
+    { this : wip
     ; next : next option
     }
 

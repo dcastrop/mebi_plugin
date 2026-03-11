@@ -1,5 +1,16 @@
 module type S = sig
-  type t
+  type state
+  type label
+  type tree
+  type annotation
+
+  type t =
+    { from : state
+    ; goto : state
+    ; label : label
+    ; tree : tree option
+    ; annotation : annotation option
+    }
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
@@ -9,39 +20,29 @@ module type S = sig
   val is_silent : t -> bool
 end
 
-type ('a, 'b, 'c, 'd) t' =
-  { from : 'a
-  ; goto : 'a
-  ; label : 'b
-  ; tree : 'c option
-  ; annotation : 'd option
-  }
-
 module Make
     (Log : Logger.S)
     (Base : Base_term.S)
-    (State : State.S with type t = Base.t)
-    (Label : Label.S with type t = Base.t Label.t')
-    (Note : sig
-       type t =
-         { from : State.t
-         ; label : Label.t
-         ; using : Base.Trees.t
-         ; goto : State.t
-         }
-     end)
-    (Annotation : sig
-       type t =
-         { this : Note.t
-         ; next : t option
-         }
+    (State : State.S with type base = Base.t)
+    (Label : Label.S with type base = Base.t)
+    (Annotation : Annotation.S with type label = Label.t) :
+  S
+  with type state = State.t
+   and type label = Label.t
+   and type tree = Base.Tree.t
+   and type annotation = Annotation.t = struct
+  type state = State.t
+  type label = Label.t
+  type tree = Base.Tree.t
+  type annotation = Annotation.t
 
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-     end) : S with type t = (State.t, Label.t, Base.Tree.t, Annotation.t) t' =
-struct
-  type t = (State.t, Label.t, Base.Tree.t, Annotation.t) t'
+  type t =
+    { from : state
+    ; goto : state
+    ; label : label
+    ; tree : tree option
+    ; annotation : annotation option
+    }
 
   include
     Json.Thing.Make

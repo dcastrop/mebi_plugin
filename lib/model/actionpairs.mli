@@ -1,29 +1,27 @@
-module Make : (Log : Logger.S)
-    (Base : Base_term.S)
-    (State : State.S with type t = Base.t)
-    (States : States.S with type elt = State.t)
-    (Action : sig
-       type t
+module type S = sig
+  type states
 
-       val equal : t -> t -> bool
-     end)
-    (ActionPair : sig
-       type t = Action.t * States.t
-
-       val json : ?as_elt:bool -> t -> Yojson.t
-       val compare : t -> t -> int
-       val shorter_annotation : t -> t -> t
-     end)
-    -> sig
-  include Set.S with type elt = ActionPair.t
+  include Set.S
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
   val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
-  val destinations : t -> States.t
+  val destinations : t -> states
 
   exception IsEmpty
 
-  val shortest_annotation : t -> ActionPair.t
-  val merge_list : t -> ActionPair.t list -> t
+  val shortest_annotation : t -> elt
+  val merge_list : t -> elt list -> t
 end
+
+module Make
+    (Log : Logger.S)
+    (States : States.S)
+    (Action : Action.S)
+    (ActionPair :
+       Actionpair.S with type action = Action.t and type states = States.t) :
+  S
+  with type states = States.t
+   and type states = ActionPair.states
+   and type elt = ActionPair.t
+   and type elt = Action.t * States.t

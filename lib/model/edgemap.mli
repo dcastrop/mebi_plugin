@@ -1,71 +1,62 @@
-module Make : (Log : Logger.S)
-    (Base : Base_term.S)
-    (State : State.S with type t = Base.t)
-    (States : States.S with type elt = State.t)
-    (Label : Label.S with type t = Base.t Label.t')
-    (Annotation : sig
-       type t
-     end)
-    (Transition : Transition.S
-                  with type t =
-                    (State.t, Label.t, Base.Tree.t, Annotation.t) Transition.t')
-    (Transitions : sig
-       include Set.S with type elt = Transition.t
-     end)
-    (Action : sig
-       type t =
-         { label : Label.t
-         ; annotation : Annotation.t option
-         ; constructor_trees : Base.Trees.t
-         }
-     end)
-    (Actions : sig
-       include Set.S with type elt = Action.t
-     end)
-    (ActionPair : sig
-       type t = Action.t * States.t
-     end)
-    (ActionPairs : sig
-       include Set.S with type elt = ActionPair.t
-     end)
-    (ActionMap : sig
-       include Hashtbl.S with type key = Action.t
+module type S = sig
+  type state
+  type states
+  type label
+  type transitions
+  type action
+  type actions
+  type actionmap
+  type edges
 
-       type t' = States.t t
+  include Hashtbl.S with type key = state
 
-       val json : ?as_elt:bool -> t' -> Yojson.t
-       val update : t' -> Action.t -> States.t -> unit
-       val destinations : t' -> States.t
-       val reduce_by_label : t' -> Label.t -> t'
-       val to_actionpairs : t' -> ActionPairs.t
-       val of_actionpairs : ActionPairs.t -> t'
-       val merge : t' -> t' -> t'
-     end)
-    (Edge : sig
-       type t =
-         { from : State.t
-         ; goto : State.t
-         ; action : Action.t
-         }
-     end)
-    (Edges : sig
-       include Set.S with type elt = Edge.t
-     end)
-    -> sig
-  include Hashtbl.S with type key = State.t
-
-  type t' = ActionMap.t' t
+  type t' = actionmap t
 
   val json : ?as_elt:bool -> t' -> Yojson.t
   val to_string : ?pretty:bool -> t' -> string
   val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
-  val update : t' -> State.t -> Action.t -> States.t -> unit
-  val destinations : t' -> State.t -> States.t
-  val get_actions : t' -> State.t -> Actions.t
-  val reduce_by_label : t' -> Label.t -> t'
-  val get_edges : t' -> State.t -> Edges.t
-  val to_edges : t' -> Edges.t
-  val of_edges : Edges.t -> t'
-  val of_transitions : Transitions.t -> t'
+  val update : t' -> state -> action -> states -> unit
+  val destinations : t' -> state -> states
+  val get_actions : t' -> state -> actions
+  val reduce_by_label : t' -> label -> t'
+  val get_edges : t' -> state -> edges
+  val to_edges : t' -> edges
+  val of_edges : edges -> t'
+  val of_transitions : transitions -> t'
   val merge : t' -> t' -> t'
 end
+
+module Make
+    (Log : Logger.S)
+    (Base : Base_term.S)
+    (State : State.S with type base = Base.t)
+    (States : States.S with type elt = State.t)
+    (Transition :
+       Transition.S with type state = State.t and type tree = Base.Tree.t)
+    (Transitions : Transitions.S with type elt = Transition.t)
+    (Action :
+       Action.S
+       with type label = Transition.label
+        and type annotation = Transition.annotation
+        and type trees = Base.Trees.t)
+    (Actions : Actions.S with type elt = Action.t)
+    (ActionPairs : Actionpairs.S with type elt = Action.t * States.t)
+    (ActionMap :
+       Actionmap.S
+       with type label = Action.label
+        and type action = Action.t
+        and type states = States.t
+        and type actionpairs = ActionPairs.t)
+    (Edge : Edge.S with type state = State.t and type action = Action.t)
+    (Edges : Edges.S with type elt = Edge.t) :
+  S
+  with type state = State.t
+   and type states = States.t
+   and type label = Transition.label
+   and type label = Action.label
+   and type label = ActionMap.label
+   and type transitions = Transitions.t
+   and type action = Action.t
+   and type actions = Actions.t
+   and type actionmap = ActionMap.t'
+   and type edges = Edges.t
