@@ -19,19 +19,19 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
     exception CouldNotDecode_State of Model.State.t
 
     let state (x : Model.State.t) : EConstr.t =
-      handle x (CouldNotDecode_State x)
+      handle x.base (CouldNotDecode_State x)
     ;;
 
     exception CouldNotDecode_Label of Model.Label.t
 
     let label (x : Model.Label.t) : EConstr.t =
-      handle x.enc (CouldNotDecode_Label x)
+      handle x.base (CouldNotDecode_Label x)
     ;;
 
     exception CouldNotDecode_LTS_Constructor of Model.Info.Meta.RocqLTS.t
 
     let lts_constructor (x : Model.Info.Meta.RocqLTS.t) : EConstr.t =
-      handle x.enc (CouldNotDecode_LTS_Constructor x)
+      handle x.base (CouldNotDecode_LTS_Constructor x)
     ;;
   end
 
@@ -498,11 +498,9 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
           let (act, tgt, int_tree) : M.Constructor.t = List.nth new_constrs i in
           let act_dec : EConstr.t = M.decode act in
           let* is_silent : bool option = is_silent_transition act_dec g.weak in
-          let label : Model.Label.t = { enc = act; is_silent } in
-          let constructor_trees : Enc.Trees.t = Enc.Trees.singleton int_tree in
-          let to_add : Model.Action.t =
-            { label; constructor_trees; annotation = None }
-          in
+          let label : Model.Label.t = { base = act; is_silent } in
+          let trees : Enc.Trees.t = Enc.Trees.singleton int_tree in
+          let to_add : Model.Action.t = { label; trees; annotation = None } in
           D.singleton (tgt, int_tree) |> T.update g.transitions from to_add;
           (* NOTE: if [tgt] has not been explored then add [to_visit] *)
           if T.mem g.transitions tgt || V.mem tgt g.states
@@ -552,7 +550,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
     end
 
     module Extract (Z : Z_Args) = struct
-      let state (x : Enc.t) : Model.State.t = x
+      let state (x : Enc.t) : Model.State.t = { base = x }
 
       let states () : Model.States.t =
         Log.trace __FUNCTION__;
@@ -611,7 +609,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
               ConstructorBindings.extract_info v
             in
             let open Model.Info.Meta.RocqLTS in
-            { enc; constructors } :: acc |> M.return
+            { base = enc; constructors } :: acc |> M.return
           | _ -> M.return acc
         in
         M.iterate 0 (List.length xs - 1) [] f
@@ -648,7 +646,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
           let xs : Model.Label.t list = Model.Labels.to_list xs in
           let g (i : int) (acc : Model.Labels.t) =
             let x : Model.Label.t = List.nth xs i in
-            let* is_weak : bool = f x.enc in
+            let* is_weak : bool = f x.base in
             if is_weak then Model.Labels.add x acc |> M.return else M.return acc
           in
           M.iterate 0 (List.length xs - 1) Model.Labels.empty g

@@ -17,7 +17,7 @@ module type S = sig
 
     module RocqLTS : sig
       type t =
-        { enc : base
+        { base : base
         ; constructors : constructorbindings list
         }
 
