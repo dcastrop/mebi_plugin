@@ -1,35 +1,14 @@
-(** [module WIP] is a lightweight counterpart of [Note.t] that forms some "work-in-progress" [Annotation.t]. Once we stop saturating an action, we check if we are able to yield a new saturated action and convert the [wip list] to an [Annotation.t].
-*)
-module Make
-    (Log : Logger.S)
-    (Base : Base_term.S)
-    (State : State.S with type t = Base.t)
-    (Label : Label.S with type t = Base.t Label.t')
-    (Note : sig
-       type t =
-         { from : State.t
-         ; label : Label.t
-         ; using : Base.Trees.t
-         ; goto : State.t
-         }
-     end)
-    (Annotation : sig
-       type t =
-         { this : Note.t
-         ; next : t option
-         }
-     end)
-    (Action : sig
-       type t =
-         { label : Label.t
-         ; annotation : Annotation.t option
-         ; constructor_trees : Base.Trees.t
-         }
-     end) : sig
+module type S = sig
+  type state
+  type label
+  type trees
+  type annotation
+  type action
+
   type t =
-    { from : State.t
-    ; via : Label.t
-    ; trees : Base.Trees.t
+    { from : state
+    ; via : label
+    ; trees : trees
     }
 
   val json : ?as_elt:bool -> t -> Yojson.t
@@ -39,16 +18,47 @@ module Make
   val is_named : t -> bool
   val equal : t -> t -> bool
   val compare : t -> t -> int
-  val create : State.t -> Action.t -> t
+  val create : state -> action -> t
 
   exception IsEmptyList
 
-  val list_to_annotation : State.t -> t list -> Annotation.t
-end = struct
+  val list_to_annotation : state -> t list -> annotation
+end
+
+(** [module WIP] is a lightweight counterpart of [Note.t] that forms some "work-in-progress" [Annotation.t]. Once we stop saturating an action, we check if we are able to yield a new saturated action and convert the [wip list] to an [Annotation.t].
+*)
+module Make
+    (Log : Logger.S)
+    (Base : Base_term.S)
+    (State : State.S with type base = Base.t)
+    (Label : Label.S with type base = Base.t)
+    (Note :
+       Annotation_note.S
+       with type state = State.t
+        and type label = Label.t
+        and type trees = Base.Trees.t)
+    (Annotation : Annotation.S with type label = Label.t and type note = Note.t)
+    (Action :
+       Action.S
+       with type label = Label.t
+        and type annotation = Annotation.t
+        and type trees = Base.Trees.t) :
+  S
+  with type state = State.t
+   and type label = Label.t
+   and type annotation = Annotation.t
+   and type trees = Base.Trees.t
+   and type action = Action.t = struct
+  type state = State.t
+  type label = Label.t
+  type trees = Base.Trees.t
+  type annotation = Annotation.t
+  type action = Action.t
+
   type t =
-    { from : State.t
-    ; via : Label.t
-    ; trees : Base.Trees.t
+    { from : state
+    ; via : label
+    ; trees : trees
     }
 
   include
@@ -86,7 +96,7 @@ end = struct
   ;;
 
   let create (from : State.t) (action : Action.t) : t =
-    { from; via = action.label; trees = action.constructor_trees }
+    { from; via = action.label; trees = action.trees }
   ;;
 
   exception IsEmptyList

@@ -1,9 +1,9 @@
 module Make
     (Log : Logger.S)
     (Base : Base_term.S)
-    (State : State.S with type t = Base.t)
+    (State : State.S with type base = Base.t)
     (States : States.S with type elt = State.t)
-    (Label : Label.S with type t = Base.t Label.t')
+    (Label : Label.S with type base = Base.t)
     (Labels : Labels.S with type elt = Label.t)
     (Action : sig
        type t

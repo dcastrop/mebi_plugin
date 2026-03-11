@@ -38,62 +38,112 @@ module Make
        val json : ?as_elt:bool -> t -> Yojson.t
      end) =
 struct
-  module State : State.S with type t = Base.t = State.Make (Log) (Base)
+  module State : State.S with type base = Base.t = State.Make (Log) (Base)
   module States : States.S with type elt = State.t = States.Make (Log) (State)
-  module Label : Label.S with type t = Base.t Label.t' = Label.Make (Log) (Base)
+  module Label : Label.S with type base = Base.t = Label.Make (Log) (Base)
   module Labels : Labels.S with type elt = Label.t = Labels.Make (Log) (Label)
 
   (* TODO: working on how to give the rest of them signatures to make maintaining this easier *)
-  module Note = Annotation_note.Make (Log) (Base) (State) (Label)
-  module Annotation = Annotation.Make (Log) (Label) (Note)
-  module Annotations = Annotations.Make (Log) (Note) (Annotation)
+  module Note :
+    Annotation_note.S
+    with type state = State.t
+     and type label = Label.t
+     and type trees = Base.Trees.t =
+    Annotation_note.Make (Log) (Base) (State) (Label)
+
+  module Annotation :
+    Annotation.S with type label = Label.t and type note = Note.t =
+    Annotation.Make (Log) (Base) (Label) (Note)
+
+  module Annotations : Annotations.S with type elt = Annotation.t =
+    Annotations.Make (Log) (Note) (Annotation)
 
   module Transition :
     Transition.S
-    with type t = (State.t, Label.t, Base.Tree.t, Annotation.t) Transition.t' =
-    Transition.Make (Log) (Base) (State) (Label) (Note) (Annotation)
+    with type state = State.t
+     and type label = Label.t
+     and type tree = Base.Tree.t
+     and type annotation = Annotation.t =
+    Transition.Make (Log) (Base) (State) (Label) (Annotation)
 
-  module Transitions =
-    Transitions.Make (Log) (Base) (State) (Label) (Labels) (Annotation)
-      (Transition)
+  module Transitions :
+    Transitions.S with type elt = Transition.t and type labels = Labels.t =
+    Transitions.Make (Log) (Labels) (Transition)
 
-  module Action = Action.Make (Log) (Base) (Label) (Annotation)
+  module Action :
+    Action.S
+    with type label = Label.t
+     and type annotation = Annotation.t
+     and type trees = Base.Trees.t =
+    Action.Make (Log) (Base) (Label) (Annotation)
 
-  module Actions =
-    Actions.Make (Log) (Base) (Label) (Labels) (Annotation) (Action)
+  module Actions :
+    Actions.S
+    with type elt = Action.t
+     and type label = Label.t
+     and type labels = Labels.t =
+    Actions.Make (Log) (Label) (Labels) (Action)
 
-  module ActionPair =
-    Actionpair.Make (Log) (Base) (State) (States) (Label) (Annotation) (Action)
+  module ActionPair :
+    Actionpair.S with type action = Action.t and type states = States.t =
+    Actionpair.Make (Log) (Base) (States) (Annotation) (Action)
 
-  module ActionPairs =
-    Actionpairs.Make (Log) (Base) (State) (States) (Action) (ActionPair)
+  module ActionPairs :
+    Actionpairs.S with type states = States.t and type elt = ActionPair.t =
+    Actionpairs.Make (Log) (States) (Action) (ActionPair)
 
-  module ActionMap =
-    Actionmap.Make (Log) (Base) (State) (States) (Label) (Annotation) (Action)
-      (Actions)
-      (ActionPair)
+  module ActionMap :
+    Actionmap.S
+    with type label = Label.t
+     and type action = Action.t
+     and type actions = Actions.t
+     and type states = States.t
+     and type actionpairs = ActionPairs.t =
+    Actionmap.Make (Log) (Base) (States) (Label) (Action) (Actions)
       (ActionPairs)
 
-  module Edge = Edge.Make (Log) (State) (Label) (Action)
-  module Edges = Edges.Make (Log) (State) (Label) (Action) (Edge)
+  module Edge :
+    Edge.S
+    with type state = State.t
+     and type label = Label.t
+     and type action = Action.t =
+    Edge.Make (Log) (State) (Label) (Action)
 
-  module EdgeMap =
-    Edgemap.Make (Log) (Base) (State) (States) (Label) (Annotation) (Transition)
-      (Transitions)
+  module Edges : Edges.S with type elt = Edge.t and type label = Edge.label =
+    Edges.Make (Log) (Edge)
+
+  module EdgeMap :
+    Edgemap.S
+    with type state = State.t
+     and type states = States.t
+     and type label = Label.t
+     and type transitions = Transitions.t
+     and type action = Action.t
+     and type actions = Actions.t
+     and type actionmap = ActionMap.t'
+     and type edges = Edges.t =
+    Edgemap.Make (Log) (Base) (State) (States) (Transition) (Transitions)
       (Action)
       (Actions)
-      (ActionPair)
       (ActionPairs)
       (ActionMap)
       (Edge)
       (Edges)
 
-  module Partition =
-    State_partition.Make (Log) (State) (States) (Label) (Action) (ActionMap)
-      (EdgeMap)
+  module Partition :
+    State_partition.S
+    with type elt = States.t
+     and type state = State.t
+     and type label = Label.t
+     and type edgemap = EdgeMap.t' =
+    State_partition.Make (Log) (State) (States) (ActionMap) (EdgeMap)
 
-  module Info =
-    Info.Make (Log) (Base) (Label) (Labels) (Bindings) (ConstructorBindings)
+  module Info :
+    Info.S
+    with type base = Base.t
+     and type constructorbindings = ConstructorBindings.t
+     and type labels = Labels.t =
+    Info.Make (Log) (Base) (Labels) (Bindings) (ConstructorBindings)
 
   module LTS = struct
     type t =
@@ -184,7 +234,18 @@ struct
     (** [module Saturate ] ...
         (* TODO: the idea of [Traces] needs to be revisited. It does provide optimizations to examples with a lot of silent actions, where the saturated FSM is considerably larger, but i believe that there are areas where this can still be improved. *)
     *)
-    module Saturate =
+    module Saturate :
+      Saturate.S
+      with type state = State.t
+       and type states = States.t
+       and type label = Label.t
+       and type labels = Labels.t
+       and type annotation = Annotation.t
+       and type trees = Base.Trees.t
+       and type action = Action.t
+       and type actionpairs = ActionPairs.t
+       and type actionmap = ActionMap.t'
+       and type edgemap = EdgeMap.t' =
       Saturate.Make (Log) (Base) (State) (States) (Label) (Labels) (Note)
         (Annotation)
         (Annotations)

@@ -1,5 +1,6 @@
 module type S = sig
-  type t
+  type base
+  type t = { base : base }
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
@@ -9,9 +10,10 @@ module type S = sig
   val hash : t -> int
 end
 
-module Make (Log : Logger.S) (Base : Base_term.S) : S with type t = Base.t =
+module Make (Log : Logger.S) (Base : Base_term.S) : S with type base = Base.t =
 struct
-  type t = Base.t
+  type base = Base.t
+  type t = { base : base }
 
   include
     Json.Thing.Make
@@ -20,10 +22,10 @@ struct
         type k = t
 
         let name = "State"
-        let json ?as_elt (x : t) : Yojson.t = Base.json ~as_elt:false x
+        let json ?as_elt (x : t) : Yojson.t = Base.json ~as_elt:false x.base
       end)
 
-  let equal = Base.equal
-  let compare = Base.compare
-  let hash = Base.hash
+  let equal a b = Base.equal a.base b.base
+  let compare a b = Base.compare a.base b.base
+  let hash x = Base.hash x.base
 end

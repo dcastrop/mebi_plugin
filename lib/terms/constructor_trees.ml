@@ -12,8 +12,9 @@ struct
     Json.List.Make
       (Log)
       (struct
-        include Constructor
+        type k = Constructor.t
 
         let name = "Constructors"
+        let json = Constructor.json
       end)
 end
