@@ -119,6 +119,19 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
           ;;
         end)
 
+    module Partition =
+      Json.Set.Make
+        (Log)
+        (struct
+          module Set = Model.Partition
+
+          let name = "Paritition"
+
+          let json ?(as_elt : bool = false) (x : Model.States.t) : Yojson.t =
+            States.json ~as_elt:true x
+          ;;
+        end)
+
     module Label =
       Json.Thing.Make
         (Log)
@@ -379,6 +392,50 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
               ]
           ;;
         end)
+
+    module Bisimilarity = struct
+      module FSMPair =
+        Json.Thing.Make
+          (Log)
+          (struct
+            type k = Model.Bisimilarity.FSMPair.t
+
+            let name = "FSM Pair"
+
+            let json ?as_elt (x : Model.Bisimilarity.FSMPair.t) : Yojson.t =
+              `Assoc
+                [ "original", FSM.json ~as_elt:true x.original
+                ; "saturated", FSM.json ~as_elt:true x.saturated
+                ]
+            ;;
+          end)
+
+      include
+        Json.Thing.Make
+          (Log)
+          (struct
+            type k = Model.Bisimilarity.t
+
+            let name = "Bisimilarity"
+
+            let json ?(as_elt : bool = false) (x : Model.Bisimilarity.t)
+              : Yojson.t
+              =
+              `Assoc
+                [ ( "fsms"
+                  , `Assoc
+                      [ "a", FSMPair.json ~as_elt:true x.fsm_a
+                      ; "b", FSMPair.json ~as_elt:true x.fsm_b
+                      ; "merged", FSM.json ~as_elt:true x.merged
+                      ] )
+                ; ( "bisimilar states"
+                  , Partition.json ~as_elt:true x.result.bisim_states )
+                ; ( "non-bisimilar states"
+                  , Partition.json ~as_elt:true x.result.non_bisim_states )
+                ]
+            ;;
+          end)
+    end
   end
 
   (** *)
@@ -1263,7 +1320,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      Log.thing Result "Finished Making FSM" the_fsm (Of Decode.FSM.to_string);
+      Decode.FSM.log ~m:Result ~s:"Finished Making FSM" the_fsm;
       M.return None
     ;;
 
@@ -1272,10 +1329,10 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      Log.thing Info "Finished Making FSM" the_fsm (Of FSM.to_string);
+      Decode.FSM.log ~m:Info ~s:"Finished Making FSM" the_fsm;
       Log.info "Saturating FSM...";
       let the_fsm = Model.FSM.saturate the_fsm in
-      Log.thing Result "Finished Saturating FSM" the_fsm (Of FSM.to_string);
+      Decode.FSM.log ~m:Result ~s:"Finished Saturating FSM" the_fsm;
       M.return None
     ;;
 
@@ -1284,10 +1341,11 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      Log.thing Info "Finished Making FSM" the_fsm (Of FSM.to_string);
+      Decode.FSM.log ~m:Info ~s:"Finished Making FSM" the_fsm;
       Log.info "Minimizing FSM...";
       let { fsm; pi } : Model.Minimize.t = Model.Minimize.fsm the_fsm in
-      Log.thing Result "Finished Minimizing FSM" fsm (Of FSM.to_string);
+      Decode.Partition.log ~m:Info ~s:"pi" pi;
+      Decode.FSM.log ~m:Result ~s:"Finished Minimizing FSM" fsm;
       M.return None
     ;;
 
@@ -1303,11 +1361,11 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       Log.info "Making FSM A...";
       let weak1 : Weak.t option = Config.get_the_weak_arg1 () in
       let* the_fsm_a = build_fsm ~weak:weak1 alts ax refs in
-      Log.thing Info "Finished Making FSM A" the_fsm_a (Of FSM.to_string);
+      Decode.FSM.log ~m:Info ~s:"Finished Making FSM A" the_fsm_a;
       Log.info "Making FSM B...";
       let weak2 : Weak.t option = Config.get_the_weak_arg2 () in
       let* the_fsm_b = build_fsm ~weak:weak2 blts bx refs in
-      Log.thing Info "Finished Making FSM B" the_fsm_a (Of FSM.to_string);
+      Decode.FSM.log ~m:Info ~s:"Finished Making FSM B" the_fsm_b;
       M.return (the_fsm_a, the_fsm_b)
     ;;
 
@@ -1317,7 +1375,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
       Log.info "Merging FSMs...";
       let the_fsm = FSM.merge the_fsm_a the_fsm_b in
-      Log.thing Result "Finished Merging FSMs" the_fsm (Of FSM.to_string);
+      Decode.FSM.log ~m:Result ~s:"Finished Merging FSMs" the_fsm;
       M.return None
     ;;
 
@@ -1327,7 +1385,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
       Log.info "Checking Bisimilarity of FSMs...";
       let result = Model.Bisimilarity.fsm the_fsm_a the_fsm_b in
-      Log.thing Result "Result" result (Of Model.Bisimilarity.to_string);
+      Decode.Bisimilarity.log ~m:Result ~s:"Result" result;
       fail_if_not_bisim result.result;
       M.return (Some result)
     ;;

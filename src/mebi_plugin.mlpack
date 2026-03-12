@@ -34,6 +34,8 @@ Edges
 Edgemap
 State_partition
 Info
+LTS
+FSM
 Wip_annotation
 Wip_trace
 Wip_traces

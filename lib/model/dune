@@ -28,6 +28,8 @@
   edgemap
   state_partition
   info
+  LTS
+  FSM
   wip_annotation
   wip_trace
   wip_traces
