@@ -40,7 +40,7 @@ module Kind = struct
 
   let default_level_fun
         ?(debug : bool = debug)
-        ?(info : bool = false)
+        ?(info : bool = true)
         ?(notice : bool = true)
         ?(warning : bool = true)
         ?(error : bool = true)
