@@ -145,130 +145,58 @@ struct
      and type labels = Labels.t =
     Info.Make (Log) (Base) (Labels) (Bindings) (ConstructorBindings)
 
-  module LTS = struct
-    type t =
-      { init : State.t option
-      ; terminals : States.t
-      ; alphabet : Labels.t
-      ; states : States.t
-      ; transitions : Transitions.t
-      ; info : Info.t
-      }
+  module LTS :
+    LTS.S
+    with type state = State.t
+     and type states = States.t
+     and type labels = Labels.t
+     and type transitions = Transitions.t
+     and type info = Info.t =
+    LTS.Make (Log) (State) (States) (Labels) (Transitions) (Info)
 
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
+  (** [module Saturate ] ...
+      (* TODO: the idea of [Traces] needs to be revisited. It does provide optimizations to examples with a lot of silent actions, where the saturated FSM is considerably larger, but i believe that there are areas where this can still be improved. *)
+  *)
+  module Saturate :
+    Saturate.S
+    with type state = State.t
+     and type states = States.t
+     and type label = Label.t
+     and type labels = Labels.t
+     and type annotation = Annotation.t
+     and type trees = Base.Trees.t
+     and type action = Action.t
+     and type actionpairs = ActionPairs.t
+     and type actionmap = ActionMap.t'
+     and type edgemap = EdgeMap.t' =
+    Saturate.Make (Log) (Base) (State) (States) (Label) (Labels) (Note)
+      (Annotation)
+      (Annotations)
+      (Action)
+      (ActionPair)
+      (ActionPairs)
+      (ActionMap)
+      (EdgeMap)
 
-          let name = "LTS"
+  module FSM :
+    FSM.S
+    with type state = State.t
+     and type states = States.t
+     and type labels = Labels.t
+     and type edgemap = EdgeMap.t'
+     and type info = Info.t
+     and type lts = LTS.t =
+    FSM.Make (Log) (State) (States) (Labels) (EdgeMap) (Info) (LTS) (Saturate)
 
-          let json ?as_elt (x : t) : Yojson.t =
-            `Assoc
-              [ "init", Json.option ~as_elt:true State.json x.init
-              ; "info", Info.json ~as_elt:true x.info
-              ; "terminals", States.json ~as_elt:true x.terminals
-              ; "alphabet", Labels.json ~as_elt:true x.alphabet
-              ; "states", States.json ~as_elt:true x.states
-              ; "transitions", Transitions.json ~as_elt:true x.transitions
-              ]
-          ;;
-        end)
-  end
-
-  module FSM = struct
-    type t =
-      { init : State.t option
-      ; terminals : States.t
-      ; alphabet : Labels.t
-      ; states : States.t
-      ; edges : EdgeMap.t'
-      ; info : Info.t
-      }
-
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
-
-          let name = "FSM"
-
-          let json ?as_elt (x : t) : Yojson.t =
-            `Assoc
-              [ "init", Json.option ~as_elt:true State.json x.init
-              ; "info", Info.json ~as_elt:true x.info
-              ; "terminals", States.json ~as_elt:true x.terminals
-              ; "alphabet", Labels.json ~as_elt:true x.alphabet
-              ; "states", States.json ~as_elt:true x.states
-              ; "edges", EdgeMap.json ~as_elt:true x.edges
-              ]
-          ;;
-        end)
-
-    let of_lts (x : LTS.t) : t =
-      Log.trace __FUNCTION__;
-      { init = x.init
-      ; terminals = x.terminals
-      ; alphabet = x.alphabet
-      ; states = x.states
-      ; edges = EdgeMap.of_transitions x.transitions
-      ; info = x.info
-      }
-    ;;
-
-    let merge (a : t) (b : t) : t =
-      let init : State.t option = None in
-      let terminals : States.t = States.union a.terminals b.terminals in
-      let alphabet : Labels.t = Labels.union a.alphabet b.alphabet in
-      let states : States.t = States.union a.states b.states in
-      let edges : EdgeMap.t' = EdgeMap.merge a.edges b.edges in
-      let info : Info.t = Info.merge a.info b.info in
-      { init; terminals; alphabet; states; edges; info }
-    ;;
-
-    let is_weak_mode (x : t) : bool =
-      Bool.not (Labels.is_empty x.info.weak_labels)
-    ;;
-
-    (** [module Saturate ] ...
-        (* TODO: the idea of [Traces] needs to be revisited. It does provide optimizations to examples with a lot of silent actions, where the saturated FSM is considerably larger, but i believe that there are areas where this can still be improved. *)
-    *)
-    module Saturate :
-      Saturate.S
-      with type state = State.t
-       and type states = States.t
-       and type label = Label.t
-       and type labels = Labels.t
-       and type annotation = Annotation.t
-       and type trees = Base.Trees.t
-       and type action = Action.t
-       and type actionpairs = ActionPairs.t
-       and type actionmap = ActionMap.t'
-       and type edgemap = EdgeMap.t' =
-      Saturate.Make (Log) (Base) (State) (States) (Label) (Labels) (Note)
-        (Annotation)
-        (Annotations)
-        (Action)
-        (ActionPair)
-        (ActionPairs)
-        (ActionMap)
-        (EdgeMap)
-
-    let saturate ?(only_if_weak : bool = true) (x : t) : t =
-      Log.trace __FUNCTION__;
-      if only_if_weak && Bool.not (is_weak_mode x)
-      then (
-        Log.debug ~__FUNCTION__ "Not weak, returning unchanged";
-        x)
-      else
-        { x with
-          edges = Saturate.edges x.alphabet x.states (EdgeMap.copy x.edges)
-        }
-    ;;
-  end
-
-  module Minimize =
+  module Minimize :
+    Minimize.S
+    with type state = State.t
+     and type states = States.t
+     and type label = Label.t
+     and type labels = Labels.t
+     and type edgemap = EdgeMap.t'
+     and type partition = Partition.t
+     and type fsm = FSM.t =
     Minimize.Make (Log) (Base) (State) (States) (Label) (Labels) (Action)
       (ActionMap)
       (EdgeMap)
@@ -276,7 +204,11 @@ struct
       (Info)
       (FSM)
 
-  module Bisimilarity =
+  module Bisimilarity :
+    Bisimilarity.S
+    with type states = States.t
+     and type partition = Partition.t
+     and type fsm = FSM.t =
     Bisimilarity.Make (Log) (State) (States) (Label) (Labels) (Action)
       (ActionMap)
       (EdgeMap)

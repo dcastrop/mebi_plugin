@@ -121,56 +121,36 @@ module Make : (Log : Logger.S)
      and type constructorbindings = ConstructorBindings.t
      and type labels = Labels.t
 
-  module LTS : sig
-    type t =
-      { init : State.t option
-      ; terminals : Partition.elt
-      ; alphabet : Labels.t
-      ; states : Partition.elt
-      ; transitions : Transitions.t
-      ; info : Info.t
-      }
+  module LTS :
+    LTS.S
+    with type state = State.t
+     and type states = States.t
+     and type labels = Labels.t
+     and type transitions = Transitions.t
+     and type info = Info.t
 
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
-  end
-
-  module FSM : sig
-    type t =
-      { init : State.t option
-      ; terminals : Partition.elt
-      ; alphabet : Labels.t
-      ; states : Partition.elt
-      ; edges : EdgeMap.t'
-      ; info : Info.t
-      }
-
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
-    val of_lts : LTS.t -> t
-    val merge : t -> t -> t
-    val is_weak_mode : t -> bool
-    val saturate : ?only_if_weak:bool -> t -> t
-  end
+  module FSM :
+    FSM.S
+    with type state = State.t
+     and type states = States.t
+     and type labels = Labels.t
+     and type edgemap = EdgeMap.t'
+     and type info = Info.t
+     and type lts = LTS.t
 
   module Minimize :
-      module type of
-        Minimize.Make (Log) (Base) (State) (States) (Label) (Labels) (Action)
-          (ActionMap)
-          (EdgeMap)
-          (Partition)
-          (Info)
-          (FSM)
+    Minimize.S
+    with type state = State.t
+     and type states = States.t
+     and type label = Label.t
+     and type labels = Labels.t
+     and type edgemap = EdgeMap.t'
+     and type partition = Partition.t
+     and type fsm = FSM.t
 
   module Bisimilarity :
-      module type of
-        Bisimilarity.Make (Log) (State) (States) (Label) (Labels) (Action)
-          (ActionMap)
-          (EdgeMap)
-          (Partition)
-          (Info)
-          (FSM)
-          (Minimize)
+    Bisimilarity.S
+    with type states = States.t
+     and type partition = Partition.t
+     and type fsm = FSM.t
 end

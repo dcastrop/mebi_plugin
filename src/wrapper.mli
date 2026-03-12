@@ -19,12 +19,19 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
     exception CouldNotDecode_LTS_Constructor of Model.Info.Meta.RocqLTS.t
 
     val lts_constructor : Model.Info.Meta.RocqLTS.t -> EConstr.t
+
     module Base : sig
       type k = Enc.t
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
 
       module Tree : sig
         module Node : sig
@@ -33,8 +40,12 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
           val json : ?as_elt:bool -> k -> Yojson.t
           val to_string : ?pretty:bool -> k -> string
 
-          val log :
-            ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+          val log
+            :  ?__FUNCTION__:string
+            -> ?m:Output.Kind.t
+            -> ?s:string
+            -> k
+            -> unit
         end
 
         type k = Enc.Tree.t
@@ -42,7 +53,12 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
         val json : ?as_elt:bool -> k -> Yojson.t
         val to_string : ?pretty:bool -> k -> string
 
-        val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+        val log
+          :  ?__FUNCTION__:string
+          -> ?m:Output.Kind.t
+          -> ?s:string
+          -> k
+          -> unit
       end
 
       module Trees : sig
@@ -51,56 +67,111 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
         val json : ?as_elt:bool -> k -> Yojson.t
         val to_string : ?pretty:bool -> k -> string
 
-        val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+        val log
+          :  ?__FUNCTION__:string
+          -> ?m:Output.Kind.t
+          -> ?s:string
+          -> k
+          -> unit
       end
     end
 
     module State : sig
-      type k = Model.Edge.state
+      type k = Model.State.t
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module States : sig
-      type k = Model.ActionMap.states
+      type k = Model.States.t
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
+    end
+
+    module Partition : sig
+      type k = Model.Partition.t
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module Label : sig
-      type k = Model.Action.label
+      type k = Model.Label.t
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module Labels : sig
-      type k = Model.Actions.labels
+      type k = Model.Labels.t
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module Note : sig
-      type k = Model.Annotation.note
+      type k = Model.Note.t
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module Annotation : sig
-      type k = Model.Action.annotation
+      type k = Model.Annotation.t
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module Annotations : sig
@@ -108,7 +179,13 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module Transition : sig
@@ -116,15 +193,27 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module Transitions : sig
-      type k = Model.EdgeMap.transitions
+      type k = Model.Transitions.t
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module Action : sig
@@ -132,23 +221,41 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module ActionMap : sig
-      type k = States.k Model.ActionMap.t
+      type k = Model.ActionMap.t'
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module EdgeMap : sig
-      type k = Model.ActionMap.t' Model.EdgeMap.t
+      type k = Model.EdgeMap.t'
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module Info : sig
@@ -159,8 +266,12 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
           val json : ?as_elt:bool -> k -> Yojson.t
           val to_string : ?pretty:bool -> k -> string
 
-          val log :
-            ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+          val log
+            :  ?__FUNCTION__:string
+            -> ?m:Output.Kind.t
+            -> ?s:string
+            -> k
+            -> unit
         end
 
         type k = Model.Info.Meta.t
@@ -168,14 +279,25 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
         val json : ?as_elt:bool -> k -> Yojson.t
         val to_string : ?pretty:bool -> k -> string
 
-        val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit 
+        val log
+          :  ?__FUNCTION__:string
+          -> ?m:Output.Kind.t
+          -> ?s:string
+          -> k
+          -> unit
       end
 
       type k = Model.Info.t
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module LTS : sig
@@ -183,7 +305,13 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
 
     module FSM : sig
@@ -191,7 +319,41 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
+    end
+
+    module Bisimilarity : sig
+      module FSMPair : sig
+        type k = Model.Bisimilarity.FSMPair.t
+
+        val json : ?as_elt:bool -> k -> Yojson.t
+        val to_string : ?pretty:bool -> k -> string
+
+        val log
+          :  ?__FUNCTION__:string
+          -> ?m:Output.Kind.t
+          -> ?s:string
+          -> k
+          -> unit
+      end
+
+      type k = Model.Bisimilarity.t
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
     end
   end
 
