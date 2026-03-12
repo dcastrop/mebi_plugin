@@ -21,9 +21,20 @@ Require Import MEBI.Examples.CADP_Glued.
 
 Definition log : Type := list label.
 
+Definition make_log (x:composition) : composition * log := (x, []).
+
+(** [clean_log p l] removes all entries containing [p] in [l]. *)
+Fixpoint clean_log (p:pid) (l:log) : log :=
+  match l with 
+  | [] => []
+  | (a, q) :: t => if Nat.eqb p q 
+                   then (clean_log p t) 
+                   else (a, q) :: (clean_log p t)
+  end.
+
 Definition update_log (l:log) (a:option label) : log :=
   match a with 
-  | Some (ENTER, p) => (ENTER, p) :: l
+  | Some (ENTER, p) => (ENTER, p) :: (clean_log p l)
   | Some (LEAVE, p) => (LEAVE, p) :: l
   | None => l
   | _ => l
@@ -77,14 +88,14 @@ Fixpoint verify_log (l:log) (p:option pid) (q:option pid) : Prop :=
 (** [MutualExclusion.lts] is defined so long as when a process [p] does an [ENTER] action, there are no other processes whose last action was [ENTER], rather their last action should either be LEAVE or nothing. *)
 
 
-Inductive valid_lts : (sys * resource) * log -> option label -> (sys * resource) * log -> Prop :=
+Inductive valid_lts : (composition) * log -> option label -> (composition) * log -> Prop :=
 | VALID_LTS : forall p1 p2 r1 r2 a l,
     verify_log l None None /\ verify_log (update_log l a) None None -> 
     lts (p1, r1) a (p2, r2) -> 
     valid_lts ((p1, r1), l) a ((p2, r2), update_log l a) 
 .
 
-Inductive valid_lts_transitive_closure : (sys * resource) * log -> Prop :=
+Inductive valid_lts_transitive_closure : (composition) * log -> Prop :=
 | trans_valid_lts : forall t a t' e' e l l',
     lts (t, e) a (t', e') ->
     valid_lts_transitive_closure ((t', e'), l') ->
@@ -93,24 +104,17 @@ Inductive valid_lts_transitive_closure : (sys * resource) * log -> Prop :=
 | no_valid_lts : forall t e, valid_lts_transitive_closure (t, e)
 .
 
-(* MeBi Dump "g1_weak_mutual_ex_base_FSM" 
-     FSM Bounded 1024 Of (g1, []) With valid_lts Weak SILENT Of action Using valid_lts lts step. *)
-
-(* Goal valid_lts_transitive_closure (g1, []).
-  unfold g1.
-  eapply trans_valid_lts.
-  constructor.
-Abort. *)
 
 
-Inductive valid_big : (sys * resource) * log -> option label -> (sys * resource) * log -> Prop :=
+
+Inductive valid_big : (composition) * log -> option label -> (composition) * log -> Prop :=
 | VALID_BIG : forall p1 p2 r1 r2 a l,
     verify_log l None None /\ verify_log (update_log l a) None None -> 
     bigstep (p1, r1) a (p2, r2) -> 
     valid_big ((p1, r1), l) a ((p2, r2), update_log l a) 
 .
 
-Inductive valid_big_transitive_closure : (sys * resource) * log -> Prop :=
+Inductive valid_big_transitive_closure : (composition) * log -> Prop :=
 | trans_valid_big : forall t a t' e' e l l',
     bigstep (t, e) a (t', e') ->
     valid_big_transitive_closure ((t', e'), l') ->
@@ -139,7 +143,7 @@ MeBi
 
 
 
-(* Inductive lts : sys * resource * log -> action -> sys * resource * log -> Prop :=
+(* Inductive lts : composition * log -> action -> composition * log -> Prop :=
 
 | LTS_PRC : forall t1 t2 s1 s2 r1 r2 a l,
   CADP.lts (PRC t1 s1, r1) a (PRC t2 s2, r2) ->

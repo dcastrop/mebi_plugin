@@ -52,12 +52,14 @@ examples/bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
 ### CADP
 examples/CADP.v ### REQUIRED FOR BELOW
 examples/CADP_Glued.v ### REQUIRED FOR BELOW
-# examples/CADP_Spec.v ### REQUIRED FOR BELOW
+# examples/CADP_Spec.v ### not working 
+examples/bisimilarity/CADP/properties/mutual_exclusion.v ### REQUIRED FOR BELOW
+examples/bisimilarity/CADP/properties/no_starvation.v ### REQUIRED FOR BELOW
 
 examples/bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
 # examples/bisimilarity/CADP/Size1/TermTests.v ### Success
-examples/bisimilarity/CADP/Size1/Glued/PluginProofs.v ### Success
-examples/bisimilarity/CADP/Size1/Property/PluginProofs.v ### Success
+# examples/bisimilarity/CADP/Size1/Glued/PluginProofs.v ### Success
+# examples/bisimilarity/CADP/Size1/Property/PluginProofs.v ### WIP
 
 # TODO: 
 examples/bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW

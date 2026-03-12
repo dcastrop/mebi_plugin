@@ -1,5 +1,5 @@
-let debug : bool = false
-let trace : bool = false
+let debug : bool = true
+let trace : bool = true
 
 module Kind = struct
   type t =
