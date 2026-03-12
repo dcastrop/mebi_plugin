@@ -26,45 +26,44 @@ theories/Bisimilarity.v ###
 examples/Proc.v ### REQUIRED FOR BELOW
 
 ### Proc.Flat.Simple 
-examples/bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
-# examples/bisimilarity/Proc/Test1/TermTests.v ### Success
-# examples/bisimilarity/Proc/Test1/PluginProofs.v ### Success
-# examples/bisimilarity/Proc/Test1/ManualProofs.v
-# examples/bisimilarity/Proc/Test1/LtacProofs.v
+examples/Bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
+# examples/Bisimilarity/Proc/Test1/TermTests.v ### Success
+# examples/Bisimilarity/Proc/Test1/PluginProofs.v ### Success
+# examples/Bisimilarity/Proc/Test1/ManualProofs.v
+# examples/Bisimilarity/Proc/Test1/LtacProofs.v
 
 ### Proc.Flat.Complex 
-examples/bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
-# examples/bisimilarity/Proc/Test2/TermTests.v ### Success
-# examples/bisimilarity/Proc/Test2/PluginProofs.v ### Success
-# examples/bisimilarity/Proc/Test2/ManualProofs.v
-# examples/bisimilarity/Proc/Test2/LtacProofs.v
+examples/Bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
+# examples/Bisimilarity/Proc/Test2/TermTests.v ### Success
+# examples/Bisimilarity/Proc/Test2/PluginProofs.v ### Success
+# examples/Bisimilarity/Proc/Test2/ManualProofs.v
+# examples/Bisimilarity/Proc/Test2/LtacProofs.v
 
 ### Proc.Layered
-examples/bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
-# examples/bisimilarity/Proc/Test3/TermTests.v ### RETEST: (takes a long time) Success
-# examples/bisimilarity/Proc/Test3/PluginProofs.v ### TODO: proof explosion
+examples/Bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
+# examples/Bisimilarity/Proc/Test3/TermTests.v ### RETEST: (takes a long time) Success
+# examples/Bisimilarity/Proc/Test3/PluginProofs.v ### TODO: proof explosion
 
-# examples/bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
-# examples/bisimilarity/Proc/Test4/TermTests.v ### Success
-# examples/bisimilarity/Proc/Test4/PluginProofs.v ### TODO: proof explosion
+# examples/Bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
+# examples/Bisimilarity/Proc/Test4/TermTests.v ### Success
+# examples/Bisimilarity/Proc/Test4/PluginProofs.v ### TODO: proof explosion
 
 ###############################################################################
 ### CADP
 examples/CADP.v ### REQUIRED FOR BELOW
 examples/CADP_Glued.v ### REQUIRED FOR BELOW
 # examples/CADP_Spec.v ### not working 
-examples/bisimilarity/CADP/properties/mutual_exclusion.v ### REQUIRED FOR BELOW
-examples/bisimilarity/CADP/properties/no_starvation.v ### REQUIRED FOR BELOW
+examples/Bisimilarity/CADP/Properties/MutualExclusion.v ### REQUIRED FOR BELOW
 
-examples/bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
-# examples/bisimilarity/CADP/Size1/TermTests.v ### Success
-# examples/bisimilarity/CADP/Size1/Glued/PluginProofs.v ### Success
-examples/bisimilarity/CADP/Size1/Property/PluginProofs.v ### WIP -- non-lts premises
+examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
+# examples/Bisimilarity/CADP/Size1/TermTests.v ### Success
+# examples/Bisimilarity/CADP/Size1/Glued/PluginProofs.v ### Success
+examples/Bisimilarity/CADP/Size1/MutualExclusion/PluginProofs.v ### WIP -- non-lts premises
 
 # TODO: 
-examples/bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
-# examples/bisimilarity/CADP/Size2/TermTests.v ### FAIL: Bound 1000 States
-# examples/bisimilarity/CADP/Size2/PluginProofs.v ###
+examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
+# examples/Bisimilarity/CADP/Size2/TermTests.v ### FAIL: Bound 1000 States
+# examples/Bisimilarity/CADP/Size2/PluginProofs.v ###
 
 
 # TODO: 
@@ -76,7 +75,7 @@ examples/bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
 # examples/CADP_simple.v
 
 ### Other (nat streams)
-# examples/bisimilarity/nat_streams.v
+# examples/Bisimilarity/nat_streams.v
 
 ###############################################################################
 ###############################################################################

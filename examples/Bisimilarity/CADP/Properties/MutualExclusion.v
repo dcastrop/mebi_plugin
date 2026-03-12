@@ -14,14 +14,28 @@ Inductive spec_state : Type :=
 | Held : nat -> spec_state
 .
 
-(* NOTE: needed to add pid *)
 Inductive spec_lts : spec_state -> option label -> spec_state -> Prop :=
 | SVC_ENTER : forall i, spec_lts Free (Some (ENTER, i)) (Held i)
 | SVC_LEAVE : forall i, spec_lts (Held i) (Some (LEAVE, i)) Free
 .
 
+(* Inductive spec_lts' (i:pid) : spec_state -> option label -> spec_state -> Prop :=
+| SVC_ENTER' : spec_lts' i Free (Some (ENTER, i)) (Held i)
+| SVC_LEAVE' : spec_lts' i (Held i) (Some (LEAVE, i)) Free
+.
 
-Example p1 : tm * env := (Protocol.P, Env.initial 1).
+Check spec_lts.
+
+Inductive spec_lts' (p:nat) : spec_state -> option label -> spec_state -> Prop :=
+| z : spec_lts
+| z1 : nat -> spec_lts
+. *)
+
+
+
+
+
+(* Example p1 : tm * env := (Protocol.P, Env.initial 1).
 
 Example c1 : composition := compose (create 1 Protocol.P).
 
@@ -102,4 +116,4 @@ Admitted.
   (* MeBi Sim Begin bigstep c1 And spec_lts Free Using step.
   (* Iteration History: _ <- _ <- _ <- _ *) 
   MeBi Sim Solve 1000. Qed. *)
-
+ *)

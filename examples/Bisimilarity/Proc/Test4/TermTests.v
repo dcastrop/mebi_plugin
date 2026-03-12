@@ -9,7 +9,7 @@ Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.Proc.
 Import Layered.
 
-Require Import MEBI.Examples.bisimilarity.Proc.Test4.Terms.
+Require Import MEBI.Examples.Bisimilarity.Proc.Test4.Terms.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test4.TermTests".
 MeBi Config Weak As Option label.
