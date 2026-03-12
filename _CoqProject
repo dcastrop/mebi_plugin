@@ -10,8 +10,8 @@ src/META.rocq-mebi
 -arg "-w all"
 
 theories/loader.v ###
-theories/DevTest.v ###
-theories/Test.v ###
+# theories/DevTest.v ###
+# theories/Test.v ###
 
 theories/Bisimilarity.v ###
 
@@ -59,7 +59,7 @@ examples/bisimilarity/CADP/properties/no_starvation.v ### REQUIRED FOR BELOW
 examples/bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
 # examples/bisimilarity/CADP/Size1/TermTests.v ### Success
 # examples/bisimilarity/CADP/Size1/Glued/PluginProofs.v ### Success
-# examples/bisimilarity/CADP/Size1/Property/PluginProofs.v ### WIP
+examples/bisimilarity/CADP/Size1/Property/PluginProofs.v ### WIP -- non-lts premises
 
 # TODO: 
 examples/bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
@@ -144,12 +144,20 @@ lib/model/state_partition.ml
 lib/model/state_partition.mli
 lib/model/info.ml
 lib/model/info.mli
+
+lib/model/LTS.ml
+lib/model/LTS.mli
+lib/model/FSM.ml
+lib/model/FSM.mli
+
+
 lib/model/wip_annotation.ml
 lib/model/wip_annotation.mli
 lib/model/wip_trace.ml
 lib/model/wip_trace.mli
 lib/model/wip_traces.ml
 lib/model/wip_traces.mli
+
 
 lib/model/algorithms/saturate.ml
 lib/model/algorithms/saturate.mli

@@ -177,20 +177,22 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
 
   let log_econstr
         ?(__FUNCTION__ : string = "")
+        ?(m : Output.Kind.t = Output.Kind.Debug)
         ?(s : string = "EConstr")
         (x : EConstr.t)
     : unit
     =
-    Log'.thing ~__FUNCTION__ Debug s x (Of Strfy.econstr)
+    Log'.thing ~__FUNCTION__ m s x (Of Strfy.econstr)
   ;;
 
   let log_econstrs
         ?(__FUNCTION__ : string = "")
+        ?(m : Output.Kind.t = Output.Kind.Debug)
         ?(s : string = "EConstrs")
         (x : EConstr.t list)
     : unit
     =
-    Log'.things ~__FUNCTION__ Debug s x (Of Strfy.econstr)
+    Log'.things ~__FUNCTION__ m s x (Of Strfy.econstr)
   ;;
 
   module type SErrors = sig
@@ -606,13 +608,8 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
 
     let encode (act : EConstr.t) (goto : EConstr.t) (tree : Enc.Tree.t) : t =
       Log.trace __FUNCTION__;
-      log_econstr ~__FUNCTION__ ~s:">> act" act;
       let act : Enc.t = encode act in
-      Enc.log ~__FUNCTION__ ~s:">> act" act;
-      log_econstr ~__FUNCTION__ ~s:">> goto" goto;
       let goto : Enc.t = encode goto in
-      Enc.log ~__FUNCTION__ ~s:">> goto" goto;
-      Enc.Tree.log ~__FUNCTION__ ~s:">> tree" tree;
       act, goto, tree
     ;;
   end
@@ -944,14 +941,11 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
         log_econstr ~__FUNCTION__ ~s:"tgt" tgt;
         let open Syntax in
         let* is_evar : bool = econstr_is_evar tgt in
-        Log.thing ~__FUNCTION__ Trace ">> is_evar" is_evar (Of Utils.Strfy.bool);
         if is_evar
         then return constructors
         else (
           let tree : Enc.Tree.t = N (constructor_index, []) in
-          Enc.Tree.log ~__FUNCTION__ ~s:">> tree" tree;
           let axiom : Constructor.t = Constructor.encode act tgt tree in
-          Constructor.log ~__FUNCTION__ ~s:">> axiom" axiom;
           return (axiom :: constructors))
       ;;
     end
@@ -985,9 +979,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let open Syntax in
       let* from_term : EConstr.t = econstr_normalize from_term in
       log_econstr ~__FUNCTION__ ~s:"from_term (normalized)" from_term;
-      (* let* () = debug_validconstrs_start from_term in *)
       let iter_body (i : int) (acc : Constructors.t) : Constructors.t mm =
-        (* let* () = debug_validconstrs_iter_start i constructors in *)
         (* NOTE: extract args for constructor *)
         let { constructor = ctx, tm; _ } : Rocq_ind.LTS.constructor =
           constructors.(i)
@@ -1003,9 +995,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
         if success
         then (
           (* NOTE: replace [act] with the fresh [act_term] *)
-          let fresh_args : Rocq_utils.constructor_args =
-            { args with act = act_term }
-          in
+          let fresh_args = { args with act = act_term } in
           explore_valid_constructor
             indmap
             from_term
@@ -1013,9 +1003,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
             fresh_args
             (i, acc)
             (substl, decls))
-        else
-          (* let* () = debug_validconstrs_iter_close i constructors in *)
-          return acc
+        else return acc
       in
       iterate 0 (Array.length constructors - 1) [] iter_body
 
@@ -1035,9 +1023,6 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let tgt : EConstr.t = EConstr.Vars.substl substl args.rhs in
       let* tgt : EConstr.t = econstr_normalize tgt in
       let* act : EConstr.t = econstr_normalize args.act in
-      (* TODO: make fresh sigma from fresh act+tgt, and use that from this point onwards. then, during cross-product, make sure that it is used over the parents sigma stored within the unification problems during ctx *)
-      (* let* constructors =
-    sandbox *)
       let* empty_problems : Problems.t = Problems.empty () in
       let* next_constructor_problems : (Enc.t * ListOfProblems.t) option =
         check_updated_ctx lts_enc [ empty_problems ] indmap (substl, decls)
@@ -1070,7 +1055,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
          | App (name, args) ->
            (match F.find_opt indmap name with
             | None ->
-              (* let* () = debug_updtcontext_close_app name in *)
+              (* log_econstr ~__FUNCTION__ ~m:Warning ~s:"name not indmap" name; *)
               check_updated_ctx lts_enc acc indmap (substl, tl)
             | Some c ->
               let args : Rocq_utils.constructor_args =
@@ -1158,6 +1143,25 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
   ;;
 
   module Bindings = struct
+    (* module Log =
+       Logger.ReMake
+       (Log)
+       (struct
+       let level : Output.Kind.level -> bool = function
+       | Debug -> true
+       | Info -> true
+       | Notice -> true
+       | Warning -> true
+       | Error -> true
+       ;;
+
+       let special : Output.Kind.special -> bool = function
+       | Trace -> false
+       | Result -> true
+       | Show -> true
+       ;;
+       end) *)
+
     module Instructions = struct
       type t =
         | Undefined
@@ -1193,8 +1197,9 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
 
       exception Rocq_bindings_CannotAppendDone of unit
 
-      let rec append (x : t) : t -> t =
-        Log.trace __FUNCTION__;
+      let rec append (x : t) : t -> t
+        =
+        (* Log.trace __FUNCTION__; *)
         function
         | Arg { root; index; cont } -> Arg { root; index; cont = append x cont }
         | Undefined -> x
@@ -1202,7 +1207,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       ;;
 
       let rec length : t -> int =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         function
         | Undefined -> 0
         | Done -> -1
@@ -1262,7 +1267,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
             (x : EConstr.t)
         : Names.Name.t mm
         =
-        Log.trace __FUNCTION__;
+        (* Log.trace __FUNCTION__; *)
         Log.thing ~__FUNCTION__ Debug "x" x (Of Strfy.econstr);
         let open Syntax in
         let f (i : int) : Names.Name.t option -> Names.Name.t option mm

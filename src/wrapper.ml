@@ -874,15 +874,11 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let get_new_constrs (from : Enc.t) : M.Constructor.t list M.mm =
         Log.trace __FUNCTION__;
         let from_term : EConstr.t = M.decode from in
-        Log.trace ~__FUNCTION__ ">> from_term";
         let label_type : EConstr.t = M.Ind.get_lts_label_type Y.primary_lts in
-        Log.trace ~__FUNCTION__ ">> label_type";
         let ind_map : M.Ind.t M.F.t = M.decode_map Y.rocq_defs in
-        Log.trace ~__FUNCTION__ ">> ind_map";
         let primary_constr_transitions =
           M.Ind.get_lts_constructor_types Y.primary_lts
         in
-        Log.trace ~__FUNCTION__ ">> primary_constr_transitions";
         M.Unification.collect_valid_constructors
           primary_constr_transitions
           ind_map
@@ -896,7 +892,6 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
         Log.thing ~__FUNCTION__ Debug "from" from (Of Enc.to_string);
         let open M.Syntax in
         let* new_constrs : M.Constructor.t list = get_new_constrs from in
-        Log.trace ~__FUNCTION__ ">> new_constrs";
         let iter_body (i : int) (new_states : V.t) =
           let (act, tgt, int_tree) : M.Constructor.t = List.nth new_constrs i in
           let act_dec : EConstr.t = M.decode act in
@@ -1157,28 +1152,20 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let open M.Syntax in
       (* NOTE: encode rocq inductive defs *)
       let* ind_defs : M.Ind.t M.B.t = build_ind_defs () in
-      Log.trace ~__FUNCTION__ ">> ind_defs";
       let* primary_lts : M.Ind.t = find_primary_lts ind_defs in
-      Log.trace ~__FUNCTION__ ">> primary_lts";
       let* init_term : EConstr.t = initial_term init_term in
-      Log.trace ~__FUNCTION__ ">> init_term";
       let$* _unit env sigma =
         Rocq_ind.get_lts_term_type primary_lts
         |> Typing.check env sigma init_term
       in
-      Log.trace ~__FUNCTION__ ">> type-check init_term";
       let init : Enc.t = M.encode init_term in
-      Log.trace ~__FUNCTION__ ">> encode init";
       (* NOTE: build the graph *)
       Log.info "Building the Graph...";
       let the_graph : t ref = ref (empty init ind_defs) in
       Queue.push init !the_graph.to_visit;
-      Log.trace ~__FUNCTION__ ">> init graph queue";
       (* _log_to_visit !the_graph; *)
       let module G = Make ((val make_yargs primary_lts ind_defs the_graph)) in
-      Log.trace ~__FUNCTION__ ">> init graph module G";
       let* the_graph : t = G.build !the_graph in
-      Log.trace ~__FUNCTION__ ">> build the_graph";
       (* M.return !the_graph *)
       Log.info ~__FUNCTION__ "Completed Graph, Extracting LTS...";
       let module L = Extract ((val make_zargs ind_defs (ref the_graph))) in
