@@ -1,13 +1,15 @@
 Require Import MEBI.loader.
 
-Require Export String.
+From Stdlib Require Export String.
 From Stdlib Require Import PeanoNat.
-From Stdlib Require Import Notations.
-Require Export Bool.
-Require Import List.
+Require Import Notations.
+From Stdlib Require Import Bool.
+From Stdlib Require Import Lists.List.
 Import ListNotations.
 
+Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.CADP.
+Require Import MEBI.Examples.CADP_Glued.
 
 (** [mutual_exclusion]
   [ true*.
