@@ -12,6 +12,4 @@ Require Import MEBI.Examples.CADP_Glued.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.Terms".
 
-Example p1 : tm * env := (P, Env.initial 2).
-
-Example c1 : composition := compose (create 2 P).
+Example c2 : composition := compose (create 2 P).

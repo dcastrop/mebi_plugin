@@ -19,14 +19,14 @@ Require Import Logic.
 
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.PluginProofs.bigstep_lts".
-Example wsim_bigstep_lts : weak_sim bigstep lts c1 c1. 
-Proof. MeBi Sim Begin bigstep c1 And lts c1 Using step.
+Example wsim_bigstep_lts : weak_sim bigstep lts c2 c2. 
+Proof. MeBi Sim Begin bigstep c2 And lts c2 Using step.
   (* Iteration History: _ <- _ <- _ <- _ *) 
   MeBi Sim Solve 2000. Qed.
 
   
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.PluginProofs.lts_bigstep".
-Example wsim_lts_bigstep : weak_sim lts bigstep c1 c1. 
-Proof. MeBi Sim Begin lts c1 And bigstep c1 Using step. 
+Example wsim_lts_bigstep : weak_sim lts bigstep c2 c2. 
+Proof. MeBi Sim Begin lts c2 And bigstep c2 Using step. 
   (* Iteration History: _ <- _ <- _ <- _  *) 
   MeBi Sim Solve 2000. Qed.
