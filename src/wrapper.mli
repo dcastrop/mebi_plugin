@@ -19,6 +19,180 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
     exception CouldNotDecode_LTS_Constructor of Model.Info.Meta.RocqLTS.t
 
     val lts_constructor : Model.Info.Meta.RocqLTS.t -> EConstr.t
+    module Base : sig
+      type k = Enc.t
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      module Tree : sig
+        module Node : sig
+          type k = Enc.Tree.Node.t
+
+          val json : ?as_elt:bool -> k -> Yojson.t
+          val to_string : ?pretty:bool -> k -> string
+
+          val log :
+            ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+        end
+
+        type k = Enc.Tree.t
+
+        val json : ?as_elt:bool -> k -> Yojson.t
+        val to_string : ?pretty:bool -> k -> string
+
+        val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+      end
+
+      module Trees : sig
+        type k = Enc.Trees.t
+
+        val json : ?as_elt:bool -> k -> Yojson.t
+        val to_string : ?pretty:bool -> k -> string
+
+        val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+      end
+    end
+
+    module State : sig
+      type k = Model.Edge.state
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module States : sig
+      type k = Model.ActionMap.states
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module Label : sig
+      type k = Model.Action.label
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module Labels : sig
+      type k = Model.Actions.labels
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module Note : sig
+      type k = Model.Annotation.note
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module Annotation : sig
+      type k = Model.Action.annotation
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module Annotations : sig
+      type k = Model.Annotations.t
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module Transition : sig
+      type k = Model.Transition.t
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module Transitions : sig
+      type k = Model.EdgeMap.transitions
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module Action : sig
+      type k = Model.Action.t
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module ActionMap : sig
+      type k = States.k Model.ActionMap.t
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module EdgeMap : sig
+      type k = Model.ActionMap.t' Model.EdgeMap.t
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module Info : sig
+      module Meta : sig
+        module RocqLTS : sig
+          type k = Model.Info.Meta.RocqLTS.t
+
+          val json : ?as_elt:bool -> k -> Yojson.t
+          val to_string : ?pretty:bool -> k -> string
+
+          val log :
+            ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+        end
+
+        type k = Model.Info.Meta.t
+
+        val json : ?as_elt:bool -> k -> Yojson.t
+        val to_string : ?pretty:bool -> k -> string
+
+        val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit 
+      end
+
+      type k = Model.Info.t
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module LTS : sig
+      type k = Model.LTS.t
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
+
+    module FSM : sig
+      type k = Model.FSM.t
+
+      val json : ?as_elt:bool -> k -> Yojson.t
+      val to_string : ?pretty:bool -> k -> string
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+    end
   end
 
   module IsTheory : sig

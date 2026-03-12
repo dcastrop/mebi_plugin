@@ -33,6 +33,352 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
     let lts_constructor (x : Model.Info.Meta.RocqLTS.t) : EConstr.t =
       handle x.base (CouldNotDecode_LTS_Constructor x)
     ;;
+
+    (** [module Decode.ModelToString] handles the decoding of [module Model] components to their decoded and pretty-printed counterparts.
+    *)
+    module Base = struct
+      include
+        Json.Thing.Make
+          (Log)
+          (struct
+            type k = Enc.t
+
+            let name = "Base"
+
+            let json ?(as_elt : bool = false) (x : Enc.t) : Yojson.t =
+              `String (M.decode x |> M.Strfy.econstr)
+            ;;
+          end)
+
+      module Tree = struct
+        module Node =
+          Json.Thing.Make
+            (Log)
+            (struct
+              type k = Enc.Tree.Node.t
+
+              let name = "Node"
+
+              let json ?as_elt (x : Enc.Tree.Node.t) : Yojson.t =
+                `Assoc
+                  [ "base", json ~as_elt:true (fst x); "index", `Int (snd x) ]
+              ;;
+            end)
+
+        include
+          Json.Thing.Make
+            (Log)
+            (struct
+              type k = Enc.Tree.t
+
+              let name = "Tree"
+
+              let rec json ?as_elt (N (x, xl) : Enc.Tree.t) : Yojson.t =
+                `Assoc
+                  [ "node", Node.json ~as_elt:true x
+                  ; "cons", `List (List.map (json ~as_elt:true) xl)
+                  ]
+              ;;
+            end)
+      end
+
+      module Trees =
+        Json.Set.Make
+          (Log)
+          (struct
+            module Set = Enc.Trees
+
+            let name = "Trees"
+            let json = Tree.json
+          end)
+    end
+
+    module State =
+      Json.Thing.Make
+        (Log)
+        (struct
+          type k = Model.State.t
+
+          let name = "State"
+
+          let json ?(as_elt : bool = false) (x : Model.State.t) : Yojson.t =
+            Base.json ~as_elt:true x.base
+          ;;
+        end)
+
+    module States =
+      Json.Set.Make
+        (Log)
+        (struct
+          module Set = Model.States
+
+          let name = "States"
+
+          let json ?(as_elt : bool = false) (x : Model.State.t) : Yojson.t =
+            State.json ~as_elt:true x
+          ;;
+        end)
+
+    module Label =
+      Json.Thing.Make
+        (Log)
+        (struct
+          type k = Model.Label.t
+
+          let name = "Label"
+
+          let json ?(as_elt : bool = false) (x : Model.Label.t) : Yojson.t =
+            `Assoc
+              [ "EConstr", Base.json ~as_elt:true x.base
+              ; ( "is_silent"
+                , Json.option
+                    ~as_elt:true
+                    (fun ?as_elt x -> `Bool x)
+                    x.is_silent )
+              ]
+          ;;
+        end)
+
+    module Labels =
+      Json.Set.Make
+        (Log)
+        (struct
+          module Set = Model.Labels
+
+          let name = "Labels"
+
+          let json ?(as_elt : bool = false) (x : Model.Label.t) : Yojson.t =
+            Label.json ~as_elt:true x
+          ;;
+        end)
+
+    module Note =
+      Json.Thing.Make
+        (Log)
+        (struct
+          type k = Model.Note.t
+
+          let name = "Note"
+
+          let json ?(as_elt : bool = false) (x : Model.Note.t) : Yojson.t =
+            `Assoc
+              [ "from", State.json ~as_elt:true x.from
+              ; "label", Label.json ~as_elt:true x.label
+              ; "goto", State.json ~as_elt:true x.goto
+              ; "using", Base.Trees.json ~as_elt:true x.using
+              ]
+          ;;
+        end)
+
+    module Annotation =
+      Json.Thing.Make
+        (Log)
+        (struct
+          type k = Model.Annotation.t
+
+          let name = "Annotation"
+
+          let rec json ?(as_elt : bool = false) (x : Model.Annotation.t)
+            : Yojson.t
+            =
+            `Assoc
+              [ "this", Note.json ~as_elt:true x.this
+              ; ( "next"
+                , match x.next with
+                  | None -> `String "None"
+                  | Some next -> json ~as_elt:true next )
+              ]
+          ;;
+        end)
+
+    module Annotations =
+      Json.Set.Make
+        (Log)
+        (struct
+          module Set = Model.Annotations
+
+          let name = "Annotations"
+          let json = Annotation.json
+        end)
+
+    module Transition =
+      Json.Thing.Make
+        (Log)
+        (struct
+          type k = Model.Transition.t
+
+          let name = "Transition"
+
+          let json ?(as_elt : bool = false) (x : Model.Transition.t) : Yojson.t =
+            `Assoc
+              [ "from", State.json ~as_elt:true x.from
+              ; "goto", State.json ~as_elt:true x.goto
+              ; "label", Label.json ~as_elt:true x.label
+              ; ( "annotation"
+                , Json.option ~as_elt:true Annotation.json x.annotation )
+              ; "tree", Json.option ~as_elt:true Base.Tree.json x.tree
+              ]
+          ;;
+        end)
+
+    module Transitions =
+      Json.Set.Make
+        (Log)
+        (struct
+          module Set = Model.Transitions
+
+          let name = "Transitions"
+          let json = Transition.json
+        end)
+
+    module Action =
+      Json.Thing.Make
+        (Log)
+        (struct
+          type k = Model.Action.t
+
+          let name = "Action"
+
+          let json ?(as_elt : bool = false) (x : Model.Action.t) : Yojson.t =
+            `Assoc
+              [ "label", Label.json ~as_elt:true x.label
+              ; ( "annotation"
+                , Json.option ~as_elt:true Annotation.json x.annotation )
+              ; "trees", Base.Trees.json ~as_elt:true x.trees
+              ]
+          ;;
+        end)
+
+    module ActionMap =
+      Json.Map.Make
+        (Log)
+        (struct
+          module Map = Model.ActionMap
+
+          type value = Model.States.t
+
+          let name = "ActionMap"
+          let kname = "Action"
+          let vname = "Destinations"
+          let kjson = Action.json
+          let vjson = States.json
+        end)
+
+    module EdgeMap =
+      Json.Map.Make
+        (Log)
+        (struct
+          module Map = Model.EdgeMap
+
+          type value = Model.ActionMap.t'
+
+          let name = "EdgeMap"
+          let kname = "From"
+          let vname = "Actions"
+          let kjson = State.json
+          let vjson = ActionMap.json
+        end)
+
+    module Info = struct
+      module Meta = struct
+        module RocqLTS =
+          Json.Thing.Make
+            (Log)
+            (struct
+              type k = Model.Info.Meta.RocqLTS.t
+
+              let name = "RocqLTS"
+
+              let json ?(as_elt : bool = false) (x : Model.Info.Meta.RocqLTS.t)
+                : Yojson.t
+                =
+                `Assoc
+                  [ "base", Base.json x.base
+                  ; ( "constructors"
+                    , `List
+                        (List.map
+                           (ConstructorBindings.json ~as_elt:true)
+                           x.constructors) )
+                  ]
+              ;;
+            end)
+
+        include
+          Json.Thing.Make
+            (Log)
+            (struct
+              type k = Model.Info.Meta.t
+
+              let name = "Meta"
+
+              let json ?as_elt (x : Model.Info.Meta.t) : Yojson.t =
+                `Assoc
+                  [ "complete", `Bool x.is_complete
+                  ; "merged", `Bool x.is_merged
+                  ; "bounds", Model.Info.Meta.Bounds.json ~as_elt:true x.bounds
+                  ; ( "rocq lts"
+                    , `List (List.map (RocqLTS.json ~as_elt:true) x.lts) )
+                  ]
+              ;;
+            end)
+      end
+
+      include
+        Json.Thing.Make
+          (Log)
+          (struct
+            type k = Model.Info.t
+
+            let name = "Info"
+
+            let json ?as_elt (x : Model.Info.t) : Yojson.t =
+              `Assoc
+                [ "meta", Json.option ~as_elt:true Meta.json x.meta
+                ; "weak labels", Labels.json ~as_elt:true x.weak_labels
+                ]
+            ;;
+          end)
+    end
+
+    module LTS =
+      Json.Thing.Make
+        (Log)
+        (struct
+          type k = Model.LTS.t
+
+          let name = "LTS"
+
+          let json ?as_elt (x : Model.LTS.t) : Yojson.t =
+            `Assoc
+              [ "init", Json.option ~as_elt:true State.json x.init
+              ; "info", Info.json ~as_elt:true x.info
+              ; "terminals", States.json ~as_elt:true x.terminals
+              ; "alphabet", Labels.json ~as_elt:true x.alphabet
+              ; "states", States.json ~as_elt:true x.states
+              ; "transitions", Transitions.json ~as_elt:true x.transitions
+              ]
+          ;;
+        end)
+
+    module FSM =
+      Json.Thing.Make
+        (Log)
+        (struct
+          type k = Model.FSM.t
+
+          let name = "FSM"
+
+          let json ?(as_elt : bool = false) (x : Model.FSM.t) : Yojson.t =
+            `Assoc
+              [ "init", Json.option ~as_elt:true State.json x.init
+              ; "info", Info.json ~as_elt:true x.info
+              ; "terminals", States.json ~as_elt:true x.terminals
+              ; "alphabet", Labels.json ~as_elt:true x.alphabet
+              ; "states", States.json ~as_elt:true x.states
+              ; "edges", EdgeMap.json ~as_elt:true x.edges
+              ]
+          ;;
+        end)
   end
 
   (** *)
@@ -908,7 +1254,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let open M.Syntax in
       Log.info "Extracting LTS...";
       let* the_lts = build_lts primary_lts x refs in
-      Log.thing Result "Finished Extracting LTS" the_lts (Of LTS.to_string);
+      Decode.LTS.log ~m:Result ~s:"Finished Extracting LTS" the_lts;
       M.return None
     ;;
 
@@ -917,7 +1263,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      Log.thing Result "Finished Making FSM" the_fsm (Of FSM.to_string);
+      Log.thing Result "Finished Making FSM" the_fsm (Of Decode.FSM.to_string);
       M.return None
     ;;
 

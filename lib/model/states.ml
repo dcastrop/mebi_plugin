@@ -3,7 +3,7 @@ module type S = sig
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
   val add_to_opt : elt -> t option -> t
 
   exception StateHasNoOrigin of (elt * t * t)

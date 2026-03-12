@@ -12,7 +12,7 @@ module Make : (Log : Logger.S)
 
                   (* val json : ?as_elt:bool -> t -> Yojson.t *)
                   (* val to_string : ?pretty:bool -> t -> string *)
-                  (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+                  (* val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit *)
                   (* val compare : t -> t -> int *)
                   (* val equal : t -> t -> bool *)
                 end
@@ -24,7 +24,7 @@ module Make : (Log : Logger.S)
               val json : ?as_elt:bool -> t -> Yojson.t
 
               (* val to_string : ?pretty:bool -> t -> string *)
-              (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+              (* val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit *)
               (* val add : t -> t -> t *)
               (* val add_list : t -> t list -> t list *)
               val equal : t -> t -> bool
@@ -41,7 +41,7 @@ module Make : (Log : Logger.S)
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
     val equal : t -> t -> bool
     val compare : t -> t -> int
   end

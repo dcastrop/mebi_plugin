@@ -3,7 +3,7 @@ module type S = sig
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
   val equal : t -> t -> bool
   val compare : t -> t -> int
   val hash : t -> int
@@ -16,7 +16,14 @@ module type S = sig
 
       val json : ?as_elt:bool -> t -> Yojson.t
       val to_string : ?pretty:bool -> t -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> t
+        -> unit
+
       val compare : t -> t -> int
       val equal : t -> t -> bool
     end
@@ -26,7 +33,7 @@ module type S = sig
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
     val add : t -> t -> t
     val add_list : t -> t list -> t list
     val equal : t -> t -> bool
@@ -43,7 +50,7 @@ module type S = sig
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
 
     exception EmptyHasNoMin
 
@@ -56,7 +63,7 @@ module type S = sig
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
   end
 
   module Constructor_trees : sig
@@ -64,7 +71,7 @@ module type S = sig
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
   end
 end
 

@@ -5,7 +5,7 @@ module Make
 
        (* val json : ?as_elt:bool -> t -> Yojson.t
           val to_string : ?pretty:bool -> t -> string
-          val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+          val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
           val equal : t -> t -> bool
           val compare : t -> t -> int
           val hash : t -> int *)
@@ -15,7 +15,7 @@ module Make
 
        (* val json : ?as_elt:bool -> t -> Yojson.t
           val to_string : ?pretty:bool -> t -> string
-          val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+          val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
           val add_to_opt : State.t -> t option -> t *)
 
        exception StateHasNoOrigin of (State.t * t * t)
@@ -28,7 +28,7 @@ module Make
 
        (* val json : ?as_elt:bool -> t -> Yojson.t
           val to_string : ?pretty:bool -> t -> string
-          val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+          val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
           val equal : t -> t -> bool
           val compare : t -> t -> int
           val hash : t -> int
@@ -39,7 +39,7 @@ module Make
 
        (* val json : ?as_elt:bool -> t -> Yojson.t
           val to_string : ?pretty:bool -> t -> string
-          val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+          val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
           val non_silent : t -> t *)
      end)
     (Action : sig
@@ -52,7 +52,7 @@ module Make
 
        (* val json : ?as_elt:bool -> t -> Yojson.t
           val to_string : ?pretty:bool -> t -> string
-          val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+          val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
           val equal : t -> t -> bool
           val compare : t -> t -> int
           val hash : t -> int
@@ -68,7 +68,7 @@ module Make
 
        (* val json : ?as_elt:bool -> t' -> Yojson.t
           val to_string : ?pretty:bool -> t' -> string
-          val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
+          val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t' -> unit
           val update : t' -> Action.t -> States.t -> unit
           val destinations : t' -> States.t
           val reduce_by_label : t' -> Label.t -> t'
@@ -84,7 +84,7 @@ module Make
 
        (* val json : ?as_elt:bool -> t' -> Yojson.t
           val to_string : ?pretty:bool -> t' -> string
-          val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
+          val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t' -> unit
           val update : t' -> State.t -> Action.t -> States.t -> unit
           val destinations : t' -> State.t -> States.t
           val get_actions : t' -> State.t -> Actions.t
@@ -99,7 +99,7 @@ module Make
 
        val json : ?as_elt:bool -> t -> Yojson.t
        (* val to_string : ?pretty:bool -> t -> string
-          val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+          val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
           val get_bisimilar : State.t -> t -> States.t
           val filter_reachable : States.t -> t -> t
           val reachable : State.t -> EdgeMap.t' -> t -> t
@@ -115,7 +115,7 @@ module Make
 
            (* val json : ?as_elt:bool -> t -> Yojson.t
               val to_string : ?pretty:bool -> t -> string
-              val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+              val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit *)
          end
 
          module RocqLTS : sig
@@ -123,7 +123,7 @@ module Make
 
            (* val json : ?as_elt:bool -> t -> Yojson.t
               val to_string : ?pretty:bool -> t -> string
-              val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+              val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit *)
          end
 
          type t =
@@ -135,7 +135,7 @@ module Make
 
          (* val json : ?as_elt:bool -> t -> Yojson.t
             val to_string : ?pretty:bool -> t -> string
-            val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+            val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit *)
        end
 
        type t =
@@ -145,7 +145,7 @@ module Make
 
        (* val json : ?as_elt:bool -> t -> Yojson.t
           val to_string : ?pretty:bool -> t -> string
-          val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+          val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
           val merge : t -> t -> t *)
      end)
     (FSM : sig
@@ -161,7 +161,7 @@ module Make
        val json : ?as_elt:bool -> t -> Yojson.t
 
        (* val to_string : ?pretty:bool -> t -> string *)
-       (* val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+       (* val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit *)
        val merge : t -> t -> t
        (* val is_weak_mode : t -> bool *)
 
@@ -189,7 +189,7 @@ module Make
 
        (* val json : ?as_elt:bool -> t -> Yojson.t *)
        (* val to_string : ?pretty:bool -> t -> string
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit *)
+       val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit *)
 
        exception CannotSplitEmptyBlock of unit
 

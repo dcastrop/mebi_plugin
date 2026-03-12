@@ -7,6 +7,9 @@ module type S = sig
     ; next : t option
     }
 
+  val json : ?as_elt:bool -> t -> Yojson.t
+  val to_string : ?pretty:bool -> t -> string
+  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
   val equal : t -> t -> bool
   val compare : t -> t -> int
   val is_empty : t -> bool
@@ -22,9 +25,6 @@ module type S = sig
   exception CannotDropLastOfSingleton of t
 
   val drop_last : t -> t
-  val json : ?as_elt:bool -> t -> Yojson.t
-  val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
 end
 
 module Make
@@ -40,6 +40,25 @@ module Make
     { this : note
     ; next : t option
     }
+
+  include
+    Json.Thing.Make
+      (Log)
+      (struct
+        type k = t
+
+        let name = "Annotation"
+
+        let rec json ?(as_elt : bool = false) (x : t) : Yojson.t =
+          `Assoc
+            [ "this", Note.json ~as_elt:true x.this
+            ; ( "next"
+              , match x.next with
+                | None -> `String "None"
+                | Some next -> json ~as_elt:true next )
+            ]
+        ;;
+      end)
 
   let rec equal (a : t) (b : t) : bool =
     Note.equal a.this b.this && Option.equal equal a.next b.next
@@ -104,27 +123,4 @@ module Make
     | { this; next = Some { next = None; _ }; _ } -> { this; next = None }
     | { this; next = Some next } -> { this; next = Some (drop_last next) }
   ;;
-
-  (* *)
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
-
-        let name = "Annotation"
-
-        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-          let rec f ?(as_elt : bool = false) (x : t) : Yojson.t =
-            `Assoc
-              [ "this", Note.json ~as_elt:true x.this
-              ; ( "next"
-                , match x.next with
-                  | None -> `String "None"
-                  | Some next -> f ~as_elt:true next )
-              ]
-          in
-          f ~as_elt x
-        ;;
-      end)
 end

@@ -24,7 +24,14 @@ module Make
        include Set.S with type elt = States.t
 
        val json : ?as_elt:bool -> t -> Yojson.t
-       val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+
+       val log
+         :  ?__FUNCTION__:string
+         -> ?m:Output.Kind.t
+         -> ?s:string
+         -> t
+         -> unit
+
        val reachable : State.t -> EdgeMap.t' -> t -> t
      end)
     (Info : sig
@@ -50,7 +57,7 @@ module Make
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
 
   exception CannotSplitEmptyBlock of unit
 

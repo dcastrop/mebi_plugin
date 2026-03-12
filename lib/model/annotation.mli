@@ -7,6 +7,9 @@ module type S = sig
     ; next : t option
     }
 
+  val json : ?as_elt:bool -> t -> Yojson.t
+  val to_string : ?pretty:bool -> t -> string
+  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
   val equal : t -> t -> bool
   val compare : t -> t -> int
   val is_empty : t -> bool
@@ -22,9 +25,6 @@ module type S = sig
   exception CannotDropLastOfSingleton of t
 
   val drop_last : t -> t
-  val json : ?as_elt:bool -> t -> Yojson.t
-  val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
 end
 
 module Make

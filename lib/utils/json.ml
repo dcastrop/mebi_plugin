@@ -10,7 +10,7 @@ module type S = sig
 
   val json : ?as_elt:bool -> k -> Yojson.t
   val to_string : ?pretty:bool -> k -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
+  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
 end
 
 module Make
@@ -29,8 +29,14 @@ module Make
     else json x |> Yojson.to_string
   ;;
 
-  let log ?(__FUNCTION__ : string = "") ?(s : string = X.name) (x : k) : unit =
-    Log.thing ~__FUNCTION__ Debug s x (Of to_string)
+  let log
+        ?(__FUNCTION__ : string = "")
+        ?(m : Output.Kind.t = Debug)
+        ?(s : string = X.name)
+        (x : k)
+    : unit
+    =
+    Log.thing ~__FUNCTION__ m s x (Of to_string)
   ;;
 end
 
