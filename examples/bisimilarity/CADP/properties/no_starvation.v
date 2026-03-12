@@ -1,13 +1,15 @@
 Require Import MEBI.loader.
 
-Require Export String.
+From Stdlib Require Export String.
 From Stdlib Require Import PeanoNat.
-From Stdlib Require Import Notations.
-Require Export Bool.
-Require Import List.
+Require Import Notations.
+From Stdlib Require Import Bool.
+From Stdlib Require Import Lists.List.
 Import ListNotations.
 
+Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.CADP.
+Require Import MEBI.Examples.CADP_Glued.
 
 Fixpoint app {X:Type} (l1 l2 : list X) : list X :=
   match l1 with
@@ -24,6 +26,10 @@ Fixpoint app {X:Type} (l1 l2 : list X) : list X :=
   ]-|
 *)
 Module NoStarvation.
+
+  Definition prc_trace : Type := list act.
+
+  Definition sys_trace : Type := list (pid * prc_trace).
 
   (** [prc_history] is a tuple of: (1) [list pid] to track the processes that have acted since a process last acted, (2) [option bool] denoting if the process starves (i.e., None if not at risk of starving, Some false if it has starved reecently, and Some true if it routinely starves) *)
   Definition prc_history : Type := list pid * option bool.
@@ -48,7 +54,7 @@ Module NoStarvation.
       else q :: update_prc_history_pids p t
     end.
 
-  (** [sys_history] is the same as [sys_trace], but with [prc_history]. *)
+  (** [sys_history] is a list of tuples, where [pid] is the last to act, [list act] is the list of actions performed, and [prc_history] is ... . *)
   Definition sys_history : Type := list (pid * prc_trace * prc_history).
 
   Definition num_of_prc (z:sys_history) : nat := List.length z.
@@ -98,11 +104,68 @@ Module NoStarvation.
       end
     end.
 
-  (** [do_action a z] checks if the process [p] can do act [a] in [z] and in doing so also updates all of the history/logs of the processes that are/are not acting. If [p] can do [a], it then checks to see if any process is now starving. It returns None if any of the above is not met. *)
-  Definition do_action (a:action) (z:sys_history) : option sys_history :=
+    Definition act_eq (a:act) (b:act) : bool :=
+    match a, b with
+    | ENTER, ENTER => true
+    | LEAVE, LEAVE => true
+    | NCS, NCS => true
+    | READ_NEXT, READ_NEXT => true
+    | READ_LOCKED, READ_LOCKED => true
+    | WRITE_NEXT _ _, WRITE_NEXT _ _ => true
+    | WRITE_LOCKED _ _, WRITE_LOCKED _ _ => true
+    | _, _ => false
+    end.
+
+  (** Note: dual only applies to ENTER and LEAVE. *)
+  Definition act_get_dual (a:act) : option act :=
     match a with
-    | SILENT => Some z (* skip *)
-    | LABEL (a, p) =>
+    | ENTER => Some LEAVE
+    | LEAVE => Some ENTER
+    | _ => None
+    end.
+
+  (** [are_dual a b] returns [Some bool] denoting if [a] and [b] are dual, and returns [None] if either [a] or [b] have no dual. *)
+  Definition act_are_dual (a:act) (b:act) : option bool :=
+    match act_get_dual a, act_get_dual b with
+    | None, _ => None
+    | _, None => None
+    | Some a, Some _ => Some (act_eq a b)
+    end.
+    
+  Fixpoint get_prc_trace (p:pid) (s:sys_trace) : option prc_trace :=
+    match s with
+    | [] => None
+    | (q, l) :: t => if Nat.eqb p q then Some l else get_prc_trace p t
+    end.
+
+
+  (** [last_act_of p s] returns the last act of [p] (if [p] not in [s], then [None]). *)
+  Definition last_act_of (p:pid) (s:sys_trace) : bool * option act :=
+    match get_prc_trace p s with
+    | None => (false, None)
+    | Some [] => (true, None)
+    | Some (h :: _) => (true, Some h)
+    end.
+
+  Definition can_do_act (p:pid) (a:act) (s:sys_trace) : option bool :=
+    match last_act_of p s with
+    | (false, _) => None (* [p] not in [s] *)
+
+    | (true, None) => (* [p] in [s], but empty trace*)
+      match a with
+      | ENTER => Some true
+      | LEAVE => Some false
+      | _ => None
+      end
+
+    | (true, Some b) => act_are_dual a b (* [p] last act [b] in [s]*)
+    end.
+
+  (** [do_action a z] checks if the process [p] can do act [a] in [z] and in doing so also updates all of the history/logs of the processes that are/are not acting. If [p] can do [a], it then checks to see if any process is now starving. It returns None if any of the above is not met. *)
+  Definition do_action (a:option label) (z:sys_history) : option sys_history :=
+    match a with
+    | None => Some z (* skip *)
+    | Some (a, p) =>
       match can_do_act p a (get_sys_trace z) with
       | None => None
       | Some false => None
@@ -115,7 +178,7 @@ Module NoStarvation.
     end.
 
   (** [NoStarvation.lts] is defined so long as after each action, [no_starvation s] holds. I.e.,  *)
-  Inductive lts : sys_history -> action -> sys_history -> Prop :=
+  Inductive lts : sys_history -> option label -> sys_history -> Prop :=
     | ACT : forall t1 t2 a, do_action a t1 = Some t2 -> lts t1 a t2
     .
 

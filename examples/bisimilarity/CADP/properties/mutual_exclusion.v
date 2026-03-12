@@ -19,20 +19,14 @@ Require Import MEBI.Examples.CADP_Glued.
   ] false
 *)
 
-Definition pid_of_action (a:action) : option pid :=
-  match a with 
-  | SILENT => None
-  | LABEL (_, p) => Some p
-  end.
-
 Definition log : Type := list label.
 
-Definition update_log (l:log) (a:action) : log :=
+Definition update_log (l:log) (a:option label) : log :=
   match a with 
-  | SILENT => l
-  | LABEL (ENTER, p) => (ENTER, p) :: l
-  | LABEL (LEAVE, p) => (LEAVE, p) :: l
-  | LABEL _ => l
+  | Some (ENTER, p) => (ENTER, p) :: l
+  | Some (LEAVE, p) => (LEAVE, p) :: l
+  | None => l
+  | _ => l
   end.
 
 (** [verify_log l p] verifies whether the contents of log [l] adheres to mutual exclusion, i.e., if a process [p] performs an [ENTER] action, then the most recent action of all other processes must be either nothing or [LEAVE]. *)
@@ -83,7 +77,7 @@ Fixpoint verify_log (l:log) (p:option pid) (q:option pid) : Prop :=
 (** [MutualExclusion.lts] is defined so long as when a process [p] does an [ENTER] action, there are no other processes whose last action was [ENTER], rather their last action should either be LEAVE or nothing. *)
 
 
-Inductive valid_lts : (sys * resource) * log -> action -> (sys * resource) * log -> Prop :=
+Inductive valid_lts : (sys * resource) * log -> option label -> (sys * resource) * log -> Prop :=
 | VALID_LTS : forall p1 p2 r1 r2 a l,
     verify_log l None None /\ verify_log (update_log l a) None None -> 
     lts (p1, r1) a (p2, r2) -> 
@@ -109,7 +103,7 @@ Inductive valid_lts_transitive_closure : (sys * resource) * log -> Prop :=
 Abort. *)
 
 
-Inductive valid_big : (sys * resource) * log -> action -> (sys * resource) * log -> Prop :=
+Inductive valid_big : (sys * resource) * log -> option label -> (sys * resource) * log -> Prop :=
 | VALID_BIG : forall p1 p2 r1 r2 a l,
     verify_log l None None /\ verify_log (update_log l a) None None -> 
     bigstep (p1, r1) a (p2, r2) -> 
@@ -165,7 +159,7 @@ MeBi
 
 . *)
 
-Module MutualExclusionOld.
+(* Module MutualExclusionOld.
 
   (** [can_enter p a s] checks that the last act of [p] is LEAVE or nothing. *)
   Definition can_enter (p:pid) (s:sys_trace) : option bool :=
@@ -206,4 +200,4 @@ Module MutualExclusionOld.
     | SILENT : forall t, lts t SILENT t
     .
 
-End MutualExclusionOld.
+End MutualExclusionOld. *)
