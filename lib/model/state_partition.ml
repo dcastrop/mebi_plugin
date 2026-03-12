@@ -7,7 +7,7 @@ module type S = sig
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
   val get_bisimilar : state -> t -> elt
   val filter_reachable : elt -> t -> t
   val reachable : state -> edgemap -> t -> t

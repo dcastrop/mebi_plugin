@@ -172,7 +172,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
     val encode : EConstr.t -> EConstr.t -> Enc.Tree.t -> t
   end
 
@@ -191,7 +191,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
       val fresh : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * t
 
       val make
@@ -216,7 +216,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
       val unify_pair_opt : Pair.t -> bool mm
       val unify_opt : t -> Enc.Tree.t option mm
       val of_constructor : Rocq_utils.constructor_args -> Constructor.t -> t
@@ -232,7 +232,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
       val empty : unit -> t mm
       val is_empty : t -> bool
       val unify_list_opt : Problem.t list -> Enc.Tree.t list option mm
@@ -250,7 +250,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> k -> unit
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
       val is_empty : t -> bool
       val cross_product : Problems.t -> t -> t
     end
@@ -260,7 +260,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> t -> Yojson.t
       val to_string : ?pretty:bool -> t -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
 
       val retrieve
         :  int
@@ -338,7 +338,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> t -> Yojson.t
       val to_string : ?pretty:bool -> t -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
 
       exception Rocq_bindings_CannotAppendDone of unit
 
@@ -354,7 +354,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> t' -> Yojson.t
       val to_string : ?pretty:bool -> t' -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> t' -> unit
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t' -> unit
       val update : t' -> Constr.t -> v -> unit
 
       exception Rocq_bindings_CannotFindBindingName of EConstr.t
@@ -386,7 +386,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
     val use_no_bindings : ConstrMap.t' option list -> bool
 
     val extract
@@ -406,7 +406,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
     val extract_info : Enc.t Rocq_ind.t -> t list mm
     val get_quantified_hyp : Names.Name.t -> Tactypes.quantified_hypothesis
 

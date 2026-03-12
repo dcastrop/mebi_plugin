@@ -12,7 +12,7 @@ module type S = sig
 
       val json : ?as_elt:bool -> t -> Yojson.t
       val to_string : ?pretty:bool -> t -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
     end
 
     module RocqLTS : sig
@@ -23,7 +23,7 @@ module type S = sig
 
       val json : ?as_elt:bool -> t -> Yojson.t
       val to_string : ?pretty:bool -> t -> string
-      val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
     end
 
     type t =
@@ -35,7 +35,7 @@ module type S = sig
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
     val merge : t -> t -> t
     val merge_opt : t option -> t option -> t option
   end
@@ -47,7 +47,7 @@ module type S = sig
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
   val merge : t -> t -> t
 end
 

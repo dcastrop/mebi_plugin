@@ -133,7 +133,7 @@ module Make : (Log : Logger.S)
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
   end
 
   module FSM : sig
@@ -148,7 +148,7 @@ module Make : (Log : Logger.S)
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?s:string -> t -> unit
+    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
     val of_lts : LTS.t -> t
     val merge : t -> t -> t
     val is_weak_mode : t -> bool
