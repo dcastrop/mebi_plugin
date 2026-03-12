@@ -1311,7 +1311,8 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let open M.Syntax in
       Log.info "Extracting LTS...";
       let* the_lts = build_lts primary_lts x refs in
-      Decode.LTS.log ~m:Result ~s:"Finished Extracting LTS" the_lts;
+      Model.LTS.log ~m:Debug ~s:"Finished Extracting LTS" the_lts;
+      (* Decode.LTS.log ~m:Result ~s:"Finished Extracting LTS" the_lts; *)
       M.return None
     ;;
 
@@ -1320,7 +1321,8 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      Decode.FSM.log ~m:Result ~s:"Finished Making FSM" the_fsm;
+      Model.FSM.log ~m:Debug ~s:"Finished Making FSM" the_fsm;
+      (* Decode.FSM.log ~m:Result ~s:"Finished Making FSM" the_fsm; *)
       M.return None
     ;;
 
@@ -1329,10 +1331,12 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      Decode.FSM.log ~m:Info ~s:"Finished Making FSM" the_fsm;
+      Model.FSM.log ~m:Debug ~s:"Finished Making FSM" the_fsm;
+      (* Decode.FSM.log ~m:Info ~s:"Finished Making FSM" the_fsm; *)
       Log.info "Saturating FSM...";
       let the_fsm = Model.FSM.saturate the_fsm in
-      Decode.FSM.log ~m:Result ~s:"Finished Saturating FSM" the_fsm;
+      Model.FSM.log ~m:Debug ~s:"Finished Saturating FSM" the_fsm;
+      (* Decode.FSM.log ~m:Result ~s:"Finished Saturating FSM" the_fsm; *)
       M.return None
     ;;
 
@@ -1361,11 +1365,13 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       Log.info "Making FSM A...";
       let weak1 : Weak.t option = Config.get_the_weak_arg1 () in
       let* the_fsm_a = build_fsm ~weak:weak1 alts ax refs in
-      Decode.FSM.log ~m:Info ~s:"Finished Making FSM A" the_fsm_a;
+      (* Model.FSM.log ~m:Debug ~s:"Finished Making FSM A" the_fsm_a; *)
+      (* Decode.FSM.log ~m:Info ~s:"Finished Making FSM A" the_fsm_a; *)
       Log.info "Making FSM B...";
       let weak2 : Weak.t option = Config.get_the_weak_arg2 () in
       let* the_fsm_b = build_fsm ~weak:weak2 blts bx refs in
-      Decode.FSM.log ~m:Info ~s:"Finished Making FSM B" the_fsm_b;
+      (* Model.FSM.log ~m:Debug ~s:"Finished Making FSM B" the_fsm_b; *)
+      (* Decode.FSM.log ~m:Info ~s:"Finished Making FSM B" the_fsm_b; *)
       M.return (the_fsm_a, the_fsm_b)
     ;;
 
@@ -1375,6 +1381,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
       Log.info "Merging FSMs...";
       let the_fsm = FSM.merge the_fsm_a the_fsm_b in
+      Model.FSM.log ~m:Debug ~s:"Finished Merging FSMs" the_fsm;
       Decode.FSM.log ~m:Result ~s:"Finished Merging FSMs" the_fsm;
       M.return None
     ;;
@@ -1385,6 +1392,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
       Log.info "Checking Bisimilarity of FSMs...";
       let result = Model.Bisimilarity.fsm the_fsm_a the_fsm_b in
+      Model.Bisimilarity.log ~m:Debug ~s:"Result" result;
       Decode.Bisimilarity.log ~m:Result ~s:"Result" result;
       fail_if_not_bisim result.result;
       M.return (Some result)
