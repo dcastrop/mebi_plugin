@@ -10,48 +10,52 @@ Require Import MEBI.Examples.CADP.
 Require Import MEBI.Examples.CADP_Glued.
 
 Require Import MEBI.Examples.bisimilarity.CADP.Size1.Terms.
+Require Import MEBI.Examples.bisimilarity.CADP.properties.mutual_exclusion.
+(* Require Import MEBI.Examples.bisimilarity.CADP.properties.no_starvation. *)
 
-MeBi Divider "Examples.Bisimilarity.CADP.Size1.Property.PluginProofs".
+MeBi Divider "Examples.Bisimilarity.CADP.Size1.Property.PluginProofs.mutual_exclusion".
 
 MeBi Config Weak As Option label.
 
 Require Import Logic.
 
-MeBi Divider "Examples.Bisimilarity.CADP.Size1.Property.PluginProofs.property".
-Inductive spec_state : Type :=
-| Free : nat -> spec_state
-| Held : nat -> spec_state
-.
 
-Inductive spec_lts : spec_state -> option label -> spec_state -> Prop :=
-| SVC_ENTER : forall i, spec_lts (Free i) (Some (ENTER, i)) (Held i)
-| SVC_LEAVE : forall i, spec_lts (Held i) (Some (LEAVE, i)) (Free i)
-.
+MeBi Divider "Examples.Bisimilarity.CADP.Size1.Property.TermTests.c1.step".
+MeBi Config Bounds As Num States 5000.
+(* MeBi Run FSM (make_log c1) Using valid_lts lts step. *)
+(* MeBi Run Saturate (make_log c1) Using valid_lts lts step. *)
+(* MeBi Run Minimize (make_log c1) Using valid_lts lts step. *)
 
-MeBi Divider "Examples.Bisimilarity.CADP.Size1.Property.PluginProofs.original".
-Example wsim_lts_spec_lts : weak_sim lts spec_lts c1 (Free 0). 
-Proof. MeBi Sim Begin lts c1 And spec_lts (Free 0) Using step.
-  (* Iteration History: 290 <- _ <- _ <- _ *) 
-  MeBi Sim Solve 290. Qed.
+(* MeBi Divider "Examples.Bisimilarity.CADP.Size1.Property.TermTests.c1.bigstep". *)
+(* MeBi Run FSM (make_log c1) Using valid_big bigstep lts step. *)
+(* MeBi Run Saturate (make_log c1) Using valid_big bigstep lts step. *)
+(* MeBi Run Minimize (make_log c1) Using valid_big bigstep lts step. *)
 
 
-MeBi Divider "Examples.Bisimilarity.CADP.Size1.Property.PluginProofs.original".
-Example wsim_spec_lts_lts : weak_sim spec_lts lts (Free 0) c1. 
-Proof. MeBi Sim Begin spec_lts (Free 0) And lts c1 Using step. 
-  (* Iteration History: 207 <- _ <- _ <- _  *) 
-  MeBi Sim Solve 207. Qed.
+MeBi Divider "Examples.Bisimilarity.CADP.Size1.Property.mutual_exclusion.valid_lts.original".
+Example wsim_lts_valid_lts : weak_sim lts valid_lts c1 (make_log c1). 
+Proof. MeBi Sim Begin lts c1 And valid_lts (make_log c1) Using lts step.
+  (* Iteration History: _ <- _ <- _ <- _ *) 
+  MeBi Sim Solve 1000. Qed.
+
+
+MeBi Divider "Examples.Bisimilarity.CADP.Size1.Property.mutual_exclusion.valid_lts.original".
+(* Example wsim_valid_lts_lts : weak_sim valid_lts lts (make_log c1) c1. 
+Proof. MeBi Sim Begin valid_lts (make_log c1) And lts c1 Using lts step. 
+  (* Iteration History: _ <- _ <- _ <- _  *) 
+  MeBi Sim Solve 1000. Qed.
 
 (****************************)
 
-MeBi Divider "Examples.Bisimilarity.CADP.Size1.Property.PluginProofs.glued".
-Example wsim_bigstep_spec_lts : weak_sim bigstep spec_lts c1 (Free 0). 
-Proof. MeBi Sim Begin bigstep c1 And spec_lts (Free 0).
-  (* Iteration History: 82 <- _ <- _ <- _ *) 
-  MeBi Sim Solve 82. Qed.
+MeBi Divider "Examples.Bisimilarity.CADP.Size1.Property.mutual_exclusion.valid_lts.glued".
+Example wsim_bigstep_valid_lts : weak_sim bigstep valid_lts c1 (make_log c1). 
+Proof. MeBi Sim Begin bigstep c1 And valid_lts (make_log c1) Using lts step.
+  (* Iteration History: _ <- _ <- _ <- _ *) 
+  MeBi Sim Solve 1000. Qed.
 
 
-MeBi Divider "Examples.Bisimilarity.CADP.Size1.Property.PluginProofs.glued".
-Example wsim_spec_lts_bigstep : weak_sim spec_lts bigstep (Free 0) c1. 
-Proof. MeBi Sim Begin spec_lts (Free 0) And bigstep c1. 
-  (* Iteration History: 59 <- _ <- _ <- _  *) 
-  MeBi Sim Solve 59. Qed.
+MeBi Divider "Examples.Bisimilarity.CADP.Size1.Property.mutual_exclusion.valid_lts.glued".
+Example wsim_valid_lts_bigstep : weak_sim valid_lts bigstep (make_log c1) c1. 
+Proof. MeBi Sim Begin valid_lts (make_log c1) And bigstep c1 Using lts step. 
+  (* Iteration History: _ <- _ <- _ <- _  *) 
+  MeBi Sim Solve 1000. Qed. *)
