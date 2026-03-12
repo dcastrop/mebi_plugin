@@ -53,8 +53,8 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
     val econstr_bindings : EConstr.t Tactypes.bindings -> string
   end
 
-  val log_econstr : ?__FUNCTION__:string -> ?s:string -> EConstr.t -> unit
-  val log_econstrs : ?__FUNCTION__:string -> ?s:string -> EConstr.t list -> unit
+  val log_econstr : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> EConstr.t -> unit
+  val log_econstrs : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> EConstr.t list -> unit
 
   module type SErrors = sig
     type t =
