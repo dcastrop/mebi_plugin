@@ -10,7 +10,7 @@ Require Import MEBI.Examples.Proc.
 Import Flat.
 Import Flat.Simple.
 
-Require Import MEBI.Examples.bisimilarity.Proc.Test1.Terms.
+Require Import MEBI.Examples.Bisimilarity.Proc.Test1.Terms.
 
 Example wsim_pq : weak_sim termLTS termLTS p q. 
 Proof. intros; subst; unfold p, q.

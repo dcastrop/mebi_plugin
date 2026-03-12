@@ -9,7 +9,7 @@ Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.Proc.
 Import Layered.
 
-Require Import MEBI.Examples.bisimilarity.Proc.Test3.Terms.
+Require Import MEBI.Examples.Bisimilarity.Proc.Test3.Terms.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs".
 

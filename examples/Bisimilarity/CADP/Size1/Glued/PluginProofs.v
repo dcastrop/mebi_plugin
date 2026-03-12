@@ -9,7 +9,7 @@ Require Import MEBI.Bisimilarity.
 Require Import MEBI.Examples.CADP.
 Require Import MEBI.Examples.CADP_Glued.
 
-Require Import MEBI.Examples.bisimilarity.CADP.Size1.Terms.
+Require Import MEBI.Examples.Bisimilarity.CADP.Size1.Terms.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.Glued.PluginProofs".
 

@@ -10,7 +10,7 @@ Require Import MEBI.Examples.Proc.
 Import Flat.
 Import Flat.Complex.
 
-Require Import MEBI.Examples.bisimilarity.Proc.Test2.Terms.
+Require Import MEBI.Examples.Bisimilarity.Proc.Test2.Terms.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test2.PluginProofs".
 
