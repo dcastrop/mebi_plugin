@@ -11,6 +11,7 @@ module type S = sig
   val json : ?as_elt:bool -> k -> Yojson.t
   val to_string : ?pretty:bool -> k -> string
   val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+  val write : ?dir:string -> string -> k -> unit
 end
 
 module Make
@@ -37,6 +38,17 @@ module Make
     : unit
     =
     Log.thing ~__FUNCTION__ m s x (Of to_string)
+  ;;
+
+  let write
+        ?(dir : string = Utils.FileWriter.default_dir)
+        (name : string)
+        (x : k)
+    : unit
+    =
+    Utils.FileWriter.create_parent_dir dir;
+    let filepath : string = Filename.concat dir name in
+    json ~as_elt:false x |> Yojson.to_file filepath
   ;;
 end
 

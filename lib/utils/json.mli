@@ -10,6 +10,7 @@ module type S = sig
   val json : ?as_elt:bool -> k -> Yojson.t
   val to_string : ?pretty:bool -> k -> string
   val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+  val write : ?dir:string -> string -> k -> unit
 end
 
 module Make

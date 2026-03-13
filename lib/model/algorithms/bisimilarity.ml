@@ -27,9 +27,8 @@ module type S = sig
     ; non_bisim_states : partition
     }
 
-  val json : ?as_elt:bool -> t -> Yojson.t
-  val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
+  include Json.S with type k = t
+
   val are_bisimilar : result -> bool
   val the_cached_result : t option ref
   val set_the_result : t -> unit
