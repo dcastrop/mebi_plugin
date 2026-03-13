@@ -1,30 +1,12 @@
-module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
-  include module type of
-      Rocq_monad.Make
-        (Logger.ReMake
-           (Log)
-           (struct
-             let level : Output.Kind.level -> bool = function
-               | Debug -> false
-               | Info -> true
-               | Notice -> true
-               | Warning -> true
-               | Error -> true
-             ;;
+module type S = sig
+  type tree
 
-             let special : Output.Kind.special -> bool = function
-               | Trace -> false
-               | Result -> true
-               | Show -> true
-             ;;
-           end))
-           (Ctx)
-        (Enc)
+  include Rocq_monad.S
 
   val fresh_evar : Rocq_utils.evar_source -> EConstr.t mm
   val econstr_eq : ?enc:bool -> EConstr.t -> EConstr.t -> bool mm
   val econstr_compare : EConstr.t -> EConstr.t -> int
-  val get_encoding : EConstr.t -> Enc.t
+  val get_encoding : EConstr.t -> enc
   val econstr_kind : EConstr.t -> Rocq_utils.econstr_kind mm
   val econstr_is_evar : EConstr.t -> bool mm
 
@@ -49,19 +31,31 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
     val hyp_type : Rocq_utils.hyp -> string
     val hyp : Rocq_utils.hyp -> string
     val hyp_value : Rocq_utils.hyp -> string
-    val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string
+
+    (* val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string *)
     val econstr_bindings : EConstr.t Tactypes.bindings -> string
   end
 
-  val log_econstr : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> EConstr.t -> unit
-  val log_econstrs : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> EConstr.t list -> unit
+  val log_econstr
+    :  ?__FUNCTION__:string
+    -> ?m:Output.Kind.t
+    -> ?s:string
+    -> EConstr.t
+    -> unit
+
+  val log_econstrs
+    :  ?__FUNCTION__:string
+    -> ?m:Output.Kind.t
+    -> ?s:string
+    -> EConstr.t list
+    -> unit
 
   module type SErrors = sig
     type t =
       | LTS_Empty
       | LTS_Incomplete of string
       | Not_Bisimilar
-      | Invalid_Ind_Kind of Rocq_ind.kind
+      | Invalid_Ind_Kind_Type of EConstr.t option
       | Invalid_Sort_LTS of Sorts.Quality.t
       | Invalid_Sort_Type of Sorts.Quality.t
       | Invalid_Ref_LTS of Names.GlobRef.t
@@ -80,7 +74,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
     val lts_empty : unit -> exn
     val lts_incomplete : string -> exn
     val not_bisimilar : unit -> exn
-    val invalid_ind_kind : Rocq_ind.kind -> exn
+    val invalid_ind_kind_type : EConstr.t option -> exn
     val invalid_sort_lts : Sorts.Quality.t -> exn
     val invalid_sort_type : Sorts.Quality.t -> exn
     val invalid_ref_lts : Names.GlobRef.t -> exn
@@ -104,7 +98,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
     val lts_empty : unit -> 'a
     val lts_incomplete : string -> 'a
     val not_bisimilar : unit -> 'a
-    val invalid_ind_kind : Rocq_ind.kind -> 'a
+    val invalid_ind_kind_type : EConstr.t option -> 'a
     val invalid_sort_lts : Sorts.Quality.t -> 'a
     val invalid_sort_type : Sorts.Quality.t -> 'a
     val invalid_ref_lts : Names.GlobRef.t -> 'a
@@ -123,14 +117,49 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
   module Err : SErr
 
   module Ind : sig
-    type t = Enc.t Rocq_ind.t
+    module LTS : sig
+      type t =
+        { term_type : EConstr.t
+        ; label_type : EConstr.t
+        ; constructor_types : constructor array
+        }
 
-    val get_lts : t -> Rocq_ind.LTS.t
+      and constructor =
+        { name : Names.Id.t
+        ; constructor : Rocq_utils.ind_constr
+        }
+
+      val json : ?as_elt:bool -> t -> Yojson.t
+      val to_string : ?pretty:bool -> t -> string
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> t
+        -> unit
+    end
+
+    type t =
+      { enc : enc
+      ; ind : EConstr.t
+      ; kind : kind
+      }
+
+    and kind =
+      | Type of EConstr.t option
+      | LTS of LTS.t
+
+    val json : ?as_elt:bool -> t -> Yojson.t
+    val to_string : ?pretty:bool -> t -> string
+    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
+    val get_lts : t -> LTS.t
     val get_lts_term_type : t -> EConstr.t
     val get_lts_label_type : t -> EConstr.t
-    val get_lts_constructor_types : t -> Rocq_ind.LTS.constructor array
-    val to_string : Environ.env -> Evd.evar_map -> t -> string
+    val get_lts_constructor_types : t -> LTS.constructor array
     val lookup : Names.inductive -> Declarations.mind_specif mm
+    val get_lts_constructor_names : t -> Names.Id.t array
+    val get_lts_constructors : t -> Rocq_utils.ind_constr array
 
     val assert_mip_arity_is_type_or_set
       :  Declarations.one_inductive_body
@@ -168,17 +197,17 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
     -> Rocq_utils.constructor_args mm
 
   module Constructor : sig
-    type t = Enc.t * Enc.t * Enc.Tree.t
+    type t = enc * enc * tree
 
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
     val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
-    val encode : EConstr.t -> EConstr.t -> Enc.Tree.t -> t
+    val encode : EConstr.t -> EConstr.t -> tree -> t
   end
 
   val make_state_tree_pair_set
     :  unit
-    -> (module Set.S with type elt = Enc.t * Enc.Tree.t)
+    -> (module Set.S with type elt = enc * tree)
 
   module Unification : sig
     module Pair : sig
@@ -191,7 +220,14 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
+
       val fresh : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * t
 
       val make
@@ -209,16 +245,23 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
       type t =
         { act : Pair.t
         ; goto : Pair.t
-        ; tree : Enc.Tree.t
+        ; tree : tree
         }
 
       type k = t
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
+
       val unify_pair_opt : Pair.t -> bool mm
-      val unify_opt : t -> Enc.Tree.t option mm
+      val unify_opt : t -> tree option mm
       val of_constructor : Rocq_utils.constructor_args -> Constructor.t -> t
     end
 
@@ -232,16 +275,23 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
+
       val empty : unit -> t mm
       val is_empty : t -> bool
-      val unify_list_opt : Problem.t list -> Enc.Tree.t list option mm
+      val unify_list_opt : Problem.t list -> tree list option mm
 
       val sandbox_unify_all_opt
         :  EConstr.t
         -> EConstr.t
         -> t
-        -> (EConstr.t * EConstr.t * Enc.Tree.t list) option mm
+        -> (EConstr.t * EConstr.t * tree list) option mm
     end
 
     module ListOfProblems : sig
@@ -250,7 +300,14 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> k -> Yojson.t
       val to_string : ?pretty:bool -> k -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> k
+        -> unit
+
       val is_empty : t -> bool
       val cross_product : Problems.t -> t -> t
     end
@@ -260,18 +317,24 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> t -> Yojson.t
       val to_string : ?pretty:bool -> t -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> t
+        -> unit
 
       val retrieve
         :  int
         -> t
         -> EConstr.t
         -> EConstr.t
-        -> Enc.t * ListOfProblems.t
+        -> enc * ListOfProblems.t
         -> t mm
 
       val to_problems : Rocq_utils.constructor_args -> t -> Problems.t mm
-      val axiom : EConstr.t -> EConstr.t -> Enc.t * int -> t -> t mm
+      val axiom : EConstr.t -> EConstr.t -> enc * int -> t -> t mm
     end
 
     val check_constructor_args_unify
@@ -281,48 +344,48 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
       -> bool mm
 
     val check_valid_constructors
-      :  Rocq_ind.LTS.constructor array
+      :  Ind.LTS.constructor array
       -> Ind.t F.t
       -> EConstr.t
       -> EConstr.t
-      -> Enc.t
+      -> enc
       -> Constructors.t mm
 
     val explore_valid_constructor
       :  Ind.t F.t
       -> EConstr.t
-      -> Enc.t
+      -> enc
       -> Rocq_utils.constructor_args
       -> int * Constructors.t
       -> EConstr.Vars.substl * EConstr.rel_declaration list
       -> Constructors.t mm
 
     val check_updated_ctx
-      :  Enc.t
+      :  enc
       -> ListOfProblems.t
       -> Ind.t F.t
       -> EConstr.Vars.substl * EConstr.rel_declaration list
-      -> (Enc.t * ListOfProblems.t) option mm
+      -> (enc * ListOfProblems.t) option mm
 
     val check_for_next_constructors
       :  int
       -> EConstr.t
       -> EConstr.t
       -> Constructors.t
-      -> (Enc.t * ListOfProblems.t) option
+      -> (enc * ListOfProblems.t) option
       -> Constructors.t mm
 
     val collect_valid_constructors
-      :  Rocq_ind.LTS.constructor array
+      :  Ind.LTS.constructor array
       -> Ind.t F.t
       -> EConstr.t
       -> EConstr.t
-      -> Enc.t
+      -> enc
       -> Constructors.t mm
   end
 
-  val make_enc_hashtbl : unit -> (module Hashtbl.S with type key = Enc.t)
-  val make_enc_set : unit -> (module Set.S with type elt = Enc.t)
+  val make_enc_hashtbl : unit -> (module Hashtbl.S with type key = enc)
+  val make_enc_set : unit -> (module Set.S with type elt = enc)
   val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t)
 
   module Bindings : sig
@@ -338,7 +401,13 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> t -> Yojson.t
       val to_string : ?pretty:bool -> t -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> t
+        -> unit
 
       exception Rocq_bindings_CannotAppendDone of unit
 
@@ -354,7 +423,14 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
 
       val json : ?as_elt:bool -> t' -> Yojson.t
       val to_string : ?pretty:bool -> t' -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t' -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> t'
+        -> unit
+
       val update : t' -> Constr.t -> v -> unit
 
       exception Rocq_bindings_CannotFindBindingName of EConstr.t
@@ -407,7 +483,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
     val json : ?as_elt:bool -> t -> Yojson.t
     val to_string : ?pretty:bool -> t -> string
     val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
-    val extract_info : Enc.t Rocq_ind.t -> t list mm
+    val extract_info : Ind.t -> t list mm
     val get_quantified_hyp : Names.Name.t -> Tactypes.quantified_hypothesis
 
     exception Rocq_bindings_BindingInstruction_NotApp of EConstr.t
@@ -434,3 +510,6 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
       -> EConstr.t Tactypes.bindings mm
   end
 end
+
+module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
+  S with type enc = Enc.t and type tree = Enc.Tree.t 

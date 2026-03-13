@@ -1,361 +1,39 @@
-module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
-  module M : module type of Rocq_monad_utils.Make (Log) (Ctx) (Enc)
+module type S = sig
+  type enc
+  type node
+  type tree
+  type trees
+
+  module M : Rocq_monad_utils.S with type enc = enc and type tree = tree
 
   module Model :
-      module type of Model.Make (Log) (Enc) (M.Bindings) (M.ConstructorBindings)
-
-  module Decode : sig
-    val enc : Enc.t -> EConstr.t
-    val handle : Enc.t -> exn -> EConstr.t
-
-    exception CouldNotDecode_State of Model.States.elt
-
-    val state : Model.States.elt -> EConstr.t
-
-    exception CouldNotDecode_Label of Model.Labels.elt
-
-    val label : Model.Labels.elt -> EConstr.t
-
-    exception CouldNotDecode_LTS_Constructor of Model.Info.Meta.RocqLTS.t
-
-    val lts_constructor : Model.Info.Meta.RocqLTS.t -> EConstr.t
-
-    module Base : sig
-      type k = Enc.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-
-      module Tree : sig
-        module Node : sig
-          type k = Enc.Tree.Node.t
-
-          val json : ?as_elt:bool -> k -> Yojson.t
-          val to_string : ?pretty:bool -> k -> string
-
-          val log
-            :  ?__FUNCTION__:string
-            -> ?m:Output.Kind.t
-            -> ?s:string
-            -> k
-            -> unit
-        end
-
-        type k = Enc.Tree.t
-
-        val json : ?as_elt:bool -> k -> Yojson.t
-        val to_string : ?pretty:bool -> k -> string
-
-        val log
-          :  ?__FUNCTION__:string
-          -> ?m:Output.Kind.t
-          -> ?s:string
-          -> k
-          -> unit
-      end
-
-      module Trees : sig
-        type k = Enc.Trees.t
-
-        val json : ?as_elt:bool -> k -> Yojson.t
-        val to_string : ?pretty:bool -> k -> string
-
-        val log
-          :  ?__FUNCTION__:string
-          -> ?m:Output.Kind.t
-          -> ?s:string
-          -> k
-          -> unit
-      end
-    end
-
-    module State : sig
-      type k = Model.State.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module States : sig
-      type k = Model.States.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module Partition : sig
-      type k = Model.Partition.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module Label : sig
-      type k = Model.Label.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module Labels : sig
-      type k = Model.Labels.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module Note : sig
-      type k = Model.Note.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module Annotation : sig
-      type k = Model.Annotation.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module Annotations : sig
-      type k = Model.Annotations.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module Transition : sig
-      type k = Model.Transition.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module Transitions : sig
-      type k = Model.Transitions.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module Action : sig
-      type k = Model.Action.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module ActionMap : sig
-      type k = Model.ActionMap.t'
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module EdgeMap : sig
-      type k = Model.EdgeMap.t'
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module Info : sig
-      module Meta : sig
-        module RocqLTS : sig
-          type k = Model.Info.Meta.RocqLTS.t
-
-          val json : ?as_elt:bool -> k -> Yojson.t
-          val to_string : ?pretty:bool -> k -> string
-
-          val log
-            :  ?__FUNCTION__:string
-            -> ?m:Output.Kind.t
-            -> ?s:string
-            -> k
-            -> unit
-        end
-
-        type k = Model.Info.Meta.t
-
-        val json : ?as_elt:bool -> k -> Yojson.t
-        val to_string : ?pretty:bool -> k -> string
-
-        val log
-          :  ?__FUNCTION__:string
-          -> ?m:Output.Kind.t
-          -> ?s:string
-          -> k
-          -> unit
-      end
-
-      type k = Model.Info.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module LTS : sig
-      type k = Model.LTS.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module FSM : sig
-      type k = Model.FSM.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-
-    module Bisimilarity : sig
-      module FSMPair : sig
-        type k = Model.Bisimilarity.FSMPair.t
-
-        val json : ?as_elt:bool -> k -> Yojson.t
-        val to_string : ?pretty:bool -> k -> string
-
-        val log
-          :  ?__FUNCTION__:string
-          -> ?m:Output.Kind.t
-          -> ?s:string
-          -> k
-          -> unit
-      end
-
-      type k = Model.Bisimilarity.t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
-    end
-  end
+    Model.S
+    with type base = enc
+     and type tree = tree
+     and type trees = trees
+     and type constructorbindings = M.ConstructorBindings.t
+ 
+  module Decode : Decoder.S
+  with type enc = enc
+   and type state = Model.State.t
+   and type states = Model.States.t
+   and type partition = Model.Partition.t
+   and type label = Model.Label.t
+   and type labels = Model.Labels.t
+   and type note = Model.Note.t
+   and type annotation = Model.Annotation.t
+   and type annotations = Model.Annotations.t
+   and type transition = Model.Transition.t
+   and type transitions = Model.Transitions.t
+   and type action = Model.Action.t
+   and type actions = Model.Actions.t
+   and type actionmap = Model.ActionMap.t'
+   and type edgemap = Model.EdgeMap.t'
+   and type rocqlts = Model.Info.Meta.RocqLTS.t
+   and type info = Model.Info.t
+   and type lts = Model.LTS.t
+   and type fsm = Model.FSM.t
+   and type bisimilarity  = Model.Bisimilarity.t
 
   module IsTheory : sig
     val is_theory : EConstr.t -> EConstr.t -> bool M.mm
@@ -368,35 +46,25 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
     val is_LTS : EConstr.t -> bool M.mm
     val is_None : EConstr.t -> bool M.mm
     val is_Some : EConstr.t -> bool M.mm
-    val get_theory_enc : (EConstr.t -> bool M.mm) -> Enc.t M.mm
+    val get_theory_enc : (EConstr.t -> bool M.mm) -> enc M.mm
 
     exception NoEncodingFoundFor_TheoriesNone of unit
 
-    val get_None_enc : unit -> Enc.t M.mm
+    val get_None_enc : unit -> enc M.mm
 
     exception NoEncodingFoundFor_TheoriesSome of unit
 
-    val get_Some_enc : unit -> Enc.t M.mm
+    val get_Some_enc : unit -> enc M.mm
 
     exception NotEqTheory of unit
 
-    val get_theory_enc_if_eq
-      :  EConstr.t
-      -> (EConstr.t -> bool M.mm)
-      -> Enc.t M.mm
-
-    val get_None_enc_if_eq : EConstr.t -> Enc.t M.mm
-    val get_Some_enc_if_eq : EConstr.t -> Enc.t M.mm
+    val get_theory_enc_if_eq : EConstr.t -> (EConstr.t -> bool M.mm) -> enc M.mm
+    val get_None_enc_if_eq : EConstr.t -> enc M.mm
+    val get_Some_enc_if_eq : EConstr.t -> enc M.mm
   end
 
-  module Weak : sig
-    type t =
-      | Option of Enc.t
-      | Custom of Enc.t * Enc.t
+  module Weak : Weak.S with type enc = enc
 
-    val eq : t -> t -> bool
-    val to_string : t -> string M.mm
-  end
 
   module Config : sig
     val load_weak_arg : Api.weak_arg -> Weak.t M.mm
@@ -426,393 +94,25 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
     val bounds : Api.bounds_args
   end
 
-  module Graph : (T0 : sig
-                    type key = Enc.t
-                    type !'a t
-
-                    val create : int -> 'a t
-                    val clear : 'a t -> unit
-                    val reset : 'a t -> unit
-                    val copy : 'a t -> 'a t
-                    val add : 'a t -> key -> 'a -> unit
-                    val remove : 'a t -> key -> unit
-                    val find : 'a t -> key -> 'a
-                    val find_opt : 'a t -> key -> 'a option
-                    val find_all : 'a t -> key -> 'a list
-                    val replace : 'a t -> key -> 'a -> unit
-                    val mem : 'a t -> key -> bool
-                    val iter : (key -> 'a -> unit) -> 'a t -> unit
-
-                    val filter_map_inplace
-                      :  (key -> 'a -> 'a option)
-                      -> 'a t
-                      -> unit
-
-                    val fold
-                      :  (key -> 'a -> 'acc -> 'acc)
-                      -> 'a t
-                      -> 'acc
-                      -> 'acc
-
-                    val length : 'a t -> int
-                    val stats : 'a t -> Hashtbl.statistics
-                    val to_seq : 'a t -> (key * 'a) Seq.t
-                    val to_seq_keys : 'a t -> key Seq.t
-                    val to_seq_values : 'a t -> 'a Seq.t
-                    val add_seq : 'a t -> (key * 'a) Seq.t -> unit
-                    val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
-                    val of_seq : (key * 'a) Seq.t -> 'a t
-                  end)
-      (V0 : sig
-         type elt = T0.key
-         type t
-
-         val empty : t
-         val add : elt -> t -> t
-         val singleton : elt -> t
-         val remove : elt -> t -> t
-         val union : t -> t -> t
-         val inter : t -> t -> t
-         val disjoint : t -> t -> bool
-         val diff : t -> t -> t
-         val cardinal : t -> int
-         val elements : t -> elt list
-         val min_elt : t -> elt
-         val min_elt_opt : t -> elt option
-         val max_elt : t -> elt
-         val max_elt_opt : t -> elt option
-         val choose : t -> elt
-         val choose_opt : t -> elt option
-         val find : elt -> t -> elt
-         val find_opt : elt -> t -> elt option
-         val find_first : (elt -> bool) -> t -> elt
-         val find_first_opt : (elt -> bool) -> t -> elt option
-         val find_last : (elt -> bool) -> t -> elt
-         val find_last_opt : (elt -> bool) -> t -> elt option
-         val iter : (elt -> unit) -> t -> unit
-         val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
-         val map : (elt -> elt) -> t -> t
-         val filter : (elt -> bool) -> t -> t
-         val filter_map : (elt -> elt option) -> t -> t
-         val partition : (elt -> bool) -> t -> t * t
-         val split : elt -> t -> t * bool * t
-         val is_empty : t -> bool
-         val mem : elt -> t -> bool
-         val equal : t -> t -> bool
-         val compare : t -> t -> int
-         val subset : t -> t -> bool
-         val for_all : (elt -> bool) -> t -> bool
-         val exists : (elt -> bool) -> t -> bool
-         val to_list : t -> elt list
-         val of_list : elt list -> t
-         val to_seq_from : elt -> t -> elt Seq.t
-         val to_seq : t -> elt Seq.t
-         val to_rev_seq : t -> elt Seq.t
-         val add_seq : elt Seq.t -> t -> t
-         val of_seq : elt Seq.t -> t
-       end)
-      (D0 : sig
-         type elt = V0.elt * Enc.Tree.t
-         type t
-
-         val empty : t
-         val add : elt -> t -> t
-         val singleton : elt -> t
-         val remove : elt -> t -> t
-         val union : t -> t -> t
-         val inter : t -> t -> t
-         val disjoint : t -> t -> bool
-         val diff : t -> t -> t
-         val cardinal : t -> int
-         val elements : t -> elt list
-         val min_elt : t -> elt
-         val min_elt_opt : t -> elt option
-         val max_elt : t -> elt
-         val max_elt_opt : t -> elt option
-         val choose : t -> elt
-         val choose_opt : t -> elt option
-         val find : elt -> t -> elt
-         val find_opt : elt -> t -> elt option
-         val find_first : (elt -> bool) -> t -> elt
-         val find_first_opt : (elt -> bool) -> t -> elt option
-         val find_last : (elt -> bool) -> t -> elt
-         val find_last_opt : (elt -> bool) -> t -> elt option
-         val iter : (elt -> unit) -> t -> unit
-         val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
-         val map : (elt -> elt) -> t -> t
-         val filter : (elt -> bool) -> t -> t
-         val filter_map : (elt -> elt option) -> t -> t
-         val partition : (elt -> bool) -> t -> t * t
-         val split : elt -> t -> t * bool * t
-         val is_empty : t -> bool
-         val mem : elt -> t -> bool
-         val equal : t -> t -> bool
-         val compare : t -> t -> int
-         val subset : t -> t -> bool
-         val for_all : (elt -> bool) -> t -> bool
-         val exists : (elt -> bool) -> t -> bool
-         val to_list : t -> elt list
-         val of_list : elt list -> t
-         val to_seq_from : elt -> t -> elt Seq.t
-         val to_seq : t -> elt Seq.t
-         val to_rev_seq : t -> elt Seq.t
-         val add_seq : elt Seq.t -> t -> t
-         val of_seq : elt Seq.t -> t
-       end)
+  module Graph : (T0 : Hashtbl.S with type key = enc)
+      (V0 : Set.S with type elt = enc)
+      (D0 : Set.S with type elt = enc * tree)
       (X : X_Args)
       -> sig
     module V : sig
-      module V2 : sig
-        type elt = V0.elt
-        type t
+      include Set.S with type elt = enc
 
-        val empty : t
-        val add : elt -> t -> t
-        val singleton : elt -> t
-        val remove : elt -> t -> t
-        val union : t -> t -> t
-        val inter : t -> t -> t
-        val disjoint : t -> t -> bool
-        val diff : t -> t -> t
-        val cardinal : t -> int
-        val elements : t -> elt list
-        val min_elt : t -> elt
-        val min_elt_opt : t -> elt option
-        val max_elt : t -> elt
-        val max_elt_opt : t -> elt option
-        val choose : t -> elt
-        val choose_opt : t -> elt option
-        val find : elt -> t -> elt
-        val find_opt : elt -> t -> elt option
-        val find_first : (elt -> bool) -> t -> elt
-        val find_first_opt : (elt -> bool) -> t -> elt option
-        val find_last : (elt -> bool) -> t -> elt
-        val find_last_opt : (elt -> bool) -> t -> elt option
-        val iter : (elt -> unit) -> t -> unit
-        val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
-        val map : (elt -> elt) -> t -> t
-        val filter : (elt -> bool) -> t -> t
-        val filter_map : (elt -> elt option) -> t -> t
-        val partition : (elt -> bool) -> t -> t * t
-        val split : elt -> t -> t * bool * t
-        val is_empty : t -> bool
-        val mem : elt -> t -> bool
-        val equal : t -> t -> bool
-        val compare : t -> t -> int
-        val subset : t -> t -> bool
-        val for_all : (elt -> bool) -> t -> bool
-        val exists : (elt -> bool) -> t -> bool
-        val to_list : t -> elt list
-        val of_list : elt list -> t
-        val to_seq_from : elt -> t -> elt Seq.t
-        val to_seq : t -> elt Seq.t
-        val to_rev_seq : t -> elt Seq.t
-        val add_seq : elt Seq.t -> t -> t
-        val of_seq : elt Seq.t -> t
-      end
-
-      type elt = V2.elt
-      type t = V2.t
-
-      val empty : t
-      val add : elt -> t -> t
-      val singleton : elt -> t
-      val remove : elt -> t -> t
-      val union : t -> t -> t
-      val inter : t -> t -> t
-      val disjoint : t -> t -> bool
-      val diff : t -> t -> t
-      val cardinal : t -> int
-      val elements : t -> elt list
-      val min_elt : t -> elt
-      val min_elt_opt : t -> elt option
-      val max_elt : t -> elt
-      val max_elt_opt : t -> elt option
-      val choose : t -> elt
-      val choose_opt : t -> elt option
-      val find : elt -> t -> elt
-      val find_opt : elt -> t -> elt option
-      val find_first : (elt -> bool) -> t -> elt
-      val find_first_opt : (elt -> bool) -> t -> elt option
-      val find_last : (elt -> bool) -> t -> elt
-      val find_last_opt : (elt -> bool) -> t -> elt option
-      val iter : (elt -> unit) -> t -> unit
-      val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
-      val map : (elt -> elt) -> t -> t
-      val filter : (elt -> bool) -> t -> t
-      val filter_map : (elt -> elt option) -> t -> t
-      val partition : (elt -> bool) -> t -> t * t
-      val split : elt -> t -> t * bool * t
-      val is_empty : t -> bool
-      val mem : elt -> t -> bool
-      val equal : t -> t -> bool
-      val compare : t -> t -> int
-      val subset : t -> t -> bool
-      val for_all : (elt -> bool) -> t -> bool
-      val exists : (elt -> bool) -> t -> bool
-      val to_list : t -> elt list
-      val of_list : elt list -> t
-      val to_seq_from : elt -> t -> elt Seq.t
-      val to_seq : t -> elt Seq.t
-      val to_rev_seq : t -> elt Seq.t
-      val add_seq : elt Seq.t -> t -> t
-      val of_seq : elt Seq.t -> t
       val to_string : t -> string
     end
 
     module D : sig
-      module D2 : sig
-        type elt = V.elt * Enc.Tree.t
-        type t
+      include Set.S with type elt = enc * tree
 
-        val empty : t
-        val add : elt -> t -> t
-        val singleton : elt -> t
-        val remove : elt -> t -> t
-        val union : t -> t -> t
-        val inter : t -> t -> t
-        val disjoint : t -> t -> bool
-        val diff : t -> t -> t
-        val cardinal : t -> int
-        val elements : t -> elt list
-        val min_elt : t -> elt
-        val min_elt_opt : t -> elt option
-        val max_elt : t -> elt
-        val max_elt_opt : t -> elt option
-        val choose : t -> elt
-        val choose_opt : t -> elt option
-        val find : elt -> t -> elt
-        val find_opt : elt -> t -> elt option
-        val find_first : (elt -> bool) -> t -> elt
-        val find_first_opt : (elt -> bool) -> t -> elt option
-        val find_last : (elt -> bool) -> t -> elt
-        val find_last_opt : (elt -> bool) -> t -> elt option
-        val iter : (elt -> unit) -> t -> unit
-        val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
-        val map : (elt -> elt) -> t -> t
-        val filter : (elt -> bool) -> t -> t
-        val filter_map : (elt -> elt option) -> t -> t
-        val partition : (elt -> bool) -> t -> t * t
-        val split : elt -> t -> t * bool * t
-        val is_empty : t -> bool
-        val mem : elt -> t -> bool
-        val equal : t -> t -> bool
-        val compare : t -> t -> int
-        val subset : t -> t -> bool
-        val for_all : (elt -> bool) -> t -> bool
-        val exists : (elt -> bool) -> t -> bool
-        val to_list : t -> elt list
-        val of_list : elt list -> t
-        val to_seq_from : elt -> t -> elt Seq.t
-        val to_seq : t -> elt Seq.t
-        val to_rev_seq : t -> elt Seq.t
-        val add_seq : elt Seq.t -> t -> t
-        val of_seq : elt Seq.t -> t
-      end
-
-      type elt = V.elt * Enc.Tree.t
-      type t = D2.t
-
-      val empty : t
-      val add : elt -> t -> t
-      val singleton : elt -> t
-      val remove : elt -> t -> t
-      val union : t -> t -> t
-      val inter : t -> t -> t
-      val disjoint : t -> t -> bool
-      val diff : t -> t -> t
-      val cardinal : t -> int
-      val elements : t -> elt list
-      val min_elt : t -> elt
-      val min_elt_opt : t -> elt option
-      val max_elt : t -> elt
-      val max_elt_opt : t -> elt option
-      val choose : t -> elt
-      val choose_opt : t -> elt option
-      val find : elt -> t -> elt
-      val find_opt : elt -> t -> elt option
-      val find_first : (elt -> bool) -> t -> elt
-      val find_first_opt : (elt -> bool) -> t -> elt option
-      val find_last : (elt -> bool) -> t -> elt
-      val find_last_opt : (elt -> bool) -> t -> elt option
-      val iter : (elt -> unit) -> t -> unit
-      val fold : (elt -> 'acc -> 'acc) -> t -> 'acc -> 'acc
-      val map : (elt -> elt) -> t -> t
-      val filter : (elt -> bool) -> t -> t
-      val filter_map : (elt -> elt option) -> t -> t
-      val partition : (elt -> bool) -> t -> t * t
-      val split : elt -> t -> t * bool * t
-      val is_empty : t -> bool
-      val mem : elt -> t -> bool
-      val equal : t -> t -> bool
-      val compare : t -> t -> int
-      val subset : t -> t -> bool
-      val for_all : (elt -> bool) -> t -> bool
-      val exists : (elt -> bool) -> t -> bool
-      val to_list : t -> elt list
-      val of_list : elt list -> t
-      val to_seq_from : elt -> t -> elt Seq.t
-      val to_seq : t -> elt Seq.t
-      val to_rev_seq : t -> elt Seq.t
-      val add_seq : elt Seq.t -> t -> t
-      val of_seq : elt Seq.t -> t
       val to_string : t -> string
     end
 
     module A : sig
-      module A2 : sig
-        type key = Model.Action.t
-        type !'a t
-
-        val create : int -> 'a t
-        val clear : 'a t -> unit
-        val reset : 'a t -> unit
-        val copy : 'a t -> 'a t
-        val add : 'a t -> key -> 'a -> unit
-        val remove : 'a t -> key -> unit
-        val find : 'a t -> key -> 'a
-        val find_opt : 'a t -> key -> 'a option
-        val find_all : 'a t -> key -> 'a list
-        val replace : 'a t -> key -> 'a -> unit
-        val mem : 'a t -> key -> bool
-        val iter : (key -> 'a -> unit) -> 'a t -> unit
-        val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-        val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-        val length : 'a t -> int
-        val stats : 'a t -> Hashtbl.statistics
-        val to_seq : 'a t -> (key * 'a) Seq.t
-        val to_seq_keys : 'a t -> key Seq.t
-        val to_seq_values : 'a t -> 'a Seq.t
-        val add_seq : 'a t -> (key * 'a) Seq.t -> unit
-        val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
-        val of_seq : (key * 'a) Seq.t -> 'a t
-      end
-
-      type key = A2.key
-      type 'a t = 'a A2.t
-
-      val create : int -> 'a t
-      val clear : 'a t -> unit
-      val reset : 'a t -> unit
-      val copy : 'a t -> 'a t
-      val add : 'a t -> key -> 'a -> unit
-      val remove : 'a t -> key -> unit
-      val find : 'a t -> key -> 'a
-      val find_opt : 'a t -> key -> 'a option
-      val find_all : 'a t -> key -> 'a list
-      val replace : 'a t -> key -> 'a -> unit
-      val mem : 'a t -> key -> bool
-      val iter : (key -> 'a -> unit) -> 'a t -> unit
-      val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-      val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-      val length : 'a t -> int
-      val stats : 'a t -> Hashtbl.statistics
-      val to_seq : 'a t -> (key * 'a) Seq.t
-      val to_seq_keys : 'a t -> key Seq.t
-      val to_seq_values : 'a t -> 'a Seq.t
-      val add_seq : 'a t -> (key * 'a) Seq.t -> unit
-      val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
-      val of_seq : (key * 'a) Seq.t -> 'a t
+      include Hashtbl.S with type key = Model.Action.t
 
       type t' = D.t t
 
@@ -822,59 +122,7 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
     end
 
     module T : sig
-      module T2 : sig
-        type key = V.elt
-        type !'a t
-
-        val create : int -> 'a t
-        val clear : 'a t -> unit
-        val reset : 'a t -> unit
-        val copy : 'a t -> 'a t
-        val add : 'a t -> key -> 'a -> unit
-        val remove : 'a t -> key -> unit
-        val find : 'a t -> key -> 'a
-        val find_opt : 'a t -> key -> 'a option
-        val find_all : 'a t -> key -> 'a list
-        val replace : 'a t -> key -> 'a -> unit
-        val mem : 'a t -> key -> bool
-        val iter : (key -> 'a -> unit) -> 'a t -> unit
-        val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-        val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-        val length : 'a t -> int
-        val stats : 'a t -> Hashtbl.statistics
-        val to_seq : 'a t -> (key * 'a) Seq.t
-        val to_seq_keys : 'a t -> key Seq.t
-        val to_seq_values : 'a t -> 'a Seq.t
-        val add_seq : 'a t -> (key * 'a) Seq.t -> unit
-        val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
-        val of_seq : (key * 'a) Seq.t -> 'a t
-      end
-
-      type key = T2.key
-      type 'a t = 'a T2.t
-
-      val create : int -> 'a t
-      val clear : 'a t -> unit
-      val reset : 'a t -> unit
-      val copy : 'a t -> 'a t
-      val add : 'a t -> key -> 'a -> unit
-      val remove : 'a t -> key -> unit
-      val find : 'a t -> key -> 'a
-      val find_opt : 'a t -> key -> 'a option
-      val find_all : 'a t -> key -> 'a list
-      val replace : 'a t -> key -> 'a -> unit
-      val mem : 'a t -> key -> bool
-      val iter : (key -> 'a -> unit) -> 'a t -> unit
-      val filter_map_inplace : (key -> 'a -> 'a option) -> 'a t -> unit
-      val fold : (key -> 'a -> 'acc -> 'acc) -> 'a t -> 'acc -> 'acc
-      val length : 'a t -> int
-      val stats : 'a t -> Hashtbl.statistics
-      val to_seq : 'a t -> (key * 'a) Seq.t
-      val to_seq_keys : 'a t -> key Seq.t
-      val to_seq_values : 'a t -> 'a Seq.t
-      val add_seq : 'a t -> (key * 'a) Seq.t -> unit
-      val replace_seq : 'a t -> (key * 'a) Seq.t -> unit
-      val of_seq : (key * 'a) Seq.t -> 'a t
+      include Hashtbl.S with type key = enc
 
       type t' = A.t' t
 
@@ -1026,5 +274,16 @@ module Make : (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) -> sig
   end
 end
 
-module Default : () ->
-    module type of Make (Api.Defaults.Log) (Api.Defaults.Ctx) (Api.Defaults.Enc)
+module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
+  S
+  with type enc = Enc.t
+   and type node = Enc.Tree.Node.t
+   and type tree = Enc.Tree.t
+   and type trees = Enc.Trees.t
+
+module Default () :
+  S
+  with type enc = Api.Defaults.Enc.t
+   and type node = Api.Defaults.Enc.Tree.Node.t
+   and type tree = Api.Defaults.Enc.Tree.t
+   and type trees = Api.Defaults.Enc.Trees.t
