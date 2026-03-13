@@ -1,52 +1,19 @@
-module Make : (Log : Logger.S)
-    (Base : Base_term.S)
-    (Bindings : sig
-       module Instructions : sig
-         type t =
-           | Undefined
-           | Done
-           | Arg of
-               { root : Constr.t
-               ; index : int
-               ; cont : t
-               }
-       end
+module type S = sig
+  type base
+  type tree
+  type trees
+  type constructorbindings
 
-       module ConstrMap : sig
-         include Hashtbl.S with type key = Constr.t
-
-         type v = Names.Name.t * Instructions.t
-         type t' = v t
-       end
-
-       type t =
-         | No_Bindings
-         | Use_Bindings of
-             { from : ConstrMap.t' option
-             ; action : ConstrMap.t' option
-             ; goto : ConstrMap.t' option
-             }
-     end)
-    (ConstructorBindings : sig
-       type t =
-         { index : int
-         ; name : string
-         ; bindings : Bindings.t
-         }
-
-       val json : ?as_elt:bool -> t -> Yojson.t
-     end)
-    -> sig
-  module State : State.S with type base = Base.t
+  module State : State.S with type base = base
   module States : States.S with type elt = State.t
-  module Label : Label.S with type base = Base.t
+  module Label : Label.S with type base = base
   module Labels : Labels.S with type elt = Label.t
 
   module Note :
     Annotation_note.S
     with type state = State.t
      and type label = Label.t
-     and type trees = Base.Trees.t
+     and type trees = trees
 
   module Annotation :
     Annotation.S with type label = Label.t and type note = Note.t
@@ -57,7 +24,7 @@ module Make : (Log : Logger.S)
     Transition.S
     with type state = State.t
      and type label = Label.t
-     and type tree = Base.Tree.t
+     and type tree = tree
      and type annotation = Annotation.t
 
   module Transitions :
@@ -67,7 +34,7 @@ module Make : (Log : Logger.S)
     Action.S
     with type label = Label.t
      and type annotation = Annotation.t
-     and type trees = Base.Trees.t
+     and type trees = trees
 
   module Actions :
     Actions.S
@@ -117,8 +84,8 @@ module Make : (Log : Logger.S)
 
   module Info :
     Info.S
-    with type base = Base.t
-     and type constructorbindings = ConstructorBindings.t
+    with type base = base
+     and type constructorbindings = constructorbindings
      and type labels = Labels.t
 
   module LTS :
@@ -154,3 +121,48 @@ module Make : (Log : Logger.S)
      and type partition = Partition.t
      and type fsm = FSM.t
 end
+
+module Make
+    (Log : Logger.S)
+    (Base : Base_term.S)
+    (Bindings : sig
+       module Instructions : sig
+         type t =
+           | Undefined
+           | Done
+           | Arg of
+               { root : Constr.t
+               ; index : int
+               ; cont : t
+               }
+       end
+
+       module ConstrMap : sig
+         include Hashtbl.S with type key = Constr.t
+
+         type v = Names.Name.t * Instructions.t
+         type t' = v t
+       end
+
+       type t =
+         | No_Bindings
+         | Use_Bindings of
+             { from : ConstrMap.t' option
+             ; action : ConstrMap.t' option
+             ; goto : ConstrMap.t' option
+             }
+     end)
+    (ConstructorBindings : sig
+       type t =
+         { index : int
+         ; name : string
+         ; bindings : Bindings.t
+         }
+
+       val json : ?as_elt:bool -> t -> Yojson.t
+     end) :
+  S
+  with type base = Base.t
+   and type tree = Base.Tree.t
+   and type trees = Base.Trees.t
+   and type constructorbindings = ConstructorBindings.t

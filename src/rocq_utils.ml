@@ -2,8 +2,8 @@
 module Log : Logger.S = Logger.MkDefault ()
 
 let () = Log.Config.enable_output ()
-let () = Log.Config.configure_output Debug true
-let () = Log.Config.configure_output Trace true
+let () = Log.Config.configure_output Debug false
+let () = Log.Config.configure_output Trace false
 (***********************************************************************)
 
 (** [kind_pair] are the arguments of [AtomicType (ty, tys)] returned by e.g., [EConstr.kind_of_type]

@@ -1,442 +1,344 @@
-module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
-  module M = Rocq_monad_utils.Make (Log) (Ctx) (Enc)
-  (* (Tree) *)
+module type S = sig
+  type enc
+  type node
+  type tree
+  type trees
+
+  module M : Rocq_monad_utils.S with type enc = enc and type tree = tree
+
+  module Model :
+    Model.S
+    with type base = enc
+     and type tree = tree
+     and type trees = trees
+     and type constructorbindings = M.ConstructorBindings.t
+
+  module Decode :
+    Decoder.S
+    with type enc = enc
+     and type state = Model.State.t
+     and type states = Model.States.t
+     and type partition = Model.Partition.t
+     and type label = Model.Label.t
+     and type labels = Model.Labels.t
+     and type note = Model.Note.t
+     and type annotation = Model.Annotation.t
+     and type annotations = Model.Annotations.t
+     and type transition = Model.Transition.t
+     and type transitions = Model.Transitions.t
+     and type action = Model.Action.t
+     and type actions = Model.Actions.t
+     and type actionmap = Model.ActionMap.t'
+     and type edgemap = Model.EdgeMap.t'
+     and type rocqlts = Model.Info.Meta.RocqLTS.t
+     and type info = Model.Info.t
+     and type lts = Model.LTS.t
+     and type fsm = Model.FSM.t
+     and type bisimilarity = Model.Bisimilarity.t
+
+  module IsTheory : sig
+    val is_theory : EConstr.t -> EConstr.t -> bool M.mm
+    val is_exists : EConstr.t -> bool M.mm
+    val is_weak_sim : EConstr.t -> bool M.mm
+    val is_weak : EConstr.t -> bool M.mm
+    val is_tau : EConstr.t -> bool M.mm
+    val is_silent : EConstr.t -> bool M.mm
+    val is_silent1 : EConstr.t -> bool M.mm
+    val is_LTS : EConstr.t -> bool M.mm
+    val is_None : EConstr.t -> bool M.mm
+    val is_Some : EConstr.t -> bool M.mm
+    val get_theory_enc : (EConstr.t -> bool M.mm) -> enc M.mm
+
+    exception NoEncodingFoundFor_TheoriesNone of unit
+
+    val get_None_enc : unit -> enc M.mm
+
+    exception NoEncodingFoundFor_TheoriesSome of unit
+
+    val get_Some_enc : unit -> enc M.mm
+
+    exception NotEqTheory of unit
+
+    val get_theory_enc_if_eq : EConstr.t -> (EConstr.t -> bool M.mm) -> enc M.mm
+    val get_None_enc_if_eq : EConstr.t -> enc M.mm
+    val get_Some_enc_if_eq : EConstr.t -> enc M.mm
+  end
+
+  module Weak : Weak.S with type enc = enc
+
+  module Config : sig
+    val load_weak_arg : Api.weak_arg -> Weak.t M.mm
+    val load_weak_arg_opt : Api.weak_arg option -> Weak.t option M.mm
+
+    type weak_args =
+      { a : Weak.t option
+      ; b : Weak.t option
+      }
+
+    val the_weak_args : weak_args ref option ref
+    val reset_the_weak_args : unit -> unit
+    val load_weak_args : unit -> unit M.mm
+    val get_the_weak_args : unit -> weak_args option
+    val get_the_weak_arg1 : unit -> Weak.t option
+    val get_the_weak_arg2 : unit -> Weak.t option
+
+    (* val api_bounds_to_model_bounds : Api.bounds_args -> Model.Info.Meta.bounds *)
+    val the_bounds_args : Api.bounds_args ref
+    val load_the_bounds_args : unit -> unit
+  end
+
+  module type X_Args = sig
+    val primary_lts : Libnames.qualid
+    val grefs : Names.GlobRef.t list
+    val weak : Weak.t option
+    val bounds : Api.bounds_args
+  end
+
+  module Graph : (T0 : Hashtbl.S with type key = enc)
+      (V0 : Set.S with type elt = enc)
+      (D0 : Set.S with type elt = enc * tree)
+      (X : X_Args)
+      -> sig
+    module V : sig
+      include Set.S with type elt = enc
+
+      val to_string : t -> string
+    end
+
+    module D : sig
+      include Set.S with type elt = enc * tree
+
+      val to_string : t -> string
+    end
+
+    module A : sig
+      include Hashtbl.S with type key = Model.Action.t
+
+      type t' = D.t t
+
+      val size : t' -> int
+      val update : t' -> Model.Action.t -> D.t -> unit
+      val to_string : t' -> string
+    end
+
+    module T : sig
+      include Hashtbl.S with type key = enc
+
+      type t' = A.t' t
+
+      val update : t' -> V.elt -> A.key -> D.t -> unit
+      val size : t' -> int
+      val to_string : t' -> string
+    end
+
+    type t =
+      { to_visit : V.elt Queue.t
+      ; init : V.elt
+      ; states : V.t
+      ; transitions : T.t'
+      ; ind_defs : M.Ind.t M.B.t
+      ; weak : Weak.t option
+      }
+
+    val empty : V0.elt -> M.Ind.t M.B.t -> t
+    val _log_to_visit : t -> unit
+    val _log_ind_defs : M.Ind.t M.B.t -> unit
+    val is_silent_transition : EConstr.t -> Weak.t option -> bool option M.mm
+
+    module type Y_Args = sig
+      val primary_lts : M.Ind.t
+      val rocq_defs : M.Ind.t M.B.t
+      val stop : t -> bool
+    end
+
+    module type Z_Args = sig
+      val g : t ref
+      val ind_defs : M.Ind.t M.B.t
+    end
+
+    module Make : (Y : Y_Args) -> sig
+      val next_to_visit : t -> T.key
+      val update_to_visit : t -> T.key -> unit
+      val update_states : t -> V.t -> t
+      val get_new_constrs : T.key -> M.Constructor.t list M.mm
+      val get_new_states : t -> T.key -> V.t M.mm
+      val build : t -> t M.mm
+    end
+
+    module Extract : (Z : Z_Args) -> sig
+      val state : V.elt -> Model.EdgeMap.key
+      val states : unit -> Model.Partition.elt
+      val terminals : unit -> Model.Partition.elt
+      val label : A.key -> Model.Label.t
+      val transitions : unit -> Model.Transitions.t
+      val constructor_info : unit -> Model.Info.Meta.RocqLTS.t list M.mm
+      val meta : unit -> Model.Info.Meta.t M.mm
+      val weak_labels : Model.Labels.t -> Model.Labels.t M.mm
+      val lts : unit -> Model.LTS.t M.mm
+    end
+
+    val build_ind_defs : unit -> M.Ind.t M.B.t M.mm
+    val find_primary_lts : M.Ind.t M.B.t -> M.Ind.t M.mm
+    val initial_term : Constrexpr.constr_expr -> EConstr.t M.mm
+    val make_yargs : M.Ind.t -> M.Ind.t M.B.t -> 'a -> (module Y_Args)
+    val make_zargs : M.Ind.t M.B.t -> t ref -> (module Z_Args)
+    val build : Constrexpr.constr_expr -> Model.LTS.t M.mm
+  end
+
+  val make_xargs
+    :  Libnames.qualid
+    -> Names.GlobRef.t list
+    -> Weak.t option
+    -> (module X_Args)
+
+  val fail_if_empty : Model.LTS.t -> unit
+  val fail_if_incomplete : Model.LTS.t -> unit
+  val fail_if_not_bisim : Model.Bisimilarity.result -> unit
+
+  val extract_lts
+    :  Libnames.qualid
+    -> Constrexpr.constr_expr
+    -> Libnames.qualid list
+    -> Weak.t option
+    -> Model.LTS.t M.mm
+
+  module Command : sig
+    val default_weak_arg : Weak.t option -> Weak.t option
+
+    val build_lts
+      :  ?weak:Weak.t option
+      -> Libnames.qualid
+      -> Constrexpr.constr_expr
+      -> Libnames.qualid list
+      -> Model.LTS.t M.mm
+
+    val build_fsm
+      :  ?weak:Weak.t option
+      -> Libnames.qualid
+      -> Constrexpr.constr_expr
+      -> Libnames.qualid list
+      -> Model.FSM.t M.mm
+
+    type t =
+      | MakeLTS of rocq_args
+      | MakeFSM of rocq_args
+      | Saturate of rocq_args
+      | Minimize of rocq_args
+      | Merge of rocq_pair
+      | CheckBisim of rocq_pair
+
+    and rocq_args = Constrexpr.constr_expr * Libnames.qualid
+
+    and rocq_pair =
+      { a : rocq_args
+      ; b : rocq_args
+      }
+
+    val do_make_lts
+      :  Constrexpr.constr_expr * Libnames.qualid
+      -> Libnames.qualid list
+      -> Model.Bisimilarity.t option M.mm
+
+    val do_make_fsm
+      :  Constrexpr.constr_expr * Libnames.qualid
+      -> Libnames.qualid list
+      -> Model.Bisimilarity.t option M.mm
+
+    val do_saturate
+      :  Constrexpr.constr_expr * Libnames.qualid
+      -> Libnames.qualid list
+      -> Model.Bisimilarity.t option M.mm
+
+    val do_minimize
+      :  Constrexpr.constr_expr * Libnames.qualid
+      -> Libnames.qualid list
+      -> Model.Bisimilarity.t option M.mm
+
+    val build_fsms
+      :  rocq_args
+      -> rocq_args
+      -> Libnames.qualid list
+      -> (Model.FSM.t * Model.FSM.t) M.mm
+
+    val do_merge
+      :  rocq_pair
+      -> Libnames.qualid list
+      -> Model.Bisimilarity.t option M.mm
+
+    val do_check_bisim
+      :  rocq_pair
+      -> Libnames.qualid list
+      -> Model.Bisimilarity.t option M.mm
+
+    val run : Libnames.qualid list -> t -> Model.Bisimilarity.t option M.mm
+  end
+end
+
+module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
+  S
+  with type enc = Enc.t
+   and type node = Enc.Tree.Node.t
+   and type tree = Enc.Tree.t
+   and type trees = Enc.Trees.t = struct
+  type enc = Enc.t
+  type node = Enc.Tree.Node.t
+  type tree = Enc.Tree.t
+  type trees = Enc.Trees.t
+
+  module M : Rocq_monad_utils.S with type enc = enc and type tree = tree =
+    Rocq_monad_utils.Make (Log) (Ctx) (Enc)
 
   module Bindings = M.Bindings
   module ConstructorBindings = M.ConstructorBindings
-  module Model = Model.Make (Log) (Enc) (Bindings) (ConstructorBindings)
+
+  module Model :
+    Model.S
+    with type base = enc
+     and type tree = tree
+     and type trees = trees
+     and type constructorbindings = ConstructorBindings.t =
+    Model.Make (Log) (Enc) (Bindings) (ConstructorBindings)
+
   module LTS = Model.LTS
   module FSM = Model.FSM
 
   (** [Decode] handles obtaining [EConstr.t] from [module M]. *)
-  module Decode = struct
-    let enc (x : Enc.t) : EConstr.t = M.decode x
-
-    let handle (x : Enc.t) (e : exn) : EConstr.t =
-      try enc x with M.CannotDecode _ -> raise e
-    ;;
-
-    exception CouldNotDecode_State of Model.State.t
-
-    let state (x : Model.State.t) : EConstr.t =
-      handle x.base (CouldNotDecode_State x)
-    ;;
-
-    exception CouldNotDecode_Label of Model.Label.t
-
-    let label (x : Model.Label.t) : EConstr.t =
-      handle x.base (CouldNotDecode_Label x)
-    ;;
-
-    exception CouldNotDecode_LTS_Constructor of Model.Info.Meta.RocqLTS.t
-
-    let lts_constructor (x : Model.Info.Meta.RocqLTS.t) : EConstr.t =
-      handle x.base (CouldNotDecode_LTS_Constructor x)
-    ;;
-
-    (** [module Decode.ModelToString] handles the decoding of [module Model] components to their decoded and pretty-printed counterparts.
-    *)
-    module Base = struct
-      include
-        Json.Thing.Make
-          (Log)
-          (struct
-            type k = Enc.t
-
-            let name = "Base"
-
-            let json ?(as_elt : bool = false) (x : Enc.t) : Yojson.t =
-              `String (M.decode x |> M.Strfy.econstr)
-            ;;
-          end)
-
-      module Tree = struct
-        module Node =
-          Json.Thing.Make
-            (Log)
-            (struct
-              type k = Enc.Tree.Node.t
-
-              let name = "Node"
-
-              let json ?as_elt (x : Enc.Tree.Node.t) : Yojson.t =
-                `Assoc
-                  [ "base", json ~as_elt:true (fst x); "index", `Int (snd x) ]
-              ;;
-            end)
-
-        include
-          Json.Thing.Make
-            (Log)
-            (struct
-              type k = Enc.Tree.t
-
-              let name = "Tree"
-
-              let rec json ?as_elt (N (x, xl) : Enc.Tree.t) : Yojson.t =
-                `Assoc
-                  [ "node", Node.json ~as_elt:true x
-                  ; "cons", `List (List.map (json ~as_elt:true) xl)
-                  ]
-              ;;
-            end)
-      end
-
-      module Trees =
-        Json.Set.Make
-          (Log)
-          (struct
-            module Set = Enc.Trees
-
-            let name = "Trees"
-            let json = Tree.json
-          end)
-    end
-
-    module State =
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = Model.State.t
-
-          let name = "State"
-
-          let json ?(as_elt : bool = false) (x : Model.State.t) : Yojson.t =
-            Base.json ~as_elt:true x.base
-          ;;
-        end)
-
-    module States =
-      Json.Set.Make
-        (Log)
-        (struct
-          module Set = Model.States
-
-          let name = "States"
-
-          let json ?(as_elt : bool = false) (x : Model.State.t) : Yojson.t =
-            State.json ~as_elt:true x
-          ;;
-        end)
-
-    module Partition =
-      Json.Set.Make
-        (Log)
-        (struct
-          module Set = Model.Partition
-
-          let name = "Paritition"
-
-          let json ?(as_elt : bool = false) (x : Model.States.t) : Yojson.t =
-            States.json ~as_elt:true x
-          ;;
-        end)
-
-    module Label =
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = Model.Label.t
-
-          let name = "Label"
-
-          let json ?(as_elt : bool = false) (x : Model.Label.t) : Yojson.t =
-            `Assoc
-              [ "EConstr", Base.json ~as_elt:true x.base
-              ; ( "is_silent"
-                , Json.option
-                    ~as_elt:true
-                    (fun ?as_elt x -> `Bool x)
-                    x.is_silent )
-              ]
-          ;;
-        end)
-
-    module Labels =
-      Json.Set.Make
-        (Log)
-        (struct
-          module Set = Model.Labels
-
-          let name = "Labels"
-
-          let json ?(as_elt : bool = false) (x : Model.Label.t) : Yojson.t =
-            Label.json ~as_elt:true x
-          ;;
-        end)
-
-    module Note =
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = Model.Note.t
-
-          let name = "Note"
-
-          let json ?(as_elt : bool = false) (x : Model.Note.t) : Yojson.t =
-            `Assoc
-              [ "from", State.json ~as_elt:true x.from
-              ; "label", Label.json ~as_elt:true x.label
-              ; "goto", State.json ~as_elt:true x.goto
-              ; "using", Base.Trees.json ~as_elt:true x.using
-              ]
-          ;;
-        end)
-
-    module Annotation =
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = Model.Annotation.t
-
-          let name = "Annotation"
-
-          let rec json ?(as_elt : bool = false) (x : Model.Annotation.t)
-            : Yojson.t
-            =
-            `Assoc
-              [ "this", Note.json ~as_elt:true x.this
-              ; ( "next"
-                , match x.next with
-                  | None -> `String "None"
-                  | Some next -> json ~as_elt:true next )
-              ]
-          ;;
-        end)
-
-    module Annotations =
-      Json.Set.Make
-        (Log)
-        (struct
-          module Set = Model.Annotations
-
-          let name = "Annotations"
-          let json = Annotation.json
-        end)
-
-    module Transition =
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = Model.Transition.t
-
-          let name = "Transition"
-
-          let json ?(as_elt : bool = false) (x : Model.Transition.t) : Yojson.t =
-            `Assoc
-              [ "from", State.json ~as_elt:true x.from
-              ; "goto", State.json ~as_elt:true x.goto
-              ; "label", Label.json ~as_elt:true x.label
-              ; ( "annotation"
-                , Json.option ~as_elt:true Annotation.json x.annotation )
-              ; "tree", Json.option ~as_elt:true Base.Tree.json x.tree
-              ]
-          ;;
-        end)
-
-    module Transitions =
-      Json.Set.Make
-        (Log)
-        (struct
-          module Set = Model.Transitions
-
-          let name = "Transitions"
-          let json = Transition.json
-        end)
-
-    module Action =
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = Model.Action.t
-
-          let name = "Action"
-
-          let json ?(as_elt : bool = false) (x : Model.Action.t) : Yojson.t =
-            `Assoc
-              [ "label", Label.json ~as_elt:true x.label
-              ; ( "annotation"
-                , Json.option ~as_elt:true Annotation.json x.annotation )
-              ; "trees", Base.Trees.json ~as_elt:true x.trees
-              ]
-          ;;
-        end)
-
-    module ActionMap =
-      Json.Map.Make
-        (Log)
-        (struct
-          module Map = Model.ActionMap
-
-          type value = Model.States.t
-
-          let name = "ActionMap"
-          let kname = "Action"
-          let vname = "Destinations"
-          let kjson = Action.json
-          let vjson = States.json
-        end)
-
-    module EdgeMap =
-      Json.Map.Make
-        (Log)
-        (struct
-          module Map = Model.EdgeMap
-
-          type value = Model.ActionMap.t'
-
-          let name = "EdgeMap"
-          let kname = "From"
-          let vname = "Actions"
-          let kjson = State.json
-          let vjson = ActionMap.json
-        end)
-
-    module Info = struct
-      module Meta = struct
-        module RocqLTS =
-          Json.Thing.Make
-            (Log)
-            (struct
-              type k = Model.Info.Meta.RocqLTS.t
-
-              let name = "RocqLTS"
-
-              let json ?(as_elt : bool = false) (x : Model.Info.Meta.RocqLTS.t)
-                : Yojson.t
-                =
-                `Assoc
-                  [ "base", Base.json x.base
-                  ; ( "constructors"
-                    , `List
-                        (List.map
-                           (ConstructorBindings.json ~as_elt:true)
-                           x.constructors) )
-                  ]
-              ;;
-            end)
-
-        include
-          Json.Thing.Make
-            (Log)
-            (struct
-              type k = Model.Info.Meta.t
-
-              let name = "Meta"
-
-              let json ?as_elt (x : Model.Info.Meta.t) : Yojson.t =
-                `Assoc
-                  [ "complete", `Bool x.is_complete
-                  ; "merged", `Bool x.is_merged
-                  ; "bounds", Model.Info.Meta.Bounds.json ~as_elt:true x.bounds
-                  ; ( "rocq lts"
-                    , `List (List.map (RocqLTS.json ~as_elt:true) x.lts) )
-                  ]
-              ;;
-            end)
-      end
-
-      include
-        Json.Thing.Make
-          (Log)
-          (struct
-            type k = Model.Info.t
-
-            let name = "Info"
-
-            let json ?as_elt (x : Model.Info.t) : Yojson.t =
-              `Assoc
-                [ "meta", Json.option ~as_elt:true Meta.json x.meta
-                ; "weak labels", Labels.json ~as_elt:true x.weak_labels
-                ]
-            ;;
-          end)
-    end
-
-    module LTS =
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = Model.LTS.t
-
-          let name = "LTS"
-
-          let json ?as_elt (x : Model.LTS.t) : Yojson.t =
-            `Assoc
-              [ "init", Json.option ~as_elt:true State.json x.init
-              ; "info", Info.json ~as_elt:true x.info
-              ; "terminals", States.json ~as_elt:true x.terminals
-              ; "alphabet", Labels.json ~as_elt:true x.alphabet
-              ; "states", States.json ~as_elt:true x.states
-              ; "transitions", Transitions.json ~as_elt:true x.transitions
-              ]
-          ;;
-        end)
-
-    module FSM =
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = Model.FSM.t
-
-          let name = "FSM"
-
-          let json ?(as_elt : bool = false) (x : Model.FSM.t) : Yojson.t =
-            `Assoc
-              [ "init", Json.option ~as_elt:true State.json x.init
-              ; "info", Info.json ~as_elt:true x.info
-              ; "terminals", States.json ~as_elt:true x.terminals
-              ; "alphabet", Labels.json ~as_elt:true x.alphabet
-              ; "states", States.json ~as_elt:true x.states
-              ; "edges", EdgeMap.json ~as_elt:true x.edges
-              ]
-          ;;
-        end)
-
-    module Bisimilarity = struct
-      module FSMPair =
-        Json.Thing.Make
-          (Log)
-          (struct
-            type k = Model.Bisimilarity.FSMPair.t
-
-            let name = "FSM Pair"
-
-            let json ?as_elt (x : Model.Bisimilarity.FSMPair.t) : Yojson.t =
-              `Assoc
-                [ "original", FSM.json ~as_elt:true x.original
-                ; "saturated", FSM.json ~as_elt:true x.saturated
-                ]
-            ;;
-          end)
-
-      include
-        Json.Thing.Make
-          (Log)
-          (struct
-            type k = Model.Bisimilarity.t
-
-            let name = "Bisimilarity"
-
-            let json ?(as_elt : bool = false) (x : Model.Bisimilarity.t)
-              : Yojson.t
-              =
-              `Assoc
-                [ ( "fsms"
-                  , `Assoc
-                      [ "a", FSMPair.json ~as_elt:true x.fsm_a
-                      ; "b", FSMPair.json ~as_elt:true x.fsm_b
-                      ; "merged", FSM.json ~as_elt:true x.merged
-                      ] )
-                ; ( "bisimilar states"
-                  , Partition.json ~as_elt:true x.result.bisim_states )
-                ; ( "non-bisimilar states"
-                  , Partition.json ~as_elt:true x.result.non_bisim_states )
-                ]
-            ;;
-          end)
-    end
-  end
+  module Decode :
+    Decoder.S
+    with type enc = Enc.t
+     and type state = Model.State.t
+     and type states = Model.States.t
+     and type partition = Model.Partition.t
+     and type label = Model.Label.t
+     and type labels = Model.Labels.t
+     and type note = Model.Note.t
+     and type annotation = Model.Annotation.t
+     and type annotations = Model.Annotations.t
+     and type transition = Model.Transition.t
+     and type transitions = Model.Transitions.t
+     and type action = Model.Action.t
+     and type actions = Model.Actions.t
+     and type actionmap = Model.ActionMap.t'
+     and type edgemap = Model.EdgeMap.t'
+     and type rocqlts = Model.Info.Meta.RocqLTS.t
+     and type info = Model.Info.t
+     and type lts = Model.LTS.t
+     and type fsm = Model.FSM.t
+     and type bisimilarity = Model.Bisimilarity.t =
+    Decoder.Make (Log) (Enc) (M) (Model)
+
+  let log
+        (fenc :
+          ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> 'a -> unit)
+        (fdec :
+          ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> 'a -> unit)
+        (m : Output.Kind.t)
+        (s : string)
+        (x : 'a)
+    : unit
+    =
+    if !Api.the_output_config.decode_results then fdec ~m ~s x else fenc ~m ~s x
+  ;;
 
   (** *)
   module IsTheory = struct
@@ -530,41 +432,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
     ;;
   end
 
-  module Weak = struct
-    type t =
-      | Option of Enc.t
-      | Custom of Enc.t * Enc.t
-
-    let eq x y : bool =
-      Log.trace __FUNCTION__;
-      match x, y with
-      | Option x, Option y -> Enc.equal x y
-      | Custom (x1, x2), Custom (y1, y2) -> Enc.equal x1 y1 && Enc.equal x2 y2
-      | _, _ -> false
-    ;;
-
-    let to_string : t -> string M.mm =
-      Log.trace __FUNCTION__;
-      function
-      | Option label_enc ->
-        let label_dec : EConstr.t = M.decode label_enc in
-        let label_enc : string = Enc.to_string label_enc in
-        let label_dec : string = M.Strfy.econstr label_dec in
-        Printf.sprintf "Option (%s) -> %s" label_enc label_dec |> M.return
-      | Custom (tau_enc, label_enc) ->
-        let tau_dec : EConstr.t = M.decode tau_enc in
-        let tau_enc : string = Enc.to_string tau_enc in
-        let tau_dec : string = M.Strfy.econstr tau_dec in
-        let label_dec : EConstr.t = M.decode label_enc in
-        let label_enc : string = Enc.to_string label_enc in
-        let label_dec : string = M.Strfy.econstr label_dec in
-        let a : string = Printf.sprintf "- tau (%s) -> %s" tau_enc tau_dec in
-        let b : string =
-          Printf.sprintf "- label (%s) -> %s" label_enc label_dec
-        in
-        Printf.sprintf "Custom\n%s\n%s" a b |> M.return
-    ;;
-  end
+  module Weak : Weak.S with type enc = Enc.t = Weak.Make (Log) (Enc) (M)
 
   (** Config *)
   module Config = struct
@@ -633,15 +501,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       match get_the_weak_args () with None -> None | Some x -> x.b
     ;;
 
-    (* let weak () : bool = Option.has_some !the_weak_args *)
-
     (***********************************************************************)
-
-    (* let api_bounds_to_model_bounds : Api.bounds_args -> Model.Info.Meta.Bounds.t
-       = function
-       | Api.States x -> Model.Info.Meta.Bounds.States x
-       | Api.Transitions x -> Model.Info.Meta.Bounds.Transitions x
-       ;; *)
 
     let the_bounds_args : Api.bounds_args ref = ref Api.default_bounds
     let load_the_bounds_args () : unit = the_bounds_args := !Api.the_bounds_args
@@ -807,9 +667,12 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
         "ind_defs"
         (M.B.to_seq xs |> List.of_seq)
         (Of
-           (Utils.Strfy.tuple
-              (Of Enc.to_string)
-              (Of (M.Strfy.rocq_ind Enc.to_string))))
+           (fun ((k, v) : Enc.t * M.Ind.t) ->
+             `Assoc
+               [ "enc", Enc.json ~as_elt:true k
+               ; "ind", M.Ind.json ~as_elt:true v
+               ]
+             |> Yojson.pretty_to_string))
     ;;
 
     (*********************************************************)
@@ -843,7 +706,6 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       val primary_lts : M.Ind.t
       val rocq_defs : M.Ind.t M.B.t
       val stop : t -> bool
-      (* val g : t ref *)
     end
 
     (* used for extraction *)
@@ -855,19 +717,16 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
     module Make (Y : Y_Args) = struct
       let next_to_visit (g : t) : Enc.t =
         Log.trace __FUNCTION__;
-        (* Queue.pop !Y.g.to_visit *)
         Queue.pop g.to_visit
       ;;
 
       let update_to_visit (g : t) (x : Enc.t) : unit =
         Log.trace __FUNCTION__;
-        (* Queue.push x !Y.g.to_visit *)
         Queue.push x g.to_visit
       ;;
 
       let update_states (g : t) (xs : V.t) : t =
         Log.trace __FUNCTION__;
-        (* Y.g := { !Y.g with states = V.union !Y.g.states xs } *)
         { g with states = V.union g.states xs }
       ;;
 
@@ -889,7 +748,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
 
       let get_new_states (g : t) (from : Enc.t) : V.t M.mm =
         Log.trace __FUNCTION__;
-        Log.thing ~__FUNCTION__ Debug "from" from (Of Enc.to_string);
+        Enc.log ~__FUNCTION__ ~m:Debug ~s:"from" from;
         let open M.Syntax in
         let* new_constrs : M.Constructor.t list = get_new_constrs from in
         let iter_body (i : int) (new_states : V.t) =
@@ -913,32 +772,18 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       (** *)
       let rec build (g : t) : t M.mm =
         Log.trace __FUNCTION__;
-        Log.things
-          ~__FUNCTION__
-          Debug
-          "to visit"
-          (* (!Y.g.to_visit |> Queue.to_seq |> List.of_seq) *)
-          (g.to_visit |> Queue.to_seq |> List.of_seq)
-          (Of
-             (fun (x : Enc.t) : string ->
-               Utils.Strfy.record
-                 [ "enc", Enc.to_string x
-                 ; "dec", M.decode x |> M.Strfy.econstr
-                 ]));
+        (* _log_to_visit g; *)
         if Y.stop g
         then (
           Log.trace ~__FUNCTION__ "stop condition";
-          (* Queue.is_empty !Y.g.to_visit |> M.return) *)
-          M.return g
-          (* else if Queue.is_empty !Y.g.to_visit *))
+          M.return g)
         else if Queue.is_empty g.to_visit
         then (
           Log.trace ~__FUNCTION__ "no more to visit";
           M.return g)
         else (
-          Log.trace ~__FUNCTION__ "continue";
+          (* Log.trace ~__FUNCTION__ "continue"; *)
           let enc_to_visit : Enc.t = next_to_visit g in
-          (* status_update enc_to_visit g bound; *)
           let open M.Syntax in
           (* NOTE: [get_new_states] also updates [g.to_visit] *)
           let* new_states : V.t = get_new_states g enc_to_visit in
@@ -1079,18 +924,13 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
         let gref : Names.GlobRef.t = List.nth X.grefs i in
         (* NOTE: [M.Ind.lts] encodes [x.ind] into the bi-enc maps. *)
         let* x : M.Ind.t = M.Ind.lts gref in
-        Log.thing
-          ~__FUNCTION__
-          Debug
-          "x"
-          x
-          (Of (M.Strfy.rocq_ind Enc.to_string));
+        M.Ind.log ~__FUNCTION__ ~m:Debug ~s:"x" x;
         (* NOTE: [ind_defs] is a separate map, so add again using same enc. *)
         M.B.replace ind_defs x.enc x;
         let x_enc : Enc.t = M.encode x.ind in
-        Log.thing ~__FUNCTION__ Debug "x_enc" x_enc (Of Enc.to_string);
+        Enc.log ~__FUNCTION__ ~m:Debug ~s:"x_enc" x_enc;
         let x_dec : EConstr.t = M.decode x.enc in
-        Log.thing ~__FUNCTION__ Debug "x_dec" x_dec (Of M.Strfy.econstr);
+        M.log_econstr ~__FUNCTION__ ~m:Debug ~s:"x_dec" x_dec;
         M.return ()
       in
       let* () = M.iterate 0 (num - 1) () f in
@@ -1101,12 +941,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       Log.trace __FUNCTION__;
       let open M.Syntax in
       let* x : M.Ind.t = Nametab.global X.primary_lts |> M.Ind.lts in
-      Log.thing
-        ~__FUNCTION__
-        Debug
-        "primary lts"
-        x
-        (Of (M.Strfy.rocq_ind Enc.to_string));
+      M.Ind.log ~__FUNCTION__ ~m:Debug ~s:"primary lts" x;
       (* NOTE: catch-all sanity check *)
       M.encode x.ind |> M.B.find ind_defs |> M.return
     ;;
@@ -1155,8 +990,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let* primary_lts : M.Ind.t = find_primary_lts ind_defs in
       let* init_term : EConstr.t = initial_term init_term in
       let$* _unit env sigma =
-        Rocq_ind.get_lts_term_type primary_lts
-        |> Typing.check env sigma init_term
+        M.Ind.get_lts_term_type primary_lts |> Typing.check env sigma init_term
       in
       let init : Enc.t = M.encode init_term in
       (* NOTE: build the graph *)
@@ -1298,8 +1132,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let open M.Syntax in
       Log.info "Extracting LTS...";
       let* the_lts = build_lts primary_lts x refs in
-      Model.LTS.log ~m:Debug ~s:"Finished Extracting LTS" the_lts;
-      (* Decode.LTS.log ~m:Result ~s:"Finished Extracting LTS" the_lts; *)
+      log Model.LTS.log Decode.LTS.log Result "Finished Extracting LTS" the_lts;
       M.return None
     ;;
 
@@ -1308,8 +1141,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      Model.FSM.log ~m:Debug ~s:"Finished Making FSM" the_fsm;
-      (* Decode.FSM.log ~m:Result ~s:"Finished Making FSM" the_fsm; *)
+      log Model.FSM.log Decode.FSM.log Result "Finished Making FSM" the_fsm;
       M.return None
     ;;
 
@@ -1318,12 +1150,10 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      Model.FSM.log ~m:Debug ~s:"Finished Making FSM" the_fsm;
-      (* Decode.FSM.log ~m:Info ~s:"Finished Making FSM" the_fsm; *)
+      log Model.FSM.log Decode.FSM.log Info "Finished Making FSM" the_fsm;
       Log.info "Saturating FSM...";
       let the_fsm = Model.FSM.saturate the_fsm in
-      Model.FSM.log ~m:Debug ~s:"Finished Saturating FSM" the_fsm;
-      (* Decode.FSM.log ~m:Result ~s:"Finished Saturating FSM" the_fsm; *)
+      log Model.FSM.log Decode.FSM.log Result "Finished Saturating FSM" the_fsm;
       M.return None
     ;;
 
@@ -1332,11 +1162,11 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       Log.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
-      Decode.FSM.log ~m:Info ~s:"Finished Making FSM" the_fsm;
+      log Model.FSM.log Decode.FSM.log Info "Finished Making FSM" the_fsm;
       Log.info "Minimizing FSM...";
       let { fsm; pi } : Model.Minimize.t = Model.Minimize.fsm the_fsm in
       Decode.Partition.log ~m:Info ~s:"pi" pi;
-      Decode.FSM.log ~m:Result ~s:"Finished Minimizing FSM" fsm;
+      log Model.FSM.log Decode.FSM.log Result "Finished Minimizing FSM" the_fsm;
       M.return None
     ;;
 
@@ -1352,13 +1182,11 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       Log.info "Making FSM A...";
       let weak1 : Weak.t option = Config.get_the_weak_arg1 () in
       let* the_fsm_a = build_fsm ~weak:weak1 alts ax refs in
-      (* Model.FSM.log ~m:Debug ~s:"Finished Making FSM A" the_fsm_a; *)
-      (* Decode.FSM.log ~m:Info ~s:"Finished Making FSM A" the_fsm_a; *)
+      log Model.FSM.log Decode.FSM.log Info "Finished Making FSM A" the_fsm_a;
       Log.info "Making FSM B...";
       let weak2 : Weak.t option = Config.get_the_weak_arg2 () in
       let* the_fsm_b = build_fsm ~weak:weak2 blts bx refs in
-      (* Model.FSM.log ~m:Debug ~s:"Finished Making FSM B" the_fsm_b; *)
-      (* Decode.FSM.log ~m:Info ~s:"Finished Making FSM B" the_fsm_b; *)
+      log Model.FSM.log Decode.FSM.log Info "Finished Making FSM B" the_fsm_b;
       M.return (the_fsm_a, the_fsm_b)
     ;;
 
@@ -1368,8 +1196,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
       Log.info "Merging FSMs...";
       let the_fsm = FSM.merge the_fsm_a the_fsm_b in
-      Model.FSM.log ~m:Debug ~s:"Finished Merging FSMs" the_fsm;
-      Decode.FSM.log ~m:Result ~s:"Finished Merging FSMs" the_fsm;
+      log Model.FSM.log Decode.FSM.log Result "Finished Merging FSMs" the_fsm;
       M.return None
     ;;
 
@@ -1379,8 +1206,12 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
       Log.info "Checking Bisimilarity of FSMs...";
       let result = Model.Bisimilarity.fsm the_fsm_a the_fsm_b in
-      Model.Bisimilarity.log ~m:Debug ~s:"Result" result;
-      Decode.Bisimilarity.log ~m:Result ~s:"Result" result;
+      log
+        Model.Bisimilarity.log
+        Decode.Bisimilarity.log
+        Result
+        "Finished Merging FSMs"
+        result;
       fail_if_not_bisim result.result;
       M.return (Some result)
     ;;
@@ -1404,4 +1235,4 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) = struct
 end
 
 module Default () =
-  Make (Api.Defaults.Log) (Api.Defaults.Ctx) (Api.Defaults.Enc)
+  Make ((val Api.make_logger ())) (Api.Defaults.Ctx) (Api.Defaults.Enc)

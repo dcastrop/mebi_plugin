@@ -11,7 +11,6 @@ Encoding
 Bi_encoding
 Theories
 Rocq_utils
-Rocq_ind
 Rocq_context
 Rocq_monad
 Rocq_monad_utils
@@ -43,7 +42,10 @@ Saturate
 Minimize
 Bisimilarity
 Model
+Decoder
 Api
+Weak
+Graph
 Wrapper
 Proof_solver
 G_mebi

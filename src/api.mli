@@ -6,6 +6,24 @@ module Defaults : sig
   (* module Trees : module type of Enc_trees.Make (Log) (Tree) *)
 end
 
+type output_config =
+  { mutable debug : bool
+  ; mutable info : bool
+  ; mutable notice : bool
+  ; mutable warning : bool
+  ; mutable error : bool
+  ; mutable trace : bool
+  ; mutable result : bool
+  ; mutable show : bool
+  ; mutable decode_results : bool
+  }
+
+val output_config_default : output_config
+val the_output_config : output_config ref
+val config_output : bool -> Output.Kind.t -> unit
+val output_config_decode_results : bool -> unit
+val make_logger : unit -> (module Logger.S)
+
 type fail_flags =
   { mutable empty : bool
   ; mutable incomplete : bool

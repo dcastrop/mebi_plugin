@@ -10,6 +10,76 @@ end
 
 (* TODO: output *)
 
+type output_config =
+  { mutable debug : bool
+  ; mutable info : bool
+  ; mutable notice : bool
+  ; mutable warning : bool
+  ; mutable error : bool
+  ; mutable trace : bool
+  ; mutable result : bool
+  ; mutable show : bool
+  ; mutable decode_results : bool
+  }
+
+let output_config_default : output_config =
+  { debug = false
+  ; info = true
+  ; notice = true
+  ; warning = true
+  ; error = true
+  ; trace = false
+  ; result = true
+  ; show = true
+  ; decode_results = false
+  }
+;;
+
+let the_output_config : output_config ref = ref output_config_default
+
+let config_output (x : bool) : Output.Kind.t -> unit = function
+  | Debug -> !the_output_config.debug <- x
+  | Info -> !the_output_config.info <- x
+  | Notice -> !the_output_config.notice <- x
+  | Warning -> !the_output_config.warning <- x
+  | Error -> !the_output_config.error <- x
+  | Trace -> !the_output_config.trace <- x
+  | Result -> !the_output_config.result <- x
+  | Show -> !the_output_config.show <- x
+;;
+
+let output_config_decode_results (x : bool) : unit =
+  !the_output_config.decode_results <- x
+;;
+
+(***********************************************************************)
+
+let make_logger () : (module Logger.S) =
+  (module Logger.Make
+            (Output.Mode.Default)
+            (struct
+              let prefix = None
+
+              let level : Output.Kind.level -> bool = function
+                | Debug -> !the_output_config.debug
+                | Info -> !the_output_config.info
+                | Notice -> !the_output_config.notice
+                | Warning -> !the_output_config.warning
+                | Error -> !the_output_config.error
+              ;;
+
+              let special : Output.Kind.special -> bool = function
+                | Trace -> !the_output_config.trace
+                | Result -> !the_output_config.result
+                | Show -> !the_output_config.show
+              ;;
+            end) : Logger.S)
+;;
+
+(* let make_wrapper () =
+   let module W = Wrapper.
+   Make (Api.Defaults.Log) (Api.Defaults.Ctx) (Api.Defaults.Enc) in *)
+
 (***********************************************************************)
 
 type fail_flags =
