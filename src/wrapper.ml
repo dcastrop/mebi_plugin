@@ -902,13 +902,18 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
         let alphabet : Model.Labels.t = Model.Transitions.labels transitions in
         let* meta : Model.Info.Meta.t = meta () in
         let* weak_labels : Model.Labels.t = weak_labels alphabet in
+        let states : Model.States.t = states () in
         let open LTS in
         { init = Some (state !Z.g.init)
         ; terminals = terminals ()
         ; alphabet
-        ; states = states ()
+        ; states
         ; transitions
-        ; info = { meta = Some meta; weak_labels }
+        ; info =
+            { meta = Some meta
+            ; weak_labels
+            ; num_states = Model.States.cardinal states
+            }
         }
         |> M.return
       ;;

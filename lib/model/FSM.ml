@@ -104,7 +104,9 @@ module Make
     let alphabet : Labels.t = Labels.union a.alphabet b.alphabet in
     let states : States.t = States.union a.states b.states in
     let edges : EdgeMap.t' = EdgeMap.merge a.edges b.edges in
-    let info : Info.t = Info.merge a.info b.info in
+    let info : Info.t =
+      Info.merge ~num_states:(States.cardinal states) a.info b.info
+    in
     { init; terminals; alphabet; states; edges; info }
   ;;
 

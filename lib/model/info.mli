@@ -12,7 +12,13 @@ module type S = sig
 
       val json : ?as_elt:bool -> t -> Yojson.t
       val to_string : ?pretty:bool -> t -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> t
+        -> unit
     end
 
     module RocqLTS : sig
@@ -23,7 +29,13 @@ module type S = sig
 
       val json : ?as_elt:bool -> t -> Yojson.t
       val to_string : ?pretty:bool -> t -> string
-      val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
+
+      val log
+        :  ?__FUNCTION__:string
+        -> ?m:Output.Kind.t
+        -> ?s:string
+        -> t
+        -> unit
     end
 
     type t =
@@ -43,12 +55,13 @@ module type S = sig
   type t =
     { meta : Meta.t option
     ; weak_labels : labels
+      ; num_states : int
     }
 
   val json : ?as_elt:bool -> t -> Yojson.t
   val to_string : ?pretty:bool -> t -> string
   val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
-  val merge : t -> t -> t
+  val merge : ?num_states:int ->  t -> t -> t
 end
 
 module Make
@@ -87,4 +100,4 @@ module Make
   S
   with type base = Base.t
    and type constructorbindings = ConstructorBindings.t
-   and type labels = Labels.t
+   and type labels = Labels.t 
