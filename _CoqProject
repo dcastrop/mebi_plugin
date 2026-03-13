@@ -91,8 +91,6 @@ lib/utils/logger.mli
 lib/utils/json.ml
 lib/utils/json.mli
 
-lib/terms/encoding.ml
-lib/terms/encoding.mli
 lib/terms/tree.ml
 lib/terms/tree.mli
 lib/terms/trees.ml
@@ -174,10 +172,12 @@ src/theories.ml
 src/theories.mli
 src/rocq_utils.ml
 src/rocq_utils.mli
-src/rocq_ind.ml
-src/rocq_ind.mli
 src/rocq_context.ml
 src/rocq_context.mli
+
+
+lib/terms/encoding.ml
+lib/terms/encoding.mli
 
 src/bi_encoding.ml
 src/bi_encoding.mli
@@ -185,13 +185,22 @@ src/rocq_monad.ml
 src/rocq_monad.mli
 src/rocq_monad_utils.ml
 src/rocq_monad_utils.mli
+src/decoder.ml
+src/decoder.mli
+
+src/api.ml
+src/api.mli
+
+src/weak.ml
+src/weak.mli
+
+src/graph.ml
+src/graph.mli
 
 src/wrapper.ml
 src/wrapper.mli
 src/proof_solver.ml
 src/proof_solver.mli
-src/api.ml
-src/api.mli
 
 # src/examples.ml
 # src/examples.mli

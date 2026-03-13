@@ -21,13 +21,20 @@ Require Import Logic.
 
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.MutualExclusion.TermTests".
-MeBi Config Bounds As Num States 5000.
-MeBi Run FSM Free Using spec_lts.
+MeBi Config Bounds As Num States 2000.
+(* MeBi Run FSM (make_spec 1) Using spec_lts. *)
+(* MeBi Run FSM (compose (create 1 Protocol.P)) Using lts step. *)
+
+(* MeBi Run FSM (make_spec 2) Using spec_lts. *)
+(* MeBi Run FSM (compose (create 2 Protocol.P)) Using lts step. *)
+MeBi Run FSM (compose (create 2 Protocol.P)) Using bigstep lts step.
+
 (* MeBi Run Saturate Free Using spec_lts. *)
 (* MeBi Run Minimize Free Using spec_lts. *)
 
-(* MeBi Run Bisim (make_log c1) With valid_lts And c1 With lts Using lts step. *)
+(* MeBi Run Bisim (make_spec 1) With spec_lts And (compose (create 1 Protocol.P)) With lts Using step. *)
 
+(* MeBi Run Bisim (make_spec 2) With spec_lts And (compose (create 2 Protocol.P)) With lts Using step. *)
 
 
 

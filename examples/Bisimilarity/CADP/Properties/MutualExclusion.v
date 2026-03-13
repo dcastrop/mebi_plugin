@@ -12,24 +12,22 @@ Require Import MEBI.Bisimilarity.
 Inductive spec_state : Type :=
 | Free : spec_state
 | Held : nat -> spec_state
+| Pid : nat -> spec_state -> spec_state
 .
 
 Inductive spec_lts : spec_state -> option label -> spec_state -> Prop :=
-| SVC_ENTER : forall i, spec_lts Free (Some (ENTER, i)) (Held i)
-| SVC_LEAVE : forall i, spec_lts (Held i) (Some (LEAVE, i)) Free
+| SVC_ENTER : forall i, spec_lts (Pid i Free) (Some (ENTER, i)) (Held i)
+| SVC_LEAVE : forall i, spec_lts (Held i) (Some (LEAVE, i)) (Pid i Free)
+| SVC_PID : forall i j x y a, spec_lts x (Some (a, j)) y ->
+                              spec_lts (Pid i x) (Some (a, j)) (Pid i y)
+| SVC_SWAP : forall i j x, spec_lts (Pid i (Pid j x)) None (Pid j (Pid i x))
 .
 
-(* Inductive spec_lts' (i:pid) : spec_state -> option label -> spec_state -> Prop :=
-| SVC_ENTER' : spec_lts' i Free (Some (ENTER, i)) (Held i)
-| SVC_LEAVE' : spec_lts' i (Held i) (Some (LEAVE, i)) Free
-.
-
-Check spec_lts.
-
-Inductive spec_lts' (p:nat) : spec_state -> option label -> spec_state -> Prop :=
-| z : spec_lts
-| z1 : nat -> spec_lts
-. *)
+Fixpoint make_spec (n:nat) : spec_state :=
+  match n with 
+  | 0 => Free
+  | S n => Pid n (make_spec n)
+  end.
 
 
 
