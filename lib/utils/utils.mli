@@ -119,3 +119,12 @@ module Strfy : sig
   val array : 'a to_string -> ?args:style_args -> 'a array -> string
   val record : ?args:style_args -> (string * string) list -> string
 end
+
+module FileWriter : sig
+
+val perm : int
+val default_dir : string
+val get_loc : unit -> string
+val create_parent_dir : string -> unit
+
+end

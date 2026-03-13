@@ -163,11 +163,11 @@ VERNAC COMMAND EXTEND MeBi_Run_LTS CLASSIFIED AS QUERY
 END 
 
 VERNAC COMMAND EXTEND MeBi_Config_Reset CLASSIFIED AS QUERY
-| ["MeBi" "Config" "Reset"]          -> { Api.reset_all              () }
-| ["MeBi" "Config" "Reset" "Bounds"] -> { Api.reset_bounds_args      () }
-| ["MeBi" "Config" "Reset" "Weak"]   -> { Api.reset_weak_args        () }
-| ["MeBi" "Config" "Reset" "FailIf"] -> { Api.reset_the_fail_flags   () }
-| ["MeBi" "Config" "Reset" "Output"] -> { Api.reset_the_logging_args () }
+| ["MeBi" "Config" "Reset"]          -> { Api.reset_all            () }
+| ["MeBi" "Config" "Reset" "Bounds"] -> { Api.reset_bounds_args    () }
+| ["MeBi" "Config" "Reset" "Weak"]   -> { Api.reset_weak_args      () }
+| ["MeBi" "Config" "Reset" "FailIf"] -> { Api.reset_the_fail_flags () }
+| ["MeBi" "Config" "Reset" "Output"] -> { Api.reset_output_config  () }
 END
 
 (* Config -- graph bounds *)
@@ -227,13 +227,12 @@ VERNAC COMMAND EXTEND MeBi_Config_FailIf_NotBisimilar CLASSIFIED AS QUERY
 END
 
 (* Config -- output *)
-(* VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
-(* TODO: check if we can just use [x] like this, would save a lot of time/space *)
-| ["MeBi" "Config" "Output" x "True"] -> 
-  { Api.set_output_level x true }
-| ["MeBi" "Config" "Output" x "False"] -> 
-  { Api.set_output_level x false }
-END *)
+VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Output" string(x) "True"] -> 
+  { Api.set_output true x }
+| ["MeBi" "Config" "Output" string(x) "False"] -> 
+  { Api.set_output false x }
+END
 
 (* VERNAC COMMAND EXTEND MeBi_Help CLASSIFIED AS QUERY
 (* TODO: update me *)

@@ -16,12 +16,16 @@ type output_config =
   ; mutable result : bool
   ; mutable show : bool
   ; mutable decode_results : bool
+  ; mutable dump_results : bool
   }
 
 val output_config_default : output_config
 val the_output_config : output_config ref
+val reset_output_config : unit -> unit
 val config_output : bool -> Output.Kind.t -> unit
 val output_config_decode_results : bool -> unit
+val output_config_dump_results : bool -> unit
+val set_output : bool -> string -> unit
 val make_logger : unit -> (module Logger.S)
 
 type fail_flags =
@@ -62,5 +66,4 @@ val get_the_weak_arg1 : unit -> weak_arg option
 val get_the_weak_arg2 : unit -> weak_arg option
 val set_the_weak_arg1 : weak_arg -> unit
 val set_the_weak_arg2 : weak_arg -> unit
-val reset_the_logging_args : unit -> unit
 val reset_all : unit -> unit

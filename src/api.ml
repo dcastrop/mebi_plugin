@@ -20,6 +20,7 @@ type output_config =
   ; mutable result : bool
   ; mutable show : bool
   ; mutable decode_results : bool
+  ; mutable dump_results : bool
   }
 
 let output_config_default : output_config =
@@ -32,10 +33,12 @@ let output_config_default : output_config =
   ; result = true
   ; show = true
   ; decode_results = false
+  ; dump_results = false
   }
 ;;
 
 let the_output_config : output_config ref = ref output_config_default
+let reset_output_config () : unit = the_output_config := output_config_default
 
 let config_output (x : bool) : Output.Kind.t -> unit = function
   | Debug -> !the_output_config.debug <- x
@@ -50,6 +53,29 @@ let config_output (x : bool) : Output.Kind.t -> unit = function
 
 let output_config_decode_results (x : bool) : unit =
   !the_output_config.decode_results <- x
+;;
+
+let output_config_dump_results (x : bool) : unit =
+  !the_output_config.dump_results <- x
+;;
+
+let set_output (x : bool) : string -> unit = function
+  | "Debug" -> config_output x Debug
+  | "Info" -> config_output x Info
+  | "Notice" -> config_output x Notice
+  | "Warning" -> config_output x Warning
+  | "Error" -> config_output x Error
+  | "Trace" -> config_output x Trace
+  | "Result" -> config_output x Result
+  | "Show" -> config_output x Show
+  | "DecodeResults" -> output_config_decode_results x
+  | "DumpResults" -> output_config_dump_results x
+  | x ->
+    Printf.sprintf
+      "Unrecognised option \"%s\". Valid options are: Debug, Info, Notice, \
+       Warning, Error, Trace, Result, Show, DecodeResults, DumpResults"
+      x
+    |> Defaults.Log.warning
 ;;
 
 (***********************************************************************)
@@ -173,31 +199,10 @@ let set_the_weak_arg2 (x : weak_arg) : unit =
 
 (***********************************************************************)
 
-(* TODO: add configurable output stuff *)
-(* let set_output_level_debug (x:bool) : unit =
-  let f
-    ?(debug : bool = debug)
-      ?(info : bool = false)
-      ?(notice : bool = true)
-      ?(warning : bool = true)
-      ?(error : bool = true) : level -> bool =
-in
-  Output.Kind.default_level := ref (
-     Output.Kind.default_level_fun ~debug:x );
-  
-;; *)
-
-let reset_the_logging_args () : unit =
-  Output.Kind.default_level := Output.Kind.default_level_fun;
-  Output.Kind.default_special := Output.Kind.default_special_fun
-;;
-
-(***********************************************************************)
-
 let reset_all () : unit =
   reset_bounds_args ();
   reset_weak_args ();
   reset_the_fail_flags ();
-  reset_the_logging_args ();
+  reset_output_config ();
   Logger.Default.show "(MeBi: Reset Config.)"
 ;;

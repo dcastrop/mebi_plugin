@@ -14,10 +14,8 @@ module type S = sig
     ; edges : edgemap
     ; info : info
     }
+include Json.S with type k = t
 
-  val json : ?as_elt:bool -> t -> Yojson.t
-  val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
   val of_lts : lts -> t
   val merge : t -> t -> t
   val is_weak_mode : t -> bool
