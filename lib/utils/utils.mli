@@ -126,5 +126,5 @@ val perm : int
 val default_dir : string
 val get_loc : unit -> string
 val create_parent_dir : string -> unit
-
+val get_local_timestamp : string
 end
