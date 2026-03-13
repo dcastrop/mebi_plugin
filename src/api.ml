@@ -30,10 +30,10 @@ let output_config_default : output_config =
   ; warning = true
   ; error = true
   ; trace = false
-  ; result = true
+  ; result = false
   ; show = true
-  ; decode_results = false
-  ; dump_results = false
+  ; decode_results = true
+  ; dump_results = true
   }
 ;;
 

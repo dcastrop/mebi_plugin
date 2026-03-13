@@ -504,4 +504,22 @@ module FileWriter = struct
       create_parent_dir parent_dir;
       Sys.mkdir parent_dir perm)
   ;;
+
+  let get_local_timestamp : string =
+    match Unix.localtime (Unix.time ()) with
+    | { tm_sec; tm_min; tm_hour; tm_mday; tm_mon; tm_year; _ } ->
+      Printf.sprintf
+        "%d %s%d %s%d - %s%d:%s%d:%s%d"
+        (tm_year + 1900)
+        (if tm_mon < 10 then "0" else "")
+        tm_mon
+        (if tm_mday < 10 then "0" else "")
+        tm_mday
+        (if tm_hour < 10 then "0" else "")
+        tm_hour
+        (if tm_min < 10 then "0" else "")
+        tm_min
+        (if tm_sec < 10 then "0" else "")
+        tm_sec
+  ;;
 end
