@@ -18,6 +18,7 @@ module type S = sig
   type info
   type lts
   type fsm
+  type result
   type bisimilarity
 
   val enc : enc -> EConstr.t
@@ -52,6 +53,7 @@ module type S = sig
   module Info : Json.S with type k = info
   module LTS : Json.S with type k = lts
   module FSM : Json.S with type k = fsm
+  module Result : Json.S with type k = result
   module Bisimilarity : Json.S with type k = bisimilarity
 end
 
@@ -59,12 +61,13 @@ module Make
     (Log : Logger.S)
     (Enc : Encoding.S)
     (M : Rocq_monad_utils.S with type enc = Enc.t)
+    (ConstructorBindings : Constructor_bindings.S with type 'a mm = 'a M.mm)
     (Model :
        Model.S
        with type base = Enc.t
         and type tree = Enc.Tree.t
         and type trees = Enc.Trees.t
-        and type constructorbindings = M.ConstructorBindings.t) :
+        and type constructorbindings = ConstructorBindings.t) :
   S
   with type enc = Enc.t
    and type state = Model.State.t
@@ -85,6 +88,7 @@ module Make
    and type info = Model.Info.t
    and type lts = Model.LTS.t
    and type fsm = Model.FSM.t
+   and type result = Model.Bisimilarity.Result.t
    and type bisimilarity = Model.Bisimilarity.t = struct
   type enc = Enc.t
   type state = Model.State.t
@@ -105,6 +109,7 @@ module Make
   type info = Model.Info.t
   type lts = Model.LTS.t
   type fsm = Model.FSM.t
+  type result = Model.Bisimilarity.Result.t
   type bisimilarity = Model.Bisimilarity.t
 
   let enc (x : Enc.t) : EConstr.t = M.decode x
@@ -360,10 +365,12 @@ module Make
         type value = Model.States.t
 
         let name = "ActionMap"
-        let kname = "Action"
-        let vname = "Destinations"
-        let kjson = Action.json
-        let vjson = States.json
+      end)
+      (Model.Action)
+      (struct
+        include Model.States
+
+        let name = "Destinations"
       end)
 
   module EdgeMap =
@@ -375,10 +382,17 @@ module Make
         type value = Model.ActionMap.t'
 
         let name = "EdgeMap"
-        let kname = "From"
-        let vname = "Actions"
-        let kjson = State.json
-        let vjson = ActionMap.json
+      end)
+      (struct
+        include Model.State
+
+        let name = "From"
+      end)
+      (struct
+        include ActionMap
+
+        let name = "Actions"
+        let compare a b : int = 0
       end)
 
   module Info = struct
@@ -399,7 +413,7 @@ module Make
                 ; ( "constructors"
                   , `List
                       (List.map
-                         (M.ConstructorBindings.json ~as_elt:true)
+                         (ConstructorBindings.json ~as_elt:true)
                          x.constructors) )
                 ]
             ;;
@@ -481,6 +495,23 @@ module Make
         ;;
       end)
 
+  module Result =
+    Json.Thing.Make
+      (Log)
+      (struct
+        type k = Model.Bisimilarity.Result.t
+
+        let name = "Result"
+
+        let json ?as_elt (x : Model.Bisimilarity.Result.t) : Yojson.t =
+          `Assoc
+            [ "bisimilar states", Partition.json ~as_elt:true x.bisim_states
+            ; ( "non-bisimilar states"
+              , Partition.json ~as_elt:true x.non_bisim_states )
+            ]
+        ;;
+      end)
+
   module Bisimilarity = struct
     module FSMPair =
       Json.Thing.Make
@@ -516,10 +547,7 @@ module Make
                     ; "b", FSMPair.json ~as_elt:true x.fsm_b
                     ; "merged", FSM.json ~as_elt:true x.merged
                     ] )
-              ; ( "bisimilar states"
-                , Partition.json ~as_elt:true x.result.bisim_states )
-              ; ( "non-bisimilar states"
-                , Partition.json ~as_elt:true x.result.non_bisim_states )
+              ; "result", Result.json ~as_elt:true x.result
               ]
           ;;
         end)

@@ -3,13 +3,12 @@ module type S = sig
   type states
   type t = action * states
 
+  include Json.S with type k = t
+
   val compare : t -> t -> int
   val shorter_annotation : t -> t -> t
   val try_update : t -> t list -> t option * t list
   val merge_lists : t list -> t list -> t list
-  val json : ?as_elt:bool -> t -> Yojson.t
-  val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
 end
 
 module Make
@@ -28,6 +27,22 @@ module Make
   type action = Action.t
   type states = States.t
   type t = action * states
+
+  include
+    Json.Thing.Make
+      (Log)
+      (struct
+        type k = t
+
+        let name = "ActionPair"
+
+        let json ?as_elt (x : t) : Yojson.t =
+          `Assoc
+            [ "action", Action.json (fst x)
+            ; "destinations", States.json (snd x)
+            ]
+        ;;
+      end)
 
   let compare ((a, x) : t) ((b, y) : t) : int =
     Utils.compare_chain [ Action.compare a b; States.compare x y ]
@@ -95,20 +110,4 @@ module Make
       in
       merge_lists a tl
   ;;
-
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
-
-        let name = "ActionPair"
-
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ "action", Action.json (fst x)
-            ; "destinations", States.json (snd x)
-            ]
-        ;;
-      end)
 end

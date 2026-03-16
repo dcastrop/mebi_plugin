@@ -3,13 +3,12 @@ module type S = sig
   type states
   type t = action * states
 
+  include Json.S with type k = t
+
   val compare : t -> t -> int
   val shorter_annotation : t -> t -> t
   val try_update : t -> t list -> t option * t list
   val merge_lists : t list -> t list -> t list
-  val json : ?as_elt:bool -> t -> Yojson.t
-  val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
 end
 
 module Make

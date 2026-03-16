@@ -9,25 +9,56 @@ Require Import MEBI.Bisimilarity.
 (* TODO: just copied from paper *)
 (* Inductive act' : Type := | ENTER : nat -> label | LEAVE : nat -> label. *)
 
+
+Inductive spec_status : Type :=
+| Free : spec_status
+| Held : nat -> spec_status
+.
+
+Inductive spec_pid : Type :=
+| Pid : nat -> spec_pid -> spec_pid
+| Nil : spec_pid
+.
+
 Inductive spec_state : Type :=
-| Free : spec_state
-| Held : nat -> spec_state
-| Pid : nat -> spec_state -> spec_state
+| State : spec_status -> spec_pid -> spec_state
 .
 
 Inductive spec_lts : spec_state -> option label -> spec_state -> Prop :=
-| SVC_ENTER : forall i, spec_lts (Pid i Free) (Some (ENTER, i)) (Held i)
-| SVC_LEAVE : forall i, spec_lts (Held i) (Some (LEAVE, i)) (Pid i Free)
-| SVC_PID : forall i j x y a, spec_lts x (Some (a, j)) y ->
-                              spec_lts (Pid i x) (Some (a, j)) (Pid i y)
-| SVC_SWAP : forall i j x, spec_lts (Pid i (Pid j x)) None (Pid j (Pid i x))
+| SVC_ENTER : forall i x, 
+  spec_lts (State Free (Pid i x)) (Some (ENTER, i)) (State (Held i) (Pid i x))
+
+| SVC_FREE : forall i j x y, 
+  spec_lts (State Free x) (Some (ENTER, j)) (State (Held j) y) ->
+  spec_lts (State Free (Pid i x)) (Some (ENTER, j)) (State (Held j) (Pid i y))
+
+| SVC_LEAVE : forall i x, 
+  spec_lts (State (Held i) (Pid i x)) (Some (LEAVE, i)) (State Free (Pid i x))
+
+| SVC_HELD : forall i j x y, 
+  spec_lts (State (Held j) x) (Some (LEAVE, j)) (State Free y) ->
+  spec_lts (State (Held j) (Pid i x)) (Some (LEAVE, j)) (State Free (Pid i y))
+
+(* | SVC_PID : forall i j x y a, 
+      spec_lts x (Some (a, j)) y ->
+      spec_lts (Pid i (x)) (Some (a, j)) (Pid i y)
+         
+| SVC_OTHER : forall i j x y a, spec_lts x (Some (a, j)) y ->
+                              spec_lts (Pid i x) (Some (a, j)) (Pid i y) *)
+                              
+(* | SVC_SWAP : forall i j x, spec_lts (Pid i (Pid j x)) None (Pid j (Pid i x)) *)
+(* | SVC_IN : forall i j x y a k, 
+  spec_lts (Pid j x) (Some (a, k)) (Pid j y) ->
+  spec_lts (Pid i (Pid j x)) (Some (a, k)) (Pid i (Pid j y)) *)
 .
 
-Fixpoint make_spec (n:nat) : spec_state :=
+Fixpoint make_spec_pid (n:nat) : spec_pid :=
   match n with 
-  | 0 => Free
-  | S n => Pid n (make_spec n)
+  | 0 => Nil
+  | S n => Pid n (make_spec_pid n)
   end.
+
+Definition make_spec (n:nat) : spec_state := State Free (make_spec_pid n).
 
 
 

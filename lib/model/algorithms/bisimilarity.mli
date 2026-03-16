@@ -9,33 +9,38 @@ module type S = sig
       ; saturated : fsm
       }
 
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
+    include Json.S with type k = t
+
     val get : fsm -> t
+  end
+
+  module Result : sig
+    type t =
+      { bisim_states : partition
+      ; non_bisim_states : partition
+      }
+
+    include Json.S with type k = t
+
+    val are_bisimilar : t -> bool
+    val split : partition -> states -> states -> t
   end
 
   type t =
     { fsm_a : FSMPair.t
     ; fsm_b : FSMPair.t
     ; merged : fsm
-    ; result : result
+    ; result : Result.t
     }
 
-  and result =
-    { bisim_states : partition
-    ; non_bisim_states : partition
-    }
-    include Json.S with type k = t
+  include Json.S with type k = t
 
-  val are_bisimilar : result -> bool
   val the_cached_result : t option ref
   val set_the_result : t -> unit
 
   exception NoCachedResult of unit
 
   val get_the_result : unit -> t
-  val split : partition -> states -> states -> result
   val fsm : fsm -> fsm -> t
 end
 

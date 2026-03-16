@@ -102,6 +102,8 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
   ;;
 
   module M = W.M
+  module Bindings = W.Bindings
+  module ConstructorBindings = W.ConstructorBindings
   module Model = W.Model
   module Decode = W.Decode
 
@@ -1079,9 +1081,9 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
       ;;
 
       let find_constructor (constructor_index : int)
-        : M.ConstructorBindings.t list -> M.ConstructorBindings.t
+        : ConstructorBindings.t list -> ConstructorBindings.t
         =
-        List.find (fun ({ index; _ } : M.ConstructorBindings.t) ->
+        List.find (fun ({ index; _ } : ConstructorBindings.t) ->
           Int.equal index constructor_index)
       ;;
 
@@ -1093,10 +1095,10 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
 
       let get_constructor_bindings
             ({ from; goto; label } : binding_args)
-            (bindings : M.Bindings.t)
+            (bindings : Bindings.t)
         : EConstr.t Tactypes.bindings
         =
-        M.ConstructorBindings.get from label goto bindings |> M.run
+        ConstructorBindings.get from label goto bindings |> M.run
       ;;
 
       (** if we have no way of obtaining the bindings (i.e., not info.meta) then we use no bindings.
@@ -1113,7 +1115,7 @@ module Make (Log : Logger.S) (Enc : Encoding.S) = struct
           let { constructors; _ } : Model.Info.Meta.RocqLTS.t =
             find_lts enc lts
           in
-          let { bindings; _ } : M.ConstructorBindings.t =
+          let { bindings; _ } : ConstructorBindings.t =
             find_constructor index constructors
           in
           get_constructor_bindings args bindings

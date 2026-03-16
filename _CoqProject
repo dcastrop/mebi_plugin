@@ -4,14 +4,15 @@ src/META.rocq-mebi
 -I lib/
 -I lib/utils/
 -I lib/terms/
+-I lib/rocq_tools/
 -I lib/model/
 -I lib/model/algorithms/
 -I src/
 -arg "-w all"
 
 theories/loader.v ###
-# theories/DevTest.v ###
-# theories/Test.v ###
+theories/DevTest.v ###
+theories/Test.v ###
 
 theories/Bisimilarity.v ###
 
@@ -56,13 +57,19 @@ examples/Bisimilarity/CADP/Properties/MutualExclusion.v ### REQUIRED FOR BELOW
 
 examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size1/TermTests.v ### Success
+# examples/Bisimilarity/CADP/Size1/MutualExclusion/PluginProofs.v ### Success
+
+# examples/Bisimilarity/CADP/Size1/Glued/TermTests.v ### Success
 # examples/Bisimilarity/CADP/Size1/Glued/PluginProofs.v ### Success
-examples/Bisimilarity/CADP/Size1/MutualExclusion/PluginProofs.v ### WIP -- non-lts premises
+# examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v ### Success
 
 # TODO: 
 examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/CADP/Size2/TermTests.v ### FAIL: Bound 1000 States
-# examples/Bisimilarity/CADP/Size2/PluginProofs.v ###
+# examples/Bisimilarity/CADP/Size2/TermTests.v ### FAIL: state-explosion
+
+examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### success
+# examples/Bisimilarity/CADP/Size2/Glued/PluginProofs.v ### FAIL: ^
+# examples/Bisimilarity/CADP/Size2/Glued/MutualExclusion/PluginProofs.v ### WIP
 
 
 # TODO: 
@@ -101,6 +108,28 @@ lib/terms/constructor_tree.mli
 lib/terms/constructor_trees.ml
 lib/terms/constructor_trees.mli
 
+lib/terms/encoding.ml
+lib/terms/encoding.mli
+
+lib/rocq_tools/theories.ml
+lib/rocq_tools/theories.mli
+lib/rocq_tools/rocq_utils.ml
+lib/rocq_tools/rocq_utils.mli
+lib/rocq_tools/rocq_context.ml
+lib/rocq_tools/rocq_context.mli
+
+lib/rocq_tools/bi_encoding.ml
+lib/rocq_tools/bi_encoding.mli
+lib/rocq_tools/rocq_monad.ml
+lib/rocq_tools/rocq_monad.mli
+lib/rocq_tools/rocq_monad_strfy.ml
+lib/rocq_tools/rocq_monad_strfy.mli
+lib/rocq_tools/rocq_monad_utils.ml
+lib/rocq_tools/rocq_monad_utils.mli
+lib/rocq_tools/bindings.ml
+lib/rocq_tools/bindings.mli
+lib/rocq_tools/constructor_bindings.ml
+lib/rocq_tools/constructor_bindings.mli
 
 lib/model/state.ml
 lib/model/state.mli
@@ -167,23 +196,6 @@ lib/model/algorithms/similarity.mli
 lib/model/model.ml
 lib/model/model.mli
 
-src/theories.ml
-src/theories.mli
-src/rocq_utils.ml
-src/rocq_utils.mli
-src/rocq_context.ml
-src/rocq_context.mli
-
-
-lib/terms/encoding.ml
-lib/terms/encoding.mli
-
-src/bi_encoding.ml
-src/bi_encoding.mli
-src/rocq_monad.ml
-src/rocq_monad.mli
-src/rocq_monad_utils.ml
-src/rocq_monad_utils.mli
 src/decoder.ml
 src/decoder.mli
 

@@ -9,9 +9,8 @@ module type S = sig
 
   type t' = states t
 
-  val json : ?as_elt:bool -> t' -> Yojson.t
-  val to_string : ?pretty:bool -> t' -> string
-  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t' -> unit
+  include Json.S with type k = t'
+
   val update : t' -> action -> states -> unit
   val destinations : t' -> states
   val reduce_by_label : t' -> label -> t'
