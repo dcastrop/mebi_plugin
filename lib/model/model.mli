@@ -125,42 +125,7 @@ end
 module Make
     (Log : Logger.S)
     (Base : Base_term.S)
-    (Bindings : sig
-       module Instructions : sig
-         type t =
-           | Undefined
-           | Done
-           | Arg of
-               { root : Constr.t
-               ; index : int
-               ; cont : t
-               }
-       end
-
-       module ConstrMap : sig
-         include Hashtbl.S with type key = Constr.t
-
-         type v = Names.Name.t * Instructions.t
-         type t' = v t
-       end
-
-       type t =
-         | No_Bindings
-         | Use_Bindings of
-             { from : ConstrMap.t' option
-             ; action : ConstrMap.t' option
-             ; goto : ConstrMap.t' option
-             }
-     end)
-    (ConstructorBindings : sig
-       type t =
-         { index : int
-         ; name : string
-         ; bindings : Bindings.t
-         }
-
-       val json : ?as_elt:bool -> t -> Yojson.t
-     end) :
+    (ConstructorBindings : Constructor_bindings.S) :
   S
   with type base = Base.t
    and type tree = Base.Tree.t

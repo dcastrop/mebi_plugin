@@ -6,7 +6,7 @@
   rocq-runtime.plugins.ltac ; Needed for tactic extend.
   rocq-mebi.mebi_lib.utils
   rocq-mebi.mebi_lib.terms
-  ; rocq-mebi.mebi_lib.model.algorithms
+  rocq-mebi.mebi_lib.rocq_tools
   yojson)
  (modules
   state

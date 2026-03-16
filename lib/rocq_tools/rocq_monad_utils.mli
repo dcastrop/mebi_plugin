@@ -129,15 +129,7 @@ module type S = sig
         ; constructor : Rocq_utils.ind_constr
         }
 
-      val json : ?as_elt:bool -> t -> Yojson.t
-      val to_string : ?pretty:bool -> t -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> t
-        -> unit
+      include Json.S with type k = t
     end
 
     type t =
@@ -150,9 +142,8 @@ module type S = sig
       | Type of EConstr.t option
       | LTS of LTS.t
 
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
+    include Json.S with type k = t
+
     val get_lts : t -> LTS.t
     val get_lts_term_type : t -> EConstr.t
     val get_lts_label_type : t -> EConstr.t
@@ -199,9 +190,8 @@ module type S = sig
   module Constructor : sig
     type t = enc * enc * tree
 
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
+    include Json.S with type k = t
+
     val encode : EConstr.t -> EConstr.t -> tree -> t
   end
 
@@ -216,17 +206,7 @@ module type S = sig
         ; acc : EConstr.t
         }
 
-      type k = t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
+      include Json.S with type k = t
 
       val fresh : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * t
 
@@ -248,17 +228,7 @@ module type S = sig
         ; tree : tree
         }
 
-      type k = t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
+      include Json.S with type k = t
 
       val unify_pair_opt : Pair.t -> bool mm
       val unify_opt : t -> tree option mm
@@ -271,17 +241,7 @@ module type S = sig
         ; to_unify : Problem.t list
         }
 
-      type k = t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
+      include Json.S with type k = t
 
       val empty : unit -> t mm
       val is_empty : t -> bool
@@ -296,17 +256,8 @@ module type S = sig
 
     module ListOfProblems : sig
       type t = Problems.t list
-      type k = Problems.t list
 
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
+      include Json.S with type k = t
 
       val is_empty : t -> bool
       val cross_product : Problems.t -> t -> t
@@ -315,15 +266,7 @@ module type S = sig
     module Constructors : sig
       type t = Constructor.t list
 
-      val json : ?as_elt:bool -> t -> Yojson.t
-      val to_string : ?pretty:bool -> t -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> t
-        -> unit
+      include Json.S with type k = t
 
       val retrieve
         :  int
@@ -387,129 +330,7 @@ module type S = sig
   val make_enc_hashtbl : unit -> (module Hashtbl.S with type key = enc)
   val make_enc_set : unit -> (module Set.S with type elt = enc)
   val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t)
-
-  module Bindings : sig
-    module Instructions : sig
-      type t =
-        | Undefined
-        | Done
-        | Arg of
-            { root : Constr.t
-            ; index : int
-            ; cont : t
-            }
-
-      val json : ?as_elt:bool -> t -> Yojson.t
-      val to_string : ?pretty:bool -> t -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> t
-        -> unit
-
-      exception Rocq_bindings_CannotAppendDone of unit
-
-      val append : t -> t -> t
-      val length : t -> int
-    end
-
-    module ConstrMap : sig
-      include Hashtbl.S with type key = Constr.t
-
-      type v = Names.Name.t * Instructions.t
-      type t' = v t
-
-      val json : ?as_elt:bool -> t' -> Yojson.t
-      val to_string : ?pretty:bool -> t' -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> t'
-        -> unit
-
-      val update : t' -> Constr.t -> v -> unit
-
-      exception Rocq_bindings_CannotFindBindingName of EConstr.t
-
-      val find_name
-        :  (EConstr.t * Names.Name.t) list
-        -> EConstr.t
-        -> Names.Name.t mm
-
-      val extract_binding_map
-        :  (EConstr.t * Names.Name.t) list
-        -> EConstr.t
-        -> Constr.t
-        -> t' mm
-
-      val make_opt
-        :  (EConstr.t * Names.Name.t) list
-        -> EConstr.t * Constr.t
-        -> t' option mm
-    end
-
-    type t =
-      | No_Bindings
-      | Use_Bindings of
-          { from : ConstrMap.t' option
-          ; action : ConstrMap.t' option
-          ; goto : ConstrMap.t' option
-          }
-
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
-    val use_no_bindings : ConstrMap.t' option list -> bool
-
-    val extract
-      :  (EConstr.t * Names.Name.t) list
-      -> EConstr.t * Constr.t
-      -> EConstr.t * Constr.t
-      -> EConstr.t * Constr.t
-      -> t mm
-  end
-
-  module ConstructorBindings : sig
-    type t =
-      { index : int
-      ; name : string
-      ; bindings : Bindings.t
-      }
-
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
-    val extract_info : Ind.t -> t list mm
-    val get_quantified_hyp : Names.Name.t -> Tactypes.quantified_hypothesis
-
-    exception Rocq_bindings_BindingInstruction_NotApp of EConstr.t
-
-    exception
-      Rocq_bindings_BindingInstruction_Undefined of EConstr.t * EConstr.t
-
-    exception
-      Rocq_bindings_BindingInstruction_IndexOutOfBounds of EConstr.t * int
-
-    exception Rocq_bindings_BindingInstruction_NEQ of EConstr.t * Constr.t
-
-    val get_bound_term : EConstr.t -> Bindings.Instructions.t -> EConstr.t mm
-
-    val get_explicit_bindings
-      :  EConstr.t * Bindings.ConstrMap.t' option
-      -> EConstr.t Tactypes.explicit_bindings mm
-
-    val get
-      :  EConstr.t
-      -> EConstr.t option
-      -> EConstr.t option
-      -> Bindings.t
-      -> EConstr.t Tactypes.bindings mm
-  end
 end
 
 module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
-  S with type enc = Enc.t and type tree = Enc.Tree.t 
+  S with type enc = Enc.t and type tree = Enc.Tree.t

@@ -1,49 +1,7 @@
 Require Import MEBI.loader.
 
-(** testing getters & setters *)
 MeBi Divider "Theories.Test.BasicCommands".
 Module BasicCommands.
-  (* MeBi Config Bound 1000.  *)
-  (* MeBi Config Reset Bound. *)
-
-  (* MeBi Config Fail If Incomplete True.  *)
-  (* MeBi Config Fail If Incomplete False.  *)
-
-  (* MeBi Config Fail If NotBisim True.  *)
-  (* MeBi Config Fail If NotBisim False.  *)
-
-  (* MeBi Config Output Enable.   *)
-  (* MeBi Config Output Disable.  *)
-
-  (* MeBi Config Output Debug Enable.   *)
-  (* MeBi Config Output Debug Disable.  *)
-  
-  (* MeBi Config Output Info Enable.   *)
-  (* MeBi Config Output Info Disable.  *)
-
-  (* MeBi Config Output Notice Enable.   *)
-  (* MeBi Config Output Notice Disable.  *)
-  
-  (* MeBi Config Output Warning Enable.  *)
-  (* MeBi Config Output Warning Disable.  *)
-
-  (* MeBi Config Output Error Enable.  *)
-  (* MeBi Config Output Error Disable.  *)
-
-  (* MeBi Config Output Trace Enable.   *)
-  (* MeBi Config Output Trace Disable.  *)
-
-  (* MeBi Config Output Results Enable.   *)
-  (* MeBi Config Output Results Disable.  *)
-
-  (* MeBi Config Output Show Enable.   *)
-  (* MeBi Config Output Show Disable.  *)
-
-  (* MeBi Config WeakMode Enable.   *)
-  (* MeBi Config WeakMode Disable.  *)
-  
-  (* MeBi Config Weak As Option nat.  *)
-  
 
   Example z := 0.
   MeBi Config Weak As z Of nat. 
@@ -67,18 +25,16 @@ Module BasicCommands.
   
 End BasicCommands.
 
-(* MeBi Config Reset.
-MeBi Config Output Enable.
-MeBi Config Output Notice Enable.
-MeBi Config Output Debug Enable.
-MeBi Config Output Info Enable.
-MeBi Config Output Results Enable.
-MeBi Config Output Warning Enable.
-(* MeBi Config Bound 100. *)
-(* MeBi Config WeakMode Enable. *)
-(* MeBi Config Weak As Option _. *)
-(* MeBi See All.  *)
-MeBi Config Output Enable. *)
+MeBi Config Output "Debug" False.
+MeBi Config Output "Info" False.
+MeBi Config Output "Notice" False.
+MeBi Config Output "Warning" True.
+MeBi Config Output "Error" True.
+MeBi Config Output "Trace" False.
+MeBi Config Output "Result" False.
+MeBi Config Output "Show" False.
+MeBi Config Output "DecodeResults" False.
+MeBi Config Output "DumpResults" False.
 
 MeBi Divider "Theories.Test.GeneralTests".
 Inductive i := C0 (i : nat) | C1 (b : bool) (j : nat) | C2 (x : nat).

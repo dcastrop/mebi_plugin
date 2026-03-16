@@ -5,35 +5,46 @@ module type S = sig
   type trees
 
   module M : Rocq_monad_utils.S with type enc = enc and type tree = tree
+  module Bindings : Bindings.S with type 'a mm = 'a M.mm
+
+  module ConstructorBindings :
+    Constructor_bindings.S
+    with type 'a mm = 'a M.mm
+     and type ind = M.Ind.t
+     and type instructions = Bindings.Instructions.t
+     and type bindings = Bindings.t
+     and type constrmap = Bindings.ConstrMap.t'
 
   module Model :
     Model.S
     with type base = enc
      and type tree = tree
      and type trees = trees
-     and type constructorbindings = M.ConstructorBindings.t
- 
-  module Decode : Decoder.S
-  with type enc = enc
-   and type state = Model.State.t
-   and type states = Model.States.t
-   and type partition = Model.Partition.t
-   and type label = Model.Label.t
-   and type labels = Model.Labels.t
-   and type note = Model.Note.t
-   and type annotation = Model.Annotation.t
-   and type annotations = Model.Annotations.t
-   and type transition = Model.Transition.t
-   and type transitions = Model.Transitions.t
-   and type action = Model.Action.t
-   and type actions = Model.Actions.t
-   and type actionmap = Model.ActionMap.t'
-   and type edgemap = Model.EdgeMap.t'
-   and type rocqlts = Model.Info.Meta.RocqLTS.t
-   and type info = Model.Info.t
-   and type lts = Model.LTS.t
-   and type fsm = Model.FSM.t
-   and type bisimilarity  = Model.Bisimilarity.t
+     and type constructorbindings = ConstructorBindings.t
+
+  module Decode :
+    Decoder.S
+    with type enc = enc
+     and type state = Model.State.t
+     and type states = Model.States.t
+     and type partition = Model.Partition.t
+     and type label = Model.Label.t
+     and type labels = Model.Labels.t
+     and type note = Model.Note.t
+     and type annotation = Model.Annotation.t
+     and type annotations = Model.Annotations.t
+     and type transition = Model.Transition.t
+     and type transitions = Model.Transitions.t
+     and type action = Model.Action.t
+     and type actions = Model.Actions.t
+     and type actionmap = Model.ActionMap.t'
+     and type edgemap = Model.EdgeMap.t'
+     and type rocqlts = Model.Info.Meta.RocqLTS.t
+     and type info = Model.Info.t
+     and type lts = Model.LTS.t
+     and type fsm = Model.FSM.t
+     and type result = Model.Bisimilarity.Result.t
+     and type bisimilarity = Model.Bisimilarity.t
 
   module IsTheory : sig
     val is_theory : EConstr.t -> EConstr.t -> bool M.mm
@@ -64,7 +75,6 @@ module type S = sig
   end
 
   module Weak : Weak.S with type enc = enc
-
 
   module Config : sig
     val load_weak_arg : Api.weak_arg -> Weak.t M.mm
@@ -193,7 +203,7 @@ module type S = sig
 
   val fail_if_empty : Model.LTS.t -> unit
   val fail_if_incomplete : Model.LTS.t -> unit
-  val fail_if_not_bisim : Model.Bisimilarity.result -> unit
+  val fail_if_not_bisim : Model.Bisimilarity.Result.t -> unit
 
   val extract_lts
     :  Libnames.qualid

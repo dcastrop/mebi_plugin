@@ -9,34 +9,38 @@ module type S = sig
       ; saturated : fsm
       }
 
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
+    include Json.S with type k = t
+
     val get : fsm -> t
+  end
+
+  module Result : sig
+    type t =
+      { bisim_states : partition
+      ; non_bisim_states : partition
+      }
+
+    include Json.S with type k = t
+
+    val are_bisimilar : t -> bool
+    val split : partition -> states -> states -> t
   end
 
   type t =
     { fsm_a : FSMPair.t
     ; fsm_b : FSMPair.t
     ; merged : fsm
-    ; result : result
-    }
-
-  and result =
-    { bisim_states : partition
-    ; non_bisim_states : partition
+    ; result : Result.t
     }
 
   include Json.S with type k = t
 
-  val are_bisimilar : result -> bool
   val the_cached_result : t option ref
   val set_the_result : t -> unit
 
   exception NoCachedResult of unit
 
   val get_the_result : unit -> t
-  val split : partition -> states -> states -> result
   val fsm : fsm -> fsm -> t
 end
 
@@ -105,16 +109,54 @@ module Make
     ;;
   end
 
+  module Result = struct
+    type t =
+      { bisim_states : Partition.t
+      ; non_bisim_states : Partition.t
+      }
+
+    include
+      Json.Thing.Make
+        (Log)
+        (struct
+          type k = t
+
+          let name = "Result"
+
+          let json ?as_elt (x : t) : Yojson.t =
+            `Assoc
+              [ "bisimilar states", Partition.json ~as_elt:true x.bisim_states
+              ; ( "non-bisimilar states"
+                , Partition.json ~as_elt:true x.non_bisim_states )
+              ]
+          ;;
+        end)
+
+    let are_bisimilar ({ non_bisim_states; _ } : t) : bool =
+      Log.trace __FUNCTION__;
+      Partition.is_empty non_bisim_states
+    ;;
+
+    let split (pi : Partition.t) (a : States.t) (b : States.t) : t =
+      Log.trace __FUNCTION__;
+      let bisim_states, non_bisim_states =
+        Partition.fold
+          (fun (x : States.t) (bisim_states, non_bisim_states) ->
+            if States.has_shared_origin x a b
+            then Partition.add x bisim_states, non_bisim_states
+            else bisim_states, Partition.add x non_bisim_states)
+          pi
+          (Partition.empty, Partition.empty)
+      in
+      { bisim_states; non_bisim_states }
+    ;;
+  end
+
   type t =
     { fsm_a : FSMPair.t
     ; fsm_b : FSMPair.t
     ; merged : FSM.t
-    ; result : result
-    }
-
-  and result =
-    { bisim_states : Partition.t
-    ; non_bisim_states : Partition.t
+    ; result : Result.t
     }
 
   include
@@ -133,18 +175,10 @@ module Make
                   ; "b", FSMPair.json ~as_elt:true x.fsm_b
                   ; "merged", FSM.json ~as_elt:true x.merged
                   ] )
-            ; ( "bisimilar states"
-              , Partition.json ~as_elt:true x.result.bisim_states )
-            ; ( "non-bisimilar states"
-              , Partition.json ~as_elt:true x.result.non_bisim_states )
+            ; "result", Result.json ~as_elt:true x.result
             ]
         ;;
       end)
-
-  let are_bisimilar ({ non_bisim_states; _ } : result) : bool =
-    Log.trace __FUNCTION__;
-    Partition.is_empty non_bisim_states
-  ;;
 
   let the_cached_result : t option ref = ref None
   let set_the_result (x : t) : unit = the_cached_result := Some x
@@ -158,27 +192,13 @@ module Make
     | Some x -> x
   ;;
 
-  let split (pi : Partition.t) (a : States.t) (b : States.t) : result =
-    Log.trace __FUNCTION__;
-    let bisim_states, non_bisim_states =
-      Partition.fold
-        (fun (x : States.t) (bisim_states, non_bisim_states) ->
-          if States.has_shared_origin x a b
-          then Partition.add x bisim_states, non_bisim_states
-          else bisim_states, Partition.add x non_bisim_states)
-        pi
-        (Partition.empty, Partition.empty)
-    in
-    { bisim_states; non_bisim_states }
-  ;;
-
   let fsm (a : FSM.t) (b : FSM.t) : t =
     Log.trace __FUNCTION__;
     let fsm_a : FSMPair.t = FSMPair.get a in
     let fsm_b : FSMPair.t = FSMPair.get b in
     let merged : FSM.t = FSM.merge fsm_a.saturated fsm_b.saturated in
     let pi : Partition.t = (Minimize.fsm merged).pi in
-    let result = split pi fsm_a.original.states fsm_b.original.states in
+    let result = Result.split pi fsm_a.original.states fsm_b.original.states in
     { fsm_a; fsm_b; merged; result }
   ;;
 end

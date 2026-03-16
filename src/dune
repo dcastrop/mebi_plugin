@@ -20,26 +20,19 @@
             ; rocq-runtime.plugins.ltac ; Needed for tactic extend.
   rocq-mebi.mebi_lib.utils
   rocq-mebi.mebi_lib.terms
+  rocq-mebi.mebi_lib.rocq_tools
   rocq-mebi.mebi_lib.model
   yojson)
  (modules
-  theories
-  rocq_utils
-  rocq_context
-  bi_encoding
-  rocq_monad
-  rocq_monad_utils
   decoder
   api ; stores modules created by [loader.v], used by commands
   weak
   graph
   wrapper ; basic plugin commands
   proof_solver ; 
-  g_mebi
-  ))
+  g_mebi))
 
 (include_subdirs unqualified)
-
 
 (rocq.pp ; This will let Dune know about Coq's .mlg grammar files.
  (modules g_mebi))

@@ -5,13 +5,22 @@ module type S = sig
   type trees
 
   module M : Rocq_monad_utils.S with type enc = enc and type tree = tree
+  module Bindings : Bindings.S with type 'a mm = 'a M.mm
+
+  module ConstructorBindings :
+    Constructor_bindings.S
+    with type 'a mm = 'a M.mm
+     and type ind = M.Ind.t
+     and type instructions = Bindings.Instructions.t
+     and type bindings = Bindings.t
+     and type constrmap = Bindings.ConstrMap.t'
 
   module Model :
     Model.S
     with type base = enc
      and type tree = tree
      and type trees = trees
-     and type constructorbindings = M.ConstructorBindings.t
+     and type constructorbindings = ConstructorBindings.t
 
   module Decode :
     Decoder.S
@@ -34,6 +43,7 @@ module type S = sig
      and type info = Model.Info.t
      and type lts = Model.LTS.t
      and type fsm = Model.FSM.t
+     and type result = Model.Bisimilarity.Result.t
      and type bisimilarity = Model.Bisimilarity.t
 
   module IsTheory : sig
@@ -193,7 +203,7 @@ module type S = sig
 
   val fail_if_empty : Model.LTS.t -> unit
   val fail_if_incomplete : Model.LTS.t -> unit
-  val fail_if_not_bisim : Model.Bisimilarity.result -> unit
+  val fail_if_not_bisim : Model.Bisimilarity.Result.t -> unit
 
   val extract_lts
     :  Libnames.qualid
@@ -288,8 +298,17 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   module M : Rocq_monad_utils.S with type enc = enc and type tree = tree =
     Rocq_monad_utils.Make (Log) (Ctx) (Enc)
 
-  module Bindings = M.Bindings
-  module ConstructorBindings = M.ConstructorBindings
+  module Bindings : Bindings.S with type 'a mm = 'a M.mm =
+    Bindings.Make (Log) (M)
+
+  module ConstructorBindings :
+    Constructor_bindings.S
+    with type 'a mm = 'a M.mm
+     and type ind = M.Ind.t
+     and type instructions = Bindings.Instructions.t
+     and type bindings = Bindings.t
+     and type constrmap = Bindings.ConstrMap.t' =
+    Constructor_bindings.Make (Log) (M) (Bindings)
 
   module Model :
     Model.S
@@ -297,7 +316,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
      and type tree = tree
      and type trees = trees
      and type constructorbindings = ConstructorBindings.t =
-    Model.Make (Log) (Enc) (Bindings) (ConstructorBindings)
+    Model.Make (Log) (Enc) (ConstructorBindings)
 
   module LTS = Model.LTS
   module FSM = Model.FSM
@@ -324,17 +343,19 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
      and type info = Model.Info.t
      and type lts = Model.LTS.t
      and type fsm = Model.FSM.t
+     and type result = Model.Bisimilarity.Result.t
      and type bisimilarity = Model.Bisimilarity.t =
-    Decoder.Make (Log) (Enc) (M) (Model)
+    Decoder.Make (Log) (Enc) (M) (ConstructorBindings) (Model)
 
   let result_log
+        ?(decode : bool = true)
         (type a)
         (module FEnc : Json.S with type k = a)
         (module FDec : Json.S with type k = a)
     : (module Json.S with type k = a)
     =
     let module E : Json.S with type k = a =
-      (val if !Api.the_output_config.decode_results
+      (val if decode && !Api.the_output_config.decode_results
            then (module FDec : Json.S with type k = a)
            else (module FEnc : Json.S with type k = a))
     in
@@ -788,6 +809,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       let rec build (g : t) : t M.mm =
         Log.trace __FUNCTION__;
         (* _log_to_visit g; *)
+        Feedback.feedback (WorkerStatus ("a", "b"));
         if Y.stop g
         then (
           Log.trace ~__FUNCTION__ "stop condition";
@@ -1019,6 +1041,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       Queue.push init !the_graph.to_visit;
       (* _log_to_visit !the_graph; *)
       let module G = Make ((val make_yargs primary_lts ind_defs the_graph)) in
+      Feedback.feedback (WorkerStatus ("a", "b"));
       let* the_graph : t = G.build !the_graph in
       (* M.return !the_graph *)
       Log.info ~__FUNCTION__ "Completed Graph, Extracting LTS...";
@@ -1068,10 +1091,10 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       | _ -> ())
   ;;
 
-  let fail_if_not_bisim (x : Model.Bisimilarity.result) : unit =
+  let fail_if_not_bisim (x : Model.Bisimilarity.Result.t) : unit =
     if !Api.the_fail_flags.incomplete
     then
-      if Bool.not (Model.Bisimilarity.are_bisimilar x)
+      if Bool.not (Model.Bisimilarity.Result.are_bisimilar x)
       then (
         Log.trace ~__FUNCTION__ "Not Bisimilar";
         M.Err.not_bisimilar ())
@@ -1235,8 +1258,16 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
       Log.info "Checking Bisimilarity of FSMs...";
       let result = Model.Bisimilarity.fsm the_fsm_a the_fsm_b in
-      result_log (module Model.Bisimilarity) (module Decode.Bisimilarity)
-      |> handle_results Result "Finished Merging FSMs" result;
+      let r = result_log (module Model.FSM) (module Decode.FSM) in
+      r |> handle_results Result "FSM a (original)" result.fsm_a.original;
+      r |> handle_results Result "FSM a (saturated)" result.fsm_a.saturated;
+      r |> handle_results Result "FSM b (original)" result.fsm_b.original;
+      r |> handle_results Result "FSM b (saturated)" result.fsm_b.saturated;
+      result_log
+        ~decode:false
+        (module Model.Bisimilarity.Result)
+        (module Decode.Result)
+      |> handle_results Result "Finished Merging FSMs" result.result;
       fail_if_not_bisim result.result;
       M.return (Some result)
     ;;

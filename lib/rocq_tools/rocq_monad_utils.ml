@@ -21,20 +21,7 @@ module type S = sig
   val type_of_econstr : EConstr.t -> EConstr.t mm
   val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
 
-  module Strfy : sig
-    val constr : Constr.t -> string
-    val constr_kind : Constr.t -> string
-    val econstr : EConstr.t -> string
-    val econstr_kind : EConstr.t -> string
-    val econstr_rel_decl : EConstr.rel_declaration -> string
-    val hyp_name : Rocq_utils.hyp -> string
-    val hyp_type : Rocq_utils.hyp -> string
-    val hyp : Rocq_utils.hyp -> string
-    val hyp_value : Rocq_utils.hyp -> string
-
-    (* val rocq_ind : ('a -> string) -> 'a Rocq_ind.t -> string *)
-    val econstr_bindings : EConstr.t Tactypes.bindings -> string
-  end
+  module Strfy : Rocq_monad_strfy.S
 
   val log_econstr
     :  ?__FUNCTION__:string
@@ -129,15 +116,7 @@ module type S = sig
         ; constructor : Rocq_utils.ind_constr
         }
 
-      val json : ?as_elt:bool -> t -> Yojson.t
-      val to_string : ?pretty:bool -> t -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> t
-        -> unit
+      include Json.S with type k = t
     end
 
     type t =
@@ -150,9 +129,8 @@ module type S = sig
       | Type of EConstr.t option
       | LTS of LTS.t
 
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
+    include Json.S with type k = t
+
     val get_lts : t -> LTS.t
     val get_lts_term_type : t -> EConstr.t
     val get_lts_label_type : t -> EConstr.t
@@ -199,9 +177,8 @@ module type S = sig
   module Constructor : sig
     type t = enc * enc * tree
 
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
+    include Json.S with type k = t
+
     val encode : EConstr.t -> EConstr.t -> tree -> t
   end
 
@@ -216,17 +193,7 @@ module type S = sig
         ; acc : EConstr.t
         }
 
-      type k = t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
+      include Json.S with type k = t
 
       val fresh : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * t
 
@@ -248,17 +215,7 @@ module type S = sig
         ; tree : tree
         }
 
-      type k = t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
+      include Json.S with type k = t
 
       val unify_pair_opt : Pair.t -> bool mm
       val unify_opt : t -> tree option mm
@@ -271,17 +228,7 @@ module type S = sig
         ; to_unify : Problem.t list
         }
 
-      type k = t
-
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
+      include Json.S with type k = t
 
       val empty : unit -> t mm
       val is_empty : t -> bool
@@ -296,17 +243,8 @@ module type S = sig
 
     module ListOfProblems : sig
       type t = Problems.t list
-      type k = Problems.t list
 
-      val json : ?as_elt:bool -> k -> Yojson.t
-      val to_string : ?pretty:bool -> k -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> k
-        -> unit
+      include Json.S with type k = t
 
       val is_empty : t -> bool
       val cross_product : Problems.t -> t -> t
@@ -315,15 +253,7 @@ module type S = sig
     module Constructors : sig
       type t = Constructor.t list
 
-      val json : ?as_elt:bool -> t -> Yojson.t
-      val to_string : ?pretty:bool -> t -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> t
-        -> unit
+      include Json.S with type k = t
 
       val retrieve
         :  int
@@ -387,128 +317,6 @@ module type S = sig
   val make_enc_hashtbl : unit -> (module Hashtbl.S with type key = enc)
   val make_enc_set : unit -> (module Set.S with type elt = enc)
   val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t)
-
-  module Bindings : sig
-    module Instructions : sig
-      type t =
-        | Undefined
-        | Done
-        | Arg of
-            { root : Constr.t
-            ; index : int
-            ; cont : t
-            }
-
-      val json : ?as_elt:bool -> t -> Yojson.t
-      val to_string : ?pretty:bool -> t -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> t
-        -> unit
-
-      exception Rocq_bindings_CannotAppendDone of unit
-
-      val append : t -> t -> t
-      val length : t -> int
-    end
-
-    module ConstrMap : sig
-      include Hashtbl.S with type key = Constr.t
-
-      type v = Names.Name.t * Instructions.t
-      type t' = v t
-
-      val json : ?as_elt:bool -> t' -> Yojson.t
-      val to_string : ?pretty:bool -> t' -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> t'
-        -> unit
-
-      val update : t' -> Constr.t -> v -> unit
-
-      exception Rocq_bindings_CannotFindBindingName of EConstr.t
-
-      val find_name
-        :  (EConstr.t * Names.Name.t) list
-        -> EConstr.t
-        -> Names.Name.t mm
-
-      val extract_binding_map
-        :  (EConstr.t * Names.Name.t) list
-        -> EConstr.t
-        -> Constr.t
-        -> t' mm
-
-      val make_opt
-        :  (EConstr.t * Names.Name.t) list
-        -> EConstr.t * Constr.t
-        -> t' option mm
-    end
-
-    type t =
-      | No_Bindings
-      | Use_Bindings of
-          { from : ConstrMap.t' option
-          ; action : ConstrMap.t' option
-          ; goto : ConstrMap.t' option
-          }
-
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
-    val use_no_bindings : ConstrMap.t' option list -> bool
-
-    val extract
-      :  (EConstr.t * Names.Name.t) list
-      -> EConstr.t * Constr.t
-      -> EConstr.t * Constr.t
-      -> EConstr.t * Constr.t
-      -> t mm
-  end
-
-  module ConstructorBindings : sig
-    type t =
-      { index : int
-      ; name : string
-      ; bindings : Bindings.t
-      }
-
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
-    val extract_info : Ind.t -> t list mm
-    val get_quantified_hyp : Names.Name.t -> Tactypes.quantified_hypothesis
-
-    exception Rocq_bindings_BindingInstruction_NotApp of EConstr.t
-
-    exception
-      Rocq_bindings_BindingInstruction_Undefined of EConstr.t * EConstr.t
-
-    exception
-      Rocq_bindings_BindingInstruction_IndexOutOfBounds of EConstr.t * int
-
-    exception Rocq_bindings_BindingInstruction_NEQ of EConstr.t * Constr.t
-
-    val get_bound_term : EConstr.t -> Bindings.Instructions.t -> EConstr.t mm
-
-    val get_explicit_bindings
-      :  EConstr.t * Bindings.ConstrMap.t' option
-      -> EConstr.t Tactypes.explicit_bindings mm
-
-    val get
-      :  EConstr.t
-      -> EConstr.t option
-      -> EConstr.t option
-      -> Bindings.t
-      -> EConstr.t Tactypes.bindings mm
-  end
 end
 
 module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
@@ -517,28 +325,29 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 
   (** [module Log] is a modified [Log] -- here disables trace & debug printing
   *)
-  module Log : Logger.S with module Config.Mode = Log.Config.Mode =
-    Logger.ReMake
-      (Log)
-      (struct
-        let level : Output.Kind.level -> bool = function
-          | Debug -> false
-          | Info -> true
-          | Notice -> true
-          | Warning -> true
-          | Error -> true
-        ;;
+  (* module Log : Logger.S with module Config.Mode = Log.Config.Mode =
+     Logger.ReMake
+     (Log)
+     (struct
+     let level : Output.Kind.level -> bool = function
+     | Debug -> false
+     | Info -> true
+     | Notice -> true
+     | Warning -> true
+     | Error -> true
+     ;;
 
-        let special : Output.Kind.special -> bool = function
-          | Trace -> false
-          | Result -> true
-          | Show -> true
-        ;;
-      end)
+     let special : Output.Kind.special -> bool = function
+     | Trace -> false
+     | Result -> true
+     | Show -> true
+     ;;
+     end) *)
 
   (*****************************************)
 
-  include Rocq_monad.Make (Log) (Ctx) (Enc)
+  module M = Rocq_monad.Make (Log) (Ctx) (Enc)
+  include M
 
   type tree = Enc.Tree.t
 
@@ -644,54 +453,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 
   (*********************************************************)
 
-  module Strfy = struct
-    let constr : Constr.t -> string = fstring Rocq_utils.Strfy.constr
-    let constr_kind : Constr.t -> string = fstring Rocq_utils.Strfy.constr_kind
-    let econstr : EConstr.t -> string = fstring Rocq_utils.Strfy.econstr
-
-    let econstr_kind : EConstr.t -> string =
-      fstring Rocq_utils.Strfy.econstr_kind
-    ;;
-
-    let econstr_rel_decl : EConstr.rel_declaration -> string =
-      fstring Rocq_utils.Strfy.econstr_rel_decl
-    ;;
-
-    let hyp_name : Rocq_utils.hyp -> string = Rocq_utils.Strfy.hyp_name
-    let hyp_type : Rocq_utils.hyp -> string = fstring Rocq_utils.Strfy.hyp_type
-
-    let hyp (x : Rocq_utils.hyp) : string =
-      Printf.sprintf "%s: %s" (hyp_name x) (hyp_type x)
-    ;;
-
-    let hyp_value : Rocq_utils.hyp -> string =
-      fstring Rocq_utils.Strfy.hyp_value
-    ;;
-
-    (* let rocq_ind (f : 'a -> string) : 'a Rocq_ind.t -> string =
-       fstring (Rocq_ind.to_string f)
-       ;; *)
-
-    let econstr_bindings : EConstr.t Tactypes.bindings -> string = function
-      | NoBindings -> "NoBindings"
-      | ImplicitBindings xs ->
-        Utils.Strfy.list (Of econstr) xs
-        |> Printf.sprintf "ImplicitBindings: %s"
-      | ExplicitBindings xs ->
-        Utils.Strfy.list
-          (Of
-             (fun ({ v = x, y; _ } :
-                    (Tactypes.quantified_hypothesis * EConstr.t) CAst.t) ->
-               Printf.sprintf
-                 "%s : %s"
-                 (match x with
-                  | AnonHyp x -> Printf.sprintf "%i" x
-                  | NamedHyp { v; _ } -> Names.Id.to_string v)
-                 (econstr y)))
-          xs
-        |> Printf.sprintf "ExplicitBindings: %s"
-    ;;
-  end
+  module Strfy = Rocq_monad_strfy.Make (M)
 
   let log_econstr
         ?(__FUNCTION__ : string = "")
@@ -1750,436 +1512,4 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
          ;;
        end))
   ;;
-
-  module Bindings = struct
-    (* module Log =
-       Logger.ReMake
-       (Log)
-       (struct
-       let level : Output.Kind.level -> bool = function
-       | Debug -> true
-       | Info -> true
-       | Notice -> true
-       | Warning -> true
-       | Error -> true
-       ;;
-
-       let special : Output.Kind.special -> bool = function
-       | Trace -> false
-       | Result -> true
-       | Show -> true
-       ;;
-       end) *)
-
-    module Instructions = struct
-      type t =
-        | Undefined
-        | Done
-        | Arg of
-            { root : Constr.t
-            ; index : int
-            ; cont : t
-            }
-
-      include
-        Json.Thing.Make
-          (Log)
-          (struct
-            type k = t
-
-            let name = "Instructions"
-
-            let json ?as_elt (x : t) : Yojson.t =
-              let rec f : t -> Yojson.t = function
-                | Undefined -> `String "Undefined"
-                | Done -> `String "Done"
-                | Arg { root; index; cont } ->
-                  `Assoc
-                    [ "root", `String (Strfy.constr root)
-                    ; "index", `Int index
-                    ; "cont", f cont
-                    ]
-              in
-              f x
-            ;;
-          end)
-
-      exception Rocq_bindings_CannotAppendDone of unit
-
-      let rec append (x : t) : t -> t
-        =
-        (* Log.trace __FUNCTION__; *)
-        function
-        | Arg { root; index; cont } -> Arg { root; index; cont = append x cont }
-        | Undefined -> x
-        | Done -> raise (Rocq_bindings_CannotAppendDone ())
-      ;;
-
-      let rec length : t -> int =
-        (* Log.trace __FUNCTION__; *)
-        function
-        | Undefined -> 0
-        | Done -> -1
-        | Arg { cont; _ } -> 1 + length cont
-      ;;
-    end
-
-    module ConstrMap = struct
-      module Map_ = Hashtbl.Make (struct
-          type t = Constr.t
-
-          let equal : t -> t -> bool = Constr.equal
-          let hash : t -> int = Constr.hash
-        end)
-
-      include Map_
-
-      type v = Names.Name.t * Instructions.t
-      type t' = v t
-
-      include
-        Json.Map.Make
-          (Log)
-          (struct
-            module Map = Map_
-
-            type value = v
-
-            let name = "ConstrMap"
-            let kname = "Constr"
-            let vname = "NamedInstructions"
-            let kjson ?(as_elt : bool = false) k = `String (Strfy.constr k)
-
-            let vjson ?(as_elt : bool = false) v =
-              `Assoc
-                [ "name", `String (Rocq_utils.Strfy.name (fst v))
-                ; "instructions", Instructions.json ~as_elt:true (snd v)
-                ]
-            ;;
-          end)
-
-      let update (cmap : t') (k : Constr.t) ((name, inst) : v) : unit =
-        Log.trace __FUNCTION__;
-        match find_opt cmap k with
-        | None -> add cmap k (name, inst)
-        | Some (name', inst') ->
-          let f = Instructions.length in
-          (match Int.compare (f inst) (f inst') with
-           | -1 -> replace cmap k (name, inst)
-           | _ -> ())
-      ;;
-
-      exception Rocq_bindings_CannotFindBindingName of EConstr.t
-
-      let find_name
-            (name_pairs : (EConstr.t * Names.Name.t) list)
-            (x : EConstr.t)
-        : Names.Name.t mm
-        =
-        (* Log.trace __FUNCTION__; *)
-        Log.thing ~__FUNCTION__ Debug "x" x (Of Strfy.econstr);
-        let open Syntax in
-        let f (i : int) : Names.Name.t option -> Names.Name.t option mm
-          = function
-          | Some n ->
-            Log.thing ~__FUNCTION__ Trace "Some" n (Of Rocq_utils.Strfy.name);
-            Some n |> return
-          | None ->
-            Log.trace ~__FUNCTION__ "None";
-            let y, z = List.nth name_pairs i in
-            let* eq = econstr_eq ~enc:false x y in
-            if eq
-            then (
-              Log.thing ~__FUNCTION__ Debug "eq x" z (Of Rocq_utils.Strfy.name);
-              Some z |> return)
-            else return None
-        in
-        let* matches = iterate 0 (List.length name_pairs - 1) None f in
-        match matches with
-        | None ->
-          Log.trace
-            ~__FUNCTION__
-            "Raise (Rocq_bindings_CannotFindBindingName x)";
-          raise (Rocq_bindings_CannotFindBindingName x)
-        | Some n ->
-          Log.trace ~__FUNCTION__ "Some (_, n)";
-          return n
-      ;;
-
-      let extract_binding_map
-            (name_pairs : (EConstr.t * Names.Name.t) list)
-            (x : EConstr.t)
-            (y : Constr.t)
-        : t' mm
-        =
-        Log.trace __FUNCTION__;
-        let open Syntax in
-        let m : t' = create 0 in
-        let rec f
-                  (acc : (Constr.t * v) list)
-                  (b : Instructions.t)
-                  ((x, y) : EConstr.t * Constr.t)
-          : unit mm
-          =
-          Log.trace __FUNCTION__;
-          let* x_kind = econstr_kind x in
-          match x_kind, Constr.kind y with
-          | App (xty, xtys), App (yty, ytys) ->
-            let* eq = econstr_eq ~enc:false xty (EConstr.of_constr yty) in
-            if eq
-            then (
-              (* NOTE: set to [-1] so that it is [0] on first use. *)
-              let (tysindex, _), _ = Utils.new_int_counter ~start:(-1) () in
-              let xytys = Array.combine xtys ytys in
-              let iter_body (i : int) () =
-                Log.trace __FUNCTION__;
-                let b' =
-                  Instructions.append
-                    (Arg { root = yty; index = tysindex (); cont = Undefined })
-                    b
-                in
-                f acc b' xytys.(i)
-              in
-              iterate 0 (Array.length xytys - 1) () iter_body)
-            else return ()
-          | _, Rel _ ->
-            let* name = find_name name_pairs x in
-            update m y (name, Instructions.append Done b);
-            return ()
-          | _, _ -> return ()
-        in
-        let* () = f [] Undefined (x, y) in
-        return m
-      ;;
-
-      let make_opt
-            (name_pairs : (EConstr.t * Names.Name.t) list)
-            ((evar, rel) : EConstr.t * Constr.t)
-        : t' option mm
-        =
-        Log.trace __FUNCTION__;
-        let open Syntax in
-        let* m = extract_binding_map name_pairs evar rel in
-        match to_seq_values m |> List.of_seq with
-        | [] -> return None
-        | [ (_, Instructions.Done) ] -> return None
-        | _ :: _ -> return (Some m)
-      ;;
-    end
-
-    type t =
-      | No_Bindings
-      | Use_Bindings of
-          { from : ConstrMap.t' option
-          ; action : ConstrMap.t' option
-          ; goto : ConstrMap.t' option
-          }
-
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
-
-          let name = "Bindings"
-
-          let json ?as_elt : t -> Yojson.t = function
-            | No_Bindings -> `String "NoBindings"
-            | Use_Bindings { from; action; goto } ->
-              `Assoc
-                [ "from", Json.option ~as_elt:true ConstrMap.json from
-                ; "action", Json.option ~as_elt:true ConstrMap.json action
-                ; "goto", Json.option ~as_elt:true ConstrMap.json goto
-                ]
-          ;;
-        end)
-
-    let use_no_bindings (xs : ConstrMap.t' option list) : bool =
-      Log.trace __FUNCTION__;
-      List.filter (function None -> false | _ -> true) xs |> List.is_empty
-    ;;
-
-    (** [] ...
-        @param name_map is a tuple list of evars and corresponding binding_names
-    *)
-    let extract
-          (name_pairs : (EConstr.t * Names.Name.t) list)
-          (from : EConstr.t * Constr.t)
-          (action : EConstr.t * Constr.t)
-          (goto : EConstr.t * Constr.t)
-      : t mm
-      =
-      Log.trace __FUNCTION__;
-      let open Syntax in
-      let f = ConstrMap.make_opt name_pairs in
-      let* from : ConstrMap.t' option = f from in
-      let* action : ConstrMap.t' option = f action in
-      let* goto : ConstrMap.t' option = f goto in
-      if use_no_bindings [ from; action; goto ]
-      then return No_Bindings
-      else return (Use_Bindings { from; action; goto })
-    ;;
-  end
-
-  module ConstructorBindings = struct
-    type t =
-      { index : int
-      ; name : string
-      ; bindings : Bindings.t
-      }
-
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
-
-          let name = "ConstructorBindings"
-
-          let json ?as_elt (x : t) : Yojson.t =
-            `Assoc
-              [ "index", `Int x.index
-              ; "name", `String x.name
-              ; "bindings", Bindings.json ~as_elt:true x.bindings
-              ]
-          ;;
-        end)
-
-    let extract_info (x : Ind.t) : t list mm =
-      Log.trace __FUNCTION__;
-      let open Syntax in
-      (* NOTE: constructor tactic index starts from 1 -- ignore 0 below *)
-      let (get_constructor_index, _), _ = Utils.new_int_counter ~start:0 () in
-      let tys : Ind.LTS.constructor array = Ind.get_lts_constructor_types x in
-      let f (i : int) (acc : t list) : t list mm =
-        Log.trace __FUNCTION__;
-        let { name; constructor = ctx, c } : Ind.LTS.constructor = tys.(i) in
-        let index : int = get_constructor_index () in
-        let name : string = Names.Id.to_string name in
-        let decls : Rocq_utils.econstr_decl list =
-          Rocq_utils.get_econstr_decls ctx
-        in
-        let* substl = mk_ctx_substl [] (List.rev decls) in
-        let name_pairs = Rocq_utils.map_decl_evar_pairs decls substl in
-        let args : Rocq_utils.constructor_args =
-          Rocq_utils.extract_args ~substl c
-        in
-        let from, action, goto =
-          Rocq_utils.constr_to_app c |> Rocq_utils.unpack_constr_args
-        in
-        let* bindings : Bindings.t =
-          Bindings.extract
-            name_pairs
-            (args.lhs, from)
-            (args.act, action)
-            (args.rhs, goto)
-        in
-        let h : t = { index; name; bindings } in
-        h :: acc |> return
-      in
-      iterate 0 (Array.length tys - 1) [] f
-    ;;
-
-    (***********************************************************************)
-
-    let get_quantified_hyp : Names.Name.t -> Tactypes.quantified_hypothesis =
-      Log.trace __FUNCTION__;
-      function
-      | Names.Name.Anonymous -> Tactypes.AnonHyp (* FIXME: *) 0
-      | Names.Name.Name v -> Tactypes.NamedHyp (CAst.make v)
-    ;;
-
-    exception Rocq_bindings_BindingInstruction_NotApp of EConstr.t
-
-    exception
-      Rocq_bindings_BindingInstruction_Undefined of EConstr.t * EConstr.t
-
-    exception
-      Rocq_bindings_BindingInstruction_IndexOutOfBounds of EConstr.t * int
-
-    exception Rocq_bindings_BindingInstruction_NEQ of EConstr.t * Constr.t
-
-    let rec get_bound_term (x : EConstr.t)
-      : Bindings.Instructions.t -> EConstr.t mm
-      =
-      Log.trace __FUNCTION__;
-      function
-      | Undefined -> raise (Rocq_bindings_BindingInstruction_Undefined (x, x))
-      | Done -> return x
-      | Arg { root; index; cont } ->
-        (try
-           let open Syntax in
-           let* kind = econstr_kind x in
-           match kind with
-           | App (xty, xtys) ->
-             let* eq = econstr_eq ~enc:false xty (EConstr.of_constr root) in
-             if eq
-             then (
-               try get_bound_term xtys.(index) cont with
-               | Invalid_argument _ ->
-                 raise
-                   (Rocq_bindings_BindingInstruction_IndexOutOfBounds (x, index)))
-             else raise (Rocq_bindings_BindingInstruction_NEQ (xty, root))
-           | _ -> raise (Rocq_bindings_BindingInstruction_NotApp x)
-         with
-         | Rocq_bindings_BindingInstruction_Undefined (_, y) ->
-           raise (Rocq_bindings_BindingInstruction_Undefined (x, y)))
-    ;;
-
-    let get_explicit_bindings
-      :  EConstr.t * Bindings.ConstrMap.t' option
-      -> EConstr.t Tactypes.explicit_bindings mm
-      =
-      Log.trace __FUNCTION__;
-      function
-      | _, None -> return []
-      | x, Some xmap ->
-        let open Syntax in
-        let ys = Bindings.ConstrMap.to_seq_values xmap |> Array.of_seq in
-        let f (i : int) (acc : EConstr.t Tactypes.explicit_bindings) =
-          Log.trace __FUNCTION__;
-          let name, inst = ys.(i) in
-          let q = get_quantified_hyp name in
-          let* bs = get_bound_term x inst in
-          CAst.make (q, bs) :: acc |> return
-        in
-        iterate 0 (Array.length ys - 1) [] f
-    ;;
-
-    let get
-          (from' : EConstr.t)
-          (action' : EConstr.t option)
-          (goto' : EConstr.t option)
-      : Bindings.t -> EConstr.t Tactypes.bindings mm
-      =
-      Log.trace __FUNCTION__;
-      function
-      | No_Bindings -> return Tactypes.NoBindings
-      | Use_Bindings { from; action; goto } ->
-        let acc_some
-              (acc : (EConstr.t * Bindings.ConstrMap.t' option) list)
-              (x : Bindings.ConstrMap.t' option)
-          : EConstr.t option -> (EConstr.t * Bindings.ConstrMap.t' option) list
-          = function
-          | None -> acc
-          | Some y -> (y, x) :: acc
-        in
-        let to_iter : (EConstr.t * Bindings.ConstrMap.t' option) list =
-          acc_some (acc_some [ from', from ] action action') goto goto'
-        in
-        let open Syntax in
-        let* bindings : EConstr.t Tactypes.explicit_bindings =
-          let f (i : int) acc =
-            Log.trace __FUNCTION__;
-            let* x = get_explicit_bindings (List.nth to_iter i) in
-            x :: acc |> return
-          in
-          let* xs = iterate 0 (List.length to_iter - 1) [] f in
-          List.flatten xs |> return
-        in
-        (match bindings with
-         | [] -> return Tactypes.NoBindings
-         | xs -> return (Tactypes.ExplicitBindings xs))
-    ;;
-  end
 end

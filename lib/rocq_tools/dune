@@ -1,0 +1,22 @@
+(library
+ (name rocq_tools)
+ (public_name rocq-mebi.mebi_lib.rocq_tools)
+ (libraries
+  rocq-runtime.vernac ; Needed for vernac extend.
+  rocq-runtime.plugins.ltac ; Needed for tactic extend.
+  rocq-mebi.mebi_lib.utils
+  rocq-mebi.mebi_lib.terms
+  yojson)
+ (modules
+  theories
+  rocq_utils
+  rocq_context
+  bi_encoding
+  rocq_monad
+  rocq_monad_strfy
+  rocq_monad_utils
+  bindings
+  constructor_bindings)
+ (wrapped false))
+
+(include_subdirs no)

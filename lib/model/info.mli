@@ -55,49 +55,20 @@ module type S = sig
   type t =
     { meta : Meta.t option
     ; weak_labels : labels
-      ; num_states : int
+    ; num_states : int
     }
 
-  val json : ?as_elt:bool -> t -> Yojson.t
-  val to_string : ?pretty:bool -> t -> string
-  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
-  val merge : ?num_states:int ->  t -> t -> t
+  include Json.S with type k = t
+
+  val merge : ?num_states:int -> t -> t -> t
 end
 
 module Make
     (Log : Logger.S)
     (Base : Base_term.S)
     (Labels : Labels.S)
-    (Bindings : sig
-       module Instructions : sig
-         type t
-       end
-
-       module ConstrMap : sig
-         include Hashtbl.S with type key = Constr.t
-
-         type v = Names.Name.t * Instructions.t
-         type t' = v t
-       end
-
-       type t =
-         | No_Bindings
-         | Use_Bindings of
-             { from : ConstrMap.t' option
-             ; action : ConstrMap.t' option
-             ; goto : ConstrMap.t' option
-             }
-     end)
-    (ConstructorBindings : sig
-       type t =
-         { index : int
-         ; name : string
-         ; bindings : Bindings.t
-         }
-
-       val json : ?as_elt:bool -> t -> Yojson.t
-     end) :
+    (ConstructorBindings : Constructor_bindings.S) :
   S
   with type base = Base.t
    and type constructorbindings = ConstructorBindings.t
-   and type labels = Labels.t 
+   and type labels = Labels.t
