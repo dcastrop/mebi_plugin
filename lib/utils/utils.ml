@@ -491,8 +491,10 @@ module FileWriter = struct
 
   let get_loc () : string =
     match Loc.get_current_command_loc () with
-    | Some { fname = InFile { dirpath; file } } -> file
-    | _ -> ""
+    | Some { line_nb; fname = InFile { file; _ } } ->
+      String.map (fun x -> if Char.equal '/' x then ' ' else x) file
+      |> Printf.sprintf "line %i | %s" line_nb
+    | _ -> "Unknown Location"
   ;;
 
   (** https://discuss.ocaml.org/t/how-to-create-a-new-file-while-automatically-creating-any-intermediate-directories/14837/5

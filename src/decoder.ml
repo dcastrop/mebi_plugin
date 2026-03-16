@@ -143,7 +143,10 @@ module Make
           let name = "Base"
 
           let json ?(as_elt : bool = false) (x : Enc.t) : Yojson.t =
-            `String (M.decode x |> M.Strfy.econstr)
+            `Assoc
+              [ "enc", Enc.json ~as_elt:true x
+              ; "term", `String (M.decode x |> M.Strfy.econstr)
+              ]
           ;;
         end)
 
@@ -392,7 +395,7 @@ module Make
               : Yojson.t
               =
               `Assoc
-                [ "base", Base.json x.base
+                [ "base", Base.json ~as_elt:true x.base
                 ; ( "constructors"
                   , `List
                       (List.map
