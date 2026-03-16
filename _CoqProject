@@ -52,7 +52,6 @@ examples/Bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
 ### CADP
 examples/CADP.v ### REQUIRED FOR BELOW
 examples/CADP_Glued.v ### REQUIRED FOR BELOW
-# examples/CADP_Spec.v ### not working 
 examples/Bisimilarity/CADP/Properties/MutualExclusion.v ### REQUIRED FOR BELOW
 
 examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW

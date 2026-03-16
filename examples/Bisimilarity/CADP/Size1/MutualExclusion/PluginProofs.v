@@ -37,13 +37,13 @@ MeBi Divider "Examples.Bisimilarity.CADP.Size1.MutualExclusion.TermTests".
 (* MeBi Run FSM (compose (create 2 Protocol.P)) Using lts step. *) 
 
 (* OK *)
-MeBi Run FSM (compose (create 2 Protocol.P)) Using bigstep lts step. 
-
-(* OK *)
 MeBi Run FSM (make_spec 2) Using spec_lts. 
 
+(* OK *)
+MeBi Run FSM (compose (create 2 Protocol.P)) Using bigstep lts step. 
+
 (* !!! not bisim ? *)
-(* MeBi Run Bisim (make_spec 2) With spec_lts And (compose (create 2 Protocol.P)) With bigstep Using lts step. *)
+MeBi Run Bisim (make_spec 2) With spec_lts And (compose (create 2 Protocol.P)) With bigstep Using lts step.
 
 
 
