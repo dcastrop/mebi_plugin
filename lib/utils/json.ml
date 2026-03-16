@@ -48,8 +48,24 @@ module Make
     =
     (* TODO: *)
     Utils.FileWriter.create_parent_dir dir;
-    let filepath : string = Filename.concat dir name in
-    json ~as_elt:false x |> Yojson.to_file filepath
+    let filepath : string =
+      Printf.sprintf
+        "%s | %s | %s%s"
+        Utils.FileWriter.get_local_timestamp
+        (Utils.FileWriter.get_loc ())
+        name
+        ".json"
+      |> Filename.concat dir
+    in
+    (* json ~as_elt:false x |> Yojson.to_file filepath *)
+    let oc = open_out filepath in
+    try
+      json ~as_elt:false x |> Yojson.pretty_to_channel oc;
+      close_out oc
+    with
+    | e ->
+      close_out_noerr oc;
+      raise e
   ;;
 end
 
