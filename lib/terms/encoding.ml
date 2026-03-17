@@ -1,5 +1,6 @@
 module type S = sig
   include Base_term.S
+  include Json.S with type k = t
 
   val init : t
   val next : t -> t
@@ -7,13 +8,17 @@ module type S = sig
   val incr : unit -> t
 end
 
+module type Args = sig
+  type t
+
+  val init : t
+  val next : t -> t
+end
+
 module Make
     (Log : Logger.S)
     (Base : Base_term.S)
-    (X : sig
-       val init : Base.t
-       val next : Base.t -> Base.t
-     end) : S with type t = Base.t = struct
+    (X : Args with type t = Base.t) : S with type t = Base.t = struct
   include Base
 
   include
@@ -46,19 +51,36 @@ module Make
   ;;
 end
 
-module ToBase (Enc : S) : Base_term.S = Enc
+module Packed = struct
+  module type PackedS = sig
+    type t
 
-module Int (Log : Logger.S) : S with type t = Int.t =
-  Make
-    (Log)
-    (Base_term.Make
-       (Log)
-       (struct
-         include Int
+    module BaseArgs : Base_term.Args with type t = t
+    module EncodingArgs : Args with type t = t
+  end
 
-         let to_string : t -> string = Printf.sprintf "%i"
-       end))
-    (struct
+  module Int : PackedS with type t = Int.t = struct
+    type t = Int.t
+
+    module BaseArgs = struct
+      include Int
+
+      let to_string : t -> string = Printf.sprintf "%i"
+    end
+
+    module EncodingArgs : Args with type t = Int.t = struct
+      type t = int
+
       let init : int = 0
       let next : int -> int = fun x -> x + 1
-    end)
+    end
+  end
+
+  module Unpack (Log : Logger.S) (Args : PackedS) : S with type t = Args.t =
+  struct
+    module Base : Base_term.S with type t = Args.t =
+      Base_term.Make (Log) (Args.BaseArgs)
+
+    include Make (Log) (Base) (Args.EncodingArgs)
+  end
+end

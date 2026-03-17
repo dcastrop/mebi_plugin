@@ -172,13 +172,10 @@ module List = struct
   module Make
       (Log : Logger.S)
       (X : sig
-         include sig
-           type k
-
-           val json : ?as_elt:bool -> k -> Yojson.t
-         end
+         type k
 
          val name : string
+         val json : ?as_elt:bool -> k -> Yojson.t
        end) : S with type k = X.k list =
     Make
       (Log)

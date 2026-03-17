@@ -1,6 +1,8 @@
 module type S = sig
   type t
-include Json.S with type k = t
+
+  include Json.S with type k = t
+
   val equal : t -> t -> bool
   val compare : t -> t -> int
   val hash : t -> int
@@ -10,14 +12,18 @@ include Json.S with type k = t
   module Tree : sig
     module Node : sig
       type t = e * int
-include Json.S with type k = t
+
+      include Json.S with type k = t
+
       val compare : t -> t -> int
       val equal : t -> t -> bool
     end
 
     type 'a tree = N of 'a * 'a tree list
     type t = Node.t tree
-include Json.S with type k = t
+
+    include Json.S with type k = t
+
     val add : t -> t -> t
     val add_list : t -> t list -> t list
     val equal : t -> t -> bool
@@ -31,7 +37,7 @@ include Json.S with type k = t
 
   module Trees : sig
     include Set.S with type elt = Tree.t
-include Json.S with type k = t
+    include Json.S with type k = t
 
     exception EmptyHasNoMin
 
@@ -41,22 +47,24 @@ include Json.S with type k = t
 
   module Constructor_tree : sig
     type t = e * e * Tree.t
-include Json.S with type k = t
+
+    include Json.S with type k = t
   end
 
   module Constructor_trees : sig
     type t = Constructor_tree.t list
-include Json.S with type k = t
+
+    include Json.S with type k = t
   end
 end
 
-module Make : (Log : Logger.S)
-    (X : sig
-       type t
+module type Args = sig
+  type t
 
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-       val hash : t -> int
-       val to_string : t -> string
-     end)
-    -> S with type t = X.t
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val hash : t -> int
+  val to_string : t -> string
+end
+
+module Make (Log : Logger.S) (X : Args) : S with type t = X.t

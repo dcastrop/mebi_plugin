@@ -291,9 +291,9 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
    and type tree = Enc.Tree.t
    and type trees = Enc.Trees.t
 
-module Default () :
-  S
-  with type enc = Api.Defaults.Enc.t
-   and type node = Api.Defaults.Enc.Tree.Node.t
-   and type tree = Api.Defaults.Enc.Tree.t
-   and type trees = Api.Defaults.Enc.Trees.t
+val make
+  :  ?log:(unit -> (module Logger.S))
+  -> ?enc:((module Logger.S) -> (module Encoding.S))
+  -> ?ctx:(module Rocq_context.S)
+  -> unit
+  -> (module S)
