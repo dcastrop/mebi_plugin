@@ -17,9 +17,9 @@ module type S = sig
 
   val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
   val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
-  val to_atomic : Evd.econstr -> Evd.econstr Rocq_utils.kind_pair mm
-  val to_lambda : Evd.econstr -> Rocq_utils.lambda_triple mm
-  val to_app : Evd.econstr -> Evd.econstr Rocq_utils.kind_pair mm
+  val to_atomic : EConstr.t -> EConstr.t Rocq_utils.kind_pair mm
+  val to_lambda : EConstr.t -> Rocq_utils.lambda_triple mm
+  val to_app : EConstr.t -> EConstr.t Rocq_utils.kind_pair mm
   val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool mm
   val type_of_econstr : EConstr.t -> EConstr.t mm
   val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
@@ -38,6 +38,20 @@ module type S = sig
     -> ?m:Output.Kind.t
     -> ?s:string
     -> EConstr.t list
+    -> unit
+
+  val log_constr
+    :  ?__FUNCTION__:string
+    -> ?m:Output.Kind.t
+    -> ?s:string
+    -> Constr.t
+    -> unit
+
+  val log_constrs
+    :  ?__FUNCTION__:string
+    -> ?m:Output.Kind.t
+    -> ?s:string
+    -> Constr.t list
     -> unit
 
   module type SErrors = sig
@@ -323,7 +337,8 @@ module type S = sig
 end
 
 module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
-  S with type enc = Enc.t and type tree = Enc.Tree.t = struct
+  S with module Ctx = Ctx and type enc = Enc.t and type tree = Enc.Tree.t =
+struct
   (*****************************************)
 
   module M : Rocq_monad.S with type enc = Enc.t =
@@ -475,6 +490,26 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     : unit
     =
     Log.things ~__FUNCTION__ m s x (Of Strfy.econstr)
+  ;;
+
+  let log_constr
+        ?(__FUNCTION__ : string = "")
+        ?(m : Output.Kind.t = Output.Kind.Debug)
+        ?(s : string = "Constr")
+        (x : Constr.t)
+    : unit
+    =
+    Log.thing ~__FUNCTION__ m s x (Of Strfy.constr)
+  ;;
+
+  let log_constrs
+        ?(__FUNCTION__ : string = "")
+        ?(m : Output.Kind.t = Output.Kind.Debug)
+        ?(s : string = "Constrs")
+        (x : Constr.t list)
+    : unit
+    =
+    Log.things ~__FUNCTION__ m s x (Of Strfy.constr)
   ;;
 
   module type SErrors = sig

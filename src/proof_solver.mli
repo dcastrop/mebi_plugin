@@ -32,7 +32,7 @@ module type S = sig
   val step : Declare.Proof.t -> Declare.Proof.t
 end
 
-module Make (Log : Logger.S) (Enc : Encoding.S) (Ctx : Rocq_context.S) :
+module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   S
   with type enc = Enc.t
    and type node = Enc.Tree.Node.t

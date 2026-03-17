@@ -4,22 +4,22 @@ module type S = sig
   type enc
   type fsm
 
-  val is_any_theory : Evd.econstr -> bool
-  val is_theory : Evd.econstr -> Evd.econstr -> bool im
-  val is_exists : Evd.econstr -> bool im
-  val is_weak_sim : Evd.econstr -> bool im
-  val is_weak : Evd.econstr -> bool im
-  val is_tau : Evd.econstr -> bool im
-  val is_silent : Evd.econstr -> bool im
-  val is_silent1 : Evd.econstr -> bool im
-  val is_LTS : Evd.econstr -> bool im
-  val is_None : Evd.econstr -> bool im
-  val is_Some : Evd.econstr -> bool im
+  val is_any_theory : EConstr.t -> bool
+  val is_theory : EConstr.t -> EConstr.t -> bool im
+  val is_exists : EConstr.t -> bool im
+  val is_weak_sim : EConstr.t -> bool im
+  val is_weak : EConstr.t -> bool im
+  val is_tau : EConstr.t -> bool im
+  val is_silent : EConstr.t -> bool im
+  val is_silent1 : EConstr.t -> bool im
+  val is_LTS : EConstr.t -> bool im
+  val is_None : EConstr.t -> bool im
+  val is_Some : EConstr.t -> bool im
 
   exception EnsureFail
 
-  val ensure : Evd.econstr -> (Evd.econstr -> bool im) -> unit im
-  val get_theory_enc : (Evd.econstr -> bool im) -> enc mm
+  val ensure : EConstr.t -> (EConstr.t -> bool im) -> unit im
+  val get_theory_enc : (EConstr.t -> bool im) -> enc mm
 
   exception NoEncodingFoundFor_TheoriesNone
 
@@ -31,35 +31,29 @@ module type S = sig
 
   exception NotEqTheory
 
-  val get_theory_enc_if_eq : Evd.econstr -> (Evd.econstr -> bool im) -> enc mm
-  val get_None_enc_if_eq : Evd.econstr -> enc mm
-  val get_Some_enc_if_eq : Evd.econstr -> enc mm
+  val get_theory_enc_if_eq : EConstr.t -> (EConstr.t -> bool im) -> enc mm
+  val get_None_enc_if_eq : EConstr.t -> enc mm
+  val get_Some_enc_if_eq : EConstr.t -> enc mm
 
   exception FSM_HasNoSilentLabel of fsm
 
-  val is_fsm_silent_label : Evd.econstr -> fsm -> bool
+  val is_fsm_silent_label : EConstr.t -> fsm -> bool
 
   exception FSM_HasNoVisibleLabel of fsm
 
-  val is_fsm_visible_label : Evd.econstr -> fsm -> bool
+  val is_fsm_visible_label : EConstr.t -> fsm -> bool
 
   exception FSM_HasNoWeakLabels of fsm
 
-  val is_fsm_weak_labels : Evd.econstr -> fsm -> bool
+  val is_fsm_weak_labels : EConstr.t -> fsm -> bool
 
   exception FSM_HasNoConstructors of fsm
 
-  val is_fsm_constructor : Evd.econstr -> fsm -> bool
+  val is_fsm_constructor : EConstr.t -> fsm -> bool
 end
 
-(** [module Make] ...
-    (* @param M
-      is the [module Rocq_monad_utils.S] of the initial run of the algorithm *)
-    @param I
-      is the [module Rocq_monad_utils.S] for the current {i iteration} of the proof-solver.
-*)
 module Make
-    (_ : Logger.S)
+    (Log : Logger.S)
     (Enc : Encoding.S)
     (W :
        Wrapper.S

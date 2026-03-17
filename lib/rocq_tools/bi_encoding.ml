@@ -1,4 +1,6 @@
 module type S = sig
+  module Ctx : Rocq_context.S
+
   type enc
 
   module F : Hashtbl.S with type key = EConstr.t
@@ -41,6 +43,8 @@ end
 
 module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   S with type enc = Enc.t = struct
+  module Ctx : Rocq_context.S = Ctx
+
   type enc = Enc.t
 
   module F : Hashtbl.S with type key = EConstr.t = Hashtbl.Make (struct

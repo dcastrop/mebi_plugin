@@ -1,4 +1,6 @@
 module type S = sig
+  module Ctx : Rocq_context.S
+
   type enc
 
   module F : Hashtbl.S with type key = EConstr.t
