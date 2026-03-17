@@ -50,5 +50,10 @@ Api
 Weak
 Graph
 Wrapper
+Wrapper_results
+Proof_solver_statem
+Proof_solver_tactic
+Proof_solver_theory
+Proof_solver_step
 Proof_solver
 G_mebi

@@ -11,8 +11,8 @@ src/META.rocq-mebi
 -arg "-w all"
 
 theories/loader.v ###
-theories/DevTest.v ###
-theories/Test.v ###
+# theories/DevTest.v ###
+# theories/Test.v ###
 
 theories/Bisimilarity.v ###
 
@@ -28,8 +28,8 @@ examples/Proc.v ### REQUIRED FOR BELOW
 
 ### Proc.Flat.Simple 
 examples/Bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/Proc/Test1/TermTests.v ### Success
-# examples/Bisimilarity/Proc/Test1/PluginProofs.v ### Success
+examples/Bisimilarity/Proc/Test1/TermTests.v ### Success
+examples/Bisimilarity/Proc/Test1/PluginProofs.v ### Success
 # examples/Bisimilarity/Proc/Test1/ManualProofs.v
 # examples/Bisimilarity/Proc/Test1/LtacProofs.v
 
@@ -67,7 +67,7 @@ examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
 examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size2/TermTests.v ### FAIL: state-explosion
 
-examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### success
+# examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### Success
 # examples/Bisimilarity/CADP/Size2/Glued/PluginProofs.v ### FAIL: ^
 # examples/Bisimilarity/CADP/Size2/Glued/MutualExclusion/PluginProofs.v ### WIP
 
@@ -210,6 +210,17 @@ src/graph.mli
 
 src/wrapper.ml
 src/wrapper.mli
+src/wrapper_results.ml
+src/wrapper_results.mli
+
+src/proof_solver_statem.ml
+src/proof_solver_statem.mli
+src/proof_solver_tactic.ml
+src/proof_solver_tactic.mli
+src/proof_solver_theory.ml
+src/proof_solver_theory.mli
+src/proof_solver_step.ml
+src/proof_solver_step.mli
 src/proof_solver.ml
 src/proof_solver.mli
 

@@ -1,4 +1,16 @@
 Require Import MEBI.loader.
+
+MeBi Config Output "Debug" True.
+MeBi Config Output "Info" False.
+MeBi Config Output "Notice" True.
+MeBi Config Output "Warning" True.
+MeBi Config Output "Error" True.
+MeBi Config Output "Trace" True.
+MeBi Config Output "Result" True.
+MeBi Config Output "Show" False.
+MeBi Config Output "DecodeResults" True.
+MeBi Config Output "DumpResults" True.
+
 Require Stdlib.Program.Tactics.
 
 From Corelib Require Import Relations.Relation_Definitions.

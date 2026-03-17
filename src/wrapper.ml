@@ -1279,16 +1279,36 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       let open M.Syntax in
       Config.load_the_bounds_args ();
       let* () = Config.load_weak_args () in
-      match x with
-      | MakeLTS args -> do_make_lts args refs
-      | MakeFSM args -> do_make_fsm args refs
-      | Saturate args -> do_saturate args refs
-      | Minimize args -> do_minimize args refs
-      | Merge args -> do_merge args refs
-      | CheckBisim args -> do_check_bisim args refs
+      let r =
+        match x with
+        | MakeLTS args -> do_make_lts args refs
+        | MakeFSM args -> do_make_fsm args refs
+        | Saturate args -> do_saturate args refs
+        | Minimize args -> do_minimize args refs
+        | Merge args -> do_merge args refs
+        | CheckBisim args -> do_check_bisim args refs
+      in
+      Log.notice "(done.)";
+      r
     ;;
   end
 end
 
-module Default () =
-  Make ((val Api.make_logger ())) (Api.Defaults.Ctx) (Api.Defaults.Enc)
+(** [make ?log ?enc ?ctx] constructs a [Wrapper.S] module.
+    @param ?log
+      is a function that returns a [module Logger.S]. By default, this is obtained from the configuration in [module Api], via [Api.make_logger ()]. This is then used to construct the [Encoding.S] as well as [Wrapper.S].
+    @param ?enc
+      is a function that takes a [module Logger.S] and returns a [module Encoding.S]. The default encoding uses [Int.t].
+    @param ?ctx is the rocq-context. *)
+let make
+      ?(log : unit -> (module Logger.S) = Api.make_logger)
+      ?(enc : (module Logger.S) -> (module Encoding.S) = Api.make_enc_int)
+      ?(ctx : (module Rocq_context.S) = (module Rocq_context.Default))
+      ()
+  : (module S)
+  =
+  let module Log : Logger.S = (val log ()) in
+  let module Enc : Encoding.S = (val enc (module Log)) in
+  let module W : S = Make (Log) ((val ctx)) (Enc) in
+  (module W : S)
+;;

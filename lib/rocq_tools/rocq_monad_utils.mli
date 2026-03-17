@@ -17,6 +17,9 @@ module type S = sig
 
   val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
   val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
+  val to_atomic : Evd.econstr -> Evd.econstr Rocq_utils.kind_pair mm
+  val to_lambda : Evd.econstr -> Rocq_utils.lambda_triple mm
+  val to_app : Evd.econstr -> Evd.econstr Rocq_utils.kind_pair mm
   val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool mm
   val type_of_econstr : EConstr.t -> EConstr.t mm
   val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm

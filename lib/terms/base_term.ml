@@ -58,16 +58,16 @@ module type S = sig
   end
 end
 
-module Make
-    (Log : Logger.S)
-    (X : sig
-       type t
+module type Args = sig
+  type t
 
-       val equal : t -> t -> bool
-       val compare : t -> t -> int
-       val hash : t -> int
-       val to_string : t -> string
-     end) : S with type t = X.t = struct
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val hash : t -> int
+  val to_string : t -> string
+end
+
+module Make (Log : Logger.S) (X : Args) : S with type t = X.t = struct
   module Y = struct
     type t = X.t
     type e = t

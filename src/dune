@@ -29,6 +29,11 @@
   weak
   graph
   wrapper ; basic plugin commands
+  wrapper_results
+  proof_solver_statem
+  proof_solver_tactic
+  proof_solver_theory
+  proof_solver_step
   proof_solver ; 
   g_mebi))
 

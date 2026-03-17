@@ -17,6 +17,9 @@ module type S = sig
 
   val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
   val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
+  val to_atomic : Evd.econstr -> Evd.econstr Rocq_utils.kind_pair mm
+  val to_lambda : Evd.econstr -> Rocq_utils.lambda_triple mm
+  val to_app : Evd.econstr -> Evd.econstr Rocq_utils.kind_pair mm
   val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool mm
   val type_of_econstr : EConstr.t -> EConstr.t mm
   val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
@@ -321,32 +324,11 @@ end
 
 module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   S with type enc = Enc.t and type tree = Enc.Tree.t = struct
-  module Log' = Log
-
-  (** [module Log] is a modified [Log] -- here disables trace & debug printing
-  *)
-  (* module Log : Logger.S with module Config.Mode = Log.Config.Mode =
-     Logger.ReMake
-     (Log)
-     (struct
-     let level : Output.Kind.level -> bool = function
-     | Debug -> false
-     | Info -> true
-     | Notice -> true
-     | Warning -> true
-     | Error -> true
-     ;;
-
-     let special : Output.Kind.special -> bool = function
-     | Trace -> false
-     | Result -> true
-     | Show -> true
-     ;;
-     end) *)
-
   (*****************************************)
 
-  module M = Rocq_monad.Make (Log) (Ctx) (Enc)
+  module M : Rocq_monad.S with type enc = Enc.t =
+    Rocq_monad.Make (Log) (Ctx) (Enc)
+
   include M
 
   type tree = Enc.Tree.t
@@ -421,6 +403,26 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 
   (*********************************************************)
 
+  let to_atomic (x : EConstr.t) : EConstr.t Rocq_utils.kind_pair mm =
+    let open Syntax in
+    let* sigma = get_sigma in
+    Rocq_utils.econstr_to_atomic sigma x |> return
+  ;;
+
+  let to_lambda (x : EConstr.t) : Rocq_utils.lambda_triple mm =
+    let open Syntax in
+    let* sigma = get_sigma in
+    Rocq_utils.econstr_to_lambda sigma x |> return
+  ;;
+
+  let to_app (x : EConstr.t) : EConstr.t Rocq_utils.kind_pair mm =
+    let open Syntax in
+    let* sigma = get_sigma in
+    Rocq_utils.econstr_to_app sigma x |> return
+  ;;
+
+  (*********************************************************)
+
   let exists_eq (x : EConstr.t) (ys : 'a list) (decoder : 'a -> EConstr.t)
     : bool mm
     =
@@ -462,7 +464,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
         (x : EConstr.t)
     : unit
     =
-    Log'.thing ~__FUNCTION__ m s x (Of Strfy.econstr)
+    Log.thing ~__FUNCTION__ m s x (Of Strfy.econstr)
   ;;
 
   let log_econstrs
@@ -472,7 +474,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
         (x : EConstr.t list)
     : unit
     =
-    Log'.things ~__FUNCTION__ m s x (Of Strfy.econstr)
+    Log.things ~__FUNCTION__ m s x (Of Strfy.econstr)
   ;;
 
   module type SErrors = sig

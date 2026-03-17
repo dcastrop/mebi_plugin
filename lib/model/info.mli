@@ -10,15 +10,7 @@ module type S = sig
         | Transitions of int
         | Merged of t * t
 
-      val json : ?as_elt:bool -> t -> Yojson.t
-      val to_string : ?pretty:bool -> t -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> t
-        -> unit
+      include Json.S with type k = t
     end
 
     module RocqLTS : sig
@@ -27,15 +19,7 @@ module type S = sig
         ; constructors : constructorbindings list
         }
 
-      val json : ?as_elt:bool -> t -> Yojson.t
-      val to_string : ?pretty:bool -> t -> string
-
-      val log
-        :  ?__FUNCTION__:string
-        -> ?m:Output.Kind.t
-        -> ?s:string
-        -> t
-        -> unit
+      include Json.S with type k = t
     end
 
     type t =
@@ -45,9 +29,8 @@ module type S = sig
       ; lts : RocqLTS.t list
       }
 
-    val json : ?as_elt:bool -> t -> Yojson.t
-    val to_string : ?pretty:bool -> t -> string
-    val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> t -> unit
+    include Json.S with type k = t
+
     val merge : t -> t -> t
     val merge_opt : t option -> t option -> t option
   end
