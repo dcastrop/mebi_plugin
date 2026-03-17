@@ -295,7 +295,11 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   type tree = Enc.Tree.t
   type trees = Enc.Trees.t
 
-  module M : Rocq_monad_utils.S with type enc = enc and type tree = tree =
+  module M :
+    Rocq_monad_utils.S
+    with module Ctx = Ctx
+     and type enc = enc
+     and type tree = tree =
     Rocq_monad_utils.Make (Log) (Ctx) (Enc)
 
   module Bindings : Bindings.S with type 'a mm = 'a M.mm =

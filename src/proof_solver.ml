@@ -32,7 +32,7 @@ module type S = sig
   val step : Declare.Proof.t -> Declare.Proof.t
 end
 
-module Make (Log : Logger.S) (Enc : Encoding.S) (Ctx : Rocq_context.S) :
+module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   S
   with type enc = Enc.t
    and type node = Enc.Tree.Node.t
@@ -47,24 +47,16 @@ module Make (Log : Logger.S) (Enc : Encoding.S) (Ctx : Rocq_context.S) :
   *)
   module Tactic : Proof_solver_tactic.S = Proof_solver_tactic.Make (Log)
 
-  module W_ :
-    Wrapper.S
-    with type enc = Enc.t
-     and type node = Enc.Tree.Node.t
-     and type tree = Enc.Tree.t
-     and type trees = Enc.Trees.t =
-    Wrapper.Make (Log) (Ctx) (Enc)
-
   (** [module W] is for running the main part of the algorithm (pre-proof). It is a standard [module Wrapper.S] which itself is wrapped in a [module Wrapper_results.S] which stores the results and provides some useful functions for using the bisimilarity result.
   *)
   module W :
     Wrapper_results.S
-    with type enc = Enc.t
+    with module M.Ctx = Ctx
+     and type enc = Enc.t
      and type node = Enc.Tree.Node.t
      and type tree = Enc.Tree.t
      and type trees = Enc.Trees.t =
-    (* Wrapper_results.Make (Log) (Enc) (Ctx) *)
-      Wrapper_results.Make (Log) (W_)
+    Wrapper_results.Make (Log) (Ctx) (Enc)
 
   (** [module ProofState] sets up the different internal states of the proof-solver. We require [module Wrapper_results.S] since some of the internal states {i (e.g., [Exists transition_opt])} store some information from the proof that corresponds to information captured in the initial run of the bisimilarity checking algorithm. {i {b Note:} this 'proof-state-machine' is not actually handled here, it is only the structure.}
     @see [module Proof_solver_step] for how these states are traversed in order to solve the proof.
@@ -171,7 +163,7 @@ let make
   =
   Log.trace __FUNCTION__;
   let module Ctx : Rocq_context.S = (val ctx) in
-  let module Solver : S with type enc = Enc.t = Make (Log) (Enc) (Ctx) in
+  let module Solver : S with type enc = Enc.t = Make (Log) (Ctx) (Enc) in
   the_cache
   := Some
        (ref { logger = (module Log : Logger.S); solver = (module Solver : S) });
@@ -189,6 +181,8 @@ let stop_msg (x : int) : string =
 
 (** [step] ... *)
 let step (pstate : Declare.Proof.t) : Declare.Proof.t =
+  let module Log : Logger.S = (val !(get_the_logger ())) in
+  Log.trace __FUNCTION__;
   let module Ps : S = (val !(get_the_proof_solver ())) in
   Ps.step pstate
 ;;

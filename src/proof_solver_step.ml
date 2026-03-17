@@ -98,8 +98,8 @@ module Make
                         with type enc = Enc.t
                          and type tree = Enc.Tree.t) ->
        Proof_solver_theory.S
-       with type 'a im = 'a I.mm
-        and type 'a mm = 'a W.M.mm
+       with type 'a mm = 'a W.M.mm
+        and type 'a im = 'a I.mm
         and type enc = Enc.t
         and type fsm = W.Model.FSM.t)
     (X : Args) : S with type tactic = Tactic.t = struct
@@ -410,6 +410,7 @@ module Make
 
     (* *)
     let do_refl () : Tactic.t mm =
+      Log.trace __FUNCTION__;
       let open Syntax in
       let* wk_none = apply_wk_none () in
       let unfold_silent = unfold_silent () in
@@ -421,7 +422,7 @@ module Make
     let collect_component_econstrs (sigma : Evd.evar_map) (x : EConstr.t)
       : EConstrSet.t
       =
-      (* Log.trace __FUNCTION__; *)
+      Log.trace __FUNCTION__;
       (* log_econstr ~__FUNCTION__ ~s:"x" x; *)
       let is_constr_ref (x : EConstr.t) : bool =
         EConstr.isRef sigma x && EConstr.isConst sigma x
@@ -462,7 +463,7 @@ module Make
     (** [can_be_unfolded sigma x] returns [true] if [x] can be {e unfolded}, i.e., refers to a definition, e.g., of a definition, fixpoint or example.
     *)
     let can_be_unfolded (sigma : Evd.evar_map) (x : EConstr.t) : bool =
-      (* Log.trace __FUNCTION__; *)
+      Log.trace __FUNCTION__;
       try
         let g, i = EConstr.destRef sigma x in
         match g with
@@ -586,7 +587,7 @@ module Make
       : EConstr.t Tactypes.bindings
       =
       Log.trace __FUNCTION__;
-      ConstructorBindings.get from label goto bindings |> M.run
+      W.ConstructorBindings.get from label goto bindings |> W.M.run
     ;;
 
     (** if we have no way of obtaining the bindings (i.e., not info.meta) then we use no bindings.
@@ -1120,6 +1121,7 @@ module Make
         (tys : EConstr.t array)
     : Model.Transition.t
     =
+    Log.trace __FUNCTION__;
     let m : Model.FSM.t = W.get_fsm_b ~saturated () in
     let from : Model.State.t = M.run (ReModel.state tys.(3) m.states) in
     let label : Model.Label.t = M.run (ReModel.label tys.(5) m.alphabet) in
@@ -1146,6 +1148,7 @@ module Make
   exception MisMatchedStates of (Model.State.t * Model.State.t)
 
   let ensure_matching_states (x : Model.State.t) (y : Model.State.t) : unit =
+    Log.trace __FUNCTION__;
     if Model.State.equal x y then () else raise (MisMatchedStates (x, y))
   ;;
 
@@ -1186,6 +1189,7 @@ module Make
         ({ wk_trans; wk_sim } : Concl.wk_conj)
     : Tactic.t mm
     =
+    Log.trace __FUNCTION__;
     let open Syntax in
     let* { a'; b } = Concl.get_conj { wk_trans; wk_sim } in
     ensure_matching_states hyp.goto a';
@@ -1238,6 +1242,7 @@ module Make
   let handle_appconstrs_update_args ({ this; next } : Model.Annotation.t)
     : Enc.Tree.Node.t list option * Model.Annotation.t option
     =
+    Log.trace __FUNCTION__;
     Some (Enc.Trees.min this.using |> Enc.Tree.minimize), next
   ;;
 

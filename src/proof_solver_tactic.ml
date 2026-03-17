@@ -69,7 +69,7 @@ module Make (Log : Logger.S) : S = struct
   let rec to_string : t -> string =
     let f : tactic -> string = function
       | { msg = None; _ } -> ""
-      | { msg = Some (Debug, s); _ } -> ""
+      (* | { msg = Some (Debug, s); _ } -> "" *)
       | { msg = Some (_, s); _ } -> Printf.sprintf "%s; " s
     in
     function

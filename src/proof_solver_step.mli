@@ -98,8 +98,8 @@ module Make
                         with type enc = Enc.t
                          and type tree = Enc.Tree.t) ->
        Proof_solver_theory.S
-       with type 'a im = 'a I.mm
-        and type 'a mm = 'a W.M.mm
+       with type 'a mm = 'a W.M.mm
+        and type 'a im = 'a I.mm
         and type enc = Enc.t
         and type fsm = W.Model.FSM.t)
     (X : Args) : S with type tactic = Tactic.t

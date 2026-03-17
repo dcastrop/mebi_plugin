@@ -130,10 +130,12 @@ module Make
     : Bindings.Instructions.t -> EConstr.t mm
     =
     Log.trace __FUNCTION__;
+    log_econstr ~__FUNCTION__ ~s:"x" x;
     function
     | Undefined -> raise (BindingInstruction_Undefined (x, x))
     | Done -> return x
     | Arg { root; index; cont } ->
+      Bindings.Instructions.log ~__FUNCTION__ (Arg { root; index; cont });
       (try
          let open Syntax in
          let* kind = econstr_kind x in
@@ -145,7 +147,10 @@ module Make
              try get_bound_term xtys.(index) cont with
              | Invalid_argument _ ->
                raise (BindingInstruction_IndexOutOfBounds (x, index)))
-           else raise (BindingInstruction_NEQ (xty, root))
+           else (
+             log_econstr ~__FUNCTION__ ~s:"xty" xty;
+             log_constr ~__FUNCTION__ ~s:"root" root;
+             raise (BindingInstruction_NEQ (xty, root)))
          | _ -> raise (BindingInstruction_NotApp x)
        with
        | BindingInstruction_Undefined (_, y) ->
@@ -165,6 +170,8 @@ module Make
       let f (i : int) (acc : EConstr.t Tactypes.explicit_bindings) =
         Log.trace __FUNCTION__;
         let name, inst = ys.(i) in
+        Log.thing ~__FUNCTION__ Debug "name" name (Of Rocq_utils.Strfy.name);
+        Bindings.Instructions.log ~__FUNCTION__ inst;
         let q = get_quantified_hyp name in
         let* bs = get_bound_term x inst in
         CAst.make (q, bs) :: acc |> return
@@ -179,6 +186,7 @@ module Make
     : Bindings.t -> EConstr.t Tactypes.bindings mm
     =
     Log.trace __FUNCTION__;
+    log_econstr ~__FUNCTION__ ~s:"from'" from';
     function
     | No_Bindings -> return Tactypes.NoBindings
     | Use_Bindings { from; action; goto } ->

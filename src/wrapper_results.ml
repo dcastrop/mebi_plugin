@@ -33,12 +33,30 @@ module type S = sig
   (* val get_candidates : Model.State.t -> Model.Label.t -> Model.EdgeMap.t' -> Model.State.t -> Model.States.t *)
 end
 
-module Make (_ : Logger.S) (W : Wrapper.S) :
+module Make
+    (Log : Logger.S)
+    (* (W : Wrapper.S) *)
+     (Ctx : Rocq_context.S)
+    (Enc : Encoding.S) :
   S
-  with type enc = W.enc
+  with module M.Ctx = Ctx
+   and type enc = Enc.t
+   and type node = Enc.Tree.Node.t
+   and type tree = Enc.Tree.t
+   and type trees = Enc.Trees.t
+(* with type enc = W.enc
    and type node = W.node
    and type tree = W.tree
-   and type trees = W.trees = struct
+   and type trees = W.trees *) = struct
+  module W :
+    Wrapper.S
+    with module M.Ctx = Ctx
+     and type enc = Enc.t
+     and type node = Enc.Tree.Node.t
+     and type tree = Enc.Tree.t
+     and type trees = Enc.Trees.t =
+    Wrapper.Make (Log) (Ctx) (Enc)
+
   include W
 
   let the_result : Model.Bisimilarity.t ref option ref = ref None
@@ -123,16 +141,16 @@ module Make (_ : Logger.S) (W : Wrapper.S) :
      ;; *)
 end
 
-let make
-      ?(log : unit -> (module Logger.S) = Api.make_logger)
-      ?(enc : (module Logger.S) -> (module Encoding.S) = Api.make_enc_int)
-      ?(ctx : (module Rocq_context.S) = (module Rocq_context.Default))
-      ()
-  : (module S)
-  =
-  let module Log : Logger.S = (val log ()) in
-  let module W : Wrapper.S =
-    (val Wrapper.make ~log:(fun () -> (module Log)) ~enc ~ctx ())
-  in
-  (module Make (Log) (W) : S)
-;;
+(* let make
+   ?(log : unit -> (module Logger.S) = Api.make_logger)
+   ?(enc : (module Logger.S) -> (module Encoding.S) = Api.make_enc_int)
+   ?(ctx : (module Rocq_context.S) = (module Rocq_context.Default))
+   ()
+   : (module S)
+   =
+   let module Log : Logger.S = (val log ()) in
+   let module W : Wrapper.S =
+   (val Wrapper.make ~log:(fun () -> (module Log)) ~enc ~ctx ())
+   in
+   (module Make (Log) (W) : S)
+   ;; *)
