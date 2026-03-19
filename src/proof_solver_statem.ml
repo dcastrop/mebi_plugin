@@ -235,6 +235,6 @@ module Make
       Debug
       "ProofState.StateM"
       (get_statem ())
-      (Of StateM.to_string)
+      StateM.to_string
   ;;
 end

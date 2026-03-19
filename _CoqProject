@@ -219,6 +219,10 @@ src/proof_solver_tactic.ml
 src/proof_solver_tactic.mli
 src/proof_solver_theory.ml
 src/proof_solver_theory.mli
+src/proof_solver_wrapper.ml
+src/proof_solver_wrapper.mli
+src/proof_solver_tactics.ml
+src/proof_solver_tactics.mli
 src/proof_solver_step.ml
 src/proof_solver_step.mli
 src/proof_solver.ml

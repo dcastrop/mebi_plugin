@@ -270,15 +270,11 @@ let type_of_econstr env sigma (x : EConstr.t) : Evd.evar_map * EConstr.t =
 ;;
 
 module Strfy = struct
-  open Utils.Strfy
-
   (**********************************)
   (****** ROCQ **********************)
   (**********************************)
 
-  let pp ?(clean : bool = true) ?(args : style_args = style_args ()) (x : Pp.t)
-    : string
-    =
+  let pp ?(clean : bool = true) (x : Pp.t) : string =
     let s = Pp.string_of_ppcmds x in
     if clean then Utils.clean_string s else s
   ;;
@@ -294,12 +290,9 @@ module Strfy = struct
     fun (x : Names.GlobRef.t) -> pp (Printer.pr_global x)
   ;;
 
-  let evar ?(args : style_args = style_args ()) : Evar.t -> string =
-    fun (x : Evar.t) -> pp (Evar.print x)
-  ;;
+  let evar : Evar.t -> string = fun (x : Evar.t) -> pp (Evar.print x)
 
-  let evar' env sigma ?(args : style_args = style_args ()) (x : Evar.t) : string
-    =
+  let evar' env sigma (x : Evar.t) : string =
     pp (Printer.pr_existential_key env sigma x)
   ;;
 
@@ -307,19 +300,11 @@ module Strfy = struct
     pp (Printer.pr_constr_env env sigma x)
   ;;
 
-  let constr_opt env sigma ?(args : style_args = style_args ())
-    : Constr.t option -> string
-    =
-    option (Utils.Strfy.Of (constr env sigma))
+  let constr_opt env sigma (x : Constr.t option) : string =
+    Utils.option_fstr (constr env sigma) x
   ;;
 
-  let constr_rel_decl
-        env
-        sigma
-        ?(args : style_args = style_args ())
-        (x : constr_decl)
-    : string
-    =
+  let constr_rel_decl env sigma (x : constr_decl) : string =
     pp (Printer.pr_rel_decl env sigma x)
   ;;
 
@@ -330,13 +315,15 @@ module Strfy = struct
   (*****************************************************************************)
 
   let ind_constr enc sigma ((x, y) : ind_constr) : string =
-    let x : string = constr_rel_context enc sigma x in
-    let y : string = constr enc sigma y in
-    Utils.Strfy.record [ "constr", y; "rel context", x ]
+    (* let x : string = constr_rel_context enc sigma x in *)
+    (* let y : string = constr enc sigma y in *)
+    (* Utils.Strfy.record [ "constr", y; "rel context", x ] *)
+    "TODO: ind_constr"
   ;;
 
   let ind_constrs env sigma (xs : ind_constr array) : string =
-    Utils.Strfy.array (Of (ind_constr env sigma)) xs
+    (* Utils.Strfy.array (ind_constr env sigma) xs *)
+    "TODO: ind_constrs"
   ;;
 
   (*****************************************************************************)
@@ -344,11 +331,11 @@ module Strfy = struct
   let constr_kind
         env
         sigma
-        (* ?(args : style_args = style_args ()) *)
+        (* *)
           (x : Constr.t)
     : string
     =
-    let k : string =
+    (* let k : string =
       list
         ~args:
           { (style_args ()) with
@@ -361,7 +348,8 @@ module Strfy = struct
            (list_of_constr_kinds x))
     in
     let x : string = constr env sigma x in
-    Utils.Strfy.record [ "constr", x; "kinds", k ]
+    Utils.Strfy.record [ "constr", x; "kinds", k ] *)
+    "TODO: constr_kind"
   ;;
 
   (*****************************************************************************)
@@ -370,9 +358,9 @@ module Strfy = struct
     pp (Printer.pr_econstr_env env sigma x)
   ;;
 
-  let feconstr env sigma : EConstr.t Utils.Strfy.to_string =
-    Of (econstr env sigma)
-  ;;
+  (* let feconstr env sigma : EConstr.t Utils.Strfy.to_string =
+     Of (econstr env sigma)
+     ;; *)
 
   (*****************************************************************************)
 
@@ -383,52 +371,47 @@ module Strfy = struct
   let econstr_type
         env
         sigma
-        ?(args : style_args = style_args ())
         ((name, x, ty, tys) : string * EConstr.t * EConstr.t * EConstr.t array)
     : string
     =
-    let name : string = Printf.sprintf "%s Type Arguments" name in
-    let tys : string =
-      array
-        ~args:(style_args ~name ~style:(Some (collection_style Record)) ())
-        (feconstr env sigma)
-        tys
-    in
-    let x : string = econstr env sigma x in
-    let ty : string = econstr env sigma ty in
-    Utils.Strfy.record [ "econstr", x; "type", ty; "args", tys ]
+    (* let name : string = Printf.sprintf "%s Type Arguments" name in
+       let tys : string =
+       array
+       ~args:(style_args ~name ~style:(Some (collection_style Record)) ())
+       (feconstr env sigma)
+       tys
+       in
+       let x : string = econstr env sigma x in
+       let ty : string = econstr env sigma ty in
+       Utils.Strfy.record [ "econstr", x; "type", ty; "args", tys ] *)
+    "TODO: econstr_type"
   ;;
 
-  let econstr_types
-        env
-        sigma
-        ?(args : style_args = style_args ())
-        (x : EConstr.types)
-    : string
-    =
-    let oops (k : string) : string =
-      Printf.sprintf
-        "Rocq_utils.Strfy.econstr_types, unimplemented kind_of_type %s for:\n\
-        \ %s"
-        k
-        (econstr env sigma x)
-    in
-    match EConstr.kind_of_type sigma x with
-    | AtomicType (ty, tys) -> econstr_type env sigma ~args ("Atomic", x, ty, tys)
-    | CastType (_ty1, _ty2) -> oops "CastType"
-    | LetInType (_name_binder_annot, _t1, _t2, _t3) -> oops "LetInType"
-    | ProdType (_name_binder_annot, _t1, _t2) -> oops "LetInType"
-    | SortType _sorts -> oops "SortType"
+  let econstr_types env sigma (x : EConstr.types) : string =
+    (* let oops (k : string) : string =
+       Printf.sprintf
+       "Rocq_utils.Strfy.econstr_types, unimplemented kind_of_type %s for:\n\
+       \ %s"
+       k
+       (econstr env sigma x)
+       in
+       match EConstr.kind_of_type sigma x with
+       | AtomicType (ty, tys) -> econstr_type env sigma ~args ("Atomic", x, ty, tys)
+       | CastType (_ty1, _ty2) -> oops "CastType"
+       | LetInType (_name_binder_annot, _t1, _t2, _t3) -> oops "LetInType"
+       | ProdType (_name_binder_annot, _t1, _t2) -> oops "LetInType"
+       | SortType _sorts -> oops "SortType" *)
+    "TODO: econstr_types"
   ;;
 
   let econstr_kind
         env
         sigma
-        (* ?(args : style_args = style_args ()) *)
+        (* *)
           (x : EConstr.t)
     : string
     =
-    let k : string =
+    (* let k : string =
       list
         ~args:
           { (style_args ()) with
@@ -441,14 +424,11 @@ module Strfy = struct
            (list_of_econstr_kinds sigma x))
     in
     let x : string = econstr env sigma x in
-    Utils.Strfy.record [ "econstr", x; "kinds", k ]
+    Utils.Strfy.record [ "econstr", x; "kinds", k ] *)
+    "TODO: econstr_kind"
   ;;
 
-  let concl env sigma ?(args : style_args = style_args ())
-    : EConstr.constr -> string
-    =
-    econstr_types ~args:(nest args) env sigma
-  ;;
+  let concl env sigma : EConstr.constr -> string = econstr_types env sigma
 
   let erel _env sigma : EConstr.ERelevance.t -> string =
     fun (x : EConstr.ERelevance.t) ->
@@ -460,32 +440,34 @@ module Strfy = struct
   let hyp_name (x : hyp) : string = name_id (Context.Named.Declaration.get_id x)
 
   let hyp_value env sigma (x : hyp) : string =
-    Utils.Strfy.option
-      (Utils.Strfy.Of (econstr env sigma))
-      (Context.Named.Declaration.get_value x)
+    (* Utils.Strfy.option
+       (Utils.Strfy.Of (econstr env sigma))*)
+    Context.Named.Declaration.get_value x
+    |> Utils.option_fstr (econstr env sigma)
   ;;
 
   let hyp_type env sigma (x : hyp) : string =
     econstr env sigma (Context.Named.Declaration.get_type x)
   ;;
 
-  let hyp env sigma ?(args : style_args = style_args ()) (x : hyp) : string =
-    let name : string = hyp_name x in
-    let rel : string =
-      erel env sigma (Context.Named.Declaration.get_relevance x)
-    in
-    let tys : string =
-      econstr_types
-        env
-        sigma
-        ~args:(nest args)
-        (Context.Named.Declaration.get_type x)
-    in
-    Utils.Strfy.record [ "name", name; "rel", rel; "tys", tys ]
+  let hyp env sigma (x : hyp) : string =
+    (* let name : string = hyp_name x in
+       let rel : string =
+       erel env sigma (Context.Named.Declaration.get_relevance x)
+       in
+       let tys : string =
+       econstr_types
+       env
+       sigma
+       ~args:(nest args)
+       (Context.Named.Declaration.get_type x)
+       in
+       Utils.Strfy.record [ "name", name; "rel", rel; "tys", tys ] *)
+    "TODO: hyp"
   ;;
 
-  let goal ?(args : style_args = style_args ()) (x : Proofview.Goal.t) : string =
-    let env : Environ.env = Proofview.Goal.env x in
+  let goal (x : Proofview.Goal.t) : string =
+    (* let env : Environ.env = Proofview.Goal.env x in
     let sigma : Evd.evar_map = Proofview.Goal.sigma x in
     let concl = concl env sigma ~args:(nest args) (Proofview.Goal.concl x) in
     let hyps : string =
@@ -498,7 +480,8 @@ module Strfy = struct
         (Args (hyp env sigma))
         (Proofview.Goal.hyps x)
     in
-    Utils.Strfy.record [ "concl", concl; "hyps", hyps ]
+    Utils.Strfy.record [ "concl", concl; "hyps", hyps ] *)
+    "TODO: goal"
   ;;
 end
 

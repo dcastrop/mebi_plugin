@@ -300,6 +300,7 @@ module Config = struct
     val enable_output : unit -> unit
     val disable_output : unit -> unit
     val configure_output : Kind.t -> bool -> unit
+    val is_enabled : Kind.t -> bool
 
     val do_output
       :  ?__FUNCTION__:string
@@ -349,6 +350,12 @@ module Config = struct
       | Special x -> Special.configure x
     ;;
 
+    let is_enabled (x : Kind.t) : bool =
+      match Kind.kind x with
+      | Level x -> Level.is_enabled x
+      | Special x -> Special.is_enabled x
+    ;;
+
     (***********************************************************************)
 
     let is_level_enabled ?(override : bool = false) : Kind.level -> bool =
@@ -371,20 +378,24 @@ module Config = struct
           ?(override : bool = false)
           (x : Kind.t)
       : string -> unit
-      =
-      match Kind.kind x with
-      | Level x ->
-        Mode.do_level_output
-          ~__FUNCTION__
-          ~prefix
-          (is_level_enabled ~override)
-          x
-      | Special x ->
-        Mode.do_special_output
-          ~__FUNCTION__
-          ~prefix
-          (is_special_enabled ~override)
-          x
+      = function
+      | "" -> ()
+      | y ->
+        (match Kind.kind x with
+         | Level x ->
+           Mode.do_level_output
+             ~__FUNCTION__
+             ~prefix
+             (is_level_enabled ~override)
+             x
+             y
+         | Special x ->
+           Mode.do_special_output
+             ~__FUNCTION__
+             ~prefix
+             (is_special_enabled ~override)
+             x
+             y)
     ;;
 
     (***********************************************************************)
@@ -396,15 +407,10 @@ module Config = struct
     let show_mode () : unit = f ~__FUNCTION__ Mode.output_mode_as_string
 
     let b ?(__FUNCTION__ : string = "") (x : bool) =
-      f ~__FUNCTION__ (Utils.Strfy.bool x)
+      f ~__FUNCTION__ (Printf.sprintf "%b" x)
     ;;
 
     let show_enabled () : unit = b ~__FUNCTION__ !get.enabled
-
-    let show_kind (x : Kind.t) : unit =
-      match Kind.kind x with
-      | Level x -> b ~__FUNCTION__ (Level.is_enabled x)
-      | Special x -> b ~__FUNCTION__ (Special.is_enabled x)
-    ;;
+    let show_kind (x : Kind.t) : unit = b ~__FUNCTION__ (is_enabled x)
   end
 end

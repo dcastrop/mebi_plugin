@@ -65,7 +65,7 @@ module Make
         and type node = Enc.Tree.Node.t
         and type tree = Enc.Tree.t
         and type trees = Enc.Trees.t)
-    (I : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t) :
+    (I : Proof_solver_wrapper.S with type enc = Enc.t and type tree = Enc.Tree.t) :
   S
   with type 'a mm = 'a W.M.mm
    and type 'a im = 'a I.mm

@@ -212,11 +212,11 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
       : Names.Name.t mm
       =
       (* Log.trace __FUNCTION__; *)
-      Log.thing ~__FUNCTION__ Debug "x" x (Of Strfy.econstr);
+      Log.thing ~__FUNCTION__ Debug "x" x Strfy.econstr;
       let open Syntax in
       let f (i : int) : Names.Name.t option -> Names.Name.t option mm = function
         | Some n ->
-          Log.thing ~__FUNCTION__ Trace "Some" n (Of Rocq_utils.Strfy.name);
+          Log.thing ~__FUNCTION__ Trace "Some" n Rocq_utils.Strfy.name;
           Some n |> return
         | None ->
           Log.trace ~__FUNCTION__ "None";
@@ -224,7 +224,7 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
           let* eq = econstr_eq ~enc:false x y in
           if eq
           then (
-            Log.thing ~__FUNCTION__ Debug "eq x" z (Of Rocq_utils.Strfy.name);
+            Log.thing ~__FUNCTION__ Debug "eq x" z Rocq_utils.Strfy.name;
             Some z |> return)
           else return None
       in
