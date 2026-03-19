@@ -1,4 +1,6 @@
 module type S = sig
+  module Ctx : Rocq_context.S
+
   type enc
 
   module F : Hashtbl.S with type key = EConstr.t
@@ -41,6 +43,8 @@ end
 
 module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   S with type enc = Enc.t = struct
+  module Ctx : Rocq_context.S = Ctx
+
   type enc = Enc.t
 
   module F : Hashtbl.S with type key = EConstr.t = Hashtbl.Make (struct
@@ -115,7 +119,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       F.add (fwdmap ()) x new_enc;
       B.add (bckmap ()) new_enc x;
       (* NOTE: make sure to update the maps (keep progress) *)
-      (* Log.thing ~__FUNCTION__ Trace "new enc" new_enc (Of Enc.to_string); *)
+      (* Log.thing ~__FUNCTION__ Trace "new enc" new_enc ( Enc.to_string); *)
       new_enc
   ;;
 
@@ -138,7 +142,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     Log.trace __FUNCTION__;
     try get_econstr x with
     | DecodingNotFound x ->
-      Log.thing ~__FUNCTION__ Trace "Err: DecodingNotFound" x (Of Enc.to_string);
+      Log.thing ~__FUNCTION__ Trace "Err: DecodingNotFound" x Enc.to_string;
       raise (CannotDecode x)
   ;;
 

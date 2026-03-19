@@ -367,7 +367,7 @@ module Make
     (* NOTE: add all traces that already have named action (if we don't) -- keep exploring with traces *)
     Traces.fold
       (fun (z : Trace.t) (acc : ActionPairs.t) : ActionPairs.t ->
-        (* Log.thing ~__FUNCTION__ Debug "z" z (Of Trace.to_string); *)
+        (* Log.thing ~__FUNCTION__ Debug "z" z ( Trace.to_string); *)
         match d.named, Trace.get_named_opt z with
         | Some named, None ->
           Log.trace ~__FUNCTION__ "stop (data)";
@@ -423,7 +423,7 @@ module Make
     Log.trace __FUNCTION__;
     States.fold
       (fun (y : State.t) (acc : ActionPairs.t) ->
-        (* Log.thing ~__FUNCTION__ Debug "y" y (Of State.to_string); *)
+        (* Log.thing ~__FUNCTION__ Debug "y" y ( State.to_string); *)
         check_from d y ActionPairs.empty)
       ys
       ActionPairs.empty
@@ -441,7 +441,7 @@ module Make
     Log.trace __FUNCTION__;
     ActionMap.fold
       (fun (x : Action.t) (ys : States.t) (acc : ActionPair.t list) ->
-        (* Log.thing ~__FUNCTION__ Debug "x" x (Of Action.to_string); *)
+        (* Log.thing ~__FUNCTION__ Debug "x" x ( Action.to_string); *)
         let d : data =
           initial_data traces old_edges
           |> update_named x
@@ -481,13 +481,13 @@ module Make
     let traces : Traces.t ref = ref Traces.empty in
     EdgeMap.iter
       (fun (from : State.t) (old_actions : ActionMap.t') ->
-        (* Log.thing ~__FUNCTION__ Debug "from" from (Of State.to_string); *)
+        (* Log.thing ~__FUNCTION__ Debug "from" from ( State.to_string); *)
         (* NOTE: populate [new_actions] with saturated [old_actions] *)
         let new_actions : ActionMap.t' = ActionMap.create 0 in
         let () = edge new_actions from old_actions old_edges traces in
         EdgeMap.replace new_edges from new_actions)
       old_edges;
-    (* Log.thing ~__FUNCTION__ Debug "traces" !traces (Of Traces.to_string); *)
+    (* Log.thing ~__FUNCTION__ Debug "traces" !traces ( Traces.to_string); *)
     new_edges
   ;;
 end

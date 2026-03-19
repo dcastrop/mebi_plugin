@@ -14,38 +14,34 @@ module type S = sig
 
   val thing
     :  ?__FUNCTION__:string
-    -> ?args:Utils.Strfy.style_args
     -> Output.Kind.t
     -> string
     -> 'a
-    -> 'a Utils.Strfy.to_string
+    -> ('a -> string)
     -> unit
 
   val things
     :  ?__FUNCTION__:string
-    -> ?args:Utils.Strfy.style_args
     -> Output.Kind.t
     -> string
     -> 'a list
-    -> 'a Utils.Strfy.to_string
+    -> ('a -> string)
     -> unit
 
   val option
     :  ?__FUNCTION__:string
-    -> ?args:Utils.Strfy.style_args
     -> Output.Kind.t
     -> string
     -> 'a option
-    -> 'a Utils.Strfy.to_string
+    -> ('a -> string)
     -> unit
 
   val options
     :  ?__FUNCTION__:string
-    -> ?args:Utils.Strfy.style_args
     -> Output.Kind.t
     -> string
     -> 'a list option
-    -> 'a Utils.Strfy.to_string
+    -> ('a -> string)
     -> unit
 end
 

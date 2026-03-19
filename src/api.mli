@@ -1,11 +1,3 @@
-module Defaults : sig
-  module Log : module type of Logger.Default
-  module Ctx : module type of Rocq_context.Default
-  module Enc : Encoding.S with type t = int
-  (* module Tree : module type of Enc_tree.Make (Log) (Enc) *)
-  (* module Trees : module type of Enc_trees.Make (Log) (Tree) *)
-end
-
 type output_config =
   { mutable debug : bool
   ; mutable info : bool
@@ -26,7 +18,16 @@ val config_output : bool -> Output.Kind.t -> unit
 val output_config_decode_results : bool -> unit
 val output_config_dump_results : bool -> unit
 val set_output : bool -> string -> unit
+
+(* *)
 val make_logger : unit -> (module Logger.S)
+
+val make_enc
+  :  (module Logger.S)
+  -> (module Encoding.Packed.PackedS)
+  -> (module Encoding.S)
+
+val make_enc_int : (module Logger.S) -> (module Encoding.S)
 
 type fail_flags =
   { mutable empty : bool
