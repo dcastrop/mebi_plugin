@@ -71,7 +71,7 @@ module List : sig
       (X : sig
          type k
 
-         val json : ?as_elt:bool -> k -> Yojson.t
          val name : string
+         val json : ?as_elt:bool -> k -> Yojson.t
        end) : S with type k = X.k list
 end

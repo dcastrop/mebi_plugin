@@ -151,8 +151,6 @@ module type S = sig
       }
 
     val empty : V0.elt -> M.Ind.t M.B.t -> t
-    val _log_to_visit : t -> unit
-    val _log_ind_defs : M.Ind.t M.B.t -> unit
     val is_silent_transition : EConstr.t -> Weak.t option -> bool option M.mm
 
     module type Y_Args = sig
@@ -291,9 +289,9 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
    and type tree = Enc.Tree.t
    and type trees = Enc.Trees.t
 
-module Default () :
-  S
-  with type enc = Api.Defaults.Enc.t
-   and type node = Api.Defaults.Enc.Tree.Node.t
-   and type tree = Api.Defaults.Enc.Tree.t
-   and type trees = Api.Defaults.Enc.Trees.t
+val make
+  :  ?log:(unit -> (module Logger.S))
+  -> ?enc:((module Logger.S) -> (module Encoding.S))
+  -> ?ctx:(module Rocq_context.S)
+  -> unit
+  -> (module S)

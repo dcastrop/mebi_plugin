@@ -17,6 +17,9 @@ module type S = sig
 
   val econstr_to_constr_opt : EConstr.t -> Constr.t option mm
   val constrexpr_to_econstr : Constrexpr.constr_expr -> EConstr.t mm
+  val to_atomic : EConstr.t -> EConstr.t Rocq_utils.kind_pair mm
+  val to_lambda : EConstr.t -> Rocq_utils.lambda_triple mm
+  val to_app : EConstr.t -> EConstr.t Rocq_utils.kind_pair mm
   val exists_eq : EConstr.t -> 'a list -> ('a -> EConstr.t) -> bool mm
   val type_of_econstr : EConstr.t -> EConstr.t mm
   val type_of_constrexpr : Constrexpr.constr_expr -> EConstr.t mm
@@ -48,6 +51,20 @@ module type S = sig
     -> ?m:Output.Kind.t
     -> ?s:string
     -> EConstr.t list
+    -> unit
+
+  val log_constr
+    :  ?__FUNCTION__:string
+    -> ?m:Output.Kind.t
+    -> ?s:string
+    -> Constr.t
+    -> unit
+
+  val log_constrs
+    :  ?__FUNCTION__:string
+    -> ?m:Output.Kind.t
+    -> ?s:string
+    -> Constr.t list
     -> unit
 
   module type SErrors = sig
@@ -333,4 +350,4 @@ module type S = sig
 end
 
 module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
-  S with type enc = Enc.t and type tree = Enc.Tree.t
+  S with module Ctx = Ctx and type enc = Enc.t and type tree = Enc.Tree.t

@@ -151,8 +151,9 @@ module type S = sig
       }
 
     val empty : V0.elt -> M.Ind.t M.B.t -> t
-    val _log_to_visit : t -> unit
-    val _log_ind_defs : M.Ind.t M.B.t -> unit
+
+    (* val _log_to_visit : t -> unit *)
+    (* val _log_ind_defs : M.Ind.t M.B.t -> unit *)
     val is_silent_transition : EConstr.t -> Weak.t option -> bool option M.mm
 
     module type Y_Args = sig
@@ -295,7 +296,11 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   type tree = Enc.Tree.t
   type trees = Enc.Trees.t
 
-  module M : Rocq_monad_utils.S with type enc = enc and type tree = tree =
+  module M :
+    Rocq_monad_utils.S
+    with module Ctx = Ctx
+     and type enc = enc
+     and type tree = tree =
     Rocq_monad_utils.Make (Log) (Ctx) (Enc)
 
   module Bindings : Bindings.S with type 'a mm = 'a M.mm =
@@ -606,7 +611,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 
       let to_string (xs : t') : string =
         Log.trace __FUNCTION__;
-        to_seq xs
+        (* to_seq xs
         |> List.of_seq
         |> Utils.Strfy.list
              ~args:
@@ -614,7 +619,8 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
              (Of
                 (fun (k, v) ->
                   Utils.Strfy.record
-                    [ "action", Model.Action.to_string k; "->", D.to_string v ]))
+                    [ "action", Model.Action.to_string k; "->", D.to_string v ])) *)
+        "TODO: graph actions"
       ;;
     end
 
@@ -647,7 +653,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 
       let to_string (xs : t') : string =
         Log.trace __FUNCTION__;
-        to_seq xs
+        (* to_seq xs
         |> List.of_seq
         |> Utils.Strfy.list
              ~args:
@@ -657,7 +663,8 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
              (Of
                 (fun (k, v) ->
                   Utils.Strfy.record
-                    [ "from", Enc.to_string k; "->", A.to_string v ]))
+                    [ "from", Enc.to_string k; "->", A.to_string v ])) *)
+        "TODO: graph transitions"
       ;;
     end
 
@@ -687,29 +694,29 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       }
     ;;
 
-    let _log_to_visit (x : t) : unit =
-      Log.things
-        ~__FUNCTION__
-        Debug
-        "to visit"
-        (x.to_visit |> Queue.to_seq |> List.of_seq)
-        (Of Enc.to_string)
-    ;;
+    (* let _log_to_visit (x : t) : unit =
+       Log.things
+       ~__FUNCTION__
+       Debug
+       "to visit"
+       (x.to_visit |> Queue.to_seq |> List.of_seq)
+       Enc.to_string
+       ;; *)
 
-    let _log_ind_defs (xs : M.Ind.t M.B.t) : unit =
-      Log.things
-        ~__FUNCTION__
-        Debug
-        "ind_defs"
-        (M.B.to_seq xs |> List.of_seq)
-        (Of
-           (fun ((k, v) : Enc.t * M.Ind.t) ->
-             `Assoc
-               [ "enc", Enc.json ~as_elt:true k
-               ; "ind", M.Ind.json ~as_elt:true v
-               ]
-             |> Yojson.pretty_to_string))
-    ;;
+    (* let _log_ind_defs (xs : M.Ind.t M.B.t) : unit =
+       (* Log.things
+       ~__FUNCTION__
+       Debug
+       "ind_defs"
+       (M.B.to_seq xs |> List.of_seq)
+       (Of
+       (fun ((k, v) : Enc.t * M.Ind.t) ->
+       `Assoc
+       [ "enc", Enc.json ~as_elt:true k ; "ind", M.Ind.json ~as_elt:true v ]
+       |> Yojson.pretty_to_string)) *)
+
+       (* "TODO: graph ind_defs" *)
+       ;; *)
 
     (*********************************************************)
 
@@ -723,7 +730,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
         let open M.Syntax in
         let* b : bool = IsTheory.is_None x in
         let b' = if b then "silent" else "not silent" in
-        Log.thing ~__FUNCTION__ Debug b' x (Of M.Strfy.econstr);
+        Log.thing ~__FUNCTION__ Debug b' x M.Strfy.econstr;
         M.return (Some b)
       | Some (Custom (tau_enc, label_enc)) ->
         (* let tau_decoding : EConstr.t = M.decode tau_enc in *)
@@ -731,7 +738,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
         let act_enc : Enc.t = M.encode x in
         let b : bool = Enc.equal tau_enc act_enc in
         let b' = if b then "silent" else "not silent" in
-        Log.thing ~__FUNCTION__ Debug b' x (Of M.Strfy.econstr);
+        Log.thing ~__FUNCTION__ Debug b' x M.Strfy.econstr;
         M.return (Some b)
     ;;
 
@@ -959,7 +966,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     let build_ind_defs () : M.Ind.t M.B.t M.mm =
       Log.trace __FUNCTION__;
       let num : int = List.length X.grefs in
-      Log.thing ~__FUNCTION__ Debug "num" num (Of Utils.Strfy.int);
+      Log.thing ~__FUNCTION__ Debug "num" num (Printf.sprintf "%i");
       let ind_defs : M.Ind.t M.B.t = M.B.create num in
       let open M.Syntax in
       let f (i : int) () =
@@ -1279,16 +1286,36 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       let open M.Syntax in
       Config.load_the_bounds_args ();
       let* () = Config.load_weak_args () in
-      match x with
-      | MakeLTS args -> do_make_lts args refs
-      | MakeFSM args -> do_make_fsm args refs
-      | Saturate args -> do_saturate args refs
-      | Minimize args -> do_minimize args refs
-      | Merge args -> do_merge args refs
-      | CheckBisim args -> do_check_bisim args refs
+      let r =
+        match x with
+        | MakeLTS args -> do_make_lts args refs
+        | MakeFSM args -> do_make_fsm args refs
+        | Saturate args -> do_saturate args refs
+        | Minimize args -> do_minimize args refs
+        | Merge args -> do_merge args refs
+        | CheckBisim args -> do_check_bisim args refs
+      in
+      Log.notice "(done.)";
+      r
     ;;
   end
 end
 
-module Default () =
-  Make ((val Api.make_logger ())) (Api.Defaults.Ctx) (Api.Defaults.Enc)
+(** [make ?log ?enc ?ctx] constructs a [Wrapper.S] module.
+    @param ?log
+      is a function that returns a [module Logger.S]. By default, this is obtained from the configuration in [module Api], via [Api.make_logger ()]. This is then used to construct the [Encoding.S] as well as [Wrapper.S].
+    @param ?enc
+      is a function that takes a [module Logger.S] and returns a [module Encoding.S]. The default encoding uses [Int.t].
+    @param ?ctx is the rocq-context. *)
+let make
+      ?(log : unit -> (module Logger.S) = Api.make_logger)
+      ?(enc : (module Logger.S) -> (module Encoding.S) = Api.make_enc_int)
+      ?(ctx : (module Rocq_context.S) = (module Rocq_context.Default))
+      ()
+  : (module S)
+  =
+  let module Log : Logger.S = (val log ()) in
+  let module Enc : Encoding.S = (val enc (module Log)) in
+  let module W : S = Make (Log) ((val ctx)) (Enc) in
+  (module W : S)
+;;

@@ -1,10 +1,10 @@
-module Defaults = struct
-  module Log : Logger.S = Logger.Default
-  module Ctx : Rocq_context.S = Rocq_context.Default
-  module Enc : Encoding.S with type t = int = Encoding.Int (Log)
-  (* module Tree = Enc_tree.Make (Log) (Enc) *)
-  (* module Trees = Enc_trees.Make (Log) (Tree) *)
-end
+(* module Defaults = struct
+   module Log : Logger.S = Logger.Default
+   module Ctx : Rocq_context.S = Rocq_context.Default
+   module Enc : Encoding.S with type t = int = Encoding.Int (Log)
+   (* module Tree = Enc_tree.Make (Log) (Enc) *)
+   (* module Trees = Enc_trees.Make (Log) (Tree) *)
+   end *)
 
 (***********************************************************************)
 
@@ -75,7 +75,7 @@ let set_output (x : bool) : string -> unit = function
       "Unrecognised option \"%s\". Valid options are: Debug, Info, Notice, \
        Warning, Error, Trace, Result, Show, DecodeResults, DumpResults"
       x
-    |> Defaults.Log.warning
+    |> Logger.Default.warning
 ;;
 
 (***********************************************************************)
@@ -102,9 +102,16 @@ let make_logger () : (module Logger.S) =
             end) : Logger.S)
 ;;
 
-(* let make_wrapper () =
-   let module W = Wrapper.
-   Make (Api.Defaults.Log) (Api.Defaults.Ctx) (Api.Defaults.Enc) in *)
+let make_enc (module Log : Logger.S) (module X : Encoding.Packed.PackedS)
+  : (module Encoding.S)
+  =
+  let module Enc : Encoding.S = Encoding.Packed.Unpack (Log) (X) in
+  (module Enc : Encoding.S)
+;;
+
+let make_enc_int (module Log : Logger.S) : (module Encoding.S) =
+  (module (val make_enc (module Log) (module Encoding.Packed.Int)) : Encoding.S)
+;;
 
 (***********************************************************************)
 

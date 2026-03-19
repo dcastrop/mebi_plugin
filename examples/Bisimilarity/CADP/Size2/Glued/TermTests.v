@@ -6,10 +6,10 @@ MeBi Config Output "Notice" True.
 MeBi Config Output "Warning" True.
 MeBi Config Output "Error" True.
 MeBi Config Output "Trace" False.
-MeBi Config Output "Result" True.
+MeBi Config Output "Result" False.
 MeBi Config Output "Show" False.
-MeBi Config Output "DecodeResults" False.
-MeBi Config Output "DumpResults" False.
+MeBi Config Output "DecodeResults" True.
+MeBi Config Output "DumpResults" True.
 
 Require Stdlib.Program.Tactics.
 
@@ -30,6 +30,8 @@ MeBi Config Bounds As Num States 5000.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.TermTests.bigstep".
 MeBi Run FSM c2 Using bigstep lts step.
-MeBi Run Saturate c2 Using bigstep lts step.
-MeBi Run Minimize c2 Using bigstep lts step.
-MeBi Run Bisim c2 With bigstep And c2 With lts Using step.
+(* MeBi Run Saturate c2 Using bigstep lts step. *)
+(* MeBi Run Minimize c2 Using bigstep lts step. *)
+
+(* !! state explosion *)
+(* MeBi Run Bisim c2 With bigstep And c2 With lts Using step. *)
