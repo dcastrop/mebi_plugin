@@ -6,7 +6,7 @@ MeBi Config Output "Notice" True.
 MeBi Config Output "Warning" True.
 MeBi Config Output "Error" True.
 MeBi Config Output "Trace" False.
-MeBi Config Output "Result" True.
+MeBi Config Output "Result" False.
 MeBi Config Output "Show" False.
 MeBi Config Output "DecodeResults" False.
 MeBi Config Output "DumpResults" False.

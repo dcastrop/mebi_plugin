@@ -8,8 +8,8 @@ MeBi Config Output "Error" True.
 MeBi Config Output "Trace" False.
 MeBi Config Output "Result" False.
 MeBi Config Output "Show" False.
-MeBi Config Output "DecodeResults" True.
-MeBi Config Output "DumpResults" True.
+MeBi Config Output "DecodeResults" False.
+MeBi Config Output "DumpResults" False.
 
 Require Stdlib.Program.Tactics.
 
