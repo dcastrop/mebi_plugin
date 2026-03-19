@@ -142,6 +142,7 @@ module Config : sig
     val enable_output : unit -> unit
     val disable_output : unit -> unit
     val configure_output : Kind.t -> bool -> unit
+    val is_enabled : Kind.t -> bool
 
     val do_output
       :  ?__FUNCTION__:string

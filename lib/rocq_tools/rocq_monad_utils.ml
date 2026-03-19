@@ -479,7 +479,7 @@ struct
         (x : EConstr.t)
     : unit
     =
-    Log.thing ~__FUNCTION__ m s x (Of Strfy.econstr)
+    Log.thing ~__FUNCTION__ m s x Strfy.econstr
   ;;
 
   let log_econstrs
@@ -489,7 +489,7 @@ struct
         (x : EConstr.t list)
     : unit
     =
-    Log.things ~__FUNCTION__ m s x (Of Strfy.econstr)
+    Log.things ~__FUNCTION__ m s x Strfy.econstr
   ;;
 
   let log_constr
@@ -499,7 +499,7 @@ struct
         (x : Constr.t)
     : unit
     =
-    Log.thing ~__FUNCTION__ m s x (Of Strfy.constr)
+    Log.thing ~__FUNCTION__ m s x Strfy.constr
   ;;
 
   let log_constrs
@@ -509,7 +509,7 @@ struct
         (x : Constr.t list)
     : unit
     =
-    Log.things ~__FUNCTION__ m s x (Of Strfy.constr)
+    Log.things ~__FUNCTION__ m s x Strfy.constr
   ;;
 
   module type SErrors = sig
@@ -656,8 +656,10 @@ struct
            have some.\n\
            substls: %s.\n\
            ctx_tys: %s."
-          (Utils.Strfy.list (Of Strfy.econstr) x)
-          (Utils.Strfy.list (Of Strfy.econstr_rel_decl) y)
+          (* (Utils.Strfy.list Strfy.econstr x) *)
+          (* (Utils.Strfy.list Strfy.econstr_rel_decl y) *)
+          "TODO: substls"
+          "TODO: ctx_tys"
         (* NOTE: *)
       | InvalidLTSArgsLength i ->
         Printf.sprintf "assertion: Array.length args == 3 failed. Got %i" i

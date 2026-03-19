@@ -1,15 +1,21 @@
 module type S = sig
+  module Tac : sig
+    type t =
+      { get : unit Proofview.tactic
+      ; msg : msg option
+      }
+
+    and msg = Output.Kind.t * string
+
+    val to_string_opt : t -> string option
+  end
+
   type t =
-    { this : tactic
+    { this : Tac.t
     ; next : t option
     }
 
-  and tactic =
-    { get : unit Proofview.tactic
-    ; msg : (Output.Kind.t * string) option
-    }
-
-  val create : ?level:Output.Kind.t -> ?msg:string -> unit Proofview.tactic -> t
+  val create : ?kind:Output.Kind.t -> ?msg:string -> unit Proofview.tactic -> t
   val empty : unit -> t
   val do_nothing : unit -> t
   val seq : t -> t -> t

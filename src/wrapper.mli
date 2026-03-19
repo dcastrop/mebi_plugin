@@ -151,8 +151,6 @@ module type S = sig
       }
 
     val empty : V0.elt -> M.Ind.t M.B.t -> t
-    val _log_to_visit : t -> unit
-    val _log_ind_defs : M.Ind.t M.B.t -> unit
     val is_silent_transition : EConstr.t -> Weak.t option -> bool option M.mm
 
     module type Y_Args = sig

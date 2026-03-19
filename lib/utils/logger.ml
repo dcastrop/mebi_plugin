@@ -19,38 +19,34 @@ module type S = sig
   (* utils for printing things *)
   val thing
     :  ?__FUNCTION__:string
-    -> ?args:Utils.Strfy.style_args
     -> Output.Kind.t
     -> string
     -> 'a
-    -> 'a Utils.Strfy.to_string
+    -> ('a -> string)
     -> unit
 
   val things
     :  ?__FUNCTION__:string
-    -> ?args:Utils.Strfy.style_args
     -> Output.Kind.t
     -> string
     -> 'a list
-    -> 'a Utils.Strfy.to_string
+    -> ('a -> string)
     -> unit
 
   val option
     :  ?__FUNCTION__:string
-    -> ?args:Utils.Strfy.style_args
     -> Output.Kind.t
     -> string
     -> 'a option
-    -> 'a Utils.Strfy.to_string
+    -> ('a -> string)
     -> unit
 
   val options
     :  ?__FUNCTION__:string
-    -> ?args:Utils.Strfy.style_args
     -> Output.Kind.t
     -> string
     -> 'a list option
-    -> 'a Utils.Strfy.to_string
+    -> ('a -> string)
     -> unit
 end
 
@@ -116,27 +112,25 @@ module Make
   (** [thing level f x] uses outputs the result of [f x] to [level]. *)
   let thing
         ?(__FUNCTION__ : string = "")
-        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
         (k : Output.Kind.t)
         (prefix : string)
         (x : 'a)
-        (f : 'a Utils.Strfy.to_string)
+        (f : 'a -> string)
     : unit
     =
     do_output
       ~prefix:(Some (Printf.sprintf "%s: " prefix))
       ~__FUNCTION__
       k
-      (Utils.Strfy.f_to_string f x)
+      (f x)
   ;;
 
   let things
         ?(__FUNCTION__ : string = "")
-        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
         (k : Output.Kind.t)
         (prefix : string)
         (xs : 'a list)
-        (f : 'a Utils.Strfy.to_string)
+        (f : 'a -> string)
     : unit
     =
     (* NOTE: start and end *)
@@ -146,7 +140,7 @@ module Make
     (* NOTE: indexed iterator *)
     let index : int ref = ref 0 in
     let fx (x : 'a) : unit =
-      thing ~args k (Printf.sprintf "%i" !index) x f;
+      thing k (Printf.sprintf "%i" !index) x f;
       index := !index + 1
     in
     e "start";
@@ -156,30 +150,28 @@ module Make
 
   let option
         ?(__FUNCTION__ : string = "")
-        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
         (k : Output.Kind.t)
         (prefix : string)
         (x : 'a option)
-        (f : 'a Utils.Strfy.to_string)
+        (f : 'a -> string)
     : unit
     =
     match x with
-    | Some x -> thing ~__FUNCTION__ ~args k prefix x f
-    | None -> thing ~__FUNCTION__ ~args k prefix "None" (Of Utils.Strfy.string)
+    | Some x -> thing ~__FUNCTION__ k prefix x f
+    | None -> thing ~__FUNCTION__ k prefix "None" (fun x -> x)
   ;;
 
   let options
         ?(__FUNCTION__ : string = "")
-        ?(args : Utils.Strfy.style_args = Utils.Strfy.style_args ())
         (k : Output.Kind.t)
         (prefix : string)
         (xs : 'a list option)
-        (f : 'a Utils.Strfy.to_string)
+        (f : 'a -> string)
     : unit
     =
     match xs with
-    | Some xs -> things ~__FUNCTION__ ~args k prefix xs f
-    | None -> thing ~__FUNCTION__ ~args k prefix "None" (Of Utils.Strfy.string)
+    | Some xs -> things ~__FUNCTION__ k prefix xs f
+    | None -> thing ~__FUNCTION__ k prefix "None" (fun x -> x)
   ;;
 end
 

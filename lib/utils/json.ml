@@ -38,7 +38,7 @@ module Make
         (x : k)
     : unit
     =
-    Log.thing ~__FUNCTION__ m s x (Of to_string)
+    Log.thing ~__FUNCTION__ m s x to_string
   ;;
 
   let write

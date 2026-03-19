@@ -25,7 +25,7 @@ module type S = sig
      and type annotation = W.Model.Annotation.t
      and type transition = W.Model.Transition.t
 
-  module Step : (_ : Proof_solver_step.Args) ->
+  module Step : (_ : Proof_solver_wrapper.Args) ->
     Proof_solver_step.S with type tactic = Tactic.t
 
   val get_updated_pstate : unit Proofview.tactic -> Declare.Proof.t

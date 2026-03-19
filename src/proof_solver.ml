@@ -25,7 +25,7 @@ module type S = sig
      and type annotation = W.Model.Annotation.t
      and type transition = W.Model.Transition.t
 
-  module Step : (_ : Proof_solver_step.Args) ->
+  module Step : (_ : Proof_solver_wrapper.Args) ->
     Proof_solver_step.S with type tactic = Tactic.t
 
   val get_updated_pstate : unit Proofview.tactic -> Declare.Proof.t
@@ -71,9 +71,9 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
      and type transition = W.Model.Transition.t =
     Proof_solver_statem.Make (Log) (Enc) (W)
 
-  (** [module TheoryMaker] is a functor that allows us to create a [module Proof_solver_theory.S] for each iteration (step) of the proof-solver. Since a fair amount of it only relies on [module Enc] and the results of the command in [module W], this functor just takes the [module Rocq_monad_utils.S] created from the [Proofview.Goal.t] of the proof in each proof-step.
+  (** [module TheoryMaker] is a functor that allows us to create a [module Proof_solver_theory.S] for each iteration (step) of the proof-solver. Since a fair amount of it only relies on [module Enc] and the results of the command in [module W], this functor just takes the [module Proof_solver_wrapper.S] created from the [Proofview.Goal.t] of the proof in each proof-step.
   *)
-  module TheoryMaker : (I : Rocq_monad_utils.S
+  module TheoryMaker : (I : Proof_solver_wrapper.S
                             with type enc = Enc.t
                              and type tree = Enc.Tree.t)
       ->
@@ -86,7 +86,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 
   (** [module Step] is a functor for returning a [module Proof_solver_step.S] for handling the current [Proofview.Goal.t], which is the only thing that will change for each proof-step.
   *)
-  module Step : (_ : Proof_solver_step.Args) ->
+  module Step : (_ : Proof_solver_wrapper.Args) ->
     Proof_solver_step.S with type tactic = Tactic.t =
     Proof_solver_step.Make (Log) (Enc) (Tactic) (W) (ProofState) (TheoryMaker)
 
@@ -121,7 +121,9 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     ProofState.update_pstate pstate;
     if Proof.is_done (Declare.Proof.get pstate) then exit_proof ();
     Proofview.Goal.enter (fun gl ->
-      let module PStep = (val make gl) in
+      let module PStep : Proof_solver_step.S with type tactic = Tactic.t =
+        (val make gl)
+      in
       let x = PStep.step () in
       let y = PStep.run (PStep.Tacs.simplify_and_subst_all ()) in
       let z = Tactic.seq x y in
@@ -175,14 +177,12 @@ let make
 let stop_msg (x : int) : string =
   Printf.sprintf
     "(Stopped) %s after %i iterations."
-    (if is_done () then "solved" else "unsolved")
+    (if is_done () then "Solved" else "Unsolved")
     x
 ;;
 
 (** [step] ... *)
 let step (pstate : Declare.Proof.t) : Declare.Proof.t =
-  let module Log : Logger.S = (val !(get_the_logger ())) in
-  Log.trace __FUNCTION__;
   let module Ps : S = (val !(get_the_proof_solver ())) in
   Ps.step pstate
 ;;
@@ -192,7 +192,7 @@ let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
   let module Log : Logger.S = (val !(get_the_logger ())) in
   Log.trace __FUNCTION__;
   let rec f (n : int) (p : Declare.Proof.t) : int * Declare.Proof.t =
-    Log.thing ~__FUNCTION__ Debug "iter" n (Of Utils.Strfy.int);
+    Log.thing ~__FUNCTION__ Debug "iter" n (Printf.sprintf "%i");
     match Int.compare n bound with
     | 1 -> n, p
     | _ -> (try step p |> f (n + 1) with NothingToDo -> n, p)

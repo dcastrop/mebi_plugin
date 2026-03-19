@@ -151,8 +151,9 @@ module type S = sig
       }
 
     val empty : V0.elt -> M.Ind.t M.B.t -> t
-    val _log_to_visit : t -> unit
-    val _log_ind_defs : M.Ind.t M.B.t -> unit
+
+    (* val _log_to_visit : t -> unit *)
+    (* val _log_ind_defs : M.Ind.t M.B.t -> unit *)
     val is_silent_transition : EConstr.t -> Weak.t option -> bool option M.mm
 
     module type Y_Args = sig
@@ -610,7 +611,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 
       let to_string (xs : t') : string =
         Log.trace __FUNCTION__;
-        to_seq xs
+        (* to_seq xs
         |> List.of_seq
         |> Utils.Strfy.list
              ~args:
@@ -618,7 +619,8 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
              (Of
                 (fun (k, v) ->
                   Utils.Strfy.record
-                    [ "action", Model.Action.to_string k; "->", D.to_string v ]))
+                    [ "action", Model.Action.to_string k; "->", D.to_string v ])) *)
+        "TODO: graph actions"
       ;;
     end
 
@@ -651,7 +653,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 
       let to_string (xs : t') : string =
         Log.trace __FUNCTION__;
-        to_seq xs
+        (* to_seq xs
         |> List.of_seq
         |> Utils.Strfy.list
              ~args:
@@ -661,7 +663,8 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
              (Of
                 (fun (k, v) ->
                   Utils.Strfy.record
-                    [ "from", Enc.to_string k; "->", A.to_string v ]))
+                    [ "from", Enc.to_string k; "->", A.to_string v ])) *)
+        "TODO: graph transitions"
       ;;
     end
 
@@ -691,29 +694,29 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       }
     ;;
 
-    let _log_to_visit (x : t) : unit =
-      Log.things
-        ~__FUNCTION__
-        Debug
-        "to visit"
-        (x.to_visit |> Queue.to_seq |> List.of_seq)
-        (Of Enc.to_string)
-    ;;
+    (* let _log_to_visit (x : t) : unit =
+       Log.things
+       ~__FUNCTION__
+       Debug
+       "to visit"
+       (x.to_visit |> Queue.to_seq |> List.of_seq)
+       Enc.to_string
+       ;; *)
 
-    let _log_ind_defs (xs : M.Ind.t M.B.t) : unit =
-      Log.things
-        ~__FUNCTION__
-        Debug
-        "ind_defs"
-        (M.B.to_seq xs |> List.of_seq)
-        (Of
-           (fun ((k, v) : Enc.t * M.Ind.t) ->
-             `Assoc
-               [ "enc", Enc.json ~as_elt:true k
-               ; "ind", M.Ind.json ~as_elt:true v
-               ]
-             |> Yojson.pretty_to_string))
-    ;;
+    (* let _log_ind_defs (xs : M.Ind.t M.B.t) : unit =
+       (* Log.things
+       ~__FUNCTION__
+       Debug
+       "ind_defs"
+       (M.B.to_seq xs |> List.of_seq)
+       (Of
+       (fun ((k, v) : Enc.t * M.Ind.t) ->
+       `Assoc
+       [ "enc", Enc.json ~as_elt:true k ; "ind", M.Ind.json ~as_elt:true v ]
+       |> Yojson.pretty_to_string)) *)
+
+       (* "TODO: graph ind_defs" *)
+       ;; *)
 
     (*********************************************************)
 
@@ -727,7 +730,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
         let open M.Syntax in
         let* b : bool = IsTheory.is_None x in
         let b' = if b then "silent" else "not silent" in
-        Log.thing ~__FUNCTION__ Debug b' x (Of M.Strfy.econstr);
+        Log.thing ~__FUNCTION__ Debug b' x M.Strfy.econstr;
         M.return (Some b)
       | Some (Custom (tau_enc, label_enc)) ->
         (* let tau_decoding : EConstr.t = M.decode tau_enc in *)
@@ -735,7 +738,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
         let act_enc : Enc.t = M.encode x in
         let b : bool = Enc.equal tau_enc act_enc in
         let b' = if b then "silent" else "not silent" in
-        Log.thing ~__FUNCTION__ Debug b' x (Of M.Strfy.econstr);
+        Log.thing ~__FUNCTION__ Debug b' x M.Strfy.econstr;
         M.return (Some b)
     ;;
 
@@ -963,7 +966,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     let build_ind_defs () : M.Ind.t M.B.t M.mm =
       Log.trace __FUNCTION__;
       let num : int = List.length X.grefs in
-      Log.thing ~__FUNCTION__ Debug "num" num (Of Utils.Strfy.int);
+      Log.thing ~__FUNCTION__ Debug "num" num (Printf.sprintf "%i");
       let ind_defs : M.Ind.t M.B.t = M.B.create num in
       let open M.Syntax in
       let f (i : int) () =

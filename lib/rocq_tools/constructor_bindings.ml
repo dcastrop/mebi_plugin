@@ -170,7 +170,7 @@ module Make
       let f (i : int) (acc : EConstr.t Tactypes.explicit_bindings) =
         Log.trace __FUNCTION__;
         let name, inst = ys.(i) in
-        Log.thing ~__FUNCTION__ Debug "name" name (Of Rocq_utils.Strfy.name);
+        Log.thing ~__FUNCTION__ Debug "name" name Rocq_utils.Strfy.name;
         Bindings.Instructions.log ~__FUNCTION__ inst;
         let q = get_quantified_hyp name in
         let* bs = get_bound_term x inst in
