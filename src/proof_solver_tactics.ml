@@ -105,15 +105,15 @@ module Make
         and type node = Enc.Tree.Node.t
         and type tree = Enc.Tree.t
         and type trees = Enc.Trees.t)
-    (I : Proof_solver_wrapper.S with type enc = Enc.t)
+    (Iter : Proof_solver_wrapper.S with type enc = Enc.t)
     (Theory :
        Proof_solver_theory.S
        with type 'a mm = 'a W.M.mm
-        and type 'a im = 'a I.mm
+        and type 'a im = 'a Iter.mm
         and type enc = Enc.t
         and type fsm = W.Model.FSM.t) :
   S
-  with type 'a mm = 'a I.mm
+  with type 'a mm = 'a Iter.mm
    and type enc = Enc.t
    and type node = Enc.Tree.Node.t
    and type bindings = W.Bindings.t
@@ -122,8 +122,8 @@ module Make
    and type label = W.Model.Label.t
    and type rocqlts = W.Model.Info.Meta.RocqLTS.t
    and type tactic = Tactic.t
-   and type econstrset = I.EConstrSet.t = struct
-  type 'a mm = 'a I.mm
+   and type econstrset = Iter.EConstrSet.t = struct
+  type 'a mm = 'a Iter.mm
 
   module Model = W.Model
   module Decode = W.Decode
@@ -138,10 +138,10 @@ module Make
   type label = Model.Label.t
   type rocqlts = Model.Info.Meta.RocqLTS.t
   type tactic = Tactic.t
-  type econstrset = I.EConstrSet.t
+  type econstrset = Iter.EConstrSet.t
 
   (* *)
-  open I
+  open Iter
 
   let inversion (x : Rocq_utils.hyp) : Tactic.t mm =
     Inv.inv_tac (Context.Named.Declaration.get_id x)
@@ -155,7 +155,7 @@ module Make
 
   let subst_all () : Tactic.t mm =
     Equality.subst_all ()
-    |> Tactic.create ~msg:(Printf.sprintf "(subst all)")
+    |> Tactic.create ~kind:Info ~msg:(Printf.sprintf "(subst all)")
     |> return
   ;;
 
@@ -212,8 +212,15 @@ module Make
     |> return
   ;;
 
+  (** [trivial ?msg ()] applies the [Auto.gen_trivial] (i.e., [trivial]) tactic. If the [module Log] is configured to display [Output.Kind.Info] messages, then the equivalent of tactic [info_trivial] is used instead.
+  *)
   let trivial ?(msg : string = "trivial") () : Tactic.t mm =
-    Tactic.create ~msg (Auto.gen_trivial ~debug:Hints.Info [] None) |> return
+    let f : string list option -> unit Proofview.tactic =
+      if Log.Config.is_enabled Output.Kind.Info
+      then Auto.gen_trivial ~debug:Hints.Info []
+      else Auto.gen_trivial []
+    in
+    Tactic.create ~msg (f None) |> return
   ;;
 
   let ex_intro (x : Model.State.t) : Tactic.t mm =
