@@ -11,8 +11,8 @@ src/META.rocq-mebi
 -arg "-w all"
 
 theories/loader.v ###
-# theories/DevTest.v ###
-# theories/Test.v ###
+theories/DevTest.v ###
+theories/Test.v ###
 
 theories/Bisimilarity.v ###
 
@@ -35,8 +35,8 @@ examples/Bisimilarity/Proc/Test1/PluginProofs.v ### Success
 
 ### Proc.Flat.Complex 
 examples/Bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/Proc/Test2/TermTests.v ### Success
-# examples/Bisimilarity/Proc/Test2/PluginProofs.v ### Success
+examples/Bisimilarity/Proc/Test2/TermTests.v ### Success
+examples/Bisimilarity/Proc/Test2/PluginProofs.v ### Success
 # examples/Bisimilarity/Proc/Test2/ManualProofs.v
 # examples/Bisimilarity/Proc/Test2/LtacProofs.v
 
