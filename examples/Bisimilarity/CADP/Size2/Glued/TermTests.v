@@ -11,6 +11,9 @@ MeBi Config Output "Show" False.
 MeBi Config Output "DecodeResults" False.
 MeBi Config Output "DumpResults" False.
 
+MeBi Config Output "DecodeResults" True.
+MeBi Config Output "DumpResults" True.
+
 Require Stdlib.Program.Tactics.
 
 From Corelib Require Import Relations.Relation_Definitions.

@@ -132,7 +132,7 @@ module Make
     Log.trace __FUNCTION__;
     ensure_nonempty block;
     let reachable_from_s : Partition.t = Partition.reachable s edges pi in
-    Partition.log ~__FUNCTION__ ~s:"reachable" reachable_from_s;
+    Partition.log ~__FUNCTION__ ~s:"reachable from state" reachable_from_s;
     States.fold
       (fun (t : State.t) ((b1, b2) : States.t * States.t option) ->
         if State.equal s t
@@ -142,7 +142,9 @@ module Make
           (* NOTE: split if [s] and [t] can reach different blocks *)
           if Partition.equal reachable_from_s reachable_from_t
           then States.add t b1, b2
-          else b1, Some (States.add_to_opt t b2)))
+          else (
+            State.log ~__FUNCTION__ ~s:"splitting" t;
+            b1, Some (States.add_to_opt t b2))))
       block
       (States.empty, None)
   ;;
@@ -164,6 +166,7 @@ module Make
     : unit
     =
     Log.trace __FUNCTION__;
+    Partition.log ~__FUNCTION__ ~s:"pi" !pi;
     Label.log ~__FUNCTION__ ~s:"split by label" label;
     let edges : EdgeMap.t' = EdgeMap.reduce_by_label edges label in
     (* NOTE: select some state [s] from [block] *)

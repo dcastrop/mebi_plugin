@@ -115,7 +115,7 @@ module Make
     Log.trace __FUNCTION__;
     match find_opt x from with
     | None ->
-      State.log ~__FUNCTION__ ~s:"has no edges" from;
+      (* State.log ~__FUNCTION__ ~m:Trace ~s:"no edges from" from; *)
       States.empty
     | Some ys -> ActionMap.destinations ys
   ;;

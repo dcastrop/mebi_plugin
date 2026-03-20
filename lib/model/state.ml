@@ -21,7 +21,7 @@ struct
         type k = t
 
         let name = "State"
-        let json ?as_elt (x : t) : Yojson.t = Base.json ~as_elt:false x.base
+        let json ?as_elt (x : t) : Yojson.t = Base.json ~as_elt:true x.base
       end)
 
   let equal a b = Base.equal a.base b.base

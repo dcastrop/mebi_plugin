@@ -119,9 +119,10 @@ module Make
     then (
       Log.debug ~__FUNCTION__ "Not weak, returning unchanged";
       x)
-    else
-      { x with
-        edges = Saturate.edges x.alphabet x.states (EdgeMap.copy x.edges)
-      }
+    else (
+      let edges, terminals' =
+        Saturate.edges x.alphabet x.states (EdgeMap.copy x.edges)
+      in
+      { x with edges; terminals = States.union x.terminals terminals' })
   ;;
 end
