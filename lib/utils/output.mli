@@ -136,6 +136,8 @@ module Config : sig
 
   module type S = sig
     module Mode : Mode.S
+    module Level : Kind.S with type t = Kind.level
+    module Special : Kind.S with type t = Kind.special
 
     val get : t ref
     val reset : unit -> unit
