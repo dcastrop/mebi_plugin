@@ -34,33 +34,8 @@
 Keep `src/` clean and plugin-focused for a more maintainable codebase.
 
 - [x] ***Standardise output*** -- Now use `lib/utils/json` for anything we expect to need to printout, pretty-print to `json` (using package `yojson`). 
-- [ ] ***Configurable output*** -- Output is handled by `lib/utils/logger`, but needs to be user-configurable (via `src/api`)
+- [x] ***Configurable output*** -- Output is handled by `lib/utils/logger`, but needs to be user-configurable (via `src/api`)
 - [x] ***Encoding*** -- Split components into separate files, move to `lib/model/`
 - [x] ***Models*** 
   - [x] Split components into separate files, move to `lib/model/`. *(Now supports usecases beyond this plugin by requiring `lib/terms/base_term` rather than `lib/terms/encoding`.)*
-  - [ ] Clean-up code with signatures
-    - [x] `lib/model/state`
-    - [x] `lib/model/states`
-    - [x] `lib/model/label`
-    - [x] `lib/model/labels`
-    - [ ] `lib/model/annotation_note`
-    - [ ] `lib/model/annotation`
-    - [ ] `lib/model/annotations`
-    - [x] `lib/model/transition`
-    - [ ] `lib/model/transitions`
-    - [ ] `lib/model/action`
-    - [ ] `lib/model/actions`
-    - [ ] `lib/model/actionpair`
-    - [ ] `lib/model/actionpairs`
-    - [ ] `lib/model/actionmap`
-    - [ ] `lib/model/edge`
-    - [ ] `lib/model/edges`
-    - [ ] `lib/model/edgemap`
-    - [ ] `lib/model/state_partition`
-    - [ ] `lib/model/info`
-    - [ ] `lib/model/model` `LTS`
-    - [ ] `lib/model/model` `FSM`
-    - [ ] `lib/model/algorithms/saturate`
-    - [ ] `lib/model/algorithms/minimize`
-    - [ ] `lib/model/algorithms/bisimilarity`
-    <!-- - [ ] `lib/model/algorithms/similarity` -->
+  - [x] Clean-up code with signatures

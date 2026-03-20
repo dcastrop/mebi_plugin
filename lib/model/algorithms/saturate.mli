@@ -86,7 +86,7 @@ module type S = sig
     -> actionpairs
 
   val edge : actionmap -> state -> actionmap -> edgemap -> Traces.t ref -> unit
-  val edges : labels -> states -> edgemap -> edgemap
+  val edges : labels -> states -> edgemap -> edgemap * states
 end
 
 module Make

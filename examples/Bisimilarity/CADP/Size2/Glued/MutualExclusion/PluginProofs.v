@@ -14,6 +14,7 @@ MeBi Config Output "DumpResults" False.
 
 MeBi Config Output "Debug" True.
 MeBi Config Output "Info" True.
+MeBi Config Output "DecodeResults" True.
 MeBi Config Output "DumpResults" True.
 
 Require Stdlib.Program.Tactics.

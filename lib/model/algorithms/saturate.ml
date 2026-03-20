@@ -86,7 +86,7 @@ module type S = sig
     -> actionpairs
 
   val edge : actionmap -> state -> actionmap -> edgemap -> Traces.t ref -> unit
-  val edges : labels -> states -> edgemap -> edgemap
+  val edges : labels -> states -> edgemap -> edgemap * states
 end
 
 module Make
@@ -381,8 +381,13 @@ module Make
           Log.trace ~__FUNCTION__ "continue (full)";
           (* NOTE: continue exploring un-traced state-space as the [named] must occur earlier in the trace and has been pruned *)
           (* NOTE: we can only use the traces once *)
-          d.can_collect_traces := false;
-          continue_check_destinations d from x ys acc
+          (* d.can_collect_traces := false; *)
+          continue_check_destinations
+            { d with can_collect_traces = ref false }
+            from
+            x
+            ys
+            acc
         | Some named, Some _ ->
           Log.trace ~__FUNCTION__ "continue (upto)";
           (* NOTE: we can only continue with the trace up-to the named action *)
@@ -472,22 +477,29 @@ module Make
          ActionMap.update new_actions saturated_action destinations)
   ;;
 
-  (** [] *)
+  (** [] returns a saturated [EdgeMap.t'] paired with a set of terminals states {i (i.e., states that now have no outgoing actions, and if reached)}.*)
   let edges (labels : Labels.t) (states : States.t) (old_edges : EdgeMap.t')
-    : EdgeMap.t'
+    : EdgeMap.t' * States.t
     =
     Log.trace __FUNCTION__;
     let new_edges : EdgeMap.t' = EdgeMap.create 0 in
     let traces : Traces.t ref = ref Traces.empty in
-    EdgeMap.iter
-      (fun (from : State.t) (old_actions : ActionMap.t') ->
-        (* Log.thing ~__FUNCTION__ Debug "from" from ( State.to_string); *)
-        (* NOTE: populate [new_actions] with saturated [old_actions] *)
-        let new_actions : ActionMap.t' = ActionMap.create 0 in
-        let () = edge new_actions from old_actions old_edges traces in
-        EdgeMap.replace new_edges from new_actions)
-      old_edges;
+    let terminals : States.t =
+      EdgeMap.fold
+        (fun (from : State.t) (old_actions : ActionMap.t') (acc : States.t) ->
+          (* Log.thing ~__FUNCTION__ Debug "from" from ( State.to_string); *)
+          (* NOTE: populate [new_actions] with saturated [old_actions] *)
+          let new_actions : ActionMap.t' = ActionMap.create 0 in
+          let () = edge new_actions from old_actions old_edges traces in
+          if ActionMap.length new_actions > 0
+          then (
+            EdgeMap.replace new_edges from new_actions;
+            acc)
+          else States.add from acc)
+        old_edges
+        States.empty
+    in
     (* Log.thing ~__FUNCTION__ Debug "traces" !traces ( Traces.to_string); *)
-    new_edges
+    new_edges, terminals
   ;;
 end
