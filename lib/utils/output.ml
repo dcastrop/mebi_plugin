@@ -294,6 +294,8 @@ module Config = struct
 
   module type S = sig
     module Mode : Mode.S
+    module Level : Kind.S with type t = Kind.level
+    module Special : Kind.S with type t = Kind.special
 
     val get : t ref
     val reset : unit -> unit
@@ -323,7 +325,7 @@ module Config = struct
          val level : Kind.level -> bool
          val special : Kind.special -> bool
        end) : S with module Mode = M = struct
-    module Mode = M
+    module Mode : Mode.S = M
 
     type t = x
 

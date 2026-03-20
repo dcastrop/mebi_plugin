@@ -205,13 +205,35 @@ module Default : S = MkDefault ()
 module ReMake
     (Old : S)
     (New : sig
-       val level : Feedback.level -> bool
-       val special : Output.Kind.special -> bool
+       val level : (Feedback.level -> bool) option
+       val special : (Output.Kind.special -> bool) option
      end) : S with module Config.Mode = Old.Config.Mode =
   Make
     (Old.Config.Mode)
     (struct
       let prefix = Old.prefix
-      let level = New.level
-      let special = New.special
+
+      let level : Output.Kind.level -> bool =
+        match New.level with None -> Old.Config.Level.is_enabled | Some x -> x
+      ;;
+
+      let special : Output.Kind.special -> bool =
+        match New.special with
+        | None -> Old.Config.Special.is_enabled
+        | Some x -> x
+      ;;
     end)
+
+(* NOTE: example of remake *)
+(* module Log =
+   Logger.ReMake
+   (Log)
+   (struct
+   let level =
+   Some (fun (x : Output.Kind.level) -> match x with _ -> true)
+   ;;
+
+   let special =
+   Some (fun (x : Output.Kind.special) -> match x with _ -> true)
+   ;;
+   end) *)

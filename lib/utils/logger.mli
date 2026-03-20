@@ -61,7 +61,7 @@ module Default : S
 
 module ReMake : (Old : S)
     (New : sig
-       val level : Output.Kind.level -> bool
-       val special : Output.Kind.special -> bool
+       val level : (Feedback.level -> bool) option
+       val special : (Output.Kind.special -> bool) option
      end)
     -> S with module Config.Mode = Old.Config.Mode
