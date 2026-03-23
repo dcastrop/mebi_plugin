@@ -448,7 +448,8 @@ module Make
 
           let json ?as_elt (x : Model.Info.t) : Yojson.t =
             `Assoc
-              [ "meta", Json.option ~as_elt:true Meta.json x.meta
+              [ "num states", `Int x.num_states
+              ; "meta", Json.option ~as_elt:true Meta.json x.meta
               ; "weak labels", Labels.json ~as_elt:true x.weak_labels
               ]
           ;;
