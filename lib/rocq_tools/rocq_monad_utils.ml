@@ -930,7 +930,7 @@ struct
       : (Constr.rel_declaration * Constr.rel_declaration) mm
       =
       (* Log.trace __FUNCTION__; *)
-      (* get the type of [mip] from [mib]. *)
+      (* NOTE: get the type of [mip] from [mib]. *)
       let typ = Inductive.type_of_inductive (UVars.in_punivs (mib, mip)) in
       match mip.mind_arity_ctxt |> Utils.split_at mip.mind_nrealdecls with
       | [ t1; a; t2 ] ->
@@ -1041,24 +1041,6 @@ struct
   ;;
 
   module Unification = struct
-    (* module type SPair = sig
-      type t =
-        { to_check : EConstr.t
-        ; acc : EConstr.t
-        }
-
-      val to_string : Environ.env -> Evd.evar_map -> t -> string
-
-      val make
-        :  Environ.env
-        -> Evd.evar_map
-        -> EConstr.t
-        -> EConstr.t
-        -> Evd.evar_map * t
-
-      val unify : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * bool
-    end *)
-
     module Pair = struct
       (** [fst] is a term (e.g., destination) that we want to check unifies with [snd] (which we have already reached).
       @see Mebi_setup.unif_problem where [type unif_problem = {termL:EConstr.t;termR:EConstr.t}] *)
@@ -1179,24 +1161,6 @@ struct
         { act; goto; tree }
       ;;
     end
-
-    (* module type SProblems = sig
-      type t =
-        { sigma : Evd.evar_map
-        ; to_unify : Problem.t list
-        }
-
-      val empty : unit -> t mm
-      val list_is_empty : t list -> bool
-      val to_string : Environ.env -> t -> string
-      val list_to_string : Environ.env -> t list -> string
-
-      val sandbox_unify_all_opt
-        :  EConstr.t
-        -> EConstr.t
-        -> t
-        -> (EConstr.t * EConstr.t * Enc.Tree.t list) option mm
-    end *)
 
     module Problems = struct
       type t =
@@ -1384,19 +1348,14 @@ struct
       : Constructors.t mm
       =
       Log.trace __FUNCTION__;
-      (* log_econstr ~__FUNCTION__ ~s:"from_term" from_term; *)
-      (* log_econstr ~__FUNCTION__ ~s:"act_term" act_term; *)
       let open Syntax in
       let* from_term : EConstr.t = econstr_normalize from_term in
-      (* log_econstr ~__FUNCTION__ ~s:"from_term (normalized)" from_term; *)
       let iter_body (i : int) (acc : Constructors.t) : Constructors.t mm =
         (* NOTE: extract args for constructor *)
         let { constructor = ctx, tm; _ } : Ind.LTS.constructor =
           constructors.(i)
         in
-        let decls : Rocq_utils.econstr_decl list =
-          Rocq_utils.get_econstr_decls ctx
-        in
+        let decls = Rocq_utils.get_econstr_decls ctx in
         let* substl = mk_ctx_substl [] (List.rev decls) in
         let* args : Rocq_utils.constructor_args = extract_args ~substl tm in
         (* NOTE: make fresh [act_term] to avoid conflicts with sibling constructors *)
@@ -1444,55 +1403,6 @@ struct
         constructors
         next_constructor_problems
 
-    (* Should return a list of unification problems *)
-    and check_updated_ctx
-          (lts_enc : Enc.t)
-          (acc : ListOfProblems.t)
-          (indmap : Ind.t F.t)
-      :  EConstr.Vars.substl * EConstr.rel_declaration list
-      -> (Enc.t * ListOfProblems.t) option mm
-      =
-      Log.trace __FUNCTION__;
-      function
-      | [], [] -> return (Some (lts_enc, acc))
-      | _hsubstl :: substl, t :: tl ->
-        let open Syntax in
-        let ty_t : EConstr.t = Context.Rel.Declaration.get_type t in
-        let$+ upd_t env sigma = EConstr.Vars.substl substl ty_t in
-        let* env = get_env in
-        let* sigma = get_sigma in
-        (match EConstr.kind sigma upd_t with
-         | App (name, args) ->
-           (match F.find_opt indmap name with
-            | None ->
-              (* log_econstr ~__FUNCTION__ ~m:Warning ~s:"name not indmap" name; *)
-              check_updated_ctx lts_enc acc indmap (substl, tl)
-            | Some c ->
-              let args : Rocq_utils.constructor_args =
-                Rocq_utils.constructor_args args
-              in
-              let$+ lhs env sigma = Reductionops.nf_evar sigma args.lhs in
-              let$+ act env sigma = Reductionops.nf_evar sigma args.act in
-              let args = { args with lhs; act } in
-              let next_lts : Ind.LTS.constructor array =
-                Ind.get_lts_constructor_types c
-              in
-              let* next_constructors : Constructors.t =
-                check_valid_constructors next_lts indmap lhs act c.enc
-              in
-              (match next_constructors with
-               | [] -> return None
-               | next_constructors ->
-                 let* problems : Problems.t =
-                   Constructors.to_problems args next_constructors
-                 in
-                 let acc = ListOfProblems.cross_product problems acc in
-                 check_updated_ctx lts_enc acc indmap (substl, tl)))
-         | _ -> check_updated_ctx lts_enc acc indmap (substl, tl))
-      | _substl, _ctxl -> Err.invalid_check_updated_ctx _substl _ctxl
-    (* ! Impossible ! *)
-    (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
-
     and check_for_next_constructors
           (i : int)
           (outer_act : EConstr.t)
@@ -1514,6 +1424,76 @@ struct
             outer_act
             tgt_term
             (next_lts_enc, next_problems)
+
+    (* Should return a list of unification problems *)
+    and check_updated_ctx
+          (lts_enc : Enc.t)
+          (acc : ListOfProblems.t)
+          (indmap : Ind.t F.t)
+      :  EConstr.Vars.substl * EConstr.rel_declaration list
+      -> (Enc.t * ListOfProblems.t) option mm
+      =
+      Log.trace __FUNCTION__;
+      function
+      | [], [] -> return (Some (lts_enc, acc))
+      | _hsubstl :: substl, t :: tl ->
+        let open Syntax in
+        let ty_t : EConstr.t = Context.Rel.Declaration.get_type t in
+        let$+ upd_t env sigma = EConstr.Vars.substl substl ty_t in
+        let* env = get_env in
+        let* sigma = get_sigma in
+        (match EConstr.kind sigma upd_t with
+         | App (name, args) ->
+           handle_app lts_enc acc indmap (substl, tl) (name, args)
+         | _ -> check_updated_ctx lts_enc acc indmap (substl, tl))
+      | _substl, _ctxl -> Err.invalid_check_updated_ctx _substl _ctxl
+    (* ! Impossible ! *)
+    (* FIXME: should fail if [t] is an evar -- but *NOT* if it contains evars! *)
+
+    and handle_app
+          (lts_enc : Enc.t)
+          (acc : ListOfProblems.t)
+          (indmap : Ind.t F.t)
+          ((substl, tl) : EConstr.Vars.substl * EConstr.rel_declaration list)
+          ((name, args) : EConstr.t * EConstr.t array)
+      =
+      Log.trace __FUNCTION__;
+      match F.find_opt indmap name with
+      | None -> check_unknown_app lts_enc acc indmap (substl, tl) (name, args)
+      | Some c ->
+        let open Syntax in
+        let args = Rocq_utils.constructor_args args in
+        let$+ lhs env sigma = Reductionops.nf_evar sigma args.lhs in
+        let$+ act env sigma = Reductionops.nf_evar sigma args.act in
+        let args = { args with lhs; act } in
+        let next_lts : Ind.LTS.constructor array =
+          Ind.get_lts_constructor_types c
+        in
+        let* next_constructors : Constructors.t =
+          check_valid_constructors next_lts indmap lhs act c.enc
+        in
+        (match next_constructors with
+         | [] -> return None
+         | next_constructors ->
+           let* problems : Problems.t =
+             Constructors.to_problems args next_constructors
+           in
+           let acc = ListOfProblems.cross_product problems acc in
+           check_updated_ctx lts_enc acc indmap (substl, tl))
+
+    and check_unknown_app
+          (lts_enc : Enc.t)
+          (acc : ListOfProblems.t)
+          (indmap : Ind.t F.t)
+          ((substl, tl) : EConstr.Vars.substl * EConstr.rel_declaration list)
+          ((name, args) : EConstr.t * EConstr.t array)
+      : (Enc.t * ListOfProblems.t) option mm
+      =
+      Log.trace __FUNCTION__;
+      if Log.Config.is_enabled Debug
+      then log_econstr ~__FUNCTION__ ~m:Warning ~s:"name not indmap" name;
+      (* Array.to_list args |> log_econstrs ~__FUNCTION__ ~m:Warning ~s:"args"; *)
+      check_updated_ctx lts_enc acc indmap (substl, tl)
     ;;
 
     let collect_valid_constructors

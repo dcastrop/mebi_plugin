@@ -1093,7 +1093,8 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     then (
       match x with
       | { info = { meta = Some { is_complete = false; _ }; _ }; _ } ->
-        Log.trace ~__FUNCTION__ "LTS Incomplete";
+        result_log (module Model.LTS) (module Decode.LTS)
+        |> handle_results Result "LTS Incomplete" x;
         M.Err.lts_incomplete "TODO..."
       | _ -> ())
   ;;
