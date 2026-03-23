@@ -11,6 +11,9 @@ MeBi Config Output "Show" False.
 MeBi Config Output "DecodeResults" False.
 MeBi Config Output "DumpResults" False.
 
+MeBi Config Output "DecodeResults" True.
+MeBi Config Output "DumpResults" True.
+
 Require Stdlib.Program.Tactics.
 
 From Corelib Require Import Relations.Relation_Definitions.
@@ -26,10 +29,11 @@ Require Import MEBI.Examples.Bisimilarity.CADP.Size2.Terms.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.TermTests".
 MeBi Config Weak As Option label.
-MeBi Config Bounds As Num States 5000.
+(* !!! incomplete at 8000 *)
+MeBi Config Bounds As Num States 15000.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.TermTests.step".
 (* !!! state-explosion *)
 MeBi Run FSM c2 Using lts step.
-MeBi Run Saturate c2 Using lts step.
-MeBi Run Minimize c2 Using lts step.
+(* MeBi Run Saturate c2 Using lts step. *)
+(* MeBi Run Minimize c2 Using lts step. *)

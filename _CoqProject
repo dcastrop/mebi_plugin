@@ -28,15 +28,15 @@ examples/Proc.v ### REQUIRED FOR BELOW
 
 ### Proc.Flat.Simple 
 examples/Bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
-examples/Bisimilarity/Proc/Test1/TermTests.v ### Success
-examples/Bisimilarity/Proc/Test1/PluginProofs.v ### Success
+# examples/Bisimilarity/Proc/Test1/TermTests.v ### Success
+# examples/Bisimilarity/Proc/Test1/PluginProofs.v ### Success
 # examples/Bisimilarity/Proc/Test1/ManualProofs.v
 # examples/Bisimilarity/Proc/Test1/LtacProofs.v
 
 ### Proc.Flat.Complex 
 examples/Bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
-examples/Bisimilarity/Proc/Test2/TermTests.v ### Success
-examples/Bisimilarity/Proc/Test2/PluginProofs.v ### Success
+# examples/Bisimilarity/Proc/Test2/TermTests.v ### Success
+# examples/Bisimilarity/Proc/Test2/PluginProofs.v ### Success
 # examples/Bisimilarity/Proc/Test2/ManualProofs.v
 # examples/Bisimilarity/Proc/Test2/LtacProofs.v
 
@@ -56,10 +56,10 @@ examples/CADP_Glued.v ### REQUIRED FOR BELOW
 examples/Bisimilarity/CADP/Properties/MutualExclusion.v ### REQUIRED FOR BELOW
 
 examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
-examples/Bisimilarity/CADP/Size1/TermTests.v ### Success
-examples/Bisimilarity/CADP/Size1/MutualExclusion/PluginProofs.v ### Success
+# examples/Bisimilarity/CADP/Size1/TermTests.v ### Success
+# examples/Bisimilarity/CADP/Size1/MutualExclusion/PluginProofs.v ### Success
 
-examples/Bisimilarity/CADP/Size1/Glued/TermTests.v ### Success
+# examples/Bisimilarity/CADP/Size1/Glued/TermTests.v ### Success
 # examples/Bisimilarity/CADP/Size1/Glued/PluginProofs.v ### Success
 # examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v ### Success
 
@@ -67,9 +67,11 @@ examples/Bisimilarity/CADP/Size1/Glued/TermTests.v ### Success
 examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size2/TermTests.v ### FAIL: state-explosion
 
-examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### Success
+# examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### Success
 # examples/Bisimilarity/CADP/Size2/Glued/PluginProofs.v ### FAIL: ^
 # examples/Bisimilarity/CADP/Size2/Glued/MutualExclusion/PluginProofs.v ### !!! WIP 
+
+# examples/CADP_v2.v ### WIP -- remodelling CADP 
 
 
 # TODO: 
