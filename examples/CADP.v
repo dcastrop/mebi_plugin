@@ -39,10 +39,7 @@ End Index.
 
 (* we dont need new_i or j, only i*)
 Definition lock : Type := index.
-
-Module Lock.
-  Definition initial : lock := Index.initial.
-End Lock.
+Definition lock_initial : lock := Index.initial.
 
 (*************************************************************************)
 (**** Memory *************************************************************)
@@ -175,13 +172,13 @@ Inductive value : Type (*Set*) :=
   .
 
 
-Definition valid_cast_to_index (v:value) : bool * index :=
+Definition value_to_index_opt (v:value) : option index :=
   match v with
-  | NAT n => (true, Some n)
-  | PID p => (true, Index.of_pid p)
-  | INDEX i => (true, i)
-  | NIL => (true, None)
-  | _ => (false, None) (* i.e., BOOL *)
+  | NAT n => Some (Some n)
+  | PID p => Some (Index.of_pid p)
+  | INDEX i => Some i
+  | NIL => Some Nil
+  | _ => None (* i.e., BOOL *)
   end.
 
 (*************************************************************************)
@@ -218,43 +215,22 @@ Record error := { error_code : nat
 (*************************************************************************)
 
 Definition resource : Type := mem * lock.
-
-Module Resource.
-  Definition initial (n:nat) : resource := (Memory.create n, Lock.initial).
-End Resource.
-
-Definition get_mem (r:resource) : mem :=
-  match r with | (m, _) => m end.
-
-Definition get_lock_i (r:resource) : index :=
-  match r with | (_, i) => i end.
-
-Definition set_mem (new_m:mem) (r:resource) : resource :=
-  match r with | (_, l) => (new_m, l) end.
-
-Definition set_lock_i (new_i:index) (r:resource) : resource :=
-  match r with | (m, _) => (m, new_i) end.
-
+Definition resource_create (n:nat) : resource := (Memory.create n, lock_initial).
+Definition resource_set_mem (m:mem) (r:resource) : resource := (m, snd r).
+Definition resource_set_lock (l:lock) (r:resource) : resource := (fst r, l).
+Definition resource_get_mem (r:resource) : mem := fst r.
+Definition resource_get_lock (r:resource) : index := snd r.
 
 (*************************************************************************)
 (**** (Local) State ******************************************************)
 (*************************************************************************)
 
 Definition state : Type := pid * local_vars * (option (list error)).
+Definition state_create (p:pid) : state := (p, Vars.initial, None).
 
-Module State.
-  Definition create (p:pid) : state := (p, Vars.initial, None).
-  Definition initial : state := State.create 0.
-End State.
-
-Definition get_pid (s:state) : pid :=
-  match s with | (p, _, _) => p end.
-
-Definition get_vars (s:state) : local_vars :=
-  match s with | (_, v, _) => v end.
-
-Definition get_errors (s:state) : option (list error) :=
-  match s with | (_, _, e) => e end.
+Definition get_pid (s:state) : pid := match s with | (p, _, _) => p end.
+Definition get_vars (s:state) : local_vars := match s with | (_, v, _) => v end.
+Definition get_errors (s:state) : option (list error) := match s with | (_, _, e) => e end.
 
 Definition get_predecessor (s:state) : index := var_predecessor (get_vars s).
 Definition get_locked      (s:state) : bool  := var_locked (get_vars s).
@@ -432,156 +408,23 @@ Definition handle_value (v:value) (s:state) : option value * option (list value)
 (*************************************************************************)
 
 Definition env : Type := state * resource.
+Definition env_create (n:nat) : env := (state_create n, resource_create n).
 
-Module Env.
-  Definition initial (n:nat) : env := (State.initial, Resource.initial n).
-End Env.
+Definition get_state (e:env) : state := fst e.
+Definition get_resource (e:env) : resource := snd e.
 
-Definition get_state (e:env) : state := match e with | (s, _) => s end.
-
-Definition get_resource (e:env) : resource :=
-  match e with | (_, r) => r end.
-
-(* not used, but useful in goals *)
-Definition set_state (s:state) (e:env) : env :=
-  match e with | (_, r) => (s, r) end.
-
-(* not used, but useful in goals *)
-Definition set_resource (r:resource) (e:env) : env :=
-  match e with | (s, _) => (s, r) end.
 
 
 (*************************************************************************)
 (**** (Local) Semantics of Processes *************************************)
 (*************************************************************************)
 
-(** [read_next e] will set [mem_next] and local var [next] to be the value
-  * currently of the [qnode.next] corresponding to the [pid] of the process
-  * in the state *)
-Definition read_next (e:env) : option env :=
-  (* get pid *)
-  let s:state := get_state e in
-  let p:pid := get_pid s in
-  (* get qnode *)
-  let r:resource := get_resource e in
-  let m:mem := get_mem r in
-  match Memory.nth_error p m with
-  | None => None (* tried to access out of bounds *)
-  | Some q => (* get next of qnode *)
-    let qnode_next:index := Qnode.get_next q in
-    (* update local vars *)
-    let v:local_vars := set_next qnode_next (get_vars s) in
-    (* update mem_next *)
-    let m:mem := Memory.set_mem_next qnode_next m in
-    (* update env *)
-    Some (set_vars v s, set_mem m r)
-  end.
-
-(** [read_locked e] will set [mem_locked] and local var [locked] to be the value
-  * currently of the [qnode.locked] corresponding to the [pid] of the process
-  *  in the state *)
-Definition read_locked (e:env) : option env :=
-  (* get pid *)
-  let s:state := get_state e in
-  let p:pid := get_pid s in
-  (* get qnode *)
-  let r:resource := get_resource e in
-  let m:mem := get_mem r in
-  match Memory.nth_error p m with
-  | None => None (* tried to access out of bounds *)
-  | Some q => (* get locked of qnode *)
-    let qnode_locked:bool := Qnode.get_locked q in
-    (* update local vars *)
-    let v:local_vars := set_locked qnode_locked (get_vars s) in
-    (* update mem_locked *)
-    let m:mem := Memory.set_mem_locked qnode_locked m in
-    (* update env *)
-    Some (set_vars v s, set_mem m r)
-  end.
-
-(** [write_next to_write next e] will set the field [qnode.next] of the [qnode] 
-  * of the index [to_write] to the value of [next]. *)
-Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
-  let s:state := get_state e in
-  (* get value of [next] *)
-  match handle_value next s with
-  | (_, Some errs) => Some (add_error (Build_error 89 "write_next, value of NEXT failed" (Build_error_info None (None, Some next))) s, get_resource e)
-  | (None, None) => None (* [next=GET v] and [v] could not be resolved *)
-  | (Some next, None) =>
-    (* get pid from [to_write] *)
-    let p:option pid := (* should be index of pid, not None *)
-    match get_local_var_value to_write s with
-    | INDEX i => i
-    | PID p => Some p
-    | _ => None (* [to_write] must be a [pid] *)
-    end
-    in
-    match p with
-    | None => None
-    | Some p => (* get qnode *)
-      let r:resource := get_resource e in
-      let m:mem := get_mem r in
-      match Memory.nth_error p m with
-      | None => None (* tried to access out of bounds *)
-      | Some q => (* check [next] of [qnode] is some kind of nat *)
-        match valid_cast_to_index next with
-        | (false, _) => None (* i.e., BOOL *)
-        | (true, n) => (* i.e., PID n, INDEX n, NIL, NAT n *)
-          match Memory.nth_replace (Qnode.set_next n q) p m with
-          | None => None
-          | Some m => Some (s, set_mem m r)
-          end
-        end
-      end
-    end
-  end.
-
-(** [write_locked to_write locked e] will set the  field [qnode.locked] of the 
-  * [qnode] of the index [to_write] to the value of [locked]. *)
-Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env :=
-  (* get pid from [to_write] *)
-  let s:state := get_state e in
-  let p:option pid := (* should be index of pid, not None *)
-    match get_local_var_value to_write s with
-    | INDEX i => i
-    | PID p => Some p
-    | _ => None (* [to_write] must be a [pid] *)
-    end
-  in
-  match p with
-  | None =>
-      (* Some (State.create 99, get_resource e) *)
-      match get_local_var_value to_write s with
-      | INDEX None => Some (add_error (Build_error 91 "write_locked, to_write yielded INDEX None" (Build_error_info None (Some to_write, Some locked))) s, get_resource e)
-      | INDEX _ => Some (add_error (Build_error 92 "write_locked, to_write yielded INDEX _" (Build_error_info None (Some to_write, Some locked))) s, get_resource e)
-      | NIL => Some (add_error (Build_error 93 "write_locked, to_write yielded NIL" (Build_error_info None (Some to_write, Some locked))) s, get_resource e)
-      | PID _ => Some (add_error (Build_error 94 "write_locked, to_write yielded PID _" (Build_error_info None (Some to_write, Some locked))) s, get_resource e)
-      | BOOL _ => Some (add_error (Build_error 95 "write_locked, to_write yielded BOOL _" (Build_error_info None (Some to_write, Some locked))) s, get_resource e)
-      | _ => None (* [to_write] must be a [pid] *)
-      end
-  | Some p => (* get qnode *)
-    let r:resource := get_resource e in
-    let m:mem := get_mem r in
-    match Memory.nth_error p m with
-    | None => Some (add_error (Build_error 96 "write_locked, qnode does not exist" (Build_error_info None (Some to_write, Some locked))) s, get_resource e) (* [qnode] must exist *)
-    | Some q => (* check [locked] of [qnode] is a [BOOL] *)
-      match locked with
-      | BOOL b =>
-        match Memory.nth_replace (Qnode.set_locked b q) p m with
-        | None => Some (add_error (Build_error 97 "write_locked, nth_replace failed" (Build_error_info None (Some to_write, Some locked))) s, get_resource e)
-        | Some m => Some (s, (set_mem m r))
-        end
-      | _ => Some (add_error (Build_error 98 "write_locked, locked value not bool" (Build_error_info None (Some to_write, Some locked))) s, get_resource e) (* [locked] must be a [BOOL] *)
-      end
-    end
-  end.
-
 (** stores the current contents of [i] of the lock in the global resource [e] 
   * within the local var [predecessor], and sets [i] to contain the [pid]. *)
-Definition fetch_and_store (e:env) : option env :=
+Definition fetch_and_store (e:env) : env :=
   (* get [i] from lock in global resource [e] *)
   let r:resource := get_resource e in
-  let i:index := get_lock_i r in
+  let i:index := resource_get_lock r in
   (* store [i] in local var [predecessor] *)
   let s:state := get_state e in
   let v:local_vars := get_vars s in
@@ -589,20 +432,20 @@ Definition fetch_and_store (e:env) : option env :=
   let s:state := set_vars v s in
   (* set [i] of lock in global resource to [pid] *)
   let p:pid := get_pid s in
-  let r:resource := set_lock_i (Index.of_pid p) r in
+  let r:resource := resource_set_lock (Index.of_pid p) r in
   (* update env *)
-  Some (s, r).
+  (s, r).
 
 (** if [i] of the global resource lock is the same as [pid], then set [i] to 
   * [NIL] and set [swap] to [true]. Otherwise, set [swap] to [false] and leave 
   * [i] unchanged. *)
-Definition compare_and_swap (e:env) : option env :=
+Definition compare_and_swap (e:env) : env :=
   (* set [j] of lock (in global resource [e]) to [pid] *)
   let s:state := get_state e in
   let p:pid := get_pid s in
   (* get [i] of lock in global resource [e] *)
   let r:resource := get_resource e in
-  let i:index := get_lock_i r in
+  let i:index := resource_get_lock r in
   (* if the same, then set [swap] to true and set [i] to [Nil], else false *)
   let v:local_vars := get_vars s in
   match Index.eqb i (Index.of_pid p) with
@@ -611,46 +454,144 @@ Definition compare_and_swap (e:env) : option env :=
     let v:local_vars := set_swap true v in
     let s:state := set_vars v s in
     (* set [i] to [Nil] *)
-    let r:resource := set_lock_i Nil r in
+    let r:resource := resource_set_lock Nil r in
     (* update env *)
-    Some (s, r)
+    (s, r)
   | false =>
     (* set [swap] false *)
     let v:local_vars := set_swap false v in
     let s:state := set_vars v s in
     (* update env *)
-    Some (s, r)
+    (s, r)
+  end.
+
+Definition return_error (n:nat) (s:string) (e:env) (a:option local_var) (b:option value) : option env :=
+Some (add_error (Build_error n s (Build_error_info None (a, b))) (get_state e), get_resource e).
+
+(** [read_next e] will set [mem_next] and local var [next] to be the value
+  * currently of the [qnode.next] corresponding to the [pid] of the process
+  * in the state *)
+Definition read_next (e:env) : option env :=
+(* get qnode *)
+match Memory.nth_error (get_pid (get_state e)) (resource_get_mem (get_resource e)) with
+| None => return_error 10 "read_next, memory out of bounds" e None None
+| Some q => (* get next of qnode *)
+  let qnode_next:index := Qnode.get_next q in
+  (* update local vars *)
+  let v:local_vars := set_next qnode_next (get_vars (get_state e)) in
+  (* update mem_next *)
+  let m:mem := Memory.set_mem_next qnode_next (resource_get_mem (get_resource e)) in
+  (* update env *)
+  Some (set_vars v (get_state e), resource_set_mem m (get_resource e))
+end.
+
+(** [read_locked e] will set [mem_locked] and local var [locked] to be the value
+  * currently of the [qnode.locked] corresponding to the [pid] of the process
+  *  in the state *)
+Definition read_locked (e:env) : option env :=
+(* get qnode *)
+match Memory.nth_error (get_pid (get_state e)) (resource_get_mem (get_resource e)) with
+| None => return_error 10 "read_locked, memory out of bounds" e None None
+| Some q => (* get locked of qnode *)
+  let qnode_locked:bool := Qnode.get_locked q in
+  (* update local vars *)
+  let v:local_vars := set_locked qnode_locked (get_vars (get_state e)) in
+  (* update mem_locked *)
+  let m:mem := Memory.set_mem_locked qnode_locked (resource_get_mem (get_resource e)) in
+  (* update env *)
+  Some (set_vars v (get_state e), resource_set_mem m (get_resource e))
+end.
+
+Definition local_var_to_pid_opt (x:local_var) (s:state) : option pid :=
+match get_local_var_value x s with
+| INDEX i => i
+| PID p => Some p
+| _ => None (* [to_write] must be a [pid] *)
+end.
+
+(** [write_next to_write next e] will set the field [qnode.next] of the [qnode] 
+  * of the index [to_write] to the value of [next]. *)
+Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
+  (* get value of [next] *)
+  match handle_value next (get_state e) with
+  | (_, Some errs) => return_error 89 "write_next, value of NEXT failed" e (Some to_write) (Some next)
+  | (None, None) => return_error 88 "write_next, value of NEXT could not resolve GET" e (Some to_write) (Some next)
+  | (Some next, None) =>
+    (* get pid from [to_write] *)
+    match local_var_to_pid_opt to_write (get_state e) with
+    | None => return_error 87 "write_next, value of TO_WRITE is not pid" e (Some to_write) (Some next)
+    | Some p => (* get qnode *)
+      match Memory.nth_error p (resource_get_mem (get_resource e)) with
+      | None => return_error 10 "write_next, memory out of bounds" e (Some to_write) (Some next)
+      | Some q => (* check [next] of [qnode] is some kind of nat *)
+        match value_to_index_opt next with
+        | None => return_error 86 "write_next, value of NEXT is not pid" e (Some to_write) (Some next)
+        | Some i => (* replace next of q with i *)
+          match Memory.nth_replace (Qnode.set_next i q) p (resource_get_mem (get_resource e)) with
+          | None => return_error 10 "write_next, replace memory out of bounds" e (Some to_write) (Some next)
+          | Some m => Some (get_state e, resource_set_mem m (get_resource e))
+          end
+        end
+      end
+    end
+  end.
+
+Definition value_to_bool_opt (x:value) : option bool :=
+match x with
+| BOOL b => Some b
+| _ => None
+end.
+
+(** [write_locked to_write locked e] will set the  field [qnode.locked] of the 
+  * [qnode] of the index [to_write] to the value of [locked]. *)
+Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env :=
+  (* get value of [locked] *)
+  match handle_value locked (get_state e) with
+  | (_, Some errs) => return_error 99 "write_locked, value of NEXT failed" e (Some to_write) (Some locked)
+  | (None, None) => return_error 98 "write_locked, value of NEXT could not resolve GET" e (Some to_write) (Some locked)
+  | (Some locked, None) =>
+    (* get pid from [to_write] *)
+    match local_var_to_pid_opt to_write (get_state e) with
+    | None => return_error 97 "write_locked, value of TO_WRITE is not pid" e (Some to_write) (Some locked)
+    | Some p => (* get qnode *)
+      match Memory.nth_error p (resource_get_mem (get_resource e)) with
+      | None => return_error 10 "write_locked, memory out of bounds" e (Some to_write) (Some locked)
+      | Some q => (* check [locked] of [qnode] is a [BOOL] *)
+        match value_to_bool_opt locked with
+        | None => return_error 98 "write_locked, locked value not bool" e (Some to_write) (Some locked) (* [locked] must be a [BOOL] *)
+        | Some b =>
+          match Memory.nth_replace (Qnode.set_locked b q) p (resource_get_mem (get_resource e)) with
+          | None => return_error 10 "write_locked, replace memory out of bounds" e (Some to_write) (Some locked)
+          | Some m => Some (get_state e, resource_set_mem m (get_resource e))
+          end
+        end
+      end
+    end
   end.
 
 (*************************************************************************)
 (**** Actions ************************************************************)
 (*************************************************************************)
 
+Definition handle_env_opt (e:env) (r:option env) : (tm * env) :=
+match r with 
+| None => (ERR, e)
+| Some e => (if has_error_occurred (get_state e) then ERR else OK, e)
+end.
+
 Definition do_act (a:act) (e:env) : (tm * env) :=
   match a with
   | NCS   => (OK, e)
   | ENTER => (OK, e)
   | LEAVE => (OK, e)
+  | FETCH_AND_STORE => (OK, fetch_and_store e)
+  | COMPARE_AND_SWAP => (OK, compare_and_swap e)
 
-  | _ =>
-    let res : option env :=
-      match a with
-      | READ_NEXT   => read_next e
-      | READ_LOCKED => read_locked e
+  | READ_NEXT   => handle_env_opt e (read_next e)
+  | READ_LOCKED => handle_env_opt e (read_locked e)
 
-      | WRITE_NEXT to_write next   => write_next to_write next e
-      | WRITE_LOCKED to_write next => write_locked to_write next e
-
-      | FETCH_AND_STORE => fetch_and_store e
-      | COMPARE_AND_SWAP => compare_and_swap e
-
-      | _ => None (* shouldn't happen, outer match catches these *)
-      end
-    in
-    match res with
-    | None => (ERR, e)
-    | Some e => (if has_error_occurred (get_state e) then ERR else OK, e)
-    end
+  | WRITE_NEXT to_write next   => handle_env_opt e (write_next to_write next e)
+  | WRITE_LOCKED to_write next => handle_env_opt e (write_locked to_write next e)
   end.
 
 Definition label : Type := act * pid.
@@ -659,7 +600,6 @@ Definition get_action (a:act) (e:env) : option label :=
   match a with
   | ENTER => Some (a, (get_pid (get_state e)))
   | LEAVE => Some (a, (get_pid (get_state e)))
-  | NCS   => None
   | _     => None
   end.
 
@@ -722,99 +662,48 @@ Definition take_branch (c:expr) (t1:tm) (t2:tm) (e:env) : tm * env :=
 (**** Semantics (Local step) *********************************************)
 (*************************************************************************)
 
-Reserved Notation "t '--<{' a '}>-->' t'" (at level 40).
+Definition process : Type := tm * env.
+Definition process_create (n:nat) (x:tm) : process := (x, (env_create n)).
 
-Inductive step : (tm * env) -> option label -> (tm * env) -> Prop :=
-| STEP_ACT : forall a e, (ACT a, e) --<{get_action a e}>--> (do_act a e)
-
-| STEP_SEQ_END : forall r e, (SEQ OK r, e) --<{None}>--> (r, e)
-
-| STEP_SEQ : forall a l1 l2 r e1 e2,
-  (l1, e1) --<{a}>--> (l2, e2) ->
-  (SEQ l1 r, e1) --<{a}>--> (SEQ l2 r, e2)
-
-| STEP_IF : forall c t1 t2 e,
-  (IF c t1 t2, e) --<{None}>--> (take_branch c t1 t2 e)
-
-| STEP_REC_DEF : forall i b e,
-  (REC_DEF i b, e) --<{None}>--> (unfold (i, b) b, e)
-
-where "t '--<{' a '}>-->' t'" := (step t a t').
-
-(* Compute (get_action (WRITE_NEXT THE_PID NIL) (0, {| var_predecessor := None; var_locked := false; var_next := None; var_swap := false |}, None, ({| mem_next := None; mem_locked := false; qnodes := {| next := None; locked := false |} :: nil |}, None))). *)
-
-(* Compute (do_act (WRITE_NEXT THE_PID NIL) (0, {| var_predecessor := None; var_locked := false; var_next := None; var_swap := false |}, None, ({| mem_next := None; mem_locked := false; qnodes := {| next := None; locked := false |} :: nil |}, None))). *)
+Inductive step : process -> option label -> process -> Prop :=
+| STEP_ACT : forall a e, step (ACT a, e) (get_action a e) (do_act a e)
+| STEP_IF : forall c t1 t2 e, step (IF c t1 t2, e) None (take_branch c t1 t2 e)
+| STEP_REC_DEF : forall i b e, step (REC_DEF i b, e) None (unfold (i, b) b, e)
+| STEP_SEQ_END : forall r e, step (SEQ OK r, e) None (r, e)
+| STEP_SEQ : forall a l1 l2 r e1 e2, 
+  step (l1, e1) a (l2, e2) ->
+  step (SEQ l1 r, e1) a (SEQ l2 r, e2).
 
 (*************************************************************************)
 (**** Semantics (System lts) *********************************************)
 (*************************************************************************)
 
+Definition worker : Type := tm * state.
+Definition worker_create (n:nat) (x:tm) : worker := (x, (state_create n)).
+
 Inductive sys : Type :=
-  | PRC : tm -> state -> sys
-  | PAR : sys -> sys -> sys
-  .
+| PRC : worker -> sys
+| PAR : sys -> sys -> sys.
+
+Fixpoint sys_create (n:nat) (x:tm) : sys :=
+match n with
+| 0 => PRC (worker_create n x)
+| S m => PAR (PRC (worker_create n x)) (sys_create m x)
+end.
 
 Definition composition : Type := sys * resource.
-
-Reserved Notation "t '==<{' a '}>==>' t'" (at level 40).
+Definition composition_create (n:nat) (x:tm) : composition := (sys_create n x, resource_create n).
 
 Inductive lts : composition -> option label -> composition -> Prop :=
 | LTS_PRC : forall a t1 t2 s1 s2 r1 r2,
-  (t1, (s1, r1)) --<{a}>--> (t2, (s2, r2)) ->
-  (PRC t1 s1, r1) ==<{a}>==> (PRC t2 s2, r2)
-
+  step (t1, (s1, r1)) a (t2, (s2, r2)) ->
+  lts (PRC (t1, s1), r1) a (PRC (t2, s2), r2)
 | LTS_PAR_L : forall a l1 l2 r gr1 gr2,
-  (l1, gr1) ==<{a}>==> (l2, gr2) ->
-  (PAR l1 r, gr1) ==<{a}>==> (PAR l2 r, gr2)
-
+  lts (l1, gr1) a (l2, gr2) ->
+  lts (PAR l1 r, gr1) a (PAR l2 r, gr2)
 | LTS_PAR_R : forall a l r1 r2 gr1 gr2,
-  (r1, gr1) ==<{a}>==> (r2, gr2) ->
-  (PAR l r1, gr1) ==<{a}>==> (PAR l r2, gr2)
-(** NOTE: the transitions below stop the term from growing in size, 
-  * but instead cause the state-space to grow far bigger. *)
-(* | LTS_OK_L : forall s r g, (PAR (PRC OK s) r, g) ==<{SILENT}>==> (r, g) *)
-
-(* | LTS_OK_R : forall l s g, (PAR l (PRC OK s), g) ==<{SILENT}>==> (l, g) *)
-
-where "t '==<{' a '}>==>' t'" := (lts t a t')
-and "y '--<{' a '}>-->' y'" := (step y a y').
-
-(*************************************************************************)
-(**** System *************************************************************)
-(*************************************************************************)
-
-Definition process : Type := tm * state.
-
-Definition spawn (p:pid) (b:tm) : process := (b, State.create p).
-
-Fixpoint populate (n:nat) (b:tm) : list process :=
-  match n with
-  | 0 => []
-  | S m => app (populate m b) [spawn m b]
-  end.
-
-Definition system : Type := list process * resource.
-
-Definition create (n:nat) (b:tm) : system := (populate n b, Resource.initial n).
-
-Fixpoint load (ps:list process) : sys :=
-  match ps with
-  | [] => PRC ERR State.initial (* shouldn't happen *)
-  | h :: t =>
-    match h with
-    | (p, s) =>
-      match t with (* to avoid having a spare empty state at the end *)
-      | [] => PRC p s
-      | _  => PAR (PRC p s) (load t)
-      end
-    end
-  end.
-
-Definition compose (s:system) : composition :=
-  match s with
-  | (ps, r) => (load ps, r)
-  end.
-
+  lts (r1, gr1) a (r2, gr2) ->
+  lts (PAR l r1, gr1) a (PAR l r2, gr2).
 
 Module Protocol.
 
@@ -888,18 +777,18 @@ End Protocol.
 (*************************)
 
 Example Lock_FaS_1 : composition :=
-  compose (create 2 (
+  composition_create 1 (
       REC_DEF 0 (
         SEQ (ACT FETCH_AND_STORE) (
           (* end when value in fetch-and-store is our own PID *)
           IF (EQ (VAR PREDECESSOR) (VAL (GET THE_PID))) (OK) (REC_CALL 0)
         )
       )
-  )).
+  ).
 (* MeBi Dump "Lock_FaS_1" LTS Bounded 16384 Of Lock_FaS_1 Using lts step. *)
 
 Example Lock_FaS_2 : composition :=
-  compose (create 2 (
+  composition_create 1 (
       REC_DEF 0 (
         SEQ (ACT FETCH_AND_STORE) (
           (* only fetch-and-store once PID has stopped being your own PID *)
@@ -915,7 +804,7 @@ Example Lock_FaS_2 : composition :=
           ) (REC_CALL 0)
         )
       )
-  )).
+  ).
 (* MeBi Dump "Lock_FaS_2" LTS Bounded 16384 Of Lock_FaS_2 Using lts step. *)
 
 (*******************************************)
@@ -923,7 +812,7 @@ Example Lock_FaS_2 : composition :=
 (*******************************************)
 
 Example Lock_CaS_1 : composition :=
-  compose (create 2 (
+  composition_create 1 (
       REC_DEF 0 (
         SEQ (ACT COMPARE_AND_SWAP) (
           (* end if value already in fetch-and-store is our own PID *)
@@ -935,7 +824,7 @@ Example Lock_CaS_1 : composition :=
           )
         )
       )
-  )).
+  ).
 (* MeBi Dump "Lock_CaS_1" LTS Bounded 16384 Of Lock_CaS_1 Using lts step. *)
 
 

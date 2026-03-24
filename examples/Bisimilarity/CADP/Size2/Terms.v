@@ -12,4 +12,6 @@ Require Import MEBI.Examples.CADP_Glued.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.Terms".
 
-Example c2 : composition := compose (create 2 P).
+(* Example p1 : process := process_create 0 Protocol.P. *)
+
+Example c2 : composition := composition_create 1 Protocol.P.
