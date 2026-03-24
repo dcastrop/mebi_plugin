@@ -318,9 +318,9 @@ module Make
 
         let json ?(as_elt : bool = false) (x : Model.Transition.t) : Yojson.t =
           `Assoc
-            [ "from", State.json ~as_elt:true x.from
-            ; "goto", State.json ~as_elt:true x.goto
-            ; "label", Label.json ~as_elt:true x.label
+            [ "from", Base.json ~as_elt:true x.from.base
+            ; "goto", Base.json ~as_elt:true x.goto.base
+            ; "label", Base.json ~as_elt:true x.label.base
             ; ( "annotation"
               , Json.option ~as_elt:true Annotation.json x.annotation )
             ; "tree", Json.option ~as_elt:true Base.Tree.json x.tree
@@ -348,7 +348,7 @@ module Make
 
         let json ?(as_elt : bool = false) (x : Model.Action.t) : Yojson.t =
           `Assoc
-            [ "label", Label.json ~as_elt:true x.label
+            [ "label", Base.json ~as_elt:true x.label.base
             ; ( "annotation"
               , Json.option ~as_elt:true Annotation.json x.annotation )
             ; "trees", Base.Trees.json ~as_elt:true x.trees
