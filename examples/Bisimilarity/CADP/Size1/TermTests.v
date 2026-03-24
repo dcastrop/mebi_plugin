@@ -11,6 +11,9 @@ MeBi Config Output "Show" False.
 MeBi Config Output "DecodeResults" False.
 MeBi Config Output "DumpResults" False.
 
+MeBi Config Output "DecodeResults" True.
+MeBi Config Output "DumpResults" True.
+
 Require Stdlib.Program.Tactics.
 
 From Corelib Require Import Relations.Relation_Definitions.
@@ -36,3 +39,8 @@ MeBi Divider "Examples.Bisimilarity.CADP.Size1.TermTests.lts".
 MeBi Run FSM c1 Using lts step.
 MeBi Run Saturate c1 Using lts step.
 MeBi Run Minimize c1 Using lts step.
+
+MeBi Divider "Examples.Bisimilarity.CADP.Size1.TermTests.lts.extra".
+MeBi Run FSM c1b Using lts step.
+MeBi Run Saturate c1b Using lts step.
+MeBi Run Minimize c1b Using lts step.
