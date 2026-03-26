@@ -12,50 +12,31 @@ Require Import MEBI.Bisimilarity.
 
 Inductive spec_status : Type :=
 | Free : spec_status
-| Held : nat -> spec_status
-.
+| Held : nat -> spec_status.
 
 Inductive spec_pid : Type :=
 | Pid : nat -> spec_pid -> spec_pid
-| Nil : spec_pid
-.
+| Nil : spec_pid.
 
 Inductive spec_state : Type :=
-| State : spec_status -> spec_pid -> spec_state
-.
+| State : spec_status -> spec_pid -> spec_state.
 
 Inductive spec_lts : spec_state -> option label -> spec_state -> Prop :=
 | SVC_ENTER : forall i x, 
   spec_lts (State Free (Pid i x)) (Some (ENTER, i)) (State (Held i) (Pid i x))
-
 | SVC_FREE : forall i j x y, 
   spec_lts (State Free x) (Some (ENTER, j)) (State (Held j) y) ->
   spec_lts (State Free (Pid i x)) (Some (ENTER, j)) (State (Held j) (Pid i y))
-
 | SVC_LEAVE : forall i x, 
   spec_lts (State (Held i) (Pid i x)) (Some (LEAVE, i)) (State Free (Pid i x))
-
 | SVC_HELD : forall i j x y, 
   spec_lts (State (Held j) x) (Some (LEAVE, j)) (State Free y) ->
-  spec_lts (State (Held j) (Pid i x)) (Some (LEAVE, j)) (State Free (Pid i y))
-
-(* | SVC_PID : forall i j x y a, 
-      spec_lts x (Some (a, j)) y ->
-      spec_lts (Pid i (x)) (Some (a, j)) (Pid i y)
-         
-| SVC_OTHER : forall i j x y a, spec_lts x (Some (a, j)) y ->
-                              spec_lts (Pid i x) (Some (a, j)) (Pid i y) *)
-                              
-(* | SVC_SWAP : forall i j x, spec_lts (Pid i (Pid j x)) None (Pid j (Pid i x)) *)
-(* | SVC_IN : forall i j x y a k, 
-  spec_lts (Pid j x) (Some (a, k)) (Pid j y) ->
-  spec_lts (Pid i (Pid j x)) (Some (a, k)) (Pid i (Pid j y)) *)
-.
+  spec_lts (State (Held j) (Pid i x)) (Some (LEAVE, j)) (State Free (Pid i y)).
 
 Fixpoint make_spec_pid (n:nat) : spec_pid :=
   match n with 
-  | 0 => Nil
-  | S n => Pid n (make_spec_pid n)
+  | 0 => Pid 0 Nil
+  | S m => Pid n (make_spec_pid m)
   end.
 
 Definition make_spec (n:nat) : spec_state := State Free (make_spec_pid n).

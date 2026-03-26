@@ -35,10 +35,12 @@ VERNAC COMMAND EXTEND MeBi_Run_Bisim CLASSIFIED AS QUERY
    "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = 
-    W.Command.run [] (W.Command.CheckBisim {a=(x, a); b=(y, b)})
-    |> W.M.run ~reset_encoding:true
-    in ()
+    let _ = W.Command.run [] (W.Command.CheckBisim {a=(x, a); b=(y, b)}) 
+            |> W.M.run ~reset_encoding:true
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Checking Bisimilarity.)";
+    ()
   }
 
 | ["MeBi" "Run" 
@@ -46,10 +48,12 @@ VERNAC COMMAND EXTEND MeBi_Run_Bisim CLASSIFIED AS QUERY
    "Using" reference_list(rs)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = 
-    W.Command.run rs (W.Command.CheckBisim {a=(x, a); b=(y, b)})
-    |> W.M.run ~reset_encoding:true
-    in ()
+    let _ = W.Command.run rs (W.Command.CheckBisim {a=(x, a); b=(y, b)})
+            |> W.M.run ~reset_encoding:true
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Checking Bisimilarity.)";
+    ()
   }
 END 
 
@@ -60,10 +64,12 @@ VERNAC COMMAND EXTEND MeBi_Run_Merge CLASSIFIED AS QUERY
    "Merge" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = 
-    W.Command.run [] (W.Command.Merge {a=(x, a); b=(y, b)})
-    |> W.M.run ~reset_encoding:true
-    in ()
+    let _ = W.Command.run [] (W.Command.Merge {a=(x, a); b=(y, b)})
+            |> W.M.run ~reset_encoding:true
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Merging FSMs.)";
+    ()
   }
 
 | ["MeBi" "Run" 
@@ -71,10 +77,12 @@ VERNAC COMMAND EXTEND MeBi_Run_Merge CLASSIFIED AS QUERY
    "Using" reference_list(rs)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = 
-    W.Command.run rs (W.Command.Merge {a=(x, a); b=(y, b)})
-    |> W.M.run ~reset_encoding:true
-    in ()
+    let _ = W.Command.run rs (W.Command.Merge {a=(x, a); b=(y, b)})
+            |> W.M.run ~reset_encoding:true
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Merging FSMs.)";
+    ()
   }
 END 
 
@@ -83,19 +91,23 @@ VERNAC COMMAND EXTEND MeBi_Run_Minimize CLASSIFIED AS QUERY
 | ["MeBi" "Run" "Minimize" constr(x) "Using" reference(r)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = 
-    W.Command.run [] (W.Command.Minimize (x, r))
-    |> W.M.run ~reset_encoding:true
-    in ()
+    let _ = W.Command.run [] (W.Command.Minimize (x, r))
+            |> W.M.run ~reset_encoding:true
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Minimizing FSM.)";
+    ()
   }
   
 | ["MeBi" "Run" "Minimize" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = 
-    W.Command.run rs (W.Command.Minimize (x, r))
-    |> W.M.run ~reset_encoding:true 
-    in ()
+    let _ = W.Command.run rs (W.Command.Minimize (x, r))
+            |> W.M.run ~reset_encoding:true 
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Minimizing FSM.)";
+    ()
   }
 END 
 
@@ -104,19 +116,23 @@ VERNAC COMMAND EXTEND MeBi_Run_Saturate CLASSIFIED AS QUERY
 | ["MeBi" "Run" "Saturate" constr(x) "Using" reference(r)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = 
-    W.Command.run [] (W.Command.Saturate (x, r))
-    |> W.M.run ~reset_encoding:true
-    in ()
+    let _ = W.Command.run [] (W.Command.Saturate (x, r))
+          |> W.M.run ~reset_encoding:true
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Saturating FSM.)";
+    ()
   }
   
 | ["MeBi" "Run" "Saturate" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = 
-    W.Command.run rs (W.Command.Saturate (x, r))
-    |> W.M.run ~reset_encoding:true 
-    in ()
+    let _ = W.Command.run rs (W.Command.Saturate (x, r))
+            |> W.M.run ~reset_encoding:true 
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Saturating FSM.)";
+    ()
   }
 END 
 
@@ -125,19 +141,23 @@ VERNAC COMMAND EXTEND MeBi_Run_FSM CLASSIFIED AS QUERY
 | ["MeBi" "Run" "FSM" constr(x) "Using" reference(r)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = 
-    W.Command.run [] (W.Command.MakeFSM (x, r))
-    |> W.M.run ~reset_encoding:true
-    in ()
+    let _ = W.Command.run [] (W.Command.MakeFSM (x, r))
+            |> W.M.run ~reset_encoding:true
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Making FSM.)";
+    ()
   }
   
 | ["MeBi" "Run" "FSM" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = 
-    W.Command.run rs (W.Command.MakeFSM (x, r))
-    |> W.M.run ~reset_encoding:true 
-    in ()
+    let _ = W.Command.run rs (W.Command.MakeFSM (x, r))
+            |> W.M.run ~reset_encoding:true 
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Making FSM.)";
+    ()
   }
 END 
 
@@ -146,19 +166,23 @@ VERNAC COMMAND EXTEND MeBi_Run_LTS CLASSIFIED AS QUERY
 | ["MeBi" "Run" "LTS" constr(x) "Using" reference(r)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = 
-    W.Command.run [] (W.Command.MakeLTS (x, r))
-    |> W.M.run ~reset_encoding:true 
-    in ()
+    let _ = W.Command.run [] (W.Command.MakeLTS (x, r))
+            |> W.M.run ~reset_encoding:true 
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Making LTS.)";
+    ()
   }
   
 | ["MeBi" "Run" "LTS" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = 
-    W.Command.run rs (W.Command.MakeLTS (x, r))
-    |> W.M.run ~reset_encoding:true
-    in ()
+    let _ = W.Command.run rs (W.Command.MakeLTS (x, r))
+            |> W.M.run ~reset_encoding:true
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Making LTS.)";
+    ()
   }
 END 
 

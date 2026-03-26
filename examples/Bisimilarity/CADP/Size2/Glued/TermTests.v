@@ -27,14 +27,21 @@ Import Protocol.
 Require Import MEBI.Examples.CADP_Glued.
 Require Import MEBI.Examples.Bisimilarity.CADP.Size2.Terms.
 
-MeBi Divider "Examples.Bisimilarity.CADP.Size2.TermTests".
+MeBi Divider "Examples.Bisimilarity.CADP.Size2.Glued.TermTests".
 MeBi Config Weak As Option label.
 MeBi Config Bounds As Num States 5000.
 
-MeBi Divider "Examples.Bisimilarity.CADP.Size2.TermTests.bigstep".
-MeBi Run FSM c2 Using bigstep lts step.
-(* MeBi Run Saturate c2 Using bigstep lts step. *)
-(* MeBi Run Minimize c2 Using bigstep lts step. *)
+
+Require Import MEBI.Examples.Bisimilarity.CADP.Properties.MutualExclusion.
+MeBi Run Minimize (make_spec 1) Using spec_lts.
+
+
+
+MeBi Divider "Examples.Bisimilarity.CADP.Size2.Glued.TermTests.bigstep".
+(* MeBi Run FSM c2 Using bigstep. *)
+(* MeBi Run Saturate c2 Using bigstep. *)
+MeBi Run Minimize c2 Using bigstep.
+
 
 (* !! state explosion *)
 (* MeBi Run Bisim c2 With bigstep And c2 With lts Using step. *)

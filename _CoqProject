@@ -56,7 +56,7 @@ examples/CADP_Glued.v ### REQUIRED FOR BELOW
 examples/Bisimilarity/CADP/Properties/MutualExclusion.v ### REQUIRED FOR BELOW
 
 examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
-examples/Bisimilarity/CADP/Size1/TermTests.v ### Success
+# examples/Bisimilarity/CADP/Size1/TermTests.v ### Success
 # examples/Bisimilarity/CADP/Size1/MutualExclusion/PluginProofs.v ### Success
 
 # examples/Bisimilarity/CADP/Size1/Glued/TermTests.v ### Success
@@ -67,11 +67,9 @@ examples/Bisimilarity/CADP/Size1/TermTests.v ### Success
 examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size2/TermTests.v ### FAIL: state-explosion
 
-# examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### Success
+examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### Success
 # examples/Bisimilarity/CADP/Size2/Glued/PluginProofs.v ### FAIL: ^
-# examples/Bisimilarity/CADP/Size2/Glued/MutualExclusion/PluginProofs.v ### !!! WIP 
-
-# examples/CADP_v2.v ### WIP -- remodelling CADP 
+# examples/Bisimilarity/CADP/Size2/Glued/MutualExclusion/PluginProofs.v ### !!! WIP -- not bisim
 
 
 # TODO: 
