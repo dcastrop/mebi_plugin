@@ -11,6 +11,7 @@ MeBi Config Output "Show" False.
 MeBi Config Output "DecodeResults" False.
 MeBi Config Output "DumpResults" False.
 
+MeBi Config Output "Info" True.
 MeBi Config Output "DecodeResults" True.
 MeBi Config Output "DumpResults" True.
 
@@ -38,9 +39,11 @@ MeBi Run Minimize (make_spec 1) Using spec_lts.
 
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.Glued.TermTests.bigstep".
-(* MeBi Run FSM c2 Using bigstep. *)
+MeBi Run FSM c2 Using bigstep.
+
+(* !! takes very long time (4-12 hours) *)
 (* MeBi Run Saturate c2 Using bigstep. *)
-MeBi Run Minimize c2 Using bigstep.
+(* MeBi Run Minimize c2 Using bigstep. *)
 
 
 (* !! state explosion *)

@@ -11,6 +11,7 @@ MeBi Config Output "Show" False.
 MeBi Config Output "DecodeResults" False.
 MeBi Config Output "DumpResults" False.
 
+MeBi Config Output "Info" True.
 MeBi Config Output "DecodeResults" True.
 MeBi Config Output "DumpResults" True.
 
