@@ -53,25 +53,17 @@ Record qnode :=
   { next   : index
   ; locked : bool }.
 
-Module Qnode.
-  Definition initial : qnode := Build_qnode Nil false.
+Definition qnode_initial : qnode := Build_qnode Nil false.
+Definition qnode_create : qnode := qnode_initial.
+Definition qnode_set_next (i:index) (q:qnode) : qnode := Build_qnode i (locked q).
+Definition qnode_set_locked (b:bool) (q:qnode) : qnode := Build_qnode (next q) b.
 
-  Fixpoint create (n:nat) : list qnode :=
-    match n with
-    | 0    => []
-    | S m => app (create m) [Qnode.initial]
-    end.
-
-  Definition get_next   (q:qnode) : index := next q.
-  Definition get_locked (q:qnode) : bool  := locked q.
-
-  Definition set_next   (i:index) (q:qnode) : qnode :=
-    Build_qnode i (Qnode.get_locked q).
-
-  Definition set_locked (b:bool)  (q:qnode) : qnode :=
-    Build_qnode (Qnode.get_next q) b.
-
-End Qnode.
+Definition qnodes : Type := list qnode.
+Fixpoint qnodes_create (n:nat) : qnodes := 
+match n with
+| 0    => [qnode_create]
+| S m => qnode_create :: (qnodes_create m)
+end.
 
 (**********************************)
 (**** mem (Memory) Type ***********)
@@ -80,46 +72,33 @@ End Qnode.
 Record mem :=
   { mem_next : index
   ; mem_locked : bool
-  ; qnodes : list qnode
+  ; mem_qnodes : qnodes
   }.
 
+Definition mem_create (n:nat) : mem := Build_mem Nil false (qnodes_create n).
+Definition mem_set_next (i:index) (m:mem) : mem := Build_mem i (mem_locked m) (mem_qnodes m).
+Definition mem_set_locked (b:bool) (m:mem) : mem := Build_mem (mem_next m) b (mem_qnodes m).
+Definition mem_set_qnodes (q:qnodes) (m:mem) : mem := Build_mem (mem_next m) (mem_locked m) q.
+
 Module Memory.
-  Definition create (n:nat) : mem := Build_mem Nil false (Qnode.create n).
+  Definition nth_error (i:nat) (m:mem) : option qnode := nth_error (mem_qnodes m) i.
 
-  Definition get_mem_next   (m:mem) : index := mem_next m.
-  Definition get_mem_locked (m:mem) : bool  := mem_locked m.
-  Definition get_mem_qnodes (m:mem) : list qnode  := qnodes m.
-
-  Definition set_mem_next   (i:index) (m:mem) : mem :=
-    Build_mem i (get_mem_locked m) (get_mem_qnodes m).
-
-  Definition set_mem_locked (b:bool)  (m:mem) : mem :=
-    Build_mem (get_mem_next m) b (get_mem_qnodes m).
-
-  Definition nth_error (i:nat) (m:mem)
-  : option qnode := nth_error (qnodes m) i.
-
-  Definition nth_default (d:qnode) (i:nat) (m:mem)
-  : qnode := nth_default d (qnodes m) i.
-
-  Fixpoint qnodes_nth_replace (r:qnode) (i:nat) (qs:list qnode)
-  : option (list qnode) :=
-    match i, qs with
-    | _, [] => None
-    | 0, h :: t => Some (r :: t)
-    | S n, h :: t =>
-      match qnodes_nth_replace r n t with
-      | None => None
-      | Some t' => Some (h :: t')
-      end
-    end.
+  Fixpoint qnodes_nth_replace (r:qnode) (i:nat) (qs:list qnode) : option (list qnode) :=
+  match i, qs with
+  | _, [] => None
+  | 0, h :: t => Some (r :: t)
+  | S n, h :: t =>
+    match qnodes_nth_replace r n t with
+    | None => None
+    | Some t' => Some (h :: t')
+    end
+  end.
 
   Definition nth_replace (r:qnode) (i:nat) (m:mem) : option mem :=
-    match (qnodes_nth_replace r i (qnodes m)) with
-    | None => None
-    | Some qs => Some (Build_mem (mem_next m) (mem_locked m) qs)
-    end.
-
+  match (qnodes_nth_replace r i (mem_qnodes m)) with
+  | None => None
+  | Some qs => Some (Build_mem (mem_next m) (mem_locked m) qs)
+  end.
 End Memory.
 
 (*************************************************************************)
@@ -137,12 +116,11 @@ Module Vars.
 End Vars.
 
 Inductive local_var : Type :=
-  | PREDECESSOR
-  | LOCKED
-  | NEXT
-  | SWAP
-  | THE_PID
-  .
+| PREDECESSOR
+| LOCKED
+| NEXT
+| SWAP
+| THE_PID.
 
 Definition set_predecessor (i:index) (v:local_vars) : local_vars :=
   Build_local_vars i (var_locked v) (var_next v) (var_swap v).
@@ -163,40 +141,26 @@ Definition set_swap (b:bool) (v:local_vars) : local_vars :=
 (* FIXME: David mentioned to use [Set] instead of [Type] here,
 but it returned [Universal inconsistency, cannot enforce pid.u0<=Set] *)
 Inductive value : Type (*Set*) :=
-  | NAT : nat -> value
-  | PID : pid -> value
-  | INDEX : index -> value
-  | BOOL : bool -> value
-  | NIL : value
-  | GET : local_var -> value
-  .
-
-
-Definition value_to_index_opt (v:value) : option index :=
-  match v with
-  | NAT n => Some (Some n)
-  | PID p => Some (Index.of_pid p)
-  | INDEX i => Some i
-  | NIL => Some Nil
-  | _ => None (* i.e., BOOL *)
-  end.
-
+| NIL : value
+| NAT : nat -> value
+| PID : pid -> value
+| INDEX : index -> value
+| BOOL : bool -> value
+| GET : local_var -> value.
+  
 (*************************************************************************)
 (**** (Conditional) Expressions ******************************************)
 (*************************************************************************)
 
 Inductive expr : Type :=
-  | NOT : expr -> expr
-  | EQ : expr -> expr -> expr
-  | VAR : local_var -> expr
-  | VAL : value -> expr
-  | TRU : expr
-  | FLS : expr
-  .
+| TRU : expr
+| FLS : expr
+| NOT : expr -> expr
+| EQ : expr -> expr -> expr
+| VAR : local_var -> expr
+| VAL : value -> expr.
 
-Module Expr.
-  Definition of_bool (b:bool) : expr := if b then TRU else FLS.
-End Expr.
+Definition expr_of_bool (b:bool) : expr := if b then TRU else FLS.
 
 (*************************************************************************)
 (**** Debugging **********************************************************)
@@ -215,7 +179,7 @@ Record error := { error_code : nat
 (*************************************************************************)
 
 Definition resource : Type := mem * lock.
-Definition resource_create (n:nat) : resource := (Memory.create n, lock_initial).
+Definition resource_create (n:nat) : resource := (mem_create n, lock_initial).
 Definition resource_set_mem (m:mem) (r:resource) : resource := (m, snd r).
 Definition resource_set_lock (l:lock) (r:resource) : resource := (fst r, l).
 Definition resource_get_mem (r:resource) : mem := fst r.
@@ -252,6 +216,25 @@ Definition get_local_var_value (v:local_var) (s:state) : value :=
   | THE_PID     => PID   (get_pid s)
   end.
 
+Definition value_to_index_opt (v:value) : option index :=
+  match v with
+  | NAT n => Some (Some n)
+  | PID p => Some (Index.of_pid p)
+  | INDEX i => Some i
+  | NIL => Some Nil
+  | _ => None (* i.e., BOOL *)
+  end.
+
+Definition local_var_to_index_opt (x:local_var) (s:state) : option index := 
+  value_to_index_opt (get_local_var_value x s).
+
+Definition local_var_to_pid_opt (x:local_var) (s:state) : option pid := 
+  match local_var_to_index_opt x s with
+  | None => None
+  | Some None => None
+  | Some (Some n) => Some n
+  end.
+
 Definition set_vars (v:local_vars) (s:state) : state :=
   match s with | (p, _, e) => (p, v, e) end.
 
@@ -276,20 +259,15 @@ Definition add_error (e:error) (s:state) : state :=
 (*************************************************************************)
 
 Inductive act : Type :=
-  | NCS   : act
-  | ENTER : act
-  | LEAVE : act
-
-  | READ_NEXT   : act
-  | READ_LOCKED : act
-
-  (* below: [expr] as may be value or var *)
-  | WRITE_NEXT   : local_var -> value -> act
-  | WRITE_LOCKED : local_var -> value -> act
-
-  | FETCH_AND_STORE  : act
-  | COMPARE_AND_SWAP : act
-  .
+| NCS   : act
+| ENTER : act
+| LEAVE : act
+| READ_NEXT   : act
+| READ_LOCKED : act
+| FETCH_AND_STORE  : act
+| COMPARE_AND_SWAP : act
+| WRITE_NEXT   : local_var -> value -> act
+| WRITE_LOCKED : local_var -> value -> act.
 
 
 (*************************************************************************)
@@ -476,11 +454,11 @@ Definition read_next (e:env) : option env :=
 match Memory.nth_error (get_pid (get_state e)) (resource_get_mem (get_resource e)) with
 | None => return_error 10 "read_next, memory out of bounds" e None None
 | Some q => (* get next of qnode *)
-  let qnode_next:index := Qnode.get_next q in
+  let qnode_next:index := next q in
   (* update local vars *)
   let v:local_vars := set_next qnode_next (get_vars (get_state e)) in
   (* update mem_next *)
-  let m:mem := Memory.set_mem_next qnode_next (resource_get_mem (get_resource e)) in
+  let m:mem := mem_set_next qnode_next (resource_get_mem (get_resource e)) in
   (* update env *)
   Some (set_vars v (get_state e), resource_set_mem m (get_resource e))
 end.
@@ -493,48 +471,41 @@ Definition read_locked (e:env) : option env :=
 match Memory.nth_error (get_pid (get_state e)) (resource_get_mem (get_resource e)) with
 | None => return_error 10 "read_locked, memory out of bounds" e None None
 | Some q => (* get locked of qnode *)
-  let qnode_locked:bool := Qnode.get_locked q in
+  let qnode_locked:bool := locked q in
   (* update local vars *)
   let v:local_vars := set_locked qnode_locked (get_vars (get_state e)) in
   (* update mem_locked *)
-  let m:mem := Memory.set_mem_locked qnode_locked (resource_get_mem (get_resource e)) in
+  let m:mem := mem_set_locked qnode_locked (resource_get_mem (get_resource e)) in
   (* update env *)
   Some (set_vars v (get_state e), resource_set_mem m (get_resource e))
 end.
 
-Definition local_var_to_pid_opt (x:local_var) (s:state) : option pid :=
-match get_local_var_value x s with
-| INDEX i => i
-| PID p => Some p
-| _ => None (* [to_write] must be a [pid] *)
-end.
 
 (** [write_next to_write next e] will set the field [qnode.next] of the [qnode] 
   * of the index [to_write] to the value of [next]. *)
 Definition write_next (to_write:local_var) (next:value) (e:env) : option env :=
-  (* get value of [next] *)
-  match handle_value next (get_state e) with
-  | (_, Some errs) => return_error 89 "write_next, value of NEXT failed" e (Some to_write) (Some next)
-  | (None, None) => return_error 88 "write_next, value of NEXT could not resolve GET" e (Some to_write) (Some next)
-  | (Some next, None) =>
-    (* get pid from [to_write] *)
-    match local_var_to_pid_opt to_write (get_state e) with
-    | None => return_error 87 "write_next, value of TO_WRITE is not pid" e (Some to_write) (Some next)
-    | Some p => (* get qnode *)
-      match Memory.nth_error p (resource_get_mem (get_resource e)) with
-      | None => return_error 10 "write_next, memory out of bounds" e (Some to_write) (Some next)
-      | Some q => (* check [next] of [qnode] is some kind of nat *)
-        match value_to_index_opt next with
-        | None => return_error 86 "write_next, value of NEXT is not pid" e (Some to_write) (Some next)
-        | Some i => (* replace next of q with i *)
-          match Memory.nth_replace (Qnode.set_next i q) p (resource_get_mem (get_resource e)) with
-          | None => return_error 10 "write_next, replace memory out of bounds" e (Some to_write) (Some next)
-          | Some m => Some (get_state e, resource_set_mem m (get_resource e))
-          end
+(* get value of [next] *)
+match handle_value next (get_state e) with
+| (_, Some errs) => return_error 89 "write_next, value of NEXT failed" e (Some to_write) (Some next)
+| (None, None) => return_error 88 "write_next, value of NEXT could not resolve GET" e (Some to_write) (Some next)
+| (Some next, None) => (* get pid [to_write] *)
+  match local_var_to_pid_opt to_write (get_state e) with
+  | None => return_error 87 "write_next, value of TO_WRITE is not pid" e (Some to_write) (Some next)
+  | Some p => (* get qnode *)
+    match Memory.nth_error p (resource_get_mem (get_resource e)) with
+    | None => return_error 10 "write_next, memory out of bounds" e (Some to_write) (Some next)
+    | Some q => (* check [next] of [qnode] is some kind of nat *)
+      match value_to_index_opt next with
+      | None => return_error 86 "write_next, value of NEXT is not pid" e (Some to_write) (Some next)
+      | Some i => (* replace next of q with i *)
+        match Memory.nth_replace (qnode_set_next i q) p (resource_get_mem (get_resource e)) with
+        | None => return_error 10 "write_next, replace memory out of bounds" e (Some to_write) (Some next)
+        | Some m => Some (get_state e, resource_set_mem m (get_resource e))
         end
       end
     end
-  end.
+  end
+end.
 
 Definition value_to_bool_opt (x:value) : option bool :=
 match x with
@@ -545,29 +516,28 @@ end.
 (** [write_locked to_write locked e] will set the  field [qnode.locked] of the 
   * [qnode] of the index [to_write] to the value of [locked]. *)
 Definition write_locked (to_write:local_var) (locked:value) (e:env) : option env :=
-  (* get value of [locked] *)
-  match handle_value locked (get_state e) with
-  | (_, Some errs) => return_error 99 "write_locked, value of NEXT failed" e (Some to_write) (Some locked)
-  | (None, None) => return_error 98 "write_locked, value of NEXT could not resolve GET" e (Some to_write) (Some locked)
-  | (Some locked, None) =>
-    (* get pid from [to_write] *)
-    match local_var_to_pid_opt to_write (get_state e) with
-    | None => return_error 97 "write_locked, value of TO_WRITE is not pid" e (Some to_write) (Some locked)
-    | Some p => (* get qnode *)
-      match Memory.nth_error p (resource_get_mem (get_resource e)) with
-      | None => return_error 10 "write_locked, memory out of bounds" e (Some to_write) (Some locked)
-      | Some q => (* check [locked] of [qnode] is a [BOOL] *)
-        match value_to_bool_opt locked with
-        | None => return_error 98 "write_locked, locked value not bool" e (Some to_write) (Some locked) (* [locked] must be a [BOOL] *)
-        | Some b =>
-          match Memory.nth_replace (Qnode.set_locked b q) p (resource_get_mem (get_resource e)) with
-          | None => return_error 10 "write_locked, replace memory out of bounds" e (Some to_write) (Some locked)
-          | Some m => Some (get_state e, resource_set_mem m (get_resource e))
-          end
+(* get value of [locked] *)
+match handle_value locked (get_state e) with
+| (_, Some errs) => return_error 99 "write_locked, value of NEXT failed" e (Some to_write) (Some locked)
+| (None, None) => return_error 98 "write_locked, value of NEXT could not resolve GET" e (Some to_write) (Some locked)
+| (Some locked, None) => (* get pid from [to_write] *)
+  match local_var_to_pid_opt to_write (get_state e) with
+  | None => return_error 97 "write_locked, value of TO_WRITE is not pid" e (Some to_write) (Some locked)
+  | Some p => (* get qnode *)
+    match Memory.nth_error p (resource_get_mem (get_resource e)) with
+    | None => return_error 10 "write_locked, memory out of bounds" e (Some to_write) (Some locked)
+    | Some q => (* check [locked] of [qnode] is a [BOOL] *)
+      match value_to_bool_opt locked with
+      | None => return_error 98 "write_locked, locked value not bool" e (Some to_write) (Some locked) (* [locked] must be a [BOOL] *)
+      | Some b =>
+        match Memory.nth_replace (qnode_set_locked b q) p (resource_get_mem (get_resource e)) with
+        | None => return_error 10 "write_locked, replace memory out of bounds" e (Some to_write) (Some locked)
+        | Some m => Some (get_state e, resource_set_mem m (get_resource e))
         end
       end
     end
-  end.
+  end
+end.
 
 (*************************************************************************)
 (**** Actions ************************************************************)
@@ -644,16 +614,13 @@ Fixpoint unfold (new:rec_def) (old:tm) : tm :=
 
 Definition take_branch (c:expr) (t1:tm) (t2:tm) (e:env) : tm * env :=
   match eval c (get_state e) with
-  | (Some (BOOL true), None) => (t1, e)
-  | (Some (BOOL false), None) => (t2, e)
-  (** NOTE: the below are for detecting errors *)
-  | (Some other, None) => (ERR, ((add_error (Build_error 1 "conditional statement evaluated to non-bool type" (Build_error_info (Some (c, Some [other])) (None, None))) (get_state e)), get_resource e))
-
-  | (Some other, Some errs) => (ERR, ((add_error (Build_error 2 "conditional statement evaluated to non-bool type with caused error" (Build_error_info (Some (c, Some (other :: errs))) (None, None))) (get_state e)), get_resource e))
-
-  | (None, None) => (ERR, ((add_error (Build_error 3 "conditional statement could not be evaluated" (Build_error_info (Some (c, None)) (None, None))) (get_state e)), get_resource e))
-
-  | (None, Some errs) => (ERR, ((add_error (Build_error 4 "conditional statement could not be evaluated with error" (Build_error_info (Some (c, Some (errs))) (None, None))) (get_state e)), get_resource e))
+  | (Some v, _errs_opt) => 
+    match value_to_bool_opt v with
+    | None => (ERR, ((add_error (Build_error 1 "conditional statement evaluated to non-bool type" (Build_error_info (Some (c, _errs_opt)) (None, Some v))) (get_state e)), get_resource e))
+    | Some true => (t1, e)
+    | Some false => (t2, e)
+    end
+  | (None, errs) => (ERR, ((add_error (Build_error 3 "conditional statement could not be evaluated" (Build_error_info (Some (c, errs)) (None, None))) (get_state e)), get_resource e))
   end.
 
 
@@ -707,63 +674,50 @@ Inductive lts : composition -> option label -> composition -> Prop :=
 
 Module Protocol.
 
-  Import CADP.Expr.
-
 Example AcquireInnerDef : idef := 2.
 Example AcquireInnerBody : tm :=
-  SEQ 
-    (ACT READ_LOCKED) 
-    (IF (VAR LOCKED) 
-      (REC_CALL (AcquireInnerDef)) 
-      (OK)).
+  SEQ (ACT READ_LOCKED) 
+      (IF (VAR LOCKED) 
+          (REC_CALL (AcquireInnerDef)) 
+          (OK)).
 
-Example AcquireInnerLoop : tm := 
-  REC_DEF (AcquireInnerDef) (AcquireInnerBody).
+Example AcquireInnerLoop : tm := REC_DEF (AcquireInnerDef) (AcquireInnerBody).
 
 Example Acquire : tm :=
-  SEQ 
-    (ACT (WRITE_NEXT THE_PID NIL)) 
-    (SEQ 
-      (ACT FETCH_AND_STORE) 
-      (IF (EQ (VAR PREDECESSOR) (VAL NIL)) 
-        (OK) 
-        (SEQ 
-          (ACT (WRITE_LOCKED THE_PID (BOOL true))) 
-          (SEQ 
-            (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) 
-            (AcquireInnerLoop))))).
+  SEQ (ACT (WRITE_NEXT THE_PID NIL)) 
+      (SEQ (ACT FETCH_AND_STORE) 
+           (IF (EQ (VAR PREDECESSOR) (VAL NIL)) 
+               (OK) 
+               (SEQ (ACT (WRITE_LOCKED THE_PID (BOOL true))) 
+                    (SEQ (ACT (WRITE_NEXT PREDECESSOR (GET THE_PID))) 
+                         (AcquireInnerLoop))))).
 
 Example ReleaseInnerDef : idef := 1.
 Example ReleaseInnerBody : tm :=
-  SEQ 
-    (ACT READ_NEXT) 
-    (IF (EQ (VAL NIL) (VAR NEXT))
-      (REC_CALL (ReleaseInnerDef))
-      (ACT (WRITE_LOCKED NEXT (BOOL false)))).
+  SEQ (ACT READ_NEXT) 
+      (IF (EQ (VAL NIL) (VAR NEXT))
+          (REC_CALL (ReleaseInnerDef))
+          (ACT (WRITE_LOCKED NEXT (BOOL false)))).
 
-Example ReleaseInnerLoop : tm := 
-  REC_DEF (ReleaseInnerDef) (ReleaseInnerBody).
+Example ReleaseInnerLoop : tm := REC_DEF (ReleaseInnerDef) (ReleaseInnerBody).
 
 Example Release : tm :=
-  SEQ 
-    (ACT READ_NEXT) 
-    (IF (EQ (VAL NIL) (VAR NEXT)) 
-      (SEQ 
-        (ACT COMPARE_AND_SWAP) 
-        (IF (EQ FLS (VAR SWAP)) 
-          (ReleaseInnerLoop) 
-          (OK))) 
-      (ACT (WRITE_LOCKED NEXT (BOOL false)))).
+  SEQ (ACT READ_NEXT) 
+      (IF (EQ (VAL NIL) (VAR NEXT)) 
+          (SEQ (ACT COMPARE_AND_SWAP) 
+               (IF (EQ FLS (VAR SWAP)) 
+                   (ReleaseInnerLoop) 
+                   (OK))) 
+          (ACT (WRITE_LOCKED NEXT (BOOL false)))).
 
 Example PMainLoopDef : idef := 0.
 Example P : tm :=
-  REC_DEF (PMainLoopDef) (
-    (* SEQ (ACT NCS) ( *)
-    SEQ (Acquire) (
-    SEQ (ACT ENTER) (
-    SEQ (ACT LEAVE) (
-    SEQ (Release) (
-    REC_CALL (PMainLoopDef)))))(* ) *)).
+  REC_DEF (PMainLoopDef) 
+          (SEQ (Acquire) 
+               (SEQ (ACT ENTER) 
+                    (SEQ (ACT LEAVE) 
+                         (SEQ (Release) 
+                              (REC_CALL (PMainLoopDef)))))).
 
 
 End Protocol.

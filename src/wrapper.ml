@@ -1287,17 +1287,13 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       let open M.Syntax in
       Config.load_the_bounds_args ();
       let* () = Config.load_weak_args () in
-      let r, s =
-        match x with
-        | MakeLTS args -> do_make_lts args refs, "Making LTS"
-        | MakeFSM args -> do_make_fsm args refs, "Making FSM"
-        | Saturate args -> do_saturate args refs, "Saturating FSM"
-        | Minimize args -> do_minimize args refs, "Minimizing FSM"
-        | Merge args -> do_merge args refs, "Merging FSMs"
-        | CheckBisim args -> do_check_bisim args refs, "Checking Bisimilarity"
-      in
-      Log.info (Printf.sprintf "(Finished %s.)" s);
-      r
+      match x with
+      | MakeLTS args -> do_make_lts args refs
+      | MakeFSM args -> do_make_fsm args refs
+      | Saturate args -> do_saturate args refs
+      | Minimize args -> do_minimize args refs
+      | Merge args -> do_merge args refs
+      | CheckBisim args -> do_check_bisim args refs
     ;;
   end
 end

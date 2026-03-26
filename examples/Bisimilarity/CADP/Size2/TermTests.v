@@ -30,7 +30,8 @@ Require Import MEBI.Examples.Bisimilarity.CADP.Size2.Terms.
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.TermTests".
 MeBi Config Weak As Option label.
 (* !!! incomplete at 8000 *)
-MeBi Config Bounds As Num States 15000.
+(* MeBi Config Bounds As Num States 15000. *)
+MeBi Config Bounds As Num States 5000.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size2.TermTests.step".
 (* !!! state-explosion *)
