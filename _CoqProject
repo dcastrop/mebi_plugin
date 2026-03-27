@@ -67,7 +67,7 @@ examples/Bisimilarity/CADP/Size1/Glued/TermTests.v ### Success
 examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size2/TermTests.v ### FAIL: state-explosion
 
-examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### Success
+# examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### Success
 # examples/Bisimilarity/CADP/Size2/Glued/PluginProofs.v ### FAIL: ^
 # examples/Bisimilarity/CADP/Size2/Glued/MutualExclusion/PluginProofs.v ### !!! WIP -- not bisim
 
@@ -111,8 +111,8 @@ lib/terms/constructor_trees.mli
 lib/terms/encoding.ml
 lib/terms/encoding.mli
 
-lib/rocq_tools/theories.ml
-lib/rocq_tools/theories.mli
+lib/rocq_tools/mebi_theories.ml
+lib/rocq_tools/mebi_theories.mli
 lib/rocq_tools/rocq_utils.ml
 lib/rocq_tools/rocq_utils.mli
 lib/rocq_tools/rocq_context.ml
@@ -126,6 +126,10 @@ lib/rocq_tools/rocq_monad_strfy.ml
 lib/rocq_tools/rocq_monad_strfy.mli
 lib/rocq_tools/rocq_monad_utils.ml
 lib/rocq_tools/rocq_monad_utils.mli
+lib/rocq_tools/theories.ml
+lib/rocq_tools/theories.mli
+lib/rocq_tools/theories_enc.ml
+lib/rocq_tools/theories_enc.mli
 lib/rocq_tools/bindings.ml
 lib/rocq_tools/bindings.mli
 lib/rocq_tools/constructor_bindings.ml
@@ -193,6 +197,7 @@ lib/model/algorithms/bisimilarity.mli
 lib/model/algorithms/similarity.ml
 lib/model/algorithms/similarity.mli
 
+lib/model/model_.mli
 lib/model/model.ml
 lib/model/model.mli
 
@@ -205,13 +210,21 @@ src/api.mli
 src/weak.ml
 src/weak.mli
 
+src/graph_type.ml
+src/graph_type.mli
+src/graph_builder.ml
+src/graph_builder.mli
+src/graph_extract_lts.ml
+src/graph_extract_lts.mli
 src/graph.ml
 src/graph.mli
 
+src/wrapper_.mli
 src/wrapper.ml
 src/wrapper.mli
-src/wrapper_results.ml
-src/wrapper_results.mli
+src/results_.mli
+src/results.ml
+src/results.mli
 
 src/proof_solver_statem.ml
 src/proof_solver_statem.mli

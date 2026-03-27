@@ -1,5 +1,5 @@
 module type S = sig
-  include Wrapper.S
+  include Wrapper_.S
 
   val the_result : Decode.bisimilarity ref option ref
 
@@ -32,26 +32,3 @@ module type S = sig
 
   (* val get_candidates : Model.State.t -> Model.Label.t -> Model.EdgeMap.t' -> Model.State.t -> Model.States.t *)
 end
-
-module Make
-    (Log : Logger.S)
-     (* (W : Wrapper.S) :
-        S
-        with type enc = W.enc
-        and type node = W.node
-        and type tree = W.tree
-        and type trees = W.trees *)
-    (Ctx : Rocq_context.S)
-    (Enc : Encoding.S) :
-  S
-  with module M.Ctx = Ctx
-   and type enc = Enc.t
-   and type node = Enc.Tree.Node.t
-   and type tree = Enc.Tree.t
-   and type trees = Enc.Trees.t
-(* val make
-   :  ?log:(unit -> (module Logger.S))
-   -> ?enc:((module Logger.S) -> (module Encoding.S))
-   -> ?ctx:(module Rocq_context.S)
-   -> unit
-   -> (module S) *)

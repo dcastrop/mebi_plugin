@@ -1,95 +1,169 @@
-(* module type S = sig
-  type enc
-  type tree
-  type action
+module type S = sig
+  type weak
+  type 'a mm
+  type t
+  type lts
 
-  module States : Set.S with type elt = enc
-  module Destinations : Set.S with type elt = enc * tree
-  module Actions : Hashtbl.S with type key = action
+  val build
+    :  ?weak:weak option
+    -> Constrexpr.constr_expr
+    -> Libnames.qualid
+    -> Names.GlobRef.t list
+    -> t mm
+
+  val extract : t -> lts mm
 end
 
 module Make
     (Log : Logger.S)
     (Enc : Encoding.S)
-    (Action : Action.S with type trees = Enc.Trees.t)
-    (S : Set.S with type elt = Enc.t)
-    (D : Set.S with type elt = Enc.t * Enc.Tree.t)
-    (A : Hashtbl.S with type key = Action.t)
-    (T : Hashtbl.S with type key = Enc.t) :
-  S with type enc = Enc.t and type tree = Enc.Tree.t with type action = Action.t =
+    (M : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t)
+    (Weak : Weak.S with type enc = Enc.t)
+    (Theory :
+       Theories_enc.S
+       with type enc = Enc.t
+        and type 'a mm = 'a M.mm
+        and type 'a im = 'a M.mm)
+    (ConstructorBindings :
+       Constructor_bindings.S with type 'a mm = 'a M.mm and type ind = M.Ind.t)
+    (Model :
+       Model_.S
+       with type base = Enc.t
+        and type tree = Enc.Tree.t
+        and type trees = Enc.Trees.t
+        and type constructorbindings = ConstructorBindings.t)
+    (X : Graph_type.Args with type enc = Enc.t and type tree = Enc.Tree.t) :
+  S with type weak = Weak.t and type 'a mm = 'a M.mm and type lts = Model.LTS.t =
 struct
-  type enc = Enc.t
-  type tree = Enc.Tree.t
-  type action = Action.t
+  type weak = Weak.t
+  type 'a mm = 'a M.mm
+  type lts = Model.LTS.t
 
-  (** [module States] is for tracking visited states, an alternative to [Model.States].
-  *)
-  module States : Set.S with type elt = Enc.t = S
+  module G :
+    Graph_type.S
+    with type enc = Enc.t
+     and type tree = Enc.Tree.t
+     and type action = Model.Action.t
+     and type weak = Weak.t
+     and type ind = M.Ind.t
+     and module B = M.B
+     and module F = M.F
+     and type indmap = M.Ind.t M.B.t
+     and type 'a mm = 'a M.mm =
+    Graph_type.Make (Log) (Enc) (M) (Weak) (Theory) (ConstructorBindings)
+      (Model)
+      (X)
 
-  (** [module Destinations] is similar to [module S], but each "destination state" is paired with a constructor tree detailing which constructors to take to reach it, which in the context of [module Actions] and [module Transitions] later illustrates how to get from one state to another via certain constructors.
-  *)
-  module Destinations : Set.S with type elt = Enc.t * Enc.Tree.t = D
+  type t = G.t
 
-  (** [module Actions] is a [Graph] alternative to [Model.ActionMap] *)
-  module Actions = struct
-    module Map_ : Hashtbl.S with type key = Action.t = A
-    include Map_
+  module Builder :
+    Graph_builder.S
+    with type t = G.t
+     and type 'a mm = 'a M.mm
+     and type enc = Enc.t
+     and type tree = Enc.Tree.t
+     and type action = Model.Action.t
+     and type constructor = M.Constructor.t
+     and type states = G.States.t =
+    Graph_builder.Make (Log) (Enc) (M) (Model) (G)
 
-    type t' = Destinations.t t
+  open G
+  module LTS = Model.LTS
 
-    let size (xs : t') : int =
-      Log.trace __FUNCTION__;
-      fold (fun k v n -> Destinations.cardinal v + n) xs 0
-    ;;
+  let encode_indlts (x : Names.GlobRef.t) (ltsmap : G.indmap) : unit M.mm =
+    let open M.Syntax in
+    (* NOTE: [M.Ind.lts] automatically encodes [x.ind] into the bi-enc maps. *)
+    let* x : M.Ind.t = M.Ind.lts x in
+    M.Ind.log ~__FUNCTION__ ~m:Debug ~s:"x" x;
+    (* NOTE: [ind_defs] is a separate map, so add again using same enc. *)
+    M.B.replace ltsmap x.enc x;
+    M.return ()
+  ;;
 
-    let update (x : t') (action : Action.t) (states : Destinations.t) : unit =
-      Log.trace __FUNCTION__;
-      if Destinations.is_empty states
-      then ()
-      else (
-        match find_opt x action with
-        | None -> add x action states
-        | Some old_states ->
-          replace x action (Destinations.union old_states states))
-    ;;
-  end
+  let build_ltsmap (grefs : Names.GlobRef.t list) : M.Ind.t M.B.t M.mm =
+    Log.trace __FUNCTION__;
+    let ltsmap : G.indmap = M.B.create (List.length grefs) in
+    let open M.Syntax in
+    let f (i : int) () = encode_indlts (List.nth grefs i) ltsmap in
+    let* () = M.iterate 0 (List.length grefs - 1) () f in
+    M.return ltsmap
+  ;;
 
-  (** [module Transitions] is an alternative to [Model.EdgeMap], but for transitions.
-  *)
-  module Transitions = struct
-    module Map_ : Hashtbl.S with type key = Enc.t = T
-    include T
+  exception LTSMapDoesNotContainPrimaryLTS of G.indmap * Libnames.qualid
 
-    type t' = Actions.t' t
+  let get_primary_lts (ltsmap : G.indmap) (primary_lts : Libnames.qualid)
+    : M.Ind.t M.mm
+    =
+    Log.trace __FUNCTION__;
+    let open M.Syntax in
+    let* x : M.Ind.t = Nametab.global primary_lts |> M.Ind.lts in
+    M.Ind.log ~__FUNCTION__ ~m:Debug ~s:"primary lts" x;
+    (* NOTE: below is a sanity check *)
+    try M.encode x.ind |> M.B.find ltsmap |> M.return with
+    | Not_found -> raise (LTSMapDoesNotContainPrimaryLTS (ltsmap, primary_lts))
+  ;;
 
-    let update
-          (x : t')
-          (from : Enc.t)
-          (action : Action.t)
-          (destinations : Destinations.t)
-      : unit
-      =
-      Log.trace __FUNCTION__;
-      match find_opt x from with
-      | None ->
-        [ action, destinations ] |> List.to_seq |> Actions.of_seq |> add x from
-      | Some actions -> Actions.update actions action destinations
-    ;;
+  (** normalize and encode the initial term *)
+  let initialize_term (x : Constrexpr.constr_expr) (lts : M.Ind.t)
+    : EConstr.t M.mm
+    =
+    Log.trace __FUNCTION__;
+    let open M.Syntax in
+    let* x : EConstr.t = M.constrexpr_to_econstr x in
+    let* x : EConstr.t = M.econstr_normalize x in
+    let$* _unit env sigma =
+      M.Ind.get_lts_term_type lts |> Typing.check env sigma x
+    in
+    M.return x
+  ;;
 
-    let size (xs : t') : int =
-      Log.trace __FUNCTION__;
-      fold (fun k v n -> Actions.size v + n) xs 0
-    ;;
-  end
+  let encode_initial_term (x : Constrexpr.constr_expr) (lts : M.Ind.t)
+    : Enc.t M.mm
+    =
+    Log.trace __FUNCTION__;
+    let open M.Syntax in
+    let* x : EConstr.t = initialize_term x lts in
+    let init : Enc.t = M.encode x in
+    Enc.log ~__FUNCTION__ ~m:Debug ~s:"init enc" init;
+    M.return init
+  ;;
 
-  (** [t] is a record containing a queue of [EConstr.t]s [to_visit], a set of states visited (i.e., [EConstr.t]s), and a hashtbl mapping [EConstr.t] to a map of [constr_transitions], which maps [action]s to [EConstr.t]s and their [Tree.t].
-  *)
-  (* type t =
-      { to_visit : Enc.t Queue.t
-      ; init : Enc.t
-      ; states : Visited.t
-      ; transitions : Transitions.t'
-      ; ind_defs : M.Ind.t M.B.t
-      ; weak : Weak.t option
-      } *)
-end *)
+  let build
+        ?(weak : Weak.t option = None)
+        (starting_term : Constrexpr.constr_expr)
+        (primary_lts : Libnames.qualid)
+        (grefs : Names.GlobRef.t list)
+    : G.t M.mm
+    =
+    Log.trace __FUNCTION__;
+    let open M.Syntax in
+    let* ltsmap : G.indmap = build_ltsmap grefs in
+    let* primary_lts : M.Ind.t = get_primary_lts ltsmap primary_lts in
+    let* init : Enc.t = encode_initial_term starting_term primary_lts in
+    Log.info "Building the Graph...";
+    let the_graph : t ref = ref (create init ltsmap primary_lts weak) in
+    Queue.push init !the_graph.to_visit;
+    let* the_graph : t = Builder.build !the_graph in
+    Log.info "Finished Building Graph.";
+    M.return the_graph
+  ;;
+
+  module Extract :
+    Graph_extract_lts.S
+    with type t = G.t
+     and type lts = Model.LTS.t
+     and type 'a mm = 'a M.mm =
+    Graph_extract_lts.Make (Log) (Enc) (M) (Weak) (Theory) (ConstructorBindings)
+      (Model)
+      (X)
+      (G)
+
+  let extract (g : G.t) : LTS.t M.mm =
+    Log.trace __FUNCTION__;
+    Log.info "Extracting LTS from Graph...";
+    let open M.Syntax in
+    let* x : LTS.t = Extract.extract g in
+    Log.info "Finished Extracting LTS.";
+    M.return x
+  ;;
+end

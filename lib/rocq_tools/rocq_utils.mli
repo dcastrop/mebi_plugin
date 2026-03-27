@@ -235,5 +235,4 @@ val econstr_to_constr
 val econstr_to_constr_opt : Evd.evar_map -> Evd.econstr -> Constr.t option
 val globref_to_econstr : Environ.env -> Names.GlobRef.t -> Evd.econstr
 val is_constant : Evd.evar_map -> Evd.econstr -> (unit -> Evd.econstr) -> bool
-val is_theory : Evd.evar_map -> Evd.econstr -> bool
 val libnames_to_globrefs : Libnames.qualid list -> Names.GlobRef.t list

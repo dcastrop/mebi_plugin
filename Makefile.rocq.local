@@ -1,1 +1,1 @@
-CAMLPKGS = -package yojson
+CAMLPKGS = -package yojson -package benchmark

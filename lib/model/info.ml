@@ -38,12 +38,18 @@ module type S = sig
   type t =
     { meta : Meta.t option
     ; weak_labels : labels
-    ; num_states : int
+    ; nums : nums option
+    }
+
+  and nums =
+    { states : int
+    ; labels : int
+    ; edges : int
     }
 
   include Json.S with type k = t
 
-  val merge : ?num_states:int -> t -> t -> t
+  val merge : ?nums:nums option -> t -> t -> t
 end
 
 module Make
@@ -167,7 +173,13 @@ module Make
   type t =
     { meta : Meta.t option
     ; weak_labels : labels
-    ; num_states : int
+    ; nums : nums option
+    }
+
+  and nums =
+    { states : int
+    ; labels : int
+    ; edges : int
     }
 
   include
@@ -180,19 +192,27 @@ module Make
 
         let json ?as_elt (x : t) : Yojson.t =
           `Assoc
-            [ "num states", `Int x.num_states
+            [ ( "nums"
+              , Json.option
+                  (fun ?as_elt ({ states; labels; edges } : nums) ->
+                    `Assoc
+                      [ "states", `Int states
+                      ; "labels", `Int labels
+                      ; "edges", `Int edges
+                      ])
+                  x.nums )
             ; "meta", Json.option ~as_elt:true Meta.json x.meta
             ; "weak labels", Labels.json ~as_elt:true x.weak_labels
             ]
         ;;
       end)
 
-  (** [merge a b] returns a new [t] with a union of [weak_labels] and [meta=(Meta.merge_opt ...)].
+  (** [merge ?nums a b] returns a new [t] with a union of [weak_labels] and [meta=(Meta.merge_opt ...)].
   *)
-  let merge ?(num_states : int = -1) (a : t) (b : t) : t =
+  let merge ?(nums : nums option = None) (a : t) (b : t) : t =
     { meta = Meta.merge_opt a.meta b.meta
     ; weak_labels = Labels.union a.weak_labels b.weak_labels
-    ; num_states
+    ; nums
     }
   ;;
 end

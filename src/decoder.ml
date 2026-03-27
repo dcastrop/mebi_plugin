@@ -63,7 +63,7 @@ module Make
     (M : Rocq_monad_utils.S with type enc = Enc.t)
     (ConstructorBindings : Constructor_bindings.S with type 'a mm = 'a M.mm)
     (Model :
-       Model.S
+       Model_.S
        with type base = Enc.t
         and type tree = Enc.Tree.t
         and type trees = Enc.Trees.t
@@ -448,7 +448,16 @@ module Make
 
           let json ?as_elt (x : Model.Info.t) : Yojson.t =
             `Assoc
-              [ "num states", `Int x.num_states
+              [ ( "nums"
+                , Json.option
+                    (fun ?as_elt
+                      ({ states; labels; edges } : Model.Info.nums) ->
+                      `Assoc
+                        [ "states", `Int states
+                        ; "labels", `Int labels
+                        ; "edges", `Int edges
+                        ])
+                    x.nums )
               ; "meta", Json.option ~as_elt:true Meta.json x.meta
               ; "weak labels", Labels.json ~as_elt:true x.weak_labels
               ]

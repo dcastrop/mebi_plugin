@@ -14,6 +14,7 @@ module type S = sig
 
   include Json.S with type k = t'
 
+  val size : t' -> int
   val update : t' -> state -> action -> states -> unit
   val destinations : t' -> state -> states
   val get_actions : t' -> state -> actions
@@ -94,6 +95,10 @@ module Make
         let name = "Actions"
         let compare a b : int = 0
       end)
+
+  let size (x : t') : int =
+    fold (fun _ (ys : ActionMap.t') (z : int) -> z + ActionMap.size ys) x 0
+  ;;
 
   let update
         (x : t')

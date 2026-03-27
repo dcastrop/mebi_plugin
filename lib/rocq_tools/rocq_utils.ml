@@ -674,12 +674,6 @@ let is_constant sigma (x : EConstr.t) (c : unit -> EConstr.t) : bool =
   | _ -> false
 ;;
 
-let is_theory sigma (x : EConstr.t) : bool =
-  let cs = Theories.collect_bisimilarity_theories () in
-  let fx = EConstr.eq_constr sigma x in
-  List.exists fx cs
-;;
-
 (* let is_app sigma (x : EConstr.t) : bool = EConstr.isApp sigma x *)
 
 (* let is_var sigma (x : EConstr.t) : bool =

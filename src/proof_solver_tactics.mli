@@ -100,7 +100,7 @@ module Make
     (Enc : Encoding.S)
     (Tactic : Proof_solver_tactic.S)
     (W :
-       Wrapper_results.S
+       Results_.S
        with type enc = Enc.t
         and type node = Enc.Tree.Node.t
         and type tree = Enc.Tree.t

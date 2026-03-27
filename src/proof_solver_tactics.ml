@@ -100,7 +100,7 @@ module Make
     (Enc : Encoding.S)
     (Tactic : Proof_solver_tactic.S)
     (W :
-       Wrapper_results.S
+       Results_.S
        with type enc = Enc.t
         and type node = Enc.Tree.Node.t
         and type tree = Enc.Tree.t
@@ -261,14 +261,17 @@ module Make
     |> return
   ;;
 
-  let apply_Pack_sim () : Tactic.t mm = apply (Theories.c_Pack_sim ())
-  let apply_In_sim () : Tactic.t mm = apply (Theories.c_In_sim ())
-  let apply_wk_none () : Tactic.t mm = apply (Theories.c_wk_none ())
-  let apply_rt1n_refl () : Tactic.t mm = apply (Theories.c_rt1n_refl ())
-  let apply_rt1n_trans () : Tactic.t mm = apply (Theories.c_rt1n_trans ())
-  let apply_weak_sim_refl () : Tactic.t mm = apply (Theories.c_weak_sim_refl ())
+  let apply_Pack_sim () : Tactic.t mm = apply (Mebi_theories.c_Pack_sim ())
+  let apply_In_sim () : Tactic.t mm = apply (Mebi_theories.c_In_sim ())
+  let apply_wk_none () : Tactic.t mm = apply (Mebi_theories.c_wk_none ())
+  let apply_rt1n_refl () : Tactic.t mm = apply (Mebi_theories.c_rt1n_refl ())
+  let apply_rt1n_trans () : Tactic.t mm = apply (Mebi_theories.c_rt1n_trans ())
 
-  (* let apply_wk_bisim_refl () : Tactic.t mm = apply (Theories.c_wk_bisim_refl ()) *)
+  let apply_weak_sim_refl () : Tactic.t mm =
+    apply (Mebi_theories.c_weak_sim_refl ())
+  ;;
+
+  (* let apply_wk_bisim_refl () : Tactic.t mm = apply (Mebi_theories.c_wk_bisim_refl ()) *)
 
   let eapply (x : EConstr.t) : Tactic.t mm =
     Tactics.eapply x
@@ -276,9 +279,12 @@ module Make
     |> return
   ;;
 
-  let eapply_wk_some () : Tactic.t mm = eapply (Theories.c_wk_some ())
-  let eapply_rt1n_refl () : Tactic.t mm = eapply (Theories.c_rt1n_refl ())
-  let eapply_rt1n_trans () : Tactic.t mm = eapply (Theories.c_rt1n_trans ())
+  let eapply_wk_some () : Tactic.t mm = eapply (Mebi_theories.c_wk_some ())
+  let eapply_rt1n_refl () : Tactic.t mm = eapply (Mebi_theories.c_rt1n_refl ())
+
+  let eapply_rt1n_trans () : Tactic.t mm =
+    eapply (Mebi_theories.c_rt1n_trans ())
+  ;;
 
   (** {b counter intuitively, this applies a transition if the label is silent.} This is because we use this to determine if we need to unfold the [weak] transition from the [Bisimilarity.v] theory.
   *)
@@ -362,8 +368,8 @@ module Make
       (match ys with [] -> None | ys -> Some (Tactic.chain ys))
   ;;
 
-  let unfold_silent () : Tactic.t = unfold_econstr (Theories.c_silent ())
-  let unfold_silent1 () : Tactic.t = unfold_econstr (Theories.c_silent1 ())
+  let unfold_silent () : Tactic.t = unfold_econstr (Mebi_theories.c_silent ())
+  let unfold_silent1 () : Tactic.t = unfold_econstr (Mebi_theories.c_silent1 ())
 
   (* *)
   let do_refl () : Tactic.t mm =

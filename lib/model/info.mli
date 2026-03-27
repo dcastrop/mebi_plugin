@@ -38,12 +38,18 @@ module type S = sig
   type t =
     { meta : Meta.t option
     ; weak_labels : labels
-    ; num_states : int
+    ; nums : nums option
+    }
+
+  and nums =
+    { states : int
+    ; labels : int
+    ; edges : int
     }
 
   include Json.S with type k = t
 
-  val merge : ?num_states:int -> t -> t -> t
+  val merge : ?nums:nums option -> t -> t -> t
 end
 
 module Make

@@ -14,7 +14,8 @@ module type S = sig
     ; edges : edgemap
     ; info : info
     }
-include Json.S with type k = t
+
+  include Json.S with type k = t
 
   val of_lts : lts -> t
   val merge : t -> t -> t
