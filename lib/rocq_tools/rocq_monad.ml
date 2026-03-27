@@ -66,9 +66,7 @@ end
 
 module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   S with module Ctx = Ctx and type enc = Enc.t = struct
-  module BiEnc : Bi_encoding.S with module Ctx = Ctx and type enc = Enc.t =
-    Bi_encoding.Make (Log) (Ctx) (Enc)
-
+  module BiEnc = Bi_encoding.Make (Log) (Ctx) (Enc)
   include BiEnc
 
   let bienc_to_list : unit -> (Enc.t * EConstr.t) list = to_list

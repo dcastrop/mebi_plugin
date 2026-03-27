@@ -8,13 +8,13 @@ module type S = sig
   type t =
     { init : state option
     ; terminals : states
-    ; alphabet : labels 
+    ; alphabet : labels
     ; states : states
     ; transitions : transitions
     ; info : info
     }
-    include Json.S with type k = t
 
+  include Json.S with type k = t
 end
 
 module Make
@@ -22,11 +22,11 @@ module Make
     (State : State.S)
     (States : States.S with type elt = State.t)
     (Labels : Labels.S)
-    (Transitions : Transitions.S with type labels = Labels.t )
+    (Transitions : Transitions.S with type labels = Labels.t)
     (Info : Info.S with type base = State.base and type labels = Labels.t) :
   S
   with type state = State.t
    and type states = States.t
    and type labels = Labels.t
    and type transitions = Transitions.t
-   and type info = Info.t 
+   and type info = Info.t

@@ -11,6 +11,7 @@ module type S = sig
 
   include Json.S with type k = t'
 
+  val size : t' -> int
   val update : t' -> action -> states -> unit
   val destinations : t' -> states
   val reduce_by_label : t' -> label -> t'
@@ -61,6 +62,10 @@ module Make
 
         let name = "Destinations"
       end)
+
+  let size (x : t') : int =
+    fold (fun _ (ys : States.t) (z : int) -> z + States.cardinal ys) x 0
+  ;;
 
   (** [update] ... if the action is already present, then along with merging the destination states, we also merge the constructor trees.
   *)

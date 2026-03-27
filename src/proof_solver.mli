@@ -10,7 +10,7 @@ module type S = sig
   module Tactic : Proof_solver_tactic.S
 
   module W :
-    Wrapper_results.S
+    Results_.S
     with type enc = enc
      and type node = node
      and type tree = tree

@@ -8,13 +8,15 @@
   rocq-mebi.mebi_lib.terms
   yojson)
  (modules
-  theories
+  mebi_theories
   rocq_utils
   rocq_context
   bi_encoding
   rocq_monad
   rocq_monad_strfy
   rocq_monad_utils
+  theories
+  theories_enc
   bindings
   constructor_bindings)
  (wrapped false))

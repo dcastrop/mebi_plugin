@@ -10,7 +10,7 @@ module type S = sig
   module Tactic : Proof_solver_tactic.S
 
   module W :
-    Wrapper_results.S
+    Results_.S
     with type enc = enc
      and type node = node
      and type tree = tree
@@ -47,47 +47,22 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   *)
   module Tactic : Proof_solver_tactic.S = Proof_solver_tactic.Make (Log)
 
-  (** [module W] is for running the main part of the algorithm (pre-proof). It is a standard [module Wrapper.S] which itself is wrapped in a [module Wrapper_results.S] which stores the results and provides some useful functions for using the bisimilarity result.
+  (** [module W] is for running the main part of the algorithm (pre-proof). It is a standard [module Wrapper_.S] which itself is wrapped in a [module Results_.S] which stores the results and provides some useful functions for using the bisimilarity result.
   *)
-  module W :
-    Wrapper_results.S
-    with module M.Ctx = Ctx
-     and type enc = Enc.t
-     and type node = Enc.Tree.Node.t
-     and type tree = Enc.Tree.t
-     and type trees = Enc.Trees.t =
-    Wrapper_results.Make (Log) (Ctx) (Enc)
+  module W = Results.Make (Log) (Ctx) (Enc)
 
-  (** [module ProofState] sets up the different internal states of the proof-solver. We require [module Wrapper_results.S] since some of the internal states {i (e.g., [Exists transition_opt])} store some information from the proof that corresponds to information captured in the initial run of the bisimilarity checking algorithm. {i {b Note:} this 'proof-state-machine' is not actually handled here, it is only the structure.}
+  (** [module ProofState] sets up the different internal states of the proof-solver. We require [module Results_.S] since some of the internal states {i (e.g., [Exists transition_opt])} store some information from the proof that corresponds to information captured in the initial run of the bisimilarity checking algorithm. {i {b Note:} this 'proof-state-machine' is not actually handled here, it is only the structure.}
     @see [module Proof_solver_step] for how these states are traversed in order to solve the proof.
     *)
-  module ProofState :
-    Proof_solver_statem.S
-    with type enc = Enc.t
-     and type node = Enc.Tree.Node.t
-     and type state = W.Model.State.t
-     and type label = W.Model.Label.t
-     and type annotation = W.Model.Annotation.t
-     and type transition = W.Model.Transition.t =
-    Proof_solver_statem.Make (Log) (Enc) (W)
+  module ProofState = Proof_solver_statem.Make (Log) (Enc) (W)
 
   (** [module TheoryMaker] is a functor that allows us to create a [module Proof_solver_theory.S] for each iteration (step) of the proof-solver. Since a fair amount of it only relies on [module Enc] and the results of the command in [module W], this functor just takes the [module Proof_solver_wrapper.S] created from the [Proofview.Goal.t] of the proof in each proof-step.
   *)
-  module TheoryMaker : (I : Proof_solver_wrapper.S
-                            with type enc = Enc.t
-                             and type tree = Enc.Tree.t)
-      ->
-    Proof_solver_theory.S
-    with type 'a im = 'a I.mm
-     and type 'a mm = 'a W.M.mm
-     and type enc = Enc.t
-     and type fsm = W.Model.FSM.t =
-    Proof_solver_theory.Make (Log) (Enc) (W)
+  module TheoryMaker = Proof_solver_theory.Make (Log) (Enc) (W)
 
   (** [module Step] is a functor for returning a [module Proof_solver_step.S] for handling the current [Proofview.Goal.t], which is the only thing that will change for each proof-step.
   *)
-  module Step : (_ : Proof_solver_wrapper.Args) ->
-    Proof_solver_step.S with type tactic = Tactic.t =
+  module Step =
     Proof_solver_step.Make (Log) (Enc) (Tactic) (W) (ProofState) (TheoryMaker)
 
   let make (gl : Proofview.Goal.t)

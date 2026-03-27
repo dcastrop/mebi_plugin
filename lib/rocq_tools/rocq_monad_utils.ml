@@ -341,9 +341,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 struct
   (*****************************************)
 
-  module M : Rocq_monad.S with type enc = Enc.t =
-    Rocq_monad.Make (Log) (Ctx) (Enc)
-
+  module M = Rocq_monad.Make (Log) (Ctx) (Enc)
   include M
 
   type tree = Enc.Tree.t

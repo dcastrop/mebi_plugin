@@ -22,14 +22,21 @@
   rocq-mebi.mebi_lib.terms
   rocq-mebi.mebi_lib.rocq_tools
   rocq-mebi.mebi_lib.model
-  yojson)
+  yojson
+  benchmark)
+ (modules_without_implementation wrapper_ results_)
  (modules
   decoder
   api ; stores modules created by [loader.v], used by commands
   weak
+  graph_type
+  graph_builder
+  graph_extract_lts
   graph
+  wrapper_
   wrapper ; basic plugin commands
-  wrapper_results
+  results_
+  results
   proof_solver_statem
   proof_solver_tactic
   proof_solver_theory

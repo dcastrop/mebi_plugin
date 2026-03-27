@@ -31,7 +31,7 @@
  (name rocq-mebi)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml rocq-core yojson)
+ (depends ocaml rocq-core yojson benchmark)
  (tags
   (topics "to describe" your project)))
 

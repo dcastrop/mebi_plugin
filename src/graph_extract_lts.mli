@@ -1,15 +1,7 @@
 module type S = sig
-  type weak
-  type 'a mm
   type t
   type lts
-
-  val build
-    :  ?weak:weak option
-    -> Constrexpr.constr_expr
-    -> Libnames.qualid
-    -> Names.GlobRef.t list
-    -> t mm
+  type 'a mm
 
   val extract : t -> lts mm
 end
@@ -32,5 +24,16 @@ module Make
         and type tree = Enc.Tree.t
         and type trees = Enc.Trees.t
         and type constructorbindings = ConstructorBindings.t)
-    (X : Graph_type.Args with type enc = Enc.t and type tree = Enc.Tree.t) :
-  S with type weak = Weak.t and type 'a mm = 'a M.mm and type lts = Model.LTS.t
+    (X : Graph_type.Args with type enc = Enc.t and type tree = Enc.Tree.t)
+    (G :
+       Graph_type.S
+       with type enc = Enc.t
+        and type tree = Enc.Tree.t
+        and type action = Model.Action.t
+        and type weak = Weak.t
+        and type ind = M.Ind.t
+        and module B = M.B
+        and module F = M.F
+        and type indmap = M.Ind.t M.B.t
+        and type 'a mm = 'a M.mm) :
+  S with type t = G.t and type lts = Model.LTS.t and type 'a mm = 'a M.mm

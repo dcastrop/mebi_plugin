@@ -14,6 +14,7 @@ module type S = sig
 
   include Json.S with type k = t'
 
+  val size : t' -> int
   val update : t' -> state -> action -> states -> unit
   val destinations : t' -> state -> states
   val get_actions : t' -> state -> actions

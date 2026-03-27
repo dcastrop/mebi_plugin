@@ -1,39 +1,7 @@
 module type S = sig
-  type 'a im
-  type 'a mm
-  type enc
+  include Theories_enc.S
+
   type fsm
-
-  val is_any_theory : EConstr.t -> bool
-  val is_theory : EConstr.t -> EConstr.t -> bool im
-  val is_exists : EConstr.t -> bool im
-  val is_weak_sim : EConstr.t -> bool im
-  val is_weak : EConstr.t -> bool im
-  val is_tau : EConstr.t -> bool im
-  val is_silent : EConstr.t -> bool im
-  val is_silent1 : EConstr.t -> bool im
-  val is_LTS : EConstr.t -> bool im
-  val is_None : EConstr.t -> bool im
-  val is_Some : EConstr.t -> bool im
-
-  exception EnsureFail
-
-  val ensure : EConstr.t -> (EConstr.t -> bool im) -> unit im
-  val get_theory_enc : (EConstr.t -> bool im) -> enc mm
-
-  exception NoEncodingFoundFor_TheoriesNone
-
-  val get_None_enc : unit -> enc mm
-
-  exception NoEncodingFoundFor_TheoriesSome
-
-  val get_Some_enc : unit -> enc mm
-
-  exception NotEqTheory
-
-  val get_theory_enc_if_eq : EConstr.t -> (EConstr.t -> bool im) -> enc mm
-  val get_None_enc_if_eq : EConstr.t -> enc mm
-  val get_Some_enc_if_eq : EConstr.t -> enc mm
 
   exception FSM_HasNoSilentLabel of fsm
 
@@ -56,7 +24,7 @@ module Make
     (Log : Logger.S)
     (Enc : Encoding.S)
     (W :
-       Wrapper.S
+       Wrapper_.S
        with type enc = Enc.t
         and type node = Enc.Tree.Node.t
         and type tree = Enc.Tree.t
