@@ -10,7 +10,7 @@ module type S = sig
   module Tactic : Proof_solver_tactic.S
 
   module W :
-    Results_.S
+    Results.S
     with type enc = enc
      and type node = node
      and type tree = tree
@@ -47,11 +47,11 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   *)
   module Tactic : Proof_solver_tactic.S = Proof_solver_tactic.Make (Log)
 
-  (** [module W] is for running the main part of the algorithm (pre-proof). It is a standard [module Wrapper_.S] which itself is wrapped in a [module Results_.S] which stores the results and provides some useful functions for using the bisimilarity result.
+  (** [module W] is for running the main part of the algorithm (pre-proof). It is a standard [module Wrapper.S] which itself is wrapped in a [module Results.S] which stores the results and provides some useful functions for using the bisimilarity result.
   *)
   module W = Results.Make (Log) (Ctx) (Enc)
 
-  (** [module ProofState] sets up the different internal states of the proof-solver. We require [module Results_.S] since some of the internal states {i (e.g., [Exists transition_opt])} store some information from the proof that corresponds to information captured in the initial run of the bisimilarity checking algorithm. {i {b Note:} this 'proof-state-machine' is not actually handled here, it is only the structure.}
+  (** [module ProofState] sets up the different internal states of the proof-solver. We require [module Results.S] since some of the internal states {i (e.g., [Exists transition_opt])} store some information from the proof that corresponds to information captured in the initial run of the bisimilarity checking algorithm. {i {b Note:} this 'proof-state-machine' is not actually handled here, it is only the structure.}
     @see [module Proof_solver_step] for how these states are traversed in order to solve the proof.
     *)
   module ProofState = Proof_solver_statem.Make (Log) (Enc) (W)

@@ -67,7 +67,7 @@ module Make
     (Log : Logger.S)
     (Enc : Encoding.S)
     (W :
-       Results_.S
+       Results.S
        with type enc = Enc.t
         and type node = Enc.Tree.Node.t
         and type tree = Enc.Tree.t

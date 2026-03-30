@@ -28,7 +28,7 @@ module Make
     (Log : Logger.S)
     (Enc : Encoding.S)
     (W :
-       Wrapper_.S
+       Wrapper.S
        with type enc = Enc.t
         and type node = Enc.Tree.Node.t
         and type tree = Enc.Tree.t

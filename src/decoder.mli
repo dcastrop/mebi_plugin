@@ -63,7 +63,7 @@ module Make
     (M : Rocq_monad_utils.S with type enc = Enc.t)
     (ConstructorBindings : Constructor_bindings.S with type 'a mm = 'a M.mm)
     (Model :
-       Model_.S
+       Model.S
        with type base = Enc.t
         and type tree = Enc.Tree.t
         and type trees = Enc.Trees.t

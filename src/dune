@@ -24,7 +24,6 @@
   rocq-mebi.mebi_lib.model
   yojson
   benchmark)
- (modules_without_implementation wrapper_ results_)
  (modules
   decoder
   api ; stores modules created by [loader.v], used by commands
@@ -33,9 +32,7 @@
   graph_builder
   graph_extract_lts
   graph
-  wrapper_
   wrapper ; basic plugin commands
-  results_
   results
   proof_solver_statem
   proof_solver_tactic

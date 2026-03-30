@@ -21,7 +21,7 @@ module Make
     (Enc : Encoding.S)
     (M : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t)
     (Model :
-       Model_.S
+       Model.S
        with type base = Enc.t
         and type tree = Enc.Tree.t
         and type trees = Enc.Trees.t)

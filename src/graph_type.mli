@@ -77,7 +77,7 @@ module Make
     (ConstructorBindings :
        Constructor_bindings.S with type 'a mm = 'a M.mm and type ind = M.Ind.t)
     (Model :
-       Model_.S
+       Model.S
        with type base = Enc.t
         and type tree = Enc.Tree.t
         and type trees = Enc.Trees.t
