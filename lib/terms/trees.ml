@@ -1,26 +1,19 @@
-module Make
-    (Log : Logger.S)
-    (Tree : sig
-       module Node : sig
-         type t
-       end
+module type S = sig
+  type tree
 
-       type 'a tree = N of 'a * 'a tree list
-       type t = Node.t tree
-
-       include Json.S with type k = t
-
-       val compare : t -> t -> int
-       val minimize : t -> Node.t list
-     end) : sig
-  include Set.S with type elt = Tree.t
+  include Set.S with type elt = tree
   include Json.S with type k = t
 
   exception EmptyHasNoMin
 
-  val min : t -> Tree.t
-  val min_opt : t -> Tree.t option
-end = struct
+  val min : t -> tree
+  val min_opt : t -> tree option
+end
+
+module Make (Log : Logger.S) (Tree : Tree.S) : S with type tree = Tree.t =
+struct
+  type tree = Tree.t
+
   module Set_ : Set.S with type elt = Tree.t = Set.Make (Tree)
   include Set_
 

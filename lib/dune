@@ -2,9 +2,9 @@
 ;  (name mebi_lib)
 ;  (public_name rocq-mebi.mebi_lib)
 ;  (libraries
-;   (re_export rocq-mebi.mebi_lib.utils)
-;   (re_export rocq-mebi.mebi_lib.terms)
-;   (re_export rocq-mebi.mebi_lib.rocq_tools)
-;   (re_export rocq-mebi.mebi_lib.model)))
+;   (re_export rocq-mebi.utils)
+;   (re_export rocq-mebi.terms)
+;   (re_export rocq-mebi.rocq_tools)
+;   (re_export rocq-mebi.model)))
 
 ; ; (include_subdirs unqualified)

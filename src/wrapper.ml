@@ -453,7 +453,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Info "Finished Making FSM" the_fsm;
       Log.info "Minimizing FSM...";
-      let { fsm; pi } : Model.Minimize.t = Model.Minimize.fsm the_fsm in
+      let { fsm; pi } : Model.Minimization.t = Model.Minimization.fsm the_fsm in
       Decode.Partition.log ~m:Info ~s:"pi" pi;
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Result "Finished Minimizing FSM" the_fsm;

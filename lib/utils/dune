@@ -1,6 +1,6 @@
 (library
  (name utils)
- (public_name rocq-mebi.mebi_lib.utils)
+ (public_name rocq-mebi.utils)
  (libraries
   rocq-runtime.vernac ; Needed for vernac extend.
   rocq-runtime.plugins.ltac ; Needed for tactic extend.

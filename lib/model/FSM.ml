@@ -37,8 +37,8 @@ module Make
         and type labels = Labels.t
         and type transitions = EdgeMap.transitions
         and type info = Info.t)
-    (Saturate :
-       Saturate.S
+    (Saturation :
+       Saturation.S
        with type state = State.t
         and type states = States.t
         and type labels = Labels.t
@@ -125,7 +125,7 @@ module Make
       x)
     else (
       let edges, terminals' =
-        Saturate.edges x.alphabet x.states (EdgeMap.copy x.edges)
+        Saturation.edges x.alphabet x.states (EdgeMap.copy x.edges)
       in
       { x with edges; terminals = States.union x.terminals terminals' })
   ;;

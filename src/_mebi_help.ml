@@ -28,7 +28,7 @@ type help_kind =
   | LTS of unit
   | FSM of unit
   | Saturate of unit
-  | Minimize of unit
+  | Minimization of unit
   | Bisim of unit
   | Info of unit
   | Unrecognized of unit
@@ -70,7 +70,7 @@ let show_help_basic () : unit =
   Log.notice
     "All commands for this plugin begin with \"MeBi\" and are followed one of \
      the following:\n\
-     Config, LTS, FSM, Saturate, Minimize, Bisim, ....\n\n\
+     Config, LTS, FSM, Saturate, Minimization, Bisim, ....\n\n\
      Use the command \"MeBi Help x\" for more information\n\
      (where x is one of the terms above)\n"
 ;;
@@ -210,7 +210,7 @@ let show_help_saturate () : unit =
 ;;
 
 let show_help_minimize () : unit =
-  Log.notice "Use the command \"MeBi Run Minimize ...\"\n"
+  Log.notice "Use the command \"MeBi Run Minimization ...\"\n"
 ;;
 
 let show_help_bisim () : unit =
@@ -277,7 +277,7 @@ let handle_help (c : help_kind) : unit =
   | LTS () -> show_help_lts ()
   | FSM () -> show_help_fsm ()
   | Saturate () -> show_help_saturate ()
-  | Minimize () -> show_help_minimize ()
+  | Minimization () -> show_help_minimize ()
   | Bisim () -> show_help_bisim ()
   | Info () -> show_help_info ()
   | Unrecognized () -> show_help_unrecognized_command ()

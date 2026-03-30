@@ -206,7 +206,7 @@ let quick_test_saturate_fsm
        "\nUnsaturated: %s."
        (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) to_test));
   let saturated : Mebi_plugin.Fsm.fsm =
-    Mebi_plugin.Fsm.Saturate.fsm ~params to_test
+    Mebi_plugin.Fsm.Saturation.fsm ~params to_test
   in
   log
     ~params
@@ -235,7 +235,7 @@ let quick_test_saturate_fsm_states
        "\nUnsaturated: %s."
        (Mebi_plugin.Fsm.PStr.fsm ~params:(Log params) to_test));
   let saturated : Mebi_plugin.Fsm.fsm =
-    Mebi_plugin.Fsm.Saturate.fsm_states ~params to_test
+    Mebi_plugin.Fsm.Saturation.fsm_states ~params to_test
   in
   log
     ~params

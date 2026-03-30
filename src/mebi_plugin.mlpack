@@ -2,6 +2,7 @@ Utils
 Output
 Logger
 Json
+Base
 Tree
 Trees
 Constructor_tree
@@ -43,8 +44,8 @@ FSM
 Wip_annotation
 Wip_trace
 Wip_traces
-Saturate
-Minimize
+Saturation
+Minimization
 Bisimilarity
 Model
 Decoder

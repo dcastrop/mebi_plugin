@@ -1,7 +1,7 @@
 ; (library
 ;  (name algorithms)
-;  (public_name rocq-mebi.mebi_lib.model.algorithms)
-;  (libraries rocq-mebi.mebi_lib.model)
+;  (public_name rocq-mebi.model.algorithms)
+;  (libraries rocq-mebi.model)
 ;  (modules
 ;   saturate
 ;   minimize

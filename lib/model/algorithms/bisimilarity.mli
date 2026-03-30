@@ -1,3 +1,4 @@
+(** {i See {!Model.S.Bisimilarity}.} *)
 module type S = sig
   type states
   type partition
@@ -66,7 +67,7 @@ module Make
         and type edgemap = EdgeMap.t'
         and type info = Info.t)
     (Minimize :
-       Minimize.S
+       Minimization.S
        with type state = State.t
         and type states = States.t
         and type label = Label.t
