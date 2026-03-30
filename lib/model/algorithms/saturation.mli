@@ -1,4 +1,9 @@
+(** {i See {!Model.S.Saturation}.} *)
 module type S = sig
+  (** BBB *)
+
+  (** {1 Signature Types} *)
+
   type state
   type states
   type label
@@ -10,6 +15,8 @@ module type S = sig
   type actionmap
   type edgemap
 
+  (** {1 Saturation by Work-In-Progress Annotations} *)
+
   module WIP :
     Wip_annotation.S
     with type state = state
@@ -18,6 +25,7 @@ module type S = sig
      and type trees = trees
      and type action = action
 
+  (** *)
   module Trace :
     Wip_trace.S
     with type state = state
@@ -26,6 +34,8 @@ module type S = sig
      and type wip = WIP.t
 
   module Traces : Wip_traces.S with type elt = Trace.t and type wip = WIP.t
+
+  (** {1 Saturation Algorithm Data} *)
 
   type data =
     { named : label option
@@ -42,6 +52,9 @@ module type S = sig
   val update_named : action -> data -> data
   val update_current : WIP.t -> data -> data
   val update_visited : state -> data -> data
+
+  (** {2 Stopping} *)
+
   val already_visited : state -> data -> bool
   val skip_action : action -> data -> bool
   val get_old_actions : state -> data -> actionmap option
@@ -55,6 +68,8 @@ module type S = sig
     -> label
     -> actionpairs
     -> actionpairs
+
+  (** {2 Exploration} *)
 
   val check_from : data -> state -> actionpairs -> actionpairs
   val check_actions : data -> state -> actionmap -> actionpairs -> actionpairs
@@ -76,6 +91,9 @@ module type S = sig
     -> actionpairs
 
   val check_destinations : data -> state -> states -> actionpairs -> actionpairs
+
+  (** {2 Main Loop} *)
+
   val edge_action_destinations : data -> state -> states -> actionpairs
 
   val edge_actions

@@ -5,7 +5,13 @@ val option
   -> Yojson.t
 
 module type S = sig
+  (**/**)
+
+  (** Necessary for signature but never intended to be used directly. Always refers to some [type t] that this handles for.
+  *)
   type k
+
+  (**/**)
 
   val name : string
   val json : ?as_elt:bool -> k -> Yojson.t

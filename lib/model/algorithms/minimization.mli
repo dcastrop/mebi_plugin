@@ -1,3 +1,4 @@
+(** {i See {!Model.S.Minimization}.} *)
 module type S = sig
   type state
   type states

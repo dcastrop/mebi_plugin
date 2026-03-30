@@ -1,12 +1,12 @@
 (library
- (name model)
- (public_name rocq-mebi.mebi_lib.model)
+ (name model_components)
+ (public_name rocq-mebi.model.components)
  (libraries
   rocq-runtime.vernac ; Needed for vernac extend.
   rocq-runtime.plugins.ltac ; Needed for tactic extend.
-  rocq-mebi.mebi_lib.utils
-  rocq-mebi.mebi_lib.terms
-  rocq-mebi.mebi_lib.rocq_tools
+  rocq-mebi.utils
+  rocq-mebi.terms
+  rocq-mebi.rocq_tools
   yojson)
  (modules
   state
@@ -27,42 +27,81 @@
   edges
   edgemap
   state_partition
-  info
-  LTS
-  FSM
-  wip_annotation
-  wip_trace
-  wip_traces
-  saturate
-  minimize
+  info)
+ (wrapped false))
+
+(library
+ (name model_models)
+ (public_name rocq-mebi.model.models)
+ (libraries
+  rocq-runtime.vernac ; Needed for vernac extend.
+  rocq-runtime.plugins.ltac ; Needed for tactic extend.
+  rocq-mebi.utils
+  rocq-mebi.terms
+  rocq-mebi.rocq_tools
+  rocq-mebi.model.components
+  yojson)
+ (modules LTS wip_annotation wip_trace wip_traces saturation FSM)
+ (wrapped false))
+
+(library
+ (name model_algorithms)
+ (public_name rocq-mebi.model.algorithms)
+ (libraries
+  rocq-runtime.vernac ; Needed for vernac extend.
+  rocq-runtime.plugins.ltac ; Needed for tactic extend.
+  rocq-mebi.utils
+  rocq-mebi.terms
+  rocq-mebi.rocq_tools
+  rocq-mebi.model.components
+  rocq-mebi.model.models
+  yojson)
+ (modules
+  minimization
   bisimilarity
   ; similarity
-  model)
+  )
+ (wrapped false))
+
+(library
+ (name model)
+ (public_name rocq-mebi.model)
+ (libraries
+  rocq-runtime.vernac ; Needed for vernac extend.
+  rocq-runtime.plugins.ltac ; Needed for tactic extend.
+  rocq-mebi.utils
+  rocq-mebi.terms
+  rocq-mebi.rocq_tools
+  rocq-mebi.model.components
+  rocq-mebi.model.models
+  rocq-mebi.model.algorithms
+  yojson)
+ (modules model)
  (wrapped false))
 
 ; (library
 ;  (name LTS)
-;  (public_name rocq-mebi.mebi_lib.model.lts)
+;  (public_name rocq-mebi.model.lts)
 ;  (libraries
 ;   rocq-runtime.vernac ; Needed for vernac extend.
 ;   rocq-runtime.plugins.ltac ; Needed for tactic extend.
-;   rocq-mebi.mebi_lib.utils
-;   rocq-mebi.mebi_lib.terms
-;   rocq-mebi.mebi_lib.model
+;   rocq-mebi.utils
+;   rocq-mebi.terms
+;   rocq-mebi.model
 ;   yojson)
 ;  (modules LTS)
 ;  (wrapped false))
 
 ; (library
 ;  (name FSM)
-;  (public_name rocq-mebi.mebi_lib.model.fsm)
+;  (public_name rocq-mebi.model.fsm)
 ;  (libraries
 ;   rocq-runtime.vernac ; Needed for vernac extend.
 ;   rocq-runtime.plugins.ltac ; Needed for tactic extend.
-;   rocq-mebi.mebi_lib.utils
-;   rocq-mebi.mebi_lib.terms
-;   rocq-mebi.mebi_lib.model
-;   rocq-mebi.mebi_lib.model.lts
+;   rocq-mebi.utils
+;   rocq-mebi.terms
+;   rocq-mebi.model
+;   rocq-mebi.model.lts
 ;   yojson)
 ;  (modules FSM)
 ;  (wrapped false))

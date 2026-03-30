@@ -1,4 +1,7 @@
+(** {i See {!Model.S.State}.} *)
 module type S = sig
+  (** @canonical Model.State *)
+
   type base
   type t = { base : base }
 

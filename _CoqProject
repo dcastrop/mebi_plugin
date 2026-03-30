@@ -97,6 +97,7 @@ lib/utils/logger.mli
 lib/utils/json.ml
 lib/utils/json.mli
 
+lib/terms/base.mli
 lib/terms/tree.ml
 lib/terms/tree.mli
 lib/terms/trees.ml
@@ -188,10 +189,10 @@ lib/model/wip_traces.ml
 lib/model/wip_traces.mli
 
 
-lib/model/algorithms/saturate.ml
-lib/model/algorithms/saturate.mli
-lib/model/algorithms/minimize.ml
-lib/model/algorithms/minimize.mli
+lib/model/algorithms/saturation.ml
+lib/model/algorithms/saturation.mli
+lib/model/algorithms/minimization.ml
+lib/model/algorithms/minimization.mli
 lib/model/algorithms/bisimilarity.ml
 lib/model/algorithms/bisimilarity.mli
 lib/model/algorithms/similarity.ml

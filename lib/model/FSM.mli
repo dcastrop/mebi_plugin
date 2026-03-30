@@ -1,3 +1,4 @@
+(** {i See {!Model.S.FSM}.} *)
 module type S = sig
   type state
   type states
@@ -37,8 +38,8 @@ module Make
         and type labels = Labels.t
         and type transitions = EdgeMap.transitions
         and type info = Info.t)
-    (Saturate :
-       Saturate.S
+    (Saturation :
+       Saturation.S
        with type state = State.t
         and type states = States.t
         and type labels = Labels.t

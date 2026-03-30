@@ -18,10 +18,10 @@
             ; with, your choice here.
             ; rocq-runtime.vernac ; Needed for vernac extend.
             ; rocq-runtime.plugins.ltac ; Needed for tactic extend.
-  rocq-mebi.mebi_lib.utils
-  rocq-mebi.mebi_lib.terms
-  rocq-mebi.mebi_lib.rocq_tools
-  rocq-mebi.mebi_lib.model
+  rocq-mebi.utils
+  rocq-mebi.terms
+  rocq-mebi.rocq_tools
+  rocq-mebi.model
   yojson
   benchmark)
  (modules

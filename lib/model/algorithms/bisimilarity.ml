@@ -65,8 +65,8 @@ module Make
         and type labels = Labels.t
         and type edgemap = EdgeMap.t'
         and type info = Info.t)
-    (Minimize :
-       Minimize.S
+    (Minimization :
+       Minimization.S
        with type state = State.t
         and type states = States.t
         and type label = Label.t
@@ -197,7 +197,7 @@ module Make
     let fsm_a : FSMPair.t = FSMPair.get a in
     let fsm_b : FSMPair.t = FSMPair.get b in
     let merged : FSM.t = FSM.merge fsm_a.saturated fsm_b.saturated in
-    let pi : Partition.t = (Minimize.fsm merged).pi in
+    let pi : Partition.t = (Minimization.fsm merged).pi in
     let result = Result.split pi fsm_a.original.states fsm_b.original.states in
     { fsm_a; fsm_b; merged; result }
   ;;
