@@ -11,7 +11,7 @@ module type S = sig
     ; trees : trees
     }
 
-  include Json.S with type k = t
+  include Json.S with type k = t (** @closed *)
 
   val is_silent : t -> bool
   val is_named : t -> bool

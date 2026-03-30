@@ -2,9 +2,9 @@
  (name terms)
  (public_name rocq-mebi.terms)
  (libraries rocq-mebi.utils yojson)
- (modules_without_implementation base)
+ (modules_without_implementation base_)
  (modules
-  base
+  base_
   tree
   trees
   constructor_tree

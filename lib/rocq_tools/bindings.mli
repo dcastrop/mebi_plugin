@@ -11,7 +11,7 @@ module type S = sig
           ; cont : t
           }
 
-    include Json.S with type k = t
+    include Json.S with type k = t (** @closed *)
 
     exception CannotAppendDone of unit
 
@@ -22,7 +22,7 @@ module type S = sig
   module NamedInstructions : sig
     type t = Names.Name.t * Instructions.t
 
-    include Json.S with type k = t
+    include Json.S with type k = t (** @closed *)
   end
 
   module ConstrMap : sig
@@ -30,7 +30,7 @@ module type S = sig
 
     type t' = NamedInstructions.t t
 
-    include Json.S with type k = t'
+    include Json.S with type k = t' (** @closed *)
 
     val update : t' -> Constr.t -> NamedInstructions.t -> unit
 
@@ -61,7 +61,7 @@ module type S = sig
         ; goto : ConstrMap.t' option
         }
 
-  include Json.S with type k = t
+  include Json.S with type k = t (** @closed *)
 
   val use_no_bindings : ConstrMap.t' option list -> bool
 

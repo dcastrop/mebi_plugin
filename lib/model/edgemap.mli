@@ -8,11 +8,11 @@ module type S = sig
   type actionmap
   type edges
 
-  include Hashtbl.S with type key = state
+  include Hashtbl.S with type key = state (** @closed *)
 
   type t' = actionmap t
 
-  include Json.S with type k = t'
+  include Json.S with type k = t' (** @closed *)
 
   val size : t' -> int
   val update : t' -> state -> action -> states -> unit

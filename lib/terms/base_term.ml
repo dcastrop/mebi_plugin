@@ -7,55 +7,14 @@ module type S = sig
   val compare : t -> t -> int
   val hash : t -> int
 
-  type e = t
+  module Tree : Tree.S with type base = t
+  module Trees : Trees.S with type tree = Tree.t
 
-  module Tree : sig
-    module Node : sig
-      type t = e * int
+  module Constructor_tree :
+    Constructor_tree.S with type base = t and type tree = Tree.t
 
-      include Json.S with type k = t
-
-      val compare : t -> t -> int
-      val equal : t -> t -> bool
-    end
-
-    type 'a tree = N of 'a * 'a tree list
-    type t = Node.t tree
-
-    include Json.S with type k = t
-
-    val add : t -> t -> t
-    val add_list : t -> t list -> t list
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val minimize : t -> Node.t list
-
-    exception CannotMinimizeEmptyList of unit
-
-    val min : t list -> Node.t list
-  end
-
-  module Trees : sig
-    include Set.S with type elt = Tree.t
-    include Json.S with type k = t
-
-    exception EmptyHasNoMin
-
-    val min : t -> Tree.t
-    val min_opt : t -> Tree.t option
-  end
-
-  module Constructor_tree : sig
-    type t = e * e * Tree.t
-
-    include Json.S with type k = t
-  end
-
-  module Constructor_trees : sig
-    type t = Constructor_tree.t list
-
-    include Json.S with type k = t
-  end
+  module Constructor_trees :
+    Constructor_trees.S with type constructor_tree = Constructor_tree.t
 end
 
 module type Args = sig
@@ -68,9 +27,8 @@ module type Args = sig
 end
 
 module Make (Log : Logger.S) (X : Args) : S with type t = X.t = struct
-  module Y = struct
+  module Base : Base_.S with type t = X.t = struct
     type t = X.t
-    type e = t
 
     include
       Json.Thing.Make
@@ -87,12 +45,13 @@ module Make (Log : Logger.S) (X : Args) : S with type t = X.t = struct
 
     let equal = X.equal
     let compare = X.compare
-    let hash = X.hash
   end
 
-  include Y
-  module Tree = Tree.Make (Log) (Y)
+  let hash = X.hash
+
+  include Base
+  module Tree = Tree.Make (Log) (Base)
   module Trees = Trees.Make (Log) (Tree)
-  module Constructor_tree = Constructor_tree.Make (Log) (Y) (Tree)
+  module Constructor_tree = Constructor_tree.Make (Log) (Base) (Tree)
   module Constructor_trees = Constructor_trees.Make (Log) (Constructor_tree)
 end

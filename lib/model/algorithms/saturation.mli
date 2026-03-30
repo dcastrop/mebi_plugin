@@ -2,8 +2,6 @@
 module type S = sig
   (** BBB *)
 
-  (** {1 Signature Types} *)
-
   type state
   type states
   type label

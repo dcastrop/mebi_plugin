@@ -9,7 +9,7 @@ module type S = sig
     ; trees : trees
     }
 
-  include Json.S with type k = t
+  include Json.S with type k = t (** @closed *)
 
   val equal : t -> t -> bool
   val compare : t -> t -> int

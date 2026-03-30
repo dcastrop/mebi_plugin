@@ -10,7 +10,7 @@ module type S = sig
     module Nodes : sig
       type t = node list
 
-      include Json.S with type k = t
+      include Json.S with type k = t (** @closed *)
     end
 
     type t =
@@ -20,7 +20,7 @@ module type S = sig
       ; remaining : annotation option
       }
 
-    include Json.S with type k = t
+    include Json.S with type k = t (** @closed *)
 
     exception TransitionHasNoConstructorsToApply
 
@@ -35,7 +35,7 @@ module type S = sig
       | Exists of transition option
       | ApplyConstructors of ApplicableConstructors.t
 
-    include Json.S with type k = t
+    include Json.S with type k = t (** @closed *)
   end
 
   type t =

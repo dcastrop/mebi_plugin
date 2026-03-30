@@ -5,11 +5,11 @@ module type S = sig
   type states
   type actionpairs
 
-  include Hashtbl.S with type key = action
+  include Hashtbl.S with type key = action (** @closed *)
 
   type t' = states t
 
-  include Json.S with type k = t'
+  include Json.S with type k = t' (** @closed *)
 
   val size : t' -> int
   val update : t' -> action -> states -> unit

@@ -146,7 +146,7 @@ module type S = sig
         ; constructor : Rocq_utils.ind_constr
         }
 
-      include Json.S with type k = t
+      include Json.S with type k = t (** @closed *)
     end
 
     type t =
@@ -159,7 +159,7 @@ module type S = sig
       | Type of EConstr.t option
       | LTS of LTS.t
 
-    include Json.S with type k = t
+    include Json.S with type k = t (** @closed *)
 
     val get_lts : t -> LTS.t
     val get_lts_term_type : t -> EConstr.t
@@ -207,7 +207,7 @@ module type S = sig
   module Constructor : sig
     type t = enc * enc * tree
 
-    include Json.S with type k = t
+    include Json.S with type k = t (** @closed *)
 
     val encode : EConstr.t -> EConstr.t -> tree -> t
   end
@@ -223,7 +223,7 @@ module type S = sig
         ; acc : EConstr.t
         }
 
-      include Json.S with type k = t
+      include Json.S with type k = t (** @closed *)
 
       val fresh : Environ.env -> Evd.evar_map -> t -> Evd.evar_map * t
 
@@ -245,7 +245,7 @@ module type S = sig
         ; tree : tree
         }
 
-      include Json.S with type k = t
+      include Json.S with type k = t (** @closed *)
 
       val unify_pair_opt : Pair.t -> bool mm
       val unify_opt : t -> tree option mm
@@ -258,7 +258,7 @@ module type S = sig
         ; to_unify : Problem.t list
         }
 
-      include Json.S with type k = t
+      include Json.S with type k = t (** @closed *)
 
       val empty : unit -> t mm
       val is_empty : t -> bool
@@ -274,7 +274,7 @@ module type S = sig
     module ListOfProblems : sig
       type t = Problems.t list
 
-      include Json.S with type k = t
+      include Json.S with type k = t (** @closed *)
 
       val is_empty : t -> bool
       val cross_product : Problems.t -> t -> t
@@ -283,7 +283,7 @@ module type S = sig
     module Constructors : sig
       type t = Constructor.t list
 
-      include Json.S with type k = t
+      include Json.S with type k = t (** @closed *)
 
       val retrieve
         :  int

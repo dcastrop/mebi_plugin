@@ -26,7 +26,7 @@ module type S = sig
   val min : t list -> Node.t list
 end
 
-module Make (Log : Logger.S) (Base : Base.S) : S with type base = Base.t =
+module Make (Log : Logger.S) (Base : Base_.S) : S with type base = Base.t =
 struct
   type base = Base.t
 

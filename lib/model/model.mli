@@ -3,6 +3,8 @@
 
 (** Type signature of {!Model}. A *)
 module type S = sig
+  (** @canonical Model.S *)
+
   (** {1 Signature Types} *)
 
   (** A {!Base_term.S.t} used by the models for {!State.t} and {!Label.t}. Must have functions for equality, comparison and hashing. Can be derived from an {!Encoding.S}.

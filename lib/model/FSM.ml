@@ -8,10 +8,10 @@ module type S = sig
 
   type t =
     { init : state option
-    ; terminals : states
     ; alphabet : labels
     ; states : states
     ; edges : edgemap
+    ; terminals : states
     ; info : info
     }
 
@@ -59,10 +59,10 @@ module Make
 
   type t =
     { init : state option
-    ; terminals : states
     ; alphabet : labels
     ; states : states
     ; edges : edgemap
+    ; terminals : states
     ; info : info
     }
 

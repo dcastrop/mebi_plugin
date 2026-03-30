@@ -1,6 +1,7 @@
 module type S = sig
   include Base_term.S
-  include Json.S with type k = t
+
+  include Json.S with type k = t (** @closed *)
 
   val init : t
   val next : t -> t

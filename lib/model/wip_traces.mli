@@ -1,8 +1,9 @@
 module type S = sig
   type wip
 
-  include Set.S
-  include Json.S with type k = t
+  include Set.S (** @closed *)
+
+  include Json.S with type k = t (** @closed *)
 
   val get : wip -> t -> t
 end

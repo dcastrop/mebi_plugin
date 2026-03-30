@@ -10,7 +10,7 @@ module type S = sig
         | Transitions of int
         | Merged of t * t
 
-      include Json.S with type k = t
+      include Json.S with type k = t (** @closed *)
     end
 
     module RocqLTS : sig
@@ -19,7 +19,7 @@ module type S = sig
         ; constructors : constructorbindings list
         }
 
-      include Json.S with type k = t
+      include Json.S with type k = t (** @closed *)
     end
 
     type t =
@@ -29,7 +29,7 @@ module type S = sig
       ; lts : RocqLTS.t list
       }
 
-    include Json.S with type k = t
+    include Json.S with type k = t (** @closed *)
 
     val merge : t -> t -> t
     val merge_opt : t option -> t option -> t option
@@ -47,7 +47,7 @@ module type S = sig
     ; edges : int
     }
 
-  include Json.S with type k = t
+  include Json.S with type k = t (** @closed *)
 
   val merge : ?nums:nums option -> t -> t -> t
 end

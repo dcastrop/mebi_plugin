@@ -1,5 +1,9 @@
 # To-Do
 
+## Documenting (`odoc`)
+- [ ] `lib/model/...`
+  - [ ] `lib/model/`
+
 ## Automatically Solve Proofs of Bisimilarity
 
 - [x] Solve each direction bisimilarity in separate proofs for each direction
@@ -18,8 +22,7 @@
 - [ ] Implement Similarity algorithm (`lib/model/algorithms/similarity`)
 - [ ] Plugin help commands
 - [ ] **Benchmarking Tools** -- 
-- [ ] JSON File Dumps (configurable)
-  - [ ] Could serve as a cache for building the LTS or saturating the FSM
+- [x] JSON File Dumps (configurable)
 - [ ] OCaml examples -- possibly aligned with json-dumped rocq-examples
 
 
