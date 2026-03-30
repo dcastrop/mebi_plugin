@@ -54,26 +54,21 @@ module type S = sig
 
   module Weak : Weak.S with type enc = enc
 
-  module Config : sig
-    val load_weak_arg : Api.weak_arg -> Weak.t M.mm
-    val load_weak_arg_opt : Api.weak_arg option -> Weak.t option M.mm
+  module Config :
+    Config_loader.S with type weak = Weak.t and type 'a mm = 'a M.mm
 
-    type weak_args =
-      { a : Weak.t option
-      ; b : Weak.t option
-      }
+  val result_log
+    :  ?decode:bool
+    -> (module Json.S with type k = 'a)
+    -> (module Json.S with type k = 'a)
+    -> (module Json.S with type k = 'a)
 
-    val the_weak_args : weak_args ref option ref
-    val reset_the_weak_args : unit -> unit
-    val load_weak_args : unit -> unit M.mm
-    val get_the_weak_args : unit -> weak_args option
-    val get_the_weak_arg1 : unit -> Weak.t option
-    val get_the_weak_arg2 : unit -> Weak.t option
-
-    (* val api_bounds_to_model_bounds : Api.bounds_args -> Model.Info.Meta.bounds *)
-    val the_bounds_args : Api.bounds_args ref
-    val load_the_bounds_args : unit -> unit
-  end
+  val handle_results
+    :  Output.Kind.t
+    -> string
+    -> 'a
+    -> (module Json.S with type k = 'a)
+    -> unit
 
   val extract_lts
     :  Libnames.qualid
@@ -83,8 +78,6 @@ module type S = sig
     -> Model.LTS.t M.mm
 
   module Command : sig
-    val default_weak_arg : Weak.t option -> Weak.t option
-
     val build_lts
       :  ?weak:Weak.t option
       -> Libnames.qualid
@@ -190,6 +183,8 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   (** [module Weak] ... *)
   module Weak = Weak.Make (Log) (Enc) (M)
 
+  module Config = Config_loader.Make (Log) (Enc) (M) (Weak)
+
   let result_log
         ?(decode : bool = true)
         (type a)
@@ -239,89 +234,6 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     else ()
   ;;
 
-  let fail_if_not_bisim (x : Model.Bisimilarity.Result.t) : unit =
-    if !Api.the_fail_flags.non_bisimilar
-    then
-      if Bool.not (Model.Bisimilarity.Result.are_bisimilar x)
-      then (
-        result_log (module Model.Bisimilarity.Result) (module Decode.Result)
-        |> handle_results Result "LTS Incomplete" x;
-        M.Err.not_bisimilar ())
-  ;;
-
-  (** Config *)
-  module Config = struct
-    let load_weak_arg : Api.weak_arg -> Weak.t M.mm =
-      let open M.Syntax in
-      function
-      | Api.Option label_tref ->
-        let* label : EConstr.t = M.constrexpr_to_econstr label_tref in
-        let label_enc : Enc.t = M.encode label in
-        (* NOTE: sanity check we can decode these *)
-        let _ : EConstr.t = M.decode label_enc in
-        Weak.Option label_enc |> M.return
-      | Api.Custom (tau_tref, label_ref) ->
-        let* tau : EConstr.t = M.constrexpr_to_econstr tau_tref in
-        let tau_enc : Enc.t = M.encode tau in
-        let* ind, (mib, mip) =
-          Nametab.global label_ref |> M.Ind.lts_type_mind
-        in
-        let label : EConstr.t = Rocq_utils.get_ind_ty ind mib in
-        let label_enc : Enc.t = M.encode label in
-        (* NOTE: sanity check we can decode these *)
-        let _ : EConstr.t = M.decode tau_enc in
-        let _ : EConstr.t = M.decode label_enc in
-        Weak.Custom (tau_enc, label_enc) |> M.return
-    ;;
-
-    let load_weak_arg_opt : Api.weak_arg option -> Weak.t option M.mm = function
-      | None -> M.return None
-      | Some x ->
-        let open M.Syntax in
-        let* y = load_weak_arg x in
-        M.return (Some y)
-    ;;
-
-    type weak_args =
-      { a : Weak.t option
-      ; b : Weak.t option
-      }
-
-    let the_weak_args : weak_args ref option ref = ref None
-    let reset_the_weak_args () : unit = the_weak_args := None
-
-    let load_weak_args () : unit M.mm =
-      Log.trace __FUNCTION__;
-      let open M.Syntax in
-      match !Api.the_weak_args with
-      | None ->
-        the_weak_args := None;
-        M.return ()
-      | Some x ->
-        let* a = load_weak_arg_opt !x.a in
-        let* b = load_weak_arg_opt !x.b in
-        the_weak_args := Some (ref { a; b });
-        M.return ()
-    ;;
-
-    let get_the_weak_args () : weak_args option =
-      match !the_weak_args with None -> None | Some x -> Some !x
-    ;;
-
-    let get_the_weak_arg1 () : Weak.t option =
-      match get_the_weak_args () with None -> None | Some x -> x.a
-    ;;
-
-    let get_the_weak_arg2 () : Weak.t option =
-      match get_the_weak_args () with None -> None | Some x -> x.b
-    ;;
-
-    (***********************************************************************)
-
-    let the_bounds_args : Api.bounds_args ref = ref Api.default_bounds
-    let load_the_bounds_args () : unit = the_bounds_args := !Api.the_bounds_args
-  end
-
   let make_graph_args ()
     : (module Graph_type.Args with type enc = Enc.t and type tree = Enc.Tree.t)
     =
@@ -363,13 +275,6 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   ;;
 
   module Command = struct
-    (** [default_weak_arg x] will return [Config.get_the_weak_arg1] in the case that [x] is [None], else returns [x].
-    *)
-    let default_weak_arg : Weak.t option -> Weak.t option = function
-      | None -> Config.get_the_weak_arg1 ()
-      | Some x -> Some x
-    ;;
-
     let build_lts
           ?(weak : Weak.t option = None)
           (primary_lts : Libnames.qualid)
@@ -378,7 +283,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       : LTS.t M.mm
       =
       Log.trace __FUNCTION__;
-      default_weak_arg weak |> extract_lts primary_lts init names
+      Config.get_weak weak |> extract_lts primary_lts init names
     ;;
 
     let build_fsm
@@ -402,8 +307,6 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       | Merge of rocq_pair
       | CheckBisim of rocq_pair
 
-    (* | Info of unit  *)
-    (* | Help of ...  *)
     and rocq_args = Constrexpr.constr_expr * Libnames.qualid
 
     and rocq_pair =
@@ -491,6 +394,16 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Result "Finished Merging FSMs" the_fsm;
       M.return None
+    ;;
+
+    let fail_if_not_bisim (x : Model.Bisimilarity.Result.t) : unit =
+      if !Api.the_fail_flags.non_bisimilar
+      then
+        if Bool.not (Model.Bisimilarity.Result.are_bisimilar x)
+        then (
+          result_log (module Model.Bisimilarity.Result) (module Decode.Result)
+          |> handle_results Result "LTS Incomplete" x;
+          M.Err.not_bisimilar ())
     ;;
 
     let do_check_bisim { a; b } refs : Model.Bisimilarity.t option M.mm =

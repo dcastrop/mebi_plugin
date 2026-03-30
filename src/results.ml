@@ -1,6 +1,15 @@
 module type S = sig
   include Wrapper.S
 
+  (* module Command :
+     Command.S
+     with type weak = Weak.t
+     and type 'a mm = 'a M.mm
+     and type lts = Model.LTS.t
+     and type fsm = Model.FSM.t
+     and type bisimilarity = Model.Bisimilarity.t
+     and type result = Model.Bisimilarity.Result.t *)
+
   val the_result : Decode.bisimilarity ref option ref
 
   exception NoResultFound
@@ -40,7 +49,9 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
    and type node = Enc.Tree.Node.t
    and type tree = Enc.Tree.t
    and type trees = Enc.Trees.t = struct
-  include Wrapper.Make (Log) (Ctx) (Enc)
+  module W = Wrapper.Make (Log) (Ctx) (Enc)
+  include W
+  (* module Command = Command.Make (Log) (W) *)
 
   let the_result : Model.Bisimilarity.t ref option ref = ref None
 

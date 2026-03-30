@@ -1,6 +1,15 @@
 module type S = sig
   include Wrapper.S
 
+  (* module Command :
+     Command.S
+     with type weak = Weak.t
+     and type 'a mm = 'a M.mm
+     and type lts = Model.LTS.t
+     and type fsm = Model.FSM.t
+     and type bisimilarity = Model.Bisimilarity.t
+     and type result = Model.Bisimilarity.Result.t *)
+
   val the_result : Decode.bisimilarity ref option ref
 
   exception NoResultFound

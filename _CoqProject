@@ -97,7 +97,7 @@ lib/utils/logger.mli
 lib/utils/json.ml
 lib/utils/json.mli
 
-lib/terms/base.mli
+lib/terms/base_.mli
 lib/terms/tree.ml
 lib/terms/tree.mli
 lib/terms/trees.ml
@@ -219,8 +219,12 @@ src/graph_extract_lts.mli
 src/graph.ml
 src/graph.mli
 
+src/config_loader.ml
+src/config_loader.mli
 src/wrapper.ml
 src/wrapper.mli
+# src/command.ml
+# src/command.mli
 src/results.ml
 src/results.mli
 
@@ -241,6 +245,9 @@ src/proof_solver.mli
 
 # src/examples.ml
 # src/examples.mli
+
+src/benchmarking.ml
+src/benchmarking.mli
 
 ################
 ### Coq Vernac

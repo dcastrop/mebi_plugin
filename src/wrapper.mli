@@ -54,26 +54,21 @@ module type S = sig
 
   module Weak : Weak.S with type enc = enc
 
-  module Config : sig
-    val load_weak_arg : Api.weak_arg -> Weak.t M.mm
-    val load_weak_arg_opt : Api.weak_arg option -> Weak.t option M.mm
+  module Config :
+    Config_loader.S with type weak = Weak.t and type 'a mm = 'a M.mm
 
-    type weak_args =
-      { a : Weak.t option
-      ; b : Weak.t option
-      }
+  val result_log
+    :  ?decode:bool
+    -> (module Json.S with type k = 'a)
+    -> (module Json.S with type k = 'a)
+    -> (module Json.S with type k = 'a)
 
-    val the_weak_args : weak_args ref option ref
-    val reset_the_weak_args : unit -> unit
-    val load_weak_args : unit -> unit M.mm
-    val get_the_weak_args : unit -> weak_args option
-    val get_the_weak_arg1 : unit -> Weak.t option
-    val get_the_weak_arg2 : unit -> Weak.t option
-
-    (* val api_bounds_to_model_bounds : Api.bounds_args -> Model.Info.Meta.bounds *)
-    val the_bounds_args : Api.bounds_args ref
-    val load_the_bounds_args : unit -> unit
-  end
+  val handle_results
+    :  Output.Kind.t
+    -> string
+    -> 'a
+    -> (module Json.S with type k = 'a)
+    -> unit
 
   val extract_lts
     :  Libnames.qualid
@@ -83,8 +78,6 @@ module type S = sig
     -> Model.LTS.t M.mm
 
   module Command : sig
-    val default_weak_arg : Weak.t option -> Weak.t option
-
     val build_lts
       :  ?weak:Weak.t option
       -> Libnames.qualid

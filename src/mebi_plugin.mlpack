@@ -55,6 +55,7 @@ Graph_type
 Graph_builder
 Graph_extract_lts
 Graph
+Config_loader
 Wrapper
 Results
 Proof_solver_statem
@@ -64,4 +65,5 @@ Proof_solver_wrapper
 Proof_solver_tactics
 Proof_solver_step
 Proof_solver
+Benchmarking
 G_mebi

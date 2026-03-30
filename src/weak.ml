@@ -5,11 +5,8 @@ module type S = sig
     | Option of enc
     | Custom of enc * enc
 
-  type k = t
+  include Json.S with type k = t
 
-  val json : ?as_elt:bool -> k -> Yojson.t
-  val to_string : ?pretty:bool -> k -> string
-  val log : ?__FUNCTION__:string -> ?m:Output.Kind.t -> ?s:string -> k -> unit
   val eq : t -> t -> bool
 end
 
