@@ -13,7 +13,7 @@ module type S = sig
     ; pi : partition
     }
 
-  include Json.S with type k = t
+  include Json.S with type k = t (** @closed *)
 
   exception CannotSplitEmptyBlock of unit
 

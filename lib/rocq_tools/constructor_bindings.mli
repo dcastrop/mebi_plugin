@@ -11,7 +11,7 @@ module type S = sig
     ; bindings : bindings
     }
 
-  include Json.S with type k = t
+  include Json.S with type k = t (** @closed *)
 
   val extract_info : ind -> t list mm
   val get_quantified_hyp : Names.Name.t -> Tactypes.quantified_hypothesis

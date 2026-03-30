@@ -6,7 +6,7 @@ module type S = sig
     ; is_silent : bool option
     }
 
-  include Json.S with type k = t
+  include Json.S with type k = t (** @closed *)
 
   val equal : t -> t -> bool
   val compare : t -> t -> int

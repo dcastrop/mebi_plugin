@@ -20,16 +20,17 @@ module type S = sig
     { init : state option
       (** Initial state. {i {b Note:} is an [option] type to mirror {!Model.S.FSM.t.init}, which uses [None] when two {!Model.S.FSM.t} are {b merged}}.
       *)
-    ; terminals : states
-      (** States with no {b outgoing edges}, i.e., that do not appear in any {!Model.S.Transition.from} in {!field:transitions}.
-      *)
     ; alphabet : labels
-    ; states : states
-    ; transitions : transitions
-    ; info : info
+      (** {!Model.S.Labels.t} that may be found in {!field:transitions}. *)
+    ; states : states (** {!Model.S.States.t} of the system. *)
+    ; transitions : transitions (** {!Model.S.Transitions.t} for the system. *)
+    ; terminals : states
+      (** Subset of {!field:states} for states with no {b outgoing edges}, i.e., that do not appear in any {!Model.S.Transition.from} in {!field:transitions}.
+      *)
+    ; info : info (** {!Model.S.Info.t} of the system. *)
     }
 
-  include Json.S with type k = t
+  include Json.S with type k = t (** @closed *)
 end
 
 module Make

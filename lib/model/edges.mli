@@ -1,8 +1,9 @@
 module type S = sig
   type label
 
-  include Set.S
-  include Json.S with type k = t
+  include Set.S (** @closed *)
+
+  include Json.S with type k = t (** @closed *)
 
   val labelled : t -> label -> t
 end

@@ -1,8 +1,9 @@
 module type S = sig
   type states
 
-  include Set.S
-  include Json.S with type k = t
+  include Set.S (** @closed *)
+
+  include Json.S with type k = t (** @closed *)
 
   val destinations : t -> states
 

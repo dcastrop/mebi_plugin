@@ -1,8 +1,13 @@
+(** {i See {!Base_term.S.Trees}.} *)
 module type S = sig
+  (** @canonical Trees.S *)
+
+  (** See {!Base_term.S.Tree.t} *)
   type tree
 
-  include Set.S with type elt = tree
-  include Json.S with type k = t
+  include Set.S with type elt = tree (** @closed *)
+
+  include Json.S with type k = t (** @closed *)
 
   exception EmptyHasNoMin
 

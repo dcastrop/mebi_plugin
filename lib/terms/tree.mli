@@ -1,10 +1,14 @@
+(** {i See {!Base_term.S.Tree}.} *)
 module type S = sig
+  (** @canonical Tree.S *)
+
+  (** See {!Base_.S.t}*)
   type base
 
   module Node : sig
     type t = base * int
 
-    include Json.S with type k = t
+    include Json.S with type k = t (** @closed *)
 
     val compare : t -> t -> int
     val equal : t -> t -> bool
@@ -13,7 +17,7 @@ module type S = sig
   type 'a tree = N of 'a * 'a tree list
   type t = Node.t tree
 
-  include Json.S with type k = t
+  include Json.S with type k = t (** @closed *)
 
   val add : t -> t -> t
   val add_list : t -> t list -> t list
@@ -26,4 +30,4 @@ module type S = sig
   val min : t list -> Node.t list
 end
 
-module Make (Log : Logger.S) (Base : Base.S) : S with type base = Base.t
+module Make (Log : Logger.S) (Base : Base_.S) : S with type base = Base.t

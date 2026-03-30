@@ -1,6 +1,7 @@
 module type S = sig
-  include Set.S
-  include Json.S with type k = t
+  include Set.S (** @closed *)
+
+  include Json.S with type k = t (** @closed *)
 
   val extrapolate : elt -> t
 end

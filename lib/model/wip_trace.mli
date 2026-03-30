@@ -13,7 +13,7 @@ module type S = sig
     | Next of t
     | Goto of state
 
-  include Json.S with type k = t
+  include Json.S with type k = t (** @closed *)
 
   val create : wip -> t
   val compare : t -> t -> int

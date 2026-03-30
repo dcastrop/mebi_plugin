@@ -10,7 +10,7 @@ module type S = sig
       ; saturated : fsm
       }
 
-    include Json.S with type k = t
+    include Json.S with type k = t (** @closed *)
 
     val get : fsm -> t
   end
@@ -21,7 +21,7 @@ module type S = sig
       ; non_bisim_states : partition
       }
 
-    include Json.S with type k = t
+    include Json.S with type k = t (** @closed *)
 
     val are_bisimilar : t -> bool
     val split : partition -> states -> states -> t
@@ -34,7 +34,7 @@ module type S = sig
     ; result : Result.t
     }
 
-  include Json.S with type k = t
+  include Json.S with type k = t (** @closed *)
 
   val the_cached_result : t option ref
   val set_the_result : t -> unit

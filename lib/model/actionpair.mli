@@ -3,7 +3,7 @@ module type S = sig
   type states
   type t = action * states
 
-  include Json.S with type k = t
+  include Json.S with type k = t (** @closed *)
 
   val compare : t -> t -> int
   val shorter_annotation : t -> t -> t

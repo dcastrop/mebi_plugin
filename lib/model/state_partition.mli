@@ -3,8 +3,9 @@ module type S = sig
   type label
   type edgemap
 
-  include Set.S
-  include Json.S with type k = t
+  include Set.S (** @closed *)
+
+  include Json.S with type k = t (** @closed *)
 
   val get_bisimilar : state -> t -> elt
   val filter_reachable : elt -> t -> t
