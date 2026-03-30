@@ -197,7 +197,6 @@ lib/model/algorithms/bisimilarity.mli
 lib/model/algorithms/similarity.ml
 lib/model/algorithms/similarity.mli
 
-lib/model/model_.mli
 lib/model/model.ml
 lib/model/model.mli
 
@@ -219,10 +218,8 @@ src/graph_extract_lts.mli
 src/graph.ml
 src/graph.mli
 
-src/wrapper_.mli
 src/wrapper.ml
 src/wrapper.mli
-src/results_.mli
 src/results.ml
 src/results.mli
 
