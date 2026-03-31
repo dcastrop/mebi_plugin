@@ -691,3 +691,14 @@ let is_constant sigma (x : EConstr.t) (c : unit -> EConstr.t) : bool =
 let libnames_to_globrefs (xs : Libnames.qualid list) : Names.GlobRef.t list =
   List.map Nametab.global xs
 ;;
+
+let extract_benchmark_args
+      (env : Environ.env)
+      (sigma : Evd.evar_map)
+      (x : Constrexpr.constr_expr)
+  : Evd.evar_map * Constrexpr.constr_expr list
+  =
+  let sigma, x = constrexpr_to_econstr env sigma x in
+  let x = econstr_to_constrexpr env sigma x in
+  sigma, [ x ]
+;;

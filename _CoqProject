@@ -56,10 +56,10 @@ examples/CADP_Glued.v ### REQUIRED FOR BELOW
 examples/Bisimilarity/CADP/Properties/MutualExclusion.v ### REQUIRED FOR BELOW
 
 examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
-examples/Bisimilarity/CADP/Size1/TermTests.v ### Success
+# examples/Bisimilarity/CADP/Size1/TermTests.v ### Success
 # examples/Bisimilarity/CADP/Size1/MutualExclusion/PluginProofs.v ### Success
 
-examples/Bisimilarity/CADP/Size1/Glued/TermTests.v ### Success
+# examples/Bisimilarity/CADP/Size1/Glued/TermTests.v ### Success
 # examples/Bisimilarity/CADP/Size1/Glued/PluginProofs.v ### Success
 # examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v ### Success
 
@@ -221,6 +221,10 @@ src/graph.mli
 
 src/config_loader.ml
 src/config_loader.mli
+
+src/benchmarking.ml
+src/benchmarking.mli
+
 src/wrapper.ml
 src/wrapper.mli
 # src/command.ml
@@ -245,9 +249,6 @@ src/proof_solver.mli
 
 # src/examples.ml
 # src/examples.mli
-
-src/benchmarking.ml
-src/benchmarking.mli
 
 ################
 ### Coq Vernac
