@@ -77,6 +77,12 @@ let econstr_to_app (sigma : Evd.evar_map) (x : EConstr.t) : EConstr.t kind_pair 
   | k -> raise (Rocq_utils_EConstrIsNot_App (sigma, x, k))
 ;;
 
+(* let econstr_to_construct (sigma : Evd.evar_map) (x : EConstr.t) : EConstr.t kind_pair =
+   match EConstr.kind sigma x with
+   | Ref (ty, tys) -> ty, tys
+   | k -> raise (Rocq_utils_EConstrIsNot_App (sigma, x, k))
+   ;; *)
+
 (* let econstr_to_ref (sigma : Evd.evar_map) (x : EConstr.t)
    : Names.GlobRef.t * EConstr.EInstance.t
    =

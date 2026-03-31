@@ -225,10 +225,13 @@ module Make
     function
     | None -> M.return None
     | Some (Option label_enc) ->
+      Enc.log ~__FUNCTION__ ~m:Trace ~s:"Option" label_enc;
       let open M.Syntax in
       let* b : bool = Theory.is_None x in
+      Log.trace ~__FUNCTION__ (Printf.sprintf "%b" b);
       M.return (Some b)
     | Some (Custom (tau_enc, label_enc)) ->
+      Enc.log ~__FUNCTION__ ~m:Trace ~s:"Custom" tau_enc;
       let act_enc : Enc.t = M.encode x in
       let b : bool = Enc.equal tau_enc act_enc in
       M.return (Some b)

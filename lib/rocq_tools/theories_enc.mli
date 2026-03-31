@@ -2,7 +2,7 @@ module type S = sig
   type 'a mm
   type enc
 
-  include Theories.S
+  include Theories.S (** @closed *)
 
   val get_theory_enc : (Evd.econstr -> bool im) -> enc mm
 

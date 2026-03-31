@@ -19,7 +19,26 @@ module Make (Log : Logger.S) : S = struct
           type k = Benchmark.t
 
           let name = "Benchmark Timing Tests"
-          let json ?(as_elt : bool = false) (x : k) : Yojson.t = `Null
+
+          let json ?(as_elt : bool = false) (x : k) : Yojson.t =
+            (* `String (Benchmark.to_string ~style:All x) *)
+            let f u s = `Assoc [ "user", `Float u; "system", `Float s ] in
+            `Assoc
+              [ "iters", `Int (Int64.to_int x.iters)
+              ; "WALL", `Float x.wall
+              ; ( "times"
+                , `Assoc
+                    [ "process", f x.utime x.stime
+                    ; "child", f x.cutime x.cstime
+                    ] )
+              ; ( "words"
+                , `Assoc
+                    [ "minor", `Float x.minor_words
+                    ; "major", `Float x.major_words
+                    ; "promoted", `Float x.promoted_words
+                    ] )
+              ]
+          ;;
         end)
   end
 

@@ -59,6 +59,16 @@ module Make : (Mode : Output.Mode.S)
 module MkDefault : () -> S
 module Default : S
 
+(** [module ReMake (Old) (New)] returns a new [Logger.S] with updated config. {b E.g.:} 
+{[
+  module Log = Logger.MkDefault ()
+  module Log' = Logger.Remake (Log) (struct
+  let level = Logger.default_level
+  let special : Output.Kind.special -> bool = function
+  | Trace -> false
+  | Result -> true
+  | Show -> true end)
+]} *)
 module ReMake : (Old : S)
     (New : sig
        val level : (Feedback.level -> bool) option

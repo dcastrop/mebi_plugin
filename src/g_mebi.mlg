@@ -188,10 +188,10 @@ END
 
 (* Benchmark LTS *)
 VERNAC COMMAND EXTEND MeBi_Benchmark_LTS CLASSIFIED AS QUERY
-| ["MeBi" "Benchmark" "LTS" int(i) constr(x) "Using" reference(r)] -> 
+| ["MeBi" "Benchmark" "LTS" int(i) int(j) constr(x) "Using" reference(r)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = W.Command.run [] (W.Command.BenchmarkGraph ((x, r), i))
+    let _ = W.Command.run [] (W.Command.BenchmarkGraph ((x, r), (i, j)))
             |> W.M.run ~reset_encoding:true 
     in 
     let module Log : Logger.S = (val Api.make_logger ()) in
@@ -199,10 +199,10 @@ VERNAC COMMAND EXTEND MeBi_Benchmark_LTS CLASSIFIED AS QUERY
     ()
   }
   
-| ["MeBi" "Benchmark" "LTS" int(i) constr(x) "Using" reference(r) reference_list(rs)] -> 
+| ["MeBi" "Benchmark" "LTS" int(i) int(j) constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
     let module W : Wrapper.S = (val Wrapper.make ()) in
-    let _ = W.Command.run rs (W.Command.BenchmarkGraph ((x, r), i))
+    let _ = W.Command.run rs (W.Command.BenchmarkGraph ((x, r), (i, j)))
             |> W.M.run ~reset_encoding:true
     in 
     let module Log : Logger.S = (val Api.make_logger ()) in
