@@ -186,6 +186,31 @@ VERNAC COMMAND EXTEND MeBi_Run_LTS CLASSIFIED AS QUERY
   }
 END 
 
+(* Benchmark LTS *)
+VERNAC COMMAND EXTEND MeBi_Benchmark_LTS CLASSIFIED AS QUERY
+| ["MeBi" "Benchmark" "LTS" int(i) constr(x) "Using" reference(r)] -> 
+  {
+    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let _ = W.Command.run [] (W.Command.BenchmarkGraph ((x, r), i))
+            |> W.M.run ~reset_encoding:true 
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Benchmarking LTS.)";
+    ()
+  }
+  
+| ["MeBi" "Benchmark" "LTS" int(i) constr(x) "Using" reference(r) reference_list(rs)] -> 
+  {
+    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let _ = W.Command.run rs (W.Command.BenchmarkGraph ((x, r), i))
+            |> W.M.run ~reset_encoding:true
+    in 
+    let module Log : Logger.S = (val Api.make_logger ()) in
+    Log.info "(Finished Benchmarking LTS.)";
+    ()
+  }
+END 
+
 VERNAC COMMAND EXTEND MeBi_Config_Reset CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Reset"]          -> { Api.reset_all            () }
 | ["MeBi" "Config" "Reset" "Bounds"] -> { Api.reset_bounds_args    () }

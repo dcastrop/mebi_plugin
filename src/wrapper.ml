@@ -99,6 +99,7 @@ module type S = sig
       | Minimize of rocq_args
       | Merge of rocq_pair
       | CheckBisim of rocq_pair
+      | BenchmarkGraph of (rocq_args * int)
 
     and rocq_args = Constrexpr.constr_expr * Libnames.qualid
 
@@ -143,6 +144,11 @@ module type S = sig
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
 
+    val do_benchmark_graph
+      :  rocq_args * int
+      -> Libnames.qualid list
+      -> Decode.bisimilarity option M.mm
+
     val run : Libnames.qualid list -> t -> Model.Bisimilarity.t option M.mm
   end
 end
@@ -157,6 +163,8 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   type node = Enc.Tree.Node.t
   type tree = Enc.Tree.t
   type trees = Enc.Trees.t
+
+  module Benchmarking = Benchmarking.Make (Log)
 
   (** [module M] ... *)
   module M = Rocq_monad_utils.Make (Log) (Ctx) (Enc)
@@ -299,21 +307,6 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       Model.FSM.of_lts the_lts |> M.return
     ;;
 
-    type t =
-      | MakeLTS of rocq_args
-      | MakeFSM of rocq_args
-      | Saturate of rocq_args
-      | Minimize of rocq_args
-      | Merge of rocq_pair
-      | CheckBisim of rocq_pair
-
-    and rocq_args = Constrexpr.constr_expr * Libnames.qualid
-
-    and rocq_pair =
-      { a : rocq_args
-      ; b : rocq_args
-      }
-
     let do_make_lts (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
       Log.trace __FUNCTION__;
       let open M.Syntax in
@@ -362,6 +355,22 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       |> handle_results Result "Finished Minimizing FSM" the_fsm;
       M.return None
     ;;
+
+    type t =
+      | MakeLTS of rocq_args
+      | MakeFSM of rocq_args
+      | Saturate of rocq_args
+      | Minimize of rocq_args
+      | Merge of rocq_pair
+      | CheckBisim of rocq_pair
+      | BenchmarkGraph of (rocq_args * int)
+
+    and rocq_args = Constrexpr.constr_expr * Libnames.qualid
+
+    and rocq_pair =
+      { a : rocq_args
+      ; b : rocq_args
+      }
 
     let build_fsms
           ((ax, alts) : rocq_args)
@@ -426,6 +435,65 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       M.return (Some result)
     ;;
 
+    exception ToImplement
+
+    (* let* _ =
+       M.state (fun env sigma ->
+       Rocq_utils.list_of_econstr_kinds sigma x
+       |> List.iter (fun (s, b) ->
+       Log.debug ~__FUNCTION__ (Printf.sprintf "%b : %s" b s));
+       sigma, ())
+       in *)
+    let extract_benchmark_args (x : Constrexpr.constr_expr)
+      : Constrexpr.constr_expr list M.mm
+      =
+      Log.trace __FUNCTION__;
+      let open M.Syntax in
+      let* x : EConstr.t = M.constrexpr_to_econstr x in
+      let* k = M.econstr_kind x in
+      match k with
+      | App (ty, tys) ->
+        M.log_econstr ~__FUNCTION__ ty;
+        Array.to_list tys |> M.log_econstrs ~__FUNCTION__;
+        raise ToImplement
+      | _ ->
+        (* NOTE: isn't a list, so treat as single lts *)
+        let* x : Constrexpr.constr_expr =
+          M.state (fun env sigma ->
+            sigma, Rocq_utils.econstr_to_constrexpr env sigma x)
+        in
+        M.return [ x ]
+    ;;
+
+    let do_benchmark_graph ((xs, primary_lts), n) refs
+      : Model.Bisimilarity.t option M.mm
+      =
+      Log.trace __FUNCTION__;
+      let open M.Syntax in
+      let* xs : Constrexpr.constr_expr list = extract_benchmark_args xs in
+      let f
+            (i : int)
+            (funs :
+              (string
+              * (Constrexpr.constr_expr -> LTS.t)
+              * Constrexpr.constr_expr)
+                list)
+        : (string * (Constrexpr.constr_expr -> LTS.t) * Constrexpr.constr_expr)
+            list
+            M.mm
+        =
+        Log.trace __FUNCTION__;
+        let test_name : string = Printf.sprintf "benchmark_graph_%i" i in
+        let x : Constrexpr.constr_expr = List.nth xs i in
+        let runf = fun x -> M.run (build_lts primary_lts x refs) in
+        (test_name, runf, x) :: funs |> M.return
+      in
+      let* funs = M.iterate 0 (List.length xs - 1) [] f in
+      let samples = Benchmark.throughputN n funs in
+      Benchmarking.log ~__FUNCTION__ samples;
+      M.return None
+    ;;
+
     let run (refs : Libnames.qualid list) (x : t)
       : Model.Bisimilarity.t option M.mm
       =
@@ -440,6 +508,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       | Minimize args -> do_minimize args refs
       | Merge args -> do_merge args refs
       | CheckBisim args -> do_check_bisim args refs
+      | BenchmarkGraph args -> do_benchmark_graph args refs
     ;;
   end
 end

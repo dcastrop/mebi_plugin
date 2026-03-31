@@ -1,6 +1,9 @@
 Require Import MEBI.loader.
 MeBi Divider "Theories.DevTest".
 
+From Stdlib Require Import Lists.List.
+Import ListNotations.
+
 MeBi Config Output "Debug" False.
 MeBi Config Output "Info" False.
 MeBi Config Output "Notice" False.
@@ -107,7 +110,7 @@ MeBi Config WeakMode Enable.*)
 
 MeBi Config Weak As Option label. 
 
-(* MeBi Divider "Theories.DevTest.0". *)
+MeBi Divider "Theories.DevTest.0".
 MeBi Run LTS (tend) Using termLTS.
 MeBi Run FSM (tend) Using termLTS.
 
@@ -141,6 +144,63 @@ MeBi Run FSM (tpar (tact (send A) tend) (tact (recv A) tend)) Using termLTS.
 MeBi Run FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) Using termLTS.
 
 MeBi Run FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) Using termLTS.
+
+
+
+
+
+
+MeBi Config Output "Debug" True.
+MeBi Config Output "Info" True.
+MeBi Config Output "Notice" True.
+MeBi Config Output "Warning" True.
+MeBi Config Output "Error" True.
+MeBi Config Output "Trace" True.
+MeBi Config Output "Result" True.
+MeBi Config Output "Show" False.
+MeBi Config Output "DecodeResults" True.
+MeBi Config Output "DumpResults" True.
+
+
+
+
+
+MeBi Divider "Theories.DevTest.Benchmarks.Graph.Single".
+MeBi Benchmark LTS 3 (tend) Using termLTS.
+(* MeBi Benchmark LTS 3 (tseq tend tend) Using termLTS. *)
+
+
+MeBi Divider "Theories.DevTest.Benchmarks.Graph.List".
+MeBi Benchmark LTS 3 [ (tend); (tseq tend tend) ] Using termLTS.
+
+
+
+
+
+
+
+
+
+MeBi Config Output "Debug" False.
+MeBi Config Output "Info" False.
+MeBi Config Output "Notice" False.
+MeBi Config Output "Warning" True.
+MeBi Config Output "Error" True.
+MeBi Config Output "Trace" False.
+MeBi Config Output "Result" False.
+MeBi Config Output "Show" False.
+MeBi Config Output "DecodeResults" False.
+MeBi Config Output "DumpResults" False.
+
+
+
+
+
+
+
+
+
+
 
 (* testing for propagation *)
 MeBi Divider "Theories.DevTest.2".

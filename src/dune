@@ -33,6 +33,7 @@
   graph_extract_lts
   graph
   config_loader ; load configuration (of api)
+  benchmarking
   wrapper ; basic plugin commands
   results
   proof_solver_statem
@@ -42,7 +43,6 @@
   proof_solver_tactics
   proof_solver_step
   proof_solver ; 
-  benchmarking
   g_mebi))
 
 (include_subdirs unqualified)

@@ -2,7 +2,7 @@ package "mebi" (
     directory = "."
     version = "dev"
     description = "A mebi plugin"
-    requires = "rocq-runtime.plugins.ltac yojson"
+    requires = "rocq-runtime.plugins.ltac yojson benchmark"
     archive(byte) = "mebi_plugin.cma"
     archive(native) = "mebi_plugin.cmxa"
     plugin(byte) = "mebi_plugin.cma"
