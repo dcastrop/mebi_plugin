@@ -719,7 +719,7 @@ struct
     (* NOTE: we can't rely on the terms in [tys] being encoded since they may be from an intermediate layer of the LTS. *)
     (if is_tau
      then (* NOTE: index (3) since [tau lts x] => [tau (term * label) x] *)
-       { from = tys.(3); goto = None; label = Some (Mebi_theories.c_None ()) }
+       { from = tys.(3); goto = None; label = Some (Mebi_theories.get "None") }
      else { from = tys.(0); goto = None; label = None })
     |> Tacs.apply_constructor x
   ;;

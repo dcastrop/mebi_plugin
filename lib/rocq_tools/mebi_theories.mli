@@ -1,8 +1,10 @@
 val constants : EConstr.t list ref
 val find_reference : string list -> string -> Names.GlobRef.t
-val collect_bisimilarity_theories : unit -> EConstr.t list
-val indexed_c : int * EConstr.t list -> EConstr.t option
-val c_LTS : unit -> EConstr.t
+(* val collect_bisimilarity_theories : unit -> EConstr.t list *)
+val get_constants : unit -> (string , EConstr.t) Hashtbl.t 
+val get : string -> EConstr.t
+(* val indexed_c : int * EConstr.t list -> EConstr.t option *)
+(* val c_LTS : unit -> EConstr.t
 val c_tau : unit -> EConstr.t
 val c_silent : unit -> EConstr.t
 val c_silent1 : unit -> EConstr.t
@@ -16,7 +18,7 @@ val c_weak_sim : unit -> EConstr.t
 val c_In_sim : unit -> EConstr.t
 val c_out_sim : unit -> EConstr.t
 val c_weak_bisim : unit -> EConstr.t
-val c_relations : unit -> EConstr.t
+val c_relation : unit -> EConstr.t
 val c_clos_refl_trans_1n : unit -> EConstr.t
 val c_rt1n_refl : unit -> EConstr.t
 val c_rt1n_trans : unit -> EConstr.t
@@ -30,5 +32,7 @@ val c_prod : unit -> EConstr.t
 val c_pair : unit -> EConstr.t
 val c_weak_sim_refl : unit -> EConstr.t
 val c_wk_bisim_refl : unit -> EConstr.t
+val c_cons : unit -> EConstr.t
+val c_nil : unit -> EConstr.t *)
 val get_proof_from_pstate : Declare.Proof.t -> Proof.t
 val get_partial_proof : Proof.t -> EConstr.t list

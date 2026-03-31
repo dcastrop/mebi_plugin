@@ -84,9 +84,11 @@ module Make
   ;;
 
   let get_action (g : t) (act : Enc.t) (int_tree : Enc.Tree.t) : Action.t mm =
+    Log.trace __FUNCTION__;
     let act_dec : EConstr.t = M.decode act in
     let open M.Syntax in
     let* is_silent : bool option = is_silent_label act_dec g.weak in
+    M.log_econstr ~__FUNCTION__ ~s:"post is_silent" act_dec;
     let label : Model.Label.t = { base = act; is_silent } in
     let trees : Enc.Trees.t = Enc.Trees.singleton int_tree in
     let action : Action.t = { label; trees; annotation = None } in

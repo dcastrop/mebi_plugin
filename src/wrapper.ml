@@ -99,7 +99,7 @@ module type S = sig
       | Minimize of rocq_args
       | Merge of rocq_pair
       | CheckBisim of rocq_pair
-      | BenchmarkGraph of (rocq_args * int)
+      | BenchmarkGraph of (rocq_args * (int * int))
 
     and rocq_args = Constrexpr.constr_expr * Libnames.qualid
 
@@ -145,7 +145,7 @@ module type S = sig
       -> Model.Bisimilarity.t option M.mm
 
     val do_benchmark_graph
-      :  rocq_args * int
+      :  rocq_args * (int * int)
       -> Libnames.qualid list
       -> Decode.bisimilarity option M.mm
 
@@ -165,6 +165,22 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   type trees = Enc.Trees.t
 
   module Benchmarking = Benchmarking.Make (Log)
+
+  (* NOTE: stops message spam when debugging *)
+  (* module Log = Log *)
+
+  (* module Log =
+     Logger.ReMake
+     (Log)
+     (struct
+     let level =
+     Some (fun (x : Output.Kind.level) -> match x with _ -> false)
+     ;;
+
+     let special =
+     Some (fun (x : Output.Kind.special) -> match x with _ -> false)
+     ;;
+     end) *)
 
   (** [module M] ... *)
   module M = Rocq_monad_utils.Make (Log) (Ctx) (Enc)
@@ -363,7 +379,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       | Minimize of rocq_args
       | Merge of rocq_pair
       | CheckBisim of rocq_pair
-      | BenchmarkGraph of (rocq_args * int)
+      | BenchmarkGraph of (rocq_args * (int * int))
 
     and rocq_args = Constrexpr.constr_expr * Libnames.qualid
 
@@ -435,62 +451,65 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       M.return (Some result)
     ;;
 
-    exception ToImplement
+    exception NothingToBenchmark
 
-    (* let* _ =
-       M.state (fun env sigma ->
-       Rocq_utils.list_of_econstr_kinds sigma x
-       |> List.iter (fun (s, b) ->
-       Log.debug ~__FUNCTION__ (Printf.sprintf "%b : %s" b s));
-       sigma, ())
-       in *)
-    let extract_benchmark_args (x : Constrexpr.constr_expr)
-      : Constrexpr.constr_expr list M.mm
-      =
-      Log.trace __FUNCTION__;
-      let open M.Syntax in
-      let* x : EConstr.t = M.constrexpr_to_econstr x in
-      let* k = M.econstr_kind x in
-      match k with
-      | App (ty, tys) ->
-        M.log_econstr ~__FUNCTION__ ty;
-        Array.to_list tys |> M.log_econstrs ~__FUNCTION__;
-        raise ToImplement
-      | _ ->
-        (* NOTE: isn't a list, so treat as single lts *)
-        let* x : Constrexpr.constr_expr =
-          M.state (fun env sigma ->
-            sigma, Rocq_utils.econstr_to_constrexpr env sigma x)
-        in
-        M.return [ x ]
+    let _log_kinds ?(__FUNCTION__ : string = "") (x : EConstr.t) : unit M.mm =
+      M.state (fun env sigma ->
+        Rocq_utils.list_of_econstr_kinds sigma x
+        |> List.iter (fun (s, b) ->
+          Log.debug ~__FUNCTION__ (Printf.sprintf "%b : %s" b s));
+        sigma, ())
     ;;
 
-    let do_benchmark_graph ((xs, primary_lts), n) refs
+    let rec extract_benchmark_args (xs : EConstr.t) : EConstr.t list M.mm =
+      Log.debug __FUNCTION__;
+      let open M.Syntax in
+      let* ty = M.type_of_econstr xs in
+      let* kxs = M.econstr_kind xs in
+      let* kty = M.econstr_kind ty in
+      match kty, kxs with
+      | App (ty, _), App (_, tys) ->
+        let* is_list : bool = Theory.is_list ty in
+        if is_list
+        then
+          if Int.equal (Array.length tys) 1
+          then M.return []
+          else
+            let* tl = extract_benchmark_args tys.(2) in
+            M.return (tys.(1) :: tl)
+        else raise NothingToBenchmark
+      | _, _ ->
+        (* NOTE: isn't a list, so treat as single lts *)
+        M.return [ xs ]
+    ;;
+
+    type graph_benchmark =
+      string * (Constrexpr.constr_expr -> LTS.t) * Constrexpr.constr_expr
+
+    let do_benchmark_graph
+          (((xs, primary_lts), (time, repeat)) : rocq_args * (int * int))
+          refs
       : Model.Bisimilarity.t option M.mm
       =
       Log.trace __FUNCTION__;
       let open M.Syntax in
-      let* xs : Constrexpr.constr_expr list = extract_benchmark_args xs in
-      let f
-            (i : int)
-            (funs :
-              (string
-              * (Constrexpr.constr_expr -> LTS.t)
-              * Constrexpr.constr_expr)
-                list)
-        : (string * (Constrexpr.constr_expr -> LTS.t) * Constrexpr.constr_expr)
-            list
-            M.mm
-        =
-        Log.trace __FUNCTION__;
+      let* xs : EConstr.t = M.constrexpr_to_econstr xs in
+      let* xs : EConstr.t list = extract_benchmark_args xs in
+      let f (i : int) (funs : graph_benchmark list) : graph_benchmark list M.mm =
+        Log.debug __FUNCTION__;
         let test_name : string = Printf.sprintf "benchmark_graph_%i" i in
-        let x : Constrexpr.constr_expr = List.nth xs i in
+        let* x : Constrexpr.constr_expr =
+          M.state (fun env sigma ->
+            sigma, List.nth xs i |> Rocq_utils.econstr_to_constrexpr env sigma)
+        in
         let runf = fun x -> M.run (build_lts primary_lts x refs) in
         (test_name, runf, x) :: funs |> M.return
       in
-      let* funs = M.iterate 0 (List.length xs - 1) [] f in
-      let samples = Benchmark.throughputN n funs in
-      Benchmarking.log ~__FUNCTION__ samples;
+      let* funs : graph_benchmark list =
+        M.iterate 0 (List.length xs - 1) [] f
+      in
+      let samples = Benchmark.throughputN ~style:All ~repeat time funs in
+      handle_results Result "benchmark lts graph" samples (module Benchmarking);
       M.return None
     ;;
 

@@ -99,7 +99,7 @@ module type S = sig
       | Minimize of rocq_args
       | Merge of rocq_pair
       | CheckBisim of rocq_pair
-      | BenchmarkGraph of (rocq_args * int)
+      | BenchmarkGraph of (rocq_args * (int * int))
 
 
     and rocq_args = Constrexpr.constr_expr * Libnames.qualid
@@ -145,9 +145,9 @@ module type S = sig
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
 
-    (** [do_benchmark_graph ((xs, primary_lts), (num, max)) refs] is always [None]. This command is similar to {!val:do_make_lts} except that it can handle a list of [xs] that each use the same [primary_lts] and [refs]. {i {b Note:} We use {!Rocq_tools.Rocq_utils.extract_benchmark_args} to obtain the list of xs, as [g_mebi] only knows it to be a [constr] (i.e., a [Constrexpr.constr_expr]).} {b Param [num]} is the number of times to repeat each of the benchmarks. {i See {!Benchmarking}.} *)
+    (** [do_benchmark_graph ((xs, primary_lts), (time, repeat)) refs] is always [None]. This command is similar to {!val:do_make_lts} except that it can handle a list of [xs] that each use the same [primary_lts] and [refs]. {i {b Note:} We use {!Rocq_utils.extract_benchmark_args} to obtain the list of xs, as [g_mebi] only knows it to be a [constr] (i.e., a [Constrexpr.constr_expr]).} {b Param [time]} is the {i minimum} run time per iteration and {b Param [repeat]} is the number of times to repeat each of the benchmarks. {i See {!Benchmarking}.} *)
     val do_benchmark_graph
-      :  (rocq_args * int)
+      :  (rocq_args * (int * int))
       -> Libnames.qualid list
       -> Decode.bisimilarity option M.mm
 

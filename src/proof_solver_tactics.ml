@@ -261,14 +261,14 @@ module Make
     |> return
   ;;
 
-  let apply_Pack_sim () : Tactic.t mm = apply (Mebi_theories.c_Pack_sim ())
-  let apply_In_sim () : Tactic.t mm = apply (Mebi_theories.c_In_sim ())
-  let apply_wk_none () : Tactic.t mm = apply (Mebi_theories.c_wk_none ())
-  let apply_rt1n_refl () : Tactic.t mm = apply (Mebi_theories.c_rt1n_refl ())
-  let apply_rt1n_trans () : Tactic.t mm = apply (Mebi_theories.c_rt1n_trans ())
+  let apply_Pack_sim () : Tactic.t mm = apply (Mebi_theories.get "Pack_sim")
+  let apply_In_sim () : Tactic.t mm = apply (Mebi_theories.get "In_sim")
+  let apply_wk_none () : Tactic.t mm = apply (Mebi_theories.get "wk_none")
+  let apply_rt1n_refl () : Tactic.t mm = apply (Mebi_theories.get "rt1n_refl")
+  let apply_rt1n_trans () : Tactic.t mm = apply (Mebi_theories.get "rt1n_trans")
 
   let apply_weak_sim_refl () : Tactic.t mm =
-    apply (Mebi_theories.c_weak_sim_refl ())
+    apply (Mebi_theories.get "weak_sim_refl")
   ;;
 
   (* let apply_wk_bisim_refl () : Tactic.t mm = apply (Mebi_theories.c_wk_bisim_refl ()) *)
@@ -279,11 +279,11 @@ module Make
     |> return
   ;;
 
-  let eapply_wk_some () : Tactic.t mm = eapply (Mebi_theories.c_wk_some ())
-  let eapply_rt1n_refl () : Tactic.t mm = eapply (Mebi_theories.c_rt1n_refl ())
+  let eapply_wk_some () : Tactic.t mm = eapply (Mebi_theories.get "wk_some")
+  let eapply_rt1n_refl () : Tactic.t mm = eapply (Mebi_theories.get "rt1n_refl")
 
   let eapply_rt1n_trans () : Tactic.t mm =
-    eapply (Mebi_theories.c_rt1n_trans ())
+    eapply (Mebi_theories.get "rt1n_trans")
   ;;
 
   (** {b counter intuitively, this applies a transition if the label is silent.} This is because we use this to determine if we need to unfold the [weak] transition from the [Bisimilarity.v] theory.
@@ -368,8 +368,11 @@ module Make
       (match ys with [] -> None | ys -> Some (Tactic.chain ys))
   ;;
 
-  let unfold_silent () : Tactic.t = unfold_econstr (Mebi_theories.c_silent ())
-  let unfold_silent1 () : Tactic.t = unfold_econstr (Mebi_theories.c_silent1 ())
+  let unfold_silent () : Tactic.t = unfold_econstr (Mebi_theories.get "silent")
+
+  let unfold_silent1 () : Tactic.t =
+    unfold_econstr (Mebi_theories.get "silent1")
+  ;;
 
   (* *)
   let do_refl () : Tactic.t mm =

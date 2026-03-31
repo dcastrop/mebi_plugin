@@ -15,6 +15,7 @@ MeBi Config Output "Show" False.
 MeBi Config Output "DecodeResults" False.
 MeBi Config Output "DumpResults" False.
 
+
 Module TestA.
 Inductive label : Set := | A | B | C.
 
@@ -146,60 +147,13 @@ MeBi Run FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) tend) Using 
 MeBi Run FSM (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) (tfix (tseq (tpar (tact (send A) tend) (tact (recv A) tend)) trec))) Using termLTS.
 
 
-
-
-
-
-MeBi Config Output "Debug" True.
-MeBi Config Output "Info" True.
-MeBi Config Output "Notice" True.
-MeBi Config Output "Warning" True.
-MeBi Config Output "Error" True.
-MeBi Config Output "Trace" True.
-MeBi Config Output "Result" True.
-MeBi Config Output "Show" False.
-MeBi Config Output "DecodeResults" True.
-MeBi Config Output "DumpResults" True.
-
-
-
-
-
 MeBi Divider "Theories.DevTest.Benchmarks.Graph.Single".
-MeBi Benchmark LTS 3 (tend) Using termLTS.
-(* MeBi Benchmark LTS 3 (tseq tend tend) Using termLTS. *)
-
+MeBi Benchmark LTS 1 5 (tend) Using termLTS.
+MeBi Benchmark LTS 1 5 (tseq tend tend) Using termLTS.
 
 MeBi Divider "Theories.DevTest.Benchmarks.Graph.List".
-MeBi Benchmark LTS 3 [ (tend); (tseq tend tend) ] Using termLTS.
-
-
-
-
-
-
-
-
-
-MeBi Config Output "Debug" False.
-MeBi Config Output "Info" False.
-MeBi Config Output "Notice" False.
-MeBi Config Output "Warning" True.
-MeBi Config Output "Error" True.
-MeBi Config Output "Trace" False.
-MeBi Config Output "Result" False.
-MeBi Config Output "Show" False.
-MeBi Config Output "DecodeResults" False.
-MeBi Config Output "DumpResults" False.
-
-
-
-
-
-
-
-
-
+MeBi Benchmark LTS 1 5 [ (tend); (tseq tend tend) ] Using termLTS.
+MeBi Benchmark LTS 1 5 [ (tend); (tseq tend tend) ; (tpar tend tend) ; (tseq (tpar tend tend) tend) ] Using termLTS.
 
 
 (* testing for propagation *)

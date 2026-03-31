@@ -12,6 +12,9 @@ module type S = sig
   val is_LTS : Evd.econstr -> bool im
   val is_None : Evd.econstr -> bool im
   val is_Some : Evd.econstr -> bool im
+  val is_list : Evd.econstr -> bool im
+  val is_cons : Evd.econstr -> bool im
+  val is_nil : Evd.econstr -> bool im
   val ensure : Evd.econstr -> (Evd.econstr -> bool im) -> unit im
 end
 
@@ -40,27 +43,32 @@ module Make
   *)
   let is_any_theory (x : EConstr.t) : bool =
     Log.trace __FUNCTION__;
-    Th.collect_bisimilarity_theories ()
+    Th.get_constants ()
+    |> Hashtbl.to_seq_values
+    |> List.of_seq
     |> List.exists (fun (y : EConstr.t) -> econstr_eq x y |> run)
   ;;
 
   (** rocq exists *)
-  let is_exists (x : EConstr.t) : bool mm = is_theory x (Th.c_ex ())
+  let is_exists (x : EConstr.t) : bool mm = is_theory x (Th.get "ex")
 
   (** weak simulation*)
-  let is_weak_sim (x : EConstr.t) : bool mm = is_theory x (Th.c_weak_sim ())
+  let is_weak_sim (x : EConstr.t) : bool mm = is_theory x (Th.get "weak_sim")
 
   (** weak transition *)
-  let is_weak (x : EConstr.t) : bool mm = is_theory x (Th.c_weak ())
+  let is_weak (x : EConstr.t) : bool mm = is_theory x (Th.get "weak")
 
   (** tau transition *)
-  let is_tau (x : EConstr.t) : bool mm = is_theory x (Th.c_tau ())
+  let is_tau (x : EConstr.t) : bool mm = is_theory x (Th.get "tau")
 
-  let is_silent (x : EConstr.t) : bool mm = is_theory x (Th.c_silent ())
-  let is_silent1 (x : EConstr.t) : bool mm = is_theory x (Th.c_silent1 ())
-  let is_LTS (x : EConstr.t) : bool mm = is_theory x (Th.c_LTS ())
-  let is_None (x : EConstr.t) : bool mm = is_theory x (Th.c_None ())
-  let is_Some (x : EConstr.t) : bool mm = is_theory x (Th.c_Some ())
+  let is_silent (x : EConstr.t) : bool mm = is_theory x (Th.get "silent")
+  let is_silent1 (x : EConstr.t) : bool mm = is_theory x (Th.get "silent1")
+  let is_LTS (x : EConstr.t) : bool mm = is_theory x (Th.get "LTS")
+  let is_None (x : EConstr.t) : bool mm = is_theory x (Th.get "None")
+  let is_Some (x : EConstr.t) : bool mm = is_theory x (Th.get "Some")
+  let is_list (x : EConstr.t) : bool mm = is_theory x (Th.get "list")
+  let is_cons (x : EConstr.t) : bool mm = is_theory x (Th.get "cons")
+  let is_nil (x : EConstr.t) : bool mm = is_theory x (Th.get "nil")
 
   exception EnsureFail
 
