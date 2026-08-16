@@ -1,5 +1,10 @@
 (executable
  (name tests)
  (public_name rocq-mebi.tests)
+ ; `saturation.ml{,i}` predates the model refactor and no longer compiles (it
+ ; refers to Mebi_plugin.Fsm, Mebi_wrapper.Enc, Dump_to_file, Logging). Nothing
+ ; links it, but without this field `dune build @check` -- and merlin -- still
+ ; type-check it and report errors.
+ (modules tests)
  (flags :standard -rectypes -w -27)
  (libraries rocq-mebi.mebi))
