@@ -77,7 +77,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   let get_updated_pstate (x : unit Proofview.tactic) : Declare.Proof.t =
     Log.trace __FUNCTION__;
     let new_pstate, is_safe_tactic =
-      Declare.Proof.by x (ProofState.get_pstate ())
+      Declare.Proof.by (Global.env ()) x (ProofState.get_pstate ())
     in
     if Bool.not is_safe_tactic
     then Log.warning ~__FUNCTION__ "unsafe tactic used";
