@@ -12,6 +12,9 @@ module type S = sig
   val equal : t -> t -> bool
   val compare : t -> t -> int
   val is_empty : t -> bool
+
+  exception AnnotationIsNone
+
   val opt_is_empty : ?fail_if_none:bool -> t option -> bool
   val length : t -> int
   val opt_length : ?fail_if_none:bool -> t option -> int

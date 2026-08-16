@@ -517,9 +517,9 @@ let get_next_evar
       (a_type : EConstr.t)
   : Evd.evar_map * EConstr.t
   =
-  match Evarutil.next_evar_name sigma (Namegen.IntroFresh (the_next ())) with
+  match Evarutil.next_evar_name (Namegen.IntroFresh (the_next ())) with
   | None -> raise (CouldNotGetNextFreshEvarName ())
-  | Some name ->
+  | Some (name, _) ->
     the_cache
     := Some { the_prev = Names.Id.Set.add name (the_prev ()); the_next = name };
     let naming = Namegen.IntroFresh name in
@@ -651,7 +651,7 @@ let unpack_constr_args ((_, tys) : Constr.t kind_pair)
 ;;
 
 let econstr_to_constrexpr env sigma : EConstr.t -> Constrexpr.constr_expr =
-  Constrextern.extern_constr env sigma
+  Constrextern.extern_constr ~flags:(PrintingFlags.current ()) env sigma
 ;;
 
 let constrexpr_to_econstr env sigma

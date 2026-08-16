@@ -1,3 +1,6 @@
+# Exact version, matched by the :with-dev-setup constraint in dune-project.
+# ocamlformat refuses to run on a mismatch rather than silently reformatting.
+version = 0.29.0
 profile = janestreet
 margin=80
 max-indent = 2
