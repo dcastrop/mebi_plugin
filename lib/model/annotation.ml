@@ -12,6 +12,9 @@ module type S = sig
   val equal : t -> t -> bool
   val compare : t -> t -> int
   val is_empty : t -> bool
+
+  exception AnnotationIsNone
+
   val opt_is_empty : ?fail_if_none:bool -> t option -> bool
   val length : t -> int
   val opt_length : ?fail_if_none:bool -> t option -> int
@@ -73,8 +76,10 @@ module Make
     | _ -> false
   ;;
 
+  exception AnnotationIsNone
+
   let opt_is_empty ?(fail_if_none : bool = false) : t option -> bool = function
-    | None -> if fail_if_none then raise Option.IsNone else true
+    | None -> if fail_if_none then raise AnnotationIsNone else true
     | Some x -> is_empty x
   ;;
 
@@ -84,7 +89,7 @@ module Make
   ;;
 
   let opt_length ?(fail_if_none : bool = false) : t option -> int = function
-    | None -> if fail_if_none then raise Option.IsNone else 0
+    | None -> if fail_if_none then raise AnnotationIsNone else 0
     | Some x -> length x
   ;;
 

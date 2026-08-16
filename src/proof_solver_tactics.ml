@@ -207,7 +207,7 @@ module Make
 
   let cofix () : Tactic.t mm =
     let name : Names.Id.t = new_cofix_name () in
-    Tactics.cofix name
+    FixTactics.cofix name
     |> Tactic.create ~msg:(Printf.sprintf "cofix %s" (Names.Id.to_string name))
     |> return
   ;;

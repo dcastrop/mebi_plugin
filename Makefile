@@ -1,22 +1,24 @@
-# FIXME: for updating to rocq-9.1
+# COQBIN is deliberately left unset: `rocq` comes from the local opam switch on PATH
+# (direnv / `opam env`). Override with `make COQBIN=/path/to/bin` for a specific
+# installation. Makefile.rocq.conf appends the trailing slash itself, so COQBIN must
+# NOT end in one.
 
-ifeq "$(COQBIN)" ""
-#   COQBIN=$(dir $(shell which rocq top))/
-  COQBIN=$(dir $(shell which coqtop))/
-endif
+ROCQ = $(if $(COQBIN),$(COQBIN)/,)rocq
 
 %: Makefile.rocq
-# %: Makefile.coq
 
 Makefile.rocq: _CoqProject
-	$(COQBIN)rocq makefile -f _CoqProject -o Makefile.rocq
+	$(ROCQ) makefile -f _CoqProject -o Makefile.rocq
 
-# Makefile.coq: _CoqProject
-# 	$(COQBIN)coq_makefile -f _CoqProject -o Makefile.coq
+# Switching back to the dune build requires removing the in-tree artifacts this
+# rocq-makefile build leaves behind (src/g_mebi.ml, *.vo, *.glob, *.cm*); dune
+# refuses to build over files it also generates.
+.PHONY: dune
+dune: clean
+	dune build
 
 tests: all
 	@$(MAKE) -C tests -s clean
 	@$(MAKE) -C tests -s all
 
 -include Makefile.rocq
-# -include Makefile.coq

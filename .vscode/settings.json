@@ -1,0 +1,13 @@
+{
+  // This is a *local* opam switch (`_opam/` in the project root), and local
+  // switches are identified by their full path -- never by the directory name.
+  // `opam --switch=mebi_plugin` looks for a *global* switch of that name and
+  // fails, so ${workspaceFolderBasename} does not work here.
+  "ocaml.sandbox": {
+    "kind": "opam",
+    "switch": "${workspaceFolder}"
+  },
+  // Only needed if VSCode is launched outside the direnv environment, which
+  // otherwise puts _opam/bin on PATH.
+  "vsrocq.path": "${workspaceFolder}/_opam/bin/vsrocqtop"
+}

@@ -10,39 +10,99 @@ This repository contains a Coq plugin for automating bisimilarity proofs (which 
 
 
 ## Building the Project
-Using **`coq 8.20.0`**, below is the "fool-poof" method:
+
+### Toolchain
+Built against **Rocq 9.2** (`rocq-core` 9.2.0, `rocq-runtime` 9.2.0, `rocq-stdlib` 9.1.0), OCaml 5.4.0 and dune 3.23, in a **local opam switch** (`_opam/` in the project root).
+
+Versions are pinned in two places, and both are committed:
+- **`flake.nix` / `flake.lock`** — nix pins the system layer: `opam` itself, `pkg-config`, `gmp`, `zlib`, `git`, `make` and the C toolchain.
+- **`rocq-mebi.opam.locked`** — opam pins the OCaml/Rocq layer: every one of the ~100 packages at an exact version, including `rocq-core.9.2.0`, `rocq-stdlib.9.1.0` and `ocaml-base-compiler.5.4.0`.
+
+The ranges the source is *known* to compile in live in `dune-project`'s `(depends ...)`; the lockfile records one exact solution inside those ranges. `rocq-mebi.opam` is generated from `dune-project` by dune and is committed — it is the input to `opam switch create`, so a clone cannot bootstrap without it.
+
+### First-time setup on a new machine
 ```shell
-make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile
+git clone https://github.com/dcastrop/mebi_plugin && cd mebi_plugin
+direnv allow                     # or: nix develop
+opam switch create . --locked --deps-only
+opam install . --locked --deps-only --with-dev-setup
 ```
+The dev shell notices when `_opam/` is missing and prints this command; run it under `nix develop` in a terminal and it offers to do it for you. Expect it to take a while — it builds OCaml 5.4.0 and Rocq from source.
+
+`--with-dev-setup` is what pulls in `ocaml-lsp-server`, `ocamlformat` and `vsrocq-language-server`. Drop it if you only want to build.
+
+> **Run these inside the dev shell.** It sets `OPAMNODEPEXTS=1`. Without it, opam probes the system package manager for `gmp` and `pkg-config`, doesn't find them (nix supplies them, not the system), and offers to run `nix-build` — which aborts the bootstrap. Outside the shell, pass `--no-depexts` by hand.
+
+### Everyday environment
+With `direnv`, entering the directory is enough. Without it:
+```shell
+nix develop
+eval $(opam env --switch=$(pwd) --set-switch)
+```
+Check it took: `rocq --version` should report 9.2, and `which dune` should point inside `_opam/bin`.
+
+### Changing dependencies
+Edit the `(depends ...)` ranges in `dune-project`, then regenerate both files:
+```shell
+dune build rocq-mebi.opam        # dune-project -> rocq-mebi.opam
+opam lock .                      # -> rocq-mebi.opam.locked
+```
+Commit both. Bumping `rocq-core`'s upper bound is a deliberate act — the plugin links against `rocq-runtime`'s OCaml API, which breaks across Rocq *minor* versions.
+
+### Two build paths
+
+**`dune build`** — the plugin (`src/`, `lib/`) and `theories/`. This is the everyday build.
+```shell
+dune build
+```
+
+**`make`** — the same, *plus* the `examples/` listed in `_CoqProject`. Use it when you want the examples checked.
+```shell
+make -j$(nproc)
+```
+`_CoqProject` deliberately enables only a subset of `examples/**/*.v`; the rest are commented out with a note on why (proof explosion, long compile). Comment lines back in to build more.
+
+### Switching back to dune after running make
+```shell
+make dune
+```
+`make` writes generated files into the source tree (`src/g_mebi.ml`, `*.vo`, `*.glob`, `*.cm*`). Dune also claims those paths, so a following `dune build` fails with `Multiple rules generated ...`. Dune has no way to ignore them, so the artifacts have to go: `make dune` is just `make clean && dune build`.
+
+### Faster inner loops
+A full `dune build` takes ~1m40s, almost all of it the `MeBi Benchmark` vernaculars in `theories/DevTest.v`. When you don't need them:
+
+| Changing | Command |
+| --- | --- |
+| OCaml plugin code | `dune build @check` — type-checks everything in `lib/` and `src/`, builds no `.vo` (~2s) |
+| OCaml, and you want the loadable plugin | `dune build src/` |
+| A single theory file | `dune build theories/Test.vo` |
+| Everything, before committing | `dune build` |
+
+`dune build @check` also produces the `.cmi`/`.cmt` files merlin needs, so it doubles as the "make my editor happy" command.
 
 ### Running tests
-Compiling using the above will also generate a `tests.exe` which can be run:
-```shell
-_build/default/test/tests.exe
-```
-
-### Altogether
-```shell
-make .merlin clean; dune build; coq_makefile -f _CoqProject -o CoqMakeFile; make -f CoqMakeFile; _build/default/test/tests.exe
-```
+`test/tests.ml` is currently commented out in its entirety, so `_build/default/test/tests.exe` builds but does nothing. `test/saturation.ml` predates the model refactor and no longer compiles; it is excluded via `(modules tests)` in `test/dune`.
 
 
 
 ### Using VSCode
-Use the **[`vscoq` extension](https://github.com/coq/vscoq)** and build as shown above. Afterwards, you have to reload vscode. (**[This extension is helpful for this](https://marketplace.visualstudio.com/items?itemName=natqe.reload).**)
+Use the **[VsRocq extension](https://github.com/rocq-prover/vsrocq)**; `vsrocqtop` is installed in the local switch. Rebuild before reloading the window, since the extension loads the compiled plugin.
 
-
-
-#### Issues with `vscoqtop`
-Try adding this to your workspace settings `.json` file, under the `"settings"` field:
+`.vscode/settings.json` is set up for the local switch already. The important part:
 ```json
-"vscoq.path": "/home/user/.opam/mebi/bin/vscoqtop"
+"ocaml.sandbox": { "kind": "opam", "switch": "${workspaceFolder}" }
 ```
-E.g.:
+A **local** switch is identified by its full path, so `${workspaceFolderBasename}` does *not* work — opam reads a bare name as a *global* switch and reports `The selected switch mebi_plugin is not installed`.
+
+The OCaml editor tooling lives in the switch too:
+```shell
+opam install ocaml-lsp-server ocamlformat
+```
+
+#### Issues with `vsrocqtop`
+If VSCode is launched outside the direnv environment it won't have `_opam/bin` on `PATH`. Point it at the binary explicitly:
 ```json
-{ "settings": {
-    "vscoq.path": "/home/user/.opam/mebi/bin/vscoqtop"
-} }
+"vsrocq.path": "${workspaceFolder}/_opam/bin/vsrocqtop"
 ```
 
 > Access this file by pressing **`ctrl+,`** and then clicking the file icon button in the top right corner, which will open the settings as a `json` file.
