@@ -31,7 +31,35 @@
  (name rocq-mebi)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml rocq-core yojson benchmark)
+ ; Bounds matter here: the plugin links against rocq-runtime's OCaml API, which
+ ; breaks across Rocq *minor* versions. Exact versions are pinned separately in
+ ; rocq-mebi.opam.locked; these are the ranges the source is known to compile in.
+ (depends
+  (ocaml
+   (>= 4.14))
+  (rocq-core
+   (and
+    (>= 9.2)
+    (< 9.3)))
+  ; theories/dune declares (theories Stdlib) and the .v files `From Stdlib Require`
+  (rocq-stdlib
+   (>= 9.1))
+  ; 3.x exposes Yojson.t; 2.x requires Yojson.Safe.t
+  (yojson
+   (>= 3.0))
+  (benchmark
+   (>= 1.6))
+  ; Editor/formatting tooling: installed by `opam install . --with-dev-setup`,
+  ; kept out of the build closure. ocamlformat is exact because its output
+  ; changes between releases (see the `version` field in .ocamlformat).
+  (ocaml-lsp-server
+   :with-dev-setup)
+  (ocamlformat
+   (and
+    :with-dev-setup
+    (= 0.29.0)))
+  (vsrocq-language-server
+   :with-dev-setup))
  (tags
   (topics "to describe" your project)))
 
