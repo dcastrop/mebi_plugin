@@ -152,14 +152,33 @@ let step (pstate : Declare.Proof.t) : Declare.Proof.t =
   Ps.step pstate
 ;;
 
-(** [solve] ... *)
+(** [solve ?bound pstate] steps the proof until it closes or [bound] is reached.
+
+    Completion is checked here, after each step, rather than being left to the
+    next call to [step] (which raises [NothingToDo] once [Proof.is_done]). Doing
+    it there cost a whole iteration to notice a proof that had already closed:
+    with [bound] one below the number of productive steps the proof still
+    closed and [Qed] succeeded, but the loop exited on the bound instead, so
+    [statem] was never set to [Done] and this reported "Unsolved". That is why
+    every [MeBi Sim Solve N] in the examples needed [N] to be one more than the
+    work actually required. Existing bounds all still hold -- the requirement
+    only ever got weaker. *)
 let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
   Logger.trace __FUNCTION__;
+  let module Ps : S = (val !(get_the_proof_solver ())) in
+  let finished (p : Declare.Proof.t) : bool =
+    Proof.is_done (Declare.Proof.get p)
+  in
   let rec f (n : int) (p : Declare.Proof.t) : int * Declare.Proof.t =
     Logger.thing ~__FUNCTION__ Debug "iter" n (Printf.sprintf "%i");
-    match Int.compare n bound with
-    | 1 -> n, p
-    | _ -> (try step p |> f (n + 1) with NothingToDo -> n, p)
+    if finished p
+    then (
+      Ps.ProofState.update_statem Done;
+      n, p)
+    else (
+      match Int.compare n bound with
+      | 1 -> n, p
+      | _ -> (try step p |> f (n + 1) with NothingToDo -> n, p))
   in
   let num, pstate = f 0 pstate in
   Logger.notice (stop_msg num);
