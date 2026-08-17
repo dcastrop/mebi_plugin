@@ -5,5 +5,5 @@ module type S = sig
   include Json.S with type k = t (** @closed *)
 end
 
-module Make (Log : Logger.S) (Constructor_tree : Constructor_tree.S) :
+module Make (Constructor_tree : Constructor_tree.S) :
   S with type constructor_tree = Constructor_tree.t

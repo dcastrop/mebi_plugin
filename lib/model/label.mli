@@ -14,4 +14,4 @@ module type S = sig
   val is_silent : t -> bool
 end
 
-module Make (Log : Logger.S) (Base : Base_term.S) : S with type base = Base.t
+module Make (Base : Base_term.S) : S with type base = Base.t

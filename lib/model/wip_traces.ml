@@ -8,7 +8,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (State : State.S with type base = Base.t)
     (WIP : Wip_annotation.S with type state = State.t)
@@ -19,15 +18,12 @@ module Make
   module Set_ : Set.S with type elt = Trace.t = Set.Make (Trace)
   include Set_
 
-  include
-    Json.Set.Make
-      (Log)
-      (struct
-        module Set = Set_
+  include Json.Set.Make (struct
+      module Set = Set_
 
-        let name = "WIP Traces"
-        let json = Trace.json
-      end)
+      let name = "WIP Traces"
+      let json = Trace.json
+    end)
 
   (** [get x ys] returns a subset subtraces [ys] that begin with [x]. This includes elements in [ys] that begin with [x], in addition to the trailing-subtraces that begin with [x] for elements in [ys].
       @raise Not_found if the set would return empty. *)

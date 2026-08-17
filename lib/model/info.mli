@@ -53,11 +53,10 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (Labels : Labels.S)
-    (ConstructorBindings : Constructor_bindings.S) :
+    (ConstructorBindings : Json.S) :
   S
   with type base = Base.t
-   and type constructorbindings = ConstructorBindings.t
+   and type constructorbindings = ConstructorBindings.k
    and type labels = Labels.t

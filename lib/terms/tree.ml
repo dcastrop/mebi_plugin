@@ -26,26 +26,22 @@ module type S = sig
   val min : t list -> Node.t list
 end
 
-module Make (Log : Logger.S) (Base : Base_.S) : S with type base = Base.t =
-struct
+module Make (Base : Base_.S) : S with type base = Base.t = struct
   type base = Base.t
 
   module Node = struct
     type t = Base.t * int
 
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
+    include Json.Thing.Make (struct
+        type k = t
 
-          let name = "Node"
+        let name = "Node"
 
-          let json ?as_elt (x : t) : Yojson.t =
-            `Assoc
-              [ "enc", Base.json ~as_elt:true (fst x); "index", `Int (snd x) ]
-          ;;
-        end)
+        let json ?as_elt (x : t) : Yojson.t =
+          `Assoc
+            [ "enc", Base.json ~as_elt:true (fst x); "index", `Int (snd x) ]
+        ;;
+      end)
 
     let compare (a : t) (b : t) : int =
       Utils.compare_chain
@@ -60,21 +56,18 @@ struct
   type 'a tree = N of 'a * 'a tree list
   type t = Node.t tree
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "Tree"
+      let name = "Tree"
 
-        let rec json ?as_elt (N (x, xl) : t) : Yojson.t =
-          `Assoc
-            [ "node", Node.json ~as_elt:true x
-            ; "cons", `List (List.map (json ~as_elt:true) xl)
-            ]
-        ;;
-      end)
+      let rec json ?as_elt (N (x, xl) : t) : Yojson.t =
+        `Assoc
+          [ "node", Node.json ~as_elt:true x
+          ; "cons", `List (List.map (json ~as_elt:true) xl)
+          ]
+      ;;
+    end)
 
   (** [add x y] inserts [x] to be a new leaf of [y], mutually recursive with [add_list x ys] (where [ys] is a list of [t]).
   *)

@@ -14,7 +14,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (State : State.S)
     (States : States.S with type elt = State.t)
     (ActionMap : Actionmap.S with type states = States.t)

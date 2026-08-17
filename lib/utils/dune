@@ -1,10 +1,13 @@
+; Deliberately no rocq-runtime dependency: this library, rocq-mebi.terms and
+; rocq-mebi.model are plain OCaml and must stay linkable from test/ without a
+; Rocq runtime. Routing output to Rocq's Feedback is done by installing a sink
+; (Logger.set_sink) from src/, which is where rocq-runtime does belong.
 (library
  (name utils)
  (public_name rocq-mebi.utils)
- (libraries
-  rocq-runtime.vernac ; Needed for vernac extend.
-  rocq-runtime.plugins.ltac ; Needed for tactic extend.
-  yojson)
+ ; unix: for FileWriter.get_local_timestamp. Previously arrived transitively
+ ; via rocq-runtime, so it has to be explicit now.
+ (libraries unix yojson)
  (modules utils output logger json)
  (wrapped false))
 

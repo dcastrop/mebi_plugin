@@ -15,7 +15,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (M : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t)
     (Weak : Weak.S with type enc = Enc.t)
@@ -50,9 +49,7 @@ struct
      and module F = M.F
      and type indmap = M.Ind.t M.B.t
      and type 'a mm = 'a M.mm =
-    Graph_type.Make (Log) (Enc) (M) (Weak) (Theory) (ConstructorBindings)
-      (Model)
-      (X)
+    Graph_type.Make (Enc) (M) (Weak) (Theory) (ConstructorBindings) (Model) (X)
 
   type t = G.t
 
@@ -65,7 +62,7 @@ struct
      and type action = Model.Action.t
      and type constructor = M.Constructor.t
      and type states = G.States.t =
-    Graph_builder.Make (Log) (Enc) (M) (Model) (G)
+    Graph_builder.Make (Enc) (M) (Model) (G)
 
   open G
   module LTS = Model.LTS
@@ -81,7 +78,7 @@ struct
   ;;
 
   let build_ltsmap (grefs : Names.GlobRef.t list) : M.Ind.t M.B.t M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let ltsmap : G.indmap = M.B.create (List.length grefs) in
     let open M.Syntax in
     let f (i : int) () = encode_indlts (List.nth grefs i) ltsmap in
@@ -94,7 +91,7 @@ struct
   let get_primary_lts (ltsmap : G.indmap) (primary_lts : Libnames.qualid)
     : M.Ind.t M.mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open M.Syntax in
     let* x : M.Ind.t = Nametab.global primary_lts |> M.Ind.lts in
     M.Ind.log ~__FUNCTION__ ~m:Debug ~s:"primary lts" x;
@@ -107,7 +104,7 @@ struct
   let initialize_term (x : Constrexpr.constr_expr) (lts : M.Ind.t)
     : EConstr.t M.mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open M.Syntax in
     let* x : EConstr.t = M.constrexpr_to_econstr x in
     let* x : EConstr.t = M.econstr_normalize x in
@@ -120,7 +117,7 @@ struct
   let encode_initial_term (x : Constrexpr.constr_expr) (lts : M.Ind.t)
     : Enc.t M.mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open M.Syntax in
     let* x : EConstr.t = initialize_term x lts in
     let init : Enc.t = M.encode x in
@@ -135,16 +132,16 @@ struct
         (grefs : Names.GlobRef.t list)
     : G.t M.mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open M.Syntax in
     let* ltsmap : G.indmap = build_ltsmap grefs in
     let* primary_lts : M.Ind.t = get_primary_lts ltsmap primary_lts in
     let* init : Enc.t = encode_initial_term starting_term primary_lts in
-    Log.info "Building the Graph...";
+    Logger.info "Building the Graph...";
     let the_graph : t ref = ref (create init ltsmap primary_lts weak) in
     Queue.push init !the_graph.to_visit;
     let* the_graph : t = Builder.build !the_graph in
-    Log.info "Finished Building Graph.";
+    Logger.info "Finished Building Graph.";
     M.return the_graph
   ;;
 
@@ -153,17 +150,17 @@ struct
     with type t = G.t
      and type lts = Model.LTS.t
      and type 'a mm = 'a M.mm =
-    Graph_extract_lts.Make (Log) (Enc) (M) (Weak) (Theory) (ConstructorBindings)
+    Graph_extract_lts.Make (Enc) (M) (Weak) (Theory) (ConstructorBindings)
       (Model)
       (X)
       (G)
 
   let extract (g : G.t) : LTS.t M.mm =
-    Log.trace __FUNCTION__;
-    Log.info "Extracting LTS from Graph...";
+    Logger.trace __FUNCTION__;
+    Logger.info "Extracting LTS from Graph...";
     let open M.Syntax in
     let* x : LTS.t = Extract.extract g in
-    Log.info "Finished Extracting LTS.";
+    Logger.info "Finished Extracting LTS.";
     M.return x
   ;;
 end

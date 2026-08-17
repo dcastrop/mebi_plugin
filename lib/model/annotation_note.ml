@@ -19,7 +19,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (State : State.S with type base = Base.t)
     (Label : Label.S with type base = Base.t) :
@@ -38,23 +37,20 @@ module Make
     ; goto : state
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "Note"
+      let name = "Note"
 
-        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-          `Assoc
-            [ "from", State.json ~as_elt:true x.from
-            ; "label", Label.json ~as_elt:true x.label
-            ; "goto", State.json ~as_elt:true x.goto
-            ; "using", Base.Trees.json ~as_elt:true x.using
-            ]
-        ;;
-      end)
+      let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+        `Assoc
+          [ "from", State.json ~as_elt:true x.from
+          ; "label", Label.json ~as_elt:true x.label
+          ; "goto", State.json ~as_elt:true x.goto
+          ; "using", Base.Trees.json ~as_elt:true x.using
+          ]
+      ;;
+    end)
 
   let equal (a : t) (b : t) : bool =
     State.equal a.from b.from

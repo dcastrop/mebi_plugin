@@ -26,7 +26,7 @@ module type S = sig
   val unpack : t -> unit Proofview.tactic
 end
 
-module Make (Log : Logger.S) : S = struct
+module Make : S = struct
   module Tac = struct
     type t =
       { get : unit Proofview.tactic
@@ -37,8 +37,7 @@ module Make (Log : Logger.S) : S = struct
 
     let to_string_opt : t -> string option = function
       | { msg = None; _ } -> None
-      | { msg = Some (k, s); _ } ->
-        if Log.Config.is_enabled k then Some s else None
+      | { msg = Some (k, s); _ } -> if Logger.is_enabled k then Some s else None
     ;;
 
     let create
@@ -98,7 +97,7 @@ module Make (Log : Logger.S) : S = struct
   ;;
 
   let unpack (x : t) : unit Proofview.tactic =
-    Log.notice (to_string x);
+    Logger.notice (to_string x);
     let rec f : t -> unit Proofview.tactic = function
       | { this; next = None } -> this.get
       | { this; next = Some next } -> Proofview.tclTHEN this.get (f next)

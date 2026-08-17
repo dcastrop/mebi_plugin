@@ -101,7 +101,6 @@ module type S = sig
       | CheckBisim of rocq_pair
       | BenchmarkGraph of (rocq_args * (int * int))
 
-
     and rocq_args = Constrexpr.constr_expr * Libnames.qualid
 
     and rocq_pair =
@@ -145,27 +144,33 @@ module type S = sig
       -> Libnames.qualid list
       -> Model.Bisimilarity.t option M.mm
 
-    (** [do_benchmark_graph ((xs, primary_lts), (time, repeat)) refs] is always [None]. This command is similar to {!val:do_make_lts} except that it can handle a list of [xs] that each use the same [primary_lts] and [refs]. {i {b Note:} We use {!Rocq_utils.extract_benchmark_args} to obtain the list of xs, as [g_mebi] only knows it to be a [constr] (i.e., a [Constrexpr.constr_expr]).} {b Param [time]} is the {i minimum} run time per iteration and {b Param [repeat]} is the number of times to repeat each of the benchmarks. {i See {!Benchmarking}.} *)
+    (** [do_benchmark_graph ((xs, primary_lts), (time, repeat)) refs] is always [None]. This command is similar to {!val:do_make_lts} except that it can handle a list of [xs] that each use the same [primary_lts] and [refs]. {i {b Note:} We use {!Rocq_utils.extract_benchmark_args} to obtain the list of xs, as [g_mebi] only knows it to be a [constr] (i.e., a [Constrexpr.constr_expr]).} {b Param [time]} is the {i minimum} run time per iteration and {b Param [repeat]} is the number of times to repeat each of the benchmarks. {i See {!Benchmarking}.}
+    *)
     val do_benchmark_graph
-      :  (rocq_args * (int * int))
+      :  rocq_args * (int * int)
       -> Libnames.qualid list
       -> Decode.bisimilarity option M.mm
 
-    (** [run refs x] is the entrypoint of {!Command}. {b Param [refs]} is a list of {b Rocq} inductive-LTS that may be used for the upper layers of a {i multi-layered} LTS. {b Param [x]} is a {!t} that specifies the command to be run. *)
+    (** [run refs x] is the entrypoint of {!Command}. {b Param [refs]} is a list of {b Rocq} inductive-LTS that may be used for the upper layers of a {i multi-layered} LTS. {b Param [x]} is a {!t} that specifies the command to be run.
+    *)
     val run : Libnames.qualid list -> t -> Model.Bisimilarity.t option M.mm
   end
 end
 
-module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
+module Make (Enc : Encoding.S) :
   S
   with type enc = Enc.t
    and type node = Enc.Tree.Node.t
    and type tree = Enc.Tree.t
    and type trees = Enc.Trees.t
 
-val make
-  :  ?log:(unit -> (module Logger.S))
-  -> ?enc:((module Logger.S) -> (module Encoding.S))
-  -> ?ctx:(module Rocq_context.S)
-  -> unit
-  -> (module S)
+val make : ?enc:(unit -> (module Encoding.S)) -> unit -> (module S)
+
+(** The shared instance the [MeBi ...] vernaculars run against, created on first
+    use. Commands no longer build their own: per-command state lifetime is
+    carried by the [~reset_encoding:true] they already pass, not by rebuilding
+    the module tree. *)
+val get : unit -> (module S)
+
+(** Drops the shared instance so the next [get] builds a fresh one. *)
+val reset : unit -> unit

@@ -247,6 +247,10 @@ src/proof_solver_step.mli
 src/proof_solver.ml
 src/proof_solver.mli
 
+### installs the Rocq Feedback sink that lib/ emits through
+src/rocq_output.ml
+src/rocq_output.mli
+
 # src/examples.ml
 # src/examples.mli
 

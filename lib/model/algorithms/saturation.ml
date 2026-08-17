@@ -90,7 +90,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (State : State.S with type base = Base.t)
     (States : States.S with type elt = State.t)
@@ -150,15 +149,13 @@ module Make
   (** [module WIP] is a lightweight counterpart of [Note.t] that forms some "work-in-progress" [Annotation.t]. Once we stop saturating an action, we check if we are able to yield a new saturated action and convert the [wip list] to an [Annotation.t].
   *)
   module WIP =
-    Wip_annotation.Make (Log) (Base) (State) (Label) (Note) (Annotation)
-      (Action)
+    Wip_annotation.Make (Base) (State) (Label) (Note) (Annotation) (Action)
 
   (** [module Trace] ... we keep track of the total sum of traces we have already checked. This is useful for checking if, from a state and action, we have already explored the rest of this trace and so can just use what we have already learned, e.g., if we are in some "subtrace".
   *)
-  module Trace =
-    Wip_trace.Make (Log) (Base) (State) (Label) (Note) (Annotation) (WIP)
+  module Trace = Wip_trace.Make (Base) (State) (Label) (Note) (Annotation) (WIP)
 
-  module Traces = Wip_traces.Make (Log) (Base) (State) (WIP) (Trace)
+  module Traces = Wip_traces.Make (Base) (State) (WIP) (Trace)
 
   (** [data] ...
       @param named is ...
@@ -187,10 +184,10 @@ module Make
     }
   ;;
 
-  let has_named (d : data) : bool = Option.has_some d.named
+  let has_named (d : data) : bool = Stdlib.Option.is_some d.named
 
   let update_traces (d : data) (x : Trace.t) : unit =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     d.traces := Traces.add x !(d.traces);
     d.can_collect_traces := true
   ;;
@@ -199,7 +196,7 @@ module Make
 
   (** returns a copy of [d] with the updated name *)
   let update_named (x : Action.t) (d : data) : data =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let named : Label.t option =
       match d.named with
       | None -> if Action.is_silent x then None else Some x.label
@@ -210,13 +207,13 @@ module Make
 
   (** returns a copy of [d] with the updated notes *)
   (* let update_notes (x : WIP.t) (d : data) : data =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       { d with notes = x :: d.notes }
     ;; *)
 
   (** returns a copy of [d] with [x] added to [d.current] *)
   let update_current (x : WIP.t) (d : data) : data =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match d.current with
     | None -> { d with current = Some (Trace.create x) }
     | Some current -> { d with current = Some (Trace.add x current) }
@@ -224,7 +221,7 @@ module Make
 
   (** returns a copy of [d] with the updated visited *)
   let update_visited (x : State.t) (d : data) : data =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let f (x : State.t) (d : data) : States.t = States.add x d.visited in
     { d with visited = f x d }
   ;;
@@ -236,11 +233,11 @@ module Make
   (** [skip_action x d] is [true] if [x] is non-silent and [d.named] is already [Some _].
   *)
   let skip_action (x : Action.t) (d : data) : bool =
-    if Action.is_silent x then false else Option.has_some d.named
+    if Action.is_silent x then false else Stdlib.Option.is_some d.named
   ;;
 
   let get_old_actions (from : State.t) (d : data) : ActionMap.t' option =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     EdgeMap.find_opt d.old_edges from
   ;;
 
@@ -250,7 +247,7 @@ module Make
     exception Model_Saturate_WIP_HadMultipleNamedActions of WIP.t list
 
     let validate_wips (xs : WIP.t list) : unit =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       match
         List.filter
           (fun ({ via; _ } : WIP.t) -> Label.is_silent via |> Bool.not)
@@ -264,7 +261,7 @@ module Make
   (****************************************************************************)
 
   let update_acc (trace : Trace.t) (label : Label.t) (acc : ActionPairs.t) =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     Trace.to_annotation trace
     |> Annotations.extrapolate
     |> Annotations.to_list
@@ -278,7 +275,7 @@ module Make
 
   (** [stop] *)
   let stop (d : data) (goto : State.t) (acc : ActionPairs.t) : ActionPairs.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match d.current, d.named with
     | Some current, Some named ->
       let () = Trace.validate current in
@@ -298,7 +295,7 @@ module Make
         (acc : ActionPairs.t)
     : ActionPairs.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let z : Trace.t = Trace.seq_opt d.current z in
     update_traces d z;
     update_acc z named acc
@@ -311,7 +308,7 @@ module Make
         (acc : ActionPairs.t)
     : ActionPairs.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try
       let z : Trace.t = Trace.upto_named z in
       finish_with_trace z d named acc
@@ -325,7 +322,7 @@ module Make
   let rec check_from (d : data) (from : State.t) (acc : ActionPairs.t)
     : ActionPairs.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     if already_visited from d
     then stop d from acc
     else (
@@ -337,7 +334,7 @@ module Make
   and check_actions (d : data) (from : State.t) (xs : ActionMap.t')
     : ActionPairs.t -> ActionPairs.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     ActionMap.fold
       (fun (x : Action.t) (ys : States.t) (acc : ActionPairs.t) ->
         if skip_action x d
@@ -361,24 +358,24 @@ module Make
         (acc : ActionPairs.t)
     : ActionPairs.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let wip : WIP.t = WIP.create from x in
     let traces : Traces.t = Traces.get wip !(d.traces) in
     (* NOTE: add all traces that already have named action (if we don't) -- keep exploring with traces *)
     Traces.fold
       (fun (z : Trace.t) (acc : ActionPairs.t) : ActionPairs.t ->
-        (* Log.thing ~__FUNCTION__ Debug "z" z ( Trace.to_string); *)
+        (* Logger.thing ~__FUNCTION__ Debug "z" z ( Trace.to_string); *)
         match d.named, Trace.get_named_opt z with
         | Some named, None ->
-          Log.trace ~__FUNCTION__ "stop (data)";
+          Logger.trace ~__FUNCTION__ "stop (data)";
           (* NOTE: stop as named is in some [current]. *)
           finish_with_trace z d named acc
         | None, Some named ->
-          Log.trace ~__FUNCTION__ "stop (trace)";
+          Logger.trace ~__FUNCTION__ "stop (trace)";
           (* NOTE: stop since the trace is named (and already explored). *)
           finish_with_trace z d named acc
         | None, None ->
-          Log.trace ~__FUNCTION__ "continue (full)";
+          Logger.trace ~__FUNCTION__ "continue (full)";
           (* NOTE: continue exploring un-traced state-space as the [named] must occur earlier in the trace and has been pruned *)
           (* NOTE: we can only use the traces once *)
           (* d.can_collect_traces := false; *)
@@ -389,7 +386,7 @@ module Make
             ys
             acc
         | Some named, Some _ ->
-          Log.trace ~__FUNCTION__ "continue (upto)";
+          Logger.trace ~__FUNCTION__ "continue (upto)";
           (* NOTE: we can only continue with the trace up-to the named action *)
           finish_with_trace_upto z d named acc)
       traces
@@ -402,7 +399,7 @@ module Make
         (ys : States.t)
     : ActionPairs.t -> ActionPairs.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let wip : WIP.t = WIP.create from x in
     let d : data (* NOTE: copy [d] *) = update_current wip d in
     let d : data = update_named x d in
@@ -411,7 +408,7 @@ module Make
   and check_destinations (d : data) (from : State.t) (xs : States.t)
     : ActionPairs.t -> ActionPairs.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     States.fold (check_from d) xs
   ;;
 
@@ -425,10 +422,10 @@ module Make
   let edge_action_destinations (d : data) (from : State.t) (ys : States.t)
     : ActionPairs.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     States.fold
       (fun (y : State.t) (acc : ActionPairs.t) ->
-        (* Log.thing ~__FUNCTION__ Debug "y" y ( State.to_string); *)
+        (* Logger.thing ~__FUNCTION__ Debug "y" y ( State.to_string); *)
         check_from d y ActionPairs.empty)
       ys
       ActionPairs.empty
@@ -443,10 +440,10 @@ module Make
         (traces : Traces.t ref)
     : ActionPairs.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     ActionMap.fold
       (fun (x : Action.t) (ys : States.t) (acc : ActionPair.t list) ->
-        (* Log.thing ~__FUNCTION__ Debug "x" x ( Action.to_string); *)
+        (* Logger.thing ~__FUNCTION__ Debug "x" x ( Action.to_string); *)
         let d : data =
           initial_data traces old_edges
           |> update_named x
@@ -470,7 +467,7 @@ module Make
         (traces : Traces.t ref)
     : unit
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     edge_actions from old_actions old_edges traces
     |> ActionPairs.iter
          (fun ((saturated_action, destinations) : Action.t * States.t) ->
@@ -481,13 +478,13 @@ module Make
   let edges (labels : Labels.t) (states : States.t) (old_edges : EdgeMap.t')
     : EdgeMap.t' * States.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let new_edges : EdgeMap.t' = EdgeMap.create 0 in
     let traces : Traces.t ref = ref Traces.empty in
     let terminals : States.t =
       EdgeMap.fold
         (fun (from : State.t) (old_actions : ActionMap.t') (acc : States.t) ->
-          (* Log.thing ~__FUNCTION__ Debug "from" from ( State.to_string); *)
+          (* Logger.thing ~__FUNCTION__ Debug "from" from ( State.to_string); *)
           (* NOTE: populate [new_actions] with saturated [old_actions] *)
           let new_actions : ActionMap.t' = ActionMap.create 0 in
           let () = edge new_actions from old_actions old_edges traces in
@@ -499,7 +496,7 @@ module Make
         old_edges
         States.empty
     in
-    (* Log.thing ~__FUNCTION__ Debug "traces" !traces ( Traces.to_string); *)
+    (* Logger.thing ~__FUNCTION__ Debug "traces" !traces ( Traces.to_string); *)
     new_edges, terminals
   ;;
 end

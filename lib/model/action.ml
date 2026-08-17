@@ -21,7 +21,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (Label : Label.S with type base = Base.t)
     (Annotation : sig
@@ -46,23 +45,19 @@ module Make
     ; trees : trees
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "Action"
+      let name = "Action"
 
-        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-          `Assoc
-            [ "label", Label.json ~as_elt:true x.label
-            ; ( "annotation"
-              , Json.option ~as_elt:true Annotation.json x.annotation )
-            ; "trees", Base.Trees.json ~as_elt:true x.trees
-            ]
-        ;;
-      end)
+      let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+        `Assoc
+          [ "label", Label.json ~as_elt:true x.label
+          ; "annotation", Json.option ~as_elt:true Annotation.json x.annotation
+          ; "trees", Base.Trees.json ~as_elt:true x.trees
+          ]
+      ;;
+    end)
 
   let equal (a : t) (b : t) : bool =
     Label.equal a.label b.label

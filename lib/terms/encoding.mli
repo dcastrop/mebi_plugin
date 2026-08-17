@@ -16,10 +16,8 @@ module type Args = sig
   val next : t -> t
 end
 
-module Make
-    (Log : Logger.S)
-    (Base : Base_term.S)
-    (X : Args with type t = Base.t) : S with type t = Base.t
+module Make (Base : Base_term.S) (X : Args with type t = Base.t) :
+  S with type t = Base.t
 
 module Packed : sig
   module type PackedS = sig
@@ -30,5 +28,5 @@ module Packed : sig
   end
 
   module Int : PackedS with type t = Int.t
-  module Unpack (Log : Logger.S) (Args : PackedS) : S with type t = Args.t
+  module Unpack (Args : PackedS) : S with type t = Args.t
 end

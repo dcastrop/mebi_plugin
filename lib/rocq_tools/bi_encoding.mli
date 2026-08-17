@@ -1,6 +1,4 @@
 module type S = sig
-  module Ctx : Rocq_context.S
-
   type enc
 
   module F : Hashtbl.S with type key = EConstr.t
@@ -39,7 +37,11 @@ module type S = sig
   val decode_map : 'a B.t -> 'a F.t
   val encode_map : 'a F.t -> 'a B.t
   val to_list : unit -> (enc * EConstr.t) list
+
+  (** The [EConstr.t] keys of [F] are compared and hashed under a [sigma], so
+      the table needs to know which context is current. [Rocq_monad.run] sets
+      this; it defaults to [Rocq_context.global]. *)
+  val set_ctx : Rocq_context.source -> unit
 end
 
-module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
-  S with type enc = Enc.t
+module Make (Enc : Encoding.S) : S with type enc = Enc.t

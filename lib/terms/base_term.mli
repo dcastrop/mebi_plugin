@@ -26,4 +26,4 @@ module type Args = sig
   val to_string : t -> string
 end
 
-module Make (Log : Logger.S) (X : Args) : S with type t = X.t
+module Make (X : Args) : S with type t = X.t

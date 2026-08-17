@@ -6,4 +6,4 @@ module type S = sig
   val non_silent : t -> t
 end
 
-module Make : (Log : Logger.S) (Label : Label.S) -> S with type elt = Label.t
+module Make : (Label : Label.S) -> S with type elt = Label.t

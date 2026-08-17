@@ -96,7 +96,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (Tactic : Proof_solver_tactic.S)
     (W :

@@ -96,7 +96,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (Tactic : Proof_solver_tactic.S)
     (W :
@@ -216,7 +215,7 @@ module Make
   *)
   let trivial ?(msg : string = "trivial") () : Tactic.t mm =
     let f : string list option -> unit Proofview.tactic =
-      if Log.Config.is_enabled Output.Kind.Info
+      if Logger.is_enabled Output.Kind.Info
       then Auto.gen_trivial ~debug:Hints.Info []
       else Auto.gen_trivial []
     in
@@ -301,7 +300,7 @@ module Make
       @raise CannotUnfoldConstr of [x] if [Constr.kind x] is not [Const (_, _)].
   *)
   let unfold_constr ?(in_hyp : Rocq_utils.hyp option) (x : Constr.t) : Tactic.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match Constr.kind x with
     | Const (name, _) ->
       let f (name : Names.Constant.t) : unit Proofview.tactic =
@@ -328,14 +327,14 @@ module Make
         (x : 'a)
     : Tactic.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match in_hyp with None -> f x | Some in_hyp -> f ~in_hyp x
   ;;
 
   let unfold_econstr ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
     : Tactic.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     (* let* y : Constr.t = econstr_to_constr x in *)
     econstr_to_constr x |> run |> f_unfold_hyp unfold_constr ~in_hyp
   ;;
@@ -345,7 +344,7 @@ module Make
         (x : Constrexpr.constr_expr)
     : Tactic.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     (* let open Syntax in *)
     (* let* y : EConstr.t = constrexpr_to_econstr x in *)
     constrexpr_to_econstr x |> run |> f_unfold_hyp unfold_econstr ~in_hyp
@@ -354,7 +353,7 @@ module Make
   let unfold_opt_constrexpr_list ?(in_hyp : Rocq_utils.hyp option)
     : Constrexpr.constr_expr list -> Tactic.t option
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     function
     | [] -> None
     | xs ->
@@ -376,7 +375,7 @@ module Make
 
   (* *)
   let do_refl () : Tactic.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let* wk_none = apply_wk_none () in
     let unfold_silent = unfold_silent () in
@@ -388,7 +387,7 @@ module Make
   let collect_component_econstrs (sigma : Evd.evar_map) (x : EConstr.t)
     : EConstrSet.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     (* log_econstr ~__FUNCTION__ ~s:"x" x; *)
     let is_constr_ref (x : EConstr.t) : bool =
       EConstr.isRef sigma x && EConstr.isConst sigma x
@@ -429,7 +428,7 @@ module Make
   (** [can_be_unfolded sigma x] returns [true] if [x] can be {e unfolded}, i.e., refers to a definition, e.g., of a definition, fixpoint or example.
   *)
   let can_be_unfolded (sigma : Evd.evar_map) (x : EConstr.t) : bool =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try
       let g, i = EConstr.destRef sigma x in
       match g with
@@ -475,7 +474,7 @@ module Make
   let try_unfold_any ?(in_hyp : Rocq_utils.hyp option) (x : EConstr.t)
     : Tactic.t option mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     (* log_econstr ~__FUNCTION__ ~s:"x" x; *)
     let open Syntax in
     let* sigma = get_sigma in
@@ -499,7 +498,7 @@ module Make
   ;;
 
   let rec try_unfold_any_of : EConstr.t list -> Tactic.t option mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     function
     | [] -> return None
     | h :: tl ->
@@ -520,7 +519,7 @@ module Make
   let find_lts (lts_enc : Enc.t)
     : Model.Info.Meta.RocqLTS.t list -> Model.Info.Meta.RocqLTS.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try
       List.find (fun ({ base; _ } : Model.Info.Meta.RocqLTS.t) ->
         Enc.equal base lts_enc)
@@ -533,7 +532,7 @@ module Make
   let find_constructor (constructor_index : int)
     : ConstructorBindings.t list -> ConstructorBindings.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try
       List.find (fun ({ index; _ } : ConstructorBindings.t) ->
         Int.equal index constructor_index)
@@ -552,7 +551,7 @@ module Make
         (bindings : Bindings.t)
     : EConstr.t Tactypes.bindings
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     W.ConstructorBindings.get from label goto bindings |> W.M.run
   ;;
 
@@ -564,7 +563,7 @@ module Make
         (args : binding_args)
     : EConstr.t Tactypes.bindings
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match (W.get_fsm_b ()).info.meta with
     | None -> Tactypes.NoBindings
     | Some { lts; _ } ->
@@ -578,13 +577,13 @@ module Make
   let apply_constructor ((enc, index) : Enc.Tree.Node.t) (args : binding_args)
     : Tactic.t mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     (* NOTE: constructors index from 1 *)
     let index : int = index + 1 in
     let msg : string = Printf.sprintf "constructor %i" index in
     (* let open Syntax in *)
     let bindings = try_get_constructor_bindings (enc, index) args in
-    Log.thing ~__FUNCTION__ Debug "bindings" bindings Strfy.econstr_bindings;
+    Logger.thing ~__FUNCTION__ Debug "bindings" bindings Strfy.econstr_bindings;
     Tactic.create ~msg (Tactics.one_constructor index bindings) |> return
   ;;
 end

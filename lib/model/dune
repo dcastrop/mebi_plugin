@@ -1,12 +1,13 @@
+; No rocq-runtime and no rocq_tools: the model is plain OCaml over an
+; abstract element type, and must stay linkable from test/ without a Rocq
+; runtime. Info.Make takes its constructor-bindings parameter as a Json.S
+; rather than a Constructor_bindings.S for exactly this reason.
 (library
  (name model_components)
  (public_name rocq-mebi.model.components)
  (libraries
-  rocq-runtime.vernac ; Needed for vernac extend.
-  rocq-runtime.plugins.ltac ; Needed for tactic extend.
   rocq-mebi.utils
   rocq-mebi.terms
-  rocq-mebi.rocq_tools
   yojson)
  (modules
   state
@@ -34,11 +35,8 @@
  (name model_models)
  (public_name rocq-mebi.model.models)
  (libraries
-  rocq-runtime.vernac ; Needed for vernac extend.
-  rocq-runtime.plugins.ltac ; Needed for tactic extend.
   rocq-mebi.utils
   rocq-mebi.terms
-  rocq-mebi.rocq_tools
   rocq-mebi.model.components
   yojson)
  (modules LTS wip_annotation wip_trace wip_traces saturation FSM)
@@ -48,11 +46,8 @@
  (name model_algorithms)
  (public_name rocq-mebi.model.algorithms)
  (libraries
-  rocq-runtime.vernac ; Needed for vernac extend.
-  rocq-runtime.plugins.ltac ; Needed for tactic extend.
   rocq-mebi.utils
   rocq-mebi.terms
-  rocq-mebi.rocq_tools
   rocq-mebi.model.components
   rocq-mebi.model.models
   yojson)
@@ -67,11 +62,8 @@
  (name model)
  (public_name rocq-mebi.model)
  (libraries
-  rocq-runtime.vernac ; Needed for vernac extend.
-  rocq-runtime.plugins.ltac ; Needed for tactic extend.
   rocq-mebi.utils
   rocq-mebi.terms
-  rocq-mebi.rocq_tools
   rocq-mebi.model.components
   rocq-mebi.model.models
   rocq-mebi.model.algorithms

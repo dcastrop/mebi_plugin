@@ -18,7 +18,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (State : State.S)
     (Label : Label.S)
     (Action : Action.S with type label = Label.t) :

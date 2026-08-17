@@ -58,7 +58,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (M : Rocq_monad_utils.S with type enc = Enc.t)
     (ConstructorBindings : Constructor_bindings.S with type 'a mm = 'a M.mm)

@@ -1,8 +1,10 @@
 val constants : EConstr.t list ref
 val find_reference : string list -> string -> Names.GlobRef.t
+
 (* val collect_bisimilarity_theories : unit -> EConstr.t list *)
-val get_constants : unit -> (string , EConstr.t) Hashtbl.t 
+val get_constants : unit -> (string, EConstr.t) Hashtbl.t
 val get : string -> EConstr.t
+
 (* val indexed_c : int * EConstr.t list -> EConstr.t option *)
 (* val c_LTS : unit -> EConstr.t
 val c_tau : unit -> EConstr.t

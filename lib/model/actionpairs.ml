@@ -13,7 +13,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (States : States.S)
     (Action : Action.S)
     (ActionPair :
@@ -28,15 +27,12 @@ module Make
   module Set_ : Set.S with type elt = ActionPair.t = Set.Make (ActionPair)
   include Set_
 
-  include
-    Json.Set.Make
-      (Log)
-      (struct
-        module Set = Set_
+  include Json.Set.Make (struct
+      module Set = Set_
 
-        let name = "ActionPairs"
-        let json = ActionPair.json
-      end)
+      let name = "ActionPairs"
+      let json = ActionPair.json
+    end)
 
   let destinations (x : t) : States.t =
     to_list x

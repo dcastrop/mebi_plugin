@@ -25,5 +25,9 @@ module type Args = sig
   val gl : Proofview.Goal.t ref
 end
 
-module Make (Log : Logger.S) (Enc : Encoding.S) (X : Args) :
-  S with type enc = Enc.t and type tree = Enc.Tree.t
+(** [M] is the shared monad/encoding stack; a proof step reuses it instead of
+    creating its own, so the encoding table survives across steps. *)
+module Make
+    (Enc : Encoding.S)
+    (M : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t)
+    (X : Args) : S with type enc = Enc.t and type tree = Enc.Tree.t

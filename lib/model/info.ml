@@ -52,17 +52,23 @@ module type S = sig
   val merge : ?nums:nums option -> t -> t -> t
 end
 
+(* [ConstructorBindings] is only ever stored and serialised here (see
+   [Meta.RocqLTS]), so it is required to satisfy [Json.S] rather than the full
+   [Constructor_bindings.S]. That signature mentions [EConstr], [Names] and
+   [Tactypes], and requiring it was the single thing forcing lib/model to
+   depend on rocq_tools. [Constructor_bindings.S] includes [Json.S with type k = t], so the call site in [Model.Make] is unchanged and the equation
+   [k = ConstructorBindings.t] stays visible to the proof solver, which reads
+   these values back out and destructures them. *)
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (Labels : Labels.S)
-    (ConstructorBindings : Constructor_bindings.S) :
+    (ConstructorBindings : Json.S) :
   S
   with type base = Base.t
-   and type constructorbindings = ConstructorBindings.t
+   and type constructorbindings = ConstructorBindings.k
    and type labels = Labels.t = struct
   type base = Base.t
-  type constructorbindings = ConstructorBindings.t
+  type constructorbindings = ConstructorBindings.k
   type labels = Labels.t
 
   module Meta = struct
@@ -72,25 +78,22 @@ module Make
         | Transitions of int
         | Merged of t * t
 
-      include
-        Json.Thing.Make
-          (Log)
-          (struct
-            type k = t
+      include Json.Thing.Make (struct
+          type k = t
 
-            let name = "Bounds"
+          let name = "Bounds"
 
-            let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-              let rec f : t -> Yojson.t = function
-                | States i -> `Assoc [ "by", `String "states"; "num", `Int i ]
-                | Transitions i ->
-                  `Assoc [ "by", `String "transitions"; "num", `Int i ]
-                | Merged (a, b) ->
-                  `Assoc [ "Merged", `Assoc [ "a", f a; "b", f b ] ]
-              in
-              f x
-            ;;
-          end)
+          let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+            let rec f : t -> Yojson.t = function
+              | States i -> `Assoc [ "by", `String "states"; "num", `Int i ]
+              | Transitions i ->
+                `Assoc [ "by", `String "transitions"; "num", `Int i ]
+              | Merged (a, b) ->
+                `Assoc [ "Merged", `Assoc [ "a", f a; "b", f b ] ]
+            in
+            f x
+          ;;
+        end)
     end
 
     module RocqLTS = struct
@@ -99,25 +102,22 @@ module Make
         ; constructors : constructorbindings list
         }
 
-      include
-        Json.Thing.Make
-          (Log)
-          (struct
-            type k = t
+      include Json.Thing.Make (struct
+          type k = t
 
-            let name = "RocqLTS"
+          let name = "RocqLTS"
 
-            let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-              `Assoc
-                [ "base", Base.json x.base
-                ; ( "constructors"
-                  , `List
-                      (List.map
-                         (ConstructorBindings.json ~as_elt:true)
-                         x.constructors) )
-                ]
-            ;;
-          end)
+          let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+            `Assoc
+              [ "base", Base.json x.base
+              ; ( "constructors"
+                , `List
+                    (List.map
+                       (ConstructorBindings.json ~as_elt:true)
+                       x.constructors) )
+              ]
+          ;;
+        end)
     end
 
     type t =
@@ -127,23 +127,20 @@ module Make
       ; lts : RocqLTS.t list
       }
 
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
+    include Json.Thing.Make (struct
+        type k = t
 
-          let name = "Meta"
+        let name = "Meta"
 
-          let json ?as_elt (x : t) : Yojson.t =
-            `Assoc
-              [ "complete", `Bool x.is_complete
-              ; "merged", `Bool x.is_merged
-              ; "bounds", Bounds.json ~as_elt:true x.bounds
-              ; "rocq lts", `List (List.map (RocqLTS.json ~as_elt:true) x.lts)
-              ]
-          ;;
-        end)
+        let json ?as_elt (x : t) : Yojson.t =
+          `Assoc
+            [ "complete", `Bool x.is_complete
+            ; "merged", `Bool x.is_merged
+            ; "bounds", Bounds.json ~as_elt:true x.bounds
+            ; "rocq lts", `List (List.map (RocqLTS.json ~as_elt:true) x.lts)
+            ]
+        ;;
+      end)
 
     let merge (a : t) (b : t) : t =
       let x : t =
@@ -182,30 +179,27 @@ module Make
     ; edges : int
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "Info"
+      let name = "Info"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ ( "nums"
-              , Json.option
-                  (fun ?as_elt ({ states; labels; edges } : nums) ->
-                    `Assoc
-                      [ "states", `Int states
-                      ; "labels", `Int labels
-                      ; "edges", `Int edges
-                      ])
-                  x.nums )
-            ; "meta", Json.option ~as_elt:true Meta.json x.meta
-            ; "weak labels", Labels.json ~as_elt:true x.weak_labels
-            ]
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        `Assoc
+          [ ( "nums"
+            , Json.option
+                (fun ?as_elt ({ states; labels; edges } : nums) ->
+                  `Assoc
+                    [ "states", `Int states
+                    ; "labels", `Int labels
+                    ; "edges", `Int edges
+                    ])
+                x.nums )
+          ; "meta", Json.option ~as_elt:true Meta.json x.meta
+          ; "weak labels", Labels.json ~as_elt:true x.weak_labels
+          ]
+      ;;
+    end)
 
   (** [merge ?nums a b] returns a new [t] with a union of [weak_labels] and [meta=(Meta.merge_opt ...)].
   *)

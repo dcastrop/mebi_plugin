@@ -27,7 +27,6 @@ end
 (** [module WIP] is a lightweight counterpart of [Note.t] that forms some "work-in-progress" [Annotation.t]. Once we stop saturating an action, we check if we are able to yield a new saturated action and convert the [wip list] to an [Annotation.t].
 *)
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (State : State.S with type base = Base.t)
     (Label : Label.S with type base = Base.t)
@@ -60,22 +59,19 @@ module Make
     ; trees : trees
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "WorkInProgress"
+      let name = "WorkInProgress"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ "from", State.json ~as_elt:true x.from
-            ; "via", Label.json ~as_elt:true x.via
-            ; "trees", Base.Trees.json ~as_elt:true x.trees
-            ]
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        `Assoc
+          [ "from", State.json ~as_elt:true x.from
+          ; "via", Label.json ~as_elt:true x.via
+          ; "trees", Base.Trees.json ~as_elt:true x.trees
+          ]
+      ;;
+    end)
 
   let is_silent (x : t) : bool = Label.is_silent x.via
   let is_named (x : t) : bool = is_silent x |> Bool.not
@@ -101,7 +97,7 @@ module Make
   exception IsEmptyList
 
   let list_to_annotation (goto : State.t) (xs : t list) : Annotation.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let rec f : t list -> Annotation.t = function
       | [] -> raise IsEmptyList
       | { from; via; trees } :: [] ->

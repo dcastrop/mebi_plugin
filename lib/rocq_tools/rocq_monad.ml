@@ -15,7 +15,7 @@ module type S = sig
     ; value : 'a
     }
 
-  val run : ?reset_encoding:bool -> 'a mm -> 'a
+  val run : ?ctx:Rocq_context.source -> ?reset_encoding:bool -> 'a mm -> 'a
   val return : 'a -> 'a mm
   val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
   val map : ('a -> 'b) -> 'a mm -> 'b mm
@@ -64,9 +64,8 @@ module type S = sig
   val fstring : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
 end
 
-module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
-  S with module Ctx = Ctx and type enc = Enc.t = struct
-  module BiEnc = Bi_encoding.Make (Log) (Ctx) (Enc)
+module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
+  module BiEnc = Bi_encoding.Make (Enc)
   include BiEnc
 
   let bienc_to_list : unit -> (Enc.t * EConstr.t) list = to_list
@@ -84,11 +83,23 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     }
 
   (* *)
-  let run ?(reset_encoding : bool = false) (x : 'a mm) : 'a =
-    (* Log.trace __FUNCTION__; *)
+
+  (** [run ?ctx m] evaluates [m] against [ctx] (default: the global
+      environment). [ctx] is a value rather than a functor parameter, so a
+      proof step can supply its goal without rebuilding this module -- and
+      therefore without discarding the encoding table, which is what used to
+      happen on every step. *)
+  let run
+        ?(ctx : Rocq_context.source = Rocq_context.global)
+        ?(reset_encoding : bool = false)
+        (x : 'a mm)
+    : 'a
+    =
+    (* Logger.trace __FUNCTION__; *)
+    set_ctx ctx;
     if reset_encoding then reset () else initialize ();
     let a : 'a in_wrapper =
-      x (ref { ctx = Ctx.get (); maps = get_the_maps () })
+      x (ref { ctx = ref (ctx ()); maps = get_the_maps () })
     in
     a.value
   ;;
@@ -125,7 +136,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
             (f : int -> 'a -> 'a mm)
     : 'a mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     if index > upper_bound
     then return acc
     else bind (f index acc) (fun acc' -> iterate (index + 1) upper_bound acc' f)
@@ -138,7 +149,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
         (st : wrapper ref)
     : 'a in_wrapper
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let sigma, a = f !(!st.ctx).env !(!st.ctx).sigma in
     st := { !st with ctx = ref { !(!st.ctx) with sigma } };
     { state = st; value = a }
@@ -151,7 +162,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   let sandbox ?(sigma : Evd.evar_map option) (m : 'a mm) (st : wrapper ref)
     : 'a in_wrapper
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let st_copy : wrapper = !st in
     let st =
       Option.cata
@@ -196,7 +207,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   end
 
   let econstr_normalize (x : EConstr.t) : EConstr.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let$+ t env sigma = Reductionops.nf_all env sigma x in
     return t

@@ -30,7 +30,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (Label : Label.S with type base = Base.t)
     (Note : Annotation_note.S with type label = Label.t) :
@@ -43,24 +42,21 @@ module Make
     ; next : t option
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "Annotation"
+      let name = "Annotation"
 
-        let rec json ?(as_elt : bool = false) (x : t) : Yojson.t =
-          `Assoc
-            [ "this", Note.json ~as_elt:true x.this
-            ; ( "next"
-              , match x.next with
-                | None -> `String "None"
-                | Some next -> json ~as_elt:true next )
-            ]
-        ;;
-      end)
+      let rec json ?(as_elt : bool = false) (x : t) : Yojson.t =
+        `Assoc
+          [ "this", Note.json ~as_elt:true x.this
+          ; ( "next"
+            , match x.next with
+              | None -> `String "None"
+              | Some next -> json ~as_elt:true next )
+          ]
+      ;;
+    end)
 
   let rec equal (a : t) (b : t) : bool =
     Note.equal a.this b.this && Option.equal equal a.next b.next

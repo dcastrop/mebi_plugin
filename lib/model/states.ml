@@ -10,23 +10,19 @@ module type S = sig
   val has_shared_origin : t -> t -> t -> bool
 end
 
-module Make (Log : Logger.S) (State : State.S) : S with type elt = State.t =
-struct
+module Make (State : State.S) : S with type elt = State.t = struct
   module Set_ : Set.S with type elt = State.t = Set.Make (State)
   include Set_
 
-  include
-    Json.Set.Make
-      (Log)
-      (struct
-        module Set = Set_
+  include Json.Set.Make (struct
+      module Set = Set_
 
-        let name = "States"
-        let json = State.json
-      end)
+      let name = "States"
+      let json = State.json
+    end)
 
   let add_to_opt (x : State.t) (ys : t option) : t =
-    add x (Option.default empty ys)
+    add x (Stdlib.Option.value ys ~default:empty)
   ;;
 
   exception StateHasNoOrigin of (State.t * t * t)

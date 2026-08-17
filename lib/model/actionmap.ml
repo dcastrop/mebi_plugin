@@ -22,7 +22,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (States : States.S)
     (Label : Label.S with type base = Base.t)
@@ -48,7 +47,6 @@ module Make
 
   include
     Json.Map.Make
-      (Log)
       (struct
         module Map = Map_
 
@@ -70,7 +68,7 @@ module Make
   (** [update] ... if the action is already present, then along with merging the destination states, we also merge the constructor trees.
   *)
   let update (x : t') (action : Action.t) (states : States.t) : unit =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     if States.is_empty states
     then ()
     else (
@@ -92,12 +90,12 @@ module Make
   (** [destinations x f e] merges the values of [x] using [f], where [e] is some initial (i.e., "empty") collection of ['a].
   *)
   let destinations (x : t') : States.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     to_seq_values x |> List.of_seq |> List.fold_left States.union States.empty
   ;;
 
   let reduce_by_label (x : t') (label : Label.t) : t' =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let y : t' = copy x in
     filter_map_inplace
       (fun (k : Action.t) (vs : States.t) ->
@@ -109,7 +107,7 @@ module Make
   let to_actions (x : t') : Actions.t = to_seq_keys x |> Actions.of_seq
 
   let to_actionpairs (x : t') : ActionPairs.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     fold
       (fun (k : Action.t) (vs : States.t) : (ActionPairs.t -> ActionPairs.t) ->
         ActionPairs.add (k, vs))
@@ -118,14 +116,14 @@ module Make
   ;;
 
   let of_actionpairs (xs : ActionPairs.t) : t' =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let y : t' = create 0 in
     ActionPairs.iter (fun ((k, vs) : ActionPairs.elt) -> update y k vs) xs;
     y
   ;;
 
   let merge (a : t') (b : t') : t' =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     ActionPairs.union (to_actionpairs a) (to_actionpairs b) |> of_actionpairs
   ;;
 end

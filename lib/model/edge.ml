@@ -18,7 +18,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (State : State.S)
     (Label : Label.S)
     (Action : Action.S with type label = Label.t) :
@@ -36,22 +35,19 @@ module Make
     ; action : action
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "Edge"
+      let name = "Edge"
 
-        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-          `Assoc
-            [ "from", State.json x.from
-            ; "goto", State.json x.goto
-            ; "action", Action.json x.action
-            ]
-        ;;
-      end)
+      let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+        `Assoc
+          [ "from", State.json x.from
+          ; "goto", State.json x.goto
+          ; "action", Action.json x.action
+          ]
+      ;;
+    end)
 
   let equal (a : t) (b : t) : bool =
     State.equal a.from b.from

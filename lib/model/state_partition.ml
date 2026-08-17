@@ -13,7 +13,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (State : State.S)
     (States : States.S with type elt = State.t)
     (ActionMap : Actionmap.S with type states = States.t)
@@ -38,15 +37,12 @@ module Make
   module Set_ : Set.S with type elt = States.t = Set.Make (States)
   include Set_
 
-  include
-    Json.Set.Make
-      (Log)
-      (struct
-        module Set = Set_
+  include Json.Set.Make (struct
+      module Set = Set_
 
-        let name = "Partitions"
-        let json = States.json
-      end)
+      let name = "Partitions"
+      let json = States.json
+    end)
 
   let get_bisimilar (x : State.t) : t -> States.t =
     find_first (fun (ys : States.t) -> States.mem x ys)
@@ -58,14 +54,14 @@ module Make
   ;;
 
   let reachable (from : State.t) (edges : EdgeMap.t') : t -> t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     filter_reachable (EdgeMap.destinations edges from)
   ;;
 
   let reachable_by_label (from : State.t) (label : label) (edges : EdgeMap.t')
     : t -> t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let actions = ActionMap.reduce_by_label (EdgeMap.find edges from) label in
     filter_reachable (ActionMap.destinations actions)
   ;;

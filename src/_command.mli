@@ -72,7 +72,7 @@ module type S = sig
   val run : Libnames.qualid list -> t -> bisimilarity option mm
 end
 
-module Make (Log : Logger.S) (W : Wrapper.S) :
+module Make (W : Wrapper.S) :
   S
   with type weak = W.Weak.t
    and type 'a mm = 'a W.M.mm

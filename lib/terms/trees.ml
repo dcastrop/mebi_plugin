@@ -10,22 +10,18 @@ module type S = sig
   val min_opt : t -> tree option
 end
 
-module Make (Log : Logger.S) (Tree : Tree.S) : S with type tree = Tree.t =
-struct
+module Make (Tree : Tree.S) : S with type tree = Tree.t = struct
   type tree = Tree.t
 
   module Set_ : Set.S with type elt = Tree.t = Set.Make (Tree)
   include Set_
 
-  include
-    Json.Set.Make
-      (Log)
-      (struct
-        module Set = Set_
+  include Json.Set.Make (struct
+      module Set = Set_
 
-        let name = "Trees"
-        let json = Tree.json
-      end)
+      let name = "Trees"
+      let json = Tree.json
+    end)
 
   exception EmptyHasNoMin
 

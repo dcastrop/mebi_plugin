@@ -20,7 +20,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (State : State.S with type base = Base.t)
     (Label : Label.S with type base = Base.t)
@@ -43,25 +42,21 @@ module Make
     ; annotation : annotation option
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "Transition"
+      let name = "Transition"
 
-        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-          `Assoc
-            [ "from", State.json ~as_elt:true x.from
-            ; "goto", State.json ~as_elt:true x.goto
-            ; "label", Label.json ~as_elt:true x.label
-            ; ( "annotation"
-              , Json.option ~as_elt:true Annotation.json x.annotation )
-            ; "tree", Json.option ~as_elt:true Base.Tree.json x.tree
-            ]
-        ;;
-      end)
+      let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+        `Assoc
+          [ "from", State.json ~as_elt:true x.from
+          ; "goto", State.json ~as_elt:true x.goto
+          ; "label", Label.json ~as_elt:true x.label
+          ; "annotation", Json.option ~as_elt:true Annotation.json x.annotation
+          ; "tree", Json.option ~as_elt:true Base.Tree.json x.tree
+          ]
+      ;;
+    end)
 
   let equal (a : t) (b : t) : bool =
     State.equal a.from b.from

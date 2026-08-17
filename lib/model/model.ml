@@ -129,63 +129,52 @@ module type S = sig
      and type fsm = FSM.t
 end
 
-module Make
-    (Log : Logger.S)
-    (Base : Base_term.S)
-    (ConstructorBindings : Constructor_bindings.S) :
+module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
   S
   with type base = Base.t
    and type tree = Base.Tree.t
    and type trees = Base.Trees.t
-   and type constructorbindings = ConstructorBindings.t = struct
+   and type constructorbindings = ConstructorBindings.k = struct
   type base = Base.t
   type tree = Base.Tree.t
   type trees = Base.Trees.t
-  type constructorbindings = ConstructorBindings.t
+  type constructorbindings = ConstructorBindings.k
 
-  module State = State.Make (Log) (Base)
-  module States = States.Make (Log) (State)
-  module Label = Label.Make (Log) (Base)
-  module Labels = Labels.Make (Log) (Label)
-  module Note = Annotation_note.Make (Log) (Base) (State) (Label)
-  module Annotation = Annotation.Make (Log) (Base) (Label) (Note)
-  module Annotations = Annotations.Make (Log) (Note) (Annotation)
-  module Transition = Transition.Make (Log) (Base) (State) (Label) (Annotation)
-  module Transitions = Transitions.Make (Log) (Labels) (Transition)
-  module Action = Action.Make (Log) (Base) (Label) (Annotation)
-  module Actions = Actions.Make (Log) (Label) (Labels) (Action)
-
-  module ActionPair =
-    Actionpair.Make (Log) (Base) (States) (Annotation) (Action)
-
-  module ActionPairs = Actionpairs.Make (Log) (States) (Action) (ActionPair)
+  module State = State.Make (Base)
+  module States = States.Make (State)
+  module Label = Label.Make (Base)
+  module Labels = Labels.Make (Label)
+  module Note = Annotation_note.Make (Base) (State) (Label)
+  module Annotation = Annotation.Make (Base) (Label) (Note)
+  module Annotations = Annotations.Make (Note) (Annotation)
+  module Transition = Transition.Make (Base) (State) (Label) (Annotation)
+  module Transitions = Transitions.Make (Labels) (Transition)
+  module Action = Action.Make (Base) (Label) (Annotation)
+  module Actions = Actions.Make (Label) (Labels) (Action)
+  module ActionPair = Actionpair.Make (Base) (States) (Annotation) (Action)
+  module ActionPairs = Actionpairs.Make (States) (Action) (ActionPair)
 
   module ActionMap =
-    Actionmap.Make (Log) (Base) (States) (Label) (Action) (Actions)
-      (ActionPairs)
+    Actionmap.Make (Base) (States) (Label) (Action) (Actions) (ActionPairs)
 
-  module Edge = Edge.Make (Log) (State) (Label) (Action)
-  module Edges = Edges.Make (Log) (Edge)
+  module Edge = Edge.Make (State) (Label) (Action)
+  module Edges = Edges.Make (Edge)
 
   module EdgeMap =
-    Edgemap.Make (Log) (Base) (State) (States) (Transition) (Transitions)
-      (Action)
+    Edgemap.Make (Base) (State) (States) (Transition) (Transitions) (Action)
       (Actions)
       (ActionPairs)
       (ActionMap)
       (Edge)
       (Edges)
 
-  module Partition =
-    State_partition.Make (Log) (State) (States) (ActionMap) (EdgeMap)
-
-  module Info = Info.Make (Log) (Base) (Labels) (ConstructorBindings)
-  module LTS = LTS.Make (Log) (State) (States) (Labels) (Transitions) (Info)
+  module Partition = State_partition.Make (State) (States) (ActionMap) (EdgeMap)
+  module Info = Info.Make (Base) (Labels) (ConstructorBindings)
+  module LTS = LTS.Make (State) (States) (Labels) (Transitions) (Info)
 
   (* TODO: the idea of [Traces] needs to be revisited. It does provide optimizations to examples with a lot of silent actions, where the saturated FSM is considerably larger, but i believe that there are areas where this can still be improved. *)
   module Saturation =
-    Saturation.Make (Log) (Base) (State) (States) (Label) (Labels) (Note)
-      (Annotation)
+    Saturation.Make (Base) (State) (States) (Label) (Labels) (Note) (Annotation)
       (Annotations)
       (Action)
       (ActionPair)
@@ -194,10 +183,10 @@ module Make
       (EdgeMap)
 
   module FSM =
-    FSM.Make (Log) (State) (States) (Labels) (EdgeMap) (Info) (LTS) (Saturation)
+    FSM.Make (State) (States) (Labels) (EdgeMap) (Info) (LTS) (Saturation)
 
   module Minimization =
-    Minimization.Make (Log) (Base) (State) (States) (Label) (Labels) (Action)
+    Minimization.Make (Base) (State) (States) (Label) (Labels) (Action)
       (ActionMap)
       (EdgeMap)
       (Partition)
@@ -205,8 +194,7 @@ module Make
       (FSM)
 
   module Bisimilarity =
-    Bisimilarity.Make (Log) (State) (States) (Label) (Labels) (Action)
-      (ActionMap)
+    Bisimilarity.Make (State) (States) (Label) (Labels) (Action) (ActionMap)
       (EdgeMap)
       (Partition)
       (Info)

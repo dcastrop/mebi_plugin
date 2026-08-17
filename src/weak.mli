@@ -10,7 +10,5 @@ module type S = sig
   val eq : t -> t -> bool
 end
 
-module Make
-    (Log : Logger.S)
-    (Enc : Encoding.S)
-    (M : Rocq_monad_utils.S with type enc = Enc.t) : S with type enc = Enc.t
+module Make (Enc : Encoding.S) (M : Rocq_monad_utils.S with type enc = Enc.t) :
+  S with type enc = Enc.t

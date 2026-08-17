@@ -50,7 +50,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (State : State.S with type base = Base.t)
     (States : States.S with type elt = State.t)
@@ -98,26 +97,23 @@ module Make
     ; pi : Partition.t
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "Minimization Results"
+      let name = "Minimization Results"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ "fsm", FSM.json ~as_elt:true x.fsm
-            ; "pi", Partition.json ~as_elt:true x.pi
-            ]
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        `Assoc
+          [ "fsm", FSM.json ~as_elt:true x.fsm
+          ; "pi", Partition.json ~as_elt:true x.pi
+          ]
+      ;;
+    end)
 
   exception CannotSplitEmptyBlock of unit
 
   let ensure_nonempty (a : States.t) : unit =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try assert (States.is_empty a |> Bool.not) with
     | Assert_failure _ -> raise (CannotSplitEmptyBlock ())
   ;;
@@ -129,7 +125,7 @@ module Make
         (block : States.t)
     : States.t * States.t option
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     ensure_nonempty block;
     let reachable_from_s : Partition.t = Partition.reachable s edges pi in
     Partition.log ~__FUNCTION__ ~s:"reachable from state" reachable_from_s;
@@ -152,7 +148,7 @@ module Make
   exception Split_OnlyReturnedOneBlock_ButNeqBlock of (States.t * States.t)
 
   let ensure_equal (a : States.t) (b : States.t) : unit =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try assert (States.equal a b) with
     | Assert_failure _ -> raise (Split_OnlyReturnedOneBlock_ButNeqBlock (a, b))
   ;;
@@ -165,7 +161,7 @@ module Make
         (label : Label.t)
     : unit
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     Partition.log ~__FUNCTION__ ~s:"pi" !pi;
     Label.log ~__FUNCTION__ ~s:"split by label" label;
     let edges : EdgeMap.t' = EdgeMap.reduce_by_label edges label in
@@ -188,13 +184,13 @@ module Make
         (block : States.t)
     : unit
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     Labels.non_silent alphabet
     |> Labels.iter (for_each_label pi changed edges (ref block))
   ;;
 
   let partition_states (fsm : FSM.t) : Partition.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let pi : Partition.t ref = ref (Partition.singleton fsm.states) in
     let changed : bool ref = ref true in
     while !changed do
@@ -205,7 +201,7 @@ module Make
   ;;
 
   let fsm (fsm : FSM.t) : t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     { fsm; pi = FSM.saturate ~only_if_weak:true fsm |> partition_states }
   ;;
 end
