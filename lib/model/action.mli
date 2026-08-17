@@ -21,7 +21,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (Label : Label.S with type base = Base.t)
     (Annotation : sig

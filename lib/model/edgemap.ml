@@ -27,7 +27,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (State : State.S with type base = Base.t)
     (States : States.S with type elt = State.t)
@@ -76,7 +75,6 @@ module Make
 
   include
     Json.Map.Make
-      (Log)
       (struct
         module Map = Map_
 
@@ -107,7 +105,7 @@ module Make
         (destinations : States.t)
     : unit
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match find_opt x from with
     | None ->
       ActionPairs.singleton (action, destinations)
@@ -117,7 +115,7 @@ module Make
   ;;
 
   let destinations (x : t') (from : State.t) : States.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match find_opt x from with
     | None ->
       (* State.log ~__FUNCTION__ ~m:Trace ~s:"no edges from" from; *)
@@ -126,12 +124,12 @@ module Make
   ;;
 
   let get_actions (x : t') (from : State.t) : Actions.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     find x from |> ActionMap.to_seq_keys |> Actions.of_seq
   ;;
 
   let reduce_by_label (x : t') (label : label) : t' =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let y : t' = copy x in
     filter_map_inplace
       (fun (k : State.t) (vs : ActionMap.t') ->
@@ -142,7 +140,7 @@ module Make
   ;;
 
   let get_edges (x : t') (from : State.t) : Edges.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     ActionMap.fold
       (fun (action : Action.t) (v : States.t) (acc : Edges.t) : Edges.t ->
         States.fold
@@ -155,7 +153,7 @@ module Make
   ;;
 
   let to_edges (x : t') : Edges.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     fold
       (fun (from : State.t) (vs : ActionMap.t') : (Edges.t -> Edges.t) ->
         ActionMap.to_actionpairs vs
@@ -173,7 +171,7 @@ module Make
   ;;
 
   let of_edges (xs : Edges.t) : t' =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let ys : t' = create 0 in
     Edges.iter
       (fun ({ from; goto; action } : Edge.t) ->
@@ -183,7 +181,7 @@ module Make
   ;;
 
   let of_transitions (xs : Transitions.t) : t' =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let edges : t' = create 0 in
     Transitions.iter
       (fun ({ from; goto; label; annotation; tree } : Transition.t) ->
@@ -193,7 +191,11 @@ module Make
           from
           { label
           ; annotation
-          ; trees = Option.cata Base.Trees.singleton Base.Trees.empty tree
+          ; trees =
+              Stdlib.Option.fold
+                ~none:Base.Trees.empty
+                ~some:Base.Trees.singleton
+                tree
           }
           (States.singleton goto))
       xs;
@@ -201,7 +203,7 @@ module Make
   ;;
 
   let merge (a : t') (b : t') : t' =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let c : t' = copy a in
     iter
       (fun (k : State.t) (vs : ActionMap.t') ->

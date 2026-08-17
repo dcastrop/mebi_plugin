@@ -45,7 +45,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (State : State.S)
     (States : States.S with type elt = State.t)
     (Label : Label.S with type base = State.base)
@@ -88,21 +87,18 @@ module Make
       ; saturated : FSM.t
       }
 
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
+    include Json.Thing.Make (struct
+        type k = t
 
-          let name = "FSM Pair"
+        let name = "FSM Pair"
 
-          let json ?as_elt (x : t) : Yojson.t =
-            `Assoc
-              [ "original", FSM.json ~as_elt:true x.original
-              ; "saturated", FSM.json ~as_elt:true x.saturated
-              ]
-          ;;
-        end)
+        let json ?as_elt (x : t) : Yojson.t =
+          `Assoc
+            [ "original", FSM.json ~as_elt:true x.original
+            ; "saturated", FSM.json ~as_elt:true x.saturated
+            ]
+        ;;
+      end)
 
     let get (x : FSM.t) : t =
       { original = x; saturated = FSM.saturate ~only_if_weak:true x }
@@ -115,30 +111,27 @@ module Make
       ; non_bisim_states : Partition.t
       }
 
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
+    include Json.Thing.Make (struct
+        type k = t
 
-          let name = "Result"
+        let name = "Result"
 
-          let json ?as_elt (x : t) : Yojson.t =
-            `Assoc
-              [ "bisimilar states", Partition.json ~as_elt:true x.bisim_states
-              ; ( "non-bisimilar states"
-                , Partition.json ~as_elt:true x.non_bisim_states )
-              ]
-          ;;
-        end)
+        let json ?as_elt (x : t) : Yojson.t =
+          `Assoc
+            [ "bisimilar states", Partition.json ~as_elt:true x.bisim_states
+            ; ( "non-bisimilar states"
+              , Partition.json ~as_elt:true x.non_bisim_states )
+            ]
+        ;;
+      end)
 
     let are_bisimilar ({ non_bisim_states; _ } : t) : bool =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       Partition.is_empty non_bisim_states
     ;;
 
     let split (pi : Partition.t) (a : States.t) (b : States.t) : t =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let bisim_states, non_bisim_states =
         Partition.fold
           (fun (x : States.t) (bisim_states, non_bisim_states) ->
@@ -159,26 +152,23 @@ module Make
     ; result : Result.t
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "Bisimilarity Results"
+      let name = "Bisimilarity Results"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ ( "fsms"
-              , `Assoc
-                  [ "a", FSMPair.json ~as_elt:true x.fsm_a
-                  ; "b", FSMPair.json ~as_elt:true x.fsm_b
-                  ; "merged", FSM.json ~as_elt:true x.merged
-                  ] )
-            ; "result", Result.json ~as_elt:true x.result
-            ]
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        `Assoc
+          [ ( "fsms"
+            , `Assoc
+                [ "a", FSMPair.json ~as_elt:true x.fsm_a
+                ; "b", FSMPair.json ~as_elt:true x.fsm_b
+                ; "merged", FSM.json ~as_elt:true x.merged
+                ] )
+          ; "result", Result.json ~as_elt:true x.result
+          ]
+      ;;
+    end)
 
   let the_cached_result : t option ref = ref None
   let set_the_result (x : t) : unit = the_cached_result := Some x
@@ -186,14 +176,14 @@ module Make
   exception NoCachedResult of unit
 
   let get_the_result () : t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match !the_cached_result with
     | None -> raise (NoCachedResult ())
     | Some x -> x
   ;;
 
   let fsm (a : FSM.t) (b : FSM.t) : t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let fsm_a : FSMPair.t = FSMPair.get a in
     let fsm_b : FSMPair.t = FSMPair.get b in
     let merged : FSM.t = FSM.merge fsm_a.saturated fsm_b.saturated in

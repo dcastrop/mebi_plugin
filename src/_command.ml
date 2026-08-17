@@ -72,7 +72,7 @@ module type S = sig
   val run : Libnames.qualid list -> t -> bisimilarity option mm
 end
 
-module Make (Log : Logger.S) (W : Wrapper.S) :
+module Make (W : Wrapper.S) :
   S
   with type weak = W.Weak.t
    and type 'a mm = 'a W.M.mm
@@ -98,7 +98,7 @@ module Make (Log : Logger.S) (W : Wrapper.S) :
         (names : Libnames.qualid list)
     : LTS.t M.mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     Config.get_weak weak |> extract_lts primary_lts init names
   ;;
 
@@ -109,7 +109,7 @@ module Make (Log : Logger.S) (W : Wrapper.S) :
         (names : Libnames.qualid list)
     : FSM.t M.mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open M.Syntax in
     let* the_lts = build_lts ~weak primary_lts init names in
     Model.FSM.of_lts the_lts |> M.return
@@ -131,9 +131,9 @@ module Make (Log : Logger.S) (W : Wrapper.S) :
     }
 
   let do_make_lts (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open M.Syntax in
-    Log.info "Extracting LTS...";
+    Logger.info "Extracting LTS...";
     let* the_lts = build_lts primary_lts x refs in
     result_log (module Model.LTS) (module Decode.LTS)
     |> handle_results Result "Finished Extracting LTS" the_lts;
@@ -141,8 +141,8 @@ module Make (Log : Logger.S) (W : Wrapper.S) :
   ;;
 
   let do_make_fsm (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
-    Log.trace __FUNCTION__;
-    Log.info "Making FSM (from extracted LTS)...";
+    Logger.trace __FUNCTION__;
+    Logger.info "Making FSM (from extracted LTS)...";
     let open M.Syntax in
     let* the_fsm = build_fsm primary_lts x refs in
     result_log (module Model.FSM) (module Decode.FSM)
@@ -151,13 +151,13 @@ module Make (Log : Logger.S) (W : Wrapper.S) :
   ;;
 
   let do_saturate (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
-    Log.trace __FUNCTION__;
-    Log.info "Making FSM (from extracted LTS)...";
+    Logger.trace __FUNCTION__;
+    Logger.info "Making FSM (from extracted LTS)...";
     let open M.Syntax in
     let* the_fsm = build_fsm primary_lts x refs in
     result_log (module Model.FSM) (module Decode.FSM)
     |> handle_results Info "Finished Making FSM" the_fsm;
-    Log.info "Saturating FSM...";
+    Logger.info "Saturating FSM...";
     let the_fsm = Model.FSM.saturate the_fsm in
     result_log (module Model.FSM) (module Decode.FSM)
     |> handle_results Result "Finished Saturating FSM" the_fsm;
@@ -165,13 +165,13 @@ module Make (Log : Logger.S) (W : Wrapper.S) :
   ;;
 
   let do_minimize (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
-    Log.trace __FUNCTION__;
-    Log.info "Making FSM (from extracted LTS)...";
+    Logger.trace __FUNCTION__;
+    Logger.info "Making FSM (from extracted LTS)...";
     let open M.Syntax in
     let* the_fsm = build_fsm primary_lts x refs in
     result_log (module Model.FSM) (module Decode.FSM)
     |> handle_results Info "Finished Making FSM" the_fsm;
-    Log.info "Minimizing FSM...";
+    Logger.info "Minimizing FSM...";
     let { fsm; pi } : Model.Minimization.t = Model.Minimization.fsm the_fsm in
     Decode.Partition.log ~m:Info ~s:"pi" pi;
     result_log (module Model.FSM) (module Decode.FSM)
@@ -185,15 +185,15 @@ module Make (Log : Logger.S) (W : Wrapper.S) :
         (refs : Libnames.qualid list)
     : (FSM.t * FSM.t) M.mm
     =
-    Log.trace __FUNCTION__;
-    Log.info "Making FSMs...";
+    Logger.trace __FUNCTION__;
+    Logger.info "Making FSMs...";
     let open M.Syntax in
-    Log.info "Making FSM A...";
+    Logger.info "Making FSM A...";
     let weak1 : Weak.t option = Config.get_the_weak_arg1 () in
     let* the_fsm_a = build_fsm ~weak:weak1 alts ax refs in
     result_log (module Model.FSM) (module Decode.FSM)
     |> handle_results Info "Finished Making FSM A" the_fsm_a;
-    Log.info "Making FSM B...";
+    Logger.info "Making FSM B...";
     let weak2 : Weak.t option = Config.get_the_weak_arg2 () in
     let* the_fsm_b = build_fsm ~weak:weak2 blts bx refs in
     result_log (module Model.FSM) (module Decode.FSM)
@@ -202,10 +202,10 @@ module Make (Log : Logger.S) (W : Wrapper.S) :
   ;;
 
   let do_merge { a; b } refs : Model.Bisimilarity.t option M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open M.Syntax in
     let* the_fsm_a, the_fsm_b = build_fsms a b refs in
-    Log.info "Merging FSMs...";
+    Logger.info "Merging FSMs...";
     let the_fsm = FSM.merge the_fsm_a the_fsm_b in
     result_log (module Model.FSM) (module Decode.FSM)
     |> handle_results Result "Finished Merging FSMs" the_fsm;
@@ -223,10 +223,10 @@ module Make (Log : Logger.S) (W : Wrapper.S) :
   ;;
 
   let do_check_bisim { a; b } refs : Model.Bisimilarity.t option M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open M.Syntax in
     let* the_fsm_a, the_fsm_b = build_fsms a b refs in
-    Log.info "Checking Bisimilarity of FSMs...";
+    Logger.info "Checking Bisimilarity of FSMs...";
     let result = Model.Bisimilarity.fsm the_fsm_a the_fsm_b in
     let r = result_log (module Model.FSM) (module Decode.FSM) in
     r |> handle_results Result "FSM a (original)" result.fsm_a.original;
@@ -245,7 +245,7 @@ module Make (Log : Logger.S) (W : Wrapper.S) :
   let run (refs : Libnames.qualid list) (x : t)
     : Model.Bisimilarity.t option M.mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open M.Syntax in
     Config.load_the_bounds_args ();
     let* () = Config.load_weak_args () in

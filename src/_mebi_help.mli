@@ -1,4 +1,3 @@
-
 type help_set_kind =
   | General of unit
   | Bound of unit
@@ -30,6 +29,5 @@ type help_kind =
 val show_instructions_to_toggle_weak : bool -> unit
 val show_instructions_to_enable_weak : unit -> unit
 val show_instructions_to_set_weak : unit -> unit
-
 val show_guidelines_and_limitations : unit -> unit
 val handle_help : help_kind -> unit

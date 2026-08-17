@@ -15,24 +15,19 @@ module type Args = sig
   val next : t -> t
 end
 
-module Make
-    (Log : Logger.S)
-    (Base : Base_term.S)
-    (X : Args with type t = Base.t) : S with type t = Base.t = struct
+module Make (Base : Base_term.S) (X : Args with type t = Base.t) :
+  S with type t = Base.t = struct
   include Base
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name : string = "Enc"
+      let name : string = "Enc"
 
-        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-          Base.json ~as_elt:true x
-        ;;
-      end)
+      let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+        Base.json ~as_elt:true x
+      ;;
+    end)
 
   let init = X.init
   let next = X.next
@@ -76,11 +71,10 @@ module Packed = struct
     end
   end
 
-  module Unpack (Log : Logger.S) (Args : PackedS) : S with type t = Args.t =
-  struct
+  module Unpack (Args : PackedS) : S with type t = Args.t = struct
     module Base : Base_term.S with type t = Args.t =
-      Base_term.Make (Log) (Args.BaseArgs)
+      Base_term.Make (Args.BaseArgs)
 
-    include Make (Log) (Base) (Args.EncodingArgs)
+    include Make (Base) (Args.EncodingArgs)
   end
 end

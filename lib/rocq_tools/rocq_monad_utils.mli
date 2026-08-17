@@ -349,5 +349,5 @@ module type S = sig
   val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t)
 end
 
-module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
-  S with module Ctx = Ctx and type enc = Enc.t and type tree = Enc.Tree.t
+module Make (Enc : Encoding.S) :
+  S with type enc = Enc.t and type tree = Enc.Tree.t

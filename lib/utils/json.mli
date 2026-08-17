@@ -20,24 +20,20 @@ module type S = sig
   val write : ?dir:string -> string -> k -> unit
 end
 
-module Make
-    (Log : Logger.S)
-    (X : sig
-       type k
+module Make (X : sig
+    type k
 
-       val name : string
-       val json : ?as_elt:bool -> k -> Yojson.t
-     end) : S with type k = X.k
+    val name : string
+    val json : ?as_elt:bool -> k -> Yojson.t
+  end) : S with type k = X.k
 
 module Thing : sig
-  module Make
-      (Log : Logger.S)
-      (X : sig
-         type k
+  module Make (X : sig
+      type k
 
-         val name : string
-         val json : ?as_elt:bool -> k -> Yojson.t
-       end) : S with type k = X.k
+      val name : string
+      val json : ?as_elt:bool -> k -> Yojson.t
+    end) : S with type k = X.k
 end
 
 module Map : sig
@@ -48,7 +44,6 @@ module Map : sig
   end
 
   module Make
-      (Log : Logger.S)
       (X : sig
          module Map : Hashtbl.S
 
@@ -61,23 +56,19 @@ module Map : sig
 end
 
 module Set : sig
-  module Make
-      (Log : Logger.S)
-      (X : sig
-         module Set : Set.S
+  module Make (X : sig
+      module Set : Set.S
 
-         val name : string
-         val json : ?as_elt:bool -> Set.elt -> Yojson.t
-       end) : S with type k = X.Set.t
+      val name : string
+      val json : ?as_elt:bool -> Set.elt -> Yojson.t
+    end) : S with type k = X.Set.t
 end
 
 module List : sig
-  module Make
-      (Log : Logger.S)
-      (X : sig
-         type k
+  module Make (X : sig
+      type k
 
-         val name : string
-         val json : ?as_elt:bool -> k -> Yojson.t
-       end) : S with type k = X.k list
+      val name : string
+      val json : ?as_elt:bool -> k -> Yojson.t
+    end) : S with type k = X.k list
 end

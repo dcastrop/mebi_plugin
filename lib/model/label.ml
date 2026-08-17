@@ -14,8 +14,7 @@ module type S = sig
   val is_silent : t -> bool
 end
 
-module Make (Log : Logger.S) (Base : Base_term.S) : S with type base = Base.t =
-struct
+module Make (Base : Base_term.S) : S with type base = Base.t = struct
   type base = Base.t
 
   type t =
@@ -23,23 +22,19 @@ struct
     ; is_silent : bool option
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "Label"
+      let name = "Label"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ "base", Base.json ~as_elt:true x.base
-            ; ( "is_silent"
-              , Json.option ~as_elt:true (fun ?as_elt x -> `Bool x) x.is_silent
-              )
-            ]
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        `Assoc
+          [ "base", Base.json ~as_elt:true x.base
+          ; ( "is_silent"
+            , Json.option ~as_elt:true (fun ?as_elt x -> `Bool x) x.is_silent )
+          ]
+      ;;
+    end)
 
   let equal (a : t) (b : t) : bool = Base.equal a.base b.base
 
@@ -48,13 +43,14 @@ struct
   let compare (a : t) (b : t) : int =
     Utils.compare_chain
       [ Base.compare a.base b.base
-      ; Option.cata
-          (fun (a : bool) -> Option.cata (Bool.compare a) 0 b.is_silent)
-          0
+      ; Stdlib.Option.fold
+          ~none:0
+          ~some:(fun (a : bool) ->
+            Stdlib.Option.fold ~none:0 ~some:(Bool.compare a) b.is_silent)
           a.is_silent
       ]
   ;;
 
   let hash (x : t) : int = Base.hash x.base
-  let is_silent (x : t) : bool = Option.default false x.is_silent
+  let is_silent (x : t) : bool = Stdlib.Option.value x.is_silent ~default:false
 end

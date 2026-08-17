@@ -7,7 +7,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (M : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t)
     (Weak : Weak.S with type enc = Enc.t)
@@ -79,7 +78,7 @@ struct
   ;;
 
   let constructor_info (g : G.t) : Model.Info.Meta.RocqLTS.t list M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let xs = M.B.to_seq g.ltsmap |> List.of_seq in
     let open M.Syntax in
     let f (i : int) (acc : Model.Info.Meta.RocqLTS.t list) =
@@ -95,7 +94,7 @@ struct
   ;;
 
   let meta (g : G.t) : Info.Meta.t M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open M.Syntax in
     let* lts : Info.Meta.RocqLTS.t list = constructor_info g in
     let x : Info.Meta.t =
@@ -112,7 +111,7 @@ struct
   ;;
 
   let weak_labels (g : G.t) (xs : Labels.t) : Labels.t M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match g.weak with
     | None -> Labels.empty |> M.return
     | Some weak ->
@@ -133,7 +132,7 @@ struct
   ;;
 
   let extract (g : G.t) : LTS.t M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let states : States.t = states g.states in
     let terminals : States.t = terminals g.states g.transitions in
     let transitions : Transitions.t = transitions g.transitions in

@@ -11,4 +11,4 @@ module type S = sig
   val has_shared_origin : t -> t -> t -> bool
 end
 
-module Make : (Log : Logger.S) (State : State.S) -> S with type elt = State.t
+module Make : (State : State.S) -> S with type elt = State.t

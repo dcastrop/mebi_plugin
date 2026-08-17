@@ -25,8 +25,14 @@ module type Args = sig
   val gl : Proofview.Goal.t ref
 end
 
-module Make (Log : Logger.S) (Enc : Encoding.S) (X : Args) :
-  S with type enc = Enc.t and type tree = Enc.Tree.t = struct
+(* [M] is the monad/encoding stack shared with the command-time run, passed in
+   rather than built here. Building it here re-created Bi_encoding -- and with
+   it the encoding table -- on every proof step, so no term encoded in one step
+   could ever be found in the next. *)
+module Make
+    (Enc : Encoding.S)
+    (M : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t)
+    (X : Args) : S with type enc = Enc.t and type tree = Enc.Tree.t = struct
   let gl () : Proofview.Goal.t = !X.gl
   let get_concl () : EConstr.t = Proofview.Goal.concl (gl ())
   let get_hyps () : Rocq_utils.hyp list = Proofview.Goal.hyps (gl ())
@@ -59,25 +65,26 @@ module Make (Log : Logger.S) (Enc : Encoding.S) (X : Args) :
     Names.Id.Set.diff (get_hyp_names ()) (get_all_cofix_hyp_names ())
   ;;
 
-  module I :
-    Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t =
-    Rocq_monad_utils.Make
-      (Log)
-      (Rocq_context.Make (struct
-           let env : unit -> Environ.env ref =
-             fun () -> ref (Proofview.Goal.env (gl ()))
-           ;;
+  include M
 
-           let sigma : unit -> Evd.evar_map ref =
-             fun () -> ref (Proofview.Goal.sigma (gl ()))
-           ;;
-         end))
-      (Enc)
+  (** The goal's [env]/[sigma], read through [X.gl] so it tracks the proof as it
+      advances. *)
+  let ctx : Rocq_context.source = Rocq_context.of_goal X.gl
 
-  include I
+  (** Same as [M.run] but defaulting to this step's goal rather than the global
+      environment. Overriding a default is all that distinguishes a proof-step
+      run from a command run now; it used to be a separate module stack. *)
+  let run
+        ?(ctx : Rocq_context.source = ctx)
+        ?(reset_encoding : bool = false)
+        (m : 'a mm)
+    : 'a
+    =
+    M.run ~ctx ~reset_encoding m
+  ;;
 
   let log_concl () : unit = log_econstr ~s:"concl" (get_concl ())
-  let log_hyps () : unit = Log.things Debug "hyps" (get_hyps ()) Strfy.hyp
+  let log_hyps () : unit = Logger.things Debug "hyps" (get_hyps ()) Strfy.hyp
 
   (** [EConstrSet] is a custom [Set] of [EConstr.t] that allows terms to be compared more efficiently during {b a single proof step only} -- since this is built for each step. {e Though, since each proof step we have a new [env] and [sigma], the same term may be encoded differently across iteration steps, so there isn't necessarily a way for us to compare terms in a proof across iterations anyway. {b ! This needs to be investigated.}}
   *)

@@ -1,8 +1,7 @@
 (***********************************************************************)
-module Log : Logger.S = Logger.MkDefault ()
-
-let () = Log.Config.configure_output Debug false
-let () = Log.Config.configure_output Trace false
+module Log = Logger.Scoped (struct
+    let overrides = [ Output.Kind.Debug, false; Output.Kind.Trace, false ]
+  end)
 (***********************************************************************)
 
 type help_set_kind =

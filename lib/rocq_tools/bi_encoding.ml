@@ -1,6 +1,4 @@
 module type S = sig
-  module Ctx : Rocq_context.S
-
   type enc
 
   module F : Hashtbl.S with type key = EConstr.t
@@ -39,26 +37,35 @@ module type S = sig
   val decode_map : 'a B.t -> 'a F.t
   val encode_map : 'a F.t -> 'a B.t
   val to_list : unit -> (enc * EConstr.t) list
+
+  (** The [EConstr.t] keys of [F] are compared and hashed under a [sigma], so
+      the table needs to know which context is current. [Rocq_monad.run] sets
+      this; it defaults to [Rocq_context.global]. *)
+  val set_ctx : Rocq_context.source -> unit
 end
 
-module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
-  S with type enc = Enc.t = struct
-  module Ctx : Rocq_context.S = Ctx
-
+module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
   type enc = Enc.t
+
+  (* Which env/sigma the EConstr keys are interpreted under. Previously a
+     functor parameter, which meant every switch of context rebuilt this module
+     -- and with it [the_maps], silently discarding the encoding table. *)
+  let the_ctx : Rocq_context.source ref = ref Rocq_context.global
+  let set_ctx (s : Rocq_context.source) : unit = the_ctx := s
+  let sigma () : Evd.evar_map = Rocq_context.sigma !the_ctx
 
   module F : Hashtbl.S with type key = EConstr.t = Hashtbl.Make (struct
       type t = EConstr.t
 
       let equal (a : t) (b : t) : bool =
-        Log.trace __FUNCTION__;
-        EConstr.eq_constr !(Ctx.sigma ()) a b
+        Logger.trace __FUNCTION__;
+        EConstr.eq_constr (sigma ()) a b
       ;;
 
       let hash (x : t) : int =
-        Log.trace __FUNCTION__;
+        Logger.trace __FUNCTION__;
         Constr.hash
-          (EConstr.to_constr ~abort_on_undefined_evars:false !(Ctx.sigma ()) x)
+          (EConstr.to_constr ~abort_on_undefined_evars:false (sigma ()) x)
       ;;
     end)
 
@@ -72,7 +79,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   let the_maps : maps ref option ref = ref None
 
   let reset () : unit =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     Enc.reset ();
     let fwd : Enc.t F.t = F.create 0 in
     let bck : EConstr.t B.t = B.create 0 in
@@ -80,24 +87,24 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   ;;
 
   let initialize () : unit =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match !the_maps with None -> reset () | Some _ -> ()
   ;;
 
   exception MapsNotInitialised of unit
 
   let get_the_maps () : maps ref =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match !the_maps with None -> raise (MapsNotInitialised ()) | Some x -> x
   ;;
 
   let fwdmap () : Enc.t F.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     !(get_the_maps ()).fwd
   ;;
 
   let bckmap () : EConstr.t B.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     !(get_the_maps ()).bck
   ;;
 
@@ -105,26 +112,26 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 
   (* *)
   let get_encoding (x : EConstr.t) : Enc.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try F.find (fwdmap ()) x with Not_found -> raise (EncodingNotFound x)
   ;;
 
   let encode (x : EConstr.t) : Enc.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try get_encoding x with
     | EncodingNotFound x ->
-      (* Log.trace ~__FUNCTION__ "Err: EncodingNotFound"; *)
+      (* Logger.trace ~__FUNCTION__ "Err: EncodingNotFound"; *)
       (* NOTE: map to the next encoding and return *)
       let new_enc : Enc.t = Enc.incr () in
       F.add (fwdmap ()) x new_enc;
       B.add (bckmap ()) new_enc x;
       (* NOTE: make sure to update the maps (keep progress) *)
-      (* Log.thing ~__FUNCTION__ Trace "new enc" new_enc ( Enc.to_string); *)
+      (* Logger.thing ~__FUNCTION__ Trace "new enc" new_enc ( Enc.to_string); *)
       new_enc
   ;;
 
   let encoded (x : EConstr.t) : bool =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     F.mem (fwdmap ()) x
   ;;
 
@@ -132,22 +139,22 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 
   (* *)
   let get_econstr (x : Enc.t) : EConstr.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try B.find (bckmap ()) x with Not_found -> raise (DecodingNotFound x)
   ;;
 
   exception CannotDecode of Enc.t
 
   let decode (x : Enc.t) : EConstr.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try get_econstr x with
     | DecodingNotFound x ->
-      Log.thing ~__FUNCTION__ Trace "Err: DecodingNotFound" x Enc.to_string;
+      Logger.thing ~__FUNCTION__ Trace "Err: DecodingNotFound" x Enc.to_string;
       raise (CannotDecode x)
   ;;
 
   let decode_opt (x : Enc.t) : EConstr.t option =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try Some (decode x) with CannotDecode _ -> None
   ;;
 
@@ -158,14 +165,14 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 
   (* *)
   let decode_map (bmap : 'a B.t) : 'a F.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let fmap : 'a F.t = F.create (B.length bmap) in
     B.iter (fun (k : Enc.t) (v : 'a) -> F.add fmap (decode k) v) bmap;
     fmap
   ;;
 
   let encode_map (fmap : 'a F.t) : 'a B.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let bmap : 'a B.t = B.create (F.length fmap) in
     F.iter (fun (k : EConstr.t) (v : 'a) -> B.add bmap (encode k) v) fmap;
     bmap
@@ -173,7 +180,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 
   (* *)
   let to_list () : (Enc.t * EConstr.t) list =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     B.to_seq (bckmap ())
     |> List.of_seq
     |> List.sort (fun (a, _) (b, _) -> Enc.compare a b)

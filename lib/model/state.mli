@@ -17,4 +17,4 @@ module type S = sig
   val hash : t -> int
 end
 
-module Make (Log : Logger.S) (Base : Base_term.S) : S with type base = Base.t
+module Make (Base : Base_term.S) : S with type base = Base.t

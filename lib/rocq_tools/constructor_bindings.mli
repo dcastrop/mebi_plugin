@@ -36,7 +36,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (M : Rocq_monad_utils.S)
     (Bindings : Bindings.S with type 'a mm = 'a M.mm) :
   S

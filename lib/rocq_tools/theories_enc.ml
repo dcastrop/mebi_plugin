@@ -22,7 +22,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (M : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t)
     (I : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t)
@@ -35,7 +34,7 @@ struct
   include Theories
 
   let get_theory_enc (f : EConstr.t -> bool I.mm) : Enc.t M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open M.Syntax in
     let* fm = M.get_fwdmap in
     let rec find_theory : (EConstr.t * Enc.t) list -> Enc.t M.mm = function
@@ -50,7 +49,7 @@ struct
   exception NoEncodingFoundFor_TheoriesNone
 
   let get_None_enc () : Enc.t M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try get_theory_enc is_None with
     | Not_found -> raise NoEncodingFoundFor_TheoriesNone
   ;;
@@ -58,7 +57,7 @@ struct
   exception NoEncodingFoundFor_TheoriesSome
 
   let get_Some_enc () : Enc.t M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try get_theory_enc is_Some with
     | Not_found -> raise NoEncodingFoundFor_TheoriesSome
   ;;
@@ -69,19 +68,19 @@ struct
   let get_theory_enc_if_eq (x : EConstr.t) (f : EConstr.t -> bool I.mm)
     : Enc.t M.mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let is_eq : bool = I.run (f x) in
     try if is_eq then get_theory_enc f else raise Not_found with
     | Not_found -> raise NotEqTheory
   ;;
 
   let get_None_enc_if_eq (x : EConstr.t) : Enc.t M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     get_theory_enc_if_eq x is_None
   ;;
 
   let get_Some_enc_if_eq (x : EConstr.t) : Enc.t M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     get_theory_enc_if_eq x is_Some
   ;;
 end

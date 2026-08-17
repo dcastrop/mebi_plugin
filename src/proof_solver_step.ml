@@ -19,7 +19,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (Tactic : Proof_solver_tactic.S)
     (W :
@@ -59,7 +58,7 @@ struct
   *)
   module Iter :
     Proof_solver_wrapper.S with type enc = Enc.t and type tree = Enc.Tree.t =
-    Proof_solver_wrapper.Make (Log) (Enc) (X)
+    Proof_solver_wrapper.Make (Enc) (W.M) (X)
 
   include Iter
 
@@ -86,7 +85,7 @@ struct
      and type rocqlts = Model.Info.Meta.RocqLTS.t
      and type tactic = Tactic.t
      and type econstrset = Iter.EConstrSet.t =
-    Proof_solver_tactics.Make (Log) (Enc) (Tactic) (W) (Iter) (Theory)
+    Proof_solver_tactics.Make (Enc) (Tactic) (W) (Iter) (Theory)
 
   (** [module ReModel] is for extracting the model component {i (e.g., state, label in [module W.Model])} corresponding to an [EConstr.t] term in the proof.
   *)
@@ -98,7 +97,7 @@ struct
         }
 
     let state (x : EConstr.t) (ys : Model.States.t) : Model.State.t M.mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       try
         let enc : Enc.t = M.get_encoding x in
         (* NOTE: [Model.States.compare] only cares about [base]. *)
@@ -113,7 +112,7 @@ struct
     let _state_opt (x : EConstr.t) (ys : Model.States.t)
       : Model.State.t option M.mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       try
         let open M.Syntax in
         let* z = state x ys in
@@ -129,7 +128,7 @@ struct
         }
 
     let label (x : EConstr.t) (ys : Model.Labels.t) : Model.Label.t M.mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let f (enc : Enc.t) : Model.Label.t M.mm =
         (* NOTE: [Model.Labels.compare] only cares about [is_silent=Some _] *)
         Model.Labels.find { base = enc; is_silent = None } ys |> M.return
@@ -158,7 +157,7 @@ struct
     let _label_opt (x : EConstr.t) (ys : Model.Labels.t)
       : Model.Label.t option M.mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       try
         let open M.Syntax in
         let* z = label x ys in
@@ -182,7 +181,7 @@ struct
           (edges : Model.EdgeMap.t')
       : Model.Transition.t
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       (* TODO: export some of this to the [Model.ActionMap] ? *)
       let actions = Model.EdgeMap.find edges from in
       let labelled = Model.ActionMap.reduce_by_label actions label in
@@ -204,7 +203,7 @@ struct
           { from; goto; label; annotation; tree }
         | h :: tl ->
           (* TODO: move this proceed to [Model] and handle this case *)
-          Log.warning ~__FUNCTION__ "Multiple actionpairs found";
+          Logger.warning ~__FUNCTION__ "Multiple actionpairs found";
           raise (CouldNotFind_Transition { from; goto; label; edges }))
     ;;
   end
@@ -230,7 +229,7 @@ struct
     (** [invertibility x] returns an integer denoting whether [x] need be inverted, with the higher numbers being of more importance to invert and [0] denoting [x] does not need to be inverted.
     *)
     let invertibility (x : t) : int mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open Syntax in
       let* _, tys = to_atomic x in
       let* sigma = get_sigma in
@@ -251,7 +250,7 @@ struct
     ;;
 
     let _need_inversion (x : t) : bool mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open Syntax in
       let* n : int = invertibility x in
       if Int.equal n 0 then return false else return true
@@ -294,7 +293,7 @@ struct
 
     (** *)
     let get_transition (x : t) (m : Model.FSM.t) : Model.Transition.t mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open Syntax in
       let* ty, tys = to_atomic x in
       if Theory.is_fsm_constructor ty m
@@ -317,16 +316,16 @@ struct
             log_econstr ~__FUNCTION__ ~s:"Err: M.EncodingNotFound" z;
             raise (CouldNotGetTransition { hyp = x; fsm = m }) *)
         | ReModel.CouldNotFind_State _ ->
-          Log.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_State";
+          Logger.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_State";
           raise (CouldNotGetTransition { hyp = x; fsm = m })
         | ReModel.CouldNotFind_Label _ ->
-          Log.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_Label";
+          Logger.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_Label";
           raise (CouldNotGetTransition { hyp = x; fsm = m })
         | ReModel.CouldNotFind_Transition _ ->
-          Log.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_Transition";
+          Logger.trace ~__FUNCTION__ "Err: ReModel.CouldNotFind_Transition";
           raise (CouldNotGetTransition { hyp = x; fsm = m }))
       else (
-        Log.trace ~__FUNCTION__ "(else)";
+        Logger.trace ~__FUNCTION__ "(else)";
         raise (CouldNotGetTransition { hyp = x; fsm = m }))
     ;;
   end
@@ -359,7 +358,7 @@ struct
     (** [try_unfold_any ()] is similar to [Hyp.try_unfold_any _], except that instead of a hypothesis, it uses the conclusion. Uses [Tacs.try_unfold_any].
     *)
     let try_unfold_any () : Tactic.t option mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open Syntax in
       let* ty, tys = get_concl () |> to_atomic in
       let* ty_opt : Tactic.t option = Tacs.try_unfold_any ty in
@@ -405,7 +404,7 @@ struct
     exception ConclDoesNotMatchConj
 
     let get_wk_conj () : wk_conj mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open Syntax in
       let* ty, tys = get_concl () |> to_atomic in
       let* () = Theory.ensure ty Theory.is_exists in
@@ -417,7 +416,7 @@ struct
     ;;
 
     let get_conj ({ wk_trans; wk_sim } : wk_conj) : conj mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open Syntax in
       let* () = Theory.ensure wk_sim Theory.is_weak_sim in
       let* a' = get_a'_from_wk_sim wk_sim in
@@ -452,9 +451,9 @@ struct
       match cofix_only with
       | None -> log_hyps ()
       | Some true ->
-        Log.things Debug "hyps (cofixes)" (get_cofixes ()) Strfy.hyp
+        Logger.things Debug "hyps (cofixes)" (get_cofixes ()) Strfy.hyp
       | Some false ->
-        Log.things Debug "hyps (non-cofixes)" (get_non_cofixes ()) Strfy.hyp
+        Logger.things Debug "hyps (non-cofixes)" (get_non_cofixes ()) Strfy.hyp
     ;;
 
     (** [can_solve_concl_cofix ()] returns true if there is a hyp that can solve the current a tactic to solve the current goal using one of he cofixes in the hyps.
@@ -473,14 +472,14 @@ struct
     (** [try_invert_any inverted_hyps] returns either [None] if no hyps can be inverted (as determined by [Hyp.invertibility]), else a [Tactic.t] that will invert the hypothesis deemed to be the most important to invert. (Only checks non-cofix hyps as by [get_non_cofixes ()].)
     *)
     let try_invert_any () : Tactic.t option mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       (* log_econstrs ~__FUNCTION__ "inverted hyps" !inverted_hyps; *)
       let hyps : Hyp.t list = get_non_cofixes () in
       let open Syntax in
       let f (i : int) (xopt : (int * Hyp.t) option) : (int * Hyp.t) option mm =
         let y : Hyp.t = List.nth hyps i in
         let* grade : int = Hyp.invertibility y in
-        Log.debug
+        Logger.debug
           ~__FUNCTION__
           (Printf.sprintf "grade %i : %s" grade (Hyp.name_to_string y));
         match xopt with
@@ -521,13 +520,13 @@ struct
     exception CannotGetTransition of Model.FSM.t
 
     let get_transition (m : Model.FSM.t) : Model.Transition.t mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let hyps = get_non_cofixes () in
       let open Syntax in
       let f (i : int)
         : Model.Transition.t option -> Model.Transition.t option mm
         =
-        (* Log.thing ~__FUNCTION__ Trace "i" i ( Utils.Strfy.int); *)
+        (* Logger.thing ~__FUNCTION__ Trace "i" i ( Utils.Strfy.int); *)
         function
         | Some x -> return (Some x)
         | None ->
@@ -546,15 +545,15 @@ struct
   (** [handle_new_cofix ()] returns a sequence of tactics to handle the creation of a new cofix in the hyps, followed by the necessary application of constructors and introduction of terms to get started on a new case.
   *)
   let handle_new_cofix () : Tactic.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let* unfold_opt = Concl.try_unfold_any () in
     match unfold_opt with
     | Some x ->
-      Log.trace ~__FUNCTION__ "do unfold";
+      Logger.trace ~__FUNCTION__ "do unfold";
       return x
     | None ->
-      Log.trace ~__FUNCTION__ "nothing to unfold";
+      Logger.trace ~__FUNCTION__ "nothing to unfold";
       let* cofix : Tactic.t = Tacs.cofix () in
       let clear : Tactic.t = Hyps.clear_non_cofix () in
       let* apply_In_sim : Tactic.t = Tacs.apply_In_sim () in
@@ -572,7 +571,7 @@ struct
         (tys : EConstr.t array)
     : Model.Transition.t
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let m : Model.FSM.t = W.get_fsm_b ~saturated () in
     let from : Model.State.t = M.run (ReModel.state tys.(3) m.states) in
     let label : Model.Label.t = M.run (ReModel.label tys.(5) m.alphabet) in
@@ -599,7 +598,7 @@ struct
   exception MisMatchedStates of (Model.State.t * Model.State.t)
 
   let ensure_matching_states (x : Model.State.t) (y : Model.State.t) : unit =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     if Model.State.equal x y then () else raise (MisMatchedStates (x, y))
   ;;
 
@@ -616,7 +615,7 @@ struct
         (wk_trans : EConstr.t)
     : Tactic.t mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     (* log_econstr ~__FUNCTION__ ~s:"wk_trans" wk_trans; *)
     let bisimilar : Model.States.t = W.get_bisimilar_states hyp.goto in
     (* log_states ~__FUNCTION__ "bisimilar" bisimilar; *)
@@ -640,28 +639,28 @@ struct
         ({ wk_trans; wk_sim } : Concl.wk_conj)
     : Tactic.t mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let* { a'; b } = Concl.get_conj { wk_trans; wk_sim } in
     ensure_matching_states hyp.goto a';
     if Model.Transition.is_silent hyp && W.are_states_bisimilar a' b
     then (
-      Log.trace ~__FUNCTION__ "is_exists, silent";
+      Logger.trace ~__FUNCTION__ "is_exists, silent";
       Tacs.ex_intro_split b)
     else (
-      Log.trace ~__FUNCTION__ "is_exists, trans";
+      Logger.trace ~__FUNCTION__ "is_exists, trans";
       handle_visible_transition hyp b wk_trans)
   ;;
 
   (* * [handle_hyp_transition ()] determines which term to introduce for [exists b'], checking whether we can do this via a silent/tau transition, and sets up the information we will need for the next state. *)
   let handle_hyp_transition () : Tactic.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let* hyp : Model.Transition.t = Hyps.get_transition (W.get_fsm_a ()) in
     Model.Transition.log ~__FUNCTION__ ~s:"hyp" hyp;
     ProofState.update_statem (Exists (Some hyp));
     let* { wk_trans; wk_sim } = Concl.get_wk_conj () in
-    Log.trace ~__FUNCTION__ "wk_trans; wk_sim";
+    Logger.trace ~__FUNCTION__ "wk_trans; wk_sim";
     let* unfold_opt = Tacs.try_unfold_any_of [ wk_trans; wk_sim ] in
     match unfold_opt with
     | Some x -> return x
@@ -670,7 +669,7 @@ struct
 
   (** [handle_appconstrs_entry_point args] ... *)
   let handle_appconstrs_entry_point (label : Model.Label.t) : Tactic.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let* constructor =
       if Model.Label.is_silent label
@@ -683,7 +682,7 @@ struct
 
   (** [handle_appconstrs_stop ()] ... *)
   let handle_appconstrs_stop () : Tactic.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let* simplify = Tacs.simplify_and_subst_all () in
     let* refl = Tacs.eapply_rt1n_refl () in
@@ -693,13 +692,13 @@ struct
   let handle_appconstrs_update_args ({ this; next } : Model.Annotation.t)
     : Enc.Tree.Node.t list option * Model.Annotation.t option
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     Some (Enc.Trees.min this.using |> Enc.Tree.minimize), next
   ;;
 
   (** [handle_appconstrs_update label] ... *)
   let handle_appconstrs_update (label : Model.Label.t) : Tactic.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let* rt1n = Tacs.eapply_rt1n_via label in
     let* unfold = Concl.try_unfold_any () in
@@ -711,7 +710,7 @@ struct
   (** [handle_appconstrs_apply x] ...
       (* NOTE: relies on the bindings we extract early on *) *)
   let handle_appconstrs_apply (x : Enc.Tree.Node.t) : Tactic.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let* _, tys = get_concl () |> to_atomic in
     let tys = Array.map (fun x -> econstr_normalize x |> run) tys in
@@ -737,7 +736,7 @@ struct
         ((a, b) : Constrexpr.constr_expr * Constrexpr.constr_expr)
     : Tactic.t mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let x = Tacs.unfold_opt_constrexpr_list [ a; b ] in
     match x with
     | None -> raise SkipNewProof
@@ -747,16 +746,16 @@ struct
   ;;
 
   let handle_weaksim () : Tactic.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let* is_weak_sim : bool = Concl.is_weak_sim () in
     if is_weak_sim
     then (
-      Log.trace ~__FUNCTION__ "is weak sim";
+      Logger.trace ~__FUNCTION__ "is weak sim";
       let* is_weak_refl : bool = Concl.is_weak_refl () in
       if is_weak_refl
       then (
-        Log.trace ~__FUNCTION__ "is weak refl";
+        Logger.trace ~__FUNCTION__ "is weak refl";
         Tacs.apply_weak_sim_refl ())
       else
         let* has_hyp_cofix : bool = Hyps.can_solve_concl_cofix () in
@@ -771,18 +770,18 @@ struct
       match invert_opt with
       | Some x -> return x
       | None ->
-        Log.trace ~__FUNCTION__ "no hyps to invert";
+        Logger.trace ~__FUNCTION__ "no hyps to invert";
         (* NOTE: check if we need to unfold anything in the inverted hyps. *)
         let* unfold_opt = Hyps.try_unfold_any () in
         (match unfold_opt with
          | Some x -> return x
          | None ->
-           Log.trace ~__FUNCTION__ "no terms to unfold";
+           Logger.trace ~__FUNCTION__ "no terms to unfold";
            raise ExitWeakSim)
   ;;
 
   let handle_exists (hyp_opt : Model.Transition.t option) : Tactic.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let* is_exists : bool = Concl.is_exists () in
     if is_exists
@@ -790,26 +789,26 @@ struct
       match hyp_opt with
       | None -> handle_hyp_transition ()
       | Some hyp ->
-        Log.trace ~__FUNCTION__ "Some hyp";
+        Logger.trace ~__FUNCTION__ "Some hyp";
         let open Syntax in
         let* { wk_trans; wk_sim } = Concl.get_wk_conj () in
         handle_wk_concl hyp { wk_trans; wk_sim })
     else (
       (* NOTE: assume we need to finish handling a silent action. *)
-      Log.trace ~__FUNCTION__ "not exists, do_refl";
+      Logger.trace ~__FUNCTION__ "not exists, do_refl";
       ProofState.update_statem WeakSim;
       Tacs.do_refl ())
   ;;
 
   (* let handle_goal_transition ({ hyp; goal } : Transition.t) : Tactic.t mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       raise (StateNotImplemented (GoalTransition { hyp; goal }))
     ;; *)
 
   let handle_apply_constructors (args : ProofState.ApplicableConstructors.t)
     : Tactic.t mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     ProofState.ApplicableConstructors.log ~__FUNCTION__ ~s:"args" args;
     match args with
     | { current = None; label; _ } ->
@@ -851,30 +850,34 @@ struct
 
   (** [step ()] ... *)
   let rec step () : Tactic.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try run (handle_state ()) with
     | ProofComplete ->
-      Log.trace ~__FUNCTION__ "_:ProofComplete => Done";
+      Logger.trace ~__FUNCTION__ "_:ProofComplete => Done";
       ProofState.update_statem Done;
       Tactic.create ~msg:"Proof Complete" (Proofview.tclUNIT ())
     | SkipNewProof ->
-      Log.trace ~__FUNCTION__ "NewProof:SkipNewProof => WeakSim";
+      Logger.trace ~__FUNCTION__ "NewProof:SkipNewProof => WeakSim";
       ProofState.update_statem WeakSim;
       step ()
     | ExitWeakSim ->
-      Log.trace ~__FUNCTION__ "WeakSim:ExitWeakSim => Exists";
+      Logger.trace ~__FUNCTION__ "WeakSim:ExitWeakSim => Exists";
       ProofState.update_statem (Exists None);
       step ()
     (********************)
     | M.EncodingNotFound x ->
-      Log.thing Warning "M.EncodingNotFound" x M.Strfy.econstr;
-      Log.thing Warning "(using P) EConstr" x Strfy.econstr;
-      Log.thing Warning "(using P) is encoded" (encoded x) (Printf.sprintf "%b");
+      Logger.thing Warning "M.EncodingNotFound" x M.Strfy.econstr;
+      Logger.thing Warning "(using P) EConstr" x Strfy.econstr;
+      Logger.thing
+        Warning
+        "(using P) is encoded"
+        (encoded x)
+        (Printf.sprintf "%b");
       raise (M.EncodingNotFound x)
     | EncodingNotFound x ->
-      Log.thing Warning "(M).EncodingNotFound" x Strfy.econstr;
-      Log.thing Warning "(using M) EConstr" x M.Strfy.econstr;
-      Log.thing
+      Logger.thing Warning "(M).EncodingNotFound" x Strfy.econstr;
+      Logger.thing Warning "(using M) EConstr" x M.Strfy.econstr;
+      Logger.thing
         Warning
         "(using P) is encoded"
         (M.encoded x)

@@ -1,8 +1,10 @@
 (***********************************************************************)
-module Log : Logger.S = Logger.MkDefault ()
-
-let () = Log.Config.configure_output Debug true
-let () = Log.Config.configure_output Trace true
+(* This module deliberately forces Debug and Trace on for itself, independently
+   of the user-facing configuration -- Logger.Scoped keeps that local rather
+   than making it a functor parameter threaded through the rest of lib/. *)
+module Log = Logger.Scoped (struct
+    let overrides = [ Output.Kind.Debug, true; Output.Kind.Trace, true ]
+  end)
 (***********************************************************************)
 
 (* let rec tactics : unit Proofview.tactic list -> unit Proofview.tactic = function

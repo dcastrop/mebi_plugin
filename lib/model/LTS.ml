@@ -18,7 +18,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (State : State.S)
     (States : States.S with type elt = State.t)
     (Labels : Labels.S)
@@ -45,23 +44,20 @@ module Make
     ; info : info
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "LTS"
+      let name = "LTS"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ "init", Json.option ~as_elt:true State.json x.init
-            ; "info", Info.json ~as_elt:true x.info
-            ; "terminals", States.json ~as_elt:true x.terminals
-            ; "alphabet", Labels.json ~as_elt:true x.alphabet
-            ; "states", States.json ~as_elt:true x.states
-            ; "transitions", Transitions.json ~as_elt:true x.transitions
-            ]
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        `Assoc
+          [ "init", Json.option ~as_elt:true State.json x.init
+          ; "info", Info.json ~as_elt:true x.info
+          ; "terminals", States.json ~as_elt:true x.terminals
+          ; "alphabet", Labels.json ~as_elt:true x.alphabet
+          ; "states", States.json ~as_elt:true x.states
+          ; "transitions", Transitions.json ~as_elt:true x.transitions
+          ]
+      ;;
+    end)
 end

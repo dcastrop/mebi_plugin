@@ -8,7 +8,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Labels : Labels.S)
     (Transition : Transition.S with type label = Labels.elt) :
   S with type elt = Transition.t and type labels = Labels.t = struct
@@ -17,18 +16,15 @@ module Make
   module Set_ : Set.S with type elt = Transition.t = Set.Make (Transition)
   include Set_
 
-  include
-    Json.Set.Make
-      (Log)
-      (struct
-        module Set = Set_
+  include Json.Set.Make (struct
+      module Set = Set_
 
-        let name = "Transitions"
-        let json = Transition.json
-      end)
+      let name = "Transitions"
+      let json = Transition.json
+    end)
 
   let labels (xs : t) : Labels.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     fold
       (fun ({ label; _ } : Transition.t) : (Labels.t -> Labels.t) ->
         Labels.add label)

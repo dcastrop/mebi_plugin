@@ -1,9 +1,9 @@
 (***********************************************************************)
-module Log : Logger.S = Logger.MkDefault ()
-
-let () = Log.Config.enable_output ()
-let () = Log.Config.configure_output Debug false
-let () = Log.Config.configure_output Trace false
+(* Debug and Trace stay off for this module regardless of the user-facing
+   configuration. See Logger.Scoped. *)
+module Log = Logger.Scoped (struct
+    let overrides = [ Output.Kind.Debug, false; Output.Kind.Trace, false ]
+  end)
 (***********************************************************************)
 
 (** [kind_pair] are the arguments of [AtomicType (ty, tys)] returned by e.g., [EConstr.kind_of_type]
@@ -28,7 +28,7 @@ let econstr_to_atomic (sigma : Evd.evar_map) (x : EConstr.t)
     | k -> raise (Rocq_utils_EConstrIsNot_Atomic (sigma, x, k))
   with
   | Failure e ->
-    (* Logger.Default.debug ~__FUNCTION__ e; *)
+    (* Logger.debug ~__FUNCTION__ e; *)
     raise (Rocq_utils_EConstrIsNotA_Type (sigma, x, e))
 ;;
 

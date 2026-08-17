@@ -73,5 +73,4 @@ module type S = sig
     -> t mm
 end
 
-module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
-  S with type 'a mm = 'a M.mm
+module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm

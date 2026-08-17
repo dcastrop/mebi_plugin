@@ -58,7 +58,6 @@ end
 (** [module Trace] ... we keep track of the total sum of traces we have already checked. This is useful for checking if, from a state and action, we have already explored the rest of this trace and so can just use what we have already learned, e.g., if we are in some "subtrace".
 *)
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (State : State.S with type base = Base.t)
     (Label : Label.S with type base = Base.t)
@@ -93,28 +92,25 @@ module Make
     | Next of t
     | Goto of State.t
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "WIP Trace"
+      let name = "WIP Trace"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          let rec f (x : t) : Yojson.t =
-            `Assoc
-              [ "this", WIP.json ~as_elt:true x.this
-              ; ( "next"
-                , match x.next with
-                  | None -> `Null
-                  | Some (Next x) -> f x
-                  | Some (Goto x) -> State.json ~as_elt:true x )
-              ]
-          in
-          f x
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        let rec f (x : t) : Yojson.t =
+          `Assoc
+            [ "this", WIP.json ~as_elt:true x.this
+            ; ( "next"
+              , match x.next with
+                | None -> `Null
+                | Some (Next x) -> f x
+                | Some (Goto x) -> State.json ~as_elt:true x )
+            ]
+        in
+        f x
+      ;;
+    end)
 
   let create (this : WIP.t) : t = { this; next = None }
 
@@ -232,7 +228,7 @@ module Make
   (** [upto_named x] ...
       @raise Not_found if [x] begins with a named label. *)
   let upto_named (x : t) : t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match x with
     | { this; next } ->
       if WIP.is_named this
@@ -252,7 +248,7 @@ module Make
   exception GotoNotSet
 
   let rec to_annotation : t -> Annotation.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     function
     | { this = { from; via; trees }; next = None } ->
       (* { this = { from; label = via; using = trees; goto }; next = None } *)

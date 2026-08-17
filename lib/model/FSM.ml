@@ -24,7 +24,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (State : State.S)
     (States : States.S with type elt = State.t)
     (Labels : Labels.S)
@@ -66,28 +65,25 @@ module Make
     ; info : info
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "FSM"
+      let name = "FSM"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ "init", Json.option ~as_elt:true State.json x.init
-            ; "info", Info.json ~as_elt:true x.info
-            ; "terminals", States.json ~as_elt:true x.terminals
-            ; "alphabet", Labels.json ~as_elt:true x.alphabet
-            ; "states", States.json ~as_elt:true x.states
-            ; "edges", EdgeMap.json ~as_elt:true x.edges
-            ]
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        `Assoc
+          [ "init", Json.option ~as_elt:true State.json x.init
+          ; "info", Info.json ~as_elt:true x.info
+          ; "terminals", States.json ~as_elt:true x.terminals
+          ; "alphabet", Labels.json ~as_elt:true x.alphabet
+          ; "states", States.json ~as_elt:true x.states
+          ; "edges", EdgeMap.json ~as_elt:true x.edges
+          ]
+      ;;
+    end)
 
   let of_lts (x : LTS.t) : t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     { init = x.init
     ; terminals = x.terminals
     ; alphabet = x.alphabet
@@ -118,10 +114,10 @@ module Make
   ;;
 
   let saturate ?(only_if_weak : bool = true) (x : t) : t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     if only_if_weak && Bool.not (is_weak_mode x)
     then (
-      Log.debug ~__FUNCTION__ "Not weak, returning unchanged";
+      Logger.debug ~__FUNCTION__ "Not weak, returning unchanged";
       x)
     else (
       let edges, terminals' =

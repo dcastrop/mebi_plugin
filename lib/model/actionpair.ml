@@ -12,7 +12,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Base : Base_term.S)
     (States : States.S)
     (Annotation : Annotation.S)
@@ -28,21 +27,16 @@ module Make
   type states = States.t
   type t = action * states
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "ActionPair"
+      let name = "ActionPair"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ "action", Action.json (fst x)
-            ; "destinations", States.json (snd x)
-            ]
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        `Assoc
+          [ "action", Action.json (fst x); "destinations", States.json (snd x) ]
+      ;;
+    end)
 
   let compare ((a, x) : t) ((b, y) : t) : int =
     Utils.compare_chain [ Action.compare a b; States.compare x y ]
@@ -62,7 +56,7 @@ module Make
       (* TODO:REFACTOR -- this is the reason so many functor params *) *)
   let try_update ((xaction, xdestinations) : t) (a : t list) : t option * t list
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let f : Annotation.t option * Annotation.t option -> Annotation.t option =
       function
       | None, None -> None
@@ -99,7 +93,7 @@ module Make
   (** [merge_lists a b] merges elements of [b] into [a], either by updating an element in [a] with additional annotation for a saturation tuple that describes the same action-destination, or in the case that the saturation tuple is not described within [a] by inserting it within [a].
   *)
   let rec merge_lists (a : t list) : t list -> t list =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     function
     | [] -> a
     | h :: tl ->

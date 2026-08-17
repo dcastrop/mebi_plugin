@@ -217,15 +217,12 @@ module type S = sig
 end
 
 (** Make A *)
-module Make
-    (Log : Logger.S)
-    (Base : Base_term.S)
-    (ConstructorBindings : Constructor_bindings.S) :
+module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
   S
   with type base = Base.t
    and type tree = Base.Tree.t
    and type trees = Base.Trees.t
-   and type constructorbindings = ConstructorBindings.t
+   and type constructorbindings = ConstructorBindings.k
 (** Make B *)
 
 (** @author Jonah Pears *)

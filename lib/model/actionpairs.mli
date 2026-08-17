@@ -14,7 +14,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (States : States.S)
     (Action : Action.S)
     (ActionPair :
