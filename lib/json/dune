@@ -1,0 +1,8 @@
+(library
+ (name json)
+ (public_name rocq-mebi.json)
+ (preprocess
+  (pps ppx_deriving.std))
+ (libraries yojson)
+ (modules Json)
+ (wrapped true))
