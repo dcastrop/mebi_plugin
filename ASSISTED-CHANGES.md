@@ -22,7 +22,7 @@ explicitly and up front, before it is written, rather than appearing in this log
 after the fact. To date, none has.
 
 **Scope of this log.** It covers work identifiable by the
-`Co-Authored-By: Claude` trailer — 10 commits, all from 2026-08-16 onward. The
+`Co-Authored-By: Claude` trailer — 12 commits, all from 2026-08-16 onward. The
 preceding 1139 commits are the project's own history; the last of them,
 `ccfc606` "implemented benchmarking for building lts graphs", dates from
 2026-03-31, before the several-month pause. If any earlier assisted work exists
@@ -110,25 +110,82 @@ Net public API surface shrank: `Logger.S` (as a functor parameter),
 
 ---
 
+## 2026-08-18 — Encoding tables unshared, contexts fixed per instance
+
+Branch `refactor/functor-layer`, one commit (`328a26f`) on top of `6f94748`.
+Net: **7 files changed, +86 / −56**.
+
+Context: backing out the encoding-table sharing from `99b0501`, the first item
+under "Outstanding" below. Working note in `notes/1-revert-shared-encoding-table.md`.
+Tracing it before implementing turned one item into three: the note's fix as
+written would have left the hazard it was aimed at, and reintroduced a worse one
+that predates the branch. All three are in the one commit because they are the
+same design tension — one table with a moving context, versus two tables sharing
+one counter — and (B) is only reachable because of (C).
+
+- **Refactor** — (C) `Proof_solver_wrapper.Make` drops its `M` parameter and builds its own `Rocq_monad_utils` again. The sharing was justified on the grounds that a fresh `Bi_encoding` per proof step meant nothing from a previous step could be found; that is not where the lookups that matter go. `ReModel.state`/`label` resolve against `W.M`, the command-time table, before and after. The per-step table only ever backed `Iter`'s own `encode`/`econstr_compare`/`EConstrSet`, which are per-step by construction. Measured effect of the sharing: none.
+- **Bug fix** — (A) `Rocq_monad.run` loses `?ctx` and reads its own instance's context, as it did pre-`99b0501` via `Ctx.get ()`. `Bi_encoding.set_ctx` becomes install-once, called by `Proof_solver_wrapper.Make` with the goal. Overriding a `run` default was never sufficient: `encode`, `fstring` and `Rocq_monad_utils.get_encoding` call `run` themselves and cannot pass a `~ctx`, so they defaulted to `Rocq_context.global` — including via `econstr_compare`, hence `EConstrSet`. A table can hash an entry under one sigma and look it up under another, and that was reachable both before and after (C) alone. The `run` override in `proof_solver_wrapper.ml` was `?ctx`'s only caller, so it disappears with it.
+- **Bug fix** — (B) `Bi_encoding.initialize` allocates the maps without calling `Enc.reset`. **Pre-existing, not introduced by `99b0501`** — that commit removed the reachable path by accident, and a literal revert would have restored it. `Enc` is one counter shared by every `Bi_encoding` instance, and a per-step table is a fresh instance each step, so its first `run` put the counter back to `0` while the command-time table already held encodings `0..N-1`. A later `M.encode` of a term not already in that table — reachable from `M.exists_eq` in `Proof_solver_theory` — is then handed a live encoding, and `B.add` shadows the model's binding for it: false positives in `M.econstr_eq`, wrong terms out of `Decode`. Only an explicit `~reset_encoding:true` resets the counter now, which is what every command call site passes.
+
+*Verified:* per file, in emission order, against the commit's parent. Each
+`PluginProofs.v` built as its own `make -j1` target — under `make -j$(nproc)`
+the concurrent `rocq` processes interleave line by line and no count can be tied
+to a file, which an aggregate comparison hides.
+
+| file | before | after |
+| --- | --- | --- |
+| `Proc/Test1` | 114 105 106 109 22 21 | 114 105 106 109 22 21 |
+| `Proc/Test2` | 446 278 299 194 446 182 | 446 278 299 194 446 182 |
+| `CADP/Size1/MutualExclusion` | 268 396 | 268 396 |
+| `CADP/Size1/Glued` | 268 396 | 268 396 |
+| `CADP/Size1/Glued/MutualExclusion` | *(none — fails at `Example`)* | *(none)* |
+
+Exit codes match; full per-file logs identical once build lines are stripped.
+`dune build @check`, `dune build`, `make` and `dune exec test/tests.exe` (9/9)
+all clean.
+
+**Session tally:** Bug fix 2 · Refactor 1 · Optimization 0 · Docs 0 ·
+**New feature 0.**
+
+Public API surface: `Rocq_monad.S.run` loses its `?ctx` argument;
+`Bi_encoding.S` gains `current_ctx` and re-specifies `set_ctx` as install-once;
+`Proof_solver_wrapper.Make` loses its `M` parameter.
+
+Note that (B) is reasoned from the code, not observed. The mechanism is
+concrete, but none of the five suites trips it — which is why the counts do not
+move. It is cheap insurance, not a fix with a reproducer behind it.
+
+---
+
 ## Outstanding
 
-- **Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.** It bought nothing measurable and introduced a latent sigma-consistency hazard; the reasoning behind it was wrong, since the lookups that matter always went through the command-time table.
+- ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
 - The term-equality problem in `ReModel` is unaddressed: goal terms are resolved to model elements by syntactic hashtable lookup, which can miss on evars, universe instances or local context.
 - Collapsing the model component cluster (71 of `model.mli`'s 80 sharing constraints; `Saturation.Make` at 13 arguments) is deliberately deferred until after any hand refactoring of individual model components.
 - `examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v` fails with "The reference compose was not found", raised in the `Example` statement before any `MeBi` command runs. Pre-existing and unrelated to the above; looks like a Rocq 9.2 port casualty despite being marked `### Success` in `_CoqProject`.
 
-Working notes for the first three live in `notes/` (local only, excluded via
-`.git/info/exclude`, so not present in a fresh clone).
+Working notes live in `notes/` (local only, excluded via `.git/info/exclude`, so
+not present in a fresh clone). Note 1 is done; its analysis was incomplete on two
+points, both recorded in the 2026-08-18 entry above.
 
 ## Verification baseline
 
-Proof-solver iteration counts, identical on `main` and on `6f94748`:
+Proof-solver iteration counts from the five `PluginProofs.v` marked `### Success`
+in `_CoqProject`, unchanged from `main` through `328a26f`. Recorded per file, in
+emission order, because a sorted aggregate cannot tell two files apart:
 
-```
-21, 22, 105, 106, 109, 114, 182, 194, 268, 268, 278, 299, 396, 446, 446
-```
+| file | counts |
+| --- | --- |
+| `Proc/Test1` | 114 105 106 109 22 21 |
+| `Proc/Test2` | 446 278 299 194 446 182 |
+| `CADP/Size1/MutualExclusion` | 268 396 |
+| `CADP/Size1/Glued` | 268 396 |
+| `CADP/Size1/Glued/MutualExclusion` | *(none — fails at `Example`, see below)* |
 
-From the five `PluginProofs.v` marked `### Success` in `_CoqProject`. Note that
+16 counts against 18 `Solve` commands in the sources; the missing two are
+`Glued/MutualExclusion`'s, never reached. To reproduce, build each file as its
+own `make -j1` target — `make -j$(nproc)` interleaves the concurrent `rocq`
+processes line by line and the counts cannot be attributed. Note that
 `make` enforces warnings (32, 50) that `dune build` accepts, and caught three
 failures during the 2026-08-17 session that `dune build` waved through — always
 finish with a `make` run, not just `dune build`.
