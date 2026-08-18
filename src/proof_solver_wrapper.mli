@@ -25,9 +25,9 @@ module type Args = sig
   val gl : Proofview.Goal.t ref
 end
 
-(** [M] is the shared monad/encoding stack; a proof step reuses it instead of
-    creating its own, so the encoding table survives across steps. *)
-module Make
-    (Enc : Encoding.S)
-    (M : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t)
-    (X : Args) : S with type enc = Enc.t and type tree = Enc.Tree.t
+(** Builds a proof step its own monad/encoding stack, reading [X.gl]'s
+    [env]/[sigma] rather than the global environment. Kept separate from the
+    command-time stack because a [Bi_encoding] table is only consistent under
+    one context; see the note on [I] in the implementation. *)
+module Make (Enc : Encoding.S) (X : Args) :
+  S with type enc = Enc.t and type tree = Enc.Tree.t

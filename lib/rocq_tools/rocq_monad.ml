@@ -15,7 +15,7 @@ module type S = sig
     ; value : 'a
     }
 
-  val run : ?ctx:Rocq_context.source -> ?reset_encoding:bool -> 'a mm -> 'a
+  val run : ?reset_encoding:bool -> 'a mm -> 'a
   val return : 'a -> 'a mm
   val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
   val map : ('a -> 'b) -> 'a mm -> 'b mm
@@ -84,22 +84,22 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
 
   (* *)
 
-  (** [run ?ctx m] evaluates [m] against [ctx] (default: the global
-      environment). [ctx] is a value rather than a functor parameter, so a
-      proof step can supply its goal without rebuilding this module -- and
-      therefore without discarding the encoding table, which is what used to
-      happen on every step. *)
-  let run
-        ?(ctx : Rocq_context.source = Rocq_context.global)
-        ?(reset_encoding : bool = false)
-        (x : 'a mm)
-    : 'a
-    =
+  (** [run m] evaluates [m] against this instance's context -- the one
+      [set_ctx] was given, default [Rocq_context.global].
+
+      The context is a value rather than a functor parameter, so installing it
+      no longer rebuilds this module and no longer discards the encoding table
+      with it. It is still fixed per instance, though: [encode], [fstring] and
+      [Rocq_monad_utils.get_encoding] all call [run] themselves, so a per-call
+      [?ctx] could not have been honoured by them anyway, and the table would
+      end up hashing some entries under one [sigma] and looking them up under
+      another. A stack that needs a different context is a different instance --
+      see [Proof_solver_wrapper.Make]. *)
+  let run ?(reset_encoding : bool = false) (x : 'a mm) : 'a =
     (* Logger.trace __FUNCTION__; *)
-    set_ctx ctx;
     if reset_encoding then reset () else initialize ();
     let a : 'a in_wrapper =
-      x (ref { ctx = ref (ctx ()); maps = get_the_maps () })
+      x (ref { ctx = ref (current_ctx ()); maps = get_the_maps () })
     in
     a.value
   ;;

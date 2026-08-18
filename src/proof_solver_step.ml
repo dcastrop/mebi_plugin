@@ -58,7 +58,7 @@ struct
   *)
   module Iter :
     Proof_solver_wrapper.S with type enc = Enc.t and type tree = Enc.Tree.t =
-    Proof_solver_wrapper.Make (Enc) (W.M) (X)
+    Proof_solver_wrapper.Make (Enc) (X)
 
   include Iter
 
