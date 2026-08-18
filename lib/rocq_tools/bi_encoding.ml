@@ -39,9 +39,13 @@ module type S = sig
   val to_list : unit -> (enc * EConstr.t) list
 
   (** The [EConstr.t] keys of [F] are compared and hashed under a [sigma], so
-      the table needs to know which context is current. [Rocq_monad.run] sets
-      this; it defaults to [Rocq_context.global]. *)
+      this instance's table has to know which context to read it from. Install
+      it once, when the instance is created; it defaults to
+      [Rocq_context.global]. *)
   val set_ctx : Rocq_context.source -> unit
+
+  (** The [env]/[sigma] this instance was given, read now. *)
+  val current_ctx : unit -> Rocq_context.t
 end
 
 module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
@@ -49,9 +53,13 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
 
   (* Which env/sigma the EConstr keys are interpreted under. Previously a
      functor parameter, which meant every switch of context rebuilt this module
-     -- and with it [the_maps], silently discarding the encoding table. *)
+     -- and with it [the_maps], silently discarding the encoding table. It is a
+     value now, but it is still per-instance and still set once: a table whose
+     context moves can hash an entry under one sigma and look it up under
+     another. *)
   let the_ctx : Rocq_context.source ref = ref Rocq_context.global
   let set_ctx (s : Rocq_context.source) : unit = the_ctx := s
+  let current_ctx () : Rocq_context.t = !the_ctx ()
   let sigma () : Evd.evar_map = Rocq_context.sigma !the_ctx
 
   module F : Hashtbl.S with type key = EConstr.t = Hashtbl.Make (struct
@@ -78,17 +86,30 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
 
   let the_maps : maps ref option ref = ref None
 
-  let reset () : unit =
-    Logger.trace __FUNCTION__;
-    Enc.reset ();
+  let alloc () : unit =
     let fwd : Enc.t F.t = F.create 0 in
     let bck : EConstr.t B.t = B.create 0 in
     the_maps := Some (ref { fwd; bck })
   ;;
 
+  (** Clears this instance's table {b and} the counter behind it.
+
+      [Enc] is shared by every [Bi_encoding] instance, so [Enc.reset] is a
+      global act: it hands the next [Enc.incr] an encoding some other instance
+      is already using, and [B.add] then shadows that instance's binding.
+      Resetting is therefore reserved for [~reset_encoding:true] -- a new
+      command, where clearing everything is the point. *)
+  let reset () : unit =
+    Logger.trace __FUNCTION__;
+    Enc.reset ();
+    alloc ()
+  ;;
+
+  (** Bring the table up if it isn't already. Deliberately {e not} [reset]: an
+      instance coming into existence must not reset the shared counter. *)
   let initialize () : unit =
     Logger.trace __FUNCTION__;
-    match !the_maps with None -> reset () | Some _ -> ()
+    match !the_maps with None -> alloc () | Some _ -> ()
   ;;
 
   exception MapsNotInitialised of unit

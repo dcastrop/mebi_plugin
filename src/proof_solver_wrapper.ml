@@ -25,14 +25,8 @@ module type Args = sig
   val gl : Proofview.Goal.t ref
 end
 
-(* [M] is the monad/encoding stack shared with the command-time run, passed in
-   rather than built here. Building it here re-created Bi_encoding -- and with
-   it the encoding table -- on every proof step, so no term encoded in one step
-   could ever be found in the next. *)
-module Make
-    (Enc : Encoding.S)
-    (M : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t)
-    (X : Args) : S with type enc = Enc.t and type tree = Enc.Tree.t = struct
+module Make (Enc : Encoding.S) (X : Args) :
+  S with type enc = Enc.t and type tree = Enc.Tree.t = struct
   let gl () : Proofview.Goal.t = !X.gl
   let get_concl () : EConstr.t = Proofview.Goal.concl (gl ())
   let get_hyps () : Rocq_utils.hyp list = Proofview.Goal.hyps (gl ())
@@ -65,23 +59,28 @@ module Make
     Names.Id.Set.diff (get_hyp_names ()) (get_all_cofix_hyp_names ())
   ;;
 
-  include M
+  (** This step's own monad/encoding stack, separate from the command-time one.
 
-  (** The goal's [env]/[sigma], read through [X.gl] so it tracks the proof as it
-      advances. *)
-  let ctx : Rocq_context.source = Rocq_context.of_goal X.gl
+      Separate because the two read different [env]/[sigma]: this one the goal,
+      the command-time one the global environment. [Bi_encoding] hashes its
+      [EConstr.t] keys under whichever it is given, so one table cannot serve
+      both -- entries would go in under one [sigma] and be looked up under the
+      other.
 
-  (** Same as [M.run] but defaulting to this step's goal rather than the global
-      environment. Overriding a default is all that distinguishes a proof-step
-      run from a command run now; it used to be a separate module stack. *)
-  let run
-        ?(ctx : Rocq_context.source = ctx)
-        ?(reset_encoding : bool = false)
-        (m : 'a mm)
-    : 'a
-    =
-    M.run ~ctx ~reset_encoding m
-  ;;
+      Nothing is lost by not sharing. The lookups that have to hit the model --
+      [ReModel.state] and [ReModel.label] in [Proof_solver_step] -- go through
+      the command-time [W.M] and always did. This table only ever backs [encode]
+      / [econstr_compare] / [EConstrSet] below, all of which are per-step by
+      construction. *)
+  module I : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t =
+    Rocq_monad_utils.Make (Enc)
+
+  (* Installed once, here, rather than per [I.run]: see [Bi_encoding.set_ctx].
+     [of_goal] closes over [X.gl], so it still tracks the proof as it advances
+     -- what is fixed is *where* the context is read from, not its contents. *)
+  let () = I.set_ctx (Rocq_context.of_goal X.gl)
+
+  include I
 
   let log_concl () : unit = log_econstr ~s:"concl" (get_concl ())
   let log_hyps () : unit = Logger.things Debug "hyps" (get_hyps ()) Strfy.hyp
