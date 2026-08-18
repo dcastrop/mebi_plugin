@@ -1,0 +1,19 @@
+(library
+ (name showable_)
+ (public_name rocq-mebi.showable.type)
+ (preprocess
+  (pps ppx_deriving.std))
+ (libraries rocq-mebi.json)
+ (modules Type_)
+ (wrapped true))
+
+(library
+ (name showable)
+ (public_name rocq-mebi.showable)
+ (preprocess
+  (pps ppx_deriving.std))
+ (libraries rocq-mebi.showable.type)
+ (modules Set_ Map_ Showable)
+ (wrapped true))
+
+(include_subdirs no)
