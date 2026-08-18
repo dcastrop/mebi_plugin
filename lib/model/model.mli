@@ -183,6 +183,8 @@ module type S = sig
 
   (** {!Saturation} provides {!Saturation.edges} which returns a saturated {!EdgeMap.t'} and a {!States.t} of now-terminating states. {i {b Note:} See {!FSM.saturate}.}
   *)
+
+  (** {i See {!FSM.saturate}.} *)
   module Saturation :
     Saturation.S
     with type state = State.t

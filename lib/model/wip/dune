@@ -1,0 +1,14 @@
+(library
+ (name wip)
+ (public_name rocq-mebi.model.wip)
+ (libraries
+  rocq-mebi.utils
+  rocq-mebi.terms
+  rocq-mebi.model.components
+  ; rocq-mebi.algorithms.saturation
+  rocq-mebi.model.lts
+  yojson)
+ (modules wip_annotation wip_trace wip_traces)
+ (wrapped false))
+
+(include_subdirs no)
