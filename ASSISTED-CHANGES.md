@@ -491,6 +491,62 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-27 — Proof solver's two self-flagged open design questions
+
+Two spots in `src/proof_solver*` carried their own doc comments flagging
+open, unresolved questions (`proof_solver_wrapper.ml:88`,
+`proof_solver_step.ml:205`). Traced both to a conclusion rather than
+leaving them open indefinitely.
+
+- **Docs.** `proof_solver_wrapper.ml`'s `EConstrSet` comment flagged
+  that, since each proof step gets a new `env`/`sigma`, comparing
+  `EConstr.t` values across steps might not be meaningful — "this needs
+  to be investigated." Audited every call site: `Proof_solver.step`
+  (`proof_solver.ml:94-107`) creates a brand-new `PStep` module (and with
+  it a fresh `Iter`/`EConstrSet`) via `(val make gl)` on *every* call, and
+  discards the whole module when it returns; no persistent state type
+  (`Proof_solver_statem.S`, `Proof_solver.t`) ever stores an
+  `EConstrSet.t`; and the only two actual uses
+  (`Proof_solver_tactics.collect_component_econstrs`/`try_unfold_any`)
+  build, consume and discard one within a single function call. The
+  invariant holds structurally, not by convention — there's no code path
+  that could compare across steps even by accident. Rewrote the comment
+  to record this as a settled, audited invariant instead of an open
+  question, with a note for future maintainers on what would need
+  re-checking if a new cross-step-persisting use were ever added.
+- **Bug fix.** `proof_solver_step.ml`'s `transition` function looks up the
+  specific transition `from --label--> goto`; when more than one distinct
+  `Action.t` (differing in `annotation`/`trees` — different weak-transition
+  witnesses reaching the same destination under the same label) matched,
+  it gave up (`raise CouldNotFind_Transition`) rather than picking one.
+  `lib/model/components.ml`'s `ActionPairs.shortest_annotation`/
+  `ActionPair.shorter_annotation` already exist for exactly this
+  "pick the best of several candidates" reduction, and are already used
+  for the structurally identical situation two hundred lines later in the
+  same file (`try_get_visible_transition`, `proof_solver_step.ml:589`),
+  with the rationale spelled out inline there: "get the pair with the
+  shortest annotation (less steps to do)." Applied the same fold here
+  instead of raising, and merged what used to be a separate
+  single-candidate branch into the general case, since folding over an
+  empty tail is a no-op — the fix is also a small simplification.
+
+**Verification:** `dune build`, `dune exec test/tests.exe` (9/9). Since the
+`transition` fix changes proof-solver behaviour, also ran the full
+five-file baseline (`-j1` per file): all 18 counts match exactly, unchanged
+— but worth being explicit that this means **none of the five cheap tests
+actually exercise the "multiple actionpairs" branch this fix touches**; the
+baseline confirms no regression, not that the new code path has been
+positively exercised. That would need either a hand-built minimal example
+that genuinely produces saturation-derived transition ambiguity, or finding
+one already present in the more expensive `Test3`/`Test4`/`Size2` examples
+— not attempted this session. `_CoqProject` restored and `make dune` run
+afterward.
+
+**Session tally:** Bug fix 1 · Docs 1 · Refactor 0 · Tooling 0 ·
+Optimization 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

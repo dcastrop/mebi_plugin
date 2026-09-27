@@ -198,13 +198,22 @@ struct
         in
         match actionpairs with
         | [] -> raise (CouldNotFind_Transition { from; goto; label; edges })
-        | ({ annotation; trees; _ }, _) :: [] ->
-          let tree : Enc.Tree.t option = Enc.Trees.min_opt trees in
-          { from; goto; label; annotation; tree }
         | h :: tl ->
-          (* TODO: move this proceed to [Model] and handle this case *)
-          Logger.warning ~__FUNCTION__ "Multiple actionpairs found";
-          raise (CouldNotFind_Transition { from; goto; label; edges }))
+          (* Multiple [(action, destinations)] pairs can match the same
+             [(from, label, goto)] when weak-transition saturation finds
+             more than one witness for it (different [Annotation.t]s over
+             the same visible label/destination). Pick the one with the
+             shortest annotation, same as [try_get_visible_transition]
+             above does for the analogous "several candidates" case --
+             fewer silent steps to justify means less proof work later. A
+             single candidate is just the degenerate case of this fold
+             ([tl = []]), so this also covers what used to be handled as a
+             separate branch. *)
+          let ({ annotation; trees; _ } : Model.Action.t), _ =
+            List.fold_left Model.Action.Pair.shorter_annotation h tl
+          in
+          let tree : Enc.Tree.t option = Enc.Trees.min_opt trees in
+          { from; goto; label; annotation; tree })
     ;;
   end
 
