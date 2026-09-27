@@ -22,7 +22,7 @@ explicitly and up front, before it is written, rather than appearing in this log
 after the fact. To date, none has.
 
 **Scope of this log.** It covers work identifiable by the
-`Co-Authored-By: Claude` trailer — 12 commits, all from 2026-08-16 onward. The
+`Co-Authored-By: Claude` trailer — 16 commits, all from 2026-08-16 onward. The
 preceding 1139 commits are the project's own history; the last of them,
 `ccfc606` "implemented benchmarking for building lts graphs", dates from
 2026-03-31, before the several-month pause. If any earlier assisted work exists
@@ -157,12 +157,121 @@ move. It is cheap insurance, not a fix with a reproducer behind it.
 
 ---
 
+## 2026-09-27 — Model component cluster collapsed, renamed, unified with Showable
+
+Branch `refactor/model-components`, four commits off `main` (`7d36087`).
+Net: **82 files changed, +2205 / −2998** — the codebase got smaller again.
+
+Context: Jonah returned to the project after another multi-month pause,
+wanting the codebase cleaned up and restructured rather than extended.
+Working assumption for this and future sessions, now recorded in
+`CLAUDE.md`: the plugin's core functionality is complete; what remains is
+refactoring, bug fixes, restructuring and optimization. Before any of that,
+all uncommitted and unpushed work (this branch, 9 commits, plus an
+in-progress uncommitted experiment) was pushed to Jonah's personal fork
+(`github.com/thecathe/mebi_plugin`) so he could keep working on it without
+pressure ahead of an eventual PR back to `dcastrop/mebi_plugin`; `origin`
+stays pointed at `dcastrop/mebi_plugin` for that PR.
+
+The uncommitted experiment — a partial attempt to rebuild `State` on top of
+membranes-style (`~/Documents/git/thecathe/membranes`) generic `Set`/`Map`
+abstractions — was syntactically broken (an incomplete signature in
+`state/set_.ml`) and would have produced a second, colliding `State` module
+alongside the existing one. It was stashed aside rather than committed or
+deleted, then superseded entirely by the work below, which targets the
+actual diagnosed bottleneck (`notes/3-collapse-model-component-cluster.md`)
+rather than a wholesale port of the other project's abstractions.
+
+- `a6eec52` — **Docs.** Added `CLAUDE.md`, making the "refactoring only"
+  working assumption, this log's practice, and the `PluginProofs.v`
+  verification procedure discoverable by anyone, not just prior-session
+  memory.
+- `16bbe37` — **Refactor.** Collapsed all 17 model components (`State`,
+  `Label`, `Action`, `Edge`, ...) from 17 separate files, each its own
+  functor, into nested modules inside one `Components.Make` functor
+  (`lib/model/components.ml`) — exactly the change `notes/3` had already
+  sized and designed. Nested modules see each other directly, so the
+  sharing constraints that used to relate one component's functor
+  parameters to another's output are gone: `model.mli` needed on the order
+  of ten, not eighty. Every algorithm functor (`LTS`, `FSM`, `Saturation`,
+  `Minimization`, `Bisimilarity`, plus `Saturation`'s private `WIP`/`Trace`/
+  `Traces` helpers) now takes a single `Components.S` argument (plus each
+  other where needed) instead of 5–13 individually-constrained ones. No
+  `src/` changes — every module path is preserved.
+- `6e436dd` — **Refactor.** Renamed each component's Set/Map/Pair to a
+  submodule of its element type — `States` → `State.Set`, `Labels` →
+  `Label.Set`, `Actions`/`ActionMap`/`ActionPair`/`ActionPairs` →
+  `Action.Set`/`Action.Map`/`Action.Pair`/`Action.Pair.Set`, and so on —
+  so `Model.Action.Map.update` reads as what it is instead of requiring the
+  reader to already know `Actions` and `ActionMap` are related. `EdgeMap`
+  and `Partition` deliberately stay standalone: `EdgeMap` and `Action.Map`
+  are mutually dependent (each stores the other's value type as data), which
+  can't be expressed if either is nested inside its own key type's module —
+  doing so would need `State`'s declaration to come both before and after
+  several other components, a cycle ordinary module signatures can't
+  express. Mechanical but wide: every `src/` call site referencing an old
+  flat name needed updating (`proof_solver_step.ml`, `decoder.ml`,
+  `wrapper.ml`/`.mli`, `results.ml`/`.mli`, `graph_extract_lts.ml`,
+  `proof_solver_theory.ml`, `_examples.ml`, `test/`). `graph.ml`/
+  `graph_builder.ml`/`graph_type.ml` were deliberately left alone — their
+  own `States`/`Actions`/`Transitions` are a separate, unrelated module
+  hierarchy that happens to share these names.
+- `e037c18` — **Refactor.** Unified the `lib/showable` port of Jonah's
+  membranes-style `Ordered`/`Set`/`Map` abstractions (committed in
+  `7249d40`, previously unused) with the existing JSON-dump mechanism
+  (`lib/utils/json.ml`) into one `Thing.Make` (new `lib/showable/thing.ml`):
+  a component supplies `{name; json; equal; compare}` once and gets
+  `pp`/`show`/`equal`/`compare` (from `Showable`) and `json`/`to_string`/
+  `log`/`write` (from the existing dump mechanism) together, instead of a
+  separate hand-written `equal`/`compare` plus a `Json.Thing.Make` call.
+  `pp`/`show` are derived from the existing `json` function, not
+  independently written, so nothing gains a second, divergent notion of
+  "show". Applied to every component with a natural `Ordered` shape —
+  `State`, `Label`, `Note`, `Annotation`, `Transition`, `Action`, `Edge`,
+  `ActionPair`, their `.Set` companions, and `Partition` — leaving
+  `ActionMap`/`EdgeMap` untouched (Hashtbl-based; `lib/showable` has no
+  Hashtbl equivalent). **Flagged before writing, per standing policy:**
+  `ActionPair` gains an `equal` it never had (`Thing.Make` requires one);
+  defined to agree with the existing `compare`, since nothing else can rely
+  on it — a plumbing detail, not a plugin capability. Surfaced pre-existing,
+  unrelated breakage: `lib/showable`/`lib/json` were never added to
+  `_CoqProject` when introduced the day before, so `make` had silently
+  never compiled either (only `dune build` had); fixing that then surfaced
+  a second latent issue, `lib/showable/type_.ml`'s `[@@deriving show, eq]`
+  never actually running under `make` either, since `_CoqProject` has no
+  equivalent of dune's per-library `(preprocess (pps ...))` — replaced with
+  hand-written `pp`/`show`/`equal` for the five small presets affected,
+  removing the `ppx_deriving` dependency from `lib/showable` entirely.
+
+**Verification**, per-file, run twice from a clean slate (after the collapse,
+and again after the rename+unification):
+
+| file | before | after |
+| --- | --- | --- |
+| `Proc/Test1` | 114 105 106 109 22 21 | 114 105 106 109 22 21 |
+| `Proc/Test2` | 446 278 299 194 446 182 | 446 278 299 194 446 182 |
+| `CADP/Size1/MutualExclusion` | 268 396 | 268 396 |
+| `CADP/Size1/Glued` | 268 396 | 268 396 |
+| `CADP/Size1/Glued/MutualExclusion` | *(none — fails at `Example`)* | *(none)* |
+
+`dune exec test/tests.exe` (9/9) after each of the four commits. Additionally,
+for the `Thing.Make` unification specifically (the step most likely to touch
+JSON dump *format*): a byte-for-byte diff of `State`/`Label`/`Transition`/
+`Action`/`Edge`/`FSM`/`Info` JSON output between this commit and the previous
+one, built in a throwaway `git worktree` — identical.
+
+**Session tally:** Refactor 3 · Docs 1 · Bug fix 0 · Optimization 0 ·
+**New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
 - The term-equality problem in `ReModel` is unaddressed: goal terms are resolved to model elements by syntactic hashtable lookup, which can miss on evars, universe instances or local context.
-- Collapsing the model component cluster (71 of `model.mli`'s 80 sharing constraints; `Saturation.Make` at 13 arguments) is deliberately deferred until after any hand refactoring of individual model components.
+- ~~Collapsing the model component cluster (71 of `model.mli`'s 80 sharing constraints; `Saturation.Make` at 13 arguments) is deliberately deferred until after any hand refactoring of individual model components.~~ Done in `16bbe37`, 2026-09-27, together with a nested-submodule rename and a Showable/JSON-dump unification — see below.
 - `examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v` fails with "The reference compose was not found", raised in the `Example` statement before any `MeBi` command runs. Pre-existing and unrelated to the above; looks like a Rocq 9.2 port casualty despite being marked `### Success` in `_CoqProject`.
+- `lib/showable/` and `lib/json/` were never added to `_CoqProject` when introduced (2026-09-26), so only `dune build` ever compiled them — `make` silently skipped both libraries entirely. Fixed in `e037c18`, 2026-09-27, as a side effect of `lib/model/components.ml` becoming their first real consumer; see below for what that uncovered.
 
 Working notes live in `notes/` (local only, excluded via `.git/info/exclude`, so
 not present in a fresh clone). Note 1 is done; its analysis was incomplete on two
@@ -171,7 +280,7 @@ points, both recorded in the 2026-08-18 entry above.
 ## Verification baseline
 
 Proof-solver iteration counts from the five `PluginProofs.v` marked `### Success`
-in `_CoqProject`, unchanged from `main` through `328a26f`. Recorded per file, in
+in `_CoqProject`, unchanged from `main` through `e037c18`. Recorded per file, in
 emission order, because a sorted aggregate cannot tell two files apart:
 
 | file | counts |
