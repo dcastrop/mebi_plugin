@@ -85,8 +85,9 @@ module Make (Enc : Encoding.S) (X : Args) :
   let log_concl () : unit = log_econstr ~s:"concl" (get_concl ())
   let log_hyps () : unit = Logger.things Debug "hyps" (get_hyps ()) Strfy.hyp
 
-  (** [EConstrSet] is a custom [Set] of [EConstr.t] that allows terms to be compared more efficiently during {b a single proof step only} -- since this is built for each step. {e Though, since each proof step we have a new [env] and [sigma], the same term may be encoded differently across iteration steps, so there isn't necessarily a way for us to compare terms in a proof across iterations anyway. {b ! This needs to be investigated.}}
-  *)
+  (** [EConstrSet] is a custom [Set] of [EConstr.t] that allows terms to be compared more efficiently during {b a single proof step only}. Since each proof step gets a new [env] and [sigma] (a fresh [module Iter], and with it a fresh [EConstrSet], is created on every call to {!Proof_solver.step} -- see [make]/[step] there), the same underlying term may encode differently across steps, so an [EConstrSet.t] built in one step is not meaningful to compare against one built in another.
+
+      {b Audited 2026-09-27:} no call site does this. Every use ([Proof_solver_tactics.collect_component_econstrs]/[try_unfold_any]) builds, consumes and discards an [EConstrSet.t] within a single function call, and no persistent state type ([Proof_solver_statem.S], [Proof_solver.t]) ever stores one. This holds structurally, not by convention: the whole module tree containing [EConstrSet] is torn down and rebuilt fresh each step, so a value could not survive to the next step even if something tried to stash it. If a future change introduces a call site that returns or stores an [EConstrSet.t] outside of one step's local computation, that would break this invariant and needs the same scrutiny this comment once flagged. *)
   module EConstrSet = struct
     include Set.Make (struct
         type t = EConstr.t
