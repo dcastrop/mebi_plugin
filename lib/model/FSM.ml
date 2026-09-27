@@ -24,31 +24,33 @@ module type S = sig
 end
 
 module Make
-    (State : State.S)
-    (States : States.S with type elt = State.t)
-    (Labels : Labels.S)
-    (EdgeMap : Edgemap.S with type state = State.t and type label = Labels.elt)
-    (Info : Info.S with type base = State.base and type labels = Labels.t)
+    (C : Components.S)
     (LTS :
        LTS.S
-       with type state = State.t
-        and type states = States.t
-        and type labels = Labels.t
-        and type transitions = EdgeMap.transitions
-        and type info = Info.t)
+       with type state = C.State.t
+        and type states = C.States.t
+        and type labels = C.Labels.t
+        and type transitions = C.EdgeMap.transitions
+        and type info = C.Info.t)
     (Saturation :
        Saturation.S
-       with type state = State.t
-        and type states = States.t
-        and type labels = Labels.t
-        and type edgemap = EdgeMap.t') :
+       with type state = C.State.t
+        and type states = C.States.t
+        and type labels = C.Labels.t
+        and type edgemap = C.EdgeMap.t') :
   S
-  with type state = State.t
-   and type states = States.t
-   and type labels = Labels.t
-   and type edgemap = EdgeMap.t'
-   and type info = Info.t
+  with type state = C.State.t
+   and type states = C.States.t
+   and type labels = C.Labels.t
+   and type edgemap = C.EdgeMap.t'
+   and type info = C.Info.t
    and type lts = LTS.t = struct
+  module State = C.State
+  module States = C.States
+  module Labels = C.Labels
+  module EdgeMap = C.EdgeMap
+  module Info = C.Info
+
   type state = State.t
   type states = States.t
   type labels = Labels.t

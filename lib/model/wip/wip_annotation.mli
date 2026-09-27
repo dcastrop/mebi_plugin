@@ -24,24 +24,12 @@ module type S = sig
   val list_to_annotation : state -> t list -> annotation
 end
 
-module Make
-    (Base : Base_term.S)
-    (State : State.S with type base = Base.t)
-    (Label : Label.S with type base = Base.t)
-    (Note :
-       Annotation_note.S
-       with type state = State.t
-        and type label = Label.t
-        and type trees = Base.Trees.t)
-    (Annotation : Annotation.S with type label = Label.t and type note = Note.t)
-    (Action :
-       Action.S
-       with type label = Label.t
-        and type annotation = Annotation.t
-        and type trees = Base.Trees.t) :
+(** [module WIP] is a lightweight counterpart of [Note.t] that forms some "work-in-progress" [Annotation.t]. Once we stop saturating an action, we check if we are able to yield a new saturated action and convert the [wip list] to an [Annotation.t].
+*)
+module Make (Base : Base_term.S) (C : Components.S with type trees = Base.Trees.t) :
   S
-  with type state = State.t
-   and type label = Label.t
-   and type annotation = Annotation.t
-   and type trees = Base.Trees.t
-   and type action = Action.t
+  with type state = C.State.t
+   and type label = C.Label.t
+   and type annotation = C.Annotation.t
+   and type trees = C.trees
+   and type action = C.Action.t

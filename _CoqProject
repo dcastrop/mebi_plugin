@@ -7,7 +7,6 @@ src/META.rocq-mebi
 -I lib/rocq_tools/
 -I lib/model/
 -I lib/model/algorithms/
--I lib/model/components/
 -I lib/model/wip/
 -I src/
 -arg "-w all"
@@ -138,44 +137,7 @@ lib/rocq_tools/bindings.mli
 lib/rocq_tools/constructor_bindings.ml
 lib/rocq_tools/constructor_bindings.mli
 
-lib/model/components/state.ml
-lib/model/components/state.mli
-lib/model/components/states.ml
-lib/model/components/states.mli
-lib/model/components/label.ml
-lib/model/components/label.mli
-lib/model/components/labels.ml
-lib/model/components/labels.mli
-lib/model/components/annotation_note.ml
-lib/model/components/annotation_note.mli
-lib/model/components/annotation.ml
-lib/model/components/annotation.mli
-lib/model/components/annotations.ml
-lib/model/components/annotations.mli
-lib/model/components/transition.ml
-lib/model/components/transition.mli
-lib/model/components/transitions.ml
-lib/model/components/transitions.mli
-lib/model/components/action.ml
-lib/model/components/action.mli
-lib/model/components/actions.ml
-lib/model/components/actions.mli
-lib/model/components/actionpair.ml
-lib/model/components/actionpair.mli
-lib/model/components/actionpairs.ml
-lib/model/components/actionpairs.mli
-lib/model/components/actionmap.ml
-lib/model/components/actionmap.mli
-lib/model/components/edge.ml
-lib/model/components/edge.mli
-lib/model/components/edges.ml
-lib/model/components/edges.mli
-lib/model/components/edgemap.ml
-lib/model/components/edgemap.mli
-lib/model/components/state_partition.ml
-lib/model/components/state_partition.mli
-lib/model/components/info.ml
-lib/model/components/info.mli
+lib/model/components.ml
 
 lib/model/LTS.ml
 lib/model/LTS.mli

@@ -1,7 +1,5 @@
 (** {i See {!Model.S.Saturation}.} *)
 module type S = sig
-  (** BBB *)
-
   type state
   type states
   type label
@@ -23,7 +21,6 @@ module type S = sig
      and type trees = trees
      and type action = action
 
-  (** *)
   module Trace :
     Wip_trace.S
     with type state = state
@@ -105,49 +102,15 @@ module type S = sig
   val edges : labels -> states -> edgemap -> edgemap * states
 end
 
-module Make
-    (Base : Base_term.S)
-    (State : State.S with type base = Base.t)
-    (States : States.S with type elt = State.t)
-    (Label : Label.S with type base = Base.t)
-    (Labels : Labels.S with type elt = Label.t)
-    (Note :
-       Annotation_note.S
-       with type state = State.t
-        and type label = Label.t
-        and type trees = Base.Trees.t)
-    (Annotation : Annotation.S with type label = Label.t and type note = Note.t)
-    (Annotations : Annotations.S with type elt = Annotation.t)
-    (Action :
-       Action.S
-       with type label = Label.t
-        and type annotation = Annotation.t
-        and type trees = Base.Trees.t)
-    (ActionPair :
-       Actionpair.S with type action = Action.t and type states = States.t)
-    (ActionPairs :
-       Actionpairs.S with type states = States.t and type elt = ActionPair.t)
-    (ActionMap :
-       Actionmap.S
-       with type label = Label.t
-        and type action = Action.t
-        and type states = States.t
-        and type actionpairs = ActionPairs.t)
-    (EdgeMap :
-       Edgemap.S
-       with type state = State.t
-        and type states = States.t
-        and type label = Label.t
-        and type action = Action.t
-        and type actionmap = ActionMap.t') :
+module Make (Base : Base_term.S) (C : Components.S with type trees = Base.Trees.t) :
   S
-  with type state = State.t
-   and type states = States.t
-   and type label = Label.t
-   and type labels = Labels.t
-   and type annotation = Annotation.t
-   and type trees = Base.Trees.t
-   and type action = Action.t
-   and type actionpairs = ActionPairs.t
-   and type actionmap = ActionMap.t'
-   and type edgemap = EdgeMap.t'
+  with type state = C.State.t
+   and type states = C.States.t
+   and type label = C.Label.t
+   and type labels = C.Labels.t
+   and type annotation = C.Annotation.t
+   and type trees = C.trees
+   and type action = C.Action.t
+   and type actionpairs = C.ActionPairs.t
+   and type actionmap = C.ActionMap.t'
+   and type edgemap = C.EdgeMap.t'
