@@ -805,6 +805,60 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-27 — Fix: saturation dropped destinations when one action had more than one (A5)
+
+Fixes the correctness bug found during the A2 investigation above.
+
+- **Bug fix.** `Saturation.Make.edge_action_destinations`
+  (`lib/model/algorithms/saturation.ml:376`) explored a multi-destination
+  action's `States.fold` with a *fresh* `ActionPairs.empty` on every
+  iteration instead of threading the fold's own accumulator, so only the
+  last-visited destination's results ever survived saturation. Fixed by
+  matching `check_destinations` three functions above (`saturation.ml:362`,
+  `States.fold (check_from d) xs`) — the sibling function this one looks
+  like it was meant to mirror, and which already threads the accumulator
+  correctly: `States.fold (check_from d) ys ActionPairs.empty`. Two-line
+  net change.
+- **Tooling.** Regression test added:
+  `test_saturate_multi_destination_action` in `test/tests.ml` — a single
+  silent action from state 0 reaching two destinations (1 and 2), which
+  then diverge under different visible labels; both resulting weak
+  transitions must survive saturation. Confirmed to be a real (not
+  vacuous) regression test by temporarily reverting the fix and rerunning:
+  exactly one of the two checks failed, matching the bug's exact mechanism
+  (last-visited-survives). Adding this test surfaced a second, pre-existing
+  issue: `test_saturate_with_tau` never actually exercised saturation at
+  all — `FSM.saturate`'s default `only_if_weak:true` gates on
+  `Info.weak_labels`, which the shared `info`/`lts`/`fsm` test helpers
+  never set, so `saturate` silently returned its input unchanged and the
+  test's "state count unchanged" assertion passed vacuously regardless.
+  Fixed by adding an optional `~weak_labels` parameter to `info`/`lts`/`fsm`
+  (defaulting to empty, so every other existing test is unaffected) and
+  passing it through on both saturation tests.
+
+**Verification:** full five-file `PluginProofs.v` baseline, each file
+rebuilt individually via `make -j1 <path>.vo` for a trustworthy per-file
+count:
+
+| file | counts |
+| --- | --- |
+| `Proc/Test1` | 114 105 106 109 22 21 |
+| `Proc/Test2` | 446 278 299 194 446 182 |
+| `CADP/Size1/MutualExclusion` | 268 396 |
+| `CADP/Size1/Glued` | 268 396 |
+| `CADP/Size1/Glued/MutualExclusion` | 81 63 |
+
+All 18 counts match the baseline exactly — expected, since (per the A2
+investigation's analysis) none of the existing examples have a single
+action with genuinely more than one destination, so the bug was inert for
+all of them. `_CoqProject` restored and `make dune` run afterward. `dune
+build` and `dune exec test/tests.exe` (11/11, up from 9/9) both pass.
+
+**Session tally:** Bug fix 1 · Tooling 1 · Docs 0 · Refactor 0 ·
+Optimization 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
@@ -817,6 +871,7 @@ Optimization 0 · **New feature 0.**
 - ~~`@fmt` drift outside `lib/model`~~ — fully resolved, 2026-09-27 (see below, two entries): non-`proof_solver*` half (`rocq_monad.mli`, `thing.ml`, `tests.ml`) and `proof_solver*` half (`graph_extract_lts.ml`, `proof_solver_wrapper.ml`, `proof_solver_step.ml`, baseline-reverified). `rocq_monad_utils.ml`/`theories.ml`/`proof_solver.ml`/`graph_type.ml`, all listed as drifted in the original review, turned out already clean on re-check.
 - ~~No CI job — the Rocq 9.2 port broke the build for months without anyone noticing.~~ Added, 2026-09-27 (see below): `.github/workflows/ci.yml`.
 - ~~`.gitignore` lists `src/commandOLDunify.ml`, which no longer exists.~~ Removed, 2026-09-27 (see below). The rest of `TODO.md`'s C6 "stale detritus" item turned out to already be resolved or not actually a problem — see below for what was checked.
+- ~~`Saturation.edge_action_destinations` silently dropped all but the last-visited destination when a single action had more than one — a real correctness bug (found 2026-09-27 during the A2 investigation).~~ Fixed, 2026-09-27 (see below), with a regression test. `notes/2-unify-instead-of-lookup.md`'s A2 (multiple-actionpairs positive test case) remains separately open.
 
 Working notes live in `notes/` (local only, excluded via `.git/info/exclude`, so
 not present in a fresh clone). Note 1 is done; its analysis was incomplete on two
