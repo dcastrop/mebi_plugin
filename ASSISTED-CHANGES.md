@@ -548,6 +548,47 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-27 — CI, and closing out the rest of backlog item C6
+
+Continuing down `notes/4-post-review-backlog.md`'s suggested order (C1, then
+C6) after Jonah returned to the project wanting it back to a usable state.
+
+- **Tooling.** Added `.github/workflows/ci.yml`: `nix develop` to provide
+  the system layer, then `opam switch create . --locked --deps-only` (cached
+  on `rocq-mebi.opam.locked`'s hash, since building OCaml/Rocq from source
+  takes a while), `dune build`, `dune exec test/tests.exe`, and `make
+  -j$(nproc)` — exactly the bootstrap path `TODO.md` proposed and the one
+  `ASSISTED-CHANGES.md`'s 2026-08-16 entry verified by hand, now automated.
+  Deliberately does not enable the `PluginProofs.v` proof-search suite (see
+  CLAUDE.md); `_CoqProject`'s default subset is what `make` builds.
+- **Tooling.** Dropped a git stash entry, `WIP: broken membranes-style state
+  experiment (superseded by cluster-collapse plan)` — confirmed superseded
+  by the now-completed `16bbe37` cluster collapse, per the 2026-09-27
+  cluster-collapse entry above.
+- **Tooling.** Removed `.gitignore`'s `src/commandOLDunify.ml` line —
+  confirmed via `git log --all` that the file is gone from the working tree
+  (last existed before this log's Rocq-9.2-port-era history) and the entry
+  was dead weight, matching what `TODO.md` already flagged.
+- Checked the rest of `TODO.md`'s C6 "stale detritus" item and found it
+  already resolved or not actually a problem, so left alone: the leftover
+  `CoqMakeFile`/`CoqMakeFile.conf`/`.CoqMakeFile.d` files it described are
+  not present in this working tree (already gitignored, and apparently
+  cleared by a later `make dune` run); `doc/index.html` redirecting into the
+  gitignored `_build/default/_doc/_html/` is dune's standard `@doc`/odoc
+  local-viewer pattern, not stale detritus — no change made.
+
+**Verification:** `dune build`, `dune exec test/tests.exe` (9/9), and
+`make -j$(nproc)` all run clean locally (the same commands the new CI job
+runs), followed by `make dune` to restore the dune-buildable state.
+`git status` clean afterward apart from the intended `.gitignore` edit and
+new `.github/` directory. The workflow itself has not yet been exercised by
+GitHub Actions — that only happens once it's pushed.
+
+**Session tally:** Tooling 3 · Bug fix 0 · Docs 0 · Refactor 0 ·
+Optimization 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
@@ -558,6 +599,8 @@ Optimization 0 · **New feature 0.**
 - ~~`_CoqProject:53` comments out `examples/Bisimilarity/Proc/Test4/PluginProofs.v` by name, but the file doesn't exist on disk. Separately, `Proc/Test3/PluginProofs.v` has two duplicate example names.~~ Both addressed 2026-09-27 (see above): the Test3 duplicates are renamed (not build-verified — see the caveat there), and the `_CoqProject` comment for Test4 now says plainly that the file was never written, rather than implying it exists. Writing an actual `Proc/Test4/PluginProofs.v` remains undone.
 - `lib/showable/` and `lib/json/` were never added to `_CoqProject` when introduced (2026-09-26), so only `dune build` ever compiled them — `make` silently skipped both libraries entirely. Fixed in `e037c18`, 2026-09-27, as a side effect of `lib/model/components.ml` becoming their first real consumer; see below for what that uncovered.
 - **New, 2026-09-27.** `@fmt` drift outside `lib/model` (unrelated to this branch's refactor, so left alone when the functor-collapse drift was fixed above): `lib/rocq_tools/rocq_monad.mli`, `rocq_monad_utils.ml`, `theories.ml`; `lib/showable/thing.ml`; `src/proof_solver_wrapper.ml`, `proof_solver_step.ml`, `proof_solver.ml`, `graph_extract_lts.ml`, `graph_type.ml`; `test/tests.ml`. Some of these (`proof_solver*`) would need the full proof-solver baseline re-run if formatted, per the usual policy.
+- ~~No CI job — the Rocq 9.2 port broke the build for months without anyone noticing.~~ Added, 2026-09-27 (see below): `.github/workflows/ci.yml`.
+- ~~`.gitignore` lists `src/commandOLDunify.ml`, which no longer exists.~~ Removed, 2026-09-27 (see below). The rest of `TODO.md`'s C6 "stale detritus" item turned out to already be resolved or not actually a problem — see below for what was checked.
 
 Working notes live in `notes/` (local only, excluded via `.git/info/exclude`, so
 not present in a fresh clone). Note 1 is done; its analysis was incomplete on two
