@@ -35,11 +35,11 @@ module type S = sig
   val get_bisimilar_states
     :  ?pi:Model.Partition.t
     -> Model.State.t
-    -> Model.States.t
+    -> Model.State.Set.t
 
   val are_states_bisimilar : Model.State.t -> Model.State.t -> bool
 
-  (* val get_candidates : Model.State.t -> Model.Label.t -> Model.EdgeMap.t' -> Model.State.t -> Model.States.t *)
+  (* val get_candidates : Model.State.t -> Model.Label.t -> Model.EdgeMap.t' -> Model.State.t -> Model.State.Set.t *)
 end
 
 module Make (Enc : Encoding.S) :

@@ -58,8 +58,8 @@ module Make
   let is_fsm_silent_label (x : EConstr.t) (m : Model.FSM.t) : bool =
     Logger.trace __FUNCTION__;
     match
-      Model.Labels.filter Model.Label.is_silent m.info.weak_labels
-      |> Model.Labels.to_list
+      Model.Label.Set.filter Model.Label.is_silent m.info.weak_labels
+      |> Model.Label.Set.to_list
     with
     | [] -> raise (FSM_HasNoSilentLabel m)
     | ys -> M.exists_eq x ys Decode.label |> M.run
@@ -71,10 +71,10 @@ module Make
   let is_fsm_visible_label (x : EConstr.t) (m : Model.FSM.t) : bool =
     Logger.trace __FUNCTION__;
     match
-      Model.Labels.filter
+      Model.Label.Set.filter
         (fun y -> Model.Label.is_silent y |> Bool.not)
         m.info.weak_labels
-      |> Model.Labels.to_list
+      |> Model.Label.Set.to_list
     with
     | [] -> raise (FSM_HasNoVisibleLabel m)
     | ys -> M.exists_eq x ys Decode.label |> M.run

@@ -70,18 +70,18 @@ module Make
   S
   with type enc = Enc.t
    and type state = Model.State.t
-   and type states = Model.States.t
+   and type states = Model.State.Set.t
    and type partition = Model.Partition.t
    and type label = Model.Label.t
-   and type labels = Model.Labels.t
+   and type labels = Model.Label.Set.t
    and type note = Model.Note.t
    and type annotation = Model.Annotation.t
-   and type annotations = Model.Annotations.t
+   and type annotations = Model.Annotation.Set.t
    and type transition = Model.Transition.t
-   and type transitions = Model.Transitions.t
+   and type transitions = Model.Transition.Set.t
    and type action = Model.Action.t
-   and type actions = Model.Actions.t
-   and type actionmap = Model.ActionMap.t'
+   and type actions = Model.Action.Set.t
+   and type actionmap = Model.Action.Map.t'
    and type edgemap = Model.EdgeMap.t'
    and type rocqlts = Model.Info.Meta.RocqLTS.t
    and type info = Model.Info.t
