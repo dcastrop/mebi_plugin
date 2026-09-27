@@ -32,18 +32,18 @@ MeBi Config Bounds As Num States 2000.
 Require Import Logic.
 
 (* MeBi Divider "Examples.Bisimilarity.CADP.Size1.Glued.MutualExclusion". *)
-(* MeBi Run FSM (make_spec 1) Using spec_lts. *)
-(* MeBi Run FSM (compose (create 1 Protocol.P)) Using lts step. *)
+(* MeBi Run FSM (make_spec 0) Using spec_lts. *)
+(* MeBi Run FSM (composition_create 0 Protocol.P) Using lts step. *)
 
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.Glued.MutualExclusion.bigstep".
-Example wsim_bigstep : weak_sim bigstep spec_lts (compose (create 1 Protocol.P)) (make_spec 1). 
-Proof. MeBi Sim Begin bigstep (compose (create 1 Protocol.P)) And spec_lts (make_spec 1) Using lts step.
-  (* Iteration History: 82 <- _ <- _ <- _ *) 
+Example wsim_bigstep : weak_sim bigstep spec_lts (composition_create 0 Protocol.P) (make_spec 0).
+Proof. MeBi Sim Begin bigstep (composition_create 0 Protocol.P) And spec_lts (make_spec 0) Using lts step.
+  (* Iteration History: 82 <- _ <- _ <- _ *)
   MeBi Sim Solve 82. Qed.
 
 MeBi Divider "Examples.Bisimilarity.CADP.Size1.Glued.MutualExclusion.spec_lts".
-Example wsim_spec_lts : weak_sim spec_lts bigstep (make_spec 1) (compose (create 1 Protocol.P)). 
-Proof. MeBi Sim Begin spec_lts (make_spec 1) And bigstep (compose (create 1 Protocol.P)) Using lts step.
-  (* Iteration History: 64 <- _ <- _ <- _ *) 
+Example wsim_spec_lts : weak_sim spec_lts bigstep (make_spec 0) (composition_create 0 Protocol.P).
+Proof. MeBi Sim Begin spec_lts (make_spec 0) And bigstep (composition_create 0 Protocol.P) Using lts step.
+  (* Iteration History: 64 <- _ <- _ <- _ *)
   MeBi Sim Solve 64. Qed.
