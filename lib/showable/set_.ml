@@ -1,10 +1,10 @@
 include Set
 
-module type Ordered = Showable_.Type_.Ordered
+module type Ordered = Type_.Ordered
 
 module type S = sig
   include Set.S
-  include Showable_.Type_.S with type t := t
+  include Type_.S with type t := t
   module Elt : Ordered with type t := elt
 
   val subset : t -> t -> bool

@@ -491,27 +491,23 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       type base = Base.t
       type t = { base : base }
 
-    include Json.Thing.Make (struct
-        type k = t
+      module X = struct
+        type nonrec t = t
 
         let name = "State"
         let json ?as_elt (x : t) : Yojson.t = Base.json ~as_elt:true x.base
-      end)
+        let equal a b = Base.equal a.base b.base
+        let compare a b = Base.compare a.base b.base
+      end
 
-    let equal a b = Base.equal a.base b.base
-    let compare a b = Base.compare a.base b.base
-    let hash x = Base.hash x.base
-  end
+      include Thing.Make (X)
+
+      let hash x = Base.hash x.base
+    end
 
   module States = struct
-    module Set_ : Set.S with type elt = State.t = Set.Make (State)
-    include Set_
-
-    include Json.Set.Make (struct
-        module Set = Set_
-
+    include Thing.Set (State) (struct
         let name = "States"
-        let json = State.json
       end)
 
     let add_to_opt (x : State.t) (ys : t option) : t =
@@ -544,47 +540,42 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       ; is_silent : bool option
       }
 
-    include Json.Thing.Make (struct
-        type k = t
+    module X = struct
+      type nonrec t = t
 
-        let name = "Label"
+      let name = "Label"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ "base", Base.json ~as_elt:true x.base
-            ; ( "is_silent"
-              , Json.option ~as_elt:true (fun ?as_elt x -> `Bool x) x.is_silent
-              )
-            ]
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        `Assoc
+          [ "base", Base.json ~as_elt:true x.base
+          ; ( "is_silent"
+            , Json.option ~as_elt:true (fun ?as_elt x -> `Bool x) x.is_silent )
+          ]
+      ;;
 
-    let equal (a : t) (b : t) : bool = Base.equal a.base b.base
+      let equal (a : t) (b : t) : bool = Base.equal a.base b.base
 
-    let compare (a : t) (b : t) : int =
-      Utils.compare_chain
-        [ Base.compare a.base b.base
-        ; Stdlib.Option.fold
-            ~none:0
-            ~some:(fun (a : bool) ->
-              Stdlib.Option.fold ~none:0 ~some:(Bool.compare a) b.is_silent)
-            a.is_silent
-        ]
-    ;;
+      let compare (a : t) (b : t) : int =
+        Utils.compare_chain
+          [ Base.compare a.base b.base
+          ; Stdlib.Option.fold
+              ~none:0
+              ~some:(fun (a : bool) ->
+                Stdlib.Option.fold ~none:0 ~some:(Bool.compare a) b.is_silent)
+              a.is_silent
+          ]
+      ;;
+    end
+
+    include Thing.Make (X)
 
     let hash (x : t) : int = Base.hash x.base
     let is_silent (x : t) : bool = Stdlib.Option.value x.is_silent ~default:false
   end
 
   module Labels = struct
-    module Set_ : Set.S with type elt = Label.t = Set.Make (Label)
-    include Set_
-
-    include Json.Set.Make (struct
-        module Set = Set_
-
+    include Thing.Set (Label) (struct
         let name = "Labels"
-        let json = Label.json
       end)
 
     let non_silent (xs : t) : t =
@@ -604,36 +595,38 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       ; goto : state
       }
 
-    include Json.Thing.Make (struct
-        type k = t
+    module X = struct
+      type nonrec t = t
 
-        let name = "Note"
+      let name = "Note"
 
-        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-          `Assoc
-            [ "from", State.json ~as_elt:true x.from
-            ; "label", Label.json ~as_elt:true x.label
-            ; "goto", State.json ~as_elt:true x.goto
-            ; "using", Base.Trees.json ~as_elt:true x.using
-            ]
-        ;;
-      end)
+      let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+        `Assoc
+          [ "from", State.json ~as_elt:true x.from
+          ; "label", Label.json ~as_elt:true x.label
+          ; "goto", State.json ~as_elt:true x.goto
+          ; "using", Base.Trees.json ~as_elt:true x.using
+          ]
+      ;;
 
-    let equal (a : t) (b : t) : bool =
-      State.equal a.from b.from
-      && State.equal a.goto b.goto
-      && Label.equal a.label b.label
-      && Base.Trees.equal a.using b.using
-    ;;
+      let equal (a : t) (b : t) : bool =
+        State.equal a.from b.from
+        && State.equal a.goto b.goto
+        && Label.equal a.label b.label
+        && Base.Trees.equal a.using b.using
+      ;;
 
-    let compare (a : t) (b : t) : int =
-      Utils.compare_chain
-        [ State.compare a.from b.from
-        ; State.compare a.goto b.goto
-        ; Label.compare a.label b.label
-        ; Base.Trees.compare a.using b.using
-        ]
-    ;;
+      let compare (a : t) (b : t) : int =
+        Utils.compare_chain
+          [ State.compare a.from b.from
+          ; State.compare a.goto b.goto
+          ; Label.compare a.label b.label
+          ; Base.Trees.compare a.using b.using
+          ]
+      ;;
+    end
+
+    include Thing.Make (X)
 
     let is_silent (x : t) : bool = Label.is_silent x.label
     let has_label (x : Label.t) (y : t) : bool = Label.equal x y.label
@@ -648,30 +641,32 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       ; next : t option
       }
 
-    include Json.Thing.Make (struct
-        type k = t
+    module X = struct
+      type nonrec t = t
 
-        let name = "Annotation"
+      let name = "Annotation"
 
-        let rec json ?(as_elt : bool = false) (x : t) : Yojson.t =
-          `Assoc
-            [ "this", Note.json ~as_elt:true x.this
-            ; ( "next"
-              , match x.next with
-                | None -> `String "None"
-                | Some next -> json ~as_elt:true next )
-            ]
-        ;;
-      end)
+      let rec json ?(as_elt : bool = false) (x : t) : Yojson.t =
+        `Assoc
+          [ "this", Note.json ~as_elt:true x.this
+          ; ( "next"
+            , match x.next with
+              | None -> `String "None"
+              | Some next -> json ~as_elt:true next )
+          ]
+      ;;
 
-    let rec equal (a : t) (b : t) : bool =
-      Note.equal a.this b.this && Option.equal equal a.next b.next
-    ;;
+      let rec equal (a : t) (b : t) : bool =
+        Note.equal a.this b.this && Option.equal equal a.next b.next
+      ;;
 
-    let rec compare (a : t) (b : t) : int =
-      Utils.compare_chain
-        [ Note.compare a.this b.this; Option.compare compare a.next b.next ]
-    ;;
+      let rec compare (a : t) (b : t) : int =
+        Utils.compare_chain
+          [ Note.compare a.this b.this; Option.compare compare a.next b.next ]
+      ;;
+    end
+
+    include Thing.Make (X)
 
     let is_empty : t -> bool = function
       | { this; next = None } -> true
@@ -732,14 +727,8 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
   end
 
   module Annotations = struct
-    module Set_ : Set.S with type elt = Annotation.t = Set.Make (Annotation)
-    include Set_
-
-    include Json.Set.Make (struct
-        module Set = Set_
-
+    include Thing.Set (Annotation) (struct
         let name = "Annotations"
-        let json = Annotation.json
       end)
 
     (** returns all of the possible actions after the named action *)
@@ -779,39 +768,41 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       ; annotation : annotation option
       }
 
-    include Json.Thing.Make (struct
-        type k = t
+    module X = struct
+      type nonrec t = t
 
-        let name = "Transition"
+      let name = "Transition"
 
-        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-          `Assoc
-            [ "from", State.json ~as_elt:true x.from
-            ; "goto", State.json ~as_elt:true x.goto
-            ; "label", Label.json ~as_elt:true x.label
-            ; "annotation", Json.option ~as_elt:true Annotation.json x.annotation
-            ; "tree", Json.option ~as_elt:true Base.Tree.json x.tree
-            ]
-        ;;
-      end)
+      let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+        `Assoc
+          [ "from", State.json ~as_elt:true x.from
+          ; "goto", State.json ~as_elt:true x.goto
+          ; "label", Label.json ~as_elt:true x.label
+          ; "annotation", Json.option ~as_elt:true Annotation.json x.annotation
+          ; "tree", Json.option ~as_elt:true Base.Tree.json x.tree
+          ]
+      ;;
 
-    let equal (a : t) (b : t) : bool =
-      State.equal a.from b.from
-      && State.equal a.goto b.goto
-      && Label.equal a.label b.label
-      && Option.equal Annotation.equal a.annotation b.annotation
-      && Option.equal Base.Tree.equal a.tree b.tree
-    ;;
+      let equal (a : t) (b : t) : bool =
+        State.equal a.from b.from
+        && State.equal a.goto b.goto
+        && Label.equal a.label b.label
+        && Option.equal Annotation.equal a.annotation b.annotation
+        && Option.equal Base.Tree.equal a.tree b.tree
+      ;;
 
-    let compare (a : t) (b : t) : int =
-      Utils.compare_chain
-        [ State.compare a.from b.from
-        ; State.compare a.goto b.goto
-        ; Label.compare a.label b.label
-        ; Option.compare Annotation.compare a.annotation b.annotation
-        ; Option.compare Base.Tree.compare a.tree b.tree
-        ]
-    ;;
+      let compare (a : t) (b : t) : int =
+        Utils.compare_chain
+          [ State.compare a.from b.from
+          ; State.compare a.goto b.goto
+          ; Label.compare a.label b.label
+          ; Option.compare Annotation.compare a.annotation b.annotation
+          ; Option.compare Base.Tree.compare a.tree b.tree
+          ]
+      ;;
+    end
+
+    include Thing.Make (X)
 
     let is_silent (x : t) : bool = Label.is_silent x.label
   end
@@ -819,14 +810,8 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
   module Transitions = struct
     type labels = Labels.t
 
-    module Set_ : Set.S with type elt = Transition.t = Set.Make (Transition)
-    include Set_
-
-    include Json.Set.Make (struct
-        module Set = Set_
-
+    include Thing.Set (Transition) (struct
         let name = "Transitions"
-        let json = Transition.json
       end)
 
     let labels (xs : t) : Labels.t =
@@ -850,33 +835,35 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       ; trees : trees
       }
 
-    include Json.Thing.Make (struct
-        type k = t
+    module X = struct
+      type nonrec t = t
 
-        let name = "Action"
+      let name = "Action"
 
-        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-          `Assoc
-            [ "label", Label.json ~as_elt:true x.label
-            ; "annotation", Json.option ~as_elt:true Annotation.json x.annotation
-            ; "trees", Base.Trees.json ~as_elt:true x.trees
-            ]
-        ;;
-      end)
+      let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+        `Assoc
+          [ "label", Label.json ~as_elt:true x.label
+          ; "annotation", Json.option ~as_elt:true Annotation.json x.annotation
+          ; "trees", Base.Trees.json ~as_elt:true x.trees
+          ]
+      ;;
 
-    let equal (a : t) (b : t) : bool =
-      Label.equal a.label b.label
-      && Option.equal Annotation.equal a.annotation b.annotation
-      && Base.Trees.equal a.trees b.trees
-    ;;
+      let equal (a : t) (b : t) : bool =
+        Label.equal a.label b.label
+        && Option.equal Annotation.equal a.annotation b.annotation
+        && Base.Trees.equal a.trees b.trees
+      ;;
 
-    let compare (a : t) (b : t) : int =
-      Utils.compare_chain
-        [ Label.compare a.label b.label
-        ; Option.compare Annotation.compare a.annotation b.annotation
-        ; Base.Trees.compare a.trees b.trees
-        ]
-    ;;
+      let compare (a : t) (b : t) : int =
+        Utils.compare_chain
+          [ Label.compare a.label b.label
+          ; Option.compare Annotation.compare a.annotation b.annotation
+          ; Base.Trees.compare a.trees b.trees
+          ]
+      ;;
+    end
+
+    include Thing.Make (X)
 
     let hash (x : t) : int = Label.hash x.label
     let wk_equal (a : t) (b : t) : bool = Label.equal a.label b.label
@@ -898,14 +885,8 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
     type label = Label.t
     type labels = Labels.t
 
-    module Set_ : Set.S with type elt = Action.t = Set.Make (Action)
-    include Set_
-
-    include Json.Set.Make (struct
-        module Set = Set_
-
+    include Thing.Set (Action) (struct
         let name = "Actions"
-        let json = Action.json
       end)
 
     let labelled (xs : t) (y : label) : t =
@@ -928,20 +909,28 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
     type states = States.t
     type t = action * states
 
-    include Json.Thing.Make (struct
-        type k = t
+    module X = struct
+      type nonrec t = t
 
-        let name = "ActionPair"
+      let name = "ActionPair"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ "action", Action.json (fst x); "destinations", States.json (snd x) ]
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        `Assoc
+          [ "action", Action.json (fst x); "destinations", States.json (snd x) ]
+      ;;
 
-    let compare ((a, x) : t) ((b, y) : t) : int =
-      Utils.compare_chain [ Action.compare a b; States.compare x y ]
-    ;;
+      let compare ((a, x) : t) ((b, y) : t) : int =
+        Utils.compare_chain [ Action.compare a b; States.compare x y ]
+      ;;
+
+      (* Not part of the original Actionpair.S -- ActionPair had no [equal]
+         before. Added only because Thing.Make needs one; defined so it
+         agrees with [compare], which is the only property anything can
+         actually rely on. *)
+      let equal (a : t) (b : t) : bool = compare a b = 0
+    end
+
+    include Thing.Make (X)
 
     let shorter_annotation ((a, xs) : t) ((b, ys) : t) : t =
       match
@@ -1011,14 +1000,8 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
   module ActionPairs = struct
     type states = States.t
 
-    module Set_ : Set.S with type elt = ActionPair.t = Set.Make (ActionPair)
-    include Set_
-
-    include Json.Set.Make (struct
-        module Set = Set_
-
+    include Thing.Set (ActionPair) (struct
         let name = "ActionPairs"
-        let json = ActionPair.json
       end)
 
     let destinations (x : t) : States.t =
@@ -1160,33 +1143,35 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       ; action : action
       }
 
-    include Json.Thing.Make (struct
-        type k = t
+    module X = struct
+      type nonrec t = t
 
-        let name = "Edge"
+      let name = "Edge"
 
-        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-          `Assoc
-            [ "from", State.json x.from
-            ; "goto", State.json x.goto
-            ; "action", Action.json x.action
-            ]
-        ;;
-      end)
+      let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+        `Assoc
+          [ "from", State.json x.from
+          ; "goto", State.json x.goto
+          ; "action", Action.json x.action
+          ]
+      ;;
 
-    let equal (a : t) (b : t) : bool =
-      State.equal a.from b.from
-      && State.equal a.goto b.goto
-      && Action.equal a.action b.action
-    ;;
+      let equal (a : t) (b : t) : bool =
+        State.equal a.from b.from
+        && State.equal a.goto b.goto
+        && Action.equal a.action b.action
+      ;;
 
-    let compare (a : t) (b : t) : int =
-      Utils.compare_chain
-        [ State.compare a.from b.from
-        ; State.compare a.goto b.goto
-        ; Action.compare a.action b.action
-        ]
-    ;;
+      let compare (a : t) (b : t) : int =
+        Utils.compare_chain
+          [ State.compare a.from b.from
+          ; State.compare a.goto b.goto
+          ; Action.compare a.action b.action
+          ]
+      ;;
+    end
+
+    include Thing.Make (X)
 
     let is_silent (x : t) : bool = Action.is_silent x.action
     let is_labelled (x : Label.t) (y : t) : bool = Action.is_labelled x y.action
@@ -1195,14 +1180,11 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
   module Edges = struct
     type label = Edge.label
 
-    module Set_ : Set.S with type elt = Edge.t = Set.Make (Edge)
-    include Set_
-
-    include Json.Set.Make (struct
-        module Set = Set_
-
+    (* Name kept as "Edge" (singular), matching the JSON dump name the
+       original edges.ml used -- not renamed to "Edges" here, to keep the
+       dump format byte-for-byte unchanged. *)
+    include Thing.Set (Edge) (struct
         let name = "Edge"
-        let json = Edge.json
       end)
 
     let labelled (xs : t) (y : label) : t =
@@ -1370,14 +1352,8 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
     type label = ActionMap.label
     type edgemap = EdgeMap.t'
 
-    module Set_ : Set.S with type elt = States.t = Set.Make (States)
-    include Set_
-
-    include Json.Set.Make (struct
-        module Set = Set_
-
+    include Thing.Set (States) (struct
         let name = "Partitions"
-        let json = States.json
       end)
 
     let get_bisimilar (x : State.t) : t -> States.t =

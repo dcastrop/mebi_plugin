@@ -1,8 +1,12 @@
+; The file (and module) is named yojson_compare.ml, not json.ml: `make`'s
+; build (driven by _CoqProject / src/mebi_plugin.mlpack, unlike dune) has no
+; per-library module wrapping -- every module is compiled into one flat
+; namespace, so a second file literally named "json.ml" would collide with
+; lib/utils/json.ml's [Json] the moment both are needed in the same link
+; (e.g. lib/showable/thing.ml, which needs the latter).
 (library
- (name json)
- (public_name rocq-mebi.json)
- (preprocess
-  (pps ppx_deriving.std))
+ (name yojson_compare)
+ (public_name rocq-mebi.yojson_compare)
  (libraries yojson)
- (modules Json)
+ (modules Yojson_compare)
  (wrapped true))

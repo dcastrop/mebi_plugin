@@ -5,6 +5,8 @@ src/META.rocq-mebi
 -I lib/utils/
 -I lib/terms/
 -I lib/rocq_tools/
+-I lib/json/
+-I lib/showable/
 -I lib/model/
 -I lib/model/algorithms/
 -I lib/model/wip/
@@ -136,6 +138,14 @@ lib/rocq_tools/bindings.ml
 lib/rocq_tools/bindings.mli
 lib/rocq_tools/constructor_bindings.ml
 lib/rocq_tools/constructor_bindings.mli
+
+lib/json/yojson_compare.ml
+
+lib/showable/type_.ml
+lib/showable/set_.ml
+lib/showable/map_.ml
+lib/showable/showable.ml
+lib/showable/thing.ml
 
 lib/model/components.ml
 
