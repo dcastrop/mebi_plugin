@@ -56,6 +56,7 @@ end = struct
   let equal = X.equal
   let compare = X.compare
   let show : X.t -> string = to_string ~pretty:false
+
   let pp (ppf : Format.formatter) (x : X.t) : unit =
     Format.pp_print_string ppf (show x)
   ;;
@@ -65,9 +66,11 @@ end
    pp/show/subset/random/etc and the JSON-dump mechanism together. [N.name]
    is separate from [X.name] because the existing dump format names a set
    differently from its element (e.g. "States", not "State"). *)
-module Set (X : S) (N : sig
-    val name : string
-  end) =
+module Set
+    (X : S)
+    (N : sig
+       val name : string
+     end) =
 struct
   module Set_ = Showable.Set.Make (X)
   include Set_

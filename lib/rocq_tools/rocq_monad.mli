@@ -19,6 +19,7 @@ module type S = sig
       [set_ctx]. A stack that needs a different context is a different
       instance. *)
   val run : ?reset_encoding:bool -> 'a mm -> 'a
+
   val return : 'a -> 'a mm
   val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
   val map : ('a -> 'b) -> 'a mm -> 'b mm
