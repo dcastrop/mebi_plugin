@@ -50,40 +50,29 @@ module type S = sig
 end
 
 module Make
-    (Base : Base_term.S)
-    (State : State.S with type base = Base.t)
-    (States : States.S with type elt = State.t)
-    (Label : Label.S with type base = Base.t)
-    (Labels : Labels.S with type elt = Label.t)
-    (Action : Action.S with type label = Label.t)
-    (ActionMap :
-       Actionmap.S with type action = Action.t and type states = States.t)
-    (EdgeMap :
-       Edgemap.S
-       with type state = State.t
-        and type actionmap = ActionMap.t'
-        and type label = Label.t)
-    (Partition :
-       State_partition.S
-       with type elt = States.t
-        and type edgemap = EdgeMap.t'
-        and type state = State.t)
-    (Info : Info.S with type base = State.base and type labels = Labels.t)
+    (C : Components.S)
     (FSM :
        FSM.S
-       with type state = State.t
-        and type states = States.t
-        and type labels = Labels.t
-        and type edgemap = EdgeMap.t'
-        and type info = Info.t) :
+       with type state = C.State.t
+        and type states = C.States.t
+        and type labels = C.Labels.t
+        and type edgemap = C.EdgeMap.t'
+        and type info = C.Info.t) :
   S
-  with type state = State.t
-   and type states = States.t
-   and type label = Label.t
-   and type labels = Labels.t
-   and type edgemap = EdgeMap.t'
-   and type partition = Partition.t
+  with type state = C.State.t
+   and type states = C.States.t
+   and type label = C.Label.t
+   and type labels = C.Labels.t
+   and type edgemap = C.EdgeMap.t'
+   and type partition = C.Partition.t
    and type fsm = FSM.t = struct
+  module State = C.State
+  module States = C.States
+  module Label = C.Label
+  module Labels = C.Labels
+  module EdgeMap = C.EdgeMap
+  module Partition = C.Partition
+
   type state = State.t
   type states = States.t
   type label = Label.t

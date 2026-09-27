@@ -89,52 +89,30 @@ module type S = sig
   val edges : labels -> states -> edgemap -> edgemap * states
 end
 
-module Make
-    (Base : Base_term.S)
-    (State : State.S with type base = Base.t)
-    (States : States.S with type elt = State.t)
-    (Label : Label.S with type base = Base.t)
-    (Labels : Labels.S with type elt = Label.t)
-    (Note :
-       Annotation_note.S
-       with type state = State.t
-        and type label = Label.t
-        and type trees = Base.Trees.t)
-    (Annotation : Annotation.S with type label = Label.t and type note = Note.t)
-    (Annotations : Annotations.S with type elt = Annotation.t)
-    (Action :
-       Action.S
-       with type label = Label.t
-        and type annotation = Annotation.t
-        and type trees = Base.Trees.t)
-    (ActionPair :
-       Actionpair.S with type action = Action.t and type states = States.t)
-    (ActionPairs :
-       Actionpairs.S with type states = States.t and type elt = ActionPair.t)
-    (ActionMap :
-       Actionmap.S
-       with type label = Label.t
-        and type action = Action.t
-        and type states = States.t
-        and type actionpairs = ActionPairs.t)
-    (EdgeMap :
-       Edgemap.S
-       with type state = State.t
-        and type states = States.t
-        and type label = Label.t
-        and type action = Action.t
-        and type actionmap = ActionMap.t') :
+module Make (Base : Base_term.S) (C : Components.S with type trees = Base.Trees.t) :
   S
-  with type state = State.t
-   and type states = States.t
-   and type label = Label.t
-   and type labels = Labels.t
-   and type annotation = Annotation.t
-   and type trees = Base.Trees.t
-   and type action = Action.t
-   and type actionpairs = ActionPairs.t
-   and type actionmap = ActionMap.t'
-   and type edgemap = EdgeMap.t' = struct
+  with type state = C.State.t
+   and type states = C.States.t
+   and type label = C.Label.t
+   and type labels = C.Labels.t
+   and type annotation = C.Annotation.t
+   and type trees = C.trees
+   and type action = C.Action.t
+   and type actionpairs = C.ActionPairs.t
+   and type actionmap = C.ActionMap.t'
+   and type edgemap = C.EdgeMap.t' = struct
+  module State = C.State
+  module States = C.States
+  module Label = C.Label
+  module Labels = C.Labels
+  module Annotation = C.Annotation
+  module Annotations = C.Annotations
+  module Action = C.Action
+  module ActionPair = C.ActionPair
+  module ActionPairs = C.ActionPairs
+  module ActionMap = C.ActionMap
+  module EdgeMap = C.EdgeMap
+
   type state = State.t
   type states = States.t
   type label = Label.t
@@ -148,14 +126,13 @@ module Make
 
   (** [module WIP] is a lightweight counterpart of [Note.t] that forms some "work-in-progress" [Annotation.t]. Once we stop saturating an action, we check if we are able to yield a new saturated action and convert the [wip list] to an [Annotation.t].
   *)
-  module WIP =
-    Wip_annotation.Make (Base) (State) (Label) (Note) (Annotation) (Action)
+  module WIP = Wip_annotation.Make (Base) (C)
 
   (** [module Trace] ... we keep track of the total sum of traces we have already checked. This is useful for checking if, from a state and action, we have already explored the rest of this trace and so can just use what we have already learned, e.g., if we are in some "subtrace".
   *)
-  module Trace = Wip_trace.Make (Base) (State) (Label) (Note) (Annotation) (WIP)
+  module Trace = Wip_trace.Make (C) (WIP)
 
-  module Traces = Wip_traces.Make (Base) (State) (WIP) (Trace)
+  module Traces = Wip_traces.Make (C) (WIP) (Trace)
 
   (** [data] ...
       @param named is ...
@@ -176,7 +153,7 @@ module Make
 
   let initial_data (traces : Traces.t ref) (old_edges : EdgeMap.t') : data =
     { named = None
-    ; (* notes = []; *) current = None
+    ; current = None
     ; visited = States.empty
     ; traces
     ; can_collect_traces = ref true
@@ -204,12 +181,6 @@ module Make
     in
     { d with named }
   ;;
-
-  (** returns a copy of [d] with the updated notes *)
-  (* let update_notes (x : WIP.t) (d : data) : data =
-      Logger.trace __FUNCTION__;
-      { d with notes = x :: d.notes }
-    ;; *)
 
   (** returns a copy of [d] with [x] added to [d.current] *)
   let update_current (x : WIP.t) (d : data) : data =
@@ -240,23 +211,6 @@ module Make
     Logger.trace __FUNCTION__;
     EdgeMap.find_opt d.old_edges from
   ;;
-
-  (****************************************************************************)
-
-  (* exception Model_Saturate_WIP_HadNoNamedActions of WIP.t list
-    exception Model_Saturate_WIP_HadMultipleNamedActions of WIP.t list
-
-    let validate_wips (xs : WIP.t list) : unit =
-      Logger.trace __FUNCTION__;
-      match
-        List.filter
-          (fun ({ via; _ } : WIP.t) -> Label.is_silent via |> Bool.not)
-          xs
-      with
-      | [] -> raise (Model_Saturate_WIP_HadNoNamedActions xs)
-      | _ :: [] -> ()
-      | _ :: _ -> raise (Model_Saturate_WIP_HadMultipleNamedActions xs)
-    ;; *)
 
   (****************************************************************************)
 
@@ -364,7 +318,6 @@ module Make
     (* NOTE: add all traces that already have named action (if we don't) -- keep exploring with traces *)
     Traces.fold
       (fun (z : Trace.t) (acc : ActionPairs.t) : ActionPairs.t ->
-        (* Logger.thing ~__FUNCTION__ Debug "z" z ( Trace.to_string); *)
         match d.named, Trace.get_named_opt z with
         | Some named, None ->
           Logger.trace ~__FUNCTION__ "stop (data)";
@@ -378,7 +331,6 @@ module Make
           Logger.trace ~__FUNCTION__ "continue (full)";
           (* NOTE: continue exploring un-traced state-space as the [named] must occur earlier in the trace and has been pruned *)
           (* NOTE: we can only use the traces once *)
-          (* d.can_collect_traces := false; *)
           continue_check_destinations
             { d with can_collect_traces = ref false }
             from
@@ -425,7 +377,6 @@ module Make
     Logger.trace __FUNCTION__;
     States.fold
       (fun (y : State.t) (acc : ActionPairs.t) ->
-        (* Logger.thing ~__FUNCTION__ Debug "y" y ( State.to_string); *)
         check_from d y ActionPairs.empty)
       ys
       ActionPairs.empty
@@ -443,7 +394,6 @@ module Make
     Logger.trace __FUNCTION__;
     ActionMap.fold
       (fun (x : Action.t) (ys : States.t) (acc : ActionPair.t list) ->
-        (* Logger.thing ~__FUNCTION__ Debug "x" x ( Action.to_string); *)
         let d : data =
           initial_data traces old_edges
           |> update_named x
@@ -484,7 +434,6 @@ module Make
     let terminals : States.t =
       EdgeMap.fold
         (fun (from : State.t) (old_actions : ActionMap.t') (acc : States.t) ->
-          (* Logger.thing ~__FUNCTION__ Debug "from" from ( State.to_string); *)
           (* NOTE: populate [new_actions] with saturated [old_actions] *)
           let new_actions : ActionMap.t' = ActionMap.create 0 in
           let () = edge new_actions from old_actions old_edges traces in
@@ -496,7 +445,6 @@ module Make
         old_edges
         States.empty
     in
-    (* Logger.thing ~__FUNCTION__ Debug "traces" !traces ( Traces.to_string); *)
     new_edges, terminals
   ;;
 end

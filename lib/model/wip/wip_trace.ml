@@ -58,29 +58,23 @@ end
 (** [module Trace] ... we keep track of the total sum of traces we have already checked. This is useful for checking if, from a state and action, we have already explored the rest of this trace and so can just use what we have already learned, e.g., if we are in some "subtrace".
 *)
 module Make
-    (Base : Base_term.S)
-    (State : State.S with type base = Base.t)
-    (Label : Label.S with type base = Base.t)
-    (Note :
-       Annotation_note.S
-       with type state = State.t
-        and type label = Label.t
-        and type trees = Base.Trees.t)
-    (Annotation : Annotation.S with type label = Label.t and type note = Note.t)
+    (C : Components.S)
     (WIP :
        Wip_annotation.S
-       with type state = State.t
-        and type label = Label.t
-        and type annotation = Annotation.t
-        and type trees = Base.Trees.t) :
+       with type state = C.State.t
+        and type label = C.Label.t
+        and type annotation = C.Annotation.t
+        and type trees = C.trees) :
   S
-  with type state = State.t
-   and type label = Label.t
-   and type annotation = Annotation.t
+  with type state = C.State.t
+   and type label = C.Label.t
+   and type annotation = C.Annotation.t
    and type wip = WIP.t = struct
+  module State = C.State
+
   type state = State.t
-  type label = Label.t
-  type annotation = Annotation.t
+  type label = C.Label.t
+  type annotation = C.Annotation.t
   type wip = WIP.t
 
   type t =
@@ -158,14 +152,14 @@ module Make
 
   exception CouldNotFindNamed
 
-  let rec get_named : t -> Label.t = function
+  let rec get_named : t -> label = function
     | { this; next = Some (Next x) } ->
       if WIP.is_named this then this.via else get_named x
     | { this; next = _ } ->
       if WIP.is_named this then this.via else raise CouldNotFindNamed
   ;;
 
-  let get_named_opt (x : t) : Label.t option =
+  let get_named_opt (x : t) : label option =
     try Some (get_named x) with CouldNotFindNamed -> None
   ;;
 
@@ -247,14 +241,12 @@ module Make
 
   exception GotoNotSet
 
-  let rec to_annotation : t -> Annotation.t =
+  let rec to_annotation : t -> annotation =
     Logger.trace __FUNCTION__;
     function
-    | { this = { from; via; trees }; next = None } ->
-      (* { this = { from; label = via; using = trees; goto }; next = None } *)
-      raise GotoNotSet
+    | { this = { from; via; trees }; next = None } -> raise GotoNotSet
     | { this = { from; via; trees }; next = Some (Next x) } ->
-      let next : Annotation.t = to_annotation x in
+      let next : annotation = to_annotation x in
       { this = { from; label = via; using = trees; goto = next.this.from }
       ; next = Some next
       }

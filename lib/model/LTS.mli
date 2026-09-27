@@ -33,15 +33,10 @@ module type S = sig
   include Json.S with type k = t (** @closed *)
 end
 
-module Make
-    (State : State.S)
-    (States : States.S with type elt = State.t)
-    (Labels : Labels.S)
-    (Transitions : Transitions.S with type labels = Labels.t)
-    (Info : Info.S with type base = State.base and type labels = Labels.t) :
+module Make (C : Components.S) :
   S
-  with type state = State.t
-   and type states = States.t
-   and type labels = Labels.t
-   and type transitions = Transitions.t
-   and type info = Info.t
+  with type state = C.State.t
+   and type states = C.States.t
+   and type labels = C.Labels.t
+   and type transitions = C.Transitions.t
+   and type info = C.Info.t

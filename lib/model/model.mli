@@ -1,13 +1,13 @@
 (** This file provides {!Model.Make} which encapsulates everything necessary for the {b OCaml} models {i (i.e., with no {b Rocq} terms)}. This is unlike {!Mebi_plugin.Graph} that is used when building an initial model of {b Rocq} and then extracting it into a pure {b OCaml} model, using {!Encoding}.
 *)
 
-(** Type signature of {!Model}. A *)
+(** Type signature of {!Model}. *)
 module type S = sig
   (** @canonical Model.S *)
 
   (** {1 Signature Types} *)
 
-  (** A {!Base_term.S.t} used by the models for {!State.t} and {!Label.t}. Must have functions for equality, comparison and hashing. Can be derived from an {!Encoding.S}.
+  (** A {!Base_term.S.t} used by the models for {!Components.S.State.t} and {!Components.S.Label.t}. Must have functions for equality, comparison and hashing. Can be derived from an {!Encoding.S}.
   *)
   type base
 
@@ -17,140 +17,23 @@ module type S = sig
   (** A {!Trees.S.t} {i (i.e., a [Set.S] of {!tree})}. *)
   type trees
 
-  (** [type t] of {!Constructor_bindings.S}. Only used in {!Info.Meta.t} to store information {i (in {!Info.Meta.RocqLTS.t})} that will be necessary when solving the {b Rocq} proofs in {!Mebi_plugin.Proof_solver}. {i {b Note:} This is the {b only} piece of information relating to {b Rocq} that makes it's way into this module, which we allow since since a model's [info.meta] field is always optional.}
+  (** [type t] of {!Constructor_bindings.S}. Only used in {!Components.S.Info.Meta.t} to store information {i (in {!Components.S.Info.Meta.RocqLTS.t})} that will be necessary when solving the {b Rocq} proofs in {!Mebi_plugin.Proof_solver}. {i {b Note:} This is the {b only} piece of information relating to {b Rocq} that makes it's way into this module, which we allow since since a model's [info.meta] field is always optional.}
   *)
   type constructorbindings
 
-  (** {1 Model Components} *)
+  (** {1 Model Components}
 
-  (** {2 States} *)
-
-  (** A {!State} is essnetially just {!base}. *)
-  module State : State.S with type base = base
-
-  (** {!States} is a [Set.S] of {!State.t} and contains other useful functions.
+      [State], [States], [Label], [Labels], [Note], [Annotation],
+      [Annotations], [Transition], [Transitions], [Action], [Actions],
+      [ActionPair], [ActionPairs], [ActionMap], [Edge], [Edges], [EdgeMap],
+      [Partition] and [Info] -- see {!Components.S} for each.
   *)
-  module States : States.S with type elt = State.t
-
-  (** {2 Labels} *)
-
-  (** A {!Label.t} has a {!base} in addition to {!Label.t.is_silent}. *)
-  module Label : Label.S with type base = base
-
-  (** {!Labels} is a [Set.S] of {!Label.t} and contains other useful functions.
-  *)
-  module Labels : Labels.S with type elt = Label.t
-
-  (** {2 Actions, Transition & Edges} *)
-
-  (** {3 Annotations} *)
-
-  module Note :
-    Annotation_note.S
-    with type state = State.t
-     and type label = Label.t
-     and type trees = trees
-
-  module Annotation :
-    Annotation.S with type label = Label.t and type note = Note.t
-
-  (** {!Annotations} is a [Set.S] of {!Annotation.t} and contains other useful functions.
-  *)
-  module Annotations : Annotations.S with type elt = Annotation.t
-
-  (** {3 Transitions} *)
-
-  (** {!Transition} ... *)
-  module Transition :
-    Transition.S
-    with type state = State.t
-     and type label = Label.t
-     and type tree = tree
-     and type annotation = Annotation.t
-
-  (** {!Transitions} is a [Set.S] of {!Transition.t} and contains other useful functions.
-  *)
-  module Transitions :
-    Transitions.S with type elt = Transition.t and type labels = Labels.t
-
-  (** {3 Actions} *)
-
-  (** {!Action} ... *)
-  module Action :
-    Action.S
-    with type label = Label.t
-     and type annotation = Annotation.t
-     and type trees = trees
-
-  module Actions :
-    Actions.S
-    with type elt = Action.t
-     and type label = Label.t
-     and type labels = Labels.t
-
-  (** {4 ActionPairs} *)
-
-  (** {!ActionPair} ... *)
-  module ActionPair :
-    Actionpair.S with type action = Action.t and type states = States.t
-
-  module ActionPairs :
-    Actionpairs.S with type states = States.t and type elt = ActionPair.t
-
-  (** {4 ActionMap} *)
-
-  (** {!ActionMap} ... *)
-  module ActionMap :
-    Actionmap.S
-    with type label = Label.t
-     and type action = Action.t
-     and type actions = Actions.t
-     and type states = States.t
-     and type actionpairs = ActionPairs.t
-
-  (** {3 Edges} *)
-
-  (** {!Edge} ... *)
-  module Edge :
-    Edge.S
-    with type state = State.t
-     and type label = Label.t
-     and type action = Action.t
-
-  module Edges : Edges.S with type elt = Edge.t and type label = Edge.label
-
-  (** {4 EdgeMap} *)
-
-  (** {!EdgeMap} ... *)
-  module EdgeMap :
-    Edgemap.S
-    with type state = State.t
-     and type states = States.t
-     and type label = Label.t
-     and type transitions = Transitions.t
-     and type action = Action.t
-     and type actions = Actions.t
-     and type actionmap = ActionMap.t'
-     and type edges = Edges.t
-
-  (** {2 State Partitions} *)
-
-  (** {!Partition} ... *)
-  module Partition :
-    State_partition.S
-    with type elt = States.t
-     and type state = State.t
-     and type label = Label.t
-     and type edgemap = EdgeMap.t'
-
-  (** {2 Info} *)
-
-  (** {!Info} ... *)
-  module Info :
-    Info.S
-    with type base = base
-     and type constructorbindings = constructorbindings
-     and type labels = Labels.t
+  include
+    Components.S
+    with type base := base
+     and type tree := tree
+     and type trees := trees
+     and type constructorbindings := constructorbindings
 
   (** {1 Models} *)
 
@@ -183,8 +66,6 @@ module type S = sig
 
   (** {!Saturation} provides {!Saturation.edges} which returns a saturated {!EdgeMap.t'} and a {!States.t} of now-terminating states. {i {b Note:} See {!FSM.saturate}.}
   *)
-
-  (** {i See {!FSM.saturate}.} *)
   module Saturation :
     Saturation.S
     with type state = State.t
@@ -218,13 +99,12 @@ module type S = sig
      and type fsm = FSM.t
 end
 
-(** Make A *)
+(** Builds a model from a term's [base] representation, plus a source of constructor-bindings used for the proof solver. *)
 module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
   S
   with type base = Base.t
    and type tree = Base.Tree.t
    and type trees = Base.Trees.t
    and type constructorbindings = ConstructorBindings.k
-(** Make B *)
 
 (** @author Jonah Pears *)

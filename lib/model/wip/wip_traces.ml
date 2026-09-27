@@ -8,10 +8,9 @@ module type S = sig
 end
 
 module Make
-    (Base : Base_term.S)
-    (State : State.S with type base = Base.t)
-    (WIP : Wip_annotation.S with type state = State.t)
-    (Trace : Wip_trace.S with type state = State.t and type wip = WIP.t) :
+    (C : Components.S)
+    (WIP : Wip_annotation.S with type state = C.State.t)
+    (Trace : Wip_trace.S with type state = C.State.t and type wip = WIP.t) :
   S with type elt = Trace.t and type wip = WIP.t = struct
   type wip = WIP.t
 

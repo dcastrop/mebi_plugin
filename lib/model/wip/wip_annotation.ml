@@ -25,28 +25,22 @@ module type S = sig
 end
 
 (** [module WIP] is a lightweight counterpart of [Note.t] that forms some "work-in-progress" [Annotation.t]. Once we stop saturating an action, we check if we are able to yield a new saturated action and convert the [wip list] to an [Annotation.t].
+    Takes [Base] directly (rather than only [Components.S]) because its own
+    record needs [Base.Trees] operations that [Components.S] deliberately
+    keeps abstract.
 *)
-module Make
-    (Base : Base_term.S)
-    (State : State.S with type base = Base.t)
-    (Label : Label.S with type base = Base.t)
-    (Note :
-       Annotation_note.S
-       with type state = State.t
-        and type label = Label.t
-        and type trees = Base.Trees.t)
-    (Annotation : Annotation.S with type label = Label.t and type note = Note.t)
-    (Action :
-       Action.S
-       with type label = Label.t
-        and type annotation = Annotation.t
-        and type trees = Base.Trees.t) :
+module Make (Base : Base_term.S) (C : Components.S with type trees = Base.Trees.t) :
   S
-  with type state = State.t
-   and type label = Label.t
-   and type annotation = Annotation.t
-   and type trees = Base.Trees.t
-   and type action = Action.t = struct
+  with type state = C.State.t
+   and type label = C.Label.t
+   and type annotation = C.Annotation.t
+   and type trees = C.trees
+   and type action = C.Action.t = struct
+  module State = C.State
+  module Label = C.Label
+  module Annotation = C.Annotation
+  module Action = C.Action
+
   type state = State.t
   type label = Label.t
   type trees = Base.Trees.t
