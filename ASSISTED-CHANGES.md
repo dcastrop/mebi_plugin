@@ -456,6 +456,41 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-27 — ocamlformat the functor-collapse drift
+
+- **Tooling.** `lib/model/components.ml`, `model.mli`,
+  `wip/wip_annotation.ml`/`.mli` and `algorithms/saturation.ml`/`.mli` had
+  never been run through `ocamlformat` since the three-commit
+  functor-collapse/rename/`Thing`-unification refactor landed on this
+  branch — `dune build @lib/model/fmt` reported a diff for all six,
+  `components.ml`'s alone touching ~1800 of its 1565 lines (everything
+  below `State` inside the `Impl` submodule sat one indent level too
+  shallow). Ran `dune build @lib/model/fmt --auto-promote`; purely
+  whitespace/line-wrapping, no AST change.
+- While scoping this, found unrelated pre-existing `@fmt` drift outside
+  `lib/model` — `lib/rocq_tools/rocq_monad.mli`, `rocq_monad_utils.ml`,
+  `theories.ml`; `lib/showable/thing.ml`; `src/proof_solver_wrapper.ml`,
+  `proof_solver_step.ml`, `proof_solver.ml`, `graph_extract_lts.ml`,
+  `graph_type.ml`; `test/tests.ml`. Not part of the functor-collapse
+  refactor this branch is otherwise about, and not touched here — left
+  as a separate backlog item (see Outstanding).
+
+**Verification:** `dune build @lib/model/fmt` clean afterward. `dune build`
+and `dune exec test/tests.exe` (9/9) both pass. Since this touches files
+the proof solver reads, also ran the full five-file proof-solver baseline
+(`-j1` per file, per `CLAUDE.md`'s procedure) rather than relying on
+`tests.exe` alone: `Proc/Test1` 114/105/106/109/22/21, `Proc/Test2`
+446/278/299/194/446/182, `CADP/Size1/MutualExclusion` 268/396,
+`CADP/Size1/Glued` 268/396, `CADP/Size1/Glued/MutualExclusion` 81/63 — all
+18 counts match the current baseline exactly, confirming the reformat is
+behaviour-preserving. `_CoqProject` restored and `make dune` run
+afterward.
+
+**Session tally:** Tooling 1 · Bug fix 0 · Docs 0 · Refactor 0 ·
+Optimization 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
@@ -465,6 +500,7 @@ Optimization 0 · **New feature 0.**
 - ~~The "Verification baseline" table below (`268`/`396` for `CADP/Size1/MutualExclusion` and `CADP/Size1/Glued`) doesn't match the bounds checked into those files (`267`/`395`).~~ Resolved, 2026-09-27 (see above): `Proof_solver.solve` permits one step beyond its nominal bound, so this is expected behaviour, not a discrepancy.
 - ~~`_CoqProject:53` comments out `examples/Bisimilarity/Proc/Test4/PluginProofs.v` by name, but the file doesn't exist on disk. Separately, `Proc/Test3/PluginProofs.v` has two duplicate example names.~~ Both addressed 2026-09-27 (see above): the Test3 duplicates are renamed (not build-verified — see the caveat there), and the `_CoqProject` comment for Test4 now says plainly that the file was never written, rather than implying it exists. Writing an actual `Proc/Test4/PluginProofs.v` remains undone.
 - `lib/showable/` and `lib/json/` were never added to `_CoqProject` when introduced (2026-09-26), so only `dune build` ever compiled them — `make` silently skipped both libraries entirely. Fixed in `e037c18`, 2026-09-27, as a side effect of `lib/model/components.ml` becoming their first real consumer; see below for what that uncovered.
+- **New, 2026-09-27.** `@fmt` drift outside `lib/model` (unrelated to this branch's refactor, so left alone when the functor-collapse drift was fixed above): `lib/rocq_tools/rocq_monad.mli`, `rocq_monad_utils.ml`, `theories.ml`; `lib/showable/thing.ml`; `src/proof_solver_wrapper.ml`, `proof_solver_step.ml`, `proof_solver.ml`, `graph_extract_lts.ml`, `graph_type.ml`; `test/tests.ml`. Some of these (`proof_solver*`) would need the full proof-solver baseline re-run if formatted, per the usual policy.
 
 Working notes live in `notes/` (local only, excluded via `.git/info/exclude`, so
 not present in a fresh clone). Note 1 is done; its analysis was incomplete on two

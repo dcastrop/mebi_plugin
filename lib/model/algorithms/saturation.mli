@@ -102,7 +102,9 @@ module type S = sig
   val edges : labels -> states -> edgemap -> edgemap * states
 end
 
-module Make (Base : Base_term.S) (C : Components.S with type trees = Base.Trees.t) :
+module Make
+    (Base : Base_term.S)
+    (C : Components.S with type trees = Base.Trees.t) :
   S
   with type state = C.State.t
    and type states = C.State.Set.t
