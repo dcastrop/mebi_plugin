@@ -14,16 +14,16 @@ module type S = sig
   module LTS :
     LTS.S
     with type state = State.t
-     and type states = States.t
-     and type labels = Labels.t
-     and type transitions = Transitions.t
+     and type states = State.Set.t
+     and type labels = Label.Set.t
+     and type transitions = Transition.Set.t
      and type info = Info.t
 
   module FSM :
     FSM.S
     with type state = State.t
-     and type states = States.t
-     and type labels = Labels.t
+     and type states = State.Set.t
+     and type labels = Label.Set.t
      and type edgemap = EdgeMap.t'
      and type info = Info.t
      and type lts = LTS.t
@@ -31,23 +31,23 @@ module type S = sig
   module Saturation :
     Saturation.S
     with type state = State.t
-     and type states = States.t
-     and type labels = Labels.t
+     and type states = State.Set.t
+     and type labels = Label.Set.t
      and type edgemap = EdgeMap.t'
 
   module Minimization :
     Minimization.S
     with type state = State.t
-     and type states = States.t
+     and type states = State.Set.t
      and type label = Label.t
-     and type labels = Labels.t
+     and type labels = Label.Set.t
      and type edgemap = EdgeMap.t'
      and type partition = Partition.t
      and type fsm = FSM.t
 
   module Bisimilarity :
     Bisimilarity.S
-    with type states = States.t
+    with type states = State.Set.t
      and type partition = Partition.t
      and type fsm = FSM.t
 end

@@ -50,39 +50,39 @@ let transition (from : int) (l : M.Label.t) (goto : int) : M.Transition.t =
 ;;
 
 let info () : M.Info.t =
-  { meta = None; weak_labels = M.Labels.empty; nums = None }
+  { meta = None; weak_labels = M.Label.Set.empty; nums = None }
 ;;
 
 (** Builds an LTS from a transition list, deriving the state set, alphabet and
     terminals rather than requiring the caller to keep them in sync. *)
 let lts (init : int) (ts : M.Transition.t list) : M.LTS.t =
   let transitions =
-    List.fold_left (fun acc t -> M.Transitions.add t acc) M.Transitions.empty ts
+    List.fold_left (fun acc t -> M.Transition.Set.add t acc) M.Transition.Set.empty ts
   in
   let states =
     List.fold_left
       (fun acc (t : M.Transition.t) ->
-        M.States.add t.from (M.States.add t.goto acc))
-      M.States.empty
+        M.State.Set.add t.from (M.State.Set.add t.goto acc))
+      M.State.Set.empty
       ts
   in
   let alphabet =
     List.fold_left
-      (fun acc (t : M.Transition.t) -> M.Labels.add t.label acc)
-      M.Labels.empty
+      (fun acc (t : M.Transition.t) -> M.Label.Set.add t.label acc)
+      M.Label.Set.empty
       ts
   in
   let sources =
     List.fold_left
-      (fun acc (t : M.Transition.t) -> M.States.add t.from acc)
-      M.States.empty
+      (fun acc (t : M.Transition.t) -> M.State.Set.add t.from acc)
+      M.State.Set.empty
       ts
   in
   { init = Some (state init)
   ; alphabet
   ; states
   ; transitions
-  ; terminals = M.States.diff states sources
+  ; terminals = M.State.Set.diff states sources
   ; info = info ()
   }
 ;;
@@ -171,8 +171,8 @@ let test_of_lts_preserves_states () : unit =
   let f = M.FSM.of_lts l in
   check_int
     "state count preserved"
-    (M.States.cardinal l.states)
-    (M.States.cardinal f.states);
+    (M.State.Set.cardinal l.states)
+    (M.State.Set.cardinal f.states);
   check "init preserved" true (Option.equal M.State.equal l.init f.init)
 ;;
 
@@ -183,8 +183,8 @@ let test_saturate_no_tau () : unit =
   let s = M.FSM.saturate f in
   check_int
     "state count unchanged"
-    (M.States.cardinal f.states)
-    (M.States.cardinal s.states)
+    (M.State.Set.cardinal f.states)
+    (M.State.Set.cardinal s.states)
 ;;
 
 (** Saturation across a silent step must keep every original state. *)
@@ -194,8 +194,8 @@ let test_saturate_with_tau () : unit =
   let s = M.FSM.saturate f in
   check_int
     "state count unchanged by saturation"
-    (M.States.cardinal f.states)
-    (M.States.cardinal s.states)
+    (M.State.Set.cardinal f.states)
+    (M.State.Set.cardinal s.states)
 ;;
 
 (** Minimising an already-minimal system must not lose states. *)
@@ -206,7 +206,7 @@ let test_minimize () : unit =
   check
     "minimal system keeps at least one state"
     true
-    (M.States.cardinal m.states > 0)
+    (M.State.Set.cardinal m.states > 0)
 ;;
 
 (** The JSON round-trip that [Json.S] provides for every model type. *)

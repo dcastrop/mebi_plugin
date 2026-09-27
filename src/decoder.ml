@@ -70,18 +70,18 @@ module Make
   S
   with type enc = Enc.t
    and type state = Model.State.t
-   and type states = Model.States.t
+   and type states = Model.State.Set.t
    and type partition = Model.Partition.t
    and type label = Model.Label.t
-   and type labels = Model.Labels.t
+   and type labels = Model.Label.Set.t
    and type note = Model.Note.t
    and type annotation = Model.Annotation.t
-   and type annotations = Model.Annotations.t
+   and type annotations = Model.Annotation.Set.t
    and type transition = Model.Transition.t
-   and type transitions = Model.Transitions.t
+   and type transitions = Model.Transition.Set.t
    and type action = Model.Action.t
-   and type actions = Model.Actions.t
-   and type actionmap = Model.ActionMap.t'
+   and type actions = Model.Action.Set.t
+   and type actionmap = Model.Action.Map.t'
    and type edgemap = Model.EdgeMap.t'
    and type rocqlts = Model.Info.Meta.RocqLTS.t
    and type info = Model.Info.t
@@ -91,18 +91,18 @@ module Make
    and type bisimilarity = Model.Bisimilarity.t = struct
   type enc = Enc.t
   type state = Model.State.t
-  type states = Model.States.t
+  type states = Model.State.Set.t
   type partition = Model.Partition.t
   type label = Model.Label.t
-  type labels = Model.Labels.t
+  type labels = Model.Label.Set.t
   type note = Model.Note.t
   type annotation = Model.Annotation.t
-  type annotations = Model.Annotations.t
+  type annotations = Model.Annotation.Set.t
   type transition = Model.Transition.t
-  type transitions = Model.Transitions.t
+  type transitions = Model.Transition.Set.t
   type action = Model.Action.t
-  type actions = Model.Actions.t
-  type actionmap = Model.ActionMap.t'
+  type actions = Model.Action.Set.t
+  type actionmap = Model.Action.Map.t'
   type edgemap = Model.EdgeMap.t'
   type rocqlts = Model.Info.Meta.RocqLTS.t
   type info = Model.Info.t
@@ -195,7 +195,7 @@ module Make
     end)
 
   module States = Json.Set.Make (struct
-      module Set = Model.States
+      module Set = Model.State.Set
 
       let name = "States"
       let json = State.json
@@ -223,7 +223,7 @@ module Make
     end)
 
   module Labels = Json.Set.Make (struct
-      module Set = Model.Labels
+      module Set = Model.Label.Set
 
       let name = "Labels"
       let json = Label.json
@@ -261,7 +261,7 @@ module Make
     end)
 
   module Annotations = Json.Set.Make (struct
-      module Set = Model.Annotations
+      module Set = Model.Annotation.Set
 
       let name = "Annotations"
       let json = Annotation.json
@@ -284,7 +284,7 @@ module Make
     end)
 
   module Transitions = Json.Set.Make (struct
-      module Set = Model.Transitions
+      module Set = Model.Transition.Set
 
       let name = "Transitions"
       let json = Transition.json
@@ -307,15 +307,15 @@ module Make
   module ActionMap =
     Json.Map.Make
       (struct
-        module Map = Model.ActionMap
+        module Map = Model.Action.Map
 
-        type value = Model.States.t
+        type value = Model.State.Set.t
 
         let name = "ActionMap"
       end)
       (Model.Action)
       (struct
-        include Model.States
+        include Model.State.Set
 
         let name = "Destinations"
       end)
@@ -325,7 +325,7 @@ module Make
       (struct
         module Map = Model.EdgeMap
 
-        type value = Model.ActionMap.t'
+        type value = Model.Action.Map.t'
 
         let name = "EdgeMap"
       end)

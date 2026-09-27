@@ -26,7 +26,7 @@ open Mebi_plugin
 let m1 : Fsm.t =
   { init = Some (Mebi_wrapper.Enc.of_int 1, None)
   ; terminals =
-      Model.States.of_list
+      Model.State.Set.of_list
         [ Mebi_wrapper.Enc.of_int 5, None; Mebi_wrapper.Enc.of_int 6, None ]
   ; alphabet =
       Model.Alphabet.of_list
@@ -37,7 +37,7 @@ let m1 : Fsm.t =
         ; Mebi_wrapper.Enc.of_int 11, (Some "d", Some false)
         ]
   ; states =
-      Model.States.of_list
+      Model.State.Set.of_list
         [ Mebi_wrapper.Enc.of_int 1, None
         ; Mebi_wrapper.Enc.of_int 2, None
         ; Mebi_wrapper.Enc.of_int 3, None
@@ -79,7 +79,7 @@ let m1 : Fsm.t =
 let m2 : Fsm.t =
   { init = Some (Mebi_wrapper.Enc.of_int 1, None)
   ; terminals =
-      Model.States.of_list
+      Model.State.Set.of_list
         [ Mebi_wrapper.Enc.of_int 5, None; Mebi_wrapper.Enc.of_int 6, None ]
   ; alphabet =
       Model.Alphabet.of_list
@@ -93,7 +93,7 @@ let m2 : Fsm.t =
         ; Mebi_wrapper.Enc.of_int 14, (Some "t", Some true)
         ]
   ; states =
-      Model.States.of_list
+      Model.State.Set.of_list
         [ Mebi_wrapper.Enc.of_int 1, None
         ; Mebi_wrapper.Enc.of_int 2, None
         ; Mebi_wrapper.Enc.of_int 3, None

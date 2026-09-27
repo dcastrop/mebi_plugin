@@ -36,7 +36,7 @@ end
 module Make (C : Components.S) :
   S
   with type state = C.State.t
-   and type states = C.States.t
-   and type labels = C.Labels.t
-   and type transitions = C.Transitions.t
+   and type states = C.State.Set.t
+   and type labels = C.Label.Set.t
+   and type transitions = C.Transition.Set.t
    and type info = C.Info.t

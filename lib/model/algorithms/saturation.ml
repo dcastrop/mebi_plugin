@@ -92,25 +92,25 @@ end
 module Make (Base : Base_term.S) (C : Components.S with type trees = Base.Trees.t) :
   S
   with type state = C.State.t
-   and type states = C.States.t
+   and type states = C.State.Set.t
    and type label = C.Label.t
-   and type labels = C.Labels.t
+   and type labels = C.Label.Set.t
    and type annotation = C.Annotation.t
    and type trees = C.trees
    and type action = C.Action.t
-   and type actionpairs = C.ActionPairs.t
-   and type actionmap = C.ActionMap.t'
+   and type actionpairs = C.Action.Pair.Set.t
+   and type actionmap = C.Action.Map.t'
    and type edgemap = C.EdgeMap.t' = struct
   module State = C.State
-  module States = C.States
+  module States = C.State.Set
   module Label = C.Label
-  module Labels = C.Labels
+  module Labels = C.Label.Set
   module Annotation = C.Annotation
-  module Annotations = C.Annotations
+  module Annotations = C.Annotation.Set
   module Action = C.Action
-  module ActionPair = C.ActionPair
-  module ActionPairs = C.ActionPairs
-  module ActionMap = C.ActionMap
+  module ActionPair = C.Action.Pair
+  module ActionPairs = C.Action.Pair.Set
+  module ActionMap = C.Action.Map
   module EdgeMap = C.EdgeMap
 
   type state = State.t

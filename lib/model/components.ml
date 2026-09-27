@@ -364,10 +364,25 @@ module type S = sig
   type trees
   type constructorbindings
 
-  module State : State_sig with type base = base
-  module States : States_sig with type elt = State.t
-  module Label : Label_sig with type base = base
-  module Labels : Labels_sig with type elt = Label.t
+  (* Each element type is grouped with its own Set/Map/Pair, e.g. [State.Set]
+     where the old flat design had a separate [States] module. [EdgeMap] and
+     [Partition] stay standalone: [EdgeMap] and [Action.Map] are mutually
+     dependent (each stores the other's [t]/[t'] as a value), which cannot be
+     expressed if either is nested inside its own key type's module -- doing
+     so would require [State] to be declared both before [Note]/[Transition]/
+     [Edge] (which need its bare type) and after [Action]/[Transition]/[Edge]
+     (which [State.Map] would need), an ordering cycle ordinary (non-[rec])
+     module signatures cannot express. *)
+
+  module State : sig
+    include State_sig with type base = base
+    module Set : States_sig with type elt = t
+  end
+
+  module Label : sig
+    include Label_sig with type base = base
+    module Set : Labels_sig with type elt = t
+  end
 
   module Note :
     Annotation_note_sig
@@ -375,69 +390,75 @@ module type S = sig
      and type label = Label.t
      and type trees = trees
 
-  module Annotation :
-    Annotation_sig with type label = Label.t and type note = Note.t
+  module Annotation : sig
+    include Annotation_sig with type label = Label.t and type note = Note.t
+    module Set : Annotations_sig with type elt = t
+  end
 
-  module Annotations : Annotations_sig with type elt = Annotation.t
+  module Transition : sig
+    include
+      Transition_sig
+      with type state = State.t
+       and type label = Label.t
+       and type tree = tree
+       and type annotation = Annotation.t
 
-  module Transition :
-    Transition_sig
-    with type state = State.t
-     and type label = Label.t
-     and type tree = tree
-     and type annotation = Annotation.t
+    module Set : Transitions_sig with type elt = t and type labels = Label.Set.t
+  end
 
-  module Transitions :
-    Transitions_sig with type elt = Transition.t and type labels = Labels.t
+  module Action : sig
+    include
+      Action_sig
+      with type label = Label.t
+       and type annotation = Annotation.t
+       and type trees = trees
 
-  module Action :
-    Action_sig
-    with type label = Label.t
-     and type annotation = Annotation.t
-     and type trees = trees
+    module Set :
+      Actions_sig
+      with type elt = t
+       and type label = Label.t
+       and type labels = Label.Set.t
 
-  module Actions :
-    Actions_sig
-    with type elt = Action.t
-     and type label = Label.t
-     and type labels = Labels.t
+    module Pair : sig
+      include
+        Actionpair_sig with type action = t and type states = State.Set.t
 
-  module ActionPair :
-    Actionpair_sig with type action = Action.t and type states = States.t
+      module Set : Actionpairs_sig with type states = State.Set.t and type elt = t
+    end
 
-  module ActionPairs :
-    Actionpairs_sig with type states = States.t and type elt = ActionPair.t
+    module Map :
+      Actionmap_sig
+      with type label = Label.t
+       and type action = t
+       and type actions = Set.t
+       and type states = State.Set.t
+       and type actionpairs = Pair.Set.t
+  end
 
-  module ActionMap :
-    Actionmap_sig
-    with type label = Label.t
-     and type action = Action.t
-     and type actions = Actions.t
-     and type states = States.t
-     and type actionpairs = ActionPairs.t
+  module Edge : sig
+    include
+      Edge_sig
+      with type state = State.t
+       and type label = Label.t
+       and type action = Action.t
 
-  module Edge :
-    Edge_sig
-    with type state = State.t
-     and type label = Label.t
-     and type action = Action.t
-
-  module Edges : Edges_sig with type elt = Edge.t and type label = Edge.label
+    module Set : Edges_sig with type elt = t and type label = Label.t
+  end
 
   module EdgeMap :
     Edgemap_sig
     with type state = State.t
-     and type states = States.t
+     and type states = State.Set.t
      and type label = Label.t
-     and type transitions = Transitions.t
+     and type transitions = Transition.Set.t
      and type action = Action.t
-     and type actions = Actions.t
-     and type actionmap = ActionMap.t'
-     and type edges = Edges.t
+     and type actions = Action.Set.t
+     and type actionmap = Action.Map.t'
+     and type edges = Edge.Set.t
 
   module Partition :
     State_partition_sig
-    with type elt = States.t
+    with type elt = State.Set.t
      and type state = State.t
      and type label = Label.t
      and type edgemap = EdgeMap.t'
@@ -446,7 +467,7 @@ module type S = sig
     Info_sig
     with type base = base
      and type constructorbindings = constructorbindings
-     and type labels = Labels.t
+     and type labels = Label.Set.t
 end
 
 module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
@@ -460,9 +481,15 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
   type trees = Base.Trees.t
   type constructorbindings = ConstructorBindings.k
 
-  module State = struct
-    type base = Base.t
-    type t = { base : base }
+  (* Wrapped in its own module so the flat, mutually-referential component
+     bodies below (unchanged from the pre-nesting design) can be regrouped
+     under State/Label/Annotation/Transition/Action/Edge afterwards without
+     a "multiple definition of module X" clash -- accessed here via
+     [Impl.State], not the bare name [State]. *)
+  module Impl = struct
+    module State = struct
+      type base = Base.t
+      type t = { base : base }
 
     include Json.Thing.Make (struct
         type k = t
@@ -1515,4 +1542,48 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
       }
     ;;
   end
+  end
+
+  module State = struct
+    include Impl.State
+    module Set = Impl.States
+  end
+
+  module Label = struct
+    include Impl.Label
+    module Set = Impl.Labels
+  end
+
+  module Note = Impl.Note
+
+  module Annotation = struct
+    include Impl.Annotation
+    module Set = Impl.Annotations
+  end
+
+  module Transition = struct
+    include Impl.Transition
+    module Set = Impl.Transitions
+  end
+
+  module Action = struct
+    include Impl.Action
+    module Set = Impl.Actions
+
+    module Pair = struct
+      include Impl.ActionPair
+      module Set = Impl.ActionPairs
+    end
+
+    module Map = Impl.ActionMap
+  end
+
+  module Edge = struct
+    include Impl.Edge
+    module Set = Impl.Edges
+  end
+
+  module EdgeMap = Impl.EdgeMap
+  module Partition = Impl.Partition
+  module Info = Impl.Info
 end

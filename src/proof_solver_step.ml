@@ -93,15 +93,15 @@ struct
     exception
       CouldNotFind_State of
         { x : EConstr.t
-        ; states : Model.States.t
+        ; states : Model.State.Set.t
         }
 
-    let state (x : EConstr.t) (ys : Model.States.t) : Model.State.t M.mm =
+    let state (x : EConstr.t) (ys : Model.State.Set.t) : Model.State.t M.mm =
       Logger.trace __FUNCTION__;
       try
         let enc : Enc.t = M.get_encoding x in
-        (* NOTE: [Model.States.compare] only cares about [base]. *)
-        Model.States.find { base = enc } ys |> M.return
+        (* NOTE: [Model.State.Set.compare] only cares about [base]. *)
+        Model.State.Set.find { base = enc } ys |> M.return
       with
       | M.EncodingNotFound _ ->
         log_econstr ~__FUNCTION__ ~s:"Err: M.EncodingNotFound" x;
@@ -109,7 +109,7 @@ struct
       | Not_found -> raise (CouldNotFind_State { x; states = ys })
     ;;
 
-    let _state_opt (x : EConstr.t) (ys : Model.States.t)
+    let _state_opt (x : EConstr.t) (ys : Model.State.Set.t)
       : Model.State.t option M.mm
       =
       Logger.trace __FUNCTION__;
@@ -124,14 +124,14 @@ struct
     exception
       CouldNotFind_Label of
         { x : EConstr.t
-        ; alphabet : Model.Labels.t
+        ; alphabet : Model.Label.Set.t
         }
 
-    let label (x : EConstr.t) (ys : Model.Labels.t) : Model.Label.t M.mm =
+    let label (x : EConstr.t) (ys : Model.Label.Set.t) : Model.Label.t M.mm =
       Logger.trace __FUNCTION__;
       let f (enc : Enc.t) : Model.Label.t M.mm =
-        (* NOTE: [Model.Labels.compare] only cares about [is_silent=Some _] *)
-        Model.Labels.find { base = enc; is_silent = None } ys |> M.return
+        (* NOTE: [Model.Label.Set.compare] only cares about [is_silent=Some _] *)
+        Model.Label.Set.find { base = enc; is_silent = None } ys |> M.return
       in
       try M.get_encoding x |> f with
       | M.EncodingNotFound _ ->
@@ -154,7 +154,7 @@ struct
               raise (CouldNotFind_Label { x; alphabet = ys })))
     ;;
 
-    let _label_opt (x : EConstr.t) (ys : Model.Labels.t)
+    let _label_opt (x : EConstr.t) (ys : Model.Label.Set.t)
       : Model.Label.t option M.mm
       =
       Logger.trace __FUNCTION__;
@@ -182,19 +182,19 @@ struct
       : Model.Transition.t
       =
       Logger.trace __FUNCTION__;
-      (* TODO: export some of this to the [Model.ActionMap] ? *)
+      (* TODO: export some of this to the [Model.Action.Map] ? *)
       let actions = Model.EdgeMap.find edges from in
-      let labelled = Model.ActionMap.reduce_by_label actions label in
-      if Model.ActionMap.length labelled |> Int.equal 0
+      let labelled = Model.Action.Map.reduce_by_label actions label in
+      if Model.Action.Map.length labelled |> Int.equal 0
       then raise (CouldNotFind_Transition { from; goto; label; edges })
       else (
         let actionpairs =
-          Model.ActionMap.to_seq labelled
+          Model.Action.Map.to_seq labelled
           |> List.of_seq
           |> List.filter
                (fun
-                   ((action, destinations) : Model.Action.t * Model.States.t) ->
-               Model.States.mem goto destinations)
+                   ((action, destinations) : Model.Action.t * Model.State.Set.t) ->
+               Model.State.Set.mem goto destinations)
         in
         match actionpairs with
         | [] -> raise (CouldNotFind_Transition { from; goto; label; edges })
@@ -567,7 +567,7 @@ struct
 
   let try_get_visible_transition
         ?(saturated : bool = false)
-        (bisimilar : Model.States.t)
+        (bisimilar : Model.State.Set.t)
         (tys : EConstr.t array)
     : Model.Transition.t
     =
@@ -576,23 +576,23 @@ struct
     let from : Model.State.t = M.run (ReModel.state tys.(3) m.states) in
     let label : Model.Label.t = M.run (ReModel.label tys.(5) m.alphabet) in
     try
-      let ({ annotation; trees; _ }, destinations) : Model.ActionPair.t =
+      let ({ annotation; trees; _ }, destinations) : Model.Action.Pair.t =
         (* NOTE: get actions [from] with [label] *)
-        Model.ActionMap.reduce_by_label (Model.EdgeMap.find m.edges from) label
-        |> Model.ActionMap.to_actionpairs
+        Model.Action.Map.reduce_by_label (Model.EdgeMap.find m.edges from) label
+        |> Model.Action.Map.to_actionpairs
         (* NOTE: keep only those that are [bisimilar] *)
-        |> Model.ActionPairs.filter_map (fun ((x, y) : Model.ActionPair.t) ->
-          if Model.States.disjoint bisimilar y
+        |> Model.Action.Pair.Set.filter_map (fun ((x, y) : Model.Action.Pair.t) ->
+          if Model.State.Set.disjoint bisimilar y
           then None
-          else Some (x, Model.States.inter bisimilar y))
+          else Some (x, Model.State.Set.inter bisimilar y))
         (* NOTE: get the pair with the shortest annotation (less steps to do) *)
-        |> Model.ActionPairs.shortest_annotation
+        |> Model.Action.Pair.Set.shortest_annotation
       in
       let tree : Enc.Tree.t option = Enc.Trees.min_opt trees in
-      let goto : Model.State.t = Model.States.min_elt destinations in
+      let goto : Model.State.t = Model.State.Set.min_elt destinations in
       { from; goto; label; annotation; tree }
     with
-    | Model.ActionPairs.IsEmpty -> raise CouldNotFindGotoState
+    | Model.Action.Pair.Set.IsEmpty -> raise CouldNotFindGotoState
   ;;
 
   exception MisMatchedStates of (Model.State.t * Model.State.t)
@@ -617,7 +617,7 @@ struct
     =
     Logger.trace __FUNCTION__;
     (* log_econstr ~__FUNCTION__ ~s:"wk_trans" wk_trans; *)
-    let bisimilar : Model.States.t = W.get_bisimilar_states hyp.goto in
+    let bisimilar : Model.State.Set.t = W.get_bisimilar_states hyp.goto in
     (* log_states ~__FUNCTION__ "bisimilar" bisimilar; *)
     let open Syntax in
     let* ty, tys = to_atomic wk_trans in

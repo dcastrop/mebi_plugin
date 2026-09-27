@@ -28,26 +28,26 @@ module Make
     (LTS :
        LTS.S
        with type state = C.State.t
-        and type states = C.States.t
-        and type labels = C.Labels.t
+        and type states = C.State.Set.t
+        and type labels = C.Label.Set.t
         and type transitions = C.EdgeMap.transitions
         and type info = C.Info.t)
     (Saturation :
        Saturation.S
        with type state = C.State.t
-        and type states = C.States.t
-        and type labels = C.Labels.t
+        and type states = C.State.Set.t
+        and type labels = C.Label.Set.t
         and type edgemap = C.EdgeMap.t') :
   S
   with type state = C.State.t
-   and type states = C.States.t
-   and type labels = C.Labels.t
+   and type states = C.State.Set.t
+   and type labels = C.Label.Set.t
    and type edgemap = C.EdgeMap.t'
    and type info = C.Info.t
    and type lts = LTS.t = struct
   module State = C.State
-  module States = C.States
-  module Labels = C.Labels
+  module States = C.State.Set
+  module Labels = C.Label.Set
   module EdgeMap = C.EdgeMap
   module Info = C.Info
 

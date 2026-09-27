@@ -23,10 +23,10 @@ module type S = sig
 
   (** {1 Model Components}
 
-      [State], [States], [Label], [Labels], [Note], [Annotation],
-      [Annotations], [Transition], [Transitions], [Action], [Actions],
-      [ActionPair], [ActionPairs], [ActionMap], [Edge], [Edges], [EdgeMap],
-      [Partition] and [Info] -- see {!Components.S} for each.
+      [State] (with nested [Set]), [Label] (with [Set]), [Note], [Annotation]
+      (with [Set]), [Transition] (with [Set]), [Action] (with [Set], [Map]
+      and [Pair]), [Edge] (with [Set]), [EdgeMap], [Partition] and [Info] --
+      see {!Components.S} for each.
   *)
   include
     Components.S
@@ -43,9 +43,9 @@ module type S = sig
   module LTS :
     LTS.S
     with type state = State.t
-     and type states = States.t
-     and type labels = Labels.t
-     and type transitions = Transitions.t
+     and type states = State.Set.t
+     and type labels = Label.Set.t
+     and type transitions = Transition.Set.t
      and type info = Info.t
 
   (** {2 FSM} *)
@@ -54,8 +54,8 @@ module type S = sig
   module FSM :
     FSM.S
     with type state = State.t
-     and type states = States.t
-     and type labels = Labels.t
+     and type states = State.Set.t
+     and type labels = Label.Set.t
      and type edgemap = EdgeMap.t'
      and type info = Info.t
      and type lts = LTS.t
@@ -64,13 +64,13 @@ module type S = sig
 
   (** {2 Saturation} *)
 
-  (** {!Saturation} provides {!Saturation.edges} which returns a saturated {!EdgeMap.t'} and a {!States.t} of now-terminating states. {i {b Note:} See {!FSM.saturate}.}
+  (** {!Saturation} provides {!Saturation.edges} which returns a saturated {!EdgeMap.t'} and a {!State.Set.t} of now-terminating states. {i {b Note:} See {!FSM.saturate}.}
   *)
   module Saturation :
     Saturation.S
     with type state = State.t
-     and type states = States.t
-     and type labels = Labels.t
+     and type states = State.Set.t
+     and type labels = Label.Set.t
      and type edgemap = EdgeMap.t'
   (** {i See {!FSM.saturate}.} *)
 
@@ -81,20 +81,20 @@ module type S = sig
   module Minimization :
     Minimization.S
     with type state = State.t
-     and type states = States.t
+     and type states = State.Set.t
      and type label = Label.t
-     and type labels = Labels.t
+     and type labels = Label.Set.t
      and type edgemap = EdgeMap.t'
      and type partition = Partition.t
      and type fsm = FSM.t
 
   (** {2 Bisimilarity} *)
 
-  (** {!Bisimilarity} provides {!val:Bisimilarity.fsm} which takes two {!FSM.t}s and: (i) saturates them both (using {!FSM.saturate}); (ii) merges them into a single {!FSM.t} (using {!FSM.merge}); (iii) minimizes the merged FSM; and, (iv) splits the resulting {!Partition.t} into two {!States.t}, one containing states that originated in {b {i both}} FSMs {i (hence are {b bisimilar states})}, and another for {i non-bisimilar states} that only originate from a single state.
+  (** {!Bisimilarity} provides {!val:Bisimilarity.fsm} which takes two {!FSM.t}s and: (i) saturates them both (using {!FSM.saturate}); (ii) merges them into a single {!FSM.t} (using {!FSM.merge}); (iii) minimizes the merged FSM; and, (iv) splits the resulting {!Partition.t} into two {!State.Set.t}, one containing states that originated in {b {i both}} FSMs {i (hence are {b bisimilar states})}, and another for {i non-bisimilar states} that only originate from a single state.
   *)
   module Bisimilarity :
     Bisimilarity.S
-    with type states = States.t
+    with type states = State.Set.t
      and type partition = Partition.t
      and type fsm = FSM.t
 end
