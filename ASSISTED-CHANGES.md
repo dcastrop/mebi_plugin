@@ -338,13 +338,85 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-27 — Fix: CADP/Glued/MutualExclusion compose/create rename fallout
+
+Context: earlier the same day, this session's review flagged
+`examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v`'s
+"The reference compose was not found" failure as likely stale example code
+rather than a Rocq 9.2 regression, but left it unfixed as out of scope for
+that pass. Jonah recalled defining `compose`/`create` for the CADP terms
+and suspected a rename during the 9.2 port; asked for it to be traced back
+through history before trusting either the fix or the old baseline.
+
+- **Bug fix.** `compose (create N b)` was folded into `composition_create N
+  b` in `f850375` (2026-03-24, "discovered bug in CADP write_next, memory
+  out of bounds"), touching `examples/CADP.v`/`examples/CADP_Glued.v` — but
+  the last edit to this specific file (`87eec6f`, 2026-03-19) predates that
+  commit by five days, so it was never updated and has been broken ever
+  since. The rename also shifted the counting convention: old `create N b`
+  produced exactly `N` processes; new `sys_create N b` (which
+  `composition_create` wraps) recurses down to `0` inclusive, producing
+  `N + 1`. A second, independent shift did the same thing to
+  `make_spec_pid` in `93dda66` (2026-03-26, "debugging CADP size 2") — its
+  base case changed from `Nil` (0 pids) to `Pid 0 Nil` (1 pid), so
+  `make_spec N` also went from `N` pids to `N + 1`. Reconstructing the
+  historically-validated (82/64-iteration) 1-process test in the current
+  codebase's conventions needed *both* arguments dropped by one:
+  `compose (create 1 Protocol.P)` → `composition_create 0 Protocol.P`
+  (matching `examples/Bisimilarity/CADP/Size1/Terms.v`'s own `c1`), and
+  `make_spec 1` → `make_spec 0`. Verified with a targeted `make -j1` build:
+  `wsim_bigstep` solves in 81 iterations (bound 82, matching the file's own
+  "Iteration History" comment almost exactly), `wsim_spec_lts` in 63
+  (bound 64).
+- Blind alley, recorded for whoever next touches this file: renaming only
+  `compose`/`create` → `composition_create` without the index shift (i.e.
+  `composition_create 1 Protocol.P`, keeping `make_spec 1`) still
+  type-checks and is internally self-consistent with the *current*
+  codebase's conventions (both sides use "N" to mean "N+1
+  processes/pids") — so it isn't a compile error — but it's a 2-process
+  mutual-exclusion instance, not the 1-process one this file has always
+  tested, and its proof search ran 84+ minutes of CPU time without
+  converging before being stopped. Not confirmed whether it would
+  eventually solve or is a genuine second proof-explosion case; not
+  investigated further since the 1-process version is the intended test.
+- Also resolved, as a byproduct of debugging this with a clean `-j1`
+  rebuild: the "baseline discrepancy" flagged in this morning's review
+  entry (checked-in bounds of `267`/`395` for `CADP/Size1/MutualExclusion`
+  and `CADP/Size1/Glued` vs. a documented baseline of `268`/`396`) is not a
+  real discrepancy. `Proof_solver.solve`'s loop guard
+  (`src/proof_solver.ml:179`, stepping again on `Int.compare n bound = 0`
+  and only stopping once `n > bound`) permits one solver step beyond the
+  nominal bound before giving up, so `Solve 267` can genuinely report
+  "Solved after 268 iterations" and still succeed. Confirmed directly: a
+  clean `make -j1` rebuild of both files reproduces 268/396 exactly,
+  matching the documented baseline.
+
+**Verification:** `make -j1` targeted rebuilds (not `-j$(nproc)`, whose
+interleaved output cannot be reliably attributed to one file/proof —
+confirmed the hard way mid-session, after initially misreading an
+interleaved run as showing this file's proof exploring for 84+ minutes,
+which was actually a different, wrongly-indexed instance of the problem)
+of `CADP/Size1/Glued/MutualExclusion/PluginProofs.v` (fixed: 81/63, bound
+82/64), `CADP/Size1/MutualExclusion/PluginProofs.v` and
+`CADP/Size1/Glued/PluginProofs.v` (268/396 each, confirming the existing
+baseline is current and correct). `_CoqProject` restored to its original
+commented-out state and `make dune` run afterward. `CLAUDE.md`'s baseline
+table updated to the full 18-value set (previously 15, missing this file's
+two values plus a stray duplicate omission) and its "known unrelated
+failure" note removed, now that it's fixed.
+
+**Session tally:** Bug fix 1 · Docs 1 (folded into the same commit) ·
+Refactor 0 · Tooling 0 · Optimization 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
 - The term-equality problem in `ReModel` is unaddressed: goal terms are resolved to model elements by syntactic hashtable lookup, which can miss on evars, universe instances or local context.
 - ~~Collapsing the model component cluster (71 of `model.mli`'s 80 sharing constraints; `Saturation.Make` at 13 arguments) is deliberately deferred until after any hand refactoring of individual model components.~~ Done in `16bbe37`, 2026-09-27, together with a nested-submodule rename and a Showable/JSON-dump unification — see below.
-- `examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v` fails with "The reference compose was not found", raised in the `Example` statement before any `MeBi` command runs. **Update, 2026-09-27 review:** the failure is more likely stale/copy-pasted example code than a Rocq 9.2 regression — neither `compose` nor `create` (both used at `PluginProofs.v:40-47`) is defined anywhere in this repo's `.v` files, no import chain brings a stdlib `compose` into scope, and the only other occurrence of that exact expression is inside a never-compiled, fully block-commented draft proof in `examples/Bisimilarity/CADP/Properties/MutualExclusion.v:48-129`. Not fixed this session (out of scope — see the 2026-09-27 entry above).
-- **New, 2026-09-27 review.** The "Verification baseline" table below (`268`/`396` for `CADP/Size1/MutualExclusion` and `CADP/Size1/Glued`) doesn't match the bounds actually checked into those files today (`267`/`395` — see e.g. `CADP/Size1/MutualExclusion/PluginProofs.v:38,45`). Plausibly explained by the off-by-one bound-tightening documented in `src/proof_solver.ml:155-165` ("existing bounds all still hold — the requirement only ever got weaker") landing after this baseline was recorded, but that wasn't confirmed by an actual run this session. Needs a live `make` run to determine which number is current before trusting either the table or the `.v` files.
+- ~~`examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v` fails with "The reference compose was not found", raised in the `Example` statement before any `MeBi` command runs.~~ Fixed, 2026-09-27 (see above) — root cause was a rename this file missed, not a Rocq 9.2 regression.
+- ~~The "Verification baseline" table below (`268`/`396` for `CADP/Size1/MutualExclusion` and `CADP/Size1/Glued`) doesn't match the bounds checked into those files (`267`/`395`).~~ Resolved, 2026-09-27 (see above): `Proof_solver.solve` permits one step beyond its nominal bound, so this is expected behaviour, not a discrepancy.
 - **New, 2026-09-27 review.** `_CoqProject:53` comments out `examples/Bisimilarity/Proc/Test4/PluginProofs.v` by name, but the file doesn't exist on disk. Separately, the live (if uncommented) `Proc/Test3/PluginProofs.v` has two duplicate example names — `wsim_rp` declared twice instead of the second being `wsim_rs` (~lines 118/123), and `wsim_pr` likewise instead of `wsim_sr` (~line 134) — invisible today only because the file is commented out of `_CoqProject`.
 - `lib/showable/` and `lib/json/` were never added to `_CoqProject` when introduced (2026-09-26), so only `dune build` ever compiled them — `make` silently skipped both libraries entirely. Fixed in `e037c18`, 2026-09-27, as a side effect of `lib/model/components.ml` becoming their first real consumer; see below for what that uncovered.
 
@@ -355,7 +427,8 @@ points, both recorded in the 2026-08-18 entry above.
 ## Verification baseline
 
 Proof-solver iteration counts from the five `PluginProofs.v` marked `### Success`
-in `_CoqProject`, unchanged from `main` through `e037c18`. Recorded per file, in
+in `_CoqProject`, unchanged from `main` through `e037c18`, and complete as of
+`CADP/Size1/Glued/MutualExclusion`'s fix on 2026-09-27. Recorded per file, in
 emission order, because a sorted aggregate cannot tell two files apart:
 
 | file | counts |
@@ -364,12 +437,19 @@ emission order, because a sorted aggregate cannot tell two files apart:
 | `Proc/Test2` | 446 278 299 194 446 182 |
 | `CADP/Size1/MutualExclusion` | 268 396 |
 | `CADP/Size1/Glued` | 268 396 |
-| `CADP/Size1/Glued/MutualExclusion` | *(none — fails at `Example`, see below)* |
+| `CADP/Size1/Glued/MutualExclusion` | 81 63 |
 
-16 counts against 18 `Solve` commands in the sources; the missing two are
-`Glued/MutualExclusion`'s, never reached. To reproduce, build each file as its
-own `make -j1` target — `make -j$(nproc)` interleaves the concurrent `rocq`
-processes line by line and the counts cannot be attributed. Note that
-`make` enforces warnings (32, 50) that `dune build` accepts, and caught three
-failures during the 2026-08-17 session that `dune build` waved through — always
-finish with a `make` run, not just `dune build`.
+All 18 `Solve` commands in the sources now reached and accounted for. To
+reproduce, build each file as its own `make -j1` target — `make -j$(nproc)`
+interleaves the concurrent `rocq` processes line by line and the counts
+cannot be reliably attributed to one file this way (confirmed the hard way
+on 2026-09-27: a `-j$(nproc)` run's interleaved "Solved after 268/396
+iterations" lines were initially, and wrongly, attributed to
+`Glued/MutualExclusion` before a `-j1` rebuild showed those actually belong
+to its two siblings). Note also that `MeBi Sim Solve N` permits up to
+`N + 1` solver steps before giving up (see `src/proof_solver.ml`'s `solve`),
+so a checked-in bound one below its file's baseline count (as with
+`MutualExclusion`/`Glued` above, `Solve 267`/`Solve 395`) is expected, not
+a bug. `make` enforces warnings (32, 50) that `dune build` accepts, and
+caught three failures during the 2026-08-17 session that `dune build`
+waved through — always finish with a `make` run, not just `dune build`.

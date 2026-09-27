@@ -42,21 +42,26 @@ To run them:
 3. `make -j$(nproc)`.
 4. Compare the `(Stopped) Solved after N iterations.` lines against the
    known-good baseline (identical across `main` and every refactor commit so
-   far):
+   far), one entry per `MeBi Sim Solve` in the five files, 18 total:
    ```
-   21, 22, 105, 106, 109, 114, 182, 194, 268, 268, 278, 299, 396, 446, 446
+   21, 22, 63, 81, 105, 106, 109, 114, 182, 194, 268, 268, 278, 299, 396, 396, 446, 446
    ```
    A change to *classification* (Solved/Unsolved) is a regression. A change
    to iteration *count* needs an explanation (fewer is fine if it fixes a
-   real miss; more needs justifying).
+   real miss; more needs justifying). Note that `MeBi Sim Solve N` actually
+   permits up to `N + 1` solver steps before giving up (`solve`'s loop guard
+   in `src/proof_solver.ml` is `n <= bound`, not `n < bound`), so a checked-in
+   bound one below the reported "Solved after" count (e.g. `MutualExclusion`
+   and `Glued` both use `Solve 267`/`Solve 395` but report 268/396) is
+   expected, not a bug.
+   With `-j` above 1, `make` interleaves output from multiple files line by
+   line and individual `Solved after N` lines cannot be reliably attributed
+   to a proof by sequential reading — rebuild a single file with
+   `make -j1 <path>.vo` (after `rm -f <path>.vo <path>.glob` if it's already
+   built) when you need a trustworthy per-file count.
 5. Restore `_CoqProject` to its original state and run `make dune` — the
    in-tree `.vo`/`.cm*` artifacts `make` leaves behind otherwise break the
    next `dune build`.
-
-Known unrelated failure, not caused by any refactor: `CADP/Size1/Glued/
-MutualExclusion/PluginProofs.v` fails with "The reference compose was not
-found", raised before any `MeBi` command runs — looks like a Rocq 9.2 port
-casualty.
 
 For pure-OCaml model changes with no Rocq/proof-solver involvement,
 `dune exec test/tests.exe` (expect 9/9) is a much faster first signal, but
