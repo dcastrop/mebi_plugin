@@ -193,8 +193,8 @@ struct
           |> List.of_seq
           |> List.filter
                (fun
-                   ((action, destinations) : Model.Action.t * Model.State.Set.t) ->
-               Model.State.Set.mem goto destinations)
+                   ((action, destinations) : Model.Action.t * Model.State.Set.t)
+                  -> Model.State.Set.mem goto destinations)
         in
         match actionpairs with
         | [] -> raise (CouldNotFind_Transition { from; goto; label; edges })
@@ -590,10 +590,11 @@ struct
         Model.Action.Map.reduce_by_label (Model.EdgeMap.find m.edges from) label
         |> Model.Action.Map.to_actionpairs
         (* NOTE: keep only those that are [bisimilar] *)
-        |> Model.Action.Pair.Set.filter_map (fun ((x, y) : Model.Action.Pair.t) ->
-          if Model.State.Set.disjoint bisimilar y
-          then None
-          else Some (x, Model.State.Set.inter bisimilar y))
+        |> Model.Action.Pair.Set.filter_map
+             (fun ((x, y) : Model.Action.Pair.t) ->
+             if Model.State.Set.disjoint bisimilar y
+             then None
+             else Some (x, Model.State.Set.inter bisimilar y))
         (* NOTE: get the pair with the shortest annotation (less steps to do) *)
         |> Model.Action.Pair.Set.shortest_annotation
       in

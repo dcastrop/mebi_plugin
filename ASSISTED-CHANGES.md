@@ -658,6 +658,49 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-27 — Formatting debt outside `lib/model`, `proof_solver*` half
+
+Closes the rest of backlog item D, deliberately deferred in the previous
+entry because it touches files the proof solver reads and needs the full
+baseline re-run to verify, not just `dune build`/`tests.exe`.
+
+- **Tooling.** `dune build @src/fmt --auto-promote`:
+  `src/graph_extract_lts.ml`, `src/proof_solver_wrapper.ml`,
+  `src/proof_solver_step.ml`. Purely whitespace/line-wrapping, no AST
+  change — same character as every other formatting pass in this log.
+  `src/proof_solver.ml` and `src/graph_type.ml`, also listed as drifted in
+  the original review, turned out already clean on re-check, same as
+  `rocq_monad_utils.ml`/`theories.ml` in the previous entry.
+- Found, not fixed: `dune build @src/fmt` also surfaces a pre-existing
+  invalid odoc comment, `src/proof_solver_step.ml:65` — `{i {e.g., ...}}`
+  triggers odoc's `{e ...}` emphasis-tag syntax by accident (`{e` needs to
+  be followed by whitespace). Unrelated to this formatting pass (odoc
+  syntax, not whitespace) and left alone as a small, low-risk item for a
+  future docs pass rather than folded in here.
+
+**Verification:** full five-file `PluginProofs.v` baseline, each file
+rebuilt individually with `make -j1 <path>.vo` (after clearing its `.vo`/
+`.glob`) for a trustworthy per-file count, per CLAUDE.md's procedure:
+
+| file | counts |
+| --- | --- |
+| `Proc/Test1` | 114 105 106 109 22 21 |
+| `Proc/Test2` | 446 278 299 194 446 182 |
+| `CADP/Size1/MutualExclusion` | 268 396 |
+| `CADP/Size1/Glued` | 268 396 |
+| `CADP/Size1/Glued/MutualExclusion` | 81 63 |
+
+All 18 counts match the baseline exactly — no regression, expected for a
+pure-whitespace change. `_CoqProject` restored and `make dune` run
+afterward; `dune build` and `dune exec test/tests.exe` (9/9) both pass.
+
+This closes backlog item D in full.
+
+**Session tally:** Tooling 1 · Bug fix 0 · Docs 0 · Refactor 0 ·
+Optimization 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
@@ -667,7 +710,7 @@ Optimization 0 · **New feature 0.**
 - ~~The "Verification baseline" table below (`268`/`396` for `CADP/Size1/MutualExclusion` and `CADP/Size1/Glued`) doesn't match the bounds checked into those files (`267`/`395`).~~ Resolved, 2026-09-27 (see above): `Proof_solver.solve` permits one step beyond its nominal bound, so this is expected behaviour, not a discrepancy.
 - ~~`_CoqProject:53` comments out `examples/Bisimilarity/Proc/Test4/PluginProofs.v` by name, but the file doesn't exist on disk. Separately, `Proc/Test3/PluginProofs.v` has two duplicate example names.~~ Both addressed 2026-09-27 (see above): the Test3 duplicates are renamed (not build-verified — see the caveat there), and the `_CoqProject` comment for Test4 now says plainly that the file was never written, rather than implying it exists. Writing an actual `Proc/Test4/PluginProofs.v` remains undone.
 - `lib/showable/` and `lib/json/` were never added to `_CoqProject` when introduced (2026-09-26), so only `dune build` ever compiled them — `make` silently skipped both libraries entirely. Fixed in `e037c18`, 2026-09-27, as a side effect of `lib/model/components.ml` becoming their first real consumer; see below for what that uncovered.
-- ~~`@fmt` drift outside `lib/model`~~ — the non-`proof_solver*` half (`lib/rocq_tools/rocq_monad.mli`, `lib/showable/thing.ml`, `test/tests.ml`) fixed 2026-09-27 (see below); `rocq_monad_utils.ml`/`theories.ml` turned out already clean. Still open: `src/proof_solver_wrapper.ml`, `proof_solver_step.ml`, `proof_solver.ml`, `graph_extract_lts.ml`, `graph_type.ml` — deliberately deferred, since formatting these needs the full proof-solver baseline re-run, per the usual policy.
+- ~~`@fmt` drift outside `lib/model`~~ — fully resolved, 2026-09-27 (see below, two entries): non-`proof_solver*` half (`rocq_monad.mli`, `thing.ml`, `tests.ml`) and `proof_solver*` half (`graph_extract_lts.ml`, `proof_solver_wrapper.ml`, `proof_solver_step.ml`, baseline-reverified). `rocq_monad_utils.ml`/`theories.ml`/`proof_solver.ml`/`graph_type.ml`, all listed as drifted in the original review, turned out already clean on re-check.
 - ~~No CI job — the Rocq 9.2 port broke the build for months without anyone noticing.~~ Added, 2026-09-27 (see below): `.github/workflows/ci.yml`.
 - ~~`.gitignore` lists `src/commandOLDunify.ml`, which no longer exists.~~ Removed, 2026-09-27 (see below). The rest of `TODO.md`'s C6 "stale detritus" item turned out to already be resolved or not actually a problem — see below for what was checked.
 
