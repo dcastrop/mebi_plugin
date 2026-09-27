@@ -1,10 +1,10 @@
 include Map
 
-module type Ordered = Showable_.Type_.Ordered
+module type Ordered = Type_.Ordered
 
 module type S = sig
   include Map.S
-  include Showable_.Type_.Sa with type 'a t := 'a t
+  include Type_.Sa with type 'a t := 'a t
   module Key : Ordered with type t := key
 end
 

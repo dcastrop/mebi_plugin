@@ -10,7 +10,7 @@
 (library
  (name components)
  (public_name rocq-mebi.model.components)
- (libraries rocq-mebi.utils rocq-mebi.terms yojson)
+ (libraries rocq-mebi.utils rocq-mebi.terms rocq-mebi.showable.thing yojson)
  (modules components)
  (wrapped false))
 

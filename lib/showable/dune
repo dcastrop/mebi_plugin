@@ -1,19 +1,35 @@
+; Named to match its sole module (Type_), like yojson_compare above: this is
+; what makes dune collapse the wrapper to a bare [Type_], matching how
+; `make`'s flat, unwrapped build (_CoqProject has no library concept at all)
+; sees it from set_.ml/map_.ml/showable.ml -- if the names didn't match,
+; dune would require the cross-library reference `Showable_.Type_`, which
+; `make` has no equivalent of.
 (library
- (name showable_)
+ (name type_)
  (public_name rocq-mebi.showable.type)
- (preprocess
-  (pps ppx_deriving.std))
- (libraries rocq-mebi.json)
+ (libraries rocq-mebi.yojson_compare)
  (modules Type_)
  (wrapped true))
 
 (library
  (name showable)
  (public_name rocq-mebi.showable)
- (preprocess
-  (pps ppx_deriving.std))
  (libraries rocq-mebi.showable.type)
  (modules Set_ Map_ Showable)
  (wrapped true))
+
+; Unifies Showable's pp/show/equal/compare with the JSON-dump mechanism
+; (lib/utils/json.ml). Kept as its own library, rather than folded into
+; "showable" above, so that library never has to depend on rocq-mebi.utils --
+; both rocq-mebi.utils and rocq-mebi.showable.type (a dependency of
+; "showable") export an unqualified top-level module named [Json], and
+; depending on both from the same library would make that name ambiguous
+; (see lib/json/dune for the same problem on the yojson_compare side).
+(library
+ (name thing)
+ (public_name rocq-mebi.showable.thing)
+ (libraries rocq-mebi.utils rocq-mebi.showable)
+ (modules Thing)
+ (wrapped false))
 
 (include_subdirs no)

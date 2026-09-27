@@ -20,6 +20,12 @@ Theories
 Theories_enc
 Bindings
 Constructor_bindings
+Yojson_compare
+Type_
+Set_
+Map_
+Showable
+Thing
 Components
 LTS
 FSM
