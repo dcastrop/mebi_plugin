@@ -32,6 +32,7 @@
 
 - [ ] ***Optimize Saturation algorithm*** (`lib/model/algorithms/saturate`) -- takes a long time on larger/multi-layered examples. We use traces to ensure we don't keep re-exploring the same path, but I think we need to go a step further and keep exploring until we have saturated each trace before continuing. ***To be Revisited***
 - [ ] ***Fix duplicate unfolding tactics*** (`src/proof_solver`) -- mechanism for creating unfolding tactic appears to not check for duplicates.
+- [ ] ***Need an example that exercises the "multiple actionpairs" case in `Proof_solver_step.transition`*** (`src/proof_solver_step.ml`) -- fixed 2026-09-27 to pick the shortest-annotation candidate (via `Model.Action.Pair.shorter_annotation`) instead of raising when more than one distinct `Action.t` matches the same `(from, label, goto)`, mirroring `try_get_visible_transition`'s existing tie-break. None of the five cheap `PluginProofs.v` baseline examples (`Proc/Test1`, `Proc/Test2`, `CADP/Size1/{MutualExclusion,Glued,Glued/MutualExclusion}`) actually hit this branch, so the fix is confirmed not to regress anything but has never been positively exercised. Needs either a small hand-built LTS where weak-transition saturation produces two distinct witnesses for the same visible transition, or confirmation that one of the more expensive examples (`Proc/Test3`/`Test4`, `CADP/Size2`) already hits it.
 
 ## Project Structure & Tooling
 

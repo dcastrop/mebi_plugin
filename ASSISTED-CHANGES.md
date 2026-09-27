@@ -540,7 +540,8 @@ positively exercised. That would need either a hand-built minimal example
 that genuinely produces saturation-derived transition ambiguity, or finding
 one already present in the more expensive `Test3`/`Test4`/`Size2` examples
 — not attempted this session. `_CoqProject` restored and `make dune` run
-afterward.
+afterward. Tracked in `TODO.md`'s "Optimizations & Fixes" section so it
+doesn't get lost.
 
 **Session tally:** Bug fix 1 · Docs 1 · Refactor 0 · Tooling 0 ·
 Optimization 0 · **New feature 0.**
