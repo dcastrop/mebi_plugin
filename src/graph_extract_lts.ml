@@ -64,14 +64,17 @@ struct
       : Transition.Set.t -> Transition.Set.t
       =
       let goto : State.t = state goto in
-      Transition.Set.add { from; goto; label; tree = Some tree; annotation = None }
+      Transition.Set.add
+        { from; goto; label; tree = Some tree; annotation = None }
     in
     let action (from : State.t) (action : Action.t)
       : G.Destinations.t -> Transition.Set.t -> Transition.Set.t
       =
       G.Destinations.fold (goto from (label action))
     in
-    let from (from : Enc.t) : G.Actions.t' -> Transition.Set.t -> Transition.Set.t =
+    let from (from : Enc.t)
+      : G.Actions.t' -> Transition.Set.t -> Transition.Set.t
+      =
       G.Actions.fold (action (state from))
     in
     G.Transitions.fold from xs Transition.Set.empty

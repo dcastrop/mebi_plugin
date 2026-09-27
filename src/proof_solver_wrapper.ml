@@ -72,7 +72,8 @@ module Make (Enc : Encoding.S) (X : Args) :
       the command-time [W.M] and always did. This table only ever backs [encode]
       / [econstr_compare] / [EConstrSet] below, all of which are per-step by
       construction. *)
-  module I : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t =
+  module I :
+    Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t =
     Rocq_monad_utils.Make (Enc)
 
   (* Installed once, here, rather than per [I.run]: see [Bi_encoding.set_ctx].
@@ -87,7 +88,8 @@ module Make (Enc : Encoding.S) (X : Args) :
 
   (** [EConstrSet] is a custom [Set] of [EConstr.t] that allows terms to be compared more efficiently during {b a single proof step only}. Since each proof step gets a new [env] and [sigma] (a fresh [module Iter], and with it a fresh [EConstrSet], is created on every call to {!Proof_solver.step} -- see [make]/[step] there), the same underlying term may encode differently across steps, so an [EConstrSet.t] built in one step is not meaningful to compare against one built in another.
 
-      {b Audited 2026-09-27:} no call site does this. Every use ([Proof_solver_tactics.collect_component_econstrs]/[try_unfold_any]) builds, consumes and discards an [EConstrSet.t] within a single function call, and no persistent state type ([Proof_solver_statem.S], [Proof_solver.t]) ever stores one. This holds structurally, not by convention: the whole module tree containing [EConstrSet] is torn down and rebuilt fresh each step, so a value could not survive to the next step even if something tried to stash it. If a future change introduces a call site that returns or stores an [EConstrSet.t] outside of one step's local computation, that would break this invariant and needs the same scrutiny this comment once flagged. *)
+      {b Audited 2026-09-27:} no call site does this. Every use ([Proof_solver_tactics.collect_component_econstrs]/[try_unfold_any]) builds, consumes and discards an [EConstrSet.t] within a single function call, and no persistent state type ([Proof_solver_statem.S], [Proof_solver.t]) ever stores one. This holds structurally, not by convention: the whole module tree containing [EConstrSet] is torn down and rebuilt fresh each step, so a value could not survive to the next step even if something tried to stash it. If a future change introduces a call site that returns or stores an [EConstrSet.t] outside of one step's local computation, that would break this invariant and needs the same scrutiny this comment once flagged.
+  *)
   module EConstrSet = struct
     include Set.Make (struct
         type t = EConstr.t
