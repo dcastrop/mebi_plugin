@@ -377,11 +377,7 @@ module Make
     : ActionPairs.t
     =
     Logger.trace __FUNCTION__;
-    States.fold
-      (fun (y : State.t) (acc : ActionPairs.t) ->
-        check_from d y ActionPairs.empty)
-      ys
-      ActionPairs.empty
+    States.fold (check_from d) ys ActionPairs.empty
   ;;
 
   (** [edge_actions] returns a list of saturated actions tupled with their respective destinations, obtained from [edge_action_destinations] which explores the reflexive-transitive closure

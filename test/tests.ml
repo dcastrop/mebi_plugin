@@ -49,13 +49,20 @@ let transition (from : int) (l : M.Label.t) (goto : int) : M.Transition.t =
   }
 ;;
 
-let info () : M.Info.t =
-  { meta = None; weak_labels = M.Label.Set.empty; nums = None }
+let info ?(weak_labels : M.Label.Set.t = M.Label.Set.empty) () : M.Info.t =
+  { meta = None; weak_labels; nums = None }
 ;;
 
 (** Builds an LTS from a transition list, deriving the state set, alphabet and
-    terminals rather than requiring the caller to keep them in sync. *)
-let lts (init : int) (ts : M.Transition.t list) : M.LTS.t =
+    terminals rather than requiring the caller to keep them in sync.
+    [weak_labels] must list which labels are silent for [FSM.saturate] to do
+    anything -- it defaults to [only_if_weak:true] and is a no-op otherwise. *)
+let lts
+      ?(weak_labels : M.Label.Set.t = M.Label.Set.empty)
+      (init : int)
+      (ts : M.Transition.t list)
+  : M.LTS.t
+  =
   let transitions =
     List.fold_left
       (fun acc t -> M.Transition.Set.add t acc)
@@ -86,12 +93,17 @@ let lts (init : int) (ts : M.Transition.t list) : M.LTS.t =
   ; states
   ; transitions
   ; terminals = M.State.Set.diff states sources
-  ; info = info ()
+  ; info = info ~weak_labels ()
   }
 ;;
 
-let fsm (init : int) (ts : M.Transition.t list) : M.FSM.t =
-  M.FSM.of_lts (lts init ts)
+let fsm
+      ?(weak_labels : M.Label.Set.t = M.Label.Set.empty)
+      (init : int)
+      (ts : M.Transition.t list)
+  : M.FSM.t
+  =
+  M.FSM.of_lts (lts ~weak_labels init ts)
 ;;
 
 (* ------------------------------------------------------------------ *)
@@ -190,15 +202,63 @@ let test_saturate_no_tau () : unit =
     (M.State.Set.cardinal s.states)
 ;;
 
-(** Saturation across a silent step must keep every original state. *)
+(** Saturation across a silent step must keep every original state.
+    [~weak_labels] is required here -- without it [FSM.saturate] (default
+    [only_if_weak:true]) sees an empty [Info.weak_labels], treats the FSM as
+    not in weak mode, and returns it unchanged, which this test's assertion
+    (state count preserved) cannot distinguish from actually saturating.
+    Found missing, 2026-09-27, while adding
+    [test_saturate_multi_destination_action] below -- this test predates
+    [~weak_labels] existing on these helpers and was passing vacuously. *)
 let test_saturate_with_tau () : unit =
   print_endline "saturation: with a silent action";
-  let f = fsm 0 [ transition 0 a 1; transition 1 tau 2; transition 2 b 0 ] in
+  let f =
+    fsm
+      ~weak_labels:(M.Label.Set.singleton tau)
+      0
+      [ transition 0 a 1; transition 1 tau 2; transition 2 b 0 ]
+  in
   let s = M.FSM.saturate f in
   check_int
     "state count unchanged by saturation"
     (M.State.Set.cardinal f.states)
     (M.State.Set.cardinal s.states)
+;;
+
+(** A single silent action with two destinations must keep both after
+    saturation — regression test for [Saturation.edge_action_destinations]
+    silently dropping all but the last-visited destination when one action
+    genuinely branches to more than one state (see [ASSISTED-CHANGES.md],
+    2026-09-27). State 0's one [tau] action reaches both 1 and 2, which
+    then diverge under different visible labels ([a] to 3, [b] to 4); both
+    weak transitions from state 0 must survive. *)
+let test_saturate_multi_destination_action () : unit =
+  print_endline "saturation: one action with two destinations";
+  let f =
+    fsm
+      ~weak_labels:(M.Label.Set.singleton tau)
+      0
+      [ transition 0 tau 1
+      ; transition 0 tau 2
+      ; transition 1 a 3
+      ; transition 2 b 4
+      ]
+  in
+  let s = M.FSM.saturate f in
+  let has_weak_transition (from_i : int) (l : M.Label.t) (goto_i : int)
+    : bool
+    =
+    match M.EdgeMap.find_opt s.edges (state from_i) with
+    | None -> false
+    | Some actions ->
+      M.Action.Map.to_seq actions
+      |> Seq.exists (fun ((act, dests) : M.Action.t * M.State.Set.t) ->
+        M.Label.equal act.label l && M.State.Set.mem (state goto_i) dests)
+  in
+  check "weak transition 0 -a-> 3 (via state 1) survives" true
+    (has_weak_transition 0 a 3);
+  check "weak transition 0 -b-> 4 (via state 2) survives" true
+    (has_weak_transition 0 b 4)
 ;;
 
 (** Minimising an already-minimal system must not lose states. *)
@@ -229,6 +289,7 @@ let () =
   test_of_lts_preserves_states ();
   test_saturate_no_tau ();
   test_saturate_with_tau ();
+  test_saturate_multi_destination_action ();
   test_minimize ();
   test_bisim_identical ();
   test_bisim_different ();
