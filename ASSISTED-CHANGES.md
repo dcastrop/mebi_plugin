@@ -265,12 +265,87 @@ one, built in a throwaway `git worktree` — identical.
 
 ---
 
+## 2026-09-27 — Review; dead-file cleanup and packaging docs
+
+Two commits off `main`. Net: 14 files removed, `_CoqProject`/`TODO.md`/
+`dune-project`/`rocq-mebi.opam`/`README.md` updated.
+
+Context: asked for a full review of the codebase, focused on what stands
+between it and being a usable Rocq plugin, and on finishing remaining work.
+Three parallel research passes (build/packaging/vernacular interface;
+`lib/model` and friends post-refactor; proof solver and test coverage)
+turned up a prioritized list of findings; this session actioned the two
+cheapest/highest-value tiers (dead-file cleanup, packaging/docs) and left
+the rest — proof-solver correctness gaps, build-list consistency beyond
+what was hit here, `ocamlformat` drift on `components.ml`, deeper test
+coverage — as backlog, recorded below.
+
+- **Tooling.** Removed 13 dead/orphaned files confirmed unreferenced by any
+  build description (`_CoqProject`, every `dune`'s `(modules ...)`,
+  `src/mebi_plugin.mlpack`): `src/_command.{ml,mli}`,
+  `src/_examples.{ml,mli}`, `src/_mebi_help.{ml,mli}` (the underscore-file
+  convention `TODO.md` already flagged as needing a decision),
+  `lib/model/algorithms/similarity.{ml,mli}` (0-byte placeholders),
+  `lib/utils/writer.ml`/`.mli`, `test/saturation.{ml,mli}` (already
+  excluded from `test/dune`, per `57a19f4`), `test/coqplugin/Proc.v` (uses
+  command syntax that predates the current `g_mebi.mlg` grammar), and
+  `examples/CADP_v2.v` (an unreferenced fork of `examples/CADP.v`). Also
+  cleared stray `.cmi`/`.cmx`/etc. build artifacts left in-tree for
+  `wrapper_results` (no source file at all), `writer`, and old
+  `minimize`/`saturate` filenames, plus three empty untracked directories
+  under `lib/term/` (rename debris from `term` → `terms`). Deleting
+  `similarity.{ml,mli}` broke `make dune` — `_CoqProject` still listed
+  them on lines 172-173 even though `lib/model/algorithms/dune`'s
+  `(modules ...)` had already dropped them — a live instance of exactly
+  the "three independently-maintained module lists can drift silently"
+  risk `TODO.md` already tracked in the abstract. Fixed by removing those
+  two `_CoqProject` lines too. Verified with `dune build`,
+  `dune exec test/tests.exe` (9/9), and a full `make dune` round-trip.
+- **Docs.** `dune-project`'s package metadata was unedited dune-init
+  boilerplate (`synopsis "A short synopsis"`, `description "A longer
+  description"`, `tags (topics "to describe" your project)`), which flowed
+  straight into the generated `rocq-mebi.opam`. Filled in real values and
+  regenerated the opam file. Left `(license LICENSE)` commented out —
+  that's a decision for @dcastrop, who owns the upstream repo, not
+  something to pick unilaterally; noted in `TODO.md`.
+- **Docs.** `README.md`'s only usage example was `MeBi Run LTS <ident>.`,
+  which omits the mandatory `Using <reference>` clause every real
+  `MeBi Run *` command requires, and never mentioned `Bisim`/`Merge`/
+  `Minimize`/`Saturate`/`Benchmark`, `MeBi Config *`, or `MeBi Sim *` at
+  all. Replaced the "Scratchpad" section with a full `Usage` section
+  covering the whole command surface (grammar drawn from `src/g_mebi.mlg`,
+  examples drawn from `theories/Test.v` and
+  `examples/Bisimilarity/Proc/Test1/PluginProofs.v`). Also replaced the
+  README's own `TODO` section, which described core LTS-reading/
+  bisimilarity functionality as unbuilt — stale relative to what's
+  actually implemented — with an accurate one-paragraph status pointing at
+  `TODO.md`; and corrected the "Running tests" section, which still
+  described `test/tests.ml` as commented out end-to-end (it's a real,
+  passing 9-assertion suite as of `c078308`, 2026-08-17) and had no
+  mention of the `PluginProofs.v` suite being the only end-to-end
+  proof-solver coverage.
+
+**Verification:** `dune build` (clean, both before and after the
+`_CoqProject` fix), `dune exec test/tests.exe` (9/9), `make dune` full
+round-trip (`rm -f Makefile.rocq Makefile.rocq.conf && make -j$(nproc)`,
+confirmed error-free, then `make dune` to restore the dune-buildable
+state). The `examples/Bisimilarity/**/PluginProofs.v` proof-solver suite
+was not re-run this session — nothing touched `lib/model` or
+`src/proof_solver*` behaviour, only build-list entries and docs.
+
+**Session tally:** Tooling 1 · Docs 2 · Refactor 0 · Bug fix 0 ·
+Optimization 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
 - The term-equality problem in `ReModel` is unaddressed: goal terms are resolved to model elements by syntactic hashtable lookup, which can miss on evars, universe instances or local context.
 - ~~Collapsing the model component cluster (71 of `model.mli`'s 80 sharing constraints; `Saturation.Make` at 13 arguments) is deliberately deferred until after any hand refactoring of individual model components.~~ Done in `16bbe37`, 2026-09-27, together with a nested-submodule rename and a Showable/JSON-dump unification — see below.
-- `examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v` fails with "The reference compose was not found", raised in the `Example` statement before any `MeBi` command runs. Pre-existing and unrelated to the above; looks like a Rocq 9.2 port casualty despite being marked `### Success` in `_CoqProject`.
+- `examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v` fails with "The reference compose was not found", raised in the `Example` statement before any `MeBi` command runs. **Update, 2026-09-27 review:** the failure is more likely stale/copy-pasted example code than a Rocq 9.2 regression — neither `compose` nor `create` (both used at `PluginProofs.v:40-47`) is defined anywhere in this repo's `.v` files, no import chain brings a stdlib `compose` into scope, and the only other occurrence of that exact expression is inside a never-compiled, fully block-commented draft proof in `examples/Bisimilarity/CADP/Properties/MutualExclusion.v:48-129`. Not fixed this session (out of scope — see the 2026-09-27 entry above).
+- **New, 2026-09-27 review.** The "Verification baseline" table below (`268`/`396` for `CADP/Size1/MutualExclusion` and `CADP/Size1/Glued`) doesn't match the bounds actually checked into those files today (`267`/`395` — see e.g. `CADP/Size1/MutualExclusion/PluginProofs.v:38,45`). Plausibly explained by the off-by-one bound-tightening documented in `src/proof_solver.ml:155-165` ("existing bounds all still hold — the requirement only ever got weaker") landing after this baseline was recorded, but that wasn't confirmed by an actual run this session. Needs a live `make` run to determine which number is current before trusting either the table or the `.v` files.
+- **New, 2026-09-27 review.** `_CoqProject:53` comments out `examples/Bisimilarity/Proc/Test4/PluginProofs.v` by name, but the file doesn't exist on disk. Separately, the live (if uncommented) `Proc/Test3/PluginProofs.v` has two duplicate example names — `wsim_rp` declared twice instead of the second being `wsim_rs` (~lines 118/123), and `wsim_pr` likewise instead of `wsim_sr` (~line 134) — invisible today only because the file is commented out of `_CoqProject`.
 - `lib/showable/` and `lib/json/` were never added to `_CoqProject` when introduced (2026-09-26), so only `dune build` ever compiled them — `make` silently skipped both libraries entirely. Fixed in `e037c18`, 2026-09-27, as a side effect of `lib/model/components.ml` becoming their first real consumer; see below for what that uncovered.
 
 Working notes live in `notes/` (local only, excluded via `.git/info/exclude`, so
