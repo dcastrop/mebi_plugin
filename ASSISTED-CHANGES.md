@@ -701,6 +701,110 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-27 — A2 investigation: two saturation findings, no working positive test yet
+
+Attempted backlog item A2: build a minimal hand-written LTS that positively
+exercises `Proof_solver_step.ReModel.transition`'s multiple-actionpairs
+fold (`6124eeb`'s fix — picks the shortest-annotation candidate instead of
+raising when more than one `Action.t` matches the same `(from, label,
+goto)`). Three hand-built terms and one check against a real example
+(`CADP/Size1/MutualExclusion`, Trace-enabled) all failed to trigger it.
+Digging into why turned up two separate findings in
+`lib/model/algorithms/saturation.ml` / `lib/model/components.ml`, neither
+fixed here — this entry exists to record them precisely enough that a
+future session doesn't have to re-derive this.
+
+- **Found, not fixed — real correctness bug.**
+  `Saturation.Make.edge_action_destinations`
+  (`lib/model/algorithms/saturation.ml:376`):
+  ```ocaml
+  let edge_action_destinations (d : data) (from : State.t) (ys : States.t)
+    : ActionPairs.t
+    =
+    States.fold
+      (fun (y : State.t) (acc : ActionPairs.t) -> check_from d y ActionPairs.empty)
+      ys
+      ActionPairs.empty
+  ```
+  The fold's `acc` is never read in the body — every `y` in `ys` is
+  explored with a fresh `ActionPairs.empty`, so only the *last*-visited
+  destination's results survive; every other destination silently vanishes.
+  This only matters when a single action genuinely has more than one
+  destination (real LTS nondeterminism under one label) — confirmed by
+  building a minimal `tChoice`-based term (`p` offering the same label via
+  two different intermediate states) and dumping the saturated FSM as JSON
+  (`MeBi Config Output "DumpResults" True`, `MeBi Run Saturate p Using
+  termLTS.`): one of the two reachable intermediate states was completely
+  absent from `p`'s saturated action list, not merely deprioritized. The
+  five-file baseline never exercises this because Proc.v's structural
+  congruence rules (`do_fix`, `do_comm`, `do_seq_end`, `do_par_end`) are all
+  deterministic — one destination per action — so `ys` is always a
+  singleton there and the bug is inert. It would need to be exercised by a
+  label with genuine multi-state branching, which doesn't happen in any
+  example built so far. Left unfixed: out of scope for A2, and a fix needs
+  its own baseline-reverification pass. The likely correct fix is threading
+  `acc` through the fold (or explicitly unioning each `y`'s result into it)
+  instead of discarding it — analogous to `check_destinations` three
+  functions above (`lib/model/algorithms/saturation.ml:362`), which does
+  this correctly (`States.fold (check_from d) xs`, letting `check_from`'s
+  curried `acc` argument thread through) and is the pattern
+  `edge_action_destinations` looks like it was meant to follow.
+
+- **Found, not fixed — a structural reason A2 is hard.** Separately from
+  the bug above, `ActionPair.try_update`
+  (`lib/model/components.ml:971`, used by `ActionPair.merge_lists`, called
+  from `Saturation.edge_actions`) merges two same-label candidates whenever
+  `Action.wk_equal xaction yaction && States.equal xdestinations
+  ydestinations` — `wk_equal` (`components.ml:888`) compares only `label`,
+  ignoring `annotation` entirely. So *any* two same-label actions with
+  exactly equal destination sets get collapsed to the shorter-annotation
+  one immediately during saturation, before the model is even stored.
+  Every actionpair `update_acc` (`saturation.ml:219`) ever produces starts
+  as a `States.singleton`, and two singletons are "equal" as sets exactly
+  when they hold the same one element — so two different-annotation
+  witnesses for the *same* single `goto` are, by construction, always
+  merged away at this point; verified by hand-tracing three deliberately
+  different constructions (two-branch choice reaching a shared destination;
+  a post-visible silent self-loop revisiting the same state via
+  `Annotations.extrapolate`'s prefix generation, `components.ml:749`) and
+  confirming each one collapses to a single surviving action for exactly
+  this reason. For `ReModel.transition`'s fold to ever see more than one
+  candidate, the competing actions' *full* destination sets have to be
+  unequal-but-overlapping on the queried `goto` — which, given every
+  actionpair is built as a singleton and singleton-vs-singleton always
+  either matches-and-merges or doesn't-match-and-stays-separate-on-a-
+  different-goto, seems to require a multi-element destination set to
+  survive from a base-level branching action essentially unchanged — which
+  is exactly the case the bug above corrupts. Whether the two findings are
+  connected (i.e. whether fixing the first bug is a *precondition* for A2
+  ever being constructible, or whether some other construction not yet
+  tried — e.g. via `MeBi Run Merge`'s cross-FSM action combination, not
+  investigated here — can produce it independently) is not established.
+- **Tooling.** Kept one small, low-risk piece of instrumentation from the
+  investigation: `src/proof_solver_step.ml`'s `transition` function now
+  logs (`Logger.trace`, so silent unless `MeBi Config Output "Trace" True`)
+  when it actually receives more than one candidate, with the count. Costs
+  nothing when the branch isn't hit (confirmed: the CADP/Glued baseline
+  file produces over 5 million trace lines with `Trace` enabled and zero
+  hits). This is exactly the check A2's original note proposed as one way
+  to confirm reachability — useful for whoever next investigates whether
+  any of the expensive `Test3`/`Test4`/`Size2` examples hit this branch,
+  without having to re-add it.
+
+**Not fixed, not committed as example code:** the three hand-built example
+attempts were discarded (not real, correct positive tests — one design was
+never even bisimilarity-true as written). A2 remains open.
+
+**Verification:** `dune build`, `dune exec test/tests.exe` (9/9). No
+proof-solver behaviour changed (the one surviving code change is a
+trace-only log line), so the full baseline wasn't re-run; `_CoqProject` and
+all example files were restored to their pre-investigation state.
+
+**Session tally:** Tooling 1 · Docs 1 · Bug fix 0 · Refactor 0 ·
+Optimization 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
