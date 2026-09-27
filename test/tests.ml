@@ -57,7 +57,10 @@ let info () : M.Info.t =
     terminals rather than requiring the caller to keep them in sync. *)
 let lts (init : int) (ts : M.Transition.t list) : M.LTS.t =
   let transitions =
-    List.fold_left (fun acc t -> M.Transition.Set.add t acc) M.Transition.Set.empty ts
+    List.fold_left
+      (fun acc t -> M.Transition.Set.add t acc)
+      M.Transition.Set.empty
+      ts
   in
   let states =
     List.fold_left
