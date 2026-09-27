@@ -26,8 +26,7 @@ module type S = sig
       [State] (with nested [Set]), [Label] (with [Set]), [Note], [Annotation]
       (with [Set]), [Transition] (with [Set]), [Action] (with [Set], [Map]
       and [Pair]), [Edge] (with [Set]), [EdgeMap], [Partition] and [Info] --
-      see {!Components.S} for each.
-  *)
+      see {!Components.S} for each. *)
   include
     Components.S
     with type base := base
@@ -99,7 +98,8 @@ module type S = sig
      and type fsm = FSM.t
 end
 
-(** Builds a model from a term's [base] representation, plus a source of constructor-bindings used for the proof solver. *)
+(** Builds a model from a term's [base] representation, plus a source of constructor-bindings used for the proof solver.
+*)
 module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
   S
   with type base = Base.t

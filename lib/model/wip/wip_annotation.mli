@@ -26,7 +26,9 @@ end
 
 (** [module WIP] is a lightweight counterpart of [Note.t] that forms some "work-in-progress" [Annotation.t]. Once we stop saturating an action, we check if we are able to yield a new saturated action and convert the [wip list] to an [Annotation.t].
 *)
-module Make (Base : Base_term.S) (C : Components.S with type trees = Base.Trees.t) :
+module Make
+    (Base : Base_term.S)
+    (C : Components.S with type trees = Base.Trees.t) :
   S
   with type state = C.State.t
    and type label = C.Label.t
