@@ -589,6 +589,51 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-27 — C7: checked the three underscore-prefixed `.v` examples
+
+Backlog item C7 explicitly withheld a verdict on
+`examples/**/_mutual_exclusion.v`, `_no_starvation.v`, `_nat_streams.v` —
+they resemble the underscore-prefixed OCaml dead files removed earlier this
+week (`5743b46`), but each needed its own check rather than a batch delete.
+Traced each file's full rename/edit history with `git log --all --follow`.
+
+- **Tooling.** Deleted `examples/Bisimilarity/CADP/Properties/_mutual_exclusion.v`
+  (and its stale, already-gitignored `.mutual_exclusion.aux`). Confirmed
+  dead: the same commit that underscore-prefixed it, `97e668c` "reorganizing
+  and preparing to rework mutual exclusion", is immediately followed by
+  `3cc6f10`/`37d997a`/`93dda66`, which wrote the current, actively-built
+  `MutualExclusion.v` from scratch as that rework — the commit's own message
+  documents the supersession, and `MutualExclusion.v` is what every CADP
+  mutual-exclusion `PluginProofs.v` (including this session's earlier
+  `Glued/MutualExclusion` fix) actually exercises.
+- **Docs.** Left `_no_starvation.v` and `_nat_streams.v` alone — neither is
+  dead. `_no_starvation.v` was underscore-prefixed by the same reorg commit,
+  but nothing ever replaced it: `TODO.md` still lists "no starvation" as
+  open, and this is the only extant attempt at it. `_nat_streams.v` has
+  eleven of its own commits ("finished nat streams examples", "finished ltac
+  for first case", "parity plus odd trans lemma", ...) predating and
+  unrelated to the mutual-exclusion rework that happened to sweep it up in
+  the same renaming commit — a real, fairly developed piece of Jonah's own
+  work, not draft filler, just currently unwired from any build target.
+- **Docs.** `_CoqProject`'s commented-out lines for these files pointed at
+  stale paths from before the March 2026 reorg
+  (`examples/properties/mutual_exclusion.v`,
+  `examples/properties/no_starvation.v`,
+  `examples/Bisimilarity/nat_streams.v` — none of which exist).
+  Removed the now-meaningless `mutual_exclusion.v` line entirely and
+  corrected the other two to their real current paths, each with a note on
+  why it's commented out (matches the verdicts above).
+
+**Verification:** `dune build`, `make -j$(nproc)` (neither ever referenced
+the deleted file — the stale `_CoqProject` comment line pointed elsewhere
+even before this fix), `make dune` round-trip. `dune exec test/tests.exe`
+not affected (`examples/` is outside its scope).
+
+**Session tally:** Tooling 1 · Docs 2 · Bug fix 0 · Refactor 0 ·
+Optimization 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
