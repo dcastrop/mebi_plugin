@@ -50,7 +50,7 @@ examples/Bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
 
 # examples/Bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test4/TermTests.v ### Success
-# examples/Bisimilarity/Proc/Test4/PluginProofs.v ### TODO: proof explosion
+# examples/Bisimilarity/Proc/Test4/PluginProofs.v ### does not exist yet -- unlike Test1-3, no PluginProofs.v was ever written for Test4 (see ASSISTED-CHANGES.md, 2026-09-27)
 
 ###############################################################################
 ### CADP
