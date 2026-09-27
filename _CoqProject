@@ -77,14 +77,13 @@ examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
 
 # TODO:
 ### CADP properties
-# examples/properties/mutual_exclusion.v
-# examples/properties/no_starvation.v
+# examples/Bisimilarity/CADP/Properties/_no_starvation.v ### unfinished draft, no starvation still unimplemented
 
 ### CADP Simple
 # examples/CADP_simple.v
 
 ### Other (nat streams)
-# examples/Bisimilarity/nat_streams.v
+# examples/Bisimilarity/_nat_streams.v ### unfinished draft, sidelined during a reorg, not superseded
 
 ###############################################################################
 ###############################################################################
