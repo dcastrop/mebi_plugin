@@ -437,10 +437,14 @@ Continuing the same day's backlog after the CADP/Glued/MutualExclusion fix.
   explosion`, but `git log --all` shows no commit ever created this file —
   unlike Test1–3, a `PluginProofs.v` for Test4 was never written, so the
   tag was actively misleading (it implies a file that exists and is known
-  slow, not one that was never authored). Writing a real `PluginProofs.v`
-  for Test4 would mean originating new example/proof content from scratch,
-  which is out of scope for a quick fix and was not attempted here —
-  updated the `_CoqProject` comment to say so plainly instead.
+  slow, not one that was never authored). Per Jonah: it was deliberately
+  skipped, not forgotten — `Test3`'s own `PluginProofs.v` was already
+  hitting proof explosion (`Solve 100000`, some examples unfinished even at
+  500000–1000000), so a `Test4` version was expected to be worse still and
+  not worth writing. Writing a real `PluginProofs.v` for Test4 would mean
+  originating new example/proof content from scratch, which is out of
+  scope for a quick fix and was not attempted here — updated the
+  `_CoqProject` comment to record the actual reason instead.
 
 **Verification:** `dune build`, `dune exec test/tests.exe` (9/9), `make
 dune` round-trip. The Test3 fix specifically was not proof-suite-verified,
