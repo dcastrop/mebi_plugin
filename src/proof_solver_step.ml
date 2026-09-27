@@ -209,6 +209,13 @@ struct
              single candidate is just the degenerate case of this fold
              ([tl = []]), so this also covers what used to be handled as a
              separate branch. *)
+          if not (List.is_empty tl)
+          then
+            Logger.trace
+              ~__FUNCTION__
+              (Printf.sprintf
+                 "multiple actionpairs matched (%d candidates)"
+                 (1 + List.length tl));
           let ({ annotation; trees; _ } : Model.Action.t), _ =
             List.fold_left Model.Action.Pair.shorter_annotation h tl
           in
