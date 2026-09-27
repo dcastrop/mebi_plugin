@@ -410,6 +410,48 @@ Refactor 0 · Tooling 0 · Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-27 — Two more Tier 2 review items: Test3 duplicate names, Test4's missing file
+
+Continuing the same day's backlog after the CADP/Glued/MutualExclusion fix.
+
+- **Bug fix.** `examples/Bisimilarity/Proc/Test3/PluginProofs.v` declared
+  `wsim_rp`/`wsim_pr` twice each — the `r`/`s` and `s`/`r` pairs (dividers
+  `ProofTest.rs`/`ProofTest.sr`) were copy-pasted from the `r`/`p` and
+  `p`/`r` pairs above them without updating the `Example` name, a real
+  Rocq identifier collision that would reject the file the moment it's
+  compiled. Renamed to `wsim_rs`/`wsim_sr`, matching every other pair's
+  `wsim_<first>_<second>` convention already used in the file. **Not**
+  verified with a full `make` build: this file needs `MeBi Sim Solve
+  100000` per example, and a `-j1` run with the expensive `Solve` calls
+  swapped for `admit` (to check elaboration/naming only, skipping the
+  actual proof search) still hadn't gotten past the *first* live example
+  after 180 seconds — the `Layered` term elaboration inside `MeBi Sim
+  Begin` is itself expensive here, independent of proof search, matching
+  the file's own "proof explosion" tag. The fix is a straightforward Rocq
+  identifier-uniqueness correction (two declarations can't legally share a
+  name in the same scope regardless of what they prove), so it was applied
+  without a build-verified round-trip; flagging that explicitly rather
+  than silently skipping the usual verification step.
+- **Docs.** `_CoqProject:53` commented out
+  `examples/Bisimilarity/Proc/Test4/PluginProofs.v` tagged `### TODO: proof
+  explosion`, but `git log --all` shows no commit ever created this file —
+  unlike Test1–3, a `PluginProofs.v` for Test4 was never written, so the
+  tag was actively misleading (it implies a file that exists and is known
+  slow, not one that was never authored). Writing a real `PluginProofs.v`
+  for Test4 would mean originating new example/proof content from scratch,
+  which is out of scope for a quick fix and was not attempted here —
+  updated the `_CoqProject` comment to say so plainly instead.
+
+**Verification:** `dune build`, `dune exec test/tests.exe` (9/9), `make
+dune` round-trip. The Test3 fix specifically was not proof-suite-verified,
+per the note above — its correctness rests on it being a mechanical Rocq
+identifier rename, not on a completed build.
+
+**Session tally:** Bug fix 1 · Docs 1 · Refactor 0 · Tooling 0 ·
+Optimization 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
@@ -417,7 +459,7 @@ Refactor 0 · Tooling 0 · Optimization 0 · **New feature 0.**
 - ~~Collapsing the model component cluster (71 of `model.mli`'s 80 sharing constraints; `Saturation.Make` at 13 arguments) is deliberately deferred until after any hand refactoring of individual model components.~~ Done in `16bbe37`, 2026-09-27, together with a nested-submodule rename and a Showable/JSON-dump unification — see below.
 - ~~`examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v` fails with "The reference compose was not found", raised in the `Example` statement before any `MeBi` command runs.~~ Fixed, 2026-09-27 (see above) — root cause was a rename this file missed, not a Rocq 9.2 regression.
 - ~~The "Verification baseline" table below (`268`/`396` for `CADP/Size1/MutualExclusion` and `CADP/Size1/Glued`) doesn't match the bounds checked into those files (`267`/`395`).~~ Resolved, 2026-09-27 (see above): `Proof_solver.solve` permits one step beyond its nominal bound, so this is expected behaviour, not a discrepancy.
-- **New, 2026-09-27 review.** `_CoqProject:53` comments out `examples/Bisimilarity/Proc/Test4/PluginProofs.v` by name, but the file doesn't exist on disk. Separately, the live (if uncommented) `Proc/Test3/PluginProofs.v` has two duplicate example names — `wsim_rp` declared twice instead of the second being `wsim_rs` (~lines 118/123), and `wsim_pr` likewise instead of `wsim_sr` (~line 134) — invisible today only because the file is commented out of `_CoqProject`.
+- ~~`_CoqProject:53` comments out `examples/Bisimilarity/Proc/Test4/PluginProofs.v` by name, but the file doesn't exist on disk. Separately, `Proc/Test3/PluginProofs.v` has two duplicate example names.~~ Both addressed 2026-09-27 (see above): the Test3 duplicates are renamed (not build-verified — see the caveat there), and the `_CoqProject` comment for Test4 now says plainly that the file was never written, rather than implying it exists. Writing an actual `Proc/Test4/PluginProofs.v` remains undone.
 - `lib/showable/` and `lib/json/` were never added to `_CoqProject` when introduced (2026-09-26), so only `dune build` ever compiled them — `make` silently skipped both libraries entirely. Fixed in `e037c18`, 2026-09-27, as a side effect of `lib/model/components.ml` becoming their first real consumer; see below for what that uncovered.
 
 Working notes live in `notes/` (local only, excluded via `.git/info/exclude`, so
