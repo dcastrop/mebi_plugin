@@ -955,6 +955,87 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-28 — A1 settled by measurement: the lookup keys structurally cannot miss
+
+Branch `investigate/a1-sizing`. Follow-up to the sizing pass above, at
+Jonah's request: "is there a new example or test we could derive to check
+whether the `ReModel` unification is necessary?"
+
+The answer turned out to be better served by a *classifier* than by a new
+example. "Zero misses observed" is weak evidence — it says the failure
+never happened, not that it could not. So instead of guessing at an example
+that might trigger a miss, `Bi_encoding.classify_key` now counts, in any
+term, the three things the A1 note says can make a syntactic key miss:
+undefined evars, non-empty universe instances, and local-context variables.
+`ReModel.state`/`label` call it on every lookup, at `Debug`.
+
+- **Tooling.** `classify_key` in `lib/rocq_tools/bi_encoding.ml`, declared in
+  both the `.ml`'s own `module type S` and `bi_encoding.mli`, so it reaches
+  `src/proof_solver_step.ml` as `M.classify_key` via
+  `Rocq_monad.S`'s `include Bi_encoding.S` with no intermediate signature
+  churn. It walks the term with `Constr.iter` over the same
+  `EConstr.to_constr ~abort_on_undefined_evars:false (sigma ())` form the
+  hashtable hashes. Guarded by `Logger.is_enabled Output.Kind.Debug`, so it
+  costs nothing when Debug is off.
+
+  One caveat is documented at the definition: it inspects the term as given,
+  before the `nf_all` that `Rocq_monad_utils.get_encoding` applies. Since
+  normalisation can only *remove* these (instantiating defined evars,
+  unfolding), never introduce them, a reported zero is conclusive for the
+  real key while a non-zero count would need re-checking after normalisation.
+
+- **Result.** All five `### Success` suites rebuilt with
+  `MeBi Config Output "Debug" True` and `make -j1`:
+
+  | file | lookups | classification | misses |
+  | --- | --- | --- | --- |
+  | `Proc/Test1` | 403 | all `evar=0 univ=0 var=0` | 0 |
+  | `Proc/Test2` | 1614 | all `evar=0 univ=0 var=0` | 0 |
+  | `CADP/Size1/MutualExclusion` | 305 | all `evar=0 univ=0 var=0` | 0 |
+  | `CADP/Size1/Glued` | 305 | all `evar=0 univ=0 var=0` | 0 |
+  | `CADP/Size1/Glued/MutualExclusion` | 93 | all `evar=0 univ=0 var=0` | 0 |
+
+  **2720 lookups, not one carrying any of the three hazards.** All 18
+  iteration counts unchanged. Debug output is also tractable — 7k-69k lines
+  per file, against the 5M+ that `Trace` produced during the A2 work.
+
+  This upgrades the earlier conclusion from "A1 never fires" to "A1 *cannot*
+  fire here": the goal terms the solver resolves are closed, ground,
+  evar-free and universe-free, so a syntactic key and a unifier would agree
+  by construction on every one of them.
+
+- **Structural corroboration.** `term` and `label` are parameterless `Set`
+  inductives (`examples/Proc.v:3`, `:26`), so their universe instances are
+  necessarily empty. The note's cause (2), universe instances, is not merely
+  unobserved but unreachable for state and label terms in this codebase.
+
+**What this means for A1, and it is a reframing.** For the plugin's current
+usage there is no example that would exercise the unification, because
+producing a state term carrying an evar means writing a goal where the state
+is *unknown* — `Example ... : exists q, weak_sim p q. Proof. eexists. MeBi
+Sim Begin ...` — i.e. asking the solver to discover `q` rather than check a
+given `q`. The plugin cannot do that today. So implementing A1 would not be
+fixing a latent bug; it would be building the enabling mechanism for a
+capability the plugin does not have. Per `CLAUDE.md`'s working assumption
+that is flagged here, before anything is written, and not started
+unilaterally.
+
+Two constructions considered and rejected as tests: a goal over a local
+variable (`Example wsim (r : term) (H : r = p) : weak_sim r q`) does produce
+`var=1`, but unification alone would not resolve it either without
+rewriting by `H`, so it does not discriminate between lookup and
+unification; and a convertible-but-not-syntactically-equal term is already
+handled, since `nf_all` runs before both encode and lookup — the note says
+as much.
+
+Also formats `test/tests.ml`, which had drifted since the A5 regression test
+landed in `a7bd17c` without a `@fmt` pass.
+
+**Session tally:** Tooling 1 · Docs 1 · Bug fix 0 · Refactor 0 ·
+Optimization 0 · **New feature 0** (one capability *flagged*, not built).
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

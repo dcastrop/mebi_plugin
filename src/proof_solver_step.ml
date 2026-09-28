@@ -98,6 +98,8 @@ struct
 
     let state (x : EConstr.t) (ys : Model.State.Set.t) : Model.State.t M.mm =
       Logger.trace __FUNCTION__;
+      if Logger.is_enabled Output.Kind.Debug
+      then Logger.debug ~__FUNCTION__ ("key: " ^ M.classify_key x);
       try
         let enc : Enc.t = M.get_encoding x in
         (* NOTE: [Model.State.Set.compare] only cares about [base]. *)
@@ -132,6 +134,8 @@ struct
 
     let label (x : EConstr.t) (ys : Model.Label.Set.t) : Model.Label.t M.mm =
       Logger.trace __FUNCTION__;
+      if Logger.is_enabled Output.Kind.Debug
+      then Logger.debug ~__FUNCTION__ ("key: " ^ M.classify_key x);
       let f (enc : Enc.t) : Model.Label.t M.mm =
         (* NOTE: [Model.Label.Set.compare] only cares about [is_silent=Some _] *)
         Model.Label.Set.find { base = enc; is_silent = None } ys |> M.return
