@@ -1139,6 +1139,49 @@ Tooling 0 · **New feature 0.**
 
 ---
 
+## 2026-09-28 — `Proc/Test3` after the rewrite: extraction 1h13m+ → 0.65s
+
+Branch `investigate/saturation-path-explosion`. The end-to-end check on the
+example that started this whole line of work. No code change.
+
+`Proc/Test3`'s `PluginProofs.v`, unmodified, with its checked-in
+`MeBi Sim Solve 100000`:
+
+| phase | before | after |
+| --- | --- | --- |
+| `MeBi Sim Begin` (extraction + saturation + merge) | **1h13m, killed without completing** | **0.65 s** |
+| whole file | never reached proof search | 166 s |
+
+The lower bound on the speedup for that phase is about 6700x, and it is only
+a lower bound because the old run never finished.
+
+**What this does and does not fix.** The file still fails: proof search runs
+its full budget and reports `(Stopped) Unsolved after 100001 iterations`
+(the documented `N + 1`), so `Qed` fails and `make` exits 2. Of the 166
+seconds, 0.65 is extraction and the remaining ~165 is proof search.
+
+So B2 is now, for the first time, genuinely what the backlog always claimed
+it was. The original entry said the trouble was "specifically `MeBi Sim`'s
+proof *search*" with extraction already succeeding. That was **wrong when
+written** — extraction never completed, so proof search was not even being
+reached, which is what the 2026-09-28 phase isolation established. After the
+saturation fix the description becomes accurate: extraction is now trivial
+and the remaining problem really is search. The backlog entry has been
+corrected to record both the error and the fact that its conclusion now
+holds for a different reason.
+
+Worth noting that the saturation fix *added* 73 weak transitions in testing,
+which enlarges the search space rather than shrinking it — so `Test3`
+remaining unsolved at 100000 iterations is not evidence against the rewrite.
+Whether it closes at a higher bound is untested, and `Proc/Test3`'s
+own comment already records `wsim_p3` as "unfinished after 500000, crashed
+on 1000000".
+
+**Session tally:** Docs 1 · Optimization 0 · Bug fix 0 · Tooling 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
