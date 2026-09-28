@@ -177,7 +177,13 @@ module Body (E : sig
         (f : 'a -> string)
     : unit
     =
-    out ~prefix:(Some (Printf.sprintf "%s: " prefix)) ~__FUNCTION__ k (f x)
+    (* [f x] is only worth paying for if the message will actually be emitted.
+       [emit] filters on this same predicate, but as a function argument [f x]
+       is evaluated before the call, so without this guard every call formats
+       its value even with the kind disabled -- and [f] is often
+       [Strfy.econstr], a Rocq pretty-printer, on a hot path. *)
+    if is_enabled k
+    then out ~prefix:(Some (Printf.sprintf "%s: " prefix)) ~__FUNCTION__ k (f x)
   ;;
 
   let things
@@ -188,19 +194,21 @@ module Body (E : sig
         (f : 'a -> string)
     : unit
     =
-    (* NOTE: start and end *)
-    let e : string -> unit =
-      out ~prefix:(Some (Printf.sprintf "%s: " prefix)) ~__FUNCTION__ k
-    in
-    (* NOTE: indexed iterator *)
-    let index : int ref = ref 0 in
-    let fx (x : 'a) : unit =
-      thing k (Printf.sprintf "%i" !index) x f;
-      index := !index + 1
-    in
-    e "start";
-    List.iter fx xs;
-    e "end"
+    if is_enabled k
+    then (
+      (* NOTE: start and end *)
+      let e : string -> unit =
+        out ~prefix:(Some (Printf.sprintf "%s: " prefix)) ~__FUNCTION__ k
+      in
+      (* NOTE: indexed iterator *)
+      let index : int ref = ref 0 in
+      let fx (x : 'a) : unit =
+        thing k (Printf.sprintf "%i" !index) x f;
+        index := !index + 1
+      in
+      e "start";
+      List.iter fx xs;
+      e "end")
   ;;
 
   let option
