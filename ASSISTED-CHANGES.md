@@ -1095,6 +1095,50 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-28 — Delete the path-enumeration machinery
+
+Branch `investigate/saturation-path-explosion`. Step 4 of the plan: the
+closure implementation landed in the previous entry, so everything that
+existed only to service the depth-first traversal is now dead.
+
+- **Refactor.** Removed from `lib/model/algorithms/saturation.ml` and its
+  `.mli`: the `data` record (`named`/`current`/`visited`/`traces`/
+  `can_collect_traces`/`old_edges`) and its updaters, `check_from`,
+  `check_actions`, `collect_from_traces`, `continue_check_destinations`,
+  `check_destinations`, `edge_action_destinations`, `edge_actions`, `edge`,
+  `stop`, `update_acc`, `finish_with_trace`, `finish_with_trace_upto`,
+  `skip_action`, `already_visited` and `get_old_actions`. Deleted
+  `lib/model/wip/` entirely — `wip_annotation`, `wip_trace`, `wip_traces`
+  and their `dune` — with the `rocq-mebi.model.wip` dependency dropped from
+  `lib/model/dune` and `lib/model/algorithms/dune`, and the `-I` plus six
+  module lines dropped from `_CoqProject`.
+
+  The public signature shrinks from 24 values and three submodules to a
+  single `val edges`. Every consumer (`FSM.ml`, `FSM.mli`, `model.ml`,
+  `model.mli`) already constrained only `state`, `states`, `labels` and
+  `edgemap` and called only `edges`, so none of them needed touching.
+
+  This is what made backlog item **A** moot rather than solved, as predicted
+  in `notes/5-saturation-rewrite.md`: the trace memo whose soundness was
+  going to be investigated no longer exists.
+
+Verification: `test/satdiff.exe` output **byte-identical** to the golden
+file before and after the deletion, which is the point — this commit must
+change nothing observable. `dune exec test/tests.exe` 11/11; `satscale`
+unchanged; full `make -j$(nproc)`.
+
+Worth recording: `make` caught five warnings that `dune build` accepted —
+unused module `Annotations`, unused module `Label`, and unused types
+`label`/`annotation`/`trees`/`action` left behind by the strip. This is the
+second time this session that `make`'s stricter settings caught something
+`dune build` waved through, as `ASSISTED-CHANGES.md`'s verification-baseline
+note warns. Always finish with a `make` run.
+
+**Session tally:** Refactor 1 · Docs 1 · Optimization 0 · Bug fix 0 ·
+Tooling 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

@@ -33,7 +33,6 @@
   rocq-mebi.terms
   rocq-mebi.model.components
   rocq-mebi.model.lts
-  rocq-mebi.model.wip
   rocq-mebi.model.algorithms.saturation
   yojson)
  (modules FSM)
@@ -47,7 +46,6 @@
   rocq-mebi.terms
   rocq-mebi.model.components
   rocq-mebi.model.lts
-  rocq-mebi.model.wip
   rocq-mebi.model.fsm
   rocq-mebi.model.algorithms
   yojson)
