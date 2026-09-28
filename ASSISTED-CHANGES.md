@@ -981,6 +981,53 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-28 — Differential harness for the saturation rewrite
+
+Branch `investigate/saturation-path-explosion`. Step 1 of the plan in
+`notes/5-saturation-rewrite.md`, agreed with Jonah: build the safety net
+before touching the algorithm.
+
+- **Tooling.** `test/satdiff.ml` plus `test/satdiff.expected` and a
+  `test/dune` stanza. Infrastructure only, linking `rocq-mebi.model` — same
+  constraint as `tests.ml` and `satscale.ml`.
+
+  It generates deterministic pseudo-random LTSs, saturates each, and prints a
+  **canonically sorted** rendering of the resulting `EdgeMap` — source states
+  ordered, actions ordered, destination sets ordered — because `EdgeMap` is a
+  `Hashtbl` and its iteration order is not a contract. 200 seeds produce 1332
+  weak-transition rows, each showing label, full annotation and destination
+  set.
+
+  Why this and not the proof suite: `CLAUDE.md`'s 18-count baseline says the
+  proofs still close in the same number of steps; it does *not* say the
+  saturated FSM holds the same weak transitions. Since `ActionPair.try_update`
+  merges on *exactly equal* destination sets and keeps `Annotation.shorter`, a
+  rewrite can change which annotation survives and still pass the proof gate.
+  That is the failure mode this harness exists to catch.
+
+Two things learned building it, both worth recording:
+
+- The first attempt generated 3-8 state graphs with out-degree up to 3 and
+  **failed to clear a single seed in ten minutes** — with the current
+  implementation. That is the blow-up being fixed, reproduced accidentally on
+  graphs small enough to draw by hand. Sizes are now 3-5 states, out-degree
+  1-2, which complete instantly; the harness is only useful while the *old*
+  implementation can still finish.
+- The first version printed per-seed timings into the dump, which made the
+  output differ between runs and defeated the entire purpose. Timings now go
+  to stderr; stdout is the artifact being diffed and may contain nothing that
+  varies run to run. Verified deterministic across repeated runs.
+
+`test/satdiff.expected` is the golden capture of the **current**
+implementation, confirmed to match on a fresh run. The rewrite is green when
+`dune exec test/satdiff.exe -- 200 2>/dev/null | diff test/satdiff.expected -`
+is empty.
+
+**Session tally:** Tooling 1 · Docs 1 · Optimization 0 · Bug fix 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
