@@ -894,6 +894,70 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-28 — Logging: a level fix and a wasted-work fix
+
+Branch `optimize/logger-formatting`, off `main` (`da32f6b`) rather than off
+the A1 branch, since neither change has anything to do with A1. Both were
+found while trying to use the A1 probe on a large example, not by looking
+for them.
+
+- **Tooling.** `lib/rocq_tools/bindings.ml:204` and `:216` logged at `Debug`
+  on every call to `find_name` — one of them formatting an `EConstr` through
+  `Strfy.econstr`, a Rocq pretty-printer. Lines 208 and 211, inside the same
+  function, already used `Trace`, so the two `Debug` calls were the outliers.
+  Moved both to `Trace`. This is what made `Debug` unusable as a diagnostic
+  level: a `Debug`-enabled run of `Proc/Test3` spent 50 minutes inside
+  `find_name` and never reached proof search.
+
+  Confirmed on `Proc/Test1` with `Debug True`: `find_name` lines drop from
+  ~1300 to **0**. Note the honest limit of that demonstration — Test1's total
+  Debug output only falls 22113 → 20822 lines, because `find_name` was never
+  the bulk *there*. The flood is a large-example problem, and whether this
+  makes `Proc/Test3` tractable is **not yet verified**.
+
+- **Optimization.** `lib/utils/logger.ml`'s `thing` (and `things`) called
+  `out ... (f x)`. As a function argument `f x` is evaluated *before* `emit`
+  ever consults `is_enabled`, so every `Logger.thing`/`things`/`option`/
+  `options` call in the plugin formatted its value even with that output kind
+  switched off. Both now guard on `is_enabled k` first.
+
+  Behaviour-identical: `is_enabled` is the very predicate `emit` filters on,
+  and it already accounts for both the global `quiet`/`disable` switch and
+  the per-kind config.
+
+  Measured, warm dependencies, default output configuration:
+
+  | example | eager | lazy | delta |
+  | --- | --- | --- | --- |
+  | `Proc/Test1` | 1.67 / 1.67 / 1.68 s | 1.44 / 1.45 / 1.46 s | −13.3% |
+  | `Proc/Test2` | 469.99 / 467.98 / 469.28 s | 461.25 / 463.06 s | −1.5% |
+
+  Deliberately not overstated: the absolute saving grows (0.22s → 7s) but
+  `Test2` is dominated by proof-search compute, so the proportional gain
+  falls to near noise. **This is not an explanation for the plugin being
+  slow on large examples**, and `TODO.md`'s A3 saturation item is untouched
+  by it. It is a free, behaviour-preserving removal of wasted work, worth
+  roughly 1–2% on realistic workloads.
+
+**A correction worth recording.** On finding the eager formatting, the first
+hypothesis was that it explained the `Debug` probe stall. It does not, and
+the two are independent: laziness only helps when a kind is *disabled*,
+whereas the stall happened with `Debug` *enabled*, where the formatting is
+genuinely wanted and the cost is the sheer volume. The real fix for the
+stall is the `bindings.ml` level change above. The measurement is what
+separated them.
+
+Verification: full five-file `PluginProofs.v` run, `make -j1` per file, all
+18 counts identical to baseline (`Test1` 114 105 106 109 22 21; `Test2` 446
+278 299 194 446 182; `MutualExclusion` 268 396; `Glued` 268 396;
+`Glued/MutualExclusion` 81 63), zero `Unsolved`. `dune exec test/tests.exe`
+11/11.
+
+**Session tally:** Optimization 1 · Tooling 1 · Docs 1 · Bug fix 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
