@@ -19,6 +19,11 @@ module type S = sig
   val fwdmap : unit -> enc F.t
   val bckmap : unit -> EConstr.t B.t
 
+  (** Counts undefined evars, non-empty universe instances and local-context
+      variables in a term -- the three things that can make a syntactic key
+      miss. A diagnostic for backlog item A1. *)
+  val classify_key : EConstr.t -> string
+
   exception EncodingNotFound of EConstr.t
 
   val get_encoding : EConstr.t -> enc
@@ -127,6 +132,35 @@ module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
   let bckmap () : EConstr.t B.t =
     Logger.trace __FUNCTION__;
     !(get_the_maps ()).bck
+  ;;
+
+  (** Diagnostic for backlog item A1. The [F] keys are hashed and compared
+      syntactically, so a lookup misses whenever a term that {e means} the
+      right thing carries an undefined evar, a non-empty universe instance, or
+      a local-context variable the command-time encoding never saw. This
+      counts all three in a given term, so "can the lookup miss here at all?"
+      can be settled by measurement rather than by reading.
+
+      Note this inspects the term as given, {e before} the [nf_all] that
+      [Rocq_monad_utils.get_encoding] applies on the way in. Normalisation can
+      only remove these (by instantiating defined evars or unfolding), never
+      introduce them, so a reported zero is conclusive for the real key while
+      a non-zero count needs re-checking after normalisation. *)
+  let classify_key (x : EConstr.t) : string =
+    let evars = ref 0
+    and univs = ref 0
+    and vars = ref 0 in
+    let rec go (c : Constr.t) : unit =
+      (match Constr.kind c with
+       | Constr.Evar _ -> incr evars
+       | Constr.Var _ -> incr vars
+       | Constr.Const (_, u) | Constr.Ind (_, u) | Constr.Construct (_, u) ->
+         if not (UVars.Instance.is_empty u) then incr univs
+       | _ -> ());
+      Constr.iter go c
+    in
+    go (EConstr.to_constr ~abort_on_undefined_evars:false (sigma ()) x);
+    Printf.sprintf "evar=%i univ=%i var=%i" !evars !univs !vars
   ;;
 
   exception EncodingNotFound of EConstr.t
