@@ -894,6 +894,93 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-28 — B2 reframed: saturation enumerates paths, not states
+
+Branch `investigate/saturation-path-explosion`, off `main` (`da32f6b`).
+`TODO.md`'s A3 ("optimize saturation -- takes a long time on larger/
+multi-layered examples") has been an unquantified hunch since it was
+written. It now has a mechanism, a location and a number.
+
+**How B2 was framed, and why that was wrong.** The backlog said
+`Proc/Test3`'s trouble is "specifically `MeBi Sim`'s proof *search*", with
+extraction already succeeding. Two phase-isolation runs say otherwise:
+
+- `CADP/Size2/Glued` fails in *extraction*, not search — `LTS_Incomplete`
+  from `src/wrapper.ml:243`, raised when the state bound is hit. It never
+  reaches the proof solver at all (zero `ReModel` lookups logged). Its
+  `### FAIL: ^` tag, inherited rather than verified, turns out to be
+  accurate.
+- `Proc/Test3`'s `wsim_pq` was rebuilt with **no `Solve` at all** — just
+  `MeBi Sim Begin`, so the wall time is extraction + saturation + merge with
+  zero proof search in it. It ran **1 hour 13 minutes without completing**
+  and was killed. The earlier 50-minute and 25-minute timeouts died in the
+  same phase; the `Solve 300` cap tried in between was never going to help,
+  because `Begin` runs unconditionally.
+
+So for `Test3` the cost is not proof search. B2 as written is misdiagnosed.
+
+**A hypothesis that was disproved on the way.** The first guess was that
+multi-layer extraction (`Using compLTS termLTS`, two LTSs) was to blame.
+It is not: `CADP/Size1/Glued/MutualExclusion` also uses two LTSs
+(`Using lts step`) and is the *fastest* of the five baseline files at 81/63.
+
+**The actual mechanism.** `Saturation.check_from`
+(`lib/model/algorithms/saturation.ml:278`) prunes only against `d.visited`.
+But `update_visited` returns a *copy* (`{ d with visited = ... }`), and
+`check_destinations` is `States.fold (check_from d) xs` — every sibling
+destination receives the same `d`. So `visited` accumulates down a path and
+never carries across branches: the traversal enumerates **simple paths**,
+not states. The `Traces` memo meant to curb this is properly global (one
+`ref` created in `edges`, shared across source states), but is switched off
+for whole subtrees by `collect_from_traces`'s `None, None` branch, which
+recurses with `{ d with can_collect_traces = ref false }` — a *fresh* ref,
+so nothing below re-enables it.
+
+**Quantified.** `test/satscale.ml` (new, see below) saturates a k x k grid
+of silent transitions — exactly the shape parallel interleaving produces,
+since `Layered.compLTS`'s `do_parl`/`do_parr` let either side of a `cpar`
+move — against a silent *chain* of identical state count as a control:
+
+| k | states | simple paths | grid (s) | chain (s) | ratio |
+| --- | --- | --- | --- | --- | --- |
+| 6 | 50 | 924 | 0.10 | 0.0008 | 129x |
+| 7 | 65 | 3432 | 0.85 | 0.0015 | 565x |
+| 8 | 82 | 12870 | 13.44 | 0.0030 | 4481x |
+| 9 | 101 | 48620 | **436.72** | 0.0050 | 87344x |
+
+The chain is linear in state count. The grid, at the *same* state count,
+takes 437 seconds for 101 states. Per-step growth is 8x, 16x, 32x while the
+path count grows only 3.8x per step, so the cost is worse than path
+enumeration alone — there is super-linear work per path as well.
+
+**Why the fix is well-defined rather than open-ended.**
+`ActionPair.try_update` (`lib/model/components.ml:971`) merges any two
+actionpairs whose actions are `wk_equal` and whose destination sets are
+*equal* by keeping `Annotation.shorter`. So of the exponentially many paths
+enumerated, all but the **shortest annotation** in each equivalence class
+are discarded. The exploration is computing, at great expense, something a
+shortest-path search would produce directly. (Note the equivalence is on
+*exactly equal* destination sets, so not everything collapses to a single
+survivor — but within a class the work beyond the shortest is waste.)
+
+- **Tooling.** `test/satscale.ml` plus its `test/dune` stanza: a pure-OCaml
+  scaling harness linking `rocq-mebi.model` only, same constraint as
+  `tests.ml`. Labelled explicitly as infrastructure per `CLAUDE.md` — it is
+  a measurement binary, not plugin capability. It partially covers
+  `TODO.md`'s unchecked "Benchmarking -> Algorithms -> Saturation" item,
+  though it was written to answer this question rather than to be that
+  feature. Its practical value going forward is that saturation changes can
+  now be iterated in **seconds** against a known-bad shape, instead of
+  hour-long Rocq builds, with the 18-count proof baseline as the
+  correctness gate.
+
+No change to the algorithm itself in this entry — this is the diagnosis.
+
+**Session tally:** Tooling 1 · Docs 1 · Optimization 0 · Bug fix 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
