@@ -9,7 +9,6 @@ src/META.rocq-mebi
 -I lib/showable/
 -I lib/model/
 -I lib/model/algorithms/
--I lib/model/wip/
 -I src/
 -arg "-w all"
 
@@ -154,12 +153,6 @@ lib/model/FSM.ml
 lib/model/FSM.mli
 
 
-lib/model/wip/wip_annotation.ml
-lib/model/wip/wip_annotation.mli
-lib/model/wip/wip_trace.ml
-lib/model/wip/wip_trace.mli
-lib/model/wip/wip_traces.ml
-lib/model/wip/wip_traces.mli
 
 
 lib/model/algorithms/saturation.ml

@@ -1097,6 +1097,294 @@ Verification: full five-file `PluginProofs.v` run, `make -j1` per file, all
 
 **Session tally:** Optimization 1 · Tooling 1 · Docs 1 · Bug fix 0 ·
 Refactor 0 · **New feature 0.**
+## 2026-09-28 — B2 reframed: saturation enumerates paths, not states
+
+Branch `investigate/saturation-path-explosion`, off `main` (`da32f6b`).
+`TODO.md`'s A3 ("optimize saturation -- takes a long time on larger/
+multi-layered examples") has been an unquantified hunch since it was
+written. It now has a mechanism, a location and a number.
+
+**How B2 was framed, and why that was wrong.** The backlog said
+`Proc/Test3`'s trouble is "specifically `MeBi Sim`'s proof *search*", with
+extraction already succeeding. Two phase-isolation runs say otherwise:
+
+- `CADP/Size2/Glued` fails in *extraction*, not search — `LTS_Incomplete`
+  from `src/wrapper.ml:243`, raised when the state bound is hit. It never
+  reaches the proof solver at all (zero `ReModel` lookups logged). Its
+  `### FAIL: ^` tag, inherited rather than verified, turns out to be
+  accurate.
+- `Proc/Test3`'s `wsim_pq` was rebuilt with **no `Solve` at all** — just
+  `MeBi Sim Begin`, so the wall time is extraction + saturation + merge with
+  zero proof search in it. It ran **1 hour 13 minutes without completing**
+  and was killed. The earlier 50-minute and 25-minute timeouts died in the
+  same phase; the `Solve 300` cap tried in between was never going to help,
+  because `Begin` runs unconditionally.
+
+So for `Test3` the cost is not proof search. B2 as written is misdiagnosed.
+
+**A hypothesis that was disproved on the way.** The first guess was that
+multi-layer extraction (`Using compLTS termLTS`, two LTSs) was to blame.
+It is not: `CADP/Size1/Glued/MutualExclusion` also uses two LTSs
+(`Using lts step`) and is the *fastest* of the five baseline files at 81/63.
+
+**The actual mechanism.** `Saturation.check_from`
+(`lib/model/algorithms/saturation.ml:278`) prunes only against `d.visited`.
+But `update_visited` returns a *copy* (`{ d with visited = ... }`), and
+`check_destinations` is `States.fold (check_from d) xs` — every sibling
+destination receives the same `d`. So `visited` accumulates down a path and
+never carries across branches: the traversal enumerates **simple paths**,
+not states. The `Traces` memo meant to curb this is properly global (one
+`ref` created in `edges`, shared across source states), but is switched off
+for whole subtrees by `collect_from_traces`'s `None, None` branch, which
+recurses with `{ d with can_collect_traces = ref false }` — a *fresh* ref,
+so nothing below re-enables it.
+
+**Quantified.** `test/satscale.ml` (new, see below) saturates a k x k grid
+of silent transitions — exactly the shape parallel interleaving produces,
+since `Layered.compLTS`'s `do_parl`/`do_parr` let either side of a `cpar`
+move — against a silent *chain* of identical state count as a control:
+
+| k | states | simple paths | grid (s) | chain (s) | ratio |
+| --- | --- | --- | --- | --- | --- |
+| 6 | 50 | 924 | 0.10 | 0.0008 | 129x |
+| 7 | 65 | 3432 | 0.85 | 0.0015 | 565x |
+| 8 | 82 | 12870 | 13.44 | 0.0030 | 4481x |
+| 9 | 101 | 48620 | **436.72** | 0.0050 | 87344x |
+
+The chain is linear in state count. The grid, at the *same* state count,
+takes 437 seconds for 101 states. Per-step growth is 8x, 16x, 32x while the
+path count grows only 3.8x per step, so the cost is worse than path
+enumeration alone — there is super-linear work per path as well.
+
+**Why the fix is well-defined rather than open-ended.**
+`ActionPair.try_update` (`lib/model/components.ml:971`) merges any two
+actionpairs whose actions are `wk_equal` and whose destination sets are
+*equal* by keeping `Annotation.shorter`. So of the exponentially many paths
+enumerated, all but the **shortest annotation** in each equivalence class
+are discarded. The exploration is computing, at great expense, something a
+shortest-path search would produce directly. (Note the equivalence is on
+*exactly equal* destination sets, so not everything collapses to a single
+survivor — but within a class the work beyond the shortest is waste.)
+
+- **Tooling.** `test/satscale.ml` plus its `test/dune` stanza: a pure-OCaml
+  scaling harness linking `rocq-mebi.model` only, same constraint as
+  `tests.ml`. Labelled explicitly as infrastructure per `CLAUDE.md` — it is
+  a measurement binary, not plugin capability. It partially covers
+  `TODO.md`'s unchecked "Benchmarking -> Algorithms -> Saturation" item,
+  though it was written to answer this question rather than to be that
+  feature. Its practical value going forward is that saturation changes can
+  now be iterated in **seconds** against a known-bad shape, instead of
+  hour-long Rocq builds, with the 18-count proof baseline as the
+  correctness gate.
+
+No change to the algorithm itself in this entry — this is the diagnosis.
+
+**Session tally:** Tooling 1 · Docs 1 · Optimization 0 · Bug fix 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
+## 2026-09-28 — Differential harness for the saturation rewrite
+
+Branch `investigate/saturation-path-explosion`. Step 1 of the plan in
+`notes/5-saturation-rewrite.md`, agreed with Jonah: build the safety net
+before touching the algorithm.
+
+- **Tooling.** `test/satdiff.ml` plus `test/satdiff.expected` and a
+  `test/dune` stanza. Infrastructure only, linking `rocq-mebi.model` — same
+  constraint as `tests.ml` and `satscale.ml`.
+
+  It generates deterministic pseudo-random LTSs, saturates each, and prints a
+  **canonically sorted** rendering of the resulting `EdgeMap` — source states
+  ordered, actions ordered, destination sets ordered — because `EdgeMap` is a
+  `Hashtbl` and its iteration order is not a contract. 200 seeds produce 1332
+  weak-transition rows, each showing label, full annotation and destination
+  set.
+
+  Why this and not the proof suite: `CLAUDE.md`'s 18-count baseline says the
+  proofs still close in the same number of steps; it does *not* say the
+  saturated FSM holds the same weak transitions. Since `ActionPair.try_update`
+  merges on *exactly equal* destination sets and keeps `Annotation.shorter`, a
+  rewrite can change which annotation survives and still pass the proof gate.
+  That is the failure mode this harness exists to catch.
+
+Two things learned building it, both worth recording:
+
+- The first attempt generated 3-8 state graphs with out-degree up to 3 and
+  **failed to clear a single seed in ten minutes** — with the current
+  implementation. That is the blow-up being fixed, reproduced accidentally on
+  graphs small enough to draw by hand. Sizes are now 3-5 states, out-degree
+  1-2, which complete instantly; the harness is only useful while the *old*
+  implementation can still finish.
+- The first version printed per-seed timings into the dump, which made the
+  output differ between runs and defeated the entire purpose. Timings now go
+  to stderr; stdout is the artifact being diffed and may contain nothing that
+  varies run to run. Verified deterministic across repeated runs.
+
+`test/satdiff.expected` is the golden capture of the **current**
+implementation, confirmed to match on a fresh run. The rewrite is green when
+`dune exec test/satdiff.exe -- 200 2>/dev/null | diff test/satdiff.expected -`
+is empty.
+
+**Session tally:** Tooling 1 · Docs 1 · Optimization 0 · Bug fix 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
+## 2026-09-28 — Saturation rewritten: closure instead of path enumeration
+
+Branch `investigate/saturation-path-explosion`. Step 2 of the plan in
+`notes/5-saturation-rewrite.md`. Closes `TODO.md`'s long-standing A3
+("optimize saturation -- takes a long time on larger/multi-layered
+examples").
+
+- **Optimization.** `Saturation.edges` now routes through `edge_closure`
+  rather than `edge`. Instead of a depth-first enumeration of every simple
+  path, it takes the reflexive-transitive silent closure of each state
+  breadth-first (recording a shortest silent path to each member), then for
+  every visible edge `s -a-> t` emits `(a, {goto})` for each `s` in the
+  closure of the source and each `goto` in the closure of `t`, annotated
+  with the concatenation. Results still go through
+  `ActionPair.merge_lists` so everything downstream is untouched.
+
+  Breadth-first is what makes this equivalent rather than merely similar:
+  `ActionPair.try_update` merges `wk_equal` actions with equal destination
+  sets by keeping `Annotation.shorter`, so of the exponentially many paths
+  the old traversal explored, only the shortest per destination ever
+  survived. The closure produces exactly those survivors directly.
+
+  | k | states | simple paths | before | after |
+  | --- | --- | --- | --- | --- |
+  | 9 | 101 | 48620 | 436.72 s | **0.0009 s** |
+  | 12 | 170 | 2704156 | infeasible | **0.0025 s** |
+
+- **Bug fix.** The rewrite is *not* behaviour-preserving, and the
+  differential harness caught exactly why. Over 200 generated LTSs:
+  **0 weak transitions lost, 73 gained, 2 annotations strictly shorter, 0
+  longer**, and 45 equal-length tie-swaps (`Annotation.shorter` returns its
+  second argument on ties, so emission order picks among equally short
+  witnesses).
+
+  The 73 are a genuine under-approximation in the old algorithm. Its
+  `visited` set prunes any witness that revisits a state — necessary to make
+  a depth-first search terminate on a cyclic graph, but it also silently
+  discards valid weak transitions, since `s =a=> t` holds whenever *some*
+  walk `tau* a tau*` exists and walks may revisit states. The closure has no
+  such restriction. This is the same character of defect as A5: a quiet
+  under-approximation in saturation, inert on the examples that happen to
+  work. A missing weak transition is a soundness concern for bisimilarity —
+  a distinguishing branch that was never derived cannot separate two
+  processes.
+
+  Adopted with Jonah's explicit agreement, since it changes what the plugin
+  computes rather than only how fast.
+
+Verification:
+
+- All 1405 emitted annotations checked structurally — every one a
+  well-formed walk whose notes chain (`goto` = next `from`), starting at its
+  source, ending at its declared destination, containing exactly one visible
+  action matching its label.
+- Full five-file `PluginProofs.v` run, `make -j1` per file: **all 18 counts
+  identical to baseline, zero `Unsolved`**. That the counts are unchanged
+  despite 73 extra weak transitions is the reassuring part — the additions
+  are options the solver never needed.
+- `dune exec test/tests.exe` 11/11.
+- `test/satdiff.expected` regenerated against the new implementation
+  (1332 -> 1405 weak rows).
+
+**Session tally:** Optimization 1 · Bug fix 1 · Docs 1 · Tooling 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
+## 2026-09-28 — Delete the path-enumeration machinery
+
+Branch `investigate/saturation-path-explosion`. Step 4 of the plan: the
+closure implementation landed in the previous entry, so everything that
+existed only to service the depth-first traversal is now dead.
+
+- **Refactor.** Removed from `lib/model/algorithms/saturation.ml` and its
+  `.mli`: the `data` record (`named`/`current`/`visited`/`traces`/
+  `can_collect_traces`/`old_edges`) and its updaters, `check_from`,
+  `check_actions`, `collect_from_traces`, `continue_check_destinations`,
+  `check_destinations`, `edge_action_destinations`, `edge_actions`, `edge`,
+  `stop`, `update_acc`, `finish_with_trace`, `finish_with_trace_upto`,
+  `skip_action`, `already_visited` and `get_old_actions`. Deleted
+  `lib/model/wip/` entirely — `wip_annotation`, `wip_trace`, `wip_traces`
+  and their `dune` — with the `rocq-mebi.model.wip` dependency dropped from
+  `lib/model/dune` and `lib/model/algorithms/dune`, and the `-I` plus six
+  module lines dropped from `_CoqProject`.
+
+  The public signature shrinks from 24 values and three submodules to a
+  single `val edges`. Every consumer (`FSM.ml`, `FSM.mli`, `model.ml`,
+  `model.mli`) already constrained only `state`, `states`, `labels` and
+  `edgemap` and called only `edges`, so none of them needed touching.
+
+  This is what made backlog item **A** moot rather than solved, as predicted
+  in `notes/5-saturation-rewrite.md`: the trace memo whose soundness was
+  going to be investigated no longer exists.
+
+Verification: `test/satdiff.exe` output **byte-identical** to the golden
+file before and after the deletion, which is the point — this commit must
+change nothing observable. `dune exec test/tests.exe` 11/11; `satscale`
+unchanged; full `make -j$(nproc)`.
+
+Worth recording: `make` caught five warnings that `dune build` accepted —
+unused module `Annotations`, unused module `Label`, and unused types
+`label`/`annotation`/`trees`/`action` left behind by the strip. This is the
+second time this session that `make`'s stricter settings caught something
+`dune build` waved through, as `ASSISTED-CHANGES.md`'s verification-baseline
+note warns. Always finish with a `make` run.
+
+**Session tally:** Refactor 1 · Docs 1 · Optimization 0 · Bug fix 0 ·
+Tooling 0 · **New feature 0.**
+
+---
+
+## 2026-09-28 — `Proc/Test3` after the rewrite: extraction 1h13m+ → 0.65s
+
+Branch `investigate/saturation-path-explosion`. The end-to-end check on the
+example that started this whole line of work. No code change.
+
+`Proc/Test3`'s `PluginProofs.v`, unmodified, with its checked-in
+`MeBi Sim Solve 100000`:
+
+| phase | before | after |
+| --- | --- | --- |
+| `MeBi Sim Begin` (extraction + saturation + merge) | **1h13m, killed without completing** | **0.65 s** |
+| whole file | never reached proof search | 166 s |
+
+The lower bound on the speedup for that phase is about 6700x, and it is only
+a lower bound because the old run never finished.
+
+**What this does and does not fix.** The file still fails: proof search runs
+its full budget and reports `(Stopped) Unsolved after 100001 iterations`
+(the documented `N + 1`), so `Qed` fails and `make` exits 2. Of the 166
+seconds, 0.65 is extraction and the remaining ~165 is proof search.
+
+So B2 is now, for the first time, genuinely what the backlog always claimed
+it was. The original entry said the trouble was "specifically `MeBi Sim`'s
+proof *search*" with extraction already succeeding. That was **wrong when
+written** — extraction never completed, so proof search was not even being
+reached, which is what the 2026-09-28 phase isolation established. After the
+saturation fix the description becomes accurate: extraction is now trivial
+and the remaining problem really is search. The backlog entry has been
+corrected to record both the error and the fact that its conclusion now
+holds for a different reason.
+
+Worth noting that the saturation fix *added* 73 weak transitions in testing,
+which enlarges the search space rather than shrinking it — so `Test3`
+remaining unsolved at 100000 iterations is not evidence against the rewrite.
+Whether it closes at a higher bound is untested, and `Proc/Test3`'s
+own comment already records `wsim_p3` as "unfinished after 500000, crashed
+on 1000000".
+
+**Session tally:** Docs 1 · Optimization 0 · Bug fix 0 · Tooling 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
