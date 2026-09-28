@@ -859,6 +859,40 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-28 — A2 revisited: a fresh, untested lead (cross-FSM merge)
+
+No code changed — a follow-up read of `lib/model/components.ml` at
+Jonah's request, to leave a documented lead for a fresh session rather
+than continue building throwaway examples in this one.
+
+- **Docs.** The 2026-09-27 A2 analysis covered deduplication *within* one
+  FSM's own saturation (`Saturation.edge_actions`'s
+  `ActionPair.merge_lists`/`try_update` fold), and concluded it makes
+  same-`goto` ambiguity collapse automatically. That analysis doesn't cover
+  how the *two* FSMs in a `weak_sim` proof combine: `MeBi Sim Begin` builds
+  and saturates an FSM for each side separately, then merges them
+  (`FSM.merge` → `EdgeMap.merge` → `ActionMap.merge` for any shared state).
+  `ActionMap.merge` (`lib/model/components.ml:1162`,
+  `ActionPairs.union (to_actionpairs a) (to_actionpairs b) |> of_actionpairs`)
+  is a plain set union on full structural equality — it does not run
+  `try_update`'s weaker collapse. So a state genuinely shared between both
+  FSMs, with each FSM's own independent saturation deriving a
+  different-annotation weak transition from it to the same `goto`, would
+  survive the merge as two separate entries. Plausible root cause of the
+  needed asymmetry: `MeBi Config`'s state-count bound (settable via `MeBi
+  Config Bounds As Num States <n>`, `src/g_mebi.mlg:214`) truncating one
+  FSM's BFS before it fully explores a shared state's descendants while
+  the other's doesn't. Full write-up, including a concrete 4-step plan for
+  a fresh session to try, in `notes/4-post-review-backlog.md`'s A2 section.
+
+Entirely unverified — a hypothesis from reading `ActionMap.merge`, not a
+confirmed mechanism.
+
+**Session tally:** Docs 1 · Bug fix 0 · Tooling 0 · Refactor 0 ·
+Optimization 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
