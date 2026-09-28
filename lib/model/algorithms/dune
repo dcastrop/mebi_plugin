@@ -4,8 +4,7 @@
  (libraries
   rocq-mebi.utils
   rocq-mebi.terms
-  rocq-mebi.model.components
-  rocq-mebi.model.wip)
+  rocq-mebi.model.components)
  (modules saturation)
  (wrapped false))
 
@@ -17,7 +16,6 @@
   rocq-mebi.terms
   rocq-mebi.model.components
   rocq-mebi.model.algorithms.saturation
-  rocq-mebi.model.wip
   rocq-mebi.model.lts
   rocq-mebi.model.fsm
   ; rocq-mebi.model
