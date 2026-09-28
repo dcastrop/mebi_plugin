@@ -47,6 +47,23 @@ jobs:
             dune exec test/tests.exe
           '
 
+      # The saturation differential. This is the only check that catches a
+      # change to Saturation silently altering which weak transitions or
+      # annotations survive -- the PluginProofs.v proof suite demonstrably
+      # cannot see that, since all 18 of its counts stayed identical through
+      # a change that added 73 weak transitions (see ASSISTED-CHANGES.md,
+      # 2026-09-28). Deterministic by construction: the dump is canonically
+      # sorted and timings go to stderr, so any diff here is a real
+      # behaviour change. If it is an intended one, regenerate the golden
+      # file deliberately and say why in the commit message.
+      - name: dune exec test/satdiff.exe (saturation differential)
+        run: |
+          nix develop --command bash -euc '
+            eval "$(opam env --switch=$(pwd) --set-switch)"
+            dune exec test/satdiff.exe -- 200 2>/dev/null \
+              | diff test/satdiff.expected -
+          '
+
       # Also exercise the make path and the examples/ subset _CoqProject
       # enables by default (the expensive PluginProofs.v proof-search suite
       # stays commented out -- see CLAUDE.md for running that by hand).
