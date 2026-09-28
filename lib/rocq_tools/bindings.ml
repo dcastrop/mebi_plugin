@@ -201,7 +201,7 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
       : Names.Name.t mm
       =
       (* Logger.trace __FUNCTION__; *)
-      Logger.thing ~__FUNCTION__ Debug "x" x Strfy.econstr;
+      Logger.thing ~__FUNCTION__ Trace "x" x Strfy.econstr;
       let open Syntax in
       let f (i : int) : Names.Name.t option -> Names.Name.t option mm = function
         | Some n ->
@@ -213,7 +213,7 @@ module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
           let* eq = econstr_eq ~enc:false x y in
           if eq
           then (
-            Logger.thing ~__FUNCTION__ Debug "eq x" z Rocq_utils.Strfy.name;
+            Logger.thing ~__FUNCTION__ Trace "eq x" z Rocq_utils.Strfy.name;
             Some z |> return)
           else return None
       in
