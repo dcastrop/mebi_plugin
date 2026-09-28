@@ -1028,6 +1028,73 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-28 — Saturation rewritten: closure instead of path enumeration
+
+Branch `investigate/saturation-path-explosion`. Step 2 of the plan in
+`notes/5-saturation-rewrite.md`. Closes `TODO.md`'s long-standing A3
+("optimize saturation -- takes a long time on larger/multi-layered
+examples").
+
+- **Optimization.** `Saturation.edges` now routes through `edge_closure`
+  rather than `edge`. Instead of a depth-first enumeration of every simple
+  path, it takes the reflexive-transitive silent closure of each state
+  breadth-first (recording a shortest silent path to each member), then for
+  every visible edge `s -a-> t` emits `(a, {goto})` for each `s` in the
+  closure of the source and each `goto` in the closure of `t`, annotated
+  with the concatenation. Results still go through
+  `ActionPair.merge_lists` so everything downstream is untouched.
+
+  Breadth-first is what makes this equivalent rather than merely similar:
+  `ActionPair.try_update` merges `wk_equal` actions with equal destination
+  sets by keeping `Annotation.shorter`, so of the exponentially many paths
+  the old traversal explored, only the shortest per destination ever
+  survived. The closure produces exactly those survivors directly.
+
+  | k | states | simple paths | before | after |
+  | --- | --- | --- | --- | --- |
+  | 9 | 101 | 48620 | 436.72 s | **0.0009 s** |
+  | 12 | 170 | 2704156 | infeasible | **0.0025 s** |
+
+- **Bug fix.** The rewrite is *not* behaviour-preserving, and the
+  differential harness caught exactly why. Over 200 generated LTSs:
+  **0 weak transitions lost, 73 gained, 2 annotations strictly shorter, 0
+  longer**, and 45 equal-length tie-swaps (`Annotation.shorter` returns its
+  second argument on ties, so emission order picks among equally short
+  witnesses).
+
+  The 73 are a genuine under-approximation in the old algorithm. Its
+  `visited` set prunes any witness that revisits a state — necessary to make
+  a depth-first search terminate on a cyclic graph, but it also silently
+  discards valid weak transitions, since `s =a=> t` holds whenever *some*
+  walk `tau* a tau*` exists and walks may revisit states. The closure has no
+  such restriction. This is the same character of defect as A5: a quiet
+  under-approximation in saturation, inert on the examples that happen to
+  work. A missing weak transition is a soundness concern for bisimilarity —
+  a distinguishing branch that was never derived cannot separate two
+  processes.
+
+  Adopted with Jonah's explicit agreement, since it changes what the plugin
+  computes rather than only how fast.
+
+Verification:
+
+- All 1405 emitted annotations checked structurally — every one a
+  well-formed walk whose notes chain (`goto` = next `from`), starting at its
+  source, ending at its declared destination, containing exactly one visible
+  action matching its label.
+- Full five-file `PluginProofs.v` run, `make -j1` per file: **all 18 counts
+  identical to baseline, zero `Unsolved`**. That the counts are unchanged
+  despite 73 extra weak transitions is the reassuring part — the additions
+  are options the solver never needed.
+- `dune exec test/tests.exe` 11/11.
+- `test/satdiff.expected` regenerated against the new implementation
+  (1332 -> 1405 weak rows).
+
+**Session tally:** Optimization 1 · Bug fix 1 · Docs 1 · Tooling 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
