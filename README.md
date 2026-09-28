@@ -81,7 +81,9 @@ A full `dune build` takes ~1m40s, almost all of it the `MeBi Benchmark` vernacul
 `dune build @check` also produces the `.cmi`/`.cmt` files merlin needs, so it doubles as the "make my editor happy" command.
 
 ### Running tests
-`test/tests.ml` is currently commented out in its entirety, so `_build/default/test/tests.exe` builds but does nothing. `test/saturation.ml` predates the model refactor and no longer compiles; it is excluded via `(modules tests)` in `test/dune`.
+`dune exec test/tests.exe` runs a small pure-OCaml test suite (no Rocq runtime) exercising `lib/model` directly — FSM construction, saturation, minimization, bisimilarity, JSON round-tripping. It's a fast first signal for changes to `lib/model`/`lib/terms`/`lib/utils`, but it doesn't exercise the proof solver (`src/proof_solver*`) or anything Rocq-facing.
+
+The only end-to-end coverage of the proof solver is the `examples/Bisimilarity/**/PluginProofs.v` files, which are commented out of `_CoqProject` by default (full proof search is slow — some examples need tens of thousands of tactic iterations). Uncomment the ones you need and run `make -j$(nproc)` to exercise them; see the comment next to each line in `_CoqProject` for which are cheap vs. expensive.
 
 
 
@@ -111,45 +113,99 @@ If VSCode is launched outside the direnv environment it won't have `_opam/bin` o
 
 
 
-## Scratchpad
+## Usage
 
-### Command that declares a relation as a "LTS-generating relation":
+Every command below starts with `MeBi` and needs `Require Import MEBI.loader.` first. This is the current command surface — see `src/g_mebi.mlg` for the exact grammar, and `theories/Test.v`/`theories/DevTest.v` for more worked examples.
+
+### Building an LTS or FSM
 
 ```
-MeBi Run LTS <ident>.
+MeBi Run LTS <term> Using <relation> [<relation>...].
+MeBi Run FSM <term> Using <relation> [<relation>...].
 ```
 
-* `<ident>` should be the identifier of a relation with type
-`Term -> Action -> Term -> Prop`.
+`<relation>` must be an inductive relation of type `Term -> Label -> Term -> Prop` describing `<term>`'s transitions; any further `<relation>`s let mebi unfold auxiliary definitions it needs while exploring. `Run LTS` builds the labelled transition system as-is; `Run FSM` additionally deduplicates into a finite state machine. Example:
+
+```coq
+Inductive testLTS : nat -> bool -> nat -> Prop :=
+  | test1 n : testLTS (S n) true n
+  | test2 : testLTS (S 0) false (S 0).
+
+MeBi Run LTS 0 Using testLTS.
+```
+
+### Bisimilarity, merging, minimizing, saturating
+
+```
+MeBi Run Bisim <term> With <relation> And <term> With <relation> [Using <relation>...].
+MeBi Run Merge <term> With <relation> And <term> With <relation> [Using <relation>...].
+MeBi Run Minimize <term> Using <relation> [<relation>...].
+MeBi Run Saturate <term> Using <relation> [<relation>...].
+```
+
+`Run Bisim` checks (weak, if `Config Weak` is set — see below) bisimilarity between the two terms' LTSs. `Run Merge` combines two FSMs into one. `Run Minimize` partition-refines an FSM down to its bisimulation quotient. `Run Saturate` computes weak transitions across silent (tau) steps.
+
+### Benchmarking
+
+```
+MeBi Benchmark LTS <min-size> <max-size> <term> Using <relation> [<relation>...].
+```
+
+Times repeated LTS construction over a range of sizes using the `benchmark` package.
+
+### Interactive proof search (`MeBi Sim`)
+
+Inside a proof whose goal is bisimilarity-shaped (e.g. `weak_sim r1 r2 t1 t2`), `MeBi Sim` drives a tactic-based proof-search state machine instead of writing the proof by hand:
+
+```coq
+Example wsim_pq : weak_sim termLTS termLTS p q.
+Proof.
+  MeBi Sim Begin termLTS p And termLTS q Using termLTS.
+  MeBi Sim Solve 114.
+Qed.
+```
+
+`Sim Begin <relation> <term> And <relation> <term> [Using <relation>...]` starts the search for the current goal. `Sim Step.` runs a single step. `Sim Solve <bound>.` runs up to `<bound>` steps, stopping as soon as the goal is proved — the bound just needs to be an upper limit, not an exact count (see the worked examples under `examples/Bisimilarity/**/PluginProofs.v` for real bound values, which vary widely by example size).
+
+### Configuration
+
+```
+MeBi Config Reset [Bounds|Weak|FailIf|Output].
+MeBi Config Bounds As Num States <n>.
+MeBi Config Bounds As Num Transitions <n>.
+MeBi Config Weak As Option <term>.
+MeBi Config Weak As <term> Of <relation>.
+MeBi Config Weak1 / Weak2 As Option <term>.        (* set only the first/second side of a Bisim/Merge/Sim check *)
+MeBi Config Weak1 / Weak2 As <term> Of <relation>.
+MeBi Config FailIf Empty/Incomplete/NotBisimilar True/False.
+MeBi Config Output "<Kind>" True/False.
+```
+
+- `Bounds` caps how large an explored graph may get before mebi gives up.
+- `Weak` (and the asymmetric `Weak1`/`Weak2`) mark a label constructor as the silent/tau action, enabling weak bisimilarity/saturation. `Reset Weak` clears it back to strong bisimilarity.
+- `FailIf` controls whether an empty LTS, an incomplete (unboundedly large) exploration, or a negative bisimilarity result raises a hard error instead of a warning.
+- `Output "<Kind>" <bool>` toggles one log channel. `<Kind>` is one of `Debug`, `Info`, `Notice`, `Warning`, `Error`, `Trace`, `Result`, `Show`, `DecodeResults`, `DumpResults`.
+
+### Diagnostics
+
+```
+MeBi Message "<text>".
+MeBi Debug "<text>".
+MeBi Divider.
+MeBi Divider "<text>".
+```
+
+Print a message/debug line, or a visual divider (with an optional label) — useful for finding your place in a large build log.
+
+> `MeBi Help` is declared in `src/g_mebi.mlg` but currently disabled (it prints a placeholder message); there is no in-plugin help text yet.
 
 
 
 
 
-## TODO
+## Status & Remaining Work
 
-So far, this is essentially
-[`coq/doc/plugins_tutorial/tuto1`](https://github.com/coq/coq/tree/master/doc/plugin_tutorial/tuto1)
-but renamed. Here is the current TODO list.
-
-- [ ] Reading `step` relation with type
-      `Step : Term -> Label -> Term -> Prop'`
-      that captures state transitions in a LTS semantics.
-
-- [ ] Reading terms `t : Term`.
-
-- [ ] Building a state machine using `Step` for term `t`
-
-- [ ] Implementing one of the algoriths for deciding
-      bisimilarity in Sangiorgi's book.
-
-
-**Questions:**
-- We need to build a proof in Coq that two terms are bisimilar.
-  We need the statement in terms of `Step`, and turn the result
-  of our algorithm into sequences of Coq tactics.
-- Tau transitions/weak bisimilarity?
-- Open terms/use of existing lemmas?
+The core functionality described under [Usage](#usage) — reading a `Step : Term -> Label -> Term -> Prop`-shaped relation, building an LTS/FSM from a term, deciding (weak) bisimilarity, and turning the result into a Rocq proof via `MeBi Sim` — is implemented and working. Remaining work (algorithmic gaps like a similarity-only algorithm, proof-solver performance on larger examples, and project-structure/tooling debt such as CI and packaging metadata) is tracked in [`TODO.md`](TODO.md).
 
 
 

@@ -36,7 +36,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (M : Rocq_monad_utils.S)
     (Bindings : Bindings.S with type 'a mm = 'a M.mm) :
   S
@@ -60,31 +59,28 @@ module Make
     ; bindings : Bindings.t
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "ConstructorBindings"
+      let name = "ConstructorBindings"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ "index", `Int x.index
-            ; "name", `String x.name
-            ; "bindings", Bindings.json ~as_elt:true x.bindings
-            ]
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        `Assoc
+          [ "index", `Int x.index
+          ; "name", `String x.name
+          ; "bindings", Bindings.json ~as_elt:true x.bindings
+          ]
+      ;;
+    end)
 
   let extract_info (x : Ind.t) : t list mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     (* NOTE: constructor tactic index starts from 1 -- ignore 0 below *)
     let (get_constructor_index, _), _ = Utils.new_int_counter ~start:0 () in
     let tys : Ind.LTS.constructor array = Ind.get_lts_constructor_types x in
     let f (i : int) (acc : t list) : t list mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let { name; constructor = ctx, c } : Ind.LTS.constructor = tys.(i) in
       let index : int = get_constructor_index () in
       let name : string = Names.Id.to_string name in
@@ -115,7 +111,7 @@ module Make
   (***********************************************************************)
 
   let get_quantified_hyp : Names.Name.t -> Tactypes.quantified_hypothesis =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     function
     | Names.Name.Anonymous -> Tactypes.AnonHyp (* FIXME: *) 0
     | Names.Name.Name v -> Tactypes.NamedHyp (CAst.make v)
@@ -129,7 +125,7 @@ module Make
   let rec get_bound_term (x : EConstr.t)
     : Bindings.Instructions.t -> EConstr.t mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     log_econstr ~__FUNCTION__ ~s:"x" x;
     function
     | Undefined -> raise (BindingInstruction_Undefined (x, x))
@@ -161,16 +157,16 @@ module Make
     :  EConstr.t * Bindings.ConstrMap.t' option
     -> EConstr.t Tactypes.explicit_bindings mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     function
     | _, None -> return []
     | x, Some xmap ->
       let open Syntax in
       let ys = Bindings.ConstrMap.to_seq_values xmap |> Array.of_seq in
       let f (i : int) (acc : EConstr.t Tactypes.explicit_bindings) =
-        Log.trace __FUNCTION__;
+        Logger.trace __FUNCTION__;
         let name, inst = ys.(i) in
-        Log.thing ~__FUNCTION__ Debug "name" name Rocq_utils.Strfy.name;
+        Logger.thing ~__FUNCTION__ Debug "name" name Rocq_utils.Strfy.name;
         Bindings.Instructions.log ~__FUNCTION__ inst;
         let q = get_quantified_hyp name in
         let* bs = get_bound_term x inst in
@@ -185,7 +181,7 @@ module Make
         (goto' : EConstr.t option)
     : Bindings.t -> EConstr.t Tactypes.bindings mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     log_econstr ~__FUNCTION__ ~s:"from'" from';
     function
     | No_Bindings -> return Tactypes.NoBindings
@@ -204,7 +200,7 @@ module Make
       let open Syntax in
       let* bindings : EConstr.t Tactypes.explicit_bindings =
         let f (i : int) acc =
-          Log.trace __FUNCTION__;
+          Logger.trace __FUNCTION__;
           let* x = get_explicit_bindings (List.nth to_iter i) in
           x :: acc |> return
         in

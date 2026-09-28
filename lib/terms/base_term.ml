@@ -26,22 +26,19 @@ module type Args = sig
   val to_string : t -> string
 end
 
-module Make (Log : Logger.S) (X : Args) : S with type t = X.t = struct
+module Make (X : Args) : S with type t = X.t = struct
   module Base : Base_.S with type t = X.t = struct
     type t = X.t
 
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
+    include Json.Thing.Make (struct
+        type k = t
 
-          let name = "Term"
+        let name = "Term"
 
-          let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-            `String (X.to_string x)
-          ;;
-        end)
+        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+          `String (X.to_string x)
+        ;;
+      end)
 
     let equal = X.equal
     let compare = X.compare
@@ -50,8 +47,8 @@ module Make (Log : Logger.S) (X : Args) : S with type t = X.t = struct
   let hash = X.hash
 
   include Base
-  module Tree = Tree.Make (Log) (Base)
-  module Trees = Trees.Make (Log) (Tree)
-  module Constructor_tree = Constructor_tree.Make (Log) (Base) (Tree)
-  module Constructor_trees = Constructor_trees.Make (Log) (Constructor_tree)
+  module Tree = Tree.Make (Base)
+  module Trees = Trees.Make (Tree)
+  module Constructor_tree = Constructor_tree.Make (Base) (Tree)
+  module Constructor_trees = Constructor_trees.Make (Constructor_tree)
 end

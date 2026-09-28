@@ -46,4 +46,3 @@ RocqMakefile*
 # ignore dumps
 **/_dumps
 src/_dump
-src/commandOLDunify.ml

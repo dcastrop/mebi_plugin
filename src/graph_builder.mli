@@ -17,7 +17,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (M : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t)
     (Model :

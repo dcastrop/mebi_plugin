@@ -50,41 +50,29 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
-    (Base : Base_term.S)
-    (State : State.S with type base = Base.t)
-    (States : States.S with type elt = State.t)
-    (Label : Label.S with type base = Base.t)
-    (Labels : Labels.S with type elt = Label.t)
-    (Action : Action.S with type label = Label.t)
-    (ActionMap :
-       Actionmap.S with type action = Action.t and type states = States.t)
-    (EdgeMap :
-       Edgemap.S
-       with type state = State.t
-        and type actionmap = ActionMap.t'
-        and type label = Label.t)
-    (Partition :
-       State_partition.S
-       with type elt = States.t
-        and type edgemap = EdgeMap.t'
-        and type state = State.t)
-    (Info : Info.S with type base = State.base and type labels = Labels.t)
+    (C : Components.S)
     (FSM :
        FSM.S
-       with type state = State.t
-        and type states = States.t
-        and type labels = Labels.t
-        and type edgemap = EdgeMap.t'
-        and type info = Info.t) :
+       with type state = C.State.t
+        and type states = C.State.Set.t
+        and type labels = C.Label.Set.t
+        and type edgemap = C.EdgeMap.t'
+        and type info = C.Info.t) :
   S
-  with type state = State.t
-   and type states = States.t
-   and type label = Label.t
-   and type labels = Labels.t
-   and type edgemap = EdgeMap.t'
-   and type partition = Partition.t
+  with type state = C.State.t
+   and type states = C.State.Set.t
+   and type label = C.Label.t
+   and type labels = C.Label.Set.t
+   and type edgemap = C.EdgeMap.t'
+   and type partition = C.Partition.t
    and type fsm = FSM.t = struct
+  module State = C.State
+  module States = C.State.Set
+  module Label = C.Label
+  module Labels = C.Label.Set
+  module EdgeMap = C.EdgeMap
+  module Partition = C.Partition
+
   type state = State.t
   type states = States.t
   type label = Label.t
@@ -98,26 +86,23 @@ module Make
     ; pi : Partition.t
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "Minimization Results"
+      let name = "Minimization Results"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ "fsm", FSM.json ~as_elt:true x.fsm
-            ; "pi", Partition.json ~as_elt:true x.pi
-            ]
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        `Assoc
+          [ "fsm", FSM.json ~as_elt:true x.fsm
+          ; "pi", Partition.json ~as_elt:true x.pi
+          ]
+      ;;
+    end)
 
   exception CannotSplitEmptyBlock of unit
 
   let ensure_nonempty (a : States.t) : unit =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try assert (States.is_empty a |> Bool.not) with
     | Assert_failure _ -> raise (CannotSplitEmptyBlock ())
   ;;
@@ -129,7 +114,7 @@ module Make
         (block : States.t)
     : States.t * States.t option
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     ensure_nonempty block;
     let reachable_from_s : Partition.t = Partition.reachable s edges pi in
     Partition.log ~__FUNCTION__ ~s:"reachable from state" reachable_from_s;
@@ -152,7 +137,7 @@ module Make
   exception Split_OnlyReturnedOneBlock_ButNeqBlock of (States.t * States.t)
 
   let ensure_equal (a : States.t) (b : States.t) : unit =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try assert (States.equal a b) with
     | Assert_failure _ -> raise (Split_OnlyReturnedOneBlock_ButNeqBlock (a, b))
   ;;
@@ -165,7 +150,7 @@ module Make
         (label : Label.t)
     : unit
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     Partition.log ~__FUNCTION__ ~s:"pi" !pi;
     Label.log ~__FUNCTION__ ~s:"split by label" label;
     let edges : EdgeMap.t' = EdgeMap.reduce_by_label edges label in
@@ -188,13 +173,13 @@ module Make
         (block : States.t)
     : unit
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     Labels.non_silent alphabet
     |> Labels.iter (for_each_label pi changed edges (ref block))
   ;;
 
   let partition_states (fsm : FSM.t) : Partition.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let pi : Partition.t ref = ref (Partition.singleton fsm.states) in
     let changed : bool ref = ref true in
     while !changed do
@@ -205,7 +190,7 @@ module Make
   ;;
 
   let fsm (fsm : FSM.t) : t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     { fsm; pi = FSM.saturate ~only_if_weak:true fsm |> partition_states }
   ;;
 end

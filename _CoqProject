@@ -5,8 +5,11 @@ src/META.rocq-mebi
 -I lib/utils/
 -I lib/terms/
 -I lib/rocq_tools/
+-I lib/json/
+-I lib/showable/
 -I lib/model/
 -I lib/model/algorithms/
+-I lib/model/wip/
 -I src/
 -arg "-w all"
 
@@ -18,7 +21,7 @@ theories/Bisimilarity.v ###
 
 ###############################################################################
 ###############################################################################
-### Coq Examples 
+### Coq Examples
 ################
 ### NOTE: compilation to take far longer if manual/ltac proofs included
 
@@ -26,14 +29,14 @@ theories/Bisimilarity.v ###
 ### Proc
 examples/Proc.v ### REQUIRED FOR BELOW
 
-### Proc.Flat.Simple 
+### Proc.Flat.Simple
 examples/Bisimilarity/Proc/Test1/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test1/TermTests.v ### Success
 # examples/Bisimilarity/Proc/Test1/PluginProofs.v ### Success
 # examples/Bisimilarity/Proc/Test1/ManualProofs.v
 # examples/Bisimilarity/Proc/Test1/LtacProofs.v
 
-### Proc.Flat.Complex 
+### Proc.Flat.Complex
 examples/Bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test2/TermTests.v ### Success
 # examples/Bisimilarity/Proc/Test2/PluginProofs.v ### Success
@@ -47,7 +50,7 @@ examples/Bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
 
 # examples/Bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test4/TermTests.v ### Success
-# examples/Bisimilarity/Proc/Test4/PluginProofs.v ### TODO: proof explosion
+# examples/Bisimilarity/Proc/Test4/PluginProofs.v ### was never written -- Test3's own PluginProofs.v was already hitting proof explosion (Solve 100000, some unfinished even at 500000-1000000), so Test4's was skipped as expected to be worse (see ASSISTED-CHANGES.md, 2026-09-27)
 
 ###############################################################################
 ### CADP
@@ -63,7 +66,7 @@ examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size1/Glued/PluginProofs.v ### Success
 # examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v ### Success
 
-# TODO: 
+# TODO:
 examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size2/TermTests.v ### FAIL: state-explosion
 
@@ -72,16 +75,15 @@ examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/CADP/Size2/Glued/MutualExclusion/PluginProofs.v ### !!! WIP -- not bisim
 
 
-# TODO: 
+# TODO:
 ### CADP properties
-# examples/properties/mutual_exclusion.v
-# examples/properties/no_starvation.v
+# examples/Bisimilarity/CADP/Properties/_no_starvation.v ### unfinished draft, no starvation still unimplemented
 
 ### CADP Simple
 # examples/CADP_simple.v
 
 ### Other (nat streams)
-# examples/Bisimilarity/nat_streams.v
+# examples/Bisimilarity/_nat_streams.v ### unfinished draft, sidelined during a reorg, not superseded
 
 ###############################################################################
 ###############################################################################
@@ -136,44 +138,15 @@ lib/rocq_tools/bindings.mli
 lib/rocq_tools/constructor_bindings.ml
 lib/rocq_tools/constructor_bindings.mli
 
-lib/model/state.ml
-lib/model/state.mli
-lib/model/states.ml
-lib/model/states.mli
-lib/model/label.ml
-lib/model/label.mli
-lib/model/labels.ml
-lib/model/labels.mli
-lib/model/annotation_note.ml
-lib/model/annotation_note.mli
-lib/model/annotation.ml
-lib/model/annotation.mli
-lib/model/annotations.ml
-lib/model/annotations.mli
-lib/model/transition.ml
-lib/model/transition.mli
-lib/model/transitions.ml
-lib/model/transitions.mli
-lib/model/action.ml
-lib/model/action.mli
-lib/model/actions.ml
-lib/model/actions.mli
-lib/model/actionpair.ml
-lib/model/actionpair.mli
-lib/model/actionpairs.ml
-lib/model/actionpairs.mli
-lib/model/actionmap.ml
-lib/model/actionmap.mli
-lib/model/edge.ml
-lib/model/edge.mli
-lib/model/edges.ml
-lib/model/edges.mli
-lib/model/edgemap.ml
-lib/model/edgemap.mli
-lib/model/state_partition.ml
-lib/model/state_partition.mli
-lib/model/info.ml
-lib/model/info.mli
+lib/json/yojson_compare.ml
+
+lib/showable/type_.ml
+lib/showable/set_.ml
+lib/showable/map_.ml
+lib/showable/showable.ml
+lib/showable/thing.ml
+
+lib/model/components.ml
 
 lib/model/LTS.ml
 lib/model/LTS.mli
@@ -181,12 +154,12 @@ lib/model/FSM.ml
 lib/model/FSM.mli
 
 
-lib/model/wip_annotation.ml
-lib/model/wip_annotation.mli
-lib/model/wip_trace.ml
-lib/model/wip_trace.mli
-lib/model/wip_traces.ml
-lib/model/wip_traces.mli
+lib/model/wip/wip_annotation.ml
+lib/model/wip/wip_annotation.mli
+lib/model/wip/wip_trace.ml
+lib/model/wip/wip_trace.mli
+lib/model/wip/wip_traces.ml
+lib/model/wip/wip_traces.mli
 
 
 lib/model/algorithms/saturation.ml
@@ -195,8 +168,6 @@ lib/model/algorithms/minimization.ml
 lib/model/algorithms/minimization.mli
 lib/model/algorithms/bisimilarity.ml
 lib/model/algorithms/bisimilarity.mli
-lib/model/algorithms/similarity.ml
-lib/model/algorithms/similarity.mli
 
 lib/model/model.ml
 lib/model/model.mli
@@ -246,6 +217,10 @@ src/proof_solver_step.ml
 src/proof_solver_step.mli
 src/proof_solver.ml
 src/proof_solver.mli
+
+### installs the Rocq Feedback sink that lib/ emits through
+src/rocq_output.ml
+src/rocq_output.mli
 
 # src/examples.ml
 # src/examples.mli

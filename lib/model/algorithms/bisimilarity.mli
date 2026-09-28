@@ -46,36 +46,24 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
-    (State : State.S)
-    (States : States.S with type elt = State.t)
-    (Label : Label.S with type base = State.base)
-    (Labels : Labels.S with type elt = Label.t)
-    (Action : Action.S with type label = Label.t)
-    (ActionMap :
-       Actionmap.S with type action = Action.t and type states = States.t)
-    (EdgeMap :
-       Edgemap.S with type state = State.t and type actionmap = ActionMap.t')
-    (Partition :
-       State_partition.S with type elt = States.t and type edgemap = EdgeMap.t')
-    (Info : Info.S with type base = State.base and type labels = Labels.t)
+    (C : Components.S)
     (FSM :
        FSM.S
-       with type state = State.t
-        and type states = States.t
-        and type labels = Labels.t
-        and type edgemap = EdgeMap.t'
-        and type info = Info.t)
-    (Minimize :
+       with type state = C.State.t
+        and type states = C.State.Set.t
+        and type labels = C.Label.Set.t
+        and type edgemap = C.EdgeMap.t'
+        and type info = C.Info.t)
+    (Minimization :
        Minimization.S
-       with type state = State.t
-        and type states = States.t
-        and type label = Label.t
-        and type labels = Labels.t
-        and type edgemap = EdgeMap.t'
-        and type partition = Partition.t
+       with type state = C.State.t
+        and type states = C.State.Set.t
+        and type label = C.Label.t
+        and type labels = C.Label.Set.t
+        and type edgemap = C.EdgeMap.t'
+        and type partition = C.Partition.t
         and type fsm = FSM.t) :
   S
-  with type states = States.t
-   and type partition = Partition.t
+  with type states = C.State.Set.t
+   and type partition = C.Partition.t
    and type fsm = FSM.t

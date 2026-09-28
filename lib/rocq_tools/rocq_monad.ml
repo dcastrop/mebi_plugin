@@ -64,9 +64,8 @@ module type S = sig
   val fstring : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
 end
 
-module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
-  S with module Ctx = Ctx and type enc = Enc.t = struct
-  module BiEnc = Bi_encoding.Make (Log) (Ctx) (Enc)
+module Make (Enc : Encoding.S) : S with type enc = Enc.t = struct
+  module BiEnc = Bi_encoding.Make (Enc)
   include BiEnc
 
   let bienc_to_list : unit -> (Enc.t * EConstr.t) list = to_list
@@ -84,11 +83,23 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     }
 
   (* *)
+
+  (** [run m] evaluates [m] against this instance's context -- the one
+      [set_ctx] was given, default [Rocq_context.global].
+
+      The context is a value rather than a functor parameter, so installing it
+      no longer rebuilds this module and no longer discards the encoding table
+      with it. It is still fixed per instance, though: [encode], [fstring] and
+      [Rocq_monad_utils.get_encoding] all call [run] themselves, so a per-call
+      [?ctx] could not have been honoured by them anyway, and the table would
+      end up hashing some entries under one [sigma] and looking them up under
+      another. A stack that needs a different context is a different instance --
+      see [Proof_solver_wrapper.Make]. *)
   let run ?(reset_encoding : bool = false) (x : 'a mm) : 'a =
-    (* Log.trace __FUNCTION__; *)
+    (* Logger.trace __FUNCTION__; *)
     if reset_encoding then reset () else initialize ();
     let a : 'a in_wrapper =
-      x (ref { ctx = Ctx.get (); maps = get_the_maps () })
+      x (ref { ctx = ref (current_ctx ()); maps = get_the_maps () })
     in
     a.value
   ;;
@@ -125,7 +136,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
             (f : int -> 'a -> 'a mm)
     : 'a mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     if index > upper_bound
     then return acc
     else bind (f index acc) (fun acc' -> iterate (index + 1) upper_bound acc' f)
@@ -138,7 +149,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
         (st : wrapper ref)
     : 'a in_wrapper
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let sigma, a = f !(!st.ctx).env !(!st.ctx).sigma in
     st := { !st with ctx = ref { !(!st.ctx) with sigma } };
     { state = st; value = a }
@@ -151,7 +162,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   let sandbox ?(sigma : Evd.evar_map option) (m : 'a mm) (st : wrapper ref)
     : 'a in_wrapper
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let st_copy : wrapper = !st in
     let st =
       Option.cata
@@ -196,7 +207,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   end
 
   let econstr_normalize (x : EConstr.t) : EConstr.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let$+ t env sigma = Reductionops.nf_all env sigma x in
     return t

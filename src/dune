@@ -25,6 +25,7 @@
   yojson
   benchmark)
  (modules
+  rocq_output ; installs the Rocq Feedback sink that lib/ emits through
   decoder
   api ; stores modules created by [loader.v], used by commands
   weak

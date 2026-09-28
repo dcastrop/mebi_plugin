@@ -15,7 +15,11 @@ module type S = sig
     ; value : 'a
     }
 
+  (** [run m] evaluates [m] against this instance's context, as installed by
+      [set_ctx]. A stack that needs a different context is a different
+      instance. *)
   val run : ?reset_encoding:bool -> 'a mm -> 'a
+
   val return : 'a -> 'a mm
   val bind : 'a mm -> ('a -> 'b mm) -> 'b mm
   val map : ('a -> 'b) -> 'a mm -> 'b mm
@@ -64,5 +68,4 @@ module type S = sig
   val fstring : (Environ.env -> Evd.evar_map -> 'a -> string) -> 'a -> string
 end
 
-module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
-  S with type enc = Enc.t 
+module Make (Enc : Encoding.S) : S with type enc = Enc.t

@@ -65,7 +65,6 @@ module type Args = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (M : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t)
     (Weak : Weak.S with type enc = Enc.t)
@@ -122,12 +121,12 @@ module Make
     type t' = Destinations.t t
 
     let size (xs : t') : int =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       fold (fun k v n -> Destinations.cardinal v + n) xs 0
     ;;
 
     let update (x : t') (action : Action.t) (states : Destinations.t) : unit =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       if Destinations.is_empty states
       then ()
       else (
@@ -147,7 +146,7 @@ module Make
     type t' = Actions.t' t
 
     let size (xs : t') : int =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       fold (fun k v n -> Actions.size v + n) xs 0
     ;;
 
@@ -158,7 +157,7 @@ module Make
           (destinations : Destinations.t)
       : unit
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       match find_opt x from with
       | None ->
         [ action, destinations ] |> List.to_seq |> Actions.of_seq |> add x from
@@ -204,31 +203,31 @@ module Make
   exception NoMoreToVisit
 
   let next_to_visit (g : t) : Enc.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     try Queue.take g.to_visit with Queue.Empty -> raise NoMoreToVisit
   ;;
 
   let update_to_visit (g : t) (x : Enc.t) : unit =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     Queue.add x g.to_visit
   ;;
 
   let update_states (g : t) (xs : States.t) : t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     { g with states = States.union g.states xs }
   ;;
 
   (** [is_silent_label x weakopt] returns [Some bool] indicating if [x] is recognized to be representative of a silent action, as configured by [weakopt]. If [weakopt=None] then returns [None].
   *)
   let is_silent_label (x : EConstr.t) : Weak.t option -> bool option M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     function
     | None -> M.return None
     | Some (Option label_enc) ->
       Enc.log ~__FUNCTION__ ~m:Trace ~s:"Option" label_enc;
       let open M.Syntax in
       let* b : bool = Theory.is_None x in
-      Log.trace ~__FUNCTION__ (Printf.sprintf "%b" b);
+      Logger.trace ~__FUNCTION__ (Printf.sprintf "%b" b);
       M.return (Some b)
     | Some (Custom (tau_enc, label_enc)) ->
       Enc.log ~__FUNCTION__ ~m:Trace ~s:"Custom" tau_enc;

@@ -17,7 +17,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (M : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t)
     (Model :
@@ -56,7 +55,7 @@ module Make
   open G
 
   let get_new_constrs (g : t) (from : Enc.t) : M.Constructor.t list M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     M.Unification.collect_valid_constructors
       (M.Ind.get_lts_constructor_types g.primarylts)
       (M.decode_map g.ltsmap)
@@ -84,7 +83,7 @@ module Make
   ;;
 
   let get_action (g : t) (act : Enc.t) (int_tree : Enc.Tree.t) : Action.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let act_dec : EConstr.t = M.decode act in
     let open M.Syntax in
     let* is_silent : bool option = is_silent_label act_dec g.weak in
@@ -96,7 +95,7 @@ module Make
   ;;
 
   let get_new_states (g : t) (from : Enc.t) : States.t M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open M.Syntax in
     let* new_constrs : M.Constructor.t list = get_new_constrs g from in
     let iter_body (i : int) (new_states : States.t) =
@@ -110,14 +109,14 @@ module Make
   ;;
 
   let stop (g : t) : bool =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match g.bounds with
     | States n -> States.cardinal g.states > n
     | Transitions n -> Transitions.size g.transitions > n
   ;;
 
   let rec build ?(stop : t -> bool = stop) (g : t) : t M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     if stop g
     then M.return g
     else (

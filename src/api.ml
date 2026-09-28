@@ -1,55 +1,33 @@
 (* module Defaults = struct
    module Log : Logger.S = Logger.Default
    module Ctx : Rocq_context.S = Rocq_context.Default
-   module Enc : Encoding.S with type t = int = Encoding.Int (Log)
-   (* module Tree = Enc_tree.Make (Log) (Enc) *)
-   (* module Trees = Enc_trees.Make (Log) (Tree) *)
+   module Enc : Encoding.S with type t = int = Encoding.Int (* module Tree = Enc_tree.Make (Enc) *)
+   (* module Trees = Enc_trees.Make (Tree) *)
    end *)
 
 (***********************************************************************)
 
-(* TODO: output *)
+(* Per-message-kind output settings now live in [Logger] itself rather than in
+   a record here that a per-command [Logger.Make] closed over. What remains
+   below is the part that was never about logging. *)
 
 type output_config =
-  { mutable debug : bool
-  ; mutable info : bool
-  ; mutable notice : bool
-  ; mutable warning : bool
-  ; mutable error : bool
-  ; mutable trace : bool
-  ; mutable result : bool
-  ; mutable show : bool
-  ; mutable decode_results : bool
+  { mutable decode_results : bool
   ; mutable dump_results : bool
   }
 
 let output_config_default : output_config =
-  { debug = false
-  ; info = true
-  ; notice = true
-  ; warning = true
-  ; error = true
-  ; trace = false
-  ; result = false
-  ; show = true
-  ; decode_results = true
-  ; dump_results = true
-  }
+  { decode_results = true; dump_results = true }
 ;;
 
 let the_output_config : output_config ref = ref output_config_default
-let reset_output_config () : unit = the_output_config := output_config_default
 
-let config_output (x : bool) : Output.Kind.t -> unit = function
-  | Debug -> !the_output_config.debug <- x
-  | Info -> !the_output_config.info <- x
-  | Notice -> !the_output_config.notice <- x
-  | Warning -> !the_output_config.warning <- x
-  | Error -> !the_output_config.error <- x
-  | Trace -> !the_output_config.trace <- x
-  | Result -> !the_output_config.result <- x
-  | Show -> !the_output_config.show <- x
+let reset_output_config () : unit =
+  the_output_config := { decode_results = true; dump_results = true };
+  Logger.reset_config ()
 ;;
+
+let config_output (x : bool) (k : Output.Kind.t) : unit = Logger.configure k x
 
 let output_config_decode_results (x : bool) : unit =
   !the_output_config.decode_results <- x
@@ -60,57 +38,28 @@ let output_config_dump_results (x : bool) : unit =
 ;;
 
 let set_output (x : bool) : string -> unit = function
-  | "Debug" -> config_output x Debug
-  | "Info" -> config_output x Info
-  | "Notice" -> config_output x Notice
-  | "Warning" -> config_output x Warning
-  | "Error" -> config_output x Error
-  | "Trace" -> config_output x Trace
-  | "Result" -> config_output x Result
-  | "Show" -> config_output x Show
   | "DecodeResults" -> output_config_decode_results x
   | "DumpResults" -> output_config_dump_results x
-  | x ->
-    Printf.sprintf
-      "Unrecognised option \"%s\". Valid options are: Debug, Info, Notice, \
-       Warning, Error, Trace, Result, Show, DecodeResults, DumpResults"
-      x
-    |> Logger.Default.warning
+  | s ->
+    (match Output.Kind.of_string s with
+     | Some k -> Logger.configure k x
+     | None ->
+       Printf.sprintf
+         "Unrecognised option \"%s\". Valid options are: Debug, Info, Notice, \
+          Warning, Error, Trace, Result, Show, DecodeResults, DumpResults"
+         s
+       |> Logger.warning)
 ;;
 
 (***********************************************************************)
 
-let make_logger () : (module Logger.S) =
-  (module Logger.Make
-            (Output.Mode.Default)
-            (struct
-              let prefix = None
-
-              let level : Output.Kind.level -> bool = function
-                | Debug -> !the_output_config.debug
-                | Info -> !the_output_config.info
-                | Notice -> !the_output_config.notice
-                | Warning -> !the_output_config.warning
-                | Error -> !the_output_config.error
-              ;;
-
-              let special : Output.Kind.special -> bool = function
-                | Trace -> !the_output_config.trace
-                | Result -> !the_output_config.result
-                | Show -> !the_output_config.show
-              ;;
-            end) : Logger.S)
-;;
-
-let make_enc (module Log : Logger.S) (module X : Encoding.Packed.PackedS)
-  : (module Encoding.S)
-  =
-  let module Enc : Encoding.S = Encoding.Packed.Unpack (Log) (X) in
+let make_enc (module X : Encoding.Packed.PackedS) : (module Encoding.S) =
+  let module Enc : Encoding.S = Encoding.Packed.Unpack (X) in
   (module Enc : Encoding.S)
 ;;
 
-let make_enc_int (module Log : Logger.S) : (module Encoding.S) =
-  (module (val make_enc (module Log) (module Encoding.Packed.Int)) : Encoding.S)
+let make_enc_int () : (module Encoding.S) =
+  (module (val make_enc (module Encoding.Packed.Int)) : Encoding.S)
 ;;
 
 (***********************************************************************)
@@ -131,7 +80,7 @@ let reset_the_fail_flags () : unit = the_fail_flags := the_fail_flags_default
 let set_fail_flag_empty (empty : bool) : unit =
   the_fail_flags := { !the_fail_flags with empty };
   Printf.sprintf "(MeBi Config: Set Fail-If 'Empty' Flag to: %b.)" empty
-  |> Logger.Default.show
+  |> Logger.show
 ;;
 
 let set_fail_flag_incomplete (incomplete : bool) : unit =
@@ -139,7 +88,7 @@ let set_fail_flag_incomplete (incomplete : bool) : unit =
   Printf.sprintf
     "(MeBi Config: Set Fail-If 'Incomplete' Flag to: %b.)"
     incomplete
-  |> Logger.Default.show
+  |> Logger.show
 ;;
 
 let set_fail_flag_non_bisimilar (non_bisimilar : bool) : unit =
@@ -147,7 +96,7 @@ let set_fail_flag_non_bisimilar (non_bisimilar : bool) : unit =
   Printf.sprintf
     "(MeBi Config: Set Fail-If 'Non-bisimilar' Flag to: %b.)"
     non_bisimilar
-  |> Logger.Default.show
+  |> Logger.show
 ;;
 
 (***********************************************************************)
@@ -167,7 +116,7 @@ let set_the_bounds_args (x : bounds_args) : unit =
     (match x with
      | States i -> Printf.sprintf "%i States" i
      | Transitions i -> Printf.sprintf "%i Transitions" i)
-  |> Logger.Default.show
+  |> Logger.show
 ;;
 
 (***********************************************************************)
@@ -211,5 +160,5 @@ let reset_all () : unit =
   reset_weak_args ();
   reset_the_fail_flags ();
   reset_output_config ();
-  Logger.Default.show "(MeBi: Reset Config.)"
+  Logger.show "(MeBi: Reset Config.)"
 ;;

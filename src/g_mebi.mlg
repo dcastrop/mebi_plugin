@@ -4,6 +4,10 @@
 (* This one is necessary, to avoid message about missing wit_string *)
 open Stdarg
 (* open Pp *)
+
+(* lib/ emits through Logger, which prints to stdout until a sink is installed.
+   Route it through Rocq's Feedback now that we are running inside Rocq. *)
+let () = Rocq_output.install ()
 }
 
 DECLARE PLUGIN "rocq-mebi.mebi"
@@ -34,12 +38,11 @@ VERNAC COMMAND EXTEND MeBi_Run_Bisim CLASSIFIED AS QUERY
 | ["MeBi" "Run" 
    "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run [] (W.Command.CheckBisim {a=(x, a); b=(y, b)}) 
             |> W.M.run ~reset_encoding:true
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Checking Bisimilarity.)";
+    Logger.info "(Finished Checking Bisimilarity.)";
     ()
   }
 
@@ -47,12 +50,11 @@ VERNAC COMMAND EXTEND MeBi_Run_Bisim CLASSIFIED AS QUERY
    "Bisim" constr(x) "With" reference(a) "And" constr(y) "With" reference(b) 
    "Using" reference_list(rs)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run rs (W.Command.CheckBisim {a=(x, a); b=(y, b)})
             |> W.M.run ~reset_encoding:true
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Checking Bisimilarity.)";
+    Logger.info "(Finished Checking Bisimilarity.)";
     ()
   }
 END 
@@ -63,12 +65,11 @@ VERNAC COMMAND EXTEND MeBi_Run_Merge CLASSIFIED AS QUERY
 | ["MeBi" "Run" 
    "Merge" constr(x) "With" reference(a) "And" constr(y) "With" reference(b)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run [] (W.Command.Merge {a=(x, a); b=(y, b)})
             |> W.M.run ~reset_encoding:true
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Merging FSMs.)";
+    Logger.info "(Finished Merging FSMs.)";
     ()
   }
 
@@ -76,12 +77,11 @@ VERNAC COMMAND EXTEND MeBi_Run_Merge CLASSIFIED AS QUERY
    "Merge" constr(x) "With" reference(a) "And" constr(y) "With" reference(b) 
    "Using" reference_list(rs)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run rs (W.Command.Merge {a=(x, a); b=(y, b)})
             |> W.M.run ~reset_encoding:true
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Merging FSMs.)";
+    Logger.info "(Finished Merging FSMs.)";
     ()
   }
 END 
@@ -90,23 +90,21 @@ END
 VERNAC COMMAND EXTEND MeBi_Run_Minimize CLASSIFIED AS QUERY
 | ["MeBi" "Run" "Minimize" constr(x) "Using" reference(r)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run [] (W.Command.Minimize (x, r))
             |> W.M.run ~reset_encoding:true
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Minimizing FSM.)";
+    Logger.info "(Finished Minimizing FSM.)";
     ()
   }
   
 | ["MeBi" "Run" "Minimize" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run rs (W.Command.Minimize (x, r))
             |> W.M.run ~reset_encoding:true 
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Minimizing FSM.)";
+    Logger.info "(Finished Minimizing FSM.)";
     ()
   }
 END 
@@ -115,23 +113,21 @@ END
 VERNAC COMMAND EXTEND MeBi_Run_Saturate CLASSIFIED AS QUERY
 | ["MeBi" "Run" "Saturate" constr(x) "Using" reference(r)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run [] (W.Command.Saturate (x, r))
           |> W.M.run ~reset_encoding:true
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Saturating FSM.)";
+    Logger.info "(Finished Saturating FSM.)";
     ()
   }
   
 | ["MeBi" "Run" "Saturate" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run rs (W.Command.Saturate (x, r))
             |> W.M.run ~reset_encoding:true 
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Saturating FSM.)";
+    Logger.info "(Finished Saturating FSM.)";
     ()
   }
 END 
@@ -140,23 +136,21 @@ END
 VERNAC COMMAND EXTEND MeBi_Run_FSM CLASSIFIED AS QUERY
 | ["MeBi" "Run" "FSM" constr(x) "Using" reference(r)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run [] (W.Command.MakeFSM (x, r))
             |> W.M.run ~reset_encoding:true
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Making FSM.)";
+    Logger.info "(Finished Making FSM.)";
     ()
   }
   
 | ["MeBi" "Run" "FSM" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run rs (W.Command.MakeFSM (x, r))
             |> W.M.run ~reset_encoding:true 
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Making FSM.)";
+    Logger.info "(Finished Making FSM.)";
     ()
   }
 END 
@@ -165,23 +159,21 @@ END
 VERNAC COMMAND EXTEND MeBi_Run_LTS CLASSIFIED AS QUERY
 | ["MeBi" "Run" "LTS" constr(x) "Using" reference(r)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run [] (W.Command.MakeLTS (x, r))
             |> W.M.run ~reset_encoding:true 
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Making LTS.)";
+    Logger.info "(Finished Making LTS.)";
     ()
   }
   
 | ["MeBi" "Run" "LTS" constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run rs (W.Command.MakeLTS (x, r))
             |> W.M.run ~reset_encoding:true
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Making LTS.)";
+    Logger.info "(Finished Making LTS.)";
     ()
   }
 END 
@@ -190,23 +182,21 @@ END
 VERNAC COMMAND EXTEND MeBi_Benchmark_LTS CLASSIFIED AS QUERY
 | ["MeBi" "Benchmark" "LTS" int(i) int(j) constr(x) "Using" reference(r)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run [] (W.Command.BenchmarkGraph ((x, r), (i, j)))
             |> W.M.run ~reset_encoding:true 
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Benchmarking LTS.)";
+    Logger.info "(Finished Benchmarking LTS.)";
     ()
   }
   
 | ["MeBi" "Benchmark" "LTS" int(i) int(j) constr(x) "Using" reference(r) reference_list(rs)] -> 
   {
-    let module W : Wrapper.S = (val Wrapper.make ()) in
+    let module W : Wrapper.S = (val Wrapper.get ()) in
     let _ = W.Command.run rs (W.Command.BenchmarkGraph ((x, r), (i, j)))
             |> W.M.run ~reset_encoding:true
     in 
-    let module Log : Logger.S = (val Api.make_logger ()) in
-    Log.info "(Finished Benchmarking LTS.)";
+    Logger.info "(Finished Benchmarking LTS.)";
     ()
   }
 END 
@@ -285,7 +275,7 @@ END
 
 (* VERNAC COMMAND EXTEND MeBi_Help CLASSIFIED AS QUERY
 (* TODO: update me *)
-| ["MeBi" "Help"] -> {Logger.Default.show "TODO: Update Mebi_help"}
+| ["MeBi" "Help"] -> {Logger.show "TODO: Update Mebi_help"}
 END  *)
 
 VERNAC COMMAND EXTEND MeBi_Divider CLASSIFIED AS QUERY

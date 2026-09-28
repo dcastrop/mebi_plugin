@@ -19,7 +19,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (M : Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t) :
   S with type 'a im = 'a M.mm = struct
@@ -42,7 +41,7 @@ module Make
   (** [is_any_theory x] is [true] if term [x] is equal to any of the terms presented in [Mebi_theories].
   *)
   let is_any_theory (x : EConstr.t) : bool =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     Th.get_constants ()
     |> Hashtbl.to_seq_values
     |> List.of_seq
@@ -74,7 +73,7 @@ module Make
 
   (** [ensure x f] is a custom assertion for [f x] being [true]. @raise EnsureFail if [f x] is [false]. *)
   let ensure (x : EConstr.t) (f : EConstr.t -> bool mm) : unit mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let* b = f x in
     if b then return () else raise EnsureFail

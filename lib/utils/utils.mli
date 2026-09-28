@@ -25,6 +25,13 @@ val clean_string : string -> string
 module FileWriter : sig
   val perm : int
   val default_dir : string
+
+  (** Labels a dump with the source location that produced it. Reading that
+      location needs Rocq's [Loc], so [src/] installs an implementation via
+      [set_loc_provider] at plugin load; otherwise this returns
+      ["Unknown Location"]. *)
+  val set_loc_provider : (unit -> string) -> unit
+
   val get_loc : unit -> string
   val create_parent_dir : string -> unit
   val get_local_timestamp : string

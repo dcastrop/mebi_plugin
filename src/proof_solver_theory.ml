@@ -25,7 +25,6 @@ end
       is the [module Rocq_monad_utils.S] for the current {i iteration} of the proof-solver.
 *)
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (W :
        Wrapper.S
@@ -48,7 +47,7 @@ module Make
     with type 'a im = 'a I.mm
      and type 'a mm = 'a M.mm
      and type enc = Enc.t =
-    Theories_enc.Make (Log) (Enc) (M) (I) (Theories.Make (Log) (Enc) (I))
+    Theories_enc.Make (Enc) (M) (I) (Theories.Make (Enc) (I))
 
   include ThEnc
 
@@ -57,10 +56,10 @@ module Make
   exception FSM_HasNoSilentLabel of Model.FSM.t
 
   let is_fsm_silent_label (x : EConstr.t) (m : Model.FSM.t) : bool =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match
-      Model.Labels.filter Model.Label.is_silent m.info.weak_labels
-      |> Model.Labels.to_list
+      Model.Label.Set.filter Model.Label.is_silent m.info.weak_labels
+      |> Model.Label.Set.to_list
     with
     | [] -> raise (FSM_HasNoSilentLabel m)
     | ys -> M.exists_eq x ys Decode.label |> M.run
@@ -70,12 +69,12 @@ module Make
 
   (** i.e., not silent label *)
   let is_fsm_visible_label (x : EConstr.t) (m : Model.FSM.t) : bool =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match
-      Model.Labels.filter
+      Model.Label.Set.filter
         (fun y -> Model.Label.is_silent y |> Bool.not)
         m.info.weak_labels
-      |> Model.Labels.to_list
+      |> Model.Label.Set.to_list
     with
     | [] -> raise (FSM_HasNoVisibleLabel m)
     | ys -> M.exists_eq x ys Decode.label |> M.run
@@ -84,7 +83,7 @@ module Make
   exception FSM_HasNoWeakLabels of Model.FSM.t
 
   let is_fsm_weak_labels (x : EConstr.t) (m : Model.FSM.t) : bool =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let is_silent = is_fsm_silent_label x m in
     if is_silent then true else is_fsm_visible_label x m
   ;;
@@ -92,7 +91,7 @@ module Make
   exception FSM_HasNoConstructors of Model.FSM.t
 
   let is_fsm_constructor (x : EConstr.t) (m : Model.FSM.t) : bool =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     match m with
     | { info = { meta = None; _ }; _ } -> raise (FSM_HasNoConstructors m)
     | { info = { meta = Some { lts; _ }; _ }; _ } ->

@@ -26,18 +26,18 @@ module type S = sig
     Decoder.S
     with type enc = enc
      and type state = Model.State.t
-     and type states = Model.States.t
+     and type states = Model.State.Set.t
      and type partition = Model.Partition.t
      and type label = Model.Label.t
-     and type labels = Model.Labels.t
+     and type labels = Model.Label.Set.t
      and type note = Model.Note.t
      and type annotation = Model.Annotation.t
-     and type annotations = Model.Annotations.t
+     and type annotations = Model.Annotation.Set.t
      and type transition = Model.Transition.t
-     and type transitions = Model.Transitions.t
+     and type transitions = Model.Transition.Set.t
      and type action = Model.Action.t
-     and type actions = Model.Actions.t
-     and type actionmap = Model.ActionMap.t'
+     and type actions = Model.Action.Set.t
+     and type actionmap = Model.Action.Map.t'
      and type edgemap = Model.EdgeMap.t'
      and type rocqlts = Model.Info.Meta.RocqLTS.t
      and type info = Model.Info.t
@@ -153,7 +153,7 @@ module type S = sig
   end
 end
 
-module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
+module Make (Enc : Encoding.S) :
   S
   with type enc = Enc.t
    and type node = Enc.Tree.Node.t
@@ -164,50 +164,38 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   type tree = Enc.Tree.t
   type trees = Enc.Trees.t
 
-  module Benchmarking = Benchmarking.Make (Log)
+  module Benchmarking = Benchmarking.Make
 
-  (* NOTE: stops message spam when debugging *)
-  (* module Log = Log *)
-
-  (* module Log =
-     Logger.ReMake
-     (Log)
-     (struct
-     let level =
-     Some (fun (x : Output.Kind.level) -> match x with _ -> false)
-     ;;
-
-     let special =
-     Some (fun (x : Output.Kind.special) -> match x with _ -> false)
-     ;;
-     end) *)
+  (* NOTE: to stop message spam when debugging, wrap the noisy call in
+     [Logger.quiet (fun () -> ...)]. This used to require re-instantiating the
+     whole module tree with a differently-configured logger (Logger.ReMake),
+     which is why the attempt that lived here was left commented out. *)
 
   (** [module M] ... *)
-  module M = Rocq_monad_utils.Make (Log) (Ctx) (Enc)
+  module M = Rocq_monad_utils.Make (Enc)
 
   (** [module Bindings] ... *)
-  module Bindings = Bindings.Make (Log) (M)
+  module Bindings = Bindings.Make (M)
 
   (** [module ConstructorBindings] ... *)
-  module ConstructorBindings = Constructor_bindings.Make (Log) (M) (Bindings)
+  module ConstructorBindings = Constructor_bindings.Make (M) (Bindings)
 
   (** [module Model] ... *)
-  module Model = Model.Make (Log) (Enc) (ConstructorBindings)
+  module Model = Model.Make (Enc) (ConstructorBindings)
 
   module LTS = Model.LTS
   module FSM = Model.FSM
 
   (** [module Decode] handles obtaining [EConstr.t] from [module M]. *)
-  module Decode = Decoder.Make (Log) (Enc) (M) (ConstructorBindings) (Model)
+  module Decode = Decoder.Make (Enc) (M) (ConstructorBindings) (Model)
 
   (** [module Theory] ... *)
-  module Theory =
-    Theories_enc.Make (Log) (Enc) (M) (M) (Theories.Make (Log) (Enc) (M))
+  module Theory = Theories_enc.Make (Enc) (M) (M) (Theories.Make (Enc) (M))
 
   (** [module Weak] ... *)
-  module Weak = Weak.Make (Log) (Enc) (M)
+  module Weak = Weak.Make (Enc) (M)
 
-  module Config = Config_loader.Make (Log) (Enc) (M) (Weak)
+  module Config = Config_loader.Make (Enc) (M) (Weak)
 
   let result_log
         ?(decode : bool = true)
@@ -241,11 +229,11 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   let check_if_lts_fail (x : LTS.t) : unit =
     if
       !Api.the_fail_flags.empty
-      && (Int.equal (Model.States.cardinal x.states) 1
-          || Model.States.is_empty x.states)
-      && Model.Transitions.is_empty x.transitions
+      && (Int.equal (Model.State.Set.cardinal x.states) 1
+          || Model.State.Set.is_empty x.states)
+      && Model.Transition.Set.is_empty x.transitions
     then (
-      Log.trace ~__FUNCTION__ "LTS Empty";
+      Logger.trace ~__FUNCTION__ "LTS Empty";
       M.Err.lts_empty ())
     else if !Api.the_fail_flags.incomplete
     then (
@@ -279,7 +267,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
 
   module G
       (X : Graph_type.Args with type enc = Enc.t and type tree = Enc.Tree.t) =
-    Graph.Make (Log) (Enc) (M) (Weak) (Theory) (ConstructorBindings) (Model) (X)
+    Graph.Make (Enc) (M) (Weak) (Theory) (ConstructorBindings) (Model) (X)
 
   let extract_lts
         (primary_lts : Libnames.qualid)
@@ -288,7 +276,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
         (weak : Weak.t option)
     : LTS.t M.mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let module G = G ((val make_graph_args ())) in
     let grefs = Rocq_utils.libnames_to_globrefs (primary_lts :: names) in
     let open M.Syntax in
@@ -306,7 +294,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
           (names : Libnames.qualid list)
       : LTS.t M.mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       Config.get_weak weak |> extract_lts primary_lts init names
     ;;
 
@@ -317,16 +305,16 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
           (names : Libnames.qualid list)
       : FSM.t M.mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open M.Syntax in
       let* the_lts = build_lts ~weak primary_lts init names in
       Model.FSM.of_lts the_lts |> M.return
     ;;
 
     let do_make_lts (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open M.Syntax in
-      Log.info "Extracting LTS...";
+      Logger.info "Extracting LTS...";
       let* the_lts = build_lts primary_lts x refs in
       result_log (module Model.LTS) (module Decode.LTS)
       |> handle_results Result "Finished Extracting LTS" the_lts;
@@ -334,8 +322,8 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     ;;
 
     let do_make_fsm (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
-      Log.trace __FUNCTION__;
-      Log.info "Making FSM (from extracted LTS)...";
+      Logger.trace __FUNCTION__;
+      Logger.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
       result_log (module Model.FSM) (module Decode.FSM)
@@ -344,13 +332,13 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     ;;
 
     let do_saturate (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
-      Log.trace __FUNCTION__;
-      Log.info "Making FSM (from extracted LTS)...";
+      Logger.trace __FUNCTION__;
+      Logger.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Info "Finished Making FSM" the_fsm;
-      Log.info "Saturating FSM...";
+      Logger.info "Saturating FSM...";
       let the_fsm = Model.FSM.saturate the_fsm in
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Result "Finished Saturating FSM" the_fsm;
@@ -358,13 +346,13 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     ;;
 
     let do_minimize (x, primary_lts) refs : Model.Bisimilarity.t option M.mm =
-      Log.trace __FUNCTION__;
-      Log.info "Making FSM (from extracted LTS)...";
+      Logger.trace __FUNCTION__;
+      Logger.info "Making FSM (from extracted LTS)...";
       let open M.Syntax in
       let* the_fsm = build_fsm primary_lts x refs in
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Info "Finished Making FSM" the_fsm;
-      Log.info "Minimizing FSM...";
+      Logger.info "Minimizing FSM...";
       let { fsm; pi } : Model.Minimization.t = Model.Minimization.fsm the_fsm in
       Decode.Partition.log ~m:Info ~s:"pi" pi;
       result_log (module Model.FSM) (module Decode.FSM)
@@ -394,15 +382,15 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
           (refs : Libnames.qualid list)
       : (FSM.t * FSM.t) M.mm
       =
-      Log.trace __FUNCTION__;
-      Log.info "Making FSMs...";
+      Logger.trace __FUNCTION__;
+      Logger.info "Making FSMs...";
       let open M.Syntax in
-      Log.info "Making FSM A...";
+      Logger.info "Making FSM A...";
       let weak1 : Weak.t option = Config.get_the_weak_arg1 () in
       let* the_fsm_a = build_fsm ~weak:weak1 alts ax refs in
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Info "Finished Making FSM A" the_fsm_a;
-      Log.info "Making FSM B...";
+      Logger.info "Making FSM B...";
       let weak2 : Weak.t option = Config.get_the_weak_arg2 () in
       let* the_fsm_b = build_fsm ~weak:weak2 blts bx refs in
       result_log (module Model.FSM) (module Decode.FSM)
@@ -411,10 +399,10 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     ;;
 
     let do_merge { a; b } refs : Model.Bisimilarity.t option M.mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open M.Syntax in
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
-      Log.info "Merging FSMs...";
+      Logger.info "Merging FSMs...";
       let the_fsm = FSM.merge the_fsm_a the_fsm_b in
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Result "Finished Merging FSMs" the_fsm;
@@ -432,10 +420,10 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     ;;
 
     let do_check_bisim { a; b } refs : Model.Bisimilarity.t option M.mm =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open M.Syntax in
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
-      Log.info "Checking Bisimilarity of FSMs...";
+      Logger.info "Checking Bisimilarity of FSMs...";
       let result = Model.Bisimilarity.fsm the_fsm_a the_fsm_b in
       let r = result_log (module Model.FSM) (module Decode.FSM) in
       r |> handle_results Result "FSM a (original)" result.fsm_a.original;
@@ -457,12 +445,12 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
       M.state (fun env sigma ->
         Rocq_utils.list_of_econstr_kinds sigma x
         |> List.iter (fun (s, b) ->
-          Log.debug ~__FUNCTION__ (Printf.sprintf "%b : %s" b s));
+          Logger.debug ~__FUNCTION__ (Printf.sprintf "%b : %s" b s));
         sigma, ())
     ;;
 
     let rec extract_benchmark_args (xs : EConstr.t) : EConstr.t list M.mm =
-      Log.debug __FUNCTION__;
+      Logger.debug __FUNCTION__;
       let open M.Syntax in
       let* ty = M.type_of_econstr xs in
       let* kxs = M.econstr_kind xs in
@@ -491,12 +479,12 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
           refs
       : Model.Bisimilarity.t option M.mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open M.Syntax in
       let* xs : EConstr.t = M.constrexpr_to_econstr xs in
       let* xs : EConstr.t list = extract_benchmark_args xs in
       let f (i : int) (funs : graph_benchmark list) : graph_benchmark list M.mm =
-        Log.debug __FUNCTION__;
+        Logger.debug __FUNCTION__;
         let test_name : string = Printf.sprintf "benchmark_graph_%i" i in
         let* x : Constrexpr.constr_expr =
           M.state (fun env sigma ->
@@ -516,7 +504,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
     let run (refs : Libnames.qualid list) (x : t)
       : Model.Bisimilarity.t option M.mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open M.Syntax in
       Config.load_the_bounds_args ();
       let* () = Config.load_weak_args () in
@@ -532,20 +520,43 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   end
 end
 
-(** [make ?log ?enc ?ctx] constructs a [Wrapper.S] module.
-    @param ?log
-      is a function that returns a [module Logger.S]. By default, this is obtained from the configuration in [module Api], via [Api.make_logger ()]. This is then used to construct the [Encoding.S] as well as [Wrapper.S].
+(** [make ?enc ?ctx] constructs a [Wrapper.S] module.
     @param ?enc
-      is a function that takes a [module Logger.S] and returns a [module Encoding.S]. The default encoding uses [Int.t].
-    @param ?ctx is the rocq-context. *)
-let make
-      ?(log : unit -> (module Logger.S) = Api.make_logger)
-      ?(enc : (module Logger.S) -> (module Encoding.S) = Api.make_enc_int)
-      ?(ctx : (module Rocq_context.S) = (module Rocq_context.Default))
-      ()
-  : (module S)
+      is a function returning a [module Encoding.S]. The default encoding uses [Int.t].
+    @param ?ctx is the rocq-context.
+
+    There is no longer a [?log]: output goes through [Logger] against the sink
+    installed at plugin load, so a wrapper no longer carries a logger. *)
+let make ?(enc : unit -> (module Encoding.S) = Api.make_enc_int) () : (module S)
   =
-  let module Log : Logger.S = (val log ()) in
-  let module Enc : Encoding.S = (val enc (module Log)) in
-  (module Make (Log) ((val ctx)) (Enc) : S)
+  let module Enc : Encoding.S = (val enc ()) in
+  (module Make (Enc) : S)
 ;;
+
+(** The instance the [MeBi ...] vernaculars run against.
+
+    Every command used to call [make ()] inside its own action block, rebuilding
+    [Enc], [Model], [Decode], [Theory], [Weak] and [Config] -- and a fresh
+    encoding table -- on each invocation. Since the Rocq context is no longer a
+    functor parameter, nothing about a command depends on the instance being
+    fresh, so there is one.
+
+    Per-command state is carried by the [~reset_encoding:true] every call site
+    already passes: [Rocq_monad.run] then calls [Bi_encoding.reset], which
+    clears the maps and resets [Enc.counter]. That flag was previously inert,
+    because a fresh [Bi_encoding] has [the_maps = None] and so reset regardless.
+    Bounds and weak-mode config are reloaded by [Command.run] itself. *)
+let the_wrapper : (module S) option ref = ref None
+
+(* Lazy rather than initialised at load: constructing it runs Api.make_enc_int,
+   which should not race the sink install in Rocq_output. *)
+let get () : (module S) =
+  match !the_wrapper with
+  | Some w -> w
+  | None ->
+    let w : (module S) = make () in
+    the_wrapper := Some w;
+    w
+;;
+
+let reset () : unit = the_wrapper := None

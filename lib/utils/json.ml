@@ -15,14 +15,12 @@ module type S = sig
   val write : ?dir:string -> string -> k -> unit
 end
 
-module Make
-    (Log : Logger.S)
-    (X : sig
-       type k
+module Make (X : sig
+    type k
 
-       val name : string
-       val json : ?as_elt:bool -> k -> Yojson.t
-     end) : S with type k = X.k = struct
+    val name : string
+    val json : ?as_elt:bool -> k -> Yojson.t
+  end) : S with type k = X.k = struct
   include X
 
   let to_string ?(pretty : bool = true) (x : k) : string =
@@ -38,7 +36,7 @@ module Make
         (x : k)
     : unit
     =
-    Log.thing ~__FUNCTION__ m s x to_string
+    Logger.thing ~__FUNCTION__ m s x to_string
   ;;
 
   let write
@@ -58,12 +56,12 @@ module Make
         ".json"
       |> Filename.concat dir
     in
-    Printf.sprintf "Writing to: %s" filepath |> Log.info;
+    Printf.sprintf "Writing to: %s" filepath |> Logger.info;
     let oc = open_out filepath in
     try
       json ~as_elt:false x |> Yojson.pretty_to_channel oc;
       close_out oc;
-      Log.info "Finish Writing."
+      Logger.info "Finish Writing."
     with
     | e ->
       close_out_noerr oc;
@@ -72,26 +70,21 @@ module Make
 end
 
 module Thing = struct
-  module Make
-      (Log : Logger.S)
-      (X : sig
-         type k
+  module Make (X : sig
+      type k
 
-         val name : string
-         val json : ?as_elt:bool -> k -> Yojson.t
-       end) : S with type k = X.k =
-    Make
-      (Log)
-      (struct
-        type k = X.k
+      val name : string
+      val json : ?as_elt:bool -> k -> Yojson.t
+    end) : S with type k = X.k = Make (struct
+      type k = X.k
 
-        let name = X.name
+      let name = X.name
 
-        let json ?(as_elt : bool = false) (x : k) : Yojson.t =
-          let y : Yojson.t = X.json x in
-          if as_elt then y else `Assoc [ X.name, y ]
-        ;;
-      end)
+      let json ?(as_elt : bool = false) (x : k) : Yojson.t =
+        let y : Yojson.t = X.json x in
+        if as_elt then y else `Assoc [ X.name, y ]
+      ;;
+    end)
 end
 
 module Map = struct
@@ -102,7 +95,6 @@ module Map = struct
   end
 
   module Make
-      (Log : Logger.S)
       (X : sig
          module Map : Hashtbl.S
 
@@ -112,89 +104,77 @@ module Map = struct
        end)
       (K : S' with type k = X.Map.key)
       (V : S' with type k = X.value) : S with type k = X.value X.Map.t =
-    Make
-      (Log)
-      (struct
-        type k = X.value X.Map.t
+  Make (struct
+      type k = X.value X.Map.t
 
-        let name = X.name
+      let name = X.name
 
-        let json ?(as_elt : bool = false) (x : k) : Yojson.t =
-          let y : Yojson.t =
-            `List
-              (X.Map.to_seq x
-               |> List.of_seq
-               |> List.sort (fun (ka, va) (kb, vb) ->
-                 Utils.compare_chain [ K.compare ka kb; V.compare va vb ])
-               |> List.map (fun (k, v) ->
-                 `Assoc
-                   [ K.name, K.json ~as_elt:true k
-                   ; V.name, V.json ~as_elt:true v
-                   ]))
-          in
-          if as_elt then y else `Assoc [ X.name, y ]
-        ;;
-      end)
+      let json ?(as_elt : bool = false) (x : k) : Yojson.t =
+        let y : Yojson.t =
+          `List
+            (X.Map.to_seq x
+             |> List.of_seq
+             |> List.sort (fun (ka, va) (kb, vb) ->
+               Utils.compare_chain [ K.compare ka kb; V.compare va vb ])
+             |> List.map (fun (k, v) ->
+               `Assoc
+                 [ K.name, K.json ~as_elt:true k
+                 ; V.name, V.json ~as_elt:true v
+                 ]))
+        in
+        if as_elt then y else `Assoc [ X.name, y ]
+      ;;
+    end)
 end
 
 module Set = struct
-  module Make
-      (Log : Logger.S)
-      (X : sig
-         module Set : Set.S
+  module Make (X : sig
+      module Set : Set.S
 
-         val name : string
-         val json : ?as_elt:bool -> Set.elt -> Yojson.t
-       end) : S with type k = X.Set.t =
-    Make
-      (Log)
-      (struct
-        type k = X.Set.t
+      val name : string
+      val json : ?as_elt:bool -> Set.elt -> Yojson.t
+    end) : S with type k = X.Set.t = Make (struct
+      type k = X.Set.t
 
-        let name = X.name
+      let name = X.name
 
-        let json ?(as_elt : bool = false) (x : X.Set.t) : Yojson.t =
-          let y : Yojson.t =
-            `List
-              (X.Set.fold
-                 (fun (x : X.Set.elt) (acc : Yojson.t list) ->
-                   X.json ~as_elt:true x :: acc)
-                 x
-                 []
-               |> List.rev)
-          in
-          if as_elt then y else `Assoc [ X.name, y ]
-        ;;
-      end)
+      let json ?(as_elt : bool = false) (x : X.Set.t) : Yojson.t =
+        let y : Yojson.t =
+          `List
+            (X.Set.fold
+               (fun (x : X.Set.elt) (acc : Yojson.t list) ->
+                 X.json ~as_elt:true x :: acc)
+               x
+               []
+             |> List.rev)
+        in
+        if as_elt then y else `Assoc [ X.name, y ]
+      ;;
+    end)
 end
 
 module List = struct
-  module Make
-      (Log : Logger.S)
-      (X : sig
-         type k
+  module Make (X : sig
+      type k
 
-         val name : string
-         val json : ?as_elt:bool -> k -> Yojson.t
-       end) : S with type k = X.k list =
-    Make
-      (Log)
-      (struct
-        type k = X.k list
+      val name : string
+      val json : ?as_elt:bool -> k -> Yojson.t
+    end) : S with type k = X.k list = Make (struct
+      type k = X.k list
 
-        let name = X.name
+      let name = X.name
 
-        (** ... *)
-        let json ?(as_elt : bool = false) (xs : k) : Yojson.t =
-          let y : Yojson.t =
-            `List
-              (List.rev xs
-               |> List.fold_left
-                    (fun (acc : Yojson.t list) (x : X.k) ->
-                      X.json ~as_elt:true x :: acc)
-                    [])
-          in
-          if as_elt then y else `Assoc [ X.name, y ]
-        ;;
-      end)
+      (** ... *)
+      let json ?(as_elt : bool = false) (xs : k) : Yojson.t =
+        let y : Yojson.t =
+          `List
+            (List.rev xs
+             |> List.fold_left
+                  (fun (acc : Yojson.t list) (x : X.k) ->
+                    X.json ~as_elt:true x :: acc)
+                  [])
+        in
+        if as_elt then y else `Assoc [ X.name, y ]
+      ;;
+    end)
 end

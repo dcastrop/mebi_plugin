@@ -32,35 +32,24 @@ module type S = sig
   val step : Declare.Proof.t -> Declare.Proof.t
 end
 
-module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
+module Make (Enc : Encoding.S) :
   S
   with type enc = Enc.t
    and type node = Enc.Tree.Node.t
    and type tree = Enc.Tree.t
    and type trees = Enc.Trees.t
 
-type t =
-  { logger : (module Logger.S)
-  ; solver : (module S)
-  }
+type t = { solver : (module S) }
 
 val reset_the_cache : unit -> unit
 
 exception NoCachedModules
 
-val make
-  :  (module Logger.S)
-  -> (module Encoding.S)
-  -> ?ctx:(module Rocq_context.S)
-  -> unit
-  -> t ref
-
+val make : (module Encoding.S) -> unit -> t ref
 val is_done : unit -> bool
 
 val init
-  :  ?log:(unit -> (module Logger.S))
-  -> ?enc:((module Logger.S) -> (module Encoding.S))
-  -> ?ctx:(module Rocq_context.S)
+  :  ?enc:(unit -> (module Encoding.S))
   -> Declare.Proof.t
   -> Libnames.qualid list
   -> Constrexpr.constr_expr * Libnames.qualid
