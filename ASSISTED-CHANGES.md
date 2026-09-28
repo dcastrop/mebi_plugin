@@ -1385,6 +1385,33 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-28 — Wire the saturation differential into CI
+
+Branch `main` (on the `fork` remote). Closes a gap noticed while
+summarising: `satdiff` existed but nothing ran it automatically.
+
+- **Tooling.** `.github/workflows/ci.yml` gains a step running
+  `dune exec test/satdiff.exe -- 200` and diffing against
+  `test/satdiff.expected`, between the `tests.exe` and `make` steps.
+
+  The rationale is recorded in the workflow itself: this is the only check
+  that catches a change to `Saturation` silently altering which weak
+  transitions or annotations survive. The `PluginProofs.v` suite
+  demonstrably cannot see that — all 18 of its counts stayed identical
+  through a change that added 73 weak transitions. It is also already
+  proven to catch this class of change, having flagged 167 lines when the
+  closure rewrite landed.
+
+  Safe to run unattended: the dump is canonically sorted and timings go to
+  stderr, so it is deterministic and any diff is a real behaviour change.
+  An intended one means regenerating the golden file deliberately and
+  saying why.
+
+**Session tally:** Tooling 1 · Docs 1 · Optimization 0 · Bug fix 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
