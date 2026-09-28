@@ -9,8 +9,5 @@ module type S = sig
   val compare : t -> t -> int
 end
 
-module Make
-    (Log : Logger.S)
-    (Base : Base_.S)
-    (Tree : Tree.S with type base = Base.t) :
+module Make (Base : Base_.S) (Tree : Tree.S with type base = Base.t) :
   S with type base = Base.t and type tree = Tree.t

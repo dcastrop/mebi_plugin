@@ -1,13 +1,32 @@
-; (library
-;  (name algorithms)
-;  (public_name rocq-mebi.model.algorithms)
-;  (libraries rocq-mebi.model)
-;  (modules
-;   saturate
-;   minimize
-;   bisimilarity
-;   ; similarity
-;   )
-;  (wrapped false))
+(library
+ (name saturation)
+ (public_name rocq-mebi.model.algorithms.saturation)
+ (libraries
+  rocq-mebi.utils
+  rocq-mebi.terms
+  rocq-mebi.model.components
+  rocq-mebi.model.wip)
+ (modules saturation)
+ (wrapped false))
 
-; (include_subdirs no)
+(library
+ (name algorithms)
+ (public_name rocq-mebi.model.algorithms)
+ (libraries
+  rocq-mebi.utils
+  rocq-mebi.terms
+  rocq-mebi.model.components
+  rocq-mebi.model.algorithms.saturation
+  rocq-mebi.model.wip
+  rocq-mebi.model.lts
+  rocq-mebi.model.fsm
+  ; rocq-mebi.model
+  yojson)
+ (modules
+  minimization
+  bisimilarity
+  ; similarity
+  )
+ (wrapped false))
+
+(include_subdirs no)

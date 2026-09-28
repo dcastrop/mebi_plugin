@@ -17,19 +17,19 @@ module type S = sig
   include Json.S with type k = t
 end
 
-module Make
-    (Log : Logger.S)
-    (State : State.S)
-    (States : States.S with type elt = State.t)
-    (Labels : Labels.S)
-    (Transitions : Transitions.S with type labels = Labels.t)
-    (Info : Info.S with type base = State.base and type labels = Labels.t) :
+module Make (C : Components.S) :
   S
-  with type state = State.t
-   and type states = States.t
-   and type labels = Labels.t
-   and type transitions = Transitions.t
-   and type info = Info.t = struct
+  with type state = C.State.t
+   and type states = C.State.Set.t
+   and type labels = C.Label.Set.t
+   and type transitions = C.Transition.Set.t
+   and type info = C.Info.t = struct
+  module State = C.State
+  module States = C.State.Set
+  module Labels = C.Label.Set
+  module Transitions = C.Transition.Set
+  module Info = C.Info
+
   type state = State.t
   type states = States.t
   type labels = Labels.t
@@ -45,23 +45,20 @@ module Make
     ; info : info
     }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "LTS"
+      let name = "LTS"
 
-        let json ?as_elt (x : t) : Yojson.t =
-          `Assoc
-            [ "init", Json.option ~as_elt:true State.json x.init
-            ; "info", Info.json ~as_elt:true x.info
-            ; "terminals", States.json ~as_elt:true x.terminals
-            ; "alphabet", Labels.json ~as_elt:true x.alphabet
-            ; "states", States.json ~as_elt:true x.states
-            ; "transitions", Transitions.json ~as_elt:true x.transitions
-            ]
-        ;;
-      end)
+      let json ?as_elt (x : t) : Yojson.t =
+        `Assoc
+          [ "init", Json.option ~as_elt:true State.json x.init
+          ; "info", Info.json ~as_elt:true x.info
+          ; "terminals", States.json ~as_elt:true x.terminals
+          ; "alphabet", Labels.json ~as_elt:true x.alphabet
+          ; "states", States.json ~as_elt:true x.states
+          ; "transitions", Transitions.json ~as_elt:true x.transitions
+          ]
+      ;;
+    end)
 end

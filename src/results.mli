@@ -35,17 +35,16 @@ module type S = sig
   val get_bisimilar_states
     :  ?pi:Model.Partition.t
     -> Model.State.t
-    -> Model.States.t
+    -> Model.State.Set.t
 
   val are_states_bisimilar : Model.State.t -> Model.State.t -> bool
 
-  (* val get_candidates : Model.State.t -> Model.Label.t -> Model.EdgeMap.t' -> Model.State.t -> Model.States.t *)
+  (* val get_candidates : Model.State.t -> Model.Label.t -> Model.EdgeMap.t' -> Model.State.t -> Model.State.Set.t *)
 end
 
-module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
+module Make (Enc : Encoding.S) :
   S
-  with module M.Ctx = Ctx
-   and type enc = Enc.t
+  with type enc = Enc.t
    and type node = Enc.Tree.Node.t
    and type tree = Enc.Tree.t
    and type trees = Enc.Trees.t

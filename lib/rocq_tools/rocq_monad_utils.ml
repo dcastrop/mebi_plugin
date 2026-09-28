@@ -336,12 +336,11 @@ module type S = sig
   val make_econstr_set : unit -> (module Set.S with type elt = EConstr.t)
 end
 
-module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
-  S with module Ctx = Ctx and type enc = Enc.t and type tree = Enc.Tree.t =
-struct
+module Make (Enc : Encoding.S) :
+  S with type enc = Enc.t and type tree = Enc.Tree.t = struct
   (*****************************************)
 
-  module M = Rocq_monad.Make (Log) (Ctx) (Enc)
+  module M = Rocq_monad.Make (Enc)
   include M
 
   type tree = Enc.Tree.t
@@ -349,12 +348,12 @@ struct
   (*****************************************)
 
   let fresh_evar (x : Rocq_utils.evar_source) : EConstr.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     state (fun env sigma -> Rocq_utils.get_next env sigma x)
   ;;
 
   let econstr_eq ?(enc : bool = true) (a : EConstr.t) (b : EConstr.t) : bool mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     if enc
     then (
       let a = encode a in
@@ -373,7 +372,7 @@ struct
   ;;
 
   let get_encoding (x : EConstr.t) : Enc.t =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     run
       (let open Syntax in
        let* x : EConstr.t = econstr_normalize x in
@@ -381,7 +380,7 @@ struct
   ;;
 
   let econstr_kind (x : EConstr.t) : Rocq_utils.econstr_kind mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let* sigma = get_sigma in
     let* x : EConstr.t = econstr_normalize x in
@@ -389,7 +388,7 @@ struct
   ;;
 
   let econstr_is_evar (x : EConstr.t) : bool mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     state (fun env sigma -> sigma, EConstr.isEvar sigma x)
   ;;
 
@@ -400,17 +399,17 @@ struct
         (x : EConstr.t)
     : Constr.t mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     state (fun env sigma -> sigma, Rocq_utils.econstr_to_constr sigma x)
   ;;
 
   let econstr_to_constr_opt (x : EConstr.t) : Constr.t option mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     state (fun env sigma -> sigma, Rocq_utils.econstr_to_constr_opt sigma x)
   ;;
 
   let constrexpr_to_econstr (x : Constrexpr.constr_expr) : EConstr.t mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     state (fun env sigma -> Rocq_utils.constrexpr_to_econstr env sigma x)
   ;;
 
@@ -439,7 +438,7 @@ struct
   let exists_eq (x : EConstr.t) (ys : 'a list) (decoder : 'a -> EConstr.t)
     : bool mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     (* List.exists (fun y -> decoder y |> econstr_eq x) ys *)
     let open Syntax in
     let f (i : int) (a : bool) =
@@ -453,14 +452,14 @@ struct
   (*********************************************************)
 
   let type_of_econstr (x : EConstr.t) : EConstr.t mm =
-    (* Log.trace __FUNCTION__; *)
+    (* Logger.trace __FUNCTION__; *)
     let open Syntax in
     let* t : EConstr.t = econstr_normalize x in
     state (fun env sigma -> Typing.type_of env sigma t)
   ;;
 
   let type_of_constrexpr (x : Constrexpr.constr_expr) : EConstr.t mm =
-    (* Log.trace __FUNCTION__; *)
+    (* Logger.trace __FUNCTION__; *)
     let open Syntax in
     let* t : EConstr.t = constrexpr_to_econstr x in
     type_of_econstr t
@@ -477,7 +476,7 @@ struct
         (x : EConstr.t)
     : unit
     =
-    Log.thing ~__FUNCTION__ m s x Strfy.econstr
+    Logger.thing ~__FUNCTION__ m s x Strfy.econstr
   ;;
 
   let log_econstrs
@@ -487,7 +486,7 @@ struct
         (x : EConstr.t list)
     : unit
     =
-    Log.things ~__FUNCTION__ m s x Strfy.econstr
+    Logger.things ~__FUNCTION__ m s x Strfy.econstr
   ;;
 
   let log_constr
@@ -497,7 +496,7 @@ struct
         (x : Constr.t)
     : unit
     =
-    Log.thing ~__FUNCTION__ m s x Strfy.constr
+    Logger.thing ~__FUNCTION__ m s x Strfy.constr
   ;;
 
   let log_constrs
@@ -507,7 +506,7 @@ struct
         (x : Constr.t list)
     : unit
     =
-    Log.things ~__FUNCTION__ m s x Strfy.constr
+    Logger.things ~__FUNCTION__ m s x Strfy.constr
   ;;
 
   module type SErrors = sig
@@ -769,34 +768,31 @@ struct
         ; constructor : Rocq_utils.ind_constr
         }
 
-      include
-        Json.Thing.Make
-          (Log)
-          (struct
-            type k = t
+      include Json.Thing.Make (struct
+          type k = t
 
-            let name = "LTS"
+          let name = "LTS"
 
-            let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-              `Assoc
-                [ "term type", `String (Strfy.econstr x.term_type)
-                ; "label type", `String (Strfy.econstr x.label_type)
-                ; ( "constructor types"
-                  , `List
-                      (x.constructor_types
-                       |> Array.map (fun (y : constructor) ->
-                         `Assoc
-                           [ "name", `String (Rocq_utils.Strfy.name_id y.name)
-                           ; ( "constructor"
-                             , `String
-                                 (fstring
-                                    Rocq_utils.Strfy.ind_constr
-                                    y.constructor) )
-                           ])
-                       |> Array.to_list) )
-                ]
-            ;;
-          end)
+          let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+            `Assoc
+              [ "term type", `String (Strfy.econstr x.term_type)
+              ; "label type", `String (Strfy.econstr x.label_type)
+              ; ( "constructor types"
+                , `List
+                    (x.constructor_types
+                     |> Array.map (fun (y : constructor) ->
+                       `Assoc
+                         [ "name", `String (Rocq_utils.Strfy.name_id y.name)
+                         ; ( "constructor"
+                           , `String
+                               (fstring
+                                  Rocq_utils.Strfy.ind_constr
+                                  y.constructor) )
+                         ])
+                     |> Array.to_list) )
+              ]
+          ;;
+        end)
     end
 
     type t =
@@ -809,26 +805,23 @@ struct
       | Type of EConstr.t option
       | LTS of LTS.t
 
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
+    include Json.Thing.Make (struct
+        type k = t
 
-          let name = "Ind"
+        let name = "Ind"
 
-          let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-            `Assoc
-              [ "enc", Enc.json ~as_elt:true x.enc
-              ; "ind", `String (Strfy.econstr x.ind)
-              ; ( "kind"
-                , match x.kind with
-                  | Type None -> `Null
-                  | Type (Some x) -> `String (Strfy.econstr x)
-                  | LTS x -> LTS.json ~as_elt:true x )
-              ]
-          ;;
-        end)
+        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+          `Assoc
+            [ "enc", Enc.json ~as_elt:true x.enc
+            ; "ind", `String (Strfy.econstr x.ind)
+            ; ( "kind"
+              , match x.kind with
+                | Type None -> `Null
+                | Type (Some x) -> `String (Strfy.econstr x)
+                | LTS x -> LTS.json ~as_elt:true x )
+            ]
+        ;;
+      end)
 
     let get_lts : t -> LTS.t = function
       | { kind = LTS x; _ } -> x
@@ -843,20 +836,20 @@ struct
     ;;
 
     let get_lts_constructor_names (x : t) : Names.Id.t array =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       get_lts_constructor_types x
       |> Array.map (fun ({ name; _ } : LTS.constructor) -> name)
     ;;
 
     let get_lts_constructors (x : t) : Rocq_utils.ind_constr array =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       get_lts_constructor_types x
       |> Array.map (fun ({ constructor; _ } : LTS.constructor) -> constructor)
     ;;
 
     (** [lookup x] is a wrapper for [Inductive.lookup_mind_specif] *)
     let lookup (x : Names.inductive) : Declarations.mind_specif mm =
-      (* Log.trace __FUNCTION__; *)
+      (* Logger.trace __FUNCTION__; *)
       let open Syntax in
       let* env = get_env in
       Inductive.lookup_mind_specif env x |> return
@@ -868,7 +861,7 @@ struct
     let assert_mip_arity_is_type_or_set (mip : Declarations.one_inductive_body)
       : unit mm
       =
-      (* Log.trace __FUNCTION__; *)
+      (* Logger.trace __FUNCTION__; *)
       match mip.mind_sort with
       | Type _ -> return ()
       | Set -> return ()
@@ -880,7 +873,7 @@ struct
     let assert_mip_arity_is_prop (mip : Declarations.one_inductive_body)
       : unit mm
       =
-      (* Log.trace __FUNCTION__; *)
+      (* Logger.trace __FUNCTION__; *)
       match mip.mind_sort with
       | Prop -> return ()
       | _ -> Err.invalid_sort_lts (Sorts.quality mip.mind_sort)
@@ -891,7 +884,7 @@ struct
     let lts_mind
       : Names.GlobRef.t -> (Names.inductive * Declarations.mind_specif) mm
       =
-      (* Log.trace __FUNCTION__; *)
+      (* Logger.trace __FUNCTION__; *)
       function
       | Names.GlobRef.IndRef ind ->
         let open Syntax in
@@ -904,7 +897,7 @@ struct
     let lts_type_mind (x : Names.GlobRef.t)
       : (Names.inductive * Declarations.mind_specif) mm
       =
-      (* Log.trace __FUNCTION__; *)
+      (* Logger.trace __FUNCTION__; *)
       let open Syntax in
       let* ind, (mib, mip) = lts_mind x in
       let* () = assert_mip_arity_is_type_or_set mip in
@@ -915,7 +908,7 @@ struct
     let lts_prop_mind (x : Names.GlobRef.t)
       : (Names.inductive * Declarations.mind_specif) mm
       =
-      (* Log.trace __FUNCTION__; *)
+      (* Logger.trace __FUNCTION__; *)
       let open Syntax in
       let* ind, (mib, mip) = lts_mind x in
       let* () = assert_mip_arity_is_prop mip in
@@ -927,7 +920,7 @@ struct
     let lts_labels_and_terms ((mib, mip) : Declarations.mind_specif)
       : (Constr.rel_declaration * Constr.rel_declaration) mm
       =
-      (* Log.trace __FUNCTION__; *)
+      (* Logger.trace __FUNCTION__; *)
       (* NOTE: get the type of [mip] from [mib]. *)
       let typ = Inductive.type_of_inductive (UVars.in_punivs (mib, mip)) in
       match mip.mind_arity_ctxt |> Utils.split_at mip.mind_nrealdecls with
@@ -944,7 +937,7 @@ struct
     let mip_to_lts_constructors (mip : Declarations.one_inductive_body)
       : LTS.constructor array
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       try
         Array.combine mip.mind_consnames mip.mind_nf_lc
         |> Array.fold_left
@@ -960,7 +953,7 @@ struct
 
     (** [] *)
     let lts (x : Names.GlobRef.t) : t mm =
-      (* Log.trace __FUNCTION__; *)
+      (* Logger.trace __FUNCTION__; *)
       let open Syntax in
       let* ind, (mib, mip) = lts_prop_mind x in
       let* label, term = lts_labels_and_terms (mib, mip) in
@@ -1015,7 +1008,7 @@ struct
     include Enc.Constructor_tree
 
     let encode (act : EConstr.t) (goto : EConstr.t) (tree : Enc.Tree.t) : t =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let act : Enc.t = encode act in
       let goto : Enc.t = encode goto in
       act, goto, tree
@@ -1025,7 +1018,7 @@ struct
   let make_state_tree_pair_set ()
     : (module Set.S with type elt = Enc.t * Enc.Tree.t)
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     (module Set.Make (struct
          type t = Enc.t * Enc.Tree.t
 
@@ -1047,21 +1040,18 @@ struct
         ; acc : EConstr.t
         }
 
-      include
-        Json.Thing.Make
-          (Log)
-          (struct
-            type k = t
+      include Json.Thing.Make (struct
+          type k = t
 
-            let name = "Pair"
+          let name = "Pair"
 
-            let json ?as_elt ({ to_check; acc } : t) : Yojson.t =
-              `Assoc
-                [ "to_check", `String (Strfy.econstr to_check)
-                ; "acc", `String (Strfy.econstr acc)
-                ]
-            ;;
-          end)
+          let json ?as_elt ({ to_check; acc } : t) : Yojson.t =
+            `Assoc
+              [ "to_check", `String (Strfy.econstr to_check)
+              ; "acc", `String (Strfy.econstr acc)
+              ]
+          ;;
+        end)
 
       let fresh
             (env : Environ.env)
@@ -1116,22 +1106,19 @@ struct
         ; tree : Enc.Tree.t
         }
 
-      include
-        Json.Thing.Make
-          (Log)
-          (struct
-            type k = t
+      include Json.Thing.Make (struct
+          type k = t
 
-            let name = "Problem"
+          let name = "Problem"
 
-            let json ?as_elt ({ act; goto; tree } : t) : Yojson.t =
-              `Assoc
-                [ "act", Pair.json ~as_elt:true act
-                ; "goto", Pair.json ~as_elt:true act
-                ; "tree", Enc.Tree.json ~as_elt:true tree
-                ]
-            ;;
-          end)
+          let json ?as_elt ({ act; goto; tree } : t) : Yojson.t =
+            `Assoc
+              [ "act", Pair.json ~as_elt:true act
+              ; "goto", Pair.json ~as_elt:true act
+              ; "tree", Enc.Tree.json ~as_elt:true tree
+              ]
+          ;;
+        end)
 
       let unify_pair_opt (pair : Pair.t) : bool mm =
         state (fun env sigma -> Pair.unify env sigma pair)
@@ -1166,21 +1153,18 @@ struct
         ; to_unify : Problem.t list
         }
 
-      include
-        Json.Thing.Make
-          (Log)
-          (struct
-            type k = t
+      include Json.Thing.Make (struct
+          type k = t
 
-            let name = "Problems"
+          let name = "Problems"
 
-            let json ?as_elt ({ sigma; to_unify } : t) : Yojson.t =
-              `Assoc
-                [ ( "to_unify"
-                  , `List (List.map (Problem.json ~as_elt:true) to_unify) )
-                ]
-            ;;
-          end)
+          let json ?as_elt ({ sigma; to_unify } : t) : Yojson.t =
+            `Assoc
+              [ ( "to_unify"
+                , `List (List.map (Problem.json ~as_elt:true) to_unify) )
+              ]
+          ;;
+        end)
 
       let empty () : t mm =
         let open Syntax in
@@ -1234,22 +1218,19 @@ struct
     module ListOfProblems = struct
       type t = Problems.t list
 
-      include
-        Json.List.Make
-          (Log)
-          (struct
-            include Problems
+      include Json.List.Make (struct
+          include Problems
 
-            let name = "Problems"
-          end)
+          let name = "Problems"
+        end)
 
       let is_empty : t -> bool =
-        Log.trace __FUNCTION__;
+        Logger.trace __FUNCTION__;
         function [] -> true | [ p ] -> Problems.is_empty p | _ :: _ -> false
       ;;
 
       let cross_product ({ sigma; to_unify } : Problems.t) : t -> t =
-        Log.trace __FUNCTION__;
+        Logger.trace __FUNCTION__;
         List.concat_map (fun ({ to_unify = xs; _ } : Problems.t) : t ->
           List.map
             (fun (y : Problem.t) : Problems.t -> { sigma; to_unify = y :: xs })
@@ -1267,7 +1248,7 @@ struct
                 (tgt : EConstr.t)
         : Enc.t * ListOfProblems.t -> t mm
         =
-        Log.trace __FUNCTION__;
+        Logger.trace __FUNCTION__;
         let open Syntax in
         function
         | _, [] -> return acc
@@ -1291,7 +1272,7 @@ struct
       ;;
 
       let to_problems args (constructors : t) : Problems.t mm =
-        Log.trace __FUNCTION__;
+        Logger.trace __FUNCTION__;
         let open Syntax in
         let* sigma = get_sigma in
         let to_unify : Problem.t list =
@@ -1308,7 +1289,7 @@ struct
             (constructors : t)
         : t mm
         =
-        Log.trace __FUNCTION__;
+        Logger.trace __FUNCTION__;
         log_econstr ~__FUNCTION__ ~s:"act" act;
         log_econstr ~__FUNCTION__ ~s:"tgt" tgt;
         let open Syntax in
@@ -1330,7 +1311,7 @@ struct
           (args : Rocq_utils.constructor_args)
       : bool mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open Syntax in
       let* lhs_unifies : bool = Pair.unifies args.lhs lhs in
       if lhs_unifies then Pair.unifies args.act act else return false
@@ -1345,7 +1326,7 @@ struct
               (lts_enc : Enc.t)
       : Constructors.t mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open Syntax in
       let* from_term : EConstr.t = econstr_normalize from_term in
       let iter_body (i : int) (acc : Constructors.t) : Constructors.t mm =
@@ -1384,7 +1365,7 @@ struct
           ((substl, decls) : EConstr.Vars.substl * EConstr.rel_declaration list)
       : Constructors.t mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open Syntax in
       (* NOTE: unpack and normalize [act] and [tgt] from [args] *)
       let tgt : EConstr.t = EConstr.Vars.substl substl args.rhs in
@@ -1408,7 +1389,7 @@ struct
           (constructors : Constructors.t)
       : (Enc.t * ListOfProblems.t) option -> Constructors.t mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       function
       | None -> return constructors
       | Some (next_lts_enc, next_problems) ->
@@ -1431,7 +1412,7 @@ struct
       :  EConstr.Vars.substl * EConstr.rel_declaration list
       -> (Enc.t * ListOfProblems.t) option mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       function
       | [], [] -> return (Some (lts_enc, acc))
       | _hsubstl :: substl, t :: tl ->
@@ -1455,7 +1436,7 @@ struct
           ((substl, tl) : EConstr.Vars.substl * EConstr.rel_declaration list)
           ((name, args) : EConstr.t * EConstr.t array)
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       match F.find_opt indmap name with
       | None -> check_unknown_app lts_enc acc indmap (substl, tl) (name, args)
       | Some c ->
@@ -1487,8 +1468,8 @@ struct
           ((name, args) : EConstr.t * EConstr.t array)
       : (Enc.t * ListOfProblems.t) option mm
       =
-      Log.trace __FUNCTION__;
-      if Log.Config.is_enabled Debug
+      Logger.trace __FUNCTION__;
+      if Logger.is_enabled Debug
       then log_econstr ~__FUNCTION__ ~m:Warning ~s:"name not indmap" name;
       (* Array.to_list args |> log_econstrs ~__FUNCTION__ ~m:Warning ~s:"args"; *)
       check_updated_ctx lts_enc acc indmap (substl, tl)
@@ -1502,7 +1483,7 @@ struct
           (lts_enc : Enc.t)
       : Constructors.t mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open Syntax in
       let* fresh_evar = fresh_evar (OfType label_type) in
       check_valid_constructors constructors indmap from_term fresh_evar lts_enc
@@ -1518,7 +1499,7 @@ struct
   ;;
 
   let make_econstr_set () : (module Set.S with type elt = EConstr.t) =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     (module Set.Make (struct
          type t = EConstr.t
 

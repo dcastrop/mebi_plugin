@@ -64,7 +64,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (W :
        Results.S
@@ -90,15 +89,12 @@ module Make
     module Nodes = struct
       type t = Enc.Tree.Node.t list
 
-      include
-        Json.List.Make
-          (Log)
-          (struct
-            type k = Enc.Tree.Node.t
+      include Json.List.Make (struct
+          type k = Enc.Tree.Node.t
 
-            let name = "Nodes"
-            let json = Enc.Tree.Node.json
-          end)
+          let name = "Nodes"
+          let json = Enc.Tree.Node.json
+        end)
     end
 
     type t =
@@ -108,24 +104,21 @@ module Make
       ; remaining : W.Model.Annotation.t option
       }
 
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
+    include Json.Thing.Make (struct
+        type k = t
 
-          let name = "ApplicableConstructors"
+        let name = "ApplicableConstructors"
 
-          let json ?(as_elt : bool = false) (x : t) : Yojson.t =
-            `Assoc
-              [ "label", W.Model.Label.json ~as_elt:true x.label
-              ; "destination", W.Model.State.json ~as_elt:true x.destination
-              ; "current", Json.option ~as_elt:true Nodes.json x.current
-              ; ( "remaining"
-                , Json.option ~as_elt:true W.Model.Annotation.json x.remaining )
-              ]
-          ;;
-        end)
+        let json ?(as_elt : bool = false) (x : t) : Yojson.t =
+          `Assoc
+            [ "label", W.Model.Label.json ~as_elt:true x.label
+            ; "destination", W.Model.State.json ~as_elt:true x.destination
+            ; "current", Json.option ~as_elt:true Nodes.json x.current
+            ; ( "remaining"
+              , Json.option ~as_elt:true W.Model.Annotation.json x.remaining )
+            ]
+        ;;
+      end)
 
     exception TransitionHasNoConstructorsToApply
 
@@ -166,23 +159,20 @@ module Make
       | Exists of W.Model.Transition.t option
       | ApplyConstructors of ApplicableConstructors.t
 
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
+    include Json.Thing.Make (struct
+        type k = t
 
-          let name = "PState"
+        let name = "PState"
 
-          let json ?(as_elt : bool = false) : t -> Yojson.t = function
-            | Done -> `String "Done"
-            | WeakSim -> `String "WeakSim"
-            | NewProof (_, _) -> `String "NewProof"
-            | Exists None -> `String "Exists (None)"
-            | Exists (Some _) -> `String "Exists (Some _)"
-            | ApplyConstructors _ -> `String "ApplyConstructors"
-          ;;
-        end)
+        let json ?(as_elt : bool = false) : t -> Yojson.t = function
+          | Done -> `String "Done"
+          | WeakSim -> `String "WeakSim"
+          | NewProof (_, _) -> `String "NewProof"
+          | Exists None -> `String "Exists (None)"
+          | Exists (Some _) -> `String "Exists (Some _)"
+          | ApplyConstructors _ -> `String "ApplyConstructors"
+        ;;
+      end)
   end
 
   type t =
@@ -230,7 +220,7 @@ module Make
   ;;
 
   let log ?(__FUNCTION__ : string = "") () : unit =
-    Log.thing
+    Logger.thing
       ~__FUNCTION__
       Debug
       "ProofState.StateM"

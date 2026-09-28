@@ -126,11 +126,11 @@ Proof. MeBi Sim Begin compLTS r And compLTS p Using compLTS termLTS.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.rs".
-Example wsim_rp : weak_sim compLTS compLTS r s. 
-Proof. MeBi Sim Begin compLTS r And compLTS s Using compLTS termLTS. 
+Example wsim_rs : weak_sim compLTS compLTS r s.
+Proof. MeBi Sim Begin compLTS r And compLTS s Using compLTS termLTS.
   MeBi Sim Solve 100000. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.sr".
-Example wsim_pr : weak_sim compLTS compLTS s r. 
-Proof. MeBi Sim Begin compLTS s And compLTS r Using compLTS termLTS. 
-  MeBi Sim Solve 100000. Qed. 
+Example wsim_sr : weak_sim compLTS compLTS s r.
+Proof. MeBi Sim Begin compLTS s And compLTS r Using compLTS termLTS.
+  MeBi Sim Solve 100000. Qed.

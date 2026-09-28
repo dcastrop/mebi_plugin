@@ -29,8 +29,9 @@
 
 (package
  (name rocq-mebi)
- (synopsis "A short synopsis")
- (description "A longer description")
+ (synopsis "Automating bisimilarity proofs in Rocq")
+ (description
+  "MeBi (Mechanised Bisimilarities) builds labelled transition systems and finite state machines from Rocq inductive relations, checks (weak) bisimilarity between them, and drives interactive tactic-based proof search for bisimilarity goals, following the methods in Sangiorgi and Rutten's \"Advanced Topics in Bisimulation and Coinduction\", Section 3.2.2.")
  ; Bounds matter here: the plugin links against rocq-runtime's OCaml API, which
  ; breaks across Rocq *minor* versions. Exact versions are pinned separately in
  ; rocq-mebi.opam.locked; these are the ranges the source is known to compile in.
@@ -61,6 +62,6 @@
   (vsrocq-language-server
    :with-dev-setup))
  (tags
-  (topics "to describe" your project)))
+  (bisimulation coinduction "process algebra" "proof automation" rocq)))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html

@@ -1,22 +1,95 @@
+(** Message emission.
+
+    Previously this exposed [module type S] and [Make], and every module in
+    [lib/] took a [Log : Logger.S] functor parameter so that the plugin could
+    print through Rocq's [Feedback] when driven from Rocq and through [stdout]
+    when driven from a test binary. But [S] had no abstract type — every member
+    returned [unit] — so the functor imposed the full type-level cost and bought
+    nothing. The Rocq/OCaml choice is now made once, at plugin load, by
+    installing a {i sink}; see [set_sink]. *)
+
+type sink = Output.message -> unit
+
+(** Used when no sink is installed, i.e. under [tests/] and any other plain
+    OCaml entry point. Formatting matches the old [Output.Mode.OCaml]. *)
+let default_sink : sink =
+  fun ({ kind; fn; prefix; body } : Output.message) ->
+  Printf.printf
+    "%s [%s] %s\n%!"
+    (match fn with "" -> "" | z -> Printf.sprintf "%s:" z)
+    (Output.Kind.to_string kind)
+    (match prefix with None -> body | Some p -> Printf.sprintf "%s: %s" p body)
+;;
+
+let the_sink : sink ref = ref default_sink
+let set_sink (f : sink) : unit = the_sink := f
+let reset_sink () : unit = the_sink := default_sink
+
+(***********************************************************************)
+
+(** Global on/off, checked before the per-kind configuration. *)
+let the_enabled : bool ref = ref true
+
+let enable () : unit = the_enabled := true
+let disable () : unit = the_enabled := false
+
+(** Per-kind overrides. Absent means [Output.Kind.default]. *)
+let the_config : (Output.Kind.t, bool) Hashtbl.t = Hashtbl.create 8
+
+let configure (k : Output.Kind.t) (b : bool) : unit =
+  Hashtbl.replace the_config k b
+;;
+
+let reset_config () : unit = Hashtbl.reset the_config
+
+let is_enabled (k : Output.Kind.t) : bool =
+  !the_enabled
+  &&
+  match Hashtbl.find_opt the_config k with
+  | None -> Output.Kind.default k
+  | Some b -> b
+;;
+
+(** [quiet f] runs [f] with all output suppressed, restoring the previous
+    setting afterwards (including if [f] raises). Replaces the old
+    [Logger.ReMake], whose two uses were both commented out. *)
+let quiet (f : unit -> 'a) : 'a =
+  let saved : bool = !the_enabled in
+  the_enabled := false;
+  Fun.protect ~finally:(fun () -> the_enabled := saved) f
+;;
+
+(***********************************************************************)
+
+(** The one place a message is filtered and handed to the sink. [enabled] lets
+    a scoped logger substitute its own predicate. *)
+let emit
+      ?(enabled : Output.Kind.t -> bool = is_enabled)
+      ?(__FUNCTION__ : string = "")
+      ?(prefix : string option = None)
+      ?(override : bool = false)
+      (kind : Output.Kind.t)
+  : string -> unit
+  = function
+  | "" -> ()
+  | body ->
+    if override || enabled kind
+    then !the_sink { kind; fn = __FUNCTION__; prefix; body }
+;;
+
+(** The logging API. Available directly at the top level of [Logger] against the
+    global configuration, and via [Scoped] for a module that needs its own. *)
 module type S = sig
-  module Config : Output.Config.S
-
-  val enabled : bool ref
-  val prefix : string option
-
-  (* Rocq's [Feedback.level] messages *)
+  val is_enabled : Output.Kind.t -> bool
   val debug : ?__FUNCTION__:string -> string -> unit
   val info : ?__FUNCTION__:string -> string -> unit
   val notice : ?__FUNCTION__:string -> string -> unit
   val warning : ?__FUNCTION__:string -> string -> unit
   val error : ?__FUNCTION__:string -> string -> unit
-
-  (* special printing messages *)
   val trace : ?__FUNCTION__:string -> string -> unit
   val result : ?__FUNCTION__:string -> string -> unit
   val show : ?__FUNCTION__:string -> string -> unit
 
-  (* utils for printing things *)
   val thing
     :  ?__FUNCTION__:string
     -> Output.Kind.t
@@ -50,66 +123,52 @@ module type S = sig
     -> unit
 end
 
-module Make
-    (Mode : Output.Mode.S)
-    (X : sig
-       val prefix : string option
-       val level : Output.Kind.level -> bool
-       val special : Output.Kind.special -> bool
-     end) : S = struct
-  module Config : Output.Config.S =
-    Output.Config.Make
-      (Mode)
-      (struct
-        let level : Output.Kind.level -> bool = X.level
-        let special : Output.Kind.special -> bool = X.special
-      end)
+(** Bodies shared by the top-level API and [Scoped], parameterised only by which
+    predicate decides whether a kind is emitted. *)
+module Body (E : sig
+    val is_enabled : Output.Kind.t -> bool
+  end) : S = struct
+  let is_enabled = E.is_enabled
 
-  let enabled : bool ref = ref true
-  let prefix : string option = X.prefix
-
-  let do_output
-        ?(__FUNCTION__ : string = "")
-        ?(prefix : string option = None)
-        ?(override : bool = false)
+  let out ?(__FUNCTION__ : string = "") ?(prefix : string option = None)
     : Output.Kind.t -> string -> unit
     =
-    Config.do_output ~__FUNCTION__ ~prefix ~override
+    emit ~enabled:E.is_enabled ~__FUNCTION__ ~prefix
   ;;
 
   let debug ?(__FUNCTION__ : string = "") (x : string) : unit =
-    do_output ~__FUNCTION__ Debug x
+    out ~__FUNCTION__ Debug x
   ;;
 
   let info ?(__FUNCTION__ : string = "") (x : string) : unit =
-    do_output ~__FUNCTION__ Info x
+    out ~__FUNCTION__ Info x
   ;;
 
   let notice ?(__FUNCTION__ : string = "") (x : string) : unit =
-    do_output ~__FUNCTION__ Notice x
+    out ~__FUNCTION__ Notice x
   ;;
 
   let warning ?(__FUNCTION__ : string = "") (x : string) : unit =
-    do_output ~__FUNCTION__ Warning x
+    out ~__FUNCTION__ Warning x
   ;;
 
   let error ?(__FUNCTION__ : string = "") (x : string) : unit =
-    do_output ~__FUNCTION__ Error x
+    out ~__FUNCTION__ Error x
   ;;
 
   let trace ?(__FUNCTION__ : string = "") (x : string) : unit =
-    do_output ~__FUNCTION__ Trace x
+    out ~__FUNCTION__ Trace x
   ;;
 
   let result ?(__FUNCTION__ : string = "") (x : string) : unit =
-    do_output ~__FUNCTION__ Result x
+    out ~__FUNCTION__ Result x
   ;;
 
   let show ?(__FUNCTION__ : string = "") (x : string) : unit =
-    do_output ~__FUNCTION__ Show x
+    out ~__FUNCTION__ Show x
   ;;
 
-  (** [thing level f x] uses outputs the result of [f x] to [level]. *)
+  (** [thing k prefix x f] outputs [f x] at kind [k]. *)
   let thing
         ?(__FUNCTION__ : string = "")
         (k : Output.Kind.t)
@@ -118,11 +177,7 @@ module Make
         (f : 'a -> string)
     : unit
     =
-    do_output
-      ~prefix:(Some (Printf.sprintf "%s: " prefix))
-      ~__FUNCTION__
-      k
-      (f x)
+    out ~prefix:(Some (Printf.sprintf "%s: " prefix)) ~__FUNCTION__ k (f x)
   ;;
 
   let things
@@ -135,7 +190,7 @@ module Make
     =
     (* NOTE: start and end *)
     let e : string -> unit =
-      do_output ~prefix:(Some (Printf.sprintf "%s: " prefix)) ~__FUNCTION__ k
+      out ~prefix:(Some (Printf.sprintf "%s: " prefix)) ~__FUNCTION__ k
     in
     (* NOTE: indexed iterator *)
     let index : int ref = ref 0 in
@@ -175,65 +230,27 @@ module Make
   ;;
 end
 
-(***********************************************************************)
-
-let default_level : Output.Kind.level -> bool = !Output.Kind.default_level
-let default_special : Output.Kind.special -> bool = !Output.Kind.default_special
-
-module MkDefault () : S =
-  Make
-    (Output.Mode.Default)
-    (struct
-      let prefix : string option = None
-      let level : Output.Kind.level -> bool = default_level
-      let special : Output.Kind.special -> bool = default_special
-    end)
-
-module Default : S = MkDefault ()
+include Body (struct
+    let is_enabled = is_enabled
+  end)
 
 (***********************************************************************)
 
-(** [module ReMake (Old) (New)] returns a new [Logger.S] with updated config.
-    {b Example:}
-    - [module Log = Logger.MkDefault ()]
-    - module Log' = Logger.Remake (Log) (struct
-      let level = Logger.default_level
-      let special : Output.Kind.special -> bool = function
-      | Trace -> false
-      | Result -> true
-      | Show -> true end) *)
-module ReMake
-    (Old : S)
-    (New : sig
-       val level : (Feedback.level -> bool) option
-       val special : (Output.Kind.special -> bool) option
-     end) : S with module Config.Mode = Old.Config.Mode =
-  Make
-    (Old.Config.Mode)
-    (struct
-      let prefix = Old.prefix
+(** A logger with its own per-kind overrides, for a module that wants output
+    settings independent of the user-facing configuration. Shares the global
+    sink and the global on/off.
 
-      let level : Output.Kind.level -> bool =
-        match New.level with None -> Old.Config.Level.is_enabled | Some x -> x
-      ;;
-
-      let special : Output.Kind.special -> bool =
-        match New.special with
-        | None -> Old.Config.Special.is_enabled
-        | Some x -> x
-      ;;
-    end)
-
-(* NOTE: example of remake *)
-(* module Log =
-   Logger.ReMake
-   (Log)
-   (struct
-   let level =
-   Some (fun (x : Output.Kind.level) -> match x with _ -> true)
-   ;;
-
-   let special =
-   Some (fun (x : Output.Kind.special) -> match x with _ -> true)
-   ;;
-   end) *)
+    Unlike the old [Logger.Make], this is {b not} threaded anywhere: it is
+    declared and used within a single file. Only [Rocq_utils] and
+    [Mebi_theories] need it. *)
+module Scoped (X : sig
+    val overrides : (Output.Kind.t * bool) list
+  end) : S = Body (struct
+    let is_enabled (k : Output.Kind.t) : bool =
+      !the_enabled
+      &&
+      match List.assoc_opt k X.overrides with
+      | Some b -> b
+      | None -> is_enabled k
+    ;;
+  end)

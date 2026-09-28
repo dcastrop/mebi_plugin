@@ -1,8 +1,37 @@
-module type S = sig
-  module Config : Output.Config.S
+(** Message emission against a sink installed at plugin load.
 
-  val enabled : bool ref
-  val prefix : string option
+    There is no [Logger.S] functor parameter any more. [S] had no abstract type,
+    so passing it to a functor cost a parameter on every module in [lib/] and
+    bought nothing. Call [Logger.trace], [Logger.info] etc. directly; the
+    Rocq-vs-stdout choice is made once via [set_sink]. *)
+
+type sink = Output.message -> unit
+
+(** Prints to [stdout]. Active until [set_sink] is called, which is what makes
+    [lib/utils], [lib/terms] and [lib/model] usable from a plain OCaml test
+    binary with no Rocq runtime linked. *)
+val default_sink : sink
+
+val set_sink : sink -> unit
+val reset_sink : unit -> unit
+
+(** {1 Configuration} *)
+
+val enable : unit -> unit
+val disable : unit -> unit
+val configure : Output.Kind.t -> bool -> unit
+val reset_config : unit -> unit
+
+(* [is_enabled] is not declared here: it comes from [include S] below. *)
+
+(** [quiet f] runs [f] with output suppressed, restoring the previous setting
+    afterwards even if [f] raises. *)
+val quiet : (unit -> 'a) -> 'a
+
+(** {1 Emission} *)
+
+module type S = sig
+  val is_enabled : Output.Kind.t -> bool
   val debug : ?__FUNCTION__:string -> string -> unit
   val info : ?__FUNCTION__:string -> string -> unit
   val notice : ?__FUNCTION__:string -> string -> unit
@@ -45,33 +74,19 @@ module type S = sig
     -> unit
 end
 
-val default_level : Output.Kind.level -> bool
-val default_special : Output.Kind.special -> bool
+include S
 
-module Make : (Mode : Output.Mode.S)
-    (X : sig
-       val prefix : string option
-       val level : Output.Kind.level -> bool
-       val special : Output.Kind.special -> bool
-     end)
+(** A logger with its own per-kind overrides, sharing the global sink and global
+    on/off. Declared and used within a single file — never threaded through a
+    functor. Only [Rocq_utils] and [Mebi_theories] need it.
+
+    {b E.g.:}
+    {[
+    module Log = Logger.Scoped (struct
+        let overrides = [ Output.Kind.Debug, false; Output.Kind.Trace, false ]
+      end)
+    ]} *)
+module Scoped : (_ : sig
+                   val overrides : (Output.Kind.t * bool) list
+                 end)
     -> S
-
-module MkDefault : () -> S
-module Default : S
-
-(** [module ReMake (Old) (New)] returns a new [Logger.S] with updated config. {b E.g.:} 
-{[
-  module Log = Logger.MkDefault ()
-  module Log' = Logger.Remake (Log) (struct
-  let level = Logger.default_level
-  let special : Output.Kind.special -> bool = function
-  | Trace -> false
-  | Result -> true
-  | Show -> true end)
-]} *)
-module ReMake : (Old : S)
-    (New : sig
-       val level : (Feedback.level -> bool) option
-       val special : (Output.Kind.special -> bool) option
-     end)
-    -> S with module Config.Mode = Old.Config.Mode

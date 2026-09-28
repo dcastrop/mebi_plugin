@@ -26,4 +26,4 @@ module type S = sig
   val unpack : t -> unit Proofview.tactic
 end
 
-module Make (Log : Logger.S) : S
+module Make : S

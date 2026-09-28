@@ -5,18 +5,15 @@ module type S = sig
   include Json.S with type k = t
 end
 
-module Make (Log : Logger.S) (Constructor_tree : Constructor_tree.S) :
+module Make (Constructor_tree : Constructor_tree.S) :
   S with type constructor_tree = Constructor_tree.t = struct
   type constructor_tree = Constructor_tree.t
   type t = Constructor_tree.t list
 
-  include
-    Json.List.Make
-      (Log)
-      (struct
-        type k = Constructor_tree.t
+  include Json.List.Make (struct
+      type k = Constructor_tree.t
 
-        let name = "Constructors"
-        let json = Constructor_tree.json
-      end)
+      let name = "Constructors"
+      let json = Constructor_tree.json
+    end)
 end

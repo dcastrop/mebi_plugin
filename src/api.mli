@@ -1,13 +1,8 @@
+(** Per-message-kind output settings live in [Logger]; what remains here is the
+    part that was never about logging. [config_output] and [set_output] forward
+    to [Logger.configure]. *)
 type output_config =
-  { mutable debug : bool
-  ; mutable info : bool
-  ; mutable notice : bool
-  ; mutable warning : bool
-  ; mutable error : bool
-  ; mutable trace : bool
-  ; mutable result : bool
-  ; mutable show : bool
-  ; mutable decode_results : bool
+  { mutable decode_results : bool
   ; mutable dump_results : bool
   }
 
@@ -20,14 +15,8 @@ val output_config_dump_results : bool -> unit
 val set_output : bool -> string -> unit
 
 (* *)
-val make_logger : unit -> (module Logger.S)
-
-val make_enc
-  :  (module Logger.S)
-  -> (module Encoding.Packed.PackedS)
-  -> (module Encoding.S)
-
-val make_enc_int : (module Logger.S) -> (module Encoding.S)
+val make_enc : (module Encoding.Packed.PackedS) -> (module Encoding.S)
+val make_enc_int : unit -> (module Encoding.S)
 
 type fail_flags =
   { mutable empty : bool

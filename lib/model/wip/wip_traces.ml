@@ -1,0 +1,45 @@
+module type S = sig
+  type wip
+
+  include Set.S
+  include Json.S with type k = t
+
+  val get : wip -> t -> t
+end
+
+module Make
+    (C : Components.S)
+    (WIP : Wip_annotation.S with type state = C.State.t)
+    (Trace : Wip_trace.S with type state = C.State.t and type wip = WIP.t) :
+  S with type elt = Trace.t and type wip = WIP.t = struct
+  type wip = WIP.t
+
+  module Set_ : Set.S with type elt = Trace.t = Set.Make (Trace)
+  include Set_
+
+  include Json.Set.Make (struct
+      module Set = Set_
+
+      let name = "WIP Traces"
+      let json = Trace.json
+    end)
+
+  (** [get x ys] returns a subset subtraces [ys] that begin with [x]. This includes elements in [ys] that begin with [x], in addition to the trailing-subtraces that begin with [x] for elements in [ys].
+      @raise Not_found if the set would return empty. *)
+  let get (x : WIP.t) (ys : t) : t =
+    let xs : t =
+      fold
+        (fun (y : Trace.t) (acc : t) ->
+          if WIP.equal x y.this
+          then add y acc
+          else (
+            match y.next with
+            | Some (Next next) ->
+              (try add (Trace.get x next) acc with Not_found -> acc)
+            | _ -> acc))
+        ys
+        empty
+    in
+    if is_empty xs then raise Not_found else xs
+  ;;
+end

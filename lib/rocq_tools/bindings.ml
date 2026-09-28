@@ -73,8 +73,7 @@ module type S = sig
     -> t mm
 end
 
-module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
-  S with type 'a mm = 'a M.mm = struct
+module Make (M : Rocq_monad_utils.S) : S with type 'a mm = 'a M.mm = struct
   type 'a mm = 'a M.mm
 
   open M
@@ -89,34 +88,31 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
           ; cont : t
           }
 
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
+    include Json.Thing.Make (struct
+        type k = t
 
-          let name = "Instructions"
+        let name = "Instructions"
 
-          let json ?as_elt (x : t) : Yojson.t =
-            let rec f : t -> Yojson.t = function
-              | Undefined -> `String "Undefined"
-              | Done -> `String "Done"
-              | Arg { root; index; cont } ->
-                `Assoc
-                  [ "root", `String (Strfy.constr root)
-                  ; "index", `Int index
-                  ; "cont", f cont
-                  ]
-            in
-            f x
-          ;;
-        end)
+        let json ?as_elt (x : t) : Yojson.t =
+          let rec f : t -> Yojson.t = function
+            | Undefined -> `String "Undefined"
+            | Done -> `String "Done"
+            | Arg { root; index; cont } ->
+              `Assoc
+                [ "root", `String (Strfy.constr root)
+                ; "index", `Int index
+                ; "cont", f cont
+                ]
+          in
+          f x
+        ;;
+      end)
 
     exception CannotAppendDone of unit
 
     let rec append (x : t) : t -> t
       =
-      (* Log.trace __FUNCTION__; *)
+      (* Logger.trace __FUNCTION__; *)
       function
       | Arg { root; index; cont } -> Arg { root; index; cont = append x cont }
       | Undefined -> x
@@ -124,7 +120,7 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
     ;;
 
     let rec length : t -> int =
-      (* Log.trace __FUNCTION__; *)
+      (* Logger.trace __FUNCTION__; *)
       function
       | Undefined -> 0
       | Done -> -1
@@ -135,21 +131,18 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
   module NamedInstructions = struct
     type t = Names.Name.t * Instructions.t
 
-    include
-      Json.Thing.Make
-        (Log)
-        (struct
-          type k = t
+    include Json.Thing.Make (struct
+        type k = t
 
-          let name = "NamedInstructions"
+        let name = "NamedInstructions"
 
-          let json ?(as_elt : bool = false) x =
-            `Assoc
-              [ "name", `String (Rocq_utils.Strfy.name (fst x))
-              ; "instructions", Instructions.json ~as_elt:true (snd x)
-              ]
-          ;;
-        end)
+        let json ?(as_elt : bool = false) x =
+          `Assoc
+            [ "name", `String (Rocq_utils.Strfy.name (fst x))
+            ; "instructions", Instructions.json ~as_elt:true (snd x)
+            ]
+        ;;
+      end)
   end
 
   module ConstrMap = struct
@@ -166,7 +159,6 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
 
     include
       Json.Map.Make
-        (Log)
         (struct
           module Map = Map_
 
@@ -175,15 +167,12 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
           let name = "ConstrMap"
         end)
         (struct
-          include
-            Json.Thing.Make
-              (Log)
-              (struct
-                type k = Constr.t
+          include Json.Thing.Make (struct
+              type k = Constr.t
 
-                let name = "Constr"
-                let json ?(as_elt : bool = false) x = `String (Strfy.constr x)
-              end)
+              let name = "Constr"
+              let json ?(as_elt : bool = false) x = `String (Strfy.constr x)
+            end)
 
           let compare a b : int = Constr.compare a b
         end)
@@ -196,7 +185,7 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
     let update (cmap : t') (k : Constr.t) ((name, inst) : NamedInstructions.t)
       : unit
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       match find_opt cmap k with
       | None -> add cmap k (name, inst)
       | Some (name', inst') ->
@@ -211,30 +200,32 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
     let find_name (name_pairs : (EConstr.t * Names.Name.t) list) (x : EConstr.t)
       : Names.Name.t mm
       =
-      (* Log.trace __FUNCTION__; *)
-      Log.thing ~__FUNCTION__ Debug "x" x Strfy.econstr;
+      (* Logger.trace __FUNCTION__; *)
+      Logger.thing ~__FUNCTION__ Debug "x" x Strfy.econstr;
       let open Syntax in
       let f (i : int) : Names.Name.t option -> Names.Name.t option mm = function
         | Some n ->
-          Log.thing ~__FUNCTION__ Trace "Some" n Rocq_utils.Strfy.name;
+          Logger.thing ~__FUNCTION__ Trace "Some" n Rocq_utils.Strfy.name;
           Some n |> return
         | None ->
-          Log.trace ~__FUNCTION__ "None";
+          Logger.trace ~__FUNCTION__ "None";
           let y, z = List.nth name_pairs i in
           let* eq = econstr_eq ~enc:false x y in
           if eq
           then (
-            Log.thing ~__FUNCTION__ Debug "eq x" z Rocq_utils.Strfy.name;
+            Logger.thing ~__FUNCTION__ Debug "eq x" z Rocq_utils.Strfy.name;
             Some z |> return)
           else return None
       in
       let* matches = iterate 0 (List.length name_pairs - 1) None f in
       match matches with
       | None ->
-        Log.trace ~__FUNCTION__ "Raise (Rocq_bindings_CannotFindBindingName x)";
+        Logger.trace
+          ~__FUNCTION__
+          "Raise (Rocq_bindings_CannotFindBindingName x)";
         raise (Rocq_bindings_CannotFindBindingName x)
       | Some n ->
-        Log.trace ~__FUNCTION__ "Some (_, n)";
+        Logger.trace ~__FUNCTION__ "Some (_, n)";
         return n
     ;;
 
@@ -244,7 +235,7 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
           (y : Constr.t)
       : t' mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open Syntax in
       let m : t' = create 0 in
       let rec f
@@ -253,7 +244,7 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
                 ((x, y) : EConstr.t * Constr.t)
         : unit mm
         =
-        Log.trace __FUNCTION__;
+        Logger.trace __FUNCTION__;
         let* x_kind = econstr_kind x in
         match x_kind, Constr.kind y with
         | App (xty, xtys), App (yty, ytys) ->
@@ -264,7 +255,7 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
             let (tysindex, _), _ = Utils.new_int_counter ~start:(-1) () in
             let xytys = Array.combine xtys ytys in
             let iter_body (i : int) () =
-              Log.trace __FUNCTION__;
+              Logger.trace __FUNCTION__;
               let b' =
                 Instructions.append
                   (Arg { root = yty; index = tysindex (); cont = Undefined })
@@ -289,7 +280,7 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
           ((evar, rel) : EConstr.t * Constr.t)
       : t' option mm
       =
-      Log.trace __FUNCTION__;
+      Logger.trace __FUNCTION__;
       let open Syntax in
       let* m = extract_binding_map name_pairs evar rel in
       match to_seq_values m |> List.of_seq with
@@ -307,27 +298,24 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
         ; goto : ConstrMap.t' option
         }
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "Bindings"
+      let name = "Bindings"
 
-        let json ?as_elt : t -> Yojson.t = function
-          | No_Bindings -> `String "NoBindings"
-          | Use_Bindings { from; action; goto } ->
-            `Assoc
-              [ "from", Json.option ~as_elt:true ConstrMap.json from
-              ; "action", Json.option ~as_elt:true ConstrMap.json action
-              ; "goto", Json.option ~as_elt:true ConstrMap.json goto
-              ]
-        ;;
-      end)
+      let json ?as_elt : t -> Yojson.t = function
+        | No_Bindings -> `String "NoBindings"
+        | Use_Bindings { from; action; goto } ->
+          `Assoc
+            [ "from", Json.option ~as_elt:true ConstrMap.json from
+            ; "action", Json.option ~as_elt:true ConstrMap.json action
+            ; "goto", Json.option ~as_elt:true ConstrMap.json goto
+            ]
+      ;;
+    end)
 
   let use_no_bindings (xs : ConstrMap.t' option list) : bool =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     List.filter (function None -> false | _ -> true) xs |> List.is_empty
   ;;
 
@@ -341,7 +329,7 @@ module Make (Log : Logger.S) (M : Rocq_monad_utils.S) :
         (goto : EConstr.t * Constr.t)
     : t mm
     =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open Syntax in
     let f = ConstrMap.make_opt name_pairs in
     let* from : ConstrMap.t' option = f from in

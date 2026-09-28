@@ -25,7 +25,7 @@ module type Args = sig
   val gl : Proofview.Goal.t ref
 end
 
-module Make (Log : Logger.S) (Enc : Encoding.S) (X : Args) :
+module Make (Enc : Encoding.S) (X : Args) :
   S with type enc = Enc.t and type tree = Enc.Tree.t = struct
   let gl () : Proofview.Goal.t = !X.gl
   let get_concl () : EConstr.t = Proofview.Goal.concl (gl ())
@@ -59,27 +59,36 @@ module Make (Log : Logger.S) (Enc : Encoding.S) (X : Args) :
     Names.Id.Set.diff (get_hyp_names ()) (get_all_cofix_hyp_names ())
   ;;
 
+  (** This step's own monad/encoding stack, separate from the command-time one.
+
+      Separate because the two read different [env]/[sigma]: this one the goal,
+      the command-time one the global environment. [Bi_encoding] hashes its
+      [EConstr.t] keys under whichever it is given, so one table cannot serve
+      both -- entries would go in under one [sigma] and be looked up under the
+      other.
+
+      Nothing is lost by not sharing. The lookups that have to hit the model --
+      [ReModel.state] and [ReModel.label] in [Proof_solver_step] -- go through
+      the command-time [W.M] and always did. This table only ever backs [encode]
+      / [econstr_compare] / [EConstrSet] below, all of which are per-step by
+      construction. *)
   module I :
     Rocq_monad_utils.S with type enc = Enc.t and type tree = Enc.Tree.t =
-    Rocq_monad_utils.Make
-      (Log)
-      (Rocq_context.Make (struct
-           let env : unit -> Environ.env ref =
-             fun () -> ref (Proofview.Goal.env (gl ()))
-           ;;
+    Rocq_monad_utils.Make (Enc)
 
-           let sigma : unit -> Evd.evar_map ref =
-             fun () -> ref (Proofview.Goal.sigma (gl ()))
-           ;;
-         end))
-      (Enc)
+  (* Installed once, here, rather than per [I.run]: see [Bi_encoding.set_ctx].
+     [of_goal] closes over [X.gl], so it still tracks the proof as it advances
+     -- what is fixed is *where* the context is read from, not its contents. *)
+  let () = I.set_ctx (Rocq_context.of_goal X.gl)
 
   include I
 
   let log_concl () : unit = log_econstr ~s:"concl" (get_concl ())
-  let log_hyps () : unit = Log.things Debug "hyps" (get_hyps ()) Strfy.hyp
+  let log_hyps () : unit = Logger.things Debug "hyps" (get_hyps ()) Strfy.hyp
 
-  (** [EConstrSet] is a custom [Set] of [EConstr.t] that allows terms to be compared more efficiently during {b a single proof step only} -- since this is built for each step. {e Though, since each proof step we have a new [env] and [sigma], the same term may be encoded differently across iteration steps, so there isn't necessarily a way for us to compare terms in a proof across iterations anyway. {b ! This needs to be investigated.}}
+  (** [EConstrSet] is a custom [Set] of [EConstr.t] that allows terms to be compared more efficiently during {b a single proof step only}. Since each proof step gets a new [env] and [sigma] (a fresh [module Iter], and with it a fresh [EConstrSet], is created on every call to {!Proof_solver.step} -- see [make]/[step] there), the same underlying term may encode differently across steps, so an [EConstrSet.t] built in one step is not meaningful to compare against one built in another.
+
+      {b Audited 2026-09-27:} no call site does this. Every use ([Proof_solver_tactics.collect_component_econstrs]/[try_unfold_any]) builds, consumes and discards an [EConstrSet.t] within a single function call, and no persistent state type ([Proof_solver_statem.S], [Proof_solver.t]) ever stores one. This holds structurally, not by convention: the whole module tree containing [EConstrSet] is torn down and rebuilt fresh each step, so a value could not survive to the next step even if something tried to stash it. If a future change introduces a call site that returns or stores an [EConstrSet.t] outside of one step's local computation, that would break this invariant and needs the same scrutiny this comment once flagged.
   *)
   module EConstrSet = struct
     include Set.Make (struct

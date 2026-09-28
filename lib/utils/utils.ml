@@ -130,13 +130,17 @@ module FileWriter = struct
   let perm : int = 0o777
   let default_dir : string = "./_dumps/"
 
-  let get_loc () : string =
-    match Loc.get_current_command_loc () with
-    | Some { line_nb; fname = InFile { file; _ } } ->
-      String.map (fun x -> if Char.equal '/' x then ' ' else x) file
-      |> Printf.sprintf "line %i | %s" line_nb
-    | _ -> "Unknown Location"
+  (** Labels a dump with the source location that produced it. Reading that
+      location needs Rocq's [Loc], so it is a hook rather than a direct call:
+      [src/] installs the Rocq implementation at plugin load (see
+      [Mebi_plugin.Rocq_output]) and a plain OCaml caller keeps the fallback.
+      That is what keeps this library free of rocq-runtime. *)
+  let the_loc_provider : (unit -> string) ref =
+    ref (fun () -> "Unknown Location")
   ;;
+
+  let set_loc_provider (f : unit -> string) : unit = the_loc_provider := f
+  let get_loc () : string = !the_loc_provider ()
 
   (** https://discuss.ocaml.org/t/how-to-create-a-new-file-while-automatically-creating-any-intermediate-directories/14837/5
   *)

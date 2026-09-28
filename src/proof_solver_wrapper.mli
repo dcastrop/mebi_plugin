@@ -25,5 +25,9 @@ module type Args = sig
   val gl : Proofview.Goal.t ref
 end
 
-module Make (Log : Logger.S) (Enc : Encoding.S) (X : Args) :
+(** Builds a proof step its own monad/encoding stack, reading [X.gl]'s
+    [env]/[sigma] rather than the global environment. Kept separate from the
+    command-time stack because a [Bi_encoding] table is only consistent under
+    one context; see the note on [I] in the implementation. *)
+module Make (Enc : Encoding.S) (X : Args) :
   S with type enc = Enc.t and type tree = Enc.Tree.t

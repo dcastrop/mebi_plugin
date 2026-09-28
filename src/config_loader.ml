@@ -24,7 +24,6 @@ module type S = sig
 end
 
 module Make
-    (Log : Logger.S)
     (Enc : Encoding.S)
     (M : Rocq_monad_utils.S with type enc = Enc.t)
     (Weak : Weak.S with type enc = Enc.t) :
@@ -70,7 +69,7 @@ module Make
   let reset_the_weak_args () : unit = the_weak_args := None
 
   let load_weak_args () : unit M.mm =
-    Log.trace __FUNCTION__;
+    Logger.trace __FUNCTION__;
     let open M.Syntax in
     match !Api.the_weak_args with
     | None ->

@@ -3,43 +3,32 @@ type t =
   ; sigma : Evd.evar_map
   }
 
-module type S = sig
-  val get : unit -> t ref
-  val env : unit -> Environ.env ref
-  val sigma : unit -> Evd.evar_map ref
-  val update : Environ.env ref -> Evd.evar_map ref -> unit
-end
+(** Where an [env]/[sigma] pair is read from.
 
-module Make (X : sig
-    val env : unit -> Environ.env ref
-    val sigma : unit -> Evd.evar_map ref
-  end) : S = struct
-  let get () : t ref = ref { env = !(X.env ()); sigma = !(X.sigma ()) }
-  let env () : Environ.env ref = ref !(get ()).env
-  let sigma () : Evd.evar_map ref = ref !(get ()).sigma
+    This used to be a [module type S] threaded as a functor parameter through
+    [Bi_encoding] -> [Rocq_monad] -> [Rocq_monad_utils] -> [Wrapper] /
+    [Results] / [Proof_solver], to serve three call sites. Because it was a
+    module, switching between the two contexts the plugin encounters -- the
+    global environment for a [MeBi ...] command, and a proof goal for a
+    [mebi_solve] step -- meant re-applying that whole stack, which also
+    re-created [Bi_encoding]'s encoding table each time. As a value the two are
+    just two [source]s.
 
-  let update (env : Environ.env ref) (sigma : Evd.evar_map ref) : unit =
-    get () := { env = !env; sigma = !sigma }
-  ;;
-end
+    Note this is a {i pull}: each call reads the current state rather than
+    caching it. The previous [S.update] could never have worked -- [Make.get]
+    allocated a fresh [ref] per call, so [update] wrote into a value that was
+    immediately discarded -- and nothing called it, so it is gone. *)
+type source = unit -> t
 
-module Default : S = Make (struct
-    let env () : Environ.env ref = ref (Global.env ())
-    let sigma () : Evd.evar_map ref = ref (Evd.from_env !(env ()))
-  end)
+let global : source =
+  fun () ->
+  let env : Environ.env = Global.env () in
+  { env; sigma = Evd.from_env env }
+;;
 
-module MakeFromGoal (X : sig
-    val gl : Proofview.Goal.t ref
-  end) : S = struct
-  let get : unit -> t ref =
-    fun () ->
-    ref { env = Proofview.Goal.env !X.gl; sigma = Proofview.Goal.sigma !X.gl }
-  ;;
+let of_goal (gl : Proofview.Goal.t ref) : source =
+  fun () -> { env = Proofview.Goal.env !gl; sigma = Proofview.Goal.sigma !gl }
+;;
 
-  let env () : Environ.env ref = ref !(get ()).env
-  let sigma () : Evd.evar_map ref = ref !(get ()).sigma
-
-  let update (env : Environ.env ref) (sigma : Evd.evar_map ref) : unit =
-    get () := { env = !env; sigma = !sigma }
-  ;;
-end
+let env (s : source) : Environ.env = (s ()).env
+let sigma (s : source) : Evd.evar_map = (s ()).sigma

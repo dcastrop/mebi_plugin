@@ -10,38 +10,32 @@ module type S = sig
   val eq : t -> t -> bool
 end
 
-module Make
-    (Log : Logger.S)
-    (Enc : Encoding.S)
-    (M : Rocq_monad_utils.S with type enc = Enc.t) : S with type enc = Enc.t =
-struct
+module Make (Enc : Encoding.S) (M : Rocq_monad_utils.S with type enc = Enc.t) :
+  S with type enc = Enc.t = struct
   type enc = Enc.t
 
   type t =
     | Option of Enc.t
     | Custom of Enc.t * Enc.t
 
-  include
-    Json.Thing.Make
-      (Log)
-      (struct
-        type k = t
+  include Json.Thing.Make (struct
+      type k = t
 
-        let name = "Weak"
+      let name = "Weak"
 
-        let json ?(as_elt : bool = false) : t -> Yojson.t =
-          let f (x : Enc.t) : Yojson.t =
-            `Assoc
-              [ "enc", Enc.json ~as_elt:true x
-              ; "econstr", `String (M.decode x |> M.Strfy.econstr)
-              ]
-          in
-          function
-          | Option label -> `Assoc [ "option label", f label ]
-          | Custom (tau, label) ->
-            `Assoc [ "custom", `Assoc [ "tau", f tau; "label", f label ] ]
-        ;;
-      end)
+      let json ?(as_elt : bool = false) : t -> Yojson.t =
+        let f (x : Enc.t) : Yojson.t =
+          `Assoc
+            [ "enc", Enc.json ~as_elt:true x
+            ; "econstr", `String (M.decode x |> M.Strfy.econstr)
+            ]
+        in
+        function
+        | Option label -> `Assoc [ "option label", f label ]
+        | Custom (tau, label) ->
+          `Assoc [ "custom", `Assoc [ "tau", f tau; "label", f label ] ]
+      ;;
+    end)
 
   let eq x y : bool =
     match x, y with

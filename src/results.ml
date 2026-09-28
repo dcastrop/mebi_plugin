@@ -35,23 +35,22 @@ module type S = sig
   val get_bisimilar_states
     :  ?pi:Model.Partition.t
     -> Model.State.t
-    -> Model.States.t
+    -> Model.State.Set.t
 
   val are_states_bisimilar : Model.State.t -> Model.State.t -> bool
 
-  (* val get_candidates : Model.State.t -> Model.Label.t -> Model.EdgeMap.t' -> Model.State.t -> Model.States.t *)
+  (* val get_candidates : Model.State.t -> Model.Label.t -> Model.EdgeMap.t' -> Model.State.t -> Model.State.Set.t *)
 end
 
-module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
+module Make (Enc : Encoding.S) :
   S
-  with module M.Ctx = Ctx
-   and type enc = Enc.t
+  with type enc = Enc.t
    and type node = Enc.Tree.Node.t
    and type tree = Enc.Tree.t
    and type trees = Enc.Trees.t = struct
-  module W = Wrapper.Make (Log) (Ctx) (Enc)
+  module W = Wrapper.Make (Enc)
   include W
-  (* module Command = Command.Make (Log) (W) *)
+  (* module Command = Command.Make (W) *)
 
   let the_result : Model.Bisimilarity.t ref option ref = ref None
 
@@ -105,14 +104,14 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
   let get_bisimilar_states
         ?(pi : Model.Partition.t = get_bisimilar_partition ())
         (x : Model.State.t)
-    : Model.States.t
+    : Model.State.Set.t
     =
     try pi |> Model.Partition.get_bisimilar x with
-    | Not_found -> Model.States.empty
+    | Not_found -> Model.State.Set.empty
   ;;
 
   let are_states_bisimilar (x : Model.State.t) (y : Model.State.t) : bool =
-    get_bisimilar_states x |> Model.States.mem y
+    get_bisimilar_states x |> Model.State.Set.mem y
   ;;
 
   (** [get_candidates from goto edges] returns the set of states reachable from state [from] that are bisimilar with state [goto].
@@ -125,7 +124,7 @@ module Make (Log : Logger.S) (Ctx : Rocq_context.S) (Enc : Encoding.S) :
      (label : Model.Label.t)
      (edges : Model.EdgeMap.t')
      (goto : Model.State.t)
-     : Model.States.t
+     : Model.State.Set.t
      =
      let reachable : Model.Partition.t =
      get_bisimilar_partition ()
