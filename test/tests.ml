@@ -245,9 +245,7 @@ let test_saturate_multi_destination_action () : unit =
       ]
   in
   let s = M.FSM.saturate f in
-  let has_weak_transition (from_i : int) (l : M.Label.t) (goto_i : int)
-    : bool
-    =
+  let has_weak_transition (from_i : int) (l : M.Label.t) (goto_i : int) : bool =
     match M.EdgeMap.find_opt s.edges (state from_i) with
     | None -> false
     | Some actions ->
@@ -255,9 +253,13 @@ let test_saturate_multi_destination_action () : unit =
       |> Seq.exists (fun ((act, dests) : M.Action.t * M.State.Set.t) ->
         M.Label.equal act.label l && M.State.Set.mem (state goto_i) dests)
   in
-  check "weak transition 0 -a-> 3 (via state 1) survives" true
+  check
+    "weak transition 0 -a-> 3 (via state 1) survives"
+    true
     (has_weak_transition 0 a 3);
-  check "weak transition 0 -b-> 4 (via state 2) survives" true
+  check
+    "weak transition 0 -b-> 4 (via state 2) survives"
+    true
     (has_weak_transition 0 b 4)
 ;;
 

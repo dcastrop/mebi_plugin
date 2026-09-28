@@ -98,15 +98,20 @@ struct
 
     let state (x : EConstr.t) (ys : Model.State.Set.t) : Model.State.t M.mm =
       Logger.trace __FUNCTION__;
+      if Logger.is_enabled Output.Kind.Debug
+      then Logger.debug ~__FUNCTION__ ("key: " ^ M.classify_key x);
       try
         let enc : Enc.t = M.get_encoding x in
         (* NOTE: [Model.State.Set.compare] only cares about [base]. *)
         Model.State.Set.find { base = enc } ys |> M.return
       with
       | M.EncodingNotFound _ ->
+        Logger.debug ~__FUNCTION__ "miss: term has no encoding";
         log_econstr ~__FUNCTION__ ~s:"Err: M.EncodingNotFound" x;
         raise (CouldNotFind_State { x; states = ys })
-      | Not_found -> raise (CouldNotFind_State { x; states = ys })
+      | Not_found ->
+        Logger.debug ~__FUNCTION__ "miss: encoding not among the given states";
+        raise (CouldNotFind_State { x; states = ys })
     ;;
 
     let _state_opt (x : EConstr.t) (ys : Model.State.Set.t)
@@ -129,15 +134,21 @@ struct
 
     let label (x : EConstr.t) (ys : Model.Label.Set.t) : Model.Label.t M.mm =
       Logger.trace __FUNCTION__;
+      if Logger.is_enabled Output.Kind.Debug
+      then Logger.debug ~__FUNCTION__ ("key: " ^ M.classify_key x);
       let f (enc : Enc.t) : Model.Label.t M.mm =
         (* NOTE: [Model.Label.Set.compare] only cares about [is_silent=Some _] *)
         Model.Label.Set.find { base = enc; is_silent = None } ys |> M.return
       in
       try M.get_encoding x |> f with
       | M.EncodingNotFound _ ->
+        Logger.debug ~__FUNCTION__ "miss: term has no encoding";
         log_econstr ~__FUNCTION__ ~s:"Err: M.EncodingNotFound" x;
         raise (CouldNotFind_Label { x; alphabet = ys })
       | Not_found ->
+        Logger.debug
+          ~__FUNCTION__
+          "miss: encoding not among the given alphabet, trying None/Some";
         let open M.Syntax in
         (* NOTE: is it [None]? (i.e., a silent action) *)
         (try
@@ -151,6 +162,9 @@ struct
               f term
             with
             | Theory.NotEqTheory ->
+              Logger.debug
+                ~__FUNCTION__
+                "miss: None/Some fallbacks did not match either";
               raise (CouldNotFind_Label { x; alphabet = ys })))
     ;;
 

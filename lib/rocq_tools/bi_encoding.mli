@@ -19,6 +19,12 @@ module type S = sig
   val fwdmap : unit -> enc F.t
   val bckmap : unit -> EConstr.t B.t
 
+  (** Counts the three things that can make a syntactic key miss a term it
+      should match: undefined evars, non-empty universe instances, and
+      local-context variables. A diagnostic for backlog item A1 -- see the
+      implementation for what a zero does and does not prove. *)
+  val classify_key : EConstr.t -> string
+
   exception EncodingNotFound of EConstr.t
 
   val get_encoding : EConstr.t -> enc
