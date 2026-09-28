@@ -1412,6 +1412,63 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-28 — B2 at a larger bound: memory, not time, is the ceiling
+
+Branch `main` (on `fork`). No code change — an experiment, at Jonah's
+request, to learn whether `Proc/Test3` merely needs a bigger budget now
+that the saturation fix lets it reach proof search at all.
+
+`wsim_pq` isolated (the other three live proofs omitted so the measurement
+is of one proof) and raised from `MeBi Sim Solve 100000` to `1000000`.
+
+**It was killed after roughly four minutes**, `exit 137` (SIGKILL). The
+cause is not the kernel OOM killer — `journalctl -k` records zero OOM kills
+this boot — but **`systemd-oomd`**, the userspace one Ubuntu runs by
+default:
+
+```
+Killed /user.slice/.../run-r25ac...scope due to memory pressure for
+/user.slice/user-1001.slice/user@1001.service being 55.71% > 50.00%
+for > 20s with reclaim activity
+... systemd-oomd killed 19 process(es) in this unit.
+```
+
+Timing it from the logs: extraction finished at 16:07:44 (the last line
+written), the kill landed at 16:11:24, so proof search ran about 220
+seconds. At the ~1.64ms per iteration measured from the `Solve 100000` run
+(100001 iterations in ~164s), that is roughly **130,000-145,000 iterations**
+before exhausting memory on a 15GB machine.
+
+**What this establishes.** The binding constraint on `Test3` is *memory per
+iteration*, not time. At 100000 iterations the proof completes the budget in
+165s and reports `Unsolved`; the ceiling sits only a little above that, so
+raising the bound cannot help — the solver accumulates state per iteration
+and runs out long before any plausible budget. This is a sharper statement
+than "proof explosion", and it points the future investigation at the
+solver's per-iteration allocation rather than at search strategy or bounds.
+
+It also retires the question this experiment was set to answer: `Test3`
+cannot be resolved by a larger bound. Whether it is *solvable* at all
+remains unknown, since no run has ever exhausted the search.
+
+The file's own comment already said `wsim_p3` "crashed on 1000000". That is
+now explained rather than merely recorded, and it was a *different* proof —
+this is `wsim_pq`, so the memory ceiling is not specific to one example.
+
+Two practical notes:
+
+- My pre-run estimate of "about 27 minutes" extrapolated the *time* per
+  iteration and was right about the rate but wrong about which resource
+  would run out first. Memory bound it at four minutes.
+- `systemd-oomd` killed 19 processes in the scope, not just `rocq`. Runs
+  like this should be capped — e.g. `systemd-run --scope -p MemoryMax=8G` —
+  so an experiment cannot take unrelated processes with it.
+
+**Session tally:** Docs 1 · Optimization 0 · Bug fix 0 · Tooling 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
