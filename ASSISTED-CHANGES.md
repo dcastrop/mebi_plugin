@@ -22,7 +22,8 @@ explicitly and up front, before it is written, rather than appearing in this log
 after the fact. To date, none has.
 
 **Scope of this log.** It covers work identifiable by the
-`Co-Authored-By: Claude` trailer — 16 commits, all from 2026-08-16 onward. The
+`Co-Authored-By: Claude` trailer — 26 commits as of `df4f65c`, all from
+2026-08-16 onward. The
 preceding 1139 commits are the project's own history; the last of them,
 `ccfc606` "implemented benchmarking for building lts graphs", dates from
 2026-03-31, before the several-month pause. If any earlier assisted work exists
