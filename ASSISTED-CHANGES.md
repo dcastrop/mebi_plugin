@@ -894,10 +894,71 @@ Optimization 0 · **New feature 0.**
 
 ---
 
+## 2026-09-28 — A1 sized before implementing: the `ReModel` miss path never fires
+
+Branch `refactor/model-components`, merged into `main` on the `fork` remote
+first (`da32f6b`, a `--no-ff` merge of the 30-commit branch) at Jonah's
+request, so upstream integration can later be a single PR from `fork/main`
+to `origin/main` that references these milestones. `origin/main` is
+deliberately untouched.
+
+`notes/2-unify-instead-of-lookup.md` (backlog item **A1**) proposes
+replacing `ReModel.state`/`ReModel.label`'s syntactic hashtable lookup with
+real unification, because the lookup can miss on evars, universe instances
+or local-context differences. The note ends by suggesting the work be sized
+first: instrument the miss path, count misses across the five cheap
+`PluginProofs.v` suites, and if the count is zero treat the failure mode as
+latent rather than active. That sizing pass was done before writing any of
+the refactor.
+
+- **Freshness check.** The note survives `16bbe37` intact. `ReModel` is now
+  at `src/proof_solver_step.ml:92-170` rather than the note's `~92-150`, and
+  `Model.States`/`Model.Labels` are now `Model.State.Set`/`Model.Label.Set`
+  after the `6e436dd` nested-submodule rename. Nothing else in the analysis
+  has drifted — `get_encoding`, the `Hashtbl.Make` key, and the `None`/`Some`
+  theory fallbacks are all exactly as described.
+
+- **Measurement.** Every miss path in `ReModel.state`/`ReModel.label` was
+  temporarily raised to `Logger.warning` (which prints by default), and all
+  five `### Success` files were rebuilt individually with `make -j1`.
+  **Result: zero misses, in all five files.** All 18 iteration counts match
+  the baseline exactly (`Test1` 114 105 106 109 22 21; `Test2` 446 278 299
+  194 446 182; `MutualExclusion` 268 396; `Glued` 268 396;
+  `Glued/MutualExclusion` 81 63).
+
+  So A1 is **latent, not active**: on every example that currently works,
+  the syntactic lookup always hits, and the unification rewrite would fix
+  nothing presently observable while costing what the note itself warns is
+  a much more expensive operation per lookup. A1 is accordingly *not*
+  implemented, and drops in priority — per the note's own stated criterion.
+
+- **Tooling.** The temporary `Logger.warning` probes were demoted to
+  `Logger.debug` and kept (`src/proof_solver_step.ml`, +12 lines, no
+  behaviour change). `Debug` is off by default and, unlike `Trace`, is not
+  emitted on every function entry, so `MeBi Config Output "Debug" True`
+  now gives a targeted read of the miss paths without the 5M-line `Trace`
+  flood the A2 investigation ran into. Two of the five paths (`state`'s
+  `Not_found`, and `label`'s two fallback outcomes) previously had no
+  logging at all. Same rationale as the permanent silent trace left at
+  `transition`'s fold site for A2.
+
+What this measurement does **not** cover, and the natural follow-up: the
+five files probed are exactly the ones that already succeed. The examples
+that *fail* — `Proc/Test3`'s `wsim_p3` (unfinished at 500000, crashed at
+1000000, backlog item B2) and `CADP/Size2/Glued` (marked `### FAIL`) —
+were not probed, and a lookup miss there is a live candidate cause. Running
+the same probe against a failing example is a cheaper and better-targeted
+next step than implementing A1 blind.
+
+**Session tally:** Tooling 1 · Docs 1 · Bug fix 0 · Refactor 0 ·
+Optimization 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
-- The term-equality problem in `ReModel` is unaddressed: goal terms are resolved to model elements by syntactic hashtable lookup, which can miss on evars, universe instances or local context.
+- The term-equality problem in `ReModel` is unaddressed: goal terms are resolved to model elements by syntactic hashtable lookup, which can miss on evars, universe instances or local context. **Measured 2026-09-28 (see above) and found latent** — zero misses across all five cheap `PluginProofs.v` suites — so the unification rewrite is deliberately not done. Still unmeasured on the *failing* examples (`Proc/Test3`, `CADP/Size2/Glued`), which is where a miss would actually explain something.
 - ~~Collapsing the model component cluster (71 of `model.mli`'s 80 sharing constraints; `Saturation.Make` at 13 arguments) is deliberately deferred until after any hand refactoring of individual model components.~~ Done in `16bbe37`, 2026-09-27, together with a nested-submodule rename and a Showable/JSON-dump unification — see below.
 - ~~`examples/Bisimilarity/CADP/Size1/Glued/MutualExclusion/PluginProofs.v` fails with "The reference compose was not found", raised in the `Example` statement before any `MeBi` command runs.~~ Fixed, 2026-09-27 (see above) — root cause was a rename this file missed, not a Rocq 9.2 regression.
 - ~~The "Verification baseline" table below (`268`/`396` for `CADP/Size1/MutualExclusion` and `CADP/Size1/Glued`) doesn't match the bounds checked into those files (`267`/`395`).~~ Resolved, 2026-09-27 (see above): `Proof_solver.solve` permits one step beyond its nominal bound, so this is expected behaviour, not a discrepancy.
