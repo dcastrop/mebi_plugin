@@ -8,3 +8,10 @@
  (name tests)
  (modules tests)
  (libraries rocq-mebi.model))
+
+; Throwaway scaling probe for the saturation algorithm (see satscale.ml).
+; Same constraint as the test binary above: model only, no rocq-runtime.
+(executable
+ (name satscale)
+ (modules satscale)
+ (libraries rocq-mebi.model unix))
