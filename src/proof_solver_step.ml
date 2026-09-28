@@ -104,9 +104,12 @@ struct
         Model.State.Set.find { base = enc } ys |> M.return
       with
       | M.EncodingNotFound _ ->
+        Logger.debug ~__FUNCTION__ "miss: term has no encoding";
         log_econstr ~__FUNCTION__ ~s:"Err: M.EncodingNotFound" x;
         raise (CouldNotFind_State { x; states = ys })
-      | Not_found -> raise (CouldNotFind_State { x; states = ys })
+      | Not_found ->
+        Logger.debug ~__FUNCTION__ "miss: encoding not among the given states";
+        raise (CouldNotFind_State { x; states = ys })
     ;;
 
     let _state_opt (x : EConstr.t) (ys : Model.State.Set.t)
@@ -135,9 +138,13 @@ struct
       in
       try M.get_encoding x |> f with
       | M.EncodingNotFound _ ->
+        Logger.debug ~__FUNCTION__ "miss: term has no encoding";
         log_econstr ~__FUNCTION__ ~s:"Err: M.EncodingNotFound" x;
         raise (CouldNotFind_Label { x; alphabet = ys })
       | Not_found ->
+        Logger.debug
+          ~__FUNCTION__
+          "miss: encoding not among the given alphabet, trying None/Some";
         let open M.Syntax in
         (* NOTE: is it [None]? (i.e., a silent action) *)
         (try
@@ -151,6 +158,9 @@ struct
               f term
             with
             | Theory.NotEqTheory ->
+              Logger.debug
+                ~__FUNCTION__
+                "miss: None/Some fallbacks did not match either";
               raise (CouldNotFind_Label { x; alphabet = ys })))
     ;;
 
