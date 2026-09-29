@@ -1915,6 +1915,113 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-29 — Which examples the B2 fix serves, and a correction
+
+Branch `main` (on `fork`). No code change; instrumentation reverted. Jonah
+pushed back on the previous entry's closing line — "worth it if `Test3`/
+`Test4` matter; not a general win" — and asked whether there is any
+indication that the `Test3`/`Test4` shape is *not* relevant to the plugin.
+There is not. That framing was wrong and is retracted here.
+
+**What actually triggers the blow-up.** The first guess — that the
+re-exploration follows from a calculus having interleaving and structural
+congruence — was tested and is wrong. `Flat.Simple` and `Flat.Complex` share
+the same `term` type, so `Test1`'s own `p`/`q` can be proved under each in
+turn with nothing else changed. `Complex` adds `do_parl`, `do_parr`,
+`do_assocl` and `do_assocr`; the result was **13 pairs and 0 re-explorations
+under both**, 114 iterations against 130. So the rules alone do not do it.
+
+The reason is that **`Flat` has no atomic action rules at all** — no
+`do_send`, no `do_recv`, only `do_handshake`, which consumes a whole `tpar`
+in one step. `do_parl`/`do_parr` need a sub-transition to lift and so can
+never fire. `Layered` is the only module in the corpus where a component can
+move on its own (`termLTS`'s `do_send`/`do_recv` lifted by `compLTS`'s
+`do_parl`/`do_parr`). The blow-up needs **independently-evolving recursive
+components**, and the corpus bears that out exactly:
+
+| example | shape | pairs | re-explored |
+| --- | --- | --- | --- |
+| `Test1` (`Flat.Simple`) | `tfix (tseq (tpar ...) trec)` — parallelism *inside* a sequential loop, one way round | 13 | 0 |
+| `Test1` terms under `Flat.Complex` | same terms, interleaving rules present but unfireable | 13 | 0 |
+| `CADP/Size1/ME` | `weak_sim bigstep lts c1 c1` — two semantics of *one* term, not a comparison of two systems | 19 / 50 | 0 |
+| `Test2` (`Flat.Complex`) | two *independently recursive* processes in parallel; their `do_fix` unfoldings commute | 10 | 32 |
+| `Test3` (`Layered`) | the same, over two LTS layers, with `do_comm`/`do_assoc*` on top | 17 | 806 and rising |
+
+So the proofs the fix does nothing for are the degenerate ones: `Test1`'s
+concurrency cannot interleave, and CADP is not a concurrency comparison at
+all. The proofs it serves are concurrent recursive processes compared up to
+weak bisimilarity — which is what the plugin is for (`README.md`: "automating
+bisimilarity proofs ... from *Advanced Topics in Bisimulation and
+Coinduction*, Section 3.2.2"). **`Layered` is the most realistic calculus in
+the repository, not an outlier**, and the correct statement is that the fix
+is a large win on the central case and a modest cost on the peripheral ones.
+
+**Predicted cost, from the recorded trajectories.** Measuring local work per
+pair and per closure directly out of the instrumented logs gives, for a
+mutual-cofix proof of `pairs x local + edges x close`:
+
+| proof | now | predicted after the fix |
+| --- | --- | --- |
+| `Test3/wsim_pq` | >100,000, never closes | **~620** |
+| `Test2/wsim_pq` | 446 | ~159 |
+| `Test2/wsim_rp` | 182 | ~118 |
+| `Test1/wsim_pq` | 114 | ~151 |
+| `CADP/Size1/ME` bigstep | 268 | ~399 |
+| `CADP/Size1/ME` lts | 396 | ~549 |
+
+`Test3` goes from unsolvable to a few hundred iterations (and, at ~40KB
+each, from an 8GB ceiling to tens of megabytes); `Test2` improves about
+2.8x; `Test1` and CADP get roughly 40% more expensive, staying in the same
+order. The CADP figures are the least trustworthy — those proofs contain
+only one coinductive closure each, so the estimator has almost no sample for
+the closure cost and falls back to half the local cost. Worth measuring
+rather than extrapolating before the numbers are quoted anywhere.
+
+**`Test4` is blocked earlier, and should not be used to justify this fix.**
+Run for the first time: at the default 100-state bound it fails **extraction**
+with `LTS_Incomplete` and never reaches proof search; raised to 5000 states,
+extraction was still running after 14 minutes at ~490MB with zero solver
+iterations. `Test4` is `cpar (cpar a1 a2) (cpar b1 b2)` against permutations
+and re-associations of itself, so its state space is the permutation lattice
+of four processes under full structural congruence. That is a state-space
+problem, not a proof-search one, and the mutual cofix would not by itself
+unlock it.
+
+**Evidence the fix would actually close `Test3`.** Two things from the 20,001
+iteration trajectory. First, the pair set is **closed under the successor
+relation**: 17 pairs, 65 distinct pair-to-pair steps, every target inside the
+set, and no new pair after iteration ~300. That is precisely the coinduction
+invariant a mutual cofix needs — every obligation lands on a hypothesis.
+Second, and a caveat on the estimate above, the **edge** set is not saturated
+nearly as fast: 38 edges by iteration 500, 55 by 4,000, 65 by 20,000, with
+the last new edge at **18,403**. The depth-first search takes tens of
+thousands of iterations to get round to obligations a breadth-first
+enumeration would list immediately — which is an argument *for* precomputing
+the product rather than discovering it, and also means ~620 is a floor.
+
+**Also closed since the previous entry.** The sharpest remaining risk — that
+a plugin-built cofix type might not match the goal the solver later sees —
+is settled by existing measurement. `Concl.eq` goes through `econstr_eq`,
+whose default `~enc:true` path compares by encoding, and `Bi_encoding`'s
+table is keyed on `EConstr.eq_constr` under its own sigma. A1 already
+measured 2,720 `ReModel` lookups with zero misses and every key `evar=0
+univ=0 var=0`, so the goal terms are closed and ground, `eq_constr` on them
+is sigma-independent, and `Decoder.state` returns the very key that matched.
+
+**Still open before implementing.** (1) Whether the product BFS should
+replay the solver's exact choice function or over-approximate it with every
+bisimilar response — the over-approximation removes a lockstep-fragility but
+its size has not been measured. (2) The CADP regression should be measured,
+not extrapolated. (3) `Test4`'s extraction cost deserves its own backlog item.
+
+**Verification.** Instrumentation reverted; `make dune` clean,
+`dune exec test/tests.exe` 11/11. No source changed.
+
+**Session tally:** Docs 1 · Bug fix 0 · Optimization 0 · Tooling 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
