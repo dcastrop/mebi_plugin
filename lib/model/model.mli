@@ -112,6 +112,7 @@ module type S = sig
      and type label = Label.t
      and type transition = Transition.t
      and type fsm = FSM.t
+     and type partition = Partition.t
 end
 
 (** Builds a model from a term's [base] representation, plus a source of constructor-bindings used for the proof solver.

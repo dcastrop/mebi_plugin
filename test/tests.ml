@@ -274,6 +274,134 @@ let test_minimize () : unit =
     (M.State.Set.cardinal m.states > 0)
 ;;
 
+(* ------------------------------------------------------------------ *)
+(* Product: the simulation game's response choice, and the relation it
+   generates. See [lib/model/algorithms/product.ml] and backlog item B2. *)
+
+(** Runs the bisimilarity check and hands back exactly what the proof solver
+    reads: the UNSATURATED left-hand FSM (its transitions are the
+    obligations), the SATURATED right-hand FSM (its actions are the weak
+    transitions available in reply) and the bisimilar partition. *)
+let game (x : M.FSM.t) (y : M.FSM.t) : M.FSM.t * M.FSM.t * M.Partition.t =
+  let r : M.Bisimilarity.t = M.Bisimilarity.fsm x y in
+  r.fsm_a.original, r.fsm_b.saturated, r.result.bisim_states
+;;
+
+let reachable (x : M.FSM.t) (y : M.FSM.t) (root : int * int)
+  : M.Product.Pair.Set.t
+  =
+  let a, b, pi = game x y in
+  M.Product.reachable a b pi (state (fst root), state (snd root))
+;;
+
+(** Two matching loops: the product is a loop of the same length, and the
+    breadth-first closure must terminate on it rather than going round. *)
+let test_product_loop () : unit =
+  print_endline "product: matching loops";
+  let x = fsm 0 [ transition 0 a 1; transition 1 b 0 ] in
+  let y = fsm 10 [ transition 10 a 11; transition 11 b 10 ] in
+  check_int
+    "a two-state loop against itself gives two game states"
+    2
+    (M.Product.Pair.Set.cardinal (reachable x y (0, 10)))
+;;
+
+(** The case the proof search gets wrong. Two routes out of the root rejoin
+    at a common state, so the product is a diamond rather than a tree. The
+    closure must return the meeting point ONCE; the solver's depth-first
+    walk re-derives it on the second route, which is what makes
+    [Proc/Test3] enumerate paths instead of pairs. *)
+let test_product_diamond () : unit =
+  print_endline "product: diamond rejoins once";
+  let x =
+    fsm
+      0
+      [ transition 0 a 1; transition 0 b 2; transition 1 b 3; transition 2 a 3 ]
+  in
+  let y =
+    fsm
+      10
+      [ transition 10 a 11
+      ; transition 10 b 12
+      ; transition 11 b 13
+      ; transition 12 a 13
+      ]
+  in
+  let a', b', pi = game x y in
+  let pairs = M.Product.reachable a' b' pi (state 0, state 10) in
+  check_int
+    "a diamond gives four game states"
+    4
+    (M.Product.Pair.Set.cardinal pairs);
+  check
+    "the meeting point is present"
+    true
+    (M.Product.Pair.Set.mem (state 3, state 13) pairs);
+  (* The point of the closure. Counting the moves instead of the game states
+     gives more moves than a tree over these states could have, and two of
+     them land on the meeting point -- so a walk that can only close against
+     its own ancestors has to prove that state twice. That is exactly what
+     [Proc/Test3] does 806 times over in 20,000 iterations. *)
+  let moves =
+    M.Product.Pair.Set.fold
+      (fun p acc -> M.Product.successors a' b' pi p @ acc)
+      pairs
+      []
+  in
+  check_int "the diamond has four moves over four states" 4 (List.length moves);
+  check_int
+    "two of them land on the meeting point"
+    2
+    (List.length
+       (List.filter
+          (fun (p : M.Product.Pair.t) ->
+            M.Product.Pair.equal p (state 3, state 13))
+          moves))
+;;
+
+(** A silent move to a state already bisimilar to the right-hand one is
+    answered by standing still, so the right-hand component does not change.
+    Mirrors [Proof_solver_step.handle_wk_concl]'s [wk_none] branch. *)
+let test_product_silent_stays_put () : unit =
+  print_endline "product: silent move stands still";
+  let weak_labels = M.Label.Set.singleton tau in
+  let x = fsm ~weak_labels 0 [ transition 0 tau 1; transition 1 a 0 ] in
+  let y = fsm ~weak_labels 10 [ transition 10 a 10 ] in
+  let a', b', pi = game x y in
+  let succs =
+    M.Product.successors a' b' pi (state 0, state 10)
+    |> List.filter (fun ((_, r) : M.Product.Pair.t) ->
+      M.State.equal r (state 10))
+  in
+  check
+    "the silent obligation is answered without moving"
+    true
+    (List.exists
+       (fun ((l, _) : M.Product.Pair.t) -> M.State.equal l (state 1))
+       succs)
+;;
+
+(** [respond] answers with a state bisimilar to the one it was asked for,
+    and raises rather than guessing when there is no such action. *)
+let test_product_respond () : unit =
+  print_endline "product: respond";
+  let x = fsm 0 [ transition 0 a 1; transition 1 b 0 ] in
+  let y = fsm 10 [ transition 10 a 11; transition 11 b 10 ] in
+  let _, b', pi = game x y in
+  let bisim_with_1 = M.Partition.get_bisimilar (state 1) pi in
+  let t : M.Transition.t = M.Product.respond b' (state 10) a bisim_with_1 in
+  check
+    "respond lands on the bisimilar state"
+    true
+    (M.State.equal t.goto (state 11));
+  check
+    "respond raises when no action carries the label"
+    true
+    (match M.Product.respond b' (state 10) b bisim_with_1 with
+     | _ -> false
+     | exception M.Product.NoBisimilarResponse _ -> true)
+;;
+
 (** The JSON round-trip that [Json.S] provides for every model type. *)
 let test_json () : unit =
   print_endline "json serialisation";
@@ -295,6 +423,10 @@ let () =
   test_minimize ();
   test_bisim_identical ();
   test_bisim_different ();
+  test_product_loop ();
+  test_product_diamond ();
+  test_product_silent_stays_put ();
+  test_product_respond ();
   test_json ();
   Printf.printf "\n%i/%i passed\n" (!total - !failures) !total;
   if !failures > 0 then exit 1

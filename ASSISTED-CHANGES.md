@@ -2220,6 +2220,104 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-29 — Steps 1 and 2: the response choice lifted, and the product computed up front
+
+Branch `main` (on `fork`). Two commits. Step 0 was attempted first and
+reverted — see the previous entry.
+
+### Step 1 — `Product.respond` (Refactor)
+
+`try_get_visible_transition` decided, at every proof step, which state the
+right-hand FSM moves to in reply to a labelled move by the left-hand one.
+Only its first two lines were Rocq-dependent; everything after read the FSM,
+the state, the label and the bisimilar set and nothing else. It now lives in
+`lib/model/algorithms/product.ml` as `Product.respond`, exposed through
+`Model.Product`, with the solver calling it.
+
+Deliberately shared rather than specified: the tie-breaks run through
+`Action.Pair.Set`'s ordering via `Action.compare`, and the offline
+re-implementation from the previous entry got 8 of 16 responses wrong.
+
+*Verification:* all five cheap suites, **18 of 18 `Solved`, counts
+byte-identical** — `21 22 63 81 105 106 109 114 182 194 268 268 278 299 396
+396 446 446`. A pure refactor has to be exactly that, and it is.
+
+*Incidental:* the new module had to be registered in **three** places —
+`lib/model/algorithms/dune`, `_CoqProject` and `src/mebi_plugin.mlpack`. The
+dune build passed while the make build failed twice, once per list missed.
+That is backlog item C3 happening, not a hypothetical.
+
+### Step 2 — `Product.successors` / `Product.reachable` (New feature, infrastructure)
+
+`successors a b pi (x, y)` is every game state one move away, mirroring what
+the solver does with one `weak_sim` goal: obligations come from the
+**unsaturated** left FSM (that is what inversion of the hypothesis yields), a
+silent move to somewhere already bisimilar to the right-hand state is
+answered by standing still, and everything else goes through `respond`.
+`reachable` is the breadth-first closure. This computes, before any proof
+step runs, the relation the solver currently discovers depth-first.
+
+Labelled **new feature** per `CLAUDE.md` even though no plugin behaviour
+changes: it is net-new machinery, not a rearrangement. Nothing calls it yet.
+
+Eight assertions added to `test/tests.exe` (11 → 19), all pure OCaml with no
+Rocq runtime — which is the point of Step 1. They cover `respond` landing on
+a bisimilar state and raising otherwise, the silent stand-still rule,
+termination on a cyclic product, and a **diamond**: four game states with
+four moves, two of which land on the same meeting point, so a walk that can
+only close against its own ancestors must prove that state twice. That is
+`Proc/Test3`'s failure in miniature.
+
+### The cross-check, and what it found
+
+`reachable` was run inside the plugin against the pairs the solver actually
+visits, on all five cheap suites plus `Proc/Test3`:
+
+| suite | proofs | predicted vs observed |
+| --- | --- | --- |
+| `Proc/Test1` | 4 | **exact** |
+| `Proc/Test2` | 6 | **exact** |
+| `Proc/Test3` | 1 | 16 vs 17 — the extra is the root goal before unfolding |
+| `CADP/Size1` ME + Glued | 4 | predicted **6 fewer** each |
+| `CADP/Size1/Glued/ME` | 2 | predicted **4 more** (8 vs 4, 7 vs 3) |
+
+Ten of the eighteen match exactly or to the known root-spelling. The other
+eight are three separate discrepancies, and finding them is what the harness
+is for:
+
+1. **The root goal before unfolding.** `Proc/Test3`'s 17th is
+   `weak_sim ... (cpar (cprc s1) (cprc r1)) ...` — the same pair written with
+   the definitions rather than their bodies.
+2. **Intermediate spellings (the CADP +6).** Dumping the goals as terms shows
+   the extras are dominated by partially-unfolded forms —
+   `(weak_sim (PRC (worker_create 0 (REC_DEF Protocol.PMainLoopDef ...`,
+   `(weak_sim (composition_create 0 Protocol.P) (composition_create 0
+   Protocol.P))` — where `Decoder.state` returns the fully normalised term.
+   Same game state, different spelling. Two predicted pairs were not matched
+   under any spelling and are not yet explained.
+3. **Over-prediction (the Glued/ME −4).** `reachable` explores past where the
+   proof actually closes on `wsim_bigstep` and `wsim_spec_lts`. Not yet
+   diagnosed. Harmless for correctness — surplus pairs are surplus goals —
+   but it is surplus work and it is not understood.
+
+**This matters for Step 3 and is why it was worth building Step 2 first.**
+`can_solve_concl_cofix` compares syntactically, so a mutual cofix whose
+hypothesis types come from `Decoder.state` will not close a goal still in an
+intermediate spelling until it has been unfolded. The solver does unfold, via
+`Concl.try_unfold_any`, but Step 3 has to order that against the closure test
+rather than assume it. Had the mutual cofix been built first, this would have
+surfaced as proofs mysteriously failing to close.
+
+**Verification.** Both steps: all five cheap suites, 18 of 18 `Solved`, counts
+byte-identical to the baseline. `dune exec test/tests.exe` 19/19. `make dune`
+clean, `dune build @fmt` clean. All probes removed and the example files
+restored to their committed state before the final run.
+
+**Session tally:** Refactor 1 · New feature 1 · Docs 1 · Bug fix 0 ·
+Optimization 0 · **Tooling 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

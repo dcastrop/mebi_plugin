@@ -58,6 +58,7 @@ module type S = sig
      and type label = Label.t
      and type transition = Transition.t
      and type fsm = FSM.t
+     and type partition = Partition.t
 end
 
 module Make (Base : Base_term.S) (ConstructorBindings : Json.S) = struct
