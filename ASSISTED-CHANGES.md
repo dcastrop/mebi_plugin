@@ -1469,6 +1469,71 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-29 — The solve loop retained every intermediate proof state
+
+Branch `fix/solve-loop-retains-proof-states`, off `main` (`b9e5594`).
+Prompted by Jonah asking whether `Test3` might be solvable by splitting one
+`Solve N` into several smaller `Solve` commands, and whether the same effect
+could be had from the OCaml side — he recalled relying on per-command
+batching and finding no OCaml equivalent.
+
+- **Optimization.** `Proof_solver.solve`'s loop read
+
+  ```ocaml
+  | _ -> (try step p |> f (n + 1) with NothingToDo -> n, p)
+  ```
+
+  The recursive call sits inside the `try`, so it is not a tail call; worse,
+  the handler body mentions `p`, so **every frame kept its own
+  `Declare.Proof.t` reachable for the whole command**. A single
+  `Solve 1000000` therefore held up to a million intermediate proof terms and
+  evar maps alive at once, none of them collectable. Per-command batching
+  worked precisely because each command returned, unwound the recursion and
+  dropped the lot — there genuinely was no way to get that from OCaml, which
+  answers the second question: nothing was being missed.
+
+  Now catches around `step p` alone, so `f (n + 1) p'` is a real tail call and
+  only the current `p` stays live.
+
+- **Measured, and smaller than predicted.** Both runs are `wsim_pq` alone at
+  `Solve 1000000` under an identical `systemd-run --scope -p MemoryMax=8G`,
+  killed by the cgroup OOM killer at the same RSS (8368088 kB vs 8366780 kB):
+
+  | | CPU time to exhaust 8G | RSS growth |
+  | --- | --- | --- |
+  | tail-call fix | **4min 40.8s** | 30.0 MB/s |
+  | old loop | 3min 58.0s | 33.8 MB/s |
+
+  **+18% more work within the same memory budget.** Real, worth keeping, and
+  nowhere near enough for `Test3`, which needs orders of magnitude. The
+  mechanism was right; the magnitude prediction was wrong — this was expected
+  to be the dominant sink and is about a fifth of it.
+
+- **What this implies for batching, not yet measured.** The remaining ~82% is
+  most plausibly the proof term and evar map under construction — roughly
+  50KB per iteration at the observed rate — which persists across command
+  boundaries just as it does within a command. If so, batching cannot help
+  `Test3` either. That is inference from the rate, *not* a measurement: the
+  direct test (twenty sequential `Solve 50000` against one `Solve 1000000`,
+  same cap, compare peak RSS) has not been run.
+
+  A plausible reconciliation with Jonah's recollection: on shorter proofs the
+  retained-frame cost is proportionally much larger, so batching would have
+  helped visibly there, while on something the size of `Test3` the proof term
+  dominates.
+
+Verification: full five-file `PluginProofs.v` run, `make -j1` per file, all 18
+counts identical to baseline, zero `Unsolved`; `tests.exe` 11/11.
+
+Note also that capping the run (`systemd-run --scope -p MemoryMax=8G`) worked
+as intended — the cgroup OOM killer took only `rocqworker`, where the
+uncapped run on 2026-09-28 had `systemd-oomd` kill 19 processes in the scope.
+
+**Session tally:** Optimization 1 · Docs 1 · Bug fix 0 · Tooling 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

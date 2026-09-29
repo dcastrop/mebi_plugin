@@ -178,7 +178,22 @@ let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
     else (
       match Int.compare n bound with
       | 1 -> n, p
-      | _ -> (try step p |> f (n + 1) with NothingToDo -> n, p))
+      | _ ->
+        (* The recursive call must be a genuine tail call, and nothing may
+           capture [p] across it. Previously this read
+
+           (try step p |> f (n + 1) with NothingToDo -> n, p)
+
+           where the handler body mentions [p], so every frame kept its own
+           [Declare.Proof.t] reachable for the whole command -- up to [bound]
+           intermediate proof terms and evar maps alive at once, none
+           collectable. That is why splitting one [Solve N] into several
+           smaller [Solve] commands used to be the only way through: each
+           command returned, unwound the recursion, and dropped the lot.
+           Catching around [step p] alone keeps only the current [p] live. *)
+        (match try Some (step p) with NothingToDo -> None with
+         | None -> n, p
+         | Some p' -> f (n + 1) p'))
   in
   let num, pstate = f 0 pstate in
   Logger.notice (stop_msg num);
