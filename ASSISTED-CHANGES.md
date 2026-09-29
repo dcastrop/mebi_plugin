@@ -2022,6 +2022,142 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-29 — B2 explored further: a second, independent defect and a hard design constraint
+
+Branch `main` (on `fork`). No code change; instrumentation reverted. Three
+explorations that the previous entry left open, plus one that was not
+planned and turned out to matter more than the ones that were.
+
+### 1. A second defect, independent of B2 and general to every proof
+
+`Hyps.try_invert_any` re-inverts hypotheses it has already inverted.
+`inversion H` does not clear `H`, `Hyp.invertibility` grades on the shape of
+the hypothesis rather than on whether inverting it would yield anything new,
+and nothing records what has been inverted — the function's own docstring
+still names a `inverted_hyps` parameter that no longer exists, and the
+logging line for it is still there, commented out
+(`src/proof_solver_step.ml:502,506`).
+
+Measured from the instrumented trajectories, counting a step as *sterile*
+when the goal is unchanged and the only new hypothesis is an exact duplicate
+of one already in context:
+
+| proof | steps | create a duplicate | provably sterile |
+| --- | --- | --- | --- |
+| `Test1/wsim_pq` | 114 | 18 (15.8%) | 3 (2.6%) |
+| `Test2/wsim_pq` | 446 | 70 (15.7%) | 12 (2.7%) |
+| `Test2/wsim_qp` | 278 | 49 (17.6%) | 12 (4.3%) |
+| `CADP/Size1/ME` bigstep | 268 | 13 (4.9%) | 13 (4.9%) |
+| `CADP/Size1/ME` lts | 396 | 140 (35.4%) | 56 (**14.1%**) |
+| `Test3/wsim_pq` | 20,001 | 4,836 (24.2%) | 2,391 (**12.0%**) |
+
+A worked instance, `Test3` iterations 5-6: the context holds
+`H1 : termLTS (tfix (tact (send A) trec)) a t'` and
+`H4 : compLTS (cprc (tfix (tact (send A) trec))) a (cprc t')`, both graded 3
+along with `H`. `try_invert_any`'s fold breaks ties toward the *last*
+candidate, so it picks `H4`; inverting `H4` yields `termLTS (tfix ...) a t'`,
+which is `H1` again, and the goal does not move. The next iteration makes
+progress only because the duplicate lands at the end of the list and is
+picked instead.
+
+This is **not** the cause of B2's blow-up — it is a constant factor — but it
+is worth more on CADP (14.1%) than on `Test3` (12.0%), so it is a general
+win that would *partly offset* the regression the mutual-cofix fix is
+predicted to cause on the tree-shaped proofs. It is small, self-contained,
+needs no new machinery, and can be done and verified entirely on its own. It
+would lower the 18-number baseline.
+
+### 2. The over-approximating pair set is dead — measured, not argued
+
+The previous entry offered the choice between replaying the solver's exact
+choice function and over-approximating it with *every* bisimilar response,
+noting the second removes a lockstep fragility. Computing both offline from
+the dumped FSMs and partition kills the second outright:
+
+| | `Test3/wsim_pq` | `CADP/Size1/ME` bigstep |
+| --- | --- | --- |
+| pairs the solver actually visits | 17 | 19 |
+| over-approximating reachable product | **144 pairs, 7,680 edges** | **100 pairs, 448 edges** |
+| all bisimilar pairs, no reachability | 144 | 240 |
+
+For `Test3` the over-approximation degenerates to the full all-bisimilar
+set — everything is in one partition block and everything is reachable —
+with a mean out-degree of 53. It is not a slightly-larger set, it is a
+different order of magnitude, and it would make every proof far worse.
+
+### 3. A re-implementation of the choice function drifts immediately
+
+This was the unplanned finding. An exact replay was written offline — ~40
+lines mirroring `try_get_visible_transition` plus `handle_wk_concl`'s silent
+stay-put rule — and run against the pairs the solver was observed to visit.
+It produces **16 pairs and 48 edges**, and the pair count is right: the
+solver's 17th is the pre-unfolding goal written with the definitions `s1`,
+`r1` rather than their bodies. (The "65 edges" in the previous entry was an
+overcount — consecutive `weak_sim` *visits* in a depth-first walk include
+backtracking steps, which are not product edges. 48 is the trustworthy
+number.) But of the 16 pairs, **8 have the wrong B-side**. All 8 A-sides are
+right.
+
+The reason is in `lib/model/components.ml`. `shortest_annotation` is
+`List.fold_left ActionPair.shorter_annotation` over `to_list`, and
+`shorter_annotation` swaps only on a strict `1` — so ties keep whichever
+element comes first in `ActionPair.Set`'s own ordering, which runs through
+`Action.compare`, which compares annotations and constructor trees
+structurally. Then `min_elt` is taken over *that one pair's* destinations,
+not the union across ties. Reproducing the choice therefore means
+reproducing the whole model comparison stack.
+
+**So the lockstep fragility is not hypothetical, and the design constraint
+is firm:** the product BFS must *call the same OCaml function the solver
+calls*, not mirror it. Fortunately that is a clean lift.
+`try_get_visible_transition` is Rocq-dependent only in its first two lines
+(`ReModel.state tys.(3)`, `ReModel.label tys.(5)`); everything from
+`Model.Action.Map.reduce_by_label` onward, and `handle_wk_concl`'s silent
+rule, is pure model code over `(fsm_a, fsm_b, partition, (a, b))`.
+
+### What this suggests the root cause is
+
+Not the mutual cofix's absence. **The solver decides the bisimulation
+relation incrementally, inside the proof, one Rocq tactic at a time, when
+the relation is pure model data that could be computed once before the proof
+starts.** Every symptom follows from that: the product can only be
+discovered depth-first, so closure can only be against ancestors, so the
+search enumerates paths; and the decision procedure cannot be tested at all
+without a Rocq runtime, which is why none of this surfaced earlier.
+
+### Proposed decomposition, none of it started
+
+- **Step 0** (independent, any order) — the sterile-inversion fix above.
+  *Verification:* the 18 counts drop; regenerate the baseline.
+- **Step 1, pure refactor** — lift the pure-model core of the response choice
+  out of `src/proof_solver_step.ml` into `lib/model`, called by the solver
+  exactly as now. *Verification:* the 18 counts must be **identical**. No new
+  capability, and valuable on its own.
+- **Step 2, new model code, no proof changes** — the product BFS on top of
+  Step 1's function, plus a `test/` harness asserting its pair set against
+  what the solver actually visits on the five cheap suites. This is where
+  drift gets caught, and — because Step 1 makes the decision procedure
+  Rocq-free — it runs under `test/tests.exe` with no Rocq runtime.
+- **Step 3, the actual fix** — `mutual_cofix` over Step 2's pair set, with
+  `tclALLGOALS` for the `In_sim`/`Pack_sim`/`intros`. By this point
+  everything it depends on has been measured.
+
+Steps 0, 1 and 2 are individually safe and verifiable; Step 3 is the only
+one carrying real risk, and it is the only one that needs a decision about
+new machinery.
+
+**Revised prediction for `Test3`** on the corrected edge count: 16 pairs x
+~10.4 local + 48 closures x ~6.8 ≈ **~490 iterations**, against >100,000 and
+never closing.
+
+**Verification.** Instrumentation reverted; `make dune` clean,
+`dune exec test/tests.exe` 11/11. No source changed.
+
+**Session tally:** Docs 1 · Bug fix 0 · Optimization 0 · Tooling 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
