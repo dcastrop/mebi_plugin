@@ -31,6 +31,7 @@ module type S = sig
     type t =
       | Done
       | NewProof of (Constrexpr.constr_expr * Constrexpr.constr_expr)
+      | OpenBlock
       | WeakSim
       | Exists of transition option
       | ApplyConstructors of ApplicableConstructors.t
@@ -155,6 +156,7 @@ module Make
     type t =
       | Done
       | NewProof of (Constrexpr.constr_expr * Constrexpr.constr_expr)
+      | OpenBlock
       | WeakSim
       | Exists of W.Model.Transition.t option
       | ApplyConstructors of ApplicableConstructors.t
@@ -166,6 +168,7 @@ module Make
 
         let json ?(as_elt : bool = false) : t -> Yojson.t = function
           | Done -> `String "Done"
+          | OpenBlock -> `String "OpenBlock"
           | WeakSim -> `String "WeakSim"
           | NewProof (_, _) -> `String "NewProof"
           | Exists None -> `String "Exists (None)"

@@ -45,11 +45,11 @@ examples/Bisimilarity/Proc/Test2/Terms.v ### REQUIRED FOR BELOW
 ### Proc.Layered
 examples/Bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test3/TermTests.v ### RETEST: (takes a long time) Success
-# examples/Bisimilarity/Proc/Test3/PluginProofs.v ### TODO: proof explosion
+# examples/Bisimilarity/Proc/Test3/PluginProofs.v ### Success (18s; needs MeBi Config Solver MutualCofix True, which the file sets)
 
 # examples/Bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test4/TermTests.v ### Success
-# examples/Bisimilarity/Proc/Test4/PluginProofs.v ### was never written -- Test3's own PluginProofs.v was already hitting proof explosion (Solve 100000, some unfinished even at 500000-1000000), so Test4's was skipped as expected to be worse (see ASSISTED-CHANGES.md, 2026-09-27)
+# examples/Bisimilarity/Proc/Test4/PluginProofs.v ### still not written -- Test4 fails EXTRACTION (LTS_Incomplete at the default 100-state bound, still extracting after 14 minutes at 5000), so it never reaches the solver at all. That is backlog item B3, and is unrelated to Test3's proof explosion, which is fixed (see ASSISTED-CHANGES.md, 2026-09-29)
 
 ###############################################################################
 ### CADP

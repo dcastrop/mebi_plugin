@@ -265,6 +265,14 @@ VERNAC COMMAND EXTEND MeBi_Config_FailIf_NotBisimilar CLASSIFIED AS QUERY
   { Api.set_fail_flag_non_bisimilar false }
 END
 
+(* Config -- solver strategy *)
+VERNAC COMMAND EXTEND MeBi_Config_Solver_MutualCofix CLASSIFIED AS QUERY
+| ["MeBi" "Config" "Solver" "MutualCofix" "True"] ->
+  { Api.set_mutual_cofix true }
+| ["MeBi" "Config" "Solver" "MutualCofix" "False"] ->
+  { Api.set_mutual_cofix false }
+END
+
 (* Config -- output *)
 VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Output" string(x) "True"] -> 

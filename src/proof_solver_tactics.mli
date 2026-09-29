@@ -19,6 +19,16 @@ module type S = sig
   val simplify_all : unit -> tactic mm
   val simplify_and_subst_all : unit -> tactic mm
   val cofix : unit -> tactic mm
+
+  (** [mutual_cofix root others] opens a mutual cofixpoint. [root]'s type is
+      taken from the goal; [others] names and types the rest of the block. One
+      goal is produced per definition, each with every hypothesis in scope. *)
+  val mutual_cofix : Names.Id.t -> (Names.Id.t * Evd.econstr) list -> tactic mm
+
+  (** [all_goals t] runs [t] on every focused goal rather than only the
+      first. *)
+  val all_goals : tactic -> tactic
+
   val trivial : ?msg:string -> unit -> tactic mm
   val exact_hyp : Rocq_utils.hyp -> tactic mm
   val ex_intro : state -> tactic mm

@@ -27,6 +27,13 @@ type fail_flags =
 val the_fail_flags_default : fail_flags
 val the_fail_flags : fail_flags ref
 val reset_the_fail_flags : unit -> unit
+
+(** Solver strategy: one mutual cofix over the precomputed product relation,
+    rather than a fresh nested cofix per newly-seen pair. Off by default. *)
+val the_mutual_cofix : bool ref
+
+val set_mutual_cofix : bool -> unit
+val reset_mutual_cofix : unit -> unit
 val set_fail_flag_empty : bool -> unit
 val set_fail_flag_incomplete : bool -> unit
 val set_fail_flag_non_bisimilar : bool -> unit

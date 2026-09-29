@@ -31,6 +31,7 @@ module type S = sig
     type t =
       | Done
       | NewProof of (Constrexpr.constr_expr * Constrexpr.constr_expr)
+      | OpenBlock
       | WeakSim
       | Exists of transition option
       | ApplyConstructors of ApplicableConstructors.t

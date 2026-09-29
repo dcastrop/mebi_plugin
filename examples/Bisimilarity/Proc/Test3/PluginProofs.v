@@ -27,6 +27,13 @@ MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs".
 
 MeBi Config Weak As Option label.
 
+(* One mutual cofix over the whole precomputed product relation, instead of a
+   fresh nested cofix per newly-seen pair. Without it this file does not
+   finish: [wsim_pq] exhausted [Solve 100000] and [wsim_p3] was recorded as
+   unfinished after 500000 and crashing at 1000000. See ASSISTED-CHANGES.md,
+   2026-09-29, and backlog item B2. *)
+MeBi Config Solver MutualCofix True.
+
 Require Import Logic.
 
 Example s0 : term := (tact (send A) tend).
@@ -79,58 +86,51 @@ Example p3a : comp := cpar (cprc s3) (cprc r3).
 Example p3b : comp := cpar (cprc r3) (cprc s3). 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.p3".
-(* Example wsim_p3 : weak_sim compLTS compLTS p3a p3b. 
+(* Was: unfinished after 500000, crashed on 1000000. 42 pairs. *)
+Example wsim_p3 : weak_sim compLTS compLTS p3a p3b. 
 Proof. MeBi Sim Begin compLTS p3a And compLTS p3b Using compLTS termLTS. 
-  (* unfinished after 500000, crashed on 1000000. *)
-  MeBi Sim Solve 100000.
-  (* MeBi Sim Solve 100000. *)
-  (* MeBi Sim Solve 100000. *)
-  (* MeBi Sim Solve 100000. *)
-  (* MeBi Sim Solve 100000. *)
-  (* MeBi Sim Solve 100000. *)
-  (* MeBi Sim Solve 100000. Qed. *)
-Admitted. *)
+  MeBi Sim Solve 1126. Qed.
 
 (**************************************************)
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.pq".
 Example wsim_pq : weak_sim compLTS compLTS p q. 
 Proof. MeBi Sim Begin compLTS p And compLTS q Using compLTS termLTS. 
-  MeBi Sim Solve 100000. Qed.
+  MeBi Sim Solve 386. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.qp".
 Example wsim_qp : weak_sim compLTS compLTS q p. 
 Proof. MeBi Sim Begin compLTS q And compLTS p Using compLTS termLTS. 
-  MeBi Sim Solve 100000. Qed.
+  MeBi Sim Solve 518. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.qr".
 Example wsim_qr : weak_sim compLTS compLTS q r. 
 Proof. MeBi Sim Begin compLTS q And compLTS r Using compLTS termLTS. 
-  MeBi Sim Solve 100000. Qed.
+  MeBi Sim Solve 518. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.rq".
 Example wsim_rq : weak_sim compLTS compLTS r q. 
 Proof. MeBi Sim Begin compLTS r And compLTS q Using compLTS termLTS. 
-  MeBi Sim Solve 100000. Qed.
+  MeBi Sim Solve 602. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.pr".
 Example wsim_pr : weak_sim compLTS compLTS p r. 
 Proof. MeBi Sim Begin compLTS p And compLTS r Using compLTS termLTS. 
-  MeBi Sim Solve 100000. Qed.
+  MeBi Sim Solve 210. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.rp".
 Example wsim_rp : weak_sim compLTS compLTS r p. 
 Proof. MeBi Sim Begin compLTS r And compLTS p Using compLTS termLTS. 
-  MeBi Sim Solve 100000. Qed.
+  MeBi Sim Solve 330. Qed.
 
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.rs".
 Example wsim_rs : weak_sim compLTS compLTS r s.
 Proof. MeBi Sim Begin compLTS r And compLTS s Using compLTS termLTS.
-  MeBi Sim Solve 100000. Qed.
+  MeBi Sim Solve 602. Qed.
 
 MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs.ProofTest.sr".
 Example wsim_sr : weak_sim compLTS compLTS s r.
 Proof. MeBi Sim Begin compLTS s And compLTS r Using compLTS termLTS.
-  MeBi Sim Solve 100000. Qed.
+  MeBi Sim Solve 330. Qed.

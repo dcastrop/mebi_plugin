@@ -155,7 +155,19 @@ let set_the_weak_arg2 (x : weak_arg) : unit =
 
 (***********************************************************************)
 
+(** Solver strategy. When [true], [Proof_solver_step] opens the proof with a
+    single mutual cofix naming every pair of the precomputed product relation
+    ([Model.Product.reachable]), instead of minting a fresh nested cofix each
+    time it meets a pair it has not seen. Defaults to [false]: the nested path
+    is what every checked-in [MeBi Sim Solve] bound was measured against.
+    See [ASSISTED-CHANGES.md], 2026-09-29, and backlog item B2. *)
+let the_mutual_cofix : bool ref = ref false
+
+let set_mutual_cofix (x : bool) : unit = the_mutual_cofix := x
+let reset_mutual_cofix () : unit = the_mutual_cofix := false
+
 let reset_all () : unit =
+  reset_mutual_cofix ();
   reset_bounds_args ();
   reset_weak_args ();
   reset_the_fail_flags ();

@@ -19,6 +19,8 @@ module type S = sig
   val simplify_all : unit -> tactic mm
   val simplify_and_subst_all : unit -> tactic mm
   val cofix : unit -> tactic mm
+  val mutual_cofix : Names.Id.t -> (Names.Id.t * Evd.econstr) list -> tactic mm
+  val all_goals : tactic -> tactic
   val trivial : ?msg:string -> unit -> tactic mm
   val exact_hyp : Rocq_utils.hyp -> tactic mm
   val ex_intro : state -> tactic mm
@@ -210,6 +212,37 @@ module Make
     FixTactics.cofix name
     |> Tactic.create ~msg:(Printf.sprintf "cofix %s" (Names.Id.to_string name))
     |> return
+  ;;
+
+  (** [mutual_cofix root others] opens a mutual cofixpoint: [root]'s type comes
+      from the goal, [others] supplies the name and type of every other
+      definition in the block, and one goal is produced per definition with the
+      whole block in scope as hypotheses.
+
+      Must be sequenced with [all_goals] applying [In_sim]/[Pack_sim]/[intros]
+      in the SAME tactic. Straight after this, every goal in the block is
+      syntactically its own hypothesis, so anything that consults the
+      coinduction hypotheses before a constructor has been applied closes the
+      goal unguarded and [Qed] rejects the proof. *)
+  let mutual_cofix (root : Names.Id.t) (others : (Names.Id.t * EConstr.t) list)
+    : Tactic.t mm
+    =
+    FixTactics.mutual_cofix root others
+    |> Tactic.create
+         ~msg:
+           (Printf.sprintf
+              "cofix %s with (%i others)"
+              (Names.Id.to_string root)
+              (List.length others))
+    |> return
+  ;;
+
+  (* [Proofview.Goal.enter] focuses each goal in turn and runs the tactic on
+     it, which is this engine's "to every goal". The solver's own [step] relies
+     on the same thing. *)
+  let all_goals (x : Tactic.t) : Tactic.t =
+    Proofview.Goal.enter (fun _ -> Tactic.unpack x)
+    |> Tactic.create ~msg:"(to all goals)"
   ;;
 
   (** [trivial ?msg ()] applies the [Auto.gen_trivial] (i.e., [trivial]) tactic. If the [module Log] is configured to display [Output.Kind.Info] messages, then the equivalent of tactic [info_trivial] is used instead.

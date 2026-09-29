@@ -610,6 +610,100 @@ struct
     ;;
   end
 
+  exception
+    PairNotInProduct of
+      { a : Model.State.t
+      ; b : Model.State.t
+      }
+
+  (** [handle_open_block ()] opens the whole proof with a single mutual
+      cofixpoint, one definition per pair of the precomputed product relation
+      ([Model.Product.reachable]).
+
+      This is the alternative to minting a fresh nested cofix each time the
+      search meets a pair it has not seen. A nested cofix is visible only to
+      the branch that created it and its descendants, so a pair that repeats a
+      *sibling* rather than an *ancestor* cannot be closed and its whole
+      subtree is re-derived; the search then enumerates simple paths through
+      the product rather than its states. See backlog item B2.
+
+      Enabled by [MeBi Config Solver MutualCofix True]; off by default. *)
+  let handle_open_block () : Tactic.t mm =
+    Logger.trace __FUNCTION__;
+    let open Syntax in
+    (* The block's types come from decoded model states, and [Concl.eq] is
+       syntactic, so the goal has to be normalised before its own pair can be
+       resolved -- and before any of the block's hypotheses could match it. *)
+    let* unfold_opt = Concl.try_unfold_any () in
+    match unfold_opt with
+    | Some x ->
+      Logger.trace ~__FUNCTION__ "unfold before opening the block";
+      return x
+    | None ->
+      let* ty, tys = get_concl () |> to_atomic in
+      let fsm_a : Model.FSM.t = W.get_fsm_a () in
+      let fsm_b : Model.FSM.t = W.get_fsm_b ~saturated:true () in
+      let pi : Model.Partition.t = W.get_bisimilar_partition () in
+      (* [weak_sim] applies as [| M; N; A; ltsM; ltsN; s; t |] -- see
+         [Concl.is_weak_refl], which tests 3 against 4 and 5 against 6. Only
+         the last two move; reusing the rest keeps the implicit and universe
+         arguments exactly as the goal has them. *)
+      let root : Model.Product.Pair.t =
+        ( M.run (ReModel.state tys.(5) fsm_a.states)
+        , M.run (ReModel.state tys.(6) fsm_b.states) )
+      in
+      let pairs : Model.Product.Pair.Set.t =
+        Model.Product.reachable fsm_a fsm_b pi root
+      in
+      let others : Model.Product.Pair.t list =
+        Model.Product.Pair.Set.remove root pairs
+        |> Model.Product.Pair.Set.elements
+      in
+      let type_of ((a, b) : Model.Product.Pair.t) : EConstr.t =
+        EConstr.mkApp
+          ( ty
+          , Array.mapi
+              (fun (i : int) (x : EConstr.t) ->
+                match i with
+                | 5 -> Decode.state a
+                | 6 -> Decode.state b
+                | _ -> x)
+              tys )
+      in
+      (* All the names at once: [new_cofix_name] measures against the current
+         goal, which does not change until the tactic runs. *)
+      let used : Names.Id.Set.t ref = ref (get_hyp_names ()) in
+      let fresh () : Names.Id.t =
+        let n : Names.Id.t =
+          Namegen.next_ident_away (Names.Id.of_string "Cofix0") !used
+        in
+        used := Names.Id.Set.add n !used;
+        n
+      in
+      let root_name : Names.Id.t = fresh () in
+      let block : (Names.Id.t * EConstr.t) list =
+        List.map (fun p -> fresh (), type_of p) others
+      in
+      Logger.notice
+        (Printf.sprintf
+           "(Mutual cofix over %i pairs.)"
+           (Model.Product.Pair.Set.cardinal pairs));
+      let* cofix : Tactic.t = Tacs.mutual_cofix root_name block in
+      let* apply_In_sim : Tactic.t = Tacs.apply_In_sim () in
+      let* apply_Pack_sim : Tactic.t = Tacs.apply_Pack_sim () in
+      let* intros_all : Tactic.t = Tacs.intros_all () in
+      (* One tactic, not two. Straight after [mutual_cofix] every goal in the
+         block is syntactically identical to its own hypothesis, so a
+         [handle_weaksim] that ran in between would close each of them with an
+         unguarded [exact], and [Qed] would reject the proof. *)
+      let setup : Tactic.t =
+        Tacs.all_goals
+          (Tactic.chain [ apply_In_sim; apply_Pack_sim; intros_all ])
+      in
+      ProofState.update_statem WeakSim;
+      Tactic.seq cofix setup |> return
+  ;;
+
   (** [handle_new_cofix ()] returns a sequence of tactics to handle the creation of a new cofix in the hyps, followed by the necessary application of constructors and introduction of terms to get started on a new case.
 
       Callers must have normalised the conclusion first: [handle_weaksim] runs
@@ -801,7 +895,8 @@ struct
     match x with
     | None -> raise SkipNewProof
     | Some x ->
-      ProofState.update_statem WeakSim;
+      ProofState.update_statem
+        (if !Api.the_mutual_cofix then OpenBlock else WeakSim);
       return x
   ;;
 
@@ -812,6 +907,7 @@ struct
     if is_weak_sim
     then (
       Logger.trace ~__FUNCTION__ "is weak sim";
+      let* _, tys = get_concl () |> to_atomic in
       let* is_weak_refl : bool = Concl.is_weak_refl () in
       if is_weak_refl
       then (
@@ -837,7 +933,22 @@ struct
           in
           (match hyp_cofix with
            | Some h -> Tacs.exact_hyp h
-           | None -> handle_new_cofix ()))
+           | None ->
+             if !Api.the_mutual_cofix
+             then (
+               (* Every pair the search can reach is supposed to be in the
+                  block. Reaching one that is not means the product computed
+                  up front disagrees with what the solver actually does --
+                  name the pair rather than leaving a stuck goal. *)
+               let a = M.run (ReModel.state tys.(5) (W.get_fsm_a ()).states) in
+               let b =
+                 M.run
+                   (ReModel.state
+                      tys.(6)
+                      (W.get_fsm_b ~saturated:true ()).states)
+               in
+               raise (PairNotInProduct { a; b }))
+             else handle_new_cofix ()))
     else if ProofState.is_done ()
     then raise ProofComplete
     else
@@ -917,6 +1028,7 @@ struct
     log_concl ();
     match ProofState.get_statem () with
     | NewProof ab -> handle_new_proof ab
+    | OpenBlock -> handle_open_block ()
     | WeakSim -> handle_weaksim ()
     | Exists hyp_opt -> handle_exists hyp_opt
     (* | GoalTransition args -> handle_goal_transition args *)
@@ -934,7 +1046,8 @@ struct
       Tactic.create ~msg:"Proof Complete" (Proofview.tclUNIT ())
     | SkipNewProof ->
       Logger.trace ~__FUNCTION__ "NewProof:SkipNewProof => WeakSim";
-      ProofState.update_statem WeakSim;
+      ProofState.update_statem
+        (if !Api.the_mutual_cofix then OpenBlock else WeakSim);
       step ()
     | ExitWeakSim ->
       Logger.trace ~__FUNCTION__ "WeakSim:ExitWeakSim => Exists";
