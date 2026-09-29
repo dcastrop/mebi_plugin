@@ -1534,6 +1534,54 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-29 — CI was broken from the day it was added
+
+Branch `main` (on `fork`). Jonah reported the GitHub run failing; the CI
+workflow added 2026-09-27 (backlog item C1) had never actually passed.
+
+```
+mebi: no local opam switch in ./_opam (or it is incomplete).
+[ERROR] Opam has not been initialised, please run `opam init'
+Error: Process completed with exit code 50.
+```
+
+The `mebi:` lines are a red herring — that is `flake.nix`'s own shellHook
+reporting the absent switch, which on CI has no tty and so just prints and
+continues. The real failure is the step after it.
+
+- **Tooling.** Two bugs in `.github/workflows/ci.yml`, both mine:
+
+  1. **No `opam init`.** `opam switch create .` needs an initialised opam
+     *root* (`~/.opam`), and a fresh runner has never had one. Added an
+     `Initialise opam root` step running
+     `opam init --bare --no-setup --disable-sandboxing --yes`, guarded on
+     `~/.opam` not existing. `--bare` because the switch we want is the
+     local one created by the next step; sandboxing off because opam's
+     bubblewrap sandbox is unreliable inside the nix shell and the runner
+     is already isolated.
+  2. **The cache saved only half the state.** `path: _opam` captured the
+     local switch but not the opam root, so even a cache hit would have
+     left every later `opam env` failing the same way. Now caches both
+     `_opam` and `~/.opam` under the same lock-file key.
+
+  Verified as far as is possible locally: `opam --version` is 2.5.2 in the
+  flake's shell, all three flags exist there (`-n, --no-setup` is spelled
+  with the short flag, which an earlier grep missed), and the exact command
+  was run against a scratch `OPAMROOT`, reporting `[default] Initialised`.
+  The workflow YAML parses and the step order is right. It cannot be fully
+  verified without a push, since the failure is specific to a runner that
+  has never seen opam.
+
+Worth recording plainly: C1 was marked done on 2026-09-27 on the strength
+of the workflow being written, not of a green run. A CI job that has never
+passed is not CI. The same caution applies to anything else closed this
+session on the strength of local verification alone.
+
+**Session tally:** Bug fix 1 · Docs 1 · Tooling 0 · Optimization 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
