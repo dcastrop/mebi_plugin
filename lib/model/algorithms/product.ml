@@ -24,6 +24,15 @@ module type S = sig
   val respond : fsm -> state -> label -> states -> transition
   val successors : fsm -> fsm -> partition -> Pair.t -> Pair.t list
   val reachable : fsm -> fsm -> partition -> Pair.t -> Pair.Set.t
+
+  type cost =
+    { pairs : int
+    ; moves : int
+    ; nested : int option
+    }
+
+  val estimate : ?cap_factor:int -> fsm -> fsm -> partition -> Pair.t -> cost
+  val prefer_mutual : cost -> bool
 end
 
 module Make
@@ -154,5 +163,59 @@ struct
           (List.rev_append next rest)
     in
     go (Pair.Set.singleton root) [ root ]
+  ;;
+
+  type cost =
+    { pairs : int
+    ; moves : int
+    ; nested : int option
+    }
+
+  exception Capped
+
+  let estimate
+        ?(cap_factor : int = 4)
+        (a : FSM.t)
+        (b : FSM.t)
+        (pi : C.Partition.t)
+        (root : Pair.t)
+    : cost
+    =
+    Logger.trace __FUNCTION__;
+    let pairs : Pair.Set.t = reachable a b pi root in
+    let moves : int =
+      Pair.Set.fold
+        (fun p acc -> acc + List.length (successors a b pi p))
+        pairs
+        0
+    in
+    (* The nested walk, simulated. [path] is the set of coinduction hypotheses
+       a nested cofix would have in scope at this point -- the ancestors, and
+       only the ancestors. Meeting one of them closes the goal; meeting any
+       other already-proved pair does not, and the whole subtree below it is
+       walked again. *)
+    let cap : int = cap_factor * (Pair.Set.cardinal pairs + moves) in
+    let seen : int ref = ref 0 in
+    let rec walk (path : Pair.Set.t) (p : Pair.t) : unit =
+      incr seen;
+      if !seen > cap then raise Capped;
+      if Pair.Set.mem p path
+      then () (* closes against an ancestor *)
+      else (
+        let path = Pair.Set.add p path in
+        List.iter (walk path) (successors a b pi p))
+    in
+    let nested : int option =
+      try
+        walk Pair.Set.empty root;
+        Some !seen
+      with
+      | Capped -> None
+    in
+    { pairs = Pair.Set.cardinal pairs; moves; nested }
+  ;;
+
+  let prefer_mutual ({ pairs; moves; nested } : cost) : bool =
+    match nested with None -> true | Some n -> n > pairs + moves
   ;;
 end

@@ -214,6 +214,35 @@ let init
   let c : t ref = make (module Enc) () in
   let module Solver : S = (val !c.solver) in
   Solver.W.check_bisimilarity refs a b;
+  (* [Auto] decides here, once, before any proof step runs. The product is
+     already known at this point, so both strategies can simply be measured:
+     a mutual cofix visits each game state once and each move once, while a
+     nested cofix walks the tree of simple paths because it can only close a
+     repeat that is an ancestor. The nested walk is capped at a small multiple
+     of the mutual cost -- the exact figure does not matter, only whether it
+     is larger. See [Model.Product.estimate]. *)
+  (match !Api.the_solver_strategy with
+   | Api.Nested | Api.Mutual -> ()
+   | Api.Auto ->
+     let module S = Solver in
+     let fsm_a = S.W.get_fsm_a () in
+     let fsm_b = S.W.get_fsm_b ~saturated:true () in
+     let pi = S.W.get_bisimilar_partition () in
+     (match fsm_a.init, fsm_b.init with
+      | Some ra, Some rb ->
+        let c = S.W.Model.Product.estimate fsm_a fsm_b pi (ra, rb) in
+        let use_mutual = S.W.Model.Product.prefer_mutual c in
+        Api.set_mutual_cofix use_mutual;
+        Logger.notice
+          (Printf.sprintf
+             "(Auto: %s -- %i pairs, %i moves, nested walk %s.)"
+             (if use_mutual then "mutual cofix" else "nested cofix")
+             c.pairs
+             c.moves
+             (match c.nested with
+              | Some n -> Printf.sprintf "%i" n
+              | None -> Printf.sprintf "over %i" (4 * (c.pairs + c.moves))))
+      | _ -> Api.set_mutual_cofix false));
   Solver.ProofState.init pstate (fst a, fst b);
   pstate
 ;;

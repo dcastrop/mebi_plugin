@@ -402,6 +402,94 @@ let test_product_respond () : unit =
      | exception M.Product.NoBisimilarResponse _ -> true)
 ;;
 
+(** [estimate] must separate the two strategies without running a proof: the
+    same cost on a tree, a higher nested cost on a diamond, and [None] --
+    "will not finish" -- when the nested walk passes its cap. *)
+let test_product_estimate () : unit =
+  print_endline "product: cost estimate";
+  (* A loop: the product is a cycle, every repeat is an ancestor, so a nested
+     walk closes it exactly where a mutual cofix would. *)
+  let x = fsm 0 [ transition 0 a 1; transition 1 b 0 ] in
+  let y = fsm 10 [ transition 10 a 11; transition 11 b 10 ] in
+  let a', b', pi = game x y in
+  let c = M.Product.estimate a' b' pi (state 0, state 10) in
+  check_int "a loop has two game states" 2 c.pairs;
+  check
+    "on a loop the nested walk costs no more than the moves"
+    true
+    (match c.nested with Some n -> n <= c.pairs + c.moves | None -> false);
+  check
+    "prefer_mutual leaves a loop on the nested cofix"
+    false
+    (M.Product.prefer_mutual c);
+  (* A diamond: two routes meet, and only one of them can be an ancestor, so
+     the nested walk pays for the meeting point twice. *)
+  let x =
+    fsm
+      0
+      [ transition 0 a 1; transition 0 b 2; transition 1 b 3; transition 2 a 3 ]
+  in
+  let y =
+    fsm
+      10
+      [ transition 10 a 11
+      ; transition 10 b 12
+      ; transition 11 b 13
+      ; transition 12 a 13
+      ]
+  in
+  let a', b', pi = game x y in
+  let d = M.Product.estimate a' b' pi (state 0, state 10) in
+  check_int "a diamond has four game states" 4 d.pairs;
+  check
+    "on a diamond the nested walk costs strictly more than the mutual one"
+    true
+    (match d.nested with Some n -> n > d.pairs && n > 0 | None -> false);
+  (* One diamond is not enough to prefer a mutual cofix, and the estimate says
+     so: the nested walk pays for the meeting point twice, five goals in all,
+     where a mutual block would prove four pairs and close four moves. Small
+     graphs favour the nested strategy, which is exactly why six of the
+     repository's eighteen cheap proofs get slower under a mutual cofix. *)
+  check
+    "one diamond stays on the nested cofix"
+    false
+    (M.Product.prefer_mutual d);
+  check
+    "the cap reports non-termination rather than hanging"
+    true
+    (match M.Product.estimate ~cap_factor:0 a' b' pi (state 0, state 10) with
+     | { nested = None; _ } -> true
+     | _ -> false);
+  (* Diamonds in series are what tips it: each one doubles the nested walk
+     while adding only a constant to the mutual cost. Three of them already
+     cross over. *)
+  let chain (o : int) : M.Transition.t list =
+    List.concat_map
+      (fun (i : int) ->
+        let n k = o + (3 * i) + k in
+        [ transition (n 0) a (n 1)
+        ; transition (n 0) b (n 2)
+        ; transition (n 1) b (n 3)
+        ; transition (n 2) a (n 3)
+        ])
+      [ 0; 1; 2 ]
+  in
+  let xa = fsm 0 (chain 0) in
+  let yb = fsm 100 (chain 100) in
+  let a', b', pi = game xa yb in
+  let e = M.Product.estimate a' b' pi (state 0, state 100) in
+  check_int "three diamonds give ten game states" 10 e.pairs;
+  check_int "and twelve moves" 12 e.moves;
+  check
+    "the nested walk costs more than the mutual one"
+    true
+    (match e.nested with Some n -> n > e.pairs + e.moves | None -> true);
+  check
+    "so prefer_mutual picks the mutual cofix"
+    true
+    (M.Product.prefer_mutual e)
+;;
+
 (** The JSON round-trip that [Json.S] provides for every model type. *)
 let test_json () : unit =
   print_endline "json serialisation";
@@ -427,6 +515,7 @@ let () =
   test_product_diamond ();
   test_product_silent_stays_put ();
   test_product_respond ();
+  test_product_estimate ();
   test_json ();
   Printf.printf "\n%i/%i passed\n" (!total - !failures) !total;
   if !failures > 0 then exit 1

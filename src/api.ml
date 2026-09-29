@@ -155,16 +155,43 @@ let set_the_weak_arg2 (x : weak_arg) : unit =
 
 (***********************************************************************)
 
-(** Solver strategy. When [true], [Proof_solver_step] opens the proof with a
-    single mutual cofix naming every pair of the precomputed product relation
-    ([Model.Product.reachable]), instead of minting a fresh nested cofix each
-    time it meets a pair it has not seen. Defaults to [false]: the nested path
-    is what every checked-in [MeBi Sim Solve] bound was measured against.
-    See [ASSISTED-CHANGES.md], 2026-09-29, and backlog item B2. *)
+(** How the proof solver introduces its coinduction hypotheses.
+
+    - [Nested] mints a fresh [cofix] each time the search meets a pair it has
+      not seen. A nested cofix is visible only to the branch that created it,
+      so a pair repeating a {e sibling} cannot be closed and its subtree is
+      re-derived.
+    - [Mutual] opens the proof with one mutual cofix naming every pair of
+      [Model.Product.reachable], so every hypothesis is in scope everywhere.
+    - [Auto] measures both on the model, before any proof step runs, and
+      picks -- see [Model.Product.estimate].
+
+    Defaults to [Nested]: that is what every checked-in [MeBi Sim Solve] bound
+    was measured against, and it costs nothing to compute. See
+    [ASSISTED-CHANGES.md], 2026-09-29, and backlog item B2. *)
+type solver_strategy =
+  | Nested
+  | Mutual
+  | Auto
+
+let the_solver_strategy : solver_strategy ref = ref Nested
+
+(** What [the_solver_strategy] resolved to for the proof now being solved.
+    [Auto] writes here once, in [Proof_solver.init]; the step machinery reads
+    only this. *)
 let the_mutual_cofix : bool ref = ref false
 
+let set_solver_strategy (x : solver_strategy) : unit =
+  the_solver_strategy := x;
+  the_mutual_cofix := match x with Mutual -> true | Nested | Auto -> false
+;;
+
 let set_mutual_cofix (x : bool) : unit = the_mutual_cofix := x
-let reset_mutual_cofix () : unit = the_mutual_cofix := false
+
+let reset_mutual_cofix () : unit =
+  the_solver_strategy := Nested;
+  the_mutual_cofix := false
+;;
 
 let reset_all () : unit =
   reset_mutual_cofix ();

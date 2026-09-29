@@ -90,6 +90,39 @@ module type S = sig
       already proved whenever the product is not a tree. See
       [ASSISTED-CHANGES.md], 2026-09-29, and backlog item B2. *)
   val reachable : fsm -> fsm -> partition -> Pair.t -> Pair.Set.t
+
+  (** What a proof of this product costs, in [weak_sim] goals, under each of
+      the two strategies. *)
+  type cost =
+    { pairs : int (** game states: one goal each under a mutual cofix *)
+    ; moves : int (** moves between them: one closure each *)
+    ; nested : int option
+      (** goals a walk that can only close against its own {e ancestors} must
+          visit -- i.e. what a fresh nested cofix per newly-seen pair costs.
+          [None] when the count passed [cap], which means the nested strategy
+          will not finish in any useful time. *)
+    }
+
+  (** [estimate ?cap_factor a b pi root] measures both strategies on the
+      product reachable from [root], without running a single proof step.
+
+      A mutual cofix over the whole relation visits each game state once and
+      each move once: [pairs + moves]. A fresh nested cofix per newly-seen
+      pair can only close a repeat that is an {e ancestor} on the current
+      branch, so it re-derives any state reachable by a second route -- it
+      walks the tree of simple paths, which is exponential on a product that
+      is not a tree. [nested] counts exactly that walk, stopping once it
+      passes [cap_factor] times the mutual cost (default 4) -- the exact
+      figure past that point does not matter, only that it is larger.
+
+      The ratio is what the caller wants: equal means the product is a tree
+      and the two strategies do identical work; [None] means only the mutual
+      cofix will finish. *)
+  val estimate : ?cap_factor:int -> fsm -> fsm -> partition -> Pair.t -> cost
+
+  (** [prefer_mutual c] is [true] when the nested walk costs more than a
+      mutual cofix would, [c.nested = None] included. *)
+  val prefer_mutual : cost -> bool
 end
 
 module Make

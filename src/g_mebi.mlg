@@ -268,9 +268,11 @@ END
 (* Config -- solver strategy *)
 VERNAC COMMAND EXTEND MeBi_Config_Solver_MutualCofix CLASSIFIED AS QUERY
 | ["MeBi" "Config" "Solver" "MutualCofix" "True"] ->
-  { Api.set_mutual_cofix true }
+  { Api.set_solver_strategy Api.Mutual }
 | ["MeBi" "Config" "Solver" "MutualCofix" "False"] ->
-  { Api.set_mutual_cofix false }
+  { Api.set_solver_strategy Api.Nested }
+| ["MeBi" "Config" "Solver" "MutualCofix" "Auto"] ->
+  { Api.set_solver_strategy Api.Auto }
 END
 
 (* Config -- output *)

@@ -28,10 +28,22 @@ val the_fail_flags_default : fail_flags
 val the_fail_flags : fail_flags ref
 val reset_the_fail_flags : unit -> unit
 
-(** Solver strategy: one mutual cofix over the precomputed product relation,
-    rather than a fresh nested cofix per newly-seen pair. Off by default. *)
+(** How the proof solver introduces its coinduction hypotheses: a fresh
+    nested cofix per newly-seen pair, one mutual cofix over the whole
+    precomputed product, or [Auto] to measure both and pick. [Nested] by
+    default. *)
+type solver_strategy =
+  | Nested
+  | Mutual
+  | Auto
+
+val the_solver_strategy : solver_strategy ref
+
+(** What {!the_solver_strategy} resolved to for the proof now being solved.
+    The step machinery reads only this. *)
 val the_mutual_cofix : bool ref
 
+val set_solver_strategy : solver_strategy -> unit
 val set_mutual_cofix : bool -> unit
 val reset_mutual_cofix : unit -> unit
 val set_fail_flag_empty : bool -> unit
