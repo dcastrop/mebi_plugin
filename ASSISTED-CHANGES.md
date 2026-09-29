@@ -1860,6 +1860,61 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-29 — Two bugs in the JSON dump path
+
+Branch `main` (on `fork`). Both were found while using
+`MeBi Config Output "DumpResults" True` to size the pair set for B2's
+candidate fix (previous entry), and both are independent of that work.
+
+**1. `DumpResults True` aborted the whole `.v` file unless `_dumps/` already
+existed.** *(Bug fix.)* `Utils.FileWriter.create_parent_dir fn` creates
+`Filename.dirname fn` — the directory that will *hold* `fn`. Its only caller,
+`Json.write`, was passing it the output directory itself, and
+`Filename.dirname "./_dumps/"` is `"."`, which always exists. So nothing was
+created, and the `open_out` two lines later failed with
+
+```
+System error: "./_dumps/2026 08 29 - 11:09:54 | ... | FSM a (original).json:
+No such file or directory"
+```
+
+which is raised out of the command and kills the compilation. Fixed by
+moving the call below the `filepath` binding and passing `filepath`, so the
+helper gets the file path its contract asks for. The `(* TODO: *)` that sat
+directly above the misuse is gone with it. The helper itself is unchanged and
+still correct; only the call site was wrong.
+
+**2. Every dump filename's month was one low.** *(Bug fix.)* `Unix.tm_mon` is
+0-based and `get_local_timestamp` printed it raw, so a dump written on
+2026-09-29 was named `2026 08 29`. December would have read `00`. Fixed with
+`tm_mon + 1`. The per-field zero padding was hand-rolled as
+`(if tm_mon < 10 then "0" else "")` immediately before printing `tm_mon`, and
+that coupling is precisely what hid the bug — a `+ 1` applied to the printed
+value alone would have left the guard testing the wrong number. Replaced the
+six hand-rolled guards with `%02d` so the padding cannot drift from the value
+again. `tm_year + 1900` was already right.
+
+**Verification.** `MeBi Config Output "DumpResults" True` on a throwaway
+`Proc/Test3` probe with no `_dumps/` present: the directory is created, all
+five dumps are written, the file compiles, and the names now read
+`2026 09 29 - 11:25:32`, matching `date`. Before the first fix the same probe
+failed to compile. `make -j$(nproc)` on the unmodified `_CoqProject` is
+clean, `make dune` is clean, `dune exec test/tests.exe` is 11/11, and
+`dune build @fmt` is clean. No proof-suite run: the change is in `lib/utils`
+and touches neither `lib/model` nor `src/proof_solver*`.
+
+**Noticed, deliberately not changed.** `get_local_timestamp` is a `string`,
+not a `unit -> string`, so it is evaluated once when the module is
+initialised and every dump in a session shares the plugin-load time rather
+than its own. That reads as intentional — it groups a session's dumps
+together in a directory listing, and the filename already carries the source
+line — so it is recorded here rather than "fixed" on the way past.
+
+**Session tally:** Bug fix 2 · Docs 1 · Optimization 0 · Tooling 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

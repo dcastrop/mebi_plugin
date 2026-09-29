@@ -152,21 +152,21 @@ module FileWriter = struct
       Sys.mkdir parent_dir perm)
   ;;
 
+  (** [Unix.tm_mon] is 0-based and [tm_year] is an offset from 1900, so both
+      need adjusting. The zero-padding is left to [%02d] rather than being
+      hand-rolled per field: the previous version guarded on the raw [tm_mon]
+      while printing it, which is exactly the coupling that let the month go
+      out by one unnoticed. *)
   let get_local_timestamp : string =
     match Unix.localtime (Unix.time ()) with
     | { tm_sec; tm_min; tm_hour; tm_mday; tm_mon; tm_year; _ } ->
       Printf.sprintf
-        "%d %s%d %s%d - %s%d:%s%d:%s%d"
+        "%d %02d %02d - %02d:%02d:%02d"
         (tm_year + 1900)
-        (if tm_mon < 10 then "0" else "")
-        tm_mon
-        (if tm_mday < 10 then "0" else "")
+        (tm_mon + 1)
         tm_mday
-        (if tm_hour < 10 then "0" else "")
         tm_hour
-        (if tm_min < 10 then "0" else "")
         tm_min
-        (if tm_sec < 10 then "0" else "")
         tm_sec
   ;;
 end
