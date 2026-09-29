@@ -1399,8 +1399,23 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) :
             let name = "Partitions"
           end)
 
-      let get_bisimilar (x : State.t) : t -> States.t =
-        find_first (fun (ys : States.t) -> States.mem x ys)
+      (** [get_bisimilar x p] is the block of [p] containing [x].
+
+          @raise Not_found when no block does.
+
+          Not [find_first]: that returns the least element satisfying a
+          predicate and requires the predicate to be {b monotonically
+          increasing} over the set's ordering, which "this block contains [x]"
+          is not. With a non-monotonic predicate its binary search is
+          unspecified, and it really does miss -- on a ten-block partition of
+          twenty states it failed to find the block holding the second state,
+          which is visibly there. Both callers ([Results.get_bisimilar_states]
+          and [Product.successors]) turn [Not_found] into the empty set, so the
+          miss surfaced not as an error but as a state with nothing bisimilar
+          to it. Found 2026-09-29 while writing a [Product.estimate] test. *)
+      let get_bisimilar (x : State.t) (p : t) : States.t =
+        let matching : t = filter (fun (ys : States.t) -> States.mem x ys) p in
+        if is_empty matching then raise Not_found else choose matching
       ;;
 
       let filter_reachable (xs : States.t) : t -> t =
