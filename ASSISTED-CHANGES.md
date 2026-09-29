@@ -1640,6 +1640,104 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-29 — B2 diagnosed: the proof search enumerates paths, not pairs
+
+Branch `main` (on `fork`). No code change; instrumentation only, reverted.
+Takes up the question the previous entry left as "the first genuinely open
+one" — what the ~40KB per iteration is spent on, and whether the search can
+close in far fewer steps.
+
+**Method.** A throwaway `B2Probe.v` next to each example, `Debug` on, plus a
+one-line temporary addition to `handle_state` so the *cofix* hypotheses were
+logged alongside the non-cofix ones (`Hyps.log ~cofix_only:(Some true)`).
+That makes every iteration self-describing: proof state, conclusion, and the
+exact set of coinduction hypotheses in scope. A small Python pass over the
+log assigns each `weak_sim` conclusion a pair id and classifies each visit as
+*first*, *closed against an ancestor cofix*, or *re-explored*.
+
+**Result for `Proc/Test3`'s `wsim_pq`, at `Solve 20000`:**
+
+| | |
+| --- | --- |
+| iterations | 20,001 |
+| `weak_sim` goal visits | 2,446 |
+| **distinct pairs** | **17** |
+| first visits | 17 |
+| closed immediately against an ancestor cofix | 1,623 |
+| **re-explorations** | **806** |
+| maximum cofix stack depth | 16 |
+
+All 17 pairs are discovered inside the first ~300 iterations. The remaining
+19,700 iterations discover nothing: they re-derive pairs that were already
+proved. The rate is flat — about 80 re-explorations per 2000 iterations in
+every window of the run, with no sign of converging.
+
+**Mechanism.** `handle_weaksim` closes a `weak_sim` goal only when
+`Hyps.can_solve_concl_cofix ()` finds a syntactically equal *cofix
+hypothesis in the current context*, and otherwise calls `handle_new_cofix`,
+which runs `FixTactics.cofix` on a fresh name. Cofix hypotheses are
+introduced inside a branch, so they are visible only to that branch and its
+descendants. A pair therefore closes when it repeats an **ancestor** on the
+current branch, and starts a whole fresh subtree when it repeats a
+**sibling** already proved elsewhere. The search is consequently enumerating
+**simple paths through the product graph**, not its states — the maximum
+cofix depth capping at 16 for a 17-pair relation is exactly that signature.
+This is the same pathology A3 found in saturation, one layer up: the fix
+there replaced path enumeration with a closure over states.
+
+**Why the passing examples pass.** The same instrumentation on the cheap
+suites shows the difference is in the product graph's shape, not in the
+proof strategy:
+
+| proof | iterations | pairs | closed on ancestor | re-explored |
+| --- | --- | --- | --- | --- |
+| `Test1/wsim_pq` | 114 | 13 | 6 | **0** |
+| `Test2/wsim_pq` | 446 | 10 | 29 | 32 |
+| `Test2/wsim_qp` | 278 | 10 | 22 | 18 |
+| `Test2/wsim_qr` | 299 | 10 | 22 | 18 |
+| `Test2/wsim_rq` | 194 | 8 | 13 | 10 |
+| `Test2/wsim_pr` | 446 | 10 | 29 | 32 |
+| `Test2/wsim_rp` | 182 | 8 | 13 | 10 |
+
+`Test1`'s product graph is acyclic enough that ancestors always suffice, so
+it costs nothing. `Test2` already pays — roughly half its `weak_sim` visits
+are redundant — but its simple-path tree is small enough to terminate.
+`Test3`'s is not. Nothing about `Test3` is special except size; the waste is
+present throughout and has simply been affordable until now.
+
+**What this means for the "~40KB per iteration" framing.** It is not the
+wrong question, but it is the second question. Each redundant subtree is
+also a redundant chunk of proof term, so the memory ceiling and the
+iteration count have the same cause. Shrinking per-iteration allocation
+would buy a constant factor against a combinatorial blow-up.
+
+**Candidate fix, flagged not started.** `FixTactics.mutual_cofix : Id.t ->
+(Id.t * constr) list -> unit Proofview.tactic` exists in the Rocq 9.2
+runtime. Because `check_bisimilarity` has already computed the full relation
+before proof search begins, the solver could issue **one mutual cofix at the
+start**, naming every pair in the relation, instead of a fresh nested
+`cofix` per newly-seen pair. Every cofix hypothesis would then be in scope in
+every branch, `can_solve_concl_cofix` would close every repeat at its first
+encounter, and the search would be linear in the size of the relation rather
+than in its number of simple paths. Per `CLAUDE.md`'s working assumption this
+is raised **before** writing it: it is a different proof-construction
+strategy and a substantial piece of net-new machinery in `proof_solver*`,
+even though it proves the same statements the plugin already states. Two
+consequences to weigh first: `mutual_cofix` yields one goal per cofixpoint,
+and the step machinery currently assumes a single focused goal with a global
+mutable `ProofState`; and the checked-in iteration counts for `Test2` and
+probably the CADP suites would **drop**, so the 18-number baseline in
+`CLAUDE.md` would need regenerating rather than matching.
+
+**Verification.** All instrumentation reverted; `git status` clean,
+`make dune` clean, `dune exec test/tests.exe` 11/11. No baseline run was
+needed — no source changed.
+
+**Session tally:** Docs 1 · Optimization 0 · Bug fix 0 · Tooling 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
