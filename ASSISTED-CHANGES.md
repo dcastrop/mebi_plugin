@@ -1582,6 +1582,64 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-29 — Batching settled by measurement: it does not release memory
+
+Branch `main` (on `fork`). No code change. Runs the experiment left open by
+the previous entry, rather than leaving it as a note for a fresh session.
+
+**Question.** Would splitting one `MeBi Sim Solve 1000000` into several
+smaller `Solve` commands let `Proc/Test3` get further, because memory is
+released between commands?
+
+**Method.** `wsim_pq` alone, twenty sequential `MeBi Sim Solve 50000`
+commands (1,000,000 iterations in total, matching the single-command run),
+under an identical `systemd-run --scope -p MemoryMax=8G`, with RSS sampled
+every 20 seconds so command boundaries are visible in the curve.
+
+**Result: no release at any boundary.** RSS climbed straight through them:
+
+| elapsed | RSS | commands finished |
+| --- | --- | --- |
+| 01:57 | 3888 MB | 2 |
+| 02:37 | 5110 MB | 2 |
+| 02:57 | 5713 MB | 3 |
+| 03:37 | 6954 MB | 3 |
+| 03:57 | 7503 MB | 4 |
+| 04:17 | 8123 MB | 4 |
+
+Killed by the cgroup OOM killer at 8370260 kB after **4 completed commands
+= 200,004 iterations**, 4min 31.2s CPU. The single-command run reached
+4min 40.8s CPU at the same 8G ceiling; at the 1.36 ms/iteration this run
+measures, that is about **207,000 iterations**. The two are within ~3% of
+each other.
+
+So batching and a single command are equivalent, and the earlier inference
+(recorded in the previous entry as *not* measured) is now confirmed: the
+memory is the proof term and evar map under construction, which persist
+across command boundaries exactly as within a command. **No batching scheme
+can resolve `Test3`.** The ceiling is roughly 200,000 iterations per 8GB,
+about 40KB per iteration.
+
+**On the recollection this tested.** Jonah recalled relying on per-command
+batching and finding no OCaml-side equivalent. The second half was exactly
+right and is now fixed (`87403dc`): the solve loop retained every
+intermediate proof state, which only a command boundary could release. That
+effect is real but about a fifth of the growth, so batching would have
+helped visibly on shorter proofs where the retained frames are
+proportionally large, and cannot help on anything `Test3`-sized where the
+proof term dominates. Both halves of the recollection are accounted for.
+
+**What this leaves for B2.** Not bounds, not batching, not the loop. The
+remaining lever is the ~40KB per iteration itself — what `step` adds to the
+proof term each time, and whether the search can be made to close in far
+fewer steps. That is a proof-solver design question, and the first genuinely
+open one since this line of work began.
+
+**Session tally:** Docs 1 · Optimization 0 · Bug fix 0 · Tooling 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
