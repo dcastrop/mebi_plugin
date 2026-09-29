@@ -2441,6 +2441,74 @@ Optimization 0 · **Tooling 0.**
 
 ---
 
+## 2026-09-29 — The tool can tell when the mutual cofix is needed, and a latent partition bug
+
+Branch `main` (on `fork`). Two commits. Answers Jonah's question: if this
+shipped, could the plugin work out for itself whether
+`MeBi Config Solver MutualCofix True` is required?
+
+**It can, and cheaply, because the product relation is known before any proof
+step runs.** Both strategies can simply be costed on the model. A mutual
+cofix visits each game state once and each move once — `pairs + moves`. A
+nested cofix walks the tree of simple paths, because it can only close a
+repeat that is an *ancestor*. `Model.Product.estimate` computes both, capping
+the nested walk at a small multiple of the mutual cost since only the
+comparison matters; `prefer_mutual` is the decision.
+`MeBi Config Solver MutualCofix` now also takes **`Auto`**.
+
+**The ratio separates the corpus cleanly.** Measured on all 27 proofs:
+
+| ratio nested / (pairs+moves) | proofs | what actually happens |
+| --- | --- | --- |
+| **0.5–0.6×** | `Proc/Test1` ×6, `CADP/Size1` ×6 | nested is cheaper — and these are exactly the two proofs a mutual cofix made *worse* (22→69, 21→63) plus the ten it left unchanged |
+| **1.4–2.4×** | `Proc/Test2` ×6 | mutual wins: 446→112, 278→112, 194→84 |
+| **10× to 664×, five over the cap** | `Proc/Test3` ×9 | only mutual finishes |
+
+`Auto` picks correctly on **all 27**. `Test1` and CADP keep their baseline
+counts exactly; `Test2` and `Test3` take the mutual path. Over the 18 cheap
+proofs that is **2565 iterations, against 3794 nested and 2654
+always-mutual** — better than either fixed strategy, with no regression
+anywhere. The default stays `False`, because `Nested` costs nothing to
+compute and is what every checked-in bound was measured against; `Auto` is
+the setting to recommend if this ships.
+
+The estimate is also the honest explanation of the two regressions recorded
+in the previous entry: on a single diamond the nested walk costs 5 goals
+against a mutual block's 8, so small products genuinely favour the nested
+strategy. It takes about three diamonds in series before the doubling
+overtakes the constant. That is now a test.
+
+### The bug this turned up
+
+Writing that test exposed a real defect in `lib/model`.
+`Partition.get_bisimilar x p` was
+`find_first (fun ys -> States.mem x ys)`. `Set.S`'s `find_first` returns the
+least element satisfying a predicate and **requires that predicate to be
+monotonically increasing** over the set's ordering. "This block contains
+[x]" is not, and with a non-monotonic predicate the binary search is
+unspecified. It really does miss: on a ten-block partition of twenty states
+it failed to find the block holding the second state, which is visibly there.
+
+Both callers — `Results.get_bisimilar_states`, which is on the solver's hot
+path via `handle_visible_transition`, and `Product.successors` — turn
+`Not_found` into the empty set. So a miss surfaced not as an error but as a
+state with nothing bisimilar to it, and hence as a transition the solver
+could not respond to. Replaced with a filter-and-choose.
+
+**Latent, not active, on the current corpus:** all 27 checked-in counts are
+unchanged, so the binary search happened to land correctly on every partition
+these examples produce. It would not have stayed that way.
+
+**Verification.** Six proof suites, 27 of 27 `Solved`, every count identical
+— the 18 baseline counts and `Proc/Test3`'s nine. `test/satdiff.exe -- 200`
+matches its golden file. `dune exec test/tests.exe` 30/30 (19 → 30).
+`make dune` and `dune build @fmt` clean.
+
+**Session tally:** Bug fix 1 · New feature 1 · Docs 1 · Refactor 0 ·
+Optimization 0 · **Tooling 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
