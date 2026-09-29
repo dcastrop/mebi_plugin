@@ -371,8 +371,8 @@ struct
     (** Returns the first hypothesis whose type is the conclusion, rather than
         just whether one exists: the caller closes the goal with that
         hypothesis directly. *)
-    let rec eq_any_hyps : Rocq_utils.hyp list -> Rocq_utils.hyp option mm
-      = function
+    let rec eq_any_hyps : Rocq_utils.hyp list -> Rocq_utils.hyp option mm =
+      function
       | [] -> return None
       | h :: tl -> if eq_hyp h then return (Some h) else eq_any_hyps tl
     ;;
