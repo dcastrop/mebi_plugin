@@ -368,9 +368,13 @@ struct
       Context.Named.Declaration.get_type x |> eq
     ;;
 
-    let rec eq_any_hyps : Rocq_utils.hyp list -> bool mm = function
-      | [] -> return false
-      | h :: tl -> if eq_hyp h then return true else eq_any_hyps tl
+    (** Returns the first hypothesis whose type is the conclusion, rather than
+        just whether one exists: the caller closes the goal with that
+        hypothesis directly. *)
+    let rec eq_any_hyps : Rocq_utils.hyp list -> Rocq_utils.hyp option mm
+      = function
+      | [] -> return None
+      | h :: tl -> if eq_hyp h then return (Some h) else eq_any_hyps tl
     ;;
 
     let is_weak_refl () : bool mm =
@@ -486,9 +490,13 @@ struct
         Logger.things Debug "hyps (non-cofixes)" (get_non_cofixes ()) Strfy.hyp
     ;;
 
-    (** [can_solve_concl_cofix ()] returns true if there is a hyp that can solve the current a tactic to solve the current goal using one of he cofixes in the hyps.
-    *)
-    let can_solve_concl_cofix () : bool mm = get_cofixes () |> Concl.eq_any_hyps
+    (** [can_solve_concl_cofix ()] is the coinduction hypothesis in scope whose
+        type is the current goal, if there is one. It used to answer only
+        whether such a hypothesis existed, leaving [trivial] to find it again
+        by hint search. *)
+    let can_solve_concl_cofix () : Rocq_utils.hyp option mm =
+      get_cofixes () |> Concl.eq_any_hyps
+    ;;
 
     (** [clear_non_cofix ()] returns a tactic that will clear all the hyps that are named according to [get_all_non_cofix_hyp_names ()]. This is to be used at the end of a case of the proof has been solved.
         (* TODO: check if this is necessary -- or could be problematic? *) *)
@@ -603,24 +611,20 @@ struct
   end
 
   (** [handle_new_cofix ()] returns a sequence of tactics to handle the creation of a new cofix in the hyps, followed by the necessary application of constructors and introduction of terms to get started on a new case.
-  *)
+
+      Callers must have normalised the conclusion first: [handle_weaksim] runs
+      [Concl.try_unfold_any] to exhaustion before reaching here, so a cofix is
+      always minted from a fully unfolded goal. *)
   let handle_new_cofix () : Tactic.t mm =
     Logger.trace __FUNCTION__;
     let open Syntax in
-    let* unfold_opt = Concl.try_unfold_any () in
-    match unfold_opt with
-    | Some x ->
-      Logger.trace ~__FUNCTION__ "do unfold";
-      return x
-    | None ->
-      Logger.trace ~__FUNCTION__ "nothing to unfold";
-      let* cofix : Tactic.t = Tacs.cofix () in
-      let clear : Tactic.t = Hyps.clear_non_cofix () in
-      let* apply_In_sim : Tactic.t = Tacs.apply_In_sim () in
-      let* apply_Pack_sim : Tactic.t = Tacs.apply_Pack_sim () in
-      let* intros_all : Tactic.t = Tacs.intros_all () in
-      Tactic.chain [ cofix; clear; apply_In_sim; apply_Pack_sim; intros_all ]
-      |> return
+    let* cofix : Tactic.t = Tacs.cofix () in
+    let clear : Tactic.t = Hyps.clear_non_cofix () in
+    let* apply_In_sim : Tactic.t = Tacs.apply_In_sim () in
+    let* apply_Pack_sim : Tactic.t = Tacs.apply_Pack_sim () in
+    let* intros_all : Tactic.t = Tacs.intros_all () in
+    Tactic.chain [ cofix; clear; apply_In_sim; apply_Pack_sim; intros_all ]
+    |> return
   ;;
 
   exception CouldNotFindGotoState
@@ -814,10 +818,26 @@ struct
         Logger.trace ~__FUNCTION__ "is weak refl";
         Tacs.apply_weak_sim_refl ())
       else
-        let* has_hyp_cofix : bool = Hyps.can_solve_concl_cofix () in
-        if has_hyp_cofix
-        then Tacs.trivial ~msg:"trivial (solve cofix)" ()
-        else handle_new_cofix ())
+        (* Normalise the conclusion BEFORE consulting the coinduction
+           hypotheses. The unfolding used to live inside [handle_new_cofix],
+           which was harmless while every hypothesis was minted from whatever
+           the goal happened to look like -- a nested [cofix] copies the goal,
+           spelling included. It stops being harmless as soon as the
+           hypotheses are built ahead of time from decoded model states, since
+           [Concl.eq] is syntactic and would not match a goal still written in
+           terms of definitions. Unfolding first makes both sides normal. *)
+        let* unfold_opt : Tactic.t option = Concl.try_unfold_any () in
+        match unfold_opt with
+        | Some x ->
+          Logger.trace ~__FUNCTION__ "unfold before cofix lookup";
+          return x
+        | None ->
+          let* hyp_cofix : Rocq_utils.hyp option =
+            Hyps.can_solve_concl_cofix ()
+          in
+          (match hyp_cofix with
+           | Some h -> Tacs.exact_hyp h
+           | None -> handle_new_cofix ()))
     else if ProofState.is_done ()
     then raise ProofComplete
     else

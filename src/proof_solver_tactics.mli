@@ -20,6 +20,7 @@ module type S = sig
   val simplify_and_subst_all : unit -> tactic mm
   val cofix : unit -> tactic mm
   val trivial : ?msg:string -> unit -> tactic mm
+  val exact_hyp : Rocq_utils.hyp -> tactic mm
   val ex_intro : state -> tactic mm
   val split : unit -> tactic mm
   val ex_intro_split : state -> tactic mm

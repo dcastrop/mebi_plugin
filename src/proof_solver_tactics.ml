@@ -20,6 +20,7 @@ module type S = sig
   val simplify_and_subst_all : unit -> tactic mm
   val cofix : unit -> tactic mm
   val trivial : ?msg:string -> unit -> tactic mm
+  val exact_hyp : Rocq_utils.hyp -> tactic mm
   val ex_intro : state -> tactic mm
   val split : unit -> tactic mm
   val ex_intro_split : state -> tactic mm
@@ -220,6 +221,20 @@ module Make
       else Auto.gen_trivial []
     in
     Tactic.create ~msg (f None) |> return
+  ;;
+
+  (** [exact_hyp h] closes the goal with the hypothesis [h] itself.
+
+      Used where the goal has already been established equal to [h]'s type, so
+      there is nothing to search for. It replaces a [trivial], which found the
+      same hypothesis by hint search: cheap while the context holds one
+      coinduction hypothesis per branch, but not once the whole relation is in
+      scope at once, and free to pick something else. *)
+  let exact_hyp (x : Rocq_utils.hyp) : Tactic.t mm =
+    let name : Names.Id.t = Context.Named.Declaration.get_id x in
+    Tactics.exact_check (EConstr.mkVar name)
+    |> Tactic.create ~msg:(Printf.sprintf "exact %s" (Names.Id.to_string name))
+    |> return
   ;;
 
   let ex_intro (x : Model.State.t) : Tactic.t mm =
