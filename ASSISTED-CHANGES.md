@@ -2509,6 +2509,68 @@ Optimization 0 · **Tooling 0.**
 
 ---
 
+## 2026-09-29 — `Auto` becomes the default solver strategy
+
+Branch `main` (on `fork`). Jonah's call: make `Auto` the default, announce
+only when it deviates, and put the question to @dcastrop.
+
+**Default flipped.** `Api.the_solver_strategy` is `Auto`, and so is what
+`MeBi Config Reset` restores. `Nested` and `Mutual` still force either path
+exactly.
+
+**It reports only the deviation.** The `Notice` now fires **only** when
+`Auto` takes the mutual path — that is the departure from what the solver has
+always done, it changes the iteration count a checked-in `MeBi Sim Solve`
+bound was measured against, and where it matters it is the difference between
+finishing and not. Staying on the nested path is the status quo and says
+nothing (it logs at `Debug`). Across the six suites the notice fires exactly
+six times, once per `Proc/Test2` proof; `Proc/Test3` sets `MutualCofix True`
+explicitly so it is not `Auto` and stays quiet.
+
+**All 27 proofs still pass**, and the counts are now:
+
+| suite | strategy chosen | counts |
+| --- | --- | --- |
+| `Proc/Test1` | nested | 114 105 106 109 22 21 |
+| `Proc/Test2` | **mutual** | 112 112 112 84 112 84 |
+| `Proc/Test3` | mutual (explicit) | 1127 387 519 519 603 211 331 603 331 |
+| `CADP/Size1` | nested | 268 396 268 396 81 63 |
+
+`CLAUDE.md`'s verification baseline is updated to these 27 numbers, with the
+old 18 nested-path figures kept alongside for forcing `MutualCofix False`.
+The estimate costs nothing measurable: a full six-suite `make -j1` is 3m09s
+against 3m13s before the flip.
+
+**`Proc/Test2`'s bounds are deliberately left loose.** They are the
+nested-path figures (446, 278, 299, 194, 446, 182) while the proofs now close
+in 112/84. `MeBi Sim Solve N` only caps, so the file compiles either way —
+tightening them would break it under `MutualCofix False`. Recorded in
+`CLAUDE.md` so the mismatch does not read as staleness.
+
+**`Proc/Test3` keeps its explicit `MutualCofix True`.** `Auto` would choose
+the same thing, but the setting is left as a record of what the file depends
+on, and so it still works if the default changes. Its comment says so.
+
+**Raised with @dcastrop**, in `TODO.md` alongside the `paper/` and LICENSE
+items, and as **C8** in the backlog note. Three sub-decisions, none of them
+Claude's to make: whether `Auto` is the right default for a released tool
+given it can silently change a proof's iteration count; whether `Test2`'s
+loose bounds should be tightened; and whether `Test3` should keep its
+explicit setting.
+
+**On the bug from the previous entry** — yes, fixed and shipped in
+`b493e1d`, not merely reported. `Partition.get_bisimilar` no longer uses
+`find_first` with a non-monotonic predicate.
+
+**Verification.** Six proof suites, 27 of 27 `Solved` with the counts above.
+`dune exec test/tests.exe` 30/30, `test/satdiff.exe -- 200` matches its
+golden file, `make dune` and `dune build @fmt` clean.
+
+**Session tally:** Docs 1 · New feature 0 · Bug fix 0 · Refactor 0 ·
+Optimization 0 · **Tooling 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

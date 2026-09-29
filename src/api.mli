@@ -30,8 +30,8 @@ val reset_the_fail_flags : unit -> unit
 
 (** How the proof solver introduces its coinduction hypotheses: a fresh
     nested cofix per newly-seen pair, one mutual cofix over the whole
-    precomputed product, or [Auto] to measure both and pick. [Nested] by
-    default. *)
+    precomputed product, or [Auto] to measure both and pick. [Auto] by
+    default; it announces at [Notice] whenever it takes the mutual path. *)
 type solver_strategy =
   | Nested
   | Mutual

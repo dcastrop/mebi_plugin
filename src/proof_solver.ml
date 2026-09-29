@@ -233,15 +233,32 @@ let init
         let c = S.W.Model.Product.estimate fsm_a fsm_b pi (ra, rb) in
         let use_mutual = S.W.Model.Product.prefer_mutual c in
         Api.set_mutual_cofix use_mutual;
-        Logger.notice
-          (Printf.sprintf
-             "(Auto: %s -- %i pairs, %i moves, nested walk %s.)"
-             (if use_mutual then "mutual cofix" else "nested cofix")
-             c.pairs
-             c.moves
-             (match c.nested with
-              | Some n -> Printf.sprintf "%i" n
-              | None -> Printf.sprintf "over %i" (4 * (c.pairs + c.moves))))
+        (* Only the mutual path is announced. It is the deviation from what
+           the solver has always done, it changes the iteration count a
+           checked-in [MeBi Sim Solve] bound was measured against, and on a
+           product where it matters it is the difference between finishing and
+           not. Staying on the nested path is the status quo and says
+           nothing. *)
+        if use_mutual
+        then
+          Logger.notice
+            (Printf.sprintf
+               "(Auto: mutual cofix -- %i pairs, %i moves; a nested cofix \
+                would visit %s goals.)"
+               c.pairs
+               c.moves
+               (match c.nested with
+                | Some n -> Printf.sprintf "%i" n
+                | None -> Printf.sprintf "over %i" (4 * (c.pairs + c.moves))))
+        else
+          Logger.debug
+            (Printf.sprintf
+               "(Auto: nested cofix -- %i pairs, %i moves, nested walk %s.)"
+               c.pairs
+               c.moves
+               (match c.nested with
+                | Some n -> Printf.sprintf "%i" n
+                | None -> "capped"))
       | _ -> Api.set_mutual_cofix false));
   Solver.ProofState.init pstate (fst a, fst b);
   pstate

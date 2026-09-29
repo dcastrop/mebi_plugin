@@ -166,15 +166,18 @@ let set_the_weak_arg2 (x : weak_arg) : unit =
     - [Auto] measures both on the model, before any proof step runs, and
       picks -- see [Model.Product.estimate].
 
-    Defaults to [Nested]: that is what every checked-in [MeBi Sim Solve] bound
-    was measured against, and it costs nothing to compute. See
+    Defaults to [Auto], which is correct on every example in the repository
+    and better than either fixed strategy: it keeps the nested path's counts
+    where that path is cheaper, and takes the mutual one where the nested walk
+    would blow up. It says so, at [Notice], whenever it takes the mutual path,
+    since that is the deviation from what the solver historically did. See
     [ASSISTED-CHANGES.md], 2026-09-29, and backlog item B2. *)
 type solver_strategy =
   | Nested
   | Mutual
   | Auto
 
-let the_solver_strategy : solver_strategy ref = ref Nested
+let the_solver_strategy : solver_strategy ref = ref Auto
 
 (** What [the_solver_strategy] resolved to for the proof now being solved.
     [Auto] writes here once, in [Proof_solver.init]; the step machinery reads
@@ -189,7 +192,7 @@ let set_solver_strategy (x : solver_strategy) : unit =
 let set_mutual_cofix (x : bool) : unit = the_mutual_cofix := x
 
 let reset_mutual_cofix () : unit =
-  the_solver_strategy := Nested;
+  the_solver_strategy := Auto;
   the_mutual_cofix := false
 ;;
 

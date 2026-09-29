@@ -27,11 +27,16 @@ MeBi Divider "Examples.Bisimilarity.Proc.Test3.PluginProofs".
 
 MeBi Config Weak As Option label.
 
-(* One mutual cofix over the whole precomputed product relation, instead of a
-   fresh nested cofix per newly-seen pair. Without it this file does not
-   finish: [wsim_pq] exhausted [Solve 100000] and [wsim_p3] was recorded as
-   unfinished after 500000 and crashing at 1000000. See ASSISTED-CHANGES.md,
-   2026-09-29, and backlog item B2. *)
+(* This file needs one mutual cofix over the whole precomputed product
+   relation, instead of a fresh nested cofix per newly-seen pair. Without it
+   it does not finish: [wsim_pq] exhausted [Solve 100000] and [wsim_p3] was
+   recorded as unfinished after 500000 and crashing at 1000000.
+
+   The default strategy is [Auto], which measures both on the model before
+   the proof starts and takes the mutual path here on its own -- it says so
+   at Notice. The setting below is left explicit so the file still works if
+   someone changes that default, and as a record of what it depends on. See
+   ASSISTED-CHANGES.md, 2026-09-29, and backlog item B2. *)
 MeBi Config Solver MutualCofix True.
 
 Require Import Logic.
