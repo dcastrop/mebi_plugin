@@ -515,6 +515,36 @@ struct
         match xopt with
         | None -> Some (grade, y) |> return
         | Some (n, x) ->
+          (* Ties on [grade] go to the LATER hypothesis, and that is load
+             bearing. [invertibility] grades on shape -- whether the label and
+             goto positions hold a local variable -- so in a layered LTS a
+             whole chain of transitions grades identically:
+
+             H  : compLTS (cpar (cprc X) R) a (cpar (cprc Y) R)
+             H1 : termLTS X a Y
+             H4 : compLTS (cprc X) a (cprc Y)
+
+             all score 3, this keeps the last and so picks [H4], whose
+             inversion yields [termLTS X a Y] -- which is [H1] again. The goal
+             does not move and the context gains a duplicate; the next step
+             makes progress only because that duplicate sorts last and gets
+             picked instead. Steps whose goal is unchanged and whose only new
+             hypothesis is an exact duplicate were measured at 2.6% (Test1),
+             2.7-4.3% (Test2), 4.9% and 14.1% (CADP/Size1) and 12.0%
+             (Proc/Test3) of all steps.
+
+             Breaking ties toward the SMALLER hypothesis instead -- the
+             innermost transition, the one whose inversion actually determines
+             the label and destination -- was tried on 2026-09-29 and
+             REVERTED. It left 16 of the 18 baseline counts byte-identical,
+             but turned [wsim_lts] and [wsim_lts_bigstep], both 396
+             iterations, into proofs that had not closed after 5000
+             iterations, 10 minutes and 1.4GB. Which hypothesis gets inverted
+             steers the whole downstream path and the search has no plan to
+             fall back on, so a local improvement here can flip a proof from
+             converging to diverging. Do not change this tie-break without
+             running all five cheap suites. See ASSISTED-CHANGES.md,
+             2026-09-29. *)
           (match Int.compare grade n with
            | -1 -> Some (n, x) |> return
            | _ -> Some (grade, y) |> return)

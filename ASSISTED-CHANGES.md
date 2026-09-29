@@ -2158,6 +2158,68 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-29 — Step 0 attempted and REVERTED: the inversion tie-break is load bearing
+
+Branch `main` (on `fork`). Net change: a comment in
+`src/proof_solver_step.ml` recording the experiment. The code is as it was.
+
+**What was tried.** The sterile re-inversions found in the previous entry
+come from `Hyps.try_invert_any`'s fold breaking grade ties toward the *last*
+candidate. `Hyp.invertibility` grades on shape, so a whole chain of
+transitions grades identically — `H : compLTS (cpar (cprc X) R) a (...)`,
+`H1 : termLTS X a Y` and `H4 : compLTS (cprc X) a (cprc Y)` all score 3 — and
+taking the last picks `H4`, whose inversion reproduces `H1`. The fix tried
+was to break ties toward the **smaller** hypothesis: the innermost
+transition is the one whose inversion determines the label and destination.
+Implemented as a `type_size` on `Hyp` plus a two-key comparison, with `<=`
+so an exact tie on both keys still kept the later hypothesis.
+
+**Result: 16 of 18 byte-identical, 2 catastrophic.** All five cheap suites
+were rebuilt. The iteration counts came back as the exact baseline —
+`21 22 63 81 105 106 109 114 182 194 268 268 278 299 396 396 446 446` — but
+**two of them were now `Unsolved`**: `wsim_lts` in
+`CADP/Size1/Glued/PluginProofs.v` and `wsim_lts_bigstep` in
+`CADP/Size1/MutualExclusion/PluginProofs.v`, both `MeBi Sim Solve 395`,
+both reporting `Unsolved after 396` where they had reported `Solved after
+396`. Raising the bound to 5000 to find the real cost: `wsim_lts_bigstep`
+had **not closed after 10 minutes and 1.4GB** and was killed. A 396-iteration
+proof became one that does not finish.
+
+**Reverted**, and the baseline re-verified after the revert: 18 of 18
+`Solved`, counts identical.
+
+**What this says, and it is not a small thing.** Which hypothesis gets
+inverted steers the entire downstream path, and the search has no plan to
+fall back on when a local heuristic sends it somewhere else. A change that
+is locally strictly better — it provably removes work that produces nothing
+— flips two proofs from converging to diverging. The 12-14% of sterile steps
+is real and still worth recovering, but it cannot be recovered by making the
+local choice smarter while the search remains an unplanned depth-first walk.
+
+No conservative variant exists either. Keeping the choice and merely dropping
+the duplicate afterwards does not work: the next step would re-make the same
+choice on the same context, so the solver loops forever. Any fix must change
+which hypothesis is inverted, and that is exactly what proved unsafe.
+
+**So Step 0 is parked behind Steps 1 and 2**, not abandoned. Once the product
+relation is computed up front, the solver knows which response it is looking
+for, and the inversion order stops being able to decide whether a proof
+converges. That is the point at which this becomes safe to revisit — and it
+is one more argument for the root cause identified in the previous entry.
+
+The reasoning, the measurements and the warning are now a comment on the
+tie-break itself, so the next person to look at that fold finds out before
+trying it rather than after.
+
+**Verification.** `make -j$(nproc)` with all five cheap suites enabled: 18 of
+18 `Solved`, counts matching the baseline exactly. `make dune` clean,
+`dune exec test/tests.exe` 11/11, `dune build @fmt` clean.
+
+**Session tally:** Docs 1 · Bug fix 0 · Optimization 0 · Tooling 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
