@@ -18,11 +18,32 @@ jobs:
       # The opam switch is pinned by rocq-mebi.opam.locked (~100 packages,
       # including OCaml and Rocq built from source) and does not change
       # unless that file does -- cache it so most runs skip the rebuild.
-      - name: Cache opam switch
+      # Both halves matter: _opam is the local switch, ~/.opam is the opam
+      # root holding the repository metadata. Caching only the former left
+      # the root missing, and every opam invocation then failed with
+      # "Opam has not been initialised".
+      - name: Cache opam switch and root
         uses: actions/cache@v4
         with:
-          path: _opam
+          path: |
+            _opam
+            ~/.opam
           key: opam-${{ runner.os }}-${{ hashFiles('rocq-mebi.opam.locked') }}
+
+      # opam switch create needs an initialised root, which a fresh runner
+      # does not have -- without this the build failed with
+      # "[ERROR] Opam has not been initialised, please run `opam init'"
+      # (exit 50). --bare creates the root without a default switch, since
+      # the switch we want is the local one created below. Sandboxing is
+      # disabled because opam's bubblewrap sandbox does not work reliably
+      # inside the nix shell, and the runner is already isolated.
+      - name: Initialise opam root
+        run: |
+          nix develop --command bash -euc '
+            if [ ! -d "$HOME/.opam" ]; then
+              opam init --bare --no-setup --disable-sandboxing --yes
+            fi
+          '
 
       - name: Bootstrap opam switch
         run: |
