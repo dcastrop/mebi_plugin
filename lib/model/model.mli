@@ -96,6 +96,22 @@ module type S = sig
     with type states = State.Set.t
      and type partition = Partition.t
      and type fsm = FSM.t
+
+  (** {2 Product} *)
+
+  (** {!Product} provides {!val:Product.respond}: the simulation game's
+      response choice, i.e. which state the right-hand FSM must move to when
+      the left-hand one has made a labelled move. This is the decision the
+      proof solver takes at every step; it lives here because it is pure
+      model code, and because everything that needs it must {b call} it
+      rather than reproduce it. *)
+  module Product :
+    Product.S
+    with type state = State.t
+     and type states = State.Set.t
+     and type label = Label.t
+     and type transition = Transition.t
+     and type fsm = FSM.t
 end
 
 (** Builds a model from a term's [base] representation, plus a source of constructor-bindings used for the proof solver.

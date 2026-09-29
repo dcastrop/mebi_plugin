@@ -23,6 +23,7 @@
  (modules
   minimization
   bisimilarity
+  product
   ; similarity
   )
  (wrapped false))

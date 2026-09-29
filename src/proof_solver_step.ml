@@ -625,6 +625,18 @@ struct
 
   exception CouldNotFindGotoState
 
+  (** [try_get_visible_transition bisimilar tys] resolves the goal's own terms
+      to a state and a label, and then asks {!Model.Product.respond} which
+      transition FSM "b" must make in reply.
+
+      The choice itself used to be inline here. It is pure model code -- it
+      reads only the FSM, the state, the label and the bisimilar set -- and
+      having it inline meant it could only run one proof step at a time and
+      could not be tested without a Rocq runtime. It now lives in
+      [lib/model/algorithms/product.ml] so that anything else needing the same
+      decision {b calls} it rather than reproducing it; the tie-breaks run
+      through [Action.Pair.Set]'s own ordering, and a re-implementation
+      measurably disagrees. See [ASSISTED-CHANGES.md], 2026-09-29. *)
   let try_get_visible_transition
         ?(saturated : bool = false)
         (bisimilar : Model.State.Set.t)
@@ -635,25 +647,8 @@ struct
     let m : Model.FSM.t = W.get_fsm_b ~saturated () in
     let from : Model.State.t = M.run (ReModel.state tys.(3) m.states) in
     let label : Model.Label.t = M.run (ReModel.label tys.(5) m.alphabet) in
-    try
-      let ({ annotation; trees; _ }, destinations) : Model.Action.Pair.t =
-        (* NOTE: get actions [from] with [label] *)
-        Model.Action.Map.reduce_by_label (Model.EdgeMap.find m.edges from) label
-        |> Model.Action.Map.to_actionpairs
-        (* NOTE: keep only those that are [bisimilar] *)
-        |> Model.Action.Pair.Set.filter_map
-             (fun ((x, y) : Model.Action.Pair.t) ->
-             if Model.State.Set.disjoint bisimilar y
-             then None
-             else Some (x, Model.State.Set.inter bisimilar y))
-        (* NOTE: get the pair with the shortest annotation (less steps to do) *)
-        |> Model.Action.Pair.Set.shortest_annotation
-      in
-      let tree : Enc.Tree.t option = Enc.Trees.min_opt trees in
-      let goto : Model.State.t = Model.State.Set.min_elt destinations in
-      { from; goto; label; annotation; tree }
-    with
-    | Model.Action.Pair.Set.IsEmpty -> raise CouldNotFindGotoState
+    try Model.Product.respond m from label bisimilar with
+    | Model.Product.NoBisimilarResponse _ -> raise CouldNotFindGotoState
   ;;
 
   exception MisMatchedStates of (Model.State.t * Model.State.t)

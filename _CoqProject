@@ -161,6 +161,8 @@ lib/model/algorithms/minimization.ml
 lib/model/algorithms/minimization.mli
 lib/model/algorithms/bisimilarity.ml
 lib/model/algorithms/bisimilarity.mli
+lib/model/algorithms/product.ml
+lib/model/algorithms/product.mli
 
 lib/model/model.ml
 lib/model/model.mli

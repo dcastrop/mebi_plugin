@@ -50,6 +50,14 @@ module type S = sig
     with type states = State.Set.t
      and type partition = Partition.t
      and type fsm = FSM.t
+
+  module Product :
+    Product.S
+    with type state = State.t
+     and type states = State.Set.t
+     and type label = Label.t
+     and type transition = Transition.t
+     and type fsm = FSM.t
 end
 
 module Make (Base : Base_term.S) (ConstructorBindings : Json.S) = struct
@@ -62,4 +70,5 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) = struct
   module FSM = FSM.Make (C) (LTS) (Saturation)
   module Minimization = Minimization.Make (C) (FSM)
   module Bisimilarity = Bisimilarity.Make (C) (FSM) (Minimization)
+  module Product = Product.Make (Base) (C) (FSM)
 end
