@@ -2318,6 +2318,129 @@ Optimization 0 · **Tooling 0.**
 
 ---
 
+## 2026-09-29 — B2 fixed: one mutual cofix over the precomputed product
+
+Branch `main` (on `fork`). Three commits: the two preliminaries, an
+ocamlformat pass, and the fix. This closes backlog item **B2**.
+
+### Falsification first
+
+The plan's own cheapest kill-shot was run before any plugin code: does Rocq's
+guard checker accept a large mutual cofix where branches close with *each
+other's* hypotheses? A generated cycle over the real
+`weak_sim`/`In_sim`/`Pack_sim` compiles and `Qed`s at **10, 50 and 200**
+branches — 1s at 50, 24s at 200. Superlinear, irrelevant at the sizes in
+play (16 to 44).
+
+### P1 — the cross-check, redone on encodings
+
+Step 2's cross-check compared *printed terms*, which is why CADP appeared to
+be 6 pairs short. Printed terms carry the goal's spelling; the plugin's
+canonical identity is the encoding. Redone as
+`(ReModel.state tys.(5), ReModel.state tys.(6))` against
+`Product.reachable`'s `Pair.Set`:
+
+- **zero** goals failed to resolve, on all 18 proofs;
+- **zero misses** — every pair the solver visits is predicted;
+- 16 of 18 match exactly; 2 over-predict by 4.
+
+The gate was zero misses, because a miss means a goal with no hypothesis.
+It held. The earlier +6 was an artifact of my own diff, not of the model.
+
+### P2 and P3 — landed separately, each at 18 of 18 with identical counts
+
+`can_solve_concl_cofix` now returns the matching hypothesis and the caller
+closes with a new `Tacs.exact_hyp`, instead of letting `trivial` find it
+again by hint search — fine for one hypothesis per branch, neither cheap nor
+predictable with the whole relation in scope. And `handle_weaksim` now runs
+`Concl.try_unfold_any` to exhaustion *before* consulting the cofixes: the
+unfolding used to sit inside `handle_new_cofix`, harmless while every
+hypothesis was minted from the goal itself, but not once the hypotheses are
+built ahead of time from decoded model states and `Concl.eq` is syntactic.
+
+### The fix
+
+`MeBi Config Solver MutualCofix True` (new; off by default) makes
+`handle_new_proof` enter a new `OpenBlock` state, which normalises the
+conclusion, resolves the goal's own pair, computes
+`Model.Product.reachable`, and emits
+
+```
+mutual_cofix Cofix0 [(Cofix1, ty1); ...]
+  <*> all_goals (In_sim; Pack_sim; intros)
+```
+
+as **one** tactic. The second half is not optional: straight after
+`mutual_cofix` every block goal is syntactically its own hypothesis, so a
+`handle_weaksim` running in between would close each with an unguarded
+`exact` and `Qed` would reject the proof — the hazard confirmed on the
+2-state probe. With the block open, `handle_new_cofix` is unreachable and a
+pair outside the product raises `PairNotInProduct` naming it, rather than
+leaving a stuck goal.
+
+### Result
+
+**`examples/Bisimilarity/Proc/Test3/PluginProofs.v` compiles**, in 17.7s:
+
+| proof | pairs | iterations | before |
+| --- | --- | --- | --- |
+| `wsim_p3` | 42 | **1127** | unfinished after 500000, crashed on 1000000 |
+| `wsim_pq` | 16 | **387** | `Unsolved after 100001` |
+| `wsim_qp` / `wsim_qr` | 18 | 519 | never run |
+| `wsim_rq` / `wsim_rs` | 24 | 603 | never run |
+| `wsim_pr` | 8 | 211 | never run |
+| `wsim_rp` / `wsim_sr` | 12 | 331 | never run |
+
+`_CoqProject`'s `### TODO: proof explosion` is now `### Success`, and
+`wsim_p3` — commented out since it was written, with the note "unfinished
+after 500000, crashed on 1000000" — is uncommented and `Qed`s.
+
+Across the five cheap suites, aligned per proof:
+
+| suite | nested | mutual |
+| --- | --- | --- |
+| `Proc/Test1` ×4 | 114 105 106 109 | unchanged |
+| `Proc/Test1` ×2 | 22, 21 | **69, 63** |
+| `Proc/Test2` ×6 | 446 278 299 194 446 182 | **112 112 112 84 112 84** |
+| `CADP/Size1` ×6 | 268 396 268 396 81 63 | unchanged |
+
+**3794 → 2654 iterations, −30% overall.**
+
+### The one regression, and it is understood
+
+The two `Proc/Test1` proofs that got worse are exactly the two where
+`Product.reachable` over-predicts — 8 pairs against the 4 the solver visits,
+and 7 against 3. A surplus pair is a surplus goal that still has to be
+proved, and on proofs of 22 and 21 iterations four extra goals cost 47 and
+42. Diagnosed, not fixed. It is bounded (surplus is cost, never failure, and
+P1's gate keeps misses at zero) and it is the last open thread on B2.
+
+### What is still open
+
+- The over-prediction above. `successors` enumerates obligations from the
+  unsaturated FSM; the solver evidently discharges fewer on those two
+  proofs. Worth a look, but it is a constant-factor tidy-up, not a blocker.
+- **Step 0 is now safe to retry.** The sterile re-inversions (2.6% of steps
+  on `Test1`, 12.0% on `Test3`, 14.1% on CADP) could not be recovered while
+  the search had no plan to fall back on — breaking the inversion tie-break
+  turned two 396-iteration proofs into non-terminating ones. With the
+  relation known up front, inversion order can no longer decide whether a
+  proof converges. Every number above is measured *with* the sterile steps
+  still in, so they are all understated.
+- Whether the flag should become the default. That is a decision about the
+  checked-in bounds, and belongs with @dcastrop.
+- `Test4` remains blocked on **extraction** (B3), untouched by this.
+
+**Verification.** Flag off: all five cheap suites, 18 of 18 `Solved`, counts
+byte-identical to the baseline, zero mutual-cofix activations. Flag on: 18 of
+18 `Solved` with the counts above, plus `Proc/Test3`'s nine. `dune exec
+test/tests.exe` 19/19, `make dune` clean, `dune build @fmt` clean.
+
+**Session tally:** New feature 1 · Refactor 1 · Docs 1 · Bug fix 0 ·
+Optimization 0 · **Tooling 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
