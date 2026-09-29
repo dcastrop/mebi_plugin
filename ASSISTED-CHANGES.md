@@ -1738,6 +1738,128 @@ Refactor 0 · **New feature 0.**
 
 ---
 
+## 2026-09-29 — Feasibility of the mutual-cofix fix for B2
+
+Branch `main` (on `fork`). No code change; instrumentation and a throwaway
+Rocq probe, both reverted. Answers the question the previous entry flagged
+before writing anything: is `FixTactics.mutual_cofix` implementable against
+the step machinery, and is it the right fix?
+
+**Q1. Does the step machinery cope with many goals?** Yes, and it already
+does. `Declare.Proof.by` is `Proof.solve env (Goal_select.select_nth 1)`
+(`vernac/declare.ml:2173`), so the `Proofview.Goal.enter` in
+`Proof_solver.step` always sees exactly one focused goal — goal 1 — no matter
+how many are open. Logging `List.length (Proof.data ...).goals` at the top of
+`step` shows the proof routinely carrying **15 to 33 open goals**, peaking at
+33, across `Test1` and `Test3`:
+
+| open goals | 1–11 | 12–16 | 17–23 | 24–33 |
+| --- | --- | --- | --- | --- |
+| steps | 195 | 811 | 3,130 | 942 |
+
+Rocq's goal list is the solver's work stack and the global mutable
+`ProofState.StateM` is the continuation for whichever goal is currently
+first. N sibling goals from a mutual cofix is therefore not a new regime.
+
+*(An earlier reading that some iterations ran `handle_state` twice for two
+goals was wrong: those 2,444 double-logs are `step ()`'s own `ExitWeakSim`
+tail call re-entering `handle_state` on the same goal.)*
+
+**Q2. Is there a multi-goal hazard?** Yes — one, and it is sharp. After
+`mutual_cofix`, every goal in the block is *syntactically identical to its
+own hypothesis*. `handle_weaksim` consults `Hyps.can_solve_concl_cofix ()`
+before anything else, so on each freshly-opened block goal it would find
+`Cofix_i` and close the goal with `exact Cofix_i` — unguarded. Nested
+`cofix` never exposes this because `handle_new_cofix` applies
+`In_sim`/`Pack_sim`/`intros` in the same chained tactic, so the bare goal is
+never observed. Both halves were checked in Rocq directly
+(`theories/MutualCofixProbe.v`, a 2-state cycle — the smallest product graph
+needing a *sibling* rather than an *ancestor* hypothesis):
+
+- a mutual cofix in which each branch closes with the **other** branch's
+  hypothesis compiles and **`Qed` succeeds** — the guard checker accepts
+  exactly the proof shape this fix would build;
+- the same proof with one branch closed by bare `exact CB` needs
+  `Fail Qed.` to compile — the hazard is real, and it fails loudly at `Qed`
+  rather than silently.
+
+The fix is confined and does not require making `StateM` per-goal: emit
+`mutual_cofix` and the `In_sim`/`Pack_sim`/`intros` for every block goal as
+**one** tactic, with `Proofview.tclALLGOALS` for the second part. `select_nth
+1` focuses before the tactic runs and does not constrain the goals the
+tactic itself creates.
+
+**Q3. Can the cofix types be built?** Yes. `FixTactics.mutual_cofix : Id.t ->
+(Id.t * constr) list -> unit Proofview.tactic` needs a `weak_sim ltsA ltsB a
+b` per pair; `Decoder.state : state -> EConstr.t` goes through
+`Bi_encoding`'s `bck` map, which stores the original `EConstr.t` that was
+encoded, so it returns the very term the goal will contain. A1's measurement
+de-risks the cross-`sigma` question for free: all 2,720 terms `ReModel`
+resolves are `evar=0 univ=0 var=0`, i.e. closed and ground, so a term decoded
+under the command-time `sigma` is safe to inject into a proof goal.
+
+**Q4. Which pairs?** This is where the design is actually decided, and the
+obvious choice is the wrong one. Two candidates:
+
+- *all bisimilar pairs* (`a ∈ A`, `b ∈ B`, same partition block) — needs no
+  replay of the solver's choice function, so nothing can drift out of sync;
+- *pairs reachable in the product from the root* — needs a BFS mirroring
+  `try_get_visible_transition`.
+
+Dumping the FSMs and partition settles it. `Proc/Test3`'s `wsim_pq`: A has 8
+states, B has 18, and the partition is a **single block containing all 26**,
+so all-bisimilar is 144 pairs against the 17 the search actually visits.
+`CADP/Size1/MutualExclusion`'s `wsim_bigstep_lts`: A has 10 states, B has 33,
+two blocks (29 and 4), about **240** bisimilar pairs — against a proof that
+currently closes in **268 iterations total**. The superset would make that
+example dramatically *worse*. So the pair set must be the reachable product,
+computed by a BFS in `lib/model` over the saturated FSMs.
+
+**Q5. What would it do to the examples that already pass?** Re-measured with
+the cofix logging, and this is the most important result of the session:
+
+| proof | iterations | pairs | closed on ancestor | re-explored |
+| --- | --- | --- | --- | --- |
+| `Test1/wsim_pq` | 114 | 13 | 6 | 0 |
+| `Test2/wsim_pq` | 446 | 10 | 29 | 32 |
+| `Test2/wsim_rp` | 182 | 8 | 13 | 10 |
+| `CADP/Size1/ME` `wsim_bigstep_lts` | 268 | 19 | 1 | **0** |
+| `CADP/Size1/ME` `wsim_lts_bigstep` | 396 | 50 | 1 | **0** |
+| `Proc/Test3/wsim_pq` | >100,000 | 17 | 1,623 | 806 and rising |
+
+The CADP proofs re-explore **nothing** — their reachable product is a tree,
+and they close exactly one goal by coinduction in several hundred
+iterations. Only `Test2` and `Test3` re-explore at all. So the fix is not a
+general speed-up: it is targeted at product graphs that are not trees, and on
+the tree-shaped ones its only effect is to split one goal into N and add one
+cheap closure per product edge. Those counts would move a little (up, not
+down, on CADP), `Test2`'s would fall, and `Test3` would go from
+non-terminating to roughly the low hundreds. The 18-number baseline needs
+regenerating either way.
+
+**Recommendation.** The fix is feasible and correctly targeted, and the
+multi-goal question is not a blocker. The remaining work is genuinely in
+`lib/model` — a reachable-product BFS mirroring the solver's own choice
+function — plus a single new tactic in `proof_solver_tactics`. It is still
+net-new machinery and still wants a decision before it is written.
+
+**Incidental, found while dumping and not fixed:** `MeBi Config Output
+"DumpResults" True` aborts the whole `.v` file with a `System error` unless
+`_dumps/` already exists, because `Utils.FileWriter.create_parent_dir fn`
+creates `Filename.dirname fn` and is called with the directory itself
+(`"./_dumps/"`, whose dirname is `"."`). And every dump filename's month is
+one low (`2026 08 29` on 2026-09-29): `get_local_timestamp` prints `Unix`'s
+0-based `tm_mon` without adding 1. Both are two-line fixes.
+
+**Verification.** All instrumentation and probes reverted; `git status`
+clean, `make dune` clean, `dune exec test/tests.exe` 11/11. No source
+changed, so no baseline run was needed.
+
+**Session tally:** Docs 1 · Optimization 0 · Bug fix 0 · Tooling 0 ·
+Refactor 0 · **New feature 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
