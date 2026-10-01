@@ -3574,6 +3574,36 @@ topic. README: the "disabled" note is replaced by a Help section.
 **Session tally (2026-10-01, this session, cumulative):** New feature 3 ·
 Bug fix 7 · Optimization 2 · Tooling 5 · Docs 2 · Refactor 1.
 
+## 2026-10-01 — F: `lib/model` docs; the bisimilarity check stops saturating twice
+
+Branch `main` (on `fork`).
+
+- **Docs.** `Bisimilarity` and `Minimization` had the fewest doc comments
+  among `lib/model`'s interfaces (7 values each, 2-4 comments); both are
+  now documented. The others were already covered. `odoc` is not installed
+  in the switch, and installing it changes the dev environment, so I did not
+  do it unasked. The comments were checked by reading, not by rendering,
+  and `make` (which rejects ambiguous doc comments, warning 50) builds.
+- **Optimization**, found while documenting. `Bisimilarity.fsm` saturates
+  both FSMs, merges them, then called `Minimization.fsm`, which **saturated
+  the merged, already-saturated FSM again**. That pass rebuilt every weak
+  action of both FSMs, roughly doubling the check's saturation memory, and
+  H2's guard does not cover it. The merged FSM has no silent edges left, so
+  the second pass reproduces the same `(from, label, goto)` structure, and
+  the partition reads only that. It now calls `partition_states` directly.
+  Proof suite: 27 counts unchanged (the solver reads this partition);
+  `tests.exe` 61/61.
+- **Not done: CADP "no starvation".** `_no_starvation.v` is unfinished
+  research content: a fairness heuristic (a process "recently" or
+  "routinely" starves) whose intended formulation is in the draft paper. No
+  starvation is a liveness property, and the plugin checks (weak)
+  simulation/bisimilarity, which does not capture liveness without a spec
+  LTS that encodes fairness. Deciding what the property *is* belongs to the
+  authors, so it is left for the user / @dcastrop.
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 3 ·
+Bug fix 7 · Optimization 3 · Tooling 5 · Docs 3 · Refactor 1.
+
 ---
 
 ## Outstanding

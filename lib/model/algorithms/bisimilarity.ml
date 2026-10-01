@@ -179,7 +179,12 @@ module Make
     let fsm_a : FSMPair.t = FSMPair.get a in
     let fsm_b : FSMPair.t = FSMPair.get b in
     let merged : FSM.t = FSM.merge fsm_a.saturated fsm_b.saturated in
-    let pi : Partition.t = (Minimization.fsm merged).pi in
+    (* [merged] is already saturated, so partition it as it is.
+       [Minimization.fsm] would saturate it again -- a pass that rebuilds
+       every weak action of both FSMs (the merged FSM has no silent edges
+       left, so it reproduces the same structure, and the partition only
+       reads that), roughly doubling the check's saturation memory. *)
+    let pi : Partition.t = Minimization.partition_states merged in
     let result = Result.split pi fsm_a.original.states fsm_b.original.states in
     { fsm_a; fsm_b; merged; result }
   ;;
