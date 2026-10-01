@@ -293,10 +293,22 @@ VERNAC COMMAND EXTEND MeBi_Config_Output CLASSIFIED AS QUERY
   { Api.set_output false x }
 END
 
-(* VERNAC COMMAND EXTEND MeBi_Help CLASSIFIED AS QUERY
-(* TODO: update me *)
-| ["MeBi" "Help"] -> {Logger.show "TODO: Update Mebi_help"}
-END  *)
+(* Help -- topics and text in [src/help.ml] *)
+VERNAC COMMAND EXTEND MeBi_Help CLASSIFIED AS QUERY
+| ["MeBi" "Help"] -> { Help.show [] }
+| ["MeBi" "Help" "Run"] -> { Help.show [ "Run" ] }
+| ["MeBi" "Help" "Sim"] -> { Help.show [ "Sim" ] }
+| ["MeBi" "Help" "Benchmark"] -> { Help.show [ "Benchmark" ] }
+| ["MeBi" "Help" "Premises"] -> { Help.show [ "Premises" ] }
+| ["MeBi" "Help" "Config"] -> { Help.show [ "Config" ] }
+| ["MeBi" "Help" "Config" "Bounds"] -> { Help.show [ "Config"; "Bounds" ] }
+| ["MeBi" "Help" "Config" "Bounds" "Saturation"] ->
+  { Help.show [ "Config"; "Bounds"; "Saturation" ] }
+| ["MeBi" "Help" "Config" "Weak"] -> { Help.show [ "Config"; "Weak" ] }
+| ["MeBi" "Help" "Config" "FailIf"] -> { Help.show [ "Config"; "FailIf" ] }
+| ["MeBi" "Help" "Config" "Solver"] -> { Help.show [ "Config"; "Solver" ] }
+| ["MeBi" "Help" "Config" "Output"] -> { Help.show [ "Config"; "Output" ] }
+END
 
 VERNAC COMMAND EXTEND MeBi_Divider CLASSIFIED AS QUERY
 (* for outputting messages -- useful for sifting through compiler output *)

@@ -128,6 +128,22 @@ let default_saturation_bound : int = 1_000_000
 
 let the_saturation_bound : int ref = ref default_saturation_bound
 
+(** Heap per weak action of a saturated FSM, measured 2026-10-01 on
+    Rocq-extracted examples: ~450 bytes on partial [Proc/Test4] LTSs (251 to
+    1001 states), 550 to 860 bytes on partial [CADP/Size2] ones (500 to 2000
+    states) -- each weak action carries its shortest witness path, which
+    grows with the LTS. {i See [Wrapper.check_saturation_size].} *)
+let bytes_per_weak_action : int * int = 450, 900
+
+let human_bytes (b : int) : string =
+  let f : float = Float.of_int b in
+  if f >= 1e9
+  then Printf.sprintf "%.1fGB" (f /. 1e9)
+  else if f >= 1e6
+  then Printf.sprintf "%.0fMB" (f /. 1e6)
+  else Printf.sprintf "%.0fKB" (f /. 1e3)
+;;
+
 let reset_bounds_args () : unit =
   the_bounds_args := default_bounds;
   the_saturation_bound := default_saturation_bound

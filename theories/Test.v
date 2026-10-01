@@ -965,3 +965,18 @@ Module TwoPremises.
     MeBi Sim Solve 100. Qed.
   MeBi Config Reset Weak.
 End TwoPremises.
+
+(* [MeBi Help]: every topic parses and prints (backlog item F). *)
+MeBi Divider "Theories.Test.Help".
+MeBi Help.
+MeBi Help Run.
+MeBi Help Sim.
+MeBi Help Benchmark.
+MeBi Help Premises.
+MeBi Help Config.
+MeBi Help Config Bounds.
+MeBi Help Config Bounds Saturation.
+MeBi Help Config Weak.
+MeBi Help Config FailIf.
+MeBi Help Config Solver.
+MeBi Help Config Output.

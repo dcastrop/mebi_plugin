@@ -261,22 +261,6 @@ module Make (Enc : Encoding.S) :
     else ()
   ;;
 
-  (** Heap per weak action of a saturated FSM, measured 2026-10-01 on
-      Rocq-extracted examples: ~450 bytes on partial [Proc/Test4] LTSs (251 to
-      1001 states), 550 to 860 bytes on partial [CADP/Size2] ones (500 to 2000
-      states) -- each weak action carries its shortest witness path, which
-      grows with the LTS. {i See [check_saturation_size].} *)
-  let bytes_per_weak_action : int * int = 450, 900
-
-  let human_bytes (b : int) : string =
-    let f : float = Float.of_int b in
-    if f >= 1e9
-    then Printf.sprintf "%.1fGB" (f /. 1e9)
-    else if f >= 1e6
-    then Printf.sprintf "%.0fMB" (f /. 1e6)
-    else Printf.sprintf "%.0fKB" (f /. 1e3)
-  ;;
-
   (** Guards every saturation: computes, without saturating, how many weak
       actions saturating [x] would produce ({!Model.SaturationEstimate}), and
       refuses past [Api.the_saturation_bound] -- or, with [MeBi Config FailIf Oversaturated False], warns and carries on. Saturating [Proc/Test4]
@@ -293,7 +277,7 @@ module Make (Enc : Encoding.S) :
            name
            (Model.SaturationEstimate.to_string e));
       let bound : int = !Api.the_saturation_bound in
-      let lo, hi = bytes_per_weak_action in
+      let lo, hi = Api.bytes_per_weak_action in
       if e.weak > bound
       then (
         let msg : string =
@@ -307,8 +291,8 @@ module Make (Enc : Encoding.S) :
             name
             (Model.SaturationEstimate.to_string e)
             bound
-            (human_bytes (e.weak * lo))
-            (human_bytes (e.weak * hi))
+            (Api.human_bytes (e.weak * lo))
+            (Api.human_bytes (e.weak * hi))
             lo
             hi
         in

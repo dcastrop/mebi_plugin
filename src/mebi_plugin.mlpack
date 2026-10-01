@@ -53,5 +53,6 @@ Proof_solver_wrapper
 Proof_solver_tactics
 Proof_solver_step
 Proof_solver
+Help
 Rocq_output
 G_mebi

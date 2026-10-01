@@ -216,7 +216,14 @@ MeBi Divider "<text>".
 
 Print a message/debug line, or a visual divider (with an optional label) — useful for finding your place in a large build log.
 
-> `MeBi Help` is declared in `src/g_mebi.mlg` but currently disabled (it prints a placeholder message); there is no in-plugin help text yet.
+### Help
+
+```
+MeBi Help.
+MeBi Help <topic>.
+```
+
+`MeBi Help` lists the topics: `Run`, `Sim`, `Benchmark`, `Premises`, `Config`, and `Config Bounds`, `Config Bounds Saturation`, `Config Weak`, `Config FailIf`, `Config Solver`, `Config Output`. `MeBi Help Config Bounds Saturation` gives the memory guidance above, computed from the same measured figures the plugin's errors and notices use.
 
 
 

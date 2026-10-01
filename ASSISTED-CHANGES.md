@@ -3544,6 +3544,36 @@ user's earlier decision.
 
 **Session tally (2026-10-01, this session, cumulative):** unchanged.
 
+## 2026-10-01 — F: a working `MeBi Help`
+
+Branch `main` (on `fork`). **New feature** (flagged before writing; asked
+for by the user, who also asked that `MeBi Help Config Bounds Saturation`
+carry the memory guidance). Backlog item F.
+
+`MeBi Help` was a commented-out placeholder; the older implementation was
+deleted on 2026-09-27 as it no longer matched the command syntax. New
+`src/help.ml`: `MeBi Help` lists the topics, and `MeBi Help <topic>` covers
+`Run`, `Sim`, `Benchmark`, `Premises` (supported constructor shapes, from
+I2), `Config`, and `Config Bounds`, `Config Bounds Saturation`,
+`Config Weak`, `Config FailIf`, `Config Solver`, `Config Output`. Each
+topic has an explicit grammar rule, like the rest of `g_mebi.mlg`, so
+there is no free-form parsing. The topic structure was my choice; the user
+had left it open.
+
+The memory figures are **computed from the same constants** the plugin's
+error and notice use, so help and behaviour cannot drift.
+`bytes_per_weak_action` and `human_bytes` moved from `Wrapper` to `Api`,
+next to `mb_per_extracted_state`, to make that possible. `Config Bounds
+Saturation` prints the bound-vs-memory table (1M → 450MB-900MB (default)
+… 20M → 9-18GB) and the time caveat.
+
+New module: `_CoqProject`, `mebi_plugin.mlpack` and `src/dune` updated;
+`check_module_lists.py` agrees (58 modules). `theories/Test.v` runs every
+topic. README: the "disabled" note is replaced by a Help section.
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 3 ·
+Bug fix 7 · Optimization 2 · Tooling 5 · Docs 2 · Refactor 1.
+
 ---
 
 ## Outstanding

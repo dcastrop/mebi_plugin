@@ -65,6 +65,14 @@ val default_saturation_bound : int
 val the_saturation_bound : int ref
 val set_saturation_bound : int -> unit
 
+(** Measured heap per weak action of a saturated FSM, in bytes (low, high). *)
+val bytes_per_weak_action : int * int
+
+(** Measured peak memory per extracted state, in MB (low, high). *)
+val mb_per_extracted_state : float * float
+
+val human_bytes : int -> string
+
 type weak_args =
   { a : weak_arg option
   ; b : weak_arg option

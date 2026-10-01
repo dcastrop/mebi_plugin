@@ -1,0 +1,189 @@
+(** [MeBi Help] (backlog item F). Topics are paths, e.g. [["Config"; "Bounds"; "Saturation"]] for [MeBi Help Config Bounds Saturation]. The
+    figures quoted are computed from the same constants the plugin's errors
+    and notices use ([Api.bytes_per_weak_action],
+    [Api.mb_per_extracted_state], [Api.default_saturation_bound]), so the
+    help cannot drift from what the plugin actually reports. *)
+
+let topics : string list list =
+  [ [ "Run" ]
+  ; [ "Sim" ]
+  ; [ "Benchmark" ]
+  ; [ "Premises" ]
+  ; [ "Config" ]
+  ; [ "Config"; "Bounds" ]
+  ; [ "Config"; "Bounds"; "Saturation" ]
+  ; [ "Config"; "Weak" ]
+  ; [ "Config"; "FailIf" ]
+  ; [ "Config"; "Solver" ]
+  ; [ "Config"; "Output" ]
+  ]
+;;
+
+let name (path : string list) : string = String.concat " " ("MeBi Help" :: path)
+
+let overview () : string =
+  String.concat
+    "\n"
+    ([ "MeBi: build the LTS of a Rocq term from an inductive relation, check \
+        (weak) bisimilarity, and search for weak_sim proofs."
+     ; ""
+     ; "Help topics:"
+     ]
+     @ List.map (fun p -> "  " ^ name p ^ ".") topics
+     @ [ ""; "See also README.md." ])
+;;
+
+let saturation_table () : string =
+  let lo, hi = Api.bytes_per_weak_action in
+  let row (n : int) : string =
+    Printf.sprintf
+      "  %12i weak actions   %s - %s%s"
+      n
+      (Api.human_bytes (n * lo))
+      (Api.human_bytes (n * hi))
+      (if Int.equal n Api.default_saturation_bound then "   (default)" else "")
+  in
+  String.concat
+    "\n"
+    (List.map row [ 1_000_000; 5_000_000; 10_000_000; 20_000_000 ])
+;;
+
+let text : string list -> string option = function
+  | [] -> Some (overview ())
+  | [ "Run" ] ->
+    Some
+      "MeBi Run LTS <term> Using <lts> [<lts>...].\n\
+       MeBi Run FSM | Saturate | Minimize <term> Using <lts> [<lts>...].\n\
+       MeBi Run Bisim <term> With <lts> And <term> With <lts> Using <lts>...\n\
+       MeBi Run Merge <term> With <lts> And <term> With <lts> Using <lts>...\n\n\
+       Build the LTS reachable from <term>, then optionally saturate it (weak \
+       transitions across silent steps), minimize it, or check two for (weak) \
+       bisimilarity. The first relation after Using is the one <term> steps \
+       by; the rest are the relations its constructors' premises mention \
+       (layered LTSs). See: MeBi Help Premises."
+  | [ "Sim" ] ->
+    Some
+      "MeBi Sim Begin <lts> <term> And <lts> <term> Using <lts>...\n\
+       MeBi Sim Step.  MeBi Sim Solve <n>.\n\n\
+       Inside a proof of [weak_sim lts1 lts2 t1 t2]: Begin computes both LTSs \
+       and their bisimilarity, then Step/Solve run the proof search. Solve n \
+       permits n + 1 steps and stops as soon as the proof closes. If it runs \
+       out it says which cofix strategy was used; see MeBi Help Config Solver."
+  | [ "Benchmark" ] ->
+    Some
+      "MeBi Benchmark LTS <min> <max> <term> Using <lts> [<lts>...].\n\n\
+       Times repeated LTS construction over a range of sizes."
+  | [ "Premises" ] ->
+    Some
+      "Which constructor shapes are supported. An LTS is an inductive relation \
+       [term -> label -> term -> Prop]. For each constructor, the source term \
+       is matched, then its premises are handled:\n\
+      \  - premises over an LTS given in Using (the same one, or another: \
+       layered LTSs) are explored; several are allowed;\n\
+      \  - equations [l = r] are decided once both sides are closed: \
+       convertible holds, differing constructors fails (the transition is \
+       dropped); in a proof they are closed by reflexivity;\n\
+      \  - anything else cannot be decided: the constructor is applied as if \
+       it held, with a warning, so the LTS may contain transitions that do not \
+       exist. A Run Bisim verdict on it may be wrong; a proof cannot be, since \
+       Qed checks the premise."
+  | [ "Config" ] ->
+    Some
+      "MeBi Config Reset [Bounds | Weak | FailIf | Output].\n\n\
+       Settings, each with its own topic:\n\
+      \  MeBi Help Config Bounds.     how big an LTS (and its saturation) may \
+       get\n\
+      \  MeBi Help Config Weak.       which label is silent (weak bisimilarity)\n\
+      \  MeBi Help Config FailIf.     which outcomes are errors, not warnings\n\
+      \  MeBi Help Config Solver.     the proof search's cofix strategy\n\
+      \  MeBi Help Config Output.     which messages are shown"
+  | [ "Config"; "Bounds" ] ->
+    let lo, hi = Api.mb_per_extracted_state in
+    Some
+      (Printf.sprintf
+         "MeBi Config Bounds As Num States <n>.\n\
+          MeBi Config Bounds As Num Transitions <n>.\n\
+          MeBi Config Bounds Saturation <n>.\n\
+          MeBi Config Reset Bounds.\n\n\
+          Exploration stops after <n> states (default %s) or transitions; an \
+          LTS cut short is an error unless [MeBi Config FailIf Incomplete \
+          False]. Extraction has measured %.2f-%.2fMB per state on top of a \
+          fixed 0.1-0.3GB, so a state bound past ~%i prints a memory notice. \
+          Logging the result (Output \"Result\" / \"DecodeResults\" / \
+          \"DumpResults\") costs far more, ~0.65MB per state. For the \
+          saturation bound see MeBi Help Config Bounds Saturation."
+         (match Api.default_bounds with
+          | Api.States n -> Printf.sprintf "%i states" n
+          | Api.Transitions n -> Printf.sprintf "%i transitions" n)
+         lo
+         hi
+         (int_of_float (1000. /. hi)))
+  | [ "Config"; "Bounds"; "Saturation" ] ->
+    let lo, hi = Api.bytes_per_weak_action in
+    Some
+      (Printf.sprintf
+         "MeBi Config Bounds Saturation <n>.   (default %i)\n\n\
+          The most weak actions saturation may produce. Saturation (used by \
+          Run Saturate, Minimize, Bisim and Sim Begin when a label is silent) \
+          can be orders of magnitude larger than the LTS: one weak action per \
+          (state, label, state reachable by tau* label tau*). Before \
+          saturating, MeBi computes that number exactly and cheaply, and above \
+          the bound refuses with Saturation_Too_Large (or warns, with MeBi \
+          Config FailIf Oversaturated False). Run [MeBi Config Output \"Info\" \
+          True.] to see each estimate.\n\n\
+          Measured memory is %i-%i bytes per weak action (the higher for \
+          larger LTSs: each keeps its shortest witness path). Choose a bound \
+          your machine can hold:\n\
+          %s\n\n\
+          Time grows faster than the count: a partial Proc/Test4 LTS with 400k \
+          weak actions takes ~13s. Proc/Test4 itself (9720 states) would \
+          saturate to 74.6M."
+         Api.default_saturation_bound
+         lo
+         hi
+         (saturation_table ()))
+  | [ "Config"; "Weak" ] ->
+    Some
+      "MeBi Config Weak As Option <type>.\n\
+       MeBi Config Weak As <term> Of <type>.\n\
+       MeBi Config Weak1 / Weak2 ...   (one side of Bisim/Merge/Sim only)\n\
+       MeBi Config Reset Weak.\n\n\
+       Mark the silent label: [As Option T] makes [None] silent in an [option \
+       T]-labelled LTS; [As c Of T] makes constructor c of T silent. With a \
+       silent label set, bisimilarity is weak and FSMs are saturated first."
+  | [ "Config"; "FailIf" ] ->
+    Some
+      "MeBi Config FailIf Empty | Incomplete | NotBisimilar | Oversaturated \
+       True | False.\n\
+       MeBi Config Reset FailIf.\n\n\
+       Whether an empty LTS (default False), an exploration cut short by the \
+       bound (True), a negative bisimilarity result (True), or a saturation \
+       above Bounds Saturation (True) is an error rather than a warning."
+  | [ "Config"; "Solver" ] ->
+    Some
+      "MeBi Config Solver MutualCofix True | False | Auto.\n\n\
+       How the proof search introduces coinduction hypotheses: False mints a \
+       nested cofix per new pair; True opens the proof with one mutual cofix \
+       over every pair it will reach; Auto (default) measures both on the \
+       model before the proof starts and picks, announcing it when it takes \
+       the mutual path."
+  | [ "Config"; "Output" ] ->
+    Some
+      "MeBi Config Output \"<Kind>\" True | False.\n\
+       MeBi Config Reset Output.\n\n\
+       Toggle one message kind: Debug, Info, Notice, Warning, Error, Trace, \
+       Result, Show, DecodeResults, DumpResults."
+  | _ -> None
+;;
+
+let show (path : string list) : unit =
+  match text path with
+  | Some t -> Feedback.msg_notice (Pp.str t)
+  | None ->
+    Feedback.msg_notice
+      (Pp.str
+         (Printf.sprintf
+            "No help for [%s]. %s"
+            (String.concat " " path)
+            (overview ())))
+;;
