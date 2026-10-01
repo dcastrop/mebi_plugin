@@ -3310,6 +3310,43 @@ intended reason (8× `LTS_Incomplete`, 2× `Saturation_Too_Large`).
 **Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
 Bug fix 4 · Optimization 2 · Tooling 3 · Docs 2 · Refactor 0.
 
+## 2026-10-01 — E(c): `lib/terms` unit tests; a two-premise constructor cannot be proved
+
+Branch `main` (on `fork`). **Tooling** (tests only). Backlog item E,
+options (c) and (d). The finding below is not fixed.
+
+**`lib/terms` tests** (`tests.exe` 41 → 58). Covered: tree
+equality/order, `Trees` dedup, `Constructor_tree` equality; `Tree.minimize`
+(a chain flattens root-first, the shortest child is kept, ties go to the
+first) and `Trees.min`/`min_opt`; and the encoding counter (`incr`/`reset`)
+that `Bi_encoding` hands encodings out from. Only functions with callers are
+pinned. `Tree.add`, `Tree.add_list` and `Tree.min` have none outside
+`lib/terms`; `add` appends its argument at *every* level of the tree, which
+I could not tell was intended. They are dead-code candidates, not tested.
+
+**The finding.** Working out what `Tree.minimize` is *for* turned up a gap.
+The solver applies its result node by node
+(`handle_appconstrs_update_args`), and `minimize` treats a node's children
+as **alternatives**, keeping the shortest. In extraction
+(`Constructors.retrieve`), though, a node's children are one derivation
+**per premise**, all required. No constructor in the repository has two LTS
+premises: a regex scan first flagged `DevTest`'s `do_comm` and CADP_simple's
+`LTS_PAR_R`, which were false positives. So I wrote one, a `sync` rule where
+both sides of `ppar` must step. Extraction is fine. The proof fails: the
+solver proves the first premise, is left with the second (`stepLTS … (Some
+A) ?q'`) and tries `rt1n_refl` on it. This is now `TwoPremises` in
+`theories/Test.v`, a documented known-wrong `Fail` (checked to fail with
+that unification error). Fixing it means the solver walking the derivation
+tree instead of a flat list: a proof-solver change, logged as backlog item
+A6, not started.
+
+(d) — `lib/rocq_tools` and `src` can only be tested through `.v` files;
+(a), (b) and `TwoPremises` are that. Nothing further is planned under E
+without a specific target.
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
+Bug fix 4 · Optimization 2 · Tooling 5 · Docs 2 · Refactor 0.
+
 ---
 
 ## Outstanding

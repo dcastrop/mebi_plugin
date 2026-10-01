@@ -830,3 +830,35 @@ Module ExtractionSizes.
   MeBi Config Reset Bounds.
   MeBi Config Reset Weak.
 End ExtractionSizes.
+
+MeBi Divider "Theories.Test.TwoPremises".
+Module TwoPremises.
+  (* KNOWN WRONG (found 2026-10-01): no example has a constructor with two
+     LTS premises, and the proof solver cannot prove through one. Extraction
+     is fine -- [sync] fires from [x] -- but the solver applies a single
+     chain of constructors per step ([Tree.minimize] keeps the shortest
+     child of a derivation, treating children as alternatives, where here
+     both are required), proves the first premise and is left with the
+     second, which it then tries to close with [rt1n_refl]. If this is
+     fixed, the [Fail] below starts failing: make the proof positive. *)
+  Import ExtractionSizes.
+  Inductive stepLTS : proc -> option act -> proc -> Prop :=
+  | st_act a p : stepLTS (pact a p) (Some a) p.
+  Inductive syncLTS : proc -> option act -> proc -> Prop :=
+  | sync p p' q q' a :
+      stepLTS p (Some a) p' -> stepLTS q (Some a) q' ->
+      syncLTS (ppar p q) (Some a) (ppar p' q').
+  Inductive syncLTS' : proc -> option act -> proc -> Prop :=
+  | sync' p p' q q' a :
+      stepLTS p (Some a) p' -> stepLTS q (Some a) q' ->
+      syncLTS' (ppar p q) (Some a) (ppar p' q').
+
+  MeBi Config Reset Weak.
+  MeBi Config Weak As Option act.
+  Definition x : proc := ppar (pact A (pact B pnil)) (pact A (pact B pnil)).
+
+  Example wsim_sync : weak_sim syncLTS syncLTS' x x.
+  Proof. MeBi Sim Begin syncLTS x And syncLTS' x Using stepLTS.
+    Fail MeBi Sim Solve 300. Abort.
+  MeBi Config Reset Weak.
+End TwoPremises.
