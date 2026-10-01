@@ -45,7 +45,7 @@ module Make
   let to_string (x : t) : string =
     Printf.sprintf
       "%i weak actions from %i states (%i strong transitions, %i silent SCCs, \
-       the largest of %i states)"
+       the largest with %i)"
       x.weak
       x.states
       x.strong
