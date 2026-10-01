@@ -2818,8 +2818,19 @@ Saturating the full LTS (`MeBi Run Saturate p`) ran out of memory. I ran it
 down. Every 120 tree shapes of a local configuration are silently
 interconvertible, so each state's silent closure is large and the saturated
 LTS plausibly has orders of magnitude more weak transitions than the 87k
-strong ones; that is unmeasured. Next step is to size it under `ulimit -v`.
-`CLAUDE.md` now says to cap any `Test4` run.
+strong ones. `CLAUDE.md` now says to cap any `Test4` run.
+
+**Sized afterwards** with the same throwaway model of the rules, via the
+silent-SCC quotient (a per-state version timed out): **81 silent SCCs of
+exactly 120 states each** — one per local configuration, holding every tree
+shape. That gives 18.7M weak silent pairs and **112M weak visible
+transitions** against 87k strong ones, a ~1280x blow-up; at the plugin's
+per-transition cost (annotations, constructor trees) that is tens of GB. So
+the out-of-memory was inevitable for *explicit* saturation and is not a
+saturation bug. Getting `Test4` through would mean saturating over the
+silent-SCC quotient (81 nodes) rather than over states — a redesign of what
+saturation hands to everything downstream, which all reads concrete states.
+Recorded as design work in the backlog, not started.
 
 **Verification.** Six suites under `Auto`, 27 of 27 `Solved`, counts
 identical. `dune exec test/tests.exe` 34/34, `make dune` and `dune build
