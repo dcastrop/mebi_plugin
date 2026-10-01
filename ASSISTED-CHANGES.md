@@ -3604,6 +3604,38 @@ Branch `main` (on `fork`).
 **Session tally (2026-10-01, this session, cumulative):** New feature 3 ·
 Bug fix 7 · Optimization 3 · Tooling 5 · Docs 3 · Refactor 1.
 
+## 2026-10-01 — Step 0 diagnosed; three more fixes tried; parked
+
+Branch `main` (on `fork`). Investigation only; no code committed (a
+reverted spike with environment-variable switches). Backlog item Step 0,
+`notes/7-inversion-tie-break.md`, which now has the full record.
+
+**Why the smaller-first inversion tie-break diverges**, confirmed by an
+inversion trace on CADP `wsim_lts_bigstep`. `inversion H` keeps `H`;
+smaller-first ranks `H` the smallest grade-3 hypothesis, none of its
+results is smaller, so it picks **the same `H` every step**: 593 of 601
+steps inversions, the last 300 all `H`. Today's later-first order avoids
+this only because new hypotheses sort last. That answers the note's open
+question. The mutual block was irrelevant: the loop never reaches a
+`weak_sim` goal.
+
+**Fixes tried, none viable.** (b) Capping consecutive inversions: healthy
+CADP proofs already run ~28 in a row, so the cap would be ~30, likely
+costing more than the ≤14% saved; not built. `inversion_clear`: removes
+the transition hypothesis `get_transition` needs, so every suite fails.
+Remembering inverted hypotheses per phase: Test1 and Test3 fail outright,
+Test2 112 → 120, CADP 396 → 413/429. So some "sterile" re-inversions
+were needed. A real fix needs the solver to model which re-inversions are
+sterile, probably from the extracted constructor trees. That is design
+work for a 7-14% saving, so it is parked.
+
+**A mistake on the way:** my first run of the `inversion_clear` matrix
+passed the two settings as one unsplit string (zsh does not word-split
+unquoted variables), so both runs silently used the default solver and
+"passed". I caught it from the identical counts and reran.
+
+**Session tally (2026-10-01, this session, cumulative):** unchanged.
+
 ---
 
 ## Outstanding
