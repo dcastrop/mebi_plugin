@@ -3284,6 +3284,32 @@ hint, and the large-bound notice.
 **Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
 Bug fix 4 · Optimization 2 · Tooling 2 · Docs 2 · Refactor 0.
 
+## 2026-10-01 — E(b): pinned extraction and saturation sizes
+
+Branch `main` (on `fork`). **Tooling** (tests only). Backlog item E,
+option (b).
+
+No command reports an LTS's size, but the bounds can be used as
+assertions: with `FailIf Incomplete` on (the default), `Bounds As Num States
+n` succeeds iff the LTS has at most `n` states. So "succeeds at `n`, fails
+at `n - 1`" pins the count, and likewise for transitions. `Bounds
+Saturation` (H2) pins the weak-action count the same way.
+
+`theories/Test.v` gains `ExtractionSizes`: a process LTS that recurses on
+itself (interleaving `ppar`, a silent `p_tidy`), and a system LTS whose
+premise is over that *different* LTS, which is the layered shape of `Proc`
+and `CADP`. Until now that shape was exercised only by `examples/`, which
+dune does not build. It pins two terms in each LTS (states, transitions)
+and two saturation sizes: 8/10, 21/38, 9/11, 22/39, and 11 and 61 weak
+actions. The `p1` figures (8 states, 10 transitions, 11 weak actions) are
+**counted by hand**, so they check that the LTS is right, not merely that
+it is unchanged. The other figures were found by searching for the least
+succeeding bound. Each of the 10 `Fail`s was checked to fail for the
+intended reason (8× `LTS_Incomplete`, 2× `Saturation_Too_Large`).
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
+Bug fix 4 · Optimization 2 · Tooling 3 · Docs 2 · Refactor 0.
+
 ---
 
 ## Outstanding

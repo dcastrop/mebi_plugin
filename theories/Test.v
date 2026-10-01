@@ -740,3 +740,93 @@ Module UncheckedPremise.
   Fail MeBi Run LTS 0 Using st.
   MeBi Config Reset Bounds.
 End UncheckedPremise.
+
+(* Pinned sizes (backlog item E(b)). No command reports an LTS's size, but
+   the bounds do: with [FailIf Incomplete] (the default), [Bounds As Num
+   States n] succeeds iff the LTS has at most [n] states, so "succeeds at n,
+   fails at n - 1" pins the count exactly. Likewise transitions, and
+   [Bounds Saturation] pins the number of weak actions saturation produces.
+
+   [procLTS] recurses on itself ([p_parl]/[p_parr]); [sysLTS] has a premise
+   over a {e different} LTS, the layered shape of [Proc] and [CADP] -- the
+   path that drops each state's matching evars, and the one I2's premise
+   check sits on. The [p1] figures are counted by hand:
+   [ppar (A.B.0) (B.0)] has 8 states and 10 transitions (2 silent [p_tidy]),
+   and saturates to 11 weak actions; [run p1] adds [done] and [s_stop]. *)
+MeBi Divider "Theories.Test.ExtractionSizes".
+Module ExtractionSizes.
+  Inductive act : Set := A | B.
+  Inductive proc : Set := pnil | pact (a : act) (p : proc) | ppar (p q : proc).
+
+  Inductive procLTS : proc -> option act -> proc -> Prop :=
+  | p_act a p : procLTS (pact a p) (Some a) p
+  | p_parl p p' q a : procLTS p a p' -> procLTS (ppar p q) a (ppar p' q)
+  | p_parr p q q' a : procLTS q a q' -> procLTS (ppar p q) a (ppar p q')
+  | p_tidy q : procLTS (ppar pnil q) None q.
+
+  Inductive sys : Set := run (p : proc) | done.
+
+  Inductive sysLTS : sys -> option act -> sys -> Prop :=
+  | s_step p a p' : procLTS p a p' -> sysLTS (run p) a (run p')
+  | s_stop : sysLTS (run pnil) None done.
+
+  Definition p1 : proc := ppar (pact A (pact B pnil)) (pact B pnil).
+  Definition p2 : proc :=
+    ppar (ppar (pact A pnil) (pact B pnil)) (pact A (pact A pnil)).
+
+  MeBi Config Reset Weak.
+
+  (* p1: 8 states, 10 transitions. *)
+  MeBi Config Bounds As Num States 8.
+  MeBi Run LTS p1 Using procLTS.
+  MeBi Config Bounds As Num States 7.
+  Fail MeBi Run LTS p1 Using procLTS.
+  MeBi Config Bounds As Num Transitions 10.
+  MeBi Run LTS p1 Using procLTS.
+  MeBi Config Bounds As Num Transitions 9.
+  Fail MeBi Run LTS p1 Using procLTS.
+
+  (* p2: 21 states, 38 transitions. *)
+  MeBi Config Bounds As Num States 21.
+  MeBi Run LTS p2 Using procLTS.
+  MeBi Config Bounds As Num States 20.
+  Fail MeBi Run LTS p2 Using procLTS.
+  MeBi Config Bounds As Num Transitions 38.
+  MeBi Run LTS p2 Using procLTS.
+  MeBi Config Bounds As Num Transitions 37.
+  Fail MeBi Run LTS p2 Using procLTS.
+
+  (* Layered: run p1 is p1's LTS plus [done]: 9 states, 11 transitions. *)
+  MeBi Config Bounds As Num States 9.
+  MeBi Run LTS (run p1) Using sysLTS procLTS.
+  MeBi Config Bounds As Num States 8.
+  Fail MeBi Run LTS (run p1) Using sysLTS procLTS.
+  MeBi Config Bounds As Num Transitions 11.
+  MeBi Run LTS (run p1) Using sysLTS procLTS.
+  MeBi Config Bounds As Num Transitions 10.
+  Fail MeBi Run LTS (run p1) Using sysLTS procLTS.
+
+  (* Layered: run p2, 22 states, 39 transitions. *)
+  MeBi Config Bounds As Num States 22.
+  MeBi Run LTS (run p2) Using sysLTS procLTS.
+  MeBi Config Bounds As Num States 21.
+  Fail MeBi Run LTS (run p2) Using sysLTS procLTS.
+  MeBi Config Bounds As Num Transitions 39.
+  MeBi Run LTS (run p2) Using sysLTS procLTS.
+  MeBi Config Bounds As Num Transitions 38.
+  Fail MeBi Run LTS (run p2) Using sysLTS procLTS.
+  MeBi Config Reset Bounds.
+
+  (* Saturation sizes, with [None] silent: p1 11 weak actions, run p2 61. *)
+  MeBi Config Weak As Option act.
+  MeBi Config Bounds Saturation 11.
+  MeBi Run Saturate p1 Using procLTS.
+  MeBi Config Bounds Saturation 10.
+  Fail MeBi Run Saturate p1 Using procLTS.
+  MeBi Config Bounds Saturation 61.
+  MeBi Run Saturate (run p2) Using sysLTS procLTS.
+  MeBi Config Bounds Saturation 60.
+  Fail MeBi Run Saturate (run p2) Using sysLTS procLTS.
+  MeBi Config Reset Bounds.
+  MeBi Config Reset Weak.
+End ExtractionSizes.
