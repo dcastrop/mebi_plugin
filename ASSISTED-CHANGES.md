@@ -3093,6 +3093,55 @@ False`. Test1 `Solve 10` prints the new hint under `Auto` (nested) and forced
 (H3 messages) · Docs 1 (README, the `Test4` figure, this log's stale "none
 has" line) · Refactor 0 · Optimization 0 · Tooling 0.
 
+## 2026-10-01 — 3b: saturation's per-state dedup made linear; closures memoised
+
+Branch `main` (on `fork`). **Optimization**, plus **Tooling** (a new
+`test/satscale.ml` shape). A new backlog item that H2's measurement turned up.
+
+**The cost.** `Saturation.edge_closure` collected every witness `from -tau*->
+s -a-> t -tau*-> goto` for a state, then deduplicated them with
+`ActionPair.merge_lists`. That makes a linear pass over the survivors so far
+for each witness, i.e. (witnesses) × (distinct weak actions) per state. It
+also recomputed `t`'s silent closure for every visible move into `t`.
+`satscale` gains the `Test4` shape (chained silent cycles, `m = 20`): 211,200
+weak actions took **468s**.
+
+**The change.** Dedup goes through a hashtable keyed on `(label, goto)`.
+Silent closures are memoised per saturation. Witness lengths are compared
+before any witness is built, so the note list and annotation are only
+allocated for a witness that replaces the one held. The survivors are exactly
+the old ones, which needed care. I first misread `Annotation.shorter` as
+keeping its first argument on a tie, and corrected that before writing the
+code. In fact `merge_lists` saw witnesses newest-first and kept `shorter
+existing incoming`, which returns `incoming` on a tie. So the shortest
+witness wins, ties go to the earliest generated, and the label comes from the
+latest (`Label.equal` ignores `is_silent`). The code reproduces that.
+
+**Results.** `satdiff -- 200` is byte-identical to `test/satdiff.expected`
+(2426 lines: every weak transition, destination set and surviving
+annotation). The 211k-action `satscale` case runs in **19s** (24×), and the
+grid and chain controls are unchanged. In the plugin, partial `Test4` LTSs at
+250/500/1000 states saturate in 0.54/2.3/**13.3s**, down from 0.73/6.3/141s
+(10.6× at 1000). The 2000-state partial (1.8M weak actions) is now refused
+by H2's guard, as it should be. Proof suite: all 27 counts unchanged under
+`Auto`. `tests.exe` 41/41. Forced-`MutualCofix` runs were skipped: no solver
+heuristic changed, and satdiff shows the solver's input is identical.
+
+**A mistake on the way.** The first proof-suite run failed to build: the
+`ActionPair` alias became unused, and `make` treats warning 60 as an error
+where `dune build` does not. Fixed by removing the alias, then the suite was
+re-run.
+
+**Not done.** Time is still about ×8 per doubling of `k`, because this shape
+has ~43M witnesses at `k = 32` and each now costs ~0.44µs. Going linear in the
+output means a BFS over `(state, before/after the visible step)` per `from`.
+That would pick *different* witnesses among equal-length ones, i.e. change
+the annotations the proof solver reads. It is left for discussion, not done
+silently.
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
+Bug fix 2 · Optimization 1 · Tooling 1 · Docs 1 · Refactor 0.
+
 ---
 
 ## Outstanding

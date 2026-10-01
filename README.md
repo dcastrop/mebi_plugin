@@ -192,7 +192,7 @@ MeBi Config Output "<Kind>" True/False.
   | 10,000,000           | 4.5–9 GB       |
   | 20,000,000           | 9–18 GB        |
 
-  Time grows faster than linearly in the count (a partial `Test4` LTS with 400k weak actions took 141s), so a large bound can also mean a long wait. The proof examples (`PluginProofs.v`) saturate to at most a few hundred weak actions. Run `MeBi Config Output "Info" True.` to see each estimate.
+  Time grows faster than linearly in the count (a partial `Test4` LTS with 400k weak actions takes ~13s), so a large bound can also mean a long wait. The proof examples (`PluginProofs.v`) saturate to at most a few hundred weak actions. Run `MeBi Config Output "Info" True.` to see each estimate.
 - `Weak` (and the asymmetric `Weak1`/`Weak2`) mark a label constructor as the silent/tau action, enabling weak bisimilarity/saturation. `Reset Weak` clears it back to strong bisimilarity.
 - `FailIf` controls whether an empty LTS, an incomplete (unboundedly large) exploration, a negative bisimilarity result, or a saturation above `Bounds Saturation` raises a hard error instead of a warning. `Oversaturated` defaults to `True`, because past the bound the likely alternative is running out of memory. `False` warns and saturates anyway.
 - `Output "<Kind>" <bool>` toggles one log channel. `<Kind>` is one of `Debug`, `Info`, `Notice`, `Warning`, `Error`, `Trace`, `Result`, `Show`, `DecodeResults`, `DumpResults`.

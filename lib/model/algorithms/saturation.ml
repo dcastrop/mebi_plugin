@@ -23,11 +23,11 @@ module Make
   module Labels = C.Label.Set
   module Annotation = C.Annotation
   module Action = C.Action
-  module ActionPair = C.Action.Pair
   module ActionPairs = C.Action.Pair.Set
   module ActionMap = C.Action.Map
   module EdgeMap = C.EdgeMap
   module Note = C.Note
+  module StateTbl = Hashtbl.Make (C.State)
 
   type state = State.t
   type states = States.t
@@ -111,17 +111,47 @@ module Make
     | x :: tl -> Some { this = x; next = annotation_of_notes tl }
   ;;
 
-  (** The closure-based counterpart of [edge]. *)
+  let with_lengths
+    : (State.t * Note.t list) list -> (State.t * Note.t list * int) list
+    =
+    List.map (fun ((s, path) : State.t * Note.t list) ->
+      s, path, List.length path)
+  ;;
+
+  (** Weak actions from one state, keyed by [(label, goto)]: the
+      deduplication [ActionPair.merge_lists] used to do by scanning a list,
+      which cost (witnesses) x (distinct weak actions) per state -- ~10x per
+      doubling on [Proc/Test4]'s shape, see [test/satscale.ml] and backlog
+      item 3b. *)
+  module Key = Hashtbl.Make (struct
+      type t = C.Label.t * State.t
+
+      let equal ((l, s) : t) ((l', s') : t) : bool =
+        C.Label.equal l l' && State.equal s s'
+      ;;
+
+      let hash ((l, s) : t) : int = Hashtbl.hash (C.Label.hash l, State.hash s)
+    end)
+
+  (** The closure-based counterpart of [edge].
+
+      Survivors are exactly those [merge_lists] picked. It was fed the
+      witnesses newest-first and kept [Annotation.shorter existing incoming],
+      which returns [incoming] on a tie: so the shortest witness wins, ties go
+      to the {e earliest} generated, and the label to the {e latest}
+      ([Label.equal] ignores [is_silent], so which one is not quite moot).
+      Checked against [test/satdiff.expected]. *)
   let edge_closure
+        (closure_of : State.t -> (State.t * Note.t list * int) list)
         (new_actions : ActionMap.t')
         (from : State.t)
         (old_edges : EdgeMap.t')
     : unit
     =
     Logger.trace __FUNCTION__;
-    let pairs : ActionPair.t list ref = ref [] in
+    let found : (C.Label.t * int * Annotation.t) Key.t = Key.create 16 in
     List.iter
-      (fun ((s, pre_rev) : State.t * Note.t list) ->
+      (fun ((s, pre_rev, pre_len) : State.t * Note.t list * int) ->
         match EdgeMap.find_opt old_edges s with
         | None -> ()
         | Some actions ->
@@ -134,26 +164,40 @@ module Make
                   (fun (t : State.t) ->
                     let mid : Note.t = note_of s a t in
                     List.iter
-                      (fun ((goto, post_rev) : State.t * Note.t list) ->
-                        let notes : Note.t list =
-                          List.rev pre_rev @ (mid :: List.rev post_rev)
-                        in
-                        match annotation_of_notes notes with
-                        | None -> ()
-                        | Some ann ->
-                          let act : Action.t =
-                            { label = a.label
-                            ; annotation = Some ann
-                            ; trees = Base.Trees.empty
-                            }
-                          in
-                          pairs := (act, States.singleton goto) :: !pairs)
-                      (silent_closure old_edges t))
+                      (fun ((goto, post_rev, post_len) :
+                             State.t * Note.t list * int) ->
+                        (* Lengths first: the witness is only built if it
+                           replaces the one held, and on this shape almost
+                           none do. *)
+                        let len : int = pre_len + 1 + post_len in
+                        let key : Key.key = a.label, goto in
+                        match Key.find_opt found key with
+                        | Some (_, len', ann') when len' <= len ->
+                          Key.replace found key (a.label, len', ann')
+                        | _ ->
+                          (match
+                             annotation_of_notes
+                               (List.rev_append
+                                  pre_rev
+                                  (mid :: List.rev post_rev))
+                           with
+                           | None -> ()
+                           | Some ann ->
+                             Key.replace found key (a.label, len, ann)))
+                      (closure_of t))
                   ds)
             actions
             ())
-      (silent_closure old_edges from);
-    ActionPair.merge_lists [] !pairs
+      (with_lengths (silent_closure old_edges from));
+    Key.fold
+      (fun ((_, goto) : Key.key)
+        ((label, _, ann) : C.Label.t * int * Annotation.t)
+        (acc : (Action.t * States.t) list) ->
+        ( { label; annotation = Some ann; trees = Base.Trees.empty }
+        , States.singleton goto )
+        :: acc)
+      found
+      []
     |> ActionPairs.of_list
     |> ActionPairs.iter
          (fun ((saturated_action, destinations) : Action.t * States.t) ->
@@ -168,6 +212,20 @@ module Make
     =
     Logger.trace __FUNCTION__;
     let new_edges : EdgeMap.t' = EdgeMap.create 0 in
+    (* A state's silent closure does not depend on where the weak step
+       started, so each is computed once per saturation rather than once per
+       visible move into it (backlog item 3b). *)
+    let closures : (State.t * Note.t list * int) list StateTbl.t =
+      StateTbl.create 64
+    in
+    let closure_of (t : State.t) : (State.t * Note.t list * int) list =
+      match StateTbl.find_opt closures t with
+      | Some c -> c
+      | None ->
+        let c = with_lengths (silent_closure old_edges t) in
+        StateTbl.add closures t c;
+        c
+    in
     let terminals : States.t =
       EdgeMap.fold
         (fun (from : State.t) (_old_actions : ActionMap.t') (acc : States.t) ->
@@ -175,7 +233,7 @@ module Make
              along with those of every state in its silent closure, so the
              fold's own [_old_actions] is redundant here. *)
           let new_actions : ActionMap.t' = ActionMap.create 0 in
-          let () = edge_closure new_actions from old_edges in
+          let () = edge_closure closure_of new_actions from old_edges in
           if ActionMap.length new_actions > 0
           then (
             EdgeMap.replace new_edges from new_actions;
