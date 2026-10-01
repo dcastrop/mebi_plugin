@@ -3436,6 +3436,20 @@ solver step for non-LTS premises) is unchanged; see I2.
 **Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
 Bug fix 6 · Optimization 2 · Tooling 5 · Docs 2 · Refactor 0.
 
+## 2026-10-01 — Two small cleanups
+
+Branch `main` (on `fork`).
+
+- **Refactor**: `Tree.add`/`Tree.add_list` removed. They had no callers
+  anywhere (found while writing the `lib/terms` tests; `add` appended its
+  argument at every level of a tree, which nothing relied on). `make`
+  builds, `tests.exe` 61/61.
+- **Bug fix** (wording): `SaturationEstimate.to_string` said "the largest
+  of 1 states"; now "the largest with 1".
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
+Bug fix 7 · Optimization 2 · Tooling 5 · Docs 2 · Refactor 1.
+
 ---
 
 ## Outstanding
