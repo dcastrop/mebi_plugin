@@ -3258,6 +3258,32 @@ Also a separate `style:` commit: `40c98d5` went in without `dune fmt`
 **Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
 Bug fix 4 · Optimization 2 · Tooling 1 · Docs 2 · Refactor 0.
 
+## 2026-10-01 — E(a): regression tests for the saturation guard and the unchecked premise
+
+Branch `main` (on `fork`). **Tooling** (tests only). Backlog item E,
+option (a).
+
+Two modules appended to `theories/Test.v`, so they run in every `dune build`:
+
+- `SaturationGuard` reuses `MultipleDerivations`' LTS (4 weak actions) with
+  `Bounds Saturation 1`. It checks that `Saturate`, `Minimize`, `Bisim` and
+  `Sim Begin` are refused; that `FailIf Oversaturated False` lets `Saturate`
+  through and `True` refuses again; and that `Reset Bounds` restores the
+  default.
+- `UncheckedPremise` is I2's `n = 0` example as a documented
+  **known-wrong** test: `Fail MeBi Run LTS 0 Using st` at a 20-state bound.
+  If such premises are ever supported, it starts failing, deliberately.
+
+`Fail` accepts any error, so each of the six was checked for the right one:
+a copy of `Test.v` cut off at that line, with the `Fail` removed, gives
+`Saturation_Too_Large` for the first five and `LTS_Incomplete` for the
+premise case. Not covered, because a `.v` file cannot assert a plugin
+`Warning` or `Notice`: the premise warning's text, `Sim Solve`'s exhaustion
+hint, and the large-bound notice.
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
+Bug fix 4 · Optimization 2 · Tooling 2 · Docs 2 · Refactor 0.
+
 ---
 
 ## Outstanding

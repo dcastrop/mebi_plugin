@@ -695,3 +695,48 @@ Module MultipleDerivations.
   Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS.
     MeBi Sim Solve 1000. Qed.
 End MultipleDerivations.
+
+(* Regression tests for the size check before saturation (backlog item H2)
+   and for the premise extraction does not check (I2). A plugin [Warning]
+   cannot be asserted from a .v file, only an error, so these pin down the
+   refusals and that each way out works. *)
+MeBi Divider "Theories.Test.SaturationGuard".
+Module SaturationGuard.
+  Import MultipleDerivations.
+  MeBi Config Reset Weak.
+  MeBi Config Weak As Option action.
+
+  (* [p] saturates to a handful of weak actions: over a bound of 1. *)
+  MeBi Config Bounds Saturation 1.
+  Fail MeBi Run Saturate p Using termLTS.
+  Fail MeBi Run Minimize p Using termLTS.
+  Fail MeBi Run Bisim p With termLTS And q With termLTS Using termLTS.
+  Example wsim_refused : weak_sim termLTS termLTS p q.
+  Proof. Fail MeBi Sim Begin termLTS p And termLTS q Using termLTS. Abort.
+
+  (* [FailIf Oversaturated False]: warn and carry on. *)
+  MeBi Config FailIf Oversaturated False.
+  MeBi Run Saturate p Using termLTS.
+  MeBi Config FailIf Oversaturated True.
+  Fail MeBi Run Saturate p Using termLTS.
+
+  (* [Reset Bounds] restores the default bound (1,000,000). *)
+  MeBi Config Reset Bounds.
+  MeBi Run Saturate p Using termLTS.
+  MeBi Config Reset Weak.
+End SaturationGuard.
+
+MeBi Divider "Theories.Test.UncheckedPremise".
+Module UncheckedPremise.
+  (* KNOWN WRONG (backlog item I2): [n = 0] is not an LTS premise, so
+     extraction does not check it and applies [go] from every state. The
+     true LTS from 0 is the single transition [0 -true-> 1]; the extracted one
+     is [0 -> 1 -> 2 -> ...], so it hits the state bound. If premises like
+     this become supported, this [Fail] will start failing: replace it with a
+     positive test. *)
+  Inductive st : nat -> bool -> nat -> Prop :=
+  | go (n : nat) : n = 0 -> st n true (S n).
+  MeBi Config Bounds As Num States 20.
+  Fail MeBi Run LTS 0 Using st.
+  MeBi Config Reset Bounds.
+End UncheckedPremise.
