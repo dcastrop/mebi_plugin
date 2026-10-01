@@ -3142,6 +3142,29 @@ silently.
 **Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
 Bug fix 2 · Optimization 1 · Tooling 1 · Docs 1 · Refactor 0.
 
+## 2026-10-01 — A4: the "duplicate things to unfold" TODO, measured and closed
+
+Branch `main` (on `fork`). **Docs** (a comment). Backlog item A4. No code
+change.
+
+`try_unfold_any` carried `TODO: make sure you remove duplicate things to
+unfold`. Within one term, duplicates are impossible: `collect_component_econstrs`
+returns an `EConstrSet`. The only place several terms are combined is
+`try_unfold_any_of`. It has one call site, `handle_hyp_transition`, on the
+conclusion's `wk_trans` and `wk_sim`, and there a shared constant *would* be
+unfolded twice. `Hyps.try_unfold_any` also chains, but per hypothesis, so
+repeats there target different hypotheses and are not duplicates.
+
+Measured with temporary instrumentation (since reverted) over the full proof
+suite, all 27 `Solve`s: 829 calls, and the two terms **never** share an
+unfoldable constant. Fourteen calls find 6 distinct constants; the other 815
+find none. Adding a dedup would change tactic structure, i.e. the order of
+the `unfold`s, for no measured benefit. So the TODO became a comment
+recording the measurement and the one place to look if it ever matters.
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
+Bug fix 2 · Optimization 1 · Tooling 1 · Docs 2 · Refactor 0.
+
 ---
 
 ## Outstanding
