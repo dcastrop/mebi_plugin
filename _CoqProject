@@ -48,8 +48,8 @@ examples/Bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test3/PluginProofs.v ### Success (18s; needs MeBi Config Solver MutualCofix True, which the file sets)
 
 # examples/Bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/Proc/Test4/TermTests.v ### Success
-# examples/Bisimilarity/Proc/Test4/PluginProofs.v ### still not written -- Test4 fails EXTRACTION (LTS_Incomplete at the default 100-state bound, still extracting after 14 minutes at 5000), so it never reaches the solver at all. That is backlog item B3, and is unrelated to Test3's proof explosion, which is fixed (see ASSISTED-CHANGES.md, 2026-09-29)
+# examples/Bisimilarity/Proc/Test4/TermTests.v ### KNOWN LIMIT (B3): fails at the default 100-state bound (LTS_Incomplete); the full LTS is 9720 states and extracts in ~25s with a raised bound, but saturation needs ~112M weak transitions and exhausts memory -- run only under a memory cap (ulimit -v). See the header of TermTests.v
+# examples/Bisimilarity/Proc/Test4/PluginProofs.v ### not written -- blocked by the same limit: the proof solver needs the saturated LTS. Deferred until the other outstanding backlog items are resolved
 
 ###############################################################################
 ### CADP

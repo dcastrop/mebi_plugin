@@ -2832,6 +2832,13 @@ silent-SCC quotient (81 nodes) rather than over states — a redesign of what
 saturation hands to everything downstream, which all reads concrete states.
 Recorded as design work in the backlog, not started.
 
+**Decision (user, 2026-10-01): `Test4` stays a documented technical limit**,
+to be revisited once every other outstanding item is resolved. Documented
+where it will be met: `_CoqProject`'s `Test4` lines (the stale `### Success`
+on `TermTests.v` replaced with `### KNOWN LIMIT (B3)`) and a header comment
+in `examples/Bisimilarity/Proc/Test4/TermTests.v` giving the numbers, the
+memory-cap warning and what fixing it would take. Docs.
+
 **Verification.** Six suites under `Auto`, 27 of 27 `Solved`, counts
 identical. `dune exec test/tests.exe` 34/34, `make dune` and `dune build
 @fmt` clean. Experiments (probe, sandbox and name-reset switches) removed.
