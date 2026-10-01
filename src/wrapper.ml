@@ -238,10 +238,25 @@ module Make (Enc : Encoding.S) :
     else if !Api.the_fail_flags.incomplete
     then (
       match x with
-      | { info = { meta = Some { is_complete = false; _ }; _ }; _ } ->
+      | { info = { meta = Some { is_complete = false; bounds; _ }; _ }; _ } ->
         result_log (module Model.LTS) (module Decode.LTS)
         |> handle_results Result "LTS Incomplete" x;
-        M.Err.lts_incomplete "TODO..."
+        let rec bound : Model.Info.Meta.Bounds.t -> string = function
+          | States n -> Printf.sprintf "%i states" n
+          | Transitions n -> Printf.sprintf "%i transitions" n
+          | Merged (a, b) -> Printf.sprintf "%s and %s" (bound a) (bound b)
+        in
+        M.Err.lts_incomplete
+          (Printf.sprintf
+             "exploration stopped at the bound of %s, with %i states and %i \
+              transitions found and more still unexplored. Raise the bound \
+              with [MeBi Config Bounds As Num States <n>] (or [... Num \
+              Transitions <n>]), or accept a partial LTS with [MeBi Config \
+              FailIf Incomplete False]. A large LTS can still be too big to \
+              saturate."
+             (bound bounds)
+             (Model.State.Set.cardinal x.states)
+             (Model.Transition.Set.cardinal x.transitions))
       | _ -> ())
     else ()
   ;;

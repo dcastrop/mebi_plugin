@@ -2893,6 +2893,40 @@ dune` afterwards. No plugin code changed.
 
 ---
 
+## 2026-10-01 — `LTS_Incomplete` explains itself; limit diagnostics recorded as a backlog item
+
+Branch `main` (on `fork`). Prompted by the user asking whether the tool can
+passively warn when a term/LTS will exceed its limits, as `Test4` did.
+
+**What exists already.** Extraction is guarded: the state/transition bound
+stops it and raises `LTS_Incomplete`. But the message was literally
+`"TODO..."`. **Bug fix:** `check_if_lts_fail` (`src/wrapper.ml`) now says,
+e.g. on `Test4` at the default bound: *"exploration stopped at the bound of
+100 states, with 106 states and 180 transitions found and more still
+unexplored. Raise the bound with [MeBi Config Bounds As Num States <n>] (or
+[... Num Transitions <n>]), or accept a partial LTS with [MeBi Config FailIf
+Incomplete False]. A large LTS can still be too big to saturate."*
+
+**What does not exist, and was not built.** Nothing guards saturation,
+which is where `Test4` actually died. A pre-saturation estimate is cheap
+and exact once the LTS is known (silent-SCC quotient plus reachability over
+the SCC DAG — 81 SCCs for `Test4`), but it is a new check with a likely new
+config knob, i.e. a new capability, so per `CLAUDE.md` it is written up as
+backlog item H2 (with H3: other limits that surface badly, such as
+`PairNotInProduct` escaping as an `Anomaly`) rather than built. Estimating
+from the term *before* extraction is not possible in general — the LTS is
+an arbitrary inductive relation — and the extraction bound is already the
+right guard there.
+
+**Verification.** Message checked on `Test4/TermTests.v` (copied into a
+scratch tree, memory-capped). `dune build`, `dune build @fmt` clean. No
+proof-solver code touched.
+
+**Session tally (2026-10-01, this session):** Bug fix 2 · Optimization 1
+(one reverted) · Docs 3 · Tooling 1 · Refactor 0 · New feature 0.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
