@@ -925,5 +925,18 @@ Module TwoPremises.
     (* still open: some goal remains *)
     match goal with |- _ => idtac end.
   Abort.
+  (* KNOWN WRONG, same cause: an [eq] premise {e before} the LTS one gets
+     the focus first. The solver used to stop with an Anomaly; it now stops
+     with a user error naming the goal. *)
+  Inductive eqfirstLTS : proc -> option act -> proc -> Prop :=
+  | eq_first p p' q a : a = a -> leftLTS p (Some a) p' ->
+                        eqfirstLTS (ppar p q) (Some a) (ppar p' q).
+  Inductive eqfirstLTS' : proc -> option act -> proc -> Prop :=
+  | eq_first' p p' q a : a = a -> leftLTS p (Some a) p' ->
+                         eqfirstLTS' (ppar p q) (Some a) (ppar p' q).
+  Example wsim_eqfirst : weak_sim eqfirstLTS eqfirstLTS' x5 x5.
+  Proof. MeBi Sim Begin eqfirstLTS x5 And eqfirstLTS' x5 Using leftLTS.
+    Fail MeBi Sim Solve 100.
+  Abort.
   MeBi Config Reset Weak.
 End TwoPremises.

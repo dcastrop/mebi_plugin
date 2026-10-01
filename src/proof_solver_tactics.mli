@@ -103,6 +103,10 @@ module type S = sig
     -> binding_args
     -> Evd.econstr Tactypes.bindings
 
+  (** Raised by {!apply_constructor} when the focused goal is not a step of
+      the constructor's LTS (its bindings cannot be read off it). *)
+  exception GoalNotAnLTSStep
+
   val apply_constructor : node -> binding_args -> tactic mm
 end
 

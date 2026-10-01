@@ -883,11 +883,27 @@ struct
     let tys = Array.map (fun x -> econstr_normalize x |> run) tys in
     let* is_tau = Concl.is_tau () in
     (* NOTE: we can't rely on the terms in [tys] being encoded since they may be from an intermediate layer of the LTS. *)
-    (if is_tau
-     then (* NOTE: index (3) since [tau lts x] => [tau (term * label) x] *)
-       { from = tys.(3); goto = None; label = Some (Mebi_theories.get "None") }
-     else { from = tys.(0); goto = None; label = None })
-    |> Tacs.apply_constructor x
+    let args : Tacs.binding_args =
+      if is_tau
+      then (* NOTE: index (3) since [tau lts x] => [tau (term * label) x] *)
+        { from = tys.(3); goto = None; label = Some (Mebi_theories.get "None") }
+      else { from = tys.(0); goto = None; label = None }
+    in
+    try Tacs.apply_constructor x args with
+    | Tacs.GoalNotAnLTSStep ->
+      (* A premise the solver has no step for -- e.g. an [eq] (backlog I2)
+         -- reached the focus before this constructor's goal. A user error,
+         not an uncaught exception (which Rocq reports as its own anomaly). *)
+      CErrors.user_err
+        (Pp.str
+           (Printf.sprintf
+              "MeBi: cannot continue the proof: the next constructor to apply \
+               is for an LTS, but the focused goal is not one of its steps:\n\
+              \  %s\n\
+               This happens when a constructor has a premise MeBi does not \
+               handle (such as an equation); extraction warns about these when \
+               it builds the LTS."
+              (Strfy.econstr (get_concl ()))))
   ;;
 
   (** [handle_ ()] ... *)

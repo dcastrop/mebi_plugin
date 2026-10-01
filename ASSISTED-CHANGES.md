@@ -3412,6 +3412,30 @@ solver has no step for non-LTS premise goals; this belongs with I2.
 **Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
 Bug fix 5 · Optimization 2 · Tooling 5 · Docs 2 · Refactor 0.
 
+## 2026-10-01 — The `eq`-premise Anomaly becomes a user error
+
+Branch `main` (on `fork`). **Bug fix** (error reporting only). Follow-up
+to A6's finding.
+
+With an `eq` premise before an LTS premise, the solver applied the LTS's
+constructor to the focused `eq` goal. `Constructor_bindings` then raised
+`BindingInstruction_NotApp`, which escaped as a Rocq **Anomaly** ("please
+report at rocq-prover.org"), blaming Rocq for a plugin limitation.
+`apply_constructor` now raises a dedicated `GoalNotAnLTSStep`, and
+`handle_appconstrs_apply`, which has the goal, turns it into a user error
+naming the focused goal and pointing at the extraction warning. My first
+version caught it one level down and printed the sub-term where binding
+extraction stopped (`act`, the type argument of `eq`), not the goal; I
+moved the catch before committing. It now prints `(A = A)`.
+
+Tests: `TwoPremises.wsim_eqfirst`, a second known-wrong case (`Fail MeBi
+Sim Solve`, checked to fail with the new message). Proof suite: 27 counts
+unchanged. `make` builds plugin and `Test.v`. The limitation itself (no
+solver step for non-LTS premises) is unchanged; see I2.
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
+Bug fix 6 · Optimization 2 · Tooling 5 · Docs 2 · Refactor 0.
+
 ---
 
 ## Outstanding

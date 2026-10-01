@@ -95,6 +95,10 @@ module type S = sig
     -> binding_args
     -> Evd.econstr Tactypes.bindings
 
+  (** Raised by {!apply_constructor} when the focused goal is not a step of
+      the constructor's LTS (its bindings cannot be read off it). *)
+  exception GoalNotAnLTSStep
+
   val apply_constructor : node -> binding_args -> tactic mm
 end
 
@@ -631,6 +635,8 @@ module Make
       get_constructor_bindings args bindings
   ;;
 
+  exception GoalNotAnLTSStep
+
   let apply_constructor ((enc, index) : Enc.Tree.Node.t) (args : binding_args)
     : Tactic.t mm
     =
@@ -639,7 +645,11 @@ module Make
     let index : int = index + 1 in
     let msg : string = Printf.sprintf "constructor %i" index in
     (* let open Syntax in *)
-    let bindings = try_get_constructor_bindings (enc, index) args in
+    let bindings =
+      try try_get_constructor_bindings (enc, index) args with
+      | ConstructorBindings.BindingInstruction_NotApp _ ->
+        raise GoalNotAnLTSStep
+    in
     Logger.thing ~__FUNCTION__ Debug "bindings" bindings Strfy.econstr_bindings;
     Tactic.create ~msg (Tactics.one_constructor index bindings) |> return
   ;;
