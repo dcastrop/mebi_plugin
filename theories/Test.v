@@ -833,32 +833,97 @@ End ExtractionSizes.
 
 MeBi Divider "Theories.Test.TwoPremises".
 Module TwoPremises.
-  (* KNOWN WRONG (found 2026-10-01): no example has a constructor with two
-     LTS premises, and the proof solver cannot prove through one. Extraction
-     is fine -- [sync] fires from [x] -- but the solver applies a single
-     chain of constructors per step ([Tree.minimize] keeps the shortest
-     child of a derivation, treating children as alternatives, where here
-     both are required), proves the first premise and is left with the
-     second, which it then tries to close with [rt1n_refl]. If this is
-     fixed, the [Fail] below starts failing: make the proof positive. *)
+  (* Constructors with more than one LTS premise (backlog item A6, fixed
+     2026-10-01). No example in the repository has one. A derivation's
+     children are its premises, all required; the solver used to keep only
+     the shortest child ([Tree.minimize]), so it proved the first premise
+     and was left with the second. It now replays the whole tree in
+     pre-order. The shapes below are the ones that told the two apart in
+     the spike (notes/8): premises over different LTSs at different
+     constructor indices fail if replayed in the wrong order, so they also
+     pin the order. *)
   Import ExtractionSizes.
-  Inductive stepLTS : proc -> option act -> proc -> Prop :=
-  | st_act a p : stepLTS (pact a p) (Some a) p.
-  Inductive syncLTS : proc -> option act -> proc -> Prop :=
-  | sync p p' q q' a :
-      stepLTS p (Some a) p' -> stepLTS q (Some a) q' ->
-      syncLTS (ppar p q) (Some a) (ppar p' q').
-  Inductive syncLTS' : proc -> option act -> proc -> Prop :=
-  | sync' p p' q q' a :
-      stepLTS p (Some a) p' -> stepLTS q (Some a) q' ->
-      syncLTS' (ppar p q) (Some a) (ppar p' q').
+  Inductive leftLTS : proc -> option act -> proc -> Prop :=
+  | l_act a p : leftLTS (pact a p) (Some a) p.
+  Inductive rightLTS : proc -> option act -> proc -> Prop :=
+  | r_unused : rightLTS pnil None pnil
+  | r_act a p : rightLTS (pact a p) (Some a) p.
+  Inductive thirdLTS : proc -> option act -> proc -> Prop :=
+  | t_unused1 : thirdLTS pnil None pnil
+  | t_unused2 : thirdLTS (ppar pnil pnil) None pnil
+  | t_act a p : thirdLTS (pact a p) (Some a) p.
 
   MeBi Config Reset Weak.
   MeBi Config Weak As Option act.
-  Definition x : proc := ppar (pact A (pact B pnil)) (pact A (pact B pnil)).
 
-  Example wsim_sync : weak_sim syncLTS syncLTS' x x.
-  Proof. MeBi Sim Begin syncLTS x And syncLTS' x Using stepLTS.
-    Fail MeBi Sim Solve 300. Abort.
+  (* Both premises over one LTS: order cannot matter. *)
+  Inductive sameLTS : proc -> option act -> proc -> Prop :=
+  | same p p' q q' a : leftLTS p (Some a) p' -> leftLTS q (Some a) q' ->
+                       sameLTS (ppar p q) (Some a) (ppar p' q').
+  Inductive sameLTS' : proc -> option act -> proc -> Prop :=
+  | same' p p' q q' a : leftLTS p (Some a) p' -> leftLTS q (Some a) q' ->
+                        sameLTS' (ppar p q) (Some a) (ppar p' q').
+  Definition x2 : proc := ppar (pact A (pact B pnil)) (pact A (pact B pnil)).
+  Example wsim_same : weak_sim sameLTS sameLTS' x2 x2.
+  Proof. MeBi Sim Begin sameLTS x2 And sameLTS' x2 Using leftLTS.
+    MeBi Sim Solve 100. Qed.
+
+  (* Two different LTSs. *)
+  Inductive syncLTS : proc -> option act -> proc -> Prop :=
+  | sync p p' q q' a : leftLTS p (Some a) p' -> rightLTS q (Some a) q' ->
+                       syncLTS (ppar p q) (Some a) (ppar p' q').
+  Inductive syncLTS' : proc -> option act -> proc -> Prop :=
+  | sync' p p' q q' a : leftLTS p (Some a) p' -> rightLTS q (Some a) q' ->
+                        syncLTS' (ppar p q) (Some a) (ppar p' q').
+  Example wsim_sync : weak_sim syncLTS syncLTS' x2 x2.
+  Proof. MeBi Sim Begin syncLTS x2 And syncLTS' x2 Using leftLTS rightLTS.
+    MeBi Sim Solve 100. Qed.
+
+  (* Three LTSs, constructor indices 0/1/2: catches a rotated order. *)
+  Inductive tripleLTS : proc -> option act -> proc -> Prop :=
+  | triple p p' q q' r r' a :
+      leftLTS p (Some a) p' -> rightLTS q (Some a) q' -> thirdLTS r (Some a) r' ->
+      tripleLTS (ppar p (ppar q r)) (Some a) (ppar p' (ppar q' r')).
+  Inductive tripleLTS' : proc -> option act -> proc -> Prop :=
+  | triple' p p' q q' r r' a :
+      leftLTS p (Some a) p' -> rightLTS q (Some a) q' -> thirdLTS r (Some a) r' ->
+      tripleLTS' (ppar p (ppar q r)) (Some a) (ppar p' (ppar q' r')).
+  Definition x3 : proc := ppar (pact A pnil) (ppar (pact A pnil) (pact A pnil)).
+  Example wsim_triple : weak_sim tripleLTS tripleLTS' x3 x3.
+  Proof. MeBi Sim Begin tripleLTS x3 And tripleLTS' x3
+           Using leftLTS rightLTS thirdLTS.
+    MeBi Sim Solve 100. Qed.
+
+  (* Nested: a two-premise LTS as a premise of a two-premise LTS. *)
+  Inductive outerLTS : proc -> option act -> proc -> Prop :=
+  | outer p p' q q' a : syncLTS p (Some a) p' -> thirdLTS q (Some a) q' ->
+                        outerLTS (ppar p q) (Some a) (ppar p' q').
+  Inductive outerLTS' : proc -> option act -> proc -> Prop :=
+  | outer' p p' q q' a : syncLTS p (Some a) p' -> thirdLTS q (Some a) q' ->
+                         outerLTS' (ppar p q) (Some a) (ppar p' q').
+  Definition x4 : proc := ppar (ppar (pact A pnil) (pact A pnil)) (pact A pnil).
+  Example wsim_nested : weak_sim outerLTS outerLTS' x4 x4.
+  Proof. MeBi Sim Begin outerLTS x4 And outerLTS' x4
+           Using syncLTS leftLTS rightLTS thirdLTS.
+    MeBi Sim Solve 100. Qed.
+
+  (* KNOWN WRONG (found 2026-10-01, independent of A6; see I2): the solver
+     has no step for a premise that is not over an LTS. With an [eq]
+     premise after the LTS one it stalls, leaving the proof open (a
+     [weak_sim] step's [exists] goal); [Qed] would fail. When fixed, this
+     match fails: make the proof positive. *)
+  Inductive eqLTS : proc -> option act -> proc -> Prop :=
+  | with_eq p p' q a : leftLTS p (Some a) p' -> a = a ->
+                       eqLTS (ppar p q) (Some a) (ppar p' q).
+  Inductive eqLTS' : proc -> option act -> proc -> Prop :=
+  | with_eq' p p' q a : leftLTS p (Some a) p' -> a = a ->
+                        eqLTS' (ppar p q) (Some a) (ppar p' q).
+  Definition x5 : proc := ppar (pact A (pact B pnil)) pnil.
+  Example wsim_eq : weak_sim eqLTS eqLTS' x5 x5.
+  Proof. MeBi Sim Begin eqLTS x5 And eqLTS' x5 Using leftLTS.
+    MeBi Sim Solve 100.
+    (* still open: some goal remains *)
+    match goal with |- _ => idtac end.
+  Abort.
   MeBi Config Reset Weak.
 End TwoPremises.

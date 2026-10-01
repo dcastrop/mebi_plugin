@@ -857,7 +857,10 @@ struct
     : Enc.Tree.Node.t list option * Model.Annotation.t option
     =
     Logger.trace __FUNCTION__;
-    Some (Enc.Trees.min this.using |> Enc.Tree.minimize), next
+    (* [preorder], not the old shortest-child [minimize]: a node's children
+       are its premises, all required. See [Tree.preorder] and
+       [theories/Test.v]'s [TwoPremises]. *)
+    Some (Enc.Trees.min this.using |> Enc.Tree.preorder), next
   ;;
 
   (** [handle_appconstrs_update label] ... *)

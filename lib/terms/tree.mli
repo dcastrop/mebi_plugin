@@ -23,11 +23,21 @@ module type S = sig
   val add_list : t -> t list -> t list
   val equal : t -> t -> bool
   val compare : t -> t -> int
-  val minimize : t -> Node.t list
 
-  exception CannotMinimizeEmptyList of unit
+  (** [preorder t] is the sequence of constructors that replays the
+      derivation [t]: depth-first, left to right. A node's children are the
+      derivations of its constructor's LTS premises, in premise order, and
+      applying a constructor leaves those premises as goals in that same
+      order, focused on the first -- so this is exactly the order in which
+      the proof solver's focused goal asks for constructors. (It replaced
+      [minimize], which kept only a node's shortest child, as if children
+      were alternatives: backlog item A6.) Alternative derivations live in
+      {!Trees}, not within a tree. *)
+  val preorder : t -> Node.t list
 
-  val min : t list -> Node.t list
+  (** [size t] is the number of constructors in [t], i.e. the length of
+      [preorder t]. *)
+  val size : t -> int
 end
 
 module Make (Base : Base_.S) : S with type base = Base.t

@@ -19,11 +19,8 @@ module type S = sig
   val add_list : t -> t list -> t list
   val equal : t -> t -> bool
   val compare : t -> t -> int
-  val minimize : t -> Node.t list
-
-  exception CannotMinimizeEmptyList of unit
-
-  val min : t list -> Node.t list
+  val preorder : t -> Node.t list
+  val size : t -> int
 end
 
 module Make (Base : Base_.S) : S with type base = Base.t = struct
@@ -89,33 +86,12 @@ module Make (Base : Base_.S) : S with type base = Base.t = struct
       Utils.compare_chain [ Node.compare a b; List.compare compare al bl ]
   ;;
 
-  (** converts a given tree into a flattened list with the minimal number of constructors to apply
-  *)
-  let rec minimize : t -> Node.t list = function
-    | N (x, []) -> [ x ]
-    | N (x, h :: tl) ->
-      x
-      :: (List.fold_left (fun acc x -> minimize x :: acc) [] tl
-          (* NOTE: we only take the shortest one *)
-          |> List.fold_left
-               (fun (the_min : Node.t list) x ->
-                 match Int.compare (List.length x) (List.length the_min) with
-                 | -1 -> x
-                 | _ -> the_min)
-               (minimize h))
+  (** {i See [tree.mli].} *)
+  let rec preorder : t -> Node.t list = function
+    | N (x, cs) -> x :: List.concat_map preorder cs
   ;;
 
-  exception CannotMinimizeEmptyList of unit
-
-  let min : t list -> Node.t list = function
-    | [] -> raise (CannotMinimizeEmptyList ())
-    | h :: tl ->
-      List.map minimize tl
-      |> List.fold_left
-           (fun the_min x ->
-             match Int.compare (List.length x) (List.length the_min) with
-             | -1 -> x
-             | _ -> the_min)
-           (minimize h)
+  let rec size : t -> int = function
+    | N (_, cs) -> List.fold_left (fun n c -> n + size c) 1 cs
   ;;
 end

@@ -3347,6 +3347,71 @@ without a specific target.
 **Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
 Bug fix 4 · Optimization 2 · Tooling 5 · Docs 2 · Refactor 0.
 
+## 2026-10-01 — A6: constructors with several LTS premises can now be proved
+
+Branch `main` (on `fork`). **Bug fix** (proof solver, `lib/terms`).
+Backlog item A6; design and spike in `notes/8-two-premise-constructors.md`.
+
+**The bug.** The solver replays a transition's derivation tree as a flat
+list of constructors, one `constructor i` per step on the focused goal. The
+list came from `Tree.minimize`, which keeps a node's *shortest child*, as if
+children were alternative derivations. They are not: a node's children are
+its constructor's LTS premises, all required (alternatives live in `Trees`,
+one level up). With two premises the solver proved the first, ran out of
+constructors, and tried `rt1n_refl` on the second.
+
+**The fix.** `Tree.preorder` (depth-first, left to right) replaces
+`minimize`; `Trees.min` ranks alternatives by `Tree.size` (constructors to
+apply) instead of minimized length. `minimize`, the unused `Tree.min` and
+`CannotMinimizeEmptyList` are gone.
+
+**Validated before building**, each claim against a test that could
+falsify it (spike with a switchable `minimize`/`preorder`/`reversed`
+replay, since reverted). The dumped tree's children are in premise order.
+A hand replay in Ltac shows Rocq focusing premise goals left to right
+(`Qed` accepts). Two LTSs, three LTSs at constructor indices 0/1/2, and a
+nested two-premise node all pass with `preorder` and fail with
+`reversed`, so the tests are order-sensitive and the order is right.
+
+**Verified after building**, including three checks the spike could not
+make, written down beforehand as a checklist in note 8 (R1–R3):
+
+- R1, R2: temporary instrumentation in `Trees.min`, through which every
+  tree choice passes (the solver, `Product.respond`,
+  `proof_solver_step.ml:236`). It found **0** trees with a multi-child node
+  anywhere, and **0** choices where the new ranking differs from the old,
+  over ~2,300 calls per mode.
+- R3: a temporary environment override forcing `MutualCofix` past the
+  per-file settings. Old code and new code were each run under `Auto`,
+  `True` and `False`, and are **identical per mode**: `Auto`'s 27 counts;
+  forced nested Test2 `446 278 299 194 446 182`; forced nested Test3
+  stops at 1127 in both. One thing gave me pause: forced `True` equals
+  `Auto` on Test1/CADP. The log's own 2026-10-01 entry explains it (since
+  item 12, mutual Test1 is 22/21, the nested figures), so the override did
+  apply.
+
+Tests: `TwoPremises` in `theories/Test.v` is now positive, with the spike's
+shapes (same LTS, two LTSs, three LTSs, nested) as regressions. It also has
+a known-wrong case, below. `tests.exe` 58 → 61 (`preorder` on a chain, two
+premises, nested; `size`; `Trees.min` by size). satdiff identical; module
+lists agree; `make` builds plugin and `Test.v`.
+
+**Mistakes on the way.** My first `tree.mli` doc comment had no blank line
+after `val compare`. `make` rejects that (warning 50) and `dune build` does
+not, so the first new-code half of the verification matrix built nothing
+and had to be rerun. During the spike, a text edit went to the signature
+instead of the implementation.
+
+**Found, not fixed: `eq` premises break proofs, independent of A6.** Even
+with one LTS premise, an `eq` premise *before* it is an Anomaly
+(`Constructor_bindings…BindingInstruction_NotApp`: the next node is
+applied to the `eq` goal), and one *after* it leaves the proof open. The
+solver has no step for non-LTS premise goals; this belongs with I2.
+`TwoPremises.wsim_eq` records it as known-wrong.
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
+Bug fix 5 · Optimization 2 · Tooling 5 · Docs 2 · Refactor 0.
+
 ---
 
 ## Outstanding

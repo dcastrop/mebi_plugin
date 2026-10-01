@@ -25,18 +25,15 @@ module Make (Tree : Tree.S) : S with type tree = Tree.t = struct
 
   exception EmptyHasNoMin
 
-  (** obtain the tree with the shortest minimized length *)
+  (** The derivation with the fewest constructors to apply ({!Tree.size});
+      on a tie, the least in the set's order. *)
   let min (xs : t) : elt =
     match to_list xs with
     | [] -> raise EmptyHasNoMin
     | h :: tl ->
       List.fold_left
         (fun (acc : elt) (x : elt) ->
-          match
-            Int.compare
-              (Tree.minimize x |> List.length)
-              (Tree.minimize acc |> List.length)
-          with
+          match Int.compare (Tree.size x) (Tree.size acc) with
           | -1 -> x
           | _ -> acc)
         h

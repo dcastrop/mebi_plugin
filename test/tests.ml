@@ -613,8 +613,8 @@ let test_saturation_estimate () : unit =
 
 (* ------------------------------------------------------------------ *)
 (* lib/terms: constructor trees and the encoding counter (backlog E(c)).
-   Only what has callers: [Tree.add], [Tree.add_list] and [Tree.min] have
-   none outside lib/terms and are deliberately not pinned here. *)
+   Only what has callers: [Tree.add] and [Tree.add_list] have none outside
+   lib/terms and are deliberately not pinned here. *)
 
 module Tree = Base.Tree
 module Trees = Base.Trees
@@ -657,40 +657,50 @@ let test_tree_order () : unit =
     (Base.Constructor_tree.equal c (1, 2, u))
 ;;
 
-(** [Tree.minimize] is what the proof solver applies, node by node
-    ([Proof_solver_step.handle_appconstrs_update_args]). It treats a node's
-    children as {e alternatives} and keeps the shortest. A chain flattens to
-    itself. See the [TwoPremises] known-wrong test in [theories/Test.v]: for
-    a constructor with two LTS premises the children are both required, and
-    keeping one is why such proofs fail. *)
-let test_tree_minimize () : unit =
-  print_endline "terms: Tree.minimize and Trees.min";
+(** [Tree.preorder] is what the proof solver applies, node by node
+    ([Proof_solver_step.handle_appconstrs_update_args]). A node's children
+    are its constructor's premises, all required, so all of them are
+    replayed, depth-first, left to right -- the order Rocq focuses premise
+    goals in. It replaced [minimize], which kept only the shortest child
+    (backlog A6; [theories/Test.v]'s [TwoPremises]). *)
+let test_tree_preorder () : unit =
+  print_endline "terms: Tree.preorder, Tree.size and Trees.min";
   let chain = Tree.N (node 1 0, [ Tree.N (node 2 1, [ leaf 3 2 ]) ]) in
   check
     "a chain flattens to its nodes, root first"
     true
-    (nodes_equal [ node 1 0; node 2 1; node 3 2 ] (Tree.minimize chain));
-  let long = Tree.N (node 2 0, [ Tree.N (node 3 0, [ leaf 4 0 ]) ]) in
+    (nodes_equal [ node 1 0; node 2 1; node 3 2 ] (Tree.preorder chain));
+  let two = Tree.N (node 1 0, [ leaf 2 0; leaf 3 1 ]) in
+  check
+    "two premises: both children, in order"
+    true
+    (nodes_equal [ node 1 0; node 2 0; node 3 1 ] (Tree.preorder two));
+  (* A two-premise node under a two-premise node: the first premise's whole
+     subtree comes before the second premise. *)
+  let nested = Tree.N (node 9 0, [ two; leaf 4 2 ]) in
+  check
+    "nested: depth-first, left to right"
+    true
+    (nodes_equal
+       [ node 9 0; node 1 0; node 2 0; node 3 1; node 4 2 ]
+       (Tree.preorder nested));
+  check_int "size counts every node" 5 (Tree.size nested);
+  check
+    "size = length of preorder"
+    true
+    (List.for_all
+       (fun t -> Int.equal (Tree.size t) (List.length (Tree.preorder t)))
+       [ chain; two; nested; leaf 1 0 ]);
+  (* [Trees.min] chooses among alternative derivations by size. *)
   let short = leaf 5 0 in
   check
-    "of two children, the shorter is kept (either order)"
+    "Trees.min picks the derivation with the fewest constructors"
     true
-    (nodes_equal
-       [ node 1 0; node 5 0 ]
-       (Tree.minimize (Tree.N (node 1 0, [ long; short ])))
-     && nodes_equal
-          [ node 1 0; node 5 0 ]
-          (Tree.minimize (Tree.N (node 1 0, [ short; long ]))));
+    (Tree.equal short (Trees.min (Trees.of_list [ chain; two; short ])));
   check
-    "on a tie, the first child is kept"
+    "a wide tree is not 'short' because one branch is"
     true
-    (nodes_equal
-       [ node 1 0; node 2 0 ]
-       (Tree.minimize (Tree.N (node 1 0, [ leaf 2 0; leaf 3 0 ]))));
-  check
-    "Trees.min picks the tree with the shortest minimized path"
-    true
-    (Tree.equal short (Trees.min (Trees.of_list [ chain; long; short ])));
+    (Tree.equal chain (Trees.min (Trees.of_list [ chain; nested ])));
   check
     "Trees.min_opt of empty is None"
     true
@@ -746,7 +756,7 @@ let () =
   test_product_estimate ();
   test_saturation_estimate ();
   test_tree_order ();
-  test_tree_minimize ();
+  test_tree_preorder ();
   test_encoding_counter ();
   test_json ();
   Printf.printf "\n%i/%i passed\n" (!total - !failures) !total;

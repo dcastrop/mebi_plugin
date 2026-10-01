@@ -93,7 +93,7 @@ To run them:
    next `dune build`.
 
 For pure-OCaml model changes with no Rocq/proof-solver involvement,
-`dune exec test/tests.exe` (expect 41/41) is a much faster first signal, but
+`dune exec test/tests.exe` (expect 61/61) is a much faster first signal, but
 does not substitute for the proof-suite run above when the change touches
 anything the proof solver reads.
 
