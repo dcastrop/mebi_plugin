@@ -3000,6 +3000,29 @@ src/mebi_plugin.cmxs` and `dune build` clean.
 
 ---
 
+## 2026-10-01 — C2: `lib/dune` deleted
+
+Branch `main` (on `fork`). Refactor (dead-file removal). Backlog item C2.
+
+`lib/dune` was 9 commented-out lines declaring an umbrella library
+`rocq-mebi.mebi_lib` that re-exported the four `lib/` libraries. Its history
+settles what it was for: when the sub-libraries were namespaced
+`rocq-mebi.mebi_lib.{utils,terms,rocq_tools,model}`, it was their parent.
+`148ddbb` (2026-03-30) renamed them to `rocq-mebi.{utils,terms,...}` and
+commented the umbrella out in the same commit; it was never revived, and
+nothing in the tree references `mebi_lib`. `src/dune` already depends on
+each library by name, so finishing it would only add an unused alias.
+Deleted.
+
+**Verification.** `dune build`, `dune exec test/tests.exe` 34/34,
+`scripts/check_module_lists.py`, `make src/mebi_plugin.cmxs
+theories/Test.vo`, then `make dune` — all clean.
+
+**Session tally (2026-10-01, this session):** Bug fix 3 · Optimization 1
+(one reverted) · Docs 3 · Tooling 2 · Refactor 1 · New feature 0.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.
