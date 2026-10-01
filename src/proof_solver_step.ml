@@ -617,12 +617,6 @@ struct
     ;;
   end
 
-  exception
-    PairNotInProduct of
-      { a : Model.State.t
-      ; b : Model.State.t
-      }
-
   (** [handle_open_block ()] opens the whole proof with a single mutual
       cofixpoint, one definition per pair of the precomputed product relation
       ([Model.Product.reachable]).
@@ -669,7 +663,7 @@ struct
          through [In_sim; Pack_sim; intros] with the rest of the block, past
          the point where [handle_weaksim] can close it by [weak_sim_refl] --
          and [reachable] did not follow its successors, so the search would
-         then raise [PairNotInProduct]. Left out, every goal that reaches it
+         then stop with a pair-not-in-product error. Left out, every goal that reaches it
          is still a bare [weak_sim x x] and closes by reflexivity. *)
       let others : Model.Product.Pair.t list =
         Model.Product.Pair.Set.remove root pairs
@@ -951,19 +945,26 @@ struct
            | Some h -> Tacs.exact_hyp h
            | None ->
              if !Api.the_mutual_cofix
-             then (
+             then
                (* Every pair the search can reach is supposed to be in the
                   block. Reaching one that is not means the product computed
                   up front disagrees with what the solver actually does --
-                  name the pair rather than leaving a stuck goal. *)
-               let a = M.run (ReModel.state tys.(5) (W.get_fsm_a ()).states) in
-               let b =
-                 M.run
-                   (ReModel.state
-                      tys.(6)
-                      (W.get_fsm_b ~saturated:true ()).states)
-               in
-               raise (PairNotInProduct { a; b }))
+                  name the pair rather than leaving a stuck goal. A user
+                  error, not an uncaught exception: Rocq reports the latter
+                  as an anomaly in Rocq itself. *)
+               CErrors.user_err
+                 (Pp.str
+                    (Printf.sprintf
+                       "MeBi: reached a weak_sim goal for a pair outside the \
+                        mutual cofix block computed up front, so the proof \
+                        cannot close it:\n\
+                       \  %s\n\
+                       \  %s\n\
+                        This is a bug in the plugin's product computation \
+                        (Model.Product). [MeBi Config Solver MutualCofix \
+                        False] avoids the mutual block."
+                       (Strfy.econstr tys.(5))
+                       (Strfy.econstr tys.(6))))
              else handle_new_cofix ()))
     else if ProofState.is_done ()
     then raise ProofComplete

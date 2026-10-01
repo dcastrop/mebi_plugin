@@ -2927,6 +2927,46 @@ proof-solver code touched.
 
 ---
 
+## 2026-10-01 — H3: `PairNotInProduct` becomes a user error; `CADP/Size2` re-measured
+
+Branch `main` (on `fork`).
+
+**Bug fix: no more "Anomaly" for a pair missing from the mutual block.**
+`PairNotInProduct` was a local exception with no `CErrors` handler, so Rocq
+reported it as `Anomaly "Uncaught exception ..." Please report at
+rocq-prover.org/bugs` — blaming Rocq for a plugin-side inconsistency. It is
+now a `CErrors.user_err` that prints both goal terms, says it is a bug in
+`Model.Product`, and names the workaround (`MutualCofix False`). The
+exception, never caught anywhere, is removed. Checked by forcing the path
+(an empty block, temporarily) on a scratch proof:
+
+```
+Error:
+MeBi: reached a weak_sim goal for a pair outside the mutual cofix block
+computed up front, so the proof cannot close it:
+  (tpar A A (tfix (tpar A A trec)))
+  (tfix (tact A (tact A trec)))
+This is a bug in the plugin's product computation (Model.Product).
+[MeBi Config Solver MutualCofix False] avoids the mutual block.
+```
+
+**Measurement: `CADP/Size2`**, recorded as "FAIL: state-explosion" before the
+evar-name fix. Extraction of `c2` is now linear — 2500 states in 67s/2.1GB,
+5000 in 135s/3.5GB (~27ms and ~0.56MB per state) — and still incomplete at
+5000. So the label was right, but the binding constraint is now memory, not
+time: ~9k states fit in a 6GB cap, ~24k in 15GB. The per-state memory
+(4x `Test4`'s, CADP terms being larger) is a plausible future optimization
+target; not investigated. `_CoqProject`'s comment updated with the numbers.
+
+**Verification.** Six proof suites not re-run: the change is confined to an
+error path no passing proof reaches. `dune build`, `@fmt` clean; error
+message checked as above.
+
+**Session tally (2026-10-01, this session):** Bug fix 3 · Optimization 1
+(one reverted) · Docs 3 · Tooling 1 · Refactor 0 · New feature 0.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

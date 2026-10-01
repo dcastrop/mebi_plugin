@@ -67,7 +67,7 @@ examples/Bisimilarity/CADP/Size1/Terms.v ### REQUIRED FOR BELOW
 
 # TODO:
 examples/Bisimilarity/CADP/Size2/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/CADP/Size2/TermTests.v ### FAIL: state-explosion
+# examples/Bisimilarity/CADP/Size2/TermTests.v ### KNOWN LIMIT (memory): re-measured 2026-10-01 -- extraction is linear (~27ms, ~0.56MB per state) but still incomplete at 5000 states (135s, 3.5GB); full size unknown, roughly 9k states fit in 6GB. Run only under a memory cap (systemd-run -p MemoryMax=...)
 
 # examples/Bisimilarity/CADP/Size2/Glued/TermTests.v ### Success
 # examples/Bisimilarity/CADP/Size2/Glued/PluginProofs.v ### FAIL: ^
