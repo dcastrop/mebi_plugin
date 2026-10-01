@@ -19,8 +19,6 @@ module type S = sig
 
   include Json.S with type k = t (** @closed *)
 
-  val add : t -> t -> t
-  val add_list : t -> t list -> t list
   val equal : t -> t -> bool
   val compare : t -> t -> int
 

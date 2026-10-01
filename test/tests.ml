@@ -612,9 +612,7 @@ let test_saturation_estimate () : unit =
 ;;
 
 (* ------------------------------------------------------------------ *)
-(* lib/terms: constructor trees and the encoding counter (backlog E(c)).
-   Only what has callers: [Tree.add] and [Tree.add_list] have none outside
-   lib/terms and are deliberately not pinned here. *)
+(* lib/terms: constructor trees and the encoding counter (backlog E(c)). *)
 
 module Tree = Base.Tree
 module Trees = Base.Trees

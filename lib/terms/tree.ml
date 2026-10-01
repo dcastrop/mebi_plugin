@@ -15,8 +15,6 @@ module type S = sig
 
   include Json.S with type k = t
 
-  val add : t -> t -> t
-  val add_list : t -> t list -> t list
   val equal : t -> t -> bool
   val compare : t -> t -> int
   val preorder : t -> Node.t list
@@ -65,15 +63,6 @@ module Make (Base : Base_.S) : S with type base = Base.t = struct
           ]
       ;;
     end)
-
-  (** [add x y] inserts [x] to be a new leaf of [y], mutually recursive with [add_list x ys] (where [ys] is a list of [t]).
-  *)
-  let rec add (x : t) : t -> t = function N (h, tl) -> N (h, add_list x tl)
-
-  and add_list (x : t) : t list -> t list = function
-    | [] -> [ x ]
-    | h :: tl -> add x h :: add_list x tl
-  ;;
 
   let rec equal (a : t) (b : t) : bool =
     match a, b with
