@@ -2571,6 +2571,76 @@ Optimization 0 · **Tooling 0.**
 
 ---
 
+## 2026-10-01 — Step 0, gated to the mutual path
+
+Branch `main` (on `fork`). Optimization. The sterile re-inversions recorded
+on 2026-09-29, recovered where it is safe to do so.
+
+**Why gating, and a correction.** The previous entry said Step 0 was "now
+safe to retry" because the search finally had a plan to fall back on. That
+was too broad. The two proofs the original attempt broke — `wsim_lts` and
+`wsim_lts_bigstep`, both 396 iterations, neither closing after 5000 — are
+**CADP** proofs, and `Auto` keeps CADP on the *nested* path. Nothing about
+them changed, so they would have broken again.
+
+What is true is narrower and sufficient: **with the mutual block open, every
+reachable pair already has a hypothesis in scope**, so sending the search
+down a different route cannot lose a closure, only reorder what gets proved.
+On the nested path it demonstrably can. So the smaller-first tie-break in
+`Hyps.try_invert_any` now applies when `Api.the_mutual_cofix` is set, and
+nowhere else — the nested path is byte-identical by construction, not by
+measurement.
+
+**Result.** All 27 proofs `Solved`:
+
+| suite | path | before | after |
+| --- | --- | --- | --- |
+| `Proc/Test1` | nested | 114 105 106 109 22 21 | identical |
+| `Proc/Test2` | mutual | 112 112 112 84 112 84 | identical |
+| `Proc/Test3` | mutual | 1127 387 519 519 603 211 331 603 331 | **1043 355 483 483 555 195 307 555 307** |
+| `CADP/Size1` | nested | 268 396 268 396 81 63 | identical |
+
+**7-8% off every `Proc/Test3` proof**, and nothing else moves. `Test2` is
+unchanged because its hypotheses are flat `termLTS` chains where the tie
+rarely has a size to break — consistent with its sterile-step rate having
+been the lowest measured (2.7-4.3%, against `Test3`'s 12.0%).
+
+**A mistake worth recording.** The first attempt at the gate failed
+immediately: `Test1`'s first proof went from `Solved after 114` to
+`Unsolved after 115`, on the *nested* path, which the gate was supposed to
+leave untouched. The original fold is
+
+```
+match Int.compare grade n with -1 -> keep old | _ -> take new
+```
+
+so a **tie takes the new (later) hypothesis**, and my rewritten condition
+kept the earlier one. The gate was right; the predicate around it was not.
+Caught by the suite on the first run, which is the argument for running all
+27 rather than reasoning about which ones could be affected.
+
+**Bounds left loose.** `Proc/Test3`'s checked-in `MeBi Sim Solve` bounds are
+now the pre-2026-10-01 figures while the proofs close in 7-8% fewer steps.
+`Solve N` only caps, so the file still compiles; leaving them loose keeps it
+working across heuristic changes, which is the same decision already taken
+for `Test2`. `CLAUDE.md` carries the real counts and says so.
+
+**What is left of Step 0.** The nested path still spends 2.6% (`Test1`) to
+14.1% (`CADP/Size1`'s `wsim_lts_bigstep`) of its steps re-inverting. That is
+not recoverable by a better local heuristic — it is the same unplanned walk
+that broke on 2026-09-29. Recovering it needs either a product-aware nested
+path or a fallback that retries with the mutual block when the nested one
+stalls. Neither is designed.
+
+**Verification.** Six proof suites, 27 of 27 `Solved` with the counts above.
+`dune exec test/tests.exe` 30/30, `test/satdiff.exe -- 200` matches its
+golden file, `make dune` and `dune build @fmt` clean.
+
+**Session tally:** Optimization 1 · Docs 1 · Bug fix 0 · New feature 0 ·
+Refactor 0 · **Tooling 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

@@ -47,7 +47,7 @@ To run them:
    ```
    Proc/Test1   114, 105, 106, 109, 22, 21        (nested)
    Proc/Test2   112, 112, 112, 84, 112, 84        (mutual)
-   Proc/Test3   1127, 387, 519, 519, 603, 211, 331, 603, 331   (mutual)
+   Proc/Test3   1043, 355, 483, 483, 555, 195, 307, 555, 307   (mutual)
    CADP/Size1   268, 396, 268, 396, 81, 63        (nested)
    ```
    A change to *classification* (Solved/Unsolved) is a regression. A change
@@ -70,9 +70,13 @@ To run them:
    `n <= bound`, not `n < bound`), so a checked-in bound one below the
    reported "Solved after" count (`MutualExclusion` and `Glued` use
    `Solve 267`/`Solve 395` and report 268/396) is expected, not a bug.
-   `Proc/Test2`'s bounds are deliberately **loose** — they are the
-   nested-path figures, so the file still compiles if someone sets
-   `MutualCofix False`.
+   `Proc/Test2`'s and `Proc/Test3`'s bounds are deliberately **loose**.
+   `Test2`'s are the nested-path figures, so the file still compiles if
+   someone sets `MutualCofix False`; `Test3`'s are the pre-2026-10-01
+   figures, from before the inversion tie-break was improved on the mutual
+   path. Leaving both loose keeps the examples working across strategy and
+   heuristic changes; the counts above are the source of truth for what they
+   actually cost.
    With `-j` above 1, `make` interleaves output from multiple files line by
    line and individual `Solved after N` lines cannot be reliably attributed
    to a proof by sequential reading — rebuild a single file with
