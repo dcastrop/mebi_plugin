@@ -54,14 +54,45 @@ module Make
 
   open G
 
+  (** [get_new_constrs g from] finds the transitions out of [from].
+
+      Run in a [sandbox], so the evar map is restored afterwards: matching a
+      state against the LTS's constructors creates an evar per constructor
+      binder, per constructor tried, and leaving them all in the one
+      command-wide evar map was most of extraction's memory (80% of the live
+      heap on [Proc/Test4] at 2000 states, ~150 evars per state; see
+      [ASSISTED-CHANGES.md], 2026-10-01). Nothing that escapes needs them:
+      the result is encodings, whose terms are normalized and were measured
+      evar-free on every example. The encoding tables themselves are updated
+      in place, so the sandbox keeps them. Should a found term ever contain
+      an evar, the inner evar map is kept instead -- the old behaviour. *)
   let get_new_constrs (g : t) (from : Enc.t) : M.Constructor.t list M.mm =
     Logger.trace __FUNCTION__;
-    M.Unification.collect_valid_constructors
-      (M.Ind.get_lts_constructor_types g.primarylts)
-      (M.decode_map g.ltsmap)
-      (M.decode from)
-      (M.Ind.get_lts_label_type g.primarylts)
-      g.primarylts.enc
+    let open M.Syntax in
+    let collect : (M.Constructor.t list * Evd.evar_map option) M.mm =
+      let* cs : M.Constructor.t list =
+        M.Unification.collect_valid_constructors
+          (M.Ind.get_lts_constructor_types g.primarylts)
+          (M.decode_map g.ltsmap)
+          (M.decode from)
+          (M.Ind.get_lts_label_type g.primarylts)
+          g.primarylts.enc
+      in
+      let* sigma : Evd.evar_map = M.get_sigma in
+      let has_evars (x : Enc.t) : bool =
+        Bool.not (Evar.Set.is_empty (Evd.evars_of_term sigma (M.decode x)))
+      in
+      if List.exists (fun ((act, tgt, _) : M.Constructor.t) ->
+           has_evars act || has_evars tgt) cs
+      then M.return (cs, Some sigma)
+      else M.return (cs, None)
+    in
+    let* cs, keep = M.sandbox collect in
+    match keep with
+    | None -> M.return cs
+    | Some sigma ->
+      let$* () = fun _ _ -> sigma in
+      M.return cs
   ;;
 
   (** [update_to_visit g x] adds [x] to [g.to_visit] if [x] has not yet been explored {i (i.e., if [x] is not recorded in [g] as a state or as having a transition)}.
