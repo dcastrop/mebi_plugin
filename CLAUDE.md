@@ -38,7 +38,8 @@ To run them:
    `CADP/Size1/Glued/MutualExclusion`. `Proc/Test3` adds ~9s; the other five
    together are under a minute. (`Test4` has no `PluginProofs.v`: its LTS has
    9720 states, which now *extract* in ~25s, but saturating them exhausted
-   memory — backlog item B3. Run anything on `Test4` under a memory cap,
+   memory — backlog item B3; the plugin now refuses that saturation with
+   `Saturation_Too_Large` instead. Run anything on `Test4` under a memory cap,
    with `systemd-run --user --scope -p MemoryMax=6G -p MemorySwapMax=0` --
    `ulimit -v` does not work, OCaml 5 then cannot reserve its heaps. An
    uncapped run took the whole machine down.)
@@ -92,7 +93,7 @@ To run them:
    next `dune build`.
 
 For pure-OCaml model changes with no Rocq/proof-solver involvement,
-`dune exec test/tests.exe` (expect 34/34) is a much faster first signal, but
+`dune exec test/tests.exe` (expect 41/41) is a much faster first signal, but
 does not substitute for the proof-suite run above when the change touches
 anything the proof solver reads.
 

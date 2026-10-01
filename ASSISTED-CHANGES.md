@@ -19,7 +19,8 @@ Entries are chronological, oldest first, so the log reads as a narrative.
 project is a finished rough draft and what remains is refactoring, bug fixes and
 optimizations. Anything that would add a *plugin capability* gets raised
 explicitly and up front, before it is written, rather than appearing in this log
-after the fact. To date, none has.
+after the fact. Those raised and agreed so far are tagged **New feature** in
+their own entries (B2's `MutualCofix Auto`, H2's saturation guard, ...).
 
 **Scope of this log.** It covers work identifiable by the
 `Co-Authored-By: Claude` trailer — 26 commits as of `df4f65c`, all from
@@ -3020,6 +3021,77 @@ theories/Test.vo`, then `make dune` — all clean.
 
 **Session tally (2026-10-01, this session):** Bug fix 3 · Optimization 1
 (one reverted) · Docs 3 · Tooling 2 · Refactor 1 · New feature 0.
+
+## 2026-10-01 — H2: a size check before every saturation; H3's remaining messages
+
+Branch `main` (on `fork`). Backlog items H2 and the rest of H3. **New
+feature** (H2: a new check and two new config commands), raised with the
+user before any code was written. They chose: **refuse by default**, mirroring
+`FailIf Incomplete`; a **configurable bound** documented with example values
+and memory; and the H3 remainder in the same session.
+
+**`Model.SaturationEstimate`** (`lib/model/algorithms/saturation_estimate.ml`,
+pure OCaml). Counts the weak actions `FSM.saturate` would materialise (one per
+distinct `(from, a, goto)`) exactly, without saturating. It works on the
+quotient by silent SCCs: Tarjan, `tau*`-reach as bitsets over the SCC DAG,
+then a per-label DP for `tau* a tau*`. The Python prototype unioned reach sets
+per member; the DP avoids its cubic worst case on long silent chains.
+`tests.exe` gains 7 checks (34 → 41). The one that matters is differential:
+the estimate equals the triple count of real saturation on 300 seeded random
+LTSs (>250 of them non-trivial, which is also checked).
+
+**The guard.** `Wrapper.check_saturation_size` runs after FSM construction in
+`do_saturate`, `do_minimize` and `do_check_bisim` (both FSMs; `Sim Begin`
+reaches it through `check_bisimilarity`). It is a no-op without weak labels.
+Above `MeBi Config Bounds Saturation <n>` (default 1,000,000; reset by `Reset
+Bounds`) it raises `Saturation_Too_Large`, naming the count and a memory range.
+`MeBi Config FailIf Oversaturated False` downgrades that to a warning. Each
+estimate is logged at `Info`.
+
+**Measurement behind the numbers.** Heap growth across `FSM.saturate`
+(full-major GC either side), on partial LTSs cut short by the state bound:
+`Proc/Test4` at 251/501/1001 states gave 427/439/443 bytes per weak action;
+`CADP/Size2` at 500/1000/2000 states gave 555/648/859. The second set grows
+because each action keeps its shortest witness path. So the message and
+README quote **450–900 bytes**, and the README has a table of bounds against
+memory. Time is **super-linear** in the count: 20k/82k/400k weak actions on
+`Test4` took 0.7/6.3/141s, against 0.5/1.1/5.2s for 7k/17k/70k on CADP. The
+likely cause is that `Saturation.edge_closure` recomputes each target's
+silent closure per visible move. That is noted as a possible optimization,
+not done here.
+
+**A correction.** The backlog and `Test4`'s header said its saturation is
+"~112M weak transitions", from the throwaway Python model
+(`notes/tools/test4_saturation_estimate.py`). The plugin's own figure is
+**74,649,600** (7680 per state, against Python's 11,520). The estimator is
+verified against real saturation, so the plugin's number is what it would
+build. The gap most likely lies in how the Python model distinguishes
+labels; I did not chase it. The header, the `_CoqProject` comment and the new
+docs now carry the plugin's figure. With the full 9720-state LTS (`Bounds As
+Num States 12000`), `MeBi Run Saturate p` now refuses after ~27s of
+extraction under a 6GB cap. Before, it took the machine down.
+
+**H3, `Sim Solve` exhaustion.** When `MeBi Sim Solve N` stops on its bound
+unsolved, a second notice now says that `N` permits `N + 1` steps, which
+cofix strategy is in force and whether `Auto` chose it, and the exact
+`MutualCofix True|False` command to force the other. The `(Stopped) Unsolved
+after N iterations.` line is byte-for-byte unchanged, since the baseline
+greps it. Bug fix (message).
+
+**H3, extraction memory.** `MeBi Config Bounds As Num States <n>` prints a
+notice when `n` × 0.56MB (measured, CADP; `Test4` is 0.16MB) passes 1GB,
+giving the range. A notice, not a refusal: the bound is an upper limit, and
+most LTSs never reach it. Bug fix (message).
+
+**Verification.** `tests.exe` 41/41. End to end against dune's plugin build:
+`Test4` refuses as above. Test3 with `Bounds Saturation 50` refuses on
+`Saturate` and `Bisim`, and warns then proceeds under `FailIf Oversaturated
+False`. Test1 `Solve 10` prints the new hint under `Auto` (nested) and forced
+`True` (mutual). Proof suite: all 27 `Solved after` counts unchanged under `Auto` (the check is read-only; no solver heuristic changed, so forced `MutualCofix` runs were not needed).
+
+**Session tally (2026-10-01, this session):** New feature 1 (H2) · Bug fix 2
+(H3 messages) · Docs 1 (README, the `Test4` figure, this log's stale "none
+has" line) · Refactor 0 · Optimization 0 · Tooling 0.
 
 ---
 

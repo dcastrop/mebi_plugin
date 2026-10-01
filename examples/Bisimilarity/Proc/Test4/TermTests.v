@@ -13,9 +13,13 @@
      LTS extracts in ~25s.
    - Saturation is the blocker. The 120 tree shapes of each local
      configuration form one silent strongly connected component (81 of
-     them), so the saturated LTS has ~112M weak transitions -- tens of GB
+     them), so the saturated LTS has 74,649,600 weak actions -- 34--67GB
      in the plugin's representation. [MeBi Run Saturate p] exhausted a 15GB
-     machine. Never run this file without a memory cap: systemd-run --user
+     machine. Since 2026-10-01 the plugin computes that figure before
+     saturating and refuses (Saturation_Too_Large: above the default
+     [MeBi Config Bounds Saturation] of 1,000,000), so the first saturation
+     now fails in ~27s instead. Still never run this file without a memory
+     cap, in case the guard is lifted: systemd-run --user
      --scope -p MemoryMax=6G -p MemorySwapMax=0 (ulimit -v does not work --
      OCaml 5 cannot then reserve its heaps).
 

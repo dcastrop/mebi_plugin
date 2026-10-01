@@ -68,10 +68,15 @@ type fail_flags =
   { mutable empty : bool
   ; mutable incomplete : bool
   ; mutable non_bisimilar : bool
+  ; mutable oversaturated : bool
   }
 
 let the_fail_flags_default : fail_flags =
-  { empty = false; incomplete = true; non_bisimilar = true }
+  { empty = false
+  ; incomplete = true
+  ; non_bisimilar = true
+  ; oversaturated = true
+  }
 ;;
 
 let the_fail_flags : fail_flags ref = ref the_fail_flags_default
@@ -99,6 +104,14 @@ let set_fail_flag_non_bisimilar (non_bisimilar : bool) : unit =
   |> Logger.show
 ;;
 
+let set_fail_flag_oversaturated (oversaturated : bool) : unit =
+  the_fail_flags := { !the_fail_flags with oversaturated };
+  Printf.sprintf
+    "(MeBi Config: Set Fail-If 'Oversaturated' Flag to: %b.)"
+    oversaturated
+  |> Logger.show
+;;
+
 (***********************************************************************)
 
 type bounds_args =
@@ -107,7 +120,24 @@ type bounds_args =
 
 let default_bounds : bounds_args = States 100
 let the_bounds_args : bounds_args ref = ref default_bounds
-let reset_bounds_args () : unit = the_bounds_args := default_bounds
+
+(** The most weak actions saturation may produce before the plugin refuses
+    (or, with [FailIf Oversaturated False], warns): see
+    [Wrapper.check_saturation_size]. *)
+let default_saturation_bound : int = 1_000_000
+
+let the_saturation_bound : int ref = ref default_saturation_bound
+
+let reset_bounds_args () : unit =
+  the_bounds_args := default_bounds;
+  the_saturation_bound := default_saturation_bound
+;;
+
+let set_saturation_bound (x : int) : unit =
+  the_saturation_bound := x;
+  Printf.sprintf "(MeBi Config: Set Saturation Bound to: %i weak actions.)" x
+  |> Logger.show
+;;
 
 let set_the_bounds_args (x : bounds_args) : unit =
   the_bounds_args := x;

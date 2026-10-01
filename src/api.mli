@@ -22,6 +22,8 @@ type fail_flags =
   { mutable empty : bool
   ; mutable incomplete : bool
   ; mutable non_bisimilar : bool
+  ; mutable oversaturated : bool
+    (** refuse to saturate past {!the_saturation_bound}, rather than warn *)
   }
 
 val the_fail_flags_default : fail_flags
@@ -49,6 +51,7 @@ val reset_mutual_cofix : unit -> unit
 val set_fail_flag_empty : bool -> unit
 val set_fail_flag_incomplete : bool -> unit
 val set_fail_flag_non_bisimilar : bool -> unit
+val set_fail_flag_oversaturated : bool -> unit
 
 type bounds_args =
   | States of int
@@ -58,6 +61,9 @@ val default_bounds : bounds_args
 val the_bounds_args : bounds_args ref
 val reset_bounds_args : unit -> unit
 val set_the_bounds_args : bounds_args -> unit
+val default_saturation_bound : int
+val the_saturation_bound : int ref
+val set_saturation_bound : int -> unit
 
 type weak_args =
   { a : weak_arg option

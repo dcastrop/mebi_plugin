@@ -48,7 +48,7 @@ examples/Bisimilarity/Proc/Test3/Terms.v ### REQUIRED FOR BELOW
 # examples/Bisimilarity/Proc/Test3/PluginProofs.v ### Success (18s; needs MeBi Config Solver MutualCofix True, which the file sets)
 
 # examples/Bisimilarity/Proc/Test4/Terms.v ### REQUIRED FOR BELOW
-# examples/Bisimilarity/Proc/Test4/TermTests.v ### KNOWN LIMIT (B3): fails at the default 100-state bound (LTS_Incomplete); the full LTS is 9720 states and extracts in ~25s with a raised bound, but saturation needs ~112M weak transitions and exhausts memory -- run only under a memory cap (systemd-run -p MemoryMax=...; ulimit -v breaks OCaml 5). See the header of TermTests.v
+# examples/Bisimilarity/Proc/Test4/TermTests.v ### KNOWN LIMIT (B3): fails at the default 100-state bound (LTS_Incomplete); the full LTS is 9720 states and extracts in ~25s with a raised bound, but saturates to 74.6M weak actions, so the plugin now refuses (Saturation_Too_Large) instead of exhausting memory -- still run only under a memory cap (systemd-run -p MemoryMax=...; ulimit -v breaks OCaml 5). See the header of TermTests.v
 # examples/Bisimilarity/Proc/Test4/PluginProofs.v ### not written -- blocked by the same limit: the proof solver needs the saturated LTS. Deferred until the other outstanding backlog items are resolved
 
 ###############################################################################

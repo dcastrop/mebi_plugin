@@ -261,6 +261,62 @@ module Make (Enc : Encoding.S) :
     else ()
   ;;
 
+  (** Heap per weak action of a saturated FSM, measured 2026-10-01 on
+      Rocq-extracted examples: ~450 bytes on partial [Proc/Test4] LTSs (251 to
+      1001 states), 550 to 860 bytes on partial [CADP/Size2] ones (500 to 2000
+      states) -- each weak action carries its shortest witness path, which
+      grows with the LTS. {i See [check_saturation_size].} *)
+  let bytes_per_weak_action : int * int = 450, 900
+
+  let human_bytes (b : int) : string =
+    let f : float = Float.of_int b in
+    if f >= 1e9
+    then Printf.sprintf "%.1fGB" (f /. 1e9)
+    else if f >= 1e6
+    then Printf.sprintf "%.0fMB" (f /. 1e6)
+    else Printf.sprintf "%.0fKB" (f /. 1e3)
+  ;;
+
+  (** Guards every saturation: computes, without saturating, how many weak
+      actions saturating [x] would produce ({!Model.SaturationEstimate}), and
+      refuses past [Api.the_saturation_bound] -- or, with [MeBi Config FailIf Oversaturated False], warns and carries on. Saturating [Proc/Test4]
+      (74.6M weak actions) exhausted a 15GB machine; this says so up front.
+      A no-op for an FSM with no silent labels, which saturation leaves
+      unchanged. *)
+  let check_saturation_size (name : string) (x : FSM.t) : unit =
+    if Model.FSM.is_weak_mode x
+    then (
+      let e : Model.SaturationEstimate.t = Model.SaturationEstimate.fsm x in
+      Logger.info
+        (Printf.sprintf
+           "Saturating %s: %s."
+           name
+           (Model.SaturationEstimate.to_string e));
+      let bound : int = !Api.the_saturation_bound in
+      let lo, hi = bytes_per_weak_action in
+      if e.weak > bound
+      then (
+        let msg : string =
+          Printf.sprintf
+            "saturating %s would produce %s, above the bound of %i. That needs \
+             about %s--%s of memory (measured %i--%i bytes per weak action), \
+             and can take a long time. Raise the bound with [MeBi Config \
+             Bounds Saturation <n>] if your machine has the memory, or carry \
+             on with only a warning with [MeBi Config FailIf Oversaturated \
+             False]."
+            name
+            (Model.SaturationEstimate.to_string e)
+            bound
+            (human_bytes (e.weak * lo))
+            (human_bytes (e.weak * hi))
+            lo
+            hi
+        in
+        if !Api.the_fail_flags.oversaturated
+        then M.Err.saturation_too_large msg
+        else Logger.warning (String.capitalize_ascii msg)))
+  ;;
+
   let make_graph_args ()
     : (module Graph_type.Args with type enc = Enc.t and type tree = Enc.Tree.t)
     =
@@ -353,6 +409,7 @@ module Make (Enc : Encoding.S) :
       let* the_fsm = build_fsm primary_lts x refs in
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Info "Finished Making FSM" the_fsm;
+      check_saturation_size "the FSM" the_fsm;
       Logger.info "Saturating FSM...";
       let the_fsm = Model.FSM.saturate the_fsm in
       result_log (module Model.FSM) (module Decode.FSM)
@@ -367,6 +424,7 @@ module Make (Enc : Encoding.S) :
       let* the_fsm = build_fsm primary_lts x refs in
       result_log (module Model.FSM) (module Decode.FSM)
       |> handle_results Info "Finished Making FSM" the_fsm;
+      check_saturation_size "the FSM" the_fsm;
       Logger.info "Minimizing FSM...";
       let { fsm; pi } : Model.Minimization.t = Model.Minimization.fsm the_fsm in
       Decode.Partition.log ~m:Info ~s:"pi" pi;
@@ -438,6 +496,8 @@ module Make (Enc : Encoding.S) :
       Logger.trace __FUNCTION__;
       let open M.Syntax in
       let* the_fsm_a, the_fsm_b = build_fsms a b refs in
+      check_saturation_size "FSM A" the_fsm_a;
+      check_saturation_size "FSM B" the_fsm_b;
       Logger.info "Checking Bisimilarity of FSMs...";
       let result = Model.Bisimilarity.fsm the_fsm_a the_fsm_b in
       let r = result_log (module Model.FSM) (module Decode.FSM) in

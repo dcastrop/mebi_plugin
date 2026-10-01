@@ -173,17 +173,28 @@ Qed.
 MeBi Config Reset [Bounds|Weak|FailIf|Output].
 MeBi Config Bounds As Num States <n>.
 MeBi Config Bounds As Num Transitions <n>.
+MeBi Config Bounds Saturation <n>.
 MeBi Config Weak As Option <term>.
 MeBi Config Weak As <term> Of <relation>.
 MeBi Config Weak1 / Weak2 As Option <term>.        (* set only the first/second side of a Bisim/Merge/Sim check *)
 MeBi Config Weak1 / Weak2 As <term> Of <relation>.
-MeBi Config FailIf Empty/Incomplete/NotBisimilar True/False.
+MeBi Config FailIf Empty/Incomplete/NotBisimilar/Oversaturated True/False.
 MeBi Config Output "<Kind>" True/False.
 ```
 
-- `Bounds` caps how large an explored graph may get before mebi gives up.
+- `Bounds` caps how large an explored graph may get before mebi gives up. Extraction has measured 0.16–0.56MB of memory per state, so setting a state bound whose upper estimate passes 1GB prints a notice.
+- `Bounds Saturation <n>` caps how many weak actions saturation (used by `Saturate`, `Minimize`, `Bisim` and `Sim Begin` whenever a `Weak` label is set) may produce. Saturation can be orders of magnitude larger than the LTS: `examples/Bisimilarity/Proc/Test4` has 9720 states and would saturate to 74.6M weak actions. Before saturating, mebi computes that number exactly (cheaply, without saturating) and refuses above the bound with `Saturation_Too_Large`, naming the figure. The default is 1,000,000. Measured memory is 450–900 bytes per weak action, the upper end for larger LTSs (each action keeps its shortest witness path). Pick a bound your machine can hold. As a guide:
+
+  | `<n>` (weak actions) | approx. memory |
+  | -------------------- | -------------- |
+  | 1,000,000 (default)  | 0.45–0.9 GB    |
+  | 5,000,000            | 2.3–4.5 GB     |
+  | 10,000,000           | 4.5–9 GB       |
+  | 20,000,000           | 9–18 GB        |
+
+  Time grows faster than linearly in the count (a partial `Test4` LTS with 400k weak actions took 141s), so a large bound can also mean a long wait. The proof examples (`PluginProofs.v`) saturate to at most a few hundred weak actions. Run `MeBi Config Output "Info" True.` to see each estimate.
 - `Weak` (and the asymmetric `Weak1`/`Weak2`) mark a label constructor as the silent/tau action, enabling weak bisimilarity/saturation. `Reset Weak` clears it back to strong bisimilarity.
-- `FailIf` controls whether an empty LTS, an incomplete (unboundedly large) exploration, or a negative bisimilarity result raises a hard error instead of a warning.
+- `FailIf` controls whether an empty LTS, an incomplete (unboundedly large) exploration, a negative bisimilarity result, or a saturation above `Bounds Saturation` raises a hard error instead of a warning. `Oversaturated` defaults to `True`, because past the bound the likely alternative is running out of memory. `False` warns and saturates anyway.
 - `Output "<Kind>" <bool>` toggles one log channel. `<Kind>` is one of `Debug`, `Info`, `Notice`, `Warning`, `Error`, `Trace`, `Result`, `Show`, `DecodeResults`, `DumpResults`.
 
 ### Diagnostics

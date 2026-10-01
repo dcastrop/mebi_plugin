@@ -4,8 +4,9 @@
     [(from, a, goto)] with [from -tau*-> s -a-> t -tau*-> goto] (of the many
     witnessing paths only the shortest is kept), so the size of its output is
     the number of such triples -- which can be orders of magnitude more than
-    the strong transitions. [Proc/Test4]'s 9720 states and ~15k transitions
-    saturate to ~112M weak actions, and the attempt exhausted 15GB.
+    the strong transitions. [Proc/Test4]'s 9720 states and 87,480
+    transitions saturate to 74,649,600 weak actions, and the attempt
+    exhausted 15GB.
 
     This counts those triples exactly, on the quotient by silent SCCs: states
     in one silent SCC have the same weak successors, so the count is

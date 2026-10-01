@@ -58,6 +58,7 @@ module type S = sig
     type t =
       | LTS_Empty
       | LTS_Incomplete of string
+      | Saturation_Too_Large of string
       | Not_Bisimilar
       | Invalid_Ind_Kind_Type of EConstr.t option
       | Invalid_Sort_LTS of Sorts.Quality.t
@@ -77,6 +78,7 @@ module type S = sig
 
     val lts_empty : unit -> exn
     val lts_incomplete : string -> exn
+    val saturation_too_large : string -> exn
     val not_bisimilar : unit -> exn
     val invalid_ind_kind_type : EConstr.t option -> exn
     val invalid_sort_lts : Sorts.Quality.t -> exn
@@ -101,6 +103,7 @@ module type S = sig
   module type SErr = sig
     val lts_empty : unit -> 'a
     val lts_incomplete : string -> 'a
+    val saturation_too_large : string -> 'a
     val not_bisimilar : unit -> 'a
     val invalid_ind_kind_type : EConstr.t option -> 'a
     val invalid_sort_lts : Sorts.Quality.t -> 'a
@@ -514,6 +517,7 @@ module Make (Enc : Encoding.S) :
       (* NOTE: *)
       | LTS_Empty
       | LTS_Incomplete of string
+      | Saturation_Too_Large of string
       | Not_Bisimilar
       (* NOTE: *)
       | Invalid_Ind_Kind_Type of EConstr.t option
@@ -540,6 +544,7 @@ module Make (Enc : Encoding.S) :
     (* NOTE: *)
     val lts_empty : unit -> exn
     val lts_incomplete : string -> exn
+    val saturation_too_large : string -> exn
     val not_bisimilar : unit -> exn
 
     (* NOTE: *)
@@ -574,6 +579,7 @@ module Make (Enc : Encoding.S) :
       (* NOTE: *)
       | LTS_Empty
       | LTS_Incomplete of string
+      | Saturation_Too_Large of string
       | Not_Bisimilar
       (* NOTE: *)
       | Invalid_Ind_Kind_Type of EConstr.t option
@@ -599,6 +605,11 @@ module Make (Enc : Encoding.S) :
 
     let lts_empty () = MEBI_exn LTS_Empty
     let lts_incomplete (msg : string) = MEBI_exn (LTS_Incomplete msg)
+
+    let saturation_too_large (msg : string) =
+      MEBI_exn (Saturation_Too_Large msg)
+    ;;
+
     let not_bisimilar () = MEBI_exn Not_Bisimilar
 
     let invalid_ind_kind_type (x : EConstr.t option) =
@@ -634,6 +645,7 @@ module Make (Enc : Encoding.S) :
       (* NOTE: *)
       | LTS_Empty -> "LTS_Empty"
       | LTS_Incomplete x -> Printf.sprintf "LTS_Incomplete: %s" x
+      | Saturation_Too_Large x -> Printf.sprintf "Saturation_Too_Large: %s" x
       | Not_Bisimilar -> "Not_Bisimilar"
       (* NOTE: *)
       | Invalid_Ind_Kind_Type x -> "Invalid_Ind_Kind (Type, expected LTS)"
@@ -678,6 +690,7 @@ module Make (Enc : Encoding.S) :
     (* NOTE: *)
     val lts_empty : unit -> 'a
     val lts_incomplete : string -> 'a
+    val saturation_too_large : string -> 'a
     val not_bisimilar : unit -> 'a
 
     (* NOTE: *)
@@ -708,6 +721,11 @@ module Make (Enc : Encoding.S) :
   module Err : SErr = struct
     let lts_empty () = raise (Errors.lts_empty ())
     let lts_incomplete (msg : string) = raise (Errors.lts_incomplete msg)
+
+    let saturation_too_large (msg : string) =
+      raise (Errors.saturation_too_large msg)
+    ;;
+
     let not_bisimilar () = raise (Errors.not_bisimilar ())
 
     (* NOTE: *)

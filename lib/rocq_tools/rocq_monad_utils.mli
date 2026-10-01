@@ -71,6 +71,7 @@ module type S = sig
     type t =
       | LTS_Empty
       | LTS_Incomplete of string
+      | Saturation_Too_Large of string
       | Not_Bisimilar
       | Invalid_Ind_Kind_Type of EConstr.t option
       | Invalid_Sort_LTS of Sorts.Quality.t
@@ -90,6 +91,7 @@ module type S = sig
 
     val lts_empty : unit -> exn
     val lts_incomplete : string -> exn
+    val saturation_too_large : string -> exn
     val not_bisimilar : unit -> exn
     val invalid_ind_kind_type : EConstr.t option -> exn
     val invalid_sort_lts : Sorts.Quality.t -> exn
@@ -114,6 +116,7 @@ module type S = sig
   module type SErr = sig
     val lts_empty : unit -> 'a
     val lts_incomplete : string -> 'a
+    val saturation_too_large : string -> 'a
     val not_bisimilar : unit -> 'a
     val invalid_ind_kind_type : EConstr.t option -> 'a
     val invalid_sort_lts : Sorts.Quality.t -> 'a

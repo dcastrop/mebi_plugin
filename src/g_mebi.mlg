@@ -215,6 +215,8 @@ VERNAC COMMAND EXTEND MeBi_Config_Bounds CLASSIFIED AS QUERY
   { Api.set_the_bounds_args (Api.States x) }
 | ["MeBi" "Config" "Bounds" "As" "Num" "Transitions" int(x)] -> 
   { Api.set_the_bounds_args (Api.Transitions x) }
+| ["MeBi" "Config" "Bounds" "Saturation" int(x)] -> 
+  { Api.set_saturation_bound x }
 END
 
 (* Config -- weak_args for both *)
@@ -263,6 +265,14 @@ VERNAC COMMAND EXTEND MeBi_Config_FailIf_NotBisimilar CLASSIFIED AS QUERY
   { Api.set_fail_flag_non_bisimilar true }
 | ["MeBi" "Config" "FailIf" "NotBisimilar" "False"] -> 
   { Api.set_fail_flag_non_bisimilar false }
+END
+
+(* Config -- fail-if oversaturated flag *)
+VERNAC COMMAND EXTEND MeBi_Config_FailIf_Oversaturated CLASSIFIED AS QUERY
+| ["MeBi" "Config" "FailIf" "Oversaturated" "True"] -> 
+  { Api.set_fail_flag_oversaturated true }
+| ["MeBi" "Config" "FailIf" "Oversaturated" "False"] -> 
+  { Api.set_fail_flag_oversaturated false }
 END
 
 (* Config -- solver strategy *)
