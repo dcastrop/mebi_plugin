@@ -2641,6 +2641,87 @@ Refactor 0 · **Tooling 0.**
 
 ---
 
+## 2026-10-01 — `Product.reachable` stops at reflexive pairs; Step 0 found to break forced-mutual CADP
+
+Branch `main` (on `fork`). Backlog item 12, plus a regression found while
+verifying it.
+
+### The over-prediction, diagnosed and fixed — Bug fix
+
+`Product.reachable` predicted 8 and 7 pairs on `Proc/Test1`'s `wsim_pr` and
+`wsim_rp` against the 4 and 3 the solver visits. The cause is a short-cut the
+model did not mirror: `Proof_solver_step.handle_weaksim` tests
+`Concl.is_weak_refl` before anything else, and closes `weak_sim x x` by
+`weak_sim_refl` outright when both sides use the same LTS. `r` is one step of
+`q`'s unfolding, so the game soon reaches pairs of *equal* states — and
+`successors` went on to enumerate the whole of `p`'s loop behind them.
+
+`successors`/`reachable`/`estimate` now take `~refl:bool` (both sides share an
+LTS) and treat a pair of equal states as a leaf. The open block passes the
+same `econstr_eq tys.(3) tys.(4)` test `is_weak_refl` uses; `Auto`, which runs
+before the goal exists, compares the two LTS qualids — two names for one LTS
+only lose the short-cut, which over-predicts (cost, never a missing pair).
+New regression test in `test/tests.exe` (30 → 34).
+
+**A mistake caught on the first run.** Making a reflexive pair a leaf but
+still minting it a cofixpoint broke `wsim_pr` under a forced mutual cofix
+with `PairNotInProduct`: the block's `all_goals (In_sim; Pack_sim; intros)`
+puts the leaf's own goal past the point where `weak_sim_refl` can apply, and
+its successors were no longer in the block. Reflexive leaves now get no
+cofixpoint at all; every goal reaching one is still a bare `weak_sim x x` and
+closes by reflexivity. The `(Mutual cofix over N pairs.)` notice now counts
+cofixpoints actually minted.
+
+**Result.** Under `Auto`, 27 of 27 `Solved`; 26 counts byte-identical, and
+`Proc/Test3`'s `wsim_p3` **1043 → 995** (42 → 39 cofixpoints — it had three
+reflexive leaves too). `CLAUDE.md` updated. With `MutualCofix True` forced,
+`wsim_pr`/`wsim_rp` go **69/63 → 22/21**, i.e. exactly their nested counts:
+the "two `Test1` slowdowns" recorded on 2026-09-29 as the cost of a small
+product were this over-prediction, not something inherent to the mutual
+path. `Test2` and `Glued/MutualExclusion` unchanged under forced mutual.
+
+**Correcting the record.** The 2026-09-28 Step 2 table attributes the
+"8 vs 4, 7 vs 3" over-prediction to `CADP/Size1/Glued/MutualExclusion`. It
+was `Proc/Test1`'s `wsim_pr`/`wsim_rp`; `Glued/MutualExclusion` shows no
+over-prediction (81 and 63, mutual or nested).
+
+### Step 0 (`ac98c3c`) breaks `MutualCofix True` on CADP — found, not fixed
+
+Running the forced-mutual pass over all six suites, CADP
+`MutualExclusion`'s `wsim_lts_bigstep` (396 iterations) did not finish: 29
+minutes at 1.7GB before it was stopped, and `Unsolved after 1001` with a
+capped bound. Bisected:
+
+| commit | forced-mutual `wsim_lts_bigstep` |
+| --- | --- |
+| `acfd55c` (before Step 0) | **Solved after 396** |
+| `ac98c3c` (Step 0) | Unsolved after 1001 |
+| this change | Unsolved after 1001 (unaffected) |
+
+So the previous entry's central claim — that with the mutual block open "a
+different route cannot lose a closure, only reorder what gets proved" — is
+**false**. The smaller-first tie-break reproduces the original 2026-09-29
+non-termination on the very proof it broke then, merely moved to the
+mutual path. It went unnoticed because Step 0 was verified only under
+`Auto`, which keeps CADP nested; the default path is genuinely unaffected,
+and all 27 default counts hold. It does mean a user-facing configuration
+that worked (`MeBi Config Solver MutualCofix True` on CADP) now hangs, and
+it undercuts the backlog's "fall back to the mutual block when the nested
+one stalls" idea for Step 0's remaining half. Left in place pending a
+decision (revert, or narrow the gate); see the backlog.
+
+**Verification.** Six proof suites under `Auto`, 27 of 27 `Solved` with the
+counts above. Forced mutual: `Test1`, `Test2`, `Test3`,
+`Glued/MutualExclusion` all `Solved`; CADP `MutualExclusion` as tabled
+(`Glued` not run — same pre-existing failure expected). `dune exec
+test/tests.exe` 34/34, `test/satdiff.exe -- 200` matches its golden file,
+`make dune` and `dune build @fmt` clean.
+
+**Session tally:** Bug fix 1 · Docs 1 · Optimization 0 · New feature 0 ·
+Refactor 0 · **Tooling 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

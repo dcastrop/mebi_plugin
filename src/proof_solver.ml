@@ -230,7 +230,12 @@ let init
      let pi = S.W.get_bisimilar_partition () in
      (match fsm_a.init, fsm_b.init with
       | Some ra, Some rb ->
-        let c = S.W.Model.Product.estimate fsm_a fsm_b pi (ra, rb) in
+        (* The goal is not built yet, so compare the LTS names rather than
+           the terms [Concl.is_weak_refl] will see. Two names for one LTS
+           only lose the refl short-cut, which over-predicts -- cost, never
+           a missing pair. *)
+        let refl = Libnames.qualid_eq (snd a) (snd b) in
+        let c = S.W.Model.Product.estimate ~refl fsm_a fsm_b pi (ra, rb) in
         let use_mutual = S.W.Model.Product.prefer_mutual c in
         Api.set_mutual_cofix use_mutual;
         (* Only the mutual path is announced. It is the deviation from what

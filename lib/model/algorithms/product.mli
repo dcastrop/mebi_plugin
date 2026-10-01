@@ -78,10 +78,14 @@ module type S = sig
       standing still, and everything else by {!val:respond}. An obligation
       with no bisimilar response is dropped rather than raising -- in a
       genuine bisimulation there are none, and a caller that wants to know
-      should compare the lengths. *)
-  val successors : fsm -> fsm -> partition -> Pair.t -> Pair.t list
+      should compare the lengths.
 
-  (** [reachable a b pi root] is the set of game states reachable from
+      [refl] says whether both sides use the same LTS. If so, a pair of equal
+      states has no successors: the solver closes [weak_sim x x] by
+      [weak_sim_refl] before anything else, so nothing past it is visited. *)
+  val successors : refl:bool -> fsm -> fsm -> partition -> Pair.t -> Pair.t list
+
+  (** [reachable ~refl a b pi root] is the set of game states reachable from
       [root], by breadth-first closure over {!val:successors}.
 
       This is the whole relation the proof needs, computed once, before any
@@ -89,7 +93,7 @@ module type S = sig
       while building the proof term, which is why it re-derives pairs it has
       already proved whenever the product is not a tree. See
       [ASSISTED-CHANGES.md], 2026-09-29, and backlog item B2. *)
-  val reachable : fsm -> fsm -> partition -> Pair.t -> Pair.Set.t
+  val reachable : refl:bool -> fsm -> fsm -> partition -> Pair.t -> Pair.Set.t
 
   (** What a proof of this product costs, in [weak_sim] goals, under each of
       the two strategies. *)
@@ -103,7 +107,7 @@ module type S = sig
           will not finish in any useful time. *)
     }
 
-  (** [estimate ?cap_factor a b pi root] measures both strategies on the
+  (** [estimate ?cap_factor ~refl a b pi root] measures both strategies on the
       product reachable from [root], without running a single proof step.
 
       A mutual cofix over the whole relation visits each game state once and
@@ -118,7 +122,14 @@ module type S = sig
       The ratio is what the caller wants: equal means the product is a tree
       and the two strategies do identical work; [None] means only the mutual
       cofix will finish. *)
-  val estimate : ?cap_factor:int -> fsm -> fsm -> partition -> Pair.t -> cost
+  val estimate
+    :  ?cap_factor:int
+    -> refl:bool
+    -> fsm
+    -> fsm
+    -> partition
+    -> Pair.t
+    -> cost
 
   (** [prefer_mutual c] is [true] when the nested walk costs more than a
       mutual cofix would, [c.nested = None] included. *)

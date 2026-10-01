@@ -291,7 +291,7 @@ let reachable (x : M.FSM.t) (y : M.FSM.t) (root : int * int)
   : M.Product.Pair.Set.t
   =
   let a, b, pi = game x y in
-  M.Product.reachable a b pi (state (fst root), state (snd root))
+  M.Product.reachable ~refl:false a b pi (state (fst root), state (snd root))
 ;;
 
 (** Two matching loops: the product is a loop of the same length, and the
@@ -328,7 +328,7 @@ let test_product_diamond () : unit =
       ]
   in
   let a', b', pi = game x y in
-  let pairs = M.Product.reachable a' b' pi (state 0, state 10) in
+  let pairs = M.Product.reachable ~refl:false a' b' pi (state 0, state 10) in
   check_int
     "a diamond gives four game states"
     4
@@ -344,7 +344,7 @@ let test_product_diamond () : unit =
      [Proc/Test3] does 806 times over in 20,000 iterations. *)
   let moves =
     M.Product.Pair.Set.fold
-      (fun p acc -> M.Product.successors a' b' pi p @ acc)
+      (fun p acc -> M.Product.successors ~refl:false a' b' pi p @ acc)
       pairs
       []
   in
@@ -369,7 +369,7 @@ let test_product_silent_stays_put () : unit =
   let y = fsm ~weak_labels 10 [ transition 10 a 10 ] in
   let a', b', pi = game x y in
   let succs =
-    M.Product.successors a' b' pi (state 0, state 10)
+    M.Product.successors ~refl:false a' b' pi (state 0, state 10)
     |> List.filter (fun ((_, r) : M.Product.Pair.t) ->
       M.State.equal r (state 10))
   in
@@ -379,6 +379,40 @@ let test_product_silent_stays_put () : unit =
     (List.exists
        (fun ((l, _) : M.Product.Pair.t) -> M.State.equal l (state 1))
        succs)
+;;
+
+(** Both sides drawn from ONE LTS, converging on a shared loop -- the shape of
+    [Proc/Test1]'s [wsim_pr], where [r] is one step of [q]'s unfolding. Once
+    the game reaches [(2, 2)] the solver closes it by [weak_sim_refl], so with
+    [~refl:true] it must be a leaf; without, the loop behind it is enumerated
+    as pairs the proof never visits. *)
+let test_product_refl_leaf () : unit =
+  print_endline "product: equal states close by reflexivity";
+  let f =
+    fsm
+      0
+      [ transition 0 a 2; transition 1 a 2; transition 2 b 3; transition 3 a 2 ]
+  in
+  let a', b', pi = game f f in
+  let root = state 0, state 1 in
+  let with_refl = M.Product.reachable ~refl:true a' b' pi root in
+  check_int
+    "the shared state is reached and stops there"
+    2
+    (M.Product.Pair.Set.cardinal with_refl);
+  check
+    "the leaf is still in the relation"
+    true
+    (M.Product.Pair.Set.mem (state 2, state 2) with_refl);
+  check_int
+    "two different LTSs keep walking"
+    3
+    (M.Product.Pair.Set.cardinal
+       (M.Product.reachable ~refl:false a' b' pi root));
+  check_int
+    "and the estimate agrees: one move, not three"
+    1
+    (M.Product.estimate ~refl:true a' b' pi root).moves
 ;;
 
 (** [respond] answers with a state bisimilar to the one it was asked for,
@@ -412,7 +446,7 @@ let test_product_estimate () : unit =
   let x = fsm 0 [ transition 0 a 1; transition 1 b 0 ] in
   let y = fsm 10 [ transition 10 a 11; transition 11 b 10 ] in
   let a', b', pi = game x y in
-  let c = M.Product.estimate a' b' pi (state 0, state 10) in
+  let c = M.Product.estimate ~refl:false a' b' pi (state 0, state 10) in
   check_int "a loop has two game states" 2 c.pairs;
   check
     "on a loop the nested walk costs no more than the moves"
@@ -439,7 +473,7 @@ let test_product_estimate () : unit =
       ]
   in
   let a', b', pi = game x y in
-  let d = M.Product.estimate a' b' pi (state 0, state 10) in
+  let d = M.Product.estimate ~refl:false a' b' pi (state 0, state 10) in
   check_int "a diamond has four game states" 4 d.pairs;
   check
     "on a diamond the nested walk costs strictly more than the mutual one"
@@ -457,7 +491,9 @@ let test_product_estimate () : unit =
   check
     "the cap reports non-termination rather than hanging"
     true
-    (match M.Product.estimate ~cap_factor:0 a' b' pi (state 0, state 10) with
+    (match
+       M.Product.estimate ~cap_factor:0 ~refl:false a' b' pi (state 0, state 10)
+     with
      | { nested = None; _ } -> true
      | _ -> false);
   (* Diamonds in series are what tips it: each one doubles the nested walk
@@ -477,7 +513,7 @@ let test_product_estimate () : unit =
   let xa = fsm 0 (chain 0) in
   let yb = fsm 100 (chain 100) in
   let a', b', pi = game xa yb in
-  let e = M.Product.estimate a' b' pi (state 0, state 100) in
+  let e = M.Product.estimate ~refl:false a' b' pi (state 0, state 100) in
   check_int "three diamonds give ten game states" 10 e.pairs;
   check_int "and twelve moves" 12 e.moves;
   check
@@ -514,6 +550,7 @@ let () =
   test_product_loop ();
   test_product_diamond ();
   test_product_silent_stays_put ();
+  test_product_refl_leaf ();
   test_product_respond ();
   test_product_estimate ();
   test_json ();

@@ -47,7 +47,7 @@ To run them:
    ```
    Proc/Test1   114, 105, 106, 109, 22, 21        (nested)
    Proc/Test2   112, 112, 112, 84, 112, 84        (mutual)
-   Proc/Test3   1043, 355, 483, 483, 555, 195, 307, 555, 307   (mutual)
+   Proc/Test3   995, 355, 483, 483, 555, 195, 307, 555, 307   (mutual)
    CADP/Size1   268, 396, 268, 396, 81, 63        (nested)
    ```
    A change to *classification* (Solved/Unsolved) is a regression. A change

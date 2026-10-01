@@ -685,11 +685,22 @@ struct
         ( M.run (ReModel.state tys.(5) fsm_a.states)
         , M.run (ReModel.state tys.(6) fsm_b.states) )
       in
+      (* Same test as [Concl.is_weak_refl]: a pair of equal states only closes
+         by [weak_sim_refl] when both sides use the same LTS. *)
+      let refl : bool = econstr_eq tys.(3) tys.(4) |> run in
       let pairs : Model.Product.Pair.Set.t =
-        Model.Product.reachable fsm_a fsm_b pi root
+        Model.Product.reachable ~refl fsm_a fsm_b pi root
       in
+      (* A reflexive leaf gets no cofixpoint of its own. Its goal would be put
+         through [In_sim; Pack_sim; intros] with the rest of the block, past
+         the point where [handle_weaksim] can close it by [weak_sim_refl] --
+         and [reachable] did not follow its successors, so the search would
+         then raise [PairNotInProduct]. Left out, every goal that reaches it
+         is still a bare [weak_sim x x] and closes by reflexivity. *)
       let others : Model.Product.Pair.t list =
         Model.Product.Pair.Set.remove root pairs
+        |> Model.Product.Pair.Set.filter (fun ((a, b) : Model.Product.Pair.t) ->
+          not (refl && Model.State.equal a b))
         |> Model.Product.Pair.Set.elements
       in
       let type_of ((a, b) : Model.Product.Pair.t) : EConstr.t =
@@ -720,7 +731,7 @@ struct
       Logger.notice
         (Printf.sprintf
            "(Mutual cofix over %i pairs.)"
-           (Model.Product.Pair.Set.cardinal pairs));
+           (1 + List.length block));
       let* cofix : Tactic.t = Tacs.mutual_cofix root_name block in
       let* apply_In_sim : Tactic.t = Tacs.apply_In_sim () in
       let* apply_Pack_sim : Tactic.t = Tacs.apply_Pack_sim () in

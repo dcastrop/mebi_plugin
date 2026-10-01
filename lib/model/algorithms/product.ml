@@ -22,8 +22,8 @@ module type S = sig
       }
 
   val respond : fsm -> state -> label -> states -> transition
-  val successors : fsm -> fsm -> partition -> Pair.t -> Pair.t list
-  val reachable : fsm -> fsm -> partition -> Pair.t -> Pair.Set.t
+  val successors : refl:bool -> fsm -> fsm -> partition -> Pair.t -> Pair.t list
+  val reachable : refl:bool -> fsm -> fsm -> partition -> Pair.t -> Pair.Set.t
 
   type cost =
     { pairs : int
@@ -31,7 +31,15 @@ module type S = sig
     ; nested : int option
     }
 
-  val estimate : ?cap_factor:int -> fsm -> fsm -> partition -> Pair.t -> cost
+  val estimate
+    :  ?cap_factor:int
+    -> refl:bool
+    -> fsm
+    -> fsm
+    -> partition
+    -> Pair.t
+    -> cost
+
   val prefer_mutual : cost -> bool
 end
 
@@ -128,26 +136,46 @@ struct
         []
   ;;
 
-  let successors (a : FSM.t) (b : FSM.t) (pi : C.Partition.t) ((x, y) : Pair.t)
+  (* [refl] says whether both sides of the game use the same LTS. When they do,
+     a pair of equal states is closed outright by [weak_sim_refl] -- mirrors
+     [Proof_solver_step.handle_weaksim]'s [is_weak_refl] test, which runs
+     before anything else -- so it is a leaf with no obligations. Without
+     this, a game whose two sides converge on a common state (e.g. [r] is one
+     step of [q]'s unfolding, [Proc/Test1]'s [wsim_pr]) went on to enumerate
+     that state's whole loop as surplus pairs the solver never visits. *)
+  let successors
+        ~(refl : bool)
+        (a : FSM.t)
+        (b : FSM.t)
+        (pi : C.Partition.t)
+        ((x, y) : Pair.t)
     : Pair.t list
     =
     Logger.trace __FUNCTION__;
-    List.filter_map
-      (fun ((label, x') : C.Label.t * C.State.t) ->
-        let bisimilar : C.State.Set.t = bisimilar_with pi x' in
-        (* Mirrors [Proof_solver_step.handle_wk_concl]: a silent move to
-           somewhere already bisimilar to [y] is answered by standing still,
-           and everything else goes through [respond]. *)
-        if C.Label.is_silent label && C.State.Set.mem y bisimilar
-        then Some (x', y)
-        else (
-          match respond b y label bisimilar with
-          | t -> Some (x', t.goto)
-          | exception NoBisimilarResponse _ -> None))
-      (obligations a x)
+    if refl && C.State.equal x y
+    then []
+    else
+      List.filter_map
+        (fun ((label, x') : C.Label.t * C.State.t) ->
+          let bisimilar : C.State.Set.t = bisimilar_with pi x' in
+          (* Mirrors [Proof_solver_step.handle_wk_concl]: a silent move to
+             somewhere already bisimilar to [y] is answered by standing still,
+             and everything else goes through [respond]. *)
+          if C.Label.is_silent label && C.State.Set.mem y bisimilar
+          then Some (x', y)
+          else (
+            match respond b y label bisimilar with
+            | t -> Some (x', t.goto)
+            | exception NoBisimilarResponse _ -> None))
+        (obligations a x)
   ;;
 
-  let reachable (a : FSM.t) (b : FSM.t) (pi : C.Partition.t) (root : Pair.t)
+  let reachable
+        ~(refl : bool)
+        (a : FSM.t)
+        (b : FSM.t)
+        (pi : C.Partition.t)
+        (root : Pair.t)
     : Pair.Set.t
     =
     Logger.trace __FUNCTION__;
@@ -155,7 +183,7 @@ struct
       | [] -> seen
       | p :: rest ->
         let next : Pair.t list =
-          successors a b pi p
+          successors ~refl a b pi p
           |> List.filter (fun q -> not (Pair.Set.mem q seen))
         in
         go
@@ -175,6 +203,7 @@ struct
 
   let estimate
         ?(cap_factor : int = 4)
+        ~(refl : bool)
         (a : FSM.t)
         (b : FSM.t)
         (pi : C.Partition.t)
@@ -182,10 +211,10 @@ struct
     : cost
     =
     Logger.trace __FUNCTION__;
-    let pairs : Pair.Set.t = reachable a b pi root in
+    let pairs : Pair.Set.t = reachable ~refl a b pi root in
     let moves : int =
       Pair.Set.fold
-        (fun p acc -> acc + List.length (successors a b pi p))
+        (fun p acc -> acc + List.length (successors ~refl a b pi p))
         pairs
         0
     in
@@ -203,7 +232,7 @@ struct
       then () (* closes against an ancestor *)
       else (
         let path = Pair.Set.add p path in
-        List.iter (walk path) (successors a b pi p))
+        List.iter (walk path) (successors ~refl a b pi p))
     in
     let nested : int option =
       try
