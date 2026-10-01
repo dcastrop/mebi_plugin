@@ -2757,6 +2757,79 @@ Optimization 0 (one reverted) · Docs 2 · New feature 0 · **Tooling 0.**
 
 ---
 
+## 2026-10-01 — B3: extraction was quadratic in evar names; `Test4` now extracts in 25s
+
+Branch `main` (on `fork`). Optimization. Backlog item B3 (`Proc/Test4`).
+
+### Sizing first
+
+`Test4/TermTests.v`'s `### Success` tag was **stale**: it fails at its first
+command (`MeBi Run FSM p`) with `LTS_Incomplete` at the default 100-state
+bound, in half a second. Enumerating `Proc.Layered`'s rules directly (a
+throwaway Python model of `termLTS`/`compLTS`, rule for rule) gives the exact
+reachable space: **9720 states, 87,480 transitions, 85% silent**, the same
+set from `p`, `q` and `r`. That is 3⁴ local configurations × 120 tree shapes
+(4! orderings × Catalan(3) bracketings, all silently interconvertible via
+`do_comm`/`do_assocl`/`do_assocr`); in general 3ᵏ·(2k−2)!/(k−1)! for k
+components — 18, 324, 9720, 408,240.
+
+9720 states is not large. But extraction time per bound was 250 → 3.5s, 500
+→ 35s, 1000 → 295s: ~9× per doubling, extrapolating to days for the whole
+LTS. So B3 was *not* purely a state-space limit.
+
+### Finding the cost — one wrong hypothesis on the way
+
+- Plugin-level trace counts (`Logger.trace`) grow linearly with the bound, so
+  the extra cost was in per-call duration, not call count.
+- **Wrong hypothesis: the evar map.** `fresh_evar` writes into the monad's
+  main `sigma` and nothing ever removes them — 41,616 evars after 500 states.
+  Running each state's exploration under `M.sandbox` kept `sigma` at zero
+  evars with a byte-identical FSM, **and no speed-up** (34.3s → 33.7s at
+  600 states). Real, but irrelevant.
+- **The cause: `Rocq_utils`' evar-name cache.** It kept the set of every
+  evar name ever issued and asked `Namegen.next_ident_away` for one not in
+  it. That function restarts its search from the base name (`UnifEvar0`)
+  whenever the candidate is taken — which it always was — so each new name
+  probed *every name before it*, at ~80 evars per state. Resetting the cache
+  per state: 34.3s → 0.76s, byte-identical output.
+
+### The fix
+
+The cache is replaced by a counter. The old code's sequence was always
+`UnifEvar0, 1, 2, …` (it scans to the first gap, and there never was one),
+so the counter produces **the same names**: same freshness guarantee, O(1).
+`the_cache`/`the_prev`/`the_default_next` removed from `rocq_utils.mli`;
+nothing else used them.
+
+**Result.**
+
+- `Test4` 600-state extraction **34.3s → 0.75s**, byte-identical FSM output
+  (1.46MB compared).
+- **The complete 9720-state `Test4` LTS extracts in ~25-27s** (1.6GB peak).
+- The 27 proof counts are identical (as the identical names predict); wall
+  time `Proc/Test3` 17.8s → 8.5s, `Proc/Test2` 3.4s → 1.6s, CADP unchanged.
+  The name set was also never reset between commands, so the cost had been
+  accumulating across every command in a file.
+
+### What is still open on B3 — and a mistake
+
+Saturating the full LTS (`MeBi Run Saturate p`) ran out of memory. I ran it
+**without a memory cap**, and it took the whole machine (and the session)
+down. Every 120 tree shapes of a local configuration are silently
+interconvertible, so each state's silent closure is large and the saturated
+LTS plausibly has orders of magnitude more weak transitions than the 87k
+strong ones; that is unmeasured. Next step is to size it under `ulimit -v`.
+`CLAUDE.md` now says to cap any `Test4` run.
+
+**Verification.** Six suites under `Auto`, 27 of 27 `Solved`, counts
+identical. `dune exec test/tests.exe` 34/34, `make dune` and `dune build
+@fmt` clean. Experiments (probe, sandbox and name-reset switches) removed.
+
+**Session tally (2026-10-01, this session):** Bug fix 1 · Optimization 1
+(one reverted) · Docs 3 · Refactor 0 · New feature 0 · **Tooling 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

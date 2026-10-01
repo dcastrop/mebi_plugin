@@ -491,22 +491,21 @@ module Strfy = struct
   ;;
 end
 
-type cache =
-  { the_prev : Names.Id.Set.t
-  ; the_next : Names.Id.t
-  }
-
-let the_cache : cache option ref = ref None
-let the_default_next () : Names.Id.t = Names.Id.of_string "UnifEvar0"
-
-let the_prev () : Names.Id.Set.t =
-  Option.cata (fun x -> x.the_prev) Names.Id.Set.empty !the_cache
-;;
+(* Evar names are only ever required to be fresh: the counter never goes
+   back, so a name is never handed out twice in a session. This produces the
+   same [UnifEvar0], [UnifEvar1], ... sequence as the previous cache, which kept
+   the set of every name issued and asked [Namegen.next_ident_away] for one
+   not in it. That call restarts its search from the base name whenever the
+   candidate is taken -- which it always was -- so each new name probed every
+   name before it. With about 80 evars per state, extracting [Proc/Test4]'s
+   first 600 states took 34s, of which ~33s was this. See ASSISTED-CHANGES.md,
+   2026-10-01 (backlog item B3). *)
+let the_counter : int ref = ref 0
 
 let the_next () : Names.Id.t =
-  Namegen.next_ident_away
-    (Option.cata (fun x -> x.the_next) (the_default_next ()) !the_cache)
-    (the_prev ())
+  let n : int = !the_counter in
+  incr the_counter;
+  Names.Id.of_string (Printf.sprintf "UnifEvar%i" n)
 ;;
 
 exception CouldNotGetNextFreshEvarName of unit
@@ -520,8 +519,6 @@ let get_next_evar
   match Evarutil.next_evar_name (Namegen.IntroFresh (the_next ())) with
   | None -> raise (CouldNotGetNextFreshEvarName ())
   | Some (name, _) ->
-    the_cache
-    := Some { the_prev = Names.Id.Set.add name (the_prev ()); the_next = name };
     let naming = Namegen.IntroFresh name in
     Evarutil.new_evar ~naming env sigma a_type
 ;;

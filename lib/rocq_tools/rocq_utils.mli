@@ -137,14 +137,8 @@ module Strfy : sig
   val goal : Proofview.Goal.t -> string
 end
 
-type cache =
-  { the_prev : Names.Id.Set.t
-  ; the_next : Names.variable
-  }
-
-val the_cache : cache option ref
-val the_default_next : unit -> Names.variable
-val the_prev : unit -> Names.Id.Set.t
+(** [the_next ()] is a fresh evar name, [UnifEvar0], [UnifEvar1], ...; never
+    the same one twice in a session. *)
 val the_next : unit -> Names.variable
 
 exception CouldNotGetNextFreshEvarName of unit
