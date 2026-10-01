@@ -2848,6 +2848,51 @@ identical. `dune exec test/tests.exe` 34/34, `make dune` and `dune build
 
 ---
 
+## 2026-10-01 — A2 closed: a positive test for the "multiple actionpairs" branch
+
+Branch `main` (on `fork`). Tooling (a regression test). Closes backlog
+item A2 and its `TODO.md` entry.
+
+**The earlier investigations were looking in the wrong place.** The
+2026-09-27 and 2026-09-28 passes reasoned about saturation's
+`ActionPair.try_update` collapse and the cross-FSM `ActionMap.merge`. But
+`ReModel.transition` is only called from `Hyps.get_transition (W.get_fsm_a
+())`, and `get_fsm_a`'s `saturated` defaults to `false`: the lookup reads
+FSM a's **original, unsaturated** edges. There, `EdgeMap.of_transitions`
+gives every extracted transition its own `Action.t` with `trees = {tree}`,
+so two *derivations* of the same strong step `from -label-> goto` are two
+actions both containing `goto`. Neither saturation nor merging is involved.
+The 2026-09-28 lead also had an unexamined problem: it relied on a
+truncated LTS, which `MeBi Sim Begin` rejects with `LTS_Incomplete` by
+default.
+
+**The test.** `theories/Test.v`'s existing `BisimTest3` LTS already has the
+shape: `do_par1` and `do_par2` coincide when `a = b`. A new module
+`MultipleDerivations` proves `weak_sim termLTS termLTS (tfix (tpar A A
+trec)) (tfix (tact A (tact A trec)))`:
+
+- with `Trace` on, `multiple actionpairs matched (2 candidates)` fires
+  twice and the proof closes in 38 iterations;
+- **negative control:** with the pre-`6124eeb` behaviour (raise on more
+  than one candidate) patched back in, the same proof fails at that branch.
+  Patch reverted.
+
+`Test.v` is compiled by every `dune build`, so CI now covers the branch
+without touching `_CoqProject`, `dune` or the `.mlpack` (cf. C3).
+
+**Tooling note.** `ulimit -v` cannot cap a Rocq run: OCaml 5 reserves its
+heaps up front and dies with "Not enough heap memory to reserve minor
+heaps". `systemd-run --user --scope -p MemoryMax=6G -p MemorySwapMax=0`
+works; that is what the B3 runs should have used.
+
+**Verification.** `dune build` and `make theories/Test.vo` clean; `make
+dune` afterwards. No plugin code changed.
+
+**Session tally (2026-10-01, this session):** Bug fix 1 · Optimization 1
+(one reverted) · Docs 3 · Tooling 1 · Refactor 0 · New feature 0.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

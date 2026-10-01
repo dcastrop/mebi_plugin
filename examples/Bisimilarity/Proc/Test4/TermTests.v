@@ -15,7 +15,9 @@
      configuration form one silent strongly connected component (81 of
      them), so the saturated LTS has ~112M weak transitions -- tens of GB
      in the plugin's representation. [MeBi Run Saturate p] exhausted a 15GB
-     machine. Never run this file without a memory cap (e.g. ulimit -v).
+     machine. Never run this file without a memory cap: systemd-run --user
+     --scope -p MemoryMax=6G -p MemorySwapMax=0 (ulimit -v does not work --
+     OCaml 5 cannot then reserve its heaps).
 
    Getting past it means saturating over the silent-SCC quotient (81 nodes)
    rather than over states, which changes what minimisation, bisimilarity

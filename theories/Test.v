@@ -647,3 +647,51 @@ End Test4. *)
 (* Proof. *)
 (*   ExploreProof. my_intro T. ExploreProof. my_intro t. ExploreProof. apply t. *)
 (* Qed. *)
+
+(* Regression test for the "multiple actionpairs" branch of
+   [Proof_solver_step.ReModel.transition] (backlog item A2, fix 6124eeb).
+
+   [do_par1] and [do_par2] coincide when [a = b], so the step
+   [tpar A A t -A-> tact A t] has two derivations. The unsaturated FSM keeps
+   one [Action.t] per derivation tree, so resolving that hypothesis finds two
+   candidates. Before 6124eeb this raised and the proof below could not be
+   built; it now picks the shorter annotation. Verified both ways on
+   2026-10-01: with the old raising behaviour patched back in, this proof
+   fails at that branch. *)
+MeBi Divider "Theories.Test.MultipleDerivations".
+Require Import MEBI.Bisimilarity.
+Module MultipleDerivations.
+  Inductive action : Set := | A | B.
+
+  Inductive term : Set :=
+  | trec : term
+  | tend : term
+  | tfix : term -> term
+  | tact : action -> term -> term
+  | tpar : action -> action -> term -> term.
+
+  Fixpoint subst (t1 : term) (t2 : term) :=
+    match t2 with
+    | trec => t1
+    | tend => tend
+    | tfix t => tfix t
+    | tact a t => tact a (subst t1 t)
+    | tpar a b t => tpar a b (subst t1 t)
+    end.
+
+  Inductive termLTS : term -> option action -> term -> Prop :=
+  | do_act : forall a t, termLTS (tact a t) (Some a) t
+  | do_par1 : forall a b t, termLTS (tpar a b t) (Some a) (tact b t)
+  | do_par2 : forall a b t, termLTS (tpar a b t) (Some b) (tact a t)
+  | do_fix : forall t, termLTS (tfix t) None (subst (tfix t) t).
+
+  MeBi Config Reset Weak.
+  MeBi Config Weak As Option action.
+
+  Example p : term := tfix (tpar A A trec).
+  Example q : term := tfix (tact A (tact A trec)).
+
+  Example wsim_pq : weak_sim termLTS termLTS p q.
+  Proof. MeBi Sim Begin termLTS p And termLTS q Using termLTS.
+    MeBi Sim Solve 1000. Qed.
+End MultipleDerivations.
