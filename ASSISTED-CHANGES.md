@@ -2722,6 +2722,41 @@ Refactor 0 · **Tooling 0.**
 
 ---
 
+## 2026-10-01 — Step 0 reverted (code only), parked as a separate optimization
+
+Branch `main` (on `fork`). Reverts the `src/proof_solver_step.ml` half of
+`ac98c3c` at the user's direction; its log entry above is kept as the
+record. The tie-break comment now says the gated retry was tried and
+reverted, and that heuristic changes need the strategy forced both ways.
+The idea is written up for a future session in the local note
+`notes/7-inversion-tie-break.md` (history, the bisect, an unconfirmed
+hypothesis for why it fails, candidate directions).
+
+**Result.** Under `Auto`, 27 of 27 `Solved`:
+
+| suite | counts |
+| --- | --- |
+| `Proc/Test1` | 114 105 106 109 22 21 (unchanged) |
+| `Proc/Test2` | 112 112 112 84 112 84 (unchanged) |
+| `Proc/Test3` | **1073** 387 519 519 603 211 331 603 331 |
+| `CADP/Size1` | 268 396 268 396 81 63 (unchanged) |
+
+`Test3` returns to its pre-Step-0 figures except `wsim_p3`, 1127 → 1073 —
+the reflexive-pair fix's own contribution, now measured without the
+tie-break on top. Forced `MutualCofix True` (bounds capped at 1000):
+`Test1`, `Test2`, all three CADP files `Solved` with the same counts,
+CADP `wsim_lts_bigstep` back to **396**. `CLAUDE.md` updated (baseline,
+loose `wsim_p3` bound, and verify-both-ways guidance; `tests.exe` expectation
+30 → 34).
+
+**A slip in the previous entry.** It reported `dune build @fmt` clean for
+`6f06ed9`; one line in `proof_solver_step.ml` was not. Formatted here.
+
+**Session tally (2026-10-01, this session):** Bug fix 1 · Refactor 0 ·
+Optimization 0 (one reverted) · Docs 2 · New feature 0 · **Tooling 0.**
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

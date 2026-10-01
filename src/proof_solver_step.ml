@@ -250,17 +250,6 @@ struct
 
     let name_to_string (x : t) : string = Strfy.hyp_name x
 
-    (** [type_size x] counts the nodes in [x]'s type. Breaks ties in
-        [Hyps.try_invert_any] -- see the note there. *)
-    let type_size (x : t) : int mm =
-      let open Syntax in
-      let* sigma = get_sigma in
-      let rec go (c : EConstr.t) : int =
-        EConstr.fold sigma (fun acc sub -> acc + go sub) 1 c
-      in
-      Context.Named.Declaration.get_type x |> go |> return
-    ;;
-
     let to_atomic (x : t) : EConstr.t Rocq_utils.kind_pair mm =
       let open Syntax in
       let* sigma = get_sigma in
@@ -525,25 +514,15 @@ struct
       (* log_econstrs ~__FUNCTION__ "inverted hyps" !inverted_hyps; *)
       let hyps : Hyp.t list = get_non_cofixes () in
       let open Syntax in
-      (* Ties go to the smaller hypothesis only when the mutual block is open
-         -- see the note on the tie-break below. *)
-      let smaller_first : bool = !Api.the_mutual_cofix in
-      let f (i : int) (xopt : (int * int * Hyp.t) option)
-        : (int * int * Hyp.t) option mm
-        =
+      let f (i : int) (xopt : (int * Hyp.t) option) : (int * Hyp.t) option mm =
         let y : Hyp.t = List.nth hyps i in
         let* grade : int = Hyp.invertibility y in
-        let* size : int = if smaller_first then Hyp.type_size y else return 0 in
         Logger.debug
           ~__FUNCTION__
-          (Printf.sprintf
-             "grade %i size %i : %s"
-             grade
-             size
-             (Hyp.name_to_string y));
+          (Printf.sprintf "grade %i : %s" grade (Hyp.name_to_string y));
         match xopt with
-        | None -> Some (grade, size, y) |> return
-        | Some (n, m, x) ->
+        | None -> Some (grade, y) |> return
+        | Some (n, x) ->
           (* Ties on [grade] go to the LATER hypothesis, and that is load
              bearing. [invertibility] grades on shape -- whether the label and
              goto positions hold a local variable -- so in a layered LTS a
@@ -575,27 +554,22 @@ struct
              running all five cheap suites. See ASSISTED-CHANGES.md,
              2026-09-29.
 
-             Retried 2026-10-01, gated on the mutual block. The two proofs it
-             broke, [wsim_lts] and [wsim_lts_bigstep], are CADP ones, and
-             [Auto] keeps CADP on the nested path -- so they would break
-             again. But with the mutual block open every reachable pair
-             already has a hypothesis in scope, so sending the search down a
-             different route cannot lose a closure, only change which order
-             things are proved in. So the smaller-first rule applies there and
-             nowhere else, and the nested path stays byte-identical by
-             construction. *)
-          if
-            grade > n
-            || (Int.equal grade n && ((not smaller_first) || size <= m))
-          then Some (grade, size, y) |> return
-          else Some (n, m, x) |> return
+             Retried 2026-10-01 gated on the mutual block ([ac98c3c]) and
+             reverted the same day: the mutual block does NOT make it safe.
+             With [MutualCofix True] forced, CADP's [wsim_lts_bigstep] went
+             from 396 to not closing. Run the suites with the strategy forced
+             both ways, not just under [Auto]. See ASSISTED-CHANGES.md,
+             2026-10-01. *)
+          (match Int.compare grade n with
+           | -1 -> Some (n, x) |> return
+           | _ -> Some (grade, y) |> return)
       in
       let* to_invert_opt = iterate 0 (List.length hyps - 1) None f in
       match to_invert_opt with
       | None -> return None
-      | Some (0, _, _) -> return None
+      | Some (0, x) -> return None
       (* NOTE: we only want to invert hyps with non-zero grades. *)
-      | Some (_, _, x) ->
+      | Some (grade, x) ->
         let* y = Hyp.invert x in
         return (Some y)
     ;;
@@ -729,9 +703,7 @@ struct
         List.map (fun p -> fresh (), type_of p) others
       in
       Logger.notice
-        (Printf.sprintf
-           "(Mutual cofix over %i pairs.)"
-           (1 + List.length block));
+        (Printf.sprintf "(Mutual cofix over %i pairs.)" (1 + List.length block));
       let* cofix : Tactic.t = Tacs.mutual_cofix root_name block in
       let* apply_In_sim : Tactic.t = Tacs.apply_In_sim () in
       let* apply_Pack_sim : Tactic.t = Tacs.apply_Pack_sim () in
