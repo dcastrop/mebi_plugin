@@ -256,9 +256,12 @@ module type S = sig
     end
 
     module Problems : sig
+      type deferred = enc * EConstr.t * EConstr.t array
+
       type t =
         { sigma : Evd.evar_map
         ; to_unify : Problem.t list
+        ; deferred : deferred list
         }
 
       include Json.S with type k = t (** @closed *)

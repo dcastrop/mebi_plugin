@@ -145,6 +145,14 @@ MeBi Run Saturate <term> Using <relation> [<relation>...].
 
 `Run Bisim` checks (weak, if `Config Weak` is set — see below) bisimilarity between the two terms' LTSs. `Run Merge` combines two FSMs into one. `Run Minimize` partition-refines an FSM down to its bisimulation quotient. `Run Saturate` computes weak transitions across silent (tau) steps.
 
+### Which constructor shapes are supported
+
+An LTS is an inductive relation `term -> label -> term -> Prop`. For each constructor, mebi matches the source term and then handles its premises:
+
+- **Premises over an LTS listed in `Using`** (the LTS itself, or another one: layered LTSs) are explored, and a constructor may have several. The proof search replays every premise's derivation.
+- **Equations `l = r`** are decided once both sides are closed. Sides fixed by matching the source term are decided immediately; sides fixed only by the constructor's LTS premises (a label, say) are decided after those are solved. Convertible sides hold, and a difference in constructors means the premise fails, so that transition is not in the LTS. In a proof, such premises are closed by `reflexivity`.
+- **Anything else** (an equation over terms that do not reduce, other propositions) cannot be decided. The constructor is applied as if the premise held, with a warning, so the LTS may contain transitions that do not exist. A `Run Bisim` verdict on such an LTS may be wrong, but a proof cannot be: `Qed` still checks the premise.
+
 ### Benchmarking
 
 ```

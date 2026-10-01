@@ -243,9 +243,14 @@ module type S = sig
     end
 
     module Problems : sig
+      (** An equation premise not decidable when its constructor was matched:
+          the LTS it belongs to, and its head and arguments. *)
+      type deferred = enc * EConstr.t * EConstr.t array
+
       type t =
         { sigma : Evd.evar_map
         ; to_unify : Problem.t list
+        ; deferred : deferred list
         }
 
       include Json.S with type k = t
@@ -1165,10 +1170,136 @@ module Make (Enc : Encoding.S) :
       ;;
     end
 
+    (** Premise heads already warned about by [warn_if_skipped_premise], keyed
+        by LTS and head. *)
+    let skipped_premises : (string * string, unit) Hashtbl.t = Hashtbl.create 8
+
+    (** Decides a premise that is not over an LTS, where that can be done
+        soundly (backlog item I2): [Some b] if it is known to hold ([true])
+        or not ([false]), [None] if not decided -- never a guess. Only
+        equations [l = r] whose sides are {e closed} once fully normalized
+        (no evars: typically guards on the source state, which matching
+        has already instantiated) are decided:
+
+        - convertible sides hold;
+        - sides that differ in a constructor, at the head or under matching
+          constructors, are false (constructors of an inductive type are
+          disjoint);
+        - anything else is undecided. *)
+    let decide_premise
+          (env : Environ.env)
+          (sigma : Evd.evar_map)
+          ((name, args) : EConstr.t * EConstr.t array)
+      : bool option
+      =
+      let is_eq : bool =
+        match EConstr.kind sigma name with
+        | Ind (ind, _) -> Rocqlib.check_ind_ref "core.eq.type" ind
+        | _ -> false
+      in
+      if Bool.not is_eq || Array.length args <> 3
+      then None
+      else (
+        let l = Reductionops.nf_all env sigma args.(1) in
+        let r = Reductionops.nf_all env sigma args.(2) in
+        let closed (x : EConstr.t) : bool =
+          Evar.Set.is_empty (Evd.evars_of_term sigma x)
+        in
+        if Bool.not (closed l && closed r)
+        then None
+        else (
+          let rec decide (l : EConstr.t) (r : EConstr.t) : bool option =
+            if Reductionops.is_conv env sigma l r
+            then Some true
+            else (
+              let hl, al = EConstr.decompose_app sigma l in
+              let hr, ar = EConstr.decompose_app sigma r in
+              match EConstr.kind sigma hl, EConstr.kind sigma hr with
+              | Construct (cl, _), Construct (cr, _) ->
+                if Bool.not (Names.Construct.CanOrd.equal cl cr)
+                then Some false
+                else if Array.length al <> Array.length ar
+                then None
+                else (
+                  (* same constructor, not convertible: false if some
+                     argument is decidedly different, else unknown *)
+                  let ds = Array.map2 decide al ar in
+                  if Array.exists (fun d -> d = Some false) ds
+                  then Some false
+                  else None)
+              | _ -> None)
+          in
+          decide l r))
+    ;;
+
+    (** A binder whose head is not one of the [Using] LTSs is not checked at
+        all. For a data binder ([xs : list nat]) that is right. For a
+        {e premise} ([n = 0], any [Prop]) it means the constructor is treated
+        as if the premise held, so the extracted LTS can contain transitions
+        that do not exist (backlog item I2). Until such premises are
+        supported, say so -- once per LTS and premise head, not once per
+        state. *)
+    let warn_if_skipped_premise
+          (lts_enc : Enc.t)
+          ((name, args) : EConstr.t * EConstr.t array)
+      : unit mm
+      =
+      let open Syntax in
+      let$+ _warned env sigma =
+        let premise : EConstr.t = EConstr.mkApp (name, args) in
+        let is_prop : bool =
+          try
+            match Retyping.get_sort_quality_of env sigma premise with
+            | UnivGen.QualityOrSet.Qual q -> Sorts.Quality.is_qprop q
+            | UnivGen.QualityOrSet.Set -> false
+          with
+          | _ -> false
+        in
+        if is_prop
+        then (
+          let head : string =
+            Rocq_utils.Strfy.econstr env sigma name
+            |> fun h ->
+            if String.starts_with ~prefix:"@" h
+            then String.sub h 1 (String.length h - 1)
+            else h
+          in
+          let key : string * string = Enc.to_string lts_enc, head in
+          if Bool.not (Hashtbl.mem skipped_premises key)
+          then (
+            Hashtbl.add skipped_premises key ();
+            Logger.warning
+              (Printf.sprintf
+                 "A constructor of %s has a premise headed by [%s] (first met \
+                  as [%s]) that MeBi cannot check: only premises over the LTSs \
+                  given in [Using], and equations between closed terms, are \
+                  decided, so the constructor is applied whether or not the \
+                  premise holds. The extracted LTS may contain transitions \
+                  that do not exist, and a [MeBi Run Bisim] verdict on it may \
+                  be wrong (a proof cannot be: [Qed] still checks the \
+                  premise)."
+                 (Rocq_utils.Strfy.econstr env sigma (decode lts_enc))
+                 head
+                 (Rocq_utils.Strfy.econstr
+                    env
+                    sigma
+                    (Reductionops.nf_evar sigma premise)))))
+      in
+      return ()
+    ;;
+
     module Problems = struct
+      type deferred = Enc.t * EConstr.t * EConstr.t array
+
+      (** [deferred] holds the premises that were not over an LTS and could
+          not be decided when the constructor was matched -- typically because
+          they mention what its LTS premises will instantiate (a label, a
+          target). They are decided once those are unified, in
+          [sandbox_unify_all_opt] (backlog item I2). *)
       type t =
         { sigma : Evd.evar_map
         ; to_unify : Problem.t list
+        ; deferred : deferred list
         }
 
       include Json.Thing.Make (struct
@@ -1176,7 +1307,7 @@ module Make (Enc : Encoding.S) :
 
           let name = "Problems"
 
-          let json ?as_elt ({ sigma; to_unify } : t) : Yojson.t =
+          let json ?as_elt ({ to_unify; _ } : t) : Yojson.t =
             `Assoc
               [ ( "to_unify"
                 , `List (List.map (Problem.json ~as_elt:true) to_unify) )
@@ -1187,7 +1318,7 @@ module Make (Enc : Encoding.S) :
       let empty () : t mm =
         let open Syntax in
         let* sigma = get_sigma in
-        return { sigma; to_unify = [] }
+        return { sigma; to_unify = []; deferred = [] }
       ;;
 
       let is_empty : t -> bool = function
@@ -1213,7 +1344,7 @@ module Make (Enc : Encoding.S) :
       let sandbox_unify_all_opt
             (act : EConstr.t)
             (goto : EConstr.t)
-            ({ sigma; to_unify } : t)
+            ({ sigma; to_unify; deferred } : t)
         : (EConstr.t * EConstr.t * Enc.Tree.t list) option mm
         =
         let open Syntax in
@@ -1223,13 +1354,34 @@ module Make (Enc : Encoding.S) :
            match unified_opt with
            | None -> return None
            | Some constructor_trees ->
-             let$+ act env sigma = Reductionops.nf_all env sigma act in
-             let$+ goto env sigma = Reductionops.nf_all env sigma goto in
-             let$+ is_act_undefined _ sigma = EConstr.isEvar sigma act in
-             let$+ is_goto_undefined _ sigma = EConstr.isEvar sigma goto in
-             if is_act_undefined && is_goto_undefined
-             then return None
-             else return (Some (act, goto, constructor_trees)))
+             let$+ decisions env sigma =
+               List.map
+                 (fun ((_, name, args) : deferred) ->
+                   decide_premise env sigma (name, args))
+                 deferred
+             in
+             if List.mem (Some false) decisions
+             then (* a premise is false here: no transition *) return None
+             else
+               let* () =
+                 iterate
+                   0
+                   (List.length deferred - 1)
+                   ()
+                   (fun i () ->
+                     match List.nth decisions i with
+                     | None ->
+                       let lts_enc, name, args = List.nth deferred i in
+                       warn_if_skipped_premise lts_enc (name, args)
+                     | Some _ -> return ())
+               in
+               let$+ act env sigma = Reductionops.nf_all env sigma act in
+               let$+ goto env sigma = Reductionops.nf_all env sigma goto in
+               let$+ is_act_undefined _ sigma = EConstr.isEvar sigma act in
+               let$+ is_goto_undefined _ sigma = EConstr.isEvar sigma goto in
+               if is_act_undefined && is_goto_undefined
+               then return None
+               else return (Some (act, goto, constructor_trees)))
       ;;
     end
 
@@ -1247,11 +1399,14 @@ module Make (Enc : Encoding.S) :
         function [] -> true | [ p ] -> Problems.is_empty p | _ :: _ -> false
       ;;
 
-      let cross_product ({ sigma; to_unify } : Problems.t) : t -> t =
+      let cross_product ({ sigma; to_unify; _ } : Problems.t) : t -> t =
         Logger.trace __FUNCTION__;
-        List.concat_map (fun ({ to_unify = xs; _ } : Problems.t) : t ->
+        List.concat_map
+          (fun ({ to_unify = xs; deferred; _ } : Problems.t) : t ->
           List.map
-            (fun (y : Problem.t) : Problems.t -> { sigma; to_unify = y :: xs })
+            (fun (y : Problem.t) : Problems.t ->
+              (* keep the accumulated problems' deferred premises *)
+              { sigma; to_unify = y :: xs; deferred })
             to_unify)
       ;;
     end
@@ -1296,7 +1451,7 @@ module Make (Enc : Encoding.S) :
         let to_unify : Problem.t list =
           List.map (Problem.of_constructor args) constructors
         in
-        let p : Problems.t = { sigma; to_unify } in
+        let p : Problems.t = { sigma; to_unify; deferred = [] } in
         return p
       ;;
 
@@ -1334,10 +1489,6 @@ module Make (Enc : Encoding.S) :
       let* lhs_unifies : bool = Pair.unifies args.lhs lhs in
       if lhs_unifies then Pair.unifies args.act act else return false
     ;;
-
-    (** Premise heads already warned about by [warn_if_skipped_premise], keyed
-        by LTS and head. *)
-    let skipped_premises : (string * string, unit) Hashtbl.t = Hashtbl.create 8
 
     (** Checks possible transitions for this term: *)
     let rec check_valid_constructors
@@ -1416,8 +1567,34 @@ module Make (Enc : Encoding.S) :
       | None -> return constructors
       | Some (next_lts_enc, next_problems) ->
         if ListOfProblems.is_empty next_problems
-        then
-          Constructors.axiom outer_act tgt_term (next_lts_enc, i) constructors
+        then (
+          (* No LTS premises to wait for: decide the deferred ones now. *)
+          let deferred : Problems.deferred list =
+            List.concat_map (fun (p : Problems.t) -> p.deferred) next_problems
+          in
+          let open Syntax in
+          let$+ decisions env sigma =
+            List.map
+              (fun ((_, name, args) : Problems.deferred) ->
+                decide_premise env sigma (name, args))
+              deferred
+          in
+          if List.mem (Some false) decisions
+          then return constructors
+          else
+            let* () =
+              iterate
+                0
+                (List.length deferred - 1)
+                ()
+                (fun i () ->
+                  match List.nth decisions i with
+                  | None ->
+                    let lts_enc, name, args = List.nth deferred i in
+                    warn_if_skipped_premise lts_enc (name, args)
+                  | Some _ -> return ())
+            in
+            Constructors.axiom outer_act tgt_term (next_lts_enc, i) constructors)
         else
           Constructors.retrieve
             i
@@ -1495,62 +1672,21 @@ module Make (Enc : Encoding.S) :
       then log_econstr ~__FUNCTION__ ~m:Warning ~s:"name not indmap" name;
       (* Array.to_list args |> log_econstrs ~__FUNCTION__ ~m:Warning ~s:"args"; *)
       let open Syntax in
-      let* () = warn_if_skipped_premise lts_enc (name, args) in
-      check_updated_ctx lts_enc acc indmap (substl, tl)
-
-    (** A binder whose head is not one of the [Using] LTSs is not checked at
-        all. For a data binder ([xs : list nat]) that is right. For a
-        {e premise} ([n = 0], any [Prop]) it means the constructor is treated
-        as if the premise held, so the extracted LTS can contain transitions
-        that do not exist (backlog item I2). Until such premises are
-        supported, say so -- once per LTS and premise head, not once per
-        state. *)
-    and warn_if_skipped_premise
-          (lts_enc : Enc.t)
-          ((name, args) : EConstr.t * EConstr.t array)
-      : unit mm
-      =
-      let open Syntax in
-      let$+ _warned env sigma =
-        let premise : EConstr.t = EConstr.mkApp (name, args) in
-        let is_prop : bool =
-          try
-            match Retyping.get_sort_quality_of env sigma premise with
-            | UnivGen.QualityOrSet.Qual q -> Sorts.Quality.is_qprop q
-            | UnivGen.QualityOrSet.Set -> false
-          with
-          | _ -> false
+      let$+ decided env sigma = decide_premise env sigma (name, args) in
+      match decided with
+      | Some false ->
+        (* the premise is false here: this constructor does not apply *)
+        return None
+      | Some true -> check_updated_ctx lts_enc acc indmap (substl, tl)
+      | None ->
+        (* not decidable yet: decide it once the LTS premises are unified *)
+        let acc : ListOfProblems.t =
+          List.map
+            (fun (p : Problems.t) : Problems.t ->
+              { p with deferred = (lts_enc, name, args) :: p.deferred })
+            acc
         in
-        if is_prop
-        then (
-          let head : string =
-            Rocq_utils.Strfy.econstr env sigma name
-            |> fun h ->
-            if String.starts_with ~prefix:"@" h
-            then String.sub h 1 (String.length h - 1)
-            else h
-          in
-          let key : string * string = Enc.to_string lts_enc, head in
-          if Bool.not (Hashtbl.mem skipped_premises key)
-          then (
-            Hashtbl.add skipped_premises key ();
-            Logger.warning
-              (Printf.sprintf
-                 "A constructor of %s has a premise headed by [%s] (first met \
-                  as [%s]) that MeBi does not check: only premises over the \
-                  LTSs given in [Using] are explored, so the constructor is \
-                  applied whether or not the premise holds. The extracted LTS \
-                  may contain transitions that do not exist, and a [MeBi Run \
-                  Bisim] verdict on it may be wrong (a proof cannot be: [Qed] \
-                  still checks the premise)."
-                 (Rocq_utils.Strfy.econstr env sigma (decode lts_enc))
-                 head
-                 (Rocq_utils.Strfy.econstr
-                    env
-                    sigma
-                    (Reductionops.nf_evar sigma premise)))))
-      in
-      return ()
+        check_updated_ctx lts_enc acc indmap (substl, tl)
     ;;
 
     let collect_valid_constructors

@@ -18,6 +18,10 @@ module type S = sig
   val simplify_hyps : unit -> tactic mm
   val simplify_all : unit -> tactic mm
   val simplify_and_subst_all : unit -> tactic mm
+
+  (** [reflexivity ()] closes an equation premise goal (up to reduction). *)
+  val reflexivity : unit -> tactic mm
+
   val cofix : unit -> tactic mm
   val mutual_cofix : Names.Id.t -> (Names.Id.t * Evd.econstr) list -> tactic mm
   val all_goals : tactic -> tactic
@@ -201,6 +205,11 @@ module Make
     let* concl : Tactic.t = simplify_concl () in
     let* hyps : Tactic.t = simplify_hyps () in
     Tactic.seq concl hyps |> return
+  ;;
+
+  let reflexivity () : Tactic.t mm =
+    Logger.trace __FUNCTION__;
+    Tactics.reflexivity_red true |> Tactic.create ~msg:"reflexivity" |> return
   ;;
 
   let simplify_and_subst_all () : Tactic.t mm =

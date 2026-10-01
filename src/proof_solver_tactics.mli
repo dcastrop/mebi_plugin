@@ -18,6 +18,10 @@ module type S = sig
   val simplify_hyps : unit -> tactic mm
   val simplify_all : unit -> tactic mm
   val simplify_and_subst_all : unit -> tactic mm
+
+  (** [reflexivity ()] closes an equation premise goal (up to reduction). *)
+  val reflexivity : unit -> tactic mm
+
   val cofix : unit -> tactic mm
 
   (** [mutual_cofix root others] opens a mutual cofixpoint. [root]'s type is

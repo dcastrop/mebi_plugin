@@ -261,22 +261,36 @@ struct
     let invertibility (x : t) : int mm =
       Logger.trace __FUNCTION__;
       let open Syntax in
-      let* _, tys = to_atomic x in
+      let* ty, tys = to_atomic x in
       let* sigma = get_sigma in
-      (* NOTE: returns true if can be inverted *)
-      let rec f (x : EConstr.t) : bool =
-        match EConstr.kind sigma x with
-        | Var _ -> EConstr.isRef sigma x
-        | App (_, tys) -> Array.exists f tys
+      (* An equation is never a transition to invert: it comes from a
+         constructor's equation premise (backlog I2). The grading below
+         assumes an LTS step's [term label goto] and would score [a = a] (both
+         sides a local variable) 3, and inverting it changes nothing, so the
+         solver picked it forever. Substitutable equations are handled by the
+         [subst] after each step. *)
+      let is_eq : bool =
+        match EConstr.kind sigma ty with
+        | Ind (ind, _) -> Rocqlib.check_ind_ref "core.eq.type" ind
         | _ -> false
       in
-      (* NOTE: since [2] is the goto-state and [1] is the label, [g] allows us to clearly see which hyp needs to be inverted first. *)
-      let g (i : int) : int =
-        try if f tys.(i) then i else 0 with
-        (* NOTE: handles "Index out of bounds" for accessing [tys] array. *)
-        | Invalid_argument _ -> 0
-      in
-      g 2 + g 1 |> return
+      if is_eq
+      then return 0
+      else (
+        (* NOTE: returns true if can be inverted *)
+        let rec f (x : EConstr.t) : bool =
+          match EConstr.kind sigma x with
+          | Var _ -> EConstr.isRef sigma x
+          | App (_, tys) -> Array.exists f tys
+          | _ -> false
+        in
+        (* NOTE: since [2] is the goto-state and [1] is the label, [g] allows us to clearly see which hyp needs to be inverted first. *)
+        let g (i : int) : int =
+          try if f tys.(i) then i else 0 with
+          (* NOTE: handles "Index out of bounds" for accessing [tys] array. *)
+          | Invalid_argument _ -> 0
+        in
+        g 2 + g 1 |> return)
     ;;
 
     let _need_inversion (x : t) : bool mm =
@@ -388,6 +402,20 @@ struct
     let is_weak_sim () : bool mm = get_concl () |> Theory.is_weak_sim
     let is_exists () : bool mm = get_concl () |> Theory.is_exists
     let is_tau () : bool mm = get_concl () |> Theory.is_tau
+
+    (** [is_eq ()] if the conclusion is an equation [_ = _]: an equation
+        premise of a constructor just applied (backlog I2). *)
+    let is_eq () : bool mm =
+      let open Syntax in
+      let* sigma = get_sigma in
+      return
+        (match EConstr.kind sigma (get_concl ()) with
+         | App (h, a) when Array.length a = 3 ->
+           (match EConstr.kind sigma h with
+            | Ind (ind, _) -> Rocqlib.check_ind_ref "core.eq.type" ind
+            | _ -> false)
+         | _ -> false)
+    ;;
 
     (** [try_unfold_any ()] is similar to [Hyp.try_unfold_any _], except that instead of a hypothesis, it uses the conclusion. Uses [Tacs.try_unfold_any].
     *)
@@ -1033,29 +1061,39 @@ struct
     =
     Logger.trace __FUNCTION__;
     ProofState.ApplicableConstructors.log ~__FUNCTION__ ~s:"args" args;
-    match args with
-    | { current = None; label; _ } ->
-      (* NOTE: entry-point *)
-      ProofState.update_statem
-        (ApplyConstructors { args with current = Some [] });
-      handle_appconstrs_entry_point label
-    | { current = Some []; remaining; _ } ->
-      (match remaining with
-       | None ->
-         (* NOTE: stop *)
-         ProofState.update_statem WeakSim;
-         handle_appconstrs_stop ()
-       | Some anno ->
-         (* NOTE: update current, prepare for next transition *)
-         let current, remaining = handle_appconstrs_update_args anno in
-         ProofState.update_statem
-           (ApplyConstructors { args with current; remaining });
-         handle_appconstrs_update anno.this.label)
-    | { current = Some (h :: tl); _ } ->
-      (* NOTE: continue applying constructors *)
-      ProofState.update_statem
-        (ApplyConstructors { args with current = Some tl });
-      handle_appconstrs_apply h
+    let open Syntax in
+    let* is_eq = Concl.is_eq () in
+    if is_eq
+    then
+      (* An equation premise has the focus. Extraction only keeps a
+         constructor whose equation premises it decided hold, i.e. whose sides
+         are convertible, so [reflexivity] closes it; the constructor list is
+         left as it is, for the goal that gets the focus next (backlog I2). *)
+      Tacs.reflexivity ()
+    else (
+      match args with
+      | { current = None; label; _ } ->
+        (* NOTE: entry-point *)
+        ProofState.update_statem
+          (ApplyConstructors { args with current = Some [] });
+        handle_appconstrs_entry_point label
+      | { current = Some []; remaining; _ } ->
+        (match remaining with
+         | None ->
+           (* NOTE: stop *)
+           ProofState.update_statem WeakSim;
+           handle_appconstrs_stop ()
+         | Some anno ->
+           (* NOTE: update current, prepare for next transition *)
+           let current, remaining = handle_appconstrs_update_args anno in
+           ProofState.update_statem
+             (ApplyConstructors { args with current; remaining });
+           handle_appconstrs_update anno.this.label)
+      | { current = Some (h :: tl); _ } ->
+        (* NOTE: continue applying constructors *)
+        ProofState.update_statem
+          (ApplyConstructors { args with current = Some tl });
+        handle_appconstrs_apply h)
   ;;
 
   let handle_state () : Tactic.t mm =

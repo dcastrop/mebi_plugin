@@ -3450,6 +3450,67 @@ Branch `main` (on `fork`).
 **Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
 Bug fix 7 · Optimization 2 · Tooling 5 · Docs 2 · Refactor 1.
 
+## 2026-10-01 — I2: equation premises are decided, and proved
+
+Branch `main` (on `fork`). **New feature** (flagged before writing; the user
+asked for it). Backlog item I2, step (1) of the ideas recorded there, plus
+the deferral that step turned out to need. General proof search over
+arbitrary premises, idea (3), is **not** built.
+
+**Extraction** (`lib/rocq_tools/rocq_monad_utils.ml`). A premise not over a
+`Using` LTS is now classified three ways, never guessed:
+
+- `decide_premise` decides an equation whose sides are **closed** after
+  `nf_all`. Convertible sides hold. A constructor difference, at the head or
+  under matching constructors, means false (constructors are disjoint),
+  so the constructor does not apply from this state. Anything else is
+  undecided.
+- An equation that is not closed when its constructor is matched is
+  **deferred**, carried in a new `Problems.deferred` field, and decided
+  after the constructor's LTS premises are unified
+  (`sandbox_unify_all_opt`), or at once on the axiom path. A guard
+  `a = A` on the label is the motivating case. The label is fixed only by
+  the LTS premise, so deciding at match time saw `?a = A`, left it
+  undecided, and kept the `B` step. That was my first version, caught by
+  `TwoPremises.wsim_guard`'s size pin. `cross_product` drops each
+  accumulated problem's fields in favour of the new premise's evar map, so
+  `deferred` is copied across explicitly there.
+- Only still-undecided premises warn (I2's warning, reworded).
+
+**Proof solver** (`src/proof_solver_step.ml`). (a) In `ApplyConstructors`,
+an equation goal with the focus is closed by `reflexivity` (new
+`Tacs.reflexivity`), leaving the constructor list for the next goal.
+Extraction only keeps an equation premise it decided holds, i.e. one with
+convertible sides. (b) **`Hyp.invertibility` grades equation hypotheses
+0.** It assumed every hypothesis was an LTS step and graded `a = a` (both
+sides a local variable) 3. Inverting it changes nothing and `subst` cannot
+remove it, so the solver inverted it **forever**: "Unsolved after 501" when
+the `eq` premise came last. This changes which hypothesis is inverted, the
+fragile choice Step 0 warns about, but only when an equation hypothesis
+exists, which no example has.
+
+**Verification.** All 27 counts unchanged under `Auto`. With `MutualCofix`
+forced `True`/`False` (temporary override), identical to the per-mode
+baselines measured for A6 (forced nested Test2 `446 278 299 194 446 182`;
+Test3 stops at 1127). All parallel builds pass, so `Test.v`'s new proofs
+hold under every mode. The eight spike shapes (multi-premise, and `eq`
+before/between/after LTS premises) all prove. `tests.exe` 61/61; `make`
+builds plugin and `Test.v`.
+
+**Tests** (`theories/Test.v`): `UncheckedPremise` becomes
+`DecidedPremise`, a positive size pin (`n = 0`: 2 states, 1 transition).
+New `UndecidedPremise` is a known-wrong `Fail`: an equation over an opaque
+`Parameter` cannot be decided, so the LTS over-approximates. In
+`TwoPremises`, `wsim_eq` and `wsim_eqfirst` are now positive, and the new
+`wsim_guard` checks that a false premise (`B = A`) blocks a step: a
+2-state pin and a proof. Each `Fail` was checked for its reason
+(`LTS_Incomplete`).
+
+**Docs.** README gains "Which constructor shapes are supported".
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 2 ·
+Bug fix 7 · Optimization 2 · Tooling 5 · Docs 2 · Refactor 1.
+
 ---
 
 ## Outstanding

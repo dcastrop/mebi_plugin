@@ -726,20 +726,38 @@ Module SaturationGuard.
   MeBi Config Reset Weak.
 End SaturationGuard.
 
-MeBi Divider "Theories.Test.UncheckedPremise".
-Module UncheckedPremise.
-  (* KNOWN WRONG (backlog item I2): [n = 0] is not an LTS premise, so
-     extraction does not check it and applies [go] from every state. The
-     true LTS from 0 is the single transition [0 -true-> 1]; the extracted one
-     is [0 -> 1 -> 2 -> ...], so it hits the state bound. If premises like
-     this become supported, this [Fail] will start failing: replace it with a
-     positive test. *)
+MeBi Divider "Theories.Test.DecidedPremise".
+Module DecidedPremise.
+  (* An equation premise over closed terms is decided during extraction
+     (backlog item I2): [go] fires from 0 ([0 = 0] holds) and not from 1
+     ([1 = 0] does not), so the LTS from 0 is the single transition
+     [0 -true-> 1]: 2 states, 1 transition. (Until 2026-10-01 the premise
+     was skipped and this was [0 -> 1 -> 2 -> ...], unbounded.) *)
   Inductive st : nat -> bool -> nat -> Prop :=
   | go (n : nat) : n = 0 -> st n true (S n).
+  MeBi Config Bounds As Num States 2.
+  MeBi Run LTS 0 Using st.
+  MeBi Config Bounds As Num States 1.
+  Fail MeBi Run LTS 0 Using st.
+  MeBi Config Bounds As Num Transitions 1.
+  MeBi Run LTS 0 Using st.
+  MeBi Config Reset Bounds.
+End DecidedPremise.
+
+MeBi Divider "Theories.Test.UndecidedPremise".
+Module UndecidedPremise.
+  (* KNOWN WRONG (backlog item I2): an equation MeBi cannot decide -- here
+     over an opaque [f], which does not reduce -- is skipped (with a
+     warning), so [go] is applied from every state and the LTS hits the
+     bound. If such premises become decidable (e.g. by proof search), this
+     [Fail] starts failing: replace it with a positive test. *)
+  Parameter f : nat -> nat.
+  Inductive st : nat -> bool -> nat -> Prop :=
+  | go (n : nat) : f n = 0 -> st n true (S n).
   MeBi Config Bounds As Num States 20.
   Fail MeBi Run LTS 0 Using st.
   MeBi Config Reset Bounds.
-End UncheckedPremise.
+End UndecidedPremise.
 
 (* Pinned sizes (backlog item E(b)). No command reports an LTS's size, but
    the bounds do: with [FailIf Incomplete] (the default), [Bounds As Num
@@ -907,11 +925,11 @@ Module TwoPremises.
            Using syncLTS leftLTS rightLTS thirdLTS.
     MeBi Sim Solve 100. Qed.
 
-  (* KNOWN WRONG (found 2026-10-01, independent of A6; see I2): the solver
-     has no step for a premise that is not over an LTS. With an [eq]
-     premise after the LTS one it stalls, leaving the proof open (a
-     [weak_sim] step's [exists] goal); [Qed] would fail. When fixed, this
-     match fails: make the proof positive. *)
+  (* Equation premises, after or before the LTS one (backlog item I2,
+     2026-10-01): extraction decides them, the solver closes them by
+     [reflexivity] and no longer tries to invert them. Until then the first
+     stalled (an [a = a] hypothesis was inverted forever) and the second was
+     an Anomaly. *)
   Inductive eqLTS : proc -> option act -> proc -> Prop :=
   | with_eq p p' q a : leftLTS p (Some a) p' -> a = a ->
                        eqLTS (ppar p q) (Some a) (ppar p' q).
@@ -921,13 +939,7 @@ Module TwoPremises.
   Definition x5 : proc := ppar (pact A (pact B pnil)) pnil.
   Example wsim_eq : weak_sim eqLTS eqLTS' x5 x5.
   Proof. MeBi Sim Begin eqLTS x5 And eqLTS' x5 Using leftLTS.
-    MeBi Sim Solve 100.
-    (* still open: some goal remains *)
-    match goal with |- _ => idtac end.
-  Abort.
-  (* KNOWN WRONG, same cause: an [eq] premise {e before} the LTS one gets
-     the focus first. The solver used to stop with an Anomaly; it now stops
-     with a user error naming the goal. *)
+    MeBi Sim Solve 100. Qed.
   Inductive eqfirstLTS : proc -> option act -> proc -> Prop :=
   | eq_first p p' q a : a = a -> leftLTS p (Some a) p' ->
                         eqfirstLTS (ppar p q) (Some a) (ppar p' q).
@@ -936,7 +948,20 @@ Module TwoPremises.
                          eqfirstLTS' (ppar p q) (Some a) (ppar p' q).
   Example wsim_eqfirst : weak_sim eqfirstLTS eqfirstLTS' x5 x5.
   Proof. MeBi Sim Begin eqfirstLTS x5 And eqfirstLTS' x5 Using leftLTS.
-    Fail MeBi Sim Solve 100.
-  Abort.
+    MeBi Sim Solve 100. Qed.
+
+  (* A false equation premise blocks a step inside a proof: [guard] lets
+     [A] through and not [B], so from [x5] only the [A]-step exists. *)
+  Inductive guardLTS : proc -> option act -> proc -> Prop :=
+  | guard p p' a : a = A -> leftLTS p (Some a) p' -> guardLTS p (Some a) p'.
+  Inductive guardLTS' : proc -> option act -> proc -> Prop :=
+  | guard' p p' a : a = A -> leftLTS p (Some a) p' -> guardLTS' p (Some a) p'.
+  Definition x6 : proc := pact A (pact B pnil).
+  MeBi Config Bounds As Num States 2.
+  MeBi Run LTS x6 Using guardLTS leftLTS.
+  MeBi Config Reset Bounds.
+  Example wsim_guard : weak_sim guardLTS guardLTS' x6 x6.
+  Proof. MeBi Sim Begin guardLTS x6 And guardLTS' x6 Using leftLTS.
+    MeBi Sim Solve 100. Qed.
   MeBi Config Reset Weak.
 End TwoPremises.
