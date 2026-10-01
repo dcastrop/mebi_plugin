@@ -157,6 +157,8 @@ lib/model/FSM.mli
 
 lib/model/algorithms/saturation.ml
 lib/model/algorithms/saturation.mli
+lib/model/algorithms/saturation_estimate.ml
+lib/model/algorithms/saturation_estimate.mli
 lib/model/algorithms/minimization.ml
 lib/model/algorithms/minimization.mli
 lib/model/algorithms/bisimilarity.ml

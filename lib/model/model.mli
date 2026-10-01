@@ -113,6 +113,15 @@ module type S = sig
      and type transition = Transition.t
      and type fsm = FSM.t
      and type partition = Partition.t
+
+  (** {2 Saturation estimate} *)
+
+  (** {!SaturationEstimate} provides {!val:SaturationEstimate.fsm}: the exact
+      number of weak actions {!FSM.saturate} would produce, computed on the
+      quotient by silent SCCs without saturating. The plugin checks it
+      against a bound before every saturation, as saturating a large LTS can
+      exhaust memory. *)
+  module SaturationEstimate : Saturation_estimate.S with type fsm = FSM.t
 end
 
 (** Builds a model from a term's [base] representation, plus a source of constructor-bindings used for the proof solver.

@@ -527,6 +527,90 @@ let test_product_estimate () : unit =
 ;;
 
 (** The JSON round-trip that [Json.S] provides for every model type. *)
+(* SaturationEstimate: the size of [FSM.saturate]'s output, computed on the
+   silent-SCC quotient without saturating. The reference is the saturation
+   itself -- the number of distinct [(from, label, goto)] it materialises. *)
+
+let saturated_triples (f : M.FSM.t) : int =
+  let s = M.FSM.saturate f in
+  M.EdgeMap.fold
+    (fun (from : M.State.t) actions acc ->
+      M.Action.Map.fold
+        (fun (x : M.Action.t) ds acc ->
+          M.State.Set.fold
+            (fun (goto : M.State.t) acc ->
+              (from.base, x.label.base, goto.base) :: acc)
+            ds
+            acc)
+        actions
+        acc)
+    s.edges
+    []
+  |> List.sort_uniq compare
+  |> List.length
+;;
+
+(** [k] silent cycles of [m] states each, chained by silent edges (cycle [i]
+    to cycle [i + 1]), with every state also able to do [a] back to the first
+    state of its own cycle. From cycle [i], [tau* a tau*] reaches cycles [i]
+    to [k - 1], so the saturation has [m^2 * k(k+1)/2] weak actions. *)
+let chained_cycles (k : int) (m : int) : M.FSM.t =
+  let st (i : int) (j : int) : int = (i * m) + j in
+  let ts =
+    List.concat_map
+      (fun i ->
+        List.concat_map
+          (fun j ->
+            [ transition (st i j) tau (st i ((j + 1) mod m))
+            ; transition (st i j) a (st i 0)
+            ]
+            @
+            if i + 1 < k && j = 0
+            then [ transition (st i 0) tau (st (i + 1) 0) ]
+            else [])
+          (List.init m Fun.id))
+      (List.init k Fun.id)
+  in
+  fsm ~weak_labels:(M.Label.Set.singleton tau) 0 ts
+;;
+
+let test_saturation_estimate () : unit =
+  print_endline "saturation estimate";
+  let small = chained_cycles 3 4 in
+  let e = M.SaturationEstimate.fsm small in
+  check_int "chained cycles: one SCC per cycle" 3 e.sccs;
+  check_int "chained cycles: largest SCC" 4 e.largest_scc;
+  check_int "chained cycles: weak = m^2 k(k+1)/2" (16 * 6) e.weak;
+  check_int "chained cycles: weak = saturated" (saturated_triples small) e.weak;
+  (* [Proc/Test4]'s shape (81 silent SCCs of ~120 states) at about its
+     size: far too big to saturate here, but the estimate is immediate. *)
+  let big = M.SaturationEstimate.fsm (chained_cycles 81 120) in
+  check_int "81 x 120 chained cycles: weak" (14400 * 81 * 82 / 2) big.weak;
+  (* Differential: small pseudo-random LTSs, label 0 silent. *)
+  let rng = Random.State.make [| 2026; 10; 1 |] in
+  let mismatches = ref 0 in
+  let nonempty = ref 0 in
+  for _ = 1 to 300 do
+    let n = 2 + Random.State.int rng 7 in
+    let ts =
+      List.init
+        (n * (1 + Random.State.int rng 3))
+        (fun _ ->
+          let l = Random.State.int rng 3 in
+          transition
+            (Random.State.int rng n)
+            (if l = 0 then tau else label l)
+            (Random.State.int rng n))
+    in
+    let f = fsm ~weak_labels:(M.Label.Set.singleton tau) 0 ts in
+    let expected = saturated_triples f in
+    if expected > 0 then incr nonempty;
+    if (M.SaturationEstimate.fsm f).weak <> expected then incr mismatches
+  done;
+  check_int "300 random LTSs: estimate = saturated" 0 !mismatches;
+  check "random LTSs are mostly non-trivial" true (!nonempty > 250)
+;;
+
 let test_json () : unit =
   print_endline "json serialisation";
   let f = fsm 0 [ transition 0 a 1 ] in
@@ -553,6 +637,7 @@ let () =
   test_product_refl_leaf ();
   test_product_respond ();
   test_product_estimate ();
+  test_saturation_estimate ();
   test_json ();
   Printf.printf "\n%i/%i passed\n" (!total - !failures) !total;
   if !failures > 0 then exit 1
