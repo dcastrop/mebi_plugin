@@ -146,6 +146,26 @@ let stop_msg (x : int) : string =
     x
 ;;
 
+(** What to say when [MeBi Sim Solve N] runs out of steps: which cofix
+    strategy was in force (and whether [Auto] picked it), and the two ways on.
+    An unsolved stop is not always a mistake -- a proof can be driven by
+    several smaller [Solve]s -- so this rides on the [Notice] above rather
+    than raising its own warning. *)
+let exhausted_msg (bound : int) : string =
+  let mutual : bool = !Api.the_mutual_cofix in
+  Printf.sprintf
+    "(The bound was reached: [MeBi Sim Solve %i] permits %i steps. The solver \
+     is using a %s cofix%s. Raise the bound, or force the other strategy with \
+     [MeBi Config Solver MutualCofix %s].)"
+    bound
+    (bound + 1)
+    (if mutual then "mutual" else "nested")
+    (match !Api.the_solver_strategy with
+     | Api.Auto -> ", chosen by Auto"
+     | Api.Nested | Api.Mutual -> ", as configured")
+    (if mutual then "False" else "True")
+;;
+
 (** [step] ... *)
 let step (pstate : Declare.Proof.t) : Declare.Proof.t =
   let module Ps : S = (val !(get_the_proof_solver ())) in
@@ -169,15 +189,17 @@ let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
   let finished (p : Declare.Proof.t) : bool =
     Proof.is_done (Declare.Proof.get p)
   in
-  let rec f (n : int) (p : Declare.Proof.t) : int * Declare.Proof.t =
+  (* [f] also says whether it stopped on [bound], as opposed to finishing or
+     running out of things to do. *)
+  let rec f (n : int) (p : Declare.Proof.t) : int * Declare.Proof.t * bool =
     Logger.thing ~__FUNCTION__ Debug "iter" n (Printf.sprintf "%i");
     if finished p
     then (
       Ps.ProofState.update_statem Done;
-      n, p)
+      n, p, false)
     else (
       match Int.compare n bound with
-      | 1 -> n, p
+      | 1 -> n, p, true
       | _ ->
         (* The recursive call must be a genuine tail call, and nothing may
            capture [p] across it. Previously this read
@@ -192,11 +214,12 @@ let solve ?(bound : int = 10) (pstate : Declare.Proof.t) : Declare.Proof.t =
            command returned, unwound the recursion, and dropped the lot.
            Catching around [step p] alone keeps only the current [p] live. *)
         (match try Some (step p) with NothingToDo -> None with
-         | None -> n, p
+         | None -> n, p, false
          | Some p' -> f (n + 1) p'))
   in
-  let num, pstate = f 0 pstate in
+  let num, pstate, exhausted = f 0 pstate in
   Logger.notice (stop_msg num);
+  if exhausted && Bool.not (is_done ()) then Logger.notice (exhausted_msg bound);
   pstate
 ;;
 

@@ -139,6 +139,12 @@ let set_saturation_bound (x : int) : unit =
   |> Logger.show
 ;;
 
+(** Peak memory per extracted state, measured 2026-10-01: ~0.16MB on
+    [Proc/Test4] (9720 states, 1.6GB) and ~0.56MB on [CADP/Size2] (5000
+    states, 3.5GB). Extraction holds every state's Rocq terms, so a large
+    state bound can exhaust memory before it is reached. *)
+let mb_per_extracted_state : float * float = 0.16, 0.56
+
 let set_the_bounds_args (x : bounds_args) : unit =
   the_bounds_args := x;
   Printf.sprintf
@@ -146,7 +152,23 @@ let set_the_bounds_args (x : bounds_args) : unit =
     (match x with
      | States i -> Printf.sprintf "%i States" i
      | Transitions i -> Printf.sprintf "%i Transitions" i)
-  |> Logger.show
+  |> Logger.show;
+  match x with
+  | States i ->
+    let lo, hi = mb_per_extracted_state in
+    let gb (mb : float) : float = Float.of_int i *. mb /. 1000. in
+    if gb hi >= 1.
+    then
+      Printf.sprintf
+        "(Exploring up to %i states may need %.1f--%.1fGB of memory: \
+         extraction has measured %.2f--%.2fMB per state.)"
+        i
+        (gb lo)
+        (gb hi)
+        lo
+        hi
+      |> Logger.notice
+  | Transitions _ -> ()
 ;;
 
 (***********************************************************************)
