@@ -3511,6 +3511,39 @@ New `UndecidedPremise` is a known-wrong `Fail`: an equation over an opaque
 **Session tally (2026-10-01, this session, cumulative):** New feature 2 ·
 Bug fix 7 · Optimization 2 · Tooling 5 · Docs 2 · Refactor 1.
 
+## 2026-10-01 — I1: is a `Test4` proof feasible at all? Measured: not soon
+
+Branch `main` (on `fork`). Measurement only; no code committed (a
+temporary print of `Product.estimate` for every proof, since reverted).
+Backlog item I1 (the user's idea: saturate on demand, one state at a time,
+so that `Test4` fits in memory).
+
+On-demand saturation suits the proof solver, which only asks for one
+state's weak moves at a time. But it only matters if the *proof* is
+feasible, which can be bounded without building anything. Every left
+transition from every reachable state must be matched at least once, so
+`Test4` (9720 states, 87,480 transitions) needs ≥ 9,720 pairs and ≥ 87,480
+moves. Iterations per move on the same family:
+
+| proof | pairs | moves | iterations | per move |
+| --- | --- | --- | --- | --- |
+| Test3 `wsim_pq` | 42 | 117 | 1073 | 9.2 |
+| Test3 (two more) | 16 / 18 | 48 / 54 | 387 / 519 | 8.1 / 9.6 |
+| Test3 (two more) | 24 / 8 | 72 / 24 | 603 / 211 | 8.4 / 8.8 |
+| Test1, Test2 | 3-13 | 3-20 | 21-114 | 5.6-7.0 |
+| CADP `MutualExclusion` | 13 / 44 | 13 / 44 | 268 / 396 | 20.6 / 9.0 |
+
+So `Test4` needs **≥ ~700k solver iterations** (8 × 87,480). Allowing for
+Test3's pairs/states ratio of 1-2.3, that is up to ~1.5M. At Test3's
+1.8 ms per iteration it takes **≥ ~21 minutes**, likely more given
+`Test4`'s larger terms. `Qed` then has to check a coinductive proof over
+≥ 9,720 pairs. The largest proof today is 1,073 iterations. On-demand
+saturation would remove the memory wall and leave this one, so I did not
+build it. `Test4` stays the documented limit, last in the order by the
+user's earlier decision.
+
+**Session tally (2026-10-01, this session, cumulative):** unchanged.
+
 ---
 
 ## Outstanding
