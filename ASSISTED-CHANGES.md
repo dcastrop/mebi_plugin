@@ -3636,6 +3636,29 @@ unquoted variables), so both runs silently used the default solver and
 
 **Session tally (2026-10-01, this session, cumulative):** unchanged.
 
+## 2026-10-01 — No plugin exception reaches Rocq as an Anomaly from `MeBi Sim`
+
+Branch `main` (on `fork`). **Bug fix** (error reporting). Found along the
+way: twice today a plugin-internal exception (`BindingInstruction_NotApp`,
+then `CannotGetTransition` in the Step 0 spike) escaped as a Rocq
+**Anomaly**, which tells users to report a bug in Rocq.
+
+`Proof_solver.guard` now wraps the `MeBi Sim Begin`/`Step`/`Solve`
+commands. An uncaught exception from inside the plugin is recognised by its
+`Mebi_plugin.` name prefix, or as a stdlib `Not_found`/`Invalid_argument`/
+`Failure`/`Assert_failure` escaping plugin code. It becomes a user error that
+names it, says it is a MeBi problem, and points at `MeBi Help Premises`.
+Exceptions with a registered printer (Rocq's own errors, tactic failures,
+`MEBI_exn`) pass through unchanged. The guard is at the command level, not
+in `step`, because `solve` uses `NothingToDo` for control flow.
+
+Checked by injecting a `Not_found` (temporary): user error, not Anomaly.
+Normal proofs are unaffected; proof suite 27 counts unchanged; `tests.exe`
+61/61. Also folds in `dune fmt` of the new `minimization.mli` comments.
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 3 ·
+Bug fix 8 · Optimization 3 · Tooling 5 · Docs 3 · Refactor 1.
+
 ---
 
 ## Outstanding

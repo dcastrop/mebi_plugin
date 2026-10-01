@@ -33,8 +33,9 @@ module type S = sig
 
   exception Split_OnlyReturnedOneBlock_ButNeqBlock of (states * states)
 
-  (** @raise Split_OnlyReturnedOneBlock_ButNeqBlock if a split that found
-      nothing to split off returned a different block. *)
+  (** @raise Split_OnlyReturnedOneBlock_ButNeqBlock
+        if a split that found
+        nothing to split off returned a different block. *)
   val ensure_equal : states -> states -> unit
 
   (** One refinement step: split [block] by one visible [label] (edges

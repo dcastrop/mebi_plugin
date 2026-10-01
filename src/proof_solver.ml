@@ -291,3 +291,34 @@ let init
   Solver.ProofState.init pstate (fst a, fst b);
   pstate
 ;;
+
+(** [guard f] runs a [MeBi Sim] command. An exception from inside the plugin
+    that nothing handled would reach Rocq as an {e Anomaly} ("please report
+    at rocq-prover.org"), blaming Rocq for a plugin failure -- as
+    [BindingInstruction_NotApp] and [CannotGetTransition] did on 2026-10-01.
+    Those (recognisable by the [Mebi_plugin.] prefix of their name, or a
+    stdlib [Not_found]/[Invalid_argument]/[Failure]/[Assert_failure] escaping
+    plugin code) become a user error that names the exception and says whose
+    problem it is. Exceptions with a registered printer -- Rocq's own errors,
+    tactic failures, [MEBI_exn] -- pass through unchanged. *)
+let guard (f : unit -> 'a) : 'a =
+  try f () with
+  | e
+    when CErrors.noncritical e
+         && (String.starts_with ~prefix:"Mebi_plugin." (Printexc.to_string e)
+             ||
+             match e with
+             | Not_found | Invalid_argument _ | Failure _ | Assert_failure _ ->
+               true
+             | _ -> false) ->
+    CErrors.user_err
+      (Pp.str
+         (Printf.sprintf
+            "MeBi: the proof search stopped on an internal error it does not \
+             handle:\n\
+            \  %s\n\
+             This is a problem in the MeBi plugin, not in Rocq. If the \
+             constructors involved have premises that are not over an LTS, see \
+             [MeBi Help Premises]."
+            (Printexc.to_string e)))
+;;

@@ -58,3 +58,8 @@ val init
 
 val step : Declare.Proof.t -> Declare.Proof.t
 val solve : ?bound:int -> Declare.Proof.t -> Declare.Proof.t
+
+(** [guard f] runs a [MeBi Sim] command, turning an otherwise-uncaught
+    plugin exception (which Rocq would report as its own Anomaly) into a
+    user error naming it. *)
+val guard : (unit -> 'a) -> 'a

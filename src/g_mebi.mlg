@@ -17,20 +17,20 @@ DECLARE PLUGIN "rocq-mebi.mebi"
 VERNAC COMMAND EXTEND MeBi_Sim CLASSIFIED AS QUERY
 |![ proof ] 
   [ "MeBi" "Sim" "Solve" int(bound) ] ->
-  { fun ~pstate -> Proof_solver.solve ~bound pstate }
+  { fun ~pstate -> Proof_solver.guard (fun () -> Proof_solver.solve ~bound pstate) }
 
 |![ proof ] 
   [ "MeBi" "Sim" "Step" ] ->
-  { fun ~pstate -> Proof_solver.step pstate }
+  { fun ~pstate -> Proof_solver.guard (fun () -> Proof_solver.step pstate) }
 
 |![ proof ] 
   [ "MeBi" "Sim" "Begin" reference(a) constr(x) "And" reference(b) constr(y) ] -> 
-  { fun ~pstate -> Proof_solver.init pstate [] (x,a) (y,b) }
+  { fun ~pstate -> Proof_solver.guard (fun () -> Proof_solver.init pstate [] (x,a) (y,b)) }
 
 |![ proof ] 
   [ "MeBi" "Sim" "Begin" reference(a) constr(x) "And" reference(b) constr(y)
                  "Using" reference_list(rs) ] -> 
-  { fun ~pstate -> Proof_solver.init pstate rs (x,a) (y,b) }
+  { fun ~pstate -> Proof_solver.guard (fun () -> Proof_solver.init pstate rs (x,a) (y,b)) }
 END
 
 (* Bisimilarity *)
