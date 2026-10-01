@@ -182,7 +182,7 @@ MeBi Config FailIf Empty/Incomplete/NotBisimilar/Oversaturated True/False.
 MeBi Config Output "<Kind>" True/False.
 ```
 
-- `Bounds` caps how large an explored graph may get before mebi gives up. Extraction has measured 0.16–0.56MB of memory per state, so setting a state bound whose upper estimate passes 1GB prints a notice.
+- `Bounds` caps how large an explored graph may get before mebi gives up. Extraction has measured 0.01–0.07MB of memory per state on top of a fixed ~0.1–0.3GB, so setting a state bound whose upper estimate passes 1GB (about 14,000 states) prints a notice. Logging the result with `Output "Result"`/`"DecodeResults"`/`"DumpResults"` costs far more, about 0.65MB per state, because every term is pretty-printed.
 - `Bounds Saturation <n>` caps how many weak actions saturation (used by `Saturate`, `Minimize`, `Bisim` and `Sim Begin` whenever a `Weak` label is set) may produce. Saturation can be orders of magnitude larger than the LTS: `examples/Bisimilarity/Proc/Test4` has 9720 states and would saturate to 74.6M weak actions. Before saturating, mebi computes that number exactly (cheaply, without saturating) and refuses above the bound with `Saturation_Too_Large`, naming the figure. The default is 1,000,000. Measured memory is 450–900 bytes per weak action, the upper end for larger LTSs (each action keeps its shortest witness path). Pick a bound your machine can hold. As a guide:
 
   | `<n>` (weak actions) | approx. memory |

@@ -139,11 +139,13 @@ let set_saturation_bound (x : int) : unit =
   |> Logger.show
 ;;
 
-(** Peak memory per extracted state, measured 2026-10-01: ~0.16MB on
-    [Proc/Test4] (9720 states, 1.6GB) and ~0.56MB on [CADP/Size2] (5000
-    states, 3.5GB). Extraction holds every state's Rocq terms, so a large
-    state bound can exhaust memory before it is reached. *)
-let mb_per_extracted_state : float * float = 0.16, 0.56
+(** Peak memory per extracted state, on top of a fixed ~0.1--0.3GB: measured
+    2026-10-01, after extraction stopped keeping matching evars, as 0.01MB on
+    [Proc/Test4] (9720 states, 0.40GB peak) and 0.03--0.07MB on
+    [CADP/Size2] (5000 states, 0.49GB). Logging the result is far costlier:
+    [Output "Result"]/["DecodeResults"]/["DumpResults"] pretty-print every
+    term, ~0.65MB per state on [CADP/Size2]. *)
+let mb_per_extracted_state : float * float = 0.01, 0.07
 
 let set_the_bounds_args (x : bounds_args) : unit =
   the_bounds_args := x;
@@ -161,7 +163,8 @@ let set_the_bounds_args (x : bounds_args) : unit =
     then
       Printf.sprintf
         "(Exploring up to %i states may need %.1f--%.1fGB of memory: \
-         extraction has measured %.2f--%.2fMB per state.)"
+         extraction has measured %.2f--%.2fMB per state, and logging the \
+         result with Output \"Result\" adds ~0.65MB per state.)"
         i
         (gb lo)
         (gb hi)

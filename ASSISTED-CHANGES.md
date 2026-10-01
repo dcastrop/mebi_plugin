@@ -3165,6 +3165,61 @@ recording the measurement and the one place to look if it ever matters.
 **Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
 Bug fix 2 · Optimization 1 · Tooling 1 · Docs 2 · Refactor 0.
 
+## 2026-10-01 — Extraction stops keeping matching evars; my per-state memory figure was wrong
+
+Branch `main` (on `fork`). **Optimization** (`src/graph_builder.ml`) and a
+**Bug fix** to figures I introduced earlier the same day. Backlog item
+"per-state extraction memory".
+
+**Where the memory went.** Temporary probes in the graph builder (since
+removed) logged live heap, evar counts and the reachable size of the evar map
+and encoding table every 250 states. On `CADP/Size2` the evar map was ~88% of
+live-heap growth: ~180 evars per state, 80% undefined, 590k at 4000 states.
+On `Proc/Test4` at 2000 states it held 87.5MB of a 110MB live heap, against
+4.2MB for the encoding table. They come from matching each state against
+the LTS's constructors (`mk_ctx_substl`, the per-constructor `fresh_evar`,
+LHS unification), all in the one command-wide evar map. (I briefly suspected
+`Rocq_monad.sandbox` of leaking updates. It doesn't: `state` swaps in a new
+context ref rather than mutating the shared one.)
+
+**My earlier figure was wrong.** H3's notice and the README quoted
+0.16–0.56MB per extracted state. The 0.56 came from `CADP/Size2/TermTests.v`,
+which enables `Output "Result"`, `"DecodeResults"` and `"DumpResults"`.
+Probing showed the OCaml heap peaking at 246MB during extraction, then
+jumping to 1.6GB while the result was pretty-printed and serialized. With
+those outputs off, the same run peaked at 0.75GB, not 1.9GB. So most of the
+"extraction" cost I measured was result logging. The `_CoqProject` comment
+on `CADP/Size2` (3.5GB at 5000 states) had the same confusion.
+
+**The change.** `get_new_constrs` runs each state's constructor collection
+in `M.sandbox`. That restores the evar map and keeps the encoding tables,
+which are mutated in place. This is safe only if nothing that escapes refers
+to those evars, so I measured that: across CADP/Size2 (7008 encoded terms),
+Test4 (2672), Test3 and CADP/Size1, no encoded term contains an evar. The
+code also checks per state: if a found term ever does contain one, the inner
+evar map is kept, which is the old behaviour.
+
+**Results** (clean A/B, no probes, same machine):
+
+| run | time | peak RSS |
+| --- | --- | --- |
+| `Test4`, full 9720 states, before → after | 24.7s → 16.7s | 1.44GB → 0.40GB |
+| `CADP/Size2`, 5000 states, before → after | 13.0s → 10.9s | 0.81GB → 0.49GB |
+
+The live heap fell from 412MB to 168MB on CADP/Size2 at 4000 states, and
+from 110MB to 22.5MB on Test4 at 2000 states. Test4's LTS is unchanged:
+9720 states, 87,480 transitions, 81 silent SCCs, 74,649,600 weak actions.
+Proof suite: all 27 counts unchanged, `theories/` builds, `tests.exe` 41/41.
+
+**Corrected figures.** `Api.mb_per_extracted_state` is now 0.01–0.07MB on
+top of a fixed ~0.1–0.3GB, so the notice fires from ~14,000 states, not
+~1,800. The notice and README now also say that result logging costs ~0.65MB
+per state. The `CADP/Size2` comment in `_CoqProject` is corrected.
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
+Bug fix 3 (one fixing my own earlier figure) · Optimization 2 · Tooling 1 ·
+Docs 2 · Refactor 0.
+
 ---
 
 ## Outstanding
