@@ -82,8 +82,11 @@ module Make
       let has_evars (x : Enc.t) : bool =
         Bool.not (Evar.Set.is_empty (Evd.evars_of_term sigma (M.decode x)))
       in
-      if List.exists (fun ((act, tgt, _) : M.Constructor.t) ->
-           has_evars act || has_evars tgt) cs
+      if
+        List.exists
+          (fun ((act, tgt, _) : M.Constructor.t) ->
+            has_evars act || has_evars tgt)
+          cs
       then M.return (cs, Some sigma)
       else M.return (cs, None)
     in
