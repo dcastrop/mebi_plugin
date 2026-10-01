@@ -611,6 +611,113 @@ let test_saturation_estimate () : unit =
   check "random LTSs are mostly non-trivial" true (!nonempty > 250)
 ;;
 
+(* ------------------------------------------------------------------ *)
+(* lib/terms: constructor trees and the encoding counter (backlog E(c)).
+   Only what has callers: [Tree.add], [Tree.add_list] and [Tree.min] have
+   none outside lib/terms and are deliberately not pinned here. *)
+
+module Tree = Base.Tree
+module Trees = Base.Trees
+
+let node (enc : int) (i : int) : Tree.Node.t = enc, i
+let leaf (enc : int) (i : int) : Tree.t = Tree.N (node enc i, [])
+
+let nodes_equal (a : Tree.Node.t list) (b : Tree.Node.t list) : bool =
+  List.equal Tree.Node.equal a b
+;;
+
+let test_tree_order () : unit =
+  print_endline "terms: tree equality and order";
+  let t = Tree.N (node 1 0, [ leaf 2 1; leaf 3 0 ]) in
+  let t' = Tree.N (node 1 0, [ leaf 2 1; leaf 3 0 ]) in
+  let u = Tree.N (node 1 0, [ leaf 2 1; leaf 3 1 ]) in
+  check "structurally equal trees are equal" true (Tree.equal t t');
+  check_int "and compare as 0" 0 (Tree.compare t t');
+  check
+    "a different constructor index deep down is not equal"
+    false
+    (Tree.equal t u);
+  check
+    "compare is antisymmetric"
+    true
+    (Int.equal (compare (Tree.compare t u) 0) (-compare (Tree.compare u t) 0));
+  (* Trees is a Set: equal trees collapse. *)
+  check_int
+    "Trees dedups equal trees"
+    2
+    (Trees.cardinal (Trees.of_list [ t; t'; u ]));
+  let c : Base.Constructor_tree.t = 1, 2, t in
+  check
+    "Constructor_tree: equal on equal parts"
+    true
+    (Base.Constructor_tree.equal c (1, 2, t'));
+  check
+    "Constructor_tree: differs if the tree differs"
+    false
+    (Base.Constructor_tree.equal c (1, 2, u))
+;;
+
+(** [Tree.minimize] is what the proof solver applies, node by node
+    ([Proof_solver_step.handle_appconstrs_update_args]). It treats a node's
+    children as {e alternatives} and keeps the shortest. A chain flattens to
+    itself. See the [TwoPremises] known-wrong test in [theories/Test.v]: for
+    a constructor with two LTS premises the children are both required, and
+    keeping one is why such proofs fail. *)
+let test_tree_minimize () : unit =
+  print_endline "terms: Tree.minimize and Trees.min";
+  let chain = Tree.N (node 1 0, [ Tree.N (node 2 1, [ leaf 3 2 ]) ]) in
+  check
+    "a chain flattens to its nodes, root first"
+    true
+    (nodes_equal [ node 1 0; node 2 1; node 3 2 ] (Tree.minimize chain));
+  let long = Tree.N (node 2 0, [ Tree.N (node 3 0, [ leaf 4 0 ]) ]) in
+  let short = leaf 5 0 in
+  check
+    "of two children, the shorter is kept (either order)"
+    true
+    (nodes_equal
+       [ node 1 0; node 5 0 ]
+       (Tree.minimize (Tree.N (node 1 0, [ long; short ])))
+     && nodes_equal
+          [ node 1 0; node 5 0 ]
+          (Tree.minimize (Tree.N (node 1 0, [ short; long ]))));
+  check
+    "on a tie, the first child is kept"
+    true
+    (nodes_equal
+       [ node 1 0; node 2 0 ]
+       (Tree.minimize (Tree.N (node 1 0, [ leaf 2 0; leaf 3 0 ]))));
+  check
+    "Trees.min picks the tree with the shortest minimized path"
+    true
+    (Tree.equal short (Trees.min (Trees.of_list [ chain; long; short ])));
+  check
+    "Trees.min_opt of empty is None"
+    true
+    (Option.is_none (Trees.min_opt Trees.empty));
+  check
+    "Trees.min of empty raises"
+    true
+    (match Trees.min Trees.empty with
+     | _ -> false
+     | exception Trees.EmptyHasNoMin -> true)
+;;
+
+(** [Bi_encoding] hands out encodings with [incr] and restarts them with
+    [reset]. *)
+let test_encoding_counter () : unit =
+  print_endline "terms: encoding counter";
+  let module E = Encoding.Packed.Unpack (Encoding.Packed.Int) in
+  E.reset ();
+  let a = E.incr () in
+  let b = E.incr () in
+  check_int "first encoding is init" E.init a;
+  check_int "then next init" (E.next E.init) b;
+  check "encodings are distinct" false (E.equal a b);
+  E.reset ();
+  check_int "reset restarts at init" E.init (E.incr ())
+;;
+
 let test_json () : unit =
   print_endline "json serialisation";
   let f = fsm 0 [ transition 0 a 1 ] in
@@ -638,6 +745,9 @@ let () =
   test_product_respond ();
   test_product_estimate ();
   test_saturation_estimate ();
+  test_tree_order ();
+  test_tree_minimize ();
+  test_encoding_counter ();
   test_json ();
   Printf.printf "\n%i/%i passed\n" (!total - !failures) !total;
   if !failures > 0 then exit 1
