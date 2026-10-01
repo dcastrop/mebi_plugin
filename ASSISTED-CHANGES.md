@@ -3220,6 +3220,44 @@ per state. The `CADP/Size2` comment in `_CoqProject` is corrected.
 Bug fix 3 (one fixing my own earlier figure) · Optimization 2 · Tooling 1 ·
 Docs 2 · Refactor 0.
 
+## 2026-10-01 — I2: extraction now says when it skips a premise
+
+Branch `main` (on `fork`). **Bug fix** (a warning; no change to what is
+extracted). Backlog item I2, raised by the user as a wider survey of
+unsupported constructor shapes, which is still to do.
+
+**The problem, confirmed by test.** `check_updated_ctx` walks every binder of
+a constructor. A binder whose type's head is one of the `Using` LTSs is
+explored as a premise. Any other is passed to `check_unknown_app`, which
+logged at `Debug` and carried on. That is right for a data binder (`xs :
+list nat`). For a *premise* like `n = 0`, though, the constructor is applied
+whether or not the premise holds. `Inductive st : nat -> bool -> nat -> Prop
+:= go n : n = 0 -> st n true (S n)` extracts `0 -> 1 -> 2 -> ...` up to any
+bound, instead of the single transition `0 -> 1`. So the LTS
+over-approximates, and a `MeBi Run Bisim` verdict on it can be wrong. A
+proof cannot be: `Qed` checks the premise.
+
+**The change.** `warn_if_skipped_premise`, called from `check_unknown_app`:
+if the skipped binder's type is a proposition (its sort is `Prop`, via
+`Retyping.get_sort_quality_of`), emit a `Warning` naming the LTS, the
+premise's head and the first instance met. It fires once per (LTS, head),
+not per state, using a table in `Unification`. My first wording printed the
+first instance as if it were the premise (`0 = 0`, which happens to be
+true); reworded before committing.
+
+**Verification.** In a scratch file, the `eq` premise warns once; a
+`list nat` data binder and a premise over the `Using` LTS itself stay quiet.
+No existing example triggers it: the full proof-suite build and the
+`TermTests.v` of `Proc/Test1-3` and `CADP/Size1` all give 0 warnings. So
+none of the repository's LTSs were being over-approximated this way. Proof
+suite: 27 counts unchanged.
+
+Also a separate `style:` commit: `40c98d5` went in without `dune fmt`
+(CI does not check formatting).
+
+**Session tally (2026-10-01, this session, cumulative):** New feature 1 ·
+Bug fix 4 · Optimization 2 · Tooling 1 · Docs 2 · Refactor 0.
+
 ---
 
 ## Outstanding

@@ -1335,6 +1335,10 @@ module Make (Enc : Encoding.S) :
       if lhs_unifies then Pair.unifies args.act act else return false
     ;;
 
+    (** Premise heads already warned about by [warn_if_skipped_premise], keyed
+        by LTS and head. *)
+    let skipped_premises : (string * string, unit) Hashtbl.t = Hashtbl.create 8
+
     (** Checks possible transitions for this term: *)
     let rec check_valid_constructors
               (constructors : Ind.LTS.constructor array)
@@ -1490,7 +1494,63 @@ module Make (Enc : Encoding.S) :
       if Logger.is_enabled Debug
       then log_econstr ~__FUNCTION__ ~m:Warning ~s:"name not indmap" name;
       (* Array.to_list args |> log_econstrs ~__FUNCTION__ ~m:Warning ~s:"args"; *)
+      let open Syntax in
+      let* () = warn_if_skipped_premise lts_enc (name, args) in
       check_updated_ctx lts_enc acc indmap (substl, tl)
+
+    (** A binder whose head is not one of the [Using] LTSs is not checked at
+        all. For a data binder ([xs : list nat]) that is right. For a
+        {e premise} ([n = 0], any [Prop]) it means the constructor is treated
+        as if the premise held, so the extracted LTS can contain transitions
+        that do not exist (backlog item I2). Until such premises are
+        supported, say so -- once per LTS and premise head, not once per
+        state. *)
+    and warn_if_skipped_premise
+          (lts_enc : Enc.t)
+          ((name, args) : EConstr.t * EConstr.t array)
+      : unit mm
+      =
+      let open Syntax in
+      let$+ _warned env sigma =
+        let premise : EConstr.t = EConstr.mkApp (name, args) in
+        let is_prop : bool =
+          try
+            match Retyping.get_sort_quality_of env sigma premise with
+            | UnivGen.QualityOrSet.Qual q -> Sorts.Quality.is_qprop q
+            | UnivGen.QualityOrSet.Set -> false
+          with
+          | _ -> false
+        in
+        if is_prop
+        then (
+          let head : string =
+            Rocq_utils.Strfy.econstr env sigma name
+            |> fun h ->
+            if String.starts_with ~prefix:"@" h
+            then String.sub h 1 (String.length h - 1)
+            else h
+          in
+          let key : string * string = Enc.to_string lts_enc, head in
+          if Bool.not (Hashtbl.mem skipped_premises key)
+          then (
+            Hashtbl.add skipped_premises key ();
+            Logger.warning
+              (Printf.sprintf
+                 "A constructor of %s has a premise headed by [%s] (first met \
+                  as [%s]) that MeBi does not check: only premises over the \
+                  LTSs given in [Using] are explored, so the constructor is \
+                  applied whether or not the premise holds. The extracted LTS \
+                  may contain transitions that do not exist, and a [MeBi Run \
+                  Bisim] verdict on it may be wrong (a proof cannot be: [Qed] \
+                  still checks the premise)."
+                 (Rocq_utils.Strfy.econstr env sigma (decode lts_enc))
+                 head
+                 (Rocq_utils.Strfy.econstr
+                    env
+                    sigma
+                    (Reductionops.nf_evar sigma premise)))))
+      in
+      return ()
     ;;
 
     let collect_valid_constructors
