@@ -20,13 +20,13 @@
   - [ ] `examples/CADP.v`
     - [ ] *Size 1*
       - [x] Original vs Glued (`examples/CADP_Glued.v`)
-      - [ ] Properties (E.g., mutual exclusion, no starvation -- ***see example in draft-paper***)
+      - [ ] Properties (E.g., mutual exclusion, no starvation -- ***see example in draft-paper***) -- mutual exclusion done; no starvation is a liveness/fairness property needing a spec LTS that encodes fairness, left for the authors (2026-10-01)
     - [ ] ~~***Size 2***~~ *(this may be infeasible -- state explosion)*
 - [ ] Solve both directions in main bisimilarity proof
 
 ## Documenting (`odoc`)
-- [ ] `lib/model/...`
-  - [ ] `lib/model/`
+- [x] `lib/model/...` -- every interface has doc comments (2026-10-01; `Bisimilarity` and `Minimization` were the gaps). Not yet rendered: `odoc` is not installed in the local switch.
+  - [x] `lib/model/`
   
 ## Optimizations & Fixes
 
