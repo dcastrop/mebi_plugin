@@ -2967,6 +2967,39 @@ message checked as above.
 
 ---
 
+## 2026-10-01 — C3: a CI check that the three module lists agree
+
+Branch `main` (on `fork`). Tooling. Backlog item C3.
+
+The OCaml sources are listed by hand three times — `_CoqProject` (for
+`make`), `src/mebi_plugin.mlpack` (for linking under `make`) and each dune
+`(modules ...)` — and drift between them has already broken a build twice
+(one build passes, the other fails). Rather than restructure the build,
+`scripts/check_module_lists.py` (stdlib-only Python) compares all three to
+the `.ml`/`.mli`/`.mlg` files under `lib/` and `src/` and names every
+mismatch. It runs as CI's first step, before the opam bootstrap, so drift
+fails in seconds. Set membership only — link order is left to `make`, which
+reports a misordering loudly itself.
+
+**It found real drift on its first run:** `Wip_annotation`, `Wip_trace` and
+`Wip_traces` were still in the `.mlpack`, two days after `lib/model/wip/`
+was deleted (A3). Removed; `make` links `mebi_plugin.cmxs` without them.
+Two false positives were fixed in the script on the way (interface-only
+`base_.mli` is a module; the `rocq.pp` stanza's `(modules g_mebi)` is not a
+library claim). Negative-tested both directions: a stray `.ml` is reported
+by all three checks, a ghost `.mlpack` entry by one.
+
+`CLAUDE.md` now says to run the script whenever a module is added, renamed
+or deleted.
+
+**Verification.** Script passes (56 modules, 103 files); `make
+src/mebi_plugin.cmxs` and `dune build` clean.
+
+**Session tally (2026-10-01, this session):** Bug fix 3 · Optimization 1
+(one reverted) · Docs 3 · Tooling 2 · Refactor 0 · New feature 0.
+
+---
+
 ## Outstanding
 
 - ~~Sharing the encoding table between command-time and proof-time (part of `99b0501`) should be backed out.~~ Done in `328a26f`, 2026-08-18.

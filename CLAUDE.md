@@ -104,6 +104,11 @@ anything the proof solver reads.
 - `TODO.md` tracks known structural/tooling debt (repo size dominated by
   `paper/`, no CI, no LICENSE, overlapping module lists across `_CoqProject`/
   `dune`/`.mlpack`, etc.) separately from plugin feature work.
+- Adding, renaming or deleting an OCaml module means updating **three**
+  lists by hand: `_CoqProject`, `src/mebi_plugin.mlpack` and the relevant
+  dune `(modules ...)`. `python3 scripts/check_module_lists.py` checks all
+  three against the source tree (CI runs it first); run it before
+  committing such a change.
 - `lib/utils`, `lib/terms`, `lib/model` and `lib/showable` must never gain a
   `rocq-runtime` dependency — they need to stay linkable from
   `test/tests.exe` without a Rocq runtime. That test binary failing to build
