@@ -133,3 +133,110 @@ Proof. intros ??? [] []; eauto with rel_db. Qed.
 Lemma wk_bisim_sym {M A} (lts : LTS M A) : forall x y,
     weak_bisim lts lts x y -> weak_bisim lts lts y x.
 Proof. intros ?? []; eauto with rel_db. Qed.
+
+(* Weak bisimilarity proper: ONE relation that is a weak simulation in both
+   directions at once (Milner's observation equivalence; Sangiorgi,
+   "Introduction to Bisimulation and Coinduction", ch. 4).
+
+   [weak_bisim] above is two separate [weak_sim]s, i.e. mutual similarity,
+   which is strictly coarser: each direction may pick a different relation.
+   [a.b + a] and [a.b] are mutually similar but not bisimilar (after [a], the
+   left can be stuck while the right can always still do [b]); so are
+   [tau.a + b] and [a + b]. [weak_bisimilar] implies [weak_bisim]
+   ([weak_bisimilar_weak_bisim]), not conversely.
+
+   Added 2026-10-02, alongside the existing definitions rather than in place
+   of them: nothing above is changed, and the plugin does not yet refer to
+   anything below. *)
+Section WeakBisimilar.
+  Context {M : Type} {N : Type} {A : Type} (ltsM : LTS M A) (ltsN : LTS N A).
+
+  Record bisimF G m1 n1 :=
+    Pack_bisim
+      { bisim_l : forall {m2 a},
+          ltsM m1 a m2 -> exists n2, weak ltsN n1 n2 a /\ G m2 n2
+      ; bisim_r : forall {n2 a},
+          ltsN n1 a n2 -> exists m2, weak ltsM m1 m2 a /\ G m2 n2
+      }.
+
+  CoInductive weak_bisimilar (s : M) (t : N) : Prop
+    := In_bisim { out_bisim : bisimF weak_bisimilar s t }.
+End WeakBisimilar.
+Arguments Pack_bisim {M N A ltsM ltsN G m1 n1} _ _.
+Arguments bisim_l {M N A ltsM ltsN G m1 n1} _ {m2 a} _.
+Arguments bisim_r {M N A ltsM ltsN G m1 n1} _ {n2 a} _.
+Arguments out_bisim {M N A ltsM ltsN s t} _.
+Hint Constructors weak_bisimilar bisimF : rel_db.
+
+Lemma weak_bisimilar_sim {M N A} {ltsM : LTS M A} {ltsN : LTS N A} :
+  forall s t, weak_bisimilar ltsM ltsN s t -> weak_sim ltsM ltsN s t.
+Proof.
+  cofix CH; intros s t H; constructor; constructor; intros m2 a T.
+  destruct (bisim_l (out_bisim H) T) as [n2 [W B]].
+  exists n2; split; [exact W | exact (CH _ _ B)].
+Qed.
+
+Lemma weak_bisimilar_sym {M N A} {ltsM : LTS M A} {ltsN : LTS N A} :
+  forall s t, weak_bisimilar ltsM ltsN s t -> weak_bisimilar ltsN ltsM t s.
+Proof.
+  cofix CH; intros s t H; constructor; constructor; intros x2 a T.
+  - destruct (bisim_r (out_bisim H) T) as [m2 [W B]].
+    exists m2; split; [exact W | exact (CH _ _ B)].
+  - destruct (bisim_l (out_bisim H) T) as [n2 [W B]].
+    exists n2; split; [exact W | exact (CH _ _ B)].
+Qed.
+
+Lemma weak_bisimilar_weak_bisim {M N A} {ltsM : LTS M A} {ltsN : LTS N A} :
+  forall s t, weak_bisimilar ltsM ltsN s t -> weak_bisim ltsM ltsN s t.
+Proof.
+  intros s t H; split.
+  - exact (weak_bisimilar_sim _ _ H).
+  - exact (weak_bisimilar_sim _ _ (weak_bisimilar_sym _ _ H)).
+Qed.
+
+Lemma weak_bisimilar_refl {M A} (lts : LTS M A) :
+  forall x, weak_bisimilar lts lts x x.
+Proof.
+  cofix CH; intros x; constructor; constructor; intros y a T; exists y;
+    (split; [exact (inject_weak _ _ _ T) | exact (CH y)]).
+Qed.
+
+Lemma weak_bisimilar_silent_clos : forall {M N A ltsM ltsN m1 n1},
+    @weak_bisimilar M N A ltsM ltsN m1 n1 ->
+    forall {m2}, silent ltsM m1 m2 ->
+                 exists n2, silent ltsN n1 n2 /\ weak_bisimilar ltsM ltsN m2 n2.
+Proof.
+  intros; revert n1 H. induction H0 as [|????? Ih]; eauto with rel_db.
+  intros; destruct (bisim_l (out_bisim H1) H) as [?[W Ws]].
+  apply Ih in Ws as [?[??]]; inversion W; eauto with rel_db.
+Qed.
+
+Lemma weak_bisimilar_act_clos : forall {M N A ltsM ltsN m1 n1},
+    @weak_bisimilar M N A ltsM ltsN m1 n1 ->
+    forall {m2 a}, weak ltsM m1 m2 a ->
+                 exists n2, weak ltsN n1 n2 a /\ weak_bisimilar ltsM ltsN m2 n2.
+Proof.
+  intros. destruct H0 as [??? PRE ACT POST|TAUs].
+  - destruct (weak_bisimilar_silent_clos H PRE) as [?[? W1]].
+    destruct (bisim_l (out_bisim W1) ACT) as [?[Wk W2]].
+    destruct (weak_bisimilar_silent_clos W2 POST) as [?[]].
+    inversion Wk; eauto 10 with rel_db.
+  - destruct (weak_bisimilar_silent_clos H TAUs) as [?[]].
+    eauto with rel_db.
+Qed.
+
+Lemma weak_bisimilar_trans {M N R A}
+  (ltsM : LTS M A) (ltsN : LTS N A) (ltsR : LTS R A)
+  : forall x y r, weak_bisimilar ltsM ltsN x y -> weak_bisimilar ltsN ltsR y r ->
+                  weak_bisimilar ltsM ltsR x r.
+Proof.
+  cofix CH; intros x y r Hxy Hyr; constructor; constructor; intros.
+  - destruct (bisim_l (out_bisim Hxy) H) as [y' [Wy Bxy]].
+    destruct (weak_bisimilar_act_clos Hyr Wy) as [r' [Wr Byr]].
+    exists r'; split; [exact Wr | exact (CH _ _ _ Bxy Byr)].
+  - destruct (bisim_r (out_bisim Hyr) H) as [y' [Wy Byr]].
+    destruct (weak_bisimilar_act_clos (weak_bisimilar_sym _ _ Hxy) Wy)
+      as [x' [Wx Byx]].
+    exists x'; split;
+      [exact Wx | exact (CH _ _ _ (weak_bisimilar_sym _ _ Byx) Byr)].
+Qed.
