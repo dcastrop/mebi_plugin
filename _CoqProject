@@ -25,6 +25,12 @@ theories/Bisimilarity.v ###
 ### NOTE: compilation to take far longer if manual/ltac proofs included
 
 ###############################################################################
+### CCS (value-free, Milner 1989): textbook pairs and the Alternating Bit
+### Protocol. Fast (under 10s together), so built by default and in CI.
+examples/CCS.v ### REQUIRED FOR BELOW
+examples/Bisimilarity/CCS/PluginProofs.v ### Success
+
+###############################################################################
 ### Proc
 examples/Proc.v ### REQUIRED FOR BELOW
 

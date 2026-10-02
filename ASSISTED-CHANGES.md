@@ -4745,6 +4745,41 @@ forced `False` matches its documented baseline. `Test.v` builds (with
 merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 `git log --merges --oneline --grep fix/refute-closed-steps main`).
 
+## 2026-10-02 (second session) — CCS examples: textbook pairs and the Alternating Bit Protocol
+
+**Tooling** (examples). On branch `examples/ccs`. This is section 2 of the
+evaluation plan (new term shapes and textbook cases), agreed with Jonah.
+
+`examples/CCS.v`: value-free CCS (Milner 1989) as one inductive LTS.
+Names, input/output actions, τ as `None`; prefix, choice, parallel with
+handshake (both orientations), restriction of a *list* of names, and
+recursion through numbered definitions `def`. One relation, `step`, serves
+every layer, unlike `Proc`/`CADP`; that shape is what exposed the bugs fixed
+in PR #11. The list restriction is deliberate: eight nested single-name
+restrictions made every inversion eight layers deep.
+
+`examples/Bisimilarity/CCS/PluginProofs.v` states exactly what holds for
+each pair:
+- **Milner's `τ.a + b` / `a + b`:** `weak_sim` both ways (24, 22),
+  `mutual_sim`, `weak_bisimilar` refused (`Not_Bisimilar`).
+- **`a.b + a.c` ≤ `a.(b + c)`** (34); the converse refused ("not weakly
+  simulated").
+- **Vending machines:** VM2 ≤ VM1 (37); the converse refused.
+- **Two one-place buffers** chained through a restricted name **≈** a
+  two-place buffer, as `weak_bisimilar` (204).
+- **Alternating Bit Protocol vs. a one-place buffer:** `MeBi Run Bisim`
+  decides them weakly bisimilar (the textbook result), and `spec ≤ ABP`
+  proves (148). `ABP ≤ spec` is left out with an explanation: it does not
+  terminate (backlog Step 0; see the previous entry).
+
+Every refusal was checked for its reason (each run once without its
+`Fail`). The files build by default and in CI: the whole `make` takes
+about 58 s, CCS under 10 s of it. No plugin code changed.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep examples/ccs main`).
+
 ---
 
 ## Outstanding
