@@ -689,14 +689,26 @@ struct
       |> List.sort Hyp.compare_name
     ;;
 
-    (** [get_non_cofixes ()] filters the hyps by name according to [get_all_non_cofix_hyp_names ()].
-    *)
+    (** [get_non_cofixes ()] is the non-coinduction hypotheses, {b oldest
+        first}: the order they were introduced in.
+
+        [try_invert_any] breaks ties toward the {e later} candidate, meaning
+        the newest hypothesis, the one the last inversion produced. Until
+        2026-10-02 this list was sorted by name, which is a string order
+        ([H79 < H8 < H80]), and Rocq reuses freed names, so past about ten
+        hypotheses "later" was not "newest": the solver could re-pick a
+        hypothesis it had already inverted and, on the CCS Alternating Bit
+        Protocol, did so forever ([inversion H8], [inversion H80], ...).
+        Ordering by introduction removed that loop and saved 4-10% of steps
+        on [Proc/Test3] and CADP, with no proof worse (backlog Step 0, note 7;
+        [ASSISTED-CHANGES.md], 2026-10-02). [Proofview.Goal.hyps] is newest
+        first, hence the reversal. *)
     let get_non_cofixes () : Rocq_utils.hyp list =
       let cofix_names : Names.Id.Set.t = get_all_non_cofix_hyp_names () in
       get_hyps ()
       |> List.filter (fun (x : Rocq_utils.hyp) ->
         Names.Id.Set.mem (get_hyp_name x) cofix_names)
-      |> List.sort Hyp.compare_name
+      |> List.rev
     ;;
 
     let log ?(cofix_only : bool option = None) () : unit =
