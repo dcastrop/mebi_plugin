@@ -4460,6 +4460,77 @@ at the first `weak_bisimilar`. `tests.exe` 74/74, `make` clean, `Test.v`
 merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 `git log --merges --oneline --grep refactor/answer-table main`).
 
+## 2026-10-02 (second session) — Measuring answer policies on the model (step 2)
+
+**Tooling** (measurement only; the solver does not read it). On branch
+`tooling/answer-policies`. Step 2 of the answer-selection plan agreed with
+Jonah: before the solver changes, measure what other ways of choosing
+answers would cost.
+
+**What was added.** `Model.Product.Policy`, pure OCaml with a
+consistency test in `tests.exe` (79/79). It describes a game (`sim_game`,
+`bisim_game`, matching how `successors`/`successors_bisim` play it) as each
+pair's obligations: the answer `Product.answer` picks, and every valid
+answer, each with its witness length. Three policies choose answers:
+- `Default`: today's choices. Checked to reproduce the product exactly.
+- `Greedy`: breadth first, prefer an answer whose pair was already
+  reached, else the default.
+- `Minimal`: start from every pair any answer reaches (always a valid
+  relation), delete pairs while every remaining pair can still answer
+  everything within what remains, then answer each move with its cheapest
+  remaining candidate. This is minimal by inclusion, not the smallest.
+
+`measure` reports pairs, moves (answers needed), total witness length, and
+moves left unanswered (0 in every case below).
+
+**How it was measured.** A temporary block in `Proof_solver.init`
+(not committed) printed each policy's measure at every `Sim Begin`, across
+all 41 proofs under `Auto`. Raw output is kept locally in `notes/`. To turn
+the measures into iterations, I fitted a linear model to the `Default` rows,
+where the real counts are known. On the 23 proofs that use the mutual cofix
+(Test3, and every `weak_bisimilar` proof):
+
+  iterations ≈ 3.0·pairs + 6.0·moves + 3.3·witness   (R² = 0.998)
+
+Over all 41 the fit is about the same (2.3/6.0/3.5, R² = 0.998). Nested
+proofs also pay for re-exploration, which the model does not see. The fit
+is dominated by the large Test3 proofs: it over-predicts small ones (Test1's
+709-iteration `weak_bisimilar` is predicted at 1055).
+
+**Results** (totals over all proofs; pairs / moves / witness):
+
+| policy | `weak_sim` (27) | `weak_bisimilar` (14) |
+|---|---|---|
+| default | 415 / 825 / 553 | 1388 / 6628 / 3096 |
+| greedy | 368 / 702 / 484 | 880 / 3839 / 2675 |
+| minimal | 401 / 860 / 652 | **374 / 1667 / 2957** |
+
+Predicted iterations over the 23 mutual-cofix proofs (actual 57,066):
+default 58,710, greedy 38,176 (−35%), **minimal 26,218 (−55%)**. Per proof:
+- Test3 `wbis_p3`: actual 14,427; greedy ~4,270, minimal ~3,184.
+- CADP `weak_bisimilar`: 2,875; minimal ~1,503.
+
+**What this says, and what it does not.**
+1. **For `weak_bisimilar`, smarter answers pay off.** `Minimal` cuts pairs
+   by 73% and moves by 75%. The 8× blow-up seen in PR #3 is mostly a choice
+   of answers, not a property of bisimilarity.
+2. **For `weak_sim`, `Minimal` is often worse.** Test3's 211-iteration proof
+   is predicted at ~464. Minimal-by-inclusion depends on deletion order, and
+   it ignores witness length. `Greedy` was never worse than `Default` on any
+   of the 41 by these measures, and helps where pairs repeat (Test3
+   `wsim_p3` 1073 → ~432).
+3. **No policy wins everywhere.** The measures are cheap to compute before a
+   proof starts, as `Auto` already does for the cofix strategy, so a
+   per-proof choice of the cheapest predicted policy is possible. So is a
+   `Minimal` that deletes in order of cost rather than of pair.
+4. **These are predictions from a fitted model, not runs.** Step 3 must
+   measure real iteration counts before any claim. The order of goals, and
+   how the nested strategy re-explores, are not in the model.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep tooling/answer-policies main`).
+
 ---
 
 ## Outstanding
