@@ -1325,6 +1325,9 @@ Module WeakBisimilarVsMutualSim.
     - exists P1; split; [exact (inject_weak _ _ _ p_a1) | exact q1_p1].
   Qed.
 
+  Example mutually_similar' : mutual_sim step step P Q.
+  Proof. exact mutually_similar. Qed.
+
   Example not_bisimilar : ~ weak_bisimilar step step P Q.
   Proof.
     intros H.
