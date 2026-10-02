@@ -65,12 +65,10 @@ Example wbis_buffers : weak_bisimilar step step chained (var 4).
 Proof. MeBi Sim Begin step chained And step (var 4) Using step. MeBi Sim Solve 1000. Qed.
 
 (* 5. The Alternating Bit Protocol is weakly bisimilar to a one-place buffer
-   (Milner 1989), and the check says so. One direction of the proof goes
-   through. The other, [abp <= spec], does not terminate: inverting an ABP
-   step whose label is still open lets the solver re-invert one kept
-   hypothesis forever (backlog Step 0, note 7), so it is left as a decided
-   check plus one proved direction until that is fixed. See
-   ASSISTED-CHANGES.md, 2026-10-02. *)
+   (Milner 1989), and the check says so. One direction of the proof is here.
+   The other, [abp <= spec], is proved in [ABPProofs.v] and [weak_bisimilar
+   abp spec] in [ABPBisimProofs.v], neither built by default: each takes
+   about 3.7 minutes and 4.2GB. See ASSISTED-CHANGES.md, 2026-10-02. *)
 MeBi Divider "Examples.Bisimilarity.CCS.PluginProofs.abp".
 MeBi Config Bounds As Num States 1000.
 MeBi Run Bisim abp With step And (var 20) With step Using step.

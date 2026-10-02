@@ -4907,6 +4907,39 @@ merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 
 **Session tally (2026-10-02, third session):** Optimization 1.
 
+## 2026-10-02 (third session) — The Alternating Bit Protocol, proved both ways
+
+**Tooling** (examples). On branch `examples/abp-proofs`. This is step 2 of
+note 11's order. With dead steps refuted (previous entry), the proofs the
+CCS example had to leave out now go through:
+
+| proof | before | now |
+|---|---|---|
+| `abp ≤ spec` | did not terminate | 6494 steps, ~3.7 min, ~4.2GB peak |
+| `weak_bisimilar abp spec` | did not terminate | 9914 steps, ~3.8 min, ~4.2GB peak |
+
+(`spec ≤ abp` was already in `PluginProofs.v`, 148.) This is the textbook
+result (Milner 1989) proved by the plugin, not only decided by `MeBi Run
+Bisim`.
+
+They are in `examples/Bisimilarity/CCS/ABPProofs.v` and
+`ABPBisimProofs.v`, **commented out in `_CoqProject`** (the CCS example
+proper is built by default and in CI, in under 10 s). `CLAUDE.md` lists them
+as the check for changes to inversion or to dead-step refutation, which the
+six Proc/CADP suites barely exercise. Bounds are the least that close each
+proof.
+
+**A mistake on the way:** I first put both proofs in one file. Under a 6GB
+cap the second was OOM-killed (the first proof's term stays in memory), so
+they are one per file, each run in its own capped process.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep examples/abp-proofs main`).
+
+**Session tally (2026-10-02, third session), cont.:** Optimization 1 ·
+Tooling 1.
+
 ---
 
 ## Outstanding
