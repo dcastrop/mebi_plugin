@@ -35,8 +35,14 @@ module type S = sig
 
   exception BisimilarityResultNotFound
 
+  (** For a [weak_sim] goal whose two states are not bisimilar: each left
+      state's simulators ({!Model.Product.simulation}), the answers the
+      solver falls back on when no bisimilar one exists. [None] otherwise. *)
+  val simulators : (Model.State.t -> Model.State.Set.t) option ref
+
   val check_bisimilarity
-    :  Libnames.qualid list
+    :  ?fail_if_not_bisim:bool
+    -> Libnames.qualid list
     -> Constrexpr.constr_expr * Libnames.qualid
     -> Constrexpr.constr_expr * Libnames.qualid
     -> unit

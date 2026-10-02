@@ -286,6 +286,41 @@ let test_product_bisim () : unit =
     (M.Product.Pair.Set.mem (state 1, state 12) pairs)
 ;;
 
+(** The weak simulation preorder: [a.b] (0) is simulated by [a.(b + c)] (10),
+    not the converse; and with a silent step, [tau.a] (20) and [a] (30)
+    simulate each other. *)
+let test_product_simulation () : unit =
+  print_endline "product: weak simulation preorder";
+  let c = label 3 in
+  let weak_labels = M.Label.Set.singleton tau in
+  let x = fsm ~weak_labels 0 [ transition 0 a 1; transition 1 b 2 ] in
+  let y =
+    fsm
+      ~weak_labels
+      10
+      [ transition 10 a 11; transition 11 b 12; transition 11 c 12 ]
+  in
+  let sim f g = M.Product.simulation f g (M.FSM.saturate g) in
+  check
+    "a.b <= a.(b + c)"
+    true
+    (M.Product.Pair.Set.mem (state 0, state 10) (sim x y));
+  check
+    "not a.(b + c) <= a.b"
+    false
+    (M.Product.Pair.Set.mem (state 10, state 0) (sim y x));
+  let u = fsm ~weak_labels 20 [ transition 20 tau 21; transition 21 a 22 ] in
+  let v = fsm ~weak_labels 30 [ transition 30 a 31 ] in
+  check
+    "tau.a <= a"
+    true
+    (M.Product.Pair.Set.mem (state 20, state 30) (sim u v));
+  check
+    "a <= tau.a"
+    true
+    (M.Product.Pair.Set.mem (state 30, state 20) (sim v u))
+;;
+
 (** Converting an LTS to an FSM must preserve the state set. *)
 let test_of_lts_preserves_states () : unit =
   print_endline "FSM.of_lts";
@@ -862,6 +897,7 @@ let () =
   test_product_respond ();
   test_product_respond_silently ();
   test_product_bisim ();
+  test_product_simulation ();
   test_product_estimate ();
   test_saturation_estimate ();
   test_tree_order ();

@@ -36,8 +36,14 @@ module type S = sig
 
   exception BisimilarityResultNotFound
 
+  (** For a [weak_sim] goal whose two states are not bisimilar: each left
+      state's simulators ({!Model.Product.simulation}), the answers the
+      solver falls back on when no bisimilar one exists. [None] otherwise. *)
+  val simulators : (Model.State.t -> Model.State.Set.t) option ref
+
   val check_bisimilarity
-    :  Libnames.qualid list
+    :  ?fail_if_not_bisim:bool
+    -> Libnames.qualid list
     -> Constrexpr.constr_expr * Libnames.qualid
     -> Constrexpr.constr_expr * Libnames.qualid
     -> unit
@@ -101,15 +107,29 @@ module Make (Enc : Encoding.S) :
 
   exception BisimilarityResultNotFound
 
+  let simulators : (Model.State.t -> Model.State.Set.t) option ref = ref None
+
+  (* [fail_if_not_bisim:false] runs the check without [FailIf]'s negative
+     verdict error, for a [weak_sim] goal, where bisimilarity is not what is
+     being asked. *)
   let check_bisimilarity
+        ?(fail_if_not_bisim : bool = true)
         (refs : Libnames.qualid list)
         (a : Constrexpr.constr_expr * Libnames.qualid)
         (b : Constrexpr.constr_expr * Libnames.qualid)
     : unit
     =
+    (* Set directly, not via [Api.set_fail_flag_non_bisimilar], which
+       announces the change to the user. *)
+    let flags : Api.fail_flags = !Api.the_fail_flags in
+    if Bool.not fail_if_not_bisim
+    then Api.the_fail_flags := { flags with non_bisimilar = false };
     let r : Model.Bisimilarity.t option =
-      Command.run refs (Command.CheckBisim { a; b })
-      |> M.run ~reset_encoding:true
+      Fun.protect
+        ~finally:(fun () -> Api.the_fail_flags := flags)
+        (fun () ->
+          Command.run refs (Command.CheckBisim { a; b })
+          |> M.run ~reset_encoding:true)
     in
     match r with
     | None -> raise BisimilarityResultNotFound

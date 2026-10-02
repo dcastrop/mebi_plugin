@@ -236,19 +236,82 @@ let init
   let module Enc : Encoding.S = (val enc ()) in
   let c : t ref = make (module Enc) () in
   let module Solver : S = (val !c.solver) in
-  Solver.W.check_bisimilarity refs a b;
-  Solver.W.swapped := false;
-  (* Is the goal [weak_bisimilar], rather than [weak_sim]? Its product then
-     has both systems' obligations ([Model.Product.successors_bisim]). *)
-  let goal_is_bisimilar : bool =
+  (* Which goal is this: [weak_bisimilar] (its product has both systems'
+     obligations, [Model.Product.successors_bisim]) or [weak_sim] (where
+     only similarity is asked, so states that are not bisimilar may still be
+     fine)? *)
+  let goal_head_is (name : string) : bool =
     let { Proof.goals; sigma; _ } = Proof.data (Declare.Proof.get pstate) in
     match goals with
     | g :: _ ->
       let concl = Evd.evar_concl (Evd.find_undefined sigma g) in
       let h, _ = EConstr.decompose_app sigma concl in
-      EConstr.eq_constr sigma h (Mebi_theories.get "weak_bisimilar")
+      EConstr.eq_constr sigma h (Mebi_theories.get name)
     | [] -> false
   in
+  let goal_is_bisimilar : bool = goal_head_is "weak_bisimilar" in
+  let goal_is_sim : bool = goal_head_is "weak_sim" in
+  Solver.W.check_bisimilarity ~fail_if_not_bisim:(Bool.not goal_is_sim) refs a b;
+  Solver.W.swapped := false;
+  Solver.W.simulators := None;
+  (* A [weak_sim] goal asks for similarity, which is coarser than
+     bisimilarity: [a.b] is simulated by [a.(b + c)]. When the two states are
+     not bisimilar, compute the greatest weak simulation, refuse only if they
+     are not even similar, and give the solver each state's simulators to
+     fall back on (see [Proof_solver_step.handle_visible_transition]). *)
+  (if
+     goal_is_sim
+     && Bool.not
+          (Solver.W.Model.Bisimilarity.Result.are_bisimilar
+             (Solver.W.get_the_result ()).result)
+   then
+     let module Model = Solver.W.Model in
+     let fsm_a = Solver.W.get_fsm_a () in
+     let fsm_b = Solver.W.get_fsm_b () in
+     let sim : Model.Product.Pair.Set.t =
+       Model.Product.simulation
+         fsm_a
+         fsm_b
+         (Solver.W.get_fsm_b ~saturated:true ())
+     in
+     match fsm_a.init, fsm_b.init with
+     | Some ra, Some rb ->
+       if Model.Product.Pair.Set.mem (ra, rb) sim
+       then (
+         let table : (Model.State.t, Model.State.Set.t) Hashtbl.t =
+           Hashtbl.create 64
+         in
+         Model.Product.Pair.Set.iter
+           (fun ((x, y) : Model.Product.Pair.t) ->
+             let ys =
+               Stdlib.Option.value
+                 (Hashtbl.find_opt table x)
+                 ~default:Model.State.Set.empty
+             in
+             Hashtbl.replace table x (Model.State.Set.add y ys))
+           sim;
+         Logger.notice
+           "(Not bisimilar, but similar: the proof search falls back on the \
+            weak simulation preorder.)";
+         Solver.W.simulators
+         := Some
+              (fun x ->
+                Stdlib.Option.value
+                  (Hashtbl.find_opt table x)
+                  ~default:Model.State.Set.empty))
+       else if !Api.the_fail_flags.non_bisimilar
+       then
+         CErrors.user_err
+           (Pp.str
+              "MeBi: the goal is weak_sim, but the left state is not weakly \
+               simulated by the right one (no weak simulation relates them), \
+               so there is no proof to find. [MeBi Config FailIf NotBisimilar \
+               False] carries on regardless.")
+       else
+         Logger.warning
+           "The left state is not weakly simulated by the right one; the proof \
+            search will not close."
+     | _ -> ());
   (* [Auto] decides here, once, before any proof step runs. The product is
      already known at this point, so both strategies can simply be measured:
      a mutual cofix visits each game state once and each move once, while a
@@ -283,7 +346,15 @@ let init
               }
               pi
               (ra, rb)
-          else S.W.Model.Product.estimate ~silent ~refl fsm_a fsm_b pi (ra, rb)
+          else
+            S.W.Model.Product.estimate
+              ~silent
+              ?sim:!S.W.simulators
+              ~refl
+              fsm_a
+              fsm_b
+              pi
+              (ra, rb)
         in
         let use_mutual = S.W.Model.Product.prefer_mutual c in
         Api.set_mutual_cofix use_mutual;

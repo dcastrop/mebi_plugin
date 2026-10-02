@@ -77,6 +77,15 @@ module type S = sig
       @raise NoBisimilarResponse when nothing qualifies. *)
   val respond : ?silent:edgemap -> fsm -> state -> label -> states -> transition
 
+  (** [simulation a b b_saturated] is the greatest weak simulation from [a]'s
+      states to [b]'s: [(x, y)] is in it when every strong move
+      [x -l-> x'] of [a] has an answer [y =l=> y'] ([=ε=>], zero steps
+      included, for a silent [l]) with [(x', y')] in it again -- [weak_sim]'s
+      own definition. [b] is the unsaturated FSM (for silent closures),
+      [b_saturated] gives the visible weak moves. Coarser than
+      bisimilarity: [a.b] is simulated by [a.(b + c)], not bisimilar to it. *)
+  val simulation : fsm -> fsm -> fsm -> Pair.Set.t
+
   (** [successors a b pi p] is every game state reachable from [p] in one
       move, where [a] is the {b unsaturated} left-hand FSM {i (its
       transitions are the obligations, one per move the left-hand system can
@@ -87,7 +96,11 @@ module type S = sig
       Mirrors what the proof solver does with one [weak_sim] goal: a silent
       move to a state already bisimilar to the right-hand one is answered by
       standing still, and everything else by {!val:respond}, given [silent]
-      so that a silent move can also be answered by moving silently. An obligation
+      so that a silent move can also be answered by moving silently. An
+      answer bisimilar to the obligation's target is preferred; failing one,
+      and given [sim] (a state's simulators, from {!val:simulation}), any
+      state that simulates it -- the same fallback the solver takes for a
+      [weak_sim] goal between states that are not bisimilar. An obligation
       with no bisimilar response is dropped rather than raising -- in a
       genuine bisimulation there are none, and a caller that wants to know
       should compare the lengths.
@@ -97,6 +110,7 @@ module type S = sig
       [weak_sim_refl] before anything else, so nothing past it is visited. *)
   val successors
     :  ?silent:edgemap
+    -> ?sim:(state -> states)
     -> refl:bool
     -> fsm
     -> fsm
@@ -114,6 +128,7 @@ module type S = sig
       [ASSISTED-CHANGES.md], 2026-09-29, and backlog item B2. *)
   val reachable
     :  ?silent:edgemap
+    -> ?sim:(state -> states)
     -> refl:bool
     -> fsm
     -> fsm
@@ -174,6 +189,7 @@ module type S = sig
   val estimate
     :  ?cap_factor:int
     -> ?silent:edgemap
+    -> ?sim:(state -> states)
     -> refl:bool
     -> fsm
     -> fsm
