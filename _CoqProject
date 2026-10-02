@@ -29,6 +29,8 @@ theories/Bisimilarity.v ###
 ### Protocol. Fast (under 10s together), so built by default and in CI.
 examples/CCS.v ### REQUIRED FOR BELOW
 examples/Bisimilarity/CCS/PluginProofs.v ### Success
+# examples/Bisimilarity/CCS/ABPProofs.v ### Success (ABP: abp <= spec; ~3.7 min, peaks ~4.2GB: run under a memory cap)
+# examples/Bisimilarity/CCS/ABPBisimProofs.v ### Success (ABP: weak_bisimilar; ~3.8 min, peaks ~4.2GB: separate file, both in one process exceed 6GB)
 
 ###############################################################################
 ### Proc
