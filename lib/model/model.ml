@@ -34,6 +34,7 @@ module type S = sig
      and type states = State.Set.t
      and type labels = Label.Set.t
      and type edgemap = EdgeMap.t'
+     and type annotation = Annotation.t
 
   module Minimization :
     Minimization.S
@@ -59,6 +60,7 @@ module type S = sig
      and type transition = Transition.t
      and type fsm = FSM.t
      and type partition = Partition.t
+     and type edgemap = EdgeMap.t'
 
   module SaturationEstimate : Saturation_estimate.S with type fsm = FSM.t
 end
@@ -73,6 +75,6 @@ module Make (Base : Base_term.S) (ConstructorBindings : Json.S) = struct
   module FSM = FSM.Make (C) (LTS) (Saturation)
   module Minimization = Minimization.Make (C) (FSM)
   module Bisimilarity = Bisimilarity.Make (C) (FSM) (Minimization)
-  module Product = Product.Make (Base) (C) (FSM)
+  module Product = Product.Make (Base) (C) (FSM) (Saturation)
   module SaturationEstimate = Saturation_estimate.Make (C) (FSM)
 end

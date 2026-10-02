@@ -157,14 +157,12 @@ let test_bisim_identical () : unit =
     (M.Bisimilarity.Result.are_bisimilar r.result)
 ;;
 
-(* [Result.are_bisimilar] is [non_bisim_states] being empty, where the merged
-   FSM's minimisation partition is split into blocks that contain states from
-   both systems and blocks that do not. It is therefore a statement about the
-   whole state space, and does not consult [init]: swapping the labels of the
-   two systems above yields a pair that is not bisimilar *as rooted systems*
-   but still reports true, because every block is still shared. That is sound
-   for the plugin, where each FSM is explored outwards from its initial term so
-   every state is reachable from the root. The case below distinguishes the two
+(* [Result.are_bisimilar] asks whether the two initial states share a block of
+   the merged FSM's partition. Until 2026-10-02 it asked instead whether every
+   block held states of both systems, and a comment here argued that this was
+   sound because every state is reachable from the root. It was not: the pair
+   in [test_bisim_not_rooted] is fully reachable, every block is shared, and
+   the two roots are not bisimilar. The case below distinguishes the two
    systems by giving one a behaviour the other cannot match at all. *)
 
 (** A two-state alternation against a one-state self-loop: no matching. *)
@@ -177,6 +175,90 @@ let test_bisim_different () : unit =
     "systems with unmatchable behaviour are not bisimilar"
     false
     (M.Bisimilarity.Result.are_bisimilar r.result)
+;;
+
+(** [a.b.x] against [b.a.y]: both blocks of the partition, {x, b.y} and
+    {b.x, y}, hold states of both systems, but the roots are in different
+    blocks. *)
+let test_bisim_not_rooted () : unit =
+  print_endline "bisimilarity: rooted";
+  let x = fsm 0 [ transition 0 a 1; transition 1 b 0 ] in
+  let y = fsm 10 [ transition 10 b 11; transition 11 a 10 ] in
+  let r = M.Bisimilarity.fsm x y in
+  check
+    "systems whose roots differ are not bisimilar"
+    false
+    (M.Bisimilarity.Result.are_bisimilar r.result)
+;;
+
+(** Milner's [τ.a + b] against [a + b], with a [c]-branch to [a] on each side
+    so that every state has a partner. Their visible weak moves coincide, so
+    only the [=ε=>] split separates them. *)
+let test_bisim_silent_closure () : unit =
+  print_endline "bisimilarity: silent closure";
+  let c = label 3 in
+  let weak_labels = M.Label.Set.singleton tau in
+  let x =
+    fsm
+      ~weak_labels
+      0
+      [ transition 0 tau 1
+      ; transition 0 b 2
+      ; transition 0 c 1
+      ; transition 1 a 2
+      ]
+  in
+  let y =
+    fsm
+      ~weak_labels
+      10
+      [ transition 10 a 12
+      ; transition 10 b 12
+      ; transition 10 c 11
+      ; transition 11 a 12
+      ]
+  in
+  check
+    "tau.a + b + c.a and a + b + c.a are not weakly bisimilar"
+    false
+    (M.Bisimilarity.Result.are_bisimilar (M.Bisimilarity.fsm x y).result);
+  (* [a] against [τ.a]: weakly bisimilar. Without the reflexive step in
+     [=ε=>], [τ.a] would reach a block by silence and [a] none, and the split
+     would separate them. *)
+  let u = fsm ~weak_labels 20 [ transition 20 a 21 ] in
+  let v = fsm ~weak_labels 30 [ transition 30 tau 31; transition 31 a 32 ] in
+  check
+    "a and tau.a are weakly bisimilar"
+    true
+    (M.Bisimilarity.Result.are_bisimilar (M.Bisimilarity.fsm u v).result)
+;;
+
+(** [respond] for a silent move that standing still cannot answer: [10 -τ-> 11 -τ-> 12], only [12] is acceptable, so the answer is two silent steps
+    -- given the unsaturated edges, and nothing without them. *)
+let test_product_respond_silently () : unit =
+  print_endline "product: silent move answered by moving";
+  let weak_labels = M.Label.Set.singleton tau in
+  let b = fsm ~weak_labels 10 [ transition 10 tau 11; transition 11 tau 12 ] in
+  let b' = M.FSM.saturate b in
+  let only_12 = M.State.Set.singleton (state 12) in
+  let t = M.Product.respond ~silent:b.edges b' (state 10) tau only_12 in
+  check "moves to the acceptable state" true (M.State.equal t.goto (state 12));
+  check_int
+    "along the shortest silent path"
+    2
+    (match t.annotation with
+     | None -> 0
+     | Some ann ->
+       let rec len (a : M.Annotation.t) =
+         match a.next with None -> 1 | Some n -> 1 + len n
+       in
+       len ann);
+  check
+    "without the unsaturated edges there is no answer"
+    true
+    (match M.Product.respond b' (state 10) tau only_12 with
+     | _ -> false
+     | exception M.Product.NoBisimilarResponse _ -> true)
 ;;
 
 (** Converting an LTS to an FSM must preserve the state set. *)
@@ -746,11 +828,14 @@ let () =
   test_minimize ();
   test_bisim_identical ();
   test_bisim_different ();
+  test_bisim_not_rooted ();
+  test_bisim_silent_closure ();
   test_product_loop ();
   test_product_diamond ();
   test_product_silent_stays_put ();
   test_product_refl_leaf ();
   test_product_respond ();
+  test_product_respond_silently ();
   test_product_estimate ();
   test_saturation_estimate ();
   test_tree_order ();

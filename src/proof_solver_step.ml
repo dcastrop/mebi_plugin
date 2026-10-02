@@ -778,6 +778,9 @@ struct
       let* ty, tys = get_concl () |> to_atomic in
       let fsm_a : Model.FSM.t = W.get_fsm_a () in
       let fsm_b : Model.FSM.t = W.get_fsm_b ~saturated:true () in
+      (* The unsaturated FSM still has the silent steps a silent move may be
+         answered with; see [Model.Product.respond]. *)
+      let silent : Model.EdgeMap.t' = (W.get_fsm_b ()).edges in
       let pi : Model.Partition.t = W.get_bisimilar_partition () in
       (* [weak_sim] applies as [| M; N; A; ltsM; ltsN; s; t |] -- see
          [Concl.is_weak_refl], which tests 3 against 4 and 5 against 6. Only
@@ -791,7 +794,7 @@ struct
          by [weak_sim_refl] when both sides use the same LTS. *)
       let refl : bool = econstr_eq tys.(3) tys.(4) |> run in
       let pairs : Model.Product.Pair.Set.t =
-        Model.Product.reachable ~refl fsm_a fsm_b pi root
+        Model.Product.reachable ~silent ~refl fsm_a fsm_b pi root
       in
       (* A reflexive leaf gets no cofixpoint of its own. Its goal would be put
          through [In_sim; Pack_sim; intros] with the rest of the block, past
@@ -887,9 +890,10 @@ struct
     =
     Logger.trace __FUNCTION__;
     let m : Model.FSM.t = W.get_fsm_b ~saturated () in
+    let silent : Model.EdgeMap.t' = (W.get_fsm_b ()).edges in
     let from : Model.State.t = M.run (ReModel.state tys.(3) m.states) in
     let label : Model.Label.t = M.run (ReModel.label tys.(5) m.alphabet) in
-    try Model.Product.respond m from label bisimilar with
+    try Model.Product.respond ~silent m from label bisimilar with
     | Model.Product.NoBisimilarResponse _ -> raise CouldNotFindGotoState
   ;;
 

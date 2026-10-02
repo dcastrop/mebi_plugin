@@ -24,17 +24,22 @@ module type S = sig
     type t =
       { bisim_states : partition
       ; non_bisim_states : partition
+      ; roots_related : bool option
+        (** whether the two FSMs' initial states share a block; [None] when
+            either FSM has no initial state *)
       }
 
     include Json.S with type k = t (** @closed *)
 
-    (** [are_bisimilar r]: no block holds states from only one FSM -- every
-        state of each FSM is bisimilar to some state of the other. *)
+    (** [are_bisimilar r]: the two initial states share a block, which is what
+        bisimilarity of two systems means. Only when an FSM has no initial
+        state does it fall back to "no block holds states from only one FSM",
+        which is necessary but not sufficient: [a.b.x] and [b.a.y] pass it. *)
     val are_bisimilar : t -> bool
 
-    (** [split pi a b] sorts the blocks of [pi] into those with states from
-        both [a] and [b] ([bisim_states]) and the rest. *)
-    val split : partition -> states -> states -> t
+    (** [split ?roots_related pi a b] sorts the blocks of [pi] into those with
+        states from both [a] and [b] ([bisim_states]) and the rest. *)
+    val split : ?roots_related:bool -> partition -> states -> states -> t
   end
 
   (** Everything a bisimilarity check produced; the proof solver reads it
