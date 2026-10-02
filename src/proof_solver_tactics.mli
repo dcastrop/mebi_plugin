@@ -12,8 +12,8 @@ module type S = sig
 
   val inversion : Rocq_utils.hyp -> tactic mm
 
-  (** [refute_premise h]: [simpl in h; inversion_clear h], for a premise
-      hypothesis known to be false (backlog I2). *)
+  (** [refute_premise h]: close the goal from [h], a premise hypothesis
+      known to be false ({!Premise_search.refute_hyp_tac}; backlog I2). *)
   val refute_premise : Rocq_utils.hyp -> tactic mm
 
   val subst_all : unit -> tactic mm
@@ -29,6 +29,9 @@ module type S = sig
 
   (** [exact_term p] closes the goal with proof term [p]. *)
   val exact_term : EConstr.t -> tactic mm
+
+  (** [prove_negation ()] proves a goal [~ P] whose [P] is refutable. *)
+  val prove_negation : unit -> tactic mm
 
   val cofix : unit -> tactic mm
 

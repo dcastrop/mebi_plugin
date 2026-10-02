@@ -1037,19 +1037,51 @@ Module GeneralPremises.
   Proof. MeBi Sim Begin or_c 0 And or_c' 0 Using or_c. MeBi Sim Solve 100. Qed.
   MeBi Config Reset Weak.
 
-  (* KNOWN WRONG (stage 1): undecidable premises still over-approximate --
-     an opaque function, and a negation (deciding ~P needs a complete search
-     of P and a proof of the negation, not built). When supported, these
-     Fails start failing: make them positive. *)
+  (* A negation [~ P] holds iff [P] is refuted by a complete search; the
+     solver proves it by [intro] and refuting [P]. [~ (3 <= n)]: 0..2,
+     so states 0..3. *)
+  Inductive not_c : nat -> option bool -> nat -> Prop :=
+  | not_go n : ~ (3 <= n) -> not_c n (Some true) (S n).
+  Inductive not_c' : nat -> option bool -> nat -> Prop :=
+  | not_go' n : ~ (3 <= n) -> not_c' n (Some true) (S n).
+  MeBi Config Bounds As Num States 4.
+  MeBi Run LTS 0 Using not_c.
+  MeBi Config Bounds As Num States 3.
+  Fail MeBi Run LTS 0 Using not_c.
+  MeBi Config Reset Bounds.
+  MeBi Config Weak As Option bool.
+  Example w_not : weak_sim not_c not_c' 0 0.
+  Proof. MeBi Sim Begin not_c 0 And not_c' 0 Using not_c. MeBi Sim Solve 100. Qed.
+  MeBi Config Reset Weak.
+
+  (* KNOWN WRONG: an opaque function cannot be decided, so the LTS
+     over-approximates (with a warning). When supported, this Fail starts
+     failing: make it positive. *)
   Parameter f : nat -> nat.
   Inductive op_c : nat -> option bool -> nat -> Prop :=
   | op_go n : f n <= 2 -> op_c n (Some true) (S n).
-  Inductive not_c : nat -> option bool -> nat -> Prop :=
-  | not_go n : ~ (3 <= n) -> not_c n (Some true) (S n).
   MeBi Config Bounds As Num States 20.
   Fail MeBi Run LTS 0 Using op_c.
-  Fail MeBi Run LTS 0 Using not_c.
   MeBi Config Reset Bounds.
+
+  (* ... unless the user supplies a tactic for what the search cannot
+     decide ([MeBi Config Premise Tactic]): it proves the premise or its
+     negation, at extraction and again in the proof. *)
+  From Stdlib Require Import Lia.
+  Axiom f_def : forall n, f n = n.
+  Inductive op_c' : nat -> option bool -> nat -> Prop :=
+  | op_go' n : f n <= 2 -> op_c' n (Some true) (S n).
+  MeBi Config Premise Tactic (rewrite f_def; lia).
+  MeBi Config Bounds As Num States 4.
+  MeBi Run LTS 0 Using op_c.
+  MeBi Config Bounds As Num States 3.
+  Fail MeBi Run LTS 0 Using op_c.
+  MeBi Config Reset Bounds.
+  MeBi Config Weak As Option bool.
+  Example w_op : weak_sim op_c op_c' 0 0.
+  Proof. MeBi Sim Begin op_c 0 And op_c' 0 Using op_c. MeBi Sim Solve 100. Qed.
+  MeBi Config Reset Weak.
+  MeBi Config Reset Premise.
 End GeneralPremises.
 
 (* [MeBi Help]: every topic parses and prints (backlog item F). *)

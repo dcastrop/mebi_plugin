@@ -260,61 +260,70 @@ struct
         above any LTS step's (at most 3). *)
     let refutable_grade : int = 4
 
+    (** A premise hypothesis (not an LTS step): the top grade if it is
+        closed and provably false -- refuting it closes the goal outright,
+        the best move there is, done by [Tacs.refute_premise] -- else 0. A
+        branch whose constructor has a false guard ([3 <= 2]) closes only
+        that way. *)
+    let premise_grade (x : t) : int mm =
+      let open Syntax in
+      let* env = get_env in
+      let* sigma = get_sigma in
+      match
+        Premise_search.prove env sigma (Context.Named.Declaration.get_type x)
+      with
+      | Premise_search.Refuted -> return refutable_grade
+      | Premise_search.Proved _ | Premise_search.Unknown -> return 0
+    ;;
+
     (** [invertibility x] returns an integer denoting whether [x] need be inverted, with the higher numbers being of more importance to invert and [0] denoting [x] does not need to be inverted.
     *)
     let invertibility (x : t) : int mm =
       Logger.trace __FUNCTION__;
       let open Syntax in
-      let* ty, tys = to_atomic x in
       let* sigma = get_sigma in
-      (* An equation is never a transition to invert: it comes from a
-         constructor's equation premise (backlog I2). The grading below
-         assumes an LTS step's [term label goto] and would score [a = a] (both
-         sides a local variable) 3, and inverting it changes nothing, so the
-         solver picked it forever. Substitutable equations are handled by the
-         [subst] after each step. *)
-      let is_eq : bool =
-        match EConstr.kind sigma ty with
-        | Ind (ind, _) -> Rocqlib.check_ind_ref "core.eq.type" ind
-        | _ -> false
-      in
-      (* Only LTS steps are inverted. Any other premise hypothesis -- an
-         [In], a [<=], an equation -- comes from a constructor premise; the
-         shape-based grading below assumes [term label goto] and could pick
-         it, and inverting it (e.g. [In], a fixpoint) is meaningless. *)
-      let is_lts : bool =
-        let lts_of (m : Model.FSM.t) : bool =
-          try Theory.is_fsm_constructor ty m with _ -> false
-        in
-        lts_of (W.get_fsm_a ()) || lts_of (W.get_fsm_b ())
-      in
-      if is_eq || Bool.not is_lts
-      then
-        (* A premise hypothesis. If it is closed and provably false, refuting
-           it closes the goal outright -- the best move there is, so it gets
-           the top grade, [refutable_grade], and [try_invert_any] uses
-           [Tacs.refute_premise]. This is what a branch whose constructor has a
-           false guard ([3 <= 2]) needs. Anything else: leave it alone. *)
-        let* env = get_env in
-        let t = Context.Named.Declaration.get_type x in
-        match Premise_search.prove env sigma t with
-        | Premise_search.Refuted -> return refutable_grade
-        | Premise_search.Proved _ | Premise_search.Unknown -> return 0
-      else (
-        (* NOTE: returns true if can be inverted *)
-        let rec f (x : EConstr.t) : bool =
-          match EConstr.kind sigma x with
-          | Var _ -> EConstr.isRef sigma x
-          | App (_, tys) -> Array.exists f tys
+      (* Not of the form [I args] (a negation [~ P], say): never an LTS step. *)
+      match Rocq_utils.hyp_to_atomic sigma x with
+      | exception Rocq_utils.Rocq_utils_HypIsNot_Atomic _ -> premise_grade x
+      | ty, tys ->
+        (* An equation is never a transition to invert: it comes from a
+           constructor's equation premise (backlog I2). The grading below
+           assumes an LTS step's [term label goto] and would score [a = a] (both
+           sides a local variable) 3, and inverting it changes nothing, so the
+           solver picked it forever. Substitutable equations are handled by the
+           [subst] after each step. *)
+        let is_eq : bool =
+          match EConstr.kind sigma ty with
+          | Ind (ind, _) -> Rocqlib.check_ind_ref "core.eq.type" ind
           | _ -> false
         in
-        (* NOTE: since [2] is the goto-state and [1] is the label, [g] allows us to clearly see which hyp needs to be inverted first. *)
-        let g (i : int) : int =
-          try if f tys.(i) then i else 0 with
-          (* NOTE: handles "Index out of bounds" for accessing [tys] array. *)
-          | Invalid_argument _ -> 0
+        (* Only LTS steps are inverted. Any other premise hypothesis -- an
+           [In], a [<=], an equation -- comes from a constructor premise; the
+           shape-based grading below assumes [term label goto] and could pick
+           it, and inverting it (e.g. [In], a fixpoint) is meaningless. *)
+        let is_lts : bool =
+          let lts_of (m : Model.FSM.t) : bool =
+            try Theory.is_fsm_constructor ty m with _ -> false
+          in
+          lts_of (W.get_fsm_a ()) || lts_of (W.get_fsm_b ())
         in
-        g 2 + g 1 |> return)
+        if is_eq || Bool.not is_lts
+        then premise_grade x
+        else (
+          (* NOTE: returns true if can be inverted *)
+          let rec f (x : EConstr.t) : bool =
+            match EConstr.kind sigma x with
+            | Var _ -> EConstr.isRef sigma x
+            | App (_, tys) -> Array.exists f tys
+            | _ -> false
+          in
+          (* NOTE: since [2] is the goto-state and [1] is the label, [g] allows us to clearly see which hyp needs to be inverted first. *)
+          let g (i : int) : int =
+            try if f tys.(i) then i else 0 with
+            (* NOTE: handles "Index out of bounds" for accessing [tys] array. *)
+            | Invalid_argument _ -> 0
+          in
+          g 2 + g 1 |> return)
     ;;
 
     let _need_inversion (x : t) : bool mm =
@@ -441,8 +450,18 @@ struct
       let lts_of (m : Model.FSM.t) : bool =
         try Theory.is_fsm_constructor h m with _ -> false
       in
+      let is_negation : bool =
+        match EConstr.kind sigma (Reductionops.whd_all env sigma concl) with
+        | Prod (_, _, b) ->
+          (match EConstr.kind sigma (Reductionops.whd_all env sigma b) with
+           | Ind (ind, _) -> Rocqlib.check_ind_ref "core.False.type" ind
+           | _ -> false)
+        | _ -> false
+      in
       return
-        (match EConstr.kind sigma h with
+        (is_negation
+         ||
+         match EConstr.kind sigma h with
          | Ind ((mind, _), _) ->
            let name = Names.Id.to_string (Names.MutInd.label mind) in
            Premise_search.is_prop env sigma concl
@@ -1125,7 +1144,9 @@ struct
       let* env = get_env in
       let* sigma = get_sigma in
       match Premise_search.prove env sigma (get_concl ()) with
-      | Premise_search.Proved p -> Tacs.exact_term p
+      | Premise_search.Proved (Premise_search.Term p) -> Tacs.exact_term p
+      | Premise_search.Proved (Premise_search.ByRefutation _) ->
+        Tacs.prove_negation ()
       | Premise_search.Refuted | Premise_search.Unknown ->
         CErrors.user_err
           (Pp.str

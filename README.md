@@ -151,7 +151,9 @@ An LTS is an inductive relation `term -> label -> term -> Prop`. For each constr
 
 - **Premises over an LTS listed in `Using`** (the LTS itself, or another one: layered LTSs) are explored, and a constructor may have several. The proof search replays every premise's derivation.
 - **Any other premise** is decided once it is closed, either immediately or after the LTS premises have fixed what it mentions (a label, say). An equation `l = r` holds when its sides are convertible and fails when they differ in a constructor. Any other inductive proposition (`<=`, `<`, `In`, `Forall`, `/\`, `\/`, your own) is decided by a bounded proof search over its constructors, after unfolding definitions and fixpoints. The bound is `MeBi Config Premise Depth <n>` (default 16). A false premise means that transition is not in the LTS. In a proof, a true premise is closed with the proof the search found, and a false one in a hypothesis is refuted. "False" is only concluded when the search was complete: nothing opaque, no depth cut.
-- **Anything else** cannot be decided: negations, opaque functions or axioms, or a search cut off by the depth bound. The constructor is applied as if the premise held, with a warning, so the LTS may contain transitions that do not exist. A `Run Bisim` verdict on such an LTS may be wrong, but a proof cannot be: `Qed` still checks the premise.
+- **Negations** `~ P` hold exactly when `P` is refuted by a complete search; in a proof they are proved by refuting `P`.
+- **A tactic of your own** for what the search cannot decide: `MeBi Config Premise Tactic <tactic>` (e.g. `(rewrite f_def; lia)`). It is tried on the premise and on its negation, both at extraction and in the proof. `MeBi Config Reset Premise` clears it and the depth.
+- **Anything else** cannot be decided: opaque functions or axioms without a user tactic, or a search cut off by the depth bound. The constructor is applied as if the premise held, with a warning, so the LTS may contain transitions that do not exist. A `Run Bisim` verdict on such an LTS may be wrong, but a proof cannot be: `Qed` still checks the premise.
 
 ### Benchmarking
 
@@ -183,6 +185,8 @@ MeBi Config Bounds As Num States <n>.
 MeBi Config Bounds As Num Transitions <n>.
 MeBi Config Bounds Saturation <n>.
 MeBi Config Premise Depth <n>.
+MeBi Config Premise Tactic <tactic>.
+MeBi Config Reset Premise.
 MeBi Config Weak As Option <term>.
 MeBi Config Weak As <term> Of <relation>.
 MeBi Config Weak1 / Weak2 As Option <term>.        (* set only the first/second side of a Bisim/Merge/Sim check *)

@@ -46,3 +46,4 @@ RocqMakefile*
 # ignore dumps
 **/_dumps
 src/_dump
+.lia.cache

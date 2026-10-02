@@ -6,10 +6,22 @@
     [Proved p] with a proof term [p]; [Refuted] only when the search was
     {e complete}; [Unknown] otherwise. *)
 
+(** How a premise was proved. A negation [~ P] has no proof term from
+    constructor search; it holds because [P] was refuted, and the solver
+    proves it with {!negation_tac} instead. *)
+type proof =
+  | Term of EConstr.t
+  | ByRefutation of EConstr.t
+
 type result =
-  | Proved of EConstr.t
+  | Proved of proof
   | Refuted
   | Unknown
+
+(** A user tactic tried on premises the search leaves undecided
+    ([MeBi Config Premise Tactic]): proving [P] means it holds, proving
+    [~ P] that it is false. *)
+let user_tactic : unit Proofview.tactic option ref = ref None
 
 (** The most nested constructor applications a search may try. *)
 let default_depth : int = 16
@@ -202,18 +214,160 @@ and try_constructor
        if closed sigma proof then Some (sigma, proof), true else None, false)
 ;;
 
+(** [P -> False] (after head reduction, so [~ P] too): [Some P]. *)
+let negated (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
+  : EConstr.t option
+  =
+  match EConstr.kind sigma (Reductionops.whd_all env sigma goal) with
+  | Prod (_, a, b) when EConstr.Vars.noccurn sigma 1 b ->
+    (match EConstr.kind sigma (Reductionops.whd_all env sigma b) with
+     | Ind (ind, _) when Rocqlib.check_ind_ref "core.False.type" ind -> Some a
+     | _ -> None)
+  | _ -> None
+;;
+
+let search_closed (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
+  : result
+  =
+  match search env sigma !max_depth goal with
+  | Some (sigma, p), _ ->
+    (* belt and braces: the term must typecheck against the goal *)
+    (match Typing.check env sigma p goal with
+     | _ -> Proved (Term p)
+     | exception _ -> Unknown)
+  | None, true -> Refuted
+  | None, false -> Unknown
+;;
+
+(** Run the user tactic, if any, on [typ]: its closed proof term. *)
+let by_tactic (env : Environ.env) (sigma : Evd.evar_map) (typ : EConstr.t)
+  : EConstr.t option
+  =
+  match !user_tactic with
+  | None -> None
+  | Some tac ->
+    (try
+       match
+         Subproof.build_by_tactic_opt
+           env
+           ~uctx:(Evd.ustate sigma)
+           ~poly:PolyFlags.default
+           ~typ
+           tac
+       with
+       | Some (c, _, _, _, _) -> Some (EConstr.of_constr c)
+       | None -> None
+     with
+     | e when CErrors.noncritical e -> None)
+;;
+
+let negation_of (goal : EConstr.t) : EConstr.t =
+  let false_ =
+    EConstr.of_constr
+      (UnivGen.constr_of_monomorphic_global
+         (Global.env ())
+         (Rocqlib.lib_ref "core.False.type"))
+  in
+  EConstr.mkArrowR goal false_
+;;
+
+(** The user tactic, if any, on [goal] and then on [~ goal]. *)
+let by_user_tactic (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t)
+  : result
+  =
+  match by_tactic env sigma goal with
+  | Some p -> Proved (Term p)
+  | None ->
+    (match by_tactic env sigma (negation_of goal) with
+     | Some _ -> Refuted
+     | None -> Unknown)
+;;
+
 let prove (env : Environ.env) (sigma : Evd.evar_map) (goal : EConstr.t) : result
   =
   let goal = Reductionops.nf_evar sigma goal in
   if not (closed sigma goal)
   then Unknown
   else (
-    match search env sigma !max_depth goal with
-    | Some (sigma, p), _ ->
-      (* belt and braces: the term must typecheck against the goal *)
-      (match Typing.check env sigma p goal with
-       | _ -> Proved p
-       | exception _ -> Unknown)
-    | None, true -> Refuted
-    | None, false -> Unknown)
+    let decided =
+      match negated env sigma goal with
+      | Some p ->
+        (* [~ P] holds iff [P] is refuted, by a complete search *)
+        (match search_closed env sigma p with
+         | Proved _ -> Refuted
+         | Refuted -> Proved (ByRefutation p)
+         | Unknown -> Unknown)
+      | None -> search_closed env sigma goal
+    in
+    match decided with Unknown -> by_user_tactic env sigma goal | r -> r)
+;;
+
+(** [refute_hyp_tac id]: close the goal from hypothesis [id], a closed
+    premise that [prove] refutes. An inductive one is unfolded ([simpl in],
+    so a fixpoint like [In] becomes [or]/[eq]/[False]) and cleared by
+    [inversion_clear], and every goal that leaves is refuted the same way
+    from a new refutable hypothesis; a negation [~ P] is applied to the
+    proof of [P]. [inversion_clear], not [inversion]: a kept hypothesis is
+    picked again forever (the Step 0 loop). *)
+let rec refute_hyp_tac ?(depth : int = !max_depth) (id : Names.Id.t)
+  : unit Proofview.tactic
+  =
+  let open Proofview.Notations in
+  Proofview.Goal.enter (fun gl ->
+    let env = Proofview.Goal.env gl in
+    let sigma = Proofview.Goal.sigma gl in
+    let ty = Context.Named.Declaration.get_type (EConstr.lookup_named id env) in
+    match negated env sigma ty with
+    | Some p ->
+      (match search_closed env sigma p with
+       | Proved (Term pf) ->
+         let false_elim = EConstr.mkApp (EConstr.mkVar id, [| pf |]) in
+         Tactics.exfalso <*> Tactics.exact_check false_elim
+       | _ ->
+         Tacticals.tclZEROMSG (Pp.str "MeBi: cannot refute a negated premise"))
+    | None
+      when match search_closed env sigma ty with
+           | Refuted -> false
+           | Proved _ | Unknown -> true ->
+      (* refuted by the user tactic, not by search: use its proof of [~ ty] *)
+      (match by_tactic env sigma (negation_of ty) with
+       | Some np ->
+         Tactics.exfalso
+         <*> Tactics.exact_check (EConstr.mkApp (np, [| EConstr.mkVar id |]))
+       | None -> Tacticals.tclZEROMSG (Pp.str "MeBi: cannot refute a premise"))
+    | None ->
+      if depth <= 0
+      then Tacticals.tclZEROMSG (Pp.str "MeBi: premise refutation too deep")
+      else
+        Tactics.simpl_in_hyp (id, Locus.InHyp)
+        <*> Inv.inv_clear_tac id
+        <*> Proofview.Goal.enter (fun gl ->
+          let env = Proofview.Goal.env gl in
+          let sigma = Proofview.Goal.sigma gl in
+          let refutable =
+            List.find_opt
+              (fun d ->
+                let t = Context.Named.Declaration.get_type d in
+                is_prop env sigma t
+                && closed sigma t
+                && match prove env sigma t with Refuted -> true | _ -> false)
+              (Proofview.Goal.hyps gl)
+          in
+          match refutable with
+          | Some d ->
+            refute_hyp_tac
+              ~depth:(depth - 1)
+              (Context.Named.Declaration.get_id d)
+          | None ->
+            Tacticals.tclZEROMSG (Pp.str "MeBi: no refutable premise left")))
+;;
+
+(** [negation_tac]: prove a goal [~ P] whose [P] [prove] refutes:
+    [intro H], then {!refute_hyp_tac} [H]. *)
+let negation_tac : unit Proofview.tactic =
+  (* [hnf] first: [~ P] is the constant [not], not yet a product. *)
+  Proofview.tclTHEN
+    Tactics.hnf_in_concl
+    (Tactics.intro_using_then (Names.Id.of_string "H_premise") (fun id ->
+       refute_hyp_tac id))
 ;;

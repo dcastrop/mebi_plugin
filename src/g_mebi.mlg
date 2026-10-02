@@ -1,5 +1,6 @@
 {
-(* open Ltac_plugin *)
+open Ltac_plugin
+open Tacarg
 
 (* This one is necessary, to avoid message about missing wit_string *)
 open Stdarg
@@ -219,6 +220,10 @@ VERNAC COMMAND EXTEND MeBi_Config_Bounds CLASSIFIED AS QUERY
   { Api.set_saturation_bound x }
 | ["MeBi" "Config" "Premise" "Depth" int(x)] -> 
   { Api.set_premise_depth x }
+| ["MeBi" "Config" "Premise" "Tactic" tactic(t)] -> 
+  { Api.set_premise_tactic (Tacinterp.interp t) }
+| ["MeBi" "Config" "Reset" "Premise"] -> 
+  { Api.reset_premise () }
 END
 
 (* Config -- weak_args for both *)

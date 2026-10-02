@@ -150,6 +150,19 @@ let reset_bounds_args () : unit =
   Premise_search.max_depth := Premise_search.default_depth
 ;;
 
+(** A tactic tried on premises the search leaves undecided
+    ([Premise_search.user_tactic]; backlog I2, stage 4). *)
+let set_premise_tactic (t : unit Proofview.tactic) : unit =
+  Premise_search.user_tactic := Some t;
+  Logger.show "(MeBi Config: Set Premise tactic.)"
+;;
+
+let reset_premise () : unit =
+  Premise_search.max_depth := Premise_search.default_depth;
+  Premise_search.user_tactic := None;
+  Logger.show "(MeBi Config: Reset Premise depth and tactic.)"
+;;
+
 (** How deep the bounded proof search for constructor premises may go
     ([Premise_search]; backlog I2). Reset by [Reset Bounds]. *)
 let set_premise_depth (x : int) : unit =
@@ -278,6 +291,7 @@ let reset_mutual_cofix () : unit =
 
 let reset_all () : unit =
   reset_mutual_cofix ();
+  Premise_search.user_tactic := None;
   reset_bounds_args ();
   reset_weak_args ();
   reset_the_fail_flags ();

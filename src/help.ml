@@ -88,11 +88,16 @@ let text : string list -> string option = function
           most %i deep (MeBi Config Premise Depth <n>). A false premise drops \
           the transition; in a proof, a true one is closed with the proof \
           found, and a false one in a hypothesis is refuted;\n\
-         \  - anything else cannot be decided -- negations, opaque functions \
-          or axioms, a search cut off by the depth: the constructor is applied \
-          as if the premise held, with a warning, so the LTS may contain \
-          transitions that do not exist. A Run Bisim verdict on it may be \
-          wrong; a proof cannot be, since Qed checks the premise."
+         \  - a negation [~ P] holds iff P is refuted by a complete search, \
+          and is proved by refuting P;\n\
+         \  - with [MeBi Config Premise Tactic <tactic>], a premise the search \
+          leaves undecided is tried with that tactic (proving it, or its \
+          negation);\n\
+         \  - anything else cannot be decided -- opaque functions or axioms, a \
+          search cut off by the depth: the constructor is applied as if the \
+          premise held, with a warning, so the LTS may contain transitions \
+          that do not exist. A Run Bisim verdict on it may be wrong; a proof \
+          cannot be, since Qed checks the premise."
          !Premise_search.max_depth)
   | [ "Config" ] ->
     Some

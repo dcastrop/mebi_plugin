@@ -1279,13 +1279,16 @@ module Make (Enc : Encoding.S) :
             Logger.warning
               (Printf.sprintf
                  "A constructor of %s has a premise headed by [%s] (first met \
-                  as [%s]) that MeBi cannot check: only premises over the LTSs \
-                  given in [Using], and equations between closed terms, are \
-                  decided, so the constructor is applied whether or not the \
-                  premise holds. The extracted LTS may contain transitions \
-                  that do not exist, and a [MeBi Run Bisim] verdict on it may \
-                  be wrong (a proof cannot be: [Qed] still checks the \
-                  premise)."
+                  as [%s]) that MeBi cannot decide: premises over the LTSs \
+                  given in [Using], equations, negations and inductive \
+                  propositions are decided, by a proof search at most [MeBi \
+                  Config Premise Depth] deep, but this one is not closed, \
+                  mentions something opaque, or needs a deeper search. So the \
+                  constructor is applied whether or not it holds: the \
+                  extracted LTS may contain transitions that do not exist, and \
+                  a [MeBi Run Bisim] verdict on it may be wrong (a proof \
+                  cannot be: [Qed] still checks the premise). See [MeBi Help \
+                  Premises]."
                  (Rocq_utils.Strfy.econstr env sigma (decode lts_enc))
                  head
                  (Rocq_utils.Strfy.econstr

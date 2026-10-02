@@ -3749,6 +3749,66 @@ at the site says so. `dune build` and `make` (plugin and `Test.v`) pass.
 **Session tally (2026-10-02):** New feature 1 · Bug fix 1 · Refactor 1 ·
 Optimization 0 · Tooling 0 · Docs 0.
 
+## 2026-10-02 — I2 stage 4 and negation: user premise tactic, `~ P`
+
+Branch `main` (on `fork`). **New feature** (negation support and the user
+tactic hook, both in note 9; the user said continue after stage 1), plus a
+**Bug fix** to the Anomaly guard.
+
+**Negation.** `Premise_search.prove` recognises `P -> False` (so `~ P`
+after head reduction). It **holds** iff `P` is refuted by a complete
+search, and is false iff `P` is proved. A negation has no
+constructor-search proof term, so `proof` gains `ByRefutation`. The solver
+proves such a goal with `negation_tac`: `hnf` (since `not` is a constant,
+not yet a product, and `intro` failed without it), `intro`, then
+`refute_hyp_tac`.
+
+**`refute_hyp_tac`** replaces yesterday's single `simpl; inversion_clear`
+step: it refutes recursively in one tactic, clearing every refutable premise
+the inversion leaves. A refutable *negation* hypothesis is applied to the
+proof of its `P`.
+
+**User tactic hook.** `MeBi Config Premise Tactic <tactic>` (an Ltac
+expression; the grammar now opens `Ltac_plugin`/`Tacarg`). For a premise
+the search leaves `Unknown`, the tactic is run with
+`Subproof.build_by_tactic_opt` on `P`, giving a proof term (holds), and
+then on `~ P`, which means false. In proofs: a held premise is `exact`ed
+with that term. A false premise hypothesis is closed by `exfalso; exact (np
+H)` with the tactic's proof of `~ P`, because inversion cannot refute
+something like `f 3 <= 2` with an opaque `f`; my first attempt tried
+exactly that and failed. `MeBi Config Reset Premise` clears depth and
+tactic; `Reset` clears the tactic too.
+
+**Also needed:** `invertibility` called `to_atomic` first, which raises
+on a non-atomic hypothesis such as `H : ~ 3 <= n` (`Rocq_utils_HypIsNot_Atomic`).
+Such a hypothesis now goes straight to the premise grading.
+
+**Guard fix** (separate commit). That `Rocq_utils_HypIsNot_Atomic` still
+escaped as an Anomaly, because it comes from a `lib/` library, not
+`Mebi_plugin.`. So the name test was the wrong criterion. The guard now
+treats as internal anything Rocq would print as "Uncaught exception",
+i.e. anything with no registered printer.
+
+**Verification.** Proof suite identical to the per-mode baselines under
+`Auto`, forced `True` and forced `False`. `Test.v` `GeneralPremises`: the
+negation case flips from known-wrong to positive (`~ (3 <= n)`: 4 states,
+and a proof), and an opaque `f` with `Axiom f_def` and `Premise Tactic
+(rewrite f_def; lia)` gives an exact LTS and a proof. The opaque case
+without a tactic stays known-wrong. The new `Fail`s were checked for their
+reasons. `make` builds; `tests.exe` 61/61. `.lia.cache` (written by `lia`
+during the build) is now gitignored.
+
+**My mistakes this round:**
+
+- The third and fourth `make`-only warning-50 errors this session, both
+  from inserting a definition between an existing doc comment and its
+  target (`api.ml`, `proof_solver_step.ml`). They cost one matrix run.
+  `make` is now run on the plugin before every matrix.
+- A wait loop on a mistyped task ID, caught when it never returned.
+
+**Session tally (2026-10-02):** New feature 2 · Bug fix 2 · Refactor 1 ·
+Optimization 0 · Tooling 0 · Docs 0.
+
 ---
 
 ## Outstanding
