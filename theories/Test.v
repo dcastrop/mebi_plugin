@@ -1179,14 +1179,13 @@ End OutputPremises.
 
 MeBi Divider "Theories.Test.SilentResponse".
 Module SilentResponse.
-  (* KNOWN WRONG (found 2026-10-02 while porting rocq-sims'
-     [examples/SimExample.v]): [q] is [p] renamed, both [tau.a + b], so
-     [p <= q] holds. Answering [p -tau-> p1] needs [q] to move silently to
-     [q1], since staying at [q] is not bisimilar to [p1]; but saturation
-     records only weak moves with a visible action, so [Product.respond] finds
-     no silent reply and the solver stops on [CouldNotGetGoalTransition]. A
-     proof is never wrong because of this, it is missing. When fixed, the
-     [Fail] starts failing: make it [MeBi Sim Solve 100. Qed.]. *)
+  (* Found 2026-10-02 while porting rocq-sims' [examples/SimExample.v], and
+     fixed the same day: [q] is [p] renamed, both [tau.a + b], so [p <= q]
+     holds. Answering [p -tau-> p1] needs [q] to move silently to [q1], since
+     staying at [q] is not bisimilar to [p1]. Saturation records only weak
+     moves with a visible action, so [Product.respond] used to find no silent
+     reply and the solver stopped on [CouldNotGetGoalTransition]; it now
+     answers from the unsaturated FSM's silent steps. *)
   Inductive st : Set := p | p1 | q | q1 | z.
   Inductive lab : Set := a | b.
   Inductive step : st -> option lab -> st -> Prop :=
@@ -1194,11 +1193,81 @@ Module SilentResponse.
   | q_tau : step q None q1 | q_b : step q (Some b) z | q1_a : step q1 (Some a) z.
   MeBi Config Weak As Option lab.
   Example sim_p_q : weak_sim step step p q.
-  Proof. MeBi Sim Begin step p And step q Using step.
-    Fail MeBi Sim Solve 100.
-  Abort.
+  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 100. Qed.
+
+  (* The LTS of rocq-sims' [examples/SimExample.v] (Nicolas Chappe,
+     https://github.com/rocq-sims/rocq-sims, LGPL-3.0-or-later), re-encoded
+     with [None] for tau. There it is proved by hand that [u0] simulates [t0]
+     in a {e divergence-sensitive} sense; [weak_sim] ignores divergence, so
+     this is a weaker statement, proved here in both directions. *)
+  Inductive sst : Set := t0 | t1 | t2 | t3 | t4 | u0 | u1 | u2 | u3.
+  Inductive sobs : Set := sa | sb.
+  Inductive strans : sst -> option sobs -> sst -> Prop :=
+  | t0t0 : strans t0 None t0 | t0t1 : strans t0 None t1
+  | t0t3 : strans t0 (Some sb) t3 | t1t2 : strans t1 (Some sa) t2
+  | t3t4 : strans t3 None t4 | u0u1 : strans u0 None u1
+  | u0u3 : strans u0 (Some sb) u3 | u1u1 : strans u1 None u1
+  | u1u2 : strans u1 (Some sa) u2.
+  MeBi Config Weak As Option sobs.
+  Example sims_t0_u0 : weak_sim strans strans t0 u0.
+  Proof. MeBi Sim Begin strans t0 And strans u0 Using strans. MeBi Sim Solve 100. Qed.
+  Example sims_u0_t0 : weak_sim strans strans u0 t0.
+  Proof. MeBi Sim Begin strans u0 And strans t0 Using strans. MeBi Sim Solve 100. Qed.
+
+  (* Divergence is invisible to [weak_sim]: a tau-loop and a stuck state
+     simulate each other, and are weakly bisimilar. A divergence-sensitive
+     relation (rocq-sims' mudiv-simulation, for one) separates them. *)
+  Inductive dst : Set := loop | stop.
+  Inductive dstep : dst -> option sobs -> dst -> Prop :=
+  | dloop : dstep loop None loop.
+  MeBi Run Bisim loop With dstep And stop With dstep.
+  Example div_loop_stop : weak_sim dstep dstep loop stop.
+  Proof. MeBi Sim Begin dstep loop And dstep stop Using dstep. MeBi Sim Solve 100. Qed.
   MeBi Config Reset Weak.
 End SilentResponse.
+
+MeBi Divider "Theories.Test.CheckerVerdicts".
+Module CheckerVerdicts.
+  (* Neither pair below is bisimilar, and until 2026-10-02 [MeBi Run Bisim]
+     answered "bisimilar" for both. With [FailIf] on a negative result (the
+     default), a correct verdict makes the command fail. *)
+
+  (* 1. Rooted. [x0 = a.b.x0] and [y0 = b.a.y0] differ in their first step,
+     so they are not even strongly bisimilar. The verdict used to ask only
+     whether every block of the partition holds states of both systems
+     ({x0, y1} and {x1, y0} do), never whether [x0] and [y0] share one. *)
+  Inductive rst : Set := x0 | x1 | y0 | y1.
+  Inductive rlab : Set := ra | rb.
+  Inductive rstep : rst -> rlab -> rst -> Prop :=
+  | xa : rstep x0 ra x1 | xb : rstep x1 rb x0
+  | yb : rstep y0 rb y1 | ya : rstep y1 ra y0.
+  Fail MeBi Run Bisim x0 With rstep And y0 With rstep.
+
+  (* 2. Silent closure. [p = tau.p1 + b.z + c.p1], [p1 = a.z] against
+     [r = a.z + b.z + c.r1], [r1 = a.z]. After [p -tau-> p1], [r] cannot move
+     silently and is not equivalent to [p1] ([r] can do [b]), so p and r are
+     not weakly bisimilar (Milner's [tau.a + b] vs [a + b], plus a [c]-branch
+     giving every state a partner). Partition refinement splits on visible
+     weak moves only, which do not tell them apart; it now also splits by
+     [=ε=>], the blocks each state reaches by zero or more silent steps.
+     [a.z] against [τ.a.z] checks the other way: they are weakly bisimilar,
+     and stay so only because [=ε=>] includes zero steps. *)
+  Inductive wst : Set := p | p1 | r | r1 | z.
+  Inductive wlab : Set := a | b | c.
+  Inductive wstep : wst -> option wlab -> wst -> Prop :=
+  | p_tau : wstep p None p1 | p_b : wstep p (Some b) z
+  | p_c : wstep p (Some c) p1 | p1_a : wstep p1 (Some a) z
+  | r_a : wstep r (Some a) z | r_b : wstep r (Some b) z
+  | r_c : wstep r (Some c) r1 | r1_a : wstep r1 (Some a) z.
+  MeBi Config Weak As Option wlab.
+  Fail MeBi Run Bisim p With wstep And r With wstep.
+  MeBi Run Bisim p1 With wstep And r1 With wstep.
+  Inductive tst : Set := u | v | v1 | w.
+  Inductive tstep : tst -> option wlab -> tst -> Prop :=
+  | u_a : tstep u (Some a) w | v_tau : tstep v None v1 | v1_a : tstep v1 (Some a) w.
+  MeBi Run Bisim u With tstep And v With tstep.
+  MeBi Config Reset Weak.
+End CheckerVerdicts.
 
 (* [MeBi Help]: every topic parses and prints (backlog item F). *)
 MeBi Divider "Theories.Test.Help".

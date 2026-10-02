@@ -53,7 +53,10 @@ module type S = sig
       ; label : label
       }
 
-  (** [respond m from label bisimilar] is the transition [m] takes in
+  (** See {!Model.S.EdgeMap.t'}. *)
+  type edgemap
+
+  (** [respond ?silent m from label bisimilar] is the transition [m] takes in
       response to a [label]-move by the other system, from [m]'s state
       [from], landing somewhere in [bisimilar].
 
@@ -63,8 +66,16 @@ module type S = sig
       {i (fewest steps left to perform)}, and its least destination is the
       answer.
 
+      A {e silent} [label] is answered differently when [silent] is given
+      (the {b unsaturated} FSM's edges, which still hold the silent steps):
+      by the nearest state in [bisimilar] that [from] reaches by {e one or
+      more} silent steps, annotated with that path. Zero steps -- standing
+      still -- is the caller's case, decided before asking. Without [silent],
+      a silent [label] finds nothing, since saturation keeps only weak moves
+      with a visible action.
+
       @raise NoBisimilarResponse when nothing qualifies. *)
-  val respond : fsm -> state -> label -> states -> transition
+  val respond : ?silent:edgemap -> fsm -> state -> label -> states -> transition
 
   (** [successors a b pi p] is every game state reachable from [p] in one
       move, where [a] is the {b unsaturated} left-hand FSM {i (its
@@ -75,7 +86,8 @@ module type S = sig
 
       Mirrors what the proof solver does with one [weak_sim] goal: a silent
       move to a state already bisimilar to the right-hand one is answered by
-      standing still, and everything else by {!val:respond}. An obligation
+      standing still, and everything else by {!val:respond}, given [silent]
+      so that a silent move can also be answered by moving silently. An obligation
       with no bisimilar response is dropped rather than raising -- in a
       genuine bisimulation there are none, and a caller that wants to know
       should compare the lengths.
@@ -83,7 +95,14 @@ module type S = sig
       [refl] says whether both sides use the same LTS. If so, a pair of equal
       states has no successors: the solver closes [weak_sim x x] by
       [weak_sim_refl] before anything else, so nothing past it is visited. *)
-  val successors : refl:bool -> fsm -> fsm -> partition -> Pair.t -> Pair.t list
+  val successors
+    :  ?silent:edgemap
+    -> refl:bool
+    -> fsm
+    -> fsm
+    -> partition
+    -> Pair.t
+    -> Pair.t list
 
   (** [reachable ~refl a b pi root] is the set of game states reachable from
       [root], by breadth-first closure over {!val:successors}.
@@ -93,7 +112,14 @@ module type S = sig
       while building the proof term, which is why it re-derives pairs it has
       already proved whenever the product is not a tree. See
       [ASSISTED-CHANGES.md], 2026-09-29, and backlog item B2. *)
-  val reachable : refl:bool -> fsm -> fsm -> partition -> Pair.t -> Pair.Set.t
+  val reachable
+    :  ?silent:edgemap
+    -> refl:bool
+    -> fsm
+    -> fsm
+    -> partition
+    -> Pair.t
+    -> Pair.Set.t
 
   (** What a proof of this product costs, in [weak_sim] goals, under each of
       the two strategies. *)
@@ -124,6 +150,7 @@ module type S = sig
       cofix will finish. *)
   val estimate
     :  ?cap_factor:int
+    -> ?silent:edgemap
     -> refl:bool
     -> fsm
     -> fsm
@@ -145,7 +172,12 @@ module Make
         and type states = C.State.Set.t
         and type labels = C.Label.Set.t
         and type edgemap = C.EdgeMap.t'
-        and type info = C.Info.t) :
+        and type info = C.Info.t)
+    (Saturation :
+       Saturation.S
+       with type state = C.State.t
+        and type edgemap = C.EdgeMap.t'
+        and type annotation = C.Annotation.t) :
   S
   with type state = C.State.t
    and type states = C.State.Set.t
@@ -153,3 +185,4 @@ module Make
    and type transition = C.Transition.t
    and type fsm = FSM.t
    and type partition = C.Partition.t
+   and type edgemap = C.EdgeMap.t'

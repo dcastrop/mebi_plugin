@@ -3976,8 +3976,172 @@ state prove similar both ways (5 and 2 iterations). That is correct for our
 definition, and is the main semantic difference to state in any comparison
 with `rocq-sims`.
 
-**Session tally (2026-10-02, second session):** Docs 1 · Tooling 1 ·
-New feature 0 · Bug fix 0 · Refactor 0 · Optimization 0.
+## 2026-10-02 (second session) — Weak bisimilarity done properly: rooted verdict, `=ε⇒` split, silent answers
+
+**Bug fix** ×3 · **Tooling** (tests). On branch `fix/weak-bisim-silent-closure`
+(pushed to `fork`, not `main`), by Jonah's decision that changes to a core
+mechanism's correctness get their own branch. Jonah also chose the notion
+the plugin is meant to mechanise: **classical weak bisimilarity**
+(Milner's observation equivalence), as the README's Sangiorgi citation
+says. This entry does the part that needs no change to `theories/`
+("option C"). Making the Rocq statement itself a bisimulation ("option A")
+is to be agreed with Jonah before starting; see "Still open" below.
+
+### Background: why weak bisimilarity needs `=ε⇒`, and why it is reflexive
+
+An LTS has steps `p –α→ p'` where `α` is visible (`a`, `b`, ...) or silent
+(`τ`). Weak transitions hide silent steps:
+
+- `p =ε⇒ p'`: `p –τ→ ··· –τ→ p'` in **zero** or more steps. Zero steps is
+  allowed, so `p =ε⇒ p` for every `p`, whether or not `p` has a `τ` step.
+- `p =a⇒ p'`: `p =ε⇒ –a→ =ε⇒ p'`, for each visible `a`.
+
+A relation `R` is a **weak bisimulation** if, whenever `p R q`: every
+`p –a→ p'` is matched by some `q =a⇒ q'` with `p' R q'`; every `p –τ→ p'`
+is matched by some `q =ε⇒ q'` with `p' R q'`; and symmetrically for `q`.
+Weak bisimilarity `≈` is the largest such relation. A silent step is matched
+by `=ε⇒`, i.e. by zero or more silent steps, not by exactly one: that is
+what makes `τ` invisible. Sources (see "On the citations" below for what was
+checked): Milner, *Communication and Concurrency*, Prentice Hall 1989, the
+chapter on bisimulation and observation equivalence; Sangiorgi,
+*Introduction to Bisimulation and Coinduction*, CUP 2011, ch. 4 ("Weak
+equivalences"). Milner writes the matching move as `q =α̂⇒ q'`, where `α̂`
+erases `τ`.
+
+**The standard reduction.** Because a weak move is answered by a weak move,
+`≈` on an LTS `L` coincides with *strong* bisimilarity `~` on the
+**saturated** LTS `L̂`. `L̂` has the same states and two kinds of
+transition: `p =a⇒ p'` for each visible `a`, and `p =ε⇒ p'` as one more
+label. This is how finite-state tools decide `≈`: compute `L̂` (a transitive
+closure), then run a strong-bisimilarity algorithm on it (Kanellakis and
+Smolka, "CCS expressions, finite state processes, and three problems of
+equivalence", *Information and Computation* 86(1):43–68, 1990, for
+partition refinement on CCS).
+
+**What MeBi had.** `Saturation` built the `=a⇒` half of `L̂` only, and
+`Minimization.partition_states` split blocks by visible labels only. With
+`=ε⇒` missing, the partition is in general **coarser** than `≈`. Milner's
+standard example shows it: `τ.a + b` and `a + b` have identical `=a⇒`/`=b⇒`
+moves, but are not weakly bisimilar. After `τ.a + b –τ→ a`, the other side
+must answer by `=ε⇒`; `a + b` can only stay put, and `a ≉ a + b`.
+
+**Why `=ε⇒` must be reflexive.** Leaving out the zero-step case breaks the
+most basic law of weak bisimilarity, `τ.P ≈ P` (the first of the `τ`-laws in
+both sources). Take `a` and `τ.a`. With a reflexive `=ε⇒`, both reach the
+block of `a` silently (`a` by zero steps, `τ.a` by one), so they are not
+split. Without the zero-step case, `τ.a` reaches that block and `a` reaches
+nothing, so a correct partition algorithm would *separate* two bisimilar
+processes. `tests.exe` checks exactly this pair, and was confirmed to fail
+when the closure is made non-reflexive (two failures).
+
+**What reflexivity does not mean.** It does not mean adding a `τ`
+self-loop to any state of the LTS, and the fix does not. That would be wrong
+in three ways:
+1. It changes the system: every state would get a real `τ` step, i.e.
+   every state would *diverge*. `≈` ignores divergence, but a
+   divergence-sensitive relation (e.g. `rocq-sims`' μdiv-simulation) would
+   then relate nothing usefully. It is also wrong for strong bisimilarity,
+   where `τ` is an ordinary label that must be matched step for step.
+2. It conflates `=ε⇒` (zero or more) with `–τ→` (exactly one). An answer
+   built from it would have to exhibit a silent step the system cannot take.
+3. In a proof it cannot be used: the Rocq LTS has no such constructor, so
+   no `weak` derivation can step along it.
+
+`=ε⇒`'s reflexivity is a property of the *weak* relation, `silent` =
+`clos_refl_trans_1n` in `theories/Bisimilarity.v`. The plugin's Rocq side
+already has it: `silent` is `clos_refl_trans_1n` of `tau`, and the
+zero-step answer is `wk_none` + `rt1n_refl`. The fix keeps it there. `=ε⇒` is
+never stored as an edge of any FSM. It is computed on the side from the
+**unsaturated** LTS's silent steps, and used only (a) as a splitting
+criterion in partition refinement and (b) as the set of answers the solver
+may give to a silent move. Saturation's output is unchanged (`satdiff -- 200`
+byte-identical).
+
+### What was wrong, and the fixes
+
+1. **The verdict was not rooted** (`6976ea0`). `Result.are_bisimilar` asked
+   whether every block of the merged partition held states of both systems,
+   never whether the two *initial* states shared a block. `a.b.x` against
+   `b.a.y` is not even strongly bisimilar, yet both blocks ({x, b.y},
+   {b.x, y}) are shared, and `MeBi Run Bisim` said bisimilar. The verdict
+   now compares the roots, and falls back to the old test only for an FSM
+   without an initial state. **This was Claude's error twice over:** the
+   `tests.ml` comment written with the first test binary (`c078308`,
+   2026-08-17) noticed that the verdict ignores `init` and argued it was
+   sound "because every state is reachable from the root". That argument is
+   false, as this pair shows. The comment is replaced.
+2. **No `=ε⇒` split** (`f162126`). `partition_states ?silent` now also
+   splits each block by the set of blocks its states reach by `=ε⇒`.
+   Closures are computed from the unsaturated silent edges and memoised,
+   not stored. `Bisimilarity.fsm` passes the merged *originals*' edges, and
+   `Minimization.fsm` its own. The interface doc said a saturated FSM's
+   partition "is weak bisimilarity"; that was Claude's (`2144f5c`,
+   2026-10-01) and is corrected.
+3. **The solver could not answer a silent move by moving** (`2e6eb0d`).
+   It stayed put when that was bisimilar, and otherwise asked the
+   saturated FSM, which has no silent moves. `Product.respond ?silent` now
+   answers a silent label with the nearest acceptable state reachable by
+   one or more silent steps (`Saturation.silent_paths`, the existing BFS,
+   now exported), annotated with that path. The solver's existing
+   `wk_none` + `rt1n_trans` walk applies it unchanged.
+   `successors`/`reachable`/`estimate` pass it on, so the mutual-cofix
+   product agrees with the solver. Also fixed: `respond` let `Not_found`
+   escape for a state with no saturated moves at all.
+
+### Tests and verification
+
+- `Test.v`:
+  - `CheckerVerdicts`: both pairs are now `Fail`s. Each was pinned
+    known-wrong first (`11bd121`) and flipped by its fix. Positive checks
+    `p1 ≈ r1` and `a.z ≈ τ.a.z` sit beside them.
+  - `SilentResponse`: now proves. It also has `rocq-sims`' `SimExample`
+    LTS (attributed, both directions: 30 and 26 iterations) and a
+    divergence pair (`loop ≈ stop`, by design).
+- `tests.exe` **67/67** (was 61): rooted verdict, `=ε⇒` split (Milner's
+  pair; `a ≈ τ.a`, mutation-checked as above), silent `respond` (path
+  length 2; no answer without `?silent`).
+- `satdiff -- 200` byte-identical. `make` on the plugin and `Test.v` clean.
+- Proof suite, all 27 `Solve`s, **identical to the baseline in all three
+  modes**:
+  - `Auto` and forced `MutualCofix True`: the `CLAUDE.md` figures.
+  - Forced `False`: Test2 `446 278 299 194 446 182`, and Test3 stops at
+    1127, as before.
+
+  As predicted: every silent step in `Proc`/`CADP` stays inside its
+  bisimilarity class, so neither the extra split nor the new answers ever
+  fire there. Which is also why none of this was caught: the corpus never
+  exercised it.
+
+### On the citations
+
+Checked this session: the bibliographic details of Kanellakis and Smolka
+(1990), and that chapter 4 of Sangiorgi (2011) is "Weak equivalences",
+covering weak bisimilarity and the `τ`-laws (publisher's summary). Not
+checked against the text: the chapter of Milner (1989) is cited by title,
+not number (sources disagreed). Whether Kanellakis and Smolka state the
+saturation reduction in exactly this form is also unchecked: their paper is
+the standard citation for partition-refinement bisimilarity checking on
+finite CCS processes, and the reduction is textbook, but a reader wanting a
+precise pointer should check §-level references before citing this log.
+The definitions above are standard and match `theories/Bisimilarity.v`'s
+own `weak`/`silent`.
+
+### Still open (for "option A", to agree with Jonah first)
+
+- `theories/Bisimilarity.v`'s `weak_bisim` is **two separate `weak_sim`s**
+  (mutual similarity), strictly coarser than `≈`. Every `PluginProofs.v`
+  therefore proves mutual similarity, while the checker now decides `≈`.
+  This is sound, since `≈` implies mutual similarity. Closing the gap means
+  a single coinductive bisimulation in `theories/` and a solver that proves
+  both directions in one proof (backlog G).
+- `MeBi Sim Begin` refuses a valid `weak_sim` goal between states that are
+  similar but not bisimilar. Checked: `a.b ≤ a.(b+c)` stops with
+  `Not_Bisimilar` before any step, and the solver also steers by the
+  bisimilarity partition. Fine for `≈`, but `weak_sim` alone is promised
+  more than it delivers.
+
+**Session tally (2026-10-02, second session):** Bug fix 3 · Tooling 2 ·
+Docs 1 · New feature 0 · Refactor 0 · Optimization 0.
 
 ## 2026-10-02 (second session) — `theories/`: `weak_bisimilar`, a single weak bisimulation (option A, part 1)
 
@@ -4071,7 +4235,7 @@ onwards (this log entry included), touching only `theories/Bisimilarity.v`,
 - ~~No CI job — the Rocq 9.2 port broke the build for months without anyone noticing.~~ Added, 2026-09-27 (see below): `.github/workflows/ci.yml`.
 - ~~`.gitignore` lists `src/commandOLDunify.ml`, which no longer exists.~~ Removed, 2026-09-27 (see below). The rest of `TODO.md`'s C6 "stale detritus" item turned out to already be resolved or not actually a problem — see below for what was checked.
 - ~~`Saturation.edge_action_destinations` silently dropped all but the last-visited destination when a single action had more than one — a real correctness bug (found 2026-09-27 during the A2 investigation).~~ Fixed, 2026-09-27 (see below), with a regression test. `notes/2-unify-instead-of-lookup.md`'s A2 (multiple-actionpairs positive test case) remained separately open; ~~it~~ done 2026-10-01 (`theories/Test.v`, `MultipleDerivations`).
-- **Open as of 2026-10-02** (the chronological entries above have the detail): an LTS premise whose source nothing determines is explored from an unknown term and finds only some of its steps (warned; known-wrong test `OutputPremises.open_c`); Step 0, the inversion tie-break optimization (diagnosed, parked as design work); saturation is still cubic in witnesses on `Test4`'s shape (going linear changes which equal-length witnesses survive); `Proc/Test4` remains a documented limit (saturation refused at 74.6M weak actions; a proof would need ≥ ~700k solver iterations); C4/C5/C8 and the CADP no-starvation property are for the upstream authors. Found in the second 2026-10-02 session: the solver cannot answer a silent step by moving silently (known-wrong test `SilentResponse`).
+- **Open as of 2026-10-02** (the chronological entries above have the detail): an LTS premise whose source nothing determines is explored from an unknown term and finds only some of its steps (warned; known-wrong test `OutputPremises.open_c`); Step 0, the inversion tie-break optimization (diagnosed, parked as design work); saturation is still cubic in witnesses on `Test4`'s shape (going linear changes which equal-length witnesses survive); `Proc/Test4` remains a documented limit (saturation refused at 74.6M weak actions; a proof would need ≥ ~700k solver iterations); C4/C5/C8 and the CADP no-starvation property are for the upstream authors. Found in the second 2026-10-02 session and fixed on branch `fix/weak-bisim-silent-closure`: the solver could not answer a silent step by moving silently, and the bisimilarity verdict was neither rooted nor split by `=ε⇒`. Open from it: `weak_bisim` in `theories/` is mutual similarity, not bisimilarity, and `MeBi Sim Begin` refuses similar-but-not-bisimilar `weak_sim` goals.
 
 Working notes live in `notes/` (local only, excluded via `.git/info/exclude`, so
 not present in a fresh clone). Note 1 is done; its analysis was incomplete on two

@@ -71,6 +71,7 @@ module type S = sig
      and type states = State.Set.t
      and type labels = Label.Set.t
      and type edgemap = EdgeMap.t'
+     and type annotation = Annotation.t
   (** {i See {!FSM.saturate}.} *)
 
   (** {2 Minimization} *)
@@ -113,6 +114,7 @@ module type S = sig
      and type transition = Transition.t
      and type fsm = FSM.t
      and type partition = Partition.t
+     and type edgemap = EdgeMap.t'
 
   (** {2 Saturation estimate} *)
 
