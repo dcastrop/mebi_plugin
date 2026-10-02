@@ -52,9 +52,11 @@ To run them:
    ```
    Proc/Test1   114, 105, 106, 109, 22, 21        (nested)
    Proc/Test2   112, 112, 112, 84, 112, 84        (mutual)
-   Proc/Test3   1073, 387, 519, 519, 603, 211, 331, 603, 331   (mutual)
-   CADP/Size1   268, 396, 268, 396, 81, 63        (nested)
+   Proc/Test3   995, 355, 483, 483, 555, 195, 307, 555, 307    (mutual)
+   CADP/Size1   268, 355, 268, 355, 81, 63        (nested)
    ```
+   (Since 2026-10-02's hypothesis-order fix. Before it: Test3 1073, 387,
+   519, 519, 603, 211, 331, 603, 331 and CADP 268, 396, 268, 396, 81, 63.)
    Each of those six files then ends with a `weak_bisimilar` section: one
    proof per pair, 14 total, after the 27 above (and a `mutual_sim` per
    pair, proved from its two `weak_sim`s, with no `Solve`). Under `Auto` and
@@ -62,8 +64,8 @@ To run them:
    ```
    Proc/Test1   709, 709, 51
    Proc/Test2   702, 852, 852
-   Proc/Test3   14427, 6787, 10243, 4467, 6755
-   CADP/Size1   2875, 2875, 185
+   Proc/Test3   13203, 6211, 9379, 4083, 6179
+   CADP/Size1   2760, 2760, 185
    ```
    Forced `False` stops at the first of them in every file (with a loose
    bound, `Glued/MutualExclusion`'s alone would finish, at 3859). They come last in each file so

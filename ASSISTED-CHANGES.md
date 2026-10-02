@@ -4780,6 +4780,64 @@ about 58 s, CCS under 10 s of it. No plugin code changed.
 merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
 `git log --merges --oneline --grep examples/ccs main`).
 
+## 2026-10-02 (second session) — Step 0, option A: hypotheses in creation order
+
+**Bug fix** · **Tooling** (tests for option C). On branch
+`fix/hyp-creation-order`. Jonah chose option A of note 7's 2026-10-02
+re-evaluation; the other options (B–E) are written up there for a later
+session.
+
+**The bug.** `try_invert_any` breaks ties toward the *later* candidate,
+meant as the newest hypothesis: note 7 recorded that "the old later-first
+order works only because each newly added hypothesis sorts last". But
+`Hyps.get_non_cofixes` sorted by `Names.Id.compare`, a **string** order
+(`H79 < H8 < H80`), and Rocq reuses freed names. Past about ten
+hypotheses, "later" was not "newest", and the solver could re-pick a
+hypothesis it had already inverted. On the CCS ABP it did so forever
+(`inversion H8`, `inversion H80`, …). It is now ordered by introduction
+(`Proofview.Goal.hyps` reversed). `get_cofixes` keeps its name order: it
+only chooses among equivalent coinduction hypotheses.
+
+**Measured, all 41 proofs, all three modes.**
+- *Nothing worse anywhere.*
+  - `Auto` and forced `True`: Test1 and Test2 identical; Test3 `weak_sim`
+    1073 387 519 519 603 211 331 603 331 → **995 355 483 483 555 195 307
+    555 307** (−7 to −10%); Test3 `weak_bisimilar` −8% (14427 → 13203,
+    …); CADP `wsim_lts_bigstep` **396 → 355** (−10%, the very proof the
+    earlier Step 0 attempts broke); CADP `weak_bisimilar` 2875 → 2760.
+  - Forced `False`: Test1/Test2 identical, CADP 396 → 355, Test3 stops at
+    1127 as before.
+- *ABP:* `abp ≤ spec` no longer loops. In a capped run the open goals fall
+  steadily (107 → 97 → 85 at 500 / 1500 / 3000 steps), but at about 200
+  steps per goal it would still need some 17,000 more. That remaining cost
+  is blind inversion through deep single-relation terms: option D in
+  note 7. So `abp ≤ spec` stays out of the CCS example for now.
+- `CLAUDE.md`'s baseline is updated, with the old figures kept alongside.
+  The checked-in bounds are upper limits, so they still hold.
+
+**Tests for option C** (`Test.v` `InversionShapes`, Jonah's request): small
+proofs that pass today, with their counts as reference.
+- *Counterexample shapes* for "clear a hypothesis once inverted": `Sync`
+  (two LTS premises share a label; 29 / 105) and `Source` (an `In` premise
+  fixes the LTS premise's source; 71).
+- *The shape C is for*: `Deep`, one relation at every layer (120).
+- *A known-wrong pin, found while writing these and present on `main`
+  before A too:* with a guard premise (`n < 3`) before a target-computing
+  premise, the solver applies `rt1n_refl` to the guard ("Unable to unify
+  clos_refl_trans_1n … with 0 < 3"), as `weak_sim` and `weak_bisimilar`,
+  in every mode. Not fixed: the next session's.
+
+**Verification:** as above; `tests.exe` 79/79, `make` clean.
+
+**How to revert:** delete the branch before merging; after merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep fix/hyp-creation-order main`). The
+counts go back to the old baseline.
+
+**Session tally (2026-10-02, second session), final:** Bug fix 11 ·
+New feature 5 · Refactor 1 · Tooling 9 · Docs 5 · Optimization 0.
+(PRs #1–#13 and two docs commits; see the entries above.)
+
 ---
 
 ## Outstanding
