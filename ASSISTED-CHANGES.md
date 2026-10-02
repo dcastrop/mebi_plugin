@@ -3953,11 +3953,23 @@ bisimilar to `p1`. But `Saturation.edge_closure` records only weak moves
 with a visible action, so `Product.respond` finds no silent reply.
 `handle_wk_concl` covers only the case where staying put works, which
 is why every `Proc`/`CADP` proof passes: their silent steps are structural
-congruence and never change the bisimilarity class. The bisimilarity
+congruence and never change the bisimilarity class. ~~The bisimilarity
 *checker* is unaffected (it correctly rejects Milner's `τ.a + b` vs
-`a + b`). No proof can be wrong because of this, since `Qed` checks it; it
-is missing. Pinned as known-wrong `theories/Test.v` `SilentResponse`. The
-`Fail` was checked for its reason.
+`a + b`).~~ **Wrong, corrected the same day:** the checker *is* affected. It
+rejected Milner's pair only because `p1` had no partner in the other FSM;
+the partition itself put `τ.a + b` and `a + b` in one block. Partition
+refinement splits on visible labels of the visible-only saturated FSM,
+leaving out the `=ε=>` (τ*) relation that the standard reduction of weak to
+strong bisimilarity needs. With one extra `c`-branch, so that every state
+has a partner (`p = τ.p1 + b + c.p1`, `r = a + b + c.r1`,
+`p1 = r1 = a`), `MeBi Run Bisim` reports them bisimilar, which
+classical weak bisimilarity rejects. A related question is open and for the
+authors: `theories/Bisimilarity.v`'s `weak_bisim` is *mutual similarity*
+(two `weak_sim`s), under which that pair, and Milner's, *are* related. So
+the checker currently matches neither notion. No proof can be wrong because
+of any of this, since `Qed` checks it; the solver's gap makes proofs
+missing, not wrong. Pinned as known-wrong `theories/Test.v`
+`SilentResponse`. The `Fail` was checked for its reason.
 
 Also measured: `weak_sim` is divergence-insensitive, so a τ-loop and a stuck
 state prove similar both ways (5 and 2 iterations). That is correct for our
