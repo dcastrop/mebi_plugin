@@ -312,6 +312,67 @@ let init
            "The left state is not weakly simulated by the right one; the proof \
             search will not close."
      | _ -> ());
+  (* The answer policy. [Default] answers move by move with
+     [Model.Product.answer], as the solver always has, and builds nothing.
+     Anything else is planned here, once: the answer to every move the game
+     can reach, which the solver, the mutual block and the estimate below
+     all read, so they cannot disagree. *)
+  Solver.W.plan := None;
+  (if !Api.the_answer_policy <> Api.Answers_default
+   then
+     let module P = Solver.W.Model.Product in
+     let fsm_a = Solver.W.get_fsm_a () in
+     let fsm_b = Solver.W.get_fsm_b () in
+     let pi = Solver.W.get_bisimilar_partition () in
+     match fsm_a.init, fsm_b.init with
+     | Some ra, Some rb ->
+       let refl = Libnames.qualid_eq (snd a) (snd b) in
+       let game =
+         if goal_is_bisimilar
+         then
+           P.Policy.bisim_game
+             ~refl
+             { a = fsm_a
+             ; a_saturated = Solver.W.get_fsm_a ~saturated:true ()
+             ; b = fsm_b
+             ; b_saturated = Solver.W.get_fsm_b ~saturated:true ()
+             }
+             pi
+         else
+           P.Policy.sim_game
+             ~silent:fsm_b.edges
+             ?sim:!Solver.W.simulators
+             ~refl
+             fsm_a
+             (Solver.W.get_fsm_b ~saturated:true ())
+             pi
+       in
+       let p : P.Policy.plan =
+         match !Api.the_answer_policy with
+         | Api.Answers_greedy -> P.Policy.plan P.Policy.Greedy game (ra, rb)
+         | Api.Answers_minimal -> P.Policy.plan P.Policy.Minimal game (ra, rb)
+         | Api.Answers_auto | Api.Answers_default -> P.Policy.best game (ra, rb)
+       in
+       if p.measure.unanswered > 0
+       then
+         Logger.warning
+           (Printf.sprintf
+              "(Answers: the %s plan leaves %i moves unanswered; answering \
+               move by move instead.)"
+              (P.Policy.name p.policy)
+              p.measure.unanswered)
+       else (
+         if p.policy <> P.Policy.Default then Solver.W.plan := Some p;
+         Logger.notice
+           (Printf.sprintf
+              "(Answers: %s -- %i pairs, %i moves, witness %i; predicted %.0f \
+               iterations.)"
+              (P.Policy.name p.policy)
+              p.measure.pairs
+              p.measure.moves
+              p.measure.witness
+              (P.Policy.predicted p.measure)))
+     | _ -> ());
   (* [Auto] decides here, once, before any proof step runs. The product is
      already known at this point, so both strategies can simply be measured:
      a mutual cofix visits each game state once and each move once, while a
@@ -335,26 +396,29 @@ let init
         let refl = Libnames.qualid_eq (snd a) (snd b) in
         let silent = (S.W.get_fsm_b ()).edges in
         let c =
-          if goal_is_bisimilar
-          then
-            S.W.Model.Product.estimate_bisim
-              ~refl
-              { a = fsm_a
-              ; a_saturated = S.W.get_fsm_a ~saturated:true ()
-              ; b = S.W.get_fsm_b ()
-              ; b_saturated = fsm_b
-              }
-              pi
-              (ra, rb)
-          else
-            S.W.Model.Product.estimate
-              ~silent
-              ?sim:!S.W.simulators
-              ~refl
-              fsm_a
-              fsm_b
-              pi
-              (ra, rb)
+          match !S.W.plan with
+          | Some p -> S.W.Model.Product.estimate_plan p
+          | None ->
+            if goal_is_bisimilar
+            then
+              S.W.Model.Product.estimate_bisim
+                ~refl
+                { a = fsm_a
+                ; a_saturated = S.W.get_fsm_a ~saturated:true ()
+                ; b = S.W.get_fsm_b ()
+                ; b_saturated = fsm_b
+                }
+                pi
+                (ra, rb)
+            else
+              S.W.Model.Product.estimate
+                ~silent
+                ?sim:!S.W.simulators
+                ~refl
+                fsm_a
+                fsm_b
+                pi
+                (ra, rb)
         in
         let use_mutual = S.W.Model.Product.prefer_mutual c in
         Api.set_mutual_cofix use_mutual;

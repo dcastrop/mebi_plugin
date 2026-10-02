@@ -289,8 +289,18 @@ let reset_mutual_cofix () : unit =
   the_mutual_cofix := false
 ;;
 
+type answer_policy =
+  | Answers_default
+  | Answers_greedy
+  | Answers_minimal
+  | Answers_auto
+
+let the_answer_policy : answer_policy ref = ref Answers_default
+let set_answer_policy (x : answer_policy) : unit = the_answer_policy := x
+
 let reset_all () : unit =
   reset_mutual_cofix ();
+  the_answer_policy := Answers_default;
   Premise_search.user_tactic := None;
   reset_bounds_args ();
   reset_weak_args ();

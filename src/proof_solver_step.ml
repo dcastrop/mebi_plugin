@@ -861,26 +861,29 @@ struct
       let refl : bool = econstr_eq tys.(3) tys.(4) |> run in
       let* bisim : bool = Concl.is_weak_bisimilar () in
       let pairs : Model.Product.Pair.Set.t =
-        if bisim
-        then
-          Model.Product.reachable_bisim
-            ~refl
-            { a = fsm_a
-            ; a_saturated = W.get_fsm_a ~saturated:true ()
-            ; b = W.get_fsm_b ()
-            ; b_saturated = fsm_b
-            }
-            pi
-            root
-        else
-          Model.Product.reachable
-            ~silent
-            ?sim:!W.simulators
-            ~refl
-            fsm_a
-            fsm_b
-            pi
-            root
+        match !W.plan with
+        | Some p -> p.relation
+        | None ->
+          if bisim
+          then
+            Model.Product.reachable_bisim
+              ~refl
+              { a = fsm_a
+              ; a_saturated = W.get_fsm_a ~saturated:true ()
+              ; b = W.get_fsm_b ()
+              ; b_saturated = fsm_b
+              }
+              pi
+              root
+          else
+            Model.Product.reachable
+              ~silent
+              ?sim:!W.simulators
+              ~refl
+              fsm_a
+              fsm_b
+              pi
+              root
       in
       (* A reflexive leaf gets no cofixpoint of its own. Its goal would be put
          through [In_sim; Pack_sim; intros] with the rest of the block, past
@@ -987,7 +990,7 @@ struct
     let open Syntax in
     let* { a'; b } = Concl.get_conj { wk_trans; wk_sim } in
     ensure_matching_states hyp.goto a';
-    match
+    let move_by_move () : Model.Product.answer option =
       Model.Product.answer
         ~silent:(W.get_fsm_b ()).edges
         ?sim:!W.simulators
@@ -996,7 +999,32 @@ struct
         b
         hyp.label
         hyp.goto
-    with
+    in
+    (* With an answer plan ([MeBi Config Solver Answers], not [Default]),
+       the plan's answer to this very move; a move it does not reach -- it
+       should reach every one the search meets -- is answered move by move,
+       and said so. *)
+    let answer : Model.Product.answer option =
+      match !W.plan with
+      | None -> move_by_move ()
+      | Some p ->
+        (match
+           Model.Product.Policy.choose
+             p
+             { swapped = !W.swapped
+             ; mover = hyp.from
+             ; answerer = b
+             ; label = hyp.label
+             ; target = hyp.goto
+             }
+         with
+         | Some a -> Some a
+         | None ->
+           Logger.notice
+             "(Answers: a move outside the plan; answered move by move.)";
+           move_by_move ())
+    in
+    match answer with
     | Some Model.Product.Stay ->
       Logger.trace ~__FUNCTION__ "stay";
       Tacs.ex_intro_split b

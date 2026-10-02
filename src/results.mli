@@ -40,6 +40,11 @@ module type S = sig
       solver falls back on when no bisimilar one exists. [None] otherwise. *)
   val simulators : (Model.State.t -> Model.State.Set.t) option ref
 
+  (** The answer plan for the proof now being solved, when the answer policy
+      is not [Default] ({!Model.Product.Policy.plan}); [None] otherwise, and
+      the solver answers with {!Model.Product.answer}. *)
+  val plan : Model.Product.Policy.plan option ref
+
   val check_bisimilarity
     :  ?fail_if_not_bisim:bool
     -> Libnames.qualid list

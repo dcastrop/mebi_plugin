@@ -198,6 +198,8 @@ MeBi Config Weak1 / Weak2 As Option <term>.        (* set only the first/second 
 MeBi Config Weak1 / Weak2 As <term> Of <relation>.
 MeBi Config FailIf Empty/Incomplete/NotBisimilar/Oversaturated True/False.
 MeBi Config Output "<Kind>" True/False.
+MeBi Config Solver MutualCofix True|False|Auto.
+MeBi Config Solver Answers Default|Greedy|Minimal|Auto.
 ```
 
 - `Bounds` caps how large an explored graph may get before mebi gives up. Extraction has measured 0.01–0.07MB of memory per state on top of a fixed ~0.1–0.3GB, so setting a state bound whose upper estimate passes 1GB (about 14,000 states) prints a notice. Logging the result with `Output "Result"`/`"DecodeResults"`/`"DumpResults"` costs far more, about 0.65MB per state, because every term is pretty-printed.
@@ -213,6 +215,7 @@ MeBi Config Output "<Kind>" True/False.
   Time grows faster than linearly in the count (a partial `Test4` LTS with 400k weak actions takes ~13s), so a large bound can also mean a long wait. The proof examples (`PluginProofs.v`) saturate to at most a few hundred weak actions. Run `MeBi Config Output "Info" True.` to see each estimate.
 - `Weak` (and the asymmetric `Weak1`/`Weak2`) mark a label constructor as the silent/tau action, enabling weak bisimilarity/saturation. `Reset Weak` clears it back to strong bisimilarity.
 - `FailIf` controls whether an empty LTS, an incomplete (unboundedly large) exploration, a negative bisimilarity result, or a saturation above `Bounds Saturation` raises a hard error instead of a warning. `Oversaturated` defaults to `True`, because past the bound the likely alternative is running out of memory. `False` warns and saturates anyway.
+- `Solver MutualCofix` picks how `MeBi Sim` introduces coinduction hypotheses (one nested cofix per new pair, or one mutual cofix over the whole relation; `Auto`, the default, measures both). `Solver Answers` picks how it chooses each answer to the other system's move: `Default` (the default) move by move; `Greedy`/`Minimal` from a plan built at `Sim Begin`; `Auto` the plan with the lowest predicted cost. On the checked-in examples `Auto` was never slower than `Default`, and cut the `weak_bisimilar` proofs by 60% (`ASSISTED-CHANGES.md`, 2026-10-02).
 - `Output "<Kind>" <bool>` toggles one log channel. `<Kind>` is one of `Debug`, `Info`, `Notice`, `Warning`, `Error`, `Trace`, `Result`, `Show`, `DecodeResults`, `DumpResults`.
 
 ### Diagnostics
