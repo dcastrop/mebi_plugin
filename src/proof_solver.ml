@@ -296,10 +296,9 @@ let init
     that nothing handled would reach Rocq as an {e Anomaly} ("please report
     at rocq-prover.org"), blaming Rocq for a plugin failure -- as
     [BindingInstruction_NotApp] and [CannotGetTransition] did on 2026-10-01.
-    Those (recognisable by the [Mebi_plugin.] prefix of their name, or a
-    stdlib [Not_found]/[Invalid_argument]/[Failure]/[Assert_failure] escaping
-    plugin code) become a user error that names the exception and says whose
-    problem it is. Exceptions with a registered printer -- Rocq's own errors,
+    Those -- any exception Rocq has no printer for, which it would report
+    as "Uncaught exception" -- become a user error that names the exception
+    and says whose problem it is. Exceptions with a registered printer -- Rocq's own errors,
     tactic failures, [MEBI_exn] -- pass through unchanged. *)
 let guard (f : unit -> 'a) : 'a =
   (* The step logic runs inside a tactic ([Proofview.Goal.enter]), whose
@@ -310,12 +309,19 @@ let guard (f : unit -> 'a) : 'a =
     | Logic_monad.TacticFailure e -> root e
     | e -> e
   in
+  (* Internal = Rocq has no printer for it, so it would print as an
+     "Uncaught exception" Anomaly. Not a name test: exceptions from the
+     plugin's own [lib/] libraries are not [Mebi_plugin.]-prefixed
+     ([Rocq_utils_HypIsNot_Atomic], 2026-10-02). *)
   let internal (e : exn) : bool =
-    String.starts_with ~prefix:"Mebi_plugin." (Printexc.to_string e)
-    ||
-    match e with
-    | Not_found | Invalid_argument _ | Failure _ | Assert_failure _ -> true
-    | _ -> false
+    let printed = Pp.string_of_ppcmds (CErrors.print_no_report e) in
+    let sub = "Uncaught exception" in
+    let n = String.length sub in
+    let rec has (i : int) : bool =
+      i + n <= String.length printed
+      && (String.equal (String.sub printed i n) sub || has (i + 1))
+    in
+    has 0
   in
   try f () with
   | e when CErrors.noncritical e && internal (root e) ->
