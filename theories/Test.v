@@ -1472,3 +1472,103 @@ Module ComputedIndex.
   Fail MeBi Run LTS 0 Using st.
   MeBi Config Reset Bounds.
 End ComputedIndex.
+
+
+(* Inversion shapes, for whoever tries backlog option C ("clear an inner
+   hypothesis once inverted, keep the top-level transition"; note 7). Each
+   proves today; the counts after each are the reference, measured after
+   2026-10-02's hypothesis-order fix. C must keep every one proving, and
+   should lower [Deep] (the shape it is for) without raising the others.
+
+   - [Sync] and [Source] are the counterexample shapes: one inversion fixes
+     a variable another hypothesis needs ([Sync]: two LTS premises share the
+     label; [Source]: an [In] premise fixes the LTS premise's source). A rule
+     that cleared or skipped a hypothesis inverted while still open would
+     lose a case split there.
+   - [Deep] is the shape C is for: one relation at every layer, so inverting
+     the top hypothesis yields inner hypotheses of the same relation, most
+     branches impossible (the CCS/ABP pattern, in miniature).
+   - [Computed] is a known-wrong pin, found while writing these.
+   The earlier "remember inverted hypotheses" attempt also broke
+   [Proc/Test1] and [Proc/Test3] (note 7): run those too. *)
+MeBi Divider "Theories.Test.InversionShapes".
+Module InversionShapes.
+  Import Stdlib.Lists.List.
+  (* sync_sim: 29 iterations; sync_bis: 105. *)
+  Module Sync.
+    Inductive lab : Set := A | B.
+    Inductive st : Set := s0 | s1 | s2 | t0 | t1.
+    Inductive comp : st -> option lab -> st -> Prop :=
+    | c_s0 : comp s0 (Some A) s1 | c_s1 : comp s1 (Some B) s2
+    | c_s0b : comp s0 (Some B) s2
+    | c_t0 : comp t0 (Some A) t1 | c_t1 : comp t1 (Some B) t0.
+    Inductive sys : st * st -> option lab -> st * st -> Prop :=
+    | sync p q a p' q' : comp p a p' -> comp q a q' -> sys (p, q) a (p', q').
+    Inductive sys' : st * st -> option lab -> st * st -> Prop :=
+    | sync' p q a p' q' : comp p a p' -> comp q a q' -> sys' (p, q) a (p', q').
+    MeBi Config Weak As Option lab.
+    Example sync_sim : weak_sim sys sys' (s0, t0) (s0, t0).
+    Proof. MeBi Sim Begin sys (s0, t0) And sys' (s0, t0) Using sys sys' comp.
+      MeBi Sim Solve 500. Qed.
+    Example sync_bis : weak_bisimilar sys sys' (s0, t0) (s0, t0).
+    Proof. MeBi Sim Begin sys (s0, t0) And sys' (s0, t0) Using sys sys' comp.
+      MeBi Sim Solve 500. Qed.
+    MeBi Config Reset Weak.
+  End Sync.
+
+  (* source_sim: 71 iterations. *)
+  Module Source.
+    Inductive base : nat -> option bool -> nat -> Prop :=
+    | b0 : base 0 (Some true) 1 | b1 : base 1 (Some false) 0.
+    Inductive pick : list nat -> option bool -> list nat -> Prop :=
+    | p_go q l a q' : In q l -> base q a q' -> pick l a (q' :: nil).
+    Inductive pick' : list nat -> option bool -> list nat -> Prop :=
+    | p_go' q l a q' : In q l -> base q a q' -> pick' l a (q' :: nil).
+    MeBi Config Weak As Option bool.
+    Example source_sim : weak_sim pick pick' (0 :: 1 :: nil) (0 :: 1 :: nil).
+    Proof. MeBi Sim Begin pick (0 :: 1 :: nil) And pick' (0 :: 1 :: nil) Using pick pick' base.
+      MeBi Sim Solve 500. Qed.
+    MeBi Config Reset Weak.
+  End Source.
+
+  (* deep_bis: 120 iterations. *)
+  Module Deep.
+    Inductive name : Set := x | y.
+    Inductive pr : Set :=
+    | nil0 | pre (n : option name) (p : pr) | sum (p q : pr) | par (p q : pr).
+    Inductive step : pr -> option name -> pr -> Prop :=
+    | s_pre n p : step (pre n p) n p
+    | s_suml p q n p' : step p n p' -> step (sum p q) n p'
+    | s_sumr p q n q' : step q n q' -> step (sum p q) n q'
+    | s_parl p q n p' : step p n p' -> step (par p q) n (par p' q)
+    | s_parr p q n q' : step q n q' -> step (par p q) n (par p q').
+    Definition l1 := par (sum (pre (Some x) nil0) (pre None nil0)) (pre (Some y) nil0).
+    Definition r1 := par (pre (Some y) nil0) (sum (pre (Some x) nil0) (pre None nil0)).
+    MeBi Config Weak As Option name.
+    Example deep_bis : weak_bisimilar step step l1 r1.
+    Proof. MeBi Sim Begin step l1 And step r1 Using step.
+      MeBi Sim Solve 2000. Qed.
+    MeBi Config Reset Weak.
+  End Deep.
+
+  Module Computed.
+    Inductive succ_rel : nat -> nat -> Prop := sr n : succ_rel n (S n).
+    Inductive st : nat -> option bool -> nat -> Prop :=
+    | go n m : n < 3 -> succ_rel n m -> st n (Some true) m
+    | back : st 3 (Some false) 0.
+    Inductive st' : nat -> option bool -> nat -> Prop :=
+    | go' n m : n < 3 -> succ_rel n m -> st' n (Some true) m
+    | back' : st' 3 (Some false) 0.
+    MeBi Config Weak As Option bool.
+    (* KNOWN WRONG (found 2026-10-02, present before the hypothesis-order fix
+       too): the guard [n < 3] before the computing premise reaches the
+       solver's "finish a silent step" path, which applies [rt1n_refl] to it
+       ("Unable to unify clos_refl_trans_1n ... with 0 < 3"). The same fails as
+       [weak_sim], in every cofix mode. When fixed: [MeBi Sim Solve 500. Qed.] *)
+    Example computed_sim : weak_sim st st' 0 0.
+    Proof. MeBi Sim Begin st 0 And st' 0 Using st st'.
+      Fail MeBi Sim Solve 500.
+    Abort.
+    MeBi Config Reset Weak.
+  End Computed.
+End InversionShapes.
