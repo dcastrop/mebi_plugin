@@ -4318,6 +4318,26 @@ proof_solver_step,proof_solver_tactics,results,help}.*`, `test/tests.ml`,
 **Session tally (2026-10-02, second session), cont.:** New feature 2
 (1 theory, 1 solver).
 
+## 2026-10-02 (second session) — `theories/`: `mutual_sim`, the honest name for `weak_bisim`
+
+**New feature** (theory only, additive). On branch `theories/mutual-sim`. Jonah's
+decision: every statement should say what it proves. `weak_bisim` is two
+separate `weak_sim`s (mutual similarity), and its name suggests the
+stronger `weak_bisimilar`. Added `mutual_sim`, with the same body, and:
+- `mutual_sim_weak_bisim` (the two are equivalent, `<->`);
+- `mutual_sim_refl`, `mutual_sim_sym`, `mutual_sim_trans`;
+- `weak_bisimilar_mutual_sim`.
+
+`weak_bisim` and its lemmas are untouched, so existing proofs (`ManualProofs.v`,
+`LtacProofs.v`) still build. `Test.v`'s strictness module also states the
+separating pair as `mutual_sim`. No name clashes (grep).
+
+**How to revert:** before merging, delete the branch. After merging with a
+merge commit, `git revert -m 1 <merge-commit>` on `main` (find it with
+`git log --merges --oneline --grep theories/mutual-sim main`). Revert any
+later branch that uses `mutual_sim` first: the `PluginProofs.v` split
+(`examples/honest-plugin-proofs`).
+
 ---
 
 ## Outstanding
