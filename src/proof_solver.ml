@@ -302,15 +302,24 @@ let init
     problem it is. Exceptions with a registered printer -- Rocq's own errors,
     tactic failures, [MEBI_exn] -- pass through unchanged. *)
 let guard (f : unit -> 'a) : 'a =
+  (* The step logic runs inside a tactic ([Proofview.Goal.enter]), whose
+     engine wraps an exception raised there: look through that wrapper, or a
+     wrapped plugin exception still escapes as an Anomaly (as
+     [CannotGetTransition] did on 2026-10-02). *)
+  let rec root : exn -> exn = function
+    | Logic_monad.TacticFailure e -> root e
+    | e -> e
+  in
+  let internal (e : exn) : bool =
+    String.starts_with ~prefix:"Mebi_plugin." (Printexc.to_string e)
+    ||
+    match e with
+    | Not_found | Invalid_argument _ | Failure _ | Assert_failure _ -> true
+    | _ -> false
+  in
   try f () with
-  | e
-    when CErrors.noncritical e
-         && (String.starts_with ~prefix:"Mebi_plugin." (Printexc.to_string e)
-             ||
-             match e with
-             | Not_found | Invalid_argument _ | Failure _ | Assert_failure _ ->
-               true
-             | _ -> false) ->
+  | e when CErrors.noncritical e && internal (root e) ->
+    let e = root e in
     CErrors.user_err
       (Pp.str
          (Printf.sprintf
