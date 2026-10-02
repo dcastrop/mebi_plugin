@@ -1179,14 +1179,13 @@ End OutputPremises.
 
 MeBi Divider "Theories.Test.SilentResponse".
 Module SilentResponse.
-  (* KNOWN WRONG (found 2026-10-02 while porting rocq-sims'
-     [examples/SimExample.v]): [q] is [p] renamed, both [tau.a + b], so
-     [p <= q] holds. Answering [p -tau-> p1] needs [q] to move silently to
-     [q1], since staying at [q] is not bisimilar to [p1]; but saturation
-     records only weak moves with a visible action, so [Product.respond] finds
-     no silent reply and the solver stops on [CouldNotGetGoalTransition]. A
-     proof is never wrong because of this, it is missing. When fixed, the
-     [Fail] starts failing: make it [MeBi Sim Solve 100. Qed.]. *)
+  (* Found 2026-10-02 while porting rocq-sims' [examples/SimExample.v], and
+     fixed the same day: [q] is [p] renamed, both [tau.a + b], so [p <= q]
+     holds. Answering [p -tau-> p1] needs [q] to move silently to [q1], since
+     staying at [q] is not bisimilar to [p1]. Saturation records only weak
+     moves with a visible action, so [Product.respond] used to find no silent
+     reply and the solver stopped on [CouldNotGetGoalTransition]; it now
+     answers from the unsaturated FSM's silent steps. *)
   Inductive st : Set := p | p1 | q | q1 | z.
   Inductive lab : Set := a | b.
   Inductive step : st -> option lab -> st -> Prop :=
@@ -1194,9 +1193,36 @@ Module SilentResponse.
   | q_tau : step q None q1 | q_b : step q (Some b) z | q1_a : step q1 (Some a) z.
   MeBi Config Weak As Option lab.
   Example sim_p_q : weak_sim step step p q.
-  Proof. MeBi Sim Begin step p And step q Using step.
-    Fail MeBi Sim Solve 100.
-  Abort.
+  Proof. MeBi Sim Begin step p And step q Using step. MeBi Sim Solve 100. Qed.
+
+  (* The LTS of rocq-sims' [examples/SimExample.v] (Nicolas Chappe,
+     https://github.com/rocq-sims/rocq-sims, LGPL-3.0-or-later), re-encoded
+     with [None] for tau. There it is proved by hand that [u0] simulates [t0]
+     in a {e divergence-sensitive} sense; [weak_sim] ignores divergence, so
+     this is a weaker statement, proved here in both directions. *)
+  Inductive sst : Set := t0 | t1 | t2 | t3 | t4 | u0 | u1 | u2 | u3.
+  Inductive sobs : Set := sa | sb.
+  Inductive strans : sst -> option sobs -> sst -> Prop :=
+  | t0t0 : strans t0 None t0 | t0t1 : strans t0 None t1
+  | t0t3 : strans t0 (Some sb) t3 | t1t2 : strans t1 (Some sa) t2
+  | t3t4 : strans t3 None t4 | u0u1 : strans u0 None u1
+  | u0u3 : strans u0 (Some sb) u3 | u1u1 : strans u1 None u1
+  | u1u2 : strans u1 (Some sa) u2.
+  MeBi Config Weak As Option sobs.
+  Example sims_t0_u0 : weak_sim strans strans t0 u0.
+  Proof. MeBi Sim Begin strans t0 And strans u0 Using strans. MeBi Sim Solve 100. Qed.
+  Example sims_u0_t0 : weak_sim strans strans u0 t0.
+  Proof. MeBi Sim Begin strans u0 And strans t0 Using strans. MeBi Sim Solve 100. Qed.
+
+  (* Divergence is invisible to [weak_sim]: a tau-loop and a stuck state
+     simulate each other, and are weakly bisimilar. A divergence-sensitive
+     relation (rocq-sims' mudiv-simulation, for one) separates them. *)
+  Inductive dst : Set := loop | stop.
+  Inductive dstep : dst -> option sobs -> dst -> Prop :=
+  | dloop : dstep loop None loop.
+  MeBi Run Bisim loop With dstep And stop With dstep.
+  Example div_loop_stop : weak_sim dstep dstep loop stop.
+  Proof. MeBi Sim Begin dstep loop And dstep stop Using dstep. MeBi Sim Solve 100. Qed.
   MeBi Config Reset Weak.
 End SilentResponse.
 

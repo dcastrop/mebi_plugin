@@ -21,9 +21,27 @@ module type S = sig
       ; label : label
       }
 
-  val respond : fsm -> state -> label -> states -> transition
-  val successors : refl:bool -> fsm -> fsm -> partition -> Pair.t -> Pair.t list
-  val reachable : refl:bool -> fsm -> fsm -> partition -> Pair.t -> Pair.Set.t
+  type edgemap
+
+  val respond : ?silent:edgemap -> fsm -> state -> label -> states -> transition
+
+  val successors
+    :  ?silent:edgemap
+    -> refl:bool
+    -> fsm
+    -> fsm
+    -> partition
+    -> Pair.t
+    -> Pair.t list
+
+  val reachable
+    :  ?silent:edgemap
+    -> refl:bool
+    -> fsm
+    -> fsm
+    -> partition
+    -> Pair.t
+    -> Pair.Set.t
 
   type cost =
     { pairs : int
@@ -33,6 +51,7 @@ module type S = sig
 
   val estimate
     :  ?cap_factor:int
+    -> ?silent:edgemap
     -> refl:bool
     -> fsm
     -> fsm
@@ -52,8 +71,14 @@ module Make
         and type states = C.State.Set.t
         and type labels = C.Label.Set.t
         and type edgemap = C.EdgeMap.t'
-        and type info = C.Info.t) =
+        and type info = C.Info.t)
+    (Saturation :
+       Saturation.S
+       with type state = C.State.t
+        and type edgemap = C.EdgeMap.t'
+        and type annotation = C.Annotation.t) =
 struct
+  type edgemap = C.EdgeMap.t'
   type state = C.State.t
   type states = C.State.Set.t
   type label = C.Label.t
@@ -87,7 +112,38 @@ struct
      The two lines that used to precede it there resolved [from] and [label]
      out of the Rocq goal; everything below is, and always was, pure model
      code. Keep it that way -- the caller resolves, this decides. *)
+  (* A silent move answered by moving silently: the nearest state, by one or
+     more silent steps of [silent], that lies in [bisimilar]. Standing still
+     (zero steps) is the caller's case, decided before [respond] is asked.
+     Saturation keeps only weak moves with a visible action, so without this
+     a silent move whose target is not bisimilar to [from] had no answer at
+     all, though [=ε=>] allows one. See [ASSISTED-CHANGES.md], 2026-10-02
+     (second session). *)
+  let respond_silently
+        (silent : C.EdgeMap.t')
+        (from : C.State.t)
+        (label : C.Label.t)
+        (bisimilar : C.State.Set.t)
+    : C.Transition.t
+    =
+    let nearest =
+      Saturation.silent_paths silent from
+      |> List.filter_map (fun (s, ann, len) ->
+        match ann with
+        | Some ann when len > 0 && C.State.Set.mem s bisimilar ->
+          Some (s, ann, len)
+        | _ -> None)
+      |> List.sort (fun (s, _, l) (s', _, l') ->
+        match Int.compare l l' with 0 -> C.State.compare s s' | n -> n)
+    in
+    match nearest with
+    | (goto, annotation, _) :: _ ->
+      { from; goto; label; annotation = Some annotation; tree = None }
+    | [] -> raise (NoBisimilarResponse { from; label })
+  ;;
+
   let respond
+        ?(silent : C.EdgeMap.t' option)
         (m : FSM.t)
         (from : C.State.t)
         (label : C.Label.t)
@@ -95,24 +151,36 @@ struct
     : C.Transition.t
     =
     Logger.trace __FUNCTION__;
-    try
-      let ({ annotation; trees; _ }, destinations) : C.Action.Pair.t =
-        (* NOTE: get actions [from] with [label] *)
-        C.Action.Map.reduce_by_label (C.EdgeMap.find m.edges from) label
-        |> C.Action.Map.to_actionpairs
-        (* NOTE: keep only those that are [bisimilar] *)
-        |> C.Action.Pair.Set.filter_map (fun ((x, y) : C.Action.Pair.t) ->
-          if C.State.Set.disjoint bisimilar y
-          then None
-          else Some (x, C.State.Set.inter bisimilar y))
-        (* NOTE: get the pair with the shortest annotation (less steps to do) *)
-        |> C.Action.Pair.Set.shortest_annotation
-      in
-      let tree : Base.Tree.t option = Base.Trees.min_opt trees in
-      let goto : C.State.t = C.State.Set.min_elt destinations in
-      { from; goto; label; annotation; tree }
-    with
-    | C.Action.Pair.Set.IsEmpty -> raise (NoBisimilarResponse { from; label })
+    match silent with
+    | Some silent when C.Label.is_silent label ->
+      respond_silently silent from label bisimilar
+    | _ ->
+      (try
+         let ({ annotation; trees; _ }, destinations) : C.Action.Pair.t =
+           (* NOTE: get actions [from] with [label] *)
+           (match C.EdgeMap.find_opt m.edges from with
+            | Some actions -> C.Action.Map.reduce_by_label actions label
+            | None ->
+              (* No weak move at all from [from] (a terminal of the saturated
+                 FSM): the same answer as no move under [label], rather than
+                 [Not_found] escaping to a caller that only expects
+                 [NoBisimilarResponse]. *)
+              raise (NoBisimilarResponse { from; label }))
+           |> C.Action.Map.to_actionpairs
+           (* NOTE: keep only those that are [bisimilar] *)
+           |> C.Action.Pair.Set.filter_map (fun ((x, y) : C.Action.Pair.t) ->
+             if C.State.Set.disjoint bisimilar y
+             then None
+             else Some (x, C.State.Set.inter bisimilar y))
+           (* NOTE: get the pair with the shortest annotation (less steps to do) *)
+           |> C.Action.Pair.Set.shortest_annotation
+         in
+         let tree : Base.Tree.t option = Base.Trees.min_opt trees in
+         let goto : C.State.t = C.State.Set.min_elt destinations in
+         { from; goto; label; annotation; tree }
+       with
+       | C.Action.Pair.Set.IsEmpty ->
+         raise (NoBisimilarResponse { from; label }))
   ;;
 
   let bisimilar_with (pi : C.Partition.t) (x : C.State.t) : C.State.Set.t =
@@ -144,6 +212,7 @@ struct
      step of [q]'s unfolding, [Proc/Test1]'s [wsim_pr]) went on to enumerate
      that state's whole loop as surplus pairs the solver never visits. *)
   let successors
+        ?(silent : C.EdgeMap.t' option)
         ~(refl : bool)
         (a : FSM.t)
         (b : FSM.t)
@@ -164,13 +233,14 @@ struct
           if C.Label.is_silent label && C.State.Set.mem y bisimilar
           then Some (x', y)
           else (
-            match respond b y label bisimilar with
+            match respond ?silent b y label bisimilar with
             | t -> Some (x', t.goto)
             | exception NoBisimilarResponse _ -> None))
         (obligations a x)
   ;;
 
   let reachable
+        ?(silent : C.EdgeMap.t' option)
         ~(refl : bool)
         (a : FSM.t)
         (b : FSM.t)
@@ -183,7 +253,7 @@ struct
       | [] -> seen
       | p :: rest ->
         let next : Pair.t list =
-          successors ~refl a b pi p
+          successors ?silent ~refl a b pi p
           |> List.filter (fun q -> not (Pair.Set.mem q seen))
         in
         go
@@ -203,6 +273,7 @@ struct
 
   let estimate
         ?(cap_factor : int = 4)
+        ?(silent : C.EdgeMap.t' option)
         ~(refl : bool)
         (a : FSM.t)
         (b : FSM.t)
@@ -211,10 +282,10 @@ struct
     : cost
     =
     Logger.trace __FUNCTION__;
-    let pairs : Pair.Set.t = reachable ~refl a b pi root in
+    let pairs : Pair.Set.t = reachable ?silent ~refl a b pi root in
     let moves : int =
       Pair.Set.fold
-        (fun p acc -> acc + List.length (successors ~refl a b pi p))
+        (fun p acc -> acc + List.length (successors ?silent ~refl a b pi p))
         pairs
         0
     in
@@ -232,7 +303,7 @@ struct
       then () (* closes against an ancestor *)
       else (
         let path = Pair.Set.add p path in
-        List.iter (walk path) (successors ~refl a b pi p))
+        List.iter (walk path) (successors ?silent ~refl a b pi p))
     in
     let nested : int option =
       try

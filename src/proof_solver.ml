@@ -258,7 +258,10 @@ let init
            only lose the refl short-cut, which over-predicts -- cost, never
            a missing pair. *)
         let refl = Libnames.qualid_eq (snd a) (snd b) in
-        let c = S.W.Model.Product.estimate ~refl fsm_a fsm_b pi (ra, rb) in
+        let silent = (S.W.get_fsm_b ()).edges in
+        let c =
+          S.W.Model.Product.estimate ~silent ~refl fsm_a fsm_b pi (ra, rb)
+        in
         let use_mutual = S.W.Model.Product.prefer_mutual c in
         Api.set_mutual_cofix use_mutual;
         (* Only the mutual path is announced. It is the deviation from what

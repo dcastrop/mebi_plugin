@@ -233,6 +233,34 @@ let test_bisim_silent_closure () : unit =
     (M.Bisimilarity.Result.are_bisimilar (M.Bisimilarity.fsm u v).result)
 ;;
 
+(** [respond] for a silent move that standing still cannot answer: [10 -τ-> 11 -τ-> 12], only [12] is acceptable, so the answer is two silent steps
+    -- given the unsaturated edges, and nothing without them. *)
+let test_product_respond_silently () : unit =
+  print_endline "product: silent move answered by moving";
+  let weak_labels = M.Label.Set.singleton tau in
+  let b = fsm ~weak_labels 10 [ transition 10 tau 11; transition 11 tau 12 ] in
+  let b' = M.FSM.saturate b in
+  let only_12 = M.State.Set.singleton (state 12) in
+  let t = M.Product.respond ~silent:b.edges b' (state 10) tau only_12 in
+  check "moves to the acceptable state" true (M.State.equal t.goto (state 12));
+  check_int
+    "along the shortest silent path"
+    2
+    (match t.annotation with
+     | None -> 0
+     | Some ann ->
+       let rec len (a : M.Annotation.t) =
+         match a.next with None -> 1 | Some n -> 1 + len n
+       in
+       len ann);
+  check
+    "without the unsaturated edges there is no answer"
+    true
+    (match M.Product.respond b' (state 10) tau only_12 with
+     | _ -> false
+     | exception M.Product.NoBisimilarResponse _ -> true)
+;;
+
 (** Converting an LTS to an FSM must preserve the state set. *)
 let test_of_lts_preserves_states () : unit =
   print_endline "FSM.of_lts";
@@ -807,6 +835,7 @@ let () =
   test_product_silent_stays_put ();
   test_product_refl_leaf ();
   test_product_respond ();
+  test_product_respond_silently ();
   test_product_estimate ();
   test_saturation_estimate ();
   test_tree_order ();

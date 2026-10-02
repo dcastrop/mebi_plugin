@@ -4,10 +4,16 @@ module type S = sig
   type states
   type labels
   type edgemap
+  type annotation
 
   (** [edges labels states old_edges] returns a saturated [edgemap], paired
       with the states that now have no outgoing actions. *)
   val edges : labels -> states -> edgemap -> edgemap * states
+
+  (** [silent_paths edges s] is every state [s] reaches by zero or more
+      silent steps of [edges], each with the length and the annotation of a
+      shortest such path ([None] for [s] itself). *)
+  val silent_paths : edgemap -> state -> (state * annotation option * int) list
 end
 
 module Make
@@ -17,7 +23,8 @@ module Make
   with type state = C.State.t
    and type states = C.State.Set.t
    and type labels = C.Label.Set.t
-   and type edgemap = C.EdgeMap.t' = struct
+   and type edgemap = C.EdgeMap.t'
+   and type annotation = C.Annotation.t = struct
   module State = C.State
   module States = C.State.Set
   module Labels = C.Label.Set
@@ -32,6 +39,7 @@ module Make
   type state = State.t
   type states = States.t
   type labels = Labels.t
+  type annotation = Annotation.t
   type edgemap = EdgeMap.t'
   (* Closure-based saturation. Replaces the depth-first path enumeration
      above, which cost time exponential in the path count rather than the
@@ -116,6 +124,15 @@ module Make
     =
     List.map (fun ((s, path) : State.t * Note.t list) ->
       s, path, List.length path)
+  ;;
+
+  let silent_paths (old_edges : EdgeMap.t') (src : State.t)
+    : (State.t * Annotation.t option * int) list
+    =
+    List.map
+      (fun ((s, path_rev, len) : State.t * Note.t list * int) ->
+        s, annotation_of_notes (List.rev path_rev), len)
+      (with_lengths (silent_closure old_edges src))
   ;;
 
   (** Weak actions from one state, keyed by [(label, goto)]: the
