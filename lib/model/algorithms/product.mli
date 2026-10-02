@@ -182,6 +182,59 @@ module type S = sig
       [weak_bisimilar] goal needs. *)
   val reachable_bisim : refl:bool -> game -> partition -> Pair.t -> Pair.Set.t
 
+  (** {b Measurement only}: what other ways of choosing answers would cost,
+      computed on the model. The proof solver does not read any of this; it
+      answers with {!val:answer}. *)
+  module Policy : sig
+    (** [Default]: {!val:answer}'s choices. [Greedy]: breadth first,
+        preferring an answer whose pair was already reached. [Minimal]: from
+        every pair any answer reaches, delete pairs while every remaining
+        pair can still answer all its moves within what remains (minimal by
+        inclusion), then answer each move with its cheapest remaining
+        option. *)
+    type t =
+      | Default
+      | Greedy
+      | Minimal
+
+    val name : t -> string
+
+    (** One move to answer: the answer {!val:answer} picks ([default]) and
+        every valid one ([candidates]), each as the next pair and its witness
+        length (weak transitions to justify; 0 for standing still). *)
+    type obligation =
+      { default : (Pair.t * int) option
+      ; candidates : (Pair.t * int) list
+      }
+
+    (** A game, as each pair's obligations. *)
+    type game_of = Pair.t -> obligation list
+
+    (** The [weak_sim] game, as {!val:successors} plays it. *)
+    val sim_game
+      :  ?silent:edgemap
+      -> ?sim:(state -> states)
+      -> refl:bool
+      -> fsm
+      -> fsm
+      -> partition
+      -> game_of
+
+    (** The [weak_bisimilar] game, as {!val:successors_bisim} plays it. *)
+    val bisim_game : refl:bool -> game -> partition -> game_of
+
+    (** Pairs reached, moves answered (one closure each), total witness
+        length, and moves left without an answer. *)
+    type measure =
+      { pairs : int
+      ; moves : int
+      ; witness : int
+      ; unanswered : int
+      }
+
+    val measure : t -> game_of -> Pair.t -> measure
+  end
+
   (** What a proof of this product costs, in [weak_sim] goals, under each of
       the two strategies. *)
   type cost =

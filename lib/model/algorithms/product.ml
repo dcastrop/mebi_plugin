@@ -70,6 +70,42 @@ module type S = sig
   val successors_bisim : refl:bool -> game -> partition -> Pair.t -> Pair.t list
   val reachable_bisim : refl:bool -> game -> partition -> Pair.t -> Pair.Set.t
 
+  module Policy : sig
+    type t =
+      | Default
+      | Greedy
+      | Minimal
+
+    val name : t -> string
+
+    type obligation =
+      { default : (Pair.t * int) option
+      ; candidates : (Pair.t * int) list
+      }
+
+    type game_of = Pair.t -> obligation list
+
+    val sim_game
+      :  ?silent:edgemap
+      -> ?sim:(state -> states)
+      -> refl:bool
+      -> fsm
+      -> fsm
+      -> partition
+      -> game_of
+
+    val bisim_game : refl:bool -> game -> partition -> game_of
+
+    type measure =
+      { pairs : int
+      ; moves : int
+      ; witness : int
+      ; unanswered : int
+      }
+
+    val measure : t -> game_of -> Pair.t -> measure
+  end
+
   type cost =
     { pairs : int
     ; moves : int
@@ -439,6 +475,282 @@ struct
     Logger.trace __FUNCTION__;
     reachable_by (successors_bisim ~refl g pi) root
   ;;
+
+  (* Measurement only (step 2 of the answer-selection plan): what other ways
+     of choosing answers would cost, computed on the model. Nothing here is
+     read by the solver, which answers with [answer] alone.
+
+     A game is described per state [p] as its obligations, each with every
+     [candidate] answer -- the next pair and the witness length, i.e. the
+     weak transitions to justify (0 for standing still) -- and the [default],
+     the one [answer] picks. The policies choose a candidate per obligation:
+     - [Default]: as the solver does now;
+     - [Greedy]: breadth first, preferring a candidate whose pair has
+       already been reached, else the default;
+     - [Minimal]: from every pair reachable by any candidate (always a valid
+       relation), delete pairs one at a time while every remaining pair can
+       still answer all its obligations within what remains -- minimal by
+       inclusion, not necessarily the smallest -- then answer each obligation
+       with its cheapest remaining candidate. *)
+  module Policy = struct
+    type t =
+      | Default
+      | Greedy
+      | Minimal
+
+    let name : t -> string = function
+      | Default -> "default"
+      | Greedy -> "greedy"
+      | Minimal -> "minimal"
+    ;;
+
+    type obligation =
+      { default : (Pair.t * int) option
+      ; candidates : (Pair.t * int) list
+      }
+
+    type game_of = Pair.t -> obligation list
+
+    let rec annotation_length (a : C.Annotation.t) : int =
+      match a.next with None -> 1 | Some n -> 1 + annotation_length n
+    ;;
+
+    let transition_length (t : C.Transition.t) : int =
+      match t.annotation with None -> 1 | Some a -> annotation_length a
+    ;;
+
+    (* Every way [b], at [y], can answer [-label-> x'], as (state reached,
+       witness length); the same targets, in the same order, as [answer]. *)
+    let candidates
+          ?(silent : C.EdgeMap.t' option)
+          ?(sim : (C.State.t -> C.State.Set.t) option)
+          (b : FSM.t)
+          (pi : C.Partition.t)
+          (y : C.State.t)
+          (label : C.Label.t)
+          (x' : C.State.t)
+      : (C.State.t * int) list
+      =
+      let into (target : C.State.Set.t) : (C.State.t * int) list =
+        let stay =
+          if C.Label.is_silent label && C.State.Set.mem y target
+          then [ y, 0 ]
+          else []
+        in
+        let moves =
+          if C.Label.is_silent label
+          then (
+            match silent with
+            | None -> []
+            | Some silent ->
+              Saturation.silent_paths silent y
+              |> List.filter_map (fun (s, _, len) ->
+                if len > 0 && C.State.Set.mem s target
+                then Some (s, len)
+                else None))
+          else (
+            match C.EdgeMap.find_opt b.edges y with
+            | None -> []
+            | Some actions ->
+              C.Action.Map.reduce_by_label actions label
+              |> C.Action.Map.to_actionpairs
+              |> C.Action.Pair.Set.elements
+              |> List.concat_map
+                   (fun ((action, ds) : C.Action.t * C.State.Set.t) ->
+                   let len =
+                     match action.annotation with
+                     | None -> 1
+                     | Some a -> annotation_length a
+                   in
+                   C.State.Set.elements (C.State.Set.inter ds target)
+                   |> List.map (fun d -> d, len)))
+        in
+        stay @ moves
+      in
+      match into (bisimilar_with pi x'), sim with
+      | (_ :: _ as cs), _ -> cs
+      | [], Some sim -> into (sim x')
+      | [], None -> []
+    ;;
+
+    let default_of
+          ?(silent : C.EdgeMap.t' option)
+          ?(sim : (C.State.t -> C.State.Set.t) option)
+          (b : FSM.t)
+          (pi : C.Partition.t)
+          (y : C.State.t)
+          (label : C.Label.t)
+          (x' : C.State.t)
+      : (C.State.t * int) option
+      =
+      match answer ?silent ?sim b pi y label x' with
+      | Some Stay -> Some (y, 0)
+      | Some (Move t) -> Some (t.goto, transition_length t)
+      | None -> None
+    ;;
+
+    (* The simulation game: [x]'s moves answered by [b]. *)
+    let sim_game
+          ?(silent : C.EdgeMap.t' option)
+          ?(sim : (C.State.t -> C.State.Set.t) option)
+          ~(refl : bool)
+          (a : FSM.t)
+          (b : FSM.t)
+          (pi : C.Partition.t)
+      : game_of
+      =
+      fun ((x, y) : Pair.t) ->
+      if refl && C.State.equal x y
+      then []
+      else
+        List.map
+          (fun ((label, x') : C.Label.t * C.State.t) ->
+            let pair (y', n) = (x', y'), n in
+            { default =
+                Option.map pair (default_of ?silent ?sim b pi y label x')
+            ; candidates =
+                List.map pair (candidates ?silent ?sim b pi y label x')
+            })
+          (obligations a x)
+    ;;
+
+    (* The bisimulation game: both sides' obligations, the right-hand ones as
+       the simulation game with the systems swapped, pairs swapped back. *)
+    let bisim_game ~(refl : bool) (g : game) (pi : C.Partition.t) : game_of =
+      let left = sim_game ~silent:g.b.edges ~refl g.a g.b_saturated pi in
+      let right = sim_game ~silent:g.a.edges ~refl g.b g.a_saturated pi in
+      let swap ((y, x), n) = (x, y), n in
+      fun ((x, y) : Pair.t) ->
+        left (x, y)
+        @ List.map
+            (fun (o : obligation) ->
+              { default = Option.map swap o.default
+              ; candidates = List.map swap o.candidates
+              })
+            (right (y, x))
+    ;;
+
+    type measure =
+      { pairs : int
+      ; moves : int
+      ; witness : int
+      ; unanswered : int
+      }
+
+    (* Close [root] under a choice function, totting up the measure. *)
+    let walk
+          (game_of : game_of)
+          (choose : Pair.Set.t -> obligation -> (Pair.t * int) option)
+          (root : Pair.t)
+      : measure
+      =
+      let rec go seen frontier moves witness unanswered =
+        match frontier with
+        | [] -> { pairs = Pair.Set.cardinal seen; moves; witness; unanswered }
+        | p :: rest ->
+          let seen, next, moves, witness, unanswered =
+            List.fold_left
+              (fun (seen, next, moves, witness, unanswered) o ->
+                match choose seen o with
+                | None -> seen, next, moves, witness, unanswered + 1
+                | Some (q, n) ->
+                  if Pair.Set.mem q seen
+                  then seen, next, moves + 1, witness + n, unanswered
+                  else
+                    ( Pair.Set.add q seen
+                    , q :: next
+                    , moves + 1
+                    , witness + n
+                    , unanswered ))
+              (seen, [], moves, witness, unanswered)
+              (game_of p)
+          in
+          go seen (rest @ List.rev next) moves witness unanswered
+      in
+      go (Pair.Set.singleton root) [ root ] 0 0 0
+    ;;
+
+    let cheapest (cs : (Pair.t * int) list) : (Pair.t * int) option =
+      List.fold_left
+        (fun acc ((_, n) as c) ->
+          match acc with Some (_, m) when m <= n -> acc | _ -> Some c)
+        None
+        cs
+    ;;
+
+    let minimal_relation (game_of : game_of) (root : Pair.t) : Pair.Set.t =
+      let memo : (Pair.t, obligation list) Hashtbl.t = Hashtbl.create 256 in
+      let obs p =
+        match Hashtbl.find_opt memo p with
+        | Some o -> o
+        | None ->
+          let o = game_of p in
+          Hashtbl.add memo p o;
+          o
+      in
+      let all : Pair.Set.t =
+        reachable_by
+          (fun p ->
+            List.concat_map (fun o -> List.map fst o.candidates) (obs p))
+          root
+      in
+      let valid (r : Pair.t) (rel : Pair.Set.t) : bool =
+        List.for_all
+          (fun o -> List.exists (fun (q, _) -> Pair.Set.mem q rel) o.candidates)
+          (obs r)
+      in
+      (* Keep only what [root] reaches within [rel]. *)
+      let trim (rel : Pair.Set.t) : Pair.Set.t =
+        reachable_by
+          (fun p ->
+            List.concat_map
+              (fun o ->
+                List.filter_map
+                  (fun (q, _) -> if Pair.Set.mem q rel then Some q else None)
+                  o.candidates)
+              (obs p))
+          root
+      in
+      let rec shrink (rel : Pair.Set.t) : Pair.Set.t =
+        let removable =
+          Pair.Set.elements rel
+          |> List.find_opt (fun p ->
+            (not (Pair.equal p root))
+            &&
+            let rel' = Pair.Set.remove p rel in
+            Pair.Set.for_all (fun q -> valid q rel') rel')
+        in
+        match removable with
+        | None -> rel
+        | Some p -> shrink (trim (Pair.Set.remove p rel))
+      in
+      if Pair.Set.for_all (fun q -> valid q all) all then shrink all else all
+    ;;
+
+    let measure (policy : t) (game_of : game_of) (root : Pair.t) : measure =
+      match policy with
+      | Default -> walk game_of (fun _ o -> o.default) root
+      | Greedy ->
+        walk
+          game_of
+          (fun seen o ->
+            match
+              cheapest
+                (List.filter (fun (q, _) -> Pair.Set.mem q seen) o.candidates)
+            with
+            | Some c -> Some c
+            | None -> o.default)
+          root
+      | Minimal ->
+        let rel = minimal_relation game_of root in
+        walk
+          game_of
+          (fun _ o ->
+            cheapest
+              (List.filter (fun (q, _) -> Pair.Set.mem q rel) o.candidates))
+          root
+    ;;
+  end
 
   type cost =
     { pairs : int

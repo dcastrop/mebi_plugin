@@ -321,6 +321,41 @@ let test_product_simulation () : unit =
     (M.Product.Pair.Set.mem (state 30, state 20) (sim v u))
 ;;
 
+(** Answer policies (measurement only). On the bisimulation game of
+    [test_product_bisim], [Default] must reproduce the product exactly, and
+    no policy may leave a move unanswered or do worse than [Default] on
+    pairs when it is [Minimal]. *)
+let test_product_policies () : unit =
+  print_endline "product: answer policies";
+  let a' = fsm 0 [ transition 0 a 1 ] in
+  let b' = fsm 10 [ transition 10 a 11; transition 10 a 12 ] in
+  let pi = (M.Bisimilarity.fsm a' b').result.bisim_states in
+  let g : M.Product.game =
+    { a = a'; a_saturated = a'; b = b'; b_saturated = b' }
+  in
+  let root = state 0, state 10 in
+  let game = M.Product.Policy.bisim_game ~refl:false g pi in
+  let m p = M.Product.Policy.measure p game root in
+  let d = m M.Product.Policy.Default in
+  check_int
+    "default reproduces the product"
+    (M.Product.Pair.Set.cardinal
+       (M.Product.reachable_bisim ~refl:false g pi root))
+    d.pairs;
+  List.iter
+    (fun p ->
+      let r = m p in
+      check_int
+        (M.Product.Policy.name p ^ ": every move answered")
+        0
+        r.unanswered)
+    M.Product.Policy.[ Default; Greedy; Minimal ];
+  check
+    "minimal is no larger than default"
+    true
+    ((m M.Product.Policy.Minimal).pairs <= d.pairs)
+;;
+
 (** Converting an LTS to an FSM must preserve the state set. *)
 let test_of_lts_preserves_states () : unit =
   print_endline "FSM.of_lts";
@@ -898,6 +933,7 @@ let () =
   test_product_respond_silently ();
   test_product_bisim ();
   test_product_simulation ();
+  test_product_policies ();
   test_product_estimate ();
   test_saturation_estimate ();
   test_tree_order ();
