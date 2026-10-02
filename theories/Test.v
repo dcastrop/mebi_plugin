@@ -1200,6 +1200,42 @@ Module SilentResponse.
   MeBi Config Reset Weak.
 End SilentResponse.
 
+MeBi Divider "Theories.Test.CheckerVerdicts".
+Module CheckerVerdicts.
+  (* KNOWN WRONG (found 2026-10-02): [MeBi Run Bisim] answers "bisimilar"
+     for both pairs below, and neither is bisimilar. With [FailIf] on a
+     negative result (the default), a correct checker makes each command
+     fail: when fixed, prefix each with [Fail]. *)
+
+  (* 1. Not rooted. [x0 = a.b.x0] and [y0 = b.a.y0] differ in their first
+     step, so they are not even strongly bisimilar. The verdict asked only
+     whether every block of the partition holds states of both systems
+     ({x0, y1} and {x1, y0} do), never whether [x0] and [y0] share one. *)
+  Inductive rst : Set := x0 | x1 | y0 | y1.
+  Inductive rlab : Set := ra | rb.
+  Inductive rstep : rst -> rlab -> rst -> Prop :=
+  | xa : rstep x0 ra x1 | xb : rstep x1 rb x0
+  | yb : rstep y0 rb y1 | ya : rstep y1 ra y0.
+  MeBi Run Bisim x0 With rstep And y0 With rstep.
+
+  (* 2. No silent closure. [p = tau.p1 + b.z + c.p1], [p1 = a.z] against
+     [r = a.z + b.z + c.r1], [r1 = a.z]. After [p -tau-> p1], [r] cannot move
+     silently and is not equivalent to [p1] ([r] can do [b]), so p and r are
+     not weakly bisimilar (Milner's [tau.a + b] vs [a + b], plus a [c]-branch
+     giving every state a partner). Partition refinement splits on visible
+     weak moves only, which do not tell them apart. *)
+  Inductive wst : Set := p | p1 | r | r1 | z.
+  Inductive wlab : Set := a | b | c.
+  Inductive wstep : wst -> option wlab -> wst -> Prop :=
+  | p_tau : wstep p None p1 | p_b : wstep p (Some b) z
+  | p_c : wstep p (Some c) p1 | p1_a : wstep p1 (Some a) z
+  | r_a : wstep r (Some a) z | r_b : wstep r (Some b) z
+  | r_c : wstep r (Some c) r1 | r1_a : wstep r1 (Some a) z.
+  MeBi Config Weak As Option wlab.
+  MeBi Run Bisim p With wstep And r With wstep.
+  MeBi Config Reset Weak.
+End CheckerVerdicts.
+
 (* [MeBi Help]: every topic parses and prints (backlog item F). *)
 MeBi Divider "Theories.Test.Help".
 MeBi Help.
